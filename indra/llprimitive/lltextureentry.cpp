@@ -80,113 +80,51 @@ LLTextureEntry::LLTextureEntry(const LLTextureEntry &rhs)
   , mSelected(false)
   , mMaterialUpdatePending(false)
 {
-	mID = rhs.mID;
-	mScaleS = rhs.mScaleS;
-	mScaleT = rhs.mScaleT;
-	mOffsetS = rhs.mOffsetS;
-	mOffsetT = rhs.mOffsetT;
-	mRotation = rhs.mRotation;
-	mColor = rhs.mColor;
-	mBump = rhs.mBump;
-	mMediaFlags = rhs.mMediaFlags;
-	mGlow = rhs.mGlow;
-	mMaterialID = rhs.mMaterialID;
-	mMaterial = rhs.mMaterial;
-	if (rhs.mMediaEntry != NULL) {
-		// Make a copy
-		mMediaEntry = new LLMediaEntry(*rhs.mMediaEntry);
-	}
+    *this = rhs;
 }
 
-LLTextureEntry::LLTextureEntry(LLTextureEntry&& rhs) noexcept : mMediaEntry(NULL), mSelected(false), mMaterialUpdatePending(false)
+LLTextureEntry &LLTextureEntry::operator=(const LLTextureEntry &rhs)
 {
-    mID         = std::move(rhs.mID);
-    mScaleS     = rhs.mScaleS;
-    mScaleT     = rhs.mScaleT;
-    mOffsetS    = rhs.mOffsetS;
-    mOffsetT    = rhs.mOffsetT;
-    mRotation   = rhs.mRotation;
-    mColor      = std::move(rhs.mColor);
-    mBump       = rhs.mBump;
-    mMediaFlags = rhs.mMediaFlags;
-    mGlow       = rhs.mGlow;
-    mMaterialID = std::move(rhs.mMaterialID);
-    mMaterial   = std::move(rhs.mMaterial);
-    if (rhs.mMediaEntry != nullptr)
-    {
-        // Make a copy
-        mMediaEntry     = rhs.mMediaEntry;
-        rhs.mMediaEntry = nullptr;
-    }
-}
+	if (this != &rhs)
+	{
+		mID = rhs.mID;
+		mScaleS = rhs.mScaleS;
+		mScaleT = rhs.mScaleT;
+		mOffsetS = rhs.mOffsetS;
+		mOffsetT = rhs.mOffsetT;
+		mRotation = rhs.mRotation;
+		mColor = rhs.mColor;
+		mBump = rhs.mBump;
+		mMediaFlags = rhs.mMediaFlags;
+		mGlow = rhs.mGlow;
+		mMaterialID = rhs.mMaterialID;
+		mMaterial = rhs.mMaterial;
+		if (mMediaEntry != NULL) {
+			delete mMediaEntry;
+		}
+		if (rhs.mMediaEntry != NULL) {
+			// Make a copy
+			mMediaEntry = new LLMediaEntry(*rhs.mMediaEntry);
+		}
+		else {
+			mMediaEntry = NULL;
+		}
 
-LLTextureEntry& LLTextureEntry::operator=(const LLTextureEntry& rhs)
-{
-    if (this != &rhs)
-    {
-        mID         = rhs.mID;
-        mScaleS     = rhs.mScaleS;
-        mScaleT     = rhs.mScaleT;
-        mOffsetS    = rhs.mOffsetS;
-        mOffsetT    = rhs.mOffsetT;
-        mRotation   = rhs.mRotation;
-        mColor      = rhs.mColor;
-        mBump       = rhs.mBump;
-        mMediaFlags = rhs.mMediaFlags;
-        mGlow       = rhs.mGlow;
         mMaterialID = rhs.mMaterialID;
-        mMaterial   = rhs.mMaterial;
-        if (mMediaEntry != NULL)
+
+        mGLTFMaterial = rhs.mGLTFMaterial;
+        
+        if (rhs.mGLTFMaterialOverrides.notNull())
         {
-            delete mMediaEntry;
-        }
-        if (rhs.mMediaEntry != NULL)
-        {
-            // Make a copy
-            mMediaEntry = new LLMediaEntry(*rhs.mMediaEntry);
+            mGLTFMaterialOverrides = new LLGLTFMaterial(*rhs.mGLTFMaterialOverrides);
         }
         else
         {
-            mMediaEntry = NULL;
+            mGLTFMaterialOverrides = nullptr;
         }
-    }
+	}
 
-    return *this;
-}
-
-LLTextureEntry& LLTextureEntry::operator=(LLTextureEntry&& rhs) noexcept
-{
-    if (this != &rhs)
-    {
-        mID         = std::move(rhs.mID);
-        mScaleS     = rhs.mScaleS;
-        mScaleT     = rhs.mScaleT;
-        mOffsetS    = rhs.mOffsetS;
-        mOffsetT    = rhs.mOffsetT;
-        mRotation   = rhs.mRotation;
-        mColor      = std::move(rhs.mColor);
-        mBump       = rhs.mBump;
-        mMediaFlags = rhs.mMediaFlags;
-        mGlow       = rhs.mGlow;
-        mMaterialID = std::move(rhs.mMaterialID);
-        mMaterial   = std::move(rhs.mMaterial);
-        if (mMediaEntry != nullptr)
-        {
-            delete mMediaEntry;
-        }
-        if (rhs.mMediaEntry != nullptr)
-        {
-            // Steal it
-            mMediaEntry = rhs.mMediaEntry;
-            rhs.mMediaEntry = nullptr;
-        }
-        else
-        {
-            mMediaEntry = nullptr;
-        }
-    }
-
-    return *this;
+	return *this;
 }
 
 void LLTextureEntry::init(const LLUUID& tex_id, F32 scale_s, F32 scale_t, F32 offset_s, F32 offset_t, F32 rotation, U8 bump)
@@ -260,6 +198,7 @@ LLSD LLTextureEntry::asLLSD() const
 
 void LLTextureEntry::asLLSD(LLSD& sd) const
 {
+    LL_PROFILE_ZONE_SCOPED;
 	sd["imageid"] = mID;
 	sd["colors"] = ll_sd_from_color4(mColor);
 	sd["scales"] = mScaleS;
@@ -278,10 +217,16 @@ void LLTextureEntry::asLLSD(LLSD& sd) const
 		sd[TEXTURE_MEDIA_DATA_KEY] = mediaData;
 	}
 	sd["glow"] = mGlow;
+
+    if (mGLTFMaterialOverrides.notNull())
+    {
+        sd["gltf_override"] = mGLTFMaterialOverrides->asJSON();
+    }
 }
 
 bool LLTextureEntry::fromLLSD(const LLSD& sd)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	const char *w, *x;
 	w = "imageid";
 	if (sd.has(w))
@@ -341,6 +286,24 @@ bool LLTextureEntry::fromLLSD(const LLSD& sd)
 	{
 		setGlow((F32)sd[w].asReal() );
 	}
+
+    w = "gltf_override";
+    if (sd.has(w))
+    {
+        if (mGLTFMaterialOverrides.isNull())
+        {
+            mGLTFMaterialOverrides = new LLGLTFMaterial();
+        }
+
+        std::string warn_msg, error_msg;
+        if (!mGLTFMaterialOverrides->fromJSON(sd[w].asString(), warn_msg, error_msg))
+        {
+            LL_WARNS() << llformat("Failed to parse GLTF json: %s -- %s", warn_msg.c_str(), error_msg.c_str()) << LL_ENDL;
+            LL_WARNS() << sd[w].asString() << LL_ENDL;
+
+            mGLTFMaterialOverrides = nullptr;
+        }
+    }
 
 	return true;
 fail:
@@ -549,6 +512,72 @@ S32 LLTextureEntry::setBumpShiny(U8 bump_shiny)
 		return TEM_CHANGE_TEXTURE;
 	}
 	return TEM_CHANGE_NONE;
+}
+
+void LLTextureEntry::setGLTFMaterial(LLGLTFMaterial* material, bool local_origin)
+{ 
+    if (material != getGLTFMaterial())
+    {
+        // assert on precondtion:
+        // whether or not mGLTFMaterial is null, any existing override should have been cleared
+        // before calling setGLTFMaterial
+        // NOTE: if you're hitting this assert, try to make sure calling code is using LLViewerObject::setRenderMaterialID
+        llassert(!local_origin || getGLTFMaterialOverride() == nullptr || getGLTFMaterialOverride()->isClearedForBaseMaterial());
+
+        mGLTFMaterial = material;
+        if (mGLTFMaterial == nullptr)
+        {
+            setGLTFRenderMaterial(nullptr);
+        }
+    }
+}
+
+void LLTextureEntry::setGLTFMaterialOverride(LLGLTFMaterial* mat)
+{ 
+    llassert(mat == nullptr || getGLTFMaterial() != nullptr); // if override is not null, base material must not be null
+    mGLTFMaterialOverrides = mat; 
+}
+
+S32 LLTextureEntry::setBaseMaterial()
+{
+    S32 changed = TEM_CHANGE_NONE;
+
+    if (mGLTFMaterialOverrides)
+    {
+        if (mGLTFMaterialOverrides->setBaseMaterial())
+        {
+            changed = TEM_CHANGE_TEXTURE;
+        }
+
+        if (LLGLTFMaterial::sDefault == *mGLTFMaterialOverrides)
+        {
+            mGLTFMaterialOverrides = nullptr;
+            changed = TEM_CHANGE_TEXTURE;
+        }
+    }
+
+    return changed;
+}
+
+LLGLTFMaterial* LLTextureEntry::getGLTFRenderMaterial() const
+{ 
+    if (mGLTFRenderMaterial.notNull())
+    {
+        return mGLTFRenderMaterial;
+    }
+    
+    llassert(getGLTFMaterialOverride() == nullptr || getGLTFMaterialOverride()->isClearedForBaseMaterial());
+    return getGLTFMaterial();
+}
+
+S32 LLTextureEntry::setGLTFRenderMaterial(LLGLTFMaterial* mat)
+{
+    if (mGLTFRenderMaterial != mat)
+    {
+        mGLTFRenderMaterial = mat;
+        return TEM_CHANGE_TEXTURE;
+    }
+    return TEM_CHANGE_NONE;
 }
 
 S32 LLTextureEntry::setMediaFlags(U8 media_flags)

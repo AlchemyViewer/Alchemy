@@ -842,20 +842,8 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 		parent = object->getRootEdit();
 	}
 
-	// Show screen-space highlight glow effect
-	bool show_highlight = false;
-
-	if (handleMediaHover(mHoverPick))
-	{
-		// *NOTE: If you think the hover glow conflicts with the media outline, you
-		// could disable it here.
-		show_highlight = true;
-		// cursor set by media object
-#ifdef SHOW_DEBUG
-		LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
-#endif
-	}
-	else if (!mMouseOutsideSlop 
+	if (!handleMediaHover(mHoverPick)
+		&& !mMouseOutsideSlop
 		&& mMouseButtonDown
 		// disable camera steering if click on land is not used for moving
 		&& gViewerInput.isMouseBindUsed(CLICK_LEFT, MASK_NONE, MODE_THIRD_PERSON))
@@ -889,7 +877,6 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 
 		if (click_action_object && useClickAction(mask, click_action_object, click_action_object->getRootEdit()))
 		{
-			show_highlight = true;
 			ECursorType cursor = cursorFromObject(click_action_object);
 			gViewerWindow->setCursor(cursor);
 #ifdef SHOW_DEBUG
@@ -906,7 +893,6 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 		else if ((object && !object->isAvatar() && object->flagUsePhysics()) 
 				 || (parent && !parent->isAvatar() && parent->flagUsePhysics()))
 		{
-			show_highlight = true;
 			gViewerWindow->setCursor(UI_CURSOR_TOOLGRAB);
 #ifdef SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
@@ -916,7 +902,6 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 				 && ((object && object->flagHandleTouch()) || (parent && parent->flagHandleTouch()))
 				 && (!object || !object->isAvatar()))
 		{
-			show_highlight = true;
 			gViewerWindow->setCursor(UI_CURSOR_HAND);
 #ifdef SHOW_DEBUG
 			LL_DEBUGS("UserInput") << "hover handled by LLToolPie (inactive)" << LL_ENDL;
@@ -935,15 +920,6 @@ BOOL LLToolPie::handleHover(S32 x, S32 y, MASK mask)
 	{
 		LLViewerMediaFocus::getInstance()->clearHover();
 	}
-
-	static LLCachedControl<bool> enable_highlight(
-		gSavedSettings, "RenderHoverGlowEnable", false);
-	LLDrawable* drawable = NULL;
-	if (enable_highlight && show_highlight && object)
-	{
-		drawable = object->mDrawable;
-	}
-	gPipeline.setHighlightObject(drawable);
 
 	return TRUE;
 }

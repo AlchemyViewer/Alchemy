@@ -38,6 +38,7 @@
 #include "llglheaders.h"
 #include "llhttpnode.h"
 #include "llregionhandle.h"
+#include "llsky.h"
 #include "llsurface.h"
 #include "lltrans.h"
 #include "llviewercamera.h"
@@ -122,6 +123,7 @@ void LLWorld::resetClass()
 {
 	mHoleWaterObjects.clear();
 	gObjectList.destroy();
+    gSky.cleanup(); // references an object
 	for(region_list_t::iterator region_it = mRegionList.begin(); region_it != mRegionList.end(); )
 	{
 		LLViewerRegion* region_to_delete = *region_it++;
@@ -879,7 +881,7 @@ void LLWorld::updateNetStats()
 
 void LLWorld::printPacketsLost()
 {
-	LL_INFOS() << "Simulators:" << LL_ENDL;
+	LL_INFOS() << "Simulators:" << LL_ENDL; 
 	LL_INFOS() << "----------" << LL_ENDL;
 
 	LLCircuitData *cdp = NULL;
@@ -912,6 +914,7 @@ F32 LLWorld::getLandFarClip() const
 
 void LLWorld::setLandFarClip(const F32 far_clip)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
 	S32 const rwidth = (S32)getRegionWidthInMeters();
 	S32 const n1 = (llceil(mLandFarClip) - 1) / rwidth;
 	S32 const n2 = (llceil(far_clip) - 1) / rwidth;

@@ -34,8 +34,7 @@ out vec4 frag_data[3];
 #endif
 
 uniform vec4 color;
-uniform vec4 sunlight_color;
-uniform vec4 moonlight_color;
+uniform vec3 moonlight_color;
 uniform vec3 moon_dir;
 uniform float moon_brightness;
 uniform sampler2D diffuseMap;
@@ -55,6 +54,12 @@ void main()
         fade = clamp( moon_dir.z*moon_dir.z*4.0, 0.0, 1.0 );
 
     vec4 c      = texture2D(diffuseMap, vary_texcoord0.xy);
+
+    // SL-14113 Don't write to depth; prevent moon's quad from hiding stars which should be visible
+    // Moon texture has transparent pixels <0x55,0x55,0x55,0x00>
+    if (c.a <= 2./255.) // 0.00784
+        discard;
+
 //       c.rgb  = srgb_to_linear(c.rgb);
          c.rgb *= moonlight_color.rgb;
          c.rgb *= moon_brightness;
@@ -66,6 +71,6 @@ void main()
 
     frag_data[0] = vec4(c.rgb, c.a);
     frag_data[1] = vec4(0.0);
-    frag_data[2] = vec4(0.0f);
+    frag_data[2] = vec4(0.0, 0.0, 0.0, GBUFFER_FLAG_HAS_ATMOS);
 }
 

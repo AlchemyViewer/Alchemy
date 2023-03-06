@@ -27,27 +27,20 @@
 
 /*[EXTRA_CODE_HERE]*/
 
-#ifdef DEFINE_GL_FRAGCOLOR
 out vec4 frag_color;
-#else
-#define frag_color gl_FragColor
-#endif
 
 vec3 fullbrightAtmosTransport(vec3 light);
-vec3 fullbrightScaleSoftClip(vec3 light);
 
 VARYING vec4 vertex_color;
 VARYING vec2 vary_texcoord0;
 
-vec3 srgb_to_linear(vec3 cs);
-
 void main() 
 {
+	float shadow = 1.0;
+
 	vec4 color = diffuseLookup(vary_texcoord0.xy)*vertex_color;
 	color.rgb = fullbrightAtmosTransport(color.rgb);
 
-	color.rgb = fullbrightScaleSoftClip(color.rgb);
-
-	frag_color = vec4(srgb_to_linear(color.rgb), color.a);
+	frag_color = color;
 }
 

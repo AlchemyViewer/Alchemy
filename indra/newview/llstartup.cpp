@@ -63,6 +63,7 @@
 #include "llfloatergridstatus.h"
 #include "llfloaterimsession.h"
 #include "lllocationhistory.h"
+#include "llgltfmateriallist.h"
 #include "llimageworker.h"
 
 #include "llloginflags.h"
@@ -338,6 +339,8 @@ void set_flags_and_update_appearance()
 {
 	LLAppearanceMgr::instance().setAttachmentInvLinkEnable(true);
 	LLAppearanceMgr::instance().updateAppearanceFromCOF(true, true, no_op);
+
+    LLInventoryModelBackgroundFetch::instance().start();
 }
 
 // Returns false to skip other idle processing. Should only return
@@ -1538,6 +1541,9 @@ bool idle_startup()
 		gXferManager->registerCallbacks(gMessageSystem);
 		display_startup();
 
+		LLGLTFMaterialList::registerCallbacks();
+		display_startup();
+
 		LLStartUp::initNameCache();
 		display_startup();
 
@@ -1618,12 +1624,10 @@ bool idle_startup()
 		LL_DEBUGS("AppInit") << "Initializing sky..." << LL_ENDL;
 		// Initialize all of the viewer object classes for the first time (doing things like texture fetches.
 		LLGLState::checkStates();
-		LLGLState::checkTextureChannels();
 
 		gSky.init();
 
 		LLGLState::checkStates();
-		LLGLState::checkTextureChannels();
 
 		display_startup();
 

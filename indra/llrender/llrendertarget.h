@@ -33,6 +33,8 @@
 #include "llrender.h"
 
 /*
+ Wrapper around OpenGL framebuffer objects for use in render-to-texture
+
  SAMPLE USAGE:
 
 	LLRenderTarget target;
@@ -73,7 +75,12 @@ public:
 	//allocate resources for rendering
 	//must be called before use
 	//multiple calls will release previously allocated resources
-	bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, LLTexUnit::eTextureType usage = LLTexUnit::TT_TEXTURE, bool use_fbo = false, S32 samples = 0, U32 pix_format = GL_RGBA, U32 pix_type = GL_UNSIGNED_BYTE);
+    // resX - width
+    // resY - height
+    // color_fmt - GL color format (e.g. GL_RGB)
+    // depth - if true, allocate a depth buffer
+    // usage - deprecated, should always be TT_TEXTURE
+	bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, LLTexUnit::eTextureType usage = LLTexUnit::TT_TEXTURE);
 
 	//resize existing attachments to use new resolution and color format
 	// CAUTION: if the GL runs out of memory attempting to resize, this render target will be undefined
@@ -93,7 +100,7 @@ public:
     // attachment -- LLImageGL to render into
     // use_name -- optional texture name to target instead of attachment->getTexName()
     // NOTE: setColorAttachment and releaseColorAttachment cannot be used in conjuction with
-    // addColorAttachment, allocateDepth, resize, etc.
+    // addColorAttachment, allocateDepth, resize, etc.   
     void setColorAttachment(LLImageGL* attachment, LLGLuint use_name = 0);
 
     // detach from current color attachment
@@ -101,7 +108,7 @@ public:
 
 	//add color buffer attachment
 	//limit of 4 color attachments per render target
-	bool addColorAttachment(U32 color_fmt, U32 pix_format = GL_RGBA, U32 pix_type = GL_UNSIGNED_BYTE);
+	bool addColorAttachment(U32 color_fmt);
 
 	//allocate a depth texture
 	bool allocateDepth();
@@ -111,14 +118,19 @@ public:
 
 	//free any allocated resources
 	//safe to call redundantly
+    // asserts that this target is not currently bound or present in the RT stack
 	void release();
 
 	//bind target for rendering
 	//applies appropriate viewport
+    //  If an LLRenderTarget is currently bound, stores a reference to that LLRenderTarget 
+    //  and restores previous binding on flush() (maintains a stack of Render Targets)
+    //  Asserts that this target is not currently bound in the stack
 	void bindTarget();
 
 	//clear render targer, clears depth buffer if present,
 	//uses scissor rect if in copy-to-texture mode
+    // asserts that this target is currently bound
 	void clear(U32 mask = 0xFFFFFFFF);
 	
 	//get applied viewport
@@ -136,28 +148,24 @@ public:
 	U32 getNumTextures() const;
 
 	U32 getDepth(void) const { return mDepth; }
-	bool hasStencil() const { return mStencil; }
 
-	void bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options = LLTexUnit::TFO_BILINEAR, LLTexUnit::eTextureColorSpace color_space = LLTexUnit::TCS_LINEAR);
+	void bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options = LLTexUnit::TFO_BILINEAR);
 
 	//flush rendering operations
 	//must be called when rendering is complete
 	//should be used 1:1 with bindTarget 
 	// call bindTarget once, do all your rendering, call flush once
-	// if fetch_depth is TRUE, every effort will be made to copy the depth buffer into 
-	// the current depth texture.  A depth texture will be allocated if needed.
-	void flush(bool fetch_depth = FALSE);
-
-	void copyContents(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1,
-						S32 dstX0, S32 dstY0, S32 dstX1, S32 dstY1, U32 mask, U32 filter);
-
-	static void copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1,
-						S32 dstX0, S32 dstY0, S32 dstX1, S32 dstY1, U32 mask, U32 filter);
+    // If an LLRenderTarget was bound when bindTarget was called, binds that RenderTarget for rendering (maintains RT stack)
+    // asserts  that this target is currently bound
+	void flush();
 
 	//Returns TRUE if target is ready to be rendered into.
 	//That is, if the target has been allocated with at least
 	//one renderable attachment (i.e. color buffer, depth buffer).
 	bool isComplete() const;
+
+    // Returns true if this RenderTarget is bound somewhere in the stack
+    bool isBoundInStack() const;
 
 	static LLRenderTarget* getCurrentBoundTarget() { return sBoundTarget; }
 
@@ -165,16 +173,13 @@ protected:
 	U32 mResX;
 	U32 mResY;
 	std::vector<U32> mTex;
-	std::vector<std::tuple<U32, U32, U32> > mInternalFormat;
+	std::vector<U32> mInternalFormat;
 	U32 mFBO;
-	U32 mPreviousFBO;
-	U32 mPreviousResX;
-	U32 mPreviousResY;
+    LLRenderTarget* mPreviousRT = nullptr;
 
-	U32 mDepth;
-	bool mStencil;
-	bool mUseDepth;
-	bool mRenderDepth;
+    U32 mDepth;
+    bool mUseDepth;
+
 	LLTexUnit::eTextureType mUsage;
 	
 	static LLRenderTarget* sBoundTarget;

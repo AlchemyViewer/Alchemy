@@ -118,34 +118,10 @@ BOOL LLViewerDynamicTexture::render()
 //-----------------------------------------------------------------------------
 void LLViewerDynamicTexture::preRender(BOOL clear_depth)
 {
-	if (!gNonInteractive)
-	{
-		llassert(mFullWidth <= static_cast<S32>(gPipeline.mBake.getWidth()));
-		llassert(mFullHeight <= static_cast<S32>(gPipeline.mBake.getHeight()));
-	}
+     //use the bottom left corner
+	mOrigin.set(0, 0);
 
-	if (gPipeline.mBake.isComplete())
-	{ //using offscreen render target, just use the bottom left corner
-		mOrigin.set(0, 0);
-	}
-	else
-	{ // force rendering to on-screen portion of frame buffer
-		LLCoordScreen window_pos;
-		gViewerWindow->getWindow()->getPosition( &window_pos );
-		mOrigin.set(0, gViewerWindow->getWindowHeightRaw() - mFullHeight);  // top left corner
-
-		if (window_pos.mX < 0)
-		{
-			mOrigin.mX = -window_pos.mX;
-		}
-		if (window_pos.mY < 0)
-		{
-			mOrigin.mY += window_pos.mY;
-			mOrigin.mY = llmax(mOrigin.mY, 0) ;
-		}
-	}
-
-	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 	// Set up camera
 	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	mCamera.setOrigin(*camera);
@@ -219,7 +195,7 @@ BOOL LLViewerDynamicTexture::updateAllInstances()
         gPipeline.mBake.clear();
 	}
 
-	LLGLSLShader::bindNoShader();
+	LLGLSLShader::unbind();
 	LLVertexBuffer::unbind();
 	
 	BOOL result = FALSE;

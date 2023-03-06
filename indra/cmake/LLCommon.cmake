@@ -4,6 +4,7 @@ include(APR)
 include(Boost)
 include(EXPAT)
 include(Tracy)
+include(xxHash)
 include(ZLIBNG)
 
 set(LLCOMMON_INCLUDE_DIRS
@@ -34,6 +35,7 @@ else (LINUX)
         ${BOOST_THREAD_LIBRARY}
         ${BOOST_STACKTRACE_LIBRARY} 
         ${BOOST_SYSTEM_LIBRARY}
+        ${TRACY_LIBRARY}
         )
 endif (LINUX)
 

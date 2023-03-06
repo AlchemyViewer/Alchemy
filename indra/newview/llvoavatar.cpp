@@ -1821,6 +1821,7 @@ BOOL LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 									  S32 face,
 									  BOOL pick_transparent,
 									  BOOL pick_rigged,
+                                      BOOL pick_unselectable,
 									  S32* face_hit,
 									  LLVector4a* intersection,
 									  LLVector2* tex_coord,
@@ -1927,6 +1928,7 @@ LLViewerObject* LLVOAvatar::lineSegmentIntersectRiggedAttachments(const LLVector
 									  S32 face,
 									  BOOL pick_transparent,
 									  BOOL pick_rigged,
+                                      BOOL pick_unselectable,
 									  S32* face_hit,
 									  LLVector4a* intersection,
 									  LLVector2* tex_coord,
@@ -1959,7 +1961,7 @@ LLViewerObject* LLVOAvatar::lineSegmentIntersectRiggedAttachments(const LLVector
 				LLViewerObject* attached_object = iter.first;
 #endif
 
-				if (attached_object->lineSegmentIntersect(start, local_end, face, pick_transparent, pick_rigged, face_hit, &local_intersection, tex_coord, normal, tangent))
+				if (attached_object->lineSegmentIntersect(start, local_end, face, pick_transparent, pick_rigged, pick_unselectable, face_hit, &local_intersection, tex_coord, normal, tangent))
 				{
 					local_end = local_intersection;
 					if (intersection)
@@ -2376,15 +2378,15 @@ void LLVOAvatar::updateMeshData()
 			LLVertexBuffer* buff = facep->getVertexBuffer();
 			if(!facep->getVertexBuffer())
 			{
-				buff = new LLVertexBuffer(LLDrawPoolAvatar::VERTEX_DATA_MASK, GL_STREAM_DRAW);
-				if (!buff->allocateBuffer(num_vertices, num_indices, TRUE))
+                buff = new LLVertexBuffer(LLDrawPoolAvatar::VERTEX_DATA_MASK);
+				if (!buff->allocateBuffer(num_vertices, num_indices))
 				{
 					LL_WARNS() << "Failed to allocate Vertex Buffer for Mesh to "
 						<< num_vertices << " vertices and "
 						<< num_indices << " indices" << LL_ENDL;
 					// Attempt to create a dummy triangle (one vertex, 3 indices, all 0)
 					facep->setSize(1, 3);
-					buff->allocateBuffer(1, 3, true);
+					buff->allocateBuffer(1, 3);
 					memset((U8*) buff->getMappedData(), 0, buff->getSize());
 					memset((U8*) buff->getMappedIndices(), 0, buff->getIndicesSize());
 				}
@@ -2399,12 +2401,13 @@ void LLVOAvatar::updateMeshData()
 				}
 				else
 				{
-					if (!buff->resizeBuffer(num_vertices, num_indices))
-					{
+                    buff = new LLVertexBuffer(buff->getTypeMask());
+                    if (!buff->allocateBuffer(num_vertices, num_indices))
+                    {
 						LL_WARNS() << "Failed to allocate vertex buffer for Mesh, Substituting" << LL_ENDL;
 						// Attempt to create a dummy triangle (one vertex, 3 indices, all 0)
 						facep->setSize(1, 3);
-						buff->resizeBuffer(1, 3);
+						buff->allocateBuffer(1, 3);
 						memset((U8*) buff->getMappedData(), 0, buff->getSize());
 						memset((U8*) buff->getMappedIndices(), 0, buff->getIndicesSize());
 					}
@@ -2441,7 +2444,7 @@ void LLVOAvatar::updateMeshData()
 			}
 
 			stop_glerror();
-			buff->flush();
+			buff->unmapBuffer();
 
 			if(!f_num)
 			{
@@ -5238,7 +5241,7 @@ U32 LLVOAvatar::renderSkinned()
 				LLVertexBuffer* vb = face->getVertexBuffer();
 				if (vb)
 				{
-					vb->flush();
+					vb->unmapBuffer();
 				}
 			}
 		}
@@ -5914,7 +5917,6 @@ void LLVOAvatar::checkTextureLoading()
 }
 
 const F32  SELF_ADDITIONAL_PRI = 0.75f ;
-const F32  ADDITIONAL_PRI = 0.5f;
 void LLVOAvatar::addBakedTextureStats( LLViewerFetchedTexture* imagep, F32 pixel_area, F32 texel_area_ratio, S32 boost_level)
 {
 	//Note:
@@ -5929,15 +5931,6 @@ void LLVOAvatar::addBakedTextureStats( LLViewerFetchedTexture* imagep, F32 pixel
 	mMinPixelArea = llmin(pixel_area, mMinPixelArea);	
 	imagep->addTextureStats(pixel_area / texel_area_ratio);
 	imagep->setBoostLevel(boost_level);
-	
-	if(boost_level != LLGLTexture::BOOST_AVATAR_BAKED_SELF)
-	{
-		imagep->setAdditionalDecodePriority(ADDITIONAL_PRI) ;
-	}
-	else
-	{
-		imagep->setAdditionalDecodePriority(SELF_ADDITIONAL_PRI) ;
-	}
 }
 
 //virtual	

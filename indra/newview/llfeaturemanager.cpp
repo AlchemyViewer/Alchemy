@@ -424,50 +424,14 @@ bool LLFeatureManager::loadGPUClass()
 		}
 	
 		if (gbps < 0.f)
-		{ //couldn't bench, use GLVersion
+		{ //couldn't bench, default to Low
 	#if LL_DARWIN
 		//GLVersion is misleading on OSX, just default to class 3 if we can't bench
 		LL_WARNS("RenderInit") << "Unable to get an accurate benchmark; defaulting to class 3" << LL_ENDL;
 		mGPUClass = GPU_CLASS_3;
 	#else
-			if (gGLManager.mGLVersion <= 2.f)
-			{
-				mGPUClass = GPU_CLASS_0;
-			}
-			else if (gGLManager.mGLVersion <= 3.f)
-			{
-				mGPUClass = GPU_CLASS_1;
-			}
-			else if (gGLManager.mGLVersion < 3.3f)
-			{
-				mGPUClass = GPU_CLASS_2;
-			}
-			else if (gGLManager.mGLVersion < 4.f)
-			{
-				mGPUClass = GPU_CLASS_3;
-			}
-			else 
-			{
-				mGPUClass = GPU_CLASS_4;
-			}
-			if (gGLManager.mIsIntel && mGPUClass > GPU_CLASS_1)
-			{
-				// Intels are generally weaker then other GPUs despite having advanced features
-				mGPUClass = (EGPUClass)(mGPUClass - 1);
-			}
+			mGPUClass = GPU_CLASS_0;
 	#endif
-		}
-		else if (gGLManager.mGLVersion <= 2.f)
-		{
-			mGPUClass = GPU_CLASS_0;
-		}
-		else if (gGLManager.mGLVersion <= 3.f)
-		{
-			mGPUClass = GPU_CLASS_1;
-		}
-		else if (gbps <= 5.f)
-		{
-			mGPUClass = GPU_CLASS_0;
 		}
 		else if (gbps <= 8.f)
 		{
@@ -606,7 +570,7 @@ void LLFeatureManager::applyFeatures(bool skipFeatures)
 void LLFeatureManager::setGraphicsLevel(U32 level, bool skipFeatures)
 {
     LLViewerShaderMgr::sSkipReload = true;
-
+    flush_glerror(); // Whatever may have already happened (e.g., to cause us to change), don't let confuse it with new initializations.
     applyBaseMasks();
 
     // if we're passed an invalid level, default to "Low"
@@ -678,15 +642,19 @@ void LLFeatureManager::applyBaseMasks()
 	{
 		maskFeatures("TexUnit8orLess");
 	}
-	if (gGLManager.mHasMapBufferRange)
-	{
-		maskFeatures("MapBufferRange");
-	}
 	if (gGLManager.mVRAM > 512)
 	{
 		maskFeatures("VRAMGT512");
 	}
-	if (!gGLManager.mHasAnisotropic || 2.f > gGLManager.mGLMaxAnisotropy)
+    if (gGLManager.mVRAM < 2048)
+    {
+        maskFeatures("VRAMLT2GB");
+    }
+    if (gGLManager.mGLVersion < 3.99f)
+    {
+        maskFeatures("GL3");
+    }
+	if (2.f > gGLManager.mGLMaxAnisotropy)
 	{
 		maskFeatures("AnisotropicMissing");
 	}

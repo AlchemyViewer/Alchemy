@@ -86,7 +86,7 @@ static LLPanelInjector<LLSidepanelTaskInfo> t_task_info("sidepanel_task_info");
 LLSidepanelTaskInfo::LLSidepanelTaskInfo()
 {
 	setMouseOpaque(FALSE);
-	LLSelectMgr::instance().mUpdateSignal.connect(boost::bind(&LLSidepanelTaskInfo::refreshAll, this));
+    mSelectionUpdateSlot = LLSelectMgr::instance().mUpdateSignal.connect(boost::bind(&LLSidepanelTaskInfo::refreshAll, this));
 }
 
 
@@ -94,6 +94,11 @@ LLSidepanelTaskInfo::~LLSidepanelTaskInfo()
 {
 	if (sActivePanel == this)
 		sActivePanel = NULL;
+
+    if (mSelectionUpdateSlot.connected())
+    {
+        mSelectionUpdateSlot.disconnect();
+    }
 }
 
 // virtual

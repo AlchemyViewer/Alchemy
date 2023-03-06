@@ -857,7 +857,7 @@ void LLViewerObjectList::renderObjectBeacons()
 			const LLVector3 &thisline = debug_beacon.mPositionAgent;
 		
 			gGL.begin(LLRender::LINES);
-			gGL.color4fv(color.mV);
+			gGL.color4fv(linearColor4(color).mV);
 			draw_cross_lines(thisline, 2.0f, 2.0f, 50.f);
 			draw_line_cube(0.10f, thisline);
 			
@@ -886,7 +886,7 @@ void LLViewerObjectList::renderObjectBeacons()
 
 			const LLVector3 &thisline = debug_beacon.mPositionAgent;
 			gGL.begin(LLRender::LINES);
-			gGL.color4fv(debug_beacon.mColor.mV);
+			gGL.color4fv(linearColor4(debug_beacon.mColor).mV);
 			draw_cross_lines(thisline, 0.5f, 0.5f, 0.5f);
 			draw_line_cube(0.10f, thisline);
 
@@ -1056,9 +1056,8 @@ private:
 //-----------------------------------------------------------------------------
 F32 gpu_benchmark()
 {
-	if (!gGLManager.mHasTimerQuery)
+	if (gGLManager.mGLVersion < 3.3f)
 	{ // don't bother benchmarking venerable drivers which don't support accurate timing anyway
-      // and are likely to be correctly identified by the GPU table already.
 		return -1.f;
 	}
 
@@ -1126,17 +1125,16 @@ F32 gpu_benchmark()
 	for (U32 i = 0; i < count; ++i)
 	{
 		//allocate render targets and textures
-        auto& render_target = dest[i];
-		if (!render_target.allocate(res, res, GL_RGBA, false, false, LLTexUnit::TT_TEXTURE, true))
+		if (!dest[i].allocate(res, res, GL_RGBA))
 		{
 			LL_WARNS("Benchmark") << "Failed to allocate render target." << LL_ENDL;
 			// abandon the benchmark test
 			delete[] pixels;
 			return -1.f;
 		}
-        render_target.bindTarget();
-        render_target.clear();
-        render_target.flush();
+		dest[i].bindTarget();
+		dest[i].clear();
+		dest[i].flush();
 
 		if (!texHolder.bind(i))
 		{
@@ -1160,9 +1158,9 @@ F32 gpu_benchmark()
     delete [] pixels;
 
 	//make a dummy triangle to draw with
-	LLPointer<LLVertexBuffer> buff = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX, GL_STREAM_DRAW);
+	LLPointer<LLVertexBuffer> buff = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
 
-	if (!buff->allocateBuffer(3, 0, true))
+	if (!buff->allocateBuffer(3, 0))
 	{
 		LL_WARNS("Benchmark") << "Failed to allocate buffer during benchmark." << LL_ENDL;
 		// abandon the benchmark test
@@ -1186,22 +1184,12 @@ F32 gpu_benchmark()
 	v[1].set(-1, -3, 0);
 	v[2].set(3, 1, 0);
 
-	buff->flush();
+	buff->unmapBuffer();
 
 	// ensure matched pair of bind() and unbind() calls
 	ShaderBinder binder(gBenchmarkProgram);
 
-#ifdef GL_ARB_vertex_array_object
-    U32 glarray = 0;
-
-    if (LLRender::sGLCoreProfile)
-    {
-        glGenVertexArrays(1, &glarray);
-        glBindVertexArray(glarray);
-    }
-#endif
-
-	buff->setBuffer(LLVertexBuffer::MAP_VERTEX);
+	buff->setBuffer();
 	glFinish();
 
 	F32 time_passed = 0; // seconds
@@ -1232,15 +1220,6 @@ F32 gpu_benchmark()
 			results.push_back(gbps);
 		}
 	}
-
-#ifdef GL_ARB_vertex_array_object
-    if (LLRender::sGLCoreProfile)
-    {
-        glBindVertexArray(0);
-        glDeleteVertexArrays(1, &glarray);
-    }
-#endif
-
 
 	std::sort(results.begin(), results.end());
 

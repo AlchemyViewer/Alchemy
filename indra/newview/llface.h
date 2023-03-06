@@ -117,12 +117,6 @@ public:
 
 	S32             getIndexInTex(U32 ch) const {llassert(ch < LLRender::NUM_TEXTURE_CHANNELS); return mIndexInTex[ch];}
 	void            setIndexInTex(U32 ch, S32 index) { llassert(ch < LLRender::NUM_TEXTURE_CHANNELS);  mIndexInTex[ch] = index ;}
-
-	void			renderSetColor() const;
-	S32				renderElements(const U16 *index_array) const;
-	S32				renderIndexed ();
-	S32				renderIndexed (U32 mask);
-	S32				pushVertices(const U16* index_array) const;
 	
 	void			setWorldMatrix(const LLMatrix4& mat);
 	const LLTextureEntry* getTextureEntry()	const { return mVObjp->getTE(mTEOffset); }
@@ -143,11 +137,12 @@ public:
 	void			setDrawable(LLDrawable *drawable);
 	void			setTEOffset(const S32 te_offset);
 	
+    void            renderIndexed();
 
 	void			setFaceColor(const LLColor4& color); // override material color
 	void			unsetFaceColor(); // switch back to material color
 	const LLColor4&	getFaceColor() const { return mFaceColor; } 
-	const LLColor4& getRenderColor() const;
+	
 
 	//for volumes
 	void updateRebuildFlags();
@@ -225,15 +220,14 @@ public:
 	LLVertexBuffer* getVertexBuffer()	const	{ return mVertexBuffer; }
 	S32 getRiggedIndex(U32 type) const;
 
-	void	notifyAboutCreatingTexture(LLViewerTexture *texture);
-	void	notifyAboutMissingAsset(LLViewerTexture *texture);
-
     // used to preserve draw order of faces that are batched together. 
     // Allows content creators to manipulate linked sets and face ordering 
     // for consistent alpha sorting results, particularly for rigged attachments
     void setDrawOrderIndex(U32 index) { mDrawOrderIndex = index; }
     U32 getDrawOrderIndex() const { return mDrawOrderIndex; }
 
+    // return true if this face is in an alpha draw pool
+    bool isInAlphaPool() const;
 public: //aligned members
 	LLVector4a		mExtents[2];
 

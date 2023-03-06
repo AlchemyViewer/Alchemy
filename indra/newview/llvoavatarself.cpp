@@ -1993,7 +1993,7 @@ void LLVOAvatarSelf::dumpLocalTextures() const
 			}
 			else
 			{
-				const LLViewerFetchedTexture* image = dynamic_cast<LLViewerFetchedTexture*>( local_tex_obj->getImage() );
+				LLViewerFetchedTexture* image = dynamic_cast<LLViewerFetchedTexture*>( local_tex_obj->getImage() );
 
 				LL_INFOS() << "LocTex " << name << ": "
 						<< "Discard " << image->getDiscardLevel() << ", "
@@ -2003,7 +2003,7 @@ void LLVOAvatarSelf::dumpLocalTextures() const
 					// makes textures easier to steal
 						<< image->getID() << " "
 #endif
-						<< "Priority: " << image->getDecodePriority()
+						<< "Priority: " << image->getMaxVirtualSize()
 						<< LL_ENDL;
 			}
 		}
@@ -2240,8 +2240,7 @@ const std::string LLVOAvatarSelf::verboseDebugDumpLocalTextureDataInfo(const LLV
 									   << " glocdisc: " << getLocalDiscardLevel(tex_index, wearable_index)
 									   << " discard: " << image->getDiscardLevel()
 									   << " desired: " << image->getDesiredDiscardLevel()
-									   << " decode: " << image->getDecodePriority()
-									   << " addl: " << image->getAdditionalDecodePriority()
+									   << " vsize: " << image->getMaxVirtualSize()
 									   << " ts: " << image->getTextureState()
 									   << " bl: " << image->getBoostLevel()
 									   << " fl: " << image->isFullyLoaded() // this is not an accessor for mFullyLoaded - see comment there.
@@ -2659,7 +2658,6 @@ void LLVOAvatarSelf::addLocalTextureStats( ETextureIndex type, LLViewerFetchedTe
 				desired_pixels = llmin(mPixelArea, (F32)getTexImageArea());
 				
 				imagep->setBoostLevel(getAvatarBoostLevel());
-				imagep->setAdditionalDecodePriority(SELF_ADDITIONAL_PRI) ;
 				imagep->resetTextureStats();
 				imagep->setMaxVirtualSizeResetInterval(MAX_TEXTURE_VIRTUAL_SIZE_RESET_INTERVAL);
 				imagep->addTextureStats( desired_pixels / texel_area_ratio );
@@ -3193,7 +3191,6 @@ void LLVOAvatarSelf::deleteScratchTextures()
 #endif
 
 		delete_and_clear(sScratchTexNames);
-		LLImageGL::sGlobalTextureMemory -= sScratchTexBytes;
 		sScratchTexBytes = S32Bytes(0);
 	}
 }

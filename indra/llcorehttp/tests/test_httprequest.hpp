@@ -618,7 +618,6 @@ void HttpRequestTestObjectType::test<7>()
 		// Issue a GET that can't connect
 		mStatus = HttpStatus(HttpStatus::EXT_CURL_EASY, CURLE_COULDNT_CONNECT);
 		HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-													 0U,
 													 "http://127.0.0.1:2/nothing/here",
 													 0,
 													 0,
@@ -720,7 +719,6 @@ void HttpRequestTestObjectType::test<8>()
 		// Issue a GET that *can* connect
 		mStatus = HttpStatus(200);
 		HttpHandle handle = req->requestGet(HttpRequest::DEFAULT_POLICY_ID,
-											0U,
 											url_base,
 											HttpOptions::ptr_t(),
                                             HttpHeaders::ptr_t(),
@@ -816,7 +814,6 @@ void HttpRequestTestObjectType::test<9>()
 		// Issue a GET that *can* connect
 		mStatus = HttpStatus(200);
 		HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-													 0U,
 													 url_base,
 													 0,
 													 0,
@@ -917,7 +914,6 @@ void HttpRequestTestObjectType::test<10>()
 		body->append(body_text, strlen(body_text));
 		mStatus = HttpStatus(200);
 		HttpHandle handle = req->requestPut(HttpRequest::DEFAULT_POLICY_ID,
-											0U,
 											url_base,
 											body,
                                             HttpOptions::ptr_t(),
@@ -1024,7 +1020,6 @@ void HttpRequestTestObjectType::test<11>()
 		body->append(body_text, strlen(body_text));
 		mStatus = HttpStatus(200);
 		HttpHandle handle = req->requestPost(HttpRequest::DEFAULT_POLICY_ID,
-											 0U,
 											 url_base,
 											 body,
                                              HttpOptions::ptr_t(),
@@ -1131,7 +1126,6 @@ void HttpRequestTestObjectType::test<12>()
 		// Issue a GET that *can* connect
 		mStatus = HttpStatus(200);
 		HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-													 0U,
 													 url_base,
 													 0,
 													 0,
@@ -1244,7 +1238,6 @@ void HttpRequestTestObjectType::test<13>()
 			regex_container_t::value_type(boost::regex("X-LL-Special", boost::regex::icase),
 										  boost::regex(".*", boost::regex::icase)));
 		HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-													 0U,
 													 url_base,
 													 0,	
 												 0,
@@ -1350,7 +1343,6 @@ void HttpRequestTestObjectType::test<14>()
 		// Issue a GET that sleeps
 		mStatus = HttpStatus(HttpStatus::EXT_CURL_EASY, CURLE_OPERATION_TIMEDOUT);
 		HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-													 0U,
 													 url_base,
 													 0,
 													 0,
@@ -1458,7 +1450,6 @@ void HttpRequestTestObjectType::test<15>()
 		mStatus = HttpStatus(200);
 		handler.mCheckContentType = "application/llsd+xml";
 		HttpHandle handle = req->requestGet(HttpRequest::DEFAULT_POLICY_ID,
-											0U,
 											url_base,
                                             HttpOptions::ptr_t(),
                                             HttpHeaders::ptr_t(),
@@ -1609,7 +1600,6 @@ void HttpRequestTestObjectType::test<16>()
 				boost::regex("X-Reflect-content-encoding", boost::regex::icase),
 				boost::regex(".*", boost::regex::icase)));
 		HttpHandle handle = req->requestGet(HttpRequest::DEFAULT_POLICY_ID,
-											0U,
 											url_base + "reflect/",
 											options,
 											HttpHeaders::ptr_t(),
@@ -1680,7 +1670,6 @@ void HttpRequestTestObjectType::test<16>()
 				boost::regex("X-Reflect-content-encoding", boost::regex::icase),
 				boost::regex(".*", boost::regex::icase)));
 		handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-										  0U,
 										  url_base + "reflect/",
 										  0,
 										  47,
@@ -1855,7 +1844,6 @@ void HttpRequestTestObjectType::test<17>()
 				boost::regex("X-Reflect-transfer_encoding", boost::regex::icase),
 				boost::regex(".*chunked.*", boost::regex::icase)));
 		HttpHandle handle = req->requestPost(HttpRequest::DEFAULT_POLICY_ID,
-											 0U,
 											 url_base + "reflect/",
 											 ba,
 											 options,
@@ -2037,7 +2025,6 @@ void HttpRequestTestObjectType::test<18>()
 				boost::regex(".*", boost::regex::icase)));
 
 		HttpHandle handle = req->requestPut(HttpRequest::DEFAULT_POLICY_ID,
-											0U,
 											url_base + "reflect/",
 											ba,
 											options,
@@ -2233,7 +2220,6 @@ void HttpRequestTestObjectType::test<19>()
 				boost::regex("X-Reflect-content-encoding", boost::regex::icase),
 				boost::regex(".*", boost::regex::icase)));
 		HttpHandle handle = req->requestGet(HttpRequest::DEFAULT_POLICY_ID,
-											0U,
 											url_base + "reflect/",
 											options,
 											headers,
@@ -2437,7 +2423,6 @@ void HttpRequestTestObjectType::test<20>()
 				boost::regex(".*", boost::regex::icase)));
 
 		HttpHandle handle = req->requestPost(HttpRequest::DEFAULT_POLICY_ID,
-											 0U,
 											 url_base + "reflect/",
 											 ba,
 											 options,
@@ -2642,7 +2627,6 @@ void HttpRequestTestObjectType::test<21>()
 				boost::regex("X-Reflect-content-type", boost::regex::icase),
 				boost::regex("text/html", boost::regex::icase)));
 		HttpHandle handle = req->requestPut(HttpRequest::DEFAULT_POLICY_ID,
-											0U,
 											url_base + "reflect/",
 											ba,
 											options,
@@ -2773,7 +2757,6 @@ void HttpRequestTestObjectType::test<22>()
 			char buffer[128];
 			snprintf(buffer, sizeof(buffer), "/bug2295/%d/", i);
 			HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-														 0U,
 														 url_base + buffer,
 														 0,
 														 25,
@@ -2805,7 +2788,6 @@ void HttpRequestTestObjectType::test<22>()
 			char buffer[128];
 			snprintf(buffer, sizeof(buffer), "/bug2295/00000012/%d/", i);
 			HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-														 0U,
 														 url_base + buffer,
 														 0,
 														 25,
@@ -2837,7 +2819,6 @@ void HttpRequestTestObjectType::test<22>()
 			char buffer[128];
 			snprintf(buffer, sizeof(buffer), "/bug2295/inv_cont_range/%d/", i);
 			HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-														 0U,
 														 url_base + buffer,
 														 0,
 														 25,
@@ -2960,7 +2941,6 @@ void HttpRequestTestObjectType::test<23>()
 			std::ostringstream url;
 			url << url_base << i << "/";
 			HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
-														 0U,
 														 url.str(),
 														 0,
 														 0,

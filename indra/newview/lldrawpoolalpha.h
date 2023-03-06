@@ -35,9 +35,13 @@ class LLFace;
 class LLColor4;
 class LLGLSLShader;
 
-class LLDrawPoolAlpha final : public LLRenderPass
+class LLDrawPoolAlpha final: public LLRenderPass
 {
 public:
+
+    // set by llsettingsvo so lldrawpoolalpha has quick access to the water plane in eye space
+    static LLVector4 sWaterPlane;
+
 	enum
 	{
 		VERTEX_DATA_MASK =	LLVertexBuffer::MAP_VERTEX |
@@ -47,14 +51,13 @@ public:
 	};
 	virtual U32 getVertexDataMask() { return VERTEX_DATA_MASK; }
 
-	LLDrawPoolAlpha(U32 type = LLDrawPool::POOL_ALPHA);
+	LLDrawPoolAlpha(U32 type);
 	/*virtual*/ ~LLDrawPoolAlpha();
 
 	/*virtual*/ S32 getNumPostDeferredPasses();
 	/*virtual*/ void renderPostDeferred(S32 pass);
 	/*virtual*/ S32	 getNumPasses() { return 1; }
 
-	virtual void render(S32 pass = 0);
     void forwardRender(bool write_depth = false);
 	/*virtual*/ void prerender();
 
@@ -74,10 +77,14 @@ private:
     LLGLSLShader* simple_shader = nullptr;
     LLGLSLShader* fullbright_shader = nullptr;
     LLGLSLShader* emissive_shader = nullptr;
+    LLGLSLShader* pbr_emissive_shader = nullptr;
+    LLGLSLShader* pbr_shader = nullptr;
 
-    void drawEmissive(U32 mask, LLDrawInfo* draw);
-    void renderEmissives(U32 mask, std::vector<LLDrawInfo*>& emissives);
-    void renderRiggedEmissives(U32 mask, std::vector<LLDrawInfo*>& emissives);
+    void drawEmissive(LLDrawInfo* draw);
+    void renderEmissives(std::vector<LLDrawInfo*>& emissives);
+    void renderRiggedEmissives(std::vector<LLDrawInfo*>& emissives);
+    void renderPbrEmissives(std::vector<LLDrawInfo*>& emissives);
+    void renderRiggedPbrEmissives(std::vector<LLDrawInfo*>& emissives);
     bool TexSetup(LLDrawInfo* draw, bool use_material);
     void RestoreTexSetup(bool tex_setup);
 

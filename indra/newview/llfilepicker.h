@@ -78,9 +78,7 @@ public:
 		FFLOAD_WAV = 2,
 		FFLOAD_IMAGE = 3,
 		FFLOAD_ANIM = 4,
-#ifdef _CORY_TESTING
-		FFLOAD_GEOMETRY = 5,
-#endif
+		FFLOAD_GLTF = 5,
 		FFLOAD_XML = 6,
 		FFLOAD_SLOBJECT = 7,
 		FFLOAD_RAW = 8,
@@ -90,7 +88,9 @@ public:
 		FFLOAD_DICTIONARY = 12,
         FFLOAD_DIRECTORY = 13,   // To call from lldirpicker.
         FFLOAD_EXE = 14,          // Note: EXE will be treated as ALL on Windows and Linux but not on Darwin
-		FFLOAD_ZIP = 15
+        FFLOAD_MATERIAL = 15,
+        FFLOAD_MATERIAL_TEXTURE = 16,
+		FFLOAD_ZIP = 17
 	};
 
 	enum ESaveFilter
@@ -101,9 +101,7 @@ public:
 		FFSAVE_BMP = 5,
 		FFSAVE_AVI = 6,
 		FFSAVE_ANIM = 7,
-#ifdef _CORY_TESTING
-		FFSAVE_GEOMETRY = 8,
-#endif
+		FFSAVE_GLTF = 8,
 		FFSAVE_XML = 9,
 		FFSAVE_COLLADA = 10,
 		FFSAVE_RAW = 11,

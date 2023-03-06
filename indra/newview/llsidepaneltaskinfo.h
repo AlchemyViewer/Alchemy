@@ -156,6 +156,8 @@ private:
 	LLView*		mDAE;
 	LLView*		mDAN;
 	LLView*		mDAF;
+
+    boost::signals2::connection mSelectionUpdateSlot;
 };
 
 

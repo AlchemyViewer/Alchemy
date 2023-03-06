@@ -1553,6 +1553,15 @@ function="World.EnvPreset"
                      function="Tools.SelectOnlyMovableObjects"
                      parameter="movable" />
                 </menu_item_check>
+            <menu_item_check
+                 label="Select Invisible Objects"
+                 name="Select Invisible Objects">
+                    <menu_item_check.on_check
+                     control="SelectInvisibleObjects" />
+                    <menu_item_check.on_click
+                     function="Tools.SelectInvisibleObjects"
+                     parameter="invisible" />
+            </menu_item_check>
                 <menu_item_check
                  label="Select By Surrounding"
                  name="Select By Surrounding">
@@ -1593,6 +1602,15 @@ function="World.EnvPreset"
                      control="RenderLightRadius" />
                     <menu_item_check.on_click
                      function="Tools.ShowSelectionLightRadius" />
+                </menu_item_check>
+                <menu_item_check
+                       label="Show Reflection Probe Volumes"
+                       name="Show Reflection Probe Volumes">
+                  <menu_item_check.on_check
+                   control="RenderReflectionProbeVolumes" />
+                  <menu_item_check.on_click
+                     function="ToggleControl"
+                     parameter="RenderReflectionProbeVolumes" />
                 </menu_item_check>
                 <menu_item_check
                  label="Show Selection Beam"
@@ -1714,6 +1732,16 @@ function="World.EnvPreset"
             <menu_item_call.on_visible
             function="File.VisibleUploadModel"/>
             </menu_item_call>
+          <menu_item_call
+           label="Material..."
+           layout="topleft"
+           name="Upload Material">
+            <menu_item_call.on_click
+             function="File.UploadMaterial"
+             parameter="" />
+            <menu_item_call.on_enable
+             function="File.EnableUploadMaterial" />
+          </menu_item_call>
 	   <menu_item_call
              label="Bulk..."
              layout="topleft"
@@ -1726,7 +1754,8 @@ function="World.EnvPreset"
                  parameter="" />
             </menu_item_call>
         </menu>
-        <menu_item_separator/>
+
+      <menu_item_separator/>
         <menu_item_call
          enabled="false"
          label="Undo"
@@ -2401,17 +2430,6 @@ function="World.EnvPreset"
                  parameter="water" />
             </menu_item_check>
             <menu_item_check
-             label="Ground"
-             name="Rendering Type Ground"
-             shortcut="control|alt|shift|8">
-                <menu_item_check.on_check
-                 function="Advanced.CheckRenderType"
-                 parameter="ground" />
-                <menu_item_check.on_click
-                 function="Advanced.ToggleRenderType"
-                 parameter="ground" />
-            </menu_item_check>
-            <menu_item_check
              label="Volume"
              name="Rendering Type Volume"
              shortcut="control|alt|shift|9">
@@ -2827,20 +2845,6 @@ function="World.EnvPreset"
                function="Advanced.ToggleConsole"
                parameter="scene monitor" />
             </menu_item_check>
-            <menu_item_call
-              enabled="false"
-              visible="false"
-              label="Texture Fetch Debug Console"
-              name="Texture Fetch Debug Console">
-              <menu_item_call.on_click
-                function="Floater.Show"
-                parameter="tex_fetch_debugger" />
-              <on_enable
-                function="Develop.SetTexFetchDebugger" />
-              <on_visible
-                function="Develop.SetTexFetchDebugger" />
-            </menu_item_call>
-          
             <menu_item_separator/>
 
             <menu_item_check
@@ -3138,15 +3142,6 @@ function="World.EnvPreset"
                  function="Advanced.TogglePeriodicSlowFrame"
                  parameter="points" />
             </menu_item_check>
-            <menu_item_check
-             label="Frame Test"
-             name="Frame Test">
-                <menu_item_check.on_check
-                 function="Advanced.CheckFrameTest"
-                 parameter="Frame Test" />
-                <menu_item_check.on_click
-                 function="Advanced.ToggleFrameTest" />
-            </menu_item_check>
           <menu_item_call
              label="Frame Profile"
              name="Frame Profile">
@@ -3326,6 +3321,16 @@ function="World.EnvPreset"
            parameter="lights" />
         </menu_item_check>
         <menu_item_check
+         label="Reflection Probes"
+         name="Reflection Probes">
+          <menu_item_check.on_check
+           function="Advanced.CheckInfoDisplay"
+           parameter="reflection probes" />
+          <menu_item_check.on_click
+           function="Advanced.ToggleInfoDisplay"
+           parameter="reflection probes" />
+        </menu_item_check>
+        <menu_item_check
          label="Particles"
          name="Particles">
           <menu_item_check.on_check
@@ -3491,23 +3496,9 @@ function="World.EnvPreset"
                 <menu_item_check.on_click
                  function="ToggleControl"
                  parameter="UseOcclusion" />
-                <menu_item_check.on_enable
-                 function="Advanced.EnableObjectObjectOcclusion" />
             </menu_item_check>
           <menu_item_separator />
 
-          <menu_item_check
-                       label="Advanced Lighting Model"
-                       name="Advanced Lighting Model">
-            <menu_item_check.on_check
-             function="CheckControl"
-             parameter="RenderDeferred" />
-            <menu_item_check.on_click
-             function="ToggleControl"
-             parameter="RenderDeferred" />
-            <menu_item_check.on_enable
-                 function="Advanced.EnableRenderDeferred" />
-          </menu_item_check>
           <menu_item_check
                        label="   Shadows from Sun/Moon/Projectors"
                        name="Shadows from Sun/Moon/Projectors">
@@ -3664,16 +3655,13 @@ function="World.EnvPreset"
                  function="Advanced.HandleAttachedLightParticles"
                  parameter="RenderAttachedParticles" />
             </menu_item_check>
-            <menu_item_check
-             label="Hover Glow Objects"
-             name="Hover Glow Objects">
-                <menu_item_check.on_check
-                 function="CheckControl"
-                 parameter="RenderHoverGlowEnable" />
-                <menu_item_check.on_click
-                 function="ToggleControl"
-                 parameter="RenderHoverGlowEnable" />
-            </menu_item_check>
+            <menu_item_call
+              enabled="true"
+              label="Rebuild Reflection Probes"
+              name="Rebuild Reflection Probes">
+              <menu_item_call.on_click
+               function="Develop.RebuildReflectionProbes" />
+            </menu_item_call>
           <menu_item_separator />
           
           <menu_item_call

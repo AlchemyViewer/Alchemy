@@ -281,7 +281,7 @@ void LLManipRotate::render()
 			LLGLEnable cull_face(GL_CULL_FACE);
 			LLGLEnable clip_plane0(GL_CLIP_PLANE0);
 			LLGLDepthTest gls_depth(GL_FALSE);
-			LLGLDisable gls_stencil(GL_STENCIL_TEST);
+			//LLGLDisable gls_stencil(GL_STENCIL_TEST);
 
 			// First pass: centers. Second pass: sides.
 			static const LLMatrix4a side1_rot = ALGLMath::genRot(90.f, 1.f, 0.f, 0.f);

@@ -47,6 +47,7 @@
 #include "llglslshader.h"
 #include "llthreadsafequeue.h"
 #include "stringize.h"
+#include "llframetimer.h"
 
 // System includes
 #include <commdlg.h>
@@ -60,6 +61,10 @@
 #include <future>
 #include <sstream>
 #include <utility>                  // std::pair
+
+#include <d3d9.h>
+#include <dxgi1_4.h>
+#include <timeapi.h>
 
 // Require DirectInput version 8
 #define DIRECTINPUT_VERSION 0x0800
@@ -308,6 +313,20 @@ struct LLWindowWin32::LLWindowWin32Thread : public LL::ThreadPool
 
     void run() override;
 
+    // initialzie DXGI adapter (for querying available VRAM)
+    void initDX();
+    
+    // initialize D3D (if DXGI cannot be used)
+    void initD3D();
+
+    // call periodically to update available VRAM
+    void updateVRAMUsage();
+
+    U32 getAvailableVRAMMegabytes()
+    {
+        return mAvailableVRAM;
+    }
+
     /// called by main thread to post work to this window thread
     template <typename CALLABLE>
     void post(CALLABLE&& func)
@@ -356,6 +375,15 @@ struct LLWindowWin32::LLWindowWin32Thread : public LL::ThreadPool
     void gatherInput();
     HWND mWindowHandle = NULL;
     HDC mhDC = 0;
+
+    // best guess at available video memory in MB
+    std::atomic<U32> mAvailableVRAM;
+
+    U32 mMaxVRAM = 0; // maximum amount of vram to allow in the "budget", or 0 for no maximum (see updateVRAMUsage)
+
+    IDXGIAdapter3* mDXGIAdapter = nullptr;
+    LPDIRECT3D9 mD3D = nullptr;
+    LPDIRECT3DDEVICE9 mD3DDevice = nullptr;
 };
 
 
@@ -365,8 +393,14 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 							 BOOL fullscreen, BOOL clearBg,
 							 BOOL enable_vsync, BOOL use_gl,
 							 BOOL ignore_pixel_depth,
-							 U32 fsaa_samples)
-	: LLWindow(callbacks, fullscreen, flags)
+							 U32 fsaa_samples,
+                             U32 max_cores,
+                             U32 max_vram,
+                             F32 max_gl_version)
+	: 
+    LLWindow(callbacks, fullscreen, flags), 
+    mMaxGLVersion(max_gl_version), 
+    mMaxCores(max_cores)
 	, mOpenGL32DLL(nullptr)
 	, mUser32DLL(nullptr)
 	, mShellcoDLL(nullptr)
@@ -380,8 +414,82 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 {
     sMainThreadId = LLThread::currentID();
     mWindowThread = new LLWindowWin32Thread();
+    mWindowThread->mMaxVRAM = max_vram;
+
 	//MAINT-516 -- force a load of opengl32.dll just in case windows went sideways 
 	//mOpenGL32DLL = LoadLibrary(TEXT("opengl32.dll"));
+    
+    
+    if (mMaxCores != 0)
+    {
+        HANDLE hProcess = GetCurrentProcess();
+        mMaxCores = llmin(mMaxCores, (U32) 64);
+        DWORD_PTR mask = 0;
+
+        for (int i = 0; i < mMaxCores; ++i)
+        {
+            mask |= ((DWORD_PTR) 1) << i;
+        }
+
+        SetProcessAffinityMask(hProcess, mask);
+    }
+
+#if 0 // this is probably a bad idea, but keep it in your back pocket if you see what looks like
+        // process deprioritization during profiles
+    // force high thread priority
+    HANDLE hProcess = GetCurrentProcess();
+
+    if (hProcess)
+    {
+        int priority = GetPriorityClass(hProcess);
+        if (priority < REALTIME_PRIORITY_CLASS)
+        {
+            if (SetPriorityClass(hProcess, REALTIME_PRIORITY_CLASS))
+            {
+                LL_INFOS() << "Set process priority to REALTIME_PRIORITY_CLASS" << LL_ENDL;
+            }
+            else
+            {
+                LL_INFOS() << "Failed to set process priority: " << std::hex << GetLastError() << LL_ENDL;
+            }
+        }
+    }
+#endif
+
+#if 0  // this is also probably a bad idea, but keep it in your back pocket for getting main thread off of background thread cores (see also LLThread::threadRun)
+    HANDLE hThread = GetCurrentThread();
+
+    SYSTEM_INFO sysInfo;
+
+    GetSystemInfo(&sysInfo);
+    U32 core_count = sysInfo.dwNumberOfProcessors;
+
+    if (max_cores != 0)
+    {
+        core_count = llmin(core_count, max_cores);
+    }
+
+    if (hThread)
+    {
+        int priority = GetThreadPriority(hThread);
+
+        if (priority < THREAD_PRIORITY_TIME_CRITICAL)
+        {
+            if (SetThreadPriority(hThread, THREAD_PRIORITY_TIME_CRITICAL))
+            {
+                LL_INFOS() << "Set thread priority to THREAD_PRIORITY_TIME_CRITICAL" << LL_ENDL;
+            }
+            else
+            {
+                LL_INFOS() << "Failed to set thread priority: " << std::hex << GetLastError() << LL_ENDL;
+            }
+
+            // tell main thread to prefer core 0
+            SetThreadIdealProcessor(hThread, 0);
+        }
+    }
+#endif
+
 
 	mUser32DLL = LoadLibrary(TEXT("User32.dll"));
 	if (mUser32DLL != nullptr)
@@ -1037,16 +1145,19 @@ BOOL LLWindowWin32::maximize()
 	BOOL success = FALSE;
 	if (!mWindowHandle) return success;
 
-	WINDOWPLACEMENT placement;
-	placement.length = sizeof(WINDOWPLACEMENT);
+    mWindowThread->post([=]
+        {
+            WINDOWPLACEMENT placement;
+            placement.length = sizeof(WINDOWPLACEMENT);
 
-	success = GetWindowPlacement(mWindowHandle, &placement);
-	if (!success) return success;
+            if (GetWindowPlacement(mWindowHandle, &placement))
+            {
+                placement.showCmd = SW_MAXIMIZE;
+                SetWindowPlacement(mWindowHandle, &placement);
+            }
+        });
 
-	placement.showCmd = SW_MAXIMIZE;
-
-	success = SetWindowPlacement(mWindowHandle, &placement);
-	return success;
+    return TRUE;
 }
 
 BOOL LLWindowWin32::getFullscreen()
@@ -1401,22 +1512,6 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen& size, BO
 	LL_INFOS("Window") << "pfd.dwDamageMask:     " << pfd.dwDamageMask << LL_ENDL ;
 	LL_INFOS("Window") << "--- end pixel format dump ---" << LL_ENDL ;
 
-	if (pfd.cColorBits < 32)
-	{
-		OSMessageBox(mCallbacks->translateString("MBTrueColorWindow"),
-			mCallbacks->translateString("MBError"), OSMB_OK);
-        close();
-		return FALSE;
-	}
-
-	if (pfd.cAlphaBits < 8)
-	{
-		OSMessageBox(mCallbacks->translateString("MBAlpha"),
-			mCallbacks->translateString("MBError"), OSMB_OK);
-        close();
-		return FALSE;
-	}
-
 	if (!SetPixelFormat(mhDC, pixel_format, &pfd))
 	{
 		OSMessageBox(mCallbacks->translateString("MBPixelFmtSetErr"),
@@ -1456,8 +1551,8 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen& size, BO
 		attrib_list[cur_attrib++] = WGL_DEPTH_BITS_ARB;
 		attrib_list[cur_attrib++] = 24;
 
-		attrib_list[cur_attrib++] = WGL_STENCIL_BITS_ARB;
-		attrib_list[cur_attrib++] = 8;
+		//attrib_list[cur_attrib++] = WGL_STENCIL_BITS_ARB; //stencil buffer is deprecated (performance penalty)
+		//attrib_list[cur_attrib++] = 8;
 
 		attrib_list[cur_attrib++] = WGL_DRAW_TO_WINDOW_ARB;
 		attrib_list[cur_attrib++] = GL_TRUE;
@@ -1475,7 +1570,7 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen& size, BO
 		attrib_list[cur_attrib++] = 24;
 
 		attrib_list[cur_attrib++] = WGL_ALPHA_BITS_ARB;
-		attrib_list[cur_attrib++] = 8;
+		attrib_list[cur_attrib++] = 0;
 
 		U32 end_attrib = 0;
 		if (mFSAASamples > 0)
@@ -1698,21 +1793,6 @@ const	S32   max_format  = (S32)num_formats - 1;
 		<< " Depth Bits " << S32(pfd.cDepthBits) 
 		<< LL_ENDL;
 
-	// make sure we have 32 bits per pixel
-	if (pfd.cColorBits < 32 || GetDeviceCaps(mhDC, BITSPIXEL) < 32)
-	{
-		OSMessageBox(mCallbacks->translateString("MBTrueColorWindow"), mCallbacks->translateString("MBError"), OSMB_OK);
-		close();
-		return FALSE;
-	}
-
-	if (pfd.cAlphaBits < 8)
-	{
-		OSMessageBox(mCallbacks->translateString("MBAlpha"), mCallbacks->translateString("MBError"), OSMB_OK);
-		close();
-		return FALSE;
-	}
-
 	mhRC = 0;
 	if (wglCreateContextAttribsARB)
 	{ //attempt to create a specific versioned context
@@ -1737,8 +1817,6 @@ const	S32   max_format  = (S32)num_formats - 1;
 		return FALSE;
 	}
 	
-	LL_PROFILER_GPU_CONTEXT
-
 	// Disable vertical sync for swap
     toggleVSync(enable_vsync);
 
@@ -1762,6 +1840,8 @@ const	S32   max_format  = (S32)num_formats - 1;
 		glClear(GL_COLOR_BUFFER_BIT);
 		swapBuffers();
 	}
+
+    LL_PROFILER_GPU_CONTEXT;
 
 	return TRUE;
 }
@@ -1875,10 +1955,15 @@ void LLWindowWin32::recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw
 
 void* LLWindowWin32::createSharedContext()
 {
+    mMaxGLVersion = llclamp(mMaxGLVersion, 3.f, 4.6f);
+
+    S32 version_major = llfloor(mMaxGLVersion);
+    S32 version_minor = llround((mMaxGLVersion-version_major)*10);
+
     S32 attribs[] =
     {
-        WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-        WGL_CONTEXT_MINOR_VERSION_ARB, 6,
+        WGL_CONTEXT_MAJOR_VERSION_ARB, version_major,
+        WGL_CONTEXT_MINOR_VERSION_ARB, version_minor,
         WGL_CONTEXT_PROFILE_MASK_ARB,  LLRender::sGLCoreProfile ? WGL_CONTEXT_CORE_PROFILE_BIT_ARB : WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
         WGL_CONTEXT_FLAGS_ARB, gDebugGL ? WGL_CONTEXT_DEBUG_BIT_ARB : 0,
         0
@@ -1927,6 +2012,7 @@ void* LLWindowWin32::createSharedContext()
 void LLWindowWin32::makeContextCurrent(void* contextPtr)
 {
     wglMakeCurrent(mhDC, (HGLRC) contextPtr);
+    LL_PROFILER_GPU_CONTEXT;
 }
 
 void LLWindowWin32::destroySharedContext(void* contextPtr)
@@ -3657,7 +3743,7 @@ BOOL LLWindowWin32::setDisplayResolution(S32 width, S32 height, S32 bits, S32 re
 	// Don't change anything if we don't have to
 	if (EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &dev_mode))
 	{
-		if (dev_mode.dmPelsWidth        == width &&
+		if (dev_mode.dmPelsWidth        == width && 
 			dev_mode.dmPelsHeight       == height &&
 			dev_mode.dmBitsPerPel       == bits &&
 			dev_mode.dmDisplayFrequency == refresh )
@@ -3723,12 +3809,15 @@ BOOL LLWindowWin32::resetDisplayResolution()
 
 void LLWindowWin32::swapBuffers()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_WIN32;
-    ASSERT_MAIN_THREAD();
-    glFlush(); //superstitious flush for maybe frame stall removal?
-	SwapBuffers(mhDC);
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_WIN32;
+        SwapBuffers(mhDC);
+    }
 
-    LL_PROFILER_GPU_COLLECT;
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("GPU Collect");
+        LL_PROFILER_GPU_COLLECT;
+    }
 }
 
 
@@ -4635,13 +4724,17 @@ std::vector<std::string> LLWindowWin32::getDynamicFallbackFontList()
 	return std::vector<std::string>();
 }
 
+U32 LLWindowWin32::getAvailableVRAMMegabytes()
+{
+    return mWindowThread ? mWindowThread->getAvailableVRAMMegabytes() : 0;
+}
 
 #endif // LL_WINDOWS
 
 inline LLWindowWin32::LLWindowWin32Thread::LLWindowWin32Thread()
-    : ThreadPool("Window Thread", 1, MAX_QUEUE_SIZE, LL::ThreadPool::E_ABOVE_NORMAL)
+    : LL::ThreadPool("Window Thread", 1, MAX_QUEUE_SIZE)
 {
-    ThreadPool::start();
+    LL::ThreadPool::start();
 }
 
 /**
@@ -4690,10 +4783,218 @@ private:
     std::string mPrev;
 };
 
+// Print hardware debug info about available graphics adapters in ordinal order
+void debugEnumerateGraphicsAdapters()
+{
+    LL_INFOS("Window") << "Enumerating graphics adapters..." << LL_ENDL;
+
+    IDXGIFactory1* factory;
+    HRESULT res = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&factory);
+    if (FAILED(res) || !factory)
+    {
+        LL_WARNS() << "CreateDXGIFactory1 failed: 0x" << std::hex << res << LL_ENDL;
+    }
+    else
+    {
+        UINT graphics_adapter_index = 0;
+        IDXGIAdapter3* dxgi_adapter;
+        while (true)
+        {
+            res = factory->EnumAdapters(graphics_adapter_index, reinterpret_cast<IDXGIAdapter**>(&dxgi_adapter));
+            if (FAILED(res))
+            {
+                if (graphics_adapter_index == 0)
+                {
+                    LL_WARNS() << "EnumAdapters failed: 0x" << std::hex << res << LL_ENDL;
+                }
+                else
+                {
+                    LL_INFOS("Window") << "Done enumerating graphics adapters" << LL_ENDL;
+                }
+            }
+            else
+            {
+                DXGI_ADAPTER_DESC desc;
+                dxgi_adapter->GetDesc(&desc);
+                std::wstring description_w((wchar_t*)desc.Description);
+                std::string description(description_w.begin(), description_w.end());
+                LL_INFOS("Window") << "Graphics adapter index: " << graphics_adapter_index << ", "
+                    << "Description: " << description << ", "
+                    << "DeviceId: " << desc.DeviceId << ", "
+                    << "SubSysId: " << desc.SubSysId << ", "
+                    << "AdapterLuid: " << desc.AdapterLuid.HighPart << "_" << desc.AdapterLuid.LowPart << ", "
+                    << "DedicatedVideoMemory: " << desc.DedicatedVideoMemory / 1024 / 1024 << ", "
+                    << "DedicatedSystemMemory: " << desc.DedicatedSystemMemory / 1024 / 1024 << ", "
+                    << "SharedSystemMemory: " << desc.SharedSystemMemory / 1024 / 1024 << LL_ENDL;
+            }
+
+            if (dxgi_adapter)
+            {
+                dxgi_adapter->Release();
+                dxgi_adapter = NULL;
+            }
+            else
+            {
+                break;
+            }
+
+            graphics_adapter_index++;
+        }
+    }
+
+    if (factory)
+    {
+        factory->Release();
+    }
+}
+
+void LLWindowWin32::LLWindowWin32Thread::initDX()
+{
+    if (mDXGIAdapter == NULL)
+    {
+        debugEnumerateGraphicsAdapters();
+
+        IDXGIFactory4* pFactory = nullptr;
+
+        HRESULT res = CreateDXGIFactory1(__uuidof(IDXGIFactory4), (void**)&pFactory);
+
+        if (FAILED(res))
+        {
+            LL_WARNS() << "CreateDXGIFactory1 failed: 0x" << std::hex << res << LL_ENDL;
+        }
+        else
+        {
+            res = pFactory->EnumAdapters(0, reinterpret_cast<IDXGIAdapter**>(&mDXGIAdapter));
+            if (FAILED(res))
+            {
+                LL_WARNS() << "EnumAdapters failed: 0x" << std::hex << res << LL_ENDL;
+            }
+            else
+            {
+                LL_INFOS() << "EnumAdapters success" << LL_ENDL;
+            }
+        }
+
+        if (pFactory)
+        {
+            pFactory->Release();
+        }
+    }
+}
+
+void LLWindowWin32::LLWindowWin32Thread::initD3D()
+{
+    if (mDXGIAdapter == NULL && mD3DDevice == NULL && mWindowHandle != 0)
+    {
+        mD3D = Direct3DCreate9(D3D_SDK_VERSION);
+        
+        D3DPRESENT_PARAMETERS d3dpp;
+
+        ZeroMemory(&d3dpp, sizeof(d3dpp));
+        d3dpp.Windowed = TRUE;
+        d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+
+        HRESULT res = mD3D->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, mWindowHandle, D3DCREATE_SOFTWARE_VERTEXPROCESSING, &d3dpp, &mD3DDevice);
+        
+        if (FAILED(res))
+        {
+            LL_WARNS() << "(fallback) CreateDevice failed: 0x" << std::hex << res << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS() << "(fallback) CreateDevice success" << LL_ENDL;
+        }
+    }
+}
+
+void LLWindowWin32::LLWindowWin32Thread::updateVRAMUsage()
+{
+    LL_PROFILE_ZONE_SCOPED;
+    if (mDXGIAdapter != nullptr)
+    {
+        // NOTE: what lies below is hand wavy math based on compatibility testing and observation against a variety of hardware
+        //  It doesn't make sense, but please don't refactor it to make sense. -- davep
+
+        DXGI_QUERY_VIDEO_MEMORY_INFO info;
+        mDXGIAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info);
+
+#if 0 // debug 0 budget and 0 CU
+        info.Budget = 0;
+        info.CurrentUsage = 0;
+#endif
+
+        U32 budget_mb = info.Budget / 1024 / 1024;
+        U32 afr_mb = info.AvailableForReservation / 1024 / 1024;
+        // correct for systems that misreport budget
+        if (budget_mb == 0)
+        { 
+            // fall back to available for reservation clamped between 512MB and 2GB
+            budget_mb = llclamp(afr_mb, (U32) 512, (U32) 2048);
+        }
+
+        if ( mMaxVRAM != 0)
+        {
+            budget_mb = llmin(budget_mb, mMaxVRAM);
+        }
+
+        U32 cu_mb = info.CurrentUsage / 1024 / 1024;
+
+        // get an estimated usage based on texture bytes allocated
+        U32 eu_mb = LLImageGL::getTextureBytesAllocated() * 2 / 1024 / 1024;
+
+        if (cu_mb == 0)
+        { // current usage is sometimes unreliable on Intel GPUs, fall back to estimated usage
+            cu_mb = llmax((U32)1, eu_mb);
+        }
+        F32 eu_error = (F32)((S32)eu_mb - (S32)cu_mb) / (F32)cu_mb;
+
+        U32 target_mb = budget_mb;
+
+        if (target_mb > 4096)  // if 4GB are installed, try to leave 2GB free 
+        {
+            target_mb -= 2048;
+        }
+        else // if less than 4GB are installed, try not to use more than half of it
+        {
+            target_mb /= 2;
+        }
+
+        mAvailableVRAM = cu_mb < target_mb ? target_mb - cu_mb : 0;
+
+        LL_INFOS("Window") << "\nLocal\nAFR: " << info.AvailableForReservation / 1024 / 1024
+            << "\nBudget: " << info.Budget / 1024 / 1024
+            << "\nCR: " << info.CurrentReservation / 1024 / 1024
+            << "\nCU: " << info.CurrentUsage / 1024 / 1024
+            << "\nEU: " << eu_mb << llformat(" (%.2f)", eu_error)
+            << "\nTU: " << target_mb
+            << "\nAM: " << mAvailableVRAM << LL_ENDL;
+
+        /*mDXGIAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &info);
+        LL_INFOS("Window") << "\nNon-Local\nAFR: " << info.AvailableForReservation / 1024 / 1024
+            << "\nBudget: " << info.Budget / 1024 / 1024
+            << "\nCR: " << info.CurrentReservation / 1024 / 1024
+            << "\nCU: " << info.CurrentUsage / 1024 / 1024 << LL_ENDL;*/
+    }
+    else if (mD3DDevice != NULL)
+    { // fallback to D3D9
+        mAvailableVRAM = mD3DDevice->GetAvailableTextureMem() / 1024 / 1024;
+    }
+}
+
 void LLWindowWin32::LLWindowWin32Thread::run()
 {
     sWindowThreadId = std::this_thread::get_id();
     LogChange logger("Window");
+
+    initDX();
+
+    //as good a place as any to up the MM timer resolution (see ms_sleep)
+    //attempt to set timer resolution to 1ms
+    TIMECAPS tc;
+    if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) == TIMERR_NOERROR)
+    {
+        timeBeginPeriod(llclamp((U32) 1, tc.wPeriodMin, tc.wPeriodMax));
+    }
 
     while (! getQueue().done())
     {
@@ -4701,6 +5002,10 @@ void LLWindowWin32::LLWindowWin32Thread::run()
 
         if (mWindowHandle != 0)
         {
+            // lazily call initD3D inside this loop to catch when mWindowHandle has been set
+            // *TODO: Shutdown if this fails when mWindowHandle exists
+            initD3D();
+
             MSG msg;
             BOOL status;
             if (mhDC == 0)
@@ -4733,6 +5038,13 @@ void LLWindowWin32::LLWindowWin32Thread::run()
             getQueue().runPending();
         }
         
+        // update available vram once every 3 seconds
+        static LLFrameTimer vramTimer;
+        if (vramTimer.getElapsedTimeF32() > 3.f)
+        {
+            updateVRAMUsage();
+            vramTimer.reset();
+        }
 #if 0
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("w32t - Sleep");
@@ -4741,6 +5053,26 @@ void LLWindowWin32::LLWindowWin32Thread::run()
         }
 #endif
     }
+
+    //clean up DXGI/D3D resources
+    if (mDXGIAdapter)
+    {
+        mDXGIAdapter->Release();
+        mDXGIAdapter = nullptr;
+    }
+
+    if (mD3DDevice)
+    {
+        mD3DDevice->Release();
+        mD3DDevice = nullptr;
+    }
+
+    if (mD3D)
+    {
+        mD3D->Release();
+        mD3D = nullptr;
+    }
+
 }
 
 void LLWindowWin32::post(const std::function<void()>& func)

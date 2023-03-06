@@ -233,8 +233,6 @@ LLInventoryModel::LLInventoryModel()
 	mHttpOptions(),
 	mHttpHeaders(),
 	mHttpPolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
-	mHttpPriorityFG(0),
-	mHttpPriorityBG(0),
 	mCategoryLock(),
 	mItemLock(),
 	mValidationInfo(new LLInventoryValidationInfo)
@@ -699,6 +697,11 @@ const LLUUID LLInventoryModel::findUserDefinedCategoryUUIDForType(LLFolderType::
     case LLFolderType::FT_ANIMATION:
     {
         cat_id = LLUUID(gSavedPerAccountSettings.getString("AnimationUploadFolder"));
+        break;
+    }
+    case LLFolderType::FT_MATERIAL:
+    {
+        cat_id = LLUUID(gSavedPerAccountSettings.getString("PBRUploadFolder"));
         break;
     }
     default:
@@ -2978,7 +2981,6 @@ LLCore::HttpHandle LLInventoryModel::requestPost(bool foreground,
 		
 	handle = LLCoreHttpUtil::requestPostWithLLSD(request,
 												 mHttpPolicyClass,
-												 (foreground ? mHttpPriorityFG : mHttpPriorityBG),
 												 url,
 												 body,
 												 mHttpOptions,
@@ -3004,6 +3006,7 @@ void LLInventoryModel::createCommonSystemCategories()
 	gInventory.findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT, true);
 	gInventory.findCategoryUUIDForType(LLFolderType::FT_LANDMARK, true); // folder should exist before user tries to 'landmark this'
     gInventory.findCategoryUUIDForType(LLFolderType::FT_SETTINGS, true);
+    gInventory.findCategoryUUIDForType(LLFolderType::FT_MATERIAL, true); // probably should be server created
     gInventory.findCategoryUUIDForType(LLFolderType::FT_INBOX, true);
 }
 
@@ -4622,7 +4625,11 @@ LLPointer<LLInventoryValidationInfo> LLInventoryModel::validate() const
 			{
 				LL_WARNS("Inventory") << "Fatal inventory corruption: system folder type has excess copies under root, type " << ft << " count " << count_under_root << LL_ENDL;
 				validation_info->mDuplicateRequiredSystemFolders.insert(folder_type);
-                if (!is_automatic && folder_type != LLFolderType::FT_SETTINGS)
+                if (!is_automatic
+                    && folder_type != LLFolderType::FT_SETTINGS
+                    // FT_MATERIAL might need to be automatic like the rest of upload folders
+                    && folder_type != LLFolderType::FT_MATERIAL
+                    )
                 {
                     // It is a fatal problem or can lead to fatal problems for COF,
                     // outfits, trash and other non-automatic folders.

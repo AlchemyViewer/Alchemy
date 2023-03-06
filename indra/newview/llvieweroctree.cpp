@@ -103,11 +103,11 @@ U8* get_box_fan_indices_ptr(LLCamera* camera, const LLVector4a& center)
 }
 
 //create a vertex buffer for efficiently rendering cubes
-LLVertexBuffer* ll_create_cube_vb(U32 type_mask, U32 usage)
+LLVertexBuffer* ll_create_cube_vb(U32 type_mask)
 {
-	LLVertexBuffer* ret = new LLVertexBuffer(type_mask, usage);
+	LLVertexBuffer* ret = new LLVertexBuffer(type_mask);
 
-	ret->allocateBuffer(8, 64, true);
+	ret->allocateBuffer(8, 64);
 
 	LLStrider<LLVector3> pos;
 	LLStrider<U16> idx;
@@ -129,7 +129,7 @@ LLVertexBuffer* ll_create_cube_vb(U32 type_mask, U32 usage)
 		idx[i] = sOcclusionIndices[i];
 	}
 
-	ret->flush();
+	ret->unmapBuffer();
 
 	return ret;
 }
@@ -801,7 +801,7 @@ U32 LLOcclusionCullingGroup::getNewOcclusionQueryObjectName()
     {
         //seed 1024 query names into the free query pool
         GLuint queries[1024];
-        glGenQueriesARB(1024, queries);
+        glGenQueries(1024, queries);
         for (int i = 0; i < 1024; ++i)
         {
             sFreeQueries.push(queries[i]);
@@ -871,6 +871,7 @@ LLOcclusionCullingGroup::LLOcclusionCullingGroup(OctreeNode* node, LLViewerOctre
 	for (U32 i = 0; i < LLViewerCamera::NUM_CAMERAS; i++)
 	{
 		mOcclusionQuery[i] = 0;
+        mOcclusionCheckCount[i] = 0;
 		mOcclusionIssued[i] = 0;
 		mOcclusionState[i] = parent ? SG_STATE_INHERIT_MASK & parent->mOcclusionState[i] : 0;
 		mVisible[i] = 0;
@@ -918,15 +919,12 @@ void LLOcclusionCullingGroup::handleChildAddition(const OctreeNode* parent, Octr
 
 void LLOcclusionCullingGroup::releaseOcclusionQueryObjectNames()
 {
-	if (gGLManager.mHasOcclusionQuery)
+	for (U32 i = 0; i < LLViewerCamera::NUM_CAMERAS; ++i)
 	{
-		for (U32 i = 0; i < LLViewerCamera::NUM_CAMERAS; ++i)
+		if (mOcclusionQuery[i])
 		{
-			if (mOcclusionQuery[i])
-			{
-				releaseOcclusionQueryObjectName(mOcclusionQuery[i]);
-				mOcclusionQuery[i] = 0;
-			}
+			releaseOcclusionQueryObjectName(mOcclusionQuery[i]);
+			mOcclusionQuery[i] = 0;
 		}
 	}
 }
@@ -1130,34 +1128,22 @@ void LLOcclusionCullingGroup::checkOcclusion()
             GLuint available;
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("co - query available");
-                glGetQueryObjectuivARB(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT_AVAILABLE_ARB, &available);
+                glGetQueryObjectuiv(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT_AVAILABLE, &available);
+                mOcclusionCheckCount[LLViewerCamera::sCurCameraID]++;
             }
 
-            if (available)
+            if (available || mOcclusionCheckCount[LLViewerCamera::sCurCameraID] > 4)
             {   
+                mOcclusionCheckCount[LLViewerCamera::sCurCameraID] = 0;
                 GLuint query_result;    // Will be # samples drawn, or a boolean depending on mHasOcclusionQuery2 (both are type GLuint)
                 {
                     LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("co - query result");
-                    glGetQueryObjectuivARB(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT_ARB, &query_result);
+                    glGetQueryObjectuiv(mOcclusionQuery[LLViewerCamera::sCurCameraID], GL_QUERY_RESULT, &query_result);
                 }
 #if LL_TRACK_PENDING_OCCLUSION_QUERIES
                 sPendingQueries.erase(mOcclusionQuery[LLViewerCamera::sCurCameraID]);
 #endif
 
-#if 0   // (12/2021) occasional false-negative occlusion tests produce water reflection errors, SL-16461
-        // If/when water occlusion queries become 100% reliable, re-enable this optimization
-
-                if (LLPipeline::RENDER_TYPE_WATER == mSpatialPartition->mDrawableType)
-                {
-                    // Note any unoccluded water, for deciding on reflection/distortion passes
-                    // (If occlusion is disabled, these are set within LLDrawPoolWater::render)
-                    if (query_result > 0)
-                    {
-                        LLDrawPoolWater::sNeedsReflectionUpdate = TRUE;
-                        LLDrawPoolWater::sNeedsDistortionUpdate = TRUE;
-                    }
-                }
-#endif
                 if (query_result > 0)
                 {
                     clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
@@ -1173,7 +1159,7 @@ void LLOcclusionCullingGroup::checkOcclusion()
     else if (mSpatialPartition->isOcclusionEnabled() && isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
     {	//check occlusion has been issued for occluded node that has not had a query issued
         assert_states_valid(this);
-        clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
+        //clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
         assert_states_valid(this);
     }
 }
@@ -1198,7 +1184,6 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
 			OCCLUSION_FUDGE_Z = 1.;
 		}
 
-		// Don't cull hole/edge water, unless we have the GL_ARB_depth_clamp extension
 		if (earlyFail(camera, bounds))
 		{
             LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - early fail");
@@ -1222,17 +1207,12 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
 					// Depth clamp all water to avoid it being culled as a result of being
 					// behind the far clip plane, and in the case of edge water to avoid
 					// it being culled while still visible.
-					bool const use_depth_clamp = gGLManager.mHasDepthClamp &&
-												(mSpatialPartition->mDrawableType == LLPipeline::RENDER_TYPE_WATER ||
+					bool const use_depth_clamp = (mSpatialPartition->mDrawableType == LLPipeline::RENDER_TYPE_WATER ||
 												mSpatialPartition->mDrawableType == LLPipeline::RENDER_TYPE_VOIDWATER);
 
-					LLGLEnable clamp(use_depth_clamp ? GL_DEPTH_CLAMP : 0);				
+					LLGLEnable clamp(use_depth_clamp ? GL_DEPTH_CLAMP : 0);
 						
-#if !LL_DARWIN					
-					U32 mode = gGLManager.mHasOcclusionQuery2 ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED_ARB;
-#else
-					U32 mode = GL_SAMPLES_PASSED_ARB;
-#endif
+					U32 mode = gGLManager.mGLVersion >= 3.3f ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED;
 					
 #if LL_TRACK_PENDING_OCCLUSION_QUERIES
 					sPendingQueries.insert(mOcclusionQuery[LLViewerCamera::sCurCameraID]);
@@ -1251,7 +1231,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
                             //get an occlusion query that hasn't been used in awhile
                             releaseOcclusionQueryObjectName(mOcclusionQuery[LLViewerCamera::sCurCameraID]);
                             mOcclusionQuery[LLViewerCamera::sCurCameraID] = getNewOcclusionQueryObjectName();
-							glBeginQueryARB(mode, mOcclusionQuery[LLViewerCamera::sCurCameraID]);					
+                            glBeginQuery(mode, mOcclusionQuery[LLViewerCamera::sCurCameraID]);
                         }
 					
 						LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
@@ -1293,7 +1273,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
 	
                         {
                             LL_PROFILE_ZONE_NAMED("glEndQuery");
-							glEndQueryARB(mode);
+                            glEndQuery(mode);
                         }
 					}
 				}

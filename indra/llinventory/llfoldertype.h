@@ -93,9 +93,11 @@ public:
 
         FT_SETTINGS = 56,
 
-		FT_ANIM_OVERRIDES = 57,
-		FT_TOXIC = 58,
-		FT_RLV = 59,
+        FT_MATERIAL = 57,
+
+		FT_ANIM_OVERRIDES = 58,
+		FT_TOXIC = 59,
+		FT_RLV = 60,
 
 		FT_LOCAL = 69,
 
@@ -105,6 +107,8 @@ public:
 		FT_COUNT,
 
 		FT_NONE = -1
+
+        // When adding, see note at bottom of LLAssetType::Etype
 	};
 
 	static EType 				lookup(const std::string_view type_name);

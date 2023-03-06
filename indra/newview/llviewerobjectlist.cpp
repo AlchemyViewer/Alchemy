@@ -830,7 +830,33 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 		max_value = llmin((S32) mObjects.size(), mCurLazyUpdateIndex + num_updates);
 	}
 
+	// Iterate through some of the objects and lazy update their texture priorities
+	for (i = mCurLazyUpdateIndex; i < max_value; i++)
+	{
+		objectp = mObjects[i];
+		if (!objectp->isDead())
+		{
+			num_objects++;
 
+			//  Update distance & gpw 
+			objectp->setPixelAreaAndAngle(agent); // Also sets the approx. pixel area
+			objectp->updateTextures();	// Update the image levels of textures for this object.
+		}
+	}
+
+	mCurLazyUpdateIndex = max_value;
+	if (mCurLazyUpdateIndex == mObjects.size())
+	{
+		// restart
+		mCurLazyUpdateIndex = 0;
+		mCurBin = 0; // keep in sync with index (mObjects.size() could have changed)
+	}
+	else
+	{
+		mCurBin = (mCurBin + 1) % NUM_BINS;
+	}
+
+#if 1
 	// Slam priorities for textures that we care about (hovered, selected, and focused)
 	// Hovered
 	// Assumes only one level deep of parenting
@@ -862,33 +888,8 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 			return true;
 		}
 	} func;
-	select_mgr.getSelection()->applyToRootObjects(&func);
-
-	// Iterate through some of the objects and lazy update their texture priorities
-	for (i = mCurLazyUpdateIndex; i < max_value; i++)
-	{
-		objectp = mObjects[i];
-		if (objectp && !objectp->isDead())
-		{
-			num_objects++;
-
-			//  Update distance & gpw 
-			objectp->setPixelAreaAndAngle(agent); // Also sets the approx. pixel area
-			objectp->updateTextures();	// Update the image levels of textures for this object.
-		}
-	}
-
-	mCurLazyUpdateIndex = max_value;
-	if (mCurLazyUpdateIndex == mObjects.size())
-	{
-		// restart
-		mCurLazyUpdateIndex = 0;
-		mCurBin = 0; // keep in sync with index (mObjects.size() could have changed)
-	}
-	else
-	{
-		mCurBin = (mCurBin + 1) % NUM_BINS;
-	}
+	LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func);
+#endif
 
 	LLVOAvatar::cullAvatarsByPixelArea();
 }
@@ -1393,35 +1394,10 @@ void LLViewerObjectList::cleanupReferences(LLViewerObject *objectp)
 	}
 
 	// Don't clean up mObject references, these will be cleaned up more efficiently later!
-	// Also, not cleaned up
-	removeDrawable(objectp->mDrawable);
-
+	
 	if(new_dead_object)
 	{
 		mNumDeadObjects++;
-	}
-}
-
-void LLViewerObjectList::removeDrawable(LLDrawable* drawablep)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
-
-	if (!drawablep)
-	{
-		return;
-	}
-
-	for (S32 i = 0; i < drawablep->getNumFaces(); i++)
-	{
-		LLFace* facep = drawablep->getFace(i) ;
-		if(facep)
-		{
-			   LLViewerObject* objectp = facep->getViewerObject();
-			   if(objectp)
-			   {
-					   mSelectPickList.erase(objectp);
-			   }
-		}
 	}
 }
 
@@ -1958,137 +1934,7 @@ void LLViewerObjectList::renderObjectBounds(const LLVector3 &center)
 {
 }
 
-void LLViewerObjectList::generatePickList(LLCamera &camera)
-{
-	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-
-		LLViewerObject *objectp;
-		S32 i;
-		// Reset all of the GL names to zero.
-		for (vobj_list_t::iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
-		{
-			(*iter)->mGLName = 0;
-		}
-
-		mSelectPickList.clear();
-
-		std::vector<LLDrawable*> pick_drawables;
-
-		for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
-		{
-			for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
-			{
-				LLSpatialPartition* part = region->getSpatialPartition(i);
-				if (part)
-				{	
-					part->cull(camera, &pick_drawables, TRUE);
-				}
-			}
-		}
-
-		for (std::vector<LLDrawable*>::iterator iter = pick_drawables.begin();
-			iter != pick_drawables.end(); iter++)
-		{
-			LLDrawable* drawablep = *iter;
-			if( !drawablep )
-				continue;
-
-			LLViewerObject* last_objectp = NULL;
-			for (S32 face_num = 0; face_num < drawablep->getNumFaces(); face_num++)
-			{
-				LLFace * facep = drawablep->getFace(face_num);
-				if (!facep) continue;
-
-				LLViewerObject* objectp = facep->getViewerObject();
-
-				if (objectp && objectp != last_objectp)
-				{
-					mSelectPickList.insert(objectp);
-					last_objectp = objectp;
-				}
-			}
-		}
-
-		LLHUDNameTag::addPickable(mSelectPickList);
-
-		for (std::vector<LLCharacter*>::iterator iter = LLCharacter::sInstances.begin();
-			iter != LLCharacter::sInstances.end(); ++iter)
-		{
-			objectp = (LLVOAvatar*) *iter;
-			if (!objectp->isDead())
-			{
-				if (objectp->mDrawable.notNull() && objectp->mDrawable->isVisible())
-				{
-					mSelectPickList.insert(objectp);
-				}
-			}
-		}
-
-		// add all hud objects to pick list
-		if (isAgentAvatarValid())
-		{
-			for (const auto& attach_pair : gAgentAvatarp->mAttachmentPoints)
-			{
-                LLViewerJointAttachment* attachment = attach_pair.second;
-				if (attachment->getIsHUDAttachment())
-				{
-                    for (LLViewerObject * attached_object : attachment->mAttachedObjects)
-					{
-						if (attached_object)
-						{
-							mSelectPickList.insert(attached_object);
-							LLViewerObject::const_child_list_t& child_list = attached_object->getChildren();
-                            for (LLViewerObject* childp : child_list)
-							{
-								if (childp)
-								{
-									mSelectPickList.insert(childp);
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		
-		S32 num_pickables = (S32)mSelectPickList.size() + LLHUDIcon::getNumInstances();
-
-		if (num_pickables != 0)
-		{
-			S32 step = (0x000fffff - GL_NAME_INDEX_OFFSET) / num_pickables;
-
-			std::set<LLViewerObject*>::iterator pick_it;
-			i = 0;
-			for (pick_it = mSelectPickList.begin(); pick_it != mSelectPickList.end();)
-			{
-				LLViewerObject* objp = (*pick_it);
-				if (!objp || objp->isDead() || !objp->mbCanSelect)
-				{
-					mSelectPickList.erase(pick_it++);
-					continue;
-				}
-				
-				objp->mGLName = (i * step) + GL_NAME_INDEX_OFFSET;
-				i++;
-				++pick_it;
-			}
-
-			LLHUDIcon::generatePickIDs(i * step, step);
-	}
-}
-
-LLViewerObject *LLViewerObjectList::getSelectedObject(const U32 object_id)
-{
-	std::set<LLViewerObject*>::iterator pick_it;
-	for (pick_it = mSelectPickList.begin(); pick_it != mSelectPickList.end(); ++pick_it)
-	{
-		if ((*pick_it)->mGLName == object_id)
-		{
-			return (*pick_it);
-		}
-	}
-	return NULL;
-}
+extern BOOL gCubeSnapshot;
 
 void LLViewerObjectList::addDebugBeacon(const LLVector3 &pos_agent,
 										const std::string &string,
@@ -2096,6 +1942,7 @@ void LLViewerObjectList::addDebugBeacon(const LLVector3 &pos_agent,
 										const LLColor4 &text_color,
 										S32 line_width)
 {
+    llassert(!gCubeSnapshot);
 	LLDebugBeacon beacon;
 	beacon.mPositionAgent = pos_agent;
 	beacon.mString = string;

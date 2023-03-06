@@ -53,7 +53,6 @@
 #include "llviewercontrol.h" // for gSavedSettings
 #include "llviewertexturelist.h"
 
-static U32 sBufferUsage = GL_STREAM_DRAW_ARB;
 static U32 sShaderLevel = 0;
 
 LLGLSLShader* LLDrawPoolAvatar::sVertexProgram = NULL;
@@ -142,15 +141,6 @@ void LLDrawPoolAvatar::prerender()
 	mShaderLevel = LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_AVATAR);
 	
 	sShaderLevel = mShaderLevel;
-	
-	if (sShaderLevel > 0)
-	{
-		sBufferUsage = GL_DYNAMIC_DRAW_ARB;
-	}
-	else
-	{
-		sBufferUsage = GL_STREAM_DRAW_ARB;
-	}
 }
 
 LLMatrix4a& LLDrawPoolAvatar::getModelView()
@@ -535,14 +525,6 @@ void LLDrawPoolAvatar::beginRigid()
 		{	//eyeballs render with the specular shader
 			sVertexProgram->bind();
 			sVertexProgram->setMinimumAlpha(LLDrawPoolAvatar::sMinimumAlpha);
-            if (LLPipeline::sRenderingHUDs)
-	        {
-		        sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 1);
-	        }
-	        else
-	        {
-		        sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 0);
-	        }
 		}
 	}
 	else
@@ -601,14 +583,6 @@ void LLDrawPoolAvatar::beginDeferredRigid()
 	sDiffuseChannel = sVertexProgram->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
 	sVertexProgram->bind();
 	sVertexProgram->setMinimumAlpha(LLDrawPoolAvatar::sMinimumAlpha);
-    if (LLPipeline::sRenderingHUDs)
-	{
-		sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 1);
-	}
-	else
-	{
-		sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 0);
-	}
 }
 
 void LLDrawPoolAvatar::endDeferredRigid()
@@ -656,14 +630,6 @@ void LLDrawPoolAvatar::beginSkinned()
 
 		sVertexProgram->bind();
 		sVertexProgram->enableTexture(LLViewerShaderMgr::BUMP_MAP);
-        if (LLPipeline::sRenderingHUDs)
-	    {
-		    sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 1);
-	    }
-	    else
-	    {
-		    sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 0);
-	    }
 		gGL.getTexUnit(0)->activate();
 	}
 	else
@@ -673,14 +639,6 @@ void LLDrawPoolAvatar::beginSkinned()
 			// software skinning, use a basic shader for windlight.
 			// TODO: find a better fallback method for software skinning.
 			sVertexProgram->bind();
-            if (LLPipeline::sRenderingHUDs)
-	        {
-		        sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 1);
-	        }
-	        else
-	        {
-		        sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 0);
-	        }
 		}
 	}
 
@@ -723,15 +681,6 @@ void LLDrawPoolAvatar::beginDeferredSkinned()
 
 	sVertexProgram->bind();
 	sVertexProgram->setMinimumAlpha(LLDrawPoolAvatar::sMinimumAlpha);
-	if (LLPipeline::sRenderingHUDs)
-	{
-		sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 1);
-	}
-	else
-	{
-		sVertexProgram->uniform1i(LLShaderMgr::NO_ATMO, 0);
-	}
-
 	sDiffuseChannel = sVertexProgram->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
 	gGL.getTexUnit(0)->activate();
 }

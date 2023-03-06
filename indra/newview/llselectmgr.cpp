@@ -63,6 +63,7 @@
 #include "llfloatertools.h"
 #include "llframetimer.h"
 #include "llfocusmgr.h"
+#include "llgltfmateriallist.h"
 #include "llhudeffecttrail.h"
 #include "llhudmanager.h"
 #include "llinventorymodel.h"
@@ -1061,10 +1062,6 @@ void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, BOOL undoab
 	// check to see if object is already in list
 	LLSelectNode *nodep = mSelectedObjects->findNode(objectp);
 
-	// Reset (in anticipation of being set to an appropriate value by panel refresh, if they're up)
-	//
-	setTextureChannel(LLRender::DIFFUSE_MAP);
-
 	// if not in list, add it
 	if (!nodep)
 	{
@@ -1189,8 +1186,8 @@ void LLSelectMgr::highlightObjectOnly(LLViewerObject* objectp)
 		return;
 	}
 	
-	if ((gSavedSettings.getBOOL("SelectOwnedOnly") && !objectp->permYouOwner()) 
-		|| (gSavedSettings.getBOOL("SelectMovableOnly") && (!objectp->permMove() ||  objectp->isPermanentEnforced())))
+    if ((gSavedSettings.getBOOL("SelectOwnedOnly") && !objectp->permYouOwner())
+        || (gSavedSettings.getBOOL("SelectMovableOnly") && (!objectp->permMove() || objectp->isPermanentEnforced())))
 	{
 		// only select my own objects
 		return;
@@ -1746,6 +1743,7 @@ void LLObjectSelection::applyNoCopyTextureToTEs(LLViewerInventoryItem* item)
 
 		S32 num_tes = llmin((S32)object->getNumTEs(), (S32)object->getNumFaces());
 		bool texture_copied = false;
+        bool updated = false;
 		for (S32 te = 0; te < num_tes; ++te)
 		{
 			if (node->isTESelected(te))
@@ -1754,21 +1752,70 @@ void LLObjectSelection::applyNoCopyTextureToTEs(LLViewerInventoryItem* item)
 				// without making any copies
 				if (!texture_copied)
 				{
-					LLToolDragAndDrop::handleDropTextureProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
+					LLToolDragAndDrop::handleDropMaterialProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
 					texture_copied = true;
 				}
 
 				// apply texture for the selected faces
 				add(LLStatViewer::EDIT_TEXTURE, 1);
 				object->setTEImage(te, image);
-				dialog_refresh_all();
-
-				// send the update to the simulator
-				object->sendTEUpdate();
+                updated = true;
 			}
 		}
+
+        if (updated) // not nessesary? sendTEUpdate update supposed to be done by sendfunc
+        {
+            dialog_refresh_all();
+
+            // send the update to the simulator
+            object->sendTEUpdate();
+        }
 	}
 }
+
+void LLObjectSelection::applyNoCopyPbrMaterialToTEs(LLViewerInventoryItem* item)
+{
+    if (!item)
+    {
+        return;
+    }
+
+    LLUUID asset_id = item->getAssetUUID();
+
+    for (iterator iter = begin(); iter != end(); ++iter)
+    {
+        LLSelectNode* node = *iter;
+        LLViewerObject* object = (*iter)->getObject();
+        if (!object)
+        {
+            continue;
+        }
+
+        S32 num_tes = llmin((S32)object->getNumTEs(), (S32)object->getNumFaces());
+        bool material_copied = false;
+        for (S32 te = 0; te < num_tes; ++te)
+        {
+            if (node->isTESelected(te))
+            {
+                //(no-copy) materials must be moved to the object's inventory only once
+                // without making any copies
+                if (!material_copied && asset_id.notNull())
+                {
+                    LLToolDragAndDrop::handleDropMaterialProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
+                    material_copied = true;
+                }
+
+                // apply texture for the selected faces
+                // blank out most override data on the server
+                //add(LLStatViewer::EDIT_TEXTURE, 1);
+                object->setRenderMaterialID(te, asset_id);
+            }
+        }
+    }
+
+    LLGLTFMaterialList::flushUpdates();
+}
+
 
 //-----------------------------------------------------------------------------
 // selectionSetImage()
@@ -1862,6 +1909,87 @@ void LLSelectMgr::selectionSetImage(const LLUUID& imageid)
 		}
 	} sendfunc(item);
 	getSelection()->applyToObjects(&sendfunc);
+}
+
+//-----------------------------------------------------------------------------
+// selectionSetGLTFMaterial()
+//-----------------------------------------------------------------------------
+void LLSelectMgr::selectionSetGLTFMaterial(const LLUUID& mat_id)
+{
+    // First for (no copy) textures and multiple object selection
+    LLViewerInventoryItem* item = gInventory.getItem(mat_id);
+    if (item
+        && !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID())
+        && (mSelectedObjects->getNumNodes() > 1))
+    {
+        LL_WARNS() << "Attempted to apply no-copy material to multiple objects"
+            << LL_ENDL;
+        return;
+    }
+
+    struct f : public LLSelectedTEFunctor
+    {
+        LLViewerInventoryItem* mItem;
+        LLUUID mMatId;
+        f(LLViewerInventoryItem* item, const LLUUID& id) : mItem(item), mMatId(id) {}
+        bool apply(LLViewerObject* objectp, S32 te)
+        {
+            if (objectp && !objectp->permModify())
+            {
+                return false;
+            }
+            LLUUID asset_id = mMatId;
+            if (mItem)
+            {
+                asset_id = mItem->getAssetUUID();
+            }
+
+            // Blank out most override data on the object and send to server
+            objectp->setRenderMaterialID(te, asset_id);
+
+            return true;
+        }
+    };
+
+    if (item && !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()))
+    {
+        getSelection()->applyNoCopyPbrMaterialToTEs(item);
+    }
+    else
+    {
+        f setfunc(item, mat_id);
+        getSelection()->applyToTEs(&setfunc);
+    }
+
+    struct g : public LLSelectedObjectFunctor
+    {
+        LLViewerInventoryItem* mItem;
+        g(LLViewerInventoryItem* item) : mItem(item) {}
+        virtual bool apply(LLViewerObject* object)
+        {
+            if (object && !object->permModify())
+            {
+                return false;
+            }
+
+            if (!mItem)
+            {
+                // 1 particle effect per object				
+                LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
+                effectp->setSourceObject(gAgentAvatarp);
+                effectp->setTargetObject(object);
+                effectp->setDuration(LL_HUD_DUR_SHORT);
+                effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+            }
+
+            dialog_refresh_all();
+            object->sendTEUpdate();
+            return true;
+        }
+    } sendfunc(item);
+    getSelection()->applyToObjects(&sendfunc);
+
+    LLGLTFMaterialList::flushUpdates();
 }
 
 //-----------------------------------------------------------------------------
@@ -2041,6 +2169,48 @@ BOOL LLSelectMgr::selectionRevertTextures()
 	return revert_successful;
 }
 
+void LLSelectMgr::selectionRevertGLTFMaterials()
+{
+    struct f : public LLSelectedTEFunctor
+    {
+        LLObjectSelectionHandle mSelectedObjects;
+        f(LLObjectSelectionHandle sel) : mSelectedObjects(sel) {}
+        bool apply(LLViewerObject* objectp, S32 te)
+        {
+            if (objectp && !objectp->permModify())
+            {
+                return false;
+            }
+
+            LLSelectNode* nodep = mSelectedObjects->findNode(objectp);
+            if (nodep && te < (S32)nodep->mSavedGLTFMaterialIds.size())
+            {
+                // Restore base material
+                LLUUID asset_id = nodep->mSavedGLTFMaterialIds[te];
+
+                // Update material locally
+                objectp->setRenderMaterialID(te, asset_id, false /*wait for LLGLTFMaterialList update*/);
+                objectp->setTEGLTFMaterialOverride(te, nodep->mSavedGLTFOverrideMaterials[te]);
+
+                // Enqueue update to server
+                if (asset_id.notNull())
+                {
+                    // Restore overrides
+                    LLGLTFMaterialList::queueModify(objectp, te, nodep->mSavedGLTFOverrideMaterials[te]);
+                } 
+                else
+                {
+                    //blank override out
+                    LLGLTFMaterialList::queueApply(objectp, te, asset_id);
+                }
+
+            }
+            return true;
+        }
+    } setfunc(mSelectedObjects);
+    getSelection()->applyToTEs(&setfunc);
+}
+
 void LLSelectMgr::selectionSetBumpmap(U8 bumpmap, const LLUUID &image_id)
 {
 	struct f : public LLSelectedTEFunctor
@@ -2070,7 +2240,7 @@ void LLSelectMgr::selectionSetBumpmap(U8 bumpmap, const LLUUID &image_id)
     {
         LLViewerObject *object = mSelectedObjects->getFirstRootObject();
         if (!object) return;
-        LLToolDragAndDrop::handleDropTextureProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
+        LLToolDragAndDrop::handleDropMaterialProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
     }
     getSelection()->applyToTEs(&setfunc);
 	
@@ -2130,7 +2300,7 @@ void LLSelectMgr::selectionSetShiny(U8 shiny, const LLUUID &image_id)
     {
         LLViewerObject *object = mSelectedObjects->getFirstRootObject();
         if (!object) return;
-        LLToolDragAndDrop::handleDropTextureProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
+        LLToolDragAndDrop::handleDropMaterialProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
     }
     getSelection()->applyToTEs(&setfunc);
 
@@ -5605,9 +5775,40 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 
 				if (can_copy && can_transfer)
 				{
-					// this should be the only place that saved textures is called
 					node->saveTextures(texture_ids);
 				}
+
+                if (can_copy && can_transfer && node->getObject()->getVolume())
+                {
+                    uuid_vec_t material_ids;
+                    gltf_materials_vec_t materials;
+                    LLVOVolume* vobjp = (LLVOVolume*)node->getObject();
+                    for (int i = 0; i < vobjp->getNumTEs(); ++i)
+                    {
+                        material_ids.push_back(vobjp->getRenderMaterialID(i));
+
+                        // Make a copy to ensure we won't affect live material
+                        // with any potential changes nor live changes will be
+                        // reflected in a saved copy.
+                        // Like changes from local material (reuses pointer) or
+                        // from live editor (revert mechanics might modify this)
+                        LLGLTFMaterial* old_override = node->getObject()->getTE(i)->getGLTFMaterialOverride();
+                        if (old_override)
+                        {
+                            LLPointer<LLGLTFMaterial> mat = new LLGLTFMaterial(*old_override);
+                            materials.push_back(mat);
+                        }
+                        else
+                        {
+                            materials.push_back(nullptr);
+                        }
+                    }
+                    node->saveGLTFMaterialIds(material_ids);
+
+                    // processObjectProperties does not include overrides so this
+                    // might need to be moved to LLGLTFMaterialOverrideDispatchHandler
+                    node->saveGLTFOverrideMaterials(materials);
+                }
 			}
 
 			node->mValid = TRUE;
@@ -6053,7 +6254,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 	auto renderMeshSelection_f = [fogCfx, wireframe_selection](LLSelectNode* node, LLViewerObject* objectp, LLColor4 hlColor)
 	{
 		//Need to because crash on ATI 3800 (and similar cards) MAINT-5018 
-		LLGLDisable multisample(LLPipeline::RenderFSAASamples > 0 ? GL_MULTISAMPLE_ARB : 0);
+		LLGLDisable multisample(LLPipeline::RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
 
 		LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
@@ -6323,6 +6524,8 @@ LLSelectNode::LLSelectNode(const LLSelectNode& nodep)
 	mSavedShinyColors = nodep.mSavedShinyColors;
 	
 	saveTextures(nodep.mSavedTextures);
+    saveGLTFMaterialIds(nodep.mSavedGLTFMaterialIds);
+    saveGLTFOverrideMaterials(nodep.mSavedGLTFOverrideMaterials);
 }
 
 LLSelectNode::~LLSelectNode()
@@ -6448,6 +6651,34 @@ void LLSelectNode::saveTextures(const uuid_vec_t& textures)
 	{
 		mSavedTextures = textures;
 	}
+}
+
+void LLSelectNode::saveGLTFMaterialIds(const uuid_vec_t& materials)
+{
+    if (mObject.notNull())
+    {
+        mSavedGLTFMaterialIds.clear();
+
+        for (uuid_vec_t::const_iterator materials_it = materials.begin();
+            materials_it != materials.end(); ++materials_it)
+        {
+            mSavedGLTFMaterialIds.push_back(*materials_it);
+        }
+    }
+}
+
+void LLSelectNode::saveGLTFOverrideMaterials(const gltf_materials_vec_t& materials)
+{
+    if (mObject.notNull())
+    {
+        mSavedGLTFOverrideMaterials.clear();
+
+        for (gltf_materials_vec_t::const_iterator mat_it = materials.begin();
+            mat_it != materials.end(); ++mat_it)
+        {
+            mSavedGLTFOverrideMaterials.push_back(*mat_it);
+        }
+    }
 }
 
 void LLSelectNode::saveTextureScaleRatios(LLRender::eTexIndex index_to_query)
@@ -6671,7 +6902,7 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 		{
 			gGL.flush();
 			gGL.blendFunc(LLRender::BF_SOURCE_COLOR, LLRender::BF_ONE);
-
+			
             LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE, GL_GEQUAL);
             gGL.flush();
 			gGL.begin(LLRender::LINES);
@@ -8220,6 +8451,7 @@ DEF_DUMMY_CHECK_FUNCTOR(int)
 DEF_DUMMY_CHECK_FUNCTOR(LLColor4)
 DEF_DUMMY_CHECK_FUNCTOR(LLMediaEntry)
 DEF_DUMMY_CHECK_FUNCTOR(LLPointer<LLMaterial>)
+DEF_DUMMY_CHECK_FUNCTOR(LLPointer<LLGLTFMaterial>)
 DEF_DUMMY_CHECK_FUNCTOR(std::string)
 DEF_DUMMY_CHECK_FUNCTOR(std::vector<std::string>)
 

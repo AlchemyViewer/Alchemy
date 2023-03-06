@@ -822,7 +822,6 @@ LLMeshRepoThread::LLMeshRepoThread()
   mHttpPolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
   mHttpLegacyPolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
   mHttpLargePolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
-  mHttpPriority(0),
   mLegacyGetMeshVersion(0)
 {
 	LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
@@ -1285,7 +1284,6 @@ LLCore::HttpHandle LLMeshRepoThread::getByteRange(const std::string & url, int l
 	if (len < LARGE_MESH_FETCH_THRESHOLD)
 	{
 		handle = mHttpRequest->requestGetByteRange( ((legacy_cap_version == 0 || legacy_cap_version == 2) ? mHttpPolicyClass : mHttpLegacyPolicyClass),
-                                                    mHttpPriority,
                                                     url,
                                                     (disable_range_req ? size_t(0) : offset),
                                                     (disable_range_req ? size_t(0) : len),
@@ -1300,7 +1298,6 @@ LLCore::HttpHandle LLMeshRepoThread::getByteRange(const std::string & url, int l
 	else
 	{
 		handle = mHttpRequest->requestGetByteRange(mHttpLargePolicyClass,
-												   mHttpPriority,
 												   url,
 												   (disable_range_req ? size_t(0) : offset),
 												   (disable_range_req ? size_t(0) : len),
@@ -1967,7 +1964,6 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list& data, 
 	mHttpHeaders = std::make_shared<LLCore::HttpHeaders>();
 	mHttpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_LLSD_XML);
 	mHttpPolicyClass = LLAppViewer::instance()->getAppCoreHttp().getPolicy(LLAppCoreHttp::AP_UPLOADS);
-	mHttpPriority = 0;
 }
 
 LLMeshUploadThread::~LLMeshUploadThread()
@@ -2486,7 +2482,6 @@ void LLMeshUploadThread::doWholeModelUpload()
 
 		LLCore::HttpHandle handle = LLCoreHttpUtil::requestPostWithLLSD(mHttpRequest,
 																		mHttpPolicyClass,
-																		mHttpPriority,
 																		mWholeModelUploadURL,
 																		body,
 																		mHttpOptions,
@@ -2537,7 +2532,6 @@ void LLMeshUploadThread::requestWholeModelFee()
 	dump_llsd_to_file(mModelData, make_dump_name("whole_model_fee_request_", dump_num));
 	LLCore::HttpHandle handle = LLCoreHttpUtil::requestPostWithLLSD(mHttpRequest,
 																	mHttpPolicyClass,
-																	mHttpPriority,
 																	mWholeModelFeeCapability,
 																	mModelData,
 																	mHttpOptions,

@@ -45,8 +45,6 @@
 
 F32 LLVOSurfacePatch::sLODFactor = 1.f;
 
-//============================================================================
-
 LLVOSurfacePatch::LLVOSurfacePatch(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
 	:	LLStaticViewerObject(id, pcode, regionp),
 		mDirtiedPatch(FALSE),
@@ -862,7 +860,7 @@ void LLVOSurfacePatch::getGeomSizesEast(const S32 stride, const S32 east_stride,
 	}
 }
 
-BOOL LLVOSurfacePatch::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, S32 *face_hitp,
+BOOL LLVOSurfacePatch::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, BOOL pick_unselectable, S32 *face_hitp,
 									  LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
 	
 {
@@ -983,17 +981,12 @@ U32 LLVOSurfacePatch::getPartitionType() const
 }
 
 LLTerrainPartition::LLTerrainPartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolTerrain::VERTEX_DATA_MASK, FALSE, GL_DYNAMIC_DRAW_ARB, regionp)
+: LLSpatialPartition(LLDrawPoolTerrain::VERTEX_DATA_MASK, FALSE, regionp)
 {
 	mOcclusionEnabled = FALSE;
 	mInfiniteFarClip = TRUE;
 	mDrawableType = LLPipeline::RENDER_TYPE_TERRAIN;
 	mPartitionType = LLViewerRegion::PARTITION_TERRAIN;
-}
-
-LLVertexBuffer* LLTerrainPartition::createVertexBuffer(U32 type_mask, U32 usage)
-{
-	return new LLVertexBuffer(LLVOSurfacePatch::VERTEX_DATA_MASK, GL_DYNAMIC_DRAW);
 }
 
 void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
@@ -1031,7 +1024,7 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
 		index_offset += facep->getGeomCount();
 	}
 
-	buffer->flush();
+	buffer->unmapBuffer();
 	mFaceList.clear();
 }
 

@@ -43,6 +43,7 @@
 #include "llcapabilityprovider.h"
 #include "m4math.h"					// LLMatrix4
 #include "llframetimer.h"
+#include "llreflectionmap.h"
 #include "lleasymessagesender.h"
 
 // Surface id's
@@ -71,6 +72,7 @@ class LLHost;
 class LLBBox;
 class LLSpatialGroup;
 class LLDrawable;
+class LLGLTFOverrideCacheEntry;
 class LLViewerRegionImpl;
 class LLViewerOctreeGroup;
 class LLVOCachePartition;
@@ -358,7 +360,10 @@ public:
 
 	// handle a full update message
 	eCacheUpdateResult cacheFullUpdate(LLDataPackerBinaryBuffer &dp, U32 flags);
-	eCacheUpdateResult cacheFullUpdate(LLViewerObject* objectp, LLDataPackerBinaryBuffer &dp, U32 flags);	
+	eCacheUpdateResult cacheFullUpdate(LLViewerObject* objectp, LLDataPackerBinaryBuffer &dp, U32 flags);
+
+    void cacheFullUpdateGLTFOverride(const LLGLTFOverrideCacheEntry &override_data);
+
 	LLVOCacheEntry* getCacheEntryForOctree(U32 local_id);
 	LLVOCacheEntry* getCacheEntry(U32 local_id, bool valid = true);
 	bool probeCache(U32 local_id, U32 crc, U32 flags, U8 &cache_miss_type);
@@ -412,6 +417,9 @@ public:
 	std::string getSimHostName();
 
 	static BOOL isNewObjectCreationThrottleDisabled() {return sNewObjectCreationThrottle < 0;}
+
+    // rebuild reflection probe list
+    void updateReflectionProbes();
 
 	/* ================================================================
 	 * @name OpenSimExtras Simulator Features capability
@@ -472,6 +480,8 @@ private:
 	bool isNonCacheableObjectCreated(U32 local_id);	
 	void setGodnames();
 
+    void loadCacheMiscExtras(U32 local_id, LLVOCacheEntry * entry, U32 crc);
+    
 public:
 	struct CompareDistance
 	{
@@ -657,6 +667,9 @@ private:
 	LLFrameTimer mMaterialsCapThrottleTimer;
 	LLFrameTimer mRenderInfoRequestTimer;
 	LLFrameTimer mRenderInfoReportTimer;
+
+    // list of reflection maps being managed by this llviewer region
+    std::vector<LLPointer<LLReflectionMap> > mReflectionMaps;
 
 	mutable tex_matrix_t mWorldMapTiles;
 	boost::unordered_flat_set<std::string> mGodNames;

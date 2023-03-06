@@ -37,6 +37,7 @@
 #include "llshadermgr.h"
 #include "llmatrix4a.h"
 #include "alglmath.h"
+#include "hbxxh.h"
 
 #if GL_ARB_debug_output
 #ifndef APIENTRY
@@ -60,7 +61,13 @@ LLMatrix4a	gGLModelView;
 LLMatrix4a	gGLLastModelView;
 LLMatrix4a	gGLLastProjection;
 LLMatrix4a	gGLProjection;
+
+// transform from last frame's camera space to this frame's camera space (and inverse)
+LLMatrix4a gGLDeltaModelView;
+LLMatrix4a gGLInverseDeltaModelView;
+
 S32			gGLViewport[4];
+
 
 U32 LLRender::sUICalls = 0;
 U32 LLRender::sUIVerts = 0;
@@ -73,11 +80,20 @@ LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 static const U32 LL_NUM_TEXTURE_LAYERS = 32; 
 static const U32 LL_NUM_LIGHT_UNITS = 8;
 
+struct LLVBCache
+{
+    LLPointer<LLVertexBuffer> vb;
+    std::chrono::steady_clock::time_point touched;
+};
+
+static std::unordered_map<U64, LLVBCache> sVBCache;
+
 static const GLenum sGLTextureType[] =
 {
 	GL_TEXTURE_2D,
-	GL_TEXTURE_RECTANGLE_ARB,
-	GL_TEXTURE_CUBE_MAP_ARB,
+	GL_TEXTURE_RECTANGLE,
+	GL_TEXTURE_CUBE_MAP,
+    GL_TEXTURE_CUBE_MAP_ARRAY,
 	GL_TEXTURE_2D_MULTISAMPLE,
     GL_TEXTURE_3D
 };
@@ -129,7 +145,7 @@ void LLTexUnit::refreshState(void)
 
 	gGL.flush();
 	
-	glActiveTexture(GL_TEXTURE0_ARB + mIndex);
+	glActiveTexture(GL_TEXTURE0 + mIndex);
 
 	if (mCurrTexType != TT_NONE)
 	{
@@ -150,7 +166,7 @@ void LLTexUnit::activate(void)
 	if ((S32)gGL.mCurrTextureUnitIndex != mIndex || gGL.mDirty)
 	{
 		gGL.flush();
-		glActiveTexture(GL_TEXTURE0_ARB + mIndex);
+		glActiveTexture(GL_TEXTURE0 + mIndex);
 		gGL.mCurrTextureUnitIndex = mIndex;
 	}
 }
@@ -161,13 +177,10 @@ void LLTexUnit::enable(eTextureType type)
 
 	if ( (mCurrTexType != type || gGL.mDirty) && (type != TT_NONE) )
 	{
-		stop_glerror();
 		activate();
-		stop_glerror();
 		if (mCurrTexType != TT_NONE && !gGL.mDirty)
 		{
 			disable(); // Force a disable of a previous texture type if it's enabled.
-			stop_glerror();
 		}
 		mCurrTexType = type;
 
@@ -181,11 +194,7 @@ void LLTexUnit::disable(void)
 
 	if (mCurrTexType != TT_NONE)
 	{
-		activate();
 		unbind(mCurrTexType);
-		gGL.flush();
-        setTextureColorSpace(TCS_SRGB);
-		
 		mCurrTexType = TT_NONE;
 	}
 }
@@ -193,8 +202,8 @@ void LLTexUnit::disable(void)
 void LLTexUnit::bindFast(LLTexture* texture)
 {
     LLImageGL* gl_tex = texture->getGLTexture();
-
-    glActiveTexture(GL_TEXTURE0_ARB + mIndex);
+    texture->setActive();
+    glActiveTexture(GL_TEXTURE0 + mIndex);
     gGL.mCurrTextureUnitIndex = mIndex;
     mCurrTexture = gl_tex->getTexName();
     if (!mCurrTexture)
@@ -230,7 +239,7 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 					enable(gl_tex->getTarget());
 					mCurrTexture = gl_tex->getTexName();
 					glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
-					if(gl_tex->updateBindStats(gl_tex->mTextureMemory))
+					if(gl_tex->updateBindStats())
 					{
 						texture->setActive() ;
 						texture->updateBindStatsForTester() ;
@@ -313,7 +322,7 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
 		mCurrTexture = texname;
 		glBindTexture(sGLTextureType[texture->getTarget()], mCurrTexture);
 		stop_glerror();
-		texture->updateBindStats(texture->mTextureMemory);		
+        texture->updateBindStats();
 		mHasMipMaps = texture->mHasMipMaps;
 		if (texture->mTexOptionsDirty)
 		{
@@ -345,14 +354,14 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap)
 
 	if (mCurrTexture != cubeMap->mImages[0]->getTexName())
 	{
-		if (gGLManager.mHasCubeMap && LLCubeMap::sUseCubeMaps)
+		if (LLCubeMap::sUseCubeMaps)
 		{
 			activate();
 			enable(LLTexUnit::TT_CUBE_MAP);
             mCurrTexture = cubeMap->mImages[0]->getTexName();
-			glBindTexture(GL_TEXTURE_CUBE_MAP_ARB, mCurrTexture);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
 			mHasMipMaps = cubeMap->mImages[0]->mHasMipMaps;
-			cubeMap->mImages[0]->updateBindStats(cubeMap->mImages[0]->mTextureMemory);
+			cubeMap->mImages[0]->updateBindStats();
 			if (cubeMap->mImages[0]->mTexOptionsDirty)
 			{
 				cubeMap->mImages[0]->mTexOptionsDirty = false;
@@ -380,10 +389,7 @@ bool LLTexUnit::bind(LLRenderTarget* renderTarget, bool bindDepth)
 
 	if (bindDepth)
 	{
-		if (renderTarget->hasStencil())
-		{
-			LL_ERRS() << "Cannot bind a render buffer for sampling.  Allocate render target without a stencil buffer if sampling of depth buffer is required." << LL_ENDL;
-		}
+        llassert(renderTarget->getDepth()); // target MUST have a depth buffer attachment
 
 		bindManual(renderTarget->getUsage(), renderTarget->getDepth());
 	}
@@ -526,16 +532,16 @@ void LLTexUnit::setTextureFilteringOption(LLTexUnit::eTextureFilterOptions optio
 		}
 	}
 
-	if (gGLManager.mHasAnisotropic)
+	if (gGLManager.mGLVersion >= 4.59f)
 	{
 		if (option == TFO_ANISOTROPIC && LLRender::sAnisotropicFilteringLevel > 1.f)
 		{
 			F32 aniso_level = llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mGLMaxAnisotropy);
-			glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso_level);
+			glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY, aniso_level);
 		}
 		else
 		{
-			glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.f);
+			glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY, 1.f);
 		}
 	}
 }
@@ -549,7 +555,7 @@ GLint LLTexUnit::getTextureSource(eTextureBlendSrc src)
 		case TBS_PREV_ALPHA:
 		case TBS_ONE_MINUS_PREV_COLOR:
 		case TBS_ONE_MINUS_PREV_ALPHA:
-			return GL_PREVIOUS_ARB;
+			return GL_PREVIOUS;
 
 		// All four cases should return the same value.
 		case TBS_TEX_COLOR:
@@ -563,18 +569,18 @@ GLint LLTexUnit::getTextureSource(eTextureBlendSrc src)
 		case TBS_VERT_ALPHA:
 		case TBS_ONE_MINUS_VERT_COLOR:
 		case TBS_ONE_MINUS_VERT_ALPHA:
-			return GL_PRIMARY_COLOR_ARB;
+			return GL_PRIMARY_COLOR;
 
 		// All four cases should return the same value.
 		case TBS_CONST_COLOR:
 		case TBS_CONST_ALPHA:
 		case TBS_ONE_MINUS_CONST_COLOR:
 		case TBS_ONE_MINUS_CONST_ALPHA:
-			return GL_CONSTANT_ARB;
+			return GL_CONSTANT;
 
 		default:
 			LL_WARNS() << "Unknown eTextureBlendSrc: " << src << ".  Using Vertex Color instead." << LL_ENDL;
-			return GL_PRIMARY_COLOR_ARB;
+			return GL_PRIMARY_COLOR;
 	}
 }
 
@@ -643,10 +649,10 @@ void LLTexUnit::debugTextureUnit(void)
 	if (mIndex < 0) return;
 
 	GLint activeTexture;
-	glGetIntegerv(GL_ACTIVE_TEXTURE_ARB, &activeTexture);
-	if ((GL_TEXTURE0_ARB + mIndex) != activeTexture)
+	glGetIntegerv(GL_ACTIVE_TEXTURE, &activeTexture);
+	if ((GL_TEXTURE0 + mIndex) != activeTexture)
 	{
-		U32 set_unit = (activeTexture - GL_TEXTURE0_ARB);
+		U32 set_unit = (activeTexture - GL_TEXTURE0);
 		LL_WARNS() << "Incorrect Texture Unit!  Expected: " << set_unit << " Actual: " << mIndex << LL_ENDL;
 	}
 }
@@ -654,23 +660,6 @@ void LLTexUnit::debugTextureUnit(void)
 void LLTexUnit::setTextureColorSpace(eTextureColorSpace space)
 {
     mTexColorSpace = space;
-
-    if (gGLManager.mHasTexturesRGBDecode)
-    {
-        if (space == TCS_LINEAR)
-        {
-            glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_SRGB_DECODE_EXT, GL_DECODE_EXT);
-        }
-        else
-        {
-            glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
-        }
-
-        if (gDebugGL)
-        {
-			stop_glerror();
-        }
-    }
 }
 
 LLLightState::LLLightState(S32 index)
@@ -730,6 +719,24 @@ void LLLightState::setSunPrimary(bool v)
     {
         ++gGL.mLightHash;
 		mSunIsPrimary = v;
+    }
+}
+
+void LLLightState::setSize(F32 v)
+{
+    if (mSize != v)
+    {
+        ++gGL.mLightHash;
+        mSize = v;
+    }
+}
+
+void LLLightState::setFalloff(F32 v)
+{
+    if (mFalloff != v)
+    {
+        ++gGL.mLightHash;
+        mFalloff = v;
     }
 }
 
@@ -880,9 +887,9 @@ void LLRender::init(bool needs_vertex_buffer)
 #if GL_ARB_debug_output
     if (gGLManager.mHasDebugOutput && gDebugGL)
     { //setup debug output callback
-        //glDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW_ARB, 0, NULL, GL_TRUE);
-        glDebugMessageCallbackARB((GLDEBUGPROCARB) gl_debug_callback, NULL);
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
+        //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW_ARB, 0, NULL, GL_TRUE);
+        glDebugMessageCallback((GLDEBUGPROC) gl_debug_callback, NULL);
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     }
 #endif
 
@@ -894,6 +901,9 @@ void LLRender::init(bool needs_vertex_buffer)
 
     glCullFace(GL_BACK);
 
+    // necessary for reflection maps
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
     if (needs_vertex_buffer)
     {
         initVertexBuffer();
@@ -904,9 +914,9 @@ void LLRender::initVertexBuffer()
 {
 	llassert_always(mBuffer.isNull());
 	stop_glerror();
-	mBuffer = new LLVertexBuffer(immediate_mask, 0);
+    mBuffer = new LLVertexBuffer(immediate_mask);
 	stop_glerror();
-	mBuffer->allocateBuffer(4096, 0, TRUE);
+    mBuffer->allocateBuffer(4096, 0);
 	stop_glerror();
 	mBuffer->getVertexStrider(mVerticesp);
 	stop_glerror();
@@ -975,7 +985,10 @@ void LLRender::syncLightState()
         LLVector4 position[LL_NUM_LIGHT_UNITS];
         LLVector3 direction[LL_NUM_LIGHT_UNITS];
         LLVector4 attenuation[LL_NUM_LIGHT_UNITS];
-		LLVector3 light_diffuse[LL_NUM_LIGHT_UNITS];
+        LLVector3 diffuse[LL_NUM_LIGHT_UNITS];
+        LLVector3 diffuse_b[LL_NUM_LIGHT_UNITS];
+        bool      sun_primary[LL_NUM_LIGHT_UNITS];
+        LLVector2 size[LL_NUM_LIGHT_UNITS];
 
         for (U32 i = 0; i < LL_NUM_LIGHT_UNITS; i++)
         {
@@ -984,18 +997,22 @@ void LLRender::syncLightState()
             position[i]  = light->mPosition;
             direction[i] = light->mSpotDirection;
             attenuation[i].set(light->mLinearAtten, light->mQuadraticAtten, light->mSpecular.mV[2], light->mSpecular.mV[3]);
-			light_diffuse[i].set(light->mDiffuse.mV);
+            diffuse[i].set(light->mDiffuse.mV);
+            diffuse_b[i].set(light->mDiffuseB.mV);
+            sun_primary[i] = light->mSunIsPrimary;
+            size[i].set(light->mSize, light->mFalloff);
         }
 
         shader->uniform4fv(LLShaderMgr::LIGHT_POSITION, LL_NUM_LIGHT_UNITS, position[0].mV);
         shader->uniform3fv(LLShaderMgr::LIGHT_DIRECTION, LL_NUM_LIGHT_UNITS, direction[0].mV);
         shader->uniform4fv(LLShaderMgr::LIGHT_ATTENUATION, LL_NUM_LIGHT_UNITS, attenuation[0].mV);
-        shader->uniform3fv(LLShaderMgr::LIGHT_DIFFUSE, LL_NUM_LIGHT_UNITS, light_diffuse[0].mV);
-        shader->uniform4fv(LLShaderMgr::LIGHT_AMBIENT, 1, mAmbientLightColor.mV);
-        shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, mLightState[0]->mSunIsPrimary ? 1 : 0);
-        shader->uniform4fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
-        shader->uniform4fv(LLShaderMgr::SUNLIGHT_COLOR, 1, mLightState[0]->mDiffuse.mV);
-        shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, mLightState[0]->mDiffuseB.mV);
+        shader->uniform2fv(LLShaderMgr::LIGHT_DEFERRED_ATTENUATION, LL_NUM_LIGHT_UNITS, size[0].mV);
+        shader->uniform3fv(LLShaderMgr::LIGHT_DIFFUSE, LL_NUM_LIGHT_UNITS, diffuse[0].mV);
+        shader->uniform3fv(LLShaderMgr::LIGHT_AMBIENT, 1, mAmbientLightColor.mV);
+        shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_primary[0] ? 1 : 0);
+        shader->uniform3fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
+        shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, diffuse[0].mV);
+        shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, diffuse_b[0].mV);
     }
 }
 
@@ -1077,14 +1094,23 @@ void LLRender::syncMatrices()
 		{ //update projection matrix, normal, and MVP
 			const LLMatrix4a& mat = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
 
-            // it would be nice to have this automatically track the state of the proj matrix
-            // but certain render paths (deferred lighting) require it to be mismatched *sigh*
-            //if (shader->getUniformLocation(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
-            //{
-	        //    LLMatrix4a inv_proj = mat
-			//    mat.invert();
-	        //    shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.getF32ptr());
-            //}
+            // GZ: This was previously disabled seemingly due to a bug involving the deferred renderer's regular pushing and popping of mats.
+			// We're reenabling this and cleaning up the code around that - that would've been the appropriate course initially.
+			// Anything beyond the standard proj and inv proj mats are special cases.  Please setup special uniforms accordingly in the future.
+            if (shader->getUniformLocation(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
+            {
+	            LLMatrix4a inv_proj = mat
+	            mat.invert();
+	            shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.getF32ptr());
+            }
+
+			// Used by some full screen effects - such as full screen lights, glow, etc.
+            if (shader->getUniformLocation(LLShaderMgr::IDENTITY_MATRIX))
+            {
+				LLMatrix4a identity;
+				identity.setIdentity();
+                shader->uniformMatrix4fv(LLShaderMgr::IDENTITY_MATRIX, 1, GL_FALSE, identity.getF32ptr());
+            }
 
 			shader->uniformMatrix4fv(name[MM_PROJECTION], 1, GL_FALSE, mat.getF32ptr());
 			shader->mMatHash[MM_PROJECTION] = mMatHash[MM_PROJECTION];
@@ -1495,12 +1521,7 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
 	llassert(color_dfactor < BF_UNDEF);
 	llassert(alpha_sfactor < BF_UNDEF);
 	llassert(alpha_dfactor < BF_UNDEF);
-	if (!gGLManager.mHasBlendFuncSeparate)
-	{
-		LL_WARNS_ONCE("render") << "no glBlendFuncSeparateEXT(), using color-only blend func" << LL_ENDL;
-		blendFunc(color_sfactor, color_dfactor);
-		return;
-	}
+	
 	if (mCurrBlendColorSFactor != color_sfactor || mCurrBlendColorDFactor != color_dfactor ||
 	    mCurrBlendAlphaSFactor != alpha_sfactor || mCurrBlendAlphaDFactor != alpha_dfactor)
 	{
@@ -1509,8 +1530,9 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
 		mCurrBlendColorDFactor = color_dfactor;
 		mCurrBlendAlphaDFactor = alpha_dfactor;
 		flush();
-		glBlendFuncSeparateEXT(sGLBlendFactor[color_sfactor], sGLBlendFactor[color_dfactor],
-				       sGLBlendFactor[alpha_sfactor], sGLBlendFactor[alpha_dfactor]);
+        
+        glBlendFuncSeparate(sGLBlendFactor[color_sfactor], sGLBlendFactor[color_dfactor],
+                           sGLBlendFactor[alpha_sfactor], sGLBlendFactor[alpha_dfactor]);
 	}
 }
 
@@ -1633,6 +1655,7 @@ void LLRender::flush()
 	if (mCount > 0)
 	{
         LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+        llassert(LLGLSLShader::sCurBoundShaderPtr != nullptr);
 		if (!mUIOffset.empty())
 		{
 			sUICalls++;
@@ -1664,16 +1687,100 @@ void LLRender::flush()
 
         if (mBuffer)
         {
-            if (mBuffer->useVBOs() && !mBuffer->isLocked())
-            { //hack to only flush the part of the buffer that was updated (relies on stream draw using buffersubdata)
-                mBuffer->getVertexStrider(mVerticesp, 0, count);
-                mBuffer->getTexCoord0Strider(mTexcoordsp, 0, count);
-                mBuffer->getColorStrider(mColorsp, 0, count);
+
+            HBXXH64 hash;
+            U32 attribute_mask = LLGLSLShader::sCurBoundShaderPtr->mAttributeMask;
+
+            {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache hash");
+
+                hash.update((U8*)mVerticesp.get(), count * sizeof(LLVector4a));
+                if (attribute_mask & LLVertexBuffer::MAP_TEXCOORD0)
+                {
+                    hash.update((U8*)mTexcoordsp.get(), count * sizeof(LLVector2));
+                }
+
+                if (attribute_mask & LLVertexBuffer::MAP_COLOR)
+                {
+                    hash.update((U8*)mColorsp.get(), count * sizeof(LLColor4U));
+                }
+
+                hash.finalize();
+            }
+            
+            
+            U64 vhash = hash.digest();
+
+            // check the VB cache before making a new vertex buffer
+            // This is a giant hack to deal with (mostly) our terrible UI rendering code
+            // that was built on top of OpenGL immediate mode.  Huge performance wins
+            // can be had by not uploading geometry to VRAM unless absolutely necessary.
+            // Most of our usage of the "immediate mode" style draw calls is actually
+            // sending the same geometry over and over again.
+            // To leverage this, we maintain a running hash of the vertex stream being
+            // built up before a flush, and then check that hash against a VB 
+            // cache just before creating a vertex buffer in VRAM
+            std::unordered_map<U64, LLVBCache>::iterator cache = sVBCache.find(vhash);
+
+            LLPointer<LLVertexBuffer> vb;
+
+            if (cache != sVBCache.end())
+            {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache hit");
+                // cache hit, just use the cached buffer
+                vb = cache->second.vb;
+                cache->second.touched = std::chrono::steady_clock::now();
+            }
+            else
+            {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache miss");
+                vb = new LLVertexBuffer(attribute_mask);
+                vb->allocateBuffer(count, 0);
+
+                vb->setBuffer();
+
+                vb->setPositionData((LLVector4a*) mVerticesp.get());
+
+                if (attribute_mask & LLVertexBuffer::MAP_TEXCOORD0)
+                {
+                    vb->setTexCoordData(mTexcoordsp.get());
+                }
+
+                if (attribute_mask & LLVertexBuffer::MAP_COLOR)
+                {
+                    vb->setColorData(mColorsp.get());
+                }
+
+                vb->unbind();
+
+                sVBCache[vhash] = { vb , std::chrono::steady_clock::now() };
+
+                static U32 miss_count = 0;
+                miss_count++;
+                if (miss_count > 1024)
+                {
+                    LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache clean");
+                    miss_count = 0;
+                    auto now = std::chrono::steady_clock::now();
+
+                    using namespace std::chrono_literals;
+                    // every 1024 misses, clean the cache of any VBs that haven't been touched in the last second
+                    for (std::unordered_map<U64, LLVBCache>::iterator iter = sVBCache.begin(); iter != sVBCache.end(); )
+                    {
+                        if (now - iter->second.touched > 1s)
+                        {
+                            iter = sVBCache.erase(iter);
+                        }
+                        else
+                        {
+                            ++iter;
+                        }
+                    }
+                }
             }
 
-            mBuffer->flush();
-            mBuffer->setBuffer(immediate_mask);
-            mBuffer->drawArrays(mMode, 0, count);
+            vb->setBuffer();
+			vb->drawArrays(mMode, 0, count);
         }
         else
         {
@@ -1923,8 +2030,7 @@ void LLRender::texCoord2fv(const GLfloat* tc)
 
 void LLRender::color4ub(const GLubyte& r, const GLubyte& g, const GLubyte& b, const GLubyte& a)
 {
-	if (!LLGLSLShader::sCurBoundShaderPtr ||
-		LLGLSLShader::sCurBoundShaderPtr->mAttributeMask & LLVertexBuffer::MAP_COLOR)
+	if (!LLGLSLShader::sCurBoundShaderPtr || LLGLSLShader::sCurBoundShaderPtr->mAttributeMask & LLVertexBuffer::MAP_COLOR)
 	{
 		mColorsp[mCount] = LLColor4U(r,g,b,a);
 	}

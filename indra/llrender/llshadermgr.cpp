@@ -28,6 +28,7 @@
 #include "llshadermgr.h"
 #include "llrender.h"
 #include "llfile.h"
+#include "lldir.h"
 
 // Lots of STL stuff in here, using namespace std to keep things more readable
 using std::vector;
@@ -132,6 +133,11 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 	// NOTE order of shader object attaching is VERY IMPORTANT!!!
 	if (features->calculatesAtmospherics)
     {
+        if (!shader->attachVertexObject("environment/srgbF.glsl")) // NOTE -- "F" suffix is superfluous here, there is nothing fragment specific in srgbF
+        {
+            return FALSE;
+        }
+
         if (!shader->attachVertexObject("windlight/atmosphericsFuncs.glsl")) {
             return FALSE;
         }
@@ -158,14 +164,26 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 			return FALSE;
 		}
 	}
+
+    if (!shader->attachVertexObject("deferred/textureUtilV.glsl"))
+    {
+        return FALSE;
+    }
 	
 	///////////////////////////////////////
 	// Attach Fragment Shader Features Next
 	///////////////////////////////////////
 
 // NOTE order of shader object attaching is VERY IMPORTANT!!!
+    if (features->hasSrgb || features->hasAtmospherics || features->calculatesAtmospherics)
+    {
+        if (!shader->attachFragmentObject("environment/srgbF.glsl"))
+        {
+            return FALSE;
+        }
+    }
 
-	if(features->calculatesAtmospherics)
+	if(features->calculatesAtmospherics || features->hasGamma || features->isDeferred)
 	{
 		if (features->hasWaterFog)
 		{
@@ -189,12 +207,20 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 	}
 
     // we want this BEFORE shadows and AO because those facilities use pos/norm access
-    if (features->isDeferred)
+    if (features->isDeferred || features->hasReflectionProbes)
 	{
         if (!shader->attachFragmentObject("deferred/deferredUtil.glsl"))
 		{
 			return FALSE;
 		}
+	}
+
+	if (features->hasScreenSpaceReflections || features->hasReflectionProbes)
+	{
+        if (!shader->attachFragmentObject("deferred/screenSpaceReflUtil.glsl"))
+        {
+            return FALSE;
+        }
 	}
 
     if (features->hasShadows)
@@ -205,6 +231,14 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 		}
 	}
 
+    if (features->hasReflectionProbes)
+    {
+        if (!shader->attachFragmentObject("deferred/reflectionProbeF.glsl"))
+        {
+            return FALSE;
+        }
+    }
+
     if (features->hasAmbientOcclusion)
 	{
         if (!shader->attachFragmentObject("deferred/aoUtil.glsl"))
@@ -213,17 +247,9 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 		}
 	}
 
-	if (features->hasGamma)
+	if (features->hasGamma || features->isDeferred)
 	{
         if (!shader->attachFragmentObject("windlight/gammaF.glsl"))
-		{
-			return FALSE;
-		}
-	}
-
-	if (features->hasSrgb)
-	{
-        if (!shader->attachFragmentObject("environment/srgbF.glsl"))
 		{
 			return FALSE;
 		}
@@ -237,7 +263,7 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 		}
 	}
 
-	if (features->hasAtmospherics)
+	if (features->hasAtmospherics || features->isDeferred)
     {
         if (!shader->attachFragmentObject("windlight/atmosphericsFuncs.glsl")) {
             return FALSE;
@@ -255,9 +281,6 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 		{
 			return FALSE;
 		}
-
-		// Test hasFullbright and hasShiny and attach fullbright and 
-		// fullbright shiny atmos transport if we split them out.
 	}
 
 	// NOTE order of shader object attaching is VERY IMPORTANT!!!
@@ -350,164 +373,6 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 		}
 	}
 	
-	// NOTE order of shader object attaching is VERY IMPORTANT!!!
-	else if (features->isFullbright)
-	{
-	
-		if (features->isShiny && features->hasWaterFog)
-		{
-			if (features->disableTextureIndex)
-			{
-                if (!shader->attachFragmentObject("lighting/lightFullbrightShinyWaterNonIndexedF.glsl"))
-				{
-					return FALSE;
-				}
-			}
-			else 
-			{
-                if (!shader->attachFragmentObject("lighting/lightFullbrightShinyWaterF.glsl"))
-				{
-					return FALSE;
-				}
-				shader->mFeatures.mIndexedTextureChannels = llmax(LLGLSLShader::sIndexedTextureChannels-1, 1);
-			}
-		}
-		else if (features->hasWaterFog)
-		{
-			if (features->disableTextureIndex)
-			{
-				if (features->hasAlphaMask)
-				{
-                    if (!shader->attachFragmentObject("lighting/lightFullbrightWaterNonIndexedAlphaMaskF.glsl"))
-					{
-						return FALSE;
-					}
-				}
-                else if (!shader->attachFragmentObject("lighting/lightFullbrightWaterNonIndexedF.glsl"))
-				{
-					return FALSE;
-				}
-			}
-			else 
-			{
-				if (features->hasAlphaMask)
-				{
-                    if (!shader->attachFragmentObject("lighting/lightFullbrightWaterAlphaMaskF.glsl"))
-					{
-						return FALSE;
-					}
-				}
-                else if (!shader->attachFragmentObject("lighting/lightFullbrightWaterF.glsl"))
-				{
-					return FALSE;
-				}
-				shader->mFeatures.mIndexedTextureChannels = llmax(LLGLSLShader::sIndexedTextureChannels-1, 1);
-			}
-		}
-		
-		else if (features->isShiny)
-		{
-			if (features->disableTextureIndex)
-			{
-                if (!shader->attachFragmentObject("lighting/lightFullbrightShinyNonIndexedF.glsl"))
-				{
-					return FALSE;
-				}
-			}
-			else 
-			{
-                if (!shader->attachFragmentObject("lighting/lightFullbrightShinyF.glsl"))
-				{
-					return FALSE;
-				}
-				shader->mFeatures.mIndexedTextureChannels = llmax(LLGLSLShader::sIndexedTextureChannels-1, 1);
-			}
-		}
-		
-		else
-		{
-			if (features->disableTextureIndex)
-			{
-
-				if (features->hasAlphaMask)
-				{
-                    if (!shader->attachFragmentObject("lighting/lightFullbrightNonIndexedAlphaMaskF.glsl"))
-					{
-						return FALSE;
-					}
-				}
-				else
-				{
-                    if (!shader->attachFragmentObject("lighting/lightFullbrightNonIndexedF.glsl"))
-					{
-						return FALSE;
-					}
-				}
-			}
-			else 
-			{
-				if (features->hasAlphaMask)
-				{
-                    if (!shader->attachFragmentObject("lighting/lightFullbrightAlphaMaskF.glsl"))
-					{
-						return FALSE;
-					}
-				}
-				else
-				{
-                    if (!shader->attachFragmentObject("lighting/lightFullbrightF.glsl"))
-					{
-						return FALSE;
-					}
-				}
-				shader->mFeatures.mIndexedTextureChannels = llmax(LLGLSLShader::sIndexedTextureChannels-1, 1);
-			}
-		}
-	}
-
-	// NOTE order of shader object attaching is VERY IMPORTANT!!!
-	else if (features->isShiny)
-	{
-	
-		if (features->hasWaterFog)
-		{
-			if (features->disableTextureIndex)
-			{
-                if (!shader->attachFragmentObject("lighting/lightShinyWaterNonIndexedF.glsl"))
-				{
-					return FALSE;
-				}
-			}
-			else 
-			{
-                if (!shader->attachFragmentObject("lighting/lightShinyWaterF.glsl"))
-				{
-					return FALSE;
-				}
-				shader->mFeatures.mIndexedTextureChannels = llmax(LLGLSLShader::sIndexedTextureChannels-1, 1);
-			}
-		}
-		
-		else 
-		{
-			if (features->disableTextureIndex)
-			{
-                if (!shader->attachFragmentObject("lighting/lightShinyNonIndexedF.glsl"))
-				{
-					return FALSE;
-				}
-			}
-			else 
-			{
-                if (!shader->attachFragmentObject("lighting/lightShinyF.glsl"))
-				{
-					return FALSE;
-				}
-				shader->mFeatures.mIndexedTextureChannels = llmax(LLGLSLShader::sIndexedTextureChannels-1, 1);
-			}
-		}
-	}
-
 	if (features->mIndexedTextureChannels <= 1)
 	{
 		if (!shader->attachVertexObject("objects/nonindexedTextureV.glsl"))
@@ -529,26 +394,60 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 //============================================================================
 // Load Shader
 
-static std::string get_object_log(GLhandleARB ret)
+static std::string get_shader_log(GLuint ret)
 {
 	std::string res;
 	
 	//get log length 
 	GLint length;
-	glGetObjectParameterivARB(ret, GL_OBJECT_INFO_LOG_LENGTH_ARB, &length);
+    glGetShaderiv(ret, GL_INFO_LOG_LENGTH, &length);
 	if (length > 0)
 	{
 		//the log could be any size, so allocate appropriately
-		GLcharARB* log = new GLcharARB[length];
-		glGetInfoLogARB(ret, length, &length, log);
+		GLchar* log = new GLchar[length];
+        glGetShaderInfoLog(ret, length, &length, log);
 		res = std::string((char *)log);
 		delete[] log;
 	}
 	return res;
 }
 
+static std::string get_program_log(GLuint ret)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+    std::string res;
+
+    //get log length 
+    GLint length;
+    glGetProgramiv(ret, GL_INFO_LOG_LENGTH, &length);
+    if (length > 0)
+    {
+        //the log could be any size, so allocate appropriately
+        GLchar* log = new GLchar[length];
+        glGetProgramInfoLog(ret, length, &length, log);
+        res = std::string((char*)log);
+        delete[] log;
+    }
+    return res;
+}
+
+// get the info log for the given object, be it a shader or program object
+// NOTE: ret MUST be a shader OR a program object
+static std::string get_object_log(GLuint ret)
+{
+    if (glIsProgram(ret))
+    {
+        return get_program_log(ret);
+    }
+    else
+    {
+        llassert(glIsShader(ret));
+        return get_shader_log(ret);
+    }
+}
+
 //dump shader source for debugging
-void LLShaderMgr::dumpShaderSource(U32 shader_code_count, GLcharARB** shader_code_text)
+void LLShaderMgr::dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text)
 {
 	char num_str[16]; // U32 = max 10 digits
 
@@ -563,9 +462,10 @@ void LLShaderMgr::dumpShaderSource(U32 shader_code_count, GLcharARB** shader_cod
     LL_CONT << LL_ENDL;
 }
 
-void LLShaderMgr::dumpObjectLog(GLhandleARB ret, BOOL warns, const std::string& filename) 
+void LLShaderMgr::dumpObjectLog(GLuint ret, BOOL warns, const std::string& filename)
 {
-	std::string log = get_object_log(ret);
+    std::string log;
+    log = get_object_log(ret);
     std::string fname = filename;
     if (filename.empty())
     {
@@ -579,7 +479,7 @@ void LLShaderMgr::dumpObjectLog(GLhandleARB ret, BOOL warns, const std::string& 
 	}
  }
 
-GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, boost::unordered_map<std::string, std::string>* defines, S32 texture_index_channels)
+GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, boost::unordered_map<std::string, std::string>* defines, S32 texture_index_channels)
 {
 
 // endsure work-around for missing GLSL funcs gets propogated to feature shader files (e.g. srgbF.glsl)
@@ -611,36 +511,57 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 	S32 gpu_class;
 
     std::string open_file_name;
-	//find the most relevant file
-	for (gpu_class = try_gpu_class; gpu_class > 0; gpu_class--)
-	{	//search from the current gpu class down to class 1 to find the most relevant shader
-		std::stringstream fname;
-		fname << getShaderDirPrefix();
-		fname << gpu_class << "/" << filename;
-		
-        open_file_name = fname.str();
 
-        /*
-        Would be awesome, if we didn't have shaders that re-use files
-        with different environments to say, add skinning, etc
-        can't depend on cached version to have evaluate ifdefs identically...
-        if we can define a deterministic hash for the shader based on
-        all the inputs, maybe we can save some time here.
-        if (mShaderObjects.count(filename) > 0)
+#if 0  // WIP -- try to come up with a way to fallback to an error shader without needing debug stubs all over the place in the shader tree
+    if (shader_level == -1)
+    {
+        // use "error" fallback
+        if (type == GL_VERTEX_SHADER)
         {
-            return mShaderObjects[filename];
+            open_file_name = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "shaders/errorV.glsl");
+        }
+        else
+        {
+            llassert(type == GL_FRAGMENT_SHADER);  // type must be vertex or fragment shader
+            open_file_name = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "shaders/errorF.glsl");
         }
 
-        */
+        file = LLFile::fopen(open_file_name, "r");
+    }
+    else
+#endif
+    {
+        //find the most relevant file
+        for (gpu_class = try_gpu_class; gpu_class > 0; gpu_class--)
+        {	//search from the current gpu class down to class 1 to find the most relevant shader
+            std::stringstream fname;
+            fname << getShaderDirPrefix();
+            fname << gpu_class << "/" << filename;
 
- 		LL_DEBUGS("ShaderLoading") << "Looking in " << open_file_name << LL_ENDL;
-		file = LLFile::fopen(open_file_name, "r");		/* Flawfinder: ignore */
-		if (file)
-		{
-			LL_DEBUGS("ShaderLoading") << "Loading file: " << open_file_name << " (Want class " << gpu_class << ")" << LL_ENDL;            
-			break; // done
-		}
-	}
+            open_file_name = fname.str();
+
+            /*
+            Would be awesome, if we didn't have shaders that re-use files
+            with different environments to say, add skinning, etc
+            can't depend on cached version to have evaluate ifdefs identically...
+            if we can define a deterministic hash for the shader based on
+            all the inputs, maybe we can save some time here.
+            if (mShaderObjects.count(filename) > 0)
+            {
+                return mShaderObjects[filename];
+            }
+
+            */
+
+            LL_DEBUGS("ShaderLoading") << "Looking in " << open_file_name << LL_ENDL;
+            file = LLFile::fopen(open_file_name, "r");		/* Flawfinder: ignore */
+            if (file)
+            {
+                LL_DEBUGS("ShaderLoading") << "Loading file: " << open_file_name << " (Want class " << gpu_class << ")" << LL_ENDL;
+                break; // done
+            }
+        }
+    }
 	
 	if (file == NULL)
 	{
@@ -650,9 +571,9 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 
 	//we can't have any lines longer than 1024 characters 
 	//or any shaders longer than 4096 lines... deal - DaveP
-    GLcharARB buff[1024];
-    GLcharARB *extra_code_text[1024];
-    GLcharARB *shader_code_text[4096 + LL_ARRAY_SIZE(extra_code_text)] = { NULL };
+    GLchar buff[1024];
+    GLchar *extra_code_text[1024];
+    GLchar *shader_code_text[4096 + LL_ARRAY_SIZE(extra_code_text)] = { NULL };
     GLuint extra_code_count = 0, shader_code_count = 0;
     BOOST_STATIC_ASSERT(LL_ARRAY_SIZE(extra_code_text) < LL_ARRAY_SIZE(shader_code_text));
     
@@ -698,8 +619,15 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 	{  
         if (major_version >= 4)
         {
-            //set version to 400
-			shader_code_text[shader_code_count++] = strdup("#version 400\n");
+            //set version to 400 or 420
+            if (minor_version >= 20)
+            {
+                shader_code_text[shader_code_count++] = strdup("#version 420\n");
+            }
+            else
+            {
+                shader_code_text[shader_code_count++] = strdup("#version 400\n");
+            }
 			extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_400 1\n");
         }
         else if (major_version == 3)
@@ -755,7 +683,6 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 		extra_code_text[extra_code_count++] = strdup("#define texture2DLod textureLod\n");
 		extra_code_text[extra_code_count++] = strdup("#define texture3DLod textureLod\n");
         extra_code_text[extra_code_count++] = strdup("#define texture2DLodOffset textureLodOffset\n");
-		extra_code_text[extra_code_count++] = strdup("#define shadow2D(a,b) vec2(texture(a,b))\n");
 		
 		if (major_version > 1 || minor_version >= 40)
 		{ //GLSL 1.40 replaces texture2DRect et al with texture
@@ -772,13 +699,20 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
     {
         extra_code_text[extra_code_count++] = strdup("#define VERTEX_SHADER 1\n");
     }
-	
+
+    // Use alpha float to store bit flags
+    // See: C++: addDeferredAttachment(), shader: frag_data[2]
+    extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_SKIP_ATMOS   0.0 \n"); // atmo kill
+    extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_ATMOS    0.34\n"); // bit 0
+    extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_PBR      0.67\n"); // bit 1
+    extra_code_text[extra_code_count++] = strdup("#define GET_GBUFFER_FLAG(flag)    (abs(norm.w-flag)< 0.1)\n");
+
 	if (defines)
 	{
 		for (boost::unordered_map<std::string,std::string>::iterator iter = defines->begin(); iter != defines->end(); ++iter)
 		{
 			std::string define = "#define " + iter->first + " " + iter->second + "\n";
-			extra_code_text[extra_code_count++] = (GLcharARB *) strdup(define.c_str());
+			extra_code_text[extra_code_count++] = (GLchar *) strdup(define.c_str());
 		}
 	}
 
@@ -787,7 +721,7 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 		extra_code_text[extra_code_count++] = strdup( "#define IS_AMD_CARD 1\n" );
 	}
 	
-	if (texture_index_channels > 0 && type == GL_FRAGMENT_SHADER_ARB)
+	if (texture_index_channels > 0 && type == GL_FRAGMENT_SHADER)
 	{
 		//use specified number of texture channels for indexed texture rendering
 
@@ -892,6 +826,13 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 	
 	GLuint out_of_extra_block_counter = 0, start_shader_code = shader_code_count, file_lines_count = 0;
 	
+#define TOUCH_SHADERS 0
+
+#if TOUCH_SHADERS
+    const char* marker = "// touched";
+    bool touched = false;
+#endif
+
 	while(NULL != fgets((char *)buff, 1024, file)
 		  && shader_code_count < (LL_ARRAY_SIZE(shader_code_text) - LL_ARRAY_SIZE(extra_code_text)))
 	{
@@ -899,6 +840,13 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 
 		bool extra_block_area_found = NULL != strstr((const char*)buff, "[EXTRA_CODE_HERE]");
 		
+#if TOUCH_SHADERS
+        if (NULL != strstr((const char*)buff, marker))
+        {
+            touched = true;
+        }
+#endif
+
 		if(extra_block_area_found && !(flag_extra_block_marker_was_found & flags))
 		{
 			if(!(flag_write_to_out_of_extra_block_area & flags))
@@ -927,7 +875,7 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 		}
         else
         {
-            shader_code_text[shader_code_count] = (GLcharARB *)strdup((char *)buff);
+            shader_code_text[shader_code_count] = (GLchar *)strdup((char *)buff);
 		
             if(flag_write_to_out_of_extra_block_area & flags)
             {
@@ -961,43 +909,50 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 		extra_code_count = 0;
 	}
 
+#if TOUCH_SHADERS
+    if (!touched)
+    {
+        fprintf(file, "\n%s\n", marker);
+    }
+#endif
+
 	fclose(file);
 
 	//create shader object
-	GLhandleARB ret = glCreateShaderObjectARB(type);
+    GLuint ret = glCreateShader(type);
 
 	error = glGetError();
 	if (error != GL_NO_ERROR)
 	{
-		LL_WARNS("ShaderLoading") << "GL ERROR in glCreateShaderObjectARB: " << error << " for file: " << open_file_name << LL_ENDL;
+		LL_WARNS("ShaderLoading") << "GL ERROR in glCreateShader: " << error << " for file: " << open_file_name << LL_ENDL;
 	}
 
 	//load source
-	glShaderSourceARB(ret, shader_code_count, (const GLcharARB**) shader_code_text, NULL);
+	glShaderSource(ret, shader_code_count, (const GLchar**) shader_code_text, NULL);
 
 	error = glGetError();
 	if (error != GL_NO_ERROR)
 	{
-		LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSourceARB: " << error << " for file: " << open_file_name << LL_ENDL;
+		LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSource: " << error << " for file: " << open_file_name << LL_ENDL;
 	}
 
 	//compile source
-	glCompileShaderARB(ret);
+	glCompileShader(ret);
 
 	error = glGetError();
 	if (error != GL_NO_ERROR)
 	{
-		LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShaderARB: " << error << " for file: " << open_file_name << LL_ENDL;
+		LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShader: " << error << " for file: " << open_file_name << LL_ENDL;
 	}
 
 	if (error == GL_NO_ERROR)
 	{
 		//check for errors
 		GLint success = GL_TRUE;
-		glGetObjectParameterivARB(ret, GL_OBJECT_COMPILE_STATUS_ARB, &success);
+        glGetShaderiv(ret, GL_COMPILE_STATUS, &success);
 
 		error = glGetError();
-		if (error != GL_NO_ERROR || success == GL_FALSE) 
+		if (error != GL_NO_ERROR || success == GL_FALSE)
 		{
 			//an error occured, print log
 			LL_WARNS("ShaderLoading") << "GLSL Compilation Error:" << LL_ENDL;
@@ -1022,10 +977,10 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 	if (ret)
 	{
 		// Add shader file to map
-        if (type == GL_VERTEX_SHADER_ARB) {
+        if (type == GL_VERTEX_SHADER) {
             mVertexShaderObjects[filename] = ret;
         }
-        else if (type == GL_FRAGMENT_SHADER_ARB) {
+        else if (type == GL_FRAGMENT_SHADER) {
             mFragmentShaderObjects[filename] = ret;
         }
 		shader_level = try_gpu_class;
@@ -1042,19 +997,29 @@ GLhandleARB LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shade
 	return ret;
 }
 
-BOOL LLShaderMgr::linkProgramObject(GLhandleARB obj, BOOL suppress_errors) 
+BOOL LLShaderMgr::linkProgramObject(GLuint obj, BOOL suppress_errors)
 {
 	//check for errors
-	glLinkProgramARB(obj);
-	GLint success = GL_TRUE;
-	glGetObjectParameterivARB(obj, GL_OBJECT_LINK_STATUS_ARB, &success);
-	if (!suppress_errors && success == GL_FALSE) 
-	{
-		//an error occured, print log
-		LL_SHADER_LOADING_WARNS() << "GLSL Linker Error:" << LL_ENDL;
-	}
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SHADER("glLinkProgram");
+        glLinkProgram(obj);
+    }
 
-	std::string log = get_object_log(obj);
+    GLint success = GL_TRUE;
+
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SHADER("glsl check link status");
+        glGetProgramiv(obj, GL_LINK_STATUS, &success);
+        if (!suppress_errors && success == GL_FALSE)
+        {
+            //an error occured, print log
+            LL_SHADER_LOADING_WARNS() << "GLSL Linker Error:" << LL_ENDL;
+            dumpObjectLog(obj, TRUE, "linker");
+            return success;
+        }
+    }
+
+	std::string log = get_program_log(obj);
 	LLStringUtil::toLower(log);
 	if (log.find("software") != std::string::npos)
 	{
@@ -1065,12 +1030,12 @@ BOOL LLShaderMgr::linkProgramObject(GLhandleARB obj, BOOL suppress_errors)
 	return success;
 }
 
-BOOL LLShaderMgr::validateProgramObject(GLhandleARB obj)
+BOOL LLShaderMgr::validateProgramObject(GLuint obj)
 {
 	//check program validity against current GL
-	glValidateProgramARB(obj);
+	glValidateProgram(obj);
 	GLint success = GL_TRUE;
-	glGetObjectParameterivARB(obj, GL_OBJECT_VALIDATE_STATUS_ARB, &success);
+    glGetProgramiv(obj, GL_LINK_STATUS, &success);
 	if (success == GL_FALSE)
 	{
 		LL_SHADER_LOADING_WARNS() << "GLSL program not valid: " << LL_ENDL;
@@ -1107,6 +1072,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("projection_matrix");
 	mReservedUniforms.push_back("inv_proj");
 	mReservedUniforms.push_back("modelview_projection_matrix");
+    mReservedUniforms.push_back("inv_modelview");
+    mReservedUniforms.push_back("identity_matrix");
 	mReservedUniforms.push_back("normal_matrix");
 	mReservedUniforms.push_back("texture_matrix0");
 	mReservedUniforms.push_back("texture_matrix1");
@@ -1114,13 +1081,20 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("texture_matrix3");
 	mReservedUniforms.push_back("object_plane_s");
 	mReservedUniforms.push_back("object_plane_t");
-	llassert(mReservedUniforms.size() == LLShaderMgr::OBJECT_PLANE_T+1);
+
+    mReservedUniforms.push_back("texture_base_color_transform"); // (GLTF)
+    mReservedUniforms.push_back("texture_normal_transform"); // (GLTF)
+    mReservedUniforms.push_back("texture_metallic_roughness_transform"); // (GLTF)
+    mReservedUniforms.push_back("texture_emissive_transform"); // (GLTF)
+
+    llassert(mReservedUniforms.size() == LLShaderMgr::TEXTURE_EMISSIVE_TRANSFORM+1);
 
 	mReservedUniforms.push_back("viewport");
 
 	mReservedUniforms.push_back("light_position");
 	mReservedUniforms.push_back("light_direction");
 	mReservedUniforms.push_back("light_attenuation");
+    mReservedUniforms.push_back("light_deferred_attenuation");
 	mReservedUniforms.push_back("light_diffuse");
 	mReservedUniforms.push_back("light_ambient");
 	mReservedUniforms.push_back("light_count");
@@ -1132,6 +1106,7 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     //NOTE: MUST match order in eGLSLReservedUniforms
 	mReservedUniforms.push_back("proj_mat");
+	mReservedUniforms.push_back("proj_near");
 	mReservedUniforms.push_back("proj_p");
 	mReservedUniforms.push_back("proj_n");
 	mReservedUniforms.push_back("proj_origin");
@@ -1141,17 +1116,26 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("shadow_fade");
 	mReservedUniforms.push_back("proj_focus");
 	mReservedUniforms.push_back("proj_lod");
+	mReservedUniforms.push_back("proj_ambient_lod");
 
-	llassert(mReservedUniforms.size() == LLShaderMgr::PROJECTOR_LOD+1);
+	llassert(mReservedUniforms.size() == LLShaderMgr::PROJECTOR_AMBIENT_LOD+1);
 
 	mReservedUniforms.push_back("color");
-		
+    mReservedUniforms.push_back("emissiveColor");
+    mReservedUniforms.push_back("metallicFactor");
+    mReservedUniforms.push_back("roughnessFactor");
+
 	mReservedUniforms.push_back("diffuseMap");
     mReservedUniforms.push_back("altDiffuseMap");
 	mReservedUniforms.push_back("specularMap");
+    mReservedUniforms.push_back("emissiveMap");
 	mReservedUniforms.push_back("bumpMap");
     mReservedUniforms.push_back("bumpMap2");
 	mReservedUniforms.push_back("environmentMap");
+    mReservedUniforms.push_back("sceneMap");
+    mReservedUniforms.push_back("sceneDepth");
+    mReservedUniforms.push_back("reflectionProbes");
+    mReservedUniforms.push_back("irradianceProbes");
 	mReservedUniforms.push_back("cloud_noise_texture");
     mReservedUniforms.push_back("cloud_noise_texture_next");
 	mReservedUniforms.push_back("fullbright");
@@ -1159,9 +1143,12 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("sunlight_color");
 	mReservedUniforms.push_back("ambient_color");
 	mReservedUniforms.push_back("blue_horizon");
+    mReservedUniforms.push_back("blue_horizon_linear");
 	mReservedUniforms.push_back("blue_density");
+    mReservedUniforms.push_back("blue_density_linear");
 	mReservedUniforms.push_back("haze_horizon");
 	mReservedUniforms.push_back("haze_density");
+    mReservedUniforms.push_back("haze_density_linear");
 	mReservedUniforms.push_back("cloud_shadow");
 	mReservedUniforms.push_back("density_multiplier");
 	mReservedUniforms.push_back("distance_multiplier");
@@ -1198,6 +1185,7 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("minimum_alpha");
 	mReservedUniforms.push_back("emissive_brightness");
 
+    // Deferred
 	mReservedUniforms.push_back("shadow_matrix");
 	mReservedUniforms.push_back("env_mat");
 	mReservedUniforms.push_back("shadow_clip");
@@ -1219,9 +1207,15 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("moon_dir");
 	mReservedUniforms.push_back("shadow_res");
 	mReservedUniforms.push_back("proj_shadow_res");
+	mReservedUniforms.push_back("depth_cutoff");
+	mReservedUniforms.push_back("norm_cutoff");
 	mReservedUniforms.push_back("shadow_target_width");
 	
 	llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH+1);
+
+    mReservedUniforms.push_back("modelview_delta");
+    mReservedUniforms.push_back("inv_modelview_delta");
+    mReservedUniforms.push_back("cube_snapshot");
 
 	mReservedUniforms.push_back("tc_scale");
 	mReservedUniforms.push_back("rcp_screen_res");
@@ -1251,6 +1245,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("positionMap");
 	mReservedUniforms.push_back("diffuseRect");
 	mReservedUniforms.push_back("specularRect");
+    mReservedUniforms.push_back("emissiveRect");
+    mReservedUniforms.push_back("brdfLut");
 	mReservedUniforms.push_back("noiseMap");
 	mReservedUniforms.push_back("lightFunc");
 	mReservedUniforms.push_back("lightMap");
@@ -1266,6 +1262,7 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("translationPalette");
 	
 	mReservedUniforms.push_back("screenTex");
+	mReservedUniforms.push_back("screenDepth");
 	mReservedUniforms.push_back("refTex");
 	mReservedUniforms.push_back("eyeVec");
 	mReservedUniforms.push_back("time");
@@ -1273,7 +1270,9 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("waveDir2");
 	mReservedUniforms.push_back("lightDir");
 	mReservedUniforms.push_back("specular");
+	mReservedUniforms.push_back("lightExp");
 	mReservedUniforms.push_back("waterFogColor");
+    mReservedUniforms.push_back("waterFogColorLinear");
 	mReservedUniforms.push_back("waterFogDensity");
 	mReservedUniforms.push_back("waterFogKS");
 	mReservedUniforms.push_back("refScale");
@@ -1284,6 +1283,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("fresnelOffset");
 	mReservedUniforms.push_back("blurMultiplier");
 	mReservedUniforms.push_back("sunAngle");
+	mReservedUniforms.push_back("scaledAngle");
+	mReservedUniforms.push_back("sunAngle2");
 	
 	mReservedUniforms.push_back("camPosLocal");
 // [RLVa:KB] - @setsphere
@@ -1305,8 +1306,18 @@ void LLShaderMgr::initAttribsAndUniforms()
 	mReservedUniforms.push_back("detail_3");
 	mReservedUniforms.push_back("alpha_ramp");
 
+	mReservedUniforms.push_back("origin");
+	mReservedUniforms.push_back("display_gamma");
+
+    mReservedUniforms.push_back("inscatter");
+    mReservedUniforms.push_back("sun_size");
+    mReservedUniforms.push_back("fog_color");
+
+    mReservedUniforms.push_back("transmittance_texture");
+    mReservedUniforms.push_back("scattering_texture");
+    mReservedUniforms.push_back("single_mie_scattering_texture");
+    mReservedUniforms.push_back("irradiance_texture");
     mReservedUniforms.push_back("blend_factor");
-    mReservedUniforms.push_back("no_atmo");
     mReservedUniforms.push_back("moisture_level");
     mReservedUniforms.push_back("droplet_radius");
     mReservedUniforms.push_back("ice_level");
@@ -1314,11 +1325,20 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("halo_map");
     mReservedUniforms.push_back("moon_brightness");
     mReservedUniforms.push_back("cloud_variance");
+    mReservedUniforms.push_back("reflection_probe_ambiance");
+    mReservedUniforms.push_back("max_probe_lod");
+
+    mReservedUniforms.push_back("sh_input_r");
+    mReservedUniforms.push_back("sh_input_g");
+    mReservedUniforms.push_back("sh_input_b");
 
     mReservedUniforms.push_back("sun_moon_glow_factor");
     mReservedUniforms.push_back("water_edge");
     mReservedUniforms.push_back("sun_up_factor");
     mReservedUniforms.push_back("moonlight_color");
+    mReservedUniforms.push_back("moonlight_linear");
+    mReservedUniforms.push_back("sunlight_linear");
+    mReservedUniforms.push_back("ambient_linear");
 
 	// Alchemy
 	mReservedUniforms.push_back("colorgrade_lut");

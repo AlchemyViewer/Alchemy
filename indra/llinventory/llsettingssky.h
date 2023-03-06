@@ -97,6 +97,8 @@ public:
     static const std::string SETTING_SKY_DROPLET_RADIUS;
     static const std::string SETTING_SKY_ICE_LEVEL;
 
+    static const std::string SETTING_REFLECTION_PROBE_AMBIANCE;
+
     static const std::string SETTING_LEGACY_HAZE;
 
     static const LLUUID DEFAULT_ASSET_ID;
@@ -131,6 +133,12 @@ public:
     F32 getSkyDropletRadius() const;
     F32 getSkyIceLevel() const;
 
+    // get the probe ambiance setting as stored in the sky settings asset
+    F32 getReflectionProbeAmbiance() const;
+
+    // get the probe ambiance setting to use for rendering (adjusted by cloud shadow, aka cloud coverage)
+    F32 getTotalReflectionProbeAmbiance(F32 cloud_shadow_scale) const;
+
     // Return first (only) profile layer represented in LLSD
     LLSD getRayleighConfig() const;
     LLSD getMieConfig() const;
@@ -158,6 +166,8 @@ public:
     void setSkyMoistureLevel(F32 moisture_level);
     void setSkyDropletRadius(F32 radius);
     void setSkyIceLevel(F32 ice_level);
+
+    void setReflectionProbeAmbiance(F32 ambiance);
 
     //---------------------------------------------------------------------
     LLColor3 getAmbientColor() const;

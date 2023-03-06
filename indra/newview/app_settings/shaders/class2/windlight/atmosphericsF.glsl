@@ -27,17 +27,19 @@ vec3 getAdditiveColor();
 vec3 getAtmosAttenuation();
 vec3 scaleSoftClipFrag(vec3 light);
 
-uniform int no_atmo;
+vec3 srgb_to_linear(vec3 col);
+vec3 linear_to_srgb(vec3 col);
 
 vec3 atmosFragLighting(vec3 light, vec3 additive, vec3 atten)
-{
-    if (no_atmo == 1)
-    {
-        return light;
-    }
+{ 
     light *= atten.r;
-    light += additive;
-    return light * 2.0;
+    light += additive * 2.0;
+    return light;
+}
+
+vec3 atmosFragLightingLinear(vec3 light, vec3 additive, vec3 atten)
+{
+    return atmosFragLighting(light, additive, atten);
 }
 
 vec3 atmosLighting(vec3 light)

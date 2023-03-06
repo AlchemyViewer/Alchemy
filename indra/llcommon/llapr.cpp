@@ -520,6 +520,7 @@ apr_off_t LLAPRFile::seek(apr_file_t* file_handle, apr_seek_where_t where, apr_o
 //static
 apr_size_t LLAPRFile::readEx(const std::string& filename, void *buf, apr_off_t offset, apr_size_t nbytes, LLVolatileAPRPool* pool)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	//*****************************************
 	LLAPRFilePoolScope scope(pool);
 	apr_file_t* file_handle = open(filename, scope.getVolatileAPRPool(), APR_READ|APR_BINARY); 
@@ -564,6 +565,7 @@ apr_size_t LLAPRFile::readEx(const std::string& filename, void *buf, apr_off_t o
 //static
 apr_size_t LLAPRFile::writeEx(const std::string& filename, void *buf, apr_off_t offset, apr_size_t nbytes, LLVolatileAPRPool* pool)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	apr_int32_t flags = APR_CREATE|APR_WRITE|APR_BINARY;
 	if (offset < 0)
 	{

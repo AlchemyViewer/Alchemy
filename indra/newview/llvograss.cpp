@@ -38,7 +38,6 @@
 #include "llsky.h"
 #include "llsurface.h"
 #include "llsurfacepatch.h"
-#include "llvosky.h"
 #include "llviewercamera.h"
 #include "llviewertexturelist.h"
 #include "llviewerregion.h"
@@ -593,7 +592,7 @@ U32 LLVOGrass::getPartitionType() const
 }
 
 LLGrassPartition::LLGrassPartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, GL_STREAM_DRAW_ARB, regionp)
+: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, regionp)
 {
 	mDrawableType = LLPipeline::RENDER_TYPE_GRASS;
 	mPartitionType = LLViewerRegion::PARTITION_GRASS;
@@ -601,13 +600,10 @@ LLGrassPartition::LLGrassPartition(LLViewerRegion* regionp)
 	mDepthMask = TRUE;
 	mSlopRatio = 0.1f;
 	mRenderPass = LLRenderPass::PASS_GRASS;
-	mBufferUsage = GL_DYNAMIC_DRAW_ARB;
 }
 
 void LLGrassPartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_count, U32& index_count)
 {
-	group->mBufferUsage = mBufferUsage;
-
 	mFaceList.clear();
 
 	LLViewerCamera* camera = LLViewerCamera::getInstance();
@@ -623,11 +619,6 @@ void LLGrassPartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_count
 		LLAlphaObject* obj = (LLAlphaObject*) drawablep->getVObj().get();
 		obj->mDepth = 0.f;
 		
-		if (drawablep->isAnimating())
-		{
-			group->mBufferUsage = GL_STREAM_DRAW_ARB;
-		}
-
 		U32 count = 0;
 		for (S32 j = 0; j < drawablep->getNumFaces(); ++j)
 		{
@@ -706,8 +697,7 @@ void LLGrassPartition::getGeometry(LLSpatialGroup* group)
 
 		S32 idx = draw_vec.size()-1;
 
-		BOOL fullbright = facep->isState(LLFace::FULLBRIGHT);
-		F32 vsize = facep->getVirtualSize();
+		bool fullbright = facep->isState(LLFace::FULLBRIGHT);
 
 		if (idx >= 0 && draw_vec[idx]->mEnd == facep->getGeomIndex()-1 &&
 			draw_vec[idx]->mTexture == facep->getTexture() &&
@@ -718,7 +708,6 @@ void LLGrassPartition::getGeometry(LLSpatialGroup* group)
 		{
 			draw_vec[idx]->mCount += facep->getIndicesCount();
 			draw_vec[idx]->mEnd += facep->getGeomCount();
-			draw_vec[idx]->mVSize = llmax(draw_vec[idx]->mVSize, vsize);
 		}
 		else
 		{
@@ -730,17 +719,13 @@ void LLGrassPartition::getGeometry(LLSpatialGroup* group)
 				//facep->getTexture(),
 				buffer, object->isSelected(), fullbright);
 
-			const LLVector4a* exts = group->getObjectExtents();
-			info->mExtents[0] = exts[0];
-			info->mExtents[1] = exts[1];
-			info->mVSize = vsize;
 			draw_vec.push_back(info);
 			//for alpha sorting
 			facep->setDrawInfo(info);
 		}
 	}
 
-	buffer->flush();
+	buffer->unmapBuffer();
 	mFaceList.clear();
 }
 
@@ -757,7 +742,7 @@ void LLVOGrass::updateDrawable(BOOL force_damped)
 }
 
 // virtual 
-BOOL LLVOGrass::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, S32 *face_hitp,
+BOOL LLVOGrass::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, BOOL pick_unselectable, S32 *face_hitp,
 									  LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
 	
 {

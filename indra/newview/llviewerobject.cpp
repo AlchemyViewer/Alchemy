@@ -84,11 +84,10 @@
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
 #include "llvograss.h"
-#include "llvoground.h"
+#include "llvosky.h"
 #include "llvolume.h"
 #include "llvolumemessage.h"
 #include "llvopartgroup.h"
-#include "llvosky.h"
 #include "llvosurfacepatch.h"
 #include "llvotree.h"
 #include "llvovolume.h"
@@ -107,6 +106,7 @@
 #include "llcleanup.h"
 #include "llcallstack.h"
 #include "llmeshrepository.h"
+s#include "llgltfmateriallist.h"
 #include "llgl.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvactions.h"
@@ -169,7 +169,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
 		&& pcode != LL_VO_VOID_WATER
 		&& pcode != LL_VO_WL_SKY
 		&& pcode != LL_VO_SKY
-		&& pcode != LL_VO_GROUND
 		&& pcode != LL_VO_PART_GROUP
 		)
 	{
@@ -241,8 +240,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
 		res = new LLVOVoidWater(id, pcode, regionp); break;
 	case LL_VO_WATER:
 		res = new LLVOWater(id, pcode, regionp); break;
-	case LL_VO_GROUND:
-	  res = new LLVOGround(id, pcode, regionp); break;
 	case LL_VO_PART_GROUP:
 	  res = new LLVOPartGroup(id, pcode, regionp); break;
 	case LL_VO_HUD_PART_GROUP:
@@ -253,6 +250,7 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
 	  LL_WARNS() << "Unknown object pcode " << (S32)pcode << LL_ENDL;
 	  res = NULL; break;
 	}
+
 	return res;
 }
 
@@ -266,7 +264,6 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
 	mTEImages(NULL),
 	mTENormalMaps(NULL),
 	mTESpecularMaps(NULL),
-	mGLName(0),
 	mbCanSelect(TRUE),
 	mFlags(0),
 	mPhysicsShapeType(0),
@@ -351,6 +348,13 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
 LLViewerObject::~LLViewerObject()
 {
 	deleteTEImages();
+
+    // unhook from reflection probe manager
+    if (mReflectionProbe.notNull())
+    {
+        mReflectionProbe->mViewerObject = nullptr;
+        mReflectionProbe = nullptr;
+    }
 
 	if(mInventory)
 	{
@@ -511,6 +515,12 @@ void LLViewerObject::markDead()
 		{
 			LLFollowCamMgr::getInstance()->removeFollowCamParams(mID);
 		}
+
+        if (mReflectionProbe.notNull())
+        {
+            mReflectionProbe->mViewerObject = nullptr;
+            mReflectionProbe = nullptr;
+        }
 
 		sNumZombieObjects++;
 	}
@@ -3550,11 +3560,11 @@ void LLViewerObject::removeInventory(const LLUUID& item_id)
 	++mExpectedInventorySerialNum;
 }
 
-bool LLViewerObject::isTextureInInventory(LLViewerInventoryItem* item)
+bool LLViewerObject::isAssetInInventory(LLViewerInventoryItem* item)
 {
 	bool result = false;
 
-	if (item && LLAssetType::AT_TEXTURE == item->getType())
+	if (item)
 	{
 		std::list<LLUUID>::iterator begin = mPendingInventoryItemsIDs.begin();
 		std::list<LLUUID>::iterator end = mPendingInventoryItemsIDs.end();
@@ -3568,13 +3578,27 @@ bool LLViewerObject::isTextureInInventory(LLViewerInventoryItem* item)
 	return result;
 }
 
-void LLViewerObject::updateTextureInventory(LLViewerInventoryItem* item, U8 key, bool is_new)
+void LLViewerObject::updateMaterialInventory(LLViewerInventoryItem* item, U8 key, bool is_new)
 {
-	if (item && !isTextureInInventory(item))
-	{
-		mPendingInventoryItemsIDs.push_back(item->getAssetUUID());
-		updateInventory(item, key, is_new);
-	}
+    if (!item)
+    {
+        return;
+    }
+    if (LLAssetType::AT_TEXTURE != item->getType()
+        && LLAssetType::AT_MATERIAL != item->getType())
+    {
+        // Not supported
+        return;
+    }
+
+    if (isAssetInInventory(item))
+    {
+        // already there
+        return;
+    }
+
+    mPendingInventoryItemsIDs.push_back(item->getAssetUUID());
+    updateInventory(item, key, is_new);
 }
 
 void LLViewerObject::updateInventory(
@@ -4102,7 +4126,7 @@ void LLViewerObject::updateTextures()
 
 void LLViewerObject::boostTexturePriority(BOOL boost_children /* = TRUE */)
 {
-	if (isDead())
+	if (isDead() || !getVolume())
 	{
 		return;
 	}
@@ -4646,6 +4670,7 @@ BOOL LLViewerObject::lineSegmentIntersect(const LLVector4a& start, const LLVecto
 										  S32 face,
 										  BOOL pick_transparent,
 										  BOOL pick_rigged,
+                                          BOOL pick_unselectable,
 										  S32* face_hit,
 										  LLVector4a* intersection,
 										  LLVector2* tex_coord,
@@ -4809,8 +4834,37 @@ void LLViewerObject::setNumTEs(const U8 num_tes)
 		{
 			deleteTEImages();
 		}
+
+        S32 original_tes = getNumTEs();
+
 		LLPrimitive::setNumTEs(num_tes);
 		setChanged(TEXTURE);
+
+        // touch up GLTF materials
+        if (original_tes > 0)
+        {
+            for (int i = original_tes; i < getNumTEs(); ++i)
+            {
+                LLTextureEntry* src = getTE(original_tes - 1);
+                LLTextureEntry* tep = getTE(i);
+                setRenderMaterialID(i, getRenderMaterialID(original_tes - 1), false);
+
+                if (tep)
+                {
+                    LLGLTFMaterial* base_material = src->getGLTFMaterial();
+                    LLGLTFMaterial* override_material = src->getGLTFMaterialOverride();
+                    if (base_material && override_material)
+                    {
+                        tep->setGLTFMaterialOverride(new LLGLTFMaterial(*override_material));
+
+                        LLGLTFMaterial* render_material = new LLFetchedGLTFMaterial();
+                        *render_material = *base_material;
+                        render_material->applyOverride(*override_material);
+                        tep->setGLTFRenderMaterial(render_material);
+                    }
+                }
+            }
+        }
 
 		if (mDrawable.notNull())
 		{
@@ -4936,23 +4990,28 @@ void LLViewerObject::updateAvatarMeshVisibility(const LLUUID& id, const LLUUID& 
 	}
 }
 
-void LLViewerObject::setTE(const U8 te, const LLTextureEntry &texture_entry)
+
+void LLViewerObject::setTE(const U8 te, const LLTextureEntry& texture_entry)
 {
-	LLUUID old_image_id;
-	if (getTE(te))
-	{
-		old_image_id = getTE(te)->getID();
-	}
-		
-	LLPrimitive::setTE(te, texture_entry);
+    LLUUID old_image_id;
+    if (getTE(te))
+    {
+        old_image_id = getTE(te)->getID();
+    }
 
-		const LLUUID& image_id = getTE(te)->getID();
-	LLViewerTexture* bakedTexture = getBakedTextureForMagicId(image_id);
-	mTEImages[te] = bakedTexture ? bakedTexture : LLViewerTextureManager::getFetchedTexture(image_id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+    LLPrimitive::setTE(te, texture_entry);
 
-	
-	updateAvatarMeshVisibility(image_id,old_image_id);
+    const LLUUID& image_id = getTE(te)->getID();
+    LLViewerTexture* bakedTexture = getBakedTextureForMagicId(image_id);
+    mTEImages[te] = bakedTexture ? bakedTexture : LLViewerTextureManager::getFetchedTexture(image_id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
 
+    updateAvatarMeshVisibility(image_id, old_image_id);
+
+    updateTEMaterialTextures(te);
+}
+
+void LLViewerObject::updateTEMaterialTextures(U8 te)
+{
 	if (getTE(te)->getMaterialParams().notNull())
 	{
 		const LLUUID& norm_id = getTE(te)->getMaterialParams()->getNormalID();
@@ -4961,6 +5020,48 @@ void LLViewerObject::setTE(const U8 te, const LLTextureEntry &texture_entry)
 		const LLUUID& spec_id = getTE(te)->getMaterialParams()->getSpecularID();
 		mTESpecularMaps[te] = LLViewerTextureManager::getFetchedTexture(spec_id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_ALM, LLViewerTexture::LOD_TEXTURE);
 	}
+
+    LLFetchedGLTFMaterial* mat = (LLFetchedGLTFMaterial*) getTE(te)->getGLTFRenderMaterial();
+    LLUUID mat_id = getRenderMaterialID(te);
+    if (mat == nullptr && mat_id.notNull())
+    {
+        mat = (LLFetchedGLTFMaterial*) gGLTFMaterialList.getMaterial(mat_id);
+        getTE(te)->setGLTFMaterial(mat);
+    }
+    else if (mat_id.isNull() && mat != nullptr)
+    {
+        mat = nullptr;
+        getTE(te)->setGLTFMaterial(nullptr);
+    }
+
+    auto fetch_texture = [this](const LLUUID& id)
+    {
+        LLViewerFetchedTexture* img = nullptr;
+        if (id.notNull())
+        {
+            if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(id))
+            {
+                 // TODO -- fall back to LLTextureEntry::mGLTFRenderMaterial when overriding with baked texture
+                LLViewerTexture* viewerTexture = getBakedTextureForMagicId(id);
+                img = viewerTexture ? dynamic_cast<LLViewerFetchedTexture*>(viewerTexture) : nullptr;
+            }
+            else
+            {
+                img = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_ALM, LLViewerTexture::LOD_TEXTURE);
+                img->addTextureStats(64.f * 64.f, TRUE);
+            }
+        }
+
+        return img;
+    };
+
+    if (mat != nullptr)
+    {
+        mat->mBaseColorTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]);
+        mat->mNormalTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL]);
+        mat->mMetallicRoughnessTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS]);
+        mat->mEmissiveTexture= fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE]);
+    }
 }
 
 void LLViewerObject::refreshBakeTexture()
@@ -5319,8 +5420,48 @@ S32 LLViewerObject::setTEMaterialParams(const U8 te, const LLMaterialPtr pMateri
 	setTENormalMap(te, (pMaterialParams) ? pMaterialParams->getNormalID() : LLUUID::null);
 	setTESpecularMap(te, (pMaterialParams) ? pMaterialParams->getSpecularID() : LLUUID::null);
 
-	refreshMaterials();
 	return retval;
+}
+
+S32 LLViewerObject::setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* override_mat)
+{
+    LL_PROFILE_ZONE_SCOPED;
+    S32 retval = TEM_CHANGE_NONE;
+
+    LLTextureEntry* tep = getTE(te);
+    if (!tep)
+    { // this could happen if the object is not fully formed yet
+        // returning TEM_CHANGE_NONE here signals to LLGLTFMaterialList to queue the override for later
+        return retval;
+    }
+
+    LLFetchedGLTFMaterial* src_mat = (LLFetchedGLTFMaterial*) tep->getGLTFMaterial();
+
+    if (!src_mat)
+    { // we can get into this state if an override has arrived before the viewer has
+        // received or handled an update, return TEM_CHANGE_NONE to signal to LLGLTFMaterialList that it
+        // should queue the update for later
+        return retval;
+    }
+
+    tep->setGLTFMaterialOverride(override_mat);
+
+    // if override mat exists, we must also have a source mat
+    llassert(override_mat ? bool(src_mat) : true);
+
+    if (override_mat && src_mat)
+    {
+        LLFetchedGLTFMaterial* render_mat = new LLFetchedGLTFMaterial(*src_mat);
+        render_mat->applyOverride(*override_mat);
+        tep->setGLTFRenderMaterial(render_mat);
+        retval = TEM_CHANGE_TEXTURE;
+    }
+    else if (tep->setGLTFRenderMaterial(nullptr))
+    {
+        retval = TEM_CHANGE_TEXTURE;
+    }
+
+    return retval;
 }
 
 void LLViewerObject::refreshMaterials()
@@ -5404,6 +5545,7 @@ S32 LLViewerObject::setTERotation(const U8 te, const F32 r)
 	if (mDrawable.notNull() && retval)
 	{
 		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_TCOORD);
+        shrinkWrap();
 	}
 	return retval;
 }
@@ -5505,7 +5647,6 @@ void LLViewerObject::fitFaceTexture(const U8 face)
 	LL_INFOS() << "fitFaceTexture not implemented" << LL_ENDL;
 }
 
-
 LLBBox LLViewerObject::getBoundingBoxAgent() const
 {
 	LLVector3 position_agent;
@@ -5588,16 +5729,6 @@ S32 LLViewerObject::countInventoryContents(LLAssetType::EType type)
 		}
 	}
 	return count;
-}
-
-
-void LLViewerObject::setCanSelect(BOOL canSelect)
-{
-	mbCanSelect = canSelect;
-	for (LLViewerObject* child : mChildList)
-	{
-		child->mbCanSelect = canSelect;
-	}
 }
 
 void LLViewerObject::setDebugText(const std::string &utf8text)
@@ -6121,8 +6252,23 @@ LLViewerObject::ExtraParameter* LLViewerObject::createNewParameterEntry(U16 para
 		  in_use = &mExtendedMeshParamsInUse;
 		  break;
       }
+      case LLNetworkData::PARAMS_RENDER_MATERIAL:
+      {
+		  mRenderMaterialParams = std::make_unique<LLRenderMaterialParams>();
+		  new_block = mExtendedMeshParams.get();
+		  in_use = &mExtendedMeshParamsInUse;
+          break;
+      }
+      case LLNetworkData::PARAMS_REFLECTION_PROBE:
+      {
+	      mLLReflectionProbeParams = std::make_unique<LLReflectionProbeParams>();
+		  new_block = mExtendedMeshParams.get();
+		  in_use = &mExtendedMeshParamsInUse;
+          break;
+      }
 	  default:
 	  {
+          llassert(false); // invalid parameter type
 			LL_INFOS() << "Unknown param type. (" << llformat("0x%2x", param_type) << ")" << LL_ENDL;
 		  break;
 	  }
@@ -6133,6 +6279,7 @@ LLViewerObject::ExtraParameter* LLViewerObject::createNewParameterEntry(U16 para
 	{
 		entry.in_use = in_use;
 		*entry.in_use = false; // not in use yet
+        llassert(mExtraParameterList[param_type] == nullptr); // leak -- redundantly allocated parameter entry
 		entry.data = new_block;
 		return &entry;
 	}
@@ -6197,6 +6344,11 @@ void LLViewerObject::parameterChanged(U16 param_type, LLNetworkData* data, BOOL 
 {
 	if (local_origin)
 	{
+        // *NOTE: Do not send the render material ID in this way as it will get
+        // out-of-sync with other sent client data.
+        // See LLViewerObject::setRenderMaterialID and LLGLTFMaterialList
+        llassert(param_type != LLNetworkData::PARAMS_RENDER_MATERIAL);
+
 		LLViewerRegion* regionp = getRegion();
 		if(!regionp) return;
 
@@ -6228,6 +6380,14 @@ void LLViewerObject::parameterChanged(U16 param_type, LLNetworkData* data, BOOL 
 			LL_WARNS() << "Failed to send object extra parameters: " << param_type << LL_ENDL;
 		}
 	}
+    else
+    {
+        if (param_type == LLNetworkData::PARAMS_RENDER_MATERIAL)
+        {
+            const LLRenderMaterialParams* params = in_use ? (LLRenderMaterialParams*)getParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL) : nullptr;
+            setRenderMaterialIDs(params, local_origin);
+        }
+    }
 }
 
 void LLViewerObject::setDrawableState(U32 state, BOOL recursive)
@@ -6759,7 +6919,7 @@ F32 LLAlphaObject::getPartSize(S32 idx)
 	return 0.f;
 }
 
-void LLAlphaObject::getBlendFunc(S32 face, U32& src, U32& dst)
+void LLAlphaObject::getBlendFunc(S32 face, LLRender::eBlendFactor& src, LLRender::eBlendFactor& dst)
 {
 
 }
@@ -7012,6 +7172,175 @@ LLVOAvatar* LLViewerObject::getAvatar() const
 	return NULL;
 }
 
+bool LLViewerObject::hasRenderMaterialParams() const
+{
+    return getParameterEntryInUse(LLNetworkData::PARAMS_RENDER_MATERIAL);
+}
+
+void LLViewerObject::setHasRenderMaterialParams(bool has_materials)
+{
+    bool had_materials = hasRenderMaterialParams();
+
+    if (had_materials != has_materials)
+    {
+        if (has_materials)
+        {
+            setParameterEntryInUse(LLNetworkData::PARAMS_RENDER_MATERIAL, TRUE, true);
+        }
+        else
+        {
+            setParameterEntryInUse(LLNetworkData::PARAMS_RENDER_MATERIAL, FALSE, true);
+        }
+    }
+}
+
+const LLUUID& LLViewerObject::getRenderMaterialID(U8 te) const
+{
+    LLRenderMaterialParams* param_block = (LLRenderMaterialParams*)getParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL);
+    if (param_block)
+    {
+        return param_block->getMaterial(te);
+    }
+
+    return LLUUID::null;
+}
+
+void LLViewerObject::rebuildMaterial()
+{
+    llassert(!isDead());
+
+    faceMappingChanged();
+    gPipeline.markTextured(mDrawable);
+}
+
+void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool update_server)
+{
+    // implementation is delicate
+
+    // if update is bound for server, should always null out GLTFRenderMaterial and clear GLTFMaterialOverride even if ids haven't changed
+    //  (the case where ids haven't changed indicates the user has reapplied the original material, in which case overrides should be dropped)
+    // otherwise, should only null out the render material where ids or overrides have changed
+    //  (the case where ids have changed but overrides are still present is from unsynchronized updates from the simulator)
+
+    S32 start_idx = 0;
+    S32 end_idx = getNumTEs();
+
+    if (te_in != -1)
+    {
+        start_idx = te_in;
+        end_idx = start_idx + 1;
+    }
+
+    start_idx = llmax(start_idx, 0);
+    end_idx = llmin(end_idx, (S32) getNumTEs());
+
+    LLRenderMaterialParams* param_block = (LLRenderMaterialParams*)getParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL);
+    if (!param_block && id.notNull())
+    { // block doesn't exist, but it will need to
+        param_block = (LLRenderMaterialParams*)createNewParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL)->data;
+    }
+
+
+    LLFetchedGLTFMaterial* new_material = nullptr;
+    if (id.notNull())
+    {
+        new_material = gGLTFMaterialList.getMaterial(id);
+    }
+        
+    // update local state
+    for (S32 te = start_idx; te < end_idx; ++te)
+    {
+        LLTextureEntry* tep = getTE(te);
+        
+        bool material_changed = !param_block || id != param_block->getMaterial(te);
+
+        if (update_server)
+        { 
+            // Clear most overrides so the render material better matches the material
+            // ID (preserve transforms). If overrides become passthrough, set the overrides
+            // to nullptr.
+            if (tep->setBaseMaterial())
+            {
+                material_changed = true;
+            }
+        }
+
+        if (update_server || material_changed)
+        { 
+            tep->setGLTFRenderMaterial(nullptr);
+        }
+
+        if (new_material != tep->getGLTFMaterial())
+        {
+            tep->setGLTFMaterial(new_material, !update_server);
+        }
+    }
+
+    // signal to render pipe that render batches must be rebuilt for this object
+    if (!new_material)
+    {
+        rebuildMaterial();
+    }
+    else
+    {
+        LLPointer<LLViewerObject> this_ptr = this;
+        new_material->onMaterialComplete([this_ptr]() mutable {
+            if (this_ptr->isDead()) { return; }
+
+            this_ptr->rebuildMaterial();
+        });
+    }
+
+    // predictively update LLRenderMaterialParams (don't wait for server)
+    if (param_block)
+    { // update existing parameter block
+        for (S32 te = start_idx; te < end_idx; ++te)
+        {
+            param_block->setMaterial(te, id);
+        }
+    }
+
+    if (update_server)
+    {
+        // update via ModifyMaterialParams cap (server will echo back changes)
+        for (S32 te = start_idx; te < end_idx; ++te)
+        {
+            // This sends a cleared version of this object's current material
+            // override, but the override should already be cleared due to
+            // calling setBaseMaterial above.
+            LLGLTFMaterialList::queueApply(this, te, id);
+        }
+    }
+}
+
+void LLViewerObject::setRenderMaterialIDs(const LLUUID& id)
+{
+    setRenderMaterialID(-1, id);
+}
+
+void LLViewerObject::setRenderMaterialIDs(const LLRenderMaterialParams* material_params, bool local_origin)
+{
+    if (!local_origin)
+    {
+        for (S32 te = 0; te < getNumTEs(); ++te)
+        {
+            const LLUUID& id = material_params ? material_params->getMaterial(te) : LLUUID::null;
+            setRenderMaterialID(te, id, false);
+        }
+    }
+}
+
+void LLViewerObject::shrinkWrap()
+{
+    if (!mShouldShrinkWrap)
+    {
+        mShouldShrinkWrap = true;
+        if (mDrawable)
+        { // we weren't shrink wrapped before but we are now, update the spatial partition
+            gPipeline.markPartitionMove(mDrawable);
+        }
+    }
+}
 
 class ObjectPhysicsProperties : public LLHTTPNode
 {

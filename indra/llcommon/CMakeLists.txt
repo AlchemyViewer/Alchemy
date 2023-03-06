@@ -32,7 +32,10 @@ include_directories(
 
 set(llcommon_SOURCE_FILES
     alxxh.cpp
+    commoncontrol.cpp
     indra_constants.cpp
+    llallocator.cpp
+    llallocator_heap_profile.cpp
     llapp.cpp
     llapr.cpp
     llassettype.cpp
@@ -120,6 +123,7 @@ set(llcommon_SOURCE_FILES
     lluriparser.cpp
     lluuid.cpp
     llworkerthread.cpp
+    hbxxh.cpp
     u64.cpp
     threadpool.cpp
     workqueue.cpp
@@ -132,6 +136,7 @@ set(llcommon_HEADER_FILES
     alxxh.h
     chrono.h
     classic_callback.h
+    commoncontrol.h
     ctype_workaround.h
     fix_macros.h
     indra_constants.h
@@ -188,6 +193,7 @@ set(llcommon_HEADER_FILES
     llinitdestroyclass.h
     llinitparam.h
     llinstancetracker.h
+    llinstancetrackersubclass.h
     llkeybind.h
     llkeythrottle.h
     llleap.h
@@ -258,10 +264,12 @@ set(llcommon_HEADER_FILES
     llwin32headers.h
     llwin32headerslean.h
     llworkerthread.h
+    hbxxh.h
     lockstatic.h
     stdtypes.h
     stringize.h
     threadpool.h
+    threadpool_fwd.h
     threadsafeschedule.h
     timer.h
     tuple.h

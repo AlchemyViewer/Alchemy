@@ -70,6 +70,8 @@
 
 #undef  VERIFY_LEGACY_CONVERSION
 
+extern BOOL gCubeSnapshot;
+
 //=========================================================================
 namespace 
 {
@@ -125,7 +127,7 @@ void LLSettingsVOBase::createNewInventoryItem(LLSettingsType::type_e stype, cons
 
 void LLSettingsVOBase::createInventoryItem(const LLSettingsBase::ptr_t &settings, const LLUUID &parent_id, std::string settings_name, inventory_result_fn callback)
 {
-    U32 nextOwnerPerm = LLPermissions::DEFAULT.getMaskNextOwner();
+    U32 nextOwnerPerm = LLFloaterPerms::getNextOwnerPerms("Settings");
     createInventoryItem(settings, nextOwnerPerm, parent_id, settings_name, callback);
 }
 
@@ -236,9 +238,11 @@ void LLSettingsVOBase::updateInventoryItem(const LLSettingsBase::ptr_t &settings
     LLSDSerialize::serialize(settingdata, buffer, LLSDSerialize::LLSD_NOTATION);
 
     LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(inv_item_id, LLAssetType::AT_SETTINGS, buffer.str(), 
-        [settings, callback](LLUUID itemId, LLUUID newAssetId, LLUUID newItemId, LLSD response) {
+        [settings, callback](LLUUID itemId, LLUUID newAssetId, LLUUID newItemId, LLSD response)
+        {
             LLSettingsVOBase::onAgentAssetUploadComplete(itemId, newAssetId, newItemId, response, settings, callback);
-        });
+        },
+        nullptr);
 
     LLViewerAssetUpload::EnqueueInventoryUpload(agent_url, uploadInfo);
 }
@@ -267,9 +271,11 @@ void LLSettingsVOBase::updateInventoryItem(const LLSettingsBase::ptr_t &settings
     LLSDSerialize::serialize(settingdata, buffer, LLSDSerialize::LLSD_NOTATION);
 
     LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(object_id, inv_item_id, LLAssetType::AT_SETTINGS, buffer.str(),
-        [settings, callback](LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response) {
-        LLSettingsVOBase::onTaskAssetUploadComplete(itemId, taskId, newAssetId, response, settings, callback);
-    });
+        [settings, callback](LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response)
+        {
+            LLSettingsVOBase::onTaskAssetUploadComplete(itemId, taskId, newAssetId, response, settings, callback);
+        },
+        nullptr);
 
     LLViewerAssetUpload::EnqueueInventoryUpload(agent_url, uploadInfo);
 }
@@ -670,59 +676,81 @@ void LLSettingsVOSky::updateSettings()
 void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
-    LLVector4 light_direction = LLEnvironment::instance().getClampedLightNorm();
+    LLVector3 light_direction = LLVector3(LLEnvironment::instance().getClampedLightNorm().mV);
+
+    bool radiance_pass = gCubeSnapshot && !gPipeline.mReflectionMapManager.isRadiancePass();
 
     LLShaderUniforms* shader = &((LLShaderUniforms*)ptarget)[LLGLSLShader::SG_DEFAULT];
 	{        
-        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, light_direction);
+        shader->uniform3fv(LLViewerShaderMgr::LIGHTNORM, light_direction);
         shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, LLViewerCamera::getInstance()->getOrigin());
 	} 
     
     shader = &((LLShaderUniforms*)ptarget)[LLGLSLShader::SG_SKY];
-	{
-        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, light_direction);
 
-        // Legacy? SETTING_CLOUD_SCROLL_RATE("cloud_scroll_rate")
-        LLVector4 vect_c_p_d1(mSettings[SETTING_CLOUD_POS_DENSITY1]);
-        LLVector4 cloud_scroll( LLEnvironment::instance().getCloudScrollDelta() );
+    shader->uniform3fv(LLViewerShaderMgr::LIGHTNORM, light_direction);
 
-        // SL-13084 EEP added support for custom cloud textures -- flip them horizontally to match the preview of Clouds > Cloud Scroll
-        // Keep in Sync!
-        // * indra\newview\llsettingsvo.cpp
-        // * indra\newview\app_settings\shaders\class2\windlight\cloudsV.glsl
-        // * indra\newview\app_settings\shaders\class1\deferred\cloudsV.glsl
-        cloud_scroll[0] = -cloud_scroll[0];
-        vect_c_p_d1 += cloud_scroll;
-        shader->uniform4fv(LLShaderMgr::CLOUD_POS_DENSITY1, vect_c_p_d1);
+    // Legacy? SETTING_CLOUD_SCROLL_RATE("cloud_scroll_rate")
+    LLVector4 vect_c_p_d1(mSettings[SETTING_CLOUD_POS_DENSITY1]);
+    LLVector4 cloud_scroll( LLEnvironment::instance().getCloudScrollDelta() );
 
-        LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+    // SL-13084 EEP added support for custom cloud textures -- flip them horizontally to match the preview of Clouds > Cloud Scroll
+    // Keep in Sync!
+    // * indra\newview\llsettingsvo.cpp
+    // * indra\newview\app_settings\shaders\class2\windlight\cloudsV.glsl
+    // * indra\newview\app_settings\shaders\class1\deferred\cloudsV.glsl
+    cloud_scroll[0] = -cloud_scroll[0];
+    vect_c_p_d1 += cloud_scroll;
+    shader->uniform3fv(LLShaderMgr::CLOUD_POS_DENSITY1, LLVector3(vect_c_p_d1.mV));
 
-        LLVector4 sunDiffuse = LLVector4(LLVector3(psky->getSunlightColor().mV));
-        LLVector4 moonDiffuse = LLVector4(LLVector3(psky->getMoonlightColor().mV));
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
-        shader->uniform4fv(LLShaderMgr::SUNLIGHT_COLOR, sunDiffuse.mV);
-        shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, moonDiffuse.mV);
+    // TODO -- make these getters return vec3s
+    LLVector3 sunDiffuse = LLVector3(psky->getSunlightColor().mV);
+    LLVector3 moonDiffuse = LLVector3(psky->getMoonlightColor().mV);
 
-        LLVector4 cloud_color(LLVector3(psky->getCloudColor().mV), 1.0);
-        shader->uniform4fv(LLShaderMgr::CLOUD_COLOR, cloud_color);
-	}
-    
+    shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, sunDiffuse);
+    shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, moonDiffuse);
+
+    shader->uniform3fv(LLShaderMgr::CLOUD_COLOR, LLVector3(psky->getCloudColor().mV));
+
     shader = &((LLShaderUniforms*)ptarget)[LLGLSLShader::SG_ANY];
     shader->uniform1f(LLShaderMgr::SCENE_LIGHT_STRENGTH, mSceneLightStrength);
 
-    LLColor4 ambient(getTotalAmbient());
-    shader->uniform4fv(LLShaderMgr::AMBIENT, LLVector4(ambient.mV));
+    LLColor3 ambient(getTotalAmbient());
+
+    if (radiance_pass)
+    { // during an irradiance map update, disable ambient lighting (direct lighting only) and desaturate sky color (avoid tinting the world blue)
+        shader->uniform3fv(LLShaderMgr::AMBIENT_LINEAR, LLVector3::zero.mV);
+        shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3::zero.mV);
+    }
+    else
+    {
+        shader->uniform3fv(LLShaderMgr::AMBIENT_LINEAR, linearColor3v(getAmbientColor() / 3.f)); // note magic number 3.f comes from SLIDER_SCALE_SUN_AMBIENT
+        shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3(ambient.mV));
+    }
+
+    shader->uniform3fv(LLShaderMgr::BLUE_HORIZON_LINEAR, linearColor3v(getBlueHorizon() / 2.f)); // note magic number of 2.f comes from SLIDER_SCALE_BLUE_HORIZON_DENSITY
+    shader->uniform3fv(LLShaderMgr::BLUE_DENSITY_LINEAR, linearColor3v(getBlueDensity() / 2.f));
+
+    shader->uniform3fv(LLShaderMgr::SUNLIGHT_LINEAR, linearColor3v(sunDiffuse));
+    shader->uniform3fv(LLShaderMgr::MOONLIGHT_LINEAR,linearColor3v(moonDiffuse));
+
+    static LLCachedControl<F32> cloud_shadow_scale(gSavedSettings, "RenderCloudShadowAmbianceFactor", 0.125f);
+    shader->uniform1f(LLShaderMgr::REFLECTION_PROBE_AMBIANCE, getTotalReflectionProbeAmbiance(cloud_shadow_scale));
 
     shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, getIsSunUp() ? 1 : 0);
     shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, getSunMoonGlowFactor());
     shader->uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, getDensityMultiplier());
     shader->uniform1f(LLShaderMgr::DISTANCE_MULTIPLIER, getDistanceMultiplier());
-    
+
+    shader->uniform1f(LLShaderMgr::HAZE_DENSITY_LINEAR, sRGBtoLinear(getHazeDensity()));
+
     F32 g             = getGamma();
-    //F32 display_gamma = gSavedSettings.getF32("RenderDeferredDisplayGamma");
+    F32 display_gamma = gSavedSettings.getF32("RenderDeferredDisplayGamma");
 
     shader->uniform1f(LLShaderMgr::GAMMA, g);
-    //shader->uniform1f(LLShaderMgr::DISPLAY_GAMMA, display_gamma);
+    shader->uniform1f(LLShaderMgr::DISPLAY_GAMMA, display_gamma);
 }
 
 const LLSettingsSky::parammapping_t& LLSettingsVOSky::getParameterMap() const
@@ -761,6 +789,7 @@ const LLSettingsSky::parammapping_t& LLSettingsVOSky::getParameterMap() const
         param_map[SETTING_SKY_DROPLET_RADIUS] = DefaultParam(LLShaderMgr::DROPLET_RADIUS, sky_defaults[SETTING_SKY_DROPLET_RADIUS]);
         param_map[SETTING_SKY_ICE_LEVEL] = DefaultParam(LLShaderMgr::ICE_LEVEL, sky_defaults[SETTING_SKY_ICE_LEVEL]);
 
+        param_map[SETTING_REFLECTION_PROBE_AMBIANCE] = DefaultParam(LLShaderMgr::REFLECTION_PROBE_AMBIANCE, sky_defaults[SETTING_REFLECTION_PROBE_AMBIANCE]);
 // AdvancedAtmospherics TODO
 // Provide mappings for new shader params here
     }
@@ -924,7 +953,7 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
 
         //transform water plane to eye space
         LLVector4a enorm(0.f, 0.f, 1.f);
-        LLVector4a ep(0.f, 0.f, water_height + 0.1f);
+        LLVector4a ep(0.f, 0.f, water_height);
 
         const LLMatrix4a& mat = get_current_modelview();
         LLMatrix4a invtrans = mat;
@@ -941,6 +970,7 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
 
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, enorm.getF32ptr());
 
+
         LLVector4 light_direction = env.getClampedLightNorm();
 
         F32 waterFogKS = 1.f / llmax(light_direction.mV[2], WATER_FOG_LIGHT_CLAMP);
@@ -953,14 +983,16 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         F32 waterFogDensity = env.getCurrentWater()->getModifiedWaterFogDensity(underwater);
         shader->uniform1f(LLShaderMgr::WATER_FOGDENSITY, waterFogDensity);
 
-        LLColor4 fog_color(env.getCurrentWater()->getWaterFogColor(), 0.0f);
+        LLColor4 fog_color(env.getCurrentWater()->getWaterFogColor());
         shader->uniform4fv(LLShaderMgr::WATER_FOGCOLOR, fog_color.mV);
+
+        shader->uniform3fv(LLShaderMgr::WATER_FOGCOLOR_LINEAR, linearColor3(fog_color).mV);
 
         F32 blend_factor = env.getCurrentWater()->getBlendFactor();
         shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
 
         // update to normal lightnorm, water shader itself will use rotated lightnorm as necessary
-        shader->uniform4fv(LLShaderMgr::LIGHTNORM, light_direction.mV);
+        shader->uniform3fv(LLShaderMgr::LIGHTNORM, light_direction.mV);
     }
 }
 

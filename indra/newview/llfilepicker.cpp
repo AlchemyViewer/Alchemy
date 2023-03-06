@@ -55,10 +55,13 @@ LLFilePicker LLFilePicker::sInstance;
 #define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png;*.webp\0"
 #define ANIM_FILTER L"Animations (*.bvh; *.anim)\0*.bvh;*.anim\0"
 #define COLLADA_FILTER L"Scene (*.dae)\0*.dae\0"
+#define GLTF_FILTER L"glTF (*.gltf; *.glb)\0*.gltf;*.glb\0"
 #define XML_FILTER L"XML files (*.xml)\0*.xml\0"
 #define SLOBJECT_FILTER L"Objects (*.slobject)\0*.slobject\0"
 #define RAW_FILTER L"RAW files (*.raw)\0*.raw\0"
 #define MODEL_FILTER L"Model files (*.dae)\0*.dae\0"
+#define MATERIAL_FILTER L"GLTF Files (*.gltf; *.glb)\0*.gltf;*.glb\0"
+#define MATERIAL_TEXTURES_FILTER L"GLTF Import (*.gltf; *.glb; *.tga; *.bmp; *.jpg; *.jpeg; *.png)\0*.gltf;*.glb;*.tga;*.bmp;*.jpg;*.jpeg;*.png\0"
 #define SCRIPT_FILTER L"Script files (*.lsl)\0*.lsl\0"
 #define DICTIONARY_FILTER L"Dictionary files (*.dic; *.xcu)\0*.dic;*.xcu\0"
 #define ZIP_FILTER L"ZIP files (*.zip)\0*.zip\0"
@@ -177,6 +180,7 @@ BOOL LLFilePicker::setupFilter(ELoadFilter filter)
 		SOUND_FILTER \
 		IMAGE_FILTER \
 		ANIM_FILTER \
+		MATERIAL_FILTER \
 		L"\0";
 		break;
 	case FFLOAD_WAV:
@@ -191,7 +195,11 @@ BOOL LLFilePicker::setupFilter(ELoadFilter filter)
 		mOFN.lpstrFilter = ANIM_FILTER \
 			L"\0";
 		break;
-	case FFLOAD_COLLADA:
+    case FFLOAD_GLTF:
+        mOFN.lpstrFilter = GLTF_FILTER \
+            L"\0";
+        break;
+    case FFLOAD_COLLADA:
 		mOFN.lpstrFilter = COLLADA_FILTER \
 			L"\0";
 		break;
@@ -211,6 +219,16 @@ BOOL LLFilePicker::setupFilter(ELoadFilter filter)
 		mOFN.lpstrFilter = MODEL_FILTER \
 			L"\0";
 		break;
+    case FFLOAD_MATERIAL:
+        mOFN.lpstrFilter = MATERIAL_FILTER \
+            L"\0";
+        break;
+    case FFLOAD_MATERIAL_TEXTURE:
+        mOFN.lpstrFilter = MATERIAL_TEXTURES_FILTER \
+            MATERIAL_FILTER \
+            IMAGE_FILTER \
+            L"\0";
+        break;
 	case FFLOAD_SCRIPT:
 		mOFN.lpstrFilter = SCRIPT_FILTER \
 			L"\0";
@@ -490,6 +508,16 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
 			L"XAF Anim File (*.xaf)\0*.xaf\0" \
 			L"\0";
 		break;
+	case FFSAVE_GLTF:
+		if (filename.empty())
+		{
+			wcsncpy( mFilesW,L"untitled.glb", FILENAME_BUFFER_SIZE);	/*Flawfinder: ignore*/
+		}
+		mOFN.lpstrDefExt = L"glb";
+		mOFN.lpstrFilter =
+			L"glTF Asset File (*.gltf *.glb)\0*.gltf;*.glb\0" \
+			L"\0";
+		break;
 	case FFSAVE_CSV:
 		if (filename.empty())
 		{
@@ -610,6 +638,8 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
             allowedv->emplace_back("dic");
             allowedv->emplace_back("xcu");
             allowedv->emplace_back("gif");
+            allowedv->emplace_back("gltf");
+            allowedv->emplace_back("glb");
         case FFLOAD_IMAGE:
             allowedv->emplace_back("jpg");
             allowedv->emplace_back("jpeg");
@@ -630,6 +660,11 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
         case FFLOAD_ANIM:
             allowedv->emplace_back("bvh");
             allowedv->emplace_back("anim");
+            break;
+        case FFLOAD_GLTF:
+        case FFLOAD_MATERIAL:
+            allowedv->push_back("gltf");
+            allowedv->push_back("glb");
             break;
         case FFLOAD_COLLADA:
             allowedv->emplace_back("dae");
@@ -720,6 +755,12 @@ bool	LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filena
 
 		case FFSAVE_ANIM:
 			extension = "xaf";
+			break;
+
+		case FFSAVE_GLTF:
+			type = "\?\?\?\?";
+			creator = "\?\?\?\?";
+			extension = "glb";
 			break;
 			
 		case FFSAVE_XML:
@@ -1366,10 +1407,13 @@ BOOL LLFilePicker::getOpenFile( ELoadFilter filter, bool blocking )
 		case FFLOAD_XML:
 			filtername = add_xml_filter_to_gtkchooser(picker);
 			break;
-		case FFLOAD_COLLADA:
-			filtername = add_collada_filter_to_gtkchooser(picker);
-			break;
-		case FFLOAD_IMAGE:
+        case FFLOAD_GLTF:
+            filtername = dead_code_should_blow_up_here(picker);
+            break;
+        case FFLOAD_COLLADA:
+            filtername = add_collada_filter_to_gtkchooser(picker);
+            break;
+        case FFLOAD_IMAGE:
 			filtername = add_imageload_filter_to_gtkchooser(picker);
 			break;
 		case FFLOAD_SCRIPT:

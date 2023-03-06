@@ -33,8 +33,8 @@ out vec4 frag_color;
 #define frag_color gl_FragColor
 #endif
 
-uniform sampler2DRect diffuseRect;
-uniform sampler2DRect lightMap;
+uniform sampler2D diffuseRect;
+uniform sampler2D lightMap;
 
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
@@ -46,38 +46,36 @@ uniform float dof_height;
 
 VARYING vec2 vary_fragcoord;
 
-vec4 dofSample(sampler2DRect tex, vec2 tc)
+vec4 dofSample(sampler2D tex, vec2 tc)
 {
-    tc.x = min(tc.x, dof_width);
-    tc.y = min(tc.y, dof_height);
+	tc.x = min(tc.x, dof_width);
+	tc.y = min(tc.y, dof_height);
 
-    return texture2DRect(tex, tc);
+	return texture2D(tex, tc);
 }
 
 void main() 
 {
-    vec2 tc = vary_fragcoord.xy;
-    
-    vec4 diff = texture2DRect(lightMap, tc.xy);
-    vec4 dof = dofSample(diffuseRect, tc.xy*res_scale);
-    dof.a = 0.0;
+	vec2 tc = vary_fragcoord.xy;
+	
+	vec4 dof = dofSample(diffuseRect, vary_fragcoord.xy*res_scale);
+	
+	vec4 diff = texture2D(lightMap, vary_fragcoord.xy);
 
-    float a = min(abs(diff.a*2.0-1.0) * max_cof*res_scale, 1.0);
+	float a = min(abs(diff.a*2.0-1.0) * max_cof*res_scale*res_scale, 1.0);
 
-    // help out the transition from low-res dof buffer to full-rez full-focus buffer
-    if (a > 0.25 && a < 0.75)
-    {
-        float sc = a/res_scale;
-        
-        vec4 col;
-        col = diff;
-        col.rgb += texture2DRect(lightMap, tc.xy+vec2(sc,sc)).rgb;
-        col.rgb += texture2DRect(lightMap, tc.xy+vec2(-sc,sc)).rgb;
-        col.rgb += texture2DRect(lightMap, tc.xy+vec2(sc,-sc)).rgb;
-        col.rgb += texture2DRect(lightMap, tc.xy+vec2(-sc,-sc)).rgb;
-        
-        diff = mix(diff, col*0.2, a);
-    }
+	if (a > 0.25 && a < 0.75)
+	{ //help out the transition a bit
+		float sc = a/res_scale;
+		
+		vec4 col;
+		col = texture2D(lightMap, vary_fragcoord.xy+vec2(sc,sc)/screen_res);
+		col += texture2D(lightMap, vary_fragcoord.xy+vec2(-sc,sc)/screen_res);
+		col += texture2D(lightMap, vary_fragcoord.xy+vec2(sc,-sc)/screen_res);
+		col += texture2D(lightMap, vary_fragcoord.xy+vec2(-sc,-sc)/screen_res);
+		
+		diff = mix(diff, col*0.25, a);
+	}
 
-    frag_color = mix(diff, dof, a);
+	frag_color = mix(diff, dof, a);
 }

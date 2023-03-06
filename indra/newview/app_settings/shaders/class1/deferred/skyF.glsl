@@ -26,7 +26,7 @@
 /*[EXTRA_CODE_HERE]*/
 
 // Inputs
-VARYING vec4 vary_HazeColor;
+VARYING vec3 vary_HazeColor;
 VARYING float vary_LightNormPosDot;
 
 uniform sampler2D rainbow_map;
@@ -45,6 +45,7 @@ out vec4 frag_data[3];
 /////////////////////////////////////////////////////////////////////////
 // The fragment shader for the sky
 /////////////////////////////////////////////////////////////////////////
+
 
 vec3 rainbow(float d)
 {
@@ -82,7 +83,7 @@ void main()
     // the fragment) if the sky wouldn't show up because the clouds 
     // are fully opaque.
 
-    vec4 color = vary_HazeColor;
+    vec3 color = vary_HazeColor;
 
     float  rel_pos_lightnorm = vary_LightNormPosDot;
     float optic_d = rel_pos_lightnorm;
@@ -95,6 +96,6 @@ void main()
     // Gamma correct for WL (soft clip effect).
     frag_data[0] = vec4(color.rgb, 1.0);
     frag_data[1] = vec4(0.0,0.0,0.0,0.0);
-    frag_data[2] = vec4(0.0,0.0,0.0,1.0); //1.0 in norm.w masks off fog
+    frag_data[2] = vec4(0.0,0.0,0.0,GBUFFER_FLAG_SKIP_ATMOS); //1.0 in norm.w masks off fog
 }
 

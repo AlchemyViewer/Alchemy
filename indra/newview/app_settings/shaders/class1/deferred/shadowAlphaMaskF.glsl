@@ -43,32 +43,30 @@ void main()
 {
 	float alpha = diffuseLookup(vary_texcoord0.xy).a;
 
-    // mask cutoff 0 -> no shadow SL-11051
-    if (minimum_alpha == 0)
+    if (alpha < minimum_alpha)
     {
         discard;
     }
+
+#if !defined(GLTF)
 
 #if !defined(IS_FULLBRIGHT)
     alpha *= vertex_color.a;
 #endif
 
-	if (alpha < 0.05) // treat as totally transparent
-	{
-		discard;
-	}
+    if (alpha < 0.05) // treat as totally transparent
+    {
+        discard;
+    }
 
-	if (alpha < 0.88) // treat as semi-transparent
-	{
-	  if (fract(0.5*floor(target_pos_x / post_pos.w )) < 0.25)
-	  {
-	    discard;
-	  }
-	}
+    if (alpha < 0.88) // treat as semi-transparent
+    {
+        if (fract(0.5*floor(target_pos_x / post_pos.w )) < 0.25)
+        {
+            discard;
+        }
+    }
+#endif
 
 	frag_color = vec4(1,1,1,1);
-	
-#if !defined(DEPTH_CLAMP)
-	gl_FragDepth = max(post_pos.z/post_pos.w*0.5+0.5, 0.0);
-#endif
 }

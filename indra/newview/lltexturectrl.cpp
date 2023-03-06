@@ -39,11 +39,14 @@
 #include "llfolderviewmodel.h"
 #include "llinventory.h"
 #include "llinventoryfunctions.h"
+#include "llinventoryicon.h"
 #include "llinventorymodelbackgroundfetch.h"
 #include "llinventoryobserver.h"
 #include "llinventorypanel.h"
+#include "llmaterialeditor.h"
 #include "llui.h"
 #include "llviewerinventory.h"
+#include "llviewermenufile.h"	// LLFilePickerReplyThread
 #include "llpermissions.h"
 #include "llpreviewtexture.h"
 #include "llassetstorage.h"
@@ -58,17 +61,10 @@
 
 #include "llradiogroup.h"
 #include "llfloaterreg.h"
+#include "lllocalgltfmaterials.h"
 #include "llerror.h"
 
 #include "llavatarappearancedefines.h"
-
-
-static const S32 LOCAL_TRACKING_ID_COLUMN = 1;
-
-//static const char CURRENT_IMAGE_NAME[] = "Current Texture";
-//static const char WHITE_IMAGE_NAME[] = "Blank Texture";
-//static const char NO_IMAGE_NAME[] = "None";
-
 
 
 //static
@@ -143,15 +139,16 @@ LLTextureCtrl::LLTextureCtrl(const LLTextureCtrl::Params& p)
 	mOnCloseCallback(NULL),
 	mOnSelectCallback(NULL),
 	mBorderColor( p.border_color() ),
-	mAllowNoTexture( FALSE ),
+	mAllowNoTexture( p.allow_no_texture ),
 	mAllowLocalTexture( TRUE ),
 	mImmediateFilterPermMask( PERM_NONE ),
-	mNonImmediateFilterPermMask( PERM_NONE ),
 	mCanApplyImmediately( FALSE ),
 	mNeedsRawImageData( FALSE ),
 	mValid( TRUE ),
 	mShowLoadingPlaceholder( TRUE ),
 	mOpenTexPreview(false),
+    mBakeTextureEnabled(true),
+    mInventoryPickType(PICK_TEXTURE),
 	mImageAssetID(p.image_id),
 	mDefaultImageAssetID(p.default_image_id),
 	mDefaultImageName(p.default_image_name),
@@ -328,7 +325,6 @@ void LLTextureCtrl::showPicker(BOOL take_focus)
 			mLabel,
 			mImmediateFilterPermMask,
 			mDnDFilterPermMask,
-			mNonImmediateFilterPermMask,
 			mCanApplyImmediately,
 			mFallbackImage);
 		mFloaterHandle = floaterp->getHandle();
@@ -345,14 +341,10 @@ void LLTextureCtrl::showPicker(BOOL take_focus)
 		if (texture_floaterp)
 		{
 			texture_floaterp->setOnFloaterCommitCallback(boost::bind(&LLTextureCtrl::onFloaterCommit, this, _1, _2));
-		}
-		if (texture_floaterp)
-		{
 			texture_floaterp->setSetImageAssetIDCallback(boost::bind(&LLTextureCtrl::setImageAssetID, this, _1));
-		}
-		if (texture_floaterp)
-		{
-			texture_floaterp->setBakeTextureEnabled(TRUE);
+
+			texture_floaterp->setBakeTextureEnabled(mBakeTextureEnabled);
+            texture_floaterp->setInventoryPickType(mInventoryPickType);
 		}
 
 		LLFloater* root_floater = gFloaterView->getParentFloater(this);
@@ -415,8 +407,16 @@ BOOL LLTextureCtrl::handleMouseDown(S32 x, S32 y, MASK mask)
 		if (!mOpenTexPreview)
 		{
 			showPicker(FALSE);
-			//grab textures first...
-			LLInventoryModelBackgroundFetch::instance().start(gInventory.findCategoryUUIDForType(LLFolderType::FT_TEXTURE));
+            if (mInventoryPickType == LLTextureCtrl::PICK_MATERIAL)
+            {
+                //grab materials first...
+                LLInventoryModelBackgroundFetch::instance().start(gInventory.findCategoryUUIDForType(LLFolderType::FT_MATERIAL));
+            }
+            else
+            {
+                //grab textures first...
+                LLInventoryModelBackgroundFetch::instance().start(gInventory.findCategoryUUIDForType(LLFolderType::FT_TEXTURE));
+            }
 			//...then start full inventory fetch.
 			LLInventoryModelBackgroundFetch::instance().start();
 			handled = TRUE;
@@ -460,9 +460,9 @@ void LLTextureCtrl::onFloaterClose()
 
 void LLTextureCtrl::onFloaterCommit(ETexturePickOp op, LLUUID id)
 {
-	LLFloaterTexturePicker* floaterp = (LLFloaterTexturePicker*)mFloaterHandle.get();
+    LLFloaterTexturePicker* floaterp = (LLFloaterTexturePicker*)mFloaterHandle.get();
 
-	if( floaterp && getEnabled())
+    if( floaterp && getEnabled())
 	{
 		if (op == TEXTURE_CANCEL)
 			mViewModel->resetDirty();
@@ -483,15 +483,15 @@ void LLTextureCtrl::onFloaterCommit(ETexturePickOp op, LLUUID id)
 			}
 			else
 			{
-			mImageItemID = floaterp->findItemID(floaterp->getAssetID(), FALSE);
-			LL_DEBUGS() << "mImageItemID: " << mImageItemID << LL_ENDL;
-			mImageAssetID = floaterp->getAssetID();
-			LL_DEBUGS() << "mImageAssetID: " << mImageAssetID << LL_ENDL;
+			    mImageItemID = floaterp->findItemID(floaterp->getAssetID(), FALSE);
+			    LL_DEBUGS() << "mImageItemID: " << mImageItemID << LL_ENDL;
+			    mImageAssetID = floaterp->getAssetID();
+			    LL_DEBUGS() << "mImageAssetID: " << mImageAssetID << LL_ENDL;
 			}
 
 			if (op == TEXTURE_SELECT && mOnSelectCallback)
 			{
-				mOnSelectCallback( this, LLSD() );
+                mOnSelectCallback(this, LLSD());
 			}
 			else if (op == TEXTURE_CANCEL && mOnCancelCallback)
 			{
@@ -502,8 +502,10 @@ void LLTextureCtrl::onFloaterCommit(ETexturePickOp op, LLUUID id)
 				// If the "no_commit_on_selection" parameter is set
 				// we commit only when user presses OK in the picker
 				// (i.e. op == TEXTURE_SELECT) or texture changes via DnD.
-				if (mCommitOnSelection || op == TEXTURE_SELECT)
-					onCommit();
+                if (mCommitOnSelection || op == TEXTURE_SELECT)
+                {
+                    onCommit();
+                }
 			}
 		}
 	}
@@ -548,13 +550,24 @@ void LLTextureCtrl::setImageAssetID( const LLUUID& asset_id )
 	}
 }
 
-void LLTextureCtrl::setBakeTextureEnabled(BOOL enabled)
+void LLTextureCtrl::setBakeTextureEnabled(bool enabled)
 {
+    mBakeTextureEnabled = enabled;
 	LLFloaterTexturePicker* floaterp = (LLFloaterTexturePicker*)mFloaterHandle.get();
 	if (floaterp)
 	{
 		floaterp->setBakeTextureEnabled(enabled);
 	}
+}
+
+void LLTextureCtrl::setInventoryPickType(EPickInventoryType type)
+{
+    mInventoryPickType = type;
+    LLFloaterTexturePicker* floaterp = (LLFloaterTexturePicker*)mFloaterHandle.get();
+    if (floaterp)
+    {
+        floaterp->setInventoryPickType(type);
+    }
 }
 
 BOOL LLTextureCtrl::handleDragAndDrop(S32 x, S32 y, MASK mask,
@@ -568,11 +581,26 @@ BOOL LLTextureCtrl::handleDragAndDrop(S32 x, S32 y, MASK mask,
 	// returns true, then the cast was valid, and we can perform
 	// the third test without problems.
 	LLInventoryItem* item = (LLInventoryItem*)cargo_data; 
-	bool is_mesh = cargo_type == DAD_MESH;
 
-	if (getEnabled() &&
-		((cargo_type == DAD_TEXTURE) || is_mesh) &&
-		 allowDrop(item))
+    bool is_mesh = cargo_type == DAD_MESH;
+    bool is_texture = cargo_type == DAD_TEXTURE;
+    bool is_material = cargo_type == DAD_MATERIAL;
+
+    bool allow_dnd = false;
+    if (mInventoryPickType == LLTextureCtrl::PICK_MATERIAL)
+    {
+        allow_dnd = is_material;
+    }
+    else if (mInventoryPickType == LLTextureCtrl::PICK_TEXTURE)
+    {
+        allow_dnd = is_texture || is_mesh;
+    }
+    else
+    {
+        allow_dnd = is_texture || is_mesh || is_material;
+    }
+
+	if (getEnabled() && allow_dnd && allowDrop(item, cargo_type, tooltip_msg))
 	{
 		if (drop)
 		{
@@ -636,7 +664,7 @@ void LLTextureCtrl::draw()
 	}
 	else//mImageAssetID == LLUUID::null
 	{
-		mTexturep = NULL;
+		mTexturep = NULL; 
 	}
 	
 	// Border
@@ -724,7 +752,7 @@ void LLTextureCtrl::draw()
 	LLUICtrl::draw();
 }
 
-BOOL LLTextureCtrl::allowDrop(LLInventoryItem* item)
+BOOL LLTextureCtrl::allowDrop(LLInventoryItem* item, EDragAndDropType cargo_type, std::string& tooltip_msg)
 {
 	BOOL copy = item->getPermissions().allowCopyBy(gAgent.getID());
 	BOOL mod = item->getPermissions().allowModifyBy(gAgent.getID());
@@ -736,8 +764,6 @@ BOOL LLTextureCtrl::allowDrop(LLInventoryItem* item)
 	if (mod)  item_perm_mask |= PERM_MODIFY;
 	if (xfer) item_perm_mask |= PERM_TRANSFER;
 	
-//	PermissionMask filter_perm_mask = mCanApplyImmediately ?			commented out due to no-copy texture loss.
-//			mImmediateFilterPermMask : mNonImmediateFilterPermMask;
 	PermissionMask filter_perm_mask = mImmediateFilterPermMask;
 	if ( (item_perm_mask & filter_perm_mask) == filter_perm_mask )
 	{
@@ -752,6 +778,12 @@ BOOL LLTextureCtrl::allowDrop(LLInventoryItem* item)
 	}
 	else
 	{
+        PermissionMask mask = PERM_COPY | PERM_TRANSFER;
+        if ((filter_perm_mask & mask) == mask
+            && cargo_type == DAD_TEXTURE)
+        {
+            tooltip_msg.assign(LLTrans::getString("TooltipTextureRestrictedDrop"));
+        }
 		return FALSE;
 	}
 }

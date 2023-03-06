@@ -10,15 +10,19 @@ include(LLCoreHttp)
 include(LLXML)
 include(LLPhysicsExtensions)
 include(LLCharacter)
+include(LLRender)
+include(TinyGLTF)
 
 include_directories(
     ${LLCOMMON_INCLUDE_DIRS}
     ${LLMATH_INCLUDE_DIRS}
     ${LLMESSAGE_INCLUDE_DIRS}
     ${LLXML_INCLUDE_DIRS}
+    ${LLRENDER_INCLUDE_DIRS}
     ${LIBS_PREBUILT_DIR}/include/collada
     ${LIBS_PREBUILT_DIR}/include/collada/1.4
     ${LLCHARACTER_INCLUDE_DIRS}
+    ${TINYGLTF_INCLUDE_DIR}
     )
 include_directories(SYSTEM
     ${LLCOMMON_SYSTEM_INCLUDE_DIRS}
@@ -28,6 +32,8 @@ include_directories(SYSTEM
 
 set(llprimitive_SOURCE_FILES
     lldaeloader.cpp
+    llgltfloader.cpp
+    llgltfmaterial.cpp
     llmaterialid.cpp
     llmaterial.cpp
     llmaterialtable.cpp
@@ -46,6 +52,8 @@ set(llprimitive_SOURCE_FILES
 set(llprimitive_HEADER_FILES
     CMakeLists.txt
     lldaeloader.h
+    llgltfloader.h
+    llgltfmaterial.h
     legacy_object_types.h
     llmaterial.h
     llmaterialid.h
@@ -96,6 +104,9 @@ if (LL_TESTS)
     INCLUDE(LLAddBuildTest)
     SET(llprimitive_TEST_SOURCE_FILES
       llmediaentry.cpp
+      llprimitive.cpp
+      llgltfmaterial.cpp
       )
+    
     LL_ADD_PROJECT_UNIT_TESTS(llprimitive "${llprimitive_TEST_SOURCE_FILES}")
 endif (LL_TESTS)

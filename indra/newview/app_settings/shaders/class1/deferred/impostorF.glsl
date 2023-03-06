@@ -57,5 +57,5 @@ void main()
 
 	frag_data[0] = vec4(col.rgb, 0.0);
 	frag_data[1] = spec;
-	frag_data[2] = vec4(encode_normal(norm.xyz),0,0);
+	frag_data[2] = vec4(encode_normal(norm.xyz),0,GBUFFER_FLAG_HAS_ATMOS);
 }

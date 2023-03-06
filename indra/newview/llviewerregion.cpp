@@ -55,6 +55,7 @@
 #include "llfloatergodtools.h"
 #include "llfloaterreporter.h"
 #include "llfloaterregioninfo.h"
+#include "llgltfmateriallist.h"
 #include "llhttpnode.h"
 #include "llregioninfomodel.h"
 #include "llsdutil.h"
@@ -221,6 +222,7 @@ public:
 	LLVOCacheEntry::vocache_entry_set_t   mVisibleEntries; //must-be-created visible entries wait for objects creation.	
 	LLVOCacheEntry::vocache_entry_priority_list_t mWaitingList; //transient list storing sorted visible entries waiting for object creation.
 	std::set<U32>                          mNonCacheableCreatedList; //list of local ids of all non-cacheable objects
+    LLVOCacheEntry::vocache_gltf_overrides_map_t mGLTFOverridesJson; // for materials
 
 	// time?
 	// LRU info?
@@ -816,7 +818,10 @@ void LLViewerRegion::loadObjectCache()
 
 	if(LLVOCache::instanceExists())
 	{
-		LLVOCache::getInstance()->readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap) ;
+        LLVOCache & vocache = LLVOCache::instance();
+		vocache.readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap)  ;
+        vocache.readGenericExtrasFromCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesJson);
+
 		if (mImpl->mCacheMap.empty())
 		{
 			mCacheDirty = TRUE;
@@ -841,8 +846,10 @@ void LLViewerRegion::saveObjectCache()
 	{
 		const F32 start_time_threshold = 600.0f; //seconds
 		bool removal_enabled = sVOCacheCullingEnabled && (mRegionTimer.getElapsedTimeF32() > start_time_threshold); //allow to remove invalid objects from object cache file.
-		
-		LLVOCache::getInstance()->writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled) ;
+
+        LLVOCache & instance = LLVOCache::instance();
+		instance.writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled)  ;
+        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesJson, mCacheDirty, removal_enabled);
 		mCacheDirty = FALSE;
 	}
 
@@ -1284,6 +1291,47 @@ bool LLViewerRegion::addVisibleGroup(LLViewerOctreeGroup* group)
 U32 LLViewerRegion::getNumOfVisibleGroups() const
 {
 	return mImpl ? mImpl->mVisibleGroups.size() : 0;
+}
+
+void LLViewerRegion::updateReflectionProbes()
+{
+#if 1
+    const F32 probe_spacing = 32.f;
+    const F32 probe_radius = sqrtf((probe_spacing * 0.5f) * (probe_spacing * 0.5f) * 3.f);
+    const F32 hover_height = 2.f;
+
+    F32 start = probe_spacing * 0.5f;
+
+    U32 grid_width = REGION_WIDTH_METERS / probe_spacing;
+
+    mReflectionMaps.resize(grid_width * grid_width);
+
+    F32 water_height = getWaterHeight();
+    LLVector3 origin = getOriginAgent();
+
+    for (U32 i = 0; i < grid_width; ++i)
+    {
+        F32 x = i * probe_spacing + start;
+        for (U32 j = 0; j < grid_width; ++j)
+        {
+            F32 y = j * probe_spacing + start;
+
+            U32 idx = i * grid_width + j;
+
+            if (mReflectionMaps[idx].isNull())
+            {
+                mReflectionMaps[idx] = gPipeline.mReflectionMapManager.addProbe();
+            }
+
+            LLVector3 probe_origin = LLVector3(x,y, llmax(water_height, mImpl->mLandp->resolveHeightRegion(x,y)));
+            probe_origin.mV[2] += hover_height;
+            probe_origin += origin;
+
+            mReflectionMaps[idx]->mOrigin.load3(probe_origin.mV);
+            mReflectionMaps[idx]->mRadius = probe_radius;
+        }
+    }
+#endif
 }
 
 void LLViewerRegion::addToVOCacheTree(LLVOCacheEntry* entry)
@@ -1826,7 +1874,7 @@ LLViewerObject* LLViewerRegion::addNewObject(LLVOCacheEntry* entry)
 
 	LLViewerObject* obj = NULL;
 	if(!entry->getEntry()->hasDrawable()) //not added to the rendering pipeline yet
-	{
+	{ 
 		//add the object
 		obj = gObjectList.processObjectUpdateFromCache(entry, this);
 		if(obj)
@@ -2783,7 +2831,7 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
             dumpStack("AnimatedObjectsStack");
 #endif
 
-			// Update the cache entry
+			// Update the cache entry 
 			entry->updateEntry(crc, dp);
 
 			decodeBoundingInfo(entry);
@@ -2802,7 +2850,7 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 		// Create new entry and add to map
 		result = CACHE_UPDATE_ADDED;
 		entry = new LLVOCacheEntry(local_id, crc, dp);
-		record(LLStatViewer::OBJECT_CACHE_HIT_RATE, LLUnits::Ratio::fromValue(0));
+		record(LLStatViewer::OBJECT_CACHE_HIT_RATE, LLUnits::Ratio::fromValue(0)); 
 		
 		mImpl->mCacheMap[local_id] = entry;
 		
@@ -2818,6 +2866,22 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLViewerObjec
 	eCacheUpdateResult result = cacheFullUpdate(dp, flags);
 
 	return result;
+}
+
+void LLViewerRegion::cacheFullUpdateGLTFOverride(const LLGLTFOverrideCacheEntry &override_data)
+{
+    LLUUID object_id = override_data.mObjectId;
+    LLViewerObject * obj = gObjectList.findObject(object_id);
+    if (obj != nullptr)
+    {
+        U32 local_id = obj->getLocalID();
+
+        mImpl->mGLTFOverridesJson[local_id] = override_data;
+    }
+    else
+    {
+        LL_WARNS("GLTF") << "got material override for unknown object_id, cannot cache it" << LL_ENDL;
+    }
 }
 
 LLVOCacheEntry* LLViewerRegion::getCacheEntryForOctree(U32 local_id)
@@ -2844,7 +2908,7 @@ LLVOCacheEntry* LLViewerRegion::getCacheEntry(U32 local_id, bool valid)
 		}
 	}
 	return NULL;
-	}
+}
 
 void LLViewerRegion::addCacheMiss(U32 id, LLViewerRegion::eCacheMissType miss_type)
 {
@@ -2918,6 +2982,9 @@ bool LLViewerRegion::probeCache(U32 local_id, U32 crc, U32 flags, U8 &cache_miss
 
 			entry->setValid();
 			decodeBoundingInfo(entry);
+
+            loadCacheMiscExtras(local_id, entry, crc);
+
 			return true;
 		}
 		else
@@ -3304,6 +3371,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
 	capabilityNames.append("MapLayer");
 	capabilityNames.append("MapLayerGod");
 	capabilityNames.append("MeshUploadFlag");	
+	capabilityNames.append("ModifyMaterialParams");
 	capabilityNames.append("NavMeshGenerationStatus");
 	capabilityNames.append("NewFileAgentInventory");
 	capabilityNames.append("ObjectAnimation");
@@ -3346,6 +3414,8 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("UpdateSettingsAgentInventory");
     capabilityNames.append("UpdateSettingsTaskInventory");
     capabilityNames.append("UploadAgentProfileImage");
+    capabilityNames.append("UpdateMaterialAgentInventory");
+    capabilityNames.append("UpdateMaterialTaskInventory");
 	capabilityNames.append("UploadBakedTexture");
     capabilityNames.append("UserInfo");
 	capabilityNames.append("ViewerAsset"); 
@@ -3785,6 +3855,15 @@ std::string LLViewerRegion::getSimHostName()
 		return mSimulatorFeatures.has("HostName") ? mSimulatorFeatures["HostName"].asString() : getHost().getHostName();
 	}
 	return std::string("...");
+}
+
+void LLViewerRegion::loadCacheMiscExtras(U32 local_id, LLVOCacheEntry * entry, U32 crc)
+{
+    auto iter = mImpl->mGLTFOverridesJson.find(local_id);
+    if (iter != mImpl->mGLTFOverridesJson.end())
+    {
+        LLGLTFMaterialList::loadCacheOverrides(iter->second);
+    }
 }
 
 bool LLViewerRegion::getRegionAllowsExport() const

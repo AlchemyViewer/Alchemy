@@ -30,6 +30,9 @@
 
 #include "u64.h"
 
+#include <chrono>
+#include <thread>
+
 #if LL_WINDOWS
 #	include "llwin32headerslean.h"
 #elif LL_LINUX || LL_DARWIN
@@ -65,16 +68,154 @@ LLTimer* LLTimer::sTimer = NULL;
 //---------------------------------------------------------------------------
 // Implementation
 //---------------------------------------------------------------------------
+#if 0 // Alchemy Test
 
 void ms_sleep(U32 ms)
 {
 	std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
-void micro_sleep(U64 us)
+void micro_sleep(U64 us, U32 max_yields)
 {
+    // max_yields is unused; just fiddle with it to avoid warnings.
+    max_yields = 0;
 	std::this_thread::sleep_for(std::chrono::microseconds(us));
 }
+
+#elif LL_WINDOWS
+
+
+#if 0
+
+void ms_sleep(U32 ms)
+{
+    LL_PROFILE_ZONE_SCOPED;
+    using TimePoint = std::chrono::steady_clock::time_point;
+    auto resume_time = TimePoint::clock::now() + std::chrono::milliseconds(ms);
+    while (TimePoint::clock::now() < resume_time)
+    {
+        std::this_thread::yield(); //note: don't use LLThread::yield here to avoid yielding for too long
+    }
+}
+
+U32 micro_sleep(U64 us, U32 max_yields)
+{
+    // max_yields is unused; just fiddle with it to avoid warnings.
+    max_yields = 0;
+	ms_sleep((U32)(us / 1000));
+    return 0;
+}
+
+#else
+
+U32 micro_sleep(U64 us, U32 max_yields)
+{
+    LL_PROFILE_ZONE_SCOPED
+#if 0
+    LARGE_INTEGER ft;
+    ft.QuadPart = -static_cast<S64>(us * 10);  // '-' using relative time
+
+    HANDLE timer = CreateWaitableTimer(NULL, TRUE, NULL);
+    SetWaitableTimer(timer, &ft, 0, NULL, NULL, 0);
+    WaitForSingleObject(timer, INFINITE);
+    CloseHandle(timer);
+#else
+    Sleep(us / 1000);
+#endif
+
+    return 0;
+}
+
+void ms_sleep(U32 ms)
+{
+    LL_PROFILE_ZONE_SCOPED
+    micro_sleep(ms * 1000, 0);
+}
+
+#endif
+
+#elif LL_LINUX || LL_DARWIN
+static void _sleep_loop(struct timespec& thiswait)
+{
+	struct timespec nextwait;
+	bool sleep_more = false;
+
+	do {
+		int result = nanosleep(&thiswait, &nextwait);
+
+		// check if sleep was interrupted by a signal; unslept
+		// remainder was written back into 't' and we just nanosleep
+		// again.
+		sleep_more = (result == -1 && EINTR == errno);
+
+		if (sleep_more)
+		{
+			if ( nextwait.tv_sec > thiswait.tv_sec ||
+			     (nextwait.tv_sec == thiswait.tv_sec &&
+			      nextwait.tv_nsec >= thiswait.tv_nsec) )
+			{
+				// if the remaining time isn't actually going
+				// down then we're being shafted by low clock
+				// resolution - manually massage the sleep time
+				// downward.
+				if (nextwait.tv_nsec > 1000000) {
+					// lose 1ms
+					nextwait.tv_nsec -= 1000000;
+				} else {
+					if (nextwait.tv_sec == 0) {
+						// already so close to finished
+						sleep_more = false;
+					} else {
+						// lose up to 1ms
+						nextwait.tv_nsec = 0;
+					}
+				}
+			}
+			thiswait = nextwait;
+		}
+	} while (sleep_more);
+}
+
+U32 micro_sleep(U64 us, U32 max_yields)
+{
+    U64 start = get_clock_count();
+    // This is kernel dependent.  Currently, our kernel generates software clock
+    // interrupts at 250 Hz (every 4,000 microseconds).
+    const U64 KERNEL_SLEEP_INTERVAL_US = 4000;
+
+    S32 num_sleep_intervals = (us - (KERNEL_SLEEP_INTERVAL_US >> 1)) / KERNEL_SLEEP_INTERVAL_US;
+    if (num_sleep_intervals > 0)
+    {
+        U64 sleep_time = (num_sleep_intervals * KERNEL_SLEEP_INTERVAL_US) - (KERNEL_SLEEP_INTERVAL_US >> 1);
+        struct timespec thiswait;
+        thiswait.tv_sec = sleep_time / 1000000;
+        thiswait.tv_nsec = (sleep_time % 1000000) * 1000l;
+        _sleep_loop(thiswait);
+    }
+
+    U64 current_clock = get_clock_count();
+    U32 yields = 0;
+    while (    (yields < max_yields)
+            && (current_clock - start < us) )
+    {
+        sched_yield();
+        ++yields;
+        current_clock = get_clock_count();
+    }
+    return yields;
+}
+
+void ms_sleep(U32 ms)
+{
+	long mslong = ms; // tv_nsec is a long
+	struct timespec thiswait;
+	thiswait.tv_sec = ms / 1000;
+	thiswait.tv_nsec = (mslong % 1000) * 1000000l;
+    _sleep_loop(thiswait);
+}
+#else
+# error "architecture not supported"
+#endif
 
 //
 // CPU clock/other clock frequency and count functions

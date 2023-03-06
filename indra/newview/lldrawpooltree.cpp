@@ -50,102 +50,6 @@ LLDrawPoolTree::LLDrawPoolTree(LLViewerTexture *texturep) :
 	mTexturep->setAddressMode(LLTexUnit::TAM_WRAP);
 }
 
-void LLDrawPoolTree::prerender()
-{
-	mShaderLevel = LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_OBJECT);
-}
-
-void LLDrawPoolTree::beginRenderPass(S32 pass)
-{
-	LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
-		
-	if (LLPipeline::sUnderWaterRender)
-	{
-		shader = &gTreeWaterProgram;
-	}
-	else
-	{
-		shader = &gTreeProgram;
-	}
-
-	if (gPipeline.shadersLoaded())
-	{
-		shader->bind();
-		shader->setMinimumAlpha(0.5f);
-		gGL.diffuseColor4f(1,1,1,1);
-	}
-	else
-	{
-		gPipeline.enableLightsDynamic();
-		gGL.flush();
-	}
-}
-
-void LLDrawPoolTree::render(S32 pass)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
-
-	if (mDrawFace.empty())
-	{
-		return;
-	}
-
-	LLGLState test(GL_ALPHA_TEST, 0);
-
-// [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
-	LLViewerTexture* pTexture = (LLPipeline::sRenderTextures) ? mTexturep.get() : LLViewerFetchedTexture::sDefaultDiffuseImagep.get();
-	gGL.getTexUnit(sDiffTex)->bindFast(pTexture);
-// [/SL:KB]
-//	gGL.getTexUnit(sDiffTex)->bindFast(mTexturep);
-    gPipeline.touchTexture(mTexturep, 1024.f * 1024.f); // <=== keep Linden tree textures at full res
-
-	for (LLFace* face : mDrawFace)
-	{
-		if (!face || !face->getDrawable() || !face->getDrawable()->getRegion())
-			continue;
-
-		LLVertexBuffer* buff = face->getVertexBuffer();
-
-		if(buff)
-		{
-			LLMatrix4a* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
-			if(model_matrix && model_matrix->isIdentity())
-			{
-				model_matrix = NULL;
-			}
-			if (model_matrix != gGLLastMatrix)
-			{
-				gGLLastMatrix = model_matrix;
-				gGL.loadMatrix(gGLModelView);
-				if (model_matrix)
-				{
-					llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
-					gGL.multMatrix(*model_matrix);
-				}
-				gPipeline.mMatrixOpCount++;
-			}
-
-			buff->setBufferFast(LLDrawPoolTree::VERTEX_DATA_MASK);
-			buff->drawRangeFast(LLRender::TRIANGLES, 0, buff->getNumVerts()-1, buff->getNumIndices(), 0); 
-		}
-	}
-}
-
-void LLDrawPoolTree::endRenderPass(S32 pass)
-{
-	LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
-		
-	if (gPipeline.canUseWindLightShadersOnObjects())
-	{
-		shader->unbind();
-	}
-	
-	if (mShaderLevel <= 0)
-	{
-        gGL.flush();
-	}
-}
-
 //============================================
 // deferred implementation
 //============================================
@@ -161,7 +65,51 @@ void LLDrawPoolTree::beginDeferredPass(S32 pass)
 void LLDrawPoolTree::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
-	render(pass);
+
+    if (mDrawFace.empty())
+    {
+        return;
+    }
+
+    LLGLState test(GL_ALPHA_TEST, 0);
+
+// [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
+	LLViewerTexture* pTexture = (LLPipeline::sRenderTextures) ? mTexturep.get() : LLViewerFetchedTexture::sDefaultDiffuseImagep.get();
+	gGL.getTexUnit(sDiffTex)->bindFast(pTexture);
+// [/SL:KB]
+//	gGL.getTexUnit(sDiffTex)->bindFast(mTexturep);
+    mTexturep->addTextureStats(1024.f * 1024.f); // <=== keep Linden tree textures at full res
+
+	for (LLFace* face : mDrawFace)
+    {
+		if (!face || !face->getDrawable() || !face->getDrawable()->getRegion())
+			continue;
+
+        LLVertexBuffer* buff = face->getVertexBuffer();
+
+        if (buff)
+        {
+			LLMatrix4a* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
+			if(model_matrix && model_matrix->isIdentity())
+			{
+				model_matrix = NULL;
+			}
+            if (model_matrix != gGLLastMatrix)
+            {
+                gGLLastMatrix = model_matrix;
+                gGL.loadMatrix(gGLModelView);
+                if (model_matrix)
+                {
+                    llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
+					gGL.multMatrix(*model_matrix);
+                }
+                gPipeline.mMatrixOpCount++;
+            }
+
+            buff->setBuffer();
+            buff->drawRange(LLRender::TRIANGLES, 0, buff->getNumVerts() - 1, buff->getNumIndices(), 0);
+        }
+    }
 }
 
 void LLDrawPoolTree::endDeferredPass(S32 pass)
@@ -190,7 +138,7 @@ void LLDrawPoolTree::beginShadowPass(S32 pass)
 
 void LLDrawPoolTree::renderShadow(S32 pass)
 {
-	render(pass);
+	renderDeferred(pass);
 }
 
 void LLDrawPoolTree::endShadowPass(S32 pass)
@@ -204,14 +152,6 @@ void LLDrawPoolTree::endShadowPass(S32 pass)
 
 BOOL LLDrawPoolTree::verify() const
 {
-/*	BOOL ok = TRUE;
-
-	if (!ok)
-	{
-		printDebugInfo();
-	}
-	return ok;*/
-
 	return TRUE;
 }
 
