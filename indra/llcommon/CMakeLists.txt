@@ -34,8 +34,6 @@ set(llcommon_SOURCE_FILES
     alxxh.cpp
     commoncontrol.cpp
     indra_constants.cpp
-    llallocator.cpp
-    llallocator_heap_profile.cpp
     llapp.cpp
     llapr.cpp
     llassettype.cpp
