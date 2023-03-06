@@ -31,11 +31,15 @@
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
 #include "lldraghandle.h"
+#include "llfilepicker.h"
 #include "llfiltereditor.h"
 #include "llfloaterreg.h"
 #include "llfloatertexturepicker.h"
+#include "llgltfmateriallist.h"
+#include "lllocalgltfmaterials.h"
 #include "llinventoryfunctions.h"
 #include "llinventorypanel.h"
+#include "llmaterialeditor.h"
 #include "llselectmgr.h"
 #include "llscrolllistctrl.h"
 #include "lltabcontainer.h"
@@ -43,6 +47,7 @@
 #include "lltoolpipette.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
+#include "llviewermenufile.h"
 
 #include "llavatarappearancedefines.h"
 

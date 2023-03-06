@@ -800,8 +800,7 @@ void LLReflectionMapManager::updateUniforms()
     ReflectionProbeData rpd;
 
     // load modelview matrix into matrix 4a
-    LLMatrix4a modelview;
-    modelview.loadu(gGLModelView);
+    LLMatrix4a modelview = gGLModelView;
     LLVector4a oa; // scratch space for transformed origin
 
     S32 count = 0;

@@ -2347,7 +2347,7 @@ void LLFace::setViewerObject(LLViewerObject* objp)
 }
 
 
-const LLMatrix4& LLFace::getRenderMatrix() const
+const LLMatrix4a& LLFace::getRenderMatrix() const
 {
 	return mDrawablep->getRenderMatrix();
 }

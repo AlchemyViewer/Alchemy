@@ -363,7 +363,7 @@ void LLFloaterHexEditor::onClickSave()
 		url = gAgent.getRegion()->getCapability("UpdateScriptAgent");
             uploadInfo = std::make_shared<LLScriptAssetUpload>(mItem->getUUID(), 
                                                                std::string(reinterpret_cast<char*>(buffer.get())), 
-                                                               boost::bind(&LLFloaterHexEditor::onSavedAsset, this, _1, _4));
+                                                               boost::bind(&LLFloaterHexEditor::onSavedAsset, this, _1, _4), nullptr);
 		break;
 	}
 	case LLAssetType::AT_GESTURE:
@@ -371,7 +371,7 @@ void LLFloaterHexEditor::onClickSave()
 		url = gAgent.getRegion()->getCapability("UpdateGestureAgentInventory");
         uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mItem->getUUID(), LLAssetType::AT_GESTURE,
                                                                  std::string(reinterpret_cast<char*>(buffer.get())),
-                                                                 boost::bind(&LLFloaterHexEditor::onSavedAsset, this, _1, _4));
+                                                                 boost::bind(&LLFloaterHexEditor::onSavedAsset, this, _1, _4), nullptr);
 		break;
 	}
 	case LLAssetType::AT_NOTECARD:
@@ -379,7 +379,7 @@ void LLFloaterHexEditor::onClickSave()
 		url = gAgent.getRegion()->getCapability("UpdateNotecardAgentInventory");
         uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mItem->getUUID(), LLAssetType::AT_NOTECARD,
                                                                  std::string(reinterpret_cast<char*>(buffer.get())),
-                                                                 boost::bind(&LLFloaterHexEditor::onSavedAsset, this, _1, _4));
+                                                                 boost::bind(&LLFloaterHexEditor::onSavedAsset, this, _1, _4), nullptr);
 		break;
 	}
 	case LLAssetType::AT_SETTINGS:
@@ -387,7 +387,7 @@ void LLFloaterHexEditor::onClickSave()
         url = gAgent.getRegion()->getCapability("UpdateSettingsAgentInventory");
         uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mItem->getUUID(), LLAssetType::AT_SETTINGS,
                                                                  std::string(reinterpret_cast<char*>(buffer.get())),
-                                                                 boost::bind(&LLFloaterHexEditor::onSavedAsset, this, _1, _4));
+                                                                 boost::bind(&LLFloaterHexEditor::onSavedAsset, this, _1, _4), nullptr);
         break;
     }
 	default:

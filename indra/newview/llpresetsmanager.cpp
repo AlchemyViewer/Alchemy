@@ -324,7 +324,6 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 		"RenderToneMapType",
 		"RenderTransparentWater",
 		"RenderTreeLODFactor",
-		"RenderVBOEnable",
 		"RenderVolumeLODFactor",
 		"RenderWaterRefResolution",
 		"TextureMemory",

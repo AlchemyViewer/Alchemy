@@ -1205,7 +1205,10 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 				{
 					sculpt();
 				}
-        return TRUE;
+			}
+		}
+
+		return TRUE;
 	}
 	else if (NO_LOD == lod) 
 	{
@@ -2469,7 +2472,7 @@ S32 LLVOVolume::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID)
 S32 LLVOVolume::setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialParams)
 {
 	S32 res = LLViewerObject::setTEMaterialParams(te, pMaterialParams);
-
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("MaterialTEs") << "te " << (S32)te << " material " << ((pMaterialParams) ? pMaterialParams->asLLSD() : LLSD("null")) << " res " << res
 							 << ( LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
 							 << LL_ENDL;

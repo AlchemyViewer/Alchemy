@@ -676,9 +676,9 @@ void settings_setup_listeners()
 	setting_setup_signal_listener(gSavedSettings, "RenderMaxPartCount", handleMaxPartCountChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderDynamicLOD", handleRenderDynamicLODChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderLocalLights", handleRenderLocalLightsChanged);
-	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaUseRMSE", handleResetVertexBuffersChanged);
-	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxRMSE", handleResetVertexBuffersChanged);
-	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxMid", handleResetVertexBuffersChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaUseRMSE", handleSetShaderChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxRMSE", handleSetShaderChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxMid", handleSetShaderChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderVSyncEnable", handleVSyncChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleReleaseGLBufferChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);

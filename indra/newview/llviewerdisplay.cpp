@@ -848,8 +848,6 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 			glClear(GL_COLOR_BUFFER_BIT);
 		}
 
-		LLVBOPool::deleteReleasedBuffers();
-
 		LLAppViewer::instance()->pingMainloopTimeout(STR_DISPLAY_RENDER_START);
 		
 		//// render frontmost floater opaque for occlusion culling purposes

@@ -64,6 +64,7 @@ bool get_can_copy_texture(LLUUID image_id);
 //////////////////////////////////////////////////////////////////////////////////////////
 // LLTextureCtrl
 
+
 class LLTextureCtrl
 : public LLUICtrl
 {
@@ -259,6 +260,7 @@ private:
 	std::string				 	mLoadingPlaceholderString;
 	S32						 	mLabelWidth;
 	bool						mOpenTexPreview;
+	bool						mBakeTextureEnabled;
     LLTextureCtrl::EPickInventoryType mInventoryPickType;
 };
 

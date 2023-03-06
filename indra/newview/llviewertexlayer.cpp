@@ -389,7 +389,7 @@ private:
 };
 
 ALTexLayerUploader::ALTexLayerUploader(LLUUID assetId, std::string texture, LLBakedUploadData* baked_upload_data) :
-	LLBufferedAssetUploadInfo(LLUUID::null, LLAssetType::AT_TEXTURE, texture, NULL),
+	LLBufferedAssetUploadInfo(LLUUID::null, LLAssetType::AT_TEXTURE, texture, NULL, nullptr),
 	mBakedUploadData(baked_upload_data)
 {
 	setAssetId(assetId);

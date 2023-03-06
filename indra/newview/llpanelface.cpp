@@ -2827,7 +2827,7 @@ void LLPanelFace::updateShinyControls(bool is_setting_texture, bool mess_with_sh
 	U32 material_type = radio_mat_type->getSelectedIndex();
 	bool show_material = (materials_media == MATMEDIA_MATERIAL);
 	bool show_shininess = show_material && (material_type == MATTYPE_SPECULAR) && mComboMatMedia->getEnabled();
-	U32 shiny_value = comboShiny->getCurrentIndex();
+	U32 shiny_value = mComboShininess->getCurrentIndex();
 	bool show_shinyctrls = (shiny_value == SHINY_TEXTURE) && show_shininess; // Use texture
 	getChildView("label glossiness")->setVisible(show_shinyctrls);
     mSpinGlossiness->setVisible(show_shinyctrls);

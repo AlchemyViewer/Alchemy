@@ -862,7 +862,6 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
     S32 indices_idx = 0;
 
 	LLSpatialGroup::drawmap_elem_t& draw_vec = group->mDrawMap[mRenderPass];	
- w	
 	for (LLFace* facep : mFaceList)
 	{
 		LLAlphaObject* object = (LLAlphaObject*) facep->getViewerObject();

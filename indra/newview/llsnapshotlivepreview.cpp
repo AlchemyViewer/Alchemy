@@ -774,7 +774,6 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 			previewp->mPreviewImageEncoded = last_preview_encoded;
 			previewp->generateThumbnailImage(FALSE);
             previewp->getWindow()->decBusyCount();
-			gPipeline.doResetVertexBuffers(true);
 		}
     }
     // Tell the floater container that the snapshot is updated now

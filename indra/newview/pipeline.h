@@ -714,6 +714,10 @@ public:
 	U32					mNoiseMap;
 	U32					mTrueNoiseMap;
 	U32					mLightFunc;
+    U32					mAreaMap;
+    U32					mSearchMap;
+    U32					mSampleMap;
+    U32                 mStencilMap;
 
 	LLColor4			mSunDiffuse;
     LLColor4			mMoonDiffuse;

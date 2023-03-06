@@ -313,17 +313,6 @@ void LLDrawPoolBump::beginFullbrightShiny()
     }
 
 	{
-		LLMatrix4 mat;
-		mat.initRows(LLVector4(gGLModelView+0),
-					 LLVector4(gGLModelView+4),
-					 LLVector4(gGLModelView+8),
-					 LLVector4(gGLModelView+12));
-		shader->bind();
-        
-		LLVector3 vec = LLVector3(gShinyOrigin) * mat;
-		LLVector4 vec4(vec, gShinyOrigin.mV[3]);
-		shader->uniform4fv(LLViewerShaderMgr::SHINY_ORIGIN, 1, vec4.mV);
-
         if (LLPipeline::sReflectionProbesEnabled)
         {
             gPipeline.bindReflectionProbes(*shader);

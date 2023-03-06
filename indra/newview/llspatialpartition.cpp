@@ -711,6 +711,7 @@ BOOL LLSpatialGroup::changeLOD()
 #endif
        
 			return TRUE;
+		}
 	}
 	
 	if (needsUpdate())
