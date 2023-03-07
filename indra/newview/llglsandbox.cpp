@@ -1061,11 +1061,13 @@ F32 gpu_benchmark()
 		return -1.f;
 	}
 
+#if 0
 	VAOHolder dummVAO;
 	if (LLRender::sGLCoreProfile)
 	{
 		dummVAO.genVAO();
 	}
+#endif
 
     if (gBenchmarkProgram.mProgramObject == 0)
 	{
