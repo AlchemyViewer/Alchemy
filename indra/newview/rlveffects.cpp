@@ -298,6 +298,7 @@ ERlvCmdRet RlvSphereEffect::onValueMaxChanged(const LLUUID& idRlvObj, const boos
 
 void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 {
+#if 0
 	LLMatrix4a proj = get_current_projection();
 	proj.invert();
 	pShader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, proj.getF32ptr());
@@ -332,10 +333,12 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 
 	// Pass effect params
 	pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM4, 1, m_Params.get().mV);
+#endif
 }
 
 void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectParams* pParams) const
 {
+#if 0
 	if (pParams->m_pDstBuffer)
 	{
 		pParams->m_pDstBuffer->bindTarget();
@@ -393,6 +396,7 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
 	{
 		pParams->m_pDstBuffer->flush();
 	}
+#endif
 }
 
 void RlvSphereEffect::run(const LLVisualEffectParams* pParams)

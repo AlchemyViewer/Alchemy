@@ -106,7 +106,7 @@
 #include "llcleanup.h"
 #include "llcallstack.h"
 #include "llmeshrepository.h"
-s#include "llgltfmateriallist.h"
+#include "llgltfmateriallist.h"
 #include "llgl.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvactions.h"
@@ -6255,15 +6255,15 @@ LLViewerObject::ExtraParameter* LLViewerObject::createNewParameterEntry(U16 para
       case LLNetworkData::PARAMS_RENDER_MATERIAL:
       {
 		  mRenderMaterialParams = std::make_unique<LLRenderMaterialParams>();
-		  new_block = mExtendedMeshParams.get();
-		  in_use = &mExtendedMeshParamsInUse;
+		  new_block = mRenderMaterialParams.get();
+		  in_use = &mRenderMaterialParamsInUse;
           break;
       }
       case LLNetworkData::PARAMS_REFLECTION_PROBE:
       {
-	      mLLReflectionProbeParams = std::make_unique<LLReflectionProbeParams>();
-		  new_block = mExtendedMeshParams.get();
-		  in_use = &mExtendedMeshParamsInUse;
+	      mReflectionProbeParams = std::make_unique<LLReflectionProbeParams>();
+		  new_block = mReflectionProbeParams.get();
+		  in_use = &mReflectionProbeParamsInUse;
           break;
       }
 	  default:
@@ -6384,7 +6384,7 @@ void LLViewerObject::parameterChanged(U16 param_type, LLNetworkData* data, BOOL 
     {
         if (param_type == LLNetworkData::PARAMS_RENDER_MATERIAL)
         {
-            const LLRenderMaterialParams* params = in_use ? (LLRenderMaterialParams*)getParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL) : nullptr;
+            const LLRenderMaterialParams* params = in_use ? getRenderMaterialParams() : nullptr;
             setRenderMaterialIDs(params, local_origin);
         }
     }
@@ -7174,7 +7174,7 @@ LLVOAvatar* LLViewerObject::getAvatar() const
 
 bool LLViewerObject::hasRenderMaterialParams() const
 {
-    return getParameterEntryInUse(LLNetworkData::PARAMS_RENDER_MATERIAL);
+    return mRenderMaterialParamsInUse; // getParameterEntryInUse(LLNetworkData::PARAMS_RENDER_MATERIAL);
 }
 
 void LLViewerObject::setHasRenderMaterialParams(bool has_materials)
@@ -7196,7 +7196,7 @@ void LLViewerObject::setHasRenderMaterialParams(bool has_materials)
 
 const LLUUID& LLViewerObject::getRenderMaterialID(U8 te) const
 {
-    LLRenderMaterialParams* param_block = (LLRenderMaterialParams*)getParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL);
+    const LLRenderMaterialParams* param_block = getRenderMaterialParams();
     if (param_block)
     {
         return param_block->getMaterial(te);
@@ -7234,7 +7234,7 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     start_idx = llmax(start_idx, 0);
     end_idx = llmin(end_idx, (S32) getNumTEs());
 
-    LLRenderMaterialParams* param_block = (LLRenderMaterialParams*)getParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL);
+    LLRenderMaterialParams* param_block = const_cast<LLRenderMaterialParams*>(getRenderMaterialParams());
     if (!param_block && id.notNull())
     { // block doesn't exist, but it will need to
         param_block = (LLRenderMaterialParams*)createNewParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL)->data;

@@ -130,11 +130,15 @@ private:
 	bool mSculptParamsInUse = false;
 	bool mLightImageParamsInUse = false;
 	bool mExtendedMeshParamsInUse = false;
+	bool mRenderMaterialParamsInUse = false;
+	bool mReflectionProbeParamsInUse = false;
 	std::unique_ptr<LLFlexibleObjectData> mFlexibleObjectData;
 	std::unique_ptr<LLLightParams> mLightParams;
 	std::unique_ptr<LLSculptParams> mSculptParams;
 	std::unique_ptr<LLLightImageParams> mLightImageParams;
 	std::unique_ptr<LLExtendedMeshParams> mExtendedMeshParams;
+	std::unique_ptr<LLRenderMaterialParams> mRenderMaterialParams;
+	std::unique_ptr<LLReflectionProbeParams> mReflectionProbeParams;
 
 public:
 	typedef std::list<LLPointer<LLViewerObject> > child_list_t;
@@ -621,6 +625,8 @@ public:
 	const LLSculptParams* getSculptParams() const { return mSculptParamsInUse ? mSculptParams.get() : nullptr; }
 	const LLLightImageParams* getLightImageParams() const { return mLightImageParamsInUse ? mLightImageParams.get() : nullptr; }
 	const LLExtendedMeshParams* getExtendedMeshParams() const { return mExtendedMeshParamsInUse ? mExtendedMeshParams.get() : nullptr; }
+	 LLRenderMaterialParams* getRenderMaterialParams() const { return mRenderMaterialParamsInUse ? mRenderMaterialParams.get() : nullptr; }
+	LLReflectionProbeParams* getReflectionProbeParams() const { return mReflectionProbeParamsInUse ? mReflectionProbeParams.get() : nullptr; }
 
 	bool setParameterEntry(U16 param_type, const LLNetworkData& new_value, bool local_origin);
 	bool setParameterEntryInUse(U16 param_type, BOOL in_use, bool local_origin);

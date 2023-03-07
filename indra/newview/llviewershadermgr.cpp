@@ -502,6 +502,7 @@ void LLViewerShaderMgr::setShaders()
     }
 
     if (loaded)
+	{
         // Load max avatar shaders to set the max level
         mShaderLevel[SHADER_AVATAR] = 3;
         mMaxAvatarShaderLevel = 3;
@@ -672,7 +673,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 	}
 	shaders.push_back( make_pair( "objects/nonindexedTextureV.glsl",        1 ) );
 
-	boost::unordered_map<std::string, std::string> attribs;
+	std::unordered_map<std::string, std::string> attribs;
 	attribs["MAX_JOINTS_PER_MESH_OBJECT"] = 
 		fmt::to_string(LLSkinningUtil::getMaxJointCount());
 
@@ -2598,7 +2599,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
             {
                 gPostSMAAEdgeDetect[i].mName = fmt::format("SMAA Edge Detection ({:s})", smaa_pair.second);
                 gPostSMAAEdgeDetect[i].mFeatures.isDeferred = true;
-                gPostSMAAEdgeDetect[i].addPremutations(defines);
+                gPostSMAAEdgeDetect[i].addPermutations(defines);
                 gPostSMAAEdgeDetect[i].mShaderFiles.clear();
                 gPostSMAAEdgeDetect[i].mShaderFiles.push_back(make_pair("effects/SMAAEdgeDetectF.glsl", GL_FRAGMENT_SHADER_ARB));
                 gPostSMAAEdgeDetect[i].mShaderFiles.push_back(make_pair("effects/SMAAEdgeDetectV.glsl", GL_VERTEX_SHADER_ARB));
@@ -2619,7 +2620,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
             {
                 gPostSMAABlendWeights[i].mName = fmt::format("SMAA Blending Weights ({:s})", smaa_pair.second);
                 gPostSMAABlendWeights[i].mFeatures.isDeferred = true;
-                gPostSMAABlendWeights[i].addPremutations(defines);
+                gPostSMAABlendWeights[i].addPermutations(defines);
                 gPostSMAABlendWeights[i].mShaderFiles.clear();
                 gPostSMAABlendWeights[i].mShaderFiles.push_back(make_pair("effects/SMAABlendWeightsF.glsl", GL_FRAGMENT_SHADER_ARB));
                 gPostSMAABlendWeights[i].mShaderFiles.push_back(make_pair("effects/SMAABlendWeightsV.glsl", GL_VERTEX_SHADER_ARB));
@@ -2641,7 +2642,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
             {
                 gPostSMAANeighborhoodBlend[i].mName = fmt::format("SMAA Neighborhood Blending ({:s})", smaa_pair.second);
                 gPostSMAANeighborhoodBlend[i].mFeatures.isDeferred = true;
-                gPostSMAANeighborhoodBlend[i].addPremutations(defines);
+                gPostSMAANeighborhoodBlend[i].addPermutations(defines);
                 gPostSMAANeighborhoodBlend[i].mShaderFiles.clear();
                 gPostSMAANeighborhoodBlend[i].mShaderFiles.push_back(make_pair("effects/SMAANeighborhoodBlendF.glsl", GL_FRAGMENT_SHADER_ARB));
                 gPostSMAANeighborhoodBlend[i].mShaderFiles.push_back(make_pair("effects/SMAANeighborhoodBlendV.glsl", GL_VERTEX_SHADER_ARB));

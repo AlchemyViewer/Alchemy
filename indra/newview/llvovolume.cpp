@@ -654,47 +654,48 @@ void LLVOVolume::animateTextures()
 
 				if (!facep->mTextureMatrix)
 				{
-					facep->mTextureMatrix = new LLMatrix4();
+					facep->mTextureMatrix = new LLMatrix4a();
 				}
 
 				LLMatrix4a& tex_mat = *facep->mTextureMatrix;
 				tex_mat.setIdentity();
 
-                if (!is_pbr)
-                {
-                    if (!(result & LLViewerTextureAnim::ROTATE))
-                    {
-                        te->getRotation(&rot);
-                    }
-                    if (!(result & LLViewerTextureAnim::TRANSLATE))
-                    {
-                        te->getOffset(&off_s,&off_t);
-                    }
-                    if (!(result & LLViewerTextureAnim::SCALE))
-                    {
-                        te->getScale(&scale_s, &scale_t);
-                    }
-
-				LLVector3 trans ;
+				if (!is_pbr)
 				{
-					trans.set(LLVector3(off_s+0.5f, off_t+0.5f, 0.f));
-					tex_mat.setTranslate_affine(LLVector3(-0.5f, -0.5f, 0.f));
+					if (!(result & LLViewerTextureAnim::ROTATE))
+					{
+						te->getRotation(&rot);
+					}
+					if (!(result & LLViewerTextureAnim::TRANSLATE))
+					{
+						te->getOffset(&off_s, &off_t);
+					}
+					if (!(result & LLViewerTextureAnim::SCALE))
+					{
+						te->getScale(&scale_s, &scale_t);
+					}
+
+					LLVector3 trans;
+					{
+						trans.set(LLVector3(off_s + 0.5f, off_t + 0.5f, 0.f));
+						tex_mat.setTranslate_affine(LLVector3(-0.5f, -0.5f, 0.f));
+					}
+
+					LLVector3 scale(scale_s, scale_t, 1.f);
+
+					tex_mat.setMul(ALGLMath::genRot(rot * RAD_TO_DEG, 0.f, 0.f, -1.f), tex_mat);	//left mul
+
+					LLMatrix4a scale_mat;
+					scale_mat.setIdentity();
+					scale_mat.applyScale_affine(scale);
+					tex_mat.setMul(scale_mat, tex_mat);	//left mul
+
+					tex_mat.translate_affine(trans);
+
 				}
-
-				LLVector3 scale(scale_s, scale_t, 1.f);
-	
-				tex_mat.setMul(ALGLMath::genRot(rot*RAD_TO_DEG,0.f,0.f,-1.f),tex_mat);	//left mul
-
-				LLMatrix4a scale_mat;
-				scale_mat.setIdentity();
-				scale_mat.applyScale_affine(scale);
-				tex_mat.setMul(scale_mat, tex_mat);	//left mul
-
-				tex_mat.translate_affine(trans);
-
-                }
                 else
                 {
+					LLMatrix4 local_tex_mat(tex_mat);
                     // For PBR materials, use Blinn-Phong rotation as hint for
                     // translation direction. In a Blinn-Phong material, the
                     // translation direction would be a byproduct the texture
@@ -702,22 +703,23 @@ void LLVOVolume::animateTextures()
                     F32 rot_frame;
                     te->getRotation(&rot_frame);
 
-                    tex_mat.translate(LLVector3(-0.5f, -0.5f, 0.f));
+                    local_tex_mat.translate(LLVector3(-0.5f, -0.5f, 0.f));
 
                     LLQuaternion quat;
                     quat.setQuat(rot, 0, 0, -1.f);
-                    tex_mat.rotate(quat);				
+                    local_tex_mat.rotate(quat);				
 
                     LLMatrix4 mat;
                     LLVector3 scale(scale_s, scale_t, 1.f);			
                     mat.initAll(scale, LLQuaternion(), LLVector3());
-                    tex_mat *= mat;
+                    local_tex_mat *= mat;
             
                     LLVector3 off(off_s, off_t, 0.f);
                     off.rotVec(rot_frame, 0, 0, 1.f);
-                    tex_mat.translate(off);
+                    local_tex_mat.translate(off);
 
-                    tex_mat.translate(LLVector3(0.5f, 0.5f, 0.f));
+                    local_tex_mat.translate(LLVector3(0.5f, 0.5f, 0.f));
+					tex_mat.loadu(local_tex_mat);
                 }
 			}
 		}
@@ -2471,7 +2473,7 @@ S32 LLVOVolume::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID)
 
 S32 LLVOVolume::setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialParams)
 {
-	S32 res = LLViewerObject::setTEMaterialParams(te, pMaterialParams);
+	/*S32 res = */LLViewerObject::setTEMaterialParams(te, pMaterialParams);
 #ifdef SHOW_DEBUG
 	LL_DEBUGS("MaterialTEs") << "te " << (S32)te << " material " << ((pMaterialParams) ? pMaterialParams->asLLSD() : LLSD("null")) << " res " << res
 							 << ( LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
@@ -3402,7 +3404,7 @@ F32 LLVOVolume::getLightCutoff() const
 
 BOOL LLVOVolume::isReflectionProbe() const
 {
-    return getParameterEntryInUse(LLNetworkData::PARAMS_REFLECTION_PROBE);
+    return getReflectionProbeParams() != nullptr;
 }
 
 bool LLVOVolume::setIsReflectionProbe(BOOL is_probe)
@@ -3427,7 +3429,7 @@ bool LLVOVolume::setIsReflectionProbe(BOOL is_probe)
 
 bool LLVOVolume::setReflectionProbeAmbiance(F32 ambiance)
 {
-    LLReflectionProbeParams* param_block = (LLReflectionProbeParams*)getParameterEntry(LLNetworkData::PARAMS_REFLECTION_PROBE);
+    LLReflectionProbeParams* param_block = getReflectionProbeParams();
     if (param_block)
     {
         if (param_block->getAmbiance() != ambiance)
@@ -3443,7 +3445,7 @@ bool LLVOVolume::setReflectionProbeAmbiance(F32 ambiance)
 
 bool LLVOVolume::setReflectionProbeNearClip(F32 near_clip)
 {
-    LLReflectionProbeParams* param_block = (LLReflectionProbeParams*)getParameterEntry(LLNetworkData::PARAMS_REFLECTION_PROBE);
+    LLReflectionProbeParams* param_block = getReflectionProbeParams();
     if (param_block)
     {
         if (param_block->getClipDistance() != near_clip)
@@ -3459,7 +3461,7 @@ bool LLVOVolume::setReflectionProbeNearClip(F32 near_clip)
 
 bool LLVOVolume::setReflectionProbeIsBox(bool is_box)
 {
-    LLReflectionProbeParams* param_block = (LLReflectionProbeParams*)getParameterEntry(LLNetworkData::PARAMS_REFLECTION_PROBE);
+    LLReflectionProbeParams* param_block = getReflectionProbeParams();
     if (param_block)
     {
         if (param_block->getIsBox() != is_box)
@@ -3475,7 +3477,7 @@ bool LLVOVolume::setReflectionProbeIsBox(bool is_box)
 
 bool LLVOVolume::setReflectionProbeIsDynamic(bool is_dynamic)
 {
-    LLReflectionProbeParams* param_block = (LLReflectionProbeParams*)getParameterEntry(LLNetworkData::PARAMS_REFLECTION_PROBE);
+    LLReflectionProbeParams* param_block = getReflectionProbeParams();
     if (param_block)
     {
         if (param_block->getIsDynamic() != is_dynamic)
@@ -3491,7 +3493,7 @@ bool LLVOVolume::setReflectionProbeIsDynamic(bool is_dynamic)
 
 F32 LLVOVolume::getReflectionProbeAmbiance() const
 {
-    const LLReflectionProbeParams* param_block = (const LLReflectionProbeParams*)getParameterEntry(LLNetworkData::PARAMS_REFLECTION_PROBE);
+    const LLReflectionProbeParams* param_block = getReflectionProbeParams();
     if (param_block)
     {
         return param_block->getAmbiance();
@@ -3504,7 +3506,7 @@ F32 LLVOVolume::getReflectionProbeAmbiance() const
 
 F32 LLVOVolume::getReflectionProbeNearClip() const
 {
-    const LLReflectionProbeParams* param_block = (const LLReflectionProbeParams*)getParameterEntry(LLNetworkData::PARAMS_REFLECTION_PROBE);
+    const LLReflectionProbeParams* param_block = getReflectionProbeParams();
     if (param_block)
     {
         return param_block->getClipDistance();
@@ -3517,7 +3519,7 @@ F32 LLVOVolume::getReflectionProbeNearClip() const
 
 bool LLVOVolume::getReflectionProbeIsBox() const
 {
-    const LLReflectionProbeParams* param_block = (const LLReflectionProbeParams*)getParameterEntry(LLNetworkData::PARAMS_REFLECTION_PROBE);
+    const LLReflectionProbeParams* param_block = getReflectionProbeParams();
     if (param_block)
     {
         return param_block->getIsBox();
@@ -3528,7 +3530,7 @@ bool LLVOVolume::getReflectionProbeIsBox() const
 
 bool LLVOVolume::getReflectionProbeIsDynamic() const
 {
-    const LLReflectionProbeParams* param_block = (const LLReflectionProbeParams*)getParameterEntry(LLNetworkData::PARAMS_REFLECTION_PROBE);
+    const LLReflectionProbeParams* param_block = getReflectionProbeParams();
     if (param_block)
     {
         return param_block->getIsDynamic();

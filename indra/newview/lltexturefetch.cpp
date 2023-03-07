@@ -2426,7 +2426,7 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, bool threaded, bool qa_mod
 	  mTotalCacheWriteCount(0U),
 	  mTotalResourceWaitCount(0U),
 	  mFetchSource(LLTextureFetch::FROM_ALL),
-	  mOriginFetchSource(LLTextureFetch::FROM_ALL),
+	  mOriginFetchSource(LLTextureFetch::FROM_ALL)
 #ifndef LL_RELEASE_FOR_DOWNLOAD
 	  , mTextureInfoMainThread(false)
 #endif
@@ -2866,12 +2866,55 @@ bool LLTextureFetch::updateRequestPriority(const LLUUID& id, F32 priority)
 	return true;
 }
 
+// Replicates and expands upon the base class's
+// getPending() implementation.  getPending() and
+// runCondition() replicate one another's logic to
+// an extent and are sometimes used for the same
+// function (deciding whether or not to sleep/pause
+// a thread).  So the implementations need to stay
+// in step, at least until this can be refactored and
+// the redundancy eliminated.
+//
+// Threads:  T*
+
+//virtual
+S32 LLTextureFetch::getPending()
+{
+    LL_PROFILE_ZONE_SCOPED;
+	S32 res;
+	lockData();															// +Ct
+    {
+        LLMutexLock lock(&mQueueMutex);									// +Mfq
+        
+        res = mRequestQueue.size();
+        res += mCommands.size();
+    }																	// -Mfq
+	unlockData();														// -Ct
+	return res;
+}
+
 // Locks:  Ct
 // virtual
 bool LLTextureFetch::runCondition()
 {
-	return ! ( !mCommandsSize && (!mRequestQueueSize && mIdleThread) );		// From base class
-
+	// Caller is holding the lock on LLThread's condition variable.
+	
+	// LLQueuedThread, unlike its base class LLThread, makes this a
+	// private method which is unfortunate.  I want to use it directly
+	// but I'm going to have to re-implement the logic here (or change
+	// declarations, which I don't want to do right now).
+	//
+	// Changes here may need to be reflected in getPending().
+	
+	bool have_no_commands(false);
+	{
+		LLMutexLock lock(&mQueueMutex);									// +Mfq
+		
+		have_no_commands = mCommands.empty();
+	}																	// -Mfq
+	
+	return ! (have_no_commands
+			  && (mRequestQueue.size() == 0 && mIdleThread));		// From base class
 }
 
 //////////////////////////////////////////////////////////////////////////////

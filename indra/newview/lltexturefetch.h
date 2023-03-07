@@ -133,7 +133,7 @@ public:
 	U32 getTotalNumHTTPRequests();
 	
     // Threads:  T*
-    S32 getPending() const override { return mCommandsSize + mRequestQueueSize; }
+    S32 getPending();
 
     // Threads:  T*
 	void lockQueue() { mQueueMutex.lock(); }
