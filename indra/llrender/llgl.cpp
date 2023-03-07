@@ -1423,6 +1423,8 @@ void LLGLManager::initExtensions()
     mHasCubeMapArray = mGLVersion >= 3.99f; 
     mHasTransformFeedback = mGLVersion >= 3.99f;
     mHasDebugOutput = mGLVersion >= 4.29f;
+    mHasGPUShader4  = mGLVersion >= 3.0f;
+    mHasTextureSwizzle = mGLVersion >= 3.29f;
 
     // Misc
 	glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);

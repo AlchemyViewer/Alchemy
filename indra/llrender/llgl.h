@@ -94,10 +94,8 @@ public:
 	bool mHasCubeMapArray = false;
 	bool mHasDebugOutput = false;
     bool mHasTransformFeedback = false;
-    bool mHasAnisotropic = false;
     bool mHasTextureSwizzle = false;
     bool mHasGPUShader4  = false;
-    bool mHasClipControl = false;
 	bool mHasAdaptiveVSync = false;
 	
 	// Vendor-specific extensions

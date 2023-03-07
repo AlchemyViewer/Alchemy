@@ -1283,7 +1283,6 @@ void LLImageGL::deleteTextures(S32 numTextures, const U32 *textures)
 void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels, bool allow_compression)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-	std::vector<U32> scratch;
     if (LLRender::sGLCoreProfile)
     {
 #ifdef GL_ARB_texture_swizzle
@@ -1316,6 +1315,7 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
 		else
 #endif
 		{
+			std::vector<U32> scratch;
 			if (pixformat == GL_ALPHA && pixtype == GL_UNSIGNED_BYTE)
 			{ //GL_ALPHA is deprecated, convert to RGBA
 				try
