@@ -88,7 +88,6 @@ public:
     S32 mGLMaxVertexRange;
     S32 mGLMaxIndexRange;
     S32 mGLMaxTextureSize;
-	F32 mGLMaxAnisotropy;
     F32 mMaxAnisotropy = 0.f;
 
 	// GL 4.x capabilities

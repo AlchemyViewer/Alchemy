@@ -2230,13 +2230,6 @@ LLVector3d LLAgentCamera::getFocusOffsetInitial()
 // [RLVa:KB] - @setcam_eyeoffsetscale
 F32 LLAgentCamera::getCameraOffsetScale() const
 {
-    // SL-14706 / SL-14885 TPV have relaxed camera constraints allowing you to mousewheeel zoom WAY out.
-    static LLCachedControl<bool> s_disable_camera_constraints(gSavedSettings, "DisableCameraConstraints", false);
-    if (s_disable_camera_constraints)
-    {
-        return (F32)INT_MAX;
-    }
-
 	static const LLCachedControl<F32> cam_offset_scale(gSavedSettings, "CameraOffsetScale");
 	static const LLCachedControl<F32> cam_offset_scale_rlva(gSavedSettings, "CameraOffsetScaleRLVa", 0.0f, "Declared in code");
 	return (ECameraPreset::CAMERA_RLV_SETCAM_VIEW != mCameraPreset) ? cam_offset_scale : cam_offset_scale_rlva;

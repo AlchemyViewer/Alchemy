@@ -654,7 +654,7 @@ void LLFeatureManager::applyBaseMasks()
     {
         maskFeatures("GL3");
     }
-	if (2.f > gGLManager.mGLMaxAnisotropy)
+	if (2.f > gGLManager.mMaxAnisotropy)
 	{
 		maskFeatures("AnisotropicMissing");
 	}

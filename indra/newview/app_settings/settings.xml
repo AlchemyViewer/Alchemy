@@ -1996,7 +1996,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>20.0</real>
+    <real>10.0</real>
   </map>
 
   <key>CameraFNumber</key>
@@ -2020,7 +2020,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>30</real>
+    <real>50</real>
   </map>
 
   <key>CameraFieldOfView</key>
@@ -9971,7 +9971,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <real>0.5</real>
+    <real>0.7</real>
   </map>
 
   <key>RenderSpotLightsInNondeferred</key>
@@ -10500,7 +10500,7 @@
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>99999</real>
+      <real>9999</real>
     </map>
     <key>RenderGlowResolutionPow</key>
     <map>
@@ -10522,7 +10522,7 @@
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>0.28</real>
+      <real>0.35</real>
     </map>
     <key>RenderGlowWarmthAmount</key>
     <map>

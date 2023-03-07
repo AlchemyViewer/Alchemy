@@ -1645,16 +1645,16 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 	getChildView("antialiasing restart")->setVisible(!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"));
 
 	LLComboBox* af_combo = getChild<LLComboBox>("anisotropic_filter");
-	if (2.f > gGLManager.mGLMaxAnisotropy) {
+	if (2.f > gGLManager.mMaxAnisotropy) {
 		af_combo->remove("2x");
 	}
-	if (4.f > gGLManager.mGLMaxAnisotropy) {
+	if (4.f > gGLManager.mMaxAnisotropy) {
 		af_combo->remove("4x");
 	}
-	if (8.f > gGLManager.mGLMaxAnisotropy) {
+	if (8.f > gGLManager.mMaxAnisotropy) {
 		af_combo->remove("8x");
 	}
-	if (16.f > gGLManager.mGLMaxAnisotropy) {
+	if (16.f > gGLManager.mMaxAnisotropy) {
 		af_combo->remove("16x");
 	}
 

@@ -979,8 +979,7 @@ LLGLManager::LLGLManager() :
 	mVRAM(0),
 	mGLMaxVertexRange(0),
 	mGLMaxIndexRange(0),
-	mGLMaxTextureSize(0),
-	mGLMaxAnisotropy(1.f)
+	mGLMaxTextureSize(0)
 {
 }
 

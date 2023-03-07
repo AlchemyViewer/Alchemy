@@ -536,7 +536,7 @@ void LLTexUnit::setTextureFilteringOption(LLTexUnit::eTextureFilterOptions optio
 	{
 		if (option == TFO_ANISOTROPIC && LLRender::sAnisotropicFilteringLevel > 1.f)
 		{
-			F32 aniso_level = llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mGLMaxAnisotropy);
+			F32 aniso_level = llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mMaxAnisotropy);
 			glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY, aniso_level);
 		}
 		else
