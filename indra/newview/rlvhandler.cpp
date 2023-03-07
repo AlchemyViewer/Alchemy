@@ -2138,6 +2138,7 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETSPHERE>::onCommand(const RlvCommand& 
 	{
 		if (gRlvHandler.hasBehaviour(rlvCmd.getObjectID(), rlvCmd.getBehaviourType()))
 		{
+#if 0
 			LLVfxManager::instance().addEffect(new RlvSphereEffect(rlvCmd.getObjectID()));
 
 			Rlv::forceAtmosphericShadersIfAvailable();
@@ -2160,6 +2161,7 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETSPHERE>::onCommand(const RlvCommand& 
 				gPipeline.createGLBuffers();
 				RLV_ASSERT(gPipeline.mDeferredLight.isComplete());
 			}
+#endif
 		}
 		else
 		{

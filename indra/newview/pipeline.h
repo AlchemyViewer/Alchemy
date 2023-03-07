@@ -725,8 +725,8 @@ public:
     LLVector4			mMoonDir;
     bool                mNeedsShadowTargetClear;
 
-	LLVector4			mTransformedSunDir;
-    LLVector4			mTransformedMoonDir;
+	LLVector4a			mTransformedSunDir;
+    LLVector4a			mTransformedMoonDir;
 
 	bool					mInitialized;
 	bool					mShadersLoaded;

@@ -1846,7 +1846,7 @@ void renderComplexityDisplay(LLDrawable* drawablep)
 		return;
 	}
 
-	LLVOVolume *voVol = vobj->asVolume();;
+	LLVOVolume *voVol = vobj->asVolume();
 
 	if (!voVol)
 	{

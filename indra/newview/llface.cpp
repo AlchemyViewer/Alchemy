@@ -1250,13 +1250,6 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 
 	const LLTextureEntry *tep = mVObjp->getTE(f);
 	const U8 bump_code = tep ? tep->getBumpmap() : 0;
-	
-	if ( bump_code && rebuild_tcoord && mVertexBuffer->hasDataType(LLVertexBuffer::TYPE_TANGENT) )
-	{
-		LLMaterial* mat = tep->getMaterialParams().get();
-		if(!mat || mat->getNormalID().isNull())
-			rebuild_tangent = true;
-	}
 
 	BOOL is_static = mDrawablep->isStatic();
 	BOOL is_global = is_static;
@@ -1381,6 +1374,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 			do_xform = false;
 		}
 	}
+	
     const LLMeshSkinInfo* skin = nullptr;
     LLMatrix4a mat_vert;
     LLMatrix4a mat_normal;
@@ -1435,60 +1429,57 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 			LLVector4a bump_t_primary_light_ray(0.f, 0.f, 0.f);
 
 			LLQuaternion bump_quat;
-			if (!LLPipeline::sRenderDeferred)
+			if (mDrawablep->isActive())
 			{
-				if (mDrawablep->isActive())
+				bump_quat = LLQuaternion(LLMatrix4(mDrawablep->getRenderMatrix()));
+			}
+		
+			if (bump_code)
+			{
+				mVObjp->getVolume()->genTangents(f);
+				F32 offset_multiple; 
+				switch( bump_code )
 				{
-					bump_quat = LLQuaternion(LLMatrix4(mDrawablep->getRenderMatrix().getF32ptr()));
-				}
-
-				if (bump_code)
-				{
-					mVObjp->getVolume()->genTangents(f);
-					F32 offset_multiple;
-					switch (bump_code)
-					{
 					case BE_NO_BUMP:
-						offset_multiple = 0.f;
-						break;
+					offset_multiple = 0.f;
+					break;
 					case BE_BRIGHTNESS:
 					case BE_DARKNESS:
-						if (mTexture[LLRender::DIFFUSE_MAP].notNull() && mTexture[LLRender::DIFFUSE_MAP]->hasGLTexture())
-						{
-							// Offset by approximately one texel
-							S32 cur_discard = mTexture[LLRender::DIFFUSE_MAP]->getDiscardLevel();
-							S32 max_size = llmax(mTexture[LLRender::DIFFUSE_MAP]->getWidth(), mTexture[LLRender::DIFFUSE_MAP]->getHeight());
-							max_size <<= cur_discard;
-							const F32 ARTIFICIAL_OFFSET = 2.f;
-							offset_multiple = ARTIFICIAL_OFFSET / (F32) max_size;
-						}
-						else
-						{
-							offset_multiple = 1.f / 256;
-						}
-						break;
+					if( mTexture[LLRender::DIFFUSE_MAP].notNull() && mTexture[LLRender::DIFFUSE_MAP]->hasGLTexture())
+					{
+						// Offset by approximately one texel
+						S32 cur_discard = mTexture[LLRender::DIFFUSE_MAP]->getDiscardLevel();
+						S32 max_size = llmax( mTexture[LLRender::DIFFUSE_MAP]->getWidth(), mTexture[LLRender::DIFFUSE_MAP]->getHeight() );
+						max_size <<= cur_discard;
+						const F32 ARTIFICIAL_OFFSET = 2.f;
+						offset_multiple = ARTIFICIAL_OFFSET / (F32)max_size;
+					}
+					else
+					{
+						offset_multiple = 1.f/256;
+					}
+					break;
 
 					default:  // Standard bumpmap textures.  Assumed to be 256x256
-						offset_multiple = 1.f / 256;
-						break;
-					}
-
-					F32 s_scale = 1.f;
-					F32 t_scale = 1.f;
-					if (tep)
-					{
-						tep->getScale(&s_scale, &t_scale);
-					}
-					// Use the nudged south when coming from above sun angle, such
-					// that emboss mapping always shows up on the upward faces of cubes when 
-					// it's noon (since a lot of builders build with the sun forced to noon).
-					LLVector3   sun_ray = gSky.mVOSkyp->mBumpSunDir;
-					LLVector3   moon_ray = gSky.mVOSkyp->getMoon().getDirection();
-					LLVector3& primary_light_ray = (sun_ray.mV[VZ] > 0) ? sun_ray : moon_ray;
-
-					bump_s_primary_light_ray.load3((offset_multiple * s_scale * primary_light_ray).mV);
-					bump_t_primary_light_ray.load3((offset_multiple * t_scale * primary_light_ray).mV);
+					offset_multiple = 1.f / 256;
+					break;
 				}
+
+				F32 s_scale = 1.f;
+				F32 t_scale = 1.f;
+				if( tep )
+				{
+					tep->getScale( &s_scale, &t_scale );
+				}
+				// Use the nudged south when coming from above sun angle, such
+				// that emboss mapping always shows up on the upward faces of cubes when 
+				// it's noon (since a lot of builders build with the sun forced to noon).
+				LLVector3   sun_ray  = gSky.mVOSkyp->mBumpSunDir;
+				LLVector3   moon_ray = gSky.mVOSkyp->getMoon().getDirection();
+				LLVector3& primary_light_ray = (sun_ray.mV[VZ] > 0) ? sun_ray : moon_ray;
+
+				bump_s_primary_light_ray.load3((offset_multiple * s_scale * primary_light_ray).mV);
+				bump_t_primary_light_ray.load3((offset_multiple * t_scale * primary_light_ray).mV);
 			}
 
 			U8 texgen = getTextureEntry() ? getTextureEntry()->getTexGen() : LLTextureEntry::TEX_GEN_DEFAULT;
@@ -1673,11 +1664,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
                 LL_PROFILE_ZONE_NAMED_CATEGORY_FACE("getGeometryVolume - texgen default");
 
 				std::vector<LLVector2> bump_tc;
-				if (!LLPipeline::sRenderDeferred && !mat && do_bump)
-				{
-					bump_tc.reserve(num_vertices);
-				}
-
+		
 				if (mat && !mat->getNormalID().isNull())
 				{ //writing out normal and specular texture coordinates, not bump offsets
 					do_bump = false;

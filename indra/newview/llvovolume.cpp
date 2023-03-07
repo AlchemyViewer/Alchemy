@@ -5245,7 +5245,6 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 //	if (selected && LLSelectMgr::getInstance()->mHideSelectedObjects)
 // [RLVa:KB] - Checked: 2010-11-29 (RLVa-1.3.0c) | Modified: RLVa-1.3.0c
 	const LLViewerObject* pObj = facep->getViewerObject();
-	bool selected = pObj->isSelected();
 	if ( (pObj->isSelected() && LLSelectMgr::getInstance()->mHideSelectedObjects) &&
 		 ( (!RlvActions::isRlvEnabled()) ||
 		   ( ((!pObj->isHUDAttachment()) || (!gRlvAttachmentLocks.isLockedAttachment(pObj->getRootEdit()))) &&

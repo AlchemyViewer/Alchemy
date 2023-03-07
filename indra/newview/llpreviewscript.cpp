@@ -2027,7 +2027,7 @@ void LLPreviewLSL::saveIfNeeded(bool sync /*= true*/)
                     LLFileSystem::removeFile(old_asset_id, LLAssetType::AT_LSL_TEXT);
                     LLPreviewLSL::finishedLSLUpload(itemId, response);
                 },
-                inventory_mono ? LLScriptAssetUpload::MONO : LLScriptAssetUpload::LSL2, LLPreviewLSL::failedLSLUpload));
+                LLPreviewLSL::failedLSLUpload, inventory_mono ? LLScriptAssetUpload::MONO : LLScriptAssetUpload::LSL2));
 
             LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
         }
