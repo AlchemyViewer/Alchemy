@@ -43,6 +43,13 @@
 // Additionally, disable inclusion of STB header files entirely with
 // TINYGLTF_NO_INCLUDE_STB_IMAGE
 // TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
+
+#include <nlohmann/json.hpp>
+
+#ifndef TINYGLTF_NO_INCLUDE_JSON
+#define TINYGLTF_NO_INCLUDE_JSON 1
+#endif
+
 #include "tinygltf/tiny_gltf.h"
 
 
