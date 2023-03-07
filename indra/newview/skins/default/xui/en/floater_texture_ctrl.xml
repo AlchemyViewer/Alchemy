@@ -107,7 +107,7 @@ PICK: TEXTURE
      name="Default"
      width="73"
 	 left="94"
-     top="215"/>
+     top="221"/>
     <button
      follows="left|top"
      height="20"
@@ -176,7 +176,7 @@ PICK: TEXTURE
      bg_alpha_color="PanelDefaultBackgroundColor"
      border="false"
      follows="all"
-     height="242"
+     height="269"
      layout="topleft"
      left_delta="0"
      name="inventory panel"
@@ -189,7 +189,7 @@ PICK: TEXTURE
      name="uuid_editor"
      label="Enter Texture UUID"
      max_length_chars="36"
-     top_pad="7"
+     top_pad="5"
      height="20"
      width="296"
      left="5" />
