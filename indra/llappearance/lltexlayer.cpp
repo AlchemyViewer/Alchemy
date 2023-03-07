@@ -991,7 +991,7 @@ LLTexLayer::~LLTexLayer()
 	for (auto& iter : mAlphaCache)
     {
 		U8* alpha_data = iter.second;
-		delete [] alpha_data;
+		ll_aligned_free_32(alpha_data);
 	}
 
 }

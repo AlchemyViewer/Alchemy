@@ -8215,7 +8215,7 @@ void LLPipeline::renderDeferredLighting()
 
                     LLVector4a sa;
                     sa.splat(s);
-					if (camera->AABBInFrustumNoFarClip(center, sa) == 0)
+                    if (camera->AABBInFrustumNoFarClip(center, sa) == 0)
                     {
                         continue;
                     }
@@ -8242,7 +8242,7 @@ void LLPipeline::renderDeferredLighting()
                             gDeferredLightProgram.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
                             gGL.syncMatrices();
 
-							mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
+                            mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
                             stop_glerror();
                         }
                     }
@@ -8304,7 +8304,7 @@ void LLPipeline::renderDeferredLighting()
                     gDeferredSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
                     gGL.syncMatrices();
 
-					mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
+                    mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
                 }
                 gDeferredSpotLightProgram.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
                 unbindDeferredShader(gDeferredSpotLightProgram);
@@ -9312,6 +9312,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 	lightDir.normVec();
 
 	//create light space camera matrix
+	
 	LLVector3 at = lightDir;
 
 	LLVector3 up = camera.getAtAxis();
