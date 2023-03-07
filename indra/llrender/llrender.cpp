@@ -86,7 +86,7 @@ struct LLVBCache
     std::chrono::steady_clock::time_point touched;
 };
 
-static std::unordered_map<U64, LLVBCache> sVBCache;
+static boost::unordered_flat_map<U64, LLVBCache> sVBCache;
 
 static const GLenum sGLTextureType[] =
 {
@@ -1720,7 +1720,7 @@ void LLRender::flush()
             // To leverage this, we maintain a running hash of the vertex stream being
             // built up before a flush, and then check that hash against a VB 
             // cache just before creating a vertex buffer in VRAM
-            std::unordered_map<U64, LLVBCache>::iterator cache = sVBCache.find(vhash);
+            auto cache = sVBCache.find(vhash);
 
             LLPointer<LLVertexBuffer> vb;
 
@@ -1765,11 +1765,12 @@ void LLRender::flush()
 
                     using namespace std::chrono_literals;
                     // every 1024 misses, clean the cache of any VBs that haven't been touched in the last second
-                    for (std::unordered_map<U64, LLVBCache>::iterator iter = sVBCache.begin(); iter != sVBCache.end(); )
+                    for (auto iter = sVBCache.begin(); iter != sVBCache.end(); )
                     {
                         if (now - iter->second.touched > 1s)
                         {
-                            iter = sVBCache.erase(iter);
+							auto old_iter = iter++;
+                            sVBCache.erase(old_iter);
                         }
                         else
                         {

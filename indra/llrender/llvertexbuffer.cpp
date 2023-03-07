@@ -307,7 +307,7 @@ public:
         clear();
     }
 
-    typedef std::unordered_map<U32, std::list<Entry>> Pool;
+    typedef boost::unordered_flat_map<U32, std::list<Entry>> Pool;
 
     Pool mVBOPool;
     Pool mIBOPool;
@@ -447,12 +447,13 @@ public:
 
         LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
 
-        std::unordered_map<U32, std::list<Entry>>* pools[] = { &mVBOPool, &mIBOPool };
+        boost::unordered_flat_map<U32, std::list<Entry>>* pools[] = { &mVBOPool, &mIBOPool };
 
         using namespace std::chrono_literals;
 
         Time cutoff = std::chrono::steady_clock::now() - 5s;
 
+        std::vector<GLuint> names_to_free;
         for (auto* pool : pools)
         {
             for (Pool::iterator iter = pool->begin(); iter != pool->end(); )
@@ -464,7 +465,7 @@ public:
                     LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vbo cache timeout");
                     auto& entry = entries.back();
                     ll_aligned_free_16(entry.mData);
-                    glDeleteBuffers(1, &entry.mGLName);
+                    names_to_free.push_back(entry.mGLName);
 #if ANALYZE_VBO_POOL
                     llassert(mReserved >= iter->first);
                     mReserved -= iter->first;
@@ -475,7 +476,7 @@ public:
 
                 if (entries.empty())
                 {
-                    iter = pool->erase(iter);
+                    pool->erase(iter++);
                 }
                 else
                 {
@@ -483,6 +484,7 @@ public:
                 }
             }
         }
+        if(!names_to_free.empty()) glDeleteBuffers(names_to_free.size(), names_to_free.data());
 
 #if ANALYZE_VBO_POOL
         LL_INFOS() << llformat("(%d/%d)/%d MB (distributed/allocated)/total in VBO Pool. Overhead: %d percent. Hit rate: %d percent", 
@@ -497,12 +499,13 @@ public:
 
     void clear()
     {
+        std::vector<GLuint> names_to_free;
         for (auto& entries : mIBOPool)
         {
             for (auto& entry : entries.second)
             {
                 ll_aligned_free_16(entry.mData);
-                glDeleteBuffers(1, &entry.mGLName);
+                names_to_free.push_back(entry.mGLName);
             }
         }
 
@@ -511,9 +514,10 @@ public:
             for (auto& entry : entries.second)
             {
                 ll_aligned_free_16(entry.mData);
-                glDeleteBuffers(1, &entry.mGLName);
+                names_to_free.push_back(entry.mGLName);
             }
         }
+        if(!names_to_free.empty()) glDeleteBuffers(names_to_free.size(), names_to_free.data());
 
 #if ANALYZE_VBO_POOL
         mReserved = 0;
