@@ -28,7 +28,6 @@
 #define LL_LLINVENTORYOBSERVERS_H
 
 #include "lluuid.h"
-#include "alxxh.h"
 #include "llmd5.h"
 #include <string>
 #include <vector>

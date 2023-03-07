@@ -483,7 +483,7 @@ U64 LLInventoryModel::hashDirectDescendentNames(const LLUUID& cat_id) const
 	{
 		return 0;
 	}
-	ALXXH item_name_hash;
+	HBXXH64 item_name_hash;
 	for (LLInventoryModel::item_array_t::const_iterator iter = item_array->begin();
 		 iter != item_array->end();
 		 iter++)

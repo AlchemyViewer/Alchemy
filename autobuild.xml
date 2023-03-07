@@ -2178,9 +2178,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4dad1c0948141e1667c01a3ee755e4dc</string>
+              <string>89d45f3caeed648508c2d2b5507f78c921f96c741ec5c963e7be59be30486fdffa593d119e2c35248998a7814881587e0d54e4fa7d469b9ce97704f9522ca191</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/105849/926137/tinygltf-v2.5.0-common-575729.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/185/packages/generic/tinygltf/v2.8.3.1883/tinygltf-v2.8.3-common-1883.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2191,7 +2193,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>source_type</key>
         <string>git</string>
         <key>version</key>
-        <string>v2.5.0</string>
+        <string>v2.8.3</string>
       </map>
       <key>tracy</key>
       <map>
@@ -2497,8 +2499,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
       </map>
       <key>xxhash</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-xxhash</string>
         <key>copyright</key>
         <string>Copyright (c) 2012-2021 Yann Collet</string>
         <key>description</key>
@@ -2511,74 +2511,16 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>xxhash</string>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>b3bc18dbb02a910000d8ab710d3f5da43935f15894ff51c3bd6c7d7beeaa6cdb6d124f8143657ec81c424a3d32ac2e1046683fd0a140775a953e4c85669da21a</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.1.1872/xxhash-0.8.1-darwin64-1872.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>d02ea9260eff0df687261dcf7201858408501b5dbe4e0cb3e402363d50cd44111936f7a5baae06c8addf56155e5815fbb41540af68188c4e9616f804ad438875</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.1.1872/xxhash-0.8.1-linux64-1872.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>ced6c02704cffb9c5ebe33fbef50cae56ebe332c8562f3e5c1ad18a83b529b957422a6d58c91e08ab854cd6328ee51e8b3f9788ac819b0c565c262bb6050046d</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.1.1872/xxhash-0.8.1-windows64-1872.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>0.8.1</string>
-      </map>
-      <key>xxhash</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright 2012-2020 Yann Collet</string>
-        <key>description</key>
-        <string>xxHash Extremely fast hash algorithm</string>
-        <key>license</key>
-        <string>bsd</string>
-        <key>license_file</key>
-        <string>LICENSES/xxhash.txt</string>
-        <key>name</key>
-        <string>xxhash</string>
-        <key>platforms</key>
-        <map>
           <key>common</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e4f77ba0a9b8ec3cc3fabc51c4da81d2</string>
+              <string>1e70c049679bd27228aa6cc6a4fe3d529dc337f69cb5c9fe50ae9c7aeba48117949c278ac5338ca99dc413134319d230954ee064da6a497a6f3194a9c64090fa</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/110070/956941/xxhash-0.8.1.578006-windows-578006.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.1.1886/xxhash-0.8.1-common-1886.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>

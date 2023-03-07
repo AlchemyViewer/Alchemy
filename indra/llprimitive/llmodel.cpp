@@ -41,8 +41,6 @@
 # include "zlib/zlib.h"
 #endif
 
-#include "alxxh.h"
-
 std::string model_names[] =
 {
 	"lowest_lod",

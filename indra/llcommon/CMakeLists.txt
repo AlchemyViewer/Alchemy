@@ -31,7 +31,6 @@ include_directories(
 #     ${LLCOMMON_LIBRARIES})
 
 set(llcommon_SOURCE_FILES
-    alxxh.cpp
     commoncontrol.cpp
     indra_constants.cpp
     llapp.cpp
@@ -131,7 +130,6 @@ set(llcommon_SOURCE_FILES
 set(llcommon_HEADER_FILES
     CMakeLists.txt
 
-    alxxh.h
     chrono.h
     classic_callback.h
     commoncontrol.h
