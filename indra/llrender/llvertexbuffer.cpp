@@ -535,6 +535,7 @@ U32 LLVertexBuffer::sGLRenderBuffer = 0;
 U32 LLVertexBuffer::sGLRenderIndices = 0;
 U32 LLVertexBuffer::sLastMask = 0;
 U32 LLVertexBuffer::sVertexCount = 0;
+GLuint LLVertexBuffer::sDummyVAO = 0;
 
 
 //NOTE: each component must be AT LEAST 4 bytes in size to avoid a performance penalty on AMD hardware
@@ -760,6 +761,24 @@ void LLVertexBuffer::drawArrays(U32 mode, U32 first, U32 count) const
 //static
 void LLVertexBuffer::initClass(LLWindow* window)
 {
+#ifdef GL_ARB_vertex_array_object
+	if (LLRender::sGLCoreProfile)
+	{
+		if (sDummyVAO != 0)
+		{
+			glBindVertexArray(0);
+			glDeleteVertexArrays(1, &sDummyVAO);
+			sDummyVAO = 0;
+		}
+
+		{ //bind a dummy vertex array object so we're core profile compliant
+			glGenVertexArrays(1, &sDummyVAO);
+			glBindVertexArray(sDummyVAO);
+		}
+		stop_glerror();
+	}
+#endif
+
     llassert(sVBOPool == nullptr);
     sVBOPool = new LLVBOPool();
 
@@ -791,6 +810,15 @@ void LLVertexBuffer::cleanupClass()
 	
     delete sVBOPool;
     sVBOPool = nullptr;
+
+	if (sDummyVAO != 0)
+	{
+#ifdef GL_ARB_vertex_array_object
+		glBindVertexArray(0);
+		glDeleteVertexArrays(1, &sDummyVAO);
+#endif
+		sDummyVAO = 0;
+	}
 
 #if ENABLE_GL_WORK_QUEUE
     sQueue->close();
