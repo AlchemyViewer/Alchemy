@@ -7463,40 +7463,6 @@ void LLPipeline::renderFinalize()
 
         if (RenderScreenSpaceReflections && !gCubeSnapshot)
         {
-#if 0
-            LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - screen space reflections");
-            LL_PROFILE_GPU_ZONE("screen space reflections");
-
-            bindDeferredShader(gPostScreenSpaceReflectionProgram, NULL);
-            mScreenTriangleVB->setBuffer();
-
-            set_camera_projection_matrix(gPostScreenSpaceReflectionProgram);
-
-            // We need linear depth.
-            static LLStaticHashedString zfar("zFar");
-            static LLStaticHashedString znear("zNear");
-            float                       nearClip = LLViewerCamera::getInstance()->getNear();
-            float                       farClip  = LLViewerCamera::getInstance()->getFar();
-            gPostScreenSpaceReflectionProgram.uniform1f(zfar, farClip);
-            gPostScreenSpaceReflectionProgram.uniform1f(znear, nearClip);
-
-            S32 channel = gPostScreenSpaceReflectionProgram.enableTexture(LLShaderMgr::DIFFUSE_MAP, screenTarget()->getUsage());
-            if (channel > -1)
-            {
-				screenTarget()->bindTexture(0, channel, LLTexUnit::TFO_POINT);
-            }
-
-            {
-                LLGLDisable blend(GL_BLEND);
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_ALWAYS);
-
-                stop_glerror();
-                mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-                stop_glerror();
-            }
-
-            unbindDeferredShader(gPostScreenSpaceReflectionProgram);
-#else
             LL_PROFILE_GPU_ZONE("ssr copy");
             LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
 
@@ -7518,7 +7484,6 @@ void LLPipeline::renderFinalize()
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
             dst.flush();
-#endif
         }
 
         screenTarget()->bindTarget();
