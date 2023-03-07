@@ -56,7 +56,7 @@ U32 wpo2(U32 i);
 
 // texture memory accounting (for OS X)
 static LLMutex sTexMemMutex;
-static std::unordered_map<U32, U32> sTextureAllocs;
+static boost::unordered_flat_map<U32, U32> sTextureAllocs;
 static U64 sTextureBytes = 0;
 
 // track a texture alloc on the currently bound texture.
