@@ -629,7 +629,7 @@ public:
 
 	static LLTrace::EventStatHandle<S64> sStatBatchSize;
 
-	//std::unique_ptr<ALRenderUtil> mALRenderUtil;
+	std::unique_ptr<ALRenderUtil> mALRenderUtil;
 
     class RenderTargetPack
     {

@@ -227,9 +227,7 @@ public:
     
 private:
     using uuid_map_t = std::map< LLTextureKey, LLPointer<LLViewerFetchedTexture> >;
-    using uuid_hash_map_t = boost::unordered_map< LLTextureKey, LLViewerFetchedTexture* >;
     uuid_map_t mUUIDMap;
-    uuid_hash_map_t mUUIDHashMap;
     LLTextureKey mLastUpdateKey;
 	
     typedef std::set < LLPointer<LLViewerFetchedTexture> > image_priority_list_t;

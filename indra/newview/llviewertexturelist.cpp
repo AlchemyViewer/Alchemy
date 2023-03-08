@@ -110,7 +110,6 @@ void LLViewerTextureList::doPreloadImages()
 	llassert_always(mInitialized) ;
 	llassert_always(mImageList.empty()) ;
 	llassert_always(mUUIDMap.empty()) ;
-	llassert_always(mUUIDHashMap.empty());
 
 	// Set the "missing asset" image
 	LLViewerFetchedTexture::sMissingAssetImagep = LLViewerTextureManager::getFetchedTextureFromFile("missing_asset.tga", FTT_LOCAL_FILE, MIPMAP_NO, LLViewerFetchedTexture::BOOST_UI);
@@ -360,8 +359,7 @@ void LLViewerTextureList::shutdown()
 	mLoadingStreamList.clear();
 	mCreateTextureList.clear();
 	mFastCacheList.clear();
-
-	mUUIDHashMap.clear();	
+	
 	mUUIDMap.clear();
 	
 	mImageList.clear();
@@ -665,8 +663,8 @@ void LLViewerTextureList::findTexturesByID(const LLUUID &image_id, std::vector<L
 LLViewerFetchedTexture *LLViewerTextureList::findImage(const LLTextureKey &search_key)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    auto iter = mUUIDHashMap.find(search_key);
-    if (iter == mUUIDHashMap.cend())
+    uuid_map_t::iterator iter = mUUIDMap.find(search_key);
+    if (iter == mUUIDMap.end())
         return NULL;
     return iter->second;
 }
@@ -721,8 +719,8 @@ void LLViewerTextureList::removeImageFromList(LLViewerFetchedTexture *image)
 			<< " but doesn't have mInImageList set"
 			<< " ref count is " << image->getNumRefs()
 			<< LL_ENDL;
-		auto iter = mUUIDHashMap.find(LLTextureKey(image->getID(), (ETexListType)image->getTextureListType()));
-		if(iter == mUUIDHashMap.cend())
+		uuid_map_t::iterator iter = mUUIDMap.find(LLTextureKey(image->getID(), (ETexListType)image->getTextureListType()));
+		if(iter == mUUIDMap.end())
 		{
 			LL_INFOS() << "Image  " << image->getID() << " is also not in mUUIDMap!" << LL_ENDL ;
 		}
@@ -767,7 +765,6 @@ void LLViewerTextureList::addImage(LLViewerFetchedTexture *new_image, ETexListTy
 
 	addImageToList(new_image);
 	mUUIDMap.insert_or_assign(key, new_image);
-	mUUIDHashMap.insert_or_assign(key, new_image);
 	new_image->setTextureListType(tex_type);
 }
 
@@ -783,7 +780,6 @@ void LLViewerTextureList::deleteImage(LLViewerFetchedTexture *image)
 		}
 		LLTextureKey key(image->getID(), (ETexListType)image->getTextureListType());
 		llverify(mUUIDMap.erase(key) == 1);
-		llverify(mUUIDHashMap.erase(key) == 1);
 		sNumImages--;
 		removeImageFromList(image);
 	}

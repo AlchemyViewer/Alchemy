@@ -514,18 +514,9 @@ bool ALRenderUtil::setupColorGrade()
 
 void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* bloom)
 {
-	gGL.matrixMode(LLRender::MM_PROJECTION);
-	gGL.pushMatrix();
-	gGL.loadIdentity();
-	gGL.matrixMode(LLRender::MM_MODELVIEW);
-	gGL.pushMatrix();
-	gGL.loadIdentity();
-
 	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
 	dst->bindTarget();
-	glClearColor(0, 0, 0, 0);
-	dst->clear(GL_COLOR_BUFFER_BIT);
 
 	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorGradeLUTProgram[mTonemapType] : &gDeferredPostTonemapProgram[mTonemapType];
 
@@ -537,10 +528,13 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 		src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
 	}
 
-	channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_BLOOM, bloom->getUsage());
-	if (channel > -1)
+	if (bloom)
 	{
-		bloom->bindTexture(0, channel);
+		channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_BLOOM, bloom->getUsage());
+		if (channel > -1)
+		{
+			bloom->bindTexture(0, channel);
+		}
 	}
 
 	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
@@ -591,11 +585,6 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 
 	tone_shader->unbind();
 	dst->flush();
-
-	gGL.matrixMode(LLRender::MM_PROJECTION);
-	gGL.popMatrix();
-	gGL.matrixMode(LLRender::MM_MODELVIEW);
-	gGL.popMatrix();
 }
 
 bool ALRenderUtil::setupSharpen()
