@@ -354,7 +354,7 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 	mCommitCallbackRegistrar.add("Pref.DeleteTranscripts",      boost::bind(&LLFloaterPreference::onDeleteTranscripts, this));
 	mCommitCallbackRegistrar.add("UpdateFilter", boost::bind(&LLFloaterPreference::onUpdateFilterTerm, this, false));
 
-#ifndef LL_HAVOK
+#if !LL_HAVOK
 	mCommitCallbackRegistrar.add("Pref.AddGrid", boost::bind(&LLFloaterPreference::onClickAddGrid, this));
     mCommitCallbackRegistrar.add("Pref.ActivateGrid", boost::bind(&LLFloaterPreference::onClickActivateGrid, this));
 	mCommitCallbackRegistrar.add("Pref.RemoveGrid", boost::bind(&LLFloaterPreference::onClickRemoveGrid, this));
@@ -472,7 +472,7 @@ BOOL LLFloaterPreference::postBuild()
 
 	LLLogChat::getInstance()->setSaveHistorySignal(boost::bind(&LLFloaterPreference::onLogChatHistorySaved, this));
 	
-#ifndef LL_HAVOK
+#if !LL_HAVOK
 	refreshGridList();
 	mGridListChangedConnection = LLGridManager::getInstance()->addGridListChangedCallback(boost::bind(&LLFloaterPreference::refreshGridList, this));
 #else
@@ -537,7 +537,7 @@ void LLFloaterPreference::onDoNotDisturbResponseChanged()
 	gSavedPerAccountSettings.setBOOL("DoNotDisturbResponseChanged", response_changed_flag );
 }
 
-#ifndef LL_HAVOK
+#if !LL_HAVOK
 ////////////////////////////////////////////////////
 // Grid panel
 
@@ -902,7 +902,7 @@ void LLFloaterPreference::refreshSkinInfo(const skin_t& skin)
 
 LLFloaterPreference::~LLFloaterPreference()
 {
-#ifndef LL_HAVOK
+#if !LL_HAVOK
 	if (mGridListChangedConnection.connected())
 		mGridListChangedConnection.disconnect();
 #endif

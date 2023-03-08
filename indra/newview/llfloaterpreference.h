@@ -245,7 +245,7 @@ private:
 	typedef std::map<std::string, skin_t> skinmap_t;
 	skinmap_t mUserSkins;
 	
-#ifndef LL_HAVOK
+#if !LL_HAVOK
 	boost::signals2::connection mGridListChangedConnection;
 #endif
 
