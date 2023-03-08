@@ -4,7 +4,7 @@ include(APR)
 include(Boost)
 include(EXPAT)
 include(Tracy)
-include(xxHash)
+include(XXHash)
 include(ZLIBNG)
 
 set(LLCOMMON_INCLUDE_DIRS

@@ -245,7 +245,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 			 S32 height, U32 flags,
 			 BOOL fullscreen, BOOL clearBg,
 			 BOOL enable_vsync, BOOL use_gl,
-			 BOOL ignore_pixel_depth, U32 fsaa_samples)
+			 BOOL ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, U32 max_vram, F32 max_gl_version)
 	: LLWindow(callbacks, fullscreen, flags),
 	  mGamma(1.0f)
 {
@@ -2701,5 +2701,13 @@ void LLWindowSDL::setTitle(const std::string title)
 	{
 		SDL_SetWindowTitle(mWindow, title.c_str());
 	}
+}
+
+U32 LLWindowSDL::getAvailableVRAMMegabytes() 
+{
+    static const U32 mb = 1024*1024;
+    // We're asked for total available gpu memory, but we only have allocation info on texture usage. So estimate by doubling that.
+    static const U32 total_factor = 2; // estimated total/textures
+    return gGLManager.mVRAM - (LLImageGL::getTextureBytesAllocated() * total_factor/mb);
 }
 #endif // LL_SDL

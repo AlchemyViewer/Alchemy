@@ -183,7 +183,7 @@ LLMatrix4 gGLObliqueProjectionInverse;
 
 std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
-#if (LL_WINDOWS || LL_LINUX)  && !LL_MESA_HEADLESS
+#if (LL_WINDOWS || LL_LINUX || LL_SDL)  && !LL_MESA_HEADLESS
 
 #if LL_WINDOWS
 // WGL_ARB_create_context
@@ -205,6 +205,8 @@ PFNWGLSWAPINTERVALEXTPROC    wglSwapIntervalEXT = nullptr;
 PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = nullptr;
 
 #endif
+
+#if !LL_SDL
 
 // GL_VERSION_1_2
 //PFNGLDRAWRANGEELEMENTSPROC  glDrawRangeElements = nullptr;
@@ -259,6 +261,8 @@ PFNGLLOADTRANSPOSEMATRIXFPROC        glLoadTransposeMatrixf = nullptr;
 PFNGLLOADTRANSPOSEMATRIXDPROC        glLoadTransposeMatrixd = nullptr;
 PFNGLMULTTRANSPOSEMATRIXFPROC        glMultTransposeMatrixf = nullptr;
 PFNGLMULTTRANSPOSEMATRIXDPROC        glMultTransposeMatrixd = nullptr;
+
+#endif
 
 // GL_VERSION_1_4
 PFNGLBLENDFUNCSEPARATEPROC       glBlendFuncSeparate = nullptr;
@@ -1485,6 +1489,8 @@ void LLGLManager::initExtensions()
 
     // Load entire OpenGL API through GetProcAddress, leaving sections beyond mGLVersion unloaded
 
+#if !LL_SDL
+
     // GL_VERSION_1_2
     if (mGLVersion < 1.19f)
     {
@@ -1547,6 +1553,7 @@ void LLGLManager::initExtensions()
     glLoadTransposeMatrixd = (PFNGLLOADTRANSPOSEMATRIXDPROC)GLH_EXT_GET_PROC_ADDRESS("glLoadTransposeMatrixd");
     glMultTransposeMatrixf = (PFNGLMULTTRANSPOSEMATRIXFPROC)GLH_EXT_GET_PROC_ADDRESS("glMultTransposeMatrixf");
     glMultTransposeMatrixd = (PFNGLMULTTRANSPOSEMATRIXDPROC)GLH_EXT_GET_PROC_ADDRESS("glMultTransposeMatrixd");
+#endif
 
     // GL_VERSION_1_4
     if (mGLVersion < 1.39f)

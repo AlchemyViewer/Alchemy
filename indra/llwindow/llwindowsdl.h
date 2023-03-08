@@ -138,6 +138,8 @@ public:
 	/*virtual*/ void *getPlatformWindow() override;
 	/*virtual*/ void bringToFront() override;
 
+	U32 getAvailableVRAMMegabytes() override;
+
 	void allowLanguageTextInput(LLPreeditor *preeditor, BOOL b) override;
 	void updateLanguageTextInputArea() override;
 	void setLanguageTextInput( const LLCoordGL & pos ) override;
@@ -169,7 +171,7 @@ protected:
 	LLWindowSDL(LLWindowCallbacks* callbacks,
 		const std::string& title, const std::string& name, int x, int y, int width, int height, U32 flags,
 		BOOL fullscreen, BOOL clearBg, BOOL disable_vsync, BOOL use_gl,
-		BOOL ignore_pixel_depth, U32 fsaa_samples);
+		BOOL ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, U32 max_vram, F32 max_gl_version);
 	~LLWindowSDL();
 
 	/*virtual*/ BOOL	isValid() override;

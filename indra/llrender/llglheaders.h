@@ -41,10 +41,11 @@
 # include "GL/glh_extensions.h"
 # undef __APPLE__
 
-#elif LL_WINDOWS
+#elif LL_WINDOWS || LL_SDL
 //----------------------------------------------------------------------------
 // LL_WINDOWS
 
+#if LL_WINDOWS
 // windows gl headers depend on things like APIENTRY, so include windows.
 #include "llwin32headerslean.h"
 
@@ -121,6 +122,10 @@ extern PFNGLLOADTRANSPOSEMATRIXFPROC        glLoadTransposeMatrixf;
 extern PFNGLLOADTRANSPOSEMATRIXDPROC        glLoadTransposeMatrixd;
 extern PFNGLMULTTRANSPOSEMATRIXFPROC        glMultTransposeMatrixf;
 extern PFNGLMULTTRANSPOSEMATRIXDPROC        glMultTransposeMatrixd;
+
+#elif LL_SDL
+#include "SDL2/SDL_opengl.h"
+#endif
 
 // GL_VERSION_1_4
 extern PFNGLBLENDFUNCSEPARATEPROC       glBlendFuncSeparate;
