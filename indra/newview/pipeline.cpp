@@ -1249,6 +1249,8 @@ void LLPipeline::createGLBuffers()
     //mRT->width = 0;
     //mRT->height = 0;
 
+	mALRenderUtil->refreshState();
+
     if (sRenderDeferred)
     {
 		if (!mNoiseMap)
