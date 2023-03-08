@@ -1200,6 +1200,24 @@ bool LLGLManager::initGL()
 	}
 #endif
 
+    // Ultimate fallbacks for linux and mesa
+	if (mHasNVXMemInfo && mVRAM == 0)
+	{
+		S32 dedicated_memory;
+		glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &dedicated_memory);
+		mVRAM = dedicated_memory/1024;
+		LL_INFOS("RenderInit") << "VRAM Detected (NVXMemInfo):" << mVRAM << LL_ENDL;
+	}
+
+	if (mHasATIMemInfo && mVRAM == 0)
+	{ //ask the gl how much vram is free at startup and attempt to use no more than half of that
+		S32 meminfo[4];
+		glGetIntegerv(GL_TEXTURE_FREE_MEMORY_ATI, meminfo);
+
+		mVRAM = meminfo[0] / 1024;
+		LL_INFOS("RenderInit") << "VRAM Detected (ATIMemInfo):" << mVRAM << LL_ENDL;
+	}
+
 	if (mVRAM < 256 && old_vram > 0)
 	{
 		// fall back to old method
@@ -1433,7 +1451,15 @@ void LLGLManager::initExtensions()
 
     mInited = TRUE;
 
-#if (LL_WINDOWS || LL_LINUX) && !LL_MESA_HEADLESS
+#if (LL_WINDOWS || LL_LINUX || LL_SDL) && !LL_MESA_HEADLESS
+#if LL_SDL
+	mHasATIMemInfo = SDL_GL_ExtensionSupported("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
+	mHasNVXMemInfo = SDL_GL_ExtensionSupported("GL_NVX_gpu_memory_info");
+#else
+    mHasATIMemInfo = ExtensionExists("GL_ATI_meminfo",gGLHExts.mSysExts); //Basic AMD method, also see mHasAMDAssociations
+    mHasNVXMemInfo = ExtensionExists("WGL_ARB_create_context",gGLHExts.mSysExts);
+#endif
+
 	LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
 	
 #if LL_WINDOWS

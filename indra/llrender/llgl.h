@@ -100,6 +100,8 @@ public:
 	
 	// Vendor-specific extensions
     bool mHasAMDAssociations = false;
+	bool mHasNVXMemInfo = false;
+	bool mHasATIMemInfo = false;
 
 	BOOL mIsAMD;
 	BOOL mIsNVIDIA;
