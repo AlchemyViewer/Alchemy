@@ -761,25 +761,53 @@
     Tonemapper:
   </text>
   <combo_box
-   control_name="RenderTonemapper"
+   control_name="RenderToneMapType"
    height="18"
    layout="topleft"
    left_delta="130"
    top_delta="0"
    name="ToneMapper"
    width="150">
-    <combo_box.item
-      label="Linear"
-      name="0"
-      value="0"/>
-    <combo_box.item
-      label="ACES Narkowicz"
-      name="1"
-      value="1"/>
-    <combo_box.item
-      label="ACES Hill"
-      name="2"
-      value="2"/>
+	<combo_box.item
+		label="Linear"
+		name="toneLinear"
+		value="1" />
+	<combo_box.item
+		label="Reinhard"
+		name="toneReinhard"
+		value="2" />
+	<combo_box.item
+		label="Reinhard2"
+		name="toneReinhard2"
+		value="3" />
+	<combo_box.item
+		label="Filmic"
+		name="toneFilmic"
+		value="4" />
+	<combo_box.item
+		label="Unreal"
+		name="toneUnreal"
+		value="5" />
+	<combo_box.item
+		label="ACES Narkowicz"
+		name="toneACES"
+		value="6" />
+	<combo_box.item
+		label="ACES Hill"
+		name="toneACES"
+		value="10" />
+	<combo_box.item
+		label="Uchimura"
+		name="toneUchimura"
+		value="7" />
+	<combo_box.item
+		label="Lottes"
+		name="toneLottes"
+		value="8" />
+	<combo_box.item
+		label="Uncharted"
+		name="toneUncharted"
+		value="9" />
   </combo_box>
 
     <slider

@@ -28,8 +28,6 @@
 
 #include "llpointer.h"
 
-#define AL_TONEMAP_COUNT 10
-
 class LLRenderTarget;
 class LLVertexBuffer;
 
@@ -55,10 +53,11 @@ public:
 		TONEMAP_REINHARD2,
 		TONEMAP_FILMIC,
 		TONEMAP_UNREAL,
-		TONEMAP_ACES,
+		TONEMAP_ACES_NARCOWICZ,
 		TONEMAP_UCHIMURA,
 		TONEMAP_LOTTES,
 		TONEMAP_UNCHARTED,
+		TONEMAP_ACES_HILL,
 		TONEMAP_COUNT
 	};
 	bool setupTonemap();

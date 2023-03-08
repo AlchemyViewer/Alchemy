@@ -331,9 +331,13 @@
 						name="toneUnreal"
 						value="5" />
 					<combo_box.item
-						label="ACES"
+						label="ACES Narkowicz"
 						name="toneACES"
 						value="6" />
+					<combo_box.item
+						label="ACES Hill"
+						name="toneACES"
+						value="10" />
 					<combo_box.item
 						label="Uchimura"
 						name="toneUchimura"

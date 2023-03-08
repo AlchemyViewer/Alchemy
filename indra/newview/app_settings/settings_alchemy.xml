@@ -1220,13 +1220,13 @@
     <key>RenderToneMapType</key>
     <map>
       <key>Comment</key>
-      <string>Tonemapping type 0 - HDR Debug, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES, 7 - Uchimura, 8 - Lottes, 9 - Uncharted</string>
+      <string>Tonemapping type 0 - HDR Debug, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES Narkowicz, 7 - Uchimura, 8 - Lottes, 9 - Uncharted, 10 - Aces Hill</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>U32</string>
       <key>Value</key>
-      <integer>7</integer>
+      <integer>10</integer>
     </map>
     <key>RenderToneMapUchimuraA</key>
     <map>

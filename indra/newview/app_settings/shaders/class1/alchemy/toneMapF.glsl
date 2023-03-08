@@ -73,7 +73,7 @@ vec3 unreal(vec3 x)
     return x / (x + 0.155) * 1.019;
 }
 
-vec3 aces(vec3 x)
+vec3 ACES_Narkowicz(vec3 x)
 {
     // Narkowicz 2015, "ACES Filmic Tone Mapping Curve"
     const float a = 2.51;
@@ -84,7 +84,45 @@ vec3 aces(vec3 x)
     return (x * (a * x + b)) / (x * (c * x + d) + e);
 }
 
-#if TONEMAP_METHOD == 7 // Uchimura
+// ACES filmic tone map approximation
+// see https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
+
+// sRGB => XYZ => D65_2_D60 => AP1 => RRT_SAT
+const mat3 ACESInputMat = mat3
+(
+    0.59719, 0.07600, 0.02840,
+    0.35458, 0.90834, 0.13383,
+    0.04823, 0.01566, 0.83777
+);
+
+
+// ODT_SAT => XYZ => D60_2_D65 => sRGB
+const mat3 ACESOutputMat = mat3
+(
+    1.60475, -0.10208, -0.00327,
+    -0.53108,  1.10813, -0.07276,
+    -0.07367, -0.00605,  1.07602
+);
+
+vec3 RRTAndODTFit(vec3 color)
+{
+    vec3 a = color * (color + 0.0245786) - 0.000090537;
+    vec3 b = color * (0.983729 * color + 0.4329510) + 0.238081;
+    return a / b;
+}
+
+vec3 ACES_Hill(vec3 color)
+{
+    color = ACESInputMat * color;
+
+    // Apply RRT and ODT
+    color = RRTAndODTFit(color);
+
+    color = ACESOutputMat * color;
+
+    return color;
+}
+
 vec3 uchimura(vec3 x, float P, float a, float m, float l, float c, float b)
 {
     float l0 = ((P - m) * l) / a;
@@ -119,9 +157,7 @@ vec3 uchimura(vec3 x)
     
     return uchimura(x, P, a, m, l, c, b);
 }
-#endif
 
-#if TONEMAP_METHOD == 8
 // Lottes 2016, "Advanced Techniques and Optimization of HDR Color Pipelines"
 uniform vec3 tone_lottes_a = vec3(1.6, 0.977, 8.0);
 uniform vec3 tone_lottes_b = vec3(0.18, 0.267, 0.0);
@@ -142,9 +178,7 @@ vec3 lottes(vec3 x)
     
     return pow(x, a) / (pow(x, a * d) * b + c);
 }
-#endif
 
-#if TONEMAP_METHOD == 9
 // Hable, http://filmicworlds.com/blog/filmic-tonemapping-operators/
 uniform vec3 tone_uncharted_a = vec3(0.15, 0.50, 0.10); // A, B, C
 uniform vec3 tone_uncharted_b = vec3(0.20, 0.02, 0.30); // D, E, F
@@ -169,7 +203,6 @@ vec3 uncharted2(vec3 col)
     vec3 whiteScale = vec3(1.0f)/Uncharted2Tonemap(vec3(tone_uncharted_c.x));
     return curr*whiteScale;
 }
-#endif
 
 //=================================
 // borrowed noise from:
@@ -238,9 +271,13 @@ void main()
     #elif TONEMAP_METHOD == 5 // Unreal method
     #define NEEDS_GAMMA_CORRECT 0
     diff.rgb = unreal(diff.rgb);
-    #elif TONEMAP_METHOD == 6 // Aces method
+    #elif TONEMAP_METHOD == 6 // Aces Narkowicz method
     #define NEEDS_GAMMA_CORRECT 1
-    diff.rgb = aces(diff.rgb);
+    diff.rgb = ACES_Narkowicz(diff.rgb);
+    #elif TONEMAP_METHOD == 10 // Aces Hill method
+    #define NEEDS_GAMMA_CORRECT 1
+    diff.rgb *= 1.0/0.6;
+    diff.rgb = ACES_Hill(diff.rgb);
     #elif TONEMAP_METHOD == 7 // Uchimura's Gran Turismo method
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = uchimura(diff.rgb);

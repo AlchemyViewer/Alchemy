@@ -170,8 +170,6 @@ void main()
     x.y += delta;
     x.z += delta;
 
-    x.rgb = linear_to_srgb(x.rgb);
-
     frag_color = x;
 }
 

@@ -206,8 +206,8 @@ LLGLSLShader			gNormalMapGenProgram;
 LLGLSLShader            gDeferredGenBrdfLutProgram;
 LLGLSLShader            gDeferredPostCASProgram;
 LLGLSLShader			gDeferredPostDLSProgram;
-LLGLSLShader			gDeferredPostTonemapProgram[AL_TONEMAP_COUNT];
-LLGLSLShader			gDeferredPostColorGradeLUTProgram[AL_TONEMAP_COUNT];
+LLGLSLShader			gDeferredPostTonemapProgram[ALRenderUtil::TONEMAP_COUNT];
+LLGLSLShader			gDeferredPostColorGradeLUTProgram[ALRenderUtil::TONEMAP_COUNT];
 // [RLVa:KB] - @setsphere
 LLGLSLShader			gRlvSphereProgram;
 // [/RLVa:KB]
@@ -597,7 +597,7 @@ void LLViewerShaderMgr::unloadShaders()
 	
 	gDeferredPostCASProgram.unload();
 	gDeferredPostDLSProgram.unload();
-	for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
+	for (U32 i = 0; i < ALRenderUtil::TONEMAP_COUNT; ++i)
 	{
 		gDeferredPostTonemapProgram[i].unload();
 		gDeferredPostColorGradeLUTProgram[i].unload();
@@ -1040,7 +1040,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
 		gDeferredPostCASProgram.unload();
 		gDeferredPostDLSProgram.unload();
-		for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
+		for (U32 i = 0; i < ALRenderUtil::TONEMAP_COUNT; ++i)
 		{
 			gDeferredPostTonemapProgram[i].unload();
 			gDeferredPostColorGradeLUTProgram[i].unload();
@@ -2869,7 +2869,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		success = gDeferredPostDLSProgram.createShader(NULL, NULL);
 	}
 
-	for (U32 i = 0; i < AL_TONEMAP_COUNT; ++i)
+	for (U32 i = 0; i < ALRenderUtil::TONEMAP_COUNT; ++i)
 	{
 		if (success)
 		{
