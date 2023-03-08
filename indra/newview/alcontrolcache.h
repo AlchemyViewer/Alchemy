@@ -30,7 +30,6 @@ struct ALControlCache
     static F32		YawFromMousePosition;
     static F32      PitchFromMousePosition;
 	static U32		RenderToneMapType;
-	static F32		RenderToneMapExposure;
 };
 
 #endif

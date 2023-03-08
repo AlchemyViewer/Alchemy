@@ -381,13 +381,13 @@
 					increment=".1"
 					follows="left|top|right"
 					layout="topleft"
-					max_val="16.0"
-					min_val="0.1"
+					max_val="4.0"
+					min_val="0.5"
 					left_delta="100"
 					right="-55"
 					name="exposure_slider"
 					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
-					control_name="RenderToneMapExposure"/>
+					control_name="RenderExposure"/>
 				<spinner
 					top_pad="-20"
 					height="15"
@@ -396,13 +396,13 @@
 					decimal_digits="1"
 					follows="top|right"
 					layout="topleft"
-					max_val="16.0"
-					min_val="0.1"
+					max_val="4.0"
+					min_val="0.5"
 					width="55"
 					increment=".1"
 					name="exposure_spinner"
 					tool_tip="Adjusts the overall brightness of the image via the Tonemapper"
-					control_name="RenderToneMapExposure"/>
+					control_name="RenderExposure"/>
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text1"

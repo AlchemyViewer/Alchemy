@@ -247,7 +247,7 @@ ALRenderUtil::ALRenderUtil()
 	// Connect settings
 	gSavedSettings.getControl("RenderColorGradeLUT")->getSignal()->connect(boost::bind(&ALRenderUtil::setupColorGrade, this));
 	gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderToneMapExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("RenderExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderToneMapLottesA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderToneMapLottesB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderToneMapUchimuraA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
@@ -310,7 +310,7 @@ bool ALRenderUtil::setupTonemap()
 			mTonemapType = ALTonemap::TONEMAP_NONE;
 		}
 
-		mTonemapExposure = llclamp(gSavedSettings.getF32("RenderToneMapExposure"), 0.1f, 16.f);
+		mTonemapExposure = llclamp(gSavedSettings.getF32("RenderExposure"), 0.5f, 4.f);
 
 		mToneLottesParamA = gSavedSettings.getVector3("RenderToneMapLottesA");
 		mToneLottesParamB = gSavedSettings.getVector3("RenderToneMapLottesB");

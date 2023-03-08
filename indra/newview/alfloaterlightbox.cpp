@@ -102,7 +102,7 @@ void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
 		{
 			controlp->resetToDefault(true);
 		}
-		controlp = gSavedSettings.getControl("RenderToneMapExposure");
+		controlp = gSavedSettings.getControl("RenderExposure");
 		if (controlp)
 		{
 			controlp->resetToDefault(true);

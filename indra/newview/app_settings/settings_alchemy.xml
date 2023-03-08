@@ -1179,7 +1179,7 @@
     <key>RenderToneMapExposure</key>
     <map>
       <key>Comment</key>
-      <string>Tonemapping exposure multiplier</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

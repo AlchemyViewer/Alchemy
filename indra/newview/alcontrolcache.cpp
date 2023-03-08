@@ -28,7 +28,6 @@ S32  ALControlCache::ToastGap;
 F32  ALControlCache::YawFromMousePosition = 90.f;
 F32  ALControlCache::PitchFromMousePosition = 90.f;
 U32  ALControlCache::RenderToneMapType = 0;
-F32  ALControlCache::RenderToneMapExposure = 1.f;
 
 
 #define DECLARE_CTRL(ctrl, type, ctrl_type) \
@@ -84,5 +83,4 @@ void ALControlCache::initControls()
     DECLARE_CTRL_F32(PitchFromMousePosition);
 
 	DECLARE_CTRL_U32(RenderToneMapType);
-	DECLARE_CTRL_F32(RenderToneMapExposure);
 }
