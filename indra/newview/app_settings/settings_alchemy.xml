@@ -1197,15 +1197,15 @@
       <string>Vector3</string>
       <key>Value</key>
       <array>
-        <real>1.6</real>
-        <real>0.977</real>
-        <real>8.0</real>
+        <real>1.4</real>
+        <real>1.0</real>
+        <real>16.0</real>
       </array>
     </map>
     <key>RenderToneMapLottesB</key>
     <map>
       <key>Comment</key>
-      <string>x (midIn), y (black), z (UNUSED)</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -1213,14 +1213,14 @@
       <key>Value</key>
       <array>
         <real>0.18</real>
-        <real>0.267</real>
+        <real>0.18</real>
         <real>0.0</real>
       </array>
     </map>
     <key>RenderToneMapType</key>
     <map>
       <key>Comment</key>
-      <string>Tonemapping type 0 - HDR Debug, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES Narkowicz, 7 - Uchimura, 8 - Lottes, 9 - Uncharted, 10 - Aces Hill</string>
+      <string>Tonemapping type 0 - HDR Debug, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES Narkowicz, 7 - Uchimura, 8 - AMD, 9 - Uncharted, 10 - Aces Hill</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

@@ -550,7 +550,7 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 		tone_shader->uniform3fv(tone_uchimura_b, 1, mToneUchimuraParamB.mV);
 		break;
 	}
-	case ALTonemap::TONEMAP_LOTTES:
+	case ALTonemap::TONEMAP_AMD:
 	{
 		tone_shader->uniform3fv(tone_lottes_a, 1, mToneLottesParamA.mV);
 		tone_shader->uniform3fv(tone_lottes_b, 1, mToneLottesParamB.mV);

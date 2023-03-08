@@ -801,8 +801,8 @@
 		name="toneUchimura"
 		value="7" />
 	<combo_box.item
-		label="Lottes"
-		name="toneLottes"
+		label="AMD Tonemapper"
+		name="toneAMD"
 		value="8" />
 	<combo_box.item
 		label="Uncharted"

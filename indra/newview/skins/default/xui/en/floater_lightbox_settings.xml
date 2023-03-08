@@ -332,19 +332,19 @@
 						value="5" />
 					<combo_box.item
 						label="ACES Narkowicz"
-						name="toneACES"
+						name="toneACESNark"
 						value="6" />
 					<combo_box.item
 						label="ACES Hill"
-						name="toneACES"
+						name="toneACESHill"
 						value="10" />
 					<combo_box.item
 						label="Uchimura"
 						name="toneUchimura"
 						value="7" />
 					<combo_box.item
-						label="Lottes"
-						name="toneLottes"
+						label="AMD Tonemapper"
+						name="toneAMD"
 						value="8" />
 					<combo_box.item
 						label="Uncharted"

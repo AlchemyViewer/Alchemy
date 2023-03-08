@@ -158,26 +158,71 @@ vec3 uchimura(vec3 x)
     return uchimura(x, P, a, m, l, c, b);
 }
 
-// Lottes 2016, "Advanced Techniques and Optimization of HDR Color Pipelines"
-uniform vec3 tone_lottes_a = vec3(1.6, 0.977, 8.0);
-uniform vec3 tone_lottes_b = vec3(0.18, 0.267, 0.0);
-vec3 lottes(vec3 x)
+//--------------------------------------------------------------------------------------
+// AMD Tonemapper
+//--------------------------------------------------------------------------------------
+// General tonemapping operator, build 'b' term.
+float ColToneB(float hdrMax, float contrast, float shoulder, float midIn, float midOut) 
 {
-    vec3 a = vec3(tone_lottes_a.x);
-    vec3 d = vec3(tone_lottes_a.y);
-    vec3 hdrMax = vec3(tone_lottes_a.z);
-    vec3 midIn = vec3(tone_lottes_b.x);
-    vec3 midOut = vec3(tone_lottes_b.y);
-    
-    vec3 b =
-    (-pow(midIn, a) + pow(hdrMax, a) * midOut) /
-    ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
-    vec3 c =
-    (pow(hdrMax, a * d) * pow(midIn, a) - pow(hdrMax, a) * pow(midIn, a * d) * midOut) /
-    ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
-    
-    return pow(x, a) / (pow(x, a * d) * b + c);
+    return
+        -((-pow(midIn, contrast) + (midOut*(pow(hdrMax, contrast*shoulder)*pow(midIn, contrast) -
+            pow(hdrMax, contrast)*pow(midIn, contrast*shoulder)*midOut)) /
+            (pow(hdrMax, contrast*shoulder)*midOut - pow(midIn, contrast*shoulder)*midOut)) /
+            (pow(midIn, contrast*shoulder)*midOut));
 }
+
+// General tonemapping operator, build 'c' term.
+float ColToneC(float hdrMax, float contrast, float shoulder, float midIn, float midOut) 
+{
+    return (pow(hdrMax, contrast*shoulder)*pow(midIn, contrast) - pow(hdrMax, contrast)*pow(midIn, contrast*shoulder)*midOut) /
+           (pow(hdrMax, contrast*shoulder)*midOut - pow(midIn, contrast*shoulder)*midOut);
+}
+
+// General tonemapping operator, p := {contrast,shoulder,b,c}.
+float ColTone(float x, vec4 p) 
+{ 
+    float z = pow(x, p.r); 
+    return z / (pow(z, p.g)*p.b + p.a); 
+}
+
+uniform vec3 tone_lottes_a = vec3(1.4, 1.0, 16.0);
+vec3 AMDTonemapper(vec3 color)
+{
+    const float hdrMax = tone_lottes_a.z; // How much HDR range before clipping. HDR modes likely need this pushed up to say 25.0.
+    const float contrast = tone_lottes_a.x; // Use as a baseline to tune the amount of contrast the tonemapper has.
+    const float shoulder = tone_lottes_a.y; // Likely don’t need to mess with this factor, unless matching existing tonemapper is not working well..
+    const float midIn = 0.18; // most games will have a {0.0 to 1.0} range for LDR so midIn should be 0.18.
+    const float midOut = 0.18; // Use for LDR. For HDR10 10:10:10:2 use maybe 0.18/25.0 to start. For scRGB, I forget what a good starting point is, need to re-calculate.
+
+    float b = ColToneB(hdrMax, contrast, shoulder, midIn, midOut);
+    float c = ColToneC(hdrMax, contrast, shoulder, midIn, midOut);
+
+    #define EPS 1e-6f
+    float peak = max(color.r, max(color.g, color.b));
+    peak = max(EPS, peak);
+
+    vec3 ratio = color / peak;
+    peak = ColTone(peak, vec4(contrast, shoulder, b, c) );
+    // then process ratio
+
+    // probably want send these pre-computed (so send over saturation/crossSaturation as a constant)
+    float crosstalk = 4.0; // controls amount of channel crosstalk
+    float saturation = contrast; // full tonal range saturation control
+    float crossSaturation = contrast*16.0; // crosstalk saturation
+
+    float white = 1.0;
+
+    // wrap crosstalk in transform
+    ratio = pow(abs(ratio), vec3(saturation / crossSaturation));
+    ratio = mix(ratio, vec3(white), vec3(pow(peak, crosstalk)));
+    ratio = pow(abs(ratio), vec3(crossSaturation));
+
+    // then apply ratio to peak
+    color = peak * ratio;
+    return color;
+}
+
+//--------------------------------------------------------------------------------------
 
 // Hable, http://filmicworlds.com/blog/filmic-tonemapping-operators/
 uniform vec3 tone_uncharted_a = vec3(0.15, 0.50, 0.10); // A, B, C
@@ -198,10 +243,7 @@ vec3 Uncharted2Tonemap(vec3 x)
 vec3 uncharted2(vec3 col)
 {
     float ExposureBias = tone_uncharted_c.y;
-    vec3 curr = Uncharted2Tonemap(ExposureBias*col);
-    
-    vec3 whiteScale = vec3(1.0f)/Uncharted2Tonemap(vec3(tone_uncharted_c.x));
-    return curr*whiteScale;
+    return Uncharted2Tonemap(ExposureBias*col)/Uncharted2Tonemap(vec3(tone_uncharted_c.x));;
 }
 
 //=================================
@@ -281,9 +323,9 @@ void main()
     #elif TONEMAP_METHOD == 7 // Uchimura's Gran Turismo method
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = uchimura(diff.rgb);
-    #elif TONEMAP_METHOD == 8 // Lottes 2016
+    #elif TONEMAP_METHOD == 8 // AMD Tonemapper
     #define NEEDS_GAMMA_CORRECT 1
-    diff.rgb = lottes(diff.rgb);
+    diff.rgb = AMDTonemapper(diff.rgb);
     #elif TONEMAP_METHOD == 9 // Uncharted
     #define NEEDS_GAMMA_CORRECT 1
     diff.rgb = uncharted2(diff.rgb);
