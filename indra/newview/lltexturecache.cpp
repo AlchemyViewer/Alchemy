@@ -1349,21 +1349,18 @@ U32 LLTextureCache::openAndReadEntries(std::vector<Entry>& entries)
 		}
 		aprfile->seek(APR_SET, (S32)sizeof(EntriesInfo));
 	}
-    
-    entries.resize(num_entries);
-    size_t total_entries_size = sizeof(Entry) * num_entries;
-    size_t bytes_read = aprfile->read((void*)entries.data(), total_entries_size);
-    if (bytes_read != total_entries_size)
-    {
-        LL_WARNS() << "Corrupted header entries, expected " << total_entries_size << " bytes but got " << bytes_read << " bytes" << LL_ENDL;
-        closeHeaderEntriesFile();
-        purgeAllTextures(false);
-        return 0;
-    }
-    
 	for (U32 idx=0; idx<num_entries; idx++)
 	{
-		const Entry& entry = entries[idx];
+		Entry entry;
+		S32 bytes_read = aprfile->read((void*)(&entry), (S32)sizeof(Entry));
+		if (bytes_read < sizeof(Entry))
+		{
+			LL_WARNS() << "Corrupted header entries, failed at " << idx << " / " << num_entries << LL_ENDL;
+			closeHeaderEntriesFile();
+			purgeAllTextures(false);
+			return 0;
+		}
+		entries.push_back(entry);
 // 		LL_INFOS() << "ENTRY: " << entry.mTime << " TEX: " << entry.mID << " IDX: " << idx << " Size: " << entry.mImageSize << LL_ENDL;
 		if(entry.mImageSize > entry.mBodySize)
 		{
@@ -1388,12 +1385,14 @@ void LLTextureCache::writeEntriesAndClose(const std::vector<Entry>& entries)
 	if (!mReadOnly)
 	{
 		LLAPRFile* aprfile = openHeaderEntriesFile(false, (S32)sizeof(EntriesInfo));
-		size_t write_size = size_t(sizeof(Entry)) * num_entries;
-		size_t bytes_written = aprfile->write((void*) (entries.data()), write_size);
-		if (bytes_written != write_size)
+		for (S32 idx=0; idx<num_entries; idx++)
 		{
-			clearCorruptedCache(); //clear the cache.
-			return;
+			S32 bytes_written = aprfile->write((void*)(&entries[idx]), (S32)sizeof(Entry));
+			if(bytes_written != sizeof(Entry))
+			{
+				clearCorruptedCache() ; //clear the cache.
+				return ;
+			}
 		}
 		closeHeaderEntriesFile();
 	}
