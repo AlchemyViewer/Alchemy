@@ -7463,7 +7463,7 @@ void LLPipeline::renderFinalize()
 	{
         LLRenderTarget* screen_target = screenTarget();
 
-        if (RenderScreenSpaceReflections && !gCubeSnapshot)
+        if (RenderScreenSpaceReflections)
         {
             LL_PROFILE_GPU_ZONE("ssr copy");
             LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
@@ -7487,48 +7487,51 @@ void LLPipeline::renderFinalize()
 
             dst.flush();
         }
-
+#if 1
 		mALRenderUtil->renderTonemap(screenTarget(),screenTarget(),nullptr);
 
-  //      screenTarget()->bindTarget();
+		mALRenderUtil->renderSharpen(screenTarget(),screenTarget());
+#else
+        screenTarget()->bindTarget();
 
-  //      // gamma correct lighting
-  //      {
-  //          LL_PROFILE_GPU_ZONE("gamma correct");
+        // gamma correct lighting
+        {
+            LL_PROFILE_GPU_ZONE("gamma correct");
 
-  //          LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+            LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
-  //          LLVector2 tc1(0, 0);
-  //          LLVector2 tc2((F32)screenTarget()->getWidth() * 2, (F32)screenTarget()->getHeight() * 2);
+            LLVector2 tc1(0, 0);
+            LLVector2 tc2((F32)screenTarget()->getWidth() * 2, (F32)screenTarget()->getHeight() * 2);
 
-  //          // Apply gamma correction to the frame here.
-  //          gDeferredPostGammaCorrectProgram.bind();
-  //          
-  //          S32 channel = 0;
-  //          channel = gDeferredPostGammaCorrectProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, screenTarget()->getUsage());
-  //          if (channel > -1)
-  //          {
-		//		screenTarget()->bindTexture(0, channel, LLTexUnit::TFO_POINT);
-  //          }
+            // Apply gamma correction to the frame here.
+            gDeferredPostGammaCorrectProgram.bind();
+            
+            S32 channel = 0;
+            channel = gDeferredPostGammaCorrectProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, screenTarget()->getUsage());
+            if (channel > -1)
+            {
+				screenTarget()->bindTexture(0, channel, LLTexUnit::TFO_POINT);
+            }
 
-  //          gDeferredPostGammaCorrectProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, screenTarget()->getWidth(), screenTarget()->getHeight());
+            gDeferredPostGammaCorrectProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, screenTarget()->getWidth(), screenTarget()->getHeight());
 
-  //          static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
+            static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
 
-  //          F32 e = llclamp(exposure(), 0.5f, 4.f);
+            F32 e = llclamp(exposure(), 0.5f, 4.f);
 
-  //          static LLStaticHashedString s_exposure("exposure");
+            static LLStaticHashedString s_exposure("exposure");
 
-  //          gDeferredPostGammaCorrectProgram.uniform1f(s_exposure, e);
+            gDeferredPostGammaCorrectProgram.uniform1f(s_exposure, e);
 
-  //          mScreenTriangleVB->setBuffer();
-  //          mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-  //          gGL.getTexUnit(channel)->unbind(screenTarget()->getUsage());
-  //          gDeferredPostGammaCorrectProgram.unbind();
-  //      }
+            gGL.getTexUnit(channel)->unbind(screenTarget()->getUsage());
+            gDeferredPostGammaCorrectProgram.unbind();
+        }
 
-		//screenTarget()->flush();
+		screenTarget()->flush();
+#endif
 
         LLVertexBuffer::unbind();
     }
