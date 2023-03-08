@@ -1214,6 +1214,16 @@ static std::string add_zip_filter_to_gtkchooser(GtkWindow *picker)
 												LLTrans::getString("zip_files") + " (*.zip)");
 }
 
+static std::string add_gltf_filter_to_gtkchooser(GtkWindow *picker)
+{
+	GtkFileFilter *gfilter = gtk_file_filter_new();
+	gtk_file_filter_add_pattern(gfilter, "*.gltf");
+	gtk_file_filter_add_pattern(gfilter, "*.glb");
+	std::string filtername = LLTrans::getString("gltf_files") + " (*.gltf; *.glb)";
+	add_common_filters_to_gtkchooser(gfilter, picker, filtername);
+	return filtername;
+}
+
 static std::string add_save_texture_filter_to_gtkchooser(GtkWindow *picker)
 {
 	GtkFileFilter *gfilter_tga = gtk_file_filter_new();
@@ -1408,7 +1418,7 @@ BOOL LLFilePicker::getOpenFile( ELoadFilter filter, bool blocking )
 			filtername = add_xml_filter_to_gtkchooser(picker);
 			break;
         case FFLOAD_GLTF:
-            filtername = dead_code_should_blow_up_here(picker);
+            filtername = add_gltf_filter_to_gtkchooser(picker);
             break;
         case FFLOAD_COLLADA:
             filtername = add_collada_filter_to_gtkchooser(picker);

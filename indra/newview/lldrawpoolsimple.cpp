@@ -37,8 +37,6 @@
 #include "llviewershadermgr.h"
 #include "llrender.h"
 
-static LLGLSLShader* simple_shader = NULL;
-
 static void setup_simple_shader(LLGLSLShader* shader)
 {
     shader->bind();

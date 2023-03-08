@@ -1413,6 +1413,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 	
     const LLMeshSkinInfo* skin = nullptr;
     LLMatrix4a mat_vert;
+	mat_vert.setIdentity();
     LLMatrix4a mat_normal;
 
     // prepare mat_vert

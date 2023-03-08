@@ -60,7 +60,6 @@
 #include "llsdserialize.h"
 #include "lljoint.h"
 
-#include "glh/glh_linear.h"
 #include "llmatrix4a.h"
 
 #include <boost/regex.hpp>
