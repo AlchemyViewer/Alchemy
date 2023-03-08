@@ -1430,41 +1430,19 @@
         <string>mikktspace</string>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
+          <key>common</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b48b7ac0792d3ea8f087d99d9e4a29d8</string>
+              <string>b88eec8af116d2b2c7c7933f7ccb47899bd433a715d28c7999138d3c7a31e4435c5f56f885e3a212f53beb5fd2a6fa7b2b98c4333d749e690385f79b00eecbe4</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/104415/914944/mikktspace-1-darwin64-574859.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/204/packages/generic/mikktspace/1.1888/mikktspace-1-common-1888.tar.zst</string>
             </map>
             <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>0a016b9c0c1e2c0b557e0124094da6c5</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/104407/914918/mikktspace-1-windows-574859.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>02e9e5b6fe6788f4d2babb83ec544843</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/104406/914909/mikktspace-1-windows64-574859.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
+            <string>common</string>
           </map>
         </map>
         <key>version</key>
