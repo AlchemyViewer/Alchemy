@@ -9,6 +9,3 @@ name = "pypi"
 llbase = "*"
 certifi = "*"
 autobuild = "*"
-
-[requires]
-python_version = "3.4"
