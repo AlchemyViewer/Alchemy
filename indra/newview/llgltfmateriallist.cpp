@@ -45,7 +45,9 @@
 #include "llworld.h"
 
 #include "tinygltf/tiny_gltf.h"
-#include <strstream>
+
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 
 #include <unordered_set>
 
@@ -531,8 +533,6 @@ void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::ETyp
         LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
         LL::WorkQueue::ptr_t general_queue = LL::WorkQueue::getInstance("General");
 
-        typedef std::pair<U32, tinygltf::Model> return_data_t;
-
         main_queue->postTo(
             general_queue,
             [id, asset_type, asset_data]() // Work done on general queue
@@ -557,8 +557,7 @@ void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::ETyp
                 LLSD asset;
 
                 // read file into buffer
-                std::istrstream str(&buffer[0], buffer.size());
-
+                boost::iostreams::stream<boost::iostreams::array_source> str(buffer.data(), buffer.size());
                 if (LLSDSerialize::deserialize(asset, str, buffer.size()))
                 {
                     if (asset.has("version") && LLGLTFMaterial::isAcceptedVersion(asset["version"].asString()))
