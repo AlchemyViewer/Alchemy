@@ -33,8 +33,6 @@
 #include "llworld.h"
 #include "llshadermgr.h"
 
-#include "glh/glh_linear.h"
-
 extern F32SecondsImplicit gFrameTimeSeconds;
 
 extern U32 get_box_fan_indices(LLCamera* camera, const LLVector4a& center);
@@ -234,42 +232,22 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
 
             if (vobjp->getReflectionProbeIsBox())
             {
-				//LLVector3 s = vobjp->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
-				//mRadius = s.magVec();
-				//if (vobjp->mDrawable != nullptr)
-				//{
-				//	LLMatrix4a mv = gGLModelView;
-				//	LLMatrix4a scale;
-				//	scale.applyScale_affine(s);
+				LLVector3 s = vobjp->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
+				mRadius = s.magVec();
+				if (vobjp->mDrawable != nullptr)
+				{
+                    LLMatrix4a scale;
+                    scale.setIdentity();
+                    scale.applyScale_affine(s);
+                    scale.transpose();
 
-				//	mv.mul(vobjp->mDrawable->getWorldMatrix());
-				//	mv.mul(scale);
-				//	//mv.mul(vobjp->getRelativeXform());
-
-				//	mv.invert();
-
-				//	box = LLMatrix4(mv);
-
-				//	return true;
-				//}
-                glh::matrix4f mv(gGLModelView.getF32ptr());
-                glh::matrix4f scale;
-                LLVector3 s = vobjp->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
-                mRadius = s.magVec();
-                scale.set_scale(glh::vec3f(s.mV));
-                if (vobjp->mDrawable != nullptr)
-                {
-                    glh::matrix4f rm((F32*)vobjp->mDrawable->getWorldMatrix().mMatrix);
-
-                    glh::matrix4f rt((F32*)vobjp->getRelativeXform().mMatrix);
-
-                    mv = mv * rm * scale; // *rt;
-                    mv = mv.inverse();
-
-                    box = LLMatrix4(mv.m);
-
+                    LLMatrix4a mv = gGLModelView;
+					mv.mul(vobjp->mDrawable->getWorldMatrix());
+					mv.mul(scale);
+					mv.invert();
+					box = LLMatrix4(mv);
                     return true;
-                }
+				}
             }
         }
     }

@@ -28,8 +28,6 @@
 
 #include "pipeline.h"
 
-#include "glh/glh_linear.h"
-
 // library includes
 #include "alglmath.h"
 #include "llaudioengine.h" // For debugging.
