@@ -286,7 +286,6 @@ bool	LLPipeline::sDelayVBUpdate = true;
 bool	LLPipeline::sAutoMaskAlphaDeferred = true;
 bool	LLPipeline::sAutoMaskAlphaNonDeferred = false;
 bool	LLPipeline::sRenderTransparentWater = true;
-bool	LLPipeline::sRenderBump = true;
 bool	LLPipeline::sBakeSunlight = false;
 bool	LLPipeline::sNoAlpha = false;
 bool	LLPipeline::sUseFarClip = true;
@@ -387,7 +386,6 @@ void LLPipeline::init()
 	gOctreeMaxCapacity = gSavedSettings.getU32("OctreeMaxNodeCapacity");
 	gOctreeMinSize = gSavedSettings.getF32("OctreeMinimumNodeSize");
 	sDynamicLOD = gSavedSettings.getBOOL("RenderDynamicLOD");
-    sRenderBump = TRUE; // DEPRECATED -- gSavedSettings.getBOOL("RenderObjectBump");
 	sRenderAttachedLights = gSavedSettings.getBOOL("RenderAttachedLights");
 	sRenderAttachedParticles = gSavedSettings.getBOOL("RenderAttachedParticles");
 
@@ -1004,12 +1002,6 @@ void LLPipeline::updateRenderTransparentWater()
     sRenderTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
 }
 
-//static
-void LLPipeline::updateRenderBump()
-{
-    sRenderBump = TRUE; // DEPRECATED -- gSavedSettings.getBOOL("RenderObjectBump");
-}
-
 // static
 void LLPipeline::refreshCachedSettings()
 {
@@ -1249,115 +1241,113 @@ void LLPipeline::createGLBuffers()
 
 	mALRenderUtil->refreshState();
 
-    if (sRenderDeferred)
-    {
-		if (!mNoiseMap)
+    
+	if (!mNoiseMap)
+	{
+		const U32 noiseRes = 128;
+		LLVector3 noise[noiseRes*noiseRes];
+
+		F32 scaler = gSavedSettings.getF32("RenderDeferredNoise")/100.f;
+		for (U32 i = 0; i < noiseRes*noiseRes; ++i)
 		{
-			const U32 noiseRes = 128;
-			LLVector3 noise[noiseRes*noiseRes];
+			noise[i] = LLVector3(ll_frand()-0.5f, ll_frand()-0.5f, 0.f);
+			noise[i].normVec();
+			noise[i].mV[2] = ll_frand()*scaler+1.f-scaler/2.f;
+		}
 
-			F32 scaler = gSavedSettings.getF32("RenderDeferredNoise")/100.f;
-			for (U32 i = 0; i < noiseRes*noiseRes; ++i)
-			{
-				noise[i] = LLVector3(ll_frand()-0.5f, ll_frand()-0.5f, 0.f);
-				noise[i].normVec();
-				noise[i].mV[2] = ll_frand()*scaler+1.f-scaler/2.f;
-			}
-
-			LLImageGL::generateTextures(1, &mNoiseMap);
+		LLImageGL::generateTextures(1, &mNoiseMap);
 			
-			gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap);
-			LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise, false);
-			gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
-		}
-
-		if (!mTrueNoiseMap)
-		{
-			const U32 noiseRes = 128;
-			F32 noise[noiseRes*noiseRes*3];
-			for (U32 i = 0; i < noiseRes*noiseRes*3; i++)
-			{
-				noise[i] = ll_frand()*2.0-1.0;
-			}
-
-			LLImageGL::generateTextures(1, &mTrueNoiseMap);
-			gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap);
-			LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F, noiseRes, noiseRes, GL_RGB,GL_FLOAT, noise, false);
-			gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
-		}
-
-		if (!mAreaMap)
-        {
-            std::vector<unsigned char> tempBuffer(AREATEX_SIZE);
-            for (unsigned int y = 0; y < AREATEX_HEIGHT; y++)
-            {
-                unsigned int srcY = AREATEX_HEIGHT - 1 - y;
-                // unsigned int srcY = y;
-                memcpy(&tempBuffer[y * AREATEX_PITCH], areaTexBytes + srcY * AREATEX_PITCH, AREATEX_PITCH);
-            }
-
-            LLImageGL::generateTextures(1, &mAreaMap);
-            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mAreaMap);
-            LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RG8, AREATEX_WIDTH, AREATEX_HEIGHT, GL_RG,
-                                      GL_UNSIGNED_BYTE, tempBuffer.data(), false);
-            gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-            gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-        }
-
-        if (!mSearchMap)
-        {
-            std::vector<unsigned char> tempBuffer(SEARCHTEX_SIZE);
-            for (unsigned int y = 0; y < SEARCHTEX_HEIGHT; y++)
-            {
-                unsigned int srcY = SEARCHTEX_HEIGHT - 1 - y;
-                // unsigned int srcY = y;
-                memcpy(&tempBuffer[y * SEARCHTEX_PITCH], searchTexBytes + srcY * SEARCHTEX_PITCH, SEARCHTEX_PITCH);
-            }
-
-            LLImageGL::generateTextures(1, &mSearchMap);
-            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSearchMap);
-            LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_R8, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT,
-                                      GL_RED, GL_UNSIGNED_BYTE, tempBuffer.data(), false);
-            gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-            gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-        }
-        if (!mSampleMap)
-        {
-            LLPointer<LLImageRaw>               raw_image = new LLImageRaw;
-            LLPointer<LLImagePNG>               png_image = new LLImagePNG;
-            static LLCachedControl<std::string> sample_path(gSavedSettings, "SamplePath", "");
-            if (png_image->load(sample_path()) && png_image->decode(raw_image, 0.0f))
-            {
-                U32 format = 0;
-                switch (raw_image->getComponents())
-                {
-                    case 1:
-                        format = GL_RED;
-                        break;
-                    case 2:
-                        format = GL_RG;
-                        break;
-                    case 3:
-                        format = GL_RGB;
-                        break;
-                    case 4:
-                        format = GL_RGBA;
-                        break;
-                    default:
-                        return;
-                };
-                LLImageGL::generateTextures(1, &mSampleMap);
-                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
-                LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB, raw_image->getWidth(),
-                                          raw_image->getHeight(), format, GL_UNSIGNED_BYTE, raw_image->getData(), false);
-                stop_glerror();
-                gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-                gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-            }
-        }
-
-		createLUTBuffers();
+		gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap);
+		LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise, false);
+		gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 	}
+
+	if (!mTrueNoiseMap)
+	{
+		const U32 noiseRes = 128;
+		F32 noise[noiseRes*noiseRes*3];
+		for (U32 i = 0; i < noiseRes*noiseRes*3; i++)
+		{
+			noise[i] = ll_frand()*2.0-1.0;
+		}
+
+		LLImageGL::generateTextures(1, &mTrueNoiseMap);
+		gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap);
+		LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F, noiseRes, noiseRes, GL_RGB,GL_FLOAT, noise, false);
+		gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+	}
+
+	if (!mAreaMap)
+    {
+        std::vector<unsigned char> tempBuffer(AREATEX_SIZE);
+        for (unsigned int y = 0; y < AREATEX_HEIGHT; y++)
+        {
+            unsigned int srcY = AREATEX_HEIGHT - 1 - y;
+            // unsigned int srcY = y;
+            memcpy(&tempBuffer[y * AREATEX_PITCH], areaTexBytes + srcY * AREATEX_PITCH, AREATEX_PITCH);
+        }
+
+        LLImageGL::generateTextures(1, &mAreaMap);
+        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mAreaMap);
+        LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RG8, AREATEX_WIDTH, AREATEX_HEIGHT, GL_RG,
+                                  GL_UNSIGNED_BYTE, tempBuffer.data(), false);
+        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+    }
+
+    if (!mSearchMap)
+    {
+        std::vector<unsigned char> tempBuffer(SEARCHTEX_SIZE);
+        for (unsigned int y = 0; y < SEARCHTEX_HEIGHT; y++)
+        {
+            unsigned int srcY = SEARCHTEX_HEIGHT - 1 - y;
+            // unsigned int srcY = y;
+            memcpy(&tempBuffer[y * SEARCHTEX_PITCH], searchTexBytes + srcY * SEARCHTEX_PITCH, SEARCHTEX_PITCH);
+        }
+
+        LLImageGL::generateTextures(1, &mSearchMap);
+        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSearchMap);
+        LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_R8, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT,
+                                  GL_RED, GL_UNSIGNED_BYTE, tempBuffer.data(), false);
+        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+    }
+    if (!mSampleMap)
+    {
+        LLPointer<LLImageRaw>               raw_image = new LLImageRaw;
+        LLPointer<LLImagePNG>               png_image = new LLImagePNG;
+        static LLCachedControl<std::string> sample_path(gSavedSettings, "SamplePath", "");
+        if (png_image->load(sample_path()) && png_image->decode(raw_image, 0.0f))
+        {
+            U32 format = 0;
+            switch (raw_image->getComponents())
+            {
+                case 1:
+                    format = GL_RED;
+                    break;
+                case 2:
+                    format = GL_RG;
+                    break;
+                case 3:
+                    format = GL_RGB;
+                    break;
+                case 4:
+                    format = GL_RGBA;
+                    break;
+                default:
+                    return;
+            };
+            LLImageGL::generateTextures(1, &mSampleMap);
+            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSampleMap);
+            LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB, raw_image->getWidth(),
+                                      raw_image->getHeight(), format, GL_UNSIGNED_BYTE, raw_image->getData(), false);
+            stop_glerror();
+            gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+            gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        }
+	}
+
+	createLUTBuffers();
 
 	gBumpImageList.restoreGL();
 }
@@ -1369,65 +1359,62 @@ F32 lerpf(F32 a, F32 b, F32 w)
 
 void LLPipeline::createLUTBuffers()
 {
-	if (sRenderDeferred)
+	if (!mLightFunc)
 	{
-		if (!mLightFunc)
+		U32 lightResX = gSavedSettings.getU32("RenderSpecularResX");
+		U32 lightResY = gSavedSettings.getU32("RenderSpecularResY");
+		F32* ls = new F32[lightResX*lightResY];
+		F32 specExp = gSavedSettings.getF32("RenderSpecularExponent");
+        // Calculate the (normalized) blinn-phong specular lookup texture. (with a few tweaks)
+		for (U32 y = 0; y < lightResY; ++y)
 		{
-			U32 lightResX = gSavedSettings.getU32("RenderSpecularResX");
-			U32 lightResY = gSavedSettings.getU32("RenderSpecularResY");
-			F32* ls = new F32[lightResX*lightResY];
-			F32 specExp = gSavedSettings.getF32("RenderSpecularExponent");
-            // Calculate the (normalized) blinn-phong specular lookup texture. (with a few tweaks)
-			for (U32 y = 0; y < lightResY; ++y)
+			for (U32 x = 0; x < lightResX; ++x)
 			{
-				for (U32 x = 0; x < lightResX; ++x)
-				{
-					ls[y*lightResX+x] = 0;
-					F32 sa = (F32) x/(lightResX-1);
-					F32 spec = (F32) y/(lightResY-1);
-					F32 n = spec * spec * specExp;
+				ls[y*lightResX+x] = 0;
+				F32 sa = (F32) x/(lightResX-1);
+				F32 spec = (F32) y/(lightResY-1);
+				F32 n = spec * spec * specExp;
 					
-					// Nothing special here.  Just your typical blinn-phong term.
-					spec = powf(sa, n);
+				// Nothing special here.  Just your typical blinn-phong term.
+				spec = powf(sa, n);
 					
-					// Apply our normalization function.
-					// Note: This is the full equation that applies the full normalization curve, not an approximation.
-					// This is fine, given we only need to create our LUT once per buffer initialization.
-					spec *= (((n + 2) * (n + 4)) / (8 * F_PI * (powf(2, -n/2) + n)));
+				// Apply our normalization function.
+				// Note: This is the full equation that applies the full normalization curve, not an approximation.
+				// This is fine, given we only need to create our LUT once per buffer initialization.
+				spec *= (((n + 2) * (n + 4)) / (8 * F_PI * (powf(2, -n/2) + n)));
 
-					// Since we use R16F, we no longer have a dynamic range issue we need to work around here.
-					// Though some older drivers may not like this, newer drivers shouldn't have this problem.
-					ls[y*lightResX+x] = spec;
-				}
+				// Since we use R16F, we no longer have a dynamic range issue we need to work around here.
+				// Though some older drivers may not like this, newer drivers shouldn't have this problem.
+				ls[y*lightResX+x] = spec;
 			}
-			
-			U32 pix_format = GL_R16F;
-			LLImageGL::generateTextures(1, &mLightFunc);
-			gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc);
-			LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, pix_format, lightResX, lightResY, GL_RED, GL_FLOAT, ls, false);
-			gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-			gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_TRILINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			
-			delete [] ls;
 		}
-
-        mPbrBrdfLut.allocate(512, 512, GL_RG16F);
-        mPbrBrdfLut.bindTarget();
-        gDeferredGenBrdfLutProgram.bind();
-
-        gGL.begin(LLRender::TRIANGLE_STRIP);
-        gGL.vertex2f(-1, -1);
-        gGL.vertex2f(-1, 1);
-        gGL.vertex2f(1, -1);
-        gGL.vertex2f(1, 1);
-        gGL.end();
-        gGL.flush();
-
-        gDeferredGenBrdfLutProgram.unbind();
-        mPbrBrdfLut.flush();
+			
+		U32 pix_format = GL_R16F;
+		LLImageGL::generateTextures(1, &mLightFunc);
+		gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc);
+		LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, pix_format, lightResX, lightResY, GL_RED, GL_FLOAT, ls, false);
+		gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+		gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_TRILINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			
+		delete [] ls;
 	}
+
+    mPbrBrdfLut.allocate(512, 512, GL_RG16F);
+    mPbrBrdfLut.bindTarget();
+    gDeferredGenBrdfLutProgram.bind();
+
+    gGL.begin(LLRender::TRIANGLE_STRIP);
+    gGL.vertex2f(-1, -1);
+    gGL.vertex2f(-1, 1);
+    gGL.vertex2f(1, -1);
+    gGL.vertex2f(1, 1);
+    gGL.end();
+    gGL.flush();
+
+    gDeferredGenBrdfLutProgram.unbind();
+    mPbrBrdfLut.flush();
 }
 
 
@@ -1456,11 +1443,6 @@ bool LLPipeline::shadersLoaded()
 }
 
 bool LLPipeline::canUseWindLightShaders() const
-{
-    return true;
-}
-
-bool LLPipeline::canUseWindLightShadersOnObjects() const
 {
     return true;
 }
@@ -4425,6 +4407,8 @@ extern std::set<LLSpatialGroup*> visible_selected_groups;
 
 void LLPipeline::renderDebug()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
 	assertInitialized();
 
 	bool hud_only = hasRenderType(LLPipeline::RENDER_TYPE_HUD);

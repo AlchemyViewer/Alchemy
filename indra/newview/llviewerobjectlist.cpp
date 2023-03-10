@@ -856,21 +856,19 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 		mCurBin = (mCurBin + 1) % NUM_BINS;
 	}
 
-#if 1
+#if 0
 	// Slam priorities for textures that we care about (hovered, selected, and focused)
 	// Hovered
 	// Assumes only one level deep of parenting
-	auto& select_mgr = LLSelectMgr::instance();
-
-	LLSelectNode* nodep = select_mgr.getHoverNode();
-	if (nodep)
-	{
-		objectp = nodep->getObject();
-		if (objectp)
-		{
-			objectp->boostTexturePriority();
-		}
-	}
+	LLSelectNode* nodep = LLSelectMgr::instance().getHoverNode();
+    if (nodep)
+    {
+        objectp = nodep->getObject();
+        if (objectp)
+        {
+            objectp->boostTexturePriority();
+        }
+    }
 
 	// Focused
 	objectp = gAgentCamera.getFocusObject();
@@ -878,6 +876,7 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 	{
 		objectp->boostTexturePriority();
 	}
+#endif
 
 	// Selected
 	struct f : public LLSelectedObjectFunctor
@@ -889,7 +888,6 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 		}
 	} func;
 	LLSelectMgr::getInstance()->getSelection()->applyToRootObjects(&func);
-#endif
 
 	LLVOAvatar::cullAvatarsByPixelArea();
 }

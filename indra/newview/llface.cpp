@@ -372,10 +372,7 @@ void LLFace::switchTexture(U32 ch, LLViewerTexture* new_texture)
 		return;
 	}
 
-	if (mTexture[ch].notNull())
-    {
-		new_texture->addTextureStats(mTexture[ch]->getMaxVirtualSize()) ;
-    }
+	llassert(mTexture[ch].notNull());
 
 	if (ch == LLRender::DIFFUSE_MAP)
 	{
@@ -1145,20 +1142,13 @@ bool LLFace::canRenderAsMask()
 		(te->getGlow() == 0.f) && // glowing masks are hard to implement - don't mask
 		(getTexture()->getIsAlphaMask((!getViewerObject()->isAttachment() && use_rmse_auto_mask) ? auto_mask_max_rmse : -1.f, auto_mask_max_mid))) // texture actually qualifies for masking (lazily recalculated but expensive)
 	{
-		if (LLPipeline::sRenderDeferred)
-		{
-			if (getViewerObject()->isHUDAttachment() || te->getFullbright())
-			{ //hud attachments and fullbright objects are NOT subject to the deferred rendering pipe
-				return LLPipeline::sAutoMaskAlphaNonDeferred;
-			}
-			else
-			{
-				return LLPipeline::sAutoMaskAlphaDeferred;
-			}
+		if (getViewerObject()->isHUDAttachment() || te->getFullbright())
+		{ //hud attachments and fullbright objects are NOT subject to the deferred rendering pipe
+			return LLPipeline::sAutoMaskAlphaNonDeferred;
 		}
 		else
 		{
-			return LLPipeline::sAutoMaskAlphaNonDeferred;
+			return LLPipeline::sAutoMaskAlphaDeferred;
 		}
 	}
 
@@ -1281,19 +1271,10 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 						
 			bool shiny_in_alpha = false;
 			
-			if (LLPipeline::sRenderDeferred)
-			{ //store shiny in alpha if we don't have a specular map
-				if  (!mat || mat->getSpecularID().isNull())
-				{
-					shiny_in_alpha = true;
-				}
-			}
-			else
+			//store shiny in alpha if we don't have a specular map
+			if  (!mat || mat->getSpecularID().isNull())
 			{
-				if (!mat || mat->getDiffuseAlphaMode() != LLMaterial::DIFFUSE_ALPHA_MODE_MASK)
-				{
-					shiny_in_alpha = true;
-				}
+				shiny_in_alpha = true;
 			}
 
 			if (shiny_in_alpha)

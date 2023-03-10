@@ -1095,11 +1095,11 @@ void LLDrawable::updateUVMinMax()
 bool LLDrawable::isVisible() const
 {
 	if (LLViewerOctreeEntryData::isVisible())
-{ 
-		return true;
-}
+    { 
+		    return true;
+    }
 
-{
+    {
 		LLViewerOctreeGroup* group = mEntry->getGroup();
 		if (group && group->isVisible())
 		{
