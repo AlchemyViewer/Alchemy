@@ -46,6 +46,8 @@
 #include "llvector4a.h"
 #include <boost/align/aligned_allocator.hpp>
 
+#include <array>
+
 class LLVertexBuffer;
 class LLCubeMap;
 class LLImageGL;
