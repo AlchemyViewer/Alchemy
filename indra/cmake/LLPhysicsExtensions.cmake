@@ -9,7 +9,7 @@ include(Prebuilt)
 # - The prebuilt package available to those with sublicenses, selected by -DHAVOK_TPV:BOOL=ON
 
 if (INSTALL_PROPRIETARY AND NOT LINUX)
-   set(HAVOK_TPV ON CACHE BOOL "Use Havok physics library" FORCE)
+   set(HAVOK_TPV ON CACHE BOOL "Use Havok physics library")
 endif ()
 
 
