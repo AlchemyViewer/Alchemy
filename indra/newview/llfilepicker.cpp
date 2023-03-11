@@ -758,8 +758,6 @@ bool	LLFilePicker::doNavSaveDialog(ESaveFilter filter, const std::string& filena
 			break;
 
 		case FFSAVE_GLTF:
-			type = "\?\?\?\?";
-			creator = "\?\?\?\?";
 			extension = "glb";
 			break;
 			
