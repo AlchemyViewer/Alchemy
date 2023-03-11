@@ -76,6 +76,7 @@ LLFloaterTexturePicker::LLFloaterTexturePicker(
 	mOriginalImageAssetID(image_asset_id),
 	mFallbackImage(fallback_image),
 	mDefaultImageAssetID(default_image_asset_id),
+	mTransparentImageAssetID(transparent_image_asset_id),
 	mBlankImageAssetID(blank_image_asset_id),
 	mTentative(tentative),
 	mAllowNoTexture(allow_no_texture),
