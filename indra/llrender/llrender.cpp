@@ -879,7 +879,7 @@ LLRender::~LLRender()
 
 void LLRender::init(bool needs_vertex_buffer)
 {
-#if GL_ARB_debug_output
+#if GL_ARB_debug_output && !LL_DARWIN
     if (gGLManager.mHasDebugOutput && gDebugGL)
     { //setup debug output callback
         //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW_ARB, 0, NULL, GL_TRUE);
