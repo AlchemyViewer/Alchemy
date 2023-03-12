@@ -1,11 +1,11 @@
 /** 
  * @file audioengine_fmodstudio.cpp
  * @brief Implementation of LLAudioEngine class abstracting the audio 
- * support as a FMOD Studio implementation
+ * support as a FMODSTUDIO implementation
  *
- * $LicenseInfo:firstyear=2014&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2020&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2014, Linden Research, Inc.
+ * Copyright (C) 2020, Linden Research, Inc.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -38,13 +38,11 @@
 #include "llmath.h"
 #include "llrand.h"
 
-#include "fmod.hpp"
-#include "fmod_errors.h"
+#include "fmodstudio/fmod.hpp"
+#include "fmodstudio/fmod_errors.h"
 #include "lldir.h"
 
 #include "sound_ids.h"
-
-const U32 EXTRA_SOUND_CHANNELS = 32;
 
 FMOD_RESULT F_CALLBACK windDSPCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, float *outbuffer, unsigned int length, int inchannels, int *outchannels);
 
@@ -93,7 +91,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 	}
 
 	// In this case, all sounds, PLUS wind and stream will be software.
-    result = mSystem->setSoftwareChannels(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS);
+    result = mSystem->setSoftwareChannels(LL_MAX_AUDIO_CHANNELS + 2);
 	Check_FMOD_Error(result,"FMOD::System::setSoftwareChannels");
 
 	FMOD_ADVANCEDSETTINGS adv_settings = { };
@@ -115,11 +113,13 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 	result = mSystem->setAdvancedSettings(&adv_settings);
 	Check_FMOD_Error(result, "FMOD::System::setAdvancedSettings");
 
-	U32 fmod_flags = FMOD_INIT_NORMAL | FMOD_INIT_3D_RIGHTHANDED | FMOD_INIT_THREAD_UNSAFE;
-	if(mEnableProfiler)
-	{
-		fmod_flags |= FMOD_INIT_PROFILE_ENABLE;
-	}
+    // FMOD_INIT_THREAD_UNSAFE Disables thread safety for API calls.
+    // Only use this if FMOD is being called from a single thread, and if Studio API is not being used.
+    U32 fmod_flags = FMOD_INIT_NORMAL | FMOD_INIT_3D_RIGHTHANDED | FMOD_INIT_THREAD_UNSAFE;
+    if (mEnableProfiler)
+    {
+        fmod_flags |= FMOD_INIT_PROFILE_ENABLE;
+    }
 
 #if LL_LINUX
 	bool audio_ok = false;
@@ -130,7 +130,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 		{
 			LL_DEBUGS("AppInit") << "Trying PulseAudio audio output..." << LL_ENDL;
 			if((result = mSystem->setOutput(FMOD_OUTPUTTYPE_PULSEAUDIO)) == FMOD_OK &&
-                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS, fmod_flags, const_cast<char*>(app_title.c_str()))) == FMOD_OK)
+                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, const_cast<char*>(app_title.c_str()))) == FMOD_OK)
 			{
 				LL_DEBUGS("AppInit") << "PulseAudio output initialized OKAY"	<< LL_ENDL;
 				audio_ok = true;
@@ -151,30 +151,30 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 		{
 			LL_DEBUGS("AppInit") << "Trying ALSA audio output..." << LL_ENDL;
 			if((result = mSystem->setOutput(FMOD_OUTPUTTYPE_ALSA)) == FMOD_OK &&
-                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS, fmod_flags, 0)) == FMOD_OK)
-			{
-				LL_DEBUGS("AppInit") << "ALSA audio output initialized OKAY" << LL_ENDL;
-				audio_ok = true;
-			} 
-			else 
-			{
-				Check_FMOD_Error(result, "ALSA audio output FAILED to initialize");
-			}
-		} 
-		else 
-		{
-			LL_DEBUGS("AppInit") << "ALSA audio output SKIPPED" << LL_ENDL;
-		}
-	}
-	if (!audio_ok)
-	{
-		LL_WARNS("AppInit") << "Overall audio init failure." << LL_ENDL;
-		return false;
-	}
+                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, 0)) == FMOD_OK)
+            {
+                LL_DEBUGS("AppInit") << "ALSA audio output initialized OKAY" << LL_ENDL;
+                audio_ok = true;
+            }
+            else
+            {
+                Check_FMOD_Error(result, "ALSA audio output FAILED to initialize");
+            }
+        }
+        else
+        {
+            LL_DEBUGS("AppInit") << "ALSA audio output SKIPPED" << LL_ENDL;
+        }
+    }
+    if (!audio_ok)
+    {
+        LL_WARNS("AppInit") << "Overall audio init failure." << LL_ENDL;
+        return false;
+    }
 
-	// We're interested in logging which output method we
-	// ended up with, for QA purposes.
-	FMOD_OUTPUTTYPE output_type;
+    // We're interested in logging which output method we
+    // ended up with, for QA purposes.
+    FMOD_OUTPUTTYPE output_type;
 	if(!Check_FMOD_Error(mSystem->getOutput(&output_type), "FMOD::System::getOutput"))
 	{
 		switch (output_type)
@@ -192,22 +192,22 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 #else // LL_LINUX
 
 	// initialize the FMOD engine
-    result = mSystem->init(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS, fmod_flags, 0);
-	if (result == FMOD_ERR_OUTPUT_CREATEBUFFER)
-	{
-		/*
-		Ok, the speaker mode selected isn't supported by this soundcard. Switch it
-		back to stereo...
-		*/
-		result = mSystem->setSoftwareFormat(44100, FMOD_SPEAKERMODE_STEREO, 0);
-		Check_FMOD_Error(result,"Error falling back to stereo mode");
-		/*
-		... and re-init.
-		*/
-        result = mSystem->init(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS, fmod_flags, 0);
-	}
-	if(Check_FMOD_Error(result, "Error initializing FMOD Studio"))
-		return false;
+    result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, 0);
+    if (Check_FMOD_Error(result, "Error initializing FMOD Studio with default settins, retrying with other format"))
+    {
+        result = mSystem->setSoftwareFormat(44100, FMOD_SPEAKERMODE_STEREO, 0/*- ignore*/);
+        if (Check_FMOD_Error(result, "Error setting sotware format. Can't init."))
+        {
+            return false;
+        }
+        result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, 0);
+    }
+    if (Check_FMOD_Error(result, "Error initializing FMOD Studio"))
+    {
+        // If it fails here and (result == FMOD_ERR_OUTPUT_CREATEBUFFER),
+        // we can retry with other settings
+        return false;
+    }
 #endif
 
 	if (mEnableProfiler)
@@ -367,58 +367,59 @@ void LLAudioEngine_FMODSTUDIO::cleanupWind()
 //-----------------------------------------------------------------------
 void LLAudioEngine_FMODSTUDIO::updateWind(LLVector3 wind_vec, F32 camera_height_above_water)
 {
-	LLVector3 wind_pos;
-	F64 pitch;
-	F64 center_freq;
+    LLVector3 wind_pos;
+    F64 pitch;
+    F64 center_freq;
 
-	if (!mEnableWind)
-	{
-		return;
-	}
-	
-	if (mWindUpdateTimer.checkExpirationAndReset(LL_WIND_UPDATE_INTERVAL))
-	{
-		
-		// wind comes in as Linden coordinate (+X = forward, +Y = left, +Z = up)
-		// need to convert this to the conventional orientation DS3D and OpenAL use
-		// where +X = right, +Y = up, +Z = backwards
+    if (!mEnableWind)
+    {
+        return;
+    }
 
-		wind_vec.setVec(-wind_vec.mV[1], wind_vec.mV[2], -wind_vec.mV[0]);
+    if (mWindUpdateTimer.checkExpirationAndReset(LL_WIND_UPDATE_INTERVAL))
+    {
 
-		// cerr << "Wind update" << endl;
+        // wind comes in as Linden coordinate (+X = forward, +Y = left, +Z = up)
+        // need to convert this to the conventional orientation DS3D and OpenAL use
+        // where +X = right, +Y = up, +Z = backwards
 
-		pitch = 1.0 + mapWindVecToPitch(wind_vec);
-		center_freq = 80.0 * pow(pitch,2.5*(mapWindVecToGain(wind_vec)+1.0));
-		
-		mWindGen->mTargetFreq = (F32)center_freq;
-		mWindGen->mTargetGain = (F32)mapWindVecToGain(wind_vec) * mMaxWindGain;
-		mWindGen->mTargetPanGainR = (F32)mapWindVecToPan(wind_vec);
-  	}
+        wind_vec.setVec(-wind_vec.mV[1], wind_vec.mV[2], -wind_vec.mV[0]);
+
+        // cerr << "Wind update" << endl;
+
+        pitch = 1.0 + mapWindVecToPitch(wind_vec);
+        center_freq = 80.0 * pow(pitch, 2.5*(mapWindVecToGain(wind_vec) + 1.0));
+
+        mWindGen->mTargetFreq = (F32)center_freq;
+        mWindGen->mTargetGain = (F32)mapWindVecToGain(wind_vec) * mMaxWindGain;
+        mWindGen->mTargetPanGainR = (F32)mapWindVecToPan(wind_vec);
+    }
 }
 
 //-----------------------------------------------------------------------
 void LLAudioEngine_FMODSTUDIO::setInternalGain(F32 gain)
 {
-	if (!mInited)
-	{
-		return;
-	}
+    if (!mInited)
+    {
+        return;
+    }
 
-	gain = llclamp( gain, 0.0f, 1.0f );
+    gain = llclamp(gain, 0.0f, 1.0f);
 
-	FMOD::ChannelGroup *master_group;
-	if(Check_FMOD_Error(mSystem->getMasterChannelGroup(&master_group), "FMOD::System::getMasterChannelGroup"))
-		return;
+    FMOD::ChannelGroup* master_group = NULL;
+    if (!Check_FMOD_Error(mSystem->getMasterChannelGroup(&master_group), "FMOD::System::getMasterChannelGroup")
+        && master_group)
+    {
+        master_group->setVolume(gain);
+    }
 
-	master_group->setVolume(gain);
-
-	LLStreamingAudioInterface *saimpl = getStreamingAudioImpl();
-	if ( saimpl )
-	{
-		// fmod likes its streaming audio channel gain re-asserted after
-		// master volume change.
-		saimpl->setGain(saimpl->getGain());
-	}
+    LLStreamingAudioInterface *saimpl = getStreamingAudioImpl();
+    if (saimpl)
+    {
+        // fmod likes its streaming audio channel gain re-asserted after
+        // master volume change.
+        saimpl->setGain(saimpl->getGain());
+    }
 }
 
 //
@@ -490,78 +491,78 @@ bool LLAudioChannelFMODSTUDIO::updateBuffer()
 		return false;
 	}
 
-	return true;
+    return true;
 }
 
 
 void LLAudioChannelFMODSTUDIO::update3DPosition()
 {
-	if (!mChannelp)
-	{
-		// We're not actually a live channel (i.e., we're not playing back anything)
-		return;
-	}
+    if (!mChannelp)
+    {
+        // We're not actually a live channel (i.e., we're not playing back anything)
+        return;
+    }
 
-	LLAudioBufferFMODSTUDIO  *bufferp = (LLAudioBufferFMODSTUDIO  *)mCurrentBufferp;
-	if (!bufferp)
-	{
-		// We don't have a buffer associated with us (should really have been picked up
-		// by the above if.
-		return;
-	}
+    LLAudioBufferFMODSTUDIO  *bufferp = (LLAudioBufferFMODSTUDIO  *)mCurrentBufferp;
+    if (!bufferp)
+    {
+        // We don't have a buffer associated with us (should really have been picked up
+        // by the above if.
+        return;
+    }
 
     if (mCurrentSourcep->isForcedPriority())
-	{
+    {
         // Prioritized UI and preview sounds don't need to do any positional updates.
-		set3DMode(false);
-	}
-	else
-	{
-		// Localized sound.  Update the position and velocity of the sound.
-		set3DMode(true);
+        set3DMode(false);
+    }
+    else
+    {
+        // Localized sound.  Update the position and velocity of the sound.
+        set3DMode(true);
 
-		LLVector3 float_pos;
-		float_pos.setVec(mCurrentSourcep->getPositionGlobal());
-		FMOD_RESULT result = mChannelp->set3DAttributes((FMOD_VECTOR*)float_pos.mV, (FMOD_VECTOR*)mCurrentSourcep->getVelocity().mV);
-		Check_FMOD_Error(result, "FMOD::Channel::set3DAttributes");
-	}
+        LLVector3 float_pos;
+        float_pos.setVec(mCurrentSourcep->getPositionGlobal());
+        FMOD_RESULT result = mChannelp->set3DAttributes((FMOD_VECTOR*)float_pos.mV, (FMOD_VECTOR*)mCurrentSourcep->getVelocity().mV);
+        Check_FMOD_Error(result, "FMOD::Channel::set3DAttributes");
+    }
 }
 
 
 void LLAudioChannelFMODSTUDIO::updateLoop()
 {
-	if (!mChannelp)
-	{
-		// May want to clear up the loop/sample counters.
-		return;
-	}
+    if (!mChannelp)
+    {
+        // May want to clear up the loop/sample counters.
+        return;
+    }
 
-	//
-	// Hack:  We keep track of whether we looped or not by seeing when the
-	// sample position looks like it's going backwards.  Not reliable; may
-	// yield false negatives.
-	//
-	U32 cur_pos;
+    //
+    // Hack:  We keep track of whether we looped or not by seeing when the
+    // sample position looks like it's going backwards.  Not reliable; may
+    // yield false negatives.
+    //
+    U32 cur_pos;
 	Check_FMOD_Error(mChannelp->getPosition(&cur_pos,FMOD_TIMEUNIT_PCMBYTES),"FMOD::Channel::getPosition");
 
-	if (cur_pos < (U32)mLastSamplePos)
-	{
-		mLoopedThisFrame = true;
-	}
-	mLastSamplePos = cur_pos;
+    if (cur_pos < (U32)mLastSamplePos)
+    {
+        mLoopedThisFrame = true;
+    }
+    mLastSamplePos = cur_pos;
 }
 
 
 void LLAudioChannelFMODSTUDIO::cleanup()
 {
-	if (!mChannelp)
-	{
-		//LL_INFOS() << "Aborting cleanup with no channel handle." << LL_ENDL;
-		return;
-	}
+    if (!mChannelp)
+    {
+        // Aborting cleanup with no channel handle.
+        return;
+    }
 
-	//LL_INFOS() << "Cleaning up channel: " << mChannelID << LL_ENDL;
-	Check_FMOD_Error(mChannelp->stop(),"FMOD::Channel::stop");
+    //Cleaning up channel mChannelID
+    Check_FMOD_Error(mChannelp->stop(), "FMOD::Channel::stop");
 
 	mCurrentBufferp = nullptr;
 	mChannelp = nullptr;
@@ -570,55 +571,55 @@ void LLAudioChannelFMODSTUDIO::cleanup()
 
 void LLAudioChannelFMODSTUDIO::play()
 {
-	if (!mChannelp)
-	{
-		LL_WARNS() << "Playing without a channel handle, aborting" << LL_ENDL;
-		return;
-	}
+    if (!mChannelp)
+    {
+        LL_WARNS() << "Playing without a channel handle, aborting" << LL_ENDL;
+        return;
+    }
 
 	Check_FMOD_Error(mChannelp->setPaused(false), "FMOD::Channel::setPaused");
 
-	getSource()->setPlayedOnce(true);
+    getSource()->setPlayedOnce(true);
 
-	if(LLAudioEngine_FMODSTUDIO::mChannelGroups[getSource()->getType()])
+    if (LLAudioEngine_FMODSTUDIO::mChannelGroups[getSource()->getType()])
 		Check_FMOD_Error(mChannelp->setChannelGroup(LLAudioEngine_FMODSTUDIO::mChannelGroups[getSource()->getType()]),"FMOD::Channel::setChannelGroup");
 }
 
 
 void LLAudioChannelFMODSTUDIO::playSynced(LLAudioChannel *channelp)
 {
-	LLAudioChannelFMODSTUDIO *fmod_channelp = (LLAudioChannelFMODSTUDIO*)channelp;
-	if (!(fmod_channelp->mChannelp && mChannelp))
-	{
-		// Don't have channels allocated to both the master and the slave
-		return;
-	}
+    LLAudioChannelFMODSTUDIO *fmod_channelp = (LLAudioChannelFMODSTUDIO*)channelp;
+    if (!(fmod_channelp->mChannelp && mChannelp))
+    {
+        // Don't have channels allocated to both the master and the slave
+        return;
+    }
 
-	U32 cur_pos;
-	if(Check_FMOD_Error(mChannelp->getPosition(&cur_pos,FMOD_TIMEUNIT_PCMBYTES), "Unable to retrieve current position"))
-		return;
+    U32 cur_pos;
+    if (Check_FMOD_Error(mChannelp->getPosition(&cur_pos, FMOD_TIMEUNIT_PCMBYTES), "Unable to retrieve current position"))
+        return;
 
-	cur_pos %= mCurrentBufferp->getLength();
-	
-	// Try to match the position of our sync master
-	Check_FMOD_Error(mChannelp->setPosition(cur_pos,FMOD_TIMEUNIT_PCMBYTES),"Unable to set current position");
+    cur_pos %= mCurrentBufferp->getLength();
 
-	// Start us playing
-	play();
+    // Try to match the position of our sync master
+    Check_FMOD_Error(mChannelp->setPosition(cur_pos, FMOD_TIMEUNIT_PCMBYTES), "Unable to set current position");
+
+    // Start us playing
+    play();
 }
 
 
 bool LLAudioChannelFMODSTUDIO::isPlaying()
 {
-	if (!mChannelp)
-	{
-		return false;
-	}
+    if (!mChannelp)
+    {
+        return false;
+    }
 
-	bool paused, playing;
+    bool paused, playing;
 	Check_FMOD_Error(mChannelp->getPaused(&paused),"FMOD::Channel::getPaused");
 	Check_FMOD_Error(mChannelp->isPlaying(&playing),"FMOD::Channel::isPlaying");
-	return !paused && playing;
+    return !paused && playing;
 }
 
 
