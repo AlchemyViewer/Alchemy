@@ -468,13 +468,6 @@ class WindowsManifest(ViewerManifest):
                 else:
                     self.path(src="fmod.dll", dst="fmod.dll")
 
-            # KDU
-            if self.args['kdu'] == 'ON' or self.args['kdu'] == 'TRUE':
-                if self.args['configuration'].lower() == 'debug':
-                    self.path("kdud.dll", "kdud.dll")
-                else:
-                    self.path(src="kdu.dll", dst="kdu.dll")
-					
             # SLVoice executable
             with self.prefix(dst="voice"):
                 with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
