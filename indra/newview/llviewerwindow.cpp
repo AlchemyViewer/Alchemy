@@ -4918,6 +4918,11 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
 	if (ec.failed())
 	{
 		LL_WARNS() << "Failed check for is directory for filesystem path " << lastSnapshotDir << " : " << ec.message() << LL_ENDL;
+		LLSD args;
+		args["PATH"] = lastSnapshotDir;
+		LLNotificationsUtil::add("SnapshotToLocalDirNotExist", args);
+		resetSnapshotLoc();
+		failure_cb();
 		return;
 	}
 	if (!is_dir)
@@ -4933,6 +4938,11 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
 	if (ec.failed())
 	{
 		LL_WARNS() << "Failed to read disk space for filesystem path " << lastSnapshotDir << " : " << ec.message() << LL_ENDL;
+		LLSD args;
+		args["PATH"] = lastSnapshotDir;
+		LLNotificationsUtil::add("SnapshotToLocalDirNotExist", args);
+		resetSnapshotLoc();
+		failure_cb();
 		return;
 	}
 	if (b_space.free < image->getDataSize())
