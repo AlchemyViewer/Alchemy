@@ -65,13 +65,11 @@ BOOL LLPanelSnapshot::postBuild()
 	getChild<LLUICtrl>(getImageSizeComboName())->setCommitCallback(boost::bind(&LLPanelSnapshot::onResolutionComboCommit, this, _1));
     if (!getWidthSpinnerName().empty())
     {
-		mWidthSpinner = getChild<LLSpinCtrl>(getWidthSpinnerName());
-		mWidthSpinner->setCommitCallback(boost::bind(&LLPanelSnapshot::onCustomResolutionCommit, this));
+        getChild<LLUICtrl>(getWidthSpinnerName())->setCommitCallback(boost::bind(&LLPanelSnapshot::onCustomResolutionCommit, this));
     }
     if (!getHeightSpinnerName().empty())
     {
-        mHeightSpinner = getChild<LLSpinCtrl>(getHeightSpinnerName());
-		mHeightSpinner->setCommitCallback(boost::bind(&LLPanelSnapshot::onCustomResolutionCommit, this));
+        getChild<LLUICtrl>(getHeightSpinnerName())->setCommitCallback(boost::bind(&LLPanelSnapshot::onCustomResolutionCommit, this));
     }
     if (!getAspectRatioCBName().empty())
     {
@@ -114,25 +112,25 @@ void LLPanelSnapshot::enableControls(BOOL enable)
 LLSpinCtrl* LLPanelSnapshot::getWidthSpinner()
 {
     llassert(!getWidthSpinnerName().empty());
-	return mWidthSpinner;
+	return getChild<LLSpinCtrl>(getWidthSpinnerName());
 }
 
 LLSpinCtrl* LLPanelSnapshot::getHeightSpinner()
 {
     llassert(!getHeightSpinnerName().empty());
-	return mHeightSpinner;
+	return getChild<LLSpinCtrl>(getHeightSpinnerName());
 }
 
 S32 LLPanelSnapshot::getTypedPreviewWidth() const
 {
     llassert(!getWidthSpinnerName().empty());
-	return mWidthSpinner->getValue().asInteger();
+	return getChild<LLUICtrl>(getWidthSpinnerName())->getValue().asInteger();
 }
 
 S32 LLPanelSnapshot::getTypedPreviewHeight() const
 {
     llassert(!getHeightSpinnerName().empty());
-    return mHeightSpinner->getValue().asInteger();
+    return getChild<LLUICtrl>(getHeightSpinnerName())->getValue().asInteger();
 }
 
 void LLPanelSnapshot::enableAspectRatioCheckbox(BOOL enable)
@@ -203,23 +201,28 @@ void LLPanelSnapshot::cancel()
 void LLPanelSnapshot::onCustomResolutionCommit()
 {
 	LLSD info;
+    std::string widthSpinnerName = getWidthSpinnerName();
+    std::string heightSpinnerName = getHeightSpinnerName();
+    llassert(!widthSpinnerName.empty() && !heightSpinnerName.empty());
+    LLSpinCtrl *widthSpinner = getChild<LLSpinCtrl>(widthSpinnerName);
+    LLSpinCtrl *heightSpinner = getChild<LLSpinCtrl>(heightSpinnerName);
 	if (getName() == "panel_snapshot_inventory")
 	{
-		S32 width = mWidthSpinner->getValue().asInteger();
+		S32 width = widthSpinner->getValue().asInteger();
 		width = power_of_two(width, MAX_TEXTURE_SIZE);
 		info["w"] = width;
-		mWidthSpinner->setIncrement(width >> 1);
-		mWidthSpinner->forceSetValue(width);
-		S32 height =  mHeightSpinner->getValue().asInteger();
+		widthSpinner->setIncrement(width >> 1);
+		widthSpinner->forceSetValue(width);
+		S32 height =  heightSpinner->getValue().asInteger();
 		height = power_of_two(height, MAX_TEXTURE_SIZE);
-		mHeightSpinner->setIncrement(height >> 1);
-		mHeightSpinner->forceSetValue(height);
+		heightSpinner->setIncrement(height >> 1);
+		heightSpinner->forceSetValue(height);
 		info["h"] = height;
 	}
 	else
 	{
-		info["w"] = mWidthSpinner->getValue().asInteger();
-		info["h"] = mHeightSpinner->getValue().asInteger();
+		info["w"] = widthSpinner->getValue().asInteger();
+		info["h"] = heightSpinner->getValue().asInteger();
 	}
     getParentByType<LLFloater>()->notify(LLSD().with("custom-res-change", info));
 }
