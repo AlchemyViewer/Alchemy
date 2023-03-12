@@ -910,11 +910,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>388c77f035b7b68dbeb494c57f0479799c55ab694d330d1dc8a921145d1ad01412b042b0803d27438a05af73eecc452474919f190604adf82c47a5858c81d652</string>
+              <string>bb4e89532b029562644f21553bcdf68a5fabb71994f75fe22391dc938f1aa3e42da3761fc0231f68ec5b550e8ed021f0aa82fcc6fa5d4be093d774d3227b40b2</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu/8.0.6.1253/kdu-8.0.6-linux64-1253.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu/8.0.6.1897/kdu-8.0.6-linux64-1897.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -926,11 +926,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>dc19ff2932abbe6ad9d023da725e1453b2804bb7cafa707856ef3480594f3de1d6f7559885ff8bd00a8c89accb83b0b805366609705ea1c53f61060a9f5c7852</string>
+              <string>bf8a8aab018f95ea30ae855b17d692308c307f6bd4f7cab7a4960344f20e81b7b071e79523c2da6bffc6bd761d45582bdc41b3c87b86aebe322fa986543eb47a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu/8.0.6.1253/kdu-8.0.6-windows64-1253.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu/8.0.6.1897/kdu-8.0.6-windows64-1897.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
