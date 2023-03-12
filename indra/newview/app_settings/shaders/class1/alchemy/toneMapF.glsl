@@ -284,6 +284,15 @@ float noise(vec2 x) {
 
 //=============================
 
+uniform float gamma;
+vec3 legacyGamma(vec3 color)
+{
+    color = 1. - clamp(color, vec3(0.), vec3(1.));
+    color = 1. - pow(color, vec3(gamma)); // s/b inverted already CPU-side
+
+    return color;
+}
+
 void main()
 {
     vec4 diff = texture2D(diffuseRect, vary_fragcoord);
@@ -352,6 +361,8 @@ void main()
     vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.x));
     diff = vec4(linear_to_srgb(texture3DLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb), diff.a);
     #endif
+
+    diff.rgb = legacyGamma(diff.rgb);
 
     vec2 tc = vary_fragcoord.xy*screen_res*4.0;
     vec3 seed = (diff.rgb+vec3(1.0))*vec3(tc.xy, tc.x+tc.y);

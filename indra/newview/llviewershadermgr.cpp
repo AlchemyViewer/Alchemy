@@ -299,7 +299,6 @@ LLViewerShaderMgr::LLViewerShaderMgr() :
     mShaderList.push_back(&gDeferredPBRAlphaProgram);
     mShaderList.push_back(&gHUDPBRAlphaProgram);
     mShaderList.push_back(&gDeferredSkinnedPBRAlphaProgram);
-    mShaderList.push_back(&gDeferredPostGammaCorrectProgram); // for gamma
 // [RLVa:KB] - @setsphere
 	mShaderList.push_back(&gRlvSphereProgram);
 // [/RLVa:KB]
@@ -2873,6 +2872,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	{
 		if (success)
 		{
+			mShaderList.push_back(&gDeferredPostTonemapProgram[i]);
 			gDeferredPostTonemapProgram[i].mName = "Tonemapping Shader " + std::to_string(i);
 			gDeferredPostTonemapProgram[i].mFeatures.hasSrgb = true;
 			gDeferredPostTonemapProgram[i].mShaderFiles.clear();
@@ -2889,6 +2889,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
 		if (success)
 		{
+			mShaderList.push_back(&gDeferredPostColorGradeLUTProgram[i]);
 			gDeferredPostColorGradeLUTProgram[i].mName = "Color Grading Shader " + std::to_string(i);
 			gDeferredPostColorGradeLUTProgram[i].mFeatures.hasSrgb = true;
 			gDeferredPostColorGradeLUTProgram[i].mShaderFiles.clear();
