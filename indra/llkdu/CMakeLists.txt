@@ -57,10 +57,6 @@ if (USE_KDU)
 
   target_compile_definitions(llkdu PRIVATE -DKDU_X86_INTRINSICS -DKDU_NO_THREADS -DKDU_NO_AVX -DKDU_NO_AVX2)
 
-  if(WINDOWS)
-    target_compile_definitions(llkdu PRIVATE -DCORESYS_IMPORTS)
-  endif()
-  
   # Add tests
   if (LL_TESTS)
     include(LLAddBuildTest)
