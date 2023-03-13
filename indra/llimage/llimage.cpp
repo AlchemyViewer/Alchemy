@@ -1155,7 +1155,7 @@ void LLImageRaw::compositeScaled4onto3(LLImageRaw* src)
 	llassert( (4 == src->getComponents()) && (3 == dst->getComponents()) );
 
 	S32 temp_data_size = src->getWidth() * dst->getHeight() * src->getComponents();
-	llassert_always(temp_data_size > 0);
+	llassert(temp_data_size > 0);
 	std::vector<U8> temp_buffer(temp_data_size);
 
 	// Vertical: scale but no composite

@@ -301,7 +301,6 @@ void transition_back_to_login_panel(const std::string& emsg);
 // [SL:KB] - Patch: Chat-Alerts | Checked: 2012-09-22 (Catznip-3.3)
 void handleLoadChatAlertSounds();
 // [/SL:KB]
-bool callbackConfirmDisplayPreferencesReset(const LLSD& notification, const LLSD& response);
 
 void callback_cache_name(const LLUUID& id, const std::string& full_name, bool is_group)
 {
@@ -439,12 +438,12 @@ bool idle_startup()
 		{
 			LLNotificationsUtil::add("DisplaySetToRecommendedFeatureChange");
 		}
-		else if ( ! lastGPU.empty() && lastGPU != thisGPU && !gSavedSettings.getBool("AlchemyKeepSettingsOnGPUChange"))
+		else if ( ! lastGPU.empty() && (lastGPU != thisGPU))
 		{
 			LLSD subs;
 			subs["LAST_GPU"] = lastGPU;
 			subs["THIS_GPU"] = thisGPU;
-			LLNotificationsUtil::add("AskForDisplayPreferencesReset", subs, LLSD(), callbackConfirmDisplayPreferencesReset);
+			LLNotificationsUtil::add("DisplaySetToRecommendedGPUChange", subs);
 		}
 		else if (!gViewerWindow->getInitAlert().empty())
 		{
