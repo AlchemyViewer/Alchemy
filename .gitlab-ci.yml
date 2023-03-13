@@ -131,7 +131,7 @@ variables:
   before_script:
     - python3 -m venv .venv
     - source .venv/bin/activate
-    - pip3 install --upgrade llbase autobuild certifi
+    - pip3 install --upgrade llbase autobuild certifi sentry-cli
   script:
     - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DHAVOK_TPV=OFF
     - autobuild build -c Release --no-configure
