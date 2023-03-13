@@ -2053,6 +2053,7 @@ LLViewerWindow::LLViewerWindow(const Params& p)
 		|| (gSavedSettings.getString("LastGPUString") != LLFeatureManager::getInstance()->getGPUString())
 		|| (gSavedSettings.getBOOL("ProbeHardwareOnStartup")))
 	{
+		LLFeatureManager::getInstance()->applyRecommendedSettings();
 		gSavedSettings.setBOOL("ProbeHardwareOnStartup", FALSE);
 	}
 
