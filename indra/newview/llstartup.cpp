@@ -433,7 +433,7 @@ bool idle_startup()
 		{
 			LLNotificationsUtil::add("DisplaySetToSafe");
 		}
-		else if ((gSavedSettings.getS32("LastFeatureVersion") < LLFeatureManager::getInstance()->getVersion()) &&
+		else if ((gSavedSettings.getS32("LastFeatureVersion") != LLFeatureManager::getInstance()->getVersion()) &&
 				 (gSavedSettings.getS32("LastFeatureVersion") != 0))
 		{
 			LLNotificationsUtil::add("DisplaySetToRecommendedFeatureChange");
