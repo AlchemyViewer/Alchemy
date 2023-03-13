@@ -7470,7 +7470,7 @@ void LLPipeline::renderFinalize()
             dst.flush();
         }
 #if 1
-		mALRenderUtil->renderTonemap(screenTarget(),screenTarget(),nullptr);
+		mALRenderUtil->renderTonemap(screenTarget(),screenTarget(),&mGlow[1]);
 
 		mALRenderUtil->renderSharpen(screenTarget(),screenTarget());
 #else

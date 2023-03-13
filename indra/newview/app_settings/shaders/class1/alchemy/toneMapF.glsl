@@ -33,7 +33,7 @@ out vec4 frag_color;
 in vec2 vary_fragcoord;
 
 uniform sampler2D diffuseRect;
-uniform sampler2D bloomMap;
+uniform sampler2D emissiveRect;
 
 uniform vec2 screen_res;
 uniform float exposure;
@@ -293,11 +293,8 @@ vec3 legacyGamma(vec3 color)
 
 void main()
 {
-    vec4 diff = texture(diffuseRect, vary_fragcoord);
-    
-    // vec4 bloom = texture(bloomMap, vary_fragcoord.xy/screen_res);
-    // diff.rgb += bloom.rgb;
-
+    vec4 diff = texture(diffuseRect, vary_fragcoord) + texture2D(emissiveRect, vary_fragcoord);
+ 
     #if TONEMAP_METHOD != 0
     // Exposure adjustment
     diff.rgb *= exposure;

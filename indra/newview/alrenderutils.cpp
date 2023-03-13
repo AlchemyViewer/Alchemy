@@ -530,10 +530,10 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 
 	if (bloom)
 	{
-		channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_BLOOM, bloom->getUsage());
+		channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_EMISSIVE, bloom->getUsage());
 		if (channel > -1)
 		{
-			bloom->bindTexture(0, channel);
+			bloom->bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
 		}
 	}
 
