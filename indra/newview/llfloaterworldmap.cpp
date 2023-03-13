@@ -487,7 +487,7 @@ void LLFloaterWorldMap::draw()
 	bool agent_on_prelude = (regionp && regionp->isPrelude());
 	bool enable_go_home = gAgent.isGodlike() || !agent_on_prelude;
 // [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
-	mGoHomeButton->setEnabled(enable_go_home && (!rlv_handler_t::isEnabled()) || !(gRlvHandler.hasBehaviour(RLV_BHVR_TPLM) && gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)));
+	mGoHomeButton->setEnabled(enable_go_home && ((!rlv_handler_t::isEnabled()) || !(gRlvHandler.hasBehaviour(RLV_BHVR_TPLM) && gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC))));
 // [/RLVa:KB]
 
 	updateLocation();
