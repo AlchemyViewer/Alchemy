@@ -499,12 +499,12 @@ bool ALRenderUtil::setupColorGrade()
 					}
 					else
 					{
-						LL_WARNS() << "Color LUT is invalid width or height: " << image_height << " x " << image_width << LL_ENDL;
+						LL_WARNS() << "Color LUT is invalid width or height: " << image_height << " x " << image_width << " at path " << lut_path << LL_ENDL;
 					}
 				}
 				else
 				{
-					LL_WARNS() << "Failed to decode color grading LUT with extension: " << temp_exten << LL_ENDL;
+					LL_WARNS() << "Failed to decode color grading LUT: " << lut_path << LL_ENDL;
 				}
 			}
 		}
