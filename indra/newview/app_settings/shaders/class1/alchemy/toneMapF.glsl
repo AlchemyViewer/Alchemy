@@ -22,8 +22,6 @@
  * $/LicenseInfo$
  */
 
- #extension GL_ARB_shader_texture_lod : enable
-
 /*[EXTRA_CODE_HERE]*/
 
 #ifdef DEFINE_GL_FRAGCOLOR
@@ -188,9 +186,9 @@ float ColTone(float x, vec4 p)
 uniform vec3 tone_lottes_a = vec3(1.4, 1.0, 16.0);
 vec3 AMDTonemapper(vec3 color)
 {
-    const float hdrMax = tone_lottes_a.z; // How much HDR range before clipping. HDR modes likely need this pushed up to say 25.0.
-    const float contrast = tone_lottes_a.x; // Use as a baseline to tune the amount of contrast the tonemapper has.
-    const float shoulder = tone_lottes_a.y; // Likely don’t need to mess with this factor, unless matching existing tonemapper is not working well..
+    float hdrMax = tone_lottes_a.z; // How much HDR range before clipping. HDR modes likely need this pushed up to say 25.0.
+    float contrast = tone_lottes_a.x; // Use as a baseline to tune the amount of contrast the tonemapper has.
+    float shoulder = tone_lottes_a.y; // Likely don’t need to mess with this factor, unless matching existing tonemapper is not working well..
     const float midIn = 0.18; // most games will have a {0.0 to 1.0} range for LDR so midIn should be 0.18.
     const float midOut = 0.18; // Use for LDR. For HDR10 10:10:10:2 use maybe 0.18/25.0 to start. For scRGB, I forget what a good starting point is, need to re-calculate.
 
