@@ -30,7 +30,7 @@ out vec4 frag_color;
 #define frag_color gl_FragColor
 #endif
 
-VARYING vec2 vary_fragcoord;
+in vec2 vary_fragcoord;
 
 uniform sampler2D diffuseRect;
 uniform sampler2D bloomMap;
@@ -293,9 +293,9 @@ vec3 legacyGamma(vec3 color)
 
 void main()
 {
-    vec4 diff = texture2D(diffuseRect, vary_fragcoord);
+    vec4 diff = texture(diffuseRect, vary_fragcoord);
     
-    // vec4 bloom = texture2D(bloomMap, vary_fragcoord.xy/screen_res);
+    // vec4 bloom = texture(bloomMap, vary_fragcoord.xy/screen_res);
     // diff.rgb += bloom.rgb;
 
     #if TONEMAP_METHOD != 0
@@ -357,7 +357,7 @@ void main()
     //see https://developer.nvidia.com/gpugems/GPUGems2/gpugems2_chapter24.html
     vec3 scale = (vec3(colorgrade_lut_size.x) - 1.0) / vec3(colorgrade_lut_size.x);
     vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.x));
-    diff = vec4(linear_to_srgb(texture3DLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb), diff.a);
+    diff = vec4(linear_to_srgb(textureLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb), diff.a);
     #endif
 
     diff.rgb = legacyGamma(diff.rgb);

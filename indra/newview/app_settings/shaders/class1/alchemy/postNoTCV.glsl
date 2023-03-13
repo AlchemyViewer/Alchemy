@@ -23,7 +23,7 @@
  */
 
 ATTRIBUTE vec3 position;
-VARYING vec2 vary_fragcoord;
+out vec2 vary_fragcoord;
 
 void main()
 {

@@ -34,7 +34,7 @@ out vec4 frag_color;
 #define frag_color gl_FragColor
 #endif
 
-VARYING vec2 vary_fragcoord;
+in vec2 vary_fragcoord;
 
 uniform sampler2D tex0;
 
@@ -86,17 +86,17 @@ void main()
     ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     */
 
-    vec4 x = texture2DLod(tex0, vary_fragcoord, 0.f);
+    vec4 x = textureLod(tex0, vary_fragcoord, 0.f);
 
-    vec4 a = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2(-1,  0));
-    vec4 b = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 1,  0));
-    vec4 c = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 0,  1));
-    vec4 d = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 0, -1));
+    vec4 a = textureLodOffset(tex0, vary_fragcoord, 0.0, ivec2(-1,  0));
+    vec4 b = textureLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 1,  0));
+    vec4 c = textureLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 0,  1));
+    vec4 d = textureLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 0, -1));
 
-    vec4 e = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2(-1, -1));
-    vec4 f = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 1,  1));
-    vec4 g = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2(-1,  1));
-    vec4 h = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 1, -1));
+    vec4 e = textureLodOffset(tex0, vary_fragcoord, 0.0, ivec2(-1, -1));
+    vec4 f = textureLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 1,  1));
+    vec4 g = textureLodOffset(tex0, vary_fragcoord, 0.0, ivec2(-1,  1));
+    vec4 h = textureLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 1, -1));
 
     float lx = GetLuma(x);
 
