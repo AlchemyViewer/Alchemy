@@ -575,8 +575,8 @@ void LLHexEditor::draw()
 	S32 top = getRect().getHeight();
 	S32 right = getRect().getWidth();
 	S32 bottom = 0;
-
-	BOOL has_focus = gFocusMgr.getKeyboardFocus() == reinterpret_cast<LLFocusableElement*>(this);
+    
+    BOOL has_focus = hasFocus();
 
 	F32 line_height = mGLFont->getLineHeight();
 	F32 char_width = mGLFont->getWidthF32(".");
