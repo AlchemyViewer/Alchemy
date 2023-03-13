@@ -50,11 +50,11 @@ public:
 	LLPanelClassifiedInfo();
 	virtual ~LLPanelClassifiedInfo();
 
-	/*virtual*/ void onOpen(const LLSD& key);
+	/*virtual*/ void onOpen(const LLSD& key) override;
 
-	/*virtual*/ BOOL postBuild();
+	/*virtual*/ BOOL postBuild() override;
 
-	/*virtual*/ void processProperties(void* data, EAvatarProcessorType type);
+	/*virtual*/ void processProperties(void* data, EAvatarProcessorType type) override;
 
 	void setAvatarId(const LLUUID& avatar_id) { mAvatarId = avatar_id; }
 

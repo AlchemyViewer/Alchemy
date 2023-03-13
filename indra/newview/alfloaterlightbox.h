@@ -42,7 +42,7 @@ class ALFloaterLightBox final : public LLFloater
 public:
 	ALFloaterLightBox(const LLSD& key);
 	BOOL postBuild() override;
-    virtual void draw();
+    virtual void draw() override;
 
   private:
 	void onClickResetControlDefault(const LLSD& userdata);

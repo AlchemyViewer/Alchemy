@@ -123,7 +123,7 @@ public:
 
 public:
 	LLVOVolume(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
-				LLVOVolume* asVolume();
+    LLVOVolume* asVolume() final;
 	void markDead() override;		// Override (and call through to parent) to clean up media references
 
 	LLDrawable* createDrawable(LLPipeline *pipeline) override;

@@ -31,29 +31,29 @@ public:
     { };
 
 	~LLHexEditor() override;
-	void setValue(const LLSD& value);
-	LLSD getValue() const;
+	void setValue(const LLSD& value) override;
+	LLSD getValue() const override;
 	void setColumns(U8 columns);
 	U8   getColumns() { return mColumns; };
 	U32  getLineCount() const;
 	F32  getSuggestedWidth(U8 cols = -1);
 	U32  getProperSelectionStart() const;
 	U32  getProperSelectionEnd() const;
-	void reshape(S32 width, S32 height, BOOL called_from_parent);
-	void setFocus(BOOL b);
+	void reshape(S32 width, S32 height, BOOL called_from_parent) override;
+	void setFocus(BOOL b) override;
 	
 	BOOL handleScrollWheel(S32 x, S32 y, S32 clicks) override;
-	BOOL handleMouseDown(S32 x, S32 y, MASK mask);
-	BOOL handleHover(S32 x, S32 y, MASK mask);
-	BOOL handleMouseUp(S32 x, S32 y, MASK mask);
+	BOOL handleMouseDown(S32 x, S32 y, MASK mask) override;
+	BOOL handleHover(S32 x, S32 y, MASK mask) override;
+	BOOL handleMouseUp(S32 x, S32 y, MASK mask) override;
 
-	BOOL handleKeyHere(KEY key, MASK mask);
-	BOOL handleKey(KEY key, MASK mask, BOOL called_from_parent);
-	BOOL handleUnicodeChar(llwchar uni_char, BOOL called_from_parent);
-	BOOL handleUnicodeCharHere(llwchar uni_char);
+	BOOL handleKeyHere(KEY key, MASK mask) override;
+	BOOL handleKey(KEY key, MASK mask, BOOL called_from_parent) override;
+	BOOL handleUnicodeChar(llwchar uni_char, BOOL called_from_parent) override;
+	BOOL handleUnicodeCharHere(llwchar uni_char) override;
 
-	/*virtual*/ BOOL 	postBuild();
-	void draw();
+	/*virtual*/ BOOL 	postBuild() override;
+	void draw() override;
 
 	void moveCursor(U32 pos, BOOL second_nibble);
 

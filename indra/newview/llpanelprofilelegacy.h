@@ -170,7 +170,6 @@ public:
 		LLFlatListView* mPicksList;
 		LLPanelPickEdit* mPanelPickEdit;
 		LLPanelPickInfo* mPanelPickInfo;
-		LLPanelClassifiedEdit* mPanelClassifiedEdit;
 		LLPanelClassifiedInfo* mPanelClassifiedInfo;
 		LLHandle<LLView> mPopupMenuHandle;
 		LLHandle<LLToggleableMenu> mPlusMenuHandle;

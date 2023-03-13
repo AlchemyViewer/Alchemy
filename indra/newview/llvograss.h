@@ -49,31 +49,31 @@ public:
 											void **user_data,
 											U32 block_num, 
 											const EObjectUpdateType update_type,
-											LLDataPacker *dp);
+											LLDataPacker *dp) override;
 	static void import(LLFILE *file, LLMessageSystem *mesgsys, const LLVector3 &pos);
 	/*virtual*/ void exportFile(LLFILE *file, const LLVector3 &position);
 
-	void updateDrawable(BOOL force_damped);
+	void updateDrawable(BOOL force_damped) override;
 
-	/*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline);
-	/*virtual*/ BOOL		updateGeometry(LLDrawable *drawable);
+	/*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) override;
+	/*virtual*/ BOOL		updateGeometry(LLDrawable *drawable) override;
 	/*virtual*/ void		getGeometry(S32 idx,
 								LLStrider<LLVector4a>& verticesp,
 								LLStrider<LLVector3>& normalsp, 
 								LLStrider<LLVector2>& texcoordsp,
 								LLStrider<LLColor4U>& colorsp, 
 								LLStrider<LLColor4U>& emissivep,
-								LLStrider<U16>& indicesp);
+								LLStrider<U16>& indicesp) override;
 
 	void updateFaceSize(S32 idx) override { }
-	/*virtual*/ void updateTextures();											
-	/*virtual*/ BOOL updateLOD();
-	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent); // generate accurate apparent angle and area
+	/*virtual*/ void updateTextures() override;
+	/*virtual*/ BOOL updateLOD() override;
+	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent) override; // generate accurate apparent angle and area
 
 	void plantBlades();
 
-	/*virtual*/ BOOL    isActive() const; // Whether this object needs to do an idleUpdate.
-	/*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time);
+	/*virtual*/ BOOL    isActive() const override; // Whether this object needs to do an idleUpdate.
+	/*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time) override;
 
 	/*virtual*/ BOOL lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, 
 										  S32 face = -1,                        // which face to check, -1 = ALL_SIDES
@@ -85,7 +85,7 @@ public:
 										  LLVector2* tex_coord = NULL,          // return the texture coordinates of the intersection point
 										  LLVector4a* normal = NULL,             // return the surface normal at the intersection point
 										  LLVector4a* tangent = NULL           // return the surface tangent at the intersection point
-		);
+		) override;
 
 	static S32 sMaxGrassSpecies;
 

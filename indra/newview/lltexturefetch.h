@@ -133,7 +133,7 @@ public:
 	U32 getTotalNumHTTPRequests();
 	
     // Threads:  T*
-    S32 getPending();
+    S32 getPending() override;
 
     // Threads:  T*
 	void lockQueue() { mQueueMutex.lock(); }

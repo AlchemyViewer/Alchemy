@@ -69,7 +69,6 @@
 #include "llviewermenu.h" // gMenuHolder
 
 static constexpr std::string_view AGENT_PROFILE_CAP("AgentProfile");
-static constexpr std::string_view UPLOAD_AGENT_PROFILE_CAP("UploadAgentProfileImage");
 
 // These are order-senstitive so don't fk with 'em!
 static const std::array<std::string, 8> sWantCheckboxes{{"wanna_build", "wanna_explore", "wanna_yiff", "wanna_work", "wanna_group", "wanna_buy", "wanna_sell", "wanna_hire"}};
@@ -819,7 +818,6 @@ LLPanelProfileLegacy::LLPanelProfilePicks::LLPanelProfilePicks()
 ,	mPicksList(nullptr)
 ,	mPanelPickEdit(nullptr)
 ,	mPanelPickInfo(nullptr)
-,	mPanelClassifiedEdit(nullptr)
 ,	mPanelClassifiedInfo(nullptr)
 ,	mPopupMenuHandle()
 ,	mPlusMenuHandle()

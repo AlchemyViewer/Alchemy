@@ -188,12 +188,12 @@ class LLScrollListIcon : public LLScrollListCell
 public:
 	LLScrollListIcon(const LLScrollListCell::Params& p);
 	/*virtual*/ ~LLScrollListIcon() = default;
-	/*virtual*/ void	draw(const LLColor4& color, const LLColor4& highlight_color) const;
-	/*virtual*/ S32		getWidth() const;
-	/*virtual*/ S32		getHeight() const;
-	/*virtual*/ const LLSD		getValue() const;
-	/*virtual*/ void	setColor(const LLColor4&);
-	/*virtual*/ void	setValue(const LLSD& value);
+	/*virtual*/ void	draw(const LLColor4& color, const LLColor4& highlight_color) const override;
+	/*virtual*/ S32		getWidth() const override;
+	/*virtual*/ S32		getHeight() const override;
+	/*virtual*/ const LLSD		getValue() const override;
+	/*virtual*/ void	setColor(const LLColor4&) override;
+	/*virtual*/ void	setValue(const LLSD& value) override;
 
 	void setClickCallback(BOOL (*callback)(void*), void* user_data);
 	BOOL handleClick() override;
