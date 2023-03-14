@@ -92,13 +92,13 @@ LLSnapshotModel::ESnapshotFormat LLFloaterSnapshot::Impl::getImageFormat(LLFloat
 LLSpinCtrl* LLFloaterSnapshot::Impl::getWidthSpinner(LLFloaterSnapshotBase* floater)
 {
 	LLPanelSnapshot* active_panel = getActivePanel(floater);
-	return active_panel ? active_panel->getWidthSpinner() : nullptr;
+	return active_panel ? active_panel->getWidthSpinner() : floater->getChild<LLSpinCtrl>("snapshot_width");
 }
 
 LLSpinCtrl* LLFloaterSnapshot::Impl::getHeightSpinner(LLFloaterSnapshotBase* floater)
 {
 	LLPanelSnapshot* active_panel = getActivePanel(floater);
-	return active_panel ? active_panel->getHeightSpinner() : nullptr;
+	return active_panel ? active_panel->getHeightSpinner() : floater->getChild<LLSpinCtrl>("snapshot_height");
 }
 
 void LLFloaterSnapshot::Impl::enableAspectRatioCheckbox(LLFloaterSnapshotBase* floater, BOOL enable)
@@ -134,7 +134,7 @@ LLSnapshotLivePreview* LLFloaterSnapshotBase::ImplBase::getPreviewView()
 LLSnapshotModel::ESnapshotLayerType LLFloaterSnapshot::Impl::getLayerType(LLFloaterSnapshotBase* floater)
 {
 	LLSnapshotModel::ESnapshotLayerType type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
-	LLSD value = floater->getLayerTypesCombo()->getValue();
+	LLSD value = floater->getChild<LLUICtrl>("layer_types")->getValue();
 	const std::string id = value.asString();
 	if (id == "colors")
 		type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
@@ -270,7 +270,7 @@ void LLFloaterSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floater)
 	LLSnapshotModel::ESnapshotLayerType layer_type = getLayerType(floater);
 
 	floater->getChild<LLComboBox>("local_format_combo")->selectNthItem(gSavedSettings.getS32("SnapshotFormat"));
-	floater->getLayerTypesCombo()->setEnabled(shot_type == LLSnapshotModel::SNAPSHOT_LOCAL);
+	floater->getChildView("layer_types")->setEnabled(shot_type == LLSnapshotModel::SNAPSHOT_LOCAL);
 
 	LLPanelSnapshot* active_panel = getActivePanel(floater);
 	if (active_panel)
@@ -360,17 +360,17 @@ void LLFloaterSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floater)
 	{
 	  case LLSnapshotModel::SNAPSHOT_WEB:
 		layer_type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
-		floater->getLayerTypesCombo()->setValue("colors");
+		floater->getChild<LLUICtrl>("layer_types")->setValue("colors");
 		setResolution(floater, "profile_size_combo");
 		break;
 	  case LLSnapshotModel::SNAPSHOT_POSTCARD:
 		layer_type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
-		floater->getLayerTypesCombo()->setValue("colors");
+		floater->getChild<LLUICtrl>("layer_types")->setValue("colors");
 		setResolution(floater, "postcard_size_combo");
 		break;
 	  case LLSnapshotModel::SNAPSHOT_TEXTURE:
 		layer_type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
-		floater->getLayerTypesCombo()->setValue("colors");
+		floater->getChild<LLUICtrl>("layer_types")->setValue("colors");
 		setResolution(floater, "texture_size_combo");
 		break;
 	  case  LLSnapshotModel::SNAPSHOT_LOCAL:
@@ -741,24 +741,20 @@ void LLFloaterSnapshot::Impl::updateResolution(LLUICtrl* ctrl, void* data, BOOL 
 
 		previewp->getSize(width, height);
 
-		auto panel = getActivePanel(view);
-		if (panel)
+		// We use the height spinner here because we come here via the aspect ratio
+		// checkbox as well and we want height always changing to width by default.
+		// If we use the width spinner we would change width according to height by
+		// default, that is not what we want.
+		updateSpinners(view, previewp, width, height, !getHeightSpinner(view)->isDirty()); // may change width and height
+		
+		if(getWidthSpinner(view)->getValue().asInteger() != width || getHeightSpinner(view)->getValue().asInteger() != height)
 		{
-			// We use the height spinner here because we come here via the aspect ratio
-			// checkbox as well and we want height always changing to width by default.
-			// If we use the width spinner we would change width according to height by
-			// default, that is not what we want.
-			updateSpinners(view, previewp, width, height, !getHeightSpinner(view)->isDirty()); // may change width and height
-
-			if (getWidthSpinner(view)->getValue().asInteger() != width || getHeightSpinner(view)->getValue().asInteger() != height)
+			getWidthSpinner(view)->setValue(width);
+			getHeightSpinner(view)->setValue(height);
+			if (getActiveSnapshotType(view) == LLSnapshotModel::SNAPSHOT_TEXTURE)
 			{
-				getWidthSpinner(view)->setValue(width);
-				getHeightSpinner(view)->setValue(height);
-				if (getActiveSnapshotType(view) == LLSnapshotModel::SNAPSHOT_TEXTURE)
-				{
-					getWidthSpinner(view)->setIncrement(width >> 1);
-					getHeightSpinner(view)->setIncrement(height >> 1);
-				}
+				getWidthSpinner(view)->setIncrement(width >> 1);
+				getHeightSpinner(view)->setIncrement(height >> 1);
 			}
 		}
 
@@ -995,9 +991,8 @@ BOOL LLFloaterSnapshot::postBuild()
 	((Impl*)impl)->setAspectRatioCheckboxValue(this, gSavedSettings.getBOOL("KeepAspectForSnapshot"));
 
 	childSetCommitCallback("layer_types", Impl::onCommitLayerTypes, this);
-	mLayerTypesCombo = getChild<LLUICtrl>("layer_types");
-	mLayerTypesCombo->setValue("colors");
-	mLayerTypesCombo->setEnabled(FALSE);
+	getChild<LLUICtrl>("layer_types")->setValue("colors");
+	getChildView("layer_types")->setEnabled(FALSE);
 
 	mFreezeFrameCheck = getChild<LLUICtrl>("freeze_frame_check");
 	mFreezeFrameCheck->setValue(gSavedSettings.getBOOL("UseFreezeFrame"));

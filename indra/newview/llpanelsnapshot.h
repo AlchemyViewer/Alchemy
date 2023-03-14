@@ -74,9 +74,6 @@ protected:
 	void onKeepAspectRatioCommit(LLUICtrl* ctrl);
 
 	LLFloaterSnapshotBase* mSnapshotFloater;
-
-	LLSpinCtrl* mWidthSpinner = nullptr;
-	LLSpinCtrl*	mHeightSpinner = nullptr;
 };
 
 #endif // LL_LLPANELSNAPSHOT_H
