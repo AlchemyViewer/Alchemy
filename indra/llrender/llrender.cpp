@@ -529,7 +529,7 @@ void LLTexUnit::setTextureFilteringOption(LLTexUnit::eTextureFilterOptions optio
 		}
 	}
 
-	if (gGLManager.mGLVersion >= 4.59f)
+	if (gGLManager.mHasTextureFilterAnisotropic)
 	{
 		if (option == TFO_ANISOTROPIC && LLRender::sAnisotropicFilteringLevel > 1.f)
 		{

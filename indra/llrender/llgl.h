@@ -102,6 +102,7 @@ public:
     bool mHasAMDAssociations = false;
 	bool mHasNVXMemInfo = false;
 	bool mHasATIMemInfo = false;
+	bool mHasTextureFilterAnisotropic = false;
 
 	BOOL mIsAMD;
 	BOOL mIsNVIDIA;
