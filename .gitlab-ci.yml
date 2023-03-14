@@ -376,7 +376,7 @@ build:release:windows64:
     -     $LnxFileName = Get-ChildItem -Path . -Name -Include Alchemy_*.tar.*
     -     $LnxFileHash = (Get-FileHash .\$LnxFileName -a sha256).Hash
     -     $LnxPackageUrl = "${UploadDestURL}/${LnxFileName}"
-    -     $LnxUploadResult = Invoke-WebRequest @UploadParams -InFile ./$LnxFileName -Uri "${LnxPackageUrl}${DestStatus}" | ConvertFrom-Json
+    -     $LnxUploadResult = Invoke-WebRequest @UploadParams -InFile ./$LnxFileName -Uri "${LnxPackageUrl}${DestStatus}" -MaximumRetryCount 5 -RetryIntervalSec 30 | ConvertFrom-Json
     -     If ($LnxFileHash -ne $LnxUploadResult.file_sha256) { Write-Output "Upload hash mismatch. expected $Hash actual $($LnxUploadResult.file_sha256)" && Exit 1 }
     -   Pop-Location
     -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/alchemy-bin newview/alchemy-bin.src.zip packages/ }
@@ -387,7 +387,7 @@ build:release:windows64:
     -     $MacFileName = Get-ChildItem -Path . -Name -Include Alchemy_*.dmg
     -     $MacFileHash = (Get-FileHash .\$MacFileName -a sha256).Hash
     -     $MacPackageUrl = "${UploadDestURL}/${MacFileName}"
-    -     $MacUploadResult = Invoke-WebRequest @UploadParams -InFile ./$MacFileName -Uri "${MacPackageUrl}${DestStatus}" | ConvertFrom-Json
+    -     $MacUploadResult = Invoke-WebRequest @UploadParams -InFile ./$MacFileName -Uri "${MacPackageUrl}${DestStatus}" -MaximumRetryCount 5 -RetryIntervalSec 30 | ConvertFrom-Json
     -     If ($MacFileHash -ne $MacUploadResult.file_sha256)  { Write-Output "Upload hash mismatch. expected $Hash actual $($MacUploadResult.file_sha256)" && Exit 1 }
     -   Pop-Location
     -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/Release/ packages/ }
@@ -398,16 +398,16 @@ build:release:windows64:
     -     $WinFileName = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
     -     $WinFileHash = (Get-FileHash .\$WinFileName -a sha256).Hash
     -     $WinPackageUrl = "${UploadDestURL}/${WinFileName}"
-    -     $WinUploadResult = Invoke-WebRequest @UploadParams -InFile ./$WinFileName -Uri "${WinPackageUrl}${DestStatus}" | ConvertFrom-Json
+    -     $WinUploadResult = Invoke-WebRequest @UploadParams -InFile ./$WinFileName -Uri "${WinPackageUrl}${DestStatus}" -MaximumRetryCount 5 -RetryIntervalSec 30 | ConvertFrom-Json
     -     If ($WinFileHash -ne $WinUploadResult.file_sha256) { Write-Output "Upload hash mismatch. expected $Hash actual $($WinUploadResult.file_sha256)" && Exit 1 }
 
     -     $WinUpdateDeployURL = "${UpdateDeployDestURL}/win-x64"
     -     $FullUpdatePkg = Get-ChildItem -Path . -Name -Include Alchemy*-full.nupkg
-    -     if (Test-Path -Path ./Alchemy*-full.nupkg) { Invoke-WebRequest @UploadParams -InFile ./$FullUpdatePkg -Uri "${WinUpdateDeployURL}/${FullUpdatePkg}" }
+    -     if (Test-Path -Path ./Alchemy*-full.nupkg) { Invoke-WebRequest @UploadParams -InFile ./$FullUpdatePkg -Uri "${WinUpdateDeployURL}/${FullUpdatePkg}" -MaximumRetryCount 5 -RetryIntervalSec 30 }
     -     $DeltaUpdatePkg = Get-ChildItem -Path . -Name -Include Alchemy*-delta.nupkg
-    -     if (Test-Path -Path ./Alchemy*-delta.nupkg) { Invoke-WebRequest @UploadParams -InFile ./$DeltaUpdatePkg -Uri "${WinUpdateDeployURL}/${DeltaUpdatePkg}" }
+    -     if (Test-Path -Path ./Alchemy*-delta.nupkg) { Invoke-WebRequest @UploadParams -InFile ./$DeltaUpdatePkg -Uri "${WinUpdateDeployURL}/${DeltaUpdatePkg}" -MaximumRetryCount 5 -RetryIntervalSec 30 }
     -     $ReleaseFile = Get-ChildItem -Path . -Name -Include RELEASES
-    -     if (Test-Path -Path ./RELEASES) { Invoke-WebRequest @UploadParams -InFile ./$ReleaseFile -Uri "${WinUpdateDeployURL}/${ReleaseFile}" }
+    -     if (Test-Path -Path ./RELEASES) { Invoke-WebRequest @UploadParams -InFile ./$ReleaseFile -Uri "${WinUpdateDeployURL}/${ReleaseFile}" -MaximumRetryCount 5 -RetryIntervalSec 30 }
 
     -   Pop-Location
     -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/Release/ packages/ }
