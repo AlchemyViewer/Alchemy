@@ -531,7 +531,7 @@ LLUpdateAppearanceOnDestroy::~LLUpdateAppearanceOnDestroy()
 	if (!LLApp::isExiting())
 	{
 		// speculative fix for MAINT-1150
-		LL_INFOS("Avatar") << self_av_string() << "done update appearance on destroy" << LL_ENDL;
+		//LL_INFOS("Avatar") << self_av_string() << "done update appearance on destroy" << LL_ENDL;
 
 		selfStopPhase("update_appearance_on_destroy");
 
