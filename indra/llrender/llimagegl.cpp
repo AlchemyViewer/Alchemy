@@ -847,14 +847,6 @@ BOOL LLImageGL::setImage(const U8* data_in, BOOL data_hasmips /* = FALSE */, S32
 
 					mMipLevels = wpo2(llmax(w, h));
 
-					//use legacy mipmap generation mode (note: making this condional can cause rendering issues)
-					// -- but making it not conditional triggers deprecation warnings when core profile is enabled
-					//		(some rendering issues while core profile is enabled are acceptable at this point in time)
-					if (gGLManager.mGLVersion < 3.f)
-					{
-						glTexParameteri(mTarget, GL_GENERATE_MIPMAP, GL_TRUE);
-					}
-
                     LLImageGL::setManualImage(mTarget, 0, mFormatInternal,
 								 w, h, 
 								 mFormatPrimary, mFormatType,
@@ -870,7 +862,6 @@ BOOL LLImageGL::setImage(const U8* data_in, BOOL data_hasmips /* = FALSE */, S32
 						stop_glerror();
 					}
 
-					if (gGLManager.mGLVersion >= 3.f)
 					{
                         LL_PROFILE_GPU_ZONE("generate mip map");
 						glGenerateMipmap(mTarget);
