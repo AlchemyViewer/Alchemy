@@ -620,27 +620,27 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         if (major_version >= 4)
         {
             //set versions 400 through 460
-            if (minor_version <= 69)
+            if (minor_version >= 60)
             {
                 shader_code_text[shader_code_count++] = strdup("#version 460\n");
             }
-            else if (minor_version <= 59)
+            else if (minor_version >= 50)
             {
                 shader_code_text[shader_code_count++] = strdup("#version 450\n");
             }
-            else if (minor_version <= 49)
+            else if (minor_version >= 40)
             {
                 shader_code_text[shader_code_count++] = strdup("#version 440\n");
             }
-            else if (minor_version <= 39)
+            else if (minor_version >= 30)
             {
                 shader_code_text[shader_code_count++] = strdup("#version 430\n");
             }
-            else if (minor_version <= 29)
+            else if (minor_version >= 20)
             {
                 shader_code_text[shader_code_count++] = strdup("#version 420\n");
             }
-            else if (minor_version <= 19)
+            else if (minor_version >= 10)
             {
                 shader_code_text[shader_code_count++] = strdup("#version 410\n");
             }

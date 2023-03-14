@@ -638,6 +638,7 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
                 kCGLPFADepthSize, static_cast<CGLPixelFormatAttribute>(24),
                 kCGLPFAAlphaSize, static_cast<CGLPixelFormatAttribute>(8),
                 kCGLPFAColorSize, static_cast<CGLPixelFormatAttribute>(24),
+                kCGLPFAOpenGLProfile, static_cast<CGLPixelFormatAttribute>(kCGLOGLPVersion_GL4_Core),
                 static_cast<CGLPixelFormatAttribute>(0)
             };
 
