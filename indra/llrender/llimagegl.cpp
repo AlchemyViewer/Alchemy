@@ -1519,14 +1519,6 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
     stop_glerror();
 }
 
-void LLImageGL::setManualImage3D(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, S32 depth, U32 pixformat, U32 pixtype, const void* pixels, bool allow_compression)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-	stop_glerror();
-	glTexImage3D(target, miplevel, intformat, width, height, depth, 0, pixformat, pixtype, pixels);
-	stop_glerror();
-}
-
 //create an empty GL texture: just create a texture name
 //the texture is assiciate with some image by calling glTexImage outside LLImageGL
 BOOL LLImageGL::createGLTexture()

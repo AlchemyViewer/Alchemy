@@ -489,9 +489,13 @@ bool ALRenderUtil::setupColorGrade()
 
 						LLImageGL::generateTextures(1, &mCGLut);
 						gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
-						LLImageGL::setManualImage3D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE_3D), 0, int_format, image_height,
-							image_height, image_height, primary_format, GL_UNSIGNED_BYTE, raw_image->getData(), false);
-						stop_glerror();
+						{
+							stop_glerror();
+							glTexImage3D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE_3D), 0, int_format, image_height, image_height, image_height, 0, primary_format, GL_UNSIGNED_BYTE, raw_image->getData());
+							stop_glerror();
+							glGenerateMipmap(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE_3D));
+							stop_glerror();
+						}
 						gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
 						gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
 						gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
