@@ -176,7 +176,7 @@ coverity_scan:
   before_script:
     - python -m venv .venv
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild
+    - pip3 install --upgrade autobuild cmake
   script:
     - cov-configure --template --comptype clangcc --compiler clang-12
     - cov-configure --template --comptype clangcxx --compiler clang++-12
@@ -350,9 +350,9 @@ build:release:windows64:
     - docker
   allow_failure: false
   before_script:
-    - python -m venv .venv
+    - python3 -m venv .venv
     - ./.venv/bin/Activate.ps1
-    - pip install --upgrade sentry-cli
+    - pip3 install --upgrade sentry-cli
   script:
     - $BuildData = Get-Content ./build-vc-64/newview/Release/build_data.json | ConvertFrom-Json
     - $BuildChannelVersion = $BuildData.Channel + ' ' + $BuildData.Version
