@@ -464,13 +464,13 @@ bool ALRenderUtil::setupColorGrade()
 					case 3:
 					{
 						primary_format = GL_RGB;
-						int_format = GL_SRGB8;
+						int_format = GL_RGB8;
 						break;
 					}
 					case 4:
 					{
 						primary_format = GL_RGBA;
-						int_format = GL_SRGB8_ALPHA8;
+						int_format = GL_RGBA8;
 						break;
 					}
 					default:
@@ -493,12 +493,9 @@ bool ALRenderUtil::setupColorGrade()
 							stop_glerror();
 							glTexImage3D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE_3D), 0, int_format, image_height, image_height, image_height, 0, primary_format, GL_UNSIGNED_BYTE, raw_image->getData());
 							stop_glerror();
-							glGenerateMipmap(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE_3D));
-							stop_glerror();
 						}
 						gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
 						gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-						gGL.getTexUnit(0)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
 						gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
 					}
 					else
@@ -577,7 +574,6 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 			gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
 			gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
 			gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-			gGL.getTexUnit(channel)->setTextureColorSpace(LLTexUnit::TCS_LINEAR);
 		}
 
 		tone_shader->uniform4fv(LLShaderMgr::COLORGRADE_LUT_SIZE, 1, mCGLutSize.mV);
@@ -668,9 +664,13 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 
 	sharpen_shader->bind();
 
-	// Draw
-	src->bindTexture(0, 0, LLTexUnit::TFO_POINT);
+	S32 channel = sharpen_shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
+	if (channel > -1)
+	{
+		src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
+	}
 
+	// Draw
 	mRenderBuffer->setBuffer();
 	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
 
