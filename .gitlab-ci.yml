@@ -49,7 +49,7 @@ variables:
   before_script:
     - python -m venv .venv
     - .\.venv\Scripts\Activate.ps1
-    - pip install --upgrade llbase autobuild certifi
+    - pip install --upgrade llbase autobuild certifi sentry-cli
   script:
     - autobuild configure -c Release -- -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DENABLE_DELTA_GEN=ON -DHAVOK_TPV=OFF
     - autobuild build -c Release --no-configure
@@ -89,7 +89,7 @@ variables:
   before_script:
     - python3 -m venv .venv
     - source .venv/bin/activate
-    - pip3 install --upgrade llbase autobuild dmgbuild certifi
+    - pip3 install --upgrade llbase autobuild dmgbuild certifi sentry-cli
   script:
     - autobuild configure -c Release -- -DENABLE_SIGNING=ON -DUSE_LTO=ON -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DHAVOK_TPV=OFF
     - autobuild build -c Release --no-configure
@@ -349,6 +349,10 @@ build:release:windows64:
     - pwsh
     - docker
   allow_failure: false
+  before_script:
+    - python -m venv .venv
+    - ./.venv/bin/Activate.ps1
+    - pip install --upgrade sentry-cli
   script:
     - $BuildData = Get-Content ./build-vc-64/newview/Release/build_data.json | ConvertFrom-Json
     - $BuildChannelVersion = $BuildData.Channel + ' ' + $BuildData.Version
