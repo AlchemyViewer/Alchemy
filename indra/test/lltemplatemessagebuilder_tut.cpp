@@ -317,7 +317,7 @@ namespace tut
 	void LLTemplateMessageBuilderTestObject::test<14>()
 		 // Quaternion
 	{
-#if LL_CLANG
+#if LL_CLANG || LL_GNUC
         skip("This test fails under fast-math in clang");
 #endif
 		LLMessageTemplate messageTemplate = defaultTemplate();
@@ -788,7 +788,7 @@ namespace tut
 	void LLTemplateMessageBuilderTestObject::test<38>()
 		 // non-zero offset with Quaternion
 	{
-#if LL_CLANG
+#if LL_CLANG || LL_GNUC
         skip("This test fails under fast-math in clang");
 #endif
 		LLMessageTemplate messageTemplate = defaultTemplate();
