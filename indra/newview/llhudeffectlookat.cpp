@@ -432,7 +432,7 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 		}
 	}
 	static LLCachedControl<bool> clamp_lookat_enabled(gSavedSettings, "AlchemyLookAtClampEnabled", false);
-	bool clamp_lookat = clamp_lookat_enabled && !looking_at_self && 
+	bool clamp_lookat = clamp_lookat_enabled && isAgentAvatarValid() && !looking_at_self && 
 						(*mAttentions)[target_type].mName != "Respond" &&
 						(*mAttentions)[target_type].mName != "Conversation" &&
 						(*mAttentions)[target_type].mName != "AutoListen";
