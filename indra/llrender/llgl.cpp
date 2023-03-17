@@ -1448,7 +1448,7 @@ void LLGLManager::initExtensions()
     mHasDebugOutput = mGLVersion >= 4.29f;
     mHasGPUShader4  = mGLVersion >= 3.0f;
     mHasTextureSwizzle = mGLVersion >= 3.29f;
-    mHasTextureFilterAnisotropic = mGLVersion >= 4.59f;
+    mHasTextureFilterAnisotropic = mGLVersion >= 4.59f || ExtensionExists("GL_EXT_texture_filter_anisotropic", gGLHExts.mSysExts);
 
     // Misc
 	glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
@@ -1461,11 +1461,7 @@ void LLGLManager::initExtensions()
 
 #if (LL_WINDOWS || LL_LINUX || LL_SDL) && !LL_MESA_HEADLESS
     mHasATIMemInfo = ExtensionExists("GL_ATI_meminfo", gGLHExts.mSysExts); //Basic AMD method, also see mHasAMDAssociations
-    mHasNVXMemInfo = ExtensionExists("WGL_ARB_create_context", gGLHExts.mSysExts);
-    if(!mHasTextureFilterAnisotropic)
-    {
-        mHasTextureFilterAnisotropic = ExtensionExists("GL_EXT_texture_filter_anisotropic", gGLHExts.mSysExts);
-    }
+    mHasNVXMemInfo = ExtensionExists("GL_NVX_gpu_memory_info", gGLHExts.mSysExts);
 
 	LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
 	
