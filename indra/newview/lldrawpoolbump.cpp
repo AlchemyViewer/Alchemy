@@ -78,7 +78,7 @@ static S32 cube_channel = -1;
 static S32 diffuse_channel = -1;
 static S32 bump_channel = -1;
 
-#define LL_BUMPLIST_MULTITHREADED 1 // TODO -- figure out why this doesn't work
+#define LL_BUMPLIST_MULTITHREADED 0 // TODO -- figure out why this doesn't work
 
 
 // static 
@@ -313,6 +313,7 @@ void LLDrawPoolBump::beginFullbrightShiny()
     }
 
 	{
+		shader->bind();
         if (LLPipeline::sReflectionProbesEnabled)
         {
             gPipeline.bindReflectionProbes(*shader);
