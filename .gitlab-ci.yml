@@ -131,7 +131,7 @@ variables:
   before_script:
     - python3 -m venv .venv
     - source .venv/bin/activate
-    - pip3 install --upgrade llbase autobuild certifi sentry-cli cmake
+    - pip3 install --upgrade llbase autobuild certifi sentry-cli cmake ninja
   script:
     - autobuild configure -c Release -- -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DHAVOK_TPV=OFF
     - autobuild build -c Release --no-configure
@@ -176,7 +176,7 @@ coverity_scan:
   before_script:
     - python -m venv .venv
     - source .venv/bin/activate
-    - pip3 install --upgrade autobuild cmake
+    - pip3 install --upgrade llbase autobuild cmake ninja
   script:
     - cov-configure --template --comptype clangcc --compiler clang-12
     - cov-configure --template --comptype clangcxx --compiler clang++-12
