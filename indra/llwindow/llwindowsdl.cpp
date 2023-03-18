@@ -803,7 +803,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 
 	LL_PROFILER_GPU_CONTEXT;
 
-	// Disable vertical sync for swap
+	// Enable vertical sync for swap
     toggleVSync(enable_vsync);
 
 	setIcon();
@@ -848,10 +848,6 @@ void* LLWindowSDL::createSharedContext()
 	SDL_GLContext shared_context = SDL_GL_CreateContext(mWindow);
 	if (shared_context)
 	{
-		SDL_GL_MakeCurrent(mWindow, shared_context);
-		SDL_GL_SetSwapInterval(0);
-		SDL_GL_MakeCurrent(mWindow, mGLContext);
-
 		LL_INFOS() << "Creating shared OpenGL context successful!" << LL_ENDL;
 
 		return (void*)shared_context;
