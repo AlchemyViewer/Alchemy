@@ -1488,7 +1488,7 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
         LL_PROFILE_ZONE_NUM(height);
 
         free_cur_tex_image();
-#if LL_DARWIN
+#if LL_DARWIN || LL_LINUX
         const bool use_sub_image = false;
 #else
         // glTexSubImage2D doesn't work with compressed textures on select tested Nvidia GPUs on Windows 10 -Cosmic,2023-03-08
