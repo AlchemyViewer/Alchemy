@@ -1124,7 +1124,7 @@ bool LLGLManager::initGL()
 	// Trailing space necessary to keep "nVidia Corpor_ati_on" cards
 	// from being recognized as ATI.
     // NOTE: AMD has been pretty good about not breaking this check, do not rename without good reason
-	if (mGLVendor.substr(0,4) == "ATI ")
+	if (mGLVendor.substr(0,4) == "ATI " || mGLVendor.find("AMD") != std::string::npos)
 	{
 		mGLVendorShort = "AMD";
 		// *TODO: Fix this?
