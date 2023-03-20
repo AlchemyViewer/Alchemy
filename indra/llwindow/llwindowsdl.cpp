@@ -848,6 +848,8 @@ void* LLWindowSDL::createSharedContext()
 	SDL_GLContext shared_context = SDL_GL_CreateContext(mWindow);
 	if (shared_context)
 	{
+		SDL_GL_MakeCurrent(mWindow, shared_context);
+		SDL_GL_MakeCurrent(mWindow, mGLContext);
 		LL_INFOS() << "Creating shared OpenGL context successful!" << LL_ENDL;
 
 		return (void*)shared_context;
