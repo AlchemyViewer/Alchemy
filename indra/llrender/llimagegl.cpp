@@ -275,7 +275,7 @@ S32 LLImageGL::dataFormatBits(S32 dataformat)
     case GL_RED:                                    return 8;
     case GL_COLOR_INDEX:						    return 8;
     case GL_LUMINANCE_ALPHA:					    return 16;
-	case GL_RG:									    return 24;
+	case GL_RG:									    return 16;
     case GL_RGB:								    return 24;
     case GL_SRGB:								    return 24;
     case GL_RGB8:								    return 24;

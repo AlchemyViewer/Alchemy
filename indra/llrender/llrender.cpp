@@ -1013,6 +1013,7 @@ void LLRender::syncMatrices()
 	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
 	static LLMatrix4a cached_mvp;
+    static LLMatrix4a cached_inv_mdv;
 	static U32 cached_mvp_mdv_hash = 0xFFFFFFFF;
 	static U32 cached_mvp_proj_hash = 0xFFFFFFFF;
 	
@@ -1030,6 +1031,13 @@ void LLRender::syncMatrices()
 		{ //update modelview, normal, and MVP
 			const LLMatrix4a& mat = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
 
+            // if MDV has changed, update the cached inverse as well
+            if (cached_mvp_mdv_hash != mMatHash[MM_MODELVIEW])
+            {
+                cached_inv_mdv = mat;
+				cached_inv_mdv.invert();
+            }
+
 			shader->uniformMatrix4fv(name[MM_MODELVIEW], 1, GL_FALSE, mat.getF32ptr());
 			shader->mMatHash[MM_MODELVIEW] = mMatHash[MM_MODELVIEW];
 
@@ -1039,8 +1047,7 @@ void LLRender::syncMatrices()
 			{
 				if (cached_normal_hash != mMatHash[i])
 				{
-					cached_normal = mat;
-					cached_normal.invert();
+					cached_normal = cached_inv_mdv;
 					cached_normal.transpose();
 					cached_normal_hash = mMatHash[i];
 				}
@@ -1054,6 +1061,11 @@ void LLRender::syncMatrices()
 
 				shader->uniformMatrix3fv(LLShaderMgr::NORMAL_MATRIX, 1, GL_FALSE, norms[0].mV);
 			}
+
+            if (shader->getUniformLocation(LLShaderMgr::INVERSE_MODELVIEW_MATRIX))
+            {                
+	            shader->uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_MATRIX, 1, GL_FALSE, cached_inv_mdv.getF32ptr()); 
+            }
 
 			//update MVP matrix
 			mvp_done = true;
