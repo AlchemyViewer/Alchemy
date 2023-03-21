@@ -154,7 +154,7 @@ public:
 	// by non-class code and it's better than making them global.
 #if LL_X11
 	Window mSDL_XWindowID;
-	Display *mSDL_Display;
+	Display *mSDL_Display = nullptr;
 #endif
 
 #if LL_GTK
@@ -207,8 +207,8 @@ protected:
 	//
 	U32             mGrabbyKeyFlags;
 	int				mReallyCapturedCount;
-	SDL_Window*		mWindow;
-	SDL_GLContext   mGLContext;
+	SDL_Window*		mWindow = nullptr;
+	SDL_GLContext   mGLContext = nullptr;
 	std::string		mWindowName;
 	std::string 	mWindowTitle;
 	double			mOriginalAspectRatio;
@@ -242,7 +242,7 @@ private:
 #endif
 
 	bool			mLanguageTextInputAllowed;
-	LLPreeditor*	mPreeditor;
+	LLPreeditor*	mPreeditor = nullptr;
 };
 
 

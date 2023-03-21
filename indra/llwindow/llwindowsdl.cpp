@@ -830,6 +830,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
         LL_WARNS() << "We're not running under any known WM. SDL Err: " << SDL_GetError() << LL_ENDL;
     }
 
+	if (gGLManager.mVRAM == 0)
 	{
 		gGLManager.mVRAM = x11_detect_VRAM_kb() / 1024;
 		if (gGLManager.mVRAM != 0)
@@ -2330,18 +2331,18 @@ S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 typ
 	S32 rtn = OSBTN_CANCEL;
 	U32 messagetype = SDL_MESSAGEBOX_INFORMATION;
 
-	const SDL_MessageBoxButtonData buttons_ok [] = {
+	static const SDL_MessageBoxButtonData buttons_ok [] = {
 		/* .flags, .buttonid, .text */
 		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, OSBTN_OK, "Ok" },
 	};
 
-	const SDL_MessageBoxButtonData buttons_okcancel [] = {
+	static const SDL_MessageBoxButtonData buttons_okcancel [] = {
 		/* .flags, .buttonid, .text */
 		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, OSBTN_OK, "Ok" },
 		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, OSBTN_CANCEL, "Cancel" },
 	};
 
-	const SDL_MessageBoxButtonData buttons_yesno [] = {
+	static const SDL_MessageBoxButtonData buttons_yesno [] = {
 		/* .flags, .buttonid, .text */
 		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, OSBTN_YES, "Yes" },
 		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, OSBTN_NO, "No" },
@@ -2369,7 +2370,7 @@ S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 typ
 
 	const SDL_MessageBoxData messageboxdata = {
 		messagetype, /* .flags */
-		gWindowImplementation->getSDLWindow(), /* .window */
+		gWindowImplementation ? gWindowImplementation->getSDLWindow() : nullptr, /* .window */
 		caption.c_str(), /* .title */
 		text.c_str(), /* .message */
 		num_buttons, /* .numbuttons */
