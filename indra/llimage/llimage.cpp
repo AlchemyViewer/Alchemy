@@ -2224,7 +2224,7 @@ bool LLImageFormatted::load(const std::string &filename, int load_size)
 {
 	resetLastError();
 
-	apr_off_t file_size = 0;
+	S32 file_size = 0;
 	LLAPRFile infile ;
 	infile.open(filename, LL_APR_RB, NULL, &file_size);
 	apr_file_t* apr_file = infile.getFileHandle();

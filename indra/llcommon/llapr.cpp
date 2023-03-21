@@ -335,7 +335,7 @@ apr_status_t LLAPRFile::close()
 	return ret ;
 }
 
-apr_status_t LLAPRFile::open(const std::string& filename, apr_int32_t flags, LLVolatileAPRPool* pool, apr_off_t* sizep)
+apr_status_t LLAPRFile::open(const std::string& filename, apr_int32_t flags, LLVolatileAPRPool* pool, S32* sizep)
 {
 	apr_status_t s ;
 
@@ -358,12 +358,12 @@ apr_status_t LLAPRFile::open(const std::string& filename, apr_int32_t flags, LLV
 	}
 	else if (sizep)
 	{
-		apr_off_t file_size = 0;
+		S32 file_size = 0;
 		apr_off_t offset = 0;
 		if (apr_file_seek(mFile, APR_END, &offset) == APR_SUCCESS)
 		{
-			llassert_always(offset <= std::numeric_limits<apr_off_t>::max());
-			file_size = (apr_off_t)offset;
+			llassert_always(offset <= 0x7fffffff);
+			file_size = (S32)offset;
 			offset = 0;
 			apr_file_seek(mFile, APR_SET, &offset);
 		}
@@ -401,7 +401,7 @@ apr_status_t LLAPRFile::open(const std::string& filename, apr_int32_t flags, BOO
 }
 
 // File I/O
-apr_size_t LLAPRFile::read(void *buf, apr_size_t nbytes)
+S32 LLAPRFile::read(void *buf, S32 nbytes)
 {
 	if(!mFile) 
 	{
@@ -418,12 +418,12 @@ apr_size_t LLAPRFile::read(void *buf, apr_size_t nbytes)
 	}
 	else
 	{
-		llassert_always(sz <= std::numeric_limits<apr_size_t>::max());
-		return (apr_size_t)sz;
+		llassert_always(sz <= 0x7fffffff);
+		return (S32)sz;
 	}
 }
 
-apr_size_t LLAPRFile::write(const void *buf, apr_size_t nbytes)
+S32 LLAPRFile::write(const void *buf, S32 nbytes)
 {
 	if(!mFile) 
 	{
@@ -440,12 +440,12 @@ apr_size_t LLAPRFile::write(const void *buf, apr_size_t nbytes)
 	}
 	else
 	{
-		llassert_always(sz <= std::numeric_limits<apr_size_t>::max());
-		return (apr_size_t)sz;
+		llassert_always(sz <= 0x7fffffff);
+		return (S32)sz;
 	}
 }
 
-apr_off_t LLAPRFile::seek(apr_seek_where_t where, apr_off_t offset)
+S32 LLAPRFile::seek(apr_seek_where_t where, S32 offset)
 {
 	return LLAPRFile::seek(mFile, where, offset) ;
 }
@@ -489,7 +489,7 @@ apr_file_t* LLAPRFile::open(const std::string& filename, apr_pool_t* apr_pool, a
 }
 
 //static
-apr_off_t LLAPRFile::seek(apr_file_t* file_handle, apr_seek_where_t where, apr_off_t offset)
+S32 LLAPRFile::seek(apr_file_t* file_handle, apr_seek_where_t where, S32 offset)
 {
 	if(!file_handle)
 	{
@@ -515,13 +515,13 @@ apr_off_t LLAPRFile::seek(apr_file_t* file_handle, apr_seek_where_t where, apr_o
 	}
 	else
 	{
-		llassert_always(apr_offset <= std::numeric_limits<apr_off_t>::max());
-		return apr_offset;
+		llassert_always(apr_offset <= 0x7fffffff);
+		return (S32)apr_offset;
 	}
 }
 
 //static
-apr_size_t LLAPRFile::readEx(const std::string& filename, void *buf, apr_off_t offset, apr_size_t nbytes, LLVolatileAPRPool* pool)
+S32 LLAPRFile::readEx(const std::string& filename, void *buf, S32 offset, S32 nbytes, LLVolatileAPRPool* pool)
 {
     LL_PROFILE_ZONE_SCOPED;
 	//*****************************************
@@ -555,18 +555,18 @@ apr_size_t LLAPRFile::readEx(const std::string& filename, void *buf, apr_off_t o
 		}
 		else
 		{
-			llassert_always(bytes_read <= std::numeric_limits<apr_size_t>::max());
+			llassert_always(bytes_read <= 0x7fffffff);		
 		}
 	}
 	
 	//*****************************************
 	close(file_handle) ; 
 	//*****************************************
-	return bytes_read;
+	return (S32)bytes_read;
 }
 
 //static
-apr_size_t LLAPRFile::writeEx(const std::string& filename, void *buf, apr_off_t offset, apr_size_t nbytes, LLVolatileAPRPool* pool)
+S32 LLAPRFile::writeEx(const std::string& filename, void *buf, S32 offset, S32 nbytes, LLVolatileAPRPool* pool)
 {
     LL_PROFILE_ZONE_SCOPED;
 	apr_int32_t flags = APR_CREATE|APR_WRITE|APR_BINARY;
@@ -607,7 +607,7 @@ apr_size_t LLAPRFile::writeEx(const std::string& filename, void *buf, apr_off_t 
 		}
 		else
 		{
-			llassert_always(bytes_written <= std::numeric_limits<apr_size_t>::max());
+			llassert_always(bytes_written <= 0x7fffffff);
 		}
 	}
 
@@ -615,7 +615,7 @@ apr_size_t LLAPRFile::writeEx(const std::string& filename, void *buf, apr_off_t 
 	LLAPRFile::close(file_handle);
 	//*****************************************
 
-	return (apr_size_t)bytes_written;
+	return (S32)bytes_written;
 }
 
 //static
@@ -673,7 +673,7 @@ bool LLAPRFile::isExist(const std::string& filename, LLVolatileAPRPool* pool, ap
 }
 
 //static
-apr_off_t LLAPRFile::size(const std::string& filename, LLVolatileAPRPool* pool)
+S32 LLAPRFile::size(const std::string& filename, LLVolatileAPRPool* pool)
 {
 	apr_file_t* apr_file;
 	apr_finfo_t info;
@@ -688,13 +688,13 @@ apr_off_t LLAPRFile::size(const std::string& filename, LLVolatileAPRPool* pool)
 	}
 	else
 	{
-		s = apr_file_info_get(&info, APR_FINFO_SIZE, apr_file);		
+		apr_status_t s = apr_file_info_get(&info, APR_FINFO_SIZE, apr_file);		
 
 		apr_file_close(apr_file) ;
 		
 		if (s == APR_SUCCESS)
 		{
-			return (apr_off_t)info.size;
+			return (S32)info.size;
 		}
 		else
 		{
