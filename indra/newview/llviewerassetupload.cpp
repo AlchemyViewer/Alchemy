@@ -455,7 +455,7 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
     else if (exten == "bvh")
     {
         assetType = LLAssetType::AT_ANIMATION;
-        apr_off_t file_size;
+        S32 file_size;
         LLAPRFile infile;
         infile.open(filename, LL_APR_RB, nullptr, &file_size);
         if (!infile.getFileHandle())
@@ -566,7 +566,7 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
     setAssetType(assetType);
 
     // copy this file into the cache for upload
-    apr_off_t file_size;
+    S32 file_size;
     LLAPRFile infile;
     infile.open(filename, LL_APR_RB, NULL, &file_size);
     if (infile.getFileHandle())
