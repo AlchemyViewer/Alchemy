@@ -110,6 +110,7 @@
 #include "llfloatermap.h"
 #include "llfloaternamedesc.h"
 #include "llfloaterpreference.h"
+#include "llfloaterprogressview.h"
 #include "llfloatersnapshot.h"
 #include "llfloatertools.h"
 #include "llfloaterworldmap.h"
@@ -5875,6 +5876,11 @@ void LLViewerWindow::setProgressPercent(const F32 percent)
 
 void LLViewerWindow::setProgressCancelButtonVisible( BOOL b, const std::string& label )
 {
+	LLFloaterProgressView* pProgFloater = LLFloaterReg::findTypedInstance<LLFloaterProgressView>("progress_view");
+	if(pProgFloater)
+	{
+		pProgFloater->setProgressCancelButtonVisible(b, label);
+	}
 	if (mProgressView)
 	{
 		mProgressView->setCancelButtonVisible( b, label );
