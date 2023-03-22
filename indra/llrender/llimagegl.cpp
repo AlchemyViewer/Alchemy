@@ -1222,7 +1222,7 @@ BOOL LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
 		if (!res) LL_ERRS() << "LLImageGL::setSubImage(): bindTexture failed" << LL_ENDL;
 		stop_glerror();
 
-#if LL_DARWIN
+#if LL_DARWIN || LL_LINUX
         const bool use_sub_image = false;
 #else
         const bool use_sub_image = !isCompressed();
