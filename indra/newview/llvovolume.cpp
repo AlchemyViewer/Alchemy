@@ -5455,7 +5455,8 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 
         if (gltf_mat)
         {
-            // nothing to do, render pools will reference the GLTF material
+            // just remember the material ID, render pools will reference the GLTF material
+            draw_info->mMaterialID = mat_id;
         }
         else if (mat)
 		{
@@ -6682,12 +6683,19 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 						LLRenderPass::PASS_NORMSPEC_EMISSIVE,
 					};
 
-					U32 mask = mat->getShaderMask();
+                    U32 alpha_mode = mat->getDiffuseAlphaMode();
+                    if (!distance_sort && alpha_mode == LLMaterial::DIFFUSE_ALPHA_MODE_BLEND)
+                    { // HACK - this should never happen, but sometimes we get a material that thinks it has alpha blending when it ought not
+                        alpha_mode = LLMaterial::DIFFUSE_ALPHA_MODE_NONE;
+                    }
+					U32 mask = mat->getShaderMask(alpha_mode);
 
 					llassert(mask < sizeof(pass)/sizeof(U32));
 
 					mask = llmin(mask, (U32)(sizeof(pass)/sizeof(U32)-1));
 
+                    // if this is going into alpha pool, distance sort MUST be true
+                    llassert(pass[mask] == LLRenderPass::PASS_ALPHA ? distance_sort : true);
 					registerFace(group, facep, pass[mask]);
 				}
 			}
