@@ -42,6 +42,8 @@ namespace tinygltf
     class Model;
 }
 
+class LLTextureEntry;
+
 class LLGLTFMaterial : public LLRefCount
 {
 public:
@@ -193,6 +195,11 @@ public:
     bool setBaseMaterial();
     // True if setBaseMaterial() was just called
     bool isClearedForBaseMaterial();
+
+    // For local materials, they have to keep track of where
+    // they are assigned to for full updates
+    virtual void addTextureEntry(LLTextureEntry* te) {};
+    virtual void removeTextureEntry(LLTextureEntry* te) {};
 
 private:
     template<typename T>
