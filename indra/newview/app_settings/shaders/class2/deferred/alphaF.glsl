@@ -25,8 +25,6 @@
 
 //class2/deferred/alphaF.glsl
 
-#extension GL_ARB_texture_rectangle : enable
-
 /*[EXTRA_CODE_HERE]*/
 
 #define INDEXED 1

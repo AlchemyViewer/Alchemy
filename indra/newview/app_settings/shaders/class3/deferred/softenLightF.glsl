@@ -23,7 +23,6 @@
  * $/LicenseInfo$
  */
 
-#extension GL_ARB_texture_rectangle : enable
 #extension GL_ARB_shader_texture_lod : enable
 
 #define FLT_MAX 3.402823466e+38
