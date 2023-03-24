@@ -654,7 +654,6 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 	}
 
 	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
-	LLGLDisable srgb(GL_FRAMEBUFFER_SRGB);
 
 	// Bind setup:
 	if (dst)
