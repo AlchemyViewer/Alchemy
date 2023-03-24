@@ -480,9 +480,9 @@ private:
 	bool isNonCacheableObjectCreated(U32 local_id);	
 	void setGodnames();
 
-    void loadCacheMiscExtras(U32 local_id, LLVOCacheEntry * entry, U32 crc);
-    
 public:
+	void loadCacheMiscExtras(U32 local_id);
+
 	struct CompareDistance
 	{
 		bool operator()(const LLViewerRegion* const& lhs, const LLViewerRegion* const& rhs)
