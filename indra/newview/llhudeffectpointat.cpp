@@ -242,7 +242,7 @@ BOOL LLHUDEffectPointAt::setPointAt(EPointAtType target_type, LLViewerObject *ob
 	
 	// type of pointat behavior or target object has changed
 	BOOL targetTypeChanged = (target_type != mTargetType) ||
-		(object != mTargetObject);
+		(object != mTargetObject.get());
 
 	BOOL targetPosChanged = (dist_vec_squared(position, mLastSentOffsetGlobal) > MIN_DELTAPOS_FOR_UPDATE_SQUARED) && 
 		((current_time - mLastSendTime) > (1.f / MAX_SENDS_PER_SEC));

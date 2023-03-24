@@ -414,7 +414,7 @@ void LLRenderPass::renderRiggedGroup(LLSpatialGroup* group, U32 type, U32 mask, 
         LLDrawInfo* pparams = *k;
         if (pparams) 
         {
-            if (lastAvatar != pparams->mAvatar || lastMeshId != pparams->mSkinInfo->mHash)
+            if (lastAvatar != pparams->mAvatar.get() || lastMeshId != pparams->mSkinInfo->mHash)
             {
                 uploadMatrixPalette(*pparams);
                 lastAvatar = pparams->mAvatar;
@@ -450,7 +450,7 @@ void LLRenderPass::pushRiggedBatches(U32 type, U32 mask, BOOL texture, BOOL batc
         LLDrawInfo* pparams = *i;
         if (pparams)
         {
-            if (pparams->mAvatar.notNull() && (lastAvatar != pparams->mAvatar || lastMeshId != pparams->mSkinInfo->mHash))
+            if (pparams->mAvatar.notNull() && (lastAvatar != pparams->mAvatar.get() || lastMeshId != pparams->mSkinInfo->mHash))
             {
                 uploadMatrixPalette(*pparams);
                 lastAvatar = pparams->mAvatar;
@@ -495,7 +495,7 @@ void LLRenderPass::pushRiggedMaskBatches(U32 type, U32 mask, BOOL texture, BOOL 
                 gGL.flush();
             }
 
-            if (lastAvatar != pparams->mAvatar || lastMeshId != pparams->mSkinInfo->mHash)
+            if (lastAvatar != pparams->mAvatar.get() || lastMeshId != pparams->mSkinInfo->mHash)
             {
                 uploadMatrixPalette(*pparams);
                 lastAvatar = pparams->mAvatar;

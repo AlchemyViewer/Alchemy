@@ -7466,7 +7466,7 @@ void LLPipeline::renderAlphaObjects(U32 mask, bool texture, bool batch_texture, 
             {
                 if (pparams->mAvatar != nullptr)
                 {
-                    if (lastAvatar != pparams->mAvatar || lastMeshId != pparams->mSkinInfo->mHash)
+                    if (lastAvatar != pparams->mAvatar.get() || lastMeshId != pparams->mSkinInfo->mHash)
                     {
                         mSimplePool->uploadMatrixPalette(*pparams);
                         lastAvatar = pparams->mAvatar;

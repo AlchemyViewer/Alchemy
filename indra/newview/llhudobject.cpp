@@ -85,7 +85,7 @@ F32 LLHUDObject::getDistance() const
 
 void LLHUDObject::setSourceObject(LLViewerObject* objectp)
 {
-	if (objectp == mSourceObject)
+	if (objectp == mSourceObject.get())
 	{
 		return;
 	}
@@ -95,7 +95,7 @@ void LLHUDObject::setSourceObject(LLViewerObject* objectp)
 
 void LLHUDObject::setTargetObject(LLViewerObject* objectp)
 {
-	if (objectp == mTargetObject)
+	if (objectp == mTargetObject.get())
 	{
 		return;
 	}
