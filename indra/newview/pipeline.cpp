@@ -7508,9 +7508,9 @@ void LLPipeline::renderFinalize()
         }
 
 #if 1
-		mALRenderUtil->renderTonemap(screenTarget(),mPostMap,&mGlow[1]);
+		mALRenderUtil->renderTonemap(screenTarget(), &mPostMap, &mGlow[1], &mExposureMap);
 
-		mALRenderUtil->renderSharpen(screenTarget(),screenTarget());
+		mALRenderUtil->renderSharpen(&mPostMap, &mPostMap);
 #else
         mPostMap.bindTarget();
 

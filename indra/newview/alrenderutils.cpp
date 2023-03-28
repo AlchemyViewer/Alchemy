@@ -513,7 +513,7 @@ bool ALRenderUtil::setupColorGrade()
 	return true;
 }
 
-void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* bloom)
+void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* bloom, LLRenderTarget* exposure)
 {
 	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
@@ -535,6 +535,15 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 		if (channel > -1)
 		{
 			bloom->bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+		}
+	}
+
+	if (exposure)
+	{
+		channel = tone_shader->enableTexture(LLShaderMgr::EXPOSURE_MAP, exposure->getUsage());
+		if (channel > -1)
+		{
+			exposure->bindTexture(0, channel);
 		}
 	}
 

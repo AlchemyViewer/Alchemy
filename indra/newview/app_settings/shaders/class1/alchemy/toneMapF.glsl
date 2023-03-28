@@ -34,6 +34,7 @@ in vec2 vary_fragcoord;
 
 uniform sampler2D diffuseRect;
 uniform sampler2D emissiveRect;
+uniform sampler2D exposureMap;
 
 uniform vec2 screen_res;
 uniform float exposure;
@@ -295,10 +296,10 @@ void main()
 {
     vec4 diff = texture(diffuseRect, vary_fragcoord) + texture2D(emissiveRect, vary_fragcoord);
  
-    #if TONEMAP_METHOD != 0
-    // Exposure adjustment
-    diff.rgb *= exposure;
-    #endif
+    float exp_sample = texture(exposureMap, vec2(0.5,0.5)).r;
+
+    float exp_scale = clamp(0.1/exp_sample, 0.5, 8.0);
+    diff.rgb *= exposure * exp_scale;
     
     #if TONEMAP_METHOD == 0 // None, Gamma Correct Only
     #define NEEDS_GAMMA_CORRECT 1

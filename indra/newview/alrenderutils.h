@@ -62,7 +62,7 @@ public:
 	};
 	bool setupTonemap();
 	bool setupColorGrade();
-	void renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* bloom);
+	void renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* bloom, LLRenderTarget* exposure);
 
 	enum ALSharpen : uint32_t
 	{
