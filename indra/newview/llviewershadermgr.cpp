@@ -682,6 +682,10 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     BOOL local_light_kill = gSavedSettings.getBOOL("LocalLightDisable");
     BOOL ssr = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
 
+	bool has_reflection_probes = gSavedSettings.getBOOL("RenderReflectionsEnabled") && gGLManager.mGLVersion > 3.99f;
+
+	S32 probe_count = gSavedSettings.getS32("RenderReflectionProbeCount");
+
     if (ambient_kill)
     {
         attribs["AMBIENT_KILL"] = "1";
@@ -714,6 +718,12 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["SSR"] = "1";
     }
 
+	if (has_reflection_probes)
+	{
+		attribs["REFMAP_COUNT"] = std::to_string(probe_count);
+		attribs["REF_SAMPLE_COUNT"] = "32";
+	}
+
 	// We no longer have to bind the shaders to global glhandles, they are automatically added to a map now.
 	for (U32 i = 0; i < shaders.size(); i++)
 	{
@@ -736,7 +746,6 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 		ch = llmax(LLGLSLShader::sIndexedTextureChannels, 1);
 	}
 
-    bool has_reflection_probes = gSavedSettings.getBOOL("RenderReflectionsEnabled") && gGLManager.mGLVersion > 3.99f;
 
 	std::vector<S32> index_channels;    
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "windlight/atmosphericsVarsF.glsl",      mShaderLevel[SHADER_WINDLIGHT] ) );
