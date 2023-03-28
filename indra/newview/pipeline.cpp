@@ -885,6 +885,13 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
         mSceneMap.allocate(resX, resY, GL_RGB, true);
     }
 
+    mPostMap.allocate(resX, resY, GL_RGBA);
+
+    mExposureMap.allocate(1, 1, GL_R16F);
+    mExposureMap.bindTarget();
+    mExposureMap.clear();
+    mExposureMap.flush();
+
     //HACK make screenbuffer allocations start failing after 30 seconds
     if (gSavedSettings.getBOOL("SimulateFBOFailure"))
     {
@@ -1142,6 +1149,10 @@ void LLPipeline::releaseGLBuffers()
     mBake.release();
 	
     mSceneMap.release();
+
+    mExposureMap.release();
+
+    mPostMap.release();
 
 	for (U32 i = 0; i < 3; i++)
 	{
@@ -7460,12 +7471,48 @@ void LLPipeline::renderFinalize()
 
             dst.flush();
         }
+
+        // exposure sample
+        {
+            LL_PROFILE_GPU_ZONE("exposure sample");
+            mExposureMap.bindTarget();
+
+            LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+            LLGLEnable blend(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+
+            gExposureProgram.bind();
+
+            S32 channel = 0;
+            channel = gExposureProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, screenTarget()->getUsage());
+            if (channel > -1)
+            {
+                screenTarget()->bindTexture(0, channel, LLTexUnit::TFO_POINT);
+            }
+
+            channel = gDeferredPostGammaCorrectProgram.enableTexture(LLShaderMgr::DEFERRED_EMISSIVE, screenTarget()->getUsage());
+            if (channel > -1)
+            {
+                mGlow[1].bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+            }
+
+            static LLStaticHashedString dt("dt");
+            gExposureProgram.uniform1f(dt, gFrameIntervalSeconds);
+            
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+            gGL.getTexUnit(channel)->unbind(screenTarget()->getUsage());
+            gExposureProgram.unbind();
+            mExposureMap.flush();
+        }
+
 #if 1
-		mALRenderUtil->renderTonemap(screenTarget(),screenTarget(),&mGlow[1]);
+		mALRenderUtil->renderTonemap(screenTarget(),mPostMap,&mGlow[1]);
 
 		mALRenderUtil->renderSharpen(screenTarget(),screenTarget());
 #else
-        screenTarget()->bindTarget();
+        mPostMap.bindTarget();
 
         // gamma correct lighting
         {
@@ -7492,6 +7539,12 @@ void LLPipeline::renderFinalize()
 				mGlow[1].bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
 			}
 
+            channel = gDeferredPostGammaCorrectProgram.enableTexture(LLShaderMgr::EXPOSURE_MAP, mExposureMap.getUsage());
+            if (channel > -1)
+            {
+                mExposureMap.bindTexture(0, channel);
+            }
+
             gDeferredPostGammaCorrectProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, screenTarget()->getWidth(), screenTarget()->getHeight());
 
             static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
@@ -7509,7 +7562,7 @@ void LLPipeline::renderFinalize()
             gDeferredPostGammaCorrectProgram.unbind();
         }
 
-		screenTarget()->flush();
+        mPostMap.flush();
 #endif
 
         LLVertexBuffer::unbind();
@@ -7557,10 +7610,10 @@ void LLPipeline::renderFinalize()
 			shader->bind();
 			shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, width, height);
 
-			channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, screenTarget()->getUsage());
+			channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mPostMap.getUsage());
 			if (channel > -1)
 			{
-				screenTarget()->bindTexture(0, channel);
+				mPostMap.bindTexture(0, channel);
 			}
 
             {
@@ -7571,7 +7624,7 @@ void LLPipeline::renderFinalize()
 
 			gGL.flush();
 
-			shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, screenTarget()->getUsage());
+			shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mPostMap.getUsage());
 			shader->unbind();
 
 			mRT->fxaaBuffer.flush();
@@ -7626,7 +7679,7 @@ void LLPipeline::renderFinalize()
             S32 screen_channel = shader->getTextureChannel(LLShaderMgr::DEFERRED_DIFFUSE);
             S32 depth_channel = shader->getTextureChannel(LLShaderMgr::DEFERRED_DEPTH);
 
-			gGL.getTexUnit(screen_channel)->bind(screenTarget());
+			gGL.getTexUnit(screen_channel)->bind(&mPostMap);
             gGL.getTexUnit(depth_channel)->bind(&mRT->deferredScreen, true);
 
 			gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
