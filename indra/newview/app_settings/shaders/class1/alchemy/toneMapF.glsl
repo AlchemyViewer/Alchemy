@@ -296,9 +296,7 @@ void main()
 {
     vec4 diff = texture(diffuseRect, vary_fragcoord) + texture2D(emissiveRect, vary_fragcoord);
  
-    float exp_sample = texture(exposureMap, vec2(0.5,0.5)).r;
-
-    float exp_scale = clamp(0.1/exp_sample, 0.5, 8.0);
+    float exp_scale = texture(exposureMap, vec2(0.5,0.5)).r;
     diff.rgb *= exposure * exp_scale;
     
     #if TONEMAP_METHOD == 0 // None, Gamma Correct Only
