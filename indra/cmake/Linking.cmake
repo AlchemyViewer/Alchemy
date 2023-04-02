@@ -65,6 +65,7 @@ elseif (WINDOWS)
           user32
           ole32
           dbghelp
+          Shlwapi
           )
 
   if(ASAN)

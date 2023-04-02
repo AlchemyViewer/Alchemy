@@ -251,6 +251,7 @@ target_include_directories( llui  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 target_link_libraries(llui
+        PUBLIC
         llrender
         llwindow
         llimage

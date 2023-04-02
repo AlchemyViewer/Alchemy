@@ -174,7 +174,7 @@ void LLGridManager::initialize(const std::string& grid_file)
 				  "secondlife",
 				  "Aditi");
 
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 	LLSD other_grids;
 	llifstream llsd_xml;
 	if (!grid_file.empty())
@@ -371,7 +371,7 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 	return added;
 }
 
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 bool LLGridManager::removeGrid(const std::string& gridkey)
 {
 	//Grid must exist and not be a system addition
@@ -447,7 +447,7 @@ void LLGridManager::addSystemGrid(const std::string& label,
 	addGrid(grid);
 }
 
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 void LLGridManager::addRemoteGrid(const std::string& login_uri, const EAddGridType type)
 {
 	LL_DEBUGS("GridManager") << "Adding '" << login_uri << "' to grid manager." << LL_ENDL;
@@ -708,7 +708,7 @@ void LLGridManager::setGridChoice(const std::string& grid, const bool only_selec
 		
 		updateIsInProductionGrid();
 	}
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 	else if (!only_select)
 	{
 		// the grid was not in the list of grids.

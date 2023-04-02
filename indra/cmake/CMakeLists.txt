@@ -39,8 +39,8 @@ set(cmake_SOURCE_FILES
         LLTestCommand.cmake
         LLWindow.cmake
         Linking.cmake
-        Meshoptimizer.cmake
         NDOF.cmake
+        NVAPI.cmake
         OPENAL.cmake
         OpenGL.cmake
         OpenJPEG.cmake
@@ -49,7 +49,6 @@ set(cmake_SOURCE_FILES
         PluginAPI.cmake
         Prebuilt.cmake
         PulseAudio.cmake
-	Python.cmake
         SDL2.cmake
         Sentry.cmake
         TemplateCheck.cmake

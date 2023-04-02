@@ -36,6 +36,7 @@
 #include "lldate.h"
 #include "lluri.h"
 #include "lluuid.h"
+#include "llstring.h"
 
 /**
 	LLSD provides a flexible data system similar to the data facilities of

@@ -39,7 +39,6 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
 
   set(alltest_LIBRARIES
           llcommon
-          ll::googlemock
           )
   if(NOT "${project}" STREQUAL "llmath")
     # add llmath as a dep unless the tested module *is* llmath!
@@ -119,7 +118,7 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
     endif()
 
     # Add to project
-    target_link_libraries(PROJECT_${project}_TEST_${name} ${alltest_LIBRARIES} ${${name}_test_additional_PROJECTS} ${${name}_test_additional_LIBRARIES} )
+    target_link_libraries(PROJECT_${project}_TEST_${name} PUBLIC ${alltest_LIBRARIES} ${${name}_test_additional_PROJECTS} ${${name}_test_additional_LIBRARIES} )
     add_dependencies( PROJECT_${project}_TEST_${name} ${alltest_DEP_TARGETS})
     # Compile-time Definitions
     GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_CFLAGS ${source} LL_TEST_ADDITIONAL_CFLAGS)
@@ -202,7 +201,6 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
 
   set(libraries
           ${library_dependencies}
-          ll::googlemock
           )
 
   # Add test executable build target
@@ -239,7 +237,7 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
     message(STATUS "TARGET_LINK_LIBRARIES(INTEGRATION_TEST_${testname} ${libraries})")
   endif()
 
-  target_link_libraries(INTEGRATION_TEST_${testname} ${libraries})
+  target_link_libraries(INTEGRATION_TEST_${testname} PUBLIC ${libraries})
   target_include_directories (INTEGRATION_TEST_${testname} PRIVATE ${LIBS_OPEN_DIR}/test )
 
   # Create the test running command

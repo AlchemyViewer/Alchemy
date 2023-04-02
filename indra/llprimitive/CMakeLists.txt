@@ -54,6 +54,7 @@ add_library (llprimitive ${llprimitive_SOURCE_FILES})
 target_include_directories( llprimitive  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(llprimitive
+        PUBLIC
         llcommon
         llmath
         llmessage
@@ -62,7 +63,6 @@ target_link_libraries(llprimitive
         llcharacter
         llphysicsextensions_impl
         ll::colladadom
-        ll::pcre
         ll::glh_linear
         )
 

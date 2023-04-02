@@ -27,11 +27,15 @@
 
 #include "lltracerecording.h"
 
-#include "llmath.h"
 #include "lltrace.h"
 #include "llfasttimer.h"
 #include "lltracethreadrecorder.h"
 #include "llthread.h"
+
+inline F64 al_lerp(F64 a, F64 b, F64 u) 
+{
+	return a + ((b - a) * u);
+}
 
 namespace LLTrace
 {
@@ -267,7 +271,7 @@ F64Kilobytes Recording::getMean(const StatType<MemAccumulator>& stat)
         {
             t = active_accumulator->mSize.getSampleCount() / div;
         }
-		return F64Bytes(ll_lerp(accumulator.mSize.getMean(), active_accumulator->mSize.getMean(), t));
+		return F64Bytes(al_lerp(accumulator.mSize.getMean(), active_accumulator->mSize.getMean(), t));
 	}
 	else
 	{
@@ -442,7 +446,7 @@ F64 Recording::getMean( const StatType<SampleAccumulator>& stat )
         {
             t = active_accumulator->getSampleCount() / div;
         }
-		return ll_lerp(accumulator.getMean(), active_accumulator->getMean(), t);
+		return al_lerp(accumulator.getMean(), active_accumulator->getMean(), t);
 	}
 	else
 	{
@@ -528,7 +532,7 @@ F64 Recording::getMean( const StatType<EventAccumulator>& stat )
         {
             t = active_accumulator->getSampleCount() / div;
         }
-		return ll_lerp(accumulator.getMean(), active_accumulator->getMean(), t);
+		return al_lerp(accumulator.getMean(), active_accumulator->getMean(), t);
 	}
 	else
 	{

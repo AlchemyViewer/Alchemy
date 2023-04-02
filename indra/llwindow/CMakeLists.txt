@@ -57,7 +57,6 @@ set(llwindow_LINK_LIBRARIES
         ll::glh_linear
         ll::glext
         ll::uilibraries
-        ll::SDL2
         )
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
@@ -83,6 +82,10 @@ if (LINUX)
         fontconfig          # For FCInit and other FC* functions.
         )
   endif (BUILD_HEADLESS)
+
+  list(APPEND llwindow_LINK_LIBRARIES
+       ll::SDL2
+       )
 
 endif (LINUX)
 

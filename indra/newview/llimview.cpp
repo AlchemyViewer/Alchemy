@@ -897,8 +897,7 @@ void LLIMModel::LLIMSession::addMessage(const std::string& from,
                                         const std::string& time,
                                         const bool is_history,  // comes from a history file or chat server
                                         const bool is_region_msg,
-                                        const U32 timestamp, // may be zero
-										const LLSD& bonus)   
+                                        const U32 timestamp) // may be zero 
 {
 	LLSD message;
 	message["from"] = from;
@@ -909,7 +908,6 @@ void LLIMModel::LLIMSession::addMessage(const std::string& from,
 	message["index"] = (LLSD::Integer)mMsgs.size();
 	message["is_history"] = is_history;
 	message["is_region_msg"] = is_region_msg;
-    message["is_announcement"] = bonus.has("announcement");
 
 	mMsgs.push_front(message);          // Add most recent messages to the front of mMsgs
 
@@ -1528,8 +1526,7 @@ bool LLIMModel::addToHistory(const LLUUID& session_id,
                              const LLUUID& from_id,
                              const std::string& utf8_text,
                              bool is_region_msg,
-                             U32 timestamp,
-							 const LLSD& bonus)
+                             U32 timestamp)
 {
 	LLIMSession* session = findIMSession(session_id);
 
@@ -1540,7 +1537,7 @@ bool LLIMModel::addToHistory(const LLUUID& session_id,
 	}
 
     // This is where a normal arriving message is added to the session.   Note that the time string created here is without the full date
-	session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp2LogString(timestamp, false), false, is_region_msg, timestamp, bonus);
+	session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp2LogString(timestamp, false), false, is_region_msg, timestamp);
 
 	return true;
 }
@@ -1578,7 +1575,7 @@ void LLIMModel::proccessOnlineOfflineNotification(
 }
 
 void LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, const LLUUID& from_id,
-						   const std::string& utf8_text, bool log2file /* = true */, bool is_region_msg, /* = false */ U32 time_stamp /* = 0 */, const LLSD& bonus)
+						   const std::string& utf8_text, bool log2file /* = true */, bool is_region_msg, /* = false */ U32 time_stamp /* = 0 */)
 {
     if (gSavedSettings.getBOOL("TranslateChat") && (from != SYSTEM_FROM))
     {
@@ -1591,14 +1588,14 @@ void LLIMModel::addMessage(const LLUUID& session_id, const std::string& from, co
     }
     else
     {
-        processAddingMessage(session_id, from, from_id, utf8_text, log2file, is_region_msg, time_stamp, bonus);
+        processAddingMessage(session_id, from, from_id, utf8_text, log2file, is_region_msg, time_stamp);
     }
 }
 
 void LLIMModel::processAddingMessage(const LLUUID& session_id, const std::string& from, const LLUUID& from_id,
-    const std::string& utf8_text, bool log2file, bool is_region_msg, U32 time_stamp, const LLSD& bonus)
+    const std::string& utf8_text, bool log2file, bool is_region_msg, U32 time_stamp)
 {
-    LLIMSession* session = addMessageSilently(session_id, from, from_id, utf8_text, log2file, is_region_msg, time_stamp, bonus);
+    LLIMSession* session = addMessageSilently(session_id, from, from_id, utf8_text, log2file, is_region_msg, time_stamp);
     if (!session)
         return;
 
@@ -1625,7 +1622,7 @@ void LLIMModel::processAddingMessage(const LLUUID& session_id, const std::string
 
 LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, const std::string& from, const LLUUID& from_id,
 													  const std::string& utf8_text, bool log2file /* = true */, bool is_region_msg, /* false */
-                                                      U32 timestamp /* = 0 */, const LLSD& bonus)
+                                                      U32 timestamp /* = 0 */)
 {
 	LLIMSession* session = findIMSession(session_id);
 
@@ -1641,7 +1638,7 @@ LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, 
 		from_name = SYSTEM_FROM;
 	}
 
-	addToHistory(session_id, from_name, from_id, utf8_text, is_region_msg, timestamp, bonus);
+	addToHistory(session_id, from_name, from_id, utf8_text, is_region_msg, timestamp);
 	if (log2file)
 	{
 		logToFile(getHistoryFileName(session_id), from_name, from_id, utf8_text);
@@ -3110,8 +3107,7 @@ void LLIMMgr::addMessage(
 	const LLUUID& region_id,
 	const LLVector3& position,
     bool is_region_msg,
-    U32 timestamp,
-	const LLSD& bonus)      // May be zero
+    U32 timestamp)      // May be zero
 {
 	LLUUID other_participant_id = target_id;
 
@@ -3222,7 +3218,7 @@ void LLIMMgr::addMessage(
 
 	if (!LLMuteList::getInstance()->isMuted(other_participant_id, LLMute::flagTextChat) && !skip_message)
 	{
-		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg, true, is_region_msg, timestamp, bonus);
+		LLIMModel::instance().addMessage(new_session_id, from, other_participant_id, msg, true, is_region_msg, timestamp);
 	}
 
 	// Open conversation floater if offline messages are present

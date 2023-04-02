@@ -26,8 +26,6 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "llviewerbuildconfig.h"
-
 #include "llappviewer.h"
 
 // Viewer includes
@@ -263,7 +261,7 @@ using namespace LL;
 #include "llcoproceduremanager.h"
 #include "llviewereventrecorder.h"
 
-#if USE_DISCORD
+#ifdef AL_DISCORD
 #include "aldiscordmanager.h"
 #endif
 
@@ -1250,7 +1248,7 @@ bool LLAppViewer::init()
     }
 #endif
 
-#if USE_DISCORD
+#ifdef AL_DISCORD
 		ALDiscordManager::getInstance();
 		LL_INFOS("AppInit") << "Discord Integration Initialized." << LL_ENDL; 
 #endif

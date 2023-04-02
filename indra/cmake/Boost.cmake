@@ -28,8 +28,6 @@ if (WINDOWS)
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_program_options-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_regex-mt${addrsfx}.lib
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_regex-mt-gd${addrsfx}.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_signals-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_signals-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_stacktrace_windbg-mt${addrsfx}.lib
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_stacktrace_windbg-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_system-mt${addrsfx}.lib
@@ -51,8 +49,6 @@ elseif (LINUX)
         debug boost_program_options-mt${addrsfx}-d
         optimized boost_regex-mt${addrsfx}
         debug boost_regex-mt${addrsfx}-d
-        optimized boost_signals-mt${addrsfx}
-        debug boost_signals-mt${addrsfx}-d
         optimized boost_system-mt${addrsfx}
         debug boost_system-mt${addrsfx}-d
         optimized boost_thread-mt${addrsfx}
@@ -73,8 +69,6 @@ elseif (DARWIN)
         debug boost_program_options-mt-d
         optimized boost_regex-mt
         debug boost_regex-mt-d
-        optimized boost_signals-mt
-        debug boost_signals-mt-d
         optimized boost_system-mt
         debug boost_system-mt-d
         optimized boost_thread-mt
@@ -84,3 +78,4 @@ elseif (DARWIN)
 	)
 endif (WINDOWS)
 
+target_compile_definitions( ll::boost INTERFACE BOOST_ALLOW_DEPRECATED_HEADERS=1 BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE=1 BOOST_BIND_GLOBAL_PLACEHOLDERS=1)

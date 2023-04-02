@@ -9,9 +9,6 @@ include(ZLIBNG)
 
 include_guard()
 
-add_library( ll::pcre INTERFACE IMPORTED )
-add_library( ll::minizip-ng INTERFACE IMPORTED )
-add_library( ll::libxml INTERFACE IMPORTED )
 add_library( ll::colladadom INTERFACE IMPORTED )
 
 # ND, needs fixup in collada conan pkg
@@ -22,25 +19,7 @@ if( USE_CONAN )
 endif()
 
 use_system_binary( colladadom )
-
 use_prebuilt_binary(colladadom)
-use_prebuilt_binary(minizip-ng) # needed for colladadom
-use_prebuilt_binary(pcre)
-use_prebuilt_binary(libxml2)
-
-target_link_libraries( ll::pcre INTERFACE pcrecpp pcre )
-
-if (WINDOWS)
-    target_link_libraries( ll::minizip-ng INTERFACE libminizip )
-else()
-    target_link_libraries( ll::minizip-ng INTERFACE minizip )
-endif()
-
-if (WINDOWS)
-    target_link_libraries( ll::libxml INTERFACE libxml2_a)
-else()
-    target_link_libraries( ll::libxml INTERFACE xml2)
-endif()
 
 target_include_directories( ll::colladadom SYSTEM INTERFACE
         ${LIBS_PREBUILT_DIR}/include/collada
@@ -50,9 +29,9 @@ if (WINDOWS)
     target_link_libraries(ll::colladadom INTERFACE 
 			  debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcollada14dom23-sd.lib
 			  optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcollada14dom23-s.lib
-			  ll::libxml ll::minizip-ng )
+			  ll::libxml2 ll::uriparser ll::minizip-ng )
 elseif (DARWIN)
-    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::libxml ll::minizip-ng)
+    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::libxml2 ll::uriparser ll::minizip-ng)
 elseif (LINUX)
-    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::libxml ll::minizip-ng)
+    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::libxml2 ll::uriparser ll::minizip-ng)
 endif()

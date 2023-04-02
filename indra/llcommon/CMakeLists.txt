@@ -12,6 +12,7 @@ include(LLSharedLibs)
 include(Copy3rdPartyLibs)
 include(ZLIBNG)
 include(URIPARSER)
+include(Sentry)
 include(Tracy)
 include(OpenSSL)
 include(XXHash)
@@ -274,18 +275,23 @@ target_link_libraries(
         PUBLIC
         ll::apr
         ll::expat
-        ll::jsoncpp
+        ll::openssl
         ll::zlib-ng
         ll::boost
         ll::uriparser
         ll::oslibraries
         ll::tracy
+        ll::xxhash
         nlohmann_json::nlohmann_json
         fmt::fmt
     )
 
 target_include_directories(llcommon INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(llcommon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(TARGET al::sentry)
+    target_compile_definitions(llcommon PRIVATE AL_SENTRY=1)
+endif()
 
 add_dependencies(llcommon stage_third_party_libs)
 

@@ -35,6 +35,7 @@
 #include "llassettype.h"
 #include "lldir.h"
 #include <boost/filesystem.hpp>
+#include <boost/range/iterator_range.hpp>
 #include <chrono>
 
 #include "lldiskcache.h"
@@ -470,21 +471,26 @@ uintmax_t LLDiskCache::dirFileSize(const std::string dir)
 #endif
     if (boost::filesystem::is_directory(dir_path, ec) && !ec.failed())
     {
-        boost::filesystem::directory_iterator iter(dir_path, ec);
-        while (iter != boost::filesystem::directory_iterator() && !ec.failed())
+        boost::filesystem::recursive_directory_iterator dir_iter(dir_path,ec);
+        if (!ec.failed())
         {
-            if (boost::filesystem::is_regular_file(*iter, ec) && !ec.failed())
+            for (auto& entry : boost::make_iterator_range(dir_iter, {}))
             {
-                if ((*iter).path().string().find(mCacheFilenamePrefix) != std::string::npos)
+                ec.clear();
+                if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
                 {
-                    uintmax_t file_size = boost::filesystem::file_size(*iter, ec);
-                    if (!ec.failed())
+                    if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
                     {
+                        uintmax_t file_size = boost::filesystem::file_size(entry, ec);
+                        if (ec.failed())
+                        {
+                            LL_WARNS() << "Failed to get file size for cache file " << entry.path().string() << " : " << ec.message() << LL_ENDL;
+                            continue;
+                        }
                         total_file_size += file_size;
                     }
                 }
             }
-            iter.increment(ec);
         }
     }
 

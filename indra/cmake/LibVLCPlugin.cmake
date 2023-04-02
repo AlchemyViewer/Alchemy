@@ -25,5 +25,4 @@ elseif (LINUX)
             ${LIBS_PREBUILT_DIR}/lib/libvlc.a
             ${LIBS_PREBUILT_DIR}/lib/libvlccore.a
     )
-endif (WINDOWS)
 endif ()

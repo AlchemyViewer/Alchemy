@@ -43,9 +43,8 @@
 #include "algamemode.h"
 
 // Sentry (https://sentry.io) crash reporting tool
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 #include <sentry.h>
-#include "llviewerbuildconfig.h"
 #endif
 
 #if LL_DBUS_ENABLED
@@ -114,7 +113,7 @@ int main( int argc, char **argv )
 	delete viewer_app_ptr;
 	viewer_app_ptr = NULL;
 
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	sentry_close();
 #endif
 
@@ -346,7 +345,7 @@ bool LLAppViewerLinux::sendURLToOtherInstance(const std::string& url)
 
 void LLAppViewerLinux::setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name)
 {
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	if (mSentryInitialized)
 	{
 		sentry_value_t user = sentry_value_new_object();
@@ -359,7 +358,7 @@ void LLAppViewerLinux::setCrashUserMetadata(const LLUUID& user_id, const std::st
 
 void LLAppViewerLinux::initCrashReporting(bool reportFreeze)
 {
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	sentry_options_t* options = sentry_options_new();
 	sentry_options_set_dsn(options, SENTRY_DSN);
 	sentry_options_set_release(options, LL_VIEWER_CHANNEL_AND_VERSION);

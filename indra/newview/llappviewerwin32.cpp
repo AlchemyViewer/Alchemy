@@ -26,8 +26,6 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "llviewerbuildconfig.h"
-
 #ifdef INCLUDE_VLD
 #include "vld.h"
 #endif
@@ -49,7 +47,7 @@
 #include "llviewercontrol.h"
 #include "lldxhardware.h"
 
-#if USE_NVAPI
+#ifdef LL_NVAPI
 #include "nvapi/nvapi.h"
 #include "nvapi/NvApiDriverSettings.h"
 #endif
@@ -77,7 +75,7 @@
 #include <exception>
 
 // Sentry (https://sentry.io) crash reporting tool
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 #include <sentry.h>
 #endif
 
@@ -142,7 +140,7 @@ bool create_app_mutex()
 	return result;
 }
 
-#if USE_NVAPI
+#ifdef LL_NVAPI
 
 #define ALWSTR_SIZE(inwstr) ((inwstr.size() + 1) * sizeof(wchar_t))
 
@@ -369,7 +367,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 		return -1;
 	}
 
-#if USE_NVAPI
+#ifdef LL_NVAPI
 	// Initialize NVAPI
 	NvAPI_Status nvStatus = NvAPI_Initialize();
 	NvDRSSessionHandle nvhSession = 0;
@@ -446,7 +444,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 	delete viewer_app_ptr;
 	viewer_app_ptr = NULL;
 
-#if USE_NVAPI
+#ifdef LL_NVAPI
 	// (NVAPI) (6) We clean up. This is analogous to doing a free()
 	if (nvhSession)
 	{
@@ -465,7 +463,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 
 #endif
 
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	sentry_close();
 #endif
 
@@ -629,7 +627,7 @@ bool LLAppViewerWin32::cleanup()
 
 void LLAppViewerWin32::reportCrashToBugsplat(void* pExcepInfo)
 {
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	if (mSentryInitialized)
 	{
 		sentry_ucontext_s exc_context = {};
@@ -641,7 +639,7 @@ void LLAppViewerWin32::reportCrashToBugsplat(void* pExcepInfo)
 
 void LLAppViewerWin32::setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name)
 {
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	if (mSentryInitialized)
 	{
 		sentry_value_t user = sentry_value_new_object();
@@ -756,7 +754,7 @@ bool LLAppViewerWin32::restoreErrorTrap()
 
 void LLAppViewerWin32::initCrashReporting(bool reportFreeze)
 {
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	sentry_options_t* options = sentry_options_new();
 	sentry_options_set_dsn(options, SENTRY_DSN);
 	sentry_options_set_release(options, LL_VIEWER_CHANNEL_AND_VERSION);

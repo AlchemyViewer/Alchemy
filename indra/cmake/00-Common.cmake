@@ -18,16 +18,15 @@ include(CheckCXXCompilerFlag)
 include(Variables)
 include(SDL2)
 
-set(Python3_FIND_VIRTUALENV FIRST)
-find_package(Python3 COMPONENTS Interpreter)
-
 # Portable compilation flags.
 add_compile_definitions(
     ADDRESS_SIZE=${ADDRESS_SIZE}
-    $<$<CONFIG:Debug>:-D_DEBUG>
-    $<$<CONFIG:Debug>:-DLL_DEBUG=1>
-    $<$<CONFIG:RelWithDebInfo>:-DLL_RELEASE=1 -DNDEBUG -DLL_RELEASE_WITH_DEBUG_INFO=1>
-    $<$<CONFIG:Release>:-DLL_RELEASE=1 -DLL_RELEASE_FOR_DOWNLOAD=1 -DNDEBUG>
+    $<$<CONFIG:Debug>:_DEBUG>
+    $<$<CONFIG:Debug>:LL_DEBUG=1>
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:LL_RELEASE=1>
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:NDEBUG>
+    $<$<CONFIG:RelWithDebInfo>:LL_RELEASE_WITH_DEBUG_INFO=1>
+    $<$<CONFIG:Release>:LL_RELEASE_FOR_DOWNLOAD=1>
     )
 # Configure crash reporting
 set(RELEASE_CRASH_REPORTING OFF CACHE BOOL "Enable use of crash reporting in release builds")
@@ -63,71 +62,116 @@ if (WINDOWS)
 
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_compile_options(/MP)
-
   elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     add_compile_options(-m${ADDRESS_SIZE})
   endif ()
 
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od /Zi /MDd /EHsc -D_SCL_SECURE_NO_WARNINGS=1")
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-      "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Od /Zi /MD /Ob0 /EHsc -D_ITERATOR_DEBUG_LEVEL=0")
+  add_compile_definitions(
+    $<$<CONFIG:Debug>:_SCL_SECURE_NO_WARNINGS=1>
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:_ITERATOR_DEBUG_LEVEL=0>
+    LL_WINDOWS=1
+    NOMINMAX
+    UNICODE
+    _UNICODE
+    _CRT_SECURE_NO_WARNINGS
+    _CRT_NONSTDC_NO_DEPRECATE
+    _WINSOCK_DEPRECATED_NO_WARNINGS
+    _SILENCE_CXX20_CISO646_REMOVED_WARNING
+    )
 
-  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-    set(CMAKE_CXX_FLAGS_RELEASE
-        "${CMAKE_CXX_FLAGS_RELEASE} /O2 /Oi /Ot /Gy /Zi /MD /Ob3 /Oy- /Zc:inline /EHsc /fp:fast -D_ITERATOR_DEBUG_LEVEL=0")
-  elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-    set(CMAKE_CXX_FLAGS_RELEASE
-        "${CMAKE_CXX_FLAGS_RELEASE} /clang:-Ofast /clang:-ffast-math /Oi /Ot /Gy /Zi /MD /Ob2 /Oy- /Zc:inline /EHsc /fp:fast -D_ITERATOR_DEBUG_LEVEL=0")
-  endif()
+  add_compile_options(
+    $<$<CONFIG:Debug>:/Od>
+    $<$<CONFIG:Debug>:/MDd>
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:/O2>
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:/MD>
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:/GS>
+    $<$<CONFIG:Release>:/Oi>
+    $<$<CONFIG:Release>:/Ot>
+    $<$<CONFIG:Release>:/Gy>
+    $<$<CONFIG:Release>:/Oy->
+    $<$<CONFIG:Release>:/Zc:inline>
+    $<$<CONFIG:Release>:/fp:fast>
+    /Zi
+    /EHsc
+    /permissive-
+    /W3 
+    /c 
+    /Zc:__cplusplus 
+    /Zc:forScope 
+    /Zc:rvalueCast 
+    /Zc:strictStrings 
+    /Zc:ternary 
+    /nologo
+    )
+
+  add_link_options(
+    /DEBUG:FULL
+    /IGNORE:4099
+    /NODEFAULTLIB:LIBCMT
+    $<$<CONFIG:Debug>:/NODEFAULTLIB:LIBCMTD>
+    $<$<CONFIG:Debug>:/NODEFAULTLIB:MSVCRT>
+    )
 
   if (ADDRESS_SIZE EQUAL 32)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LARGEADDRESSAWARE")
-  endif (ADDRESS_SIZE EQUAL 32)
-
-  if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR FULL_DEBUG_SYMS OR USE_SENTRY)
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG:FULL")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG:FULL")
+    add_compile_options(/arch:SSE2)
+  elseif (USE_AVX2)
+    add_compile_options(/arch:AVX2)
+  elseif (USE_AVX)
+    add_compile_options(/arch:AVX)
+  elseif (USE_SSE42)
+    add_compile_definitions(__SSE3__=1 __SSSE3__=1 __SSE4__=1 __SSE4_1__=1 __SSE4_2__=1)
   else ()
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG:FASTLINK /IGNORE:4099")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG:FASTLINK /IGNORE:4099")
+    add_compile_definitions(__SSE3__=1 __SSSE3__=1 __SSE4__=1 __SSE4_1__=1)
   endif ()
 
-  set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:LIBCMT")
-  set(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:LIBCMT /NODEFAULTLIB:LIBCMTD /NODEFAULTLIB:MSVCRT")
-  set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:LIBCMT")
-  set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:LIBCMT /NODEFAULTLIB:LIBCMTD /NODEFAULTLIB:MSVCRT")
-  
+  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    add_compile_options(/Zc:externConstexpr /Zc:referenceBinding /ZH:SHA_256)
+  elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    add_compile_options(/Qvec /Zc:dllexportInlines- /clang:-mprefer-vector-width=128 -fno-strict-aliasing -Wno-ignored-pragma-intrinsic -Wno-unused-local-typedef)
+  endif()
+
+  if(FAVOR_AMD AND FAVOR_INTEL)
+      message(FATAL_ERROR "Cannot enable FAVOR_AMD and FAVOR_INTEL at the same time")
+  elseif(FAVOR_AMD)
+      add_compile_options(/favor:AMD64)
+  elseif(FAVOR_INTEL)
+      add_compile_options(/favor:INTEL64)
+  endif()
+
   if (USE_LTO)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
       if(INCREMENTAL_LINK)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LTCG:incremental")
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /LTCG:incremental")
+        add_link_options(/LTCG:incremental)
         set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /LTCG")
-      else(INCREMENTAL_LINK)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LTCG")
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /LTCG")
+      else()
+        add_link_options(/LTCG)
         set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /LTCG")
-      endif(INCREMENTAL_LINK)
-      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /OPT:REF /OPT:ICF /INCREMENTAL:NO")
-      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /OPT:REF /OPT:ICF /INCREMENTAL:NO")
-      set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /GL /Gy /Gw")
+      endif()
+      add_link_options(
+        $<$<CONFIG:Release>:/OPT:REF>
+        $<$<CONFIG:Release>:/OPT:ICF>
+        $<$<CONFIG:Release>:/INCREMENTAL:NO>
+        )
+      add_compile_options(/GL /Gy /Gw)
     elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
       if(INCREMENTAL_LINK)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=thin -fwhole-program-vtables /clang:-fforce-emit-vtables")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto=thin -fwhole-program-vtables /clang:-fforce-emit-vtables")
-      else(INCREMENTAL_LINK)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=full -fwhole-program-vtables /clang:-fforce-emit-vtables")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto=full -fwhole-program-vtables /clang:-fforce-emit-vtables")
-      endif(INCREMENTAL_LINK)
-      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /OPT:REF /OPT:ICF")
-      set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /OPT:REF /OPT:ICF")
+        add_compile_options(-flto=thin -fwhole-program-vtables /clang:-fforce-emit-vtables)
+      else()
+        add_compile_options(-flto=full -fwhole-program-vtables /clang:-fforce-emit-vtables)
+      endif()
+      add_link_options(
+        $<$<CONFIG:Release>:/OPT:REF>
+        $<$<CONFIG:Release>:/OPT:ICF>
+        )
     endif()
   elseif (INCREMENTAL_LINK)
-    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /INCREMENTAL")
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /INCREMENTAL")
+    add_link_options($<$<CONFIG:Release>:/INCREMENTAL>)
   else ()
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /OPT:REF /OPT:ICF /INCREMENTAL:NO")
-    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /OPT:REF /OPT:ICF /INCREMENTAL:NO")
+    add_link_options(
+      $<$<CONFIG:Release>:/OPT:REF>
+      $<$<CONFIG:Release>:/OPT:ICF>
+      $<$<CONFIG:Release>:/INCREMENTAL:NO>
+      )
   endif ()
 
   if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
@@ -140,230 +184,124 @@ if (WINDOWS)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /defaultlib:\"${CLANG_RT}\"")
   endif()
 
-  set(GLOBAL_CXX_FLAGS 
-      "/GS /W3 /c /Zc:__cplusplus /Zc:forScope /Zc:rvalueCast /Zc:strictStrings /Zc:ternary /nologo"
-      )
-
-  if (ADDRESS_SIZE EQUAL 32)
-    set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /arch:SSE2")
-  elseif (USE_AVX2)
-    set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /arch:AVX2")
-    add_definitions(/DAL_AVX2=1 /DAL_AVX=1)
-  elseif (USE_AVX)
-    set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /arch:AVX")
-    add_definitions(/DAL_AVX=1)
-  elseif (USE_SSE42)
-    add_definitions(/D__SSE3__=1 /D__SSSE3__=1 /D__SSE4__=1 /D__SSE4_1__=1 /D__SSE4_2__=1)
-  else()
-    add_definitions(/D__SSE3__=1 /D__SSSE3__=1 /D__SSE4__=1 /D__SSE4_1__=1)
-  endif ()
-
-  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-    set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /permissive- /Zc:externConstexpr /Zc:referenceBinding /ZH:SHA_256")
-  elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-    set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /Qvec /Zc:dllexportInlines- /clang:-mprefer-vector-width=128 -fno-strict-aliasing -Wno-ignored-pragma-intrinsic -Wno-unused-local-typedef")
-  endif()
-
-  if(FAVOR_AMD AND FAVOR_INTEL)
-      message(FATAL_ERROR "Cannot enable FAVOR_AMD and FAVOR_INTEL at the same time")
-  elseif(FAVOR_AMD)
-      set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /favor:AMD64")
-  elseif(FAVOR_INTEL)
-      set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /favor:INTEL64")
-  endif()
-
   if (NOT DISABLE_FATAL_WARNINGS)
-    set(GLOBAL_CXX_FLAGS "${GLOBAL_CXX_FLAGS} /WX")
+    add_compile_options(/WX)
   endif (NOT DISABLE_FATAL_WARNINGS)
 
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${GLOBAL_CXX_FLAGS}" CACHE STRING "C++ compiler debug options" FORCE)
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${GLOBAL_CXX_FLAGS}" CACHE STRING "C++ compiler release-with-debug options" FORCE)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${GLOBAL_CXX_FLAGS}" CACHE STRING "C++ compiler release options" FORCE)
-
-  add_definitions(
-      /DLL_WINDOWS=1
-      /DNOMINMAX
-      /DUNICODE
-      /D_UNICODE
-      /D_CRT_SECURE_NO_WARNINGS
-      /D_CRT_NONSTDC_NO_DEPRECATE
-      /D_WINSOCK_DEPRECATED_NO_WARNINGS
-      /DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE
-      /DBOOST_ALLOW_DEPRECATED_HEADERS
-      /D_SILENCE_CXX20_CISO646_REMOVED_WARNING
-      )
-
-  # library linkage defines
-  add_definitions(
-      /DCURL_STATICLIB=1
-      /DURI_STATIC_BUILD=1
-      /DLIBXML_STATIC=1
-      /DHUNSPELL_STATIC=1
-      /DXML_STATIC=1
-      /DXMLRPCEPI_STATIC=1
-      /DAPR_DECLARE_STATIC=1
-      /DAPU_DECLARE_STATIC=1
-      /DAPI_DECLARE_STATIC=1
-  )
+  string(REPLACE "/Ob2" "/Ob3" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
+  string(REPLACE "/Ob2" "/Ob3" CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
 
   # configure win32 API for 7 and above compatibility
   set(WINVER "0x0601" CACHE STRING "Win32 API Target version (see http://msdn.microsoft.com/en-us/library/aa383745%28v=VS.85%29.aspx)")
-  add_definitions("/DWINVER=${WINVER}" "/D_WIN32_WINNT=${WINVER}")
+  add_compile_definitions(WINVER=${WINVER} _WIN32_WINNT=${WINVER})
 endif (WINDOWS)
 
 if (LINUX)
   set(CMAKE_SKIP_BUILD_RPATH TRUE)
 
-  set(ALCHEMY_GLOBAL_DEFS "-DLL_LINUX=1 -DAPPID=secondlife -DLL_IGNORE_SIGCHLD -D_REENTRANT -DGDK_DISABLE_DEPRECATED -DGTK_DISABLE_DEPRECATED -DGSEAL_ENABLE -DGTK_DISABLE_SINGLE_INCLUDES")
-  set(ALCHEMY_GLOBAL_CFLAGS "-fvisibility=hidden -fexceptions -fno-math-errno -fno-strict-aliasing -fsigned-char -g -gz -pthread")
+  add_compile_definitions(
+    LL_LINUX=1
+    APPID=secondlife
+    LL_IGNORE_SIGCHLD
+    _REENTRANT
+    $<$<CONFIG:Release>:_FORTIFY_SOURCE=2>
+    GDK_DISABLE_DEPRECATED
+    GTK_DISABLE_DEPRECATED
+    GSEAL_ENABLE
+    GTK_DISABLE_SINGLE_INCLUDES
+    )
+
+  add_compile_options(
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-fstack-protector>
+    -fvisibility=hidden 
+    -fexceptions
+    -fno-math-errno
+    -fno-strict-aliasing
+    -fsigned-char
+    -g
+    -gz
+    -pthread
+    )
 
   if (USE_AVX2)
-    set(ALCHEMY_GLOBAL_CFLAGS "${ALCHEMY_GLOBAL_CFLAGS} -mavx2")
+    add_compile_options(-mavx2)
   elseif (USE_AVX)
-    set(ALCHEMY_GLOBAL_CFLAGS "${ALCHEMY_GLOBAL_CFLAGS} -mavx")
+    add_compile_options(-mavx)
   elseif (USE_SSE42)
-    set(ALCHEMY_GLOBAL_CFLAGS "${ALCHEMY_GLOBAL_CFLAGS} -mfpmath=sse -msse -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2")
+    add_compile_options(-mfpmath=sse -msse -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2)
   else()
-    set(ALCHEMY_GLOBAL_CFLAGS "${ALCHEMY_GLOBAL_CFLAGS} -mfpmath=sse -msse -msse2 -msse3 -mssse3 -msse4 -msse4.1")
+    add_compile_options(-mfpmath=sse -msse -msse2 -msse3 -mssse3 -msse4 -msse4.1)
   endif ()
-
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ALCHEMY_GLOBAL_DEFS} ${ALCHEMY_GLOBAL_CFLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ALCHEMY_GLOBAL_DEFS} ${ALCHEMY_GLOBAL_CFLAGS}")
 
   if (USE_LTO)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=thin -fwhole-program-vtables -fforce-emit-vtables")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto=thin -fwhole-program-vtables -fforce-emit-vtables")
+      add_compile_options(-flto=thin -fwhole-program-vtables -fforce-emit-vtables)
     elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=auto -fno-fat-lto-objects")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto=auto -fno-fat-lto-objects")
+      add_compile_options(-flto=auto -fno-fat-lto-objects)
     endif ()
-  endif (USE_LTO)
+  endif ()
 
   if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     if (USE_ASAN)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fsanitize-recover=address")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fsanitize-recover=address")
+      add_compile_options(-fsanitize=address -fsanitize-recover=address)
       link_libraries(-lasan)
-    endif (USE_ASAN)
-
-    if (USE_LEAKSAN)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=leak")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=leak")
+    elseif (USE_LEAKSAN)
+      add_compile_options(-fsanitize=leak)
       link_libraries(-llsan)
-    endif (USE_LEAKSAN)
-
-    if (USE_UBSAN)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined -fno-sanitize=vptr")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined -fno-sanitize=vptr")
+    elseif (USE_UBSAN)
+      add_compile_options(-fsanitize=undefined -fno-sanitize=vptr)
       link_libraries(-lubsan)
-    endif (USE_UBSAN)
-
-    if (USE_THDSAN)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread")
-    endif (USE_THDSAN)
-  endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-
-  CHECK_CXX_COMPILER_FLAG(-Og HAS_DEBUG_OPTIMIZATION)
-  CHECK_CXX_COMPILER_FLAG(-fstack-protector HAS_STACK_PROTECTOR)
-  if (${CMAKE_BUILD_TYPE} STREQUAL "Release")
-    if (HAS_STACK_PROTECTOR)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fstack-protector")
+    elseif (USE_THDSAN)
+      add_compile_options(-fsanitize=thread)
     endif ()
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2")
-  endif (${CMAKE_BUILD_TYPE} STREQUAL "Release")
-
-  if (HAS_DEBUG_OPTIMIZATION)
-    set(CMAKE_CXX_FLAGS_DEBUG "-Og ${CMAKE_CXX_FLAGS_DEBUG}")
-  else (HAS_DEBUG_OPTIMIZATION)
-    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -fno-inline ${CMAKE_CXX_FLAGS_DEBUG}")
-  endif (HAS_DEBUG_OPTIMIZATION)
+  endif ()
 
   if (USE_ASAN OR USE_LEAKSAN OR USE_UBSAN OR USE_THDSAN)
-    if (HAS_DEBUG_OPTIMIZATION)
-      set(CMAKE_CXX_FLAGS_RELEASE "-Og -fno-omit-frame-pointer ${CMAKE_CXX_FLAGS_RELEASE}")
-    else()
-      set(CMAKE_CXX_FLAGS_RELEASE "-O0 -fno-omit-frame-pointer ${CMAKE_CXX_FLAGS_RELEASE}")
-    endif()
+    add_compile_options(-Og -fno-omit-frame-pointer)
   else ()
-    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffast-math ${CMAKE_CXX_FLAGS_RELEASE}")
+    add_compile_options(-O3 -ffast-math)
   endif ()
 
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND USE_LTO)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+    add_link_options(-fuse-ld=lld)
   endif()
 
   # Enable these flags so we have a read only GOT and some linking opts
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now -Wl,--as-needed")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,relro -Wl,-z,now -Wl,--as-needed")
-endif (LINUX)
-
+  add_link_options("LINKER:-z,relro" "LINKER:-z,now" "LINKER:--as-needed")
+endif ()
 
 if (DARWIN)
-  add_definitions(-DLL_DARWIN=1 -DGL_SILENCE_DEPRECATION=1)
-  set(CMAKE_CXX_LINK_FLAGS "-Wl,-headerpad_max_install_names,-search_paths_first")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
-  set(DARWIN_extra_cstar_flags "-gdwarf-2")
-  add_compile_options(-O3 ${DARWIN_extra_cstar_flags})
-
-  add_definitions(
-      -DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE=1
-      -DBOOST_ALLOW_DEPRECATED_HEADERS=1
-      )
-endif (DARWIN)
+  add_compile_definitions(LL_DARWIN=1 GL_SILENCE_DEPRECATION=1)
+  add_link_options("LINKER:-headerpad_max_install_names" "LINKER:-search_paths_first")
+  add_compile_options(-O3 -gdwarf-2)
+endif ()
 
 if (LINUX OR DARWIN)
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-ignored-qualifiers -Wno-unused-function")
+    add_compile_options(-Wall -Wno-sign-compare -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-ignored-qualifiers -Wno-unused-function)
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-    set(GCC_WARNINGS "-Wall -Wno-sign-compare -Wno-trigraphs -Wno-unused-local-typedef -Wno-unknown-warning-option")
+    add_compile_options(-Wall -Wno-sign-compare -Wno-trigraphs -Wno-unused-local-typedef -Wno-unknown-warning-option)
   endif()
 
   CHECK_CXX_COMPILER_FLAG(-Wdeprecated-copy HAS_DEPRECATED_COPY)
   if (HAS_DEPRECATED_COPY)
-    set(GCC_WARNINGS "${GCC_WARNINGS} -Wno-deprecated-copy")
+    add_compile_options(-Wno-deprecated-copy)
   endif()
 
   if (NOT DISABLE_FATAL_WARNINGS)
-    set(GCC_WARNINGS "${GCC_WARNINGS} -Werror")
+    add_compile_options(-Werror)
   endif (NOT DISABLE_FATAL_WARNINGS)
 
-  set(GCC_CXX_WARNINGS "${GCC_WARNINGS} -Wno-reorder")
-
-  set(CMAKE_C_FLAGS "${GCC_WARNINGS} ${CMAKE_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${GCC_CXX_WARNINGS} ${CMAKE_CXX_FLAGS}")
-
   add_compile_options(-m${ADDRESS_SIZE})
-endif (LINUX OR DARWIN)
-
-add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
-
-add_definitions(-DOPENSSL_API_COMPAT=0x30000000L)
+endif ()
 
 option(RELEASE_SHOW_ASSERTS "Enable asserts in release builds" OFF)
 
 if(RELEASE_SHOW_ASSERTS)
-  add_definitions(-DRELEASE_SHOW_ASSERT=1)
-else()
-  add_definitions(-URELEASE_SHOW_ASSERT)
+  add_compile_definitions(RELEASE_SHOW_ASSERT=1)
 endif()
-
-if(HAVOK_TPV)
-  add_definitions(-DHAVOK_BUILD=1)
-endif(HAVOK_TPV)
 
 option(ENABLE_TIMING "Enable all fast timers" ON)
 if(ENABLE_TIMING)
-  add_definitions(-DAL_ENABLE_ALL_TIMERS=1)
-else()
-  add_definitions(-DAL_ENABLE_ALL_TIMERS=0)
+  add_compile_definitions(AL_ENABLE_ALL_TIMERS=1)
 endif()
-
-if(SDL_FOUND)
-  add_definitions(-DLL_SDL=1)
-endif()
-
-

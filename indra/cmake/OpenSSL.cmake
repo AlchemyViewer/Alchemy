@@ -21,3 +21,4 @@ else()
 endif (WINDOWS)
 target_include_directories( ll::openssl SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include)
 
+target_compile_definitions( ll::openssl INTERFACE OPENSSL_API_COMPAT=0x30000000L)

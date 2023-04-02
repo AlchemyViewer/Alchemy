@@ -7,6 +7,8 @@
 include(CMakeCopyIfDifferent)
 include(Linking)
 include(FMODSTUDIO)
+include(OPENAL)
+include(DiscordSDK)
 include(Sentry)
 
 # When we copy our dependent libraries, we almost always want to copy them to
@@ -15,34 +17,17 @@ include(Sentry)
 # copy_if_different commands. Encapsulate that usage.
 # Pass FROM_DIR, TARGETS and the files to copy. TO_DIR is implicit.
 # to_staging_dirs diverges from copy_if_different in that it appends to TARGETS.
-MACRO(to_debug_staging_dirs from_dir targets)
-          "${SHARED_LIB_STAGING_DIR_RELEASE}"
-    copy_if_different("${from_dir}" "${staging_dir}" out_targets ${ARGN})
-    list(APPEND "${targets}" "${out_targets}")
-  endforeach()
-ENDMACRO(to_debug_staging_dirs from_dir to_dir targets)
-
-MACRO(to_relwithdeb_staging_dirs from_dir targets)
-  foreach(staging_dir
+macro(to_staging_dirs from_dir targets)
+    set( targetDir "${SHARED_LIB_STAGING_DIR}")
     copy_if_different("${from_dir}" "${targetDir}" out_targets ${ARGN})
 
     list(APPEND "${targets}" "${out_targets}")
 endmacro()
-ENDMACRO(to_relwithdeb_staging_dirs from_dir to_dir targets)
-
-MACRO(to_release_staging_dirs from_dir targets)
-  foreach(staging_dir
-          "${SHARED_LIB_STAGING_DIR_RELEASE}")
-    copy_if_different("${from_dir}" "${staging_dir}" out_targets ${ARGN})
-    list(APPEND "${targets}" "${out_targets}")
-  endforeach()
-ENDMACRO(to_staging_dirs from_dir to_dir targets)
 
 ###################################################################
 # set up platform specific lists of files that need to be copied
 ###################################################################
 if(WINDOWS)
-z
     #*******************************
     # VIVOX - *NOTE: no debug version
     set(vivox_lib_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
@@ -50,7 +35,7 @@ z
     # ND, it seems there is no such thing defined. At least when building a viewer
     # Does this maybe matter on some LL buildserver? Otherwise this and the snippet using slvoice_src_dir
     # can all go
-    if( ARCH_PREBUILT_BIN_RELEASE )
+    if( ARCH_PREBUILT_BIN_DIRS_RELEASE )
         set(slvoice_src_dir "${ARCH_PREBUILT_BIN_DIRS_RELEASE}")    
     endif()
     set(slvoice_files SLVoice.exe )
@@ -83,7 +68,7 @@ z
 
     # Filenames are different for 32/64 bit BugSplat file and we don't
     # have any control over them so need to branch.
-    if (USE_SENTRY)
+    if (TARGET al::sentry)
       list(APPEND release_files sentry.dll)
     endif ()
 
@@ -97,7 +82,7 @@ z
       list(APPEND release_files OpenAL32.dll alut.dll)
     endif ()
 
-    if(USE_DISCORD)
+    if(TARGET al::discord-gamesdk)
       list(APPEND release_files discord_game_sdk.dll)
     endif()
 elseif(DARWIN)
@@ -120,17 +105,11 @@ elseif(DARWIN)
       list(APPEND release_files libfmod.dylib)
     endif ()
 
-    if(USE_DISCORD)
+    if(TARGET al::discord-gamesdk)
       list(APPEND release_files discord_game_sdk.dylib)
     endif()
 
 elseif(LINUX)
-    # linux is weird, multiple side by side configurations aren't supported
-    # and we don't seem to have any debug shared libs built yet anyways...
-    set(SHARED_LIB_STAGING_DIR_DEBUG            "${SHARED_LIB_STAGING_DIR}")
-    set(SHARED_LIB_STAGING_DIR_RELWITHDEBINFO   "${SHARED_LIB_STAGING_DIR}")
-    set(SHARED_LIB_STAGING_DIR_RELEASE          "${SHARED_LIB_STAGING_DIR}")
-
     set(vivox_lib_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(vivox_libs
         libsndfile.so.1
@@ -166,7 +145,7 @@ elseif(LINUX)
       list(APPEND release_files libfmod.so)
     endif ()
 
-    if(USE_DISCORD)
+    if(TARGET al::discord-gamesdk)
       list(APPEND release_files libdiscord_game_sdk.so)
     endif()
 
@@ -195,75 +174,33 @@ endif(WINDOWS)
 # Done building the file lists, now set up the copy commands.
 ################################################################
 
-if (GEN_IS_MULTI_CONFIG OR UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
+# Curiously, slvoice_files are only copied to SHARED_LIB_STAGING_DIR_RELEASE.
+# It's unclear whether this is oversight or intentional, but anyway leave the
+# single copy_if_different command rather than using to_staging_dirs.
+
+if( slvoice_src_dir )
     copy_if_different(
-        ${slvoice_src_dir}
-        "${SHARED_LIB_STAGING_DIR_DEBUG}"
-        out_targets
-        ${slvoice_files}
-        )
+            ${slvoice_src_dir}
+            "${SHARED_LIB_STAGING_DIR}"
+            out_targets
+            ${slvoice_files}
+    )
     list(APPEND third_party_targets ${out_targets})
-
-    to_debug_staging_dirs(
-        ${vivox_lib_dir}
-        third_party_targets
-        ${vivox_libs}
-        )
-
-    to_debug_staging_dirs(
-        ${debug_src_dir}
-        third_party_targets
-        ${debug_files}
-        )
 endif()
 
-if (GEN_IS_MULTI_CONFIG OR UPPERCASE_CMAKE_BUILD_TYPE MATCHES RELWITHDEBINFO)
-    copy_if_different(
-        ${slvoice_src_dir}
-        "${SHARED_LIB_STAGING_DIR_RELWITHDEBINFO}"
-        out_targets
-        ${slvoice_files}
-        )
-    list(APPEND third_party_targets ${out_targets})
+to_staging_dirs(
+    ${vivox_lib_dir}
+    third_party_targets
+    ${vivox_libs}
+    )
 
-    to_relwithdeb_staging_dirs(
-        ${vivox_lib_dir}
-        third_party_targets
-        ${vivox_libs}
-        )
+to_staging_dirs(
+    ${release_src_dir}
+    third_party_targets
+    ${release_files}
+    )
 
-    to_relwithdeb_staging_dirs(
-        ${release_src_dir}
-        third_party_targets
-        ${release_files}
-        )
-endif()
-
-if (GEN_IS_MULTI_CONFIG OR UPPERCASE_CMAKE_BUILD_TYPE MATCHES RELEASE)
-    copy_if_different(
-        ${slvoice_src_dir}
-        "${SHARED_LIB_STAGING_DIR_RELEASE}"
-        out_targets
-        ${slvoice_files}
-        )
-    list(APPEND third_party_targets ${out_targets})
-
-    to_release_staging_dirs(
-        ${vivox_lib_dir}
-        third_party_targets
-        ${vivox_libs}
-        )
-
-    to_release_staging_dirs(
-        ${release_src_dir}
-        third_party_targets
-        ${release_files}
-        )
-endif()
-
-if(NOT USESYSTEMLIBS)
-  add_custom_target(
-      stage_third_party_libs ALL
-      DEPENDS ${third_party_targets}
-      )
-endif(NOT USESYSTEMLIBS)
+add_custom_target(
+        stage_third_party_libs ALL
+        DEPENDS ${third_party_targets}
+)

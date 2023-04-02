@@ -231,8 +231,6 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
     // possible to hit the bad scale case.
     llassert(valid_weights);
 #endif
-    // variable-set-but-unused error.
-    (void)valid_weights;
 }
 
 void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)

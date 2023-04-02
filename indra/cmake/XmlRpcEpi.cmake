@@ -8,6 +8,7 @@ use_system_binary( xmlrpc-epi )
 
 use_prebuilt_binary(xmlrpc-epi)
 if (WINDOWS)
+  target_compile_definitions( ll::xmlrpc-epi INTERFACE XMLRPCEPI_STATIC=1)
   target_link_libraries(ll::xmlrpc-epi INTERFACE
     debug ${ARCH_PREBUILT_DIRS_DEBUG}/xmlrpc-epid.lib
     optimized ${ARCH_PREBUILT_DIRS_RELEASE}/xmlrpc-epi.lib)

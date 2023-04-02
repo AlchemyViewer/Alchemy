@@ -37,7 +37,6 @@
 #include "llappviewer.h"
 #include "llviewernetwork.h"
 #include "llregioninfomodel.h"
-#include "llviewerbuildconfig.h"
 #include "llviewercontrol.h"
 #include "llviewerregion.h"
 #include "rlvactions.h"

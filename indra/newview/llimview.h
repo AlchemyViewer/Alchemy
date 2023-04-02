@@ -102,8 +102,7 @@ public:
                         const std::string& time,
                         const bool is_history,
                         const bool is_region_msg,
-                        U32 timestamp,
-						const LLSD& bonus);
+                        U32 timestamp);
 
         void onVoiceChannelStateChanged(const LLVoiceChannel::EState& old_state, const LLVoiceChannel::EState& new_state, const LLVoiceChannel::EDirection& direction);
 
@@ -249,8 +248,7 @@ public:
                     const std::string& utf8_text,
                     bool log2file = true,
                     bool is_region_msg = false,
-                    U32 time_stamp = 0,
-					const LLSD& bonus = LLSD());
+                    U32 time_stamp = 0);
 
     void processAddingMessage(const LLUUID& session_id,
                     const std::string& from,
@@ -258,14 +256,13 @@ public:
                     const std::string& utf8_text,
                     bool log2file,
                     bool is_region_msg,
-                    U32 time_stamp,
-					const LLSD& bonus);
+                    U32 time_stamp);
 
 	/**
 	 * Similar to addMessage(...) above but won't send a signal about a new message added
 	 */
 	LLIMModel::LLIMSession* addMessageSilently(const LLUUID& session_id, const std::string& from, const LLUUID& from_id,
-		const std::string& utf8_text, bool log2file = true, bool is_region_msg = false, U32 timestamp = 0, const LLSD& bonus = LLSD());
+		const std::string& utf8_text, bool log2file = true, bool is_region_msg = false, U32 timestamp = 0);
 
 	/**
 	 * Add a system message to an IM Model
@@ -343,7 +340,7 @@ private:
 	/**
 	 * Add message to a list of message associated with session specified by session_id
 	 */
-	bool addToHistory(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, const std::string& utf8_text, bool is_region_msg, U32 timestamp, const LLSD& bonus);
+	bool addToHistory(const LLUUID& session_id, const std::string& from, const LLUUID& from_id, const std::string& utf8_text, bool is_region_msg, U32 timestamp);
 
 };
 
@@ -386,8 +383,7 @@ public:
 					const LLUUID& region_id = LLUUID::null,
 					const LLVector3& position = LLVector3::zero,
                     bool is_region_msg = false,
-                    U32 timestamp = 0,
-					const LLSD& bonus = LLSD());
+                    U32 timestamp = 0);
 
 	void addSystemMessage(const LLUUID& session_id, const std::string& message_name, const LLSD& args);
 

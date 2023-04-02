@@ -57,6 +57,7 @@ list(APPEND llaudio_SOURCE_FILES ${llaudio_HEADER_FILES})
 add_library (llaudio ${llaudio_SOURCE_FILES})
 target_include_directories( llaudio  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries( llaudio
+        PUBLIC
         llcommon
         llmath
         llmessage
@@ -65,10 +66,10 @@ target_link_libraries( llaudio
     )
 
 if( TARGET ll::openal )
-    target_link_libraries( llaudio ll::openal )
+    target_link_libraries( llaudio PUBLIC ll::openal )
 endif()
 if( TARGET ll::fmodstudio )
-    target_link_libraries( llaudio ll::fmodstudio )
+    target_link_libraries( llaudio PUBLIC ll::fmodstudio )
 endif()
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 

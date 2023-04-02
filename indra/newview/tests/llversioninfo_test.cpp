@@ -25,8 +25,6 @@
 
 #include "linden_common.h"
 
-#include "llviewerbuildconfig.h"
-
 #include "../test/lltut.h"
 
 #include "../llversioninfo.h"

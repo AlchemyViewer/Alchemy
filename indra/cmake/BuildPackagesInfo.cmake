@@ -2,6 +2,8 @@
 # Construct the version and copyright information based on package data.
 include(FindAutobuild)
 
+include_guard()
+
 # packages-formatter.py runs autobuild install --versions, which needs to know
 # the build_directory, which (on Windows) depends on AUTOBUILD_ADDRSIZE.
 # Within an autobuild build, AUTOBUILD_ADDRSIZE is already set. But when

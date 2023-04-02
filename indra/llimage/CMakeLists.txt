@@ -52,16 +52,17 @@ target_include_directories( llimage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 if (USE_KDU)
-    target_link_libraries(llimage llkdu)
+    target_link_libraries(llimage PUBLIC llkdu)
 else (USE_KDU)
-    target_link_libraries(llimage llimagej2coj)
+    target_link_libraries(llimage PUBLIC llimagej2coj)
 endif (USE_KDU)
 
 target_link_libraries(llimage
+        PUBLIC
         llfilesystem
         llmath
         llcommon
-    ${WEBP_LIBRARIES}
+        ll::libwebp
         ll::libpng
         ll::libjpeg
     )

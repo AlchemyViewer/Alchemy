@@ -1,18 +1,20 @@
 # -*- cmake -*-
+
+include_guard()
+
 include(Prebuilt)
 
-if (USESYSTEMLIBS)
- find_package(xxHash 0.8.1 CONFIG REQUIRED)
-else (USESYSTEMLIBS)
-  use_prebuilt_binary(xxhash)
+add_library( ll::xxhash INTERFACE IMPORTED )
+
+use_system_binary( xxhash )
+
+use_prebuilt_binary(xxhash)  
+# if(WINDOWS)
+#   target_link_libraries( ll::xxhash INTERFACE
+#     debug ${ARCH_PREBUILT_DIRS_DEBUG}/xxhash.lib
+#     optimized ${ARCH_PREBUILT_DIRS_RELEASE}/xxhash.lib)
+# else()
+#   target_link_libraries( ll::xxhash INTERFACE xxhash)
+# endif()
   
-  if(WINDOWS)
-    set(XXHASH_LIBRARIES
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/xxhash.lib
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/xxhash.lib)
-  else(WINDOWS)
-    set(XXHASH_LIBRARIES xxhash)
-  endif(WINDOWS)
-  
-  set(XXHASH_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/xxhash)
-endif (USESYSTEMLIBS)
+  target_include_directories( ll::xxhash SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/xxhash)

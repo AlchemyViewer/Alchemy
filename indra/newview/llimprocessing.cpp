@@ -725,7 +725,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 					region_id,
 					position,
 					false,
-					LLSD().with("announcement", true)
+                    0
 				);
 			}
 

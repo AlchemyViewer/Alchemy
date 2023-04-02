@@ -31,7 +31,6 @@
 #include "llsd.h"
 
 #include "llerror.h"
-#include "llmath.h"
 #include "llformat.h"
 #include "llsdserialize.h"
 #include "stringize.h"
@@ -259,10 +258,10 @@ namespace
 	};
 
 	LLSD::Boolean ImplReal::asBoolean() const
-		{ return !llisnan(mValue)  &&  mValue != 0.0; }
+		{ return !std::isnan(mValue)  &&  mValue != 0.0; }
 		
 	LLSD::Integer ImplReal::asInteger() const
-		{ return !llisnan(mValue) ? (LLSD::Integer)mValue : 0; }
+		{ return !std::isnan(mValue) ? (LLSD::Integer)mValue : 0; }
 		
 	LLSD::String ImplReal::asString() const
 		{ return llformat("%lg", mValue); }

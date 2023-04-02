@@ -32,6 +32,8 @@
 #include "llframetimer.h"
 
 // This is used for the stl search_n function.
+bool eq_message_throttle_entry(LLMessageThrottleEntry a, LLMessageThrottleEntry b)
+ 		{ return a.getHash() == b.getHash(); }
 
 const U64 SEC_TO_USEC = 1000000;
 		

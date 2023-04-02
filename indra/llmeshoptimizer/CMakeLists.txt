@@ -2,8 +2,6 @@
 
 project(llmeshoptimizer)
 
-include(Meshoptimizer)
-
 include(00-Common)
 include(LLCommon)
 include(LLMath)
@@ -26,6 +24,7 @@ add_library (llmeshoptimizer ${llmeshoptimizer_SOURCE_FILES})
 target_include_directories( llmeshoptimizer INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(llmeshoptimizer
+        PUBLIC
         llcommon
         llmath
         meshoptimizer)

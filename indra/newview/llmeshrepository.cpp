@@ -74,7 +74,6 @@
 #include "lluploaddialog.h"
 #include "llfloaterreg.h"
 #include "llviewernetwork.h"
-#include "llviewerbuildconfig.h"
 
 #include <boost/smart_ptr/make_shared.hpp>
 #include <boost/iostreams/device/array.hpp>
@@ -4715,7 +4714,7 @@ S32 LLPhysicsDecomp::llcdCallback(const char* status, S32 p1, S32 p2)
 	return 1;
 }
 
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 bool needTriangles( LLConvexDecomposition *aDC )
 {
 	if( !aDC )
@@ -4744,7 +4743,7 @@ bool needTriangles( LLConvexDecomposition *aDC )
 
 void LLPhysicsDecomp::setMeshData(LLCDMeshData& mesh, bool vertex_based)
 {
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 	LLConvexDecomposition *pDeComp = LLConvexDecomposition::getInstance();
 	if( !pDeComp )
 		return;

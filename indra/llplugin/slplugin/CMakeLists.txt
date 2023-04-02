@@ -31,6 +31,7 @@ add_executable(SLPlugin
     )
 
 target_link_libraries(SLPlugin
+        PUBLIC
         llplugin
         llmessage
         llcommon
@@ -38,7 +39,6 @@ target_link_libraries(SLPlugin
         )
 
 if (WINDOWS)
-  target_link_libraries(SLPlugin wer)
   set_target_properties(SLPlugin
     PROPERTIES
     LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMTD\""
@@ -58,8 +58,6 @@ elseif (DARWIN)
     MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/slplugin_info.plist
     )
 
-  # Mac version needs to link against Cocoa
-  target_link_libraries(SLPlugin ${COCOA_LIBRARY})
   # Make sure the app bundle has a Resources directory (it will get populated by viewer-manifest.py later)
   add_custom_command(
     TARGET SLPlugin POST_BUILD

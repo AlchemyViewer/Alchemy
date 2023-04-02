@@ -2,13 +2,6 @@
 
 project(llkdu)
 
-# Visual Studio 2005 has a dumb bug that causes it to fail compilation
-# of KDU if building with both optimisation and /WS (treat warnings as
-# errors), even when the specific warnings that make it croak are
-# disabled.
-
-#set(VS_DISABLE_FATAL_WARNINGS ON)
-
 include(00-Common)
 include(LLCommon)
 include(LLImage)
@@ -27,21 +20,11 @@ set(llkdu_HEADER_FILES
 
 list(APPEND llkdu_SOURCE_FILES ${llkdu_HEADER_FILES})
 
-# Our KDU package is built with KDU_X86_INTRINSICS in its .vcxproj file.
-# Unless that macro is also set for every consumer build, KDU freaks out,
-# spamming the viewer log with alignment FUD.
-set_source_files_properties(${llkdu_SOURCE_FILES}
-                            PROPERTIES
-                            COMPILE_DEFINITIONS
-                            "KDU_X86_INTRINSICS")
-
 if (USE_KDU)
   add_library (llkdu ${llkdu_SOURCE_FILES})
 
-  target_link_libraries(llkdu ll::kdu llimage llcommon)
+  target_link_libraries(llkdu PUBLIC ll::kdu llimage llcommon)
   target_include_directories( llkdu  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
-
-  target_compile_definitions(llkdu PRIVATE -DKDU_X86_INTRINSICS -DKDU_NO_THREADS -DKDU_NO_AVX -DKDU_NO_AVX2)
 
   # Add tests
   # ND: llkdu tests are very strange as they include stubs for KDU classes/methods

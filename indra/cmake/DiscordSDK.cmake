@@ -1,37 +1,47 @@
 # -*- cmake -*-
-include(Linking)
 include(Prebuilt)
-include(Variables)
+
+include_guard()
+
+#Discord Integration
+option(USE_DISCORD "Enable Discord client integration" OFF)
+
+if(DEFINED ENV{DISCORD_CLIENTID})
+  set(DISCORD_CLIENTID $ENV{DISCORD_CLIENTID} CACHE STRING "Discord Client ID" FORCE)
+else()
+  set(DISCORD_CLIENTID "" CACHE STRING "Discord Client ID")
+endif()
+
+if (INSTALL_PROPRIETARY)
+  set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
+  if (DISCORD_CLIENTID)
+      set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
+  else ()
+      set(USE_DISCORD OFF CACHE BOOL "Use Discord SDK" FORCE)
+  endif ()
+endif ()
 
 if (USE_DISCORD)
-  if (STANDALONE)
-    # In that case, we use the version of the library installed on the system
-    set(DISCORD_FIND_REQUIRED ON)
-    include(FindFMODSTUDIO)
-  else (STANDALONE)
+    add_library( al::discord-gamesdk INTERFACE IMPORTED )
+
     use_prebuilt_binary(discord-gamesdk)    
     if (WINDOWS)
-      set(DISCORD_LIBRARY 
+      target_link_libraries( al::discord-gamesdk INTERFACE
           ${ARCH_PREBUILT_DIRS_RELEASE}/discordgamesdk.lib
           ${ARCH_PREBUILT_DIRS_RELEASE}/discord_game_sdk.dll.lib)
     elseif (DARWIN)
-      set(DISCORD_LIBRARY 
+      target_link_libraries( al::discord-gamesdk INTERFACE
           ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscordgamesdk.a
           ${ARCH_PREBUILT_DIRS_RELEASE}/discord_game_sdk.dylib)
     elseif (LINUX)
-      set(DISCORD_LIBRARY 
+      target_link_libraries( al::discord-gamesdk INTERFACE
           optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscord_game_sdk.so
           optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscordgamesdk.a)
     endif (WINDOWS)
-    set(DISCORD_LIBRARIES ${DISCORD_LIBRARY})
-    set(DISCORD_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/discord/)
+    target_include_directories( al::discord-gamesdk SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/discord/)
 
-    add_definitions(-DUSE_DISCORD=1)
-  endif (STANDALONE)
-
-  if(DISCORD_CLIENTID STREQUAL "")
-    message(FATAL_ERROR "You must set a ClientID with -DDISCORD_CLIENTID= to enable Discord integration")
-  endif()
-
+    if(DISCORD_CLIENTID STREQUAL "")
+        message(FATAL_ERROR "You must set a ClientID with -DDISCORD_CLIENTID= to enable Discord integration")
+    endif()
+    target_compile_definitions( al::discord-gamesdk INTERFACE AL_DISCORD=1 DISCORD_CLIENTID=${DISCORD_CLIENTID})
 endif (USE_DISCORD)
-

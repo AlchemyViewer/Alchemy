@@ -27,8 +27,6 @@
 
 #include "alsquirrelupdater.h"
 
-#include "llviewerbuildconfig.h"
-
 #include "llappviewer.h"
 #include "llnotificationsutil.h"
 #include "llversioninfo.h"

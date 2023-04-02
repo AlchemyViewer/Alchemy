@@ -115,6 +115,4 @@
 #include "llui.h"
 #include "lluictrl.h"
 
-#include "llviewerbuildconfig.h"
-
 #endif

@@ -9,6 +9,7 @@ add_library( ll::hunspell INTERFACE IMPORTED )
 use_system_binary(hunspell)
 use_prebuilt_binary(libhunspell)
 if (WINDOWS)
+    target_compile_definitions( ll::hunspell INTERFACE HUNSPELL_STATIC=1)
     target_link_libraries( ll::hunspell INTERFACE
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libhunspell.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libhunspell.lib

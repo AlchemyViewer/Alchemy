@@ -785,7 +785,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 
 S32 LLVOAvatar::getNumBakes() const 
 {
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 	// BAKED_LEFT_ARM is equal to the pre-BOM BAKED_NUM_INDICES
 	if(LLViewerRegion* regionp = getRegion())
 	{

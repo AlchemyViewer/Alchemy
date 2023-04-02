@@ -1501,7 +1501,7 @@ set(viewer_HEADER_FILES
     VorbisFramework.h
     )
 
-if(USE_DISCORD)
+if(TARGET al::discord-gamesdk)
   LIST(APPEND viewer_HEADER_FILES aldiscordmanager.h)
   LIST(APPEND viewer_SOURCE_FILES aldiscordmanager.cpp)
 endif()
@@ -1512,9 +1512,6 @@ source_group("CMake Rules" FILES ViewerInstall.cmake)
 # the viewer_version.txt file created here is for passing to viewer_manifest and autobuild
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
            "${VIEWER_SHORT_VERSION}\n")
-
-configure_file(llviewerbuildconfig.h.in llviewerbuildconfig.h @ONLY)
-LIST(APPEND viewer_HEADER_FILES ${CMAKE_CURRENT_BINARY_DIR}/llviewerbuildconfig.h)
 
 if (WINDOWS)
   LIST(APPEND viewer_SOURCE_FILES alsquirrelupdater.cpp)
@@ -1712,10 +1709,6 @@ if (WINDOWS)
 
 endif (WINDOWS)
 
-if (USE_OPENAL)
-    LIST(APPEND viewer_LIBRARIES ${OPENAL_LIBRARIES} ${FREEALUT_LIBRARIES})
-endif ()
-
 # Add the xui files. This is handy for searching for xui elements
 # from within the IDE.
 set(viewer_XUI_FILES
@@ -1830,13 +1823,13 @@ add_executable(${VIEWER_BINARY_NAME}
     ${viewer_SOURCE_FILES}
     )
 
-if (USE_SENTRY)
-  target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE ${SENTRY_DEFINE})
+target_include_directories(${VIEWER_BINARY_NAME}
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}
+    )
 
-  list(APPEND viewer_LIBRARIES
-       ${SENTRY_LIBRARIES}
-       )
-endif ()
+target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE VIEWER_UPDATE_SERVICE="${VIEWER_UPDATE_SERVICE}")
 
 # add package files
 file(GLOB EVENT_HOST_SCRIPT_GLOB_LIST
@@ -1869,12 +1862,9 @@ if (WINDOWS)
 
     set_target_properties(${VIEWER_BINARY_NAME} PROPERTIES OUTPUT_NAME "${WIN_BINARY_NAME}")
 
-    if(GEN_IS_MULTI_CONFIG)
-      set(VIEWER_BUILD_DEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}")
-    else()
-      set(VIEWER_BUILD_DEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/package")
+    if(NOT LL_GENERATOR_IS_MULTI_CONFIG)
       set_target_properties(${VIEWER_BINARY_NAME} PROPERTIES
-       			    RUNTIME_OUTPUT_DIRECTORY "${VIEWER_BUILD_DEST_DIR}")
+       			    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>")
     endif()
 
     # If adding a file to viewer_manifest.py in the WindowsManifest.construct() method, be sure to add the dependency
@@ -1894,8 +1884,6 @@ if (WINDOWS)
       ${CMAKE_SOURCE_DIR}/../etc/message.xml
       ${CMAKE_SOURCE_DIR}/../scripts/messages/message_template.msg
       ${SHARED_LIB_STAGING_DIR}/openjp2.dll
-      ${SHARED_LIB_STAGING_DIR}/libhunspell.dll
-      ${SHARED_LIB_STAGING_DIR}/uriparser.dll
       #${SHARED_LIB_STAGING_DIR}/${LL_INTDIR}/SLVoice.exe
       #${SHARED_LIB_STAGING_DIR}/${LL_INTDIR}/libsndfile-1.dll
       #${SHARED_LIB_STAGING_DIR}/${LL_INTDIR}/vivoxoal.dll
@@ -1932,20 +1920,9 @@ if (WINDOWS)
     endif ()
 
     if (TARGET ll::fmodstudio)
-      if (GEN_IS_MULTI_CONFIG)
-        list(APPEND COPY_INPUT_DEPENDENCIES
+      list(APPEND COPY_INPUT_DEPENDENCIES
            ${SHARED_LIB_STAGING_DIR}/fmod.dll
-            ${SHARED_LIB_STAGING_DIR}/Debug/fmodL.dll
-            )
-      elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
-        list(APPEND COPY_INPUT_DEPENDENCIES
-            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/fmodL.dll
-            )
-      else()
-        list(APPEND COPY_INPUT_DEPENDENCIES
-            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/fmod.dll
-            )
-      endif()
+           )
     endif ()
 
     if (TARGET ll::openal)
@@ -1956,7 +1933,7 @@ if (WINDOWS)
     endif ()
 
     add_custom_command(
-      OUTPUT  ${VIEWER_BUILD_DEST_DIR}/copy_touched.bat
+      OUTPUT  ${CMAKE_CFG_INTDIR}/copy_touched.bat
       COMMAND ${Python3_EXECUTABLE}
       ARGS
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
@@ -1983,7 +1960,7 @@ if (WINDOWS)
       COMMENT "Performing viewer_manifest copy"
       )
 
-    add_custom_target(copy_w_viewer_manifest ALL DEPENDS ${VIEWER_BUILD_DEST_DIR}/copy_touched.bat)
+    add_custom_target(copy_w_viewer_manifest ALL DEPENDS ${CMAKE_CFG_INTDIR}/copy_touched.bat)
 
     add_dependencies(${VIEWER_BINARY_NAME} stage_third_party_libs llcommon copy_w_viewer_manifest)
 
@@ -2010,7 +1987,7 @@ if (WINDOWS)
           ${CMAKE_CURRENT_SOURCE_DIR}/event_host_manifest.py
           ${CMAKE_CURRENT_SOURCE_DIR}/..
           ${CMAKE_CURRENT_BINARY_DIR}
-          ${VIEWER_BUILD_DEST_DIR}
+          ${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
         DEPENDS
           lleventhost
           ${EVENT_HOST_SCRIPTS}
@@ -2024,27 +2001,27 @@ if (WINDOWS)
       endif ()
 
       add_custom_command(
-        OUTPUT ${VIEWER_BUILD_DEST_DIR}/touched.bat
+        OUTPUT ${CMAKE_CFG_INTDIR}/touched.bat
         COMMAND ${Python3_EXECUTABLE}
         ARGS
-          ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-          --arch=${ARCH}
-          --artwork=${ARTWORK_DIR}
-          "--discord=${USE_DISCORD}"
-          "--sentry=${USE_SENTRY}"
-          "--fmodstudio=${USE_FMODSTUDIO}"
-          "--openal=${USE_OPENAL}"
-          --build=${CMAKE_CURRENT_BINARY_DIR}
+              ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
+              --arch=${ARCH}
+              --artwork=${ARTWORK_DIR}
+              "--discord=${USE_DISCORD}"
+              "--sentry=${USE_SENTRY}"
+              "--fmodstudio=${USE_FMODSTUDIO}"
+              "--openal=${USE_OPENAL}"
+              --build=${CMAKE_CURRENT_BINARY_DIR}
               --buildtype=$<CONFIG>
-          "--channel=${VIEWER_CHANNEL}"
-          --configuration=${CMAKE_CFG_INTDIR}
+              "--channel=${VIEWER_CHANNEL}"
+              --configuration=${CMAKE_CFG_INTDIR}
               --dest=${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
-          --grid=${GRID}
-          --source=${CMAKE_CURRENT_SOURCE_DIR}
+              --grid=${GRID}
+              --source=${CMAKE_CURRENT_SOURCE_DIR}
               --touch=${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/touched.bat
-          --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-          --updateurl=${VIEWER_UPDATE_SERVICE}
-          ${DELTA_GEN_SETTING}
+              --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
+              --updateurl=${VIEWER_UPDATE_SERVICE}
+              ${DELTA_GEN_SETTING}
         DEPENDS
             ${VIEWER_BINARY_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
@@ -2058,6 +2035,7 @@ if (WINDOWS)
         # temporarily disable packaging of event_host until hg subrepos get
         # sorted out on the parabuild cluster...
         #${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/event_host.tar.bz2)
+
     endif (PACKAGE)
 elseif (DARWIN)
     set_target_properties(${VIEWER_BINARY_NAME}
@@ -2101,6 +2079,7 @@ endif (WINDOWS)
 # modern version.
 
 target_link_libraries(${VIEWER_BINARY_NAME}
+        PUBLIC
         llaudio
         llcharacter
         llimage
@@ -2122,12 +2101,28 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         llprimitive
         llappearance
         ${LLPHYSICSEXTENSIONS_LIBRARIES}
-        ll::bugsplat
         ll::tracy
+        ll::versioninfo
         )
 
 if( TARGET ll::nvapi )
-   target_link_libraries(${VIEWER_BINARY_NAME} ll::nvapi )
+   target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC ll::nvapi )
+endif()
+
+if( TARGET al::discord-gamesdk )
+   target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC al::discord-gamesdk )
+endif()
+
+if( TARGET al::sentry )
+   target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC al::sentry )
+endif()
+
+if( TARGET media_plugin_cef )
+    target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE USE_CEF=1)
+endif()
+
+if( TARGET media_plugin_libvlc )
+    target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE USE_VLC=1)
 endif()
 
 set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
@@ -2461,6 +2456,7 @@ if (LL_TESTS)
           lllogin
           llplugin
           llappearance
+          ll::versioninfo
     )
 
   set_source_files_properties(

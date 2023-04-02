@@ -16,12 +16,6 @@ if(NOT DEFINED COMMON_CMAKE_DIR)
     set(COMMON_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake")
 endif(NOT DEFINED COMMON_CMAKE_DIR)
 
-get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-option(GEN_IS_MULTI_CONFIG "" ${_isMultiConfig})
-mark_as_advanced(GEN_IS_MULTI_CONFIG)
-
-string(TOUPPER "${CMAKE_BUILD_TYPE}" UPPERCASE_CMAKE_BUILD_TYPE)
-
 set(LIBS_CLOSED_PREFIX)
 set(LIBS_OPEN_PREFIX)
 set(SCRIPTS_PREFIX ../scripts)
@@ -54,29 +48,6 @@ set(VIEWER_SYMBOL_FILE "" CACHE STRING "Name of tarball into which to place symb
 
 option(USE_CEF "Enable CEF media plugin" ON)
 option(USE_VLC "Enable VLC media plugin" ON)
-
-#Discord Integration
-option(USE_DISCORD "Enable Discord client integration" OFF)
-
-if(DEFINED ENV{DISCORD_CLIENTID})
-  set(DISCORD_CLIENTID $ENV{DISCORD_CLIENTID} CACHE STRING "Discord Client ID" FORCE)
-else()
-  set(DISCORD_CLIENTID "" CACHE STRING "Discord Client ID")
-endif()
-
-if (INSTALL_PROPRIETARY)
-  set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
-  # Note that viewer_manifest.py makes decision based on SENTRY_DSN and not USE_SENTRY
-  if (DISCORD_CLIENTID)
-      set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
-  else ()
-      set(USE_DISCORD OFF CACHE BOOL "Use Discord SDK" FORCE)
-  endif ()
-endif ()
-
-if (DEFINED ENV{USE_DISCORD})
-  set(USE_DISCORD $ENV{USE_DISCORD} CACHE BOOL "" FORCE)
-endif()
 
 #Crash reporting
 option(USE_SENTRY "Use the Sentry crash reporting system" OFF)

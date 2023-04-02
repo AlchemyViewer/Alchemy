@@ -1,9 +1,6 @@
 # -*- cmake -*-
 include(Prebuilt)
-
-if( NOT USE_CONAN )
-  use_prebuilt_binary(libhunspell)
-endif()
+include_guard()
 
 use_prebuilt_binary(slvoice)
 

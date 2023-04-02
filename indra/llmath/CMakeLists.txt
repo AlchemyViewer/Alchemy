@@ -101,7 +101,7 @@ list(APPEND llmath_SOURCE_FILES ${llmath_HEADER_FILES})
 
 add_library (llmath ${llmath_SOURCE_FILES})
 
-target_link_libraries(llmath llcommon meshoptimizer)
+target_link_libraries(llmath PUBLIC llcommon llmeshoptimizer)
 target_include_directories( llmath  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add tests

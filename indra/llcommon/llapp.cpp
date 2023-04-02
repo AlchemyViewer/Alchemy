@@ -374,13 +374,13 @@ void LLApp::setupErrorHandling(bool second_instance)
 
 #if defined(LL_WINDOWS)
 
-#if LL_SEND_CRASH_REPORTS && ! defined(USE_SENTRY)
+#if LL_SEND_CRASH_REPORTS && ! defined(AL_SENTRY)
 	EnableCrashingOnCrashes();
 
 	// This sets a callback to handle w32 signals to the console window.
 	// The viewer shouldn't be affected, sicne its a windowed app.
 	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) ConsoleCtrlHandler, TRUE);
-#endif // LL_SEND_CRASH_REPORTS && ! defined(USE_SENTRY)
+#endif // LL_SEND_CRASH_REPORTS && ! defined(AL_SENTRY)
 #else  // ! LL_WINDOWS
 	//
 	// Start up signal handling.
@@ -391,9 +391,9 @@ void LLApp::setupErrorHandling(bool second_instance)
 	setup_signals();
 #endif // ! LL_WINDOWS
 
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
     // do not start our own error thread
-#else // ! USE_SENTRY
+#else // ! AL_SENTRY
 	startErrorThread();
 #endif
 }
@@ -638,16 +638,16 @@ void setup_signals()
 	act.sa_flags = SA_SIGINFO;
 
 	// Synchronous signals
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGABRT, &act, NULL);
 #endif
 	sigaction(SIGALRM, &act, NULL);
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGBUS, &act, NULL);
 	sigaction(SIGFPE, &act, NULL);
 #endif
 	sigaction(SIGHUP, &act, NULL);
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGILL, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 	sigaction(SIGSEGV, &act, NULL);
@@ -681,16 +681,16 @@ void clear_signals()
 	act.sa_flags = SA_SIGINFO;
 
 	// Synchronous signals
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGABRT, &act, NULL);
 #endif
 	sigaction(SIGALRM, &act, NULL);
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGBUS, &act, NULL);
 	sigaction(SIGFPE, &act, NULL);
 #endif
 	sigaction(SIGHUP, &act, NULL);
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGILL, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 	sigaction(SIGSEGV, &act, NULL);

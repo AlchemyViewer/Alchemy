@@ -80,6 +80,7 @@ list(APPEND llcorehttp_SOURCE_FILES ${llcorehttp_HEADER_FILES})
 add_library (llcorehttp ${llcorehttp_SOURCE_FILES})
 target_link_libraries(
         llcorehttp
+        PUBLIC
         llcommon
         ll::libcurl
         ll::openssl

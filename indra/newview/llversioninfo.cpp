@@ -26,7 +26,6 @@
  */
 
 #include "llviewerprecompiledheaders.h"
-#include "llviewerbuildconfig.h"
 #include "llevents.h"
 #include "lleventfilter.h"
 #include "llregex.h"

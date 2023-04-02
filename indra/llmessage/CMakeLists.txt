@@ -188,6 +188,7 @@ add_library (llmessage ${llmessage_SOURCE_FILES})
 
 target_link_libraries(
         llmessage
+        PUBLIC
         llcommon
         llfilesystem
         llmath

@@ -33,13 +33,13 @@
 
 #include "llappviewermacosx-objc.h"
 
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 #import "Sentry.h"
 #endif
 
 void setCrashUserMetadataWrapper(const std::string& userid, const std::string& username)
 {
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
     SentryUser *user = [[SentryUser alloc] init];
     user.userId = @(userid.c_str());
     user.username = @(username.c_str());

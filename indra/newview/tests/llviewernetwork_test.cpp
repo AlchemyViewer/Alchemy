@@ -280,7 +280,7 @@ namespace tut
 			   LLGridManager::getInstance()->isSystemGrid("util.aditi.lindenlab.com"));
 	}
 
-#ifndef HAVOK_BUILD
+#ifndef LL_HAVOK
 	// initialization with a grid file
 	template<> template<>
 	void viewerNetworkTestObject::test<2>()
@@ -450,7 +450,7 @@ namespace tut
 					  uris[0],
 					  std::string("https://login.agni.lindenlab.com/cgi-bin/login.cgi"));
 
-#ifndef HAVOK_BUILD
+#ifndef LL_HAVOK
 		LLGridManager::getInstance()->setGridChoice(std::string("altgrid.long.name"));
 		ensure_equals("getGridLabel",
 					  LLGridManager::getInstance()->getGridLabel(),
