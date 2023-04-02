@@ -1162,7 +1162,7 @@ bool LLAppViewer::init()
     {
         LL_WARNS("InitInfo") << "Skipping updater check." << LL_ENDL;
     }
-
+#endif //LL_RELEASE_FOR_DOWNLOAD
     {
         // Iterate over --leap command-line options. But this is a bit tricky: if
         // there's only one, it won't be an array at all.
@@ -1188,7 +1188,6 @@ bool LLAppViewer::init()
             LLLeap::create("", leap.asString(), false); // exception=false
         }
     }
-#endif //LL_RELEASE_FOR_DOWNLOAD
 
 	LLTextUtil::TextHelpers::iconCallbackCreationFunction = create_text_segment_icon_from_url_match;
 
@@ -5497,7 +5496,8 @@ void LLAppViewer::disconnectViewer()
     {
         gInventory.cache(gInventory.getRootFolderID(), gAgent.getID());
         if (gInventory.getLibraryRootFolderID().notNull()
-            && gInventory.getLibraryOwnerID().notNull())
+            && gInventory.getLibraryOwnerID().notNull()
+            && !mSecondInstance) // agent is unique, library isn't
         {
             gInventory.cache(
                 gInventory.getLibraryRootFolderID(),

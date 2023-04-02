@@ -858,7 +858,10 @@ void LLViewerObjectList::updateApparentAngles(LLAgent &agent)
 	{
 		virtual bool apply(LLViewerObject* objectp)
 		{
-			objectp->boostTexturePriority();
+            if (objectp)
+            {
+                objectp->boostTexturePriority();
+            }
 			return true;
 		}
 	} func;

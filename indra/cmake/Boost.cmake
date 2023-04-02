@@ -1,121 +1,86 @@
 # -*- cmake -*-
 include(Prebuilt)
-include(Linking)
 
-set(Boost_FIND_QUIETLY ON)
-set(Boost_FIND_REQUIRED ON)
+include_guard()
 
-if (USESYSTEMLIBS)
-  include(FindBoost)
+add_library( ll::boost INTERFACE IMPORTED )
+if( USE_CONAN )
+  target_link_libraries( ll::boost INTERFACE CONAN_PKG::boost )
+  target_compile_definitions( ll::boost INTERFACE BOOST_ALLOW_DEPRECATED_HEADERS BOOST_BIND_GLOBAL_PLACEHOLDERS )
+  return()
+endif()
 
-  set(BOOST_CONTEXT_LIBRARY boost_context-mt)
-  set(BOOST_FIBER_LIBRARY boost_fiber-mt)
-  set(BOOST_FILESYSTEM_LIBRARY boost_filesystem-mt)
-  set(BOOST_PROGRAM_OPTIONS_LIBRARY boost_program_options-mt)
-  set(BOOST_REGEX_LIBRARY boost_regex-mt)
-  set(BOOST_SIGNALS_LIBRARY boost_signals-mt)
-  set(BOOST_SYSTEM_LIBRARY boost_system-mt)
-  set(BOOST_THREAD_LIBRARY boost_thread-mt)
-else (USESYSTEMLIBS)
-  use_prebuilt_binary(boost)
-  set(Boost_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)
+use_prebuilt_binary(boost)
 
-  # As of sometime between Boost 1.67 and 1.72, Boost libraries are suffixed
-  # with the address size.
-  set(addrsfx "-x${ADDRESS_SIZE}")
+# As of sometime between Boost 1.67 and 1.72, Boost libraries are suffixed
+# with the address size.
+set(addrsfx "-x${ADDRESS_SIZE}")
 
-  if (WINDOWS)
-    set(BOOST_CONTEXT_LIBRARY 
+if (WINDOWS)
+  target_link_libraries( ll::boost INTERFACE
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_context-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_context-mt-gd${addrsfx}.lib)
-    set(BOOST_FIBER_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_context-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_fiber-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_fiber-mt-gd${addrsfx}.lib)
-    set(BOOST_FILESYSTEM_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_fiber-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_filesystem-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_filesystem-mt-gd${addrsfx}.lib)
-    set(BOOST_PROGRAM_OPTIONS_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_filesystem-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_program_options-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_program_options-mt-gd${addrsfx}.lib)
-    set(BOOST_REGEX_LIBRARY
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_program_options-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_regex-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_regex-mt-gd${addrsfx}.lib)
-    set(BOOST_SIGNALS_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_regex-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_signals-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_signals-mt-gd${addrsfx}.lib)
-    set(BOOST_STACKTRACE_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_signals-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_stacktrace_windbg-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_stacktrace_windbg-mt-gd${addrsfx}.lib)
-    set(BOOST_SYSTEM_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_stacktrace_windbg-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_system-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_system-mt-gd${addrsfx}.lib)
-    set(BOOST_THREAD_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_system-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_thread-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_thread-mt-gd${addrsfx}.lib)
-    set(BOOST_WAVE_LIBRARY 
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_thread-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_wave-mt${addrsfx}.lib
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_wave-mt-gd${addrsfx}.lib)
-  elseif (LINUX)
-    set(BOOST_CONTEXT_LIBRARY
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_wave-mt-gd${addrsfx}.lib
+	)
+elseif (LINUX)
+  target_link_libraries( ll::boost INTERFACE
         optimized boost_context-mt${addrsfx}
-        debug boost_context-mt${addrsfx}-d)
-    set(BOOST_FIBER_LIBRARY
+        debug boost_context-mt${addrsfx}-d
         optimized boost_fiber-mt${addrsfx}
-        debug boost_fiber-mt${addrsfx}-d)
-    set(BOOST_FILESYSTEM_LIBRARY
+        debug boost_fiber-mt${addrsfx}-d
         optimized boost_filesystem-mt${addrsfx}
-        debug boost_filesystem-mt${addrsfx}-d)
-    set(BOOST_PROGRAM_OPTIONS_LIBRARY
+        debug boost_filesystem-mt${addrsfx}-d
         optimized boost_program_options-mt${addrsfx}
-        debug boost_program_options-mt${addrsfx}-d)
-    set(BOOST_REGEX_LIBRARY
+        debug boost_program_options-mt${addrsfx}-d
         optimized boost_regex-mt${addrsfx}
-        debug boost_regex-mt${addrsfx}-d)
-    set(BOOST_SIGNALS_LIBRARY
+        debug boost_regex-mt${addrsfx}-d
         optimized boost_signals-mt${addrsfx}
-        debug boost_signals-mt${addrsfx}-d)
-    set(BOOST_SYSTEM_LIBRARY
+        debug boost_signals-mt${addrsfx}-d
         optimized boost_system-mt${addrsfx}
-        debug boost_system-mt${addrsfx}-d)
-    set(BOOST_THREAD_LIBRARY
+        debug boost_system-mt${addrsfx}-d
         optimized boost_thread-mt${addrsfx}
-        debug boost_thread-mt${addrsfx}-d)
-    set(BOOST_WAVE_LIBRARY
+        debug boost_thread-mt${addrsfx}-d
         optimized boost_wave-mt${addrsfx}
-        debug boost_wave-mt${addrsfx}-d)
-  elseif (DARWIN)
-    set(BOOST_CONTEXT_LIBRARY
+        debug boost_wave-mt${addrsfx}-d
+	rt
+	)
+elseif (DARWIN)
+  target_link_libraries( ll::boost INTERFACE
         optimized boost_context-mt
-        debug boost_context-mt-d)
-    set(BOOST_FIBER_LIBRARY
+        debug boost_context-mt-d
         optimized boost_fiber-mt
-        debug boost_fiber-mt-d)
-    set(BOOST_FILESYSTEM_LIBRARY
+        debug boost_fiber-mt-d
         optimized boost_filesystem-mt
-        debug boost_filesystem-mt-d)
-    set(BOOST_PROGRAM_OPTIONS_LIBRARY
+        debug boost_filesystem-mt-d
         optimized boost_program_options-mt
-        debug boost_program_options-mt-d)
-    set(BOOST_REGEX_LIBRARY
+        debug boost_program_options-mt-d
         optimized boost_regex-mt
-        debug boost_regex-mt-d)
-    set(BOOST_SIGNALS_LIBRARY
+        debug boost_regex-mt-d
         optimized boost_signals-mt
-        debug boost_signals-mt-d)
-    set(BOOST_SYSTEM_LIBRARY
+        debug boost_signals-mt-d
         optimized boost_system-mt
-        debug boost_system-mt-d)
-    set(BOOST_THREAD_LIBRARY
+        debug boost_system-mt-d
         optimized boost_thread-mt
-        debug boost_thread-mt-d)
-    set(BOOST_WAVE_LIBRARY
+        debug boost_thread-mt-d
         optimized boost_wave-mt
-        debug boost_wave-mt-d)
-  endif (WINDOWS)
-endif (USESYSTEMLIBS)
-
-if (LINUX)
-    set(BOOST_SYSTEM_LIBRARY ${BOOST_SYSTEM_LIBRARY} rt)
-    set(BOOST_THREAD_LIBRARY ${BOOST_THREAD_LIBRARY} rt)
-endif (LINUX)
+        debug boost_wave-mt-d
+	)
+endif (WINDOWS)
 

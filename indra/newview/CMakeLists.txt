@@ -24,25 +24,13 @@ include(LibXML2)
 include(LLAppearance)
 include(LLAudio)
 include(LLCA)
-include(LLCharacter)
 include(LLCommon)
 include(LLCoreHttp)
 include(LLImage)
-include(LLImageJ2COJ)
-include(LLInventory)
 include(LLKDU)
-include(LLLogin)
-include(LLMath)
-include(LLMeshOptimizer)
-include(LLMessage)
 include(LLPhysicsExtensions)
-include(LLPlugin)
 include(LLPrimitive)
-include(LLRender)
-include(LLUI)
-include(LLFileSystem)
 include(LLWindow)
-include(LLXML)
 include(NDOF)
 include(NVAPI)
 include(OPENAL)
@@ -54,12 +42,12 @@ include(TemplateCheck)
 include(ThreeJS)
 include(Tracy)
 include(UI)
-include(UnixInstall)
 include(ViewerMiscLibs)
 include(ViewerManager)
 include(VisualLeakDetector)
 include(ZLIBNG)
 include(URIPARSER)
+include(LLPrimitive)
 
 # Viewer Branding Assets
 use_prebuilt_binary(branding)
@@ -68,62 +56,29 @@ if (WINDOWS)
 endif()
 
 if( LLPHYSICSEXTENSIONS_SRC_DIR )
-  if (NOT HAVOK_TPV)
-    # When using HAVOK_TPV, the library is precompiled, so no need for this
-    add_subdirectory(${LLPHYSICSEXTENSIONS_SRC_DIR} llphysicsextensions)
-    target_link_libraries(${LLPHYSICSEXTENSIONS_LIBRARIES} llcommon)
-  endif (NOT HAVOK_TPV)
-endif( LLPHYSICSEXTENSIONS_SRC_DIR )
+if (NOT HAVOK_TPV)
+   # When using HAVOK_TPV, the library is precompiled, so no need for this
 
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR}
-    ${DBUSGLIB_INCLUDE_DIRS}
-    ${ZLIBNG_INCLUDE_DIRS}
-    ${LIBXML2_INCLUDE_DIRS}
-    ${LLAUDIO_INCLUDE_DIRS}
-    ${LLCHARACTER_INCLUDE_DIRS}
-    ${LLCOMMON_INCLUDE_DIRS}
-    ${LLCOREHTTP_INCLUDE_DIRS}
-    ${LLPHYSICS_INCLUDE_DIRS}
-    ${LLIMAGE_INCLUDE_DIRS}
-    ${LLKDU_INCLUDE_DIRS}
-    ${LLINVENTORY_INCLUDE_DIRS}
-    ${LLMATH_INCLUDE_DIRS}
-    ${LLMESHOPTIMIZER_INCLUDE_DIRS}
-    ${LLMESSAGE_INCLUDE_DIRS}
-    ${LLPLUGIN_INCLUDE_DIRS}
-    ${LLPRIMITIVE_INCLUDE_DIRS}
-    ${LLRENDER_INCLUDE_DIRS}
-    ${LLUI_INCLUDE_DIRS}
-    ${LLFILESYSTEM_INCLUDE_DIRS}
-    ${LLWINDOW_INCLUDE_DIRS}
-    ${LLXML_INCLUDE_DIRS}
-    ${LLLOGIN_INCLUDE_DIRS}
-    "${LIBS_PREBUILT_DIR}/include/collada"
-    "${LIBS_PREBUILD_DIR}/include/hunspell"
-    ${OPENAL_INCLUDE_DIRS}
-    ${FREEALUT_INCLUDE_DIRS}
-    "${LIBS_PREBUILT_DIR}/include/collada/1.4"
-    ${LLAPPEARANCE_INCLUDE_DIRS}
-    ${DISCORD_INCLUDE_DIRS}
-    )
+   # Stub and probably havok lib itself is a hack, autobuild loads a 3p that really is a source tarball
+   # which includes a CMakeList.txt and then this whole source tree gets pushed into out build ... :/
+   # To make matters worse there is a internal assumption about the structure of the viewers CMake layout,
+   # which means we need to duct tape this togther ...
 
-if(USE_FMODSTUDIO)
-  include_directories(${FMODSTUDIO_INCLUDE_DIR})
-endif(USE_FMODSTUDIO)
+   add_subdirectory(${LLPHYSICSEXTENSIONS_SRC_DIR} llphysicsextensions)
 
-include_directories(SYSTEM
-    ${LLCOMMON_SYSTEM_INCLUDE_DIRS}
-    ${LLXML_SYSTEM_INCLUDE_DIRS}
-    ${LLPHYSICSEXTENSIONS_INCLUDE_DIRS}
-    )
-
-if (USE_SENTRY)
-  include_directories(AFTER
-    ${SENTRY_INCLUDE_DIRS}
-    )
-endif (USE_SENTRY)
+   # Another hack that works with newer cmake versions:
+   cmake_policy( SET CMP0079 NEW)
+   if( TARGET llphysicsextensionsstub )
+      target_link_libraries(llphysicsextensionsstub llcommon llmath)
+   endif()
+   if( TARGET llphysicsextensions )
+      target_link_libraries(llphysicsextensions llrender )
+      if (DARWIN)
+        target_compile_options( llphysicsextensions  PRIVATE -Wno-unused-local-typedef)
+      endif (DARWIN)
+   endif()
+endif (NOT HAVOK_TPV)
+endif()
 
 set(viewer_SOURCE_FILES
     alcinematicmode.cpp
@@ -1593,21 +1548,6 @@ if (DARWIN)
       PROPERTIES 
       SKIP_PRECOMPILE_HEADERS TRUE
       )
-
-  find_library(APPKIT_LIBRARY AppKit)
-  find_library(COCOA_LIBRARY Cocoa)
-  find_library(IOKIT_LIBRARY IOKit)
-  find_library(COREFOUNDATION_LIBRARY CoreFoundation)
-  find_library(COREAUDIO_LIBRARY CoreAudio)
-
-  set(viewer_LIBRARIES
-    ${COCOA_LIBRARY}
-    ${APPKIT_LIBRARY}
-    ${IOKIT_LIBRARY}
-    ${COREFOUNDATION_LIBRARY}
-    ${COREAUDIO_LIBRARY}
-    )
-
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
     macview.r
@@ -1620,12 +1560,7 @@ if (DARWIN)
     Japanese.lproj/language.txt
     Korean.lproj/language.txt
     )
-  set_source_files_properties(
-    ${viewer_RESOURCE_FILES}
-    PROPERTIES
-    HEADER_FILE_ONLY TRUE
-    #MACOSX_PACKAGE_LOCATION Resources #don't do this! this tells cmake to copy the files.
-    )
+
   SOURCE_GROUP("Resources" FILES ${viewer_RESOURCE_FILES})
   list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
 endif (DARWIN)
@@ -1637,9 +1572,6 @@ if (LINUX)
 	LIST(APPEND viewer_HEADER_FILES algamemode.h)
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
 
-    set(viewer_LIBRARIES
-        Xinerama
-        )
 endif (LINUX)
 
 if (WINDOWS)
@@ -1652,7 +1584,6 @@ if (WINDOWS)
          llappviewerwin32.h
          llwindebug.h
          )
-
     # Replace the icons with the appropriate ones for the channel
     # ('test' is the default)
     set(ICON_PATH "test")
@@ -1774,29 +1705,11 @@ if (WINDOWS)
 
     source_group("Resource Files" FILES ${viewer_RESOURCE_FILES})
 
-    if (NOT USESYSTEMLIBS)
-        list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
-    endif (NOT USESYSTEMLIBS)
+    list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
 
     set_source_files_properties(llappviewer.cpp PROPERTIES COMPILE_FLAGS /bigobj)
     set_source_files_properties(llviewermenu.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 
-# see EXP-1765 - theory is opengl32.lib needs to be included before gdi32.lib (windows libs)
-    set(viewer_LIBRARIES
-        opengl32
-        ${WINDOWS_LIBRARIES}
-        comdlg32
-        dxguid
-        imm32
-        kernel32
-        odbc32
-        odbccp32
-        oleaut32
-        shell32
-        Vfw32
-        wer
-        winspool
-        )
 endif (WINDOWS)
 
 if (USE_OPENAL)
@@ -1886,9 +1799,7 @@ source_group("Character File" FILES ${viewer_CHARACTER_FILES})
 
 set_source_files_properties(${viewer_CHARACTER_FILES}
                             PROPERTIES HEADER_FILE_ONLY TRUE)
-if (NOT USESYSTEMLIBS)
-    list(APPEND viewer_SOURCE_FILES ${viewer_CHARACTER_FILES})
-endif (NOT USESYSTEMLIBS)
+list(APPEND viewer_SOURCE_FILES ${viewer_CHARACTER_FILES})
 
 set(viewer_MISC_FILES
     viewer_manifest.py
@@ -1910,14 +1821,8 @@ if (WINDOWS)
   list(APPEND viewer_SOURCE_FILES ${viewer_INSTALLER_FILES})
 endif (WINDOWS)
 
-if (USE_FMODSTUDIO)
-  set(FMODWRAPPER_LIBRARY ${FMODSTUDIO_LIBRARY})
-endif (USE_FMODSTUDIO)
 
 list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
-
-set_source_files_properties(${viewer_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
 
 add_executable(${VIEWER_BINARY_NAME}
     WIN32
@@ -1988,8 +1893,13 @@ if (WINDOWS)
       # The following commented dependencies are determined at variably at build time. Can't do this here.
       ${CMAKE_SOURCE_DIR}/../etc/message.xml
       ${CMAKE_SOURCE_DIR}/../scripts/messages/message_template.msg
-      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/openjp2.dll
-      ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/SLVoice.exe
+      ${SHARED_LIB_STAGING_DIR}/openjp2.dll
+      ${SHARED_LIB_STAGING_DIR}/libhunspell.dll
+      ${SHARED_LIB_STAGING_DIR}/uriparser.dll
+      #${SHARED_LIB_STAGING_DIR}/${LL_INTDIR}/SLVoice.exe
+      #${SHARED_LIB_STAGING_DIR}/${LL_INTDIR}/libsndfile-1.dll
+      #${SHARED_LIB_STAGING_DIR}/${LL_INTDIR}/vivoxoal.dll
+      ${AUTOBUILD_INSTALL_DIR}/ca-bundle.crt
       ${CMAKE_CURRENT_SOURCE_DIR}/licenses-win32.txt
       ${CMAKE_CURRENT_SOURCE_DIR}/featuretable.txt
       ${viewer_APPSETTINGS_FILES}
@@ -1998,15 +1908,15 @@ if (WINDOWS)
       )
 
     if (ADDRESS_SIZE EQUAL 64)
-        list(APPEND COPY_INPUT_DEPENDENCIES
-            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/vivoxsdk_x64.dll
-            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/ortp_x64.dll
-            )
+       list(APPEND COPY_INPUT_DEPENDENCIES
+               ${SHARED_LIB_STAGING_DIR}/vivoxsdk_x64.dll
+               ${SHARED_LIB_STAGING_DIR}/ortp_x64.dll
+               )
     else (ADDRESS_SIZE EQUAL 64)
-        list(APPEND COPY_INPUT_DEPENDENCIES
-            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/vivoxsdk.dll
-            ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/ortp.dll
-            )
+       list(APPEND COPY_INPUT_DEPENDENCIES
+               ${SHARED_LIB_STAGING_DIR}/vivoxsdk.dll
+               ${SHARED_LIB_STAGING_DIR}/ortp.dll
+               )
     endif (ADDRESS_SIZE EQUAL 64)
 
     if (USE_CEF)
@@ -2021,11 +1931,10 @@ if (WINDOWS)
            )
     endif ()
 
-    if (USE_FMODSTUDIO)
+    if (TARGET ll::fmodstudio)
       if (GEN_IS_MULTI_CONFIG)
         list(APPEND COPY_INPUT_DEPENDENCIES
-            ${SHARED_LIB_STAGING_DIR}/Release/fmod.dll
-            ${SHARED_LIB_STAGING_DIR}/RelWithDebInfo/fmod.dll
+           ${SHARED_LIB_STAGING_DIR}/fmod.dll
             ${SHARED_LIB_STAGING_DIR}/Debug/fmodL.dll
             )
       elseif (UPPERCASE_CMAKE_BUILD_TYPE MATCHES DEBUG)
@@ -2037,12 +1946,12 @@ if (WINDOWS)
             ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/fmod.dll
             )
       endif()
-    endif (USE_FMODSTUDIO)
+    endif ()
 
-    if (USE_OPENAL)
+    if (TARGET ll::openal)
       list(APPEND COPY_INPUT_DEPENDENCIES
-           ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/OpenAL32.dll
-           ${SHARED_LIB_STAGING_DIR}/${CMAKE_CFG_INTDIR}/alut.dll
+           ${SHARED_LIB_STAGING_DIR}/OpenAL32.dll
+           ${SHARED_LIB_STAGING_DIR}/alut.dll
           )
     endif ()
 
@@ -2058,15 +1967,14 @@ if (WINDOWS)
         "--sentry=${USE_SENTRY}"
         "--fmodstudio=${USE_FMODSTUDIO}"
         "--openal=${USE_OPENAL}"
-        "--kdu=${USE_KDU}"
         --build=${CMAKE_CURRENT_BINARY_DIR}
-        --buildtype=${CMAKE_BUILD_TYPE}
+        --buildtype=$<CONFIG>
         "--channel=${VIEWER_CHANNEL}"
         --configuration=${CMAKE_CFG_INTDIR}
-        --dest=${VIEWER_BUILD_DEST_DIR}
+        --dest=${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
         --grid=${GRID}
         --source=${CMAKE_CURRENT_SOURCE_DIR}
-        --touch=${VIEWER_BUILD_DEST_DIR}/copy_touched.bat
+        --touch=${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/copy_touched.bat
         --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
       DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
@@ -2126,15 +2034,14 @@ if (WINDOWS)
           "--sentry=${USE_SENTRY}"
           "--fmodstudio=${USE_FMODSTUDIO}"
           "--openal=${USE_OPENAL}"
-          "--kdu=${USE_KDU}"
           --build=${CMAKE_CURRENT_BINARY_DIR}
-          --buildtype=${CMAKE_BUILD_TYPE}
+              --buildtype=$<CONFIG>
           "--channel=${VIEWER_CHANNEL}"
           --configuration=${CMAKE_CFG_INTDIR}
-          --dest=${VIEWER_BUILD_DEST_DIR}
+              --dest=${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
           --grid=${GRID}
           --source=${CMAKE_CURRENT_SOURCE_DIR}
-          --touch=${VIEWER_BUILD_DEST_DIR}/touched.bat
+              --touch=${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/touched.bat
           --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
           --updateurl=${VIEWER_UPDATE_SERVICE}
           ${DELTA_GEN_SETTING}
@@ -2146,7 +2053,7 @@ if (WINDOWS)
         )
 
       add_custom_target(llpackage ALL DEPENDS
-        ${VIEWER_BUILD_DEST_DIR}/touched.bat
+              ${CMAKE_CFG_INTDIR}/touched.bat
         )
         # temporarily disable packaging of event_host until hg subrepos get
         # sorted out on the parabuild cluster...
@@ -2194,59 +2101,34 @@ endif (WINDOWS)
 # modern version.
 
 target_link_libraries(${VIEWER_BINARY_NAME}
-    ${PNG_PRELOAD_ARCHIVES}
-    ${ZLIBNG_PRELOAD_ARCHIVES}
-    ${URIPARSER_PRELOAD_ARCHIVES}
-    ${GOOGLE_PERFTOOLS_LIBRARIES}
-    ${LLAUDIO_LIBRARIES}
-    ${LLCHARACTER_LIBRARIES}
-    ${LLIMAGE_LIBRARIES}
-    ${LLINVENTORY_LIBRARIES}
-    ${LLMESHOPTIMIZER_LIBRARIES}
-    ${LLMESSAGE_LIBRARIES}
-    ${LLPLUGIN_LIBRARIES}
-    ${LLPRIMITIVE_LIBRARIES}
-    ${LLRENDER_LIBRARIES}
-    ${FREETYPE_LIBRARIES}
-    ${LLUI_LIBRARIES}
-    ${LLFILESYSTEM_LIBRARIES}
-    ${LLWINDOW_LIBRARIES}
-    ${LLXML_LIBRARIES}
-    ${LLMATH_LIBRARIES}
-    ${LLCOREHTTP_LIBRARIES}
-    ${LLCOMMON_LIBRARIES}
-    ${NDOF_LIBRARY}
-    ${NVAPI_LIBRARY}
-    ${HUNSPELL_LIBRARY}
-    ${viewer_LIBRARIES}
-    ${BOOST_PROGRAM_OPTIONS_LIBRARY}
-    ${BOOST_REGEX_LIBRARY}
-    ${BOOST_FIBER_LIBRARY}
-    ${BOOST_CONTEXT_LIBRARY}
-    ${BOOST_WAVE_LIBRARY}
-    ${DBUSGLIB_LIBRARIES}
-    ${OPENGL_LIBRARIES}
-    ${FMODWRAPPER_LIBRARY} # must come after LLAudio
-    ${SDL_LIBRARIES}
-    ${SMARTHEAP_LIBRARY}
-    ${UI_LIBRARIES}
-    ${WINDOWS_LIBRARIES}
-    ${EXPAT_LIBRARIES}
-    ${LIBXML2_LIBRARIES}
-    ${XMLRPCEPI_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
-    ${CRYPTO_LIBRARIES}
-    ${LLLOGIN_LIBRARIES}
-    ${LLPHYSICS_LIBRARIES}
-    ${LLPHYSICSEXTENSIONS_LIBRARIES}
-    ${LLAPPEARANCE_LIBRARIES}
-    ${TRACY_LIBRARY}
-    ${MINIZIP_LIBRARIES}
-    ${DISCORD_LIBRARIES}
-    meshoptimizer
-    nlohmann_json::nlohmann_json
-    fmt::fmt
-    )
+        llaudio
+        llcharacter
+        llimage
+        llinventory
+        llmessage
+        llplugin
+        llprimitive
+        llrender
+        llui
+        llfilesystem
+        llwindow
+        llxml
+        llmath
+        llcorehttp
+        llcommon
+        llmeshoptimizer
+        ll::ndof
+        lllogin
+        llprimitive
+        llappearance
+        ${LLPHYSICSEXTENSIONS_LIBRARIES}
+        ll::bugsplat
+        ll::tracy
+        )
+
+if( TARGET ll::nvapi )
+   target_link_libraries(${VIEWER_BINARY_NAME} ll::nvapi )
+endif()
 
 set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
     "Path to artwork files.")
@@ -2344,7 +2226,7 @@ if (DARWIN)
   # https://blog.kitware.com/upcoming-in-cmake-2-8-12-osx-rpath-support/
   set(CMAKE_MACOSX_RPATH 1)
   
-  set(VIEWER_APP_BUNDLE "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${product}.app")
+  set(VIEWER_APP_BUNDLE "${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/${product}.app")
   set(VIEWER_APP_EXE "${VIEWER_APP_BUNDLE}/Contents/MacOS/${product}")
   set(VIEWER_APP_DSYM "${VIEWER_APP_EXE}.dSYM")
   set(VIEWER_APP_XCARCHIVE "${VIEWER_APP_BUNDLE}/../${product}.xcarchive.zip")
@@ -2397,7 +2279,7 @@ if (DARWIN)
       "--openal=${USE_OPENAL}"
       "--kdu=${USE_KDU}"
       --build=${CMAKE_CURRENT_BINARY_DIR}
-      --buildtype=${CMAKE_BUILD_TYPE}
+      --buildtype=$<CONFIG>
       --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER}
       "--channel=${VIEWER_CHANNEL}"
       --configuration=${CMAKE_CFG_INTDIR}
@@ -2433,24 +2315,24 @@ if (DARWIN)
         TARGET llpackage POST_BUILD
         COMMAND ${Python3_EXECUTABLE}
         ARGS
-          ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-          --arch=${ARCH}
-          --artwork=${ARTWORK_DIR}
-          "--discord=${USE_DISCORD}"
-          "--sentry=${USE_SENTRY}"
-          "--fmodstudio=${USE_FMODSTUDIO}"
-          "--openal=${USE_OPENAL}"
-          "--kdu=${USE_KDU}"
-          --build=${CMAKE_CURRENT_BINARY_DIR}
-          --buildtype=${CMAKE_BUILD_TYPE}
-          "--channel=${VIEWER_CHANNEL}"
-          --configuration=${CMAKE_CFG_INTDIR}
-          --dest=${VIEWER_APP_BUNDLE}
-          --grid=${GRID}
-          --source=${CMAKE_CURRENT_SOURCE_DIR}
-          --touch=${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/.${product}.touched
-          --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-          ${SIGNING_SETTING}
+              ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
+              --arch=${ARCH}
+              --artwork=${ARTWORK_DIR}
+              "--discord=${USE_DISCORD}"
+              "--sentry=${USE_SENTRY}"
+              "--fmodstudio=${USE_FMODSTUDIO}"
+              "--openal=${USE_OPENAL}"
+              "--kdu=${USE_KDU}"
+              --build=${CMAKE_CURRENT_BINARY_DIR}
+              --buildtype=$<CONFIG>
+              "--channel=${VIEWER_CHANNEL}"
+              --configuration=${CMAKE_CFG_INTDIR}
+              --dest=${VIEWER_APP_BUNDLE}
+              --grid=${GRID}
+              --source=${CMAKE_CURRENT_SOURCE_DIR}
+              --touch=${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/.${product}.bat
+              --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
+              ${SIGNING_SETTING}
         DEPENDS
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
       )
@@ -2570,9 +2452,15 @@ if (LL_TESTS)
   )
 
   set(test_libs
-    ${LLCOMMON_LIBRARIES}
-    ${CURL_LIBRARIES}
-    ${NGHTTP2_LIBRARIES}
+          llcommon
+          llfilesystem
+          llxml
+          llmessage
+          llcharacter
+          llui
+          lllogin
+          llplugin
+          llappearance
     )
 
   set_source_files_properties(
@@ -2581,17 +2469,6 @@ if (LL_TESTS)
     LL_TEST_ADDITIONAL_LIBRARIES "${test_libs}"
   )
 
-  set_source_files_properties(
-    llviewerhelputil.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_LIBRARIES "${BOOST_SYSTEM_LIBRARY}"
-  )
-
-  set_source_files_properties(
-    llremoteparcelrequest.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_LIBRARIES "${BOOST_SYSTEM_LIBRARY}"
-  )
 
   set_source_files_properties(
     llworldmap.cpp
@@ -2599,86 +2476,49 @@ if (LL_TESTS)
     PROPERTIES
     LL_TEST_ADDITIONAL_SOURCE_FILES 
     tests/llviewertexture_stub.cpp
-    #llviewertexturelist.cpp
-    LL_TEST_ADDITIONAL_LIBRARIES "${BOOST_SYSTEM_LIBRARY}"
   )
 
   set_source_files_properties(
     llmediadataclient.cpp
     PROPERTIES
-    LL_TEST_ADDITIONAL_LIBRARIES "${LLPRIMITIVE_LIBRARIES}"
-  )
-
-  set_source_files_properties(
-    llagentaccess.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_LIBRARIES "${BOOST_SYSTEM_LIBRARY}"
+    LL_TEST_ADDITIONAL_LIBRARIES llprimitive
   )
 
   set_source_files_properties(
     lllogininstance.cpp
     PROPERTIES
     LL_TEST_ADDITIONAL_SOURCE_FILES llversioninfo.cpp
-    LL_TEST_ADDITIONAL_LIBRARIES "${BOOST_SYSTEM_LIBRARY}"
+  )
+  set_property( SOURCE
+          ${viewer_TEST_SOURCE_FILES}
+          PROPERTY
+          LL_TEST_ADDITIONAL_LIBRARIES ${test_libs}
   )
 
-  ##################################################
-  # DISABLING PRECOMPILED HEADERS USAGE FOR TESTS
-  ##################################################
-  # if(USE_PRECOMPILED_HEADERS)
-  #     set_source_files_properties(
-  #       ${viewer_TEST_SOURCE_FILES}
-  #       PROPERTIES
-  #         LL_TEST_ADDITIONAL_SOURCE_FILES llviewerprecompiledheaders.cpp
-  #       )
-  # endif(USE_PRECOMPILED_HEADERS)
   LL_ADD_PROJECT_UNIT_TESTS(${VIEWER_BINARY_NAME} "${viewer_TEST_SOURCE_FILES}")
 
   #set(TEST_DEBUG on)
-  ##################################################
-  # DISABLING PRECOMPILED HEADERS USAGE FOR TESTS
-  ##################################################
-  # if(USE_PRECOMPILED_HEADERS)
-  #     set(test_sources "${test_sources}" llviewerprecompiledheaders.cpp)
-  # endif(USE_PRECOMPILED_HEADERS)
-  set(test_libs
-    ${LLMESSAGE_LIBRARIES}
-    ${WINDOWS_LIBRARIES}
-    ${LLFILESYSTEM_LIBRARIES}
-    ${LLMATH_LIBRARIES}
-    ${LLCOMMON_LIBRARIES}
-    )
-
-  if (LINUX)
-    # llcommon uses `clock_gettime' which is provided by librt on linux.
-    set(LIBRT_LIBRARY
-      rt
-      )
-  endif (LINUX)
 
   set(test_libs
-    ${WINDOWS_LIBRARIES}
-    ${LLFILESYSTEM_LIBRARIES}
-    ${LLMATH_LIBRARIES}
-    ${LLCOMMON_LIBRARIES}
-    ${LLMESSAGE_LIBRARIES}
-    ${LLCOREHTTP_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
-    ${CRYPTO_LIBRARIES}
-    ${LIBRT_LIBRARY}
-    ${BOOST_FIBER_LIBRARY}
-    ${BOOST_CONTEXT_LIBRARY}
-  )
-
-  LL_ADD_INTEGRATION_TEST(llagentaccess 
-    llagentaccess.cpp 
-    "${test_libs}"
-    )
+          llfilesystem
+          llmath
+          llcommon
+          llmessage
+          llcorehttp
+          llxml
+          llui
+          llplugin
+          llappearance
+          lllogin
+          llprimitive
+          lllogin
+          )
 
   LL_ADD_INTEGRATION_TEST(cppfeatures
     ""
     "${test_libs}"
     )
+
   LL_ADD_INTEGRATION_TEST(llsechandler_basic
     llsechandler_basic.cpp
     "${test_libs}"
@@ -2692,10 +2532,10 @@ if (LL_TESTS)
   set(llslurl_test_sources
       llslurl.cpp
       llviewernetwork.cpp
-      )
+  )
 
   LL_ADD_INTEGRATION_TEST(llslurl
-    "${llslurl_test_sources}"
+     "${llslurl_test_sources}"
     "${test_libs}"
     )
 

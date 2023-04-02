@@ -9,10 +9,8 @@
 #   LINUX   - Linux
 #   WINDOWS - Windows
 
+include_guard()
 # Relative and absolute paths to subtrees.
-
-if(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
-set(${CMAKE_CURRENT_LIST_FILE}_INCLUDED "YES")
 
 if(NOT DEFINED COMMON_CMAKE_DIR)
     set(COMMON_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake")
@@ -132,10 +130,8 @@ set(TEMPLATE_VERIFIER_MASTER_URL "https://git.alchemyviewer.org/alchemy/master-m
 # If someone has specified an address size, use that to determine the
 # architecture.  Otherwise, let the architecture specify the address size.
 if (ADDRESS_SIZE EQUAL 32)
-  #message(STATUS "ADDRESS_SIZE is 32")
   set(ARCH i686)
 elseif (ADDRESS_SIZE EQUAL 64)
-  #message(STATUS "ADDRESS_SIZE is 64")
   set(ARCH x86_64)
 else (ADDRESS_SIZE EQUAL 32)
     #message(STATUS "ADDRESS_SIZE is UNDEFINED")
@@ -154,15 +150,6 @@ endif (ADDRESS_SIZE EQUAL 32)
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
   set(WINDOWS ON BOOL FORCE)
-  if (ADDRESS_SIZE EQUAL 64)
-    set(LL_ARCH ${ARCH}_win64)
-    set(LL_ARCH_DIR ${ARCH}-win64)
-  elseif (ADDRESS_SIZE EQUAL 32)
-    set(LL_ARCH ${ARCH}_win32)
-    set(LL_ARCH_DIR ${ARCH}-win32)
-  else()
-    message(FATAL_ERROR "Unkown Architecture!")
-  endif ()
 endif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -187,9 +174,6 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     set(CMAKE_SYSTEM_LIBRARY_PATH /usr/lib/${DPKG_ARCH} /usr/local/lib/${DPKG_ARCH} ${CMAKE_SYSTEM_LIBRARY_PATH})
   endif (DPKG_RESULT EQUAL 0)
 
-
-  set(LL_ARCH ${ARCH}_linux)
-  set(LL_ARCH_DIR ${ARCH}-linux)
 
   #if (INSTALL_PROPRIETARY)
     # Only turn on headless if we can find osmesa libraries.
@@ -258,9 +242,6 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(ADDRESS_SIZE 64)
   set(ARCH x86_64)
   set(CMAKE_OSX_ARCHITECTURES x86_64)
-
-  set(LL_ARCH ${ARCH}_darwin)
-  set(LL_ARCH_DIR universal-darwin)
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 # Default deploy grid
@@ -278,7 +259,6 @@ if(DEFINED ENV{VIEWER_SIGNING_IDENTITY})
 endif()
 
 set(VERSION_BUILD "0" CACHE STRING "Revision number passed in from the outside")
-set(USESYSTEMLIBS OFF CACHE BOOL "Use libraries from your system rather than Linden-supplied prebuilt libraries.")
 
 set(USE_PRECOMPILED_HEADERS ON CACHE BOOL "Enable use of precompiled header directives where supported.")
 
@@ -286,4 +266,5 @@ set(VIEWER_UPDATE_SERVICE "https://git.alchemyviewer.org/api/v4/projects/198/pac
 
 source_group("CMake Rules" FILES CMakeLists.txt)
 
-endif(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
+get_property(LL_GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+

@@ -2,31 +2,28 @@
 include(Prebuilt)
 include(Linking)
 
-set(CURL_FIND_QUIETLY ON)
-set(CURL_FIND_REQUIRED ON)
+include_guard()
+add_library( ll::libcurl INTERFACE IMPORTED )
 
-if (USESYSTEMLIBS)
-  include(FindCURL)
-else (USESYSTEMLIBS)
-  use_prebuilt_binary(curl)
-  if (WINDOWS)
-    set(CURL_LIBRARIES 
+use_system_binary(libcurl)
+use_prebuilt_binary(curl)
+if (WINDOWS)
+    target_link_libraries(ll::libcurl INTERFACE
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.lib
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.lib
       Normaliz.lib
       Iphlpapi.lib
     )
-  elseif(DARWIN)
-    set(CURL_LIBRARIES 
+elseif(DARWIN)
+    target_link_libraries(ll::libcurl INTERFACE 
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.a
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.a
       resolv
     )
-  else ()
-    set(CURL_LIBRARIES
+else ()
+    target_link_libraries(ll::libcurl INTERFACE
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.a
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.a
       )
-  endif ()
-  set(CURL_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)
-endif (USESYSTEMLIBS)
+endif ()
+target_include_directories( ll::libcurl SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include)

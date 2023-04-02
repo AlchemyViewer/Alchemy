@@ -2,25 +2,8 @@ project(SLPlugin)
 
 include(00-Common)
 include(LLCommon)
-include(LLPlugin)
 include(Linking)
 include(PluginAPI)
-include(LLMessage)
-
-include_directories(
-    ${LLPLUGIN_INCLUDE_DIRS}
-    ${LLMESSAGE_INCLUDE_DIRS}
-    ${LLCOMMON_INCLUDE_DIRS}
-)
-include_directories(SYSTEM
-    ${LLCOMMON_SYSTEM_INCLUDE_DIRS}
-    )
-
-if (DARWIN)
-    include(CMakeFindFrameworks)
-    find_library(COCOA_LIBRARY Cocoa)
-endif (DARWIN)
-
 
 ### SLPlugin
 
@@ -37,9 +20,6 @@ if (DARWIN)
   )
 endif (DARWIN)
 
-set_source_files_properties(${SLPlugin_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-
 if (SLPlugin_HEADER_FILES)
   list(APPEND SLPlugin_SOURCE_FILES ${SLPlugin_HEADER_FILES})
 endif (SLPlugin_HEADER_FILES)
@@ -51,11 +31,11 @@ add_executable(SLPlugin
     )
 
 target_link_libraries(SLPlugin
-  ${LLPLUGIN_LIBRARIES}
-  ${LLMESSAGE_LIBRARIES}
-  ${LLCOMMON_LIBRARIES}
-  ${PLUGIN_API_WINDOWS_LIBRARIES}
-)
+        llplugin
+        llmessage
+        llcommon
+        ll::pluginlibraries
+        )
 
 if (WINDOWS)
   target_link_libraries(SLPlugin wer)
@@ -86,6 +66,6 @@ elseif (DARWIN)
     COMMAND mkdir
     ARGS
       -p
-      ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/SLPlugin.app/Contents/Resources
+      ${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/SLPlugin.app/Contents/Resources
   )
 endif ()

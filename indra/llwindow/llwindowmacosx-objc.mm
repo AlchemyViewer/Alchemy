@@ -213,6 +213,7 @@ NSWindowRef createNSWindow(int x, int y, int width, int height)
                                                       styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable backing:NSBackingStoreBuffered defer:NO];
 	[window makeKeyAndOrderFront:nil];
 	[window setAcceptsMouseMovedEvents:TRUE];
+	[window setRestorable:FALSE]; // Viewer manages state from own settings
 	return (NSWindowRef)CFBridgingRetain(window);
 }
 

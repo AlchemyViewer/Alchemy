@@ -4,16 +4,8 @@ project(llmath)
 
 include(00-Common)
 include(LLCommon)
-include(LLMeshOptimizer)
 include(LLMath)
 include(Boost)
-
-include_directories(
-    ${LLCOMMON_INCLUDE_DIRS}
-    ${LLMATH_INCLUDE_DIRS}
-    ${LLCOMMON_SYSTEM_INCLUDE_DIRS}
-    ${LLMESHOPTIMIZER_INCLUDE_DIRS}
-    )
 
 set(llmath_SOURCE_FILES
     llbbox.cpp
@@ -105,27 +97,12 @@ set(llmath_HEADER_FILES
     xform.h
     )
 
-set_source_files_properties(${llmath_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-
 list(APPEND llmath_SOURCE_FILES ${llmath_HEADER_FILES})
 
 add_library (llmath ${llmath_SOURCE_FILES})
 
-target_link_libraries(llmath
-    PRIVATE
-    meshoptimizer
-    PUBLIC
-    ${LLCOMMON_LIBRARIES}
-    ${LLMESHOPTIMIZER_LIBRARIES}
-    )
-
-if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
-  target_precompile_headers(llmath
-    PRIVATE
-    [["linden_common.h"]]
-    )
-endif()
+target_link_libraries(llmath llcommon meshoptimizer)
+target_include_directories( llmath  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add tests
 if (LL_TESTS)
@@ -140,15 +117,11 @@ if (LL_TESTS)
     v4color.cpp
     v4coloru.cpp
     )
-  set_source_files_properties(
-    ${llmath_TEST_SOURCE_FILES}
-    PROPERTIES
-    LL_TEST_ADDITIONAL_LIBRARIES "${BOOST_STACKTRACE_LIBRARY};${BOOST_THREAD_LIBRARY}"
-  )
+
   LL_ADD_PROJECT_UNIT_TESTS(llmath "${llmath_TEST_SOURCE_FILES}")
 
   # INTEGRATION TESTS
-  set(test_libs llmath llcommon ${LLCOMMON_LIBRARIES} ${WINDOWS_LIBRARIES})
+  set(test_libs llmath llcommon)
   # TODO: Some of these need refactoring to be proper Unit tests rather than Integration tests.
   LL_ADD_INTEGRATION_TEST(alignment "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llbbox llbbox.cpp "${test_libs}")

@@ -63,6 +63,7 @@
 #include "llcorehttputil.h"
 #include "llvoicevivox.h"
 #include "llinventorymodel.h"
+#include "lltranslate.h"
 
 namespace LLStatViewer
 {
@@ -499,6 +500,7 @@ void send_viewer_stats(bool include_preferences)
 	agent["meters_traveled"] = gAgent.getDistanceTraveled();
 	agent["regions_visited"] = gAgent.getRegionsVisited();
 	agent["mem_use"] = LLMemory::getCurrentRSS() / 1024.0;
+	agent["translation"] = LLTranslate::instance().asLLSD();
 
 	LLSD &system = body["system"];
 	
@@ -508,6 +510,7 @@ void send_viewer_stats(bool include_preferences)
     system["cpu_sse"] = gSysCPU.getSSEVersions();
 	system["address_size"] = ADDRESS_SIZE;
 	system["os_bitness"] = LLOSInfo::instance().getOSBitness();
+	system["hardware_concurrency"] = (LLSD::Integer) std::thread::hardware_concurrency();
 	unsigned char MACAddress[MAC_ADDRESS_BYTES];
 	LLUUID::getNodeID(MACAddress);
 	std::string macAddressString = llformat("%02x-%02x-%02x-%02x-%02x-%02x",
@@ -528,6 +531,7 @@ void send_viewer_stats(bool include_preferences)
 	system["opengl_version"] = gGLManager.mGLVersionString;
 
 	gGLManager.asLLSD(system["gl"]);
+
 
 	S32 shader_level = 0;
 	if (LLPipeline::sRenderDeferred)

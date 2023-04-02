@@ -1,21 +1,18 @@
 # -*- cmake -*-
 include(Prebuilt)
 
-set(EXPAT_FIND_QUIETLY ON)
-set(EXPAT_FIND_REQUIRED ON)
+include_guard()
+add_library( ll::expat INTERFACE IMPORTED )
 
-if (USESYSTEMLIBS)
-  include(FindEXPAT)
-else (USESYSTEMLIBS)
-    use_prebuilt_binary(expat)
-    if (WINDOWS)
-        set(EXPAT_LIBRARIES
+use_system_binary(expat)
+use_prebuilt_binary(expat)
+if (WINDOWS)
+    target_link_libraries( ll::expat  INTERFACE
             debug ${ARCH_PREBUILT_DIRS_DEBUG}/libexpatd.lib
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libexpat.lib)
-    else ()
-        set(EXPAT_LIBRARIES
+else ()
+    target_link_libraries( ll::expat  INTERFACE
             debug ${ARCH_PREBUILT_DIRS_DEBUG}/libexpat.a
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libexpat.a)
-    endif ()
-    set(EXPAT_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)
-endif (USESYSTEMLIBS)
+endif ()
+target_include_directories( ll::expat SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include )

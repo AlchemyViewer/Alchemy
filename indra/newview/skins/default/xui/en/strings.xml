@@ -148,7 +148,7 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="LoginFailedViewerNotPermitted">
     The viewer you are using can no longer access [CURRENT_GRID]. Please visit the following page to download a new viewer:
 https://www.alchemyviewer.org/pages/downloads.html</string>
-	<string name="LoginFailed">Grid emergency login failure.
+	<string name="LoginFailed">"Login process did not complete due to system issues. Try again in a few minutes.
 If you feel this is an error, please contact support.</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">Optional viewer update available: [VERSION]</string>
 	<string name="LoginFailedRequiredUpdate">Required viewer update: [VERSION]</string>

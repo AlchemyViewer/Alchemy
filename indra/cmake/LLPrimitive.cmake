@@ -1,55 +1,58 @@
 # -*- cmake -*-
 
 # these should be moved to their own cmake file
-include(Linking)
 include(Prebuilt)
 include(Boost)
 include(LibXML2)
 include(URIPARSER)
 include(ZLIBNG)
 
+include_guard()
+
+add_library( ll::pcre INTERFACE IMPORTED )
+add_library( ll::minizip-ng INTERFACE IMPORTED )
+add_library( ll::libxml INTERFACE IMPORTED )
+add_library( ll::colladadom INTERFACE IMPORTED )
+
+# ND, needs fixup in collada conan pkg
+if( USE_CONAN )
+  target_include_directories( ll::colladadom SYSTEM INTERFACE
+    "${CONAN_INCLUDE_DIRS_COLLADADOM}/collada-dom/" 
+    "${CONAN_INCLUDE_DIRS_COLLADADOM}/collada-dom/1.4/" )
+endif()
+
+use_system_binary( colladadom )
+
 use_prebuilt_binary(colladadom)
 use_prebuilt_binary(minizip-ng) # needed for colladadom
+use_prebuilt_binary(pcre)
+use_prebuilt_binary(libxml2)
 
-set(LLPRIMITIVE_INCLUDE_DIRS
-    ${LIBS_OPEN_DIR}/llprimitive
-    )
+target_link_libraries( ll::pcre INTERFACE pcrecpp pcre )
+
 if (WINDOWS)
-    set(LLPRIMITIVE_LIBRARIES 
-        debug llprimitive
-        optimized llprimitive
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcollada14dom23-sd.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcollada14dom23-s.lib
-        ${BOOST_FILESYSTEM_LIBRARY}
-        ${BOOST_SYSTEM_LIBRARIES}
-        ${LIBXML2_LIBRARIES}
-        ${URIPARSER_LIBRARIES}
-        ${MINIZIP_LIBRARIES}
-        ${ZLIBNG_LIBRARIES}
-        )
-elseif (DARWIN)
-    set(LLPRIMITIVE_LIBRARIES 
-        llprimitive
-        debug collada14dom-d
-        optimized collada14dom
-        ${BOOST_FILESYSTEM_LIBRARY}
-        ${BOOST_SYSTEM_LIBRARIES}
-        ${LIBXML2_LIBRARIES}
-        ${URIPARSER_LIBRARIES}
-        ${MINIZIP_LIBRARIES}
-        ${ZLIBNG_LIBRARIES}
-        )
-elseif (LINUX)
-    set(LLPRIMITIVE_LIBRARIES 
-        llprimitive
-        debug collada14dom-d
-        optimized collada14dom
-        ${BOOST_FILESYSTEM_LIBRARY}
-        ${BOOST_SYSTEM_LIBRARIES}
-        ${LIBXML2_LIBRARIES}
-        ${URIPARSER_LIBRARIES}
-        ${MINIZIP_LIBRARIES}
-        ${ZLIBNG_LIBRARIES}
-        )
-endif (WINDOWS)
+    target_link_libraries( ll::minizip-ng INTERFACE libminizip )
+else()
+    target_link_libraries( ll::minizip-ng INTERFACE minizip )
+endif()
 
+if (WINDOWS)
+    target_link_libraries( ll::libxml INTERFACE libxml2_a)
+else()
+    target_link_libraries( ll::libxml INTERFACE xml2)
+endif()
+
+target_include_directories( ll::colladadom SYSTEM INTERFACE
+        ${LIBS_PREBUILT_DIR}/include/collada
+        ${LIBS_PREBUILT_DIR}/include/collada/1.4
+        )
+if (WINDOWS)
+    target_link_libraries(ll::colladadom INTERFACE 
+			  debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcollada14dom23-sd.lib
+			  optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcollada14dom23-s.lib
+			  ll::libxml ll::minizip-ng )
+elseif (DARWIN)
+    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::libxml ll::minizip-ng)
+elseif (LINUX)
+    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::libxml ll::minizip-ng)
+endif()

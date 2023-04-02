@@ -1,8 +1,9 @@
 # -*- cmake -*-
 include(Prebuilt)
 
-if (NOT USESYSTEMLIBS)
+if( NOT USE_CONAN )
   use_prebuilt_binary(libhunspell)
-  use_prebuilt_binary(slvoice)
-endif(NOT USESYSTEMLIBS)
+endif()
+
+use_prebuilt_binary(slvoice)
 

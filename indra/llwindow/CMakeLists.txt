@@ -14,27 +14,9 @@ include(00-Common)
 include(DragDrop)
 include(LLCommon)
 include(LLImage)
-include(LLMath)
-include(LLRender)
-include(LLFileSystem)
 include(LLWindow)
-include(LLXML)
 include(UI)
-include(SDL2)
-
-include_directories(
-    ${LLCOMMON_INCLUDE_DIRS}
-    ${LLIMAGE_INCLUDE_DIRS}
-    ${LLMATH_INCLUDE_DIRS}
-    ${LLRENDER_INCLUDE_DIRS}
-    ${LLFILESYSTEM_INCLUDE_DIRS}
-    ${LLWINDOW_INCLUDE_DIRS}
-    ${LLXML_INCLUDE_DIRS}
-    )
-include_directories(SYSTEM
-    ${LLCOMMON_SYSTEM_INCLUDE_DIRS}
-    ${LLXML_SYSTEM_INCLUDE_DIRS}
-    )
+include(ViewerMiscLibs)
 
 set(llwindow_SOURCE_FILES
     llcursortypes.cpp
@@ -65,21 +47,21 @@ set(viewer_HEADER_FILES
     llmousehandler.h
     )
 
+set(llwindow_LINK_LIBRARIES
+        llcommon
+        llimage
+        llmath
+        llrender
+        llfilesystem
+        llxml
+        ll::glh_linear
+        ll::glext
+        ll::uilibraries
+        ll::SDL2
+        )
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 if (LINUX)
-  set(llwindow_LINK_LIBRARIES
-      ${LLCOMMON_LIBRARIES}
-      ${LLIMAGE_LIBRARIES}
-      ${LLMATH_LIBRARIES}
-      ${LLRENDER_LIBRARIES}
-      ${LLFILESYSTEM_LIBRARIES}
-      ${LLXML_LIBRARIES}
-      ${UI_LIBRARIES}     # for GTK
-      ${SDL_LIBRARIES}
-      ${FONTCONFIG_LIBRARIES}          # For FCInit and other FC* functions.
-      )
-
   list(APPEND viewer_SOURCE_FILES 
        llkeyboardsdl.cpp 
        llwindowsdl.cpp
@@ -146,18 +128,6 @@ if (WINDOWS)
        )
 endif (WINDOWS)
 
-if (SOLARIS)
-  list(APPEND llwindow_SOURCE_FILES
-       llwindowsolaris.cpp
-       )
-  list(APPEND llwindow_HEADER_FILES
-       llwindowsolaris.h
-       )
-endif (SOLARIS)
-
-set_source_files_properties(${llwindow_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-
 if (BUILD_HEADLESS)
   set(llwindowheadless_SOURCE_FILES
        llwindowmesaheadless.cpp
@@ -189,16 +159,10 @@ add_library (llwindow
   )
 
 target_link_libraries (llwindow llcommon ${llwindow_LINK_LIBRARIES})
+target_include_directories(llwindow INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
   
 if (DARWIN)
   include(CMakeFindFrameworks)
   find_library(CARBON_LIBRARY Carbon)
   target_link_libraries(llwindow ${CARBON_LIBRARY})
 endif (DARWIN)
-
-if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
-  target_precompile_headers(llwindow
-    PRIVATE
-    [["linden_common.h"]]
-    )
-endif()

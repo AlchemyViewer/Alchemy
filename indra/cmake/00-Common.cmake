@@ -12,9 +12,7 @@
 #   Also realize that CMAKE_CXX_FLAGS may already be partially populated on
 #   entry to this file.
 #*****************************************************************************
-
-if(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
-set(${CMAKE_CURRENT_LIST_FILE}_INCLUDED "YES")
+include_guard()
 
 include(CheckCXXCompilerFlag)
 include(Variables)
@@ -24,25 +22,24 @@ set(Python3_FIND_VIRTUALENV FIRST)
 find_package(Python3 COMPONENTS Interpreter)
 
 # Portable compilation flags.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DADDRESS_SIZE=${ADDRESS_SIZE}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DADDRESS_SIZE=${ADDRESS_SIZE}")
-set(CMAKE_CXX_FLAGS_DEBUG "-D_DEBUG -DLL_DEBUG=1")
-set(CMAKE_CXX_FLAGS_RELEASE
-    "-DLL_RELEASE=1 -DLL_RELEASE_FOR_DOWNLOAD=1 -DNDEBUG")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-    "-DLL_RELEASE=1 -DNDEBUG -DLL_RELEASE_WITH_DEBUG_INFO=1")
+add_compile_definitions(
+    ADDRESS_SIZE=${ADDRESS_SIZE}
+    $<$<CONFIG:Debug>:-D_DEBUG>
+    $<$<CONFIG:Debug>:-DLL_DEBUG=1>
+    $<$<CONFIG:RelWithDebInfo>:-DLL_RELEASE=1 -DNDEBUG -DLL_RELEASE_WITH_DEBUG_INFO=1>
+    $<$<CONFIG:Release>:-DLL_RELEASE=1 -DLL_RELEASE_FOR_DOWNLOAD=1 -DNDEBUG>
+    )
 # Configure crash reporting
 set(RELEASE_CRASH_REPORTING OFF CACHE BOOL "Enable use of crash reporting in release builds")
 set(NON_RELEASE_CRASH_REPORTING OFF CACHE BOOL "Enable use of crash reporting in developer builds")
 
 if(RELEASE_CRASH_REPORTING)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DLL_SEND_CRASH_REPORTS=1")
+  add_compile_definitions( LL_SEND_CRASH_REPORTS=1)
 endif()
 
 if(NON_RELEASE_CRASH_REPORTING)
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -DLL_SEND_CRASH_REPORTS=1")
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DLL_SEND_CRASH_REPORTS=1")
-endif()  
+  add_compile_definitions( LL_SEND_CRASH_REPORTS=1)
+endif()
 
 # Don't bother with a MinSizeRel build.
 set(CMAKE_CONFIGURATION_TYPES "RelWithDebInfo;Release;Debug" CACHE STRING
@@ -65,11 +62,10 @@ if (WINDOWS)
   set(BUILD_SHARED_LIBS OFF)
 
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+    add_compile_options(/MP)
+
   elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m${ADDRESS_SIZE}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m${ADDRESS_SIZE}")
+    add_compile_options(-m${ADDRESS_SIZE})
   endif ()
 
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od /Zi /MDd /EHsc -D_SCL_SECURE_NO_WARNINGS=1")
@@ -311,17 +307,13 @@ if (DARWIN)
   set(CMAKE_CXX_LINK_FLAGS "-Wl,-headerpad_max_install_names,-search_paths_first")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
   set(DARWIN_extra_cstar_flags "-gdwarf-2")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 ${DARWIN_extra_cstar_flags}")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 ${DARWIN_extra_cstar_flags}")
-  # NOTE: it's critical that the optimization flag is put in front.
-  # NOTE: it's critical to have both CXX_FLAGS and C_FLAGS covered.
+  add_compile_options(-O3 ${DARWIN_extra_cstar_flags})
 
   add_definitions(
       -DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE=1
       -DBOOST_ALLOW_DEPRECATED_HEADERS=1
       )
 endif (DARWIN)
-
 
 if (LINUX OR DARWIN)
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -344,17 +336,12 @@ if (LINUX OR DARWIN)
   set(CMAKE_C_FLAGS "${GCC_WARNINGS} ${CMAKE_C_FLAGS}")
   set(CMAKE_CXX_FLAGS "${GCC_CXX_WARNINGS} ${CMAKE_CXX_FLAGS}")
 
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m${ADDRESS_SIZE}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m${ADDRESS_SIZE}")
+  add_compile_options(-m${ADDRESS_SIZE})
 endif (LINUX OR DARWIN)
 
 add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 
 add_definitions(-DOPENSSL_API_COMPAT=0x30000000L)
-
-if (USESYSTEMLIBS)
-  add_definitions(-DLL_USESYSTEMLIBS=1)
-endif (USESYSTEMLIBS)
 
 option(RELEASE_SHOW_ASSERTS "Enable asserts in release builds" OFF)
 
@@ -380,4 +367,3 @@ if(SDL_FOUND)
 endif()
 
 
-endif(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
