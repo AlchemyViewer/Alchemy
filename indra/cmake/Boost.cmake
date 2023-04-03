@@ -39,22 +39,22 @@ if (WINDOWS)
 	)
 elseif (LINUX)
   target_link_libraries( ll::boost INTERFACE
-        optimized boost_fiber-mt${addrsfx}
-        debug boost_fiber-mt${addrsfx}-d
-        optimized boost_context-mt${addrsfx}
-        debug boost_context-mt${addrsfx}-d
-        optimized boost_filesystem-mt${addrsfx}
-        debug boost_filesystem-mt${addrsfx}-d
-        optimized boost_program_options-mt${addrsfx}
-        debug boost_program_options-mt${addrsfx}-d
-        optimized boost_regex-mt${addrsfx}
-        debug boost_regex-mt${addrsfx}-d
-        optimized boost_thread-mt${addrsfx}
-        debug boost_thread-mt${addrsfx}-d
-        optimized boost_wave-mt${addrsfx}
-        debug boost_wave-mt${addrsfx}-d
-        optimized boost_system-mt${addrsfx}
-        debug boost_system-mt${addrsfx}-d
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_fiber-mt${addrsfx}.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_fiber-mt-d${addrsfx}.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_context-mt${addrsfx}.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_context-mt-d${addrsfx}.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_filesystem-mt${addrsfx}.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_filesystem-mt-d${addrsfx}.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_program_options-mt${addrsfx}.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_program_options-mt-d${addrsfx}.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_regex-mt${addrsfx}.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_regex-mt-d${addrsfx}.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_thread-mt${addrsfx}.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_thread-mt-d${addrsfx}.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_wave-mt${addrsfx}.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_wave-mt-d${addrsfx}.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_system-mt${addrsfx}.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_system-mt-d${addrsfx}.a
         rt
 	)
 elseif (DARWIN)

@@ -16,7 +16,9 @@ if (WINDOWS)
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/zlibd.lib
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/zlib.lib)
 else()
-  target_link_libraries( ll::zlib-ng INTERFACE ${ARCH_PREBUILT_DIRS_RELEASE}/libz.a)
+  target_link_libraries( ll::zlib-ng INTERFACE 
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libz.a
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libz.a)
 endif (WINDOWS)
 
 target_include_directories( ll::zlib-ng SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/zlib)
@@ -35,7 +37,10 @@ if (WINDOWS)
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libminizip.lib
       ll::zlib-ng)
 else()
-  target_link_libraries( ll::minizip-ng INTERFACE ${ARCH_PREBUILT_DIRS_RELEASE}/libminizip.a ll::zlib-ng)
+  target_link_libraries( ll::minizip-ng INTERFACE 
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libminizip.a 
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libminizip.a 
+      ll::zlib-ng)
 endif (WINDOWS)
 
 target_include_directories( ll::minizip-ng SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/minizip)
