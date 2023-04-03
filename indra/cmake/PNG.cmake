@@ -12,6 +12,11 @@ if (WINDOWS)
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libpng16d.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libpng16.lib
         )
+elseif(LINUX)
+  target_link_libraries(ll::libpng INTERFACE
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libpng16d.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libpng16.a
+        )
 else()
   target_link_libraries(ll::libpng INTERFACE png16 )
 endif()

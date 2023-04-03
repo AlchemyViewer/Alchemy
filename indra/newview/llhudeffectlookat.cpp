@@ -440,7 +440,7 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 	if (!clamp_lookat)
 	{
 		// type of lookat behavior or target object has changed
-		bool lookAtChanged = (target_type != mTargetType) || (object != mTargetObject);
+		bool lookAtChanged = (target_type != mTargetType) || (object != mTargetObject.get());
 
 		// lookat position has moved a certain amount and we haven't just sent an update
 		lookAtChanged = lookAtChanged || ((dist_vec_squared(position, mLastSentOffsetGlobal) > MIN_DELTAPOS_FOR_UPDATE_SQUARED) && 

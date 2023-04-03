@@ -218,13 +218,13 @@ BOOL LLXMLNode::removeChild(LLXMLNode *target_child)
 		LLXMLChildList::iterator children_itr = mChildren->map.find(target_child->mName);
 		while (children_itr != mChildren->map.end())
 		{
-			if (target_child == children_itr->second)
+			if (target_child == children_itr->second.get())
 			{
-				if (target_child == mChildren->head)
+				if (target_child == mChildren->head.get())
 				{
 					mChildren->head = target_child->mNext;
 				}
-				if (target_child == mChildren->tail)
+				if (target_child == mChildren->tail.get())
 				{
 					mChildren->tail = target_child->mPrev;
 				}

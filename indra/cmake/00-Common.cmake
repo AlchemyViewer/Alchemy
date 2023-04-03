@@ -167,6 +167,8 @@ endif (WINDOWS)
 if (LINUX)
   set(CMAKE_SKIP_BUILD_RPATH TRUE)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  set(CMAKE_C_VISIBILITY_PRESET "hidden")
+  set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 
   add_compile_definitions(
     LL_LINUX=1
@@ -182,7 +184,6 @@ if (LINUX)
 
   add_compile_options(
     $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-fstack-protector>
-    -fvisibility=hidden 
     -fexceptions
     -fno-math-errno
     -fno-strict-aliasing

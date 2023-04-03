@@ -554,7 +554,7 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
 
             if (rigged)
             {
-                if (avatar != params.mAvatar || skin != params.mSkinInfo->mHash)
+                if (avatar != params.mAvatar.get() || skin != params.mSkinInfo->mHash)
                 {
                     uploadMatrixPalette(params);
                     avatar = params.mAvatar;
@@ -1185,7 +1185,7 @@ void LLDrawPoolBump::pushBumpBatches(U32 type)
 		{
             if (mRigged)
             {
-                if (avatar != params.mAvatar || skin != params.mSkinInfo->mHash)
+                if (avatar != params.mAvatar.get() || skin != params.mSkinInfo->mHash)
                 {
                     if (uploadMatrixPalette(params))
                     {

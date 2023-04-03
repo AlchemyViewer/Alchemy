@@ -51,8 +51,6 @@ add_library(media_plugin_cef
     ${media_plugin_cef_SOURCE_FILES}
     )
 
-set_target_properties(media_plugin_cef PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-
 target_link_libraries(media_plugin_cef
         media_plugin_base
         ll::cef

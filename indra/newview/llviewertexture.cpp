@@ -735,7 +735,7 @@ bool LLViewerTexture::bindDefaultImage(S32 stage)
 		// use default if we've got it
 		res = gGL.getTexUnit(stage)->bind(LLViewerFetchedTexture::sDefaultImagep);
 	}
-	if (!res && LLViewerTexture::sNullImagep.notNull() && (this != LLViewerTexture::sNullImagep))
+	if (!res && LLViewerTexture::sNullImagep.notNull() && (this != LLViewerTexture::sNullImagep.get()))
 	{
 		res = gGL.getTexUnit(stage)->bind(LLViewerTexture::sNullImagep);
 	}

@@ -299,7 +299,7 @@ endif()
 
 add_dependencies(llcommon stage_third_party_libs)
 
-if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+if(USE_PRECOMPILED_HEADERS) 
   target_precompile_headers(llcommon
     PRIVATE
     linden_common.h
