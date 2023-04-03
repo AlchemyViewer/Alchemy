@@ -38,8 +38,10 @@ if (USE_OPENAL)
 	    )
   elseif (LINUX)
     target_link_libraries( ll::openal INTERFACE
-            openal
-            alut
+            debug ${ARCH_PREBUILT_DIRS_DEBUG}/libopenal.so
+            optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libopenal.so
+            debug ${ARCH_PREBUILT_DIRS_DEBUG}/libalut.so
+            optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libalut.so
             )
   else()
     message(FATAL_ERROR "OpenAL is not available for this platform")

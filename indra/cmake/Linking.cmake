@@ -3,13 +3,6 @@
 include_guard()
 include(Variables)
 
-set(ARCH_PREBUILT_DIRS ${AUTOBUILD_INSTALL_DIR}/lib)
-set(ARCH_PREBUILT_DIRS_PLUGINS ${AUTOBUILD_INSTALL_DIR}/plugins)
-set(ARCH_PREBUILT_DIRS_RELEASE ${AUTOBUILD_INSTALL_DIR}/lib/release)
-set(ARCH_PREBUILT_DIRS_DEBUG ${AUTOBUILD_INSTALL_DIR}/lib/debug)
-set(ARCH_PREBUILT_BIN_DIRS ${AUTOBUILD_INSTALL_DIR}/bin)
-set(ARCH_PREBUILT_BIN_DIRS_RELEASE ${AUTOBUILD_INSTALL_DIR}/bin/release)
-set(ARCH_PREBUILT_BIN_DIRS_DEBUG ${AUTOBUILD_INSTALL_DIR}/bin/debug)
 if (WINDOWS OR DARWIN )
   # Kludge for older cmake versions, 3.20+ is needed to use a genex in add_custom_command( OUTPUT <var> ... )
   # Using this will work okay-ish, as Debug is not supported anyway. But for property multi config and also
@@ -41,8 +34,8 @@ endif ()
 # that CMAKE_BUILD_TYPE is essentially meaningless at configuration time for IDE generators and
 # CMAKE_CFG_INTDIR is meaningless at build time for Makefile generators
 
-link_directories(${AUTOBUILD_INSTALL_DIR}/lib/$<LOWER_CASE:$<CONFIG>>)
-link_directories(${AUTOBUILD_INSTALL_DIR}/lib/release)
+link_directories(${LIBS_PREBUILT_DIR}/lib/$<LOWER_CASE:$<CONFIG>>)
+link_directories(${LIBS_PREBUILT_DIR}/lib/release)
 
 add_library( ll::oslibraries INTERFACE IMPORTED )
 

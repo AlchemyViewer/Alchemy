@@ -20,13 +20,13 @@ if (WINDOWS)
 	)
 else (WINDOWS)
   target_link_libraries(ll::vorbis INTERFACE
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libogg.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libogg.a
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libvorbis.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libvorbis.a
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libvorbisenc.a
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libvorbisenc.a
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libvorbisfile.a
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libvorbisfile.a
-	)
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libvorbis.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libvorbis.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libogg.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libogg.a
+        )
 endif (WINDOWS)

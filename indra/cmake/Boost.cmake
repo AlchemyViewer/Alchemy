@@ -39,23 +39,23 @@ if (WINDOWS)
 	)
 elseif (LINUX)
   target_link_libraries( ll::boost INTERFACE
-        optimized boost_context-mt${addrsfx}
-        debug boost_context-mt${addrsfx}-d
         optimized boost_fiber-mt${addrsfx}
         debug boost_fiber-mt${addrsfx}-d
+        optimized boost_context-mt${addrsfx}
+        debug boost_context-mt${addrsfx}-d
         optimized boost_filesystem-mt${addrsfx}
         debug boost_filesystem-mt${addrsfx}-d
         optimized boost_program_options-mt${addrsfx}
         debug boost_program_options-mt${addrsfx}-d
         optimized boost_regex-mt${addrsfx}
         debug boost_regex-mt${addrsfx}-d
-        optimized boost_system-mt${addrsfx}
-        debug boost_system-mt${addrsfx}-d
         optimized boost_thread-mt${addrsfx}
         debug boost_thread-mt${addrsfx}-d
         optimized boost_wave-mt${addrsfx}
         debug boost_wave-mt${addrsfx}-d
-	rt
+        optimized boost_system-mt${addrsfx}
+        debug boost_system-mt${addrsfx}-d
+        rt
 	)
 elseif (DARWIN)
   target_link_libraries( ll::boost INTERFACE

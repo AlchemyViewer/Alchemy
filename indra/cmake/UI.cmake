@@ -5,31 +5,34 @@ include(FreeType)
 add_library( ll::uilibraries INTERFACE IMPORTED )
 
 if (LINUX)
-  target_compile_definitions(ll::uilibraries INTERFACE LL_GTK=1 LL_X11=1 )
+  target_compile_definitions(ll::uilibraries INTERFACE LL_GTK=1)
+
+  if(USE_X11)
+    target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1 )
+  endif()
 
   if( USE_CONAN )
     target_link_libraries( ll::uilibraries INTERFACE CONAN_PKG::gtk )
     return()
   endif()
-  use_prebuilt_binary(gtk-atk-pango-glib)
-  
-  target_link_libraries( ll::uilibraries INTERFACE
-          atk-1.0
-          gdk-x11-2.0
-          gdk_pixbuf-2.0
-          Xinerama
-          glib-2.0
-          gmodule-2.0
-          gobject-2.0
-          gthread-2.0
-          gtk-x11-2.0
-          pango-1.0
-          pangoft2-1.0
-          pangox-1.0
-          pangoxft-1.0
-          Xinerama
-          ll::freetype
+
+  include(FindPkgConfig)
+
+  set(PKGCONFIG_PACKAGES
+    gdk-3.0
+    gtk+-3.0
+    )
+
+  if(USE_X11)
+    list(APPEND PKGCONFIG_PACKAGES 
+          x11
           )
+  endif()
+
+  foreach(pkg ${PKGCONFIG_PACKAGES})
+    pkg_check_modules(${pkg} REQUIRED IMPORTED_TARGET ${pkg})
+    target_link_libraries( ll::uilibraries INTERFACE PkgConfig::${pkg})
+  endforeach(pkg)
 endif (LINUX)
 if( WINDOWS )
   target_link_libraries( ll::uilibraries INTERFACE

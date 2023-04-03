@@ -88,6 +88,7 @@ target_include_directories( llrender  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 target_link_libraries(llrender
+        PUBLIC
         llcommon
         llimage
         llmath
@@ -95,7 +96,6 @@ target_link_libraries(llrender
         llxml
         llwindow
         ll::freetype
-        OpenGL::GL
-        OpenGL::GLU
+        OpenGL::OpenGL
         )
 

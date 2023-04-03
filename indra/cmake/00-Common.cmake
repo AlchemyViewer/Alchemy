@@ -198,6 +198,7 @@ endif (WINDOWS)
 
 if (LINUX)
   set(CMAKE_SKIP_BUILD_RPATH TRUE)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
   add_compile_definitions(
     LL_LINUX=1
@@ -219,7 +220,6 @@ if (LINUX)
     -fno-strict-aliasing
     -fsigned-char
     -g
-    -gz
     -pthread
     )
 
@@ -277,10 +277,11 @@ if (DARWIN)
 endif ()
 
 if (LINUX OR DARWIN)
+  add_compile_options(-Wall -Wno-sign-compare -Wno-reorder)
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    add_compile_options(-Wall -Wno-sign-compare -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-ignored-qualifiers -Wno-unused-function)
+    add_compile_options(-Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-ignored-qualifiers -Wno-unused-function)
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-    add_compile_options(-Wall -Wno-sign-compare -Wno-trigraphs -Wno-unused-local-typedef -Wno-unknown-warning-option)
+    add_compile_options(-Wno-trigraphs -Wno-unused-local-typedef -Wno-unknown-warning-option)
   endif()
 
   CHECK_CXX_COMPILER_FLAG(-Wdeprecated-copy HAS_DEPRECATED_COPY)

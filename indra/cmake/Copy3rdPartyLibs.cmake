@@ -5,7 +5,7 @@
 # VisualStudio.
 
 include(CMakeCopyIfDifferent)
-include(Linking)
+include(Prebuilt)
 include(FMODSTUDIO)
 include(OPENAL)
 include(DiscordSDK)

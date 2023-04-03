@@ -5,6 +5,13 @@ include(Prebuilt)
 include_guard()
 add_library( ll::libvlc INTERFACE IMPORTED )
 
+if(LINUX)
+    include(FindPkgConfig)
+
+    pkg_check_modules(libvlc REQUIRED IMPORTED_TARGET libvlc)
+    target_link_libraries( ll::libvlc INTERFACE PkgConfig::libvlc)
+    return()
+endif()
 
 use_prebuilt_binary(vlc-bin)
 target_include_directories( ll::libvlc INTERFACE ${LIBS_PREBUILT_DIR}/include/vlc)

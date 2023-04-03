@@ -34,7 +34,6 @@ else()
           optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libapr-1.a
           debug ${ARCH_PREBUILT_DIRS_DEBUG}/libaprutil-1.a
           optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libaprutil-1.a
-          iconv
           rt
           )
 endif ()
