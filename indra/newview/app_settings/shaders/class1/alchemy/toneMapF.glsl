@@ -294,7 +294,7 @@ vec3 legacyGamma(vec3 color)
 
 void main()
 {
-    vec4 diff = texture(diffuseRect, vary_fragcoord) + texture2D(emissiveRect, vary_fragcoord);
+    vec4 diff = texture(diffuseRect, vary_fragcoord);
  
     float exp_scale = texture(exposureMap, vec2(0.5,0.5)).r;
     diff.rgb *= exposure * exp_scale;
