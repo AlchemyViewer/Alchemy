@@ -2038,15 +2038,9 @@ if (WINDOWS)
 
     endif (PACKAGE)
 elseif (DARWIN)
-    set_target_properties(${VIEWER_BINARY_NAME}
-        PROPERTIES
-        LINK_FLAGS_RELEASE "${LINK_FLAGS_RELEASE} -Xlinker -dead_strip -Xlinker -map -Xlinker ${CMAKE_CURRENT_BINARY_DIR}/${VIEWER_BINARY_NAME}.MAP"
-        )
-else (WINDOWS)
-        # Linux
-    set_target_properties(${VIEWER_BINARY_NAME}
-        PROPERTIES
-        LINK_FLAGS_RELEASE "${LINK_FLAGS_RELEASE} -Wl,--Map=${VIEWER_BINARY_NAME}.MAP"
+    target_link_options(${VIEWER_BINARY_NAME}
+        PRIVATE
+        $<$<CONFIG:Release>:LINKER:-dead_strip>
         )
 endif (WINDOWS)
 
