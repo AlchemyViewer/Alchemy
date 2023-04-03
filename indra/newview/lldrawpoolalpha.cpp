@@ -353,7 +353,7 @@ void LLDrawPoolAlpha::renderAlphaHighlight(U32 mask)
 
                     if (rigged)
                     {
-                        if (lastAvatar != params.mAvatar ||
+                        if (lastAvatar != params.mAvatar.get() ||
                             lastMeshId != params.mSkinInfo->mHash)
                         {
                             if (!uploadMatrixPalette(params))
@@ -514,7 +514,7 @@ void LLDrawPoolAlpha::renderRiggedEmissives(U32 mask, std::vector<LLDrawInfo*>& 
     for (LLDrawInfo* draw : emissives)
     {
         bool tex_setup = TexSetup(draw, false);
-        if (lastAvatar != draw->mAvatar || lastMeshId != draw->mSkinInfo->mHash)
+        if (lastAvatar != draw->mAvatar.get() || lastMeshId != draw->mSkinInfo->mHash)
         {
             if (!uploadMatrixPalette(*draw))
             { // failed to upload matrix palette, skip rendering
@@ -708,7 +708,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                 if (params.mAvatar != nullptr)
                 {
-                    if (lastAvatar != params.mAvatar ||
+                    if (lastAvatar != params.mAvatar.get() ||
                         lastMeshId != params.mSkinInfo->mHash ||
                         lastAvatarShader != LLGLSLShader::sCurBoundShaderPtr)
                     {
