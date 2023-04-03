@@ -1,23 +1,21 @@
 # -*- cmake -*-
-include(Linking)
+
+include_guard()
+
 include(Prebuilt)
 
-set(WEBP_FIND_QUIETLY ON)
-set(WEBP_FIND_REQUIRED ON)
+add_library( ll::libwebp INTERFACE IMPORTED )
 
-if (USESYSTEMLIBS)
-  include(FindWEBP)
-else (USESYSTEMLIBS)
-  use_prebuilt_binary(libwebp)
-  if (WINDOWS)
-    set(WEBP_LIBRARIES 
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libwebp_debug.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libwebp.lib
-        )
-  elseif(DARWIN)
-    set(WEBP_LIBRARIES webp)
-  else()
-    set(WEBP_LIBRARIES webp)
-  endif()
-  set(WEBP_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/webp)
-endif (USESYSTEMLIBS)
+use_system_binary( libwebp )
+
+use_prebuilt_binary(libwebp)  
+if(WINDOWS)
+  target_link_libraries( ll::libwebp INTERFACE
+    debug ${ARCH_PREBUILT_DIRS_DEBUG}/libwebp_debug.lib
+    optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libwebp.lib
+    )
+else()
+  target_link_libraries( ll::libwebp INTERFACE webp)
+endif()
+  
+target_include_directories( ll::libwebp SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/webp)

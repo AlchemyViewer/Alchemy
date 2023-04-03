@@ -1,7 +1,15 @@
 # -*- cmake -*-
+include_guard()
 
-if(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
-set(${CMAKE_CURRENT_LIST_FILE}_INCLUDED "YES")
+include(Variables)
+
+set(ARCH_PREBUILT_DIRS ${LIBS_PREBUILT_DIR}/lib)
+set(ARCH_PREBUILT_DIRS_PLUGINS ${LIBS_PREBUILT_DIR}/plugins)
+set(ARCH_PREBUILT_DIRS_RELEASE ${LIBS_PREBUILT_DIR}/lib/release)
+set(ARCH_PREBUILT_DIRS_DEBUG ${LIBS_PREBUILT_DIR}/lib/debug)
+set(ARCH_PREBUILT_BIN_DIRS ${LIBS_PREBUILT_DIR}/bin)
+set(ARCH_PREBUILT_BIN_DIRS_RELEASE ${LIBS_PREBUILT_DIR}/bin/release)
+set(ARCH_PREBUILT_BIN_DIRS_DEBUG ${LIBS_PREBUILT_DIR}/bin/debug)
 
 include(FindAutobuild)
 
@@ -22,42 +30,52 @@ endif ("${CMAKE_SOURCE_DIR}/../autobuild.xml" IS_NEWER_THAN "${PREBUILD_TRACKING
 # of previous attempts is serialized in the file
 # ${PREBUILD_TRACKING_DIR}/${_binary}_installed)
 macro (use_prebuilt_binary _binary)
-  if (NOT DEFINED USESYSTEMLIBS_${_binary})
-    set(USESYSTEMLIBS_${_binary} ${USESYSTEMLIBS})
-  endif (NOT DEFINED USESYSTEMLIBS_${_binary})
+    if( NOT DEFINED ${_binary}_installed )
+        set( ${_binary}_installed "")
+    endif()
 
-  if (NOT USESYSTEMLIBS_${_binary})
     if("${${_binary}_installed}" STREQUAL "" AND EXISTS "${PREBUILD_TRACKING_DIR}/${_binary}_installed")
-      file(READ ${PREBUILD_TRACKING_DIR}/${_binary}_installed "${_binary}_installed")
-      if(DEBUG_PREBUILT)
-        message(STATUS "${_binary}_installed: \"${${_binary}_installed}\"")
-      endif(DEBUG_PREBUILT)
+        file(READ ${PREBUILD_TRACKING_DIR}/${_binary}_installed "${_binary}_installed")
+        if(DEBUG_PREBUILT)
+            message(STATUS "${_binary}_installed: \"${${_binary}_installed}\"")
+        endif(DEBUG_PREBUILT)
     endif("${${_binary}_installed}" STREQUAL "" AND EXISTS "${PREBUILD_TRACKING_DIR}/${_binary}_installed")
 
     if(${PREBUILD_TRACKING_DIR}/sentinel_installed IS_NEWER_THAN ${PREBUILD_TRACKING_DIR}/${_binary}_installed OR NOT ${${_binary}_installed} EQUAL 0)
-      if(DEBUG_PREBUILT)
-        message(STATUS "cd ${CMAKE_SOURCE_DIR} && ${AUTOBUILD_EXECUTABLE} install
+        if(DEBUG_PREBUILT)
+            message(STATUS "cd ${CMAKE_SOURCE_DIR} && ${AUTOBUILD_EXECUTABLE} install
         --install-dir=${AUTOBUILD_INSTALL_DIR}
         ${_binary} ")
-      endif(DEBUG_PREBUILT)
-      execute_process(COMMAND "${AUTOBUILD_EXECUTABLE}"
-        install
-        -A${ADDRESS_SIZE}
-        --skip-source-environment
-        --install-dir=${AUTOBUILD_INSTALL_DIR}
-        ${_binary}
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        RESULT_VARIABLE ${_binary}_installed
-        )
-      file(WRITE ${PREBUILD_TRACKING_DIR}/${_binary}_installed "${${_binary}_installed}")
+        endif(DEBUG_PREBUILT)
+        execute_process(COMMAND "${AUTOBUILD_EXECUTABLE}"
+                install
+                -A${ADDRESS_SIZE}
+                --skip-source-environment
+                --install-dir=${AUTOBUILD_INSTALL_DIR}
+                ${_binary}
+                WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+                RESULT_VARIABLE ${_binary}_installed
+                )
+        file(WRITE ${PREBUILD_TRACKING_DIR}/${_binary}_installed "${${_binary}_installed}")
     endif(${PREBUILD_TRACKING_DIR}/sentinel_installed IS_NEWER_THAN ${PREBUILD_TRACKING_DIR}/${_binary}_installed OR NOT ${${_binary}_installed} EQUAL 0)
 
     if(NOT ${_binary}_installed EQUAL 0)
-      message(FATAL_ERROR
-              "Failed to download or unpack prebuilt '${_binary}'."
-              " Process returned ${${_binary}_installed}.")
+        message(FATAL_ERROR
+                "Failed to download or unpack prebuilt '${_binary}'."
+                " Process returned ${${_binary}_installed}.")
     endif (NOT ${_binary}_installed EQUAL 0)
-  endif (NOT USESYSTEMLIBS_${_binary})
 endmacro (use_prebuilt_binary _binary)
 
-endif(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
+#Sadly we need a macro here, otherwise the return() will not properly work
+macro ( use_system_binary package )
+  if( USE_CONAN )
+    target_link_libraries( ll::${package} INTERFACE CONAN_PKG::${package} )
+    foreach( extra_pkg "${ARGN}" )
+      if( extra_pkg )
+        target_link_libraries( ll::${package} INTERFACE CONAN_PKG::${extra_pkg} )
+      endif()
+    endforeach()
+    return()
+  endif()
+endmacro()
+

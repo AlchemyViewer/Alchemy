@@ -5,24 +5,12 @@ project(llimage)
 include(00-Common)
 include(LLCommon)
 include(LLImage)
-include(LLMath)
-include(LLFileSystem)
+include(JPEG)
 include(LLKDU)
-include(LLImageJ2COJ)
 include(WebP)
 include(ZLIBNG)
 include(LLAddBuildTest)
 include(Tut)
-
-include_directories(
-    ${LLCOMMON_INCLUDE_DIRS}
-    ${LLCOMMON_SYSTEM_INCLUDE_DIRS}
-    ${LLMATH_INCLUDE_DIRS}
-    ${LLFILESYSTEM_INCLUDE_DIRS}
-    ${WEBP_INCLUDE_DIRS}
-    ${PNG_INCLUDE_DIRS}
-    ${ZLIBNG_INCLUDE_DIRS}
-    )
 
 set(llimage_SOURCE_FILES
     llimagebmp.cpp
@@ -57,46 +45,30 @@ set(llimage_HEADER_FILES
     llpngwrapper.h
     )
 
-set_source_files_properties(${llimage_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-
 list(APPEND llimage_SOURCE_FILES ${llimage_HEADER_FILES})
 
 add_library (llimage ${llimage_SOURCE_FILES})
+target_include_directories( llimage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 if (USE_KDU)
-    target_link_libraries(llimage ${LLKDU_LIBRARIES})
+    target_link_libraries(llimage PUBLIC llkdu)
 else (USE_KDU)
-    target_link_libraries(llimage ${LLIMAGEJ2COJ_LIBRARIES})
+    target_link_libraries(llimage PUBLIC llimagej2coj)
 endif (USE_KDU)
 
 target_link_libraries(llimage
-    ${LLFILESYSTEM_LIBRARIES}
-    ${LLMATH_LIBRARIES}
-    ${LLCOMMON_LIBRARIES}
-    ${WEBP_LIBRARIES}
-    ${JPEG_LIBRARIES}
-    ${PNG_LIBRARIES}
-    ${ZLIBNG_LIBRARIES}
+        PUBLIC
+        llfilesystem
+        llmath
+        llcommon
+        ll::libwebp
+        ll::libpng
+        ll::libjpeg
     )
-
-if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
-  target_precompile_headers(llimage
-    PRIVATE
-    [["linden_common.h"]]
-    )
-endif()
 
 # Add tests
 if (LL_TESTS)
-
-set_source_files_properties(
-    llimageworker.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_LIBRARIES "${LLPRIMITIVE_LIBRARIES}"
-  )
-
   SET(llimage_TEST_SOURCE_FILES
     llimageworker.cpp
     )

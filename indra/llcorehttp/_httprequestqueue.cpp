@@ -28,7 +28,6 @@
 
 #include "_httpoperation.h"
 #include "_mutex.h"
-#include "llmessagelog.h"
 
 
 using namespace LLCoreInt;
@@ -37,6 +36,7 @@ namespace LLCore
 {
 
 HttpRequestQueue * HttpRequestQueue::sInstance(NULL);
+std::function<void(const HttpRequestQueue::opPtr_t &)> HttpRequestQueue::sMessageLogFunc = nullptr;
 
 
 HttpRequestQueue::HttpRequestQueue()
@@ -80,7 +80,7 @@ HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op, bool log
 			// Return op and error to caller
 			return HttpStatus(HttpStatus::LLCORE, HE_SHUTTING_DOWN);
 		}
-        if (loggable && LLMessageLog::haveLogger()) { LLMessageLog::log(op); }
+        if (loggable && sMessageLogFunc != nullptr ) { sMessageLogFunc(op); }
 		wake = mQueue.empty();
 		mQueue.push_back(op);
 	}

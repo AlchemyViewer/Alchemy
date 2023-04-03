@@ -196,7 +196,7 @@ void LLMuteList::cleanupSingleton()
 }
 
 // static
-BOOL LLMuteList::isLinden(const LLUUID& id)
+bool LLMuteList::isLinden(const LLUUID& id)
 {
 	std::string name;
 	gCacheName->getFullName(id, name);
@@ -204,7 +204,7 @@ BOOL LLMuteList::isLinden(const LLUUID& id)
 }
 
 // static
-BOOL LLMuteList::isLinden(const std::string& name)
+bool LLMuteList::isLinden(const std::string& name)
 {
 	std::string username = boost::replace_all_copy(name, ".", " ");
 	typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
@@ -212,9 +212,9 @@ BOOL LLMuteList::isLinden(const std::string& name)
 	tokenizer tokens(username, sep);
 	tokenizer::iterator token_iter = tokens.begin();
 	
-	if (token_iter == tokens.end()) return FALSE;
-	++token_iter;
-	if (token_iter == tokens.end()) return FALSE;
+	if (token_iter == tokens.end()) return false;
+	token_iter++;
+	if (token_iter == tokens.end()) return false;
 	
 	std::string last_name = *token_iter;
 	if (LLGridManager::getInstance()->isInSecondlife())
@@ -225,13 +225,13 @@ BOOL LLMuteList::isLinden(const std::string& name)
 	else if (LLGridManager::getInstance()->isInOpenSim())
 	{
 		LLViewerRegion* region = gAgent.getRegion();
-		if (!region) return FALSE;
+		if (!region) return false;
 		const auto& gods = region->getGods();
-		if (gods.empty()) return FALSE;
+		if (gods.empty()) return false;
 		
 		return (gods.find(name) != gods.cend() || gods.find(last_name) != gods.cend());
 	}
-	return FALSE;
+	return false;
 }
 
 static LLVOAvatar* find_avatar(const LLUUID& id)

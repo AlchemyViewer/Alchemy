@@ -2,6 +2,8 @@
 # Construct the version and copyright information based on package data.
 include(FindAutobuild)
 
+include_guard()
+
 # packages-formatter.py runs autobuild install --versions, which needs to know
 # the build_directory, which (on Windows) depends on AUTOBUILD_ADDRSIZE.
 # Within an autobuild build, AUTOBUILD_ADDRSIZE is already set. But when
@@ -15,5 +17,5 @@ add_custom_command(OUTPUT packages-info.txt
   COMMAND ${Python3_EXECUTABLE}
           ${CMAKE_SOURCE_DIR}/cmake/run_build_test.py -DAUTOBUILD_ADDRSIZE=${ADDRESS_SIZE} -DAUTOBUILD=${AUTOBUILD_EXECUTABLE}
           ${Python3_EXECUTABLE}
-          ${CMAKE_SOURCE_DIR}/../scripts/packages-formatter.py "${VIEWER_CHANNEL}" "${VIEWER_SHORT_VERSION}" > packages-info.txt
+          ${CMAKE_SOURCE_DIR}/../scripts/packages-formatter.py "${VIEWER_CHANNEL}" "${VIEWER_SHORT_VERSION}" "${AUTOBUILD_INSTALL_DIR}" > packages-info.txt
   )

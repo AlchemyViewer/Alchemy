@@ -274,7 +274,7 @@ namespace tut
 		ensure_equals(" slurl, region + coords", slurl.getSLURLString(),
 					  "http://maps.secondlife.com/secondlife/my%20region/1/2/3");
 
-#ifndef HAVOK_BUILD
+#ifndef LL_HAVOK
 		LLGridManager::getInstance()->setGridChoice("my.grid.com");
 		slurl = LLSLURL("x-grid-info://my.grid.com/region/my%20region/1/2/3");
 		ensure_equals("grid slurl, region + coords - type", slurl.getType(), LLSLURL::LOCATION);
@@ -368,7 +368,7 @@ namespace tut
 		ensure_equals(" default grid/region/vector", slurl.getSLURLString(),
 					  "http://maps.secondlife.com/secondlife/my%20region/1/2/3");
 
-#ifndef HAVOK_BUILD
+#ifndef LL_HAVOK
 		LLGridManager::getInstance()->setGridChoice("MyGrid");
 		slurl = LLSLURL("my region", LLVector3(1,2,3));
 		ensure_equals("default grid/region/vector - type", slurl.getType(), LLSLURL::LOCATION);
@@ -377,7 +377,7 @@ namespace tut
 #endif
 	}
 
-#ifndef HAVOK_BUILD
+#ifndef LL_HAVOK
 	// x-grid-location-info
 	template<> template<>
 	void slurlTestObject::test<3>()

@@ -126,8 +126,11 @@ public:
 	/// Threading:  callable by any thread.
 	bool stopQueue();
 	
+	static void setMessageLogFunc(std::function<void(const HttpRequestQueue::opPtr_t &)> func) { sMessageLogFunc = func;} 
+
 protected:
 	static HttpRequestQueue *			sInstance;
+	static std::function<void(const HttpRequestQueue::opPtr_t &)> sMessageLogFunc;
 	
 protected:
 	OpContainer							mQueue;

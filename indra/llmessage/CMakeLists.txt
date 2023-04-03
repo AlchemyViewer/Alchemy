@@ -9,21 +9,8 @@ include(NGHTTP2)
 include(LLAddBuildTest)
 include(LLCommon)
 include(LLCoreHttp)
-include(LLMath)
-include(LLMessage)
-include(LLFileSystem)
 include(LLAddBuildTest)
 include(Tut)
-
-include_directories (${CMAKE_CURRENT_SOURCE_DIR})
-
-include_directories(
-    ${LLCOMMON_INCLUDE_DIRS}
-    ${LLCOREHTTP_INCLUDE_DIRS}
-    ${LLMATH_INCLUDE_DIRS}
-    ${LLMESSAGE_INCLUDE_DIRS}
-    ${LLFILESYSTEM_INCLUDE_DIRS}
-    )
 
 set(llmessage_SOURCE_FILES
     llaescipher.cpp
@@ -195,54 +182,20 @@ set(llmessage_HEADER_FILES
     sound_ids.h
     )
 
-set_source_files_properties(${llmessage_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-
 list(APPEND llmessage_SOURCE_FILES ${llmessage_HEADER_FILES})
 
 add_library (llmessage ${llmessage_SOURCE_FILES})
 
-if (LINUX)
 target_link_libraries(
-  llmessage
-  ${CURL_LIBRARIES}
-  ${LLCOMMON_LIBRARIES}
-  ${LLFILESYSTEM_LIBRARIES}
-  ${LLMATH_LIBRARIES}
-  ${OPENSSL_LIBRARIES}
-  ${CRYPTO_LIBRARIES}
-  ${NGHTTP2_LIBRARIES}
-  ${XMLRPCEPI_LIBRARIES}
-  ${LLCOREHTTP_LIBRARIES}
-  ${BOOST_FIBER_LIBRARY}
-  ${BOOST_CONTEXT_LIBRARY}
-  ${BOOST_SYSTEM_LIBRARY}
-  rt
-  )
-else (LINUX)
-target_link_libraries(
-  llmessage
-  ${CURL_LIBRARIES}
-  ${LLCOMMON_LIBRARIES}
-  ${LLFILESYSTEM_LIBRARIES}
-  ${LLMATH_LIBRARIES}
-  ${OPENSSL_LIBRARIES}
-  ${CRYPTO_LIBRARIES}
-  ${NGHTTP2_LIBRARIES}
-  ${XMLRPCEPI_LIBRARIES}
-  ${LLCOREHTTP_LIBRARIES}
-  ${BOOST_FIBER_LIBRARY}
-  ${BOOST_CONTEXT_LIBRARY}
-  ${BOOST_SYSTEM_LIBRARY}
-  )
-endif(LINUX)
-
-if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
-  target_precompile_headers(llmessage
-    PRIVATE
-    [["linden_common.h"]]
-    )
-endif()
+        llmessage
+        PUBLIC
+        llcommon
+        llfilesystem
+        llmath
+        llcorehttp
+        ll::xmlrpc-epi
+)
+target_include_directories( llmessage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
 # tests
 if (LL_TESTS)
@@ -252,39 +205,18 @@ if (LL_TESTS)
     lltrustedmessageservice.cpp
     lltemplatemessagedispatcher.cpp
     )
+  set_property( SOURCE ${llmessage_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES llmath llcorehttp)
   LL_ADD_PROJECT_UNIT_TESTS(llmessage "${llmessage_TEST_SOURCE_FILES}")
 
-  
   #    set(TEST_DEBUG on)
-  
-if (LINUX)
+
   set(test_libs
-    ${WINDOWS_LIBRARIES}
-    ${LLFILESYSTEM_LIBRARIES}
-    ${LLMATH_LIBRARIES}
-    ${CURL_LIBRARIES}
-    ${NGHTTP2_LIBRARIES}
-    ${LLCOMMON_LIBRARIES}
-    ${LLMESSAGE_LIBRARIES}
-    ${LLCOREHTTP_LIBRARIES}
-    ${BOOST_FIBER_LIBRARY}
-    ${BOOST_CONTEXT_LIBRARY}
-    rt
-    )
-else (LINUX)
-  set(test_libs
-    ${WINDOWS_LIBRARIES}
-    ${LLFILESYSTEM_LIBRARIES}
-    ${LLMATH_LIBRARIES}
-    ${CURL_LIBRARIES}
-    ${NGHTTP2_LIBRARIES}
-    ${LLCOMMON_LIBRARIES}
-    ${LLMESSAGE_LIBRARIES}
-    ${LLCOREHTTP_LIBRARIES}
-    ${BOOST_FIBER_LIBRARY}
-    ${BOOST_CONTEXT_LIBRARY}
-    )
-endif(LINUX)
+          llfilesystem
+          llmath
+          llcorehttp
+          llmessage
+          llcommon
+          )
 
   #LL_ADD_INTEGRATION_TEST(llavatarnamecache "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llhost "" "${test_libs}")

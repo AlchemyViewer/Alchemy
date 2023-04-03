@@ -39,7 +39,6 @@
 #include "llsearcheditor.h"
 #include "llsetkeybinddialog.h"
 #include "llkeyconflict.h"
-#include "llviewerbuildconfig.h"
 
 class LLConversationLogObserver;
 class LLPanelPreference;
@@ -206,7 +205,7 @@ private:
 	void updateMaxComplexity();
 	static bool loadFromFilename(const std::string& filename, std::map<std::string, std::string> &label_map);
 
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 	void refreshGridList();
 	void onClickAddGrid();
     void onClickActivateGrid();

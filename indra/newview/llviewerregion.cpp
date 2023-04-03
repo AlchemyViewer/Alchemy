@@ -89,7 +89,6 @@
 #include "llviewernetwork.h"
 #include "llslurl.h"
 #include "llnotificationsutil.h"
-#include "llviewerbuildconfig.h"
 
 #include <boost/regex.hpp>
 
@@ -628,12 +627,17 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 	mHandle(handle),
 	mTimeDilation(1.0f),
 	mWidthScaleFactor(region_width_meters / REGION_WIDTH_METERS),
+#ifndef LL_HAVOK
 	mMaxBakes(LLGridManager::getInstance()->isInSecondlife()?
 		LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES:
 		LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM),
 	mMaxTEs(LLGridManager::getInstance()->isInSecondlife()?
 		LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES:
 		LLAvatarAppearanceDefines::ETextureIndex::TEX_HEAD_UNIVERSAL_TATTOO),
+#else
+	mMaxBakes(LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES),
+	mMaxTEs(LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES),
+#endif
 	mName(""),
 	mZoning(""),
 	mIsEstateManager(FALSE),
@@ -2494,7 +2498,7 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 {
 	LL_INFOS() << "region " << getName() << " "  << ll_pretty_print_sd(sim_features) << LL_ENDL;
 	mSimulatorFeatures = sim_features;
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 	if (LLGridManager::getInstance()->isInOpenSim())
 	{
 		setGodnames();
@@ -2606,15 +2610,17 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 	mAvatarHoverHeightEnabled = (mSimulatorFeatures.has("AvatarHoverHeightEnabled") &&
 		mSimulatorFeatures["AvatarHoverHeightEnabled"].asBoolean());
 
-	if (mBakesOnMeshEnabled)
-	{
-		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES;
-		mMaxTEs   = LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES;
-	}
-	else
+#ifndef LL_HAVOK
+	if (!mBakesOnMeshEnabled)
 	{
 		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM;
 		mMaxTEs   = LLAvatarAppearanceDefines::ETextureIndex::TEX_HEAD_UNIVERSAL_TATTOO;
+	}
+	else
+#endif
+	{
+		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES;
+		mMaxTEs   = LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES;
 	}
 
 	setSimulatorFeaturesReceived(true);
@@ -3189,6 +3195,7 @@ void LLViewerRegion::unpackRegionHandshake()
 	}
 
 	mCentralBakeVersion = region_protocols & 1; // was (S32)gSavedSettings.getBOOL("UseServerTextureBaking");
+#ifndef LL_HAVOK
 	constexpr U64 REGION_SUPPORTS_BOM{ 1ULL << 63ULL };
 	if (LLGridManager::instance().isInSecondlife() || (region_protocols & REGION_SUPPORTS_BOM)) // OS sets bit 63 when BOM supported
 	{
@@ -3200,6 +3207,12 @@ void LLViewerRegion::unpackRegionHandshake()
 		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM;
 		mMaxTEs = LLAvatarAppearanceDefines::ETextureIndex::TEX_HEAD_UNIVERSAL_TATTOO;
 	}
+#else
+	{
+		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES;
+		mMaxTEs = LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES;
+	}
+#endif
 
 	LLVLComposition *compp = getComposition();
 	if (compp)

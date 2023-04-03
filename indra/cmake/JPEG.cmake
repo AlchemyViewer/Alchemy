@@ -2,21 +2,19 @@
 include(Prebuilt)
 
 include(Linking)
-set(JPEG_FIND_QUIETLY ON)
-set(JPEG_FIND_REQUIRED ON)
 
-if (USESYSTEMLIBS)
-  include(FindJPEG)
-else (USESYSTEMLIBS)
-  use_prebuilt_binary(libjpeg-turbo)
-  if (LINUX)
-    set(JPEG_LIBRARIES jpeg)
-  elseif (DARWIN)
-    set(JPEG_LIBRARIES jpeg)
-  elseif (WINDOWS)
-    set(JPEG_LIBRARIES
+include_guard()
+add_library( ll::libjpeg INTERFACE IMPORTED )
+
+use_system_binary(libjpeg)
+use_prebuilt_binary(libjpeg-turbo)
+if (LINUX)
+  target_link_libraries( ll::libjpeg INTERFACE jpeg)
+elseif (DARWIN)
+  target_link_libraries( ll::libjpeg INTERFACE jpeg)
+elseif (WINDOWS)
+    target_link_libraries( ll::libjpeg INTERFACE
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/jpeg.lib
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/jpeg.lib)
-  endif (LINUX)
-  set(JPEG_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)
-endif (USESYSTEMLIBS)
+endif (LINUX)
+target_include_directories( ll::libjpeg SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include)

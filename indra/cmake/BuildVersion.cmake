@@ -1,5 +1,7 @@
 # -*- cmake -*-
 
+include_guard()
+
 option(REVISION_FROM_VCS "Get current revision from vcs" ON)
 # Construct the viewer channel from environment variables or defaults
 if(NOT DEFINED VIEWER_CHANNEL)
@@ -139,3 +141,18 @@ if (NOT DEFINED VIEWER_COMMIT_SHORT_SHA)
         set(VIEWER_COMMIT_SHORT_SHA 0)
     endif()
 endif (NOT DEFINED VIEWER_COMMIT_SHORT_SHA)
+
+add_library( ll::versioninfo INTERFACE IMPORTED )
+target_compile_definitions( ll::versioninfo INTERFACE 
+    $<$<CONFIG:Debug>:LLBUILD_CONFIG="Debug">
+    $<$<CONFIG:RelWithDebInfo>:LLBUILD_CONFIG="RelWithDebInfo">
+    $<$<CONFIG:Release>:LLBUILD_CONFIG="Release">
+    LL_VIEWER_CHANNEL="${VIEWER_CHANNEL}"
+    LL_VIEWER_CHANNEL_CODENAME="${VIEWER_CHANNEL_CODENAME_INTERNAL}"
+    LL_VIEWER_CHANNEL_AND_VERSION="${VIEWER_VERSION_AND_CHANNEL}"
+    LL_VIEWER_VERSION_MAJOR=${VIEWER_VERSION_MAJOR}
+    LL_VIEWER_VERSION_MINOR=${VIEWER_VERSION_MINOR}
+    LL_VIEWER_VERSION_PATCH=${VIEWER_VERSION_PATCH}
+    LL_VIEWER_COMMIT_SHA="${VIEWER_COMMIT_LONG_SHA}"
+    LL_VIEWER_COMMIT_SHORT_SHA="${VIEWER_COMMIT_SHORT_SHA}"
+    )

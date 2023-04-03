@@ -2,31 +2,27 @@
 include(Linking)
 include(Prebuilt)
 
-set(HUNSPELL_FIND_QUIETLY ON)
-set(HUNSPELL_FIND_REQUIRED ON)
+include_guard()
+use_prebuilt_binary(dictionaries)
 
-if (USESYSTEMLIBS)
-  include(FindHUNSPELL)
-else (USESYSTEMLIBS)
-  use_prebuilt_binary(libhunspell)
-  if (WINDOWS)
-    set(HUNSPELL_LIBRARY 
+add_library( ll::hunspell INTERFACE IMPORTED )
+use_system_binary(hunspell)
+use_prebuilt_binary(libhunspell)
+if (WINDOWS)
+    target_compile_definitions( ll::hunspell INTERFACE HUNSPELL_STATIC=1)
+    target_link_libraries( ll::hunspell INTERFACE
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libhunspell.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libhunspell.lib
         )
-  elseif(DARWIN)
-    set(HUNSPELL_LIBRARY 
+elseif(DARWIN)
+    target_link_libraries( ll::hunspell INTERFACE
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libhunspell-1.7.a
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libhunspell-1.7.a
         )
-  elseif(LINUX)
-    set(HUNSPELL_LIBRARY 
+elseif(LINUX)
+    target_link_libraries( ll::hunspell INTERFACE
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libhunspell-1.7.a
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libhunspell-1.7.a
         )
-  else()
-    message(FATAL_ERROR "Invalid platform")
-  endif()
-  set(HUNSPELL_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include/hunspell)
-  use_prebuilt_binary(dictionaries)
-endif (USESYSTEMLIBS)
+endif()
+target_include_directories( ll::hunspell SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/hunspell)

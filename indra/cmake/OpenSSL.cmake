@@ -1,30 +1,24 @@
 # -*- cmake -*-
 include(Prebuilt)
-include(Linking)
 
-set(OpenSSL_FIND_QUIETLY ON)
-set(OpenSSL_FIND_REQUIRED ON)
+include_guard()
+add_library( ll::openssl INTERFACE IMPORTED )
 
-if (USESYSTEMLIBS)
-  include(FindOpenSSL)
-else (USESYSTEMLIBS)
-  use_prebuilt_binary(openssl)
-  if (WINDOWS)
-    set(SSL_LIBRARY
+use_system_binary(openssl)
+use_prebuilt_binary(openssl)
+if (WINDOWS)
+  target_link_libraries(ll::openssl INTERFACE
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libssl.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libssl.lib)
-    set(CRYPTO_LIBRARY
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libssl.lib
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcrypto.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcrypto.lib)
-    set(OPENSSL_LIBRARIES ${SSL_LIBRARY} ${CRYPTO_LIBRARY} Crypt32.lib)
-  else (WINDOWS)
-    set(OPENSSL_LIBRARIES ssl crypto)
-  endif (WINDOWS)
-  set(OPENSSL_INCLUDE_DIRS ${LIBS_PREBUILT_DIR}/include)
-endif (USESYSTEMLIBS)
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcrypto.lib
+        Crypt32.lib
+  )
+elseif (LINUX)
+  target_link_libraries(ll::openssl INTERFACE ssl crypto dl)
+else()
+  target_link_libraries(ll::openssl INTERFACE ssl crypto)
+endif (WINDOWS)
+target_include_directories( ll::openssl SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include)
 
-if (LINUX)
-  set(CRYPTO_LIBRARIES crypto dl)
-elseif (DARWIN)
-  set(CRYPTO_LIBRARIES crypto)
-endif (LINUX)
+target_compile_definitions( ll::openssl INTERFACE OPENSSL_API_COMPAT=0x30000000L)

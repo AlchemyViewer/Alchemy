@@ -12,23 +12,11 @@ include(LLSharedLibs)
 include(Copy3rdPartyLibs)
 include(ZLIBNG)
 include(URIPARSER)
+include(Sentry)
 include(Tracy)
 include(OpenSSL)
 include(XXHash)
 
-include_directories(
-    ${EXPAT_INCLUDE_DIRS}
-    ${LLCOMMON_INCLUDE_DIRS}
-    ${LLMATH_INCLUDE_DIRS}
-    ${ZLIBNG_INCLUDE_DIRS}
-    ${URIPARSER_INCLUDE_DIRS}
-    ${XXHASH_INCLUDE_DIRS}
-    )
-
-# add_executable(lltreeiterators lltreeiterators.cpp)
-# 
-# target_link_libraries(lltreeiterators
-#     ${LLCOMMON_LIBRARIES})
 
 set(llcommon_SOURCE_FILES
     commoncontrol.cpp
@@ -277,53 +265,37 @@ set(llcommon_HEADER_FILES
 if (DARWIN)
   list(APPEND llcommon_HEADER_FILES llsys_objc.h)
   list(APPEND llcommon_SOURCE_FILES llsys_objc.mm)
-endif (DARWIN)
-
-if (DARWIN)
-  list(APPEND llcommon_HEADER_FILES llsys_objc.h)
-  list(APPEND llcommon_SOURCE_FILES llsys_objc.mm)
 
   set_source_files_properties(llsys_objc.mm
                               PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 endif (DARWIN)
 
-set_source_files_properties(${llcommon_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-
-if (USE_SENTRY)
-  set_source_files_properties(${llcommon_SOURCE_FILES}
-    PROPERTIES COMPILE_DEFINITIONS "${SENTRY_DEFINE}")
-endif (USE_SENTRY)
-
 list(APPEND llcommon_SOURCE_FILES ${llcommon_HEADER_FILES})
 
 add_library (llcommon ${llcommon_SOURCE_FILES})
 
-set_target_properties(llcommon PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-
 target_link_libraries(
-    llcommon
-    PUBLIC
-    ${APRUTIL_LIBRARIES}
-    ${APR_LIBRARIES}
-    ${EXPAT_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
-    ${ZLIBNG_LIBRARIES}
-    ${WINDOWS_LIBRARIES}
-    ${BOOST_FIBER_LIBRARY}
-    ${BOOST_CONTEXT_LIBRARY}
-    ${BOOST_PROGRAM_OPTIONS_LIBRARY}
-    ${BOOST_REGEX_LIBRARY}
-    ${BOOST_STACKTRACE_LIBRARY}
-    ${BOOST_SYSTEM_LIBRARY}
-    ${GOOGLE_PERFTOOLS_LIBRARIES}
-    ${URIPARSER_LIBRARIES}
-    nlohmann_json::nlohmann_json
-    fmt::fmt
-    ${TRACY_LIBRARY}
-    ${DL_LIBRARY}
-    ${RT_LIBRARY}
+        llcommon
+        PUBLIC
+        ll::apr
+        ll::expat
+        ll::openssl
+        ll::zlib-ng
+        ll::boost
+        ll::uriparser
+        ll::oslibraries
+        ll::tracy
+        ll::xxhash
+        nlohmann_json::nlohmann_json
+        fmt::fmt
     )
+
+target_include_directories(llcommon INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(llcommon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(TARGET al::sentry)
+    target_compile_definitions(llcommon PRIVATE AL_SENTRY=1)
+endif()
 
 add_dependencies(llcommon stage_third_party_libs)
 
@@ -358,16 +330,7 @@ if (LL_TESTS)
   LL_ADD_PROJECT_UNIT_TESTS(llcommon "${llcommon_TEST_SOURCE_FILES}")
 
   #set(TEST_DEBUG on)
-  set(test_libs llcommon 
-      ${LLCOMMON_LIBRARIES} 
-      ${WINDOWS_LIBRARIES} 
-      ${BOOST_FIBER_LIBRARY} 
-      ${BOOST_CONTEXT_LIBRARY} 
-      ${BOOST_THREAD_LIBRARY} 
-      ${BOOST_SYSTEM_LIBRARY}
-      ${OPENSSL_LIBRARIES}
-      ${ZLIBNG_LIBRARIES}
-      )
+  set(test_libs llcommon)
   LL_ADD_INTEGRATION_TEST(bitpack "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(classic_callback "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}")

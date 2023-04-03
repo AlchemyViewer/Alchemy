@@ -1,48 +1,50 @@
 # -*- cmake -*-
-include(Linking)
-include(Prebuilt)
 
-# FMOD can be set when launching the make using the argument -DUSE_FMODSTUDIO:BOOL=ON
+include_guard()
+
+# FMODSTUDIO can be set when launching the make using the argument -DFMODSTUDIO:BOOL=ON
 # When building using proprietary binaries though (i.e. having access to LL private servers),
 # we always build with FMODSTUDIO.
-# Open source devs should use the -DFMODSTUDIO:BOOL=ON then if they want to build with FMOD, whether
-# they are using STANDALONE or not.
 if (INSTALL_PROPRIETARY)
-  set(USE_FMODSTUDIO ON CACHE BOOL "Use FMOD Studio audio subsystem" FORCE)
+  set(USE_FMODSTUDIO ON CACHE BOOL "Using FMODSTUDIO sound library.")
 endif (INSTALL_PROPRIETARY)
 
+# ND: To streamline arguments passed, switch from FMODSTUDIO to USE_FMODSTUDIO
+# To not break all old build scripts convert old arguments but warn about it
+if(FMODSTUDIO)
+  message( WARNING "Use of the FMODSTUDIO argument is deprecated, please switch to USE_FMODSTUDIO")
+  set(USE_FMODSTUDIO ${FMODSTUDIO})
+endif()
+
 if (USE_FMODSTUDIO)
-  if (STANDALONE)
-    # In that case, we use the version of the library installed on the system
-    set(FMODSTUDIO_FIND_REQUIRED ON)
-    include(FindFMODSTUDIO)
-  else (STANDALONE)
-    if (FMODSTUDIO_LIBRARY AND FMODSTUDIO_INCLUDE_DIR)
-      # If the path have been specified in the arguments, use that
-      set(FMODSTUDIO_LIBRARIES ${FMODSTUDIO_LIBRARY})
-      MESSAGE(STATUS "Using FMODSTUDIO path: ${FMODSTUDIO_LIBRARIES}, ${FMODSTUDIO_INCLUDE_DIR}")
-    else (FMODSTUDIO_LIBRARY AND FMODSTUDIO_INCLUDE_DIR)
-      # If not, we're going to try to get the package listed in autobuild.xml
-      # Note: if you're not using INSTALL_PROPRIETARY, the package URL should be local (file:/// URL) 
-      # as accessing the private LL location will fail if you don't have the credential
-      include(Prebuilt)
-      use_prebuilt_binary(fmodstudio)    
-      if (WINDOWS)
-        set(FMODSTUDIO_LIBRARY 
+  add_library( ll::fmodstudio INTERFACE IMPORTED )
+  target_compile_definitions( ll::fmodstudio INTERFACE LL_FMODSTUDIO=1)
+
+  if (FMODSTUDIO_LIBRARY AND FMODSTUDIO_INCLUDE_DIR)
+    # If the path have been specified in the arguments, use that
+
+    target_link_libraries(ll::fmodstudio INTERFACE ${FMODSTUDIO_LIBRARY})
+    target_include_directories( ll::fmodstudio SYSTEM INTERFACE  ${FMODSTUDIO_INCLUDE_DIR})
+  else (FMODSTUDIO_LIBRARY AND FMODSTUDIO_INCLUDE_DIR)
+    # If not, we're going to try to get the package listed in autobuild.xml
+    # Note: if you're not using INSTALL_PROPRIETARY, the package URL should be local (file:/// URL)
+    # as accessing the private LL location will fail if you don't have the credential
+    include(Prebuilt)
+    use_prebuilt_binary(fmodstudio)
+    if (WINDOWS)
+      target_link_libraries( ll::fmodstudio INTERFACE
             debug ${ARCH_PREBUILT_DIRS_DEBUG}/fmodL_vc.lib
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/fmod_vc.lib)
-      elseif (DARWIN)
-        set(FMODSTUDIO_LIBRARY 
-            debug fmodL
-            optimized fmod)
-      elseif (LINUX)
-        set(FMODSTUDIO_LIBRARY 
-            debug fmodL
-            optimized fmod)
-      endif (WINDOWS)
-      set(FMODSTUDIO_LIBRARIES ${FMODSTUDIO_LIBRARY})
-      set(FMODSTUDIO_INCLUDE_DIR ${LIBS_PREBUILT_DIR}/include/fmodstudio)
-    endif (FMODSTUDIO_LIBRARY AND FMODSTUDIO_INCLUDE_DIR)
-  endif (STANDALONE)
-endif (USE_FMODSTUDIO)
+    elseif (DARWIN)
+      #despite files being called libfmod.dylib, we are searching for fmod
+      target_link_libraries( ll::fmodstudio INTERFACE  fmod)
+    elseif (LINUX)
+      target_link_libraries( ll::fmodstudio INTERFACE  fmod)
+    endif (WINDOWS)
+
+    target_include_directories( ll::fmodstudio SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/fmodstudio)
+  endif (FMODSTUDIO_LIBRARY AND FMODSTUDIO_INCLUDE_DIR)
+else()
+  set( USE_FMODSTUDIO "OFF")
+endif ()
 

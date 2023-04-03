@@ -83,12 +83,12 @@ class ViewerManifest(LLManifest):
                 # include the entire shaders directory recursively
                 self.path("shaders")
                 # include the extracted list of contributors
-                contributions_path = "../../doc/contributions.txt"
+                contributions_path = os.path.join(self.args['source'], "..", "..", "doc", "contributions.txt")
                 contributor_names = self.extract_names(contributions_path)
                 self.put_in_file(contributor_names, "contributors.txt", src=contributions_path)
 
                 # include the extracted list of supporters
-                supporters_path = "../../doc/supporters.txt"
+                supporters_path = os.path.join(self.args['source'], "..", "..", "doc", "supporters.txt")
                 supporters_names = self.extract_names(supporters_path)
                 self.put_in_file(supporters_names, "supporters.txt", src=supporters_path)
 
@@ -451,7 +451,7 @@ class WindowsManifest(ViewerManifest):
         
         # Get shared libs from the shared libs staging directory
         with self.prefix(src=os.path.join(self.args['build'], os.pardir,
-                                          'sharedlibs', self.args['configuration'])):
+                                          'sharedlibs', self.args['buildtype'])):
             # For image support
             self.path("openjp2.dll")
 
@@ -463,7 +463,7 @@ class WindowsManifest(ViewerManifest):
 
             # Get fmodstudio dll for audio engine, continue if missing
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
-                if self.args['configuration'].lower() == 'debug':
+                if self.args['buildtype'].lower() == 'debug':
                     self.path("fmodL.dll", "fmodL.dll")
                 else:
                     self.path(src="fmod.dll", dst="fmod.dll")
@@ -499,13 +499,13 @@ class WindowsManifest(ViewerManifest):
         # Media plugins - CEF
         with self.prefix(dst="llplugin"):
             with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'media_plugins')):
-                if self.args['configuration'].lower() != 'debug':
+                if self.args['buildtype'].lower() != 'debug':
                     with self.prefix(src=os.path.join('cef', self.args['configuration'])):
                         self.path("media_plugin_cef.dll")
 
-                # Media plugins - LibVLC
-                with self.prefix(src=os.path.join('libvlc', self.args['configuration'])):
-                    self.path("media_plugin_libvlc.dll")
+                    # Media plugins - LibVLC
+                    with self.prefix(src=os.path.join('libvlc', self.args['configuration'])):
+                        self.path("media_plugin_libvlc.dll")
 
                 # Media plugins - Example (useful for debugging - not shipped with release viewer)
                 if self.channel_type() != 'release':
@@ -514,8 +514,8 @@ class WindowsManifest(ViewerManifest):
 
             # CEF runtime files - debug
             # CEF runtime files - not debug (release, relwithdebinfo etc.)
-            config = 'debug' if self.args['configuration'].lower() == 'debug' else 'release'
-            if self.args['configuration'].lower() != 'debug':
+            config = 'debug' if self.args['buildtype'].lower() == 'debug' else 'release'
+            if self.args['buildtype'].lower() != 'debug':
                 with self.prefix(src=os.path.join(pkgdir, 'bin', config)):
                     self.path("chrome_elf.dll")
                     self.path("d3dcompiler_47.dll")
@@ -528,8 +528,6 @@ class WindowsManifest(ViewerManifest):
                     self.path("snapshot_blob.bin")
                     self.path("v8_context_snapshot.bin")
                     self.path("vk_swiftshader_icd.json")
-
-                self.path_optional("vcruntime140_1.dll")
 
                 # CEF files common to all configurations
                 with self.prefix(src=os.path.join(pkgdir, 'resources')):
@@ -700,7 +698,7 @@ class DarwinManifest(ViewerManifest):
         pkgdir = os.path.join(self.args['build'], os.pardir, 'packages')
         relpkgdir = os.path.join(pkgdir, "lib", "release")
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
-        libdir = debpkgdir if self.args['configuration'].lower() == 'debug' else relpkgdir
+        libdir = debpkgdir if self.args['buildtype'].lower() == 'debug' else relpkgdir
 
         with self.prefix(src="", dst="Contents"):  # everything goes in Contents
             # CEF framework goes inside Contents/Frameworks.
@@ -722,7 +720,7 @@ class DarwinManifest(ViewerManifest):
                         self.path(libfile)
 
                 if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
-                    if self.args['configuration'].lower() == 'debug':
+                    if self.args['buildtype'].lower() == 'debug':
                         self.path("libfmodL.dylib")
                     else:
                         self.path("libfmod.dylib")

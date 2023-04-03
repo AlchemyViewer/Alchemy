@@ -25,6 +25,7 @@
 #include <boost/circular_buffer.hpp>
 #include <utility>
 #include "_httpoprequest.h"
+#include "_httprequestqueue.h"
 
 static boost::circular_buffer<LogPayload> sRingBuffer = boost::circular_buffer<LogPayload>(2048);
 
@@ -102,7 +103,15 @@ void LLMessageLog::setCallback(LogCallback callback)
 		{
 			callback(m);
 		}
+		LLCore::HttpRequestQueue::setMessageLogFunc([](const LLCore::HttpRequestQueue::opPtr_t& op) { LLMessageLog::log(op); });
+		LLCore::HttpOpRequest::setMessageLogFunc([](LLCore::HttpResponse* response) { LLMessageLog::log(response); });
 	}
+	else
+	{
+		LLCore::HttpOpRequest::setMessageLogFunc(nullptr);
+		LLCore::HttpRequestQueue::setMessageLogFunc(nullptr);
+	}
+
 	sCallback = callback;
 }
 

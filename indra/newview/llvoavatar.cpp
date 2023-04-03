@@ -785,7 +785,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 
 S32 LLVOAvatar::getNumBakes() const 
 {
-#if !LL_HAVOK
+#ifndef LL_HAVOK
 	// BAKED_LEFT_ARM is equal to the pre-BOM BAKED_NUM_INDICES
 	if(LLViewerRegion* regionp = getRegion())
 	{
@@ -3662,14 +3662,15 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
 void LLVOAvatar::addNameTagLine(const std::string& line, const LLColor4& color, S32 style, const LLFontGL* font, const bool use_ellipses)
 {
+    // extra width (NAMETAG_MAX_WIDTH) is for names only, not for chat
 	llassert(mNameText);
 	if (mVisibleChat)
 	{
-		mNameText->addLabel(line);
+		mNameText->addLabel(line, LLHUDNameTag::NAMETAG_MAX_WIDTH);
 	}
 	else
 	{
-		mNameText->addLine(line, color, (LLFontGL::StyleFlags)style, font, use_ellipses);
+		mNameText->addLine(line, color, (LLFontGL::StyleFlags)style, font, use_ellipses, LLHUDNameTag::NAMETAG_MAX_WIDTH);
 	}
     mNameIsSet |= !line.empty();
 }

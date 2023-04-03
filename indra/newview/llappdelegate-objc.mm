@@ -25,12 +25,11 @@
  */
 
 #import "llappdelegate-objc.h"
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 #import "Sentry.h"
 #endif
 #include "llwindowmacosx-objc.h"
 #include "llappviewermacosx-for-objc.h"
-#include "llviewerbuildconfig.h"
 #include <Carbon/Carbon.h> // Used for Text Input Services ("Safe" API - it's supported)
 
 @implementation LLAppDelegate
@@ -56,7 +55,7 @@
 	// initialized, "played back" into whatever handlers have been set up.
 	constructViewer();
 
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
     [SentrySDK startWithConfigureOptions:^(SentryOptions *options) {
         options.dsn = @SENTRY_DSN;
         options.debug = NO;

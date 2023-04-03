@@ -26,8 +26,6 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "llviewerbuildconfig.h"
-
 #include "llprogressview.h"
 
 #include "indra_constants.h"
@@ -403,7 +401,7 @@ void LLProgressView::initLogos()
 
 	S32 icon_height;
 
-#if USE_FMODSTUDIO
+#ifdef LL_FMODSTUDIO
     // original image size is 264x96, it is on longer side but
     // with no internal paddings so it gets additional padding
     icon_width = 77;
@@ -418,7 +416,7 @@ void LLProgressView::initLogos()
 
     texture_start_x += icon_width + default_pad + 1;
 #endif //LL_FMODSTUDIO
-#if LL_HAVOK
+#ifdef LL_HAVOK
     // original image size is 342x113, central element is on a larger side
     // plus internal padding, so it gets slightly more height than desired 32
     icon_width = 88;

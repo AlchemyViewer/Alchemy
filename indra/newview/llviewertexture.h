@@ -518,6 +518,8 @@ protected:
 	LLFrameTimer mStopFetchingTimer;	// Time since mDecodePriority == 0.f.
 
 	BOOL  mInImageList;				// TRUE if image is in list (in which case don't reset priority!)
+	// This needs to be atomic, since it is written both in the main thread
+	// and in the GL image worker thread... HB
 	LLAtomicBool mNeedsCreateTexture;	
 
 	BOOL   mForSculpt ; //a flag if the texture is used as sculpt data.
