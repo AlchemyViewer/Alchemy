@@ -96,6 +96,6 @@ target_link_libraries(llrender
         llxml
         llwindow
         ll::freetype
-        OpenGL::OpenGL
+        ll::opengl
         )
 
