@@ -57,11 +57,6 @@ set(cmake_SOURCE_FILES
         UnixInstall.cmake
         URIPARSER.cmake
         WebP.cmake
-        Variables.cmake
-        ViewerMiscLibs.cmake
-        VisualLeakDetector.cmake
-        LibVLCPlugin.cmake
-        XmlRpcEpi.cmake
         XXHash.cmake
         ZLIBNG.cmake
         )
