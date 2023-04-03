@@ -46,7 +46,6 @@
 
 #include "llhttpconstants.h"
 #include "llproxy.h"
-#include "llmessagelog.h"
 #include "httpstats.h"
 
 // *DEBUG:  "[curl:bugs] #1420" problem and testing.
@@ -125,6 +124,7 @@ static const char * const LOG_CORE("CoreHttp");
 namespace LLCore
 {
 
+std::function<void(LLCore::HttpResponse* response)> HttpOpRequest::sMessageLogFunc = nullptr;
 
 HttpOpRequest::HttpOpRequest()
 	: HttpOperation(),
@@ -280,7 +280,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
 		response->setTransferStats(stats);
 
 		mUserHandler->onCompleted(this->getHandle(), response);
-		if (LLMessageLog::haveLogger())  LLMessageLog::log(response);
+		if (sMessageLogFunc != nullptr) sMessageLogFunc(response);
 		response->release();
 	}
 }
