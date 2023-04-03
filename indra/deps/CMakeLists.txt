@@ -5,6 +5,7 @@ include(00-Common)
 include(FetchContent)
 
 set(CMAKE_FOLDER "Third Party")
+set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
