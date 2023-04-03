@@ -63,6 +63,7 @@ endif()
 if (WINDOWS)
   # Don't build DLLs.
   set(BUILD_SHARED_LIBS OFF)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_compile_options(/MP)
@@ -84,15 +85,6 @@ if (WINDOWS)
     )
 
   add_compile_options(
-    $<$<CONFIG:Debug>:/Od>
-    $<$<CONFIG:Debug>:/MDd>
-    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:/O2>
-    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:/MD>
-    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:/GS>
-    $<$<CONFIG:Release>:/Oi>
-    $<$<CONFIG:Release>:/Ot>
-    $<$<CONFIG:Release>:/Gy>
-    $<$<CONFIG:Release>:/Oy->
     $<$<CONFIG:Release>:/Zc:inline>
     $<$<CONFIG:Release>:/fp:fast>
     /Zi
@@ -101,19 +93,12 @@ if (WINDOWS)
     /W3 
     /c 
     /Zc:__cplusplus 
-    /Zc:forScope 
-    /Zc:rvalueCast 
-    /Zc:strictStrings 
-    /Zc:ternary 
     /nologo
     )
 
   add_link_options(
     /DEBUG:FULL
     /IGNORE:4099
-    /NODEFAULTLIB:LIBCMT
-    $<$<CONFIG:Debug>:/NODEFAULTLIB:LIBCMTD>
-    $<$<CONFIG:Debug>:/NODEFAULTLIB:MSVCRT>
     )
 
   if (ADDRESS_SIZE EQUAL 32)
@@ -129,7 +114,7 @@ if (WINDOWS)
   endif ()
 
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-    add_compile_options(/Zc:externConstexpr /Zc:referenceBinding /ZH:SHA_256)
+    add_compile_options(/Zc:externConstexpr /ZH:SHA_256)
   elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     add_compile_options(/Qvec /Zc:dllexportInlines- /clang:-mprefer-vector-width=128 -fno-strict-aliasing -Wno-ignored-pragma-intrinsic -Wno-unused-local-typedef)
   endif()
