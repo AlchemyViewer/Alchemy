@@ -1,10 +1,12 @@
+
 project(deps)
 
 include(00-Common)
 include(FetchContent)
 
 set(CMAKE_FOLDER "Third Party")
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 set(deps_SOURCE_FILES
     CMakeLists.txt
@@ -17,17 +19,6 @@ add_library(deps
             ../cmake/cmake_dummy.cpp
             ${deps_SOURCE_FILES}
             )
-
-
-if(${CMAKE_VERSION} VERSION_LESS 3.14)
-    macro(FetchContent_MakeAvailable NAME)
-        FetchContent_GetProperties(${NAME})
-        if(NOT ${NAME}_POPULATED)
-            FetchContent_Populate(${NAME})
-            add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
-        endif()
-    endmacro()
-endif()
 
 FetchContent_Declare(
   meshoptimizer
@@ -79,8 +70,7 @@ if(USE_TRACY)
   set(TRACY_ON_DEMAND ON)
   set(TRACY_ONLY_LOCALHOST ON)
   set(TRACY_FIBERS ON)
-  FetchContent_MakeAvailable (tracy)
+  FetchContent_MakeAvailable(tracy)
 endif()
 
 unset(CMAKE_FOLDER)
-unset(CMAKE_POSITION_INDEPENDENT_CODE)

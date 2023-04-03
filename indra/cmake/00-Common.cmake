@@ -55,6 +55,10 @@ endif()
 # Warnings
 option(DISABLE_FATAL_WARNINGS "Disable warnings as errors" ON)
 
+if(USE_LTO)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${USE_LTO})
+endif()
+
 # Platform-specific compilation flags.
 if (WINDOWS)
   # Don't build DLLs.
@@ -139,31 +143,10 @@ if (WINDOWS)
   endif()
 
   if (USE_LTO)
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-      if(INCREMENTAL_LINK)
-        add_link_options(/LTCG:incremental)
-        set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /LTCG")
-      else()
-        add_link_options(/LTCG)
-        set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /LTCG")
-      endif()
-      add_link_options(
-        $<$<CONFIG:Release>:/OPT:REF>
-        $<$<CONFIG:Release>:/OPT:ICF>
-        $<$<CONFIG:Release>:/INCREMENTAL:NO>
-        )
-      add_compile_options(/GL /Gy /Gw)
-    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-      if(INCREMENTAL_LINK)
-        add_compile_options(-flto=thin -fwhole-program-vtables /clang:-fforce-emit-vtables)
-      else()
-        add_compile_options(-flto=full -fwhole-program-vtables /clang:-fforce-emit-vtables)
-      endif()
-      add_link_options(
-        $<$<CONFIG:Release>:/OPT:REF>
-        $<$<CONFIG:Release>:/OPT:ICF>
-        )
-    endif()
+    add_link_options(
+      $<$<CONFIG:Release>:/OPT:REF>
+      $<$<CONFIG:Release>:/OPT:ICF>
+      )
   elseif (INCREMENTAL_LINK)
     add_link_options($<$<CONFIG:Release>:/INCREMENTAL>)
   else ()
@@ -233,14 +216,6 @@ if (LINUX)
     add_compile_options(-mfpmath=sse -msse -msse2 -msse3 -mssse3 -msse4 -msse4.1)
   endif ()
 
-  if (USE_LTO)
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-      add_compile_options(-flto=thin -fwhole-program-vtables -fforce-emit-vtables)
-    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-      add_compile_options(-flto=auto -fno-fat-lto-objects)
-    endif ()
-  endif ()
-
   if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     if (USE_ASAN)
       add_compile_options(-fsanitize=address -fsanitize-recover=address)
@@ -261,10 +236,6 @@ if (LINUX)
   else ()
     add_compile_options(-O3 -ffast-math)
   endif ()
-
-  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND USE_LTO)
-    add_link_options(-fuse-ld=lld)
-  endif()
 
   # Enable these flags so we have a read only GOT and some linking opts
   add_link_options("LINKER:-z,relro" "LINKER:-z,now" "LINKER:--as-needed")
