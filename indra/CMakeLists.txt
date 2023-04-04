@@ -11,13 +11,40 @@
 ##   We're not there yet, but once done, there is a kludge in Linking.cmake
 #    "if(${CMAKE_VERSION} VERSION_LESS "3.20.0")" that can also be removed
 cmake_minimum_required(VERSION 3.16.0 FATAL_ERROR)
-cmake_policy(SET CMP0063 NEW)
-cmake_policy(SET CMP0083 NEW)
-cmake_policy(SET CMP0091 NEW)
+if(POLICY CMP0063)
+  cmake_policy(SET CMP0063 NEW)
+endif()
+if(POLICY CMP0083)
+  cmake_policy(SET CMP0083 NEW)
+endif()
+if(POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif()
+if(POLICY CMP0119)
+  cmake_policy(SET CMP0119 NEW)
+endif()
 
 set(ROOT_PROJECT_NAME "Alchemy" CACHE STRING
     "The root project/makefile/solution name. Defaults to Alchemy.")
 project(${ROOT_PROJECT_NAME})
+
+# The viewer code base can now be successfully compiled with -std=c++14. But
+# turning that on in the generic viewer-build-variables/variables file would
+# potentially require tweaking each of our ~50 third-party library builds.
+# Until we decide to set -std=c++14 in viewer-build-variables/variables, set
+# it locally here: we want to at least prevent inadvertently reintroducing
+# viewer code that would fail with C++14.
+if(MSVC)
+  set(CMAKE_CXX_STANDARD 20)
+else()
+  set(CMAKE_OBJCXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  enable_language(OBJCXX)
+endif()
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake"  "${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -31,19 +58,6 @@ else()
   set( USE_CONAN OFF )
   set( USE_AUTOBUILD_3P ON )
 endif()
-
-# The viewer code base can now be successfully compiled with -std=c++14. But
-# turning that on in the generic viewer-build-variables/variables file would
-# potentially require tweaking each of our ~50 third-party library builds.
-# Until we decide to set -std=c++14 in viewer-build-variables/variables, set
-# it locally here: we want to at least prevent inadvertently reintroducing
-# viewer code that would fail with C++14.
-if(MSVC)
-  set(CMAKE_CXX_STANDARD 20)
-else()
-  set(CMAKE_CXX_STANDARD 17)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 

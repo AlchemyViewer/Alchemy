@@ -104,9 +104,7 @@ if (DARWIN)
     llappdelegate-objc.h
     )
 
-    set_source_files_properties(llwindowmacosx-objc.mm
-                                PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
-    set_source_files_properties(llopenglview-objc.mm
+    set_source_files_properties(llopenglview-objc.mm llwindowmacosx-objc.mm
                                 PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 endif (DARWIN)
 

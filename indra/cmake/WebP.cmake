@@ -15,7 +15,12 @@ if(WINDOWS)
     optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libwebp.lib
     )
 else()
-  target_link_libraries( ll::libwebp INTERFACE webp)
+  target_link_libraries( ll::libwebp INTERFACE 
+    debug ${ARCH_PREBUILT_DIRS_DEBUG}/libwebp.a
+    optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libwebp.a
+    debug ${ARCH_PREBUILT_DIRS_DEBUG}/libsharpyuv.a
+    optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libsharpyuv.a
+    )
 endif()
   
 target_include_directories( ll::libwebp SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/webp)

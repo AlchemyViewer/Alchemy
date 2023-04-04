@@ -472,7 +472,7 @@ std::string FSLSLPreprocessor::lslcomp(std::string script)
 		display_error(err);
 		throw;
 	}
-	catch (std::exception& e)
+	catch (const std::exception& e)
 	{
 		LLStringUtil::format_map_t args;
 		args["[WHAT]"] = e.what();
@@ -490,7 +490,7 @@ struct ProcCacheInfo
 	FSLSLPreprocessor* self;
 };
 
-class trace_include_files : public boost::wave::context_policies::default_preprocessing_hooks
+struct trace_include_files : public boost::wave::context_policies::default_preprocessing_hooks
 {
 public:
 	trace_include_files(FSLSLPreprocessor* proc)

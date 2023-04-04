@@ -59,6 +59,11 @@ if(USE_LTO)
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${USE_LTO})
 endif()
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_C_VISIBILITY_PRESET "hidden")
+set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+
 # Platform-specific compilation flags.
 if (WINDOWS)
   # Don't build DLLs.
@@ -166,9 +171,6 @@ endif (WINDOWS)
 
 if (LINUX)
   set(CMAKE_SKIP_BUILD_RPATH TRUE)
-  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-  set(CMAKE_C_VISIBILITY_PRESET "hidden")
-  set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 
   add_compile_definitions(
     LL_LINUX=1
@@ -229,16 +231,24 @@ endif ()
 
 if (DARWIN)
   add_compile_definitions(LL_DARWIN=1 GL_SILENCE_DEPRECATION=1)
-  add_link_options("LINKER:-headerpad_max_install_names" "LINKER:-search_paths_first")
-  add_compile_options(-O3 -gdwarf-2)
+  add_link_options("LINKER:-headerpad_max_install_names" "LINKER:-search_paths_first" "LINKER:-dead_strip")
+  add_compile_options(
+    -O3
+    -ffast-math
+    -gdwarf-2
+    -fno-strict-aliasing
+    -msse4.2
+    $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc> 
+    $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-weak>
+    )
 endif ()
 
 if (LINUX OR DARWIN)
   add_compile_options(-Wall -Wno-sign-compare -Wno-reorder)
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  if (${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
     add_compile_options(-Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-ignored-qualifiers -Wno-unused-function)
-  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-    add_compile_options(-Wno-trigraphs -Wno-unused-local-typedef -Wno-unknown-warning-option)
+  elseif (${CMAKE_CXX_COMPILER_ID} MATCHES Clang)
+    add_compile_options(-Wno-trigraphs -Wno-unused-local-typedef -Wno-unknown-warning-option -Wno-shorten-64-to-32)
   endif()
 
   CHECK_CXX_COMPILER_FLAG(-Wdeprecated-copy HAS_DEPRECATED_COPY)
