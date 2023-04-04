@@ -917,8 +917,6 @@ class DarwinManifest(ViewerManifest):
                 self.run_command(['codesign', '--verify', '--deep', '--verbose', application])
 
         vol_icon = self.src_path_of(os.path.join(self.icon_path(), 'alchemy.icns'))
-        print("DEBUG: icon_path '%s'" % vol_icon)
-
         dmgoptions = {
             'format': 'ULFO',
             'compression_level': 9,
