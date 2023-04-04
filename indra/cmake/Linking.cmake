@@ -34,8 +34,10 @@ endif ()
 # that CMAKE_BUILD_TYPE is essentially meaningless at configuration time for IDE generators and
 # CMAKE_CFG_INTDIR is meaningless at build time for Makefile generators
 
-link_directories(${LIBS_PREBUILT_DIR}/lib/$<LOWER_CASE:$<CONFIG>>)
-link_directories(${LIBS_PREBUILT_DIR}/lib/release)
+link_directories(
+    ${LIBS_PREBUILT_DIR}/lib/$<IF:$<NOT:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>>,$<LOWER_CASE:$<CONFIG>>,>
+    $<$<NOT:$<CONFIG:Release>>:${LIBS_PREBUILT_DIR}/lib/release>
+)
 
 add_library( ll::oslibraries INTERFACE IMPORTED )
 

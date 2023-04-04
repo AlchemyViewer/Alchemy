@@ -35,9 +35,9 @@ if (USE_DISCORD)
           ${ARCH_PREBUILT_DIRS_RELEASE}/discord_game_sdk.dylib)
     elseif (LINUX)
       target_link_libraries( al::discord-gamesdk INTERFACE
-          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscord_game_sdk.so
-          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscordgamesdk.a)
-    endif (WINDOWS)
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscordgamesdk.a
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libdiscord_game_sdk.so )
+          endif (WINDOWS)
     target_include_directories( al::discord-gamesdk SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/discord/)
 
     if(DISCORD_CLIENTID STREQUAL "")
