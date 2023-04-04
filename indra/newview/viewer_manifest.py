@@ -1245,8 +1245,8 @@ if __name__ == "__main__":
            ' '.join((("'%s'" % arg) if ' ' in arg else arg) for arg in sys.argv))))
     # fmodstudio and openal can be used simultaneously and controled by environment
     extra_arguments = [
-        dict(name='discord', description="""Enable Discord integration""", default=''),
-        dict(name='sentry', description="""Enable Sentry crash report system""", default=''),
+        dict(name='discord', description="""Enable Discord integration""", default='OFF'),
+        dict(name='sentry', description="""Enable Sentry crash report system""", default='OFF'),
         dict(name='fmodstudio', description="""Indication if fmod studio libraries are needed""", default='OFF'),
         dict(name='openal', description="""Indication if openal libraries are needed""", default='OFF'),
         dict(name='kdu', description="""Indication if kdu libraries are needed""", default='OFF'),

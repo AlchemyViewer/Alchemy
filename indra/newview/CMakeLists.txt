@@ -1610,27 +1610,27 @@ if (WINDOWS)
     message(STATUS "Copying icons for ${ICON_PATH}")
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${AUTOBUILD_INSTALL_DIR}/branding/viewer/icons/${ICON_PATH}/alchemy.ico"
+        "${LIBS_PREBUILT_DIR}/branding/viewer/icons/${ICON_PATH}/alchemy.ico"
         "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico"
       )
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${AUTOBUILD_INSTALL_DIR}/branding/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+        "${LIBS_PREBUILT_DIR}/branding/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
         "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP"
       )
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${AUTOBUILD_INSTALL_DIR}/branding/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+        "${LIBS_PREBUILT_DIR}/branding/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
         "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
       )
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${AUTOBUILD_INSTALL_DIR}/branding/installer/icons/install_icon.ico"
+        "${LIBS_PREBUILT_DIR}/branding/installer/icons/install_icon.ico"
         "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico"
       )
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${AUTOBUILD_INSTALL_DIR}/branding/installer/splash/${ICON_PATH}/install_splash.gif"
+        "${LIBS_PREBUILT_DIR}/branding/installer/splash/${ICON_PATH}/install_splash.gif"
         "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
       )
 
@@ -1902,7 +1902,7 @@ if (WINDOWS)
       #${SHARED_LIB_STAGING_DIR}/${LL_INTDIR}/SLVoice.exe
       #${SHARED_LIB_STAGING_DIR}/${LL_INTDIR}/libsndfile-1.dll
       #${SHARED_LIB_STAGING_DIR}/${LL_INTDIR}/vivoxoal.dll
-      ${AUTOBUILD_INSTALL_DIR}/ca-bundle.crt
+      ${LIBS_PREBUILT_DIR}/ca-bundle.crt
       ${CMAKE_CURRENT_SOURCE_DIR}/licenses-win32.txt
       ${CMAKE_CURRENT_SOURCE_DIR}/featuretable.txt
       ${viewer_APPSETTINGS_FILES}

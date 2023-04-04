@@ -4,21 +4,18 @@ include(Prebuilt)
 include_guard()
 
 #Discord Integration
-option(USE_DISCORD "Enable Discord client integration" OFF)
+if (DEFINED ENV{USE_DISCORD})
+  set(USE_DISCORD $ENV{USE_DISCORD} CACHE BOOL "Enable Discord client integration" FORCE)
+endif()
 
 if(DEFINED ENV{DISCORD_CLIENTID})
   set(DISCORD_CLIENTID $ENV{DISCORD_CLIENTID} CACHE STRING "Discord Client ID" FORCE)
 else()
-  set(DISCORD_CLIENTID "" CACHE STRING "Discord Client ID")
+  set(DISCORD_CLIENTID "564763931009220608" CACHE STRING "Discord Client ID")
 endif()
 
-if (INSTALL_PROPRIETARY)
-  set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
-  if (DISCORD_CLIENTID)
-      set(USE_DISCORD ON CACHE BOOL "Use Discord SDK" FORCE)
-  else ()
-      set(USE_DISCORD OFF CACHE BOOL "Use Discord SDK" FORCE)
-  endif ()
+if (INSTALL_PROPRIETARY AND NOT DISCORD_CLIENTID STREQUAL "")
+  set(USE_DISCORD ON CACHE BOOL "Enable Discord client integration")
 endif ()
 
 if (USE_DISCORD)

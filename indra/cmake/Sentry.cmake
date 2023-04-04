@@ -7,6 +7,19 @@ include(OpenSSL)
 include(ZLIBNG)
 
 include_guard()
+if (DEFINED ENV{USE_SENTRY})
+  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
+endif()
+
+if(DEFINED ENV{SENTRY_DSN})
+  set(SENTRY_DSN $ENV{SENTRY_DSN} CACHE STRING "Sentry DSN" FORCE)
+else()
+  set(SENTRY_DSN "" CACHE STRING "Sentry DSN")
+endif()
+
+if (INSTALL_PROPRIETARY AND NOT SENTRY_DSN STREQUAL "")
+  set(USE_SENTRY ON CACHE BOOL "Use the Sentry crash reporting system")
+endif ()
 
 if (USE_SENTRY)
     add_library( al::sentry INTERFACE IMPORTED )

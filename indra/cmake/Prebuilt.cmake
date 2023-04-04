@@ -13,7 +13,7 @@ set(ARCH_PREBUILT_BIN_DIRS_DEBUG ${LIBS_PREBUILT_DIR}/bin/debug)
 
 include(FindAutobuild)
 
-set(PREBUILD_TRACKING_DIR ${AUTOBUILD_INSTALL_DIR}/cmake_tracking)
+set(PREBUILD_TRACKING_DIR ${LIBS_PREBUILT_DIR}/cmake_tracking)
 # For the library installation process;
 # see cmake/Prebuild.cmake for the counterpart code.
 if ("${CMAKE_SOURCE_DIR}/../autobuild.xml" IS_NEWER_THAN "${PREBUILD_TRACKING_DIR}/sentinel_installed")
@@ -44,14 +44,14 @@ macro (use_prebuilt_binary _binary)
     if(${PREBUILD_TRACKING_DIR}/sentinel_installed IS_NEWER_THAN ${PREBUILD_TRACKING_DIR}/${_binary}_installed OR NOT ${${_binary}_installed} EQUAL 0)
         if(DEBUG_PREBUILT)
             message(STATUS "cd ${CMAKE_SOURCE_DIR} && ${AUTOBUILD_EXECUTABLE} install
-        --install-dir=${AUTOBUILD_INSTALL_DIR}
+        --install-dir=${LIBS_PREBUILT_DIR}
         ${_binary} ")
         endif(DEBUG_PREBUILT)
         execute_process(COMMAND "${AUTOBUILD_EXECUTABLE}"
                 install
                 -A${ADDRESS_SIZE}
                 --skip-source-environment
-                --install-dir=${AUTOBUILD_INSTALL_DIR}
+                --install-dir=${LIBS_PREBUILT_DIR}
                 ${_binary}
                 WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
                 RESULT_VARIABLE ${_binary}_installed
