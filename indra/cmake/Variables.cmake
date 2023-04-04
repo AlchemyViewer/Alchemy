@@ -34,7 +34,6 @@ option(ENABLE_MEDIA_PLUGINS "Turn off building media plugins if they are importe
 # Compiler and toolchain options
 option(INCREMENTAL_LINK "Use incremental linking on win32 builds (enable for faster links on some machines)" OFF)
 option(USE_LTO "Enable global and interprocedural optimizations" OFF)
-option(FULL_DEBUG_SYMS "Enable Generation of full pdb on msvc or dsym on macos" OFF)
 option(USE_ASAN "Enable address sanitizer for detection of memory issues" OFF)
 option(USE_LEAKSAN "Enable address sanitizer for detection of memory leaks" OFF)
 option(USE_UBSAN "Enable undefined behavior sanitizer" OFF)
@@ -48,28 +47,6 @@ set(VIEWER_SYMBOL_FILE "" CACHE STRING "Name of tarball into which to place symb
 
 option(USE_CEF "Enable CEF media plugin" ON)
 option(USE_VLC "Enable VLC media plugin" ON)
-
-#Crash reporting
-option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
-
-if(DEFINED ENV{SENTRY_DSN})
-  set(SENTRY_DSN $ENV{SENTRY_DSN} CACHE STRING "Sentry DSN" FORCE)
-endif()
-
-if (INSTALL_PROPRIETARY)
-  # Note that viewer_manifest.py makes decision based on SENTRY_DSN and not USE_SENTRY
-  if (SENTRY_DSN)
-      set(USE_SENTRY ON  CACHE BOOL "Use the Sentry crash reporting system" FORCE)
-  else ()
-      set(USE_SENTRY OFF CACHE BOOL "Use the Sentry crash reporting system" FORCE)
-  endif ()
-else ()
-  set(USE_SENTRY OFF CACHE BOOL "Use the Sentry crash reporting system" FORCE)
-endif ()
-
-if (DEFINED ENV{USE_SENTRY})
-  set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
-endif()
 
 if(LIBS_CLOSED_DIR)
   file(TO_CMAKE_PATH "${LIBS_CLOSED_DIR}" LIBS_CLOSED_DIR)
@@ -169,11 +146,8 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
 
   set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS YES)
-  if(FULL_DEBUG_SYMS OR USE_SENTRY)
-    set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT dwarf-with-dsym)
-  else()
-    set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT dwarf)
-  endif()
+  set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT dwarf-with-dsym)
+
   # Obj-C
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_WEAK YES)

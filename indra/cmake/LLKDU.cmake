@@ -28,6 +28,6 @@ if (USE_KDU)
   endif (WINDOWS)
 
   target_include_directories( ll::kdu SYSTEM INTERFACE
-          ${AUTOBUILD_INSTALL_DIR}/include/kdu
+          ${LIBS_PREBUILT_DIR}/include/kdu
           )
 endif (USE_KDU)
