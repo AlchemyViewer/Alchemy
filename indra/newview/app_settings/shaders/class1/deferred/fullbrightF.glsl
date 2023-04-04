@@ -42,7 +42,6 @@ vec4 applyWaterFogView(vec3 pos, vec4 color);
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cl);
 vec3 fullbrightAtmosTransport(vec3 light);
-vec3 fullbrightScaleSoftClip(vec3 light);
 
 #ifdef HAS_ALPHA_MASK
 uniform float minimum_alpha;
@@ -86,8 +85,9 @@ void main()
 #endif
 
 #ifndef IS_HUD
-    color.rgb = fullbrightAtmosTransport(color.rgb);
     color.rgb = srgb_to_linear(color.rgb);
+    color.rgb = fullbrightAtmosTransport(color.rgb);
+    
 #endif
 
     frag_color.rgb = color.rgb;
