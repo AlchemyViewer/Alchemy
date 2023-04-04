@@ -59,6 +59,8 @@ if(USE_LTO)
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${USE_LTO})
 endif()
 
+option(COMPRESS_DEBUG "Compress debug sections on supported compilers" OFF)
+
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
@@ -193,6 +195,10 @@ if (LINUX)
     -g
     -pthread
     )
+
+  if(COMPRESS_DEBUG)
+    add_compile_options(-gz)
+  endif()
 
   if (USE_AVX2)
     add_compile_options(-mavx2)
