@@ -829,7 +829,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 	if (!mRT->deferredScreen.allocate(resX, resY, GL_RGBA, true)) return false;
 	if (!addDeferredAttachments(mRT->deferredScreen)) return false;
 	
-	GLuint screenFormat = GL_RGBA16;
+	GLuint screenFormat = GL_RGBA16F;
         
 	if (!mRT->screen.allocate(resX, resY, screenFormat)) return false;
 
@@ -849,7 +849,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 	if (shadow_detail > 0 || ssao || RenderDepthOfField || samples > 0 || RlvActions::hasPostProcess())
 // [/RLVa:KB]
 	{ //only need mRT->deferredLight for shadows OR ssao OR dof OR fxaa
-		if (!mRT->deferredLight.allocate(resX, resY, GL_RGBA16)) return false;
+		if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
 	}
 	else
 	{
