@@ -63,7 +63,7 @@
 #include "llavatarappearancedefines.h"
 
 
-static const S32 LOCAL_TRACKING_ID_COLUMN = 1;
+//static const S32 LOCAL_TRACKING_ID_COLUMN = 1;
 
 //static const char CURRENT_IMAGE_NAME[] = "Current Texture";
 //static const char WHITE_IMAGE_NAME[] = "Blank Texture";
