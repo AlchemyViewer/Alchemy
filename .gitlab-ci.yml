@@ -69,9 +69,9 @@ variables:
     - .\.venv\Scripts\Activate.ps1
     - pip install --upgrade llbase autobuild certifi sentry-cli cmake
   script:
-    - autobuild configure -c Release -- -DUSE_LTO=${USE_LTO} -DHAVOK_TPV=${USE_HAVOK} -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DENABLE_DELTA_GEN=ON
+    - autobuild configure -c Release -- -DUSE_LTO="${USE_LTO}" -DHAVOK_TPV="${USE_HAVOK}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DENABLE_DELTA_GEN=ON
     - autobuild build -c Release --no-configure
-    - autobuild graph -c Release --graph-file alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg build-vc-64/autobuild-package.xml
+    - autobuild graph -c Release --graph-file "alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg" build-vc-64/autobuild-package.xml
     - $AlchemyPdbPath = Resolve-Path build-vc-*/newview/Release/Alchemy*.pdb
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli difutil bundle-sources $AlchemyPdbPath }
   artifacts:
