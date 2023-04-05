@@ -1366,6 +1366,12 @@ void render_ui(F32 zoom_factor, int subfield)
         LL_PROFILE_ZONE_NAMED_CATEGORY_UI("HUD");
 		render_hud_elements();
         LLGLState::checkStates();
+// [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
+		if (RlvActions::hasBehaviour(RLV_BHVR_SETOVERLAY))
+		{
+			LLVfxManager::instance().runEffect(EVisualEffect::RlvOverlay);
+		}
+// [/RLVa:KB]
 		render_hud_attachments();
 
         LLGLState::checkStates();
