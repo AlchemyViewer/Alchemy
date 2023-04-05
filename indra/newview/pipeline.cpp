@@ -864,6 +864,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
     }
 
     mPostMap.allocate(resX, resY, GL_RGBA);
+	mPostFXMap.allocate(resX, resY, GL_RGBA);
 
     //HACK make screenbuffer allocations start failing after 30 seconds
     if (gSavedSettings.getBOOL("SimulateFBOFailure"))
@@ -1123,6 +1124,7 @@ void LLPipeline::releaseGLBuffers()
     mSceneMap.release();
 
     mPostMap.release();
+	mPostFXMap.release();
 
 	for (U32 i = 0; i < 3; i++)
 	{
@@ -7517,6 +7519,16 @@ void LLPipeline::renderFinalize()
 		mGlow[1].flush();
 	}
 
+// [RLVa:KB] - @setsphere
+	LLRenderTarget* pRenderBuffer = &mPostMap;
+	if (RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
+	{
+		LLShaderEffectParams params(pRenderBuffer, &mPostFXMap, false);
+		LLVfxManager::instance().runEffect(EVisualEffect::RlvSphere, &params);
+		pRenderBuffer = params.m_pDstBuffer;
+	}
+// [/RLVa:KB]
+
 	{
         llassert(!gCubeSnapshot);
 		bool multisample = RenderFSAASamples > 1 && mRT->fxaaBuffer.isComplete();
@@ -7559,10 +7571,10 @@ void LLPipeline::renderFinalize()
 			shader->bind();
 			shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, width, height);
 
-			channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mPostMap.getUsage());
+			channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pRenderBuffer->getUsage());
 			if (channel > -1)
 			{
-				mPostMap.bindTexture(0, channel);
+				pRenderBuffer->bindTexture(0, channel);
 			}
 
 			channel = shader->enableTexture(LLShaderMgr::DEFERRED_EMISSIVE, mGlow[1].getUsage());
@@ -7630,7 +7642,7 @@ void LLPipeline::renderFinalize()
 
 			shader->bind();
 
-			shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mPostMap);
+			shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, pRenderBuffer);
 			shader->bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
 			shader->bindTexture(LLShaderMgr::DEFERRED_EMISSIVE, &mGlow[1]);
 

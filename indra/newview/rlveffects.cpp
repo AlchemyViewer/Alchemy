@@ -298,11 +298,7 @@ ERlvCmdRet RlvSphereEffect::onValueMaxChanged(const LLUUID& idRlvObj, const boos
 
 void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 {
-#if 0
-	LLMatrix4a proj = get_current_projection();
-	proj.invert();
-	pShader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, proj.getF32ptr());
-	pShader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, gPipeline.mScreen.getWidth(), gPipeline.mScreen.getHeight());
+	pShader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, gPipeline.mRT->screen.getWidth(), gPipeline.mRT->screen.getHeight());
 	pShader->uniform1i(LLShaderMgr::RLV_EFFECT_MODE, llclamp((int)m_eMode, 0, (int)ESphereMode::Count));
 
 	// Pass the sphere origin to the shader
@@ -333,12 +329,10 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 
 	// Pass effect params
 	pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM4, 1, m_Params.get().mV);
-#endif
 }
 
 void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectParams* pParams) const
 {
-#if 0
 	if (pParams->m_pDstBuffer)
 	{
 		pParams->m_pDstBuffer->bindTarget();
@@ -357,46 +351,25 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
 	if (nDiffuseChannel > -1)
 	{
 		pParams->m_pSrcBuffer->bindTexture(0, nDiffuseChannel);
-		gGL.getTexUnit(nDiffuseChannel)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+		gGL.getTexUnit(nDiffuseChannel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
 	}
 
-	S32 nDepthChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mDeferredDepth.getUsage());
+	S32 nDepthChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mRT->deferredScreen.getUsage());
 	if (nDepthChannel > -1)
 	{
-		gGL.getTexUnit(nDepthChannel)->bind(&gPipeline.mDeferredDepth, TRUE);
+		gGL.getTexUnit(nDepthChannel)->bind(&gPipeline.mRT->deferredScreen, TRUE);
 	}
 
-	gGL.matrixMode(LLRender::MM_PROJECTION);
-	gGL.pushMatrix();
-	gGL.loadIdentity();
-	gGL.matrixMode(LLRender::MM_MODELVIEW);
-	gGL.pushMatrix();
-	gGL.loadMatrix(gGLModelView);
-
-	LLVector2 tc1(0, 0);
-	LLVector2 tc2((F32)gPipeline.mScreen.getWidth() * 2, (F32)gPipeline.mScreen.getHeight() * 2);
-	gGL.begin(LLRender::TRIANGLE_STRIP);
-	gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
-	gGL.vertex2f(-1, -1);
-	gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
-	gGL.vertex2f(-1, 3);
-	gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
-	gGL.vertex2f(3, -1);
-	gGL.end();
-
-	gGL.matrixMode(LLRender::MM_PROJECTION);
-	gGL.popMatrix();
-	gGL.matrixMode(LLRender::MM_MODELVIEW);
-	gGL.popMatrix();
+	gPipeline.mScreenTriangleVB->setBuffer();
+	gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
 	pShader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pParams->m_pSrcBuffer->getUsage());
-	pShader->disableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mDeferredDepth.getUsage());
+	pShader->disableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mRT->deferredScreen.getUsage());
 
 	if (pParams->m_pDstBuffer)
 	{
 		pParams->m_pDstBuffer->flush();
 	}
-#endif
 }
 
 void RlvSphereEffect::run(const LLVisualEffectParams* pParams)

@@ -667,6 +667,7 @@ public:
 
     // tonemapped and gamma corrected render ready for post
     LLRenderTarget          mPostMap;
+	LLRenderTarget          mPostFXMap;
 
     LLCullResult            mSky;
     LLCullResult            mReflectedObjects;

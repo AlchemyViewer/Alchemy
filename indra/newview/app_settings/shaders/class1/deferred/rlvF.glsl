@@ -22,8 +22,8 @@
 
 VARYING vec2 vary_fragcoord;
 
-uniform sampler2DRect diffuseRect;
-uniform sampler2DRect depthMap;
+uniform sampler2D diffuseRect;
+uniform sampler2D depthMap;
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
 
@@ -43,35 +43,23 @@ uniform vec2 rlvEffectParam5;   // Blur direction (not used for blend)
 #define SPHERE_PARAMS		rlvEffectParam4
 #define BLUR_DIRECTION		rlvEffectParam5.xy
 
-vec4 getPosition_d(vec2 pos_screen, float depth)
-{
-	vec2 sc = pos_screen.xy * 2.0;
-	sc /= screen_res;
-	sc -= vec2(1.0, 1.0);
-	vec4 ndc = vec4(sc.x, sc.y, 2.0 * depth - 1.0, 1.0);
-	vec4 pos = inv_proj * ndc;
-	pos /= pos.w;
-	pos.w = 1.0;
-	return pos;
-}
-
-vec3 blur13(sampler2DRect source, vec2 tc, vec2 direction)
+vec3 blur13(sampler2D source, vec2 tc, vec2 direction)
 {
   vec4 color = vec4(0.0);
   vec2 off1 = vec2(1.411764705882353) * direction;
   vec2 off2 = vec2(3.2941176470588234) * direction;
   vec2 off3 = vec2(5.176470588235294) * direction;
 
-  color += texture2DRect(source, tc) * 0.1964825501511404;
+  color += texture(source, tc) * 0.1964825501511404;
 
-  color += texture2DRect(source, tc + off1) * 0.2969069646728344;
-  color += texture2DRect(source, tc - off1) * 0.2969069646728344;
+  color += texture(source, tc + off1 / screen_res) * 0.2969069646728344;
+  color += texture(source, tc - off1 / screen_res) * 0.2969069646728344;
 
-  color += texture2DRect(source, tc + off2) * 0.09447039785044732;
-  color += texture2DRect(source, tc - off2) * 0.09447039785044732;
+  color += texture(source, tc + off2 / screen_res) * 0.09447039785044732;
+  color += texture(source, tc - off2 / screen_res) * 0.09447039785044732;
 
-  color += texture2DRect(source, tc + off3) * 0.010381362401148057;
-  color += texture2DRect(source, tc - off3) * 0.010381362401148057;
+  color += texture(source, tc + off3 / screen_res) * 0.010381362401148057;
+  color += texture(source, tc - off3 / screen_res) * 0.010381362401148057;
 
   return color.xyz;
 }
@@ -79,7 +67,7 @@ vec3 blur13(sampler2DRect source, vec2 tc, vec2 direction)
 const float pi = 3.14159265;
 
 // http://callumhay.blogspot.com/2010/09/gaussian-blur-shader-glsl.html
-vec3 blurVariable(sampler2DRect source, vec2 tc, float kernelSize, vec2 direction, float strength) {
+vec3 blurVariable(sampler2D source, vec2 tc, float kernelSize, vec2 direction, float strength) {
   float numBlurPixelsPerSide = float(kernelSize / 2);
 
   // Incremental Gaussian Coefficent Calculation (See GPU Gems 3 pp. 877 - 889)
@@ -92,14 +80,14 @@ vec3 blurVariable(sampler2DRect source, vec2 tc, float kernelSize, vec2 directio
   float coefficientSum = 0.0;
 
   // Take the central sample first...
-  avgValue += texture2DRect(source, tc) * incrementalGaussian.x;
+  avgValue += texture(source, tc) * incrementalGaussian.x;
   coefficientSum += incrementalGaussian.x;
   incrementalGaussian.xy *= incrementalGaussian.yz;
 
   // Go through the remaining 8 vertical samples (4 on each side of the center)
   for (float i = 1.0; i <= numBlurPixelsPerSide; i++) {
-	avgValue += texture2DRect(source, tc - i * direction) * incrementalGaussian.x;
-	avgValue += texture2DRect(source, tc + i * direction) * incrementalGaussian.x;
+	avgValue += texture(source, tc - i * direction / screen_res) * incrementalGaussian.x;
+	avgValue += texture(source, tc + i * direction / screen_res) * incrementalGaussian.x;
 	coefficientSum += 2.0 * incrementalGaussian.x;
 	incrementalGaussian.xy *= incrementalGaussian.yz;
   }
@@ -107,15 +95,15 @@ vec3 blurVariable(sampler2DRect source, vec2 tc, float kernelSize, vec2 directio
   return (avgValue / coefficientSum).rgb;
 }
 
-vec3 chromaticAberration(sampler2DRect source, vec2 tc, vec2 redDrift, vec2 blueDrift, float strength)
+vec3 chromaticAberration(sampler2D source, vec2 tc, vec2 redDrift, vec2 blueDrift, float strength)
 {
-	vec3 sourceColor = texture2DRect(source, tc).rgb;
+	vec3 sourceColor = texture(source, tc).rgb;
 
 	// Sample the color components
 	vec3 driftColor;
-	driftColor.r = texture2DRect(source, tc + redDrift).r;
+	driftColor.r = texture(source, tc + redDrift / screen_res).r;
 	driftColor.g = sourceColor.g;
-	driftColor.b = texture2DRect(source, tc + blueDrift).b;
+	driftColor.b = texture(source, tc + blueDrift / screen_res).b;
 
 	// Adjust the strength of the effect
 	return mix(sourceColor, driftColor, strength);
@@ -123,9 +111,8 @@ vec3 chromaticAberration(sampler2DRect source, vec2 tc, vec2 redDrift, vec2 blue
 
 void main()
 {
-	vec2 fragTC = vary_fragcoord.st;
-	float fragDepth = texture2DRect(depthMap, fragTC).x;
-	vec3 fragPosLocal = getPosition_d(fragTC, fragDepth).xyz;
+	vec2 fragTC = vary_fragcoord.xy;
+	vec3 fragPosLocal = getPositionWithDepth(fragTC, getDepth(fragTC)).xyz;
 	float distance = length(fragPosLocal.xyz - SPHERE_ORIGIN);
 
 	// Linear non-branching interpolation of the strength of the sphere effect (replaces if/elseif/else for x < min, min <= x <= max and x > max)
@@ -133,18 +120,20 @@ void main()
 	effectStrength = mix(effectStrength, mix(0, SPHERE_VALUEMIN, SPHERE_DISTEXTEND.x), distance < SPHERE_DISTMIN);
 	effectStrength = mix(effectStrength, mix(0, SPHERE_VALUEMAX, SPHERE_DISTEXTEND.y), distance > SPHERE_DISTMAX);
 
-	vec3 fragColor;
+
+
+	vec3 fragColor ;
 	switch (rlvEffectMode)
 	{
 		case 0:		// Blend
-			fragColor = texture2DRect(diffuseRect, fragTC).rgb;
+			fragColor = texture(diffuseRect, fragTC).rgb;
 			fragColor = mix(fragColor, SPHERE_PARAMS.rgb, effectStrength);
 			break;
 		case 1:		// Blur (fixed)
-			fragColor = blur13(diffuseRect, fragTC, effectStrength * BLUR_DIRECTION);
+			fragColor = blur13(diffuseRect, fragTC, BLUR_DIRECTION * vec2(effectStrength));
 			break;
 		case 2:		// Blur (variable)
-			fragColor = texture2DRect(diffuseRect, fragTC).rgb;
+			fragColor = texture(diffuseRect, fragTC).rgb;
 			fragColor = mix(fragColor, blurVariable(diffuseRect, fragTC, SPHERE_PARAMS.x, BLUR_DIRECTION, effectStrength), int(effectStrength > 0));
 			break;
 		case 3:		// ChromaticAberration
@@ -152,10 +141,14 @@ void main()
 			break;
 		case 4:		// Pixelate
 			{
-				effectStrength = sign(effectStrength);
-				float pixelWidth = max(1, round(SPHERE_PARAMS.x * effectStrength)); float pixelHeight = max(1, round(SPHERE_PARAMS.y * effectStrength));
-				fragTC = vec2(pixelWidth * floor(fragTC.x / pixelWidth), pixelHeight * floor(fragTC.y / pixelHeight));
-				fragColor = texture2DRect(diffuseRect, fragTC).rgb;
+				if (effectStrength > 0)
+				{
+					effectStrength = sign(effectStrength);
+					vec2 pixelSize = vec2(1.0) / round(SPHERE_PARAMS.xy * vec2(effectStrength)); 
+					fragTC = (floor(fragTC / pixelSize) * pixelSize) + 0.5 / screen_res;
+				}
+
+				fragColor = texture(diffuseRect, fragTC).rgb;
 			}
 			break;
 	}

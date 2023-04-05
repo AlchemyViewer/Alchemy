@@ -300,9 +300,6 @@ LLViewerShaderMgr::LLViewerShaderMgr() :
     mShaderList.push_back(&gDeferredPBRAlphaProgram);
     mShaderList.push_back(&gHUDPBRAlphaProgram);
     mShaderList.push_back(&gDeferredSkinnedPBRAlphaProgram);
-// [RLVa:KB] - @setsphere
-	mShaderList.push_back(&gRlvSphereProgram);
-// [/RLVa:KB]
 }
 
 LLViewerShaderMgr::~LLViewerShaderMgr()
@@ -588,6 +585,8 @@ void LLViewerShaderMgr::unloadShaders()
 		gDeferredPostTonemapProgram[i].unload();
 		gDeferredPostColorGradeLUTProgram[i].unload();
 	}
+
+	gRlvSphereProgram.unload();
 
 	mShaderLevel[SHADER_LIGHTING] = 0;
 	mShaderLevel[SHADER_OBJECT] = 0;
@@ -1055,6 +1054,8 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			gDeferredPostTonemapProgram[i].unload();
 			gDeferredPostColorGradeLUTProgram[i].unload();
 		}
+
+		gRlvSphereProgram.unload();
 
         gHUDPBROpaqueProgram.unload();
         gPBRGlowProgram.unload();
@@ -2929,6 +2930,22 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			success = gDeferredPostColorGradeLUTProgram[i].createShader(NULL, NULL);
 		}
 	}
+
+// [RLVa:KB] - @setsphere
+	if (success)
+	{
+		gRlvSphereProgram.mName = "RLVa Sphere Post Processing Shader";
+		gRlvSphereProgram.mFeatures.isDeferred = true;
+		gRlvSphereProgram.mShaderFiles.clear();
+		gRlvSphereProgram.mShaderFiles.push_back(make_pair("deferred/rlvV.glsl", GL_VERTEX_SHADER_ARB));
+ 		if (gGLManager.mGLVersion >= 4.5f)
+			gRlvSphereProgram.mShaderFiles.push_back(make_pair("deferred/rlvF.glsl", GL_FRAGMENT_SHADER_ARB));
+		else
+			gRlvSphereProgram.mShaderFiles.push_back(make_pair("deferred/rlvFLegacy.glsl", GL_FRAGMENT_SHADER_ARB));
+		gRlvSphereProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		success = gRlvSphereProgram.createShader(NULL, NULL);
+	}
+// [/RLV:KB]
 
 	return success;
 }
