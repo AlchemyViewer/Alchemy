@@ -4224,7 +4224,7 @@ U32 LLAppViewer::getTextureCacheVersion()
 	// 2021-03-10 Bumping up by one to help obviate texture cache issues with
 	//            Simple Cache Viewer - see SL-14985 for more information
 	//const U32 TEXTURE_CACHE_VERSION = 8;
-	const U32 TEXTURE_CACHE_VERSION = 10;
+	const U32 TEXTURE_CACHE_VERSION = 11;
 
 	return TEXTURE_CACHE_VERSION ;
 }
@@ -4243,7 +4243,7 @@ U32 LLAppViewer::getObjectCacheVersion()
 {
 	// Viewer object cache version, change if object update
 	// format changes. JC
-	const U32 INDRA_OBJECT_CACHE_VERSION = 16;
+	const U32 INDRA_OBJECT_CACHE_VERSION = 17;
 
 	return INDRA_OBJECT_CACHE_VERSION;
 }
