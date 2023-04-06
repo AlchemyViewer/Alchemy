@@ -1957,14 +1957,18 @@ void LLPipeline::removeMutedAVsLights(LLVOAvatar* muted_avatar)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 	for (light_set_t::iterator iter = gPipeline.mNearbyLights.begin();
-		 iter != gPipeline.mNearbyLights.end(); iter++)
+		 iter != gPipeline.mNearbyLights.end();)
 	{
         const LLViewerObject *vobj = iter->drawable->getVObj();
         if (vobj && vobj->getAvatar()
             && vobj->isAttachment() && vobj->getAvatar() == muted_avatar)
 		{
 			gPipeline.mLights.erase(iter->drawable);
-			gPipeline.mNearbyLights.erase(iter);
+			iter = gPipeline.mNearbyLights.erase(iter);
+		}
+		else
+		{
+			++iter;
 		}
 	}
 }
