@@ -513,39 +513,16 @@ bool ALRenderUtil::setupColorGrade()
 	return true;
 }
 
-void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* bloom, LLRenderTarget* exposure)
+void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure)
 {
 	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
-
-	dst->bindTarget();
 
 	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorGradeLUTProgram[mTonemapType] : &gDeferredPostTonemapProgram[mTonemapType];
 
 	tone_shader->bind();
 
-	S32 channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
-	if (channel > -1)
-	{
-		src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
-	}
-
-	if (bloom)
-	{
-		channel = tone_shader->enableTexture(LLShaderMgr::DEFERRED_EMISSIVE, bloom->getUsage());
-		if (channel > -1)
-		{
-			bloom->bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
-		}
-	}
-
-	if (exposure)
-	{
-		channel = tone_shader->enableTexture(LLShaderMgr::EXPOSURE_MAP, exposure->getUsage());
-		if (channel > -1)
-		{
-			exposure->bindTexture(0, channel);
-		}
-	}
+	tone_shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
+	tone_shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, exposure, false, LLTexUnit::TFO_BILINEAR);
 
 	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
 	tone_shader->uniform1f(al_exposure, mTonemapExposure);
@@ -575,9 +552,10 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 	}
 	}
 
+	S32 channel = -1;
 	if (mCGLut != 0)
 	{
-		S32 channel = tone_shader->enableTexture(LLShaderMgr::COLORGRADE_LUT, LLTexUnit::TT_TEXTURE_3D);
+		channel = tone_shader->enableTexture(LLShaderMgr::COLORGRADE_LUT, LLTexUnit::TT_TEXTURE_3D);
 		if (channel > -1)
 		{
 			gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
@@ -592,8 +570,14 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRen
 	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
 	stop_glerror();
 
+	if (channel > -1)
+	{
+		gGL.getTexUnit(channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
+	}
+
+	tone_shader->unbindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
+	tone_shader->unbindTexture(LLShaderMgr::EXPOSURE_MAP, exposure->getUsage());
 	tone_shader->unbind();
-	dst->flush();
 }
 
 bool ALRenderUtil::setupSharpen()
@@ -641,7 +625,7 @@ bool ALRenderUtil::setupSharpen()
 	return true;
 }
 
-void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
+void ALRenderUtil::renderSharpen(LLRenderTarget* src)
 {
 	if (mSharpenMethod == ALSharpen::SHARPEN_NONE)
 	{
@@ -665,28 +649,14 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
 	// Bind setup:
-	if (dst)
-	{
-		dst->bindTarget();
-	}
-
 	sharpen_shader->bind();
 
-	S32 channel = sharpen_shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
-	if (channel > -1)
-	{
-		src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
-	}
+	sharpen_shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
 
 	// Draw
 	mRenderBuffer->setBuffer();
 	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-	if (dst)
-	{
-		dst->flush();
-	}
-
+	sharpen_shader->unbindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
 	sharpen_shader->unbind();
-	gGL.getTexUnit(0)->disable();
 }

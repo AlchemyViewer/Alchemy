@@ -49,9 +49,6 @@ uniform vec3 sharpen_params;
 #define kDenoiseMin (0.001)
 #define kDenoiseMax (-0.1)
 
-vec3 linear_to_srgb(vec3 cl);
-vec3 srgb_to_linear(vec3 cl);
-
 float GetLuma(vec4 p)
 {
     return 0.212655 * p.r + 0.715158 * p.g + 0.072187 * p.b;

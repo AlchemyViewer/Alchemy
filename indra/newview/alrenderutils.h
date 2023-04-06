@@ -62,7 +62,7 @@ public:
 	};
 	bool setupTonemap();
 	bool setupColorGrade();
-	void renderTonemap(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* bloom, LLRenderTarget* exposure);
+	void renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure);
 
 	enum ALSharpen : uint32_t
 	{
@@ -73,7 +73,7 @@ public:
 	};
 
 	bool setupSharpen();
-	void renderSharpen(LLRenderTarget* src, LLRenderTarget* dst);
+	void renderSharpen(LLRenderTarget* src);
 	// End Deferred Only
 
 	U32 getSharpenMethod() { return mSharpenMethod; };

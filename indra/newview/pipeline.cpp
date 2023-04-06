@@ -7310,6 +7310,8 @@ void LLPipeline::renderFinalize()
     gGL.setColorMask(true, true);
     glClearColor(0, 0, 0, 0);
 
+	LLRenderTarget* bound_target = &mPostMap;
+	LLRenderTarget* post_target = &mPostFXMap;
     if (!gCubeSnapshot)
 	{
         LLRenderTarget* screen_target = screenTarget();
@@ -7429,17 +7431,15 @@ void LLPipeline::renderFinalize()
             mExposureMap.flush();
         }
 
-#if 1
-		mALRenderUtil->renderTonemap(screenTarget(), &mPostMap, &mGlow[1], &mExposureMap);
-
-		mALRenderUtil->renderSharpen(&mPostMap, &mPostMap);
-#else
-        mPostMap.bindTarget();
+        bound_target->bindTarget();
 
         // gamma correct lighting
         {
-            LL_PROFILE_GPU_ZONE("gamma correct");
 
+            LL_PROFILE_GPU_ZONE("gamma correct");
+#if 1
+			mALRenderUtil->renderTonemap(screenTarget(), &mExposureMap);
+#else
             LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
             // Apply gamma correction to the frame here.
@@ -7466,10 +7466,20 @@ void LLPipeline::renderFinalize()
 
             gGL.getTexUnit(channel)->unbind(screenTarget()->getUsage());
             gDeferredPostGammaCorrectProgram.unbind();
-        }
-
-        mPostMap.flush();
 #endif
+		}
+
+        bound_target->flush();
+
+		std::swap(bound_target, post_target);
+
+		if(mALRenderUtil->getSharpenMethod() != ALRenderUtil::SHARPEN_NONE)
+		{
+			bound_target->bindTarget();
+			mALRenderUtil->renderSharpen(post_target);
+			bound_target->flush();
+			std::swap(bound_target, post_target);
+		}
 
         LLVertexBuffer::unbind();
     }
@@ -7500,7 +7510,7 @@ void LLPipeline::renderFinalize()
 
 			gGL.setSceneBlendType(LLRender::BT_ADD_WITH_ALPHA);
 
-			gGlowExtractProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mPostMap);
+			gGlowExtractProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, post_target);
 
 			gGL.color4f(1, 1, 1, 1);
 			gPipeline.enableLightsFullbright();
@@ -7570,19 +7580,17 @@ void LLPipeline::renderFinalize()
 	}
 
 // [RLVa:KB] - @setsphere
-	LLRenderTarget* pRenderBuffer = &mPostMap;
 	if (RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
 	{
-		LLShaderEffectParams params(pRenderBuffer, &mPostFXMap, false);
+		LLShaderEffectParams params(post_target, bound_target, false);
 		LLVfxManager::instance().runEffect(EVisualEffect::RlvSphere, &params);
-		pRenderBuffer = params.m_pDstBuffer;
+		std::swap(bound_target, post_target);
 	}
 // [/RLVa:KB]
 
 	{
         llassert(!gCubeSnapshot);
 		bool multisample = RenderFSAASamples > 1 && mRT->fxaaBuffer.isComplete();
-		LLGLSLShader* shader = &gGlowCombineProgram;
 
 		S32 width = screenTarget()->getWidth();
 		S32 height = screenTarget()->getHeight();
@@ -7616,15 +7624,15 @@ void LLPipeline::renderFinalize()
 
 			glViewport(0, 0, width, height);
 
-			shader = &gGlowCombineFXAAProgram;
+			LLGLSLShader* shader = &gGlowCombineFXAAProgram;
 
 			shader->bind();
 			shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, width, height);
 
-			channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pRenderBuffer->getUsage());
+			channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, post_target->getUsage());
 			if (channel > -1)
 			{
-				pRenderBuffer->bindTexture(0, channel);
+				post_target->bindTexture(0, channel);
 			}
 
 			channel = shader->enableTexture(LLShaderMgr::DEFERRED_EMISSIVE, mGlow[1].getUsage());
@@ -7641,7 +7649,7 @@ void LLPipeline::renderFinalize()
 
 			gGL.flush();
 
-			shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, mPostMap.getUsage());
+			shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, post_target->getUsage());
 			shader->unbind();
 
 			mRT->fxaaBuffer.flush();
@@ -7690,11 +7698,11 @@ void LLPipeline::renderFinalize()
 
             LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);
 
-			shader->bind();
+			gGlowCombineProgram.bind();
 
-			shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, pRenderBuffer);
-			shader->bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
-			shader->bindTexture(LLShaderMgr::DEFERRED_EMISSIVE, &mGlow[1]);
+			gGlowCombineProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, post_target);
+			gGlowCombineProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+			gGlowCombineProgram.bindTexture(LLShaderMgr::DEFERRED_EMISSIVE, &mGlow[1]);
 
 			gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
 			gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
@@ -7706,7 +7714,7 @@ void LLPipeline::renderFinalize()
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
 			gGL.flush();
-			shader->unbind();
+			gGlowCombineProgram.unbind();
 		}
 	}
 
