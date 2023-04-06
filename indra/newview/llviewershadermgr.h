@@ -241,6 +241,7 @@ extern LLGLSLShader			gFXAAProgram[4];
 extern LLGLSLShader			gDeferredPostNoDoFProgram;
 extern LLGLSLShader			gDeferredPostGammaCorrectProgram;
 extern LLGLSLShader			gExposureProgram;
+extern LLGLSLShader			gLuminanceProgram;
 extern LLGLSLShader			gDeferredAvatarShadowProgram;
 extern LLGLSLShader			gDeferredAvatarAlphaShadowProgram;
 extern LLGLSLShader			gDeferredAvatarAlphaMaskShadowProgram;

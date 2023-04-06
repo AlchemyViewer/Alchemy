@@ -174,10 +174,7 @@ void main()
         }
     }
 
-    //not sure why, but this line prevents MATBUG-194
-    final_color = max(final_color, vec3(0.0));
-
-    frag_color.rgb = final_color;
+    frag_color.rgb = max(final_color, vec3(0));
     frag_color.a   = 0.0;
 #endif // LOCAL_LIGHT_KILL
 

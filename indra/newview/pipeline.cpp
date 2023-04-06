@@ -849,7 +849,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 	if (shadow_detail > 0 || ssao || RenderDepthOfField || samples > 0 || RlvActions::hasPostProcess())
 // [/RLVa:KB]
 	{ //only need mRT->deferredLight for shadows OR ssao OR dof OR fxaa
-		if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
+		if (!mRT->deferredLight.allocate(resX, resY, GL_RGBA16F)) return false;
 	}
 	else
 	{
@@ -1148,6 +1148,7 @@ void LLPipeline::releaseLUTBuffers()
     mPbrBrdfLut.release();
 
     mExposureMap.release();
+    mLuminanceMap.release();
     mLastExposure.release();
 
 }
@@ -1398,6 +1399,8 @@ void LLPipeline::createLUTBuffers()
     mExposureMap.bindTarget();
     mExposureMap.clear();
     mExposureMap.flush();
+
+    mLuminanceMap.allocate(256, 256, GL_R16F);
 
     mLastExposure.allocate(1, 1, GL_R16F);
 }
@@ -5734,6 +5737,14 @@ void LLPipeline::setupHWLights()
         return;
     }
 
+    F32 light_scale = 1.f;
+
+    if (gCubeSnapshot)
+    { //darken local lights when probe ambiance is above 1
+        light_scale = mReflectionMapManager.mLightScale;
+    }
+
+
     LLEnvironment& environment = LLEnvironment::instance();
 	const LLSettingsSky::ptr_t& psky = environment.getCurrentSky();
 
@@ -5833,7 +5844,7 @@ void LLPipeline::setupHWLights()
 			}
 			
             //send linear light color to shader
-			LLColor4  light_color = light->getLightLinearColor();
+            LLColor4  light_color = light->getLightLinearColor() * light_scale;
 			light_color.mV[3] = 0.0f;
 
 			F32 fade = iter->fade;
@@ -7324,6 +7335,43 @@ void LLPipeline::renderFinalize()
             dst.flush();
         }
 
+        // luminance sample and mipmap generation
+        {
+            LL_PROFILE_GPU_ZONE("luminance sample");
+
+            mLuminanceMap.bindTarget();
+
+            LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+
+            gLuminanceProgram.bind();
+
+
+            S32 channel = 0;
+            channel = gLuminanceProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
+            if (channel > -1)
+            {
+                screenTarget()->bindTexture(0, channel, LLTexUnit::TFO_POINT);
+            }
+
+            channel = gLuminanceProgram.enableTexture(LLShaderMgr::DEFERRED_EMISSIVE);
+            if (channel > -1)
+            {
+                mGlow[1].bindTexture(0, channel);
+            }
+
+
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            mLuminanceMap.flush();
+
+            mLuminanceMap.bindTexture(0, 0, LLTexUnit::TFO_TRILINEAR);
+            glGenerateMipmap(GL_TEXTURE_2D);
+
+            // note -- unbind AFTER the glGenerateMipMap so time in generatemipmap can be profiled under "Luminance"
+            // also note -- keep an eye on the performance of glGenerateMipmap, might need to replace it with a mip generation shader
+            gLuminanceProgram.unbind();
+        }
+
         // exposure sample
         {
             LL_PROFILE_GPU_ZONE("exposure sample");
@@ -7340,24 +7388,16 @@ void LLPipeline::renderFinalize()
                 mLastExposure.flush();
             }
 
-
             mExposureMap.bindTarget();
 
             LLGLDepthTest depth(GL_FALSE, GL_FALSE);
             
             gExposureProgram.bind();
 
-            S32 channel = 0;
-            channel = gExposureProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
+            S32 channel = gExposureProgram.enableTexture(LLShaderMgr::DEFERRED_EMISSIVE);
             if (channel > -1)
             {
-                screenTarget()->bindTexture(0, channel, LLTexUnit::TFO_POINT);
-            }
-
-            channel = gExposureProgram.enableTexture(LLShaderMgr::DEFERRED_EMISSIVE);
-            if (channel > -1)
-            {
-                mGlow[1].bindTexture(0, channel);
+                mLuminanceMap.bindTexture(0, channel, LLTexUnit::TFO_TRILINEAR);
             }
 
             channel = gExposureProgram.enableTexture(LLShaderMgr::EXPOSURE_MAP);
@@ -7366,11 +7406,17 @@ void LLPipeline::renderFinalize()
                 mLastExposure.bindTexture(0, channel);
             }
 
+            static LLCachedControl<F32> dynamic_exposure_coefficient(gSavedSettings, "RenderDynamicExposureCoefficient", 0.175f);
+            static LLCachedControl<F32> dynamic_exposure_min(gSavedSettings, "RenderDynamicExposureMin", 0.125f);
+            static LLCachedControl<F32> dynamic_exposure_max(gSavedSettings, "RenderDynamicExposureMax", 1.3f);
+
             static LLStaticHashedString dt("dt");
             static LLStaticHashedString noiseVec("noiseVec");
+            static LLStaticHashedString dynamic_exposure_params("dynamic_exposure_params");
             gExposureProgram.uniform1f(dt, gFrameIntervalSeconds);
             gExposureProgram.uniform2f(noiseVec, ll_frand() * 2.0 - 1.0, ll_frand() * 2.0 - 1.0);
-           
+            gExposureProgram.uniform3f(dynamic_exposure_params, dynamic_exposure_coefficient, dynamic_exposure_min, dynamic_exposure_max);
+
             mScreenTriangleVB->setBuffer();
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
@@ -7938,6 +7984,13 @@ void LLPipeline::renderDeferredLighting()
 
     llassert(!sRenderingHUDs);
 
+    F32 light_scale = 1.f;
+
+    if (gCubeSnapshot)
+    { //darken local lights when probe ambiance is above 1
+        light_scale = mReflectionMapManager.mLightScale;
+    }
+
     LLRenderTarget *screen_target         = &mRT->screen;
     LLRenderTarget* deferred_light_target = &mRT->deferredLight;
 
@@ -8072,9 +8125,13 @@ void LLPipeline::renderDeferredLighting()
             LL_PROFILE_GPU_ZONE("atmospherics");
             bindDeferredShader(soften_shader);
 
+            static LLCachedControl<F32> sky_scale(gSavedSettings, "RenderSkyHDRScale", 1.f);
+            static LLStaticHashedString sky_hdr_scale("sky_hdr_scale");
+
             LLEnvironment &environment = LLEnvironment::instance();
             soften_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
             soften_shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
+            soften_shader.uniform1f(sky_hdr_scale, sky_scale);
 
             soften_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
 
@@ -8151,7 +8208,7 @@ void LLPipeline::renderDeferredLighting()
                     F32        s = volume->getLightRadius() * 1.5f;
 
                     // send light color to shader in linear space
-                    LLColor3 col = volume->getLightLinearColor();
+                    LLColor3 col = volume->getLightLinearColor() * light_scale;
 
                     if (col.magVecSquared() < 0.001f)
                     {
@@ -8246,7 +8303,7 @@ void LLPipeline::renderDeferredLighting()
                     setupSpotLight(gDeferredSpotLightProgram, drawablep);
 
                     // send light color to shader in linear space
-                    LLColor3 col = volume->getLightLinearColor();
+                    LLColor3 col = volume->getLightLinearColor() * light_scale;
 
                     gDeferredSpotLightProgram.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, c);
                     gDeferredSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_SIZE, s);
@@ -8321,7 +8378,7 @@ void LLPipeline::renderDeferredLighting()
                     setupSpotLight(gDeferredMultiSpotLightProgram, drawablep);
 
                     // send light color to shader in linear space
-                    LLColor3 col = volume->getLightLinearColor();
+                    LLColor3 col = volume->getLightLinearColor() * light_scale;
 
                     gDeferredMultiSpotLightProgram.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, center.getF32ptr());
                     gDeferredMultiSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_SIZE, light_size_final);
