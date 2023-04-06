@@ -60,6 +60,7 @@
         options.dsn = @SENTRY_DSN;
         options.debug = NO;
         options.releaseName = @LL_VIEWER_CHANNEL_AND_VERSION;
+        options.enableAppHangTracking = NO;
     }];
 #endif
     
