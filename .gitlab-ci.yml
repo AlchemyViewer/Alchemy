@@ -77,19 +77,13 @@ variables:
   script:
     - autobuild configure -c Release -- -DUSE_LTO="${ENABLE_LTO}" -DHAVOK_TPV="${USE_HAVOK}" -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DENABLE_DELTA_GEN=ON
     - autobuild build -c Release --no-configure
-    - autobuild graph -c Release --graph-file "alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg" build-vc-64/autobuild-package.xml
-    - $AlchemyPdbPath = Resolve-Path build-vc-*/newview/Release/Alchemy*.pdb
-    - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli difutil bundle-sources $AlchemyPdbPath }
+    - autobuild graph -c Release --graph-file "alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg" "build-vc-${AUTOBUILD_ADDRSIZE}/autobuild-package.xml"
+    - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli debug-files upload --include-sources (Get-Item .\build-vc-${AUTOBUILD_ADDRSIZE}\newview\Release\Alchemy*.*).FullName (Get-Item .\build-vc-64\newview\Release\*.dll).FullName }
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
-      - build-vc-*/packages/lib/release/*.pdb
       - build-vc-*/newview/Release/build_data.json
-      - build-vc-*/newview/Release/Alchemy*.exe
-      - build-vc-*/newview/Release/Alchemy*.pdb
-      - build-vc-*/newview/Release/Alchemy*.src.zip
-      - build-vc-*/newview/Release/*.dll
       - build-vc-*/newview/Deploy/*
       - alchemy-*-dependencies.svg
 
@@ -118,23 +112,13 @@ variables:
     - autobuild configure -c Release -- -DENABLE_SIGNING=ON -DUSE_LTO=${ENABLE_LTO} -DHAVOK_TPV=${USE_HAVOK} -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg build-darwin-64/autobuild-package.xml
-    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli difutil bundle-sources build-darwin-*/newview/Release/*.app.dSYM/Contents/Resources/DWARF/*; fi
+    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli debug-files upload --include-sources build-darwin-*/newview/Release/*.app.dSYM build-darwin-*/newview/Release/*.app/Contents/MacOS/ build-darwin-*/newview/Release/*.app/Contents/Frameworks/ build-darwin-*/packages/lib/release/*.dSYM; fi
   artifacts:
     name: "$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
       - build-darwin-*/build_data.json
-      - build-darwin-*/packages/lib/release/discord_game_sdk.dylib
-      - build-darwin-*/packages/lib/release/libalut*.dylib
-      - build-darwin-*/packages/lib/release/libfmod*.dylib
-      - build-darwin-*/packages/lib/release/libndofdev*.dylib
-      - build-darwin-*/packages/lib/release/libopenal*.dylib
-      - build-darwin-*/packages/lib/release/Sentry.framework
-      - build-darwin-*/packages/lib/release/*.dSYM
       - build-darwin-*/newview/Alchemy_*.dmg
-      - build-darwin-*/newview/Release/*.app/Contents/MacOS/*
-      - build-darwin-*/newview/Release/*.dSYM
-      - build-darwin-*/newview/Release/*.src.zip
       - alchemy-*-dependencies.svg
 
 .linux_build:
@@ -160,22 +144,13 @@ variables:
     - autobuild configure -c Release -- -DUSE_LTO=OFF -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DCOMPRESS_DEBUG=ON
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg build-linux-${AUTOBUILD_ADDRSIZE}/autobuild-package.xml
-    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli difutil bundle-sources build-linux-*/newview/alchemy-bin; fi
+    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli debug-files upload --include-sources ./build-linux-*/newview/alchemy-bin ./build-linux-*/newview/packaged/lib/*.so; fi
   artifacts:
     name: "$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
       - build-linux-*/build_data.json
-      - build-linux-*/packages/lib/release/libalut.so*
-      - build-linux-*/packages/lib/release/libdiscord_game_sdk.so*
-      - build-linux-*/packages/lib/release/libfmod*.so*
-      - build-linux-*/packages/lib/release/libjpeg.so*
-      - build-linux-*/packages/lib/release/libopenal.so*
-      - build-linux-*/packages/lib/release/libopenjp2.so*
-      - build-linux-*/packages/lib/release/libSDL2*.so*
       - build-linux-*/newview/Alchemy_*.tar.*
-      - build-linux-*/newview/alchemy-bin
-      - build-linux-*/newview/alchemy-bin.src.zip
       - alchemy-*-dependencies.svg
 
 coverity_scan:
@@ -262,6 +237,7 @@ coverity_scan:
     #  when: delayed
     #  start_in: '12 hours'
   variables:
+    USE_SENTRY: "FALSE"
     VIEWER_CHANNEL_TYPE: Test
     VIEWER_USE_CRASHPAD: "FALSE"
 
@@ -407,7 +383,6 @@ build:release:windows64:
     -     $LnxUploadResult = Invoke-WebRequest @UploadParams -InFile ./$LnxFileName -Uri "${LnxPackageUrl}${DestStatus}" -MaximumRetryCount 5 -RetryIntervalSec 30 | ConvertFrom-Json
     -     If ($LnxFileHash -ne $LnxUploadResult.file_sha256) { Write-Output "Upload hash mismatch. expected $Hash actual $($LnxUploadResult.file_sha256)" && Exit 1 }
     -   Pop-Location
-    -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/alchemy-bin newview/alchemy-bin.src.zip packages/ }
     - Pop-Location
 
     - Push-Location ./build-darwin-64/
@@ -418,7 +393,6 @@ build:release:windows64:
     -     $MacUploadResult = Invoke-WebRequest @UploadParams -InFile ./$MacFileName -Uri "${MacPackageUrl}${DestStatus}" -MaximumRetryCount 5 -RetryIntervalSec 30 | ConvertFrom-Json
     -     If ($MacFileHash -ne $MacUploadResult.file_sha256)  { Write-Output "Upload hash mismatch. expected $Hash actual $($MacUploadResult.file_sha256)" && Exit 1 }
     -   Pop-Location
-    -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/Release/ packages/ }
     - Pop-Location
 
     - Push-Location ./build-vc-64/
@@ -438,10 +412,8 @@ build:release:windows64:
     -     if (Test-Path -Path ./RELEASES) { Invoke-WebRequest @UploadParams -InFile ./$ReleaseFile -Uri "${WinUpdateDeployURL}/${ReleaseFile}" -MaximumRetryCount 5 -RetryIntervalSec 30 }
 
     -   Pop-Location
-    -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/Release/ packages/ }
     - Pop-Location
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases finalize $BuildChannelVersion }
-    - Write-Output "Deploy Success!"
     - Write-Output "Package Listing > https://git.alchemyviewer.org/alchemy/alchemy-next/-/packages/$($WinUploadResult.package_id)"
     - Write-Output "Windows Package > ${WinPackageUrl}"
     - Write-Output "macOS Package   > ${MacPackageUrl}"
