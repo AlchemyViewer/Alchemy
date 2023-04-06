@@ -4957,7 +4957,7 @@ void LLWindowWin32::LLWindowWin32Thread::updateVRAMUsage()
         { // current usage is sometimes unreliable on Intel GPUs, fall back to estimated usage
             cu_mb = llmax((U32)1, eu_mb);
         }
-        F32 eu_error = (F32)((S32)eu_mb - (S32)cu_mb) / (F32)cu_mb;
+        //F32 eu_error = (F32)((S32)eu_mb - (S32)cu_mb) / (F32)cu_mb;
 
         U32 target_mb = budget_mb;
 
