@@ -71,7 +71,7 @@ void main()
     vec4 diffuse = texture2D(diffuseRect, tc);
     vec3 specCol = spec.rgb;
 
-    frag_color = texture(diffuseMap, tc);
+    vec4 fcol = texture(diffuseMap, tc);
 
     if (GET_GBUFFER_FLAG(GBUFFER_FLAG_HAS_PBR)) 
     {
@@ -92,5 +92,6 @@ void main()
 
     collectedColor.rgb *= specCol.rgb;
 
-    frag_color += collectedColor * w;
+    fcol += collectedColor * w;
+    frag_color = max(fcol, vec4(0));
 }

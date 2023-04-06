@@ -304,6 +304,6 @@ void main()
     color.rgb = linear_to_srgb(color.rgb);
 #endif
 
-    frag_color = color;
+    frag_color = max(color, vec4(0));
 }
 

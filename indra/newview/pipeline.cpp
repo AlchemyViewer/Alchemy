@@ -4038,7 +4038,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
         }
     }
 
-    bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion;
+    bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion && !LLGLSLShader::sProfileEnabled;
 
     setupHWLights();
 
