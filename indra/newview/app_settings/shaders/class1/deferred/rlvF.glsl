@@ -14,6 +14,8 @@
  *
  */
 
+/*[EXTRA_CODE_HERE]*/
+
 #ifdef DEFINE_GL_FRAGCOLOR
 	out vec4 frag_color;
 #else
@@ -42,6 +44,9 @@ uniform vec2 rlvEffectParam5;   // Blur direction (not used for blend)
 #define SPHERE_VALUEMAX		rlvEffectParam2.z
 #define SPHERE_PARAMS		rlvEffectParam4
 #define BLUR_DIRECTION		rlvEffectParam5.xy
+
+vec4 getPositionWithDepth(vec2 pos_screen, float depth);
+float getDepth(vec2 pos_screen);
 
 vec3 blur13(sampler2D source, vec2 tc, vec2 direction)
 {
@@ -120,8 +125,6 @@ void main()
 	effectStrength = mix(effectStrength, mix(0, SPHERE_VALUEMIN, SPHERE_DISTEXTEND.x), distance < SPHERE_DISTMIN);
 	effectStrength = mix(effectStrength, mix(0, SPHERE_VALUEMAX, SPHERE_DISTEXTEND.y), distance > SPHERE_DISTMAX);
 
-
-
 	vec3 fragColor ;
 	switch (rlvEffectMode)
 	{
@@ -141,13 +144,10 @@ void main()
 			break;
 		case 4:		// Pixelate
 			{
-				if (effectStrength > 0)
-				{
-					effectStrength = sign(effectStrength);
-					vec2 pixelSize = vec2(1.0) / round(SPHERE_PARAMS.xy * vec2(effectStrength)); 
-					fragTC = (floor(fragTC / pixelSize) * pixelSize) + 0.5 / screen_res;
-				}
-
+				effectStrength = sign(effectStrength);
+				float pixelWidth = max(1, round(SPHERE_PARAMS.x * effectStrength)) / screen_res.x; 
+				float pixelHeight = max(1, round(SPHERE_PARAMS.y * effectStrength)) / screen_res.y;
+				fragTC = vec2(pixelWidth * floor(fragTC.x / pixelWidth), pixelHeight * floor(fragTC.y / pixelHeight));
 				fragColor = texture(diffuseRect, fragTC).rgb;
 			}
 			break;
