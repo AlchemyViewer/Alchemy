@@ -4972,13 +4972,13 @@ void LLWindowWin32::LLWindowWin32Thread::updateVRAMUsage()
 
         mAvailableVRAM = cu_mb < target_mb ? target_mb - cu_mb : 0;
 
-        LL_INFOS("Window") << "\nLocal\nAFR: " << info.AvailableForReservation / 1024 / 1024
-            << "\nBudget: " << info.Budget / 1024 / 1024
-            << "\nCR: " << info.CurrentReservation / 1024 / 1024
-            << "\nCU: " << info.CurrentUsage / 1024 / 1024
-            << "\nEU: " << eu_mb << llformat(" (%.2f)", eu_error)
-            << "\nTU: " << target_mb
-            << "\nAM: " << mAvailableVRAM << LL_ENDL;
+        //LL_INFOS("Window") << "\nLocal\nAFR: " << info.AvailableForReservation / 1024 / 1024
+        //    << "\nBudget: " << info.Budget / 1024 / 1024
+        //    << "\nCR: " << info.CurrentReservation / 1024 / 1024
+        //    << "\nCU: " << info.CurrentUsage / 1024 / 1024
+        //    << "\nEU: " << eu_mb << llformat(" (%.2f)", eu_error)
+        //    << "\nTU: " << target_mb
+        //    << "\nAM: " << mAvailableVRAM << LL_ENDL;
 
         /*mDXGIAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &info);
         LL_INFOS("Window") << "\nNon-Local\nAFR: " << info.AvailableForReservation / 1024 / 1024
