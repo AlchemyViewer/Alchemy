@@ -1368,11 +1368,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>9069e994d5a7fa050872abef8afbc6587f09e02bf5a108a6090c5f15fcdf522004b85e29b30ae08ea83fdd43b805f37bb8b719bee7587a940109fa520dd33301</string>
+              <string>696d74ee37482abd7ee62ab68eb851c60d46f4055e7b003a9ac811a56c2917fa5259bb370cda8e6bf43645d5466c0b1d6ffe32aafac3c2f9f566b941db6924a9</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.577418/llphysicsextensions_tpv-1.0.577418-darwin64-577418.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.579391/llphysicsextensions_tpv-1.0.579391-darwin64-579391.tar.bz2</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1400,18 +1400,18 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>3471aae4c25f6376589b1688165f7568a6735abc928dda2ee8767b5a9e1d0b537eb4f5e67c6c1f3e619b6cafb1a9c295002ad7e10431f424a0bf853bbc67e6a5</string>
+              <string>2ba67fd9f731c062d48ef1c0ef6440eda1d48829f553412f52379291fac9bfedd3d16c9dfc880e7e10110e6ff62d27d0773424d4451f33c5d456ecd591d0d2be</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.577418/llphysicsextensions_tpv-1.0.577418-windows64-577418.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.579391/llphysicsextensions_tpv-1.0.579391-windows64-579391.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.0.577418</string>
+        <string>1.0.579391</string>
       </map>
       <key>mikktspace</key>
       <map>
