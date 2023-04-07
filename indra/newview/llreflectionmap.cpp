@@ -169,7 +169,6 @@ void LLReflectionMap::autoAdjustOrigin()
 
 bool LLReflectionMap::intersects(LLReflectionMap* other)
 {
-    // TODO: incorporate getBox
     LLVector4a delta;
     delta.setSub(other->mOrigin, mOrigin);
 
@@ -236,14 +235,18 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
 				mRadius = s.magVec();
 				if (vobjp->mDrawable != nullptr)
 				{
+                    // object to agent space (no scale)
                     LLMatrix4a scale;
                     scale.setIdentity();
                     scale.applyScale_affine(s);
                     scale.transpose();
 
+                    // construct object to camera space (with scale)
                     LLMatrix4a mv = gGLModelView;
 					mv.mul(vobjp->mDrawable->getWorldMatrix());
 					mv.mul(scale);
+
+                    // inverse is camera space to object unit cube 
 					mv.invert();
 					box = LLMatrix4(mv);
                     return true;
