@@ -232,7 +232,7 @@ if (LINUX)
   endif ()
 
   # Enable these flags so we have a read only GOT and some linking opts
-  add_link_options("LINKER:-z,relro" "LINKER:-z,now" "LINKER:--as-needed")
+  add_link_options("LINKER:-z,relro" "LINKER:-z,now" "LINKER:--as-needed" "LINKER:--build-id")
 endif ()
 
 if (DARWIN)

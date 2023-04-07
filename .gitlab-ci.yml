@@ -112,7 +112,7 @@ variables:
     - autobuild configure -c Release -- -DENABLE_SIGNING=ON -DUSE_LTO=${ENABLE_LTO} -DHAVOK_TPV=${USE_HAVOK} -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg build-darwin-64/autobuild-package.xml
-    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli debug-files upload --include-sources build-darwin-*/newview/Release/*.app.dSYM build-darwin-*/newview/Release/*.app/Contents/MacOS/ build-darwin-*/newview/Release/*.app/Contents/Frameworks/ build-darwin-*/packages/lib/release/*.dSYM; fi
+    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli debug-files upload --include-sources build-darwin-64/newview/Release/*.app.dSYM build-darwin-64/newview/Release/*.app/Contents/MacOS/ build-darwin-64/newview/Release/*.app/Contents/Frameworks/ build-darwin-*/packages/lib/release/*.dSYM; fi
   artifacts:
     name: "$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
@@ -144,7 +144,7 @@ variables:
     - autobuild configure -c Release -- -DUSE_LTO=OFF -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DCOMPRESS_DEBUG=ON
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg build-linux-${AUTOBUILD_ADDRSIZE}/autobuild-package.xml
-    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli debug-files upload --include-sources ./build-linux-*/newview/alchemy-bin ./build-linux-*/newview/packaged/lib/*.so; fi
+    - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli debug-files upload --include-sources build-linux-${AUTOBUILD_ADDRSIZE}/newview/alchemy-bin build-linux-${AUTOBUILD_ADDRSIZE}/newview/packaged/lib/*.so; fi
   artifacts:
     name: "$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
