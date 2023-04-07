@@ -292,12 +292,21 @@ vec3 legacyGamma(vec3 color)
     return color;
 }
 
+float legacyGammaApprox()
+{
+ //TODO -- figure out how to plumb this in as a uniform
+    float c = 0.5;
+    float gc = 1.0-pow(c, gamma);
+    
+    return gc/c * gamma;
+}
+
 void main()
 {
     vec4 diff = texture(diffuseRect, vary_fragcoord);
  
     float exp_scale = texture(exposureMap, vec2(0.5,0.5)).r;
-    diff.rgb *= exposure * exp_scale;
+    diff.rgb *= exposure * exp_scale * legacyGammaApprox();
     
     #if TONEMAP_METHOD == 0 // None, Gamma Correct Only
     #define NEEDS_GAMMA_CORRECT 1
@@ -355,8 +364,6 @@ void main()
     vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.x));
     diff = vec4(textureLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb, diff.a);
     #endif
-
-    diff.rgb = legacyGamma(diff.rgb);
 
     vec2 tc = vary_fragcoord.xy*screen_res*4.0;
     vec3 seed = (diff.rgb+vec3(1.0))*vec3(tc.xy, tc.x+tc.y);
