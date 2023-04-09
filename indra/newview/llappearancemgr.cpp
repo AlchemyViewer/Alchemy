@@ -528,7 +528,7 @@ void LLUpdateAppearanceOnDestroy::fire(const LLUUID& inv_item)
 
 LLUpdateAppearanceOnDestroy::~LLUpdateAppearanceOnDestroy()
 {
-	if (!LLApp::isExiting())
+	if (LLApp::isRunning())
 	{
 		// speculative fix for MAINT-1150
 		//LL_INFOS("Avatar") << self_av_string() << "done update appearance on destroy" << LL_ENDL;
@@ -549,7 +549,7 @@ LLUpdateAppearanceAndEditWearableOnDestroy::LLUpdateAppearanceAndEditWearableOnD
 LLRequestServerAppearanceUpdateOnDestroy::~LLRequestServerAppearanceUpdateOnDestroy()
 {
 	LL_DEBUGS("Avatar") << "ATT requesting server appearance update" << LL_ENDL;
-    if (!LLApp::isExiting())
+    if (LLApp::isRunning())
     {
         LLAppearanceMgr::instance().requestServerAppearanceUpdate();
     }
@@ -575,7 +575,7 @@ void edit_wearable_and_customize_avatar(LLUUID item_id)
 
 LLUpdateAppearanceAndEditWearableOnDestroy::~LLUpdateAppearanceAndEditWearableOnDestroy()
 {
-	if (!LLApp::isExiting())
+	if (LLApp::isRunning())
 	{
 		LLAppearanceMgr::instance().updateAppearanceFromCOF(
 			true,true,
