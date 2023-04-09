@@ -17,6 +17,7 @@
 *~
 
 # Specific paths and/or names
+.venv
 CMakeCache.txt
 cmake_install.cmake
 LICENSES
