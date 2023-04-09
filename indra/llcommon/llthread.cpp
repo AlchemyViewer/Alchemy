@@ -146,10 +146,8 @@ void LLThread::threadRun()
 #endif
     LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
 
-#ifndef LL_RELEASE_FOR_DOWNLOAD
     // for now, hard code all LLThreads to report to single master thread recorder, which is known to be running on main thread
-    mRecorder = new LLTrace::ThreadRecorder(*LLTrace::get_master_thread_recorder());
-#endif
+    mRecorder = std::make_unique<LLTrace::ThreadRecorder>(*LLTrace::get_master_thread_recorder());
 
     // Run the user supplied function
     do 
@@ -176,10 +174,7 @@ void LLThread::threadRun()
 
     //LL_INFOS() << "LLThread::staticRun() Exiting: " << threadp->mName << LL_ENDL;
 
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-    delete mRecorder;
-    mRecorder = NULL;
-#endif
+    mRecorder.reset();
 
     // We're done with the run function, this thread is done executing now.
     //NB: we are using this flag to sync across threads...we really need memory barriers here
@@ -192,9 +187,6 @@ LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
     mPaused(FALSE),
     mName(name),
     mStatus(STOPPED)
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-    , mRecorder(NULL)
-#endif
 {
     mRunCondition = std::make_unique<LLCondition>();
     mDataLock = std::make_unique<LLMutex>();
@@ -254,25 +246,33 @@ void LLThread::shutdown()
             }
         }
 
-        if(mThreadp->joinable())
+        if (!isStopped())
         {
-            mThreadp->join();
-            LL_INFOS() << "Successfully joined thread: " << mName << LL_ENDL;
+            // This thread just wouldn't stop, even though we gave it time
+            LL_WARNS() << "LLThread::~LLThread() exiting thread: " << mName << " before clean exit!" << LL_ENDL;
+            // Put a stake in its heart. (A very hostile method to force a thread to quit)
+#if		LL_WINDOWS
+            TerminateThread(mNativeHandle, 0);
+#else
+            pthread_cancel(mNativeHandle);
+#endif
+            mRecorder.reset();
+
+            mStatus = STOPPED;
+            return;
         }
     }
 
     mThreadp.reset();
     mRunCondition.reset();
     mDataLock.reset();
-#ifndef LL_RELEASE_FOR_DOWNLOAD
     if (mRecorder)
     {
         // missed chance to properly shut down recorder (needs to be done in thread context)
         // probably due to abnormal thread termination
         // so just leak it and remove it from parent
-        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder);
+        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder.get());
     }
-#endif
 }
 
 void LLThread::start()
@@ -281,6 +281,8 @@ void LLThread::start()
     try
     {
         mThreadp = std::make_unique<std::thread>(std::bind(&LLThread::threadRun, this));
+        mNativeHandle = mThreadp->native_handle();
+        mThreadp->detach();
 	}
 	catch (const std::system_error& err)
 	{
@@ -302,7 +304,7 @@ LLThread::id_t LLThread::getID() const
  bool LLThread::setPriority(EThreadPriority thread_priority)
 {
      if(!mThreadp) return false;
-#if LL_WINDOWS
+#if 0
 	int thread_prio = 0;
 	switch (thread_priority)
 	{
