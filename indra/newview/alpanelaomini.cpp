@@ -91,7 +91,9 @@ void ALPanelAOMini::updateSetList()
 
 void ALPanelAOMini::onSetChanged(const std::string& set_name)
 {
-	if (!set_name.empty())
+	LLSD curr_selected_set = mSetList->getSelectedValue();
+
+	if (!set_name.empty() && set_name != curr_selected_set.asString())
 	{
 		mSetList->selectByValue(LLSD(set_name));
 	}
