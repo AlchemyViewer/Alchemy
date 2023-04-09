@@ -1345,7 +1345,10 @@ void ALAOEngine::selectSet(ALAOSet* set)
 	}
 
 	mCurrentSet = set;
-	mSetChangedSignal(mCurrentSet->getName());
+	if(mCurrentSet)
+	{
+		mSetChangedSignal(mCurrentSet->getName());
+	}
 
 	if (mEnabled)
 	{
