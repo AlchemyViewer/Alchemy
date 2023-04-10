@@ -2076,7 +2076,7 @@ bool LLVivoxVoiceClient::waitForChannel()
             {
                 recordingAndPlaybackMode();
             }
-            else if (checkParcelChanged() || (!mAreaVoiceDisabled && mNextAudioSession == nullptr))
+            else if ((checkParcelChanged() || mNextAudioSession == nullptr) && !mAreaVoiceDisabled)
             {
                 // the parcel is changed, or we have no pending audio sessions,
                 // so try to request the parcel voice info
@@ -2087,8 +2087,6 @@ bool LLVivoxVoiceClient::waitForChannel()
             {
                 LL_INFOS("Voice") << "Session requesting reprovision and login." << LL_ENDL;
                 requestRelog();
-				state = VOICE_CHANNEL_STATE_RELOG;
-				break;
             }
             else if (mNextAudioSession)
             {
@@ -2097,7 +2095,6 @@ bool LLVivoxVoiceClient::waitForChannel()
                 if (!runSession(joinSession)) //suspends
                 {
                     LL_DEBUGS("Voice") << "runSession returned false; leaving inner loop" << LL_ENDL;
-                    return false;
                 }
                 else
                 {
