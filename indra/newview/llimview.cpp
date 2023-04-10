@@ -3425,6 +3425,7 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
 	LLIMModel::LLIMSession* im_session = LLIMModel::getInstance()->findIMSession(session_id);
 	if (!im_session) return false;
 
+#if 0
 // [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
 	// Only group sessions can be snoozed
 	if (im_session->isGroupSessionType())
@@ -3467,7 +3468,9 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
 		LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
 	}
 // [/SL:KB]
-//	LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+#else
+	LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+#endif
 	gIMMgr->removeSession(session_id);
 	return true;
 }
@@ -3670,7 +3673,7 @@ bool LLIMMgr::restoreSnoozedSession(const LLUUID& session_id)
 		LLGroupData groupData;
 		if (gAgent.getGroupData(session_id, groupData))
 		{
-			gIMMgr->addSession(groupData.mName, IM_SESSION_INVITE, session_id);
+			gIMMgr->addSession(groupData.mName, IM_SESSION_GROUP_START, session_id);
 
 			uuid_vec_t ids;
 			LLIMModel::sendStartSession(session_id, session_id, ids, IM_SESSION_GROUP_START);
