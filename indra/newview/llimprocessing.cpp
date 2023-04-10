@@ -1241,7 +1241,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             // should happen after you get an "invitation"
 //           if (!gIMMgr->hasSession(session_id))
 // [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
-            if ( (!gIMMgr->hasSession(session_id)) && ( (!gAgent.isInGroup(session_id)) || (!gIMMgr->checkSnoozeExpiration(session_id)) || (!gIMMgr->restoreSnoozedSession(session_id)) ) )
+            if (!gIMMgr->hasSession(session_id) && (!gAgent.isInGroup(session_id) || (!gIMMgr->checkSnoozeExpiration(session_id) || !gIMMgr->restoreSnoozedSession(session_id))) )
 // [/SL:KB]
             {
                 return;
@@ -1844,7 +1844,6 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
         {
             from_group = message_data["from_group"].asString() == "Y";
         }
-
 
         LLIMProcessing::processNewMessage(
             message_data["from_agent_id"].asUUID(),

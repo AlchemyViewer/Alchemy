@@ -145,10 +145,6 @@ public:
 		// connection to voice channel state change signal
 		boost::signals2::connection mVoiceChannelStateChangeConnection;
 
-// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
-		LLDate mParticipantLastMessageTime = LLDate::now();
-// [/SL:KB]
-
 		//does NOT include system messages and agent's messages
 		S32 mParticipantUnreadMessageCount;
 

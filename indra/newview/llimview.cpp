@@ -1652,9 +1652,6 @@ LLIMModel::LLIMSession* LLIMModel::addMessageSilently(const LLUUID& session_id, 
 			|| INTERACTIVE_SYSTEM_FROM == from)
 	{
 		++(session->mParticipantUnreadMessageCount);
-// [SL:KB] - Patch: Chat-GroupSnooze | Checked: Catznip-3.3
-		session->mParticipantLastMessageTime = LLDate::now();
-// [/SL:K]
 	}
 
 	return session;
@@ -3452,11 +3449,12 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
 				nSnoozeDuration = ((pOptions) && (pOptions->mSnoozeOnClose)) ? pOptions->mSnoozeDuration * 60 : s_nSnoozeTime;
 			}
 
+			F64 expirationTime = LLTimer::getTotalSeconds() + F64(nSnoozeDuration);
 			snoozed_sessions_t::iterator itSession = mSnoozedSessions.find(session_id);
 			if (mSnoozedSessions.end() != itSession)
-				itSession->second = im_session->mParticipantLastMessageTime.secondsSinceEpoch() + static_cast<F64>(nSnoozeDuration);
+				itSession->second = expirationTime;
 			else
-				mSnoozedSessions.emplace(session_id, im_session->mParticipantLastMessageTime.secondsSinceEpoch() + static_cast<F64>(nSnoozeDuration));
+				mSnoozedSessions.emplace(session_id, expirationTime);
 		}
 		else
 		{
@@ -3653,7 +3651,7 @@ BOOL LLIMMgr::hasSession(const LLUUID& session_id)
 bool LLIMMgr::checkSnoozeExpiration(const LLUUID& session_id) const
 {
  	snoozed_sessions_t::const_iterator itSession = mSnoozedSessions.find(session_id);
-	return (mSnoozedSessions.end() != itSession) && (itSession->second < LLTimer::getTotalSeconds());
+	return (mSnoozedSessions.end() != itSession) && (itSession->second <= LLTimer::getTotalSeconds());
 }
 
 bool LLIMMgr::isSnoozedSession(const LLUUID& session_id) const
@@ -3676,7 +3674,10 @@ bool LLIMMgr::restoreSnoozedSession(const LLUUID& session_id)
 			uuid_vec_t ids;
 			LLIMModel::sendStartSession(session_id, session_id, ids, IM_SESSION_GROUP_START);
 
-			make_ui_sound("UISndStartIM");
+			if(!gAgent.isDoNotDisturb())
+			{
+				make_ui_sound("UISndStartIM");
+			}
 			return true;
 		}
 	}
