@@ -1000,20 +1000,33 @@
                  function="RLV.EnableIfNot"
                  parameter="setenv" />
             </menu_item_check>
-            <menu_item_check
-             label="Midday"
-             name="Noon"
-             shortcut="control|shift|Y">
-                <menu_item_check.on_click
-                 function="World.EnvSettings"
-                 parameter="noon" />
-                <menu_item_check.on_check
-                 function="World.EnableEnvSettings" 
-                 parameter="noon" />
-                <menu_item_check.on_enable
-                 function="RLV.EnableIfNot"
-                 parameter="setenv" />
-            </menu_item_check>
+          <menu_item_check
+           label="Midday"
+           name="Noon"
+           shortcut="control|shift|Y">
+            <menu_item_check.on_click
+             function="World.EnvSettings"
+             parameter="noon" />
+            <menu_item_check.on_check
+             function="World.EnableEnvSettings"
+             parameter="noon" />
+            <menu_item_check.on_enable
+             function="RLV.EnableIfNot"
+             parameter="setenv" />
+          </menu_item_check>
+          <menu_item_check
+             label="Midday (Legacy)"
+             name="legacy noon">
+            <menu_item_check.on_click
+             function="World.EnvSettings"
+             parameter="legacy noon" />
+            <menu_item_check.on_check
+             function="World.EnableEnvSettings"
+             parameter="legacy noon" />
+            <menu_item_check.on_enable
+             function="RLV.EnableIfNot"
+             parameter="setenv" />
+          </menu_item_check>
             <menu_item_check
              label="Sunset"
              name="Sunset"

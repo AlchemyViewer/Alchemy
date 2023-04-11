@@ -79,6 +79,8 @@
 #include <boost/bind.hpp>	// for SkinFolder listener
 #include <boost/signals2.hpp>
 
+extern BOOL gCubeSnapshot;
+
 // *TODO: Consider enabling mipmaps (they have been disabled for a long time). Likely has a significant performance impact for tiled/high texture repeat media. Mip generation in a shader may also be an option if necessary.
 constexpr BOOL USE_MIPMAPS = FALSE;
 
@@ -264,6 +266,7 @@ viewer_media_t LLViewerMedia::newMediaImpl(
 
 viewer_media_t LLViewerMedia::updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self)
 {
+    llassert(!gCubeSnapshot);
 	// Try to find media with the same media ID
 	viewer_media_t media_impl = getMediaImplFromTextureID(media_entry->getMediaID());
 
@@ -616,6 +619,8 @@ void LLViewerMedia::onIdle(void *dummy_arg)
 void LLViewerMedia::updateMedia(void *dummy_arg)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE);
+
+    llassert(!gCubeSnapshot);
 
 	// Enable/disable the plugin read thread
 	static LLCachedControl<bool> pluginUseReadThread(gSavedSettings, "PluginUseReadThread");
@@ -3005,6 +3010,7 @@ void LLViewerMediaImpl::updateImagesMediaStreams()
 LLViewerMediaTexture* LLViewerMediaImpl::updateMediaImage()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
+    llassert(!gCubeSnapshot);
 //    if (!mMediaSource)
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
 	if ( (!mMediaSource) || ((LLViewerFetchedTexture::sDefaultDiffuseImagep.notNull()) && (LLViewerFetchedTexture::sDefaultDiffuseImagep->getID() == mTextureId)))
@@ -3658,6 +3664,8 @@ void LLViewerMediaImpl::calculateInterest()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_CALCULATE_INTEREST);
 	LLViewerMediaTexture* texture = LLViewerTextureManager::findMediaTexture( mTextureId );
+
+    llassert(!gCubeSnapshot);
 
 	if(texture != NULL)
 	{
