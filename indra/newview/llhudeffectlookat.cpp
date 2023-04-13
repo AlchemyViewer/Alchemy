@@ -43,9 +43,8 @@
 #include "llglheaders.h"
 #include "llxmltree.h"
 
-#include "llavatarnamecache.h"
-#include "llhudrender.h"
-#include "llviewercontrol.h"
+
+BOOL LLHUDEffectLookAt::sDebugLookAt = FALSE;
 
 // packet layout
 const S32 SOURCE_AVATAR = 0;
@@ -242,8 +241,7 @@ static BOOL loadAttentions()
 LLHUDEffectLookAt::LLHUDEffectLookAt(const U8 type) : 
 	LLHUDEffect(type), 
 	mKillTime(0.f),
-	mLastSendTime(0.f),
-	mDebugLookAt(gSavedSettings, "AlchemyLookAtShow", false)
+	mLastSendTime(0.f)
 {
 	clearLookAtTarget();
 	// parse the default sets
@@ -563,14 +561,8 @@ void LLHUDEffectLookAt::setSourceObject(LLViewerObject* objectp)
 //-----------------------------------------------------------------------------
 void LLHUDEffectLookAt::render()
 {
-	if (mDebugLookAt && mSourceObject.notNull())
+	if (sDebugLookAt && mSourceObject.notNull())
 	{
-		static LLCachedControl<bool> isOwnHidden(gSavedSettings, "AlchemyLookAtHideSelf", true);
-		static LLCachedControl<bool> isPrivate(gSavedSettings, "AlchemyLookAtPrivate", false);
-
-		if ((isOwnHidden || isPrivate) && static_cast<LLVOAvatar*>(mSourceObject.get())->isSelf())
-			return;
-
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
 		//LLGLDisable gls_stencil(GL_STENCIL_TEST);
@@ -579,7 +571,7 @@ void LLHUDEffectLookAt::render()
 		gGL.matrixMode(LLRender::MM_MODELVIEW);
 		gGL.pushMatrix();
 		gGL.translatef(target.mV[VX], target.mV[VY], target.mV[VZ]);
-		gGL.scalef(0.1f, 0.1f, 0.1f);
+		gGL.scalef(0.3f, 0.3f, 0.3f);
 		gGL.begin(LLRender::LINES);
 		{
 			LLColor3 color = (*mAttentions)[mTargetType].mColor;
@@ -592,62 +584,8 @@ void LLHUDEffectLookAt::render()
 
 			gGL.vertex3f(0.f, 0.f, -1.f);
 			gGL.vertex3f(0.f, 0.f, 1.f);
-
-			static LLCachedControl<bool> lookAtLines(gSavedSettings, "AlchemyLookAtLines", false);
-			if(lookAtLines)
-			{
-				const std::string targname = (*mAttentions)[mTargetType].mName;
-				if(targname != "None" && targname != "Idle" && targname != "AutoListen")
-				{
-					LLVector3 dist = (mSourceObject->getWorldPosition() - mTargetPos) * 10;
-					gGL.vertex3f(0.f, 0.f, 0.f);
-					gGL.vertex3f(dist.mV[VX], dist.mV[VY], dist.mV[VZ] + 0.5f);
-				}
-			}
-		}
-		gGL.end();
+		} gGL.end();
 		gGL.popMatrix();
-
-		static LLCachedControl<U32> lookAtNames(gSavedSettings, "AlchemyLookAtNames", 0);
-		if(lookAtNames > 0)
-		{
-			std::string text;
-			LLAvatarName av_name;
-			LLAvatarNameCache::get(static_cast<LLVOAvatar*>(mSourceObject.get())->getID(), &av_name);
-			switch (lookAtNames)
-			{
-				case 1: // Display Name (user.name)
-					text = av_name.getCompleteName();
-					break;
-				case 2: // Display Name
-					text = av_name.getDisplayName();
-					break;
-				case 3: // First Last
-					text = av_name.getUserName();
-					break;
-				default: //user.name
-					text = av_name.getAccountName();
-					break;
-			}
-
-			const LLFontGL* fontp = LLFontGL::getFontSansSerif();
-			gGL.pushMatrix();
-
-			LLWString wstr(utf8str_to_wstring(text));
-
-			hud_render_text(
-				wstr,
-				target + LLVector3(0.f, 0.f, 0.15f),
-				*fontp,
-				LLFontGL::NORMAL, 
-				LLFontGL::NO_SHADOW,
-				-0.5f * fontp->getWidthF32(wstr.c_str()),
-				0.0f,
-				(*mAttentions)[mTargetType].mColor, 
-				FALSE
-			);
-			gGL.popMatrix();
-		}
 	}
 }
 
@@ -699,6 +637,11 @@ void LLHUDEffectLookAt::update()
 				((LLVOAvatar*)(LLViewerObject*)mSourceObject)->startMotion(ANIM_AGENT_HEAD_ROT);
 			}
 		}
+	}
+
+	if (sDebugLookAt)
+	{
+		((LLVOAvatar*)(LLViewerObject*)mSourceObject)->addDebugText((*mAttentions)[mTargetType].mName);
 	}
 }
 

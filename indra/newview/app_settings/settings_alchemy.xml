@@ -423,7 +423,7 @@
     <key>AlchemyLookAtShow</key>
     <map>
       <key>Comment</key>
-      <string>If true, avatar look at beacons will be displayed</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -434,7 +434,7 @@
     <key>AlchemyLookAtLines</key>
     <map>
       <key>Comment</key>
-      <string>Render a line from Look At beacon to the originating avatar</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -445,7 +445,7 @@
     <key>AlchemyLookAtNames</key>
     <map>
       <key>Comment</key>
-      <string>Render name of originating avatar under Look At beacon</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -456,7 +456,7 @@
     <key>AlchemyLookAtHideSelf</key>
     <map>
       <key>Comment</key>
-      <string>Hide own Look At beacon when Look At render is enabled</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -467,7 +467,7 @@
     <key>AlchemyLookAtPrivate</key>
     <map>
       <key>Comment</key>
-      <string>Disable broadcast of own look at to other users.</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
