@@ -1955,8 +1955,7 @@ class LLAdvancedToggleShowLookAt : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		bool value = !gSavedSettings.getBOOL("AlchemyLookAtShow");
-		gSavedSettings.setBOOL("AlchemyLookAtShow", value);
+		LLHUDEffectLookAt::sDebugLookAt = !(LLHUDEffectLookAt::sDebugLookAt);
 		return true;
 	}
 };
@@ -1965,7 +1964,7 @@ class LLAdvancedCheckShowLookAt : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
 	{
-		bool new_value = gSavedSettings.getBOOL("AlchemyLookAtShow");
+		bool new_value = LLHUDEffectLookAt::sDebugLookAt;
 		return new_value;
 	}
 };

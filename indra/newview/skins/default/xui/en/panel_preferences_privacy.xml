@@ -152,66 +152,7 @@
          width="250"
          control_name="AlchemyLookAtShow"
          tool_tip="Enable crosshairs marking where people are looking."/>
-        <text
-         type="string"
-         length="1"
-         follows="left|top"
-         height="15"
-         layout="topleft"
-         left="290"
-         name="lookatnames"
-		     tool_tip="Select whether to show avatar names on the LookAt crosshairs"
-         left_delta="250"
-         width="70">
-            Name Style:
-        </text>
-        <combo_box
-         control_name="AlchemyLookAtNames"
-         follows="left|top"
-         height="23"
-         layout="topleft"
 
-         left_pad="0"
-         max_chars="135"
-         name="lookatshownames_combobox"
-         width="150">
-            <combo_box.item
-             enabled="true"
-             label="None"
-             name="None"
-             value="0" />
-            <combo_box.item
-             enabled="true"
-             label="Complete name"
-             name="Complete_Name"
-             value="1" />
-            <combo_box.item
-             enabled="true"
-             label="Display name"
-             name="Display_Name"
-             value="2" />
-            <combo_box.item
-             enabled="true"
-             label="Legacy name"
-             name="Legacy_Name"
-             value="3" />
-            <combo_box.item
-             enabled="true"
-             label="Username"
-             name="User_Name"
-             value="4" />
-        </combo_box>
-
-        <check_box
-         control_name="AlchemyLookAtLines"
-         height="16"
-         label="Show a line from the Look At beacon to its owner"
-         layout="topleft"
-         left="30"
-         name="lineslookat"
-         tool_tip="See a line connecting the camera focus point to the avatar. Useful to find where they are."
-         top_pad="4"
-         width="350" />
 
         <text
          type="string"
@@ -225,28 +166,8 @@
          text_color="LtGray_50">
             My LookAt:
         </text>
-	    	<check_box
-         control_name="AlchemyLookAtHideSelf"
-         height="16"
-         initial_value="true"
-         label="Don't show me my LookAt target"
-         layout="topleft"
-         left="30"
-         name="LookAtHideOwn"
-         tool_tip="Don't show me my own camera crosshairs"
-         width="350" />
-        <check_box
-         control_name="AlchemyLookAtPrivate"
-         height="16"
-         label="Don't send my actual camera target to others"
-         layout="topleft"
-         left="30"
-         name="privatelookat"
-         tool_tip="Disable your camera focus point from showing to others"
-         width="350" />
         <check_box
          control_name="AlchemyLookAtClampEnabled"
-         disabled_control="AlchemyLookAtPrivate"
          height="16"
          label="Limit camera target distance"
          layout="topleft"
@@ -262,7 +183,6 @@
             max_val="128"
             follows="top|left"
             control_name="AlchemyLookAtClampDistance"
-            disabled_control="AlchemyLookAtPrivate"
             initial_value="1.0"
             increment="0.5"
             label="Max Distance"
