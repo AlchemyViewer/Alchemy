@@ -7304,7 +7304,25 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst) {
 			mRT->fxaaBuffer.flush();
 
 			dst->bindTarget();
-			shader = &gFXAAProgram;
+
+			U32 fsaa_quality = 0;
+			switch (RenderFSAASamples)
+			{
+			case 2:
+				fsaa_quality = 0;
+				break;
+			case 4:
+				fsaa_quality = 1;
+				break;
+			default:
+			case 8:
+				fsaa_quality = 2;
+				break;
+			case 16:
+				fsaa_quality = 3;
+				break;
+			}
+			shader = &gFXAAProgram[fsaa_quality];
 			shader->bind();
 
 			channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP, mRT->fxaaBuffer.getUsage());
@@ -7618,7 +7636,9 @@ void LLPipeline::renderFinalize()
 
 		generateExposure(&mLuminanceMap, &mExposureMap);
 
-		gammaCorrect(&mRT->screen, &mPostMap);
+		mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mPostFXMap);
+		mALRenderUtil->renderSharpen(&mPostFXMap, &mPostMap);
+		//gammaCorrect(&mRT->screen, &mPostMap);
 
         LLVertexBuffer::unbind();
     }

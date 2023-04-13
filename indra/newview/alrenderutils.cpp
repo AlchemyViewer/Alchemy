@@ -513,9 +513,9 @@ bool ALRenderUtil::setupColorGrade()
 	return true;
 }
 
-void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure)
+void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, LLRenderTarget* dst)
 {
-	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+	dst->bindTarget();
 
 	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorGradeLUTProgram[mTonemapType] : &gDeferredPostTonemapProgram[mTonemapType];
 
@@ -578,6 +578,8 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure)
 	tone_shader->unbindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
 	tone_shader->unbindTexture(LLShaderMgr::EXPOSURE_MAP, exposure->getUsage());
 	tone_shader->unbind();
+
+	dst->flush();
 }
 
 bool ALRenderUtil::setupSharpen()
@@ -625,12 +627,15 @@ bool ALRenderUtil::setupSharpen()
 	return true;
 }
 
-void ALRenderUtil::renderSharpen(LLRenderTarget* src)
+void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 {
 	if (mSharpenMethod == ALSharpen::SHARPEN_NONE)
 	{
+		gPipeline.copyRenderTarget(src, dst);
 		return;
 	}
+
+	dst->bindTarget();
 
 	LLGLSLShader* sharpen_shader = nullptr;
 	switch (mSharpenMethod)
@@ -646,8 +651,6 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src)
 		break;
 	}
 
-	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
-
 	// Bind setup:
 	sharpen_shader->bind();
 
@@ -657,6 +660,7 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src)
 	mRenderBuffer->setBuffer();
 	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-	sharpen_shader->unbindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
 	sharpen_shader->unbind();
+
+	dst->flush();
 }
