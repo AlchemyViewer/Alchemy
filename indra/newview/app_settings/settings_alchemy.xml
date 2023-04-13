@@ -302,7 +302,7 @@
     <key>AlchemyForceFly</key>
     <map>
       <key>Comment</key>
-      <string>Always allow flight</string>
+      <string>[OBSELETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
