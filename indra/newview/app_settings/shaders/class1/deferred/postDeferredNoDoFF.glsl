@@ -32,6 +32,7 @@ out vec4 frag_color;
 #endif
 
 uniform sampler2D diffuseRect;
+uniform sampler2D depthMap;
 
 uniform vec2 screen_res;
 VARYING vec2 vary_fragcoord;
@@ -41,5 +42,7 @@ void main()
 	vec4 diff = texture2D(diffuseRect, vary_fragcoord.xy);
 	
 	frag_color = diff;
+
+    gl_FragDepth = texture(depthMap, vary_fragcoord.xy).r;
 }
 
