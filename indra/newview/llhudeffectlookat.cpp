@@ -43,6 +43,8 @@
 #include "llglheaders.h"
 #include "llxmltree.h"
 
+#include "llviewercontrol.h"
+
 
 BOOL LLHUDEffectLookAt::sDebugLookAt = FALSE;
 
