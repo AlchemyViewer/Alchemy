@@ -1450,32 +1450,6 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 		}
 	}
 
-	if (skin.has("inverse_bind_matrix"))
-	{
-		const auto& inv_bind_mat = skin["inverse_bind_matrix"];
-		for (auto i = 0; i < inv_bind_mat.size(); ++i)
-		{
-			LLMatrix4 mat;
-			for (auto j = 0; j < 4; j++)
-			{
-				for (auto k = 0; k < 4; k++)
-				{
-					mat.mMatrix[j][k] = inv_bind_mat[i][j*4+k].asReal();
-				}
-			}
-
-			mInvBindMatrix.push_back(LLMatrix4a(mat));
-		}
-
-        if (mJointNames.size() != mInvBindMatrix.size())
-        {
-            LL_WARNS("MESHSKININFO") << "Joints vs bind matrix count mismatch. Dropping joint bindings." << LL_ENDL;
-            mJointNames.clear();
-            mJointNums.clear();
-            mInvBindMatrix.clear();
-        }
-	}
-
 	if (skin.has("bind_shape_matrix"))
 	{
 		const auto& bind_shape_mat = skin["bind_shape_matrix"];
@@ -1490,10 +1464,35 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 		mBindShapeMatrix.loadu(mat);
 	}
 
-	mInvBindShapeMatrix.resize(llmin(mInvBindMatrix.size(), (size_t)216));
-	for (U32 i = 0; i < mInvBindShapeMatrix.size(); ++i)
+	if (skin.has("inverse_bind_matrix"))
 	{
-		mInvBindShapeMatrix[i].setMul(mInvBindMatrix[i], mBindShapeMatrix);
+		const auto& inv_bind_mat = skin["inverse_bind_matrix"];
+		for (auto i = 0; i < inv_bind_mat.size(); ++i)
+		{
+			LLMatrix4 mat;
+			for (auto j = 0; j < 4; j++)
+			{
+				for (auto k = 0; k < 4; k++)
+				{
+					mat.mMatrix[j][k] = inv_bind_mat[i][j*4+k].asReal();
+				}
+			}
+
+			LLMatrix4a inv_bind(mat);
+			mInvBindMatrix.push_back(inv_bind);
+
+			LLMatrix4a inv_bind_shape;
+			inv_bind_shape.setMul(inv_bind, mBindShapeMatrix);
+			mInvBindShapeMatrix.push_back(inv_bind_shape);
+		}
+
+        if (mJointNames.size() != mInvBindMatrix.size())
+        {
+            LL_WARNS("MESHSKININFO") << "Joints vs bind matrix count mismatch. Dropping joint bindings." << LL_ENDL;
+            mJointNames.clear();
+            mJointNums.clear();
+            mInvBindMatrix.clear();
+        }
 	}
 
 	if (skin.has("alt_inverse_bind_matrix"))

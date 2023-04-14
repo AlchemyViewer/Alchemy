@@ -1466,17 +1466,16 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 									mat.mMatrix[i][j] = transform[k*16 + i + j*4];
 								}
 							}
-							model->mSkinInfo.mInvBindMatrix.push_back(LLMatrix4a(mat));
+
+							LLMatrix4a inv_bind(mat);
+							model->mSkinInfo.mInvBindMatrix.push_back(inv_bind);
+							LLMatrix4a inv_bind_shape;
+							inv_bind_shape.setMul(inv_bind, model->mSkinInfo.mBindShapeMatrix);
+							model->mSkinInfo.mInvBindShapeMatrix.push_back(inv_bind_shape);
 						}
 					}
 				}
 			}
-		}
-
-		model->mSkinInfo.mInvBindShapeMatrix.resize(llmin(model->mSkinInfo.mInvBindMatrix.size(), (size_t)216));
-		for (U32 i = 0; i < model->mSkinInfo.mInvBindShapeMatrix.size(); ++i)
-		{
-			model->mSkinInfo.mInvBindShapeMatrix[i].setMul(model->mSkinInfo.mInvBindMatrix[i], model->mSkinInfo.mBindShapeMatrix);
 		}
 
 		//Now that we've parsed the joint array, let's determine if we have a full rig
