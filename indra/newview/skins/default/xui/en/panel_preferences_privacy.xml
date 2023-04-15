@@ -141,29 +141,6 @@
          name="mylookat"
          width="200"
          text_color="LtGray_50">
-            LookAt:
-        </text>
-        <check_box
-         follows="left|top"
-         height="16"
-         label="Show others Look At targets"
-         left="30"
-         name="showlookat"
-         width="250"
-         control_name="AlchemyLookAtShow"
-         tool_tip="Enable crosshairs marking where people are looking."/>
-
-
-        <text
-         type="string"
-         length="1"
-         follows="left|top"
-         height="14"
-         layout="topleft"
-         left="20"
-         name="mylookat"
-         width="200"
-         text_color="LtGray_50">
             My LookAt:
         </text>
         <check_box
