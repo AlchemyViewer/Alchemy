@@ -21,6 +21,25 @@ variables:
       - "FALSE"
       - "TRUE"
     description: "Are package registry uploads public?. Set to 'TRUE' by default"
+  ENABLE_TESTS:
+    value: "TRUE"
+    options:
+      - "FALSE"
+      - "TRUE"
+    description: "Enable Sentry crash reporting. Set to 'TRUE' by default."
+    description: "Enable Discord integrations. Set to 'TRUE' by default."
+  ENABLE_LTO:
+    value: "TRUE"
+    options:
+      - "FALSE"
+      - "TRUE"
+    description: "Enable Link Time Optimization. Set to 'TRUE' by default."
+  USE_HAVOK:
+    value: "TRUE"
+    options:
+      - "FALSE"
+      - "TRUE"
+    description: "Enable Havok integrations. Set to 'TRUE' by default."
   USE_SENTRY:
     value: "TRUE"
     options:
@@ -32,19 +51,6 @@ variables:
     options:
       - "FALSE"
       - "TRUE"
-    description: "Enable Discord integrations. Set to 'TRUE' by default."
-  USE_HAVOK:
-    value: "TRUE"
-    options:
-      - "FALSE"
-      - "TRUE"
-    description: "Enable Havok integrations. Set to 'TRUE' by default."
-  USE_LTO:
-    value: "TRUE"
-    options:
-      - "FALSE"
-      - "TRUE"
-    description: "Enable Link Time Optimization. Set to 'TRUE' by default."
   AUTOBUILD_BUILD_ID: $CI_PIPELINE_ID
   AUTOBUILD_GITLAB_TOKEN: $CI_JOB_TOKEN
   AUTOBUILD_INSTALLABLE_CACHE: "$CI_PROJECT_DIR/.cache/autobuild"
@@ -69,7 +75,7 @@ variables:
     - .\.venv\Scripts\Activate.ps1
     - pip install --upgrade llbase autobuild certifi sentry-cli cmake
   script:
-    - autobuild configure -c Release -- -DUSE_LTO="${USE_LTO}" -DHAVOK_TPV="${USE_HAVOK}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DENABLE_DELTA_GEN=ON
+    - autobuild configure -c Release -- -DUSE_LTO="${ENABLE_LTO}" -DHAVOK_TPV="${USE_HAVOK}" -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DENABLE_DELTA_GEN=ON
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file "alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg" build-vc-64/autobuild-package.xml
     - $AlchemyPdbPath = Resolve-Path build-vc-*/newview/Release/Alchemy*.pdb
@@ -109,7 +115,7 @@ variables:
     - source .venv/bin/activate
     - pip3 install --upgrade llbase autobuild dmgbuild certifi sentry-cli cmake
   script:
-    - autobuild configure -c Release -- -DENABLE_SIGNING=ON -DUSE_LTO=${USE_LTO} -DHAVOK_TPV=${USE_HAVOK} -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild configure -c Release -- -DENABLE_SIGNING=ON -DUSE_LTO=${ENABLE_LTO} -DHAVOK_TPV=${USE_HAVOK} -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg build-darwin-64/autobuild-package.xml
     - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli difutil bundle-sources build-darwin-*/newview/Release/*.app.dSYM/Contents/Resources/DWARF/*; fi
@@ -151,7 +157,7 @@ variables:
     - source .venv/bin/activate
     - pip3 install --upgrade llbase autobuild certifi sentry-cli cmake ninja
   script:
-    - autobuild configure -c Release -- -DUSE_LTO=OFF -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DCOMPRESS_DEBUG=ON
+    - autobuild configure -c Release -- -DUSE_LTO=OFF -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DCOMPRESS_DEBUG=ON
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-linuxs${AUTOBUILD_ADDRSIZE}-dependencies.svg build-linux-${AUTOBUILD_ADDRSIZE}/autobuild-package.xml
     - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli difutil bundle-sources build-linux-*/newview/alchemy-bin; fi
@@ -435,7 +441,6 @@ build:release:windows64:
     -   If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli upload-dif newview/Release/ packages/ }
     - Pop-Location
     - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli releases finalize $BuildChannelVersion }
-    - Write-Output "Deploy Success!"
     - Write-Output "Package Listing > https://git.alchemyviewer.org/alchemy/alchemy-next/-/packages/$($WinUploadResult.package_id)"
     - Write-Output "Windows Package > ${WinPackageUrl}"
     - Write-Output "macOS Package   > ${MacPackageUrl}"
