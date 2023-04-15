@@ -2068,10 +2068,8 @@ void LLEnvironment::coroRequestEnvironment(S32 parcel_id, LLEnvironment::environ
 
     if (parcel_id != INVALID_PARCEL_ID)
     {
-        std::stringstream query;
-
-        query << "?parcelid=" << parcel_id;
-        url += query.str();
+        url.append("?parcelid=");
+        url.append(fmt::to_string(parcel_id));
     }
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
