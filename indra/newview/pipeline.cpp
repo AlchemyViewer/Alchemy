@@ -7790,6 +7790,20 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
         stop_glerror();
     }
 
+    channel = shader.enableTexture(LLShaderMgr::EXPOSURE_MAP);
+    if (channel > -1)
+    {
+        gGL.getTexUnit(channel)->bind(&mExposureMap);
+    }
+
+    if (shader.getUniformLocation(LLShaderMgr::VIEWPORT) != -1)
+    {
+		shader.uniform4f(LLShaderMgr::VIEWPORT, (F32) gGLViewport[0],
+									(F32) gGLViewport[1],
+									(F32) gGLViewport[2],
+									(F32) gGLViewport[3]);
+	}
+
     if (sReflectionRender && !shader.getUniformLocation(LLShaderMgr::MODELVIEW_MATRIX))
     {
         shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_MATRIX, 1, FALSE, mReflectionModelView.getF32ptr());  

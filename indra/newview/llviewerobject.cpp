@@ -5022,10 +5022,12 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
 	}
 
     LLFetchedGLTFMaterial* mat = (LLFetchedGLTFMaterial*) getTE(te)->getGLTFRenderMaterial();
+    llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(getTE(te)->getGLTFRenderMaterial()) != nullptr);
     LLUUID mat_id = getRenderMaterialID(te);
     if (mat == nullptr && mat_id.notNull())
     {
         mat = (LLFetchedGLTFMaterial*) gGLTFMaterialList.getMaterial(mat_id);
+        llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(gGLTFMaterialList.getMaterial(mat_id)) != nullptr);
         if (mat->isFetching())
         { // material is not loaded yet, rebuild draw info when the object finishes loading
             mat->onMaterialComplete([id=getID()]
@@ -5452,7 +5454,7 @@ S32 LLViewerObject::setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* override_ma
     }
 
     LLFetchedGLTFMaterial* src_mat = (LLFetchedGLTFMaterial*) tep->getGLTFMaterial();
-
+    llassert(src_mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(tep->getGLTFMaterial()) != nullptr);
     // if override mat exists, we must also have a source mat
     if (!src_mat)
     {
