@@ -1274,6 +1274,7 @@ void LLViewerMedia::getOpenIDCookieCoro(std::string url)
                     cookie_host, cookie_path, httponly, secure);
 			}
 		}
+		LLFloaterReg::hideInstance("destinations");
 	}
 
     // Note: Rider: MAINT-6392 - Some viewer code requires access to the my.sl.com openid cookie for such 
