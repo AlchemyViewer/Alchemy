@@ -4224,7 +4224,7 @@ U32 LLAppViewer::getTextureCacheVersion()
 	// 2021-03-10 Bumping up by one to help obviate texture cache issues with
 	//            Simple Cache Viewer - see SL-14985 for more information
 	//const U32 TEXTURE_CACHE_VERSION = 8;
-	const U32 TEXTURE_CACHE_VERSION = 11;
+	const U32 TEXTURE_CACHE_VERSION = 12;
 
 	return TEXTURE_CACHE_VERSION ;
 }
