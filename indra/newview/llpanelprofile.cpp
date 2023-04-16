@@ -1635,8 +1635,6 @@ BOOL LLPanelProfileWeb::postBuild()
 {
     mWebBrowser = getChild<LLMediaCtrl>("profile_html");
     mWebBrowser->addObserver(this);
-    mWebBrowser->setHomePageUrl("about:blank");
-
     return TRUE;
 }
 
