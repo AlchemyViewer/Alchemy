@@ -34,6 +34,7 @@
 #include <boost/function.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/unordered/unordered_node_map.hpp>
 #include <boost/unordered/unordered_map.hpp>
 // [RLVa:KB] - Checked: 2011-05-25 (RLVa-1.4.0a)
 #include <boost/signals2.hpp>
@@ -58,15 +59,15 @@ public:
 	// 2) We can change the key of a floater without altering the list.
 	typedef std::list<LLFloater*> instance_list_t;
 	typedef const instance_list_t const_instance_list_t;
-	typedef boost::unordered_map<std::string, instance_list_t, al::string_hash, std::equal_to<>> instance_map_t;
+	typedef boost::unordered_node_map<std::string, instance_list_t, al::string_hash, std::equal_to<>> instance_map_t;
 
 	struct BuildData
 	{
 		LLFloaterBuildFunc mFunc;
 		std::string mFile;
 	};
-	typedef boost::unordered_flat_map<std::string, BuildData, al::string_hash, std::equal_to<>> build_map_t;
-	typedef boost::unordered_flat_map<std::string, std::string, al::string_hash, std::equal_to<>> group_map_t;
+	typedef boost::unordered_node_map<std::string, BuildData, al::string_hash, std::equal_to<>> build_map_t;
+	typedef boost::unordered_node_map<std::string, std::string, al::string_hash, std::equal_to<>> group_map_t;
 	
 private:
 	friend class LLFloaterRegListener;

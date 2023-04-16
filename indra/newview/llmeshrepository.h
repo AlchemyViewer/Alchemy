@@ -43,6 +43,7 @@
 
 #include "boost/unordered/unordered_map.hpp"
 #include "boost/unordered/unordered_flat_map.hpp"
+#include "boost/unordered/unordered_node_map.hpp"
 
 #define LLCONVEXDECOMPINTER_STATIC 1
 
@@ -649,7 +650,7 @@ public:
 	static void metricsProgress(unsigned int count);
 	static void metricsUpdate();
 	
-	typedef boost::unordered_map<LLUUID, boost::unordered_set<LLVOVolume*> > mesh_load_map;
+	typedef boost::unordered_node_map<LLUUID, boost::unordered_flat_set<LLVOVolume*> > mesh_load_map;
 	mesh_load_map mLoadingMeshes[4];
 	
 	typedef boost::unordered_flat_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
@@ -663,7 +664,7 @@ public:
 	std::vector<LLMeshRepoThread::LODRequest> mPendingRequests;
 	
 	//list of mesh ids awaiting skin info
-	typedef boost::unordered_map<LLUUID, boost::unordered_set<LLVOVolume*> > skin_load_map;
+	typedef boost::unordered_node_map<LLUUID, boost::unordered_flat_set<LLVOVolume*> > skin_load_map;
 	skin_load_map mLoadingSkins;
 
 	//list of mesh ids that need to send skin info fetch requests

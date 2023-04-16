@@ -42,6 +42,7 @@
 #include "boost/unordered/unordered_map.hpp"
 #include "boost/unordered/unordered_flat_map.hpp"
 #include "boost/unordered/unordered_flat_set.hpp"
+#include "boost/unordered/unordered_node_map.hpp"
 
 //-----------------------------------------------------------------------------
 // Class predeclaration
@@ -76,7 +77,7 @@ public:
 
 
 protected:
-	typedef boost::unordered_map<LLUUID, LLMotionConstructor> motion_map_t;
+	typedef boost::unordered_node_map<LLUUID, LLMotionConstructor> motion_map_t;
 	motion_map_t mMotionTable;
 };
 

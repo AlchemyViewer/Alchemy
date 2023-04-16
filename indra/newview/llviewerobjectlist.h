@@ -229,7 +229,7 @@ protected:
 	static U32 sSimulatorMachineIndex;
 	static boost::unordered_flat_map<U64, U32> sIPAndPortToIndex;
 
-	static boost::unordered_map<U64, LLUUID> sIndexAndLocalIDToUUID;
+	static boost::unordered_flat_map<U64, LLUUID> sIndexAndLocalIDToUUID;
 
 	friend class LLViewerObject;
 
