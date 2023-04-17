@@ -257,7 +257,6 @@ void LLThread::shutdown()
             pthread_cancel(mNativeHandle);
 #endif
             mRecorder.reset();
-
             mStatus = STOPPED;
             return;
         }
@@ -271,7 +270,7 @@ void LLThread::shutdown()
         // missed chance to properly shut down recorder (needs to be done in thread context)
         // probably due to abnormal thread termination
         // so just leak it and remove it from parent
-        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder.get());
+        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder.release());
     }
 }
 
