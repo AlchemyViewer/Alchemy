@@ -115,7 +115,7 @@ class LLDiskCache final :
          * file in the cache is read (not written) so that the last time the file was
          * accessed is up to date (This is used in the mechanism for purging the cache)
          */
-        void updateFileAccessTime(const boost::filesystem::path& file_path);
+        static void updateFileAccessTime(const boost::filesystem::path& file_path);
 
         /**
          * Purge the oldest items in the cache so that the combined size of all files

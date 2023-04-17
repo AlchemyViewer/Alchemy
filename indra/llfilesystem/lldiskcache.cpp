@@ -290,6 +290,7 @@ const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
     return fmt::format("{}{}{}{}{}{}", sCacheDir, dirdelim, std::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
 }
 
+// static
 void LLDiskCache::updateFileAccessTime(const boost::filesystem::path& file_path)
 {
     /**
