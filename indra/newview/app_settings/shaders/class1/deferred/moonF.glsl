@@ -28,7 +28,6 @@
 out vec4 frag_data[4];
 
 uniform vec4 color;
-uniform vec3 moonlight_color;
 uniform vec3 moon_dir;
 uniform float moon_brightness;
 uniform sampler2D diffuseMap;
@@ -51,11 +50,7 @@ void main()
         discard;
     }
 
-
-    c.rgb *= moonlight_color.rgb;
     c.rgb *= moon_brightness;
-
-    c.rgb *= fade;
     c.a   *= fade;
 
     frag_data[0] = vec4(0);
