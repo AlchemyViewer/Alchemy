@@ -62,7 +62,7 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
         bool exists = gDirUtilp->fileExists(filename);
         if (exists)
         {
-            updateFileAccessTime(filename);
+            LLDiskCache::updateFileAccessTime(filename);
         }
     }
 }
@@ -289,39 +289,4 @@ BOOL LLFileSystem::remove()
     LLFileSystem::removeFile(mFileID, mFileType);
 
     return TRUE;
-}
-
-void LLFileSystem::updateFileAccessTime(const std::string& file_path)
-{
-    /**
-     * Threshold in time_t units that is used to decide if the last access time
-     * time of the file is updated or not. Added as a precaution for the concern
-     * outlined in SL-14582  about frequent writes on older SSDs reducing their
-     * lifespan. I think this is the right place for the threshold value - rather
-     * than it being a pref - do comment on that Jira if you disagree...
-     *
-     * Let's start with 1 hour in time_t units and see how that unfolds
-     */
-    const std::time_t time_threshold = 1 * 60 * 60;
-
-    // current time
-    const std::time_t cur_time = std::time(nullptr);
-
-    // file last write time
-#if LL_WINDOWS
-    boost::filesystem::path native_file_path(ll_convert_string_to_wide(file_path));
-#else
-    boost::filesystem::path native_file_path(file_path);
-#endif
-    const std::time_t last_write_time = boost::filesystem::last_write_time(native_file_path);
-
-    // delta between cur time and last time the file was written
-    const std::time_t delta_time = cur_time - last_write_time;
-
-    // we only write the new value if the time in time_threshold has elapsed
-    // before the last one
-    if (delta_time > time_threshold)
-    {
-        boost::filesystem::last_write_time(native_file_path, cur_time);
-    }
 }
