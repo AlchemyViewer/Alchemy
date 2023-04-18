@@ -395,7 +395,7 @@ void LLChatBar::sendChat( EChatType type )
 			if (!utf8_revised_text.empty() && !ALChatCommand::parseCommand(utf8_revised_text))
 			{
 				// Chat with animation
-				sendChatFromViewer(utf8_revised_text, type, gSavedSettings.getBOOL("PlayChatAnim"));
+				sendChatFromViewer(utf8_revised_text, type, gSavedSettings.getBOOL("PlayTypingAnim"));
 			}
 		}
 	}
