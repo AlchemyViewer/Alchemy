@@ -8730,6 +8730,8 @@ void LLPipeline::renderShadow(LLMatrix4a& view, LLMatrix4a& proj, LLCamera& shad
     U32 saved_occlusion = sUseOcclusion;
     sUseOcclusion = 0;
 
+    // List of render pass types that use the prim volume as the shadow,
+    // ignoring textures.
     static const U32 types[] = {
         LLRenderPass::PASS_SIMPLE,
         LLRenderPass::PASS_FULLBRIGHT,
