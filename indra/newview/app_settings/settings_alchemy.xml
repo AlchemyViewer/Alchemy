@@ -467,7 +467,7 @@
     <key>AlchemyLookAtPrivate</key>
     <map>
       <key>Comment</key>
-      <string>[OBSOLETE]</string>
+      <string>Disable broadcast of own look at to other users.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
