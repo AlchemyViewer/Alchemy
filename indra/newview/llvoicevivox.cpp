@@ -2076,7 +2076,7 @@ bool LLVivoxVoiceClient::waitForChannel()
             {
                 recordingAndPlaybackMode();
             }
-            else if ((checkParcelChanged() || mNextAudioSession == nullptr) && !mAreaVoiceDisabled)
+            else if ((checkParcelChanged() || (mNextAudioSession == NULL)) && LLViewerParcelMgr::instance().allowAgentVoice())
             {
                 // the parcel is changed, or we have no pending audio sessions,
                 // so try to request the parcel voice info
