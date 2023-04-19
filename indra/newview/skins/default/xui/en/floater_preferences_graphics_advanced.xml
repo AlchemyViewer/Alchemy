@@ -683,26 +683,12 @@
   </combo_box>
 
   <check_box
-    control_name="RenderReflectionsEnabled"
-    height="16"
-    initial_value="true"
-    label="Reflections"
-    layout="topleft"
-    left="420"
-    name="ReflectionsEnabled"
-    top_delta="16"
-    width="240">
-    <check_box.commit_callback
-      function="Pref.RenderOptionUpdate" />
-  </check_box>
-
-  <check_box
     control_name="RenderScreenSpaceReflections"
     height="16"
     initial_value="true"
     label="Screen Space Reflections"
     layout="topleft"
-    left="440"
+    left="420"
     name="ScreenSpaceReflections"
     top_delta="16"
     width="240">
@@ -716,7 +702,7 @@
     follows="left|top"
     height="16"
     layout="topleft"
-    left="440"
+    left="420"
     name="ReflectionDetailText"
     text_readonly_color="LabelDisabledColor"
     top_delta="16"
@@ -728,7 +714,7 @@
    control_name="RenderReflectionProbeDetail"
    height="18"
    layout="topleft"
-   left_delta="110"
+   left_delta="130"
    top_delta="0"
    name="ReflectionDetail"
    width="150">
@@ -746,7 +732,6 @@
       value="2"/>
   </combo_box>
 
-
   <text
     type="string"
     length="1"
@@ -754,63 +739,40 @@
     height="16"
     layout="topleft"
     left="420"
-    name="RenderTonemapperText"
+    name="ReflectionProbeText"
     text_readonly_color="LabelDisabledColor"
-    top_delta="24"
+    top_delta="16"
     width="128">
-    Tonemapper:
+    Reflection Coverage:
   </text>
+
   <combo_box
-   control_name="RenderToneMapType"
+   control_name="RenderReflectionProbeLevel"
    height="18"
    layout="topleft"
    left_delta="130"
    top_delta="0"
-   name="ToneMapper"
+   name="ReflectionLevel"
    width="150">
-	<combo_box.item
-		label="Linear"
-		name="toneLinear"
-		value="1" />
-	<combo_box.item
-		label="Reinhard"
-		name="toneReinhard"
-		value="2" />
-	<combo_box.item
-		label="Reinhard2"
-		name="toneReinhard2"
-		value="3" />
-	<combo_box.item
-		label="Filmic"
-		name="toneFilmic"
-		value="4" />
-	<combo_box.item
-		label="Unreal"
-		name="toneUnreal"
-		value="5" />
-	<combo_box.item
-		label="ACES Narkowicz"
-		name="toneACES"
-		value="6" />
-	<combo_box.item
-		label="ACES Hill"
-		name="toneACES"
-		value="10" />
-	<combo_box.item
-		label="Uchimura"
-		name="toneUchimura"
-		value="7" />
-	<combo_box.item
-		label="AMD Tonemapper"
-		name="toneAMD"
-		value="8" />
-	<combo_box.item
-		label="Uncharted"
-		name="toneUncharted"
-		value="9" />
+    <combo_box.item
+      label="None"
+      name="0"
+      value="0"/>
+    <combo_box.item
+      label="Manual only"
+      name="1"
+      value="1"/>
+    <combo_box.item
+      label="Manual + terrain and water"
+      name="2"
+      value="2"/>
+    <combo_box.item
+      label="Full scene"
+      name="3"
+      value="3"/>
   </combo_box>
 
-    <slider
+  <slider
     control_name="RenderExposure"
     decimal_digits="1"
     follows="left|top"
