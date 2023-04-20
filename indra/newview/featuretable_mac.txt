@@ -73,6 +73,7 @@ RenderReflectionProbeDetail	1	2
 RenderScreenSpaceReflections 1  1
 RenderReflectionProbeCount  1   256
 RenderReflectionProbeLevel  1   3
+RenderToneMapType 1 1
 
 //
 // Low Graphics Settings

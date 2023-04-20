@@ -50,12 +50,9 @@ public:
 	void onClickResetGroupDefault(const LLSD& userdata);
     void updateTonemapper();
     void updateCAS();
-    void updateSSAO();
-    void commitTonemapper(const LLSD& userdata);
     void commitCAS(const LLSD& userdata);
-    void commitSSAO(const LLSD& userdata);
 
-    boost::signals2::scoped_connection mTonemapConnection;
+    boost::signals2::scoped_connection mTonemapConnection;	
 	
 };
 

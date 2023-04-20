@@ -512,7 +512,8 @@ void LLPipeline::init()
 	connectRefreshCachedSettingsSafe("RenderSSAOScale");
 	connectRefreshCachedSettingsSafe("RenderSSAOMaxScale");
 	connectRefreshCachedSettingsSafe("RenderSSAOFactor");
-	connectRefreshCachedSettingsSafe("RenderSSAOEffect");
+	connectRefreshCachedSettingsSafe("RenderSSAOEffectValue");
+	connectRefreshCachedSettingsSafe("RenderSSAOEffectSat");
 	connectRefreshCachedSettingsSafe("RenderShadowOffsetError");
 	connectRefreshCachedSettingsSafe("RenderShadowBiasError");
 	connectRefreshCachedSettingsSafe("RenderShadowOffset");
@@ -1047,7 +1048,7 @@ void LLPipeline::refreshCachedSettings()
 	RenderSSAOScale = gSavedSettings.getF32("RenderSSAOScale");
 	RenderSSAOMaxScale = gSavedSettings.getU32("RenderSSAOMaxScale");
 	RenderSSAOFactor = gSavedSettings.getF32("RenderSSAOFactor");
-	RenderSSAOEffect = gSavedSettings.getVector3("RenderSSAOEffect");
+	RenderSSAOEffect = LLVector3(gSavedSettings.getF32("RenderSSAOEffectValue"), gSavedSettings.getF32("RenderSSAOEffectSat"), 0.0f);
 	RenderShadowOffsetError = gSavedSettings.getF32("RenderShadowOffsetError");
 	RenderShadowBiasError = gSavedSettings.getF32("RenderShadowBiasError");
 	RenderShadowOffset = gSavedSettings.getF32("RenderShadowOffset");
@@ -7439,31 +7440,40 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst) {
 				}
 			}
 
-			if (focus_point.isExactlyZero())
+			static LLVector3 last_focus_point{};
+			if (LLPipeline::RenderFocusPointLocked && !last_focus_point.isExactlyZero())
 			{
-				if (LLViewerJoystick::getInstance()->getOverrideCamera())
-				{ // focus on point under cursor
-					focus_point.set(gDebugRaycastIntersection.getF32ptr());
-				}
-				else if (gAgentCamera.cameraMouselook())
-				{ // focus on point under mouselook crosshairs
-					LLVector4a result;
-					result.clear();
-
-					gViewerWindow->cursorIntersect(-1, -1, 512.f, NULL, -1, FALSE, FALSE, TRUE, NULL, &result);
-
-					focus_point.set(result.getF32ptr());
-				}
-				else
+				focus_point = last_focus_point;
+			}
+			else
+			{
+				if (focus_point.isExactlyZero())
 				{
-					// focus on alt-zoom target
-					LLViewerRegion* region = gAgent.getRegion();
-					if (region)
+					if (LLViewerJoystick::getInstance()->getOverrideCamera())
+					{ // focus on point under cursor
+						focus_point.set(gDebugRaycastIntersection.getF32ptr());
+					}
+					else if (gAgentCamera.cameraMouselook())
+					{ // focus on point under mouselook crosshairs
+						LLVector4a result;
+						result.clear();
+
+						gViewerWindow->cursorIntersect(-1, -1, 512.f, NULL, -1, FALSE, FALSE, TRUE, NULL, &result);
+
+						focus_point.set(result.getF32ptr());
+					}
+					else
 					{
-						focus_point = LLVector3(gAgentCamera.getFocusGlobal() - region->getOriginGlobal());
+						// focus on alt-zoom target
+						LLViewerRegion* region = gAgent.getRegion();
+						if (region)
+						{
+							focus_point = LLVector3(gAgentCamera.getFocusGlobal() - region->getOriginGlobal());
+						}
 					}
 				}
 			}
+			last_focus_point = focus_point;
 
 			LLVector3 eye = LLViewerCamera::getInstance()->getOrigin();
 			F32 target_distance = 16.f;

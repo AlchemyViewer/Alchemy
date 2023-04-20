@@ -9560,6 +9560,28 @@
     <key>Value</key>
     <real>0.30</real>
   </map>
+  <key>RenderSSAOEffectValue</key>
+  <map>
+    <key>Comment</key>
+    <string>Multiplier for value , for areas which are totally occluded.  Blends with original color for partly-occluded areas.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>0.80</real>
+  </map>
+  <key>RenderSSAOEffectSat</key>
+  <map>
+    <key>Comment</key>
+    <string>Multiplier for saturation , for areas which are totally occluded.  Blends with original color for partly-occluded areas.</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>1.00</real>
+  </map>
   <key>RenderSSAOEffect</key>
   <map>
     <key>Comment</key>

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
  width="365"
- height="330"
+ height="340"
  layout="topleft"
- min_height="330"
+ min_height="340"
  min_width="365"
  name="floater_lightbox_settings"
  positioning="cascading"
@@ -15,13 +15,13 @@
 		top_pad="0" 
 		enabled="true" 
 		follows="left|top" 
-		height="330" 
-		left_delta="5"
+		height="340" 
 		mouse_opaque="false" 
 		name="lightbox_tab_container" 
 		tab_position="top"
 		tab_stop="false" 
-		width="350">
+		tab_min_width="70"
+		width="363">
 			<!--Image Panel-->
 			<panel
 				label="Image"
@@ -34,7 +34,7 @@
 					follows="left|top"
 					height="15"
 					left="10"
-					top_pad="6"
+					top_pad="8"
 					width="60"
 					layout="topleft"
 					tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
@@ -45,12 +45,11 @@
 					tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
 					control_name="RenderColorGradeLUT"
 					follows="left|top"
-					height="20"
 					layout="topleft"
 					right="-4"
 					max_chars="200"
 					name="colorlut_combo"
-					top_pad="-18"
+					top_pad="-21"
 					width="265">
 					<combo_box.item
 						label="None"
@@ -1366,12 +1365,12 @@
 					top_pad="4"
 					width="110"
 					layout="topleft"
-					tool_tip="Controls the strength of the SSAO effect."
-					value="SSAO Strength:" />
+					tool_tip="Controls the value of the SSAO HSV transform."
+					value="SSAO Value:" />
 				<slider
 					top_pad="-18"
 					height="20"
-					increment=".1"
+					increment=".01"
 					follows="left|top|right"
 					layout="topleft"
 					max_val="1"
@@ -1379,32 +1378,77 @@
 					left="140"
 					right="-75"
 					show_text="false"
-					name="ssao_strength_slider"
-					tool_tip="Controls the strength of the SSAO effect."
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.SSAOCommit"
-						parameter="slider" />
-					</slider>
+					name="ssao_value_slider"
+					tool_tip="Controls the value of the SSAO HSV transform.."
+					control_name="RenderSSAOEffectValue" />
 				<spinner
 					top_pad="-20"
 					height="15"
 					label_width="0"
 					right="-20"
-					decimal_digits="1"
+					decimal_digits="3"
 					follows="top|right"
 					layout="topleft"
 					max_val="1"
 					min_val="0"
 					width="55"
-					increment=".1"
+					increment=".01"
+					name="ssao_value_spinner"
+					tool_tip="Controls the value of the SSAO HSV transform."
+					control_name="RenderSSAOEffectValue"/>
+				<button
+					name="ssaoVal_default_btn"
+					follows="top|right"
+					layout="topleft"
+					height="22"
+					left_delta="55"
+					top_pad="-15"
+					width="18"
+					scale_image="true"
+					image_overlay="Refresh_Off"
+					image_overlay_alignment="center">
+					<button.commit_callback
+						function="LightBox.ResetControlDefault"
+						parameter="RenderSSAOEffectValue" />
+				</button>
+				<text
+					follows="left|top"
+					height="15"
+					left="30"
+					top_pad="4"
+					width="110"
+					layout="topleft"
+					tool_tip="Controls the saturation of the SSAO HSV transform."
+					value="SSAO Saturation:" />
+				<slider
+					top_pad="-18"
+					height="20"
+					increment=".01"
+					follows="left|top|right"
+					layout="topleft"
+					max_val="1"
+					min_val="0"
+					left="140"
+					right="-75"
+					show_text="false"
+					name="ssao_sat_slider"
+					tool_tip="Controls the saturation of the SSAO HSV transform."
+					control_name="RenderSSAOEffectSat" />
+				<spinner
+					top_pad="-20"
+					height="15"
+					label_width="0"
+					right="-20"
+					decimal_digits="3"
+					follows="top|right"
+					layout="topleft"
+					max_val="1"
+					min_val="0"
+					width="55"
+					increment=".01"
 					name="ssao_strength_spinner"
-					tool_tip="Controls the strength of the SSAO effect."
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.SSAOCommit"
-						parameter="spinner" />
-					</spinner>
+					tool_tip="Controls the saturation of the SSAO HSV transform."
+					control_name="RenderSSAOEffectSat"/>
 				<button
 					name="ssaoStrength_default_btn"
 					follows="top|right"
@@ -1418,7 +1462,7 @@
 					image_overlay_alignment="center">
 					<button.commit_callback
 						function="LightBox.ResetControlDefault"
-						parameter="RenderSSAOEffect" />
+						parameter="RenderSSAOEffectSat" />
 				</button>
 				<!--SSAO Factor-->
 				<text
@@ -1448,7 +1492,7 @@
 					height="15"
 					label_width="0"
 					right="-20"
-					decimal_digits="1"
+					decimal_digits="3"
 					follows="top|right"
 					layout="topleft"
 					max_val="10"

@@ -72,6 +72,7 @@ RenderGLContextCoreProfile         1   1
 RenderGLMultiThreaded       1   0
 RenderReflectionProbeResolution 1 128
 RenderScreenSpaceReflections 1  1
+RenderToneMapType 1 1
 
 
 //

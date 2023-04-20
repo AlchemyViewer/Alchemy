@@ -45,7 +45,6 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.ResetGroupDefault", std::bind(&ALFloaterLightBox::onClickResetGroupDefault, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.CASSelect", boost::bind(&ALFloaterLightBox::updateCAS, this));
     mCommitCallbackRegistrar.add("LightBox.CASCommit", std::bind(&ALFloaterLightBox::commitCAS, this, std::placeholders::_2));
-    mCommitCallbackRegistrar.add("LightBox.SSAOCommit", std::bind(&ALFloaterLightBox::commitSSAO, this, std::placeholders::_2));
 }
 
 ALFloaterLightBox::~ALFloaterLightBox()
@@ -62,7 +61,6 @@ BOOL ALFloaterLightBox::postBuild()
 
 void ALFloaterLightBox::draw()
 {
-    updateSSAO();
     updateCAS();
     LLFloater::draw();
 }
@@ -496,28 +494,6 @@ void ALFloaterLightBox::updateTonemapper()
 	}
 }
 
-void ALFloaterLightBox::updateSSAO() 
-{
-    //TODO: Make generic in case more Vec3 values need to be poked
-    LLVector3 SSAO_PARAMS = gSavedSettings.getVector3("RenderSSAOEffect");
-    F32       SSAO_Strength_Relative = clamp(1 - SSAO_PARAMS[VX], 0.0f, 1.0f);  // Remapped Value to Slider's Expecations, also clamped
-
-    // Init UI
-    LLSpinCtrl*   spinner1 = getChild<LLSpinCtrl>("ssao_strength_spinner");
-    LLSliderCtrl* slider1  = getChild<LLSliderCtrl>("ssao_strength_slider");
-
-    spinner1->setMinValue(0.0f);
-    spinner1->setMaxValue(1.0f);
-    spinner1->setPrecision(2);
-    spinner1->setIncrement(0.01f);
-    spinner1->setValue(SSAO_Strength_Relative);
-
-    slider1->setMinValue(0.0f);
-    slider1->setMaxValue(1.0f);
-    slider1->setIncrement(0.01f);
-    slider1->setValue(SSAO_Strength_Relative);
-}
-
 void ALFloaterLightBox::updateCAS() 
 {
     // Check the state of RenderSharpenMethod
@@ -575,69 +551,6 @@ void ALFloaterLightBox::updateCAS()
     slider2->setMaxValue(sharp1.TM_Max);
     slider2->setIncrement(sharp1.TM_Inc);
     slider2->setValue(CAS_PARAMS[VY]);
-}
-
-void ALFloaterLightBox::commitTonemapper(const LLSD& userdata)
-{
-    const std::string& active_control = userdata.asString();
-    // Check the state of RenderToneMapType
-    U32 TMap = gSavedSettings.getU32("RenderToneMapType");
-
-    LLVector3 vTM_A;
-    LLVector3 vTM_B;
-    LLVector3 vTM_C;
-    if (TMap == 7)  // Uchimura
-    {
-        vTM_A[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "1")->getValue().asReal();
-        vTM_A[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "2")->getValue().asReal();
-        vTM_A[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "3")->getValue().asReal();
-        vTM_B[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "4")->getValue().asReal();
-        vTM_B[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "5")->getValue().asReal();
-        vTM_B[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "6")->getValue().asReal();
-        gSavedSettings.setVector3("RenderToneMapUchimuraA", vTM_A);
-        gSavedSettings.setVector3("RenderToneMapUchimuraB", vTM_B);
-    }
-    else if (TMap == 8)  // Lottes
-    {
-        vTM_A[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "1")->getValue().asReal();
-        vTM_A[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "2")->getValue().asReal();
-        vTM_A[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "3")->getValue().asReal();
-        vTM_B[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "4")->getValue().asReal();
-        vTM_B[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "5")->getValue().asReal();
-        vTM_B[VZ] = 0.0f;
-        gSavedSettings.setVector3("RenderToneMapLottesA", vTM_A);
-        gSavedSettings.setVector3("RenderToneMapLottesB", vTM_B);
-    }
-    else if (TMap == 9)  // Uncharted
-    {
-        vTM_A[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "1")->getValue().asReal();
-        vTM_A[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "2")->getValue().asReal();
-        vTM_A[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "3")->getValue().asReal();
-        vTM_B[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "4")->getValue().asReal();
-        vTM_B[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "5")->getValue().asReal();
-        vTM_B[VZ] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "6")->getValue().asReal();
-        vTM_C[VX] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "7")->getValue().asReal();
-        vTM_C[VY] = (F32) getChild<LLUICtrl>("tonemapper_dynamic_" + active_control + "8")->getValue().asReal();
-        vTM_C[VZ] = 0.0f;
-        gSavedSettings.setVector3("RenderToneMapUnchartedA", vTM_A);
-        gSavedSettings.setVector3("RenderToneMapUnchartedB", vTM_B);
-        gSavedSettings.setVector3("RenderToneMapUnchartedC", vTM_C);
-    }
-}
-
-void ALFloaterLightBox::commitSSAO(const LLSD& userdata)
-{
-    // TODO: This should probably be more generic in case I need to poke another vec3 setting.
-    const std::string& active_control = userdata.asString();
-
-    // Remap back to what the value expects, also clamp
-    F32 SSAO_Strength_Real = clamp(1 - (F32) getChild<LLUICtrl>("ssao_strength_" + active_control)->getValue().asReal(), 0.0f, 1.0f);
-    
-    LLVector3 SSAO;
-    SSAO[VX] = SSAO_Strength_Real;
-    SSAO[VY] = 1.0f;
-    SSAO[VZ] = 0.0f;
-    gSavedSettings.setVector3("RenderSSAOEffect", SSAO);
 }
 
 void ALFloaterLightBox::commitCAS(const LLSD& userdata)
