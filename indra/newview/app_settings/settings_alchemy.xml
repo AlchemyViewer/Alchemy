@@ -420,50 +420,6 @@
       <key>Value</key>
       <real>1.0</real>
     </map>
-    <key>AlchemyLookAtShow</key>
-    <map>
-      <key>Comment</key>
-      <string>[OBSOLETE]</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>AlchemyLookAtLines</key>
-    <map>
-      <key>Comment</key>
-      <string>[OBSOLETE]</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>AlchemyLookAtNames</key>
-    <map>
-      <key>Comment</key>
-      <string>[OBSOLETE]</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>U32</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>AlchemyLookAtHideSelf</key>
-    <map>
-      <key>Comment</key>
-      <string>[OBSOLETE]</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
     <key>AlchemyLookAtPrivate</key>
     <map>
       <key>Comment</key>
@@ -1176,10 +1132,43 @@
         <real>0.0</real>
       </array>
     </map>
-    <key>RenderToneMapExposure</key>
+    <key>RenderToneMapType</key>
     <map>
       <key>Comment</key>
-      <string>[OBSOLETE]</string>
+      <string>Tonemapping type 0 - HDR Debug, 1 - ACES, 2 - Uchimura, 3 - AMD, 4 - Uncharted</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>AlchemyToneMapAMDHDRMax</key>
+    <map>
+      <key>Comment</key>
+      <string>How much HDR range before clipping. HDR modes likely need this pushed up to say 25.0.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>16.0</real>
+    </map>
+    <key>AlchemyToneMapAMDContrast</key>
+    <map>
+      <key>Comment</key>
+      <string>Use as a baseline to tune the amount of contrast the tonemapper has.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.4</real>
+    </map>
+    <key>AlchemyToneMapAMDShoulder</key>
+    <map>
+      <key>Comment</key>
+      <string>Tonemap shoulder adjustment</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -1187,121 +1176,137 @@
       <key>Value</key>
       <real>1.0</real>
     </map>
-    <key>RenderToneMapLottesA</key>
+    <key>AlchemyToneMapUchimuraMaxBrightness</key>
     <map>
       <key>Comment</key>
-      <string>x (a), y (d), z (hdrMax)</string>
+      <string>Maximum Possible Display Brightness</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Vector3</string>
+      <string>F32</string>
       <key>Value</key>
-      <array>
-        <real>1.4</real>
-        <real>1.0</real>
-        <real>16.0</real>
-      </array>
+      <real>1.0</real>
     </map>
-    <key>RenderToneMapLottesB</key>
+    <key>AlchemyToneMapUchimuraContrast</key>
     <map>
       <key>Comment</key>
-      <string>[OBSOLETE]</string>
+      <string>Contrast Adjustment</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Vector3</string>
+      <string>F32</string>
       <key>Value</key>
-      <array>
-        <real>0.18</real>
-        <real>0.18</real>
-        <real>0.0</real>
-      </array>
+      <real>1.0</real>
     </map>
-    <key>RenderToneMapType</key>
+    <key>AlchemyToneMapUchimuraLinearStart</key>
     <map>
       <key>Comment</key>
-      <string>Tonemapping type 0 - HDR Debug, 1 - Linear, 2 - Reinhard, 3 - Reinhard2, 4 - Filmic, 5 - Unreal, 6 - ACES Narkowicz, 7 - Uchimura, 8 - AMD, 9 - Uncharted, 10 - Aces Hill</string>
+      <string>Curve Linear Section Start</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>U32</string>
+      <string>F32</string>
       <key>Value</key>
-      <integer>10</integer>
+      <real>0.22</real>
     </map>
-    <key>RenderToneMapUchimuraA</key>
+    <key>AlchemyToneMapUchimuraLinearLength</key>
     <map>
       <key>Comment</key>
-      <string>x (max display brightness), y (contrast), z (linear section start)</string>
+      <string>Length of linear section in tonemapping curve</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Vector3</string>
+      <string>F32</string>
       <key>Value</key>
-      <array>
-        <real>1.0</real>
-        <real>1.0</real>
-        <real>0.22</real>
-      </array>
+      <real>0.44</real>
     </map>
-    <key>RenderToneMapUchimuraB</key>
+    <key>AlchemyToneMapUchimuraBlackLevel</key>
     <map>
       <key>Comment</key>
-      <string>x (linear section length), y (black), z (pedestal)</string>
+      <string>Adjust black range of curve</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Vector3</string>
+      <string>F32</string>
       <key>Value</key>
-      <array>
-        <real>0.4</real>
-        <real>1.13</real>
-        <real>0.0</real>
-      </array>
+      <real>1.33</real>
     </map>
-    <key>RenderToneMapUnchartedA</key>
+    <key>AlchemyToneMapFilmicToeStr</key>
     <map>
       <key>Comment</key>
-      <string>A, B, C</string>
+      <string>Toe Strength</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Vector3</string>
+      <string>F32</string>
       <key>Value</key>
-      <array>
-        <real>0.15</real>
-        <real>0.50</real>
-        <real>0.10</real>
-      </array>
+      <real>0.22</real>
     </map>
-    <key>RenderToneMapUnchartedB</key>
+    <key>AlchemyToneMapFilmicToeLen</key>
     <map>
       <key>Comment</key>
-      <string>D, E, F</string>
+      <string>Toe Length</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Vector3</string>
+      <string>F32</string>
       <key>Value</key>
-      <array>
-        <real>0.20</real>
-        <real>0.02</real>
-        <real>0.20</real>
-      </array>
+      <real>0.30</real>
     </map>
-    <key>RenderToneMapUnchartedC</key>
+    <key>AlchemyToneMapFilmicShoulderStr</key>
     <map>
       <key>Comment</key>
-      <string>W, ExposureBias, UNUSED</string>
+      <string>Shoulder Strength</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Vector3</string>
+      <string>F32</string>
       <key>Value</key>
-      <array>
-        <real>11.2</real>
-        <real>2.0</real>
-        <real>0.0</real>
-      </array>
+      <real>0.22</real>
+    </map>
+    <key>AlchemyToneMapFilmicShoulderLen</key>
+    <map>
+      <key>Comment</key>
+      <string>Shoulder Length</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.20</real>
+    </map>
+    <key>AlchemyToneMapFilmicShoulderAngle</key>
+    <map>
+      <key>Comment</key>
+      <string>Shoulder Angle</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.01</real>
+    </map>
+    <key>AlchemyToneMapFilmicGamma</key>
+    <map>
+      <key>Comment</key>
+      <string>Curve Gamma</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.3</real>
+    </map>
+    <key>AlchemyToneMapFilmicWhitePoint</key>
+    <map>
+      <key>Comment</key>
+      <string>Curve White Point</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>8.0</real>
     </map>
     <key>ResetUserColorsOnLogout</key>
     <map>
@@ -1390,6 +1395,166 @@
       <string>U32</string>
       <key>Value</key>
       <integer>1023</integer>
+    </map>
+    <key>AlchemyLookAtShow</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyLookAtLines</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyLookAtNames</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyLookAtHideSelf</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>RenderToneMapExposure</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>RenderToneMapLottesA</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>1.4</real>
+        <real>1.0</real>
+        <real>16.0</real>
+      </array>
+    </map>
+    <key>RenderToneMapLottesB</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.18</real>
+        <real>0.18</real>
+        <real>0.0</real>
+      </array>
+    </map>
+    <key>RenderToneMapUchimuraA</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>1.0</real>
+        <real>1.0</real>
+        <real>0.22</real>
+      </array>
+    </map>
+    <key>RenderToneMapUchimuraB</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.4</real>
+        <real>1.13</real>
+        <real>0.0</real>
+      </array>
+    </map>
+    <key>RenderToneMapUnchartedA</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.22</real>
+        <real>0.30</real>
+        <real>0.10</real>
+      </array>
+    </map>
+    <key>RenderToneMapUnchartedB</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.20</real>
+        <real>0.01</real>
+        <real>0.30</real>
+      </array>
+    </map>
+    <key>RenderToneMapUnchartedC</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>6.5</real>
+        <real>2.0</real>
+        <real>0.0</real>
+      </array>
     </map>
   </map>
 </llsd>

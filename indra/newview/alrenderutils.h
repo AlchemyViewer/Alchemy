@@ -48,16 +48,10 @@ public:
 	enum ALTonemap : uint32_t
 	{
 		TONEMAP_NONE = 0,
-		TONEMAP_LINEAR,
-		TONEMAP_REINHARD,
-		TONEMAP_REINHARD2,
-		TONEMAP_FILMIC,
-		TONEMAP_UNREAL,
-		TONEMAP_ACES_NARCOWICZ,
+		TONEMAP_ACES_HILL,
 		TONEMAP_UCHIMURA,
 		TONEMAP_AMD,
 		TONEMAP_UNCHARTED,
-		TONEMAP_ACES_HILL,
 		TONEMAP_COUNT
 	};
 	bool setupTonemap();
@@ -84,8 +78,7 @@ private:
 
 	// State
 	U32 mTonemapType = ALTonemap::TONEMAP_NONE;
-	LLVector3 mToneLottesParamA;
-	LLVector3 mToneLottesParamB;
+	LLVector3 mToneAMDParams;
 	LLVector3 mToneUchimuraParamA;
 	LLVector3 mToneUchimuraParamB;
 	LLVector3 mToneUnchartedParamA;

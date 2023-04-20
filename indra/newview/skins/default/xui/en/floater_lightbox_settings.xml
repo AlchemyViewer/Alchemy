@@ -311,47 +311,21 @@
 					top_pad="-16"
 					width="80">
 					<combo_box.item
-						label="Linear"
-						name="toneLinear"
+						label="ACES"
+						name="toneACES"
 						value="1" />
-					<combo_box.item
-						label="Reinhard"
-						name="toneReinhard"
-						value="2" />
-					<combo_box.item
-						label="Reinhard2"
-						name="toneReinhard2"
-						value="3" />
-					<combo_box.item
-						label="Filmic"
-						name="toneFilmic"
-						value="4" />
-					<combo_box.item
-						label="Unreal"
-						name="toneUnreal"
-						value="5" />
-					<combo_box.item
-						label="ACES Narkowicz"
-						name="toneACESNark"
-						value="6" />
-					<combo_box.item
-						label="ACES Hill"
-						name="toneACESHill"
-						value="10" />
 					<combo_box.item
 						label="Uchimura"
 						name="toneUchimura"
-						value="7" />
+						value="2" />
 					<combo_box.item
 						label="AMD Tonemapper"
 						name="toneAMD"
-						value="8" />
+						value="3" />
 					<combo_box.item
 						label="Uncharted"
 						name="toneUncharted"
-						value="9" />
-					<combo_box.commit_callback
-       					function="LightBox.TonemapperSelect" />
+						value="4" />
 				</combo_box>
 				<button
 					name="exposure_default_btn"
@@ -429,32 +403,21 @@
 					left_delta="100"
 					right="-55"
 					show_text="false"
-					name="tonemapper_dynamic_slider1"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="slider" />
-					</slider>
+					name="tonemapper_dynamic_slider1" />
 				<spinner
 					visible="false"
 					top_pad="-20"
 					height="15"
 					label_width="0"
 					right="-1"
-					decimal_digits="1"
+					decimal_digits="2"
 					follows="top|right"
 					layout="topleft"
 					max_val="1.0"
 					min_val="0.0"
 					width="55"
 					increment=".1"
-					name="tonemapper_dynamic_spinner1"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="spinner" />
-					</spinner>
-					
+					name="tonemapper_dynamic_spinner1" />
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text2"
@@ -477,31 +440,21 @@
 					left_delta="100"
 					right="-55"
 					show_text="false"
-					name="tonemapper_dynamic_slider2"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="slider" />
-					</slider>
+					name="tonemapper_dynamic_slider2" />
 				<spinner
 					visible="false"
 					top_pad="-20"
 					height="15"
 					label_width="0"
 					right="-1"
-					decimal_digits="1"
+					decimal_digits="2"
 					follows="top|right"
 					layout="topleft"
 					max_val="1.0"
 					min_val="0.0"
 					width="55"
 					increment=".1"
-					name="tonemapper_dynamic_spinner2"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="spinner" />
-					</spinner>
+					name="tonemapper_dynamic_spinner2" />
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text3"
@@ -524,31 +477,21 @@
 					left_delta="100"
 					right="-55"
 					show_text="false"
-					name="tonemapper_dynamic_slider3"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="slider" />
-					</slider>
+					name="tonemapper_dynamic_slider3" />
 				<spinner
 					visible="false"
 					top_pad="-20"
 					height="15"
 					label_width="0"
 					right="-1"
-					decimal_digits="1"
+					decimal_digits="2"
 					follows="top|right"
 					layout="topleft"
 					max_val="1.0"
 					min_val="0.0"
 					width="55"
 					increment=".1"
-					name="tonemapper_dynamic_spinner3"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="spinner" />
-					</spinner>
+					name="tonemapper_dynamic_spinner3" />
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text4"
@@ -571,31 +514,21 @@
 					left_delta="100"
 					right="-55"
 					show_text="false"
-					name="tonemapper_dynamic_slider4"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="slider" />
-					</slider>
+					name="tonemapper_dynamic_slider4" />
 				<spinner
 					visible="false"
 					top_pad="-20"
 					height="15"
 					label_width="0"
 					right="-1"
-					decimal_digits="1"
+					decimal_digits="2"
 					follows="top|right"
 					layout="topleft"
 					max_val="1.0"
 					min_val="0.0"
 					width="55"
 					increment=".1"
-					name="tonemapper_dynamic_spinner4"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="spinner" />
-					</spinner>
+					name="tonemapper_dynamic_spinner4" />
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text5"
@@ -618,31 +551,21 @@
 					left_delta="100"
 					right="-55"
 					show_text="false"
-					name="tonemapper_dynamic_slider5"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="slider" />
-					</slider>
+					name="tonemapper_dynamic_slider5" />
 				<spinner
 					visible="false"
 					top_pad="-20"
 					height="15"
 					label_width="0"
 					right="-1"
-					decimal_digits="1"
+					decimal_digits="2"
 					follows="top|right"
 					layout="topleft"
 					max_val="1.0"
 					min_val="0.0"
 					width="55"
 					increment=".1"
-					name="tonemapper_dynamic_spinner5"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="spinner" />
-					</spinner>
+					name="tonemapper_dynamic_spinner5" />
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text6"
@@ -665,31 +588,21 @@
 					left_delta="100"
 					right="-55"
 					show_text="false"
-					name="tonemapper_dynamic_slider6"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="slider" />
-					</slider>
+					name="tonemapper_dynamic_slider6" />
 				<spinner
 					visible="false"
 					top_pad="-20"
 					height="15"
 					label_width="0"
 					right="-1"
-					decimal_digits="1"
+					decimal_digits="2"
 					follows="top|right"
 					layout="topleft"
 					max_val="1.0"
 					min_val="0.0"
 					width="55"
 					increment=".1"
-					name="tonemapper_dynamic_spinner6"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="spinner" />
-					</spinner>
+					name="tonemapper_dynamic_spinner6" />
 				<text
 					visible="false"
 					name="tonemapper_dynamic_text7"
@@ -712,79 +625,21 @@
 					left_delta="100"
 					right="-55"
 					show_text="false"
-					name="tonemapper_dynamic_slider7"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="slider" />
-					</slider>
+					name="tonemapper_dynamic_slider7" />
 				<spinner
 					visible="false"
 					top_pad="-20"
 					height="15"
 					label_width="0"
 					right="-1"
-					decimal_digits="1"
+					decimal_digits="2"
 					follows="top|right"
 					layout="topleft"
 					max_val="1.0"
 					min_val="0.0"
 					width="55"
 					increment=".1"
-					name="tonemapper_dynamic_spinner7"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="spinner" />
-					</spinner>
-				<text
-					visible="false"
-					name="tonemapper_dynamic_text8"
-					follows="left|top"
-					height="15"
-					left="30"
-					top_pad="10"
-					width="100"
-					layout="topleft"
-					value="TonemapD8:" />
-				<slider
-					visible="false"
-					top_pad="-18"
-					height="20"
-					increment=".1"
-					follows="left|top|right"
-					layout="topleft"
-					max_val="1.0"
-					min_val="0.0"
-					left_delta="100"
-					right="-55"
-					show_text="false"
-					name="tonemapper_dynamic_slider8"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="slider" />
-					</slider>
-				<spinner
-					visible="false"
-					top_pad="-20"
-					height="15"
-					label_width="0"
-					right="-1"
-					decimal_digits="1"
-					follows="top|right"
-					layout="topleft"
-					max_val="1.0"
-					min_val="0.0"
-					width="55"
-					increment=".1"
-					name="tonemapper_dynamic_spinner8"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.TonemapperCommit"
-						parameter="spinner" />
-					</spinner>
-				
+					name="tonemapper_dynamic_spinner7" />	
 			</panel>
 			<!--Rendering Panel-->
 			<panel

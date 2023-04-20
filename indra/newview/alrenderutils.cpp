@@ -46,8 +46,7 @@ const U32 ALRENDER_BUFFER_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MA
 static LLStaticHashedString al_exposure("exposure");
 static LLStaticHashedString tone_uchimura_a("tone_uchimura_a");
 static LLStaticHashedString tone_uchimura_b("tone_uchimura_b");
-static LLStaticHashedString tone_lottes_a("tone_lottes_a");
-static LLStaticHashedString tone_lottes_b("tone_lottes_b");
+static LLStaticHashedString tonemap_amd_params("tonemap_amd");
 static LLStaticHashedString tone_uncharted_a("tone_uncharted_a");
 static LLStaticHashedString tone_uncharted_b("tone_uncharted_b");
 static LLStaticHashedString tone_uncharted_c("tone_uncharted_c");
@@ -248,13 +247,21 @@ ALRenderUtil::ALRenderUtil()
 	gSavedSettings.getControl("RenderColorGradeLUT")->getSignal()->connect(boost::bind(&ALRenderUtil::setupColorGrade, this));
 	gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderToneMapLottesA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderToneMapLottesB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderToneMapUchimuraA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderToneMapUchimuraB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderToneMapUnchartedA")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderToneMapUnchartedB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderToneMapUnchartedC")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDHDRMax")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDShoulder")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapUchimuraMaxBrightness")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapUchimuraContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapUchimuraLinearStart")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapUchimuraLinearLength")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapUchimuraBlackLevel")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapFilmicToeStr")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapFilmicToeLen")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapFilmicShoulderStr")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapFilmicShoulderLen")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapFilmicShoulderAngle")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapFilmicGamma")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapFilmicWhitePoint")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
 	gSavedSettings.getControl("RenderSharpenCASParams")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
 	gSavedSettings.getControl("RenderSharpenDLSParams")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
@@ -312,13 +319,12 @@ bool ALRenderUtil::setupTonemap()
 
 		mTonemapExposure = llclamp(gSavedSettings.getF32("RenderExposure"), 0.5f, 4.f);
 
-		mToneLottesParamA = gSavedSettings.getVector3("RenderToneMapLottesA");
-		mToneLottesParamB = gSavedSettings.getVector3("RenderToneMapLottesB");
-		mToneUchimuraParamA = gSavedSettings.getVector3("RenderToneMapUchimuraA");
-		mToneUchimuraParamB = gSavedSettings.getVector3("RenderToneMapUchimuraB");
-		mToneUnchartedParamA = gSavedSettings.getVector3("RenderToneMapUnchartedA");
-		mToneUnchartedParamB = gSavedSettings.getVector3("RenderToneMapUnchartedB");
-		mToneUnchartedParamC = gSavedSettings.getVector3("RenderToneMapUnchartedC");
+		mToneAMDParams = LLVector3(gSavedSettings.getF32("AlchemyToneMapAMDHDRMax"), gSavedSettings.getF32("AlchemyToneMapAMDContrast"), gSavedSettings.getF32("AlchemyToneMapAMDShoulder"));
+		mToneUchimuraParamA = LLVector3(gSavedSettings.getF32("AlchemyToneMapUchimuraMaxBrightness"), gSavedSettings.getF32("AlchemyToneMapUchimuraContrast"), gSavedSettings.getF32("AlchemyToneMapUchimuraLinearStart"));
+		mToneUchimuraParamB = LLVector3(gSavedSettings.getF32("AlchemyToneMapUchimuraLinearLength"), gSavedSettings.getF32("AlchemyToneMapUchimuraBlackLevel"), 0.0);
+		mToneUnchartedParamA = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicToeStr"), gSavedSettings.getF32("AlchemyToneMapFilmicToeLen"), gSavedSettings.getF32("AlchemyToneMapFilmicShoulderStr"));
+		mToneUnchartedParamB = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicShoulderLen"), gSavedSettings.getF32("AlchemyToneMapFilmicShoulderAngle"), gSavedSettings.getF32("AlchemyToneMapFilmicGamma"));
+		mToneUnchartedParamC = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicWhitePoint"), 2.0, 0.0);
 	}
 	else
 	{
@@ -539,8 +545,7 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 	}
 	case ALTonemap::TONEMAP_AMD:
 	{
-		tone_shader->uniform3fv(tone_lottes_a, 1, mToneLottesParamA.mV);
-		tone_shader->uniform3fv(tone_lottes_b, 1, mToneLottesParamB.mV);
+		tone_shader->uniform3fv(tonemap_amd_params, 1, mToneAMDParams.mV);
 		break;
 	}
 	case ALTonemap::TONEMAP_UNCHARTED:

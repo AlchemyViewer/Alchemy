@@ -41,6 +41,7 @@ class ALFloaterLightBox final : public LLFloater
 {
 public:
 	ALFloaterLightBox(const LLSD& key);
+    ~ALFloaterLightBox() override;
 	BOOL postBuild() override;
     virtual void draw() override;
 
@@ -53,6 +54,8 @@ public:
     void commitTonemapper(const LLSD& userdata);
     void commitCAS(const LLSD& userdata);
     void commitSSAO(const LLSD& userdata);
+
+    boost::signals2::scoped_connection mTonemapConnection;
 	
 };
 

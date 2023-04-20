@@ -31,6 +31,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
+#include "alrenderutils.h"
 #include "llviewercontrol.h"
 #include "llspinctrl.h"
 #include "llsliderctrl.h"
@@ -43,23 +44,26 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.ResetGroupDefault", std::bind(&ALFloaterLightBox::onClickResetGroupDefault, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.CASSelect", boost::bind(&ALFloaterLightBox::updateCAS, this));
-    mCommitCallbackRegistrar.add("LightBox.TonemapperSelect", boost::bind(&ALFloaterLightBox::updateTonemapper, this));
-    mCommitCallbackRegistrar.add("LightBox.TonemapperCommit", std::bind(&ALFloaterLightBox::commitTonemapper, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.CASCommit", std::bind(&ALFloaterLightBox::commitCAS, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.SSAOCommit", std::bind(&ALFloaterLightBox::commitSSAO, this, std::placeholders::_2));
 }
 
+ALFloaterLightBox::~ALFloaterLightBox()
+{
+	mTonemapConnection.disconnect();
+}
+
 BOOL ALFloaterLightBox::postBuild()
 {
+    updateTonemapper();
+    mTonemapConnection = gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateTonemapper(); });
 	return TRUE;
 }
 
 void ALFloaterLightBox::draw()
 {
-    updateTonemapper();
     updateSSAO();
     updateCAS();
-
     LLFloater::draw();
 }
 
@@ -76,10 +80,9 @@ void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
 void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
 {
 	const std::string& setting_group = userdata.asString();
-	LLControlVariable* controlp = nullptr;
 	if (setting_group == "sharpen")
 	{
-		controlp = gSavedSettings.getControl("RenderSharpenMethod");
+		LLControlVariable* controlp = gSavedSettings.getControl("RenderSharpenMethod");
 		if (controlp)
 		{
 			controlp->resetToDefault(true);
@@ -89,7 +92,7 @@ void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
 		{
 			controlp->resetToDefault(true);
 		}
-	    controlp = gSavedSettings.getControl("RenderSharpenDLSParams");
+		controlp = gSavedSettings.getControl("RenderSharpenDLSParams");
 		if (controlp)
 		{
 			controlp->resetToDefault(true);
@@ -97,412 +100,400 @@ void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
 	}
 	else if (setting_group == "tonemap")
 	{
-		controlp = gSavedSettings.getControl("RenderToneMapType");
-		if (controlp)
 		{
-			controlp->resetToDefault(true);
+			LLControlVariable* controlp = gSavedSettings.getControl("RenderExposure");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
 		}
-		controlp = gSavedSettings.getControl("RenderExposure");
-		if (controlp)
+
+		U32 tone_map_type = gSavedSettings.getU32("RenderToneMapType");
+		switch (tone_map_type)
 		{
-			controlp->resetToDefault(true);
+		case ALRenderUtil::TONEMAP_AMD:
+		{
+			LLControlVariable* controlp = gSavedSettings.getControl("AlchemyToneMapAMDHDRMax");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapAMDContrast");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapAMDShoulder");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			break;
 		}
-        controlp = gSavedSettings.getControl("RenderToneMapUchimuraA");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderToneMapUchimuraB");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderToneMapLottesA");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderToneMapLottesB");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderToneMapUnchartedA");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderToneMapUnchartedB");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderToneMapUnchartedC");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
+		case ALRenderUtil::TONEMAP_UCHIMURA:
+		{
+			LLControlVariable* controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraMaxBrightness");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraContrast");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraLinearStart");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraLinearLength");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraBlackLevel");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			break;
+		}
+		case ALRenderUtil::TONEMAP_UNCHARTED:
+		{
+			LLControlVariable* controlp = gSavedSettings.getControl("AlchemyToneMapFilmicToeStr");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapFilmicToeLen");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapFilmicShoulderStr");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapFilmicShoulderLen");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapFilmicShoulderAngle");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapFilmicGamma");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapFilmicWhitePoint");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			break;
+		}
+		}
 	}
 }
 
 void ALFloaterLightBox::updateTonemapper()
 {
-    //TODO: We should figure out how to call this on floater open, otherwise it'll be weird.
-    
-    //Init Text
-    LLTextBox* text1 = getChild<LLTextBox>("tonemapper_dynamic_text1");
-    LLTextBox* text2 = getChild<LLTextBox>("tonemapper_dynamic_text2");
-    LLTextBox* text3 = getChild<LLTextBox>("tonemapper_dynamic_text3");
-    LLTextBox* text4 = getChild<LLTextBox>("tonemapper_dynamic_text4");
-    LLTextBox* text5 = getChild<LLTextBox>("tonemapper_dynamic_text5");
-    LLTextBox* text6 = getChild<LLTextBox>("tonemapper_dynamic_text6");
-    LLTextBox* text7 = getChild<LLTextBox>("tonemapper_dynamic_text7");
-    LLTextBox* text8 = getChild<LLTextBox>("tonemapper_dynamic_text8");
+	//Init Text
+	LLTextBox* text1 = getChild<LLTextBox>("tonemapper_dynamic_text1");
+	LLTextBox* text2 = getChild<LLTextBox>("tonemapper_dynamic_text2");
+	LLTextBox* text3 = getChild<LLTextBox>("tonemapper_dynamic_text3");
+	LLTextBox* text4 = getChild<LLTextBox>("tonemapper_dynamic_text4");
+	LLTextBox* text5 = getChild<LLTextBox>("tonemapper_dynamic_text5");
+	LLTextBox* text6 = getChild<LLTextBox>("tonemapper_dynamic_text6");
+	LLTextBox* text7 = getChild<LLTextBox>("tonemapper_dynamic_text7");
 
 	//Init Spinners
-    LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner1");
-    LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner2");
-    LLSpinCtrl* spinner3 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner3");
-    LLSpinCtrl* spinner4 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner4");
-    LLSpinCtrl* spinner5 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner5");
-    LLSpinCtrl* spinner6 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner6");
-    LLSpinCtrl* spinner7 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner7");
-    LLSpinCtrl* spinner8 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner8");
-
-    // Init Sliders
-    LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider1");
-    LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider2");
-    LLSliderCtrl* slider3 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider3");
-    LLSliderCtrl* slider4 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider4");
-    LLSliderCtrl* slider5 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider5");
-    LLSliderCtrl* slider6 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider6");
-    LLSliderCtrl* slider7 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider7");
-    LLSliderCtrl* slider8 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider8");
-
-    // Check the state of RenderToneMapType
-    U32 TMap = gSavedSettings.getU32("RenderToneMapType");
-
-    //Init Ctrl Objects
-    ALToneMapCtrl tm1;
-    ALToneMapCtrl tm2;
-    ALToneMapCtrl tm3;
-    ALToneMapCtrl tm4;
-    ALToneMapCtrl tm5;
-    ALToneMapCtrl tm6;
-    ALToneMapCtrl tm7;
-    ALToneMapCtrl tm8;
-
-    //These get to live on their own, lucky!
-	LLVector3 vTM_A;
-    LLVector3 vTM_B;
-    LLVector3 vTM_C;
-
-    if (TMap == 7)  // Uchimura
-    {
-        vTM_A = gSavedSettings.getVector3("RenderToneMapUchimuraA");
-
-        // max display brightness
-        tm1.TM_Enable = TRUE;
-        tm1.TM_CtrlName = "Max Brightness:";
-        tm1.TM_Min      = 0.0f;
-        tm1.TM_Max      = 1.0f;
-
-        // contrast
-        tm2.TM_Enable = TRUE;
-        tm2.TM_CtrlName = "Contrast:";
-        tm2.TM_Min      = 0.01f;
-        tm2.TM_Max      = 1.0f;
-
-        // linear section start
-        tm3.TM_Enable = TRUE;
-        tm3.TM_CtrlName = "Linear Start:";
-        tm3.TM_Min      = 0.01f;
-        tm3.TM_Max      = 2.0f;
-
-        vTM_B = gSavedSettings.getVector3("RenderToneMapUchimuraB");
-
-        // linear section length
-        tm4.TM_Enable   = TRUE;
-        tm4.TM_CtrlName = "Linear Length:";
-        tm4.TM_Min      = 0.01f;
-        tm4.TM_Max      = 1.0f;
-
-        // black
-        tm5.TM_Enable   = TRUE;
-        tm5.TM_CtrlName = "Black Level:";
-        tm5.TM_Min      = -4.0f;
-        tm5.TM_Max      = 4.0f;
-
-        // pedestal
-        tm6.TM_Enable   = TRUE;
-        tm6.TM_CtrlName = "Pedestal:";
-        tm6.TM_Min      = -2.0f;
-        tm6.TM_Max      = 2.0f;
-    }
-    else if (TMap == 8)  // Lottes
-    {
-        //TODO: Better names?
-        vTM_A = gSavedSettings.getVector3("RenderToneMapLottesA");
-
-        // a
-        tm1.TM_Enable   = TRUE;
-        tm1.TM_CtrlName = "A:";
-        tm1.TM_Min      = 0.0f;
-        tm1.TM_Max      = 1.0f;
-
-        // d
-        tm2.TM_Enable   = TRUE;
-        tm2.TM_CtrlName = "D:";
-        tm2.TM_Min      = 0.01f;
-        tm2.TM_Max      = 1.0f;
-
-        // maxhdr
-        tm3.TM_Enable   = TRUE;
-        tm3.TM_CtrlName = "Max HDR:";
-        tm3.TM_Min      = 0.01f;
-        tm3.TM_Max      = 2.0f;
-
-        vTM_B = gSavedSettings.getVector3("RenderToneMapLottesB");
-
-        // midln
-        tm4.TM_Enable   = TRUE;
-        tm4.TM_CtrlName = "Mid Level:";
-        tm4.TM_Min      = 0.01f;
-        tm4.TM_Max      = 1.0f;
-
-        // black
-        tm5.TM_Enable   = TRUE;
-        tm5.TM_CtrlName = "Black Level:";
-        tm5.TM_Min      = -4.0f;
-        tm5.TM_Max      = 4.0f;
-    }
-    else if (TMap == 9)  // Uncharted
-    {
-        //TODO: What in the world are these settings actually called?!
-        vTM_A = gSavedSettings.getVector3("RenderToneMapUnchartedA");
-
-        // a
-        tm1.TM_Enable   = TRUE;
-        tm1.TM_CtrlName = "A:";
-        tm1.TM_Min      = 0.0f;
-        tm1.TM_Max      = 4.0f;
-
-        // b
-        tm2.TM_Enable   = TRUE;
-        tm2.TM_CtrlName = "B:";
-        tm2.TM_Min      = 0.0f;
-        tm2.TM_Max      = 4.0f;
-
-        // c
-        tm3.TM_Enable   = TRUE;
-        tm3.TM_CtrlName = "C:";
-        tm3.TM_Min      = 0.0f;
-        tm3.TM_Max      = 4.0f;
-
-        vTM_B = gSavedSettings.getVector3("RenderToneMapUnchartedB");
-
-        // d
-        tm4.TM_Enable   = TRUE;
-        tm4.TM_CtrlName = "D:";
-        tm4.TM_Min      = 0.0f;
-        tm4.TM_Max      = 4.0f;
-
-        // e
-        tm5.TM_Enable   = TRUE;
-        tm5.TM_CtrlName = "E:";
-        tm5.TM_Min      = -0.5f;
-        tm5.TM_Max      = 0.05f;
-        tm5.TM_Inc      = 0.001f;
-        tm5.TM_Precision = 3;
-
-        // f
-        tm6.TM_Enable   = TRUE;
-        tm6.TM_CtrlName = "F:";
-        tm6.TM_Min      = 0.04f;
-        tm6.TM_Max      = 4.0f;
-
-        vTM_C = gSavedSettings.getVector3("RenderToneMapUnchartedC");
-
-        // w
-        tm7.TM_Enable   = TRUE;
-        tm7.TM_CtrlName = "W:";
-        tm7.TM_Min      = 0.0f;
-        tm7.TM_Max      = 12.0f;
-
-        // exposure bias
-        tm8.TM_Enable   = TRUE;
-        tm8.TM_CtrlName = "Exposure Bias:";
-        tm8.TM_Min      = 0.0f;
-        tm8.TM_Max      = 16.0f;
-    }
-
-    //Set Controls
-
-    //Visibilty
-    text1->setVisible(tm1.TM_Enable);
-    text1->setText(tm1.TM_CtrlName);
-    spinner1->setVisible(tm1.TM_Enable);
-    slider1->setVisible(tm1.TM_Enable);
-
-    text2->setVisible(tm2.TM_Enable);
-    text2->setText(tm2.TM_CtrlName);
-    spinner2->setVisible(tm2.TM_Enable);
-    slider2->setVisible(tm2.TM_Enable);
-
-    text3->setVisible(tm3.TM_Enable);
-    text3->setText(tm3.TM_CtrlName);
-    spinner3->setVisible(tm3.TM_Enable);
-    slider3->setVisible(tm3.TM_Enable);
-
-    text4->setVisible(tm4.TM_Enable);
-    text4->setText(tm4.TM_CtrlName);
-    spinner4->setVisible(tm4.TM_Enable);
-    slider4->setVisible(tm4.TM_Enable);
-
-    text5->setVisible(tm5.TM_Enable);
-    text5->setText(tm5.TM_CtrlName);
-    spinner5->setVisible(tm5.TM_Enable);
-    slider5->setVisible(tm5.TM_Enable);
-
-    text6->setVisible(tm6.TM_Enable);
-    text6->setText(tm6.TM_CtrlName);
-    spinner6->setVisible(tm6.TM_Enable);
-    slider6->setVisible(tm6.TM_Enable);
-
-    text7->setVisible(tm7.TM_Enable);
-    text7->setText(tm7.TM_CtrlName);
-    spinner7->setVisible(tm7.TM_Enable);
-    slider7->setVisible(tm7.TM_Enable);
-
-    text8->setVisible(tm8.TM_Enable);
-    text8->setText(tm8.TM_CtrlName);
-    spinner8->setVisible(tm8.TM_Enable);
-    slider8->setVisible(tm8.TM_Enable);
-
-    //Min Values
-    spinner1->setMinValue(tm1.TM_Min);
-    slider1->setMinValue(tm1.TM_Min);
-
-    spinner2->setMinValue(tm2.TM_Min);
-    slider2->setMinValue(tm2.TM_Min);
-
-    spinner3->setMinValue(tm3.TM_Min);
-    slider3->setMinValue(tm3.TM_Min);
-
-    spinner4->setMinValue(tm4.TM_Min);
-    slider4->setMinValue(tm4.TM_Min);
-
-    spinner5->setMinValue(tm5.TM_Min);
-    slider5->setMinValue(tm5.TM_Min);
-
-    spinner6->setMinValue(tm6.TM_Min);
-    slider6->setMinValue(tm6.TM_Min);
-
-    spinner7->setMinValue(tm7.TM_Min);
-    slider7->setMinValue(tm7.TM_Min);
-
-    spinner8->setMinValue(tm8.TM_Min);
-    slider8->setMinValue(tm8.TM_Min);
-
-    //Max Values
-    spinner1->setMaxValue(tm1.TM_Max);
-    slider1->setMaxValue(tm1.TM_Max);
-
-    spinner2->setMaxValue(tm2.TM_Max);
-    slider2->setMaxValue(tm2.TM_Max);
-
-    spinner3->setMaxValue(tm3.TM_Max);
-    slider3->setMaxValue(tm3.TM_Max);
-
-    spinner4->setMaxValue(tm4.TM_Max);
-    slider4->setMaxValue(tm4.TM_Max);
-
-    spinner5->setMaxValue(tm5.TM_Max);
-    slider5->setMaxValue(tm5.TM_Max);
-
-    spinner6->setMaxValue(tm6.TM_Max);
-    slider6->setMaxValue(tm6.TM_Max);
-
-    spinner7->setMaxValue(tm7.TM_Max);
-    slider7->setMaxValue(tm7.TM_Max);
-
-    spinner8->setMaxValue(tm8.TM_Max);
-    slider8->setMaxValue(tm8.TM_Max);
-
-    //Precision
-    spinner1->setPrecision(tm1.TM_Precision);
-    slider1->setPrecision(tm1.TM_Precision);
-
-    spinner2->setPrecision(tm2.TM_Precision);
-    slider2->setPrecision(tm2.TM_Precision);
-
-    spinner3->setPrecision(tm3.TM_Precision);
-    slider3->setPrecision(tm3.TM_Precision);
-
-    spinner4->setPrecision(tm4.TM_Precision);
-    slider4->setPrecision(tm4.TM_Precision);
-
-    spinner5->setPrecision(tm5.TM_Precision);
-    slider5->setPrecision(tm5.TM_Precision);
-
-    spinner6->setPrecision(tm6.TM_Precision);
-    slider6->setPrecision(tm6.TM_Precision);
-
-    spinner7->setPrecision(tm7.TM_Precision);
-    slider7->setPrecision(tm7.TM_Precision);
-
-    spinner8->setPrecision(tm8.TM_Precision);
-    slider8->setPrecision(tm8.TM_Precision);
-
-    //Increment
-    spinner1->setIncrement(tm1.TM_Inc);
-    slider1->setIncrement(tm1.TM_Inc);
-
-    spinner2->setIncrement(tm2.TM_Inc);
-    slider2->setIncrement(tm2.TM_Inc);
-
-    spinner3->setIncrement(tm3.TM_Inc);
-    slider3->setIncrement(tm3.TM_Inc);
-
-    spinner4->setIncrement(tm4.TM_Inc);
-    slider4->setIncrement(tm4.TM_Inc);
-
-    spinner5->setIncrement(tm5.TM_Inc);
-    slider5->setIncrement(tm5.TM_Inc);
-
-    spinner6->setIncrement(tm6.TM_Inc);
-    slider6->setIncrement(tm6.TM_Inc);
-
-    spinner7->setIncrement(tm7.TM_Inc);
-    slider7->setIncrement(tm7.TM_Inc);
-
-    spinner8->setIncrement(tm8.TM_Inc);
-    slider8->setIncrement(tm8.TM_Inc);
-
-    // Values
-    spinner1->setValue(vTM_A[VX]);
-    slider1->setValue(vTM_A[VX]);
-
-    spinner2->setValue(vTM_A[VY]);
-    slider2->setValue(vTM_A[VY]);
-
-    spinner3->setValue(vTM_A[VZ]);
-    slider3->setValue(vTM_A[VZ]);
-
-    spinner4->setValue(vTM_B[VX]);
-    slider4->setValue(vTM_B[VX]);
-
-    spinner5->setValue(vTM_B[VY]);
-    slider5->setValue(vTM_B[VY]);
-
-    spinner6->setValue(vTM_B[VZ]);
-    slider6->setValue(vTM_B[VZ]);
-
-    spinner7->setValue(vTM_C[VX]);
-    slider7->setValue(vTM_C[VX]);
-
-    spinner8->setValue(vTM_C[VY]);
-    slider8->setValue(vTM_C[VY]);
+	LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner1");
+	LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner2");
+	LLSpinCtrl* spinner3 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner3");
+	LLSpinCtrl* spinner4 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner4");
+	LLSpinCtrl* spinner5 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner5");
+	LLSpinCtrl* spinner6 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner6");
+	LLSpinCtrl* spinner7 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner7");
+
+	// Init Sliders
+	LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider1");
+	LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider2");
+	LLSliderCtrl* slider3 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider3");
+	LLSliderCtrl* slider4 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider4");
+	LLSliderCtrl* slider5 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider5");
+	LLSliderCtrl* slider6 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider6");
+	LLSliderCtrl* slider7 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider7");
+
+	// Check the state of RenderToneMapType
+	switch (gSavedSettings.getU32("RenderToneMapType"))
+	{
+	default:
+	{
+		text1->setVisible(FALSE);
+		spinner1->setVisible(FALSE);
+		slider1->setVisible(FALSE);
+
+		text2->setVisible(FALSE);
+		spinner2->setVisible(FALSE);
+		slider2->setVisible(FALSE);
+
+		text3->setVisible(FALSE);
+		spinner3->setVisible(FALSE);
+		slider3->setVisible(FALSE);
+
+		text4->setVisible(FALSE);
+		spinner4->setVisible(FALSE);
+		slider4->setVisible(FALSE);
+
+		text5->setVisible(FALSE);
+		spinner5->setVisible(FALSE);
+		slider5->setVisible(FALSE);
+
+		text6->setVisible(FALSE);
+		spinner6->setVisible(FALSE);
+		slider6->setVisible(FALSE);
+
+		text7->setVisible(FALSE);
+		spinner7->setVisible(FALSE);
+		slider7->setVisible(FALSE);
+		break;
+	}
+	case ALRenderUtil::TONEMAP_UCHIMURA:
+	{
+		text1->setVisible(TRUE);
+		text1->setText(std::string("Max Brightness"));
+		spinner1->setVisible(TRUE);
+		spinner1->setMinValue(0.01);
+		spinner1->setMaxValue(8.0);
+		spinner1->setIncrement(0.1);
+		spinner1->setControlName("AlchemyToneMapUchimuraMaxBrightness");
+		slider1->setVisible(TRUE);
+		slider1->setMinValue(0.01);
+		slider1->setMaxValue(8.0);
+		slider1->setIncrement(0.1);
+		slider1->setControlName("AlchemyToneMapUchimuraMaxBrightness", nullptr);
+
+		text2->setVisible(TRUE);
+		text2->setText(std::string("Contrast"));
+		spinner2->setVisible(TRUE);
+		spinner2->setMinValue(0.01);
+		spinner2->setMaxValue(2.0);
+		spinner2->setIncrement(0.01);
+		spinner2->setControlName("AlchemyToneMapUchimuraContrast");
+		slider2->setVisible(TRUE);
+		slider2->setMinValue(0.01);
+		slider2->setMaxValue(2.0);
+		slider2->setIncrement(0.01);
+		slider2->setControlName("AlchemyToneMapUchimuraContrast", nullptr);
+
+		text3->setVisible(TRUE);
+		text3->setText(std::string("Linear Start"));
+		spinner3->setVisible(TRUE);
+		spinner3->setMinValue(0.01);
+		spinner3->setMaxValue(1.0);
+		spinner3->setIncrement(0.01);
+		spinner3->setControlName("AlchemyToneMapUchimuraLinearStart");
+		slider3->setVisible(TRUE);
+		slider3->setMinValue(0.01);
+		slider3->setMaxValue(1.0);
+		slider3->setIncrement(0.01);
+		slider3->setControlName("AlchemyToneMapUchimuraLinearStart", nullptr);
+
+		text4->setVisible(TRUE);
+		text4->setText(std::string("Linear Length"));
+		spinner4->setVisible(TRUE);
+		spinner4->setMinValue(0.01);
+		spinner4->setMaxValue(1.0);
+		spinner4->setIncrement(0.01);
+		spinner4->setControlName("AlchemyToneMapUchimuraLinearLength");
+		slider4->setVisible(TRUE);
+		slider4->setMinValue(0.01);
+		slider4->setMaxValue(1.0);
+		slider4->setIncrement(0.01);
+		slider4->setControlName("AlchemyToneMapUchimuraLinearLength", nullptr);
+
+		text5->setVisible(TRUE);
+		text5->setText(std::string("Black Level"));
+		spinner5->setVisible(TRUE);
+		spinner5->setMinValue(0.01);
+		spinner5->setMaxValue(4.0);
+		spinner5->setIncrement(0.01);
+		spinner5->setControlName("AlchemyToneMapUchimuraBlackLevel");
+		slider5->setVisible(TRUE);
+		slider5->setMinValue(0.01);
+		slider5->setMaxValue(4.0);
+		slider5->setIncrement(0.01);
+		slider5->setControlName("AlchemyToneMapUchimuraBlackLevel", nullptr);
+
+		text6->setVisible(FALSE);
+		spinner6->setVisible(FALSE);
+		slider6->setVisible(FALSE);
+
+		text7->setVisible(FALSE);
+		spinner7->setVisible(FALSE);
+		slider7->setVisible(FALSE);
+		break;
+	}
+	case ALRenderUtil::TONEMAP_AMD:
+	{
+		text1->setVisible(TRUE);
+		text1->setText(std::string("HDR Max"));
+		spinner1->setVisible(TRUE);
+		spinner1->setMinValue(1.0);
+		spinner1->setMaxValue(24.0);
+		spinner1->setIncrement(0.1);
+		spinner1->setControlName("AlchemyToneMapAMDHDRMax");
+		slider1->setVisible(TRUE);
+		slider1->setMinValue(1.0);
+		slider1->setMaxValue(24.0);
+		slider1->setIncrement(0.1);
+		slider1->setControlName("AlchemyToneMapAMDHDRMax", nullptr);
+
+		text2->setVisible(TRUE);
+		text2->setText(std::string("Contrast"));
+		spinner2->setVisible(TRUE);
+		spinner2->setMinValue(0.5);
+		spinner2->setMaxValue(4.0);
+		spinner2->setControlName("AlchemyToneMapAMDContrast");
+		spinner2->setIncrement(0.01);
+		slider2->setVisible(TRUE);
+		slider2->setMinValue(0.5);
+		slider2->setMaxValue(4.0);
+		slider2->setIncrement(0.01);
+		slider2->setControlName("AlchemyToneMapAMDContrast", nullptr);
+
+		text3->setVisible(TRUE);
+		text3->setText(std::string("Shoulder"));
+		spinner3->setVisible(TRUE);
+		spinner3->setMinValue(0.5);
+		spinner3->setMaxValue(4.0);
+		spinner3->setIncrement(0.01);
+		spinner3->setControlName("AlchemyToneMapAMDShoulder");
+		slider3->setVisible(TRUE);
+		slider3->setMinValue(0.5);
+		slider3->setMaxValue(4.0);
+		slider3->setIncrement(0.01);
+		slider3->setControlName("AlchemyToneMapAMDShoulder", nullptr);
+
+		text4->setVisible(FALSE);
+		spinner4->setVisible(FALSE);
+		slider4->setVisible(FALSE);
+
+		text5->setVisible(FALSE);
+		spinner5->setVisible(FALSE);
+		slider5->setVisible(FALSE);
+
+		text6->setVisible(FALSE);
+		spinner6->setVisible(FALSE);
+		slider6->setVisible(FALSE);
+
+		text7->setVisible(FALSE);
+		spinner7->setVisible(FALSE);
+		slider7->setVisible(FALSE);
+		break;
+	}
+	case ALRenderUtil::TONEMAP_UNCHARTED:
+	{
+		text1->setVisible(TRUE);
+		text1->setText(std::string("Toe Strength"));
+		spinner1->setVisible(TRUE);
+		spinner1->setMinValue(0.0);
+		spinner1->setMaxValue(1.0);
+		spinner1->setIncrement(0.01);
+		spinner1->setControlName("AlchemyToneMapFilmicToeStr");
+		slider1->setVisible(TRUE);
+		slider1->setMinValue(0.0);
+		slider1->setMaxValue(1.0);
+		slider1->setIncrement(0.01);
+		slider1->setControlName("AlchemyToneMapFilmicToeStr", nullptr);
+
+		text2->setVisible(TRUE);
+		text2->setText(std::string("Toe Length"));
+		spinner2->setVisible(TRUE);
+		spinner2->setMinValue(0.01);
+		spinner2->setMaxValue(1.0);
+		spinner2->setIncrement(0.01);
+		spinner2->setControlName("AlchemyToneMapFilmicToeLen");
+		slider2->setVisible(TRUE);
+		slider2->setMinValue(0.01);
+		slider2->setMaxValue(1.0);
+		slider2->setIncrement(0.01);
+		slider2->setControlName("AlchemyToneMapFilmicToeLen", nullptr);
+
+		text3->setVisible(TRUE);
+		text3->setText(std::string("Shoulder Strength"));
+		spinner3->setVisible(TRUE);
+		spinner3->setMinValue(0.0);
+		spinner3->setMaxValue(1.0);
+		spinner3->setIncrement(0.01);
+		spinner3->setControlName("AlchemyToneMapFilmicShoulderStr");
+		slider3->setVisible(TRUE);
+		slider3->setMinValue(0.0);
+		slider3->setMaxValue(1.0);
+		slider3->setIncrement(0.01);
+		slider3->setControlName("AlchemyToneMapFilmicShoulderStr", nullptr);
+
+		text4->setVisible(TRUE);
+		text4->setText(std::string("Shoulder Length"));
+		spinner4->setVisible(TRUE);
+		spinner4->setMinValue(0.01);
+		spinner4->setMaxValue(8.0);
+		spinner4->setIncrement(0.01);
+		spinner4->setControlName("AlchemyToneMapFilmicShoulderLen");
+		slider4->setVisible(TRUE);
+		slider4->setMinValue(0.01);
+		slider4->setMaxValue(8.0);
+		slider4->setIncrement(0.01);
+		slider4->setControlName("AlchemyToneMapFilmicShoulderLen", nullptr);
+
+		text5->setVisible(TRUE);
+		text5->setText(std::string("Shoulder Angle"));
+		spinner5->setVisible(TRUE);
+		spinner5->setMinValue(0.0);
+		spinner5->setMaxValue(1.0);
+		spinner5->setIncrement(0.01);
+		spinner5->setControlName("AlchemyToneMapFilmicShoulderAngle");
+		slider5->setVisible(TRUE);
+		slider5->setMinValue(0.0);
+		slider5->setMaxValue(1.0);
+		slider5->setIncrement(0.01);
+		slider5->setControlName("AlchemyToneMapFilmicShoulderAngle", nullptr);
+
+		text6->setVisible(TRUE);
+		text6->setText(std::string("Gamma"));
+		spinner6->setVisible(TRUE);
+		spinner6->setMinValue(0.01);
+		spinner6->setMaxValue(5.0);
+		spinner6->setIncrement(0.01);
+		spinner6->setControlName("AlchemyToneMapFilmicGamma");
+		slider6->setVisible(TRUE);
+		slider6->setMinValue(0.01);
+		slider6->setMaxValue(5.0);
+		slider6->setIncrement(0.01);
+		slider6->setControlName("AlchemyToneMapFilmicGamma", nullptr);
+
+		text7->setVisible(TRUE);
+		text7->setText(std::string("White Point"));
+		spinner7->setVisible(TRUE);
+		spinner7->setMinValue(1.0);
+		spinner7->setMaxValue(16.0);
+		spinner7->setIncrement(0.1);
+		spinner7->setControlName("AlchemyToneMapFilmicWhitePoint");
+		slider7->setVisible(TRUE);
+		slider7->setMinValue(1.0);
+		slider7->setMaxValue(16.0);
+		slider7->setIncrement(0.1);
+		slider7->setControlName("AlchemyToneMapFilmicWhitePoint", nullptr);
+		break;
+	}
+	}
 }
 
 void ALFloaterLightBox::updateSSAO() 

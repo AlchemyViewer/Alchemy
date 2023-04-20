@@ -47,45 +47,8 @@ uniform sampler3D colorgrade_lut;
 uniform vec4 colorgrade_lut_size;
 #endif
 
-vec3 reinhard(vec3 x)
-{
-    return x/(1+x);
-}
-
-vec3 reinhard2(vec3 x) {
-    const float L_white = 4.0;
-    return (x * (1.0 + x / (L_white * L_white))) / (1.0 + x);
-}
-
-vec3 filmic(vec3 color)
-{
-    color = max(vec3(0.), color - vec3(0.004));
-    color = (color * (6.2 * color + .5)) / (color * (6.2 * color + 1.7) + 0.06);
-    return color;
-}
-
-vec3 unreal(vec3 x)
-{
-    // Unreal 3, Documentation: "Color Grading"
-    // Adapted to be close to Tonemap_ACES, with similar range
-    // Gamma 2.2 correction is baked in, don't use with sRGB conversion!
-    return x / (x + 0.155) * 1.019;
-}
-
-vec3 ACES_Narkowicz(vec3 x)
-{
-    // Narkowicz 2015, "ACES Filmic Tone Mapping Curve"
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return (x * (a * x + b)) / (x * (c * x + d) + e);
-}
-
 // ACES filmic tone map approximation
 // see https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
-
 // sRGB => XYZ => D65_2_D60 => AP1 => RRT_SAT
 const mat3 ACESInputMat = mat3
 (
@@ -152,7 +115,7 @@ vec3 uchimura(vec3 x)
     float m = tone_uchimura_a.z; // linear section start
     float l = tone_uchimura_b.x; // linear section length
     float c = tone_uchimura_b.y; // black
-    float b = tone_uchimura_b.z; // pedestal
+    float b = 0.0; // pedestal
     
     return uchimura(x, P, a, m, l, c, b);
 }
@@ -184,12 +147,12 @@ float ColTone(float x, vec4 p)
     return z / (pow(z, p.g)*p.b + p.a); 
 }
 
-uniform vec3 tone_lottes_a = vec3(1.4, 1.0, 16.0);
+uniform vec3 tonemap_amd = vec3(16.0, 1.4, 1.0);
 vec3 AMDTonemapper(vec3 color)
 {
-    float hdrMax = tone_lottes_a.z; // How much HDR range before clipping. HDR modes likely need this pushed up to say 25.0.
-    float contrast = tone_lottes_a.x; // Use as a baseline to tune the amount of contrast the tonemapper has.
-    float shoulder = tone_lottes_a.y; // Likely don’t need to mess with this factor, unless matching existing tonemapper is not working well..
+    float hdrMax = tonemap_amd.x; // How much HDR range before clipping. HDR modes likely need this pushed up to say 25.0.
+    float contrast = tonemap_amd.y; // Use as a baseline to tune the amount of contrast the tonemapper has.
+    float shoulder = tonemap_amd.z; // Likely don’t need to mess with this factor, unless matching existing tonemapper is not working well..
     const float midIn = 0.18; // most games will have a {0.0 to 1.0} range for LDR so midIn should be 0.18.
     const float midOut = 0.18; // Use for LDR. For HDR10 10:10:10:2 use maybe 0.18/25.0 to start. For scRGB, I forget what a good starting point is, need to re-calculate.
 
@@ -224,13 +187,14 @@ vec3 AMDTonemapper(vec3 color)
 //--------------------------------------------------------------------------------------
 
 // Hable, http://filmicworlds.com/blog/filmic-tonemapping-operators/
-uniform vec3 tone_uncharted_a = vec3(0.15, 0.50, 0.10); // A, B, C
-uniform vec3 tone_uncharted_b = vec3(0.20, 0.02, 0.30); // D, E, F
-uniform vec3 tone_uncharted_c = vec3(11.2, 2.0, 0.0); // W, ExposureBias, Unused
+uniform vec3 tone_uncharted_a = vec3(0.22, 0.30, 0.10); // A, B, C
+uniform vec3 tone_uncharted_b = vec3(0.20, 0.01, 0.30); // D, E, F
+uniform vec3 tone_uncharted_c = vec3(8.0, 2.0, 0.0); // W, ExposureBias, Unused
 vec3 Uncharted2Tonemap(vec3 x)
 {
-    float A = tone_uncharted_a.x;
-    float B = tone_uncharted_a.y;
+    float ExposureBias = tone_uncharted_c.y;
+    float A = tone_uncharted_a.x * ExposureBias * ExposureBias;
+    float B = tone_uncharted_a.y * ExposureBias;
     float C = tone_uncharted_a.z;
     float D = tone_uncharted_b.x;
     float E = tone_uncharted_b.y;
@@ -241,8 +205,7 @@ vec3 Uncharted2Tonemap(vec3 x)
 
 vec3 uncharted2(vec3 col)
 {
-    float ExposureBias = tone_uncharted_c.y;
-    return Uncharted2Tonemap(ExposureBias*col)/Uncharted2Tonemap(vec3(tone_uncharted_c.x));;
+    return Uncharted2Tonemap(col)/Uncharted2Tonemap(vec3(tone_uncharted_c.x));
 }
 
 //=================================
@@ -301,6 +264,8 @@ float legacyGammaApprox()
     return gc/c * gamma;
 }
 
+vec3 legacy_adjust_post(vec3 c);
+
 void main()
 {
     vec4 diff = texture(diffuseRect, vary_fragcoord);
@@ -308,51 +273,23 @@ void main()
     float exp_scale = texture(exposureMap, vec2(0.5,0.5)).r;
     diff.rgb *= exposure * exp_scale * legacyGammaApprox();
     
-    #if TONEMAP_METHOD == 0 // None, Gamma Correct Only
-    #define NEEDS_GAMMA_CORRECT 1
-    #elif TONEMAP_METHOD == 1 // Linear
-    #define NEEDS_GAMMA_CORRECT 1
-    diff.rgb = clamp(diff.rgb, 0, 1);
-    #elif TONEMAP_METHOD == 2 // Reinhard method
-    #define NEEDS_GAMMA_CORRECT 1
-    diff.rgb = reinhard(diff.rgb);
-    #elif TONEMAP_METHOD == 3 // Reinhard2 method
-    #define NEEDS_GAMMA_CORRECT 1
-    diff.rgb = reinhard2(diff.rgb);
-    #elif TONEMAP_METHOD == 4 // Filmic method
-    #define NEEDS_GAMMA_CORRECT 0
-    diff.rgb = filmic(diff.rgb);
-    #elif TONEMAP_METHOD == 5 // Unreal method
-    #define NEEDS_GAMMA_CORRECT 0
-    diff.rgb = unreal(diff.rgb);
-    #elif TONEMAP_METHOD == 6 // Aces Narkowicz method
-    #define NEEDS_GAMMA_CORRECT 1
-    diff.rgb = ACES_Narkowicz(diff.rgb);
-    #elif TONEMAP_METHOD == 10 // Aces Hill method
-    #define NEEDS_GAMMA_CORRECT 1
+#if TONEMAP_METHOD == 1 // Aces Hill method
     diff.rgb *= 1.0/0.6;
     diff.rgb = ACES_Hill(diff.rgb);
-    #elif TONEMAP_METHOD == 7 // Uchimura's Gran Turismo method
-    #define NEEDS_GAMMA_CORRECT 1
+#elif TONEMAP_METHOD == 2 // Uchimura's Gran Turismo method
     diff.rgb = uchimura(diff.rgb);
-    #elif TONEMAP_METHOD == 8 // AMD Tonemapper
-    #define NEEDS_GAMMA_CORRECT 1
+#elif TONEMAP_METHOD == 3 // AMD Tonemapper
     diff.rgb = AMDTonemapper(diff.rgb);
-    #elif TONEMAP_METHOD == 9 // Uncharted
-    #define NEEDS_GAMMA_CORRECT 1
+#elif TONEMAP_METHOD == 4 // Uncharted
     diff.rgb = uncharted2(diff.rgb);
-    #else
-    #define NEEDS_GAMMA_CORRECT 1
-    #endif
+#endif
     
     // We should always be 0-1 past here.
     diff.rgb = clamp(diff.rgb, 0, 1);
-
-    #if NEEDS_GAMMA_CORRECT != 0
     diff.rgb = linear_to_srgb(diff.rgb);
-    #endif
-    
-    #if COLOR_GRADE_LUT != 0
+    diff.rgb = legacy_adjust_post(diff.rgb);
+
+#if COLOR_GRADE_LUT != 0
     // Invert coord for compat with DX-style LUT
     diff.g = colorgrade_lut_size.y > 0.5 ? 1.0 - diff.g : diff.g;
 
@@ -363,7 +300,7 @@ void main()
     vec3 scale = (vec3(colorgrade_lut_size.x) - 1.0) / vec3(colorgrade_lut_size.x);
     vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.x));
     diff = vec4(textureLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb, diff.a);
-    #endif
+#endif
 
     vec2 tc = vary_fragcoord.xy*screen_res*4.0;
     vec3 seed = (diff.rgb+vec3(1.0))*vec3(tc.xy, tc.x+tc.y);
