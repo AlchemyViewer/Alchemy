@@ -82,7 +82,7 @@ typedef int(WINAPI* GetSystemMetricsForDpi_t)(
 	_In_ int nIndex,
 	_In_ UINT dpi);
 
-class LLWindowWin32 : public LLWindow
+class LLWindowWin32 final : public LLWindow
 {
 public:
 	/*virtual*/ void show();
