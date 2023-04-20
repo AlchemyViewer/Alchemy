@@ -271,6 +271,7 @@ extern LLGLSLShader			gDeferredFullbrightShinyProgram;
 extern LLGLSLShader         gHUDFullbrightShinyProgram;
 extern LLGLSLShader			gNormalMapGenProgram;
 extern LLGLSLShader         gDeferredGenBrdfLutProgram;
+extern LLGLSLShader			gDeferredBufferVisualProgram;
 extern LLGLSLShader         gDeferredPostCASProgram;
 extern LLGLSLShader			gDeferredPostDLSProgram;
 extern LLGLSLShader			gDeferredPostTonemapProgram[ALRenderUtil::TONEMAP_COUNT];

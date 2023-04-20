@@ -207,6 +207,7 @@ LLGLSLShader            gDeferredSkinnedFullbrightAlphaMaskProgram;
 LLGLSLShader            gDeferredSkinnedFullbrightAlphaMaskAlphaProgram;
 LLGLSLShader			gNormalMapGenProgram;
 LLGLSLShader            gDeferredGenBrdfLutProgram;
+LLGLSLShader            gDeferredBufferVisualProgram;
 LLGLSLShader            gDeferredPostCASProgram;
 LLGLSLShader			gDeferredPostDLSProgram;
 LLGLSLShader			gDeferredPostTonemapProgram[ALRenderUtil::TONEMAP_COUNT];
@@ -1046,6 +1047,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         
 		gNormalMapGenProgram.unload();
         gDeferredGenBrdfLutProgram.unload();
+		gDeferredBufferVisualProgram.unload();
 
 		for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
 		{
@@ -2845,6 +2847,15 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         gPostScreenSpaceReflectionProgram.mFeatures.isDeferred                = true;
         gPostScreenSpaceReflectionProgram.mShaderLevel = 3;
         success = gPostScreenSpaceReflectionProgram.createShader(NULL, NULL);
+	}
+
+	if (success) {
+		gDeferredBufferVisualProgram.mName = "Deferred Buffer Visualization Shader";
+		gDeferredBufferVisualProgram.mShaderFiles.clear();
+		gDeferredBufferVisualProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredBufferVisualProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredVisualizeBuffers.glsl", GL_FRAGMENT_SHADER));
+		gDeferredBufferVisualProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		success = gDeferredBufferVisualProgram.createShader(NULL, NULL);
 	}
 
 	if (success)
