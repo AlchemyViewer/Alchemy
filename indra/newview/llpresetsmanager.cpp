@@ -292,8 +292,6 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 {
 	const std::vector<std::string> camera_controls = {
 		// From panel_preferences_graphics.xml
-		"AlchemyRenderCAS",
-		"AlchemyRenderCASSharpness",
 		"AlwaysRenderFriends",
 		"RenderAnisotropicLevel",
 		"RenderAvatarLODFactor",
@@ -301,13 +299,11 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 		"RenderAvatarMaxNonImpostors",
 		"RenderAvatarPhysicsLODFactor",
 		"RenderColorGradeLUT",
-		"RenderCompressTextures",
 		"RenderDeferredSSAO",
 		"RenderDepthOfField",
 		"RenderFSAASamples",
 		"RenderFarClip",
 		"RenderFlexTimeFactor",
-		"RenderGamma",
 		"RenderGlowResolutionPow",
 		"RenderLocalLights",
 		"RenderMaxPartCount",
@@ -320,6 +316,12 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 		"RenderTreeLODFactor",
 		"RenderVolumeLODFactor",
 		"WLSkyDetail",
+		"RenderScreenSpaceReflections",
+		"RenderReflectionProbeDetail",
+		"RenderReflectionProbeLevel"
+		"RenderSharpenMethod",
+		"RenderSharpenDLSParams",
+		"RenderSharpenCASParams",
 	};
 	names = camera_controls;
 }

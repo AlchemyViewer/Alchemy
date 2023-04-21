@@ -314,7 +314,7 @@ bool ALRenderUtil::setupTonemap()
 		mTonemapType = gSavedSettings.getU32("RenderToneMapType");
 		if (mTonemapType >= TONEMAP_COUNT)
 		{
-			mTonemapType = ALTonemap::TONEMAP_NONE;
+			mTonemapType = ALTonemap::TONEMAP_ACES_HILL;
 		}
 
 		mTonemapExposure = llclamp(gSavedSettings.getF32("RenderExposure"), 0.5f, 4.f);
@@ -325,11 +325,6 @@ bool ALRenderUtil::setupTonemap()
 		mToneUnchartedParamA = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicToeStr"), gSavedSettings.getF32("AlchemyToneMapFilmicToeLen"), gSavedSettings.getF32("AlchemyToneMapFilmicShoulderStr"));
 		mToneUnchartedParamB = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicShoulderLen"), gSavedSettings.getF32("AlchemyToneMapFilmicShoulderAngle"), gSavedSettings.getF32("AlchemyToneMapFilmicGamma"));
 		mToneUnchartedParamC = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicWhitePoint"), 2.0, 0.0);
-	}
-	else
-	{
-		mTonemapType = ALTonemap::TONEMAP_NONE;
-		mTonemapExposure = 1.f;
 	}
 	return true;
 }
