@@ -304,7 +304,7 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
 			mValSpinner1->setLabel(std::string("value")); // Debug, don't translate
 			if (!mValSpinner1->hasFocus())
 			{
-				mValSpinner1->setPrecision(3);
+				mValSpinner1->setPrecision(5);
 				mValSpinner1->setValue(sd);
 			}
 			break;
@@ -340,17 +340,17 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
 			mValSpinner3->setLabel(std::string("Z"));
 			if (!mValSpinner1->hasFocus())
 			{
-				mValSpinner1->setPrecision(3);
+				mValSpinner1->setPrecision(4);
 				mValSpinner1->setValue(v[VX]);
 			}
 			if (!mValSpinner2->hasFocus())
 			{
-				mValSpinner2->setPrecision(3);
+				mValSpinner2->setPrecision(4);
 				mValSpinner2->setValue(v[VY]);
 			}
 			if (!mValSpinner3->hasFocus())
 			{
-				mValSpinner3->setPrecision(3);
+				mValSpinner3->setPrecision(4);
 				mValSpinner3->setValue(v[VZ]);
 			}
 			break;
@@ -367,17 +367,17 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
 			mValSpinner3->setLabel(std::string("Z"));
 			if (!mValSpinner1->hasFocus())
 			{
-				mValSpinner1->setPrecision(3);
+				mValSpinner1->setPrecision(4);
 				mValSpinner1->setValue(v[VX]);
 			}
 			if (!mValSpinner2->hasFocus())
 			{
-				mValSpinner2->setPrecision(3);
+				mValSpinner2->setPrecision(4);
 				mValSpinner2->setValue(v[VY]);
 			}
 			if (!mValSpinner3->hasFocus())
 			{
-				mValSpinner3->setPrecision(3);
+				mValSpinner3->setPrecision(4);
 				mValSpinner3->setValue(v[VZ]);
 			}
 			break;
@@ -396,22 +396,22 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
 			mValSpinner4->setLabel(std::string("W"));
 			if (!mValSpinner1->hasFocus())
 			{
-				mValSpinner1->setPrecision(3);
+				mValSpinner1->setPrecision(4);
 				mValSpinner1->setValue(v[VX]);
 			}
 			if (!mValSpinner2->hasFocus())
 			{
-				mValSpinner2->setPrecision(3);
+				mValSpinner2->setPrecision(4);
 				mValSpinner2->setValue(v[VY]);
 			}
 			if (!mValSpinner3->hasFocus())
 			{
-				mValSpinner3->setPrecision(3);
+				mValSpinner3->setPrecision(4);
 				mValSpinner3->setValue(v[VZ]);
 			}
 			if (!mValSpinner4->hasFocus())
 			{
-				mValSpinner4->setPrecision(3);
+				mValSpinner4->setPrecision(4);
 				mValSpinner4->setValue(v[VW]);
 			}
 			break;
