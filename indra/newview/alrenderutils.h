@@ -78,7 +78,6 @@ private:
 
 	// State
 	U32 mTonemapType = ALTonemap::TONEMAP_NONE;
-	LLVector3 mToneAMDParams;
 	LLVector3 mToneUchimuraParamA;
 	LLVector3 mToneUchimuraParamB;
 	LLVector3 mToneUnchartedParamA;

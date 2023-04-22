@@ -116,12 +116,27 @@ void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
 			{
 				controlp->resetToDefault(true);
 			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapAMDExposure");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
 			controlp = gSavedSettings.getControl("AlchemyToneMapAMDContrast");
 			if (controlp)
 			{
 				controlp->resetToDefault(true);
 			}
-			controlp = gSavedSettings.getControl("AlchemyToneMapAMDShoulder");
+			controlp = gSavedSettings.getControl("AlchemyToneMapAMDSaturationR");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapAMDSaturationG");
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+			controlp = gSavedSettings.getControl("AlchemyToneMapAMDSaturationB");
 			if (controlp)
 			{
 				controlp->resetToDefault(true);
@@ -345,52 +360,79 @@ void ALFloaterLightBox::updateTonemapper()
 		text1->setText(std::string("HDR Max"));
 		spinner1->setVisible(TRUE);
 		spinner1->setMinValue(1.0);
-		spinner1->setMaxValue(24.0);
-		spinner1->setIncrement(0.1);
+		spinner1->setMaxValue(512.0);
+		spinner1->setIncrement(1.f);
 		spinner1->setControlName("AlchemyToneMapAMDHDRMax");
 		slider1->setVisible(TRUE);
 		slider1->setMinValue(1.0);
-		slider1->setMaxValue(24.0);
-		slider1->setIncrement(0.1);
+		slider1->setMaxValue(512.0);
+		slider1->setIncrement(1.f);
 		slider1->setControlName("AlchemyToneMapAMDHDRMax", nullptr);
 
 		text2->setVisible(TRUE);
-		text2->setText(std::string("Contrast"));
+		text2->setText(std::string("Tone Exposure"));
 		spinner2->setVisible(TRUE);
-		spinner2->setMinValue(0.5);
-		spinner2->setMaxValue(4.0);
-		spinner2->setControlName("AlchemyToneMapAMDContrast");
-		spinner2->setIncrement(0.01);
+		spinner2->setMinValue(1.0);
+		spinner2->setMaxValue(16.0);
+		spinner2->setIncrement(0.1);
+		spinner2->setControlName("AlchemyToneMapAMDExposure");
 		slider2->setVisible(TRUE);
-		slider2->setMinValue(0.5);
-		slider2->setMaxValue(4.0);
-		slider2->setIncrement(0.01);
-		slider2->setControlName("AlchemyToneMapAMDContrast", nullptr);
+		slider2->setMinValue(1.0);
+		slider2->setMaxValue(16.0);
+		slider2->setIncrement(0.1);
+		slider2->setControlName("AlchemyToneMapAMDExposure", nullptr);
 
 		text3->setVisible(TRUE);
-		text3->setText(std::string("Shoulder"));
+		text3->setText(std::string("Contrast"));
 		spinner3->setVisible(TRUE);
-		spinner3->setMinValue(0.5);
-		spinner3->setMaxValue(4.0);
+		spinner3->setMinValue(0.0);
+		spinner3->setMaxValue(1.0);
 		spinner3->setIncrement(0.01);
-		spinner3->setControlName("AlchemyToneMapAMDShoulder");
+		spinner3->setControlName("AlchemyToneMapAMDContrast");
 		slider3->setVisible(TRUE);
-		slider3->setMinValue(0.5);
-		slider3->setMaxValue(4.0);
+		slider3->setMinValue(0.0);
+		slider3->setMaxValue(1.0);
 		slider3->setIncrement(0.01);
-		slider3->setControlName("AlchemyToneMapAMDShoulder", nullptr);
+		slider3->setControlName("AlchemyToneMapAMDContrast", nullptr);
 
-		text4->setVisible(FALSE);
-		spinner4->setVisible(FALSE);
-		slider4->setVisible(FALSE);
+		text4->setVisible(TRUE);
+		text4->setText(std::string("R Saturation"));
+		spinner4->setVisible(TRUE);
+		spinner4->setMinValue(-2.0);
+		spinner4->setMaxValue(2.0);
+		spinner4->setIncrement(0.1);
+		spinner4->setControlName("AlchemyToneMapAMDSaturationR");
+		slider4->setVisible(TRUE);
+		slider4->setMinValue(-2.0);
+		slider4->setMaxValue(2.0);
+		slider4->setIncrement(0.1);
+		slider4->setControlName("AlchemyToneMapAMDSaturationR", nullptr);
 
-		text5->setVisible(FALSE);
-		spinner5->setVisible(FALSE);
-		slider5->setVisible(FALSE);
+		text5->setVisible(TRUE);
+		text5->setText(std::string("G Saturation"));
+		spinner5->setVisible(TRUE);
+		spinner5->setMinValue(-2.0);
+		spinner5->setMaxValue(2.0);
+		spinner5->setIncrement(0.1);
+		spinner5->setControlName("AlchemyToneMapAMDSaturationG");
+		slider5->setVisible(TRUE);
+		slider5->setMinValue(-2.0);
+		slider5->setMaxValue(2.0);
+		slider5->setIncrement(0.1);
+		slider5->setControlName("AlchemyToneMapAMDSaturationG", nullptr);
 
-		text6->setVisible(FALSE);
-		spinner6->setVisible(FALSE);
-		slider6->setVisible(FALSE);
+		text6->setVisible(TRUE);
+		text6->setText(std::string("B Saturation"));
+		spinner6->setVisible(TRUE);
+		spinner6->setMinValue(-2.0);
+		spinner6->setMaxValue(2.0);
+		spinner6->setIncrement(0.1);
+		spinner6->setControlName("AlchemyToneMapAMDSaturationB");
+		slider6->setVisible(TRUE);
+		slider6->setMinValue(-2.0);
+		slider6->setMaxValue(2.0);
+		slider6->setIncrement(0.1);
+		slider6->setControlName("AlchemyToneMapAMDSaturationB", nullptr);
 
 		text7->setVisible(FALSE);
 		spinner7->setVisible(FALSE);

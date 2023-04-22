@@ -247,6 +247,14 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 		}
 	}
 
+	if (features->hasLPM)
+	{
+        if (!shader->attachFragmentObject("alchemy/LPMUtil.glsl"))
+		{
+			return FALSE;
+		}
+	}
+
 	if (features->hasGamma || features->isDeferred)
 	{
         if (!shader->attachFragmentObject("windlight/gammaF.glsl"))

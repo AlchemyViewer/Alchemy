@@ -752,7 +752,8 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/deferredUtil.glsl",                    1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/shadowUtil.glsl",                      1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/aoUtil.glsl",                          1) );
-    index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/reflectionProbeF.glsl",                has_reflection_probes ? 3 : 2) );
+	index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/LPMUtil.glsl",                    1) );
+	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/reflectionProbeF.glsl",                has_reflection_probes ? 3 : 2) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/screenSpaceReflUtil.glsl",             ssr ? 3 : 1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "lighting/lightNonIndexedF.glsl",                    mShaderLevel[SHADER_LIGHTING] ) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "lighting/lightAlphaMaskNonIndexedF.glsl",                   mShaderLevel[SHADER_LIGHTING] ) );
@@ -2887,6 +2888,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			mShaderList.push_back(&gDeferredPostTonemapProgram[i]);
 			gDeferredPostTonemapProgram[i].mName = "Tonemapping Shader " + std::to_string(i);
 			gDeferredPostTonemapProgram[i].mFeatures.hasSrgb = true;
+			gDeferredPostTonemapProgram[i].mFeatures.hasLPM = true;
 			gDeferredPostTonemapProgram[i].mShaderFiles.clear();
 			gDeferredPostTonemapProgram[i].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
 			gDeferredPostTonemapProgram[i].mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
@@ -2904,6 +2906,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			mShaderList.push_back(&gDeferredPostColorGradeLUTProgram[i]);
 			gDeferredPostColorGradeLUTProgram[i].mName = "Color Grading Shader " + std::to_string(i);
 			gDeferredPostColorGradeLUTProgram[i].mFeatures.hasSrgb = true;
+			gDeferredPostColorGradeLUTProgram[i].mFeatures.hasLPM = true;
 			gDeferredPostColorGradeLUTProgram[i].mShaderFiles.clear();
 			gDeferredPostColorGradeLUTProgram[i].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
 			gDeferredPostColorGradeLUTProgram[i].mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));

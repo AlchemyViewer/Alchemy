@@ -1146,29 +1146,117 @@
     <key>AlchemyToneMapAMDHDRMax</key>
     <map>
       <key>Comment</key>
-      <string>How much HDR range before clipping. HDR modes likely need this pushed up to say 25.0.</string>
+      <string>Maximum input value.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>16.0</real>
+      <real>256.0</real>
     </map>
-    <key>AlchemyToneMapAMDContrast</key>
+    <key>AlchemyToneMapAMDExposure</key>
     <map>
       <key>Comment</key>
-      <string>Use as a baseline to tune the amount of contrast the tonemapper has.</string>
+      <string>Number of stops between 'hdrMax' and 18% mid-level on input.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>1.4</real>
+      <real>8.0</real>
     </map>
-    <key>AlchemyToneMapAMDShoulder</key>
+	<key>AlchemyToneMapAMDContrast</key>
     <map>
       <key>Comment</key>
-      <string>Tonemap shoulder adjustment</string>
+      <string>Input range 0.0 (no extra contrast) to 1.0 (maximum contrast)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.25</real>
+    </map>
+    <key>AlchemyToneMapAMDCrosstalkR</key>
+    <map>
+      <key>Comment</key>
+      <string>One channel must be 1.0, the rest can be greater than or equal to 1.0 but not zero.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.5</real>
+    </map>
+    <key>AlchemyToneMapAMDCrosstalkG</key>
+    <map>
+      <key>Comment</key>
+      <string>One channel must be 1.0, the rest can be greater than or equal to 1.0 but not zero.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>1.0</real>
+    </map>
+    <key>AlchemyToneMapAMDCrosstalkB</key>
+    <map>
+      <key>Comment</key>
+      <string> One channel must be 1.0, the rest can be greater than or equal to 1.0 but not zero.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.03125</real>
+    </map>
+    <key>AlchemyToneMapAMDSaturationR</key>
+    <map>
+      <key>Comment</key>
+      <string>A per channel adjustment, use less than 0 decrease, 0=no change, greater 0 increase.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>AlchemyToneMapAMDSaturationG</key>
+    <map>
+      <key>Comment</key>
+      <string>A per channel adjustment, use less than 0 decrease, 0=no change, greater 0 increase.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>AlchemyToneMapAMDSaturationB</key>
+    <map>
+      <key>Comment</key>
+      <string>A per channel adjustment, use less than 0 decrease, 0=no change, greater 0 increase.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.0</real>
+    </map>
+    <key>AlchemyToneMapAMDShoulderContrast</key>
+    <map>
+      <key>Comment</key>
+      <string>Use optional extra shoulderContrast tuning (set to false if shoulderContrast is 1.0).</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>AlchemyToneMapAMDShoulderContrastRange</key>
+    <map>
+      <key>Comment</key>
+      <string>Shoulder shaping, 1.0 = no change (fast path)</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

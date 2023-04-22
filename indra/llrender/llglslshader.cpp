@@ -95,6 +95,7 @@ LLShaderFeatures::LLShaderFeatures()
     , hasAtmospherics(false)
     , hasGamma(false)
     , hasSrgb(false)
+    , hasLPM(false)
     , encodesNormal(false)
     , isDeferred(false)
     , hasScreenSpaceReflections(false)
@@ -1394,6 +1395,31 @@ void LLGLSLShader::uniform4iv(U32 index, U32 count, const GLint* v)
     }
 }
 
+void LLGLSLShader::uniform4uiv(U32 index, U32 count, const GLuint* v)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+    llassert(sCurBoundShaderPtr == this);
+
+    if (mProgramObject)
+    {
+        if (mUniform.size() <= index)
+        {
+            LL_SHADER_UNIFORM_ERRS() << "Uniform index out of bounds." << LL_ENDL;
+            return;
+        }
+
+        if (mUniform[index] >= 0)
+        {
+            const auto& iter = mValue.find(mUniform[index]);
+            LLVector4 vec(v[0], v[1], v[2], v[3]);
+            if (iter == mValue.end() || shouldChange(iter->second, vec) || count != 1)
+            {
+                glUniform1uiv(mUniform[index], count, v);
+                mValue[mUniform[index]] = vec;
+            }
+        }
+    }
+}
 
 void LLGLSLShader::uniform1fv(U32 index, U32 count, const GLfloat* v)
 {
@@ -1686,6 +1712,24 @@ void LLGLSLShader::uniform4iv(const LLStaticHashedString& uniform, U32 count, co
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
             glUniform4iv(location, count, v);
+            mValue[location] = vec;
+        }
+    }
+}
+
+void LLGLSLShader::uniform4uiv(const LLStaticHashedString& uniform, U32 count, const GLuint* v)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+    GLint location = getUniformLocation(uniform);
+
+    if (location >= 0)
+    {
+        LLVector4 vec(v[0], v[1], v[2], v[3]);
+        const auto& iter = mValue.find(location);
+        if (iter == mValue.end() || shouldChange(iter->second, vec) || count != 1)
+        {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+            glUniform4uiv(location, count, v);
             mValue[location] = vec;
         }
     }

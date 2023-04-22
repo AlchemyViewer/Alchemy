@@ -41,12 +41,21 @@
 #include "llviewershadermgr.h"
 #include "pipeline.h"
 
+#define A_CPU 1
+#include "app_settings/shaders/class1/alchemy/ffx_a.h"
+
+AU1 ctl[24 * 4] = {}; // Upload this to a uint4[24] part of a constant buffer (for example 'constant.lpm[24]').
+A_STATIC void LpmSetupOut(AU1 i, inAU4 v) { ctl[i * 4 + 0] = v[0]; ctl[i * 4 + 1] = v[1]; ctl[i * 4 + 2] = v[2]; ctl[i * 4 + 3] = v[3]; }
+
+#include "app_settings/shaders/class1/alchemy/ffx_lpm.h"
+
 const U32 ALRENDER_BUFFER_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
 
 static LLStaticHashedString al_exposure("exposure");
 static LLStaticHashedString tone_uchimura_a("tone_uchimura_a");
 static LLStaticHashedString tone_uchimura_b("tone_uchimura_b");
 static LLStaticHashedString tonemap_amd_params("tonemap_amd");
+static LLStaticHashedString tonemap_amd_params_shoulder("tonemap_amd_shoulder");
 static LLStaticHashedString tone_uncharted_a("tone_uncharted_a");
 static LLStaticHashedString tone_uncharted_b("tone_uncharted_b");
 static LLStaticHashedString tone_uncharted_c("tone_uncharted_c");
@@ -248,8 +257,16 @@ ALRenderUtil::ALRenderUtil()
 	gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("RenderExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("AlchemyToneMapAMDHDRMax")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("AlchemyToneMapAMDContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDShoulder")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDSaturationR")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDSaturationG")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDSaturationB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDCrosstalkR")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDCrosstalkG")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDCrosstalkB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDShoulderContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
+	gSavedSettings.getControl("AlchemyToneMapAMDShoulderContrastRange")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("AlchemyToneMapUchimuraMaxBrightness")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("AlchemyToneMapUchimuraContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
 	gSavedSettings.getControl("AlchemyToneMapUchimuraLinearStart")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
@@ -319,12 +336,35 @@ bool ALRenderUtil::setupTonemap()
 
 		mTonemapExposure = llclamp(gSavedSettings.getF32("RenderExposure"), 0.5f, 4.f);
 
-		mToneAMDParams = LLVector3(gSavedSettings.getF32("AlchemyToneMapAMDHDRMax"), gSavedSettings.getF32("AlchemyToneMapAMDContrast"), gSavedSettings.getF32("AlchemyToneMapAMDShoulder"));
 		mToneUchimuraParamA = LLVector3(gSavedSettings.getF32("AlchemyToneMapUchimuraMaxBrightness"), gSavedSettings.getF32("AlchemyToneMapUchimuraContrast"), gSavedSettings.getF32("AlchemyToneMapUchimuraLinearStart"));
 		mToneUchimuraParamB = LLVector3(gSavedSettings.getF32("AlchemyToneMapUchimuraLinearLength"), gSavedSettings.getF32("AlchemyToneMapUchimuraBlackLevel"), 0.0);
 		mToneUnchartedParamA = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicToeStr"), gSavedSettings.getF32("AlchemyToneMapFilmicToeLen"), gSavedSettings.getF32("AlchemyToneMapFilmicShoulderStr"));
 		mToneUnchartedParamB = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicShoulderLen"), gSavedSettings.getF32("AlchemyToneMapFilmicShoulderAngle"), gSavedSettings.getF32("AlchemyToneMapFilmicGamma"));
 		mToneUnchartedParamC = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicWhitePoint"), 2.0, 0.0);
+
+		static LLCachedControl<F32> amd_hdrmax(gSavedSettings, "AlchemyToneMapAMDHDRMax", 256.f);
+		static LLCachedControl<F32> amd_exposure(gSavedSettings, "AlchemyToneMapAMDExposure", 8.0f);
+		static LLCachedControl<F32> amd_contrast(gSavedSettings, "AlchemyToneMapAMDContrast", 0.25f);
+		static LLCachedControl<F32> amd_satr(gSavedSettings, "AlchemyToneMapAMDSaturationR", 0.f);
+		static LLCachedControl<F32> amd_satg(gSavedSettings, "AlchemyToneMapAMDSaturationG", 0.f);
+		static LLCachedControl<F32> amd_satb(gSavedSettings, "AlchemyToneMapAMDSaturationB", 0.f);
+		static LLCachedControl<F32> amd_crossr(gSavedSettings, "AlchemyToneMapAMDCrosstalkR", 1.0 / 2.0);
+		static LLCachedControl<F32> amd_crossg(gSavedSettings, "AlchemyToneMapAMDCrosstalkG", 1.f);
+		static LLCachedControl<F32> amd_crossb(gSavedSettings, "AlchemyToneMapAMDCrosstalkB", 1.0 / 32.0);
+		static LLCachedControl<bool> amd_sh_contrast(gSavedSettings, "AlchemyToneMapAMDShoulderContrast", false);
+		static LLCachedControl<F32> amd_sh_contrast_range(gSavedSettings, "AlchemyToneMapAMDShoulderContrastRange", 1.0);
+
+		varAF3(saturation) = initAF3(amd_satr, amd_satg, amd_satb);
+		varAF3(crosstalk) = initAF3(amd_crossr, amd_crossg, amd_crossb);
+		LpmSetup(
+			amd_sh_contrast, LPM_CONFIG_709_709, LPM_COLORS_709_709, // <-- Using the LPM_ prefabs to make inputs easier.
+			0.0, // softGap
+			amd_hdrmax, // hdrMax
+			amd_exposure, // exposure
+			amd_contrast, // contrast
+			amd_sh_contrast ? amd_sh_contrast_range : 1.0, // shoulder contrast
+			saturation, crosstalk);
+
 	}
 	return true;
 }
@@ -540,7 +580,9 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 	}
 	case ALTonemap::TONEMAP_AMD:
 	{
-		tone_shader->uniform3fv(tonemap_amd_params, 1, mToneAMDParams.mV);
+		static LLCachedControl<bool> amd_sh_contrast(gSavedSettings, "AlchemyToneMapAMDShoulderContrast", false);
+		tone_shader->uniform4uiv(tonemap_amd_params, 24, ctl);
+		tone_shader->uniform1i(tonemap_amd_params_shoulder, amd_sh_contrast);
 		break;
 	}
 	case ALTonemap::TONEMAP_UNCHARTED:

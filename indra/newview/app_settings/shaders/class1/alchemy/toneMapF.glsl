@@ -47,6 +47,8 @@ uniform sampler3D colorgrade_lut;
 uniform vec4 colorgrade_lut_size;
 #endif
 
+void RunLPMFilter(inout vec3 diff);
+
 // ACES filmic tone map approximation
 // see https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
 // sRGB => XYZ => D65_2_D60 => AP1 => RRT_SAT
@@ -118,70 +120,6 @@ vec3 uchimura(vec3 x)
     float b = 0.0; // pedestal
     
     return uchimura(x, P, a, m, l, c, b);
-}
-
-//--------------------------------------------------------------------------------------
-// AMD Tonemapper
-//--------------------------------------------------------------------------------------
-// General tonemapping operator, build 'b' term.
-float ColToneB(float hdrMax, float contrast, float shoulder, float midIn, float midOut) 
-{
-    return
-        -((-pow(midIn, contrast) + (midOut*(pow(hdrMax, contrast*shoulder)*pow(midIn, contrast) -
-            pow(hdrMax, contrast)*pow(midIn, contrast*shoulder)*midOut)) /
-            (pow(hdrMax, contrast*shoulder)*midOut - pow(midIn, contrast*shoulder)*midOut)) /
-            (pow(midIn, contrast*shoulder)*midOut));
-}
-
-// General tonemapping operator, build 'c' term.
-float ColToneC(float hdrMax, float contrast, float shoulder, float midIn, float midOut) 
-{
-    return (pow(hdrMax, contrast*shoulder)*pow(midIn, contrast) - pow(hdrMax, contrast)*pow(midIn, contrast*shoulder)*midOut) /
-           (pow(hdrMax, contrast*shoulder)*midOut - pow(midIn, contrast*shoulder)*midOut);
-}
-
-// General tonemapping operator, p := {contrast,shoulder,b,c}.
-float ColTone(float x, vec4 p) 
-{ 
-    float z = pow(x, p.r); 
-    return z / (pow(z, p.g)*p.b + p.a); 
-}
-
-uniform vec3 tonemap_amd = vec3(16.0, 1.4, 1.0);
-vec3 AMDTonemapper(vec3 color)
-{
-    float hdrMax = tonemap_amd.x; // How much HDR range before clipping. HDR modes likely need this pushed up to say 25.0.
-    float contrast = tonemap_amd.y; // Use as a baseline to tune the amount of contrast the tonemapper has.
-    float shoulder = tonemap_amd.z; // Likely don’t need to mess with this factor, unless matching existing tonemapper is not working well..
-    const float midIn = 0.18; // most games will have a {0.0 to 1.0} range for LDR so midIn should be 0.18.
-    const float midOut = 0.18; // Use for LDR. For HDR10 10:10:10:2 use maybe 0.18/25.0 to start. For scRGB, I forget what a good starting point is, need to re-calculate.
-
-    float b = ColToneB(hdrMax, contrast, shoulder, midIn, midOut);
-    float c = ColToneC(hdrMax, contrast, shoulder, midIn, midOut);
-
-    #define EPS 1e-6f
-    float peak = max(color.r, max(color.g, color.b));
-    peak = max(EPS, peak);
-
-    vec3 ratio = color / peak;
-    peak = ColTone(peak, vec4(contrast, shoulder, b, c) );
-    // then process ratio
-
-    // probably want send these pre-computed (so send over saturation/crossSaturation as a constant)
-    float crosstalk = 4.0; // controls amount of channel crosstalk
-    float saturation = contrast; // full tonal range saturation control
-    float crossSaturation = contrast*16.0; // crosstalk saturation
-
-    float white = 1.0;
-
-    // wrap crosstalk in transform
-    ratio = pow(abs(ratio), vec3(saturation / crossSaturation));
-    ratio = mix(ratio, vec3(white), vec3(pow(peak, crosstalk)));
-    ratio = pow(abs(ratio), vec3(crossSaturation));
-
-    // then apply ratio to peak
-    color = peak * ratio;
-    return color;
 }
 
 //--------------------------------------------------------------------------------------
@@ -279,7 +217,8 @@ void main()
 #elif TONEMAP_METHOD == 2 // Uchimura's Gran Turismo method
     diff.rgb = uchimura(diff.rgb);
 #elif TONEMAP_METHOD == 3 // AMD Tonemapper
-    diff.rgb = AMDTonemapper(diff.rgb);
+    RunLPMFilter(diff.rgb);// LpmFilter(diff.r,diff.g,diff.b,false,LPM_CONFIG_709_709); // <-- Using the LPM_CONFIG_ prefab to make inputs easier.
+    //diff.rgb = AMDTonemapper(diff.rgb);
 #elif TONEMAP_METHOD == 4 // Uncharted
     diff.rgb = uncharted2(diff.rgb);
 #endif
