@@ -1203,22 +1203,22 @@ void LLDrawPoolBump::pushBumpBatches(U32 type)
 	}
 }
 
-void LLDrawPoolBump::pushBatch(LLDrawInfo& params, bool texture, bool batch_textures)
+void LLDrawPoolBump::pushBatch(LLDrawInfo& params, bool texture, bool batch_textures, bool reset_gltf)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 	applyModelMatrix(params);
 
 	bool tex_setup = false;
 
-	const U32 tex_list_size = params.mTextureList.size();
-	if (batch_textures && tex_list_size > 1)
+	if (reset_gltf) { LLRenderPass::resetGLTFTextureTransform(); }
+
+	if (batch_textures && params.mTextureList.size() > 1)
 	{
-		for (U32 i = 0; i < tex_list_size; ++i)
+		for (U32 i = 0; i < params.mTextureList.size(); ++i)
 		{
-			LLViewerTexture* texturep = params.mTextureList[i];
-			if (texturep)
+			if (params.mTextureList[i].notNull())
 			{
-				gGL.getTexUnit(i)->bindFast(texturep);
+				gGL.getTexUnit(i)->bindFast(params.mTextureList[i]);
 			}
 		}
 	}
