@@ -871,7 +871,7 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
 //			disabled_items.push_back(std::string("Copy"));
 //		}
 
-        if (isAgentInventory())
+        if (isAgentInventory() && !isCOFFolder() && !isInboxFolder() && !isOutfitsFolder())
         {
             items.push_back(std::string("New folder from selected"));
             items.push_back(std::string("Subfolder Separator"));
@@ -1415,6 +1415,18 @@ BOOL LLInvFVBridge::isMarketplaceListingsFolder() const
 	}
 	
 	return gInventory.isObjectDescendentOf(mUUID, folder_id);
+}
+
+BOOL LLInvFVBridge::isOutfitsFolder() const
+{
+	const LLUUID inbox_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS, false);
+	
+	if (inbox_id.isNull())
+	{
+		return FALSE;
+	}
+	
+	return gInventory.isObjectDescendentOf(mUUID, inbox_id);
 }
 
 BOOL LLInvFVBridge::isItemPermissive() const

@@ -177,6 +177,8 @@ protected:
 
 	BOOL isMarketplaceListingsFolder() const;     // true if descendant of Marketplace listings folder
 
+	BOOL isOutfitsFolder() const;
+
 	virtual BOOL isItemPermissive() const;
 	static void changeItemParent(LLInventoryModel* model,
 								 LLViewerInventoryItem* item,
