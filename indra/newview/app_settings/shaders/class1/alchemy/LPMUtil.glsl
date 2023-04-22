@@ -1,8 +1,15 @@
-uniform uvec4 tonemap_amd[24];
-uniform bool tonemap_amd_shoulder;
 
+/*[EXTRA_CODE_HERE]*/
+
+#ifdef GL_core_profile
 #define A_GLSL 1
 #define A_GPU 1
+#endif
+
+#ifdef A_GPU
+uniform uvec4 tonemap_amd[24];
+uniform bool tonemap_amd_shoulder;
+#endif
 
 //_____________________________________________________________/\_______________________________________________________________
 //==============================================================================================================================
@@ -2282,8 +2289,16 @@ uniform bool tonemap_amd_shoulder;
  AF3 opARcpF3(outAF3 d,inAF3 a){d=ARcpF3(a);return d;}
  AF4 opARcpF4(outAF4 d,inAF4 a){d=ARcpF4(a);return d;}
 #endif
-AU4 LpmFilterCtl(AU1 i){return tonemap_amd[i];}
+
+#ifdef A_CPU
+A_STATIC void LpmSetupOut(AU1 i, inAU4 v) { LPM_CONTROL_BLOCK[i * 4 + 0] = v[0]; LPM_CONTROL_BLOCK[i * 4 + 1] = v[1]; LPM_CONTROL_BLOCK[i * 4 + 2] = v[2]; LPM_CONTROL_BLOCK[i * 4 + 3] = v[3]; }
+#endif
+
+#ifdef A_GPU
 #define LPM_NO_SETUP 1
+AU4 LpmFilterCtl(AU1 i){return tonemap_amd[i];}
+#endif
+
 //_____________________________________________________________/\_______________________________________________________________
 //==============================================================================================================================
 //
@@ -3269,8 +3284,9 @@ AF1 minLuma,AF1 maxLuma){ // Queried display properties.
 //==============================================================================================================================
 #endif
 
-
+#ifdef A_GPU
 void RunLPMFilter(inout vec3 diff)
 {
     LpmFilter(diff.r, diff.g, diff.b, tonemap_amd_shoulder, LPM_CONFIG_709_709); // <-- Using the LPM_CONFIG_ prefab to make inputs easier.
 }
+#endif

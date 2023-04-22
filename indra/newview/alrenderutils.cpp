@@ -41,13 +41,10 @@
 #include "llviewershadermgr.h"
 #include "pipeline.h"
 
+uint32_t LPM_CONTROL_BLOCK[24 * 4] = {}; // Upload this to a uint4[24] part of a constant buffer (for example 'constant.lpm[24]').
+
 #define A_CPU 1
-#include "app_settings/shaders/class1/alchemy/ffx_a.h"
-
-AU1 ctl[24 * 4] = {}; // Upload this to a uint4[24] part of a constant buffer (for example 'constant.lpm[24]').
-A_STATIC void LpmSetupOut(AU1 i, inAU4 v) { ctl[i * 4 + 0] = v[0]; ctl[i * 4 + 1] = v[1]; ctl[i * 4 + 2] = v[2]; ctl[i * 4 + 3] = v[3]; }
-
-#include "app_settings/shaders/class1/alchemy/ffx_lpm.h"
+#include "app_settings/shaders/class1/alchemy/LPMUtil.glsl"
 
 const U32 ALRENDER_BUFFER_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
 
@@ -581,7 +578,7 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 	case ALTonemap::TONEMAP_AMD:
 	{
 		static LLCachedControl<bool> amd_sh_contrast(gSavedSettings, "AlchemyToneMapAMDShoulderContrast", false);
-		tone_shader->uniform4uiv(tonemap_amd_params, 24, ctl);
+		tone_shader->uniform4uiv(tonemap_amd_params, 24, LPM_CONTROL_BLOCK);
 		tone_shader->uniform1i(tonemap_amd_params_shoulder, amd_sh_contrast);
 		break;
 	}
