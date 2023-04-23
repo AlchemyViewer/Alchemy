@@ -596,7 +596,7 @@ void ALAvatarActions::estateBan(const uuid_vec_t& ids)
 	}
 
 	bool single_user = (payload["avatar_ids"].size() == 1);
-	LLNotificationsUtil::add(single_user ? "EstateBanSingle" : "EstateBanMultiple", args, payload, handleEstateKick);
+	LLNotificationsUtil::add(single_user ? "EstateBanSingle" : "EstateBanMultiple", args, payload, handleEstateBan);
 }
 
 // static
