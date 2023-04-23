@@ -43,6 +43,10 @@
 
 uint32_t LPM_CONTROL_BLOCK[24 * 4] = {}; // Upload this to a uint4[24] part of a constant buffer (for example 'constant.lpm[24]').
 
+#ifndef LL_WINDOWS
+#define A_GCC 1
+#endif
+
 #define A_CPU 1
 #include "app_settings/shaders/class1/alchemy/LPMUtil.glsl"
 
