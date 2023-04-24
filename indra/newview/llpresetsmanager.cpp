@@ -320,8 +320,9 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 		"RenderReflectionProbeDetail",
 		"RenderReflectionProbeLevel"
 		"RenderSharpenMethod",
-		"RenderSharpenDLSParams",
-		"RenderSharpenCASParams",
+		"RenderSharpenDLSSharpness",
+		"RenderSharpenDLSDenoise",
+		"RenderSharpenCASSharpness",
 	};
 	names = camera_controls;
 }

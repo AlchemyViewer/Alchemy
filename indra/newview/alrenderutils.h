@@ -28,6 +28,9 @@
 
 #include "llpointer.h"
 
+#include "boost/signals2/connection.hpp"
+
+
 class LLRenderTarget;
 class LLVertexBuffer;
 
@@ -35,7 +38,7 @@ class ALRenderUtil
 {
 public:
 	ALRenderUtil();
-	~ALRenderUtil() = default;
+	~ALRenderUtil();
 
 	void restoreVertexBuffers();
 	void resetVertexBuffers();
@@ -92,4 +95,6 @@ private:
 
 	// Vertex Buffers
 	LLPointer<LLVertexBuffer> mRenderBuffer;
+
+	std::vector<boost::signals2::scoped_connection> mSettingConnections;
 };

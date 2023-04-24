@@ -1102,35 +1102,38 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
-    <key>RenderSharpenCASParams</key>
+    <key>RenderSharpenCASSharpness</key>
     <map>
       <key>Comment</key>
-      <string>x (Sharpness 0-1), y (Contrast 0-1) z (UNUSED)</string>
+      <string>Sharpening level for CAS 0 to 1 range.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Vector3</string>
+      <string>F32</string>
       <key>Value</key>
-      <array>
-        <real>1.0</real>
-        <real>0.6</real>
-        <real>0.0</real>
-      </array>
+      <real>0.6</real>
     </map>
-    <key>RenderSharpenDLSParams</key>
+    <key>RenderSharpenDLSSharpness</key>
     <map>
       <key>Comment</key>
-      <string>x (Sharpness 0-1), y (Denoise 0-1) z (UNUSED)</string>
+      <string>Sharpening level for DLS 0 to 1 range.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
-      <string>Vector3</string>
+      <string>F32</string>
       <key>Value</key>
-      <array>
-        <real>0.6</real>
-        <real>0.17</real>
-        <real>0.0</real>
-      </array>
+      <real>0.6</real>
+    </map>
+    <key>RenderSharpenDLSDenoise</key>
+    <map>
+      <key>Comment</key>
+      <string>Denoise level for DLS 0 to 1 range.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>F32</string>
+      <key>Value</key>
+      <real>0.17</real>
     </map>
     <key>RenderToneMapType</key>
     <map>
@@ -1641,6 +1644,36 @@
       <array>
         <real>6.5</real>
         <real>2.0</real>
+        <real>0.0</real>
+      </array>
+    </map>
+    <key>RenderSharpenCASParams</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>1.0</real>
+        <real>0.6</real>
+        <real>0.0</real>
+      </array>
+    </map>
+    <key>RenderSharpenDLSParams</key>
+    <map>
+      <key>Comment</key>
+      <string>[OBSOLETE]</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Vector3</string>
+      <key>Value</key>
+      <array>
+        <real>0.6</real>
+        <real>0.17</real>
         <real>0.0</real>
       </array>
     </map>

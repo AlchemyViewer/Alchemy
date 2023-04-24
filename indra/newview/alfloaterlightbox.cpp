@@ -43,19 +43,19 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
 {
     mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.ResetGroupDefault", std::bind(&ALFloaterLightBox::onClickResetGroupDefault, this, std::placeholders::_2));
-    mCommitCallbackRegistrar.add("LightBox.CASSelect", boost::bind(&ALFloaterLightBox::updateCAS, this));
-    mCommitCallbackRegistrar.add("LightBox.CASCommit", std::bind(&ALFloaterLightBox::commitCAS, this, std::placeholders::_2));
 }
 
 ALFloaterLightBox::~ALFloaterLightBox()
 {
 	mTonemapConnection.disconnect();
+	mCASConnection.disconnect();
 }
 
 BOOL ALFloaterLightBox::postBuild()
 {
     updateTonemapper();
     mTonemapConnection = gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateTonemapper(); });
+	mCASConnection = gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateCAS(); });
 	return TRUE;
 }
 
@@ -85,7 +85,7 @@ void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
 		{
 			controlp->resetToDefault(true);
 		}
-		controlp = gSavedSettings.getControl("RenderSharpenCASParams");
+		controlp = gSavedSettings.getControl("RenderSharpenCASSharpness");
 		if (controlp)
 		{
 			controlp->resetToDefault(true);
@@ -548,69 +548,48 @@ void ALFloaterLightBox::updateCAS()
     LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("sharp_strength_slider");
     LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("sharp_dynamic_slider");
 
-    // Init Ctrl Objects
-    ALToneMapCtrl sharp1;
-    ALToneMapCtrl sharp2;
-    LLVector3     CAS_PARAMS;
+	//Due to how ALToneMapCtrl inits, we don't need to check if it's been disabled.
+	if (CAS_MODE == 1) //CAS
+	{
+		spinner1->setVisible(TRUE);
+		spinner1->setMinValue(0.0);
+		spinner1->setMaxValue(1.0);
+		spinner1->setIncrement(0.1);
+		spinner1->setControlName("RenderSharpenCASSharpness");
+		slider1->setVisible(TRUE);
+		slider1->setMinValue(0.0);
+		slider1->setMaxValue(1.0);
+		slider1->setIncrement(0.1);
+		slider1->setControlName("RenderSharpenCASSharpness", nullptr);
 
-    //Due to how ALToneMapCtrl inits, we don't need to check if it's been disabled.
-    if (CAS_MODE==1) //CAS
-    {
-        CAS_PARAMS = gSavedSettings.getVector3("RenderSharpenCASParams");
-        sharp1.TM_Enable = TRUE;
-        sharp1.TM_Min      = 0.0f;
-        sharp1.TM_CtrlName = "Contrast:";
-    }
-    else if (CAS_MODE == 2)  // DLS
-    {
-        CAS_PARAMS         = gSavedSettings.getVector3("RenderSharpenDLSParams");
-        sharp1.TM_Enable   = TRUE;
-        sharp1.TM_Min      = 0.0f;
-        sharp1.TM_CtrlName = "Denoise:";
-    }
-    spinner1->setEnabled(sharp1.TM_Enable);
-    spinner1->setMinValue(sharp1.TM_Min);
-    spinner1->setMaxValue(sharp1.TM_Max);
-    spinner1->setPrecision(sharp1.TM_Precision);
-    spinner1->setIncrement(sharp1.TM_Inc);
-    spinner1->setValue(CAS_PARAMS[VX]);
-    slider1->setEnabled(sharp1.TM_Enable);
-    slider1->setMinValue(sharp1.TM_Min);
-    slider1->setMaxValue(sharp1.TM_Max);
-    slider1->setIncrement(sharp1.TM_Inc);
-    slider1->setValue(CAS_PARAMS[VX]);
+		text2->setVisible(FALSE);
+		spinner2->setVisible(FALSE);
+		slider2->setVisible(FALSE);
+	}
+	else if (CAS_MODE == 2)  // DLS
+	{
+		spinner1->setVisible(TRUE);
+		spinner1->setMinValue(0.0);
+		spinner1->setMaxValue(1.0);
+		spinner1->setIncrement(0.1);
+		spinner1->setControlName("RenderSharpenDLSSharpness");
+		slider1->setVisible(TRUE);
+		slider1->setMinValue(0.0);
+		slider1->setMaxValue(1.0);
+		slider1->setIncrement(0.1);
+		slider1->setControlName("RenderSharpenCASSharpness", nullptr);
 
-    text2->setVisible(sharp1.TM_Enable);
-    text2->setText(sharp1.TM_CtrlName);
-    spinner2->setEnabled(sharp1.TM_Enable);
-    spinner2->setMinValue(sharp1.TM_Min);
-    spinner2->setMaxValue(sharp1.TM_Max);
-    spinner2->setPrecision(sharp1.TM_Precision);
-    spinner2->setIncrement(sharp1.TM_Inc);
-    spinner2->setValue(CAS_PARAMS[VY]);
-    slider2->setEnabled(sharp1.TM_Enable);
-    slider2->setMinValue(sharp1.TM_Min);
-    slider2->setMaxValue(sharp1.TM_Max);
-    slider2->setIncrement(sharp1.TM_Inc);
-    slider2->setValue(CAS_PARAMS[VY]);
-}
-
-void ALFloaterLightBox::commitCAS(const LLSD& userdata)
-{
-    const std::string& active_control = userdata.asString();
-    // Check the state of RenderSharpenMethod
-    U32 CAS_MODE = gSavedSettings.getU32("RenderSharpenMethod");
-
-    LLVector3 CAS_PARAMS;
-    CAS_PARAMS[VX] = (F32) getChild<LLUICtrl>("sharp_strength_" + active_control)->getValue().asReal();
-    CAS_PARAMS[VY] = (F32) getChild<LLUICtrl>("sharp_dynamic_" + active_control)->getValue().asReal();
-    CAS_PARAMS[VZ] = 0.0f;
-    if (CAS_MODE == 1)  // CAS
-    {
-        gSavedSettings.setVector3("RenderSharpenCASParams", CAS_PARAMS);
-    }
-    else if (CAS_MODE == 2)  // DLS
-    {
-        gSavedSettings.setVector3("RenderSharpenDLSParams", CAS_PARAMS);
-    }
+		text2->setVisible(TRUE);
+		text2->setText(std::string("Denoise:"));
+		spinner2->setVisible(TRUE);
+		spinner2->setMinValue(0.0);
+		spinner2->setMaxValue(1.0);
+		spinner2->setIncrement(0.1);
+		spinner2->setControlName("RenderSharpenDLSDenoise");
+		slider2->setVisible(TRUE);
+		slider2->setMinValue(0.0);
+		slider2->setMaxValue(1.0);
+		slider2->setIncrement(0.1);
+		slider2->setControlName("RenderSharpenDLSDenoise", nullptr);
+	}
 }

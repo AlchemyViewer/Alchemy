@@ -49,6 +49,7 @@ uint32_t LPM_CONTROL_BLOCK[24 * 4] = {}; // Upload this to a uint4[24] part of a
 
 #define A_CPU 1
 #include "app_settings/shaders/class1/alchemy/LPMUtil.glsl"
+#include "app_settings/shaders/class1/alchemy/CASF.glsl"
 
 const U32 ALRENDER_BUFFER_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
 
@@ -254,35 +255,41 @@ void LutCube::writeColor(int x, int y, int z, unsigned char r, unsigned char g, 
 ALRenderUtil::ALRenderUtil()
 {
 	// Connect settings
-	gSavedSettings.getControl("RenderColorGradeLUT")->getSignal()->connect(boost::bind(&ALRenderUtil::setupColorGrade, this));
-	gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDHDRMax")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDSaturationR")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDSaturationG")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDSaturationB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDCrosstalkR")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDCrosstalkG")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDCrosstalkB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDShoulderContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapAMDShoulderContrastRange")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapUchimuraMaxBrightness")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapUchimuraContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapUchimuraLinearStart")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapUchimuraLinearLength")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapUchimuraBlackLevel")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapFilmicToeStr")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapFilmicToeLen")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapFilmicShoulderStr")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapFilmicShoulderLen")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapFilmicShoulderAngle")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapFilmicGamma")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("AlchemyToneMapFilmicWhitePoint")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this));
-	gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
-	gSavedSettings.getControl("RenderSharpenCASParams")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
-	gSavedSettings.getControl("RenderSharpenDLSParams")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this));
+	mSettingConnections.push_back(gSavedSettings.getControl("RenderColorGradeLUT")->getSignal()->connect(boost::bind(&ALRenderUtil::setupColorGrade, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("RenderExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDHDRMax")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDSaturationR")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDSaturationG")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDSaturationB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDCrosstalkR")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDCrosstalkG")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDCrosstalkB")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDShoulderContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapAMDShoulderContrastRange")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapUchimuraMaxBrightness")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapUchimuraContrast")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapUchimuraLinearStart")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapUchimuraLinearLength")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapUchimuraBlackLevel")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapFilmicToeStr")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapFilmicToeLen")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapFilmicShoulderStr")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapFilmicShoulderLen")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapFilmicShoulderAngle")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapFilmicGamma")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("AlchemyToneMapFilmicWhitePoint")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("RenderSharpenDLSSharpness")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("RenderSharpenDLSDenoise")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this)));
+	mSettingConnections.push_back(gSavedSettings.getControl("RenderSharpenCASSharpness")->getSignal()->connect(boost::bind(&ALRenderUtil::setupSharpen, this)));
+}
+
+ALRenderUtil::~ALRenderUtil()
+{
+	mSettingConnections.clear();
 }
 
 void ALRenderUtil::restoreVertexBuffers()
@@ -641,18 +648,13 @@ bool ALRenderUtil::setupSharpen()
 		case ALSharpen::SHARPEN_CAS:
 		{
 			sharpen_shader = &gDeferredPostCASProgram;
-			sharpen_shader->bind();
-			LLVector3 params = gSavedSettings.getVector3("RenderSharpenCASParams");
-			params.clamp(LLVector3::zero, LLVector3::all_one);
-			sharpen_shader->uniform3fv(sharpen_params, 1, params.mV);
-			sharpen_shader->unbind();
 			break;
 		}
 		case ALSharpen::SHARPEN_DLS:
 		{
 			sharpen_shader = &gDeferredPostDLSProgram;
 			sharpen_shader->bind();
-			LLVector3 params = gSavedSettings.getVector3("RenderSharpenDLSParams");
+			LLVector3 params = LLVector3(gSavedSettings.getF32("RenderSharpenDLSSharpness"), gSavedSettings.getF32("RenderSharpenDLSDenoise"), 0.f);
 			params.clamp(LLVector3::zero, LLVector3::all_one);
 			sharpen_shader->uniform3fv(sharpen_params, 1, params.mV);
 			sharpen_shader->unbind();
@@ -684,8 +686,10 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 	switch (mSharpenMethod)
 	{
 	case ALSharpen::SHARPEN_CAS:
+	{
 		sharpen_shader = &gDeferredPostCASProgram;
 		break;
+	}
 	case ALSharpen::SHARPEN_DLS:
 		sharpen_shader = &gDeferredPostDLSProgram;
 		break;
@@ -696,6 +700,25 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 
 	// Bind setup:
 	sharpen_shader->bind();
+	if (mSharpenMethod == ALSharpen::SHARPEN_CAS)
+	{
+		static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderSharpenCASSharpness", 0.6f);
+		static LLStaticHashedString cas_param_0("cas_param_0");
+		static LLStaticHashedString cas_param_1("cas_param_1");
+		static LLStaticHashedString out_screen_res("out_screen_res");
+
+		varAU4(const0);
+		varAU4(const1);
+		CasSetup(const0, const1,
+			cas_sharpness,             // Sharpness tuning knob (0.0 to 1.0).
+			src->getWidth(), src->getHeight(),  // Example input size.
+			dst->getWidth(), dst->getHeight()); // Example output size.
+
+		sharpen_shader->uniform4uiv(cas_param_0, 1, const0);
+		sharpen_shader->uniform4uiv(cas_param_1, 1, const1);
+		
+		sharpen_shader->uniform2f(out_screen_res, dst->getWidth(), dst->getHeight());
+	}
 
 	sharpen_shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
 

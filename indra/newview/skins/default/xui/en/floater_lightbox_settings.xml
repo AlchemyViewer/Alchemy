@@ -190,8 +190,6 @@
 						label="DLS"
 						name="sharp_DLS"
 						value="2" />
-					<combo_box.commit_callback
-       					function="LightBox.CASSelect" />
 					</combo_box>
 				<slider
 					top_pad="-18"
@@ -204,12 +202,7 @@
 					left_delta="80"
 					right="-75"
 					name="sharp_strength_slider"
-					show_text="false"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.CASCommit"
-						parameter="slider" />
-					</slider>
+					show_text="false" />
 				<spinner
 					top_pad="-20"
 					height="15"
@@ -222,12 +215,7 @@
 					min_val="0.0"
 					width="55"
 					increment=".1"
-					name="sharp_strength_spinner"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.CASCommit"
-						parameter="spinner" />
-					</spinner>
+					name="sharp_strength_spinner" />
 				<text
 					name="sharp_dynamic_text"
 					follows="left|top"
@@ -248,12 +236,7 @@
 					left_delta="80"
 					right="-75"
 					show_text="false"
-					name="sharp_dynamic_slider"
-					control_name="">
-					<slider.commit_callback
-						function="LightBox.CASCommit"
-						parameter="slider" />
-					</slider>
+					name="sharp_dynamic_slider" />
 				<spinner
 					top_pad="-20"
 					height="15"
@@ -266,12 +249,7 @@
 					min_val="0.0"
 					width="55"
 					increment=".1"
-					name="sharp_dynamic_spinner"
-					control_name="">
-					<spinner.commit_callback
-						function="LightBox.CASCommit"
-						parameter="spinner" />
-					</spinner>
+					name="sharp_dynamic_spinner" />
 				<button
 					name="sharpen_default_btn"
 					follows="top|right"
