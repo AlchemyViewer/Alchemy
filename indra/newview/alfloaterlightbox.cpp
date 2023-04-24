@@ -536,20 +536,28 @@ void ALFloaterLightBox::updateTonemapper()
 	}
 }
 
-void ALFloaterLightBox::updateCAS() 
+void ALFloaterLightBox::updateCAS()
 {
-    // Check the state of RenderSharpenMethod
-    U32 CAS_MODE = gSavedSettings.getU32("RenderSharpenMethod");
+	// Init UI
+	LLTextBox* text2 = getChild<LLTextBox>("sharp_dynamic_text");
+	LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("sharp_strength_spinner");
+	LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("sharp_dynamic_spinner");
+	LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("sharp_strength_slider");
+	LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("sharp_dynamic_slider");
 
-    // Init UI
-    LLTextBox* text2 = getChild<LLTextBox>("sharp_dynamic_text");
-    LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("sharp_strength_spinner");
-    LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("sharp_dynamic_spinner");
-    LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("sharp_strength_slider");
-    LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("sharp_dynamic_slider");
-
-	//Due to how ALToneMapCtrl inits, we don't need to check if it's been disabled.
-	if (CAS_MODE == 1) //CAS
+	switch (gSavedSettings.getU32("RenderSharpenMethod"))
+	{
+	default:
+	case ALRenderUtil::SHARPEN_NONE:
+	{
+		spinner1->setVisible(FALSE);
+		slider1->setVisible(FALSE);
+		text2->setVisible(FALSE);
+		spinner2->setVisible(FALSE);
+		slider2->setVisible(FALSE);
+		break;
+	}
+	case ALRenderUtil::SHARPEN_CAS:
 	{
 		spinner1->setVisible(TRUE);
 		spinner1->setMinValue(0.0);
@@ -565,8 +573,9 @@ void ALFloaterLightBox::updateCAS()
 		text2->setVisible(FALSE);
 		spinner2->setVisible(FALSE);
 		slider2->setVisible(FALSE);
+		break;
 	}
-	else if (CAS_MODE == 2)  // DLS
+	case ALRenderUtil::SHARPEN_DLS:
 	{
 		spinner1->setVisible(TRUE);
 		spinner1->setMinValue(0.0);
@@ -591,5 +600,7 @@ void ALFloaterLightBox::updateCAS()
 		slider2->setMaxValue(1.0);
 		slider2->setIncrement(0.1);
 		slider2->setControlName("RenderSharpenDLSDenoise", nullptr);
+		break;
+	}
 	}
 }

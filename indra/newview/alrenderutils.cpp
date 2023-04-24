@@ -377,6 +377,57 @@ bool ALRenderUtil::setupTonemap()
 	return true;
 }
 
+void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, LLRenderTarget* dst)
+{
+	dst->bindTarget();
+
+	LLGLSLShader* tone_shader = &gDeferredPostTonemapProgram[mTonemapType];
+
+	tone_shader->bind();
+
+	tone_shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
+	tone_shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, exposure, false, LLTexUnit::TFO_BILINEAR);
+
+	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
+	tone_shader->uniform1f(al_exposure, mTonemapExposure);
+
+	switch (mTonemapType)
+	{
+	default:
+		break;
+	case ALTonemap::TONEMAP_UCHIMURA:
+	{
+		tone_shader->uniform3fv(tone_uchimura_a, 1, mToneUchimuraParamA.mV);
+		tone_shader->uniform3fv(tone_uchimura_b, 1, mToneUchimuraParamB.mV);
+		break;
+	}
+	case ALTonemap::TONEMAP_AMD:
+	{
+		static LLCachedControl<bool> amd_sh_contrast(gSavedSettings, "AlchemyToneMapAMDShoulderContrast", false);
+		tone_shader->uniform4uiv(tonemap_amd_params, 24, LPM_CONTROL_BLOCK);
+		tone_shader->uniform1i(tonemap_amd_params_shoulder, amd_sh_contrast);
+		break;
+	}
+	case ALTonemap::TONEMAP_UNCHARTED:
+	{
+		tone_shader->uniform3fv(tone_uncharted_a, 1, mToneUnchartedParamA.mV);
+		tone_shader->uniform3fv(tone_uncharted_b, 1, mToneUnchartedParamB.mV);
+		tone_shader->uniform3fv(tone_uncharted_c, 1, mToneUnchartedParamC.mV);
+		break;
+	}
+	}
+
+	mRenderBuffer->setBuffer();
+	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
+	stop_glerror();
+
+	tone_shader->unbindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
+	tone_shader->unbindTexture(LLShaderMgr::EXPOSURE_MAP, exposure->getUsage());
+	tone_shader->unbind();
+
+	dst->flush();
+}
+
 bool ALRenderUtil::setupColorGrade()
 {
 	if (mCGLut)
@@ -562,45 +613,18 @@ bool ALRenderUtil::setupColorGrade()
 	return true;
 }
 
-void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, LLRenderTarget* dst)
+void ALRenderUtil::renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst)
 {
 	dst->bindTarget();
 
-	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorGradeLUTProgram[mTonemapType] : &gDeferredPostTonemapProgram[mTonemapType];
+	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorCorrectLUTProgram : &gDeferredPostColorCorrectProgram;
 
 	tone_shader->bind();
 
 	tone_shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
-	tone_shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, exposure, false, LLTexUnit::TFO_BILINEAR);
 
 	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
-	tone_shader->uniform1f(al_exposure, mTonemapExposure);
 
-	switch (mTonemapType)
-	{
-	default:
-		break;
-	case ALTonemap::TONEMAP_UCHIMURA:
-	{
-		tone_shader->uniform3fv(tone_uchimura_a, 1, mToneUchimuraParamA.mV);
-		tone_shader->uniform3fv(tone_uchimura_b, 1, mToneUchimuraParamB.mV);
-		break;
-	}
-	case ALTonemap::TONEMAP_AMD:
-	{
-		static LLCachedControl<bool> amd_sh_contrast(gSavedSettings, "AlchemyToneMapAMDShoulderContrast", false);
-		tone_shader->uniform4uiv(tonemap_amd_params, 24, LPM_CONTROL_BLOCK);
-		tone_shader->uniform1i(tonemap_amd_params_shoulder, amd_sh_contrast);
-		break;
-	}
-	case ALTonemap::TONEMAP_UNCHARTED:
-	{
-		tone_shader->uniform3fv(tone_uncharted_a, 1, mToneUnchartedParamA.mV);
-		tone_shader->uniform3fv(tone_uncharted_b, 1, mToneUnchartedParamB.mV);
-		tone_shader->uniform3fv(tone_uncharted_c, 1, mToneUnchartedParamC.mV);
-		break;
-	}
-	}
 
 	S32 channel = -1;
 	if (mCGLut != 0)
@@ -626,7 +650,6 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 	}
 
 	tone_shader->unbindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
-	tone_shader->unbindTexture(LLShaderMgr::EXPOSURE_MAP, exposure->getUsage());
 	tone_shader->unbind();
 
 	dst->flush();

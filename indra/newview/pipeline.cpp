@@ -867,7 +867,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
     }
 
     mPostMap.allocate(resX, resY, GL_RGBA);
-	mPostFXMap.allocate(resX, resY, GL_RGBA);
+	mPostFXMap.allocate(resX, resY, screenFormat);
 
     //HACK make screenbuffer allocations start failing after 30 seconds
     if (gSavedSettings.getBOOL("SimulateFBOFailure"))
@@ -7624,7 +7624,8 @@ void LLPipeline::renderFinalize()
 		generateExposure(&mLuminanceMap, &mExposureMap);
 
 		mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mPostFXMap);
-		mALRenderUtil->renderSharpen(&mPostFXMap, &mPostMap);
+		mALRenderUtil->renderSharpen(&mPostFXMap, &mRT->screen);
+		mALRenderUtil->renderColorGrade(&mRT->screen, &mPostMap);
 		//gammaCorrect(&mRT->screen, &mPostMap);
 
         LLVertexBuffer::unbind();

@@ -58,8 +58,10 @@ public:
 		TONEMAP_COUNT
 	};
 	bool setupTonemap();
-	bool setupColorGrade();
 	void renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, LLRenderTarget* dst);
+
+	bool setupColorGrade();
+	void renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst);
 
 	enum ALSharpen : uint32_t
 	{

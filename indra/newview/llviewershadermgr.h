@@ -275,7 +275,8 @@ extern LLGLSLShader			gDeferredBufferVisualProgram;
 extern LLGLSLShader         gDeferredPostCASProgram;
 extern LLGLSLShader			gDeferredPostDLSProgram;
 extern LLGLSLShader			gDeferredPostTonemapProgram[ALRenderUtil::TONEMAP_COUNT];
-extern LLGLSLShader			gDeferredPostColorGradeLUTProgram[ALRenderUtil::TONEMAP_COUNT];
+extern LLGLSLShader			gDeferredPostColorCorrectProgram;
+extern LLGLSLShader			gDeferredPostColorCorrectLUTProgram;
 // [RLVa:KB] - @setsphere
 extern LLGLSLShader			gRlvSphereProgram;
 // [/RLVa:KB]
