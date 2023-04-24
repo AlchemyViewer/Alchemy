@@ -90,7 +90,12 @@ void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
 		{
 			controlp->resetToDefault(true);
 		}
-		controlp = gSavedSettings.getControl("RenderSharpenDLSParams");
+		controlp = gSavedSettings.getControl("RenderSharpenDLSSharpness");
+		if (controlp)
+		{
+			controlp->resetToDefault(true);
+		}
+		controlp = gSavedSettings.getControl("RenderSharpenDLSDenoise");
 		if (controlp)
 		{
 			controlp->resetToDefault(true);
@@ -586,7 +591,7 @@ void ALFloaterLightBox::updateCAS()
 		slider1->setMinValue(0.0);
 		slider1->setMaxValue(1.0);
 		slider1->setIncrement(0.1);
-		slider1->setControlName("RenderSharpenCASSharpness", nullptr);
+		slider1->setControlName("RenderSharpenDLSSharpness", nullptr);
 
 		text2->setVisible(TRUE);
 		text2->setText(std::string("Denoise:"));
