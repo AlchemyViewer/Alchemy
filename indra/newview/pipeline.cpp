@@ -6987,7 +6987,8 @@ void LLPipeline::bindScreenToTexture()
 
 static LLTrace::BlockTimerStatHandle FTM_RENDER_BLOOM("Bloom");
 
-void LLPipeline::visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex) {
+void LLPipeline::visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex)
+{
 	dst->bindTarget();
 	gDeferredBufferVisualProgram.bind();
 	gDeferredBufferVisualProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_BILINEAR, bufferIndex);
@@ -7004,7 +7005,8 @@ void LLPipeline::visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 
 	dst->flush();
 }
 
-void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst) {
+void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
+{
 	// luminance sample and mipmap generation
 	{
 		LL_PROFILE_GPU_ZONE("luminance sample");
@@ -7129,7 +7131,8 @@ void LLPipeline::gammaCorrect(LLRenderTarget* src, LLRenderTarget* dst) {
 	dst->flush();
 }
 
-void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst) {
+void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst) 
+{
 
 	if (RenderScreenSpaceReflections && !gCubeSnapshot)
 	{
@@ -7155,7 +7158,8 @@ void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget*
 	}
 }
 
-void LLPipeline::generateGlow(LLRenderTarget* src) {
+void LLPipeline::generateGlow(LLRenderTarget* src) 
+{
 	if (sRenderGlow)
 	{
 		LL_PROFILE_GPU_ZONE("glow");
@@ -7252,7 +7256,8 @@ void LLPipeline::generateGlow(LLRenderTarget* src) {
 	}
 }
 
-void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst) {
+void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst) 
+{
 	{
 		llassert(!gCubeSnapshot);
 		bool multisample = RenderFSAASamples > 1 && mRT->fxaaBuffer.isComplete();
@@ -7343,7 +7348,8 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst) {
 	}
 }
 
-void LLPipeline::copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst) {
+void LLPipeline::copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst)
+{
 
 	LL_PROFILE_GPU_ZONE("copyRenderTarget");
 	dst->bindTarget();
@@ -7363,7 +7369,8 @@ void LLPipeline::copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst) {
 	dst->flush();
 }
 
-void LLPipeline::combineGlow(LLRenderTarget* src, LLRenderTarget* dst) {
+void LLPipeline::combineGlow(LLRenderTarget* src, LLRenderTarget* dst)
+{
 	// Go ahead and do our glow combine here in our destination.  We blit this later into the front buffer.
 
 	dst->bindTarget();
@@ -7382,7 +7389,8 @@ void LLPipeline::combineGlow(LLRenderTarget* src, LLRenderTarget* dst) {
 	dst->flush();
 }
 
-void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst) {
+void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
+{
 	{
 		bool dof_enabled =
 			(RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) &&
@@ -7557,10 +7565,12 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst) {
 			{ // combine result based on alpha
 				
 				dst->bindTarget();
-				if (RenderFSAASamples > 1 && mRT->fxaaBuffer.isComplete()) {
+				if (RenderFSAASamples > 1 && mRT->fxaaBuffer.isComplete())
+                {
 					glViewport(0, 0, dst->getWidth(), dst->getHeight());
 				}
-				else {
+				else
+                {
 					gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
 					gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
 					gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
@@ -7595,6 +7605,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst) {
 
 void LLPipeline::renderFinalize()
 {
+    llassert(!gCubeSnapshot);
     LLVertexBuffer::unbind();
     LLGLState::checkStates();
 
@@ -7615,25 +7626,23 @@ void LLPipeline::renderFinalize()
     gGL.setColorMask(true, true);
     glClearColor(0, 0, 0, 0);
 
-    if (!gCubeSnapshot)
-    {
-		copyScreenSpaceReflections(&mRT->screen, &mSceneMap);
+    
+    copyScreenSpaceReflections(&mRT->screen, &mSceneMap);
 
-		generateLuminance(&mRT->screen, &mLuminanceMap);
+    generateLuminance(&mRT->screen, &mLuminanceMap);
 
-		generateExposure(&mLuminanceMap, &mExposureMap);
+    generateExposure(&mLuminanceMap, &mExposureMap);
 
-		mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mPostFXMap);
-		mALRenderUtil->renderSharpen(&mPostFXMap, &mRT->screen);
-		mALRenderUtil->renderColorGrade(&mRT->screen, &mPostMap);
-		//gammaCorrect(&mRT->screen, &mPostMap);
+	mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mPostFXMap);
+	mALRenderUtil->renderSharpen(&mPostFXMap, &mRT->screen);
+	mALRenderUtil->renderColorGrade(&mRT->screen, &mPostMap);
+	//gammaCorrect(&mRT->screen, &mPostMap);
 
-        LLVertexBuffer::unbind();
-    }
+    LLVertexBuffer::unbind();
 
-	generateGlow(&mPostMap);
+    generateGlow(&mPostMap);
 
-	combineGlow(&mPostMap, &mRT->screen);
+    combineGlow(&mPostMap, &mRT->screen);
 
 	gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
 	gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
@@ -7645,7 +7654,8 @@ void LLPipeline::renderFinalize()
 
 	applyFXAA(&mPostMap, &mRT->screen);
 	LLRenderTarget* finalBuffer = &mRT->screen;
-	if (RenderBufferVisualization > -1) {
+	if (RenderBufferVisualization > -1)
+    {
 		finalBuffer = &mPostMap;
 		switch (RenderBufferVisualization)
 		{
