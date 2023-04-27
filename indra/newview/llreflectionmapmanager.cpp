@@ -392,8 +392,7 @@ void LLReflectionMapManager::getReflectionMaps(std::vector<LLReflectionMap*>& ma
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
 
-    LLMatrix4a modelview;
-    modelview.loadu(gGLModelView);
+    const LLMatrix4a modelview = gGLModelView;
     LLVector4a oa; // scratch space for transformed origin
 
     U32 count = 0;
