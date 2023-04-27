@@ -793,6 +793,8 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
         gCubeSnapshot = FALSE;
     }
 
+	bool is_aux_alloc = mRT == &mAuxillaryRT;
+
 	U32 res_mod = RenderResolutionDivisor;
 
 	if (res_mod > 1 && res_mod < resX && res_mod < resY)
@@ -812,12 +814,12 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 	mRT->width = resX;
 	mRT->height = resY;
 
-    if (LLPipeline::sRenderTransparentWater)
+    if (!is_aux_alloc && LLPipeline::sRenderTransparentWater)
     { //water reflection texture
-        mWaterDis.allocate(resX, resY, GL_RGBA, true);
+        if (!mWaterDis.allocate(resX, resY, GL_RGBA, true)) return false;
     }
 
-	if (RenderUIBuffer)
+	if (!is_aux_alloc && RenderUIBuffer)
 	{
 		if (!mRT->uiScreen.allocate(resX,resY, GL_RGBA))
 		{
@@ -838,21 +840,9 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 
     mRT->deferredScreen.shareDepthBuffer(mRT->screen);
 
-	if (samples > 0)
-	{
-		if (!mRT->fxaaBuffer.allocate(resX, resY, GL_RGBA)) return false;
-	}
-	else
-	{
-		mRT->fxaaBuffer.release();
-	}
-		
-//	if (shadow_detail > 0 || ssao || RenderDepthOfField || samples > 0)
-// [RLVa:KB] - @setsphere
-	if (shadow_detail > 0 || ssao || RenderDepthOfField || samples > 0 || RlvActions::hasPostProcess())
-// [/RLVa:KB]
-	{ //only need mRT->deferredLight for shadows OR ssao OR dof OR fxaa
-		if (!mRT->deferredLight.allocate(resX, resY, GL_RGBA16F)) return false;
+	if (shadow_detail > 0 || ssao || gSavedSettings.getU32("RenderSharpenMethod") != ALRenderUtil::SHARPEN_NONE)
+	{ //only need mRT->deferredLight for shadows OR ssao OR sharpening
+		if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
 	}
 	else
 	{
@@ -861,14 +851,21 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 
     allocateShadowBuffer(resX, resY);
 
-    if (!gCubeSnapshot && RenderScreenSpaceReflections) // hack to not allocate mSceneMap for cube snapshots
-    {
-        mSceneMap.allocate(resX, resY, GL_RGB, true);
-    }
+	if (!is_aux_alloc)
+	{
+		if (!mSceneMap.allocate(resX, resY, GL_RGB, true)) return false;
 
-    mPostMap.allocate(resX, resY, screenFormat);
-	mPostFXMap.allocate(resX, resY, screenFormat);
-
+		if (!mPostMap.allocate(resX, resY, GL_RGBA)) return false;
+		if (!mPostFXMap.allocate(resX, resY, GL_RGBA)) return false;
+		if (RenderDepthOfField || samples > 0)
+		{ //only need mPostHelperMap for dof OR fxaa
+			if (!mPostHelperMap.allocate(resX, resY, GL_RGBA)) return false;
+		}
+		else
+		{
+			mPostHelperMap.release();
+		}
+	}
     //HACK make screenbuffer allocations start failing after 30 seconds
     if (gSavedSettings.getBOOL("SimulateFBOFailure"))
     {
@@ -1129,6 +1126,7 @@ void LLPipeline::releaseGLBuffers()
 
     mPostMap.release();
 	mPostFXMap.release();
+	mPostHelperMap.release();
 
 	for (U32 i = 0; i < 3; i++)
 	{
@@ -1167,9 +1165,11 @@ void LLPipeline::releaseScreenBuffers()
 {
     mRT->uiScreen.release();
     mRT->screen.release();
-    mRT->fxaaBuffer.release();
     mRT->deferredScreen.release();
     mRT->deferredLight.release();
+	mPostMap.release();
+	mPostFXMap.release();
+	mPostHelperMap.release();
 }
 
 void LLPipeline::releaseSunShadowTarget(U32 index)
@@ -7277,7 +7277,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
 {
 	{
 		llassert(!gCubeSnapshot);
-		bool multisample = RenderFSAASamples > 1 && mRT->fxaaBuffer.isComplete();
+		bool multisample = RenderFSAASamples > 1 && mPostHelperMap.isComplete();
 		LLGLSLShader* shader = &gGlowCombineProgram;
 
 		S32 width = dst->getWidth();
@@ -7288,7 +7288,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
 		{
 			LL_PROFILE_GPU_ZONE("aa");
 			// bake out texture2D with RGBL for FXAA shader
-			mRT->fxaaBuffer.bindTarget();
+			mPostHelperMap.bindTarget();
 
 			shader = &gGlowCombineFXAAProgram;
 			shader->bind();
@@ -7308,7 +7308,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
 			shader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
 			shader->unbind();
 
-			mRT->fxaaBuffer.flush();
+			mPostHelperMap.flush();
 
 			dst->bindTarget();
 
@@ -7332,14 +7332,14 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
 			shader = &gFXAAProgram[fsaa_quality];
 			shader->bind();
 
-			channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP, mRT->fxaaBuffer.getUsage());
+			channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP, mPostHelperMap.getUsage());
 			if (channel > -1)
 			{
-				mRT->fxaaBuffer.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+				mPostHelperMap.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
 			}
 
-			F32 scale_x = (F32)width / mRT->fxaaBuffer.getWidth();
-			F32 scale_y = (F32)height / mRT->fxaaBuffer.getHeight();
+			F32 scale_x = (F32)width / mPostHelperMap.getWidth();
+			F32 scale_y = (F32)height / mPostHelperMap.getHeight();
 			shader->uniform2f(LLShaderMgr::FXAA_TC_SCALE, scale_x, scale_y);
 			shader->uniform2f(LLShaderMgr::FXAA_RCP_SCREEN_RES, 1.f / width * scale_x, 1.f / height * scale_y);
 			shader->uniform4f(LLShaderMgr::FXAA_RCP_FRAME_OPT, -0.5f / width * scale_x, -0.5f / height * scale_y,
@@ -7531,7 +7531,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 			F32 magnification = focal_length / (subject_distance - focal_length);
 
 			{ // build diffuse+bloom+CoF
-				mRT->deferredLight.bindTarget();
+				mPostHelperMap.bindTarget();
 
 				gDeferredCoFProgram.bind();
 
@@ -7551,7 +7551,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 				mScreenTriangleVB->setBuffer();
 				mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 				gDeferredCoFProgram.unbind();
-				mRT->deferredLight.flush();
+				mPostHelperMap.flush();
 			}
 
 			U32 dof_width = (U32)(mRT->screen.getWidth() * CameraDoFResScale);
@@ -7564,7 +7564,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 				gGL.setColorMask(true, false);
 
 				gDeferredPostProgram.bind();
-				gDeferredPostProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->deferredLight, LLTexUnit::TFO_POINT);
+				gDeferredPostProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mPostHelperMap, LLTexUnit::TFO_POINT);
 
 				gDeferredPostProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, dst->getWidth(), dst->getHeight());
 				gDeferredPostProgram.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
@@ -7582,22 +7582,12 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 			{ // combine result based on alpha
 				
 				dst->bindTarget();
-				if (RenderFSAASamples > 1 && mRT->fxaaBuffer.isComplete())
-                {
-					glViewport(0, 0, dst->getWidth(), dst->getHeight());
-				}
-				else
-                {
-					gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
-					gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
-					gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
-					gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
-					glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
-				}
+
+				glViewport(0, 0, dst->getWidth(), dst->getHeight());
 
 				gDeferredDoFCombineProgram.bind();	
 				gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, LLTexUnit::TFO_POINT);
-				gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mRT->deferredLight, LLTexUnit::TFO_POINT);
+				gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mPostHelperMap, LLTexUnit::TFO_POINT);
 
 				gDeferredDoFCombineProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, dst->getWidth(), dst->getHeight());
 				gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
@@ -7650,16 +7640,17 @@ void LLPipeline::renderFinalize()
 
     generateExposure(&mLuminanceMap, &mExposureMap);
 
-	mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mPostFXMap);
-	mALRenderUtil->renderSharpen(&mPostFXMap, &mRT->screen);
+	mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mRT->deferredLight);
+	mALRenderUtil->renderSharpen(&mRT->deferredLight, &mRT->screen);
 	mALRenderUtil->renderColorGrade(&mRT->screen, &mPostMap);
-	//gammaCorrect(&mRT->screen, &mPostMap);
 
     LLVertexBuffer::unbind();
 
     generateGlow(&mPostMap);
 
-    combineGlow(&mPostMap, &mRT->screen);
+    combineGlow(&mPostMap, &mPostFXMap);
+
+	renderDoF(&mPostFXMap, &mPostMap);
 
 	gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
 	gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
@@ -7667,10 +7658,8 @@ void LLPipeline::renderFinalize()
 	gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
 	glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
 
-	renderDoF(&mRT->screen, &mPostMap);
-
-	applyFXAA(&mPostMap, &mRT->screen);
-	LLRenderTarget* finalBuffer = &mRT->screen;
+	applyFXAA(&mPostMap, &mPostFXMap);
+	LLRenderTarget* finalBuffer = &mPostFXMap;
 	if (RenderBufferVisualization > -1)
     {
 		finalBuffer = &mPostMap;

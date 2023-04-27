@@ -645,8 +645,6 @@ public:
         LLRenderTarget			screen;
         LLRenderTarget			uiScreen;
         LLRenderTarget			deferredScreen;
-        LLRenderTarget			fxaaBuffer;
-        LLRenderTarget			edgeMap;
         LLRenderTarget			deferredLight;
 
         //sun shadow map
@@ -678,6 +676,7 @@ public:
     // tonemapped and gamma corrected render ready for post
     LLRenderTarget          mPostMap;
 	LLRenderTarget          mPostFXMap;
+	 LLRenderTarget			mPostHelperMap;
 
     LLCullResult            mSky;
     LLCullResult            mReflectedObjects;

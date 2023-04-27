@@ -895,7 +895,6 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
 
         gGL.setColorMask(true, true);
 
-        if (LLPipeline::sRenderDeferred)
         {
             gPipeline.mRT->deferredScreen.bindTarget();
             if (gUseWireframe)
@@ -908,16 +907,6 @@ pProgFloater->setProgressCancelButtonVisible(FALSE, LLTrans::getString("Cancel")
                 glClearColor(1, 0, 1, 1);
             }
             gPipeline.mRT->deferredScreen.clear();
-        }
-        else
-        {
-            gPipeline.mRT->screen.bindTarget();
-            if (LLPipeline::sUnderWaterRender && !gPipeline.canUseWindLightShaders())
-            {
-                const LLColor3 col = LLEnvironment::getInstance()->getCurrentWater()->getWaterFogColor();
-                glClearColor(col.mV[0], col.mV[1], col.mV[2], 0.f);
-            }
-            gPipeline.mRT->screen.clear();
         }
 
         gGL.setColorMask(true, false);
