@@ -190,6 +190,8 @@ LLGLSLShader			gDeferredPostProgram;
 LLGLSLShader			gDeferredCoFProgram;
 LLGLSLShader			gDeferredDoFCombineProgram;
 LLGLSLShader			gDeferredPostGammaCorrectProgram;
+LLGLSLShader            gNoPostGammaCorrectProgram;
+LLGLSLShader            gLegacyPostGammaCorrectProgram;
 LLGLSLShader			gExposureProgram;
 LLGLSLShader			gLuminanceProgram;
 LLGLSLShader			gFXAAProgram[4];
@@ -211,8 +213,8 @@ LLGLSLShader            gDeferredBufferVisualProgram;
 LLGLSLShader            gDeferredPostCASProgram;
 LLGLSLShader			gDeferredPostDLSProgram;
 LLGLSLShader			gDeferredPostTonemapProgram[ALRenderUtil::TONEMAP_COUNT];
-LLGLSLShader			gDeferredPostColorCorrectProgram;
-LLGLSLShader			gDeferredPostColorCorrectLUTProgram;
+LLGLSLShader			gDeferredPostColorCorrectProgram[3];
+LLGLSLShader			gDeferredPostColorCorrectLUTProgram[3];
 // [RLVa:KB] - @setsphere
 LLGLSLShader			gRlvSphereProgram;
 // [/RLVa:KB]
@@ -304,6 +306,9 @@ LLViewerShaderMgr::LLViewerShaderMgr() :
     mShaderList.push_back(&gDeferredPBRAlphaProgram);
     mShaderList.push_back(&gHUDPBRAlphaProgram);
     mShaderList.push_back(&gDeferredSkinnedPBRAlphaProgram);
+    //mShaderList.push_back(&gDeferredPostGammaCorrectProgram); // for gamma
+    //mShaderList.push_back(&gNoPostGammaCorrectProgram);
+    //mShaderList.push_back(&gLegacyPostGammaCorrectProgram);
 }
 
 LLViewerShaderMgr::~LLViewerShaderMgr()
@@ -588,8 +593,12 @@ void LLViewerShaderMgr::unloadShaders()
 	{
 		gDeferredPostTonemapProgram[i].unload();
 	}
-	gDeferredPostColorCorrectProgram.unload();
-	gDeferredPostColorCorrectLUTProgram.unload();
+
+	for (U32 i = 0; i < 3; ++i)
+	{
+		gDeferredPostColorCorrectProgram[i].unload();
+		gDeferredPostColorCorrectLUTProgram[i].unload();
+	}
 
 	gRlvSphereProgram.unload();
 
@@ -1027,6 +1036,8 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         gExposureProgram.unload();
         gLuminanceProgram.unload();
 		gDeferredPostGammaCorrectProgram.unload();
+        gNoPostGammaCorrectProgram.unload();
+        gLegacyPostGammaCorrectProgram.unload();
         for (auto i = 0; i < 4; ++i)
         {
             gFXAAProgram[i].unload();
@@ -1064,8 +1075,11 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		{
 			gDeferredPostTonemapProgram[i].unload();
 		}
-		gDeferredPostColorCorrectProgram.unload();
-		gDeferredPostColorCorrectLUTProgram.unload();
+		for (U32 i = 0; i < 3; ++i)
+		{
+			gDeferredPostColorCorrectProgram[i].unload();
+			gDeferredPostColorCorrectLUTProgram[i].unload();
+		}
 
 		gRlvSphereProgram.unload();
 
@@ -2571,6 +2585,37 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		success = gDeferredPostGammaCorrectProgram.createShader(NULL, NULL);
 		llassert(success);
 	}
+    
+    if (success)
+    {
+        gNoPostGammaCorrectProgram.mName = "No Post Gamma Correction Post Process";
+        gNoPostGammaCorrectProgram.mFeatures.hasSrgb = true;
+        gNoPostGammaCorrectProgram.mFeatures.isDeferred = true;
+        gNoPostGammaCorrectProgram.mShaderFiles.clear();
+        gNoPostGammaCorrectProgram.clearPermutations();
+        gNoPostGammaCorrectProgram.addPermutation("NO_POST", "1");
+        gNoPostGammaCorrectProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gNoPostGammaCorrectProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredGammaCorrect.glsl", GL_FRAGMENT_SHADER));
+        gNoPostGammaCorrectProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = gNoPostGammaCorrectProgram.createShader(NULL, NULL);
+        llassert(success);
+    }
+
+    if (success)
+    {
+        gLegacyPostGammaCorrectProgram.mName = "Legacy Gamma Correction Post Process";
+        gLegacyPostGammaCorrectProgram.mFeatures.hasSrgb = true;
+        gLegacyPostGammaCorrectProgram.mFeatures.isDeferred = true;
+        gLegacyPostGammaCorrectProgram.mShaderFiles.clear();
+        gLegacyPostGammaCorrectProgram.clearPermutations();
+        gLegacyPostGammaCorrectProgram.addPermutation("LEGACY_GAMMA", "1");
+        gLegacyPostGammaCorrectProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gLegacyPostGammaCorrectProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredGammaCorrect.glsl", GL_FRAGMENT_SHADER));
+        gLegacyPostGammaCorrectProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = gLegacyPostGammaCorrectProgram.createShader(NULL, NULL);
+        llassert(success);
+    }
+
 
 	if (success && gGLManager.mGLVersion > 3.9f)
 	{
@@ -2900,40 +2945,99 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			gDeferredPostTonemapProgram[i].addPermutation("TONEMAP_METHOD", std::to_string(i));
 
 			success = gDeferredPostTonemapProgram[i].createShader(NULL, NULL);
-			mShaderList.push_back(&gDeferredPostTonemapProgram[i]);
 		}
 	}
 
 	if (success)
 	{
-		mShaderList.push_back(&gDeferredPostColorCorrectProgram);
-		gDeferredPostColorCorrectProgram.mName = "Color Grading Shader";
-		gDeferredPostColorCorrectProgram.mFeatures.hasSrgb = true;
-		gDeferredPostColorCorrectProgram.mShaderFiles.clear();
-		gDeferredPostColorCorrectProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
-		gDeferredPostColorCorrectProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
-		gDeferredPostColorCorrectProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostColorCorrectProgram[0].mName = "Color Grading Shader";
+		gDeferredPostColorCorrectProgram[0].mFeatures.hasSrgb = true;
+		gDeferredPostColorCorrectProgram[0].mShaderFiles.clear();
+		gDeferredPostColorCorrectProgram[0].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostColorCorrectProgram[0].mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostColorCorrectProgram[0].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
-		gDeferredPostColorCorrectProgram.clearPermutations();
-		gDeferredPostColorCorrectProgram.addPermutation("COLOR_GRADE_LUT", std::to_string(0));
+		gDeferredPostColorCorrectProgram[0].clearPermutations();
+		gDeferredPostColorCorrectProgram[0].addPermutation("COLOR_GRADE_LUT", std::to_string(0));
 
-		success = gDeferredPostColorCorrectProgram.createShader(NULL, NULL);
+		success = gDeferredPostColorCorrectProgram[0].createShader(NULL, NULL);
 	}
 
 	if (success)
 	{
-		mShaderList.push_back(&gDeferredPostColorCorrectLUTProgram);
-		gDeferredPostColorCorrectLUTProgram.mName = "Color Grading Shader";
-		gDeferredPostColorCorrectLUTProgram.mFeatures.hasSrgb = true;
-		gDeferredPostColorCorrectLUTProgram.mShaderFiles.clear();
-		gDeferredPostColorCorrectLUTProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
-		gDeferredPostColorCorrectLUTProgram.mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
-		gDeferredPostColorCorrectLUTProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		mShaderList.push_back(&gDeferredPostColorCorrectProgram[1]);
+		gDeferredPostColorCorrectProgram[1].mName = "Color Grading Shader Legacy";
+		gDeferredPostColorCorrectProgram[1].mFeatures.hasSrgb = true;
+		gDeferredPostColorCorrectProgram[1].mShaderFiles.clear();
+		gDeferredPostColorCorrectProgram[1].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostColorCorrectProgram[1].mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostColorCorrectProgram[1].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostColorCorrectProgram[1].clearPermutations();
+		gDeferredPostColorCorrectProgram[1].addPermutation("COLOR_GRADE_LUT", std::to_string(0));
+		gDeferredPostColorCorrectProgram[1].addPermutation("LEGACY_GAMMA", "1");
 
-		gDeferredPostColorCorrectLUTProgram.clearPermutations();
-		gDeferredPostColorCorrectLUTProgram.addPermutation("COLOR_GRADE_LUT", std::to_string(1));
+		success = gDeferredPostColorCorrectProgram[1].createShader(NULL, NULL);
+	}
 
-		success = gDeferredPostColorCorrectLUTProgram.createShader(NULL, NULL);
+	if (success)
+	{
+		gDeferredPostColorCorrectProgram[2].mName = "Color Grading Shader NoPost";
+		gDeferredPostColorCorrectProgram[2].mFeatures.hasSrgb = true;
+		gDeferredPostColorCorrectProgram[2].mShaderFiles.clear();
+		gDeferredPostColorCorrectProgram[2].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostColorCorrectProgram[2].mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostColorCorrectProgram[2].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostColorCorrectProgram[2].clearPermutations();
+		gDeferredPostColorCorrectProgram[2].addPermutation("COLOR_GRADE_LUT", std::to_string(0));
+		gDeferredPostColorCorrectProgram[2].addPermutation("NO_POST", "1");
+
+		success = gDeferredPostColorCorrectProgram[2].createShader(NULL, NULL);
+	}
+
+	if (success)
+	{
+		gDeferredPostColorCorrectLUTProgram[0].mName = "Color Grading LUT Shader";
+		gDeferredPostColorCorrectLUTProgram[0].mFeatures.hasSrgb = true;
+		gDeferredPostColorCorrectLUTProgram[0].mShaderFiles.clear();
+		gDeferredPostColorCorrectLUTProgram[0].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostColorCorrectLUTProgram[0].mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostColorCorrectLUTProgram[0].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+
+		gDeferredPostColorCorrectLUTProgram[0].clearPermutations();
+		gDeferredPostColorCorrectLUTProgram[0].addPermutation("COLOR_GRADE_LUT", std::to_string(1));
+
+		success = gDeferredPostColorCorrectLUTProgram[0].createShader(NULL, NULL);
+	}
+
+	if (success)
+	{
+		mShaderList.push_back(&gDeferredPostColorCorrectLUTProgram[1]);
+		gDeferredPostColorCorrectLUTProgram[1].mName = "Color Grading LUT Shader Legacy";
+		gDeferredPostColorCorrectLUTProgram[1].mFeatures.hasSrgb = true;
+		gDeferredPostColorCorrectLUTProgram[1].mShaderFiles.clear();
+		gDeferredPostColorCorrectLUTProgram[1].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostColorCorrectLUTProgram[1].mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostColorCorrectLUTProgram[1].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostColorCorrectLUTProgram[1].clearPermutations();
+		gDeferredPostColorCorrectLUTProgram[1].addPermutation("COLOR_GRADE_LUT", std::to_string(1));
+		gDeferredPostColorCorrectLUTProgram[1].addPermutation("LEGACY_GAMMA", "1");
+
+		success = gDeferredPostColorCorrectLUTProgram[1].createShader(NULL, NULL);
+	}
+
+	if (success)
+	{
+		gDeferredPostColorCorrectLUTProgram[2].mName = "Color Grading LUT Shader NoPost";
+		gDeferredPostColorCorrectLUTProgram[2].mFeatures.hasSrgb = true;
+		gDeferredPostColorCorrectLUTProgram[2].mShaderFiles.clear();
+		gDeferredPostColorCorrectLUTProgram[2].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostColorCorrectLUTProgram[2].mShaderFiles.push_back(make_pair("alchemy/colorCorrectF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostColorCorrectLUTProgram[2].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostColorCorrectLUTProgram[2].clearPermutations();
+		gDeferredPostColorCorrectLUTProgram[2].addPermutation("COLOR_GRADE_LUT", std::to_string(1));
+		gDeferredPostColorCorrectLUTProgram[2].addPermutation("NO_POST", "1");
+
+		success = gDeferredPostColorCorrectLUTProgram[2].createShader(NULL, NULL);
 	}
 
 // [RLVa:KB] - @setsphere

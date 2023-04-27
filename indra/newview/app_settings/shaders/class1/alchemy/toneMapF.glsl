@@ -134,24 +134,16 @@ vec3 uncharted2(vec3 col)
 
 //=============================
 
-uniform float gamma;
-float legacyGammaApprox()
-{
- //TODO -- figure out how to plumb this in as a uniform
-    float c = 0.5;
-    float gc = 1.0-pow(c, gamma);
-    
-    return gc/c * gamma;
-}
-
 void main()
 {
     vec4 diff = texture(diffuseRect, vary_fragcoord);
  
     float exp_scale = texture(exposureMap, vec2(0.5,0.5)).r;
-    diff.rgb *= exposure * exp_scale * legacyGammaApprox();
+    diff.rgb *= exposure * exp_scale;
     
-#if TONEMAP_METHOD == 1 // Aces Hill method
+#if TONEMAP_METHOD == 0 // NO_POST
+    diff.rgb *= 0.6;
+#elif TONEMAP_METHOD == 1 // Aces Hill method
     diff.rgb *= 1.0/0.6;
     diff.rgb = ACES_Hill(diff.rgb);
 #elif TONEMAP_METHOD == 2 // Uchimura's Gran Turismo method

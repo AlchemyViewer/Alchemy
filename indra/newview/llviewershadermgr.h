@@ -240,6 +240,8 @@ extern LLGLSLShader			gDeferredDoFCombineProgram;
 extern LLGLSLShader			gFXAAProgram[4];
 extern LLGLSLShader			gDeferredPostNoDoFProgram;
 extern LLGLSLShader			gDeferredPostGammaCorrectProgram;
+extern LLGLSLShader         gNoPostGammaCorrectProgram;
+extern LLGLSLShader         gLegacyPostGammaCorrectProgram;
 extern LLGLSLShader			gExposureProgram;
 extern LLGLSLShader			gLuminanceProgram;
 extern LLGLSLShader			gDeferredAvatarShadowProgram;
@@ -275,8 +277,8 @@ extern LLGLSLShader			gDeferredBufferVisualProgram;
 extern LLGLSLShader         gDeferredPostCASProgram;
 extern LLGLSLShader			gDeferredPostDLSProgram;
 extern LLGLSLShader			gDeferredPostTonemapProgram[ALRenderUtil::TONEMAP_COUNT];
-extern LLGLSLShader			gDeferredPostColorCorrectProgram;
-extern LLGLSLShader			gDeferredPostColorCorrectLUTProgram;
+extern LLGLSLShader			gDeferredPostColorCorrectProgram[3];
+extern LLGLSLShader			gDeferredPostColorCorrectLUTProgram[3];
 // [RLVa:KB] - @setsphere
 extern LLGLSLShader			gRlvSphereProgram;
 // [/RLVa:KB]

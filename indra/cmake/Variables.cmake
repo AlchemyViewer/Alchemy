@@ -22,7 +22,7 @@ set(SCRIPTS_PREFIX ../scripts)
 set(VIEWER_PREFIX)
 set(INTEGRATION_TESTS_PREFIX)
 
-option(LL_TESTS "Build and run unit and integration tests (disable for build timing runs to reduce variation" ON)
+option(LL_TESTS "Build and run unit and integration tests (disable for build timing runs to reduce variation" OFF)
 if(DEFINED ENV{LL_TESTS})
   set(LL_TESTS $ENV{LL_TESTS} CACHE STRING "Build and run unit and integration tests (disable for build timing runs to reduce variation" FORCE)
 else()

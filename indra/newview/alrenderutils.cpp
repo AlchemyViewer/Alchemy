@@ -37,6 +37,8 @@
 #include "llvertexbuffer.h"
 
 #include "alcontrolcache.h"
+#include "llenvironment.h"
+#include "llfloatertools.h"
 #include "llviewercontrol.h"
 #include "llviewershadermgr.h"
 #include "pipeline.h"
@@ -381,7 +383,8 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 {
 	dst->bindTarget();
 
-	LLGLSLShader* tone_shader = &gDeferredPostTonemapProgram[mTonemapType];
+	static LLCachedControl<bool> no_post(gSavedSettings, "RenderDisablePostProcessing", false);
+	LLGLSLShader* tone_shader = no_post && gFloaterTools->isAvailable() ? &gDeferredPostTonemapProgram[0] : &gDeferredPostTonemapProgram[mTonemapType];
 
 	tone_shader->bind();
 
@@ -617,7 +620,21 @@ void ALRenderUtil::renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst)
 {
 	dst->bindTarget();
 
-	LLGLSLShader* tone_shader = (mCGLut != 0 ) ? &gDeferredPostColorCorrectLUTProgram : &gDeferredPostColorCorrectProgram;
+	static LLCachedControl<bool> no_post(gSavedSettings, "RenderDisablePostProcessing", false);
+
+	LLGLSLShader* tone_shader = nullptr;
+	if (mCGLut != 0 )
+	{
+		tone_shader = no_post && gFloaterTools->isAvailable() ? &gDeferredPostColorCorrectLUTProgram[2] : // no post (no gamma, no exposure, no tonemapping)
+        LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance() == 0.f ? &gDeferredPostColorCorrectLUTProgram[1] :
+        &gDeferredPostColorCorrectLUTProgram[0];
+	}
+	else
+	{
+	    tone_shader = no_post && gFloaterTools->isAvailable() ? &gDeferredPostColorCorrectProgram[2] : // no post (no gamma, no exposure, no tonemapping)
+        LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance() == 0.f ? &gDeferredPostColorCorrectProgram[1] :
+        &gDeferredPostColorCorrectProgram[0];
+	}
 
 	tone_shader->bind();
 

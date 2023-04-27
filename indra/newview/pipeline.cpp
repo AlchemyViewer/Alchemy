@@ -866,7 +866,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
         mSceneMap.allocate(resX, resY, GL_RGB, true);
     }
 
-    mPostMap.allocate(resX, resY, GL_RGBA);
+    mPostMap.allocate(resX, resY, screenFormat);
 	mPostFXMap.allocate(resX, resY, screenFormat);
 
     //HACK make screenbuffer allocations start failing after 30 seconds
@@ -7082,9 +7082,19 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst) {
 		static LLCachedControl<F32> dynamic_exposure_min(gSavedSettings, "RenderDynamicExposureMin", 0.125f);
 		static LLCachedControl<F32> dynamic_exposure_max(gSavedSettings, "RenderDynamicExposureMax", 1.3f);
 
+        F32 exposure_max = dynamic_exposure_max;
+        LLSettingsSky::ptr_t sky = LLEnvironment::instance().getCurrentSky();
+
+        if (sky->getReflectionProbeAmbiance() > 0.f)
+        { //not a legacy sky, use gamma as a boost to max exposure
+            exposure_max = llmax(exposure_max - 1.f, 0.f);
+            exposure_max *= sky->getGamma();
+            exposure_max += 1.f;
+        }
+
 		gExposureProgram.uniform1f(dt, gFrameIntervalSeconds);
 		gExposureProgram.uniform2f(noiseVec, ll_frand() * 2.0 - 1.0, ll_frand() * 2.0 - 1.0);
-		gExposureProgram.uniform3f(dynamic_exposure_params, dynamic_exposure_coefficient, dynamic_exposure_min, dynamic_exposure_max);
+		gExposureProgram.uniform3f(dynamic_exposure_params, dynamic_exposure_coefficient, dynamic_exposure_min, exposure_max);
 
 		mScreenTriangleVB->setBuffer();
 		mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -7101,18 +7111,25 @@ void LLPipeline::gammaCorrect(LLRenderTarget* src, LLRenderTarget* dst) {
 	{
 		LL_PROFILE_GPU_ZONE("gamma correct");
 
+        static LLCachedControl<bool> no_post(gSavedSettings, "RenderDisablePostProcessing", false);
+
 		LLGLDepthTest depth(GL_FALSE, GL_FALSE);
 
 		// Apply gamma correction to the frame here.
-		gDeferredPostGammaCorrectProgram.bind();
+
+        LLGLSLShader& shader = no_post && gFloaterTools->isAvailable() ? gNoPostGammaCorrectProgram : // no post (no gamma, no exposure, no tonemapping)
+            LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance() == 0.f ? gLegacyPostGammaCorrectProgram :
+            gDeferredPostGammaCorrectProgram;
+        
+        shader.bind();
 
 		S32 channel = 0;
 
-		gDeferredPostGammaCorrectProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
+        shader.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
 
-		gDeferredPostGammaCorrectProgram.bindTexture(LLShaderMgr::EXPOSURE_MAP, &mExposureMap);
+        shader.bindTexture(LLShaderMgr::EXPOSURE_MAP, &mExposureMap);
 
-		gDeferredPostGammaCorrectProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
+        shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
 
 		static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
 
@@ -7120,13 +7137,13 @@ void LLPipeline::gammaCorrect(LLRenderTarget* src, LLRenderTarget* dst) {
 
 		static LLStaticHashedString s_exposure("exposure");
 
-		gDeferredPostGammaCorrectProgram.uniform1f(s_exposure, e);
+        shader.uniform1f(s_exposure, e);
 
 		mScreenTriangleVB->setBuffer();
 		mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
 		gGL.getTexUnit(channel)->unbind(src->getUsage());
-		gDeferredPostGammaCorrectProgram.unbind();
+        shader.unbind();
 	}
 	dst->flush();
 }

@@ -36,7 +36,6 @@ uniform vec4 colorgrade_lut_size;
 #endif
 
 vec3 linear_to_srgb(vec3 cl);
-vec3 legacy_adjust_post(vec3 c);
 
 //=================================
 // borrowed noise from:
@@ -75,13 +74,28 @@ float noise(vec2 x) {
 }
 //=============================
 
+uniform float gamma;
+vec3 legacyGamma(vec3 color)
+{
+    color = 1. - clamp(color, vec3(0.), vec3(1.));
+    color = 1. - pow(color, vec3(gamma)); // s/b inverted already CPU-side
+
+    return color;
+}
+
 void main()
 {
     vec4 diff = texture(diffuseRect, vary_fragcoord);
     diff.rgb = linear_to_srgb(diff.rgb);
-    diff.rgb = legacy_adjust_post(diff.rgb);
+
+#if LEGACY_GAMMA
+#ifndef NO_POST
+    diff.rgb = legacyGamma(diff.rgb);
+#endif
+#endif
 
 #if COLOR_GRADE_LUT != 0
+#ifndef NO_POST
     // Invert coord for compat with DX-style LUT
     diff.g = colorgrade_lut_size.y > 0.5 ? 1.0 - diff.g : diff.g;
 
@@ -93,10 +107,11 @@ void main()
     vec3 offset = 1.0 / (2.0 * vec3(colorgrade_lut_size.x));
     diff = vec4(textureLod(colorgrade_lut, scale * diff.rgb + offset, 0).rgb, diff.a);
 #endif
+#endif
     vec2 tc = vary_fragcoord.xy*screen_res*4.0;
     vec3 seed = (diff.rgb+vec3(1.0))*vec3(tc.xy, tc.x+tc.y);
     vec3 nz = vec3(noise(seed.rg), noise(seed.gb), noise(seed.rb));
     diff.rgb += nz*0.003;
 
-    frag_color = diff;
+    frag_color = max(diff, vec4(0));;
 }
