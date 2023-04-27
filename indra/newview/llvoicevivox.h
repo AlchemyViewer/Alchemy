@@ -604,7 +604,11 @@ protected:
 	void avatarNameResolved(const LLUUID &id, const std::string &name);
     static void predAvatarNameResolution(const LLVivoxVoiceClient::sessionStatePtr_t &session, LLUUID id, std::string name);
 
-	boost::signals2::connection mAvatarNameCacheConnection;
+	boost::signals2::scoped_connection mAvatarNameCacheConnection;
+    boost::signals2::scoped_connection mVivoxVadAutoCon;
+    boost::signals2::scoped_connection mVivoxVadAHangoverCon;
+    boost::signals2::scoped_connection mVivoxVadNoiseCon;
+    boost::signals2::scoped_connection mVivoxVadSensitivityCon;
 
 	/////////////////////////////
 	// Voice fonts

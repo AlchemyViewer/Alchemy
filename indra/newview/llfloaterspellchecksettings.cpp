@@ -63,7 +63,7 @@ void LLFloaterSpellCheckerSettings::draw()
 
 BOOL LLFloaterSpellCheckerSettings::postBuild(void)
 {
-	gSavedSettings.getControl("SpellCheck")->getSignal()->connect(boost::bind(&LLFloaterSpellCheckerSettings::refreshDictionaries, this, false));
+	mSpellcheckCtrlConnection = gSavedSettings.getControl("SpellCheck")->getSignal()->connect(boost::bind(&LLFloaterSpellCheckerSettings::refreshDictionaries, this, false));
 	LLSpellChecker::setSettingsChangeCallback(boost::bind(&LLFloaterSpellCheckerSettings::onSpellCheckSettingsChange, this));
 	getChild<LLUICtrl>("spellcheck_remove_btn")->setCommitCallback(boost::bind(&LLFloaterSpellCheckerSettings::onBtnRemove, this));
 	getChild<LLUICtrl>("spellcheck_import_btn")->setCommitCallback(boost::bind(&LLFloaterSpellCheckerSettings::onBtnImport, this));
@@ -101,6 +101,8 @@ void LLFloaterSpellCheckerSettings::onBtnMove(const std::string& from, const std
 
 void LLFloaterSpellCheckerSettings::onClose(bool app_quitting)
 {
+	mSpellcheckCtrlConnection.disconnect();
+
 	if (app_quitting)
 	{
 		// don't save anything

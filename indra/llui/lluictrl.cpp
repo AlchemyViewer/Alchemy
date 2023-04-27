@@ -249,6 +249,12 @@ LLUICtrl::~LLUICtrl()
 		gFocusMgr.removeTopCtrlWithoutCallback( this );
 	}
 
+	mControlConnection.disconnect();
+	mEnabledControlConnection.disconnect();
+	mDisabledControlConnection.disconnect();
+	mMakeVisibleControlConnection.disconnect();
+	mMakeInvisibleControlConnection.disconnect();
+
 	delete mCommitSignal;
 	delete mValidateSignal;
 	delete mMouseEnterSignal;

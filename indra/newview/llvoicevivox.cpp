@@ -385,6 +385,10 @@ LLVivoxVoiceClient::~LLVivoxVoiceClient()
 	{
 		mAvatarNameCacheConnection.disconnect();
 	}
+	mVivoxVadAutoCon.disconnect();
+    mVivoxVadAHangoverCon.disconnect();
+    mVivoxVadNoiseCon.disconnect();
+    mVivoxVadSensitivityCon.disconnect();
     sShuttingDown = true;
 }
 
@@ -854,10 +858,10 @@ void LLVivoxVoiceClient::voiceControlStateMachine(S32 &coro_state)
                 setupVADParams(vad_auto, vad_hangover, vad_noise_floor, vad_sensitivity);
 
                 // watch for changes to the VAD settings via Debug Settings UI and act on them accordingly
-                gSavedSettings.getControl("VivoxVadAuto")->getSignal()->connect(boost::bind(&LLVivoxVoiceClient::onVADSettingsChange, this));
-                gSavedSettings.getControl("VivoxVadHangover")->getSignal()->connect(boost::bind(&LLVivoxVoiceClient::onVADSettingsChange, this));
-                gSavedSettings.getControl("VivoxVadNoiseFloor")->getSignal()->connect(boost::bind(&LLVivoxVoiceClient::onVADSettingsChange, this));
-                gSavedSettings.getControl("VivoxVadSensitivity")->getSignal()->connect(boost::bind(&LLVivoxVoiceClient::onVADSettingsChange, this));
+                mVivoxVadAutoCon = gSavedSettings.getControl("VivoxVadAuto")->getSignal()->connect(boost::bind(&LLVivoxVoiceClient::onVADSettingsChange, this));
+                mVivoxVadAHangoverCon = gSavedSettings.getControl("VivoxVadHangover")->getSignal()->connect(boost::bind(&LLVivoxVoiceClient::onVADSettingsChange, this));
+                mVivoxVadNoiseCon = gSavedSettings.getControl("VivoxVadNoiseFloor")->getSignal()->connect(boost::bind(&LLVivoxVoiceClient::onVADSettingsChange, this));
+                mVivoxVadSensitivityCon = gSavedSettings.getControl("VivoxVadSensitivity")->getSignal()->connect(boost::bind(&LLVivoxVoiceClient::onVADSettingsChange, this));
 
                 if (mTuningMode)
                 {
