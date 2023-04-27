@@ -5706,6 +5706,7 @@ void LLAppViewer::handleLoginComplete()
 	}
 
 	mOnLoginCompleted();
+	mOnLoginCompleted.disconnect_all_slots(); // No longer needed
 
 // [SL:KB] - Patch: Build-AssetRecovery | Checked: 2011-11-24 (Catznip-3.2)
 	LLAssetRecoverQueue::recoverIfNeeded();

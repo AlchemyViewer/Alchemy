@@ -49,6 +49,7 @@ private:
     void onRegionChange();
     void updateActivity();
 
+    boost::signals2::connection mIntegrationSettingConnection;
     boost::signals2::connection mRegionChangeConnection;
     std::unique_ptr<discord::Core> mDiscord;
     LLHost mCurrentHost;

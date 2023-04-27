@@ -47,7 +47,7 @@ ALDiscordManager::ALDiscordManager()
 {
 	LLAppViewer::instance()->setOnLoginCompletedCallback(boost::bind(&ALDiscordManager::onLoginCompleted, this));
 
-	gSavedPerAccountSettings.getControl("ALDiscordIntegration")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+	mIntegrationSettingConnection = gSavedPerAccountSettings.getControl("ALDiscordIntegration")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
 		{
 			bool discord_enabled = new_val;
 			if (discord_enabled)
@@ -68,6 +68,7 @@ ALDiscordManager::ALDiscordManager()
 
 ALDiscordManager::~ALDiscordManager()
 {
+	mIntegrationSettingConnection.disconnect();
 	shutdown();
 }
 
