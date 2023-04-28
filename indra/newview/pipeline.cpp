@@ -998,7 +998,7 @@ void LLPipeline::refreshCachedSettings()
     WindLightUseAtmosShaders = TRUE; // DEPRECATED -- gSavedSettings.getBOOL("WindLightUseAtmosShaders");
     RenderDeferred = TRUE; // DEPRECATED -- gSavedSettings.getBOOL("RenderDeferred");
 	RenderDeferredSunWash = gSavedSettings.getF32("RenderDeferredSunWash");
-	RenderFSAASamples = gSavedSettings.getU32("RenderFSAASamples");
+	RenderFSAASamples = LLFeatureManager::getInstance()->isFeatureAvailable("RenderFSAASamples") ? gSavedSettings.getU32("RenderFSAASamples") : 0;
 	RenderResolutionDivisor = gSavedSettings.getU32("RenderResolutionDivisor");
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
 	RenderResolutionMultiplier = gSavedSettings.getF32("RenderResolutionMultiplier");
