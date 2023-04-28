@@ -34,7 +34,10 @@ uniform float exposure;
 
 vec3 srgb_to_linear(vec3 cl);
 vec3 linear_to_srgb(vec3 cl);
+
+#if TONEMAP_METHOD == 3
 void RunLPMFilter(inout vec3 diff);
+#endif
 
 // ACES filmic tone map approximation
 // see https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
@@ -149,8 +152,7 @@ void main()
 #elif TONEMAP_METHOD == 2 // Uchimura's Gran Turismo method
     diff.rgb = uchimura(diff.rgb);
 #elif TONEMAP_METHOD == 3 // AMD Tonemapper
-    RunLPMFilter(diff.rgb);// LpmFilter(diff.r,diff.g,diff.b,false,LPM_CONFIG_709_709); // <-- Using the LPM_CONFIG_ prefab to make inputs easier.
-    //diff.rgb = AMDTonemapper(diff.rgb);
+    RunLPMFilter(diff.rgb);
 #elif TONEMAP_METHOD == 4 // Uncharted
     diff.rgb = uncharted2(diff.rgb);
 #endif

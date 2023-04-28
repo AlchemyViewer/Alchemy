@@ -43,6 +43,7 @@
 #include "llviewershadermgr.h"
 #include "pipeline.h"
 
+#if !LL_DARWIN
 uint32_t LPM_CONTROL_BLOCK[24 * 4] = {}; // Upload this to a uint4[24] part of a constant buffer (for example 'constant.lpm[24]').
 
 #ifndef LL_WINDOWS
@@ -52,6 +53,7 @@ uint32_t LPM_CONTROL_BLOCK[24 * 4] = {}; // Upload this to a uint4[24] part of a
 #define A_CPU 1
 #include "app_settings/shaders/class1/alchemy/LPMUtil.glsl"
 #include "app_settings/shaders/class1/alchemy/CASF.glsl"
+#endif
 
 const U32 ALRENDER_BUFFER_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
 
@@ -352,6 +354,7 @@ bool ALRenderUtil::setupTonemap()
 		mToneUnchartedParamB = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicShoulderLen"), gSavedSettings.getF32("AlchemyToneMapFilmicShoulderAngle"), gSavedSettings.getF32("AlchemyToneMapFilmicGamma"));
 		mToneUnchartedParamC = LLVector3(gSavedSettings.getF32("AlchemyToneMapFilmicWhitePoint"), 2.0, 0.0);
 
+#if !LL_DARWIN
 		static LLCachedControl<F32> amd_hdrmax(gSavedSettings, "AlchemyToneMapAMDHDRMax", 256.f);
 		static LLCachedControl<F32> amd_exposure(gSavedSettings, "AlchemyToneMapAMDExposure", 8.0f);
 		static LLCachedControl<F32> amd_contrast(gSavedSettings, "AlchemyToneMapAMDContrast", 0.25f);
@@ -374,7 +377,7 @@ bool ALRenderUtil::setupTonemap()
 			amd_contrast, // contrast
 			amd_sh_contrast ? amd_sh_contrast_range : 1.0, // shoulder contrast
 			saturation, crosstalk);
-
+#endif
 	}
 	return true;
 }
@@ -384,7 +387,40 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 	dst->bindTarget();
 
 	static LLCachedControl<bool> no_post(gSavedSettings, "RenderDisablePostProcessing", false);
-	LLGLSLShader* tone_shader = no_post && gFloaterTools->isAvailable() ? &gDeferredPostTonemapProgram[0] : &gDeferredPostTonemapProgram[mTonemapType];
+	LLGLSLShader* tone_shader = nullptr;
+	if (no_post && gFloaterTools->isAvailable())
+	{
+		tone_shader = &gDeferredPostTonemapProgram;
+	}
+	else
+	{
+		switch (mTonemapType)
+		{
+		default:
+		case ALTonemap::TONEMAP_ACES_HILL:
+		{
+			tone_shader = &gDeferredPostTonemapACESProgram;
+			break;
+		}
+		case ALTonemap::TONEMAP_UCHIMURA:
+		{
+			tone_shader = &gDeferredPostTonemapUchiProgram;
+			break;
+		}
+#if !LL_DARWIN
+		case ALTonemap::TONEMAP_AMD:
+		{
+			tone_shader = &gDeferredPostTonemapLPMProgram;
+			break;
+		}
+#endif
+		case ALTonemap::TONEMAP_UNCHARTED:
+		{
+			tone_shader = &gDeferredPostTonemapHableProgram;
+			break;
+		}
+		}
+	}
 
 	tone_shader->bind();
 
@@ -404,6 +440,7 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 		tone_shader->uniform3fv(tone_uchimura_b, 1, mToneUchimuraParamB.mV);
 		break;
 	}
+#if !LL_DARWIN
 	case ALTonemap::TONEMAP_AMD:
 	{
 		static LLCachedControl<bool> amd_sh_contrast(gSavedSettings, "AlchemyToneMapAMDShoulderContrast", false);
@@ -411,6 +448,7 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 		tone_shader->uniform1i(tonemap_amd_params_shoulder, amd_sh_contrast);
 		break;
 	}
+#endif
 	case ALTonemap::TONEMAP_UNCHARTED:
 	{
 		tone_shader->uniform3fv(tone_uncharted_a, 1, mToneUnchartedParamA.mV);
@@ -685,11 +723,6 @@ bool ALRenderUtil::setupSharpen()
 		LLGLSLShader* sharpen_shader = nullptr;
 		switch (mSharpenMethod)
 		{
-		case ALSharpen::SHARPEN_CAS:
-		{
-			sharpen_shader = &gDeferredPostCASProgram;
-			break;
-		}
 		case ALSharpen::SHARPEN_DLS:
 		{
 			sharpen_shader = &gDeferredPostDLSProgram;
@@ -720,26 +753,34 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 		return;
 	}
 
-	dst->bindTarget();
-
 	LLGLSLShader* sharpen_shader = nullptr;
 	switch (mSharpenMethod)
 	{
+#if !LL_DARWIN
 	case ALSharpen::SHARPEN_CAS:
 	{
 		sharpen_shader = &gDeferredPostCASProgram;
 		break;
 	}
+#endif
 	case ALSharpen::SHARPEN_DLS:
+	{
 		sharpen_shader = &gDeferredPostDLSProgram;
 		break;
+	}
 	default:
 	case ALSharpen::SHARPEN_NONE:
-		break;
+	{
+		gPipeline.copyRenderTarget(src, dst);
+		return;
+	}
 	}
 
 	// Bind setup:
+	dst->bindTarget();
+
 	sharpen_shader->bind();
+#if !LL_DARWIN
 	if (mSharpenMethod == ALSharpen::SHARPEN_CAS)
 	{
 		static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderSharpenCASSharpness", 0.6f);
@@ -759,6 +800,7 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 		
 		sharpen_shader->uniform2f(out_screen_res, dst->getWidth(), dst->getHeight());
 	}
+#endif
 
 	sharpen_shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
 

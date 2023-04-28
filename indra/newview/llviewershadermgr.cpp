@@ -212,7 +212,11 @@ LLGLSLShader            gDeferredGenBrdfLutProgram;
 LLGLSLShader            gDeferredBufferVisualProgram;
 LLGLSLShader            gDeferredPostCASProgram;
 LLGLSLShader			gDeferredPostDLSProgram;
-LLGLSLShader			gDeferredPostTonemapProgram[ALRenderUtil::TONEMAP_COUNT];
+LLGLSLShader			gDeferredPostTonemapProgram;
+LLGLSLShader			gDeferredPostTonemapACESProgram;
+LLGLSLShader			gDeferredPostTonemapUchiProgram;
+LLGLSLShader			gDeferredPostTonemapLPMProgram;
+LLGLSLShader			gDeferredPostTonemapHableProgram;
 LLGLSLShader			gDeferredPostColorCorrectProgram[3];
 LLGLSLShader			gDeferredPostColorCorrectLUTProgram[3];
 // [RLVa:KB] - @setsphere
@@ -589,10 +593,11 @@ void LLViewerShaderMgr::unloadShaders()
 	
 	gDeferredPostCASProgram.unload();
 	gDeferredPostDLSProgram.unload();
-	for (U32 i = 0; i < ALRenderUtil::TONEMAP_COUNT; ++i)
-	{
-		gDeferredPostTonemapProgram[i].unload();
-	}
+	gDeferredPostTonemapProgram.unload();
+	gDeferredPostTonemapACESProgram.unload();
+	gDeferredPostTonemapUchiProgram.unload();
+	gDeferredPostTonemapLPMProgram.unload();
+	gDeferredPostTonemapHableProgram.unload();
 
 	for (U32 i = 0; i < 3; ++i)
 	{
@@ -763,7 +768,9 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/deferredUtil.glsl",                    1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/shadowUtil.glsl",                      1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/aoUtil.glsl",                          1) );
+#if !LL_DARWIN
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/LPMUtil.glsl",                    1) );
+#endif
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/reflectionProbeF.glsl",                has_reflection_probes ? 3 : 2) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/screenSpaceReflUtil.glsl",             ssr ? 3 : 1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "lighting/lightNonIndexedF.glsl",                    mShaderLevel[SHADER_LIGHTING] ) );
@@ -1071,10 +1078,11 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
 		gDeferredPostCASProgram.unload();
 		gDeferredPostDLSProgram.unload();
-		for (U32 i = 0; i < ALRenderUtil::TONEMAP_COUNT; ++i)
-		{
-			gDeferredPostTonemapProgram[i].unload();
-		}
+		gDeferredPostTonemapProgram.unload();
+		gDeferredPostTonemapACESProgram.unload();
+		gDeferredPostTonemapUchiProgram.unload();
+		gDeferredPostTonemapLPMProgram.unload();
+		gDeferredPostTonemapHableProgram.unload();
 		for (U32 i = 0; i < 3; ++i)
 		{
 			gDeferredPostColorCorrectProgram[i].unload();
@@ -2907,6 +2915,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		success = gDeferredBufferVisualProgram.createShader(NULL, NULL);
 	}
 
+#if !LL_DARWIN
 	if (success)
 	{
 		gDeferredPostCASProgram.mName = "Contrast Adaptive Sharpen Shader";
@@ -2917,6 +2926,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredPostCASProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 		success = gDeferredPostCASProgram.createShader(NULL, NULL);
 	}
+#endif
 
 	if (success)
 	{
@@ -2929,23 +2939,76 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		success = gDeferredPostDLSProgram.createShader(NULL, NULL);
 	}
 
-	for (U32 i = 0; i < ALRenderUtil::TONEMAP_COUNT; ++i)
+	if (success)
 	{
-		if (success)
-		{
-			gDeferredPostTonemapProgram[i].mName = "Tonemapping Shader " + std::to_string(i);
-			gDeferredPostTonemapProgram[i].mFeatures.hasSrgb = true;
-			gDeferredPostTonemapProgram[i].mFeatures.hasLPM = true;
-			gDeferredPostTonemapProgram[i].mShaderFiles.clear();
-			gDeferredPostTonemapProgram[i].mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
-			gDeferredPostTonemapProgram[i].mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
-			gDeferredPostTonemapProgram[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostTonemapProgram.mName = "Tonemapping Shader None";
+		gDeferredPostTonemapProgram.mFeatures.hasSrgb = true;
+		gDeferredPostTonemapProgram.mFeatures.hasLPM = false;
+		gDeferredPostTonemapProgram.mShaderFiles.clear();
+		gDeferredPostTonemapProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostTonemapProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostTonemapProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostTonemapProgram.clearPermutations();
+		gDeferredPostTonemapProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_NONE));
+		success = gDeferredPostTonemapProgram.createShader(NULL, NULL);
+	}
 
-			gDeferredPostTonemapProgram[i].clearPermutations();
-			gDeferredPostTonemapProgram[i].addPermutation("TONEMAP_METHOD", std::to_string(i));
+	if (success)
+	{
+		gDeferredPostTonemapACESProgram.mName = "Tonemapping Shader ACES";
+		gDeferredPostTonemapACESProgram.mFeatures.hasSrgb = true;
+		gDeferredPostTonemapACESProgram.mFeatures.hasLPM = false;
+		gDeferredPostTonemapACESProgram.mShaderFiles.clear();
+		gDeferredPostTonemapACESProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostTonemapACESProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostTonemapACESProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostTonemapACESProgram.clearPermutations();
+		gDeferredPostTonemapACESProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_ACES_HILL));
+		success = gDeferredPostTonemapACESProgram.createShader(NULL, NULL);
+	}
 
-			success = gDeferredPostTonemapProgram[i].createShader(NULL, NULL);
-		}
+	if (success)
+	{
+		gDeferredPostTonemapUchiProgram.mName = "Tonemapping Shader Uchimura";
+		gDeferredPostTonemapUchiProgram.mFeatures.hasSrgb = true;
+		gDeferredPostTonemapUchiProgram.mFeatures.hasLPM = false;
+		gDeferredPostTonemapUchiProgram.mShaderFiles.clear();
+		gDeferredPostTonemapUchiProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostTonemapUchiProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostTonemapUchiProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostTonemapUchiProgram.clearPermutations();
+		gDeferredPostTonemapUchiProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_UCHIMURA));
+		success = gDeferredPostTonemapUchiProgram.createShader(NULL, NULL);
+	}
+
+#if !LL_DARWIN
+	if (success)
+	{
+		gDeferredPostTonemapLPMProgram.mName = "Tonemapping Shader LPM";
+		gDeferredPostTonemapLPMProgram.mFeatures.hasSrgb = true;
+		gDeferredPostTonemapLPMProgram.mFeatures.hasLPM = true;
+		gDeferredPostTonemapLPMProgram.mShaderFiles.clear();
+		gDeferredPostTonemapLPMProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostTonemapLPMProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostTonemapLPMProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostTonemapLPMProgram.clearPermutations();
+		gDeferredPostTonemapLPMProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_AMD));
+		success = gDeferredPostTonemapLPMProgram.createShader(NULL, NULL);
+	}
+#endif
+
+	if (success)
+	{
+		gDeferredPostTonemapHableProgram.mName = "Tonemapping Shader Uncharted";
+		gDeferredPostTonemapHableProgram.mFeatures.hasSrgb = true;
+		gDeferredPostTonemapHableProgram.mFeatures.hasLPM = false;
+		gDeferredPostTonemapHableProgram.mShaderFiles.clear();
+		gDeferredPostTonemapHableProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+		gDeferredPostTonemapHableProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostTonemapHableProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+		gDeferredPostTonemapHableProgram.clearPermutations();
+		gDeferredPostTonemapHableProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_UNCHARTED));
+		success = gDeferredPostTonemapHableProgram.createShader(NULL, NULL);
 	}
 
 	if (success)
