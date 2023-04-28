@@ -88,7 +88,7 @@ void main()
     vec4 diff = texture(diffuseRect, vary_fragcoord);
     diff.rgb = linear_to_srgb(diff.rgb);
 
-#if LEGACY_GAMMA
+#ifdef LEGACY_GAMMA
 #ifndef NO_POST
     diff.rgb = legacyGamma(diff.rgb);
 #endif

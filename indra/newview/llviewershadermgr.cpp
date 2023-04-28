@@ -2580,6 +2580,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         llassert(success);
     }
 
+#if 0
 	if (success)
 	{
 		gDeferredPostGammaCorrectProgram.mName = "Deferred Gamma Correction Post Process";
@@ -2623,7 +2624,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         success = gLegacyPostGammaCorrectProgram.createShader(NULL, NULL);
         llassert(success);
     }
-
+#endif
 
 	if (success && gGLManager.mGLVersion > 3.9f)
 	{
