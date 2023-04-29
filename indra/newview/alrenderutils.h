@@ -78,17 +78,8 @@ public:
 	U32 getSharpenMethod() { return mSharpenMethod; };
 
 private:
-	// Parameters
-	F32 mTonemapExposure = 1.f;
-
 	// State
 	U32 mTonemapType = ALTonemap::TONEMAP_NONE;
-	LLVector3 mToneUchimuraParamA;
-	LLVector3 mToneUchimuraParamB;
-	LLVector3 mToneUnchartedParamA;
-	LLVector3 mToneUnchartedParamB;
-	LLVector3 mToneUnchartedParamC;
-
 	U32 mSharpenMethod = ALSharpen::SHARPEN_NONE;
 
 	// Texture Data

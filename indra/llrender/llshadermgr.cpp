@@ -246,15 +246,15 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 			return FALSE;
 		}
 	}
-#if !LL_DARWIN
-	if (features->hasLPM)
+
+	if (features->hasLPM && gGLManager.mGLVersion >= 4.19f)
 	{
         if (!shader->attachFragmentObject("alchemy/LPMUtil.glsl"))
 		{
 			return FALSE;
 		}
 	}
-#endif
+
 	if (features->hasGamma || features->isDeferred)
 	{
         if (!shader->attachFragmentObject("windlight/gammaF.glsl"))

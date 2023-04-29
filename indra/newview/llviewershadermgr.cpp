@@ -641,14 +641,6 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 		sum_lights_class = 1;
 	}
 
-#if LL_DARWIN
-	// Work around driver crashes on older Macs when using deferred rendering
-	// NORSPEC-59
-	//
-	if (gGLManager.mIsMobileGF)
-		sum_lights_class = 3;
-#endif
-
 	// Use the feature table to mask out the max light level to use.  Also make sure it's at least 1.
 	S32 max_light_class = gSavedSettings.getS32("RenderShaderLightingMaxLevel");
 	sum_lights_class = llclamp(sum_lights_class, 1, max_light_class);
@@ -768,9 +760,10 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/deferredUtil.glsl",                    1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/shadowUtil.glsl",                      1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/aoUtil.glsl",                          1) );
-#if !LL_DARWIN
-	index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/LPMUtil.glsl",                    1) );
-#endif
+	if(gGLManager.mGLVersion >= 4.19f)
+	{
+		index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/LPMUtil.glsl",                    1) );
+	}
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/reflectionProbeF.glsl",                has_reflection_probes ? 3 : 2) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/screenSpaceReflUtil.glsl",             ssr ? 3 : 1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "lighting/lightNonIndexedF.glsl",                    mShaderLevel[SHADER_LIGHTING] ) );
@@ -2580,7 +2573,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         llassert(success);
     }
 
-#if 0
 	if (success)
 	{
 		gDeferredPostGammaCorrectProgram.mName = "Deferred Gamma Correction Post Process";
@@ -2624,7 +2616,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         success = gLegacyPostGammaCorrectProgram.createShader(NULL, NULL);
         llassert(success);
     }
-#endif
 
 	if (success && gGLManager.mGLVersion > 3.9f)
 	{
@@ -2916,8 +2907,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		success = gDeferredBufferVisualProgram.createShader(NULL, NULL);
 	}
 
-#if !LL_DARWIN
-	if (success)
+	if (success && gGLManager.mGLVersion >= 4.19f)
 	{
 		gDeferredPostCASProgram.mName = "Contrast Adaptive Sharpen Shader";
 		gDeferredPostCASProgram.mFeatures.hasSrgb = true;
@@ -2927,7 +2917,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredPostCASProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 		success = gDeferredPostCASProgram.createShader(NULL, NULL);
 	}
-#endif
 
 	if (success)
 	{
@@ -2944,7 +2933,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	{
 		gDeferredPostTonemapProgram.mName = "Tonemapping Shader None";
 		gDeferredPostTonemapProgram.mFeatures.hasSrgb = true;
-		gDeferredPostTonemapProgram.mFeatures.hasLPM = false;
 		gDeferredPostTonemapProgram.mShaderFiles.clear();
 		gDeferredPostTonemapProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
 		gDeferredPostTonemapProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
@@ -2958,7 +2946,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	{
 		gDeferredPostTonemapACESProgram.mName = "Tonemapping Shader ACES";
 		gDeferredPostTonemapACESProgram.mFeatures.hasSrgb = true;
-		gDeferredPostTonemapACESProgram.mFeatures.hasLPM = false;
 		gDeferredPostTonemapACESProgram.mShaderFiles.clear();
 		gDeferredPostTonemapACESProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
 		gDeferredPostTonemapACESProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
@@ -2972,7 +2959,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	{
 		gDeferredPostTonemapUchiProgram.mName = "Tonemapping Shader Uchimura";
 		gDeferredPostTonemapUchiProgram.mFeatures.hasSrgb = true;
-		gDeferredPostTonemapUchiProgram.mFeatures.hasLPM = false;
 		gDeferredPostTonemapUchiProgram.mShaderFiles.clear();
 		gDeferredPostTonemapUchiProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
 		gDeferredPostTonemapUchiProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
@@ -2982,8 +2968,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		success = gDeferredPostTonemapUchiProgram.createShader(NULL, NULL);
 	}
 
-#if !LL_DARWIN
-	if (success)
+	if (success  && gGLManager.mGLVersion >= 4.19f)
 	{
 		gDeferredPostTonemapLPMProgram.mName = "Tonemapping Shader LPM";
 		gDeferredPostTonemapLPMProgram.mFeatures.hasSrgb = true;
@@ -2996,13 +2981,11 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredPostTonemapLPMProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_AMD));
 		success = gDeferredPostTonemapLPMProgram.createShader(NULL, NULL);
 	}
-#endif
 
 	if (success)
 	{
 		gDeferredPostTonemapHableProgram.mName = "Tonemapping Shader Uncharted";
 		gDeferredPostTonemapHableProgram.mFeatures.hasSrgb = true;
-		gDeferredPostTonemapHableProgram.mFeatures.hasLPM = false;
 		gDeferredPostTonemapHableProgram.mShaderFiles.clear();
 		gDeferredPostTonemapHableProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
 		gDeferredPostTonemapHableProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
