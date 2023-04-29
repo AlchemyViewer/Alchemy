@@ -857,7 +857,10 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 
 		if (!mPostMap.allocate(resX, resY, GL_RGBA)) return false;
 		if (!mPostFXMap.allocate(resX, resY, GL_RGBA)) return false;
-		if (RenderDepthOfField || samples > 0)
+//		if (RenderDepthOfField || samples > 0)
+// [RLVa:KB] - @setsphere
+		if (RenderDepthOfField || samples > 0 || RlvActions::hasPostProcess())
+// [/RLVa:KB]
 		{ //only need mPostHelperMap for dof OR fxaa
 			if (!mPostHelperMap.allocate(resX, resY, GL_RGBA)) return false;
 		}
@@ -7650,7 +7653,17 @@ void LLPipeline::renderFinalize()
 
     combineGlow(&mPostMap, &mPostFXMap);
 
-	renderDoF(&mPostFXMap, &mPostMap);
+	// [RLVa:KB] - @setsphere
+	LLRenderTarget* pRenderBuffer = &mPostFXMap;
+	if (RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))
+	{
+		LLShaderEffectParams params(pRenderBuffer, &mPostHelperMap, false);
+		LLVfxManager::instance().runEffect(EVisualEffect::RlvSphere, &params);
+		pRenderBuffer = params.m_pDstBuffer;
+	}
+// [/RLVa:KB]
+
+	renderDoF(pRenderBuffer, &mPostMap);
 
 	gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
 	gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;

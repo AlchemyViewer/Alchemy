@@ -2139,6 +2139,13 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SETSPHERE>::onCommand(const RlvCommand& 
 		if (gRlvHandler.hasBehaviour(rlvCmd.getObjectID(), rlvCmd.getBehaviourType()))
 		{
 			LLVfxManager::instance().addEffect(new RlvSphereEffect(rlvCmd.getObjectID()));
+			if (!gPipeline.mPostHelperMap.isComplete())
+			{
+				// In case of deferred with no shadows, no ambient occlusion, no depth of field, and no antialiasing
+				gPipeline.releaseGLBuffers();
+				gPipeline.createGLBuffers();
+				RLV_ASSERT(gPipeline.mPostHelperMap.isComplete());
+			}
 		}
 		else
 		{
