@@ -147,7 +147,6 @@ void main()
 #if TONEMAP_METHOD == 0 // NO_POST
     diff.rgb *= 0.6;
 #elif TONEMAP_METHOD == 1 // Aces Hill method
-    diff.rgb *= 1.0/0.6;
     diff.rgb = ACES_Hill(diff.rgb);
 #elif TONEMAP_METHOD == 2 // Uchimura's Gran Turismo method
     diff.rgb = uchimura(diff.rgb);
