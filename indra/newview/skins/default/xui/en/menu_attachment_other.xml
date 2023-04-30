@@ -72,7 +72,7 @@
     <menu_item_separator />
     <menu_item_check
       name="RenderNormally"
-      label="Normally Render">
+      label="Normal detail">
       <menu_item_check.on_check
         function="Avatar.CheckImpostorMode"
         parameter="0" />
@@ -82,7 +82,7 @@
     </menu_item_check>
     <menu_item_check
       name="AlwaysRenderFully"
-      label="Always Render">
+      label="Always full detail">
       <menu_item_check.on_check
         function="Avatar.CheckImpostorMode"
         parameter="2" />
@@ -92,7 +92,7 @@
     </menu_item_check>
     <menu_item_check
       name="DoNotRender"
-      label="Never Render">
+      label="Never full detail">
       <menu_item_check.on_check
         function="Avatar.CheckImpostorMode"
         parameter="1" />

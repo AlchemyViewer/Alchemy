@@ -412,6 +412,7 @@ public:
 	void skipRenderingOfTerrain( bool flag );
 	void hideObject( const LLUUID& id );
 	void restoreHiddenObject( const LLUUID& id );
+    void handleShadowDetailChanged();
 
     LLReflectionMapManager mReflectionMapManager;
     void overrideEnvironmentMap();
@@ -426,9 +427,7 @@ private:
 	void connectRefreshCachedSettingsSafe(const std::string name);
 	void hideDrawable( LLDrawable *pDrawable );
 	void unhideDrawable( LLDrawable *pDrawable );
-
-	void drawFullScreenRect();
-
+    void skipRenderingShadows();
 public:
 	enum {GPU_CLASS_MAX = 3 };
 
@@ -753,7 +752,6 @@ protected:
 	U64						mOldRenderDebugMask;
 	std::stack<U32>			mRenderDebugFeatureStack;
 
-	
 	/////////////////////////////////////////////
 	//
 	//
@@ -950,6 +948,7 @@ public:
 // [/SL:KB]
 	static bool RenderUIBuffer;
 	static S32 RenderShadowDetail;
+    static S32 RenderShadowSplits;
 	static bool RenderDeferredSSAO;
 	static F32 RenderShadowResolutionScale;
 	static bool RenderLocalLights;

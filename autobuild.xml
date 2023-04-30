@@ -778,9 +778,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4f8dc85863fec36e8d872c31f4abcd05</string>
+              <string>7cc58b3acb230a7e65ea5f0ff800be393eb4aa1b</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/101480/892402/glext-68-common-572829.tar.bz2</string>
+              <string>https://github.com/secondlife/3p-glext/releases/download/v69/glext-68-common-685b36e.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>

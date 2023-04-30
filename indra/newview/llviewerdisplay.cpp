@@ -86,6 +86,7 @@
 // [/RLVa:KB]
 
 #include "llenvironment.h"
+#include "llperfstats.h"
 #include "alcinematicmode.h"
 
 extern LLPointer<LLViewerTexture> gStartTexture;
@@ -276,6 +277,7 @@ static std::string STR_DISPLAY_DONE("Display:Done");
 // Paint the display!
 void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
 {
+    LLPerfStats::RecordSceneTime T (LLPerfStats::StatType_t::RENDER_DISPLAY); // render time capture - This is the main stat for overall rendering.
     LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Render");
 
 	if (gWindowResized)
@@ -1122,7 +1124,8 @@ void display_cube_face()
 
 void render_hud_attachments()
 {
-	gGL.matrixMode(LLRender::MM_PROJECTION);
+    LLPerfStats::RecordSceneTime T ( LLPerfStats::StatType_t::RENDER_HUDS); // render time capture - Primary contributor to HUDs (though these end up in render batches)
+    gGL.matrixMode(LLRender::MM_PROJECTION);
 	gGL.pushMatrix();
 	gGL.matrixMode(LLRender::MM_MODELVIEW);
 	gGL.pushMatrix();
@@ -1324,7 +1327,8 @@ bool setup_hud_matrices(const LLRect& screen_region)
 
 void render_ui(F32 zoom_factor, int subfield)
 {
-	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI; //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI);
+    LLPerfStats::RecordSceneTime T ( LLPerfStats::StatType_t::RENDER_UI ); // render time capture - Primary UI stat can have HUD time overlap (TODO)
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI; //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI);
     LL_PROFILE_GPU_ZONE("ui");
 	LLGLState::checkStates();
 	
@@ -1409,6 +1413,7 @@ void render_ui(F32 zoom_factor, int subfield)
 
 void swap()
 {
+    LLPerfStats::RecordSceneTime T ( LLPerfStats::StatType_t::RENDER_SWAP ); // render time capture - Swap buffer time - can signify excessive data transfer to/from GPU
     LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Swap");
     LL_PROFILE_GPU_ZONE("swap");
 	if (gDisplaySwapBuffers)

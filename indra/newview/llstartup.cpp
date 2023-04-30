@@ -214,6 +214,7 @@
 #include "llstacktrace.h"
 
 #include "threadpool.h"
+#include "llperfstats.h"
 
 #include "llfloatersidepanelcontainer.h"
 
@@ -1560,6 +1561,7 @@ bool idle_startup()
 			LLViewerParcelAskPlay::getInstance()->loadSettings();
 		}
 
+		gAgent.addRegionChangedCallback(boost::bind(&LLPerfStats::StatsRecorder::clearStats));
 		// Create people views early enough to register with avatar tracker
 		LLFloaterSidePanelContainer::getPanel("people", "panel_people");
 		
@@ -2431,6 +2433,8 @@ bool idle_startup()
 			DFQ_AGENT_OWNED,
 			LLParcel::C_ANY,
 			"");
+
+        LLPerfStats::StatsRecorder::setAutotuneInit();
 
 		return TRUE;
 	}
@@ -3522,6 +3526,9 @@ bool process_login_success_response(U32& first_sim_size_x, U32& first_sim_size_y
 	if(!text.empty()) gAgentID.set(text);
 	gDebugInfo["AgentID"] = text;
 	
+	LLPerfStats::StatsRecorder::setEnabled(gSavedSettings.getBOOL("PerfStatsCaptureEnabled"));
+	LLPerfStats::StatsRecorder::setFocusAv(gAgentID);
+
 	// Agent id needed for parcel info request in LLUrlEntryParcel
 	// to resolve parcel name.
 	LLUrlEntryParcel::setAgentID(gAgentID);

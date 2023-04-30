@@ -44,6 +44,7 @@
 #include "llui.h" 
 #include "llglheaders.h"
 #include "llrender.h"
+#include "llstartup.h"
 #include "llwindow.h"	// swapBuffers()
 
 // newview includes
@@ -140,6 +141,7 @@ F32 LLPipeline::RenderResolutionMultiplier;
 // [/SL:KB]
 bool LLPipeline::RenderUIBuffer;
 S32 LLPipeline::RenderShadowDetail;
+S32 LLPipeline::RenderShadowSplits;
 bool LLPipeline::RenderDeferredSSAO;
 F32 LLPipeline::RenderShadowResolutionScale;
 bool LLPipeline::RenderLocalLights;
@@ -211,6 +213,7 @@ LLTrace::EventStatHandle<S64> LLPipeline::sStatBatchSize("renderbatchsize");
 
 const F32 BACKLIGHT_DAY_MAGNITUDE_OBJECT = 0.1f;
 const F32 BACKLIGHT_NIGHT_MAGNITUDE_OBJECT = 0.08f;
+const F32 ALPHA_BLEND_CUTOFF = 0.598f;
 const F32 DEFERRED_LIGHT_FALLOFF = 0.5f;
 const U32 DEFERRED_VB_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
 
@@ -473,6 +476,7 @@ void LLPipeline::init()
 // [/SL:KB]
 	connectRefreshCachedSettingsSafe("RenderUIBuffer");
 	connectRefreshCachedSettingsSafe("RenderShadowDetail");
+    connectRefreshCachedSettingsSafe("RenderShadowSplits");
 	connectRefreshCachedSettingsSafe("RenderDeferredSSAO");
 	connectRefreshCachedSettingsSafe("RenderShadowResolutionScale");
 	connectRefreshCachedSettingsSafe("RenderLocalLights");
@@ -546,7 +550,6 @@ void LLPipeline::init()
 
 LLPipeline::~LLPipeline()
 {
-
 }
 
 void LLPipeline::cleanup()
@@ -1008,6 +1011,7 @@ void LLPipeline::refreshCachedSettings()
 // [/SL:KB]
 	RenderUIBuffer = gSavedSettings.getBOOL("RenderUIBuffer");
 	RenderShadowDetail = gSavedSettings.getS32("RenderShadowDetail");
+    RenderShadowSplits = gSavedSettings.getS32("RenderShadowSplits");
 	RenderDeferredSSAO = gSavedSettings.getBOOL("RenderDeferredSSAO");
 	RenderShadowResolutionScale = gSavedSettings.getF32("RenderShadowResolutionScale");
 	RenderLocalLights = gSavedSettings.getBOOL("RenderLocalLights");
@@ -5669,7 +5673,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 			else if (light->isAttachment())
 			{
 				LLVOAvatar* av = light->getAvatar();
-				if (av && (av->isTooComplex() || av->isInMuteList()))
+            	if (av && (av->isTooComplex() || av->isInMuteList() || av->isTooSlow()))
 				{
 					// avatars that are already in the list will be removed by removeMutedAVsLights
 					continue;
@@ -6867,6 +6871,8 @@ void LLPipeline::renderAlphaObjects(bool rigged)
     assertInitialized();
     gGL.loadMatrix(gGLModelView);
     gGLLastMatrix = NULL;
+    S32 sun_up = LLEnvironment::instance().getIsSunUp() ? 1 : 0;
+    U32 target_width = LLRenderTarget::sCurResX;
     U32 type = LLRenderPass::PASS_ALPHA;
     LLVOAvatar* lastAvatar = nullptr;
     U64 lastMeshId = 0;
@@ -6889,10 +6895,18 @@ void LLPipeline::renderAlphaObjects(bool rigged)
         {
             if (pparams->mGLTFMaterial)
             {
+                gDeferredShadowGLTFAlphaMaskProgram.bind(rigged);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
                 mSimplePool->pushRiggedGLTFBatch(*pparams, lastAvatar, lastMeshId);
             }
             else
             {
+                gDeferredShadowAlphaMaskProgram.bind(rigged);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
                 if (lastAvatar != pparams->mAvatar.get() || lastMeshId != pparams->mSkinInfo->mHash)
                 {
                     mSimplePool->uploadMatrixPalette(*pparams);
@@ -6900,18 +6914,26 @@ void LLPipeline::renderAlphaObjects(bool rigged)
                     lastMeshId = pparams->mSkinInfo->mHash;
                 }
 
-                mSimplePool->pushBatch(*pparams, true, true, true);
+                mSimplePool->pushBatch(*pparams, true, true);
             }
         }
         else
         {
             if (pparams->mGLTFMaterial)
             {
+                gDeferredShadowGLTFAlphaMaskProgram.bind(rigged);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
                 mSimplePool->pushGLTFBatch(*pparams);
             }
             else
             {
-                mSimplePool->pushBatch(*pparams, true, true, true);
+                gDeferredShadowAlphaMaskProgram.bind(rigged);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
+                mSimplePool->pushBatch(*pparams, true, true);
             }
         }
     }
@@ -6928,11 +6950,11 @@ void LLPipeline::renderMaskedObjects(U32 type, bool texture, bool batch_texture,
 	gGLLastMatrix = NULL;
     if (rigged)
     {
-        mAlphaMaskPool->pushRiggedMaskBatches(type+1, texture, batch_texture, true);
+        mAlphaMaskPool->pushRiggedMaskBatches(type+1, texture, batch_texture);
     }
     else
     {
-        mAlphaMaskPool->pushMaskBatches(type, texture, batch_texture, true);
+        mAlphaMaskPool->pushMaskBatches(type, texture, batch_texture);
     }
 	gGL.loadMatrix(gGLModelView);
 	gGLLastMatrix = NULL;		
@@ -6946,11 +6968,11 @@ void LLPipeline::renderFullbrightMaskedObjects(U32 type, bool texture, bool batc
 	gGLLastMatrix = NULL;
     if (rigged)
     {
-        mFullbrightAlphaMaskPool->pushRiggedMaskBatches(type+1, texture, batch_texture, true);
+        mFullbrightAlphaMaskPool->pushRiggedMaskBatches(type+1, texture, batch_texture);
     }
     else
     {
-        mFullbrightAlphaMaskPool->pushMaskBatches(type, texture, batch_texture, true);
+        mFullbrightAlphaMaskPool->pushMaskBatches(type, texture, batch_texture);
     }
 	gGL.loadMatrix(gGLModelView);
 	gGLLastMatrix = NULL;		
@@ -8809,8 +8831,6 @@ void LLPipeline::renderShadow(LLMatrix4a& view, LLMatrix4a& proj, LLCamera& shad
 
     stop_glerror();
 
-    LLEnvironment& environment = LLEnvironment::instance();
-
     struct CompareVertexBuffer
     {
         bool operator()(const LLDrawInfo* const& lhs, const LLDrawInfo* const& rhs)
@@ -8825,7 +8845,6 @@ void LLPipeline::renderShadow(LLMatrix4a& view, LLMatrix4a& proj, LLCamera& shad
     {
         bool rigged = j == 1;
         gDeferredShadowProgram.bind(rigged);
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
 
         gGL.diffuseColor4f(1, 1, 1, 1);
 
@@ -8870,27 +8889,25 @@ void LLPipeline::renderShadow(LLMatrix4a& view, LLMatrix4a& proj, LLCamera& shad
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha");
         LL_PROFILE_GPU_ZONE("shadow alpha");
-
+        const S32 sun_up = LLEnvironment::instance().getIsSunUp() ? 1 : 0;
         U32 target_width = LLRenderTarget::sCurResX;
 
         for (int i = 0; i < 2; ++i)
         {
             bool rigged = i == 1;
 
-            gDeferredShadowAlphaMaskProgram.bind(rigged);
-            LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-            LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
-
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha masked");
                 LL_PROFILE_GPU_ZONE("shadow alpha masked");
+                gDeferredShadowAlphaMaskProgram.bind(rigged);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
                 renderMaskedObjects(LLRenderPass::PASS_ALPHA_MASK, true, true, rigged);
             }
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha blend");
                 LL_PROFILE_GPU_ZONE("shadow alpha blend");
-                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(0.598f);
                 renderAlphaObjects(rigged);
             }
 
@@ -8898,8 +8915,8 @@ void LLPipeline::renderShadow(LLMatrix4a& view, LLMatrix4a& proj, LLCamera& shad
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow fullbright alpha masked");
                 LL_PROFILE_GPU_ZONE("shadow alpha masked");
                 gDeferredShadowFullbrightAlphaMaskProgram.bind(rigged);
+                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
                 LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
                 renderFullbrightMaskedObjects(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true, rigged);
             }
 
@@ -8907,9 +8924,10 @@ void LLPipeline::renderShadow(LLMatrix4a& view, LLMatrix4a& proj, LLCamera& shad
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow alpha grass");
                 LL_PROFILE_GPU_ZONE("shadow alpha grass");
                 gDeferredTreeShadowProgram.bind(rigged);
+                LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(ALPHA_BLEND_CUTOFF);
+
                 if (i == 0)
                 {
-                    LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(0.598f);
                     renderObjects(LLRenderPass::PASS_GRASS, true);
                 }
 
@@ -8928,8 +8946,8 @@ void LLPipeline::renderShadow(LLMatrix4a& view, LLMatrix4a& proj, LLCamera& shad
         {
             bool rigged = i == 1;
             gDeferredShadowGLTFAlphaMaskProgram.bind(rigged);
+            LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
             LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-            LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
             
             gGL.loadMatrix(gGLModelView);
             gGLLastMatrix = NULL;
@@ -9427,14 +9445,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 	
 	if (mSunDiffuse == LLColor4::black)
 	{ //sun diffuse is totally black shadows don't matter
-		LLGLDepthTest depth(GL_TRUE);
-
-		for (S32 j = 0; j < 4; j++)
-		{
-			mRT->shadow[j].bindTarget();
-			mRT->shadow[j].clear();
-			mRT->shadow[j].flush();
-		}
+        skipRenderingShadows();
 	}
 	else
 	{
@@ -9490,7 +9501,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
 			std::vector<LLVector3> fp;
 
-			if (!gPipeline.getVisiblePointCloud(shadow_cam, min, max, fp, lightDir))
+			if (!gPipeline.getVisiblePointCloud(shadow_cam, min, max, fp, lightDir)
+                || j > RenderShadowSplits)
 			{
 				//no possible shadow receivers
                 if (!gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_SHADOW_FRUSTA) && !gCubeSnapshot)
@@ -10043,10 +10055,10 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar)
                               << " is " << ( too_complex ? "" : "not ") << "too complex"
                               << LL_ENDL;
 
-	pushRenderTypeMask();
-	
-	if (visually_muted || too_complex)
-	{
+    pushRenderTypeMask();
+
+    if (visually_muted || too_complex)
+    {
         // only show jelly doll geometry
 		andRenderTypeMask(LLPipeline::RENDER_TYPE_AVATAR,
 							LLPipeline::RENDER_TYPE_CONTROL_AV,
@@ -10675,9 +10687,32 @@ void LLPipeline::restoreHiddenObject( const LLUUID& id )
 	}
 }
 
+void LLPipeline::skipRenderingShadows()
+{
+    LLGLDepthTest depth(GL_TRUE);
+
+    for (S32 j = 0; j < 4; j++)
+    {
+        mRT->shadow[j].bindTarget();
+        mRT->shadow[j].clear();
+        mRT->shadow[j].flush();
+    }
+}
+
+void LLPipeline::handleShadowDetailChanged()
+{
+    if (RenderShadowDetail > gSavedSettings.getS32("RenderShadowDetail"))
+    {
+        skipRenderingShadows();
+    }
+    else
+    {
+        LLViewerShaderMgr::instance()->setShaders();
+    }
+}
+
 void LLPipeline::overrideEnvironmentMap()
 {
     //mReflectionMapManager.mProbes.clear();
     //mReflectionMapManager.addProbe(LLViewerCamera::instance().getOrigin());
 }
-

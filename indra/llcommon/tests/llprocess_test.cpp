@@ -355,7 +355,7 @@ namespace tut
 
         // Create a script file in a temporary place.
         NamedTempFile script("py",
-			"from __future__ import print_function" EOL
+            "from __future__ import print_function" EOL
             "import sys" EOL
             "import time" EOL
             EOL
@@ -365,7 +365,7 @@ namespace tut
             "time.sleep(2)" EOL
             "print('stderr after wait',file=sys.stderr)" EOL
             "sys.stderr.flush()" EOL
-            );
+        );
 
         // Arrange to track the history of our interaction with child: what we
         // fetched, which pipe it came from, how many tries it took before we
@@ -859,8 +859,8 @@ namespace tut
         set_test_name("'bogus' test");
         CaptureLog recorder;
         PythonProcessLauncher py(get_test_name(),
-                                 "from __future__ import print_function\n"
-                                 "print('Hello world')\n");
+            "from __future__ import print_function\n"
+            "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam("bogus"));
         py.mPy = LLProcess::create(py.mParams);
         ensure("should have rejected 'bogus'", ! py.mPy);
@@ -875,8 +875,8 @@ namespace tut
         // Replace this test with one or more real 'file' tests when we
         // implement 'file' support
         PythonProcessLauncher py(get_test_name(),
-                                 "from __future__ import print_function\n"
-                                 "print('Hello world')\n");
+            "from __future__ import print_function\n"
+            "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("file"));
         py.mPy = LLProcess::create(py.mParams);
@@ -891,8 +891,8 @@ namespace tut
         // implement 'tpipe' support
         CaptureLog recorder;
         PythonProcessLauncher py(get_test_name(),
-                                 "from __future__ import print_function\n"
-                                 "print('Hello world')\n");
+            "from __future__ import print_function\n"
+            "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("tpipe"));
         py.mPy = LLProcess::create(py.mParams);
@@ -909,8 +909,8 @@ namespace tut
         // implement 'npipe' support
         CaptureLog recorder;
         PythonProcessLauncher py(get_test_name(),
-                                 "from __future__ import print_function\n"
-                                 "print('Hello world')\n");
+            "from __future__ import print_function\n"
+            "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("npipe"));
@@ -986,20 +986,20 @@ namespace tut
     {
         set_test_name("get*Pipe() validation");
         PythonProcessLauncher py(get_test_name(),
-                                 "from __future__ import print_function\n"
-                                 "print('this output is expected')\n");
+            "from __future__ import print_function\n"
+            "print('this output is expected')\n");
         py.mParams.files.add(LLProcess::FileParam("pipe")); // pipe for  stdin
         py.mParams.files.add(LLProcess::FileParam());       // inherit stdout
         py.mParams.files.add(LLProcess::FileParam("pipe")); // pipe for stderr
         py.run();
         TEST_getPipe(*py.mPy, getWritePipe, getOptWritePipe,
-                     LLProcess::STDIN,   // VALID
-                     LLProcess::STDOUT,  // NOPIPE
-                     LLProcess::STDERR); // BADPIPE
+            LLProcess::STDIN,   // VALID
+            LLProcess::STDOUT,  // NOPIPE
+            LLProcess::STDERR); // BADPIPE
         TEST_getPipe(*py.mPy, getReadPipe,  getOptReadPipe,
-                     LLProcess::STDERR,  // VALID
-                     LLProcess::STDOUT,  // NOPIPE
-                     LLProcess::STDIN);  // BADPIPE
+            LLProcess::STDERR,  // VALID
+            LLProcess::STDOUT,  // NOPIPE
+            LLProcess::STDIN);  // BADPIPE
     }
 
     template<> template<>
@@ -1126,8 +1126,8 @@ namespace tut
     {
         set_test_name("ReadPipe \"eof\" event");
         PythonProcessLauncher py(get_test_name(),
-                                 "from __future__ import print_function\n"
-                                 "print('Hello from Python!')\n");
+            "from __future__ import print_function\n"
+            "print('Hello from Python!')\n");
         py.mParams.files.add(LLProcess::FileParam()); // stdin
         py.mParams.files.add(LLProcess::FileParam("pipe")); // stdout
         py.launch();
