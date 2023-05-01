@@ -40,11 +40,7 @@ public:
 	ALRenderUtil();
 	~ALRenderUtil();
 
-	void restoreVertexBuffers();
-	void resetVertexBuffers();
-
 	void releaseGLBuffers();
-
 	void refreshState();
 
 	// Deferred Only Functions
@@ -85,9 +81,6 @@ private:
 	// Texture Data
 	U32 mCGLut;
 	LLVector4 mCGLutSize;
-
-	// Vertex Buffers
-	LLPointer<LLVertexBuffer> mRenderBuffer;
 
 	std::vector<boost::signals2::scoped_connection> mSettingConnections;
 };

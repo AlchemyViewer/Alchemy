@@ -453,8 +453,6 @@ void LLPipeline::init()
         mScreenTriangleVB->unmapBuffer();
     }
 
-	mALRenderUtil->restoreVertexBuffers();
-
     setLightingDetail(-1);
 	
 	//

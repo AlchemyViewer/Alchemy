@@ -293,30 +293,6 @@ ALRenderUtil::~ALRenderUtil()
 	mSettingConnections.clear();
 }
 
-void ALRenderUtil::restoreVertexBuffers()
-{
-	mRenderBuffer = new LLVertexBuffer(ALRENDER_BUFFER_MASK);
-	mRenderBuffer->allocateBuffer(3, 0);
-
-	LLStrider<LLVector3> vert;
-	LLStrider<LLVector2> tc0;
-	LLStrider<LLVector2> tc1;
-	mRenderBuffer->getVertexStrider(vert);
-	mRenderBuffer->getTexCoord0Strider(tc0);
-	mRenderBuffer->getTexCoord1Strider(tc1);
-
-	vert[0].set(-1.f, -1.f, 0.f);
-	vert[1].set(3.f, -1.f, 0.f);
-	vert[2].set(-1.f, 3.f, 0.f);
-
-	mRenderBuffer->unmapBuffer();
-}
-
-void ALRenderUtil::resetVertexBuffers()
-{
-	mRenderBuffer = nullptr;
-}
-
 void ALRenderUtil::releaseGLBuffers()
 {
 	if (mCGLut)
@@ -463,8 +439,8 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 
 	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
 
-	mRenderBuffer->setBuffer();
-	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
+	gPipeline.mScreenTriangleVB->setBuffer();
+	gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 	stop_glerror();
 
 	tone_shader->unbindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
@@ -700,8 +676,8 @@ void ALRenderUtil::renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst)
 		tone_shader->uniform4fv(LLShaderMgr::COLORGRADE_LUT_SIZE, 1, mCGLutSize.mV);
 	}
 
-	mRenderBuffer->setBuffer();
-	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
+	gPipeline.mScreenTriangleVB->setBuffer();
+	gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 	stop_glerror();
 
 	if (channel > -1)
@@ -807,8 +783,8 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 	sharpen_shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
 
 	// Draw
-	mRenderBuffer->setBuffer();
-	mRenderBuffer->drawArrays(LLRender::TRIANGLES, 0, 3);
+	gPipeline.mScreenTriangleVB->setBuffer();
+	gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
 	sharpen_shader->unbind();
 
