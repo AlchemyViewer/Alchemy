@@ -89,7 +89,6 @@
 #include "llcallstack.h"
 #include "llsculptidsize.h"
 #include "llavatarappearancedefines.h"
-#include "llperfstats.h" 
 #include "llgltfmateriallist.h"
 #include "lltoolmgr.h"
 // [RLVa:KB] - Checked: RLVa-2.0.0
@@ -5682,8 +5681,8 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
         LL_PROFILE_ZONE_NAMED("rebuildGeom - face list");
 
 		//get all the faces into a list
-        std::unique_ptr<LLPerfStats::RecordAttachmentTime> ratPtr{};
-		for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(), drawable_end = group->getDataEnd(); drawable_iter != drawable_end; ++drawable_iter)
+		for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(); 
+             drawable_iter != group->getDataEnd(); ++drawable_iter)
 		{
 			LLDrawable* drawablep = (LLDrawable*)(*drawable_iter)->getDrawable();
 		
@@ -5714,11 +5713,6 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 			{
 				continue;
 			}
-
-            if(vobj->isAttachment())
-            {
-                trackAttachments( vobj, drawablep->isState(LLDrawable::RIGGED),&ratPtr);
-            }
 
 			LLVolume* volume = vobj->getVolume();
 			if (volume)
@@ -6119,8 +6113,7 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 
 			U32 buffer_count = 0;
 
-            std::unique_ptr<LLPerfStats::RecordAttachmentTime> ratPtr{};
-			for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(), drawable_end = group->getDataEnd(); drawable_iter != drawable_end; ++drawable_iter)
+            for (LLSpatialGroup::element_iter drawable_iter = group->getDataBegin(); drawable_iter != group->getDataEnd(); ++drawable_iter)
 			{
 				LLDrawable* drawablep = (LLDrawable*)(*drawable_iter)->getDrawable();
 
@@ -6129,11 +6122,6 @@ void LLVolumeGeometryManager::rebuildMesh(LLSpatialGroup* group)
 					LLVOVolume* vobj = drawablep->getVOVolume();
 					
 					if (!vobj) continue;
-
-                    if (vobj->isAttachment())
-                    {
-                        trackAttachments( vobj, drawablep->isState(LLDrawable::RIGGED), &ratPtr );
-                    }
 
 #ifdef SHOW_DEBUG
 					static const bool enable_log = debugLoggingEnabled("AnimatedObjectsLinkset");
@@ -6506,16 +6494,11 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 		U32 indices_index = 0;
 		U16 index_offset = 0;
 
-        std::unique_ptr<LLPerfStats::RecordAttachmentTime> ratPtr;
         while (face_iter < i)
 		{
 			//update face indices for new buffer
 			facep = *face_iter;
-            LLViewerObject* vobj = facep->getViewerObject();
-            if(vobj && vobj->isAttachment())
-            {
-                trackAttachments(vobj, LLPipeline::sShadowRender, &ratPtr);
-            }
+
 			if (buffer.isNull())
 			{
 				// Bulk allocation failed

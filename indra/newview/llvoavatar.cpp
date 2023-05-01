@@ -8722,7 +8722,7 @@ void LLVOAvatar::updateTooSlow()
     {
         // use the cached values.
         render_time_raw = mRenderTime;
-        render_geom_time_raw = mGeomTime;		
+        render_geom_time_raw = mGeomTime;
     }
 
 	bool autotune = LLPerfStats::tunables.userAutoTuneEnabled && !mIsControlAvatar && !isSelf();
@@ -11408,6 +11408,7 @@ void LLVOAvatar::accountRenderComplexityForObject(
 // Calculations for mVisualComplexity value
 void LLVOAvatar::calculateUpdateRenderComplexity()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     /*****************************************************************
      * This calculation should not be modified by third party viewers,
      * since it is used to limit rendering and should be uniform for
