@@ -251,6 +251,7 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
     LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
     LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
     LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
+    LLComboBox* ctrl_anisotropic = getChild<LLComboBox>("anisotropic_filter");
 
     // disabled windlight
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))
@@ -345,8 +346,6 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
     {
         ctrl_avatar_cloth->setEnabled(FALSE);
         ctrl_avatar_cloth->setValue(FALSE);
-    }
-	LLComboBox* ctrl_anisotropic = getChild<LLComboBox>("anisotropic_filter");
     }
 	
 	if (!LLFeatureManager::instance().isFeatureAvailable("RenderAnisotropicLevel"))
