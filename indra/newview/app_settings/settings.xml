@@ -5306,7 +5306,7 @@
     <key>ImagePipelineUseHTTP</key>
     <map>
       <key>Comment</key>
-      <string>If TRUE use HTTP GET to fetch textures from the server</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
