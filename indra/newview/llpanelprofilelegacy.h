@@ -68,7 +68,6 @@ private:
 	void resetControls() override;
     void resetInterestsControlValues();
 	void setProgress(bool started);
-    void requestAvatarProfileCoro(std::string url);
     void sendAvatarProfileCoro(std::string url, LLSD payload);
 	void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
 	void onCommitAvatarProperties();
