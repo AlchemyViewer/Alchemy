@@ -2751,6 +2751,10 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
 
     if ((LLFrameTimer::getFrameCount() + mID.mData[0]) % compl_upd_freq == 0)
     {
+        // DEPRECATED 
+        // replace with LLPipeline::profileAvatar?
+        // Avatar profile takes ~ 0.5ms while idleUpdateRenderComplexity takes ~5ms
+        // (both are unacceptably costly)
         idleUpdateRenderComplexity();
     }
     idleUpdateDebugInfo();
@@ -11264,6 +11268,7 @@ void LLVOAvatar::accountRenderComplexityForObject(
     std::map<LLUUID, U32>& item_complexity,
     std::map<LLUUID, U32>& temp_item_complexity)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     if (attached_object && !attached_object->isHUDAttachment())
 		{
         mAttachmentVisibleTriangleCount += attached_object->recursiveGetTriangleCount();
@@ -11408,7 +11413,6 @@ void LLVOAvatar::accountRenderComplexityForObject(
 // Calculations for mVisualComplexity value
 void LLVOAvatar::calculateUpdateRenderComplexity()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     /*****************************************************************
      * This calculation should not be modified by third party viewers,
      * since it is used to limit rendering and should be uniform for
@@ -11931,3 +11935,43 @@ BOOL LLVOAvatar::isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex type,
 	// non-self avatars don't have wearables
 	return FALSE;
 }
+
+void LLVOAvatar::placeProfileQuery()
+{
+    if (mGPUTimerQuery == 0)
+    {
+        glGenQueries(1, &mGPUTimerQuery);
+    }
+
+    glBeginQuery(GL_TIME_ELAPSED, mGPUTimerQuery);
+}
+
+void LLVOAvatar::readProfileQuery(S32 retries)
+{
+    if (!mGPUProfilePending)
+    {
+        glEndQuery(GL_TIME_ELAPSED);
+        mGPUProfilePending = true;
+    }
+
+    GLuint64 result = 0;
+    glGetQueryObjectui64v(mGPUTimerQuery, GL_QUERY_RESULT_AVAILABLE, &result);
+
+    if (result == GL_TRUE || --retries <= 0)
+    { // query available, readback result
+        GLuint64 time_elapsed = 0;
+        glGetQueryObjectui64v(mGPUTimerQuery, GL_QUERY_RESULT, &time_elapsed);
+        mGPURenderTime = time_elapsed / 1000000.f;
+        mGPUProfilePending = false;
+    }
+    else
+    { // wait until next frame
+        LLUUID id = getID();
+
+        LL::WorkQueue::getInstance("mainloop")->post([id, retries] {
+            LLVOAvatar* avatar = (LLVOAvatar*) gObjectList.findObject(id);
+            avatar->readProfileQuery(retries);
+            });
+    }
+}
+

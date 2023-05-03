@@ -907,14 +907,6 @@ void LLDrawable::updateDistance(LLCamera& camera, bool force_update)
                 LLVector3 cam_pos_from_agent = LLViewerCamera::getInstance()->getOrigin();
                 LLVector3 cam_to_box_offset = point_to_box_offset(cam_pos_from_agent, av_box);
                 mDistanceWRTCamera = llmax(0.01f, ll_round(cam_to_box_offset.magVec(), 0.01f));
-#ifdef SHOW_DEBUG
-                LL_DEBUGS("DynamicBox") << volume->getAvatar()->getFullname() 
-                                        << " pos (ignored) " << pos
-                                        << " cam pos " << cam_pos_from_agent
-                                        << " box " << av_box[0] << "," << av_box[1] 
-                                        << " -> dist " << mDistanceWRTCamera
-                                        << LL_ENDL;
-#endif
                 mVObjp->updateLOD();
                 return;
             }
