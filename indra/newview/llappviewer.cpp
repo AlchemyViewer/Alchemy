@@ -4380,7 +4380,7 @@ bool LLAppViewer::initCache()
 	// Init the texture cache
 	const S32 MB = 1024 * 1024;
 	const S64 MIN_CACHE_SIZE = 512 * MB;
-	const S64 MAX_CACHE_SIZE = 9984ll * MB;
+	const S64 MAX_CACHE_SIZE = 8192ll * MB;
 
 	S64 texture_cache_size = (S64)(gSavedSettings.getU32("TextureCacheSize")) * MB;
 	texture_cache_size = llclamp(texture_cache_size, MIN_CACHE_SIZE, MAX_CACHE_SIZE);
