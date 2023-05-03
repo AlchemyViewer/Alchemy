@@ -50,14 +50,6 @@ public:
         CRASHED = -1    // An uncaught exception was thrown by the thread
     } EThreadStatus;
 
-    typedef enum e_thread_priority
-    {
-        LOWEST = 0,
-        BELOW_NORMAL,
-        NORMAL,
-        ABOVE_NORMAL,
-        HIGHEST
-    } EThreadPriority;
     typedef std::thread::id id_t;
 
     LLThread(const std::string& name, apr_pool_t *poolp = NULL);
@@ -94,8 +86,6 @@ public:
 
     id_t getID() const;
 
-    bool setPriority(EThreadPriority thread_priority);
-
 private:
     bool                mPaused;
 
@@ -109,8 +99,9 @@ protected:
     std::unique_ptr<std::thread>        mThreadp;
     std::atomic_int                     mStatus;
     std::thread::native_handle_type     mNativeHandle;
+#if 0
     std::unique_ptr<LLTrace::ThreadRecorder> mRecorder;
-
+#endif
     //a local apr_pool for APRFile operations in this thread. If it exists, LLAPRFile::sAPRFilePoolp should not be used.
     //Note: this pool is used by APRFile ONLY, do NOT use it for any other purposes.
     //      otherwise it will cause severe memory leaking!!! --bao

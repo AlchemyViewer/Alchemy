@@ -35,8 +35,7 @@
 // Run on MAIN thread
 
 LLWorkerThread::LLWorkerThread(const std::string& name, bool threaded, bool should_pause) :
-	LLQueuedThread(name, threaded, should_pause),
-	mDeleteListSize(0)
+	LLQueuedThread(name, threaded, should_pause)
 {
 	mDeleteMutex = new LLMutex();
 
@@ -78,7 +77,6 @@ void LLWorkerThread::clearDeleteList()
 			delete *iter ;
 		}
 		mDeleteList.clear() ;
-		mDeleteListSize = mDeleteList.size();
 		mDeleteMutex->unlock() ;
 	}
 }
@@ -90,8 +88,6 @@ S32 LLWorkerThread::update(F32 max_time_ms)
 	// Delete scheduled workers
 	std::vector<LLWorkerClass*> delete_list;
 	std::vector<LLWorkerClass*> abort_list;
-	if (mDeleteListSize)
-	{
 		mDeleteMutex->lock();
 		for (delete_list_t::iterator iter = mDeleteList.begin();
 			 iter != mDeleteList.end(); )
@@ -112,9 +108,7 @@ S32 LLWorkerThread::update(F32 max_time_ms)
 				}
 			}
 		}
-		mDeleteListSize = mDeleteList.size();
 		mDeleteMutex->unlock();
-	}
 	// abort and delete after releasing mutex
 	for (std::vector<LLWorkerClass*>::iterator iter = abort_list.begin();
 		 iter != abort_list.end(); ++iter)
@@ -162,7 +156,6 @@ void LLWorkerThread::deleteWorker(LLWorkerClass* workerclass)
 {
 	mDeleteMutex->lock();
 	mDeleteList.push_back(workerclass);
-	mDeleteListSize = mDeleteList.size();
 	mDeleteMutex->unlock();
 }
 

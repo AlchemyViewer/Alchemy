@@ -146,8 +146,10 @@ void LLThread::threadRun()
 #endif
     LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
 
+#if 0
     // for now, hard code all LLThreads to report to single master thread recorder, which is known to be running on main thread
     mRecorder = std::make_unique<LLTrace::ThreadRecorder>(*LLTrace::get_master_thread_recorder());
+#endif
 
     // Run the user supplied function
     do 
@@ -174,7 +176,9 @@ void LLThread::threadRun()
 
     //LL_INFOS() << "LLThread::staticRun() Exiting: " << threadp->mName << LL_ENDL;
 
+#if 0
     mRecorder.reset();
+#endif
 
     // We're done with the run function, this thread is done executing now.
     //NB: we are using this flag to sync across threads...we really need memory barriers here
@@ -256,7 +260,9 @@ void LLThread::shutdown()
 #else
             pthread_cancel(mNativeHandle);
 #endif
+#if 0
             mRecorder.reset();
+#endif
             mStatus = STOPPED;
             return;
         }
@@ -265,6 +271,7 @@ void LLThread::shutdown()
     mThreadp.reset();
     mRunCondition.reset();
     mDataLock.reset();
+#if 0
     if (mRecorder)
     {
         // missed chance to properly shut down recorder (needs to be done in thread context)
@@ -272,6 +279,7 @@ void LLThread::shutdown()
         // so just leak it and remove it from parent
         LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder.release());
     }
+#endif
 }
 
 void LLThread::start()
@@ -285,7 +293,7 @@ void LLThread::start()
 	}
 	catch (const std::system_error& err)
 	{
-		mStatus = CRASHED;
+		mStatus = STOPPED;
 		LL_WARNS() << "Failed to start thread: \"" << mName << "\" due to error: " << err.what() << LL_ENDL;
 	}
     catch (const std::bad_alloc& err)
@@ -298,35 +306,6 @@ void LLThread::start()
 LLThread::id_t LLThread::getID() const
 {
     return mThreadp ? mThreadp->get_id() : std::thread::id();
-}
-
- bool LLThread::setPriority(EThreadPriority thread_priority)
-{
-     if(!mThreadp) return false;
-#if 0
-	int thread_prio = 0;
-	switch (thread_priority)
-	{
-	case LOWEST:
-		thread_prio = THREAD_PRIORITY_LOWEST;
-		break;
-	case BELOW_NORMAL:
-		thread_prio = THREAD_PRIORITY_BELOW_NORMAL;
-		break;
-	default:
-	case NORMAL:
-		thread_prio = THREAD_PRIORITY_NORMAL;
-		break;
-	case ABOVE_NORMAL:
-		thread_prio = THREAD_PRIORITY_ABOVE_NORMAL;
-		break;
-	case HIGHEST:
-		thread_prio = THREAD_PRIORITY_HIGHEST;
-		break;
-	}
-	SetThreadPriority(mThreadp->native_handle(), thread_prio);
-#endif
-    return true;
 }
 
 //============================================================================
