@@ -498,7 +498,7 @@ void ALAvatarActions::estateTeleportHome(const uuid_vec_t& ids)
 	LLSD args;
 	args["AVATAR_NAMES"] = avatars;
 
-	LLNotificationsUtil::add((payload["avatar_ids"].size() == 1) ? "EstateTeleportHomeSingle" : "EstateTeleportHomeMulti", args, payload, handleEstateTeleportHome);
+	LLNotificationsUtil::add((payload["avatar_ids"].size() == 1) ? "EstateTeleportHomeSingle" : "EstateTeleportHomeMultiple", args, payload, handleEstateTeleportHome);
 }
 
 // static
