@@ -41,6 +41,12 @@ const S32 LLFileSystem::APPEND      = 0x00000006;  // 0x00000004 & LLFileSystem:
 
 LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode)
 {
+        // build the filename (TODO: we do this in a few places - perhaps we should factor into a single function)
+#if LL_WINDOWS
+    mFilePath = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(file_id, file_type));
+#else
+    mFilePath = LLDiskCache::metaDataToFilepath(file_id, file_type);
+#endif
     mFileType = file_type;
     mFileID = file_id;
     mPosition = 0;
@@ -52,13 +58,6 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
     // we decided to follow Henri's suggestion and move the code to update the last access time here.
     if (mode == LLFileSystem::READ)
     {
-        // build the filename (TODO: we do this in a few places - perhaps we should factor into a single function)
-#if LL_WINDOWS
-        mFilePath = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(file_id, file_type));
-#else
-        mFilePath = LLDiskCache::metaDataToFilepath(file_id, file_type);
-#endif
-
         // update the last access time for the file if it exists - this is required
         // even though we are reading and not writing because this is the
         // way the cache works - it relies on a valid "last accessed time" for
@@ -175,8 +174,6 @@ BOOL LLFileSystem::eof()
 
 BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 {
-    const std::string filename =  LLDiskCache::metaDataToFilepath(mFileID, mFileType);
-
     BOOL success = FALSE;
 
     if (mMode == APPEND)
@@ -268,7 +265,13 @@ S32 LLFileSystem::tell() const
 
 S32 LLFileSystem::getSize()
 {
-    return LLFileSystem::getFileSize(mFileID, mFileType);
+    boost::system::error_code ec;
+    S32 file_size = boost::filesystem::file_size(mFilePath, ec);
+    if(ec.failed())
+    {
+        return 0;
+    }
+    return file_size;
 }
 
 S32 LLFileSystem::getMaxSize()
@@ -294,7 +297,7 @@ BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_typ
 
 BOOL LLFileSystem::remove()
 {
-    LLFileSystem::removeFile(mFileID, mFileType);
-
+    boost::system::error_code ec;
+    boost::filesystem::remove(mFilePath, ec);
     return TRUE;
 }
