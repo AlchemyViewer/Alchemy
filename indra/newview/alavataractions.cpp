@@ -316,7 +316,7 @@ void ALAvatarActions::parcelFreeze(const uuid_vec_t& ids)
 		return;
 
 	LLSD payload;
-	payload["avatar_ids"] = LLSDArray();
+	payload["avatar_ids"] = LLSD::emptyArray();
 	std::string avatars;
 	for (auto id : ids)
 	{
