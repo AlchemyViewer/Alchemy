@@ -86,7 +86,6 @@ protected:
 	FMOD::System *mSystem;
 	bool mEnableProfiler;
 	U32 mResampleMethod;
-	std::string mAppName;
 
 public:
 	static FMOD::ChannelGroup *mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT];

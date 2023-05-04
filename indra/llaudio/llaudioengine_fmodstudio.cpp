@@ -86,12 +86,12 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 
 	if (version < FMOD_VERSION)
 	{
-		LL_WARNS("AppInit") << "Error : You are using the wrong FMOD Studio version (" << version
-			<< ")!  You should be using FMOD Studio" << FMOD_VERSION << LL_ENDL;
+        LL_WARNS("AppInit") << "FMOD Studio version mismatch, actual: " << version
+            << " expected:" << FMOD_VERSION << LL_ENDL;
 	}
 
 	// In this case, all sounds, PLUS wind and stream will be software.
-    result = mSystem->setSoftwareChannels(LL_MAX_AUDIO_CHANNELS + 2);
+    result = mSystem->setSoftwareChannels(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS);
 	Check_FMOD_Error(result,"FMOD::System::setSoftwareChannels");
 
 	FMOD_ADVANCEDSETTINGS adv_settings = { };
@@ -130,7 +130,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 		{
 			LL_DEBUGS("AppInit") << "Trying PulseAudio audio output..." << LL_ENDL;
 			if((result = mSystem->setOutput(FMOD_OUTPUTTYPE_PULSEAUDIO)) == FMOD_OK &&
-                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, const_cast<char*>(app_title.c_str()))) == FMOD_OK)
+                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS, fmod_flags, const_cast<char*>(app_title.c_str()))) == FMOD_OK)
 			{
 				LL_DEBUGS("AppInit") << "PulseAudio output initialized OKAY"	<< LL_ENDL;
 				audio_ok = true;
@@ -151,7 +151,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 		{
 			LL_DEBUGS("AppInit") << "Trying ALSA audio output..." << LL_ENDL;
 			if((result = mSystem->setOutput(FMOD_OUTPUTTYPE_ALSA)) == FMOD_OK &&
-                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, 0)) == FMOD_OK)
+                (result = mSystem->init(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS, fmod_flags, 0)) == FMOD_OK)
             {
                 LL_DEBUGS("AppInit") << "ALSA audio output initialized OKAY" << LL_ENDL;
                 audio_ok = true;
@@ -192,7 +192,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 #else // LL_LINUX
 
 	// initialize the FMOD engine
-    result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, 0);
+    result = mSystem->init(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS, fmod_flags, 0);
     if (Check_FMOD_Error(result, "Error initializing FMOD Studio with default settins, retrying with other format"))
     {
         result = mSystem->setSoftwareFormat(44100, FMOD_SPEAKERMODE_STEREO, 0/*- ignore*/);
@@ -200,7 +200,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
         {
             return false;
         }
-        result = mSystem->init(LL_MAX_AUDIO_CHANNELS + 2, fmod_flags, 0);
+        result = mSystem->init(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS, fmod_flags, 0);
     }
     if (Check_FMOD_Error(result, "Error initializing FMOD Studio"))
     {
