@@ -1382,7 +1382,7 @@ U32 LLTextureCache::openAndReadEntries(std::vector<Entry>& entries)
 
 void LLTextureCache::writeEntriesAndClose(const std::vector<Entry>& entries)
 {
-	size_t num_entries = entries.size();
+	S32 num_entries = entries.size();
 	llassert_always(num_entries == mHeaderEntriesInfo.mEntries);
 	
 	if (!mReadOnly)
