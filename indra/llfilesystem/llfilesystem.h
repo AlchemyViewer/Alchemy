@@ -66,6 +66,7 @@ class LLFileSystem
         static const S32 APPEND;
 
     protected:
+        boost::filesystem::path mFilePath;
         LLAssetType::EType mFileType;
         LLUUID  mFileID;
         S32     mPosition;

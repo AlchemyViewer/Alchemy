@@ -54,9 +54,9 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
     {
         // build the filename (TODO: we do this in a few places - perhaps we should factor into a single function)
 #if LL_WINDOWS
-        boost::filesystem::path filename(ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(file_id, file_type)));
+        mFilePath = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(file_id, file_type));
 #else
-        boost::filesystem::path filename(LLDiskCache::metaDataToFilepath(file_id, file_type));
+        mFilePath = LLDiskCache::metaDataToFilepath(file_id, file_type);
 #endif
 
         // update the last access time for the file if it exists - this is required
@@ -64,10 +64,10 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
         // way the cache works - it relies on a valid "last accessed time" for
         // each file so it knows how to remove the oldest, unused files
         boost::system::error_code ec;
-        bool exists = boost::filesystem::exists(filename, ec);
+        bool exists = boost::filesystem::exists(mFilePath, ec);
         if (exists && !ec.failed())
         {
-            LLDiskCache::updateFileAccessTime(filename);
+            LLDiskCache::updateFileAccessTime(mFilePath);
         }
     }
 }
@@ -141,9 +141,7 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
 {
     BOOL success = FALSE;
 
-    const std::string filename =  LLDiskCache::metaDataToFilepath(mFileID, mFileType);
-
-    LLFILE* file = LLFile::fopen(filename, "rb");
+    LLFILE* file = LLFile::fopen(mFilePath, TEXT("rb"));
     if (file)
     {
         if (fseek(file, mPosition, SEEK_SET) == 0)
@@ -183,7 +181,7 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
 
     if (mMode == APPEND)
     {
-        LLFILE* ofs = LLFile::fopen(filename, "a+b");
+        LLFILE* ofs = LLFile::fopen(mFilePath, TEXT("a+b"));
         if (ofs)
         {
             S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
@@ -194,7 +192,7 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
     }
     else if (mMode == READ_WRITE)
     {
-        LLFILE* ofs = LLFile::fopen(filename, "r+b");
+        LLFILE* ofs = LLFile::fopen(mFilePath, TEXT("r+b"));
         if (ofs)
         {
             if (fseek(ofs, mPosition, SEEK_SET) == 0)
@@ -207,7 +205,7 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
         }
         else
         {
-            ofs = LLFile::fopen(filename, "wb");
+            ofs = LLFile::fopen(mFilePath, TEXT("wb"));
             if (ofs)
             {
                 S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
@@ -219,7 +217,7 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
     }
     else
     {
-        LLFILE* ofs = LLFile::fopen(filename, "wb");
+        LLFILE* ofs = LLFile::fopen(mFilePath, TEXT("wb"));
         if (ofs)
         {
             S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
@@ -285,6 +283,11 @@ BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_typ
 
     mFileID = new_id;
     mFileType = new_type;
+#if LL_WINDOWS
+    mFilePath = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(mFileID, mFileType));
+#else
+    mFilePath = LLDiskCache::metaDataToFilepath(mFileID, mFileType);
+#endif
 
     return TRUE;
 }
