@@ -75,7 +75,7 @@ class ViewerManifest(LLManifest):
                 self.path("*.xml")
 
                 # include static assets
-                self.path("static_assets")
+                # self.path("static_assets")
 
                 # include the cube
                 self.path("cube.dae")

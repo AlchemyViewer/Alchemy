@@ -62,7 +62,9 @@ void LLDiskCache::createCache()
     {
         LLFile::mkdir(fmt::format("{}{}{}", sCacheDir, gDirUtilp->getDirDelimiter(), prefixchar));
     }
+#if 0
     prepopulateCacheWithStatic();
+#endif
 }
 
 // WARNING: purge() is called by LLPurgeDiskCacheThread. As such it must
@@ -118,7 +120,6 @@ void LLDiskCache::purge()
         {
             for (auto& entry : boost::make_iterator_range(dir_iter, {}))
             {
-                ec.clear();
                 if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
                 {
                     if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
@@ -156,9 +157,6 @@ void LLDiskCache::purge()
     {
         file_removed.reserve(file_info.size());
     }
-    int keep{0};
-    int del{0};
-    int skip{0};
     uintmax_t file_size_total = 0;
     for (const file_info_t& entry : file_info)
     {
@@ -170,24 +168,17 @@ void LLDiskCache::purge()
             file_removed.push_back(should_remove);
         }
 
-        std::string action = "";
         if (should_remove)
         {
-
-            action = "DELETE:";
             auto uuid_as_string = LLUUID(gDirUtilp->getBaseFileName(entry.second.second.string(), true));
             // LL_INFOS() << "checking UUID=" <<uuid_as_string<< LL_ENDL;
             if (uuid_as_string.notNull() && mSkipList.find(uuid_as_string) != mSkipList.end())
             {
                 // this is one of our protected items so no purging
-                action = "STATIC:";
-                skip++;
                 updateFileAccessTime(entry.second.second); // force these to the front of the list next time so that purge size works 
             }
             else 
             {
-                del++;    // Extra accounting to track the retention of static assets
-
                 boost::filesystem::remove(entry.second.second, ec);
                 if (ec.failed())
                 {
@@ -195,10 +186,6 @@ void LLDiskCache::purge()
                     continue;
                 }
             }
-        }
-        else
-        {
-            keep++;
         }
     }
 
@@ -228,7 +215,6 @@ void LLDiskCache::purge()
 
         LL_INFOS() << "Total dir size after purge is " << dirFileSize(sCacheDir) << LL_ENDL;
         LL_INFOS() << "Cache purge took " << execute_time << " ms to execute for " << file_info.size() << " files" << LL_ENDL;
-        LL_INFOS() << "Deleted: " << del << " Skipped: " << skip << " Kept: " << keep << LL_ENDL;
     }
 }
 
@@ -343,6 +329,7 @@ const std::string LLDiskCache::getCacheInfo()
     return llformat("%juMB / %juMB (%.1f%% used)", cache_used_mb, max_in_mb, percent_used);
 }
 
+#if 0
 // Copy static items into cache and add to the skip list that prevents their purging
 // Note that there is no de-duplication nor other validation of the list.
 void LLDiskCache::prepopulateCacheWithStatic()
@@ -391,6 +378,7 @@ void LLDiskCache::prepopulateCacheWithStatic()
         }
     }
 }
+#endif
 
 void LLDiskCache::clearCache()
 {

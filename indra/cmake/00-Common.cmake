@@ -279,3 +279,7 @@ option(ENABLE_TIMING "Enable all fast timers" ON)
 if(ENABLE_TIMING)
   add_compile_definitions(AL_ENABLE_ALL_TIMERS=1)
 endif()
+
+if(HAVOK OR HAVOK_TPV)
+  add_compile_definitions(LL_HAVOK=1)
+endif()

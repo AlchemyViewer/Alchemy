@@ -130,8 +130,10 @@ class LLDiskCache final :
          */
         void purge();
 
+#if 0
         // copy from distribution into cache to replace static content
         void prepopulateCacheWithStatic();
+#endif
 
         /**
          * Clear the cache by removing all the files in the specified cache

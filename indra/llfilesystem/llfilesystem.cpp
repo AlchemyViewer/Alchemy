@@ -53,14 +53,19 @@ LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_
     if (mode == LLFileSystem::READ)
     {
         // build the filename (TODO: we do this in a few places - perhaps we should factor into a single function)
-        const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+#if LL_WINDOWS
+        boost::filesystem::path filename(ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(file_id, file_type)));
+#else
+        boost::filesystem::path filename(LLDiskCache::metaDataToFilepath(file_id, file_type));
+#endif
 
         // update the last access time for the file if it exists - this is required
         // even though we are reading and not writing because this is the
         // way the cache works - it relies on a valid "last accessed time" for
         // each file so it knows how to remove the oldest, unused files
-        bool exists = gDirUtilp->fileExists(filename);
-        if (exists)
+        boost::system::error_code ec;
+        bool exists = boost::filesystem::exists(filename, ec);
+        if (exists && !ec.failed())
         {
             LLDiskCache::updateFileAccessTime(filename);
         }
