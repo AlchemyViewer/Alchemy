@@ -7758,10 +7758,10 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
 					   }
 				   }
 
-				   for (const auto& tex_cost_pair : textures)
+				   for (LLVOVolume::texture_cost_t::iterator iter = textures.begin(); iter != textures.end(); ++iter)
 				   {
 					   // add the cost of each individual texture in the linkset
-					   cost += tex_cost_pair.second;
+					   cost += LLVOVolume::getTextureCost(*iter);
 				   }
 
 				   textures.clear();
@@ -7779,10 +7779,10 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
 					computed_objects.insert(object->getID());
 			}
 
-			for (const auto& tex_cost_pair : textures)
+			for (LLVOVolume::texture_cost_t::iterator iter = textures.begin(); iter != textures.end(); ++iter)
 			{
 				// add the cost of each individual texture in the linkset
-				cost += tex_cost_pair.second;
+				cost += LLVOVolume::getTextureCost(*iter);
 			}
 
 			textures.clear();

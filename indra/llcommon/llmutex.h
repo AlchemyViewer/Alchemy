@@ -35,7 +35,8 @@
 
 //============================================================================
 
-#define MUTEX_DEBUG (LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO)
+//#define MUTEX_DEBUG (LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO)
+#define MUTEX_DEBUG 0 //disable mutex debugging as it's interfering with profiles
 
 #if MUTEX_DEBUG
 #include <map>

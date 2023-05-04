@@ -34,8 +34,8 @@
 #include "lllocalbitmaps.h"
 #include "m3math.h"		// LLMatrix3
 #include "m4math.h"		// LLMatrix4
-#include <map>
-#include <set>
+#include <unordered_map>
+#include <unordered_set>
 
 class LLViewerTextureAnim;
 class LLDrawPool;
@@ -147,7 +147,8 @@ public:
 	const LLMatrix4a&	getRelativeXform() const				{ return mRelativeXform; }
 	const LLMatrix4a&	getRelativeXformInvTrans() const		{ return mRelativeXformInvTrans; }
 	/*virtual*/	const LLMatrix4a&	getRenderMatrix() const override;
-				typedef std::map<LLUUID, S32> texture_cost_t;
+				typedef std::unordered_set<const LLViewerTexture*> texture_cost_t;
+                static S32 getTextureCost(const LLViewerTexture* img);
 				U32 	getRenderCost(texture_cost_t &textures) const;
     /*virtual*/	F32		getEstTrianglesMax() const override;
     /*virtual*/	F32		getEstTrianglesStreamingCost() const override;
@@ -271,6 +272,7 @@ public:
 	void setSpotLightParams(LLVector3 params);
 
 	BOOL getIsLight() const;
+    bool getIsLightFast() const;
 
 
     // Get the light color in sRGB color space NOT scaled by intensity.
@@ -319,7 +321,15 @@ public:
 	virtual BOOL isRiggedMesh() const override;
 	virtual BOOL hasLightTexture() const override;
 
-    
+    // fast variants above that use state that is filled in later
+    //  not reliable early in the life of an object, but should be used after
+    //  object is loaded
+    bool isFlexibleFast() const;
+    bool isSculptedFast() const;
+    bool isMeshFast() const;
+    bool isRiggedMeshFast() const;
+    bool isAnimatedObjectFast() const;
+
 	BOOL isVolumeGlobal() const;
 	BOOL canBeFlexible() const;
 	BOOL setIsFlexible(BOOL is_flexible);
@@ -465,6 +475,13 @@ private:
 	S32 mIndexInTex[LLRender::NUM_VOLUME_TEXTURE_CHANNELS];
 	S32 mMDCImplCount;
 
+    // cached value of getIsLight to avoid redundant map lookups
+    // accessed by getIsLightFast
+    mutable bool mIsLight = false;
+
+    // cached value of getIsAnimatedObject to avoid redundant map lookups
+    // accessed by getIsAnimatedObjectFast
+    mutable bool mIsAnimatedObject = false;
 	bool mResetDebugText;
 
 	LLPointer<LLRiggedVolume> mRiggedVolume;
@@ -480,7 +497,6 @@ public:
 
 	static LLPointer<LLObjectMediaDataClient> sObjectMediaClient;
 	static LLPointer<LLObjectMediaNavigateClient> sObjectMediaNavigateClient;
-
 protected:
 	static S32 sNumLODChanges;
 
