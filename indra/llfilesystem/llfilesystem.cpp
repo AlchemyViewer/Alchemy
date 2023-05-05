@@ -102,11 +102,16 @@ bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType fi
 bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
                               const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
 {
-    const std::string old_filename =  LLDiskCache::metaDataToFilepath(old_file_id, old_file_type);
-    const std::string new_filename =  LLDiskCache::metaDataToFilepath(new_file_id, new_file_type);
+#if LL_WINDOWS
+    const boost::filesystem::path old_filename =  ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(old_file_id, old_file_type));
+    const boost::filesystem::path new_filename =  ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(new_file_id, new_file_type));
+#else
+    const boost::filesystem::path old_filename =  LLDiskCache::metaDataToFilepath(old_file_id, old_file_type);
+    const boost::filesystem::path new_filename =  LLDiskCache::metaDataToFilepath(new_file_id, new_file_type);
+#endif
 
     // Rename needs the new file to not exist.
-    LLFileSystem::removeFile(new_file_id, new_file_type, ENOENT);
+    LLFile::remove(new_filename, ENOENT);
 
     if (LLFile::rename(old_filename, new_filename) != 0)
     {
@@ -282,15 +287,27 @@ S32 LLFileSystem::getMaxSize()
 
 BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_type)
 {
-    LLFileSystem::renameFile(mFileID, mFileType, new_id, new_type);
+#if LL_WINDOWS
+    const boost::filesystem::path new_filename = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(new_id, new_type));
+#else
+    const boost::filesystem::path new_filename = LLDiskCache::metaDataToFilepath(new_id, new_type);
+#endif
+
+    // Rename needs the new file to not exist.
+    LLFile::remove(new_filename, ENOENT);
+
+    if (LLFile::rename(mFilePath, new_filename) != 0)
+    {
+        // We would like to return FALSE here indicating the operation
+        // failed but the original code does not and doing so seems to
+        // break a lot of things so we go with the flow...
+        //return FALSE;
+        LL_WARNS() << "Failed to rename " << mFileID << " to " << new_id << " reason: "  << strerror(errno) << LL_ENDL;
+    }
 
     mFileID = new_id;
     mFileType = new_type;
-#if LL_WINDOWS
-    mFilePath = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(mFileID, mFileType));
-#else
-    mFilePath = LLDiskCache::metaDataToFilepath(mFileID, mFileType);
-#endif
+    mFilePath = new_filename;
 
     return TRUE;
 }
