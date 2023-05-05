@@ -133,7 +133,7 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
     if (DARWIN)
       # test binaries always need to be signed for local development
       set_target_properties(PROJECT_${project}_TEST_${name}
-	      PROPERTIES
+          PROPERTIES
               XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-")
     endif ()
 
