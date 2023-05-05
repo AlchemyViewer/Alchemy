@@ -107,7 +107,7 @@ class LLDiskCache final :
          * so many things had to be pushed back there to accomodate it, that I
          * decided to move it here.  Still not sure that's completely right.
          */
-        static const std::string metaDataToFilepath(const LLUUID& id,
+        static const boost::filesystem::path metaDataToFilepath(const LLUUID& id,
                                              LLAssetType::EType at);
 
         /**

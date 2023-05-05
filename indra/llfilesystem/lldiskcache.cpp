@@ -109,9 +109,9 @@ void LLDiskCache::purge()
     std::vector<file_info_t> file_info;
 
 #if LL_WINDOWS
-    std::wstring cache_path(ll_convert_string_to_wide(sCacheDir));
+    boost::filesystem::path cache_path(ll_convert_string_to_wide(sCacheDir));
 #else
-    std::string cache_path(sCacheDir);
+    boost::filesystem::path cache_path(sCacheDir);
 #endif
     if (boost::filesystem::is_directory(cache_path, ec) && !ec.failed())
     {
@@ -268,12 +268,17 @@ const std::string LLDiskCache::assetTypeToString(LLAssetType::EType at)
 }
 
 // static
-const std::string LLDiskCache::metaDataToFilepath(const LLUUID& id,
+const boost::filesystem::path LLDiskCache::metaDataToFilepath(const LLUUID& id,
         LLAssetType::EType at)
 {
     std::string uuidstr = id.asString();
     const auto& dirdelim = gDirUtilp->getDirDelimiter();
-    return fmt::format("{}{}{}{}{}{}", sCacheDir, dirdelim, std::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
+    std::string out_string = fmt::format(FMT_COMPILE("{:s}{:s}{}{}{}{}"), sCacheDir, dirdelim, std::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
+#if LL_WINDOWS
+    return boost::filesystem::path(ll_convert_string_to_wide(out_string));
+#else
+    return boost::filesystem::path(out_string);
+#endif
 }
 
 // static

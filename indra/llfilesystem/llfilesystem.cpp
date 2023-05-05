@@ -41,12 +41,8 @@ const S32 LLFileSystem::APPEND      = 0x00000006;  // 0x00000004 & LLFileSystem:
 
 LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode)
 {
-        // build the filename (TODO: we do this in a few places - perhaps we should factor into a single function)
-#if LL_WINDOWS
-    mFilePath = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(file_id, file_type));
-#else
+    // build the filename (TODO: we do this in a few places - perhaps we should factor into a single function)
     mFilePath = LLDiskCache::metaDataToFilepath(file_id, file_type);
-#endif
     mFileType = file_type;
     mFileID = file_id;
     mPosition = 0;
@@ -78,22 +74,17 @@ LLFileSystem::~LLFileSystem()
 // static
 bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
-    llstat file_stat;
-    if (LLFile::stat(filename, &file_stat) == 0)
-    {
-        return S_ISREG(file_stat.st_mode) && file_stat.st_size > 0;
-    }
-
-    return false;
+    const boost::filesystem::path filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+    boost::system::error_code ec;
+    return boost::filesystem::exists(filename, ec) && !ec.failed();
 }
 
 // static
 bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType file_type, int suppress_error /*= 0*/)
 {
-    const std::string filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+    const boost::filesystem::path filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
 
-    LLFile::remove(filename.c_str(), suppress_error);
+    LLFile::remove(filename, suppress_error);
 
     return true;
 }
@@ -102,13 +93,8 @@ bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType fi
 bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
                               const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
 {
-#if LL_WINDOWS
-    const boost::filesystem::path old_filename =  ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(old_file_id, old_file_type));
-    const boost::filesystem::path new_filename =  ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(new_file_id, new_file_type));
-#else
     const boost::filesystem::path old_filename =  LLDiskCache::metaDataToFilepath(old_file_id, old_file_type);
     const boost::filesystem::path new_filename =  LLDiskCache::metaDataToFilepath(new_file_id, new_file_type);
-#endif
 
     // Rename needs the new file to not exist.
     LLFile::remove(new_filename, ENOENT);
@@ -128,16 +114,13 @@ bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::ETyp
 // static
 S32 LLFileSystem::getFileSize(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    const std::string filename =  LLDiskCache::metaDataToFilepath(file_id, file_type);
-
-    S32 file_size = 0;
-    llstat file_stat;
-    if (LLFile::stat(filename, &file_stat) == 0)
+    const boost::filesystem::path filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+    boost::system::error_code ec;
+    S32 file_size = boost::filesystem::file_size(filename, ec);
+    if(ec.failed())
     {
-        file_size = file_stat.st_size;
+        return 0;
     }
-
-
     return file_size;
 }
 
@@ -287,11 +270,7 @@ S32 LLFileSystem::getMaxSize()
 
 BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_type)
 {
-#if LL_WINDOWS
-    const boost::filesystem::path new_filename = ll_convert_string_to_wide(LLDiskCache::metaDataToFilepath(new_id, new_type));
-#else
     const boost::filesystem::path new_filename = LLDiskCache::metaDataToFilepath(new_id, new_type);
-#endif
 
     // Rename needs the new file to not exist.
     LLFile::remove(new_filename, ENOENT);
