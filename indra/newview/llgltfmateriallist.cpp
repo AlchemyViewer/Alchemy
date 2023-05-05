@@ -225,105 +225,97 @@ public:
 
         if (!object_override.mSides.empty())
         {
-			try
-			{
-	            // fromJson() is performance heavy offload to a thread.
-	            main_queue->postTo(
-	                general_queue,
-	                [sides=object_override.mSides]() // Work done on general queue
+	        // fromJson() is performance heavy offload to a thread.
+	        main_queue->postTo(
+	            general_queue,
+	            [sides=object_override.mSides]() // Work done on general queue
+	        {
+	            std::vector<ReturnData> results;
+
+	            results.reserve(sides.size());
+	            // parse json
+	            std::unordered_map<S32, std::string>::const_iterator iter = sides.begin();
+	            std::unordered_map<S32, std::string>::const_iterator end = sides.end();
+	            while (iter != end)
 	            {
-	                std::vector<ReturnData> results;
+	                std::string warn_msg, error_msg;
 
-	                results.reserve(sides.size());
-	                // parse json
-	                std::unordered_map<S32, std::string>::const_iterator iter = sides.begin();
-	                std::unordered_map<S32, std::string>::const_iterator end = sides.end();
-	                while (iter != end)
+	                ReturnData result;
+
+	                bool success = result.mMaterial.fromJSON(iter->second, warn_msg, error_msg);
+
+	                result.mSuccess = success;
+	                result.mSide = iter->first;
+
+	                if (!success)
 	                {
-	                    std::string warn_msg, error_msg;
-
-	                    ReturnData result;
-
-	                    bool success = result.mMaterial.fromJSON(iter->second, warn_msg, error_msg);
-
-	                    result.mSuccess = success;
-	                    result.mSide = iter->first;
-
-	                    if (!success)
-	                    {
-	                        LL_WARNS("GLTF") << "failed to parse GLTF override data.  errors: " << error_msg << " | warnings: " << warn_msg << LL_ENDL;
-	                    }
-
-	                    results.push_back(result);
-	                    iter++;
+	                    LL_WARNS("GLTF") << "failed to parse GLTF override data.  errors: " << error_msg << " | warnings: " << warn_msg << LL_ENDL;
 	                }
-	                return results;
-	            },
-	            [object_id=object_override.mObjectId, this](std::vector<ReturnData> results) // Callback to main thread
+
+	                results.push_back(result);
+	                iter++;
+	            }
+	            return results;
+	        },
+	        [object_id=object_override.mObjectId, this](std::vector<ReturnData> results) // Callback to main thread
+	        {
+	            LLViewerObject * obj = gObjectList.findObject(object_id);
+
+	            if (results.size() > 0 )
 	            {
-	                LLViewerObject * obj = gObjectList.findObject(object_id);
+	                std::unordered_set<S32> side_set;
 
-	                if (results.size() > 0 )
+	                for (auto const & result : results)
 	                {
-	                    std::unordered_set<S32> side_set;
-
-	                    for (auto const & result : results)
+	                    S32 side = result.mSide;
+	                    if (result.mSuccess)
 	                    {
-	                        S32 side = result.mSide;
-	                        if (result.mSuccess)
+	                        // copy to heap here because LLTextureEntry is going to take ownership with an LLPointer
+	                        LLGLTFMaterial * material = new LLGLTFMaterial(result.mMaterial);
+
+	                        // flag this side to not be nulled out later
+	                        side_set.insert(side);
+
+	                        if (obj)
 	                        {
-	                            // copy to heap here because LLTextureEntry is going to take ownership with an LLPointer
-	                            LLGLTFMaterial * material = new LLGLTFMaterial(result.mMaterial);
-
-	                            // flag this side to not be nulled out later
-	                            side_set.insert(side);
-
-	                            if (obj)
-	                            {
-	                                obj->setTEGLTFMaterialOverride(side, material);
-	                            }
-	                        }
-
-	                        // unblock material editor
-	                        if (obj && obj->getTE(side) && obj->getTE(side)->isSelected())
-	                        {
-	                            doSelectionCallbacks(object_id, side);
+	                            obj->setTEGLTFMaterialOverride(side, material);
 	                        }
 	                    }
 
-	                    if (obj && side_set.size() != obj->getNumTEs())
-	                    { // object exists and at least one texture entry needs to have its override data nulled out
-	                        for (int i = 0; i < obj->getNumTEs(); ++i)
-	                        {
-	                            if (side_set.find(i) == side_set.end())
-	                            {
-	                                obj->setTEGLTFMaterialOverride(i, nullptr);
-	                                if (obj->getTE(i) && obj->getTE(i)->isSelected())
-	                                {
-	                                    doSelectionCallbacks(object_id, i);
-	                                }
-	                            }
-	                        }
+	                    // unblock material editor
+	                    if (obj && obj->getTE(side) && obj->getTE(side)->isSelected())
+	                    {
+	                        doSelectionCallbacks(object_id, side);
 	                    }
 	                }
-	                else if (obj)
-	                { // override list was empty or an error occurred, null out all overrides for this object
+
+	                if (obj && side_set.size() != obj->getNumTEs())
+	                { // object exists and at least one texture entry needs to have its override data nulled out
 	                    for (int i = 0; i < obj->getNumTEs(); ++i)
 	                    {
-	                        obj->setTEGLTFMaterialOverride(i, nullptr);
-	                        if (obj->getTE(i) && obj->getTE(i)->isSelected())
+	                        if (side_set.find(i) == side_set.end())
 	                        {
-	                            doSelectionCallbacks(obj->getID(), i);
+	                            obj->setTEGLTFMaterialOverride(i, nullptr);
+	                            if (obj->getTE(i) && obj->getTE(i)->isSelected())
+	                            {
+	                                doSelectionCallbacks(object_id, i);
+	                            }
 	                        }
 	                    }
 	                }
-	            });
-			}
-			catch (const LLThreadSafeQueueInterrupt&)
-			{
-				// Shutdown
-				LL_WARNS() << "Tried to start decoding on shutdown" << LL_ENDL;
-			}
+	            }
+	            else if (obj)
+	            { // override list was empty or an error occurred, null out all overrides for this object
+	                for (int i = 0; i < obj->getNumTEs(); ++i)
+	                {
+	                    obj->setTEGLTFMaterialOverride(i, nullptr);
+	                    if (obj->getTE(i) && obj->getTE(i)->isSelected())
+	                    {
+	                        doSelectionCallbacks(obj->getID(), i);
+	                    }
+	                }
+	            }
+	        });
         }
     }
 
