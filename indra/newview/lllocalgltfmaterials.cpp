@@ -139,12 +139,17 @@ bool LLLocalGLTFMaterial::updateSelf()
         if (gDirUtilp->fileExists(mFilename))
         {
             // verifying that the file has indeed been modified
-
+            boost::system::error_code ec;
 #ifndef LL_WINDOWS
-            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(mFilename));
+            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(mFilename), ec);
 #else
-            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(ll_convert_string_to_wide(mFilename)));
+            const std::time_t temp_time = boost::filesystem::last_write_time(boost::filesystem::path(ll_convert_string_to_wide(mFilename)), ec);
 #endif
+			if (ec.failed())
+			{
+				LL_WARNS() << "Failed to get last write time for filesystem path " << mFilename << " : " << ec.message() << LL_ENDL;
+				return false;
+			}
             LLSD new_last_modified = asctime(localtime(&temp_time));
 
             if (mLastModified.asString() != new_last_modified.asString())
