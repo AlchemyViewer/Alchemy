@@ -93,22 +93,8 @@ bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType fi
 bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::EType old_file_type,
                               const LLUUID& new_file_id, const LLAssetType::EType new_file_type)
 {
-    const boost::filesystem::path old_filename =  LLDiskCache::metaDataToFilepath(old_file_id, old_file_type);
-    const boost::filesystem::path new_filename =  LLDiskCache::metaDataToFilepath(new_file_id, new_file_type);
-
-    // Rename needs the new file to not exist.
-    LLFile::remove(new_filename, ENOENT);
-
-    if (LLFile::rename(old_filename, new_filename) != 0)
-    {
-        // We would like to return FALSE here indicating the operation
-        // failed but the original code does not and doing so seems to
-        // break a lot of things so we go with the flow...
-        //return FALSE;
-        LL_WARNS() << "Failed to rename " << old_file_id << " to " << new_file_id << " reason: "  << strerror(errno) << LL_ENDL;
-    }
-
-    return TRUE;
+    LLFileSystem old_file(old_file_id, old_file_type);
+    return old_file.rename(new_file_id, new_file_type);
 }
 
 // static
@@ -273,15 +259,22 @@ BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_typ
     const boost::filesystem::path new_filename = LLDiskCache::metaDataToFilepath(new_id, new_type);
 
     // Rename needs the new file to not exist.
-    LLFile::remove(new_filename, ENOENT);
+    boost::system::error_code ec;
+    boost::filesystem::remove(new_filename, ec);
+    if(ec.failed())
+    {
+        //LL_WARNS() << "Failed to remove existing file " << new_filename << " reason: " << ec.what() << LL_ENDL;
+        ec.clear();
+    }
 
-    if (LLFile::rename(mFilePath, new_filename) != 0)
+    boost::filesystem::rename(mFilePath, new_filename, ec);
+    if (ec.failed())
     {
         // We would like to return FALSE here indicating the operation
         // failed but the original code does not and doing so seems to
         // break a lot of things so we go with the flow...
         //return FALSE;
-        LL_WARNS() << "Failed to rename " << mFileID << " to " << new_id << " reason: "  << strerror(errno) << LL_ENDL;
+        LL_WARNS() << "Failed to rename " << mFileID << " to " << new_id << " reason: "  << ec.what() << LL_ENDL;
     }
 
     mFileID = new_id;

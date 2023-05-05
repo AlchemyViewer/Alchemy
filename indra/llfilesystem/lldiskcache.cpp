@@ -170,6 +170,7 @@ void LLDiskCache::purge()
 
         if (should_remove)
         {
+#if 0
             auto uuid_as_string = LLUUID(gDirUtilp->getBaseFileName(entry.second.second.string(), true));
             // LL_INFOS() << "checking UUID=" <<uuid_as_string<< LL_ENDL;
             if (uuid_as_string.notNull() && mSkipList.find(uuid_as_string) != mSkipList.end())
@@ -178,6 +179,7 @@ void LLDiskCache::purge()
                 updateFileAccessTime(entry.second.second); // force these to the front of the list next time so that purge size works 
             }
             else 
+#endif
             {
                 boost::filesystem::remove(entry.second.second, ec);
                 if (ec.failed())
