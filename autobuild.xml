@@ -22,11 +22,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>36374fef337e1872a6577b67d87acd7be85c8dfc622df98d231a28210c88230ed8bc655f2f31b606de631cf1c50aff2c788e39af149b24bfd56fa706d12aed11</string>
+              <string>c3ae3dd66d9b93e4a090e88edf7baa686a82ca1b9f1adacee79964ce871613d02283dcfe17188c55baffc07ac4a553ca512550a4f29851d806e1a096ba02c7dd</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.26.1.1721/SDL2-2.26.1-darwin64-1721.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.26.5.1999/SDL2-2.26.5-darwin64-1999.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -36,11 +36,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9372564b07f4dbc8080bbffcf33b69fa23a5a9f38191c47bc3850981f06585b9cb1c23744b4dc706dd50d874a78106eacbc8ede0fca76c850d7fc234d146b66a</string>
+              <string>72b988c7ad48a7089a64310824aa2366d4780cea3e0808432bcc4f0cb2b951e06baf4f77962ba86923c71c450246bc243b99b25bf64e9b6611023ce4df98edd5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.26.1.1721/SDL2-2.26.1-linux64-1721.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.26.5.1999/SDL2-2.26.5-linux64-1999.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -50,18 +50,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>025efb0ef5fae5cfa726c365c7412f3f0b149f659950febf49f48c54b7eae3a909dd0e9b4cb4b5ca4a0c7120bfafd19e79a096b046bce2ba39416a1b2c12ec69</string>
+              <string>c6d8f7bc5ccd140652c90ce407f702323cc743716570d6ec35ce05ea1904edd4d391522fd6d7855e9f0ddfb00f10af89b6da0d64836751aca6a13c420861b2ea</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.26.1.1721/SDL2-2.26.1-windows64-1721.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.26.5.1999/SDL2-2.26.5-windows64-1999.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.26.1</string>
+        <string>2.26.5</string>
       </map>
       <key>apr_suite</key>
       <map>
@@ -1748,11 +1748,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8ff3cf136f90286d7a67d0da624429003cb7220c0d607aabb7866747cb8d6c5e067ebc178d96e739d6a528b4fe3d6028ef1b804db3abee1518c7a6c73cdbb61a</string>
+              <string>936cad88da896405c2a750be46d71992374200166573761d4b6b36dc753bc73411f00bb4ec916e9ae2b82a977683320cd89acbca4da227a726948f7ff65ac993</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev/0.13.0.1723/open_libndofdev-0.13.0-linux64-1723.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev/0.13.0.2000/open_libndofdev-0.13.0-linux64-2000.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
