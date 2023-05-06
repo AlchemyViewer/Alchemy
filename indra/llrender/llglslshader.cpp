@@ -454,6 +454,7 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString>* attributes,
         else
         {
             success = FALSE;
+            break;
         }
     }
 
@@ -471,7 +472,7 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString>* attributes,
     }
 
 #ifdef GL_INTERLEAVED_ATTRIBS
-    if (varying_count > 0 && varyings)
+    if (success && varying_count > 0 && varyings)
     {
         glTransformFeedbackVaryings((GLuint64)mProgramObject, varying_count, varyings, GL_INTERLEAVED_ATTRIBS);
     }
@@ -496,6 +497,11 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString>* attributes,
             LL_SHADER_LOADING_WARNS() << "Failed to link using shader level " << mShaderLevel << " trying again using shader level " << (mShaderLevel - 1) << LL_ENDL;
             mShaderLevel--;
             return createShader(attributes, uniforms);
+        }
+        else
+        {
+            // Give up and unload shader.
+            unloadInternal();
         }
     }
     else if (mFeatures.mIndexedTextureChannels > 0)

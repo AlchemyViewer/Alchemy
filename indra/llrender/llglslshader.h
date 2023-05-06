@@ -276,6 +276,8 @@ public:
     //helper to conditionally bind mRiggedVariant instead of this
     void bind(bool rigged);
     
+    bool isComplete() const { return mProgramObject != 0; }
+
     // Unbinds any previously bound shader by explicitly binding no shader.
     static void unbind();
 

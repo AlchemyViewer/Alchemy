@@ -312,7 +312,7 @@ void ALRenderUtil::refreshState()
 bool ALRenderUtil::setupTonemap()
 {
 	mTonemapType = gSavedSettings.getU32("RenderToneMapType");
-	if (mTonemapType >= TONEMAP_COUNT || (mTonemapType == ALTonemap::TONEMAP_AMD && gGLManager.mGLVersion < 4.20f))
+	if (mTonemapType >= TONEMAP_COUNT || (mTonemapType == ALTonemap::TONEMAP_AMD && (gGLManager.mGLVersion < 4.20f || !gDeferredPostTonemapLPMProgram.isComplete())))
 	{
 		mTonemapType = ALTonemap::TONEMAP_ACES_HILL;
 	}
@@ -696,7 +696,9 @@ bool ALRenderUtil::setupSharpen()
 	if (LLPipeline::sRenderDeferred)
 	{
 		mSharpenMethod = gSavedSettings.getU32("RenderSharpenMethod");
-		if (mSharpenMethod >= SHARPEN_COUNT || (mSharpenMethod == ALSharpen::SHARPEN_CAS && gGLManager.mGLVersion < 4.2f))
+		if (mSharpenMethod >= SHARPEN_COUNT 
+			|| (mSharpenMethod == ALSharpen::SHARPEN_CAS && (gGLManager.mGLVersion < 4.2f || !gDeferredPostCASProgram.isComplete())) 
+			|| (mSharpenMethod == ALSharpen::SHARPEN_DLS && !gDeferredPostDLSProgram.isComplete()))
 		{
 			mSharpenMethod = ALSharpen::SHARPEN_NONE;
 		}
