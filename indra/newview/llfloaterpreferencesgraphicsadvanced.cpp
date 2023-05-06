@@ -309,14 +309,6 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
         shadows_text->setEnabled(FALSE);
     }
 
-    // disabled reflections
-    if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderReflectionDetail"))
-    {
-        ctrl_reflections->setEnabled(FALSE);
-        ctrl_reflections->setValue(FALSE);
-        reflections_text->setEnabled(FALSE);
-    }
-
     // disabled av
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderAvatarVP"))
     {
