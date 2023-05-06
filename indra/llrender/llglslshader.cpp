@@ -95,7 +95,6 @@ LLShaderFeatures::LLShaderFeatures()
     , hasAtmospherics(false)
     , hasGamma(false)
     , hasSrgb(false)
-    , hasLPM(false)
     , encodesNormal(false)
     , isDeferred(false)
     , hasScreenSpaceReflections(false)
@@ -461,6 +460,7 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString>* attributes,
     // Attach existing objects
     if (!LLShaderMgr::instance()->attachShaderFeatures(this))
     {
+        unloadInternal();
         return FALSE;
     }
 

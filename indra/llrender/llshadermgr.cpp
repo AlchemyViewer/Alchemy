@@ -247,14 +247,6 @@ BOOL LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 		}
 	}
 
-	if (features->hasLPM && gGLManager.mGLVersion >= 4.19f)
-	{
-        if (!shader->attachFragmentObject("alchemy/LPMUtil.glsl"))
-		{
-			return FALSE;
-		}
-	}
-
 	if (features->hasGamma || features->isDeferred)
 	{
         if (!shader->attachFragmentObject("windlight/gammaF.glsl"))
@@ -953,24 +945,39 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 	if (error != GL_NO_ERROR)
 	{
 		LL_WARNS("ShaderLoading") << "GL ERROR in glCreateShader: " << error << " for file: " << open_file_name << LL_ENDL;
+		if (ret)
+		{
+			glDeleteShader(ret); //no longer need handle
+			ret = 0;
+		}
 	}
 
 	//load source
-	glShaderSource(ret, shader_code_count, (const GLchar**) shader_code_text, NULL);
-
-	error = glGetError();
-	if (error != GL_NO_ERROR)
+	if (ret)
 	{
-		LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSource: " << error << " for file: " << open_file_name << LL_ENDL;
+		glShaderSource(ret, shader_code_count, (const GLchar**)shader_code_text, NULL);
+
+		error = glGetError();
+		if (error != GL_NO_ERROR)
+		{
+			LL_WARNS("ShaderLoading") << "GL ERROR in glShaderSource: " << error << " for file: " << open_file_name << LL_ENDL;
+			glDeleteShader(ret); //no longer need handle
+			ret = 0;
+		}
 	}
 
 	//compile source
-	glCompileShader(ret);
-
-	error = glGetError();
-	if (error != GL_NO_ERROR)
+	if (ret)
 	{
-		LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShader: " << error << " for file: " << open_file_name << LL_ENDL;
+		glCompileShader(ret);
+
+		error = glGetError();
+		if (error != GL_NO_ERROR)
+		{
+			LL_WARNS("ShaderLoading") << "GL ERROR in glCompileShader: " << error << " for file: " << open_file_name << LL_ENDL;
+			glDeleteShader(ret); //no longer need handle
+			ret = 0;
+		}
 	}
 
 	if (error == GL_NO_ERROR)
@@ -986,12 +993,9 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 			LL_WARNS("ShaderLoading") << "GLSL Compilation Error:" << LL_ENDL;
 			dumpObjectLog(ret, TRUE, open_file_name);
 			dumpShaderSource(shader_code_count, shader_code_text);
+			glDeleteShader(ret); //no longer need handle
 			ret = 0;
 		}
-	}
-	else
-	{
-		ret = 0;
 	}
 	stop_glerror();
 

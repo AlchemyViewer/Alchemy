@@ -51,7 +51,6 @@ public:
     bool hasShadows;
     bool hasAmbientOcclusion;
     bool hasSrgb;
-    bool hasLPM;
     bool encodesNormal; // include: shaders\class1\environment\encodeNormF.glsl
     bool isDeferred;
     bool hasScreenSpaceReflections;

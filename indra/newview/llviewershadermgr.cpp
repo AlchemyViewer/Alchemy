@@ -760,10 +760,6 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/deferredUtil.glsl",                    1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/shadowUtil.glsl",                      1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/aoUtil.glsl",                          1) );
-	if(gGLManager.mGLVersion >= 4.19f)
-	{
-		index_channels.push_back(-1);    shaders.push_back( make_pair( "alchemy/LPMUtil.glsl",                    1) );
-	}
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/reflectionProbeF.glsl",                has_reflection_probes ? 3 : 2) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "deferred/screenSpaceReflUtil.glsl",             ssr ? 3 : 1) );
 	index_channels.push_back(-1);    shaders.push_back( make_pair( "lighting/lightNonIndexedF.glsl",                    mShaderLevel[SHADER_LIGHTING] ) );
@@ -2971,10 +2967,10 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	{
 		gDeferredPostTonemapLPMProgram.mName = "Tonemapping Shader LPM";
 		gDeferredPostTonemapLPMProgram.mFeatures.hasSrgb = true;
-		gDeferredPostTonemapLPMProgram.mFeatures.hasLPM = true;
 		gDeferredPostTonemapLPMProgram.mShaderFiles.clear();
 		gDeferredPostTonemapLPMProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
 		gDeferredPostTonemapLPMProgram.mShaderFiles.push_back(make_pair("alchemy/toneMapF.glsl", GL_FRAGMENT_SHADER));
+		gDeferredPostTonemapLPMProgram.mShaderFiles.push_back(make_pair("alchemy/LPMUtil.glsl", GL_FRAGMENT_SHADER));
 		gDeferredPostTonemapLPMProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 		gDeferredPostTonemapLPMProgram.clearPermutations();
 		gDeferredPostTonemapLPMProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_AMD));
