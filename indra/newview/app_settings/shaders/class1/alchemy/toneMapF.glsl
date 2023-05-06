@@ -141,9 +141,11 @@ void main()
 {
     vec4 diff = texture(diffuseRect, vary_fragcoord);
  
+#if TONEMAP_METHOD != 0 
     float exp_scale = texture(exposureMap, vec2(0.5,0.5)).r;
     diff.rgb *= exposure * exp_scale;
-    
+#endif
+
 #if TONEMAP_METHOD == 0 // NO_POST
     diff.rgb *= 0.6;
 #elif TONEMAP_METHOD == 1 // Aces Hill method
