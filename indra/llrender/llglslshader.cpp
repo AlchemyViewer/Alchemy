@@ -754,7 +754,6 @@ void LLGLSLShader::mapUniform(GLint index, const vector<LLStaticHashedString>* u
         }
 
         LLStaticHashedString hashedName(name);
-        mUniformNameMap[location] = name;
         mUniformMap[hashedName] = location;
 
         LL_DEBUGS("ShaderUniform") << "Uniform " << name << " is at location " << location << LL_ENDL;
@@ -855,7 +854,6 @@ BOOL LLGLSLShader::mapUniforms(const vector<LLStaticHashedString>* uniforms)
     mActiveTextureChannels = 0;
     mUniform.clear();
     mUniformMap.clear();
-    mUniformNameMap.clear();
     mTexture.clear();
     mValue.clear();
     //initialize arrays

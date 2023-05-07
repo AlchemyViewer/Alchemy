@@ -300,9 +300,7 @@ public:
     U32 mAttributeMask;  //mask of which reserved attributes are set (lines up with LLVertexBuffer::getTypeMask())
     std::vector<GLint> mUniform;   //lookup table of uniform enum to uniform location
     LLStaticStringTable<GLint> mUniformMap; //lookup map of uniform name to uniform location
-    typedef boost::unordered_map<GLint, std::string> uniform_name_map_t;
     typedef boost::unordered_flat_map<GLint, LLVector4> uniform_value_map_t;
-    uniform_name_map_t mUniformNameMap; //lookup map of uniform location to uniform name
     uniform_value_map_t mValue; //lookup map of uniform location to last known value
     std::vector<GLint> mTexture;
     S32 mTotalUniformSize;
