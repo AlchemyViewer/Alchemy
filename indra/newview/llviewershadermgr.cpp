@@ -2631,13 +2631,13 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
                 gFXAAProgram[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
                 gFXAAProgram[i].addPermutation("FXAA_QUALITY__PRESET", smaa_pair.first);
                 success = gFXAAProgram[i].createShader(NULL, NULL);
-                gFXAAProgram[i].removePermutation("FXAA_QUALITY__PRESET");
                 llassert(success);
             }
             ++i;
         }
     }
 
+#if 0
 	if (success && gGLManager.mGLVersion > 3.9f)
     {
         std::vector<std::pair<std::string, std::string>> smaa_preset_pair = {{"SMAA_PRESET_LOW", "Low"},
@@ -2676,7 +2676,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
                     gPostSMAAEdgeDetect[i].uniform1i(sTex0, 0);
                     gPostSMAAEdgeDetect[i].uniform1i(sTex1, 1);
                 }
-                gPostSMAAEdgeDetect[i].removePermutations(defines);
             }
 
             if (success)
@@ -2698,7 +2697,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
                     gPostSMAABlendWeights[i].uniform1i(sTex1, 1);
                     gPostSMAABlendWeights[i].uniform1i(sTex2, 2);
                 }
-                gPostSMAABlendWeights[i].removePermutations(defines);
             }
 
             if (success)
@@ -2720,11 +2718,11 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
                     gPostSMAANeighborhoodBlend[i].uniform1i(sTex1, 1);
                     gPostSMAANeighborhoodBlend[i].uniform1i(sTex2, 2);
                 }
-                gPostSMAANeighborhoodBlend[i].removePermutations(defines);
             }
             ++i;
         }
     }
+#endif
 
 	if (success)
 	{
