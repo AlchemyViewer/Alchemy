@@ -4356,19 +4356,18 @@ bool LLAppViewer::initCache()
         
         if (mPurgeCache)
 		{
-		LLSplashScreen::update(LLTrans::getString("StartupClearingCache"));
-		purgeCache();
+			LLSplashScreen::update(LLTrans::getString("StartupClearingCache"));
+			purgeCache();
 
 			// clear the new C++ file system based cache
 			LLDiskCache::getInstance()->clearCache();
 	}
 		else
 		{
-			// purge excessive files from the new file system based cache
-			LLDiskCache::getInstance()->purge();
+			// purge excessive files from the new file system based cache in background thread
+			LLAppViewer::getPurgeDiskCacheThread()->start();
 		}
 	}
-	LLAppViewer::getPurgeDiskCacheThread()->start();
 
     {
         std::random_device rnddev;
