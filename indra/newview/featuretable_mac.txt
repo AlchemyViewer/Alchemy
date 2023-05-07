@@ -28,7 +28,6 @@ version 51
 //
 list all
 RenderAnisotropicLevel			1	16
-RenderAvatarCloth			0	0
 RenderAvatarLODFactor		1	1.0
 RenderAvatarPhysicsLODFactor 1	1.0
 RenderAvatarMaxNonImpostors 1   16
