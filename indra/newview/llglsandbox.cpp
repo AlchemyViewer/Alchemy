@@ -1074,7 +1074,7 @@ F32 gpu_benchmark()
 	{
 		LLViewerShaderMgr::instance()->initAttribsAndUniforms();
 
-		gBenchmarkProgram.mName = "Benchmark Shader";
+		gBenchmarkProgram.mName = "Benchmark Shader Local";
 		gBenchmarkProgram.mFeatures.attachNothing = true;
 		gBenchmarkProgram.mShaderFiles.clear();
 		gBenchmarkProgram.mShaderFiles.push_back(std::make_pair("interface/benchmarkV.glsl", GL_VERTEX_SHADER));
@@ -1266,6 +1266,8 @@ F32 gpu_benchmark()
 	gbps = samples_sec*4;  // 4 bytes per sample
 
 	LL_INFOS("Benchmark") << "Memory bandwidth is " << llformat("%.3f", gbps) << " GB/sec according to ARB_timer_query, total time " << seconds << " seconds" << LL_ENDL;
+
+	gBenchmarkProgram.unload();
 
 	return gbps;
 }

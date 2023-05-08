@@ -848,8 +848,8 @@ BOOL LLViewerShaderMgr::loadShadersWater()
 		gWaterEdgeProgram.mShaderFiles.clear();
 		gWaterEdgeProgram.mShaderFiles.push_back(make_pair("environment/waterV.glsl", GL_VERTEX_SHADER));
 		gWaterEdgeProgram.mShaderFiles.push_back(make_pair("environment/waterF.glsl", GL_FRAGMENT_SHADER));
-		gWaterEdgeProgram.addPermutation("WATER_EDGE", "1");
         gWaterEdgeProgram.clearPermutations();
+		gWaterEdgeProgram.addPermutation("WATER_EDGE", "1");
         if (LLPipeline::sRenderTransparentWater)
         {
             gWaterEdgeProgram.addPermutation("TRANSPARENT_WATER", "1");
@@ -1143,7 +1143,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
     
 	if (success)
 	{
-		gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.mName = "Deferred Diffuse Non-Indexed Alpha Mask Shader";
+		gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.mName = "Deferred Diffuse Non-Indexed Alpha Mask No Color Shader";
 		gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.mFeatures.encodesNormal = true;
 		gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.mShaderFiles.clear();
 		gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.mShaderFiles.push_back(make_pair("deferred/diffuseNoColorV.glsl", GL_VERTEX_SHADER));
@@ -2167,7 +2167,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        gHUDFullbrightShinyProgram.mName = "Deferred FullbrightShiny Shader";
+        gHUDFullbrightShinyProgram.mName = "HUD FullbrightShiny Shader";
         gHUDFullbrightShinyProgram.mFeatures.calculatesAtmospherics = true;
         gHUDFullbrightShinyProgram.mFeatures.hasAtmospherics = true;
         gHUDFullbrightShinyProgram.mFeatures.hasGamma = true;
@@ -2478,7 +2478,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
 	if (success)
 	{
-		gDeferredAvatarProgram.mName = "Avatar Shader";
+		gDeferredAvatarProgram.mName = "Deferred Avatar Shader";
 		gDeferredAvatarProgram.mFeatures.hasSkinning = true;
 		gDeferredAvatarProgram.mFeatures.encodesNormal = true;
 		gDeferredAvatarProgram.mShaderFiles.clear();
@@ -2762,7 +2762,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
 	if (success)
 	{
-		gDeferredPostNoDoFProgram.mName = "Deferred Post Shader";
+		gDeferredPostNoDoFProgram.mName = "Deferred Post NoDoF Shader";
 		gDeferredPostNoDoFProgram.mFeatures.isDeferred = true;
 		gDeferredPostNoDoFProgram.mShaderFiles.clear();
 		gDeferredPostNoDoFProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
@@ -3579,7 +3579,7 @@ BOOL LLViewerShaderMgr::loadShadersInterface()
 
     if (success)
     {
-        gGaussianProgram.mName = "Reflection Mip Shader";
+        gGaussianProgram.mName = "Gaussian Shader";
         gGaussianProgram.mFeatures.isDeferred = true;
         gGaussianProgram.mFeatures.hasGamma = true;
         gGaussianProgram.mFeatures.hasAtmospherics = true;
