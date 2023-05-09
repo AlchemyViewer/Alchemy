@@ -2383,17 +2383,8 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
     ASSERT_WINDOW_THREAD();
     LL_PROFILE_ZONE_SCOPED_CATEGORY_WIN32;
 
-#ifdef SHOW_DEBUG
-    LL_DEBUGS("Window") << "mainWindowProc(" << std::hex << h_wnd
-                        << ", " << u_msg
-                        << ", " << w_param << ")" << std::dec << LL_ENDL;
-#endif
-
     if (u_msg == WM_POST_FUNCTION_)
     {
-#ifdef SHOW_DEBUG
-        LL_DEBUGS("Window") << "WM_POST_FUNCTION_" << LL_ENDL;
-#endif
         // from LLWindowWin32Thread::Post()
         // Cast l_param back to the pointer to the heap FuncType
         // allocated by Post(). Capture in unique_ptr so we'll delete
@@ -2616,9 +2607,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
                     window_imp->mRawWParam = w_param;
                     window_imp->mRawLParam = l_param;
 
-                    {
-                        gKeyboard->handleKeyDown(w_param, mask);
-                    }
+                    gKeyboard->handleKeyDown(w_param, mask);
                 });
             if (eat_keystroke) return 0;    // skip DefWindowProc() handling if we're consuming the keypress 
             break;
@@ -2638,6 +2627,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
                 window_imp->mRawLParam = l_param;
 
                 {
+                    LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_KEYUP");
                     gKeyboard->handleKeyUp(w_param, mask);
                 }
             });
@@ -2714,7 +2704,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
                     // it is worth trying.  The good old WM_CHAR works just fine even for supplementary
                     // characters.  We just need to take care of surrogate pairs sent as two WM_CHAR's
                     // by ourselves.  It is not that tough.  -- Alissa Sabre @ SL
-
+                    
                     // Even if LLWindowCallbacks::handleUnicodeChar(llwchar, BOOL) returned FALSE,
                     // we *did* processed the event, so I believe we should not pass it to DefWindowProc...
                     window_imp->handleUnicodeUTF16((U16)w_param, gKeyboard->currentMask(FALSE));
@@ -3029,7 +3019,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_SIZE");
             window_imp->updateWindowRect();
-
 			// There's an odd behavior with WM_SIZE that I would call a bug. If 
             // the window is maximized, and you call MoveWindow() with a size smaller
             // than a maximized window, it ends up sending WM_SIZE with w_param set 
@@ -3221,6 +3210,7 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         default:
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - default");
+            LL_DEBUGS("Window") << "Unhandled windows message code: 0x" << std::hex << U32(u_msg) << LL_ENDL;
         }
         break;
         }

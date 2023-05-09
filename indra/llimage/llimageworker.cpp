@@ -97,7 +97,7 @@ LLImageDecodeThread::handle_t LLImageDecodeThread::decodeImage(
 		// Instantiate the ImageRequest right in the lambda, why not?
 		mThreadPool->getQueue().post(
 			[req = ImageRequest(image, discard, needs_aux, responder)]
-		() mutable
+			() mutable
 			{
 				auto done = req.processRequest();
 				req.finishRequest(done);
