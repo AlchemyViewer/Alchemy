@@ -1087,9 +1087,9 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
 {
 	LL_INFOS() << "Initializing shader cache" << LL_ENDL;
 
-	mShaderCacheEnabled = enabled;
+	mShaderCacheEnabled = gGLManager.mGLVersion >= 4.09 && enabled;
 
-	if(mShaderCacheInitialized)
+	if(!mShaderCacheEnabled || mShaderCacheInitialized)
 		return;
 
 	mShaderCacheInitialized = true;
@@ -1157,6 +1157,8 @@ void LLShaderMgr::persistShaderCacheMetadata()
 bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
 {
 	if(!mShaderCacheEnabled) return false;
+
+	glProgramParameteri(shader->mProgramObject, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
 
 	auto binary_iter = mShaderBinaryCache.find(shader->mShaderHash);
 	if (binary_iter != mShaderBinaryCache.end())

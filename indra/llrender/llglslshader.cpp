@@ -442,8 +442,6 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString>* attributes,
         return FALSE;
     }
 
-    glProgramParameteri(mProgramObject, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
-
     BOOL success = TRUE;
 
     mUsingBinaryProgram =  LLShaderMgr::instance()->loadCachedProgramBinary(this);
