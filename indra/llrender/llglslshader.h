@@ -276,6 +276,8 @@ public:
     
     bool isComplete() const { return mProgramObject != 0; }
 
+    LLUUID hash();
+
     // Unbinds any previously bound shader by explicitly binding no shader.
     static void unbind();
 
@@ -311,6 +313,8 @@ public:
     std::string mName;
     typedef std::map<std::string, std::string> defines_map_t;
     defines_map_t mDefines;
+    LLUUID mShaderHash;
+    bool mUsingBinaryProgram = false;
 
     //statistics for profiling shader performance
     bool mProfilePending = false;

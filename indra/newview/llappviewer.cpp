@@ -597,7 +597,7 @@ static void settings_modify()
     LLRenderTarget::sUseFBO             = LLPipeline::sRenderDeferred;
     LLVOSurfacePatch::sLODFactor        = gSavedSettings.getF32("RenderTerrainLODFactor");
     LLVOSurfacePatch::sLODFactor *= LLVOSurfacePatch::sLODFactor; //square lod factor to get exponential range of [1,4]
-    gDebugGL       = gDebugGLSession || gDebugSession;
+    gDebugGL       = TRUE; //gDebugGLSession || gDebugSession;
     gDebugPipeline = gSavedSettings.getBOOL("RenderDebugPipeline");
 }
 
@@ -2726,7 +2726,7 @@ bool LLAppViewer::initConfiguration()
 		ll_init_fail_log(gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "test_failures.log"));
 	}
 
-    if (gSavedSettings.getBOOL("RenderDebugGLSession"))
+    //if (gSavedSettings.getBOOL("RenderDebugGLSession"))
     {
         gDebugGLSession = TRUE;
         gDebugGL = TRUE;

@@ -29,6 +29,8 @@
 #include "llrender.h"
 #include "llfile.h"
 #include "lldir.h"
+#include "llsdserialize.h"
+#include "hbxxh.h"
 
 // Lots of STL stuff in here, using namespace std to keep things more readable
 using std::vector;
@@ -1079,6 +1081,137 @@ BOOL LLShaderMgr::validateProgramObject(GLuint obj)
 	}
 
 	return success;
+}
+
+void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version, const LLUUID& current_cache_version)
+{
+	LL_INFOS() << "Initializing shader cache" << LL_ENDL;
+
+	mShaderCacheEnabled = enabled;
+
+	if(mShaderCacheInitialized)
+		return;
+
+	mShaderCacheInitialized = true;
+
+	std::string shader_cache_dir = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache");
+	LLFile::mkdir(shader_cache_dir);
+
+	{
+		std::string meta_out_path = gDirUtilp->add(shader_cache_dir, "shaderdata.llsd");
+		if (gDirUtilp->fileExists(meta_out_path))
+		{
+			LL_INFOS() << "Loading shader metadata" << LL_ENDL;
+
+			llifstream instream(meta_out_path);
+			LLSD in_data;
+			LLSDSerialize::fromNotation(in_data, instream, LLSDSerialize::SIZE_UNLIMITED);
+			instream.close();
+
+			if (old_cache_version == current_cache_version)
+			{
+				for (const auto& stuff_pair : in_data.map())
+				{
+					ProgramBinaryData binary_info;
+					binary_info.mBinaryFormat = stuff_pair.second["binary_format"].asInteger();
+					binary_info.mBinaryLength = stuff_pair.second["binary_size"].asInteger();
+					mShaderBinaryCache.emplace(stuff_pair.first, binary_info);
+				}
+			}
+			else
+			{
+				clearShaderCache();
+			}
+		}
+	}
+}
+
+void LLShaderMgr::clearShaderCache()
+{
+	std::string shader_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache");
+	LL_INFOS() << "Removing shader cache at " << shader_cache << LL_ENDL;
+	const std::string mask = "*";
+	gDirUtilp->deleteFilesInDir(shader_cache, mask);
+	mShaderBinaryCache.clear();
+}
+
+void LLShaderMgr::persistShaderCacheMetadata()
+{
+	if(!mShaderCacheEnabled) return;
+
+	LLSD out = LLSD::emptyMap();
+	for (const auto& stuff_pair : LLShaderMgr::instance()->mShaderBinaryCache)
+	{
+		LLSD datastuff = LLSD::emptyMap();
+		datastuff["binary_format"] = LLSD::Integer(stuff_pair.second.mBinaryFormat);
+		datastuff["binary_size"] = LLSD::Integer(stuff_pair.second.mBinaryLength);
+		out[stuff_pair.first.asString()] = datastuff;
+	}
+
+	std::string meta_out_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache", "shaderdata.llsd");
+	llofstream outstream(meta_out_path);
+	LLSDSerialize::toNotation(out, outstream);
+	outstream.close();
+}
+
+bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
+{
+	if(!mShaderCacheEnabled) return false;
+
+	auto binary_iter = mShaderBinaryCache.find(shader->mShaderHash);
+	if (binary_iter != mShaderBinaryCache.end())
+	{
+		auto& shader_info = binary_iter->second;
+		std::vector<U8> in_data;
+		in_data.resize(shader_info.mBinaryLength);
+
+		std::string in_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache", shader->mShaderHash.asString() + ".shaderbin");
+		LLUniqueFile filep = LLFile::fopen(in_path, "rb");
+		if (filep)
+		{
+			fread(in_data.data(), sizeof(U8), in_data.size(), filep);
+			filep.close();
+
+			glProgramBinary(shader->mProgramObject, shader_info.mBinaryFormat, in_data.data(), shader_info.mBinaryLength);
+
+			GLint success = GL_TRUE;
+			glGetProgramiv(shader->mProgramObject, GL_LINK_STATUS, &success);
+			if (success == GL_FALSE)
+			{
+				//an error occured, normally we would print log but in this case it means the shader needs recompiling.
+				LL_INFOS() << "Failed to load cached binary for shader: " << shader->mName << " falling back to compilation" << LL_ENDL;
+				return false;
+			}
+
+			return true;
+		}
+	}
+	return false;
+}
+
+bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
+{
+	if(!mShaderCacheEnabled) return true;
+
+	ProgramBinaryData binary_info;
+	glGetProgramiv(shader->mProgramObject, GL_PROGRAM_BINARY_LENGTH, &binary_info.mBinaryLength);
+
+	std::vector<U8> program_binary;
+	program_binary.resize(binary_info.mBinaryLength);
+
+	glGetProgramBinary(shader->mProgramObject, program_binary.size() * sizeof(U8), nullptr, &binary_info.mBinaryFormat, program_binary.data());
+
+	std::string out_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache", shader->mShaderHash.asString() + ".shaderbin");
+	LLUniqueFile outfile = LLFile::fopen(out_path, "wb");
+	if (outfile)
+	{
+		fwrite(program_binary.data(), sizeof(U8), program_binary.size(), outfile);
+		outfile.close();
+
+		mShaderBinaryCache.emplace(shader->mShaderHash, binary_info);
+		return true;
+	}
+	return false;
 }
 
 //virtual

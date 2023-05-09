@@ -30,6 +30,7 @@
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
 #include "llviewercontrol.h"
+#include "llversioninfo.h"
 
 #include "llrender.h"
 #include "llenvironment.h"
@@ -380,6 +381,27 @@ void LLViewerShaderMgr::setShaders()
         return;
     }
 
+	{
+		static LLCachedControl<bool> shader_cache_enabled(gSavedSettings, "RenderShaderCacheEnabled", true);
+		static LLUUID old_cache_version;
+		static LLUUID current_cache_version;
+		if (current_cache_version.isNull())
+		{
+			HBXXH128 hash_obj;
+			hash_obj.update(LLVersionInfo::instance().getVersion());
+			hash_obj.update(gGLManager.mGLVendor);
+			hash_obj.update(gGLManager.mGLRenderer);
+			hash_obj.update(gGLManager.mGLVersionString);
+
+			current_cache_version = hash_obj.digest();
+
+			old_cache_version = LLUUID(gSavedSettings.getString("RenderShaderCacheVersion"));
+			gSavedSettings.setString("RenderShaderCacheVersion", current_cache_version.asString());
+		}
+
+		initShaderCache(shader_cache_enabled, old_cache_version, current_cache_version);
+	}
+
     static LLCachedControl<U32> max_texture_index(gSavedSettings, "RenderMaxTextureIndex", 16);
     
     // when using indexed texture rendering, leave 8 texture units available for shadow and reflection maps
@@ -524,6 +546,8 @@ void LLViewerShaderMgr::setShaders()
     llassert(loaded);
     loaded = loaded && loadShadersDeferred();
     llassert(loaded);
+
+	persistShaderCacheMetadata();
 
     if (gViewerWindow)
     {

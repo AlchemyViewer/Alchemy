@@ -313,6 +313,13 @@ public:
 	// Implemented in the application to actually update out of date uniforms for a particular shader
 	virtual void updateShaderUniforms(LLGLSLShader * shader) = 0; // Pure Virtual
 
+    void initShaderCache(bool enabled, const LLUUID& old_cache_version, const LLUUID& current_cache_version);
+    void clearShaderCache();
+    void persistShaderCacheMetadata();
+
+    bool loadCachedProgramBinary(LLGLSLShader* shader);
+    bool saveCachedProgramBinary(LLGLSLShader* shader);
+
 public:
 	// Map of shader names to compiled
     std::map<std::string, GLuint, std::less<>> mVertexShaderObjects;
@@ -322,6 +329,15 @@ public:
 	std::vector<std::string> mReservedAttribs;
 
 	std::vector<std::string> mReservedUniforms;
+
+    struct ProgramBinaryData
+    {
+        GLsizei mBinaryLength;
+        GLenum mBinaryFormat;
+    };
+    boost::unordered_map<LLUUID, ProgramBinaryData> mShaderBinaryCache;
+    bool mShaderCacheInitialized = false;
+    bool mShaderCacheEnabled = false;
 
 protected:
 
