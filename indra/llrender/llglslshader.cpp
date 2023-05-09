@@ -1993,10 +1993,12 @@ LLUUID LLGLSLShader::hash()
     for (const auto& shdr_pair : mShaderFiles)
     {
         hash_obj.update(shdr_pair.first);
+        hash_obj.update(&shdr_pair.second, sizeof(GLenum));
     }
     for (const auto& define_pair : mDefines)
     {
         hash_obj.update(define_pair.first);
+        hash_obj.update(define_pair.second);
 
     }
     hash_obj.update(&mFeatures, sizeof(LLShaderFeatures));

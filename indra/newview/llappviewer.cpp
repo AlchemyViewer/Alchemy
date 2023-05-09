@@ -597,7 +597,7 @@ static void settings_modify()
     LLRenderTarget::sUseFBO             = LLPipeline::sRenderDeferred;
     LLVOSurfacePatch::sLODFactor        = gSavedSettings.getF32("RenderTerrainLODFactor");
     LLVOSurfacePatch::sLODFactor *= LLVOSurfacePatch::sLODFactor; //square lod factor to get exponential range of [1,4]
-    gDebugGL       = TRUE; //gDebugGLSession || gDebugSession;
+    gDebugGL       = gDebugGLSession || gDebugSession;
     gDebugPipeline = gSavedSettings.getBOOL("RenderDebugPipeline");
 }
 
@@ -2726,7 +2726,7 @@ bool LLAppViewer::initConfiguration()
 		ll_init_fail_log(gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "test_failures.log"));
 	}
 
-    //if (gSavedSettings.getBOOL("RenderDebugGLSession"))
+    if (gSavedSettings.getBOOL("RenderDebugGLSession"))
     {
         gDebugGLSession = TRUE;
         gDebugGL = TRUE;
@@ -4416,6 +4416,7 @@ void LLAppViewer::purgeCache()
 	LL_INFOS("AppCache") << "Purging Cache and Texture Cache..." << LL_ENDL;
 	LLAppViewer::getTextureCache()->purgeCache(LL_PATH_CACHE);
 	LLVOCache::getInstance()->removeCache(LL_PATH_CACHE);
+	LLViewerShaderMgr::instance()->clearShaderCache();
 	std::string browser_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "cef_cache");
 	if (LLFile::isdir(browser_cache))
 	{

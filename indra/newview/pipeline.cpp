@@ -7220,6 +7220,7 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
 			mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
 			mGlow[2].flush();
+			gGL.setSceneBlendType(LLRender::BT_ALPHA);
 		}
 
 		gGlowExtractProgram.unbind();
@@ -8418,6 +8419,8 @@ void LLPipeline::renderDeferredLighting()
                 gDeferredMultiSpotLightProgram.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
                 unbindDeferredShader(gDeferredMultiSpotLightProgram);
             }
+
+			gGL.setSceneBlendType(LLRender::BT_ALPHA);
         }
 
 
