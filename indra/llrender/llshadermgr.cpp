@@ -479,7 +479,7 @@ void LLShaderMgr::dumpObjectLog(GLuint ret, BOOL warns, const std::string& filen
 	}
  }
 
-GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::unordered_map<std::string, std::string>* defines, S32 texture_index_channels)
+GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels)
 {
 
 // endsure work-around for missing GLSL funcs gets propogated to feature shader files (e.g. srgbF.glsl)
@@ -729,7 +729,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 
 	if (defines)
 	{
-		for (std::unordered_map<std::string,std::string>::iterator iter = defines->begin(); iter != defines->end(); ++iter)
+		for (auto iter = defines->begin(); iter != defines->end(); ++iter)
 		{
 			std::string define = "#define " + iter->first + " " + iter->second + "\n";
 			extra_code_text[extra_code_count++] = (GLchar *) strdup(define.c_str());

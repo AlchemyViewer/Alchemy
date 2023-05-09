@@ -32,8 +32,6 @@
 #include "llstaticstringtable.h"
 #include <boost/unordered_map.hpp>
 
-#include <unordered_map>
-
 class LLShaderFeatures
 {
 public:
@@ -311,7 +309,7 @@ public:
     LLShaderFeatures mFeatures;
     std::vector< std::pair< std::string, GLenum > > mShaderFiles;
     std::string mName;
-    typedef std::unordered_map<std::string, std::string> defines_map_t;
+    typedef std::map<std::string, std::string> defines_map_t;
     defines_map_t mDefines;
 
     //statistics for profiling shader performance
