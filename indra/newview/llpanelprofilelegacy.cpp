@@ -221,7 +221,8 @@ void LLPanelProfileLegacy::updateData()
     if (!cap_url.empty())
     {
 		const auto& agent_id = getAvatarId();
-		LLCoros::instance().launch("requestAvatarProfileCoro", [cap_url, agent_id]() {
+		auto handle = getHandle();
+		LLCoros::instance().launch("requestAvatarProfileCoro", [cap_url, agent_id, handle]() {
 			LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
 			LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
 				httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("request_avatar_properties_coro", httpPolicy));
@@ -248,14 +249,13 @@ void LLPanelProfileLegacy::updateData()
 				return;
 			}
 
-			LLFloater* floater_profile = LLFloaterReg::findInstance("legacy_profile", LLSD().with("avatar_id", agent_id));
-			if (!floater_profile)
+			if (handle.isDead())
 			{
-				// floater is dead, so panels are dead as well
+				// panel is dead
 				return;
 			}
 
-			LLPanelProfileLegacy* legacy_sidetray = floater_profile->findChild<LLPanelProfileLegacy>("panel_profile_legacy_sidetray");
+			LLPanelProfileLegacy* legacy_sidetray = (LLPanelProfileLegacy*)handle.get();
 			if (!legacy_sidetray)
 			{
 				return;
