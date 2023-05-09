@@ -1167,7 +1167,7 @@ void LLShaderMgr::persistShaderCacheMetadata()
 		}
 	}
 
-	std::string meta_out_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache", "shaderdata.llsd");
+	std::string meta_out_path = gDirUtilp->add(mShaderCacheDir, "shaderdata.llsd");
 	llofstream outstream(meta_out_path);
 	LLSDSerialize::toNotation(out, outstream);
 	outstream.close();
