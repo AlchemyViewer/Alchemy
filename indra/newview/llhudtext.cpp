@@ -104,7 +104,8 @@ LLHUDText::~LLHUDText()
 
 void LLHUDText::render()
 {
-	if (!mOnHUDAttachment && sDisplayText && mVisible && !mHidden)
+	static LLCachedControl<bool> cinematic_hide_hover(gSavedSettings, "AlchemyCinematicModeHideHoverText");
+	if (!mOnHUDAttachment && sDisplayText && mVisible && !mHidden && !(ALCinematicMode::isEnabled() && cinematic_hide_hover))
 	{
 		LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
 		//LLGLDisable gls_stencil(GL_STENCIL_TEST);
@@ -229,10 +230,7 @@ void LLHUDText::setString(const std::string &text_utf8)
 //	addLine(text_utf8, mColor);
 // [RLVa:KB] - Checked: RLVa-2.0.3
 	// NOTE: setString() is called for debug and map beacons as well
-	if (ALCinematicMode::isEnabled() && gSavedSettings.getBool("AlchemyCinematicModeHideHoverText"))
-	{
-		return;
-	}
+
 	if (RlvActions::isRlvEnabled())
 	{
 		std::string text(text_utf8);

@@ -40,6 +40,7 @@
 #include "llviewertexturelist.h"
 #include "llvoiceclient.h"
 #include "llrender.h"
+#include "alcinematicmode.h"
 
 //brent's wave image
 //29de489d-0491-fb00-7dab-f9e686d31e83
@@ -336,7 +337,7 @@ void LLVoiceVisualizer::lipSyncOohAah( F32& ooh, F32& aah )
 //---------------------------------------------------
 void LLVoiceVisualizer::render()
 {
-	if ( ! mVoiceEnabled )
+	if ( ! mVoiceEnabled  || ALCinematicMode::isEnabled())
 	{
 		return;
 	}
