@@ -1094,11 +1094,11 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
 
 	mShaderCacheInitialized = true;
 
-	std::string shader_cache_dir = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache");
-	LLFile::mkdir(shader_cache_dir);
+	mShaderCacheDir = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache");
+	LLFile::mkdir(mShaderCacheDir);
 
 	{
-		std::string meta_out_path = gDirUtilp->add(shader_cache_dir, "shaderdata.llsd");
+		std::string meta_out_path = gDirUtilp->add(mShaderCacheDir, "shaderdata.llsd");
 		if (gDirUtilp->fileExists(meta_out_path))
 		{
 			LL_INFOS() << "Loading shader metadata" << LL_ENDL;
@@ -1167,7 +1167,7 @@ bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
 		std::vector<U8> in_data;
 		in_data.resize(shader_info.mBinaryLength);
 
-		std::string in_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache", shader->mShaderHash.asString() + ".shaderbin");
+		std::string in_path = gDirUtilp->add(mShaderCacheDir, shader->mShaderHash.asString() + ".shaderbin");
 		LLUniqueFile filep = LLFile::fopen(in_path, "rb");
 		if (filep)
 		{
@@ -1203,7 +1203,7 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
 
 	glGetProgramBinary(shader->mProgramObject, program_binary.size() * sizeof(U8), nullptr, &binary_info.mBinaryFormat, program_binary.data());
 
-	std::string out_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache", shader->mShaderHash.asString() + ".shaderbin");
+	std::string out_path = gDirUtilp->add(mShaderCacheDir, shader->mShaderHash.asString() + ".shaderbin");
 	LLUniqueFile outfile = LLFile::fopen(out_path, "wb");
 	if (outfile)
 	{

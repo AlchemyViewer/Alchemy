@@ -338,6 +338,7 @@ public:
     boost::unordered_map<LLUUID, ProgramBinaryData> mShaderBinaryCache;
     bool mShaderCacheInitialized = false;
     bool mShaderCacheEnabled = false;
+    std::string mShaderCacheDir;
 
 protected:
 
