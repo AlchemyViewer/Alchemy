@@ -527,11 +527,6 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString>* attributes,
         unbind();
     }
 
-    if(!mUsingBinaryProgram && success)
-    {
-        LLShaderMgr::instance()->saveCachedProgramBinary(this);
-    }
-
 #ifdef LL_PROFILER_ENABLE_RENDER_DOC
     setLabel(mName.c_str());
 #endif
@@ -822,7 +817,7 @@ void LLGLSLShader::addConstant(const LLGLSLShader::eShaderConsts shader_const)
 
 void LLGLSLShader::removePermutation(std::string name)
 {
-    mDefines[name].erase();
+    mDefines.erase(name);
 }
 
 GLint LLGLSLShader::mapUniformTextureChannel(GLint location, GLenum type, GLint size)
@@ -1041,6 +1036,11 @@ BOOL LLGLSLShader::link(BOOL suppress_errors)
     if (!success && !suppress_errors)
     {
         LLShaderMgr::instance()->dumpObjectLog(mProgramObject, !success, mName);
+    }
+
+    if (success)
+    {
+        LLShaderMgr::instance()->saveCachedProgramBinary(this);
     }
 
     return success;
