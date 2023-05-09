@@ -1110,16 +1110,18 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
 
 			if (old_cache_version == current_cache_version)
 			{
-				for (const auto& stuff_pair : in_data.map())
+				for (const auto& data_pair : in_data.map())
 				{
 					ProgramBinaryData binary_info;
-					binary_info.mBinaryFormat = stuff_pair.second["binary_format"].asInteger();
-					binary_info.mBinaryLength = stuff_pair.second["binary_size"].asInteger();
-					mShaderBinaryCache.emplace(stuff_pair.first, binary_info);
+					binary_info.mBinaryFormat = data_pair.second["binary_format"].asInteger();
+					binary_info.mBinaryLength = data_pair.second["binary_size"].asInteger();
+					binary_info.mLastUsedTime = data_pair.second["last_used"].asReal();
+					mShaderBinaryCache.emplace(data_pair.first, binary_info);
 				}
 			}
 			else
 			{
+				LL_INFOS() << "Shader cache version mismatch deteched. Purging." << LL_ENDL;
 				clearShaderCache();
 			}
 		}
@@ -1139,13 +1141,30 @@ void LLShaderMgr::persistShaderCacheMetadata()
 {
 	if(!mShaderCacheEnabled) return;
 
+	LL_INFOS() << "Persisting shader cache metadata to disk" << LL_ENDL;
+
 	LLSD out = LLSD::emptyMap();
-	for (const auto& stuff_pair : LLShaderMgr::instance()->mShaderBinaryCache)
+
+	static const F32 LRU_TIME = (60.f * 60.f) * 24.f * 7.f; // 14 days
+	const F32 current_time = LLTimer::getTotalSeconds();
+	for (auto it = mShaderBinaryCache.begin(); it != mShaderBinaryCache.end();)
 	{
-		LLSD datastuff = LLSD::emptyMap();
-		datastuff["binary_format"] = LLSD::Integer(stuff_pair.second.mBinaryFormat);
-		datastuff["binary_size"] = LLSD::Integer(stuff_pair.second.mBinaryLength);
-		out[stuff_pair.first.asString()] = datastuff;
+		const ProgramBinaryData& shader_metadata = it->second;
+		if ((shader_metadata.mLastUsedTime + LRU_TIME) < current_time)
+		{
+			std::string shader_path = gDirUtilp->add(mShaderCacheDir, it->first.asString() + ".shaderbin");
+			LLFile::remove(shader_path);
+			it = mShaderBinaryCache.erase(it);
+		}
+		else
+		{
+			LLSD data = LLSD::emptyMap();
+			data["binary_format"] = LLSD::Integer(shader_metadata.mBinaryFormat);
+			data["binary_size"] = LLSD::Integer(shader_metadata.mBinaryLength);
+			data["last_used"] = LLSD::Real(shader_metadata.mLastUsedTime);
+			out[it->first.asString()] = data;
+			++it;
+		}
 	}
 
 	std::string meta_out_path = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "shader_cache", "shaderdata.llsd");
@@ -1178,15 +1197,18 @@ bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
 
 			GLint success = GL_TRUE;
 			glGetProgramiv(shader->mProgramObject, GL_LINK_STATUS, &success);
-			if (success == GL_FALSE)
+			if (success == GL_TRUE)
 			{
-				//an error occured, normally we would print log but in this case it means the shader needs recompiling.
-				LL_INFOS() << "Failed to load cached binary for shader: " << shader->mName << " falling back to compilation" << LL_ENDL;
-				return false;
+				binary_iter->second.mLastUsedTime = LLTimer::getTotalSeconds();
+				return true;
 			}
-
-			return true;
 		}
+
+		//an error occured, normally we would print log but in this case it means the shader needs recompiling.
+		LL_INFOS() << "Failed to load cached binary for shader: " << shader->mName << " falling back to compilation" << LL_ENDL;
+		LLFile::remove(in_path);
+		mShaderBinaryCache.erase(binary_iter);
+		return false;
 	}
 	return false;
 }
@@ -1209,6 +1231,8 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
 	{
 		fwrite(program_binary.data(), sizeof(U8), program_binary.size(), outfile);
 		outfile.close();
+
+		binary_info.mLastUsedTime = LLTimer::getTotalSeconds();
 
 		mShaderBinaryCache.emplace(shader->mShaderHash, binary_info);
 		return true;

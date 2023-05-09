@@ -389,10 +389,6 @@ void LLViewerShaderMgr::setShaders()
 		{
 			HBXXH128 hash_obj;
 			hash_obj.update(LLVersionInfo::instance().getVersion());
-			hash_obj.update(gGLManager.mGLVendor);
-			hash_obj.update(gGLManager.mGLRenderer);
-			hash_obj.update(gGLManager.mGLVersionString);
-
 			current_cache_version = hash_obj.digest();
 
 			old_cache_version = LLUUID(gSavedSettings.getString("RenderShaderCacheVersion"));

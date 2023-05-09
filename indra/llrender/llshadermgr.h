@@ -334,6 +334,7 @@ public:
     {
         GLsizei mBinaryLength;
         GLenum mBinaryFormat;
+        F32 mLastUsedTime;
     };
     boost::unordered_map<LLUUID, ProgramBinaryData> mShaderBinaryCache;
     bool mShaderCacheInitialized = false;
