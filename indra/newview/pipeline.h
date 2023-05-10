@@ -42,6 +42,8 @@
 
 #include "alrenderutils.h"
 
+#include "glh/glh_linear.h"
+
 #include <stack>
 
 class LLViewerTexture;
@@ -712,7 +714,7 @@ public:
 	LLMatrix4a				mSunShadowMatrix[6];
 	LLMatrix4a				mShadowModelview[6];
 	LLMatrix4a				mShadowProjection[6];
-    LLMatrix4a			    mReflectionModelView;
+    glh::matrix4f           mReflectionModelView;
 
 	LLPointer<LLDrawable>	mShadowSpotLight[2];
 	F32						mSpotLightFade[2];
