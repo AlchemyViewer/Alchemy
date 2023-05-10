@@ -52,6 +52,11 @@ public:
         loadu(val);
     }
 
+    explicit LLMatrix4a(const F32* val)
+    {
+        loadu(val);
+    }
+
 	LLMatrix4a(const LLQuad& q1,const LLQuad& q2,const LLQuad& q3,const LLQuad& q4)
 	{
 		mMatrix[0] = q1;

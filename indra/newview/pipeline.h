@@ -306,7 +306,7 @@ public:
 
 	void renderHighlight(const LLViewerObject* obj, F32 fade);
 	
-	void renderShadow(LLMatrix4a& view, LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp);
+	void renderShadow(glh::matrix4f& view, glh::matrix4f& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp);
 	void renderHighlights();
 	void renderDebug();
 	void renderPhysicsDisplay();
@@ -711,9 +711,9 @@ public:
 	LLCamera				mShadowCamera[8];
 	LLVector3				mShadowExtents[4][2];
     // TODO : separate Sun Shadow and Spot Shadow matrices
-	LLMatrix4a				mSunShadowMatrix[6];
-	LLMatrix4a				mShadowModelview[6];
-	LLMatrix4a				mShadowProjection[6];
+	glh::matrix4f			mSunShadowMatrix[6];
+	glh::matrix4f			mShadowModelview[6];
+	glh::matrix4f			mShadowProjection[6];
     glh::matrix4f           mReflectionModelView;
 
 	LLPointer<LLDrawable>	mShadowSpotLight[2];
