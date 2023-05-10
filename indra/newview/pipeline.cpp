@@ -8505,14 +8505,12 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
 	LLVector3 origin = np - at_axis*dist;
 
 	//matrix from volume space to agent space
-	LLMatrix4 light_mat_(quat, LLVector4(origin,1.f));
+	LLMatrix4 light_mat(quat, LLVector4(origin,1.f));
 
-	LLMatrix4a light_mat;
-	light_mat.loadu(light_mat_);
-	LLMatrix4a light_to_screen;
-	light_to_screen.setMul(get_current_modelview(), light_mat);
-	LLMatrix4a screen_to_light = light_to_screen;
-	screen_to_light.invert();
+	glh::matrix4f light_to_agent((F32*) light_mat.mMatrix);
+	glh::matrix4f light_to_screen = glh::matrix4f((F32*)get_current_modelview().getF32ptr()) * light_to_agent;
+
+	glh::matrix4f screen_to_light = light_to_screen.inverse();
 
 	F32 s = volume->getLightRadius()*1.5f;
 	F32 near_clip = dist;
@@ -8523,28 +8521,31 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
 	F32 fovy = fov * RAD_TO_DEG;
 	F32 aspect = width/height;
 
-	LLVector4a p1(0, 0, -(near_clip+0.01f));
-	LLVector4a p2(0, 0, -(near_clip+1.f));
+	glh::matrix4f trans(0.5f, 0.f, 0.f, 0.5f,
+				0.f, 0.5f, 0.f, 0.5f,
+				0.f, 0.f, 0.5f, 0.5f,
+				0.f, 0.f, 0.f, 1.f);
 
-	LLVector4a screen_origin(LLVector4a::getZero());
+	glh::vec3f p1(0, 0, -(near_clip+0.01f));
+	glh::vec3f p2(0, 0, -(near_clip+1.f));
 
-	light_to_screen.affineTransform(p1,p1);
-	light_to_screen.affineTransform(p2,p2);
-	light_to_screen.affineTransform(screen_origin,screen_origin);
+	glh::vec3f screen_origin(0, 0, 0);
 
-	LLVector4a n;
-	n.setSub(p2,p1);
-	n.normalize3fast();
+	light_to_screen.mult_matrix_vec(p1);
+	light_to_screen.mult_matrix_vec(p2);
+	light_to_screen.mult_matrix_vec(screen_origin);
+
+	glh::vec3f n = p2-p1;
+	n.normalize();
 	
 	F32 proj_range = far_clip - near_clip;
-	LLMatrix4a light_proj = ALGLMath::genPersp(fovy, aspect, near_clip, far_clip);
-	light_proj.setMul(ALGLMath::genNDCtoWC(),light_proj);
-	screen_to_light.setMul(light_proj,screen_to_light);
-	shader.uniformMatrix4fv(LLShaderMgr::PROJECTOR_MATRIX, 1, FALSE, screen_to_light.getF32ptr());
+	glh::matrix4f light_proj = gl_perspective(fovy, aspect, near_clip, far_clip);
+	screen_to_light = trans * light_proj * screen_to_light;
+	shader.uniformMatrix4fv(LLShaderMgr::PROJECTOR_MATRIX, 1, FALSE, screen_to_light.m);
 	shader.uniform1f(LLShaderMgr::PROJECTOR_NEAR, near_clip);
-	shader.uniform3fv(LLShaderMgr::PROJECTOR_P, 1, p1.getF32ptr());
-	shader.uniform3fv(LLShaderMgr::PROJECTOR_N, 1, n.getF32ptr());
-	shader.uniform3fv(LLShaderMgr::PROJECTOR_ORIGIN, 1, screen_origin.getF32ptr());
+	shader.uniform3fv(LLShaderMgr::PROJECTOR_P, 1, p1.v);
+	shader.uniform3fv(LLShaderMgr::PROJECTOR_N, 1, n.v);
+	shader.uniform3fv(LLShaderMgr::PROJECTOR_ORIGIN, 1, screen_origin.v);
 	shader.uniform1f(LLShaderMgr::PROJECTOR_RANGE, proj_range);
 	shader.uniform1f(LLShaderMgr::PROJECTOR_AMBIANCE, params.mV[2]);
 	S32 s_idx = -1;
