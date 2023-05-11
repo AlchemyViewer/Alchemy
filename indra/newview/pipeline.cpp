@@ -771,8 +771,7 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
 		ret = FBO_FAILURE;
 
 		releaseScreenBuffers();
-        releaseSunShadowTargets();
-        releaseSpotShadowTargets();
+		releaseShadowBuffers();
 		//reduce number of samples 
 		while (samples > 0)
 		{
@@ -782,8 +781,7 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
 				return FBO_SUCCESS_LOWRES;
 			}
 			releaseScreenBuffers();
-            releaseSunShadowTargets();
-            releaseSpotShadowTargets();
+            releaseShadowBuffers();
 		}
 
 		samples = 0;
@@ -797,8 +795,7 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
 				return FBO_SUCCESS_LOWRES;
 			}
 			releaseScreenBuffers();
-            releaseSunShadowTargets();
-            releaseSpotShadowTargets();
+            releaseShadowBuffers();
 
 			resX /= 2;
 			if (allocateScreenBuffer(resX, resY, samples))
@@ -806,8 +803,7 @@ LLPipeline::eFBOStatus LLPipeline::doAllocateScreenBuffer(U32 resX, U32 resY)
 				return FBO_SUCCESS_LOWRES;
 			}
 			releaseScreenBuffers();
-            releaseSunShadowTargets();
-            releaseSpotShadowTargets();
+            releaseShadowBuffers();
 		}
 
 		LL_WARNS() << "Unable to allocate screen buffer at any resolution!" << LL_ENDL;
@@ -1165,16 +1161,13 @@ void LLPipeline::releaseGLBuffers()
 	
     mSceneMap.release();
 
-    mPostMap.release();
-	mPostFXMap.release();
-	mPostHelperMap.release();
-
 	for (U32 i = 0; i < 3; i++)
 	{
 		mGlow[i].release();
 	}
 
 	releaseScreenBuffers();
+	releaseShadowBuffers();
 
 	gBumpImageList.destroyGL();
 	LLVOAvatar::resetImpostors();
