@@ -1279,7 +1279,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
             }
             else
             {
-                gDeferredMaterialProgram[i].mRiggedVariant = &gDeferredMaterialProgram[i + 0x10];
+                gDeferredMaterialProgram[i].mRiggedVariant = &gDeferredMaterialProgram[i + 0x10U];
             }
 
             success = gDeferredMaterialProgram[i].createShader(NULL, NULL);
@@ -1334,7 +1334,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
             }
             else
             {
-                gDeferredMaterialWaterProgram[i].mRiggedVariant = &(gDeferredMaterialWaterProgram[i + 0x10]);
+                gDeferredMaterialWaterProgram[i].mRiggedVariant = &(gDeferredMaterialWaterProgram[i + 0x10U]);
             }
             gDeferredMaterialWaterProgram[i].addPermutation("WATER_FOG","1");
 
@@ -2159,6 +2159,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredFullbrightAlphaMaskWaterProgram.mShaderFiles.push_back(make_pair("deferred/fullbrightF.glsl", GL_FRAGMENT_SHADER));
 		gDeferredFullbrightAlphaMaskWaterProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 		gDeferredFullbrightAlphaMaskWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
+		gDeferredFullbrightAlphaMaskWaterProgram.clearPermutations();
 		gDeferredFullbrightAlphaMaskWaterProgram.addPermutation("HAS_ALPHA_MASK","1");
 		gDeferredFullbrightAlphaMaskWaterProgram.addPermutation("WATER_FOG","1");
         success = make_rigged_variant(gDeferredFullbrightAlphaMaskWaterProgram, gDeferredSkinnedFullbrightAlphaMaskWaterProgram);
@@ -2491,6 +2492,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 		gDeferredTerrainWaterProgram.mShaderFiles.push_back(make_pair("deferred/terrainF.glsl", GL_FRAGMENT_SHADER));
 		gDeferredTerrainWaterProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 		gDeferredTerrainWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
+		gDeferredTerrainWaterProgram.clearPermutations();
 		gDeferredTerrainWaterProgram.addPermutation("WATER_FOG", "1");
 		success = gDeferredTerrainWaterProgram.createShader(NULL, NULL);
         llassert(success);
@@ -2649,6 +2651,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
                 gFXAAProgram[i].mShaderFiles.push_back(make_pair("deferred/postDeferredV.glsl", GL_VERTEX_SHADER));
                 gFXAAProgram[i].mShaderFiles.push_back(make_pair("deferred/fxaaF.glsl", GL_FRAGMENT_SHADER));
                 gFXAAProgram[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+				gFXAAProgram[i].clearPermutations();
                 gFXAAProgram[i].addPermutation("FXAA_QUALITY__PRESET", smaa_pair.first);
                 success = gFXAAProgram[i].createShader(NULL, NULL);
                 llassert(success);
