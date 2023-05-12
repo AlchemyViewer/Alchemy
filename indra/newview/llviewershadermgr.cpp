@@ -683,6 +683,8 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 		attribs["REF_SAMPLE_COUNT"] = "32";
 	}
 
+	LLGLSLShader::sGlobalDefines = attribs;
+
 	// We no longer have to bind the shaders to global glhandles, they are automatically added to a map now.
 	for (U32 i = 0; i < shaders.size(); i++)
 	{

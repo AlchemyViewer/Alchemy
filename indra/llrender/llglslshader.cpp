@@ -58,6 +58,7 @@ LLGLSLShader* LLGLSLShader::sCurBoundShaderPtr = NULL;
 S32 LLGLSLShader::sIndexedTextureChannels = 0;
 bool LLGLSLShader::sProfileEnabled = false;
 std::set<LLGLSLShader*> LLGLSLShader::sInstances;
+LLGLSLShader::defines_map_t LLGLSLShader::sGlobalDefines;
 U64 LLGLSLShader::sTotalTimeElapsed = 0;
 U32 LLGLSLShader::sTotalTrianglesDrawn = 0;
 U64 LLGLSLShader::sTotalSamplesDrawn = 0;
@@ -1997,6 +1998,12 @@ LLUUID LLGLSLShader::hash()
         hash_obj.update(&shdr_pair.second, sizeof(GLenum));
     }
     for (const auto& define_pair : mDefines)
+    {
+        hash_obj.update(define_pair.first);
+        hash_obj.update(define_pair.second);
+
+    }
+    for (const auto& define_pair : LLGLSLShader::sGlobalDefines)
     {
         hash_obj.update(define_pair.first);
         hash_obj.update(define_pair.second);

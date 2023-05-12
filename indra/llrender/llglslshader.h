@@ -313,6 +313,7 @@ public:
     std::string mName;
     typedef std::map<std::string, std::string> defines_map_t;
     defines_map_t mDefines;
+    static defines_map_t sGlobalDefines;
     LLUUID mShaderHash;
     bool mUsingBinaryProgram = false;
 
