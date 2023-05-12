@@ -68,7 +68,7 @@ LLTimer* LLTimer::sTimer = NULL;
 //---------------------------------------------------------------------------
 // Implementation
 //---------------------------------------------------------------------------
-#if 0 // Alchemy Test
+#if LL_LINUX || LL_DARWIN // Alchemy
 
 void ms_sleep(U32 ms)
 {
