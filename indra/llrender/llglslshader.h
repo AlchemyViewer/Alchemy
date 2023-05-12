@@ -311,7 +311,7 @@ public:
     LLShaderFeatures mFeatures;
     std::vector< std::pair< std::string, GLenum > > mShaderFiles;
     std::string mName;
-    typedef std::map<std::string, std::string> defines_map_t;
+    typedef std::map<std::string, std::string> defines_map_t; //NOTE: this must be an ordered map to maintain hash consistency
     defines_map_t mDefines;
     static defines_map_t sGlobalDefines;
     LLUUID mShaderHash;
