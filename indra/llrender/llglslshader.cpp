@@ -350,6 +350,7 @@ void LLGLSLShader::unload()
 {
     mShaderFiles.clear();
     mDefines.clear();
+    mFeatures = LLShaderFeatures();
 
     unloadInternal();
 }

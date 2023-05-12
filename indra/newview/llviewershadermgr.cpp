@@ -412,6 +412,8 @@ void LLViewerShaderMgr::setShaders()
     initAttribsAndUniforms();
     gPipeline.releaseGLBuffers();
 
+	unloadShaders();
+
     LLPipeline::sRenderGlow = gSavedSettings.getBOOL("RenderGlow"); 
     
     if (gViewerWindow)
@@ -556,76 +558,14 @@ void LLViewerShaderMgr::setShaders()
 
 void LLViewerShaderMgr::unloadShaders()
 {
-	gOcclusionProgram.unload();
-    gSkinnedOcclusionProgram.unload();
-	gOcclusionCubeProgram.unload();
-	gDebugProgram.unload();
-    gSkinnedDebugProgram.unload();
-	gClipProgram.unload();
-	gBenchmarkProgram.unload();
-    gReflectionProbeDisplayProgram.unload();
-	gAlphaMaskProgram.unload();
-	gUIProgram.unload();
-	gPathfindingProgram.unload();
-	gPathfindingNoNormalsProgram.unload();
-	gGlowCombineProgram.unload();
-	gReflectionMipProgram.unload();
-    gRadianceGenProgram.unload();
-    gIrradianceGenProgram.unload();
-	gGlowCombineFXAAProgram.unload();
-	gTwoTextureCompareProgram.unload();
-	gOneTextureFilterProgram.unload();
-	gSolidColorProgram.unload();
-
-	gObjectPreviewProgram.unload();
-    gPhysicsPreviewProgram.unload();
-	gImpostorProgram.unload();
-	gObjectBumpProgram.unload();
-    gSkinnedObjectBumpProgram.unload();
-    gSkinnedObjectFullbrightAlphaMaskProgram.unload();
-	
-	gObjectAlphaMaskNoColorProgram.unload();
-	gObjectAlphaMaskNoColorWaterProgram.unload();
-	
-	gWaterProgram.unload();
-    gWaterEdgeProgram.unload();
-	gUnderWaterProgram.unload();
-
-	gGlowProgram.unload();
-	gGlowExtractProgram.unload();
-	gAvatarProgram.unload();
-	gAvatarWaterProgram.unload();
-	gAvatarEyeballProgram.unload();
-	gHighlightProgram.unload();
-    gSkinnedHighlightProgram.unload();
-	gHighlightNormalProgram.unload();
-	gHighlightSpecularProgram.unload();
-
-	gPostScreenSpaceReflectionProgram.unload();
-
-	gDeferredDiffuseProgram.unload();
-	gDeferredDiffuseAlphaMaskProgram.unload();
-    gDeferredSkinnedDiffuseAlphaMaskProgram.unload();
-	gDeferredNonIndexedDiffuseAlphaMaskProgram.unload();
-	gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.unload();
-	gDeferredSkinnedDiffuseProgram.unload();
-	gDeferredSkinnedBumpProgram.unload();
-	
-	gDeferredPostCASProgram.unload();
-	gDeferredPostDLSProgram.unload();
-	gDeferredPostTonemapProgram.unload();
-	gDeferredPostTonemapACESProgram.unload();
-	gDeferredPostTonemapUchiProgram.unload();
-	gDeferredPostTonemapLPMProgram.unload();
-	gDeferredPostTonemapHableProgram.unload();
-
-	for (U32 i = 0; i < 3; ++i)
+	if (!LLGLSLShader::sInstances.empty())
 	{
-		gDeferredPostColorCorrectProgram[i].unload();
-		gDeferredPostColorCorrectLUTProgram[i].unload();
+		auto instance_copy = LLGLSLShader::sInstances;
+		for (auto instancep : instance_copy)
+		{
+			instancep->unload();
+		}
 	}
-
-	gRlvSphereProgram.unload();
 
 	mShaderLevel[SHADER_LIGHTING] = 0;
 	mShaderLevel[SHADER_OBJECT] = 0;
