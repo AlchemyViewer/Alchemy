@@ -1651,11 +1651,7 @@ F32 LLWorld::getNearbyAvatarsAndMaxGPUTime(std::vector<LLCharacter*> &valid_near
                 char_iter++;
                 continue;
             }
-
-            if (!avatar->isTooSlow())
-            {
-                gPipeline.profileAvatar(avatar);
-            }
+            gPipeline.profileAvatar(avatar);
             nearby_max_complexity = llmax(nearby_max_complexity, avatar->getGPURenderTime());
             valid_nearby_avs.push_back(*char_iter);
         }

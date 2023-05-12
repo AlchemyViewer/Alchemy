@@ -456,8 +456,15 @@ void LLFloaterPerformance::populateNearbyList()
 
             row[1]["column"] = "complex_value";
             row[1]["type"] = "text";
-            // use GPU time in us
-            row[1]["value"] = llformat( "%.f", render_av_gpu_ms * 1000.f);
+            if (is_slow && !showTunedART)
+            {
+                row[1]["value"] = llformat( "%.f", LLPerfStats::raw_to_us( avatar->getLastART() ) );
+            }
+            else
+            {
+                // use GPU time in us
+                row[1]["value"] = llformat( "%.f", render_av_gpu_ms * 1000.f);
+            }
             row[1]["font"]["name"] = "SANSSERIF";
 
             row[3]["column"] = "name";
