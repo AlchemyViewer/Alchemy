@@ -35,32 +35,28 @@
 class LLShaderFeatures
 {
 public:
-    bool calculatesLighting;
-    bool calculatesAtmospherics;
-    bool hasLighting; // implies no transport (it's possible to have neither though)
-    bool isAlphaLighting; // indicates lighting shaders need not be linked in (lighting performed directly in alpha shader to match deferred lighting functions)
-    bool isSpecular;
-    bool hasWaterFog; // implies no gamma
-    bool hasTransport; // implies no lighting (it's possible to have neither though)
-    bool hasSkinning;
-    bool hasObjectSkinning;
-    bool hasAtmospherics;
-    bool hasGamma;
-    bool hasShadows;
-    bool hasAmbientOcclusion;
-    bool hasSrgb;
-    bool encodesNormal; // include: shaders\class1\environment\encodeNormF.glsl
-    bool isDeferred;
-    bool hasScreenSpaceReflections;
-    S32 mIndexedTextureChannels;
-    bool disableTextureIndex;
-    bool hasAlphaMask;
+    S32 mIndexedTextureChannels = 0;
+    bool calculatesLighting = false;
+    bool calculatesAtmospherics = false;
+    bool hasLighting = false; // implies no transport (it's possible to have neither though)
+    bool isAlphaLighting = false; // indicates lighting shaders need not be linked in (lighting performed directly in alpha shader to match deferred lighting functions)
+    bool isSpecular = false;
+    bool hasWaterFog = false; // implies no gamma
+    bool hasTransport = false; // implies no lighting (it's possible to have neither though)
+    bool hasSkinning = false;
+    bool hasObjectSkinning = false;
+    bool hasAtmospherics = false;
+    bool hasGamma = false;
+    bool hasShadows = false;
+    bool hasAmbientOcclusion = false;
+    bool hasSrgb = false;
+    bool encodesNormal = false; // include: shaders\class1\environment\encodeNormF.glsl
+    bool isDeferred = false;
+    bool hasScreenSpaceReflections = false;
+    bool disableTextureIndex = false;
+    bool hasAlphaMask = false;
     bool hasReflectionProbes = false;
-    bool attachNothing;
-
-    // char numLights;
-
-    LLShaderFeatures();
+    bool attachNothing = false;
 };
 
 // ============= Structure for caching shader uniforms ===============

@@ -558,13 +558,11 @@ void LLViewerShaderMgr::setShaders()
 
 void LLViewerShaderMgr::unloadShaders()
 {
-	if (!LLGLSLShader::sInstances.empty())
+	//unload shader's
+	while (!LLGLSLShader::sInstances.empty())
 	{
-		auto instance_copy = LLGLSLShader::sInstances;
-		for (auto instancep : instance_copy)
-		{
-			instancep->unload();
-		}
+		LLGLSLShader* shader = *(LLGLSLShader::sInstances.begin());
+		shader->unload();
 	}
 
 	mShaderLevel[SHADER_LIGHTING] = 0;
@@ -3210,31 +3208,31 @@ BOOL LLViewerShaderMgr::loadShadersAvatar()
 		gAvatarProgram.mShaderLevel = mShaderLevel[SHADER_AVATAR];
 		success = gAvatarProgram.createShader(NULL, NULL);
 			
-		if (success)
-		{
-			gAvatarWaterProgram.mName = "Avatar Water Shader";
-			gAvatarWaterProgram.mFeatures.hasSkinning = true;
-			gAvatarWaterProgram.mFeatures.calculatesAtmospherics = true;
-			gAvatarWaterProgram.mFeatures.calculatesLighting = true;
-			gAvatarWaterProgram.mFeatures.hasWaterFog = true;
-			gAvatarWaterProgram.mFeatures.hasAtmospherics = true;
-			gAvatarWaterProgram.mFeatures.hasLighting = true;
-			gAvatarWaterProgram.mFeatures.hasAlphaMask = true;
-			gAvatarWaterProgram.mFeatures.disableTextureIndex = true;
-			gAvatarWaterProgram.mShaderFiles.clear();
-			gAvatarWaterProgram.mShaderFiles.push_back(make_pair("avatar/avatarV.glsl", GL_VERTEX_SHADER));
-			gAvatarWaterProgram.mShaderFiles.push_back(make_pair("objects/simpleWaterF.glsl", GL_FRAGMENT_SHADER));
-			// Note: no cloth under water:
-			gAvatarWaterProgram.mShaderLevel = llmin(mShaderLevel[SHADER_AVATAR], 1);	
-			gAvatarWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;				
-			success = gAvatarWaterProgram.createShader(NULL, NULL);
-		}
-
 		/// Keep track of avatar levels
 		if (gAvatarProgram.mShaderLevel != mShaderLevel[SHADER_AVATAR])
 		{
 			mMaxAvatarShaderLevel = mShaderLevel[SHADER_AVATAR] = gAvatarProgram.mShaderLevel;
 		}
+	}
+
+	if (success)
+	{
+		gAvatarWaterProgram.mName = "Avatar Water Shader";
+		gAvatarWaterProgram.mFeatures.hasSkinning = true;
+		gAvatarWaterProgram.mFeatures.calculatesAtmospherics = true;
+		gAvatarWaterProgram.mFeatures.calculatesLighting = true;
+		gAvatarWaterProgram.mFeatures.hasWaterFog = true;
+		gAvatarWaterProgram.mFeatures.hasAtmospherics = true;
+		gAvatarWaterProgram.mFeatures.hasLighting = true;
+		gAvatarWaterProgram.mFeatures.hasAlphaMask = true;
+		gAvatarWaterProgram.mFeatures.disableTextureIndex = true;
+		gAvatarWaterProgram.mShaderFiles.clear();
+		gAvatarWaterProgram.mShaderFiles.push_back(make_pair("avatar/avatarV.glsl", GL_VERTEX_SHADER));
+		gAvatarWaterProgram.mShaderFiles.push_back(make_pair("objects/simpleWaterF.glsl", GL_FRAGMENT_SHADER));
+		// Note: no cloth under water:
+		gAvatarWaterProgram.mShaderLevel = llmin(mShaderLevel[SHADER_AVATAR], 1);
+		gAvatarWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
+		success = gAvatarWaterProgram.createShader(NULL, NULL);
 	}
 
 	if (success)

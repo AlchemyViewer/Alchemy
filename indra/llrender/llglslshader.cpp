@@ -88,31 +88,6 @@ BOOL shouldChange(const LLVector4& v1, const LLVector4& v2)
     return v1 != v2;
 }
 
-LLShaderFeatures::LLShaderFeatures()
-    : calculatesLighting(false)
-    , calculatesAtmospherics(false)
-    , hasLighting(false)
-    , isAlphaLighting(false)
-    , isSpecular(false)
-    , hasWaterFog(false)
-    , hasTransport(false)
-    , hasSkinning(false)
-    , hasObjectSkinning(false)
-    , hasAtmospherics(false)
-    , hasGamma(false)
-    , hasSrgb(false)
-    , encodesNormal(false)
-    , isDeferred(false)
-    , hasScreenSpaceReflections(false)
-    , hasShadows(false)
-    , hasAmbientOcclusion(false)
-    , mIndexedTextureChannels(0)
-    , disableTextureIndex(false)
-    , hasAlphaMask(false)
-    , attachNothing(false)
-{
-}
-
 //===============================
 // LLGLSL Shader implementation
 //===============================
@@ -335,6 +310,7 @@ LLGLSLShader::LLGLSLShader()
     mActiveTextureChannels(0),
     mShaderLevel(0),
     mShaderGroup(SG_DEFAULT),
+    mFeatures(),
     mUniformsDirty(FALSE),
     mTimerQuery(0),
     mSamplesQuery(0),

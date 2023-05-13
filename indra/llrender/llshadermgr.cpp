@@ -1116,7 +1116,7 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
 					binary_info.mBinaryFormat = data_pair.second["binary_format"].asInteger();
 					binary_info.mBinaryLength = data_pair.second["binary_size"].asInteger();
 					binary_info.mLastUsedTime = data_pair.second["last_used"].asReal();
-					mShaderBinaryCache.emplace(data_pair.first, binary_info);
+					mShaderBinaryCache.insert_or_assign(LLUUID(data_pair.first), binary_info);
 				}
 			}
 			else
@@ -1234,7 +1234,7 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
 
 		binary_info.mLastUsedTime = LLTimer::getTotalSeconds();
 
-		mShaderBinaryCache.emplace(shader->mShaderHash, binary_info);
+		mShaderBinaryCache.insert_or_assign(shader->mShaderHash, binary_info);
 		return true;
 	}
 	return false;

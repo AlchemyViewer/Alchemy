@@ -336,7 +336,7 @@ public:
         GLenum mBinaryFormat;
         F32 mLastUsedTime;
     };
-    boost::unordered_map<LLUUID, ProgramBinaryData> mShaderBinaryCache;
+    std::map<LLUUID, ProgramBinaryData> mShaderBinaryCache;
     bool mShaderCacheInitialized = false;
     bool mShaderCacheEnabled = false;
     std::string mShaderCacheDir;
