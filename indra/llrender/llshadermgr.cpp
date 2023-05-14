@@ -1190,17 +1190,20 @@ bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
 		LLUniqueFile filep = LLFile::fopen(in_path, "rb");
 		if (filep)
 		{
-			fread(in_data.data(), sizeof(U8), in_data.size(), filep);
+			size_t result = fread(in_data.data(), sizeof(U8), in_data.size(), filep);
 			filep.close();
 
-			glProgramBinary(shader->mProgramObject, shader_info.mBinaryFormat, in_data.data(), shader_info.mBinaryLength);
-
-			GLint success = GL_TRUE;
-			glGetProgramiv(shader->mProgramObject, GL_LINK_STATUS, &success);
-			if (success == GL_TRUE)
+			if (result == in_data.size())
 			{
-				binary_iter->second.mLastUsedTime = LLTimer::getTotalSeconds();
-				return true;
+				glProgramBinary(shader->mProgramObject, shader_info.mBinaryFormat, in_data.data(), shader_info.mBinaryLength);
+
+				GLint success = GL_TRUE;
+				glGetProgramiv(shader->mProgramObject, GL_LINK_STATUS, &success);
+				if (success == GL_TRUE)
+				{
+					binary_iter->second.mLastUsedTime = LLTimer::getTotalSeconds();
+					return true;
+				}
 			}
 		}
 
