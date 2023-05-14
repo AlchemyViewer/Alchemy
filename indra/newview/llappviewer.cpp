@@ -3610,45 +3610,6 @@ void LLAppViewer::writeSystemInfo()
 	writeDebugInfo(); // Save out debug_info.log early, in case of crash.
 }
 
-#ifdef LL_WINDOWS
-//For whatever reason, in Windows when using OOP server for breakpad, the callback to get the
-//name of the dump file is not getting triggered by the breakpad library.   Unfortunately they
-//also didn't see fit to provide a simple query request across the pipe to get this name either.
-//Since we are putting our output in a runtime generated directory and we know the header data in
-//the dump format, we can however use the following hack to identify our file.
-// TODO make this a member function.
-void getFileList()
-{
-	std::stringstream filenames;
-
-	typedef std::vector<std::string> vec;
-	std::string pathname = gDirUtilp->getExpandedFilename(LL_PATH_DUMP,"");
-	vec file_vec = gDirUtilp->getFilesInDir(pathname);
-	for(vec::const_iterator iter=file_vec.begin(); iter!=file_vec.end(); ++iter)
-	{
-		filenames << *iter << " ";
-		if ( ( iter->length() > 30 ) && (iter->rfind(".dmp") == (iter->length()-4) ) )
-		{
-			std::string fullname = pathname + *iter;
-			llifstream fdat( fullname.c_str(), std::ifstream::binary);
-			if (fdat)
-			{
-				char buf[5];
-				fdat.read(buf,4);
-				fdat.close();
-				if (!strncmp(buf,"MDMP",4))
-				{
-					gDebugInfo["Dynamic"]["MinidumpPath"] = fullname;
-					break;
-				}
-			}
-		}
-	}
-	filenames << std::endl;
-	gDebugInfo["Dynamic"]["DumpDirContents"] = filenames.str();
-}
-#endif
-
 void LLAppViewer::handleViewerCrash()
 {
 	LL_INFOS("CRASHREPORT") << "Handle viewer crash entry." << LL_ENDL;

@@ -281,10 +281,6 @@ public:
 	  */
 	LLRunner& getRunner() { return mRunner; }
 
-#ifdef LL_WINDOWS
-    virtual void reportCrashToBugsplat(void* pExcepInfo /*EXCEPTION_POINTERS*/) { }
-#endif
-
 	virtual void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) {};
 
 public:

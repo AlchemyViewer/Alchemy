@@ -625,18 +625,6 @@ bool LLAppViewerWin32::cleanup()
 	return result;
 }
 
-void LLAppViewerWin32::reportCrashToBugsplat(void* pExcepInfo)
-{
-#if defined(AL_SENTRY)
-	if (mSentryInitialized)
-	{
-		sentry_ucontext_s exc_context = {};
-		exc_context.exception_ptrs = *(EXCEPTION_POINTERS*)pExcepInfo;
-		sentry_handle_exception(&exc_context);
-	}
-#endif
-}
-
 void LLAppViewerWin32::setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name)
 {
 #if defined(AL_SENTRY)
