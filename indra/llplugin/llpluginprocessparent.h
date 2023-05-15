@@ -168,6 +168,7 @@ private:
 
 	LLProcess::Params mProcessParams;
 	LLProcessPtr mProcess;
+	bool mProcessCreationRequested = false;
 
 	std::string mPluginFile;
 	std::string mPluginDir;

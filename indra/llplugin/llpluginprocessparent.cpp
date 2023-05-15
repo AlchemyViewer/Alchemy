@@ -35,6 +35,9 @@
 #include "llsdserialize.h"
 #include "stringize.h"
 
+#include "threadpool.h"
+#include "workqueue.h"
+
 #include "llapr.h"
 
 bool LLPluginProcessParent::sUseReadThread = false;
@@ -487,14 +490,76 @@ void LLPluginProcessParent::idle(void)
 			case STATE_LISTENING:
 			    {
 				    // Launch the plugin process.
-				
 				    // Only argument to the launcher is the port number we're listening on
 				    mProcessParams.args.add(stringize(mBoundPort));
-				    if (! (mProcess = LLProcess::create(mProcessParams)))
-				    {
-					    errorState();
-				    }
-				    else
+
+				    // Launch the plugin process.
+                    if (mDebug && !mProcess)
+                    {
+						if (!(mProcess = LLProcess::create(mProcessParams)))
+						{
+							errorState();
+						}
+                    }
+					else if (!mProcess && !mProcessCreationRequested)
+					{
+						mProcessCreationRequested = true;
+						LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
+						// *NOTE: main_queue->postTo casts this refcounted smart pointer to a weak
+						// pointer
+						LL::WorkQueue::ptr_t general_queue = LL::WorkQueue::getInstance("General");
+						const LL::ThreadPool::ptr_t general_thread_pool = LL::ThreadPool::getInstance("General");
+						llassert_always(main_queue);
+						llassert_always(general_queue);
+						llassert_always(general_thread_pool);
+
+						auto process_params = mProcessParams;
+
+						bool posted = main_queue->postTo(
+							general_queue,
+							[process_params]() // Work done on general queue
+							{
+								return LLProcess::create(process_params);
+							},
+							[this](LLProcessPtr new_process) // Callback to main thread
+								mutable {
+								ptr_t that;
+								{
+									// this grabs a copy of the smart pointer to ourselves to ensure that we do not
+									// get destroyed until after this method returns.
+									LLMutexLock lock(sInstancesMutex);
+									mapInstances_t::iterator it = sInstances.find(this);
+									if (it != sInstances.end())
+										that = (*it).second;
+								}
+
+								if (that)
+								{
+									if (new_process)
+									{
+										that->mProcess = new_process;
+									}
+									else
+									{
+										that->errorState();
+									}
+								}
+
+							});
+						if (!posted)
+						{
+							// Shutdown
+							// Consider making processQueue() do a cleanup instead
+							// of starting more decodes
+							LL_WARNS("Plugin") << "Failed to dispath process creation to threadpool" << LL_ENDL;
+							if (!(mProcess = LLProcess::create(mProcessParams)))
+							{
+								errorState();
+							}
+						}
+					}
+
+					if (mProcess)
 				    {
 					    if(mDebug)
 					    {
