@@ -11906,10 +11906,13 @@ void LLVOAvatar::readProfileQuery(S32 retries)
     { // wait until next frame
         LLUUID id = getID();
 
-        LL::WorkQueue::getInstance("mainloop")->post([id, retries] {
-            LLVOAvatar* avatar = (LLVOAvatar*) gObjectList.findObject(id);
-            avatar->readProfileQuery(retries);
-            });
+		LL::WorkQueue::getInstance("mainloop")->post([id, retries] {
+			LLVOAvatar* avatar = (LLVOAvatar*)gObjectList.findObject(id);
+			if (avatar)
+			{
+				avatar->readProfileQuery(retries);
+			}
+			});
     }
 }
 
