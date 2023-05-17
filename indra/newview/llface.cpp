@@ -219,7 +219,7 @@ void LLFace::destroy()
 			if (group)
 			{
 				group->dirtyGeom();
-				gPipeline.markRebuild(group, TRUE);
+				gPipeline.markRebuild(group);
 			}
 		}
 	}
@@ -258,7 +258,7 @@ void LLFace::setPool(LLFacePool* new_pool, LLViewerTexture *texturep)
 
 			if (mDrawablep)
 			{
-				gPipeline.markRebuild(mDrawablep, LLDrawable::REBUILD_ALL, TRUE);
+				gPipeline.markRebuild(mDrawablep, LLDrawable::REBUILD_ALL);
 			}
 		}
 		mGeomIndex = 0;
@@ -349,7 +349,7 @@ void LLFace::dirtyTexture()
 
                     vobj->updateVisualComplexity();
 				}
-				gPipeline.markRebuild(drawablep, LLDrawable::REBUILD_VOLUME, FALSE);
+				gPipeline.markRebuild(drawablep, LLDrawable::REBUILD_VOLUME);
 			}
 		}
 	}
@@ -1192,6 +1192,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 		{
 			if (gDebugGL)
 			{
+                llassert(false);
 				LL_WARNS()	<< "Index buffer overflow!" << LL_ENDL;
 				LL_WARNS() << "Indices Count: " << mIndicesCount
 						<< " VF Num Indices: " << num_indices
@@ -1207,6 +1208,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 		{
 			if (gDebugGL)
 			{
+                llassert(false);
 				LL_WARNS() << "Vertex buffer overflow!" << LL_ENDL;
 			}
 			return FALSE;
