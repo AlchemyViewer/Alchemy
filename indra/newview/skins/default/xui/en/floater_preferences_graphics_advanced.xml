@@ -369,19 +369,19 @@
       name="FSAADisabled"
       value="0" />
     <combo_box.item
-      label="2x"
+      label="Low"
       name="2x"
       value="2" />
     <combo_box.item
-     label="4x"
+     label="Medium"
      name="4x"
      value="4" />
     <combo_box.item
-     label="8x"
+     label="High"
      name="8x"
      value="8" />
     <combo_box.item
-     label="16x"
+     label="Ultra"
      name="16x"
      value="16" />
   </combo_box>

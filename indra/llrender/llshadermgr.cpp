@@ -575,41 +575,6 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 	S32 major_version = gGLManager.mGLSLVersionMajor;
 	S32 minor_version = gGLManager.mGLSLVersionMinor;
 	
-	if (major_version == 1 && minor_version < 30)
-	{
-		if (minor_version < 10)
-		{
-			//should NEVER get here -- if major version is 1 and minor version is less than 10, 
-			// viewer should never attempt to use shaders, continuing will result in undefined behavior
-			LL_ERRS() << "Unsupported GLSL Version." << LL_ENDL;
-		}
-
-		if (minor_version <= 19)
-		{
-			shader_code_text[shader_code_count++] = strdup("#version 110\n");
-			extra_code_text[extra_code_count++] = strdup("#define ATTRIBUTE attribute\n");
-			extra_code_text[extra_code_count++] = strdup("#define VARYING varying\n");
-			extra_code_text[extra_code_count++] = strdup("#define VARYING_FLAT varying\n");
-		}
-		else if (minor_version <= 29)
-		{
-			//set version to 1.20
-			shader_code_text[shader_code_count++] = strdup("#version 120\n");
-       		extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_120 1\n");
-            if (gGLManager.mHasGPUShader4) 
-			{
-                extra_code_text[extra_code_count++] = strdup("#define FXAA_FAST_PIXEL_OFFSET 1\n");
-			}
-            else
-            {
-                extra_code_text[extra_code_count++] = strdup("#define FXAA_FAST_PIXEL_OFFSET 0\n");
-            }
-			extra_code_text[extra_code_count++] = strdup("#define ATTRIBUTE attribute\n");
-			extra_code_text[extra_code_count++] = strdup("#define VARYING varying\n");
-			extra_code_text[extra_code_count++] = strdup("#define VARYING_FLAT varying\n");
-		}
-	}
-	else
 	{  
         if (major_version >= 4)
         {
@@ -642,7 +607,6 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             {
                 shader_code_text[shader_code_count++] = strdup("#version 400\n");
             }
-			extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_400 1\n");
         }
         else if (major_version == 3)
         {
@@ -662,7 +626,6 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             {
                 shader_code_text[shader_code_count++] = strdup("#version 330\n");
             }
-			extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_130 1\n");
         }
 		else
 		{
@@ -671,7 +634,6 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 			//some implementations of GLSL 1.30 require integer precision be explicitly declared
 			extra_code_text[extra_code_count++] = strdup("precision mediump int;\n");
 			extra_code_text[extra_code_count++] = strdup("precision highp float;\n");
-			extra_code_text[extra_code_count++] = strdup("#define FXAA_GLSL_130 1\n");
 		}
 
 		extra_code_text[extra_code_count++] = strdup("#define DEFINE_GL_FRAGCOLOR 1\n");
@@ -1193,9 +1155,10 @@ bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
 
 				if (result == in_data.size())
 				{
+					GLenum error = glGetError(); // Clear current error
 					glProgramBinary(shader->mProgramObject, shader_info.mBinaryFormat, in_data.data(), shader_info.mBinaryLength);
 
-					GLenum error = glGetError();
+					error = glGetError();
 					GLint success = GL_TRUE;
 					glGetProgramiv(shader->mProgramObject, GL_LINK_STATUS, &success);
 					if (error == GL_NO_ERROR && success == GL_TRUE)
@@ -1226,8 +1189,9 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
 		std::vector<U8> program_binary;
 		program_binary.resize(binary_info.mBinaryLength);
 
+		GLenum error = glGetError(); // Clear current error
 		glGetProgramBinary(shader->mProgramObject, program_binary.size() * sizeof(U8), nullptr, &binary_info.mBinaryFormat, program_binary.data());
-		GLenum error = glGetError();
+		error = glGetError();
 		if (error == GL_NO_ERROR)
 		{
 			std::string out_path = gDirUtilp->add(mShaderCacheDir, shader->mShaderHash.asString() + ".shaderbin");

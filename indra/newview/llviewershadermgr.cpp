@@ -2556,25 +2556,33 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         llassert(success);
     }
 
-	if (success && gGLManager.mGLVersion > 3.9f)
+	if (success)
 	{
         std::vector<std::pair<std::string, std::string>> smaa_preset_pair = {{"12", "Low"},
                                                                              {"23", "Medium"},
                                                                              {"29", "High"},
                                                                              {"39", "Ultra"}};
         int i = 0;
-        for (const auto& smaa_pair : smaa_preset_pair)
+        for (const auto& fxaa_pair : smaa_preset_pair)
         {
             if (success)
             {
-                gFXAAProgram[i].mName = fmt::format("FXAA {:s} Shader", smaa_pair.second);
+                gFXAAProgram[i].mName = fmt::format("FXAA {:s} Shader", fxaa_pair.second);
                 gFXAAProgram[i].mFeatures.isDeferred = true;
                 gFXAAProgram[i].mShaderFiles.clear();
                 gFXAAProgram[i].mShaderFiles.push_back(make_pair("deferred/postDeferredV.glsl", GL_VERTEX_SHADER));
                 gFXAAProgram[i].mShaderFiles.push_back(make_pair("deferred/fxaaF.glsl", GL_FRAGMENT_SHADER));
                 gFXAAProgram[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 				gFXAAProgram[i].clearPermutations();
-                gFXAAProgram[i].addPermutation("FXAA_QUALITY__PRESET", smaa_pair.first);
+                gFXAAProgram[i].addPermutation("FXAA_QUALITY__PRESET", fxaa_pair.first);
+				if(gGLManager.mGLVersion > 3.9)
+				{
+					gFXAAProgram[i].addPermutation("FXAA_GLSL_400", "1");
+				}
+				else
+				{
+					gFXAAProgram[i].addPermutation("FXAA_GLSL_130", "1");
+				}
                 success = gFXAAProgram[i].createShader(NULL, NULL);
                 llassert(success);
             }
