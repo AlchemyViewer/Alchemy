@@ -443,27 +443,25 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString>* attributes,
 			else
 			{
 				success = FALSE;
-				break;
 			}
 		}
     }
 
-	// Attach existing objects
-	if (!LLShaderMgr::instance()->attachShaderFeatures(this))
-	{
-		unloadInternal();
-		return FALSE;
-	}
-
-	// Map attributes and uniforms
-	if (success)
-	{
-		success = mapAttributes(attributes);
-	}
-	if (success)
-	{
-		success = mapUniforms(uniforms);
-	}
+    // Attach existing objects
+    if (!LLShaderMgr::instance()->attachShaderFeatures(this))
+    {
+        unloadInternal();
+        return FALSE;
+    }
+    // Map attributes and uniforms
+    if (success)
+    {
+        success = mapAttributes(attributes);
+    }
+    if (success)
+    {
+        success = mapUniforms(uniforms);
+    }
     if (!success)
     {
         LL_SHADER_LOADING_WARNS() << "Failed to link shader: " << mName << LL_ENDL;
