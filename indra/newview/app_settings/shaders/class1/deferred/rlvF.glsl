@@ -16,13 +16,8 @@
 
 /*[EXTRA_CODE_HERE]*/
 
-#ifdef DEFINE_GL_FRAGCOLOR
-	out vec4 frag_color;
-#else
-	#define frag_color gl_FragColor
-#endif
-
-VARYING vec2 vary_fragcoord;
+out vec4 frag_color;
+in vec2 vary_fragcoord;
 
 uniform sampler2D diffuseRect;
 uniform sampler2D depthMap;

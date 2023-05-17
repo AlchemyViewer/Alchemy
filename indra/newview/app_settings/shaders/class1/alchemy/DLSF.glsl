@@ -23,17 +23,9 @@
  * $/LicenseInfo$
  */
 
-#extension GL_ARB_shader_texture_lod : enable
-#extension GL_EXT_gpu_shader4 : enable
-
 /*[EXTRA_CODE_HERE]*/
 
-#ifdef DEFINE_GL_FRAGCOLOR
 out vec4 frag_color;
-#else
-#define frag_color gl_FragColor
-#endif
-
 in vec2 vary_fragcoord;
 
 uniform sampler2D diffuseRect;

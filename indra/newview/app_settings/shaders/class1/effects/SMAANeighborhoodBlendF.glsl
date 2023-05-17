@@ -4,14 +4,10 @@
 
 /*[EXTRA_CODE_HERE]*/
 
-#ifdef DEFINE_GL_FRAGCOLOR
 out vec4 frag_color;
-#else
-#define frag_color gl_FragColor
-#endif
 
-VARYING vec2 vary_texcoord0;
-VARYING vec4 vary_offset;
+in vec2 vary_texcoord0;
+in vec4 vary_offset;
 
 uniform sampler2D tex0;
 uniform sampler2D tex1;

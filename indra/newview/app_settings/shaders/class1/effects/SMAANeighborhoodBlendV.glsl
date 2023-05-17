@@ -6,10 +6,10 @@
 
 uniform mat4 modelview_projection_matrix;
 
-ATTRIBUTE vec3 position;
+in vec3 position;
 
-VARYING vec2 vary_texcoord0;
-VARYING vec4 vary_offset;
+out vec2 vary_texcoord0;
+out vec4 vary_offset;
 
 #define float4 vec4
 #define float2 vec2
