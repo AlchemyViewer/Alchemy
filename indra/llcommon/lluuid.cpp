@@ -40,11 +40,12 @@
 #include "lluuid.h"
 #include "llerror.h"
 #include "llrand.h"
-#include "llmd5.h"
 #include "llstring.h"
 #include "lltimer.h"
 #include "llthread.h"
 #include "llmutex.h"
+#include "llmd5.h"
+#include "hbxxh.h"
 
 const LLUUID LLUUID::null;
 const LLTransactionID LLTransactionID::tnull;
@@ -549,6 +550,9 @@ LLUUID LLUUID::operator^(const LLUUID& rhs) const
     return id;
 }
 
+// WARNING: this algorithm SHALL NOT be changed. It is also used by the server
+// and plays a role in some assets validation (e.g. clothing items). Changing
+// it would cause invalid assets.
 void LLUUID::combine(const LLUUID& other, LLUUID& result) const
 {
     LLMD5 md5_uuid;

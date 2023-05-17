@@ -125,7 +125,7 @@ ThreadRecorder::~ThreadRecorder()
 #endif
 }
 
-TimeBlockTreeNode* ThreadRecorder::getTimeBlockTreeNode( S32 index )
+TimeBlockTreeNode* ThreadRecorder::getTimeBlockTreeNode( size_t index )
 {
 #if LL_TRACE_ENABLED
 	if (0 <= index && index < mNumTimeBlockTreeNodes)
@@ -280,17 +280,15 @@ void ThreadRecorder::pullFromChildren()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
 	if (mActiveRecordings.empty()) return;
 
-	{ LLMutexLock child_list_lock(&mChildListMutex);
+	{ LLMutexLock lock(&mChildListMutex);
 
 		AccumulatorBufferGroup& target_recording_buffers = mActiveRecordings.back()->mPartialRecording;
 		target_recording_buffers.sync();
-		for (child_thread_recorder_list_t::iterator it = mChildThreadRecorders.begin(), end_it = mChildThreadRecorders.end();
-			it != end_it;
-			++it)
-		{ LLMutexLock shared_record_lock(&(*it)->mSharedRecordingMutex);
+		for (LLTrace::ThreadRecorder* rec : mChildThreadRecorders)
+		{ LLMutexLock lock2(&(rec->mSharedRecordingMutex));
 
-			target_recording_buffers.merge((*it)->mSharedRecordingBuffers);
-			(*it)->mSharedRecordingBuffers.reset();
+			target_recording_buffers.merge(rec->mSharedRecordingBuffers);
+			rec->mSharedRecordingBuffers.reset();
 		}
 	}
 #endif

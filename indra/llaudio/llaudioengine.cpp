@@ -122,18 +122,16 @@ void LLAudioEngine::shutdown()
 	mStreamingAudioImpl = nullptr;
 
 	// Clean up audio sources
-	source_map::iterator iter_src;
-	for (iter_src = mAllSources.begin(); iter_src != mAllSources.end(); ++iter_src)
+	for (source_map::value_type& src_pair : mAllSources)
 	{
-		delete iter_src->second;
+		delete src_pair.second;
 	}
 
 
 	// Clean up audio data
-	data_map::iterator iter_data;
-	for (iter_data = mAllData.begin(); iter_data != mAllData.end(); ++iter_data)
+	for (data_map::value_type& data_pair : mAllData)
 	{
-		delete iter_data->second;
+		delete data_pair.second;
 	}
 
 
@@ -306,12 +304,12 @@ void LLAudioEngine::idle()
 	updateChannels();
 
 	// Update queued sounds (switch to next queued data if the current has finished playing)
-	for (const auto& all_pair : mAllSources)
+	for (source_map::value_type& src_pair : mAllSources)
 	{
 		// This is lame, instead of this I could actually iterate through all the sources
 		// attached to each channel, since only those with active channels
 		// can have anything interesting happen with their queue? (Maybe not true)
-		LLAudioSource *sourcep = all_pair.second;
+		LLAudioSource *sourcep = src_pair.second;
 		if (!sourcep->mQueuedDatap || sourcep->isMuted())
 		{
 			// Muted, or nothing queued, so we don't care.
@@ -391,9 +389,9 @@ void LLAudioEngine::idle()
 	LLAudioSource *sync_masterp = NULL;
 	LLAudioChannel *master_channelp = NULL;
 	F32 max_sm_priority = -1.f;
-	for (const auto& all_pair : mAllSources)
+	for (source_map::value_type& src_pair : mAllSources)
 	{
-		LLAudioSource *sourcep = all_pair.second;
+		LLAudioSource *sourcep = src_pair.second;
 		if (sourcep->isMuted())
 		{
 			continue;
@@ -413,9 +411,9 @@ void LLAudioEngine::idle()
 	{
 		// Synchronize loop slaves with their masters
 		// Update queued sounds (switch to next queued data if the current has finished playing)
-		for (const auto& all_pair : mAllSources)
+		for (source_map::value_type& src_pair : mAllSources)
 		{
-			LLAudioSource *sourcep = all_pair.second;
+			LLAudioSource *sourcep = src_pair.second;
 
 			if (!sourcep->isSyncSlave())
 			{
@@ -1126,7 +1124,7 @@ void LLAudioEngine::startNextTransfer()
 			}
 
 
-			for (const auto& preload_pair : asp->mPreloadMap)
+			for (data_map::value_type& preload_pair : asp->mPreloadMap)
 			{
 				LLAudioData *adp = preload_pair.second;
 				if (!adp)
@@ -1147,9 +1145,10 @@ void LLAudioEngine::startNextTransfer()
 	if (asset_id.isNull())
 	{
 		max_pri = -1.f;
-		for (const auto& all_source_pair : mAllSources)
+		source_map::iterator source_iter;
+		for (source_map::value_type& source_pair : mAllSources)
 		{
-			asp = all_source_pair.second;
+			asp = source_pair.second;
 			if (!asp)
 			{
 				continue;
@@ -1176,7 +1175,7 @@ void LLAudioEngine::startNextTransfer()
 				continue;
 			}
 
-			for (const auto& preload_pair : asp->mPreloadMap)
+			for (data_map::value_type& preload_pair : asp->mPreloadMap)
 			{
 				LLAudioData *adp = preload_pair.second;
 				if (!adp)
@@ -1688,7 +1687,7 @@ void LLAudioSource::addAudioData(LLAudioData *adp, const bool set_current)
 bool LLAudioSource::hasPendingPreloads() const
 {
 	// Check to see if we've got any preloads on deck for this source
-	for (const auto& preload_pair : mPreloadMap)
+	for (const data_map::value_type& preload_pair : mPreloadMap)
 	{
 		LLAudioData *adp = preload_pair.second;
 		// note: a bad UUID will forever be !hasDecodedData()

@@ -2876,19 +2876,19 @@ bool LLTextureFetch::updateRequestPriority(const LLUUID& id, F32 priority)
 // Threads:  T*
 
 //virtual
-S32 LLTextureFetch::getPending()
+size_t LLTextureFetch::getPending()
 {
     LL_PROFILE_ZONE_SCOPED;
-	S32 res;
-	lockData();															// +Ct
+    size_t res;
+    lockData();															// +Ct
     {
         LLMutexLock lock(&mQueueMutex);									// +Mfq
         
         res = mRequestQueue.size();
         res += mCommands.size();
     }																	// -Mfq
-	unlockData();														// -Ct
-	return res;
+    unlockData();														// -Ct
+    return res;
 }
 
 // Locks:  Ct
@@ -2955,7 +2955,7 @@ void LLTextureFetch::commonUpdate()
 // Threads:  Tmain
 
 //virtual
-S32 LLTextureFetch::update(F32 max_time_ms)
+size_t LLTextureFetch::update(F32 max_time_ms)
 {
     LL_PROFILE_ZONE_SCOPED;
 	static LLCachedControl<F32> band_width(gSavedSettings,"ThrottleBandwidthKBPS", 3000.0f);
@@ -2966,7 +2966,7 @@ S32 LLTextureFetch::update(F32 max_time_ms)
 		add(LLStatViewer::TEXTURE_NETWORK_DATA_RECEIVED, mHTTPTextureBits.exchange((U32Bits)0));
 	}
 
-	S32 res = LLWorkerThread::update(max_time_ms);
+	size_t res = LLWorkerThread::update(max_time_ms);
 	
 	if (!mThreaded)
 	{

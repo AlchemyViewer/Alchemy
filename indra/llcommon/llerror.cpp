@@ -606,9 +606,9 @@ namespace
 	
 	void Globals::invalidateCallSites()
 	{
-		for (LLError::CallSite* callsite : callSites)
+		for (LLError::CallSite* site : callSites)
 		{
-            callsite->invalidate();
+            site->invalidate();
 		}
 		
 		callSites.clear();
@@ -1237,7 +1237,7 @@ namespace
         std::string escaped_message;
 
         LLMutexLock lock(&s->mRecorderMutex);
-		for (LLError::RecorderPtr r : s->mRecorders)
+		for (LLError::RecorderPtr& r : s->mRecorders)
 		{
             if (!r->enabled())
             {
@@ -1520,7 +1520,7 @@ namespace LLError
 		const size_t BUF_SIZE = 64;
 		char time_str[BUF_SIZE];	/* Flawfinder: ignore */
 		
-		int chars = strftime(time_str, BUF_SIZE, 
+		auto chars = strftime(time_str, BUF_SIZE, 
 								  "%Y-%m-%dT%H:%M:%SZ",
 								  gmtime(&now));
 

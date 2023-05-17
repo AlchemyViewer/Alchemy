@@ -2910,6 +2910,13 @@ void handle_object_open()
 //	LLFloaterReg::showInstance("openobject");
 }
 
+bool enable_object_inspect()
+{
+    LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+    LLViewerObject* selected_objectp = selection->getFirstRootObject();
+    return selected_objectp != NULL;
+}
+
 struct LLSelectedTEGetmatIdAndPermissions : public LLSelectedTEFunctor
 {
     LLSelectedTEGetmatIdAndPermissions() : mCanCopy(true), mCanModify(true), mCanTransfer(true) {}
@@ -8256,7 +8263,7 @@ bool enable_object_take_copy()
 	bool all_valid = false;
 	LLSelectMgr* select_mgr = LLSelectMgr::getInstance();
 	{
-		if (!select_mgr->getSelection()->isEmpty())
+		if (select_mgr->getSelection()->getRootObjectCount() > 0)
 		{
 		all_valid = true;
 #ifndef HACKED_GODLIKE_VIEWER
@@ -10056,6 +10063,7 @@ void initialize_menus()
 	commit.add("Object.Open", boost::bind(&handle_object_open));
 	commit.add("Object.Take", boost::bind(&handle_take));
 	commit.add("Object.ShowInspector", boost::bind(&handle_object_show_inspector));
+    enable.add("Object.EnableInspect", boost::bind(&enable_object_inspect));
     enable.add("Object.EnableEditGLTFMaterial", boost::bind(&enable_object_edit_gltf_material));
     enable.add("Object.EnableSaveGLTFMaterial", boost::bind(&enable_object_save_gltf_material));
 	enable.add("Object.EnableOpen", boost::bind(&enable_object_open));

@@ -140,7 +140,7 @@ void LLPathfindingNavMesh::handleNavMeshResult(const LLSD &pContent, U32 pNavMes
 		if ( pContent.has(NAVMESH_DATA_FIELD) )
 		{
 			const LLSD::Binary &value = pContent.get(NAVMESH_DATA_FIELD).asBinary();
-			unsigned int decompBinSize = 0;
+			size_t decompBinSize = 0;
 			bool valid = false;
 			U8* pUncompressedNavMeshContainer = unzip_llsdNavMesh( valid, decompBinSize, value.data(), value.size()) ;
 			if ( !valid )

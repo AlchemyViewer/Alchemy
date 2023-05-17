@@ -349,7 +349,10 @@ public:
 	{
 		// will be deleted by ~LLInventoryModel
 		//delete mInvObserver;
-		LLVoiceClient::getInstance()->removeObserver(this);
+        if (LLVoiceClient::instanceExists())
+        {
+            LLVoiceClient::getInstance()->removeObserver(this);
+        }
 		LLAvatarTracker::instance().removeObserver(this);
 	}
 

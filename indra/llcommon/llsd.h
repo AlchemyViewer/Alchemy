@@ -206,7 +206,17 @@ public:
 
 	/** @name Convenience Constructors */
 	//@{
-		LLSD(F32); // F32 -> Real
+		// support construction from size_t et al.
+		template <typename VALUE,
+				  typename std::enable_if<std::is_integral<VALUE>::value &&
+										  ! std::is_same<VALUE, Boolean>::value,
+										  bool>::type = true>
+		LLSD(VALUE v): LLSD(Integer(narrow(v))) {}
+		// support construction from F32 et al.
+		template <typename VALUE,
+				  typename std::enable_if<std::is_floating_point<VALUE>::value,
+										  bool>::type = true>
+		LLSD(VALUE v): LLSD(Real(narrow(v))) {}
 	//@}
 	
 	/** @name Scalar Assignment */
@@ -300,7 +310,7 @@ public:
 	//@{
 		LLSD(const char*);
 		void assign(const char*);
-		LLSD& operator=(const char* v)	{ assign(v); return *this; }
+		LLSD& operator=(const char* v) { assign(v); return *this; }
 	//@}
 	
 	/** @name Map Values */
@@ -330,14 +340,24 @@ public:
 		LLSD& append(const LLSD&);
 		void erase(Integer);
 		LLSD& with(Integer, const LLSD&);
-		
-		const LLSD& operator[](Integer) const;
-		LLSD& operator[](Integer);
+
+		// accept size_t so we can index relative to size()
+		const LLSD& operator[](size_t) const;
+		LLSD& operator[](size_t);
+		// template overloads to support int literals, U32 et al.
+		template <typename IDX,
+				  typename std::enable_if<std::is_convertible<IDX, size_t>::value,
+										  bool>::type = true>
+		const LLSD& operator[](IDX i) const { return (*this)[size_t(i)]; }
+		template <typename IDX,
+				  typename std::enable_if<std::is_convertible<IDX, size_t>::value,
+										  bool>::type = true>
+		LLSD& operator[](IDX i) { return (*this)[size_t(i)]; }
 	//@}
 
 	/** @name Iterators */
 	//@{
-		int size() const;
+		size_t size() const;
 
 		typedef std::map<String, LLSD, std::less<>>					map_t;
 		typedef map_t::iterator		map_iterator;

@@ -42,8 +42,10 @@ class LLFloaterProgressView final : public LLFloater
 public:
 	LLFloaterProgressView(const LLSD& key);
 	BOOL postBuild() override;
+	void setShowProgress(BOOL visible);
 	void setProgressCancelButtonVisible(BOOL visible, const std::string& label = LLStringUtil::null);
 	void setProgressText(const std::string& text);
+	void setProgressString(const std::string& text) { setProgressText(text); }
 	void setProgressPercent(const F32 percent);
 	void setRegion(const std::string& region = LLStringUtil::null);
 	

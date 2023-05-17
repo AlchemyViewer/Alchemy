@@ -27,13 +27,13 @@
 #import "llsys_objc.h"
 #import <AppKit/AppKit.h>
 
-bool LLGetDarwinOSInfo(int &major, int &minor, int &patch)
+bool LLGetDarwinOSInfo(int64_t &major, int64_t &minor, int64_t &patch)
 {
     NSOperatingSystemVersion osVersion = [[NSProcessInfo processInfo] operatingSystemVersion];
-    major = (int)osVersion.majorVersion;
-    minor = (int)osVersion.minorVersion;
-    patch = (int)osVersion.patchVersion;
-	return true;
+    major = osVersion.majorVersion;
+    minor = osVersion.minorVersion;
+    patch = osVersion.patchVersion;
+    return true;
 }
 
 const char* LLGetDarwinPreferredLanguage()

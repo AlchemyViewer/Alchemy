@@ -59,7 +59,7 @@ class LLGroupCommandHandler : public LLCommandHandler
 {
 public:
 	// requires trusted browser to trigger
-	LLGroupCommandHandler() : LLCommandHandler("group", UNTRUSTED_CLICK_ONLY) { }
+	LLGroupCommandHandler() : LLCommandHandler("group", UNTRUSTED_THROTTLE) { }
 
     virtual bool canHandleUntrusted(
         const LLSD& params,

@@ -222,9 +222,9 @@ public:
 	S32 getVisualParamCountInGroup(const EVisualParamGroup group) const
 	{
 		S32 rtn = 0;
-		for (const auto& pair : mVisualParamSortedVector)
+		for (const auto& index_pair : mVisualParamSortedVector)
 		{
-			if (pair.second->getGroup() == group)
+			if (index_pair.second->getGroup() == group)
 			{
 				++rtn;
 			}
