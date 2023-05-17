@@ -375,14 +375,16 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
 void RlvSphereEffect::run(const LLVisualEffectParams* pParams)
 {
 	LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("Post-process (RLVa sphere)");
-	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
-
-	gRlvSphereProgram.bind();
-	setShaderUniforms(&gRlvSphereProgram);
-
-	const LLShaderEffectParams* pShaderParams = static_cast<const LLShaderEffectParams*>(pParams);
-	switch (m_eMode)
+	if (gRlvSphereProgram.isComplete())
 	{
+		LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+
+		gRlvSphereProgram.bind();
+		setShaderUniforms(&gRlvSphereProgram);
+
+		const LLShaderEffectParams* pShaderParams = static_cast<const LLShaderEffectParams*>(pParams);
+		switch (m_eMode)
+		{
 		case ESphereMode::Blend:
 		case ESphereMode::ChromaticAberration:
 		case ESphereMode::Pixelate:
@@ -397,9 +399,10 @@ void RlvSphereEffect::run(const LLVisualEffectParams* pParams)
 			break;
 		default:
 			llassert(true);
-	}
+		}
 
-	gRlvSphereProgram.unbind();
+		gRlvSphereProgram.unbind();
+	}
 }
 
 // ====================================================================================
