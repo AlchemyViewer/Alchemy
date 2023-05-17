@@ -364,8 +364,7 @@ void LLCoros::toplevel(std::string name, callable_t callable)
     {
         // Stash any OTHER kind of uncaught exception in the rethrow() queue
         // to be rethrown by the main fiber.
-        LL_WARNS("LLCoros") << "Capturing uncaught exception in coroutine "
-                            << name << LL_ENDL;
+        LOG_UNHANDLED_EXCEPTION(STRINGIZE("coroutine " << name));
         LLCoros::instance().saveException(name, std::current_exception());
     }
 }
