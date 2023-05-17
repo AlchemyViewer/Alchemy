@@ -34,5 +34,5 @@ in vec2 tc;
 
 void main() 
 {
-	frag_color = texture2D(diffuseRect, tc) + texture2D(emissiveRect, tc);
+	frag_color = texture(diffuseRect, tc) + texture(emissiveRect, tc);
 }

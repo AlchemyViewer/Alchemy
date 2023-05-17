@@ -22,13 +22,13 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-
+ 
 /*[EXTRA_CODE_HERE]*/
 
 out vec4 frag_color;
 
-VARYING vec4 vertex_color;
-VARYING vec2 vary_texcoord0;
+in vec4 vertex_color;
+in vec2 vary_texcoord0;
 
 void main() 
 {

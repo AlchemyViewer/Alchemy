@@ -575,6 +575,11 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 	S32 major_version = gGLManager.mGLSLVersionMajor;
 	S32 minor_version = gGLManager.mGLSLVersionMinor;
 	
+	if (major_version == 1 && minor_version < 30)
+	{
+        llassert(false); // GL 3.1 or later required
+	}
+	else
 	{  
         if (major_version >= 4)
         {
@@ -629,43 +634,12 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         }
 		else
 		{
-			//set version to 1.30
-			shader_code_text[shader_code_count++] = strdup("#version 130\n");
+			//set version to 1.40
+			shader_code_text[shader_code_count++] = strdup("#version 140\n");
 			//some implementations of GLSL 1.30 require integer precision be explicitly declared
 			extra_code_text[extra_code_count++] = strdup("precision mediump int;\n");
 			extra_code_text[extra_code_count++] = strdup("precision highp float;\n");
 		}
-
-		extra_code_text[extra_code_count++] = strdup("#define DEFINE_GL_FRAGCOLOR 1\n");
-
-		extra_code_text[extra_code_count++] = strdup("#define ATTRIBUTE in\n");
-
-		if (type == GL_VERTEX_SHADER)
-		{ //"varying" state is "out" in a vertex program, "in" in a fragment program 
-			// ("varying" is deprecated after version 1.20)
-			extra_code_text[extra_code_count++] = strdup("#define VARYING out\n");
-			extra_code_text[extra_code_count++] = strdup("#define VARYING_FLAT flat out\n");
-		}
-		else
-		{
-			extra_code_text[extra_code_count++] = strdup("#define VARYING in\n");
-			extra_code_text[extra_code_count++] = strdup("#define VARYING_FLAT flat in\n");
-		}
-
-		//backwards compatibility with legacy texture lookup syntax
-		extra_code_text[extra_code_count++] = strdup("#define texture2D texture\n");
-		extra_code_text[extra_code_count++] = strdup("#define texture3D texture\n");
-		extra_code_text[extra_code_count++] = strdup("#define textureCube texture\n");
-		extra_code_text[extra_code_count++] = strdup("#define texture2DLod textureLod\n");
-		extra_code_text[extra_code_count++] = strdup("#define texture3DLod textureLod\n");
-        extra_code_text[extra_code_count++] = strdup("#define texture2DLodOffset textureLodOffset\n");
-		
-		if (major_version > 1 || minor_version >= 40)
-		{ //GLSL 1.40 replaces texture2DRect et al with texture
-			extra_code_text[extra_code_count++] = strdup("#define texture2DRect texture\n");
-			extra_code_text[extra_code_count++] = strdup("#define shadow2DRect(a,b) vec2(texture(a,b))\n");
-		}
-	}
 
 	if (type == GL_FRAGMENT_SHADER_ARB)
     {
@@ -711,13 +685,13 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 		.
 		uniform sampler2D texN;
 		
-		VARYING_FLAT ivec4 vary_texture_index;
+		flat in int vary_texture_index;
 
 		vec4 ret = vec4(1,0,1,1);
 
 		vec4 diffuseLookup(vec2 texcoord)
 		{
-			switch (vary_texture_index.r))
+			switch (vary_texture_index)
 			{
 				case 0: ret = texture2D(tex0, texcoord); break;
 				case 1: ret = texture2D(tex1, texcoord); break;
@@ -743,7 +717,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 
 		if (texture_index_channels > 1)
 		{
-			extra_code_text[extra_code_count++] = strdup("VARYING_FLAT int vary_texture_index;\n");
+			extra_code_text[extra_code_count++] = strdup("flat in int vary_texture_index;\n");
 		}
 
 		extra_code_text[extra_code_count++] = strdup("vec4 diffuseLookup(vec2 texcoord)\n");

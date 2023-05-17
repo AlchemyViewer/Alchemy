@@ -22,24 +22,20 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
-
+ 
 /*[EXTRA_CODE_HERE]*/
 
-#ifdef DEFINE_GL_FRAGCOLOR
 out vec4 frag_color;
-#else
-#define frag_color gl_FragColor
-#endif
 
 uniform sampler2D diffuseRect;
 uniform sampler2D depthMap;
 
 uniform vec2 screen_res;
-VARYING vec2 vary_fragcoord;
+in vec2 vary_fragcoord;
 
 void main() 
 {
-	vec4 diff = texture2D(diffuseRect, vary_fragcoord.xy);
+	vec4 diff = texture(diffuseRect, vary_fragcoord.xy);
 	
 	frag_color = diff;
 
