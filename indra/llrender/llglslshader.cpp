@@ -531,12 +531,13 @@ void dumpAttachObject(const char* func_name, GLuint program_object, const std::s
 }
 #endif // DEBUG_SHADER_INCLUDES
 
-BOOL LLGLSLShader::attachVertexObject(std::string object_path)
+BOOL LLGLSLShader::attachVertexObject(std::string_view object_path)
 {
-    if (LLShaderMgr::instance()->mVertexShaderObjects.count(object_path) > 0)
+    auto vert_iter = LLShaderMgr::instance()->mVertexShaderObjects.find(object_path);
+    if (vert_iter != LLShaderMgr::instance()->mVertexShaderObjects.end())
     {
         stop_glerror();
-        glAttachShader(mProgramObject, LLShaderMgr::instance()->mVertexShaderObjects[object_path]);
+        glAttachShader(mProgramObject, vert_iter->second);
 #if DEBUG_SHADER_INCLUDES
         dumpAttachObject("attachVertexObject", mProgramObject, object_path);
 #endif // DEBUG_SHADER_INCLUDES
@@ -550,15 +551,16 @@ BOOL LLGLSLShader::attachVertexObject(std::string object_path)
     }
 }
 
-BOOL LLGLSLShader::attachFragmentObject(std::string object_path)
+BOOL LLGLSLShader::attachFragmentObject(std::string_view object_path)
 {
     if(mUsingBinaryProgram)
         return TRUE;
 
-    if (LLShaderMgr::instance()->mFragmentShaderObjects.count(object_path) > 0)
+    auto frag_iter = LLShaderMgr::instance()->mFragmentShaderObjects.find(object_path);
+    if (frag_iter != LLShaderMgr::instance()->mFragmentShaderObjects.end())
     {
         stop_glerror();
-        glAttachShader(mProgramObject, LLShaderMgr::instance()->mFragmentShaderObjects[object_path]);
+        glAttachShader(mProgramObject, frag_iter->second);
 #if DEBUG_SHADER_INCLUDES
         dumpAttachObject("attachFragmentObject", mProgramObject, object_path);
 #endif // DEBUG_SHADER_INCLUDES

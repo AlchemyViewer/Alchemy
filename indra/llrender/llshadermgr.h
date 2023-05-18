@@ -321,9 +321,8 @@ public:
     bool saveCachedProgramBinary(LLGLSLShader* shader);
 
 public:
-	// Map of shader names to compiled
-    std::map<std::string, GLuint, std::less<>> mVertexShaderObjects;
-    std::map<std::string, GLuint, std::less<>> mFragmentShaderObjects;
+    boost::unordered_map<std::string, GLuint, al::string_hash, std::equal_to<>> mVertexShaderObjects;
+    boost::unordered_map<std::string, GLuint, al::string_hash, std::equal_to<>> mFragmentShaderObjects;
 
 	//global (reserved slot) shader parameters
 	std::vector<std::string> mReservedAttribs;
