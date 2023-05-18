@@ -22,9 +22,6 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
- 
-#extension GL_ARB_shader_texture_lod : enable
-#extension GL_EXT_gpu_shader4 : enable
 
 /*[EXTRA_CODE_HERE]*/
 
