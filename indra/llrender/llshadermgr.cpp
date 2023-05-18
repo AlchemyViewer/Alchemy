@@ -475,7 +475,6 @@ void LLShaderMgr::dumpObjectLog(GLuint ret, BOOL warns, const std::string& filen
 
 GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels)
 {
-
 // endsure work-around for missing GLSL funcs gets propogated to feature shader files (e.g. srgbF.glsl)
 #if LL_DARWIN
     if (defines)
@@ -640,6 +639,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 			extra_code_text[extra_code_count++] = strdup("precision mediump int;\n");
 			extra_code_text[extra_code_count++] = strdup("precision highp float;\n");
 		}
+	}
 
 	if (type == GL_FRAGMENT_SHADER_ARB)
     {
@@ -666,11 +666,6 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 		}
 	}
 
-	if( gGLManager.mIsAMD )
-	{
-		extra_code_text[extra_code_count++] = strdup( "#define IS_AMD_CARD 1\n" );
-	}
-	
 	if (texture_index_channels > 0 && type == GL_FRAGMENT_SHADER)
 	{
 		//use specified number of texture channels for indexed texture rendering
