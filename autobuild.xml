@@ -2158,11 +2158,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b089a2a291c44732e4451db43d64638900bb542474ce22adba6503c56d78ed1728487f246335622aaf49de819bb6854915ef4ade74b58fb5f75ccaa4d0eed3ad</string>
+              <string>0fe9b25023c28225c5133d07c1178af4f143070971f1d52f7eeeea8e72bc402002408c9fc3a6dcba5be4f944fcb310fa18ccdf5dad8a2c3e63111e5e03ff2b93</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/185/packages/generic/tinygltf/v2.8.5.1963/tinygltf-v2.8.5-common-1963.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/185/packages/generic/tinygltf/v2.8.9.2010/tinygltf-v2.8.9-common-2010.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2173,7 +2173,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>source_type</key>
         <string>git</string>
         <key>version</key>
-        <string>v2.8.5</string>
+        <string>v2.8.9</string>
       </map>
       <key>tracy</key>
       <map>
