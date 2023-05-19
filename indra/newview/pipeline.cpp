@@ -2614,9 +2614,9 @@ void LLPipeline::doOcclusion(LLCamera& camera)
 	}
 }
 	
-bool LLPipeline::updateDrawableGeom(LLDrawable* drawablep, bool priority)
+bool LLPipeline::updateDrawableGeom(LLDrawable* drawablep)
 {
-	bool update_complete = drawablep->updateGeometry(priority);
+	bool update_complete = drawablep->updateGeometry();
 	if (update_complete && assertInitialized())
 	{
 		drawablep->setState(LLDrawable::BUILT);
@@ -2757,7 +2757,7 @@ void LLPipeline::updateGeom(F32 max_dtime)
 				drawablep->clearState(LLDrawable::FOR_UNLOAD);
 			}
 
-			if (updateDrawableGeom(drawablep, TRUE))
+			if (updateDrawableGeom(drawablep))
 			{
 				drawablep->clearState(LLDrawable::IN_REBUILD_Q);
 				mBuildQ1.erase(curiter);
@@ -6587,6 +6587,7 @@ void LLPipeline::renderObjects(U32 type, bool texture, bool batch_texture, bool 
 	assertInitialized();
 	gGL.loadMatrix(gGLModelView);
 	gGLLastMatrix = NULL;
+
     if (rigged)
     {
         mSimplePool->pushRiggedBatches(type + 1, texture, batch_texture);
@@ -6595,40 +6596,9 @@ void LLPipeline::renderObjects(U32 type, bool texture, bool batch_texture, bool 
     {
         mSimplePool->pushBatches(type, texture, batch_texture);
     }
-	gGL.loadMatrix(gGLModelView);
+
+    gGL.loadMatrix(gGLModelView);
 	gGLLastMatrix = NULL;		
-}
-
-void LLPipeline::renderShadowSimple(U32 type)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
-    assertInitialized();
-    gGL.loadMatrix(gGLModelView);
-    gGLLastMatrix = NULL;
-
-    LLVertexBuffer* last_vb = nullptr;
-
-    LLCullResult::drawinfo_iterator begin = gPipeline.beginRenderMap(type);
-    LLCullResult::drawinfo_iterator end = gPipeline.endRenderMap(type);
-
-    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
-    {
-        LLDrawInfo& params = **i;
-
-        LLCullResult::increment_iterator(i, end);
-
-        LLVertexBuffer* vb = params.mVertexBuffer;
-        if (vb != last_vb)
-        {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("push shadow simple");
-            mSimplePool->applyModelMatrix(params);
-            vb->setBuffer();
-            vb->drawRange(LLRender::TRIANGLES, 0, vb->getNumVerts()-1, vb->getNumIndices(), 0);
-            last_vb = vb;
-        }
-    }
-    gGL.loadMatrix(gGLModelView);
-    gGLLastMatrix = NULL;
 }
 
 // Currently only used for shadows -Cosmic,2023-04-19
@@ -8700,14 +8670,7 @@ void LLPipeline::renderShadow(glh::matrix4f& view, glh::matrix4f& proj, LLCamera
 
         for (U32 type : types)
         {
-            if (rigged)
-            {
-                renderObjects(type, false, false, rigged);
-            }
-            else
-            {
-                renderShadowSimple(type);
-            }
+            renderObjects(type, false, false, rigged);
         }
 
         gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);

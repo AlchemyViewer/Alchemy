@@ -259,7 +259,6 @@ public:
 	void forAllVisibleDrawables(void (*func)(LLDrawable*));
 
     void renderObjects(U32 type, bool texture = true, bool batch_texture = false, bool rigged = false);
-    void renderShadowSimple(U32 type);
 
     void renderAlphaObjects(bool rigged = false);
 	void renderMaskedObjects(U32 type, bool texture = true, bool batch_texture = false, bool rigged = false);
@@ -435,7 +434,7 @@ private:
 	void unloadShaders();
 	void addToQuickLookup( LLDrawPool* new_poolp );
 	void removeFromQuickLookup( LLDrawPool* poolp );
-	bool updateDrawableGeom(LLDrawable* drawable, bool priority);
+	bool updateDrawableGeom(LLDrawable* drawable);
 	void assertInitializedDoError();
 	bool assertInitialized() { const bool is_init = isInit(); if (!is_init) assertInitializedDoError(); return is_init; };
 	void connectRefreshCachedSettingsSafe(const std::string name);

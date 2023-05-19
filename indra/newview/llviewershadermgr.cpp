@@ -564,7 +564,6 @@ void LLViewerShaderMgr::setShaders()
 
 void LLViewerShaderMgr::unloadShaders()
 {
-	//unload shader's
 	while (!LLGLSLShader::sInstances.empty())
 	{
 		LLGLSLShader* shader = *(LLGLSLShader::sInstances.begin());
