@@ -1,0 +1,1294 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<colors>
+<!-- Reminder: Defining colors after they are referenced sounds silly, because it is.
+     If your custom color is showing up as black, move its definition before the first
+     reference.
+ -->
+   <color
+    name="AccordionHeaderTextColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="AgentChatColor"
+    value="0.800781 0.800781 0.800781 1"/>
+   <color
+    name="AlertBoxColor"
+    value="0.24 0.24 0.24 1"/>
+   <color
+    name="AlertCautionBoxColor"
+    value="1 0.82 0.46 1"/>
+   <color
+    name="AlertCautionTextColor"
+    reference="LtYellow"/>
+   <color
+    name="AvatarCustomColor1"
+    reference="Red" />
+   <color
+    name="AvatarCustomColor2"
+    reference="Green" />
+   <color
+    name="AvatarCustomColor3"
+    reference="Blue" />
+   <color
+    name="AvatarCustomColor4"
+    reference="Yellow" />
+   <color
+    name="AvatarDefaultColor"
+    reference="MapAvatarColor" />
+   <color
+    name="AvatarListItemIconDefaultColor"
+    reference="White"/>
+   <color
+    name="AvatarListItemIconOfflineColor"
+    value="0.5 0.5 0.5 0.5"/>
+   <color
+    name="AvatarListItemIconOnlineColor"
+    reference="White"/>
+   <color
+    name="AvatarListItemIconVoiceInvitedColor"
+    reference="AvatarListItemIconOfflineColor"/>
+   <color
+    name="AvatarListItemIconVoiceJoinedColor"
+    reference="AvatarListItemIconOnlineColor"/>
+   <color
+    name="AvatarListItemIconVoiceLeftColor"
+    reference="AvatarListItemIconOfflineColor"/>
+   <color
+    name="AvatarMutedColor"
+    reference="Gray" />
+   <color
+    name="BadgeBorderColor"
+    reference="PlvrWindowBorderColor"/>
+   <color
+    name="BadgeImageColor"
+    value="1.0 0.40 0.0 1.0"/>
+   <color
+    name="BadgeLabelColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="BeaconColor"
+    value="0.65625 0.14967 0.00000 1.0"/>
+   <color
+    name="Black"
+    value="0 0 0 1"/>
+   <color
+    name="black"
+    value="0 0 0 1"/>
+   <color
+    name="Black_10"
+    value="0 0 0 0.1"/>
+   <color
+    name="Black_25"
+    value="0 0 0 0.25"/>
+   <color
+    name="Black_50"
+    value="0 0 0 0.5"/>
+   <color
+    name="Black_75"
+    value="0 0 0 0.75"/>
+   <color
+    name="Blue"
+    value="0 0 1 1"/>
+   <color
+    name="blue"
+    value="0 0 1 1"/>
+   <color
+    name="Blue_80"
+    value="0 0 1 0.8"/>
+   <color
+    name="ButtonBorderColor"
+    reference="PlvrWindowBorderColor"/>
+   <color
+    name="ButtonCautionImageColor"
+    reference="Unused?"/>
+   <color
+    name="ButtonColor"
+    reference="Unused?"/>
+   <color
+    name="ButtonFlashBgColor"
+    reference="PlvrWhite"/>
+   <color
+    name="ButtonGlowColor"
+    reference="PlvrWhite"/>
+   <color
+    name="ButtonHighlightColor"
+    reference="White"/>
+   <color
+    name="ButtonImageColor"
+    reference="White"/>
+   <color
+    name="ButtonLabelColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="ButtonLabelDisabledColor"
+    value="0.42 0.42 0.42 1"/>
+   <color
+    name="ButtonLabelSelectedColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="ButtonLabelSelectedDisabledColor"
+    reference="White_25"/>
+   <color
+    name="ButtonSelectedBgColor"
+    reference="Unused?"/>
+   <color
+    name="ButtonSelectedColor"
+    reference="Unused?"/>
+   <color
+    name="ButtonUnselectedBgColor"
+    reference="Unused?"/>
+   <color
+    name="ButtonUnselectedFgColor"
+    reference="Unused?"/>
+   <color
+    name="ChannelBetaColor"
+    value="0.8274509803921569 0.7607843137254902 0.196078431372549 1"/>
+   <color
+    name="ChannelProjectColor"
+    value="0.4588235294117647 0.2588235294117647 0.5215686274509804 1"/>
+   <color
+    name="ChannelReleaseColor"
+    value="0.3176470588235294 0.5137254901960784 0.1098039215686275 1"/>
+   <color
+    name="ChannelTestColor"
+    value="0.6392156862745098 0.2117647058823529 0.192156862745098 1"/>
+   <color
+    name="PolarityNeonGreen"
+    value="0.60784 0.75294 0.16863 1.0" />
+   <color
+    name="ChatHeaderAlphaBackground"
+    reference="DkGray2"/>
+   <color
+    name="ChatHeaderDisplayNameColor"
+    value="0.87 0.87 0.87 1"/>
+   <color
+    name="ChatHeaderOpaqueBackground"
+    reference="DkGray2"/>
+   <color
+    name="ChatHeaderTimestampColor"
+    reference="EmphasisColor_35"/>
+   <color
+    name="ChatHeaderUserNameColor"
+    reference="EmphasisColorLight"/>
+   <color
+    name="ChatHistoryBgColor"
+    value="0.1372549019607843 0.1372549019607843 0.1372549019607843 1"/>
+   <color
+    name="ChatHistoryTextColor"
+    value="0.33000 0.33000 0.33000 1.0"/>
+   <color
+    name="ChatNameColor"
+    reference="TextDefaultColor"/>
+   <color
+    name="ChatNameObjectColor"
+    reference="TextDefaultColor"/>
+   <color
+    name="ChatTimestampColor"
+    value="0.42 0.42 0.42 1"/>
+   <color
+    name="ChicletFlashColor"
+    value="0.114 0.65 0.1" />
+   <color
+    name="ColorDropShadow"
+    value="0 0 0 0.25"/>
+   <color
+    name="ColorPaletteEntry01"
+    reference="Black"/>
+   <color
+    name="ColorPaletteEntry02"
+    reference="Gray"/>
+   <color
+    name="ColorPaletteEntry03"
+    value="0.5 0 0 1"/>
+   <color
+    name="ColorPaletteEntry04"
+    value="0.5 0.5 0 1"/>
+   <color
+    name="ColorPaletteEntry05"
+    value="0 0.5 0 1"/>
+   <color
+    name="ColorPaletteEntry06"
+    value="0 0.5 0.5 1"/>
+   <color
+    name="ColorPaletteEntry07"
+    value="0 0 0.5 1"/>
+   <color
+    name="ColorPaletteEntry08"
+    value="0.5 0 0.5 1"/>
+   <color
+    name="ColorPaletteEntry09"
+    value="0.5 0.5 0 1"/>
+   <color
+    name="ColorPaletteEntry10"
+    value="0 0.25 0.25 1"/>
+   <color
+    name="ColorPaletteEntry11"
+    value="0 0.5 1 1"/>
+   <color
+    name="ColorPaletteEntry12"
+    value="0 0.25 0.5 1"/>
+   <color
+    name="ColorPaletteEntry13"
+    value="0.5 0 1 1"/>
+   <color
+    name="ColorPaletteEntry14"
+    value="0.5 0.25 0 1"/>
+   <color
+    name="ColorPaletteEntry15"
+    reference="ChannelReleaseColor"/>
+   <color
+    name="ColorPaletteEntry16"
+    reference="PlvrWhite"/>
+   <color
+    name="ColorPaletteEntry17"
+    reference="White"/>
+   <color
+    name="ColorPaletteEntry18"
+    value="0.42 0.42 0.42 1"/>
+   <color
+    name="ColorPaletteEntry19"
+    reference="Red"/>
+   <color
+    name="ColorPaletteEntry20"
+    reference="Yellow"/>
+   <color
+    name="ColorPaletteEntry21"
+    reference="Green"/>
+   <color
+    name="ColorPaletteEntry22"
+    value="0 1 1 1"/>
+   <color
+    name="ColorPaletteEntry23"
+    reference="Blue"/>
+   <color
+    name="ColorPaletteEntry24"
+    reference="Purple"/>
+   <color
+    name="ColorPaletteEntry25"
+    value="1 1 0.5 1"/>
+   <color
+    name="ColorPaletteEntry26"
+    value="0 1 0.5 1"/>
+   <color
+    name="ColorPaletteEntry27"
+    value="0.5 1 1 1"/>
+   <color
+    name="ColorPaletteEntry28"
+    value="0.5 0.5 1 1"/>
+   <color
+    name="ColorPaletteEntry29"
+    value="1 0 0.5 1"/>
+   <color
+    name="ColorPaletteEntry30"
+    value="1 0.5 0 1"/>
+   <color
+    name="ColorPaletteEntry31"
+    reference="ChannelBetaColor"/>
+   <color
+    name="ColorPaletteEntry32"
+    value="1 0.368627 0.180392 1"/>
+   <color
+    name="ColorPaletteEntry33"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry34"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry35"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry36"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry37"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry38"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry39"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry40"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry41"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry42"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry43"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry44"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry45"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry46"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry47"
+    reference="ChannelProjectColor"/>
+   <color
+    name="ColorPaletteEntry48"
+    reference="PolarityNeonGreen"/>
+   <color
+    name="ColorPaletteEntry49"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry50"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry51"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry52"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry53"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry54"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry55"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry56"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry57"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry58"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry59"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry60"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry61"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry62"
+    reference="DkGray"/>
+   <color
+    name="ColorPaletteEntry63"
+    reference="ChannelTestColor"/>
+   <color
+    name="ColorPaletteEntry64"
+    reference="EmphasisColor"/>
+   <color
+    name="ColorSwatchBorderColor"
+    value="0.45098 0.517647 0.607843 1"/>
+   <color
+    name="ComboListBgColor"
+    value="0.1 0.1 0.1 1"/>
+   <color
+    name="ConsoleBackground"
+    value="0.09020 0.09020 0.09020 1"/>
+   <color
+    name="ContextSilhouetteColor"
+    reference="EmphasisColor_35"/>
+   <color
+    name="DefaultHighlightDark"
+    reference="DkGray2"/>  <!-- Border element color -->
+   <color
+    name="DefaultHighlightLight"
+    reference="DkGray"/>  <!-- Border element color -->
+   <color
+    name="DefaultShadowDark"
+    reference="Black_50"/>
+   <color
+    name="DefaultShadowLight"
+    reference="Black_50"/>
+   <color
+    name="DirectChatColor"
+    value="0.925 0.886 0.576 1"/>
+   <color
+    name="DkBlue"
+    value=".06 .06 .3 1"/>
+   <color
+    name="DkGray"
+    value="0.1372549019607843 0.1372549019607843 0.1372549019607843 1"/>
+   <color
+    name="DkGray2"
+    value="0.10980 0.10980 0.10980 1"/>
+   <color
+    name="DkGray_33"
+    value="0.1372549019607843 0.1372549019607843 0.1372549019607843 0.33"/>
+   <color
+    name="DkGray_66"
+    value="0.1372549019607843 0.1372549019607843 0.1372549019607843 0.66"/>
+   <color
+    name="DkGray_90"
+    value="0.1372549019607843 0.1372549019607843 0.1372549019607843 0.90"/>
+   <color
+    name="DkRed"
+    value="0.3 0.06 0.06 1"/>
+   <color
+    name="DrYellow"
+    value="1 0.86 0 1"/>
+   <color
+    name="EffectColor"
+    reference="White"/>
+   <color
+    name="EmphasisColor"
+    value="0.31765 0.51373 0.10980 1.0"/>
+   <color
+    name="EmphasisColor_13"
+    value="0.31765 0.51373 0.10980 0.13"/>
+   <color
+    name="EmphasisColor_35"
+    value="0.20000 0.33659 0.06341 0.35"/>
+   <color
+    name="EmphasisColor_65"
+    value="0.20000 0.33659 0.06341 0.65"/>
+   <color
+    name="EmphasisColorDark"
+    value="0.20000 0.33659 0.06341 1.0"/>
+   <color
+    name="EmphasisColorLight"
+    value="0.85882 0.85882 0.85882 1.0"/>
+   <color
+    name="EmphasisColorPale"
+    value="0.52234 0.64013 0.33241 1.0"/>
+   <color
+    name="FilterBackgroundColor"
+    value="0.25 0.25 0.25 0.5"/>
+   <color
+    name="FilterTextColor"
+    reference="EmphasisColor_35"/>
+    <color
+    name="FirestormOrange"
+    value="1.0 0.6 0.0 1.0" />
+   <color
+    name="FloaterButtonImageColor"
+    value="0.42 0.42 0.42 1"/>
+   <color
+    name="FloaterDefaultBackgroundColor"
+    reference="DkGray_66" />
+   <color
+    name="FloaterFocusBackgroundColor"
+    reference="DkGray2" />
+   <color
+    name="FloaterFocusBorderColor"
+    reference="Black_50" />
+   <color
+    name="FloaterUnfocusBorderColor"
+    reference="Black_50" />
+   <color
+    name="FocusColor"
+    reference="EmphasisColorLight"/>
+   <color
+    name="FolderViewLoadingMessageTextColor"
+    value="0.3344 0.5456 0.5159 1"/>
+   <color
+    name="FrogGreen"
+    value="0.26 0.345 0.263 1"/>
+   <color
+    name="Gray"
+    value="0.5 0.5 0.5 1"/>
+   <color
+    name="Gray_15"
+    value="0.5 0.5 0.5 0.15"/>
+   <color
+    name="Green"
+    value="0 1 0 1"/>
+   <color
+    name="green"
+    value="0 1 0 1"/>
+   <color
+    name="Green_80"
+    value="0 1 0 0.8"/>
+   <color
+    name="GridFocusPointColor"
+    reference="White_50"/>
+   <color
+    name="GridlineBGColor"
+    value="0.92 0.92 1 0.78"/>
+   <color
+    name="GridlineColor"
+    reference="PlvrWhite"/>
+   <color
+    name="GridlineShadowColor"
+    value="0 0 0 0.31"/>
+   <color
+    name="GroupActive"
+    reference="EmphasisColor_35"/>
+   <color
+    name="GroupHiddenInProfile"
+    value="0.38 0.38 0.38 1"/>
+   <color
+    name="GroupNotifyBoxColor"
+    value="0.3344 0.5456 0.5159 1"/>
+   <color
+    name="GroupNotifyDimmedTextColor"
+    value="0.42 0.42 0.42 1"/>
+   <color
+    name="GroupNotifyTextColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="GroupOverTierColor"
+    value="0.43 0.06 0.06 1"/>
+   <color
+    name="GroupVisibleInProfile"
+    reference="TextDefaultColor"/>
+   <color
+    name="HealthTextColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="HelpBgColor"
+    reference="Unused?" />
+   <color
+    name="HelpFgColor"
+    reference="Unused?" />
+   <color
+    name="HelpScrollHighlightColor"
+    reference="Unused?"/>
+   <color
+    name="HelpScrollShadowColor"
+    reference="Unused?"/>
+   <color
+    name="HelpScrollThumbColor"
+    reference="Unused?"/>
+   <color
+    name="HelpScrollTrackColor"
+    reference="Unused?"/>
+   <color
+    name="HighlightChildColor"
+    reference="SilhouetteChildColor"/>
+   <color
+    name="HighlightInspectColor"
+    reference="EmphasisColor_35"/>
+   <color
+    name="HighlightParentColor"
+    reference="Yellow"/>
+   <color
+    name="HTMLLinkColor"
+    reference="EmphasisColor"/>
+   <color
+    name="IconDisabledColor"
+    reference="White_25"/>
+   <color
+    name="IconEnabledColor"
+    reference="White"/>
+   <color
+    name="IMHistoryBgColor"
+    reference="Unused?" />
+   <color
+    name="IMHistoryTextColor"
+    reference="Unused?" />
+   <color
+    name="InspectorTipTextColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="InventoryBackgroundColor"
+    reference="DkGray"/>
+   <color
+    name="InventoryBackgroundColorAlpha"
+    reference="DkGray_90"/>
+   <color
+    name="InventoryFocusOutlineColor"
+    reference="EmphasisColor_13"/>
+<!--     <color
+    name="InventoryFolderNameColor"
+    reference="LabelTextColor"/> -->
+    <color
+    name="InventoryFolderNameColor"
+    value="0.66016 0.66016 0.66016 1.0"/>
+   <color
+    name="InventoryItemLibraryColor"
+    value="0.31885 0.61865 0.40926 1.0"/>
+   <color
+    name="InventoryItemLinkColor"
+    reference="LtGray"/>
+<!--    <color
+    name="InventoryItemNameColor"
+    reference="LabelTextColor"/> -->
+   <color
+    name="InventoryItemNameColor"
+    value="0.87500 0.87500 0.87500 1.0"/>
+   <color
+    name="InventoryItemOutfitContentColor"
+    reference="TextFgColor"/>
+   <color
+    name="InventoryItemSuffixColor"
+    reference="PolarityNeonGreen"/>
+   <color
+    name="InventoryItemWornColor"
+    reference="EmphasisColor_35"/>
+   <color
+    name="InventoryMouseOverColor"
+    reference="EmphasisColor_35"/>
+   <color
+    name="InventoryObjectIconColor"
+    reference="EmphasisColor_35"/>
+   <color
+    name="InventorySearchStatusColor"
+    reference="EmphasisColor_35"/>
+   <color
+    name="LabelDisabledColor"
+    reference="LtGray_35"/>
+   <color
+    name="LabelSelectedColor"
+    reference="PlvrWhite"/>
+   <color
+    name="LabelSelectedDisabledColor"
+    reference="White_25"/>
+   <color
+    name="LabelTextColor"
+    value="0.72157 0.72157 0.72157 1.0" />
+   <color
+    name="Lime"
+    value=".8 1 .73 1"/>
+   <color
+    name="llOwnerSayChatColor"
+    value="0.740524 0.601002 0.517288 1"/>
+   <color
+    name="LoginProgressBarBgColor"
+    reference="Unused?"/>
+   <color
+    name="LoginProgressBarFgColor"
+    reference="Unused?"/>
+   <color
+    name="LoginProgressBorderColor"
+    value="0 0.12 0.24 0"/>
+   <color
+    name="LoginProgressShadowColor"
+    value="0 0 0 0.78" />
+   <color
+    name="LoginProgressSquarePanelColor"
+    value="0 0 0 0.75"/>
+   <color
+    name="LoginProgressStatusColor"
+    value="0.53 0.53 0.53 0.75"/>
+   <color
+    name="LoginProgressTextColor"
+    value="0.72 0.72 0.72 0.75"/>
+   <color
+    name="LtGray"
+    value="0.55 0.55 0.55 1"/>
+   <color
+    name="LtGray_35"
+    value="0.60 0.60 0.60 0.35"/>
+   <color
+    name="LtGray_50"
+    value="0.60 0.60 0.60 0.50"/>
+   <color
+    name="LtGreen"
+    value="0.2 1 0.2 1"/>
+   <color
+    name="LtOrange"
+    value="1 .85 .73 1"/>
+   <color
+    name="LtRed"
+    value="1 0.2 0.2 1"/>
+   <color
+    name="LtYellow"
+    value="1 1 .79 1"/>
+   <color
+    name="MapAvatarColor"
+    reference="White"/>
+   <color
+    name="MapAvatarFriendColor"
+    value="0.37158 0.81592 0.59722 1"/>
+   <color
+    name="MapAvatarSelfColor"
+    reference="LtGray"/>
+   <color
+    name="MapFrustumColor"
+    reference="White_10"/>
+   <color
+    name="MapFrustumRotatingColor"
+    value="1 1 1 0.2"/>
+   <color
+    name="MapTrackColor"
+    reference="Red"/>
+   <color
+    name="MapTrackColorUnder"
+    reference="Blue" />
+   <color
+    name="MapTrackDisabledColor"
+    value="0.5 0 0 1"/>
+   <color
+    name="MaterialErrorColor"
+    reference="LtRed"/>
+   <color
+    name="MaterialGoodColor"
+    reference="LtGreen"/>
+   <color
+    name="MaterialWarningColor"
+    reference="DrYellow"/>
+   <color
+    name="MdBlue"
+    value=".07 .38 .51 1"/>
+   <color
+    name="MenuBarBgColor"
+    value="0.1372549019607843 0.1372549019607843 0.1372549019607843 1" />
+   <color
+    name="MenuDefaultBgColor"
+    value="0.1372549019607843 0.1372549019607843 0.1372549019607843 1" />
+   <color
+    name="MenuItemDisabledColor"
+    reference="PlvrWindowBackgroundLight"/>
+   <color
+    name="MenuItemEnabledColor"
+    value="0.565 0.565 0.565 1"/>
+   <color
+    name="MenuItemFlashBgColor"
+    reference="BeaconColor" />
+   <color
+    name="MenuItemHighlightBgColor"
+    reference="EmphasisColor_65"/>
+   <color
+    name="MenuItemHighlightFgColor"
+    reference="PlvrWhite"/>
+   <color
+    name="MenuNonProductionBgColor"
+    reference="DkGray"/>
+   <color
+    name="MenuNonProductionGodBgColor"
+    value="0.263 0.325 0.345 1"/>
+   <color
+    name="MenuPopupBgColor"
+    reference="DkGray"/>
+   <color
+    name="MeshImportTableHighlightColor"
+    value="0.2 0.8 1 1"/>
+   <color
+    name="MeshImportTableNormalColor"
+    value="1 1 1 1"/>
+   <color
+    name="ModelUploaderLabels"
+    value="1 0.6 0 1"/>
+   <color
+    name="MouseGray"
+    value="0.191 0.191 0.191 1"/>
+   <color
+    name="MultiSliderDisabledThumbColor"
+    reference="Black"/>
+   <color
+    name="MultiSliderThumbCenterColor"
+    reference="PlvrWhite"/>
+   <color
+    name="MultiSliderThumbCenterSelectedColor"
+    reference="Green"/>
+   <color
+    name="MultiSliderThumbOutlineColor"
+    reference="Unused?"/>
+   <color
+    name="MultiSliderTrackColor"
+    value="0.42 0.42 0.42 1"/>
+   <color
+    name="MultiSliderTriangleColor"
+    reference="Yellow"/>
+   <color
+    name="NameTagBackground"
+    value="0 0 0 1"/>
+   <color
+    name="NameTagChat"
+    reference="EmphasisColor"/>
+   <color
+    name="NameTagFriend"
+    reference="MapAvatarFriendColor"/>
+   <color
+    name="NameTagGroup"
+    value="0.60000 0.60000 0.60000 1.0"/>
+   <color
+    name="NameTagLegacy"
+    reference="White"/>
+   <color
+    name="NameTagMatch"
+    reference="White"/>
+   <color
+    name="NameTagMismatch"
+    reference="White"/>
+   <color
+    name="NameTagStatusText"
+    value="0.85292 0.81320 0.21739 1.0" />
+   <color
+    name="NetMapBackgroundColor"
+    reference="Black_25"/>
+   <color
+    name="NetMapGroupOwnAboveWater"
+    reference="Purple"/>
+   <color
+    name="NetMapGroupOwnBelowWater"
+    value="0.78 0 0.78 1"/>
+   <color
+    name="NetMapOtherOwnAboveWater"
+    value="0.24 0.24 0.24 1"/>
+   <color
+    name="NetMapOtherOwnBelowWater"
+    value="0.12 0.12 0.12 1"/>
+   <color
+    name="NetMapYouOwnAboveWater"
+    value="0 1 1 1"/>
+   <color
+    name="NetMapYouOwnBelowWater"
+    value="0 0.78 0.78 1"/>
+   <color
+    name="NotifyBoxColor"
+    reference="LtGray"/>
+   <color
+    name="NotifyCautionBoxColor"
+    value="1 0.82 0.46 1"/>
+   <color
+    name="NotifyCautionWarnColor"
+    reference="PlvrWhite"/>
+   <color
+    name="NotifyTextColor"
+    reference="PlvrWhite"/>
+   <color
+    name="ObjectBubbleColor"
+    reference="DkGray_66"/>
+   <color
+    name="ObjectChatColor"
+    value="0.89563 0.66123 0.21374 1.0"/>
+   <color
+    name="ObjectIMColor"
+    value="0.6705882352941176 0.803921568627451 0.6784313725490196 1"/>
+
+   <color
+    name="Orange"
+    value="1.0 0.5 0.0 1.0"/>
+   <color
+    name="OutfitGalleryItemSelected"
+    reference="EmphasisColor_65" />
+   <color
+    name="OutfitGalleryItemUnselected"
+    value="0.250 0.250 0.250 1.0" />
+   <color
+    name="OutfitGalleryItemWorn"
+    reference="Yellow" />
+   <color
+    name="OutputMonitorMutedColor"
+    reference="DkGray"/>
+   <color
+    name="OverdrivenColor"
+    reference="Red"/>
+   <color
+    name="PanelDefaultBackgroundColor"
+    reference="DkGray" />
+<!--    <color
+    name="PanelDefaultHighlightLight"
+    value="0.52 0.52 0.52 0.75"/> --> <!-- Unused in Polarity 2016.11.26 -->
+   <color
+    name="PanelFocusBackgroundColor"
+    reference="DkGray2" />
+   <color
+    name="PanelNotificationBackground"
+    value="1 0.3 0.3 0"/>
+   <color
+    name="PanelNotificationListItem"
+    value="0.3 0.3 0.3 .3" />
+   <color
+    name="ParcelHoverColor"
+    reference="PlvrWhite"/>
+   <color
+    name="PathfindingCharacterBeaconColor"
+    reference="Red_80"/>
+   <color
+    name="PathfindingDefaultBeaconColor"
+    reference="Red_80"/>
+   <color
+    name="PathfindingDefaultBeaconTextColor"
+    reference="PlvrWhite"/>
+   <color
+    name="PathfindingErrorColor"
+    reference="LtRed"/>
+   <color
+    name="PathfindingGoodColor"
+    reference="LtGreen"/>
+   <color
+    name="PathfindingLinksetBeaconColor"
+    reference="Blue_80"/>
+   <color
+    name="PathfindingWarningColor"
+    reference="DrYellow"/>
+   <color
+    name="PieMenuBgColor"
+    value="0.24 0.24 0.24 0.59"/>
+   <color
+    name="PieMenuLineColor"
+    value="0 0 0 0.5"/>
+   <color
+    name="PieMenuSelectedColor"
+    value="0.72 0.72 0.74 0.3"/>
+   <color
+    name="PolarityGreen"
+    value="0.31765 0.51373 0.10980 1.0"/>
+   <color
+    name="PlvrBannedChatColor"
+    value="0.38 0.38 0.38 1.0"/>
+   <color
+    name="PlvrBlack"
+    value="0.611765 0.235294 0.376471 1"/>
+   <color
+    name="PlvrDevChatColor"
+    value="1.00000 0.46275 0.30588 1.0"/>
+   <color
+    name="PlvrGray1"
+    value="0.20000 0.200000 0.20000 1"/>
+   <color
+    name="PlvrLindenChatColor"
+    value="0.33725 0.70196 0.96863 1.0"/>
+   <color
+    name="PlvrMutedChatColor"
+    value="0.313 0.313 0.313 1.0"/>
+   <color
+    name="PlvrQAChatColor"
+    value="0.85490 0.80000 0.32549 1.0"/>
+   <color
+    name="PlvrSupportChatColor"
+    value="0.849 0.665 0.974 1.0"/>
+   <color
+    name="PlvrTesterChatColor"
+    value="0.97478 0.38978 0.34554 1.0"/>
+   <color
+    name="PlvrWhite"
+    value="0.85882 0.858820.85882 1"/>
+   <color
+    name="PlvrWindowBackground"
+    value="0.1372549019607843 0.1372549019607843 0.1372549019607843 1"/>
+   <color
+    name="PlvrWindowBackgroundAlpha"
+    value="0.1372549019607843 0.1372549019607843 0.1372549019607843 0.90"/>
+   <color
+    name="PlvrWindowBackgroundDark"
+    value="0.07843 0.07843 0.07843 1"/>
+   <color
+    name="PlvrWindowBackgroundDarker"
+    value="0.05882 0.05882 0.05882 1.0"/>
+   <color
+    name="PlvrWindowBackgroundLight"
+    value="0.23922 0.23922 0.23922 1"/>
+   <color
+    name="PlvrWindowBackgroundMid"
+    value="0.10980 0.10980 0.10980 1"/>
+   <color
+    name="PlvrWindowBackgroundMidLight"
+    value="0.12941 0.12941 0.12941 1"/>
+   <color
+    name="PlvrWindowBorderColor"
+    value="0.1019607843137255 0.1019607843137255 0.1019607843137255 1"/>
+   <color
+    name="PolarityLightBlue"
+    value="0.2431372549019608 0.7019607843137255 0.9764705882352941 0.50"/>
+   <color
+    name="ProgressViewBackgroundColor"
+    reference="PlvrWindowBackground"/>
+   <color
+    name="ProgressViewTextColor"
+    reference="PlvrWhite"/>
+   <color
+    name="PropertyColorAuction"
+    value="0.5 0 1 0.4"/>
+   <color
+    name="PropertyColorAvail"
+    reference="Transparent"/>
+   <color
+    name="PropertyColorForSale"
+    value="1 0.5 0 0.4"/>
+   <color
+    name="PropertyColorGroup"
+    value="0 0.72 0.72 0.4"/>
+   <color
+    name="PropertyColorOther"
+    value="1 0 0 0.4"/>
+   <color
+    name="PropertyColorSelf"
+    value="0 1 0 0.4"/>
+   <color
+    name="Purple"
+    value="1 0 1 1"/>
+   <color
+    name="PVLineEditorBackgroundSelected"
+    reference="EmphasisColor"/>
+   <color
+    name="PVLineEditorHighlight"
+    reference="EmphasisColor"/>
+   <color
+    name="PVLineEditorPreEditBackground"
+    reference="White"/>
+   <color
+    name="PVUI_FPSCounter_Critical"
+    value="0.97647 0.27843 0.24314 1.0"/>
+   <color
+    name="PVUI_FPSCounter_High"
+    value="0.24314 0.97647 0.24314 1.0"/>
+   <color
+    name="PVUI_FPSCounter_Limited"
+    value="0.69412 0.24314 0.97647 1.0"/>
+   <color
+    name="PVUI_FPSCounter_Low"
+    value="0.97647 0.43922 0.24314 1.0"/>
+   <color
+    name="PVUI_FPSCounter_Medium"
+    value="0.97256 0.74017 0.24704 1.0"/>
+   <color
+    name="PVUI_FPSCounter_Outstanding"
+    value="0.24314 0.70196 0.97647 1.0"/>
+   <color
+    name="PVUI_FPSCounter_Vsync"
+    value="0.50980 0.82745 0.04706 1.0"/>
+   <color
+    name="Red"
+    value="1 0 0 1"/>
+   <color
+    name="red"
+    value="1 0 0 1"/>
+   <color
+    name="Red_80"
+    value="1 0 0 0.8"/>
+   <color
+    name="ResizebarBody"
+    value="0.208 0.208 0.208 1"/>
+   <color
+    name="ResizebarBorderDark"
+    value="0.133 0.133 0.133 1"/>
+   <color
+    name="ResizebarBorderLight"
+    value="0.231 0.231 0.231 1"/>
+   <color
+    name="ScriptBackground"
+    value="0.16925 0.19794 0.18180 1.0"/>
+   <color
+    name="ScriptBgReadOnlyColor"
+    value="0.39 0.39 0.39 1" />
+   <color
+    name="ScriptCursorColor"
+    reference="PolarityNeonGreen"/>
+   <color
+    name="ScriptErrorColor"
+    value="0.839216 0.411765 0.486275 1"/>
+   <color
+    name="ScriptGutterText"
+    value="0.3019607843137255 0.3019607843137255 0.3019607843137255 1"/>
+   <color
+    name="ScriptText"
+    value="0.6274509803921569 0.6274509803921569 0.6274509803921569 1"/>
+   <color
+    name="ScrollbarThumbColor"
+    reference="White"/>
+   <color
+    name="ScrollbarTrackColor"
+    reference="DkGray"/>
+   <color
+    name="ScrollBgReadOnlyColor"
+    reference="DkGray"/>
+   <color
+    name="ScrollBGStripeColor"
+    reference="Transparent"/>
+   <color
+    name="ScrollBgWriteableColor"
+    reference="White_05"/>
+   <color
+    name="ScrollDisabledColor"
+    reference="White_25"/>
+   <color
+    name="ScrollHighlightedColor"
+    reference="Unused?"/>
+   <color
+    name="ScrollHoveredColor"
+    reference="EmphasisColor_13"/>
+   <color
+    name="ScrollSelectedBGColor"
+    reference="DkGray"/>
+   <color
+    name="ScrollSelectedFGColor"
+    reference="White"/>
+   <color
+    name="ScrollUnselectedColor"
+    value="0.42 0.42 0.42 1"/>
+   <color
+    name="SelectedOutfitTextColor"
+    reference="PolarityGreen"/>
+   <color
+    name="SilhouetteChildColor"
+    value="0.13 0.42 0.77 1"/>
+   <color
+    name="SilhouetteParentColor"
+    reference="Yellow"/>
+   <color
+    name="SliderDisabledThumbColor"
+    reference="White_25"/>
+   <color
+    name="SliderThumbCenterColor"
+    reference="White"/>
+   <color
+    name="SliderThumbOutlineColor"
+    reference="White"/>
+   <color
+    name="SliderTrackColor"
+    reference="Unused?"/>
+   <color
+    name="SpeakingColor"
+    reference="EmphasisColor"/>
+   <color
+    name="StatBarFPSBGColor"
+    value="0.12157 0.12157 0.12157 0.45"/>
+   <color
+    name="StatBarMeanBarColor"
+    reference="White_25"/>
+   <color
+    name="StatBarMinMaxDots"
+    reference="White"/>
+   <color
+    name="SyntaxLslComment"
+    value="0.38290 0.44523 0.40961 1.0"/>
+   <color
+    name="SyntaxLslConstant"
+    value="0.7725490196078431 0.5215686274509804 0.3019607843137255 1"/>
+   <color
+    name="SyntaxLslControlFlow"
+    value="0.71887 0.09363 0.09363 1.0"/>
+   <color
+    name="SyntaxLslControlLabel"
+    value="0 0 0.8 1"/>
+   <color
+    name="SyntaxLslDataType"
+    value="0.29457 0.51288 0.61949 1.0"/>
+   <color
+    name="SyntaxLslDeprecated"
+    value="0.9 0.0 0.66 1"/>
+   <color
+    name="SyntaxLslEvent"
+    value="0.80051 0.80934 0.52660 1.0"/>
+   <color
+    name="SyntaxLslFunction"
+    value="0.289917 0.686646 0.389099 1"/>
+   <color
+    name="SyntaxLslGodMode"
+    value="0.7 .2 .35 1"/>
+   <color
+    name="SyntaxLslStringLiteral"
+    value="0.82745 0.76078 0.19608 1.0"/>
+  <!-- <FS:CR> Script Editor Colors -->
+  <color
+   name="SyntaxLslSection"
+   value=".5 .1 .3 1" />
+  <color
+   name="SyntaxLslIntegerConstant"
+   value="0.75325 0.44206 0.74109 1.0" />
+  <color
+   name="SyntaxLslStringConstant"
+   value="0.60481 0.61075 0.69987 1.0" />
+  <color
+   name="SyntaxLslFloatConstant"
+   value="0.95459 0.29541 0.60440 1.0" />
+  <color
+   name="SyntaxLslCompoundConstant"
+   value=".4 .2 .4 1" />
+  <color
+   name="SyntaxLslPreprocessor"
+   value="0.04686 0.60158 0.56257 1.0" />
+  <!-- <FS:CR> END Script Editor Colors -->
+   <color
+    name="SystemChatColor"
+    value="0.348127 0.408783 0.333405 1"/>
+   <color
+    name="SysWellItemSelected"
+    value="0.3 0.3 0.3 1.0"/>
+   <color
+    name="SysWellItemUnselected"
+    value="0 0 0 0"/>
+   <color
+    name="TextBgFocusColor"
+    reference="PlvrWindowBackgroundDark"/>
+   <color
+    name="TextBgReadOnlyColor"
+    reference="PlvrWindowBackgroundMidLight"/>
+   <color
+    name="TextBgWriteableColor"
+    reference="PlvrWindowBackgroundMid"/>
+   <color
+    name="TextCursorColor"
+    reference="LtOrange"/>
+   <color
+    name="TextDefaultColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="TextEmbeddedItemColor"
+    reference="EmphasisColor"/>
+   <color
+    name="TextEmbeddedItemReadOnlyColor"
+    reference="EmphasisColorDark"/>
+   <color
+    name="TextFgColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="TextFgReadOnlyColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="TextFgTentativeColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="TextField_Active"
+    value="0.0666666666666667 0.0666666666666667 0.0666666666666667 1"/>
+   <color
+    name="TextField_Disabled"
+    value="0.1411764705882353 0.1411764705882353 0.1411764705882353 1"/>
+   <color
+    name="TextField_Off"
+    value="0.0980392156862745 0.0980392156862745 0.0980392156862745 1"/>
+   <color
+    name="TimeTextColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="TitleBarFocusColor"
+    reference="EmphasisColor"/>
+   <color
+    name="ToastBackground"
+    value="0.3 0.3 0.3 0"/>
+   <color
+    name="ToolbarDropZoneColor"
+    reference="EmphasisColor_35"/>
+   <color
+    name="ToolTipBgColor"
+    value="0.937 0.89 0.655 1"/>
+   <color
+    name="ToolTipBorderColor"
+    reference="PlvrWindowBorderColor"/>
+   <color
+    name="ToolTipTextColor"
+    value="0.72 0.72 0.72 1"/>
+   <color
+    name="Transparent"
+    value="0 0 0 0"/>
+   <color
+    name="Unused?"
+    value="1 0 0.5 1"/>
+   <color
+    name="UserChatColor"
+    value="0.45000 0.45000 0.45000 1.0"/>
+   <color
+    name="WarningRed"
+    value="0.85 0.35 0.33 0.97"/>
+   <color
+    name="White"
+    value="1 1 1 1"/>
+   <color
+    name="white"
+    value="1 1 1 1"/>
+   <color
+    name="White_05"
+    value="1 1 1 0.05"/>
+   <color
+    name="White_10"
+    value="1 1 1 0.1"/>
+   <color
+    name="White_25"
+    value="1 1 1 0.25"/>
+   <color
+    name="White_50"
+    value="1 1 1 0.5"/>
+   <color
+    name="Yellow"
+    value="1 1 0 1"/>
+</colors>
