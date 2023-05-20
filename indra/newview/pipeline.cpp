@@ -7400,9 +7400,17 @@ void LLPipeline::renderFinalize()
 
     generateExposure(&mLuminanceMap, &mExposureMap);
 
-	mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mRT->deferredLight);
-	mALRenderUtil->renderSharpen(&mRT->deferredLight, &mRT->screen);
-	mALRenderUtil->renderColorGrade(&mRT->screen, &mPostMap);
+    if(mALRenderUtil->getSharpenMethod() != ALRenderUtil::SHARPEN_NONE)
+    {
+		mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mRT->deferredLight);
+		mALRenderUtil->renderSharpen(&mRT->deferredLight, &mRT->screen);
+		mALRenderUtil->renderColorGrade(&mRT->screen, &mPostMap);
+	}
+	else
+	{
+		mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mPostFXMap);
+		mALRenderUtil->renderColorGrade(&mPostFXMap, &mPostMap);
+	}
 
     LLVertexBuffer::unbind();
 
