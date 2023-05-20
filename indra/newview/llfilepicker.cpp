@@ -1689,20 +1689,32 @@ BOOL LLFilePicker::getSaveFileModeless(ESaveFilter filter,
                                        void (*callback)(bool, std::string&, void*),
                                        void *userdata)
 {
-    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    if( mLocked )
+        return FALSE;
+
+    // if local file browsing is turned off, return without opening dialog
+    if ( check_local_file_access_enabled() == false )
+    {
+        return FALSE;
+    }
+
+    reset();
+    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
     return FALSE;
 }
 
 BOOL LLFilePicker::getOpenFile( ELoadFilter filter, bool blocking )
 {
-	// if local file browsing is turned off, return without opening dialog
-	// (Even though this is a stub, I think we still should not return anything at all)
-	if ( check_local_file_access_enabled() == false )
-	{
-		return FALSE;
-	}
+    if( mLocked )
+        return FALSE;
 
-	reset();
+    // if local file browsing is turned off, return without opening dialog
+    if ( check_local_file_access_enabled() == false )
+    {
+        return FALSE;
+    }
+
+    reset();
 	
 	// HACK: Static filenames for 'open' until we implement filepicker
 	std::string filename = gDirUtilp->getLindenUserDir() + gDirUtilp->getDirDelimiter() + "upload";
@@ -1722,20 +1734,32 @@ BOOL LLFilePicker::getOpenFileModeless(ELoadFilter filter,
                                        void (*callback)(bool, std::vector<std::string> &, void*),
                                        void *userdata)
 {
-    LL_ERRS() << "NOT IMPLEMENTED" << LL_ENDL;
+    if( mLocked )
+        return FALSE;
+
+    // if local file browsing is turned off, return without opening dialog
+    if ( check_local_file_access_enabled() == false )
+    {
+        return FALSE;
+    }
+
+    reset();
+    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
     return FALSE;
 }
 
 BOOL LLFilePicker::getMultipleOpenFiles( ELoadFilter filter, bool blocking)
 {
-	// if local file browsing is turned off, return without opening dialog
-	// (Even though this is a stub, I think we still should not return anything at all)
-	if ( check_local_file_access_enabled() == false )
-	{
-		return FALSE;
-	}
+    if( mLocked )
+        return FALSE;
 
-	reset();
+    // if local file browsing is turned off, return without opening dialog
+    if ( check_local_file_access_enabled() == false )
+    {
+        return FALSE;
+    }
+
+    reset();
 	return FALSE;
 }
 
@@ -1743,6 +1767,17 @@ BOOL LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
                                                 void (*callback)(bool, std::vector<std::string> &, void*),
                                                 void *userdata )
 {
+    if( mLocked )
+        return FALSE;
+
+    // if local file browsing is turned off, return without opening dialog
+    if ( check_local_file_access_enabled() == false )
+    {
+        return FALSE;
+    }
+
+    reset();
+
     LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
     return FALSE;
 }
