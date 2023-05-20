@@ -790,7 +790,7 @@ void set_nav_save_data(LLFilePicker::ESaveFilter filter, std::string &extension,
         case LLFilePicker::FFSAVE_PNG:
             extension = "png";
             break;
-		case FFSAVE_WEBP:
+		case LLFilePicker::FFSAVE_WEBP:
 			extension = "webp";
 			break;
         case LLFilePicker::FFSAVE_AVI:
@@ -808,7 +808,7 @@ void set_nav_save_data(LLFilePicker::ESaveFilter filter, std::string &extension,
         case LLFilePicker::FFSAVE_XML:
             extension = "xml";
             break;
-		case FFSAVE_CSV:
+		case LLFilePicker::FFSAVE_CSV:
 			extension = "csv";
 			break;
         case LLFilePicker::FFSAVE_RAW:
