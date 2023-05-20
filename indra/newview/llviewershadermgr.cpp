@@ -312,9 +312,16 @@ LLViewerShaderMgr::LLViewerShaderMgr() :
     mShaderList.push_back(&gDeferredPBRAlphaProgram);
     mShaderList.push_back(&gHUDPBRAlphaProgram);
     mShaderList.push_back(&gDeferredSkinnedPBRAlphaProgram);
-    //mShaderList.push_back(&gDeferredPostGammaCorrectProgram); // for gamma
-    //mShaderList.push_back(&gNoPostGammaCorrectProgram);
-    //mShaderList.push_back(&gLegacyPostGammaCorrectProgram);
+    mShaderList.push_back(&gDeferredPostGammaCorrectProgram); // for gamma
+    mShaderList.push_back(&gNoPostGammaCorrectProgram);
+    mShaderList.push_back(&gLegacyPostGammaCorrectProgram);
+    for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+    {
+        mShaderList.push_back(&gDeferredMaterialProgram[i]);
+        mShaderList.push_back(&gDeferredMaterialWaterProgram[i]);
+    }
+    mShaderList.push_back(&gDeferredPostColorCorrectProgram[1]);
+    mShaderList.push_back(&gDeferredPostColorCorrectLUTProgram[1]);
 }
 
 LLViewerShaderMgr::~LLViewerShaderMgr()
@@ -1150,9 +1157,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	{
 		if (success)
 		{
-            mShaderList.push_back(&gDeferredMaterialProgram[i]);
-
-			gDeferredMaterialProgram[i].mName = llformat("Deferred Material Shader %d", i);
+            gDeferredMaterialProgram[i].mName = llformat("Deferred Material Shader %d", i);
 			
 			U32 alpha_mode = i & 0x3;
 
@@ -1229,8 +1234,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
 		if (success)
 		{
-            mShaderList.push_back(&gDeferredMaterialWaterProgram[i]);
-
             gDeferredMaterialWaterProgram[i].mName = llformat("Deferred Underwater Material Shader %d", i);
 
             U32 alpha_mode = i & 0x3;
@@ -2925,7 +2928,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
 	if (success)
 	{
-		mShaderList.push_back(&gDeferredPostColorCorrectProgram[1]);
 		gDeferredPostColorCorrectProgram[1].mName = "Color Grading Shader Legacy";
 		gDeferredPostColorCorrectProgram[1].mFeatures.hasSrgb = true;
 		gDeferredPostColorCorrectProgram[1].mShaderFiles.clear();
@@ -2967,7 +2969,6 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
 	if (success)
 	{
-		mShaderList.push_back(&gDeferredPostColorCorrectLUTProgram[1]);
 		gDeferredPostColorCorrectLUTProgram[1].mName = "Color Grading LUT Shader Legacy";
 		gDeferredPostColorCorrectLUTProgram[1].mFeatures.hasSrgb = true;
 		gDeferredPostColorCorrectLUTProgram[1].mShaderFiles.clear();
