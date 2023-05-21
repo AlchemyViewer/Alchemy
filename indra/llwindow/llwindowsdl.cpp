@@ -1396,6 +1396,8 @@ void LLWindowSDL::beforeDialog()
 		}
 	}
 
+#if LL_GTK
+
 #if LL_X11
 	if (mSDL_Display)
 	{
@@ -1405,7 +1407,6 @@ void LLWindowSDL::beforeDialog()
 	}
 #endif // LL_X11
 
-#if LL_GTK
 	// this is a good time to grab some GTK version information for
 	// diagnostics, if not already done.
 	ll_try_gtk_init();
@@ -1804,13 +1805,6 @@ void LLWindowSDL::processMiscNativeEvents()
 	// * Anything else which quietly hooks into the default glib/GTK loop
     if (ll_try_gtk_init())
     {
-	    // Yuck, Mozilla's GTK callbacks play with the locale - push/pop
-	    // the locale to protect it, as exotic/non-C locales
-	    // causes our code lots of general critical weirdness
-	    // and crashness. (SL-35450)
-	    static std::string saved_locale;
-	    saved_locale = ll_safe_string(setlocale(LC_ALL, NULL));
-
 	    // Pump until we've nothing left to do or passed 1/15th of a
 	    // second pumping for this frame.
 	    static LLTimer pump_timer;
@@ -1821,8 +1815,6 @@ void LLWindowSDL::processMiscNativeEvents()
 		    gtk_main_iteration_do(FALSE);
 	    } while (gtk_events_pending() &&
 		     !pump_timer.hasExpired());
-
-	    setlocale(LC_ALL, saved_locale.c_str() );
     }
 #endif // LL_GTK
 

@@ -36,7 +36,7 @@
 #include "llthread.h"
 #include <queue>
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_NFD
 #include <shlobj.h>
 #endif
 
@@ -89,7 +89,7 @@ private:
 	bool mLocked;
 
 	static LLDirPicker sInstance;
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_NFD
 	BROWSEINFO bi;
 #endif
 	

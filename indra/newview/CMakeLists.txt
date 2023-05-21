@@ -2122,23 +2122,27 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         )
 
 if( TARGET ll::nvapi )
-   target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC ll::nvapi )
+  target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC ll::nvapi )
 endif()
 
 if( TARGET al::discord-gamesdk )
-   target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC al::discord-gamesdk )
+  target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC al::discord-gamesdk )
 endif()
 
 if( TARGET al::sentry )
-   target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC al::sentry )
+  target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC al::sentry )
 endif()
 
 if( TARGET media_plugin_cef )
-    target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE USE_CEF=1)
+  target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE USE_CEF=1)
 endif()
 
 if( TARGET media_plugin_libvlc )
-    target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE USE_VLC=1)
+  target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE USE_VLC=1)
+endif()
+
+if(USE_NFD)
+  target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC nfd )
 endif()
 
 set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH

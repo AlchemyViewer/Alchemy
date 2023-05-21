@@ -5,7 +5,14 @@ include(FreeType)
 add_library( ll::uilibraries INTERFACE IMPORTED )
 
 if (LINUX)
-  target_compile_definitions(ll::uilibraries INTERFACE LL_GTK=1)
+  option(USE_GTK "Enable GTK3 functionality" ON)
+  option(USE_NFD "Enable NFD universal filepicker library" ON)
+  
+  option(USE_X11 "Enable undefined behavior sanitizer" OFF)
+
+  if (USE_GTK)
+    target_compile_definitions(ll::uilibraries INTERFACE LL_GTK=1)
+  endif()
 
   if(USE_X11)
     target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1 )
@@ -18,10 +25,12 @@ if (LINUX)
 
   include(FindPkgConfig)
 
-  set(PKGCONFIG_PACKAGES
-    gdk-3.0
-    gtk+-3.0
-    )
+  if (USE_GTK)
+    set(PKGCONFIG_PACKAGES
+      gdk-3.0
+      gtk+-3.0
+      )
+  endif()
 
   if(USE_X11)
     list(APPEND PKGCONFIG_PACKAGES 
@@ -49,6 +58,10 @@ if( WINDOWS )
           winspool
           imm32
           )
+endif()
+
+if(USE_NFD)
+  target_compile_definitions(ll::uilibraries INTERFACE LL_NFD=1 )
 endif()
 
 target_include_directories( ll::uilibraries SYSTEM INTERFACE

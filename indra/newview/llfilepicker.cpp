@@ -37,11 +37,15 @@
 #include "llwindow.h"	// beforeDialog()
 
 #if LL_SDL
-#include "llwindowsdl.h" // for some X/GTK utils to help with filepickers
+#include "llwindowsdl.h"
 #endif // LL_SDL
 
 #if LL_LINUX
 #include "llhttpconstants.h"    // file picker uses some of thes constants on Linux
+#endif
+
+#if LL_NFD
+#include "nfd.hpp"
 #endif
 
 //
@@ -50,7 +54,7 @@
 
 LLFilePicker LLFilePicker::sInstance;
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_NFD
 #define SOUND_FILTER L"Sounds (*.wav)\0*.wav\0"
 #define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png;*.webp\0"
 #define ANIM_FILTER L"Animations (*.bvh; *.anim)\0*.bvh;*.anim\0"
@@ -82,7 +86,7 @@ LLFilePicker::LLFilePicker()
 {
 	reset();
 
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_NFD
 	mOFN.lStructSize = sizeof(OPENFILENAMEW);
 	mOFN.hwndOwner = NULL;  // Set later
 	mOFN.hInstance = NULL;
@@ -167,7 +171,411 @@ void LLFilePicker::reset()
 	mCurrentFile = 0;
 }
 
-#if LL_WINDOWS
+#if LL_NFD
+std::vector<nfdfilteritem_t> LLFilePicker::setupFilter(ELoadFilter filter)
+{
+	std::vector<nfdfilteritem_t> filter_vec;
+	switch (filter)
+	{
+    case FFLOAD_ALL:
+    case FFLOAD_EXE:
+		filter_vec.emplace_back("Sounds", "wav");
+		filter_vec.emplace_back("Images", "tga,bmp,jpg,jpeg,png,webp");
+		filter_vec.emplace_back("Animations", "bvh,anim");
+		break;
+	case FFLOAD_WAV:
+		filter_vec.emplace_back("Sounds", "wav");
+		break;
+	case FFLOAD_IMAGE:
+		filter_vec.emplace_back("Images", "tga,bmp,jpg,jpeg,png,webp");
+		break;
+	case FFLOAD_ANIM:
+		filter_vec.emplace_back("Animations", "bvh,anim");
+		break;
+    case FFLOAD_GLTF:
+		filter_vec.emplace_back("GLTF Files", "gltf,glb");
+        break;
+	case FFLOAD_COLLADA:
+		filter_vec.emplace_back("Scene", "dae");
+		break;
+	case FFLOAD_XML:
+		filter_vec.emplace_back("XML files", "xml");
+		break;
+	case FFLOAD_SLOBJECT:
+		filter_vec.emplace_back("Objects", "slobject");
+		break;
+	case FFLOAD_RAW:
+		filter_vec.emplace_back("RAW files", "raw");
+		break;
+	case FFLOAD_MODEL:
+		filter_vec.emplace_back("Model files", "dae");
+		break;
+    case FFLOAD_MATERIAL:
+		filter_vec.emplace_back("GLTF Files", "gltf,glb");
+        break;
+    case FFLOAD_MATERIAL_TEXTURE:
+		filter_vec.emplace_back("GLTF Import", "gltf,glb,tga,bmp,jpg,jpeg,png");
+		filter_vec.emplace_back("GLTF Files", "gltf,glb");
+		filter_vec.emplace_back("Images", "tga,bmp,jpg,jpeg,png,webp");
+        break;
+	case FFLOAD_SCRIPT:
+		filter_vec.emplace_back("Script files", "lsl");
+		break;
+	case FFLOAD_DICTIONARY:
+		filter_vec.emplace_back("Dictionary files", "dic,xcu");
+		break;
+	case FFLOAD_ZIP:
+		filter_vec.emplace_back("ZIP files", "zip");
+	default:
+		break;
+	}
+	return filter_vec;
+}
+
+BOOL LLFilePicker::getOpenFile(ELoadFilter filter, bool blocking)
+{
+	if( mLocked )
+	{
+		return FALSE;
+	}
+	BOOL success = FALSE;
+
+	// if local file browsing is turned off, return without opening dialog
+	if ( check_local_file_access_enabled() == false )
+	{
+		return FALSE;
+	}
+
+	// initialize NFD
+    NFD::Guard nfdGuard;
+
+	// auto-freeing memory
+    NFD::UniquePath outPath;
+
+    // prepare filters for the dialog
+    auto filterItem = setupFilter(filter);
+	//
+	if (blocking)
+	{
+		// Modal, so pause agent
+		send_agent_pause();
+	}
+
+	reset();
+	
+	// show the dialog
+    nfdresult_t result = NFD::OpenDialog(outPath, filterItem.data(), filterItem.size());
+    if (result == NFD_OKAY) 
+	{
+		mFiles.push_back(outPath.get());
+		success = TRUE;
+    }
+
+	if (blocking)
+	{
+		send_agent_resume();
+		// Account for the fact that the app has been stalled.
+		LLFrameTimer::updateFrameTime();
+	}
+	
+	return success;
+}
+
+BOOL LLFilePicker::getOpenFileModeless(ELoadFilter filter,
+                                       void (*callback)(bool, std::vector<std::string> &, void*),
+                                       void *userdata)
+{
+    if( mLocked )
+        return FALSE;
+
+    // if local file browsing is turned off, return without opening dialog
+    if ( check_local_file_access_enabled() == false )
+    {
+        return FALSE;
+    }
+
+    reset();
+    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
+    return FALSE;
+}
+
+BOOL LLFilePicker::getMultipleOpenFiles(ELoadFilter filter, bool blocking)
+{
+	if( mLocked )
+	{
+		return FALSE;
+	}
+	BOOL success = FALSE;
+
+	// if local file browsing is turned off, return without opening dialog
+	if ( check_local_file_access_enabled() == false )
+	{
+		return FALSE;
+	}
+
+	// initialize NFD
+    NFD::Guard nfdGuard;
+
+	auto filterItem = setupFilter(filter);
+
+	reset();
+
+	if (blocking)
+	{
+		// Modal, so pause agent
+		send_agent_pause();
+	}
+
+    // auto-freeing memory
+    NFD::UniquePathSet outPaths;
+
+    // show the dialog
+    nfdresult_t result = NFD::OpenDialogMultiple(outPaths, filterItem.data(), filterItem.size());
+    if (result == NFD_OKAY) 
+	{
+        LL_INFOS() << "Success!" << LL_ENDL;
+
+        nfdpathsetsize_t numPaths;
+        NFD::PathSet::Count(outPaths, numPaths);
+
+        nfdpathsetsize_t i;
+        for (i = 0; i < numPaths; ++i) 
+		{
+            NFD::UniquePathSetPath path;
+            NFD::PathSet::GetPath(outPaths, i, path);
+			mFiles.push_back(path.get());
+            LL_INFOS() << "Path " << i << ": " << path.get() << LL_ENDL;
+        }
+		success = TRUE;
+    } 
+	else if (result == NFD_CANCEL) 
+	{
+        LL_INFOS() << "User pressed cancel." << LL_ENDL;
+    } 
+	else 
+	{
+        LL_INFOS() << "Error: " << NFD::GetError() << LL_ENDL;
+    }
+
+	if (blocking)
+	{
+		send_agent_resume();
+
+		// Account for the fact that the app has been stalled.
+		LLFrameTimer::updateFrameTime();
+	}
+
+	return success;
+}
+
+BOOL LLFilePicker::getMultipleOpenFilesModeless(ELoadFilter filter,
+                                                void (*callback)(bool, std::vector<std::string> &, void*),
+                                                void *userdata )
+{
+    if( mLocked )
+        return FALSE;
+
+    // if local file browsing is turned off, return without opening dialog
+    if ( check_local_file_access_enabled() == false )
+    {
+        return FALSE;
+    }
+
+    reset();
+
+    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
+    return FALSE;
+}
+
+BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, bool blocking)
+{
+	if( mLocked )
+	{
+		return FALSE;
+	}
+	BOOL success = FALSE;
+
+	// if local file browsing is turned off, return without opening dialog
+	if ( check_local_file_access_enabled() == false )
+	{
+		return FALSE;
+	}
+
+    // initialize NFD
+    NFD::Guard nfdGuard;
+
+	std::vector<nfdfilteritem_t> filter_vec;
+	std::string saved_filename = filename;
+	switch( filter )
+	{
+	case FFSAVE_ALL:
+		filter_vec.emplace_back("WAV Sounds", "wav");
+		filter_vec.emplace_back("Targa, Bitmap Images", "tga,bmp");
+		break;
+	case FFSAVE_WAV:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.wav";
+		}
+		filter_vec.emplace_back("WAV Sounds", "wav");
+		break;
+	case FFSAVE_TGA:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.tga";
+		}
+		filter_vec.emplace_back("Targa Images", "tga");
+		break;
+	case FFSAVE_BMP:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.bmp";
+		}
+		filter_vec.emplace_back("Bitmap Images", "bmp");
+		break;
+	case FFSAVE_PNG:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.png";
+		}
+		filter_vec.emplace_back("PNG Images", "png");
+		break;
+	case FFSAVE_WEBP:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.webp";
+		}
+		filter_vec.emplace_back("WebP Images", "webp");
+		break;
+	case FFSAVE_TGAPNGWEBP:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.png";
+		}
+		filter_vec.emplace_back("PNG Images", "png");
+		filter_vec.emplace_back("Targa Images", "tga");
+		filter_vec.emplace_back("Jpeg Images", "jpg,jpeg");
+		filter_vec.emplace_back("Jpeg2000 Images", "j2c");
+		filter_vec.emplace_back("Bitmap Images", "bmp");
+		filter_vec.emplace_back("WebP Images", "webp");
+		break;
+	case FFSAVE_JPEG:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.jpeg";
+		}
+		filter_vec.emplace_back("Jpeg Images", "jpg,jpeg");
+		break;
+	case FFSAVE_AVI:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.avi";
+		}
+		filter_vec.emplace_back("AVI Movie File", "avi");
+		break;
+	case FFSAVE_ANIM:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.xaf";
+		}
+		filter_vec.emplace_back("XAF Anim File", "xaf");
+		break;
+	case FFSAVE_CSV:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.csv";
+		}
+		filter_vec.emplace_back("Comma seperated values", "csv");
+		break;
+	case FFSAVE_XML:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.xml";
+		}
+		filter_vec.emplace_back("XML File", "xml");
+		break;
+	case FFSAVE_COLLADA:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.collada";
+		}
+		filter_vec.emplace_back("COLLADA File", "collada");
+		break;
+	case FFSAVE_RAW:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.raw";
+		}
+		filter_vec.emplace_back("RAW files", "raw");
+		break;
+	case FFSAVE_J2C:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.j2c";
+		}
+		filter_vec.emplace_back("Compressed Images", "j2c");
+		break;
+	case FFSAVE_SCRIPT:
+		if (filename.empty())
+		{
+			saved_filename = "untitled.lsl";
+		}
+		filter_vec.emplace_back("LSL Files", "lsl");
+		break;
+	default:
+		return FALSE;
+	}
+
+	reset();
+
+	if (blocking)
+	{
+		// Modal, so pause agent
+		send_agent_pause();
+	}
+
+	{
+		NFD::UniquePath savePath;
+
+		// show the dialog
+		nfdresult_t result = NFD::SaveDialog(savePath, filter_vec.data(), filter_vec.size(), NULL, saved_filename.c_str());
+		if (result == NFD_OKAY) {
+			mFiles.push_back(savePath.get());
+			success = TRUE;
+		}
+		gKeyboard->resetKeys();
+	}
+
+	if (blocking)
+	{
+		send_agent_resume();
+
+		// Account for the fact that the app has been stalled.
+		LLFrameTimer::updateFrameTime();
+	}
+
+	return success;
+}
+
+BOOL LLFilePicker::getSaveFileModeless(ESaveFilter filter,
+                                       const std::string& filename,
+                                       void (*callback)(bool, std::string&, void*),
+                                       void *userdata)
+{
+    if( mLocked )
+        return FALSE;
+
+    // if local file browsing is turned off, return without opening dialog
+    if ( check_local_file_access_enabled() == false )
+    {
+        return FALSE;
+    }
+
+    reset();
+    LL_WARNS() << "NOT IMPLEMENTED" << LL_ENDL;
+    return FALSE;
+}
+#elif LL_WINDOWS
 
 BOOL LLFilePicker::setupFilter(ELoadFilter filter)
 {

@@ -37,6 +37,10 @@
 #include "llviewercontrol.h"
 #include "llwin32headerslean.h"
 
+#if LL_NFD
+#include "nfd.hpp"
+#endif
+
 #if LL_LINUX || LL_DARWIN
 # include "llfilepicker.h"
 #endif
@@ -71,7 +75,84 @@ bool LLDirPicker::check_local_file_access_enabled()
 	return true;
 }
 
-#if LL_WINDOWS
+#if LL_NFD
+LLDirPicker::LLDirPicker() :
+	mFileName(NULL),
+	mLocked(false)
+{
+	reset();
+}
+
+LLDirPicker::~LLDirPicker()
+{
+}
+
+
+void LLDirPicker::reset()
+{
+	mDir.clear();
+}
+
+BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
+{
+	if( mLocked )
+	{
+		return FALSE;
+	}
+
+	// if local file browsing is turned off, return without opening dialog
+	if ( check_local_file_access_enabled() == false )
+	{
+		return FALSE;
+	}
+
+	BOOL success = FALSE;
+
+	if (blocking)
+	{
+		// Modal, so pause agent
+		send_agent_pause();
+	}
+
+    // initialize NFD
+    NFD::Guard nfdGuard;
+
+    // auto-freeing memory
+    NFD::UniquePath outPath;
+
+    // show the dialog
+    nfdresult_t result = NFD::PickFolder(outPath);
+    if (result == NFD_OKAY) 
+	{
+        mDir = std::string(outPath.get());
+		success = true;
+    }
+	else if (result == NFD_CANCEL) 
+	{
+        LL_INFOS() << "User pressed cancel." << LL_ENDL;
+    } 
+	else 
+	{
+        LL_INFOS() << "DirPicker Error: " << NFD::GetError() << LL_ENDL;
+    }
+
+	if (blocking)
+	{
+		send_agent_resume();
+
+		// Account for the fact that the app has been stalled.
+		LLFrameTimer::updateFrameTime();
+	}
+
+	return success;
+}
+
+std::string LLDirPicker::getDirName()
+{
+	return mDir;
+}
+
+#elif LL_WINDOWS
 
 LLDirPicker::LLDirPicker() :
 	mFileName(NULL),
@@ -308,7 +389,7 @@ std::queue<LLDirPickerThread*> LLDirPickerThread::sDeadQ;
 
 void LLDirPickerThread::getFile()
 {
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_NFD
 	start();
 #else
 	run();
@@ -318,7 +399,7 @@ void LLDirPickerThread::getFile()
 //virtual 
 void LLDirPickerThread::run()
 {
-#if LL_WINDOWS
+#if LL_WINDOWS && !LL_NFD
 	bool blocking = false;
 #else
 	bool blocking = true; // modal

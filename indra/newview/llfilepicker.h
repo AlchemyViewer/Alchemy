@@ -48,12 +48,17 @@
 #endif
 
 // Need commdlg.h for OPENFILENAMEA
-#ifdef LL_WINDOWS
+#if LL_WINDOWS && !LL_NFD
 #include "llwin32headerslean.h"
 #include <commdlg.h>
 #endif
 
-#if LL_GTK
+#if LL_NFD
+#include "nfd.hpp"
+#endif
+
+#if LL_LINUX
+#if LL_GTK && !LL_NFD
 extern "C" {
 // mostly for Linux, possible on others
 #include <gtk/gtk.h>
@@ -61,10 +66,11 @@ extern "C" {
 #include <gdk/gdkx.h>
 }
 #endif // LL_GTK
+#endif
 
 class LLFilePicker
 {
-#ifdef LL_GTK
+#if defined(LL_GTK) && !LL_NFD
 	friend class LLDirPicker;
 	friend void chooser_responder(GtkWidget *, gint, gpointer);
 #endif // LL_GTK
@@ -164,14 +170,18 @@ private:
 	// is enabled and if not, tidy up and indicate we're not allowed to do this.
 	bool check_local_file_access_enabled();
 	
-#if LL_WINDOWS
+#if LL_NFD
+	std::vector<nfdfilteritem_t> setupFilter(ELoadFilter filter);
+#endif
+
+#if LL_WINDOWS && !LL_NFD
 	OPENFILENAMEW mOFN;				// for open and save dialogs
 	WCHAR mFilesW[FILENAME_BUFFER_SIZE];
 
 	BOOL setupFilter(ELoadFilter filter);
 #endif
 
-#if LL_DARWIN
+#if LL_DARWIN && !LL_NFD
     S32 mPickOptions;
 	std::vector<std::string> mFileVector;
 	
@@ -187,7 +197,8 @@ private:
                                  void *userdata);
 #endif
 
-#if LL_GTK
+#if LL_LINUX
+#if LL_GTK && !LL_NFD
 	static void add_to_selectedfiles(gpointer data, gpointer user_data);
 	static void chooser_responder(GtkWidget *widget, gint response, gpointer user_data);
 	// we remember the last path that was accessed for a particular usage
@@ -195,6 +206,7 @@ private:
 	std::string mCurContextName;
 	// we also remember the extension of the last added file.
 	std::string mCurrentExtension;
+#endif
 #endif
 
 	std::vector<std::string> mFiles;
@@ -204,7 +216,7 @@ private:
 	static LLFilePicker sInstance;
 	
 protected:
-#if LL_GTK
+#if LL_GTK && !LL_NFD
         GtkWindow* buildFilePicker(bool is_save, bool is_folder,
 				   std::string context = "generic");
 #endif

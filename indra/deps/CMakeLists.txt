@@ -3,6 +3,7 @@ project(deps)
 
 include(00-Common)
 include(FetchContent)
+include(UI)
 
 set(CMAKE_FOLDER "Third Party")
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
@@ -72,6 +73,17 @@ if(USE_TRACY)
   set(TRACY_ONLY_LOCALHOST ON)
   set(TRACY_FIBERS ON)
   FetchContent_MakeAvailable(tracy)
+endif()
+
+if(USE_NFD)
+  FetchContent_Declare(
+    nfd
+    GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
+    GIT_TAG        v1.0.3
+    )
+
+  set(NFD_PORTAL ON)
+  FetchContent_MakeAvailable(nfd)
 endif()
 
 unset(CMAKE_FOLDER)
