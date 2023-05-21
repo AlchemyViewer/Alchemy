@@ -69,6 +69,7 @@ LLFilePicker LLFilePicker::sInstance;
 #define SCRIPT_FILTER L"Script files (*.lsl)\0*.lsl\0"
 #define DICTIONARY_FILTER L"Dictionary files (*.dic; *.xcu)\0*.dic;*.xcu\0"
 #define ZIP_FILTER L"ZIP files (*.zip)\0*.zip\0"
+#define EXECUTABLE_FILTER L"Executables (*.exe)\0*.exe\0"
 #endif
 
 #ifdef LL_DARWIN
@@ -178,54 +179,55 @@ std::vector<nfdfilteritem_t> LLFilePicker::setupFilter(ELoadFilter filter)
 	switch (filter)
 	{
     case FFLOAD_ALL:
+    	break;
     case FFLOAD_EXE:
-		filter_vec.emplace_back("Sounds", "wav");
-		filter_vec.emplace_back("Images", "tga,bmp,jpg,jpeg,png,webp");
-		filter_vec.emplace_back("Animations", "bvh,anim");
+#if LL_WINDOWS
+   		filter_vec.emplace_back(nfdfilteritem_t{"Executables", "exe"});
+#endif
 		break;
 	case FFLOAD_WAV:
-		filter_vec.emplace_back("Sounds", "wav");
+		filter_vec.emplace_back(nfdfilteritem_t{"Sounds", "wav"});
 		break;
 	case FFLOAD_IMAGE:
-		filter_vec.emplace_back("Images", "tga,bmp,jpg,jpeg,png,webp");
+		filter_vec.emplace_back(nfdfilteritem_t{"Images", "tga,bmp,jpg,jpeg,png,webp"});
 		break;
 	case FFLOAD_ANIM:
-		filter_vec.emplace_back("Animations", "bvh,anim");
+		filter_vec.emplace_back(nfdfilteritem_t{"Animations", "bvh,anim"});
 		break;
     case FFLOAD_GLTF:
-		filter_vec.emplace_back("GLTF Files", "gltf,glb");
+		filter_vec.emplace_back(nfdfilteritem_t{"GLTF Files", "gltf,glb"});
         break;
 	case FFLOAD_COLLADA:
-		filter_vec.emplace_back("Scene", "dae");
+		filter_vec.emplace_back(nfdfilteritem_t{"Scene", "dae"});
 		break;
 	case FFLOAD_XML:
-		filter_vec.emplace_back("XML files", "xml");
+		filter_vec.emplace_back(nfdfilteritem_t{"XML files", "xml"});
 		break;
 	case FFLOAD_SLOBJECT:
-		filter_vec.emplace_back("Objects", "slobject");
+		filter_vec.emplace_back(nfdfilteritem_t{"Objects", "slobject"});
 		break;
 	case FFLOAD_RAW:
-		filter_vec.emplace_back("RAW files", "raw");
+		filter_vec.emplace_back(nfdfilteritem_t{"RAW files", "raw"});
 		break;
 	case FFLOAD_MODEL:
-		filter_vec.emplace_back("Model files", "dae");
+		filter_vec.emplace_back(nfdfilteritem_t{"Model files", "dae"});
 		break;
     case FFLOAD_MATERIAL:
-		filter_vec.emplace_back("GLTF Files", "gltf,glb");
+		filter_vec.emplace_back(nfdfilteritem_t{"GLTF Files", "gltf,glb"});
         break;
     case FFLOAD_MATERIAL_TEXTURE:
-		filter_vec.emplace_back("GLTF Import", "gltf,glb,tga,bmp,jpg,jpeg,png");
-		filter_vec.emplace_back("GLTF Files", "gltf,glb");
-		filter_vec.emplace_back("Images", "tga,bmp,jpg,jpeg,png,webp");
+		filter_vec.emplace_back(nfdfilteritem_t{"GLTF Import", "gltf,glb,tga,bmp,jpg,jpeg,png"});
+		filter_vec.emplace_back(nfdfilteritem_t{"GLTF Files", "gltf,glb"});
+		filter_vec.emplace_back(nfdfilteritem_t{"Images", "tga,bmp,jpg,jpeg,png,webp"});
         break;
 	case FFLOAD_SCRIPT:
-		filter_vec.emplace_back("Script files", "lsl");
+		filter_vec.emplace_back(nfdfilteritem_t{"Script files", "lsl"});
 		break;
 	case FFLOAD_DICTIONARY:
-		filter_vec.emplace_back("Dictionary files", "dic,xcu");
+		filter_vec.emplace_back(nfdfilteritem_t{"Dictionary files", "dic,xcu"});
 		break;
 	case FFLOAD_ZIP:
-		filter_vec.emplace_back("ZIP files", "zip");
+		filter_vec.emplace_back(nfdfilteritem_t{"ZIP files", "zip"});
 	default:
 		break;
 	}
@@ -409,118 +411,118 @@ BOOL LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
 	switch( filter )
 	{
 	case FFSAVE_ALL:
-		filter_vec.emplace_back("WAV Sounds", "wav");
-		filter_vec.emplace_back("Targa, Bitmap Images", "tga,bmp");
+		filter_vec.emplace_back(nfdfilteritem_t{"WAV Sounds", "wav"});
+		filter_vec.emplace_back(nfdfilteritem_t{"Targa, Bitmap Images", "tga,bmp"});
 		break;
 	case FFSAVE_WAV:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.wav";
 		}
-		filter_vec.emplace_back("WAV Sounds", "wav");
+		filter_vec.emplace_back(nfdfilteritem_t{"WAV Sounds", "wav"});
 		break;
 	case FFSAVE_TGA:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.tga";
 		}
-		filter_vec.emplace_back("Targa Images", "tga");
+		filter_vec.emplace_back(nfdfilteritem_t{"Targa Images", "tga"});
 		break;
 	case FFSAVE_BMP:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.bmp";
 		}
-		filter_vec.emplace_back("Bitmap Images", "bmp");
+		filter_vec.emplace_back(nfdfilteritem_t{"Bitmap Images", "bmp"});
 		break;
 	case FFSAVE_PNG:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.png";
 		}
-		filter_vec.emplace_back("PNG Images", "png");
+		filter_vec.emplace_back(nfdfilteritem_t{"PNG Images", "png"});
 		break;
 	case FFSAVE_WEBP:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.webp";
 		}
-		filter_vec.emplace_back("WebP Images", "webp");
+		filter_vec.emplace_back(nfdfilteritem_t{"WebP Images", "webp"});
 		break;
 	case FFSAVE_TGAPNGWEBP:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.png";
 		}
-		filter_vec.emplace_back("PNG Images", "png");
-		filter_vec.emplace_back("Targa Images", "tga");
-		filter_vec.emplace_back("Jpeg Images", "jpg,jpeg");
-		filter_vec.emplace_back("Jpeg2000 Images", "j2c");
-		filter_vec.emplace_back("Bitmap Images", "bmp");
-		filter_vec.emplace_back("WebP Images", "webp");
+		filter_vec.emplace_back(nfdfilteritem_t{"PNG Images", "png"});
+		filter_vec.emplace_back(nfdfilteritem_t{"Targa Images", "tga"});
+		filter_vec.emplace_back(nfdfilteritem_t{"Jpeg Images", "jpg,jpeg"});
+		filter_vec.emplace_back(nfdfilteritem_t{"Jpeg2000 Images", "j2c"});
+		filter_vec.emplace_back(nfdfilteritem_t{"Bitmap Images", "bmp"});
+		filter_vec.emplace_back(nfdfilteritem_t{"WebP Images", "webp"});
 		break;
 	case FFSAVE_JPEG:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.jpeg";
 		}
-		filter_vec.emplace_back("Jpeg Images", "jpg,jpeg");
+		filter_vec.emplace_back(nfdfilteritem_t{"Jpeg Images", "jpg,jpeg"});
 		break;
 	case FFSAVE_AVI:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.avi";
 		}
-		filter_vec.emplace_back("AVI Movie File", "avi");
+		filter_vec.emplace_back(nfdfilteritem_t{"AVI Movie File", "avi"});
 		break;
 	case FFSAVE_ANIM:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.xaf";
 		}
-		filter_vec.emplace_back("XAF Anim File", "xaf");
+		filter_vec.emplace_back(nfdfilteritem_t{"XAF Anim File", "xaf"});
 		break;
 	case FFSAVE_CSV:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.csv";
 		}
-		filter_vec.emplace_back("Comma seperated values", "csv");
+		filter_vec.emplace_back(nfdfilteritem_t{"Comma seperated values", "csv"});
 		break;
 	case FFSAVE_XML:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.xml";
 		}
-		filter_vec.emplace_back("XML File", "xml");
+		filter_vec.emplace_back(nfdfilteritem_t{"XML File", "xml"});
 		break;
 	case FFSAVE_COLLADA:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.collada";
 		}
-		filter_vec.emplace_back("COLLADA File", "collada");
+		filter_vec.emplace_back(nfdfilteritem_t{"COLLADA File", "collada"});
 		break;
 	case FFSAVE_RAW:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.raw";
 		}
-		filter_vec.emplace_back("RAW files", "raw");
+		filter_vec.emplace_back(nfdfilteritem_t{"RAW files", "raw"});
 		break;
 	case FFSAVE_J2C:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.j2c";
 		}
-		filter_vec.emplace_back("Compressed Images", "j2c");
+		filter_vec.emplace_back(nfdfilteritem_t{"Compressed Images", "j2c"});
 		break;
 	case FFSAVE_SCRIPT:
 		if (filename.empty())
 		{
 			saved_filename = "untitled.lsl";
 		}
-		filter_vec.emplace_back("LSL Files", "lsl");
+		filter_vec.emplace_back(nfdfilteritem_t{"LSL Files", "lsl"});
 		break;
 	default:
 		return FALSE;
@@ -583,13 +585,16 @@ BOOL LLFilePicker::setupFilter(ELoadFilter filter)
 	switch (filter)
 	{
     case FFLOAD_ALL:
-    case FFLOAD_EXE:
 		mOFN.lpstrFilter = L"All Files (*.*)\0*.*\0" \
 		SOUND_FILTER \
 		IMAGE_FILTER \
 		ANIM_FILTER \
 		MATERIAL_FILTER \
 		L"\0";
+		break;
+    case FFLOAD_EXE:
+		mOFN.lpstrFilter = EXECUTABLE_FILTER \
+			L"\0";
 		break;
 	case FFLOAD_WAV:
 		mOFN.lpstrFilter = SOUND_FILTER \
