@@ -967,6 +967,9 @@ LLWindowSDL::~LLWindowSDL()
 	}
 
 	gWindowImplementation = NULL;
+
+	// Shutdown SDL
+	SDL_Quit();
 }
 
 
