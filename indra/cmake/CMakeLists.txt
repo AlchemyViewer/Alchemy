@@ -16,7 +16,6 @@ set(cmake_SOURCE_FILES
         CMakeCopyIfDifferent.cmake
         CURL.cmake
         Copy3rdPartyLibs.cmake
-        DBusGlib.cmake
         DeploySharedLibs.cmake
         DiscordSDK.cmake
         DragDrop.cmake
@@ -49,6 +48,7 @@ set(cmake_SOURCE_FILES
         PluginAPI.cmake
         Prebuilt.cmake
         PulseAudio.cmake
+        SDBusCPP.cmake
         SDL2.cmake
         Sentry.cmake
         TemplateCheck.cmake

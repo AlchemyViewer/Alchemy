@@ -5,7 +5,7 @@ include(FreeType)
 add_library( ll::uilibraries INTERFACE IMPORTED )
 
 if (LINUX)
-  option(USE_GTK "Enable GTK3 functionality" ON)
+  option(USE_GTK "Enable GTK3 functionality" OFF)
   option(USE_NFD "Enable NFD universal filepicker library" ON)
   
   option(USE_X11 "Enable undefined behavior sanitizer" OFF)
