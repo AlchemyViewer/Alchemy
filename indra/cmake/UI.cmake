@@ -5,35 +5,17 @@ include(FreeType)
 add_library( ll::uilibraries INTERFACE IMPORTED )
 
 if (LINUX)
-  option(USE_GTK "Enable GTK3 functionality" OFF)
   option(USE_NFD "Enable NFD universal filepicker library" ON)
-  
   option(USE_X11 "Enable undefined behavior sanitizer" OFF)
-
-  if (USE_GTK)
-    target_compile_definitions(ll::uilibraries INTERFACE LL_GTK=1)
-  endif()
 
   if(USE_X11)
     target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1 )
   endif()
 
-  if( USE_CONAN )
-    target_link_libraries( ll::uilibraries INTERFACE CONAN_PKG::gtk )
-    return()
-  endif()
-
   include(FindPkgConfig)
 
-  if (USE_GTK)
-    set(PKGCONFIG_PACKAGES
-      gdk-3.0
-      gtk+-3.0
-      )
-  endif()
-
   if(USE_X11)
-    list(APPEND PKGCONFIG_PACKAGES 
+    set(PKGCONFIG_PACKAGES
           x11
           )
   endif()
