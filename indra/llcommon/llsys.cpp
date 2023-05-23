@@ -1155,9 +1155,10 @@ LLSD LLMemoryInfo::loadStatsMap()
 				LLSD::String key(matched[1].first, matched[1].second);
 				LLSD::String value_str(matched[2].first, matched[2].second);
 				LLSD::Integer value(0);
+				S64 intval = 0;
 				try
 				{
-					value = boost::lexical_cast<LLSD::Integer>(value_str);
+					intval = llclamp(boost::lexical_cast<S64>(value_str), 0, S32_MAX);
 				}
 				catch (const boost::bad_lexical_cast&)
 				{
@@ -1166,6 +1167,7 @@ LLSD LLMemoryInfo::loadStatsMap()
 											 << line << LL_ENDL;
 					continue;
 				}
+				value = LLSD::Integer(intval);
 				// Store this statistic.
 				stats.add(key, value);
 			}

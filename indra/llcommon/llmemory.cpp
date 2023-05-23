@@ -40,6 +40,7 @@
 #include <mach/mach_host.h>
 #elif LL_LINUX
 # include <unistd.h>
+# include <sys/sysinfo.h>
 #endif
 
 #include "llmemory.h"
@@ -164,7 +165,14 @@ void LLMemory::updateMemoryInfo()
     {
         LL_WARNS() << "task_info failed" << LL_ENDL;
     }
+#elif LL_LINUX
+    const U64 page_size = getpagesize();
+	U64 phys = page_size * (U64)(get_phys_pages());
+	U64 avail = page_size * (U64)(get_avphys_pages());
 
+	sAllocatedMemInKB = U64Bytes(LLMemory::getCurrentRSS());
+	sMaxPhysicalMemInKB = U64Bytes(phys);
+	sAvailPhysicalMemInKB = U64Bytes(avail);
 #else
 	//not valid for other systems for now.
 	sAllocatedMemInKB = U64Bytes(LLMemory::getCurrentRSS());
