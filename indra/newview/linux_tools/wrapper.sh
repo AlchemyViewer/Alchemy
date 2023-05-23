@@ -16,30 +16,6 @@
 # This can be useful if you run Alchemy on a battery-operated device (i.e. laptop)
 # export DISABLE_GAMEMODE=1
 
-## - Avoids the optional OpenGL extensions which have proven most problematic
-##   on some hardware.  Disabling this option may cause BETTER PERFORMANCE but
-##   may also cause CRASHES and hangs on some unstable combinations of drivers
-##   and hardware.
-## NOTE: This is now disabled by default.
-#export LL_GL_BASICEXT=x
-
-## - Avoids *all* optional OpenGL extensions.  This is the safest and least-
-##   exciting option.  Enable this if you experience stability issues.
-#export LL_GL_NOEXT=x
-
-## - For advanced troubleshooters, this lets you disable specific GL
-##   extensions, each of which is represented by a letter a-o.  If you can
-##   narrow down a stability problem on your system to just one or two
-##   extensions then please post details of your hardware (and drivers) to
-##   the Linux Client Testers forum along with the minimal
-##   LL_GL_BLACKLIST which solves your problems.
-#export LL_GL_BLACKLIST=abcdefghijklmno
-
-if [ "`uname -m`" = "x86_64" ]; then
-    echo '64-bit Linux detected.'
-fi
-
-
 ## Everything below this line is just for advanced troubleshooters.
 ##-------------------------------------------------------------------
 
@@ -71,7 +47,6 @@ export SDL_VIDEO_X11_WMCLASS=Alchemy
 
 ## - Enable threaded mesa GL impl
 export mesa_glthread=true
-
 
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
