@@ -7379,7 +7379,8 @@ void LLVOAvatar::setPixelAreaAndAngle(LLAgent &agent)
 	size.setSub(ext[1], ext[0]);
 	size.mul(0.5f);
 
-	mImpostorPixelArea = LLPipeline::calcPixelArea(center, size, LLViewerCamera::instance());
+	mImpostorPixelArea = LLPipeline::calcPixelArea(center, size, *LLViewerCamera::getInstance());
+    mPixelArea = mImpostorPixelArea;
 
 	F32 range = mDrawable->mDistanceWRTCamera;
 
