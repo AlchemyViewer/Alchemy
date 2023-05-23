@@ -53,7 +53,7 @@
                      color="LoginProgressBoxCenterColor"
                      follows="left|right|bottom|top"
                      height="275"
-                     image_name="Rounded_Square"
+                     image_name="Nametag_Rect"
                      layout="topleft"
                      left="0"
                      top="0"
