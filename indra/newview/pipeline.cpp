@@ -579,7 +579,6 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionRayStep");
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionDistanceBias");
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionDepthRejectBias");
-    connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionsGlossySamples");
 	connectRefreshCachedSettingsSafe("RenderBufferVisualization");
 	connectRefreshCachedSettingsSafe("RenderNormalMapScale");
 	connectRefreshCachedSettingsSafe("RenderAttachedLights");
