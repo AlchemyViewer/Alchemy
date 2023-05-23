@@ -50,22 +50,10 @@
 #include "../newview/res/resource.h"
 #endif
 
-#if LL_GTK
-extern "C" {
-#include <gtk/gtk.h>
-#include <gdk/gdk.h>
-#if GTK_CHECK_VERSION(2, 24, 0)
-#include <gdk/gdkx.h>
-#endif
-}
-#include <clocale>
-#endif // LL_GTK
-
 #if LL_LINUX
 extern "C" {
 # include "fontconfig/fontconfig.h"
 }
-
 
 // not necessarily available on random SDL platforms, so #if LL_LINUX
 // for execv(), waitpid(), fork()
@@ -92,64 +80,6 @@ const S32 MAX_NUM_RESOLUTIONS = 200;
 // maintain in the constructor and destructor.  This assumes that there will
 // be only one object of this class at any time.  Currently this is true.
 static LLWindowSDL *gWindowImplementation = NULL;
-
-#if LL_GTK
-// Lazily initialize and check the runtime GTK version for goodness.
-// static
-bool LLWindowSDL::ll_try_gtk_init(void)
-{
-	static BOOL done_gtk_diag = FALSE;
-	static BOOL gtk_is_good = FALSE;
-	static BOOL done_setlocale = FALSE;
-	static BOOL tried_gtk_init = FALSE;
-
-	if (!done_setlocale)
-	{
-		LL_INFOS() << "Starting GTK Initialization." << LL_ENDL;
-		gtk_disable_setlocale();
-		done_setlocale = TRUE;
-	}
-	
-	if (!tried_gtk_init)
-	{
-		tried_gtk_init = TRUE;
-		gtk_is_good = gtk_init_check(NULL, NULL);
-		if (!gtk_is_good)
-			LL_WARNS() << "GTK Initialization failed." << LL_ENDL;
-	}
-
-	if (gtk_is_good && !done_gtk_diag)
-	{
-		LL_INFOS() << "GTK Initialized." << LL_ENDL;
-		LL_INFOS() << "- Compiled against GTK version "
-			<< GTK_MAJOR_VERSION << "."
-			<< GTK_MINOR_VERSION << "."
-			<< GTK_MICRO_VERSION << LL_ENDL;
-		LL_INFOS() << "- Running against GTK version "
-			<< gtk_major_version << "."
-			<< gtk_minor_version << "."
-			<< gtk_micro_version << LL_ENDL;
-
-		const gchar* gtk_warning = gtk_check_version(
-			GTK_MAJOR_VERSION,
-			GTK_MINOR_VERSION,
-			GTK_MICRO_VERSION);
-		if (gtk_warning)
-		{
-			LL_WARNS() << "- GTK COMPATIBILITY WARNING: " <<
-				gtk_warning << LL_ENDL;
-			gtk_is_good = FALSE;
-		} else {
-			LL_INFOS() << "- GTK version is good." << LL_ENDL;
-		}
-
-		done_gtk_diag = TRUE;
-	}
-
-	return gtk_is_good;
-}
-#endif // LL_GTK
-
 
 #if LL_X11
 // static
@@ -293,13 +223,6 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
 	mSDL_XWindowID = None;
 	mSDL_Display = NULL;
 #endif // LL_X11
-
-#if LL_GTK
-	// We MUST be the first to initialize GTK so that GTK doesn't get badly
-	// initialized with a non-C locale and cause lots of serious random
-	// weirdness.
-	ll_try_gtk_init();
-#endif // LL_GTK
 
 	// Assume 4:3 aspect ratio until we know better
 	mOriginalAspectRatio = 1024.0 / 768.0;
@@ -1395,22 +1318,6 @@ void LLWindowSDL::beforeDialog()
 			}
 		}
 	}
-
-#if LL_GTK
-
-#if LL_X11
-	if (mSDL_Display)
-	{
-		// Everything that we/SDL asked for should happen before we
-		// potentially hand control over to GTK.
-		XSync(mSDL_Display, False);
-	}
-#endif // LL_X11
-
-	// this is a good time to grab some GTK version information for
-	// diagnostics, if not already done.
-	ll_try_gtk_init();
-#endif // LL_GTK
 }
 
 void LLWindowSDL::afterDialog()
@@ -1799,25 +1706,6 @@ finally:
 // virtual
 void LLWindowSDL::processMiscNativeEvents()
 {
-#if LL_GTK
-	// Pump GTK events to avoid starvation for:
-	// * DBUS servicing
-	// * Anything else which quietly hooks into the default glib/GTK loop
-    if (ll_try_gtk_init())
-    {
-	    // Pump until we've nothing left to do or passed 1/15th of a
-	    // second pumping for this frame.
-	    static LLTimer pump_timer;
-	    pump_timer.reset();
-	    pump_timer.setTimerExpirySec(1.0f / 15.0f);
-	    do {
-		     // Always do at least one non-blocking pump
-		    gtk_main_iteration_do(FALSE);
-	    } while (gtk_events_pending() &&
-		     !pump_timer.hasExpired());
-    }
-#endif // LL_GTK
-
     // hack - doesn't belong here - but this is just for debugging
     if (getenv("LL_DEBUG_BLOAT"))
     {

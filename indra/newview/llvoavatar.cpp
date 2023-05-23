@@ -702,7 +702,6 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 	mVisualComplexity(VISUAL_COMPLEXITY_UNKNOWN),
 	mLoadedCallbacksPaused(FALSE),
 	mLoadedCallbackTextures(0),
-	mRenderUnloadedAvatar(LLCachedControl<bool>(gSavedSettings, "RenderUnloadedAvatar", false)),
 	mLastRezzedStatus(-1),
 	mIsEditingAppearance(FALSE),
 	mUseLocalAppearance(FALSE),
@@ -7380,7 +7379,8 @@ void LLVOAvatar::setPixelAreaAndAngle(LLAgent &agent)
 	size.setSub(ext[1], ext[0]);
 	size.mul(0.5f);
 
-	mImpostorPixelArea = LLPipeline::calcPixelArea(center, size, LLViewerCamera::instance());
+	mImpostorPixelArea = LLPipeline::calcPixelArea(center, size, *LLViewerCamera::getInstance());
+    mPixelArea = mImpostorPixelArea;
 
 	F32 range = mDrawable->mDistanceWRTCamera;
 
@@ -8622,11 +8622,12 @@ BOOL LLVOAvatar::processFullyLoadedChange(bool loading)
 
 BOOL LLVOAvatar::isFullyLoaded() const
 {
+	static LLCachedControl<bool> render_unloaded_avatar(gSavedSettings, "RenderUnloadedAvatar", false);
 // [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-2.2
 	// Changes to LLAppearanceMgr::updateAppearanceFromCOF() expect this function to actually return mFullyLoaded for gAgentAvatarp
-	return (mRenderUnloadedAvatar && !isSelf()) ||(mFullyLoaded);
+	return (render_unloaded_avatar && !isSelf()) ||(mFullyLoaded);
 // [/SL:KB]
-//	return (mRenderUnloadedAvatar || mFullyLoaded);
+//	return (render_unloaded_avatar || mFullyLoaded);
 }
 
 bool LLVOAvatar::isTooComplex() const

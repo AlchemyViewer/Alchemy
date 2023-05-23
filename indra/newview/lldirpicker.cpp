@@ -389,7 +389,7 @@ std::queue<LLDirPickerThread*> LLDirPickerThread::sDeadQ;
 
 void LLDirPickerThread::getFile()
 {
-#if LL_WINDOWS && !LL_NFD
+#if (LL_WINDOWS && !LL_NFD) || (LL_LINUX && LL_NFD)
 	start();
 #else
 	run();
@@ -399,7 +399,7 @@ void LLDirPickerThread::getFile()
 //virtual 
 void LLDirPickerThread::run()
 {
-#if LL_WINDOWS && !LL_NFD
+#if (LL_WINDOWS && !LL_NFD) || (LL_LINUX && LL_NFD)
 	bool blocking = false;
 #else
 	bool blocking = true; // modal

@@ -2048,7 +2048,7 @@ LLViewerWindow::LLViewerWindow(const Params& p)
 
 std::string LLViewerWindow::getLastSnapshotDir()
 {
-    static LLCachedControl<std::string>	sSnapshotDir(LLCachedControl<std::string>(gSavedPerAccountSettings, "SnapshotBaseDir", ""));
+    static LLCachedControl<std::string>	sSnapshotDir(gSavedPerAccountSettings, "SnapshotBaseDir", "");
     return sSnapshotDir;
 }
 
@@ -4839,17 +4839,7 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
 	boost::filesystem::path b_path(lastSnapshotDir);
 #endif
 	bool is_dir = boost::filesystem::is_directory(b_path, ec);
-	if (ec.failed())
-	{
-		LL_WARNS() << "Failed check for is directory for filesystem path " << lastSnapshotDir << " : " << ec.message() << LL_ENDL;
-		LLSD args;
-		args["PATH"] = lastSnapshotDir;
-		LLNotificationsUtil::add("SnapshotToLocalDirNotExist", args);
-		resetSnapshotLoc();
-		failure_cb();
-		return;
-	}
-	if (!is_dir)
+	if (!is_dir || ec.failed())
 	{
 		LLSD args;
 		args["PATH"] = lastSnapshotDir;
@@ -4894,8 +4884,8 @@ void LLViewerWindow::saveImageLocal(LLImageFormatted *image, const snapshot_save
 	S32 i = 1;
 	S32 err = 0;
 	std::string extension("." + image->getExtension());
-    static LLCachedControl<std::string>	sSnapshotBaseName(LLCachedControl<std::string>(gSavedPerAccountSettings, "SnapshotBaseName", "Snapshot"));
-    static LLCachedControl<std::string>	sSnapshotDir(LLCachedControl<std::string>(gSavedPerAccountSettings, "SnapshotBaseDir", ""));
+    static LLCachedControl<std::string>	sSnapshotBaseName(gSavedPerAccountSettings, "SnapshotBaseName", "Snapshot");
+    static LLCachedControl<std::string>	sSnapshotDir(gSavedPerAccountSettings, "SnapshotBaseDir", "");
 	do
 	{
 		filepath = sSnapshotDir;
@@ -5003,7 +4993,7 @@ void LLViewerWindow::playSnapshotAnimAndSound()
 
 BOOL LLViewerWindow::isSnapshotLocSet() const
 {
-    static LLCachedControl<std::string>	sSnapshotDir(LLCachedControl<std::string>(gSavedPerAccountSettings, "SnapshotBaseDir", ""));
+    static LLCachedControl<std::string>	sSnapshotDir(gSavedPerAccountSettings, "SnapshotBaseDir", "");
 	return !sSnapshotDir().empty();
 }
 
@@ -5615,6 +5605,7 @@ BOOL LLViewerWindow::cubeSnapshot(const LLVector3& origin, LLCubeMapArray* cubea
     *camera = saved_camera;
     set_current_modelview(saved_mod);
     set_current_projection(saved_proj);
+    setup3DViewport();
     LLPipeline::sUseOcclusion = old_occlusion;
 
     // ====================================================

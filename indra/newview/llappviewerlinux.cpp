@@ -48,14 +48,12 @@
 #endif
 
 #if LL_DBUS_ENABLED
-# include "llappviewerlinux_api_dbus.h"
+#include <sdbus-c++/sdbus-c++.h>
+#include "llappviewerlinux_api-client-glue.h"
+#include "llappviewerlinux_api-server-glue.h"
 
-// regrettable hacks to give us better runtime compatibility with older systems inside llappviewerlinux_api.h:
-#define llg_return_if_fail(COND) do{if (!(COND)) return;}while(0)
-#undef g_return_if_fail
-#define g_return_if_fail(COND) llg_return_if_fail(COND)
-// The generated API
-# include "llappviewerlinux_api.h"
+#include "threadpool.h"
+#include "workqueue.h"
 #endif
 
 namespace
@@ -101,6 +99,10 @@ int main( int argc, char **argv )
 	while (! viewer_app_ptr->frame()) 
 	{}
 
+#if LL_DBUS_ENABLED
+	((LLAppViewerLinux*)viewer_app_ptr)->shutdownDBUS();
+#endif
+
 	if (!LLApp::isError())
 	{
 		//
@@ -132,14 +134,6 @@ LLAppViewerLinux::~LLAppViewerLinux()
 
 bool LLAppViewerLinux::init()
 {
-#if !GLIB_CHECK_VERSION(2, 32, 0)
-	// g_thread_init() must be called before *any* use of glib, *and*
-	// before any mutexes are held, *and* some of our third-party
-	// libraries likes to use glib functions; in short, do this here
-	// really early in app startup!
-	if (!g_thread_supported ()) g_thread_init (NULL);
-#endif
-
     LLAppViewer* pApp = LLAppViewer::instance();
     pApp->initCrashReporting();
 
@@ -160,176 +154,127 @@ bool LLAppViewerLinux::restoreErrorTrap()
 /////////////////////////////////////////
 #if LL_DBUS_ENABLED
 
-typedef struct
+class ViewerAppAPI : public sdbus::AdaptorInterfaces<com::secondlife::ViewerAppAPI_adaptor /*, more adaptor classes if there are more interfaces*/>
 {
-        GObjectClass parent_class;
-} ViewerAppAPIClass;
+public:
+    ViewerAppAPI(sdbus::IConnection& connection, std::string objectPath)
+        : AdaptorInterfaces(connection, std::move(objectPath))
+    {
+        registerAdaptor();
+    }
 
-static void viewerappapi_init(ViewerAppAPI *server);
-static void viewerappapi_class_init(ViewerAppAPIClass *klass);
+    ~ViewerAppAPI()
+    {
+        unregisterAdaptor();
+    }
 
-///
-
-// regrettable hacks to give us better runtime compatibility with older systems in general
-static GType llg_type_register_static_simple_ONCE(GType parent_type,
-						  const gchar *type_name,
-						  guint class_size,
-						  GClassInitFunc class_init,
-						  guint instance_size,
-						  GInstanceInitFunc instance_init,
-						  GTypeFlags flags)
-{
-	static GTypeInfo type_info;
-	memset(&type_info, 0, sizeof(type_info));
-
-	type_info.class_size = class_size;
-	type_info.class_init = class_init;
-	type_info.instance_size = instance_size;
-	type_info.instance_init = instance_init;
-
-	return g_type_register_static(parent_type, type_name, &type_info, flags);
-}
-#define llg_intern_static_string(S) (S)
-#define g_intern_static_string(S) llg_intern_static_string(S)
-#define g_type_register_static_simple(parent_type, type_name, class_size, class_init, instance_size, instance_init, flags) llg_type_register_static_simple_ONCE(parent_type, type_name, class_size, class_init, instance_size, instance_init, flags)
-
-G_DEFINE_TYPE(ViewerAppAPI, viewerappapi, G_TYPE_OBJECT);
-
-void viewerappapi_class_init(ViewerAppAPIClass *klass)
-{
-}
-
-static bool dbus_server_init = false;
-
-void viewerappapi_init(ViewerAppAPI *server)
-{
-	// Connect to the default DBUS, register our service/API.
-
-	if (!dbus_server_init)
+protected:
+	bool GoSLURL(const std::string& slurl) override
 	{
-		GError *error = NULL;
-		
-		server->connection = lldbus_g_bus_get(DBUS_BUS_SESSION, &error);
-		if (server->connection)
-		{
-			lldbus_g_object_type_install_info(viewerappapi_get_type(), &dbus_glib_viewerapp_object_info);
-			
-			lldbus_g_connection_register_g_object(server->connection, VIEWERAPI_PATH, G_OBJECT(server));
-			
-			DBusGProxy *serverproxy = lldbus_g_proxy_new_for_name(server->connection, DBUS_SERVICE_DBUS, DBUS_PATH_DBUS, DBUS_INTERFACE_DBUS);
+		LL_INFOS() << "Was asked to go to slurl: " << slurl << LL_ENDL;
 
-			guint request_name_ret_unused;
-			// akin to org_freedesktop_DBus_request_name
-			if (lldbus_g_proxy_call(serverproxy, "RequestName", &error, G_TYPE_STRING, VIEWERAPI_SERVICE, G_TYPE_UINT, 0, G_TYPE_INVALID, G_TYPE_UINT, &request_name_ret_unused, G_TYPE_INVALID))
-			{
-				// total success.
-				dbus_server_init = true;
-			}
-			else 
-			{
-				LL_WARNS() << "Unable to register service name: " << error->message << LL_ENDL;
-			}
-	
-			g_object_unref(serverproxy);
-		}
-		else
-		{
-			g_warning("Unable to connect to dbus: %s", error->message);
-		}
+	    LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
+	    LL::WorkQueue::ptr_t general_queue = LL::WorkQueue::getInstance("General");
+	    llassert_always(main_queue);
+	    llassert_always(general_queue);
 
-		if (error)
-			g_error_free(error);
+        bool posted = main_queue->postTo(
+            general_queue,
+            [slurl]() // Work done on general queue
+            {
+                return slurl;
+            },
+            [](std::string url) // Callback to main thread
+            mutable {
+				const bool trusted_browser = false;
+				if (LLURLDispatcher::dispatch(url, "", nullptr, trusted_browser))
+				{
+					LL_INFOS() << "Dispatched url from ViewerAppAPI: " << url << LL_ENDL;
+				}
+            });
+
+		return posted; // the invokation succeeded, even if the actual dispatch didn't.
 	}
-}
+};
 
-gboolean viewer_app_api_GoSLURL(ViewerAppAPI *obj, gchar *slurl, gboolean **success_rtn, GError **error)
+class ViewerAppAPIProxy : public sdbus::ProxyInterfaces<com::secondlife::ViewerAppAPI_proxy /*, more proxy classes if there are more interfaces*/>
 {
-	bool success = false;
+public:
+    ViewerAppAPIProxy(std::string destination, std::string objectPath)
+        : ProxyInterfaces(std::move(destination), std::move(objectPath))
+    {
+        registerProxy();
+    }
 
-	LL_INFOS() << "Was asked to go to slurl: " << slurl << LL_ENDL;
-
-	std::string url = slurl;
-	LLMediaCtrl* web = NULL;
-	const bool trusted_browser = false;
-	if (LLURLDispatcher::dispatch(url, "", web, trusted_browser))
-	{
-		// bring window to foreground, as it has just been "launched" from a URL
-		// todo: hmm, how to get there from here?
-		//xxx->mWindow->bringToFront();
-		success = true;
-	}		
-
-	*success_rtn = g_new (gboolean, 1);
-	(*success_rtn)[0] = (gboolean)success;
-
-	return TRUE; // the invokation succeeded, even if the actual dispatch didn't.
-}
-
-///
+    ~ViewerAppAPIProxy()
+    {
+        unregisterProxy();
+    }
+};
 
 //virtual
 bool LLAppViewerLinux::initSLURLHandler()
 {
-	if (!grab_dbus_syms(DBUSGLIB_DYLIB_DEFAULT_NAME))
-	{
-		return false; // failed
-	}
+    // Create D-Bus connection to the system bus and requests name on it.
+    try
+    {
+    	mViewerAPIConnection = sdbus::createSessionBusConnection(VIEWERAPI_SERVICE);
+    }
+    catch(const sdbus::Error& err)
+    {
+    	LL_WARNS() << "Failed to create DBUS session connection: " << err.what() << LL_ENDL;
+    	return false;
+    }
 
-#if !GLIB_CHECK_VERSION(2, 36, 0)
-	g_type_init();
-#endif
+    // Create concatenator D-Bus object.
+    try
+    {
+    	mViewerAPIObject = std::make_unique<ViewerAppAPI>(*mViewerAPIConnection, VIEWERAPI_PATH);
+    }
+    catch(const sdbus::Error& err)
+    {
+    	LL_WARNS() << "Failed to create DBUS ViewerAppAPI object: " << err.what() << LL_ENDL;
+    	mViewerAPIConnection.reset();
+    	return false;
+    }
 
-	//ViewerAppAPI *api_server = (ViewerAppAPI*)
-	g_object_new(viewerappapi_get_type(), NULL);
+    // Run the loop on the connection.
+    try
+    {
+    	mViewerAPIConnection->enterEventLoopAsync();
+    }
+    catch(const sdbus::Error& err)
+    {
+    	LL_WARNS() << "Failed to create DBUS event loop: " << err.what() << LL_ENDL;
+    	mViewerAPIObject.reset();
+    	mViewerAPIConnection.reset();
+    	return false;
+    }
+    return true;
+}
 
-	return true;
+void LLAppViewerLinux::shutdownDBUS()
+{
+	mViewerAPIObject.reset();
+	mViewerAPIConnection.reset();
 }
 
 //virtual
 bool LLAppViewerLinux::sendURLToOtherInstance(const std::string& url)
 {
-	if (!grab_dbus_syms(DBUSGLIB_DYLIB_DEFAULT_NAME))
-	{
-		return false; // failed
-	}
+    // Create proxy object for the concatenator object on the server side
+    ViewerAppAPIProxy viewerAppAPIProxy(VIEWERAPI_SERVICE, VIEWERAPI_PATH);
 
-	bool success = false;
-	DBusGConnection *bus;
-	GError *error = NULL;
+    try
+    {
+        viewerAppAPIProxy.GoSLURL(url);
+    }
+    catch(const sdbus::Error& e)
+    {
+        LL_WARNS() << "Got ViewerAppAPI error " << e.getName() << " with message " << e.getMessage() << LL_ENDL;
+    }
 
-#if !GLIB_CHECK_VERSION(2, 36, 0)
-	g_type_init();
-#endif
-	
-	bus = lldbus_g_bus_get (DBUS_BUS_SESSION, &error);
-	if (bus)
-	{
-		gboolean rtn = FALSE;
-		DBusGProxy *remote_object =
-			lldbus_g_proxy_new_for_name(bus, VIEWERAPI_SERVICE, VIEWERAPI_PATH, VIEWERAPI_INTERFACE);
-
-		if (lldbus_g_proxy_call(remote_object, "GoSLURL", &error,
-					G_TYPE_STRING, url.c_str(), G_TYPE_INVALID,
-				       G_TYPE_BOOLEAN, &rtn, G_TYPE_INVALID))
-		{
-			success = rtn;
-		}
-		else
-		{
-			LL_INFOS() << "Call-out to other instance failed (perhaps not running): " << error->message << LL_ENDL;
-		}
-
-		g_object_unref(G_OBJECT(remote_object));
-	}
-	else
-	{
-		LL_WARNS() << "Couldn't connect to session bus: " << error->message << LL_ENDL;
-	}
-
-	if (error)
-		g_error_free(error);
-	
-	return success;
+	return true;
 }
 
 #else // LL_DBUS_ENABLED
