@@ -168,24 +168,18 @@
   </menu_item_call>
   <menu_item_separator layout="topleft" />
   <menu_item_call
-      enabled="false"
       label="Sit here"
       name="Object Sit">
     <menu_item_call.on_click
         function="Object.SitOrStand" />
     <menu_item_call.on_visible
         function="Object.EnableSit" />
-    <menu_item_call.on_visible
-        function="Object.EnableSit" />
   </menu_item_call>
   <menu_item_call
-      enabled="false"
       label="Stand up"
       name="Object Stand Up">
     <menu_item_call.on_click
         function="Object.SitOrStand" />
-    <menu_item_call.on_visible
-        function="Object.EnableStandUp" />
     <menu_item_call.on_visible
         function="Object.EnableStandUp" />
   </menu_item_call>

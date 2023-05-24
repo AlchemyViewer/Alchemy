@@ -45,6 +45,10 @@
 
 #ifndef LL_WINDOWS
 #define A_GCC 1
+#if LL_GNUC
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wrestrict"
+#endif
 #endif
 
 #define A_CPU 1
