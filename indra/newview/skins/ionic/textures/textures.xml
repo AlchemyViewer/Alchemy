@@ -229,7 +229,6 @@ Additional notes:
 <texture name="Generic_Object_Small" file_name="icons/Generic_Object_Small.png" preload="false" />
 <texture name="Generic_Person" file_name="icons/Generic_Person.png" preload="false" />
 <texture name="Generic_Person_Large" file_name="icons/Generic_Person_Large.png" preload="false" />
-<texture name="Hand" file_name="icons/url_icons/hand.png" preload="false" />
 <texture name="Help_Press" file_name="navbar/Help_Press.png" preload="false" />
 <texture name="Hierarchy_View_Disabled" file_name="icons/Hierarchy_View_Disabled.png" preload="false" />
 <texture name="Hierarchy_View_On" file_name="icons/Hierarchy_View_On.png" preload="false" />
@@ -678,22 +677,6 @@ Additional notes:
 <texture name="YouAreHere_Badge" file_name="icons/YouAreHere_Badge.png" preload="false" />
 <texture name="Yellow_Gradient" file_name="windows/yellow_gradient.png"/>
 <texture name="Zoom_Off" file_name="icons/Zoom_Off.png" preload="false" />
-
-<!-- URL Decoration -->
-<texture name="Url_Icon_Bitbucket"   file_name="icons/url_icons/bitbucket.png" preload="true" />
-<texture name="Url_Icon_e621"        file_name="icons/url_icons/e621.png" preload="true" />
-<texture name="Url_Icon_Flickr"      file_name="icons/url_icons/flickr.png" preload="true" />
-<texture name="Url_Icon_Github"      file_name="icons/url_icons/github.png" preload="true" />
-<texture name="Url_Icon_Imgur"       file_name="icons/url_icons/imgur.png" preload="true" />
-<texture name="Url_Icon_LastFM"      file_name="icons/url_icons/lastfm.png" preload="true" />
-<texture name="Url_Icon_Reddit"      file_name="icons/url_icons/reddit.png" preload="true" />
-<texture name="Url_Icon_Soundcloud"  file_name="icons/url_icons/soundcloud.png" preload="true" />
-<texture name="Url_Icon_Steam"       file_name="icons/url_icons/steam.png" preload="true" />
-<texture name="Url_Icon_Twitch"      file_name="icons/url_icons/twitch.png" preload="true" />
-<texture name="Url_Icon_Twitter"     file_name="icons/url_icons/twitter.png" preload="true" />
-<texture name="Url_Icon_Vendor"      file_name="icons/url_icons/vendor.png" preload="true" />
-<texture name="Url_Icon_Wikipedia"   file_name="icons/url_icons/wikipedia.png" preload="true" />
-<texture name="Url_Icon_Youtube"     file_name="icons/url_icons/youtube.png" preload="true" />
 
 <!-- LSL Preprocessor icons -->
 <texture name="Script_Save"         file_name="script_editor/script_save.png" preload="false" />
