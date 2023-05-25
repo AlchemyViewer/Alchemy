@@ -224,10 +224,10 @@ void LLUIColorTable::saveUserSettings(const bool scrub /* = false */) const
 {
 	Params params;
 
-	if (!scrub)
+	for (const auto& color_pair : mUserSetColors)
 	{
-		for (const auto& color_pair : mUserSetColors)
-        {
+		if (!scrub || color_pair.first.find("ColorPaletteEntry") != std::string::npos)
+		{
 			ColorEntryParams color_entry;
 			color_entry.name = color_pair.first;
 			color_entry.color.value = color_pair.second;
