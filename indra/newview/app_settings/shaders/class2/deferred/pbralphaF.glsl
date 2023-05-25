@@ -225,8 +225,8 @@ void main()
     // NOTE: ao is applied in pbrIbl (see pbrBaseLight), do not apply here
     irradiance       = max(amblit,irradiance);
 
-    vec3 diffuseColor;
-    vec3 specularColor;
+    vec3 diffuseColor = vec3(0);
+    vec3 specularColor = vec3(0);
     calcDiffuseSpecular(col.rgb, metallic, diffuseColor, specularColor);
 
     vec3 v = -normalize(pos.xyz);
