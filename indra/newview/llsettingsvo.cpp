@@ -978,6 +978,8 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         ep.negate();
         enorm.copyComponent<3>(ep);
 
+        LLDrawPoolAlpha::sWaterPlane = LLVector4(enorm.getF32ptr());
+
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, enorm.getF32ptr());
 
 

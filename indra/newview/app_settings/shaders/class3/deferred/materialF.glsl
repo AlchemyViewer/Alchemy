@@ -39,7 +39,7 @@ uniform int sun_up_factor;
 
 #ifdef WATER_FOG
 vec4 applyWaterFogView(vec3 pos, vec4 color);
-vec4 applyWaterFogViewLinear(vec3 pos, vec4 color, vec3 sunlit)
+vec4 applyWaterFogViewLinear(vec3 pos, vec4 color, vec3 sunlit);
 #endif
 
 vec3 atmosFragLightingLinear(vec3 l, vec3 additive, vec3 atten);
