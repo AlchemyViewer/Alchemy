@@ -39,6 +39,7 @@ uniform int sun_up_factor;
 
 #ifdef WATER_FOG
 vec4 applyWaterFogView(vec3 pos, vec4 color);
+vec4 applyWaterFogViewLinear(vec3 pos, vec4 color, vec3 sunlit)
 #endif
 
 vec3 atmosFragLightingLinear(vec3 l, vec3 additive, vec3 atten);
@@ -431,7 +432,7 @@ void main()
     float al = max(diffcol.a, glare) * vertex_color.a;
     
 #ifdef WATER_FOG
-    vec4 temp = applyWaterFogView(pos, vec4(color, 0.0));
+    vec4 temp = applyWaterFogViewLinear(pos, vec4(color, 0.0), sunlit_linear);
     color = temp.rgb;
 #endif
 
