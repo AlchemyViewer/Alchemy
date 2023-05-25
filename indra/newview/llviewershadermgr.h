@@ -197,7 +197,6 @@ extern LLGLSLShader			gPathfindingNoNormalsProgram;
 
 // avatar shader handles
 extern LLGLSLShader			gAvatarProgram;
-extern LLGLSLShader			gAvatarWaterProgram;
 extern LLGLSLShader			gAvatarEyeballProgram;
 extern LLGLSLShader			gImpostorProgram;
 

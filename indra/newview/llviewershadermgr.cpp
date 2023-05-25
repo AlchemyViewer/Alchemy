@@ -116,7 +116,6 @@ LLGLSLShader		gPathfindingNoNormalsProgram;
 
 //avatar shader handles
 LLGLSLShader		gAvatarProgram;
-LLGLSLShader		gAvatarWaterProgram;
 LLGLSLShader		gAvatarEyeballProgram;
 LLGLSLShader		gImpostorProgram;
 
@@ -272,7 +271,6 @@ LLViewerShaderMgr::LLViewerShaderMgr() :
     mShaderList.push_back(&gSkinnedObjectFullbrightAlphaMaskProgram);
 	mShaderList.push_back(&gObjectAlphaMaskNoColorProgram);
 	mShaderList.push_back(&gObjectAlphaMaskNoColorWaterProgram);
-	mShaderList.push_back(&gAvatarWaterProgram);
 	mShaderList.push_back(&gUnderWaterProgram);
 	mShaderList.push_back(&gDeferredSunProgram);
 	mShaderList.push_back(&gDeferredSoftenProgram);
@@ -1057,7 +1055,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         gDeferredSkinnedPBROpaqueProgram.unload();
         gDeferredPBRAlphaProgram.unload();
         gDeferredSkinnedPBRAlphaProgram.unload();
-		gDeferredPBRAlphaWaterProgram.unload();
+        gDeferredPBRAlphaWaterProgram.unload();
         gDeferredSkinnedPBRAlphaWaterProgram.unload();
 
 		return TRUE;
@@ -1446,15 +1444,15 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         shader->mRiggedVariant->mFeatures.hasLighting = true;
     }
 
-	if (success)
-	{
+    if (success)
+    {
         LLGLSLShader* shader = &gDeferredPBRAlphaWaterProgram;
         shader->mName = "Deferred PBR Alpha Underwater Shader";
                           
         shader->mFeatures.calculatesLighting = false;
         shader->mFeatures.hasLighting = false;
         shader->mFeatures.isAlphaLighting = true;
-		shader->mFeatures.hasWaterFog = true;
+        shader->mFeatures.hasWaterFog = true;
         shader->mFeatures.hasSrgb = true;
         shader->mFeatures.encodesNormal = true;
         shader->mFeatures.calculatesAtmospherics = true;
@@ -1464,7 +1462,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         shader->mFeatures.isDeferred = true; // include deferredUtils
         shader->mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED];
 
-		shader->mShaderGroup = LLGLSLShader::SG_WATER;
+        shader->mShaderGroup = LLGLSLShader::SG_WATER;
 
         shader->mShaderFiles.clear();
         shader->mShaderFiles.push_back(make_pair("deferred/pbralphaV.glsl", GL_VERTEX_SHADER));
@@ -1478,7 +1476,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
         shader->addPermutation("HAS_SPECULAR_MAP", "1"); // PBR: Packed: Occlusion, Metal, Roughness
         shader->addPermutation("HAS_EMISSIVE_MAP", "1");
         shader->addPermutation("USE_VERTEX_COLOR", "1");
-		shader->addPermutation("WATER_FOG", "1");
+        shader->addPermutation("WATER_FOG", "1");
 
         if (use_sun_shadow)
         {
@@ -3241,7 +3239,6 @@ BOOL LLViewerShaderMgr::loadShadersAvatar()
 	if (mShaderLevel[SHADER_AVATAR] == 0)
 	{
 		gAvatarProgram.unload();
-		gAvatarWaterProgram.unload();
 		gAvatarEyeballProgram.unload();
 		return TRUE;
 	}
@@ -3268,26 +3265,6 @@ BOOL LLViewerShaderMgr::loadShadersAvatar()
 		{
 			mMaxAvatarShaderLevel = mShaderLevel[SHADER_AVATAR] = gAvatarProgram.mShaderLevel;
 		}
-	}
-
-	if (success)
-	{
-		gAvatarWaterProgram.mName = "Avatar Water Shader";
-		gAvatarWaterProgram.mFeatures.hasSkinning = true;
-		gAvatarWaterProgram.mFeatures.calculatesAtmospherics = true;
-		gAvatarWaterProgram.mFeatures.calculatesLighting = true;
-		gAvatarWaterProgram.mFeatures.hasWaterFog = true;
-		gAvatarWaterProgram.mFeatures.hasAtmospherics = true;
-		gAvatarWaterProgram.mFeatures.hasLighting = true;
-		gAvatarWaterProgram.mFeatures.hasAlphaMask = true;
-		gAvatarWaterProgram.mFeatures.disableTextureIndex = true;
-		gAvatarWaterProgram.mShaderFiles.clear();
-		gAvatarWaterProgram.mShaderFiles.push_back(make_pair("avatar/avatarV.glsl", GL_VERTEX_SHADER));
-		gAvatarWaterProgram.mShaderFiles.push_back(make_pair("objects/simpleWaterF.glsl", GL_FRAGMENT_SHADER));
-		// Note: no cloth under water:
-		gAvatarWaterProgram.mShaderLevel = llmin(mShaderLevel[SHADER_AVATAR], 1);
-		gAvatarWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
-		success = gAvatarWaterProgram.createShader(NULL, NULL);
 	}
 
 	if (success)

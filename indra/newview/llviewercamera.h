@@ -88,7 +88,7 @@ public:
 
 	// Sets the current matrix
 	/* virtual */ void setView(F32 vertical_fov_rads) override;
-
+    void setViewNoBroadcast(F32 vertical_fov_rads);  // set FOV without broadcasting to simulator (for temporary local cameras)
 	void setDefaultFOV(F32 fov) ;
 	F32 getDefaultFOV() { return mCameraFOVDefault; }
 
