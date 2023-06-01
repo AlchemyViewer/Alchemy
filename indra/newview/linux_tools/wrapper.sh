@@ -33,8 +33,7 @@ if [[ -v AL_VALGRIND ]]; then
 fi
 
 if [[ -v AL_MANGO ]]; then
-    export MANGOHUD_DLSYM=1
-	export LL_WRAPPER='mangohud'
+	export LL_WRAPPER='mangohud --dlsym'
 fi
 
 ## For controlling various sanitizer options
