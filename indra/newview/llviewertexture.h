@@ -185,7 +185,6 @@ private:
 
 	virtual void switchToCachedImage();
 	
-	static bool isMemoryForTextureSuficientlyFree();
 	static void getGPUMemoryForTextures(S32Megabytes &gpu, S32Megabytes &physical);
 
 public:
