@@ -77,10 +77,10 @@ float noise(vec2 x) {
 uniform float gamma;
 vec3 legacyGamma(vec3 color)
 {
-    color = 1. - clamp(color, vec3(0.), vec3(1.));
-    color = 1. - pow(color, vec3(gamma)); // s/b inverted already CPU-side
+    vec3 c = 1. - clamp(color, vec3(0.), vec3(1.));
+    c = 1. - pow(c, vec3(gamma)); // s/b inverted already CPU-side
 
-    return color;
+    return c;
 }
 
 void main()
@@ -89,9 +89,7 @@ void main()
     diff.rgb = linear_to_srgb(diff.rgb);
 
 #ifdef LEGACY_GAMMA
-#ifndef NO_POST
     diff.rgb = legacyGamma(diff.rgb);
-#endif
 #endif
 
 #if COLOR_GRADE_LUT != 0

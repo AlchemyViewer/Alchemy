@@ -403,8 +403,9 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 	dst->bindTarget();
 
 	static LLCachedControl<bool> no_post(gSavedSettings, "RenderDisablePostProcessing", false);
+	static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", true);
 	LLGLSLShader* tone_shader = nullptr;
-	if (no_post && gFloaterTools->isAvailable())
+	if ((no_post && gFloaterTools->isAvailable()) || LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust) == 0.f)
 	{
 		tone_shader = &gDeferredPostTonemapProgram;
 	}
@@ -644,18 +645,18 @@ void ALRenderUtil::renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst)
 	dst->bindTarget();
 
 	static LLCachedControl<bool> no_post(gSavedSettings, "RenderDisablePostProcessing", false);
-
+	static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", true);
 	LLGLSLShader* tone_shader = nullptr;
 	if (mCGLut != 0 )
 	{
 		tone_shader = no_post && gFloaterTools->isAvailable() ? &gDeferredPostColorCorrectLUTProgram[2] : // no post (no gamma, no exposure, no tonemapping)
-        LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance() == 0.f ? &gDeferredPostColorCorrectLUTProgram[1] :
+        LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust) == 0.f ? &gDeferredPostColorCorrectLUTProgram[1] :
         &gDeferredPostColorCorrectLUTProgram[0];
 	}
 	else
 	{
 	    tone_shader = no_post && gFloaterTools->isAvailable() ? &gDeferredPostColorCorrectProgram[2] : // no post (no gamma, no exposure, no tonemapping)
-        LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance() == 0.f ? &gDeferredPostColorCorrectProgram[1] :
+        LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust) == 0.f ? &gDeferredPostColorCorrectProgram[1] :
         &gDeferredPostColorCorrectProgram[0];
 	}
 

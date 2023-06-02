@@ -146,9 +146,7 @@ void main()
     diff.rgb *= exposure * exp_scale;
 #endif
 
-#if TONEMAP_METHOD == 0 // NO_POST
-    diff.rgb *= 0.6;
-#elif TONEMAP_METHOD == 1 // Aces Hill method
+#if TONEMAP_METHOD == 1 // Aces Hill method
     diff.rgb = ACES_Hill(diff.rgb);
 #elif TONEMAP_METHOD == 2 // Uchimura's Gran Turismo method
     diff.rgb = uchimura(diff.rgb);
