@@ -6859,7 +6859,8 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst) {
 		static LLCachedControl<F32> dynamic_exposure_coefficient(gSavedSettings, "RenderDynamicExposureCoefficient", 0.175f);
         LLSettingsSky::ptr_t sky = LLEnvironment::instance().getCurrentSky();
 
-        F32 probe_ambiance = LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance();
+		static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", true);
+        F32 probe_ambiance = LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust);
         F32 exp_min = 1.f;
         F32 exp_max = 1.f;
                 
@@ -7423,16 +7424,24 @@ void LLPipeline::renderFinalize()
 
     generateExposure(&mLuminanceMap, &mExposureMap);
 
-    if(mALRenderUtil->getSharpenMethod() != ALRenderUtil::SHARPEN_NONE)
-    {
-		mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mRT->deferredLight);
-		mALRenderUtil->renderSharpen(&mRT->deferredLight, &mRT->screen);
-		mALRenderUtil->renderColorGrade(&mRT->screen, &mPostMap);
+	static LLCachedControl<bool> use_linden_gamma(gSavedSettings, "RenderLindenGamma", false);
+	if (use_linden_gamma)
+	{
+		gammaCorrect(&mRT->screen, &mPostMap);
 	}
 	else
 	{
-		mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mPostFXMap);
-		mALRenderUtil->renderColorGrade(&mPostFXMap, &mPostMap);
+		if (mALRenderUtil->getSharpenMethod() != ALRenderUtil::SHARPEN_NONE)
+		{
+			mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mRT->deferredLight);
+			mALRenderUtil->renderSharpen(&mRT->deferredLight, &mRT->screen);
+			mALRenderUtil->renderColorGrade(&mRT->screen, &mPostMap);
+		}
+		else
+		{
+			mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mPostFXMap);
+			mALRenderUtil->renderColorGrade(&mPostFXMap, &mPostMap);
+		}
 	}
 
     LLVertexBuffer::unbind();
