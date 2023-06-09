@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater
+ width="320"
+ height="39"
+ layout="topleft"
+ min_width="300"
+ min_height="39"
+ name="floater_music_ticker"
+ positioning="cascading"
+ title=""
+ can_minimize="false"
+ header_height="0"
+ can_resize="true"
+ can_resize_height="false"
+ show_title="false"
+ save_rect="true"
+ chrome="true">
+  <panel
+   class="music_ticker"
+   name="music_ticker"
+   filename="panel_music_ticker.xml"
+   layout="topleft"
+   follows="all"
+   width="296"
+   top="0"
+   mouse_opaque="false"/>
+</floater>

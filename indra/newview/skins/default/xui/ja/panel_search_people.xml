@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ height="70"
+ class="panel_search_people"
+ name="panel_search_people"
+ width="602">
+  <panel.string name="SeachFilteredOnShortWordsEmpty">
+   Your search terms were too short so no search was performed.
+  </panel.string>
+  <text
+   follows="left|top|right"
+   height="16"
+   layout="topleft"
+   left="4"
+   name="search_title"
+   top="4"
+   value="Enter search terms:"
+   width="255" />
+  <search_editor
+   follows="top|left|right"
+   search_button_visible="true"
+   height="22"
+   text_readonly_color="DkGray"
+   label="Search"
+   layout="topleft"
+   top_pad="1"
+   left="4"
+   right="-4"
+   name="search_bar"
+   select_on_focus="true"
+   commit_on_focus_lost="false"
+   tool_tip="Enter search terms">
+    <search_editor.commit_callback
+     function="Search.query" />
+  </search_editor>
+</panel>

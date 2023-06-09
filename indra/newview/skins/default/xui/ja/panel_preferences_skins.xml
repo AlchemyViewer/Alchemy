@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ border="true"
+ follows="left|top|right|bottom"
+ height="408"
+ label="Skinning"
+ layout="topleft"
+ left="102"
+ name="skins"
+ top="1"
+ width="517">
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="12"
+   layout="topleft"
+   left="30"
+   name="select_skin_text"
+   top="12"
+   width="180">
+   Select a skin:
+  </text>
+  <!-- Chooser -->
+  <scroll_list
+   height="225"
+   follows="left|top"
+   layout="topleft"
+   left="40"
+   name="skin_list"
+   draw_heading="false"
+   top_pad="8"
+   width="170">
+    <scroll_list.commit_callback
+     function="Pref.SelectSkin" />
+  </scroll_list>
+  <button
+   enabled="true"
+   follows="left|top"
+   height="19"
+   label="Apply"
+   layout="topleft"
+   left="40"
+   name="apply_skin"
+   tool_tip="Changes will take effect after you restart [APP_NAME]"
+   top_pad="4"
+   width="75">
+    <button.commit_callback
+     function="Pref.ApplySkin" />
+  </button>
+  <button
+   enabled="true"
+   follows="left|top"
+   height="19"
+   image_disabled="AddItem_Disabled"
+   image_selected="AddItem_Press"
+   image_unselected="AddItem_Off"
+   layout="topleft"
+   left_pad="52"
+   name="add_skin"
+   top_delta="0"
+   tool_tip="Add a new skin..."
+   width="19">
+    <button.commit_callback
+     function="Pref.AddSkin" />
+  </button>
+  <button
+   enabled="false"
+   follows="left|top"
+   height="19"
+   image_disabled="TrashItem_Disabled"
+   image_selected="TrashItem_Press"
+   image_unselected="TrashItem_Off"
+   layout="topleft"
+   left_pad="4"
+   name="remove_skin"
+   top_delta="0"
+   tool_tip="Remove selected skin..."
+   width="19">
+    <button.commit_callback
+     function="Pref.RemoveSkin" />
+  </button>
+  <!-- Info/Preview -->
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="20"
+   layout="topleft"
+   font="SansSerifLarge"
+   left="215"
+   name="skin_name"
+   top="10"
+   right="-10">
+   Boring skin!
+  </text>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   name="skin_author_label"
+   top_pad="2"
+   width="90"
+   value="Author:" />
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   name="skin_homepage_label"
+   top_pad="2"
+   width="90"
+   value="Homepage:" />
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   name="skin_date_label"
+   top_pad="2"
+   width="90"
+   value="Date:" />
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   name="skin_compatibility_label"
+   top_pad="2"
+   width="90"
+   value="Compatiblity:" />
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   name="skin_author"
+   top_delta="-48"
+   left_pad="1"
+   width="200">
+Nobody
+  </text>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   name="skin_homepage"
+   top_pad="2"
+   width="200">
+http://www.example.com/
+  </text>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   name="skin_date"
+   top_pad="2"
+   width="200">
+Jan 1, 2001
+  </text>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   name="skin_compatibility"
+   top_pad="2"
+   width="200">
+0.0.0
+  </text>
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   name="skin_notes_label"
+   top_pad="2"
+   left="215"
+   width="90"
+   value="Notes:" />
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="70"
+   layout="topleft"
+   name="skin_notes"
+   top_pad="2"
+   word_wrap="true"
+   width="291" />
+</panel>
