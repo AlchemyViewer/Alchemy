@@ -7,6 +7,9 @@
     <menu_item_call label="場所…" name="Places" />
     <menu_item_call label="ピック…" name="Picks" />
     <menu_item_call label="体験…" name="Experiences" />
+    <menu_item_separator/>
+    <menu_item_check label="ミュージック・ティッカー…" name="music_ticker_check"/>
+    <menu_item_separator/>
     <menu_item_call label="カメラコントロール…" name="Camera Controls" />
 
     <menu_item_separator />
@@ -25,8 +28,9 @@
 
     <menu_item_call label="初期設定…" name="Preferences" />
     <menu_item_call label="ツールバーのボタン…" name="Toolbars" />
+    <menu_item_call label="シネマティックモード" name="CinematicMode" />
     <menu_item_call label="全てのコントロールを隠す" name="Hide UI" shortcut="control|shift|U" />
-    <menu_item_check label="HUDを表示" name="Show HUD Attachments" shortcut="alt|shift|H" />
+    <menu_item_check label="ＨＵＤを表示" name="Show HUD Attachments" shortcut="alt|shift|H" />
 
     <menu_item_separator />
 
@@ -73,6 +77,8 @@
     <menu_item_separator />
     <menu_item_call label="スケルトンをリセット" name="Reset Skeleton" />
     <menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations" />
+    <menu_item_call label="自分を変形しない" name="Undeform Me"/>
+    <menu_item_call label="ビューアのエフェクトをクリア" name="Clear Viewer Effects"/>
     <menu_item_call label="スクリプトを装着…" name="MyScripts" />
     <menu_item_separator />
     <menu_item_call label="アバターに関するヘルプ…" name="Help with avatars" />
@@ -82,24 +88,36 @@
     <menu_item_check label="近隣のチャット…" name="Nearby Chat" />
     <menu_item_check label="ボイスチャット" name="Speak" />
     <menu_item_check name="Conversation Log..." label="会話ログ…" />
-    <menu_item_separator />
-    <menu label="ボイスモーフィング" name="VoiceMorphing" />
+    <menu_item_check label="チャットのアラート…" name="Chat Alerts"/>
     <menu_item_check label="ジェスチャー…" name="Gestures" />
-    <menu_item_separator />
+
+    <menu_item_separator/>
+    <menu_item_check label="喋る" name="Speak" />
+    <menu label="ボイスモーフィング" name="VoiceMorphing">
+      <menu_item_check label="ボイスモーフィングなし" name="NoVoiceMorphing"/>
+      <menu_item_separator/>
+      <menu_item_check label="プレビュー" name="Preview"/>
+      <menu_item_call label="購読…" name="Subscribe"/>
+      <menu_item_call label="プレミアム特典…" name="PremiumPerk"/>
+    </menu>
+    <menu_item_separator/>
     <menu_item_check label="フレンド" name="My Friends" />
     <menu_item_check label="グループ" name="My Groups" />
-    <menu_item_check label="近くにいる人物" name="Active Speakers" />
+    <menu_item_check label="近くの人物" name="Active Speakers" />
     <menu_item_check label="ブロックリスト" name="Block List" />
     <menu_item_separator />
-    <menu_item_check label="着信拒否" name="Do Not Disturb" />
-
+    <menu_item_check name="Do Not Disturb" label="着信拒否" />
   </menu>
   <menu label="ワールド" name="World">
+    <menu_item_call label="アニメーションを再同期" name="Resync Animations" />
+    <menu_item_check label="サウンドエクスプローラー" name="Sound Explorer" />
+    <menu_item_separator />
     <menu_item_call label="現在地をランドマーク" name="Create Landmark Here" />
     <menu_item_call label="行き先…" name="Destinations" />
     <menu_item_check label="ワールドマップ" name="World Map" />
     <menu_item_check label="ミニマップ" name="Mini-Map" />
     <menu_item_call label="イベント" name="Events" />
+    <menu_item_check label="リージョン（地域）トラッカー…" name="Region Tracker"/>
     <menu_item_check label="検索…" name="Search" />
     <menu_item_separator />
     <menu_item_call label="ホームにテレポート" name="Teleport Home" />
@@ -126,6 +144,7 @@
       <menu_item_check label="座標" name="Coordinates" />
       <menu_item_check label="区画のプロパティ" name="Parcel Properties" />
       <menu_item_separator />
+      <menu_item_check label="被写界深度フォーカスロック" name="lock_focus_point" />
       <menu_item_check label="拡張メニュー" name="Show Advanced Menu" />
     </menu>
     <menu_item_check label="グラフィック性能の最適化…" name="Performance" />
@@ -139,6 +158,7 @@
     <menu label="環境" name="Environment">
       <menu_item_check label="夜明け" name="Sunrise" />
       <menu_item_check label="正午" name="Noon" />
+      <menu_item_check label="正午（レガシー）" name="legacy noon" />
       <menu_item_check label="夕方" name="Sunset" />
       <menu_item_check label="深夜" name="Midnight" />
       <menu_item_check label="共有された環境を使用" name="Use Shared Environment" />
@@ -208,6 +228,7 @@
       <menu_item_call label="スクリプトのリセット" name="Reset Scripts" />
       <menu_item_call label="スクリプトを実行中にする" name="Set Scripts to Running" />
       <menu_item_call label="スクリプトを実行停止にする" name="Set Scripts to Not Running" />
+      <menu_item_call label="スクリプトを削除" name="Delete Scripts"/>
     </menu>
 
     <menu label="経路探索" name="Pathfinding">
@@ -227,6 +248,7 @@
 
       <menu_item_check label="自分のオブジェクトだけを選択する" name="Select Only My Objects" />
       <menu_item_check label="動的オブジェクトだけを選択する" name="Select Only Movable Objects" />
+      <menu_item_check label="非表示のオブジェクトを選択する" name="Select Invisible Objects" />
       <menu_item_check label="範囲内を選択する" name="Select By Surrounding" />
 
       <menu_item_separator />
@@ -234,9 +256,15 @@
       <menu_item_check label="選択のアウトラインを表示" name="Show Selection Outlines" />
       <menu_item_check label="隠れた位置の選択も表示する" name="Show Hidden Selection" />
       <menu_item_check label="選択した光の効果範囲を表示する" name="Show Light Radius for Selection" />
+      <menu_item_check label="反射プローブのボリュームを表示" name="Show Reflection Probe Volumes" />
       <menu_item_check label="選択ビームを表示する" name="Show Selection Beam" />
+      <menu_item_check label="ハイライトを透過" name="Highlight Transparent" />
 
       <menu_item_separator />
+
+      <menu_item_check label="ポストプロセッシングを無効化" name="No Post" />
+
+      <menu_item_separator/>
 
       <menu_item_check label="グリッド吸着" name="Snap to Grid" />
       <menu_item_call label="オブジェクトのＸＹ軸をグリッドに吸着" name="Snap Object XY to Grid" />
@@ -277,8 +305,43 @@
     <menu_item_call label="衝突・プッシュ＆打撃" name="Bumps, Pushes &amp;amp; Hits" />
     <menu_item_call label="[APP_NAME]について" name="About Second Life" />
   </menu>
+
+  <menu label="ＲＬＶａ" name="RLVa Main">
+    <menu label="Debug" name="デバッグ">
+      <menu_item_check label="トップレベルのＲＬＶａメニューを表示" name="Show Top-level RLVa Menu" />
+      <menu_item_separator/>
+      <menu_item_check label="デバッグメッセージを表示" name="Show Debug Messages" />
+      <menu_item_check label="未設定または重複メッセージを隠す" name="Hide Unset or Duplicate Messages" />
+      <menu_item_check label="アサーションの失敗を表示" name="Show Assertion Failures" />
+      <menu_item_separator/>
+      <menu_item_check label="ロックされたレイヤーを隠す" name="Hide Locked Layers" />
+      <menu_item_check label="ロックされた装着物を隠す" name="Hide Locked Attachments" />
+      <menu_item_separator/>
+      <menu_item_check label="古いネーミングを有効化" name="Enable Legacy Naming" />
+      <menu_item_check label="共有された衣装を有効化" name="Enable Shared Wear" />
+      <menu_item_check label="着用中の共有されたアイテム名をリネーム" name="Rename Shared Items on Wear" />
+      <menu_item_separator/>
+      <menu_item_check label="ロック…" name="Locks">
+      </menu_item_check>
+    </menu>
+    <menu_item_separator/>
+    <menu_item_check label="ＯＯＣチャットを許可" name="Allow OOC Chat" />
+    <menu_item_check label="フィルタリングされたチャットを表示" name="Show Filtered Chat" />
+    <menu_item_check label="リダイレクトされたチャット入力を表示" name="Show Redirected Chat Typing" />
+    <menu_item_check label="リダイレクトされた長文チャット分割" name="Split Long Redirected Chat" />
+    <menu_item_separator />
+    <menu_item_check label="一時的な装着物を許可" name="Allow Temporary Attachments" />
+    <menu_item_check label="#RLVへの譲渡を禁止" name="Forbid Give to #RLV" />
+    <menu_item_check label="衣類の交換をアンロック" name="Wear Replaces Unlocked" />
+    <menu_item_separator />
+    <menu_item_check label="コンソール…" name="Console" />
+    <menu_item_check label="制限…" name="Restrictions" />
+    <menu_item_check label="文章…" name="Strings" />
+  </menu>
+
   <menu label="拡張" name="Advanced">
     <menu_item_call label="テクスチャをリベークする" name="Rebake Texture" />
+    <menu_item_call label="装着物をリフレッシュ" name="Refresh Attachments" />
     <menu_item_call label="ＵＩサイズをデフォルトにする" name="Set UI Size to Default" />
     <menu_item_call label="ウィンドウサイズ設定…" name="Set Window Size..." />
 
@@ -286,6 +349,8 @@
 
     <menu_item_check label="オブジェクトの選択距離の制限" name="Limit Select Distance" />
     <menu_item_check label="カメラの距離移動を制限しない" name="Disable Camera Distance" />
+    <menu_item_check label="最小ズーム距離を無効化" name="Disable Minimum Zoom Distance" />
+    <menu_item_check label="ＳＩＭのカメラの衝突面を無効化" name="Disable Sim Camera Collision Plane"/>
 
     <menu_item_separator />
 
@@ -344,6 +409,7 @@
       <menu_item_check label="FRInfoのテスト" name="Test FRInfo" />
       <menu_item_check label="フレキシブルオブジェクト" name="Flexible Objects" />
     </menu>
+    <menu label="ＲＬＶａ" name="RLVa Embedded" />
     <menu_item_check label="プラグイン読み取りスレッドを使用" name="Use Plugin Read Thread" />
     <menu_item_call label="グループキャッシュのクリア" name="ClearGroupCache" />
     <menu_item_check label="マウスの平滑化" name="Mouse Smoothing" />
@@ -375,7 +441,7 @@
     <!--Shortcuts-->
 
     <menu_item_separator />
-
+    <menu_item_check label="RestrainedLove API" name="RLV API" />
     <menu_item_call label="デバッグ設定を表示" name="Debug Settings" />
     <menu_item_check label="開発メニューを表示" name="Debug Mode" />
   </menu>
@@ -490,6 +556,7 @@
       <menu_item_check label="パイプラインをデバッグ" name="Debug Pipeline" />
       <menu_item_check label="自動アルファマスク（遅延）" name="Automatic Alpha Masks (deferred)" />
       <menu_item_check label="自動アルファマスク（遅延なし）" name="Automatic Alpha Masks (non-deferred)" />
+      <menu_item_check label="自動アルファマスク（ＲＭＳＥ）" name="Automatic Alpha Masks (RMSE)" />
       <menu_item_check label="アニメーションテクスチャ" name="Animation Textures" />
       <menu_item_check label="テクスチャを無効にする" name="Disable Textures" />
       <menu_item_check label="アンビエントを無効にする" name="Disable Ambient" />
@@ -501,12 +568,22 @@
       <menu_item_check label="マウスオーバーで強調表示する" name="Hover Glow Objects" />
       <menu_item_separator />
 
+      <menu_item_check label="シェーダーキャッシュを有効化" name="Enable Shader Cache" />
+      <menu_item_call label="シェーダーキャッシュをクリア" name="Shader Cache Clear" />
+      <menu_item_separator />
+
       <menu_item_call label="キャッシュを直ちにクリア" name="Cache Clear" />
 
     </menu>
 
     <menu label="ネットワーク" name="Network">
       <menu_item_check label="エージェントを一時停止する" name="AgentPause" />
+
+      <menu_item_separator/>
+
+      <menu_item_call label="メッセージログ…" name="Message Log" />
+      <menu_item_call label="メッセージビルダー…" name="Message Builder"/>
+      <menu_item_call label="メッセージ書き換え…" name="Message Rewriter"/>
 
       <menu_item_separator />
 

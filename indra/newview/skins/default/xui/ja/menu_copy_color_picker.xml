@@ -1,34 +1,7 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
-<toggleable_menu
- layout="topleft"
- name="Copy Color Picker Menu">
-    <menu_item_call
-     label="Copy LSL Vector"
-     layout="topleft"
-     name="params_copy_lsl"
-     visible="true">
-       <on_click function="ColorPicker.menuDoToSelected" parameter="color_copy_lsl" />
-    </menu_item_call>
-    <menu_item_call
-     label="Copy Hex"
-     layout="topleft"
-     name="params_copy_hex"
-     visible="true">
-       <on_click function="ColorPicker.menuDoToSelected" parameter="color_copy_hex" />
-    </menu_item_call>
-    <menu_item_call
-     label="Copy Float Vector4"
-     layout="topleft"
-     name="params_copy_vec4"
-     visible="true">
-       <on_click function="ColorPicker.menuDoToSelected" parameter="color_copy_vec4" />
-    </menu_item_call>
-    <menu_item_call
-     label="Copy RGB Vector4"
-     layout="topleft"
-     name="params_copy_vec4u"
-     visible="true">
-       <on_click function="ColorPicker.menuDoToSelected" parameter="color_copy_vec4u" />
-    </menu_item_call>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="Copy Color Picker Menu">
+  <menu_item_call label="ＬＳＬベクターをコピー" name="params_copy_lsl" />
+  <menu_item_call label="ＨＥＸをコピー" name="params_copy_hex" />
+  <menu_item_call label="浮動ベクトル４をコピー" name="params_copy_vec4" />
+  <menu_item_call label="ＲＧＢベクトル４をコピー" name="params_copy_vec4u" />
 </toggleable_menu>
-

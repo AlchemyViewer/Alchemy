@@ -43,6 +43,8 @@
   <check_box label="両側を引き伸ばす" name="checkbox uniform" />
   <check_box initial_value="true" label="テクスチャを引き延ばす" name="checkbox stretch textures" />
   <check_box initial_value="true" label="グリッドにスナップ" name="checkbox snap to grid" />
+  <check_box label="ルートの軸を編集する" name="checkbox actual root" />
+  <check_box label="選択のアウトラインを表示する" name="checkbox selection" />
   <combo_box name="combobox grid mode" tool_tip="オブジェクトの配置に使うグリッドルーラの種類を選択">
     <combo_box.item label="ワールド" name="World" />
     <combo_box.item label="ローカル" name="Local" />

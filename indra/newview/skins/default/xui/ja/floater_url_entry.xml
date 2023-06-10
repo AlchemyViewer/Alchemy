@@ -5,5 +5,5 @@
   <button label="ＯＫ" name="ok_btn" />
   <button label="キャンセル" name="cancel_btn" />
   <button label="クリア" name="clear_btn" />
-  <text name="loading_label">読み込んでいます…	</text>
+  <text name="loading_label">読み込んでいます…</text>
 </floater>

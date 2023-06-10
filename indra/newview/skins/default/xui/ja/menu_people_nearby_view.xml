@@ -7,4 +7,7 @@
   <menu_item_check label="人物のアイコン表示" name="view_icons" />
   <menu_item_check label="マップを表示" name="view_map" />
   <menu_item_check label="ユーザー名を非表示" name="view_usernames" />
+  <menu_item_separator  />
+  <menu_item_check name ="radar_alerts" label="レーダーアラートを表示"/>
+  <menu_item_check name ="radar_alerts_chat" label="ログアラートをチャットに記載"/>
 </toggleable_menu>

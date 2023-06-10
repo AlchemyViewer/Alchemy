@@ -19,6 +19,7 @@
     <button label="表示" name="display_floater_2" tool_tip="選択したＸＭＬファイルで定義されたＸＵＩフロータを表示します。" />
     <button enabled="false" label="非表示" name="close_displayed_floater_2" tool_tip="現在表示されているフローターが存在する場合は、それを閉じます。" />
     <button label="スキーマをエクスポート" name="export_schema" />
+    <button label="リフレッシュ" name="refresh_btn" />
     <check_box label="四角形を表示" name="show_rectangles" />
     <scroll_list name="name_list">
       <scroll_list.columns label="タイトル" name="title_column" />

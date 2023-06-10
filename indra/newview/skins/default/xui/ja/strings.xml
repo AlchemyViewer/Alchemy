@@ -8,11 +8,15 @@ that are returned from one component and may appear in many places
 <strings>
 
   <!-- Default Args - these arguments will be replaced in all strings -->
-  <string name="SECOND_LIFE">Second Life</string>
-  <string name="APP_NAME">Second Life</string>
-  <string name="CAPITALIZED_APP_NAME">SECOND LIFE</string>
-  <string name="SECOND_LIFE_GRID">Second Lifeグリッド</string>
-  <string name="SUPPORT_SITE">Second Lifeサポートポータル</string>
+  <string name="SECOND_LIFE">[CURRENT_GRID]</string>
+  <string name="APP_NAME">Alchemy</string>
+  <string name="CAPITALIZED_APP_NAME">ALCHEMY</string>
+  <string name="SECOND_LIFE_GRID">[CURRENT_GRID]グリッド</string>
+  <string name="SUPPORT_SITE">サポートポータル</string>
+  <!-- Default Args set in LLViewerNetwork -->
+  <string name="CURRENT_GRID"/>
+  <string name="GRID_ADMIN"/>
+
   <!-- starting up -->
   <string name="StartupDetectingHardware">ハードウェアの検出中です…</string>
   <string name="StartupLoading">[APP_NAME]をインストール中です…</string>
@@ -107,11 +111,11 @@ LibVLCバージョン：[LIBVLC_VERSION]
   <string name="AgniGridLabel">Second Lifeメイングリッド (Agni)</string>
   <string name="AditiGridLabel">Second Lifeベータテストグリッド (Aditi)</string>
 
-  <string name="ViewerDownloadURL">https://secondlife.com/support/downloads/?lang=ja</string>
-  <string name="LoginFailedViewerNotPermitted">お使いの古いビューアでは、Second Lifeにアクセスできません。以下のページから新しいビューアをダウンロードしてください： https://secondlife.com/support/downloads/?lang=ja
+  <string name="ViewerDownloadURL">https://www.alchemyviewer.org/pages/downloads.html</string>
+  <string name="LoginFailedViewerNotPermitted">お使いの古いビューアでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアをダウンロードしてください： https://secondlife.com/support/downloads/?lang=ja
 
 詳細については、FAQ を参照してください：
-https://secondlife.com/viewer-access-faq</string>
+https://www.alchemyviewer.org/pages/downloads.html</string>
   <string name="LoginIntermediateOptionalUpdateAvailable">ビューアの更新（オプション）があります：[VERSION]</string>
   <string name="LoginFailedRequiredUpdate">ビューアの更新（必須）：[VERSION]</string>
   <string name="LoginFailedAlreadyLoggedIn">このエージェントは既にログインしています。</string>
@@ -296,7 +300,7 @@ support@secondlife.com にお問い合わせください。</string>
 
   <string name="ReleaseNotes">リリースノート</string>
   <!-- Always mark translate="false" for strings that are nothing but URLs, as they don't need translation. -->
-  <string name="RELEASE_NOTES_BASE_URL" translate="false">https://releasenotes.secondlife.com/viewer/</string>
+  <string name="RELEASE_NOTES_BASE_URL" translate="false">https://git.alchemyviewer.org/alchemy/alchemy/releases/</string>
 
   <!-- Indicates something is being loaded. Maybe should be merged with RetrievingData -->
   <string name="LoadingData">読み込んでいます…</string>
@@ -2898,7 +2902,7 @@ For AI Character: Get the closest navigable point to the point provided.
 続けますか？</string>
   <string name="MBWarning">警告</string>
   <string name="MBNoAutoUpdate">自動更新は現在 Linux には対応していません。
-www.secondlife.com から最新バージョンをダウンロードしてください。</string>
+https://www.alchemyviewer.org から最新バージョンをダウンロードしてください。</string>
   <string name="MBRegClassFailed">RegisterClass 失敗</string>
   <string name="MBError">エラー</string>
   <string name="MBFullScreenErr">[WIDTH]✕[HEIGHT]では全画面で実行することができません。
@@ -4112,4 +4116,51 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 また、お使いのネットワークとファイアウォールが正しく設定されている事もお確かめください。
 このエラーが継続的に起こる場合は、Secondlife.com のサポートセクションから問題を報告してください。
 [https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%8A%E3%83%AC%E3%83%83%E3%82%B8%E3%83%99%E3%83%BC%E3%82%B9/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%A8%E3%83%A9%E3%83%BC-r1283/ ナレッジベース]</string>
+
+  <!-- Alchemy Strings -->
+  <string name="NotifyIncomingMessage">[NAME]さんからメッセージが届いています…</string>
+  <string name="AvatarTyping">入力中</string>
+  <string name="UnknownAvatar">不明なアバター</string>
+  <string name="NotAvailableOnPlatform">このプラットフォームでは使用できません。</string>
+  <string name="GridInfoTitle">グリッド情報</string>
+
+  <!-- <LSL Preprocessor -->
+  <string name="preproc_toggle_warning">プリプロセッサの切り替えは、このエディタを閉じて再度開くまで完全には有効になりません。</string>
+  <string name="fs_preprocessor_starting">[APP_NAME]プリプロセッサを開始しています…</string>
+  <string name="fs_preprocessor_not_supported">警告：このビルドではプリプロセッサをサポートしていません。（[WHERE]）</string>
+  <string name="fs_preprocessor_disabled_by_script_marker">[APP_NAME]プリプロセッサは、[LINENUMBER]行目の命令で無効化されています。</string>
+  <string name="fs_preprocessor_settings_list_prefix">設定：</string>
+  <string name="fs_preprocessor_cpp_exception">[ERR_NAME]（[LINENUMBER]）：[ERR_DESC]</string>
+  <string name="fs_preprocessor_lexing_exception">[SEVERITY]：[ERR_NAME]（[LINENUMBER]）：[ERR_DESC]</string>
+  <string name="fs_preprocessor_exception">[ERR_NAME]（[LINENUMBER]）：以下の例外が発生しました：[ERR_DESC]</string>
+  <string name="fs_preprocessor_error">[ERR_NAME]（[LINENUMBER]）：予期しない例外がキャッチされました。</string>
+  <string name="fs_preprocessor_lsl2_directive_override">ＬＳＬ２としてコンパイルするディレクティブの優先設定が検出されました。</string>
+  <string name="fs_preprocessor_mono_directive_override">Ｍｏｎｏとしてコンパイルするディレクティブの優先設定が検出されました。</string>
+  <!-- LSL Optimizer -->
+  <string name="fs_preprocessor_optimizer_start">参照されていないユーザー定義関数とグローバル変数を最適化します。</string>
+  <string name="fs_preprocessor_optimizer_regex_err">有効な正規表現ではありません：「[WHAT]」；ＬＳＬ最適化はスキップされました。</string>
+  <string name="fs_preprocessor_optimizer_exception">例外をキャッチしました：「[WHAT]」；ＬＳＬ最適化はスキップされました。</string>
+  <string name="fs_preprocessor_optimizer_unexpected_exception">ＬＳＬ最適化時に予期しない例外が発生しました。適用されていません。</string>
+  <!-- LSL Compressor -->
+  <string name="fs_preprocessor_compress_start">不要なスペースを削除してスクリプトテキストを圧縮します。</string>
+  <string name="fs_preprocessor_compress_regex_err">有効な正規表現ではありません：「[WHAT]」；ＬＳＬ圧縮はスキップされました。</string>
+  <string name="fs_preprocessor_compress_exception">例外をキャッチしました：「[WHAT]」；ＬＳＬ圧縮はスキップされました。</string>
+  <string name="fs_preprocessor_compress_unexpected_exception">ＬＳＬ圧縮時に予期しない例外が発生しました。適用されていません。</string>
+  <!-- LSL Lazy lists -->
+  <string name="fs_preprocessor_lazylist_start">遅延リスト変換を適用します。</string>
+  <string name="fs_preprocessor_lazylist_regex_err">有効な正規表現ではありません：「[WHAT]」；ＬＳＬ遅延リスト変換はスキップされました。</string>
+  <string name="fs_preprocessor_lazylist_exception">例外をキャッチしました：「[WHAT]」；ＬＳＬ遅延リスト変換されました。</string>
+  <string name="fs_preprocessor_lazylist_unexpected_exception">ＬＳＬ遅延リスト変換時に予期しない例外が発生しました。適用されていません。</string>
+  <!-- LSL switch statement -->
+  <string name="fs_preprocessor_switchstatement_start">Switch文変換を適用します。</string>
+  <string name="fs_preprocessor_switchstatement_regex_err">有効な正規表現ではありません：「[WHAT]」；Swicth文変換はスキップされました。</string>
+  <string name="fs_preprocessor_switchstatement_exception">例外をキャッチしました：'[WHAT]'; Swicth文変換はスキップされました。</string>
+  <string name="fs_preprocessor_switchstatement_unexpected_exception">Switch文変換時に予期しない例外が発生しました。適用されていません。</string>
+  <!-- LSL Cache -->
+  <string name="fs_preprocessor_cache_miss">キャッシュされたインクルードファイル：「[FILENAME]」</string>
+  <string name="fs_preprocessor_cache_invalidated">インクルードされたファイル「[FILENAME]」に変更がありました。再キャッシュしています。</string>
+  <string name="fs_preprocessor_cache_completed">コンパイルされた「[FILENAME]」をキャッシュしています。</string>
+  <string name="fs_preprocessor_cache_unsafe">エラー：「[FILENAME]」という名前のスクリプトをファイルシステムにコピーするのは安全ではありません。このインクルードは失敗します。</string>
+  <string name="fs_preprocessor_caching_err">エラー：インクルードされた「[FILENAME]」というファイルをキャッシュできませんでした。</string>
+  <string name="fs_preprocessor_truncated">警告：スクリプトのテキストサイズが大きすぎるため、プリプロセッサの出力が切り詰められました。このスクリプトはおそらく機能しません。</string>
 </strings>
