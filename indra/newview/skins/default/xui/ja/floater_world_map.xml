@@ -79,7 +79,7 @@
 
         <button label="SLurlをコピー" layout="topleft" name="copy_slurl" tool_tip="現在の場所をWebで使えるSLurlにしてコピーする。" />
         <button label="選択を表示" name="Show Destination" tool_tip="選択した場所をマップの中心にする。" />
-        <button label="リージョンをトラック" name="track_region" tool_tip="このリージョンをリージョントラッカーに追加します。" />
+        <button label="リージョン追跡" name="track_region" tool_tip="このリージョンをリージョントラッカーに追加します。" />
       </panel>
       <panel name="layout_panel_5">
         <text name="zoom_label">縮尺</text>

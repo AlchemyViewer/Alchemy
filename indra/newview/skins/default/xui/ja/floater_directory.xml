@@ -14,12 +14,12 @@
   <floater.string name="search_no_query">検索語句にクエリ文字列がありませんでした。</floater.string>
   <tab_container name="search_tabs">
     <panel label="人物" name="panel_search_people" />
-    <panel label="グループ" />
-    <panel label="場所" />
-    <panel label="ランド" />
-    <panel label="イベント" />
-    <panel label="クラシファイド広告" />
-    <panel label="AltaVista" />
+    <panel label="グループ" name="panel_search_groups" />
+    <panel label="場所" name="panel_search_places" />
+    <panel label="ランド" name="panel_search_landsales" />
+    <panel label="イベント" name="panel_search_events" />
+    <panel label="クラシファイド広告" name="panel_search_classifieds" />
+    <panel label="AltaVista" name="panel_search_web" />
   </tab_container>
   <layout_stack name="results_stack">
     <layout_panel name="results_lp">

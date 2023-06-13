@@ -20,7 +20,7 @@
   <color_swatch name="alerts_highlight_color" />
 
   <text name="alerts_sound_label">再生するサウンド：</text>
-  <line_editor label="イベントリ内のアイテムをここにドラッグ・アンド・ドロップ" name="alerts_sound_name" />
+  <line_editor label="イベントリ内のアイテムをここにドラッグ＆ドロップ" name="alerts_sound_name" />
   <icon name="alerts_sound_icon" />
   <button name="alerts_sound_clear_btn" />
 

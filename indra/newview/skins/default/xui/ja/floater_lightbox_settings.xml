@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater name="floater_lightbox_settings" title="作業中のライトボックス">
+<floater name="floater_lightbox_settings" title="ライトボックス（作業中）">
   <tab_container name="lightbox_tab_container">
     <!--Image Panel-->
     <panel label="画像" name="colortone_settings">
@@ -55,7 +55,7 @@
         <combo_box.item label="ＡＭＤトーンマッパー" name="toneAMD" value="3" />
         <combo_box.item label="アンチャーテッド" name="toneUncharted" value="4" />
       </combo_box>
-      <button name="exposure_default_btn" label="トーンマップスライダーをリセット" />
+      <button name="exposure_default_btn" label="リセット" tool_tip="トーンマップスライダーをリセット" />
       <text follows="left|top" height="15" left="30" top_pad="4" width="100" layout="topleft" tool_tip="トーンマッパーを介して画像全体の明るさを調整します。" value="露光：" />
       <slider_bar name="exposure_slider" tool_tip="トーンマッパーを介して画像全体の明るさを調整します。" />
       <spinner name="exposure_spinner" tool_tip="トーンマッパーを介して画像全体の明るさを調整します。" />
@@ -115,7 +115,7 @@
       <!--Object LOD-->
       <text follows="left|top" height="15" left="10" top_pad="8" width="90" layout="topleft" value="オブジェクトのＬＯＤ：" />
       <slider_bar name="lod_slider_bar" />
-      <spinner name="lod_spinner" control_name="RenderVolumeLODFactor" />
+      <spinner name="lod_spinner" />
       <!--Max Particles-->
       <text follows="left|top" height="15" left="10" top_pad="8" width="90" layout="topleft" value="最大パーティクル数：" />
       <slider_bar name="max_particles_slider_bar" />
@@ -125,8 +125,7 @@
       <slider_bar name="max_avatar_slider_bar" />
       <spinner name="max_avatar_spinner" />
     </panel>
-    <!--Shadows/SSAO
-    Panel-->
+    <!--Shadows/SSAOmPanel-->
     <panel label="影" name="shadow_settings">
       <!--TODO: Display a warning message and disable this panel if Advanced Lighting Model is disabled?-->
       <!--Shadow Detail-->
@@ -233,7 +232,7 @@
       <button name="glowWidth_default_btn" />
     </panel>
     <!--DOF Panel-->
-    <panel label="ＤｏＦ" class="dof_settings" layout="topleft" name="dof_settings">
+    <panel label="ＤｏＦ" name="dof_settings">
       <!--DOF Toggle-->
       <!--TODO: Disable sliders if disabled?-->
       <check_box follows="left|top" height="15" left="8" top_pad="4" width="80" layout="topleft" label="被写体深度" tool_tip="被写体深度の切り替え" control_name="RenderDepthOfField" />

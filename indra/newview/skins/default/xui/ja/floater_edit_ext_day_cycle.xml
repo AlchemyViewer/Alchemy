@@ -22,7 +22,7 @@
       <!-- This layout_panel is for loading legacy presets -->
       <text name="label">デイサイクル名：</text>
       <line_editor name="day_cycle_name" />
-      <button label="インポート" fname="btn_import" tool_tip="ディスクから過去の設定をインポートする。" />
+      <button label="インポート" name="btn_import" tool_tip="ディスクからレガシー設定をインポートする。" />
     </layout_panel>
     <layout_panel name="content">
       <layout_stack name="content_stack">
@@ -50,8 +50,8 @@
 
             <layout_stack name="track_options_ls">
               <layout_panel name="track_options_lp">
-                <button label="トラックを以下から複製" name="copy_track" />
-                <button label="トラックを以下から読み込み" name="load_track" />
+                <button label="以下から複製" name="copy_track" />
+                <button label="以下から読み込み" name="load_track" />
                 <button label="トラックを消去" name="clear_track" />
 
               </layout_panel>

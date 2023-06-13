@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="inspect" title="オブジェクトの調査">
-  <floater.string name="timeStamp">[year,datetime,slt]年[mth,datetime,slt]月[day,datetime,slt]日（[wkday,datetime,slt]）　[hour,datetime,slt]：[min,datetime,slt]：[second,datetime,slt]</floater.string>
+  <floater.string name="timeStamp">[year,datetime,slt]年[mth,datetime,slt]月[day,datetime,slt]日（[wkday,datetime,slt]）[hour,datetime,slt]：[min,datetime,slt]：[second,datetime,slt]</floater.string>
   <scroll_list name="object_list" tool_tip="このリストからオブジェクトを選択して、インワールドでハイライトします。">
     <scroll_list.columns label="オブジェクト名" name="object_name" />
+    <scroll_list.columns label="説明" name="description" />
     <scroll_list.columns label="所有者" name="owner_name" />
     <scroll_list.columns label="制作者" name="creator_name" />
+    <scroll_list.columns label="面数" name="facecount" />
+    <scroll_list.columns label="頂点数" name="vertexcount" />
+    <scroll_list.columns label="三角形の数" name="trianglecount" />
+    <scroll_list.columns label="トラム数" name="tramcount" />
+    <scroll_list.columns label="ＶＲＡＭ" name="vramcount" />
     <scroll_list.columns label="制作日" name="creation_date" />
     <scroll_list.commit_callback function="Inspect.SelectObject" />
   </scroll_list>

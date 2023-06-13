@@ -2,6 +2,7 @@
 <context_menu name="Attachment Pie">
   <menu_item_call label="触る" name="Attachment Object Touch" />
   <menu_item_call label="編集…" name="Edit..." />
+  <menu_item_call label="ＰＢＲマテリアルを編集" name="EditGLTFMaterial"/>
   <menu_item_call label="取り外す" name="Detach" />
   <menu_item_call label="座る" name="Sit Down Here" />
   <menu_item_call label="立ち上がる" name="Stand Up" />
