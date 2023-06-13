@@ -1024,13 +1024,6 @@ const LLSettingsWater::parammapping_t& LLSettingsVOWater::getParameterMap() cons
 {
     static parammapping_t param_map;
 
-    if (param_map.empty())
-    {
-        //LLSD water_defaults = LLSettingsWater::defaults();
-        //param_map[SETTING_FOG_COLOR] = DefaultParam(LLShaderMgr::WATER_FOGCOLOR, water_defaults[SETTING_FOG_COLOR]);
-        // let this get set by LLSettingsVOWater::applySpecial so that it can properly reflect the underwater modifier
-        //param_map[SETTING_FOG_DENSITY] = DefaultParam(LLShaderMgr::WATER_FOGDENSITY, water_defaults[SETTING_FOG_DENSITY]);
-    }
     return param_map;
 }
 
