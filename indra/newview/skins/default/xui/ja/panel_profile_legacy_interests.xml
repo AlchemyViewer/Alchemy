@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="関心" name="avatar_interests_tab">
-  <text name="i_want_label">欲しい物：</text>
-  <check_box name="wanna_build" />
+  <text name="i_want_label">やりたいこと：</text>
+  <check_box label="制作" name="wanna_build" />
 
   <check_box label="探検" name="wanna_explore" />
 

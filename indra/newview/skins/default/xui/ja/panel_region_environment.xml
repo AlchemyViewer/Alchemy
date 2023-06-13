@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="環境" name="panel_env_info">
+<panel label="環境" name="panel_region_environment_tab">
   <string name="str_label_use_default">既定の設定を使用</string>
   <string name="str_label_use_region">リージョン（地域）の設定を使用</string>
   <string name="str_altitude_desription">空 [INDEX]（[ALTITUDE]ｍ）</string>
@@ -10,7 +10,12 @@
   <string name="str_too_small">環境を変更するには、最低でも128㎡の区画が必要です。</string>
   <string name="str_empty">（空）</string>
   <string name="str_region_env">（リージョンの環境）</string>
+
   <layout_stack>
+    <layout_panel name="pnl_environment_region_msg">
+      <text follows="left|top" name="region_text_lbl">リージョン（地域）：</text>
+      <text follows="left|top" name="region_text">不明</text>
+    </layout_panel>
     <layout_panel name="pnl_environment_disabled">
       <text name="txt_environment_disabled">…</text>
     </layout_panel>

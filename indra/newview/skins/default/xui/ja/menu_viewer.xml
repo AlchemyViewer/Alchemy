@@ -144,7 +144,7 @@
       <menu_item_check label="座標" name="Coordinates" />
       <menu_item_check label="区画のプロパティ" name="Parcel Properties" />
       <menu_item_separator />
-      <menu_item_check label="被写界深度フォーカスロック" name="lock_focus_point" />
+      <menu_item_check label="被写界深度のフォーカスを固定する" name="lock_focus_point" />
       <menu_item_check label="拡張メニュー" name="Show Advanced Menu" />
     </menu>
     <menu_item_check label="グラフィック性能の最適化…" name="Performance" />

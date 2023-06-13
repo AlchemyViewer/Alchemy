@@ -34,7 +34,7 @@ Required height for dragbar (icon in spec) is 10, so resizebar height should be 
 It is calculated as border_size + 2*UIResizeBarOverlap
 -->
   <layout_stack name="im_panels">
-    <layout_panel lname="outfit_wearables_panel">
+    <layout_panel name="outfit_wearables_panel">
       <layout_stack name="filter_panels">
         <layout_panel name="add_button_and_combobox">
           <!-- List containing items from the COF and Base outfit -->
@@ -64,6 +64,7 @@ It is calculated as border_size + 2*UIResizeBarOverlap
   <panel name="no_add_wearables_button_bar">
     <menu_button name="gear_menu_btn" />
     <icon name="dummy_right_icon" />
+    <text name="avatar_complexity_label">複雑度：[WEIGHT]</text>
     <button name="shop_btn_1" tool_tip="SLマーケットプレイスをご覧ください。また、いま着用しているアイテムを選択してここをクリックすると、それに似たアイテムが表示されます。" />
   </panel>
   <!-- BUTTON BAR - WEARABLES ADDING MODE -->

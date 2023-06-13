@@ -39,6 +39,8 @@
   <check_box label="フレンドは常に描画" name="AlwaysRenderFriends" />
   <button label="例外…" name="RenderExceptionsButton" />
 
+  <slider label="ブライトネス（露光）:" name="RenderExposure" />
+
   <!-- End of Basic Settings block -->
 
   <button label="設定をプリセットとして保存…" name="PrefSaveButton" />

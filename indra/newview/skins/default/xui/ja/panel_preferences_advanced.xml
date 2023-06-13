@@ -2,12 +2,14 @@
 <panel label="拡張" name="advanced">
   <panel.string name="aspect_ratio_text">[NUM]：[DEN]</panel.string>
   <text name="Cache:">キャッシュ：</text>
-  <spinner label="キャッシュ容量（256～9984㎆）" name="cachesizespinner" />
-  <text name="text_box5">㎆</text>
-  <button label="キャッシュをクリア" label_selected="キャッシュをクリア" name="clear_cache" />
+  <slider label="ディスクキャッシュサイズ（1024～1638㎆）" name="disk_cache_size" />
+  <text name="disk_cache_mb_text">㎆</text>
+  <slider label="テスクチャのキャッシュサイズ（1024～8192㎆）" name="texture_cache_size" />
+  <text name="tex_cache_mb_text">㎆</text>
+  <button label="クリア" label_selected="クリア" name="clear_cache" />
   <text name="Cache location">キャッシュ保存先：</text>
-  <button label="参照" label_selected="参照" name="set_cache" />
-  <button label="デフォルトの場所" label_selected="デフォルトの場所" name="default_cache_location" />
+  <button label="ブラウズ" label_selected="ブラウズ" name="set_cache" />
+  <button label="デフォルトの場所" label_selected="デフォルト" name="default_cache_location" />
   <text name="UI Size:">ＵＩのサイズ：</text>
   <text name="HUD Size:">ＨＵＤのスケール：</text>
   <check_box label="スクリプトのエラーを表示：" name="show_script_errors" />

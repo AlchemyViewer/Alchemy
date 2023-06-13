@@ -4,7 +4,7 @@
   <check_box label="マウスルック時に自分の体を表示" name="first_person_avatar_visible" />
   <check_box label="リアルなマウスルック" name="AlchemyRealisticMouselook" tool_tip="マウスルック時にアバターの体の動きとアニメーションがカメラに反映されるされようにします。" />
   <check_box label="マウスステアリングを無効化" name="disable_mouse_steering" tool_tip="アバターをクリックしたときに、カメラとアバターの位置がカメラから離れるようにリセットされるのを抑制します。" />
-  <text name=" Mouse Sensitivity">マウスルック時のマウスの敏感度：</text>
+  <text name=" Mouse Sensitivity">マウスルック時の敏感度：</text>
   <slider name="mouse_sensitivity" />
   <check_box name="invert_mouse" />
   <text name="Combat Features">戦闘時の機能：</text>
