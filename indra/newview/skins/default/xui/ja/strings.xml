@@ -2350,28 +2350,32 @@ For AI Character: Get the closest navigable point to the point provided.
 
   <!-- Gestures labels -->
   <!-- use value="" because they have preceding spaces -->
-  <string name="Chat Message" value="チャット：" />
-  <string name="Sound" value=" サウンド：" />
-  <string name="Wait" value=" --- 待機：:" />
-  <string name="AnimFlagStop" value=" アニメーションを停止：" />
-  <string name="AnimFlagStart" value=" アニメーションを開始：" />
-  <string name="Wave" value=" 手を振る" />
+  <string name="Chat Message" value="　チャット：" />
+  <string name="Sound" value="　サウンド：" />
+  <string name="Wait" value="–　待機：" />
+  <string name="AnimFlagStop" value="　アニメーションを停止：" />
+  <string name="AnimFlagStart" value="　アニメーションを開始：" />
+  <string name="Wave" value="　手を振る" />
   <string name="GestureActionNone" value="なし" />
-  <string name="HelloAvatar" value=" やあ、アバター！" />
-  <string name="ViewAllGestures" value="すべて表示 &gt;&gt;" />
-  <string name="GetMoreGestures" value="ショッピング &gt;&gt;" />
+  <string name="HelloAvatar" value="　やあ、アバター！" />
+  <string name="ViewAllGestures" value="　すべて表示　》" />
+  <string name="GetMoreGestures" value="　ショッピング　》" />
+
+  <!-- inventory filter -->
+  <!-- use value="" because they have preceding spaces -->
   <string name="Animations" value="アニメーション、" />
   <string name="Calling Cards" value="コーリングカード、" />
   <string name="Clothing" value="服装、" />
   <string name="Gestures" value="ジェスチャー、" />
   <string name="Landmarks" value="ランドマーク、" />
+  <string name="Materials" value=" マテリアル、" />
   <string name="Notecards" value="ノートカード、" />
   <string name="Objects" value="オブジェクト、" />
   <string name="Scripts" value="スクリプト、" />
   <string name="Sounds" value="サウンド、" />
   <string name="Textures" value="テクスチャ、" />
   <string name="Snapshots" value="スナップショット、" />
-  <string name="No Filters" value="いいえ" />
+  <string name="No Filters" value="なし" />
   <string name="Since Logoff" value="–ログオフ以来" />
 
   <!-- inventory folder -->
@@ -2409,6 +2413,14 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="InvFolder Meshes">メッシュ</string>
   <string name="InvFolder Received Items">受け取った商品</string>
   <string name="InvFolder Merchant Outbox">販売品ボックス</string>
+  <string name="InvFolder Settings">設定</string>
+  <string name="InvFolder Material">マテリアル</string>
+  <string name="InvFolder Materials">マテリアル</string>
+  <string name="InvFolder Animation Overrides">アニメーションオーバーライド</string>
+  <string name="InvFolder Settings">設定</string>
+  <string name="InvFolder Local Inventory">ローカルのインベントリ</string>
+  <string name="InvFolder #RLV">#RLV</string>
+  <string name="InvFolder #Firestorm">#Firestorm</string>
 
   <!-- are used for Friends and Friends/All folders in Inventory "Calling cards" folder. See EXT-694-->
   <string name="InvFolder Friends">フレンド</string>
@@ -2420,7 +2432,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- inventory FVBridge -->
   <!--  This is used in llpanelinventory.cpp when constructing a context menu for an item for Sale  -->
   <string name="Buy">購入</string>
-  <string name="BuyforL$">L$ で購入</string>
+  <string name="BuyforL$">L$で購入</string>
 
   <string name="Stone">石</string>
   <string name="Metal">金属</string>
@@ -2591,8 +2603,8 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="SummaryForTheWeek" value="今週のまとめ。開始日は" />
   <string name="NextStipendDay" value="です。次回のお小遣い支給日：" />
   <string name="GroupPlanningDate">[year,datetime,utc]年[mthnum,datetime,utc]月[day,datetime,utc]日</string>
-  <string name="GroupIndividualShare" value="グループ 個人の割り当て" />
-  <string name="GroupColumn" value="グループの設定" />
+  <string name="GroupIndividualShare" value="　　　　　　　　　　　グループ　　　　個人の割り当て" />
+  <string name="GroupColumn" value="　　　　　　　　　　　グループの設定" />
   <string name="Balance">残高</string>
   <string name="Credits">収入</string>
   <string name="Debits">支出</string>
@@ -3985,9 +3997,11 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Command_Report_Abuse_Label">嫌がらせの報告</string>
   <string name="Command_Search_Label">検索</string>
   <string name="Command_Snapshot_Label">スナップショット</string>
+  <string name="Command_Snapshot_Disk_Label">Ｓショットを保存</string>
   <string name="Command_Speak_Label">ボイスチャット</string>
   <string name="Command_View_Label">カメラ操作</string>
   <string name="Command_Voice_Label">ボイス設定</string>
+  <string name="Command_Webbrowser_Label">Webブラウザ</string>
 
   <string name="Command_360_Capture_Tooltip">３６０度の正距円筒図法のスナップショット画像を撮影します。</string>
   <string name="Command_AboutLand_Tooltip">訪問先に関する情報を表示します。</string>
@@ -4016,10 +4030,13 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Command_Report_Abuse_Tooltip">嫌がらせを報告します。</string>
   <string name="Command_Search_Tooltip">場所、イベント、人物を検索します。</string>
   <string name="Command_Snapshot_Tooltip">スナップショット画像を撮ります。</string>
+  <string name="Command_Snapshot_Disk_Tooltip">スナップショット画像を直ちに撮影します。</string>
   <string name="Command_Speak_Tooltip">マイクを使って近くの人と話します。</string>
   <string name="Command_View_Tooltip">カメラアングルの変更を表示します。</string>
   <string name="Command_Voice_Tooltip">インワールドでのコールや近くにいる人物の音量調整します。</string>
+  <string name="Command_Webbrowser_Tooltip">[APP_NAME]内のブラウザを起動します。</string>
 
+  <string name="Toolbar_Top_Tooltip">現在、上のツールバーにあります。</string>
   <string name="Toolbar_Bottom_Tooltip">現在、下のツールバーにあります。</string>
   <string name="Toolbar_Left_Tooltip">現在、左のツールバーにあります。</string>
   <string name="Toolbar_Right_Tooltip">現在、右のツールバーにあります。</string>
@@ -4052,6 +4069,15 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 
   <!-- Spell check settings floater -->
   <string name="UserDictionary">[User]</string>
+
+  <!-- RLVa -->
+  <string name="RLVaPendingRestart">（再起動待ち）</string>
+  <string name="RLVaToggleMessageLogin">ＲＬＶａは[STATE]状態です。（再起動は必要ありません）</string>
+  <string name="RLVaToggleMessageRestart">ＲＬＶａは再起動後に[STATE]になります。</string>
+  <string name="RLVaToggleEnabled">有効</string>
+  <string name="RLVaToggleDisabled">無効</string>
+
+  <!-- Experience Tools strings -->
   <string name="experience_tools_experience">体験</string>
   <string name="ExperienceNameNull">（体験なし）</string>
   <string name="ExperienceNameUntitled">（タイトルのない体験）</string>
@@ -4083,6 +4109,9 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="ExperiencePermissionShort12">権限</string>
   <string name="ExperiencePermissionShort16">座る</string>
   <string name="ExperiencePermissionShort17">環境</string>
+
+  <!-- PBR Materials -->
+  <string name="Material Texture Name Header">テクスチャはこのマテリアルを表しています： </string>
 
   <!-- Conversation log messages -->
   <string name="logging_calls_disabled_log_empty">会話はログに記録されていません。ログの記録を開始するには、「初期設定」＞「チャット」で「保存：ログのみ」または「保存：ログと会話のテキスト」を選択します。</string>

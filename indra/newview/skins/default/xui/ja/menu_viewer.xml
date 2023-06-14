@@ -223,8 +223,8 @@
     </menu>
     <menu label="スクリプト" name="Scripts">
       <menu_item_check label="スクリプトの警告／エラー…" name="Script debug" />
-      <menu_item_call label="スクリプトの再コンパイル（Mono）" name="Mono" />
-      <menu_item_call label="スクリプトの再コンパイル（LSL）" name="LSL" />
+      <menu_item_call label="スクリプトの再コンパイル（Ｍｏｎｏ）" name="Mono" />
+      <menu_item_call label="スクリプトの再コンパイル（ＬＳＬ）" name="LSL" />
       <menu_item_call label="スクリプトのリセット" name="Reset Scripts" />
       <menu_item_call label="スクリプトを実行中にする" name="Set Scripts to Running" />
       <menu_item_call label="スクリプトを実行停止にする" name="Set Scripts to Not Running" />
@@ -441,7 +441,7 @@
     <!--Shortcuts-->
 
     <menu_item_separator />
-    <menu_item_check label="RestrainedLove API" name="RLV API" />
+    <menu_item_check label="RestrainedLove APIを有効化" name="RLV API" />
     <menu_item_call label="デバッグ設定を表示" name="Debug Settings" />
     <menu_item_check label="開発メニューを表示" name="Debug Mode" />
   </menu>

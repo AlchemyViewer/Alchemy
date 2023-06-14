@@ -2,6 +2,7 @@
 <context_menu name="Object Pie">
   <menu_item_call label="触る" name="Object Touch" />
   <menu_item_call label="編集…" name="Edit..." />
+  <menu_item_call label="ＰＢＲマテリアルを編集" name="EditGLTFMaterial" />
   <menu_item_call label="制作" name="Build" />
   <context_menu label="ツール" name="Tools">
     <menu_item_call label="テスクチャをリフレッシュ" name="RefreshTextures"/>
@@ -9,7 +10,7 @@
     <menu_item_call label="リージョンオブジェクトを表示" name="show_in_linksets"/>
     <menu_item_call label="文字で表示" name="show_in_characters"/>
     <menu_item_separator  />
-    <menu_item_call label="スクリプトの再コンパイル（Mono）" name="Mono"/>
+    <menu_item_call label="スクリプトの再コンパイル（Ｍｏｎｏ）" name="Mono"/>
     <menu_item_call label="スクリプトの再コンパイル（ＬＳＬ）" name="LSL"/>
     <menu_item_call label="スクリプトをリセット" name="Reset Scripts"/>
     <menu_item_call label="スクリプトを実行状態にする" name="Set Scripts to Running"/>
@@ -23,6 +24,7 @@
   <menu_item_call label="開く" name="Open" />
   <menu_item_call label="ここに座る" name="Object Sit" />
   <menu_item_call label="立ち上がる" name="Object Stand Up" />
+  <menu_item_call label="オブジェクトのプロフィール" name="Object Profile" />
   <menu_item_call label="オブジェクトの調査" name="Object Inspect" />
   <menu_item_call label="ズームイン" name="Zoom In" />
   <menu_item_call label="リンクセットで表示" name="show_in_linksets" />
@@ -32,7 +34,7 @@
     <menu_item_call label="着用" name="Wear" />
     <menu_item_call label="追加" name="Add" />
     <context_menu label="装着" name="Object Attach" />
-    <context_menu label="HUDに装着" name="Object Attach HUD" />
+    <context_menu label="ＨＵＤに装着" name="Object Attach HUD" />
   </context_menu>
   <context_menu label="管理" name="Remove">
     <menu_item_call label="嫌がらせの報告…" name="Report Abuse..." />
@@ -48,6 +50,6 @@
   <menu_item_call label="削除" name="Delete" />
   <menu_item_separator />
   <menu_item_call label="パーティクル所有者をブロック" name="Mute Particle" />
-  <menu_item_call label="XMLとしてダンプ" name="Dump XML" />
+  <menu_item_call label="ＸＭＬとしてダンプ" name="Dump XML" />
   <menu_item_call label="スケルトンをリセット" name="Reset Skeleton" />
 </context_menu>

@@ -24,9 +24,7 @@
     <text name="metallic_upload_fee">アップロード費用なし</text>
     <text name="metallic_factor_lbl">金属的ファクター</text>
     <spinner name="metalness factor" />
-    <text name="roughness_factor_lbl">
-      粗さファクター
-    </text>
+    <text name="roughness_factor_lbl">粗さファクター</text>
     <spinner name="roughness factor" />
   </panel>
   <panel name="emissive_texture_pnl">

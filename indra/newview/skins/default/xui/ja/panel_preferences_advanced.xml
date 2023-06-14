@@ -2,7 +2,7 @@
 <panel label="拡張" name="advanced">
   <panel.string name="aspect_ratio_text">[NUM]：[DEN]</panel.string>
   <text name="Cache:">キャッシュ：</text>
-  <slider label="ディスクキャッシュサイズ（1024～1638㎆）" name="disk_cache_size" />
+  <slider label="ディスクキャッシュサイズ（1024～16384㎆）" name="disk_cache_size" />
   <text name="disk_cache_mb_text">㎆</text>
   <slider label="テスクチャのキャッシュサイズ（1024～8192㎆）" name="texture_cache_size" />
   <text name="tex_cache_mb_text">㎆</text>

@@ -47,6 +47,6 @@
     <!-- 字数制限のため「[COUNT]個のアウトフィット」にしない。-->
     <text name="OutfitcountText">[COUNT]個</text>
     <text name="avatar_complexity_label">複雑度：[WEIGHT]</text>
-    <button name="trash_btn" tool_tip="選択されたアウトフィットを削除" />
+    <button name="trash_btn" tool_tip="選択されたアウトフィットを削除する。" />
   </panel>
 </panel>

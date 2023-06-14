@@ -4,8 +4,9 @@
     <menu_item_call label="画像 （L$ [COST]）…" name="Upload Image" />
     <menu_item_call label="サウンド （L$ [COST]）…" name="Upload Sound" />
     <menu_item_call label="アニメーション （L$ [COST]）…" name="Upload Animation" />
-    <menu_item_call label="モデル" name="Upload Model" />
-    <menu_item_call label="一括 （ファイルにつき L$ [COST]）…" name="Bulk Upload" />
+    <menu_item_call label="モデル…" name="Upload Model" />
+    <menu_item_call label="マテリアル…" name="Upload Material" />
+    <menu_item_call label="一括…" name="Bulk Upload" />
   </menu>
   <menu_item_call label="新規フォルダ" name="New Folder" />
   <menu_item_call label="新規スクリプト" name="New Script" />
@@ -37,4 +38,6 @@
     <menu_item_call label="新しい水面" name="New Water" />
     <menu_item_call label="新しいデイサイクル" name="New Day Cycle" />
   </menu>
+  <menu_item_separator />
+  <menu_item_call label="新しいローカルアセット" name="New Local Item"/>
 </menu>

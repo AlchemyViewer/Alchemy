@@ -9,7 +9,7 @@
   <text name="label_matmedia">マテリアル</text>
   <combo_box name="combobox matmedia">
     <combo_box.item label="ブリンフォン" name="Materials" value="Materials" />
-    <combo_box.item label="PBR 金属的な粗さ" name="PBR" value="PBR" />
+    <combo_box.item label="物理基準レンダリング（ＰＢＲ）" name="PBR" value="PBR" />
     <combo_box.item label="メディア" name="Media" value="Media" />
   </combo_box>
   <radio_group name="radio_material_type">
@@ -18,13 +18,13 @@
     <radio_item label="輝き (反射)" name="Shininess (specular)" value="2" />
   </radio_group>
   <radio_group name="radio_pbr_type">
-    <radio_item label="完全なマテリアル" name="Complete material" value="0"/>
-    <radio_item label="ベースカラー" name="Base color" value="1"/>
-    <radio_item label="通常" name="Normal" value="2"/>
-    <radio_item label="金属的／粗い" name="Metallic/roughness" value="3"/>
-    <radio_item label="放射性" name="Emissive" value="4"/>
+    <radio_item label="完全なマテリアル" name="Complete material" value="0" />
+    <radio_item label="ベースカラー" name="Base color" value="1" />
+    <radio_item label="通常" name="Normal" value="2" />
+    <radio_item label="金属的／粗い" name="Metallic/roughness" value="3" />
+    <radio_item label="放射性" name="Emissive" value="4" />
   </radio_group>
-  <menu_button name="clipboard_texture_params_btn" tool_tip="ペースト時のオプション"/>
+  <menu_button name="clipboard_texture_params_btn" tool_tip="ペースト時のオプション" />
   <check_box initial_value="false" label="繰り返しをロックする" name="checkbox_sync_settings" tool_tip="すべてのマップの繰り返しを調整する" />
   <texture_picker label="マテリアル" name="pbr_control" tool_tip="クリックでＰＢＲマテリアルを選択できます。" />
   <button name="pbr_from_inventory" label="インベントリから選択" />
@@ -116,7 +116,7 @@
   <spinner label="垂直オフセット" name="shinyOffsetV" />
   <check_box label="平面を揃える" name="checkbox planar align" tool_tip="選択面全てのテクスチャを、最後に選択された面に揃えます。平面テクスチャのマッピングが必要です。" />
   <button label="揃える" label_selected="現在のテクスチャレイヤーを揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーを揃える" />
-  <web_browser visible="false" enabled="false" border_visible="true" bottom_delta="0" follows="top|left" left="0" name="title_media" width="4" height="4" start_url="" decouple_texture_size="true" />
+  <web_browser name="title_media" />
   <!-- BEGIN PBR Material texture transform parameters -->
   <spinner label="Ｕスケール" name="gltfTextureScaleU" />
   <spinner label="Ｖスケール" name="gltfTextureScaleV" />
