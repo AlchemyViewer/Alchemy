@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_gltf_material">
+  <check_box label="両面" name="double sided" />
+  <panel name="base_color_texture_pnl">
+    <text name="base_color_lbl">基準色：</text>
+    <texture_picker name="base_color_texture" tool_tip="基準色のマップ。アルファチャネルはオプションで透明度で使用されます。" />
+    <text name="base_color_upload_fee">アップロード料金なし</text>
+    <text name="base_color_tint_lbl">色彩</text>
+    <color_swatch name="base color" />
+    <text name="base_color_transparency_lbl">透明度</text>
+    <spinner name="transparency" />
+    <text name="alpha_mode_lbl">アルファモード</text>
+    <combo_box name="alpha mode">
+      <combo_box.item label="不透明" name="None" value="OPAQUE" />
+      <combo_box.item label="ブレンド" name="Alpha blending" value="BLEND" />
+      <combo_box.item label="マスク" name="Alpha masking" value="MASK" />
+    </combo_box>
+    <text name="alpha_cutoff_lbl">アルファのカットオフ</text>
+    <spinner name="alpha cutoff" />
+  </panel>
+  <panel name="metallic_texture_pnl">
+    <text name="metallic_roughness_lbl">金属的な粗さ：</text>
+    <texture_picker name="metallic_roughness_texture" tool_tip="オプションのオクルージョンを備えたＧＬＴＦによる金属的粗さマップを指定します。赤のチャネルはオクルージョン、緑のチャネルは粗さ、青のチャネルは金属度です。" />
+    <text name="metallic_upload_fee">アップロード費用なし</text>
+    <text name="metallic_factor_lbl">金属的ファクター</text>
+    <spinner name="metalness factor" />
+    <text name="roughness_factor_lbl">粗さファクター</text>
+    <spinner name="roughness factor" />
+  </panel>
+  <panel name="emissive_texture_pnl">
+    <text name="emissive_lbl">放射性：</text>
+    <texture_picker name="emissive_texture" />
+    <text name="emissive_upload_fee">アップロード費用なし</text>
+    <text name="emissive_tint_lbl">色彩</text>
+    <color_swatch name="emissive color" />
+  </panel>
+  <panel name="normal_texture_pnl">
+    <text name="normal_lbl">普通のテスクチャ：</text>
+    <texture_picker name="normal_texture" />
+    <text name="normal_upload_fee">アップロード費用なし</text>
+  </panel>
+</panel>

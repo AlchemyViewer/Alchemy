@@ -1,38 +1,9 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<!-- Part of side tray, see that XML file for panel config -->
-<panel label="home_tab" name="home_tab">
-	<scroll_container name="profile_scroll">
-		<panel name="profile_scroll_panel">
-			<panel name="sidebar_people">
-				<text name="tab_name" value="人"/>
-				<text name="tab_description">
-					あなたのフレンド、グループ、連絡先、近くの人を探します。
-				</text>
-			</panel>
-			<panel name="sidebar_places">
-				<text name="tab_name" value="場所"/>
-				<text name="tab_description">
-					行きたい場所、行ったことのある場所を探します。
-				</text>
-			</panel>
-			<panel name="sidebar_me">
-				<text name="tab_name" value="マイ プロフィール"/>
-				<text name="tab_description">
-					あなたの公開プロフィールを編集します。
-				</text>
-			</panel>
-			<panel name="sidebar_appearance">
-				<text name="tab_name" value="容姿"/>
-				<text name="tab_description">
-					あなたの容姿や現在の見た目を変更します。
-				</text>
-			</panel>
-			<panel name="sidebar_inventory">
-				<text name="tab_name" value="持ち物"/>
-				<text name="tab_description">
-					あなたの持ち物を眺めます。
-				</text>
-			</panel>
-		</panel>
-	</scroll_container>
+<!-- the web-based Home panel of the side tray -->
+<panel name="home_tab">
+  <layout_stack name="stack">
+    <layout_panel name="browser_layout">
+      <web_browser name="browser" start_url="data:text/html,%3Chtml%3E%3Cbody bgcolor=%22#2A2A2A%22 text=%22eeeeee%22%3E %3Ch3%3E %0D%0A%0D%0ALoading... %3C/h3%3E %3C/body%3E%3C/html%3E" />
+    </layout_panel>
+  </layout_stack>
 </panel>
