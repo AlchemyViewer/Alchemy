@@ -307,7 +307,7 @@
   </menu>
 
   <menu label="ＲＬＶａ" name="RLVa Main">
-    <menu label="Debug" name="デバッグ">
+    <menu label="デバッグ" name="Debug">
       <menu_item_check label="トップレベルのＲＬＶａメニューを表示" name="Show Top-level RLVa Menu" />
       <menu_item_separator/>
       <menu_item_check label="デバッグメッセージを表示" name="Show Debug Messages" />
