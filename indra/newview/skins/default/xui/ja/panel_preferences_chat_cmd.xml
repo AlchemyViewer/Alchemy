@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="commands_settings">
+  <check_box label="チャットバーコマンドを有効化" name="chat_cmd_toggle" />
+  <!--dd-->
+  <text name="AlchemyChatCommandDrawDistance_txt">描画距離を変更（使用方法：cmd meters）</text>
+  <line_editor name="AlchemyChatCommandDrawDistance" />
+  <!--gth-->
+  <text name="AlchemyChatCommandHeight_txt">テレポートする高さ（0～8192）</text>
+  <line_editor name="AlchemyChatCommandHeight" />
+  <!--flr-->
+  <text name="AlchemyChatCommandGround_txt">地面にテレポート</text>
+  <line_editor name="AlchemyChatCommandGround" />
+  <!--pos-->
+  <text name="AlchemyChatCommandPos_txt">座標にテレポート（使用方法：cmd x y z）</text>
+  <line_editor name="AlchemyChatCommandPos" />
+  <!--mapto-->
+  <text name="AlchemyChatCommandMapto_txt">リージョンにテレポート</text>
+  <line_editor name="AlchemyChatCommandMapto" />
+  <!--clr-->
+  <text name="AlchemyChatCommandClearNearby_txt">近隣チャットのコンテンツをクリア</text>
+  <line_editor name="AlchemyChatCommandClearNearby" />
+  <!--Hover-->
+  <text name="hover_txt" width="240">ホバー高さ</text>
+  <line_editor name="AlchemyChatCommandHoverHeight" />
+  <!--AO-->
+  <text name="ao_txt">アニメーションオーバーライド</text>
+  <line_editor name="AlchemyChatCommandAnimationOverride" />
+  <!--home-->
+  <text name="AlchemyChatCommandHome_txt">ホームにテレポート</text>
+  <line_editor name="AlchemyChatCommandHome" />
+  <!--sethome-->
+  <text name="AlchemyChatCommandSetHome_txt">現在地をホームにする</text>
+  <line_editor name="AlchemyChatCommandSetHome" />
+  <!--tp2cam-->
+  <text name="AlchemyChatCommandTeleportToCam_txt">カメラの位置にテレポート</text>
+  <line_editor name="AlchemyChatCommandTeleportToCam" />
+  <!--Calculatooor-->
+  <text name="calc_txt">計算機</text>
+  <line_editor name="AlchemyChatCommandCalc" />
+  <!--Resync
+  Anims-->
+  <text name="calc_txt">アニメーションを再同期</text>
+  <line_editor name="AlchemyChatCommandResyncAnim" />
+  <!--rezplat-->
+  <text name="AlchemyChatCommandRezPlat_txt">プラットフォームにRez（使用法：cmd size）</text>
+  <line_editor name="AlchemyChatCommandRezPlat" />
+  <slider name="AlchemyChatCommandRezPlatSize" label="幅" tool_tip="コマンドでサイズが指定されていない場合のRezされたプラットフォームのデフォルトのサイズを指定します。" />
+</panel>

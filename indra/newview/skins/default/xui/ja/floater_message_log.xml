@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="Message Log" title="メッセージログ">
+  <floater.string name="filter_status">全[TOTAL]件のメッセージの内[MESSAGES]件を表示しています…</floater.string>
+  <floater.string name="no_filter_status">[TOTAL]件のメッセージを表示しています…</floater.string>
+  <layout_stack name="a_stack">
+    <layout_panel name="net_panel">
+      <scroll_list name="net_list">
+        <scroll_list.columns name="text" label="テキスト" />
+        <scroll_list.columns name="icon0" label="アイコン０" />
+        <scroll_list.columns name="icon1" label="アイコン１" />
+        <scroll_list.columns name="icon2" label="アイコン２" />
+      </scroll_list>
+    </layout_panel>
+    <layout_panel name="message_panel">
+      <menu_button name="filter_choice_btn" />
+      <line_editor name="filter_edit" />
+      <button name="filter_apply_btn" label="✔" />
+      <button name="clear_log_btn" label="Ｃ" />
+      <scroll_list name="message_log">
+        <scroll_list.columns name="sequence" label="＃" width="48" />
+        <scroll_list.columns name="protocol" label="プロトコル" width="48" />
+        <scroll_list.columns name="verb" label="動詞" width="56" />
+        <scroll_list.columns name="net" label="ホスト" width="120" />
+        <scroll_list.columns name="name" label="種類" />
+      </scroll_list>
+      <text name="log_status_text">
+      </text>
+    </layout_panel>
+    <layout_panel name="net_info_panel">
+      <!-- Only visible in IPANE_NET / IPANE_TEMPLATE_LOG modes -->
+      <text_editor name="net_info">
+      </text_editor>
+      <!-- Only visible in IPANE_HTTP_LOG mode -->
+      <layout_stack name="conv_stack">
+        <layout_panel>
+          <text_editor name="conv_request" />
+        </layout_panel>
+        <layout_panel>
+          <text_editor name="conv_response" />
+        </layout_panel>
+      </layout_stack>
+    </layout_panel>
+  </layout_stack>
+  <check_box name="wrap_net_info" label="情報テキストを折り返す" />
+  <!-- Format the message body to be more readable, but not exactly what was sent? -->
+  <check_box name="beautify_messages" label="メッセージをきれいにする" />
+  <button name="msg_builder_send_btn" label="メッセージビルダーに送信" />
+</floater>

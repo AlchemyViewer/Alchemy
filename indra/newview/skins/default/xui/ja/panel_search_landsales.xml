@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_search_landsales">
+  <text name="search_title" value="検索語句を入力：" />
+  <check_box label="" name="pg_all" />
+
+  <icon name="rating_icon_general" />
+  <check_box label="" name="mature_all" />
+
+  <icon name="rating_icon_moderate" />
+  <check_box label="" name="adult_all" />
+  <icon name="rating_icon_adult" />
+  <check_box label="価格　＞" name="price_check" />
+  <line_editor name="edit_price" />
+  <check_box label="エリア　＞" name="area_check" />
+  <line_editor name="edit_area" />
+  <combo_box name="land_type">
+    <combo_box.item label="すべてのカテゴリ" name="All" value="All" />
+    <combo_box.item label="オークション" name="Auction" value="Auction" />
+    <combo_box.item label="メインランドのセール" name="Mainland" value="Mainland" />
+    <combo_box.item label="不動産セール" name="Estate" value="Estate" />
+  </combo_box>
+  <combo_box name="land_sort">
+    <combo_box.item label="名前でソート" name="Name_item" value="Name" />
+    <combo_box.item label="価格でソート" name="Price_item" value="Price" />
+    <combo_box.item label="㎡あたりの価格でソート" name="PPM_item" value="PPM" />
+    <combo_box.item label="エリアでソート" name="Area_item" value="Area" />
+  </combo_box>
+  <check_box label="昇順" name="ascending" />
+</panel>
