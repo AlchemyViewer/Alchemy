@@ -210,6 +210,7 @@ S32 LLPipeline::RenderScreenSpaceReflectionIterations;
 F32 LLPipeline::RenderScreenSpaceReflectionRayStep;
 F32 LLPipeline::RenderScreenSpaceReflectionDistanceBias;
 F32 LLPipeline::RenderScreenSpaceReflectionDepthRejectBias;
+F32 LLPipeline::RenderScreenSpaceReflectionAdaptiveStepMultiplier;
 S32 LLPipeline::RenderScreenSpaceReflectionGlossySamples;
 S32 LLPipeline::RenderBufferVisualization;
 F32 LLPipeline::RenderNormalMapScale;
@@ -353,6 +354,7 @@ LLPipeline::LLPipeline() :
 	mMatrixOpCount(0),
 	mTextureMatrixOps(0),
 	mNumVisibleNodes(0),
+	mPoissonOffset(0),
 	mInitialized(false),
 	mShadersLoaded(false),
 	mRenderDebugFeatureMask(0),
@@ -579,6 +581,8 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionRayStep");
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionDistanceBias");
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionDepthRejectBias");
+    connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionAdaptiveStepMultiplier");
+    connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionGlossySamples");
 	connectRefreshCachedSettingsSafe("RenderBufferVisualization");
 	connectRefreshCachedSettingsSafe("RenderNormalMapScale");
 	connectRefreshCachedSettingsSafe("RenderAttachedLights");
@@ -1113,6 +1117,7 @@ void LLPipeline::refreshCachedSettings()
     RenderScreenSpaceReflectionRayStep = gSavedSettings.getF32("RenderScreenSpaceReflectionRayStep");
     RenderScreenSpaceReflectionDistanceBias = gSavedSettings.getF32("RenderScreenSpaceReflectionDistanceBias");
     RenderScreenSpaceReflectionDepthRejectBias = gSavedSettings.getF32("RenderScreenSpaceReflectionDepthRejectBias");
+    RenderScreenSpaceReflectionAdaptiveStepMultiplier = gSavedSettings.getF32("RenderScreenSpaceReflectionAdaptiveStepMultiplier");
     RenderScreenSpaceReflectionGlossySamples = gSavedSettings.getS32("RenderScreenSpaceReflectionGlossySamples");
 	RenderBufferVisualization = gSavedSettings.getS32("RenderBufferVisualization");
     sReflectionProbesEnabled = LLFeatureManager::getInstance()->isFeatureAvailable("RenderReflectionsEnabled") && gSavedSettings.getBOOL("RenderReflectionsEnabled");
@@ -8527,6 +8532,13 @@ void LLPipeline::bindReflectionProbes(LLGLSLShader& shader)
     shader.uniform1f(LLShaderMgr::DEFERRED_SSR_RAY_STEP, RenderScreenSpaceReflectionRayStep);
     shader.uniform1f(LLShaderMgr::DEFERRED_SSR_GLOSSY_SAMPLES, RenderScreenSpaceReflectionGlossySamples);
     shader.uniform1f(LLShaderMgr::DEFERRED_SSR_REJECT_BIAS, RenderScreenSpaceReflectionDepthRejectBias);
+    mPoissonOffset++;
+
+	if (mPoissonOffset > 128 - RenderScreenSpaceReflectionGlossySamples)
+        mPoissonOffset = 0;
+
+    shader.uniform1f(LLShaderMgr::DEFERRED_SSR_NOISE_SINE, mPoissonOffset);
+    shader.uniform1f(LLShaderMgr::DEFERRED_SSR_ADAPTIVE_STEP_MULT, RenderScreenSpaceReflectionAdaptiveStepMultiplier);
 
     channel = shader.enableTexture(LLShaderMgr::SCENE_DEPTH);
     if (channel > -1)
