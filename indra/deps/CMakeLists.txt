@@ -25,7 +25,7 @@ add_library(deps
 FetchContent_Declare(
   meshoptimizer
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/meshoptimizer.git
-  GIT_TAG        v0.18
+  GIT_TAG        v0.19
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
   )
