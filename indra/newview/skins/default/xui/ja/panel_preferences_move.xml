@@ -2,6 +2,6 @@
 <panel label="移動" name="move_panel">
   <tab_container name="moveview_tab_container">
     <panel label="一般的な移動と視線" name="general_move_panel" />
-    <panel label="マウスルック" />
+    <panel label="マウスルック" name="mlook_panel" />
   </tab_container>
 </panel>

@@ -7,9 +7,9 @@
     <menu_item_call label="場所…" name="Places" />
     <menu_item_call label="ピック…" name="Picks" />
     <menu_item_call label="体験…" name="Experiences" />
-    <menu_item_separator/>
-    <menu_item_check label="ミュージック・ティッカー…" name="music_ticker_check"/>
-    <menu_item_separator/>
+    <menu_item_separator />
+    <menu_item_check label="ミュージック・ティッカー…" name="music_ticker_check" />
+    <menu_item_separator />
     <menu_item_call label="カメラコントロール…" name="Camera Controls" />
 
     <menu_item_separator />
@@ -77,8 +77,8 @@
     <menu_item_separator />
     <menu_item_call label="スケルトンをリセット" name="Reset Skeleton" />
     <menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations" />
-    <menu_item_call label="自分を変形しない" name="Undeform Me"/>
-    <menu_item_call label="ビューアのエフェクトをクリア" name="Clear Viewer Effects"/>
+    <menu_item_call label="自分を変形しない" name="Undeform Me" />
+    <menu_item_call label="ビューアのエフェクトをクリア" name="Clear Viewer Effects" />
     <menu_item_call label="スクリプトを装着…" name="MyScripts" />
     <menu_item_separator />
     <menu_item_call label="アバターに関するヘルプ…" name="Help with avatars" />
@@ -88,19 +88,19 @@
     <menu_item_check label="近隣のチャット…" name="Nearby Chat" />
     <menu_item_check label="ボイスチャット" name="Speak" />
     <menu_item_check name="Conversation Log..." label="会話ログ…" />
-    <menu_item_check label="チャットのアラート…" name="Chat Alerts"/>
+    <menu_item_check label="チャットのアラート…" name="Chat Alerts" />
     <menu_item_check label="ジェスチャー…" name="Gestures" />
 
-    <menu_item_separator/>
+    <menu_item_separator />
     <menu_item_check label="喋る" name="Speak" />
     <menu label="ボイスモーフィング" name="VoiceMorphing">
-      <menu_item_check label="ボイスモーフィングなし" name="NoVoiceMorphing"/>
-      <menu_item_separator/>
-      <menu_item_check label="プレビュー" name="Preview"/>
-      <menu_item_call label="購読…" name="Subscribe"/>
-      <menu_item_call label="プレミアム特典…" name="PremiumPerk"/>
+      <menu_item_check label="ボイスモーフィングなし" name="NoVoiceMorphing" />
+      <menu_item_separator />
+      <menu_item_check label="プレビュー" name="Preview" />
+      <menu_item_call label="購読…" name="Subscribe" />
+      <menu_item_call label="プレミアム特典…" name="PremiumPerk" />
     </menu>
-    <menu_item_separator/>
+    <menu_item_separator />
     <menu_item_check label="フレンド" name="My Friends" />
     <menu_item_check label="グループ" name="My Groups" />
     <menu_item_check label="近くの人物" name="Active Speakers" />
@@ -117,7 +117,7 @@
     <menu_item_check label="ワールドマップ" name="World Map" />
     <menu_item_check label="ミニマップ" name="Mini-Map" />
     <menu_item_call label="イベント" name="Events" />
-    <menu_item_check label="リージョン（地域）トラッカー…" name="Region Tracker"/>
+    <menu_item_check label="リージョン（地域）トラッカー…" name="Region Tracker" />
     <menu_item_check label="検索…" name="Search" />
     <menu_item_separator />
     <menu_item_call label="ホームにテレポート" name="Teleport Home" />
@@ -228,7 +228,7 @@
       <menu_item_call label="スクリプトのリセット" name="Reset Scripts" />
       <menu_item_call label="スクリプトを実行中にする" name="Set Scripts to Running" />
       <menu_item_call label="スクリプトを実行停止にする" name="Set Scripts to Not Running" />
-      <menu_item_call label="スクリプトを削除" name="Delete Scripts"/>
+      <menu_item_call label="スクリプトを削除" name="Delete Scripts" />
     </menu>
 
     <menu label="経路探索" name="Pathfinding">
@@ -264,7 +264,7 @@
 
       <menu_item_check label="ポストプロセッシングを無効化" name="No Post" />
 
-      <menu_item_separator/>
+      <menu_item_separator />
 
       <menu_item_check label="グリッド吸着" name="Snap to Grid" />
       <menu_item_call label="オブジェクトのＸＹ軸をグリッドに吸着" name="Snap Object XY to Grid" />
@@ -309,22 +309,22 @@
   <menu label="ＲＬＶａ" name="RLVa Main">
     <menu label="デバッグ" name="Debug">
       <menu_item_check label="トップレベルのＲＬＶａメニューを表示" name="Show Top-level RLVa Menu" />
-      <menu_item_separator/>
+      <menu_item_separator />
       <menu_item_check label="デバッグメッセージを表示" name="Show Debug Messages" />
       <menu_item_check label="未設定または重複メッセージを隠す" name="Hide Unset or Duplicate Messages" />
       <menu_item_check label="アサーションの失敗を表示" name="Show Assertion Failures" />
-      <menu_item_separator/>
+      <menu_item_separator />
       <menu_item_check label="ロックされたレイヤーを隠す" name="Hide Locked Layers" />
       <menu_item_check label="ロックされた装着物を隠す" name="Hide Locked Attachments" />
-      <menu_item_separator/>
+      <menu_item_separator />
       <menu_item_check label="古いネーミングを有効化" name="Enable Legacy Naming" />
       <menu_item_check label="共有された衣装を有効化" name="Enable Shared Wear" />
       <menu_item_check label="着用中の共有されたアイテム名をリネーム" name="Rename Shared Items on Wear" />
-      <menu_item_separator/>
+      <menu_item_separator />
       <menu_item_check label="ロック…" name="Locks">
       </menu_item_check>
     </menu>
-    <menu_item_separator/>
+    <menu_item_separator />
     <menu_item_check label="ＯＯＣチャットを許可" name="Allow OOC Chat" />
     <menu_item_check label="フィルタリングされたチャットを表示" name="Show Filtered Chat" />
     <menu_item_check label="リダイレクトされたチャット入力を表示" name="Show Redirected Chat Typing" />
@@ -350,7 +350,7 @@
     <menu_item_check label="オブジェクトの選択距離の制限" name="Limit Select Distance" />
     <menu_item_check label="カメラの距離移動を制限しない" name="Disable Camera Distance" />
     <menu_item_check label="最小ズーム距離を無効化" name="Disable Minimum Zoom Distance" />
-    <menu_item_check label="ＳＩＭのカメラの衝突面を無効化" name="Disable Sim Camera Collision Plane"/>
+    <menu_item_check label="ＳＩＭのカメラの衝突面を無効化" name="Disable Sim Camera Collision Plane" />
 
     <menu_item_separator />
 
@@ -579,11 +579,11 @@
     <menu label="ネットワーク" name="Network">
       <menu_item_check label="エージェントを一時停止する" name="AgentPause" />
 
-      <menu_item_separator/>
+      <menu_item_separator />
 
       <menu_item_call label="メッセージログ…" name="Message Log" />
-      <menu_item_call label="メッセージビルダー…" name="Message Builder"/>
-      <menu_item_call label="メッセージ書き換え…" name="Message Rewriter"/>
+      <menu_item_call label="メッセージビルダー…" name="Message Builder" />
+      <menu_item_call label="メッセージ書き換え…" name="Message Rewriter" />
 
       <menu_item_separator />
 

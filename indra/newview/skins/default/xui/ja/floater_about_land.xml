@@ -71,7 +71,7 @@
       <text name="estate_owner_lbl">所有者：</text>
       <text name="estate_owner_text">（なし）</text>
       <text_editor name="covenant_editor">この不動産には約款がありません。</text_editor>
-      <text name="covenant_timestamp_text">最後更新：1969年12月31日水曜日　16：00：00</text>
+      <text name="covenant_timestamp_text">最後更新：1969年12月31日水曜日 16：00：00</text>
       <text font="SansSerifLarge" name="region_section_lbl">地域：</text>
       <text name="region_name_text">EricaVille</text>
       <text name="region_landtype_lbl">種類：</text>
@@ -206,6 +206,8 @@
       <check_box label="ボイスチャットを有効にする" name="parcel_enable_voice_channel" />
       <check_box label="ボイスチャットを有効にする（不動産設定）" name="parcel_enable_voice_channel_is_estate_disabled" />
       <check_box label="ボイスチャットをこの区画内に限定する" name="parcel_enable_voice_channel_local" />
+      <text name="media">メディア：</text>
+      <check_box label="ＭＯＡＰを区画に制限する" name="obscure_moap" tool_tip="プリムに付けられたメディア（ＭＯＡＰ）が区画外にあるときに、区画内にいるエージェントに対して自動再生されないようにします。" />
     </panel>
     <panel label="アクセス" name="land_access_panel">
       <panel.string name="access_estate_defined">（不動産に限定）</panel.string>
@@ -223,13 +225,13 @@
       <spinner label="アクセス時間：" name="HoursSpin" />
       <text name="OwnerLimited">（不動産所有者が、このオプションに制約を与えている場合があります）</text>
       <panel name="Allowed_layout_panel">
-        <text label="常に許可" name="AllowedText">常に許可する人（[COUNT]人、最大[MAX]人）</text>
+        <text label="常に許可" name="AllowedText">常に許可する人（全[MAX]中人[COUNT]人）</text>
         <name_list name="AccessList" tool_tip="（合計[LISTED]人、最大[MAX]人）" />
         <button label="追加" name="add_allowed" />
         <button label="削除" label_selected="削除" name="remove_allowed" />
       </panel>
       <panel name="Banned_layout_panel">
-        <text label="バン" name="BanCheck">バンした人（[COUNT]人、最大[MAX]人）</text>
+        <text label="バン" name="BanCheck">バンした人（全[MAX]人中[COUNT]人）</text>
         <name_list name="BannedList" tool_tip="（合計[LISTED]人、最大[MAX]人）">
           <columns label="名前" name="name" />
           <columns label="期間" name="duration" />
