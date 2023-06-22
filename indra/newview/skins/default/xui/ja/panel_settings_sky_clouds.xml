@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="雲" name="panel_settings_sky_clouds">
-  <layout_stack>
-    <layout_panel>
+  <layout_stack name="main_ls">
+    <layout_panel name="left_lp">
       <text name="cloud_color_label">雲の色：</text>
       <color_swatch name="cloud_color" />
       <text name="cloud_coverage_label">雲の量：</text>
@@ -16,7 +16,7 @@
       <text name="cloud_image_label">雲の画像：</text>
       <texture_picker name="cloud_map" />
     </layout_panel>
-    <layout_panel>
+    <layout_panel name="right_lp">
       <text name="cloud_density_label">雲の密度：</text>
       <slider label="Ｘ" name="cloud_density_x" />
       <slider label="Ｙ" name="cloud_density_y" />
@@ -27,4 +27,4 @@
       <slider label="密度" name="cloud_detail_d" />
     </layout_panel>
   </layout_stack>
-</panel>                
+</panel>
