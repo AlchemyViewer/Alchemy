@@ -12,7 +12,7 @@
   <check_box label="チャット時の機械翻訳機能を有効にする" name="translate_chat_checkbox" />
   <text name="translate_language_label">翻訳する言語：</text>
   <combo_box name="translate_language_combo">
-    <combo_box.item label="システム標準" name="System Default Language" />
+    <combo_box.item label="システムデフォルト" name="System Default Language" />
     <combo_box.item label="英語" name="English" />
     <!-- After "System Default" and "English", please keep the rest of these combo_box.items in alphabetical order by the first character in the string. -->
     <combo_box.item label="Dansk（デンマーク語）" name="Danish" />
@@ -57,11 +57,11 @@
   <line_editor default_text="グローバルサービスの場合は空のままにすることができます。" />
   <button label="認証" name="verify_azure_api_key_btn" />
 
-  <text name="google_api_key_label">Google [http://code.google.com/apis/language/translate/v2/getting_started.html#auth APIキー]：</text>
+  <text name="google_api_key_label">Google [https://cloud.google.com/translate/docs/quickstarts?hl=ja#auth APIキー]：</text>
   <line_editor default_text="Google APIキーを入力して「確認」ボタンをクリックしてください。" name="google_api_key" />
   <button label="認証" name="verify_google_api_key_btn" />
 
-  <text name="google_links_text">[http://code.google.com/apis/language/translate/v2/pricing.html 価格]｜[https://code.google.com/apis/console 統計]</text>
+  <text name="google_links_text">[https://cloud.google.com/translate/pricing?hl=ja 価格]｜[https://code.google.com/apis/console 統計]</text>
 
   <text name="deepl_api_domain_label">エンドポイント：</text>
 
@@ -78,6 +78,6 @@
 
   <text name="deepl_links_text">[https://www.deepl.com/pro/select-country?cta=header-prices 価格]</text>
 
-  <button label=" ＯＫ" name=" ok_btn" />
-  <button label=" キャンセル" name=" cancel_btn" />
+  <button label="ＯＫ" name="ok_btn" />
+  <button label="キャンセル" name="cancel_btn" />
 </floater>
