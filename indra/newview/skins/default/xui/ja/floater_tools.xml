@@ -5,7 +5,7 @@
   <floater.string name="grid_world_text">ワールド</floater.string>
   <floater.string name="grid_reference_text">リファレンス</floater.string>
   <floater.string name="grid_attachment_text">装着物</floater.string>
-  <floater.string name="status_rotate">色の付いたバンドをドラッグしてオブジェクトを回転</floater.string>
+  <floater.string name="status_rotate">色の付いた帯をドラッグすることでオブジェクトを回転</floater.string>
   <floater.string name="status_scale">選択した側をクリックし、ドラッグで引き伸ばす</floater.string>
   <floater.string name="status_move">移動：ドラッグ、コピー：Shift＋ドラッグ</floater.string>
   <floater.string name="status_modifyland">土地をクリックし、ボタンを押したまま入力して修正変更</floater.string>
@@ -13,8 +13,10 @@
   <floater.string name="status_grab">ドラッグで移動、Ctrlで持ち上げ、Ctrl＋Shiftで回転</floater.string>
   <floater.string name="status_place">インワールドでクリックして作成</floater.string>
   <floater.string name="status_selectland">土地をクリックし、ドラッグして選択</floater.string>
-  <floater.string name="status_selectcount">選択されているオブジェクトは[OBJ_COUNT]個、土地の負荷は[LAND_IMPACT]　[secondlife:///app/openfloater/object_weights 詳細]</floater.string>
-  <floater.string name="status_remaining_capacity">残りの許容数[LAND_CAPACITY]</floater.string>
+  <floater.string name="status_selectcount">選択されているオブジェクトは[OBJ_COUNT]個あり、土地への負荷は[LAND_IMPACT]です。</floater.string>
+  <floater.string name="status_remaining_capacity">残りの許容数は[LAND_CAPACITY]です。</floater.string>
+  <floater.string name="link_number">リンク数：</floater.string>
+  <floater.string name="selected_faces">面数：</floater.string>
   <button label="" label_selected="" name="button focus" tool_tip="フォーカス" />
   <button label="" label_selected="" name="button move" tool_tip="動かす" />
   <button label="" label_selected="" name="button edit" tool_tip="編集" />
@@ -36,6 +38,7 @@
     <radio_item label="回転（Ctrl）" name="radio rotate" />
     <radio_item label="引き延ばす (Ctrl＋Shift)" name="radio stretch" />
     <radio_item label="面を選択" name="radio select face" />
+    <radio_item label="整列" name="radio align" />
   </radio_group>
   <check_box label="リンク部分を編集" name="checkbox edit linked parts" />
   <button label="リンク" name="link_btn" />
@@ -51,11 +54,11 @@
     <combo_box.item label="リファレンス" name="Reference" />
   </combo_box>
   <button label="" label_selected="オプション…" name="Options..." tool_tip="グリッドオプションを表示します" />
-  <button label="" label_selected="" name="ToolCube" tool_tip="キューブ" />
+  <button label="" label_selected="" name="ToolCube" tool_tip="立方体" />
   <button label="" label_selected="" name="ToolPrism" tool_tip="プリズム" />
   <button label="" label_selected="" name="ToolPyramid" tool_tip="ピラミッド" />
-  <button label="" label_selected="" name="ToolTetrahedron" tool_tip="4面体" />
-  <button label="" label_selected="" name="ToolCylinder" tool_tip="シリンダー" />
+  <button label="" label_selected="" name="ToolTetrahedron" tool_tip="四面体" />
+  <button label="" label_selected="" name="ToolCylinder" tool_tip="円柱" />
   <button label="" label_selected="" name="ToolHemiCylinder" tool_tip="半円柱" />
   <button label="" label_selected="" name="ToolCone" tool_tip="円錐" />
   <button label="" label_selected="" name="ToolHemiCone" tool_tip="半円錐" />
@@ -282,11 +285,11 @@
     <text name="label_area_price">価格：[AREA]㎡　L$ [PRICE]</text>
     <text name="label_area">面積：[AREA]㎡</text>
     <button label="土地情報" label_selected="土地情報" name="button about land" />
-    <check_box label="所有者を表示" name="checkbox show owners" tool_tip="所有者の種類別に区画を色づけます：緑色＝あなたの土地　水色＝あなたのグループ所有地　赤色＝他人が所有する土地　黄色 = 売り出し中　紫色＝オークション　灰色＝公共領域" />
+    <check_box label="所有者を表示" name="checkbox show owners" tool_tip="所有者の種類別に区画を色づけます：緑色＝あなたの土地　水色＝あなたのグループ所有地　赤色＝他人が所有する土地　黄色＝売り出し中　紫色＝オークション中　灰色＝公共領域" />
     <text name="label_parcel_modify">区画の編集</text>
     <button label="再分割" label_selected="再分割" name="button subdivide land" />
     <button label="統合" label_selected="統合" name="button join land" />
-    <text name="label_parcel_trans">土地取引</text>
+    <text name="label_parcel_trans">土地の取引</text>
     <button label="土地の購入" label_selected="土地の購入" name="button buy land" />
     <button label="土地の放棄" label_selected="土地の放棄" name="button abandon land" />
   </panel>

@@ -5,9 +5,9 @@
   <layout_stack name="main_ls">
     <layout_panel name="top_lp">
 
-      <text name="ambient_color_label">アンビエントカラー：</text>
+      <text name="ambient_color_label">周辺カラー：</text>
       <color_swatch name="ambient_light" />
-      <text name="blue_horizon_label">青のホライズン：</text>
+      <text name="blue_horizon_label">青の地平線：</text>
       <color_swatch name="blue_horizon" />
       <text name="blue_density_label">青の濃度：</text>
       <color_swatch name="blue_density" />
@@ -29,11 +29,11 @@
         <layout_panel name="right_lp">
           <text name="density_multiplier_label">密度乗数：</text>
           <slider name="density_multip" />
-          <text width="200">距離乗数：</text>
+          <text name="distance_multiplier_label">距離乗数：</text>
           <slider name="distance_multip" />
           <text name="maximum_altitude_label">最大高度：</text>
           <slider name="max_alt" />
-          <text name="probe_ambiance_label" tooltip="放射照度制御。ゼロ以外の場合、ＨＤＲライティングモデルが有効になります。">環境反射プローブ（ＨＤＲ）：</text>
+          <text tooltip="放射照度制御。ゼロ以外の場合、ＨＤＲライティングモデルが有効になります。">環境反射プローブ（ＨＤＲ）：</text>
           <slider name="probe_ambiance" />
           <text name="scene_gamma_label">ブライトネス：</text>
           <slider name="scene_gamma" />
