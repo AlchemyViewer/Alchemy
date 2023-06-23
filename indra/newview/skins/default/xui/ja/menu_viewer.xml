@@ -217,6 +217,7 @@
       <menu_item_call label="購入" name="Menu Object Buy" />
       <menu_item_call label="取得" name="Menu Object Take" />
       <menu_item_call label="コピーを取得" name="Take Copy" />
+      <menu_item_call label="パーティクルの編集" name="Menu Object Edit Particles"/>
       <menu_item_call label="オブジェクトの中身に保存" name="Save Object Back to Object Contents" />
       <menu_item_call label="オブジェクトを返却" name="Return Object back to Owner" />
       <menu_item_call label="複製" name="DuplicateObject" />
@@ -278,6 +279,7 @@
       <menu_item_call label="サウンド（L$ [COST]）…" name="Upload Sound" />
       <menu_item_call label="アニメーション（L$ [COST]）…" name="Upload Animation" />
       <menu_item_call label="モデル…" name="Upload Model" />
+      <menu_item_call label="マテリアル…" name="Upload Material" />
       <menu_item_call label="一括…" name="Bulk Upload" />
     </menu>
     <menu_item_separator />
@@ -524,7 +526,8 @@
       <menu_item_check label="ＬＯＤ情報" name="LOD Info" />
       <menu_item_check label="三角形の数" name="Triangle Count" />
       <menu_item_check label="制作・キュー" name="Build Queue" />
-      <menu_item_check label="光" name="Lights" />
+      <menu_item_check label="光源" name="Lights" />
+      <menu_item_check label="反射プローブ" name="Reflection Probes"/>
       <menu_item_check label="パーティクル" name="Particles" />
       <menu_item_check label="骨組みの衝突判定" name="Collision Skeleton" />
       <menu_item_check label="ジョイント" name="Joints" />
@@ -624,6 +627,8 @@
     </menu>
     <menu label="ＵＩ" name="UI">
       <menu_item_call label="メディアブラウザ" name="Media Browser" />
+      <menu_item_call label="ＦＢ接続テスト" name="FB Connect Test" />
+      <menu_item_call label="SelectMgrをダンプ" name="Dump SelectMgr" />
       <menu_item_call label="インベントリの出力" name="Dump Inventory" />
       <menu_item_call label="タイマーをダンプ" name="Dump Timers" />
       <menu_item_call label="フォーカスホールダーをダンプ" name="Dump Focus Holder" />
