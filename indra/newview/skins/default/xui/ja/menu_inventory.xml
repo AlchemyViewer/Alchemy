@@ -23,6 +23,7 @@
   <menu_item_call label="新しいスクリプト" name="New Script" />
   <menu_item_call label="新しいノートカード" name="New Note" />
   <menu_item_call label="新しいジェスチャー" name="New Gesture" />
+  <menu_item_call label="新しいマテリアル" name="New Material"/>
   <menu label="新しい服装" name="New Clothes">
     <menu_item_call label="新しいシャツ" name="New Shirt" />
     <menu_item_call label="新しいズボン" name="New Pants" />
@@ -135,8 +136,8 @@
   <menu_item_call label="自分にのみ適用" name="Settings Apply Local" />
   <menu_item_call label="区画に適用" name="Settings Apply Parcel" />
   <menu_item_separator name="Subfolder Separator" />
-  <menu_item_call label="Create folder from selected" name="New folder from selected"/>
-  <menu_item_call label="Ungroup folder items" name="Ungroup folder items"/>
+  <menu_item_call label="選択項目からフォルダを作成" name="New folder from selected"/>
+  <menu_item_call label="フォルダ項目のグループを解除" name="Ungroup folder items"/>
   <menu_item_separator name="Marketplace Separator" />
   <menu_item_call label="マーケットプレイスのリストにコピー" name="Marketplace Copy" />
   <menu_item_call label="マーケットプレイスのリストに移動" name="Marketplace Move" />

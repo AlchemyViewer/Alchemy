@@ -16,7 +16,7 @@
   <icon name="rating_icon_moderate" />
   <check_box label="" name="adult_all" />
   <icon name="rating_icon_adult" />
-  <search_editor label="Search" name="search_bar" />
+  <search_editor label="検索" name="search_bar" />
   <combo_box name="events_category">
     <combo_box.item label="すべてのカテゴリ" name="any" value="0" />
     <combo_box.item label="" value="filter_separator" enabled="false" />

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="環境" name="panel_region_environment_tab">
+<panel label="環境" name="panel_env_info">
   <string name="str_label_use_default">既定の設定を使用</string>
   <string name="str_label_use_region">リージョン（地域）の設定を使用</string>
-  <string name="str_altitude_desription">空 [INDEX]（[ALTITUDE]ｍ）</string>
+  <string name="str_altitude_desription">空[INDEX]（[ALTITUDE]ｍ）</string>
   <string name="str_no_parcel">区画が選択されていません。環境の設定は無効になっています。</string>
   <string name="str_cross_region">リージョン（地域）の境界では環境の設定ができません。</string>
   <string name="str_legacy">このリージョン（地域）で環境の設定ができません。</string>
@@ -11,6 +11,7 @@
   <string name="str_empty">（空）</string>
   <string name="str_region_env">（リージョンの環境）</string>
 
+  <!-- TODO: 翻訳が反映できない -->
   <layout_stack>
     <layout_panel name="pnl_environment_region_msg">
       <text name="region_text_lbl">リージョン（地域）：</text>
@@ -30,24 +31,24 @@
               <check_box label="区画所有者による環境を上書きを許可" name="chk_allow_override" />
             </layout_panel>
             <layout_panel name="pnl_environment_length">
-              <text name="lbl_apparent_time">[AP]　[HH]：[MM]（[PRC]％）</text>
+              <text name="lbl_apparent_time">[AP] [HH]：[MM]（[PRC]％）</text>
             </layout_panel>
             <layout_panel name="pnl_environment_buttons" />
           </layout_stack>
         </layout_panel>
         <layout_panel name="pnl_environment_altitudes">
           <panel name="pnl_alt1">
-            <text name="txt_alt1">空[INDEX]　[ALTITUDE]ｍ</text>
+            <text name="txt_alt1">空[INDEX] [ALTITUDE]ｍ</text>
             <line_editor name="edt_invname_alt1">不明</line_editor>
             <settings_drop_target name="sdt_alt1" tool_tip="インベントリからターゲットボックスに設定をドラッグし、現在の空として選択します。" />
           </panel>
           <panel name="pnl_alt2">
-            <text name="txt_alt2">空[INDEX]　[ALTITUDE]ｍ</text>
+            <text name="txt_alt2">空[INDEX] [ALTITUDE]ｍ</text>
             <line_editor name="edt_invname_alt2">不明</line_editor>
             <settings_drop_target name="sdt_alt2" tool_tip="インベントリからターゲットボックスに設定をドラッグし、現在の空として選択します。" />
           </panel>
           <panel name="pnl_alt3">
-            <text name="txt_alt3">空[INDEX]　[ALTITUDE]ｍ</text>
+            <text name="txt_alt3">空[INDEX] [ALTITUDE]ｍ</text>
             <line_editor name="edt_invname_alt3">不明</line_editor>
             <settings_drop_target name="sdt_alt3" tool_tip="インベントリからターゲットボックスに設定をドラッグし、現在の空として選択します。" />
           </panel>

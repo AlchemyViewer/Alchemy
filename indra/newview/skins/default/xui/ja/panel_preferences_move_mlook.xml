@@ -6,7 +6,7 @@
   <check_box label="マウスステアリングを無効化" name="disable_mouse_steering" tool_tip="アバターをクリックしたときに、カメラとアバターの位置がカメラから離れるようにリセットされるのを抑制します。" />
   <text name=" Mouse Sensitivity">マウスルック時の敏感度：</text>
   <slider name="mouse_sensitivity" />
-  <check_box name="invert_mouse" />
+  <check_box label="反転" name="invert_mouse" />
   <text name="Combat Features">戦闘時の機能：</text>
   <check_box label="照準にユーザーを表示する" name="alchemy_mlook_iff" tool_tip="マウスルック時の照準にユーザーの名前と距離を表示します。" />
   <check_box label="画面外のユーザーに矢印を表示" name="alchemy_mlook_iff_markers" tool_tip="画面外のユーザーのいる方角の画面端に矢印を表示します。" />

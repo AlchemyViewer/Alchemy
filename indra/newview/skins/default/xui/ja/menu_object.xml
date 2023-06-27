@@ -5,21 +5,21 @@
   <menu_item_call label="ＰＢＲマテリアルを編集" name="EditGLTFMaterial" />
   <menu_item_call label="制作" name="Build" />
   <context_menu label="ツール" name="Tools">
-    <menu_item_call label="テスクチャをリフレッシュ" name="RefreshTextures"/>
-    <menu_item_call label="パーティクルを編集" name="Menu Object Edit Particles"/>
-    <menu_item_call label="リージョンオブジェクトを表示" name="show_in_linksets"/>
-    <menu_item_call label="文字で表示" name="show_in_characters"/>
-    <menu_item_separator  />
-    <menu_item_call label="スクリプトの再コンパイル（Ｍｏｎｏ）" name="Mono"/>
-    <menu_item_call label="スクリプトの再コンパイル（ＬＳＬ）" name="LSL"/>
-    <menu_item_call label="スクリプトをリセット" name="Reset Scripts"/>
-    <menu_item_call label="スクリプトを実行状態にする" name="Set Scripts to Running"/>
-    <menu_item_call label="スクリプトを非実行状態にする" name="Set Scripts to Not Running"/>
-    <menu_item_call label="スクリプトの削除" name="Delete Scripts"/>
+    <menu_item_call label="テスクチャをリフレッシュ" name="RefreshTextures" />
+    <menu_item_call label="パーティクルを編集" name="Menu Object Edit Particles" />
+    <menu_item_call label="リージョンオブジェクトを表示" name="show_in_linksets" />
+    <menu_item_call label="文字で表示" name="show_in_characters" />
     <menu_item_separator />
-    <menu_item_call label="爆発" name="Explode"/>
-    <menu_item_call label="破壊" name="Destroy"/>
-    <menu_item_call label="強制的に削除" name="Force Delete"/>
+    <menu_item_call label="スクリプトの再コンパイル（Ｍｏｎｏ）" name="Mono" />
+    <menu_item_call label="スクリプトの再コンパイル（ＬＳＬ）" name="LSL" />
+    <menu_item_call label="スクリプトをリセット" name="Reset Scripts" />
+    <menu_item_call label="スクリプトを実行状態にする" name="Set Scripts to Running" />
+    <menu_item_call label="スクリプトを非実行状態にする" name="Set Scripts to Not Running" />
+    <menu_item_call label="スクリプトの削除" name="Delete Scripts" />
+    <menu_item_separator />
+    <menu_item_call label="爆発" name="Explode" />
+    <menu_item_call label="破壊" name="Destroy" />
+    <menu_item_call label="強制的に削除" name="Force Delete" />
   </context_menu>
   <menu_item_call label="開く" name="Open" />
   <menu_item_call label="ここに座る" name="Object Sit" />
@@ -52,4 +52,5 @@
   <menu_item_call label="パーティクル所有者をブロック" name="Mute Particle" />
   <menu_item_call label="ＸＭＬとしてダンプ" name="Dump XML" />
   <menu_item_call label="スケルトンをリセット" name="Reset Skeleton" />
+  <menu_item_call label="ＩＤをコピー" name="Copy ID" />
 </context_menu>
