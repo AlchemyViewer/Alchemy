@@ -933,6 +933,7 @@ public:
 	virtual BOOL 		detachObject(LLViewerObject *viewer_object);
 	static bool		    getRiggedMeshID( LLViewerObject* pVO, LLUUID& mesh_id );
 	void				cleanupAttachedMesh( LLViewerObject* pVO );
+    bool                hasPendingAttachedMeshes();
 	static LLVOAvatar*  findAvatarFromAttachment(LLViewerObject* obj);
 	/*virtual*/ BOOL	isWearingWearableType(LLWearableType::EType type ) const override;
 	LLViewerObject *	findAttachmentByID( const LLUUID & target_id ) const;

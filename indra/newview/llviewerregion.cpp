@@ -751,6 +751,7 @@ static LLTrace::BlockTimerStatHandle FTM_SAVE_REGION_CACHE("Save Region Cache");
 
 LLViewerRegion::~LLViewerRegion() 
 {
+    LL_PROFILE_ZONE_SCOPED;
 	mDead = TRUE;
 	mImpl->mActiveSet.clear();
 	mImpl->mVisibleEntries.clear();
@@ -1638,6 +1639,7 @@ void LLViewerRegion::lightIdleUpdate()
 
 void LLViewerRegion::idleUpdate(F32 max_update_time)
 {	
+    LL_PROFILE_ZONE_SCOPED;
 	LLTimer update_timer;
 	F32 max_time;
 
@@ -1741,6 +1743,10 @@ BOOL LLViewerRegion::isViewerCameraStatic()
 
 void LLViewerRegion::killInvisibleObjects(F32 max_time)
 {
+#if 1 // TODO: kill this.  This is ill-conceived, objects that aren't in the camera frustum should not be deleted from memory.
+        // because of this, every time you turn around the simulator sends a swarm of full object update messages from cache
+    // probe misses and objects have to be reloaded from scratch.  From some reason, disabling this causes holes to 
+    // appear in the scene when flying back and forth between regions
 	if(!sVOCacheCullingEnabled)
 	{
 		return;
@@ -1817,6 +1823,7 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
 	}
 
 	return;
+#endif
 }
 
 void LLViewerRegion::killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>& delete_list)

@@ -334,6 +334,7 @@ public:
 	BOOL setIsFlexible(BOOL is_flexible);
 
     const LLMeshSkinInfo* getSkinInfo() const;
+    const bool isSkinInfoUnavaliable() const { return mSkinInfoUnavaliable; }
 
     //convenience accessor for mesh ID (which is stored in sculpt id for legacy reasons)
     const LLUUID& getMeshID() const { return getVolume()->getParams().getSculptID(); }
@@ -483,10 +484,9 @@ private:
 	bool mResetDebugText;
 
 	LLPointer<LLRiggedVolume> mRiggedVolume;
+
+	bool mSkinInfoUnavaliable;
 	LLConstPointer<LLMeshSkinInfo> mSkinInfo;
-	bool mHasRequestedMeshData = false;
-	bool mHasRequestedSkinData = false;
-	
 	// statics
 public:
 	static F32 sLODSlopDistanceFactor;// Changing this to zero, effectively disables the LOD transition slop
