@@ -566,7 +566,7 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
         mLightScale = max_local_light_ambiance / probe->getAmbiance();
     }
 
-    if (probe == mDefaultProbe)
+    if (probe == mDefaultProbe.get())
     {
         touch_default_probe(probe);
 
