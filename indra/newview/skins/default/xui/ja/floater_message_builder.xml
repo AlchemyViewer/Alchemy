@@ -4,11 +4,8 @@
     <scroll_list.columns name="text" label="テキスト" />
     <scroll_list.columns name="state" label="ステート" />
   </scroll_list>
-  <combo_box name="untrusted_message_combo" tool_tip="信頼しない">
-  </combo_box>
-  <combo_box name="trusted_message_combo" tool_tip="信頼する">
-  </combo_box>
-  <text_editor name="message_edit">
-  </text_editor>
+  <combo_box name="untrusted_message_combo" tool_tip="信頼しない" />
+  <combo_box name="trusted_message_combo" tool_tip="信頼する" />
+  <text_editor name="message_edit" />
   <button name="send_btn" label="送信" tool_tip="送信（Ctrl＋Enter）" />
 </floater>

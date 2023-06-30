@@ -2857,7 +2857,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
   
 [_URL]
     <tag>confirm</tag>
-    <url name="url" option="0">https://secondlife.com/account/index.php?lang=ja</url>
+    <url name="url" option="0">https://secondlife.com/my/account/index.php?lang=ja-JP</url>
     <usetemplate ignoretext="支払情報が登録されていません" name="okcancelignore" notext="いいえ" yestext="はい" />
   </notification>
 
@@ -4982,7 +4982,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="LandHasBeenDivided">土地が分割されています。
+  <notification name="LandHasBeenDivided">土地を分割しました。
     <tag>fail</tag>
   </notification>
 
@@ -5281,8 +5281,8 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>confirm</tag>
     <form name="form">
       <input name="token" />
-      <button name="continue" text="確認"/>
-      <button name="cancel" text="キャンセル"/>
+      <button name="continue" text="確認" />
+      <button name="cancel" text="キャンセル" />
     </form>
   </notification>
 
@@ -5291,14 +5291,14 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>confirm</tag>
     <form name="form">
       <input name="message">[DESC]</input>
-      <button name="ＯＫ" text="ＯＫ"/>
-      <button name="Cancel" text="キャンセル"/>
+      <button name="ＯＫ" text="ＯＫ" />
+      <button name="Cancel" text="キャンセル" />
     </form>
   </notification>
 
   <notification name="SameFolderRequired">選択したアイテムは、同じフォルダー内に存在する必要があります。
     <tag>fail</tag>
-    <usetemplate name="okbutton" yestext="ＯＫ"/>
+    <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
   <notification name="RiggedMeshAttachedToHUD">ＨＵＤポイント「[POINT]」にアタッチされたオブジェクト「[NAME]」にはリグメッシュが含まれています。
@@ -5307,14 +5307,26 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
 他の人にこのオブジェクトを見てもらいたい場合は、オブジェクトを削除して、アバターのアタッチメントポイントに再度アタッチします。
     <tag>confirm</tag>
-    <usetemplate ignoretext="リグメッシュがＨＵＤポイントにアタッチされている場合に警告します。" name="okignore" yestext="ＯＫ"/>
+    <usetemplate ignoretext="リグメッシュがＨＵＤポイントにアタッチされている場合に警告します。" name="okignore" yestext="ＯＫ" />
   </notification>
 
   <notification name="EnableAutoFPSWarning">自動ＦＰＳを有効にしようとしています。保存されていないグラフィック設定はすべて失われます。
 
 まずそれらを保存しますか？
     <tag>confirm</tag>
-    <usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい"/>
+    <usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい" />
+  </notification>
+
+  <notification name="MaterialCreated">マテリアルは正常に作成されました。アセットＩＤ：[ASSET_ID]</notification>
+
+  <notification name="ReflectionProbeApplied">警告：オブジェクトを反射プローブとしました。これにより、オブジェクトが暗黙的に反射量を模倣するように不可逆的な変更が加えられます。
+
+続けてもよろしいですか？
+    <usetemplate ignoretext="反射プローブのヒント" name="okcancelignore" notext="キャンセル" yestext="ＯＫ" />
+  </notification>
+
+  <notification name="AutoAdjustHDRSky">編集中の非ＨＤＲの空の設定は自動的にＨＤＲの設定に変換されます。ＨＤＲとトーンマッピングを削除する場合は、反射プローブ環境値を０にしてください。
+    <usetemplate ignoretext="ＨＤＲの空の調整時の警告" name="okignore" yestext="OK" />
   </notification>
 
   <!-- ALCHEMY BELOW THIS LINE -->
@@ -5408,8 +5420,8 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>confirm</tag>
     <form name="form">
       <input name="label" type="text">[LABEL]</input>
-      <button default="true" index="0" name="OK" text="ＯＫ"/>
-      <button index="1" name="Cancel" text="キャンセル"/>
+      <button default="true" index="0" name="OK" text="ＯＫ" />
+      <button index="1" name="Cancel" text="キャンセル" />
     </form>
   </notification>
 
@@ -5431,8 +5443,8 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 （名前には、「:」または「|」を除く任意のASCII文字を含めることができます。）
     <form name="form">
       <input name="message" type="text" default="true">新しいＡＯセット</input>
-      <button default="true" index="0" name="OK" text="ＯＫ"/>
-      <button index="1" name="Cancel" text="キャンセル"/>
+      <button default="true" index="0" name="OK" text="ＯＫ" />
+      <button index="1" name="Cancel" text="キャンセル" />
     </form>
   </notification>
 
@@ -5450,7 +5462,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
   <notification name="RemoveAOSet">
 リストからＡＯセット「[AO_SET_NAME]」を削除してもよろしいですか？
-    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="削除"/>
+    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="削除" />
   </notification>
 
   <notification name="AOForeignItemsFound">
@@ -5559,7 +5571,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
 このまま続けてもよろしいですか？
     <tag>confirm</tag>
-    <usetemplate ignoretext="非セキュアなログイン接続を試みようとした" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+    <usetemplate ignoretext="非セキュアなログイン接続を試みようとした" name="okcancelignore" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
   <notification name="ShapeImportGenericFail">
@@ -5587,7 +5599,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 元に戻すには、[SHORTCUT]を押します。
     <unique/>
     <tag>confirm</tag>
-    <usetemplate name="okcancelignore" yestext="ＯＫ" notext="キャンセル" ignoretext="シネマティックモードを有効にする前の確認"/>
+    <usetemplate name="okcancelignore" yestext="ＯＫ" notext="キャンセル" ignoretext="シネマティックモードを有効にする前の確認" />
   </notification>
 
   <notification name="AlchemyUnpoweredWizard">
@@ -5609,7 +5621,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 今回：[THIS_GPU]
 
 グラフィック設定をリセットしますか?
-    <usetemplate name="yesnocancelbuttons" yestext="リセットする" notext="このままにする" canceltext="リセットしない"/>
+    <usetemplate name="yesnocancelbuttons" yestext="リセットする" notext="このままにする" canceltext="リセットしない" />
   </notification>
 
   <notification name="UpdateDownloadRequest">
@@ -5618,7 +5630,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
 [VIEWER_UPDATES]
     <tag>confirm</tag>
-    <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ"/>
+    <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ" />
   </notification>
 
   <notification name="UpdateDownloaded">
@@ -5627,7 +5639,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
 [VIEWER_UPDATES]
     <tag>confirm</tag>
-    <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ"/>
+    <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ" />
   </notification>
 
   <notification name="UpdateInstalledRestart">
@@ -5636,7 +5648,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
 再起動しますか？
     <tag>confirm</tag>
-    <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ"/>
+    <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ" />
   </notification>
   <notification name="UpdateInstalledRestartToast">
 ビューアは以下のバージョンに更新されました：
@@ -5644,6 +5656,6 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
 再起動しますか？
     <tag>confirm</tag>
-    <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ"/>
+    <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ" />
   </notification>
 </notifications>

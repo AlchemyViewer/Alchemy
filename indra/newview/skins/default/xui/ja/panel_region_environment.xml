@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="環境" name="panel_env_info">
+<panel label="自然環境の設定" name="panel_env_info">
   <string name="str_label_use_default">既定の設定を使用</string>
   <string name="str_label_use_region">リージョン（地域）の設定を使用</string>
   <string name="str_altitude_desription">空[INDEX]（[ALTITUDE]ｍ）</string>
@@ -38,17 +38,17 @@
         </layout_panel>
         <layout_panel name="pnl_environment_altitudes">
           <panel name="pnl_alt1">
-            <text name="txt_alt1">空[INDEX] [ALTITUDE]ｍ</text>
+            <text name="txt_alt1">空[INDEX]　[ALTITUDE]ｍ</text>
             <line_editor name="edt_invname_alt1">不明</line_editor>
             <settings_drop_target name="sdt_alt1" tool_tip="インベントリからターゲットボックスに設定をドラッグし、現在の空として選択します。" />
           </panel>
           <panel name="pnl_alt2">
-            <text name="txt_alt2">空[INDEX] [ALTITUDE]ｍ</text>
+            <text name="txt_alt2">空[INDEX]　[ALTITUDE]ｍ</text>
             <line_editor name="edt_invname_alt2">不明</line_editor>
             <settings_drop_target name="sdt_alt2" tool_tip="インベントリからターゲットボックスに設定をドラッグし、現在の空として選択します。" />
           </panel>
           <panel name="pnl_alt3">
-            <text name="txt_alt3">空[INDEX] [ALTITUDE]ｍ</text>
+            <text name="txt_alt3">空[INDEX]　[ALTITUDE]ｍ</text>
             <line_editor name="edt_invname_alt3">不明</line_editor>
             <settings_drop_target name="sdt_alt3" tool_tip="インベントリからターゲットボックスに設定をドラッグし、現在の空として選択します。" />
           </panel>
@@ -58,7 +58,7 @@
             <slider name="sld3" value="3000" />
           </multi_slider>
           <panel name="pnl_ground">
-            <text name="txt_ground">地面</text>
+            <text name="txt_ground">地表</text>
             <line_editor name="edt_invname_ground">不明</line_editor>
             <settings_drop_target name="sdt_ground" tool_tip="インベントリからターゲットボックスに設定をドラッグし、地面レベルの空として選択します。" />
           </panel>

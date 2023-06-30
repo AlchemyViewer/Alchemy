@@ -84,7 +84,7 @@
     <combo_box.item label="中" name="Medium" value="Medium" />
     <combo_box.item label="高い" name="High" value="High" />
   </combo_box>
-  <text name="label environment">環境</text>
+  <text name="label environment">自然環境</text>
   <spinner name="environment" />
   <text name="label shinycolor">色</text>
   <!-- label is blank because control places it below the box -->

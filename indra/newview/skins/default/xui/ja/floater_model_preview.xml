@@ -58,7 +58,7 @@
       <last_tab tab_top_image_flash="TabTop_Right_Flashing"/>
       <!-- for log tab -->
       <!-- LOD PANEL -->
-      <panel label="ＬｏＤ" name="lod_panel" title="ＬｏＤ">
+      <panel label="ＬｏＤ" name="lod_panel" title="詳細度">
         <view_border name="lod_tab_border" />
         <text name="source" value="ソース" />
         <text name="triangles" value="三角形の数" />

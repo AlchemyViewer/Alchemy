@@ -103,16 +103,14 @@
 
   <check_box label="大気（周囲）シェーダー" name="WindLightUseAtmosShaders" />
 
-  <slider label="空：" name="SkyMeshDetail"/>
+  <slider label="空：" name="SkyMeshDetail" />
   <text name="SkyMeshDetailText">低</text>
 
   <check_box label="高度な光源モデル" name="UseLightShaders" />
 
   <check_box label="アンビエントオクルージョン" name="UseSSAO" />
 
-  <check_box label="レガシーな空の設定を自動調整" name="AutoAdjustLegacySky" />
-
-  <check_box label="被写界深度（DoF）" name="UseDoF" />
+  <check_box label="被写界深度（ＤｏＦ）" name="UseDoF" />
 
   <!--
   <check_box control_name="RenderUseAdvancedAtmospherics" label="Advanced Atmospherics" name="UseAdvancedAtmo" top_delta="16" width="240">
@@ -132,18 +130,18 @@
   <text name="ReflectionDetailText">反射の詳細：</text>
 
   <combo_box name="ReflectionDetail">
-    <combo_box.item label="静的のみ" name="0" value="0"/>
-    <combo_box.item label="静的＋動的" name="1" value="1"/>
-    <combo_box.item label="リアルタイム" name="2" value="2"/>
+    <combo_box.item label="静的のみ" name="0" value="0" />
+    <combo_box.item label="静的＋動的" name="1" value="1" />
+    <combo_box.item label="リアルタイム" name="2" value="2" />
   </combo_box>
 
-  <text name="ReflectionProbeText">反射範囲：  </text>
+  <text name="ReflectionProbeText">反射範囲：</text>
 
   <combo_box name="ReflectionLevel">
-    <combo_box.item label="なし" name="0" value="0"/>
-    <combo_box.item label="マニュアルのみ" name="1" value="1"/>
-    <combo_box.item label="マニュアル＋地形" name="2" value="2"/>
-    <combo_box.item label="全てのシーン" name="3" value="3"/>
+    <combo_box.item label="なし" name="0" value="0" />
+    <combo_box.item label="マニュアルのみ" name="1" value="1" />
+    <combo_box.item label="マニュアル＋地形" name="2" value="2" />
+    <combo_box.item label="全てのシーン" name="3" value="3" />
   </combo_box>
 
   <slider label="露光：" name="RenderExposure" />
@@ -156,9 +154,8 @@
 
   <button label="キャンセル" label_selected="キャンセル" name="Cancel" />
 
-  <!-- These two check boxes are dummies and will never be displayed.  They are here so the control
-  variables
-are saved in a preset file. -->
+  <!-- These two check boxes are dummies and will never be displayed.
+  They are here so the control variables are saved in a preset file. -->
   <check_box label="RenderAvatarMaxComplexity" name="RenderAvatarMaxComplexity" />
 
   <check_box label="RenderAvatarMaxNonImpostors" name="RenderAvatarMaxNonImpostors" />

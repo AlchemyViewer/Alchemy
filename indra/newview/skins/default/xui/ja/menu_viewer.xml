@@ -87,7 +87,7 @@
     <menu_item_check label="会話…" name="Conversations" />
     <menu_item_check label="近隣のチャット…" name="Nearby Chat" />
     <menu_item_check label="ボイスチャット" name="Speak" />
-    <menu_item_check name="Conversation Log..." label="会話ログ…" />
+    <menu_item_check label="会話ログ…" name="Conversation Log..." />
     <menu_item_check label="チャットのアラート…" name="Chat Alerts" />
     <menu_item_check label="ジェスチャー…" name="Gestures" />
 
@@ -106,7 +106,7 @@
     <menu_item_check label="近くの人物" name="Active Speakers" />
     <menu_item_check label="ブロックリスト" name="Block List" />
     <menu_item_separator />
-    <menu_item_check name="Do Not Disturb" label="着信拒否" />
+    <menu_item_check label="着信拒否" name="Do Not Disturb" />
   </menu>
   <menu label="ワールド" name="World">
     <menu_item_call label="アニメーションを再同期" name="Resync Animations" />
@@ -117,7 +117,7 @@
     <menu_item_check label="ワールドマップ" name="World Map" />
     <menu_item_check label="ミニマップ" name="Mini-Map" />
     <menu_item_call label="イベント" name="Events" />
-    <menu_item_check label="リージョン（地域）トラッカー…" name="Region Tracker" />
+    <menu_item_check label="リージョントラッカー…" name="Region Tracker" />
     <menu_item_check label="検索…" name="Search" />
     <menu_item_separator />
     <menu_item_call label="ホームにテレポート" name="Teleport Home" />
@@ -155,7 +155,7 @@
     <menu_item_separator/>
     -->
 
-    <menu label="環境" name="Environment">
+    <menu label="自然環境" name="Environment">
       <menu_item_check label="夜明け" name="Sunrise" />
       <menu_item_check label="正午" name="Noon" />
       <menu_item_check label="正午（レガシー）" name="legacy noon" />
@@ -171,17 +171,17 @@
     </menu>
 
     <!--
-    <menu create_jump_keys="true" label="環境編集" name="Environment Editor" tear_off="true">
-      <menu_item_call label="初期設定…" name="Environment Settings"/>
+    <menu create_jump_keys="true" label="自然環境の編集" name="Environment Editor" tear_off="true">
+      <menu_item_call label="初期設定…" name="Environment Settings" />
       <menu_item_separator/>
       <menu name="Water Presets" label="水のプリセット"/>
       <menu name="Sky Presets" label="空のプリセット">
-        <menu_item_call label="新規プリセット…" name="new_sky_preset"/>
-        <menu_item_call label="プリセット編集…" name="edit_sky_preset"/>
+        <menu_item_call label="新規プリセット…" name="new_sky_preset" />
+        <menu_item_call label="プリセット編集…" name="edit_sky_preset" />
       </menu>
       <menu name="Day Presets" label="一日のプリセット">
-        <menu_item_call label="新規プリセット…" name="new_day_preset"/>
-        <menu_item_call label="プリセット編集…" name="edit_day_preset"/>
+        <menu_item_call label="新規プリセット…" name="new_day_preset" />
+        <menu_item_call label="プリセット編集…" name="edit_day_preset" />
       </menu>
     </menu>
     -->
@@ -205,7 +205,7 @@
       <menu_item_call label="次のパーツまたは面を含める" name="Include Next Part or Face" />
       <menu_item_call label="前のパーツまたは面を含める" name="Include Previous Part or Face" />
     </menu>
-    <menu_item_call label="リージョン（地域）オブジェクト" name="pathfinding_linkset_menu_item" />
+    <menu_item_call label="リージョンのオブジェクト" name="pathfinding_linkset_menu_item" />
     <menu_item_separator />
 
     <menu_item_call label="選択をフォーカス" name="Focus on Selection" />
@@ -300,8 +300,8 @@
     <menu_item_call label="[SECOND_LIFE]ブログ" name="Second Life Blogs" />
     <menu_item_separator />
 
-    <menu_item_call label="嫌がらせを報告する" name="Report Abuse" />
-    <menu_item_call label="バグを報告する" name="Report Bug" />
+    <menu_item_call label="嫌がらせの報告" name="Report Abuse" />
+    <menu_item_call label="バグの報告" name="Report Bug" />
 
     <menu_item_separator />
     <menu_item_call label="衝突・プッシュ＆打撃" name="Bumps, Pushes &amp;amp; Hits" />
@@ -327,7 +327,7 @@
       </menu_item_check>
     </menu>
     <menu_item_separator />
-    <menu_item_check label="ＯＯＣチャットを許可" name="Allow OOC Chat" />
+    <menu_item_check label="ＯＯＣ（その人らしくない）チャットの許可" name="Allow OOC Chat" />
     <menu_item_check label="フィルタリングされたチャットを表示" name="Show Filtered Chat" />
     <menu_item_check label="リダイレクトされたチャット入力を表示" name="Show Redirected Chat Typing" />
     <menu_item_check label="リダイレクトされた長文チャット分割" name="Split Long Redirected Chat" />
@@ -375,12 +375,10 @@
       <menu_item_check label="マウスルックのときに十字線を表示" name="ShowCrosshairs" />
       <!-- 
       <menu create_jump_keys="true" label="ホバーでTips表示" name="Hover Tips" tear_off="true">
-        <menu_item_check label="Tips表示" name="Show Tips" shortcut="control|shift|T"/>
-
+        <menu_item_check label="Tips表示" name="Show Tips" shortcut="control|shift|T" />
         <menu_item_separator />
-
-        <menu_item_check label="土地のツールチップを表示" name="Land Tips"/>
-        <menu_item_check label="すべてのオブジェクトのツールチップを表示" name="Tips On All Objects"/>
+        <menu_item_check label="土地のツールチップを表示" name="Land Tips" />
+        <menu_item_check label="すべてのオブジェクトのツールチップを表示" name="Tips On All Objects" />
       </menu>
       -->
     </menu>
@@ -469,7 +467,7 @@
 
       <menu_item_check label="カメラ" name="Camera" />
       <menu_item_check label="風" name="Wind" />
-      <menu_item_check label="ＦＯＶ" name="FOV" />
+      <menu_item_check label="視野角（ＦｏＶ）" name="FOV" />
       <menu_item_check label="バッジ" name="Badge" />
     </menu>
     <menu label="情報を表示" name="Display Info">
@@ -523,7 +521,7 @@
       <menu_item_check label="テクスチャ優先度" name="Texture Priority" />
       <menu_item_check label="テクスチャの範囲" name="Texture Area" />
       <menu_item_check label="側面" name="Face Area" />
-      <menu_item_check label="ＬＯＤ情報" name="LOD Info" />
+      <menu_item_check label="被写体深度（ＬｏＤ）情報" name="LOD Info" />
       <menu_item_check label="三角形の数" name="Triangle Count" />
       <menu_item_check label="制作・キュー" name="Build Queue" />
       <menu_item_check label="光源" name="Lights" />
@@ -677,7 +675,7 @@
       <menu_item_check label="見ているものを表示する" name="Show Look At" />
       <menu_item_check label="クリックした場所を表示する" name="Show Point At" />
       <menu_item_check label="結合部のアップデートのデバッグ" name="Debug Joint Updates" />
-      <menu_item_check label="ＬＯＤを無効にする" name="Disable LOD" />
+      <menu_item_check label="被写体深度（ＬｏＤ）を無効にする" name="Disable LOD" />
       <menu_item_check label="キャラクターVisのデバッグ" name="Debug Character Vis" />
       <menu_item_check label="スケルトンの衝突判定を表示する" name="Show Collision Skeleton" />
       <menu_item_check label="ボーンを表示" name="Show Bones" />

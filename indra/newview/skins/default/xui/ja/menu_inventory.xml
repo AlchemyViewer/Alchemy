@@ -45,7 +45,7 @@
     <menu_item_call label="新しい髪" name="New Hair" />
     <menu_item_call label="新しい眼" name="New Eyes" />
   </menu>
-  <menu label="新しい設定" name="New Settings">
+  <menu label="新しい自然環境の設定" name="New Settings">
     <menu_item_call label="新しい空" name="New Sky" />
     <menu_item_call label="新しい水面" name="New Water" />
     <menu_item_call label="新しいデイサイクル" name="New Day Cycle" />
@@ -94,7 +94,6 @@
   <menu_item_separator name="Paste Separator" />
   <menu_item_call label="削除" name="Delete" />
   <menu_item_call label="システムフォルダを削除" name="Delete System Folder" />
-  <menu_item_separator />
   <menu_item_separator />
   <menu_item_call label="会話チャットを開始" name="Conference Chat Folder" />
   <menu_item_separator />

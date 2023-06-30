@@ -23,8 +23,7 @@
         <scroll_list.columns name="net" label="ホスト" width="120" />
         <scroll_list.columns name="name" label="種類" />
       </scroll_list>
-      <text name="log_status_text">
-      </text>
+      <text name="log_status_text" />
     </layout_panel>
     <layout_panel name="net_info_panel">
       <!-- Only visible in IPANE_NET / IPANE_TEMPLATE_LOG modes -->

@@ -14,7 +14,7 @@
   <string name="water_label">水面</string>
 
   <string name="commit_parcel">区画に適用</string>
-  <string name="commit_region">リージョン（地域）に適用</string>
+  <string name="commit_region">リージョンに適用</string>
 
   <!-- Layout -->
   <layout_stack name="outer_stack">

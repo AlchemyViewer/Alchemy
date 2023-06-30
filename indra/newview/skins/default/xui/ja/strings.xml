@@ -18,16 +18,29 @@ that are returned from one component and may appear in many places
   <string name="GRID_ADMIN"/>
 
   <!-- starting up -->
-  <string name="StartupDetectingHardware">ハードウェアの検出中です…</string>
-  <string name="StartupLoading">[APP_NAME]をインストール中です…</string>
-  <string name="StartupClearingCache">キャッシュをクリア中です…</string>
-  <string name="StartupInitializingTextureCache">テクスチャキャッシュを初期化中です…</string>
+  <string name="StartupDetectingHardware">ハードウェアを検出しています…</string>
+  <string name="StartupLoading">[APP_NAME]をインストールしています…</string>
+  <string name="StartupClearingCache">キャッシュを消去しています…</string>
+  <string name="StartupInitializingTextureCache">テクスチャキャッシュを初期化しています…</string>
+  <string name="StartupInitializingTextureCache0">テクスチャキャッシュのフラッフィングしています…</string>
+  <string name="StartupInitializingTextureCache1">網目状のスプライン…</string>
+  <string name="StartupInitializingTextureCache2">テクスチャのベーキングに使用するオーブンの予熱をしています…</string>
+  <string name="StartupInitializingTextureCache3">スヌートを叩いてテスクチャの質感を出しています…</string>
+  <string name="StartupInitializingTextureCache4">魔法のカバを読み込んでいます…</string>
+  <string name="StartupInitializingTextureCache5">Nvidiaにスケープゴートを捧げています…</string>
+  <string name="StartupInitializingTextureCache6">プロジェクト・サンサール（笑）を準備しています…</string>
+  <string name="StartupInitializingTextureCache7">あなたを待たせる新しい方法を発見しています…</string>
+  <string name="StartupInitializingTextureCache8">オ（ン）で並び替えを試みています…</string>
+  <string name="StartupInitializingTextureCache9">気の利いた起動メッセージを生成しています…</string>
   <string name="StartupRequireDriverUpdate">グラフィックを初期化できませんでした。グラフィックドライバを更新してください。</string>
 
   <!-- about dialog/support string-->
-  <string name="AboutHeader">[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2].[VIEWER_VERSION_3]（[ADDRESS_SIZE]bit）
+  <string name="AboutHeader">[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2]（[ADDRESS_SIZE]bit）
 [[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]</string>
+  <string name="AboutCompiler">コンパイラのバージョン：[COMPILER] [COMPILER_VERSION]</string>
+  <string name="AboutVCSRev">Gitリビジョン：[GIT_REV]</string>
   <string name="BuildConfig">ビルド構成：[BUILD_CONFIG]</string>
+  <string name="BuildDate">ビルド日付：[BUILD_DATE] [BUILD_TIME]</string>
 
   <string name="AboutPosition">あなたは、現在[REGION]の[POSITION_LOCAL_0,number,1]，[POSITION_LOCAL_1,number,1]，[POSITION_LOCAL_2,number,1]にいます。
 位置は、&lt;nolink&gt;[HOSTNAME]&lt;/nolink&gt;です。（[HOSTIP]）
@@ -35,6 +48,11 @@ SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 （グローバル座標は、[POSITION_0,number,1]，[POSITION_1,number,1]，[POSITION_2,number,1]です。）
 [SERVER_VERSION]
 [SERVER_RELEASE_NOTES_URL]</string>
+  <string name="AboutPositionRLVShowLoc">
+あなたは、[REGION]にいます。
+[SERVER_VERSION]
+[SERVER_RELEASE_NOTES_URL]
+  </string>
   <!-- *NOTE: Do not translate text like GPU, Graphics Card, etc -
        Most PC users who know what these mean will be used to the English versions,
        and this info sometimes gets sent to support. -->
@@ -55,13 +73,15 @@ SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 高度な光源モデル：[GPU_SHADERS]
 テクスチャメモリ：[TEXTURE_MEMORY]㎆</string>
   <string name="AboutOSXHiDPI">高ＤＰＩ表示モード：[HIDPI]</string>
-  <string name="AboutLibs">J2Cデコーダバージョン：[J2C_VERSION]
-オーディオドライババージョン：[AUDIO_DRIVER_VERSION]
-LibCEFバージョン：[LIBCEF_VERSION]
-LibVLCバージョン：[LIBVLC_VERSION]
-ボイスサーバーバージョン：[VOICE_VERSION]</string>
+  <string name="AboutLibs">RestrainedLove API：[RLV_VERSION]
+libcurlのバージョン：[LIBCURL_VERSION]
+J2Cデコーダーのバージョン：[J2C_VERSION]
+オーディオドライバのバージョン：[AUDIO_DRIVER_VERSION]
+[CEF_VERSION]
+LibVLCのバージョン：[LIBVLC_VERSION]
+ボイスサーバーのバージョン：[VOICE_VERSION]</string>
   <string name="AboutTraffic">パケット損失：[PACKETS_LOST,number,0]／[PACKETS_IN,number,0]（[PACKETS_PCT,number,1]％）</string>
-  <string name="AboutTime">[year, datetime, slt]年[month, datetime, slt]月[day, datetime, slt]日　[hour, datetime, slt]：[min,datetime, slt]：[second,datetime,slt]</string>
+  <string name="AboutTime">[year, datetime, slt]年[month, datetime, slt][day, datetime, slt]日　[hour, datetime, slt]：[min,datetime, slt]：[second,datetime,slt]</string>
   <string name="ErrorFetchingServerReleaseNotesURL">サーバーのリリースノートのＵＲＬ取得時にエラーが発生しました。</string>
   <string name="BuildConfiguration">ビルド構成</string>
 
@@ -125,7 +145,7 @@ https://www.alchemyviewer.org/pages/downloads.html</string>
 ・パスワード
 ・２段階認証（使用している場合）
 また、Caps Lockが入っていないこともご確認ください。</string>
-  <string name="LoginFailedPasswordChanged">セキュリティ上の理由により、あなたのパスワードは変更されました。 アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP）へ移動し、
+  <string name="LoginFailedPasswordChanged">セキュリティ上の理由により、あなたのパスワードは変更されました。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP）へ移動し、
 秘密の質問に答えて、パスワードをリセットしてください。
 ご迷惑をおかけして申し訳ございません。</string>
   <string name="LoginFailedPasswordReset">弊社はシステムを若干変更しました。お手数ですが、パスワードのリセットをお願いします。アカウントページ（ https://secondlife.com/my/account/request.php?lang=ja-JP ）に移動し、
@@ -208,7 +228,7 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="TooltipOwner">所有者：</string>
   <string name="TooltipPublic">公共</string>
   <string name="TooltipIsGroup">（グループ）</string>
-  <string name="TooltipForSaleL$">売り出し中：L$[AMOUNT]</string>
+  <string name="TooltipForSaleL$">売り出し中：L$ [AMOUNT]</string>
   <string name="TooltipFlagGroupBuild">グループ作成</string>
   <string name="TooltipFlagNoBuild">作成禁止</string>
   <string name="TooltipFlagNoEdit">グループ作成</string>
@@ -370,7 +390,8 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="favorite">お気に入り</string>
   <string name="symbolic link">リンク</string>
   <string name="symbolic folder link">フォルダのリンク</string>
-  <string name="settings blob">設定</string>
+  <string name="settings blob">自然環境の設定</string>
+  <string name="render material">マテリアル</string>
   <string name="mesh">メッシュ</string>
 
   <!-- llvoavatar. Displayed in the avatar chat bubble -->
@@ -528,20 +549,24 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="animation_files">アニメーション</string>
   <string name="image_files">画像</string>
   <string name="save_file_verb">保存</string>
-  <string name="load_file_verb">ロード</string>
+  <string name="load_file_verb">読み込む</string>
   <string name="targa_image_files">Targa画像</string>
   <string name="bitmap_image_files">ビットマップ画像</string>
   <string name="png_image_files">PNG画像</string>
-  <string name="save_texture_image_files">TargaまたはPNG画像</string>
-  <string name="avi_movie_file">AVIムービーファイル</string>
+  <string name="webp_image_files">WebP画像</string>
+  <string name="save_texture_image_files">Targa、PNGまたはWebP画像</string>
+  <string name="avi_movie_file">AVIファイル</string>
   <string name="xaf_animation_file">XAFアニメーションファイル</string>
   <string name="xml_file">XMLファイル</string>
+  <string name="csv_files">カンマ区切りの値</string>
   <string name="raw_file">RAWファイル</string>
   <string name="compressed_image_files">圧縮画像</string>
-  <string name="load_files">ファイルのロード</string>
-  <string name="choose_the_directory">参照</string>
+  <string name="load_files">ファイルを読み込む</string>
+  <string name="choose_the_directory">ディレクトリを選択</string>
   <string name="script_files">スクリプト</string>
   <string name="dictionary_files">辞書</string>
+  <string name="gltf_files">GLTFファイル</string>
+  <string name="zip_files">Zipファイル</string>
 
   <!-- LSL Usage Hover Tips -->
   <!-- NOTE: For now these are set as translate="false", until DEV-40761 is implemented (to internationalize the rest of tooltips in the same window).
@@ -2413,11 +2438,11 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="InvFolder Meshes">メッシュ</string>
   <string name="InvFolder Received Items">受け取った商品</string>
   <string name="InvFolder Merchant Outbox">販売品ボックス</string>
-  <string name="InvFolder Settings">設定</string>
+  <string name="InvFolder Settings">自然環境の設定</string>
   <string name="InvFolder Material">マテリアル</string>
   <string name="InvFolder Materials">マテリアル</string>
   <string name="InvFolder Animation Overrides">アニメーションオーバーライド</string>
-  <string name="InvFolder Settings">設定</string>
+  <string name="InvFolder Settings">自然環境の設定</string>
   <string name="InvFolder Local Inventory">ローカルのインベントリ</string>
   <string name="InvFolder #RLV">#RLV</string>
   <string name="InvFolder #Firestorm">#Firestorm</string>
@@ -2745,9 +2770,9 @@ For AI Character: Get the closest navigable point to the point provided.
 
   <!-- Environment settings -->
   <string name="LocalSettings">ローカル設定</string>
-  <string name="RegionSettings">リージョン（地域）の設定</string>
+  <string name="RegionSettings">リージョンの設定</string>
 
-  <string name="NoEnvironmentSettings">このリージョンは環境設定をサポートしていません。</string>
+  <string name="NoEnvironmentSettings">このリージョンは自然環境の設定変更をサポートしていません。</string>
   <string name="EnvironmentSun">太陽</string>
   <string name="EnvironmentMoon">月</string>
   <string name="EnvironmentBloom">花</string>
@@ -2763,7 +2788,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="NoPicksClassifiedsText">ピックやクラシファイド広告を作成していません。作成するには、下にある「＋」ボタンをクリックします。</string>
   <string name="NoPicksText">ピックを作成していません。「新規」ボタンをクリックしてピックを作成する。</string>
   <string name="NoClassifiedsText">クラシファイド広告を作成していません。「新規」ボタンをクリックしてクラシファイド広告を作成する。</string>
-  <string name="NoAvatarPicksClassifiedsText">ピック、またはクラシファイド広告がありません</string>
+  <string name="NoAvatarPicksClassifiedsText">ピック、またはクラシファイド広告がありません。</string>
   <string name="NoAvatarPicksText">ピックがありません</string>
   <string name="NoAvatarClassifiedsText">クラシファイド広告がありません</string>
   <string name="PicksClassifiedsLoadingText">読み込んでいます…</string>
@@ -2797,7 +2822,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- Viewer menu -->
   <string name="AcquiredItems">取得アイテム</string>
   <string name="Cancel">キャンセル</string>
-  <string name="UploadingCosts">[NAME]のアップロード料金は L$ [AMOUNT]です。</string>
+  <string name="UploadingCosts">[NAME]のアップロード料金はL$ [AMOUNT]です。</string>
   <string name="BuyingCosts">これをL$ [AMOUNT]で購入します。</string>
   <string name="UnknownFileExtension">不明な拡張子：%s
 使用可能な拡張子：.wav，.tga，.bmp，.jpg，.jpeg，.bvh</string>
@@ -3985,7 +4010,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Command_Compass_Label">コンパス</string>
   <string name="Command_Debug_Label">デバッグ設定</string>
   <string name="Command_Destinations_Label">行き先</string>
-  <string name="Command_Environments_Label">環境</string>
+  <string name="Command_Environments_Label">自然環境</string>
   <string name="Command_Gestures_Label">ジェスチャー</string>
   <string name="Command_Grid_Status_Label">グリッド状況</string>
   <string name="Command_HowTo_Label">ハウツー</string>
@@ -4026,7 +4051,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Command_Compass_Tooltip">コンパスを表示します。</string>
   <string name="Command_Debug_Tooltip">上級者向けデバッグ設定を表示します。</string>
   <string name="Command_Destinations_Tooltip">行ってみたい場所を表示します。</string>
-  <string name="Command_Environments_Tooltip">自分の環境を表示します。</string>
+  <string name="Command_Environments_Tooltip">自分の自然環境の設定を表示します。</string>
   <string name="Command_Gestures_Tooltip">アバターのジェスチャーを表示します。</string>
   <string name="Command_Grid_Status_Tooltip">現在のグリッドステータスを表示します。</string>
   <string name="Command_HowTo_Tooltip">一般的タスクの実行方法を表示します。</string>
@@ -4109,7 +4134,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Admin_Experiences_Tab">管理</string>
   <string name="Recent_Experiences_Tab">最新</string>
   <string name="Owned_Experiences_Tab">所有</string>
-  <string name="ExperiencesCounter">（[MAXEXPERIENCES]件中[EXPERIENCES]件）</string>
+  <string name="ExperiencesCounter">（全[MAXEXPERIENCES]件中[EXPERIENCES]件）</string>
   <string name="ExperiencePermission1">コントロールを引き継ぐ</string>
   <string name="ExperiencePermission3">アバターでアニメーションをトリガー</string>
   <string name="ExperiencePermission4">アバターに装着</string>
@@ -4128,7 +4153,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="ExperiencePermissionShort11">テレポート</string>
   <string name="ExperiencePermissionShort12">権限</string>
   <string name="ExperiencePermissionShort16">座る</string>
-  <string name="ExperiencePermissionShort17">環境</string>
+  <string name="ExperiencePermissionShort17">自然環境の設定</string>
 
   <!-- PBR Materials -->
   <string name="Material Texture Name Header">テクスチャはこのマテリアルを表しています： </string>
