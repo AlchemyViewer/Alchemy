@@ -279,7 +279,7 @@ LLSD LLSettingsBase::interpolateSDValue(const std::string& key_name, const LLSD 
     {
         case LLSD::TypeInteger:
             // lerp between the two values rounding the result to the nearest integer. 
-            new_value = LLSD::Integer(llroundf(ll_lerp(value.asReal(), other_value.asReal(), mix)));
+            new_value = LLSD::Integer(ll_round(ll_lerp(value.asReal(), other_value.asReal(), mix)));
             break;
         case LLSD::TypeReal:
             // lerp between the two values.

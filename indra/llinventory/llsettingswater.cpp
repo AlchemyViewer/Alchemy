@@ -300,7 +300,7 @@ F32 LLSettingsWater::getModifiedWaterFogDensityFast(F32 fog_density, F32 underwa
         // 2) Force density to be an arbitrary non-negative (i.e. 1) when underwater and modifier is not an integer (1 was aribtrarily chosen as it gives at least some notion of fog in the transition)
         // This is more restrictive, effectively forcing a density under certain conditions, but allowing the range of #1 and avoiding blackness in other cases
         // at the cost of overriding the fog density. 
-        if(fog_density < 0.0f && underwater_fog_mod != (F32)llround(underwater_fog_mod) )
+        if(fog_density < 0.0f && underwater_fog_mod != (F32)ll_round(underwater_fog_mod) )
         {
             fog_density = 1.0f;
         }
