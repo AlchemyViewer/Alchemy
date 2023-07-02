@@ -511,7 +511,7 @@ void LLFloaterPerformance::populateNearbyList()
 void LLFloaterPerformance::setFPSText()
 {
     const S32 NUM_PERIODS = 50;
-    S32 current_fps = (S32)llround(LLTrace::get_frame_recording().getPeriodMedianPerSec(LLStatViewer::FPS, NUM_PERIODS));
+    S32 current_fps = (S32)ll_round(LLTrace::get_frame_recording().getPeriodMedianPerSec(LLStatViewer::FPS, NUM_PERIODS));
     getChild<LLTextBox>("fps_value")->setValue(current_fps);
 
     std::string fps_text = getString("fps_text");

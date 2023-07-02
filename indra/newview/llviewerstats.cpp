@@ -529,12 +529,12 @@ void update_statistics()
                 pct_scene_render_time = llclamp(pct_scene_render_time, 0., 100.);
                 if (tot_sleep_time_raw == 0)
                 {
-                    sample(LLStatViewer::SCENERY_FRAME_PCT, (U32)llround(pct_scene_render_time));
-                    sample(LLStatViewer::AVATAR_FRAME_PCT, (U32)llround(pct_avatar_time));
-                    sample(LLStatViewer::HUDS_FRAME_PCT, (U32)llround(pct_huds_time));
-                    sample(LLStatViewer::UI_FRAME_PCT, (U32)llround(pct_ui_time));
-                    sample(LLStatViewer::SWAP_FRAME_PCT, (U32)llround(pct_swap_time));
-                    sample(LLStatViewer::IDLE_FRAME_PCT, (U32)llround(pct_idle_time));
+                    sample(LLStatViewer::SCENERY_FRAME_PCT, (U32)ll_round(pct_scene_render_time));
+                    sample(LLStatViewer::AVATAR_FRAME_PCT, (U32)ll_round(pct_avatar_time));
+                    sample(LLStatViewer::HUDS_FRAME_PCT, (U32)ll_round(pct_huds_time));
+                    sample(LLStatViewer::UI_FRAME_PCT, (U32)ll_round(pct_ui_time));
+                    sample(LLStatViewer::SWAP_FRAME_PCT, (U32)ll_round(pct_swap_time));
+                    sample(LLStatViewer::IDLE_FRAME_PCT, (U32)ll_round(pct_idle_time));
                 }
             }
             else
