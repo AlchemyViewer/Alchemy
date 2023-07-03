@@ -3049,7 +3049,7 @@ void LLModelPreview::stateChangedCallback(U32 state, void* opaque)
 LLJoint* LLModelPreview::lookupJointByName(const std::string& str, void* opaque)
 {
     LLModelPreview* pPreview = static_cast< LLModelPreview* >(opaque);
-    if (pPreview)
+    if (pPreview && pPreview->getPreviewAvatar())
     {
         return pPreview->getPreviewAvatar()->getJoint(str);
     }

@@ -1966,11 +1966,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5d3edf0f51c492547398c72a3dfe13c7e00a6281308b9a890c1ae3716b3c1278859394fbf0705935e9a2be6804bf5f5911e16fff5c0678292c35a128e9c418d3</string>
+              <string>56b89f33e8b209c94d6fcfbd6e482d9dcc8cd3ec99b8e337f35dba44aea04b7631545e53b4001ab32cd23582dceff1dd734809a12fc43fea08f4706462e1bcf1</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.3.3-0.6.0.1939/sentry-8.3.3-0.6.0-darwin64-1939.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.8.0-0.6.4.2103/sentry-8.8.0-0.6.4-darwin64-2103.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1980,11 +1980,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>42ae27903974f99d8ca3bed1a5c31ce7b909a14194e1e3337e8c4bcaa15badf68f71b66aac8ebfa57cac99302a2417cde2c80669110b639962e8665a95ccf437</string>
+              <string>9e3665b4e4b04f14304bf308d4844408367fe3f163623f4c0627ab651948792883adf480fb3c0a9efbd96288c509b9e3eddec104e0fc849e54bbbe5b14dd8b73</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.3.3-0.6.0.2092/sentry-8.3.3-0.6.0-linux64-2092.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.8.0-0.6.4.2103/sentry-8.8.0-0.6.4-linux64-2103.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1994,18 +1994,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0a7be6df6cf4e705e55e5d3361db0394aa9c23007ffac62cd5e4d7ed0c3e14798ef9f1b1968be17073a010e4b8ad45a408886926700dd3cf6c122da96ca4d9b1</string>
+              <string>48017386317669d6c8b3bc1022d1643dec1dafe2e8606b43eb7d06dbd9f7b86d6e06df98e75764020a1f98eedebce458d6fb29c36c234cde909cb2426895a3b8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.3.3-0.6.0.2092/sentry-8.3.3-0.6.0-windows64-2092.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.8.0-0.6.4.2103/sentry-8.8.0-0.6.4-windows64-2103.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>8.3.3-0.6.0</string>
+        <string>8.8.0-0.6.4</string>
       </map>
       <key>slvoice</key>
       <map>
