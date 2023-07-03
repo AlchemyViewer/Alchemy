@@ -521,7 +521,7 @@
       <menu_item_check label="テクスチャ優先度" name="Texture Priority" />
       <menu_item_check label="テクスチャの範囲" name="Texture Area" />
       <menu_item_check label="側面" name="Face Area" />
-      <menu_item_check label="被写体深度（ＬｏＤ）情報" name="LOD Info" />
+      <menu_item_check label="ＬｏＤ情報" name="LOD Info" />
       <menu_item_check label="三角形の数" name="Triangle Count" />
       <menu_item_check label="制作・キュー" name="Build Queue" />
       <menu_item_check label="光源" name="Lights" />
