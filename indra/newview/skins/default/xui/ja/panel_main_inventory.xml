@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="もの" name="main inventory panel">
-  <panel.string name="ItemcountFetching">[ITEM_COUNT]個のアイテムと[CATEGORY_COUNT]個のフォルダーを取得中です…。[FILTER]</panel.string>
+  <panel.string name="ItemcountFetching">[ITEM_COUNT]個のアイテムと[CATEGORY_COUNT]個のフォルダーを取得しています…。[FILTER]</panel.string>
   <panel.string name="ItemcountCompleted">[ITEM_COUNT]個のアイテムと[CATEGORY_COUNT]個のフォルダーの取得が完了しました。[FILTER]</panel.string>
   <panel.string name="ItemcountUnknown">[ITEM_COUNT]個のアイテムと[CATEGORY_COUNT]個のフォルダーを取得しました。[FILTER]</panel.string>
   <text name="ItemcountText">アイテム：</text>
@@ -20,13 +20,20 @@
   </tab_container>
   <layout_stack name="bottom_panel">
     <layout_panel name="options_gear_btn_panel">
-      <menu_button name="options_gear_btn" tool_tip="オプションを表示します。" />
+      <menu_button name="options_gear_btn" tool_tip="オプションを表示" />
     </layout_panel>
     <layout_panel name="add_btn_panel">
-      <button name="add_btn" tool_tip="新しいアイテムを追加します。" />
+      <button name="add_btn" tool_tip="新しいアイテムを追加" />
     </layout_panel>
+    <layout_panel name="open_folder_btn_panel">
+      <button name="open_folder_btn" tool_tip="すべてのフォルダを開く" />
+    </layout_panel>
+    <layout_panel name="close_folder_btn_panel">
+      <button name="close_folder_btn" tool_tip="すべてのフォルダを閉じる"/>
+    </layout_panel>
+    <layout_panel name="dummy_panel"/>
     <layout_panel name="trash_btn_panel">
-      <dnd_button name="trash_btn" tool_tip="選択したアイテムを削除します。" />
+      <dnd_button name="trash_btn" tool_tip="選択したアイテムを削除" />
     </layout_panel>
   </layout_stack>
 </panel>

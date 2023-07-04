@@ -77,9 +77,9 @@
         <spinner name="teleport_coordinate_z" />
         <button label="テレポート" name="Teleport" tool_tip="選択した場所にテレポートする。" />
 
-        <button label="SLurlをコピー" layout="topleft" name="copy_slurl" tool_tip="現在の場所をWebで使えるSLurlにしてコピーする。" />
+        <button label="SLurlをコピー" name="copy_slurl" tool_tip="現在の場所をWebで使えるSLurlにしてコピーする。" />
         <button label="選択を表示" name="Show Destination" tool_tip="選択した場所をマップの中心にする。" />
-        <button label="リージョン追跡" name="track_region" tool_tip="このリージョンをリージョントラッカーに追加します。" />
+        <button label="リージョン追跡" name="track_region" tool_tip="このリージョン（地域）をリージョントラッカーに追加します。" />
       </panel>
       <panel name="layout_panel_5">
         <text name="zoom_label">縮尺</text>

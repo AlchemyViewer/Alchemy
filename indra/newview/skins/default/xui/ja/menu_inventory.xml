@@ -117,7 +117,7 @@
   <menu_item_separator name="Texture Separator" />
   <menu_item_call label="名前をつけて保存" name="Save As" />
 
-  <menu_item_call label="選択を名前をつけて保存" layout="topleft" name="Save Selected As" />
+  <menu_item_call label="選択を名前をつけて保存" name="Save Selected As" />
   <menu_item_separator name="Wearable And Object Separator"/>
   <!-- COMMENTED OUT for DEV-32347 -->
   <!--
