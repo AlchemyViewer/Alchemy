@@ -231,14 +231,14 @@
       <text name="OwnerLimited">（不動産所有者が、このオプションに制約を与えている場合があります）</text>
       <layout_stack name="access_stack">
         <layout_panel name="Allowed_layout_panel">
-          <text label="常に許可" name="AllowedText">常に許可（全[MAX]人中[LISTED]人）</text>
-          <name_list name="AccessList" tool_tip="（全[MAX]人中[LISTED]人）" />
+          <text label="常に許可" name="AllowedText">常に許可（全[MAX]人中[COUNT]人）</text>
+          <name_list name="AccessList" tool_tip="（全[MAX]人中[COUNT]人）" />
           <button label="追加" name="add_allowed" />
           <button label="削除" label_selected="削除" name="remove_allowed" />
         </layout_panel>
         <layout_panel name="Banned_layout_panel">
-          <text label="Ban" name="BanCheck">バンした人（全[MAX]人中[LISTED]人）</text>
-          <name_list name="BannedList" tool_tip="（全[MAX]人中[LISTED]人）">
+          <text label="Ban" name="BanCheck">バンした人（全[MAX]人中[COUNT]人）</text>
+          <name_list name="BannedList" tool_tip="（全[MAX]人中[COUNT]人）">
             <columns label="名前" name="name" />
             <columns label="期間" name="duration" />
           </name_list>
