@@ -40,6 +40,7 @@
 #include "llfloatertools.h"
 #include "llgesturemgr.h"
 #include "llgiveinventory.h"
+#include "llgltfmateriallist.h"
 #include "llhudmanager.h"
 #include "llhudeffecttrail.h"
 #include "llimview.h"
@@ -1101,11 +1102,16 @@ void LLToolDragAndDrop::dropMaterialOneFace(LLViewerObject* hit_obj,
         LL_WARNS() << "LLToolDragAndDrop::dropTextureOneFace no material item." << LL_ENDL;
         return;
     }
-    LLUUID asset_id = item->getAssetUUID();
     BOOL success = handleDropMaterialProtections(hit_obj, item, source, src_id);
     if (!success)
     {
         return;
+    }
+    LLUUID asset_id = item->getAssetUUID();
+    if (asset_id.isNull())
+    {
+        // use blank material
+        asset_id = LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID;
     }
 
     hit_obj->setRenderMaterialID(hit_face, asset_id);
@@ -1127,11 +1133,17 @@ void LLToolDragAndDrop::dropMaterialAllFaces(LLViewerObject* hit_obj,
         LL_WARNS() << "LLToolDragAndDrop::dropTextureAllFaces no material item." << LL_ENDL;
         return;
     }
-    LLUUID asset_id = item->getAssetUUID();
     BOOL success = handleDropMaterialProtections(hit_obj, item, source, src_id);
     if (!success)
     {
         return;
+    }
+
+    LLUUID asset_id = item->getAssetUUID();
+    if (asset_id.isNull())
+    {
+        // use blank material
+        asset_id = LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID;
     }
 
     hit_obj->setRenderMaterialIDs(asset_id);
