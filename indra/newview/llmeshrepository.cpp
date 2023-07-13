@@ -2937,7 +2937,7 @@ S32 LLMeshRepository::getActualMeshLOD(LLMeshHeader& header, S32 lod)
 	}
 
 	//search up to find then ext available higher lod
-	for (S32 i = lod+1; i < 4; ++i)
+	for (S32 i = lod+1; i < LLVolumeLODGroup::NUM_LODS; ++i)
 	{
 		if (header.mLodSize[i] > 0)
 		{
@@ -3099,7 +3099,7 @@ void LLMeshHeaderHandler::processFailure(LLCore::HttpStatus status)
 
 	// Can't get the header so none of the LODs will be available
 	LLMutexLock lock(gMeshRepo.mThread->mMutex);
-	for (int i(0); i < 4; ++i)
+	for (int i(0); i < LLVolumeLODGroup::NUM_LODS; ++i)
 	{
 		gMeshRepo.mThread->mUnavailableQ.emplace_back(mMeshParams, i);
 	}
@@ -3128,7 +3128,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 
 		// Can't get the header so none of the LODs will be available
 		LLMutexLock lock(gMeshRepo.mThread->mMutex);
-		for (int i(0); i < 4; ++i)
+		for (int i(0); i < LLVolumeLODGroup::NUM_LODS; ++i)
 		{
 			gMeshRepo.mThread->mUnavailableQ.emplace_back(mMeshParams, i);
 		}
@@ -3209,7 +3209,7 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 
 			// headerReceived() parsed header, but header's data is invalid so none of the LODs will be available
 			LLMutexLock lock(gMeshRepo.mThread->mMutex);
-			for (int i(0); i < 4; ++i)
+			for (int i(0); i < LLVolumeLODGroup::NUM_LODS; ++i)
 			{
 				gMeshRepo.mThread->mUnavailableQ.emplace_back(mMeshParams, i);
 			}
@@ -3584,7 +3584,7 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 	// Manage time-to-load metrics for mesh download operations.
 	metricsProgress(1);
 
-	if (detail < 0 || detail >= 4)
+	if (detail < 0 || detail >= LLVolumeLODGroup::NUM_LODS)
 	{
 		return detail;
 	}
@@ -3648,7 +3648,7 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 			}
 
 			//no lower LOD is a available, is a higher lod available?
-			for (S32 i = detail+1; i < 4; ++i)
+			for (S32 i = detail+1; i < LLVolumeLODGroup::NUM_LODS; ++i)
 			{
 				LLVolume* lod = group->refLOD(i);
 				if (lod && lod->isMeshAssetLoaded() && lod->getNumVolumeFaces() > 0)
@@ -4066,7 +4066,7 @@ void LLMeshRepository::notifyMeshUnavailable(const LLVolumeParams& mesh_params, 
 	{
 		F32 detail = LLVolumeLODGroup::getVolumeScaleFromDetail(lod);
 
-        LLVolume* sys_volume = LLPrimitive::getVolumeManager()->refVolume(mesh_params, detail);
+        LLVolume* sys_volume = LLPrimitive::getVolumeManager()->refVolume(mesh_params, lod);
         if (sys_volume)
         {
             sys_volume->setMeshAssetUnavaliable(true);
@@ -4447,7 +4447,7 @@ F32 LLMeshRepository::getStreamingCostLegacy(LLUUID mesh_id, F32 radius, S32* by
             {
                 LL_WARNS() << mesh_id << "bytes mismatch " << *bytes << " " << data.getSizeTotal() << LL_ENDL;
             }
-            if (bytes_visible && (lod >=0) && (lod < 4) && (*bytes_visible != data.getSizeByLOD(lod)))
+            if (bytes_visible && (lod >=0) && (lod < LLVolumeLODGroup::NUM_LODS) && (*bytes_visible != data.getSizeByLOD(lod)))
             {
                 LL_WARNS() << mesh_id << "bytes_visible mismatch " << *bytes_visible << " " << data.getSizeByLOD(lod) << LL_ENDL;
             }
@@ -4609,7 +4609,7 @@ bool LLMeshCostData::init(const LLMeshHeader& header)
     static LLCachedControl<U32> minimum_size(gSavedSettings, "MeshMinimumByteSize", 16); //make sure nothing is "free"
     static LLCachedControl<U32> bytes_per_triangle(gSavedSettings, "MeshBytesPerTriangle", 16);
 
-    for (S32 i=0; i<4; i++)
+    for (S32 i=0; i<LLVolumeLODGroup::NUM_LODS; i++)
     {
         mEstTrisByLOD[i] = llmax((F32)mSizeByLOD[i] - (F32)metadata_discount, (F32)minimum_size) / (F32)bytes_per_triangle;
     }
