@@ -84,8 +84,8 @@
       <text name="changeable_clause">このリージョンにある土地は統合または分割ができないことがあります。</text>
     </panel>
     <panel label="オブジェクト" name="land_objects_panel">
-      <panel.string name="objects_available_text">[MAX]個中[COUNT]個（[AVAILABLE]個が利用可能）</panel.string>
-      <panel.string name="objects_deleted_text">[MAX]個中[COUNT]個（[DELETED]個を削除しました）</panel.string>
+      <panel.string name="objects_available_text">全[MAX]個中[COUNT]個（[AVAILABLE]個が利用可能）</panel.string>
+      <panel.string name="objects_deleted_text">全[MAX]個中[COUNT]個（[DELETED]個を削除しました）</panel.string>
       <text name="parcel_object_bonus">オブジェクトボーナス：[BONUS]個</text>
       <text name="Simulator primitive usage:">リージョン全体の最大プリム数：</text>
       <text name="objects_available">[MAX]個中[COUNT]個（[AVAILABLE]個が利用可能）</text>
@@ -123,7 +123,7 @@
     <panel label="オプション" name="land_options_panel">
       <panel.string name="search_enabled_tooltip">この区画を検索結果に表示する</panel.string>
       <panel.string name="search_disabled_small_tooltip">区画面積が１２８㎡未満のため、このオプションは無効です。
-大きな区画のみ検索に表示させることが可能です。</panel.string>
+より大きな区画のみ検索に表示させることが可能です。</panel.string>
       <panel.string name="search_disabled_permissions_tooltip">あなたはこの区画の設定編集ができないため、このオプションは無効です。</panel.string>
       <panel.string name="mature_check_mature">「Moderate」コンテンツ</panel.string>
       <panel.string name="mature_check_adult">「Adult」コンテンツ</panel.string>
@@ -237,7 +237,7 @@
           <button label="削除" label_selected="削除" name="remove_allowed" />
         </layout_panel>
         <layout_panel name="Banned_layout_panel">
-          <text label="Ban" name="BanCheck">バンした人（全[MAX]人中[COUNT]人）</text>
+          <text label="Ban" name="BanCheck">バンした人物（全[MAX]人中[COUNT]人）</text>
           <name_list name="BannedList" tool_tip="（全[MAX]人中[COUNT]人）">
             <columns label="名前" name="name" />
             <columns label="期間" name="duration" />

@@ -3,7 +3,7 @@
   <string name="outfit_photo_string">"[OUTFIT_NAME]"のアウトフィットの画像</string>
   <string name="no_outfits_msg">あなたは、まだアウトフィットを持っていません。[secondlife:///app/search/all/ 検索]してみてください。</string>
   <string name="no_matched_outfits_msg">お探しのものが見つかりませんでしたか？[secondlife:///app/search/all/[SEARCH_TERM] 検索]してみてください。</string>
-  <text name="no_outfits_txt">検索中…</text>
+  <text name="no_outfits_txt">検索しています…</text>
   <scroll_container name="gallery_scroll_panel">
     <!--outfit_gallery_item layout="topleft" left="10" name="preview_outfit1" height="175" width="150" follows="left|top"/-->
     <!--layout_stack follows="left|right" height="180" width="498" layout="topleft" left="0" animate="false" top="0" name="top_gallery_stack" orientation="horizontal">

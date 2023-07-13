@@ -4,7 +4,7 @@
   <panel.string name="can_not_view">このスクリプトは「コピーなし」に設定されているため、表示または編集できません。
 オブジェクト内のスクリプトを表示または編集するには、完全な権限が必要です。</panel.string>
   <panel.string name="public_objects_can_not_run">パブリックオブジェクトはスクリプトを実行できません。</panel.string>
-  <panel.string name="script_running">動作中</panel.string>
+  <panel.string name="script_running">実行中</panel.string>
   <panel.string name="Title">スクリプト名：[NAME]</panel.string>
   <menu_bar name="script_menu">
     <menu label="ファイル" name="File">

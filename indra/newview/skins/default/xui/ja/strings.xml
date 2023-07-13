@@ -97,7 +97,7 @@ LibVLCのバージョン：[LIBVLC_VERSION]
   <string name="LoginInProgressNoFrozen">ログインしています…</string>
   <string name="LoginAuthenticating">認証しています…</string>
   <string name="LoginMaintenance">アカウントのメンテナンスを実行しています…</string>
-  <string name="LoginAttempt">前回のログインに失敗しました。ログイン中です（[NUMBER]回目）</string>
+  <string name="LoginAttempt">前回のログインに失敗しました。ログインしています（[NUMBER]回目）</string>
   <string name="LoginPrecaching">ワールドを読み込んでいます…</string>
   <string name="LoginInitializingBrowser">内蔵Webブラウザを初期化しています…</string>
   <string name="LoginInitializingMultimedia">マルチメディアを初期化しています…</string>
@@ -185,7 +185,7 @@ support@secondlife.com にお問い合わせください。</string>
 システムのエラーだと思われる場合は、support@secondlife.com にお問い合わせください。</string>
   <string name="LoginFailedLastNameNotAlphanumeric">ラストネームのパラメーターは英数字です。
 システムのエラーだと思われる場合は、support@secondlife.com にお問い合わせください。</string>
-  <string name="LogoutFailedRegionGoingOffline">リージョンは、オフライン中です。
+  <string name="LogoutFailedRegionGoingOffline">リージョンは、現在オフラインです。
 しばらくしてから再度お試しください。</string>
   <string name="LogoutFailedPendingLogin">このリージョンでは、別のセッションでログインされていました。
 しばらくしてから再度お試しください。</string>
@@ -202,12 +202,12 @@ support@secondlife.com にお問い合わせください。</string>
 
   <!-- Disconnection -->
   <string name="AgentLostConnection">このリージョンに不都合が発生している可能性があります。ご使用のインターネット接続をご確認ください。</string>
-  <string name="SavingSettings">設定を保存中です…</string>
-  <string name="LoggingOut">ログアウト中です…</string>
-  <string name="ShuttingDown">シャットダウン中です…</string>
+  <string name="SavingSettings">設定を保存しています…</string>
+  <string name="LoggingOut">ログアウトしています…</string>
+  <string name="ShuttingDown">シャットダウンしています…</string>
   <string name="YouHaveBeenDisconnected">あなたがいたリージョンへの接続が切れました。</string>
   <string name="SentToInvalidRegion">無効なリージョンにテレポートされました。</string>
-  <string name="TestingDisconnect">ビューアーの接続を切るテスト中</string>
+  <string name="TestingDisconnect">ビューアーの接続を切るテストをしています。</string>
 
   <!-- SLShare: User Friendly Filter Names Translation -->
   <string name="BlackAndWhite">白黒</string>
@@ -494,7 +494,7 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="NearbyChatLabel">（近くのチャット）</string>
   <string name="whisper">のささやき：</string>
   <string name="shout">のシャウト：</string>
-  <string name="ringing">インワールドボイスチャットに接続中…</string>
+  <string name="ringing">インワールドボイスチャットに接続しています…</string>
   <string name="connected">接続しました</string>
   <string name="unavailable">現在地では、ボイスを利用できません。</string>
   <string name="hang_up">インワールドボイスチャットの通話が切断されました。</string>
@@ -2350,7 +2350,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="MarketplaceMax">最大</string>
   <string name="MarketplaceStock">在庫</string>
   <string name="MarketplaceNoStock">在庫なし</string>
-  <string name="MarketplaceUpdating">アップデート中…</string>
+  <string name="MarketplaceUpdating">アップデートしています…</string>
 
   <string name="UploadFeeInfo">料金はサブスクリプションのレベルにより異なります。レベルが高いほど、料金が下がります。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細]</string>
 
@@ -3592,7 +3592,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="ringing-im">ボイスコールに参加…</string>
   <string name="connected-im">接続しました。「通話終了」をクリックして切断します。</string>
   <string name="hang_up-im">ボイスコールから退席しました</string>
-  <string name="answering-im">接続中…</string>
+  <string name="answering-im">接続しています…</string>
   <string name="conference-title">複数人チャット</string>
   <string name="conference-title-incoming">[AGENT_NAME]と会話する</string>
   <string name="inventory_item_offered-im">アイテム「[ITEM_NAME]」がインベントリに送られてきました。</string>

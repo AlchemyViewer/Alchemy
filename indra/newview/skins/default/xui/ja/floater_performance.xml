@@ -22,7 +22,7 @@
       <icon name="icon_arrow3" />
     </panel>
     <panel name="nearby_subpanel">
-      <text name="avatars_nearby_lbl">近隣のアバター</text>
+      <text name="avatars_nearby_lbl">近くのアバター</text>
       <text name="avatars_nearby_desc">近くにいるアバターのうち、どのタイプのアバターを完全に表示するかを管理します。</text>
       <icon name="icon_arrow2" />
     </panel>
