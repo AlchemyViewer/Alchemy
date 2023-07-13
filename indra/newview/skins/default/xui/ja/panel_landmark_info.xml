@@ -20,7 +20,7 @@
       <texture_picker name="logo" />
       <!-- texture picker has an empty label section, compensate for it with negative top_pad-->
       <text name="parcel_title" value="SampleParcel, Name Long" />
-      <text name="region_title">リージョン（地域）：[REGIONAMEPOS]</text>
+      <text name="region_title">リージョン：[REGIONAMEPOS]</text>
       <text name="parcel_owner_label" value="所有者：" />
       <text name="parcel_owner" value="一時的な所有者" />
       <expandable_text name="description" value="Du waltz die spritz" />

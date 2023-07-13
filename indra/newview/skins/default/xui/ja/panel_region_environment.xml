@@ -13,7 +13,7 @@
   <!-- TODO: 翻訳が反映できない -->
   <layout_stack>
     <layout_panel name="pnl_environment_region_msg">
-      <text name="region_text_lbl">リージョン（地域）：</text>
+      <text name="region_text_lbl">リージョン：</text>
       <text name="region_text">不明</text>
     </layout_panel>
     <layout_panel name="pnl_environment_disabled">

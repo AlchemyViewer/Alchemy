@@ -93,8 +93,8 @@ LibVLCのバージョン：[LIBVLC_VERSION]
   <string name="Fullbright">明るさ全開（レガシー）</string>  <!-- used in the Build > materials dropdown-->
 
   <!-- Login -->
-  <string name="LoginInProgress">ログイン中です。[APP_NAME]の表示がフリーズする場合があります。しばらくお待ちください。</string>
-  <string name="LoginInProgressNoFrozen">ログイン中です…</string>
+  <string name="LoginInProgress">ログインしています。[APP_NAME]の表示がフリーズする場合があります。しばらくお待ちください。</string>
+  <string name="LoginInProgressNoFrozen">ログインしています…</string>
   <string name="LoginAuthenticating">認証しています…</string>
   <string name="LoginMaintenance">アカウントのメンテナンスを実行しています…</string>
   <string name="LoginAttempt">前回のログインに失敗しました。ログイン中です（[NUMBER]回目）</string>
@@ -109,10 +109,10 @@ LibVLCのバージョン：[LIBVLC_VERSION]
   <string name="LoginInitializingQuicktime">QuickTimeを初期化しています…</string>
   <string name="LoginQuicktimeNotFound">QuickTimeが見つかりません。初期化に失敗しました。</string>
   <string name="LoginQuicktimeOK">QuickTimeが正常に初期化されました。</string>
-  <string name="LoginRequestSeedCapGrant">リージョン（地域）の機能をリクエストしています…</string>
-  <string name="LoginRetrySeedCapGrant">リージョン（地域）の機能をリクエストしています…（試行[NUMBER]回目）</string>
-  <string name="LoginWaitingForRegionHandshake">リージョン（地域）のハンドシェイクを待っています…</string>
-  <string name="LoginConnectingToRegion">リージョン（地域）に接続しています…</string>
+  <string name="LoginRequestSeedCapGrant">リージョンの機能をリクエストしています…</string>
+  <string name="LoginRetrySeedCapGrant">リージョンの機能をリクエストしています…（試行[NUMBER]回目）</string>
+  <string name="LoginWaitingForRegionHandshake">リージョンのハンドシェイクを待っています…</string>
+  <string name="LoginConnectingToRegion">リージョンに接続しています…</string>
   <string name="LoginDownloadingClothing">服装をダウンロードしています…</string>
   <string name="InvalidCertificate">証明書が無効であるか、壊れています。グリッド管理者にご連絡ください。</string>
   <string name="CertInvalidHostname">無効なホストネームがサーバーにアクセスしようとしています。SLURLかグリッドのホストネームをご確認ください。</string>
@@ -306,13 +306,13 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="BUTTON_HELP">ヘルプを表示</string>
 
   <!-- ToolTips for notecards -->
-  <string name="TooltipNotecardNotAllowedTypeDrop">このタイプのアイテムは、このリージョン（地域）のノートカードに添付することができません。</string>
+  <string name="TooltipNotecardNotAllowedTypeDrop">このタイプのアイテムは、このリージョンのノートカードに添付することができません。</string>
   <string name="TooltipNotecardOwnerRestrictedDrop">制限のない「次の所有者」の
 許可のみノートカードに
 添付できます。</string>
 
   <!-- searching - generic -->
-  <string name="Searching">検索中…</string>
+  <string name="Searching">検索しています…</string>
   <string name="NoneFound">見つかりませんでした。</string>
 
   <!-- Indicates that an avatar name or other similar datum is being retrieved. General usage. -->
@@ -491,7 +491,7 @@ support@secondlife.com にお問い合わせください。</string>
 
   <!-- Chat -->
   <string name="NearbyChatTitle">近隣チャット</string>
-  <string name="NearbyChatLabel">（近隣のチャット）</string>
+  <string name="NearbyChatLabel">（近くのチャット）</string>
   <string name="whisper">のささやき：</string>
   <string name="shout">のシャウト：</string>
   <string name="ringing">インワールドボイスチャットに接続中…</string>
@@ -499,8 +499,8 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="unavailable">現在地では、ボイスを利用できません。</string>
   <string name="hang_up">インワールドボイスチャットの通話が切断されました。</string>
   <string name="reconnect_nearby">「近隣ボイスチャット」に再接続されます。</string>
-  <string name="ScriptQuestionCautionChatGranted">リージョン（地域）「[REGIONNAME]」の「[REGIONPOS]」という場所にある、「[OWNERNAME]」が所有する「[OBJECTNAME]」というオブジェクトは、以下の権限を許可しました：[PERMISSIONS]</string>
-  <string name="ScriptQuestionCautionChatDenied">リージョン（地域）「[REGIONNAME]」の「[REGIONPOS]」という場所にある、「[OWNERNAME]」が所有する「[OBJECTNAME]」というオブジェクトは、以下の権限を拒否しました：[PERMISSIONS]</string>
+  <string name="ScriptQuestionCautionChatGranted">リージョン「[REGIONNAME]」の「[REGIONPOS]」という場所にある、「[OWNERNAME]」が所有する「[OBJECTNAME]」というオブジェクトは、以下の権限を許可しました：[PERMISSIONS]</string>
+  <string name="ScriptQuestionCautionChatDenied">リージョン「[REGIONNAME]」の「[REGIONPOS]」という場所にある、「[OWNERNAME]」が所有する「[OBJECTNAME]」というオブジェクトは、以下の権限を拒否しました：[PERMISSIONS]</string>
   <string name="AdditionalPermissionsRequestHeader">あなたのアカウントへのアクセスを許可すると、このオブジェクトには次の操作も許可されます：</string>
   <string name="ScriptTakeMoney">リンデンドル（L$）のお支払い</string>
   <string name="ActOnControlInputs">制御入力に基づいて行動</string>
@@ -2672,7 +2672,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="ScriptLimitsRequestError">情報のリクエスト中にエラーが発生しました</string>
   <string name="ScriptLimitsRequestNoParcelSelected">区画が選択されていません。</string>
   <string name="ScriptLimitsRequestWrongRegion">エラー：スクリプト情報は現在地のみ取得できます</string>
-  <string name="ScriptLimitsRequestWaiting">情報を取得中…</string>
+  <string name="ScriptLimitsRequestWaiting">情報を取得しています…</string>
   <string name="ScriptLimitsRequestDontOwnParcel">この区画を調査する権限がありません。</string>
 
   <string name="SITTING_ON">着席中</string>
@@ -2943,7 +2943,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="MBRegClassFailed">RegisterClass 失敗</string>
   <string name="MBError">エラー</string>
   <string name="MBFullScreenErr">[WIDTH]✕[HEIGHT]では全画面で実行することができません。
-ウィンドウモードで実行中です。</string>
+ウィンドウモードで実行しています。</string>
   <string name="MBDestroyWinFailed">シャットダウンエラー（DestroyWindow() 失敗）</string>
   <string name="MBShutdownErr">シャットダウンエラー</string>
   <string name="MBDevContextErr">GL ディバイスコンテキストが作れません</string>
@@ -3546,17 +3546,17 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="LocationCtrlModerateIconTooltip">Moderateリージョン</string>
   <string name="LocationCtrlGeneralIconTooltip">Generalリージョン</string>
   <string name="LocationCtrlSeeAVsTooltip">この区画内のアバターは、この区画の外にいるアバターからは見ることも聞くこともできません。</string>
-  <string name="LocationCtrlPathfindingDirtyTooltip">リージョン（地域）が再構築されるまで、移動するオブジェクトは正しく動作しない可能性があります。</string>
-  <string name="LocationCtrlPathfindingDisabledTooltip">このリージョン（地域）では、動的経路探索が有効になっていません。</string>
+  <string name="LocationCtrlPathfindingDirtyTooltip">リージョンが再構築されるまで、移動するオブジェクトは正しく動作しない可能性があります。</string>
+  <string name="LocationCtrlPathfindingDisabledTooltip">このリージョンでは、動的経路探索が有効になっていません。</string>
   <!-- Strings used by the (currently Linux) auto-updater app -->
   <string name="UpdaterWindowTitle">[APP_NAME]の更新</string>
-  <string name="UpdaterNowUpdating">只今[APP_NAME]を更新中です…</string>
+  <string name="UpdaterNowUpdating">只今[APP_NAME]を更新しています…</string>
   <string name="UpdaterNowInstalling">[APP_NAME]をインストール中です…</string>
   <string name="UpdaterUpdatingDescriptive">お使いの[APP_NAME]ビューアーを最新バージョンに更新しています。数分かかることがありますのでしばらくお待ちください。</string>
   <string name="UpdaterProgressBarTextWithEllipses">アップデートをダウンロード中です…</string>
-  <string name="UpdaterProgressBarText">更新をダウンロード中…</string>
+  <string name="UpdaterProgressBarText">更新をダウンロードしています…</string>
   <string name="UpdaterFailDownloadTitle">更新のダウンロードに失敗しました。</string>
-  <string name="UpdaterFailUpdateDescriptive">[APP_NAME]の更新中にエラーが発生しました。www.secondlife.com から最新バージョンをダウンロードしてください。</string>
+  <string name="UpdaterFailUpdateDescriptive">[APP_NAME]の更新時にエラーが発生しました。www.secondlife.com から最新バージョンをダウンロードしてください。</string>
   <string name="UpdaterFailInstallTitle">更新のインストールに失敗しました。</string>
   <string name="UpdaterFailStartTitle">ビューアーの起動に失敗しました。</string>
 
@@ -3566,7 +3566,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 
   <!-- IM system messages -->
   <string name="IM_logging_string">－インスタントメッセージの保存開始－</string>
-  <string name="IM_typing_start_string">[NAME]は入力中です…</string>
+  <string name="IM_typing_start_string">[NAME]は入力しています…</string>
   <string name="Unnamed">（名前なし）</string>
   <string name="IM_moderated_chat_label">（モデレート：デフォルトでボイスはオフ）</string>
   <string name="IM_unavailable_text_label">このコールでは文字チャットが利用できません。</string>
@@ -3685,7 +3685,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="group_role_owners">所有者</string>
   <string name="group_member_status_online">オンライン</string>
 
-  <string name="uploading_abuse_report">アップロード中…
+  <string name="uploading_abuse_report">アップロードしています…
 
 嫌がらせの報告</string>
 
@@ -3987,14 +3987,14 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <!-- Mouse button names end -->
 
   <!-- llviewerwindow -->
-  <string name="BeaconParticle">パーティクル源ビーコン（青）を表示中</string>
-  <string name="BeaconPhysical">物理的オブジェクトのビーコン（緑）を表示中</string>
-  <string name="BeaconScripted">スクリプトのオブジェクトのビーコン（赤）を表示中</string>
-  <string name="BeaconScriptedTouch">タッチ機能のビーコンが付いたスクリプトのオブジェクト（赤）を表示中</string>
-  <string name="BeaconSound">サウンドビーコン（黄）を表示中</string>
-  <string name="BeaconMedia">メディアビーコン（白）を表示中</string>
-  <string name="BeaconSun">太陽の方角ビーコン（オレンジ）を表示中</string>
-  <string name="BeaconMoon">月の方角ビーコン（紫）を表示中</string>
+  <string name="BeaconParticle">パーティクル源ビーコン（青）を表示しています。</string>
+  <string name="BeaconPhysical">物理的オブジェクトのビーコン（緑）を表示しています。</string>
+  <string name="BeaconScripted">スクリプトのオブジェクトのビーコン（赤）を表示しています。</string>
+  <string name="BeaconScriptedTouch">タッチ機能のビーコンが付いたスクリプトのオブジェクト（赤）を表示しています。</string>
+  <string name="BeaconSound">サウンドビーコン（黄）を表示しています。</string>
+  <string name="BeaconMedia">メディアビーコン（白）を表示しています。</string>
+  <string name="BeaconSun">太陽の方角ビーコン（橙）を表示しています。</string>
+  <string name="BeaconMoon">月の方角ビーコン（紫）を表示しています。</string>
   <string name="ParticleHiding">パーティクルを非表示</string>
 
   <!-- commands -->
@@ -4010,7 +4010,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Command_Compass_Label">コンパス</string>
   <string name="Command_Debug_Label">デバッグ設定</string>
   <string name="Command_Destinations_Label">行き先</string>
-  <string name="Command_Environments_Label">自然環境</string>
+  <string name="Command_Environments_Label">自然環境の設定</string>
   <string name="Command_Gestures_Label">ジェスチャー</string>
   <string name="Command_Grid_Status_Label">グリッド状況</string>
   <string name="Command_HowTo_Label">ハウツー</string>
@@ -4058,11 +4058,11 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Command_Inventory_Tooltip">インベントリの内容を表示したり使用したりします。</string>
   <string name="Command_Lightbox_Settings_Tooltip">フォトジェニックな画を撮影する上で便利なオプションを表示します。</string>
   <string name="Command_Map_Tooltip">ワールドマップを表示します。</string>
-  <string name="Command_Marketplace_Tooltip">ショッピングに出掛ける</string>
-  <string name="Command_MarketplaceListings_Tooltip">創作アイテムを販売します。</string>
-  <string name="Command_MiniMap_Tooltip">近隣の人を表示します。</string>
+  <string name="Command_Marketplace_Tooltip">ショッピングに出掛けます。</string>
+  <string name="Command_MarketplaceListings_Tooltip">自分が創作したアイテムを販売します。</string>
+  <string name="Command_MiniMap_Tooltip">近くの人を表示します。</string>
   <string name="Command_Move_Tooltip">アバターの移動操作をします。</string>
-  <string name="Command_People_Tooltip">フレンド、グループ、近隣の人物を表示します。</string>
+  <string name="Command_People_Tooltip">フレンド、グループ、近くの人物を表示します。</string>
   <string name="Command_Performance_Tooltip">グラフィック速度を向上させます。</string>
   <string name="Command_Picks_Tooltip">プロフィールで紹介しているお気に入りの場所を表示します。</string>
   <string name="Command_Places_Tooltip">保存済みの場所を表示します。</string>
@@ -4110,7 +4110,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="snapshot_quality_high">高</string>
   <string name="snapshot_quality_very_high">最高</string>
 
-  <string name="TeleportMaturityExceeded">住人はこのリージョン（地域）を訪問できません。</string>
+  <string name="TeleportMaturityExceeded">住人はこのリージョンを訪問できません。</string>
 
   <!-- Spell check settings floater -->
   <string name="UserDictionary">[User]</string>
@@ -4156,7 +4156,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="ExperiencePermissionShort17">自然環境の設定</string>
 
   <!-- PBR Materials -->
-  <string name="Material Texture Name Header">テクスチャはこのマテリアルを表しています： </string>
+  <string name="Material Texture Name Header">テクスチャはこのマテリアルを表しています：</string>
 
   <!-- Conversation log messages -->
   <string name="logging_calls_disabled_log_empty">会話はログに記録されていません。ログの記録を開始するには、「初期設定」＞「チャット」で「保存：ログのみ」または「保存：ログと会話のテキスト」を選択します。</string>

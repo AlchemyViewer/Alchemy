@@ -85,7 +85,7 @@
   </menu>
   <menu label="コミュニケーション" name="Communicate">
     <menu_item_check label="会話…" name="Conversations" />
-    <menu_item_check label="近隣のチャット…" name="Nearby Chat" />
+    <menu_item_check label="近くのチャット…" name="Nearby Chat" />
     <menu_item_check label="ボイスチャット" name="Speak" />
     <menu_item_check label="会話ログ…" name="Conversation Log..." />
     <menu_item_check label="チャットのアラート…" name="Chat Alerts" />
@@ -129,7 +129,7 @@
     <menu_item_separator />
     <menu_item_call label="場所のプロフィール" name="Place Profile" />
     <menu_item_call label="土地情報" name="About Land" />
-    <menu_item_call label="リージョン（地域）／不動産" name="RegionEstate" />
+    <menu_item_call label="リージョン／不動産" name="RegionEstate" />
     <menu_item_call label="自分のLindenホーム…" name="Linden Home" />
     <menu_item_call label="自分の所有地…" name="My Land" />
     <menu_item_call label="この土地を購入" name="Buy Land" />
@@ -233,10 +233,10 @@
     </menu>
 
     <menu label="経路探索" name="Pathfinding">
-      <menu_item_call label="リージョン（地域）のオブジェクト" name="pathfinding_linksets_menu_item" />
+      <menu_item_call label="リージョンのオブジェクト" name="pathfinding_linksets_menu_item" />
       <menu_item_call label="キャラクター…" name="pathfinding_characters_menu_item" />
       <menu_item_call label="表示／テスト…" name="pathfinding_console_menu_item" />
-      <menu_item_call label="リージョン（地域）の再構築" name="pathfinding_rebake_navmesh_item" />
+      <menu_item_call label="リージョンの再構築" name="pathfinding_rebake_navmesh_item" />
     </menu>
 
 
@@ -450,7 +450,7 @@
       <menu_item_check label="テクスチャのコンソール" name="Texture Console" />
       <menu_item_check label="デバッグコンソール" name="Debug Console" />
       <menu_item_call label="通知コンソール" name="Notifications" />
-      <menu_item_check label="リージョン（地域）デバッグコンソール" name="Region Debug Console" />
+      <menu_item_check label="リージョンデバッグコンソール" name="Region Debug Console" />
       <menu_item_check label="ファーストタイマー" name="Fast Timers" />
       <menu_item_check label="メモリ" name="Memory" />
       <menu_item_check label="シーンの統計" name="Scene Statistics" />
@@ -727,7 +727,7 @@
       <menu_item_call label="Lindenのコンテンツに設定する" name="Set to Linden Content" />
       <menu_item_call label="パブリックの土地を取得する" name="Claim Public Land" />
     </menu>
-    <menu label="リージョン（地域）" name="Region">
+    <menu label="リージョン" name="Region">
       <menu_item_call label="一時アセットデータのダンプ" name="Dump Temp Asset Data" />
       <menu_item_call label="リージョンの状態を保存する" name="Save Region State" />
     </menu>

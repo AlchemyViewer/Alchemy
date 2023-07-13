@@ -61,9 +61,9 @@
           <combo_box.item label="ランドマーク" name="item1" value="None" />
         </combo_box>
         <icon name="location_icon" />
-        <search_editor label="リージョン（地域）名で" name="location" tool_tip="リージョン（地域）名を入力してください。" />
+        <search_editor label="リージョン名で" name="location" tool_tip="リージョン名を入力してください。" />
 
-        <button label="探す" name="DoSearch" tool_tip="リージョン（地域）を検索する。" />
+        <button label="探す" name="DoSearch" tool_tip="リージョンを検索する。" />
 
         <button name="Clear" tool_tip="追跡ラインをクリアしてマップをリセットする。" />
 
@@ -79,7 +79,7 @@
 
         <button label="SLurlをコピー" name="copy_slurl" tool_tip="現在の場所をWebで使えるSLurlにしてコピーする。" />
         <button label="選択を表示" name="Show Destination" tool_tip="選択した場所をマップの中心にする。" />
-        <button label="リージョン追跡" name="track_region" tool_tip="このリージョン（地域）をリージョントラッカーに追加します。" />
+        <button label="リージョン追跡" name="track_region" tool_tip="このリージョンをリージョントラッカーに追加します。" />
       </panel>
       <panel name="layout_panel_5">
         <text name="zoom_label">縮尺</text>

@@ -481,7 +481,7 @@ L$が不足しているので、このグループに参加することができ
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
-  <notification name="DisableAllTopObjects">このリージョン（地域）内のすべてのオブジェクトを無効にしようとしています。このまま操作を続行してもよろしいですか？
+  <notification name="DisableAllTopObjects">このリージョン内のすべてのオブジェクトを無効にしようとしています。このまま操作を続行してもよろしいですか？
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
@@ -491,7 +491,7 @@ L$が不足しているので、このグループに参加することができ
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
   <notification name="UnableToDisableOutsideScripts">スクリプトを無効にできません。
-このリージョン（地域）全体が「ダメージ有効」に設定されています。
+このリージョン全体が「ダメージ有効」に設定されています。
 武器を使用するには、スクリプトの実行を許可する必要があります。
     <tag>fail</tag>
   </notification>
@@ -821,7 +821,7 @@ L$が不足しているので、このグループに参加することができ
   <notification name="AcquireErrorTooManyObjects">取得エラー：選択したオブジェクトの数が多すぎます。
     <tag>fail</tag>
   </notification>
-  <notification name="AcquireErrorObjectSpan">取得エラー：オブジェクトが複数のリージョン（地域）にまたがって存在しています。
+  <notification name="AcquireErrorObjectSpan">取得エラー：オブジェクトが複数のリージョンにまたがって存在しています。
 すべて同じリージョン内に移動させてから取得してください。
     <tag>fail</tag>
   </notification>
@@ -846,10 +846,10 @@ L$が不足しているので、このグループに参加することができ
 どのオブジェクトもロックされておらず、あなたのものであることを確認してください。
     <tag>fail</tag>
   </notification>
-  <notification name="CannotLinkPermanent">リージョン（地域）の境界を越えてオブジェクトをリンクできません。
+  <notification name="CannotLinkPermanent">リージョンの境界を越えてオブジェクトをリンクできません。
     <tag>fail</tag>
   </notification>
-  <notification name="CannotLinkAcrossRegions">リージョン（地域）の境界を越えてオブジェクトをリンクできません。
+  <notification name="CannotLinkAcrossRegions">リージョンの境界を越えてオブジェクトをリンクできません。
     <tag>fail</tag>
   </notification>
   <notification name="CannotLinkDifferentOwners">所有者が異なるため、オブジェクトをリンクできません。
@@ -1696,7 +1696,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
-  <notification name="ChangeObjectBonusFactor">リージョン（地域）のオブジェクトボーナスを下げると、制作されたオブジェクトが返却されたり、削除されます。本当にオブジェクトボーナスを変更してもよろしいですか？
+  <notification name="ChangeObjectBonusFactor">リージョンのオブジェクトボーナスを下げると、制作されたオブジェクトが返却されたり、削除されます。本当にオブジェクトボーナスを変更してもよろしいですか？
     <tag>confirm</tag>
     <usetemplate ignoretext="オブジェクトボーナス係数変更の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ" />
   </notification>
@@ -1706,12 +1706,12 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
-  <notification name="InvalidTerrainBitDepth">地域テクスチャを設定できませんでした：
+  <notification name="InvalidTerrainBitDepth">リージョンテクスチャを設定できませんでした：
 地形テクスチャ「[TEXTURE_NUM]」は、無効なビット深度（[TEXTURE_BIT_DEPTH]ビット）です。
 
 テクスチャは、２４ビットの[MAX_SIZE]x[MAX_SIZE]以下の画像を選択し、「適用」ボタンを再度クリックしてください。</notification>
 
-  <notification name="InvalidTerrainSize">地域テクスチャを設定できませんでした：
+  <notification name="InvalidTerrainSize">リージョンの地形テクスチャを設定できませんでした：
 地形テクスチャ「[TEXTURE_NUM]」は、[TEXTURE_SIZE_X]✕[TEXTURE_SIZE_Y]では大きすぎます。
 
 テクスチャは、２４ビットの[MAX_SIZE]✕[MAX_SIZE]以下の画像を選択し、「適用」ボタンを再度クリックしてください。</notification>
@@ -2095,7 +2095,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 
 この行為は「危険」であり、グリッドからオブジェクトやお金の転送をもたらすハッキングを引き起こす可能性があるため、完全にそれを意図した場合のみ行うべきものです。
 
-これにより多数のリージョン（地域）が変更され、スペースサーバーに悪影響が生じます。
+これにより多数のリージョンが変更され、スペースサーバーに悪影響が生じます。
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
@@ -2190,36 +2190,36 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
-  <notification name="RegionEntryAccessBlocked">訪問しようとしているリージョン（地域）には、現在の初期設定を超えるレーティングのコンテンツが含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
+  <notification name="RegionEntryAccessBlocked">訪問しようとしているリージョンには、現在の初期設定を超えるレーティングのコンテンツが含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
 
 レーティング制限に関する詳細情報は、[https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%8A%E3%83%AC%E3%83%83%E3%82%B8%E3%83%99%E3%83%BC%E3%82%B9/%E3%83%AC%E3%83%BC%E3%83%86%E3%82%A3%E3%83%B3%E3%82%B0%E5%8C%BA%E5%88%86-r323/ こちら]をご覧になってください。
     <tag>confirm</tag>
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="RegionEntryAccessBlocked_AdultsOnlyContent">訪問しようとしているリージョン（地域）には、成人のみアクセスできる[REGIONMATURITY]コンテンツが含まれています。
+  <notification name="RegionEntryAccessBlocked_AdultsOnlyContent">訪問しようとしているリージョンには、成人のみアクセスできる[REGIONMATURITY]コンテンツが含まれています。
     <url name="url">https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%8A%E3%83%AC%E3%83%83%E3%82%B8%E3%83%99%E3%83%BC%E3%82%B9/%E3%83%AC%E3%83%BC%E3%83%86%E3%82%A3%E3%83%B3%E3%82%B0%E5%8C%BA%E5%88%86-r323/</url>
     <tag>fail</tag>
-    <usetemplate ignoretext="リージョン（地域）の横断：成人のみアクセスできるコンテンツが含まれているときの警告" name="okcancelignore" notext="閉じる" yestext="ナレッジベースを開く" />
+    <usetemplate ignoretext="リージョンの横断：成人のみアクセスできるコンテンツが含まれているときの警告" name="okcancelignore" notext="閉じる" yestext="ナレッジベースを開く" />
   </notification>
 
   <notification name="SLM_UPDATE_FOLDER">[MESSAGE]</notification>
 
-  <notification name="RegionEntryAccessBlocked_Notify">訪問しようとしているリージョン（地域）には、[REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は、[REGIONMATURITY]コンテンツ除外するように設定されています。
+  <notification name="RegionEntryAccessBlocked_Notify">訪問しようとしているリージョンには、[REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は、[REGIONMATURITY]コンテンツ除外するように設定されています。
     <tag>fail</tag>
   </notification>
 
-  <notification name="RegionEntryAccessBlocked_NotifyAdultsOnly">訪問しようとしているリージョン（地域）には、成人のみアクセスできる[REGIONMATURITY] コンテンツが含まれています。
+  <notification name="RegionEntryAccessBlocked_NotifyAdultsOnly">訪問しようとしているリージョンには、成人のみアクセスできる[REGIONMATURITY] コンテンツが含まれています。
     <tag>fail</tag>
   </notification>
 
-  <notification name="RegionEntryAccessBlocked_Change">訪問しようとしているリ－ジョン（地域）は、[REGIONMATURITY]コンテンツが含まれていますが、現在の設定では[REGIONMATURITY]コンテンツを除外するように設定されています。ご希望を変更することも、キャンセルすることもできます。この設定を変更すると、そのリージョンに入ることができるようになります。
+  <notification name="RegionEntryAccessBlocked_Change">訪問しようとしているリ－ジョンは、[REGIONMATURITY]コンテンツが含まれていますが、現在の設定では[REGIONMATURITY]コンテンツを除外するように設定されています。ご希望を変更することも、キャンセルすることもできます。この設定を変更すると、そのリージョンに入ることができるようになります。
     <tag>fail</tag>
     <tag>confirm</tag>
     <form name="form">
       <button name="ＯＫ" text="初期設定の変更" />
       <button default="true" name="Cancel" text="キャンセル" />
-      <ignore name="ignore" text="リージョン（地域）の横断：訪問しようとしているリージョン（地域）には現在の初期設定により除外されたコンテンツが含まれています。" />
+      <ignore name="ignore" text="リージョンの横断：訪問しようとしているリージョンには現在の初期設定により除外されたコンテンツが含まれています。" />
     </form>
   </notification>
 
@@ -2228,12 +2228,12 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="TeleportEntryAccessBlocked">訪問しようとしているリージョン（地域）には現在の初期設定を超えるコンテンツが含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
+  <notification name="TeleportEntryAccessBlocked">訪問しようとしているリージョンには現在の初期設定を超えるコンテンツが含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
     <tag>fail</tag>
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="TeleportEntryAccessBlocked_AdultsOnlyContent">訪問しようとしているリージョン（地域）には、成人のみアクセスできる[REGIONMATURITY]コンテンツが含まれています。
+  <notification name="TeleportEntryAccessBlocked_AdultsOnlyContent">訪問しようとしているリージョンには、成人のみアクセスできる[REGIONMATURITY]コンテンツが含まれています。
     <unique>
       <context>REGIONMATURITY</context>
     </unique>
@@ -2243,21 +2243,21 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <usetemplate ignoretext="テレポート：成人のみアクセスできるコンテンツが含まれているときの警告" name="okcancelignore" notext="閉じる" yestext="ナレッジベースを開く" />
   </notification>
 
-  <notification name="TeleportEntryAccessBlocked_Notify">訪問しようとしているリージョン（地域）には、[REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は[REGIONMATURITY]コンテンツを除外するように設定されています。
+  <notification name="TeleportEntryAccessBlocked_Notify">訪問しようとしているリージョンには、[REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は[REGIONMATURITY]コンテンツを除外するように設定されています。
     <unique>
       <context>REGIONMATURITY</context>
     </unique>
     <tag>fail</tag>
   </notification>
 
-  <notification name="TeleportEntryAccessBlocked_NotifyAdultsOnly">訪問しようとしているリージョン（地域）には、成人のみアクセスできる[REGIONMATURITY]コンテンツが含まれています。
+  <notification name="TeleportEntryAccessBlocked_NotifyAdultsOnly">訪問しようとしているリージョンには、成人のみアクセスできる[REGIONMATURITY]コンテンツが含まれています。
     <unique>
       <context>REGIONMATURITY</context>
     </unique>
     <tag>fail</tag>
   </notification>
 
-  <notification name="TeleportEntryAccessBlocked_ChangeAndReTeleport">訪問しようとしているリージョン（地域）には、[REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は[REGIONMATURITY]コンテンツを除外するように設定されています。
+  <notification name="TeleportEntryAccessBlocked_ChangeAndReTeleport">訪問しようとしているリージョンには、[REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は[REGIONMATURITY]コンテンツを除外するように設定されています。
 初期設定を変更してテレポートを続けるか、このテレポートを取り消すことができます。
     <unique>
       <context>REGIONMATURITY</context>
@@ -2267,11 +2267,11 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <form name="form">
       <button name="ＯＫ" text="変更して続ける" />
       <button name="Cancel" text="キャンセル" />
-      <ignore name="ignore" text="テレポート（再起動可能）：訪問しようとしているリージョン（地域）には、現在の初期設定により除外されたコンテンツが含まれています。" />
+      <ignore name="ignore" text="テレポート（再起動可能）：訪問しようとしているリージョンには、現在の初期設定により除外されたコンテンツが含まれています。" />
     </form>
   </notification>
 
-  <notification name="TeleportEntryAccessBlocked_Change">訪問しようとしているリージョン（地域）には、 [REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は[REGIONMATURITY]コンテンツを除外するように設定されています。
+  <notification name="TeleportEntryAccessBlocked_Change">訪問しようとしているリージョンには、 [REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は[REGIONMATURITY]コンテンツを除外するように設定されています。
 初期設定を変更するか、テレポートを取り消すことができます。初期設定を変更した後、もう一度テレポートを実行する必要があります。
     <unique>
       <context>REGIONMATURITY</context>
@@ -2281,7 +2281,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <form name="form">
       <button name="ＯＫ" text="初期設定の変更" />
       <button name="Cancel" text="キャンセル" />
-      <ignore name="ignore" text="テレポート（再起動不可）：訪問しようとしているリージョン（地域）には、現在の初期設定により除外されたコンテンツが含まれています。" />
+      <ignore name="ignore" text="テレポート（再起動不可）：訪問しようとしているリージョンには、現在の初期設定により除外されたコンテンツが含まれています。" />
     </form>
   </notification>
 
@@ -2290,13 +2290,13 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="RegionTPSpecialUsageBlocked">リージョン（地域）に入ることができません。「[REGION_NAME]」は、スキルゲーミングリージョンであり、あなたはこのリージョンに入るための特定の基準を満たす必要があります。
+  <notification name="RegionTPSpecialUsageBlocked">リージョンに入ることができません。「[REGION_NAME]」は、スキルゲーミングリージョンであり、あなたはこのリージョンに入るための特定の基準を満たす必要があります。
 詳しくは、[https://wiki.secondlife.com/wiki/Linden_Lab_Official:Second_Life_Skill_Gaming_FAQ スキルゲーミングのよくある質問]を参照してください。
     <tag>fail</tag>
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="PreferredMaturityChanged">今後、[RATING]コンテンツ付きのリージョン（地域）を訪問しようとしているという通知を受け取りません。後でメニューバーの「私」＞「初期設定」＞「一般」を使用して、コンテンツの初期設定を変更できます。
+  <notification name="PreferredMaturityChanged">今後、[RATING]コンテンツ付きのリージョンを訪問しようとしているという通知を受け取りません。後でメニューバーの「私」＞「初期設定」＞「一般」を使用して、コンテンツの初期設定を変更できます。
     <tag>fail</tag>
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
@@ -2432,7 +2432,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
-  <notification label="このリージョンにメッセージを送信" name="MessageRegion">このリージョン（地域）にいる人全員に送る、短いメッセージを入力してください。
+  <notification label="このリージョンにメッセージを送信" name="MessageRegion">このリージョンにいる人全員に送る、短いメッセージを入力してください。
     <tag>confirm</tag>
     <form name="form">
       <input name="message" />
@@ -2441,12 +2441,12 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     </form>
   </notification>
 
-  <notification label="地域のレーティング区分指定変更しました" name="RegionMaturityChange">このリージョン（地域）のレーティング区分が変更されました。
+  <notification label="リージョンのレーティング区分指定変更しました" name="RegionMaturityChange">このリージョンのレーティング区分が変更されました。
 マップにこの変更が反映するには数分かかることがあります。
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification label="ボイスバージョンの不一致" name="VoiceVersionMismatch">[APP_NAME]のこのバージョンは、このリージョン（地域）におけるボイスチャットの互換性がありません。ボイスチャットを正常に行うためには、[APP_NAME]のアップデートが必要です。
+  <notification label="ボイスバージョンの不一致" name="VoiceVersionMismatch">[APP_NAME]のこのバージョンは、このリージョンにおけるボイスチャットの互換性がありません。ボイスチャットを正常に行うためには、[APP_NAME]のアップデートが必要です。
     <tag>fail</tag>
     <tag>voice</tag>
   </notification>
@@ -2693,13 +2693,13 @@ Linden Lab</notification>
     <tag>fail</tag>
   </notification>
 
-  <notification label="既存の装着物を置換" name="ReplaceAttachment">体のこの部位には既にオブジェクトが装着されています。
+  <notification label="既存の装着物を差し替え" name="ReplaceAttachment">体のこの部位には既にオブジェクトが装着されています。
 選択されたオブジェクトと置き換えますか？
     <tag>confirm</tag>
     <form name="form">
       <ignore name="ignore" save_option="true" text="装着しているアイテムと選択したアイテムを入れ替える" />
-      <button ignore="自動的に置き換える" name="Yes" text="ＯＫ" />
-      <button ignore="置き換えない" name="No" text="キャンセル" />
+      <button ignore="自動的に差し替える" name="Yes" text="ＯＫ" />
+      <button ignore="差し替えない" name="No" text="キャンセル" />
     </form>
   </notification>
 
@@ -2707,11 +2707,11 @@ Linden Lab</notification>
     <tag>fail</tag>
   </notification>
 
-  <notification label="「取り込み中」モードの警告" name="DoNotDisturbModePay">「取り込み中」をオンにします。この支払との交換で提供されるアイテムが受信されなくなります。
-このトランザクションを完了するために、「取り込み中」をオフにしてもよろしいですか。
+  <notification label="「取り込み中」モードの警告" name="DoNotDisturbModePay">「取り込み中」をオンにします。この状態では、お金を支払ったり交換したときにアイテムが受信されなくなります。
+この取り引きを完了するために、「取り込み中」をオフにしてもよろしいですか。
     <tag>confirm</tag>
     <form name="form">
-      <ignore name="ignore" text="「取り込み中」モード時に、人や物を支払う予定です。" />
+      <ignore name="ignore" text="「取り込み中」モード時に人や物へ支払うときの確認" />
       <button ignore="「取り込み中」モードを解除する" name="Yes" text="ＯＫ" />
       <button ignore="「取り込み中」モードを維持する" name="No" text="キャンセル" />
     </form>
@@ -3100,16 +3100,16 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 
   <notification name="NoBuild">このエリアでの制作は禁止されています。オブジェクトを制作したりRezすることはできません。</notification>
 
-  <notification name="PathfindingDirty">このリージョン（地域）において、保留中の経路探索の変更があります。制作できる権限がある場合は、「リージョンの再構築」ボタンをクリックして、リージョンを再構築できます。
+  <notification name="PathfindingDirty">このリージョンにおいて、保留中の経路探索の変更があります。制作できる権限がある場合は、「リージョンの再構築」ボタンをクリックして、リージョンを再構築できます。
     <unique />
   </notification>
 
-  <notification name="PathfindingDirtyRebake">このリージョン（地域）において、保留中の経路探索の変更があります。制作できる権限がある場合は、「リージョンの再構築」ボタンをクリックして、リージョンを再構築できます。
+  <notification name="PathfindingDirtyRebake">このリージョンにおいて、保留中の経路探索の変更があります。制作できる権限がある場合は、「リージョンの再構築」ボタンをクリックして、リージョンを再構築できます。
     <unique />
     <usetemplate name="okbutton" yestext="リージョンの再構築" />
   </notification>
 
-  <notification name="DynamicPathfindingDisabled">このリージョン（地域）において、動的経路探索が有効になっていません。経路探索ＬＳＬ呼び出しを使用するスクリプトの入ったオブジェクトは、このリージョンで期待どおりに動作しない可能性があります。
+  <notification name="DynamicPathfindingDisabled">このリージョンにおいて、動的経路探索が有効になっていません。経路探索ＬＳＬ呼び出しを使用するスクリプトの入ったオブジェクトは、このリージョンで期待どおりに動作しない可能性があります。
     <unique />
   </notification>
 
@@ -3132,15 +3132,15 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     <tag>fail</tag>
   </notification>
 
-  <notification name="ClaimPublicLand">あなたが所有できるのは、自分がいるリージョン（地域）の公有地のみです。
+  <notification name="ClaimPublicLand">あなたが所有できるのは、自分がいるリージョンの公有地のみです。
     <tag>fail</tag>
   </notification>
 
-  <notification name="RegionTPAccessBlocked">訪問しようとしているリージョン（地域）には現在の初期設定を超えるコンテンツが含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
+  <notification name="RegionTPAccessBlocked">訪問しようとしているリージョンには現在の初期設定を超えるコンテンツが含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
     <tag>fail</tag>
   </notification>
 
-  <notification name="URBannedFromRegion">あなたは、このリージョン（地域）への立ち入りが禁止されています。
+  <notification name="URBannedFromRegion">あなたは、このリージョンへの立ち入りが禁止されています。
     <tag>fail</tag>
   </notification>
 
@@ -3148,11 +3148,11 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     <tag>fail</tag>
   </notification>
 
-  <notification name="ImproperPaymentStatus">このリージョン（地域）に入るための適切な支払い状況がありません。
+  <notification name="ImproperPaymentStatus">このリージョンに入るための適切な支払い状況がありません。
     <tag>fail</tag>
   </notification>
 
-  <notification name="MustGetAgeRegion">このリージョン（地域）に入るには、１８歳以上である必要があります。
+  <notification name="MustGetAgeRegion">このリージョンに入るには、１８歳以上である必要があります。
     <tag>fail</tag>
   </notification>
 
@@ -3160,7 +3160,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     <tag>fail</tag>
   </notification>
 
-  <notification name="NoDestRegion">目的地のリージョン（地域）が見つかりませんでした。
+  <notification name="NoDestRegion">目的地のリージョンが見つかりませんでした。
     <tag>fail</tag>
   </notification>
 
@@ -3215,7 +3215,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     <tag>fail</tag>
   </notification>
 
-  <notification name="NoGoodTPDestination">このリージョン（地域）では、適切なテレポート目的地が見つかりませんでした。
+  <notification name="NoGoodTPDestination">このリージョンでは、適切なテレポート目的地が見つかりませんでした。
     <tag>fail</tag>
   </notification>
 
@@ -3287,7 +3287,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 
 &lt;icon&gt;[MATURITY_ICON]&lt;/icon&gt;－[MATURITY_STR]
 
-このリージョン（地域）には[REGION_CONTENT_MATURITY]コンテンツが含まれていますが、現在の初期設定は[REGION_CONTENT_MATURITY]コンテンツを除外するように設定されています。初期設定を変更してテレポートを続けるか、このテレポートを取り消すことができます。
+このリージョンには[REGION_CONTENT_MATURITY]コンテンツが含まれていますが、現在の初期設定は[REGION_CONTENT_MATURITY]コンテンツを除外するように設定されています。初期設定を変更してテレポートを続けるか、このテレポートを取り消すことができます。
     <tag>confirm</tag>
     <form name="form">
       <button name="Teleport" text="変更して続ける" />
@@ -3299,7 +3299,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 
 &lt;icon&gt;[MATURITY_ICON]&lt;/icon&gt;－[MATURITY_STR]
 
-ただし、このリージョン（地域）には成人のみアクセスできるコンテンツが含まれています。
+ただし、このリージョンには成人のみアクセスできるコンテンツが含まれています。
     <tag>fail</tag>
   </notification>
 
@@ -3608,7 +3608,7 @@ Your L$ balance is shown in the upper-right.
   </notification>
 
   <notification name="VoiceChannelDisconnected">[VOICE_CHANNEL_NAME]への接続が切れました。
-「近隣のボイスチャット」に再接続されます。
+「近くのボイスチャット」に再接続されます。
     <tag>voice</tag>
     <unique>
       <context>VOICE_CHANNEL_NAME</context>
@@ -3616,7 +3616,7 @@ Your L$ balance is shown in the upper-right.
   </notification>
 
   <notification name="VoiceChannelDisconnectedP2P">[VOICE_CHANNEL_NAME]がコールを終了しました。
-「近隣のボイスチャット」に再接続されます。
+「近くのボイスチャット」に再接続されます。
     <tag>voice</tag>
     <unique>
       <context>VOICE_CHANNEL_NAME</context>
@@ -3624,7 +3624,7 @@ Your L$ balance is shown in the upper-right.
   </notification>
 
   <notification name="P2PCallDeclined">[VOICE_CHANNEL_NAME]があなたのコールを拒否しました。
-「近隣のボイスチャット」に再接続されます。
+「近くのボイスチャット」に再接続されます。
     <tag>voice</tag>
     <tag>fail</tag>
     <unique>
@@ -3633,7 +3633,7 @@ Your L$ balance is shown in the upper-right.
   </notification>
 
   <notification name="P2PCallNoAnswer">[VOICE_CHANNEL_NAME]はあなたのコールを受けることができません。
-「近隣のボイスチャット」に再接続されます。
+「近くのボイスチャット」に再接続されます。
     <tag>fail</tag>
     <tag>voice</tag>
     <unique>
@@ -3642,7 +3642,7 @@ Your L$ balance is shown in the upper-right.
   </notification>
 
   <notification name="VoiceChannelJoinFailed">[VOICE_CHANNEL_NAME]への接続に失敗しました。あとで再度お試しください。
-「近隣のボイスチャット」に再接続されます。
+「近くのボイスチャット」に再接続されます。
     <tag>fail</tag>
     <tag>voice</tag>
     <unique>
@@ -4363,7 +4363,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="CantDupeCuzRegionIsFull">リージョン（地域）が埋まっているため、オブジェクトのコピーを作成することができません。
+  <notification name="CantDupeCuzRegionIsFull">リージョンが埋まっているため、オブジェクトのコピーを作成することができません。
     <tag>fail</tag>
   </notification>
 
@@ -4379,7 +4379,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="ToxicInvRezAttemptFailed">このリージョン（地域）で問題を引き起こすアイテムは作成できません。
+  <notification name="ToxicInvRezAttemptFailed">このリージョンで問題を引き起こすアイテムは作成できません。
     <tag>fail</tag>
   </notification>
 
@@ -4410,7 +4410,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="NoEnterRegionMaybeFull">このリージョン（地域）「[NAME]」へ入場することはできません。
+  <notification name="NoEnterRegionMaybeFull">このリージョン「[NAME]」へ入場することはできません。
 いっぱいになるか、すぐに再起動される可能性があります。
     <tag>fail</tag>
   </notification>
@@ -4492,17 +4492,17 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
   </notification>
 
   <notification name="CMOParcelFull">区画がいっぱいなので、オブジェクト「[O]」を
-リージョン（地域）[R]の[P]に移動できません。
+リージョン[R]の[P]に移動できません。
     <tag>fail</tag>
   </notification>
 
   <notification name="CMOParcelPerms">ご使用のオブジェクトは、この区画で使用が許可されていないため、
-オブジェクト「[O]」をリージョン（地域）[R]の[P]に移動できません。
+オブジェクト「[O]」をリージョン[R]の[P]に移動できません。
     <tag>fail</tag>
   </notification>
 
   <notification name="CMOParcelResources">この区画にこのオブジェクトのリソースが不足しているため、
-オブジェクト「[O]」をリージョン（地域）[R]の[P]に移動できません。
+オブジェクト「[O]」をリージョン[R]の[P]に移動できません。
     <tag>fail</tag>
   </notification>
 
@@ -4511,18 +4511,18 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
   </notification>
 
   <notification name="CMORegionVersion">オブジェクトの受け取りに対応していない、旧バージョンを実行しているため、
-他のリージョン（地域）でリージョンをまたがる
-オブジェクト「[O]」をリージョン（地域）[R]の[P]に移動できません。
+他のリージョンでリージョンをまたがる
+オブジェクト「[O]」をリージョン[R]の[P]に移動できません。
     <tag>fail</tag>
   </notification>
 
   <notification name="CMONavMesh">リージョンの境界にわたって、ナビメッシュを変更できないため、
-オブジェクト「[O]」をリージョン（地域）[R]の[P]に移動できません。
+オブジェクト「[O]」をリージョン[R]の[P]に移動できません。
     <tag>fail</tag>
   </notification>
 
   <notification name="CMOWTF">不明な理由により、オブジェクト「[O]」を
-リージョン（地域）[R]の[P]に移動できません。（[F]）
+リージョン[R]の[P]に移動できません。（[F]）
     <tag>fail</tag>
   </notification>
 
@@ -4599,7 +4599,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="AssetServerTimeoutObjReturn">アセットサーバーが適時に応答しませんでした。オブジェクトが地域に返されました。
+  <notification name="AssetServerTimeoutObjReturn">アセットサーバーが適時に応答しませんでした。オブジェクトがリージョンに返されました。
     <tag>fail</tag>
   </notification>
 
@@ -4998,7 +4998,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="RegionDisallowsClassifieds">このリージョン（地域）では、クラシファイド広告の掲載が許可されていません。
+  <notification name="RegionDisallowsClassifieds">このリージョンでは、クラシファイド広告の掲載が許可されていません。
     <tag>fail</tag>
   </notification>
 
@@ -5205,7 +5205,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="NoEnvironmentSettings">このリージョン（地域）は初期設定をサポートしていません。
+  <notification name="NoEnvironmentSettings">このリージョンは初期設定をサポートしていません。
     <tag>fail</tag>
   </notification>
 
@@ -5231,7 +5231,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="SettingsUnsuported">このリージョン（地域）では設定をサポートしていません。
+  <notification name="SettingsUnsuported">このリージョンでは設定をサポートしていません。
 設定に対応しているリージョンに移動し、アクションを再試行してください。
     <tag>fail</tag>
   </notification>
@@ -5405,7 +5405,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification icon="alert.tga" name="RegionTrackerAdd" type="alert">リージョン（地域）「[REGION]」にどのラベルを使用しますか?
+  <notification icon="alert.tga" name="RegionTrackerAdd" type="alert">リージョン「[REGION]」にどのラベルを使用しますか?
     <tag>confirm</tag>
     <form name="form">
       <input name="label" type="text">[LABEL]</input>

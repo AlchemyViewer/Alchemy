@@ -96,8 +96,8 @@
       <panel.string name="text modify info 2">これらのオブジェクトは、修正することができます。</panel.string>
       <panel.string name="text modify info 3">このオブジェクトは、修正することができません。</panel.string>
       <panel.string name="text modify info 4">これらのオブジェクトは、修正することができません。</panel.string>
-      <panel.string name="text modify info 5">リージョン（地域）の境界を越えて、このオブジェクトを修正することはできません。</panel.string>
-      <panel.string name="text modify info 6">リージョン（地域）の境界を越えて、これらのオブジェクトを修正することはできません。</panel.string>
+      <panel.string name="text modify info 5">リージョンの境界を越えて、このオブジェクトを修正することはできません。</panel.string>
+      <panel.string name="text modify info 6">リージョンの境界を越えて、これらのオブジェクトを修正することはできません。</panel.string>
       <panel.string name="text modify warning">オブジェクト全体を選択して、権限の設定を行ってください。</panel.string>
       <panel.string name="Cost Default">価格：L$</panel.string>
       <panel.string name="Cost Total">合計：L$</panel.string>
