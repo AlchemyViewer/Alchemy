@@ -87,7 +87,7 @@
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="BadInstallation">[APP_NAME]のアップデート中にエラーが発生しました。[http://get.secondlife.com 最新バージョンのビューアーをダウンロード]してください。
+  <notification name="BadInstallation">[APP_NAME]のアップデート中にエラーが発生しました。[https://alchemyviewer.org/downloads 最新バージョンのビューアーをダウンロード]してください。
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
@@ -99,7 +99,7 @@
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="LoginFailedToParse">ビューアがサーバーから不正な形式の応答を受け取りました。インターネット接続が正常に機能していることを確認してから、後でもう一度お試しください。
+  <notification name="LoginFailedToParse">ビューアーがサーバーから不正な形式の応答を受け取りました。インターネット接続が正常に機能していることを確認してから、後でもう一度お試しください。
 
 これが誤りだと思われる場合は、サポートにお問い合わせください。
     <tag>fail</tag>
@@ -750,11 +750,11 @@ L$が不足しているので、このグループに参加することができ
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="続ける"/>
   </notification>
-  <notification name="AdvancedLightingConfirm">高度な照明をオンにするには、品質をレベル4以上にする必要があります。
+  <notification name="AdvancedLightingConfirm">高度な照明をオンにするには、品質をレベルを４以上にする必要があります。
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
   </notification>
-  <notification name="ShadowsConfirm">影を有効にするには、品質をレベルを4以上にする必要があります。
+  <notification name="ShadowsConfirm">影を有効にするには、品質をレベルを４以上にする必要があります。
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
   </notification>
@@ -896,7 +896,7 @@ L$が不足しているので、このグループに参加することができ
 [FILE]
     <tag>fail</tag>
   </notification>
-  <notification name="SoundFileInvalidTooLong">オーディオファイルが長すぎます。（最大１０秒）：
+  <notification name="SoundFileInvalidTooLong">オーディオファイルが長すぎます。（最大[MAX_LENGTH]秒）：
 [FILE]
     <tag>fail</tag>
   </notification>
@@ -1709,12 +1709,12 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
   <notification name="InvalidTerrainBitDepth">地域テクスチャを設定できませんでした：
 地形テクスチャ「[TEXTURE_NUM]」は、無効なビット深度（[TEXTURE_BIT_DEPTH]ビット）です。
 
-テクスチャは、24ビットの512✕512以下の画像を選択し、「適用」ボタンを再度クリックしてください。</notification>
+テクスチャは、２４ビットの[MAX_SIZE]x[MAX_SIZE]以下の画像を選択し、「適用」ボタンを再度クリックしてください。</notification>
 
   <notification name="InvalidTerrainSize">地域テクスチャを設定できませんでした：
-地形テクスチャ「[TEXTURE_NUM]」は、[TEXTURE_SIZE_X]x[TEXTURE_SIZE_Y] では大きすぎます。
+地形テクスチャ「[TEXTURE_NUM]」は、[TEXTURE_SIZE_X]✕[TEXTURE_SIZE_Y]では大きすぎます。
 
-テクスチャは、24ビットの512✕512以下の画像を選択し、「適用」ボタンを再度クリックしてください。</notification>
+テクスチャは、２４ビットの[MAX_SIZE]✕[MAX_SIZE]以下の画像を選択し、「適用」ボタンを再度クリックしてください。</notification>
 
   <notification name="RawUploadStarted">アップロードを開始しました。接続速度によっては、最大２分程度かかります。</notification>
 
@@ -1909,11 +1909,11 @@ OKをクリックして、ダウンロードとインストールを開始しま
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="DoNotDisturbModeSet">「着信拒否」がオンになっています。通信の受信は通知されません。
+  <notification name="DoNotDisturbModeSet">「取り込み中」がオンになっています。通信の受信は通知されません。
   
-・他の居住者はあなたの「着信拒否」応答を受け取ります。（「初期設定」＞「全般」で設定）
+・他の居住者はあなたの「取り込み中」応答を受け取ります。（「初期設定」＞「全般」で設定）
 ・音声通話は拒否されます。
-    <usetemplate ignoretext="ログイン状態を「着信拒否」モードに変更したとき" name="okignore" yestext="ＯＫ" />
+    <usetemplate ignoretext="ログイン状態を「取り込み中」モードに変更したとき" name="okignore" yestext="ＯＫ" />
   </notification>
 
   <notification name="JoinedTooManyGroupsMember">グループの最大数に達しました。このグループに参加する前に別のグループから退会するか、オファーを断ってください。
@@ -2693,13 +2693,13 @@ Linden Lab</notification>
     <tag>fail</tag>
   </notification>
 
-  <notification label="既存の付属品を置換" name="ReplaceAttachment">体のこの部位には既にオブジェクトが装着されています。
+  <notification label="既存の装着物を置換" name="ReplaceAttachment">体のこの部位には既にオブジェクトが装着されています。
 選択されたオブジェクトと置き換えますか？
     <tag>confirm</tag>
     <form name="form">
       <ignore name="ignore" save_option="true" text="装着しているアイテムと選択したアイテムを入れ替える" />
-      <button ignore="自動的に交換" name="Yes" text="ＯＫ" />
-      <button ignore="交換しない" name="No" text="キャンセル" />
+      <button ignore="自動的に置き換える" name="Yes" text="ＯＫ" />
+      <button ignore="置き換えない" name="No" text="キャンセル" />
     </form>
   </notification>
 
@@ -2707,13 +2707,13 @@ Linden Lab</notification>
     <tag>fail</tag>
   </notification>
 
-  <notification label="「着信拒否」モードの警告" name="DoNotDisturbModePay">「着信拒否」をオンにします。この支払との交換で提供されるアイテムが受信されなくなります。
-このトランザクションを完了するために、「着信拒否」をオフにしてもよろしいですか。
+  <notification label="「取り込み中」モードの警告" name="DoNotDisturbModePay">「取り込み中」をオンにします。この支払との交換で提供されるアイテムが受信されなくなります。
+このトランザクションを完了するために、「取り込み中」をオフにしてもよろしいですか。
     <tag>confirm</tag>
     <form name="form">
-      <ignore name="ignore" text="「着信拒否」モード時に、人や物を支払う予定です。" />
-      <button ignore="「着信拒否」モードを解除する" name="Yes" text="ＯＫ" />
-      <button ignore="「着信拒否」モードを維持する" name="No" text="キャンセル" />
+      <ignore name="ignore" text="「取り込み中」モード時に、人や物を支払う予定です。" />
+      <button ignore="「取り込み中」モードを解除する" name="Yes" text="ＯＫ" />
+      <button ignore="「取り込み中」モードを維持する" name="No" text="キャンセル" />
     </form>
   </notification>
 
@@ -2735,7 +2735,7 @@ Linden Lab</notification>
 
   <notification name="TrashIsFull">ゴミ箱があふれています。これはログイン時に問題を引き起こします。
     <tag>confirm</tag>
-    <usetemplate name="okcancelbuttons" notext="後でゴミ箱を空にする" yestext="ごみ箱フォルダーを確認する" />
+    <usetemplate name="okcancelbuttons" notext="後でゴミ箱を空にする" yestext="ごみ箱フォルダを確認する" />
   </notification>
 
   <notification name="InventoryLimitReachedAIS">インベントリに問題が発生しています。お手数ですが、サポートにお問い合わせください。
@@ -2918,7 +2918,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     <tag>fail</tag>
   </notification>
 
-  <notification name="RezItemNoPermissions">オブジェクトをRezするには権限が不足しています。
+  <notification name="RezItemNoPermissions">この場所では、オブジェクトをRezする権限がありません。
     <tag>fail</tag>
   </notification>
 
@@ -3393,7 +3393,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     </form>
   </notification>
 
-  <notification name="FailedToFindWearableUnnamed">データベースに[TYPE]は見つかりませんでした。
+  <notification name="FailedToFindWearableUnnamed">データベースに[TYPE]が見つかりませんでした。
     <tag>fail</tag>
   </notification>
 
@@ -3442,7 +3442,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
   <notification name="TrustedExperienceEntry">キー体験 secondlife:///app/experience/[public_id]/profile に参加することにより、[region_name]リージョンに入ることを許可されました。
 この体験を削除すると、このリージョンから追放される可能性があります。
     <form name="form">
-      <ignore name="ignore" text="体験によりリージョンに入ることを許可されました" />
+      <ignore name="ignore" text="体験に参加した事によりリージョンに入ることを許可されました。" />
     </form>
   </notification>
 
@@ -4563,11 +4563,11 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="NoPermToEdit">これを編集する許可がありません。
+  <notification name="NoPermToEdit">これを編集する権限がありません。
     <tag>fail</tag>
   </notification>
 
-  <notification name="NoPermToCopyInventory">そのインベントリをコピーすることは許可されません。
+  <notification name="NoPermToCopyInventory">そのインベントリをコピーすることは許可されていません。
     <tag>fail</tag>
   </notification>
 
@@ -5254,13 +5254,13 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい" />
   </notification>
 
-  <notification name="SettingsMakeNoTrans">このデイサイクルに移行不可の設定をインポートしようとしています。このまま続けると、編集中の設定も移行不可になります。
+  <notification name="SettingsMakeNoTrans">このデイサイクルに譲渡不可の設定をインポートしようとしています。このまま続けると、編集中の設定も譲渡不可になります。
 
 この変更は元に戻すことができません。
 
 続けてもよろしいですか？
     <tag>confirm</tag>
-    <usetemplate ignoretext="設定を移行不可にしますか？" name="okcancelignore" notext="いいえ" yestext="はい" />
+    <usetemplate ignoretext="設定を譲渡不可にしますか？" name="okcancelignore" notext="いいえ" yestext="はい" />
   </notification>
 
   <notification name="NoEditFromLibrary">ライブラリから直接設定を変更することはできません。自分のインベントリからコピーしてやり直してください。
@@ -5539,14 +5539,14 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ" />
   </notification>
 
-  <notification name="UpdateInstalledRestart">ビューアは以下のバージョンに更新されました：
+  <notification name="UpdateInstalledRestart">ビューアーは以下のバージョンに更新されました：
 [VIEWER_VER]⇨[VIEWER_UPDATES] 
 
 再起動しますか？
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ" />
   </notification>
-  <notification name="UpdateInstalledRestartToast">ビューアは以下のバージョンに更新されました：
+  <notification name="UpdateInstalledRestartToast">ビューアーは以下のバージョンに更新されました：
 [VIEWER_VER]⇨[VIEWER_UPDATES] 
 
 再起動しますか？

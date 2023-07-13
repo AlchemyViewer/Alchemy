@@ -43,14 +43,14 @@
     <radio_item label="移動する（WSADなど）" name="radio_move" value="0" />
   </radio_group>
 
-  <text name="title_afk_text">「離席」とするまでの時間：</text>
-  <combo_box label="「離席」とするまでの時間：" name="afk">
+  <text name="title_afk_text">「離席中」とするまでの時間：</text>
+  <combo_box label="「離席中」とするまでの時間：" name="afk">
     <combo_box.item label="２分" name="item0" />
     <combo_box.item label="５分" name="item1" />
     <combo_box.item label="１０分" name="item2" />
     <combo_box.item label="３０分" name="item3" />
     <combo_box.item label="離席設定なし" name="item4" />
   </combo_box>
-  <text name="text_box3">「着信拒否」時の応答：</text>
+  <text name="text_box3">「取り込み中」のときの応答：</text>
   <text_editor name="do_not_disturb_response">log_in_to_change</text_editor>
 </panel>

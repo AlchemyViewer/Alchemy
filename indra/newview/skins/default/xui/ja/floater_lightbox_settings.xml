@@ -240,8 +240,8 @@
       <check_box follows="left|top" height="15" left="30" top_pad="4" width="80" layout="topleft" label="フォーカスをロック（Alt＋Shift＋X）" tool_tip="ＤｏＦの現在のフォーカスポイントをロックします。" control_name="RenderFocusPointLocked" />
       <!--DOF Resolution-->
       <!--TODO: Ensure this setting is temporary? Large CoC @ Full Res has caused Login-Crashes on other viewers, even on high end GPUs!-->
-      <text follows="left|top" height="15" left="30" top_pad="4" width="80" layout="topleft" tool_tip="被写界深度のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" value="ＤｏＦ解像度： " />
-      <combo_box tool_tip="被写界深度のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" name="dof_res_combo">
+      <text follows="left|top" height="15" left="30" top_pad="4" width="80" layout="topleft" tool_tip="被写界深度のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアーが応答しなくなる可能性があります。" value="ＤｏＦ解像度： " />
+      <combo_box tool_tip="被写界深度のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアーが応答しなくなる可能性があります。" name="dof_res_combo">
         <combo_box.item label="１／４" name="dof_quarterres" value="0.25" />
         <combo_box.item label="１／２" name="dof_halfres" value="0.5" />
         <combo_box.item label="完全" name="dof_fullres" value="1.0" />
@@ -263,9 +263,9 @@
       <button name="dofFocal_default_btn" />
       <!--Circle of Confusion-->
       <!--TODO: This can get dangerous on low-end machines! See DoF Resolution-->
-      <text follows="left|top" height="15" left="30" top_pad="3" width="80" layout="topleft" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアまたはシステムが応答しなくなる可能性があります。" value="最大錯乱円：" />
-      <slider_bar name="dof_coc_slider" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアまたはシステムが応答しなくなる可能性があります。" />
-      <spinner name="dof_coc_spinner" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアまたはシステムが応答しなくなる可能性があります。" />
+      <text follows="left|top" height="15" left="30" top_pad="3" width="80" layout="topleft" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアーまたはシステムが応答しなくなる可能性があります。" value="最大錯乱円：" />
+      <slider_bar name="dof_coc_slider" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアーまたはシステムが応答しなくなる可能性があります。" />
+      <spinner name="dof_coc_spinner" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアーまたはシステムが応答しなくなる可能性があります。" />
       <button name="dofCOF_default_btn" />
       <!--Focus Transition Time-->
       <text follows="left|top" height="15" left="30" top_pad="3" width="100" layout="topleft" tool_tip="カメラが新しい焦点に移動するまでにかかる時間。" value="遷移時間（秒）：" />

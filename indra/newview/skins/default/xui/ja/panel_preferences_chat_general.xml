@@ -71,7 +71,7 @@
       <item label="アクションなし" name="NoAction" value="noaction" />
     </combo_box>
     <check_box label="サウンド再生" name="play_sound_object_im" />
-    <text name="notifications_alert">すべての通知を一時的に停止するには、「コミュニケーション」＞「着信拒否」を選択します。</text>
+    <text name="notifications_alert">すべての通知を一時的に停止するには、「コミュニケーション」＞「取り込み中」を選択します。</text>
   </panel>
 
   <panel name="play_sound_settings">

@@ -14,8 +14,8 @@ that are returned from one component and may appear in many places
   <string name="SECOND_LIFE_GRID">[CURRENT_GRID]グリッド</string>
   <string name="SUPPORT_SITE">サポートポータル</string>
   <!-- Default Args set in LLViewerNetwork -->
-  <string name="CURRENT_GRID"/>
-  <string name="GRID_ADMIN"/>
+  <string name="CURRENT_GRID" />
+  <string name="GRID_ADMIN" />
 
   <!-- starting up -->
   <string name="StartupDetectingHardware">ハードウェアを検出しています…</string>
@@ -128,16 +128,16 @@ LibVLCのバージョン：[LIBVLC_VERSION]
   <string name="Quit">終了</string>
   <string name="create_account_url">https://join.secondlife.com/?lang=ja&amp;sourceid=[sourceid]</string>
 
-  <string name="AgniGridLabel">Second Lifeメイングリッド (Agni)</string>
-  <string name="AditiGridLabel">Second Lifeベータテストグリッド (Aditi)</string>
+  <string name="AgniGridLabel">Second Lifeメイングリッド（Agni）</string>
+  <string name="AditiGridLabel">Second Lifeベータテストグリッド（Aditi）</string>
 
   <string name="ViewerDownloadURL">https://www.alchemyviewer.org/pages/downloads.html</string>
-  <string name="LoginFailedViewerNotPermitted">お使いの古いビューアでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアをダウンロードしてください： https://secondlife.com/support/downloads/?lang=ja
+  <string name="LoginFailedViewerNotPermitted">お使いの古いビューアーでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアーをダウンロードしてください： https://secondlife.com/support/downloads/?lang=ja
 
 詳細については、FAQ を参照してください：
 https://www.alchemyviewer.org/pages/downloads.html</string>
-  <string name="LoginIntermediateOptionalUpdateAvailable">ビューアの更新（オプション）があります：[VERSION]</string>
-  <string name="LoginFailedRequiredUpdate">ビューアの更新（必須）：[VERSION]</string>
+  <string name="LoginIntermediateOptionalUpdateAvailable">ビューアーの更新（オプション）があります：[VERSION]</string>
+  <string name="LoginFailedRequiredUpdate">ビューアーの更新（必須）：[VERSION]</string>
   <string name="LoginFailedAlreadyLoggedIn">このエージェントは既にログインしています。</string>
   <string name="LoginFailedAuthenticationFailed">申し訳ありませんが、ログインできませんでした。
 以下の情報が正しく入力されたことを確認してください：
@@ -207,7 +207,7 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="ShuttingDown">シャットダウン中です…</string>
   <string name="YouHaveBeenDisconnected">あなたがいたリージョンへの接続が切れました。</string>
   <string name="SentToInvalidRegion">無効なリージョンにテレポートされました。</string>
-  <string name="TestingDisconnect">ビューアの接続を切るテスト中</string>
+  <string name="TestingDisconnect">ビューアーの接続を切るテスト中</string>
 
   <!-- SLShare: User Friendly Filter Names Translation -->
   <string name="BlackAndWhite">白黒</string>
@@ -316,7 +316,7 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="NoneFound">見つかりませんでした。</string>
 
   <!-- Indicates that an avatar name or other similar datum is being retrieved. General usage. -->
-  <string name="RetrievingData">取得中…</string>
+  <string name="RetrievingData">取得しています…</string>
 
   <string name="ReleaseNotes">リリースノート</string>
   <!-- Always mark translate="false" for strings that are nothing but URLs, as they don't need translation. -->
@@ -348,7 +348,7 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="AssetErrorFileNotFound">ファイルが見つかりません</string>
   <string name="AssetErrorTCPTimeout">ファイルの転送タイムアウト</string>
   <string name="AssetErrorCircuitGone">サーキットエラー</string>
-  <string name="AssetErrorPriceMismatch">ビューアとサーバー上の値段が一致していません。</string>
+  <string name="AssetErrorPriceMismatch">ビューアーとサーバー上の値段が一致していません。</string>
   <string name="AssetErrorUnknownStatus">不明のステータス</string>
 
   <!-- Asset upload errors. -->
@@ -396,8 +396,8 @@ support@secondlife.com にお問い合わせください。</string>
 
   <!-- llvoavatar. Displayed in the avatar chat bubble -->
   <string name="AvatarEditingAppearance">（容姿の編集中）</string>
-  <string name="AvatarAway">一時退席中</string>
-  <string name="AvatarDoNotDisturb">着信拒否</string>
+  <string name="AvatarAway">離席中</string>
+  <string name="AvatarDoNotDisturb">取り込み中</string>
   <string name="AvatarMuted">ブロック中</string>
 
   <!-- animations -->
@@ -2535,9 +2535,9 @@ For AI Character: Get the closest navigable point to the point provided.
 
   <!-- Avatar complexity rendering messages, see llavatarrendernotifier. -->
   <string name="av_render_everyone_now">あなたは、全員から見えるようになりました。</string>
-  <string name="av_render_not_everyone">あなたは、周囲にいる一部の人から、見えない可能性があります。</string>
-  <string name="av_render_over_half">あなたは、周囲にいる半分以上の人から、見えない可能性があります。</string>
-  <string name="av_render_most_of">あなたは、周囲にいるほとんどの人から、見えない可能性があります。</string>
+  <string name="av_render_not_everyone">あなたは、周囲にいる一部の人から見えない可能性があります。</string>
+  <string name="av_render_over_half">あなたは、周囲にいる半分以上の人から見えない可能性があります。</string>
+  <string name="av_render_most_of">あなたは、周囲にいるほとんどの人から見えない可能性があります。</string>
   <string name="av_render_anyone">あなたは、周囲の誰からも見えていない可能性があります。</string>
 
   <!-- HUD complexity rendering messages, see llavatarrendernotifier. -->
@@ -2599,8 +2599,8 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="CompileQueueProblemDownloading">ダウンロードに問題があります</string>
   <string name="CompileQueueInsufficientPermDownload">権限不足のためスクリプトをダウンロードできません。</string>
   <string name="CompileQueueInsufficientPermFor">権限不足：</string>
-  <string name="CompileQueueUnknownFailure">原因不明の失敗によりダウンロードができません</string>
-  <string name="CompileNoExperiencePerm">[EXPERIENCE]体験による[SCRIPT]スクリプトのスキップ。</string>
+  <string name="CompileQueueUnknownFailure">原因不明の失敗によりダウンロードができません。</string>
+  <string name="CompileNoExperiencePerm">[EXPERIENCE]体験による[SCRIPT]スクリプトをスキップします。</string>
   <string name="CompileQueueTitle">再コンパイル進行</string>
   <string name="CompileQueueStart">再コンパイル</string>
   <string name="ResetQueueTitle">進行をリセット</string>
@@ -2614,7 +2614,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="CompileSuccessful">コンパイルが完了しました！</string>
   <string name="CompileSuccessfulSaving">コンパイル完了、保存しています…</string>
   <string name="SaveComplete">保存完了。</string>
-  <string name="UploadFailed">ファイルのアップロードが失敗しました:</string>
+  <string name="UploadFailed">ファイルのアップロードが失敗しました：</string>
   <string name="ObjectOutOfRange">スクリプト（オブジェクトが範囲外にあります）</string>
   <string name="ScriptWasDeleted">スクリプト（インベントリから削除済み）</string>
 
@@ -2651,9 +2651,9 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="RegionInfoAllEstatesOwnedBy">[OWNER]が所有するすべての不動産</string>
   <string name="RegionInfoAllEstatesYouOwn">あなたが所有するすべての不動産</string>
   <string name="RegionInfoAllEstatesYouManage">あなたが[OWNER]のために管理するすべての不動産</string>
-  <string name="RegionInfoAllowedResidents">常に許可：（[MAXACCESS]人中[ALLOWEDAGENTS]人）</string>
-  <string name="RegionInfoAllowedGroups">グループを常に許可：（[MAXACCESS]グループ中[ALLOWEDGROUPS]グループ）</string>
-  <string name="RegionInfoBannedResidents">常に禁止：（[MAXBANNED]人中[BANNEDAGENTS]人）</string>
+  <string name="RegionInfoAllowedResidents">常に許可：（全[MAXACCESS]人中[ALLOWEDAGENTS]人）</string>
+  <string name="RegionInfoAllowedGroups">グループを常に許可：（最大[MAXACCESS]グループ中[ALLOWEDGROUPS]グループ）</string>
+  <string name="RegionInfoBannedResidents">常に禁止：（全[MAXBANNED]人中[BANNEDAGENTS]人）</string>
   <string name="RegionInfoListTypeAllowedAgents">常に許可</string>
   <string name="RegionInfoListTypeBannedAgents">常に禁止</string>
   <string name="RegionInfoAllEstates">すべての不動産</string>
@@ -2664,10 +2664,10 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- script limits floater -->
   <string name="ScriptLimitsParcelScriptMemory">区画スクリプトメモリ</string>
   <string name="ScriptLimitsParcelsOwned">区画一覧：[PARCELS]個</string>
-  <string name="ScriptLimitsMemoryUsed">使用されたメモリ：[MAX]㎅中[COUNT]㎅使用　[AVAILABLE]㎅利用可</string>
+  <string name="ScriptLimitsMemoryUsed">使用されたメモリ：全[MAX]㎅中[COUNT]㎅使用　[AVAILABLE]㎅利用可</string>
   <string name="ScriptLimitsMemoryUsedSimple">使用されたメモリ：[COUNT]㎅</string>
   <string name="ScriptLimitsParcelScriptURLs">区画のスクリプトＵＲＬ</string>
-  <string name="ScriptLimitsURLsUsed">使用されたＵＲＬ：[MAX]件中[COUNT]件使用　[AVAILABLE]件利用可</string>
+  <string name="ScriptLimitsURLsUsed">使用されたＵＲＬ：全[MAX]件中[COUNT]件使用　[AVAILABLE]件利用可</string>
   <string name="ScriptLimitsURLsUsedSimple">使用されたＵＲＬ：[COUNT]件</string>
   <string name="ScriptLimitsRequestError">情報のリクエスト中にエラーが発生しました</string>
   <string name="ScriptLimitsRequestNoParcelSelected">区画が選択されていません。</string>
@@ -2747,7 +2747,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="PanelContentsNewScript">新規スクリプト</string>
 
   <!-- panel preferences general -->
-  <string name="DoNotDisturbModeResponseDefault">この住民が「着信拒否」をオンにすると、あなたのメッセージが後で表示されるようになります。</string>
+  <string name="DoNotDisturbModeResponseDefault">この住民が「取り込み中」をオンにすると、あなたのメッセージが後で表示されるようになります。</string>
 
   <!-- Mute -->
   <string name="MuteByName">（名前で）</string>
@@ -3552,13 +3552,13 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="UpdaterWindowTitle">[APP_NAME]の更新</string>
   <string name="UpdaterNowUpdating">只今[APP_NAME]を更新中です…</string>
   <string name="UpdaterNowInstalling">[APP_NAME]をインストール中です…</string>
-  <string name="UpdaterUpdatingDescriptive">お使いの[APP_NAME]ビューアを最新バージョンに更新しています。数分かかることがありますのでしばらくお待ちください。</string>
+  <string name="UpdaterUpdatingDescriptive">お使いの[APP_NAME]ビューアーを最新バージョンに更新しています。数分かかることがありますのでしばらくお待ちください。</string>
   <string name="UpdaterProgressBarTextWithEllipses">アップデートをダウンロード中です…</string>
   <string name="UpdaterProgressBarText">更新をダウンロード中…</string>
   <string name="UpdaterFailDownloadTitle">更新のダウンロードに失敗しました。</string>
   <string name="UpdaterFailUpdateDescriptive">[APP_NAME]の更新中にエラーが発生しました。www.secondlife.com から最新バージョンをダウンロードしてください。</string>
   <string name="UpdaterFailInstallTitle">更新のインストールに失敗しました。</string>
-  <string name="UpdaterFailStartTitle">ビューアの起動に失敗しました。</string>
+  <string name="UpdaterFailStartTitle">ビューアーの起動に失敗しました。</string>
 
   <!-- System Messages -->
   <string name="ItemsComingInTooFastFrom">[APP_NAME]：アイテムが[FROM_NAME]から同時にたくさん読み込まれているため、自動プレビューが[TIME]秒間無効となります。</string>
@@ -3779,7 +3779,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="/whistle">/口笛を吹く</string>
   <string name="/yes">/はい</string>
   <string name="/yes!">/イエス！</string>
-  <string name="afk">一時退席中</string>
+  <string name="afk">離席</string>
   <string name="dance1">ダンス１</string>
   <string name="dance2">ダンス２</string>
   <string name="dance3">ダンス３</string>

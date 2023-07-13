@@ -29,7 +29,7 @@
   <text name="vsync_desc_limit">注意：VSyncをオンにすると、フレームレートが[FPS_LIMIT]fpsに制限されます。</text>
   <view_border name="border1" />
   <text name="simplify_dist_desc">遠くにあるアバターの表示の詳細度を減らすと、グラフィックスの速度が向上します。</text>
-  <check_box label="アバターをさらに簡素化" name="AutoTuneImpostorByDistEnabled" tool_tip="有効にするとビューアは、MaxNonImpostorsの設定を調整して、完全にレンダリングされるアバターを指定された半径内のアバターに限定します。" />
+  <check_box label="アバターをさらに簡素化" name="AutoTuneImpostorByDistEnabled" tool_tip="有効にするとビューアーは、MaxNonImpostorsの設定を調整して、完全にレンダリングされるアバターを指定された半径内のアバターに限定します。" />
   <spinner name="ffa_autotune"/>
   <text name="dist_meters">メートル</text>
   <view_border name="border2" />
