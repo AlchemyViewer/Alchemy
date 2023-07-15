@@ -12299,13 +12299,6 @@ Would you like to save them first?
        yestext="Yes"/>
   </notification>
     
-<notification
- icon="notifytip.tga"
- name="MaterialCreated"
- type="notifytip">
-Material successfully created.  Asset ID: [ASSET_ID]
-</notification>
-
   <notification
     icon="notifytip.tga"
     name="ReflectionProbeApplied"
