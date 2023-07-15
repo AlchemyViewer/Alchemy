@@ -535,8 +535,19 @@ L$が不足しているので、このグループに参加することができ
   <notification name="ErrorUploadingReportScreenshot">以下の理由で、レポートのスクリーンショットのアップロード時に問題が起こりました：[REASON]
     <tag>fail</tag>
   </notification>
-  <notification name="MustAgreeToLogIn">[SECOND_LIFE]へのログインを続けるには、Second Lifeの利用規約、プライバシーポリシー、およびサービス規約に同意する必要があります。
+  <notification name="MustAgreeToLogIn">[CURRENT_GRID]へのログインを続けるには、[CURRENT_GRID]の利用規約、プライバシーポリシー、およびサービス規約に同意する必要があります。
     <tag>fail</tag>
+  </notification>
+  <notification name="CouldNotBuyCurrency">[TITLE]
+[MESSAGE]
+    <tag>fail</tag>
+    <usetemplate name="okbutton" yestext="ＯＫ"/>
+  </notification>
+  <notification name="CouldNotBuyCurrencyOS">[TITLE]
+[MESSAGE]
+    <tag>confirm</tag>
+    <url option="0" name="url" target="_external">[LINK]</url>
+    <usetemplate name="okcancelbuttons" notext="いいえ" yestext="ＯＫ"/>
   </notification>
   <notification name="CouldNotPutOnOutfit">アウトフィットを装着できません。
 アウトフィットフォルダに服装、身体部位、装着物がありません。
@@ -558,7 +569,7 @@ L$が不足しているので、このグループに参加することができ
   <notification name="MustHaveAccountToLogIn">おっと、記入漏れがあります。
 アバターのユーザー名を入力してください。
 
-[SECOND_LIFE]に入るにはアカウントが必要です。今すぐアカウントを作成しますか？
+[CURRENT_GRID]に入るにはアカウントが必要です。今すぐアカウントを作成しますか？
     <tag>confirm</tag>
     <url name="url">[create_account_url]</url>
     <usetemplate name="okcancelbuttons" notext="もう一度試す" yestext="新しいアカウントを作成" />
@@ -616,7 +627,7 @@ L$が不足しているので、このグループに参加することができ
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
-  <notification name="PromptGoToEventsPage">[SECOND_LIFE]イベントWebページに移動しますか？
+  <notification name="PromptGoToEventsPage">[CURRENT_GRID]イベントWebページに移動しますか？
     <url name="url">https://secondlife.com/my/community/events/?lang=ja-JP</url>
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
@@ -640,11 +651,15 @@ L$が不足しているので、このグループに参加することができ
   <notification name="CacheWillClear">キャッシュは、[APP_NAME]再起動後にクリアされます。</notification>
   <notification name="CacheWillBeMoved">キャッシュは、[APP_NAME]再起動後が移動されます。
 注意：キャッシュがクリアされます。</notification>
-  <notification name="ChangeConnectionPort">ポートの設定は、[APP_NAME]再起動後に反映されます。</notification>
+  <notification name="ChangeConnectionPort">ポートの設定は、[APP_NAME]再起動後に反映されます。
+修正した色をスキンのデフォルトに戻してもよろしいですか？
+    <tag>confirm</tag>
+    <usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="いいえ" yestext="はい" />
+  </notification>
   <notification name="ChangeDeferredDebugSetting">デバッグ設定の変更は、[APP_NAME]再起動後に反映されます。</notification>
   <notification name="ChangeSkin">新しいスキンは、[APP_NAME]再起動後に表示されます。</notification>
   <notification name="ChangeLanguage">言語の変更は、[APP_NAME]再起動後に反映されます。</notification>
-  <notification name="GoToAuctionPage">[SECOND_LIFE]のWebページに移動し、入札あるいはオークションの詳細を確認しますか？
+  <notification name="GoToAuctionPage">[CURRENT_GRID]のWebページに移動し、入札あるいはオークションの詳細を確認しますか？
     <tag>confirm</tag>
     <url name="url">http://secondlife.com/auctions/auction-detail.php?id=[AUCTION_ID]&amp;lang=ja-JP</url>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
@@ -793,17 +808,24 @@ L$が不足しているので、このグループに参加することができ
   <notification name="CannotGiveCategory">選択したフォルダを渡す権限がありません。
     <tag>fail</tag>
   </notification>
-  <notification name="FreezeAvatar">このアバターをフリーズしますか？
+  <notification name="FreezeAvatar">[AVATAR_NAMES]をフリーズしますか？
 アバターは一時的に動けなくなり、チャットを含めインワールドで何もできなくなります。
     <tag>confirm</tag>
     <usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="解除" yestext="フリーズ" />
+  </notification>
+  <notification name="FreezeAvatarMultiple">以下の住民らをフリーズしますか？
+彼らは一時的に動けなくなり、チャットを含めインワールドで何もできなくなります。
+
+[AVATAR_NAMES]
+    <tag>confirm</tag>
+    <usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="解除" yestext="フリーズ"/>
   </notification>
   <notification name="FreezeAvatarFullname">[AVATAR_NAME]をフリーズしますか？
 フリーズされた人は一時的に動けなくなり、チャットなど、この世界に対する関わりを持つことができなくなります。
     <tag>confirm</tag>
     <usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="解除" yestext="フリーズ" />
   </notification>
-  <notification name="EjectAvatarFullname">あなたの土地から[AVATAR_NAME]を追放しますか？
+  <notification name="EjectAvatarFullname">あなたの土地から[AVATAR_NAMES]を追放しますか？
     <tag>confirm</tag>
     <usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="追放しバンする" yestext="追放する" />
   </notification>
@@ -811,9 +833,55 @@ L$が不足しているので、このグループに参加することができ
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="追放" />
   </notification>
-  <notification name="EjectAvatarFullnameNoBan">[AVATAR_NAME]をあなたの土地から追放しますか？
+  <notification name="EjectAvatarFullnameNoBan">[AVATAR_NAMES]をあなたの土地から追放しますか？
+    <tag>confirm</tag>
+    <usetemplate name="okcancelbuttons" notext="Cancel" yestext="Eject"/>
+  </notification>
+  <notification name="EjectAvatarMultiple">以下の住民らをあなたの土地から追放しますか？
+
+[AVATAR_NAMES]
+    <tag>confirm</tag>
+    <usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="追放しバンする" yestext="追放する" />
+  </notification>
+
+  <notification name="EjectAvatarMultipleNoBan">以下の住民らをあなたの土地から追放しますか？
+
+[AVATAR_NAMES]
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="追放" />
+  </notification>
+
+  <notification label="ホームにテレポートさせる確認" name="EstateTeleportHomeSingle">[AVATAR_NAMES]というアバターをホームにてレポートさせますか？
+    <tag>confirm</tag>
+    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
+  </notification>
+
+  <notification label="ホームにテレポートさせる確認" name="EstateTeleportHomeMultiple">以下の住民らをホームにテレポートさせますか？
+
+[AVATAR_NAMES]
+    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
+  </notification>
+
+  <notification label="Confirm Kick" name="EstateKickSingle">この不動産から[AVATAR_NAMES]をキックしますか？
+    <tag>confirm</tag>
+    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
+  </notification>
+
+  <notification label="Confirm Kick" name="EstateKickMultiple">以下の住民らをこの不動産からキックしますか？
+
+[AVATAR_NAMES]
+    <tag>confirm</tag>
+    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
+  </notification>
+
+  <notification label="バンの確認" name="EstateBanSingle">[AVATAR_NAMES]のこの不動産のみ、または[ALL_ESTATES]へのアクセスを拒否しますか？
+    <usetemplate name="yesnocancelbuttons" canceltext="キャンセル" notext="すべての不動産" yestext="この不動産" />
+  </notification>
+
+  <notification label="Confirm Ban" name="EstateBanMultiple">以下の住民らをこの不動産のみ、または[ALL_ESTATES]へのアクセスを拒否しますか？
+
+[AVATAR_NAMES]
+    <usetemplate name="yesnocancelbuttons" canceltext="キャンセル" notext="すべての不動産" yestext="この不動産" />
   </notification>
   <notification name="EjectAvatarFromGroup">&lt;nolink&gt;[GROUP_NAME]&lt;/nolink&gt;から[AVATAR_NAME]を追放しました。
     <tag>group</tag>
@@ -896,7 +964,7 @@ L$が不足しているので、このグループに参加することができ
 [FILE]
     <tag>fail</tag>
   </notification>
-  <notification name="SoundFileInvalidTooLong">オーディオファイルが長すぎます。（最大[MAX_LENGTH]秒）：
+  <notification name="SoundFileInvalidTooLong">オーディオファイルが長すぎます。（最大６０秒）：
 [FILE]
     <tag>fail</tag>
   </notification>
@@ -973,6 +1041,11 @@ L$が不足しているので、このグループに参加することができ
   </notification>
   <notification name="CannotResetSelectObjectsNoPermission">「再設定」ができません。
 修正権限のある、スクリプトが入ったオブジェクトを選択してください。
+    <tag>fail</tag>
+  </notification>
+  <notification name="CannotDeleteSelectObjectsNoScripts">「削除」ができません。
+
+スクリプトが入ったオブジェクトを選択してください。
     <tag>fail</tag>
   </notification>
   <notification name="CannotOpenScriptObjectNoMod">修正権限のないオブジェクトのスクリプトは開くことはできません。
@@ -1264,7 +1337,9 @@ L$が不足しているので、このグループに参加することができ
     <tag>fail</tag>
   </notification>
 
-  <notification name="YouHaveBeenLoggedOut">しまった、[SECOND_LIFE]からログアウトされてしまいました。[MESSAGE]
+  <notification name="YouHaveBeenLoggedOut">しまった、[CURRENT_GRID]からログアウトされてしまいました。
+
+[MESSAGE]
     <usetemplate name="okcancelbuttons" notext="終了" yestext="ＩＭでチャット" />
   </notification>
 
@@ -1560,7 +1635,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
   </notification>
 
   <notification name="ClothingLoading">現在服装をダウンロード中です。
-このまま[SECOND_LIFE]を通常通りご使用いただけます。他人からはあなたは正しく表示されます。
+このまま[CURRENT_GRID]を通常通りご使用いただけます。他人からはあなたは正しく表示されます。
     <form name="form">
       <ignore name="ignore" text="服装がダウンロードされるまで時間がかかっているとき" />
     </form>
@@ -1589,8 +1664,9 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
     <usetemplate ignoretext="ＨＵＤが複雑すぎる場合の警告" name="notifyignore" />
   </notification>
 
-  <notification name="FirstRun">[APP_NAME]のインストールが完了しました。
-[SECOND_LIFE]を使ったことがない場合は、ログインする前にアカウントの作成を行ってください。
+  <notification name="FirstRun">
+[APP_NAME]のインストールが完了しました。
+[CURRENT_GRID]を使ったことがない場合は、ログインする前にアカウントの作成を行ってください。
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="続行" yestext="アカウントを作成…" />
   </notification>
@@ -1608,7 +1684,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 
 インターネット接続を確認してから数分後に再接続するか、ヘルプをクリックして [SUPPORT_SITE]をご覧になるか、テレポートをクリックしてホームに移動してみてください。
     <tag>fail</tag>
-    <url name="url">https://support.secondlife.com/</url>
+    <url name="url">https://git.alchemyviewer.org/alchemy/alchemy-next/issues</url>
     <form name="form">
       <button name="ＯＫ" text="ＯＫ" />
       <button name="Help" text="ヘルプ" />
@@ -1771,7 +1847,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
   <notification name="FinishedRawDownload">未加工の地形ファイルをダウンロードしました：[DOWNLOAD_PATH]</notification>
 
   <notification name="RequiredUpdate">ログインするには、バージョン[VERSION]が必要です。以下からダウンロードしてください。
-https://secondlife.com/support/downloads/
+https://www.alchemyviewer.org/downloads.html
     <tag>confirm</tag>
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
@@ -1822,17 +1898,17 @@ OKをクリックして、ダウンロードとインストールを開始しま
     <usetemplate ignoretext="ブラウザを起動して、アカウントを管理するとき" name="okcancelignore" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
-  <notification name="WebLaunchSecurityIssues">[SECOND_LIFE] Wikiで、セキュリティ問題を報告する方法をご覧ください。
+  <notification name="WebLaunchSecurityIssues">[CURRENT_GRID] Wikiで、セキュリティ問題を報告する方法をご覧ください。
     <tag>confirm</tag>
     <usetemplate ignoretext="ブラウザを起動して、セキュリティ問題の報告方法を確認するとき" name="okcancelignore" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
-  <notification name="WebLaunchQAWiki">[SECOND_LIFE] QA（品質保証）Wikiをご覧ください。
+  <notification name="WebLaunchQAWiki">[CURRENT_GRID] QA（品質保証）Wikiをご覧ください。
     <tag>confirm</tag>
     <usetemplate ignoretext="ブラウザを起動して、QA Wikiを閲覧するとき" name="okcancelignore" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
-  <notification name="WebLaunchPublicIssue">[SECOND_LIFE] Public Issue Trackerにアクセスして、バグやその他の問題を報告できます。
+  <notification name="WebLaunchPublicIssue">[CURRENT_GRID] Public Issue Trackerにアクセスして、バグやその他の問題を報告できます。
     <tag>confirm</tag>
     <usetemplate ignoretext="ブラウザを起動して、Public Issue Trackerにアクセスするとき" name="okcancelignore" notext="キャンセル" yestext="ページへ行く" />
   </notification>
@@ -1941,7 +2017,7 @@ OKをクリックして、ダウンロードとインストールを開始しま
     <usetemplate name="okbutton" yestext="閉じる" />
   </notification>
 
-  <notification name="KickUser">どのようなメッセージを添えて、この住人を追い出しますか？
+  <notification name="KickUser">どのようなメッセージを添えて、この[AVATAR_NAME]をログアウトさせますか？
     <tag>win</tag>
     <tag>confirm</tag>
     <form name="form">
@@ -1961,7 +2037,7 @@ OKをクリックして、ダウンロードとインストールを開始しま
     </form>
   </notification>
 
-  <notification name="FreezeUser">どのようなメッセージを添えて、この住人をフリーズしますか？
+  <notification name="FreezeUser">どのようなメッセージを添えて、この[AVATAR_NAME]をフリーズしますか？
     <tag>win</tag>
     <tag>confirm</tag>
     <form name="form">
@@ -1971,7 +2047,7 @@ OKをクリックして、ダウンロードとインストールを開始しま
     </form>
   </notification>
 
-  <notification name="UnFreezeUser">どのようなメッセージを添えて、この住人のフリーズを解除しますか？
+  <notification name="UnFreezeUser">どのようなメッセージを添えて、この[AVATAR_NAME]のフリーズを解除しますか？
     <tag>win</tag>
     <tag>confirm</tag>
     <form name="form">
@@ -2030,6 +2106,14 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
       <input name="message">[REGION]に来てみませんか？</input>
       <button name="ＯＫ" text="ＯＫ" />
       <button name="Cancel" text="キャンセル" />
+    </form>
+  </notification>
+  <notification name="TeleportRequestPrompt">次のメッセージを使用して、[NAME]にあなたのいる場所へのテレポートのリクエストをしますか？
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="message" type="text">こちらに入りませんか？</input>
+      <button default="true" index="0" name="OK" text="ＯＫ"/>
+      <button index="1" name="Cancel" text="キャンセル"/>
     </form>
   </notification>
 
@@ -2427,7 +2511,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="いいえ" yestext="はい" />
   </notification>
 
-  <notification label="再起動を確認" name="ConfirmRestart">このリージョンを２分後に再起動しようとしています。このまま続けてもよろしいですか？
+  <notification label="再起動を確認" name="ConfirmRestart">このリージョンは[SECONDS]秒後に再起動しようとしています。このまま続けてもよろしいですか？
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
@@ -2678,15 +2762,15 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 
 知的財産権の侵害を報告しているようです。正しく報告していることを確認してください。
 
-⑴嫌がらせの報告の手順。居住者が、[SECOND_LIFE]権限システムを悪用していると思われる場合（たとえば、CopyBotまたは同様のコピーツールを使用して、知的財産権を侵害していると思われる場合）は、不正使用報告を提出することができます。不正行為チームは、[SECOND_LIFE][http://secondlife.com/corporate/tos.php 利用規約]や、[http://jp.secondlife.com/corporate/cs.php コミュニティ・スタンダード]に違反する行為を調査し、に違反する行為に対する適切な処罰を下します。ただし、担当チームは[SECOND_LIFE]の世界からコンテンツを削除して欲しいというリクエストには応じません。
+⑴嫌がらせの報告の手順。居住者が、[CURRENT_GRID]権限システムを悪用していると思われる場合（たとえば、CopyBotまたは同様のコピーツールを使用して、知的財産権を侵害していると思われる場合）は、不正使用報告を提出することができます。不正行為チームは、[SECOND_LIFE][http://secondlife.com/corporate/tos.php 利用規約]や、[http://jp.secondlife.com/corporate/cs.php コミュニティ・スタンダード]に違反する行為を調査し、に違反する行為に対する適切な処罰を下します。ただし、担当チームは[SECOND_LIFE]の世界からコンテンツを削除して欲しいというリクエストには応じません。
 
-⑵DMCA またはコンテンツ削除プロセス。[SECOND_LIFE]からコンテンツの削除をリクエストするには、[https://www.lindenlab.com/legal/intellectual-property-infringement-notification-policy ＤＣＭＡポリシー]に規定されている有効な権利侵害通知を提出する必要があります。
+⑵DMCA またはコンテンツ削除プロセス。[CURRENT_GRID]からコンテンツの削除をリクエストするには、[https://www.lindenlab.com/legal/intellectual-property-infringement-notification-policy ＤＣＭＡポリシー]に規定されている有効な権利侵害通知を提出する必要があります。
 
 このまま嫌がらせの報告を続けたい場合は、このウィンドウを閉じて報告の送信を完了してください。特定のカテゴリ「コピー Bot 及び権限の悪用」を選択する必要がある場合があります。
 
 ご協力ありがとうございます。
 
-Linden Lab</notification>
+[CURRENT_GRID]</notification>
 
   <notification name="FailedRequirementsCheck">以下の必要なコンポーネントが、[FLOATER]から抜け落ちています
 [COMPONENTS]
@@ -2853,7 +2937,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     <tag>fail</tag>
   </notification>
 
-  <notification name="Cannot enter parcel: no payment info on file">支払情報が登録されていないため、このエリアを訪れることができません。[SECOND_LIFE]サイトで登録を行いますか？
+  <notification name="Cannot enter parcel: no payment info on file">支払情報が登録されていないため、このエリアを訪れることができません。[CURRENT_GRID]サイトで登録を行いますか？
   
 [_URL]
     <tag>confirm</tag>
@@ -2866,7 +2950,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
   </notification>
 
   <notification name="SystemMessageTip">[MESSAGE]</notification>
-
+  <notification name="ChatSystemMessageTip">[MESSAGE]</notification>
   <notification name="IMSystemMessageTip">[MESSAGE]</notification>
 
   <notification name="Cancelled">取り消されました。</notification>
@@ -3249,7 +3333,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     </form>
   </notification>
 
-  <notification name="UserGiveItem">[NAME_SLURL] が、あなたに[OBJECTTYPE]を渡しました：
+  <notification name="UserGiveItem" label="[NAME_LABEL]からのインベントリのオファー">[NAME_SLURL] が、あなたに[OBJECTTYPE]を渡しました：
 [ITEM_SLURL]
     <form name="form">
       <button name="Show" text="表示" />
@@ -3271,7 +3355,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     </form>
   </notification>
 
-  <notification name="TeleportOffered">[NAME_SLURL] は、テレポートであなたを呼んでいます。
+  <notification name="TeleportOffered" label="[NAME_LABEL]からのテレポートのオファー">[NAME_SLURL] は、テレポートであなたを呼んでいます。
 [MESSAGE]
 
 &lt;icon&gt;[MATURITY_ICON]&lt;/icon&gt;－[MATURITY_STR]
@@ -3325,7 +3409,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     </form>
   </notification>
 
-  <notification name="OfferFriendship">[NAME_SLURL] は、あなたにフレンド登録を申し込んでいます。
+  <notification name="OfferFriendship" label="[NAME_LABEL]からのフレンド登録のオファー">[NAME_SLURL] は、あなたにフレンド登録を申し込んでいます。
 
 [MESSAGE]
 
@@ -3488,7 +3572,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     <footer>[FOOTERTEXT]</footer>
   </notification>
 
-  <notification name="ScriptDialog">[NAME]の「&lt;nolink&gt;[TITLE]&lt;/nolink&gt;」
+  <notification name="ScriptDialog">[CHANNEL]での[NAME]の「&lt;nolink&gt;[TITLE]&lt;/nolink&gt;」
 [MESSAGE]
     <form name="form">
       <button name="Client_Side_Mute" text="ブロック" />
@@ -3866,6 +3950,8 @@ Your L$ balance is shown in the upper-right.
 [STATUS]</notification>
   <notification name="AvatarRezCloudNotification">（[EXISTENCE]秒）
 アバター「[NAME]」が、クラウドになります。</notification>
+
+  <notification name="AvatarRezSelfBakeForceUpdateNotification">ビューアは、あなたがクラウドのように見えることを検知し、自動的に修正しようとしています。</notification>
 
   <notification name="AvatarRezArrivedNotification">（[EXISTENCE]秒）
 アバター「[NAME]」が、現れます。</notification>
@@ -5160,6 +5246,18 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
   <notification name="LargePrimAgentIntersect">他の住民と交差する大きなプリムを作成することはできません。他の住民が移動した場合は再度お試しください。
     <tag>fail</tag>
+  </notification>
+
+  <notification name="RLVaChangeStrings">[APP_NAME]を再起動するまで効果は現れません。</notification>
+
+  <notification name="RLVaListRequested" label="[NAME_LABEL]からの制限要求">[NAME_SLURL]は、現在有効なＲＬＶ制限のリストを送信するよう要請しました。
+    <tag>confirm</tag>
+    <form name="form">
+      <button index="0" default="true" name="Allow" text="許可"/>
+      <button index="1" name="Always Allow" text="常に許可"/>
+      <button index="2" name="Deny" text="拒否"/>
+      <ignore text="現在のＲＬＶの制限のリストを誰かに送る前の確認"/>
+    </form>
   </notification>
 
   <notification name="PreferenceChatClearLog">これにより、過去の会話のログ、およびそのファイルのすべてのバックアップが削除されます。
