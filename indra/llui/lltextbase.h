@@ -680,7 +680,7 @@ protected:
 public:
 	bool							hasSelection() const { return (mSelectionStart !=mSelectionEnd); }
 
-    std::vector<LLRect> getSelctionRects(const highlight_list_t& highlights);
+    std::vector<LLRect> getSelectionRects(const highlight_list_t& highlights);
 
 protected:
 	// text segmentation and flow

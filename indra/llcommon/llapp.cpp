@@ -39,7 +39,6 @@
 #include "llcommon.h"
 #include "llapr.h"
 #include "llerrorcontrol.h"
-#include "llerrorthread.h"
 #include "llframetimer.h"
 #include "lllivefile.h"
 #include "llmemory.h"
@@ -100,12 +99,7 @@ LLAppErrorHandler LLApp::sErrorHandler = NULL;
 BOOL LLApp::sErrorThreadRunning = FALSE;
 
 
-LLApp::LLApp() : mThreadErrorp(NULL)
-{
-	commonCtor();
-}
-
-void LLApp::commonCtor()
+LLApp::LLApp()
 {
 	assert_main_thread();		// Make sure we record the main thread
 	on_main_thread();			// Make sure we record the main thread
@@ -133,12 +127,6 @@ void LLApp::commonCtor()
 	sApplication = this;
 }
 
-LLApp::LLApp(LLErrorThread *error_thread) :
-	mThreadErrorp(error_thread)
-{
-	commonCtor();
-}
-
 
 LLApp::~LLApp()
 {
@@ -148,13 +136,6 @@ LLApp::~LLApp()
 	mLiveFiles.clear();
 
 	setStopped();
-	// HACK: wait for the error thread to clean itself
-	ms_sleep(20);
-	if (mThreadErrorp)
-	{
-		delete mThreadErrorp;
-		mThreadErrorp = NULL;
-	}
 
 	SUBSYSTEM_CLEANUP_DBG(LLCommon);
 }
@@ -374,43 +355,17 @@ void LLApp::setupErrorHandling(bool second_instance)
 
 #if defined(LL_WINDOWS)
 
-#if LL_SEND_CRASH_REPORTS && ! defined(AL_SENTRY)
-	EnableCrashingOnCrashes();
-
-	// This sets a callback to handle w32 signals to the console window.
-	// The viewer shouldn't be affected, sicne its a windowed app.
-	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) ConsoleCtrlHandler, TRUE);
-#endif // LL_SEND_CRASH_REPORTS && ! defined(AL_SENTRY)
 #else  // ! LL_WINDOWS
 	//
+#if ! defined(AL_SENTRY)
 	// Start up signal handling.
 	//
 	// There are two different classes of signals.  Synchronous signals are delivered to a specific
 	// thread, asynchronous signals can be delivered to any thread (in theory)
 	//
 	setup_signals();
+#endif // ! AL_SENTRY
 #endif // ! LL_WINDOWS
-
-#if defined(AL_SENTRY)
-    // do not start our own error thread
-#else // ! AL_SENTRY
-	startErrorThread();
-#endif
-}
-
-void LLApp::startErrorThread()
-{
-	//
-	// Start the error handling thread, which is responsible for taking action
-	// when the app goes into the APP_STATUS_ERROR state
-	//
-	if(!mThreadErrorp)
-	{
-		LL_INFOS() << "Starting error thread" << LL_ENDL;
-		mThreadErrorp = new LLErrorThread();
-		mThreadErrorp->setUserData((void *) this);
-		mThreadErrorp->start();
-	}
 }
 
 void LLApp::setErrorHandler(LLAppErrorHandler handler)
@@ -473,7 +428,7 @@ void LLApp::setStatus(EAppStatus status)
 // static
 void LLApp::setError()
 {
-	// set app status to ERROR so that the LLErrorThread notices
+	// set app status to ERROR
 	setStatus(APP_STATUS_ERROR);
 }
 

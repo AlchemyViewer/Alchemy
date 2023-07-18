@@ -155,6 +155,7 @@ protected:
 
 	bool mMessagePaneExpanded;
 	bool mIsParticipantListExpanded;
+    S32 mMinFloaterHeight;
 
 
 	LLIMModel::LLIMSession* mSession;

@@ -194,7 +194,7 @@ void LLScriptEditor::drawSelectionBackground()
 	{
 		highlight_list_t highlights;
 		highlights.push_back(range_pair_t(llmin(mSelectionStart, mSelectionEnd), llmax(mSelectionStart, mSelectionEnd)));
-        std::vector<LLRect> selection_rects = getSelctionRects(highlights);
+        std::vector<LLRect> selection_rects = getSelectionRects(highlights);
 
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 		const LLColor4& color = mReadOnly ? mReadOnlyFgColor : mFgColor;
