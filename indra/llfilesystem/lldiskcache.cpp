@@ -120,6 +120,11 @@ void LLDiskCache::purge()
         {
             for (auto& entry : boost::make_iterator_range(dir_iter, {}))
             {
+                if(!LLApp::isRunning())
+                {
+                    return;
+                }
+
                 if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
                 {
                     if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
@@ -157,9 +162,15 @@ void LLDiskCache::purge()
     {
         file_removed.reserve(file_info.size());
     }
+
     uintmax_t file_size_total = 0;
     for (const file_info_t& entry : file_info)
     {
+		if (!LLApp::isRunning())
+		{
+			return;
+		}
+
         file_size_total += entry.second.first;
 
         bool should_remove = file_size_total > mMaxSizeBytes;
@@ -200,6 +211,11 @@ void LLDiskCache::purge()
         // Logging thousands of file results can take hundreds of milliseconds
         for (size_t i = 0; i < file_info.size(); ++i)
         {
+			if (!LLApp::isRunning())
+			{
+				return;
+			}
+
             const file_info_t& entry = file_info[i];
             const bool removed = file_removed[i];
             const std::string action = removed ? "DELETE:" : "KEEP:";

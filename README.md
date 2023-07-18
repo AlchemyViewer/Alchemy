@@ -1,7 +1,4 @@
- [![Alchemy Logo](https://www.alchemyviewer.org/images/banner.png)](https://www.alchemyviewer.org)
-
-[![Alchemy License](https://img.shields.io/badge/license-LGPL%202.1-blue.svg)](https://git.alchemyviewer.org/alchemy/alchemy-next/-/blob/master/LICENSE.md)
-[![pipeline status](https://git.alchemyviewer.org/alchemy/alchemy-next/badges/master/pipeline.svg)](https://git.alchemyviewer.org/alchemy/alchemy-next/-/commits/master)
+ [![Alchemy Logo](https://alchemyviewer.org/assets/images/banner-4bed76df9322897136b74485a58ae2d7.webp)](https://www.alchemyviewer.org)
 
 ## About
 [Alchemy](https://www.alchemyviewer.org) Viewer is a client for Second Life and OpenMetaverse protocol simulators. We focus on creating a smooth and easy to use experience with secure and sane defaults.
