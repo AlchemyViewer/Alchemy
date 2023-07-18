@@ -193,7 +193,7 @@ void LLVoiceChannel::handleError(EStatusType type)
 BOOL LLVoiceChannel::isActive()
 { 
 	// only considered active when currently bound channel matches what our channel
-	return callStarted() && LLVoiceClient::getInstance()->getCurrentChannel() == mURI;
+	return callStarted() && LLVoiceClient::getInstance()->getCurrentChannel() == mURI; 
 }
 
 BOOL LLVoiceChannel::callStarted()
@@ -684,7 +684,7 @@ void LLVoiceChannelProximal::activate()
 	if((LLVoiceChannel::sCurrentVoiceChannel != this) && (LLVoiceChannel::getState() == STATE_CONNECTED))
 	{
 		// we're connected to a non-spatial channel, so disconnect.
-		LLVoiceClient::getInstance()->leaveNonSpatialChannel();
+		LLVoiceClient::getInstance()->leaveNonSpatialChannel();	
 	}
 	LLVoiceChannel::activate();
 	
