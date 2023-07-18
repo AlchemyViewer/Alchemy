@@ -24,7 +24,7 @@
   <floater.string name="pathing_path_invalid">選択した２点間のパスが見つかりません。</floater.string>
   <floater.string name="pathing_error">パスの生成中にエラーが発生しました。</floater.string>
   <panel name="pathfinding_console_main">
-    <text name="viewer_status_label">ビューアーのステータス</text>
+    <text name="viewer_status_label">ビューアのステータス</text>
   </panel>
   <panel name="pathfinding_console_simulator">
     <text name="simulator_status_label">シミュレータのステータス</text>

@@ -78,7 +78,7 @@
     <menu_item_call label="スケルトンをリセット" name="Reset Skeleton" />
     <menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations" />
     <menu_item_call label="自分を変形しない" name="Undeform Me" />
-    <menu_item_call label="ビューアーのエフェクトをクリア" name="Clear Viewer Effects" />
+    <menu_item_call label="ビューアのエフェクトをクリア" name="Clear Viewer Effects" />
     <menu_item_call label="スクリプトを装着…" name="MyScripts" />
     <menu_item_separator />
     <menu_item_call label="アバターに関するヘルプ…" name="Help with avatars" />
@@ -497,7 +497,7 @@
       <menu_item_call label="ソフトウェア例外エラーの発生させる" name="Force Software Exception" />
       <menu_item_call label="コルーチン内でクラッシュを発生させる" name="Force a Crash in a Coroutine" />
       <menu_item_call label="スレッド内でクラッシュを発生させる" name="Force a Crash in a Thread" />
-      <menu_item_call label="ビューアーの接続遮断を実行する" name="Force Disconnect Viewer" />
+      <menu_item_call label="ビューアの接続遮断を実行する" name="Force Disconnect Viewer" />
       <menu_item_call label="メモリリークをシミュレートする" name="Memory Leaking Simulation" />
     </menu>
     <menu label="描画テスト" name="Render Tests">

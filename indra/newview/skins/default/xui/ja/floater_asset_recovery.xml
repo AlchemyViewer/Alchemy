@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="asset_recovery" title="アセット復元">
 
-  <text name="txt2">[APP_NAME]は、最近のビューアーのクラッシュで残った可能性のある復元可能なアイテムを検出しました。
+  <text name="txt2">[APP_NAME]は、最近のビューアのクラッシュで残った可能性のある復元可能なアイテムを検出しました。
 
 回収されたアイテムは「遺失物」インベントリフォルダーに置かれます。
   </text>

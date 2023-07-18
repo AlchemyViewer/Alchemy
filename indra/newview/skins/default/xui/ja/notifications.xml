@@ -58,7 +58,7 @@
   </template>
 
   <notification functor="GenericAcknowledge" label="不明な通知メッセージ" name="MissingAlert">現在使用中の[APP_NAME]のバージョンでは、受け取った通知メッセージを表示することができません。
-最新のビューアーがインストールされている事をご確認ください。
+最新のビューアがインストールされている事をご確認ください。
 
 エラー詳細：「 [_NAME] 」という通知メッセージは、notifications.xmlに定義されていませんでした。
     <tag>fail</tag>
@@ -87,7 +87,7 @@
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="BadInstallation">[APP_NAME]のアップデート中にエラーが発生しました。[https://alchemyviewer.org/downloads 最新バージョンのビューアーをダウンロード]してください。
+  <notification name="BadInstallation">[APP_NAME]のアップデート時にエラーが発生しました。[https://alchemyviewer.org/downloads 最新バージョンのビューアをダウンロード]してください。
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
@@ -99,7 +99,7 @@
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="LoginFailedToParse">ビューアーがサーバーから不正な形式の応答を受け取りました。インターネット接続が正常に機能していることを確認してから、後でもう一度お試しください。
+  <notification name="LoginFailedToParse">ビューアがサーバーから不正な形式の応答を受け取りました。インターネット接続が正常に機能していることを確認してから、後でもう一度お試しください。
 
 これが誤りだと思われる場合は、サポートにお問い合わせください。
     <tag>fail</tag>
@@ -245,7 +245,7 @@
   <notification name="FavoritesOnLogin">注意：このオプションを有効にすると、このパソコンを使うユーザーは誰でも、あなたのお気に入りの場所を見ることができるようになります。
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
-  <notification name="AllowMultipleViewers">Second Lifeビューアーの多重起動はサポートされていません。
+  <notification name="AllowMultipleViewers">Second Lifeビューアの多重起動はサポートされていません。
 テクスチャキャッシュの競合による破損や、およびビジュアルとパフォーマンスの低下につながる恐れがあります。
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
@@ -376,7 +376,7 @@ L$が不足しているので、このグループに参加することができ
     <tag>success</tag>
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
-  <notification name="JoinGroupError">グループ参加リクエスト中にエラーが発生しました。
+  <notification name="JoinGroupError">グループ参加のリクエスト時にエラーが発生しました。
     <tag>group_id</tag>
     <tag>success</tag>
     <usetemplate name="okbutton" yestext="ＯＫ" />
@@ -1078,7 +1078,7 @@ L$が不足しているので、このグループに参加することができ
   <notification name="invalid_tport">テレポートの試行は１分間に６回までと制限されています。１分待ってからもう一度テレポートしてみてください。問題が解決しない場合は、ログインし直してください。
     <tag>fail</tag>
   </notification>
-  <notification name="invalid_region_handoff">リージョン間の移動中に問題が発生しました。ログインし直す必要があるかもしれません。
+  <notification name="invalid_region_handoff">リージョン間の移動時に問題が発生しました。ログインし直す必要があるかもしれません。
 このメッセージが何度も出る場合は、[SUPPORT_SITE]をご確認ください。
     <tag>fail</tag>
   </notification>
@@ -1343,7 +1343,7 @@ L$が不足しているので、このグループに参加することができ
     <usetemplate name="okcancelbuttons" notext="終了" yestext="ＩＭでチャット" />
   </notification>
 
-  <notification name="InventoryUnusable">インベントリの読み込み中に問題が発生しました。まず、ログアウトして再度ログインし直してみてください。
+  <notification name="InventoryUnusable">インベントリの読み込み時に問題が発生しました。お手数ですが、ログアウトしてから再度ログインし直してみてください。
 このメッセージが再度表示される場合は、サポートに連絡して問題を解決してください。
     <tag>fail</tag>
   </notification>
@@ -1634,8 +1634,8 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
     <tag>fail</tag>
   </notification>
 
-  <notification name="ClothingLoading">現在服装をダウンロード中です。
-このまま[CURRENT_GRID]を通常通りご使用いただけます。他人からはあなたは正しく表示されます。
+  <notification name="ClothingLoading">現在服装をダウンロードしています。
+このまま[CURRENT_GRID]を通常通りご使用いただけます。他者からはあなたは正常に表示されています。
     <form name="form">
       <ignore name="ignore" text="服装がダウンロードされるまで時間がかかっているとき" />
     </form>
@@ -1698,7 +1698,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="女性" yestext="男性" />
   </notification>
-  <notification name="CantTeleportToGrid">現在のグリッド（[CURRENT_GRID]）とはグリッド（[GRID]）が異なるため、[SLURL] にテレポートできませんでした。ビューアーを閉じてからもう一度お試しください。
+  <notification name="CantTeleportToGrid">現在のグリッド（[CURRENT_GRID]）とはグリッド（[GRID]）が異なるため、[SLURL] にテレポートできませんでした。ビューアを閉じてからもう一度お試しください。
     <tag>fail</tag>
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
@@ -2648,7 +2648,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 
   <notification name="ClickActionNotPayable">警告：クリックで「オブジェクトに支払う」設定をしました。スクリプトにmoney()イベントが追加されると動作します。
     <form name="form">
-      <ignore name="ignore" text="オブジェクトを作成中に、money() スクリプトを入れずに「オブジェクトに支払う」アクションを設定したとき" />
+      <ignore name="ignore" text="オブジェクト作成時に、money() スクリプトを入れずに「オブジェクトに支払う」アクションを設定したとき" />
     </form>
   </notification>
 
@@ -2831,7 +2831,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
-  <notification name="ConfirmClearCache">ビューアーのキャッシュをクリアしますか？
+  <notification name="ConfirmClearCache">ビューアのキャッシュをクリアしますか？
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ" />
   </notification>
@@ -2971,7 +2971,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 
   <notification name="AddSelfRenderExceptions">あなた自身をレンダリングの例外リストに加えることはできません。</notification>
 
-  <notification name="UploadingAuctionSnapshot">インワールドとWebサイトのスナップショットをアップロード中です…
+  <notification name="UploadingAuctionSnapshot">インワールドとWebサイトのスナップショットをアップロードしています…
 （所要時間：約５分）</notification>
   <notification name="UploadPayment">アップロードにL$ [AMOUNT]支払いました。
     <tag>funds</tag>
@@ -3040,12 +3040,12 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     <tag>fail</tag>
   </notification>
 
-  <notification name="UnableToBuyWhileDownloading">オブジェクトデータのダウンロード中は購入できません。
+  <notification name="UnableToBuyWhileDownloading">オブジェクトのデータをダウンロードしている最中は購入できません。
 もう一度お試しください。
     <tag>fail</tag>
   </notification>
 
-  <notification name="UnableToLinkWhileDownloading">オブジェクトデータのウンロード中はリンクできません。
+  <notification name="UnableToLinkWhileDownloading">オブジェクトのデータをダウンロードしている最中はリンクできません。
 もう一度お試しください。
     <tag>fail</tag>
   </notification>
@@ -3485,7 +3485,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
     <tag>fail</tag>
   </notification>
 
-  <notification name="InvalidWearable">着用しようとしているアイテムは、あなたのビューアーでは読み込むことができません。[APP_NAME]のバージョンをアップグレードしてからこのアイテムを着用してください。
+  <notification name="InvalidWearable">着用しようとしているアイテムは、あなたのビューアでは読み込むことができません。[APP_NAME]のバージョンをアップグレードしてからこのアイテムを着用してください。
     <tag>fail</tag>
   </notification>
 
@@ -3783,7 +3783,7 @@ Your L$ balance is shown in the upper-right.
     </unique>
   </notification>
 
-  <notification name="VoiceCallGenericError">[VOICE_CHANNEL_NAME]のボイスチャットに接続中に、エラーが発生しました。後でもう一度お試しください。
+  <notification name="VoiceCallGenericError">[VOICE_CHANNEL_NAME]のボイスチャットに接続時に、エラーが発生しました。後でもう一度お試しください。
     <tag>fail</tag>
     <tag>voice</tag>
     <unique>
@@ -3828,7 +3828,7 @@ Your L$ balance is shown in the upper-right.
 
   <notification name="DefaultPresetNotSaved">デフォルトのプリセットを上書きすることはできません。</notification>
 
-  <notification name="PresetAlreadyExists">「[NAME]」は使用中です。
+  <notification name="PresetAlreadyExists">「[NAME]」というプリセット名は、すでに使用されています。
 このプリセットを置き換えるか、別の名前を選択することができます。
     <tag>fail</tag>
     <usetemplate name="okbutton" yestext="ＯＫ"/>
@@ -3894,7 +3894,7 @@ Your L$ balance is shown in the upper-right.
 
 詳しくは、SecondLife.logをご覧ください</notification>
 
-  <notification name="MeshUploadPermError">メッシュのアップロード許可をリクエスト中にエラーが発生しました。</notification>
+  <notification name="MeshUploadPermError">メッシュのアップロード許可をリクエスト時にエラーが発生しました。</notification>
 
   <notification name="RegionCapabilityRequestError">リージョンの「[CAPABILITY]」という機能を取得できませんでした。</notification>
 
@@ -4352,7 +4352,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
   <notification name="LocalBitmapsVerifyFail">開いたりデコードすることができない、無効である、もしくは読み取り不能な画像ファイル「[FNAME]」を追加しようとしました。
 この試行はキャンセルされました。</notification>
 
-  <notification name="PathfindingReturnMultipleItems">[NUM_ITEMS]個のアイテムを返却中しようとしています。
+  <notification name="PathfindingReturnMultipleItems">[NUM_ITEMS]個のアイテムを返却しようとしています。
 このまま続けてもよろしいですか？
     <tag>confirm</tag>
     <usetemplate ignoretext="複数のアイテムを返しますか？" name="okcancelignore" notext="いいえ" yestext="はい" />
@@ -4509,7 +4509,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="NoModNoSaveToContents">あなたには、オブジェクト &lt;nolink&gt;'[DEST_NAME]'&lt;/nolink&gt;を修正する権限がないため、&lt;nolink&gt;「[OBJ_NAME]」&lt;/nolink&gt;をオブジェクトの中身に保存できませんでした。
+  <notification name="NoModNoSaveToContents">あなたには、オブジェクト &lt;nolink&gt;「[DEST_NAME]」&lt;/nolink&gt;を修正する権限がないため、&lt;nolink&gt;「[OBJ_NAME]」&lt;/nolink&gt;をオブジェクトの中身に保存できませんでした。
     <tag>fail</tag>
   </notification>
 
@@ -5027,7 +5027,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="UpdateViewerBuyParcel">この区画を購入するには、ビューアーを更新する必要があります。
+  <notification name="UpdateViewerBuyParcel">この区画を購入するには、ビューアを更新する必要があります。
     <tag>fail</tag>
   </notification>
 
@@ -5240,7 +5240,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="UserBalanceOrLandUsageError">内部エラーが発生したため、ビューアーを正しく更新できませんでした。ビューアーに表示されるリンデンドルの残高または区画の所有は、サーバー上の実際の残高を反映していない可能性があります。
+  <notification name="UserBalanceOrLandUsageError">内部エラーが発生したため、ビューアを正しく更新できませんでした。ビューアに表示されるリンデンドルの残高または区画の所有は、サーバー上の実際の残高を反映していない可能性があります。
     <tag>fail</tag>
   </notification>
 
@@ -5431,7 +5431,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <usetemplate ignoretext="反射プローブのヒント" name="okcancelignore" notext="キャンセル" yestext="ＯＫ" />
   </notification>
 
-  <notification name="AutoAdjustHDRSky">編集中の非ＨＤＲの空の設定は自動的にＨＤＲの設定に変換されます。ＨＤＲとトーンマッピングを削除する場合は、反射プローブ環境値を０にしてください。
+  <notification name="AutoAdjustHDRSky">編集中の非ＨＤＲの空の設定は自動的にＨＤＲの設定に変換されます。ＨＤＲとトーンマッピングを削除する場合は、反射プローブ環境の値を０にしてください。
     <usetemplate ignoretext="ＨＤＲの空の調整時の警告" name="okignore" yestext="OK" />
   </notification>
 
@@ -5548,7 +5548,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 移動されたアイテムがないか、「遺失物」フォルダーを確認してください。</notification>
   <notification name="AOImportSetAlreadyExists">この名前のアニメーションセットはすでに存在します。</notification>
   <notification name="AOImportPermissionDenied">ノートカードを読み取るための十分な権限がありません。</notification>
-  <notification name="AOImportCreateSetFailed">インポートセット作成中にエラーが発生しました。</notification>
+  <notification name="AOImportCreateSetFailed">インポートセット作成時にエラーが発生しました。</notification>
   <notification name="AOImportDownloadFailed">ノートカードをダウンロードできませんでした。</notification>
   <notification name="AOImportNoText">ノートカードが空であるか、読み取り不能です。</notification>
   <notification name="AOImportNoFolder">アニメーションを読み取るフォルダーが見つかりませんでした。</notification>
@@ -5637,14 +5637,14 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ" />
   </notification>
 
-  <notification name="UpdateInstalledRestart">ビューアーは以下のバージョンに更新されました：
+  <notification name="UpdateInstalledRestart">ビューアは以下のバージョンに更新されました：
 [VIEWER_VER]⇨[VIEWER_UPDATES] 
 
 再起動しますか？
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="あとで" yestext="ＯＫ" />
   </notification>
-  <notification name="UpdateInstalledRestartToast">ビューアーは以下のバージョンに更新されました：
+  <notification name="UpdateInstalledRestartToast">ビューアは以下のバージョンに更新されました：
 [VIEWER_VER]⇨[VIEWER_UPDATES] 
 
 再起動しますか？

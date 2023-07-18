@@ -107,7 +107,7 @@
       <text name="Name:">名前：</text>
       <line_editor name="Object Name" tool_tip="使用できる名前の文字数は最大６３文字までです。長いプリム名は短縮されます。名前に使用できる文字は、ASCII-7（非拡張）に含まれる印字可能な文字のみです（パイプ文字「|」は例外）。" />
       <text name="Description:">説明：</text>
-      <line_editor name="Object Description" tool_tip="ビューアーの設定で「すべてのオブジェクト上でヒントを表示」が選択されている場合、オブジェクトにマウスのポインタをかざすと、そのオブジェクトの説明がポップアップ表示されます。プリムの説明は最大 127 バイトまでに制限されているため、それよりも長い文字列は切り捨てられます。" />
+      <line_editor name="Object Description" tool_tip="ビューアの設定で「すべてのオブジェクト上でヒントを表示」が選択されている場合、オブジェクトにマウスのポインタをかざすと、そのオブジェクトの説明がポップアップ表示されます。プリムの説明は最大 127 バイトまでに制限されているため、それよりも長い文字列は切り捨てられます。" />
       <text name="Creator:">制作者：</text>
       <text name="Creator Name">Mrs. Esbee Linden (esbee.linden)</text>
       <text name="Owner:">所有者：</text>
