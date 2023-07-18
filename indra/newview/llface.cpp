@@ -1776,7 +1776,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
                         }
 
                         *dst++ = tc;
-                        if (do_bump)
+                        if ((!mat && !gltf_mat) && do_bump)
                         {
                             bump_tc.push_back(tc);
                         }

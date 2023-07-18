@@ -37,7 +37,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG        9.1.0
+  GIT_TAG        10.0.0
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
   )
@@ -79,7 +79,7 @@ if(USE_NFD)
   FetchContent_Declare(
     nfd
     GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
-    GIT_TAG        v1.0.3
+    GIT_TAG        v1.1.0
     )
 
   set(NFD_PORTAL ON)

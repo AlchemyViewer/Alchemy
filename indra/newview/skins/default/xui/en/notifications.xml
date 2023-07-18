@@ -192,7 +192,7 @@ No tutorial is currently available.
    icon="alertmodal.tga"
    name="BadInstallation"
    type="alertmodal">
- An error occurred while updating [APP_NAME].  Please [https://www.alchemyviewer.org/pages/downloads.html download the latest version] of the Viewer.
+ An error occurred while updating [APP_NAME].  Please [https://www.alchemyviewer.org/downloads download the latest version] of the Viewer.
     <tag>fail</tag>
     <usetemplate
      name="okbutton"
@@ -4322,7 +4322,7 @@ Finished download of raw terrain file to:
    name="RequiredUpdate"
    type="alertmodal">
 Version [VERSION] is required for login.
-Please download from https://www.alchemyviewer.org/pages/downloads.html
+Please download from https://www.alchemyviewer.org/downloads
     <tag>confirm</tag>
     <usetemplate
      name="okbutton"
@@ -6515,6 +6515,14 @@ Your trash is overflowing. This may cause problems logging in.
          name="okcancelbuttons"
          notext="I will empty trash later"
          yestext="Check trash folder"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="InventoryLimitReachedAIS"
+   type="notifytip">
+Your inventory is experiencing issues. Please, contact support.
+  <tag>fail</tag>
   </notification>
 
   <notification
