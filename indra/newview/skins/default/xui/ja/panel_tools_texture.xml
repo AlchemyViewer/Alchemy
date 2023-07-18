@@ -65,7 +65,7 @@
     <combo_box.item label="Use texture" name="Use texture" value="Use texture" />
     -->
   </combo_box>
-  <texture_picker label="テクスチャ" name="shinytexture control" tool_tip="クリックしてスペキュラマップのテスクチャを選択します" />
+  <texture_picker label="テクスチャ" name="shinytexture control" tool_tip="クリックして光沢（グロッシネス）マップのテスクチャを選択します。" />
   <text name="label shininess">輝き</text>
   <combo_box name="combobox shininess">
     <combo_box.item label="なし" name="None" />

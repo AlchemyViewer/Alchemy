@@ -7,7 +7,7 @@
     <text name="base_color_upload_fee">アップロード料金なし</text>
     <text name="base_color_tint_lbl">色彩</text>
     <color_swatch name="base color" />
-    <text name="base_color_transparency_lbl">透明度</text>
+    <text name="base_color_transparency_lbl">アルファ</text>
     <spinner name="transparency" />
     <text name="alpha_mode_lbl">アルファモード</text>
     <combo_box name="alpha mode">
