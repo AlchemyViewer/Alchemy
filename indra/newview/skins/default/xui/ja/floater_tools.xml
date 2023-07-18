@@ -228,7 +228,7 @@
     <panel label="特徴" name="Features">
       <panel.string name="None">なし</panel.string>
       <panel.string name="Prim">プリム</panel.string>
-      <panel.string name="Convex Hull">凸状の外殻構造</panel.string>
+      <panel.string name="Convex Hull">凸包</panel.string>
       <text name="select_single">プリムを１つだけ選択して編集してください。</text>
       <text name="edit_object">オブジェクトの特徴を編集：</text>
       <check_box label="アニメーションメッシュ" name="Animated Mesh Checkbox Ctrl" tool_tip="リグ入りメッシュオブジェクトを、それぞれアニメーションさせることができるようになります。" />
@@ -241,9 +241,10 @@
       <spinner label="Ｘ軸方向の力" name="FlexForceX" />
       <spinner label="Ｙ軸方向の力" name="FlexForceY" />
       <spinner label="Ｚ軸方向の力" name="FlexForceZ" />
-      <check_box label="発光" name="Light Checkbox Ctrl" tool_tip="オブジェクトが発光します" />
-      <color_swatch label="" name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます" />
-      <texture_picker label="" name="light texture control" tool_tip="クリックで投影画を選択します（遅延レンダリング有効時のみ）" />
+      <!-- 作用は射影テスクチャマッピングなので意訳 -->
+      <check_box label="射影元" name="Light Checkbox Ctrl" tool_tip="オブジェクトが投影元になります。" />
+      <color_swatch label="色" name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます" />
+      <texture_picker label="射影テクスチャ" name="light texture control" tool_tip="クリックで射影テスクチャを選択します（遅延レンダリング有効時のみ）" />
       <spinner label="輝度" name="Light Intensity" />
       <spinner label="ＦＯＶ" name="Light FOV" />
       <spinner label="半径" name="Light Radius" />
@@ -274,7 +275,7 @@
       <spinner label="密度（１００㎏/㎥）" name="Physics Density" />
       <spinner label="復元" name="Physics Restitution" />
     </panel>
-    <panel label="材質" name="Texture" />
+    <panel label="テスクチャ" name="Texture" />
     <panel label="中身" name="Contents">
       <button label="新規スクリプト" label_selected="新規スクリプト" name="button new script" />
       <button label="権限" name="button permissions" />
