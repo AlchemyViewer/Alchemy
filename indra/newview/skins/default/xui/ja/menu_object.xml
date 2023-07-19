@@ -5,7 +5,7 @@
   <menu_item_call label="ＰＢＲマテリアルを編集" name="EditGLTFMaterial" />
   <menu_item_call label="制作" name="Build" />
   <context_menu label="ツール" name="Tools">
-    <menu_item_call label="テスクチャをリフレッシュ" name="RefreshTextures" />
+    <menu_item_call label="テクスチャをリフレッシュ" name="RefreshTextures" />
     <menu_item_call label="パーティクルを編集" name="Menu Object Edit Particles" />
     <menu_item_call label="リージョンオブジェクトを表示" name="show_in_linksets" />
     <menu_item_call label="文字で表示" name="show_in_characters" />

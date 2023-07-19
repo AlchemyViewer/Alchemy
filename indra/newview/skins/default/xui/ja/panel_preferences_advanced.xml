@@ -4,7 +4,7 @@
   <text name="Cache:">キャッシュ：</text>
   <slider label="ディスクキャッシュサイズ（1024～16384㎆）" name="disk_cache_size" />
   <text name="disk_cache_mb_text">㎆</text>
-  <slider label="テスクチャのキャッシュサイズ（1024～8192㎆）" name="texture_cache_size" />
+  <slider label="テクスチャのキャッシュサイズ（1024～8192㎆）" name="texture_cache_size" />
   <text name="tex_cache_mb_text">㎆</text>
   <button label="クリア" label_selected="クリア" name="clear_cache" />
   <text name="Cache location">キャッシュ保存先：</text>

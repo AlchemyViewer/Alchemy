@@ -241,10 +241,10 @@
       <spinner label="Ｘ軸方向の力" name="FlexForceX" />
       <spinner label="Ｙ軸方向の力" name="FlexForceY" />
       <spinner label="Ｚ軸方向の力" name="FlexForceZ" />
-      <!-- 作用は射影テスクチャマッピングなので意訳 -->
+      <!-- 作用は射影テクスチャマッピングなので意訳 -->
       <check_box label="射影元" name="Light Checkbox Ctrl" tool_tip="オブジェクトが投影元になります。" />
       <color_swatch label="色" name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます" />
-      <texture_picker label="射影テクスチャ" name="light texture control" tool_tip="クリックで射影テスクチャを選択します（遅延レンダリング有効時のみ）" />
+      <texture_picker label="射影テクスチャ" name="light texture control" tool_tip="クリックで射影テクスチャを選択します（遅延レンダリング有効時のみ）" />
       <spinner label="輝度" name="Light Intensity" />
       <spinner label="ＦＯＶ" name="Light FOV" />
       <spinner label="半径" name="Light Radius" />
@@ -275,7 +275,7 @@
       <spinner label="密度（１００㎏/㎥）" name="Physics Density" />
       <spinner label="復元" name="Physics Restitution" />
     </panel>
-    <panel label="テスクチャ" name="Texture" />
+    <panel label="テクスチャ" name="Texture" />
     <panel label="中身" name="Contents">
       <button label="新規スクリプト" label_selected="新規スクリプト" name="button new script" />
       <button label="権限" name="button permissions" />

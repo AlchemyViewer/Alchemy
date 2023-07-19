@@ -16,7 +16,7 @@
 
 
   <text name="skills_label">スキル：</text>
-  <check_box label="テスクチャ" name="can_texture" />
+  <check_box label="テクスチャ" name="can_texture" />
   <check_box label="建築" name="can_architect" />
   <check_box label="モデリング" name="can_model" />
   <check_box label="イベント企画" name="can_event" />

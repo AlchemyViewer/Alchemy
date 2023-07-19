@@ -13,7 +13,7 @@
 三角形の数：[NUM_TRIANGLES]個
 複雑度：[COMPLEXITY]
 
-テスクチャ数：[NUM_TEXTURES]個
+テクスチャ数：[NUM_TEXTURES]個
 ＴＭｅｍ：[TEXTURE_MEMORY]㎅
 ＶＲＡＭ：[VRAM_USAGE]㎅</floater.string>
   <text_editor name="linksetstats_text" value="（読み込んでいます…）" />

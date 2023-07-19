@@ -272,7 +272,7 @@
         <text name="price_breakdown_labels">ダウンロード：
 物理効果数：
 インスタンス数：
-テスクチャ数：
+テクスチャ数：
 モデル：</text>
         <text name="price_breakdown">[STREAMING]
 [PHYSICS]
@@ -320,7 +320,7 @@
     <text name="label_display">表示…</text>
     <check_box label="エッジ" name="show_edges" />
     <check_box label="物理効果" name="show_physics" />
-    <check_box label="テスクチャ数" name="show_textures" />
+    <check_box label="テクスチャ数" name="show_textures" />
     <check_box label="スキンのウエイト" name="show_skin_weight" />
     <check_box label="ジョイント位置のオーバーライド" name="show_joint_overrides" />
     <check_box label="ジョイント数" name="show_joint_positions" />

@@ -25,7 +25,7 @@ that are returned from one component and may appear in many places
   <string name="StartupInitializingTextureCache0">テクスチャキャッシュのフラッフィングしています…</string>
   <string name="StartupInitializingTextureCache1">網目状のスプライン…</string>
   <string name="StartupInitializingTextureCache2">テクスチャのベーキングに使用するオーブンの予熱をしています…</string>
-  <string name="StartupInitializingTextureCache3">スヌートを叩いてテスクチャの質感を出しています…</string>
+  <string name="StartupInitializingTextureCache3">スヌートを叩いてテクスチャの質感を出しています…</string>
   <string name="StartupInitializingTextureCache4">魔法のカバを読み込んでいます…</string>
   <string name="StartupInitializingTextureCache5">Nvidiaにスケープゴートを捧げています…</string>
   <string name="StartupInitializingTextureCache6">プロジェクト・サンサール（笑）を準備しています…</string>
