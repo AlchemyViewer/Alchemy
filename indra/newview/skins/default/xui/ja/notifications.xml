@@ -5291,89 +5291,91 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <usetemplate name="okbutton" yestext="ＯＫ" />
   </notification>
 
-  <notification name="FailedToFindSettings">データベースから「[NAME]」の設定の読み込みができませんでした。
+  <notification name="EnableHiDPI">HiDPIサポートを有効にすると、パフォーマンスが低下する可能性があります。</notification>
+
+  <notification name="FailedToFindSettings">[NAME]の設定をデータベースから読み込むことができませんでした。
     <tag>fail</tag>
   </notification>
 
-  <notification name="FailedToLoadSettingsApply">環境にこれらの設定を適用することができません。
+  <notification name="FailedToLoadSettingsApply">これらの自然環境の設定を反映させることができませんでした。
     <tag>fail</tag>
   </notification>
 
-  <notification name="FailedToBuildSettingsDay">環境にこれらの設定を適用することができません。
+  <notification name="FailedToBuildSettingsDay">これらの自然環境の設定を反映させることができませんでした。
     <tag>fail</tag>
   </notification>
 
-  <notification name="NoEnvironmentSettings">このリージョンは初期設定をサポートしていません。
+  <notification name="NoEnvironmentSettings">このリージョンは、自然環境の設定をサポートしていません。
     <tag>fail</tag>
   </notification>
 
-  <!-- messageには日本語が使えないため翻訳しない -->
-  <notification label="アウトフィットを保存する" name="SaveSettingAs">現在の設定を次の内容で保存する：
+  <notification label="設定を保存" name="SaveSettingAs">現在の設定を以下のように保存します：
     <unique />
     <tag>confirm</tag>
     <form name="form">
-      <input name="message">[DESC] (New)</input>
-      <button name="ＯＫ" text="ＯＫ" />
-      <button name="Cancel" text="キャンセル" />
+      <input name="message">[DESC] (new)</input>
+      <button name="OK" text="ＯＫ"/>
+      <button name="Cancel" text="キャンセル"/>
     </form>
   </notification>
 
-  <notification name="WLImportFail">[FILE]から過去のウインドライトの設定「[NAME]」をインポートできません。
+  <notification name="WLImportFail">過去のウィンドライトの設定[NAME]を[FILE]からインポートできませんでした。
 
 [REASONS]
     <tag>fail</tag>
   </notification>
 
-  <notification name="WLParcelApplyFail">この区画で環境を設定することはできません。
-変更する権限のある区画を入力または選択してください。
+  <notification name="WLParcelApplyFail">この区画に自然環境の設定をセットすることができませんでした。
+変更する権利がある区画を入力または選択してください。
     <tag>fail</tag>
   </notification>
 
-  <notification name="SettingsUnsuported">このリージョンでは設定をサポートしていません。
-設定に対応しているリージョンに移動し、アクションを再試行してください。
+  <notification name="SettingsUnsuported">このリージョンでは自然環境の設定はサポートされていません。
+設定が有効なリージョンに移動し、操作をやり直してください。
     <tag>fail</tag>
   </notification>
 
-  <notification name="SettingsConfirmLoss">「[NAME]」と名付けられたこの[TYPE]に加えられた変更が失われます。
-続けてもよろしいですか？
+  <notification name="SettingsConfirmLoss">「[NAME]」で[TYPE]に加えた変更が失われようとしています。
+本当に続けてもよろしいですか？
     <tag>confirm</tag>
-    <usetemplate ignoretext="変更を失いますがよろしいですか？" name="okcancelignore" notext="いいえ" yestext="はい" />
+    <usetemplate ignoretext="変更が失われますがよろしいですか？" name="okcancelignore" notext="いいえ" yestext="はい" />
   </notification>
 
-  <notification name="SettingsConfirmReset">適用されたすべての設定を削除しようとしています。
-続けてもよろしいですか？
-    <tag>confirm</tag>
-    <usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい" />
-  </notification>
-
-  <notification name="PersonalSettingsConfirmReset">適用されたすべての個人的な照明の設定を削除しようとしています。
-続けてもよろしいですか？
+  <notification name="SettingsConfirmReset">適用されている設定をすべて削除しようとしています。
+本当に続けてもよろしいですか？
     <tag>confirm</tag>
     <usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい" />
   </notification>
 
-  <notification name="SettingsMakeNoTrans">このデイサイクルに譲渡不可の設定をインポートしようとしています。このまま続けると、編集中の設定も譲渡不可になります。
-
-この変更は元に戻すことができません。
-
-続けてもよろしいですか？
+  <notification name="PersonalSettingsConfirmReset">適用されているすべての個人的光源設定を削除しようとしています。
+本当に続けてもよろしいですか？
     <tag>confirm</tag>
-    <usetemplate ignoretext="設定を譲渡不可にしますか？" name="okcancelignore" notext="いいえ" yestext="はい" />
+    <usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい" />
   </notification>
 
-  <notification name="NoEditFromLibrary">ライブラリから直接設定を変更することはできません。自分のインベントリからコピーしてやり直してください。
+  <notification name="SettingsMakeNoTrans">譲渡不可な設定をこのデイサイクルにインポートしようとしています。続行すると、編集中の設定も譲渡不可になります。
+
+この変更を取り消すことはできません。
+
+本当に続けてもよろしいですか？
+    <tag>confirm</tag>
+    <usetemplate ignoretext="譲渡不可な自然環境の設定をインポートする前の確認" name="okcancelignore" notext="いいえ" yestext="はい" />
+  </notification>
+
+  <notification name="NoEditFromLibrary">ライブラリから直接設定を編集することはできません。 
+ご自身のインベントリにコピーして再度お試しください。
     <tag>fail</tag>
   </notification>
 
-  <notification name="EnvironmentApplyFailed">この設定で問題が発生しました。この設定は現在保存または適用ができません。
+  <notification name="EnvironmentApplyFailed">これらの自然環境の設定で問題が発生しました。現在、これらの自然環境の設定を保存または適用することはできません。
     <tag>fail</tag>
   </notification>
 
-  <notification name="TrackLoadFailed">トラックを[TRACK]にロードできません。
+  <notification name="TrackLoadFailed">トラック[TRACK]を読み込むことができませんでした。
     <tag>fail</tag>
   </notification>
 
-  <notification name="TrackLoadMismatch">トラックを[TRACK1]から[TRACK2]にロードできません。
+  <notification name="TrackLoadMismatch">トラック[TRACK1]を[TRACK2]に読み込むことができませんでした。
     <tag>fail</tag>
   </notification>
 
@@ -5392,12 +5394,12 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     </form>
   </notification>
 
-  <notification label="サブフォルダの作成" name="CreateSubfolder">新しいフォルダーに名前を付けます：
+  <notification label="サブフォルダの作成" name="CreateSubfolder">新しいフォルダ名：
     <unique />
     <tag>confirm</tag>
     <form name="form">
       <input name="message">[DESC]</input>
-      <button name="ＯＫ" text="ＯＫ" />
+      <button name="OK" text="ＯＫ" />
       <button name="Cancel" text="キャンセル" />
     </form>
   </notification>
@@ -5456,7 +5458,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
     <tag>opensim</tag>
   </notification>
-  <notification name="ConfirmRemoveGrid">[GRID]をグリッド リストから削除してもよろしいですか？  
+  <notification name="ConfirmRemoveGrid">[GRID]をグリッドリストから削除してもよろしいですか？  
     <tag>opensim</tag>
     <tag>confirm</tag>
     <usetemplate ignoretext="グリッド削除時の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ" />
