@@ -490,7 +490,7 @@
     <menu label="エラー実行" name="Force Errors">
       <menu_item_call label="ブレークポイント" name="Force Breakpoint" />
       <menu_item_call label="LLErrorとクラッシュを実行する" name="Force LLError And Crash" />
-      <menu_item_call label="バッドメモリアクセスを実行する" name="Force Bad Memory Access" />
+      <menu_item_call label="不正なメモリアクセスを実行する" name="Force Bad Memory Access" />
       <menu_item_call label="コルーチン内で不正なメモリアクセスを発生させる" name="Force Bad Memory Access in Coroutine" />
       <menu_item_call label="無限ループ" name="Force Infinite Loop" />
       <menu_item_call label="ドライバのクラッシュを発生させる" name="Force Driver Carsh" />
@@ -513,7 +513,7 @@
       <menu_item_check label="普通" name="Normals" />
       <menu_item_check label="八分木" name="Octree" />
       <menu_item_check label="シャドウ円錐" name="Shadow Frusta" />
-      <menu_item_check label="実像" name="Physics Shapes" />
+      <menu_item_check label="物理的形状" name="Physics Shapes" />
       <menu_item_check label="オクルージョン" name="Occlusion" />
       <menu_item_check label="バッチの描画" name="Render Batches" />
       <menu_item_check label="タイプを更新" name="Update Type" />
@@ -527,11 +527,11 @@
       <menu_item_check label="光源" name="Lights" />
       <menu_item_check label="反射プローブ" name="Reflection Probes"/>
       <menu_item_check label="パーティクル" name="Particles" />
-      <menu_item_check label="骨組みの衝突判定" name="Collision Skeleton" />
+      <menu_item_check label="スケルトンの衝突判定" name="Collision Skeleton" />
       <menu_item_check label="ジョイント" name="Joints" />
       <menu_item_check label="レイキャスト" name="Raycast" />
       <menu_item_check label="風のベクトル" name="Wind Vectors" />
-      <menu_item_check label="彫刻" name="Sculpt" />
+      <menu_item_check label="スカルプト" name="Sculpt" />
       <menu label="テクスチャの密度" name="Texture Density">
         <menu_item_check label="無し" name="None" />
         <menu_item_check label="原行" name="Current" />
@@ -550,7 +550,7 @@
 
       <menu_item_check label="高度な光源モデル" name="Advanced Lighting Model" />
       <menu_item_check label="　太陽・月・プロジェクタからの影" name="Shadows from Sun/Moon/Projectors" />
-      <menu_item_check label="　SSAOと影のスムージング" name="SSAO and Shadow Smoothing" />
+      <menu_item_check label="　ＳＳＡＯと影のスムージング" name="SSAO and Shadow Smoothing" />
       <menu_item_separator />
 
       <menu_item_check label="次回起動時にＧＬをデバッグ" name="Debug GL" />
@@ -645,7 +645,11 @@
     <menu label="ＸＵＩ" name="XUI">
       <menu_item_call label="色の設定をリロード" name="Reload Color Settings" />
       <menu_item_call label="フォントテストを表示" name="Show Font Test" />
+      <menu_item_call label="ＸＭＬから読み込む" name="Load from XML"/>
+      <menu_item_call label="ＸＭＬに保存" name="Save to XML"/>
       <menu_item_check label="ＸＵＩ名を表示" name="Show XUI Names" />
+      <menu_item_check label="デバッグ情報をビューに表示" name="DebugViews"/>
+      <menu_item_call label="ＸＵＩプレビューツール" name="UI Preview Tool"/>
       <menu_item_call label="テストＩＭを送信する" name="Send Test IMs" />
       <menu_item_call label="名前キャッシュをフラッシュ" name="Flush Names Caches" />
     </menu>

@@ -2822,7 +2822,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <usetemplate name="okcancelbuttons" notext="後でゴミ箱を空にする" yestext="ごみ箱フォルダを確認する" />
   </notification>
 
-  <notification name="InventoryLimitReachedAIS">インベントリに問題が発生しています。お手数ですが、サポートにお問い合わせください。
+  <notification name="InventoryLimitReachedAIS">インベントリに問題が発生しています。お手数ですが、グリッドのサポートにお問い合わせください。
     <tag>fail</tag>
   </notification>
 
@@ -5253,9 +5253,9 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
   <notification name="RLVaListRequested" label="[NAME_LABEL]からの制限要求">[NAME_SLURL]は、現在有効なＲＬＶ制限のリストを送信するよう要請しました。
     <tag>confirm</tag>
     <form name="form">
-      <button index="0" default="true" name="Allow" text="許可"/>
-      <button index="1" name="Always Allow" text="常に許可"/>
-      <button index="2" name="Deny" text="拒否"/>
+      <button name="Allow" text="許可" />
+      <button name="Always Allow" text="常に許可" />
+      <button name="Deny" text="拒否" />
       <ignore text="現在のＲＬＶの制限のリストを誰かに送る前の確認"/>
     </form>
   </notification>
