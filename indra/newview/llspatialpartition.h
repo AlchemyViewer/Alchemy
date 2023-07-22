@@ -299,6 +299,7 @@ public:
         BOOL pick_transparent,
         BOOL pick_rigged,
         BOOL pick_unselectable,
+        BOOL pick_reflection_probe,
         S32* face_hit,                          // return the face hit
         LLVector4a* intersection = NULL,         // return the intersection point
         LLVector2* tex_coord = NULL,            // return the texture coordinates of the intersection point
@@ -373,6 +374,7 @@ public:
 									 BOOL pick_transparent, 
 									 BOOL pick_rigged,
                                      BOOL pick_unselectable,
+                                     BOOL pick_reflection_probe,
 									 S32* face_hit,                          // return the face hit
 									 LLVector4a* intersection = NULL,         // return the intersection point
 									 LLVector2* tex_coord = NULL,            // return the texture coordinates of the intersection point
