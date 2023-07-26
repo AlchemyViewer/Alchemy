@@ -31,12 +31,12 @@
               <check_box label="区画所有者による自然環境の設定を上書きを許可" name="chk_allow_override" />
             </layout_panel>
             <layout_panel name="pnl_environment_length">
-              <text>Day Settings</text>
-              <text>一日の長さ（時間）</text>
+              <text name="day_settings_label">一日の設定</text>
+              <text name="day_length_label">一日の長さ（時間）</text>
               <slider name="sld_day_length" />
-              <text>日中のオフセット（時間）</text>
+              <text name="day_offset_label">日中のオフセット（時間）</text>
               <slider name="sld_day_offset" />
-              <text>見かけ上の時刻：</text>
+              <text name="apparent_time_of_day_label">見かけ上の時刻：</text>
               <text name="lbl_apparent_time">[AP] [HH]：[MM]（[PRC]％）</text>
             </layout_panel>
             <layout_panel name="pnl_environment_buttons">
@@ -48,21 +48,24 @@
         <layout_panel name="pnl_environment_altitudes">
           <!-- Three movable panels first so that they will be 'below' slider -->
           <panel name="pnl_alt1">
-            <text name="txt_alt1">空[INDEX] [ALTITUDE]ｍ</text>
+            <text name="txt_alt1">空[INDEX]
+[ALTITUDE]ｍ</text>
             <line_editor name="edt_invname_alt1">不明</line_editor>
             <settings_drop_target name="sdt_alt1" tool_tip="インベントリからターゲットボックスに設定をドラッグし、現在の空として選択します。" />
           </panel>
           <panel name="pnl_alt2">
-            <text name="txt_alt2">空[INDEX] [ALTITUDE]ｍ</text>
+            <text name="txt_alt2">空[INDEX]
+[ALTITUDE]ｍ</text>
             <line_editor name="edt_invname_alt2">不明</line_editor>
             <settings_drop_target name="sdt_alt2" tool_tip="インベントリからターゲットボックスに設定をドラッグし、現在の空として選択します。" />
           </panel>
           <panel name="pnl_alt3">
-            <text name="txt_alt3">空[INDEX] [ALTITUDE]ｍ</text>
+            <text name="txt_alt3">空[INDEX]
+[ALTITUDE]ｍ</text>
             <line_editor name="edt_invname_alt3">不明</line_editor>
             <settings_drop_target name="sdt_alt3" tool_tip="インベントリからターゲットボックスに設定をドラッグし、現在の空として選択します。" />
           </panel>
-          <text>空の高度</text>
+          <text name="sky_altitudes_label">空の高度</text>
           <!-- Divider icons also should be under slider to not interfer with clicks -->
           <icon name="mark0" />
           <icon name="mark1" />
