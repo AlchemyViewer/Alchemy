@@ -4,8 +4,8 @@
   <slider label="表示角" name="camera_fov" />
   <slider label="距離" name="camera_offset_scale" />
   <text name="heading2">カメラ位置の自動調整：</text>
-  <check_box label="制作／編集" name="edit_camera_movement" tool_tip="編集モードの開始時と終了時に自動カメラ位置を使用する。" />
-  <check_box label="外観" name="appearance_camera_movement" tool_tip="編集モードで自動カメラ位置調整を使用する。" />
+  <check_box label="ビルド／編集" name="edit_camera_movement" tool_tip="編集モードの開始時と終了時に自動カメラ位置を使用する。" />
+  <check_box label="容姿" name="appearance_camera_movement" tool_tip="編集モードで自動カメラ位置調整を使用する。" />
   <icon name="avatar_icon" />
   <text name="keyboard_lbl">キーボード：</text>
   <check_box label="移動キー押下時は、常に移動するようにする" name="arrow_keys_move_avatar_check" />

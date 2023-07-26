@@ -46,7 +46,7 @@
             <text name="fly_value" value="オン" />
             <text name="push_label" value="プッシュ：" />
             <text name="push_value" value="オフ" />
-            <text name="build_label" value="制作：" />
+            <text name="build_label" value="ビルド" />
             <text name="build_value" value="オン" />
             <text name="scripts_label" value="スクリプト：" />
             <text name="scripts_value" value="オン" />

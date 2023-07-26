@@ -12,8 +12,8 @@
   <string name="no_filtered_friends_msg">お探しのフレンドは見つかりましたか？[secondlife:///app/search/people/[SEARCH_TERM] 検索]をお試しください。</string>
   <string name="no_filtered_groups_msg" value="お探しのフレンドは見つかりましたか？[secondlife:///app/search/groups/[SEARCH_TERM] 検索]をお試しください。" />
   <string name="no_groups_msg" value="グループをお探しですか？[secondlife:///app/search/groups 検索]をお試しください。" />
-  <string name="MiniMapToolTipMsg" value="[リージョン]（ダブルクリックでマップを開く。Shift‐ドラッグで水平・垂直移動）" />
-  <string name="AltMiniMapToolTipMsg" value="[リージョン]（ダブルクリックでテレポート。Shift‐ドラッグで水平・垂直移動）" />
+  <string name="MiniMapToolTipMsg" value="[REGION]（ダブルクリックでマップを開く。Shift‐ドラッグで水平・垂直移動）" />
+  <string name="AltMiniMapToolTipMsg" value="[REGION]（ダブルクリックでテレポート。Shift‐ドラッグで水平・垂直移動）" />
   <string name="GroupCountWithInfo" value="あなたは現在、[COUNT]グループに属しています。あと[REMAINING]グループに参加することができます。[secondlife:/// 上限を増やす]" />
   <tab_container name="tabs">
     <panel label="近隣" name="nearby_panel">

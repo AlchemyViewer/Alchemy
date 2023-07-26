@@ -266,7 +266,7 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="TooltipAgentInspect">この住人の詳細を参照</string>
   <string name="TooltipAgentMute">クリックしてこの住人に対して無視設定をします。</string>
   <string name="TooltipAgentUnmute">クリックしてこの住人に対する無視設定を解除します。</string>
-  <string name="TooltipAgentIM">クリックしてこの住人に IM を送ります。</string>
+  <string name="TooltipAgentIM">クリックしてこの住人にＩＭを送ります。</string>
   <string name="TooltipAgentPay">クリックしてこの住人に支払います。</string>
   <string name="TooltipAgentOfferTeleport">クリックしてこの住人にテレポートのオファーを送ります。</string>
   <string name="TooltipAgentRequestFriend">クリックしてこの住人にフレンド登録リクエストを送ります。</string>
@@ -2600,7 +2600,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="CompileQueueScriptNotFound">サーバー上にスクリプトが見つかりません。</string>
   <string name="CompileQueueProblemDownloading">ダウンロードに問題があります</string>
   <string name="CompileQueueInsufficientPermDownload">権限不足のためスクリプトをダウンロードできません。</string>
-  <string name="CompileQueueInsufficientPermFor">権限不足：</string>
+  <string name="CompileQueueInsufficientPermFor">不足している権限：</string>
   <string name="CompileQueueUnknownFailure">原因不明の失敗によりダウンロードができません。</string>
   <string name="CompileNoExperiencePerm">[EXPERIENCE]体験による[SCRIPT]スクリプトをスキップします。</string>
   <string name="CompileQueueTitle">再コンパイル進行</string>
@@ -2615,8 +2615,8 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- compile comment text-->
   <string name="CompileSuccessful">コンパイルが完了しました！</string>
   <string name="CompileSuccessfulSaving">コンパイル完了、保存しています…</string>
-  <string name="SaveComplete">保存完了。</string>
-  <string name="UploadFailed">ファイルのアップロードが失敗しました：</string>
+  <string name="SaveComplete">保存しました。</string>
+  <string name="UploadFailed">ファイルのアップロードに失敗しました：</string>
   <string name="ObjectOutOfRange">スクリプト（オブジェクトが範囲外にあります）</string>
   <string name="ScriptWasDeleted">スクリプト（インベントリから削除済み）</string>
 
@@ -2789,10 +2789,10 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- panel picks -->
   <string name="NoPicksClassifiedsText">ピックやクラシファイド広告を作成していません。作成するには、下にある「＋」ボタンをクリックします。</string>
   <string name="NoPicksText">ピックを作成していません。「新規」ボタンをクリックしてピックを作成する。</string>
-  <string name="NoClassifiedsText">クラシファイド広告を作成していません。「新規」ボタンをクリックしてクラシファイド広告を作成する。</string>
+  <string name="NoClassifiedsText">クラシファイド広告を作成していません。「新規」ボタンをクリックしてクラシファイド広告を作成します。</string>
   <string name="NoAvatarPicksClassifiedsText">ピック、またはクラシファイド広告がありません。</string>
-  <string name="NoAvatarPicksText">ピックがありません</string>
-  <string name="NoAvatarClassifiedsText">クラシファイド広告がありません</string>
+  <string name="NoAvatarPicksText">ピックがありません。</string>
+  <string name="NoAvatarClassifiedsText">クラシファイド広告がありません。</string>
   <string name="PicksClassifiedsLoadingText">読み込んでいます…</string>
 
   <!-- Multi Preview Floater -->
@@ -2805,7 +2805,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="InvOfferOwnedByUnknownGroup">不明なグループが所有している</string>
   <string name="InvOfferOwnedBy">が、</string>
   <string name="InvOfferOwnedByUnknownUser">不明なユーザーが所有している</string>
-  <string name="InvOfferGaveYou">に渡されました。</string>
+  <string name="InvOfferGaveYou">から渡されました。</string>
   <string name="InvOfferDecline">&lt;nolink&gt;[NAME]&lt;/nolink&gt;からの[DESC]を拒否しました。</string>
 
   <!-- group money -->
@@ -3362,7 +3362,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 
   <string name="Package">パッケージ</string>
   <string name="Painted Nails">あり</string>
-  <string name="Pale">悪い</string>
+  <string name="Pale">血相</string>
   <string name="Pants Crotch">ズボンの股</string>
   <string name="Pants Fit">ズボンのフィット感</string>
   <string name="Pants Length">ズボン丈</string>
@@ -3535,7 +3535,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="LocationCtrlVoiceTooltip">ここではボイスを利用できません。</string>
   <string name="LocationCtrlFlyTooltip">飛行は禁止されています。</string>
   <string name="LocationCtrlPushTooltip">プッシュ禁止</string>
-  <string name="LocationCtrlBuildTooltip">オブジェクトの制作や落とす事は禁止されています。</string>
+  <string name="LocationCtrlBuildTooltip">オブジェクトのビルドや落とす事は禁止されています。</string>
   <string name="LocationCtrlScriptsTooltip">スクリプト不可</string>
   <string name="LocationCtrlDamageTooltip">体力</string>
   <string name="LocationCtrlAdultIconTooltip">Adultリージョン</string>
@@ -3572,7 +3572,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="IM_moderator_label">（モデレータ）</string>
   <!-- TODO: [LOGN_TIMESTAMP]の時刻表記が日本で標準的な書式でない -->
   <string name="Saved_message">（保存日時：[LONG_TIMESTAMP]）</string>
-  <string name="IM_unblock_only_groups_friends">このメッセージを表示するには、「初期設定」の「プライバシー」で「フレンドとグループ以外からはコールとIMを受信しない」チェックボックスをオフにします。</string>
+  <string name="IM_unblock_only_groups_friends">このメッセージを表示するには、「初期設定」の「プライバシー」で「フレンドとグループ以外からはコールとＩＭを受信しない」チェックボックスをオフにします。</string>
   <string name="OnlineStatus">オンライン</string>
   <string name="OfflineStatus">オフライン</string>
   <string name="not_online_msg">ユーザーがオンラインでありません－メッセージは保存され、後で配信されます。</string>
@@ -3597,7 +3597,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 
   <string name="no_session_message">（ＩＭセッションが存在しません）</string>
   <string name="only_user_message">このセッションにいるユーザーはあなただけです。</string>
-  <string name="offline_message">[NAME]はオフライン中です。</string>
+  <string name="offline_message">[NAME]はオフラインです。</string>
   <string name="invite_message">このボイスチャットに応答・接続する場合は、[BUTTON NAME]をクリックしてください。</string>
   <string name="muted_message">この住人をブロックしています。メッセージを送ると、ブロックが自動的に解除されます。</string>
   <!--Some times string name is getting from the body of server response.
@@ -4000,7 +4000,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Command_AnimationOverride_Label">ＡＯ</string>
   <string name="Command_Appearance_Label">容姿</string>
   <string name="Command_Avatar_Label">アバター一式</string>
-  <string name="Command_Build_Label">制作</string>
+  <string name="Command_Build_Label">ビルド</string>
   <string name="Command_Chat_Label">チャット</string>
   <string name="Command_Conversations_Label">会話</string>
   <string name="Command_Compass_Label">コンパス</string>
@@ -4041,7 +4041,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Command_AnimationOverride_Tooltip">アニメーションオーバーライド</string>
   <string name="Command_Appearance_Tooltip">アバターの外観を変更します。</string>
   <string name="Command_Avatar_Tooltip">アバター一式を選択します。</string>
-  <string name="Command_Build_Tooltip">オブジェクトの制作や地形の変形をします。</string>
+  <string name="Command_Build_Tooltip">オブジェクトのビルドや地形の変形をします。</string>
   <string name="Command_Chat_Tooltip">近くにいる人物とテキストチャットします。</string>
   <string name="Command_Conversations_Tooltip">全員との会話を表示します。</string>
   <string name="Command_Compass_Tooltip">コンパスを表示します。</string>
