@@ -14,8 +14,8 @@
   <text name="HUD Size:">ＨＵＤのスケール：</text>
   <check_box label="スクリプトのエラーを表示：" name="show_script_errors" />
   <radio_group name="show_location">
-    <radio_item label="近隣チャット" name="0" />
-    <radio_item label="別々のウィンドウ" name="1" />
+    <radio_item label="近くのチャット" name="0" />
+    <radio_item label="別ウィンドウ" name="1" />
   </radio_group>
   <check_box label="複数のビューアを許可" name="allow_multiple_viewer_check" />
   <check_box label="ゲームモードを有効化" name="enable_game_mode_check" />

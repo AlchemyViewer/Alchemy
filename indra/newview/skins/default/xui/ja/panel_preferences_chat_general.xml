@@ -2,7 +2,7 @@
 <panel label="テキストチャット" name="chat">
   <panel name="general_chat_settings">
 
-    <check_box label="近隣チャットでゼスチャーをオートコンプリート" name="auto_complete_gestures" />
+    <check_box label="近くのチャットでゼスチャーをオートコンプリート" name="auto_complete_gestures" />
 
     <check_box label="チャット時にタイピングアニメーションを再生" name="play_typing_animation" />
     <check_box label="オフライン時にＩＭが送られてきたときにメールを送る（[EMAIL]）" name="send_im_to_email" />
@@ -54,7 +54,7 @@
       <item label="アクションなし" name="NoAction" value="noaction" />
     </combo_box>
     <check_box label="サウンド再生" name="play_sound_group_chat_im" />
-    <text name="nearby_chat">近隣チャット：</text>
+    <text name="nearby_chat">近くのチャット：</text>
     <combo_box name="NearbyChatOptions">
       <item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations" />
       <item label="メッセージをポップアップ" name="PopUpMessage" value="toast" />

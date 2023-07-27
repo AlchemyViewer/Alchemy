@@ -492,7 +492,7 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="ST_NO_JOINT">ROOT または JOINT が見つかりません</string>
 
   <!-- Chat -->
-  <string name="NearbyChatTitle">近隣チャット</string>
+  <string name="NearbyChatTitle">近くのチャット</string>
   <string name="NearbyChatLabel">（近くのチャット）</string>
   <string name="whisper">のささやき：</string>
   <string name="shout">のシャウト：</string>
