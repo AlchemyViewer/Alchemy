@@ -627,13 +627,17 @@ void LLViewerOctreeGroup::handleRemoval(const TreeNode* node, LLViewerOctreeEntr
 //virtual 
 void LLViewerOctreeGroup::handleDestruction(const TreeNode* node)
 {
+    if (isDead())
+    {
+        return;
+    }
+    setState(DEAD);
 	for (OctreeNode::element_iter i = mOctreeNode->getDataBegin(), i_end = mOctreeNode->getDataEnd(); i != i_end; ++i)
 	{
 		LLViewerOctreeEntry* obj = *i;
 		if (obj && obj->getGroup() == this)
 		{
 			obj->nullGroup();
-			//obj->setGroup(NULL);
 		}
 	}
 	mOctreeNode = NULL;
@@ -724,8 +728,7 @@ bool LLViewerOctreeGroup::boundObjects(BOOL empty, LLVector4a& minOut, LLVector4
 		newMin = minMax[0];
 		newMax = minMax[1];
 
-		OctreeNode::const_element_iter i_end = node->getDataEnd();
-		for (++i; i != i_end; ++i)
+		for (++i; i != node->getDataEnd(); ++i)
 		{
 			entry = *i;
 			minMax = entry->getSpatialExtents();

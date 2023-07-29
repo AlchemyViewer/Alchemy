@@ -2915,7 +2915,12 @@ bool enable_object_inspect()
 
 struct LLSelectedTEGetmatIdAndPermissions : public LLSelectedTEFunctor
 {
-    LLSelectedTEGetmatIdAndPermissions() : mCanCopy(true), mCanModify(true), mCanTransfer(true) {}
+    LLSelectedTEGetmatIdAndPermissions()
+        : mCanCopy(true)
+        , mCanModify(true)
+        , mCanTransfer(true)
+        , mHasNonPbrFaces(false)
+    {}
     bool apply(LLViewerObject* objectp, S32 te_index)
     {
         mCanCopy &= (bool)objectp->permCopy();
@@ -2926,11 +2931,16 @@ struct LLSelectedTEGetmatIdAndPermissions : public LLSelectedTEFunctor
         {
             mMaterialId = mat_id;
         }
+        else
+        {
+            mHasNonPbrFaces = true;
+        }
         return true;
     }
     bool mCanCopy;
     bool mCanModify;
     bool mCanTransfer;
+    bool mHasNonPbrFaces;
     LLUUID mMaterialId;
 };
 
@@ -2943,7 +2953,7 @@ bool enable_object_edit_gltf_material()
 
     LLSelectedTEGetmatIdAndPermissions func;
     LLSelectMgr::getInstance()->getSelection()->applyToTEs(&func);
-    return func.mCanModify && func.mMaterialId.notNull();
+    return func.mCanModify && !func.mHasNonPbrFaces;
 }
 
 bool enable_object_open()
@@ -8451,6 +8461,18 @@ class LLToolsSelectInvisibleObjects : public view_listener_t
     }
 };
 
+class LLToolsSelectReflectionProbes: public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        BOOL cur_val = gSavedSettings.getBOOL("SelectReflectionProbes");
+
+        gSavedSettings.setBOOL("SelectReflectionProbes", !cur_val);
+
+        return true;
+    }
+};
+
 class LLToolsSelectBySurrounding : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
@@ -9743,6 +9765,7 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLToolsSelectOnlyMyObjects(), "Tools.SelectOnlyMyObjects");
 	view_listener_t::addMenu(new LLToolsSelectOnlyMovableObjects(), "Tools.SelectOnlyMovableObjects");
     view_listener_t::addMenu(new LLToolsSelectInvisibleObjects(), "Tools.SelectInvisibleObjects");
+    view_listener_t::addMenu(new LLToolsSelectReflectionProbes(), "Tools.SelectReflectionProbes");
 	view_listener_t::addMenu(new LLToolsSelectBySurrounding(), "Tools.SelectBySurrounding");
 	view_listener_t::addMenu(new LLToolsShowHiddenSelection(), "Tools.ShowHiddenSelection");
 	view_listener_t::addMenu(new LLToolsShowSelectionLightRadius(), "Tools.ShowSelectionLightRadius");
