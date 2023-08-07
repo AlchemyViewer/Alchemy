@@ -10,8 +10,7 @@
   <string name="str_too_small">環境を変更するには、最低でも128㎡の区画が必要です。</string>
   <string name="str_empty">（空）</string>
   <string name="str_region_env">（リージョンの環境）</string>
-  <!-- TODO: 翻訳が反映できない -->
-  <layout_stack>
+  <layout_stack name="ls_main">
     <layout_panel name="pnl_environment_region_msg">
       <text name="region_text_lbl">リージョン：</text>
       <text name="region_text">不明</text>
@@ -20,11 +19,11 @@
       <text name="txt_environment_disabled">…</text>
     </layout_panel>
     <layout_panel name="pnl_environment_config">
-      <layout_stack>
+      <layout_stack name="ls_environment_config">
         <layout_panel name="pnl_environment_config">
-          <layout_stack>
+          <layout_stack name="ls_environment_config2">
             <layout_panel name="pnl_environment_current">
-              <text>自然環境の設定を選択</text>
+              <text name="select_environment_label">自然環境の設定を選択</text>
               <button label="[USEDEFAULT]" name="btn_usedefault" />
               <button label="インベントリを使用" name="btn_select_inventory" />
               <button label="カスタマイズ" name="btn_edit" />
@@ -40,8 +39,7 @@
               <text name="lbl_apparent_time">[AP] [HH]：[MM]（[PRC]％）</text>
             </layout_panel>
             <layout_panel name="pnl_environment_buttons">
-              <!--used
-              to be buttons, but now spacer.　-->
+              <!--used to be buttons, but now spacer.　-->
             </layout_panel>
           </layout_stack>
         </layout_panel>

@@ -315,7 +315,7 @@
         <combo_box.item label="金属" name="Metal" />
         <combo_box.item label="ガラス" name="Glass" />
         <combo_box.item label="木" name="Wood" />
-        <combo_box.item label="肌" name="Flesh" />
+        <combo_box.item label="肉" name="Flesh" />
         <combo_box.item label="プラスチック" name="Plastic" />
         <combo_box.item label="ゴム" name="Rubber" />
       </combo_box>

@@ -2297,7 +2297,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
     <tag>fail</tag>
   </notification>
 
-  <notification name="RegionEntryAccessBlocked_Change">訪問しようとしているリ－ジョンは、[REGIONMATURITY]コンテンツが含まれていますが、現在の設定では[REGIONMATURITY]コンテンツを除外するように設定されています。ご希望を変更することも、キャンセルすることもできます。この設定を変更すると、そのリージョンに入ることができるようになります。
+  <notification name="RegionEntryAccessBlocked_Change">訪問しようとしているリージョンは、[REGIONMATURITY]コンテンツが含まれていますが、現在の設定では[REGIONMATURITY]コンテンツを除外するように設定されています。ご希望を変更することも、キャンセルすることもできます。この設定を変更すると、そのリージョンに入ることができるようになります。
     <tag>fail</tag>
     <tag>confirm</tag>
     <form name="form">
@@ -3358,7 +3358,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
   <notification name="TeleportOffered" label="[NAME_LABEL]からのテレポートのオファー">[NAME_SLURL] は、テレポートであなたを呼んでいます。
 [MESSAGE]
 
-&lt;icon&gt;[MATURITY_ICON]&lt;/icon&gt;－[MATURITY_STR]
+&lt;icon&gt;[MATURITY_ICON]&lt;/icon&gt;‐[MATURITY_STR]
     <tag>confirm</tag>
     <form name="form">
       <button name="Teleport" text="テレポート" />
@@ -3369,7 +3369,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
   <notification name="TeleportOffered_MaturityExceeded">[NAME_SLURL] は、テレポートであなたを呼んでいます。
 [MESSAGE]
 
-&lt;icon&gt;[MATURITY_ICON]&lt;/icon&gt;－[MATURITY_STR]
+&lt;icon&gt;[MATURITY_ICON]&lt;/icon&gt;‐[MATURITY_STR]
 
 このリージョンには[REGION_CONTENT_MATURITY]コンテンツが含まれていますが、現在の初期設定は[REGION_CONTENT_MATURITY]コンテンツを除外するように設定されています。初期設定を変更してテレポートを続けるか、このテレポートを取り消すことができます。
     <tag>confirm</tag>
@@ -3381,7 +3381,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
   <notification name="TeleportOffered_MaturityBlocked">[NAME_SLURL] は、テレポートであなたを呼んでいます。
 [MESSAGE]
 
-&lt;icon&gt;[MATURITY_ICON]&lt;/icon&gt;－[MATURITY_STR]
+&lt;icon&gt;[MATURITY_ICON]&lt;/icon&gt;‐[MATURITY_STR]
 
 ただし、このリージョンには成人のみアクセスできるコンテンツが含まれています。
     <tag>fail</tag>
@@ -3619,7 +3619,7 @@ Your L$ balance is shown in the upper-right.
   <notification name="MaxListSelectMessage">このリストから[MAX_SELECT]個までのアイテムを選択できます。</notification>
 
   <notification name="VoiceInviteP2P">[NAME]があなたをボイスチャットコールに招待しています。
-受け入れるをクリックするか、断る場合は拒否をクリックしてください。ブロックをクリックすると、この発信者をブロックします。
+「受け入れる」をクリックするか、断る場合は「却下する」をクリックしてください。「ブロック」をクリックすると、この発信者をブロックします。
     <tag>confirm</tag>
     <tag>voice</tag>
     <unique>
@@ -3627,7 +3627,7 @@ Your L$ balance is shown in the upper-right.
     </unique>
     <form name="form">
       <button name="Accept" text="受け入れる" />
-      <button name="Decline" text="拒否" />
+      <button name="Decline" text="却下する" />
       <button name="Mute" text="ブロック" />
     </form>
   </notification>
@@ -3639,7 +3639,7 @@ Your L$ balance is shown in the upper-right.
   <notification name="AutoUnmuteByInventory">[NAME]はインベントリを受け取り、自動的にブロックが解除されました。</notification>
 
   <notification name="VoiceInviteGroup">[NAME]は &lt;nolink&gt;[GROUP]&lt;/nolink&gt;のボイスチャットコールに参加しました。
-受け入れるをクリックするか、断る場合は拒否をクリックしてください。ブロックをクリックすると、この発信者をブロックします。
+「受け入れる」をクリックするか、断る場合は「却下する」をクリックしてください。「ブロック」をクリックすると、この発信者をブロックします。
     <tag>group</tag>
     <tag>confirm</tag>
     <tag>voice</tag>
@@ -3649,22 +3649,22 @@ Your L$ balance is shown in the upper-right.
     </unique>
     <form name="form">
       <button name="Accept" text="受け入れる" />
-      <button name="Decline" text="拒否" />
+      <button name="Decline" text="却下する" />
       <button name="Mute" text="ブロック" />
     </form>
   </notification>
 
   <notification name="VoiceInviteAdHoc">[NAME]は、会話チャットでボイスチャットコールに参加しました。
-受け入れるをクリックするか、断る場合は拒否をクリックしてください。ブロックをクリックすると、この発信者をブロックします。
+「受け入れる」をクリックするか、断る場合は「却下する」をクリックしてください。「ブロック」をクリックすると、この発信者をブロックします。
     <form name="form">
       <button name="Accept" text="受け入れる" />
-      <button name="Decline" text="拒否" />
+      <button name="Decline" text="却下する" />
       <button name="Mute" text="ブロック" />
     </form>
   </notification>
 
   <notification name="InviteAdHoc">[NAME]があなたを会話チャットに招待しています。
-受け入れるをクリックするか、断る場合は拒否をクリックしてください。ブロックをクリックすると、この発信者をブロックします。
+「受け入れる」をクリックするか、断る場合は「却下する」をクリックしてください。「ブロック」をクリックすると、この発信者をブロックします。
     <tag>confirm</tag>
     <tag>voice</tag>
     <unique>
@@ -3672,7 +3672,7 @@ Your L$ balance is shown in the upper-right.
     </unique>
     <form name="form">
       <button name="Accept" text="受け入れる" />
-      <button name="Decline" text="拒否" />
+      <button name="Decline" text="却下する" />
       <button name="Mute" text="ブロック" />
     </form>
   </notification>
@@ -4335,9 +4335,9 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
   <global name="UnsupportedRAMAmount">510</global>
 
-  <global name="UnsupportedGPU">－あなたのグラフィックカードは、必須動作環境の条件を満たしていません。</global>
+  <global name="UnsupportedGPU">‐あなたのグラフィックカードは、必須動作環境の条件を満たしていません。</global>
 
-  <global name="UnsupportedRAM">－あなたのシステムメモリは、必須動作環境の条件を満たしていません。</global>
+  <global name="UnsupportedRAM">‐あなたのシステムメモリは、必須動作環境の条件を満たしていません。</global>
 
   <global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">自分の土地を持っている場合、そこを「ホーム」に設定できます。持っていない場合は、マップから「情報ハブ」をお探しください。</global>
 
@@ -4733,39 +4733,39 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     <tag>fail</tag>
   </notification>
 
-  <notification name="LinkFailedOwnersDiffer">リンクエラー－所有者が違います。
+  <notification name="LinkFailedOwnersDiffer">リンクエラー‐所有者が違います。
     <tag>fail</tag>
   </notification>
 
-  <notification name="LinkFailedNoModNavmeshAcrossRegions">リンクエラー－リージョンの境界をまたぐナビメッシュは変更できません。
+  <notification name="LinkFailedNoModNavmeshAcrossRegions">リンクエラー‐リージョンの境界をまたぐナビメッシュは変更できません。
     <tag>fail</tag>
   </notification>
 
-  <notification name="LinkFailedNoPermToEdit">リンクエラー－編集権限がありません。
+  <notification name="LinkFailedNoPermToEdit">リンクエラー‐編集権限がありません。
     <tag>fail</tag>
   </notification>
 
-  <notification name="LinkFailedTooManyPrims">リンクエラー－プリミティブが多すぎます。
+  <notification name="LinkFailedTooManyPrims">リンクエラー‐プリミティブが多すぎます。
     <tag>fail</tag>
   </notification>
 
-  <notification name="LinkFailedCantLinkNoCopyNoTrans">リンクエラー－コピーなしと転送なしをリンクできません。
+  <notification name="LinkFailedCantLinkNoCopyNoTrans">リンクエラー‐コピーなしと転送なしをリンクできません。
     <tag>fail</tag>
   </notification>
 
-  <notification name="LinkFailedNothingLinkable">リンクエラー－リンクできるものがありません。
+  <notification name="LinkFailedNothingLinkable">リンクエラー‐リンクできるものがありません。
     <tag>fail</tag>
   </notification>
 
-  <notification name="LinkFailedTooManyPathfindingChars">リンクエラー－経路探索の文字数が多すぎます。
+  <notification name="LinkFailedTooManyPathfindingChars">リンクエラー‐経路探索の文字数が多すぎます。
     <tag>fail</tag>
   </notification>
 
-  <notification name="LinkFailedInsufficientLand">リンクエラー－土地のリソースが足りません。
+  <notification name="LinkFailedInsufficientLand">リンクエラー‐土地のリソースが足りません。
     <tag>fail</tag>
   </notification>
 
-  <notification name="LinkFailedTooMuchPhysics">オブジェクトが使用する物理リソースが多すぎます－そのダイナミクスが無効になっています。
+  <notification name="LinkFailedTooMuchPhysics">オブジェクトが使用する物理リソースが多すぎます‐そのダイナミクスが無効になっています。
     <tag>fail</tag>
   </notification>
 
@@ -5434,7 +5434,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
   </notification>
 
   <notification name="AutoAdjustHDRSky">編集中の非ＨＤＲの空の設定は自動的にＨＤＲの設定に変換されます。ＨＤＲとトーンマッピングを削除する場合は、反射プローブ環境の値を０にしてください。
-    <usetemplate ignoretext="ＨＤＲの空の調整時の警告" name="okignore" yestext="OK" />
+    <usetemplate ignoretext="ＨＤＲの空の調整時の警告" name="okignore" yestext="ＯＫ" />
   </notification>
 
   <!-- ALCHEMY BELOW THIS LINE -->
@@ -5543,7 +5543,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
   </notification>
 
   <notification name="RemoveAOSet">リストからＡＯセット「[AO_SET_NAME]」を削除してもよろしいですか？
-    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="削除" />
+    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="削除する" />
   </notification>
 
   <notification name="AOForeignItemsFound">アニメーションオーバーライダーは、構成に属さない項目を少なくとも１つ見つけました。
