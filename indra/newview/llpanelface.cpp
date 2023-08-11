@@ -955,7 +955,8 @@ void LLPanelFace::getState()
 
 void LLPanelFace::updateUI(bool force_set_values /*false*/)
 { //set state of UI to match state of texture entry(ies)  (calls setEnabled, setValue, etc, but NOT setVisible)
-	LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
+    LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode();
+	LLViewerObject* objectp = node ? node->getObject() : NULL;
 
 	if (objectp
 		&& objectp->getPCode() == LL_PCODE_VOLUME
@@ -986,6 +987,62 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
             }
         }
 
+        // *NOTE: The "identical" variable is currently only used to decide if
+        // the texgen control should be tentative - this is not used by GLTF
+        // materials. -Cosmic;2022-11-09
+        bool identical         = true;  // true because it is anded below
+        bool identical_diffuse = false;
+        bool identical_norm    = false;
+        bool identical_spec    = false;
+
+        LLTextureCtrl *texture_ctrl      = getChild<LLTextureCtrl>("texture control");
+        LLTextureCtrl *shinytexture_ctrl = getChild<LLTextureCtrl>("shinytexture control");
+        LLTextureCtrl *bumpytexture_ctrl = getChild<LLTextureCtrl>("bumpytexture control");
+
+        LLUUID id;
+        LLUUID normmap_id;
+        LLUUID specmap_id;
+
+        LLSelectedTE::getTexId(id, identical_diffuse);
+        LLSelectedTEMaterial::getNormalID(normmap_id, identical_norm);
+        LLSelectedTEMaterial::getSpecularID(specmap_id, identical_spec);
+
+        static S32 selected_te = -1;
+        if ((LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()) && 
+            !LLSelectMgr::getInstance()->getSelection()->isMultipleTESelected()) 
+        {
+            S32 new_selection = -1; // Don't use getLastSelectedTE, it could have been deselected
+            S32 num_tes = llmin((S32)objectp->getNumTEs(), (S32)objectp->getNumFaces());
+            for (S32 te = 0; te < num_tes; ++te)
+            {
+                if (node->isTESelected(te))
+                {
+                    new_selection = te;
+                    break;
+                }
+            }
+
+            if (new_selection != selected_te)
+            {
+                bool te_has_media = objectp->getTE(new_selection) && objectp->getTE(new_selection)->hasMedia();
+                bool te_has_pbr = objectp->getRenderMaterialID(new_selection).notNull();
+
+                if (te_has_pbr && !((mComboMatMedia->getCurrentIndex() == MATMEDIA_MEDIA) && te_has_media))
+                {
+                    mComboMatMedia->selectNthItem(MATMEDIA_PBR);
+                }
+                else if (te_has_media) 
+                {
+                    mComboMatMedia->selectNthItem(MATMEDIA_MEDIA);
+                }
+                else if (id.notNull() || normmap_id.notNull() || specmap_id.notNull()) 
+                {
+                    mComboMatMedia->selectNthItem(MATMEDIA_MATERIAL);
+                }
+                selected_te = new_selection;
+            }
+        }
+
         mComboMatMedia->setEnabled(editable);
 
         LLRadioGroup* radio_mat_type = getChild<LLRadioGroup>("radio_material_type");
@@ -1009,22 +1066,6 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 
 		updateVisibility();
 
-        // *NOTE: The "identical" variable is currently only used to decide if
-        // the texgen control should be tentative - this is not used by GLTF
-        // materials. -Cosmic;2022-11-09
-		bool identical			= true;	// true because it is anded below
-        bool identical_diffuse	= false;
-        bool identical_norm		= false;
-        bool identical_spec		= false;
-
-		LLTextureCtrl*	texture_ctrl = getChild<LLTextureCtrl>("texture control");
-		LLTextureCtrl*	shinytexture_ctrl = getChild<LLTextureCtrl>("shinytexture control");
-		LLTextureCtrl*	bumpytexture_ctrl = getChild<LLTextureCtrl>("bumpytexture control");
-		
-		LLUUID id;
-		LLUUID normmap_id;
-		LLUUID specmap_id;
-		
 		// Color swatch
 		{
 			getChildView("color label")->setEnabled(editable);
@@ -1054,9 +1095,6 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 		getChild<LLUICtrl>("ColorTrans")->setValue(editable ? transparency : 0);
 		getChildView("ColorTrans")->setEnabled(editable && has_material);
 
-		// Specular map
-		LLSelectedTEMaterial::getSpecularID(specmap_id, identical_spec);
-		
 		U8 shiny = 0;
 		bool identical_shiny = false;
 
@@ -1120,11 +1158,6 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 
 		// Texture
 		{
-			LLSelectedTE::getTexId(id,identical_diffuse);
-
-			// Normal map
-			LLSelectedTEMaterial::getNormalID(normmap_id, identical_norm);
-
 			mIsAlpha = FALSE;
 			LLGLenum image_format = GL_RGB;
 			bool identical_image_format = false;
@@ -1753,13 +1786,13 @@ void LLPanelFace::updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, 
 
     const bool editable = objectp->permModify() && !objectp->isPermanentEnforced();
     bool has_pbr_capabilities = LLMaterialEditor::capabilitiesAvailable();
+    bool identical_pbr = true;
 
     // pbr material
     LLTextureCtrl* pbr_ctrl = findChild<LLTextureCtrl>("pbr_control");
     if (pbr_ctrl)
     {
         LLUUID pbr_id;
-        bool identical_pbr;
         LLSelectedTE::getPbrMaterialId(pbr_id, identical_pbr, has_pbr_material, has_faces_without_pbr);
 
         pbr_ctrl->setTentative(identical_pbr ? FALSE : TRUE);
@@ -1769,7 +1802,7 @@ void LLPanelFace::updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, 
 
     getChildView("pbr_from_inventory")->setEnabled(editable && has_pbr_capabilities);
     getChildView("edit_selected_pbr")->setEnabled(editable && has_pbr_material && !has_faces_without_pbr && has_pbr_capabilities);
-    getChildView("save_selected_pbr")->setEnabled(objectp->permCopy() && has_pbr_material && !has_faces_without_pbr && has_pbr_capabilities);
+    getChildView("save_selected_pbr")->setEnabled(objectp->permCopy() && has_pbr_material && identical_pbr && has_pbr_capabilities);
 
     const bool show_pbr = mComboMatMedia->getCurrentIndex() == MATMEDIA_PBR && mComboMatMedia->getEnabled();
     if (show_pbr)
@@ -4583,13 +4616,6 @@ void LLPanelFace::updateGLTFTextureTransform(float value, U32 pbr_type, std::fun
             edit(&new_transform);
         }
     });
-
-    LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode();
-    if (node)
-    {
-        LLViewerObject* object = node->getObject();
-        sMaterialOverrideSelection.setObjectUpdatePending(object->getID(), node->getLastSelectedTE());
-    }
 }
 
 void LLPanelFace::setMaterialOverridesFromSelection()
@@ -4702,17 +4728,22 @@ bool LLPanelFace::Selection::update()
     return changed;
 }
 
-void LLPanelFace::Selection::setObjectUpdatePending(const LLUUID &object_id, S32 side)
-{
-    mPendingObjectID = object_id;
-    mPendingSide = side;
-}
-
 void LLPanelFace::Selection::onSelectedObjectUpdated(const LLUUID& object_id, S32 side)
 {
-    if (object_id == mSelectedObjectID && side == mSelectedSide)
+    if (object_id == mSelectedObjectID)
     {
-        mChanged = true;
+        if (side == mLastSelectedSide)
+        {
+            mChanged = true;
+        }
+        else if (mLastSelectedSide == -1) // if last selected face was deselected
+        {
+            LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode();
+            if (node && node->isTESelected(side))
+            {
+                mChanged = true;
+            }
+        }
     }
 }
 
@@ -4725,8 +4756,9 @@ bool LLPanelFace::Selection::compareSelection()
     mNeedsSelectionCheck = false;
 
     const S32 old_object_count = mSelectedObjectCount;
+    const S32 old_te_count = mSelectedTECount;
     const LLUUID old_object_id = mSelectedObjectID;
-    const S32 old_side = mSelectedSide;
+    const S32 old_side = mLastSelectedSide;
 
     LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
     LLSelectNode* node = selection->getFirstNode();
@@ -4734,17 +4766,23 @@ bool LLPanelFace::Selection::compareSelection()
     {
         LLViewerObject* object = node->getObject();
         mSelectedObjectCount = selection->getObjectCount();
+        mSelectedTECount = selection->getTECount();
         mSelectedObjectID = object->getID();
-        mSelectedSide = node->getLastSelectedTE();
+        mLastSelectedSide = node->getLastSelectedTE();
     }
     else
     {
         mSelectedObjectCount = 0;
+        mSelectedTECount = 0;
         mSelectedObjectID = LLUUID::null;
-        mSelectedSide = -1;
+        mLastSelectedSide = -1;
     }
 
-    const bool selection_changed = old_object_count != mSelectedObjectCount || old_object_id != mSelectedObjectID || old_side != mSelectedSide;
+    const bool selection_changed =
+        old_object_count != mSelectedObjectCount
+        || old_te_count != mSelectedTECount
+        || old_object_id != mSelectedObjectID
+        || old_side != mLastSelectedSide;
     mChanged = mChanged || selection_changed;
     return selection_changed;
 }
@@ -4965,14 +5003,18 @@ void LLPanelFace::LLSelectedTE::getTexId(LLUUID& id, bool& identical)
 
 void LLPanelFace::LLSelectedTE::getPbrMaterialId(LLUUID& id, bool& identical, bool& has_faces_with_pbr, bool& has_faces_without_pbr)
 {
-    struct LLSelectedTEGetmatId : public LLSelectedTEGetFunctor<LLUUID>
+    struct LLSelectedTEGetmatId : public LLSelectedTEFunctor
     {
         LLSelectedTEGetmatId()
             : mHasFacesWithoutPBR(false)
             , mHasFacesWithPBR(false)
+            , mIdenticalId(true)
+            , mIdenticalOverride(true)
+            , mInitialized(false)
+            , mMaterialOverride(LLGLTFMaterial::sDefault)
         {
         }
-        LLUUID get(LLViewerObject* object, S32 te_index)
+        bool apply(LLViewerObject* object, S32 te_index) override
         {
             LLUUID pbr_id = object->getRenderMaterialID(te_index);
             if (pbr_id.isNull())
@@ -4983,12 +5025,49 @@ void LLPanelFace::LLSelectedTE::getPbrMaterialId(LLUUID& id, bool& identical, bo
             {
                 mHasFacesWithPBR = true;
             }
-            return pbr_id;
+            if (mInitialized)
+            {
+                if (mPBRId != pbr_id)
+                {
+                    mIdenticalId = false;
+                }
+                
+                LLGLTFMaterial* te_override = object->getTE(te_index)->getGLTFMaterialOverride();
+                if (te_override)
+                {
+                    LLGLTFMaterial override = *te_override;
+                    override.sanitizeAssetMaterial();
+                    mIdenticalOverride &= (override == mMaterialOverride);
+                }
+                else
+                {
+                    mIdenticalOverride &= (mMaterialOverride == LLGLTFMaterial::sDefault);
+                }
+            }
+            else
+            {
+                mInitialized = true;
+                mPBRId = pbr_id;
+                LLGLTFMaterial* override = object->getTE(te_index)->getGLTFMaterialOverride();
+                if (override)
+                {
+                    mMaterialOverride = *override;
+                    mMaterialOverride.sanitizeAssetMaterial();
+                }
+            }
+            return true;
         }
         bool mHasFacesWithoutPBR;
         bool mHasFacesWithPBR;
+        bool mIdenticalId;
+        bool mIdenticalOverride;
+        bool mInitialized;
+        LLGLTFMaterial mMaterialOverride;
+        LLUUID mPBRId;
     } func;
-    identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue(&func, id);
+    LLSelectMgr::getInstance()->getSelection()->applyToTEs(&func);
+    id = func.mPBRId;
+    identical = func.mIdenticalId && func.mIdenticalOverride;
     has_faces_with_pbr = func.mHasFacesWithPBR;
     has_faces_without_pbr = func.mHasFacesWithoutPBR;
 }
