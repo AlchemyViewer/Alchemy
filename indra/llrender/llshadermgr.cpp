@@ -641,7 +641,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 		}
 	}
 
-	if (type == GL_FRAGMENT_SHADER_ARB)
+	if (type == GL_FRAGMENT_SHADER)
     {
         extra_code_text[extra_code_count++] = strdup("#define FRAGMENT_SHADER 1\n");
     }

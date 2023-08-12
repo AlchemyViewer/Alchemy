@@ -235,8 +235,6 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, BOOL first_pass, BOOL is_dummy)
 		gGL.diffuseColor4fv(mColor.mV);
 
 	stop_glerror();
-	
-	LLGLSSpecular specular(LLColor4(1.f,1.f,1.f,1.f), 0.f);
 
 	//----------------------------------------------------------------
 	// setup current texture

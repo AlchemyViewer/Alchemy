@@ -6790,7 +6790,7 @@ void LLPipeline::renderFullbrightMaskedObjects(U32 type, bool texture, bool batc
 void validate_framebuffer_object()
 {                                                           
 	GLenum status;                                            
-	status = glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT); 
+	status = glCheckFramebufferStatus(GL_FRAMEBUFFER); 
 	switch(status) 
 	{                                          
 		case GL_FRAMEBUFFER_COMPLETE:                       
