@@ -12,7 +12,7 @@
   <floater.string name="client_frame_time_warning_msg">クライアントのフレームレートが[CLIENT_FRAME_RATE_CRITICAL]と[CLIENT_FRAME_RATE_WARNING]の間</floater.string>
   <floater.string name="client_frame_time_normal_msg">標準</floater.string>
   <floater.string name="client_draw_distance_cause_msg">考えられる原因：描画距離の設定が高すぎる</floater.string>
-  <floater.string name="client_texture_loading_cause_msg">考えられる原因：画像のロード中</floater.string>
+  <floater.string name="client_texture_loading_cause_msg">考えられる原因：画像の読み込んでいる途中</floater.string>
   <floater.string name="client_texture_memory_cause_msg">考えられる原因：メモリ内に画像が多すぎる</floater.string>
   <floater.string name="client_complex_objects_cause_msg">考えられる原因：シーンに複雑なオブジェクトが多すぎる</floater.string>
   <floater.string name="network_text_msg">ネットワーク</floater.string>

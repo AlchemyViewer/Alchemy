@@ -2,7 +2,7 @@
 <floater name="Model Preview" title="モデルのアップロード">
 
   <string name="status_idle" />
-  <string name="status_parse_error">エラー：DAEファイルに問題が見つかりました。─詳細につきましてはログをご確認ください。</string>
+  <string name="status_parse_error">エラー：DAEファイルに問題が見つかりました。‐詳細につきましてはログをご確認ください。</string>
   <string name="status_bind_shape_orientation">警告：バインドシェイプマトリックスは、標準のＸ軸正方向にはありません。</string>
   <string name="status_material_mismatch">エラー：モデルの材料は参考モデルのサブセットではありません。</string>
   <string name="status_reading_file">読み込んでいます…</string>
@@ -42,7 +42,7 @@
   <string name="CantResolveGeometryUrl">ジオメトリＵＲＬを解決することができませんでした。</string>
   <string name="ParsingErrorBadElement">不正な要素です。</string>
   <string name="ParsingErrorCantParseScene">シーンを解析できませんでした。</string>
-  <string name="ParsingErrorCorrupt">DAEファイルでエラーが見つかりました。─ファイルが破損しているようです。</string>
+  <string name="ParsingErrorCorrupt">DAEファイルでエラーが見つかりました。‐ファイルが破損しているようです。</string>
   <string name="ParsingErrorNoController">コントローラーを確認できませんでした。</string>
   <string name="ParsingErrorNoDoc">内部ドキュメントが見つかりません。</string>
   <string name="ParsingErrorNoRoot">ドキュメントにルートがありません。</string>
@@ -58,7 +58,7 @@
       <last_tab tab_top_image_flash="TabTop_Right_Flashing"/>
       <!-- for log tab -->
       <!-- LOD PANEL -->
-      <panel label="ＬｏＤ" name="lod_panel" title="ＬｏＤ">
+      <panel label="ＬｏＤ" name="lod_panel" title="詳細度">
         <view_border name="lod_tab_border" />
         <text name="source" value="ソース" />
         <text name="triangles" value="三角形の数" />
@@ -272,7 +272,7 @@
         <text name="price_breakdown_labels">ダウンロード：
 物理効果数：
 インスタンス数：
-テスクチャ数：
+テクスチャ数：
 モデル：</text>
         <text name="price_breakdown">[STREAMING]
 [PHYSICS]
@@ -320,7 +320,7 @@
     <text name="label_display">表示…</text>
     <check_box label="エッジ" name="show_edges" />
     <check_box label="物理効果" name="show_physics" />
-    <check_box label="テスクチャ数" name="show_textures" />
+    <check_box label="テクスチャ数" name="show_textures" />
     <check_box label="スキンのウエイト" name="show_skin_weight" />
     <check_box label="ジョイント位置のオーバーライド" name="show_joint_overrides" />
     <check_box label="ジョイント数" name="show_joint_positions" />

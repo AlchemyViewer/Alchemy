@@ -17,10 +17,10 @@
   <text name="AlchemyChatCommandMapto_txt">リージョンにテレポート</text>
   <line_editor name="AlchemyChatCommandMapto" />
   <!--clr-->
-  <text name="AlchemyChatCommandClearNearby_txt">近隣チャットのコンテンツをクリア</text>
+  <text name="AlchemyChatCommandClearNearby_txt">近くのチャットのコンテンツをクリア</text>
   <line_editor name="AlchemyChatCommandClearNearby" />
   <!--Hover-->
-  <text name="hover_txt" width="240">ホバー高さ</text>
+  <text name="hover_txt">ホバー高さ</text>
   <line_editor name="AlchemyChatCommandHoverHeight" />
   <!--AO-->
   <text name="ao_txt">アニメーションオーバーライド</text>
@@ -37,8 +37,7 @@
   <!--Calculatooor-->
   <text name="calc_txt">計算機</text>
   <line_editor name="AlchemyChatCommandCalc" />
-  <!--Resync
-  Anims-->
+  <!--Resync Anims-->
   <text name="calc_txt">アニメーションを再同期</text>
   <line_editor name="AlchemyChatCommandResyncAnim" />
   <!--rezplat-->

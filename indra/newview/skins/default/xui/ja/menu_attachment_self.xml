@@ -15,9 +15,9 @@
   <menu_item_call label="ホバー高さ…" name="Hover Height" />
   <menu_item_call label="シェイプ…" name="Edit Shape" />
   <menu_item_call label="アウトフィット編集…" name="Edit Outfit" />
-  <context_menu label="脱ぐ" layout="topleft" name="Take Off &gt;">
-    <context_menu label="衣類" layout="topleft" name="Clothes &gt;">
-      <menu_item_call label="シャツ" name="Shirt"/>
+  <context_menu label="脱ぐ" name="Take Off &gt;">
+    <context_menu label="衣類" name="Clothes &gt;">
+      <menu_item_call label="シャツ" name="Shirt" />
       <menu_item_call label="ズボン" name="Pants" />
       <menu_item_call label="スカート" name="Skirt" />
       <menu_item_call label="靴" name="Shoes" />
@@ -41,10 +41,10 @@
   <menu_item_call label="飛行／着地" name="Fly land" />
   <menu_item_call label="アニメーションを停止" name="Stop Animating My Avatar" />
   <menu_item_separator />
-  <menu_item_call label="テスクチャをリフレッシュ" name="Refresh Textures" />
-  <menu_item_call label="スケルトンをリセット" layout="topleft" name="Reset Skeleton" />
-  <menu_item_call label="スケルトンとアニメをリセット" layout="topleft" name="Reset Skeleton And Animations" />
-  <menu_item_call label="テスクチャのデバッグ" name="Debug..." />
+  <menu_item_call label="テクスチャをリフレッシュ" name="Refresh Textures" />
+  <menu_item_call label="スケルトンをリセット" name="Reset Skeleton" />
+  <menu_item_call label="スケルトンとアニメをリセット" name="Reset Skeleton And Animations" />
+  <menu_item_call label="テクスチャのデバッグ" name="Debug..." />
   <menu_item_call label="ＸＭＬダンプL" name="Dump XML" />
   <menu_item_call label="パーティクル所有者をブロック" name="Mute Particle" />
   <menu_item_separator />

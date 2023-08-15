@@ -45,9 +45,9 @@
             <slider name="omega_z" label="Ｚ：" />
           </panel>
         </accordion_tab>
-        <accordion_tab name="color_tab" title="色／テスクチャ">
+        <accordion_tab name="color_tab" title="色／テクスチャ">
           <panel name="color_panel">
-            <texture_picker name="texture_picker" label="テスクチャ" />
+            <texture_picker name="texture_picker" label="テクスチャ" />
             <color_swatch label="開始色" name="start_color_selector" />
             <color_swatch label="終了色" name="end_color_selector" />
 
@@ -57,10 +57,10 @@
               <combo_box.item label="ブレンド０" name="blend_zero" value="blend_zero" />
               <combo_box.item label="終了色にブレンド" name="blend_dest_color" value="blend_dest_color" />
               <combo_box.item label="開始色にブレンド" name="blend_src_color" value="blend_src_color" />
-              <combo_box.item label="ブレンド１─終了色" name="blend_one_minus_dest_color" value="blend_one_minus_dest_color" />
-              <combo_box.item label="ブレンド１─開始色" name="blend_one_minus_src_color" value="blend_one_minus_src_color" />
+              <combo_box.item label="ブレンド１‐終了色" name="blend_one_minus_dest_color" value="blend_one_minus_dest_color" />
+              <combo_box.item label="ブレンド１‐開始色" name="blend_one_minus_src_color" value="blend_one_minus_src_color" />
               <combo_box.item label="開始色アルファ" name="blend_src_alpha" value="blend_src_alpha" />
-              <combo_box.item label="ブレンド１─開始色アルファ" name="blend_one_minus_src_alpha" value="blend_one_minus_src_alpha" />
+              <combo_box.item label="ブレンド１‐開始色アルファ" name="blend_one_minus_src_alpha" value="blend_one_minus_src_alpha" />
             </combo_box>
             <combo_box name="blend_func_dest_combo">
               <combo_box.commit_callback function="Particle.Edit" />
@@ -68,10 +68,10 @@
               <combo_box.item label="ブレンド０" name="blend_zero" value="blend_zero" />
               <combo_box.item label="終了色にブレンド" name="blend_dest_color" value="blend_dest_color" />
               <combo_box.item label="開始色にブレンド" name="blend_src_color" value="blend_src_color" />
-              <combo_box.item label="ブレンド１─終了色" name="blend_one_minus_dest_color" value="blend_one_minus_dest_color" />
-              <combo_box.item label="ブレンド１─開始色" name="blend_one_minus_src_color" value="blend_one_minus_src_color" />
+              <combo_box.item label="ブレンド１‐終了色" name="blend_one_minus_dest_color" value="blend_one_minus_dest_color" />
+              <combo_box.item label="ブレンド１‐開始色" name="blend_one_minus_src_color" value="blend_one_minus_src_color" />
               <combo_box.item label="開始色アルファ" name="blend_src_alpha" value="blend_src_alpha" />
-              <combo_box.item label="ブレンド１─開始色アルファ" name="blend_one_minus_src_alpha" value="blend_one_minus_src_alpha" />
+              <combo_box.item label="ブレンド１‐開始色アルファ" name="blend_one_minus_src_alpha" value="blend_one_minus_src_alpha" />
             </combo_box>
           </panel>
         </accordion_tab>

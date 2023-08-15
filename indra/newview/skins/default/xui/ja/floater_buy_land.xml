@@ -13,12 +13,12 @@
   <floater.string name="group_already_owns">グループはすでにこの区画を所有しています。</floater.string>
   <floater.string name="you_already_own">あなたはすでにこの区画を所有しています</floater.string>
   <floater.string name="set_to_sell_to_other">選択された区画は、他の人への販売が決まっています。</floater.string>
-  <floater.string name="no_public_land">選択された地域に、公共の土地はありません。</floater.string>
+  <floater.string name="no_public_land">選択されたリージョンに、公共の土地はありません。</floater.string>
   <floater.string name="not_owned_by_you">他の住人が所有する土地を選択しています。
 もっと狭い範囲を選択してみてください。</floater.string>
-  <floater.string name="processing">購入処理中…
+  <floater.string name="processing">購入処理をしています…
 （数分かかることがあります）</floater.string>
-  <floater.string name="fetching_error">土地購入の情報入手中にエラーが起きました</floater.string>
+  <floater.string name="fetching_error">土地購入の情報入手時にエラーが起きました</floater.string>
   <floater.string name="buying_will">この土地を買うと：</floater.string>
   <floater.string name="buying_for_group">グループ用の土地の購入：</floater.string>
   <floater.string name="cannot_buy_now">現在購入不可：</floater.string>
@@ -27,7 +27,7 @@
   <floater.string name="must_upgrade">アカウントをアップグレードしないと、土地を所有できません</floater.string>
   <floater.string name="cant_own_land">あなたのアカウントで土地を所有できます。</floater.string>
   <floater.string name="land_holdings">あなたは、[BUYER]㎡の土地を所有しています。</floater.string>
-  <floater.string name="pay_to_for_land">この土地の代金として、[SELLER]にL$[AMOUNT]を支払う。</floater.string>
+  <floater.string name="pay_to_for_land">この土地の代金として、[SELLER]にL$ [AMOUNT]を支払う。</floater.string>
   <floater.string name="buy_for_US">L$[AMOUNT]を、約[LOCAL_AMOUNT]で購入します。</floater.string>
   <floater.string name="parcel_meters">この区画は[AMOUNT]㎡です。</floater.string>
   <floater.string name="premium_land">この土地は割り増し付です。[AMOUNT]㎡の料金がかかります。</floater.string>
@@ -46,7 +46,7 @@
   <floater.string name="balance_left">購入後、残額はL$ [AMOUNT]になります。</floater.string>
   <floater.string name="balance_needed">この土地を買うには、少なくともL$ [AMOUNT]購入する必要があります。</floater.string>
   <floater.string name="no_parcel_selected">（区画が選定されていません）</floater.string>
-  <text name="region_name_label">地域：</text>
+  <text name="region_name_label">リージョン：</text>
   <text name="region_name_text">（不明）</text>
   <text name="region_type_label">種類：</text>
   <text name="region_type_text">（不明）</text>
@@ -54,7 +54,7 @@
   <text name="estate_name_text">（不明）</text>
   <text name="estate_owner_label">不動産オーナー：</text>
   <text name="estate_owner_text">（不明）</text>
-  <text name="resellable_changeable_label">このリージョン（地域）で購入した土地：</text>
+  <text name="resellable_changeable_label">このリージョンで購入した土地：</text>
   <text name="resellable_clause">再販できる場合とできない場合があります。</text>
   <text name="changeable_clause">統合または再分割できる場合とできない場合があります。</text>
   <text name="covenant_text">不動産約款に同意してください：</text>

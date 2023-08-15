@@ -4,8 +4,8 @@
   <check_box label="このスクリーンショットを使用" name="screen_check" />
   <text name="reporter_title">報告者：</text>
   <text name="reporter_field">Loremipsum Dolorsitamut Longnamez</text>
-  <text name="sim_title">リージョン（地域）：</text>
-  <text name="sim_field">リージョン（地域）名</text>
+  <text name="sim_title">リージョン：</text>
+  <text name="sim_field">リージョン名</text>
   <text name="pos_title">位置：</text>
   <text name="pos_field">{128.1, 128.1, 15.4}</text>
   <text name="select_object_label">ボタンをクリックしてから、悪意のあるオブジェクトをクリック：</text>
@@ -26,7 +26,7 @@
     <combo_box.item label="開示＞リアルワールドの情報" name="Disclosure__Real_world_information" />
     <combo_box.item label="開示＞離れたところからチャットをモニターしている" name="Disclosure__Remotely_monitoring chat" />
     <combo_box.item label="開示＞Second Life の情報/チャット/IM" name="Disclosure__Second_Life_information_chat_IMs" />
-    <combo_box.item label="平穏を乱す行為＞地域リソースの使用が不公平" name="Disturbing_the_peace__Unfair_use_of_region_resources" />
+    <combo_box.item label="平穏を乱す行為＞リージョンリソースの使用が不公平" name="Disturbing_the_peace__Unfair_use_of_region_resources" />
     <combo_box.item label="平穏を乱す行為＞スクリプト・オブジェクトの乱用" name="Disturbing_the_peace__Excessive_scripted_objects" />
     <combo_box.item label="平穏を乱す行為＞オブジェクトの捨て置き" name="Disturbing_the_peace__Object_littering" />
     <combo_box.item label="平穏を乱す行為＞繰り返しスパム" name="Disturbing_the_peace__Repetitive_spam" />
@@ -43,8 +43,8 @@
     <combo_box.item label="嫌がらせ＞暴言" name="Harassment__Verbal_abuse" />
     <combo_box.item label="猥褻＞著しく不快であると見なされるコンテンツまたは行為" name="Indecency__Broadly_offensive_content_or_conduct" />
     <combo_box.item label="猥褻＞不適切なアバター名" name="Indecency__Inappropriate_avatar_name" />
-    <combo_box.item label="猥褻＞リージョン（地域）のレーティング区分に対して不適切なコンテンツまたは行為" name="Indecency__Mature_content_in_PG_region" />
-    <combo_box.item label="猥褻＞「Moderate」指定の地域での不適切なコンテンツまたは行為" name="Indecency__Inappropriate_content_in_Mature_region" />
+    <combo_box.item label="猥褻＞リージョンのレーティング区分に対して不適切なコンテンツまたは行為" name="Indecency__Mature_content_in_PG_region" />
+    <combo_box.item label="猥褻＞「Moderate」指定のリージョンでの不適切なコンテンツまたは行為" name="Indecency__Inappropriate_content_in_Mature_region" />
     <combo_box.item label="知的財産の侵害＞コンテンツの撤去" name="Intellectual_property_infringement_Content_Removal" />
     <combo_box.item label="知的財産の侵害＞コピーBot及び権限の悪用" name="Intellectual_property_infringement_CopyBot_or_Permissions_Exploit" />
     <combo_box.item label="不寛容" name="Intolerance" />

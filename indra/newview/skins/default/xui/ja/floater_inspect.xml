@@ -9,11 +9,11 @@
 
 面数：[NUM_FACES]個
 表示面数：[NUM_VISIBLE_FACES]個
-超点数：[NUM_VERTICES]個
+頂点数：[NUM_VERTICES]個
 三角形の数：[NUM_TRIANGLES]個
 複雑度：[COMPLEXITY]
 
-テスクチャ数：[NUM_TEXTURES]個
+テクスチャ数：[NUM_TEXTURES]個
 ＴＭｅｍ：[TEXTURE_MEMORY]㎅
 ＶＲＡＭ：[VRAM_USAGE]㎅</floater.string>
   <text_editor name="linksetstats_text" value="（読み込んでいます…）" />

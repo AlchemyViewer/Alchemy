@@ -9,7 +9,7 @@
   <menu_item_separator />
   <context_menu label="外観" name="Appearance">
     <menu_item_call label="スケルトンをリセット" name="Reset Skeleton" />
-    <menu_item_call label="テスクチャをリフレシュ" name="Refresh Textures" />
+    <menu_item_call label="テクスチャをリフレシュ" name="Refresh Textures" />
     <menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations" />
     <menu_item_separator />
     <menu_item_check name="RenderNormally" label="通常の描画設定" />

@@ -2,7 +2,7 @@
 <floater name="land holdings floater" title="自分の土地">
   <scroll_list name="parcel list">
     <column label="区画" name="name" />
-    <column label="リージョン（地域）" name="location" />
+    <column label="リージョン" name="location" />
     <column label="種類" name="type" />
     <column label="面積" name="area" />
     <column label="" name="hidden" />

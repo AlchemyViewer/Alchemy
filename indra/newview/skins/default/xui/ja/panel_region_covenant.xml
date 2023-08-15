@@ -20,11 +20,11 @@
   <text name="region_maturity_lbl">区分：</text>
   <text name="region_maturity_text">アダルト</text>
   <text name="resellable_lbl">再販：</text>
-  <text name="resellable_clause">このリージョン（地域）にある土地は再販できません。</text>
+  <text name="resellable_clause">このリージョンにある土地は再販できません。</text>
   <text name="changeable_lbl">再分割：</text>
-  <text name="changeable_clause">このリージョン（地域）にある土地は統合または分割ができません。</text>
-  <string name="can_resell">このリージョン（地域）で購入した土地は、再販できます。</string>
-  <string name="can_not_resell">このリージョン（地域）の購入地は再販できないことがあります。</string>
-  <string name="can_change">このリージョン（地域）の購入地は統合または再分割できます。</string>
-  <string name="can_not_change">このリージョン（地域）の購入地は統合／再分割できないことがあります。</string>
+  <text name="changeable_clause">このリージョンにある土地は統合または分割ができません。</text>
+  <string name="can_resell">このリージョンで購入した土地は、再販できます。</string>
+  <string name="can_not_resell">このリージョンの購入地は再販できないことがあります。</string>
+  <string name="can_change">このリージョンの購入地は統合または再分割できます。</string>
+  <string name="can_not_change">このリージョンの購入地は統合／再分割できないことがあります。</string>
 </panel>

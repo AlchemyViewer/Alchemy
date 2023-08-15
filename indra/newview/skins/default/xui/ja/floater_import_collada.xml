@@ -6,6 +6,6 @@
   <button label="キャンセル" name="cancel" />
   <button label="ＯＫ" name="ok" />
   <string name="status_idle">待機状態</string>
-  <string name="status_uploading">[NAME]をアップロード中</string>
-  <string name="status_creating">オブジェクト[NAME]を作成中</string>
+  <string name="status_uploading">[NAME]をアップロードしています…</string>
+  <string name="status_creating">オブジェクト[NAME]を作成しています…</string>
 </floater>
