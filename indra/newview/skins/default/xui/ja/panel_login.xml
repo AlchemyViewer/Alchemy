@@ -6,7 +6,7 @@
     <layout_panel name="login">
       <text name="log_in_text">ログイン</text>
       <text name="username_text">ユーザ名：</text>
-      <combo_box tool_tip="登録時に自分で選んだユーザー名（例：bobsmith12、Steller Sunshineなど）" name="username_combo" />
+      <combo_box tool_tip="登録時に自分で選んだユーザー名（例：bobsmith12、Steller Sunshineなど）を入力します。" name="username_combo" />
       <text name="password_text">パスワード：</text>
       <!-- STEAM-14: Turn off commit_on_focus_lost so if user presses Enter
            with focus in this line_editor, we can use commit action to

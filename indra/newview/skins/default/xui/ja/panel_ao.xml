@@ -39,8 +39,8 @@
   <panel name="ao_reload_cover">
     <panel name="ao_reload_text_panel">
       <view_border name="ao_reload_view_border" />
-      <text name="reload_label">設定のリロード中</text>
-      <text name="wait_label">しばらくお待ち下さい</text>
+      <text name="reload_label">設定をリロードしています。</text>
+      <text name="wait_label">しばらくお待ち下さい。</text>
       <layout_stack name="ao_reload_indicator_layout_stack">
         <layout_panel name="ao_reload_indicator_left_layout_panel">
         </layout_panel>

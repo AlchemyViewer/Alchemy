@@ -45,7 +45,7 @@
     <text name="failed_lbl">失敗</text>
   </panel>
   <loading_indicator name="working_indicator" />
-  <text name="working_lbl">処理中</text>
+  <text name="working_lbl">処理中です</text>
   <text name="refresh_lbl">リフレッシュして保存</text>
   <ui_ctrl name="thumbnail_placeholder" />
   <view_border name="img_info_border" />

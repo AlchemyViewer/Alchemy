@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="関心" name="avatar_interests_tab">
   <text name="i_want_label">やりたいこと：</text>
-  <check_box label="制作" name="wanna_build" />
+  <check_box label="ビルド" name="wanna_build" />
 
   <check_box label="探検" name="wanna_explore" />
 
@@ -16,7 +16,7 @@
 
 
   <text name="skills_label">スキル：</text>
-  <check_box label="テスクチャ" name="can_texture" />
+  <check_box label="テクスチャ" name="can_texture" />
   <check_box label="建築" name="can_architect" />
   <check_box label="モデリング" name="can_model" />
   <check_box label="イベント企画" name="can_event" />

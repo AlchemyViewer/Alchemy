@@ -14,20 +14,33 @@ that are returned from one component and may appear in many places
   <string name="SECOND_LIFE_GRID">[CURRENT_GRID]グリッド</string>
   <string name="SUPPORT_SITE">サポートポータル</string>
   <!-- Default Args set in LLViewerNetwork -->
-  <string name="CURRENT_GRID"/>
-  <string name="GRID_ADMIN"/>
+  <string name="CURRENT_GRID" />
+  <string name="GRID_ADMIN" />
 
   <!-- starting up -->
-  <string name="StartupDetectingHardware">ハードウェアの検出中です…</string>
-  <string name="StartupLoading">[APP_NAME]をインストール中です…</string>
-  <string name="StartupClearingCache">キャッシュをクリア中です…</string>
-  <string name="StartupInitializingTextureCache">テクスチャキャッシュを初期化中です…</string>
+  <string name="StartupDetectingHardware">ハードウェアを検出しています…</string>
+  <string name="StartupLoading">[APP_NAME]をインストールしています…</string>
+  <string name="StartupClearingCache">キャッシュを消去しています…</string>
+  <string name="StartupInitializingTextureCache">テクスチャキャッシュを初期化しています…</string>
+  <string name="StartupInitializingTextureCache0">テクスチャキャッシュのフラッフィングしています…</string>
+  <string name="StartupInitializingTextureCache1">網目状のスプライン…</string>
+  <string name="StartupInitializingTextureCache2">テクスチャのベーキングに使用するオーブンの予熱をしています…</string>
+  <string name="StartupInitializingTextureCache3">スヌートを叩いてテクスチャの質感を出しています…</string>
+  <string name="StartupInitializingTextureCache4">魔法のカバを読み込んでいます…</string>
+  <string name="StartupInitializingTextureCache5">Nvidiaにスケープゴートを捧げています…</string>
+  <string name="StartupInitializingTextureCache6">プロジェクト・サンサール（笑）を準備しています…</string>
+  <string name="StartupInitializingTextureCache7">あなたを待たせる新しい方法を発見しています…</string>
+  <string name="StartupInitializingTextureCache8">オ（ン）で並び替えを試みています…</string>
+  <string name="StartupInitializingTextureCache9">気の利いた起動メッセージを生成しています…</string>
   <string name="StartupRequireDriverUpdate">グラフィックを初期化できませんでした。グラフィックドライバを更新してください。</string>
 
   <!-- about dialog/support string-->
-  <string name="AboutHeader">[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2].[VIEWER_VERSION_3]（[ADDRESS_SIZE]bit）
+  <string name="AboutHeader">[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2]（[ADDRESS_SIZE]bit）
 [[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]</string>
+  <string name="AboutCompiler">コンパイラのバージョン：[COMPILER] [COMPILER_VERSION]</string>
+  <string name="AboutVCSRev">Gitリビジョン：[GIT_REV]</string>
   <string name="BuildConfig">ビルド構成：[BUILD_CONFIG]</string>
+  <string name="BuildDate">ビルド日付：[BUILD_DATE] [BUILD_TIME]</string>
 
   <string name="AboutPosition">あなたは、現在[REGION]の[POSITION_LOCAL_0,number,1]，[POSITION_LOCAL_1,number,1]，[POSITION_LOCAL_2,number,1]にいます。
 位置は、&lt;nolink&gt;[HOSTNAME]&lt;/nolink&gt;です。（[HOSTIP]）
@@ -35,6 +48,11 @@ SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 （グローバル座標は、[POSITION_0,number,1]，[POSITION_1,number,1]，[POSITION_2,number,1]です。）
 [SERVER_VERSION]
 [SERVER_RELEASE_NOTES_URL]</string>
+  <string name="AboutPositionRLVShowLoc">
+あなたは、[REGION]にいます。
+[SERVER_VERSION]
+[SERVER_RELEASE_NOTES_URL]
+  </string>
   <!-- *NOTE: Do not translate text like GPU, Graphics Card, etc -
        Most PC users who know what these mean will be used to the English versions,
        and this info sometimes gets sent to support. -->
@@ -55,13 +73,15 @@ SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 高度な光源モデル：[GPU_SHADERS]
 テクスチャメモリ：[TEXTURE_MEMORY]㎆</string>
   <string name="AboutOSXHiDPI">高ＤＰＩ表示モード：[HIDPI]</string>
-  <string name="AboutLibs">J2Cデコーダバージョン：[J2C_VERSION]
-オーディオドライババージョン：[AUDIO_DRIVER_VERSION]
-LibCEFバージョン：[LIBCEF_VERSION]
-LibVLCバージョン：[LIBVLC_VERSION]
-ボイスサーバーバージョン：[VOICE_VERSION]</string>
+  <string name="AboutLibs">RestrainedLove API：[RLV_VERSION]
+libcurlのバージョン：[LIBCURL_VERSION]
+J2Cデコーダーのバージョン：[J2C_VERSION]
+オーディオドライバのバージョン：[AUDIO_DRIVER_VERSION]
+[CEF_VERSION]
+LibVLCのバージョン：[LIBVLC_VERSION]
+ボイスサーバーのバージョン：[VOICE_VERSION]</string>
   <string name="AboutTraffic">パケット損失：[PACKETS_LOST,number,0]／[PACKETS_IN,number,0]（[PACKETS_PCT,number,1]％）</string>
-  <string name="AboutTime">[year, datetime, slt]年[month, datetime, slt]月[day, datetime, slt]日　[hour, datetime, slt]：[min,datetime, slt]：[second,datetime,slt]</string>
+  <string name="AboutTime">[year, datetime, slt]年[month, datetime, slt][day, datetime, slt]日　[hour, datetime, slt]：[min,datetime, slt]：[second,datetime,slt]</string>
   <string name="ErrorFetchingServerReleaseNotesURL">サーバーのリリースノートのＵＲＬ取得時にエラーが発生しました。</string>
   <string name="BuildConfiguration">ビルド構成</string>
 
@@ -73,11 +93,11 @@ LibVLCバージョン：[LIBVLC_VERSION]
   <string name="Fullbright">明るさ全開（レガシー）</string>  <!-- used in the Build > materials dropdown-->
 
   <!-- Login -->
-  <string name="LoginInProgress">ログイン中です。[APP_NAME]の表示がフリーズする場合があります。しばらくお待ちください。</string>
-  <string name="LoginInProgressNoFrozen">ログイン中です…</string>
+  <string name="LoginInProgress">ログインしています。[APP_NAME]の表示がフリーズする場合があります。しばらくお待ちください。</string>
+  <string name="LoginInProgressNoFrozen">ログインしています…</string>
   <string name="LoginAuthenticating">認証しています…</string>
   <string name="LoginMaintenance">アカウントのメンテナンスを実行しています…</string>
-  <string name="LoginAttempt">前回のログインに失敗しました。ログイン中です（[NUMBER]回目）</string>
+  <string name="LoginAttempt">前回のログインに失敗しました。ログインしています（[NUMBER]回目）</string>
   <string name="LoginPrecaching">ワールドを読み込んでいます…</string>
   <string name="LoginInitializingBrowser">内蔵Webブラウザを初期化しています…</string>
   <string name="LoginInitializingMultimedia">マルチメディアを初期化しています…</string>
@@ -89,13 +109,13 @@ LibVLCバージョン：[LIBVLC_VERSION]
   <string name="LoginInitializingQuicktime">QuickTimeを初期化しています…</string>
   <string name="LoginQuicktimeNotFound">QuickTimeが見つかりません。初期化に失敗しました。</string>
   <string name="LoginQuicktimeOK">QuickTimeが正常に初期化されました。</string>
-  <string name="LoginRequestSeedCapGrant">リージョン（地域）の機能をリクエストしています…</string>
-  <string name="LoginRetrySeedCapGrant">リージョン（地域）の機能をリクエストしています…（試行[NUMBER]回目）</string>
-  <string name="LoginWaitingForRegionHandshake">リージョン（地域）のハンドシェイクを待っています…</string>
-  <string name="LoginConnectingToRegion">リージョン（地域）に接続しています…</string>
+  <string name="LoginRequestSeedCapGrant">リージョンの機能をリクエストしています…</string>
+  <string name="LoginRetrySeedCapGrant">リージョンの機能をリクエストしています…（試行[NUMBER]回目）</string>
+  <string name="LoginWaitingForRegionHandshake">リージョンのハンドシェイクを待っています…</string>
+  <string name="LoginConnectingToRegion">リージョンに接続しています…</string>
   <string name="LoginDownloadingClothing">服装をダウンロードしています…</string>
   <string name="InvalidCertificate">証明書が無効であるか、壊れています。グリッド管理者にご連絡ください。</string>
-  <string name="CertInvalidHostname">無効なホストネームがサーバーにアクセスしようとしています。SLURLかグリッドのホストネームをご確認ください。</string>
+  <string name="CertInvalidHostname">無効なホストネームがサーバーにアクセスしようとしています。SLUrlかグリッドのホストネームをご確認ください。</string>
   <string name="CertExpired">グリッドが返した証明書は、有効期限が過ぎていると考えられます。お使いのシステムクロックを確認するか、グリッドの管理者にお問い合わせください。</string>
   <string name="CertKeyUsage">SSL証明書のエラーが発生しました。グリッド管理者にご連絡ください。</string>
   <string name="CertBasicConstraints">サーバーの証明書チェーンに証明書が多すぎます。グリッド管理者にご連絡ください。</string>
@@ -108,14 +128,13 @@ LibVLCバージョン：[LIBVLC_VERSION]
   <string name="Quit">終了</string>
   <string name="create_account_url">https://join.secondlife.com/?lang=ja&amp;sourceid=[sourceid]</string>
 
-  <string name="AgniGridLabel">Second Lifeメイングリッド (Agni)</string>
-  <string name="AditiGridLabel">Second Lifeベータテストグリッド (Aditi)</string>
+  <string name="AgniGridLabel">Second Lifeメイングリッド（Agni）</string>
+  <string name="AditiGridLabel">Second Lifeベータテストグリッド（Aditi）</string>
 
-  <string name="ViewerDownloadURL">https://www.alchemyviewer.org/pages/downloads.html</string>
-  <string name="LoginFailedViewerNotPermitted">お使いの古いビューアでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアをダウンロードしてください： https://secondlife.com/support/downloads/?lang=ja
-
-詳細については、FAQ を参照してください：
-https://www.alchemyviewer.org/pages/downloads.html</string>
+  <string name="ViewerDownloadURL">https://www.alchemyviewer.org/downloads</string>
+  <string name="LoginFailedViewerNotPermitted">お使いの古いビューアでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアをダウンロードしてください：https://www.alchemyviewer.org/downloads</string>
+  <string name="LoginFailed">"システムの問題により、ログインプロセスが完了しませんでした。数分後にもう一度試してください。
+これがエラーであると思われる場合は、サポートにお問い合わせください。</string>
   <string name="LoginIntermediateOptionalUpdateAvailable">ビューアの更新（オプション）があります：[VERSION]</string>
   <string name="LoginFailedRequiredUpdate">ビューアの更新（必須）：[VERSION]</string>
   <string name="LoginFailedAlreadyLoggedIn">このエージェントは既にログインしています。</string>
@@ -125,7 +144,7 @@ https://www.alchemyviewer.org/pages/downloads.html</string>
 ・パスワード
 ・２段階認証（使用している場合）
 また、Caps Lockが入っていないこともご確認ください。</string>
-  <string name="LoginFailedPasswordChanged">セキュリティ上の理由により、あなたのパスワードは変更されました。 アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP）へ移動し、
+  <string name="LoginFailedPasswordChanged">セキュリティ上の理由により、あなたのパスワードは変更されました。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP）へ移動し、
 秘密の質問に答えて、パスワードをリセットしてください。
 ご迷惑をおかけして申し訳ございません。</string>
   <string name="LoginFailedPasswordReset">弊社はシステムを若干変更しました。お手数ですが、パスワードのリセットをお願いします。アカウントページ（ https://secondlife.com/my/account/request.php?lang=ja-JP ）に移動し、
@@ -165,7 +184,7 @@ support@secondlife.com にお問い合わせください。</string>
 システムのエラーだと思われる場合は、support@secondlife.com にお問い合わせください。</string>
   <string name="LoginFailedLastNameNotAlphanumeric">ラストネームのパラメーターは英数字です。
 システムのエラーだと思われる場合は、support@secondlife.com にお問い合わせください。</string>
-  <string name="LogoutFailedRegionGoingOffline">リージョンは、オフライン中です。
+  <string name="LogoutFailedRegionGoingOffline">リージョンは、現在オフラインです。
 しばらくしてから再度お試しください。</string>
   <string name="LogoutFailedPendingLogin">このリージョンでは、別のセッションでログインされていました。
 しばらくしてから再度お試しください。</string>
@@ -182,12 +201,12 @@ support@secondlife.com にお問い合わせください。</string>
 
   <!-- Disconnection -->
   <string name="AgentLostConnection">このリージョンに不都合が発生している可能性があります。ご使用のインターネット接続をご確認ください。</string>
-  <string name="SavingSettings">設定を保存中です…</string>
-  <string name="LoggingOut">ログアウト中です…</string>
-  <string name="ShuttingDown">シャットダウン中です…</string>
+  <string name="SavingSettings">設定を保存しています…</string>
+  <string name="LoggingOut">ログアウトしています…</string>
+  <string name="ShuttingDown">シャットダウンしています…</string>
   <string name="YouHaveBeenDisconnected">あなたがいたリージョンへの接続が切れました。</string>
   <string name="SentToInvalidRegion">無効なリージョンにテレポートされました。</string>
-  <string name="TestingDisconnect">ビューアの接続を切るテスト中</string>
+  <string name="TestingDisconnect">ビューアの接続を切るテストをしています。</string>
 
   <!-- SLShare: User Friendly Filter Names Translation -->
   <string name="BlackAndWhite">白黒</string>
@@ -203,12 +222,12 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="Toycamera">トイカメラ</string>
 
   <!-- Tooltip -->
-  <string name="TooltipPerson">人</string>
+  <string name="TooltipPerson">人物</string>
   <string name="TooltipNoName">（名前なし）</string>
   <string name="TooltipOwner">所有者：</string>
   <string name="TooltipPublic">公共</string>
   <string name="TooltipIsGroup">（グループ）</string>
-  <string name="TooltipForSaleL$">売り出し中：L$[AMOUNT]</string>
+  <string name="TooltipForSaleL$">売り出し中：L$ [AMOUNT]</string>
   <string name="TooltipFlagGroupBuild">グループ作成</string>
   <string name="TooltipFlagNoBuild">作成禁止</string>
   <string name="TooltipFlagNoEdit">グループ作成</string>
@@ -247,7 +266,7 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="TooltipAgentInspect">この住人の詳細を参照</string>
   <string name="TooltipAgentMute">クリックしてこの住人に対して無視設定をします。</string>
   <string name="TooltipAgentUnmute">クリックしてこの住人に対する無視設定を解除します。</string>
-  <string name="TooltipAgentIM">クリックしてこの住人に IM を送ります。</string>
+  <string name="TooltipAgentIM">クリックしてこの住人にＩＭを送ります。</string>
   <string name="TooltipAgentPay">クリックしてこの住人に支払います。</string>
   <string name="TooltipAgentOfferTeleport">クリックしてこの住人にテレポートのオファーを送ります。</string>
   <string name="TooltipAgentRequestFriend">クリックしてこの住人にフレンド登録リクエストを送ります。</string>
@@ -260,7 +279,7 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="TooltipMapUrl">クリックしてこの場所をマップに表示します。</string>
   <string name="TooltipSLAPP">クリックして secondlife:// コマンドを出します。</string>
   <string name="CurrentURL" value="現在のＵＲＬ：[CurrentURL]" />
-  <string name="TooltipEmail">クリックして電子メールを作成します。</string>
+  <string name="TooltipEmail">クリックしてＥメールを作成します。</string>
 
   <!-- text for SLURL labels -->
   <string name="SLurlLabelTeleport">テレポート</string>
@@ -286,17 +305,20 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="BUTTON_HELP">ヘルプを表示</string>
 
   <!-- ToolTips for notecards -->
-  <string name="TooltipNotecardNotAllowedTypeDrop">このタイプのアイテムは、このリージョン（地域）のノートカードに添付することができません。</string>
+  <string name="TooltipNotecardNotAllowedTypeDrop">このタイプのアイテムは、このリージョンのノートカードに添付することができません。</string>
   <string name="TooltipNotecardOwnerRestrictedDrop">制限のない「次の所有者」の
 許可のみノートカードに
 添付できます。</string>
+  <string name="TooltipTextureRestrictedDrop">無制限のコピーおよび
+譲渡可能権限を持つテクスチャのみが
+許可されます。</string>
 
   <!-- searching - generic -->
-  <string name="Searching">検索中…</string>
+  <string name="Searching">検索しています…</string>
   <string name="NoneFound">見つかりませんでした。</string>
 
   <!-- Indicates that an avatar name or other similar datum is being retrieved. General usage. -->
-  <string name="RetrievingData">取得中…</string>
+  <string name="RetrievingData">取得しています…</string>
 
   <string name="ReleaseNotes">リリースノート</string>
   <!-- Always mark translate="false" for strings that are nothing but URLs, as they don't need translation. -->
@@ -355,8 +377,8 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="note card">ノートカード</string>
   <string name="folder">フォルダ</string>
   <string name="root">ルート</string>
-  <string name="lsl2 script">LSL2スクリプト</string>
-  <string name="lsl bytecode">LSLバイトコード</string>
+  <string name="lsl2 script">ＬＳＬ２スクリプト</string>
+  <string name="lsl bytecode">ＬＳＬバイトコード</string>
   <string name="tga texture">tgaテクスチャ</string>
   <string name="body part">身体部位</string>
   <string name="snapshot">スナップショット</string>
@@ -370,13 +392,14 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="favorite">お気に入り</string>
   <string name="symbolic link">リンク</string>
   <string name="symbolic folder link">フォルダのリンク</string>
-  <string name="settings blob">設定</string>
+  <string name="settings blob">自然環境の設定</string>
+  <string name="render material">マテリアル</string>
   <string name="mesh">メッシュ</string>
 
   <!-- llvoavatar. Displayed in the avatar chat bubble -->
   <string name="AvatarEditingAppearance">（容姿の編集中）</string>
-  <string name="AvatarAway">一時退席中</string>
-  <string name="AvatarDoNotDisturb">着信拒否</string>
+  <string name="AvatarAway">離席中</string>
+  <string name="AvatarDoNotDisturb">取り込み中</string>
   <string name="AvatarMuted">ブロック中</string>
 
   <!-- animations -->
@@ -464,22 +487,22 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="worldmap_results_none_found">何も見つかりませんでした。</string>
 
   <!-- animations uploading status codes -->
-  <string name="Ok">OK</string>
+  <string name="Ok">ＯＫ</string>
   <string name="Premature end of file">不完全なファイル</string>
-  <string name="ST_NO_JOINT">ROOT または JOINT が見つかりません</string>
+  <string name="ST_NO_JOINT">ROOTまたはJOINTが見つかりません</string>
 
   <!-- Chat -->
-  <string name="NearbyChatTitle">近隣チャット</string>
-  <string name="NearbyChatLabel">（近隣のチャット）</string>
+  <string name="NearbyChatTitle">近くのチャット</string>
+  <string name="NearbyChatLabel">（近くのチャット）</string>
   <string name="whisper">のささやき：</string>
   <string name="shout">のシャウト：</string>
-  <string name="ringing">インワールドボイスチャットに接続中…</string>
+  <string name="ringing">インワールドボイスチャットに接続しています…</string>
   <string name="connected">接続しました</string>
   <string name="unavailable">現在地では、ボイスを利用できません。</string>
   <string name="hang_up">インワールドボイスチャットの通話が切断されました。</string>
   <string name="reconnect_nearby">「近隣ボイスチャット」に再接続されます。</string>
-  <string name="ScriptQuestionCautionChatGranted">リージョン（地域）「[REGIONNAME]」の「[REGIONPOS]」という場所にある、「[OWNERNAME]」が所有する「[OBJECTNAME]」というオブジェクトは、以下の権限を許可しました：[PERMISSIONS]</string>
-  <string name="ScriptQuestionCautionChatDenied">リージョン（地域）「[REGIONNAME]」の「[REGIONPOS]」という場所にある、「[OWNERNAME]」が所有する「[OBJECTNAME]」というオブジェクトは、以下の権限を拒否しました：[PERMISSIONS]</string>
+  <string name="ScriptQuestionCautionChatGranted">リージョン「[REGIONNAME]」の「[REGIONPOS]」という場所にある、「[OWNERNAME]」が所有する「[OBJECTNAME]」というオブジェクトは、以下の権限を許可しました：[PERMISSIONS]</string>
+  <string name="ScriptQuestionCautionChatDenied">リージョン「[REGIONNAME]」の「[REGIONPOS]」という場所にある、「[OWNERNAME]」が所有する「[OBJECTNAME]」というオブジェクトは、以下の権限を拒否しました：[PERMISSIONS]</string>
   <string name="AdditionalPermissionsRequestHeader">あなたのアカウントへのアクセスを許可すると、このオブジェクトには次の操作も許可されます：</string>
   <string name="ScriptTakeMoney">リンデンドル（L$）のお支払い</string>
   <string name="ActOnControlInputs">制御入力に基づいて行動</string>
@@ -528,20 +551,24 @@ support@secondlife.com にお問い合わせください。</string>
   <string name="animation_files">アニメーション</string>
   <string name="image_files">画像</string>
   <string name="save_file_verb">保存</string>
-  <string name="load_file_verb">ロード</string>
+  <string name="load_file_verb">読み込む</string>
   <string name="targa_image_files">Targa画像</string>
   <string name="bitmap_image_files">ビットマップ画像</string>
   <string name="png_image_files">PNG画像</string>
-  <string name="save_texture_image_files">TargaまたはPNG画像</string>
-  <string name="avi_movie_file">AVIムービーファイル</string>
+  <string name="webp_image_files">WebP画像</string>
+  <string name="save_texture_image_files">Targa、PNGまたはWebP画像</string>
+  <string name="avi_movie_file">AVIファイル</string>
   <string name="xaf_animation_file">XAFアニメーションファイル</string>
   <string name="xml_file">XMLファイル</string>
+  <string name="csv_files">カンマ区切りの値</string>
   <string name="raw_file">RAWファイル</string>
   <string name="compressed_image_files">圧縮画像</string>
-  <string name="load_files">ファイルのロード</string>
-  <string name="choose_the_directory">参照</string>
+  <string name="load_files">ファイルを読み込む</string>
+  <string name="choose_the_directory">ディレクトリを選択</string>
   <string name="script_files">スクリプト</string>
   <string name="dictionary_files">辞書</string>
+  <string name="gltf_files">GLTFファイル</string>
+  <string name="zip_files">Zipファイル</string>
 
   <!-- LSL Usage Hover Tips -->
   <!-- NOTE: For now these are set as translate="false", until DEV-40761 is implemented (to internationalize the rest of tooltips in the same window).
@@ -2234,7 +2261,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- LLGroupNotify -->
   <!-- used in the construction of a Group Notice blue dialog box, buttons, tooltip etc. Seems to be no longer utilized by code in Viewer 2.0 -->
   <string name="next">次へ</string>
-  <string name="ok">OK</string>
+  <string name="ok">ＯＫ</string>
   <string name="GroupNotifyGroupNotice">グループ通知</string>
   <string name="GroupNotifyGroupNotices">グループ通知</string>
   <string name="GroupNotifySentBy">送信者</string>
@@ -2325,7 +2352,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="MarketplaceMax">最大</string>
   <string name="MarketplaceStock">在庫</string>
   <string name="MarketplaceNoStock">在庫なし</string>
-  <string name="MarketplaceUpdating">アップデート中…</string>
+  <string name="MarketplaceUpdating">アップデートしています…</string>
 
   <string name="UploadFeeInfo">料金はサブスクリプションのレベルにより異なります。レベルが高いほど、料金が下がります。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細]</string>
 
@@ -2352,7 +2379,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- use value="" because they have preceding spaces -->
   <string name="Chat Message" value="　チャット：" />
   <string name="Sound" value="　サウンド：" />
-  <string name="Wait" value="–　待機：" />
+  <string name="Wait" value="‐　待機：" />
   <string name="AnimFlagStop" value="　アニメーションを停止：" />
   <string name="AnimFlagStart" value="　アニメーションを開始：" />
   <string name="Wave" value="　手を振る" />
@@ -2413,11 +2440,11 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="InvFolder Meshes">メッシュ</string>
   <string name="InvFolder Received Items">受け取った商品</string>
   <string name="InvFolder Merchant Outbox">販売品ボックス</string>
-  <string name="InvFolder Settings">設定</string>
+  <string name="InvFolder Settings">自然環境の設定</string>
   <string name="InvFolder Material">マテリアル</string>
   <string name="InvFolder Materials">マテリアル</string>
   <string name="InvFolder Animation Overrides">アニメーションオーバーライド</string>
-  <string name="InvFolder Settings">設定</string>
+  <string name="InvFolder Settings">自然環境の設定</string>
   <string name="InvFolder Local Inventory">ローカルのインベントリ</string>
   <string name="InvFolder #RLV">#RLV</string>
   <string name="InvFolder #Firestorm">#Firestorm</string>
@@ -2438,10 +2465,10 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="Metal">金属</string>
   <string name="Glass">ガラス</string>
   <string name="Wood">木</string>
-  <string name="Flesh">肌</string>
+  <string name="Flesh">肉</string>
   <string name="Plastic">プラスチック</string>
   <string name="Rubber">ゴム</string>
-  <string name="Light">ライト</string>
+  <string name="Light">光源</string>
 
   <!-- keyboard -->
   <string name="KBShift">Shift</string>
@@ -2510,9 +2537,9 @@ For AI Character: Get the closest navigable point to the point provided.
 
   <!-- Avatar complexity rendering messages, see llavatarrendernotifier. -->
   <string name="av_render_everyone_now">あなたは、全員から見えるようになりました。</string>
-  <string name="av_render_not_everyone">あなたは、周囲にいる一部の人から、見えない可能性があります。</string>
-  <string name="av_render_over_half">あなたは、周囲にいる半分以上の人から、見えない可能性があります。</string>
-  <string name="av_render_most_of">あなたは、周囲にいるほとんどの人から、見えない可能性があります。</string>
+  <string name="av_render_not_everyone">あなたは、周囲にいる一部の人から見えない可能性があります。</string>
+  <string name="av_render_over_half">あなたは、周囲にいる半分以上の人から見えない可能性があります。</string>
+  <string name="av_render_most_of">あなたは、周囲にいるほとんどの人から見えない可能性があります。</string>
   <string name="av_render_anyone">あなたは、周囲の誰からも見えていない可能性があります。</string>
 
   <!-- HUD complexity rendering messages, see llavatarrendernotifier. -->
@@ -2559,13 +2586,13 @@ For AI Character: Get the closest navigable point to the point provided.
 
   <!-- HUD Position -->
   <string name="Center 2">中央２</string>
-  <string name="Top Right">右上</string>
-  <string name="Top">上部</string>
-  <string name="Top Left">左上</string>
+  <string name="Top Right">右上　↗</string>
+  <string name="Top">上部　↑</string>
+  <string name="Top Left">左上　↖</string>
   <string name="Center">中央</string>
-  <string name="Bottom Left">左下</string>
-  <string name="Bottom">下部</string>
-  <string name="Bottom Right">右下</string>
+  <string name="Bottom Left">左下　↙</string>
+  <string name="Bottom">下部　↓</string>
+  <string name="Bottom Right">右下　↘</string>
 
   <!-- compile queue-->
   <string name="CompileQueueDownloadedCompiling">ダウンロードが完了しました。コンパイルしています。</string>
@@ -2573,9 +2600,9 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="CompileQueueScriptNotFound">サーバー上にスクリプトが見つかりません。</string>
   <string name="CompileQueueProblemDownloading">ダウンロードに問題があります</string>
   <string name="CompileQueueInsufficientPermDownload">権限不足のためスクリプトをダウンロードできません。</string>
-  <string name="CompileQueueInsufficientPermFor">権限不足：</string>
-  <string name="CompileQueueUnknownFailure">原因不明の失敗によりダウンロードができません</string>
-  <string name="CompileNoExperiencePerm">[EXPERIENCE]体験による[SCRIPT]スクリプトのスキップ。</string>
+  <string name="CompileQueueInsufficientPermFor">不足している権限：</string>
+  <string name="CompileQueueUnknownFailure">原因不明の失敗によりダウンロードができません。</string>
+  <string name="CompileNoExperiencePerm">[EXPERIENCE]体験による[SCRIPT]スクリプトをスキップします。</string>
   <string name="CompileQueueTitle">再コンパイル進行</string>
   <string name="CompileQueueStart">再コンパイル</string>
   <string name="ResetQueueTitle">進行をリセット</string>
@@ -2588,8 +2615,8 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- compile comment text-->
   <string name="CompileSuccessful">コンパイルが完了しました！</string>
   <string name="CompileSuccessfulSaving">コンパイル完了、保存しています…</string>
-  <string name="SaveComplete">保存完了。</string>
-  <string name="UploadFailed">ファイルのアップロードが失敗しました:</string>
+  <string name="SaveComplete">保存しました。</string>
+  <string name="UploadFailed">ファイルのアップロードに失敗しました：</string>
   <string name="ObjectOutOfRange">スクリプト（オブジェクトが範囲外にあります）</string>
   <string name="ScriptWasDeleted">スクリプト（インベントリから削除済み）</string>
 
@@ -2626,9 +2653,9 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="RegionInfoAllEstatesOwnedBy">[OWNER]が所有するすべての不動産</string>
   <string name="RegionInfoAllEstatesYouOwn">あなたが所有するすべての不動産</string>
   <string name="RegionInfoAllEstatesYouManage">あなたが[OWNER]のために管理するすべての不動産</string>
-  <string name="RegionInfoAllowedResidents">常に許可：（[MAXACCESS]人中[ALLOWEDAGENTS]人）</string>
-  <string name="RegionInfoAllowedGroups">グループを常に許可：（[MAXACCESS]グループ中[ALLOWEDGROUPS]グループ）</string>
-  <string name="RegionInfoBannedResidents">常に禁止：（[MAXBANNED]人中[BANNEDAGENTS]人）</string>
+  <string name="RegionInfoAllowedResidents">常に許可：（全[MAXACCESS]人中[ALLOWEDAGENTS]人）</string>
+  <string name="RegionInfoAllowedGroups">グループを常に許可：（最大[MAXACCESS]グループ中[ALLOWEDGROUPS]グループ）</string>
+  <string name="RegionInfoBannedResidents">常に禁止：（全[MAXBANNED]人中[BANNEDAGENTS]人）</string>
   <string name="RegionInfoListTypeAllowedAgents">常に許可</string>
   <string name="RegionInfoListTypeBannedAgents">常に禁止</string>
   <string name="RegionInfoAllEstates">すべての不動産</string>
@@ -2639,15 +2666,15 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- script limits floater -->
   <string name="ScriptLimitsParcelScriptMemory">区画スクリプトメモリ</string>
   <string name="ScriptLimitsParcelsOwned">区画一覧：[PARCELS]個</string>
-  <string name="ScriptLimitsMemoryUsed">使用されたメモリ：[MAX]㎅中[COUNT]㎅使用　[AVAILABLE]㎅利用可</string>
+  <string name="ScriptLimitsMemoryUsed">使用されたメモリ：全[MAX]㎅中[COUNT]㎅使用　[AVAILABLE]㎅利用可</string>
   <string name="ScriptLimitsMemoryUsedSimple">使用されたメモリ：[COUNT]㎅</string>
   <string name="ScriptLimitsParcelScriptURLs">区画のスクリプトＵＲＬ</string>
-  <string name="ScriptLimitsURLsUsed">使用されたＵＲＬ：[MAX]件中[COUNT]件使用　[AVAILABLE]件利用可</string>
+  <string name="ScriptLimitsURLsUsed">使用されたＵＲＬ：全[MAX]件中[COUNT]件使用　[AVAILABLE]件利用可</string>
   <string name="ScriptLimitsURLsUsedSimple">使用されたＵＲＬ：[COUNT]件</string>
   <string name="ScriptLimitsRequestError">情報のリクエスト中にエラーが発生しました</string>
   <string name="ScriptLimitsRequestNoParcelSelected">区画が選択されていません。</string>
   <string name="ScriptLimitsRequestWrongRegion">エラー：スクリプト情報は現在地のみ取得できます</string>
-  <string name="ScriptLimitsRequestWaiting">情報を取得中…</string>
+  <string name="ScriptLimitsRequestWaiting">情報を取得しています…</string>
   <string name="ScriptLimitsRequestDontOwnParcel">この区画を調査する権限がありません。</string>
 
   <string name="SITTING_ON">着席中</string>
@@ -2662,7 +2689,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="ATTACH_BACK">背骨</string>
   <string name="ATTACH_PELVIS">骨盤</string>
   <string name="ATTACH_MOUTH">口</string>
-  <string name="ATTACH_CHIN">あご</string>
+  <string name="ATTACH_CHIN">顎</string>
   <string name="ATTACH_LEAR">左耳</string>
   <string name="ATTACH_REAR">右耳</string>
   <string name="ATTACH_LEYE">左目</string>
@@ -2678,23 +2705,23 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="ATTACH_LHIP">左腰</string>
   <string name="ATTACH_LULEG">左脚（上）</string>
   <string name="ATTACH_LLLEG">左脚（下）</string>
-  <string name="ATTACH_BELLY">腹</string>
-  <string name="ATTACH_LEFT_PEC">左胸筋</string>
-  <string name="ATTACH_RIGHT_PEC">右胸筋</string>
-  <string name="ATTACH_HUD_CENTER_2">ＨＵＤ（中央 2）</string>
-  <string name="ATTACH_HUD_TOP_RIGHT">ＨＵＤ（右上）</string>
-  <string name="ATTACH_HUD_TOP_CENTER">ＨＵＤ（上・中央）</string>
-  <string name="ATTACH_HUD_TOP_LEFT">ＨＵＤ（左上）</string>
-  <string name="ATTACH_HUD_CENTER_1">ＨＵＤ（中央 1）</string>
-  <string name="ATTACH_HUD_BOTTOM_LEFT">ＨＵＤ（左下）</string>
-  <string name="ATTACH_HUD_BOTTOM">ＨＵＤ（下）</string>
-  <string name="ATTACH_HUD_BOTTOM_RIGHT">ＨＵＤ（右下）</string>
+  <string name="ATTACH_BELLY">腹部</string>
+  <string name="ATTACH_LEFT_PEC">左胸</string>
+  <string name="ATTACH_RIGHT_PEC">右胸</string>
+  <string name="ATTACH_HUD_CENTER_2">ＨＵＤ（中央２）</string>
+  <string name="ATTACH_HUD_TOP_RIGHT">ＨＵＤ（右上）↗</string>
+  <string name="ATTACH_HUD_TOP_CENTER">ＨＵＤ（上）↑</string>
+  <string name="ATTACH_HUD_TOP_LEFT">ＨＵＤ（左上）↖</string>
+  <string name="ATTACH_HUD_CENTER_1">ＨＵＤ（中央１）</string>
+  <string name="ATTACH_HUD_BOTTOM_LEFT">ＨＵＤ（左下）↙</string>
+  <string name="ATTACH_HUD_BOTTOM">ＨＵＤ（下）↓</string>
+  <string name="ATTACH_HUD_BOTTOM_RIGHT">ＨＵＤ（右下）↘</string>
   <string name="ATTACH_NECK">首</string>
   <string name="ATTACH_AVATAR_CENTER">アバターの中央</string>
   <string name="ATTACH_LHAND_RING1">左薬指</string>
   <string name="ATTACH_RHAND_RING1">右薬指</string>
-  <string name="ATTACH_TAIL_BASE">しっぽのベース</string>
-  <string name="ATTACH_TAIL_TIP">しっぽの先</string>
+  <string name="ATTACH_TAIL_BASE">尻尾の付け根</string>
+  <string name="ATTACH_TAIL_TIP">尻尾の先</string>
   <string name="ATTACH_LWING">左の翼</string>
   <string name="ATTACH_RWING">右の翼</string>
   <string name="ATTACH_FACE_JAW">顎</string>
@@ -2703,7 +2730,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="ATTACH_FACE_LEYE">代わりの左目</string>
   <string name="ATTACH_FACE_REYE">代わりの右目</string>
   <string name="ATTACH_FACE_TONGUE">舌</string>
-  <string name="ATTACH_GROIN">脚の付け根</string>
+  <string name="ATTACH_GROIN">股間</string>
   <string name="ATTACH_HIND_LFOOT">左後足</string>
   <string name="ATTACH_HIND_RFOOT">右後足</string>
 
@@ -2722,7 +2749,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="PanelContentsNewScript">新規スクリプト</string>
 
   <!-- panel preferences general -->
-  <string name="DoNotDisturbModeResponseDefault">この住民が「着信拒否」をオンにすると、あなたのメッセージが後で表示されるようになります。</string>
+  <string name="DoNotDisturbModeResponseDefault">この住民が「取り込み中」をオンにすると、あなたのメッセージが後で表示されるようになります。</string>
 
   <!-- Mute -->
   <string name="MuteByName">（名前で）</string>
@@ -2745,27 +2772,27 @@ For AI Character: Get the closest navigable point to the point provided.
 
   <!-- Environment settings -->
   <string name="LocalSettings">ローカル設定</string>
-  <string name="RegionSettings">リージョン（地域）の設定</string>
+  <string name="RegionSettings">リージョンの設定</string>
 
-  <string name="NoEnvironmentSettings">このリージョンは環境設定をサポートしていません。</string>
+  <string name="NoEnvironmentSettings">このリージョンは自然環境の設定変更をサポートしていません。</string>
   <string name="EnvironmentSun">太陽</string>
   <string name="EnvironmentMoon">月</string>
-  <string name="EnvironmentBloom">花</string>
+  <string name="EnvironmentBloom">ブルーム効果</string>
   <string name="EnvironmentCloudNoise">雲の音</string>
-  <string name="EnvironmentNormalMap">ノーマル・マップ</string>
+  <string name="EnvironmentNormalMap">法線マップ</string>
   <string name="EnvironmentTransparent">透過</string>
 
   <!-- panel classified -->
-  <string name="ClassifiedClicksTxt">クリック数：[TELEPORT]テレポート、[MAP]マップ、[PROFILE]プロフィール</string>
+  <string name="ClassifiedClicksTxt">クリック回数：[TELEPORT]テレポート、[MAP]マップ、[PROFILE]プロフィール</string>
   <string name="ClassifiedUpdateAfterPublish">（掲載後更新）</string>
 
   <!-- panel picks -->
   <string name="NoPicksClassifiedsText">ピックやクラシファイド広告を作成していません。作成するには、下にある「＋」ボタンをクリックします。</string>
   <string name="NoPicksText">ピックを作成していません。「新規」ボタンをクリックしてピックを作成する。</string>
-  <string name="NoClassifiedsText">クラシファイド広告を作成していません。「新規」ボタンをクリックしてクラシファイド広告を作成する。</string>
-  <string name="NoAvatarPicksClassifiedsText">ピック、またはクラシファイド広告がありません</string>
-  <string name="NoAvatarPicksText">ピックがありません</string>
-  <string name="NoAvatarClassifiedsText">クラシファイド広告がありません</string>
+  <string name="NoClassifiedsText">クラシファイド広告を作成していません。「新規」ボタンをクリックしてクラシファイド広告を作成します。</string>
+  <string name="NoAvatarPicksClassifiedsText">ピック、またはクラシファイド広告がありません。</string>
+  <string name="NoAvatarPicksText">ピックがありません。</string>
+  <string name="NoAvatarClassifiedsText">クラシファイド広告がありません。</string>
   <string name="PicksClassifiedsLoadingText">読み込んでいます…</string>
 
   <!-- Multi Preview Floater -->
@@ -2778,8 +2805,8 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="InvOfferOwnedByUnknownGroup">不明なグループが所有している</string>
   <string name="InvOfferOwnedBy">が、</string>
   <string name="InvOfferOwnedByUnknownUser">不明なユーザーが所有している</string>
-  <string name="InvOfferGaveYou">に渡されました。</string>
-  <string name="InvOfferDecline">&lt;nolink&gt;[NAME]&lt;/nolink&gt;からの[DESC]を拒否しました。</string>
+  <string name="InvOfferGaveYou">から渡されました。</string>
+  <string name="InvOfferDecline">&lt;nolink&gt;[NAME]&lt;/nolink&gt;からの[DESC]を却下しました。</string>
 
   <!-- group money -->
   <string name="GroupMoneyTotal">合計</string>
@@ -2797,7 +2824,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <!-- Viewer menu -->
   <string name="AcquiredItems">取得アイテム</string>
   <string name="Cancel">キャンセル</string>
-  <string name="UploadingCosts">[NAME]のアップロード料金は L$ [AMOUNT]です。</string>
+  <string name="UploadingCosts">[NAME]のアップロード料金はL$ [AMOUNT]です。</string>
   <string name="BuyingCosts">これをL$ [AMOUNT]で購入します。</string>
   <string name="UnknownFileExtension">不明な拡張子：%s
 使用可能な拡張子：.wav，.tga，.bmp，.jpg，.jpeg，.bvh</string>
@@ -2842,7 +2869,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name="Any Category">全カテゴリ</string>
   <string name="Shopping">ショッピング</string>
   <string name="Land Rental">土地のレンタル</string>
-  <string name="Property Rental">プロパティのレンタル</string>
+  <string name="Property Rental">資産のレンタル</string>
   <string name="Special Attraction">特別なアトラクション</string>
   <string name="New Products">新製品</string>
   <string name="Employment">雇用</string>
@@ -2852,7 +2879,7 @@ For AI Character: Get the closest navigable point to the point provided.
 
   <!-- PARCEL_CATEGORY_UI_STRING -->
   <string name="None">なし</string>
-  <string name="Linden Location">Linden 所在地</string>
+  <string name="Linden Location">Linden所在地</string>
   <string name="Adult">成人向け</string>
   <string name="Arts&amp;Culture">芸術と文化</string>
   <string name="Business">ビジネス</string>
@@ -2878,7 +2905,7 @@ For AI Character: Get the closest navigable point to the point provided.
   <string name=")">）</string>
   <string name=".">。</string>
   <string name="'">'</string>
-  <string name="---">─</string>
+  <string name="---">‐</string>
 
   <!-- media -->
   <string name="Multiple Media">複数のメディア</string>
@@ -2918,18 +2945,12 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="MBRegClassFailed">RegisterClass 失敗</string>
   <string name="MBError">エラー</string>
   <string name="MBFullScreenErr">[WIDTH]✕[HEIGHT]では全画面で実行することができません。
-ウィンドウモードで実行中です。</string>
+ウィンドウモードで実行しています。</string>
   <string name="MBDestroyWinFailed">シャットダウンエラー（DestroyWindow() 失敗）</string>
   <string name="MBShutdownErr">シャットダウンエラー</string>
-  <string name="MBDevContextErr">GL ディバイスコンテキストが作れません</string>
+  <string name="MBDevContextErr">ＧＬデバイスのコンテキストが作れません</string>
   <string name="MBPixelFmtErr">適切なピクセル形式が見つかりません</string>
   <string name="MBPixelFmtDescErr">ピクセル形式情報が見つかりません</string>
-  <string name="MBTrueColorWindow">[APP_NAME]を実行するには、True Color（３２ビット）が必要です。
-お使いのコンピューターの「コントロールパネル」＞「画面」＞「設定」に行き、「最高 （３２ビット）」に設定してください。</string>
-  <string name="MBAlpha">[APP_NAME]は８ビットのアルファチャンネルを取得できないため実行できません。通常ビデオカードのドライバの問題で起こります。
-お使いのコンピューターに最新のビデオカードドライバがインストールされているかご確認ください。
-また、「コントロールパネル」＞「画面」＞「設定」内で、モニターが「最高 （３２ビット）」に設定されていることもご確認ください。
-このメッセージが何度も出る場合は、 [SUPPORT_SITE] へご連絡ください。</string>
   <string name="MBPixelFmtSetErr">ピクセル形式が設定できません。</string>
   <string name="MBGLContextErr">ＧＬレンダーコンテキストが作れません</string>
   <string name="MBGLContextActErr">ＧＬレンダーコンテキストを有効化できません。</string>
@@ -2938,8 +2959,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 
 このメッセージが何度も出る場合は、[SUPPORT_SITE]へご連絡ください。</string>
 
-  <!-- Avatar Shape Information -->
-  <string name="5 O'Clock Shadow">うっすらとしたヒゲ</string>
+  <string name="5 O'Clock Shadow">不精ひげ</string>
 
   <string name="All White">真っ白</string>
   <string name="Anime Eyes">アニメ風の目</string>
@@ -2968,32 +2988,32 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Black">黒</string>
   <string name="Blonde">ブロンド</string>
   <string name="Blonde Hair">ブロンドの髪</string>
-  <string name="Blush">チーク</string>
-  <string name="Blush Color">チークカラー</string>
-  <string name="Blush Opacity">チークの濃さ</string>
+  <string name="Blush">頬紅</string>
+  <string name="Blush Color">頬の色</string>
+  <string name="Blush Opacity">頬の濃さ</string>
   <string name="Body Definition">体の精細度</string>
-  <string name="Body Fat">体脂肪</string>
+  <string name="Body Fat">太っている</string>
   <string name="Body Freckles">体のしみ・そばかす</string>
   <string name="Body Thick">骨太</string>
   <string name="Body Thickness">体の厚み</string>
-  <string name="Body Thin">細め</string>
+  <string name="Body Thin">痩せている</string>
 
   <string name="Bow Legged">股</string>
-  <string name="Breast Buoyancy">胸の重力</string>
+  <string name="Breast Buoyancy">胸の弾み</string>
   <string name="Breast Cleavage">胸の谷間</string>
   <string name="Breast Size">胸の大きさ</string>
   <string name="Bridge Width">両目の間の幅</string>
   <string name="Broad">広</string>
   <string name="Brow Size">眉毛上の隆起</string>
-  <string name="Bug Eyes">Bug Eyes</string>
+  <string name="Bug Eyes">丸い目</string>
   <string name="Bugged Eyes">突き出た目</string>
   <string name="Bulbous">だんご</string>
   <string name="Bulbous Nose">だんご鼻</string>
 
-  <string name="Breast Physics Mass">胸の豊かさ</string>
-  <string name="Breast Physics Smoothing">胸の平滑化</string>
+  <string name="Breast Physics Mass">胸の動きの大きさ</string>
+  <string name="Breast Physics Smoothing">胸の動きの滑らかさ</string>
   <string name="Breast Physics Gravity">胸の垂れ具合</string>
-  <string name="Breast Physics Drag">胸の空気抵抗</string>
+  <string name="Breast Physics Drag">胸の揺れ具合</string>
 
   <string name="Breast Physics InOut Max Effect">最大エフェクト数</string>
   <string name="Breast Physics InOut Spring">振動速度</string>
@@ -3010,51 +3030,51 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Breast Physics LeftRight Gain">増加率</string>
   <string name="Breast Physics LeftRight Damping">減衰</string>
 
-  <string name="Belly Physics Mass">お腹の豊かさ</string>
-  <string name="Belly Physics Smoothing">お腹の平滑化</string>
-  <string name="Belly Physics Gravity">お腹の垂れ具合</string>
-  <string name="Belly Physics Drag">お腹の空気抵抗</string>
+  <string name="Belly Physics Mass">腹部の動きの大きさ</string>
+  <string name="Belly Physics Smoothing">腹部の動きの滑らかさ</string>
+  <string name="Belly Physics Gravity">腹部の垂れ具合</string>
+  <string name="Belly Physics Drag">腹部の揺れ具合</string>
 
   <string name="Belly Physics UpDown Max Effect">最大エフェクト数</string>
   <string name="Belly Physics UpDown Spring">振動速度</string>
   <string name="Belly Physics UpDown Gain">増加率</string>
   <string name="Belly Physics UpDown Damping">減衰</string>
 
-  <string name="Butt Physics Mass">お尻の豊かさ</string>
-  <string name="Butt Physics Smoothing">お尻の平滑化</string>
-  <string name="Butt Physics Gravity">お尻の垂れ具合</string>
-  <string name="Butt Physics Drag">お尻の空気抵抗</string>
+  <string name="Butt Physics Mass">尻の動きの大きさ</string>
+  <string name="Butt Physics Smoothing">尻の動きの滑らかさ</string>
+  <string name="Butt Physics Gravity">尻の垂れ具合</string>
+  <string name="Butt Physics Drag">尻の揺れ具合</string>
 
-  <string name="Butt Physics UpDown Max Effect">最大エフェクト数</string>
-  <string name="Butt Physics UpDown Spring">振動速度</string>
-  <string name="Butt Physics UpDown Gain">増加率</string>
-  <string name="Butt Physics UpDown Damping">減衰</string>
+  <string name="Butt Physics UpDown Max Effect">上下の最大効果数</string>
+  <string name="Butt Physics UpDown Spring">上下の振動速度</string>
+  <string name="Butt Physics UpDown Gain">上下の増加率</string>
+  <string name="Butt Physics UpDown Damping">上下の減衰</string>
 
-  <string name="Butt Physics LeftRight Max Effect">最大エフェクト数</string>
-  <string name="Butt Physics LeftRight Spring">振動速度</string>
-  <string name="Butt Physics LeftRight Gain">増加率</string>
-  <string name="Butt Physics LeftRight Damping">減衰</string>
+  <string name="Butt Physics LeftRight Max Effect">左右の最大効果数</string>
+  <string name="Butt Physics LeftRight Spring">左右の振動速度</string>
+  <string name="Butt Physics LeftRight Gain">左右の増加率</string>
+  <string name="Butt Physics LeftRight Damping">左右の減衰</string>
 
   <string name="Bushy Eyebrows">太</string>
   <string name="Bushy Hair">ぼさぼさヘア</string>
-  <string name="Butt Size">お尻の大きさ</string>
-  <string name="Butt Gravity">お尻の垂れ具合</string>
+  <string name="Butt Size">尻の大きさ</string>
+  <string name="Butt Gravity">尻の垂れ具合</string>
   <string name="bustle skirt">後ろの膨らみ</string>
   <string name="no bustle">膨らみなし</string>
   <string name="more bustle">膨らみ大</string>
 
   <string name="Chaplin">チャップリン</string>
-  <string name="Cheek Bones">ほお骨</string>
-  <string name="Chest Size">胸部の大きさ</string>
-  <string name="Chin Angle">あごの角度</string>
-  <string name="Chin Cleft">あごの先の割れ</string>
-  <string name="Chin Curtains">あごに沿ったひげ</string>
+  <string name="Cheek Bones">頬骨</string>
+  <string name="Chest Size">胸の大きさ</string>
+  <string name="Chin Angle">顎の角度</string>
+  <string name="Chin Cleft">顎の先の割れ</string>
+  <string name="Chin Curtains">顎髭</string>
 
-  <string name="Chin Depth">あごの長さ</string>
-  <string name="Chin Heavy">あごを強調</string>
-  <string name="Chin In">ひいたあご</string>
-  <string name="Chin Out">突き出たあご</string>
-  <string name="Chin-Neck">あごと首</string>
+  <string name="Chin Depth">顎の長さ</string>
+  <string name="Chin Heavy">顎を強調</string>
+  <string name="Chin In">ひいた顎</string>
+  <string name="Chin Out">突き出た顎</string>
+  <string name="Chin-Neck">顎と首</string>
   <string name="Clear">クリア</string>
   <string name="Cleft">割れた</string>
   <string name="Close Set Eyes">顔の中心寄りの目</string>
@@ -3064,11 +3084,11 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Closed Left">左とじ</string>
   <string name="Closed Right">右とじ</string>
   <string name="Coin Purse">コイン入れ</string>
-  <string name="Collar Back">後ろえり</string>
+  <string name="Collar Back">後ろ襟</string>
 
 
 
-  <string name="Collar Front">前えり</string>
+  <string name="Collar Front">前襟</string>
 
 
 
@@ -3078,14 +3098,14 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Creased">重いまぶた</string>
   <string name="Crooked Nose">曲がった鼻</string>
 
-  <string name="Cuff Flare">袖口のフレア</string>
+  <string name="Cuff Flare">袖の広がり</string>
   <string name="Dark">ダーク</string>
   <string name="Dark Green">ダークグリーン</string>
   <string name="Darker">ダーク</string>
   <string name="Deep">尖った</string>
-  <string name="Default Heels">デフォルトのかかと</string>
+  <string name="Default Heels">デフォルトの踵</string>
 
-  <string name="Dense">濃</string>
+  <string name="Dense">濃さ</string>
 
   <string name="Double Chin">二重あご</string>
   <string name="Downturned">下向き</string>
@@ -3135,12 +3155,12 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Flared Cuffs">広がった袖口</string>
   <string name="Flat">平ら</string>
   <string name="Flat Butt">小</string>
-  <string name="Flat Head">絶壁頭</string>
-  <string name="Flat Toe">フラット</string>
+  <string name="Flat Head">平坦な頭</string>
+  <string name="Flat Toe">扁平足</string>
   <string name="Foot Size">足の大きさ</string>
-  <string name="Forehead Angle">ひたいの角度</string>
-  <string name="Forehead Heavy">ひたいを強調</string>
-  <string name="Freckles">しみ・そばかす</string>
+  <string name="Forehead Angle">額の角度</string>
+  <string name="Forehead Heavy">額の重さ</string>
+  <string name="Freckles">そばかす</string>
 
   <string name="Front Fringe">前髪の毛先</string>
 
@@ -3158,7 +3178,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Hair">髪</string>
   <string name="Hair Back">髪：後ろ</string>
   <string name="Hair Front">髪：前</string>
-  <string name="Hair Sides">髪：サイド</string>
+  <string name="Hair Sides">髪：横</string>
   <string name="Hair Sweep">流す</string>
   <string name="Hair Thickess">髪の量</string>
   <string name="Hair Thickness">髪の量</string>
@@ -3192,11 +3212,11 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Inner Shadow">内側のシャドウ</string>
 
 
-  <string name="Jacket Length">ジャケット丈</string>
-  <string name="Jacket Wrinkles">ジャケットのしわ</string>
-  <string name="Jaw Angle">あごの角度</string>
-  <string name="Jaw Jut">あごの突出</string>
-  <string name="Jaw Shape">あごの形</string>
+  <string name="Jacket Length">上着の丈</string>
+  <string name="Jacket Wrinkles">上着の皺</string>
+  <string name="Jaw Angle">顎の角度</string>
+  <string name="Jaw Jut">顎の突出</string>
+  <string name="Jaw Shape">顎の形</string>
   <string name="Join">寄せた胸</string>
   <string name="Jowls">えら</string>
   <string name="Knee Angle">膝の角度</string>
@@ -3222,9 +3242,9 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Less Square">小</string>
   <string name="Less Volume">ボリューム少な目</string>
   <string name="Less soul">小</string>
-  <string name="Lighter">ライト</string>
-  <string name="Lip Cleft">唇の山</string>
-  <string name="Lip Cleft Depth">唇の山の高さ</string>
+  <string name="Lighter">軽い</string>
+  <string name="Lip Cleft">唇の裂け目</string>
+  <string name="Lip Cleft Depth">唇の裂け目の深さ</string>
   <string name="Lip Fullness">唇の厚み</string>
   <string name="Lip Pinkness">唇の赤み</string>
   <string name="Lip Ratio">上下唇の大きさ</string>
@@ -3256,7 +3276,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Low and Loose">低めでゆったり</string>
   <string name="Lower">低</string>
   <string name="Lower Bridge">鼻筋</string>
-  <string name="Lower Cheeks">ほおの下部</string>
+  <string name="Lower Cheeks">下頬</string>
 
   <string name="Male">男性</string>
   <string name="Middle Part">真ん中分け</string>
@@ -3270,7 +3290,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="More Gravity">大</string>
   <string name="More Lipstick">あり</string>
   <string name="More Love">大</string>
-  <string name="More Lower Lip">大</string>
+  <string name="More Lower Lip">下唇</string>
   <string name="More Muscles">多め</string>
   <string name="More Muscular">筋骨隆々</string>
   <string name="More Rosy">多め</string>
@@ -3278,7 +3298,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="More Saddle">大</string>
   <string name="More Sloped">なだらか</string>
   <string name="More Square">四角</string>
-  <string name="More Upper Lip">大</string>
+  <string name="More Upper Lip">上唇</string>
   <string name="More Vertical">垂直</string>
   <string name="More Volume">大</string>
   <string name="More soul">大</string>
@@ -3341,14 +3361,14 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 
   <string name="Package">パッケージ</string>
   <string name="Painted Nails">あり</string>
-  <string name="Pale">悪い</string>
+  <string name="Pale">血相</string>
   <string name="Pants Crotch">ズボンの股</string>
   <string name="Pants Fit">ズボンのフィット感</string>
   <string name="Pants Length">ズボン丈</string>
 
 
   <string name="Pants Waist">ウエスト</string>
-  <string name="Pants Wrinkles">ズボンのしわ</string>
+  <string name="Pants Wrinkles">ズボンの皺</string>
   <string name="Part">あり</string>
   <string name="Part Bangs">分けた前髪</string>
   <string name="Pectorals">胸筋</string>
@@ -3415,14 +3435,14 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Short hips">短</string>
   <string name="Shoulders">肩</string>
 
-  <string name="Side Fringe">サイドの毛先</string>
+  <string name="Side Fringe">横髪の毛先</string>
   <string name="Sideburns">もみあげ</string>
 
-  <string name="Sides Hair">サイドの髪</string>
-  <string name="Sides Hair Down">ダウン</string>
-  <string name="Sides Hair Up">アップ</string>
+  <string name="Sides Hair">横髪</string>
+  <string name="Sides Hair Down">下げる</string>
+  <string name="Sides Hair Up">揚げる</string>
 
-  <string name="Skinny Neck">細</string>
+  <string name="Skinny Neck">細い首</string>
   <string name="Skirt Fit">スカートのフィット感</string>
   <string name="Skirt Length">スカート丈</string>
   <string name="Slanted Forehead">傾斜した額</string>
@@ -3445,10 +3465,10 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 
   <string name="Soulpatch">ソウルパッチ</string>
 
-  <string name="Sparse">薄</string>
+  <string name="Sparse">疎ら</string>
   <string name="Spiked Hair">とげとげヘア</string>
   <string name="Square">角張った</string>
-  <string name="Square Toe">スクエアトゥ</string>
+  <string name="Square Toe">つま先が四角い</string>
   <string name="Squash Head">カボチャ型</string>
 
   <string name="Stretch Head">縦長</string>
@@ -3458,18 +3478,18 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Sweep Back">後ろへ</string>
   <string name="Sweep Forward">前へ</string>
 
-  <string name="Tall">トール</string>
+  <string name="Tall">高い</string>
   <string name="Taper Back">後ろに先細</string>
   <string name="Taper Front">前に先細</string>
   <string name="Thick Heels">幅広</string>
-  <string name="Thick Neck">太</string>
-  <string name="Thick Toe">厚め</string>
+  <string name="Thick Neck">太い首</string>
+  <string name="Thick Toe">厚い足</string>
 
   <string name="Thin">薄い</string>
-  <string name="Thin Eyebrows">細</string>
+  <string name="Thin Eyebrows">細い眉</string>
   <string name="Thin Lips">小</string>
   <string name="Thin Nose">細い鼻</string>
-  <string name="Tight Chin">ひきしまったあご</string>
+  <string name="Tight Chin">引き締まった顎</string>
   <string name="Tight Cuffs">タイト</string>
   <string name="Tight Pants">タイト</string>
   <string name="Tight Shirt">タイト</string>
@@ -3486,8 +3506,8 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Underbite">受け口</string>
   <string name="Unnatural">ユニーク</string>
   <string name="Upper Bridge">両目のあいだ</string>
-  <string name="Upper Cheeks">ほおの上部</string>
-  <string name="Upper Chin Cleft">あご上部の割れ</string>
+  <string name="Upper Cheeks">上頬</string>
+  <string name="Upper Chin Cleft">上顎の割れ</string>
 
   <string name="Upper Eyelid Fold">二重の幅</string>
   <string name="Upturned">上向き</string>
@@ -3495,17 +3515,17 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Waist Height">ウエストの高さ</string>
 
 
-  <string name="Well-Fed">つまったほお</string>
+  <string name="Well-Fed">太った</string>
   <string name="White Hair">白髪</string>
   <string name="Wide">広</string>
   <string name="Wide Back">広</string>
   <string name="Wide Front">広</string>
-  <string name="Wide Lips">大きい口</string>
+  <string name="Wide Lips">広い唇</string>
   <string name="Wild">ワイルド</string>
-  <string name="Wrinkles">しわ</string>
+  <string name="Wrinkles">皺</string>
 
   <!-- Navigation bar location input control.
-       Strings are here because widget xml is not localizable -->
+      Strings are here because widget xml is not localizable -->
   <string name="LocationCtrlAddLandmarkTooltip">ランドマークに追加</string>
   <string name="LocationCtrlEditLandmarkTooltip">ランドマークを編集</string>
   <string name="LocationCtrlInfoBtnTooltip">現在地の詳細を見る</string>
@@ -3514,24 +3534,24 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="LocationCtrlVoiceTooltip">ここではボイスを利用できません。</string>
   <string name="LocationCtrlFlyTooltip">飛行は禁止されています。</string>
   <string name="LocationCtrlPushTooltip">プッシュ禁止</string>
-  <string name="LocationCtrlBuildTooltip">オブジェクトの制作や落とす事は禁止されています。</string>
+  <string name="LocationCtrlBuildTooltip">オブジェクトのビルドや落とす事は禁止されています。</string>
   <string name="LocationCtrlScriptsTooltip">スクリプト不可</string>
   <string name="LocationCtrlDamageTooltip">体力</string>
   <string name="LocationCtrlAdultIconTooltip">Adultリージョン</string>
   <string name="LocationCtrlModerateIconTooltip">Moderateリージョン</string>
   <string name="LocationCtrlGeneralIconTooltip">Generalリージョン</string>
   <string name="LocationCtrlSeeAVsTooltip">この区画内のアバターは、この区画の外にいるアバターからは見ることも聞くこともできません。</string>
-  <string name="LocationCtrlPathfindingDirtyTooltip">リージョン（地域）が再構築されるまで、移動するオブジェクトは正しく動作しない可能性があります。</string>
-  <string name="LocationCtrlPathfindingDisabledTooltip">このリージョン（地域）では、動的経路探索が有効になっていません。</string>
+  <string name="LocationCtrlPathfindingDirtyTooltip">リージョンが再構築されるまで、移動するオブジェクトは正しく動作しない可能性があります。</string>
+  <string name="LocationCtrlPathfindingDisabledTooltip">このリージョンでは、動的経路探索が有効になっていません。</string>
   <!-- Strings used by the (currently Linux) auto-updater app -->
   <string name="UpdaterWindowTitle">[APP_NAME]の更新</string>
-  <string name="UpdaterNowUpdating">只今[APP_NAME]を更新中です…</string>
-  <string name="UpdaterNowInstalling">[APP_NAME]をインストール中です…</string>
+  <string name="UpdaterNowUpdating">只今[APP_NAME]を更新しています…</string>
+  <string name="UpdaterNowInstalling">[APP_NAME]をインストールしています…</string>
   <string name="UpdaterUpdatingDescriptive">お使いの[APP_NAME]ビューアを最新バージョンに更新しています。数分かかることがありますのでしばらくお待ちください。</string>
-  <string name="UpdaterProgressBarTextWithEllipses">アップデートをダウンロード中です…</string>
-  <string name="UpdaterProgressBarText">更新をダウンロード中…</string>
+  <string name="UpdaterProgressBarTextWithEllipses">アップデートをダウンロードしています…</string>
+  <string name="UpdaterProgressBarText">更新をダウンロードしています…</string>
   <string name="UpdaterFailDownloadTitle">更新のダウンロードに失敗しました。</string>
-  <string name="UpdaterFailUpdateDescriptive">[APP_NAME]の更新中にエラーが発生しました。www.secondlife.com から最新バージョンをダウンロードしてください。</string>
+  <string name="UpdaterFailUpdateDescriptive">[APP_NAME]の更新時にエラーが発生しました。www.secondlife.com から最新バージョンをダウンロードしてください。</string>
   <string name="UpdaterFailInstallTitle">更新のインストールに失敗しました。</string>
   <string name="UpdaterFailStartTitle">ビューアの起動に失敗しました。</string>
 
@@ -3540,8 +3560,8 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="ItemsComingInTooFast">[APP_NAME]：アイテムが同時にたくさん読み込まれているため、自動プレビューが[TIME]秒間無効となります。</string>
 
   <!-- IM system messages -->
-  <string name="IM_logging_string">－インスタントメッセージの保存開始－</string>
-  <string name="IM_typing_start_string">[NAME]は入力中です…</string>
+  <string name="IM_logging_string">‐インスタントメッセージの保存開始‐</string>
+  <string name="IM_typing_start_string">[NAME]は入力しています…</string>
   <string name="Unnamed">（名前なし）</string>
   <string name="IM_moderated_chat_label">（モデレート：デフォルトでボイスはオフ）</string>
   <string name="IM_unavailable_text_label">このコールでは文字チャットが利用できません。</string>
@@ -3551,7 +3571,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="IM_moderator_label">（モデレータ）</string>
   <!-- TODO: [LOGN_TIMESTAMP]の時刻表記が日本で標準的な書式でない -->
   <string name="Saved_message">（保存日時：[LONG_TIMESTAMP]）</string>
-  <string name="IM_unblock_only_groups_friends">このメッセージを表示するには、「初期設定」の「プライバシー」で「フレンドとグループ以外からはコールとIMを受信しない」チェックボックスをオフにします。</string>
+  <string name="IM_unblock_only_groups_friends">このメッセージを表示するには、「初期設定」の「プライバシー」で「フレンドとグループ以外からはコールとＩＭを受信しない」チェックボックスをオフにします。</string>
   <string name="OnlineStatus">オンライン</string>
   <string name="OfflineStatus">オフライン</string>
   <string name="not_online_msg">ユーザーがオンラインでありません－メッセージは保存され、後で配信されます。</string>
@@ -3567,7 +3587,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="ringing-im">ボイスコールに参加…</string>
   <string name="connected-im">接続しました。「通話終了」をクリックして切断します。</string>
   <string name="hang_up-im">ボイスコールから退席しました</string>
-  <string name="answering-im">接続中…</string>
+  <string name="answering-im">接続しています…</string>
   <string name="conference-title">複数人チャット</string>
   <string name="conference-title-incoming">[AGENT_NAME]と会話する</string>
   <string name="inventory_item_offered-im">アイテム「[ITEM_NAME]」がインベントリに送られてきました。</string>
@@ -3576,16 +3596,16 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 
   <string name="no_session_message">（ＩＭセッションが存在しません）</string>
   <string name="only_user_message">このセッションにいるユーザーはあなただけです。</string>
-  <string name="offline_message">[NAME]はオフライン中です。</string>
-  <string name="invite_message">このボイスチャットに応答・接続する場合は、[BUTTON NAME]をクリックしてください。</string>
+  <string name="offline_message">[NAME]はオフラインです。</string>
+  <string name="invite_message">このボイスチャットに応答／接続する場合は、[BUTTON NAME]をクリックしてください。</string>
   <string name="muted_message">この住人をブロックしています。メッセージを送ると、ブロックが自動的に解除されます。</string>
   <!--Some times string name is getting from the body of server response.
   For ex.: from gIMMgr::showSessionStartError in the LLViewerChatterBoxSessionStartReply::post.
   In case of the EXT-3115 issue 'generic' is passed into the gIMMgr::showSessionStartError as a string name.
   Also there are some other places where "generic" is used.
   So, let add string with name="generic" with the same value as "generic_request_error" -->
-  <string name="generic">リクエスト中にエラーが発生しました。お手数ですが、もう一度やり直してください。</string>
-  <string name="generic_request_error">要求中にエラーが発生しました。お手数ですが、もう一度やり直してください。</string>
+  <string name="generic">リクエスト時にエラーが発生しました。お手数ですが、もう一度やり直してください。</string>
+  <string name="generic_request_error">リクエスト時にエラーが発生しました。お手数ですが、もう一度やり直してください。</string>
   <string name="insufficient_perms_error">あなたには充分な権限がありません。</string>
   <string name="session_does_not_exist_error">このセッションは既に切断されています。</string>
   <string name="no_ability_error">あなたにはその能力がありません。</string>
@@ -3604,7 +3624,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   So, let add string with name="message" with the same value as "message_session_event" -->
   <string name="message">[RECIPIENT]とのチャットセッションに、メッセージを送信することができません。</string>
   <string name="message_session_event">[RECIPIENT]とのチャットセッションにメッセージを送ることができません。</string>
-  <string name="mute">モデレート中にエラーが発生しました。</string>
+  <string name="mute">モデレート時にエラーが発生しました。</string>
   <!--Some times string name is getting from the body of server response.
   For ex.: from gIMMgr::showSessionStartError in the LLViewerChatterBoxSessionStartReply::post.
   In case of the EXT-3459 issue 'removed' is passed into the gIMMgr::showSessionStartError as a string name.
@@ -3616,7 +3636,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="unread_chat_multiple">[SOURCES]は、何か新しいことを言いました。</string>
   <string name="session_initialization_timed_out_error">セッションの初期化がタイムアウトしました。</string>
 
-  <string name="Home position set.">家の配置の設定。</string>
+  <string name="Home position set.">ホーム位置を設定しました。</string>
 
   <string name="voice_morphing_url">https://secondlife.com/destination/voice-island</string>
   <string name="premium_voice_morphing_url">https://secondlife.com/destination/voice-morphing-premium</string>
@@ -3660,7 +3680,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="group_role_owners">所有者</string>
   <string name="group_member_status_online">オンライン</string>
 
-  <string name="uploading_abuse_report">アップロード中…
+  <string name="uploading_abuse_report">アップロードしています…
 
 嫌がらせの報告</string>
 
@@ -3699,36 +3719,36 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="RlvRoot">#RLV</string>
   <string name="Local Inventory">ローカルインベントリ</string>
   <!-- gestures -->
-  <string name="Male - Excuse me">男性－すみません</string>
-  <string name="Male - Get lost">男性－あっち行けよ</string>
-  <string name="Male - Blow kiss">男性－投げキッス</string>
-  <string name="Male - Boo">男性－ぶー</string>
-  <string name="Male - Bored">男性－退屈</string>
-  <string name="Male - Hey">男性－–やぁ</string>
-  <string name="Male - Laugh">男性－笑う</string>
-  <string name="Male - Repulsed">男性－拒絶</string>
-  <string name="Male - Shrug">男性－肩をすくめる</string>
-  <string name="Male - Stick tougue out">男性－舌を出す</string>
-  <string name="Male - Wow">男性－わぁ</string>
+  <string name="Male - Excuse me">男性‐すみません</string>
+  <string name="Male - Get lost">男性‐あっち行けよ</string>
+  <string name="Male - Blow kiss">男性‐投げキッス</string>
+  <string name="Male - Boo">男性‐ぶー</string>
+  <string name="Male - Bored">男性‐退屈</string>
+  <string name="Male - Hey">男性‐やぁ</string>
+  <string name="Male - Laugh">男性‐笑う</string>
+  <string name="Male - Repulsed">男性‐拒絶</string>
+  <string name="Male - Shrug">男性‐肩をすくめる</string>
+  <string name="Male - Stick tougue out">男性‐舌を出す</string>
+  <string name="Male - Wow">男性‐わぁ</string>
 
-  <string name="Female - Chuckle">女性－クスクス</string>
-  <string name="Female - Cry">女性－泣く</string>
-  <string name="Female - Embarrassed">女性－恥ずかしい</string>
-  <string name="Female - Excuse me">女性－すみません</string>
-  <string name="Female - Get lost">女性－あっち行ってよ</string>
-  <string name="Female - Blow kiss">女性–投げキッス</string>
-  <string name="Female - Boo">女性－ぶー</string>
-  <string name="Female - Bored">女性－退屈</string>
-  <string name="Female - Hey">女性－やぁ</string>
-  <string name="Female - Hey baby">女性－ヘイ、ベィビー！</string>
-  <string name="Female - Laugh">女性－笑う</string>
-  <string name="Female - Looking good">女性－いい感じ</string>
-  <string name="Female - Over here">女性－こっちよ</string>
-  <string name="Female - Please">女性－プリーズ</string>
-  <string name="Female - Repulsed">女性－拒絶</string>
-  <string name="Female - Shrug">女性－肩をすくめる</string>
-  <string name="Female - Stick tougue out">女性－舌を出す</string>
-  <string name="Female - Wow">女性－わぁ</string>
+  <string name="Female - Chuckle">女性‐クスクス</string>
+  <string name="Female - Cry">女性‐泣く</string>
+  <string name="Female - Embarrassed">女性‐恥ずかしい</string>
+  <string name="Female - Excuse me">女性‐すみません</string>
+  <string name="Female - Get lost">女性‐あっち行ってよ</string>
+  <string name="Female - Blow kiss">女性‐投げキッス</string>
+  <string name="Female - Boo">女性‐ぶー</string>
+  <string name="Female - Bored">女性‐退屈</string>
+  <string name="Female - Hey">女性‐やぁ</string>
+  <string name="Female - Hey baby">女性‐ヘイ、ベィビー！</string>
+  <string name="Female - Laugh">女性‐笑う</string>
+  <string name="Female - Looking good">女性‐いい感じ</string>
+  <string name="Female - Over here">女性‐こっちよ</string>
+  <string name="Female - Please">女性‐プリーズ</string>
+  <string name="Female - Repulsed">女性‐拒絶</string>
+  <string name="Female - Shrug">女性‐肩をすくめる</string>
+  <string name="Female - Stick tougue out">女性‐舌を出す</string>
+  <string name="Female - Wow">女性‐わぁ</string>
 
   <!-- settings -->
   <string name="New Daycycle">新しいデイサイクル</string>
@@ -3754,7 +3774,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="/whistle">/口笛を吹く</string>
   <string name="/yes">/はい</string>
   <string name="/yes!">/イエス！</string>
-  <string name="afk">一時退席中</string>
+  <string name="afk">離席</string>
   <string name="dance1">ダンス１</string>
   <string name="dance2">ダンス２</string>
   <string name="dance3">ダンス３</string>
@@ -3962,30 +3982,30 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <!-- Mouse button names end -->
 
   <!-- llviewerwindow -->
-  <string name="BeaconParticle">パーティクル源ビーコン（青）を表示中</string>
-  <string name="BeaconPhysical">物理的オブジェクトのビーコン（緑）を表示中</string>
-  <string name="BeaconScripted">スクリプトのオブジェクトのビーコン（赤）を表示中</string>
-  <string name="BeaconScriptedTouch">タッチ機能のビーコンが付いたスクリプトのオブジェクト（赤）を表示中</string>
-  <string name="BeaconSound">サウンドビーコン（黄）を表示中</string>
-  <string name="BeaconMedia">メディアビーコン（白）を表示中</string>
-  <string name="BeaconSun">太陽の方角ビーコン（オレンジ）を表示中</string>
-  <string name="BeaconMoon">月の方角ビーコン（紫）を表示中</string>
-  <string name="ParticleHiding">パーティクルを非表示</string>
+  <string name="BeaconParticle">パーティクル源ビーコン（青）を表示しています。</string>
+  <string name="BeaconPhysical">物理的オブジェクトのビーコン（緑）を表示しています。</string>
+  <string name="BeaconScripted">スクリプトのオブジェクトのビーコン（赤）を表示しています。</string>
+  <string name="BeaconScriptedTouch">タッチ機能のビーコンが付いたスクリプトのオブジェクト（赤）を表示しています。</string>
+  <string name="BeaconSound">サウンドビーコン（黄）を表示しています。</string>
+  <string name="BeaconMedia">メディアビーコン（白）を表示しています。</string>
+  <string name="BeaconSun">太陽の方角ビーコン（橙）を表示しています。</string>
+  <string name="BeaconMoon">月の方角ビーコン（紫）を表示しています。</string>
+  <string name="ParticleHiding">パーティクルを非表示にします。</string>
 
   <!-- commands -->
   <!-- 「360度スナップショット」だと文字が切れてしまうため -->
   <string name="Command_360_Capture_Label">３６０度Ｓショット</string>
   <string name="Command_AboutLand_Label">土地情報</string>
   <string name="Command_AnimationOverride_Label">ＡＯ</string>
-  <string name="Command_Appearance_Label">アウトフィット</string>
+  <string name="Command_Appearance_Label">容姿</string>
   <string name="Command_Avatar_Label">アバター一式</string>
-  <string name="Command_Build_Label">制作</string>
+  <string name="Command_Build_Label">ビルド</string>
   <string name="Command_Chat_Label">チャット</string>
   <string name="Command_Conversations_Label">会話</string>
   <string name="Command_Compass_Label">コンパス</string>
   <string name="Command_Debug_Label">デバッグ設定</string>
   <string name="Command_Destinations_Label">行き先</string>
-  <string name="Command_Environments_Label">環境</string>
+  <string name="Command_Environments_Label">自然環境の設定</string>
   <string name="Command_Gestures_Label">ジェスチャー</string>
   <string name="Command_Grid_Status_Label">グリッド状況</string>
   <string name="Command_HowTo_Label">ハウツー</string>
@@ -4020,24 +4040,24 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Command_AnimationOverride_Tooltip">アニメーションオーバーライド</string>
   <string name="Command_Appearance_Tooltip">アバターの外観を変更します。</string>
   <string name="Command_Avatar_Tooltip">アバター一式を選択します。</string>
-  <string name="Command_Build_Tooltip">オブジェクトの制作や地形の変形をします。</string>
+  <string name="Command_Build_Tooltip">オブジェクトのビルドや地形の変形をします。</string>
   <string name="Command_Chat_Tooltip">近くにいる人物とテキストチャットします。</string>
   <string name="Command_Conversations_Tooltip">全員との会話を表示します。</string>
   <string name="Command_Compass_Tooltip">コンパスを表示します。</string>
   <string name="Command_Debug_Tooltip">上級者向けデバッグ設定を表示します。</string>
   <string name="Command_Destinations_Tooltip">行ってみたい場所を表示します。</string>
-  <string name="Command_Environments_Tooltip">自分の環境を表示します。</string>
+  <string name="Command_Environments_Tooltip">自分の自然環境の設定を表示します。</string>
   <string name="Command_Gestures_Tooltip">アバターのジェスチャーを表示します。</string>
   <string name="Command_Grid_Status_Tooltip">現在のグリッドステータスを表示します。</string>
   <string name="Command_HowTo_Tooltip">一般的タスクの実行方法を表示します。</string>
   <string name="Command_Inventory_Tooltip">インベントリの内容を表示したり使用したりします。</string>
   <string name="Command_Lightbox_Settings_Tooltip">フォトジェニックな画を撮影する上で便利なオプションを表示します。</string>
   <string name="Command_Map_Tooltip">ワールドマップを表示します。</string>
-  <string name="Command_Marketplace_Tooltip">ショッピングに出掛ける</string>
-  <string name="Command_MarketplaceListings_Tooltip">創作アイテムを販売します。</string>
-  <string name="Command_MiniMap_Tooltip">近隣の人を表示します。</string>
+  <string name="Command_Marketplace_Tooltip">ショッピングに出掛けます。</string>
+  <string name="Command_MarketplaceListings_Tooltip">自分が創作したアイテムを販売します。</string>
+  <string name="Command_MiniMap_Tooltip">近くの人を表示します。</string>
   <string name="Command_Move_Tooltip">アバターの移動操作をします。</string>
-  <string name="Command_People_Tooltip">フレンド、グループ、近隣の人物を表示します。</string>
+  <string name="Command_People_Tooltip">フレンド、グループ、近くの人物を表示します。</string>
   <string name="Command_Performance_Tooltip">グラフィック速度を向上させます。</string>
   <string name="Command_Picks_Tooltip">プロフィールで紹介しているお気に入りの場所を表示します。</string>
   <string name="Command_Places_Tooltip">保存済みの場所を表示します。</string>
@@ -4085,14 +4105,14 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="snapshot_quality_high">高</string>
   <string name="snapshot_quality_very_high">最高</string>
 
-  <string name="TeleportMaturityExceeded">住人はこのリージョン（地域）を訪問できません。</string>
+  <string name="TeleportMaturityExceeded">住人はこのリージョンを訪問できません。</string>
 
   <!-- Spell check settings floater -->
   <string name="UserDictionary">[User]</string>
 
   <!-- RLVa -->
   <string name="RLVaPendingRestart">（再起動待ち）</string>
-  <string name="RLVaToggleMessageLogin">ＲＬＶａは[STATE]状態です。（再起動は必要ありません）</string>
+  <string name="RLVaToggleMessageLogin">ＲＬＶａは[STATE]状態です。（再起動する必要はありません）</string>
   <string name="RLVaToggleMessageRestart">ＲＬＶａは再起動後に[STATE]になります。</string>
   <string name="RLVaToggleEnabled">有効</string>
   <string name="RLVaToggleDisabled">無効</string>
@@ -4109,7 +4129,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Admin_Experiences_Tab">管理</string>
   <string name="Recent_Experiences_Tab">最新</string>
   <string name="Owned_Experiences_Tab">所有</string>
-  <string name="ExperiencesCounter">（[MAXEXPERIENCES]件中[EXPERIENCES]件）</string>
+  <string name="ExperiencesCounter">（全[MAXEXPERIENCES]件中[EXPERIENCES]件）</string>
   <string name="ExperiencePermission1">コントロールを引き継ぐ</string>
   <string name="ExperiencePermission3">アバターでアニメーションをトリガー</string>
   <string name="ExperiencePermission4">アバターに装着</string>
@@ -4128,10 +4148,10 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="ExperiencePermissionShort11">テレポート</string>
   <string name="ExperiencePermissionShort12">権限</string>
   <string name="ExperiencePermissionShort16">座る</string>
-  <string name="ExperiencePermissionShort17">環境</string>
+  <string name="ExperiencePermissionShort17">自然環境の設定</string>
 
   <!-- PBR Materials -->
-  <string name="Material Texture Name Header">テクスチャはこのマテリアルを表しています： </string>
+  <string name="Material Texture Name Header">テクスチャはこのマテリアルを表しています：</string>
 
   <!-- Conversation log messages -->
   <string name="logging_calls_disabled_log_empty">会話はログに記録されていません。ログの記録を開始するには、「初期設定」＞「チャット」で「保存：ログのみ」または「保存：ログと会話のテキスト」を選択します。</string>
@@ -4143,7 +4163,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="na">該当なし</string>
 
   <!-- Presets graphic/camera -->
-  <string name="preset_combo_label">－空のリスト－</string>
+  <string name="preset_combo_label">‐空のリスト‐</string>
   <string name="Default">デフォルト</string>
   <string name="none_paren_cap">（なし）</string>
   <string name="no_limit">無制限</string>
@@ -4155,7 +4175,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
   <string name="Mav_Details_MAV_UNKNOWN_VERSION">物理形状のバージョンが正しくありません。物理モデルに正しいバージョンを設定してください。</string>
 
   <!-- CURL error messages -->
-  <string name="couldnt_resolve_host">DNSがホスト名 ([HOSTNAME]) を解決できませんでした。
+  <string name="couldnt_resolve_host">ＤＮＳがホスト名 ([HOSTNAME]) を解決できませんでした。
 www.secondlife.com のウェブサイトに接続できるかご確認ください。
 接続できても、このエラーが継続的に起こる場合は、サポートセクションから問題を報告してください。</string>
   <string name="ssl_peer_certificate">ログインサーバーがＳＳＬ経由で確認できませんでした。

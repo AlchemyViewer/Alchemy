@@ -8,9 +8,9 @@
       <!--TODO: Make more flexible?-->
       <combo_box tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。 カスタムＬＵＴには完全なファイル名が必要です！" name="colorlut_combo">
         <combo_box.item label="なし" name="lut_none" value="" />
-        <combo_box.item label="自然" name="lut_neutral" value="NeutralLUT.png" />
-        <combo_box.item label="クロスプロセス─暖色" name="lut_xprocess_warm" value="CrossWarm.png" />
-        <combo_box.item label="クロスプロセス─寒色" name="lut_xprocess_cool" value="CrossCool.png" />
+        <combo_box.item label="ナチュラル" name="lut_neutral" value="NeutralLUT.png" />
+        <combo_box.item label="クロスプロセス‐暖色" name="lut_xprocess_warm" value="CrossWarm.png" />
+        <combo_box.item label="クロスプロセス‐寒色" name="lut_xprocess_cool" value="CrossCool.png" />
         <combo_box.item label="アシッド・トリップ" name="lut_acidTrip" value="AcidTrip.png" />
         <combo_box.item label="バトルブルー" name="lut_battleblue" value="Battleblue.png" />
         <combo_box.item label="サクサク" name="lut_crunchy" value="Crunchy.png" />
@@ -96,7 +96,7 @@
       </combo_box>
       <!--Anisotropic Filtering-->
       <text follows="left|top" height="15" left="10" top_pad="8" width="90" layout="topleft" tool_tip="異方性フィルタリングの品質を制御します。" value="異方性フィルタリング：" />
-      <combo_box allow_text_entry="false" tool_tip="異方性フィルタリングの品質を制御します。" name="anisotropicfilter_combo">
+      <combo_box allow_tool_tip="異方性フィルタリングの品質を制御します。" name="anisotropicfilter_combo">
         <combo_box.item label="無効" name="anisotropicfilter_off" value="0" />
         <combo_box.item label="低（✕２）" name="anisotropicfilter_2" value="2" />
         <combo_box.item label="中（✕４）" name="anisotropicfilter_4" value="4" />
@@ -240,8 +240,8 @@
       <check_box follows="left|top" height="15" left="30" top_pad="4" width="80" layout="topleft" label="フォーカスをロック（Alt＋Shift＋X）" tool_tip="ＤｏＦの現在のフォーカスポイントをロックします。" control_name="RenderFocusPointLocked" />
       <!--DOF Resolution-->
       <!--TODO: Ensure this setting is temporary? Large CoC @ Full Res has caused Login-Crashes on other viewers, even on high end GPUs!-->
-      <text follows="left|top" height="15" left="30" top_pad="4" width="80" layout="topleft" tool_tip="被写界深度のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" value="ＤｏＦ解像度： " />
-      <combo_box tool_tip="被写界深度のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" name="dof_res_combo">
+      <text follows="left|top" height="15" left="30" top_pad="4" width="80" layout="topleft" tool_tip="被写界深度（ＤｏＦ）のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" value="ＤｏＦ解像度： " />
+      <combo_box tool_tip="被写界深度（ＤｏＦ）のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" name="dof_res_combo">
         <combo_box.item label="１／４" name="dof_quarterres" value="0.25" />
         <combo_box.item label="１／２" name="dof_halfres" value="0.5" />
         <combo_box.item label="完全" name="dof_fullres" value="1.0" />
@@ -258,8 +258,8 @@
       <button name="dofFNumber_default_btn" follows="top|right" />
       <!--Focal Length-->
       <text follows="left|top" height="15" left="30" top_pad="3" width="100" layout="topleft" tool_tip="シミュレートされたカメラの焦点距離。" value="焦点距離（㎜）：" />
-      <slider_bar name="dof_length_slider" tool_tip="シミュレートされたカメラの焦点距離。" />
-      <spinner name="dof_length_spinner" tool_tip="シミュレートされたカメラの焦点距離。" />
+      <slider_bar name="dof_length_slider" tool_tip="シミュレートされたカメラの焦点距離" />
+      <spinner name="dof_length_spinner" tool_tip="シミュレートされたカメラの焦点距離" />
       <button name="dofFocal_default_btn" />
       <!--Circle of Confusion-->
       <!--TODO: This can get dangerous on low-end machines! See DoF Resolution-->

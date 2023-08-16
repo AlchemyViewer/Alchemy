@@ -62,30 +62,30 @@
       <button label="土地を取り戻す" label_selected="土地の返還を要求…" name="Reclaim Land..." />
     </panel>
     <panel label="約款" name="land_covenant_panel">
-      <panel.string name="can_resell">このリージョン（地域）で購入した土地は、再販することができます。</panel.string>
-      <panel.string name="can_not_resell">このリージョン（地域）で購入した土地は、再販することができないことがあります。</panel.string>
-      <panel.string name="can_change">このリージョン（地域）で購入した土地は、結合や再分割することができます。</panel.string>
-      <panel.string name="can_not_change">このリージョン（地域）で購入した土地は、結合や再分割することができないことがあります。</panel.string>
+      <panel.string name="can_resell">このリージョンで購入した土地は、再販することができます。</panel.string>
+      <panel.string name="can_not_resell">このリージョンで購入した土地は、再販することができないことがあります。</panel.string>
+      <panel.string name="can_change">このリージョンで購入した土地は、結合や再分割することができます。</panel.string>
+      <panel.string name="can_not_change">このリージョンで購入した土地は、結合や再分割することができないことがあります。</panel.string>
       <text name="estate_section_lbl">不動産：</text>
       <text name="estate_name_text">メインランド</text>
       <text name="estate_owner_lbl">所有者：</text>
       <text name="estate_owner_text">（なし）</text>
       <text_editor name="covenant_editor">この不動産には約款がありません。</text_editor>
       <text name="covenant_timestamp_text">最後更新：1969年12月31日水曜日 16：00：00</text>
-      <text name="region_section_lbl">リージョン（地域）名：</text>
+      <text name="region_section_lbl">リージョン名：</text>
       <text name="region_name_text">EricaVille</text>
       <text name="region_landtype_lbl">種類：</text>
       <text name="region_landtype_text">メインランド／入植地</text>
       <text name="region_maturity_lbl">レーティング区分：</text>
       <text name="region_maturity_text">Adult</text>
       <text name="resellable_lbl">再販：</text>
-      <text name="resellable_clause">このリージョン（地域）にある土地は再販できません。</text>
+      <text name="resellable_clause">このリージョンにある土地は再販できません。</text>
       <text name="changeable_lbl">再分割：</text>
-      <text name="changeable_clause">このリージョン（地域）にある土地は統合または分割ができないことがあります。</text>
+      <text name="changeable_clause">このリージョンにある土地は統合または分割ができないことがあります。</text>
     </panel>
     <panel label="オブジェクト" name="land_objects_panel">
-      <panel.string name="objects_available_text">[MAX]個中[COUNT]個（[AVAILABLE]個が利用可能）</panel.string>
-      <panel.string name="objects_deleted_text">[MAX]個中[COUNT]個（[DELETED]個を削除しました）</panel.string>
+      <panel.string name="objects_available_text">全[MAX]個中[COUNT]個（[AVAILABLE]個が利用可能）</panel.string>
+      <panel.string name="objects_deleted_text">全[MAX]個中[COUNT]個（[DELETED]個を削除しました）</panel.string>
       <text name="parcel_object_bonus">オブジェクトボーナス：[BONUS]個</text>
       <text name="Simulator primitive usage:">リージョン全体の最大プリム数：</text>
       <text name="objects_available">[MAX]個中[COUNT]個（[AVAILABLE]個が利用可能）</text>
@@ -123,7 +123,7 @@
     <panel label="オプション" name="land_options_panel">
       <panel.string name="search_enabled_tooltip">この区画を検索結果に表示する</panel.string>
       <panel.string name="search_disabled_small_tooltip">区画面積が１２８㎡未満のため、このオプションは無効です。
-大きな区画のみ検索に表示させることが可能です。</panel.string>
+より大きな区画のみ検索に表示させることが可能です。</panel.string>
       <panel.string name="search_disabled_permissions_tooltip">あなたはこの区画の設定編集ができないため、このオプションは無効です。</panel.string>
       <panel.string name="mature_check_mature">「Moderate」コンテンツ</panel.string>
       <panel.string name="mature_check_adult">「Adult」コンテンツ</panel.string>
@@ -131,7 +131,7 @@
       <panel.string name="mature_check_adult_tooltip">あなたの区画情報及びコンテンツは「Adult」とされています。</panel.string>
       <panel.string name="landing_point_none">（なし）</panel.string>
       <panel.string name="push_restrict_text">プッシュ禁止</panel.string>
-      <panel.string name="push_restrict_region_text">プッシュ禁止 （リージョン設定優先）</panel.string>
+      <panel.string name="push_restrict_region_text">プッシュ禁止 （リージョンの設定が優先されます。）</panel.string>
 
       <text name="allow_label">他の住人への許可設定：</text>
       <text name="allow_label1">地形の編集：</text>
@@ -140,9 +140,9 @@
 
       <text name="allow_label0">飛行：</text>
       <check_box label="全員" name="check fly" tool_tip="ここにチェックを入れると、この土地での飛行が可能となります。このチェックを外すと、土地に入る時や通過する時のみ飛行可能となります。" />
-      <text name="allow_label2">制作：</text>
-      <check_box label="全員" name="edit objects check" tool_tip="このオプションを選択すると、住人があなたの土地でオブジェクトの制作や、rezすることができるようになります。" />
-      <check_box label="グループ" name="edit group objects check" tool_tip="このオプションを選択すると、区画のグループメンバーが、あなたの土地でオブジェクトの制作やrezができるようになります。" />
+      <text name="allow_label2">ビルド許可：</text>
+      <check_box label="全員" name="edit objects check" tool_tip="このオプションを選択すると、住人があなたの土地でオブジェクトのビルドや、rezすることができるようになります。" />
+      <check_box label="グループ" name="edit group objects check" tool_tip="このオプションを選択すると、区画のグループメンバーが、あなたの土地でオブジェクトのビルドやrezができるようになります。" />
       <text name="allow_label3">オブジェクトの進入：</text>
       <check_box label="全員" name="all object entry check" tool_tip="このオプションを選択すると、住人が他の区画にあるオブジェクトをこの区画へ移動することができるようになります。" />
       <check_box label="グループ" name="group object entry check" tool_tip="このオプションを選択すると、区画のグループメンバーが、他の区画にあるオブジェクトからこの区画へ移動することができるようになります。" />
@@ -231,14 +231,14 @@
       <text name="OwnerLimited">（不動産所有者が、このオプションに制約を与えている場合があります）</text>
       <layout_stack name="access_stack">
         <layout_panel name="Allowed_layout_panel">
-          <text label="常に許可" name="AllowedText">常に許可（全[MAX]人中[LISTED]人）</text>
-          <name_list name="AccessList" tool_tip="（全[MAX]人中[LISTED]人）" />
+          <text label="常に許可" name="AllowedText">常に許可（全[MAX]人中[COUNT]人）</text>
+          <name_list name="AccessList" tool_tip="（全[MAX]人中[COUNT]人）" />
           <button label="追加" name="add_allowed" />
           <button label="削除" label_selected="削除" name="remove_allowed" />
         </layout_panel>
         <layout_panel name="Banned_layout_panel">
-          <text label="Ban" name="BanCheck">バンした人（全[MAX]人中[LISTED]人）</text>
-          <name_list name="BannedList" tool_tip="（全[MAX]人中[LISTED]人）">
+          <text label="Ban" name="BanCheck">バンした人物（全[MAX]人中[COUNT]人）</text>
+          <name_list name="BannedList" tool_tip="（全[MAX]人中[COUNT]人）">
             <columns label="名前" name="name" />
             <columns label="期間" name="duration" />
           </name_list>
@@ -248,6 +248,6 @@
       </layout_stack>
     </panel>
     <panel label="体験" name="land_experiences_panel" />
-    <panel label="環境" name="land_environment_panel" />
+    <panel label="自然環境" name="land_environment_panel" />
   </tab_container>
 </floater>

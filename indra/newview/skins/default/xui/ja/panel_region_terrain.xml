@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="地形" name="Terrain">
-  <text name="region_text_lbl">地域：</text>
+  <text name="region_text_lbl">リージョン：</text>
   <text name="region_text">未知</text>
   <spinner label="水面の高さ" name="water_height_spin" />
   <spinner label="地形の上昇限度" name="terrain_raise_spin" />

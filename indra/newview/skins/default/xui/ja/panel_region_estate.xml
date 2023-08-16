@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="不動産" name="Estate">
-  <text name="estate_help_text">このタブ内の設定変更は、不動産内のすべてのリージョン（地域）に影響します。</text>
+  <text name="estate_help_text">このタブ内の設定変更は、不動産内のすべてのリージョンに影響します。</text>
   <text name="estate_text">不動産：</text>
   <text name="estate_name">（不明）</text>
   <text name="owner_text">所有者：</text>

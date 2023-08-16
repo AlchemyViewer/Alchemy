@@ -2,11 +2,11 @@
 <panel label="テキストチャット" name="chat">
   <panel name="general_chat_settings">
 
-    <check_box label="近隣チャットでゼスチャーをオートコンプリート" name="auto_complete_gestures" />
+    <check_box label="近くのチャットでゼスチャーをオートコンプリート" name="auto_complete_gestures" />
 
     <check_box label="チャット時にタイピングアニメーションを再生" name="play_typing_animation" />
     <check_box label="オフライン時にＩＭが送られてきたときにメールを送る（[EMAIL]）" name="send_im_to_email" />
-    <text name="email_settings">[https://accounts.secondlife.com/change_email?lang=ja オフライン時のＩＭのメール送信先の設定]</text>
+    <text name="email_settings">[https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]</text>
 
     <text name="font_size">フォントサイズ：</text>
 
@@ -32,7 +32,7 @@
     </check_box>
     <text name="non_friend_ims">フレンドでない人からのＩＭ：</text>
     <combo_box name="NonFriendIMOptions">
-      <item label="会話フィン道を開く" name="OpenConversationsWindow" value="openconversations" />
+      <item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations" />
       <item label="メッセージをポップアップ" name="PopUpMessage" value="toast" />
       <item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash" />
       <item label="アクションなし" name="NoAction" value="noaction" />
@@ -40,7 +40,7 @@
     <check_box label="サウンド再生" name="play_sound_non_friend_im" />
     <text name="conference_ims">会話ＩＭ：</text>
     <combo_box name="ConferenceIMOptions">
-      <item label="会話フィン道を開く" name="OpenConversationsWindow" value="openconversations" />
+      <item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations" />
       <item label="メッセージをポップアップ" name="PopUpMessage" value="toast" />
       <item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash" />
       <item label="アクションなし" name="NoAction" value="noaction" />
@@ -48,15 +48,15 @@
     <check_box label="サウンド再生" name="play_sound_conference_im" />
     <text name="group_chat">グループチャット：</text>
     <combo_box name="GroupChatOptions">
-      <item label="会話フィン道を開く" name="OpenConversationsWindow" value="openconversations" />
+      <item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations" />
       <item label="メッセージをポップアップ" name="PopUpMessage" value="toast" />
       <item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash" />
       <item label="アクションなし" name="NoAction" value="noaction" />
     </combo_box>
     <check_box label="サウンド再生" name="play_sound_group_chat_im" />
-    <text name="nearby_chat">近隣チャット：</text>
+    <text name="nearby_chat">近くのチャット：</text>
     <combo_box name="NearbyChatOptions">
-      <item label="会話フィン道を開く" name="OpenConversationsWindow" value="openconversations" />
+      <item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations" />
       <item label="メッセージをポップアップ" name="PopUpMessage" value="toast" />
       <item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash" />
       <item label="アクションなし" name="NoAction" value="noaction" />
@@ -65,13 +65,13 @@
     </check_box>
     <text name="object_ims">オブジェクトのＩＭ：</text>
     <combo_box name="ObjectIMOptions">
-      <item label="会話フィン道を開く" name="OpenConversationsWindow" value="openconversations" />
+      <item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations" />
       <item label="メッセージをポップアップ" name="PopUpMessage" value="toast" />
       <item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash" />
       <item label="アクションなし" name="NoAction" value="noaction" />
     </combo_box>
     <check_box label="サウンド再生" name="play_sound_object_im" />
-    <text name="notifications_alert">すべての通知を一時的に停止するには、「コミュニケーション」＞「着信拒否」を選択します。</text>
+    <text name="notifications_alert">すべての通知を一時的に停止するには、「コミュニケーション」＞「取り込み中」を選択します。</text>
   </panel>
 
   <panel name="play_sound_settings">

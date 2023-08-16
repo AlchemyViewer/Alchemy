@@ -12,7 +12,7 @@
   <panel name="layout_panel_landmoney">
     <scroll_list name="group_parcel_list">
       <scroll_list.columns label="区画" name="name" />
-      <scroll_list.columns label="リージョン（地域）" name="location" />
+      <scroll_list.columns label="リージョン" name="location" />
       <scroll_list.columns label="種別" name="type" />
       <scroll_list.columns label="エリア" name="area" />
       <scroll_list.columns label="非表示" name="hidden" />
