@@ -1828,7 +1828,12 @@ bool can_use_objects_material(LLSelectedTEGetMatData& func, const std::vector<Pe
         return false;
     }
 
+    // func.mIsOverride=true is used for the singleton material editor floater
+    // associated with the build floater. This flag also excludes objects from
+    // the selection that do not satisfy PERM_MODIFY.
+    llassert(func.mIsOverride);
     LLSelectMgr::getInstance()->getSelection()->applyToTEs(&func, true /*first applicable*/);
+
     LLViewerObject* selected_object = func.mObject;
     if (!selected_object)
     {
@@ -1929,7 +1934,7 @@ bool can_use_objects_material(LLSelectedTEGetMatData& func, const std::vector<Pe
 
 bool LLMaterialEditor::canModifyObjectsMaterial()
 {
-    LLSelectedTEGetMatData func(false);
+    LLSelectedTEGetMatData func(true);
     LLPermissions permissions;
     LLViewerInventoryItem* item_out;
     return can_use_objects_material(func, std::vector({PERM_MODIFY}), permissions, item_out);
@@ -1937,7 +1942,7 @@ bool LLMaterialEditor::canModifyObjectsMaterial()
 
 bool LLMaterialEditor::canSaveObjectsMaterial()
 {
-    LLSelectedTEGetMatData func(false);
+    LLSelectedTEGetMatData func(true);
     LLPermissions permissions;
     LLViewerInventoryItem* item_out;
     return can_use_objects_material(func, std::vector({PERM_COPY, PERM_MODIFY}), permissions, item_out);
@@ -1945,7 +1950,7 @@ bool LLMaterialEditor::canSaveObjectsMaterial()
 
 void LLMaterialEditor::saveObjectsMaterialAs()
 {
-    LLSelectedTEGetMatData func(false);
+    LLSelectedTEGetMatData func(true);
     LLPermissions permissions;
     LLViewerInventoryItem* item = nullptr;
     bool allowed = can_use_objects_material(func, std::vector({PERM_COPY, PERM_MODIFY}), permissions, item);

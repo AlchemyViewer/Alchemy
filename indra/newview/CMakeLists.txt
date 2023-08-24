@@ -296,6 +296,7 @@ set(viewer_SOURCE_FILES
     llfloatermyscripts.cpp
     llfloatermyenvironment.cpp
     llfloaternamedesc.cpp
+    llfloaternewfeaturenotification.cpp
     llfloaternewlocalinventory.cpp
     llfloaternotificationsconsole.cpp
     llfloaternotificationstabbed.cpp
@@ -1019,6 +1020,7 @@ set(viewer_HEADER_FILES
     llfloatermyscripts.h
     llfloatermyenvironment.h
     llfloaternamedesc.h
+    llfloaternewfeaturenotification.h
     llfloaternewlocalinventory.h
     llfloaternotificationsconsole.h
     llfloaternotificationstabbed.h
