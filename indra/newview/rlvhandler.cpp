@@ -1549,6 +1549,16 @@ bool RlvHandler::setEnabled(bool fEnable)
 		// Reset to show assertions if the viewer version changed
 		if (gSavedSettings.getString("LastRunVersion") != gLastRunVersion)
 			gSavedSettings.set<bool>(RlvSettingNames::ShowAssertionFail, TRUE);
+
+		// Set up camera debug controls
+		{
+			LLControlVariable* pCameraOffsetRLVaView = gSavedSettings.declareVec3("CameraOffsetRLVaView", LLVector3::zero, "Declared in code", LLControlVariable::PERSIST_NO);
+			pCameraOffsetRLVaView->setHiddenFromSettingsEditor(true);
+			LLControlVariable* pCameraOffsetScaleRLVa = gSavedSettings.declareF32("CameraOffsetScaleRLVa", 0.0f, "Declared in code", LLControlVariable::PERSIST_NO);
+			pCameraOffsetScaleRLVa->setHiddenFromSettingsEditor(true);
+			LLControlVariable* pFocusOffsetRLVaView = gSavedSettings.declareVec3d("FocusOffsetRLVaView", LLVector3d::zero, "Declared in code", LLControlVariable::PERSIST_NO);
+			pFocusOffsetRLVaView->setHiddenFromSettingsEditor(true);
+		}
 	}
 
 	return m_fEnabled;
