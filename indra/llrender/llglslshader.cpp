@@ -1082,17 +1082,17 @@ void LLGLSLShader::unbind(void)
     sCurBoundShaderPtr = NULL;
 }
 
-S32 LLGLSLShader::bindTexture(const std::string& uniform, LLTexture* texture, LLTexUnit::eTextureType mode, LLTexUnit::eTextureColorSpace colorspace)
+S32 LLGLSLShader::bindTexture(const std::string& uniform, LLTexture* texture, LLTexUnit::eTextureType mode)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
     S32 channel = 0;
     channel = getUniformLocation(uniform);
 
-    return bindTexture(channel, texture, mode, colorspace);
+    return bindTexture(channel, texture, mode);
 }
 
-S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, LLTexUnit::eTextureType mode, LLTexUnit::eTextureColorSpace colorspace)
+S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, LLTexUnit::eTextureType mode)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
@@ -1107,7 +1107,6 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, LLTexUnit::eTextu
     if (uniform > -1)
     {
         gGL.getTexUnit(uniform)->bindFast(texture);
-        gGL.getTexUnit(uniform)->setTextureColorSpace(colorspace);
     }
 
     return uniform;
@@ -1185,7 +1184,7 @@ S32 LLGLSLShader::getTextureChannel(S32 uniform) const
     return mTexture[uniform];
 }
 
-S32 LLGLSLShader::enableTexture(S32 uniform, LLTexUnit::eTextureType mode, LLTexUnit::eTextureColorSpace space)
+S32 LLGLSLShader::enableTexture(S32 uniform, LLTexUnit::eTextureType mode)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
@@ -1199,12 +1198,11 @@ S32 LLGLSLShader::enableTexture(S32 uniform, LLTexUnit::eTextureType mode, LLTex
     {
         gGL.getTexUnit(index)->activate();
         gGL.getTexUnit(index)->enable(mode);
-        gGL.getTexUnit(index)->setTextureColorSpace(space);
     }
     return index;
 }
 
-S32 LLGLSLShader::disableTexture(S32 uniform, LLTexUnit::eTextureType mode, LLTexUnit::eTextureColorSpace space)
+S32 LLGLSLShader::disableTexture(S32 uniform, LLTexUnit::eTextureType mode)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
@@ -1216,7 +1214,7 @@ S32 LLGLSLShader::disableTexture(S32 uniform, LLTexUnit::eTextureType mode, LLTe
     S32 index = mTexture[uniform];
     if (index != -1 && gGL.getTexUnit(index)->getCurrType() != LLTexUnit::TT_NONE)
     {
-        if (gDebugGL && gGL.getTexUnit(index)->getCurrType() != mode && gGL.getTexUnit(index)->getCurrColorSpace() != space)
+        if (gDebugGL && gGL.getTexUnit(index)->getCurrType() != mode)
         {
             if (gDebugSession)
             {

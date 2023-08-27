@@ -1270,8 +1270,8 @@ void LLGLManager::getGLInfo(LLSD& info)
 	}
 
 #if !LL_MESA_HEADLESS
-#if !LL_DARWIN
-    if (mGLVersion >= 3.0f && glGetStringi) {
+    if (glGetStringi) 
+    {
         std::vector<std::string> gl_extension_str_vec;
         GLint n, i;
         glGetIntegerv(GL_NUM_EXTENSIONS, &n);
@@ -1279,15 +1279,6 @@ void LLGLManager::getGLInfo(LLSD& info)
             std::string exten = ll_safe_string((const char *) glGetStringi(GL_EXTENSIONS, i));
             if (!exten.empty())
                 info["GLInfo"]["GLExtensions"].append(exten);
-        }
-    } else
-#endif
-    {
-        std::string all_exts = ll_safe_string((const char *) glGetString(GL_EXTENSIONS));
-        boost::char_separator<char> sep(" ");
-        boost::tokenizer<boost::char_separator<char> > tok(all_exts, sep);
-        for (boost::tokenizer<boost::char_separator<char> >::iterator i = tok.begin(); i != tok.end(); ++i) {
-            info["GLInfo"]["GLExtensions"].append(*i);
         }
     }
 #endif
@@ -1311,8 +1302,8 @@ std::string LLGLManager::getGLInfoString()
 	}
 
 #if !LL_MESA_HEADLESS
-#if !LL_DARWIN
-    if (mGLVersion >= 3.0f && glGetStringi) {
+    if (glGetStringi) 
+    {
         std::stringstream gl_extension_strstrm;
         GLint n, i;
         glGetIntegerv(GL_NUM_EXTENSIONS, &n);
@@ -1322,12 +1313,6 @@ std::string LLGLManager::getGLInfoString()
                 gl_extension_strstrm << exten << "\n";
         }
         info_str += std::string("GL_EXTENSIONS:\n") + gl_extension_strstrm.str() + std::string("\n");
-    } else
-#endif
-    {
-        std::string all_exts = ll_safe_string((const char *) glGetString(GL_EXTENSIONS));
-        LLStringUtil::replaceChar(all_exts, ' ', '\n');
-        info_str += std::string("GL_EXTENSIONS:\n") + all_exts + std::string("\n");
     }
 #endif
 
@@ -1350,8 +1335,8 @@ void LLGLManager::printGLInfoString()
 	}
 
 #if !LL_MESA_HEADLESS
-#if !LL_DARWIN
-    if (mGLVersion >= 3.0f && glGetStringi) {
+    if (glGetStringi)
+    {
         std::stringstream gl_extension_strstrm;
         GLint n, i;
         glGetIntegerv(GL_NUM_EXTENSIONS, &n);
@@ -1361,13 +1346,6 @@ void LLGLManager::printGLInfoString()
                 gl_extension_strstrm << exten << "\n";
         }
         LL_INFOS("RenderInit") << "GL_EXTENSIONS:\n" << gl_extension_strstrm.str() << LL_ENDL;
-    }
-    else
-#endif
-    {
-        std::string all_exts = ll_safe_string((const char *) glGetString(GL_EXTENSIONS));
-        LLStringUtil::replaceChar(all_exts, ' ', '\n');
-        LL_INFOS("RenderInit") << "GL_EXTENSIONS:\n" << all_exts << LL_ENDL;
     }
 #endif
 }
@@ -1451,7 +1429,6 @@ void LLGLManager::initExtensions()
     mHasCubeMapArray = mGLVersion >= 3.99f; 
     mHasTransformFeedback = mGLVersion >= 3.99f;
     mHasDebugOutput = mGLVersion >= 4.29f;
-    mHasGPUShader4  = mGLVersion >= 3.0f;
     mHasTextureSwizzle = mGLVersion >= 3.29f;
     mHasTextureFilterAnisotropic = mGLVersion >= 4.59f || ExtensionExists("GL_EXT_texture_filter_anisotropic", gGLHExts.mSysExts);
 
