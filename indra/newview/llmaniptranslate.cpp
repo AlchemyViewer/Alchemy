@@ -1568,11 +1568,6 @@ void LLManipTranslate::renderSnapGuides()
 					LLGLEnable stipple(GL_LINE_STIPPLE);
 					gGL.flush();
 
-					if (!LLGLSLShader::sNoFixedFunction)
-					{
-						glLineStipple(1, 0x3333);
-					}
-		
 					switch (mManipPart)
 					{
 					  case LL_YZ_PLANE:
@@ -1636,7 +1631,7 @@ void LLManipTranslate::highlightIntersection(LLVector3 normal,
 											 LLQuaternion grid_rotation, 
 											 LLColor4 inner_color)
 {
-	if (!gSavedSettings.getBOOL("GridCrossSections") || !LLGLSLShader::sNoFixedFunction)
+	if (!gSavedSettings.getBOOL("GridCrossSections"))
 	{
 		return;
 	}
