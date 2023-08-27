@@ -59,6 +59,7 @@ public:
 	// initialization/startup/shutdown
 	virtual bool init(void *user_data, const std::string &app_title) final;
 	std::string getDriverName(bool verbose) final override;
+	LLStreamingAudioInterface* createDefaultStreamingAudioImpl() const override;
 	void allocateListener() final override;
 
 	void shutdown() final override;

@@ -64,7 +64,7 @@ public:
         return false;
     }
 
-	bool handle(const LLSD& params, const LLSD& query_map,
+	bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, 
 		LLMediaCtrl* web)
 	{
 		if (params.size() < 2) return false;

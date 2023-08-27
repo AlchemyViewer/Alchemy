@@ -278,6 +278,7 @@ public:
 	BOOL addObject(LLDrawable *drawablep);
 	BOOL removeObject(LLDrawable *drawablep, BOOL from_octree = FALSE);
 	BOOL updateInGroup(LLDrawable *drawablep, BOOL immediate = FALSE); // Update position if it's in the group
+	void expandExtents(const LLVector4a* addingExtents, const LLXformMatrix& currentTransform);
 	void shift(const LLVector4a &offset);
 
     // TODO: this no longer appears to be called, figure out if it's important and if not remove it
@@ -436,7 +437,7 @@ public:
 	void destroyTree();
 
 	BOOL isSpatialBridge() const final		{ return TRUE; }
-	void updateSpatialExtents() final;
+	void updateSpatialExtents() override;
 	void updateBinRadius() final;
 	void setVisible(LLCamera& camera_in, std::vector<LLDrawable*>* results = NULL, BOOL for_select = FALSE) final;
 	void updateDistance(LLCamera& camera_in, bool force_update) final;
@@ -705,8 +706,10 @@ public:
 
 class LLControlAVBridge final : public LLVolumeBridge
 {
+	using super = LLVolumeBridge;
 public:
 	LLControlAVBridge(LLDrawable* drawablep, LLViewerRegion* regionp);
+	void updateSpatialExtents() override;
 };
 
 class LLHUDBridge final : public LLVolumeBridge

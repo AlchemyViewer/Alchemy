@@ -41,7 +41,6 @@
 #include "llinventoryobserver.h"
 #include "llinventorypanel.h"
 #include "lllocaltextureobject.h"
-#include "llmd5.h"
 #include "llnotificationsutil.h"
 #include "lloutfitobserver.h"
 #include "llsidepanelappearance.h"
@@ -1643,6 +1642,7 @@ void LLAgentWearables::setWearableOutfit(const LLInventoryItem::item_array_t& it
 
 void LLAgentWearables::queryWearableCache()
 {
+#if OPENSIM
 	if (!areWearablesLoaded() || (gAgent.getRegion() && gAgent.getRegion()->getCentralBakeVersion()))
 	{
 		return;
@@ -1697,16 +1697,7 @@ void LLAgentWearables::queryWearableCache()
 		gAgentQueryManager.mNumPendingQueries++;
 		gAgentQueryManager.mWearablesCacheQueryID++;
 	}
-}
-
-// virtual
-void LLAgentWearables::invalidateBakedTextureHash(LLMD5& hash) const
-{
-	// Add some garbage into the hash so that it becomes invalid.
-	if (isAgentAvatarValid())
-	{
-		hash.update((const unsigned char*)gAgentAvatarp->getID().mData, UUID_BYTES);
-	}
+#endif
 }
 
 // User has picked "remove from avatar" from a menu.

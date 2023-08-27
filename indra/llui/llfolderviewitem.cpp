@@ -178,6 +178,7 @@ LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
 LLFolderViewItem::~LLFolderViewItem()
 {
 	mViewModelItem = NULL;
+    gFocusMgr.removeKeyboardFocusWithoutCallback(this);
 }
 
 BOOL LLFolderViewItem::postBuild()

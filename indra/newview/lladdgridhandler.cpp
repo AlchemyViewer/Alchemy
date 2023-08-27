@@ -36,7 +36,7 @@
 // Must have an instance to auto-register with LLCommandDispatcher
 LLAddGridHandler gAddGridHandler;
 
-bool LLAddGridHandler::handle(const LLSD& tokens, const LLSD& query_map, LLMediaCtrl* web)
+bool LLAddGridHandler::handle(const LLSD& tokens, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web)
 {
 	if (query_map.has("grid"))
 	{

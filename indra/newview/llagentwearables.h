@@ -176,7 +176,6 @@ public:
 
 protected:
 
-	/*virtual*/ void	invalidateBakedTextureHash(LLMD5& hash) const override;
 	void			sendAgentWearablesUpdate();
 	void			sendAgentWearablesRequest();
 	void			queryWearableCache();

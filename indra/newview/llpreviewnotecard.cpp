@@ -64,6 +64,7 @@
 #include "lllineeditor.h"
 #include "lluictrlfactory.h"
 #include "llviewerassetupload.h"
+#include "llmd5.h"
 
 ///----------------------------------------------------------------------------
 /// Class LLPreviewNotecard

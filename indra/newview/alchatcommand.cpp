@@ -202,7 +202,7 @@ bool ALChatCommand::parseCommand(std::string data)
 				params.append(fmodf(static_cast<F32>(pos.mdV[VX]), REGION_WIDTH_METERS));
 				params.append(fmodf(static_cast<F32>(pos.mdV[VY]), REGION_WIDTH_METERS));
 				params.append(static_cast<F32>(pos.mdV[VZ]));
-				LLCommandDispatcher::dispatch("teleport", params, LLSD(), nullptr, "clicked", true);
+				LLCommandDispatcher::dispatch("teleport", params, LLSD(), std::string(), nullptr, "clicked", true);
 				return true;
 			}
 		}

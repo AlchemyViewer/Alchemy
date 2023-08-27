@@ -40,7 +40,6 @@ LLOutfitObserver::LLOutfitObserver() :
 	mCOFSaved(),
 	mOutfitLockChanged()
 {
-	mItemNameHash = 0;
 	gInventory.addObserver(this);
 }
 
@@ -89,7 +88,7 @@ bool LLOutfitObserver::checkCOF()
 		return false;
 
 	bool cof_changed = false;
-	U64 item_name_hash = gInventory.hashDirectDescendentNames(cof);
+	LLUUID item_name_hash = gInventory.hashDirectDescendentNames(cof);
 	if (item_name_hash != mItemNameHash)
 	{
 		cof_changed = true;
