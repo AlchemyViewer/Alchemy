@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="チャット" name="chat">
-  <tab_container name="chat_tab_container">
-    <panel label="一般" name="chat_pref_general" />
-    <panel label="コマンド" name="chat_pref_cmd" />
-  </tab_container>
+	<tab_container name="chat_tab_container">
+		<panel label="一般" name="chat_pref_general"/>
+		<panel label="コマンド" name="chat_pref_cmd"/>
+	</tab_container>
 </panel>

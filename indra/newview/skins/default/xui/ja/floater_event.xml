@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater label="イベント" name="Event" title="イベントの情報">
-  <panel name="event_panel" />
+	<panel name="event_panel"/>
 </floater>

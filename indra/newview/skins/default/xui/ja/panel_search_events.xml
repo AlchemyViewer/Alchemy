@@ -1,37 +1,35 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="panel_search_events">
-  <text name="search_title" value="検索語句を入力：" />
-  <radio_group name="events_search_mode">
-    <radio_item label="現在進行中および今後の予定" name="current" value="current" />
-    <radio_item label="日付で" name="date" value="date" />
-  </radio_group>
-  <button name="minus_day" />
-  <text name="events_date" value="4/20" />
-  <button name="plus_day" />
-  <check_box label="" name="pg_all" />
-
-  <icon name="rating_icon_general" />
-  <check_box label="" name="mature_all" />
-
-  <icon name="rating_icon_moderate" />
-  <check_box label="" name="adult_all" />
-  <icon name="rating_icon_adult" />
-  <search_editor label="検索" name="search_bar" />
-  <combo_box name="events_category">
-    <combo_box.item label="すべてのカテゴリ" name="any" value="0" />
-    <combo_box.item label="" value="filter_separator" enabled="false" />
-    <combo_box.item label="討論" name="discussion" value="18" />
-    <combo_box.item label="スポーツ" name="sports" value="19" />
-    <combo_box.item label="ライブミュージック" name="music" value="20" />
-    <!-- <combo_box.item label="???" name="mystery_category" value="21" /> -->
-    <combo_box.item label="商用" name="commercial" value="22" />
-    <combo_box.item label="夜の生活／エンターティメント" name="nightlife" value="23" />
-    <combo_box.item label="ゲーム／コンテンスト" name="games" value="24" />
-    <combo_box.item label="野外劇" name="pageants" value="25" />
-    <combo_box.item label="教育" name="education" value="26" />
-    <combo_box.item label="芸術と文化" name="arts" value="27" />
-    <combo_box.item label="チャリティー／サポートグループ" name="charity" value="28" />
-    <combo_box.item label="その他" name="misc" value="29" />
-    <combo_box.commit_callback function="Search.query" />
-  </combo_box>
+	<text name="search_title" value="検索語句を入力："/>
+	<radio_group name="events_search_mode">
+		<radio_item label="現在進行中および今後の予定" name="current" value="current"/>
+		<radio_item label="日付で" name="date" value="date"/>
+	</radio_group>
+	<button name="minus_day"/>
+	<text name="events_date" value="4/20"/>
+	<button name="plus_day"/>
+	<check_box label="" name="pg_all"/>
+	<icon name="rating_icon_general"/>
+	<check_box label="" name="mature_all"/>
+	<icon name="rating_icon_moderate"/>
+	<check_box label="" name="adult_all"/>
+	<icon name="rating_icon_adult"/>
+	<search_editor label="検索" name="search_bar"/>
+	<combo_box name="events_category">
+		<combo_box.item label="すべてのカテゴリ" name="any" value="0"/>
+		<combo_box.item label="" value="filter_separator" enabled="false"/>
+		<combo_box.item label="討論" name="discussion" value="18"/>
+		<combo_box.item label="スポーツ" name="sports" value="19"/>
+		<combo_box.item label="ライブミュージック" name="music" value="20"/>
+		<!-- <combo_box.item label="???" name="mystery_category" value="21"/> -->
+		<combo_box.item label="商用" name="commercial" value="22"/>
+		<combo_box.item label="夜の生活／エンターティメント" name="nightlife" value="23"/>
+		<combo_box.item label="ゲーム／コンテンスト" name="games" value="24"/>
+		<combo_box.item label="野外劇" name="pageants" value="25"/>
+		<combo_box.item label="教育" name="education" value="26"/>
+		<combo_box.item label="芸術と文化" name="arts" value="27"/>
+		<combo_box.item label="チャリティー／サポートグループ" name="charity" value="28"/>
+		<combo_box.item label="その他" name="misc" value="29"/>
+		<combo_box.commit_callback function="Search.query"/>
+	</combo_box>
 </panel>

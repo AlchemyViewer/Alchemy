@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="移動" name="move_panel">
-  <icon name="camera_icon" />
-  <slider label="表示角" name="camera_fov" />
-  <slider label="距離" name="camera_offset_scale" />
-  <text name="heading2">カメラ位置の自動調整：</text>
-  <check_box label="ビルド／編集" name="edit_camera_movement" tool_tip="編集モードの開始時と終了時に自動カメラ位置を使用する。" />
-  <check_box label="容姿" name="appearance_camera_movement" tool_tip="編集モードで自動カメラ位置調整を使用する。" />
-  <icon name="avatar_icon" />
-  <text name="keyboard_lbl">キーボード：</text>
-  <check_box label="移動キー押下時は、常に移動するようにする" name="arrow_keys_move_avatar_check" />
-  <check_box label="移動したときにカメラの位置をリセットする" name="motion_reset_camera_check" />
-  <check_box label="移動キー２度押し＋長押しで走る" name="tap_tap_hold_to_run" />
-  <check_box label="ジャンプまたはしゃがみキーを押し続けると、飛行を開始または停止します。" name="automatic_fly" />
-  <check_box label="ムーンウォークを有効化" tool_tip="後ろ向きに歩いているときに振り向かなくなります。これは、あなただけに反映されます" name="moon_walk" />
-  <text name="single_click_action_lbl">土地をシングルクリック：</text>
-  <combo_box name="single_click_action_combo">
-    <combo_box.item label="動作なし" name="0" value="0" />
-    <combo_box.item label="クリックされた地点に移動" name="1" value="1" />
-  </combo_box>
-  <text name="double_click_action_lbl">土地をダブルクリック：</text>
-  <combo_box name="double_click_action_combo">
-    <combo_box.item label="動作なし" name="0" value="0" />
-    <combo_box.item label="クリックされた地点に移動" name="1" value="1" />
-    <combo_box.item label="クリックされた地点にテレポート" name="2" value="2" />
-  </combo_box>
-  <button label="その他のデバイス" name="joystick_setup_button" />
+	<icon name="camera_icon"/>
+	<slider label="表示角" name="camera_fov"/>
+	<slider label="距離" name="camera_offset_scale"/>
+	<text name="heading2">カメラ位置の自動調整：</text>
+	<check_box label="ビルド／編集" name="edit_camera_movement" tool_tip="編集モードの開始時と終了時に自動カメラ位置を使用する。"/>
+	<check_box label="容姿" name="appearance_camera_movement" tool_tip="編集モードで自動カメラ位置調整を使用する。"/>
+	<icon name="avatar_icon"/>
+	<text name="keyboard_lbl">キーボード：</text>
+	<check_box label="移動キー押下時は、常に移動するようにする" name="arrow_keys_move_avatar_check"/>
+	<check_box label="移動したときにカメラの位置をリセットする" name="motion_reset_camera_check"/>
+	<check_box label="移動キー２度押し＋長押しで走る" name="tap_tap_hold_to_run"/>
+	<check_box label="ジャンプまたはしゃがみキーを押し続けると、飛行を開始または停止します。" name="automatic_fly"/>
+	<check_box label="ムーンウォークを有効化" tool_tip="後ろ向きに歩いているときに振り向かなくなります。これは、あなただけに反映されます" name="moon_walk"/>
+	<text name="single_click_action_lbl">土地をシングルクリック：</text>
+	<combo_box name="single_click_action_combo">
+		<combo_box.item label="動作なし" name="0" value="0"/>
+		<combo_box.item label="クリックされた地点に移動" name="1" value="1"/>
+	</combo_box>
+	<text name="double_click_action_lbl">土地をダブルクリック：</text>
+	<combo_box name="double_click_action_combo">
+		<combo_box.item label="動作なし" name="0" value="0"/>
+		<combo_box.item label="クリックされた地点に移動" name="1" value="1"/>
+		<combo_box.item label="クリックされた地点にテレポート" name="2" value="2"/>
+	</combo_box>
+	<button label="その他のデバイス" name="joystick_setup_button"/>
 </panel>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="ファーストライフ" name="avatar_firstlife_tab">
-  <panel name="avatar_info_top">
-    <texture_picker label="" name="fl_profile_pic" tool_tip="クリックして画像を選択" />
-  </panel>
-  <text_editor name="fl_about" />
+	<panel name="avatar_info_top">
+		<texture_picker label="" name="fl_profile_pic" tool_tip="クリックして画像を選択"/>
+	</panel>
+	<text_editor name="fl_about"/>
 </panel>

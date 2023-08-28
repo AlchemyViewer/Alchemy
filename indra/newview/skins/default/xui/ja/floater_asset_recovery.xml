@@ -1,21 +1,18 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="asset_recovery" title="アセット復元">
+	<text name="txt2">[APP_NAME]は、最近のビューアのクラッシュで残った可能性のある復元可能なアイテムを検出しました。
 
-  <text name="txt2">[APP_NAME]は、最近のビューアのクラッシュで残った可能性のある復元可能なアイテムを検出しました。
-
-回収されたアイテムは「遺失物」インベントリフォルダーに置かれます。
-  </text>
-
-  <scroll_list name="item_list">
-    <scroll_list.columns label="" name="item_check" />
-    <scroll_list.columns label="アイテム名" name="item_name" />
-    <scroll_list.columns label="アイテム種別" name="item_type" />
-  </scroll_list>
-  <panel label="ボトムパネル" name="bottom_panel">
-    <icon name="dummy_icon1" />
-    <button label="復元" name="recover_btn" />
-    <icon name="dummy_icon2" />
-    <button label="キャンセル" name="cancel_btn" />
-    <icon name="dummy_icon3" />
-  </panel>
+回収されたアイテムは「遺失物」インベントリフォルダーに置かれます。</text>
+	<scroll_list name="item_list">
+		<scroll_list.columns label="" name="item_check"/>
+		<scroll_list.columns label="アイテム名" name="item_name"/>
+		<scroll_list.columns label="アイテム種別" name="item_type"/>
+	</scroll_list>
+	<panel label="ボトムパネル" name="bottom_panel">
+		<icon name="dummy_icon1"/>
+		<button label="復元" name="recover_btn"/>
+		<icon name="dummy_icon2"/>
+		<button label="キャンセル" name="cancel_btn"/>
+		<icon name="dummy_icon3"/>
+	</panel>
 </floater>
