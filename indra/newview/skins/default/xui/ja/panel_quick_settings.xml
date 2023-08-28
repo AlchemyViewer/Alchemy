@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="quick_settings">
-  <text follows="left|top" height="15" left="10" top_pad="2" width="120" layout="topleft" value="描画距離：" />
-  <slider_bar name="draw_dist_slider_bar" />
-  <spinner label="" name="draw_dist_spinner" />
-  <text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="詳細レベル：" />
-  <slider_bar name="lod_slider_bar" />
-  <spinner name="lod_spinner" />
-  <text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="最大パーティクル数：" />
-  <slider_bar name="max_particles_slider_bar" />
-  <spinner name="max_particles_spinner" />
-  <text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="最大アバター数：" />
-  <slider_bar name="max_avatar_slider_bar" />
-  <spinner name="max_avatar_spinner" />
-  <text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="最大帯域幅：" />
-  <slider_bar name="bandwith_slider_bar" />
-  <spinner name="bandwith_spinner" />
-  <text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="ホバー高さ：" />
-  <slider_bar name="hover_slider_bar" />
-  <spinner name="hover_spinner" />
+	<text follows="left|top" height="15" left="10" top_pad="2" width="120" layout="topleft" value="描画距離：" />
+	<slider_bar name="draw_dist_slider_bar" />
+	<spinner label="" name="draw_dist_spinner" />
+	<text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="詳細レベル：" />
+	<slider_bar name="lod_slider_bar" />
+	<spinner name="lod_spinner" />
+	<text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="最大パーティクル数：" />
+	<slider_bar name="max_particles_slider_bar" />
+	<spinner name="max_particles_spinner" />
+	<text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="最大アバター数：" />
+	<slider_bar name="max_avatar_slider_bar" />
+	<spinner name="max_avatar_spinner" />
+	<text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="最大帯域幅：" />
+	<slider_bar name="bandwith_slider_bar" />
+	<spinner name="bandwith_spinner" />
+	<text follows="left|top" height="15" left="10" top_pad="3" width="120" layout="topleft" value="ホバー高さ：" />
+	<slider_bar name="hover_slider_bar" />
+	<spinner name="hover_spinner" />
 </panel>

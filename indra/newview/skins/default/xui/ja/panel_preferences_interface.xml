@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="インターフェース" name="Interface panel">
-  <text name="Network:">フローティングテキスト：</text>
-  <text name="Maximum bandwidth">フェード距離</text>
-  <slider name="text_draw_distance" />
-  <text name="text_box2">ｍ</text>
-  <text name="Maximum bandwidth">フェード範囲</text>
-  <slider name="text_draw_distance" />
-  <text name="text_box2">ｍ</text>
-  <check_box label="シネマティックモードでは隠す" name="HideHoverTextInCinematicMode" />
-  <text name="InventoryText">インベントリ：</text>
-  <check_box label="ダブルクリックで装着物を追加" name="DoubleClickAttachmentAddCheck" />
-  <check_box label="ダブルクリックで衣装を追加" name="DoubleClickWearableAddCheck" />
-  <text name="SecurityText">セキュリティ：</text>
-  <check_box label="左クリックでオブジェクトに座るのをブロック" name="AlchemyDisableClickToSit" />
-  <check_box label="マップのＵＩを開いたときにスクリプト実行を許可（llMapDestination関数）" name="ScriptsCanShowUI" />
-  <text name="inworld_typing_rg_label" value="以下の場合、オブジェクトの権限を取り消す：" />
-  <radio_group name="revoke_perms_radio">
-    <radio_item label="しない" name="None" value="0" />
-    <radio_item label="座る時" name="Sitting" value="1" />
-    <radio_item label="立つ時" name="Standing" value="2" />
-    <radio_item label="両方" name="Both" />
-  </radio_group>
+	<text name="Network:">フローティングテキスト：</text>
+	<text name="Maximum bandwidth">フェード距離</text>
+	<slider name="text_draw_distance" />
+	<text name="text_box2">ｍ</text>
+	<text name="Maximum bandwidth">フェード範囲</text>
+	<slider name="text_draw_distance" />
+	<text name="text_box2">ｍ</text>
+	<check_box label="シネマティックモードでは隠す" name="HideHoverTextInCinematicMode" />
+	<text name="InventoryText">インベントリ：</text>
+	<check_box label="ダブルクリックで装着物を追加" name="DoubleClickAttachmentAddCheck" />
+	<check_box label="ダブルクリックで衣装を追加" name="DoubleClickWearableAddCheck" />
+	<text name="SecurityText">セキュリティ：</text>
+	<check_box label="左クリックでオブジェクトに座るのをブロック" name="AlchemyDisableClickToSit" />
+	<check_box label="マップのＵＩを開いたときにスクリプト実行を許可（llMapDestination関数）" name="ScriptsCanShowUI" />
+	<text name="inworld_typing_rg_label" value="以下の場合、オブジェクトの権限を取り消す：" />
+	<radio_group name="revoke_perms_radio">
+		<radio_item label="しない" name="None" value="0" />
+		<radio_item label="座る時" name="Sitting" value="1" />
+		<radio_item label="立つ時" name="Standing" value="2" />
+		<radio_item label="両方" name="Both" />
+	</radio_group>
 </panel>

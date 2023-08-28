@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <panel name="ao_mini">
-   <combo_box name="set_list" />
-   <button label="" name="ao_wrench" tool_tip="アニメーションオーバーライドのコントロールを表示" />
-   <button name="ao_prev" tool_tip="前のアニメーションに切り替えます。" />
-   <button name="ao_next" tool_tip="次のアニメーションに切り替えます。" />
+	<combo_box name="set_list" />
+	<button label="" name="ao_wrench" tool_tip="アニメーションオーバーライドのコントロールを表示" />
+	<button name="ao_prev" tool_tip="前のアニメーションに切り替えます。" />
+	<button name="ao_next" tool_tip="次のアニメーションに切り替えます。" />
 </panel>

@@ -1,43 +1,43 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="floater_about" title="[CAPITALIZED_APP_NAME]について">
-  <tab_container name="about_tab">
-    <panel label="情報" name="support_panel">
-      <icon name="viewer_logo" />
-      <icon name="discord_icon" tooltip="[APP_NAME]のDiscord"/>
-      <icon name="mastodon_icon" tooltip="[APP_NAME]のマストドン" />
-      <button tool_tip="更新がダウンロードできるかを確認します。" name="update_btn" label="更新を確認" />
-      <button name="copy_btn" label="情報をコピー" />
-      <text_editor name="support_editor"/>
-    </panel>
-    <panel label="クレジット" name="credits_panel">
-      <accordion name="credits_accordion">
-        <!-- Credits -->
-        <accordion_tab name="alchemy_credits_tab" title="Alchemy">
-          <panel name="alchemy_credits_panel">
-            <text name="alchemy_intro">Alchemy は、Alchemy Development Groupによって提供されています：</text>
-            <text_editor name="alchemy_names">Rye Cogtail
+	<tab_container name="about_tab">
+		<panel label="情報" name="support_panel">
+			<icon name="viewer_logo" />
+			<icon name="discord_icon" tooltip="[APP_NAME]のDiscord"/>
+			<icon name="mastodon_icon" tooltip="[APP_NAME]のマストドン" />
+			<button tool_tip="更新がダウンロードできるかを確認します。" name="update_btn" label="更新を確認" />
+			<button name="copy_btn" label="情報をコピー" />
+			<text_editor name="support_editor"/>
+		</panel>
+		<panel label="クレジット" name="credits_panel">
+			<accordion name="credits_accordion">
+				<!-- Credits -->
+				<accordion_tab name="alchemy_credits_tab" title="Alchemy">
+					<panel name="alchemy_credits_panel">
+						<text name="alchemy_intro">Alchemy は、Alchemy Development Groupによって提供されています：</text>
+						<text_editor name="alchemy_names">Rye Cogtail
 Luminous Luminos
 Unexpectedly Dismantled
 Cinder Roxley
 Inusaito Kanya
 Zanibar Darkstone
 Doug Falta</text_editor>
-            <text name="alchemy_thanks_intro">スペシャルサンクス：</text>
-            <text_editor name="alchemy_supporter_names">実行時に置き換えられるダミー名</text_editor>
-          </panel>
-        </accordion_tab>
-        <accordion_tab name="sl_credits_tab" title="Second Life">
-          <panel name="sl_credits_panel">
-            <text name="linden_intro">Second Life は Lindens によって開発され、
+						<text name="alchemy_thanks_intro">スペシャルサンクス：</text>
+						<text_editor name="alchemy_supporter_names">実行時に置き換えられるダミー名</text_editor>
+					</panel>
+				</accordion_tab>
+				<accordion_tab name="sl_credits_tab" title="Second Life">
+					<panel name="sl_credits_panel">
+						<text name="linden_intro">Second Life は Lindens によって開発され、
 以下のオープンソースの貢献があります：</text>
-            <text_editor name="contrib_names">実行時に置き換えられるダミー名</text_editor>
-          </panel>
-        </accordion_tab>
-      </accordion>
-    </panel>
-    <!-- Licences -->
-    <panel label="ライセンス" name="licenses_panel">
-      <text_editor name="licenses_editor">このライブラリはフリーソフトウェアです。Free Software Foundationによって公開されているGNU Lesser General Public Licenseの条件に基づいて、再配布したり変更したりすることができます。このディストリビューションのライセンスのバージョンは2.1でdoc/LGPL-licence.txtにあります。（オンラインでは、https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt を参照してください。）
+						<text_editor name="contrib_names">実行時に置き換えられるダミー名</text_editor>
+					</panel>
+				</accordion_tab>
+			</accordion>
+		</panel>
+		<!-- Licences -->
+		<panel label="ライセンス" name="licenses_panel">
+			<text_editor name="licenses_editor">このライブラリはフリーソフトウェアです。Free Software Foundationによって公開されているGNU Lesser General Public Licenseの条件に基づいて、再配布したり変更したりすることができます。このディストリビューションのライセンスのバージョンは2.1でdoc/LGPL-licence.txtにあります。（オンラインでは、https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt を参照してください。）
 
 このライブラリは役立つことを期待して配布されていますが、いかなる保証もありません。商品性や特定目的への適合性についての暗黙の保証もありません。詳細については、ＧＮＵ劣等一般公衆利用許諾書を参照してください。
 
@@ -70,6 +70,6 @@ Second Life ビューアでは Havok (TM) Physics が使用されています。
 無断複写・複製・転載を禁じます。詳細については licenses.txt をご参照ください。
 
 ボイスチャットのオーディオコーディング：Polycom(R) Siren14(TM) (ITU-T Rec. G.722.1 Annex C)</text_editor>
-    </panel>
-  </tab_container>
+		</panel>
+	</tab_container>
 </floater>
