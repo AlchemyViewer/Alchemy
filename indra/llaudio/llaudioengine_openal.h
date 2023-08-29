@@ -54,9 +54,9 @@ class LLAudioEngine_OpenAL final : public LLAudioEngine
 		/*virtual*/ bool initWind();
 		/*virtual*/ void cleanupWind();
 		/*virtual*/ void updateWind(LLVector3 direction, F32 camera_altitude);
+		/*virtual*/ LLStreamingAudioInterface* createDefaultStreamingAudioImpl() const { return nullptr; }
 
 	private:
-		void * windDSP(void *newbuffer, int length);
         typedef S16 WIND_SAMPLE_T;
     	LLWindGen<WIND_SAMPLE_T> *mWindGen;
     	S16 *mWindBuf;

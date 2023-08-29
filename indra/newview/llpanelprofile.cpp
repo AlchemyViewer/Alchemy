@@ -316,8 +316,10 @@ public:
 	// requires trusted browser to trigger
 	LLWebProfileHandler() : LLCommandHandler("profile", UNTRUSTED_THROTTLE) { }
 
-	bool handle(const LLSD& params, const LLSD& query_map,
-		LLMediaCtrl* web)
+	bool handle(const LLSD& params,
+                const LLSD& query_map,
+                const std::string& grid,
+                LLMediaCtrl* web)
 	{
 		if (params.size() < 1) return false;
 		std::string agent_name = params[0];

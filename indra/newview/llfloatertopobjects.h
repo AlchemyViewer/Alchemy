@@ -77,6 +77,7 @@ private:
 	void initColumns(LLCtrlListInterface *list);
 
 	void onCommitObjectsList();
+    void onSelectionChanged();
 	static void onDoubleClickObjectsList(void* data);
 	void onClickShowBeacon();
 
@@ -99,10 +100,9 @@ private:
 	void onGetByParcelName();
 
 	void showBeacon();
+    void teleportToSelectedObject();
 
 private:
-	LLScrollListCtrl* mObjectList;
-
 	std::string mMethod;
 
 	LLSD mObjectListData;
@@ -117,6 +117,7 @@ private:
 	F32 mtotalScore;
 
 	static LLFloaterTopObjects* sInstance;
+    LLScrollListCtrl* mObjectsScrollList;
 };
 
 #endif

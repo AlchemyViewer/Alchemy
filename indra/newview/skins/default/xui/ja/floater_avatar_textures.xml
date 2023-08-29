@@ -12,18 +12,15 @@
 				<texture_picker label="髪" name="hair_grain"/>
 				<texture_picker label="髪のアルファ" name="hair_alpha"/>
 				<texture_picker label="髪のタトゥ" name="hair_tattoo"/>
-
 				<texture_picker label="頭" name="head-baked"/>
 				<texture_picker label="メイクアップ" name="head_bodypaint"/>
 				<texture_picker label="頭部のアルファ" name="head_alpha"/>
 				<texture_picker label="頭部のタトゥ" name="head_tattoo"/>
 				<texture_picker label="頭部全般のタトゥ" name="head_universal_tattoo"/>
-
 				<texture_picker label="目" name="eyes-baked"/>
 				<texture_picker label="目" name="eyes_iris"/>
 				<texture_picker label="目のアルファ" name="eyes_alpha"/>
 				<texture_picker label="目のタトゥ" name="eyes_tattoo"/>
-
 				<texture_picker label="上半身" name="upper-baked"/>
 				<texture_picker label="上半身のボディペイント" name="upper_bodypaint"/>
 				<texture_picker label="上半身の下着" name="upper_undershirt"/>
@@ -33,7 +30,6 @@
 				<texture_picker label="上半身のアルファ" name="upper_alpha"/>
 				<texture_picker label="上半身のタトゥ" name="upper_tattoo"/>
 				<texture_picker label="上半身全般のタトゥ" name="upper_universal_tattoo"/>
-
 				<texture_picker label="下半身" name="lower-baked"/>
 				<texture_picker label="下半身のボディペイント" name="lower_bodypaint"/>
 				<texture_picker label="下半身の下着" name="lower_underpants"/>
@@ -47,7 +43,6 @@
 				<texture_picker label="スカート" name="skirt"/>
 				<texture_picker label="スカートのタトゥ" name="skirt_tattoo"/>
 				<texture_picker label="下半身全般のタトゥ" name="lower_universal_tattoo"/>
-
 				<texture_picker label="左腕" name="leftarm-baked"/>
 				<texture_picker label="左腕のタトゥ" name="leftarm_tattoo"/>
 				<texture_picker label="左足" name="leftleg-baked"/>
@@ -62,3 +57,4 @@
 		</panel>
 	</scroll_container>
 </floater>
+

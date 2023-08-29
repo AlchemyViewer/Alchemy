@@ -82,9 +82,9 @@ BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
 	std::string cur_grid = LLGridManager::instance().getGrid();
 	bool is_hypergrid = remote_grid != cur_grid;
 
-	S32 pos_x = S32(agent_pos_region.mV[VX]);
-	S32 pos_y = S32(agent_pos_region.mV[VY]);
-	S32 pos_z = S32(agent_pos_region.mV[VZ]);
+	S32 pos_x = S32(agent_pos_region.mV[VX] + 0.5f);
+	S32 pos_y = S32(agent_pos_region.mV[VY] + 0.5f);
+	S32 pos_z = S32(agent_pos_region.mV[VZ] + 0.5f);
 
 	// Round the numbers based on the velocity
 	F32 velocity_mag_sq = gAgent.getVelocity().magVecSquared();

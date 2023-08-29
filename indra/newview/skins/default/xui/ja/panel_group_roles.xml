@@ -101,8 +101,7 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 		<text_editor name="role_description"/>
 		<text name="static4">割当られたメンバー</text>
 		<name_list name="role_assigned_members"/>
-		<check_box label="明らかなメンバー" name="role_visible_in_list"
-			tool_tip="グループ外の人が一般タブを見たときに、この役割のメンバーが表示されるかどうかを設定します。"/>
+		<check_box label="明らかなメンバー" name="role_visible_in_list" tool_tip="グループ外の人が一般タブを見たときに、この役割のメンバーが表示されるかどうかを設定します。"/>
 		<text name="static5" tool_tip="現在選択されている役割で実行できる能力のリスト">許可された能力</text>
 		<scroll_list name="role_allowed_actions" tool_tip="各能力の詳細は、能力のタブをご覧ください。">
 			<scroll_list.columns label="" name="icon"/>

@@ -43,7 +43,9 @@ class LLEventHandler : public LLCommandHandler
 public:
 	// requires trusted browser to trigger
 	LLEventHandler() : LLCommandHandler("event", UNTRUSTED_THROTTLE) { }
-	bool handle(const LLSD& params, const LLSD& query_map,
+	bool handle(const LLSD& params,
+                const LLSD& query_map,
+                const std::string& grid,
 				LLMediaCtrl* web) override
 	{
 		if (params.size() < 2)

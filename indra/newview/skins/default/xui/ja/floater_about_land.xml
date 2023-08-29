@@ -132,12 +132,10 @@
 			<panel.string name="landing_point_none">（なし）</panel.string>
 			<panel.string name="push_restrict_text">プッシュ禁止</panel.string>
 			<panel.string name="push_restrict_region_text">プッシュ禁止 （リージョンの設定が優先されます。）</panel.string>
-
 			<text name="allow_label">他の住人への許可設定：</text>
 			<text name="allow_label1">地形の編集：</text>
 			<check_box label="全員" name="edit land check" tool_tip="ここにチェックを入れると、誰でもあなたの土地をテラフォーミングすることができるようになります。自分の土地はいつでも編集できるため、ここはオフのままにしておくことを推奨します。"/>
 			<text name="caution_text">（使用には注意してください！）</text>
-
 			<text name="allow_label0">飛行：</text>
 			<check_box label="全員" name="check fly" tool_tip="ここにチェックを入れると、この土地での飛行が可能となります。このチェックを外すと、土地に入る時や通過する時のみ飛行可能となります。"/>
 			<text name="allow_label2">ビルド許可：</text>

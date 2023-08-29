@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="モデルのアップロード">
-
 	<string name="status_idle"/>
 	<string name="status_parse_error">エラー：DAEファイルに問題が見つかりました。‐詳細につきましてはログをご確認ください。</string>
 	<string name="status_bind_shape_orientation">警告：バインドシェイプマトリックスは、標準のＸ軸正方向にはありません。</string>
@@ -27,13 +26,11 @@
 	<string name="decomposing">分析しています…</string>
 	<string name="simplifying">簡素化しています…</string>
 	<string name="tbd">未計算</string>
-
 	<!-- Warnings and info from model loader-->
 	<string name="TooManyJoint">ジョイントが多すぎるためスキニングが無効化されました：[MAX]個中[JOINTS]個</string>
 	<string name="UnrecognizedJoint">認識できないジョイント名をリグしようとしています：[NAME]</string>
 	<string name="UnknownJoints">[COUNT]個の不明なジョイントがあるためスキニングは無効化されました。</string>
 	<string name="ModelLoaded">[MODEL_NAME]モデルが読み込まれました。</string>
-
 	<string name="IncompleteTC">テクスチャの座標データが不完全です。</string>
 	<string name="PositionNaN">DAEモデルから位置データを読み込み時にNaNが見つかりました。このモデルは無効です。</string>
 	<string name="NormalsNaN">DAEモデルの法線マップ読み込み時にNaNが見つかりました。このモデルは無効です。</string>
@@ -48,7 +45,6 @@
 	<string name="ParsingErrorNoRoot">ドキュメントにルートがありません。</string>
 	<string name="ParsingErrorNoScene">ドキュメントにvisual_scene要素がありません。</string>
 	<string name="ParsingErrorPositionInvalidModel">位置データがないのでメッシュを処理できません。無効なモデルです。</string>
-
 	<panel name="left_panel">
 		<panel name="model_name_representation_panel">
 			<text name="name_label">モデル名：</text>
@@ -151,7 +147,6 @@
 			</panel>
 			<!-- PHYSYCS PANEL -->
 			<panel label="物理効果" name="physics_panel">
-
 				<!-- ==== STEP 1: Level of Detail ==== -->
 				<view_border name="physics_tab_border"/>
 				<panel name="physics geometry">
@@ -168,11 +163,10 @@
 					<line_editor name="physics_file"/>
 					<button name="physics_browse" label="ブラウズ…"/>
 					<!--
-        <check_box name="physics_optimize" label="最適化"/>
-        <check_box name="physics_use_hull" label="凸包を使用"/>
-        -->
+					<check_box name="physics_optimize" label="最適化"/>
+					<check_box name="physics_use_hull" label="凸包を使用"/>
+					-->
 				</panel>
-
 				<!-- ==== STEP 2: Analyze ==== -->
 				<view_border name="physics_tab_border"/>
 				<panel name="physics analysis">
@@ -187,7 +181,6 @@
 					<button label="分析" name="Decompose"/>
 					<button label="キャンセル" name="decompose_cancel"/>
 				</panel>
-
 				<!-- ==== STEP 3: Simplify ==== -->
 				<view_border name="physics_tab_border"/>
 				<panel name="physics simplification">
@@ -203,7 +196,6 @@
 					<button label="簡素化" name="Simplify"/>
 					<button label="キャンセル" name="simplify_cancel"/>
 				</panel>
-
 				<!-- ==== Results ==== -->
 				<view_border name="physics_tab_border"/>
 				<panel name="physics info">
@@ -275,10 +267,10 @@
 テクスチャ数：
 モデル：</text>
 				<text name="price_breakdown">[STREAMING]
-[PHYSICS]
-[INSTANCES]
-[TEXTURES]
-[MODEL]</text>
+[PHYSICS]箇所
+[INSTANCES]個
+[TEXTURES]枚
+[MODEL]個</text>
 			</panel>
 			<!-- 
       Streaming breakdown numbers are available but not fully understood

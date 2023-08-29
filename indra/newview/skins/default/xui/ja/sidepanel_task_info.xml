@@ -36,6 +36,7 @@
 			<combo_box.item label="オブジェクトに支払う" name="Payobject"/>
 			<combo_box.item label="開く" name="Open"/>
 			<combo_box.item label="ズーム" name="Zoom"/>
+			<combo_box.item label="オブジェクトを無視" name="Ignoreobject"/>
 			<combo_box.item label="なし" name="None"/>
 		</combo_box>
 		<panel name="perms_inv">

@@ -17,7 +17,7 @@
 		<menu_item_check name="DoNotRender" label="描画しない"/>
 		<menu_item_separator/>
 		<menu_item_call label="描画の例外…" name="RenderExceptions">
-    </menu_item_call>
+		</menu_item_call>
 	</context_menu>
 	<context_menu label="ユーティリティ" name="Utilities">
 		<menu_item_call label="テクスチャのデバッグ" name="Debug..."/>
@@ -41,6 +41,6 @@
 	<menu_item_separator/>
 	<menu_item_call label="ズームイン" name="Zoom In"/>
 	<menu_item_call label="ここにテレポート" name="Teleport To">
-  </menu_item_call>
+	</menu_item_call>
 	<menu_item_call label="支払う" name="Pay..."/>
 </context_menu>

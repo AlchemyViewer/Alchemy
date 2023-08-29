@@ -38,7 +38,6 @@
 						<slider name="acceleration_x" label="Ｘ："/>
 						<slider name="acceleration_y" label="Ｙ："/>
 						<slider name="acceleration_z" label="Ｚ："/>
-
 						<text name="Omega_Label">オメガ：</text>
 						<slider name="omega_x" label="Ｘ："/>
 						<slider name="omega_y" label="Ｙ："/>
@@ -50,7 +49,6 @@
 						<texture_picker name="texture_picker" label="テクスチャ"/>
 						<color_swatch label="開始色" name="start_color_selector"/>
 						<color_swatch label="終了色" name="end_color_selector"/>
-
 						<combo_box name="blend_func_src_combo">
 							<combo_box.commit_callback function="Particle.Edit"/>
 							<combo_box.item label="ブレンド１" name="blend_one" value="blend_one"/>
@@ -89,22 +87,14 @@
 			</combo_box>
 			<check_box name="bounce_checkbox" label="跳ねる"/>
 			<check_box name="emissive_checkbox" label="放射性" top_pad="4"/>
-
 			<check_box name="wind_checkbox" label="風"/>
-
 			<check_box name="ribbon_checkbox" label="リボン"/>
-
 			<check_box name="follow_source_checkbox" label="ソースに従う"/>
-
 			<check_box name="follow_velocity_checkbox" label="速度に従う"/>
-
 			<check_box name="interpolate_color_checkbox" label="色を補間"/>
-
 			<check_box name="interpolate_scale_checkbox" label="スケールを補間"/>
-
 			<check_box name="target_position_checkbox" label="目標位置"/>
 			<check_box name="target_linear_checkbox" label="線形の目標"/>
-
 			<line_editor name="target_key_input"/>
 			<button name="clear_target_button" tool_tip="目標のオブジェクトまたはアバターをクリアします。"/>
 			<button name="pick_target_button" tool_tip="ここをクリックして、パーティクルの目標オブジェクトまたはアバターを選択します。"/>

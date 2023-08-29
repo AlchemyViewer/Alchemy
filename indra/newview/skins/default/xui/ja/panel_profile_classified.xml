@@ -75,7 +75,7 @@
 					<button name="edit_btn" label="編集"/>
 				</layout_panel>
 				<layout_panel name="util_resizer_right">
-        </layout_panel>
+				</layout_panel>
 			</layout_stack>
 		</layout_panel>
 		<layout_panel name="publish_layout_panel">

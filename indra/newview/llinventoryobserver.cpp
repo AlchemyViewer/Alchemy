@@ -670,7 +670,7 @@ void LLInventoryCategoriesObserver::changed(U32 mask)
 		// computed, or (b) a name has changed.
 		if (!cat_data.mIsNameHashInitialized || (mask & LLInventoryObserver::LABEL))
 		{
-			U64 item_name_hash = gInventory.hashDirectDescendentNames(cat_id);
+			digest_t item_name_hash = gInventory.hashDirectDescendentNames(cat_id);
 			if (cat_data.mItemNameHash != item_name_hash)
 			{
 				cat_data.mIsNameHashInitialized = true;
@@ -731,7 +731,7 @@ bool LLInventoryCategoriesObserver::addCategory(const LLUUID& cat_id, callback_t
 	{
 		if(init_name_hash)
 		{
-			U64 item_name_hash = gInventory.hashDirectDescendentNames(cat_id);
+			digest_t item_name_hash = gInventory.hashDirectDescendentNames(cat_id);
 			mCategoryMap.insert(category_map_value_t(cat_id,LLCategoryData(cat_id, cb, version, current_num_known_descendents,item_name_hash)));
 		}
 		else
@@ -757,11 +757,10 @@ LLInventoryCategoriesObserver::LLCategoryData::LLCategoryData(
 	, mDescendentsCount(num_descendents)
 	, mIsNameHashInitialized(false)
 {
-	mItemNameHash = 0;
 }
 
 LLInventoryCategoriesObserver::LLCategoryData::LLCategoryData(
-	const LLUUID& cat_id, callback_t cb, S32 version, S32 num_descendents, U64 name_hash)
+	const LLUUID& cat_id, callback_t cb, S32 version, S32 num_descendents, const digest_t& name_hash)
 
 	: mCatID(cat_id)
 	, mCallback(cb)

@@ -3,7 +3,7 @@
 	<action_set description="これらの能力には、グループメンバーを追加、排除し、招待状なしに新メンバーの参加を認める権限が含まれます。" name="Membership">
 		<action description="このグループに人を招待" longdescription="「役割とメンバー」セクションの「メンバー」タブ内にある「招待」ボタンを押して、このグループにメンバーを招待します。" name="member invite" value="1"/>
 		<action description="このグループから「全員（Everyone）」の役割に属するメンバーを追放します" longdescription="「役割とメンバー」セクションの「メンバー」タブ内にある「追放」ボタンを押して、このグループからメンバーを追放します。「オーナー」は、他の「オーナー」以外は誰でも追放できます。「オーナー」ではない人が「全員（Everyone）」にしか役割がない場合、メンバーはグループから追放されることがあります。「役割」からメンバーを削除するには、「役割からメンバーを削除」の能力が与えられている必要があります。" name="member eject" value="2"/>
-		<action description="立入禁止リストの管理" longdescription="グループのメンバーに、このグループから住人を立入禁止/立入禁止解除できるようにします。" name="allow ban" value="51"/>
+		<action description="バンリストの管理" longdescription="グループのメンバーに、このグループから住人をバン／バン解除できるようにします。" name="allow ban" value="51"/>
 		<action description="「自由参加」と「入会費」の切り替え" longdescription="「自由参加」に切り替えると、招待されなくても新しいメンバーが入会できます。「入会費」は「一般」セクションで変更します。" name="member options" value="3"/>
 	</action_set>
 	<action_set description="これらの能力には、グループ内の役割を追加、削除、変更し、役割にメンバーを追加、削除し、さらに役割へ能力を割り当てる権限が含まれます。" name="Roles">
@@ -45,7 +45,7 @@
 	</action_set>
 	<action_set description="これらの能力には、住人の凍結や追放を含む、グループ所有の区画へのアクセスを許可、制限する権限が含まれます。" name="Parcel Access">
 		<action description="区画アクセスリストの管理" longdescription="区画アクセス・リストの管理は、「土地情報」＞「アクセス」タブで行います。" name="land manage allowed" value="29"/>
-		<action description="区画禁止リストの管理" longdescription="「土地情報」＞「アクセス」タブの、区画の禁止リストの管理ができます。" name="land manage banned" value="30"/>
+		<action description="区画のバンリストの管理" longdescription="「土地情報」＞「アクセス」タブの区画のバンリストの管理ができます。" name="land manage banned" value="30"/>
 		<action description="「入場許可を販売」の設定を変更" longdescription="「土地情報」＞「アクセス」タブで、区画の「入場許可を販売」の設定を変更します。" name="land manage passes" value="31"/>
 		<action description="区画上の住人の追放とフリーズ" longdescription="この「能力」を持つ「役割」のメンバーは、グループ所有地にいて欲しくない住人を右クリックし、「追放」や「フリーズ」を選んで対応できます。" name="land admin" value="32"/>
 	</action_set>

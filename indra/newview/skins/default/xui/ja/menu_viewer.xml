@@ -125,7 +125,10 @@
 		<menu_item_call label="この土地を購入" name="Buy Land"/>
 		<menu_item_separator/>
 		<menu label="表示" name="LandShow">
-			<menu_item_check label="立入禁止ライン" name="Ban Lines"/>
+			<menu_item_check label="バンラインを隠す" name="Hide Ban Lines" />
+			<menu_item_check label="バンラインをぶつかったときに表示" name="Show Ban Lines On Collision" />
+			<menu_item_check label="バンラインを近づいたときに表示" name="Show Ban Lines On Proximity" />
+			<menu_item_separator />
 			<menu_item_check label="ビーコン（標識）" name="beacons"/>
 			<menu_item_check label="敷地境界線" name="Property Lines"/>
 			<menu_item_check label="土地所有者" name="Land Owners"/>
@@ -138,10 +141,10 @@
 		<menu_item_check label="グラフィック性能の最適化…" name="Performance"/>
 		<menu_item_separator/>
 		<!--
-    <menu_item_check label="ナビゲーションバーを表示" name="ShowNavbarNavigationPanel"/>
-    <menu_item_check label="お気に入りバーを表示" name="ShowNavbarFavoritesPanel"/>
-    <menu_item_separator/>
-    -->
+		<menu_item_check label="ナビゲーションバーを表示" name="ShowNavbarNavigationPanel"/>
+		<menu_item_check label="お気に入りバーを表示" name="ShowNavbarFavoritesPanel"/>
+		<menu_item_separator/>
+		-->
 		<menu label="自然環境" name="Environment">
 			<menu_item_check label="夜明け" name="Sunrise"/>
 			<menu_item_check label="正午" name="Noon"/>
@@ -290,7 +293,7 @@
 			<menu_item_check label="着用中の共有されたアイテム名をリネーム" name="Rename Shared Items on Wear"/>
 			<menu_item_separator/>
 			<menu_item_check label="ロック…" name="Locks">
-      </menu_item_check>
+			</menu_item_check>
 		</menu>
 		<menu_item_separator/>
 		<menu_item_check label="ＯＯＣ（その人らしくない）チャットの許可" name="Allow OOC Chat"/>
@@ -545,7 +548,9 @@
 			<menu_item_check label="シムの太陽の設定を無視する" name="Sim Sun Override"/>
 			<menu_item_check label="固定された天気" name="Fixed Weather"/>
 			<menu_item_call label="リージョンオブジェクトのキャッシュをダンプ" name="Dump Region Object Cache"/>
-			<menu_item_call label="関心リスト：フルアップデート" name="Interest List: Full Update"/>
+			<menu_item_check label="レコード状況をファイルに保存" name="Stats Recorder File"/>
+			<menu_item_check label="関心リスト：３６０モード" name="Interest List: 360 Mode"/>
+			<menu_item_call label="関心リストをリセット" name="Reset Interest Lists"/>
 		</menu>
 		<menu label="ＵＩ" name="UI">
 			<menu_item_call label="メディアブラウザ" name="Media Browser"/>
@@ -592,8 +597,8 @@
 				<menu_item_check label="選択アバター許可" name="Allow Select Avatar"/>
 			</menu>
 			<menu label="アニメーションの速度" name="Animation Speed">
-				<menu_item_call label="すべてのアニメーションを10%速く" name="All Animations 10 Faster"/>
-				<menu_item_call label="すべてのアニメーションを10%遅く" name="All Animations 10 Slower"/>
+				<menu_item_call label="すべてのアニメーションを１０％速く" name="All Animations 10 Faster"/>
+				<menu_item_call label="すべてのアニメーションを１０％遅く" name="All Animations 10 Slower"/>
 				<menu_item_call label="すべてのアニメーションの速度をリセット" name="Reset All Animation Speed"/>
 				<menu_item_check label="アニメーションをスローモーション" name="Slow Motion Animations"/>
 			</menu>
@@ -602,7 +607,7 @@
 			<menu_item_check label="見ているものを表示する" name="Show Look At"/>
 			<menu_item_check label="クリックした場所を表示する" name="Show Point At"/>
 			<menu_item_check label="結合部のアップデートのデバッグ" name="Debug Joint Updates"/>
-			<menu_item_check label="被写体深度（ＬｏＤ）を無効にする" name="Disable LOD"/>
+			<menu_item_check label="ＬｏＤを無効にする" name="Disable LOD"/>
 			<menu_item_check label="キャラクターVisのデバッグ" name="Debug Character Vis"/>
 			<menu_item_check label="スケルトンの衝突判定を表示する" name="Show Collision Skeleton"/>
 			<menu_item_check label="ボーンを表示" name="Show Bones"/>
@@ -674,7 +679,7 @@
 			<menu_item_call label="すべての服装" name="All Clothes"/>
 		</menu>
 		<menu label="ヘルプ" name="DeprecatedHelp">
-			<menu_item_call label="リンデン公式ブログ" name="Official Linden Blog"/>
+			<menu_item_call label="Linden公式ブログ" name="Official Linden Blog"/>
 			<menu_item_call label="スクリプトポータル" name="Scripting Portal"/>
 			<menu label="バグ報告" name="Bug Reporting">
 				<menu_item_call label="パブリック問題トラッカー" name="Public Issue Tracker"/>

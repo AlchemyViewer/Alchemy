@@ -296,22 +296,22 @@
 	<notification name="EjectGroupMemberWarning">[AVATAR_NAME]をグループから追放しようとしています。
 		<tag>group</tag>
 		<tag>confirm</tag>
-		<usetemplate ignoretext="グループからの参加者の追放を確認します" name="okcancelignore" notext="キャンセル" yestext="追放"/>
+		<usetemplate ignoretext="グループからの参加者の追放を確認します" name="okcancelignore" notext="キャンセル" yestext="追放する"/>
 	</notification>
 	<notification name="EjectGroupMembersWarning">[COUNT]名のメンバーをグループから追放しようとしています。
 		<tag>group</tag>
 		<tag>confirm</tag>
-		<usetemplate ignoretext="グループからの複数のメンバーの追放を確認します" name="okcancelignore" notext="キャンセル" yestext="追放"/>
+		<usetemplate ignoretext="グループからの複数のメンバーの追放を確認します" name="okcancelignore" notext="キャンセル" yestext="追放する"/>
 	</notification>
 	<notification name="BanGroupMemberWarning">[AVATAR_NAME]をグループから追放しようとしています。
 		<tag>group</tag>
 		<tag>confirm</tag>
-		<usetemplate ignoretext="グループからの参加者の追放を確認します" name="okcancelignore" notext="キャンセル" yestext="禁止"/>
+		<usetemplate ignoretext="グループからの参加者の追放を確認します" name="okcancelignore" notext="キャンセル" yestext="バンする"/>
 	</notification>
 	<notification name="BanGroupMembersWarning">[COUNT]名のメンバーをグループから追放しようとしています。
 		<tag>group</tag>
 		<tag>confirm</tag>
-		<usetemplate ignoretext="グループからの複数のメンバーの追放を確認します" name="okcancelignore" notext="キャンセル" yestext="禁止"/>
+		<usetemplate ignoretext="グループからの複数のメンバーの追放を確認します" name="okcancelignore" notext="キャンセル" yestext="バンする"/>
 	</notification>
 	<notification name="GroupBanUserOnBanlist">一部の住人がグループから追放されたため、招待状が送られませんでした。</notification>
 	<notification name="AttachmentDrop">装着物を下に置こうとしています。
@@ -323,13 +323,13 @@
 		<tag>confirm</tag>
 		<tag>funds</tag>
 		<tag>group</tag>
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="参加"/>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="参加します"/>
 	</notification>
 	<notification name="JoinGroupNoCost">「&lt;nolink&gt;[NAME]&lt;/nolink&gt;」というグループに入ろうとしています。
 このまま続けてもよろしいですか？
 		<tag>group</tag>
 		<tag>confirm</tag>
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="参加"/>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="参加します"/>
 	</notification>
 	<notification name="JoinGroupCannotAfford">このグループに加入するには、L$ [COST]必要です。
 L$が不足しているので、このグループに参加することができません。
@@ -342,7 +342,7 @@ L$が不足しているので、このグループに参加することができ
 ４８時間以内にメンバーを勧誘し、入会してもらってください。
 		<tag>group</tag>
 		<tag>funds</tag>
-		<usetemplate canceltext="キャンセル" name="okcancelbuttons" notext="キャンセル" yestext="L$100 でグループを作成"/>
+		<usetemplate canceltext="キャンセル" name="okcancelbuttons" notext="キャンセル" yestext="L$ 100でグループを作成"/>
 	</notification>
 	<notification name="JoinGroupInaccessible">あなたはグループに参加することはできません。
 		<tag>group_id</tag>
@@ -984,7 +984,7 @@ L$が不足しているので、このグループに参加することができ
 		<tag>confirm</tag>
 		<form name="form">
 			<input name="message" type="text">
-      </input>
+			</input>
 			<button default="true" index="0" name="ＯＫ" text="ＯＫ"/>
 			<button index="1" name="Cancel" text="キャンセル"/>
 		</form>
@@ -2207,7 +2207,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 いずれかの不動産のマネージャーリストが満杯になっています。
 		<tag>fail</tag>
 	</notification>
-	<notification name="ProblemAddingEstateBanManager">不動産所有者または管理者を禁止リストに追加できません。
+	<notification name="ProblemAddingEstateBanManager">不動産所有者または管理者をバンリストに追加できません。
 		<tag>fail</tag>
 	</notification>
 	<notification name="ProblemAddingEstateGeneric">不動産リストの追加に関する問題：
@@ -3258,7 +3258,7 @@ Your L$ balance is shown in the upper-right.
 		<tag>fail</tag>
 		<tag>group</tag>
 	</notification>
-	<notification name="Cannot enter parcel: banned">立入禁止されているため、この区画に入ることができません。
+	<notification name="Cannot enter parcel: banned">バンラインが設定されている（立入禁止になっている）いるため、この区画に入ることができません。
 		<tag>fail</tag>
 	</notification>
 	<notification name="Cannot enter parcel: not on access list">アクセスリストに含まれていないため、この区画に入ることができません。

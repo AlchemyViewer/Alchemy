@@ -45,7 +45,7 @@
 		<!-- ================================ BANNED tab ============================ -->
 		<panel label="バン" name="banned_panel">
 			<panel label="top_panel" name="banned_search_panel">
-				<filter_editor label="禁止されたエージェントを検索" name="banned_search_input"/>
+				<filter_editor label="バンされたエージェントを検索" name="banned_search_input"/>
 				<button label="コピー" name="copy_banned_list_btn"/>
 			</panel>
 			<text name="ban_resident_label">常にバン：</text>

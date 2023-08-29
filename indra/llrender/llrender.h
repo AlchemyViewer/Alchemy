@@ -144,12 +144,6 @@ public:
 		TBS_ONE_MINUS_CONST_ALPHA
 	} eTextureBlendSrc;
 
-    typedef enum
-    {
-        TCS_LINEAR = 0,
-        TCS_SRGB
-    } eTextureColorSpace;
-
 	LLTexUnit(S32 index = -1);
 
 	// Refreshes renderer state of the texture unit to the cached values
@@ -222,17 +216,12 @@ public:
 
 	void setHasMipMaps(bool hasMips) { mHasMipMaps = hasMips; }
 
-    void setTextureColorSpace(eTextureColorSpace space);
-
-    eTextureColorSpace getCurrColorSpace() { return mTexColorSpace; }
-
 protected:
     friend class LLRender;
 
 	S32		        	mIndex;
 	U32					mCurrTexture;
 	eTextureType		mCurrTexType;
-    eTextureColorSpace  mTexColorSpace;
 	S32					mCurrColorScale;
 	S32					mCurrAlphaScale;
 	bool				mHasMipMaps;

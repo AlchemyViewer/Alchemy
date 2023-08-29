@@ -43,12 +43,12 @@
 			<text name="wait_label">しばらくお待ち下さい。</text>
 			<layout_stack name="ao_reload_indicator_layout_stack">
 				<layout_panel name="ao_reload_indicator_left_layout_panel">
-        </layout_panel>
+				</layout_panel>
 				<layout_panel name="ao_reload_indicator_layout_panel">
 					<loading_indicator name="ao_reload_indicator"/>
 				</layout_panel>
 				<layout_panel name="ao_reload_indicator_right_layout_panel">
-        </layout_panel>
+				</layout_panel>
 			</layout_stack>
 		</panel>
 	</panel>

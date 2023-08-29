@@ -4,8 +4,8 @@
 	<menu_item_separator/>
 	<!--
 	<menu label="プロフィール画像をアップロード" name="upload_image_menu">
-			<menu_item_call label="セカンドライフ…" name="upload_second_life"/>
-			<menu_item_call label="ファーストライフ…" name="upload_first_life"/>
+		<menu_item_call label="セカンドライフ…" name="upload_second_life"/>
+		<menu_item_call label="ファーストライフ…" name="upload_first_life"/>
 	</menu>
 	-->
 	<menu_item_call label="共有…" name="share"/>

@@ -24,7 +24,7 @@
 			<item label="アクションなし" name="NoAction" value="noaction"/>
 		</combo_box>
 		<check_box label="サウンド再生" name="play_sound_friend_im">
-    </check_box>
+		</check_box>
 		<text name="non_friend_ims">フレンドでない人からのＩＭ：</text>
 		<combo_box name="NonFriendIMOptions">
 			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>
@@ -57,7 +57,7 @@
 			<item label="アクションなし" name="NoAction" value="noaction"/>
 		</combo_box>
 		<check_box label="サウンド再生" name="play_sound_nearby_chat_im">
-    </check_box>
+		</check_box>
 		<text name="object_ims">オブジェクトのＩＭ：</text>
 		<combo_box name="ObjectIMOptions">
 			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>

@@ -371,7 +371,7 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
 		if (!objectp)
 		{
 			LL_INFOS() << "createObject failure for object: " << fullid << LL_ENDL;
-			recorder.objectUpdateFailure(entry->getLocalID(), OUT_FULL_CACHED, 0);
+			recorder.objectUpdateFailure();
 			return NULL;
 		}
 		justCreated = true;
@@ -395,7 +395,6 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
 		objectp->setLastUpdateType(OUT_FULL_COMPRESSED); //newly cached
 		objectp->setLastUpdateCached(TRUE);
 	}
-	recorder.log(0.2f);
 	LLVOAvatar::cullAvatarsByPixelArea();
 
 	return objectp;
@@ -474,18 +473,14 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 
 	for (i = 0; i < num_objects; i++)
 	{
-		// timer is unused?
-		LLTimer update_timer;
 		BOOL justCreated = FALSE;
-		S32	msg_size = 0;
 		bool update_cache = false; //update object cache if it is a full-update or terse update
 
 		if (compressed)
 		{
-			S32							uncompressed_length = 2048;
 			compressed_dp.reset();
 
-			uncompressed_length = mesgsys->getSizeFast(_PREHASH_ObjectData, i, _PREHASH_Data);
+			S32 uncompressed_length = mesgsys->getSizeFast(_PREHASH_ObjectData, i, _PREHASH_Data);
 #ifdef SHOW_DEBUG
 			LL_DEBUGS("ObjectUpdate") << "got binary data from message to compressed_dpbuffer" << LL_ENDL;
 #endif
@@ -509,7 +504,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 						<< " Flags: " << flags
 						<< " Region: " << regionp->getName()
 						<< " Region id: " << regionp->getRegionID() << LL_ENDL;
-					recorder.objectUpdateFailure(local_id, update_type, msg_size);
+					recorder.objectUpdateFailure();
 					continue;
 				}
 				else if ((flags & FLAGS_TEMPORARY_ON_REZ) == 0)
@@ -539,7 +534,6 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 		else if (update_type != OUT_FULL) // !compressed, !OUT_FULL ==> OUT_FULL_CACHED only?
 		{
 			mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, local_id, i);
-			msg_size += sizeof(U32);
 
 			getUUIDFromLocal(fullid,
 							local_id,
@@ -562,8 +556,6 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 			update_cache = true;
 			mesgsys->getUUIDFast(_PREHASH_ObjectData, _PREHASH_FullID, fullid, i);
 			mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, local_id, i);
-			msg_size += sizeof(LLUUID);
-			msg_size += sizeof(U32);
 #ifdef SHOW_DEBUG
 			LL_DEBUGS("ObjectUpdate") << "Full Update, obj " << local_id << ", global ID " << fullid << " from " << mesgsys->getSender() << LL_ENDL;
 #endif
@@ -628,7 +620,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 				if (update_type == OUT_TERSE_IMPROVED)
 				{
 					// LL_INFOS() << "terse update for an unknown object (compressed):" << fullid << LL_ENDL;
-					recorder.objectUpdateFailure(local_id, update_type, msg_size);
+					recorder.objectUpdateFailure();
 					continue;
 				}
 			}
@@ -637,12 +629,11 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 				if (update_type != OUT_FULL)
 				{
 					//LL_INFOS() << "terse update for an unknown object:" << fullid << LL_ENDL;
-					recorder.objectUpdateFailure(local_id, update_type, msg_size);
+					recorder.objectUpdateFailure();
 					continue;
 				}
 
 				mesgsys->getU8Fast(_PREHASH_ObjectData, _PREHASH_PCode, pcode, i);
-				msg_size += sizeof(U8);
 
 			}
 #ifdef IGNORE_DEAD
@@ -650,7 +641,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 			{
 				mNumDeadObjectUpdates++;
 				//LL_INFOS() << "update for a dead object:" << fullid << LL_ENDL;
-				recorder.objectUpdateFailure(local_id, update_type, msg_size);
+				recorder.objectUpdateFailure();
 				continue;
 			}
 #endif
@@ -665,7 +656,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 			if (!objectp)
 			{
 				LL_INFOS() << "createObject failure for object: " << fullid << LL_ENDL;
-				recorder.objectUpdateFailure(local_id, update_type, msg_size);
+				recorder.objectUpdateFailure();
 				continue;
 			}
 
@@ -695,11 +686,11 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 			
 				if(!(flags & FLAGS_TEMPORARY_ON_REZ))
 				{
-				bCached = true;
+					bCached = true;
 					LLViewerRegion::eCacheUpdateResult result = objectp->mRegionp->cacheFullUpdate(objectp, compressed_dp, flags);
-				recorder.cacheFullUpdate(local_id, update_type, result, objectp, msg_size);
+					recorder.cacheFullUpdate(result);
+				}
 			}
-		}
 #endif
 		}
 		else
@@ -710,11 +701,9 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 			}
 			processUpdateCore(objectp, user_data, i, update_type, NULL, justCreated);
 		}
-		recorder.objectUpdateEvent(local_id, update_type, objectp, msg_size);
+		recorder.objectUpdateEvent(update_type);
 		objectp->setLastUpdateType(update_type);
 	}
-
-	recorder.log(0.2f);
 
 	LLVOAvatar::cullAvatarsByPixelArea();
 }
@@ -748,14 +737,12 @@ void LLViewerObjectList::processCachedObjectUpdate(LLMessageSystem *mesgsys,
 
 	for (S32 i = 0; i < num_objects; i++)
 	{
-		S32	msg_size = 0;
 		U32 id;
 		U32 crc;
 		U32 flags;
 		mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, id, i);
 		mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_CRC, crc, i);
 		mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_UpdateFlags, flags, i);
-		msg_size += sizeof(U32) * 2;
 
 #ifdef SHOW_DEBUG
         LL_DEBUGS("ObjectUpdate") << "got probe for id " << id << " crc " << crc << LL_ENDL;
@@ -764,16 +751,16 @@ void LLViewerObjectList::processCachedObjectUpdate(LLMessageSystem *mesgsys,
 
 		// Lookup data packer and add this id to cache miss lists if necessary.
 		U8 cache_miss_type = LLViewerRegion::CACHE_MISS_TYPE_NONE;
-		if(!regionp->probeCache(id, crc, flags, cache_miss_type))
-		{
-			// Cache Miss.
+        if (regionp->probeCache(id, crc, flags, cache_miss_type))
+		{	// Cache Hit
+            recorder.cacheHitEvent();
+		}
+        else
+		{	// Cache Miss
 #ifdef SHOW_DEBUG
             LL_DEBUGS("ObjectUpdate") << "cache miss for id " << id << " crc " << crc << " miss type " << (S32) cache_miss_type << LL_ENDL;
 #endif
-
-			recorder.cacheMissEvent(id, update_type, cache_miss_type, msg_size);
-
-			continue; // no data packer, skip this object
+            recorder.cacheMissEvent(cache_miss_type);
 		}
 	}
 

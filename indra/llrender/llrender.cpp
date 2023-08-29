@@ -122,7 +122,7 @@ static const GLenum sGLBlendFactor[] =
 
 LLTexUnit::LLTexUnit(S32 index)
 	: mCurrTexType(TT_NONE),
-    mCurrColorScale(1), mCurrAlphaScale(1), mCurrTexture(0), mTexColorSpace(TCS_SRGB),
+    mCurrColorScale(1), mCurrAlphaScale(1), mCurrTexture(0),
 	mHasMipMaps(false),
 	mIndex(index)
 {
@@ -152,8 +152,6 @@ void LLTexUnit::refreshState(void)
 	{
 		glBindTexture(GL_TEXTURE_2D, 0);	
 	}
-
-    setTextureColorSpace(mTexColorSpace);
 }
 
 void LLTexUnit::activate(void)
@@ -248,7 +246,6 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 						setTextureAddressMode(gl_tex->mAddressMode);
 						setTextureFilteringOption(gl_tex->mFilterOption);
                     }
-                    setTextureColorSpace(mTexColorSpace);
 				}
 			}
 			else
@@ -329,7 +326,6 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
 			setTextureFilteringOption(texture->mFilterOption);
 			stop_glerror();
 		}
-        setTextureColorSpace(mTexColorSpace);
 	}
 
 	stop_glerror();
@@ -365,7 +361,6 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap)
 				setTextureAddressMode(cubeMap->mImages[0]->mAddressMode);
 				setTextureFilteringOption(cubeMap->mImages[0]->mFilterOption);
             }
-            setTextureColorSpace(mTexColorSpace);
 			return true;
 		}
 		else
@@ -414,7 +409,6 @@ bool LLTexUnit::bindManual(eTextureType type, U32 texture, bool hasMips)
 		mCurrTexture = texture;
 		glBindTexture(sGLTextureType[type], texture);
         mHasMipMaps = hasMips;
-        setTextureColorSpace(mTexColorSpace);
 	}
 	return true;
 }
@@ -435,8 +429,6 @@ void LLTexUnit::unbind(eTextureType type)
 	{
 		mCurrTexture = 0;
 
-        // Always make sure our texture color space is reset to linear.  SRGB sampling should be opt-in in the vast majority of cases.  Also prevents color space "popping".
-        mTexColorSpace = TCS_SRGB;
 		if (type == LLTexUnit::TT_TEXTURE)
 		{
 			glBindTexture(sGLTextureType[type], sWhiteTexture);
@@ -458,8 +450,6 @@ void LLTexUnit::unbindFast(eTextureType type)
     {
         mCurrTexture = 0;
 
-        // Always make sure our texture color space is reset to linear.  SRGB sampling should be opt-in in the vast majority of cases.  Also prevents color space "popping".
-        mTexColorSpace = TCS_LINEAR;
         if (type == LLTexUnit::TT_TEXTURE)
         {
             glBindTexture(sGLTextureType[type], sWhiteTexture);
@@ -652,11 +642,6 @@ void LLTexUnit::debugTextureUnit(void)
 		U32 set_unit = (activeTexture - GL_TEXTURE0);
 		LL_WARNS() << "Incorrect Texture Unit!  Expected: " << set_unit << " Actual: " << mIndex << LL_ENDL;
 	}
-}
-
-void LLTexUnit::setTextureColorSpace(eTextureColorSpace space)
-{
-    mTexColorSpace = space;
 }
 
 LLLightState::LLLightState(S32 index)
