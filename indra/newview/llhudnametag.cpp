@@ -346,7 +346,7 @@ void LLHUDNameTag::renderText(BOOL for_select)
 
 			LLColor4 label_color(0.f, 0.f, 0.f, 1.f);
 			label_color.mV[VALPHA] = alpha_factor;
-			hud_render_text(segment_iter->getText(), render_position, *fontp, segment_iter->mStyle, LLFontGL::NO_SHADOW, x_offset, y_offset, label_color, FALSE);
+			hud_render_text(segment_iter->getText(), render_position, *fontp, segment_iter->mStyle, LLFontGL::DROP_SHADOW, x_offset, y_offset, label_color, FALSE);
 		}
 	}
 
