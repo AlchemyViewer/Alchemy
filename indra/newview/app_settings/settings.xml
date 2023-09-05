@@ -17935,16 +17935,5 @@
     <key>Value</key>
     <integer>0</integer>
   </map>
-  <key>ClickingAvatarKeepsCamera</key>
-  <map>
-    <key>Comment</key>
-    <string>This option allows you to orbit your camera without your avatar rotating when clicking on it or your nametag.</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
 </map>
 </llsd>
