@@ -1,36 +1,36 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel name="panel_login" focus_root="true">
-	<panel.string name="forgot_password_url">
-		https://secondlife.com/my/account/request.php?lang=ja-JP
-	</panel.string>
-	<panel.string name="sign_up_url">
-		https://join.secondlife.com/?lang=ja
-	</panel.string>
-	<layout_stack name="ui_stack">
-		<layout_panel name="ui_elastic_pad_left"/>
-		<layout_panel name="ui_container">
-			<icon name="sl_logo_small"/>
-			<combo_box label="Username" tool_tip="登録時に自分で選んだユーザー名（例：bobsmith12、Steller Sunshineなど）" name="username_combo">
-				<combo_box.combo_editor/>
-			</combo_box>
-			<line_editor name="password_edit" label="パスワード"/>
-			<combo_box label="お気に入りの場所" name="start_location_combo">
+<panel name="panel_login">
+	<!-- *NOTE: Custom resize logic for login_html in llpanellogin.cpp -->
+	<web_browser name="login_html" start_url=""/>
+	<layout_stack name="login_widgets">
+		<layout_panel name="login">
+			<text name="log_in_text">ログイン</text>
+			<text name="username_text">ユーザ名：</text>
+			<combo_box tool_tip="登録時に自分で選んだユーザー名（例：bobsmith12、Steller Sunshineなど）を入力します。" name="username_combo"/>
+			<text name="password_text">パスワード：</text>
+			<!-- STEAM-14: Turn off commit_on_focus_lost so if user presses Enter
+			with focus in this line_editor, we can use commit action to
+			initiate login -->
+			<line_editor name="password_edit"/>
+		</layout_panel>
+		<layout_panel name="start_location_panel">
+			<text name="start_location_text">開始位置：</text>
+			<combo_box name="start_location_combo">
 				<combo_box.combo_editor/>
 				<combo_box.item label="最後にいた場所" name="MyLastLocation" value="last"/>
 				<combo_box.item label="ホーム" name="MyHome" value="home"/>
 			</combo_box>
-			<button label="ログイン" name="connect_btn"/>
-			<text name="sign_up_text">
-				サインアップ
-			</text>
-			<check_box label="名前を記録" name="remember_name" tool_tip="すでに記憶されているユーザーは、「私」＞「初期設定」＞「詳細設定」＞「記憶されたユーザー名」から削除できます。"/>
-			<check_box label="パスワードを記録" name="remember_password"/>
-			<combo_box label="Select grid" name="server_combo"/>
-			<text name="forgot_password_text">
-				パスワードに関するヘルプ
-			</text>
 		</layout_panel>
-		<layout_panel name="ui_elastic_pad_right"/>
+		<layout_panel name="grid_panel">
+			<text name="grid_login_text">ログイン先のグリッド：</text>
+			<combo_box name="server_combo"/>
+		</layout_panel>
+		<layout_panel name="links_login_panel">
+			<text name="sign_up_text">アカウントを作成</text>
+			<text name="forgot_password_text">ユーザ名かパスワードを忘れましたか？</text>
+			<button label="ログイン" name="connect_btn"/>
+			<check_box label="ユーザ名を保存" name="remember_name"/>
+			<check_box label="パスワードを保存" name="remember_password"/>
+		</layout_panel>
 	</layout_stack>
-	<web_browser name="login_html"/>
 </panel>

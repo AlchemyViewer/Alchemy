@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="panel_profile" label="プロフィール">
+	<!--
+  Date from server comes already converted to stl timezone,
+  so display it as an UTC+0
+  -->
 	<string name="date_format" value="ＳＬでの誕生日：[year,datetime,utc]年[mth,datetime,utc]月[day,datetime,utc]日"/>
 	<string name="age_format" value="[AGE]経過"/>
 	<string name="partner_text" value="パートナー：[LINK]"/>
-	<string name="CaptionTextAcctInfo">
-		アカウント：[ACCTTYPE]
-[PAYMENTINFO]
-	</string>
+	<string name="CaptionTextAcctInfo">アカウント：[ACCTTYPE]
+[PAYMENTINFO]</string>
+	<!--Badges-->
 	<string name="BadgeBeta" value="オリジナルβテスター"/>
 	<string name="BadgeBetaLifetime" value="β会員"/>
 	<string name="BadgeLifetime" value="会員"/>
@@ -49,6 +52,7 @@
 			<loading_indicator name="progress_indicator"/>
 		</layout_panel>
 		<layout_panel name="settings_panel">
+			<!-- only for self -->
 			<text name="search_label" value="自分のプロフィールを検索結果に反映："/>
 			<combo_box name="show_in_search" tool_tip="検索結果から、あなたを見つけてもらいましょう。">
 				<combo_box.item name="Hide" label="表示しない" value="0"/>

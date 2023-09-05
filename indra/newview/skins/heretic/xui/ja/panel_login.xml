@@ -1,39 +1,37 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="panel_login">
-  <!-- *NOTE: Custom resize logic for login_html in llpanellogin.cpp -->
-  <web_browser name="login_html" />
-  <layout_stack name="login_widgets">
-    <layout_panel name="login">
-      <text name="log_in_text">ログイン</text>
-      <text name="username_text">ユーザ名：</text>
-      <combo_box tool_tip="登録時に自分で選んだユーザー名（例：bobsmith12、Steller Sunshineなど）" name="username_combo" />
-
-      <text name="password_text">パスワード：</text>
-      <!-- STEAM-14: Turn off commit_on_focus_lost so if user presses Enter
-           with focus in this line_editor, we can use commit action to
-           initiate login -->
-      <line_editor name="password_edit" />
-    </layout_panel>
-    <layout_panel name="start_location_panel">
-      <text name="start_location_text">開始位置：</text>
-      <combo_box name="start_location_combo">
-        <combo_box.item label="最後にいた場所" name="MyLastLocation" value="last" />
-        <combo_box.item label="ホーム" name="MyHome" value="home" />
-      </combo_box>
-    </layout_panel>
-    <layout_panel name="grid_panel">
-      <text name="grid_login_text">ログインするグリッド：</text>
-      <combo_box name="server_combo" />
-
-    </layout_panel>
-    <layout_panel name="links_login_panel">
-      <text name="sign_up_text">アカウント作成</text>
-      <text name="forgot_password_text">パスワードを忘れましたか？
-      </text>
-      <button label="ログイン" name="connect_btn" />
-      <check_box label="ユーザ名を記録" name="remember_name" />
-      <check_box label="パスワードを記録" name="remember_password" />
-    </layout_panel>
-    <layout_panel name="heretic_panel" />
-  </layout_stack>
+	<!-- *NOTE: Custom resize logic for login_html in llpanellogin.cpp -->
+	<web_browser name="login_html" />
+	<layout_stack name="login_widgets">
+		<layout_panel name="login">
+			<text name="log_in_text">ログイン</text>
+			<text name="username_text">ユーザ名：</text>
+			<combo_box tool_tip="登録時に自分で選んだユーザー名（例：bobsmith12、Steller Sunshineなど）" name="username_combo" />
+			<text name="password_text">パスワード：</text>
+			<!-- STEAM-14: Turn off commit_on_focus_lost so if user presses Enter
+			with focus in this line_editor, we can use commit action to
+			initiate login -->
+			<line_editor name="password_edit" />
+		</layout_panel>
+		<layout_panel name="start_location_panel">
+			<text name="start_location_text">開始位置：</text>
+			<combo_box name="start_location_combo">
+				<combo_box.item label="最後にいた場所" name="MyLastLocation" value="last" />
+				<combo_box.item label="ホーム" name="MyHome" value="home" />
+			</combo_box>
+		</layout_panel>
+		<layout_panel name="grid_panel">
+			<text name="grid_login_text">ログインするグリッド：</text>
+			<combo_box name="server_combo" />
+		</layout_panel>
+		<layout_panel name="links_login_panel">
+			<text name="sign_up_text">アカウント作成</text>
+			<text name="forgot_password_text">パスワードを忘れましたか？
+			</text>
+			<button label="ログイン" name="connect_btn" />
+			<check_box label="ユーザ名を記録" name="remember_name" />
+			<check_box label="パスワードを記録" name="remember_password" />
+		</layout_panel>
+		<layout_panel name="heretic_panel" />
+	</layout_stack>
 </panel>

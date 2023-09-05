@@ -1,13 +1,9 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="グリッド" name="grids">
-	<text name="add_grid_text">
-		新しいグリッドを追加：
-	</text>
+	<text name="add_grid_text">新しいグリッドを追加：</text>
 	<line_editor name="add_grid" label="ログインURIを入力"/>
 	<button label="追加" name="add_grid_commit"/>
-	<text name="manage_grid_text">
-		グリッド管理：
-	</text>
+	<text name="manage_grid_text">グリッド管理：</text>
 	<scroll_list name="grid_list">
 		<scroll_list.columns label="グリッド名" name="grid_label"/>
 		<scroll_list.columns label="ログインURI" name="login_uri"/>

@@ -6,18 +6,11 @@
 	<string name="not_available" value="（該当なし）"/>
 	<string name="unknown" value="（不明）"/>
 	<string name="public" value="（公開）"/>
-	<string name="server_update_text">
-		場所の情報はサーバーがアップデートされるまでご利用いただけません。
-	</string>
-	<string name="server_error_text">
-		この位置の情報は現在ご利用いただけません。あとでもう一度お試しください。
-	</string>
-	<string name="server_forbidden_text">
-		この位置の情報は、アクセス制限のためご利用いただけません。許可については区画所有者にお問い合わせください。
-	</string>
-	<string name="acquired_date">
-		[year,datetime,local]年[mth,datetime,local]月[day,datetime,local]日（[wkday,datetime,local]）　[hour,datetime,local]：[min,datetime,local]：[second,datetime,local]
-	</string>
+	<string name="server_update_text">場所の情報はサーバーがアップデートされるまでご利用いただけません。</string>
+	<string name="server_error_text">この位置の情報は現在ご利用いただけません。あとでもう一度お試しください。</string>
+	<string name="server_forbidden_text">この位置の情報は、アクセス制限のためご利用いただけません。許可については区画所有者にお問い合わせください。</string>
+	<string name="acquired_date">[year,datetime,local]年[mth,datetime,local]月[day,datetime,local]日（[wkday,datetime,local]）[hour,datetime,local]：[min,datetime,local]：[second,datetime,local]</string>
+	<string name="information_text">トラフィック：[TRAFFIC] 面積：[AREA]㎡</string>
 	<string name="icon_PG" value="Parcel_PG_Dark"/>
 	<string name="icon_M" value="Parcel_M_Dark"/>
 	<string name="icon_R" value="Parcel_R_Dark"/>
@@ -26,10 +19,9 @@
 	<scroll_container name="place_scroll">
 		<panel name="scrolling_panel">
 			<texture_picker name="logo"/>
-			<text name="parcel_title" value="SampleParcel, Name Long"/>
-			<text name="region_title">
-				リージョン（地域）：[REGIONAMEPOS]
-			</text>
+			<!-- texture picker has an empty label section, compensate for it with negative top_pad-->
+			<text name="parcel_title" value="とても長い名前のサンプル区画"/>
+			<text name="region_title">リージョン：[REGIONAMEPOS]</text>
 			<text name="parcel_owner_label" value="所有者："/>
 			<text name="parcel_owner" value="一時的な所有者"/>
 			<expandable_text name="description" value="Du waltz die spritz"/>
@@ -37,9 +29,7 @@
 			<text name="maturity_value" value="不明"/>
 			<panel name="landmark_info_panel">
 				<view_border name="lod_tab_border"/>
-				<text name="this_landmark">
-					ランドマーク：
-				</text>
+				<text name="this_landmark">ランドマーク：</text>
 				<text name="owner_label" value="所有者："/>
 				<text name="owner"/>
 				<text name="creator_label" value="作成者："/>

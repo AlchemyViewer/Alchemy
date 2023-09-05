@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="移動" name="move_panel">
-  <text name="mouse_lbl">マウス：</text>
-  <check_box label="マウスルック時に自分の体を表示" name="first_person_avatar_visible" />
-  <check_box label="リアルなマウスルック" name="AlchemyRealisticMouselook" tool_tip="マウスルック時にアバターの体の動きとアニメーションがカメラに反映されるされようにします。" />
-  <check_box label="マウスステアリングを無効化" name="disable_mouse_steering" tool_tip="アバターをクリックしたときに、カメラとアバターの位置がカメラから離れるようにリセットされるのを抑制します。" />
-  <text name=" Mouse Sensitivity">マウスルック時の敏感度：</text>
-  <slider name="mouse_sensitivity" />
-  <check_box label="反転" name="invert_mouse" />
-  <text name="Combat Features">戦闘時の機能：</text>
-  <check_box label="照準にユーザーを表示する" name="alchemy_mlook_iff" tool_tip="マウスルック時の照準にユーザーの名前と距離を表示します。" />
-  <check_box label="画面外のユーザーに矢印を表示" name="alchemy_mlook_iff_markers" tool_tip="画面外のユーザーのいる方角の画面端に矢印を表示します。" />
-  <slider name="iff_range_slider" />
-  <spinner label="" name="iff_range_spinner" />
+	<text name="mouse_lbl">マウス：</text>
+	<check_box label="マウスルック時に自分の体を表示" name="first_person_avatar_visible"/>
+	<check_box label="リアルなマウスルック" name="AlchemyRealisticMouselook" tool_tip="マウスルック時にアバターの体の動きとアニメーションがカメラに反映されるされようにします。"/>
+	<check_box label="マウスステアリングを無効化" name="disable_mouse_steering" tool_tip="アバターをクリックしたときに、カメラとアバターの位置がカメラから離れるようにリセットされるのを抑制します。"/>
+	<text name=" Mouse Sensitivity">マウスルック時の敏感度：</text>
+	<slider name="mouse_sensitivity"/>
+	<check_box label="反転" name="invert_mouse"/>
+	<text name="Combat Features">戦闘時の機能：</text>
+	<check_box label="照準にユーザーを表示する" name="alchemy_mlook_iff" tool_tip="マウスルック時の照準にユーザーの名前と距離を表示します。"/>
+	<check_box label="画面外のユーザーに矢印を表示" name="alchemy_mlook_iff_markers" tool_tip="画面外のユーザーのいる方角の画面端に矢印を表示します。"/>
+	<slider name="iff_range_slider"/>
+	<spinner label="" name="iff_range_spinner"/>
 </panel>

@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="presets_pulldown">
-	<text name="Graphic Presets">
-		グラフィックのプリセット
-	</text>
+	<text name="Graphic Presets">グラフィックのプリセット</text>
 	<scroll_list name="preset_list"/>
 	<view_border name="horiz_separator"/>
 	<button name="open_prefs_btn" label="グラフィック初期設定" tool_tip="グラフィック設定を呼び出します。"/>

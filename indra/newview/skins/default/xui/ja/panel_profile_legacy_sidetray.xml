@@ -1,57 +1,54 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="プロフィール" name="Avatar Profile">
-  <panel.string name="account_info_fmt">[ACCOUNT_TYPE]
+	<panel.string name="account_info_fmt">[ACCOUNT_TYPE]
 [PAYMENT_INFO]
 [AGE_VERIFIED]</panel.string>
-  <panel.string name="age_verified">年齢確認済み</panel.string>
-  <panel.string name="rezday_fmt">[REZDAY]（[AGE]）</panel.string>
-  <panel.string name="add_friend">フレンドに追加</panel.string>
-  <panel.string name="remove_friend">フレンドから削除</panel.string>
-  <panel name="avatar_info_top">
-    <button name="back" />
-    <text_editor name="avatar_name" value="（読み込んでいます…）" />
-    <loading_indicator name="progress_indicator" />
-  </panel>
-  <layout_stack name="layout">
-    <layout_panel name="avatar_accordions">
-      <accordion name="avatar_accordion">
-        <accordion_tab name="avatar_secondlife_tab" title="セカンドライフ">
-          <panel name="avatar_secondlife_tab_panel" />
-        </accordion_tab>
-        <accordion_tab name="avatar_groups_tab" title="グループ">
-          <panel name="avatar_groups_tab_panel" />
-        </accordion_tab>
-        <accordion_tab name="avatar_interest_tab" title="関心">
-          <panel name="avatar_interest_tab_panel" />
-        </accordion_tab>
-        <accordion_tab name="avatar_picks_tab" title="ピック">
-          <panel name="avatar_picks_tab_panel" />
-        </accordion_tab>
-        <accordion_tab name="avatar_firstlife_tab" title="ファーストライフ">
-          <panel name="avatar_firstlife_tab_panel" />
-        </accordion_tab>
-        <accordion_tab name="avatar_notes_tab" title="ノート">
-          <panel name="avatar_notes_tab_panel" />
-        </accordion_tab>
-      </accordion>
-    </layout_panel>
-  </layout_stack>
-
-  <layout_stack name="button_row_ls">
-    <layout_panel name="btn_chat_lp">
-      <button name="btn_chat" label="チャット" tool_tip="インスタントメッセージを送ります。" />
-
-    </layout_panel>
-    <layout_panel name="btn_friend_lp">
-      <button name="btn_friend" label="フレンドに追加" />
-
-    </layout_panel>
-    <layout_panel name="btn_block_lp">
-      <button name="btn_block" label="ブロック" tool_tip="このアバターをブロック" />
-    </layout_panel>
-    <layout_panel name="btn_menu_lp">
-      <menu_button tool_tip="このアバターへのアクション" name="btn_menu" />
-    </layout_panel>
-  </layout_stack>
-  <drop_target name="drop_target" />
+	<panel.string name="age_verified">年齢確認済み</panel.string>
+	<panel.string name="rezday_fmt">[REZDAY]（[AGE]）</panel.string>
+	<panel.string name="add_friend">フレンドに追加</panel.string>
+	<panel.string name="remove_friend">フレンドから削除</panel.string>
+	<panel name="avatar_info_top">
+		<button name="back"/>
+		<text_editor name="avatar_name" value="（読み込んでいます…）"/>
+		<loading_indicator name="progress_indicator"/>
+	</panel>
+	<layout_stack name="layout">
+		<layout_panel name="avatar_accordions">
+			<accordion name="avatar_accordion">
+				<accordion_tab name="avatar_secondlife_tab" title="セカンドライフ">
+					<panel name="avatar_secondlife_tab_panel"/>
+				</accordion_tab>
+				<accordion_tab name="avatar_groups_tab" title="グループ">
+					<panel name="avatar_groups_tab_panel"/>
+				</accordion_tab>
+				<accordion_tab name="avatar_interest_tab" title="関心">
+					<panel name="avatar_interest_tab_panel"/>
+				</accordion_tab>
+				<accordion_tab name="avatar_picks_tab" title="ピック">
+					<panel name="avatar_picks_tab_panel"/>
+				</accordion_tab>
+				<accordion_tab name="avatar_firstlife_tab" title="ファーストライフ">
+					<panel name="avatar_firstlife_tab_panel"/>
+				</accordion_tab>
+				<accordion_tab name="avatar_notes_tab" title="ノート">
+					<panel name="avatar_notes_tab_panel"/>
+				</accordion_tab>
+			</accordion>
+		</layout_panel>
+	</layout_stack>
+	<layout_stack name="button_row_ls">
+		<layout_panel name="btn_chat_lp">
+			<button name="btn_chat" label="チャット" tool_tip="インスタントメッセージを送ります。"/>
+		</layout_panel>
+		<layout_panel name="btn_friend_lp">
+			<button name="btn_friend" label="フレンドに追加"/>
+		</layout_panel>
+		<layout_panel name="btn_block_lp">
+			<button name="btn_block" label="ブロック" tool_tip="このアバターをブロックします。"/>
+		</layout_panel>
+		<layout_panel name="btn_menu_lp">
+			<menu_button tool_tip="このアバターへのアクションを表示します。" name="btn_menu"/>
+		</layout_panel>
+	</layout_stack>
+	<drop_target name="drop_target"/>
 </panel>
