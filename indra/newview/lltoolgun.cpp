@@ -223,7 +223,7 @@ void LLToolGun::draw()
 					LLFontGL::getFontSansSerifBold()->renderUTF8(
 						llformat("%s : %.2fm", targetName.c_str(), (targetPosition - myPosition).magVec()),
 						0, (windowWidth / 2.f) + userPresetX, (windowHeight / 2.f) + userPresetY, crosshair_color,
-						(LLFontGL::HAlign)((S32)userPresetHAlign), LLFontGL::TOP, LLFontGL::BOLD, LLFontGL::NO_SHADOW
+						(LLFontGL::HAlign)((S32)userPresetHAlign), LLFontGL::TOP, LLFontGL::BOLD, LLFontGL::DROP_SHADOW
 					);
 
 					if (!show_iff_markers)

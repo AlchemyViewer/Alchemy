@@ -197,7 +197,7 @@ void LLHUDText::renderText()
 			y_offset -= fontp->getLineHeight() - 1; // correction factor to match legacy font metrics
 
 			U8 style = segment_iter->mStyle;
-			LLFontGL::ShadowType shadow = LLFontGL::NO_SHADOW;
+			LLFontGL::ShadowType shadow = LLFontGL::DROP_SHADOW;
 	
 			F32 x_offset;
 			if (mTextAlignment== ALIGN_TEXT_CENTER)
