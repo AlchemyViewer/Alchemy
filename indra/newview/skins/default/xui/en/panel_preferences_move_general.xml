@@ -55,6 +55,18 @@
    show_text="false"
    width="240"
    top_pad="5"/>
+    <check_box
+      control_name="ClickingAvatarKeepsCamera"
+      follows="left|top"
+      height="25"
+      label="Clicking on your avatar does not rotate it."
+      tool_tip="This option allows you to orbit your camera without your avatar rotating when clicking on it or your nametag."
+      layout="topleft"
+      left_delta="0"
+      name="clicking_avatar_keeps_camera"
+      width="237"
+      top_pad="0"
+    />
   <text
   follows="left|top"
   type="string"
