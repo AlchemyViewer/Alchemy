@@ -27,6 +27,12 @@
 #ifndef LL_LLGLTFLoader_H
 #define LL_LLGLTFLoader_H
 
+#include <nlohmann/json.hpp>
+
+#ifndef TINYGLTF_NO_INCLUDE_JSON
+#define TINYGLTF_NO_INCLUDE_JSON 1
+#endif
+#undef STRICT
 #include "tinygltf/tiny_gltf.h"
 
 #include "llglheaders.h"
