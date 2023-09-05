@@ -99,7 +99,7 @@ public:
 	
 	viewer_media_t updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self);
 	LLViewerMediaImpl* getMediaImplFromTextureID(const LLUUID& texture_id);
-	std::string getCurrentUserAgent();
+	static std::string getCurrentUserAgent();
 	void updateBrowserUserAgent();
 	bool handleSkinCurrentChanged(const LLSD& /*newvalue*/);
 	bool textureHasMedia(const LLUUID& texture_id);

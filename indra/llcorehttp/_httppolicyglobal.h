@@ -70,6 +70,7 @@ public:
 	std::string			mCAPath;
 	std::string			mCAFile;
 	std::string			mHttpProxy;
+	std::string			mUserAgent;
 	long				mTrace;
 	long				mUseLLProxy;
 	HttpRequest::policyCallback_t	mSslCtxCallback;

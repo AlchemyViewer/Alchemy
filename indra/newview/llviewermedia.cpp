@@ -380,6 +380,7 @@ LLViewerMediaImpl* LLViewerMedia::getMediaImplFromTextureID(const LLUUID& textur
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
+// static
 std::string LLViewerMedia::getCurrentUserAgent()
 {
 	// Don't use user-visible string to avoid
@@ -1767,7 +1768,7 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 			media_source->enableMediaPluginDebugging( media_plugin_debugging_enabled  || clean_browser);
 
 			// need to set agent string here before instance created
-			media_source->setBrowserUserAgent(LLViewerMedia::getInstance()->getCurrentUserAgent());
+			media_source->setBrowserUserAgent(LLViewerMedia::getCurrentUserAgent());
 
             // configure and pass proxy setup based on debug settings that are 
             // configured by UI in prefs -> setup
@@ -1843,7 +1844,7 @@ bool LLViewerMediaImpl::initializePlugin(const std::string& media_type)
 		media_source->setDisableTimeout(gSavedSettings.getBOOL("DebugPluginDisableTimeout"));
 		media_source->setLoop(mMediaLoop);
 		media_source->setAutoScale(mMediaAutoScale);
-		media_source->setBrowserUserAgent(LLViewerMedia::getInstance()->getCurrentUserAgent());
+		media_source->setBrowserUserAgent(LLViewerMedia::getCurrentUserAgent());
 		media_source->focus(mHasFocus);
 		media_source->setBackgroundColor(mBackgroundColor);
 
