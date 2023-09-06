@@ -41,6 +41,8 @@
 #include "llcorehttputil.h"
 #include "httpstats.h"
 
+#include "llviewermedia.h"
+
 // Here is where we begin to get our connection usage under control.
 // This establishes llcorehttp policy classes that, among other
 // things, limit the maximum number of connections to outside
@@ -160,6 +162,16 @@ void LLAppCoreHttp::init()
 	{
 		LL_ERRS("Init") << "Failed to initialize HTTP services.  Reason:  " << status.toString()
 						<< LL_ENDL;
+	}
+
+	// Set user agent.
+	status = LLCore::HttpRequest::setStaticPolicyOption(LLCore::HttpRequest::PO_USER_AGENT,
+														LLCore::HttpRequest::GLOBAL_POLICY_ID,
+														LLViewerMedia::getCurrentUserAgent(), NULL);
+	if (! status)
+	{
+		LL_WARNS("Init") << "Failed to set user agent for HTTP services.  Reason:  " << status.toString()
+						 << LL_ENDL;
 	}
 
 	// Point to our certs or SSH/https: will fail on connect

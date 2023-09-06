@@ -231,6 +231,11 @@ public:
 		/// Global only
 		PO_SSL_VERIFY_CALLBACK,
 
+		/// String giving a user agent for app
+		///
+		/// Global only
+		PO_USER_AGENT,
+
 		PO_LAST  // Always at end
 	};
 

@@ -44,10 +44,16 @@
 #include "llvocache.h"
 #include "llworld.h"
 
-#include "tinygltf/tiny_gltf.h"
-
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
+
+#include <nlohmann/json.hpp>
+
+#ifndef TINYGLTF_NO_INCLUDE_JSON
+#define TINYGLTF_NO_INCLUDE_JSON 1
+#endif
+#undef STRICT
+#include "tinygltf/tiny_gltf.h"
 
 #include <unordered_set>
 

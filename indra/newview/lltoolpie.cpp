@@ -498,7 +498,9 @@ BOOL LLToolPie::handleLeftClickPick()
 		LLToolCamera::getInstance()->setMouseCapture(TRUE);
         LLToolCamera::getInstance()->setClickPickPending();
 		LLToolCamera::getInstance()->pickCallback(mPick);
-		gAgentCamera.setFocusOnAvatar(TRUE, TRUE);
+        if(!gSavedSettings.getBool("ClickingAvatarKeepsCamera")){
+            gAgentCamera.setFocusOnAvatar(TRUE, TRUE);
+		}
 
 		return TRUE;
 	}

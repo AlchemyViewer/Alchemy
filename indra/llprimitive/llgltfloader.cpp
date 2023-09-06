@@ -49,7 +49,7 @@
 #ifndef TINYGLTF_NO_INCLUDE_JSON
 #define TINYGLTF_NO_INCLUDE_JSON 1
 #endif
-
+#undef STRICT
 #include "tinygltf/tiny_gltf.h"
 
 

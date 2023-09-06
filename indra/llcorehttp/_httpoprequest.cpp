@@ -529,6 +529,11 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_COOKIEFILE, "");
 
+	if(!gpolicy.mUserAgent.empty())
+	{
+		check_curl_easy_setopt(mCurlHandle, CURLOPT_USERAGENT, gpolicy.mUserAgent.c_str());
+	}
+
 	if (gpolicy.mSslCtxCallback)
 	{
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_SSL_CTX_FUNCTION, curlSslCtxCallback);

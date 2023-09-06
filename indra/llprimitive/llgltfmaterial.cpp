@@ -29,6 +29,12 @@
 #include "llgltfmaterial.h"
 
 // NOTE -- this should be the one and only place tiny_gltf.h is included
+#include <nlohmann/json.hpp>
+
+#ifndef TINYGLTF_NO_INCLUDE_JSON
+#define TINYGLTF_NO_INCLUDE_JSON 1
+#endif
+#undef STRICT
 #include "tinygltf/tiny_gltf.h"
 
 const char* const LLGLTFMaterial::ASSET_VERSION = "1.1";
