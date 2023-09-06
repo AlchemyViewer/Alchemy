@@ -35,7 +35,8 @@
 #if ! defined(LL_VIEWER_CHANNEL)       \
  || ! defined(LL_VIEWER_VERSION_MAJOR) \
  || ! defined(LL_VIEWER_VERSION_MINOR) \
- || ! defined(LL_VIEWER_VERSION_PATCH)
+ || ! defined(LL_VIEWER_VERSION_PATCH) \
+ || ! defined(LL_VIEWER_VERSION_BUILD)
  #error "Channel or Version information is undefined"
 #endif
 
@@ -93,7 +94,7 @@ S32 LLVersionInfo::getPatch()
 
 S32 LLVersionInfo::getBuild()
 {
-	return 0;
+	return LL_VIEWER_VERSION_BUILD;
 }
 
 const std::string& LLVersionInfo::getVersion()
@@ -111,7 +112,7 @@ const std::string& LLVersionInfo::getChannelAndVersion()
 	if (mVersionChannel.empty())
 	{
 		// cache the version string
-		mVersionChannel = getChannel() + " " + getShortVersion();
+		mVersionChannel = getChannel() + " " + getVersion();
 	}
 
 	return mVersionChannel;

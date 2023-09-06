@@ -381,7 +381,7 @@ bool LLDir_Win32::fileExists(const std::string& filename) const
 
 /*virtual*/ std::string LLDir_Win32::getLLPluginLauncher()
 {
-	return gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() +
+	return gDirUtilp->getExecutableDir() + gDirUtilp->getDirDelimiter() +
 		"SLPlugin.exe";
 }
 

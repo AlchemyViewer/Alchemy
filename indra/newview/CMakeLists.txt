@@ -52,9 +52,6 @@ include(LLPrimitive)
 
 # Viewer Branding Assets
 use_prebuilt_binary(branding)
-if (WINDOWS)
-  use_prebuilt_binary(squirrel)
-endif()
 
 if( LLPHYSICSEXTENSIONS_SRC_DIR )
 if (NOT HAVOK_TPV)
@@ -1531,12 +1528,12 @@ source_group("CMake Rules" FILES ViewerInstall.cmake)
 #build_data.json creation moved to viewer_manifest.py MAINT-6413
 # the viewer_version.txt file created here is for passing to viewer_manifest and autobuild
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
-           "${VIEWER_SHORT_VERSION}\n")
+           "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n")
 
-if (WINDOWS)
-  LIST(APPEND viewer_SOURCE_FILES alsquirrelupdater.cpp)
-  LIST(APPEND viewer_HEADER_FILES alsquirrelupdater.h)
-endif (WINDOWS)
+# if (WINDOWS)
+#  LIST(APPEND viewer_SOURCE_FILES alsquirrelupdater.cpp)
+#  LIST(APPEND viewer_HEADER_FILES alsquirrelupdater.h)
+# endif (WINDOWS)
 
 if (DARWIN)
   LIST(APPEND viewer_SOURCE_FILES llappviewermacosx.cpp)
@@ -1638,8 +1635,8 @@ if (WINDOWS)
       )
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${LIBS_PREBUILT_DIR}/branding/installer/splash/${ICON_PATH}/install_splash.gif"
-        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
+        "${LIBS_PREBUILT_DIR}/branding/installer/icons/uninstall_icon.ico"
+        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/uninstall_icon.ico"
       )
 
     # Add resource files to the project.
@@ -1706,10 +1703,6 @@ if (WINDOWS)
                     ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
                     )
 
-    configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/viewer.nuspec
-                    ${CMAKE_CURRENT_BINARY_DIR}/viewer.nuspec
-                    )
-
     list(APPEND viewer_RESOURCE_FILES
     	windows.manifest
         ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
@@ -1759,7 +1752,6 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders PREFIX "Shade
 set_source_files_properties(${viewer_SHADER_FILES} 
                             PROPERTIES HEADER_FILE_ONLY TRUE)
 list(APPEND viewer_SOURCE_FILES ${viewer_SHADER_FILES})
-
 
 set(viewer_APPSETTINGS_FILES
     app_settings/anim.ini
@@ -1882,8 +1874,6 @@ if (WINDOWS)
         LINK_FLAGS_DEBUG "/NODEFAULTLIB:\"LIBCMT;LIBCMTD;MSVCRT\" /INCREMENTAL:NO /LARGEADDRESSAWARE"
         LINK_FLAGS_RELEASE "/OPT:REF /LARGEADDRESSAWARE"
         )
-
-    set_target_properties(${VIEWER_BINARY_NAME} PROPERTIES OUTPUT_NAME "${WIN_BINARY_NAME}")
 
     if(NOT LL_GENERATOR_IS_MULTI_CONFIG)
       set_target_properties(${VIEWER_BINARY_NAME} PROPERTIES
@@ -2017,12 +2007,6 @@ if (WINDOWS)
           ${CMAKE_CURRENT_SOURCE_DIR}/event_host_manifest.py
         )
 
-      if (ENABLE_DELTA_GEN)
-        set(DELTA_GEN_SETTING "--gendelta=ON")
-      else ()
-        set(DELTA_GEN_SETTING "")
-      endif ()
-
       add_custom_command(
         OUTPUT ${CMAKE_CFG_INTDIR}/touched.bat
         COMMAND ${Python3_EXECUTABLE}
@@ -2044,7 +2028,6 @@ if (WINDOWS)
               --touch=${CMAKE_CURRENT_BINARY_DIR}/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/touched.bat
               --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
               --updateurl=${VIEWER_UPDATE_SERVICE}
-              ${DELTA_GEN_SETTING}
         DEPENDS
             ${VIEWER_BINARY_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
@@ -2151,7 +2134,7 @@ set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
     "Path to artwork files.")
 
 if (LINUX)
-  set(product Alchemy-${ARCH}-${VIEWER_SHORT_VERSION})
+  set(product Alchemy-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
 
   # These are the generated targets that are copied to package/
   set(COPY_INPUT_DEPENDENCIES
@@ -2232,10 +2215,10 @@ if (DARWIN)
   set(MACOSX_BUNDLE_INFO_STRING "${VIEWER_CHANNEL}")
   set(MACOSX_BUNDLE_ICON_FILE "alchemy.icns")
   set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer")
-  set(MACOSX_BUNDLE_LONG_VERSION_STRING "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}")
+  set(MACOSX_BUNDLE_LONG_VERSION_STRING "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
   set(MACOSX_BUNDLE_BUNDLE_NAME "Alchemy")
-  set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}")
-  set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}")
+  set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
+  set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_VERSION_REVISION}")
   set(MACOSX_BUNDLE_COPYRIGHT "Copyright (C) 2013-2023 Alchemy Development Group")
   set(MACOSX_BUNDLE_NSMAIN_NIB_FILE "Alchemy.nib")
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
@@ -2384,7 +2367,7 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIE
           "-C"
           "${PARENT_DIRECTORY_CYGWIN}"
           "alchemy-bin.pdb"
-        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/${WIN_BINARY_NAME}.pdb"
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/alchemy-bin.pdb"
         COMMENT "Packing viewer PDB into ${VIEWER_SYMBOL_FILE_CYGWIN}"
         )
       add_custom_target(generate_symbols DEPENDS "${VIEWER_SYMBOL_FILE}" ${VIEWER_BINARY_NAME})

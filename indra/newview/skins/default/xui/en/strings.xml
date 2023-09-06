@@ -35,7 +35,7 @@
 
 	<!-- about dialog/support string-->
 	<string name="AboutHeader">
-[CHANNEL] [VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2] ([ADDRESS_SIZE]bit)
+[CHANNEL] [VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2].[VIEWER_VERSION_3] ([ADDRESS_SIZE]bit)
 [[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]
 	</string>
 	<string name="AboutCompiler">Compiler Version: [COMPILER] [COMPILER_VERSION]</string>
