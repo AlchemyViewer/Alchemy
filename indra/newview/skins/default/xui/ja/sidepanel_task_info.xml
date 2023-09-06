@@ -59,7 +59,7 @@
 			<combo_box.item label="オリジナル" name="Original"/>
 		</combo_box>
 		<spinner label="価格： L$" name="Edit Cost" tool_tip="オブジェクトの価格を指定します。"/>
-		<check_box label="検索に表示" name="search_check" tool_tip="このオブジェクトを検索結果に表示します"/>
+		<check_box label="検索に表示" name="search_check" tool_tip="このオブジェクトを検索結果に表示します。"/>
 		<text name="pathfinding_attributes_label">経路探索属性：</text>
 		<text name="B:">Ｂ：</text>
 		<text name="O:">Ｏ：</text>
