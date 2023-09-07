@@ -612,7 +612,7 @@ class WindowsManifest(ViewerManifest):
         if not self.is_packaging_viewer():
             self.package_file = "copied_deps"    
 
-    def nsi_file_commands(self, install=True):
+    def isc_file_commands(self):
         def wpath(path):
             if path.endswith('/') or path.endswith(os.path.sep):
                 path = path[:-1]
@@ -628,25 +628,7 @@ class WindowsManifest(ViewerManifest):
             rel_file = os.path.normpath(pkg_file.replace(self.get_dst_prefix()+os.path.sep,''))
             installed_dir = wpath(os.path.join('{app}', os.path.dirname(rel_file)))
             pkg_file = wpath(os.path.normpath(pkg_file))
-            if install:
-                result += 'Source: "' + pkg_file + '"; DestDir: "' + installed_dir + '"; Flags: ignoreversion \n'
-            else:
-                result += 'Delete ' + wpath(os.path.join('$INSTDIR', rel_file)) + '\n'
-
-        # at the end of a delete, just rmdir all the directories
-        if not install:
-            deleted_file_dirs = [os.path.dirname(pair[1].replace(self.get_dst_prefix()+os.path.sep,'')) for pair in self.file_list]
-            # find all ancestors so that we don't skip any dirs that happened to have no non-dir children
-            deleted_dirs = []
-            for d in deleted_file_dirs:
-                deleted_dirs.extend(path_ancestors(d))
-            # sort deepest hierarchy first
-            deleted_dirs.sort(key=lambda f: (f.count(os.path.sep), f), reverse=True)
-            prev = None
-            for d in deleted_dirs:
-                if d != prev:   # skip duplicates
-                    result += 'RMDir ' + wpath(os.path.join('$INSTDIR', os.path.normpath(d))) + '\n'
-                prev = d
+            result += 'Source: "' + pkg_file + '"; DestDir: "' + installed_dir + '"; Flags: ignoreversion \n'
 
         return result
 
@@ -688,8 +670,7 @@ class WindowsManifest(ViewerManifest):
         self.replace_in("installers/windows/install_template.iss", tempfile, {
                 "%%SOURCE%%":self.get_src_prefix(),
                 "%%INST_VARS%%":inst_vars_template % substitution_strings,
-                "%%INSTALL_FILES%%":self.nsi_file_commands(True),
-                "%%DELETE_FILES%%":self.nsi_file_commands(False)})
+                "%%INSTALL_FILES%%":self.isc_file_commands()})
 
         # If we're on a build machine, sign the code using our Authenticode certificate. JC
         # note that the enclosing setup exe is signed later, after the makensis makes it.
