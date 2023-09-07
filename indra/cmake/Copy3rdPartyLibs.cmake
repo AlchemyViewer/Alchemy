@@ -198,7 +198,7 @@ elseif(LINUX)
          list( APPEND release_files
                  libjpeg.so
                  libjpeg.so.8
-                 libjpeg.so.8.2.2
+                 libjpeg.so.8.3.2
                  )
      endif()
 
