@@ -75,16 +75,16 @@ variables:
     - .\.venv\Scripts\Activate.ps1
     - pip install --upgrade llbase autobuild certifi sentry-cli cmake
   script:
-    - autobuild configure -c Release -- -DUSE_LTO="${ENABLE_LTO}" -DHAVOK_TPV="${USE_HAVOK}" -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DENABLE_DELTA_GEN=ON
+    - autobuild configure -c Release -- -DUSE_LTO="${ENABLE_LTO}" -DHAVOK_TPV="${USE_HAVOK}" -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file "alchemy-windows${AUTOBUILD_ADDRSIZE}-dependencies.svg" "build-vc-${AUTOBUILD_ADDRSIZE}/autobuild-package.xml"
-    - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli debug-files upload --include-sources (Get-Item .\build-vc-${AUTOBUILD_ADDRSIZE}\newview\Release\Alchemy*.*).FullName (Get-Item .\build-vc-64\newview\Release\*.dll).FullName }
+    - If ($env:USE_SENTRY -eq 'TRUE') { sentry-cli debug-files upload --include-sources (Get-Item .\build-vc-${AUTOBUILD_ADDRSIZE}\newview\Release\alchemy-bin.*).FullName (Get-Item .\build-vc-64\newview\Release\*.dll).FullName }
   artifacts:
     name: "$env:CI_COMMIT_REF_NAME-$env:CI_COMMIT_SHORT_SHA"
     expire_in: 1 week
     paths:
       - build-vc-*/newview/Release/build_data.json
-      - build-vc-*/newview/Deploy/*
+      - build-vc-*/newview/Release/Alchemy_*_Setup.exe
       - alchemy-*-dependencies.svg
 
 .mac_build:
@@ -396,20 +396,12 @@ build:release:windows64:
     - Pop-Location
 
     - Push-Location ./build-vc-64/
-    -   Push-Location ./newview/Deploy/
+    -   Push-Location ./newview/Release/
     -     $WinFileName = Get-ChildItem -Path . -Name -Include Alchemy_*_Setup.exe
     -     $WinFileHash = (Get-FileHash .\$WinFileName -a sha256).Hash
     -     $WinPackageUrl = "${UploadDestURL}/${WinFileName}"
     -     $WinUploadResult = Invoke-WebRequest @UploadParams -InFile ./$WinFileName -Uri "${WinPackageUrl}${DestStatus}" -MaximumRetryCount 5 -RetryIntervalSec 30 | ConvertFrom-Json
     -     If ($WinFileHash -ne $WinUploadResult.file_sha256) { Write-Output "Upload hash mismatch. expected $Hash actual $($WinUploadResult.file_sha256)" && Exit 1 }
-
-    -     $WinUpdateDeployURL = "${UpdateDeployDestURL}/win-x64"
-    -     $FullUpdatePkg = Get-ChildItem -Path . -Name -Include Alchemy*-full.nupkg
-    -     if (Test-Path -Path ./Alchemy*-full.nupkg) { Invoke-WebRequest @UploadParams -InFile ./$FullUpdatePkg -Uri "${WinUpdateDeployURL}/${FullUpdatePkg}" -MaximumRetryCount 5 -RetryIntervalSec 30 }
-    -     $DeltaUpdatePkg = Get-ChildItem -Path . -Name -Include Alchemy*-delta.nupkg
-    -     if (Test-Path -Path ./Alchemy*-delta.nupkg) { Invoke-WebRequest @UploadParams -InFile ./$DeltaUpdatePkg -Uri "${WinUpdateDeployURL}/${DeltaUpdatePkg}" -MaximumRetryCount 5 -RetryIntervalSec 30 }
-    -     $ReleaseFile = Get-ChildItem -Path . -Name -Include RELEASES
-    -     if (Test-Path -Path ./RELEASES) { Invoke-WebRequest @UploadParams -InFile ./$ReleaseFile -Uri "${WinUpdateDeployURL}/${ReleaseFile}" -MaximumRetryCount 5 -RetryIntervalSec 30 }
 
     -   Pop-Location
     - Pop-Location

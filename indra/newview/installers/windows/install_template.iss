@@ -43,7 +43,8 @@ MinVersion=10.0
 AppMutex=AlchemyAppMutex,Global\AlchemyAppMutex
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoVersion={#MyAppVersion}
-DisableWelcomePage=no
+AlwaysShowDirOnReadyPage=yes
+;DisableWelcomePage=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
