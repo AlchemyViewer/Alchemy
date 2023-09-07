@@ -819,6 +819,38 @@
         <key>version</key>
         <string>0.10.6.314267</string>
       </map>
+      <key>innosetup</key>
+      <map>
+        <key>copyright</key>
+        <string>Copyright (C) 1997-2023 Jordan Russell. All rights reserved.</string>
+        <key>description</key>
+        <string>Innosetup installer framework</string>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/innosetup.txt</string>
+        <key>name</key>
+        <string>innosetup</string>
+        <key>platforms</key>
+        <map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>46b82a3209dfa4bc6b65aa655eebdbd4ecaed1e1cc33e0a3b77d36475d5fa3ccd3fdc220c803ba91fa19b3e94b3bda2fa459cabab2620946af28f170d8aaa76c</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/212/packages/generic/innosetup/6.2.2.2143/innosetup-6.2.2-windows64-2143.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>version</key>
+        <string>6.2.2</string>
+      </map>
       <key>jpegencoderbasic</key>
       <map>
         <key>copyright</key>
@@ -2078,38 +2110,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         </map>
         <key>version</key>
         <string>4.10.0000.32327.5fc3fe7c.558436</string>
-      </map>
-      <key>squirrel</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2012 GitHub, Inc.</string>
-        <key>description</key>
-        <string>Squirrel installer framework</string>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/squirrel.txt</string>
-        <key>name</key>
-        <string>squirrel</string>
-        <key>platforms</key>
-        <map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>6ebc2d8934207911406aea18de8eac46bcd18cc4b6f6e2c24b936cac2d7f0abe94fc17e274f5567dc4280ace5a4e8accac658edb0cdf0623348fc72678c999cd</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/197/packages/generic/squirrel/2.9.42.1850/squirrel-2.9.42-windows64-1850.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>2.9.42</string>
       </map>
       <key>threejs</key>
       <map>

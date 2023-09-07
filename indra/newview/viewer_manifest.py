@@ -471,6 +471,18 @@ class WindowsManifest(ViewerManifest):
                 else:
                     self.path(src="fmod.dll", dst="fmod.dll")
 
+            # These need to be installed as a SxS assembly, currently a 'private' assembly.
+            # See http://msdn.microsoft.com/en-us/library/ms235291(VS.80).aspx
+            self.path("concrt140.dll")
+            self.path("msvcp140.dll")
+            self.path("msvcp140_1.dll")
+            self.path("msvcp140_2.dll")
+            self.path("msvcp140_atomic_wait.dll")
+            self.path("msvcp140_codecvt_ids.dll")
+            self.path("vccorlib140.dll")
+            self.path("vcruntime140.dll")
+            self.path("vcruntime140_1.dll")
+
             # SLVoice executable
             with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
                 self.path("SLVoice.exe")
@@ -614,14 +626,10 @@ class WindowsManifest(ViewerManifest):
         out_path = None
         for pkg_file in dest_files:
             rel_file = os.path.normpath(pkg_file.replace(self.get_dst_prefix()+os.path.sep,''))
-            installed_dir = wpath(os.path.join('$INSTDIR', os.path.dirname(rel_file)))
+            installed_dir = wpath(os.path.join('{app}', os.path.dirname(rel_file)))
             pkg_file = wpath(os.path.normpath(pkg_file))
-            if installed_dir != out_path:
-                if install:
-                    out_path = installed_dir
-                    result += 'SetOutPath ' + out_path + '\n'
             if install:
-                result += 'File ' + pkg_file + '\n'
+                result += 'Source: "' + pkg_file + '"; DestDir: "' + installed_dir + '"; Flags: ignoreversion \n'
             else:
                 result += 'Delete ' + wpath(os.path.join('$INSTDIR', rel_file)) + '\n'
 
@@ -653,20 +661,12 @@ class WindowsManifest(ViewerManifest):
             'final_exe' : self.final_exe(),
             'flags':'',
             'app_name':self.app_name(),
-            'app_name_oneword':self.app_name_oneword()
+            'app_name_oneword':self.app_name_oneword(),
+            'src_dir':self.get_src_prefix()
             }
 
         installer_file = self.installer_base_name() + '_Setup.exe'
-        substitution_strings['installer_file'] = installer_file
-        
-        version_vars = """
-        !define INSTEXE "SLVersionChecker.exe"
-        !define VERSION "%(version_short)s"
-        !define VERSION_LONG "%(version)s"
-        !define VERSION_DASHES "%(version_dashes)s"
-        !define VERSION_REGISTRY "%(version_registry)s"
-        !define VIEWER_EXE "%(final_exe)s"
-        """ % substitution_strings
+        substitution_strings['installer_file'] = self.installer_base_name() + '_Setup'
         
         if self.channel_type() == 'release':
             substitution_strings['caption'] = CHANNEL_VENDOR_BASE
@@ -674,30 +674,21 @@ class WindowsManifest(ViewerManifest):
             substitution_strings['caption'] = self.app_name() + ' ${VERSION}'
 
         inst_vars_template = """
-            OutFile "%(installer_file)s"
-            !define INSTNAME   "%(app_name_oneword)s"
-            !define SHORTCUT   "%(app_name)s"
-            !define URLNAME   "secondlife"
-            Caption "%(caption)s"
+#define MyAppName "%(app_name)s"
+#define MyAppNameShort "%(app_name_oneword)s"
+#define MyAppVersion "%(version)s"
+#define MyAppExeName "%(final_exe)s"
+#define ViewerSrcDir "%(src_dir)s"
+#define MyAppInstFile "%(installer_file)s"
             """
 
-        if(self.address_size == 64):
-            engage_registry="SetRegView 64"
-            program_files="!define MULTIUSER_USE_PROGRAMFILES64"
-        else:
-            engage_registry="SetRegView 32"
-            program_files=""
-
-        tempfile = "alchemy_setup_tmp.nsi"
+        tempfile = "alchemy_setup_tmp.iss"
         # the following replaces strings in the nsi template
         # it also does python-style % substitution
-        self.replace_in("installers/windows/installer_template.nsi", tempfile, {
-                "%%VERSION%%":version_vars,
+        self.replace_in("installers/windows/install_template.iss", tempfile, {
                 "%%SOURCE%%":self.get_src_prefix(),
                 "%%INST_VARS%%":inst_vars_template % substitution_strings,
                 "%%INSTALL_FILES%%":self.nsi_file_commands(True),
-                "%%PROGRAMFILES%%":program_files,
-                "%%ENGAGEREGISTRY%%":engage_registry,
                 "%%DELETE_FILES%%":self.nsi_file_commands(False)})
 
         # If we're on a build machine, sign the code using our Authenticode certificate. JC
@@ -705,33 +696,26 @@ class WindowsManifest(ViewerManifest):
         # Unlike the viewer binary, the VMP filenames are invariant with respect to version, os, etc.
         for exe in (
             self.final_exe(),
-            "SLVersionChecker.exe",
             "llplugin/dullahan_host.exe",
             ):
             self.sign(exe)
             
-        # Check two paths, one for Program Files, and one for Program Files (x86).
-        # Yay 64bit windows.
-        for ProgramFiles in 'ProgramFiles', 'ProgramFiles(x86)':
-            NSIS_path = os.path.expandvars(r'${%s}\NSIS\makensis.exe' % ProgramFiles)
-            if os.path.exists(NSIS_path):
-                break
-        installer_created=False
-        nsis_attempts=3
-        nsis_retry_wait=15
-        for attempt in range(nsis_attempts):
+        inno_path = os.path.join(self.args['build'], os.pardir, 'packages', 'innosetup', 'iscc.exe')
+        iscc_attempts=3
+        iscc_retry_wait=15
+        for attempt in range(iscc_attempts):
             try:
-                self.run_command([NSIS_path, '/V2', self.dst_path_of(tempfile)])
+                self.run_command([inno_path, self.dst_path_of(tempfile)])
             except ManifestError as err:
-                if attempt+1 < nsis_attempts:
-                    print("nsis failed, waiting %d seconds before retrying" % nsis_retry_wait, file=sys.stderr)
-                    time.sleep(nsis_retry_wait)
-                    nsis_retry_wait*=2
+                if attempt+1 < iscc_attempts:
+                    print("iscc failed, waiting %d seconds before retrying" % iscc_retry_wait, file=sys.stderr)
+                    time.sleep(iscc_retry_wait)
+                    iscc_retry_wait*=2
             else:
-                # NSIS worked! Done!
+                # ISCC worked! Done!
                 break
         else:
-            print("Maximum nsis attempts exceeded; giving up", file=sys.stderr)
+            print("Maximum iscc attempts exceeded; giving up", file=sys.stderr)
             raise
 
         self.sign(installer_file)

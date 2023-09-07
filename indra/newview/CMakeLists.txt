@@ -53,6 +53,10 @@ include(LLPrimitive)
 # Viewer Branding Assets
 use_prebuilt_binary(branding)
 
+if(WINDOWS)
+  use_prebuilt_binary(innosetup)
+endif()
+
 if( LLPHYSICSEXTENSIONS_SRC_DIR )
 if (NOT HAVOK_TPV)
    # When using HAVOK_TPV, the library is precompiled, so no need for this
