@@ -44,6 +44,7 @@ AppMutex=AlchemyAppMutex,Global\AlchemyAppMutex
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoVersion={#MyAppVersion}
 AlwaysShowDirOnReadyPage=yes
+UninstallDisplayIcon={app}\{#MyAppExeName}
 ;DisableWelcomePage=no
 
 [Languages]
