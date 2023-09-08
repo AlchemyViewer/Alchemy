@@ -560,7 +560,7 @@ void LLDrawPoolAlpha::renderRiggedPbrEmissives(std::vector<LLDrawInfo*>& emissiv
 
     for (LLDrawInfo* draw : emissives)
     {
-        if (lastAvatar != draw->mAvatar || lastMeshId != draw->mSkinInfo->mHash)
+        if (lastAvatar != draw->mAvatar.get() || lastMeshId != draw->mSkinInfo->mHash)
         {
             if (!uploadMatrixPalette(*draw))
             { // failed to upload matrix palette, skip rendering
