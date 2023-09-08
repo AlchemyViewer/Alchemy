@@ -29,9 +29,6 @@
 #include "llappviewer.h"
 
 // Viewer includes
-#if LL_WINDOWS
-#include "alsquirrelupdater.h"
-#endif
 #include "llregex.h"
 #include "llversioninfo.h"
 #include "llfeaturemanager.h"
@@ -1142,13 +1139,7 @@ bool LLAppViewer::init()
     // Skip updater if this is a non-interactive instance
     if (!gSavedSettings.getBOOL("CmdLineSkipUpdater") && !gNonInteractive)
     {
-#if LL_WINDOWS
-		// Init updater here
-		if (ALUpdateHandler::isSupported())
-		{
-			ALUpdateHandler::getInstance()->check();
-		}
-#endif
+
     }
     else
     {
@@ -2568,12 +2559,6 @@ bool LLAppViewer::initConfiguration()
 		return false;
 	}
 
-#if LL_WINDOWS
-	if (ALUpdateUtils::handleCommandLineParse(clp))
-	{
-		return false;
-	}
-#endif
 	// - selectively apply settings
 
 	// If the user has specified a alternate settings file name.
@@ -3187,7 +3172,7 @@ LLSD LLAppViewer::getViewerInfo() const
 	LLSD info;
 	auto& versionInfo(LLVersionInfo::instance());
 	info["VIEWER_VERSION"] = llsd::array(versionInfo.getMajor(), versionInfo.getMinor(),
-										 versionInfo.getPatch());
+										 versionInfo.getPatch(), versionInfo.getBuild());
 	info["VIEWER_VERSION_STR"] = versionInfo.getVersion();
 	info["CHANNEL"] = versionInfo.getChannel();
 	info["ADDRESS_SIZE"] = ADDRESS_SIZE;

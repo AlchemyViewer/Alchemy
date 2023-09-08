@@ -32,9 +32,6 @@
 #include "llfloaterabout.h"
 
 // Viewer includes
-#if LL_WINDOWS
-#include "alsquirrelupdater.h"
-#endif
 #include "llagent.h"
 #include "llagentui.h"
 #include "llappviewer.h"
@@ -359,12 +356,7 @@ void LLFloaterAbout::onClickCopyToClipboard()
 
 void LLFloaterAbout::onClickUpdateCheck()
 {
-#if LL_WINDOWS
-	if (ALUpdateHandler::isSupported())
-	{
-		ALUpdateHandler::getInstance()->check();
-	}
-#endif
+
 }
 
 void LLFloaterAbout::setSupportText(const std::string& server_release_notes_url)

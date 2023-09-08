@@ -827,28 +827,6 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
-    <key>AlchemyUpdatePreference</key>
-    <map>
-      <key>Comment</key>
-      <string>Default behavior of updater 0(Download and install), 1(download and prompt for install), 2(Prompt for download and install)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>S32</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>AlchemyUpdateCheckInterval</key>
-    <map>
-      <key>Comment</key>
-      <string>How frequently to check for updates in seconds.</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>14400.0</real>
-    </map>
     <key>ChatAlerts</key>
     <map>
       <key>Comment</key>
@@ -870,61 +848,6 @@
       <string>Boolean</string>
       <key>Value</key>
       <boolean>0</boolean>
-    </map>
-    <key>CmdLineSquirrelInstall</key>
-    <map>
-      <key>Comment</key>
-      <string>Command line flag for initial install from squirrel with version as arguement</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string />
-    </map>
-    <key>CmdLineSquirrelFirstRun</key>
-    <map>
-      <key>Comment</key>
-      <string>Command line flag for initial application run from squirrel</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>CmdLineSquirrelUpdated</key>
-    <map>
-      <key>Comment</key>
-      <string>Command line flag for update from squirrel with version as arguement</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string />
-    </map>
-    <key>CmdLineSquirrelObsolete</key>
-    <map>
-      <key>Comment</key>
-      <string>Command line flag for obsolete version from squirrel with version as arguement</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string />
-    </map>
-    <key>CmdLineSquirrelUninstall</key>
-    <map>
-      <key>Comment</key>
-      <string>Command line flag for uninstall from squirrel with version as arguement</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string />
     </map>
     <key>DoubleClickAttachmentAdd</key>
     <map>

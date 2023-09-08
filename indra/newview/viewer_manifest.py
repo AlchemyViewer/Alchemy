@@ -443,11 +443,14 @@ class WindowsManifest(ViewerManifest):
         relpkgdir = os.path.join(pkgdir, "lib", "release")
         debpkgdir = os.path.join(pkgdir, "lib", "debug")
 
+        if self.is_packaging_viewer():
+            # Find alchemy-bin.exe in the 'configuration' dir, then rename it to the result of final_exe.
+            self.path(src='%s/alchemy-bin.exe' % self.args['configuration'], dst=self.final_exe())
+
         # Plugin host application
-        with self.prefix(dst="llplugin"):
-            self.path2basename(os.path.join(os.pardir,
-                                            'llplugin', 'slplugin', self.args['configuration']),
-                                            "slplugin.exe")
+        self.path2basename(os.path.join(os.pardir,
+                                        'llplugin', 'slplugin', self.args['configuration']),
+                           "slplugin.exe")
         
         # Get shared libs from the shared libs staging directory
         with self.prefix(src=os.path.join(self.args['build'], os.pardir,
@@ -468,23 +471,34 @@ class WindowsManifest(ViewerManifest):
                 else:
                     self.path(src="fmod.dll", dst="fmod.dll")
 
-            # SLVoice executable
-            with self.prefix(dst="voice"):
-                with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
-                    self.path("SLVoice.exe")
+            # These need to be installed as a SxS assembly, currently a 'private' assembly.
+            # See http://msdn.microsoft.com/en-us/library/ms235291(VS.80).aspx
+            self.path("concrt140.dll")
+            self.path("msvcp140.dll")
+            self.path("msvcp140_1.dll")
+            self.path("msvcp140_2.dll")
+            self.path("msvcp140_atomic_wait.dll")
+            self.path("msvcp140_codecvt_ids.dll")
+            self.path("vccorlib140.dll")
+            self.path("vcruntime140.dll")
+            self.path("vcruntime140_1.dll")
 
-                # Vivox libraries
-                if (self.address_size == 64):
-                    self.path("vivoxsdk_x64.dll")
-                    self.path("ortp_x64.dll")
-                else:
-                    self.path("vivoxsdk.dll")
-                    self.path("ortp.dll")
+            # SLVoice executable
+            with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
+                self.path("SLVoice.exe")
+
+            # Vivox libraries
+            if (self.address_size == 64):
+                self.path("vivoxsdk_x64.dll")
+                self.path("ortp_x64.dll")
+            else:
+                self.path("vivoxsdk.dll")
+                self.path("ortp.dll")
 
             # Sentry
             if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
                 self.path("sentry.dll")
-                with self.prefix(src=os.path.join(pkgdir, 'bin', 'release'), dst="sentry"):
+                with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
                     self.path("crashpad_handler.exe")
 
             if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
@@ -598,58 +612,95 @@ class WindowsManifest(ViewerManifest):
         if not self.is_packaging_viewer():
             self.package_file = "copied_deps"    
 
+    def isc_file_commands(self):
+        def wpath(path):
+            if path.endswith('/') or path.endswith(os.path.sep):
+                path = path[:-1]
+            path = path.replace('/', '\\')
+            return path
+
+        result = ""
+        dest_files = [pair[1] for pair in self.file_list if pair[0] and os.path.isfile(pair[1])]
+        # sort deepest hierarchy first
+        dest_files.sort(key=lambda f: (f.count(os.path.sep), f), reverse=True)
+        out_path = None
+        for pkg_file in dest_files:
+            rel_file = os.path.normpath(pkg_file.replace(self.get_dst_prefix()+os.path.sep,''))
+            installed_dir = wpath(os.path.join('{app}', os.path.dirname(rel_file)))
+            pkg_file = wpath(os.path.normpath(pkg_file))
+            result += 'Source: "' + pkg_file + '"; DestDir: "' + installed_dir + '"; Flags: ignoreversion \n'
+
+        return result
+
     def package_finish(self):
-        nuget_exe = os.path.join(self.args['build'], os.pardir, 'packages', 'squirrel', 'nuget.exe')
-        self.run_command(
-            [nuget_exe,
-                'pack',
-                '-Properties', 'NoWarn=NU5128',
-                os.path.join(self.args['build'], 'viewer.nuspec')])
+        # a standard map of strings for replacing in the templates
+        substitution_strings = {
+            'version' : '.'.join(self.args['version']),
+            'version_short' : '.'.join(self.args['version'][:-1]),
+            'version_dashes' : '-'.join(self.args['version']),
+            'version_registry' : '%s(%s)' %
+            ('.'.join(self.args['version']), self.address_size),
+            'final_exe' : self.final_exe(),
+            'flags':'',
+            'app_name':self.app_name(),
+            'app_name_oneword':self.app_name_oneword(),
+            'src_dir':self.get_src_prefix()
+            }
 
-        #Build installer and update delta
-        squirrel_exe = os.path.join(self.args['build'], os.pardir, 'packages', 'squirrel', 'Squirrel.exe')
-
-        # Download previous build for delta generation
-        temp_installdir = os.path.join(self.args['build'], 'Installer')
-        self.cmakedirs(temp_installdir)
-        if 'gendelta' in self.args and 'updateurl' in self.args:
-            if (self.address_size == 64):
-                updater_arch = 'x64'
-            else:
-                updater_arch = 'x86'
-
-            try:
-                self.run_command(
-                    [squirrel_exe,
-                        'http-down',
-                        '--releaseDir', temp_installdir,
-                        '--url', '{}/{}/win-{}/'.format(self.args['updateurl'], self.app_name_oneword(), updater_arch)])
-            except (ManifestError, MissingError) as err:
-                pass
-
-        # Build installer files
-        temp_nupkg = os.path.join(self.args['build'], '{}.{}.nupkg'.format(self.app_name_oneword(), '.'.join(self.args['version'])))
-        self.run_command(
-            [squirrel_exe,
-                'releasify',
-                '--releaseDir', temp_installdir,
-                '--framework', 'vcredist143-x64',
-                '--icon', os.path.join(self.args['source'], 'installers', 'windows', 'install_icon.ico'),
-                '--splashImage', os.path.join(self.args['source'], 'installers', 'windows', 'install_splash.gif'),
-                '--package', temp_nupkg])
-
-        # Copy to final installer destination
         installer_file = self.installer_base_name() + '_Setup.exe'
-        with self.prefix(src=temp_installdir, dst=os.path.join(self.args['build'], 'Deploy')):  # everything goes in Contents
-            self.path(src=self.app_name_oneword() + 'Setup.exe', dst=installer_file)
-            self.path('{}-{}-*.nupkg'.format(self.app_name_oneword(), '.'.join(self.args['version'])))
-            self.path('RELEASES')
+        substitution_strings['installer_file'] = self.installer_base_name() + '_Setup'
+        
+        if self.channel_type() == 'release':
+            substitution_strings['caption'] = CHANNEL_VENDOR_BASE
+        else:
+            substitution_strings['caption'] = self.app_name() + ' ${VERSION}'
 
-        # Clean up temporary files
-        os.remove(temp_nupkg)
-        shutil.rmtree(temp_installdir, True)
+        inst_vars_template = """
+#define MyAppName "%(app_name)s"
+#define MyAppNameShort "%(app_name_oneword)s"
+#define MyAppVersion "%(version)s"
+#define MyAppExeName "%(final_exe)s"
+#define ViewerSrcDir "%(src_dir)s"
+#define MyAppInstFile "%(installer_file)s"
+            """
 
-        self.created_path(os.path.join(self.args['build'], 'Deploy', installer_file))
+        tempfile = "alchemy_setup_tmp.iss"
+        # the following replaces strings in the nsi template
+        # it also does python-style % substitution
+        self.replace_in("installers/windows/install_template.iss", tempfile, {
+                "%%SOURCE%%":self.get_src_prefix(),
+                "%%INST_VARS%%":inst_vars_template % substitution_strings,
+                "%%INSTALL_FILES%%":self.isc_file_commands()})
+
+        # If we're on a build machine, sign the code using our Authenticode certificate. JC
+        # note that the enclosing setup exe is signed later, after the makensis makes it.
+        # Unlike the viewer binary, the VMP filenames are invariant with respect to version, os, etc.
+        for exe in (
+            self.final_exe(),
+            "llplugin/dullahan_host.exe",
+            ):
+            self.sign(exe)
+            
+        inno_path = os.path.join(self.args['build'], os.pardir, 'packages', 'innosetup', 'iscc.exe')
+        iscc_attempts=3
+        iscc_retry_wait=15
+        for attempt in range(iscc_attempts):
+            try:
+                self.run_command([inno_path, self.dst_path_of(tempfile)])
+            except ManifestError as err:
+                if attempt+1 < iscc_attempts:
+                    print("iscc failed, waiting %d seconds before retrying" % iscc_retry_wait, file=sys.stderr)
+                    time.sleep(iscc_retry_wait)
+                    iscc_retry_wait*=2
+            else:
+                # ISCC worked! Done!
+                break
+        else:
+            print("Maximum iscc attempts exceeded; giving up", file=sys.stderr)
+            raise
+
+        self.sign(installer_file)
+        self.created_path(self.dst_path_of(installer_file))
         self.package_file = installer_file
 
     def sign(self, exe):

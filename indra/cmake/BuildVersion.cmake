@@ -54,20 +54,21 @@ if(NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/ne
     set(VIEWER_VERSION_BASE_FILE "${CMAKE_SOURCE_DIR}/newview/VIEWER_VERSION.txt")
 
     if(EXISTS ${VIEWER_VERSION_BASE_FILE})
-        file(STRINGS ${VIEWER_VERSION_BASE_FILE} VIEWER_FILE_VERSION REGEX "^[0-9]+\\.[0-9]+")
-        string(REGEX REPLACE "^([0-9]+)\\.[0-9]+" "\\1" VIEWER_VERSION_MAJOR ${VIEWER_FILE_VERSION})
-        string(REGEX REPLACE "^[0-9]+\\.([0-9]+)" "\\1" VIEWER_VERSION_MINOR ${VIEWER_FILE_VERSION})
+        file(STRINGS ${VIEWER_VERSION_BASE_FILE} VIEWER_SHORT_VERSION REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+")
+        string(REGEX REPLACE "^([0-9]+)\\.[0-9]+\\.[0-9]+" "\\1" VIEWER_VERSION_MAJOR ${VIEWER_SHORT_VERSION})
+        string(REGEX REPLACE "^[0-9]+\\.([0-9]+)\\.[0-9]+" "\\1" VIEWER_VERSION_MINOR ${VIEWER_SHORT_VERSION})
+        string(REGEX REPLACE "^[0-9]+\\.[0-9]+\\.([0-9]+)" "\\1" VIEWER_VERSION_PATCH ${VIEWER_SHORT_VERSION})
 
         if(REVISION_FROM_VCS)
             find_package(Git)
         endif()
 
         if((NOT REVISION_FROM_VCS) AND DEFINED ENV{CI_PIPELINE_ID})
-            set(VIEWER_VERSION_PATCH $ENV{CI_PIPELINE_ID})
-            message(STATUS "Revision (from environment): ${VIEWER_VERSION_PATCH}")
+            set(VIEWER_VERSION_REVISION $ENV{CI_PIPELINE_ID})
+            message(STATUS "Revision (from environment): ${VIEWER_VERSION_REVISION}")
         elseif((NOT REVISION_FROM_VCS) AND DEFINED ENV{AUTOBUILD_BUILD_ID})
-            set(VIEWER_VERSION_PATCH $ENV{AUTOBUILD_BUILD_ID})
-            message(STATUS "Revision (from autobuild environment): ${VIEWER_VERSION_PATCH}")
+            set(VIEWER_VERSION_REVISION $ENV{AUTOBUILD_BUILD_ID})
+            message(STATUS "Revision (from autobuild environment): ${VIEWER_VERSION_REVISION}")
         elseif(Git_FOUND)
             execute_process(
                 COMMAND ${GIT_EXECUTABLE} rev-list HEAD --count
@@ -76,26 +77,24 @@ if(NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/ne
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
             if(GIT_REV_LIST_COUNT)
-                set(VIEWER_VERSION_PATCH ${GIT_REV_LIST_COUNT})
+                set(VIEWER_VERSION_REVISION ${GIT_REV_LIST_COUNT})
             else(GIT_REV_LIST_COUNT)
-                set(VIEWER_VERSION_PATCH 0)
+                set(VIEWER_VERSION_REVISION 0)
             endif(GIT_REV_LIST_COUNT)
         else()
-            set(VIEWER_VERSION_PATCH 0)
+            set(VIEWER_VERSION_REVISION 0)
         endif()
-        message(STATUS "Building '${VIEWER_CHANNEL}' Version ${VIEWER_SHORT_VERSION}")
-
-        if("${VIEWER_VERSION_PATCH}" STREQUAL "")
-            message(STATUS "Ultimate fallback, revision was blank or not set: will use 0")
-            set(VIEWER_VERSION_PATCH 0)
-        endif("${VIEWER_VERSION_PATCH}" STREQUAL "")
-
-        set(VIEWER_SHORT_VERSION "${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}")
+        message(STATUS "Building '${VIEWER_CHANNEL}' Version ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
     else(EXISTS ${VIEWER_VERSION_BASE_FILE})
         message(SEND_ERROR "Cannot get viewer version from '${VIEWER_VERSION_BASE_FILE}'")
     endif(EXISTS ${VIEWER_VERSION_BASE_FILE})
 
-    set(VIEWER_VERSION_AND_CHANNEL "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}")
+    if("${VIEWER_VERSION_REVISION}" STREQUAL "")
+        message(STATUS "Ultimate fallback, revision was blank or not set: will use 0")
+        set(VIEWER_VERSION_REVISION 0)
+    endif("${VIEWER_VERSION_REVISION}" STREQUAL "")
+
+    set(VIEWER_VERSION_AND_CHANNEL "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
 endif(NOT DEFINED VIEWER_SHORT_VERSION)
 
 if (NOT DEFINED VIEWER_COMMIT_LONG_SHA)
@@ -153,6 +152,7 @@ target_compile_definitions( ll::versioninfo INTERFACE
     LL_VIEWER_VERSION_MAJOR=${VIEWER_VERSION_MAJOR}
     LL_VIEWER_VERSION_MINOR=${VIEWER_VERSION_MINOR}
     LL_VIEWER_VERSION_PATCH=${VIEWER_VERSION_PATCH}
+    LL_VIEWER_VERSION_BUILD=${VIEWER_VERSION_REVISION}
     LL_VIEWER_COMMIT_SHA="${VIEWER_COMMIT_LONG_SHA}"
     LL_VIEWER_COMMIT_SHORT_SHA="${VIEWER_COMMIT_SHORT_SHA}"
     )
