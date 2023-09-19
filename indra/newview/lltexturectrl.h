@@ -184,8 +184,7 @@ public:
 
 	void			setCanApply(bool can_preview, bool can_apply);
 
-	void			setImmediateFilterPermMask(PermissionMask mask)
-					{ mImmediateFilterPermMask = mask; }
+	void			setImmediateFilterPermMask(PermissionMask mask);
 	void			setDnDFilterPermMask(PermissionMask mask)
 						{ mDnDFilterPermMask = mask; }
 	PermissionMask	getImmediateFilterPermMask() { return mImmediateFilterPermMask; }

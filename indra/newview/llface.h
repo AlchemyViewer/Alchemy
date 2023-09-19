@@ -148,10 +148,12 @@ public:
 	void updateRebuildFlags();
 	bool canRenderAsMask(); // logic helper
 	BOOL getGeometryVolume(const LLVolume& volume,
-						const S32 &f,
-						const LLMatrix4a& mat_vert, const LLMatrix4a& mat_normal,
-						const U16 &index_offset,
-						bool force_rebuild = false);
+                            S32 face_index,
+                            const LLMatrix4a& mat_vert,
+                            const LLMatrix4a& mat_normal,
+                            U16 index_offset,
+                            bool force_rebuild = false,
+                            bool no_debug_assert = false);
 
 	// For avatar
 	U16			 getGeometryAvatar(

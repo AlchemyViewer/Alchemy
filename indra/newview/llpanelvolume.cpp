@@ -384,6 +384,15 @@ void LLPanelVolume::getState( )
 		mLightTextureCtrl->setEnabled(FALSE);
 		mLightTextureCtrl->setValid(FALSE);
 
+        if (objectp->isAttachment())
+        {
+            mLightTextureCtrl->setImmediateFilterPermMask(PERM_COPY | PERM_TRANSFER);
+        }
+        else
+        {
+            mLightTextureCtrl->setImmediateFilterPermMask(PERM_NONE);
+        }
+
 		mLightIntensity->setEnabled(false);
         mLightRadius->setEnabled(false);
         mLightFalloff->setEnabled(false);
@@ -1399,6 +1408,19 @@ void LLPanelVolume::setLightTextureID(const LLUUID &asset_id, const LLUUID &item
     if (volobjp)
     {
         LLViewerInventoryItem* item = gInventory.getItem(item_id);
+
+        if (item && volobjp->isAttachment())
+        {
+            const LLPermissions& perm = item->getPermissions();
+            BOOL unrestricted = ((perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED) ? TRUE : FALSE;
+            if (!unrestricted)
+            {
+                // Attachments are in world and in inventory simultaneously,
+                // at the moment server doesn't support such a situation.
+                return;
+            }
+        }
+
         if (item && !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()))
         {
             LLToolDragAndDrop::handleDropMaterialProtections(volobjp, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);

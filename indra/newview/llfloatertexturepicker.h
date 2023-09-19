@@ -125,6 +125,8 @@ class LLFloaterTexturePicker final : public LLFloater
 
     void setInventoryPickType(LLTextureCtrl::EPickInventoryType type);
 
+	void			setImmediateFilterPermMask(PermissionMask mask);
+
     static void		onPickerCallback(const std::vector<std::string>& filenames, LLHandle<LLFloater> handle);
 
 protected:
