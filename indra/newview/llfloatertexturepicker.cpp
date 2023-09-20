@@ -1283,6 +1283,12 @@ void LLFloaterTexturePicker::setInventoryPickType(LLTextureCtrl::EPickInventoryT
     }
 }
 
+void LLFloaterTexturePicker::setImmediateFilterPermMask(PermissionMask mask)
+{
+	mImmediateFilterPermMask = mask;
+	mInventoryPanel->setFilterPermMask(mask);
+}
+
 void LLFloaterTexturePicker::onPickerCallback(const std::vector<std::string>& filenames, LLHandle<LLFloater> handle)
 {
     std::vector<std::string>::const_iterator iter = filenames.begin();
