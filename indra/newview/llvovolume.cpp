@@ -5127,7 +5127,7 @@ void LLControlAVBridge::updateSpatialExtents()
 	// disappear when root goes off-screen"
 	//
 	// Expand extents to include Control Avatar placed outside of the bounds
-	if (controlAvatar && (rootWasDirty || controlAvatar->mPlaying))
+	if (controlAvatar && controlAvatar->mDrawable && (rootWasDirty || controlAvatar->mPlaying))
 	{
 		root->expandExtents(controlAvatar->mDrawable->getSpatialExtents(), *mDrawable->getXform());
 	}
