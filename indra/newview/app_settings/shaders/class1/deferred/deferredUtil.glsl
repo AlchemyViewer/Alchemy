@@ -375,6 +375,12 @@ vec2 BRDF(float NoV, float roughness)
     return texture(brdfLut, vec2(NoV, roughness)).rg;
 }
 
+// Lagarde and de Rousiers 2014, "Moving Frostbite to PBR"
+float computeSpecularAO(float NoV, float ao, float roughness) 
+{
+    return clamp(pow(NoV + ao, exp2(-16.0 * roughness - 1.0)) - 1.0 + ao, 0.0, 1.0);
+}
+
 // set colorDiffuse and colorSpec to the results of GLTF PBR style IBL
 vec3 pbrIbl(vec3 diffuseColor,
             vec3 specularColor,
@@ -386,16 +392,20 @@ vec3 pbrIbl(vec3 diffuseColor,
             out vec3 specContrib)
 {
     // retrieve a scale and bias to F0. See [1], Figure 3
-	vec2 brdf = BRDF(clamp(nv, 0, 1), 1.0-perceptualRough);
-	vec3 diffuseLight = irradiance;
-	vec3 specularLight = radiance;
+    vec2 brdf = BRDF(clamp(nv, 0, 1), 1.0-perceptualRough);
+    vec3 diffuseLight = irradiance;
+    vec3 specularLight = radiance;
     
-	vec3 diffuse = diffuseLight * diffuseColor;
-	vec3 specular = specularLight * (specularColor * brdf.x + brdf.y);
+    vec3 energy = mix(brdf.xxx, brdf.yyy, specularColor);
 
-    specContrib = specular * ao;
+    vec3 diffuse = diffuseLight * diffuseColor * (1.0 - energy);
+    vec3 specular = specularLight * energy;
 
-	return (diffuse + specular) * ao;
+    specular *= computeSpecularAO(nv, ao, perceptualRough * perceptualRough) * (1.0 + specularColor * (1.0 / brdf.y - 1.0));
+
+    specContrib = specular;
+
+    return (diffuse * ao) + specular;
 }
 
 vec3 pbrIbl(vec3 diffuseColor,
