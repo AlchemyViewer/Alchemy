@@ -16,9 +16,9 @@
 					<button label="リセット" tool_tip="閉じて共有された環境にリセットします。" name="btn_reset"/>
 					<text name="sun_color_lbl">太陽の色：</text>
 					<color_swatch name="sun_color"/>
-					<text name="cloud_color_lbl">雲の色：:</text>
+					<text name="cloud_color_lbl">雲の色：</text>
 					<color_swatch name="cloud_color"/>
-					<text name="cloud_map_label">雲の画像：:</text>
+					<text name="cloud_map_label">雲の画像：</text>
 					<texture_picker name="cloud_map"/>
 					<text name="cloud_map_label">水面の画像：</text>
 					<texture_picker name="water_normal_map"/>

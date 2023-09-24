@@ -102,7 +102,7 @@
 	<menu_item_call label="SLurlをコピー" name="url_copy"/>
 	<menu_item_call label="ランドマークの情報" name="About Landmark"/>
 	<menu_item_call label="マップに表示" name="show_on_map"/>
-	<menu_item_separator lname="Animation Separator"/>
+	<menu_item_separator name="Animation Separator"/>
 	<menu_item_call label="インワールドで再生" name="Animation Play"/>
 	<menu_item_call label="ローカルで再生" name="Animation Audition"/>
 	<menu_item_separator name="Send Instant Message Separator"/>
