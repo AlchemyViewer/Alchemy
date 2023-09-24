@@ -58,7 +58,7 @@ U32 wpo2(U32 i);
 
 // texture memory accounting (for OS X)
 static LLMutex sTexMemMutex;
-static boost::unordered_flat_map<U32, U32> sTextureAllocs;
+static boost::unordered_flat_map<U32, U64> sTextureAllocs;
 static U64 sTextureBytes = 0;
 
 // track a texture alloc on the currently bound texture.
@@ -67,7 +67,7 @@ static void alloc_tex_image(U32 width, U32 height, U32 pixformat)
 {
     U32 texUnit = gGL.getCurrentTexUnitIndex();
     U32 texName = gGL.getTexUnit(texUnit)->getCurrTexture();
-    U32 size = LLImageGL::dataFormatBytes(pixformat, width, height);
+    U64 size = LLImageGL::dataFormatBytes(pixformat, width, height);
 
     llassert(size >= 0);
 
