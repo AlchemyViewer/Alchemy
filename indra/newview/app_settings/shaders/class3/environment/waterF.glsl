@@ -266,7 +266,7 @@ void main()
 
     float nv = clamp(abs(dot(norm.xyz, v)), 0.001, 1.0);
     vec2 brdf = BRDF(clamp(nv, 0, 1), 1.0);
-    float f = 1.0-brdf.y; //1.0 - (brdf.x+brdf.y);
+    float f = 1.0-brdf.x; //1.0 - (brdf.x+brdf.y);
     f *= 0.9;
     f *= f;
 

@@ -129,7 +129,7 @@ vec2 BRDF(float NoV, float roughness)
 			float G = G_SchlicksmithGGX(dotNL, dotNV, roughness);
 			float G_Vis = (G * dotVH) / (dotNH * dotNV);
 			float Fc = pow(1.0 - dotVH, 5.0);
-			LUT += vec2((1.0 - Fc) * G_Vis, Fc * G_Vis);
+			LUT += vec2(Fc * G_Vis, G_Vis);
 		}
 	}
 	return LUT / float(NUM_SAMPLES);
