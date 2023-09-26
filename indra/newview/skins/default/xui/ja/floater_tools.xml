@@ -42,6 +42,8 @@
 		<radio_item label="整列" name="radio align"/>
 	</radio_group>
 	<check_box label="リンク部分を編集" name="checkbox edit linked parts"/>
+	<button name="prev_part_btn" tool_tip="前のリンク部分か面を選択します。"/>
+	<button name="next_part_btn" tool_tip="次のリンク部分か面を選択します。"/>
 	<button label="リンク" name="link_btn"/>
 	<button label="リンク解除" name="unlink_btn"/>
 	<combo_box name="combobox grid mode" tool_tip="オブジェクトを配置するグリッドルーラーを選択します。">
@@ -87,10 +89,8 @@
 	<text name="Dozer Size:">影響範囲：</text>
 	<text name="Strength:">強度：</text>
 	<button label="適用" label_selected="適用" name="button apply to selection" tool_tip="選択した土地を修正します。"/>
+	<text name="link_num_obj_count" tool_tip="このリンク数は正確でない可能性があります。">[DESC]　[NUM]</text>
 	<text name="selection_empty">選択されていません。</text>
-	<!--
-		<text name="selection_faces">選択された面：[FACES_STRING]</text>
-		-->
 	<text name="selection_count"/>
 	<text name="remaining_capacity">[CAPACITY_STRING]　[secondlife:///app/openfloater/object_weights 詳細情報]</text>
 	<view_border name="cost_text_border"/>
@@ -156,6 +156,7 @@
 				<text name="Anyone can:">全員：</text>
 				<check_box label="移動" name="checkbox allow everyone move" tool_tip="オブジェクトは誰でも動かすことができます。"/>
 				<check_box label="コピー" name="checkbox allow everyone copy" tool_tip="オブジェクトのコピーは誰でも受け取ることができます。オブジェクトとそのオブジェクトの中身はすべて、コピーまたは譲渡できるように設定する必要があります。"/>
+				<check_box label="エクスポート" name="checkbox allow export"/>
 				<text name="Next owner can:">次の所有者：</text>
 				<check_box label="修正" name="checkbox next owner can modify" tool_tip="次の所有者は、アイテム名などのプロパティ内容を編集したり、このオブジェクトのサイズを変更することができます。"/>
 				<check_box label="コピー" name="checkbox next owner can copy" tool_tip="次の所有者は、このオブジェクトを無制限にコピーできます。コピーには制作者の情報が含まれ、コピー元のアイテムと異なり許可設定などに制約があります。"/>
@@ -251,12 +252,12 @@
 			<text name="text topshear">上部層</text>
 			<spinner label="Ｘ" name="Shear X"/>
 			<spinner label="Ｙ" name="Shear Y"/>
-			<text name="advanced_cut">プロフィールカット（始点と終点）</text>
+			<text name="advanced_cut">側面カット（始点と終点）</text>
 			<text name="advanced_dimple">くぼみ（始点と終点）</text>
 			<text name="advanced_slice">切り取り（始点と終点）</text>
 			<spinner label="始" name="Path Limit Begin"/>
 			<spinner label="終" name="Path Limit End"/>
-			<text name="text taper2" tool_tip="すべてのプリムタイプに対応しているとは限りません。">テーパーのプロファイル</text>
+			<text name="text taper2" tool_tip="すべてのプリムタイプに対応しているとは限りません。">側面のテーパー</text>
 			<spinner label="Ｘ" name="Taper X"/>
 			<spinner label="Ｙ" name="Taper Y"/>
 			<text name="text radius delta">半径</text>
@@ -293,8 +294,8 @@
 			<!-- 作用は射影テクスチャマッピングなので意訳 -->
 			<check_box label="射影元" name="Light Checkbox Ctrl" tool_tip="オブジェクトが投影元になります。"/>
 			<color_swatch label="色" name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます"/>
-			<texture_picker label="射影画像" name="light texture control" tool_tip="クリックで射影テクスチャを選択します（遅延レンダリング有効時のみ）"/>
-			<menu_button name="clipboard_light_params_btn" tool_tip="ペースト時のオプション"/>
+			<texture_picker label="射影画像" name="light texture control" tool_tip="クリックで射影テクスチャを選択します。（遅延レンダリング有効時のみ）"/>
+			<menu_button name="clipboard_light_params_btn" tool_tip="ペースト時のオプションを指定します。"/>
 			<spinner label="輝度" name="Light Intensity"/>
 			<spinner label="ＦＯＶ" name="Light FOV"/>
 			<spinner label="半径" name="Light Radius"/>

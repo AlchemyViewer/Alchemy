@@ -7283,21 +7283,6 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 			static F32 transition_time = 1.f;
 
 			LLVector3 focus_point;
-
-			LLViewerObject* obj = LLViewerMediaFocus::getInstance()->getFocusedObject();
-			if (obj && obj->mDrawable && obj->isSelected())
-			{ // focus on selected media object
-				S32 face_idx = LLViewerMediaFocus::getInstance()->getFocusedFace();
-				if (obj && obj->mDrawable)
-				{
-					LLFace* face = obj->mDrawable->getFace(face_idx);
-					if (face)
-					{
-						focus_point = face->getPositionAgent();
-					}
-				}
-			}
-
 			static LLVector3 last_focus_point{};
 			if (LLPipeline::RenderFocusPointLocked && !last_focus_point.isExactlyZero())
 			{
@@ -7305,9 +7290,23 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 			}
 			else
 			{
+				LLViewerObject* obj = LLViewerMediaFocus::getInstance()->getFocusedObject();
+				if (obj && obj->mDrawable && obj->isSelected())
+				{ // focus on selected media object
+					S32 face_idx = LLViewerMediaFocus::getInstance()->getFocusedFace();
+					if (obj && obj->mDrawable)
+					{
+						LLFace* face = obj->mDrawable->getFace(face_idx);
+						if (face)
+						{
+							focus_point = face->getPositionAgent();
+						}
+					}
+				}
+
 				if (focus_point.isExactlyZero())
 				{
-					if (LLViewerJoystick::getInstance()->getOverrideCamera())
+					if (LLViewerJoystick::getInstance()->getOverrideCamera() || LLPipeline::RenderFocusPointFollowsPointer)
 					{ // focus on point under cursor
 						focus_point.set(gDebugRaycastIntersection.getF32ptr());
 					}
