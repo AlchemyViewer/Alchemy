@@ -1020,6 +1020,7 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
         LLSelectedTEMaterial::getSpecularID(specmap_id, identical_spec);
 
         static S32 selected_te = -1;
+        static LLUUID prev_obj_id;
         if ((LLToolFace::getInstance() == LLToolMgr::getInstance()->getCurrentTool()) && 
             !LLSelectMgr::getInstance()->getSelection()->isMultipleTESelected()) 
         {
@@ -1034,7 +1035,8 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
                 }
             }
 
-            if (new_selection != selected_te)
+            if ((new_selection != selected_te)
+                || (prev_obj_id != objectp->getID()))
             {
                 bool te_has_media = objectp->getTE(new_selection) && objectp->getTE(new_selection)->hasMedia();
                 bool te_has_pbr = objectp->getRenderMaterialID(new_selection).notNull();
@@ -1052,6 +1054,7 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
                     mComboMatMedia->selectNthItem(MATMEDIA_MATERIAL);
                 }
                 selected_te = new_selection;
+                prev_obj_id = objectp->getID();
             }
         }
 
