@@ -72,6 +72,8 @@ uniform vec2 screen_res;
 const float M_PI = 3.14159265;
 const float ONE_OVER_PI = 0.3183098861;
 
+const float MIN_PBR_ROUGHNESS = 0.045;
+
 vec3 srgb_to_linear(vec3 cs);
 vec3 atmosFragLightingLinear(vec3 light, vec3 additive, vec3 atten);
 
@@ -489,7 +491,7 @@ vec3 pbrPunctual(vec3 diffuseColor, vec3 specularColor,
                     out vec3 specContrib) //specular contribution (exposed to alpha shaders to calculate "glare")
 {
     // make sure specular highlights from punctual lights don't fall off of polished surfaces
-    perceptualRoughness = max(perceptualRoughness, 8.0/255.0);
+    perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
     
 	float alphaRoughness = perceptualRoughness * perceptualRoughness;
 
@@ -566,6 +568,7 @@ void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor
 
 vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, vec3 additive, vec3 atten, out vec3 specContrib)
 {
+    perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
     vec3 color = vec3(0);
 
     float NdotV = clamp(abs(dot(norm, v)), 0.001, 1.0);
