@@ -144,26 +144,26 @@ vec2 getScreenCoordinate(vec2 screenpos)
 //      Method #4: Spheremap Transform, Lambert Azimuthal Equal-Area projection
 vec3 getNorm(vec2 screenpos)
 {
-   vec2 enc = texture(normalMap, screenpos.xy).xy;
-   vec2 fenc = enc*4-2;
-   float f = dot(fenc,fenc);
-   float g = sqrt(1-f/4);
-   vec3 n;
-   n.xy = fenc*g;
-   n.z = 1-f/2;
-   return n;
+   vec2 f = texture(normalMap, screenpos.xy).xy;
+    f = f * 2.0 - 1.0;
+ 
+    // https://twitter.com/Stubbesaurus/status/937994790553227264
+    vec3 n = vec3( f.x, f.y, 1.0 - abs( f.x ) - abs( f.y ) );
+    float t = clamp( -n.z , 0.0, 1.0);
+    n.xy += vec2(n.x >= 0.0 ? -t : t, n.y >= 0.0 ? -t : t); 
+    return normalize( n );
 }
 
 vec3 getNormalFromPacked(vec4 packedNormalEnvIntensityFlags)
 {
-   vec2 enc = packedNormalEnvIntensityFlags.xy;
-   vec2 fenc = enc*4-2;
-   float f = dot(fenc,fenc);
-   float g = sqrt(1-f/4);
-   vec3 n;
-   n.xy = fenc*g;
-   n.z = 1-f/2;
-   return normalize(n); // TODO: Is this normalize redundant?
+    vec2 f = packedNormalEnvIntensityFlags.xy;
+    f = f * 2.0 - 1.0;
+
+    // https://twitter.com/Stubbesaurus/status/937994790553227264
+    vec3 n = vec3( f.x, f.y, 1.0 - abs( f.x ) - abs( f.y ) );
+    float t = clamp( -n.z , 0.0, 1.0);
+    n.xy += vec2(n.x >= 0.0 ? -t : t, n.y >= 0.0 ? -t : t); 
+    return normalize( n );
 }
 
 // return packedNormalEnvIntensityFlags since GBUFFER_FLAG_HAS_PBR needs .w
@@ -392,7 +392,7 @@ vec3 pbrIbl(vec3 diffuseColor,
             out vec3 specContrib)
 {
     // retrieve a scale and bias to F0. See [1], Figure 3
-    vec2 brdf = BRDF(clamp(nv, 0, 1), 1.0-perceptualRough);
+    vec2 brdf = BRDF(clamp(nv, 0, 1), perceptualRough);
     vec3 diffuseLight = irradiance;
     vec3 specularLight = radiance;
     
