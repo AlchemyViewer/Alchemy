@@ -1455,7 +1455,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
         {
             LLViewerJointAttachment* attachment = attach_pair.second;
 
-            if (attachment->getValid())
+            if (attachment && attachment->getValid())
             {
                 for (LLViewerObject* attached_object : attachment->mAttachedObjects)
                 {
@@ -1885,7 +1885,7 @@ BOOL LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 			for (const auto& attach_pair : mAttachmentPoints)
 			{
 				LLViewerJointAttachment* attachment = attach_pair.second;
-
+				if (!attachment) continue;
 				for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 				{
 					if (attached_object && !attached_object->isDead() && attachment->getValid())
@@ -1943,6 +1943,7 @@ LLViewerObject* LLVOAvatar::lineSegmentIntersectRiggedAttachments(const LLVector
 		for (const auto& attach_pair : mAttachmentPoints)
 		{
 			LLViewerJointAttachment* attachment = attach_pair.second;
+			if (!attachment) continue;
 
 			for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
@@ -2256,7 +2257,7 @@ void LLVOAvatar::releaseMeshData()
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
-		if (!attachment->getIsHUDAttachment())
+		if (attachment && !attachment->getIsHUDAttachment())
 		{
 			attachment->setAttachmentVisibility(FALSE);
 		}
@@ -2870,6 +2871,7 @@ void LLVOAvatar::idleUpdateMisc(bool detailed_update)
 		for (const auto& attach_point_pair : mAttachmentPoints)
 		{
 			LLViewerJointAttachment* attachment = attach_point_pair.second;
+			if (!attachment) continue;
 
 			for (LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
@@ -2883,7 +2885,7 @@ void LLVOAvatar::idleUpdateMisc(bool detailed_update)
 
                 LLSpatialBridge* bridge = attached_object->mDrawable->getSpatialBridge();
 				
-				if (visible || !(bridge && bridge->getRadius() < 2.0))
+				if (visible || !(bridge && bridge->getRadius() < 2.0f))
 				{
                     //override rigged attachments' octree spatial extents with this avatar's bounding box
                     bool rigged = false;
@@ -7761,7 +7763,7 @@ void LLVOAvatar::resetHUDAttachments()
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* attachment = attach_pair.second;
-		if (attachment->getIsHUDAttachment())
+		if (attachment && attachment->getIsHUDAttachment())
 		{
 			for (const LLViewerObject* attached_object : attachment->mAttachedObjects)
 			{
@@ -7779,6 +7781,8 @@ void LLVOAvatar::rebuildRiggedAttachments( void )
 	for (const auto& attach_pair : mAttachmentPoints)
 	{
 		LLViewerJointAttachment* pAttachment = attach_pair.second;
+		if (!pAttachment) continue;
+
 		for (const LLViewerObject* pAttachedObject : pAttachment->mAttachedObjects)
 		{
 			if (pAttachedObject && pAttachedObject->mDrawable.notNull() )
