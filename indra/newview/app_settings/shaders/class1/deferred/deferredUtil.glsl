@@ -392,7 +392,7 @@ vec3 pbrIbl(vec3 diffuseColor,
             out vec3 specContrib)
 {
     // retrieve a scale and bias to F0. See [1], Figure 3
-    vec2 brdf = BRDF(clamp(nv, 0, 1), 1.0-perceptualRough);
+    vec2 brdf = BRDF(clamp(nv, 0, 1), perceptualRough);
     vec3 diffuseLight = irradiance;
     vec3 specularLight = radiance;
     
