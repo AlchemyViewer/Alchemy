@@ -5,7 +5,9 @@
 		<column name="RuleName" label="ルール名"/>
 		<column name="direction" label="入／出"/>
 	</scroll_list>
-	<text name="message_type_lable">メッセージ種別：</text>
+	<text name="message_type_lable">
+		メッセージ種別：
+	</text>
 	<combo_box name="message_type"/>
 	<text_editor name="rule_editor"/>
 	<button name="save_rules" label="ルールを保存"/>

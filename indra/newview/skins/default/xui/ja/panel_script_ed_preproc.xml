@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="script panel">
-	<panel.string name="loading">読み込んでいます… </panel.string>
-	<panel.string name="can_not_view">このスクリプトは「コピーなし」に設定されているため、表示または編集できません。
-オブジェクト内のスクリプトを表示または編集するには、完全な権限が必要です。</panel.string>
-	<panel.string name="public_objects_can_not_run">パブリックオブジェクトはスクリプトを実行できません。</panel.string>
-	<panel.string name="script_running">実行中</panel.string>
-	<panel.string name="Title">スクリプト名：[NAME]</panel.string>
+	<panel.string name="loading">
+		読み込んでいます…
+	</panel.string>
+	<panel.string name="can_not_view">
+		このスクリプトは「コピーなし」に設定されているため、表示または編集できません。
+オブジェクト内のスクリプトを表示または編集するには、完全な権限が必要です。
+	</panel.string>
+	<panel.string name="public_objects_can_not_run">
+		公共オブジェクトはスクリプトを実行できません。
+	</panel.string>
+	<panel.string name="script_running">
+		実行中
+	</panel.string>
+	<panel.string name="Title">
+		スクリプト名：[NAME]
+	</panel.string>
 	<menu_bar name="script_menu">
 		<menu label="ファイル" name="File">
 			<menu_item_call label="保存" name="Save"/>
@@ -37,10 +47,14 @@
 	</menu_bar>
 	<tab_container name="Tabset">
 		<panel name="Script" label="スクリプト">
-			<script_editor name="Script Editor">読み込んでいます…</script_editor>
+			<script_editor name="Script Editor">
+				読み込んでいます…
+			</script_editor>
 		</panel>
 		<panel name="Preprocessed" label="プリプロセス済み">
-			<lsl_preproc_viewer name="Post Editor">読み込んでいます…</lsl_preproc_viewer>
+			<lsl_preproc_viewer name="Post Editor">
+				読み込んでいます…
+			</lsl_preproc_viewer>
 		</panel>
 	</tab_container>
 	<scroll_list name="lsl errors"/>

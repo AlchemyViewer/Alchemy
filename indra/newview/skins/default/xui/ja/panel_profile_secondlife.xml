@@ -7,8 +7,10 @@
 	<string name="date_format" value="ＳＬでの誕生日：[year,datetime,utc]年[mth,datetime,utc]月[day,datetime,utc]日"/>
 	<string name="age_format" value="[AGE]経過"/>
 	<string name="partner_text" value="パートナー：[LINK]"/>
-	<string name="CaptionTextAcctInfo">アカウント：[ACCTTYPE]
-[PAYMENTINFO]</string>
+	<string name="CaptionTextAcctInfo">
+		アカウント：[ACCTTYPE]
+[PAYMENTINFO]
+	</string>
 	<!--Badges-->
 	<string name="BadgeBeta" value="オリジナルβテスター"/>
 	<string name="BadgeBetaLifetime" value="β会員"/>

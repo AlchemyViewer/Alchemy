@@ -5,6 +5,8 @@
 	<layout_panel name="panel4"/>
 	<layout_panel name="center"/>
 	<layout_stack name="horizontal_centering">
-		<text name="logos_lbl">セカンドライフ使用</text>
+		<text name="logos_lbl">
+			セカンドライフ使用
+		</text>
 	</layout_stack>
 </panel>

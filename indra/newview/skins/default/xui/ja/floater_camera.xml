@@ -1,10 +1,20 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="camera_floater" help_topic="camera_floater" title="カメラ操作">
-	<floater.string name="rotate_tooltip">対象を中心にカメラを回す</floater.string>
-	<floater.string name="zoom_tooltip">対象にカメラをズーム</floater.string>
-	<floater.string name="move_tooltip">カメラを上下左右に移動</floater.string>
-	<floater.string name="free_mode_title">オブジェクト視点</floater.string>
-	<string name="inactive_combo_text">プリセットを使用</string>
+	<floater.string name="rotate_tooltip">
+		対象を中心にカメラを回す
+	</floater.string>
+	<floater.string name="zoom_tooltip">
+		対象にカメラをズーム
+	</floater.string>
+	<floater.string name="move_tooltip">
+		カメラを上下左右に移動
+	</floater.string>
+	<floater.string name="free_mode_title">
+		オブジェクト視点
+	</floater.string>
+	<string name="inactive_combo_text">
+		プリセットを使用
+	</string>
 	<panel name="controls">
 		<!--TODO: replace + - images -->
 		<panel name="zoom">
@@ -13,7 +23,9 @@
 			<slider_bar name="zoom_slider" tool_tip="対象にカメラをズームします。"/>
 			<button name="zoom_minus_btn"/>
 			<joystick_track name="cam_track_stick" tool_tip="カメラを上下左右に動かします。"/>
-			<text name="precise_ctrs_label">数値で角度方位を指定</text>
+			<text name="precise_ctrs_label">
+				数値で角度方位を指定
+			</text>
 		</panel>
 	</panel>
 	<panel name="buttons_panel">

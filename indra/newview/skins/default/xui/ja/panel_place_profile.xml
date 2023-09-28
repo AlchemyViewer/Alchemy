@@ -17,19 +17,37 @@
 	<string name="area_text" value="㎡"/>
 	<string name="all_residents_text" value="すべての住人"/>
 	<string name="group_text" value="グループ"/>
-	<string name="can_resell">このリージョンで購入した土地は、再販することができます。</string>
-	<string name="can_not_resell">このリージョンで購入した土地は、再販できません。</string>
-	<string name="can_change">このリージョンで購入した土地は、統合・分割することができます。</string>
-	<string name="can_not_change">このリージョンで購入した土地は、統合・分割できません。</string>
-	<string name="server_update_text">場所の情報は、サーバーがアップデートされるまでご利用いただけません。</string>
-	<string name="server_error_text">この場所の情報は現在ご利用いただけません。あとでもう一度お試しください。</string>
-	<string name="server_forbidden_text">この場所の情報は、アクセス制限のためご利用いただけません。許可については区画所有者にお問い合わせください。</string>
-	<string name="acquired_date">[year,datetime,local]年[mth,datetime,local]月[day,datetime,local]日[wkday,datetime,local]　[hour,datetime,local]：[min,datetime,local]：[second,datetime,local]</string>
+	<string name="can_resell">
+		このリージョンで購入した土地は、再販することができます。
+	</string>
+	<string name="can_not_resell">
+		このリージョンで購入した土地は、再販できません。
+	</string>
+	<string name="can_change">
+		このリージョンで購入した土地は、統合・分割することができます。
+	</string>
+	<string name="can_not_change">
+		このリージョンで購入した土地は、統合・分割できません。
+	</string>
+	<string name="server_update_text">
+		場所の情報は、サーバーがアップデートされるまでご利用いただけません。
+	</string>
+	<string name="server_error_text">
+		この場所の情報は現在ご利用いただけません。あとでもう一度お試しください。
+	</string>
+	<string name="server_forbidden_text">
+		この場所の情報は、アクセス制限のためご利用いただけません。許可については区画所有者にお問い合わせください。
+	</string>
+	<string name="acquired_date">
+		[year,datetime,local]年[mth,datetime,local]月[day,datetime,local]日[wkday,datetime,local]　[hour,datetime,local]：[min,datetime,local]：[second,datetime,local]
+	</string>
 	<button name="back_btn" tool_tip="戻る"/>
 	<text name="title" value="場所のプロフィール"/>
 	<scroll_container name="place_scroll">
 		<panel name="scrolling_panel">
-			<text name="region_title">リージョン：[REGIONAMEPOS]</text>
+			<text name="region_title">
+				リージョン：[REGIONAMEPOS]
+			</text>
 			<text name="parcel_title" value="不明"/>
 			<expandable_text name="description" value="不明"/>
 			<text name="owner_label" value="所有者："/>
@@ -79,7 +97,9 @@
 						<text name="region_owner_label" value="所有者："/>
 						<text name="region_owner" value="ムース・ヴァン・ムース エクストラ・ロング・ネーム・ムース"/>
 						<text name="region_group_label" value="グループ："/>
-						<text name="region_group">ムースヴィル・サウンドヴィル・ムースのマイティ・ムース</text>
+						<text name="region_group">
+							ムースヴィル・サウンドヴィル・ムースのマイティ・ムース
+						</text>
 						<button label="リージョン／不動産" name="region_info_btn"/>
 					</panel>
 				</accordion_tab>

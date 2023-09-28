@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="volumepulldown_floater">
-	<slider label="マスター" name="System Volume"/>
+	<slider label="全般" name="System Volume"/>
 	<slider label="ボタン" name="UI Volume"/>
 	<slider label="環境音" name="Wind Volume"/>
 	<slider label="サウンド" name="SFX Volume"/>

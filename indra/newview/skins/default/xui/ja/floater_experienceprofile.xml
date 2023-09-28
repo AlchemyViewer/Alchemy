@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="experience_profile" title="体験プロフィール">
-	<floater.string name="empty_slurl">（なし）</floater.string>
-	<floater.string name="maturity_icon_general">"Parcel_PG_Light"</floater.string>
-	<floater.string name="maturity_icon_moderate">"Parcel_M_Light"</floater.string>
-	<floater.string name="maturity_icon_adult">"Parcel_R_Light"</floater.string>
+	<floater.string name="empty_slurl">
+		（なし）
+	</floater.string>
+	<floater.string name="maturity_icon_general">
+		"Parcel_PG_Light"
+	</floater.string>
+	<floater.string name="maturity_icon_moderate">
+		"Parcel_M_Light"
+	</floater.string>
+	<floater.string name="maturity_icon_adult">
+		"Parcel_R_Light"
+	</floater.string>
 	<text name="edit_title" value="体験プロフィール"/>
 	<tab_container name="tab_container">
 		<panel name="panel_experience_info">
@@ -24,30 +32,42 @@
 							<expandable_text name="experience_description"/>
 						</layout_panel>
 						<layout_panel name="maturity panel">
-							<text name="ContentRating">レーティング区分：</text>
+							<text name="ContentRating">
+								レーティング区分：
+							</text>
 							<text name="ContentRatingText"/>
 						</layout_panel>
 						<layout_panel name="location panel">
-							<text name="Location">場所：</text>
+							<text name="Location">
+								場所：
+							</text>
 							<text name="LocationTextText"/>
 						</layout_panel>
 						<layout_panel name="marketplace panel">
-							<text name="Marketplace">マーケットプレイスストア：</text>
+							<text name="Marketplace">
+								マーケットプレイスストア：
+							</text>
 							<text name="marketplace"/>
 						</layout_panel>
 						<layout_panel name="owner panel">
-							<text name="Owner">所有者：</text>
+							<text name="Owner">
+								所有者：
+							</text>
 							<text name="OwnerText"/>
 						</layout_panel>
 						<layout_panel name="group_panel">
-							<text name="Group">グループ：</text>
+							<text name="Group">
+								グループ：
+							</text>
 							<text name="GroupText"/>
 						</layout_panel>
 						<layout_panel name="perm panel">
 							<button label="許可" name="allow_btn"/>
 							<button label="無視" name="forget_btn"/>
 							<button label="ブロック" name="block_btn"/>
-							<text name="privileged">この体験はすべての住人に対して有効です。</text>
+							<text name="privileged">
+								この体験はすべての住人に対して有効です。
+							</text>
 							<button label="嫌がらせの報告" name="report_btn"/>
 						</layout_panel>
 					</layout_stack>
@@ -60,16 +80,22 @@
 					<text name="edit_experience_title_label" value="名前："/>
 					<text name="edit_experience_desc_label" value="説明："/>
 					<button label="グループ" name="Group_btn"/>
-					<text name="edit_ContentRating">レーティング：</text>
+					<text name="edit_ContentRating">
+						レーティング区分：
+					</text>
 					<icons_combo_box label="Moderate" name="edit_ContentRatingText" tool_tip="体験のレーティング区分を上げると、体験を許可したすべての住人の権限がリセットされます。">
 						<icons_combo_box.item label="Adult" name="Adult" value="42"/>
 						<icons_combo_box.item label="Moderate" name="Mature" value="21"/>
 						<icons_combo_box.item label="General" name="PG" value="13"/>
 					</icons_combo_box>
-					<text name="edit_Location">場所：</text>
+					<text name="edit_Location">
+						場所：
+					</text>
 					<button label="現在に設定" name="location_btn"/>
 					<button label="場所をクリア" name="clear_btn"/>
-					<text name="edit_marketplace">マーケットプレイスストア：</text>
+					<text name="edit_marketplace">
+						マーケットプレイスストア：
+					</text>
 					<line_editor name="edit_marketplace"/>
 					<check_box label="体験を有効にする" name="edit_enable_btn" tool_tip=""/>
 					<check_box label="検索で表示しない" name="edit_private_btn"/>

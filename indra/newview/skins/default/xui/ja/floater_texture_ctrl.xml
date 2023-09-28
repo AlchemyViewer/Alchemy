@@ -15,6 +15,7 @@
 	<text name="size_lbl">[DIMENSIONS]</text>
 	<!--  middle: inventory mode -->
 	<button label="デフォルト" label_selected="デフォルト" name="Default"/>
+	<button label="透明" label_selected="透明" name="Transparent"/>
 	<button label="ブランク" label_selected="ブランク" name="Blank"/>
 	<button label="なし" label_selected="なし" name="None"/>
 	<button label="" label_selected="" name="Pipette"/>

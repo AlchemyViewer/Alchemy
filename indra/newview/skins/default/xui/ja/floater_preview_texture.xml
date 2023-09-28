@@ -1,10 +1,20 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="preview_texture">
-	<floater.string name="Title">テクスチャ：[NAME]</floater.string>
-	<floater.string name="Copy">インベントリにコピー</floater.string>
-	<floater.string name="UploadInfo">・[UPLOADER]によって[DATE]にアップロードされました。</floater.string>
-	<text name="desc txt">説明：</text>
-	<text name="dimensions">[WIDTH]px✕[HEIGHT]px</text>
+	<floater.string name="Title">
+		テクスチャ：[NAME]
+	</floater.string>
+	<floater.string name="Copy">
+		インベントリにコピー
+	</floater.string>
+	<floater.string name="UploadInfo">
+		・[UPLOADER]によって[DATE]にアップロードされました。
+	</floater.string>
+	<text name="desc txt">
+		説明：
+	</text>
+	<text name="dimensions">
+		[WIDTH]px×[HEIGHT]px
+	</text>
 	<layout_stack name="button_row_ls">
 		<layout_panel name="btn_keep_lp">
 			<button label="ＯＫ" name="Keep"/>

@@ -20,7 +20,7 @@
 					<color_swatch name="cloud_color"/>
 					<text name="cloud_map_label">雲の画像：</text>
 					<texture_picker name="cloud_map"/>
-					<text name="cloud_map_label">水面の画像：</text>
+					<text name="water_map_label">水面の画像：</text>
 					<texture_picker name="water_normal_map"/>
 				</layout_panel>
 				<layout_panel name="lp_2">
