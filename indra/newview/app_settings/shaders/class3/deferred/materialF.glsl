@@ -305,8 +305,6 @@ void main()
     float glossiness = specular_color.a;
     vec3 norm = getNormal(glossiness);
 
-    vec2 abnormal = encode_normal(norm.xyz);
-
     float emissive = getEmissive(diffcol);
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
@@ -347,8 +345,6 @@ void main()
     vec3 sun_contrib = min(da, shadow) * sunlit_linear;
     color.rgb += sun_contrib;
     color *= diffcol.rgb;
-
-    vec3 refnormpersp = reflect(pos.xyz, norm.xyz);
 
     float glare = 0.0;
 

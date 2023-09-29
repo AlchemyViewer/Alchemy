@@ -72,6 +72,8 @@ uniform vec2 screen_res;
 const float M_PI = 3.14159265;
 const float ONE_OVER_PI = 0.3183098861;
 
+const float MIN_PBR_ROUGHNESS = 0.045;
+
 vec3 srgb_to_linear(vec3 cs);
 vec3 atmosFragLightingLinear(vec3 light, vec3 additive, vec3 atten);
 
@@ -144,26 +146,26 @@ vec2 getScreenCoordinate(vec2 screenpos)
 //      Method #4: Spheremap Transform, Lambert Azimuthal Equal-Area projection
 vec3 getNorm(vec2 screenpos)
 {
-   vec2 enc = texture(normalMap, screenpos.xy).xy;
-   vec2 fenc = enc*4-2;
-   float f = dot(fenc,fenc);
-   float g = sqrt(1-f/4);
-   vec3 n;
-   n.xy = fenc*g;
-   n.z = 1-f/2;
-   return n;
+   vec2 f = texture(normalMap, screenpos.xy).xy;
+    f = f * 2.0 - 1.0;
+ 
+    vec3 n = vec3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+    float t = max(-n.z, 0.0);
+    n.x += n.x >= 0.0 ? -t : t;
+    n.y += n.y >= 0.0 ? -t : t;
+    return normalize(n);
 }
 
 vec3 getNormalFromPacked(vec4 packedNormalEnvIntensityFlags)
 {
-   vec2 enc = packedNormalEnvIntensityFlags.xy;
-   vec2 fenc = enc*4-2;
-   float f = dot(fenc,fenc);
-   float g = sqrt(1-f/4);
-   vec3 n;
-   n.xy = fenc*g;
-   n.z = 1-f/2;
-   return normalize(n); // TODO: Is this normalize redundant?
+    vec2 f = packedNormalEnvIntensityFlags.xy;
+    f = f * 2.0 - 1.0;
+
+    vec3 n = vec3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+    float t = max(-n.z, 0.0);
+    n.x += n.x >= 0.0 ? -t : t;
+    n.y += n.y >= 0.0 ? -t : t;
+    return normalize(n);
 }
 
 // return packedNormalEnvIntensityFlags since GBUFFER_FLAG_HAS_PBR needs .w
@@ -392,7 +394,7 @@ vec3 pbrIbl(vec3 diffuseColor,
             out vec3 specContrib)
 {
     // retrieve a scale and bias to F0. See [1], Figure 3
-    vec2 brdf = BRDF(clamp(nv, 0, 1), 1.0-perceptualRough);
+    vec2 brdf = BRDF(clamp(nv, 0, 1), perceptualRough);
     vec3 diffuseLight = irradiance;
     vec3 specularLight = radiance;
     
@@ -489,7 +491,7 @@ vec3 pbrPunctual(vec3 diffuseColor, vec3 specularColor,
                     out vec3 specContrib) //specular contribution (exposed to alpha shaders to calculate "glare")
 {
     // make sure specular highlights from punctual lights don't fall off of polished surfaces
-    perceptualRoughness = max(perceptualRoughness, 8.0/255.0);
+    perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
     
 	float alphaRoughness = perceptualRoughness * perceptualRoughness;
 
@@ -566,6 +568,7 @@ void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor
 
 vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, vec3 additive, vec3 atten, out vec3 specContrib)
 {
+    perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
     vec3 color = vec3(0);
 
     float NdotV = clamp(abs(dot(norm, v)), 0.001, 1.0);

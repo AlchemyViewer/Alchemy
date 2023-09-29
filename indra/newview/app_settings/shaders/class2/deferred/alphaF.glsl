@@ -254,11 +254,7 @@ void main()
     sampleReflectionProbesLegacy(irradiance, glossenv, legacyenv, frag, pos.xyz, norm.xyz, 0.0, 0.0, true, amblit_linear);
     
 
-    float da = dot(norm.xyz, light_dir.xyz);
-          da = clamp(da, -1.0, 1.0);
- 
-    float final_da = da;
-          final_da = clamp(final_da, 0.0f, 1.0f);
+    float final_da = clamp(dot(norm.xyz, light_dir.xyz), 0.0, 1.0);
 
     vec4 color = vec4(0.0);
 
