@@ -27,16 +27,11 @@
  // https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
  //
 
-vec2 OctWrap( vec2 v )
-{
-    return ( 1.0 - abs( v.yx ) ) * vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0); 
-}
-
 vec2 encode_normal(vec3 n)
 {
-    n /= ( abs( n.x ) + abs( n.y ) + abs( n.z ) );
-    n.xy = n.z >= 0.0 ? n.xy : OctWrap( n.xy );
-    n.xy = n.xy * 0.5 + 0.5;
-    return n.xy;
+    n *= 1.0 / max(dot(abs(n), vec3(1.0)), 1e-6);
+    float t = clamp(-n.z, 0.0, 1.0);
+	n.x += n.x >= 0.0 ? t : -t;
+	n.y += n.y >= 0.0 ? t : -t;
+    return n.xy * 0.5 + 0.5;
 }
-
