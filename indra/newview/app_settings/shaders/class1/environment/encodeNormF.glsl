@@ -23,12 +23,20 @@
  * $/LicenseInfo$
  */
 
-// Lambert Azimuthal Equal-Area projection
-// See: https://aras-p.info/texts/CompactNormalStorage.html
-// Also see: A_bit_more_deferred_-_CryEngine3.ppt
+ // Octahedron normal vector encoding
+ // https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
+ //
+
+vec2 OctWrap( vec2 v )
+{
+    return ( 1.0 - abs( v.yx ) ) * vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0); 
+}
+
 vec2 encode_normal(vec3 n)
 {
-	float f = sqrt(8 * n.z + 8);
-	return n.xy / f + 0.5;
+    n /= ( abs( n.x ) + abs( n.y ) + abs( n.z ) );
+    n.xy = n.z >= 0.0 ? n.xy : OctWrap( n.xy );
+    n.xy = n.xy * 0.5 + 0.5;
+    return n.xy;
 }
 

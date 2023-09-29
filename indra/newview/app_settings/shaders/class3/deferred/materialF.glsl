@@ -305,8 +305,6 @@ void main()
     float glossiness = specular_color.a;
     vec3 norm = getNormal(glossiness);
 
-    vec2 abnormal = encode_normal(norm.xyz);
-
     float emissive = getEmissive(diffcol);
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
