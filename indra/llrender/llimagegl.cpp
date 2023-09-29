@@ -1779,7 +1779,7 @@ BOOL LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, BOOL data_
     }
 
     
-    mTextureMemory = S64Bytes(getMipBytes(mCurrentDiscardLevel));
+    mTextureMemory = (S64Bytes)getMipBytes(mCurrentDiscardLevel);
     mTexelsInGLTexture = getWidth() * getHeight();
 
     // mark this as bound at this point, so we don't throw it out immediately
