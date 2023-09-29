@@ -346,8 +346,6 @@ void main()
     color.rgb += sun_contrib;
     color *= diffcol.rgb;
 
-    vec3 refnormpersp = reflect(pos.xyz, norm.xyz);
-
     float glare = 0.0;
 
     if (glossiness > 0.0)
