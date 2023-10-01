@@ -475,14 +475,6 @@ void LLShaderMgr::dumpObjectLog(GLuint ret, BOOL warns, const std::string& filen
 
 GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels)
 {
-// endsure work-around for missing GLSL funcs gets propogated to feature shader files (e.g. srgbF.glsl)
-#if LL_DARWIN
-    if (defines)
-    {
-        (*defines)["OLD_SELECT"] = "1";
-    }
-#endif
-
 	GLenum error = GL_NO_ERROR;
 
 	error = glGetError();

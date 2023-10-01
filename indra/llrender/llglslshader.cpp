@@ -403,11 +403,6 @@ BOOL LLGLSLShader::createShader(std::vector<LLStaticHashedString>* attributes,
 
     llassert_always(!mShaderFiles.empty());
 
-#if LL_DARWIN
-    // work-around missing mix(vec3,vec3,bvec3)
-    mDefines["OLD_SELECT"] = "1";
-#endif
-
     mShaderHash = hash();
 
     // Create program
