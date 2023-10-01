@@ -124,26 +124,6 @@ void LLReflectionMapManager::update()
 
     initReflectionMaps();
 
-    if (!mRenderTarget.isComplete())
-    {
-        U32 color_fmt = GL_RGB16F;
-        U32 targetRes = mProbeResolution * 4; // super sample
-        mRenderTarget.allocate(targetRes, targetRes, color_fmt, true);
-    }
-
-    if (mMipChain.empty())
-    {
-        U32 res = mProbeResolution;
-        U32 count = log2((F32)res) + 0.5f;
-        
-        mMipChain.resize(count);
-        for (int i = 0; i < count; ++i)
-        {
-            mMipChain[i].allocate(res, res, GL_RGB16F);
-            res /= 2;
-        }
-    }
-
     llassert(mProbes[0] == mDefaultProbe);
     
     LLVector4a camera_pos;
@@ -1267,6 +1247,28 @@ void LLReflectionMapManager::initReflectionMaps()
         mDefaultProbe->mProbeIndex = 0;
         touch_default_probe(mDefaultProbe);
 
+        mRenderTarget.release();
+        mMipChain.clear();
+    }
+
+    if (!mRenderTarget.isComplete())
+    {
+        U32 color_fmt = GL_RGB16F;
+        U32 targetRes = mProbeResolution * 4; // super sample
+        mRenderTarget.allocate(targetRes, targetRes, color_fmt, true);
+    }
+
+    if (mMipChain.empty())
+    {
+        U32 res = mProbeResolution;
+        U32 count = log2((F32)res) + 0.5f;
+
+        mMipChain.resize(count);
+        for (int i = 0; i < count; ++i)
+        {
+            mMipChain[i].allocate(res, res, GL_RGB16F);
+            res /= 2;
+        }
     }
 
     if (mVertexBuffer.isNull())
