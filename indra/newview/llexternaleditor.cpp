@@ -46,8 +46,7 @@ LLExternalEditor::EErrorCode LLExternalEditor::setCommand(const std::string& env
 	{
 		LL_WARNS() << "Editor command is empty or not set, falling back to OS-specific open handler" << LL_ENDL;
 #if LL_WINDOWS
-		static std::string comspec = getenv("COMSPEC");
-		static const std::string os_cmd = comspec.append(" /C START \"%s\"");
+		static const std::string os_cmd = "C:\\Windows\\explorer.exe \"%s\"";
 #elif LL_DARWIN
 		static const std::string os_cmd = "/usr/bin/open \"%s\"";
 #elif LL_LINUX
