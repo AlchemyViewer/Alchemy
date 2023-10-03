@@ -117,7 +117,12 @@ class LLLocalBitmapMgr final : public LLSingleton<LLLocalBitmapMgr>
 	~LLLocalBitmapMgr();
 public:
     bool         addUnit(const std::vector<std::string>& filenames);
+protected:
+	LLUUID       addUnitInternal(const std::string& filename);
+public:
     LLUUID       addUnit(const std::string& filename);
+	LLUUID       getUnitID(const std::string& filename);
+// [/SL:KB]
 	void         delUnit(LLUUID tracking_id);
 	bool 		checkTextureDimensions(std::string filename);
 

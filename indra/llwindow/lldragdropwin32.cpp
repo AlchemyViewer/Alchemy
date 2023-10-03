@@ -43,9 +43,12 @@ class LLDragDropWin32Target:
 		//
 		LLDragDropWin32Target( HWND  hWnd ) :
 			mRefCount( 1 ),
-			mAppWindowHandle( hWnd ),
-			mAllowDrop(false),
-			mIsSlurl(false)
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+			mAppWindowHandle(hWnd)
+// [/SL:KB]
+//			mAppWindowHandle( hWnd ),
+//			mAllowDrop(false),
+//			mIsSlurl(false)
 		{
 		};
 
@@ -98,39 +101,87 @@ class LLDragDropWin32Target:
 		//
 		HRESULT __stdcall DragEnter( IDataObject* pDataObject, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect )
 		{
-			FORMATETC fmtetc = { CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+			*pdwEffect = DROPEFFECT_NONE;
+			mDropType = LLWindowCallbacks::DNDT_NONE;
+			mDropData.clear();
 
-			// support CF_TEXT using a HGLOBAL?
-			if ( S_OK == pDataObject->QueryGetData( &fmtetc ) )
+			IEnumFORMATETC* pEnumFmt = NULL;
+			if ( (S_OK == pDataObject->EnumFormatEtc(DATADIR_GET, &pEnumFmt)) && (pEnumFmt) )
 			{
-				mAllowDrop = true;
-				mDropUrl = std::string();
-				mIsSlurl = false;
-
-				STGMEDIUM stgmed;
-				if( S_OK == pDataObject->GetData( &fmtetc, &stgmed ) )
+				FORMATETC fmtetc; bool fContinue = true;
+				while ( (fContinue) && (S_OK == pEnumFmt->Next(1, &fmtetc, NULL)) )
 				{
-					PVOID data = GlobalLock( stgmed.hGlobal );
-					mDropUrl = std::string( (char*)data );
-					// XXX MAJOR MAJOR HACK!
-					LLWindowWin32 *window_imp = (LLWindowWin32 *)GetWindowLongPtr( mAppWindowHandle, GWLP_USERDATA );
-					if (NULL != window_imp)
+					switch (fmtetc.cfFormat)
 					{
-						LLCoordGL gl_coord( 0, 0 );
+						case CF_HDROP:	// Files dropped from Explorer
+							{
+								fContinue = false;
 
-						POINT pt2;
-						pt2.x = pt.x;
-						pt2.y = pt.y;
-						ScreenToClient( mAppWindowHandle, &pt2 );
+								STGMEDIUM stgmed;
+								if (S_OK == pDataObject->GetData(&fmtetc, &stgmed))
+								{
+									wchar_t strFilePath[MAX_PATH];
 
-						LLCoordWindow cursor_coord_window( pt2.x, pt2.y );
-						MASK mask = gKeyboard->currentMask(TRUE);
+									HDROP hDrop = (HDROP)GlobalLock(stgmed.hGlobal);
+									for (int idxFile = 0, cntFile = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0); idxFile < cntFile; idxFile++)
+									{
+										UINT nRet = DragQueryFile(hDrop, idxFile, strFilePath, sizeof(strFilePath));
+										if (nRet)
+										{
+											std::string meowstr = ll_convert_wide_to_string(strFilePath);
+											LL_INFOS() << meowstr << LL_ENDL;
+											mDropData.push_back(meowstr);
+										}
+									}
+									GlobalUnlock(stgmed.hGlobal);
 
-						LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest( cursor_coord_window.convert(), mask, 
-							LLWindowCallbacks::DNDA_START_TRACKING, mDropUrl );
+									ReleaseStgMedium(&stgmed);
 
-						switch (result)
-						{
+									mDropType = LLWindowCallbacks::DNDT_FILE;
+								}
+							}
+							break;
+						case CF_TEXT:
+							{
+								fContinue = false;
+
+								STGMEDIUM stgmed;
+								if (S_OK == pDataObject->GetData(&fmtetc, &stgmed))
+								{
+									void* pData = GlobalLock(stgmed.hGlobal);
+									mDropData.push_back(std::string((char*)pData));
+									GlobalUnlock( stgmed.hGlobal );
+
+									ReleaseStgMedium(&stgmed);
+
+									mDropType = LLWindowCallbacks::DNDT_DEFAULT;
+								}
+							}
+							break;
+						default:
+							break;
+					}
+				}
+			}
+
+			if (LLWindowCallbacks::DNDT_NONE != mDropType)
+			{
+				// XXX MAJOR MAJOR HACK!
+				LLWindowWin32* window_imp = (LLWindowWin32*)GetWindowLongPtr(mAppWindowHandle, GWLP_USERDATA);
+				if (NULL != window_imp)
+				{
+					LLCoordGL gl_coord(0, 0);
+
+					POINT pt2  = { pt.x, pt.y };
+					ScreenToClient(mAppWindowHandle, &pt2);
+
+					LLCoordWindow cursor_coord_window(pt2.x, pt2.y);
+					MASK mask = gKeyboard->currentMask(TRUE);
+
+					LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest(cursor_coord_window.convert(), mask, LLWindowCallbacks::DNDA_START_TRACKING, mDropType, mDropData);
+					switch (result)
+					{
 						case LLWindowCallbacks::DND_COPY:
 							*pdwEffect = DROPEFFECT_COPY;
 							break;
@@ -144,28 +195,85 @@ class LLDragDropWin32Target:
 						default:
 							*pdwEffect = DROPEFFECT_NONE;
 							break;
-						}
-					};
+					}
+				}
 
-					GlobalUnlock( stgmed.hGlobal );
-					ReleaseStgMedium( &stgmed );
-				};
 				SetFocus( mAppWindowHandle );
 			}
-			else
-			{
-				mAllowDrop = false;
-				*pdwEffect = DROPEFFECT_NONE;
-			};
-
 			return S_OK;
+// [/SL:KB]
+//			FORMATETC fmtetc = { CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+//
+//			// support CF_TEXT using a HGLOBAL?
+//			if ( S_OK == pDataObject->QueryGetData( &fmtetc ) )
+//			{
+//				mAllowDrop = true;
+//				mDropUrl = std::string();
+//				mIsSlurl = false;
+//
+//				STGMEDIUM stgmed;
+//				if( S_OK == pDataObject->GetData( &fmtetc, &stgmed ) )
+//				{
+//					PVOID data = GlobalLock( stgmed.hGlobal );
+//					mDropUrl = std::string( (char*)data );
+//					// XXX MAJOR MAJOR HACK!
+//					LLWindowWin32 *window_imp = (LLWindowWin32 *)GetWindowLong(mAppWindowHandle, GWL_USERDATA);
+//					if (NULL != window_imp)
+//					{
+//						LLCoordGL gl_coord( 0, 0 );
+//
+//						POINT pt2;
+//						pt2.x = pt.x;
+//						pt2.y = pt.y;
+//						ScreenToClient( mAppWindowHandle, &pt2 );
+//
+//						LLCoordWindow cursor_coord_window( pt2.x, pt2.y );
+//						MASK mask = gKeyboard->currentMask(TRUE);
+//
+//						LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest( cursor_coord_window.convert(), mask, 
+//							LLWindowCallbacks::DNDA_START_TRACKING, mDropUrl );
+//
+//						switch (result)
+//						{
+//						case LLWindowCallbacks::DND_COPY:
+//							*pdwEffect = DROPEFFECT_COPY;
+//							break;
+//						case LLWindowCallbacks::DND_LINK:
+//							*pdwEffect = DROPEFFECT_LINK;
+//							break;
+//						case LLWindowCallbacks::DND_MOVE:
+//							*pdwEffect = DROPEFFECT_MOVE;
+//							break;
+//						case LLWindowCallbacks::DND_NONE:
+//						default:
+//							*pdwEffect = DROPEFFECT_NONE;
+//							break;
+//						}
+//					};
+//
+//					GlobalUnlock( stgmed.hGlobal );
+//					ReleaseStgMedium( &stgmed );
+//				};
+//				SetFocus( mAppWindowHandle );
+//			}
+//			else
+//			{
+//				mAllowDrop = false;
+//				*pdwEffect = DROPEFFECT_NONE;
+//			};
+//
+//			return S_OK;
 		};
 
 		////////////////////////////////////////////////////////////////////////////////
 		//
 		HRESULT __stdcall DragOver( DWORD grfKeyState, POINTL pt, DWORD* pdwEffect )
 		{
-			if ( mAllowDrop )
+//			if ( mAllowDrop )
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+			*pdwEffect = DROPEFFECT_NONE;
+			if (LLWindowCallbacks::DNDT_NONE != mDropType)
+// [/SL:KB]
 			{
 				// XXX MAJOR MAJOR HACK!
 				LLWindowWin32 *window_imp = (LLWindowWin32 *)GetWindowLongPtr( mAppWindowHandle, GWLP_USERDATA );
@@ -181,8 +289,11 @@ class LLDragDropWin32Target:
 					LLCoordWindow cursor_coord_window( pt2.x, pt2.y );
 					MASK mask = gKeyboard->currentMask(TRUE);
 
-					LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest( cursor_coord_window.convert(), mask, 
-						LLWindowCallbacks::DNDA_TRACK, mDropUrl );
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+					LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest(cursor_coord_window.convert(), mask, LLWindowCallbacks::DNDA_TRACK, mDropType, mDropData);
+// [/SL:KB]
+//					LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest( cursor_coord_window.convert(), mask, 
+//						LLWindowCallbacks::DNDA_TRACK, mDropUrl );
 					
 					switch (result)
 					{
@@ -202,10 +313,10 @@ class LLDragDropWin32Target:
 					}
 				};
 			}
-			else
-			{
-				*pdwEffect = DROPEFFECT_NONE;
-			};
+//			else
+//			{
+//				*pdwEffect = DROPEFFECT_NONE;
+//			};
 
 			return S_OK;
 		};
@@ -220,7 +331,10 @@ class LLDragDropWin32Target:
 			{
 				LLCoordGL gl_coord( 0, 0 );
 				MASK mask = gKeyboard->currentMask(TRUE);
-				window_imp->completeDragNDropRequest( gl_coord, mask, LLWindowCallbacks::DNDA_STOP_TRACKING, mDropUrl );
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+				window_imp->completeDragNDropRequest(gl_coord, mask, LLWindowCallbacks::DNDA_STOP_TRACKING, mDropType, mDropData);
+// [/SL:KB]
+//				window_imp->completeDragNDropRequest( gl_coord, mask, LLWindowCallbacks::DNDA_STOP_TRACKING, mDropUrl );
 			};
 			return S_OK;
 		};
@@ -229,7 +343,10 @@ class LLDragDropWin32Target:
 		//
 		HRESULT __stdcall Drop( IDataObject* pDataObject, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect )
 		{
-			if ( mAllowDrop )
+//			if ( mAllowDrop )
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+			if (LLWindowCallbacks::DNDT_NONE != mDropType)
+// [/SL:KB]
 			{
 				// window impl stored in Window data (neat!)
 				LLWindowWin32 *window_imp = (LLWindowWin32 *)GetWindowLongPtr( mAppWindowHandle, GWLP_USERDATA );
@@ -242,7 +359,7 @@ class LLDragDropWin32Target:
 
 					LLCoordWindow cursor_coord_window( pt_client.x, pt_client.y );
 					LLCoordGL gl_coord(cursor_coord_window.convert());
-					LL_INFOS() << "### (Drop) URL is: " << mDropUrl << LL_ENDL;
+//					LL_INFOS() << "### (Drop) URL is: " << mDropUrl << LL_ENDL;
 					LL_INFOS() << "###        raw coords are: " << pt.x << " x " << pt.y << LL_ENDL;
 					LL_INFOS() << "###	    client coords are: " << pt_client.x << " x " << pt_client.y << LL_ENDL;
 					LL_INFOS() << "###         GL coords are: " << gl_coord.mX << " x " << gl_coord.mY << LL_ENDL;
@@ -252,8 +369,11 @@ class LLDragDropWin32Target:
 					MASK mask = gKeyboard->currentMask( TRUE );
 
 					// actually do the drop
-					LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest( gl_coord, mask, 
-						LLWindowCallbacks::DNDA_DROPPED, mDropUrl );
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+					LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest(gl_coord, mask, LLWindowCallbacks::DNDA_DROPPED, mDropType, mDropData);
+// [/SL:KB]
+//					LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest( gl_coord, mask, 
+//						LLWindowCallbacks::DNDA_DROPPED, mDropUrl );
 
 					switch (result)
 					{
@@ -286,9 +406,13 @@ class LLDragDropWin32Target:
 	private:
 		LONG mRefCount;
 		HWND mAppWindowHandle;
-		bool mAllowDrop;
-		std::string mDropUrl;
-		bool mIsSlurl;
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+		LLWindowCallbacks::DragNDropType mDropType;
+		std::vector<std::string>         mDropData;
+// [/SL:KB]
+//		bool mAllowDrop;
+//		std::string mDropUrl;
+//		bool mIsSlurl;
 		friend class LLWindowWin32;
 };
 

@@ -2063,8 +2063,13 @@ void LLWindowMacOSX::handleDragNDrop(std::string url, LLWindowCallbacks::DragNDr
 	
 	if(!url.empty())
 	{
-		LLWindowCallbacks::DragNDropResult res =
-		mCallbacks->handleDragNDrop(this, gl_pos, mask, action, url);
+//		LLWindowCallbacks::DragNDropResult res =
+//		mCallbacks->handleDragNDrop(this, gl_pos, mask, action, url);
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+		std::vector<std::string> data;
+		data.push_back(url);
+		LLWindowCallbacks::DragNDropResult res = mCallbacks->handleDragNDrop(this, gl_pos, mask, action, LLWindowCallbacks::DNDT_DEFAULT, data);
+// [/SL:KB]
 		
 		switch (res) {
 			case LLWindowCallbacks::DND_NONE:		// No drop allowed

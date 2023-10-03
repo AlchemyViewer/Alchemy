@@ -499,41 +499,46 @@ const void upload_single_file(const std::vector<std::string>& filenames, LLFileP
 				LLNotificationsUtil::add(error_msg, args);
 				return;
 			}
-			else
-			{
-				LLFloaterReg::showInstance("upload_sound", LLSD(filename));
-			}
 		}
-		if (type == LLFilePicker::FFLOAD_IMAGE)
+
+		std::string floater_name;
+
+		switch (type)
 		{
-			LLFloaterReg::showInstance("upload_image", LLSD(filename));
-		}
-		if (type == LLFilePicker::FFLOAD_ANIM)
+		case LLFilePicker::FFLOAD_ANIM:
 		{
 			std::string filename_lc(filename);
 			LLStringUtil::toLower(filename_lc);
-			if (filename_lc.rfind(".anim") != std::string::npos)
-			{
-				LLFloaterReg::showInstance("upload_anim_anim", LLSD(filename));
-			}
-			else
-			{
-				LLFloaterReg::showInstance("upload_anim_bvh", LLSD(filename));
-			}
-		}		
+			floater_name = (filename_lc.rfind(".anim") != std::string::npos) ? "upload_anim_anim" : "upload_anim_bvh";
+		}
+		break;
+		case LLFilePicker::FFLOAD_IMAGE:
+			floater_name = "upload_image";
+			break;
+		case LLFilePicker::FFLOAD_WAV:
+			floater_name = "upload_sound";
+			break;
+		case LLFilePicker::FFLOAD_MODEL:
+			if (LLFloaterModelPreview* pFloaterModelPreview = LLFloaterReg::getTypedInstance<LLFloaterModelPreview>("upload_model"))
+				pFloaterModelPreview->loadModel(LLModel::LOD_HIGH, filename);
+			return;
+		case LLFilePicker::FFLOAD_GLTF:
+			LLMaterialEditor::loadMaterialFromFile(filename, -1);
+			return;
+		default:
+			break;
+		}
+
+		if (!floater_name.empty())
+		{
+			LLFloaterReg::showInstance(floater_name, LLSD(filename));
+		}
 	}
 	return;
 }
 
-void do_bulk_upload(std::vector<std::string> filenames, const LLSD& notification, const LLSD& response)
+void do_bulk_upload(std::vector<std::string> filenames)
 {
-	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
-	if (option != 0)
-	{
-		// Cancel upload
-		return;
-	}
-
 	for (std::vector<std::string>::const_iterator in_iter = filenames.begin(); in_iter != filenames.end(); ++in_iter)
 	{
 		std::string filename = (*in_iter);
@@ -583,6 +588,18 @@ void do_bulk_upload(std::vector<std::string> filenames, const LLSD& notification
             }
         }
     }
+}
+
+void do_bulk_upload(std::vector<std::string> filenames, const LLSD& notification, const LLSD& response)
+{
+	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+	if (option != 0)
+	{
+		// Cancel upload
+		return;
+	}
+
+	do_bulk_upload(filenames);
 }
 
 bool get_bulk_upload_expected_cost(const std::vector<std::string>& filenames, S32& total_cost, S32& file_count)
@@ -680,10 +697,24 @@ const void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::
 	S32 expected_upload_count;
 	if (get_bulk_upload_expected_cost(filtered_filenames, expected_upload_cost, expected_upload_count))
 	{
-		LLSD args;
-		args["COST"] = expected_upload_cost;
-		args["COUNT"] = expected_upload_count;
-		LLNotificationsUtil::add("BulkUploadCostConfirmation",  args, LLSD(), boost::bind(do_bulk_upload, filtered_filenames, _1, _2));
+		static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
+		if (sPowerfulWizard && expected_upload_cost == 0)
+		{
+			do_bulk_upload(filtered_filenames);
+		}
+		else
+		{
+			LLSD args;
+			args["COST"] = expected_upload_cost;
+			args["COUNT"] = expected_upload_count;
+
+			std::string strUploadList;
+			for (const std::string& filename : filtered_filenames)
+				strUploadList += gDirUtilp->getBaseFileName(filename) + "\n";
+			args["FILES"] = strUploadList;
+
+			LLNotificationsUtil::add("BulkUploadCostConfirmation", args, LLSD(), boost::bind(do_bulk_upload, filtered_filenames, _1, _2));
+		}
 
 		if (filtered_filenames.size() > expected_upload_count)
 		{

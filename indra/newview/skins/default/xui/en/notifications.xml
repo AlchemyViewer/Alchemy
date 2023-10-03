@@ -8973,6 +8973,8 @@ Your voice has been muted by moderator.
     name="BulkUploadCostConfirmation"
     type="alertmodal">
 This will upload [COUNT] items at a total cost of L$[COST]. Do you wish to continue with the upload?
+
+[FILES]
     <usetemplate
      name="okcancelbuttons"
      notext="Cancel"
