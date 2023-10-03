@@ -6,6 +6,9 @@
 	<string name="brightness_string">
 		ブライトネス：
 	</string>
+	<string name="hdr_tooltip">
+		リアルで明るい空やダイナミックな露出などの光源効果の強さを指定します。1.0がデフォルトで、0はオフとなり、0～1の間の値はアンビエントとＨＤＲの混合となります。
+	</string>
 	<layout_stack name="main_ls">
 		<layout_panel name="top_lp">
 			<text name="ambient_color_label">

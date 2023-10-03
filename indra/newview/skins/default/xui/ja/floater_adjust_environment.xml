@@ -2,6 +2,9 @@
 <floater name="env_adjust_snapshot" title="個人的な光源">
 	<string name="hdr_string">ＨＤＲスケール：</string>
 	<string name="brightness_string">輝度：</string>
+	<string name="hdr_tooltip">
+		リアルで明るい空やダイナミックな露出などの光源効果の強さを指定します。1.0がデフォルトで、0はオフとなり、0～1の間の値は周辺とＨＤＲの混合となります。
+	</string>
 	<layout_stack name="outer_stack">
 		<!-- If I put in a timeline it would go here -->
 		<layout_panel name="env_controls">
