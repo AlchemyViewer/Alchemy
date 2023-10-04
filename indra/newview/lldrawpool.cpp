@@ -468,7 +468,7 @@ void LLRenderPass::pushRiggedBatches(U32 type, bool texture, bool batch_textures
             LLDrawInfo* pparams = *i;
             LLCullResult::increment_iterator(i, end);
 
-            if (pparams->mAvatar.notNull() && (lastAvatar != pparams->mAvatar || lastMeshId != pparams->mSkinInfo->mHash))
+            if (pparams->mAvatar.notNull() && (lastAvatar != pparams->mAvatar.get() || lastMeshId != pparams->mSkinInfo->mHash))
             {
                 uploadMatrixPalette(*pparams);
                 lastAvatar = pparams->mAvatar;
@@ -820,7 +820,7 @@ void LLRenderPass::pushUntexturedRiggedGLTFBatches(U32 type)
 
 void LLRenderPass::pushRiggedGLTFBatch(LLDrawInfo& params, LLVOAvatar*& lastAvatar, U64& lastMeshId)
 {
-    if (params.mAvatar.notNull() && (lastAvatar != params.mAvatar || lastMeshId != params.mSkinInfo->mHash))
+    if (params.mAvatar.notNull() && (lastAvatar != params.mAvatar.get() || lastMeshId != params.mSkinInfo->mHash))
     {
         uploadMatrixPalette(params);
         lastAvatar = params.mAvatar;
@@ -832,7 +832,7 @@ void LLRenderPass::pushRiggedGLTFBatch(LLDrawInfo& params, LLVOAvatar*& lastAvat
 
 void LLRenderPass::pushUntexturedRiggedGLTFBatch(LLDrawInfo& params, LLVOAvatar*& lastAvatar, U64& lastMeshId)
 {
-    if (params.mAvatar.notNull() && (lastAvatar != params.mAvatar || lastMeshId != params.mSkinInfo->mHash))
+    if (params.mAvatar.notNull() && (lastAvatar != params.mAvatar.get() || lastMeshId != params.mSkinInfo->mHash))
     {
         uploadMatrixPalette(params);
         lastAvatar = params.mAvatar;
