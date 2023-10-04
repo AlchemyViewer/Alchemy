@@ -577,30 +577,10 @@ void LLMenuItemGL::onVisibilityChange(BOOL new_visibility)
 LLMenuItemSeparatorGL::LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params& p) :
 	LLMenuItemGL( p )
 {
-}
-
-void LLMenuItemSeparatorGL::initFromParams(const Params& p)
-{
-	if (p.on_visible.isProvided())
-	{
-		mVisibleSignal.connect(initEnableCallback(p.on_visible));
-	}
-	LLUICtrl::initFromParams(p);
-}
-
-void LLMenuItemSeparatorGL::updateVisible()
-{
-	if (mVisibleSignal.num_slots() > 0)
-	{
-		bool visible = mVisibleSignal(this, LLSD());
-		setVisible(visible);
-	}
-}
-
-void LLMenuItemSeparatorGL::buildDrawLabel()
-{
-	updateVisible();
-	LLMenuItemGL::buildDrawLabel();
+    if (p.on_visible.isProvided())
+    {
+        mVisibleSignal.connect(initEnableCallback(p.on_visible));
+    }
 }
 
 //virtual
@@ -615,6 +595,15 @@ void LLMenuItemSeparatorGL::draw( void )
 	const S32 y = getRect().getHeight() / 2;
 	const S32 PAD = 6;
 	gl_line_2d( PAD, y, getRect().getWidth() - PAD, y );
+}
+
+void LLMenuItemSeparatorGL::buildDrawLabel( void )
+{
+    if (mVisibleSignal.num_slots() > 0)
+    {
+        bool visible = mVisibleSignal(this, LLSD());
+        setVisible(visible);
+    }
 }
 
 BOOL LLMenuItemSeparatorGL::handleMouseDown(S32 x, S32 y, MASK mask)

@@ -443,7 +443,7 @@ BOOL ALFloaterAO::newSetCallback(const LLSD& notification, const LLSD& response)
 	
 	if (option == 0)
 	{
-		if (ALAOEngine::instance().addSet(new_name).notNull())
+		ALAOEngine::instance().addSet(new_name);
 		{
 			reloading(true);
 			return TRUE;

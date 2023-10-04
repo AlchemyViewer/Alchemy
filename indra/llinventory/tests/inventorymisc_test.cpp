@@ -401,15 +401,7 @@ namespace tut
 		// Deleted LLInventoryItem::exportFileXML() and LLInventoryItem::importXML()
 		// because I can't find any non-test code references to it. 2009-05-04 JC
 	}
-		
-	template<> template<>
-	void inventory_object::test<10>()
-	{
-		// Deleted LLInventoryItem::packBinaryBucket() and LLInventoryItem::unpackBinaryBucket()
-		// because I can't find any non-test code references to it.
-	
-	}
-	
+
 	template<> template<>
 	void inventory_object::test<11>()
 	{

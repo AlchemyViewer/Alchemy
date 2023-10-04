@@ -545,6 +545,15 @@ void LLUICtrl::setControlVariable(LLControlVariable* control)
 	}
 }
 
+void LLUICtrl::removeControlVariable()
+{
+    if (mControlVariable)
+    {
+        mControlConnection.disconnect();
+        mControlVariable = NULL;
+    }
+}
+
 //virtual
 void LLUICtrl::setControlName(std::string_view control_name, LLView *context)
 {

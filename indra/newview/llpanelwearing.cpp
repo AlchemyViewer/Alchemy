@@ -40,6 +40,7 @@
 #include "llinventorymodel.h"
 #include "llinventoryobserver.h"
 #include "llmenubutton.h"
+#include "lloutfitobserver.h"
 #include "llscrolllistctrl.h"
 #include "llviewermenu.h"
 #include "llviewerregion.h"
@@ -242,8 +243,6 @@ LLPanelWearing::LLPanelWearing()
 	,	mIsInitialized(false)
 	,	mAttachmentsChangedConnection()
 {
-	mCategoriesObserver = new LLInventoryCategoriesObserver();
-
 	mGearMenu = new LLWearingGearMenu(this);
 	mContextMenu = new LLWearingContextMenu();
 	mAttachmentsMenu = new LLTempAttachmentsContextMenu(this);
@@ -254,12 +253,6 @@ LLPanelWearing::~LLPanelWearing()
 	delete mGearMenu;
 	delete mContextMenu;
 	delete mAttachmentsMenu;
-
-	if (gInventory.containsObserver(mCategoriesObserver))
-	{
-		gInventory.removeObserver(mCategoriesObserver);
-	}
-	delete mCategoriesObserver;
 
 	if (mAttachmentsChangedConnection.connected())
 	{
@@ -307,10 +300,8 @@ void LLPanelWearing::onOpen(const LLSD& /*info*/)
 		if (!category)
 			return;
 
-		gInventory.addObserver(mCategoriesObserver);
-
 		// Start observing changes in Current Outfit category.
-		mCategoriesObserver->addCategory(cof, boost::bind(&LLWearableItemsList::updateList, mCOFItemsList, cof));
+        LLOutfitObserver::instance().addCOFChangedCallback(boost::bind(&LLWearableItemsList::updateList, mCOFItemsList, cof));
 
 		// Fetch Current Outfit contents and refresh the list to display
 		// initially fetched items. If not all items are fetched now

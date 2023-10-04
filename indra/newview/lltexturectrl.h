@@ -61,6 +61,14 @@ bool get_is_predefined_texture(LLUUID asset_id);
 LLUUID get_copy_free_item_by_asset_id(LLUUID image_id, bool no_trans_perm = false);
 bool get_can_copy_texture(LLUUID image_id);
 
+enum LLPickerSource
+{
+    PICKER_INVENTORY,
+    PICKER_LOCAL,
+    PICKER_BAKE,
+    PICKER_UNKNOWN, // on cancel, default ids
+};
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // LLTextureCtrl
 
@@ -192,7 +200,7 @@ public:
 	void			closeDependentFloater();
 
 	void			onFloaterClose();
-	void			onFloaterCommit(ETexturePickOp op, LLUUID id);
+	void			onFloaterCommit(ETexturePickOp op, LLPickerSource source, const LLUUID& local_id, const LLUUID& inv_id);
 
 	// This call is returned when a drag is detected. Your callback
 	// should return TRUE if the drag is acceptable.
@@ -262,5 +270,164 @@ private:
 	bool						mBakeTextureEnabled;
     LLTextureCtrl::EPickInventoryType mInventoryPickType;
 };
+#if 0
+//////////////////////////////////////////////////////////////////////////////////////////
+// LLFloaterTexturePicker
+typedef boost::function<void(LLTextureCtrl::ETexturePickOp op, LLPickerSource source, const LLUUID& asset_id, const LLUUID& inventory_id)> floater_commit_callback;
+typedef boost::function<void()> floater_close_callback;
+typedef boost::function<void(const LLUUID& asset_id)> set_image_asset_id_callback;
+typedef boost::function<void(LLPointer<LLViewerTexture> texture)> set_on_update_image_stats_callback;
 
+class LLFloaterTexturePicker : public LLFloater
+{
+public:
+	LLFloaterTexturePicker(
+		LLView* owner,
+		LLUUID image_asset_id,
+		LLUUID default_image_asset_id,
+		LLUUID blank_image_asset_id,
+		BOOL tentative,
+		BOOL allow_no_texture,
+		const std::string& label,
+		PermissionMask immediate_filter_perm_mask,
+		PermissionMask dnd_filter_perm_mask,
+		BOOL can_apply_immediately,
+		LLUIImagePtr fallback_image_name
+		);
+
+	virtual ~LLFloaterTexturePicker();
+
+	// LLView overrides
+	/*virtual*/ BOOL	handleDragAndDrop(S32 x, S32 y, MASK mask,
+		BOOL drop, EDragAndDropType cargo_type, void *cargo_data,
+		EAcceptance *accept,
+		std::string& tooltip_msg);
+	/*virtual*/ void	draw();
+	/*virtual*/ BOOL	handleKeyHere(KEY key, MASK mask);
+
+	// LLFloater overrides
+	/*virtual*/ BOOL    postBuild();
+	/*virtual*/ void	onClose(bool app_settings);
+
+	// New functions
+	void setImageID(const LLUUID& image_asset_id, bool set_selection = true);
+	bool updateImageStats(); // true if within limits
+	const LLUUID&	getAssetID() { return mImageAssetID; }
+	const LLUUID&	findItemID(const LLUUID& asset_id, BOOL copyable_only, BOOL ignore_library = FALSE);
+	void			setCanApplyImmediately(BOOL b);
+
+	void			setActive(BOOL active);
+
+	LLView*			getOwner() const { return mOwner; }
+	void			setOwner(LLView* owner) { mOwner = owner; }
+	void			stopUsingPipette();
+
+	void commitIfImmediateSet();
+    void commitCallback(LLTextureCtrl::ETexturePickOp op);
+	void commitCancel();
+
+	void onFilterEdit(const std::string& search_string);
+
+	void setCanApply(bool can_preview, bool can_apply, bool inworld_image = true);
+    void setMinDimentionsLimits(S32 min_dim);
+	void setTextureSelectedCallback(const texture_selected_callback& cb) { mTextureSelectedCallback = cb; }
+	void setOnFloaterCloseCallback(const floater_close_callback& cb) { mOnFloaterCloseCallback = cb; }
+	void setOnFloaterCommitCallback(const floater_commit_callback& cb) { mOnFloaterCommitCallback = cb; }
+	void setSetImageAssetIDCallback(const set_image_asset_id_callback& cb) { mSetImageAssetIDCallback = cb; }
+	void setOnUpdateImageStatsCallback(const set_on_update_image_stats_callback& cb) { mOnUpdateImageStatsCallback = cb; }
+	const LLUUID& getDefaultImageAssetID() { return mDefaultImageAssetID; }
+	const LLUUID& getBlankImageAssetID() { return mBlankImageAssetID; }
+
+	static void		onBtnSetToDefault(void* userdata);
+	static void		onBtnSelect(void* userdata);
+	static void		onBtnCancel(void* userdata);
+	void			onBtnPipette();
+	//static void		onBtnRevert( void* userdata );
+	static void		onBtnBlank(void* userdata);
+	static void		onBtnNone(void* userdata);
+	void			onSelectionChange(const std::deque<LLFolderViewItem*> &items, BOOL user_action);
+	static void		onApplyImmediateCheck(LLUICtrl* ctrl, void* userdata);
+	void			onTextureSelect(const LLTextureEntry& te);
+
+	static void		onModeSelect(LLUICtrl* ctrl, void *userdata);
+	static void		onBtnAdd(void* userdata);
+	static void		onBtnRemove(void* userdata);
+	static void		onBtnUpload(void* userdata);
+	static void		onLocalScrollCommit(LLUICtrl* ctrl, void* userdata);
+
+	static void		onBakeTextureSelect(LLUICtrl* ctrl, void *userdata);
+
+	void 			setLocalTextureEnabled(BOOL enabled);
+	void 			setBakeTextureEnabled(BOOL enabled);
+
+    void setInventoryPickType(LLTextureCtrl::EPickInventoryType type);
+    void setImmediateFilterPermMask(PermissionMask mask);
+
+    static void		onPickerCallback(const std::vector<std::string>& filenames, LLHandle<LLFloater> handle);
+
+protected:
+    void refreshLocalList();
+    void refreshInventoryFilter();
+    void setImageIDFromItem(const LLInventoryItem* itemp, bool set_selection = true);
+
+	LLPointer<LLViewerTexture> mTexturep;
+    LLPointer<LLFetchedGLTFMaterial> mGLTFMaterial;
+	LLView*				mOwner;
+
+	LLUUID				mImageAssetID; // Currently selected texture
+	LLUIImagePtr		mFallbackImage; // What to show if currently selected texture is null.
+	LLUUID				mDefaultImageAssetID;
+	LLUUID				mBlankImageAssetID;
+	BOOL				mTentative;
+	BOOL				mAllowNoTexture;
+	LLUUID				mSpecialCurrentImageAssetID;  // Used when the asset id has no corresponding texture in the user's inventory.
+	LLUUID				mOriginalImageAssetID;
+
+	std::string			mLabel;
+
+	LLTextBox*			mTentativeLabel;
+	LLTextBox*			mResolutionLabel;
+    LLTextBox*          mResolutionWarning;
+
+	std::string			mPendingName;
+	BOOL				mActive;
+
+	LLFilterEditor*		mFilterEdit;
+	LLInventoryPanel*	mInventoryPanel;
+	PermissionMask		mImmediateFilterPermMask;
+	PermissionMask		mDnDFilterPermMask;
+	BOOL				mCanApplyImmediately;
+	BOOL				mNoCopyTextureSelected;
+	F32					mContextConeOpacity;
+	LLSaveFolderState	mSavedFolderState;
+	BOOL				mSelectedItemPinned;
+
+	LLComboBox*			mModeSelector;
+	LLScrollListCtrl*	mLocalScrollCtrl;
+    LLButton*           mDefaultBtn;
+    LLButton*           mNoneBtn;
+    LLButton*           mBlankBtn;
+    LLButton*           mPipetteBtn;
+    LLButton*           mSelectBtn;
+    LLButton*           mCancelBtn;
+
+private:
+	bool mCanApply;
+	bool mCanPreview;
+	bool mPreviewSettingChanged;
+    bool mLimitsSet;
+    S32 mMaxDim;
+    S32 mMinDim;
+    LLTextureCtrl::EPickInventoryType mInventoryPickType;
+
+
+	texture_selected_callback mTextureSelectedCallback;
+	floater_close_callback mOnFloaterCloseCallback;
+	floater_commit_callback mOnFloaterCommitCallback;
+	set_image_asset_id_callback mSetImageAssetIDCallback;
+	set_on_update_image_stats_callback mOnUpdateImageStatsCallback;
+
+	BOOL mBakeTextureEnabled;
+};
+#endif
 #endif  // LL_LLTEXTURECTRL_H

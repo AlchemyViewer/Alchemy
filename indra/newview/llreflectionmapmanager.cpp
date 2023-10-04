@@ -224,7 +224,7 @@ void LLReflectionMapManager::update()
             continue;
         }
         
-        if (probe != mDefaultProbe && 
+        if (probe != mDefaultProbe.get() && 
             (!probe->isRelevant() || mPaused))
         { // skip irrelevant probes (or all non-default probes if paused)
             continue;
@@ -234,7 +234,7 @@ void LLReflectionMapManager::update()
 
         LLVector4a d;
 
-        if (probe != mDefaultProbe)
+        if (probe != mDefaultProbe.get())
         {
             if (probe->mViewerObject) //make sure probes track the viewer objects they are attached to
             {
@@ -930,7 +930,7 @@ void LLReflectionMapManager::updateUniforms()
             break;
         }
 
-        if (refmap != mDefaultProbe)
+        if (refmap != mDefaultProbe.get())
         {
             // bucket search data
             // theory of operation:

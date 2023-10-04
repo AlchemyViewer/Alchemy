@@ -122,6 +122,7 @@ public:
 	virtual PermissionMask getPermissionMask() const { return PERM_NONE; }
 	/*virtual*/ LLFolderType::EType getPreferredType() const { return LLFolderType::FT_NONE; }
 	virtual const LLUUID& getUUID() const { return mUUID; }
+    virtual const LLUUID& getThumbnailUUID() const { return LLUUID::null;}
 	virtual time_t getCreationDate() const;
 	virtual void setCreationDate(time_t creation_date_utc);
 
@@ -130,6 +131,7 @@ public:
 	virtual BOOL canOpenItem() const { return FALSE; }
 	virtual void closeItem() {}
 	virtual void selectItem() {}
+    virtual void navigateToFolder(bool new_window = false, bool change_mode = false) {}
 	virtual BOOL isItemRenameable() const;
 	virtual BOOL renameItem(const std::string& new_name);
 	virtual BOOL isItemMovable() const;
@@ -638,11 +640,7 @@ void LLTaskInvFVBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 // [/RLVa:KB]
 	}
 	items.push_back(std::string("Task Properties"));
-	// If multiple items are selected, only disable properties if we're not showing them in a multi-floater
-	if ( ((flags & FIRST_SELECTED_ITEM) == 0) && (!gSavedSettings.getBOOL("ShowPropertiesFloaters")) )
-	{
-		disabled_items.push_back(std::string("Task Properties"));
-	}
+
 	if(isItemRenameable())
 	{
 		items.push_back(std::string("Task Rename"));
@@ -959,10 +957,6 @@ void LLTaskSoundBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 		}
 	}
 	items.push_back(std::string("Task Properties"));
-	if ((flags & FIRST_SELECTED_ITEM) == 0)
-	{
-		disabled_items.push_back(std::string("Task Properties"));
-	}
 	if(isItemRenameable())
 	{
 		items.push_back(std::string("Task Rename"));
@@ -1320,10 +1314,6 @@ void LLTaskMeshBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 	}
 
 	items.push_back(std::string("Task Properties"));
-	if ((flags & FIRST_SELECTED_ITEM) == 0)
-	{
-		disabled_items.push_back(std::string("Task Properties"));
-	}
 	if(isItemRenameable())
 	{
 		items.push_back(std::string("Task Rename"));
@@ -1662,21 +1652,6 @@ void LLPanelObjectInventory::inventoryChanged(LLViewerObject* object,
 	if(mTaskUUID == object->mID)
 	{
 		mInventoryNeedsUpdate = TRUE;
-	}
-
-	// refresh any properties floaters that are hanging around.
-	if(inventory)
-	{
-		for (LLInventoryObject::object_list_t::const_iterator iter = inventory->begin();
-			 iter != inventory->end(); )
-		{
-			LLInventoryObject* item = *iter++;
-			LLFloaterProperties* floater = LLFloaterReg::findTypedInstance<LLFloaterProperties>("properties", item->getUUID());
-			if(floater)
-			{
-				floater->refresh();
-			}
-		}
 	}
 }
 

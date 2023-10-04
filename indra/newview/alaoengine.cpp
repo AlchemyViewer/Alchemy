@@ -776,23 +776,22 @@ void ALAOEngine::updateSortOrder(ALAOSet::AOState* state)
 	}
 }
 
-LLUUID ALAOEngine::addSet(const std::string& name, const bool reload)
+void ALAOEngine::addSet(const std::string& name, const bool reload, inventory_func_type callback)
 {
 	if (mAOFolder.isNull())
 	{
 		LL_WARNS("AOEngine") << ROOT_AO_FOLDER << " folder not there yet. Requesting recreation." << LL_ENDL;
 		tick();
-		return LLUUID::null;
+		return;
 	}
 
 	LL_DEBUGS("AOEngine") << "adding set folder " << name << LL_ENDL;
-	LLUUID newUUID = gInventory.createNewCategory(mAOFolder, LLFolderType::FT_NONE, name);
+	gInventory.createNewCategory(mAOFolder, LLFolderType::FT_NONE, name, callback);
 
 	if (reload)
 	{
 		mTimerCollection.setReloadTimer(true);
 	}
-	return newUUID;
 }
 
 bool ALAOEngine::createAnimationLink(const ALAOSet* set, ALAOSet::AOState* state, const LLInventoryItem* item)
@@ -1609,12 +1608,17 @@ void ALAOEngine::tick()
 {
 	if (!isAgentAvatarValid()) return;
 
-	LLUUID const& category_id = gInventory.findCategoryUUIDForNameInRoot(ROOT_AO_FOLDER, true, gInventory.getRootFolderID());
-
-	if (category_id.notNull())
+	if (mAOFolder.isNull())
 	{
-		mAOFolder = category_id;
-		LL_INFOS("AOEngine") << "AO basic folder structure intact." << LL_ENDL;
+		gInventory.findCategoryUUIDForNameInRoot(ROOT_AO_FOLDER, gInventory.getRootFolderID(), true,
+			[&](const LLUUID& category_id)
+			{	mAOFolder = category_id;
+				LL_INFOS("AOEngine") << "AO basic folder structure intact." << LL_ENDL;
+				update(); 
+			});
+	}
+	else
+	{
 		update();
 	}
 }
@@ -1855,11 +1859,60 @@ void ALAOEngine::parseNotecard(std::unique_ptr<char[]> buffer)
 	processImport(false);
 }
 
-void ALAOEngine::processImport(bool aFromTimer)
+void ALAOEngine::processImportInternal(bool aFromTimer)
 {
-	if (mImportCategory.isNull())
+	bool allComplete = true;
+	for (S32 index = 0; index < ALAOSet::AOSTATES_MAX; ++index)
 	{
-		mImportCategory = addSet(mImportSet->getName(), false);
+		ALAOSet::AOState* state = mImportSet->getState(index);
+		if (!state->mAnimations.empty())
+		{
+			if (state->mCycleTime)
+			{
+				const std::string oldName = state->mName + ":CT";
+				state->mName = llformat("%s%d", oldName.c_str(), state->mCycleTime);
+			}
+			if (state->mCycle)
+			{
+				const std::string& oldName = state->mName;
+				state->mName = llformat("%s%s", oldName.c_str(), ":CY");
+			}
+			allComplete = false;
+			LL_DEBUGS("AOEngine") << "state " << state->mName << " still has animations to link." << LL_ENDL;
+
+			for (S32 animationIndex = state->mAnimations.size() - 1; animationIndex >= 0; --animationIndex)
+			{
+				LL_DEBUGS("AOEngine") << "linking animation " << state->mAnimations[animationIndex].mName << LL_ENDL;
+				if (createAnimationLink(mImportSet, state, gInventory.getItem(state->mAnimations[animationIndex].mInventoryUUID)))
+				{
+					LL_DEBUGS("AOEngine") << "link success, size " << state->mAnimations.size() << ", removing animation "
+						<< (*(state->mAnimations.begin() + animationIndex)).mName << " from import state" << LL_ENDL;
+					state->mAnimations.erase(state->mAnimations.begin() + animationIndex);
+					LL_DEBUGS("AOEngine") << "deleted, size now: " << state->mAnimations.size() << LL_ENDL;
+				}
+				else
+				{
+					LLSD args;
+					args["NAME"] = state->mAnimations[animationIndex].mName;
+					LLNotificationsUtil::add("AOImportLinkFailed", args);
+				}
+			}
+		}
+	}
+
+	if (allComplete)
+	{
+		mTimerCollection.setImportTimer(false);
+		mOldImportSets.push_back(mImportSet);
+		mImportSet = nullptr;
+		mImportCategory.setNull();
+		reload(aFromTimer);
+	}
+}
+
+void ALAOEngine::processImportNewCat(const LLUUID& id, bool process)
+{
+	mImportCategory = id;
 		if (mImportCategory.isNull())
 		{
 			mImportRetryCount++;
@@ -1883,55 +1936,20 @@ void ALAOEngine::processImport(bool aFromTimer)
 			}
 			return;
 		}
-		mImportSet->setInventoryUUID(mImportCategory);
-	}
+	mImportSet->setInventoryUUID(mImportCategory);
 
-	bool allComplete = true;
-	for (S32 index = 0; index < ALAOSet::AOSTATES_MAX; ++index)
+	processImportInternal(process);
+}
+
+void ALAOEngine::processImport(bool aFromTimer)
+{
+	if (mImportCategory.isNull())
 	{
-		ALAOSet::AOState* state = mImportSet->getState(index);
-		if (!state->mAnimations.empty())
-		{
-			if (state->mCycleTime)
-			{
-				const std::string oldName = state->mName + ":CT";
-				state->mName = llformat("%s%d",oldName.c_str(),state->mCycleTime);
-			}
-			if (state->mCycle)
-			{
-				const std::string& oldName = state->mName;
-				state->mName = llformat("%s%s", oldName.c_str(), ":CY");
-			}
-			allComplete = false;
-			LL_DEBUGS("AOEngine") << "state " << state->mName << " still has animations to link." << LL_ENDL;
-
-			for (S32 animationIndex = state->mAnimations.size() - 1; animationIndex >= 0; --animationIndex)
-			{
-				LL_DEBUGS("AOEngine") << "linking animation " << state->mAnimations[animationIndex].mName << LL_ENDL;
-				if (createAnimationLink(mImportSet, state, gInventory.getItem(state->mAnimations[animationIndex].mInventoryUUID)))
-				{
-					LL_DEBUGS("AOEngine")	<< "link success, size "<< state->mAnimations.size() << ", removing animation "
-								<< (*(state->mAnimations.begin() + animationIndex)).mName << " from import state" << LL_ENDL;
-					state->mAnimations.erase(state->mAnimations.begin() + animationIndex);
-					LL_DEBUGS("AOEngine") << "deleted, size now: " << state->mAnimations.size() << LL_ENDL;
-				}
-				else
-				{
-					LLSD args;
-					args["NAME"] = state->mAnimations[animationIndex].mName;
-					LLNotificationsUtil::add("AOImportLinkFailed", args);
-				}
-			}
-		}
+		addSet(mImportSet->getName(), false, [this, aFromTimer](const LLUUID& newid) { processImportNewCat(newid, aFromTimer); });
 	}
-
-	if (allComplete)
+	else
 	{
-		mTimerCollection.setImportTimer(false);
-		mOldImportSets.push_back(mImportSet);
-		mImportSet = nullptr;
-		mImportCategory.setNull();
-		reload(aFromTimer);
+		processImportInternal(aFromTimer);
 	}
 }
 
