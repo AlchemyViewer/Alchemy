@@ -4155,6 +4155,8 @@ Your L$ balance is shown in the upper-right.
 	</notification>
 	<notification name="BulkUploadCostConfirmation">
 		[COUNT]個アイテムを一括アップロードします。総費用はL$ [COST]です。アップロードを続けてもよろしいですか？
+
+[FILES]
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="アップロード"/>
 	</notification>
 	<notification name="BulkUploadNoCompatibleFiles">
