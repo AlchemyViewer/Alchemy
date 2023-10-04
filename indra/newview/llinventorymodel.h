@@ -327,8 +327,9 @@ public:
 		const LLUUID& root_id) const;
 
 	const LLUUID findCategoryUUIDForNameInRoot(std::string const& folder_name,
-											   bool create_folder,
-											   LLUUID const& root_id);
+											   LLUUID const& root_id,
+											   bool create_folder = false,
+											   inventory_func_type func = {});
 
 	// Returns the uuid of the category that specifies 'type' as what it 
 	// defaults to containing. The category is not necessarily only for that type. 
@@ -707,9 +708,7 @@ public:
 	static void processRemoveInventoryObjects(LLMessageSystem* msg, void**);
 	static void processSaveAssetIntoInventory(LLMessageSystem* msg, void**);
 	static void processBulkUpdateInventory(LLMessageSystem* msg, void**);
-	static void processInventoryDescendents(LLMessageSystem* msg, void**);
 	static void processMoveInventoryItem(LLMessageSystem* msg, void**);
-	static void processFetchInventoryReply(LLMessageSystem* msg, void**);
 protected:
 	bool messageUpdateCore(LLMessageSystem* msg, bool do_accounting, U32 mask = 0x0);
 

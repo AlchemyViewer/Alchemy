@@ -44,8 +44,6 @@
 #include "bufferarray.h"
 #include "bufferstream.h"
 #include "llcorehttputil.h"
-#include "llviewermenu.h"
-#include "llviewernetwork.h"
 
 // History (may be apocryphal)
 //
@@ -1251,32 +1249,32 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 			LLUUID owner_id(folder_sd["owner_id"].asUUID());
 			S32    version(folder_sd["version"].asInteger());
 			S32    descendents(folder_sd["descendents"].asInteger());
+			LLPointer<LLViewerInventoryCategory> tcategory = new LLViewerInventoryCategory(owner_id);
+
             if (parent_id.isNull())
             {
 				LLSD items(folder_sd["items"]);
-				if (items.isArray() && items.asBoolean())
-				{
-					LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
+			    LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
+				
+				for (const auto& item : items.array())
+			    {	
+                    const LLUUID lost_uuid(gInventory.findCategoryUUIDForType(LLFolderType::FT_LOST_AND_FOUND));
 
-					for (const auto& item : items.array())
-					{
-						const LLUUID lost_uuid(gInventory.findCategoryUUIDForType(LLFolderType::FT_LOST_AND_FOUND));
+                    if (lost_uuid.notNull())
+                    {
 
-						if (lost_uuid.notNull())
-						{
-							titem->unpackMessage(item);
+				        titem->unpackMessage(item);
+				
+                        LLInventoryModel::update_list_t update;
+                        LLInventoryModel::LLCategoryUpdate new_folder(lost_uuid, 1);
+                        update.push_back(new_folder);
+                        gInventory.accountForUpdate(update);
 
-							LLInventoryModel::update_list_t update;
-							LLInventoryModel::LLCategoryUpdate new_folder(lost_uuid, 1);
-							update.push_back(new_folder);
-							gInventory.accountForUpdate(update);
-
-							titem->setParent(lost_uuid);
-							titem->updateParentOnServer(FALSE);
-							gInventory.updateItem(titem);
-						}
-					}
-				}
+                        titem->setParent(lost_uuid);
+                        titem->updateParentOnServer(FALSE);
+                        gInventory.updateItem(titem);
+                    }
+                }
             }
 
 	        LLViewerInventoryCategory * pcat(gInventory.getCategory(parent_id));
@@ -1286,35 +1284,28 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 			}
 
 			LLSD categories(folder_sd["categories"]);
-			if (categories.isArray() && categories.asBoolean())
-			{
-				LLPointer<LLViewerInventoryCategory> tcategory = new LLViewerInventoryCategory(owner_id);
-				for (const auto& category : categories.array())
+			for (const auto& category : categories.array())
+			{	
+				tcategory->fromLLSD(category); 
+				
+				const bool recursive(getIsRecursive(tcategory->getUUID()));
+				if (recursive)
 				{
-					tcategory->fromLLSD(category);
-
-					const bool recursive(getIsRecursive(tcategory->getUUID()));
-					if (recursive)
-					{
-						fetcher->addRequestAtBack(tcategory->getUUID(), recursive, true);
-					}
-					else if (!gInventory.isCategoryComplete(tcategory->getUUID()))
-					{
-						gInventory.updateCategory(tcategory);
-					}
+					fetcher->addRequestAtBack(tcategory->getUUID(), recursive, true);
+				}
+				else if (! gInventory.isCategoryComplete(tcategory->getUUID()))
+				{
+					gInventory.updateCategory(tcategory);
 				}
 			}
 
 			LLSD items(folder_sd["items"]);
-			if (items.isArray() && items.asBoolean())
-			{
-				LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
-				for (const auto& item : items.array())
-				{
-					titem->unpackMessage(item);
-
-					gInventory.updateItem(titem);
-				}
+			LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
+			for (const auto& item : items.array())
+			{	
+				titem->unpackMessage(item);
+				
+				gInventory.updateItem(titem);
 			}
 
 			// Set version and descendentcount according to message.
@@ -1331,14 +1322,11 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 	if (content.has("bad_folders"))
 	{
 		LLSD bad_folders(content["bad_folders"]);
-		if (bad_folders.isArray() && bad_folders.asBoolean())
+		for (const auto& folder_sd : bad_folders.array())
 		{
-			for (const auto& folder_sd : bad_folders.array())
-			{
-				// These folders failed on the dataserver.  We probably don't want to retry them.
-				LL_WARNS(LOG_INV) << "Folder " << folder_sd["folder_id"].asString()
-					<< "Error: " << folder_sd["error"].asString() << LL_ENDL;
-			}
+			// These folders failed on the dataserver.  We probably don't want to retry them.
+			LL_WARNS(LOG_INV) << "Folder " << folder_sd["folder_id"].asString() 
+							  << "Error: " << folder_sd["error"].asString() << LL_ENDL;
 		}
 	}
 	

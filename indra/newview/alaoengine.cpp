@@ -1608,12 +1608,17 @@ void ALAOEngine::tick()
 {
 	if (!isAgentAvatarValid()) return;
 
-	LLUUID const& category_id = gInventory.findCategoryUUIDForNameInRoot(ROOT_AO_FOLDER, true, gInventory.getRootFolderID());
-
-	if (category_id.notNull())
+	if (mAOFolder.isNull())
 	{
-		mAOFolder = category_id;
-		LL_INFOS("AOEngine") << "AO basic folder structure intact." << LL_ENDL;
+		gInventory.findCategoryUUIDForNameInRoot(ROOT_AO_FOLDER, gInventory.getRootFolderID(), true,
+			[&](const LLUUID& category_id)
+			{	mAOFolder = category_id;
+				LL_INFOS("AOEngine") << "AO basic folder structure intact." << LL_ENDL;
+				update(); 
+			});
+	}
+	else
+	{
 		update();
 	}
 }
