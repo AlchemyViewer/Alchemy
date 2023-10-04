@@ -35,6 +35,7 @@
 
 #include "llextendedstatus.h"
 #include "llsingleton.h"
+#include "llviewerinventory.h"
 
 class ALAOTimerCollection final : public LLEventTimer
 {
@@ -103,7 +104,7 @@ public:
 
 	const LLUUID& getAOFolder() const;
 
-	LLUUID addSet(const std::string& name, bool reload = true);
+	void addSet(const std::string& name, bool reload = true, inventory_func_type callback = {});
 	bool removeSet(ALAOSet* set);
 
 	bool addAnimation(const ALAOSet* set, ALAOSet::AOState* state,
@@ -114,6 +115,8 @@ public:
 
 	bool importNotecard(const LLInventoryItem* item);
 	void processImport(const bool process);
+	void processImportInternal(const bool process);
+	void processImportNewCat(const LLUUID&, bool process);
 
 	bool swapWithPrevious(ALAOSet::AOState* state, S32 index);
 	bool swapWithNext(ALAOSet::AOState* state, S32 index);

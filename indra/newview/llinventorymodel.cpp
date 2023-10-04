@@ -977,7 +977,7 @@ const LLUUID LLInventoryModel::findCategoryUUIDForNameInRoot(std::string const& 
 	{
 		if (root_id.notNull())
 		{
-			return createNewCategory(root_id, LLFolderType::FT_NONE, folder_name);
+			createNewCategory(root_id, LLFolderType::FT_NONE, folder_name);
 		}
 	}
 	return rv;
