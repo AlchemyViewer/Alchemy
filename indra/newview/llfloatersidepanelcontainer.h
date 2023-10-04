@@ -61,6 +61,8 @@ public:
 
 	LLPanel* openChildPanel(std::string_view panel_name, const LLSD& params);
 
+    static LLFloater* getTopmostInventoryFloater();
+
 // [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
 	static bool canShowPanel(std::string_view floater_name, const LLSD& key);
 	static bool canShowPanel(std::string_view floater_name, std::string_view panel_name, const LLSD& key);

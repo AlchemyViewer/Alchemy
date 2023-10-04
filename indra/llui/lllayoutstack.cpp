@@ -217,7 +217,8 @@ LLLayoutStack::Params::Params()
 	drag_handle_first_indent("drag_handle_first_indent", 0),
 	drag_handle_second_indent("drag_handle_second_indent", 0),
 	drag_handle_thickness("drag_handle_thickness", 5),
-	drag_handle_shift("drag_handle_shift", 2)
+	drag_handle_shift("drag_handle_shift", 2),
+    drag_handle_color("drag_handle_color", LLUIColorTable::instance().getColor("ResizebarBody"))
 {
 	addSynonym(border_size, "drag_handle_gap");
 }
@@ -237,7 +238,8 @@ LLLayoutStack::LLLayoutStack(const LLLayoutStack::Params& p)
 	mDragHandleFirstIndent(p.drag_handle_first_indent),
 	mDragHandleSecondIndent(p.drag_handle_second_indent),
 	mDragHandleThickness(p.drag_handle_thickness),
-	mDragHandleShift(p.drag_handle_shift)
+	mDragHandleShift(p.drag_handle_shift),
+    mDragHandleColor(p.drag_handle_color())
 {
 }
 
@@ -525,6 +527,15 @@ void LLLayoutStack::updateLayout()
 	mNeedsLayout = continue_animating;
 } // end LLLayoutStack::updateLayout
 
+void LLLayoutStack::setPanelSpacing(S32 val)
+{
+    if (mPanelSpacing != val)
+    {
+        mPanelSpacing = val;
+        mNeedsLayout = true;
+    }
+}
+
 LLLayoutPanel* LLLayoutStack::findEmbeddedPanel(LLPanel* panelp) const
 {
 	if (!panelp) return NULL;
@@ -578,7 +589,7 @@ void LLLayoutStack::createResizeBar(LLLayoutPanel* panelp)
 				resize_bar_bg_panel_p.follows.flags = FOLLOWS_ALL;
 				resize_bar_bg_panel_p.tab_stop = false;
 				resize_bar_bg_panel_p.background_visible = true;
-				resize_bar_bg_panel_p.bg_alpha_color = LLUIColorTable::instance().getColor("ResizebarBody");
+				resize_bar_bg_panel_p.bg_alpha_color = mDragHandleColor;
 				resize_bar_bg_panel_p.has_border = true;
 				resize_bar_bg_panel_p.border.border_thickness = 1;
 				resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instance().getColor("ResizebarBorderLight");

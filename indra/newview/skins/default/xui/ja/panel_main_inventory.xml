@@ -3,6 +3,7 @@
 	<panel.string name="ItemcountFetching">[ITEM_COUNT]個のアイテムと[CATEGORY_COUNT]個のフォルダーを取得しています…。[FILTER]</panel.string>
 	<panel.string name="ItemcountCompleted">[ITEM_COUNT]個のアイテムと[CATEGORY_COUNT]個のフォルダーの取得が完了しました。[FILTER]</panel.string>
 	<panel.string name="ItemcountUnknown">[ITEM_COUNT]個のアイテムと[CATEGORY_COUNT]個のフォルダーを取得しました。[FILTER]</panel.string>
+    <panel.string name="inventory_title">インベントリ</panel.string>
 	<text name="ItemcountText">アイテム：</text>
 	<filter_editor label="検索用語を入力する" name="inventory search editor" tool_tip="検索したい単語は「+」で区切って複数入力してください。"/>
 	<combo_box name="search_type">
