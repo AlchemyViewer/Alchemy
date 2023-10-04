@@ -32,6 +32,7 @@
 #include "llscripteditor.h"
 #include "lldirpicker.h"
 #include "llviewercontrol.h"
+#include "llviewermenufile.h" // LLFilePickerReplyThread
 
 #include "llfloaterreg.h"
 #include "llpreviewscript.h"
@@ -43,6 +44,7 @@ LLFloaterScriptEdPrefs::LLFloaterScriptEdPrefs(const LLSD& key)
 	mCommitCallbackRegistrar.add("ScriptPref.applyUIColor",	boost::bind(&LLFloaterScriptEdPrefs::applyUIColor, this ,_1, _2));
 	mCommitCallbackRegistrar.add("ScriptPref.getUIColor",	boost::bind(&LLFloaterScriptEdPrefs::getUIColor, this ,_1, _2));
 	mCommitCallbackRegistrar.add("ScriptPref.SetPreprocInclude",	boost::bind(&LLFloaterScriptEdPrefs::setPreprocInclude, this));
+	mCommitCallbackRegistrar.add("ScriptPref.SetExternalEditor", boost::bind(&LLFloaterScriptEdPrefs::setExternalEditor, this));
 }
 
 BOOL LLFloaterScriptEdPrefs::postBuild()
@@ -83,5 +85,20 @@ void LLFloaterScriptEdPrefs::changePreprocIncludePath(const std::vector<std::str
 	{
 		std::string new_top_folder(gDirUtilp->getBaseFileName(dir_name));
 		gSavedSettings.setString("AlchemyPreProcHDDIncludeLocation", dir_name);
+	}
+}
+
+void LLFloaterScriptEdPrefs::setExternalEditor()
+{
+	LLFilePickerReplyThread::startPicker(boost::bind(&LLFloaterScriptEdPrefs::changeExternalEditorPath, this, _1), LLFilePicker::FFLOAD_EXE, false);
+}
+
+void LLFloaterScriptEdPrefs::changeExternalEditorPath(const std::vector<std::string>& filenames)
+{
+	std::string exe_name = filenames[0];
+	if (!exe_name.empty())
+	{
+		std::string command = "\"" + exe_name + "\" \"%s\"";
+		gSavedSettings.setString("ExternalEditor", command);
 	}
 }

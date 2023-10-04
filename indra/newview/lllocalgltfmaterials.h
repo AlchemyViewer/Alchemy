@@ -103,8 +103,13 @@ class LLLocalGLTFMaterialMgr : public LLSingleton<LLLocalGLTFMaterialMgr>
     ~LLLocalGLTFMaterialMgr();
 public:
     S32          addUnit(const std::vector<std::string>& filenames);
-    S32          addUnit(const std::string& filename); // file can hold multiple materials
+    S32          addUnit(const std::string& filename);
+    S32          addUnit(const std::string& filename, LLUUID& outID); // returns first material id as outID
+protected:
+    S32          addUnitInternal(const std::string& filename, LLUUID& outID); // file can hold multiple materials
+public:
     void         delUnit(LLUUID tracking_id);
+    LLUUID       getUnitID(const std::string& filename, S32 index = 0);
 
     LLUUID       getWorldID(LLUUID tracking_id);
     bool         isLocal(LLUUID world_id);

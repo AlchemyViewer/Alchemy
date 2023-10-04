@@ -22,11 +22,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>cea5e7565f9d0f16752f023de0b8320bc02adee70cfb50949ade08cd2b6fa37702e24c2130169e0e2c6ce08536546aa7aff0de72b03403e4ed303d04ba4dba81</string>
+              <string>2c1c3b8349a08e124f7f78e0ba2562fa783b05da99a9572af5177f1174ccb260a198e00871067e18fbd91e1273955d799a47b0bbeb08a777cc3d9b5492a38547</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.28.0.2097/SDL2-2.28.0-darwin64-2097.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.28.4.2165/SDL2-2.28.4-darwin64-2165.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -36,11 +36,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>34c1610ae560013911fc5582fb3c9096c4cf061bfd0ceae4e8b81d6c4d2e332dcd96d0f814794d2b959ac108325a36eebf31dd93156413eae0998d1f335d5d6a</string>
+              <string>ec9f831032f3f3e303b94a58636756e6d3a0d709039e2c86ee135155fcdbafa5ae29bc1754f32ce403e84075bf80e27781903a3c807f67e918f0e8959407f708</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.28.0.2097/SDL2-2.28.0-linux64-2097.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.28.4.2165/SDL2-2.28.4-linux64-2165.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -50,18 +50,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>644bca46c116ef002d2833c4ecc92e71de235426babbe9d3417d7dd5df68fb0231628513c3629c122c9d7112cc3143582231a6b8177f9b0282b6b7e5c2c47007</string>
+              <string>96648f32db67f1ad7accff7bf742cd4c23c91eaf29f58e9da24d099c51c23f376056e521a9a66434ae788fd53129bfeef28a15e77c5636853e98a24069d02b73</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.28.0.2097/SDL2-2.28.0-windows64-2097.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.28.4.2165/SDL2-2.28.4-windows64-2165.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.28.0</string>
+        <string>2.28.4</string>
       </map>
       <key>apr_suite</key>
       <map>
@@ -482,11 +482,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>99a59ab94132716fab4cfcd8ba3081c600a1c0ea9e9bfd00fe8ab086208dd91959cb14c8b72aa230599a1b2ff75592eaa9abfce4d1755d37912f161158b4bafa</string>
+              <string>bb2ba05805d2f72ba6c2462742334649d5b51255675943e0cdefc2813b925603554487ef37c42146e62553adc0d23fc157dcd0e193c7d12ff94003073439bbc2</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_117.1.4_ga26f38b_chromium-117.0.5938.92.2159/dullahan-1.12.4_117.1.4_ga26f38b_chromium-117.0.5938.92-darwin64-2159.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132.2164/dullahan-1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132-darwin64-2164.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -496,11 +496,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f1380cee09c1c78438afba4f195f897a9b180e807827b3d8a1670d260f06753c46258c7bab8889a0576e10a35f0f75fbbffc16455a22f5e92ae0fca00183eabc</string>
+              <string>4a1433fe7e24b76b85184fa9001ea6d87109170d9d2798f2293327b042b2ccc5c5eaf1e0803ffe75c28fb3195fee392a484857a1806693583800b0fcafdd3216</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_117.1.4_ga26f38b_chromium-117.0.5938.92.2159/dullahan-1.12.4_117.1.4_ga26f38b_chromium-117.0.5938.92-linux64-2159.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132.2164/dullahan-1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132-linux64-2164.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -510,18 +510,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b1f3542d61cb6c5fb5cd4d12625b7c41b263291bcc54337615eb6210996c08d78b7db3c3381a7e48c00d5f1ec69695ca8e11065d4e0d81fd10b766f64189e495</string>
+              <string>cc36c9b0032e52c9d262b3c79c615412bcad111530c3b04c9244a526bf124b7f608825b15d06817263cddb37f2ff994a1885af224fbcda866460d72517c970f0</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_117.1.4_ga26f38b_chromium-117.0.5938.92.2159/dullahan-1.12.4_117.1.4_ga26f38b_chromium-117.0.5938.92-windows64-2159.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_117.2.2_ge80c977_chromium-117.0.5938.132.2164/dullahan-1.12.4_117.2.2_ge80c977_chromium-117.0.5938.132-windows64-2164.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.12.4_115.3.13_g749b4d4_chromium-115.0.5790.171</string>
+        <string>1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132</string>
       </map>
       <key>expat</key>
       <map>
@@ -1750,11 +1750,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e02b37de2c4adb3f1017ac920166782df3ae00063286f9f11a680711ec42076fdca392f8ccf8ee5e92fac3491f5c0ad654c0a762bca04c2270ca97122e32fa93</string>
+              <string>24ddb669f26a9214392d8e6783372fe094803cf78f9b012637076a6f68a4272ab09274edcf6665040306fdb6ec94a3f6019a093a9067964fab985f8426de394e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev/0.13.0.2098/open_libndofdev-0.13.0-linux64-2098.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev/0.13.0.2166/open_libndofdev-0.13.0-linux64-2166.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
