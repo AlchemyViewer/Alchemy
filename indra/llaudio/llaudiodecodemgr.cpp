@@ -800,7 +800,11 @@ BOOL LLAudioDecodeMgr::addDecodeRequest(const LLUUID &uuid)
 	{
 		// Just put it on the decode queue.
 		LL_DEBUGS("AudioEngine") << "addDecodeRequest for " << uuid << " has local asset file already" << LL_ENDL;
-        mImpl->mDecodeQueue.push_back(uuid);
+		// ...only add it if it's note already in the queue
+		if (std::find(mImpl->mDecodeQueue.begin(), mImpl->mDecodeQueue.end(), uuid) == mImpl->mDecodeQueue.end())
+		{
+			mImpl->mDecodeQueue.push_back(uuid);
+		}
 		return TRUE;
 	}
 

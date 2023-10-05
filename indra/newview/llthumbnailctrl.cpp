@@ -105,8 +105,6 @@ void LLThumbnailCtrl::draw()
         }
         
         gl_draw_scaled_image( draw_rect.mLeft, draw_rect.mBottom, draw_rect.getWidth(), draw_rect.getHeight(), mTexturep, UI_VERTEX_COLOR % alpha);
-        
-        mTexturep->setKnownDrawSize(draw_rect.getWidth(), draw_rect.getHeight());
     }
     else if( mImagep.notNull() )
     {
@@ -173,7 +171,6 @@ void LLThumbnailCtrl::draw()
 
 void LLThumbnailCtrl::clearTexture()
 {
-    mImageAssetID = LLUUID::null;
     mTexturep = nullptr;
     mImagep = nullptr;
 }
@@ -191,37 +188,46 @@ void LLThumbnailCtrl::setValue(const LLSD& value)
     
 	LLUICtrl::setValue(tvalue);
     
-    mImageAssetID = LLUUID::null;
+    loadImage(tvalue);
+}
+
+void LLThumbnailCtrl::loadImage(const LLSD& tvalue)
+{
     mTexturep = nullptr;
     mImagep = nullptr;
-    
-	if (tvalue.isUUID())
-	{
-        mImageAssetID = tvalue.asUUID();
-        if (mImageAssetID.notNull())
+
+    if (!getVisible()) return;
+
+    if (tvalue.isUUID())
+    {
+        auto imageAssetID = tvalue.asUUID();
+        if (imageAssetID.notNull())
         {
             // Should it support baked textures?
-            mTexturep = LLViewerTextureManager::getFetchedTexture(mImageAssetID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
-            
+            mTexturep = LLViewerTextureManager::getFetchedTexture(imageAssetID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+
             mTexturep->setBoostLevel(mPriority);
             mTexturep->forceToSaveRawImage(0);
-            
-            S32 desired_draw_width = mTexturep->getWidth();
-            S32 desired_draw_height = mTexturep->getHeight();
-            
-            mTexturep->setKnownDrawSize(desired_draw_width, desired_draw_height);
+
+            LLRect draw_rect = getLocalRect();
+            if (mBorderVisible)
+            {
+                draw_rect.stretch(-1);
+            }
+            mTexturep->setKnownDrawSize(draw_rect.getWidth(), draw_rect.getHeight());
         }
-	}
+    }
     else if (tvalue.isString())
     {
         mImagep = LLUI::getUIImage(tvalue.asString(), LLGLTexture::BOOST_UI);
         if (mImagep)
         {
-            LLViewerFetchedTexture* texture = dynamic_cast<LLViewerFetchedTexture*>(mImagep->getImage().get());
-            if(texture)
+            LLRect draw_rect = getLocalRect();
+            if (mBorderVisible)
             {
-                mImageAssetID = texture->getID();
+                draw_rect.stretch(-1);
             }
+            mImagep->getImage()->setKnownDrawSize(draw_rect.getWidth(), draw_rect.getHeight());
         }
     }
 }
@@ -234,6 +240,21 @@ BOOL LLThumbnailCtrl::handleHover(S32 x, S32 y, MASK mask)
         return TRUE;
     }
     return LLUICtrl::handleHover(x, y, mask);
+}
+
+void LLThumbnailCtrl::onVisibilityChange(BOOL new_visibility)
+{
+    LLUICtrl::onVisibilityChange(new_visibility);
+    {
+        if (new_visibility)
+        {
+            loadImage(getValue());
+        }
+        else
+        {
+            clearTexture();
+        }
+    }
 }
 
 

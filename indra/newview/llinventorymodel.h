@@ -610,7 +610,7 @@ private:
     U32 mModifyMaskBacklog;
     changed_items_t mChangedItemIDsBacklog;
     changed_items_t mAddedItemIDsBacklog;
-    typedef std::map<LLUUID , changed_items_t> broken_links_t;
+    typedef boost::unordered_map<LLUUID , changed_items_t> broken_links_t;
     broken_links_t mPossiblyBrockenLinks; // there can be multiple links per item
     changed_items_t mLinksRebuildList;
     boost::signals2::connection mBulkFecthCallbackSlot;
