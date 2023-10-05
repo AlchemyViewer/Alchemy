@@ -68,7 +68,10 @@ public:
 	virtual void setValue(const LLSD& value ) override;
     void clearTexture();
     
+    void loadImage(const LLSD& tvalue);
+
     virtual BOOL handleHover(S32 x, S32 y, MASK mask) override;
+    void onVisibilityChange(BOOL new_visibility) override;
 	
 private:
 	S32 mPriority;
@@ -76,7 +79,6 @@ private:
     bool mInteractable;
     bool mShowLoadingPlaceholder;
     std::string mLoadingPlaceholderString;
-    LLUUID mImageAssetID;
     LLViewBorder* mBorder;
     LLUIColor mBorderColor;
     
