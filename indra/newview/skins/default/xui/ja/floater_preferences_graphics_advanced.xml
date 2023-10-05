@@ -54,7 +54,7 @@
 	</text>
 	<combo_box label="アンチエイリアシング" name="fsaa">
 		<combo_box.item label="無効" name="FSAADisabled" value="0"/>
-		<combo_box.item label="邸" name="2x" value="2"/>
+		<combo_box.item label="低" name="2x" value="2"/>
 		<combo_box.item label="中" name="4x" value="4"/>
 		<combo_box.item label="高" name="8x" value="8"/>
 		<combo_box.item label="最大" name="16x" value="16"/>
