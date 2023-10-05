@@ -91,7 +91,7 @@
        top_delta="0"
        right="340"
        height="20"
-       max_length="65535" />
+       max_length_bytes="65535" />
       <button
        name="filter_apply_btn"
        follows="top|right"
