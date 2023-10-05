@@ -1911,6 +1911,16 @@ bool LLAudioData::load()
 		gAudiop->cleanupBuffer(mBufferp);
 		mBufferp = NULL;
 
+		if (!gDirUtilp->fileExists(wav_path))
+		{
+			mHasLocalData = false;
+			mHasDecodedData = false;
+			mHasCompletedDecode = false;
+			mHasDecodeFailed = false;
+			mHasWAVLoadFailed = false;
+			gAudiop->preloadSound(mID);
+		}
+
 		return false;
 	}
 	mBufferp->mAudioDatap = this;
