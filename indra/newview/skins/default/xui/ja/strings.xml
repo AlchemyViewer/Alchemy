@@ -182,7 +182,7 @@ LibVLCのバージョン：[LIBVLC_VERSION]
 		マルチメディアを初期化しています…
 	</string>
 	<string name="LoginInitializingFonts">
-		フォントを読み込んでいます…
+		すべての読みやすいフォントを読み込んでいます…
 	</string>
 	<string name="LoginVerifyingCache">
 		キャッシュファイルを検証しています（所要時間は60～90秒）…
@@ -194,7 +194,7 @@ LibVLCのバージョン：[LIBVLC_VERSION]
 		ワールドを初期化しています…
 	</string>
 	<string name="LoginDecodingImages">
-		画像をデコードしています…
+		画像をハンドクラフトしています…
 	</string>
 	<string name="LoginInitializingQuicktime">
 		QuickTimeを初期化しています…
@@ -261,9 +261,11 @@ LibVLCのバージョン：[LIBVLC_VERSION]
 	<string name="AditiGridLabel">
 		Second Lifeベータテストグリッド（Aditi）
 	</string>
-	<string name="ViewerDownloadURL"> https://secondlife.com/support/downloads/?lang=ja_JP
+	<string name="ViewerDownloadURL">
+		https://www.alchemyviewer.org/downloads
 	</string>
-	<string name="LoginFailedViewerNotPermitted"> お使いの古いビューアでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアをダウンロードしてください：https://secondlife.com/support/downloads/?lang=ja_JP
+	<string name="LoginFailedViewerNotPermitted">
+		お使いの古いビューアでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアをダウンロードしてください：https://www.alchemyviewer.org/downloads
 
 詳細については、ＦＡＱを参照してください：
 https://secondlife.com/viewer-access-faq
@@ -298,28 +300,28 @@ https://secondlife.com/viewer-access-faq
 ご迷惑をおかけして申し訳ございません。
 	</string>
 	<string name="LoginFailedEmployeesOnly">
-		Second Lifeは、メンテナンス中につき一時的にご利用いただけません。
-従業員以外にはログインをご遠慮いただいています。
-最新の状況については www.secondlife.com/status でお確かめください。
+		[CURRENT_GRID]はメンテナンスのため一時的に閉鎖されています。
+ログインは現在[GRID_ADMIN]の従業員のみに制限されています。
 	</string>
 	<string name="LoginFailedPremiumOnly">
-		既にログインしているユーザーに最上のインワールド体験を提供するため、Second Lifeへのログインは一時的に制限されています。
-申し訳ございませんが、有料アカウントのユーザーを優先するため、現在のところ無料アカウントのユーザーには Second Lifeへのアクセスをご遠慮いただいています。
+		[CURRENT_GRID]へのログインは、インワールドの人々が可能な限り最高の体験をできるようにするため、一時的に制限されています。
 	</string>
 	<string name="LoginFailedComputerProhibited">
-		お使いのパソコンからは、Second Lifeにアクセスできません。
-システムエラーだと思われる場合は、support@secondlife.comにお問い合わせください。
+		このコンピュータから[CURRENT_GRID]にアクセスできません。
+エラーと思われる場合は、サポートまでご連絡ください。
 	</string>
 	<string name="LoginFailedAcountSuspended">
-		あなたのアカウントは、太平洋時間の[TIME]までご利用いただけません。
+		あなたのアカウントは、下記時間までアクセスできません：
+[TIME]
+エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedAccountDisabled">
 		現在リクエストを完了することができません。
-Second Lifeのサポート（https://support.secondlife.com/）にお問い合わせください。
+[CURRENT_GRID]のサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedTransformError">
 		ログイン時にデータの不一致が見つかりました。
-support@secondlife.comにお問い合わせください。
+[CURRENT_GRID]のサポートまでお問い合わせください。
 	</string>
 	<!--'Pacific time' placeholder for [TIME] in case time from server can't be decoded-->
 	<string name="PacificTime">
@@ -329,7 +331,7 @@ support@secondlife.comにお問い合わせください。
 		現在アカウントのメンテナンスが行われています。
 あなたのアカウントは、
 太平洋時間の[TIME]までご利用いただけません。
-システムのエラーだと思われる場合は、support@secondlife.com にお問い合わせください。
+エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedPendingLogoutFault">
 		ログアウトのリスクエスト時に、シミュレーターから「fault」が返されました。
@@ -345,22 +347,22 @@ support@secondlife.comにお問い合わせください。
 		シミュレーターに接続できませんでした。
 	</string>
 	<string name="LoginFailedRestrictedHours">
-		あなたのSecond Lifeアカウントにアクセスできるのは、
+		あなたのアカウントにアクセスできるのは、
 太平洋時間の[START]～[END]の間に限られます。
 有効な時間帯に再度お試しください。
-システムのエラーだと思われる場合は、support@secondlife.com にお問い合わせください。
+エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedIncorrectParameters">
 		パラメーターが正しくありません。
-システムのエラーだと思われる場合は、support@secondlife.com にお問い合わせください。
+エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedFirstNameNotAlphanumeric">
 		ファーストネームのパラメーターは英数字です。
-システムのエラーだと思われる場合は、support@secondlife.com にお問い合わせください。
+エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedLastNameNotAlphanumeric">
 		ラストネームのパラメーターは英数字です。
-システムのエラーだと思われる場合は、support@secondlife.com にお問い合わせください。
+エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
 	</string>
 	<string name="LogoutFailedRegionGoingOffline">
 		リージョンは、現在オフラインです。
@@ -391,7 +393,7 @@ support@secondlife.comにお問い合わせください。
 しばらくしてから再度お試しください。
 	</string>
 	<string name="AgentLostConnection">
-		このリージョンに不都合が発生している可能性があります。ご使用のインターネット接続をご確認ください。
+		これは恥ずべきことだ。このリージョンではトラブルが発生している可能性があります。インターネットへの接続を確認してください。
 	</string>
 	<string name="SavingSettings">
 		設定を保存しています…
@@ -690,7 +692,9 @@ support@secondlife.comにお問い合わせください。
 		リリースノート
 	</string>
 	<!-- Always mark translate="false" for strings that are nothing but URLs, as they don't need translation. -->
-	<string name="RELEASE_NOTES_BASE_URL" translate="false">https://git.alchemyviewer.org/alchemy/alchemy/releases/</string>
+	<string name="RELEASE_NOTES_BASE_URL" translate="false">
+		https://git.alchemyviewer.org/alchemy/alchemy/releases/
+	</string>
 	<!-- Indicates something is being loaded. Maybe should be merged with RetrievingData -->
 	<string name="LoadingData">
 		読み込んでいます…
@@ -1277,6 +1281,9 @@ support@secondlife.comにお問い合わせください。
 	<string name="png_image_files">
 		PNG画像
 	</string>
+	<string name="webp_image_files">
+		WebP画像
+	</string>
 	<string name="save_texture_image_files">
 		TargaまたはPNG画像
 	</string>
@@ -1288,6 +1295,9 @@ support@secondlife.comにお問い合わせください。
 	</string>
 	<string name="xml_file">
 		XMLファイル
+	</string>
+	<string name="csv_files">
+		CSVファイル
 	</string>
 	<string name="raw_file">
 		RAWファイル
@@ -1641,7 +1651,7 @@ Returns the rotation velocity in radians per second
 	</string>
 	<string name="LSLTipText_llGetTimeOfDay" translate="false">
 		float llGetTimeOfDay()
-Returns the time in seconds since [SECOND_LIFE] server midnight or since region up-time, whichever is smaller
+Returns the time in seconds since [CURRENT_GRID] server midnight or since region up-time, whichever is smaller
 	</string>
 	<string name="LSLTipText_llGetWallclock" translate="false">
 		float llGetWallclock()
@@ -3395,6 +3405,9 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="No Filters" value="なし"/>
 	<string name="Since Logoff" value="–ログオフ以来"/>
 	<!-- inventory folder -->
+	<string name="InvFolder Basic Root">
+		基本ルート
+	</string>
 	<string name="InvFolder My Inventory">
 		インベントリ
 	</string>
@@ -3931,6 +3944,13 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="NotRunQueueStart">
 		実行停止に設定
 	</string>
+	<string name="DeleteQueueTitle">
+		削除中
+	</string>
+	<string name="DeleteQueueStart">
+		削除
+	</string>
+	<!-- compile comment text-->
 	<string name="CompileSuccessful">
 		コンパイルが完了しました！
 	</string>
@@ -3949,9 +3969,11 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="ScriptWasDeleted">
 		スクリプト（インベントリから削除済み）
 	</string>
+	<!-- god tools -->
 	<string name="GodToolsObjectOwnedBy">
 		[OWNER]が所有している「[OBJECT]」というオブジェクト
 	</string>
+	<!-- groups -->
 	<string name="GroupsNone">
 		なし
 	</string>
@@ -3992,6 +4014,7 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="IMTeen">
 		ティーン
 	</string>
+	<!-- floater about land -->
 	<string name="Anyone">
 		全員
 	</string>
@@ -4696,7 +4719,7 @@ For AI Character: Get the closest navigable point to the point provided.
 	</string>
 	<string name="MBNoAutoUpdate">
 		自動更新は現在 Linux には対応していません。
-www.secondlife.com から最新バージョンをダウンロードしてください。
+https://www.alchemyviewer.org から最新バージョンをダウンロードしてください。
 	</string>
 	<string name="MBRegClassFailed">
 		RegisterClass 失敗
@@ -6236,7 +6259,7 @@ www.secondlife.com から最新バージョンをダウンロードしてくだ�
 		更新のダウンロードに失敗しました。
 	</string>
 	<string name="UpdaterFailUpdateDescriptive">
-		[APP_NAME]の更新時にエラーが発生しました。www.secondlife.com から最新バージョンをダウンロードしてください。
+		[APP_NAME]の更新時にエラーが発生しました。https://www.alchemyviewer.org から最新バージョンをダウンロードしてください。
 	</string>
 	<string name="UpdaterFailInstallTitle">
 		更新のインストールに失敗しました。
@@ -7393,6 +7416,9 @@ www.secondlife.com から最新バージョンをダウンロードしてくだ�
 	<string name="Command_Move_Label">
 		歩行／走行／飛行
 	</string>
+	<string name="Command_Panic_Label">
+		パニック！
+	</string>
 	<string name="Command_People_Label">
 		人物
 	</string>
@@ -7432,6 +7458,7 @@ www.secondlife.com から最新バージョンをダウンロードしてくだ�
 	<string name="Command_Snapshot_Label">
 		スナップショット
 	</string>
+	<!--正確には「スナップショットをディスクに保存」だが字数制限の都合上省略-->
 	<string name="Command_Snapshot_Disk_Label">
 		Ｓショットを保存
 	</string>
@@ -7512,6 +7539,9 @@ www.secondlife.com から最新バージョンをダウンロードしてくだ�
 	</string>
 	<string name="Command_Move_Tooltip">
 		アバターの移動操作をします。
+	</string>
+	<string name="Command_Panic_Tooltip">
+		トラブル発生時にクリックしてください。
 	</string>
 	<string name="Command_People_Tooltip">
 		フレンド、グループ、近くの人物を表示します。
@@ -7812,6 +7842,9 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 また、お使いのネットワークとファイアウォールが正しく設定されている事もお確かめください。
 このエラーが継続的に起こる場合は、Secondlife.com のサポートセクションから問題を報告してください。
 [https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%8A%E3%83%AC%E3%83%83%E3%82%B8%E3%83%99%E3%83%BC%E3%82%B9/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%A8%E3%83%A9%E3%83%BC-r1283/ ナレッジベース]
+	</string>
+	<string name="outfit_photo_load_codec_error">
+		無効な画像ファイル形式です。他の画像を選択してください。
 	</string>
 	<!-- Alchemy Strings -->
 	<string name="NotifyIncomingMessage">

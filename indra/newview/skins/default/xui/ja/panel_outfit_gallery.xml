@@ -13,43 +13,6 @@
 		検索しています…
 	</text>
 	<scroll_container name="gallery_scroll_panel">
-		<!--
-		<outfit_gallery_item name="preview_outfit1" />
-		<layout_stack name="top_gallery_stack">
-			<layout_panel name="top_gallery_panel">
-				<outfit_gallery_item name="preview_outfit1"/>
-			</layout_panel>
-			<layout_panel name="top panel">
-				<outfit_gallery_item name="preview_outfit2"/>
-			</layout_panel>
-			<layout_panel name="top panel">
-				<outfit_gallery_item name="preview_outfit2"/>
-			</layout_panel>
-		</layout_stack>
-		<layout_stack name="top_gallery_stack">
-			<layout_panel name="top_gallery_panel">
-				<outfit_gallery_item name="preview_outfit1"/>
-			</layout_panel>
-			<layout_panel name="top panel">
-				<outfit_gallery_item name="preview_outfit2"/>
-			</layout_panel>
-			<layout_panel name="top panel">
-				<outfit_gallery_item name="preview_outfit2"/>
-			</layout_panel>
-		</layout_stack>
-		<layout_stack name="top_gallery_stack">
-			<layout_panel name="top_gallery_panel">
-				<outfit_gallery_item name="preview_outfit1"/>
-			</layout_panel>
-			<layout_panel name="top panel">
-				<outfit_gallery_item name="preview_outfit2"/>
-			</layout_panel>
-			<layout_panel name="top panel">
-				<outfit_gallery_item name="preview_outfit2"/>
-			</layout_panel>
-			</layout_stack>
-		</panel>
-	-->
 	</scroll_container>
 	<panel name="bottom_panel">
 		<menu_button tool_tip="追加オプションを表示" name="options_gear_btn"/>
