@@ -330,16 +330,6 @@ BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
 
 	if (mFilePicker)
 	{
-		GtkWindow* picker = mFilePicker->buildFilePicker(false, true,
-								 "dirpicker");
-
-		if (picker)
-		{		   
-		   gtk_window_set_title(GTK_WINDOW(picker), LLTrans::getString("choose_the_directory").c_str());
-		   gtk_widget_show_all(GTK_WIDGET(picker));
-		   gtk_main();
-		   return (!mFilePicker->getFirstFile().empty());
-		}
 	}
 #endif // !LL_MESA_HEADLESS
 

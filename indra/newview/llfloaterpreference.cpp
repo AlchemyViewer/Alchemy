@@ -76,6 +76,7 @@
 #include "llviewercontrol.h"
 #include "llviewercamera.h"
 #include "llviewereventrecorder.h"
+#include "llviewermenufile.h"
 #include "llviewermessage.h"
 #include "llviewerwindow.h"
 #include "llviewerthrottle.h"
@@ -746,59 +747,60 @@ void LLFloaterPreference::reloadSkinList()
 
 void LLFloaterPreference::onAddSkin()
 {
-	LLFilePicker& filepicker = LLFilePicker::instance();
-	if (filepicker.getOpenFile(LLFilePicker::FFLOAD_ZIP))
+	LLFilePickerReplyThread::startPicker(boost::bind(&LLFloaterPreference::onAddSkinCallback, this, _1), LLFilePicker::FFLOAD_ZIP, false);
+}
+
+void LLFloaterPreference::onAddSkinCallback(const std::vector<std::string>& filenames)
+{
+	const std::string& package = filenames[0];
+	auto zip = std::make_unique<ALUnZip>(package);
+	if (zip->isValid())
 	{
-		const std::string& package = filepicker.getFirstFile();
-		auto zip = std::make_unique<ALUnZip>(package);
-		if (zip->isValid())
+		size_t buf_size = zip->getSizeFile("manifest.json");
+		if (buf_size)
 		{
-			size_t buf_size = zip->getSizeFile("manifest.json");
-			if (buf_size)
-			{
-				buf_size++;
-				buf_size *= sizeof(char);
-				auto buf = std::make_unique<char[]>(buf_size);
-				zip->extractFile("manifest.json", buf.get(), buf_size);
-				buf[buf_size - 1] = '\0'; // force.
-				std::stringstream ss;
-				ss << std::string(const_cast<const char*>(buf.get()), buf_size);
-				buf.reset();
+			buf_size++;
+			buf_size *= sizeof(char);
+			auto buf = std::make_unique<char[]>(buf_size);
+			zip->extractFile("manifest.json", buf.get(), buf_size);
+			buf[buf_size - 1] = '\0'; // force.
+			std::stringstream ss;
+			ss << std::string(const_cast<const char*>(buf.get()), buf_size);
+			buf.reset();
 				
-				nlohmann::json root;
-				try
-				{
-                    ss >> root;
-					const std::string& name = root.value("name", "Unknown");
-					std::string pathname = gDirUtilp->add(gDirUtilp->getOSUserAppDir(), "skins");
-					if (!gDirUtilp->fileExists(pathname))
-					{
-						LLFile::mkdir(pathname);
-					}
-					pathname = gDirUtilp->add(pathname, name);
-					if (!LLFile::isdir(pathname) && (LLFile::mkdir(pathname) != 0))
-					{
-						LLNotificationsUtil::add("AddSkinUnpackFailed");
-					}
-					else if (!zip->extract(pathname))
-					{
-						LLNotificationsUtil::add("AddSkinUnpackFailed");
-					}
-					else
-					{
-						loadUserSkins();
-						LLNotificationsUtil::add("AddSkinSuccess", LLSD().with("PACKAGE", name));
-					}
-				}
-                catch(const nlohmann::json::exception&)
-				{
-					LLNotificationsUtil::add("AddSkinCantParseManifest", LLSD().with("PACKAGE", package));
-				}
-			}
-			else
+			nlohmann::json root;
+			try
 			{
-				LLNotificationsUtil::add("AddSkinNoManifest", LLSD().with("PACKAGE", package));
+                ss >> root;
+				const std::string& name = root.value("name", "Unknown");
+				std::string pathname = gDirUtilp->add(gDirUtilp->getOSUserAppDir(), "skins");
+				if (!gDirUtilp->fileExists(pathname))
+				{
+					LLFile::mkdir(pathname);
+				}
+				pathname = gDirUtilp->add(pathname, name);
+				if (!LLFile::isdir(pathname) && (LLFile::mkdir(pathname) != 0))
+				{
+					LLNotificationsUtil::add("AddSkinUnpackFailed");
+				}
+				else if (!zip->extract(pathname))
+				{
+					LLNotificationsUtil::add("AddSkinUnpackFailed");
+				}
+				else
+				{
+					loadUserSkins();
+					LLNotificationsUtil::add("AddSkinSuccess", LLSD().with("PACKAGE", name));
+				}
 			}
+            catch(const nlohmann::json::exception&)
+			{
+				LLNotificationsUtil::add("AddSkinCantParseManifest", LLSD().with("PACKAGE", package));
+			}
+		}
+		else
+		{
+			LLNotificationsUtil::add("AddSkinNoManifest", LLSD().with("PACKAGE", package));
 		}
 	}
 }
