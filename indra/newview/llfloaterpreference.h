@@ -227,6 +227,7 @@ private:
 	void loadUserSkins();
 	void reloadSkinList();
 	void onAddSkin();
+	void onAddSkinCallback(const std::vector<std::string>& filenames);
 	void onRemoveSkin();
 	void callbackRemoveSkin(const LLSD& notification, const LLSD& response);
 	void onApplySkin();

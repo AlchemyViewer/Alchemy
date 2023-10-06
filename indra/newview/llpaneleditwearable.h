@@ -90,6 +90,7 @@ private:
 	void				updateVerbs();
 	
 	void				onClickedImportBtn();
+	void				onClickedImportBtnCallback(const std::vector<std::string>& filenames);
 
 	void				onColorSwatchCommit(const LLUICtrl*);
 	void				onTexturePickerCommit(const LLUICtrl*);

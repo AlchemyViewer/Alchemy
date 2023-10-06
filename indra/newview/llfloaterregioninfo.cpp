@@ -80,6 +80,7 @@
 #include "llviewercontrol.h"
 #include "lluictrlfactory.h"
 #include "llviewerinventory.h"
+#include "llviewermenufile.h"
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
 #include "llviewerregion.h"
@@ -1567,13 +1568,14 @@ bool LLPanelRegionTerrainInfo::callbackTextureHeights(const LLSD& notification, 
 // static
 void LLPanelRegionTerrainInfo::onClickDownloadRaw(void* data)
 {
-	LLFilePicker& picker = LLFilePicker::instance();
-	if (!picker.getSaveFile(LLFilePicker::FFSAVE_RAW, "terrain.raw"))
-	{
-		LL_WARNS() << "No file" << LL_ENDL;
-		return;
-	}
-	std::string filepath = picker.getFirstFile();
+	LLDir::getScrubbedFileName(LLRegionInfoModel::instance().mSimName+"_terrain.raw");
+	LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelRegionTerrainInfo::onClickDownloadRawCallback, _1, data), LLFilePicker::FFSAVE_RAW, LLDir::getScrubbedFileName(LLRegionInfoModel::instance().mSimName + "_terrain.raw"));
+}
+
+// static
+void LLPanelRegionTerrainInfo::onClickDownloadRawCallback(const std::vector<std::string>& filenames, void* data)
+{
+	std::string filepath = filenames[0];
 	gXferManager->expectFileForRequest(filepath);
 
 	LLPanelRegionTerrainInfo* self = (LLPanelRegionTerrainInfo*)data;
@@ -1587,13 +1589,13 @@ void LLPanelRegionTerrainInfo::onClickDownloadRaw(void* data)
 // static
 void LLPanelRegionTerrainInfo::onClickUploadRaw(void* data)
 {
-	LLFilePicker& picker = LLFilePicker::instance();
-	if (!picker.getOpenFile(LLFilePicker::FFLOAD_RAW))
-	{
-		LL_WARNS() << "No file" << LL_ENDL;
-		return;
-	}
-	std::string filepath = picker.getFirstFile();
+	LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelRegionTerrainInfo::onClickUploadRawCallback, data, _1), LLFilePicker::FFLOAD_RAW, false);
+}
+
+// static
+void LLPanelRegionTerrainInfo::onClickUploadRawCallback(void* data, const std::vector<std::string>& filenames)
+{
+	std::string filepath = filenames[0];
 	gXferManager->expectFileForTransfer(filepath);
 
 	LLPanelRegionTerrainInfo* self = (LLPanelRegionTerrainInfo*)data;

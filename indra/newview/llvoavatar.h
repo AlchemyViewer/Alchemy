@@ -1184,6 +1184,7 @@ private:
 public:
     void                getSortedJointNames(S32 joint_type, std::vector<std::string>& result) const;
 	void				dumpArchetypeXML(const std::string& prefix, bool group_by_wearables = false);
+	void				dumpArchetypeXMLCallback(const std::vector<std::string>& filenames, bool group_by_wearables);
 	void 				dumpAppearanceMsgParams( const std::string& dump_prefix,
 												 const LLAppearanceMessageContents& contents);
 	static void			dumpBakedStatus();

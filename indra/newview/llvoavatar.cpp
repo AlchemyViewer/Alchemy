@@ -127,6 +127,7 @@
 
 #include "alcinematicmode.h"
 #include "llsidepanelappearance.h"
+#include "llviewermenufile.h"
 
 extern F32 SPEED_ADJUST_MAX;
 extern F32 SPEED_ADJUST_MAX_SEC;
@@ -10264,29 +10265,26 @@ void LLVOAvatar::getSortedJointNames(S32 joint_type, std::vector<std::string>& r
     std::sort(result.begin(), result.end());
 }
 
-void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_wearables )
+void LLVOAvatar::dumpArchetypeXML(const std::string& prefix, bool group_by_wearables)
 {
 	std::string outprefix(prefix);
 	if (outprefix.empty())
 	{
-		outprefix = getFullname() + (isSelf()?"_s":"_o");
+		outprefix = getFullname() + (isSelf() ? "_s" : "_o");
 	}
 	if (outprefix.empty())
 	{
 		outprefix = std::string("new_archetype");
 	}
-	std::string outfilename = get_sequential_numbered_file_name(outprefix,".xml");
+	std::string outfilename = get_sequential_numbered_file_name(outprefix, ".xml");
+	LLFilePickerReplyThread::startPicker(boost::bind(&LLVOAvatar::dumpArchetypeXMLCallback, this, _1, group_by_wearables), LLFilePicker::FFSAVE_XML, outfilename);
+}
 
-	LLFilePicker& file_picker = LLFilePicker::instance();
-	if (!file_picker.getSaveFile(LLFilePicker::FFSAVE_XML, outfilename))
-	{
-		LL_INFOS("DumpArchetypeXML") << "User closed the filepicker" << LL_ENDL;
-		return;
-	}
-	
+void LLVOAvatar::dumpArchetypeXMLCallback(const std::vector<std::string>& filenames, bool group_by_wearables)
+{
 	LLAPRFile outfile;
     LLWearableType *wr_inst = LLWearableType::getInstance();
-	std::string fullpath = file_picker.getFirstFile();
+	std::string fullpath = filenames[0];
 	if (APR_SUCCESS == outfile.open(fullpath, LL_APR_WB ))
 	{
 		apr_file_t* file = outfile.getFileHandle();
