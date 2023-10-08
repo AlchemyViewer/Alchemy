@@ -32,7 +32,6 @@
 
 class LLSpeakerMgr;
 class LLUICtrl;
-class LLAvalineUpdater;
 
 class LLParticipantList : public LLConversationItemSession
 {
@@ -140,8 +139,6 @@ protected:
 	};
 
 private:
-	void onAvalineCallerFound(const LLUUID& participant_id);
-	void onAvalineCallerRemoved(const LLUUID& participant_id);
 
 	/**
 	 * Adjusts passed participant to work properly.
@@ -163,7 +160,6 @@ private:
 	LLPointer<SpeakerMuteListener>				mSpeakerMuteListener;
 
 	validate_speaker_callback_t mValidateSpeakerCallback;
-	LLAvalineUpdater* mAvalineUpdater;
 };
 
 #endif // LL_PARTICIPANTLIST_H

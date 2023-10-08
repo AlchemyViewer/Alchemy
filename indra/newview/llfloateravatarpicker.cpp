@@ -109,6 +109,7 @@ LLFloaterAvatarPicker::LLFloaterAvatarPicker(const LLSD& key)
 	mNumResultsReturned(0),
 	mNearMeListComplete(FALSE),
 	mCloseOnSelect(FALSE),
+    mExcludeAgentFromSearchResults(FALSE),
     mContextConeOpacity	(0.f),
     mContextConeInAlpha(0.f),
     mContextConeOutAlpha(0.f),
@@ -316,7 +317,7 @@ void LLFloaterAvatarPicker::populateNearMe()
 	for(U32 i=0; i<avatar_ids.size(); i++)
 	{
 		LLUUID& av = avatar_ids[i];
-		if(av == gAgent.getID()) continue;
+		if(mExcludeAgentFromSearchResults && (av == gAgent.getID())) continue;
 		LLSD element;
 		element["id"] = av; // value
 		LLAvatarName av_name;
