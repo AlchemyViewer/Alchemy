@@ -212,11 +212,15 @@ void LLDerenderList::save() const
 
 LLDerenderList::entry_list_t::iterator LLDerenderList::findEntry(LLDerenderEntry::EEntryType eType, const LLUUID& idEntry)
 {
+	if (m_Entries.empty()) return {};
+
 	return std::find_if(m_Entries.begin(), m_Entries.end(), [eType, &idEntry](const auto& e) { return (eType == e->getType()) && (idEntry == e->getID()); });
 }
 
 LLDerenderList::entry_list_t::iterator LLDerenderList::findObjectEntry(U64 idRegion, const LLUUID& idObject, U32 idRootLocal)
 {
+	if (m_Entries.empty()) return {};
+
 	// NOTE: 'idRootLocal' will be 0 for the root prim itself and is the only time we need to compare against 'idObject'
 	return std::find_if(m_Entries.begin(), m_Entries.end(), 
 						[&idRegion, &idObject, &idRootLocal](const std::unique_ptr<LLDerenderEntry>& e)
