@@ -36,7 +36,7 @@
 #ifdef LL_USESYSTEMLIBS
 # include <zlib.h>
 #else
-# include "zlib/zlib.h"
+# include "zlib-ng/zlib.h"
 #endif
 
 std::string model_names[] =
@@ -105,6 +105,14 @@ void LLModel::offsetMesh( const LLVector3& pivotPoint )
 			pos[i].add( pivot );
 		}
 	}
+}
+
+void LLModel::remapVolumeFaces()
+{
+    for (U32 i = 0; i < getNumVolumeFaces(); ++i)
+    {
+        mVolumeFaces[i].remap();
+    }
 }
 
 void LLModel::optimizeVolumeFaces()
