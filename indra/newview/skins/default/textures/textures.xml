@@ -812,6 +812,7 @@ with the same filename but different name
   <texture name="Zoom_Off" file_name="icons/Zoom_Off.png" preload="false" />
   <texture name="UnZoom_Off" file_name="icons/UnZoom_Off.png" preload="false" />
 
+  <texture name="PixieSmall.png" use_mips="true" />
   <texture name="pixiesmall.j2c" use_mips="true" />
   <texture name="script_error.j2c" use_mips="true" />
   <texture name="silhouette.j2c" use_mips="true" />
