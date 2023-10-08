@@ -51,6 +51,7 @@ class LLHost;
 class LLViewerObject;
 class LLSurfacePatch;
 
+class LLCharacter;
 class LLCloudPuff;
 class LLCloudGroup;
 class LLVOAvatar;
@@ -173,6 +174,8 @@ public:
 	// 'false' if the region has been removed due to region change
 	// or if the circuit to this simulator had been lost.
 	bool isRegionListed(const LLViewerRegion* region) const;
+
+    S32 getNearbyAvatarsAndCompl(std::vector<LLCharacter*> &valid_nearby_avs);
 
 private:
     void clearHoleWaterObjects();

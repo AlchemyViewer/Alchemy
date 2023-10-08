@@ -63,6 +63,7 @@
 #include "llnotificationsutil.h"
 #include "llpaneltopinfobar.h"
 #include "llparcel.h"
+#include "llperfstats.h"
 #include "llrendersphere.h"
 #include "llscriptruntimeperms.h"
 #include "llsdutil.h"
@@ -4204,6 +4205,7 @@ void LLAgent::handleTeleportFinished()
             mRegionp->setCapabilitiesReceivedCallback(boost::bind(&LLAgent::onCapabilitiesReceivedAfterTeleport));
         }
     }
+    LLPerfStats::tunables.autoTuneTimeout = true;
 }
 
 void LLAgent::handleTeleportFailed()
@@ -4235,6 +4237,8 @@ void LLAgent::handleTeleportFailed()
 	}
 
     mTPNeedsNeabyChatSeparator = false;
+
+    LLPerfStats::tunables.autoTuneTimeout = true;
 }
 
 /*static*/
