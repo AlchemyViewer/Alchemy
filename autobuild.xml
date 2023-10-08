@@ -604,11 +604,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>73a736565bfccb42785663f43eb56f874ab590d60942d40f178bcd32371e04d1ea267c9d8f34f1204c249ba7a13ab58270ef27fcba2fb035209a8cdfe712a39d</string>
+              <string>129e77c5352c096e798ee5fb071388cee3211512af62ac178fc6918d7862209da67a945434b98e0dd8a9ddc507227cf9e7d08023bc08123fbcfc0a96fb9b621d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.17.2119/fmodstudio-2.02.17-darwin64-2119.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.18.2172/fmodstudio-2.02.18-darwin64-2172.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -620,11 +620,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>a29ec4e40ebf8753322248d2d93c8f221bf3d5c8f6a5bc4c834116cebb554962fd6730d4c2366305f4bc38b542b834c39bc065cf90df2f52215bc34d10eecbdb</string>
+              <string>86bd7557845f296cf46e6ea3150279dc4bac68b398d7e9de856604be98ae3c0444a6f55744c8c8e5ac05c4f1a81cc3be185b323bf1e8efa592293a2a73918fc9</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.17.2119/fmodstudio-2.02.17-linux64-2119.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.18.2172/fmodstudio-2.02.18-linux64-2172.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -636,18 +636,18 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>d1798ab7e74fa12fc3a1fa49a3f5dfe9fd7893d72a079ad8701f185940727e6df63d075863a344ea34924d903bae62dc9354f764284c237e395a4a181b3aa277</string>
+              <string>99b7b1116c75f399f5edc453015977675967146b75ee487d7c490287ed89963c4cc1440bc5d0a1b0c76b7b5869da88050036eab103e0a4d5e18391586ff4b80a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.17.2119/fmodstudio-2.02.17-windows64-2119.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.18.2172/fmodstudio-2.02.18-windows64-2172.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>2.02.17</string>
+        <string>2.02.18</string>
       </map>
       <key>fonts</key>
       <map>
