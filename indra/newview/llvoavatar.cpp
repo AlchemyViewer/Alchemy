@@ -3249,8 +3249,13 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
 // [/RLVa:KB]
 	bool visible_chat = use_chat_bubbles && (mChats.size() || mTyping);
 	bool render_name =	visible_chat ||
-		(((sRenderName == RENDER_NAME_ALWAYS) ||
+// [RLVa:KB] - Checked: RLVa-2.0.1
+		((fRlvShowAvTag) &&
+		 ((sRenderName == RENDER_NAME_ALWAYS) ||
 		  (sRenderName == RENDER_NAME_FADE && time_visible < NAME_SHOW_TIME)));
+// [/RLVa:KB]
+//		(((sRenderName == RENDER_NAME_ALWAYS) ||
+//		  (sRenderName == RENDER_NAME_FADE && time_visible < NAME_SHOW_TIME)));
 	// If it's your own avatar, don't draw in mouselook, and don't
 	// draw if we're specifically hiding our own name.
 	if (isSelf())

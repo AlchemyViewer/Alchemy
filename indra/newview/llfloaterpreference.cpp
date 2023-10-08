@@ -1192,6 +1192,13 @@ void LLFloaterPreference::buildPopupLists()
 
 void LLFloaterPreference::refreshEnabledState()
 {
+// [RLVa:KB] - Checked: 2013-05-11 (RLVa-1.4.9)
+	if (RlvActions::isRlvEnabled())
+	{
+		getChild<LLUICtrl>("do_not_disturb_response")->setEnabled(!RlvActions::hasBehaviour(RLV_BHVR_SENDIM));
+	}
+// [/RLVa:KB]
+
 	LLCheckBoxCtrl* ctrl_wind_light = getChild<LLCheckBoxCtrl>("WindLightUseAtmosShaders");
 	LLCheckBoxCtrl* ctrl_deferred = getChild<LLCheckBoxCtrl>("UseLightShaders");
 

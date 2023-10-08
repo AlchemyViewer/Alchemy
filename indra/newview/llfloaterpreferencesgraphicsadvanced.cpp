@@ -40,6 +40,9 @@
 #include "llviewertexturelist.h"
 #include "llvoavatar.h"
 #include "pipeline.h"
+// [RLVa:KB] - Checked: 2010-03-18 (RLVa-1.2.0a)
+#include "rlvactions.h"
+// [/RLVa:KB]
 
 
 LLFloaterPreferenceGraphicsAdvanced::LLFloaterPreferenceGraphicsAdvanced(const LLSD& key)
@@ -399,7 +402,11 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
     LLCheckBoxCtrl* ctrl_wind_light = getChild<LLCheckBoxCtrl>("WindLightUseAtmosShaders");
     LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
     LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
-    ctrl_wind_light->setEnabled(TRUE);
+// [RLVa:KB] - Checked: 2010-03-18 (RLVa-1.2.0a) | Modified: RLVa-0.2.0a
+    // "Atmospheric Shaders" can't be disabled - but can be enabled - under @setenv=n
+    ctrl_wind_light->setEnabled( ((RlvActions::canChangeEnvironment()) && (!RlvActions::hasBehaviour(RLV_BHVR_SETSPHERE))) || (!gSavedSettings.getBOOL("WindLightUseAtmosShaders")));
+// [/RLVa:KB]
+//    ctrl_wind_light->setEnabled(TRUE);
     sky->setEnabled(TRUE);
     sky_text->setEnabled(TRUE);
 
