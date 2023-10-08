@@ -19,14 +19,7 @@ set(${CMAKE_CURRENT_LIST_FILE}_INCLUDED "YES")
 include(Variables)
 
 # We go to some trouble to set LL_BUILD to the set of relevant compiler flags.
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} $ENV{LL_BUILD}")
-set(CMAKE_CXX_FLAGS_RELEASE "$ENV{LL_BUILD_RELEASE}")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "$ENV{LL_BUILD_RELWITHDEBINFO}")
-set(CMAKE_CXX_FLAGS_DEBUG "$ENV{LL_BUILD_DEBUG}")
-set(CMAKE_EXE_LINKER_FLAGS "$ENV{LL_BUILD_BASE_LINKER}")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE "$ENV{LL_BUILD_RELEASE_LINKER}")
-set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "$ENV{LL_BUILD_RELWITHDEBINFO_LINKER}")
-set(CMAKE_EXE_LINKER_FLAGS_DEBUG "$ENV{LL_BUILD_DEBUG_LINKER}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} $ENV{LL_BUILD}")
 # Given that, all the flags you see added below are flags NOT present in
 # https://bitbucket.org/lindenlab/viewer-build-variables/src/tip/variables.
 # Before adding new ones here, it's important to ask: can this flag really be
@@ -35,9 +28,6 @@ set(CMAKE_EXE_LINKER_FLAGS_DEBUG "$ENV{LL_BUILD_DEBUG_LINKER}")
 
 # Portable compilation flags.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DADDRESS_SIZE=${ADDRESS_SIZE}")
-
-# Configure asan
-set(ASAN OFF CACHE BOOL "Enable use of asan in builds")
 
 # Configure crash reporting
 set(RELEASE_CRASH_REPORTING OFF CACHE BOOL "Enable use of crash reporting in release builds")
@@ -70,21 +60,16 @@ if (WINDOWS)
   # http://www.cmake.org/pipermail/cmake/2009-September/032143.html
   string(REPLACE "/Zm1000" " " CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
 
-  if(ASAN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fsanitize=address")
-  endif(ASAN)
-
   # Without PreferredToolArchitecture=x64, as of 2020-06-26 the 32-bit
   # compiler on our TeamCity build hosts has started running out of virtual
   # memory for the precompiled header file.
   # CP changed to only append the flag for 32bit builds - on 64bit builds,
   # locally at least, the build output is spammed with 1000s of 'D9002'
   # warnings about this switch being ignored.
-  # [SL:KB] - Moved to variables for the convenience of people who are not Kitty
-  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
-  #if( ADDRESS_SIZE EQUAL 32 )
-  #  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /p:PreferredToolArchitecture=x64")  
-  #endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")  
+  if( ADDRESS_SIZE EQUAL 32 )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /p:PreferredToolArchitecture=x64")  
+  endif()
   # Preserve first-pass-through versions (ie no FORCE overwrite). Prevents recursive addition of /Zo (04/2021)
   set(OG_CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE} CACHE STRING "OG_CXX_FLAGS_RELEASE")
   set(OG_CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO} CACHE STRING "OG_CXX_FLAGS_RELWITHDEBINFO")

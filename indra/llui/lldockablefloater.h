@@ -131,10 +131,7 @@ protected:
 	boost::function<BOOL ()> mIsDockedStateForcedCallback;
 
 private:
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-6.6
-	std::unique_ptr<LLDockControl> mDockControl;
-// [/SL:KB]
-//	std::auto_ptr<LLDockControl> mDockControl;
+	std::auto_ptr<LLDockControl> mDockControl;
 	LLUIImagePtr mDockTongue;
 	static LLHandle<LLFloater> sInstanceHandle;
 	/**

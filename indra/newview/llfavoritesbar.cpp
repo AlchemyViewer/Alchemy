@@ -840,11 +840,8 @@ void LLFavoritesBarCtrl::updateButtons(bool force_update)
 		if (getChildList()->size() > 0)
 		{
 			//find last visible child to get the rightest button offset
-//			child_list_const_reverse_iter_t last_visible_it = std::find_if(childs->rbegin(), childs->rend(), 
-//					std::mem_fun(&LLView::getVisible));
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-6.6
-			child_list_const_reverse_iter_t last_visible_it = std::find_if(childs->rbegin(), childs->rend(), [](const LLView* viewp) { return viewp->getVisible(); });
-// [/SL:KB]
+			child_list_const_reverse_iter_t last_visible_it = std::find_if(childs->rbegin(), childs->rend(), 
+					std::mem_fun(&LLView::getVisible));
 			if(last_visible_it != childs->rend())
 			{
 				last_right_edge = (*last_visible_it)->getRect().mRight;

@@ -1265,14 +1265,8 @@ void LLParcel::setExperienceKeyType( const LLUUID& experience_key, U32 type )
 
 U32 LLParcel::countExperienceKeyType( U32 type )
 {
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-6.6
-    return std::count_if(
+	return std::count_if(
 		boost::begin(mExperienceKeys | boost::adaptors::map_values), 
 		boost::end(mExperienceKeys | boost::adaptors::map_values), 
-        [type](U32 v) { return v == type; });
-// [/SL:KB]
-//	return std::count_if(
-//		boost::begin(mExperienceKeys | boost::adaptors::map_values), 
-//		boost::end(mExperienceKeys | boost::adaptors::map_values), 
-//		std::bind2nd(std::equal_to<U32>(), type));
+		std::bind2nd(std::equal_to<U32>(), type));
 }

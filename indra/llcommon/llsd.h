@@ -421,60 +421,42 @@ public:
 	static std::string		typeString(Type type);		// Return human-readable type as a string
 };
 
-//struct llsd_select_bool : public std::unary_function<LLSD, LLSD::Boolean>
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-6.6
-struct llsd_select_bool
-// [/SL:KB]
+struct llsd_select_bool : public std::unary_function<LLSD, LLSD::Boolean>
 {
 	LLSD::Boolean operator()(const LLSD& sd) const
 	{
 		return sd.asBoolean();
 	}
 };
-//struct llsd_select_integer : public std::unary_function<LLSD, LLSD::Integer>
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-6.6
-struct llsd_select_integer
-// [/SL:KB]
+struct llsd_select_integer : public std::unary_function<LLSD, LLSD::Integer>
 {
 	LLSD::Integer operator()(const LLSD& sd) const
 	{
 		return sd.asInteger();
 	}
 };
-//struct llsd_select_real : public std::unary_function<LLSD, LLSD::Real>
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-6.6
-struct llsd_select_real
-// [/SL:KB]
+struct llsd_select_real : public std::unary_function<LLSD, LLSD::Real>
 {
 	LLSD::Real operator()(const LLSD& sd) const
 	{
 		return sd.asReal();
 	}
 };
-//struct llsd_select_float : public std::unary_function<LLSD, F32>
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-6.6
-struct llsd_select_float
-// [/SL:KB]
+struct llsd_select_float : public std::unary_function<LLSD, F32>
 {
 	F32 operator()(const LLSD& sd) const
 	{
 		return (F32)sd.asReal();
 	}
 };
-//struct llsd_select_uuid : public std::unary_function<LLSD, LLSD::UUID>
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-6.6
-struct llsd_select_uuid
-// [/SL:KB]
+struct llsd_select_uuid : public std::unary_function<LLSD, LLSD::UUID>
 {
 	LLSD::UUID operator()(const LLSD& sd) const
 	{
 		return sd.asUUID();
 	}
 };
-//struct llsd_select_string : public std::unary_function<LLSD, LLSD::String>
-// [SL:KB] - Patch: Viewer-Build | Checked: Catznip-6.6
-struct llsd_select_string
-// [/SL:KB]
+struct llsd_select_string : public std::unary_function<LLSD, LLSD::String>
 {
 	LLSD::String operator()(const LLSD& sd) const
 	{
