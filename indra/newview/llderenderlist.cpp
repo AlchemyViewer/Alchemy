@@ -260,6 +260,10 @@ void LLDerenderList::removeObjects(LLDerenderEntry::EEntryType eType, const uuid
 					}
 				}
 				break;
+			default:
+			case LLDerenderEntry::TYPE_AVATAR:
+			case LLDerenderEntry::TYPE_NONE:
+				break;
 		}
 		fSave |= pEntry->isPersistent();
 

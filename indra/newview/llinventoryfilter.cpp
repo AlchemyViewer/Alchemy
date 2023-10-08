@@ -624,16 +624,24 @@ bool LLInventoryFilter::checkAgainstSearchVisibility(const LLFolderViewModelItem
 
 	const BOOL is_link = object->getIsLinkType();
 	if (is_link && ((mFilterOps.mSearchVisibility & VISIBILITY_LINKS) == 0))
+	{
 		return FALSE;
+	}
 
     if (listener->isItemInOutfits() && ((mFilterOps.mSearchVisibility & VISIBILITY_OUTFITS) == 0))
-        return FALSE;
+	{
+		return FALSE;
+	}
 
 	if (listener->isItemInTrash() && ((mFilterOps.mSearchVisibility & VISIBILITY_TRASH) == 0))
+	{
 		return FALSE;
+	}
 
 	if (!listener->isAgentInventory() && ((mFilterOps.mSearchVisibility & VISIBILITY_LIBRARY) == 0))
+	{
 		return FALSE;
+	}
 
 	return TRUE;
 }

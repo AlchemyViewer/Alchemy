@@ -958,7 +958,6 @@ void LLFloaterDirectory::processSearchLandReply(LLMessageSystem* msg, void**)
 	}
 	
 	self->mNumResultsReceived += num_new_rows;
-	S32 not_auction = 0;
 	for (S32 i = 0; i < num_new_rows; ++i)
 	{
 		msg->getUUID(	"QueryReplies", "ParcelID",		parcel_id,	i);
@@ -1018,7 +1017,6 @@ void LLFloaterDirectory::processSearchLandReply(LLMessageSystem* msg, void**)
 			if (!auction)
 			{
 				buffer = llformat("%d", price);
-				not_auction++;
 			}
 			element["columns"][2]["column"]	= "price";
 			element["columns"][2]["value"]	= price;

@@ -1760,7 +1760,7 @@ BOOL LLFloater::handleDoubleClick(S32 x, S32 y, MASK mask)
 	}
 	else if ( (mHeaderHeight > 0) && (mDragHandle) && (mButtons[BUTTON_COLLAPSE]) && (mButtons[BUTTON_COLLAPSE]->getVisible()) && (mButtons[BUTTON_COLLAPSE]->getEnabled()) && 
 	          ( ((!mDragOnLeft) && (mDragHandle->getRect().mTop >= y) && (mDragHandle->getRect().mTop - mHeaderHeight <= y)) ||
-	            (mDragOnLeft) && (mDragHandle->getRect().pointInRect(x,y))) )
+	            ((mDragOnLeft) && (mDragHandle->getRect().pointInRect(x,y)))) )
 	{
 		setCollapsed(true);
 		return TRUE;

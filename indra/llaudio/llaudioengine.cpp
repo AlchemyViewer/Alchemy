@@ -1139,7 +1139,6 @@ void LLAudioEngine::startNextTransfer()
 	if (asset_id.isNull())
 	{
 		max_pri = -1.f;
-		source_map::iterator source_iter;
 		for (source_map::value_type& source_pair : mAllSources)
 		{
 			asp = source_pair.second;

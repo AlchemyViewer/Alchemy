@@ -53,7 +53,7 @@ public:
 // LLPanelBlockList
 //
 
-class LLPanelBlockList : public LLPanel, public LLMuteListObserver, public LLPanelBlockBase
+class LLPanelBlockList final : public LLPanel, public LLMuteListObserver, public LLPanelBlockBase
 {
 public:
 	LLPanelBlockList();
@@ -73,7 +73,7 @@ public:
 	const std::string& getFilterString() const override { return m_strFilter; }
 	void setFilterString(const std::string& strFilter) override;
 protected:
-	void refresh();
+	void refresh() override;
 	void removePicker();
 	void selectEntry(const LLSD& sdValue) { LLMute muteEntry(sdValue["id"].asUUID(), sdValue["name"].asString()); selectEntry(muteEntry); }
 	void selectEntry(const LLMute& muteEntry);
@@ -83,7 +83,7 @@ protected:
 	 * Event handlers
 	 */
 public:
-	       void onChange() override;
+	void onChange() override;
 protected:
 	       void onAddAvatar(LLUICtrl* pCtrl);
 	static void onAddAvatarCallback(const uuid_vec_t& idAgents, const std::vector<LLAvatarName>& avAgents);
@@ -110,7 +110,7 @@ protected:
 // LLPanelDerenderList
 //
 
-class LLPanelDerenderList : public LLPanel
+class LLPanelDerenderList final : public LLPanel
 {
 public:
 	LLPanelDerenderList();
@@ -127,7 +127,7 @@ public:
 	 * Member functions
 	 */
 protected:
-	void refresh();
+	void refresh() override;
 
 	/*
 	 * Event handlers
@@ -149,7 +149,7 @@ protected:
 // LLPanelAvatarRendering - Configure avatar complexity excpetions
 //
 
-class LLPanelAvatarRendering : public LLPanel, public LLMuteListObserver, public LLPanelBlockBase
+class LLPanelAvatarRendering final : public LLPanel, public LLMuteListObserver, public LLPanelBlockBase
 {
 	friend class LLPanelAvatarRenderingContextMenu;
 public:
@@ -170,7 +170,7 @@ public:
 	const std::string& getFilterString() const override { return m_strFilter; }
 	void setFilterString(const std::string& strFilter) override;
 protected:
-	void refresh();
+	void refresh() override;
 	void removePicker();
 	void updateButtons();
 
@@ -206,7 +206,7 @@ protected:
 // LLFloaterBlocked
 //
 
-class LLFloaterBlocked : public LLFloater
+class LLFloaterBlocked final : public LLFloater
 {
 public:
 	LLFloaterBlocked(const LLSD& sdKey);

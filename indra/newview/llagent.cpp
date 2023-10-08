@@ -479,7 +479,9 @@ LLAgent::LLAgent() :
     mCrouch(false),
 	mVoiceConnected(false),
 
+#if OPENSIM
 	mAppearanceSerialNum(0),
+#endif
 	mMouselookModeInSignal(NULL),
 	mMouselookModeOutSignal(NULL)
 {
