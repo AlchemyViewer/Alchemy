@@ -212,15 +212,11 @@ void LLDerenderList::save() const
 
 LLDerenderList::entry_list_t::iterator LLDerenderList::findEntry(LLDerenderEntry::EEntryType eType, const LLUUID& idEntry)
 {
-	if (m_Entries.empty()) return {};
-
 	return std::find_if(m_Entries.begin(), m_Entries.end(), [eType, &idEntry](const auto& e) { return (eType == e->getType()) && (idEntry == e->getID()); });
 }
 
 LLDerenderList::entry_list_t::iterator LLDerenderList::findObjectEntry(U64 idRegion, const LLUUID& idObject, U32 idRootLocal)
 {
-	if (m_Entries.empty()) return {};
-
 	// NOTE: 'idRootLocal' will be 0 for the root prim itself and is the only time we need to compare against 'idObject'
 	return std::find_if(m_Entries.begin(), m_Entries.end(), 
 						[&idRegion, &idObject, &idRootLocal](const std::unique_ptr<LLDerenderEntry>& e)
@@ -365,14 +361,16 @@ bool LLDerenderList::canAddSelection()
 
 LLDerenderObject* LLDerenderList::getObjectEntry(const LLUUID& idObject) /*const*/
 {
+	if (m_Entries.empty()) return nullptr;
 	LLDerenderList::entry_list_t::iterator itEntry = findEntry(LLDerenderEntry::TYPE_OBJECT, idObject);
-	return (m_Entries.end() != itEntry) ? (LLDerenderObject*)itEntry->get() : NULL;
+	return (m_Entries.end() != itEntry) ? (LLDerenderObject*)itEntry->get() : nullptr;
 }
 
 LLDerenderObject* LLDerenderList::getObjectEntry(U64 idRegion, const LLUUID& idObject, U32 idRootLocal) /*const*/
 {
+	if (m_Entries.empty()) return nullptr;
 	LLDerenderList::entry_list_t::const_iterator itEntry = findObjectEntry(idRegion, idObject, idRootLocal);
-	return (m_Entries.end() != itEntry) ? (LLDerenderObject*)itEntry->get() : NULL;
+	return (m_Entries.end() != itEntry) ? (LLDerenderObject*)itEntry->get() : nullptr;
 }
 
 bool LLDerenderList::processObjectUpdate(U64 idRegion, const LLUUID& idObject, const LLVOCacheEntry* pCacheEntry)
