@@ -3527,13 +3527,10 @@ void LLFloater::stackWith(LLFloater& other)
 	}
 	next_rect.translate(floater_offset, -floater_offset);
 
-	if (!mRectControl.empty())
+	const LLRect& rect = !mRectControl.empty() ? getControlGroup()->getRect(mRectControl) : LLRect::null;
+	if (rect.notEmpty() && !mDefaultRectForGroup && mResizable)
 	{
-		const LLRect& rect = getControlGroup()->getRect(mRectControl);
-		if (rect.notEmpty() && !mDefaultRectForGroup && mResizable)
-		{
-			next_rect.setLeftTopAndSize(next_rect.mLeft, next_rect.mTop, llmax(mMinWidth, rect.getWidth()), llmax(mMinHeight, rect.getHeight()));
-		}
+		next_rect.setLeftTopAndSize(next_rect.mLeft, next_rect.mTop, llmax(mMinWidth, rect.getWidth()), llmax(mMinHeight, rect.getHeight()));
 	}
 	else
 	{
