@@ -48,6 +48,12 @@
 // implementation to be defined in order for llprimitive to link correctly.
 #define TINYGLTF_NO_EXTERNAL_IMAGE 1
 
+#include <nlohmann/json.hpp>
+
+#ifndef TINYGLTF_NO_INCLUDE_JSON
+#define TINYGLTF_NO_INCLUDE_JSON 1
+#endif
+#undef STRICT
 #include "tinygltf/tiny_gltf.h"
 
 namespace tut

@@ -42,7 +42,7 @@ namespace tut
 			stream << LL_VIEWER_VERSION_MAJOR << "."
 				   << LL_VIEWER_VERSION_MINOR << "."
 				   << LL_VIEWER_VERSION_PATCH << "."
-				   << 0;
+				   << LL_VIEWER_VERSION_BUILD;
 			mVersion = stream.str();
 			stream.str("");
 
@@ -54,13 +54,13 @@ namespace tut
 
 			stream << LL_VIEWER_CHANNEL
 				   << " "
-				   << mShortVersion;
+				   << mVersion;
 			mVersionAndChannel = stream.str();
 			stream.str("");
 
 			stream << mResetChannel
 				   << " "
-				   << mShortVersion;
+				   << mVersion;
 			mResetVersionAndChannel = stream.str();
 			stream.str("");
 
@@ -98,7 +98,7 @@ namespace tut
 					  LL_VIEWER_VERSION_PATCH);
 		ensure_equals("Build version", 
 					  LLVersionInfo::instance().getBuild(), 
-					  0);
+					  LL_VIEWER_VERSION_BUILD);
 		ensure_equals("Channel version", 
 					  LLVersionInfo::instance().getChannel(), 
 					  LL_VIEWER_CHANNEL);
