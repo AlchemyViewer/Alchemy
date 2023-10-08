@@ -139,6 +139,9 @@ public:
 	{
 		BUTTON_CLOSE = 0,
 		BUTTON_RESTORE,
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-3.2
+		BUTTON_COLLAPSE,
+// [/SL:KB]
 		BUTTON_MINIMIZE,
 		BUTTON_TEAR_OFF,
 		BUTTON_DOCK,
@@ -158,6 +161,9 @@ public:
 								can_resize_height,
 								can_resize_width,
 								can_minimize,
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
+								can_collapse,
+// [/SL:KB]
 								can_close,
 								can_drag_on_left,
 								can_tear_off,
@@ -180,12 +186,18 @@ public:
 		Optional<LLUIImage*>	close_image,
 								restore_image,
 								minimize_image,
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-3.2
+								collapse_image,
+// [/SL:KB]
 								tear_off_image,
 								dock_image,
 								help_image;
 		Optional<LLUIImage*>	close_pressed_image,
 								restore_pressed_image,
 								minimize_pressed_image,
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-3.2
+								collapse_pressed_image,
+// [/SL:KB]
 								tear_off_pressed_image,
 								dock_pressed_image,
 								help_pressed_image;
@@ -257,13 +269,19 @@ public:
 	std::string		getTitle() const;
 	void			setShortTitle( const std::string& short_title );
 	std::string		getShortTitle() const;
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-3.4
+	void            setCollapsed(bool collapsed);
+// [/SL:KB]
 	virtual void	setMinimized(BOOL b);
 	void			moveResizeHandlesToFront();
 	void			addDependentFloater(LLFloater* dependent, BOOL reposition = TRUE);
 	void			addDependentFloater(LLHandle<LLFloater> dependent_handle, BOOL reposition = TRUE);
 	LLFloater*		getDependee() { return (LLFloater*)mDependeeHandle.get(); }
 	void		removeDependentFloater(LLFloater* dependent);
-	BOOL			isMinimized() const				{ return mMinimized; }
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
+	bool			isMinimized() const				{ return mMinimized; }
+// [/SL:KB]
+//	BOOL			isMinimized() const				{ return mMinimized; }
 	/// isShown() differs from getVisible() in that isShown() also considers
 	/// isMinimized(). isShown() is true only if visible and not minimized.
 	bool			isShown() const;
@@ -276,6 +294,9 @@ public:
 	virtual BOOL	isFrontmost();
 	BOOL			isDependent()					{ return !mDependeeHandle.isDead(); }
 	void			setCanMinimize(BOOL can_minimize);
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
+	void			setCanCollapse(bool can_collapse);
+// [/SL:KB]
 	void			setCanClose(BOOL can_close);
 	void			setCanTearOff(BOOL can_tear_off);
 	virtual void	setCanResize(BOOL can_resize);
@@ -290,6 +311,9 @@ public:
 	static LLControlGroup*	getControlGroup();
 
 	bool			isMinimizeable() const{ return mCanMinimize; }
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
+	bool			isCollapsible() const { return mCanCollapse; }
+// [/SL:KB]
 	bool			isCloseable() const{ return mCanClose; }
 	bool			isDragOnLeft() const{ return mDragOnLeft; }
 	S32				getMinWidth() const{ return mMinWidth; }
@@ -359,9 +383,15 @@ public:
 
 	static void		onClickClose(LLFloater* floater);
 	static void		onClickMinimize(LLFloater* floater);
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-3.2
+	static void		onClickCollapse(LLFloater* floater);
+// [/SL:KB]
 	static void		onClickTearOff(LLFloater* floater);
 	static void     onClickDock(LLFloater* floater);
 	static void		onClickHelp(LLFloater* floater);
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-3.2
+	static void		handleShowCollapseButtonChanged(const LLSD& sdValue);
+// [/SL:KB]
 
 	static void		setFloaterHost(LLMultiFloater* hostp) {sHostp = hostp; }
 	static LLMultiFloater* getFloaterHost() {return sHostp; }
@@ -486,6 +516,9 @@ private:
 	
 	BOOL			mCanTearOff;
 	BOOL			mCanMinimize;
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
+	bool			mCanCollapse;
+// [/SL:KB]
 	BOOL			mCanClose;
 	BOOL			mDragOnLeft;
 	BOOL			mResizable;
@@ -502,6 +535,9 @@ private:
 	S32				mLegacyHeaderHeight;// HACK see initFloaterXML()
 	
 	BOOL			mMinimized;
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-3.2
+	bool			mCollapseOnMinimize;
+// [/SL:KB]
 	BOOL			mForeground;
 	LLHandle<LLFloater>	mDependeeHandle;
 	
@@ -529,6 +565,9 @@ private:
 	static std::string	sButtonNames[BUTTON_COUNT];
 	static std::string	sButtonToolTips[BUTTON_COUNT];
 	static std::string  sButtonToolTipsIndex[BUTTON_COUNT];
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-3.2
+	static bool			sShowCollapseButton;
+// [/SL:KB]
 	
 	typedef void(*click_callback)(LLFloater*);
 	static click_callback sButtonCallbacks[BUTTON_COUNT];

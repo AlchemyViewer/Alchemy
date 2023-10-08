@@ -43,6 +43,9 @@ void LLDockableFloater::init(LLDockableFloater* thiz)
 	thiz->setCanClose(TRUE);
 	thiz->setCanDock(true);
 	thiz->setCanMinimize(TRUE);
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
+	thiz->setCanCollapse(true);
+// [/SL:KB]
 	thiz->setOverlapsScreenChannel(false);
 	thiz->mForceDocking = false;
 }

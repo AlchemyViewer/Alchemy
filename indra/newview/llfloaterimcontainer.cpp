@@ -951,6 +951,9 @@ void LLFloaterIMContainer::reshapeFloaterAndSetResizeLimits(bool collapse, S32 d
 
 	setCanResize(at_least_one_panel_is_expanded);
 	setCanMinimize(at_least_one_panel_is_expanded);
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
+	setCanCollapse(at_least_one_panel_is_expanded);
+// [/SL:KB]
 
     assignResizeLimits();
 }

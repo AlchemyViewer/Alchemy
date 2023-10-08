@@ -320,6 +320,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="BUTTON_CLOSE_WIN">Close (Ctrl+W)</string>
 	<string name="BUTTON_CLOSE_CHROME">Close</string>
 	<string name="BUTTON_RESTORE">Restore</string>
+	<string name="BUTTON_COLLAPSE">Collapse</string>
 	<string name="BUTTON_MINIMIZE">Minimize</string>
 	<string name="BUTTON_TEAR_OFF">Tear Off</string>
 	<string name="BUTTON_DOCK">Dock</string>
