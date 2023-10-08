@@ -1210,11 +1210,15 @@ void LLReflectionMapManager::initReflectionMaps()
 {
     U32 count = LL_MAX_REFLECTION_PROBE_COUNT;
 
-    if (mTexture.isNull() || mReflectionProbeCount != count || mReset)
+    static LLCachedControl<U32> probe_res_cc(gSavedSettings, "RenderReflectionProbeResolution", 128);
+    U32 probe_resolution = nhpo2(llclamp(probe_res_cc(), (U32)64, (U32)512));
+    bool probe_resolution_changed = mProbeResolution != probe_resolution;
+
+    if (mTexture.isNull() || mReflectionProbeCount != count || probe_resolution_changed || mReset)
     {
         mReset = false;
         mReflectionProbeCount = count;
-        mProbeResolution = nhpo2(llclamp(gSavedSettings.getU32("RenderReflectionProbeResolution"), (U32)64, (U32)512));
+        mProbeResolution = probe_resolution;
         mMaxProbeLOD = log2f(mProbeResolution) - 1.f; // number of mips - 1
 
         mTexture = new LLCubeMapArray();
@@ -1259,7 +1263,10 @@ void LLReflectionMapManager::initReflectionMaps()
         mDefaultProbe->mRadius = 4096.f;
         mDefaultProbe->mProbeIndex = 0;
         touch_default_probe(mDefaultProbe);
+    }
 
+    if (probe_resolution_changed)
+    {
         mRenderTarget.release();
         mMipChain.clear();
     }
