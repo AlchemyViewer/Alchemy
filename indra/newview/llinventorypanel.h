@@ -406,6 +406,8 @@ public:
     {};
 
     void initFromParams(const Params& p);
+    void onFocusReceived() override;
+
     bool isSelectionRemovable() { return false; }
 
     void initFolderRoot(const LLUUID& start_folder_id = LLUUID::null);
