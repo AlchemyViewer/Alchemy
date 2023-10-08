@@ -1065,7 +1065,7 @@ void LLViewerWindow::handlePieMenu(S32 x, S32 y, MASK mask)
     }
 }
 
-BOOL LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK mask, EMouseClickType clicktype, BOOL down)
+BOOL LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK mask, EMouseClickType clicktype, BOOL down, bool& is_toolmgr_action)
 {
 	const char* buttonname = "";
 	const char* buttonstatestr = "";
@@ -1214,6 +1214,7 @@ BOOL LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK m
 	if(!gDisconnected && LLToolMgr::getInstance()->getCurrentTool()->handleAnyMouseClick( x, y, mask, clicktype, down ) )
 	{
 		LLViewerEventRecorder::instance().clear_xui(); 
+        is_toolmgr_action = true;
 		return TRUE;
 	}
 

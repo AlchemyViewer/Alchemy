@@ -177,6 +177,7 @@ LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
 LLFolderViewItem::~LLFolderViewItem()
 {
 	mViewModelItem = NULL;
+    gFocusMgr.removeKeyboardFocusWithoutCallback(this);
 }
 
 BOOL LLFolderViewItem::postBuild()
@@ -395,7 +396,7 @@ S32 LLFolderViewItem::arrange( S32* width, S32* height )
             // it is purely visual, so it is fine to do at our laisure
             refreshSuffix();
         }
-		mLabelWidth = getLabelXPos() + getLabelFontForStyle(mLabelStyle)->getWidth(mLabel) + getLabelFontForStyle(mLabelStyle)->getWidth(mLabelSuffix) + mLabelPaddingRight; 
+		mLabelWidth = getLabelXPos() + getLabelFontForStyle(mLabelStyle)->getWidth(mLabel) + getLabelFontForStyle(mLabelStyle)->getWidth(mLabelSuffix) + mLabelPaddingRight;
 		mLabelWidthDirty = false;
 	}
 
