@@ -564,7 +564,7 @@ void LLFloaterPerformance::onClickHideAvatars()
 
 void LLFloaterPerformance::onClickExceptions()
 {
-    LLFloaterReg::showInstance("avatar_render_settings");
+    LLFloaterReg::showInstance("blocked", LLSD("avatar_rendering_tab"));
 }
 
 void LLFloaterPerformance::updateMaxRenderTime()

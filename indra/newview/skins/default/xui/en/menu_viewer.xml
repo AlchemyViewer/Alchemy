@@ -671,11 +671,11 @@
          label="Block List"
          name="Block List">
             <menu_item_check.on_check
-             function="SideTray.CheckPanelPeopleTab"
-             parameter="blocked_panel" />
+             function="Floater.Visible"
+             parameter="blocked" />
             <menu_item_check.on_click
-              function="SideTray.PanelPeopleTab"
-              parameter="blocked_panel" />
+             function="Floater.Toggle"
+             parameter="blocked" />
         </menu_item_check>
       <menu_item_separator/>
       <menu_item_check

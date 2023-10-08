@@ -2837,6 +2837,10 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 
 	if (entry)
 	{
+// [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
+		// If the entry isn't currently valid then we shouldn't just assume everything's in perfect working order
+		bool fUpdateObj = (!entry->isValid()) || (entry->getCRC() != crc);
+// [/SL:KB]
 		entry->setValid();
 
 		// we've seen this object before
@@ -2861,10 +2865,15 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 			// Update the cache entry 
 			entry->updateEntry(crc, dp);
 
-			decodeBoundingInfo(entry);
+//			decodeBoundingInfo(entry);
 
 			result = CACHE_UPDATE_CHANGED;
 		}		
+
+// [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
+		if (fUpdateObj)
+			decodeBoundingInfo(entry);
+// [/SL:KB]
 	}
 	else
 	{

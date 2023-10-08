@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<panel
+ follows="all"
+ height="300"
+ label="AVATAR RENDERING"
+ layout="topleft"
+ name="panel_block_avatar_rendering"
+ width="350">
+    <string
+     name="av_never_render"
+     value="Never"/>
+    <string
+     name="av_always_render"
+     value="Always"/>
+    <name_list
+     draw_heading="true"
+     follows="all"
+     height="275"
+     layout="topleft"
+     left="1"
+     multi_select="false"
+     name="exception_list"
+     right="-1"
+     top="0" >
+        <name_list.columns
+         label="Name"
+         name="name"
+         relative_width="0.5" />
+        <name_list.columns
+         label="Render setting"
+         name="setting"
+         relative_width="0.25" />
+        <name_list.columns
+         label="Date added"
+         name="timestamp"
+         relative_width="0.25" />
+     </name_list>
+    <panel
+     follows="left|right|bottom"
+     height="25"
+     left="1"
+     layout="topleft"
+     name="bottom_panel"
+     right="-1"
+     top_pad="0" >
+        <button 
+         follows="left|bottom"
+         height="25"
+         image_hover_unselected="Toolbar_Left_Over"
+         image_overlay="AddItem_Off"
+         image_overlay_alignment="left"
+         image_selected="Toolbar_Left_Selected"
+         image_unselected="Toolbar_Left_Off"
+         label="Always Render"
+         left="1"
+         name="rendering_exception_always_btn"
+         tool_tip="Pick a resident to always render"
+         top="0"
+         width="119">
+            <button.commit_callback
+             function="Rendering.AddException"
+             parameter="always" />
+        </button>
+        <button 
+         follows="left|bottom"
+         height="25"
+         image_hover_unselected="Toolbar_Middle_Over"
+         image_overlay="AddItem_Off"
+         image_overlay_alignment="left"
+         image_selected="Toolbar_Middle_Selected"
+         image_unselected="Toolbar_Middle_Off"
+         label="Never Render"
+         left_pad="1"
+         name="rendering_exception_never_btn"
+         tool_tip="Pick a resident to never render"
+         width="109">
+            <button.commit_callback
+             function="Rendering.AddException"
+             parameter="never" />
+        </button>
+        <icon  
+         follows="left|bottom|right"
+         height="25"
+         image_name="Toolbar_Middle_Off"
+         left_pad="1"
+         right="-80"
+         name="rendering_spacer_icon" />
+        <button 
+         enabled="false"
+         follows="bottom|right"
+         height="25"
+         image_hover_unselected="Toolbar_Right_Over"
+         image_overlay="TrashItem_Off"
+         image_overlay_alignment="left"
+         image_selected="Toolbar_Right_Selected"
+         image_unselected="Toolbar_Right_Off"
+         label="Remove"
+         left_pad="1"
+         name="rendering_exception_trash_btn"
+         tool_tip="Remove the currently selected rendering exception"
+         width="79">
+            <button.commit_callback
+             function="Rendering.RemoveException" />
+        </button>
+    </panel>
+</panel>

@@ -48,6 +48,8 @@
 #include "llsidetraypanelcontainer.h"
 #include "llviewercontrol.h"
 
+#if 0
+
 static LLPanelInjector<LLPanelBlockedList> t_panel_blocked_list("panel_block_list_sidetray");
 
 //
@@ -255,6 +257,8 @@ void LLPanelBlockedList::callbackBlockByName(const std::string& text)
 		LLNotificationsUtil::add("MuteByNameFailed");
 	}
 }
+
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 //			LLFloaterGetBlockedObjectName

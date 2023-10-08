@@ -631,7 +631,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
 
 <!-- ================================= BLOCKED tab ========================== -->
 
-        <panel
+        <!--<panel
          background_opaque="true"
          background_visible="true"
          bg_alpha_color="DkGray"
@@ -657,6 +657,6 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
            font="SansSerifBold"
            top="0"
            right="-1" />
-        </panel>
+        </panel>-->
     </tab_container>
 </panel>

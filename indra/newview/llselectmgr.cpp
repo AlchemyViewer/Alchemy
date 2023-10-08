@@ -1664,6 +1664,11 @@ void LLSelectMgr::dump()
 	{
 		LLViewerObject* objectp = (*iter)->getObject();
 		LL_INFOS() << "Object " << count << " type " << LLPrimitive::pCodeToString(objectp->getPCode()) << LL_ENDL;
+// [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
+		LL_INFOS() << "  isRoot " << objectp->isRoot() << LL_ENDL;
+		LL_INFOS() << "  idLocal " << objectp->getLocalID() << LL_ENDL;
+		LL_INFOS() << "  idGlobal " << objectp->getID() << LL_ENDL;
+// [/SL:KB]
 		LL_INFOS() << "  hasLSL " << objectp->flagScripted() << LL_ENDL;
 		LL_INFOS() << "  hasTouch " << objectp->flagHandleTouch() << LL_ENDL;
 		LL_INFOS() << "  hasMoney " << objectp->flagTakesMoney() << LL_ENDL;
@@ -6656,7 +6661,7 @@ S32 LLSelectNode::getLastSelectedTE() const
 	return mLastTESelected;
 }
 
-LLViewerObject* LLSelectNode::getObject()
+LLViewerObject* LLSelectNode::getObject() const
 {
 	if (!mObject)
 	{
@@ -6664,7 +6669,7 @@ LLViewerObject* LLSelectNode::getObject()
 	}
 	else if (mObject->isDead())
 	{
-		mObject = NULL;
+		mObject = nullptr;
 	}
 	return mObject;
 }

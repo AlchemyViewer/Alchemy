@@ -117,7 +117,8 @@
 #include "llkeythrottle.h"
 #include "llgroupactions.h"
 #include "llagentui.h"
-#include "llpanelblockedlist.h"
+//#include "llpanelblockedlist.h"
+#include "llfloaterblocked.h"
 #include "llpanelplaceprofile.h"
 #include "llviewerregion.h"
 #include "llfloaterregionrestarting.h"
@@ -1640,7 +1641,8 @@ void inventory_offer_mute_callback(const LLUUID& blocked_id,
 	LLMute mute(blocked_id, full_name, mute_type);
 	if (LLMuteList::getInstance()->add(mute))
 	{
-		LLPanelBlockedList::showPanelAndSelect(blocked_id);
+		LLFloaterBlocked::showMuteAndSelect(blocked_id);
+		//LLPanelBlockedList::showPanelAndSelect(blocked_id);
 	}
 
 	// purge the message queue of any previously queued inventory offers from the same source.
@@ -7068,7 +7070,8 @@ bool callback_script_dialog(const LLSD& notification, const LLSD& response)
 		{
 			// This call opens the sidebar, displays the block list, and highlights the newly blocked
 			// object in the list so the user can see that their block click has taken effect.
-			LLPanelBlockedList::showPanelAndSelect(object_id);
+			//LLPanelBlockedList::showPanelAndSelect(object_id);
+			LLFloaterBlocked::showMuteAndSelect(object_id);
 		}
 	}
 

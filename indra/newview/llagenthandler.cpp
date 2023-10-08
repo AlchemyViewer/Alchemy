@@ -32,7 +32,8 @@
 #include "llfloaterreporter.h"
 #include "llmutelist.h"
 #include "llnotificationsutil.h"
-#include "llpanelblockedlist.h"
+//#include "llpanelblockedlist.h"
+#include "llfloaterblocked.h"
 
 class LLAgentHandler : public LLCommandHandler
 {
@@ -148,7 +149,8 @@ public:
 				const std::string object_name = LLURI::unescape(params[2].asString());
 				LLMute mute(avatar_id, object_name, LLMute::OBJECT);
 				LLMuteList::getInstance()->add(mute);
-				LLPanelBlockedList::showPanelAndSelect(mute.mID);
+				LLFloaterBlocked::showMuteAndSelect(mute.mID);
+				//LLPanelBlockedList::showPanelAndSelect(mute.mID);
 			}
 			return true;
 		}

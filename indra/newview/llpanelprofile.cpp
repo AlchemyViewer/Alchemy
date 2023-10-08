@@ -69,7 +69,7 @@
 #include "lllogchat.h"
 #include "llmutelist.h"
 #include "llnotificationsutil.h"
-#include "llpanelblockedlist.h"
+//#include "llpanelblockedlist.h"
 #include "llpanelprofileclassifieds.h"
 #include "llpanelprofilepicks.h"
 #include "llthumbnailctrl.h"

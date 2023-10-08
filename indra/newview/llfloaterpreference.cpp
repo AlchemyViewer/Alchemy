@@ -2081,8 +2081,11 @@ void LLFloaterPreference::onChangeAnimationFolder()
 // but the UI for this will still be enabled
 void LLFloaterPreference::onClickBlockList()
 {
-	LLFloaterSidePanelContainer::showPanel("people", "panel_people",
-		LLSD().with("people_panel_tab_name", "blocked_panel"));
+// [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
+	LLFloaterReg::showInstance("blocked");
+// [/SL:KB]
+//	LLFloaterSidePanelContainer::showPanel("people", "panel_people",
+//		LLSD().with("people_panel_tab_name", "blocked_panel"));
 }
 
 void LLFloaterPreference::onClickProxySettings()
@@ -2107,7 +2110,7 @@ void LLFloaterPreference::onClickSpellChecker()
 
 void LLFloaterPreference::onClickRenderExceptions()
 {
-    LLFloaterReg::showInstance("avatar_render_settings");
+    LLFloaterReg::showInstance("blocked", LLSD("avatar_rendering_tab"));
 }
 
 void LLFloaterPreference::onClickAutoAdjustments()
