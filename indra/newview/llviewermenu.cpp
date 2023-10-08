@@ -4338,7 +4338,7 @@ void handle_object_sit(LLViewerObject *object, const LLVector3 &offset)
 //	if (object && object->getPCode() == LL_PCODE_VOLUME)
 // [RLVa:KB] - Checked: 2010-03-06 (RLVa-1.2.0c) | Modified: RLVa-1.2.0c
 	if ( (object && object->getPCode() == LL_PCODE_VOLUME) && 
-		 ((!rlv_handler_t::isEnabled()) || (RlvActions::canSit(object, pick.mObjectOffset))) )
+		 ((!rlv_handler_t::isEnabled()) || (RlvActions::canSit(object, offset))) )
 // [/RLVa:KB]
 	{
 // [RLVa:KB] - Checked: 2010-08-29 (RLVa-1.2.1c) | Added: RLVa-1.2.1c
