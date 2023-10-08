@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Message Log" title="メッセージログ">
-	<floater.string name="filter_status">全[TOTAL]件のメッセージの内[MESSAGES]件を表示しています…</floater.string>
-	<floater.string name="no_filter_status">[TOTAL]件のメッセージを表示しています…</floater.string>
+	<floater.string name="filter_status">
+		全[TOTAL]件のメッセージ中[MESSAGES]件を表示しています…
+	</floater.string>
+	<floater.string name="no_filter_status">
+		[TOTAL]件のメッセージを表示しています…
+	</floater.string>
 	<layout_stack name="a_stack">
 		<layout_panel name="net_panel">
 			<scroll_list name="net_list">

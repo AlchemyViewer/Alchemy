@@ -1,18 +1,30 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="ピックを編集" name="panel_edit_pick">
-	<panel.string name="location_notice">（更新後保存されます。）</panel.string>
+	<panel.string name="location_notice">
+		（更新後保存されます。）
+	</panel.string>
 	<button name="back_btn"/>
-	<text name="title">ピックの編集</text>
+	<text name="title">
+		ピックの編集
+	</text>
 	<scroll_container name="profile_scroll">
 		<panel name="scroll_content_panel">
 			<texture_picker name="pick_snapshot"/>
 			<icon name="edit_icon" label="" tool_tip="画像を選択します。"/>
-			<text name="Name:">タイトル：</text>
+			<text name="Name:">
+				タイトル：
+			</text>
 			<line_editor name="pick_name"/>
-			<text name="description_label">説明：</text>
+			<text name="description_label">
+				説明：
+			</text>
 			<text_editor name="pick_desc"/>
-			<text name="location_label">場所：</text>
-			<text name="pick_location" word_wrap="true">読み込んでいます…</text>
+			<text name="location_label">
+				場所：
+			</text>
+			<text name="pick_location" word_wrap="true">
+				読み込んでいます…
+			</text>
 			<button label="現在地をセット" name="set_to_curr_location_btn"/>
 		</panel>
 	</scroll_container>

@@ -7,12 +7,14 @@
 	<string name="no_one_filtered_near" value="お探しの人物は見つかりましたか？[secondlife:///app/search/people/[SEARCH_TERM] 検索]をお試しください。"/>
 	<string name="no_friends_online" value="オンラインのフレンドはいません。"/>
 	<string name="no_friends" value="フレンドはいません"/>
-	<string name="no_friends_msg">フレンドに追加するには、相手のアバターまたは名前を右クリックします。
+	<string name="no_friends_msg">
+		フレンドに追加するには、相手のアバターまたは名前を右クリックします。
 
 より多くの人が集まる場所をお探しですか？
 
 [secondlife:///app/floater/destinations 行き先ガイド]にはSecond Lifeスタッフが選んだ場所があります。
-[secondlife:///app/search/ 検索]では、特定のキーワードでSecond Life全体を検索できます。</string>
+[secondlife:///app/search/ 検索]では、特定のキーワードでSecond Life全体を検索できます。
+	</string>
 	<string name="no_filtered_friends_msg">お探しのものは見つかりましたか？[secondlife:///app/search/people/[SEARCH_TERM]
 検索]をお試しください。</string>
 	<!--
@@ -20,13 +22,14 @@
 	They are not defined as translatable in VLT. See EXT-5931
 	-->
 	<string name="no_filtered_groups_msg" value="お探しのものは見つかりましたか？[secondlife:///app/search/groups/[SEARCH_TERM] 検索]をお試しください。"/>
-	<string name="no_groups_msg">あなたはどのグループにも属していません。
-[https://community.secondlife.com/knowledgebase/joining-and-participating-in-groups-r51/ Second Lifeのグループ]について学びましょう。</string>
+	<string name="no_groups_msg">
+		あなたはどのグループにも属していません。
+[https://community.secondlife.com/knowledgebase/joining-and-participating-in-groups-r51/ Second Lifeのグループ]について学びましょう。
+	</string>
 	<string name="MiniMapToolTipMsg" value="[REGION]（ダブルクリックでマップを開く。Shift‐ドラッグで水平・垂直移動）"/>
 	<string name="AltMiniMapToolTipMsg" value="[REGION]（ダブルクリックでテレポート。Shift‐ドラッグで水平・垂直移動）"/>
 	<string name="GroupCountWithInfo" value="あなたは現在、[COUNT]グループに属しています。あと[REMAINING]グループに参加することができます。[secondlife:/// 上限を増やす]"/>
 	<tab_container name="tabs">
-		<!-- ================================= NEARBY tab =========================== -->
 		<panel label="近く" name="nearby_panel">
 			<panel label="bottom_panel" name="nearby_buttons_panel">
 				<filter_editor label="人物をフィルタ" name="nearby_filter_input"/>
@@ -36,7 +39,6 @@
 				<dnd_button name="nearby_del_btn" tool_tip="フレンドとして選択されている人物を削除します。"/>
 			</panel>
 		</panel>
-		<!-- ================================= FRIENDS tab ========================== -->
 		<panel label="フレンド" name="friends_panel">
 			<panel label="bottom_panel" name="friends_buttons_panel">
 				<filter_editor label="人物をフィルタ" name="friends_filter_input"/>
@@ -51,12 +53,7 @@
 				<accordion_tab name="tab_suggested_friends" title="友だちになりたくない人物"/>
 			</accordion>
 		</panel>
-		<!-- ================================= GROUPS tab =========================== -->
 		<panel label="グループ" name="groups_panel">
-			<!--
-			*NOTE: no_groups_msg & group_list attributes are not defined as translatable in VLT. See EXT-5931
-			Values are set from appropriate strings at the top of file via LLPeoplePanel::postBuild()
-			-->
 			<panel label="bottom_panel" name="groups_buttons_panel">
 				<filter_editor label="グループをフィルタ" name="groups_filter_input"/>
 				<menu_button name="groups_gear_btn" tool_tip="選択したグループに対するアクションを表示します。"/>
@@ -64,10 +61,11 @@
 				<menu_button name="plus_btn" tool_tip="グループに参加／新規グループを作成します。"/>
 				<dnd_button name="minus_btn" tool_tip="選択したグループから脱退します。"/>
 			</panel>
-			<text name="groupcount">現在、[COUNT]グループに属しています。あと[REMAINING]グループに参加できます。</text>
+			<text name="groupcount">
+				現在、[COUNT]件のグループに属しています。あと[REMAINING]件のグループに参加できます。
+			</text>
 			<group_list name="group_list"/>
 		</panel>
-		<!-- ================================= RECENT tab =========================== -->
 		<panel label="最新" name="recent_panel">
 			<panel label="bottom_panel" name="recent_buttons_panel">
 				<filter_editor label="人物をフィルタ" name="recent_filter_input"/>
@@ -77,7 +75,6 @@
 				<dnd_button name="recent_del_btn" tool_tip="選択されているフレンドを削除します。"/>
 			</panel>
 		</panel>
-		<!-- ================================= BLOCKED tab ========================== -->
 		<panel label="ブロック" name="blocked_panel">
 			<panel label="ブロックされた人物とオブジェクト" name="panel_block_list_sidetray"/>
 		</panel>

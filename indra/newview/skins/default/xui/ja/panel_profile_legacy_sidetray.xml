@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="プロフィール" name="Avatar Profile">
-	<panel.string name="account_info_fmt">[ACCOUNT_TYPE]
+	<panel.string name="account_info_fmt">
+		[ACCOUNT_TYPE]
 [PAYMENT_INFO]
-[AGE_VERIFIED]</panel.string>
-	<panel.string name="age_verified">年齢確認済み</panel.string>
-	<panel.string name="rezday_fmt">[REZDAY]（[AGE]）</panel.string>
-	<panel.string name="add_friend">フレンドに追加</panel.string>
-	<panel.string name="remove_friend">フレンドから削除</panel.string>
+[AGE_VERIFIED]
+	</panel.string>
+	<panel.string name="age_verified">
+		年齢確認済み
+	</panel.string>
+	<panel.string name="rezday_fmt">
+		[REZDAY]（[AGE]）
+	</panel.string>
+	<panel.string name="add_friend">
+		フレンドに追加
+	</panel.string>
+	<panel.string name="remove_friend">
+		フレンドから削除
+	</panel.string>
 	<panel name="avatar_info_top">
 		<button name="back"/>
 		<text_editor name="avatar_name" value="（読み込んでいます…）"/>

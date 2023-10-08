@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="ピック" name="panel_profile_picks">
-	<text name="picks_panel_text">ピックなし</text>
+	<text name="picks_panel_text">
+		ピックなし
+	</text>
 	<accordion name="accordion">
 		<accordion_tab name="tab_picks" title="ピック">
 			<flat_list_view name="picks_list"/>

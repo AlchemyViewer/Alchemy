@@ -3,7 +3,9 @@
 	<tab_container name="tabs">
 		<!-- ============================= ESTATE MANAGERS tab ====================== -->
 		<panel label="不動産の管理" name="estate_managers_panel">
-			<text name="estate_manager_label">不動産の管理：</text>
+			<text name="estate_manager_label">
+				不動産の管理：
+			</text>
 			<!-- Estate Managers box -->
 			<name_list name="estate_manager_name_list">
 				<columns label="名前" name="name"/>
@@ -18,7 +20,9 @@
 				<filter_editor label="許可されたエージェントを検索" name="allowed_search_input"/>
 				<button label="コピー" name="copy_allowed_list_btn"/>
 			</panel>
-			<text name="allow_resident_label">常に許可：</text>
+			<text name="allow_resident_label">
+				常に許可：
+			</text>
 			<!-- Always allowed box -->
 			<name_list name="allowed_avatar_name_list">
 				<columns label="名前" name="name"/>
@@ -33,7 +37,9 @@
 				<filter_editor label="許可するグループを検索" name="allowed_group_search_input"/>
 				<button label="コピー" name="copy_allowed_group_list_btn"/>
 			</panel>
-			<text name="allow_group_label">常に許可するグループ：</text>
+			<text name="allow_group_label">
+				常に許可するグループ：
+			</text>
 			<!-- Groups always allowed box -->
 			<name_list name="allowed_group_name_list">
 				<columns label="名前" name="name"/>
@@ -48,7 +54,9 @@
 				<filter_editor label="バンされたエージェントを検索" name="banned_search_input"/>
 				<button label="コピー" name="copy_banned_list_btn"/>
 			</panel>
-			<text name="ban_resident_label">常にバン：</text>
+			<text name="ban_resident_label">
+				常にバン：
+			</text>
 			<!-- Always banned box -->
 			<name_list name="banned_avatar_name_list">
 				<columns label="名前" name="name"/>

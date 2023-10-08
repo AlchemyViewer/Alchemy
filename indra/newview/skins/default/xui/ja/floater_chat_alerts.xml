@@ -8,16 +8,24 @@
 	<button label="新規" name="alerts_new_btn"/>
 	<button label="削除" name="alerts_delete_btn"/>
 	<view_border name="divisor"/>
-	<text name="alerts_keyword_label">キーワード：</text>
+	<text name="alerts_keyword_label">
+		キーワード：
+	</text>
 	<line_editor name="alerts_keyword"/>
 	<check_box label="大文字と小文字を区別" name="alerts_keyword_case"/>
-	<text name="alerts_color_label">ハイライトカラー：</text>
+	<text name="alerts_color_label">
+		ハイライトカラー：
+	</text>
 	<color_swatch name="alerts_highlight_color"/>
-	<text name="alerts_sound_label">再生するサウンド：</text>
+	<text name="alerts_sound_label">
+		再生するサウンド：
+	</text>
 	<line_editor label="イベントリ内のアイテムをここにドラッグ＆ドロップ" name="alerts_sound_name"/>
 	<icon name="alerts_sound_icon"/>
 	<button name="alerts_sound_clear_btn"/>
-	<text name="alerts_trigger_label">トリガー：</text>
+	<text name="alerts_trigger_label">
+		トリガー：
+	</text>
 	<check_box label="チャット" name="alerts_trigger_chat"/>
 	<check_box label="ＩＭ" name="alerts_trigger_im"/>
 	<check_box label="グループ" name="alerts_trigger_group"/>

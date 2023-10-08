@@ -1,11 +1,22 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="リージョン" name="General">
-	<text name="region_text_lbl">リージョン：</text>
-	<text left_delta="70" name="region_text">未知</text>
-	<text name="version_channel_text_lbl">バージョン：</text>
-	<text left_delta="70" name="version_channel_text">不明</text>
-	<text name="region_type_lbl">種類：</text>
-	<text left_delta="70" name="region_type">不明
+	<text name="region_text_lbl">
+		リージョン：
+	</text>
+	<text left_delta="70" name="region_text">
+		未知
+	</text>
+	<text name="version_channel_text_lbl">
+		バージョン：
+	</text>
+	<text left_delta="70" name="version_channel_text">
+		不明
+	</text>
+	<text name="region_type_lbl">
+		種類：
+	</text>
+	<text left_delta="70" name="region_type">
+		不明
 	</text>
 	<check_box label="地形編集をブロック" name="block_terraform_check"/>
 	<check_box label="飛行をブロック" name="block_fly_check"/>
@@ -17,7 +28,9 @@
 	<check_box label="土地の検索表示をブロック" name="block_parcel_search_check" tool_tip="検索結果で、このリージョンと区画を表示するかどうかの設定です。"/>
 	<spinner label="アバター数上限" name="agent_limit_spin"/>
 	<spinner label="物体ボーナス" name="object_bonus_spin"/>
-	<text label="レーティング" name="access_text">区分：</text>
+	<text label="レーティング" name="access_text">
+		区分：
+	</text>
 	<icons_combo_box label="Moderate" name="access_combo">
 		<icons_combo_box.item label="Adult" name="Adult" value="42"/>
 		<icons_combo_box.item label="Moderate" name="Mature" value="21"/>

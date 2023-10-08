@@ -1,17 +1,41 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="search" title="検索">
-	<floater.string name="not_found">「[TEXT]」は見つかりませんでした。</floater.string>
-	<floater.string name="no_results">結果なし</floater.string>
-	<floater.string name="result_spillover">[TOTAL]件以上ヒットしました。[VISIBLE_BEGIN]～[VISIBLE_END]件を表示しています。</floater.string>
-	<floater.string name="result_count">[TOTAL]件ヒットしました。</floater.string>
-	<floater.string name="searching">検索しています…</floater.string>
-	<floater.string name="all_categories">すべてのカテゴリ</floater.string>
-	<floater.string name="search_banned">コミュニティ標準で明確にされているコンテンツ制限により、検索クエリ内の一部の用語が除外されました。</floater.string>
-	<floater.string name="search_short">検索語句が短すぎるため、検索は実行されませんでした。</floater.string>
-	<floater.string name="search_disabled">このリージョンでは、ディレクトリ検索が無効になっています。</floater.string>
-	<floater.string name="search_no_date_offset">検索語句に日付オフセットがありませんでした。</floater.string>
-	<floater.string name="search_no_catgory">検索語句にカテゴリがありませんでした。</floater.string>
-	<floater.string name="search_no_query">検索語句にクエリ文字列がありませんでした。</floater.string>
+	<floater.string name="not_found">
+		「[TEXT]」は見つかりませんでした。
+	</floater.string>
+	<floater.string name="no_results">
+		結果なし
+	</floater.string>
+	<floater.string name="result_spillover">
+		[TOTAL]件以上ヒットしました。[VISIBLE_BEGIN]～[VISIBLE_END]件を表示しています。
+	</floater.string>
+	<floater.string name="result_count">
+		[TOTAL]件ヒットしました。
+	</floater.string>
+	<floater.string name="searching">
+		検索しています…
+	</floater.string>
+	<floater.string name="all_categories">
+		すべてのカテゴリ
+	</floater.string>
+	<floater.string name="search_banned">
+		コミュニティ標準で明確にされているコンテンツ制限により、検索クエリ内の一部の用語が除外されました。
+	</floater.string>
+	<floater.string name="search_short">
+		検索語句が短すぎるため、検索は実行されませんでした。
+	</floater.string>
+	<floater.string name="search_disabled">
+		このリージョンでは、ディレクトリ検索が無効になっています。
+	</floater.string>
+	<floater.string name="search_no_date_offset">
+		検索語句に日付オフセットがありませんでした。
+	</floater.string>
+	<floater.string name="search_no_catgory">
+		検索語句にカテゴリがありませんでした。
+	</floater.string>
+	<floater.string name="search_no_query">
+		検索語句にクエリ文字列がありませんでした。
+	</floater.string>
 	<tab_container name="search_tabs">
 		<panel label="人物" name="panel_search_people"/>
 		<panel label="グループ" name="panel_search_groups"/>

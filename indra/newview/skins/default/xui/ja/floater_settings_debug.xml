@@ -5,7 +5,9 @@
 		<scroll_list.columns name="changed_setting"/>
 		<scroll_list.columns label="設定" name="setting"/>
 	</scroll_list>
-	<text name="setting_name_txt">デバッグ設定名</text>
+	<text name="setting_name_txt">
+		デバッグ設定名
+	</text>
 	<text_editor name="comment_text"/>
 	<radio_group name="boolean_combo">
 		<radio_item label="有効" name="TRUE" value="true"/>

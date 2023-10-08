@@ -3,7 +3,9 @@
 	<panel name="marketplace_listings_panel">
 		<panel>
 			<panel name="marketplace_listings_inventory_placeholder_panel">
-				<text name="marketplace_listings_inventory_placeholder_title">読み込んでいます…</text>
+				<text name="marketplace_listings_inventory_placeholder_title">
+					読み込んでいます…
+				</text>
 				<text name="marketplace_listings_inventory_placeholder_text"/>
 			</panel>
 			<panel name="panel_marketplace_listing"/>

@@ -15,8 +15,8 @@
 		<action description="役割からメンバーを解除" longdescription="「割り当てられた役割」（「役割とメンバー」セクション＞「メンバー」タブ）のリストで、メンバーを「役割」から削除します。「オーナー」は削除できません。" name="role remove member" value="9"/>
 		<action description="役割の能力の割り当てと解除" longdescription="「許可された能力」（「役割とメンバー」セクション＞「役割」タブ）のリストで、各「役割」に対する「能力」を割り当てたり削除したりします。*警告* この「能力」がある「役割」を持つメンバーなら誰でも自分自身と、他の「オーナー」以外のメンバーをすべての「能力」」に割り当てることができます。つまり、「オーナー」以外の人が「オーナー」に近い権限を持つよう設定できることになります。この「能力」を割り当てる前に、自分がしようとしていることをよく把握してください。" name="role change actions" value="10"/>
 	</action_set>
-	<action_set description="これらの能力には、グループの公開性や理念、記章の変更といった、グループのアイデンティティを修正する権限が含まれます。" name="Group Identity">
-		<action description="理念、記章、「Web 上で公開」、およびグループ情報内で公開のメンバーを変更。" longdescription="理念、記章、「検索に表示」の変更をします。「一般」セクションで行えます。" name="group change identity" value="11"/>
+	<action_set description="これらの能力には、グループの公開性や理念、憲章の変更といった、グループのアイデンティティを修正する権限が含まれます。" name="Group Identity">
+		<action description="理念、憲章、「Web上で公開」、およびグループ情報内で公開のメンバーを変更。" longdescription="理念、憲章、「検索に表示」の変更をします。「一般」セクションで行えます。" name="group change identity" value="11"/>
 	</action_set>
 	<action_set description="これらの「能力」には、このグループの所有地の譲渡、修正、販売をする権限があります。「土地情報」ウィンドウを見るには、地表を右クリックして「土地情報」を選ぶか、ナビゲーションバーの「i」アイコンをクリックします。" name="Parcel Management">
 		<action description="グループ用の土地の譲渡と購入" longdescription="グループ用の土地の譲渡と購入を行います。この操作には、「土地情報」＞「一般」タブを使います。" name="land deed" value="12"/>
@@ -31,9 +31,9 @@
 	</action_set>
 	<action_set description="これらの能力には、「オブジェクトを作成」、「地形の編集」、音楽とメディアの設定など、区画のオプションに関連する権限が含まれます。" name="Parcel Settings">
 		<action description="音楽とメディアの設定を変更" longdescription="ストリーミングミュージックと動画の設定を変更するには、「土地情報」＞「メディア」タブを使います。" name="land change media" value="20"/>
-		<action description="「地形の編集」に切り替え" longdescription="「地形の編集」に切り替えます.*警告* 「土地情報」＞「オプション」＞「地形の編集」の順で進むと、誰でもあなたの土地の形の整備や、リンデン製の樹木の設置、移動ができます。この能力を割り振る前に、このことをよく理解しておいてください。「土地情報」＞「オプション」タブから「地形の編集」に切り替えられます。" name="land edit" value="21"/>
-		<action description="「土地情報」＞「オプション」タブ内のさまざまな設定を切り替え" longdescription="「安全（ダメージなし）」、「飛行」を切り替え、住人に以下を許可します： グループ所有地の「土地情報」＞「オプション」タブ内の、「地形の編集」、「ビルド」、「ランドマークの作成」、「スクリプトの実行」。" name="land options" value="22"/>
-		<action description="自然環境の設定とデイサイクルを修正する。" longdescription="「土地について」＞「環境」タブから自然環境の設定とデイサイクルを変更する。" name="land change environment" value="46"/>
+		<action description="「地形の編集」に切り替え" longdescription="「地形の編集」に切り替えます。*警告* 「土地情報」＞「オプション」＞「地形の編集」の順で進むと、誰でもあなたの土地の形の整備や、リンデン製の樹木の設置、移動ができます。この能力を割り振る前に、このことをよく理解しておいてください。「土地情報」＞「オプション」タブから「地形の編集」に切り替えられます。" name="land edit" value="21"/>
+		<action description="「土地情報」＞「オプション」タブ内のさまざまな設定を切り替えます。" longdescription="「安全（ダメージなし）」、「飛行」を切り替え、住人に以下を許可します： グループ所有地の「土地情報」＞「オプション」タブ内の、「地形の編集」、「ビルド」、「ランドマークの作成」、「スクリプトの実行」" name="land options" value="22"/>
+		<action description="自然環境の設定とデイサイクルを修正します。" longdescription="「土地について」＞「環境」タブから自然環境の設定とデイサイクルを変更する。" name="land change environment" value="46"/>
 	</action_set>
 	<action_set description="これらの能力には、グループ所有の区画に関する規制を迂回することを、メンバーに許可する権限が含まれます。" name="Parcel Powers">
 		<action description="常に「地形の編集」を許可" longdescription="この能力を持つ役割のメンバーは、グループ所有の区画上で地形の編集することができます。その区画が「土地情報」＞「オプション」タブでオフになっていても、地形の編集が可能です。" name="land allow edit land" value="23"/>
