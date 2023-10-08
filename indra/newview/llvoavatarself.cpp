@@ -67,6 +67,7 @@
 #include "llsdserialize.h"
 #include "llcallstack.h"
 #include "llcorehttputil.h"
+#include "lluiusage.h"
 // [RLVa:KB] - Checked: RLVa-2.0.2
 #include "rlvhandler.h"
 #include "rlvhelper.h"
@@ -2770,6 +2771,7 @@ void LLVOAvatarSelf::onCustomizeStart(bool disable_camera_switch)
 {
 	if (isAgentAvatarValid())
 	{
+		LLUIUsage::instance().logCommand("Avatar.CustomizeStart");
 		if (!gAgentAvatarp->mEndCustomizeCallback.get())
 		{
 			gAgentAvatarp->mEndCustomizeCallback = new LLUpdateAppearanceOnDestroy;

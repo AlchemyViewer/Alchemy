@@ -2020,7 +2020,7 @@ LLViewerWindow::LLViewerWindow(const Params& p)
 	}
 	LLVertexBuffer::initClass(gSavedSettings.getBOOL("RenderVBOEnable"), gSavedSettings.getBOOL("RenderVBOMappingDisable"));
 	LL_INFOS("RenderInit") << "LLVertexBuffer initialization done." << LL_ENDL ;
-	gGL.init() ;
+	gGL.init(true);
 
 	if (LLFeatureManager::getInstance()->isSafe()
 		|| (gSavedSettings.getS32("LastFeatureVersion") != LLFeatureManager::getInstance()->getVersion())
@@ -2533,10 +2533,11 @@ void LLViewerWindow::reshape(S32 width, S32 height)
 
 		//glViewport(0, 0, width, height );
 
-		if (height > 0)
+        LLViewerCamera * camera = LLViewerCamera::getInstance(); // simpleton, might not exist
+		if (height > 0 && camera)
 		{ 
-			LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
-			LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
+            camera->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
+            camera->setAspect( getWorldViewAspectRatio() );
 		}
 
 		calcDisplayScale();
