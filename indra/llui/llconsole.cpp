@@ -70,7 +70,7 @@ LLConsole::LLConsole(const LLConsole::Params& p)
 	mFadeTime = mLinePersistTime - FADE_DURATION;
 	setMaxLines(LLUI::getInstance()->mSettingGroups["config"]->getS32("ConsoleMaxLines"));
 
-	mBackgroundImagep = LLUI::getUIImage("transparent");
+	mBackgroundImagep = LLUI::getUIImage("Rounded_Square");
 }
 
 void LLConsole::setLinePersistTime(F32 seconds)

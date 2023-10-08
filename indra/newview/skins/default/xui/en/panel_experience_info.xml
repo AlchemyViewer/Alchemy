@@ -303,7 +303,7 @@
           <icon
             follows="top|left"
             height="16"
-            image_name="unknown"
+            image_name="Parcel_M_Dark"
             layout="topleft"
             left_pad="10"
             name="maturity_icon"
