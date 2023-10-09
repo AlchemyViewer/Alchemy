@@ -317,7 +317,7 @@ public:
 
 protected:
 	static bool parseCommand(const std::string& strCommand, std::string& strBehaviour, std::string& strOption,  std::string& strParam);
-	bool               markRefCounted() const   { return m_fRefCounted = true; }
+	bool               markRefCounted() const { m_fRefCounted = true;  return m_fRefCounted; }
 
 	/*
 	 * Operators

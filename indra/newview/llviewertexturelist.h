@@ -36,8 +36,6 @@
 #include <set>
 #include "lluiimage.h"
 
-#include "boost/unordered/unordered_flat_map.hpp"
-
 const U32 LL_IMAGE_REZ_LOSSLESS_CUTOFF = 128;
 
 const BOOL MIPMAP_YES = TRUE;

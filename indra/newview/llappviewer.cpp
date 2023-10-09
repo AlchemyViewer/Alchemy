@@ -3614,7 +3614,7 @@ void LLAppViewer::writeSystemInfo()
     gDebugInfo["StartupState"] = LLStartUp::getStartupStateString();
 
 	std::vector<std::string> resolutions = LLWindow::getDisplaysResolutionList();
-	for (auto res_iter : resolutions)
+	for (const auto& res_iter : resolutions)
 	{
 		gDebugInfo["DisplayInfo"].append(res_iter);
 	}
