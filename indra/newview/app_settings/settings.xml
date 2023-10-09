@@ -10152,7 +10152,7 @@
     <key>Comment</key>
     <string>Amount to scale down depth of field resolution.  Valid range is 0.25 (quarter res) to 1.0 (full res)</string>
     <key>Persist</key>
-    <integer>1</integer>
+    <integer>0</integer>
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
