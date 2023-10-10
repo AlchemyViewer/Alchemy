@@ -42,7 +42,7 @@ const S32 LLFileSystem::APPEND      = 0x00000006;  // 0x00000004 & LLFileSystem:
 LLFileSystem::LLFileSystem(const LLUUID& file_id, const LLAssetType::EType file_type, S32 mode)
 {
     // build the filename (TODO: we do this in a few places - perhaps we should factor into a single function)
-    mFilePath = LLDiskCache::metaDataToFilepath(file_id, file_type);
+    mFilePath = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
     mFileType = file_type;
     mFileID = file_id;
     mPosition = 0;
@@ -74,7 +74,7 @@ LLFileSystem::~LLFileSystem()
 // static
 bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    const boost::filesystem::path filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+    const boost::filesystem::path filename = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
     boost::system::error_code ec;
     return boost::filesystem::exists(filename, ec) && !ec.failed();
 }
@@ -82,7 +82,7 @@ bool LLFileSystem::getExists(const LLUUID& file_id, const LLAssetType::EType fil
 // static
 bool LLFileSystem::removeFile(const LLUUID& file_id, const LLAssetType::EType file_type, int suppress_error /*= 0*/)
 {
-    const boost::filesystem::path filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+    const boost::filesystem::path filename = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
 
     LLFile::remove(filename, suppress_error);
 
@@ -100,7 +100,7 @@ bool LLFileSystem::renameFile(const LLUUID& old_file_id, const LLAssetType::ETyp
 // static
 S32 LLFileSystem::getFileSize(const LLUUID& file_id, const LLAssetType::EType file_type)
 {
-    const boost::filesystem::path filename = LLDiskCache::metaDataToFilepath(file_id, file_type);
+    const boost::filesystem::path filename = LLDiskCache::getInstance()->metaDataToFilepath(file_id, file_type);
     boost::system::error_code ec;
     S32 file_size = boost::filesystem::file_size(filename, ec);
     if(ec.failed())
@@ -256,7 +256,7 @@ S32 LLFileSystem::getMaxSize()
 
 BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_type)
 {
-    const boost::filesystem::path new_filename = LLDiskCache::metaDataToFilepath(new_id, new_type);
+    const boost::filesystem::path new_filename = LLDiskCache::getInstance()->metaDataToFilepath(new_id, new_type);
 
     // Rename needs the new file to not exist.
     boost::system::error_code ec;

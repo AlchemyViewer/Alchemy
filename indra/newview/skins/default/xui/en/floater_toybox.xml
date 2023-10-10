@@ -3,8 +3,9 @@
   can_close="true"
   can_dock="false"
   can_minimize="false"
-  can_resize="false"
-  height="455"
+  can_resize="true"
+  height="430"
+  min_height="430"
   help_topic="toybox"
   layout="topleft"
   legacy_header_height="18"
@@ -13,9 +14,10 @@
   save_rect="true"
   single_instance="true"
   title="TOOLBAR BUTTONS"
-  width="675">
+  width="730"
+  min_width="580">
   <text
-    follows="left|top"
+    follows="left|top|right"
     font="SansSerifMedium"
     valign="top"
     halign="left"
@@ -30,7 +32,7 @@
       Add or remove buttons by dragging them to or from the toolbars.
   </text>
   <text
-    follows="left|top"
+    follows="left|top|right"
     font="SansSerifMedium"
     valign="top"
     halign="left"
@@ -44,11 +46,27 @@
     type="string">
       Buttons will appear as shown or as icon-only depending on each toolbar's settings.
   </text>
+  <scroll_container
+   top="85"
+   bottom="-45"
+   left="20"
+   right="-20"
+   follows="all"
+   border_visible="true"
+   name="stack">
+  <panel
+   name="scroll_content_panel"
+   follows="all"
+   layout="topleft"
+   top="1"
+   left="1"
+   right="-1"
+   bottom="-1">
   <toolbar
-    bottom="365"
+    bottom="-1"
     button_display_mode="icons_with_text"
     follows="all"
-    left="20"
+    left="1"
     button_icon_and_text.button_width.max="140"
     button_icon_and_text.button_width.min="70"
     name="toybox_toolbar"
@@ -58,9 +76,9 @@
     pad_bottom="5"
     pad_between="15"
     read_only="true"
-    right="-20"
+    right="-1"
     side="top"
-    top="85">
+    top="1">
     <button_panel background_visible="false" />
     <button_icon_and_text image_unselected="PushButton_Off"
                           image_selected="PushButton_Off"
@@ -78,35 +96,29 @@
                           sound_flags="0"
                           display_pressed_state="false" />
   </toolbar>
-  <panel
-    bevel_style="none"
-    border="true"
-    bottom="390"
-    follows="left|bottom|right"
-    left="20"
-    right="-20"
-    top="390" />
+  </panel>
+  </scroll_container>
   <button
-    follows="left|bottom|right"
+    follows="right|bottom"
     height="23"
     label="Clear all toolbars"
     label_selected="Clear all toolbars"
     layout="topleft"
-    left="185"
+    right="-170"
     name="btn_clear_all"
-    top="-45"
+    top="395"
     width="130">
     <button.commit_callback function="Toybox.ClearAll" />
   </button>
   <button
-    follows="left|bottom|right"
+    follows="right|bottom"
     height="23"
     label="Restore defaults"
     label_selected="Restore defaults"
     layout="topleft"
-    left="335"
+    right="-20"
     name="btn_restore_defaults"
-    top="-45"
+    top="395"
     width="130">
     <button.commit_callback function="Toybox.RestoreDefaults" />
   </button>

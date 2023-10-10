@@ -2002,6 +2002,9 @@ bool LLAppViewer::cleanup()
 	sTextureFetch->shutDownTextureCacheThread() ;
     LLLFSThread::sLocal->shutdown();
 
+	LL_INFOS() << "Shutting down disk cache" << LL_ENDL;
+	LLDiskCache::deleteSingleton();
+
 	LL_INFOS() << "Shutting down message system" << LL_ENDL;
 	end_messaging_system();
 
@@ -4002,76 +4005,6 @@ void LLAppViewer::abortQuit()
 	mQuitRequested = false;
 }
 
-void LLAppViewer::migrateCacheDirectory()
-{
-#if LL_WINDOWS || LL_DARWIN
-	// NOTE: (Nyx) as of 1.21, cache for mac is moving to /library/caches/SecondLife from
-	// /library/application support/SecondLife/cache This should clear/delete the old dir.
-
-	// As of 1.23 the Windows cache moved from
-	//   C:\Documents and Settings\James\Application Support\SecondLife\cache
-	// to
-	//   C:\Documents and Settings\James\Local Settings\Application Support\SecondLife
-	//
-	// The Windows Vista equivalent is from
-	//   C:\Users\James\AppData\Roaming\SecondLife\cache
-	// to
-	//   C:\Users\James\AppData\Local\SecondLife
-	//
-	// Note the absence of \cache on the second path.  James.
-
-	// Only do this once per fresh install of this version.
-	if (gSavedSettings.getBOOL("MigrateCacheDirectory"))
-	{
-		gSavedSettings.setBOOL("MigrateCacheDirectory", FALSE);
-
-		std::string old_cache_dir = gDirUtilp->add(gDirUtilp->getOSUserAppDir(), "cache");
-		std::string new_cache_dir = gDirUtilp->getCacheDir(true);
-
-		if (gDirUtilp->fileExists(old_cache_dir))
-		{
-			LL_INFOS() << "Migrating cache from " << old_cache_dir << " to " << new_cache_dir << LL_ENDL;
-
-			// Migrate inventory cache to avoid pain to inventory database after mass update
-			S32 file_count = 0;
-			std::string file_name;
-			std::string mask = "*.*";
-
-			LLDirIterator iter(old_cache_dir, mask);
-			while (iter.next(file_name))
-			{
-				if (file_name == "." || file_name == "..") continue;
-				std::string source_path = gDirUtilp->add(old_cache_dir, file_name);
-				std::string dest_path = gDirUtilp->add(new_cache_dir, file_name);
-				if (!LLFile::rename(source_path, dest_path))
-				{
-					file_count++;
-				}
-			}
-			LL_INFOS() << "Moved " << file_count << " files" << LL_ENDL;
-
-			// Nuke the old cache
-			gDirUtilp->setCacheDir(old_cache_dir);
-			purgeCache();
-			gDirUtilp->setCacheDir(new_cache_dir);
-
-#if LL_DARWIN
-			// Clean up Mac files not deleted by removing *.*
-			std::string ds_store = old_cache_dir + "/.DS_Store";
-			if (gDirUtilp->fileExists(ds_store))
-			{
-				LLFile::remove(ds_store);
-			}
-#endif
-			if (LLFile::rmdir(old_cache_dir) != 0)
-			{
-				LL_WARNS() << "could not delete old cache directory " << old_cache_dir << LL_ENDL;
-			}
-		}
-	}
-#endif // LL_WINDOWS || LL_DARWIN
-}
-
 //static
 U32 LLAppViewer::getTextureCacheVersion()
 {
@@ -4110,26 +4043,27 @@ bool LLAppViewer::initCache()
 	LLAppViewer::getTextureCache()->setReadOnly(read_only) ;
 	LLVOCache::initParamSingleton(read_only);
 
-	// initialize the new disk cache using saved settings
-	const std::string cache_dir_name = gSavedSettings.getString("DiskCacheDirName");
-
-    // note that the maximum size of this cache is defined as a percentage of the 
-    // total cache size - the 'CacheSize' pref - for all caches. 
-    const unsigned int cache_total_size_mb = gSavedSettings.getU32("DiskCacheSize");
-    const uintmax_t disk_cache_mb = cache_total_size_mb;
-    const uintmax_t disk_cache_bytes = disk_cache_mb * 1024 * 1024;
+	// Create disk cache singleton
+	LLDiskCache::createInstance();
+	LLDiskCache::getInstance()->setReadonly(read_only);
 
 	bool texture_cache_mismatch = false;
-    bool remove_vfs_files = false;
 	if (gSavedSettings.getS32("LocalCacheVersion") != LLAppViewer::getTextureCacheVersion())
 	{
 		texture_cache_mismatch = true;
 		if(!read_only)
 		{
 			gSavedSettings.setS32("LocalCacheVersion", LLAppViewer::getTextureCacheVersion());
+		}
+	}
 
-            //texture cache version was bumped up in Simple Cache Viewer, and at this point old vfs files are not needed
-            remove_vfs_files = true;   
+	bool disk_cache_mismatch = false;
+	if (gSavedSettings.getS32("DiskCacheVersion") != LLAppViewer::getDiskCacheVersion())
+	{
+		disk_cache_mismatch = true;
+		if (!read_only)
+		{
+			gSavedSettings.setS32("DiskCacheVersion", LLAppViewer::getDiskCacheVersion());
 		}
 	}
 
@@ -4146,18 +4080,15 @@ bool LLAppViewer::initCache()
 			texture_cache_mismatch = true;
 		}
 
-		// We have moved the location of the cache directory over time.
-		migrateCacheDirectory();
-
 		// Setup and verify the cache location
 		std::string cache_location = gSavedSettings.getString("CacheLocation");
 		std::string new_cache_location = gSavedSettings.getString("NewCacheLocation");
 		if (new_cache_location != cache_location)
 		{
+			LLSplashScreen::update(LLTrans::getString("StartupChangingCacheLocation"));
 			LL_INFOS("AppCache") << "Cache location changed, cache needs purging" << LL_ENDL;
 			gDirUtilp->setCacheDir(gSavedSettings.getString("CacheLocation"));
 			purgeCache(); // purge old cache
-			gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, cache_dir_name));
 			gSavedSettings.setString("CacheLocation", new_cache_location);
 			gSavedSettings.setString("CacheLocationTopFolder", gDirUtilp->getBaseFileName(new_cache_location));
 		}
@@ -4170,56 +4101,50 @@ bool LLAppViewer::initCache()
 		gSavedSettings.setString("CacheLocationTopFolder", "");
 	}
 
-	const bool enable_cache_debug_info = gSavedSettings.getBOOL("EnableDiskCacheDebugInfo");
-	const std::string cache_dir = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, cache_dir_name);
-	LLDiskCache::initParamSingleton(cache_dir, disk_cache_bytes, enable_cache_debug_info);
-
 	if (!read_only)
 	{
-        if (gSavedSettings.getS32("DiskCacheVersion") != LLAppViewer::getDiskCacheVersion())
-        {
-            LLDiskCache::getInstance()->clearCache();
-            remove_vfs_files = true;
-            gSavedSettings.setS32("DiskCacheVersion", LLAppViewer::getDiskCacheVersion());
-        }
-
-        if (remove_vfs_files)
-        {
-            LLDiskCache::getInstance()->removeOldVFSFiles();
-        }
-        
         if (mPurgeCache)
 		{
 			LLSplashScreen::update(LLTrans::getString("StartupClearingCache"));
 			purgeCache();
-
-			// clear the new C++ file system based cache
-			LLDiskCache::getInstance()->clearCache();
+		}
 	}
-		else
+
+	// Init the asset cache
+	{
+		LLSplashScreen::update(LLTrans::getString("StartupInitializingDiskCache"));
+		const uintmax_t disk_cache_mb = (uintmax_t)gSavedSettings.getU32("DiskCacheSize");
+		const uintmax_t disk_cache_bytes = disk_cache_mb * 1024ull * 1024ull;
+
+		const bool enable_cache_debug_info = gSavedSettings.getBOOL("EnableDiskCacheDebugInfo");
+		LLDiskCache::getInstance()->init(LL_PATH_CACHE, disk_cache_bytes, enable_cache_debug_info, disk_cache_mismatch);
+
+		if (!read_only)
 		{
 			// purge excessive files from the new file system based cache in background thread
 			LLAppViewer::getPurgeDiskCacheThread()->start();
 		}
 	}
 
-    {
-        std::random_device rnddev;
-        std::mt19937 rng(rnddev());
-        std::uniform_int_distribution<> dist(0, 9);
-
-        LLSplashScreen::update(LLTrans::getString(llformat("StartupInitializingTextureCache%d", dist(rng))));
-    }
-
 	// Init the texture cache
-	const S32 MB = 1024 * 1024;
-	const S64 MIN_CACHE_SIZE = 512 * MB;
-	const S64 MAX_CACHE_SIZE = 8192ll * MB;
+	{
+		{
+			std::random_device rnddev;
+			std::mt19937 rng(rnddev());
+			std::uniform_int_distribution<> dist(0, 9);
 
-	S64 texture_cache_size = (S64)(gSavedSettings.getU32("TextureCacheSize")) * MB;
-	texture_cache_size = llclamp(texture_cache_size, MIN_CACHE_SIZE, MAX_CACHE_SIZE);
+			LLSplashScreen::update(LLTrans::getString(llformat("StartupInitializingTextureCache%d", dist(rng))));
+		}
 
-	LLAppViewer::getTextureCache()->initCache(LL_PATH_CACHE, texture_cache_size, texture_cache_mismatch);
+		const S64 MB = 1024ll * 1024ll;
+		const S64 MIN_CACHE_SIZE = 1024ll * MB;
+		const S64 MAX_CACHE_SIZE = 16384ll * MB;
+
+		S64 texture_cache_size = (S64)(gSavedSettings.getU32("TextureCacheSize")) * MB;
+		texture_cache_size = llclamp(texture_cache_size, MIN_CACHE_SIZE, MAX_CACHE_SIZE);
+
+		LLAppViewer::getTextureCache()->initCache(LL_PATH_CACHE, texture_cache_size, texture_cache_mismatch);
+	}
 
 	LLVOCache::getInstance()->initCache(LL_PATH_CACHE, gSavedSettings.getU32("CacheNumberOfRegionsForObjects"), getObjectCacheVersion());
 
@@ -4248,8 +4173,16 @@ void LLAppViewer::loadKeyBindings()
 void LLAppViewer::purgeCache()
 {
 	LL_INFOS("AppCache") << "Purging Cache and Texture Cache..." << LL_ENDL;
+	LLSplashScreen::update(LLTrans::getString("StartupClearingTextureCache"));
 	LLAppViewer::getTextureCache()->purgeCache(LL_PATH_CACHE);
+
+	LLSplashScreen::update(LLTrans::getString("StartupClearingDiskCache"));
+	LLDiskCache::getInstance()->clearCache(LL_PATH_CACHE, false);
+
+	LLSplashScreen::update(LLTrans::getString("StartupClearingObjectCache"));
 	LLVOCache::getInstance()->removeCache(LL_PATH_CACHE);
+
+	LLSplashScreen::update(LLTrans::getString("StartupClearingShaderCache"));
 	LLViewerShaderMgr::instance()->clearShaderCache();
 	std::string browser_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "cef_cache");
 	if (LLFile::isdir(browser_cache))
@@ -4262,6 +4195,8 @@ void LLAppViewer::purgeCache()
 	{
 		gDirUtilp->deleteDirAndContents(browser_data);
 	}
+	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "inv_cache"));
+	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "lslpreproc"));
 	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "gridcache"));
 	gDirUtilp->deleteFilesInDir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""), "*");
 }
@@ -4417,13 +4352,13 @@ void LLAppViewer::loadNameCache()
 	std::string file;
 	if (LLGridManager::getInstance()->isInSecondlife())
 	{
-		file = "avatar_name_cache.xml";
+		file = "avatar_name_cache.llsd";
 	}
 	else
 	{
 		std::string gridlabel = LLGridManager::getInstance()->getGridId();
 		LLStringUtil::toLower(gridlabel);
-		file = llformat("avatar_name_cache.%s.xml", gridlabel.c_str());
+		file = llformat("avatar_name_cache.%s.llsd", gridlabel.c_str());
 	}
 	std::string filename =
 		gDirUtilp->getExpandedFilename(LL_PATH_CACHE, file);
@@ -4467,13 +4402,13 @@ void LLAppViewer::saveNameCache()
 	std::string file;
 	if (LLGridManager::getInstance()->isInSecondlife())
 	{
-		file = "avatar_name_cache.xml";
+		file = "avatar_name_cache.llsd";
 	}
 	else
 	{
 		std::string gridlabel = LLGridManager::getInstance()->getGridId();
 		LLStringUtil::toLower(gridlabel);
-		file = llformat("avatar_name_cache.%s.xml", gridlabel.c_str());
+		file = llformat("avatar_name_cache.%s.llsd", gridlabel.c_str());
 	}
 	std::string filename =
 		gDirUtilp->getExpandedFilename(LL_PATH_CACHE, file);

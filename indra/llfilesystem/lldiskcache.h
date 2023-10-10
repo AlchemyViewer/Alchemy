@@ -64,11 +64,12 @@
 
 #include "llsingleton.h"
 #include "lluuid.h"
+#include "lldir.h"
 
 #include "boost/unordered/unordered_flat_set.hpp"
 
 class LLDiskCache final :
-    public LLParamSingleton<LLDiskCache>
+    public LLSimpleton<LLDiskCache>
 {
     public:
         /**
@@ -78,28 +79,30 @@ class LLDiskCache final :
          * LLParamSingleton idiom and use it to initialize
          * the class via a call in LLAppViewer.
          */
-        LLSINGLETON(LLDiskCache,
-                    /**
-                     * The full name of the cache folder - typically a
-                     * a child of the main Viewer cache directory. Defined
-                     * by the setting at 'DiskCacheDirName'
-                     */
-                    const std::string cache_dir,
-                    /**
-                     * The maximum size of the cache in bytes - Based on the
-                     * setting at 'CacheSize' and 'DiskCachePercentOfTotal'
-                     */
-                    const uintmax_t max_size_bytes,
-                    /**
-                     * A flag that enables extra cache debugging so that
-                     * if there are bugs, we can ask uses to enable this
-                     * setting and send us their logs
-                     */
-                    const bool enable_cache_debug_info);
-
+        LLDiskCache();
         virtual ~LLDiskCache() = default;
+public:
+        void init(                    
+            /**
+             * The meta path of the cache e.g LL_PATH_CACHE
+             */
+            ELLPath location,
+            /**
+             * The maximum size of the cache in bytes - Based on the
+             * setting at 'CacheSize' and 'DiskCachePercentOfTotal'
+             */
+            const uintmax_t max_size_bytes,
+            /**
+             * A flag that enables extra cache debugging so that
+             * if there are bugs, we can ask uses to enable this
+             * setting and send us their logs
+             */
+            const bool enable_cache_debug_info,
+            /**
+             * Cache version mismatch purge
+             */
+            const bool cache_version_mismatch);
 
-    public:
         /**
          * Construct a filename and path to it based on the file meta data
          * (id, asset type, additional 'extra' info like discard level perhaps)
@@ -107,7 +110,7 @@ class LLDiskCache final :
          * so many things had to be pushed back there to accomodate it, that I
          * decided to move it here.  Still not sure that's completely right.
          */
-        static const boost::filesystem::path metaDataToFilepath(const LLUUID& id,
+        const boost::filesystem::path metaDataToFilepath(const LLUUID& id,
                                              LLAssetType::EType at);
 
         /**
@@ -140,7 +143,7 @@ class LLDiskCache final :
          * directory individually. Only the files that contain a prefix defined
          * by mCacheFilenamePrefix will be removed.
          */
-        void clearCache();
+        void clearCache(ELLPath location, bool recreate_cache = true);
 
         /**
          * Return some information about the cache for use in About Box etc.
@@ -148,6 +151,8 @@ class LLDiskCache final :
         const std::string getCacheInfo();
 
         void removeOldVFSFiles();
+
+        void setReadonly(bool read_only) { mReadOnly = read_only; }
 
     private:
         /**
@@ -183,7 +188,7 @@ class LLDiskCache final :
          * setting could potentially point it at a non-cache directory (for example,
          * the Windows System dir) with disastrous results.
          */
-        static std::string sCacheDir;
+        std::string mCacheDir;
 
         /**
          * The extension inserted at the end of a cache file filename to
@@ -200,8 +205,8 @@ class LLDiskCache final :
          * various parts of the code
          */
         bool mEnableCacheDebugInfo;
-        
-        boost::unordered_flat_set<LLUUID> mSkipList;
+
+        bool mReadOnly = false;
 };
 
 class LLPurgeDiskCacheThread : public LLThread
