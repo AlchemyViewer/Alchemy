@@ -30,6 +30,7 @@
 	<string name="AltMiniMapToolTipMsg" value="[REGION]（ダブルクリックでテレポート。Shift‐ドラッグで水平・垂直移動）"/>
 	<string name="GroupCountWithInfo" value="あなたは現在、[COUNT]グループに属しています。あと[REMAINING]グループに参加することができます。[secondlife:/// 上限を増やす]"/>
 	<tab_container name="tabs">
+		<!-- ================================= NEARBY tab =========================== -->
 		<panel label="近く" name="nearby_panel">
 			<panel label="bottom_panel" name="nearby_buttons_panel">
 				<filter_editor label="人物をフィルタ" name="nearby_filter_input"/>
@@ -39,6 +40,7 @@
 				<dnd_button name="nearby_del_btn" tool_tip="フレンドとして選択されている人物を削除します。"/>
 			</panel>
 		</panel>
+		<!-- ================================= FRIENDS tab ========================== -->
 		<panel label="フレンド" name="friends_panel">
 			<panel label="bottom_panel" name="friends_buttons_panel">
 				<filter_editor label="人物をフィルタ" name="friends_filter_input"/>
@@ -53,7 +55,12 @@
 				<accordion_tab name="tab_suggested_friends" title="友だちになりたくない人物"/>
 			</accordion>
 		</panel>
+		<!-- ================================= GROUPS tab =========================== -->
 		<panel label="グループ" name="groups_panel">
+			<!--
+			*NOTE: no_groups_msg & group_list attributes are not defined as translatable in VLT. See EXT-5931
+			Values are set from appropriate strings at the top of file via LLPeoplePanel::postBuild()
+			-->
 			<panel label="bottom_panel" name="groups_buttons_panel">
 				<filter_editor label="グループをフィルタ" name="groups_filter_input"/>
 				<menu_button name="groups_gear_btn" tool_tip="選択したグループに対するアクションを表示します。"/>
@@ -66,6 +73,7 @@
 			</text>
 			<group_list name="group_list"/>
 		</panel>
+		<!-- ================================= RECENT tab =========================== -->
 		<panel label="最新" name="recent_panel">
 			<panel label="bottom_panel" name="recent_buttons_panel">
 				<filter_editor label="人物をフィルタ" name="recent_filter_input"/>
@@ -75,8 +83,11 @@
 				<dnd_button name="recent_del_btn" tool_tip="選択されているフレンドを削除します。"/>
 			</panel>
 		</panel>
+		<!-- ================================= BLOCKED tab ========================== -->
+		<!--
 		<panel label="ブロック" name="blocked_panel">
 			<panel label="ブロックされた人物とオブジェクト" name="panel_block_list_sidetray"/>
 		</panel>
+		-->
 	</tab_container>
 </panel>

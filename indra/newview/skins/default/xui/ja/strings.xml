@@ -650,10 +650,13 @@ https://secondlife.com/viewer-access-faq
 		閉じる
 	</string>
 	<string name="BUTTON_RESTORE">
-		復帰
+		復元
+	</string>
+	<string name="BUTTON_COLLAPSE">
+		折り畳む
 	</string>
 	<string name="BUTTON_MINIMIZE">
-		元に戻す（縮小）
+		最小化
 	</string>
 	<string name="BUTTON_TEAR_OFF">
 		別ウィンドウで開く
@@ -3200,6 +3203,12 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="MarketplaceNoMatchingItems">
 		アイテムが見つかりませんでした。検索文字列のスペルを確認して、もう一度やり直してください。
 	</string>
+	<string name="InventorySingleFolderEmpty">
+		フォルダは空です。
+	</string>
+	<string name="InventorySingleFolderNoMatches">
+		一致するものはありませんでした。
+	</string>
 	<string name="InventoryNoTexture">
 		インベントリ内にこのテクスチャのコピーがありません
 	</string>
@@ -3354,12 +3363,16 @@ For AI Character: Get the closest navigable point to the point provided.
 		アンコンストレインド（制約なし）
 	</string>
 	<!-- use value="" because they have preceding spaces -->
+	<string name="active" value="（アクティブ）"/>
 	<string name="no_transfer" value=" （再販・譲渡不可）"/>
 	<string name="no_modify" value=" （編集不可）"/>
 	<string name="no_copy" value=" （コピー不可）"/>
 	<string name="worn" value=" （着用中）"/>
-	<string name="link" value=" （リンク）"/>
-	<string name="broken_link" value=" （壊れたリンク）"/>
+	<string name="link" value=" 　リンク"/>
+	<string name="broken_link" value=" 　壊れたリンク"/>
+	<string name="no_transfer_lbl" value="　再販・譲渡不可" />
+	<string name="no_modify_lbl" value="　編集不可" />
+	<string name="no_copy_lbl" value="　コピー不可" />
 	<string name="LoadingContents">
 		コンテンツを読み込んでいます…
 	</string>

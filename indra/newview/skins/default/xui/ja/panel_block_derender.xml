@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel label="非描画リスト">
+	<scroll_list name="derender_list" tool_tip="現在の描画しないオブジェクトの一覧です。">
+		<scroll_list.columns label="オブジェクト名" name="object_name"/>
+		<scroll_list.columns label="場所" name="location"/>
+		<scroll_list.columns label="種別" name="derender_type"/>
+	</scroll_list>
+	<panel name="bottom_panel">
+		<icon name="derender_spacer_icon"/>
+		<button label="復元" name="derender_trash_btn" tool_tip="選択したオブジェクトを復元します。"/>
+	</panel>
+</panel>
