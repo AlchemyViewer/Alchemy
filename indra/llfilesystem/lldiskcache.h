@@ -133,11 +133,6 @@ public:
          */
         void purge();
 
-#if 0
-        // copy from distribution into cache to replace static content
-        void prepopulateCacheWithStatic();
-#endif
-
         /**
          * Clear the cache by removing all the files in the specified cache
          * directory individually. Only the files that contain a prefix defined
@@ -180,7 +175,7 @@ public:
          * total size of the cache files in the cache directory will be
          * less than this value
          */
-        uintmax_t mMaxSizeBytes;
+        uintmax_t mMaxSizeBytes = 1024ull * 1024ull * 1024ull;
 
         /**
          * The folder that holds the cached files. The consumer of this
@@ -198,13 +193,13 @@ public:
          * like the users' OS system dir by mistake or maliciously and
          * this will help to offset any damage if that happens.
          */
-        static std::string sCacheFilenameExt;
+        const std::string mCacheFilenameExt = ".sl_cache";
 
         /**
          * When enabled, displays additional debugging information in
          * various parts of the code
          */
-        bool mEnableCacheDebugInfo;
+        bool mEnableCacheDebugInfo = false;
 
         bool mReadOnly = false;
 };
