@@ -471,7 +471,7 @@ void LLAvatarNameCache::requestNamesViaLegacy()
 bool LLAvatarNameCache::importFile(std::istream& istr)
 {
 	LLSD data;
-	if (LLSDParser::PARSE_FAILURE == LLSDSerialize::fromXMLDocument(data, istr))
+	if (LLSDParser::PARSE_FAILURE == LLSDSerialize::fromNotation(data, istr, LLSDSerialize::SIZE_UNLIMITED))
 	{
         LL_WARNS("AvNameCache") << "avatar name cache data xml parse failed" << LL_ENDL;
 		return false;
@@ -517,7 +517,7 @@ void LLAvatarNameCache::exportFile(std::ostream& ostr)
     LL_INFOS("AvNameCache") << "LLAvatarNameCache returning " << agents.size() << LL_ENDL;
 	LLSD data;
 	data["agents"] = agents;
-	LLSDSerialize::toPrettyXML(data, ostr);
+	LLSDSerialize::toNotation(data, ostr);
 }
 
 void LLAvatarNameCache::setNameLookupURL(const std::string& name_lookup_url)

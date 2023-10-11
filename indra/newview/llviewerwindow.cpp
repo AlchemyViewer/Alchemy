@@ -3660,7 +3660,7 @@ void LLViewerWindow::updateUI()
 				if (!out_vec.empty())
 				{
 					LL_INFOS() << "gFloaterView removal diff size: '" << out_vec.size() << "' begin_child_diff";
-					for (auto str : out_vec)
+					for (const auto& str : out_vec)
 					{
 						LL_CONT << " : " << str;
 					}
@@ -3672,7 +3672,7 @@ void LLViewerWindow::updateUI()
 				if (!out_vec.empty())
 				{
 					LL_INFOS() << "gFloaterView addition diff size: '" << out_vec.size() << "' begin_child_diff";
-					for (auto str : out_vec)
+					for (const auto& str : out_vec)
 					{
 						LL_CONT << " : " << str;
 					}
@@ -3713,7 +3713,7 @@ void LLViewerWindow::updateUI()
 				if (!out_vec.empty())
 				{
 					LL_INFOS() << "gMenuHolder removal diff size: '"<<out_vec.size() <<"' begin_child_diff";
-					for (auto str : out_vec)
+					for (const auto& str : out_vec)
 					{
 						LL_CONT << " : " << str;
 					}
@@ -3725,7 +3725,7 @@ void LLViewerWindow::updateUI()
 				if (!out_vec.empty())
 				{
 					LL_INFOS() << "gMenuHolder addition diff size: '" << out_vec.size() << "' begin_child_diff";
-					for (auto str : out_vec)
+					for (const auto& str : out_vec)
 					{
 						LL_CONT << " : " << str;
 					}

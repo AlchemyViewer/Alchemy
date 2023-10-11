@@ -1001,9 +1001,9 @@ S64 LLTextureCache::initCache(ELLPath location, S64 max_size, BOOL texture_cache
 	llassert_always(getPending() == 0) ; //should not start accessing the texture cache before initialized.
 
 	S64 entries_size = (max_size * 36) / 100; //0.36 * max_size
-	S64 max_entries = entries_size / (TEXTURE_CACHE_ENTRY_SIZE + TEXTURE_FAST_CACHE_ENTRY_SIZE);
-	sCacheMaxEntries = (S32)(llmin((S64)sCacheMaxEntries, max_entries));
-	entries_size = sCacheMaxEntries * (TEXTURE_CACHE_ENTRY_SIZE + TEXTURE_FAST_CACHE_ENTRY_SIZE);
+	S64 max_entries = entries_size / (S64)(TEXTURE_CACHE_ENTRY_SIZE + TEXTURE_FAST_CACHE_ENTRY_SIZE);
+	sCacheMaxEntries = (U32)(llmin((S64)sCacheMaxEntries, max_entries));
+	entries_size = (S64)sCacheMaxEntries * (S64)(TEXTURE_CACHE_ENTRY_SIZE + TEXTURE_FAST_CACHE_ENTRY_SIZE);
 	max_size -= entries_size;
 	if (sCacheMaxTexturesSize > 0)
 		sCacheMaxTexturesSize = llmin(sCacheMaxTexturesSize, max_size);
@@ -1619,7 +1619,6 @@ void LLTextureCache::purgeAllTextures(bool purge_directories)
 	mTexturesSizeMap.clear();
 	mTexturesSizeTotal = 0;
 	mFreeList.clear();
-	mTexturesSizeTotal = 0;
 	mUpdatedEntryMap.clear();
 
 	// Info with 0 entries
@@ -1676,7 +1675,7 @@ void LLTextureCache::purgeTexturesLazy(F32 time_limit_sec)
 		}
 
 		S64 cache_size = mTexturesSizeTotal;
-		S64 purged_cache_size = (llmax(cache_size, sCacheMaxTexturesSize) * (S64)((1.f - TEXTURE_CACHE_PURGE_AMOUNT) * 100)) / 100;
+		S64 purged_cache_size = (llmax(cache_size, sCacheMaxTexturesSize) * (S64)((1.f - TEXTURE_CACHE_PURGE_AMOUNT) * 100)) / 100ll;
 		for (time_idx_set_t::iterator iter = time_idx_set.begin();
 			iter != time_idx_set.end(); ++iter)
 		{

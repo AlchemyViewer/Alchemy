@@ -132,7 +132,7 @@ public:
 	BOOL			mPickTransparent;
 	BOOL			mPickRigged;
 	BOOL			mPickParticle;
-	BOOL			mPickUnselectable;
+	BOOL			mPickUnselectable = FALSE;
     BOOL            mPickReflectionProbe = FALSE;
 	void		    getSurfaceInfo();
 

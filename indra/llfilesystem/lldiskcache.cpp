@@ -40,31 +40,35 @@
 
 #include "lldiskcache.h"
 
-std::string LLDiskCache::sCacheDir = "";
-std::string LLDiskCache::sCacheFilenameExt = ".sl_cache";
+const std::string DISK_CACHE_DIR_NAME = "cache";
 
-LLDiskCache::LLDiskCache(const std::string cache_dir,
-                         const uintmax_t max_size_bytes,
-                         const bool enable_cache_debug_info) :
-    mMaxSizeBytes(max_size_bytes),
-    mEnableCacheDebugInfo(enable_cache_debug_info)
+LLDiskCache::LLDiskCache()
 {
-    sCacheDir = cache_dir;
+}
+
+void LLDiskCache::init(ELLPath location, const uintmax_t max_size_bytes, const bool enable_cache_debug_info, const bool cache_version_mismatch)
+{
+    mMaxSizeBytes = max_size_bytes;
+    mEnableCacheDebugInfo = enable_cache_debug_info;
+    mCacheDir = gDirUtilp->getExpandedFilename(location, DISK_CACHE_DIR_NAME);
+
+    if (cache_version_mismatch)
+    {
+        clearCache(location, false);
+    }
 
     createCache();
 }
 
+
 void LLDiskCache::createCache()
 {
-    LLFile::mkdir(sCacheDir);
+    LLFile::mkdir(mCacheDir);
     std::vector<std::string> uuidprefix = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f" };
     for (auto& prefixchar : uuidprefix)
     {
-        LLFile::mkdir(fmt::format("{}{}{}", sCacheDir, gDirUtilp->getDirDelimiter(), prefixchar));
+        LLFile::mkdir(fmt::format("{}{}{}", mCacheDir, gDirUtilp->getDirDelimiter(), prefixchar));
     }
-#if 0
-    prepopulateCacheWithStatic();
-#endif
 }
 
 // WARNING: purge() is called by LLPurgeDiskCacheThread. As such it must
@@ -97,9 +101,11 @@ void LLDiskCache::createCache()
 // asset will have to be re-requested.
 void LLDiskCache::purge()
 {
+    if (mReadOnly) return;
+
     if (mEnableCacheDebugInfo)
     {
-        LL_INFOS() << "Total dir size before purge is " << dirFileSize(sCacheDir) << LL_ENDL;
+        LL_INFOS() << "Total dir size before purge is " << dirFileSize(mCacheDir) << LL_ENDL;
     }
 
     boost::system::error_code ec;
@@ -109,7 +115,7 @@ void LLDiskCache::purge()
     std::vector<file_info_t> file_info;
 
 #if LL_WINDOWS
-    boost::filesystem::path cache_path(ll_convert_string_to_wide(sCacheDir));
+    boost::filesystem::path cache_path(ll_convert_string_to_wide(mCacheDir));
 #else
     boost::filesystem::path cache_path(sCacheDir);
 #endif
@@ -127,7 +133,7 @@ void LLDiskCache::purge()
 
                 if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
                 {
-                    if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
+                    if (entry.path().string().rfind(mCacheFilenameExt) != std::string::npos)
                     {
                         const uintmax_t file_size = boost::filesystem::file_size(entry, ec);
                         if (ec.failed())
@@ -181,23 +187,11 @@ void LLDiskCache::purge()
 
         if (should_remove)
         {
-#if 0
-            auto uuid_as_string = LLUUID(gDirUtilp->getBaseFileName(entry.second.second.string(), true));
-            // LL_INFOS() << "checking UUID=" <<uuid_as_string<< LL_ENDL;
-            if (uuid_as_string.notNull() && mSkipList.find(uuid_as_string) != mSkipList.end())
+            boost::filesystem::remove(entry.second.second, ec);
+            if (ec.failed())
             {
-                // this is one of our protected items so no purging
-                updateFileAccessTime(entry.second.second); // force these to the front of the list next time so that purge size works 
-            }
-            else 
-#endif
-            {
-                boost::filesystem::remove(entry.second.second, ec);
-                if (ec.failed())
-                {
-                    LL_WARNS() << "Failed to delete cache file " << entry.second.second << ": " << ec.message() << LL_ENDL;
-                    continue;
-                }
+                LL_WARNS() << "Failed to delete cache file " << entry.second.second << ": " << ec.message() << LL_ENDL;
+                continue;
             }
         }
     }
@@ -231,7 +225,7 @@ void LLDiskCache::purge()
             LL_INFOS() << line.str() << LL_ENDL;
         }
 
-        LL_INFOS() << "Total dir size after purge is " << dirFileSize(sCacheDir) << LL_ENDL;
+        LL_INFOS() << "Total dir size after purge is " << dirFileSize(mCacheDir) << LL_ENDL;
         LL_INFOS() << "Cache purge took " << execute_time << " ms to execute for " << file_info.size() << " files" << LL_ENDL;
     }
 }
@@ -285,13 +279,12 @@ const std::string LLDiskCache::assetTypeToString(LLAssetType::EType at)
     return std::string("UNKNOWN");
 }
 
-// static
 const boost::filesystem::path LLDiskCache::metaDataToFilepath(const LLUUID& id,
         LLAssetType::EType at)
 {
     std::string uuidstr = id.asString();
     const auto& dirdelim = gDirUtilp->getDirDelimiter();
-    std::string out_string = fmt::format(FMT_COMPILE("{:s}{:s}{}{}{}{}"), sCacheDir, dirdelim, std::string_view(&uuidstr[0], 1), dirdelim, uuidstr, sCacheFilenameExt);
+    std::string out_string = fmt::format(FMT_COMPILE("{:s}{:s}{}{}{}{}"), mCacheDir, dirdelim, std::string_view(&uuidstr[0], 1), dirdelim, uuidstr, mCacheFilenameExt);
 #if LL_WINDOWS
     return boost::filesystem::path(ll_convert_string_to_wide(out_string));
 #else
@@ -344,7 +337,7 @@ void LLDiskCache::updateFileAccessTime(const boost::filesystem::path& file_path)
 
 const std::string LLDiskCache::getCacheInfo()
 {
-    uintmax_t cache_used_mb = dirFileSize(sCacheDir) / (1024U * 1024U);
+    uintmax_t cache_used_mb = dirFileSize(mCacheDir) / (1024U * 1024U);
 
     uintmax_t max_in_mb = mMaxSizeBytes / (1024U * 1024U);
     F64 percent_used = ((F64)cache_used_mb / (F64)max_in_mb) * 100.0;
@@ -352,80 +345,32 @@ const std::string LLDiskCache::getCacheInfo()
     return llformat("%juMB / %juMB (%.1f%% used)", cache_used_mb, max_in_mb, percent_used);
 }
 
-#if 0
-// Copy static items into cache and add to the skip list that prevents their purging
-// Note that there is no de-duplication nor other validation of the list.
-void LLDiskCache::prepopulateCacheWithStatic()
+void LLDiskCache::clearCache(ELLPath location, bool recreate_cache)
 {
-    LL_INFOS() << "Prepopulating cache with static assets" << LL_ENDL;
-
-    mSkipList.clear();
-
-    std::vector<std::string> from_folders;
-    from_folders.emplace_back(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "static_assets"));
-
-    for (const auto& from_folder : from_folders)
+    if (!mReadOnly)
     {
-        if (gDirUtilp->fileExists(from_folder))
-        {
-            auto assets_to_copy = gDirUtilp->getFilesInDir(from_folder);
-            for (auto from_asset_file : assets_to_copy)
-            {
-                from_asset_file = from_folder + gDirUtilp->getDirDelimiter() + from_asset_file;
-                // we store static assets as UUID.asset_type the asset_type is not used in the current simple cache format
-                auto uuid_as_string = LLUUID(gDirUtilp->getBaseFileName(from_asset_file, true));
-                if (uuid_as_string.notNull())
-                {
-                    auto to_asset_file = metaDataToFilepath(LLUUID(uuid_as_string), LLAssetType::AT_UNKNOWN);
-                    if (!gDirUtilp->fileExists(to_asset_file))
-                    {
-                        if (mEnableCacheDebugInfo)
-                        {
-                            LL_INFOS("LLDiskCache") << "Copying static asset " << from_asset_file << " to cache from " << from_folder << LL_ENDL;
-                        }
-                        if (!LLFile::copy(from_asset_file, to_asset_file))
-                        {
-                            LL_WARNS("LLDiskCache") << "Failed to copy " << from_asset_file << " to " << to_asset_file << LL_ENDL;
-                        }
-                    }
-                    if (mSkipList.find(uuid_as_string) == mSkipList.end())
-                    {
-                        if (mEnableCacheDebugInfo)
-                        {
-                            LL_INFOS("LLDiskCache") << "Adding " << uuid_as_string << " to skip list" << LL_ENDL;
-                        }
-                        mSkipList.insert(uuid_as_string);
-                    }
-                }
-            }
-        }
-    }
-}
-#endif
+        std::string disk_cache_dir = gDirUtilp->getExpandedFilename(location, DISK_CACHE_DIR_NAME);
 
-void LLDiskCache::clearCache()
-{
-    /**
-     * See notes on performance in dirFileSize(..) - there may be
-     * a quicker way to do this by operating on the parent dir vs
-     * the component files but it's called infrequently so it's
-     * likely just fine
-     */
-    boost::system::error_code ec;
+        const char* subdirs = "0123456789abcdef";
+        std::string delem = gDirUtilp->getDirDelimiter();
+        std::string mask = "*";
+        for (S32 i = 0; i < 16; i++)
+        {
+            std::string dirname = disk_cache_dir + delem + subdirs[i];
+            LL_INFOS() << "Deleting files in directory: " << dirname << LL_ENDL;
+            gDirUtilp->deleteDirAndContents(dirname);
 #if LL_WINDOWS
-    boost::filesystem::path cache_path(ll_convert_string_to_wide(sCacheDir));
-#else
-    boost::filesystem::path cache_path(sCacheDir);
+            // Texture cache can be large and can take a while to remove
+            // assure OS that processes is alive and not hanging
+            MSG msg;
+            PeekMessage(&msg, 0, 0, 0, PM_NOREMOVE | PM_NOYIELD);
 #endif
-    if (boost::filesystem::is_directory(cache_path, ec) && !ec.failed())
-    {
-        boost::filesystem::remove_all(cache_path, ec);
-        if (ec.failed())
-        {
-            LL_WARNS() << "Failed to delete cached files " << cache_path << " : " << ec.message() << LL_ENDL;
         }
-
-        createCache();
+        gDirUtilp->deleteFilesInDir(disk_cache_dir, mask);
+        if (recreate_cache)
+        {
+            createCache();
+        }
     }
 }
 
@@ -492,7 +437,7 @@ uintmax_t LLDiskCache::dirFileSize(const std::string dir)
                 ec.clear();
                 if (boost::filesystem::is_regular_file(entry, ec) && !ec.failed())
                 {
-                    if (entry.path().string().rfind(sCacheFilenameExt) != std::string::npos)
+                    if (entry.path().string().rfind(mCacheFilenameExt) != std::string::npos)
                     {
                         uintmax_t file_size = boost::filesystem::file_size(entry, ec);
                         if (ec.failed())

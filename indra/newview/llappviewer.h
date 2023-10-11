@@ -245,10 +245,6 @@ private:
 	void initStrings();       // Initialize LLTrans machinery
 	bool initCache(); // Initialize local client cache.
 
-	// We have switched locations of both Mac and Windows cache, make sure
-	// files migrate and old cache is cleared out.
-	void migrateCacheDirectory();
-
 	void cleanupSavedSettings(); // Sets some config data to current or default values during cleanup.
 	void removeCacheFiles(const std::string& filemask); // Deletes cached files the match the given wildcard.
 
