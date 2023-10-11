@@ -20,7 +20,13 @@
 	<!-- starting up -->
 	<string name="StartupDetectingHardware">Detecting hardware...</string>
 	<string name="StartupLoading">Loading [APP_NAME]...</string>
+	<string name="StartupChangingCacheLocation">Migrating cache...</string>
 	<string name="StartupClearingCache">Obliterating cache...</string>
+	<string name="StartupClearingTextureCache">Obliterating texture cache...</string>
+	<string name="StartupClearingDiskCache">Obliterating asset cache...</string>
+	<string name="StartupClearingObjectCache">Obliterating object cache...</string>
+	<string name="StartupClearingShaderCache">Obliterating shader cache...</string>
+	<string name="StartupInitializingDiskCache">Initializing Disk Cache...</string>
 	<string name="StartupInitializingTextureCache0">Fluffing texture cache...</string>
 	<string name="StartupInitializingTextureCache1">Reticulating splines...</string>
 	<string name="StartupInitializingTextureCache2">Preheating texture baking oven...</string>
