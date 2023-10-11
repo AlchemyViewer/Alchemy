@@ -32,8 +32,23 @@ that are returned from one component and may appear in many places
 	<string name="StartupLoading">
 		[APP_NAME]をインストールしています…
 	</string>
+	<string name="StartupChangingCacheLocation">
+		キャッシュを移行しています…
+	</string>
 	<string name="StartupClearingCache">
 		キャッシュを消去しています…
+	</string>
+	<string name="StartupClearingTextureCache">
+		テクスチャキャッシュを消去しています…
+	</string>
+	<string name="StartupClearingDiskCache">
+		アセットキャッシュを消去しています…
+	</string>
+	<string name="StartupClearingObjectCache">
+		オブジェクトキャッシュを消去しています…
+	</string>
+	<string name="StartupClearingShaderCache">
+		シェーダーキャッシュを消去しています…
 	</string>
 	<string name="StartupInitializingTextureCache">
 		テクスチャキャッシュを初期化しています…
@@ -3380,7 +3395,7 @@ For AI Character: Get the closest navigable point to the point provided.
 		コンテンツなし
 	</string>
 	<string name="WornOnAttachmentPoint" value=" （[ATTACHMENT_POINT]に装着中）"/>
-	<string name="AttachmentErrorMessage" value="([ATTACHMENT_ERROR])"/>
+	<string name="AttachmentErrorMessage" value="（[ATTACHMENT_ERROR]）"/>
 	<string name="ActiveGesture" value="[GESLABEL]（アクティブ）"/>
 	<!-- Inventory permissions -->
 	<string name="PermYes">
