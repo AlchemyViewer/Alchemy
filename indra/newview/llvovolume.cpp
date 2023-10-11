@@ -604,6 +604,7 @@ void LLVOVolume::onDrawableUpdateFromServer()
     }
 }
 
+// ALCHMERGE
 void LLVOVolume::animateTextures()
 {
 	if (!mDead)
@@ -655,7 +656,7 @@ void LLVOVolume::animateTextures()
 
 				if (!facep->mTextureMatrix)
 				{
-					facep->mTextureMatrix = new LLMatrix4();
+					facep->mTextureMatrix = new LLMatrix4a();
 				}
 
 				LLMatrix4a& tex_mat = *facep->mTextureMatrix;
