@@ -62,6 +62,8 @@
 #include <boost/regex.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
+#include "dae/daeErrorHandler.h"
+
 std::string colladaVersion[VERSIONTYPE_COUNT+1] = 
 {
 	"1.4.0",
@@ -906,6 +908,14 @@ LLDAELoader::LLDAELoader(
   mGeneratedModelLimit(modelLimit),
   mPreprocessDAE(preprocess)
 {
+	mHandler = std::make_unique<LLDAELogHandler>();
+	daeErrorHandler::setErrorHandler(mHandler.get());
+}
+
+LLDAELoader::~LLDAELoader()
+{
+	daeErrorHandler::setErrorHandler(nullptr);
+	mHandler.reset();
 }
 
 struct ModelSort
@@ -2600,4 +2610,13 @@ bool LLDAELoader::loadModelsFromDomMesh(domMesh* mesh, std::vector<LLModel*>& mo
 	} while (volume_faces);	
 
 	return true;
+}
+
+void LLDAELoader::LLDAELogHandler::handleError(daeString msg)
+{
+	LL_WARNS() << msg << LL_ENDL;
+}
+void LLDAELoader::LLDAELogHandler::handleWarning(daeString msg)
+{
+	LL_WARNS() << msg << LL_ENDL;
 }
