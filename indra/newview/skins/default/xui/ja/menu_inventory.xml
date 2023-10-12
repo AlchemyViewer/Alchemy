@@ -75,17 +75,21 @@
 	<menu_item_call label="着用中のアウトフィットと入れ替え" name="Replace Outfit"/>
 	<menu_item_call label="着用中のアウトフィットに追加" name="Add To Outfit"/>
 	<menu_item_call label="着用中のアウトフィットから取り外す" name="Remove From Outfit"/>
-	<menu_item_call label="アウトフィット一覧をクリップボードにコピー" name="Copy outfit list to clipboard"/>
+	<menu_item_call label="アウトフィットリストをクリップボードにコピー" name="Copy outfit list to clipboard"/>
 	<menu_item_separator name="Outfit Separator"/>
 	<menu_item_call label="オリジナルを探す" name="Find Original"/>
 	<menu_item_call label="アイテムを除外" name="Purge Item"/>
 	<menu_item_call label="アイテムを復元" name="Restore Item"/>
-	<menu_item_call label="開く" name="Open"/>
+	<menu_item_call label="画像…" name="thumbnail"/>
 	<menu_item_call label="オリジナルを開く" name="Open Original"/>
 	<menu_item_call label="プロパティ" name="Properties"/>
 	<menu_item_call label="名前を変更" name="Rename"/>
 	<menu_item_call label="アセットのＵＵＩＤをコピー" name="Copy Asset UUID"/>
 	<menu_item_call label="メインパネルで表示" name="Show in Main Panel"/>
+	<menu_item_call label="開く" name="open_in_current_window"/>
+	<menu_item_call label="新しいウィンドウで開く" name="open_in_new_window"/>
+	<menu_item_separator name="Open Folder Separator"/>
+	<menu_item_call label="リネーム" name="Rename"/>
 	<menu_item_call label="カット" name="Cut"/>
 	<menu_item_call label="コピー" name="Copy"/>
 	<menu_item_call label="ペースト" name="Paste"/>

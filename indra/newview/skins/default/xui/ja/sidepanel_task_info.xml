@@ -42,7 +42,6 @@
 	<panel.string name="Sale Mixed">
 		販売額
 	</panel.string>
-	<button name="back_btn"/>
 	<text name="title" value="オブジェクトのプロフィール"/>
 	<text name="where" value="（インワールド）"/>
 	<panel label="" name="properties_panel">

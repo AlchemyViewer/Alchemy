@@ -6,11 +6,11 @@
 	<text name="Cache:">
 		キャッシュ：
 	</text>
-	<slider label="ディスクキャッシュサイズ（1024～16384㎆）" name="disk_cache_size"/>
+	<slider label="ディスクキャッシュサイズ（1～16㎇）" name="disk_cache_size"/>
 	<text name="disk_cache_mb_text">
 		㎆
 	</text>
-	<slider label="テクスチャのキャッシュサイズ（1024～8192㎆）" name="texture_cache_size"/>
+	<slider label="テクスチャのキャッシュサイズ（1～16㎇）" name="texture_cache_size"/>
 	<text name="tex_cache_mb_text">
 		㎆
 	</text>

@@ -1672,6 +1672,16 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 			<button name="Cancel" text="キャンセル"/>
 		</form>
 	</notification>
+	<notification label="選択したアイテムのリネーム" name="RenameItem">
+以下の新しい名前を入力してください：
+[NAME]
+		<tag>confirm</tag>
+		<form name="form">
+			<input name="new_name" type="text">[NAME]</input>
+			<button default="true" index="0" name="OK" text="ＯＫ"/>
+			<button index="1" name="Cancel" text="キャンセル"/>
+		</form>
+	</notification>
 	<notification name="RemoveFromFriends">
 		フレンドリストから&lt;nolink&gt;[NAME]&lt;/nolink&gt;を削除しますか？
 		<tag>friendship</tag>
@@ -2965,6 +2975,27 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<tag>confirm</tag>
 		<usetemplate ignoretext="フィルリングされたアイテムを削除する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
+	<notification name="DeleteThumbnail">
+		<unique/>
+		このアイテムの画像を削除してもよろしいですか？この操作は取り消しできません。
+		<tag>confirm</tag>
+		<usetemplate ignoretext="アイテム画像削除時の確認" name="okcancelignore" notext="キャンセル" yestext="削除"/>
+	</notification>
+	<notification name="ThumbnailDimentionsLimit">
+		一辺が６４～２５６ピクセルの正方形の画像のみサポートしています。
+		<unique/>
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="ThumbnailInsufficientPermissions">
+		サムネイルとして使用できる画像は、コピー可能かつ転送可能な画像のみです。
+		<unique/>
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="ThumbnailOutfitPhoto">
+		アウトフィットに画像を追加するには、アウトフィットギャラリーウィンドウを使うか、アウトフィットフォルダーを右クリックし、「画像…」を選択します。
+		<unique/>
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
 	<notification name="ConfirmUnlink">
 		これは、リンクセットによる広範囲の選択です。リンクを解除すると、もう一度リンクできなくなる可能性があります。
 そのような場合に備えて、リンクセットを自分のインベントリにコピーできます。
@@ -3072,6 +3103,10 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate name="okcancelbuttons" notext="後でゴミ箱を空にする" yestext="ごみ箱フォルダを確認する"/>
 	</notification>
 	<notification name="InventoryLimitReachedAIS">
+		インベントリに問題が発生しています。お手数ですが、サポートにお問い合わせください。
+		<tag>fail</tag>
+	</notification>
+	<notification name="InventoryLimitReachedAISAlert">
 		インベントリに問題が発生しています。お手数ですが、サポートにお問い合わせください。
 		<tag>fail</tag>
 	</notification>
@@ -5718,6 +5753,16 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 			<input name="token"/>
 			<button name="continue" text="確認"/>
 			<button name="cancel" text="キャンセル"/>
+		</form>
+	</notification>
+	<notification label="二段階認証トークンプロンプト" name="PromptMFATokenWithSave">
+    [MESSAGE]
+		<tag>confirm</tag>
+		<form name="form">
+			<input name="token" type="text" />
+			<ignore name="ignore" text="このコンピューターを３０日間記録する"/>
+			<button default="true" index="0" name="continue" text="続ける"/>
+			<button index="1" name="cancel" text="キャンセル"/>
 		</form>
 	</notification>
 	<notification label="サブフォルダの作成" name="CreateSubfolder">

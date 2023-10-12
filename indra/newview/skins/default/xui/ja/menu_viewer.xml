@@ -505,9 +505,6 @@
 			<menu_item_check label="自動アルファマスク（ＲＭＳＥ）" name="Automatic Alpha Masks (RMSE)"/>
 			<menu_item_check label="アニメーションテクスチャ" name="Animation Textures"/>
 			<menu_item_check label="テクスチャを無効にする" name="Disable Textures"/>
-			<menu_item_check label="アンビエントを無効にする" name="Disable Ambient"/>
-			<menu_item_check label="日の光を無効にする" name="Disable Sunlight"/>
-			<menu_item_check label="近くの光を無効にする" name="Disable Local Lights"/>
 			<menu_item_check label="フル解像度テクスチャ" name="Rull Res Textures"/>
 			<menu_item_check label="装着された光源を描画する" name="Render Attached Lights"/>
 			<menu_item_check label="取り付けられたパーティクルを描画する" name="Render Attached Particles"/>

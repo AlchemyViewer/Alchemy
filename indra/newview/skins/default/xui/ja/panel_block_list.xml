@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel label="ブロックリスト" name="panel_block_list">
+	<scroll_list name="block_list" tool_tip="ブロックした住民／オブジェクトの一覧を表示します。">
+		<scroll_list.columns label="名前" name="item_name"/>
+		<scroll_list.columns label="ブロック種別" name="item_type"/>
+		<scroll_list.columns label="Ｔ" name="item_text" tool_tip="テキスト"/>
+		<scroll_list.columns label="Ｖ" name="item_voice" tool_tip="ボイス" />
+		<scroll_list.columns label="Ｐ" name="item_particles" tool_tip="パーティクル"/>
+		<scroll_list.columns label="Ｓ" name="item_sounds" tool_tip="オブジェクトのサウンド"/>
+	</scroll_list>
+	<panel name="bottom_panel">
+		<button label="住民をブロック" name="block_resident_btn" tool_tip="ブロックしたい住民をピックします。"/>
+		<button label="オブジェクトをブロック" name="block_object_btn" tool_tip="ブロックしたいオブジェクトを名前でピックします。"/>
+		<icon name="derenderx_spacer_icon" />
+		<button label="ブロック解除" name="block_trash_btn" tool_tip="選択した項目をブロックリストから削除します。"/>
+	</panel>
+</panel>
