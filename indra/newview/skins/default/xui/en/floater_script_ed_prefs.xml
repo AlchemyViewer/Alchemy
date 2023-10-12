@@ -2,18 +2,18 @@
 <floater
  legacy_header_height="18"
  can_resize="false"
- height="528"
+ height="602"
  layout="topleft"
  name="floater_script_colors"
  help_topic="script_colors"
  save_rect="true"
  title="SCRIPT COLORS"
- width="320">
+ width="380">
     <text
      follows="left|top"
      height="15"
      layout="topleft"
-     left="12"
+     left="8"
      name="color_pickers_label"
      top="30"
      width="200">
@@ -176,7 +176,7 @@
      height="24"
      label_height="0"
      layout="topleft"
-     left="190"
+     left="210"
      name="string_literal"
      top="45"
      width="44" >
@@ -206,7 +206,7 @@
      height="24"
      label_height="0"
      layout="topleft"
-     left="190"
+     left="210"
      name="constant"
      top_pad="10"
      width="44" >
@@ -236,7 +236,7 @@
      height="24"
      label_height="0"
      layout="topleft"
-     left="190"
+     left="210"
      name="flow_control"
      top_pad="10"
      width="44" >
@@ -266,7 +266,7 @@
      height="24"
      label_height="0"
      layout="topleft"
-     left="190"
+     left="210"
      name="function"
      top_pad="10"
      width="44" >
@@ -296,7 +296,7 @@
      height="24"
      label_height="0"
      layout="topleft"
-     left="190"
+     left="210"
      name="comment"
      top_pad="10"
      width="44" >
@@ -360,17 +360,28 @@ default
 		follows="left|top"
 		height="15"
 		layout="topleft"
-		left="12"
+		left="8"
 		name="prefs_label"
 		top_pad="6"
 		width="150">
 		Script Editor Options:
     </text>
+        <panel
+         bevel_style="in"
+         bg_alpha_color="0 0 0 0"
+         bg_opaque_color="0 0 0 0.3"
+         border="true"
+         follows="left|top"
+         height="140"
+         layout="topleft"
+         left="10"
+         name="editor_panel"
+         right="-10">
 	<check_box
 		control_name="AlchemyLSLPreprocessor"
 		follows="left|top"
 		height="16"
-		top_pad="2"
+		top_pad="5"
 		label="Enable LSL preprocessor"
 		tool_tip="When checked, the LSL preprocessor is enabled."
 		name="preproc_checkbox" />
@@ -432,27 +443,91 @@ default
 		max_length_chars="4096"
 		name="preprocinclude_location"
 		top_pad="0"
-		width="235" />
+		width="283" />
 	<button
 		follows="left|top"
 		height="23"
 		enabled_control="AlchemyPreProcEnableHDDInclude"
-		label="..."
+		label="Browse"
 		label_selected="Browse"
 		left_pad="5"
 		name="SetPreprocInclude"
 		top_delta="0"
-		width="30">
+		width="50">
 		<button.commit_callback
 		function="ScriptPref.SetPreprocInclude" />
 	</button>
-       
+     </panel>
+	<text
+		follows="left|top"
+		height="15"
+		layout="topleft"
+		left="8"
+		name="prefs_label"
+		top_pad="6"
+		width="150">
+		External Editor:
+    </text>
+        <panel
+         bevel_style="in"
+         bg_alpha_color="0 0 0 0"
+         bg_opaque_color="0 0 0 0.3"
+         border="true"
+         follows="left|top"
+         height="36"
+         layout="topleft"
+         left="10"
+         name="editor_panel"
+         right="-10">
+            <text
+             type="string"
+             length="1"
+             follows="left|top"
+             font="SansSerif"
+             height="30"
+             layout="topleft"
+             left_delta="5"
+             name="editor_path_label"
+             top="10"
+             width="72">
+                Editor Path:
+            </text>
+            <line_editor
+             control_name="ExternalEditor"
+             border_style="line"
+             border_thickness="1"
+             follows="left|top"
+             font="SansSerif"
+             height="23"
+             layout="topleft"
+             left_pad="1"
+             max_length_bytes="300"
+             name="executable_path_field"
+             select_on_focus="true"
+             tool_tip="The full path to an editor (executable) to edit lsl files (quotes not necessary)"
+             top_delta="-3"
+             width="221" />
+            <button
+             follows="left|top"
+             height="23"
+             label="Browse"
+             label_selected="Browse"
+             layout="topleft"
+             left_pad="5"
+             name="browse_for_executable"
+             tool_tip="Browse for an editor (executable) to edit lsl files"
+             top_delta="0"
+             width="50">
+               <button.commit_callback
+               function="ScriptPref.SetExternalEditor" />
+          </button>
+        </panel>    
 	<button
-		follows="top|left"
+		follows="bottom|right"
 		height="23"
 		layout="topleft"
 		top_pad="6"
-		left="115"
+          right="-10"
 		name="close_btn"
 		width="100"
 		label="OK" />

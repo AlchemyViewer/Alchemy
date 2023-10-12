@@ -29,6 +29,7 @@
 
 #include "llagent.h"
 #include "llloadingindicator.h"
+#include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llviewertexturelist.h"
 
@@ -74,7 +75,9 @@ void LLProfileImagePicker::notify(const std::vector<std::string>& filenames)
     const S32 MAX_DIM = 256;
     if (!LLViewerTextureList::createUploadFile(file_path, temp_file, codec, MAX_DIM))
     {
-        //todo: image not supported notification
+        LLSD notif_args;
+        notif_args["REASON"] = LLImage::getLastError().c_str();
+        LLNotificationsUtil::add("CannotUploadTexture", notif_args);
         LL_WARNS("AvatarProperties") << "Failed to upload profile image of type " << (S32)PROFILE_IMAGE_SL << ", failed to open image" << LL_ENDL;
         return;
     }
@@ -82,6 +85,9 @@ void LLProfileImagePicker::notify(const std::vector<std::string>& filenames)
     std::string cap_url = gAgent.getRegionCapability(PROFILE_IMAGE_UPLOAD_CAP);
     if (cap_url.empty())
     {
+        LLSD args;
+        args["CAPABILITY"] = std::string(PROFILE_IMAGE_UPLOAD_CAP);
+        LLNotificationsUtil::add("RegionCapabilityRequestError", args);
         LL_WARNS("AvatarProperties") << "Failed to upload profile image of type " << (S32)PROFILE_IMAGE_SL << ", no cap found" << LL_ENDL;
         return;
     }

@@ -161,7 +161,9 @@ void LLViewerStatsRecorder::writeToLog( F32 interval )
 	size_t data_size = 0;
 	F64 delta_time = LLFrameTimer::getTotalSeconds() - mLastSnapshotTime;
     if (delta_time < interval)
-        return;
+	{
+		return;
+	}
 
 	if (mSkipSaveIfZeros)
 	{

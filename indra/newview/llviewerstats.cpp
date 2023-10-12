@@ -191,7 +191,6 @@ LLTrace::SampleStatHandle<>	FPS_SAMPLE("fpssample"),
 							NUM_OBJECTS("numobjectsstat"),
 							NUM_ACTIVE_OBJECTS("numactiveobjectsstat"),
 							ENABLE_VBO("enablevbo", "Vertex Buffers Enabled"),
-							LIGHTING_DETAIL("lightingdetail", "Lighting Detail"),
 							VISIBLE_AVATARS("visibleavatars", "Visible Avatars"),
 							SHADER_OBJECTS("shaderobjects", "Object Shaders"),
 							DRAW_DISTANCE("drawdistance", "Draw Distance"),
@@ -401,7 +400,6 @@ void update_statistics()
 	record(LLStatViewer::TRIANGLES_DRAWN_PER_FRAME, last_frame_recording.getSum(LLStatViewer::TRIANGLES_DRAWN));
 
 	sample(LLStatViewer::ENABLE_VBO,      (F64)TRUE);
-	sample(LLStatViewer::LIGHTING_DETAIL, (F64)gPipeline.getLightingDetail());
 	sample(LLStatViewer::DRAW_DISTANCE,   (F64)LLPipeline::RenderFarClip);
 
 	static const LLCachedControl<bool> use_chat_bubbles(gSavedSettings, "UseChatBubbles");

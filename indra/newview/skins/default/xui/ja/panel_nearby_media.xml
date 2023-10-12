@@ -1,20 +1,33 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="nearby_media">
-	<string name="media_item_count_format">（メディアアイテム %ld ）</string>
-	<string name="empty_item_text">&lt;空&gt;</string>
-	<string name="parcel_media_name">区画ストリーミングメディア</string>
-	<string name="parcel_audio_name">区画ストリーミングオーディオ</string>
-	<string name="playing_suffix">（再生中）</string>
+	<string name="media_item_count_format">
+		（メディアアイテム %ld ）</string>
+	<string name="empty_item_text">
+		＜空＞
+	</string>
+	<string name="parcel_media_name">
+		区画ストリーミングメディア
+	</string>
+	<string name="parcel_audio_name">
+		区画ストリーミングオーディオ
+	</string>
+	<string name="playing_suffix">
+		（再生中）
+	</string>
 	<panel name="minimized_controls">
-		<button label="すべて停止" name="all_nearby_media_disable_btn" tool_tip="近くのメディアをすべてオフにします"/>
-		<button label="すべて開始" name="all_nearby_media_enable_btn" tool_tip="近くのメディアをすべてオンにします"/>
+		<button label="すべて停止" name="all_nearby_media_disable_btn" tool_tip="近くのメディアをすべてオフにします。"/>
+		<button label="すべて開始" name="all_nearby_media_enable_btn" tool_tip="近くのメディアをすべてオンにします。"/>
 		<button name="open_prefs_btn" tool_tip="メディアの設定を開きます"/>
-		<button label="詳細　≫" label_selected="≪　簡易" name="more_btn" tool_tip="拡張コントロール"/>
-		<button label="詳細　≫" label_selected="≪　簡易" name="less_btn" tool_tip="拡張コントロール"/>
+		<button label="詳細　≫" label_selected="≪　簡易" name="more_btn" tool_tip="拡張コントロールを表示します。"/>
+		<button label="詳細　≫" label_selected="≪　簡易" name="less_btn" tool_tip="拡張コントロールを非表示にします。"/>
 	</panel>
 	<panel name="nearby_media_panel">
-		<text name="nearby_media_title">近くのメディア</text>
-		<text name="show_text">表示：</text>
+		<text name="nearby_media_title">
+			近くのメディア
+		</text>
+		<text name="show_text">
+			表示：
+		</text>
 		<combo_box name="show_combo">
 			<combo_box.item label="すべて" name="All"/>
 			<combo_box.item label="この区画内" name="WithinParcel"/>

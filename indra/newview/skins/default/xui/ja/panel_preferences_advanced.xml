@@ -1,17 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <panel label="拡張" name="advanced">
-	<panel.string name="aspect_ratio_text">[NUM]：[DEN]</panel.string>
-	<text name="Cache:">キャッシュ：</text>
+	<panel.string name="aspect_ratio_text">
+		[NUM]：[DEN]
+	</panel.string>
+	<text name="Cache:">
+		キャッシュ：
+	</text>
 	<slider label="ディスクキャッシュサイズ（1024～16384㎆）" name="disk_cache_size"/>
-	<text name="disk_cache_mb_text">㎆</text>
+	<text name="disk_cache_mb_text">
+		㎆
+	</text>
 	<slider label="テクスチャのキャッシュサイズ（1024～8192㎆）" name="texture_cache_size"/>
-	<text name="tex_cache_mb_text">㎆</text>
+	<text name="tex_cache_mb_text">
+		㎆
+	</text>
 	<button label="クリア" label_selected="クリア" name="clear_cache"/>
-	<text name="Cache location">キャッシュ保存先：</text>
+	<text name="Cache location">
+		キャッシュ保存先：
+	</text>
 	<button label="ブラウズ" label_selected="ブラウズ" name="set_cache"/>
 	<button label="デフォルトの場所" label_selected="デフォルト" name="default_cache_location"/>
-	<text name="UI Size:">ＵＩのサイズ：</text>
-	<text name="HUD Size:">ＨＵＤのスケール：</text>
+	<text name="UI Size:">
+		ＵＩのサイズ：
+	</text>
+	<text name="HUD Size:">
+		ＨＵＤのスケール：
+	</text>
 	<check_box label="スクリプトのエラーを表示：" name="show_script_errors"/>
 	<radio_group name="show_location">
 		<radio_item label="近くのチャット" name="0"/>

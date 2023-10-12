@@ -62,6 +62,7 @@
 #include "llcommandhandler.h"
 #include "lltextutil.h"
 #include "llappearancemgr.h"
+#include "llviewermenufile.h"
 
 // register panel with appropriate XML
 static LLPanelInjector<LLPanelEditWearable> t_edit_wearable("panel_edit_wearable");
@@ -1202,14 +1203,13 @@ void LLPanelEditWearable::showWearable(LLViewerWearable* wearable, BOOL show, BO
                         const std::string accordion_tab = subpart_entry->mAccordionTab;
         
                         LLScrollingPanelList *panel_list = getChild<LLScrollingPanelList>(scrolling_panel);
-                        LLAccordionCtrlTab *tab = getChild<LLAccordionCtrlTab>(accordion_tab);
-			
                         if (!panel_list)
                         {
                                 LL_WARNS() << "could not get scrolling panel list: " << scrolling_panel << LL_ENDL;
                                 continue;
                         }
         
+                        LLAccordionCtrlTab *tab = getChild<LLAccordionCtrlTab>(accordion_tab);
                         if (!tab)
                         {
                                 LL_WARNS() << "could not get llaccordionctrltab from UI with name: " << accordion_tab << LL_ENDL;
@@ -1664,14 +1664,12 @@ void LLPanelEditWearable::initPreviousAlphaTextureEntry(LLAvatarAppearanceDefine
 
 void LLPanelEditWearable::onClickedImportBtn()
 {
-	LLFilePicker& file_picker = LLFilePicker::instance();
-	if(!file_picker.getOpenFile(LLFilePicker::FFLOAD_XML))
-	{
-		LL_INFOS("ShapeImport") << "User closed the filepicker. Aborting!" << LL_ENDL;
-		return;
-	}
-	
-	const std::string filename = file_picker.getFirstFile();
+    LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelEditWearable::onClickedImportBtnCallback, this, _1), LLFilePicker::FFLOAD_XML, false);
+}
+
+void LLPanelEditWearable::onClickedImportBtnCallback(const std::vector<std::string>& filenames)
+{
+    const std::string filename = filenames[0];
 	LLXmlTree tree;
 	if (!tree.parseFile(filename, FALSE))
 	{

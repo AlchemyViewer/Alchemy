@@ -78,6 +78,7 @@
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
 #include "llpanelgrouplandmoney.h"
+#include "llpanelmaininventory.h"
 #include "llrecentpeople.h"
 #include "llscriptfloater.h"
 #include "llscriptruntimeperms.h"
@@ -116,7 +117,8 @@
 #include "llkeythrottle.h"
 #include "llgroupactions.h"
 #include "llagentui.h"
-#include "llpanelblockedlist.h"
+//#include "llpanelblockedlist.h"
+#include "llfloaterblocked.h"
 #include "llpanelplaceprofile.h"
 #include "llviewerregion.h"
 #include "llfloaterregionrestarting.h"
@@ -1558,11 +1560,35 @@ void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_nam
 		}
 
 		////////////////////////////////////////////////////////////////////////////////
-		// Highlight item
-		// Only show if either ShowInInventory is true OR it is an inventory
-		// offer from an agent and the asset is not previewable
-		const BOOL auto_open = gSavedSettings.getBOOL("ShowInInventory") || (manual_offer && !check_asset_previewable(asset_type));
-		if (auto_open) LLInventoryPanel::openInventoryPanelAndSetSelection(auto_open, obj_id);
+        static LLUICachedControl<bool> find_original_new_floater("FindOriginalOpenWindow", false);
+        //show in a new single-folder window
+        if(find_original_new_floater && !from_name.empty())
+        {
+            const LLInventoryObject *obj = gInventory.getObject(obj_id);
+            if (obj && obj->getParentUUID().notNull())
+            {
+                if (obj->getActualType() == LLAssetType::AT_CATEGORY)
+                {
+                    LLPanelMainInventory::newFolderWindow(obj_id);
+                }
+                else
+                {
+                    LLPanelMainInventory::newFolderWindow(obj->getParentUUID(), obj_id);
+                }
+            }
+        }
+        else
+        {
+            // Highlight item
+            // Only show if either ShowInInventory is true OR it is an inventory
+            // offer from an agent and the asset is not previewable
+            const BOOL auto_open = gSavedSettings.getBOOL("ShowInInventory") || (manual_offer && !check_asset_previewable(asset_type));
+            if(auto_open)
+            {
+                LLFloaterReg::showInstance("inventory");
+            }
+            if (auto_open) LLInventoryPanel::openInventoryPanelAndSetSelection(auto_open, obj_id, true);
+        }
 	}
 }
 
@@ -1615,7 +1641,8 @@ void inventory_offer_mute_callback(const LLUUID& blocked_id,
 	LLMute mute(blocked_id, full_name, mute_type);
 	if (LLMuteList::getInstance()->add(mute))
 	{
-		LLPanelBlockedList::showPanelAndSelect(blocked_id);
+		LLFloaterBlocked::showMuteAndSelect(blocked_id);
+		//LLPanelBlockedList::showPanelAndSelect(blocked_id);
 	}
 
 	// purge the message queue of any previously queued inventory offers from the same source.
@@ -6385,42 +6412,47 @@ void container_inventory_arrived(LLViewerObject* object,
 	{
 		// create a new inventory category to put this in
 		LLUUID cat_id;
-		cat_id = gInventory.createNewCategory(gInventory.getRootFolderID(),
-											  LLFolderType::FT_NONE,
-											  LLTrans::getString("AcquiredItems"));
+		gInventory.createNewCategory(
+            gInventory.getRootFolderID(),
+            LLFolderType::FT_NONE,
+            LLTrans::getString("AcquiredItems"),
+            [inventory](const LLUUID &new_cat_id)
+        {
+            LLInventoryObject::object_list_t::const_iterator it = inventory->begin();
+            LLInventoryObject::object_list_t::const_iterator end = inventory->end();
+            for (; it != end; ++it)
+            {
+                if ((*it)->getType() != LLAssetType::AT_CATEGORY)
+                {
+                    LLInventoryObject* obj = (LLInventoryObject*)(*it);
+                    LLInventoryItem* item = (LLInventoryItem*)(obj);
+                    LLUUID item_id;
+                    item_id.generate();
+                    time_t creation_date_utc = time_corrected();
+                    LLPointer<LLViewerInventoryItem> new_item
+                        = new LLViewerInventoryItem(item_id,
+                            new_cat_id,
+                            item->getPermissions(),
+                            item->getAssetUUID(),
+                            item->getType(),
+                            item->getInventoryType(),
+                            item->getName(),
+                            item->getDescription(),
+                            LLSaleInfo::DEFAULT,
+                            item->getFlags(),
+                            creation_date_utc);
+                    new_item->updateServer(TRUE);
+                    gInventory.updateItem(new_item);
+                }
+            }
+            gInventory.notifyObservers();
 
-		LLInventoryObject::object_list_t::const_iterator it = inventory->begin();
-		LLInventoryObject::object_list_t::const_iterator end = inventory->end();
-		for ( ; it != end; ++it)
-		{
-			if ((*it)->getType() != LLAssetType::AT_CATEGORY)
-			{
-				LLInventoryObject* obj = (LLInventoryObject*)(*it);
-				LLInventoryItem* item = (LLInventoryItem*)(obj);
-				LLUUID item_id;
-				item_id.generate();
-				time_t creation_date_utc = time_corrected();
-				LLPointer<LLViewerInventoryItem> new_item
-					= new LLViewerInventoryItem(item_id,
-												cat_id,
-												item->getPermissions(),
-												item->getAssetUUID(),
-												item->getType(),
-												item->getInventoryType(),
-												item->getName(),
-												item->getDescription(),
-												LLSaleInfo::DEFAULT,
-												item->getFlags(),
-												creation_date_utc);
-				new_item->updateServer(TRUE);
-				gInventory.updateItem(new_item);
-			}
-		}
-		gInventory.notifyObservers();
-		if(active_panel)
-		{
-			active_panel->setSelection(cat_id, TAKE_FOCUS_NO);
-		}
+            LLInventoryPanel *active_panel = LLInventoryPanel::getActiveInventoryPanel();
+            if (active_panel)
+            {
+                active_panel->setSelection(new_cat_id, TAKE_FOCUS_NO);
+            }
+        });
 	}
 	else if (inventory->size() == 2)
 	{
@@ -7038,7 +7070,8 @@ bool callback_script_dialog(const LLSD& notification, const LLSD& response)
 		{
 			// This call opens the sidebar, displays the block list, and highlights the newly blocked
 			// object in the list so the user can see that their block click has taken effect.
-			LLPanelBlockedList::showPanelAndSelect(object_id);
+			//LLPanelBlockedList::showPanelAndSelect(object_id);
+			LLFloaterBlocked::showMuteAndSelect(object_id);
 		}
 	}
 

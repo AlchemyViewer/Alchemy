@@ -57,7 +57,6 @@
 #include "llviewerwindow.h"
 #include "lldrawable.h"
 #include "llfloaterinspect.h"
-#include "llfloaterproperties.h"
 #include "llfloaterreporter.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
@@ -1665,6 +1664,11 @@ void LLSelectMgr::dump()
 	{
 		LLViewerObject* objectp = (*iter)->getObject();
 		LL_INFOS() << "Object " << count << " type " << LLPrimitive::pCodeToString(objectp->getPCode()) << LL_ENDL;
+// [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
+		LL_INFOS() << "  isRoot " << objectp->isRoot() << LL_ENDL;
+		LL_INFOS() << "  idLocal " << objectp->getLocalID() << LL_ENDL;
+		LL_INFOS() << "  idGlobal " << objectp->getID() << LL_ENDL;
+// [/SL:KB]
 		LL_INFOS() << "  hasLSL " << objectp->flagScripted() << LL_ENDL;
 		LL_INFOS() << "  hasTouch " << objectp->flagHandleTouch() << LL_ENDL;
 		LL_INFOS() << "  hasMoney " << objectp->flagTakesMoney() << LL_ENDL;
@@ -1781,6 +1785,10 @@ bool LLObjectSelection::applyRestrictedPbrMaterialToTEs(LLViewerInventoryItem* i
     }
 
     LLUUID asset_id = item->getAssetUUID();
+    if (asset_id.isNull())
+    {
+        asset_id = LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID;
+    }
 
     bool material_copied_all_faces = true;
 
@@ -1980,6 +1988,10 @@ bool LLSelectMgr::selectionSetGLTFMaterial(const LLUUID& mat_id)
                     return false;
                 }
                 asset_id = mItem->getAssetUUID();
+                if (asset_id.isNull())
+                {
+                    asset_id = LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID;
+                }
             }
 
             // Blank out most override data on the object and send to server
@@ -6657,7 +6669,7 @@ S32 LLSelectNode::getLastSelectedTE() const
 	return mLastTESelected;
 }
 
-LLViewerObject* LLSelectNode::getObject()
+LLViewerObject* LLSelectNode::getObject() const
 {
 	if (!mObject)
 	{
@@ -6665,7 +6677,7 @@ LLViewerObject* LLSelectNode::getObject()
 	}
 	else if (mObject->isDead())
 	{
-		mObject = NULL;
+		mObject = nullptr;
 	}
 	return mObject;
 }
@@ -7069,8 +7081,6 @@ void dialog_refresh_all()
 	{
 		gMenuAttachmentOther->arrange();
 	}
-
-	LLFloaterProperties::dirtyAll();
 
 	LLFloaterInspect* inspect_instance = LLFloaterReg::findTypedInstance<LLFloaterInspect>("inspect");
 	if(inspect_instance)

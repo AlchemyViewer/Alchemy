@@ -1,15 +1,35 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="panel_profile_classified">
-	<panel.string name="type_mature">Moderate</panel.string>
-	<panel.string name="type_pg">General コンテンツ</panel.string>
-	<panel.string name="l$_price">L$[PRICE]</panel.string>
-	<panel.string name="click_through_text_fmt">[TELEPORT]テレポート、[MAP]マップ、[PROFILE]プロフィール</panel.string>
-	<panel.string name="date_fmt">[year,datetime,slt]年[mthnum,datetime,slt]月[day,datetime,slt]日</panel.string>
-	<panel.string name="auto_renew_on">有効</panel.string>
-	<panel.string name="auto_renew_off">無効</panel.string>
-	<panel.string name="location_notice">（掲載後更新）</panel.string>
-	<string name="publish_label">掲載</string>
-	<string name="save_label">保存</string>
+	<panel.string name="type_mature">
+		Moderate
+	</panel.string>
+	<panel.string name="type_pg">
+		Generalコンテンツ
+	</panel.string>
+	<panel.string name="l$_price">
+		L$ [PRICE]
+	</panel.string>
+	<panel.string name="click_through_text_fmt">
+		[TELEPORT]テレポート、[MAP]マップ、[PROFILE]プロフィール
+	</panel.string>
+	<panel.string name="date_fmt">
+		[year,datetime,slt]年[mthnum,datetime,slt]月[day,datetime,slt]日
+	</panel.string>
+	<panel.string name="auto_renew_on">
+		有効
+	</panel.string>
+	<panel.string name="auto_renew_off">
+		無効
+	</panel.string>
+	<panel.string name="location_notice">
+		（掲載後更新）
+	</panel.string>
+	<string name="publish_label">
+		掲載
+	</string>
+	<string name="save_label">
+		保存
+	</string>
 	<layout_stack name="main_classifieds_stack">
 		<layout_panel name="scroll_layout_panel">
 			<scroll_container name="profile_scroll">
@@ -18,7 +38,9 @@
 					<icon label="" name="edit_icon" tool_tip="クリックして画像を選択"/>
 					<layout_stack name="info_panel">
 						<layout_panel name="main_info_panel">
-							<text_editor name="classified_name">[name]</text_editor>
+							<text_editor name="classified_name">
+								[name]
+							</text_editor>
 							<text name="classified_location_label" value="場所："/>
 							<text_editor name="classified_location" value="[loading...]"/>
 							<text name="content_type_label" value="コンテンツの種類："/>
@@ -28,7 +50,9 @@
 							<text name="creation_date_label" value="制作日："/>
 							<text_editor name="creation_date" tool_tip="制作日" value="[date]"/>
 							<text name="price_for_listing_label" value="掲載料："/>
-							<text_editor name="price_for_listing" tool_tip="掲載料を入力します。">[PRICE]</text_editor>
+							<text_editor name="price_for_listing" tool_tip="掲載料を入力します。">
+								[PRICE]
+							</text_editor>
 						</layout_panel>
 						<layout_panel name="clickthrough_layout_panel">
 							<text name="click_through_label" value="クリック数："/>
@@ -44,10 +68,18 @@
 						</layout_panel>
 					</layout_stack>
 					<panel name="edit_panel">
-						<text name="Name:">タイトル：</text>
-						<text name="description_label">説明：</text>
-						<text name="location_label">場所：</text>
-						<text name="classified_location_edit">読み込んでいます…</text>
+						<text name="Name:">
+							タイトル：
+						</text>
+						<text name="description_label">
+							説明：
+						</text>
+						<text name="location_label">
+							場所：
+						</text>
+						<text name="classified_location_edit">
+							読み込んでいます…
+						</text>
 						<button label="現在地に設定" name="set_to_curr_location_btn"/>
 						<text name="category_label" value="カテゴリ："/>
 						<text name="content_type_label" value="コンテンツの種類："/>

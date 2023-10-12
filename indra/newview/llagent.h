@@ -866,7 +866,9 @@ public:
 	
 private:
 	BOOL			mShowAvatar; 		// Should we render the avatar?
+#if OPENSIM
 	U32				mAppearanceSerialNum;
+#endif
 
 	//--------------------------------------------------------------------
 	// Rendering state bitmap helpers

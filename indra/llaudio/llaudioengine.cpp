@@ -1139,7 +1139,6 @@ void LLAudioEngine::startNextTransfer()
 	if (asset_id.isNull())
 	{
 		max_pri = -1.f;
-		source_map::iterator source_iter;
 		for (source_map::value_type& source_pair : mAllSources)
 		{
 			asp = source_pair.second;
@@ -1910,6 +1909,16 @@ bool LLAudioData::load()
 		// Hrm.  Right now, let's unset the buffer, since it's empty.
 		gAudiop->cleanupBuffer(mBufferp);
 		mBufferp = NULL;
+
+		if (!gDirUtilp->fileExists(wav_path))
+		{
+			mHasLocalData = false;
+			mHasDecodedData = false;
+			mHasCompletedDecode = false;
+			mHasDecodeFailed = false;
+			mHasWAVLoadFailed = false;
+			gAudiop->preloadSound(mID);
+		}
 
 		return false;
 	}

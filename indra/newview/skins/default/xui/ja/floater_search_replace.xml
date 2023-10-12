@@ -7,8 +7,12 @@
 		<button label="置換え" name="replace_btn"/>
 		<button label="全て置換え" name="replace_all_btn"/>
 	</panel>
-	<text name="txt">検索</text>
-	<text name="txt2">置換え</text>
+	<text name="txt">
+		検索
+	</text>
+	<text name="txt2">
+		置換え
+	</text>
 	<line_editor name="search_text"/>
 	<line_editor name="replace_text"/>
 </floater>

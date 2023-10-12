@@ -434,12 +434,6 @@ static bool handleRenderDynamicLODChanged(const LLSD& newvalue)
 	return true;
 }
 
-static bool handleRenderLocalLightsChanged(const LLSD& newvalue)
-{
-	gPipeline.setLightingDetail(-1);
-	return true;
-}
-
 static bool handleReflectionProbeDetailChanged(const LLSD& newvalue)
 {
     if (gPipeline.isInit())
@@ -741,7 +735,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderFogRatio", handleFogRatioChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderMaxPartCount", handleMaxPartCountChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDynamicLOD", handleRenderDynamicLODChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderLocalLights", handleRenderLocalLightsChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaUseRMSE", handleSetShaderChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxRMSE", handleSetShaderChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxMid", handleSetShaderChanged);
@@ -754,7 +747,6 @@ void settings_setup_listeners()
 // [/SL:KB]
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeResolution", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShaderCacheEnabled", handleSetShaderChanged);

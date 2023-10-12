@@ -1201,11 +1201,11 @@ bool LLGLManager::initGL()
 		// Function will check all GPUs WMI knows of and will pick up the one with most
 		// memory. We need to check all GPUs because system can switch active GPU to
 		// weaker one, to preserve power when not under load.
-		S32 mem = LLDXHardware::getMBVideoMemoryViaDXGI();
+		U64 mem = LLDXHardware::getMBVideoMemoryViaDXGI();
 		if (mem != 0)
 		{
-			mVRAM = mem;
-			LL_INFOS("RenderInit") << "VRAM Detected (WMI):" << mVRAM<< LL_ENDL;
+			mVRAM = mem / (1024 * 1024);
+			LL_INFOS("RenderInit") << "VRAM Detected (DXGI):" << mVRAM<< LL_ENDL;
 		}
 	}
 #endif

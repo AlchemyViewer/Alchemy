@@ -53,6 +53,7 @@
 #include "llviewerwindow.h"
 #include "llfocusmgr.h"
 #include "llviewercontrol.h"
+#include "llviewermenufile.h"
 
 #include "roles_constants.h"
 #include "llfilepicker.h"
@@ -1959,18 +1960,25 @@ void LLPanelGroupMembersSubTab::handleBanMember()
 	handleEjectMembers();
 }
 
-
 void LLPanelGroupMembersSubTab::onExportMembersToCSV()
 {
 	if (mPendingMemberUpdate) return;
-	
+
 	LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupID);
-	LLFilePicker& file_picker = LLFilePicker::instance();
-	if (!file_picker.getSaveFile(LLFilePicker::FFSAVE_CSV, LLDir::getScrubbedFileName(gdatap->mName + "_members.csv")))
+	if (gdatap)
+	{
+		LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelGroupMembersSubTab::exportMembersToCSVCallback, this, _1), LLFilePicker::FFSAVE_CSV, LLDir::getScrubbedFileName(gdatap->mName + "_members.csv"));
+	}
+}
+
+void LLPanelGroupMembersSubTab::exportMembersToCSVCallback(const std::vector<std::string>& filenames)
+{
+	LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupID);
+	if (!gdatap)
 	{
 		return;
 	}
-	std::string fullpath = file_picker.getFirstFile();
+	std::string fullpath = filenames[0];
 	
 	LLAPRFile outfile;
 	outfile.open(fullpath, LL_APR_WB );

@@ -42,7 +42,7 @@
 				<menu_item_call label="スカート" name="Skirt"/>
 				<menu_item_call label="靴" name="Shoes"/>
 				<menu_item_call label="靴下" name="Socks"/>
-				<menu_item_call label="上着" name="Jacket"/>
+				<menu_item_call label="ジャケット" name="Jacket"/>
 				<menu_item_call label="手袋" name="Gloves"/>
 				<menu_item_call label="下着（上半身）" name="Self Undershirt"/>
 				<menu_item_call label="下着（下半身）" name="Self Underpants"/>
@@ -91,6 +91,7 @@
 			<menu_item_call label="購読…" name="Subscribe"/>
 			<menu_item_call label="プレミアム特典…" name="PremiumPerk"/>
 		</menu>
+		<menu_item_check label="ジェスチャー…" name="Gestures"/>
 		<menu_item_separator/>
 		<menu_item_check label="フレンド" name="My Friends"/>
 		<menu_item_check label="グループ" name="My Groups"/>
@@ -480,7 +481,7 @@
 			<menu_item_check label="スカルプト" name="Sculpt"/>
 			<menu label="テクスチャの密度" name="Texture Density">
 				<menu_item_check label="無し" name="None"/>
-				<menu_item_check label="原行" name="Current"/>
+				<menu_item_check label="現行" name="Current"/>
 				<menu_item_check label="望ましい" name="Desired"/>
 				<menu_item_check label="全て" name="Full"/>
 			</menu>
@@ -616,8 +617,8 @@
 			<menu_item_check label="エージェントの目標を表示する" name="Display Agent Target"/>
 			<menu_item_check label="インポスターの範囲を表示" name="Show Impostor Extents"/>
 			<!-- Appears not to exist anymore
-      <menu_item_check label="回転をデバッグ" name="Debug Rotation"/>
-      -->
+			<menu_item_check label="回転をデバッグ" name="Debug Rotation"/>
+			-->
 			<menu_item_call label="装着物のダンプ" name="Dump Attachments"/>
 			<menu_item_call label="アバターのテクスチャをデバッグ" name="Debug Avatar Textures"/>
 			<menu_item_call label="ローカルテクスチャをダンプ" name="Dump Local Textures"/>

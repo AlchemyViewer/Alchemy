@@ -37,7 +37,7 @@
 		<menu_item_call label="新しいアルファマスク" name="New Alpha Mask"/>
 		<menu_item_call label="新しいタトゥ" name="New Tattoo"/>
 		<menu_item_call label="新しいユニバーサル" name="New Universal"/>
-		<menu_item_call label="新規の物理作用" name="New Physics"/>
+		<menu_item_call label="新しい物理作用" name="New Physics"/>
 	</menu>
 	<menu label="新しい身体部位" name="New Body Parts">
 		<menu_item_call label="新しいシェイプ(体型)" name="New Shape"/>
@@ -50,7 +50,7 @@
 		<menu_item_call label="新しい水面" name="New Water"/>
 		<menu_item_call label="新しいデイサイクル" name="New Day Cycle"/>
 	</menu>
-	<menu label="次のデフォルトとして使用" name="upload_def">
+	<menu label="以下のデフォルトとして使用" name="upload_def">
 		<menu_item_call label="画像のアップロード" name="Image uploads"/>
 		<menu_item_call label="サウンドのアップロード" name="Sound uploads"/>
 		<menu_item_call label="アニメーションのアップロード" name="Animation uploads"/>
@@ -60,7 +60,7 @@
 	<menu label="種類を変更" name="Change Type">
 		<menu_item_call label="デフォルト" name="Default"/>
 		<menu_item_call label="手袋" name="Gloves"/>
-		<menu_item_call label="上着" name="Jacket"/>
+		<menu_item_call label="ジャケット" name="Jacket"/>
 		<menu_item_call label="ズボン" name="Pants"/>
 		<menu_item_call label="シェイプ" name="Shape"/>
 		<menu_item_call label="靴" name="Shoes"/>

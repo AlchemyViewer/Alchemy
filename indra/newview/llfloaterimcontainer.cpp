@@ -292,6 +292,9 @@ void LLFloaterIMContainer::onOpen(const LLSD& key)
 	LLMultiFloater::onOpen(key);
 	reSelectConversation();
 	assignResizeLimits();
+
+	LLFloaterIMSessionTab* session_floater = LLFloaterIMSessionTab::getConversation(mSelectedSession);
+	session_floater->onOpen(key);
 }
 
 // virtual
@@ -948,6 +951,9 @@ void LLFloaterIMContainer::reshapeFloaterAndSetResizeLimits(bool collapse, S32 d
 
 	setCanResize(at_least_one_panel_is_expanded);
 	setCanMinimize(at_least_one_panel_is_expanded);
+// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
+	setCanCollapse(at_least_one_panel_is_expanded);
+// [/SL:KB]
 
     assignResizeLimits();
 }

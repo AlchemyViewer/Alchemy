@@ -156,7 +156,7 @@
          control_name="AlchemyLookAtClampEnabled"
          disabled_control="AlchemyLookAtPrivate"
          height="16"
-         label="Limit Look At distance from avatar head"
+         label="Limit Look At Distance"
          layout="topleft"
          left="30"
          name="privatelookat"

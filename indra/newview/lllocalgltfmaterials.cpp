@@ -336,20 +336,37 @@ LLLocalGLTFMaterialMgr::~LLLocalGLTFMaterialMgr()
 
 S32 LLLocalGLTFMaterialMgr::addUnit(const std::vector<std::string>& filenames)
 {
+    mTimer.stopTimer();
     S32 add_count = 0;
+    LLUUID outid;
     std::vector<std::string>::const_iterator iter = filenames.begin();
     while (iter != filenames.end())
     {
         if (!iter->empty())
         {
-            add_count += addUnit(*iter);
+            add_count += addUnitInternal(*iter, outid);
         }
         iter++;
     }
+    mTimer.startTimer();
     return add_count;
 }
 
 S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename)
+{
+    LLUUID out;
+    return addUnit(filename, out);
+}
+
+S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename, LLUUID& outID)
+{
+    mTimer.stopTimer();
+    S32 res = addUnitInternal(filename, outID);
+    mTimer.startTimer();
+    return res;
+}
+
+S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID& outID)
 {
     tinygltf::Model model;
     LLTinyGLTFHelper::loadModel(filename, model);
@@ -372,6 +389,10 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename)
         if (unit->updateSelf())
         {
             mMaterialList.emplace_back(unit);
+            if(loaded_materials == 0)
+            {
+                outID = unit->getTrackingID();
+            }
             loaded_materials++;
         }
         else
@@ -413,6 +434,22 @@ void LLLocalGLTFMaterialMgr::delUnit(LLUUID tracking_id)
             unit = NULL;
         }
     }
+}
+
+LLUUID LLLocalGLTFMaterialMgr::getUnitID(const std::string& filename, S32 index)
+{
+    if (!mMaterialList.empty())
+    {
+        for (local_list_iter itBitmap = mMaterialList.begin(); mMaterialList.end() != itBitmap; ++itBitmap)
+        {
+            LLLocalGLTFMaterial* unit = *itBitmap;
+            if (filename == unit->getFilename() && index == unit->getIndexInFile())
+            {
+                return unit->getTrackingID();
+            }
+        }
+    }
+    return LLUUID::null;
 }
 
 LLUUID LLLocalGLTFMaterialMgr::getWorldID(LLUUID tracking_id)

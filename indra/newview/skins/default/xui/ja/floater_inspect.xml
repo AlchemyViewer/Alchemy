@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="inspect" title="オブジェクトの調査">
-	<floater.string name="timeStamp">[year,datetime,slt]年[mth,datetime,slt]月[day,datetime,slt]日（[wkday,datetime,slt]）[hour,datetime,slt]：[min,datetime,slt]：[second,datetime,slt]</floater.string>
-	<floater.string name="Group">（グループ）</floater.string>
-	<floater.string name="stats_list">全般のステータス：
+	<floater.string name="timeStamp">
+		[year,datetime,slt]年[mth,datetime,slt]月[day,datetime,slt]日（[wkday,datetime,slt]）[hour,datetime,slt]：[min,datetime,slt]：[second,datetime,slt]
+	</floater.string>
+	<floater.string name="Group">
+		（グループ）
+	</floater.string>
+	<floater.string name="stats_list">
+		全般のステータス：
 
 [NUM_OBJECTS]個のオブジェクト、
 [NUM_PRIMS]個のプリム
@@ -15,7 +20,8 @@
 
 テクスチャ数：[NUM_TEXTURES]個
 ＴＭｅｍ：[TEXTURE_MEMORY]㎅
-ＶＲＡＭ：[VRAM_USAGE]㎅</floater.string>
+ＶＲＡＭ：[VRAM_USAGE]㎅
+	</floater.string>
 	<text_editor name="linksetstats_text" value="（読み込んでいます…）"/>
 	<scroll_list name="object_list" tool_tip="このリストからオブジェクトを選択して、インワールドでハイライトします。">
 		<scroll_list.columns label="オブジェクト名" name="object_name"/>

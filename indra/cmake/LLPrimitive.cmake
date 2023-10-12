@@ -4,7 +4,6 @@
 include(Prebuilt)
 include(Boost)
 include(LibXML2)
-include(URIPARSER)
 include(ZLIBNG)
 
 include_guard()
@@ -29,9 +28,9 @@ if (WINDOWS)
     target_link_libraries(ll::colladadom INTERFACE 
 			  debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcollada14dom23-sd.lib
 			  optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcollada14dom23-s.lib
-			  ll::libxml2 ll::uriparser ll::minizip-ng )
+			  ll::boost ll::libxml2 ll::minizip-ng )
 elseif (DARWIN)
-    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::libxml2 ll::uriparser ll::minizip-ng)
+    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::boost ll::libxml2 ll::minizip-ng)
 elseif (LINUX)
-    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::libxml2 ll::uriparser ll::minizip-ng)
+    target_link_libraries(ll::colladadom INTERFACE collada14dom ll::boost ll::libxml2 ll::minizip-ng)
 endif()

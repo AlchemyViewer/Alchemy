@@ -1,28 +1,58 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="toolbox floater" short_title="ビルド" title="ビルドツール">
-	<floater.string name="grid_screen_text">スクリーン</floater.string>
-	<floater.string name="grid_local_text">ローカル</floater.string>
-	<floater.string name="grid_world_text">ワールド</floater.string>
-	<floater.string name="grid_reference_text">リファレンス</floater.string>
-	<floater.string name="grid_attachment_text">装着物</floater.string>
-	<floater.string name="status_rotate">色の付いた帯をドラッグすることでオブジェクトを回転できます。</floater.string>
-	<floater.string name="status_scale">クリック＆ドラッグで選択している面を伸ばします。</floater.string>
-	<floater.string name="status_move">ドラッグで移動、Shift＋ドラッグでコピーできます。</floater.string>
-	<floater.string name="status_modifyland">クリックしたままにすることで、地形を変化させることができます。</floater.string>
-	<floater.string name="status_camera">クリック＋ドラッグで視点移動できます。</floater.string>
-	<floater.string name="status_grab">ドラッグで移動、Ctrlで持ち上げ、Ctrl＋Shiftで回転させます。</floater.string>
-	<floater.string name="status_place">インワールドでクリックしてビルドします。</floater.string>
-	<floater.string name="status_selectland">土地をクリックし、ドラッグして選択します。</floater.string>
-	<floater.string name="status_selectcount">選択したオブジェクトは[OBJ_COUNT]個で、土地への負荷（ＬＩ）は[LAND_IMPACT]です。</floater.string>
-	<floater.string name="status_remaining_capacity">残りの許容数は[LAND_CAPACITY]です。</floater.string>
-	<floater.string name="link_number">リンク数：</floater.string>
-	<floater.string name="selected_faces">面数：</floater.string>
+	<floater.string name="grid_screen_text">
+		スクリーン</floater.string>
+	<floater.string name="grid_local_text">
+		ローカル</floater.string>
+	<floater.string name="grid_world_text">
+		ワールド</floater.string>
+	<floater.string name="grid_reference_text">
+		リファレンス</floater.string>
+	<floater.string name="grid_attachment_text">
+		装着物</floater.string>
+	<floater.string name="status_rotate">
+		色の付いた帯をドラッグすることでオブジェクトを回転できます。
+	</floater.string>
+	<floater.string name="status_scale">
+		クリック＆ドラッグで選択している面を伸ばします。
+	</floater.string>
+	<floater.string name="status_move">
+		ドラッグで移動、Shift＋ドラッグでコピーできます。
+	</floater.string>
+	<floater.string name="status_modifyland">
+		クリックしたままにすることで、地形を変化させることができます。
+	</floater.string>
+	<floater.string name="status_camera">
+		クリック＋ドラッグで視点移動できます。
+	</floater.string>
+	<floater.string name="status_grab">
+		ドラッグで移動、Ctrlで持ち上げ、Ctrl＋Shiftで回転させます。
+	</floater.string>
+	<floater.string name="status_place">
+		インワールドでクリックしてビルドします。
+	</floater.string>
+	<floater.string name="status_selectland">
+		土地をクリックし、ドラッグして選択します。
+	</floater.string>
+	<floater.string name="status_selectcount">
+		選択したオブジェクトは[OBJ_COUNT]個で、土地への負荷は[LAND_IMPACT]です。
+	</floater.string>
+	<floater.string name="status_remaining_capacity">残りの許容数は[LAND_CAPACITY]です。
+	</floater.string>
+	<floater.string name="link_number">
+		リンク数：
+	</floater.string>
+	<floater.string name="selected_faces">
+		面数：
+	</floater.string>
 	<button name="button focus" tool_tip="注視"/>
 	<button name="button move" tool_tip="移動"/>
 	<button name="button edit" tool_tip="編集"/>
 	<button name="button create" tool_tip="作成"/>
 	<button name="button land" tool_tip="地形"/>
-	<text name="text status">移動する場合ドラッグ、コピーするにはShiftキーを押しながらドラッグしてください。</text>
+	<text name="text status">
+		移動する場合ドラッグ、コピーするにはShiftキーを押しながらドラッグしてください。
+	</text>
 	<radio_group name="focus_radio_group">
 		<radio_item label="ズーム" name="radio zoom"/>
 		<radio_item label="旋回（Ctrl）" name="radio orbit"/>
@@ -85,49 +115,107 @@
 		<radio_item label="凸凹にする" name="radio noise"/>
 		<radio_item label="元に戻す" name="radio revert"/>
 	</radio_group>
-	<text name="Bulldozer:">ブルドーザー：</text>
-	<text name="Dozer Size:">影響範囲：</text>
-	<text name="Strength:">強度：</text>
+	<text name="Bulldozer:">
+		ブルドーザー：
+	</text>
+	<text name="Dozer Size:">
+		影響範囲：
+	</text>
+	<text name="Strength:">
+		強度：
+	</text>
 	<button label="適用" label_selected="適用" name="button apply to selection" tool_tip="選択した土地を修正します。"/>
-	<text name="link_num_obj_count" tool_tip="このリンク数は正確でない可能性があります。">[DESC]　[NUM]</text>
-	<text name="selection_empty">選択されていません。</text>
+	<text name="link_num_obj_count" tool_tip="このリンク数は正確でない可能性があります。">
+		[DESC]　[NUM]
+	</text>
+	<text name="selection_empty">
+		選択されていません。
+	</text>
 	<text name="selection_count"/>
-	<text name="remaining_capacity">[CAPACITY_STRING]　[secondlife:///app/openfloater/object_weights 詳細情報]</text>
+	<text name="remaining_capacity">
+		[CAPACITY_STRING]　[secondlife:///app/openfloater/object_weights 詳細情報]
+	</text>
 	<view_border name="cost_text_border"/>
 	<tab_container name="Object Info Tabs">
 		<panel label="一般" name="General">
-			<panel.string name="text deed continued">譲渡</panel.string>
-			<panel.string name="text deed">譲渡</panel.string>
-			<panel.string name="text modify info 1">このオブジェクトは、修正することができます。</panel.string>
-			<panel.string name="text modify info 2">これらのオブジェクトは、修正することができます。</panel.string>
-			<panel.string name="text modify info 3">このオブジェクトは、修正することができません。</panel.string>
-			<panel.string name="text modify info 4">これらのオブジェクトは、修正することができません。</panel.string>
-			<panel.string name="text modify info 5">リージョンの境界を越えて、このオブジェクトを修正することはできません。</panel.string>
-			<panel.string name="text modify info 6">リージョンの境界を越えて、これらのオブジェクトを修正することはできません。</panel.string>
-			<panel.string name="text modify warning">オブジェクト全体を選択して、権限の設定を行ってください。</panel.string>
-			<panel.string name="Cost Default">価格：L$</panel.string>
-			<panel.string name="Cost Total">合計：L$</panel.string>
-			<panel.string name="Cost Per Unit">単価：L$</panel.string>
-			<panel.string name="Cost Mixed">総額</panel.string>
-			<panel.string name="Sale Mixed">販売価格</panel.string>
-			<panel.string name="multiple selection">複数の選択</panel.string>
-			<text name="Name:">名前：</text>
+			<panel.string name="text deed continued">
+				再譲渡
+			</panel.string>
+			<panel.string name="text deed">
+				譲渡
+			</panel.string>
+			<panel.string name="text modify info 1">
+				このオブジェクトは、修正することができます。
+			</panel.string>
+			<panel.string name="text modify info 2">
+				これらのオブジェクトは、修正することができます。
+			</panel.string>
+			<panel.string name="text modify info 3">
+				このオブジェクトは、修正することができません。
+			</panel.string>
+			<panel.string name="text modify info 4">
+				これらのオブジェクトは、修正することができません。
+			</panel.string>
+			<panel.string name="text modify info 5">
+				リージョンの境界を越えて、このオブジェクトを修正することはできません。
+			</panel.string>
+			<panel.string name="text modify info 6">
+				リージョンの境界を越えて、これらのオブジェクトを修正することはできません。
+			</panel.string>
+			<panel.string name="text modify warning">
+				オブジェクト全体を選択して、権限の設定を行ってください。
+			</panel.string>
+			<panel.string name="Cost Default">
+				価格：L$
+			</panel.string>
+			<panel.string name="Cost Total">
+				合計：L$
+			</panel.string>
+			<panel.string name="Cost Per Unit">
+				単価：L$
+			</panel.string>
+			<panel.string name="Cost Mixed">
+				総額
+			</panel.string>
+			<panel.string name="Sale Mixed">
+				販売価格
+			</panel.string>
+			<panel.string name="multiple selection">
+				複数の選択
+			</panel.string>
+			<text name="Name:">
+				名前：
+			</text>
 			<line_editor name="Object Name" tool_tip="使用できる名前の文字数は最大６３文字までです。長いプリム名は短縮されます。名前に使用できる文字は、ASCII-7（非拡張）に含まれる印字可能な文字のみです。（パイプ文字「|」は例外）"/>
-			<text name="Description:">説明：</text>
+			<text name="Description:">
+				説明：
+			</text>
 			<line_editor name="Object Description" tool_tip="ビューアの設定で「すべてのオブジェクト上でヒントを表示」が選択されている場合、オブジェクトにマウスのポインタをかざすと、そのオブジェクトの説明がポップアップ表示されます。プリムの説明は最大 127 バイトまでに制限されているため、それよりも長い文字列は切り捨てられます。"/>
-			<text name="Creator:">制作者：</text>
+			<text name="Creator:">
+				制作者：
+			</text>
 			<!-- *NOTE: Intentionally wide for long names -->
-			<text name="Creator Name">テスト文字列です。（無視してください）</text>
-			<text name="Owner:">所有者：</text>
+			<text name="Creator Name">
+				テスト文字列です。（無視してください）
+			</text>
+			<text name="Owner:">
+				所有者：
+			</text>
 			<!-- *NOTE: Intentionally wide for long names -->
-			<text name="Owner Name">テスト文字列です。（無視してください）</text>
-			<text name="Group:">グループ：</text>
+			<text name="Owner Name">
+				テスト文字列です。（無視してください）
+			</text>
+			<text name="Group:">
+				グループ：
+			</text>
 			<button name="button set group" tool_tip="このオブジェクトの権限を共有するグループを選択します。"/>
 			<name_box initial_value="読み込んでいます…" name="Group Name Proxy"/>
 			<button label="設定…" label_selected="設定…" name="button set group" tool_tip="このオブジェクト権限を共有したいグループを選択します。"/>
 			<check_box label="共有" name="checkbox share with group" tool_tip="設定したグループのメンバー全員に、このオブジェクトの修正権限を与えます。譲渡しない限り、役割による制限は有効にできません。"/>
 			<button label="譲渡" label_selected="譲渡" name="button deed" tool_tip="このアイテムを譲渡すると「次の所有者」の権限が適用されます。グループ共有オブジェクトは、グループのオフィサーが譲渡できます。"/>
-			<text name="label click action">クリックで：</text>
+			<text name="label click action">
+				クリックで：
+			</text>
 			<combo_box name="clickaction" tool_tip="左クリック１回でオブジェクトにインタラクトすることができます。各クリック操作には、その動作を示す特別なカーソルがあります。いくつかのクリック動作には、機能するための条件があります。例えば、「触る」や「支払う」にはスクリプトが必要です。">
 				<combo_box.item label="触る（デフォルト）" name="Touch/grab(default)"/>
 				<combo_box.item label="オブジェクトに座る" name="Sitonobject"/>
@@ -152,12 +240,18 @@
 			</combo_box>
 			<check_box label="検索に表示" name="search_check" tool_tip="検索結果にこのオブジェクトを表示します。"/>
 			<panel name="perms_build">
-				<text name="perm_modify">あなたは、このオブジェクトを修正することができます。</text>
-				<text name="Anyone can:">全員：</text>
+				<text name="perm_modify">
+					あなたは、このオブジェクトを修正することができます。
+				</text>
+				<text name="Anyone can:">
+					全員：
+				</text>
 				<check_box label="移動" name="checkbox allow everyone move" tool_tip="オブジェクトは誰でも動かすことができます。"/>
 				<check_box label="コピー" name="checkbox allow everyone copy" tool_tip="オブジェクトのコピーは誰でも受け取ることができます。オブジェクトとそのオブジェクトの中身はすべて、コピーまたは譲渡できるように設定する必要があります。"/>
 				<check_box label="エクスポート" name="checkbox allow export"/>
-				<text name="Next owner can:">次の所有者：</text>
+				<text name="Next owner can:">
+					次の所有者：
+				</text>
 				<check_box label="修正" name="checkbox next owner can modify" tool_tip="次の所有者は、アイテム名などのプロパティ内容を編集したり、このオブジェクトのサイズを変更することができます。"/>
 				<check_box label="コピー" name="checkbox next owner can copy" tool_tip="次の所有者は、このオブジェクトを無制限にコピーできます。コピーには制作者の情報が含まれ、コピー元のアイテムと異なり許可設定などに制約があります。"/>
 				<check_box label="再販・譲渡" name="checkbox next owner can transfer" tool_tip="次の所有者は、このオブジェクトを他人に譲渡したり再販することができます。"/>
@@ -171,7 +265,9 @@
 				<text name="F:">Ｆ：</text>
 			</panel>
 			<panel name="pathfinding_attrs_panel">
-				<text name="pathfinding_attributes_label">経路探索属性：</text>
+				<text name="pathfinding_attributes_label">
+					経路探索属性：
+				</text>
 				<text name="pathfinding_attributes_value"/>
 			</panel>
 		</panel>
@@ -182,17 +278,23 @@
 			<check_box label="一時的" name="Temporary Checkbox Ctrl" tool_tip="作成から１分後にオブジェクトを削除します。"/>
 			<check_box label="ファントム" name="Phantom Checkbox Ctrl" tool_tip="オブジェクトが他のオブジェクトやアバターと衝突しないようにします。"/>
 			<view_border name="object_horizontal"/>
-			<text name="label position">位置（メートル）</text>
+			<text name="label position">
+				位置（メートル）
+			</text>
 			<spinner label="Ｘ" name="Pos X"/>
 			<spinner label="Ｙ" name="Pos Y"/>
 			<spinner label="Ｚ" name="Pos Z"/>
 			<menu_button name="clipboard_pos_btn" tool_tip="ペーストオプション"/>
-			<text name="label size">サイズ（メートル）</text>
+			<text name="label size">
+				サイズ（メートル）
+			</text>
 			<spinner label="Ｘ" name="Scale X"/>
 			<spinner label="Ｙ" name="Scale Y"/>
 			<spinner label="Ｚ" name="Scale Z"/>
 			<menu_button name="clipboard_size_btn" tool_tip="ペーストオプション"/>
-			<text name="label rotation">回転（角度）</text>
+			<text name="label rotation">
+				回転（角度）
+			</text>
 			<spinner label="Ｘ" name="Rot X"/>
 			<spinner label="Ｙ" name="Rot Y"/>
 			<spinner label="Ｚ" name="Rot Z"/>
@@ -228,46 +330,76 @@
 				<combo_item name="Path33Profile5" value="Path33Profile5" label="３３→半円"/>
 				<!-- End Working33 by Gregory Maurer -->
 			</combo_box>
-			<text name="text cut">パスカット（始点と終点）</text>
+			<text name="text cut">
+				パスカット（始点と終点）
+			</text>
 			<spinner label="始" name="cut begin"/>
 			<spinner label="終" name="cut end"/>
-			<text name="text hollow">中空（空洞）</text>
-			<text name="text skew">傾斜</text>
+			<text name="text hollow">
+				中空（空洞）
+			</text>
+			<text name="text skew">
+				傾斜
+			</text>
 			<spinner name="Scale 1"/>
 			<spinner name="Skew"/>
-			<text name="Hollow Shape">中空の形状</text>
+			<text name="Hollow Shape">
+				中空の形状
+			</text>
 			<combo_box name="hole">
 				<combo_box.item label="デフォルト" name="Default"/>
 				<combo_box.item label="円形" name="Circle"/>
 				<combo_box.item label="正方形" name="Square"/>
 				<combo_box.item label="三角形" name="Triangle"/>
 			</combo_box>
-			<text name="text twist">ひねり（始点と終点）</text>
+			<text name="text twist">
+				ひねり（始点と終点）
+			</text>
 			<spinner label="始" name="Twist Begin"/>
 			<spinner label="終" name="Twist End"/>
-			<text name="scale_taper">テーパー</text>
-			<text name="scale_hole">穴のサイズ</text>
+			<text name="scale_taper">
+				テーパー
+			</text>
+			<text name="scale_hole">
+				穴のサイズ
+			</text>
 			<spinner label="Ｘ" name="Taper Scale X"/>
 			<spinner label="Ｙ" name="Taper Scale Y"/>
-			<text name="text topshear">上部層</text>
+			<text name="text topshear">
+				上部層
+			</text>
 			<spinner label="Ｘ" name="Shear X"/>
 			<spinner label="Ｙ" name="Shear Y"/>
-			<text name="advanced_cut">側面カット（始点と終点）</text>
-			<text name="advanced_dimple">くぼみ（始点と終点）</text>
-			<text name="advanced_slice">切り取り（始点と終点）</text>
+			<text name="advanced_cut">
+				側面カット（始点と終点）
+			</text>
+			<text name="advanced_dimple">
+				くぼみ（始点と終点）
+			</text>
+			<text name="advanced_slice">
+				切り取り（始点と終点）
+			</text>
 			<spinner label="始" name="Path Limit Begin"/>
 			<spinner label="終" name="Path Limit End"/>
-			<text name="text taper2" tool_tip="すべてのプリムタイプに対応しているとは限りません。">側面のテーパー</text>
+			<text name="text taper2" tool_tip="すべてのプリムタイプに対応しているとは限りません。">
+				側面のテーパー
+			</text>
 			<spinner label="Ｘ" name="Taper X"/>
 			<spinner label="Ｙ" name="Taper Y"/>
-			<text name="text radius delta">半径</text>
-			<text name="text revolutions">回転体</text>
+			<text name="text radius delta">
+				半径
+			</text>
+			<text name="text revolutions">
+				回転体
+			</text>
 			<spinner name="Radius Offset"/>
 			<spinner name="Revolutions"/>
 			<texture_picker label="スカルプトテクスチャ" name="sculpt texture control" tool_tip="画像を選択してください。"/>
 			<check_box label="ミラー" name="sculpt mirror control" tool_tip="スカルプトプリムをＸ軸に沿って反転させます。"/>
 			<check_box label="裏返す" name="sculpt invert control" tool_tip="スカルプトプリムの法線を反転し、裏返しに見えるようにします。"/>
-			<text name="label sculpt type">縫い目の種類</text>
+			<text name="label sculpt type">
+				縫い目の種類
+			</text>
 			<combo_box name="sculpt type control" tool_tip="「なし」オプションは、「平面」と同一であるため削除されました。">
 				<combo_box.item label="球体" name="Sphere"/>
 				<combo_box.item label="円環体" name="Torus"/>
@@ -276,11 +408,21 @@
 			</combo_box>
 		</panel>
 		<panel label="特徴" name="Features">
-			<panel.string name="None">なし</panel.string>
-			<panel.string name="Prim">プリム</panel.string>
-			<panel.string name="Convex Hull">凸包</panel.string>
-			<text name="select_single">プリムを１つだけ選択して編集してください。</text>
-			<text name="edit_object">オブジェクトの特徴を編集：</text>
+			<panel.string name="None">
+				なし
+			</panel.string>
+			<panel.string name="Prim">
+				プリム
+			</panel.string>
+			<panel.string name="Convex Hull">
+				凸包
+			</panel.string>
+			<text name="select_single">
+				プリムを１つだけ選択して編集してください。
+			</text>
+			<text name="edit_object">
+				オブジェクトの特徴を編集：
+			</text>
 			<check_box label="アニメーションメッシュ" name="Animated Mesh Checkbox Ctrl" tool_tip="リグ入りメッシュオブジェクトを、それぞれアニメーションさせることができるようになります。"/>
 			<check_box label="フレキシブルパス" name="Flexible1D Checkbox Ctrl" tool_tip="Ｚ軸を中心に、オブジェクトの屈曲を有効にします。（クライアント側のみ）"/>
 			<spinner label="柔軟性" name="FlexNumSections"/>
@@ -310,7 +452,9 @@
 			<check_box label="動的" name="Probe Dynamic" tool_tip="有効にすると、アバターはこのプローブ範囲内の反射に影響されて表示されます。"/>
 			<spinner label="雰囲気" name="Probe Ambiance"/>
 			<spinner label="ニアクリップ" name="Probe Near Clip"/>
-			<text name="label physicsshapetype">物理的形状の種類：</text>
+			<text name="label physicsshapetype">
+				物理的形状の種類：
+			</text>
 			<combo_box name="Physics Shape Type Combo Ctrl" tool_tip="物理的形状の種類を選択してください。"/>
 			<combo_box name="material">
 				<combo_box.item label="石" name="Stone"/>
@@ -333,15 +477,25 @@
 		</panel>
 	</tab_container>
 	<panel name="land info panel">
-		<text name="label_parcel_info">区画情報</text>
-		<text name="label_area_price">価格：[AREA]㎡　L$ [PRICE]</text>
-		<text name="label_area">面積：[AREA]㎡</text>
+		<text name="label_parcel_info">
+			区画情報
+		</text>
+		<text name="label_area_price">
+			価格：[AREA]㎡　L$ [PRICE]
+		</text>
+		<text name="label_area">
+			面積：[AREA]㎡
+		</text>
 		<button label="土地情報" label_selected="土地情報" name="button about land"/>
 		<check_box label="所有者を表示" name="checkbox show owners" tool_tip="区画の境界に色をつけます：緑色＝あなたの所有地　水色＝あなたのグループの所有地　赤色＝他人の所有地　黄色＝販売中の土地　紫色＝オークション中の土地　灰色＝公共の土地"/>
-		<text name="label_parcel_modify">区画の編集</text>
+		<text name="label_parcel_modify">
+			区画の編集
+		</text>
 		<button label="分離" label_selected="分離" name="button subdivide land"/>
 		<button label="結合" label_selected="結合" name="button join land"/>
-		<text name="label_parcel_trans">土地の取引</text>
+		<text name="label_parcel_trans">
+			土地の取引
+		</text>
 		<button label="土地の購入" label_selected="土地の購入" name="button buy land"/>
 		<button label="土地の放棄" label_selected="土地の放棄" name="button abandon land"/>
 	</panel>

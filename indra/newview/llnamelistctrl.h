@@ -147,7 +147,11 @@ public:
 					 BOOL enabled = TRUE, const std::string& suffix = LLStringUtil::null, const std::string& prefix = LLStringUtil::null);
 	LLScrollListItem* addNameItem(NameItem& item, EAddPosition pos = ADD_BOTTOM);
 
-	/*virtual*/ LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL);
+//	/*virtual*/ LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL);
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+	LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = nullptr) override;
+	LLScrollListItem* addElement(const LLSD& element, const LLScrollListItem::commit_signal_t::slot_type& cb, EAddPosition pos = ADD_BOTTOM) override;
+// [/SL:KB]
 	LLScrollListItem* addNameItemRow(const NameItem& value, EAddPosition pos = ADD_BOTTOM, const std::string& suffix = LLStringUtil::null,
 																							const std::string& prefix = LLStringUtil::null);
 
@@ -169,18 +173,18 @@ public:
 	/*virtual*/ BOOL	handleDragAndDrop(S32 x, S32 y, MASK mask,
 									  BOOL drop, EDragAndDropType cargo_type, void *cargo_data,
 									  EAcceptance *accept,
-									  std::string& tooltip_msg);
-	/*virtual*/ BOOL handleToolTip(S32 x, S32 y, MASK mask);
+									  std::string& tooltip_msg) override;
+	/*virtual*/ BOOL handleToolTip(S32 x, S32 y, MASK mask) override;
 
 	void setAllowCallingCardDrop(BOOL b) { mAllowCallingCardDrop = b; }
 
 	void sortByName(BOOL ascending);
 
-	/*virtual*/ void updateColumns(bool force_update);
+	/*virtual*/ void updateColumns(bool force_update) override;
 
-	/*virtual*/ void mouseOverHighlightNthItem( S32 index );
+	/*virtual*/ void mouseOverHighlightNthItem( S32 index ) override;
 
-    /*virtual*/ BOOL handleRightMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
     bool isSpecialType() { return (mNameListType == SPECIAL); }
 

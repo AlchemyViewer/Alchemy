@@ -88,9 +88,6 @@ Remove Friend
   </panel>
   <layout_stack
    name="layout"
-   bg_opaque_color="PanelDefaultBackgroundColor"
-   background_visible="true"
-   background_opaque="true"
    orientation="vertical"
    follows="all"
    left="6"

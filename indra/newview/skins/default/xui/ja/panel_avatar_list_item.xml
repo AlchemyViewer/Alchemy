@@ -4,13 +4,27 @@
 	Strings used to localize last interaction time.
 	See last_interaction textbox below.
 	-->
-	<string name="FormatSeconds">[COUNT]秒</string>
-	<string name="FormatMinutes">[COUNT]分</string>
-	<string name="FormatHours">[COUNT]時間</string>
-	<string name="FormatDays">[COUNT]日</string>
-	<string name="FormatWeeks">[COUNT]週間</string>
-	<string name="FormatMonths">[COUNT]ヶ月</string>
-	<string name="FormatYears">[COUNT]年</string>
+	<string name="FormatSeconds">
+		[COUNT]秒
+	</string>
+	<string name="FormatMinutes">
+		[COUNT]分
+	</string>
+	<string name="FormatHours">
+		[COUNT]時間
+	</string>
+	<string name="FormatDays">
+		[COUNT]日
+	</string>
+	<string name="FormatWeeks">
+		[COUNT]週間
+	</string>
+	<string name="FormatMonths">
+		[COUNT]ヶ月
+	</string>
+	<string name="FormatYears">
+		[COUNT]年
+	</string>
 	<!--
 	*NOTE: llavatarlistitem.cpp lays these controls out depending on which
 	ones are visible. Trying to change their order here will break it

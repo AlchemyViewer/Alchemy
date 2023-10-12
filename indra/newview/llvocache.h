@@ -130,7 +130,7 @@ public:
 
 	void dump() const;
 	S32 writeToBuffer(U8 *data_buffer) const;
-	LLDataPackerBinaryBuffer *getDP();
+	LLDataPackerBinaryBuffer *getDP() const;
 	void recordHit();
 	void recordDupe() { mDupeCount++; }
 	
@@ -169,6 +169,11 @@ public:
 
     typedef std::unordered_map<U32, LLGLTFOverrideCacheEntry>  vocache_gltf_overrides_map_t;
 
+// [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
+	vocache_entry_set_t::const_iterator getChildrenBegin() const { return mChildrenList.begin(); }
+	vocache_entry_set_t::const_iterator getChildrenEnd() const { return mChildrenList.end(); }
+// [/SL:KB]
+
 	S32                         mLastCameraUpdated;
 protected:
 	U32							mLocalID;
@@ -178,7 +183,7 @@ protected:
 	S32							mHitCount;
 	S32							mDupeCount;
 	S32							mCRCChangeCount;
-	LLDataPackerBinaryBuffer	mDP;
+	mutable LLDataPackerBinaryBuffer	mDP;
 	U8							*mBuffer;
 
 	F32                         mSceneContrib; //projected scene contributuion of this object.

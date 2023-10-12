@@ -69,22 +69,16 @@
    sort_column="0">
    <scroll_list.columns
     name="region_label"
-    label="Label"
-    dynamicwidth="true"
-    width="100" />
+    label="Label"/>
    <scroll_list.columns 
     name="region_maturity_icon"
-    dynamicwidth="true"
     width="26" />
    <scroll_list.columns 
     name="region_name"
-    label="Region"
-    dynamicwidth="true"
-    width="130" />
+    label="Region"/>
    <scroll_list.columns 
     name="region_agent_count"	
-    label="Count"	
-    dynamicwidth="true" 
-    width="30" />
+    label="Count"
+    width="50" />
   </scroll_list>
  </floater>

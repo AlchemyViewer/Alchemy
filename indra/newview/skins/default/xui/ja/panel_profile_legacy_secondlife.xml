@@ -3,16 +3,26 @@
 	<layout_stack >
 		<layout_panel name="avatar_info_top">
 			<texture_picker name="sl_profile_pic" tool_tip="プロフィール画像を選択してください。"/>
-			<text name="rezday_label">誕生日：</text>
+			<text name="rezday_label">
+				誕生日：
+			</text>
 			<icon tool_tip="ハッピー・Rezデー" name="cake"/>
-			<text name="online">オンライン</text>
+			<text name="online">
+				オンライン
+			</text>
 			<icon name="account_type_internal"/>
 			<icon name="account_type_premium"/>
 			<icon name="account_type_plus"/>
-			<text name="rezday">（不明）</text>
+			<text name="rezday">
+				（不明）
+			</text>
 			<text name="account_info"/>
-			<text name="partner_label">パートナー：</text>
-			<text name="partner_info">secondlife:///app/agent/00000000-0000-0000-0000-000000000000/inspect</text>
+			<text name="partner_label">
+				パートナー：
+			</text>
+			<text name="partner_info">
+				secondlife:///app/agent/00000000-0000-0000-0000-000000000000/inspect
+			</text>
 		</layout_panel>
 		<layout_panel name="avatar_desc">
 			<text_editor name="sl_about"/>
@@ -20,7 +30,9 @@
 			<line_editor name="www_edit"/>
 		</layout_panel>
 		<layout_panel name="avatar_perm">
-			<text name="permissions_label">このアバターに許可すること：</text>
+			<text name="permissions_label">
+				このアバターに許可すること：
+			</text>
 			<check_box label="自分のオンライン状況" name="allow_show_online"/>
 			<check_box label="ワールドマップから自分を見つける" name="allow_mapping"/>
 			<check_box label="自分のオブジェクトの編集、削除、取得" name="allow_object_perms"/>

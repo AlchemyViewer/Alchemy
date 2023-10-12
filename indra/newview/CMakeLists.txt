@@ -177,6 +177,7 @@ set(viewer_SOURCE_FILES
     lldebugview.cpp
     lldeferredsounds.cpp
     lldelayedgestureerror.cpp
+    llderenderlist.cpp
     lldirpicker.cpp
     lldonotdisturbnotificationstorage.cpp
     lldndbutton.cpp
@@ -229,6 +230,7 @@ set(viewer_SOURCE_FILES
     llfloaterbanduration.cpp
     llfloaterbeacons.cpp
     llfloaterbigpreview.cpp
+    llfloaterblocked.cpp
     llfloaterbuildoptions.cpp
     llfloaterbulkpermission.cpp
     llfloaterbump.cpp
@@ -239,6 +241,7 @@ set(viewer_SOURCE_FILES
     llfloaterbuyland.cpp
     llfloatercamera.cpp
     llfloatercamerapresets.cpp
+    llfloaterchangeitemthumbnail.cpp
     llfloaterchatalerts.cpp
     llfloaterchatvoicevolume.cpp
     llfloaterclassified.cpp
@@ -279,6 +282,7 @@ set(viewer_SOURCE_FILES
     llfloaterimsession.cpp
     llfloaterimcontainer.cpp
     llfloaterinspect.cpp
+    llfloaterinventorysettings.cpp
     llfloaterjoystick.cpp
     llfloaterlagmeter.cpp
     llfloaterland.cpp
@@ -301,10 +305,9 @@ set(viewer_SOURCE_FILES
     llfloaternewlocalinventory.cpp
     llfloaternotificationsconsole.cpp
     llfloaternotificationstabbed.cpp
-    llfloateroutfitphotopreview.cpp 
     llfloaterobjectweights.cpp
     llfloateropenobject.cpp
-    llfloatersimpleoutfitsnapshot.cpp
+    llfloatersimplesnapshot.cpp
     llfloaterpathfindingcharacters.cpp
     llfloaterpathfindingconsole.cpp
     llfloaterpathfindinglinksets.cpp
@@ -320,7 +323,6 @@ set(viewer_SOURCE_FILES
     llfloaterpreviewtrash.cpp
     llfloaterprofiletexture.cpp
     llfloaterprogressview.cpp
-    llfloaterproperties.cpp
     llfloaterpublishclassified.cpp
     llfloaterregiondebugconsole.cpp
     llfloaterregioninfo.cpp
@@ -398,10 +400,13 @@ set(viewer_SOURCE_FILES
     llinspectgroup.cpp
     llinspectobject.cpp
     llinspectremoteobject.cpp
+    llinspecttexture.cpp
     llinspecttoast.cpp
     llinventorybridge.cpp
     llinventoryfilter.cpp
     llinventoryfunctions.cpp
+    llinventorygallery.cpp
+    llinventorygallerymenu.cpp
     llinventoryicon.cpp
     llinventoryitemslist.cpp
     llinventorylistitem.cpp
@@ -646,6 +651,7 @@ set(viewer_SOURCE_FILES
     lltextureinfodetails.cpp
     lltexturestats.cpp
     lltextureview.cpp
+    llthumbnailctrl.cpp
     lltinygltfhelper.cpp
     lltoast.cpp
     lltoastalertpanel.cpp
@@ -898,6 +904,7 @@ set(viewer_HEADER_FILES
     lldebugview.h
     lldeferredsounds.h
     lldelayedgestureerror.h
+    llderenderlist.h
     lldirpicker.h
     lldonotdisturbnotificationstorage.h
     lldndbutton.h
@@ -950,6 +957,7 @@ set(viewer_HEADER_FILES
     llfloaterbanduration.h
     llfloaterbeacons.h
     llfloaterbigpreview.h
+    llfloaterblocked.h
     llfloaterbuildoptions.h
     llfloaterbulkpermission.h
     llfloaterbump.h
@@ -959,6 +967,7 @@ set(viewer_HEADER_FILES
     llfloaterbuycurrencyhtml.h
     llfloaterbuyland.h
     llfloatercamerapresets.h
+    llfloaterchangeitemthumbnail.h
     llfloatercamera.h
     llfloaterchatalerts.h
     llfloaterchatvoicevolume.h
@@ -1003,6 +1012,7 @@ set(viewer_HEADER_FILES
     llfloaterimsession.h
     llfloaterimcontainer.h
     llfloaterinspect.h
+    llfloaterinventorysettings.h
     llfloaterjoystick.h
     llfloaterlagmeter.h
     llfloaterland.h
@@ -1025,10 +1035,9 @@ set(viewer_HEADER_FILES
     llfloaternewlocalinventory.h
     llfloaternotificationsconsole.h
     llfloaternotificationstabbed.h
-    llfloateroutfitphotopreview.h
     llfloaterobjectweights.h
     llfloateropenobject.h
-    llfloatersimpleoutfitsnapshot.h
+    llfloatersimplesnapshot.h
     llfloaterpathfindingcharacters.h
     llfloaterpathfindingconsole.h
     llfloaterpathfindinglinksets.h
@@ -1044,7 +1053,6 @@ set(viewer_HEADER_FILES
     llfloaterpreviewtrash.h
     llfloaterprofiletexture.h
     llfloaterprogressview.h
-    llfloaterproperties.h
     llfloaterpublishclassified.h
     llfloaterregiondebugconsole.h
     llfloaterregioninfo.h
@@ -1120,10 +1128,13 @@ set(viewer_HEADER_FILES
     llinspectgroup.h
     llinspectobject.h
     llinspectremoteobject.h
+    llinspecttexture.h
     llinspecttoast.h
     llinventorybridge.h
     llinventoryfilter.h
     llinventoryfunctions.h
+    llinventorygallery.h
+    llinventorygallerymenu.h
     llinventoryicon.h
     llinventoryitemslist.h
     llinventorylistitem.h
@@ -1359,6 +1370,7 @@ set(viewer_HEADER_FILES
     lltextureinfodetails.h
     lltexturestats.h
     lltextureview.h
+    llthumbnailctrl.h
     lltinygltfhelper.h
     lltoast.h
     lltoastalertpanel.h

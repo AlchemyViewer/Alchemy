@@ -671,11 +671,11 @@
          label="Block List"
          name="Block List">
             <menu_item_check.on_check
-             function="SideTray.CheckPanelPeopleTab"
-             parameter="blocked_panel" />
+             function="Floater.Visible"
+             parameter="blocked" />
             <menu_item_check.on_click
-              function="SideTray.PanelPeopleTab"
-              parameter="blocked_panel" />
+             function="Floater.Toggle"
+             parameter="blocked" />
         </menu_item_check>
       <menu_item_separator/>
       <menu_item_check
@@ -3649,36 +3649,6 @@ function="World.EnvPreset"
                  function="ToggleControl"
                  parameter="TextureDisable" />
             </menu_item_check>
-            <menu_item_check
-              label="Disable Ambient"
-             name="Disable Ambient">
-            <menu_item_check.on_check
-             function="CheckControl"
-             parameter="AmbientDisable" />
-            <menu_item_check.on_click
-             function="ToggleShaderControl"
-             parameter="AmbientDisable" />
-          </menu_item_check>
-          <menu_item_check
-             label="Disable Sunlight"
-             name="Disable Sunlight">
-            <menu_item_check.on_check
-             function="CheckControl"
-             parameter="SunlightDisable" />
-            <menu_item_check.on_click
-             function="ToggleShaderControl"
-             parameter="SunlightDisable" />
-          </menu_item_check>
-          <menu_item_check
-             label="Disable Local Lights"
-             name="Disable Local Lights">
-            <menu_item_check.on_check
-             function="CheckControl"
-             parameter="LocalLightDisable" />
-            <menu_item_check.on_click
-             function="ToggleShaderControl"
-             parameter="LocalLightDisable" />
-          </menu_item_check>
             <menu_item_check
               label="Full Res Textures"
              name="Rull Res Textures">

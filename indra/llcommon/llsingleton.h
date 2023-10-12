@@ -113,7 +113,7 @@ protected:
 
     // delegate logging calls to llsingleton.cpp
 public:
-    typedef std::initializer_list<const std::string_view> string_params;
+    typedef std::initializer_list<const std::string> string_params;
 protected:
     static void logerrs  (const string_params&);
     static void logwarns (const string_params&);

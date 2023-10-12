@@ -1,50 +1,135 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="モデルのアップロード">
 	<string name="status_idle"/>
-	<string name="status_parse_error">エラー：DAEファイルに問題が見つかりました。‐詳細につきましてはログをご確認ください。</string>
-	<string name="status_bind_shape_orientation">警告：バインドシェイプマトリックスは、標準のＸ軸正方向にはありません。</string>
-	<string name="status_material_mismatch">エラー：モデルの材料は参考モデルのサブセットではありません。</string>
-	<string name="status_reading_file">読み込んでいます…</string>
-	<string name="status_generating_meshes">メッシュを作成しています…</string>
-	<string name="status_vertex_number_overflow">エラー：頂点の数が65534個を超えたので中止しました。</string>
-	<string name="bad_element">エラー：要素が無効です</string>
-	<string name="high">高</string>
-	<string name="medium">中</string>
-	<string name="low">低</string>
-	<string name="lowest">最低</string>
-	<string name="mesh_status_good">発送します！</string>
-	<string name="mesh_status_na">該当なし</string>
-	<string name="mesh_status_none">なし</string>
-	<string name="mesh_status_submesh_mismatch">テクスチャ編集可能な面の数は、描画詳細度に応じて異なります。</string>
-	<string name="mesh_status_mesh_mismatch">メッシュインスタンスの数は、描画詳細度に応じて異なります。</string>
-	<string name="mesh_status_too_many_vertices">描画詳細度に対して頂点の数が多すぎます。</string>
-	<string name="mesh_status_missing_lod">必要な描画詳細度が見つかりません。</string>
-	<string name="mesh_status_invalid_material_list">ＬｏＤ付きのマテリアルは、参考モデルのサブセットではありません。</string>
-	<string name="phys_status_vertex_limit_exceeded">一部の物理的な外殻構造が、頂点の制限を超えます。</string>
-	<string name="phys_status_degenerate_triangles">物理メッシュが密すぎるか、極小な三角形が含まれています。この問題を解決するには、分析／簡素化を使用します。</string>
-	<string name="layer_all">全て</string>	<!-- Text to display in physics layer combo box for "all layers" -->
-	<string name="decomposing">分析しています…</string>
-	<string name="simplifying">簡素化しています…</string>
-	<string name="tbd">未計算</string>
-	<!-- Warnings and info from model loader-->
-	<string name="TooManyJoint">ジョイントが多すぎるためスキニングが無効化されました：[MAX]個中[JOINTS]個</string>
-	<string name="UnrecognizedJoint">認識できないジョイント名をリグしようとしています：[NAME]</string>
-	<string name="UnknownJoints">[COUNT]個の不明なジョイントがあるためスキニングは無効化されました。</string>
-	<string name="ModelLoaded">[MODEL_NAME]モデルが読み込まれました。</string>
-	<string name="IncompleteTC">テクスチャの座標データが不完全です。</string>
-	<string name="PositionNaN">DAEモデルから位置データを読み込み時にNaNが見つかりました。このモデルは無効です。</string>
-	<string name="NormalsNaN">DAEモデルの法線マップ読み込み時にNaNが見つかりました。このモデルは無効です。</string>
-	<string name="NegativeScaleTrans">負のスケールが検出されました。domInstance_geometry要素の変換はサポートされていません：[LABEL]</string>
-	<string name="NegativeScaleNormTrans">負のスケールが検出されました。正規化後のdomInstance_geometry要素の変換はサポートされていません: [LABEL]</string>
-	<string name="CantResolveGeometryUrl">ジオメトリＵＲＬを解決することができませんでした。</string>
-	<string name="ParsingErrorBadElement">不正な要素です。</string>
-	<string name="ParsingErrorCantParseScene">シーンを解析できませんでした。</string>
-	<string name="ParsingErrorCorrupt">DAEファイルでエラーが見つかりました。‐ファイルが破損しているようです。</string>
-	<string name="ParsingErrorNoController">コントローラーを確認できませんでした。</string>
-	<string name="ParsingErrorNoDoc">内部ドキュメントが見つかりません。</string>
-	<string name="ParsingErrorNoRoot">ドキュメントにルートがありません。</string>
-	<string name="ParsingErrorNoScene">ドキュメントにvisual_scene要素がありません。</string>
-	<string name="ParsingErrorPositionInvalidModel">位置データがないのでメッシュを処理できません。無効なモデルです。</string>
+	<string name="status_parse_error">
+		エラー：DAEファイルに問題が見つかりました。‐詳細につきましてはログをご確認ください。
+	</string>
+	<string name="status_bind_shape_orientation">
+		警告：バインドシェイプマトリックスは、標準のＸ軸正方向にはありません。
+	</string>
+	<string name="status_material_mismatch">
+		エラー：モデルの材料は参考モデルのサブセットではありません。
+	</string>
+	<string name="status_reading_file">
+		読み込んでいます…
+	</string>
+	<string name="status_generating_meshes">
+		メッシュを作成しています…
+	</string>
+	<string name="status_vertex_number_overflow">
+		エラー：頂点の数が65534個を超えたので中止しました。
+	</string>
+	<string name="bad_element">
+		エラー：要素が無効です。
+	</string>
+	<string name="high">
+		高
+	</string>
+	<string name="medium">
+		中
+	</string>
+	<string name="low">
+		低
+	</string>
+	<string name="lowest">
+		最低
+	</string>
+	<string name="mesh_status_good">
+		発送できます！
+	</string>
+	<string name="mesh_status_na">
+		該当なし
+	</string>
+	<string name="mesh_status_none">
+		なし
+	</string>
+	<string name="mesh_status_submesh_mismatch">
+		テクスチャ編集可能な面の数は、描画詳細度に応じて異なります。
+	</string>
+	<string name="mesh_status_mesh_mismatch">
+		メッシュインスタンスの数は、描画詳細度に応じて異なります。
+	</string>
+	<string name="mesh_status_too_many_vertices">
+		描画詳細度に対して頂点の数が多すぎます。
+	</string>
+	<string name="mesh_status_missing_lod">
+		必要な描画詳細度が見つかりません。
+	</string>
+	<string name="mesh_status_invalid_material_list">
+		ＬｏＤ付きのマテリアルは、参考モデルのサブセットではありません。
+	</string>
+	<string name="phys_status_vertex_limit_exceeded">
+		一部の物理的な凸包が、頂点の制限を超えます。
+	</string>
+	<string name="phys_status_degenerate_triangles">
+		物理メッシュが密すぎるか、極小な三角形が含まれています。この問題を解決するには、分析／簡素化を使用します。
+	</string>
+	<string name="layer_all">
+		全て
+	</string>
+	<string name="decomposing">
+		分析しています…
+	</string>
+	<string name="simplifying">
+		簡素化しています…
+	</string>
+	<string name="tbd">
+		未計算
+	</string>
+	<string name="TooManyJoint">
+		ジョイントが多すぎるためスキニングが無効化されました：[MAX]個中[JOINTS]個
+	</string>
+	<string name="UnrecognizedJoint">
+		認識できないジョイント名をリグしようとしています：[NAME]
+	</string>
+	<string name="UnknownJoints">
+		[COUNT]個の不明なジョイントがあるためスキニングは無効化されました。
+	</string>
+	<string name="ModelLoaded">
+		[MODEL_NAME]モデルが読み込まれました。
+	</string>
+	<string name="IncompleteTC">
+		テクスチャの座標データが不完全です。
+	</string>
+	<string name="PositionNaN">
+		DAEモデルから位置データを読み込み時にNaNが見つかりました。このモデルは無効です。
+	</string>
+	<string name="NormalsNaN">
+		DAEモデルの法線マップ読み込み時にNaNが見つかりました。このモデルは無効です。
+	</string>
+	<string name="NegativeScaleTrans">
+		負のスケールが検出されました。domInstance_geometry要素の変換はサポートされていません：[LABEL]
+	</string>
+	<string name="NegativeScaleNormTrans">
+		負のスケールが検出されました。正規化後のdomInstance_geometry要素の変換はサポートされていません：[LABEL]
+	</string>
+	<string name="CantResolveGeometryUrl">
+		ジオメトリＵＲＬを解決することができませんでした。
+	</string>
+	<string name="ParsingErrorBadElement">
+		不正な要素です。
+	</string>
+	<string name="ParsingErrorCantParseScene">
+		シーンを解析できませんでした。
+	</string>
+	<string name="ParsingErrorCorrupt">
+		DAEファイルでエラーが見つかりました。‐ファイルが破損しているようです。
+	</string>
+	<string name="ParsingErrorNoController">
+		コントローラーを確認できませんでした。
+	</string>
+	<string name="ParsingErrorNoDoc">
+		内部ドキュメントが見つかりません。
+	</string>
+	<string name="ParsingErrorNoRoot">
+		ドキュメントにルートがありません。
+	</string>
+	<string name="ParsingErrorNoScene">
+		ドキュメントにvisual_scene要素がありません。
+	</string>
+	<string name="ParsingErrorPositionInvalidModel">
+		位置データがないのでメッシュを処理できません。無効なモデルです。
+	</string>
 	<panel name="left_panel">
 		<panel name="model_name_representation_panel">
 			<text name="name_label">モデル名：</text>
@@ -57,8 +142,8 @@
 			<panel label="ＬｏＤ" name="lod_panel" title="詳細度">
 				<view_border name="lod_tab_border"/>
 				<text name="source" value="ソース"/>
-				<text name="triangles" value="三角形の数"/>
-				<text name="vertices" value="頂点の数"/>
+				<text name="triangles" value="三角形数"/>
+				<text name="vertices" value="頂点数"/>
 				<text name="high_label" value="高"/>
 				<combo_box name="lod_source_high">
 					<item name="Load from file" label="ファイルから読み込む" value="Load from file"/>
@@ -150,15 +235,31 @@
 				<!-- ==== STEP 1: Level of Detail ==== -->
 				<view_border name="physics_tab_border"/>
 				<panel name="physics geometry">
-					<text name="first_step_name">ステップ１：物理モデルを指定：</text>
-					<combo_box name="physics_lod_combo" tool_tip="LOD to use for physics shape">
-						<combo_item name="choose_one">１つを選択…</combo_item>
-						<combo_item name="physics_high">高</combo_item>
-						<combo_item name="physics_medium">中</combo_item>
-						<combo_item name="physics_low">低</combo_item>
-						<combo_item name="physics_lowest">最低</combo_item>
-						<combo_item name="physics_bounding_box">バウンディングボックス</combo_item>
-						<combo_item name="load_from_file">ファイルから</combo_item>
+					<text name="first_step_name">
+						ステップ１：描画詳細度
+					</text>
+					<combo_box name="physics_lod_combo" tool_tip="実像に適用するLOD">
+						<combo_item name="choose_one">
+							１つを選択…
+						</combo_item>
+						<combo_item name="physics_high">
+							高
+						</combo_item>
+						<combo_item name="physics_medium">
+							中
+						</combo_item>
+						<combo_item name="physics_low">
+							低
+						</combo_item>
+						<combo_item name="physics_lowest">
+							最低
+						</combo_item>
+						<combo_item name="physics_bounding_box">
+							バウンディングボックス
+						</combo_item>
+						<combo_item name="load_from_file">
+							ファイルから
+						</combo_item>
 					</combo_box>
 					<line_editor name="physics_file"/>
 					<button name="physics_browse" label="ブラウズ…"/>
@@ -170,13 +271,18 @@
 				<!-- ==== STEP 2: Analyze ==== -->
 				<view_border name="physics_tab_border"/>
 				<panel name="physics analysis">
-					<text name="method_label">ステップ２：凸包の変換（オプション）</text>
-					<text name="analysis_method_label">方法：</text>
-					<text name="quality_label">品質：</text>
-					<text name="smooth_method_label">滑らかさ：</text>
-					<combo_box name="Method"/>
-					<combo_box name="Decompose Quality"/>
-					<combo_box name="Cosine%"/>
+					<text name="method_label">
+						ステップ２：分析
+					</text>
+					<text name="analysis_method_label">
+						方法：
+					</text>
+					<text name="quality_label">
+						品質：
+					</text>
+					<text name="smooth_method_label">
+						滑らかさ：
+					</text>
 					<check_box label="穴を閉じる" name="Close Holes (Slow)"/>
 					<button label="分析" name="Decompose"/>
 					<button label="キャンセル" name="decompose_cancel"/>
@@ -184,25 +290,40 @@
 				<!-- ==== STEP 3: Simplify ==== -->
 				<view_border name="physics_tab_border"/>
 				<panel name="physics simplification">
-					<text name="second_step_label">手順３：簡素化</text>
-					<text name="simp_method_header">方法：</text>
-					<text name="pass_method_header">パス数：</text>
-					<text name="Detail Scale label">詳細スケール：</text>
-					<text name="Retain%_label">維持率：</text>
-					<combo_box name="Simplify Method"/>
-					<combo_box name="Combine Quality"/>
-					<spinner name="Detail Scale"/>
-					<spinner name="Retain%"/>
+					<text name="second_step_label">
+						手順３：簡素化
+					</text>
+					<text name="simp_method_header">
+						方法：
+					</text>
+					<text name="pass_method_header">
+						パス：
+					</text>
+					<text name="Detail Scale label">
+						詳細度：
+					</text>
+					<text name="Retain%_label">
+						維持率：
+					</text>
+					<combo_box name="Combine Quality" value="1"/>
 					<button label="簡素化" name="Simplify"/>
 					<button label="キャンセル" name="simplify_cancel"/>
 				</panel>
 				<!-- ==== Results ==== -->
 				<view_border name="physics_tab_border"/>
 				<panel name="physics info">
-					<text name="results_text">結果：</text>
-					<text name="physics_triangles">三角形：[TRIANGLES]，</text>
-					<text name="physics_points">頂点数：[POINTS]，</text>
-					<text name="physics_hulls">殻の数：[HULLS]</text>
+					<text name="results_text">
+						結果：
+					</text>
+					<text name="physics_triangles">
+						三角形：[TRIANGLES]，
+					</text>
+					<text name="physics_points">
+						頂点数：[POINTS]，
+					</text>
+					<text name="physics_hulls">
+						凸包数：[HULLS]
+					</text>
 				</panel>
 				<panel name="physics message">
 					<icon name="physics_status_message_icon"/>
@@ -211,12 +332,27 @@
 			</panel>
 			<!-- MODIFIERS PANEL -->
 			<panel label="アップロードオプション" name="modifiers_panel">
-				<view_border name="border"/>
-				<text name="scale_label"> スケール（１＝拡大縮小なし）：</text>
-				<spinner name="import_scale"/>
-				<text name="dimensions_label">サイズ：</text>
-				<text name="import_dimensions">[X]✕[Y]✕[Z]</text>
+				<text name="scale_label">
+					スケール（１＝拡大縮小なし）：
+				</text>
+				<spinner name="import_scale" value="1.0"/>
+				<text name="dimensions_label">
+					サイズ：
+				</text>
+				<text name="import_dimensions">
+					[X]×[Y]×[Z]
+				</text>
 				<check_box label="テクスチャを含む" name="upload_textures"/>
+				<text name="include_label">
+					アバターモデル専用：
+				</text>
+				<check_box label="スキンの重さを含む" name="upload_skin"/>
+				<check_box label="ジョイント位置を含む" name="upload_joints"/>
+				<check_box label="ジョイント位置が定義されている場合、スケールをロックします。" name="lock_scale_if_joint_position"/>
+				<text name="pelvis_offset_label">
+					Ｚオフセット（アバターを上下調整）：
+				</text>
+				<spinner name="pelvis_offset" value="0.0"/>
 			</panel>
 			<panel label="オーバーライド" name="rigging_panel" title="リグ">
 				<view_border name="avatar_tab_border"/>
@@ -252,14 +388,26 @@
 			<button label="アップロード" name="ok_btn" tool_tip="シミュレーターにアップロードします。"/>
 			<button label="設定をクリアしてフォームをリセット" name="reset_btn"/>
 			<!-- ========== WEIGHTS ==========-->
-			<text name="upload_fee">アップロード費用：L$ [FEE]</text>
-			<text name="prim_weight">土地への負荷：[EQ]</text>
-			<text name="download_weight">ダウンロード：[ST]</text>
-			<text name="physics_weight">物理演算：[PH]</text>
-			<text name="server_weight">サーバー負荷：[SIM]</text>
+			<text name="upload_fee">
+				アップロード料金：L$ [FEE]
+			</text>
+			<text name="prim_weight">
+				土地への負荷（ＬＩ）：[EQ]
+			</text>
+			<text name="download_weight">
+				ダウンロード：[ST]
+			</text>
+			<text name="physics_weight">
+				物理演算：[PH]
+			</text>
+			<text name="server_weight">
+				サーバー負荷：[SIM]
+			</text>
 			<!-- =========== Cost breakdown ======== -->
 			<panel name="price_breakdown_panel">
-				<text>費用の内訳</text>
+				<text>
+					費用の内訳
+				</text>
 				<view_border name="price_breakdown_border"/>
 				<text name="price_breakdown_labels">ダウンロード：
 物理効果数：
@@ -286,7 +434,9 @@
 [STR_LOW]
 [STR_LOWEST]</text>-->
 			<panel name="physics_costs_panel">
-				<text>物理効果コスト</text>
+				<text>
+					物理効果コスト
+				</text>
 				<view_border name="price_breakdown_border"/>
 				<text name="physics_breakdown_labels">基準の殻：
 メッシュ：
@@ -300,23 +450,36 @@
 			<text name="status">[STATUS]</text>
 		</panel>
 	</panel>
-	<text name="lod_label">プレビュー：</text>
-	<panel name="preview_panel"/>
+	<text name="lod_label">
+		プレビュー：
+	</text>
 	<panel name="right_panel">
 		<combo_box name="preview_lod_combo" tool_tip="プレビューレンダーで表示するＬｏＤ">
-			<combo_item name="high">高</combo_item>
-			<combo_item name="medium">中</combo_item>
-			<combo_item name="low">低</combo_item>
-			<combo_item name="lowest">最低</combo_item>
+			<combo_item name="high">
+				高
+			</combo_item>
+			<combo_item name="medium">
+				中
+			</combo_item>
+			<combo_item name="low">
+				低
+			</combo_item>
+			<combo_item name="lowest">
+				最低
+			</combo_item>
 		</combo_box>
-		<text name="label_display">表示…</text>
+		<text name="label_display">
+			表示…
+		</text>
 		<check_box label="エッジ" name="show_edges"/>
 		<check_box label="物理効果" name="show_physics"/>
 		<check_box label="テクスチャ数" name="show_textures"/>
 		<check_box label="スキンのウエイト" name="show_skin_weight"/>
 		<check_box label="ジョイント位置のオーバーライド" name="show_joint_overrides"/>
 		<check_box label="ジョイント数" name="show_joint_positions"/>
-		<text name="physics_explode_label">スプレッドのプレビュー：</text>
+		<text name="physics_explode_label">
+			スプレッドのプレビュー：
+		</text>
 		<slider name="physics_explode"/>
 	</panel>
 </floater>

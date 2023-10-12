@@ -100,6 +100,29 @@ void LLFloaterSidePanelContainer::closeFloater(bool app_quitting)
 	}
 }
 
+LLFloater* LLFloaterSidePanelContainer::getTopmostInventoryFloater()
+{
+    LLFloater* topmost_floater = NULL;
+    S32 z_min = S32_MAX;
+    
+    LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
+    for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end(); ++iter)
+    {
+        LLFloater* inventory_floater = (*iter);
+
+        if (inventory_floater && inventory_floater->getVisible())
+        {
+            S32 z_order = gFloaterView->getZOrder(inventory_floater);
+            if (z_order < z_min)
+            {
+                z_min = z_order;
+                topmost_floater = inventory_floater;
+            }
+        }
+    }
+    return topmost_floater;
+}
+
 LLPanel* LLFloaterSidePanelContainer::openChildPanel(std::string_view panel_name, const LLSD& params)
 {
 	LLView* view = findChildView(panel_name, true);
@@ -152,6 +175,18 @@ void LLFloaterSidePanelContainer::showPanel(std::string_view floater_name, const
 
 void LLFloaterSidePanelContainer::showPanel(std::string_view floater_name, std::string_view panel_name, const LLSD& key)
 {
+// [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
+	// Hack in case we forget a reference somewhere
+	if ( (!panel_name.empty()) && ("panel_people" == panel_name) && (key.has("people_panel_tab_name")) && ("blocked_panel" == key["people_panel_tab_name"].asString()) )
+	{
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+		LL_ERRS() << "Request to open the blocked floater through the sidepanel!" << LL_ENDL;
+#endif // LL_RELEASE_FOR_DOWNLOAD
+		LLFloaterReg::showInstance("blocked", key);
+		return;
+	}
+// [/SL:KB]
+
 	LLFloaterSidePanelContainer* floaterp = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>(floater_name);
 //	if (floaterp)
 // [RLVa:KB] - Checked: 2013-04-16 (RLVa-1.4.8)
