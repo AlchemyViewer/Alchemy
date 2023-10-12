@@ -117,7 +117,7 @@ void LLDiskCache::purge()
 #if LL_WINDOWS
     boost::filesystem::path cache_path(ll_convert_string_to_wide(mCacheDir));
 #else
-    boost::filesystem::path cache_path(sCacheDir);
+    boost::filesystem::path cache_path(mCacheDir);
 #endif
     if (boost::filesystem::is_directory(cache_path, ec) && !ec.failed())
     {

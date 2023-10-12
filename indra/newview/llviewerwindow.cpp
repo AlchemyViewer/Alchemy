@@ -1592,7 +1592,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropFile(LLWindow 
 							result = LLWindowCallbacks::DND_LINK;
 							if (!fDrop)
 							{
-								if (pObj != mDragHoveredObject)
+								if (pObj != mDragHoveredObject.get())
 								{
 									LLSelectMgr::getInstance()->unhighlightObjectOnly(mDragHoveredObject);
 									mDragHoveredObject = pObj;
