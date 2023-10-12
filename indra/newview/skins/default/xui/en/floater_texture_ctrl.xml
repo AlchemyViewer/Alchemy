@@ -57,7 +57,6 @@ PICK: TEXTURE
 	
 	<!-- mode selector -->
     <combo_box
-     control_name="mode_selection"
      height="20"
      layout="topleft"
      left="6"
