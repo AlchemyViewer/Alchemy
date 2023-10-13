@@ -29,6 +29,7 @@ set(llmessage_SOURCE_FILES
     lldispatcher.cpp
     llexperiencecache.cpp
     llfiltersd2xmlrpc.cpp
+    llgenericstreamingmessage.cpp
     llhost.cpp
     llhttpnode.cpp
     llhttpsdhandler.cpp
@@ -113,6 +114,7 @@ set(llmessage_HEADER_FILES
     llextendedstatus.h
     llfiltersd2xmlrpc.h
     llfollowcamparams.h
+    llgenericstreamingmessage.h
     llhost.h
     llhttpnode.h
     llhttpnodeadapter.h
