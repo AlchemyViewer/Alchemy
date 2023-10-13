@@ -117,7 +117,7 @@ if (WINDOWS)
   elseif (USE_SSE42)
     add_compile_definitions(__SSE3__=1 __SSSE3__=1 __SSE4__=1 __SSE4_1__=1 __SSE4_2__=1)
   else ()
-    add_compile_definitions(__SSE3__=1 __SSSE3__=1 __SSE4__=1 __SSE4_1__=1)
+    add_compile_definitions(__SSE3__=1)
   endif ()
 
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
