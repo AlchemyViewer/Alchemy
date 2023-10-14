@@ -4323,7 +4323,7 @@ void LLInventoryModel::removeCategory(const LLUUID& category_id)
 		}
 		else
 		{
-			const LLUUID& trash_id = findCategoryUUIDForType(LLFolderType::FT_TRASH);
+			const LLUUID trash_id = findCategoryUUIDForType(LLFolderType::FT_TRASH);
 			if (trash_id.notNull())
 			{
 				changeCategoryParent(cat, trash_id, TRUE);
