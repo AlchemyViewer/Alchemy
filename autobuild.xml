@@ -482,11 +482,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bb2ba05805d2f72ba6c2462742334649d5b51255675943e0cdefc2813b925603554487ef37c42146e62553adc0d23fc157dcd0e193c7d12ff94003073439bbc2</string>
+              <string>3a2e26f01656a6634023d83f2a53a36a373c61b6af1d00517543050a09826113a2f99121ece20c2c0b581aab9020aeb7cdfe972fa331ea94f3862556a70eae19</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132.2164/dullahan-1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132-darwin64-2164.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-darwin64-2178.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -496,11 +496,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4a1433fe7e24b76b85184fa9001ea6d87109170d9d2798f2293327b042b2ccc5c5eaf1e0803ffe75c28fb3195fee392a484857a1806693583800b0fcafdd3216</string>
+              <string>ab9d290a61fb038e6c0ba9ce4efa5f431238e1ab9d4de2c28da1ad0114926af9b716db90cb216816ec8a1de3680d358913851e316d8df6b5eea5302989d9f3bc</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132.2164/dullahan-1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132-linux64-2164.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-linux64-2178.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -510,18 +510,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>cc36c9b0032e52c9d262b3c79c615412bcad111530c3b04c9244a526bf124b7f608825b15d06817263cddb37f2ff994a1885af224fbcda866460d72517c970f0</string>
+              <string>e88cd99c9d71b2dd1297007bcfdac224d5401cdfadd7aeb069195392274559f7f63ee312061d3441ba7505a4e649ccea67f9d8f3f3c56c9cce638b35c29b6eb5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_117.2.2_ge80c977_chromium-117.0.5938.132.2164/dullahan-1.12.4_117.2.2_ge80c977_chromium-117.0.5938.132-windows64-2164.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-windows64-2178.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>1.12.4_117.1.5_gf1b94ea_chromium-117.0.5938.132</string>
+        <string>1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54</string>
       </map>
       <key>expat</key>
       <map>
