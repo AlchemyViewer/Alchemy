@@ -838,11 +838,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>46b82a3209dfa4bc6b65aa655eebdbd4ecaed1e1cc33e0a3b77d36475d5fa3ccd3fdc220c803ba91fa19b3e94b3bda2fa459cabab2620946af28f170d8aaa76c</string>
+              <string>bcce1475013242472bc4158d7c46692aa62a582cbe9ea4a3d54f392da97b359812c6df2aef7038866f009f7e22a8ff18679c6fbc5179ea4883409b1dd3d56a86</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/212/packages/generic/innosetup/6.2.2.2143/innosetup-6.2.2-windows64-2143.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/212/packages/generic/innosetup/6.2.2.2179/innosetup-6.2.2-windows64-2179.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
