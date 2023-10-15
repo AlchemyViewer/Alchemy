@@ -3318,8 +3318,18 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	</notification>
 	<notification name="UnableToLoadNotecard">
 		ノートカードを読み込めません。
-あとで再度お試しください。
+お手数ですがもう一度やり直してください。
 		<tag>fail</tag>
+	</notification>
+	<notification name="UnableToLoadMaterial">
+		マテリアルを読み込めません。
+お手数ですがもう一度やり直してください。
+		<tag>fail</tag>
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="MissingMaterialCaps">
+		<tag>fail</tag>
+    マテリアル対応リージョンに接続されていません。
 	</notification>
 	<notification name="ScriptMissing">
 		データベースにスクリプトがありません。
