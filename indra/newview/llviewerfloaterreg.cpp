@@ -75,6 +75,7 @@
 // [/SL:KB]
 #include "llfloaterchatvoicevolume.h"
 #include "llfloaterclassified.h"
+#include "llfloaterclearcache.h"
 #include "llfloaterconversationlog.h"
 #include "llfloaterconversationpreview.h"
 #include "llfloatercreatelandmark.h"
@@ -367,6 +368,7 @@ void LLViewerFloaterReg::registerFloaters()
 	LLFloaterReg::add("build_options", "floater_build_options.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBuildOptions>);
 	LLFloaterReg::add("bumps", "floater_bumps.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBump>);
 
+	LLFloaterReg::add("clear_cache", "floater_clear_cache.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterClearCache>);
 	LLFloaterReg::add("camera", "floater_camera.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterCamera>);
 	LLFloaterReg::add("camera_presets", "floater_camera_presets.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterCameraPresets>);
 // [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-17 (Catznip-3.3)

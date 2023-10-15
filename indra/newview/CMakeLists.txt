@@ -245,6 +245,7 @@ set(viewer_SOURCE_FILES
     llfloaterchatalerts.cpp
     llfloaterchatvoicevolume.cpp
     llfloaterclassified.cpp
+    llfloaterclearcache.cpp
     llfloatercolorpicker.cpp
     llfloaterconversationlog.cpp
     llfloaterconversationpreview.cpp
@@ -972,6 +973,7 @@ set(viewer_HEADER_FILES
     llfloaterchatalerts.h
     llfloaterchatvoicevolume.h
     llfloaterclassified.h
+    llfloaterclearcache.h
     llfloatercolorpicker.h
     llfloaterconversationlog.h
     llfloaterconversationpreview.h

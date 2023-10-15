@@ -204,6 +204,8 @@ public:
     void initGeneralThread();
 	void purgeUserDataOnExit() { mPurgeUserDataOnExit = true; }
 	void purgeCache(); // Clear the local cache. 
+	void purgeCacheSelective(const LLSD& insd); // Clear the local cache. 
+	void purgeWebCache(); // Clear the local cache. 
 	void purgeCacheImmediate(); //clear local cache immediately.
 	S32  updateTextureThreads(F32 max_time);
 

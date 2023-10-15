@@ -1637,6 +1637,13 @@ Would you like to disable all popups which can be skipped?
    type="alertmodal">
 Cache will be cleared after you restart [APP_NAME].
   </notification>
+	
+  <notification
+   icon="alertmodal.tga"
+   name="WebCacheWillClear"
+   type="alertmodal">
+Web Browser caches will be cleared after you restart [APP_NAME].
+  </notification>
 
   <notification
    icon="alertmodal.tga"

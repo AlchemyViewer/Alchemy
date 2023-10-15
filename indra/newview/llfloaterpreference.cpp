@@ -232,8 +232,8 @@ bool callback_clear_browser_cache(const LLSD& notification, const LLSD& response
 		LLNavigationBar::getInstance()->clearHistoryCache();
 		
 		// flag client texture cache for clearing next time the client runs
-		gSavedSettings.setBOOL("PurgeCacheOnNextStartup", TRUE);
-		LLNotificationsUtil::add("CacheWillClear");
+		gSavedSettings.setBOOL("PurgeWebCacheOnNextStartup", TRUE);
+		LLNotificationsUtil::add("WebCacheWillClear");
 
 		LLSearchHistory::getInstance()->clearHistory();
 		LLSearchHistory::getInstance()->save();
@@ -1427,7 +1427,7 @@ void LLFloaterPreference::refreshEnabledGraphics()
 
 void LLFloaterPreference::onClickClearCache()
 {
-	LLNotificationsUtil::add("ConfirmClearCache", LLSD(), LLSD(), callback_clear_cache);
+	LLFloaterReg::showInstance("clear_cache");
 }
 
 void LLFloaterPreference::onClickBrowserClearCache()

@@ -4074,7 +4074,7 @@ bool LLAppViewer::initCache()
 			gSavedSettings.getBOOL("PurgeCacheOnNextStartup"))
 		{
 			LL_INFOS("AppCache") << "Startup cache purge requested: " << (gSavedSettings.getBOOL("PurgeCacheOnStartup") ? "ALWAYS" : "ONCE") << LL_ENDL;
-			gSavedSettings.setBOOL("PurgeCacheOnNextStartup", false);
+			gSavedSettings.setBOOL("PurgeCacheOnNextStartup", FALSE);
 			mPurgeCache = true;
 			// STORM-1141 force purgeAllTextures to get called to prevent a crash here. -brad
 			texture_cache_mismatch = true;
@@ -4107,6 +4107,11 @@ bool LLAppViewer::initCache()
 		{
 			LLSplashScreen::update(LLTrans::getString("StartupClearingCache"));
 			purgeCache();
+		}
+
+		if (gSavedSettings.getBool("PurgeCacheSelective"))
+		{
+			purgeCacheSelective(gSavedSettings.getLLSD("PurgeCacheSelectiveData"));
 		}
 	}
 
@@ -4184,6 +4189,64 @@ void LLAppViewer::purgeCache()
 
 	LLSplashScreen::update(LLTrans::getString("StartupClearingShaderCache"));
 	LLViewerShaderMgr::instance()->clearShaderCache();
+	purgeWebCache();
+	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "inv_cache"));
+	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "lslpreproc"));
+	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "gridcache"));
+	gDirUtilp->deleteFilesInDir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""), "*");
+}
+
+void LLAppViewer::purgeCacheSelective(const LLSD& insd)
+{
+	if(insd.has("textures"))
+	{
+		LL_INFOS("AppCache") << "Purging Texture Cache..." << LL_ENDL;
+		LLSplashScreen::update(LLTrans::getString("StartupClearingTextureCache"));
+		LLAppViewer::getTextureCache()->purgeCache(LL_PATH_CACHE);
+	}
+
+	if (insd.has("assets"))
+	{
+		LL_INFOS("AppCache") << "Purging Disk Cache..." << LL_ENDL;
+		LLSplashScreen::update(LLTrans::getString("StartupClearingDiskCache"));
+		LLDiskCache::getInstance()->clearCache(LL_PATH_CACHE, false);
+	}
+
+	if (insd.has("regions"))
+	{
+		LL_INFOS("AppCache") << "Purging Object Cache..." << LL_ENDL;
+		LLSplashScreen::update(LLTrans::getString("StartupClearingObjectCache"));
+		LLVOCache::getInstance()->removeCache(LL_PATH_CACHE);
+	}
+
+	if (insd.has("inventory"))
+	{
+		LL_INFOS("AppCache") << "Purging Inventory Cache..." << LL_ENDL;
+		gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "inv_cache"));
+	}
+
+	if (insd.has("shaders"))
+	{
+		LL_INFOS("AppCache") << "Purging Shader Cache..." << LL_ENDL;
+		LLSplashScreen::update(LLTrans::getString("StartupClearingShaderCache"));
+		LLViewerShaderMgr::instance()->clearShaderCache();
+	}
+
+	if (insd.has("web"))
+	{
+		purgeWebCache();
+	}
+
+	if (insd.has("userdata"))
+	{
+		gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "lslpreproc"));
+		gDirUtilp->deleteFilesInDir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""), "*.*");
+	}
+}
+
+void LLAppViewer::purgeWebCache()
+{
+	LL_INFOS("AppCache") << "Purging CEF Cache..." << LL_ENDL;
 	std::string browser_cache = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "cef_cache");
 	if (LLFile::isdir(browser_cache))
 	{
@@ -4195,10 +4258,6 @@ void LLAppViewer::purgeCache()
 	{
 		gDirUtilp->deleteDirAndContents(browser_data);
 	}
-	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "inv_cache"));
-	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "lslpreproc"));
-	gDirUtilp->deleteDirAndContents(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "gridcache"));
-	gDirUtilp->deleteFilesInDir(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ""), "*");
 }
 
 //purge cache immediately, do not wait until the next login.

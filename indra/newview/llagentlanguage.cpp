@@ -48,6 +48,7 @@ void LLAgentLanguage::onChange()
 {
 	// Clear inventory cache so that default names of inventory items
 	// appear retranslated (EXT-8308).
+	LL_INFOS() << "Agent language changed" << LL_ENDL;
 	gSavedSettings.setBOOL("PurgeCacheOnNextStartup", TRUE);
 }
 

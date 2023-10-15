@@ -46,6 +46,7 @@ LLModalDialog::LLModalDialog( const LLSD& key, BOOL modal )
 	{
 		setCanMinimize(FALSE);
 		setCanClose(FALSE);
+		setCanCollapse(FALSE);
 	}
 	setVisible( FALSE );
 	setBackgroundVisible(TRUE);
@@ -72,6 +73,16 @@ LLModalDialog::~LLModalDialog()
 // virtual
 BOOL LLModalDialog::postBuild()
 {
+	if (mModal)
+	{
+		setCanMinimize(FALSE);
+		setCanClose(FALSE);
+		setCanCollapse(FALSE);
+	}
+	setVisible(FALSE);
+	setBackgroundVisible(TRUE);
+	setBackgroundOpaque(TRUE);
+	centerOnScreen(); // default position
 	return LLFloater::postBuild();
 }
 
