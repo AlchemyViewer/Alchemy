@@ -1311,18 +1311,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>abc35a30176e478e1839da89b44a1c01a00b1e8605c5a4fece2f9d1c1f16682c40f0fd878df73a250d54027d064f6dc67cc4859484413996c523ecc512cdedab</string>
+              <string>334ec2aa9fedcb7eb5396cc54dc7165318f2d15261ecf4ccb79deaa623351638b5b6909149bd30dcd57e934eac0061c1b15c6353f143c8534de4890bd7c092c8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/125/packages/generic/llca/2023.0905.1528.2140/llca-2023.0905.1528-common-2140.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/125/packages/generic/llca/2023.1015.0309.2181/llca-2023.1015.0309-common-2181.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
           </map>
         </map>
         <key>version</key>
-        <string>2023.0905.1528</string>
+        <string>2023.1015.0309</string>
       </map>
       <key>llphysicsextensions_stub</key>
       <map>
@@ -1998,11 +1998,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a0940db651c3c05ecf31c2e5954d241f73fe2f6968b4a62ade909a3d570cdd4482e3f694726e2b35167e5304b5b671be22d53321b5b5dc55c5c39138053d24ed</string>
+              <string>41c1aa6565b9eacdb55aa9d638c9a6d6398e7a4177e7654c3cfa27b2e400cad97ff378b583bab8f0fceebb6a6dd9d510be3ff0f74250d7a6401b40df880360ef</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.11.0-0.6.5.2161/sentry-8.11.0-0.6.5-darwin64-2161.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.13.1-0.6.6.2182/sentry-8.13.1-0.6.6-darwin64-2182.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2012,11 +2012,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9b982352f97b4835220fced0af633374993a706acbec9f01ecba0842cca237758e8140bee90dc7e1f6c43bd9a682670be08efd03f91b3a0b3d8528e37728fe08</string>
+              <string>d8b31f58d28e9648e20dc4a9c3ee735be056912a27f936779c3343b0aa043747cbdcefee3867f6e5a33253cae674c393aa1c73c07e487673965df7cff5353cad</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.11.0-0.6.5.2161/sentry-8.11.0-0.6.5-linux64-2161.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.13.1-0.6.6.2182/sentry-8.13.1-0.6.6-linux64-2182.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2026,18 +2026,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>161ebde49b399512e12e96e08bbe60e424e9527dd70c2227f87a2f91f448b92cacd72ea70cba49dc51ce7d4addde135e2980fc38fc6b9b6596cfb250ae872163</string>
+              <string>d5781be654d365f402244c9ed0adf5dc97f4f5957344e74ee105e084011efd5cad8281809831f914b7a73c01c34ef014b12db74ae79581696b752aa487927e29</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.11.0-0.6.5.2161/sentry-8.11.0-0.6.5-windows64-2161.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.13.1-0.6.6.2182/sentry-8.13.1-0.6.6-windows64-2182.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>version</key>
-        <string>8.11.0-0.6.5</string>
+        <string>8.13.1-0.6.6</string>
       </map>
       <key>slvoice</key>
       <map>
@@ -2162,11 +2162,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>539723333f4f6e0653f20df7260b92df2bb9f77bc85fd9cf290a93470cada52cc201505a9c4bb498789320c6ab2d139a0b1f2ccfb8989eb0774b604a48ed3c34</string>
+              <string>7aaf18fe73df539125388e030852d6162587c661a4c5dd923c9a5f3b4a45c3166112cfd692bad8c8e4ef7d93efb86ce38fdb0c45263e3b939e9081e7e8a9e590</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/185/packages/generic/tinygltf/v2.8.15.2120/tinygltf-v2.8.15-common-2120.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/185/packages/generic/tinygltf/v2.8.18.2180/tinygltf-v2.8.18-common-2180.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2177,7 +2177,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>source_type</key>
         <string>git</string>
         <key>version</key>
-        <string>v2.8.15</string>
+        <string>v2.8.18</string>
       </map>
       <key>tracy</key>
       <map>
