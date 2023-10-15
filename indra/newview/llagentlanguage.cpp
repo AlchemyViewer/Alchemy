@@ -46,10 +46,15 @@ void LLAgentLanguage::init()
 // static
 void LLAgentLanguage::onChange()
 {
+	LL_INFOS() << "Agent language changed" << LL_ENDL;
+
 	// Clear inventory cache so that default names of inventory items
 	// appear retranslated (EXT-8308).
-	LL_INFOS() << "Agent language changed" << LL_ENDL;
-	gSavedSettings.setBOOL("PurgeCacheOnNextStartup", TRUE);
+	LLSD caches;
+	caches.insert("inventory", "true");
+
+	gSavedSettings.setLLSD("PurgeCacheSelectiveData", caches);
+	gSavedSettings.setBOOL("PurgeCacheSelective", true);
 }
 
 // send language settings to the sim
