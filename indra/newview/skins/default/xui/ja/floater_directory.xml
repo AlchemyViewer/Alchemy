@@ -40,7 +40,7 @@
 		<panel label="人物" name="panel_search_people"/>
 		<panel label="グループ" name="panel_search_groups"/>
 		<panel label="場所" name="panel_search_places"/>
-		<panel label="ランド" name="panel_search_landsales"/>
+		<panel label="土地の販売" name="panel_search_landsales"/>
 		<panel label="イベント" name="panel_search_events"/>
 		<panel label="クラシファイド広告" name="panel_search_classifieds"/>
 		<panel label="AltaVista" name="panel_search_web"/>

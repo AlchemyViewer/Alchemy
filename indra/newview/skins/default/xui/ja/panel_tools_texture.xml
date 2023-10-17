@@ -8,7 +8,7 @@
 		透過度％
 	</text>
 	<text name="glow label">
-		発光
+		グロー
 	</text>
 	<check_box label="明るさ全開" name="checkbox fullbright"/>
 	<view_border name="object_horizontal"/>
@@ -108,7 +108,7 @@
 	</text>
 	<spinner name="environment"/>
 	<text name="label shinycolor">
-		発光色
+		光沢色
 	</text>
 	<!-- label is blank because control places it below the box -->
 	<color_swatch label="" name="shinycolorswatch" tool_tip="クリックしてカラーピッカーを開きます。"/>

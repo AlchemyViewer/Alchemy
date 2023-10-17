@@ -2889,13 +2889,21 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 本ピックの位置を更新しましたが、 他の詳細は元の値のままになります。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
+	<notification name="ApplyInventoryToObject">
+		インベントリアイテムを「コピー不可」にしようとしています。
+このアイテムはオブジェクトのインベントリに移動され、コピーされません。
+
+このままインベントリにアイテムを移動しますか？
+		<tag>confirm</tag>
+		<usetemplate ignoretext="「コピー不可」にしたアイテムをオブジェクトに移動する前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+	</notification>
 	<notification name="MoveInventoryFromObject">
 		「コピー不可」のインベントリアイテムを選択しました。
 これらのアイテムはコピーされないまま、あなたのインベントリに移動されます。
 
 このままインベントリにアイテムを移動しますか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="「コピー不可」のアイテムをオブジェクトから動かす前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="「コピー不可」のアイテムをオブジェクトから移動する前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="MoveInventoryFromScriptedObject">
 		「コピー不可」のインベントリアイテムを選択しました。

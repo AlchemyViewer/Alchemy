@@ -230,6 +230,7 @@
 			<menu_item_check label="動的オブジェクトだけを選択する" name="Select Only Movable Objects"/>
 			<menu_item_check label="非表示のオブジェクトを選択する" name="Select Invisible Objects"/>
 			<menu_item_check label="反射プローブを選択する" name="Select Reflection Probes"/>
+			<menu_item_check label="プローブの更新" name="Probe Updates"/>
 			<menu_item_check label="範囲内を選択する" name="Select By Surrounding"/>
 			<menu_item_separator/>
 			<menu_item_check label="選択のアウトラインを表示" name="Show Selection Outlines"/>

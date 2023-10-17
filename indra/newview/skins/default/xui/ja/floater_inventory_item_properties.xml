@@ -13,7 +13,7 @@
 		所有者ができること：
 	</floater.string>
 	<floater.string name="acquiredDate">
-		[year,datetime,local]年[mth,datetime,local]月[day,datetime,local]日[wkday,datetime,local]　[hour,datetime,local]：[min,datetime,local]：[second,datetime,local]
+		[year,datetime,local]年[mth,datetime,local]月[day,datetime,local]日（[wkday,datetime,local]）　[hour,datetime,local]：[min,datetime,local]：[second,datetime,local]
 	</floater.string>
 	<text name="LabelItemNameTitle">
 		名前：
@@ -33,7 +33,7 @@
 		入手日時：
 	</text>
 	<text name="LabelAcquiredDate">
-		2006年5月24日水曜日　12：50：46
+		2006年5月24日（水）　12：50：46
 	</text>
 	<text name="OwnerLabel">
 		あなた：
