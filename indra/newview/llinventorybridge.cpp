@@ -4603,10 +4603,6 @@ void LLFolderBridge::buildContextMenuOptions(U32 flags, menuentry_vec_t&   items
                         disabled_items.push_back("New Settings");
                     }
                 }
-                if (menu_items_added)
-                {
-                    items.push_back(std::string("Create Separator"));
-                }
 			}
 			getClipboardEntries(false, items, disabled_items, flags);
 		}
