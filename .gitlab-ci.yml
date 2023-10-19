@@ -58,8 +58,9 @@ variables:
 
 .win_build:
   stage: build
+  image: r.alchemyviewer.org/alchemy/infrastructure/windows-build-image:latest
   tags:
-    - autobuild
+    - docker
     - windows
   cache:
     key:
@@ -71,8 +72,6 @@ variables:
       - .cache/pip
     when: 'always'
   before_script:
-    - python -m venv .venv
-    - .\.venv\Scripts\Activate.ps1
     - pip install --upgrade llbase autobuild certifi sentry-cli cmake
   script:
     - autobuild configure -c Release -- -DUSE_LTO="${ENABLE_LTO}" -DHAVOK_TPV="${USE_HAVOK}" -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
