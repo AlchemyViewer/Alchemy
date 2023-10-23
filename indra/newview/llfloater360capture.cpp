@@ -84,7 +84,6 @@ LLFloater360Capture::~LLFloater360Capture()
     // and now reverts to the regular "keyhole" frustum of interest
     // list updates.
     if (!LLApp::isExiting() && 
-        gSavedSettings.getBOOL("360CaptureUseInterestListCap") &&
         mStartILMode != gAgent.getInterestListMode())
     {
         gAgent.changeInterestListMode(mStartILMode);
