@@ -18,45 +18,7 @@
 	<menu_item_call label="削除" name="Task Remove"/>
 	<menu_item_call label="ごみ箱を空に" name="Empty Trash"/>
 	<menu_item_call label="遺失物フォルダを空に" name="Empty Lost And Found"/>
-	<menu_item_call label="新しいフォルダ" name="New Folder"/>
 	<menu_item_call label="新しいアウトフィット" name="New Outfit"/>
-	<menu_item_call label="新しいスクリプト" name="New Script"/>
-	<menu_item_call label="新しいノートカード" name="New Note"/>
-	<menu_item_call label="新しいジェスチャー" name="New Gesture"/>
-	<menu_item_call label="新しいマテリアル" name="New Material"/>
-	<menu label="新しい服装" name="New Clothes">
-		<menu_item_call label="新しいシャツ" name="New Shirt"/>
-		<menu_item_call label="新しいズボン" name="New Pants"/>
-		<menu_item_call label="新しい靴" name="New Shoes"/>
-		<menu_item_call label="新しい靴下" name="New Socks"/>
-		<menu_item_call label="新しいジャケット" name="New Jacket"/>
-		<menu_item_call label="新しいスカート" name="New Skirt"/>
-		<menu_item_call label="新しい手袋" name="New Gloves"/>
-		<menu_item_call label="新しい下着（上）" name="New Undershirt"/>
-		<menu_item_call label="新しい下着（下）" name="New Underpants"/>
-		<menu_item_call label="新しいアルファマスク" name="New Alpha Mask"/>
-		<menu_item_call label="新しいタトゥ" name="New Tattoo"/>
-		<menu_item_call label="新しいユニバーサル" name="New Universal"/>
-		<menu_item_call label="新しい物理作用" name="New Physics"/>
-	</menu>
-	<menu label="新しい身体部位" name="New Body Parts">
-		<menu_item_call label="新しいシェイプ(体型)" name="New Shape"/>
-		<menu_item_call label="新しいスキン" name="New Skin"/>
-		<menu_item_call label="新しい髪" name="New Hair"/>
-		<menu_item_call label="新しい眼" name="New Eyes"/>
-	</menu>
-	<menu label="新しい自然環境の設定" name="New Settings">
-		<menu_item_call label="新しい空" name="New Sky"/>
-		<menu_item_call label="新しい水面" name="New Water"/>
-		<menu_item_call label="新しいデイサイクル" name="New Day Cycle"/>
-	</menu>
-	<menu label="以下のデフォルトとして使用" name="upload_def">
-		<menu_item_call label="画像のアップロード" name="Image uploads"/>
-		<menu_item_call label="サウンドのアップロード" name="Sound uploads"/>
-		<menu_item_call label="アニメーションのアップロード" name="Animation uploads"/>
-		<menu_item_call label="モデルのアップロード" name="Model uploads"/>
-		<menu_item_call label="ＰＢＲマテリアルのアップロード" name="PBR uploads"/>
-	</menu>
 	<menu label="種類を変更" name="Change Type">
 		<menu_item_call label="デフォルト" name="Default"/>
 		<menu_item_call label="手袋" name="Gloves"/>
@@ -134,6 +96,49 @@
 	<menu_item_separator name="Settings Separator"/>
 	<menu_item_call label="自分にのみ適用" name="Settings Apply Local"/>
 	<menu_item_call label="区画に適用" name="Settings Apply Parcel"/>
+	<menu_item_separator name="Subfolder Separator" />
+	<menu label="新規作成" name="create_new">
+		<menu_item_call label="新しいフォルダ" name="New Folder"/>
+		<menu_item_call label="新しいスクリプト" name="New Script"/>
+		<menu_item_call label="新しいノートカード" name="New Note"/>
+		<menu_item_call label="新しいジェスチャー" name="New Gesture"/>
+		<menu_item_call label="新しいマテリアル" name="New Material"/>
+		<menu label="新しい服装" name="New Clothes">
+			<menu_item_call label="新しいシャツ" name="New Shirt"/>
+			<menu_item_call label="新しいズボン" name="New Pants"/>
+			<menu_item_call label="新しい靴" name="New Shoes"/>
+			<menu_item_call label="新しい靴下" name="New Socks"/>
+			<menu_item_call label="新しいジャケット" name="New Jacket"/>
+			<menu_item_call label="新しいスカート" name="New Skirt"/>
+			<menu_item_call label="新しい手袋" name="New Gloves"/>
+			<menu_item_call label="新しい下着（上）" name="New Undershirt"/>
+			<menu_item_call label="新しい下着（下）" name="New Underpants"/>
+			<menu_item_call label="新しいアルファマスク" name="New Alpha Mask"/>
+			<menu_item_call label="新しいタトゥ" name="New Tattoo"/>
+			<menu_item_call label="新しいユニバーサル" name="New Universal"/>
+			<menu_item_call label="新しい物理作用" name="New Physics"/>
+		</menu>
+		<menu label="新しい身体部位" name="New Body Parts">
+			<menu_item_call label="新しいシェイプ(体型)" name="New Shape"/>
+			<menu_item_call label="新しいスキン" name="New Skin"/>
+			<menu_item_call label="新しい髪" name="New Hair"/>
+			<menu_item_call label="新しい眼" name="New Eyes"/>
+		</menu>
+		<menu label="新しい自然環境の設定" name="New Settings">
+			<menu_item_call label="新しい空" name="New Sky"/>
+			<menu_item_call label="新しい水面" name="New Water"/>
+			<menu_item_call label="新しいデイサイクル" name="New Day Cycle"/>
+		</menu>
+	</menu>
+	<menu_item_call label="選択したもので新しいフォルダを作る" name="New folder from selected"/>
+	<menu_item_call label="フォルダの項目のグループ解除" name="Ungroup folder items"/>
+	<menu label="以下のデフォルトとして使用" name="upload_def">
+		<menu_item_call label="画像のアップロード" name="Image uploads"/>
+		<menu_item_call label="サウンドのアップロード" name="Sound uploads"/>
+		<menu_item_call label="アニメーションのアップロード" name="Animation uploads"/>
+		<menu_item_call label="モデルのアップロード" name="Model uploads"/>
+		<menu_item_call label="ＰＢＲマテリアルのアップロード" name="PBR uploads"/>
+	</menu>
 	<menu_item_separator name="Marketplace Separator"/>
 	<menu_item_call label="マーケットプレイスのリストにコピー" name="Marketplace Copy"/>
 	<menu_item_call label="マーケットプレイスのリストに移動" name="Marketplace Move"/>

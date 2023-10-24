@@ -36,7 +36,7 @@
 					</text>
 					<slider name="haze_density"/>
 					<text name="moisture_level_label">
-						水分レベル：
+						湿度：
 					</text>
 					<slider name="moisture_level"/>
 					<text name="droplet_radius_label">
@@ -61,7 +61,7 @@
 						最大高度：
 					</text>
 					<slider name="max_alt"/>
-					<text name="probe_ambiance_label" tooltip="放射照度制御。ゼロ以外の場合、ＨＤＲライティングモデルが有効になります。">
+					<text name="probe_ambiance_label" tooltip="放射照度制御。０以外の場合、ＨＤＲライティングモデルが有効になります。">
 						環境反射プローブ（ＨＤＲ）：
 					</text>
 					<slider name="probe_ambiance"/>

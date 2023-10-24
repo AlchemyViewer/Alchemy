@@ -35,7 +35,7 @@
 		土地をクリックし、ドラッグして選択します。
 	</floater.string>
 	<floater.string name="status_selectcount">
-		選択したオブジェクトは[OBJ_COUNT]個で、土地への負荷は[LAND_IMPACT]です。
+		選択したオブジェクトは[OBJ_COUNT]個で、ランドインパクトは[LAND_IMPACT]です。
 	</floater.string>
 	<floater.string name="status_remaining_capacity">残りの許容数は[LAND_CAPACITY]です。
 	</floater.string>
