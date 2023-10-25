@@ -35,7 +35,7 @@
 		最低
 	</string>
 	<string name="mesh_status_good">
-		発送できます！
+		転送できる状態です！
 	</string>
 	<string name="mesh_status_na">
 		該当なし
@@ -132,7 +132,9 @@
 	</string>
 	<panel name="left_panel">
 		<panel name="model_name_representation_panel">
-			<text name="name_label">モデル名：</text>
+			<text name="name_label">
+				モデル名：
+			</text>
 			<line_editor name="description_form"/>
 		</panel>
 		<tab_container name="import_tab">
@@ -238,7 +240,7 @@
 					<text name="first_step_name">
 						ステップ１：描画詳細度
 					</text>
-					<combo_box name="physics_lod_combo" tool_tip="実像に適用するLOD">
+					<combo_box name="physics_lod_combo" tool_tip="実像に適用するＬｏＤを定義します。">
 						<combo_item name="choose_one">
 							１つを選択…
 						</combo_item>
@@ -359,14 +361,26 @@
 				<check_box label="スキンのウエイトを含める" name="upload_skin"/>
 				<check_box label="ジョイント位置を含める" name="upload_joints"/>
 				<check_box label="ジョイント位置が定義されている場合はスケールをロック" name="lock_scale_if_joint_position"/>
-				<text name="pelvis_offset_label">Ｚオフセット（アバターの上下調整）：</text>
+				<text name="pelvis_offset_label">
+					Ｚオフセット（アバターの上下調整）：
+				</text>
 				<spinner name="pelvis_offset"/>
-				<text name="skin_too_many_joints">スキンされたジョイントが多すぎます。</text>
-				<text name="skin_unknown_joint">モデルに不明なジョイントがあります。</text>
-				<text name="joints_descr">ジョイント数：</text>
+				<text name="skin_too_many_joints">
+					スキンされたジョイントが多すぎます。
+				</text>
+				<text name="skin_unknown_joint">
+					モデルに不明なジョイントがあります。
+				</text>
+				<text name="joints_descr">
+					ジョイント数：
+				</text>
 				<scroll_list name="joints_list"/>
-				<text name="conflicts_description">[JOINTS_COUNT]個のジョイントに[CONFLICTS]箇所の競合があります。</text>
-				<text name="pos_overrides_descr">ジョイント「[JOINT]」の位置オーバーライド：</text>
+				<text name="conflicts_description">
+					[JOINTS_COUNT]個のジョイントに[CONFLICTS]箇所の競合があります。
+				</text>
+				<text name="pos_overrides_descr">
+					ジョイント「[JOINT]」の位置オーバーライド：
+				</text>
 				<scroll_list name="pos_overrides_list">
 					<scroll_list.columns label="モデル" name="model_name"/>
 					<scroll_list.columns label="Ｘ" name="axis_x"/>
@@ -377,8 +391,7 @@
 			<!-- Log -->
 			<panel label="ログ" name="logs_panel" title="ログ">
 				<view_border name="log_tab_border"/>
-				<text_editor name="log_text">
-				</text_editor>
+				<text_editor name="log_text"/>
 				<check_box label="詳細ログを有効にする（非常に遅くなる可能性があります）" name="verbose_logging"/>
 			</panel>
 		</tab_container>
@@ -392,7 +405,7 @@
 				アップロード料金：L$ [FEE]
 			</text>
 			<text name="prim_weight">
-				土地への負荷（ＬＩ）：[EQ]
+				ランドインパクト：[EQ]
 			</text>
 			<text name="download_weight">
 				ダウンロード：[ST]
@@ -409,7 +422,8 @@
 					費用の内訳
 				</text>
 				<view_border name="price_breakdown_border"/>
-				<text name="price_breakdown_labels">ダウンロード：
+				<text name="price_breakdown_labels">
+					ダウンロード：
 物理効果数：
 インスタンス数：
 テクスチャ数：
@@ -421,14 +435,16 @@
 [MODEL]個</text>
 			</panel>
 			<!-- 
-      Streaming breakdown numbers are available but not fully understood
-      uncommenting the following sections will display the numbers for debugging purposes
-      <text name="streaming_breakdown_labels">ストリーミング／ダウンロード
+			Streaming breakdown numbers are available but not fully understood
+			uncommenting the following sections will display the numbers for debugging purposes
+			<text name="streaming_breakdown_labels">
+				ストリーミング／ダウンロード
 高：
 通常：
 低：
 最低：</text>
-      <text name="streaming_breakdown">[STR_TOTAL]
+			<text name="streaming_breakdown">
+				[STR_TOTAL]
 [STR_HIGH]
 [STR_MED]
 [STR_LOW]
@@ -438,23 +454,31 @@
 					物理効果コスト
 				</text>
 				<view_border name="price_breakdown_border"/>
-				<text name="physics_breakdown_labels">基準の殻：
+				<text name="physics_breakdown_labels">
+					基準の殻：
 メッシュ：
 分析済み：</text>
-				<text name="physics_breakdown">[PCH]
+				<text name="physics_breakdown">
+					[PCH]
 [PM]
 [PHU]</text>
 			</panel>
-			<text name="warning_title">ご注意：</text>
-			<text name="warning_message">メッシュモデルをアップロードする権利がありません。権利の取得方法については[[VURL]]こちらを参照してください。</text>
-			<text name="status">[STATUS]</text>
+			<text name="warning_title">
+				ご注意：
+			</text>
+			<text name="warning_message">
+				メッシュモデルをアップロードする権利がありません。権利の取得方法については[[VURL]]こちらを参照してください。
+			</text>
+			<text name="status">
+				[STATUS]
+			</text>
 		</panel>
 	</panel>
 	<text name="lod_label">
 		プレビュー：
 	</text>
 	<panel name="right_panel">
-		<combo_box name="preview_lod_combo" tool_tip="プレビューレンダーで表示するＬｏＤ">
+		<combo_box name="preview_lod_combo" tool_tip="プレビューレンダーで表示するＬｏＤモデルを指定します。">
 			<combo_item name="high">
 				高
 			</combo_item>

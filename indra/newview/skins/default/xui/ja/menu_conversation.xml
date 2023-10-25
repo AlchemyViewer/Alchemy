@@ -23,6 +23,7 @@
 	<menu_item_call label="嫌がらせの報告" name="report_abuse"/>
 	<menu_item_check label="ボイスをブロック" name="block_unblock"/>
 	<menu_item_check label="テキストをブロックする" name="MuteText"/>
+	<menu_item_call label="報告" name="report_abuse"/>
 	<menu_item_call label="グループのプロフィール" name="group_profile"/>
 	<menu_item_call label="このグループをアクティブ化" name="activate_group"/>
 	<menu_item_call label="このグループから脱退する" name="leave_group"/>
