@@ -1,20 +1,14 @@
 <?xml version="1.0" ?>
 <llsd>
 <map>
+    <key>version</key>
+    <string>1.3</string>
+    <key>type</key>
+    <string>autobuild</string>
     <key>installables</key>
     <map>
       <key>SDL2</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 1997-2022 Sam Lantinga (slouken@libsdl.org)</string>
-        <key>description</key>
-        <string>Simple DirectMedia Layer is a cross-platform multimedia library designed to provide low level access to audio, keyboard, mouse, joystick, 3D hardware via OpenGL, and 2D video framebuffer.</string>
-        <key>license</key>
-        <string>lgpl</string>
-        <key>license_file</key>
-        <string>LICENSES/SDL2.txt</string>
-        <key>name</key>
-        <string>SDL2</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -60,21 +54,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>lgpl</string>
+        <key>license_file</key>
+        <string>LICENSES/SDL2.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1997-2022 Sam Lantinga (slouken@libsdl.org)</string>
         <key>version</key>
         <string>2.28.4</string>
+        <key>name</key>
+        <string>SDL2</string>
+        <key>description</key>
+        <string>Simple DirectMedia Layer is a cross-platform multimedia library designed to provide low level access to audio, keyboard, mouse, joystick, 3D hardware via OpenGL, and 2D video framebuffer.</string>
       </map>
       <key>apr_suite</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright © 2012 The Apache Software Foundation, Licensed under the Apache License, Version 2.0.</string>
-        <key>description</key>
-        <string>Apache portable runtime project</string>
-        <key>license</key>
-        <string>apache</string>
-        <key>license_file</key>
-        <string>LICENSES/apr_suite.txt</string>
-        <key>name</key>
-        <string>apr_suite</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -120,21 +114,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>apache</string>
+        <key>license_file</key>
+        <string>LICENSES/apr_suite.txt</string>
+        <key>copyright</key>
+        <string>Copyright © 2012 The Apache Software Foundation, Licensed under the Apache License, Version 2.0.</string>
         <key>version</key>
         <string>1.4.5</string>
+        <key>name</key>
+        <string>apr_suite</string>
+        <key>description</key>
+        <string>Apache portable runtime project</string>
       </map>
       <key>boost</key>
       <map>
-        <key>copyright</key>
-        <string>(see individual source files)</string>
-        <key>description</key>
-        <string>Boost C++ Libraries</string>
-        <key>license</key>
-        <string>boost 1.0</string>
-        <key>license_file</key>
-        <string>LICENSES/boost.txt</string>
-        <key>name</key>
-        <string>boost</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -180,21 +174,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>boost 1.0</string>
+        <key>license_file</key>
+        <string>LICENSES/boost.txt</string>
+        <key>copyright</key>
+        <string>(see individual source files)</string>
         <key>version</key>
         <string>1.83.0</string>
+        <key>name</key>
+        <string>boost</string>
+        <key>description</key>
+        <string>Boost C++ Libraries</string>
       </map>
       <key>branding</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2023 Alchemy Development Group</string>
-        <key>description</key>
-        <string>Alchemy Branding Material</string>
-        <key>license</key>
-        <string>All Rights Reserved.</string>
-        <key>license_file</key>
-        <string>LICENSES/branding.txt</string>
-        <key>name</key>
-        <string>branding</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -212,19 +206,21 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>All Rights Reserved.</string>
+        <key>license_file</key>
+        <string>LICENSES/branding.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2023 Alchemy Development Group</string>
         <key>version</key>
         <string>1.0.0</string>
+        <key>name</key>
+        <string>branding</string>
+        <key>description</key>
+        <string>Alchemy Branding Material</string>
       </map>
       <key>colladadom</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright 2006 Sony Computer Entertainment Inc.</string>
-        <key>license</key>
-        <string>SCEA</string>
-        <key>license_file</key>
-        <string>LICENSES/collada.txt</string>
-        <key>name</key>
-        <string>colladadom</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -270,19 +266,19 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>SCEA</string>
+        <key>license_file</key>
+        <string>LICENSES/collada.txt</string>
+        <key>copyright</key>
+        <string>Copyright 2006 Sony Computer Entertainment Inc.</string>
         <key>version</key>
         <string>2.3.0</string>
+        <key>name</key>
+        <string>colladadom</string>
       </map>
       <key>cubemaptoequirectangular</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2017 Jaume Sanchez Elias, http://www.clicktorelease.com</string>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/CUBEMAPTOEQUIRECTANGULAR_LICENSE.txt</string>
-        <key>name</key>
-        <string>cubemaptoequirectangular</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -300,21 +296,19 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/CUBEMAPTOEQUIRECTANGULAR_LICENSE.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2017 Jaume Sanchez Elias, http://www.clicktorelease.com</string>
         <key>version</key>
         <string>1.1.0</string>
+        <key>name</key>
+        <string>cubemaptoequirectangular</string>
       </map>
       <key>curl</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 1996 - 2017, Daniel Stenberg, (daniel@haxx.se), and many contributors</string>
-        <key>description</key>
-        <string>Library for transferring data specified with URL syntax</string>
-        <key>license</key>
-        <string>curl</string>
-        <key>license_file</key>
-        <string>LICENSES/curl.txt</string>
-        <key>name</key>
-        <string>curl</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -360,21 +354,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>curl</string>
+        <key>license_file</key>
+        <string>LICENSES/curl.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 1996 - 2017, Daniel Stenberg, (daniel@haxx.se), and many contributors</string>
         <key>version</key>
         <string>7.54.1</string>
+        <key>name</key>
+        <string>curl</string>
+        <key>description</key>
+        <string>Library for transferring data specified with URL syntax</string>
       </map>
       <key>dictionaries</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright 2014 Apache OpenOffice software</string>
-        <key>description</key>
-        <string>Spell checking dictionaries to bundled into the viewer</string>
-        <key>license</key>
-        <string>various open source</string>
-        <key>license_file</key>
-        <string>LICENSES/dictionaries.txt</string>
-        <key>name</key>
-        <string>dictionaries</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -392,23 +386,21 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>various open source</string>
+        <key>license_file</key>
+        <string>LICENSES/dictionaries.txt</string>
+        <key>copyright</key>
+        <string>Copyright 2014 Apache OpenOffice software</string>
         <key>version</key>
         <string>1.0.0</string>
+        <key>name</key>
+        <string>dictionaries</string>
+        <key>description</key>
+        <string>Spell checking dictionaries to bundled into the viewer</string>
       </map>
       <key>discord-gamesdk</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-discord-gamesdk</string>
-        <key>copyright</key>
-        <string>Copyright (c) Discord.</string>
-        <key>description</key>
-        <string>Discord GameSDK for integrating with Discord</string>
-        <key>license</key>
-        <string>proprietary</string>
-        <key>license_file</key>
-        <string>LICENSES/discord-gamesdk.txt</string>
-        <key>name</key>
-        <string>discord-gamesdk</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -460,21 +452,23 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>proprietary</string>
+        <key>license_file</key>
+        <string>LICENSES/discord-gamesdk.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) Discord.</string>
         <key>version</key>
         <string>3.2.1</string>
+        <key>name</key>
+        <string>discord-gamesdk</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-discord-gamesdk</string>
+        <key>description</key>
+        <string>Discord GameSDK for integrating with Discord</string>
       </map>
       <key>dullahan</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2017, Linden Research, Inc.</string>
-        <key>description</key>
-        <string>A headless browser SDK that uses the Chromium Embedded Framework (CEF). It is designed to make it easier to write applications that render modern web content directly to a memory buffer, inject synthesized mouse and keyboard events as well as interact with web based features like JavaScript or cookies.</string>
-        <key>license</key>
-        <string>MPL</string>
-        <key>license_file</key>
-        <string>LICENSES/LICENSE.txt</string>
-        <key>name</key>
-        <string>dullahan</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -520,21 +514,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>MPL</string>
+        <key>license_file</key>
+        <string>LICENSES/LICENSE.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2017, Linden Research, Inc.</string>
         <key>version</key>
         <string>1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54</string>
+        <key>name</key>
+        <string>dullahan</string>
+        <key>description</key>
+        <string>A headless browser SDK that uses the Chromium Embedded Framework (CEF). It is designed to make it easier to write applications that render modern web content directly to a memory buffer, inject synthesized mouse and keyboard events as well as interact with web based features like JavaScript or cookies.</string>
       </map>
       <key>expat</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 1998, 1999, 2000 Thai Open Source Software Center Ltd and Clark Cooper - Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Expat maintainers.</string>
-        <key>description</key>
-        <string>Expat is an XML parser library written in C</string>
-        <key>license</key>
-        <string>expat</string>
-        <key>license_file</key>
-        <string>LICENSES/expat.txt</string>
-        <key>name</key>
-        <string>expat</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -580,21 +574,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>expat</string>
+        <key>license_file</key>
+        <string>LICENSES/expat.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 1998, 1999, 2000 Thai Open Source Software Center Ltd and Clark Cooper - Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Expat maintainers.</string>
         <key>version</key>
         <string>2.5.0</string>
+        <key>name</key>
+        <string>expat</string>
+        <key>description</key>
+        <string>Expat is an XML parser library written in C</string>
       </map>
       <key>fmodstudio</key>
       <map>
-        <key>copyright</key>
-        <string>FMOD Studio, Copyright (c) Firelight Technologies Pty Ltd.</string>
-        <key>description</key>
-        <string>FMOD Studio audio system library</string>
-        <key>license</key>
-        <string>fmodstudio</string>
-        <key>license_file</key>
-        <string>LICENSES/fmodstudio.txt</string>
-        <key>name</key>
-        <string>fmodstudio</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -646,23 +640,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>fmodstudio</string>
+        <key>license_file</key>
+        <string>LICENSES/fmodstudio.txt</string>
+        <key>copyright</key>
+        <string>FMOD Studio, Copyright (c) Firelight Technologies Pty Ltd.</string>
         <key>version</key>
         <string>2.02.18</string>
+        <key>name</key>
+        <string>fmodstudio</string>
+        <key>description</key>
+        <string>FMOD Studio audio system library</string>
       </map>
       <key>fonts</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-fonts</string>
-        <key>copyright</key>
-        <string>Various Licenses</string>
-        <key>description</key>
-        <string>A collection of fonts used by the viewer</string>
-        <key>license</key>
-        <string>various</string>
-        <key>license_file</key>
-        <string>LICENSES/fonts.txt</string>
-        <key>name</key>
-        <string>fonts</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -680,21 +672,23 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>various</string>
+        <key>license_file</key>
+        <string>LICENSES/fonts.txt</string>
+        <key>copyright</key>
+        <string>Various Licenses</string>
         <key>version</key>
         <string>187d5d3</string>
+        <key>name</key>
+        <string>fonts</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-fonts</string>
+        <key>description</key>
+        <string>A collection of fonts used by the viewer</string>
       </map>
       <key>freetype</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright 2006, 2007, 2008, 2009, 2010 by David Turner, Robert Wilhelm, and Werner Lemberg.</string>
-        <key>description</key>
-        <string>Font rendering library</string>
-        <key>license</key>
-        <string>FreeType</string>
-        <key>license_file</key>
-        <string>LICENSES/freetype.txt</string>
-        <key>name</key>
-        <string>freetype</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -726,21 +720,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>FreeType</string>
+        <key>license_file</key>
+        <string>LICENSES/freetype.txt</string>
+        <key>copyright</key>
+        <string>Copyright 2006, 2007, 2008, 2009, 2010 by David Turner, Robert Wilhelm, and Werner Lemberg.</string>
         <key>version</key>
         <string>2.13.2</string>
+        <key>name</key>
+        <string>freetype</string>
+        <key>description</key>
+        <string>Font rendering library</string>
       </map>
       <key>glext</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
-        <key>description</key>
-        <string>glext headers define function prototypes and constants for OpenGL extensions</string>
-        <key>license</key>
-        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
-        <key>license_file</key>
-        <string>LICENSES/glext.txt</string>
-        <key>name</key>
-        <string>glext</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -758,21 +752,21 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
+        <key>license_file</key>
+        <string>LICENSES/glext.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
         <key>version</key>
         <string>68</string>
+        <key>name</key>
+        <string>glext</string>
+        <key>description</key>
+        <string>glext headers define function prototypes and constants for OpenGL extensions</string>
       </map>
       <key>glh_linear</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2000 Cass Everitt</string>
-        <key>description</key>
-        <string>glh - is a platform-indepenedent C++ OpenGL helper library</string>
-        <key>license</key>
-        <string>BSD</string>
-        <key>license_file</key>
-        <string>LICENSES/glh-linear.txt</string>
-        <key>name</key>
-        <string>glh_linear</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -788,19 +782,21 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/glh-linear.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2000 Cass Everitt</string>
         <key>version</key>
         <string>0.0.0</string>
+        <key>name</key>
+        <string>glh_linear</string>
+        <key>description</key>
+        <string>glh - is a platform-indepenedent C++ OpenGL helper library</string>
       </map>
       <key>gstreamer</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 2007 Free Software Foundation, Inc. &lt;http://fsf.org/&gt;</string>
-        <key>license</key>
-        <string>LGPL</string>
-        <key>license_file</key>
-        <string>LICENSES/gstreamer.txt</string>
-        <key>name</key>
-        <string>gstreamer</string>
         <key>platforms</key>
         <map>
           <key>linux64</key>
@@ -816,21 +812,19 @@
             <string>linux64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>LGPL</string>
+        <key>license_file</key>
+        <string>LICENSES/gstreamer.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 2007 Free Software Foundation, Inc. &lt;http://fsf.org/&gt;</string>
         <key>version</key>
         <string>0.10.6.314267</string>
+        <key>name</key>
+        <string>gstreamer</string>
       </map>
       <key>innosetup</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 1997-2023 Jordan Russell. All rights reserved.</string>
-        <key>description</key>
-        <string>Innosetup installer framework</string>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/innosetup.txt</string>
-        <key>name</key>
-        <string>innosetup</string>
         <key>platforms</key>
         <map>
           <key>windows64</key>
@@ -848,19 +842,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/innosetup.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1997-2023 Jordan Russell. All rights reserved.</string>
         <key>version</key>
         <string>6.2.2</string>
+        <key>name</key>
+        <string>innosetup</string>
+        <key>description</key>
+        <string>Innosetup installer framework</string>
       </map>
       <key>jpegencoderbasic</key>
       <map>
-        <key>copyright</key>
-        <string>Andreas Ritter, www.bytestrom.eu, 11/2009</string>
-        <key>license</key>
-        <string>NONE</string>
-        <key>license_file</key>
-        <string>LICENSES/JPEG_ENCODER_BASIC_LICENSE.txt</string>
-        <key>name</key>
-        <string>jpegencoderbasic</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -878,21 +874,19 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>NONE</string>
+        <key>license_file</key>
+        <string>LICENSES/JPEG_ENCODER_BASIC_LICENSE.txt</string>
+        <key>copyright</key>
+        <string>Andreas Ritter, www.bytestrom.eu, 11/2009</string>
         <key>version</key>
         <string>1.0</string>
+        <key>name</key>
+        <string>jpegencoderbasic</string>
       </map>
       <key>kdu</key>
       <map>
-        <key>copyright</key>
-        <string>Kakadu software</string>
-        <key>description</key>
-        <string>JPEG2000 library by Kakadu</string>
-        <key>license</key>
-        <string>Kakadu</string>
-        <key>license_file</key>
-        <string>LICENSES/kdu.txt</string>
-        <key>name</key>
-        <string>kdu</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -940,21 +934,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>Kakadu</string>
+        <key>license_file</key>
+        <string>LICENSES/kdu.txt</string>
+        <key>copyright</key>
+        <string>Kakadu software</string>
         <key>version</key>
         <string>8.0.6</string>
+        <key>name</key>
+        <string>kdu</string>
+        <key>description</key>
+        <string>JPEG2000 library by Kakadu</string>
       </map>
       <key>libhunspell</key>
       <map>
-        <key>copyright</key>
-        <string>LGPL 2.1</string>
-        <key>description</key>
-        <string>Spell checking library</string>
-        <key>license</key>
-        <string>LGPL</string>
-        <key>license_file</key>
-        <string>LICENSES/hunspell.txt</string>
-        <key>name</key>
-        <string>libhunspell</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1000,23 +994,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>LGPL</string>
+        <key>license_file</key>
+        <string>LICENSES/hunspell.txt</string>
+        <key>copyright</key>
+        <string>LGPL 2.1</string>
         <key>version</key>
         <string>1.7.2</string>
+        <key>name</key>
+        <string>libhunspell</string>
+        <key>description</key>
+        <string>Spell checking library</string>
       </map>
       <key>libjpeg-turbo</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libjpeg-turbo</string>
-        <key>copyright</key>
-        <string>Copyright (C)2009-2023 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
-        <key>description</key>
-        <string>JPEG encoding, decoding library</string>
-        <key>license</key>
-        <string>libjpeg-turbo</string>
-        <key>license_file</key>
-        <string>LICENSES/libjpeg-turbo.txt</string>
-        <key>name</key>
-        <string>libjpeg-turbo</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1062,21 +1054,23 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>libjpeg-turbo</string>
+        <key>license_file</key>
+        <string>LICENSES/libjpeg-turbo.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C)2009-2023 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
         <key>version</key>
         <string>3.0.0</string>
+        <key>name</key>
+        <string>libjpeg-turbo</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libjpeg-turbo</string>
+        <key>description</key>
+        <string>JPEG encoding, decoding library</string>
       </map>
       <key>libndofdev</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2007, 3Dconnexion, Inc. - All rights reserved.</string>
-        <key>description</key>
-        <string>3DConnexion SDK</string>
-        <key>license</key>
-        <string>BSD</string>
-        <key>license_file</key>
-        <string>LICENSES/libndofdev.txt</string>
-        <key>name</key>
-        <string>libndofdev</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1108,21 +1102,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/libndofdev.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2007, 3Dconnexion, Inc. - All rights reserved.</string>
         <key>version</key>
         <string>0.1.0</string>
+        <key>name</key>
+        <string>libndofdev</string>
+        <key>description</key>
+        <string>3DConnexion SDK</string>
       </map>
       <key>libpng</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 1995-2019 The PNG Reference Library Authors</string>
-        <key>description</key>
-        <string>PNG Reference library</string>
-        <key>license</key>
-        <string>libpng</string>
-        <key>license_file</key>
-        <string>LICENSES/libpng.txt</string>
-        <key>name</key>
-        <string>libpng</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1168,23 +1162,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>libpng</string>
+        <key>license_file</key>
+        <string>LICENSES/libpng.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 1995-2019 The PNG Reference Library Authors</string>
         <key>version</key>
         <string>1.6.40</string>
+        <key>name</key>
+        <string>libpng</string>
+        <key>description</key>
+        <string>PNG Reference library</string>
       </map>
       <key>libwebp</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libwebp</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2010, Google Inc. All rights reserved.</string>
-        <key>description</key>
-        <string>WebP is a modern image format that provides superior lossless and lossy compression for images on the web.</string>
-        <key>license</key>
-        <string>BSD</string>
-        <key>license_file</key>
-        <string>LICENSES/libwebp.txt</string>
-        <key>name</key>
-        <string>libwebp</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1230,21 +1222,23 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/libwebp.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Google Inc. All rights reserved.</string>
         <key>version</key>
         <string>1.3.1</string>
+        <key>name</key>
+        <string>libwebp</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libwebp</string>
+        <key>description</key>
+        <string>WebP is a modern image format that provides superior lossless and lossy compression for images on the web.</string>
       </map>
       <key>libxml2</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 1998-2012 Daniel Veillard.  All Rights Reserved.</string>
-        <key>description</key>
-        <string>Libxml2 is the XML C parser and toolkit developed for the Gnome project.</string>
-        <key>license</key>
-        <string>mit</string>
-        <key>license_file</key>
-        <string>LICENSES/libxml2.txt</string>
-        <key>name</key>
-        <string>libxml2</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1290,20 +1284,21 @@
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>2.11.5</string>
-      </map>
-      <key>llca</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2020, Alchemy Development Group; data provided by the Mozilla NSS Project.
-      </string>
         <key>license</key>
         <string>mit</string>
         <key>license_file</key>
-        <string>LICENSES/ca-license.txt</string>
+        <string>LICENSES/libxml2.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1998-2012 Daniel Veillard.  All Rights Reserved.</string>
+        <key>version</key>
+        <string>2.11.5</string>
         <key>name</key>
-        <string>llca</string>
+        <string>libxml2</string>
+        <key>description</key>
+        <string>Libxml2 is the XML C parser and toolkit developed for the Gnome project.</string>
+      </map>
+      <key>llca</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -1321,19 +1316,20 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>mit</string>
+        <key>license_file</key>
+        <string>LICENSES/ca-license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2020, Alchemy Development Group; data provided by the Mozilla NSS Project.
+      </string>
         <key>version</key>
         <string>2023.1015.0309</string>
+        <key>name</key>
+        <string>llca</string>
       </map>
       <key>llphysicsextensions_stub</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2010, Linden Research, Inc.</string>
-        <key>license</key>
-        <string>internal</string>
-        <key>license_file</key>
-        <string>LICENSES/llphysicsextensions.txt</string>
-        <key>name</key>
-        <string>llphysicsextensions_stub</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -1351,19 +1347,19 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>internal</string>
+        <key>license_file</key>
+        <string>LICENSES/llphysicsextensions.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Linden Research, Inc.</string>
         <key>version</key>
         <string>1.0</string>
+        <key>name</key>
+        <string>llphysicsextensions_stub</string>
       </map>
       <key>llphysicsextensions_tpv</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2010, Linden Research, Inc.</string>
-        <key>license</key>
-        <string>commercial</string>
-        <key>license_file</key>
-        <string>LICENSES/llphysicsextensions.txt</string>
-        <key>name</key>
-        <string>llphysicsextensions_tpv</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1415,23 +1411,19 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>commercial</string>
+        <key>license_file</key>
+        <string>LICENSES/llphysicsextensions.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Linden Research, Inc.</string>
         <key>version</key>
         <string>1.0.579391</string>
+        <key>name</key>
+        <string>llphysicsextensions_tpv</string>
       </map>
       <key>mikktspace</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://bitbucket.org/lindenlab/3p-mikktspace</string>
-        <key>copyright</key>
-        <string>Copyright (C) 2011 by Morten S. Mikkelsen</string>
-        <key>description</key>
-        <string>Mikktspace Tangent Generator</string>
-        <key>license</key>
-        <string>Copyright (C) 2011 by Morten S. Mikkelsen</string>
-        <key>license_file</key>
-        <string>mikktspace.txt</string>
-        <key>name</key>
-        <string>mikktspace</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -1449,23 +1441,23 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>Copyright (C) 2011 by Morten S. Mikkelsen</string>
+        <key>license_file</key>
+        <string>mikktspace.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 2011 by Morten S. Mikkelsen</string>
         <key>version</key>
         <string>1</string>
+        <key>name</key>
+        <string>mikktspace</string>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-mikktspace</string>
+        <key>description</key>
+        <string>Mikktspace Tangent Generator</string>
       </map>
       <key>minizip-ng</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-minizip-ng</string>
-        <key>copyright</key>
-        <string>Copyright (C) 2010-2021 Nathan Moinvaziri</string>
-        <key>description</key>
-        <string>Fork of the popular zip manipulation library found in the zlib distribution.</string>
-        <key>license</key>
-        <string>zlib</string>
-        <key>license_file</key>
-        <string>LICENSES/minizip-ng.txt</string>
-        <key>name</key>
-        <string>minizip-ng</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1511,21 +1503,23 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>zlib</string>
+        <key>license_file</key>
+        <string>LICENSES/minizip-ng.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 2010-2021 Nathan Moinvaziri</string>
         <key>version</key>
         <string>4.0.1</string>
+        <key>name</key>
+        <string>minizip-ng</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-minizip-ng</string>
+        <key>description</key>
+        <string>Fork of the popular zip manipulation library found in the zlib distribution.</string>
       </map>
       <key>ndPhysicsStub</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c)2011-2013 Nicky Dasmijn</string>
-        <key>description</key>
-        <string>ndPhysicsStub</string>
-        <key>license</key>
-        <string>LGPL</string>
-        <key>license_file</key>
-        <string>LICENSES/ndphysicsstub.txt</string>
-        <key>name</key>
-        <string>ndPhysicsStub</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1571,22 +1565,21 @@
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>LGPL</string>
+        <key>license_file</key>
+        <string>LICENSES/ndphysicsstub.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c)2011-2013 Nicky Dasmijn</string>
         <key>version</key>
         <string>0.1.2</string>
+        <key>name</key>
+        <string>ndPhysicsStub</string>
+        <key>description</key>
+        <string>ndPhysicsStub</string>
       </map>
       <key>nghttp2</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2012, 2014, 2015, 2016 Tatsuhiro Tsujikawa
-Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
-        <key>description</key>
-        <string>Library providing HTTP 2 support for libcurl</string>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/nghttp2.txt</string>
-        <key>name</key>
-        <string>nghttp2</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1632,23 +1625,24 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
-        <key>source_type</key>
-        <string>hg</string>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/nghttp2.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2012, 2014, 2015, 2016 Tatsuhiro Tsujikawa
+Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>version</key>
         <string>1.56.0</string>
+        <key>name</key>
+        <string>nghttp2</string>
+        <key>description</key>
+        <string>Library providing HTTP 2 support for libcurl</string>
+        <key>source_type</key>
+        <string>hg</string>
       </map>
       <key>nvapi</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2007- 2020 NVIDIA Corporation. All rights reserved. </string>
-        <key>description</key>
-        <string>NVAPI provides an interface to NVIDIA devices.</string>
-        <key>license</key>
-        <string>nvapi</string>
-        <key>license_file</key>
-        <string>LICENSES/nvapi.txt</string>
-        <key>name</key>
-        <string>nvapi</string>
         <key>platforms</key>
         <map>
           <key>windows64</key>
@@ -1668,21 +1662,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>nvapi</string>
+        <key>license_file</key>
+        <string>LICENSES/nvapi.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2007- 2020 NVIDIA Corporation. All rights reserved. </string>
         <key>version</key>
         <string>535.0.0</string>
+        <key>name</key>
+        <string>nvapi</string>
+        <key>description</key>
+        <string>NVAPI provides an interface to NVIDIA devices.</string>
       </map>
       <key>ogg_vorbis</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2002, Xiph.org Foundation</string>
-        <key>description</key>
-        <string>Audio encoding library</string>
-        <key>license</key>
-        <string>ogg-vorbis</string>
-        <key>license_file</key>
-        <string>LICENSES/ogg-vorbis.txt</string>
-        <key>name</key>
-        <string>ogg_vorbis</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1728,21 +1722,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>ogg-vorbis</string>
+        <key>license_file</key>
+        <string>LICENSES/ogg-vorbis.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2002, Xiph.org Foundation</string>
         <key>version</key>
         <string>1.3.5-1.3.7</string>
+        <key>name</key>
+        <string>ogg_vorbis</string>
+        <key>description</key>
+        <string>Audio encoding library</string>
       </map>
       <key>open-libndofdev</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2008, Jan Ciger (jan.ciger (at) gmail.com)</string>
-        <key>description</key>
-        <string>Open Source replacement for 3DConnection SDK</string>
-        <key>license</key>
-        <string>BSD</string>
-        <key>license_file</key>
-        <string>LICENSES/libndofdev.txt</string>
-        <key>name</key>
-        <string>open-libndofdev</string>
         <key>platforms</key>
         <map>
           <key>linux64</key>
@@ -1760,21 +1754,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>linux64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/libndofdev.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2008, Jan Ciger (jan.ciger (at) gmail.com)</string>
         <key>version</key>
         <string>0.13.0</string>
+        <key>name</key>
+        <string>open-libndofdev</string>
+        <key>description</key>
+        <string>Open Source replacement for 3DConnection SDK</string>
       </map>
       <key>openal</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 1999-2007 by authors.</string>
-        <key>description</key>
-        <string>OpenAL Soft is a software implementation of the OpenAL 3D audio API.</string>
-        <key>license</key>
-        <string>LGPL2</string>
-        <key>license_file</key>
-        <string>LICENSES/openal-soft.txt</string>
-        <key>name</key>
-        <string>openal</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1820,21 +1814,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>LGPL2</string>
+        <key>license_file</key>
+        <string>LICENSES/openal-soft.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1999-2007 by authors.</string>
         <key>version</key>
         <string>1.23.1</string>
+        <key>name</key>
+        <string>openal</string>
+        <key>description</key>
+        <string>OpenAL Soft is a software implementation of the OpenAL 3D audio API.</string>
       </map>
       <key>openjpeg</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2002-2014, Universite catholique de Louvain, Belgium, Copyright (c) 2002-2012, Professor Benoit Macq, Copyright (c) 2003-2012, Antonin Descampe, Copyright (c) 2003-2009, Francois-Olivier Devaux, Copyright (c) 2005, Herve Drolon, FreeImage Team, Copyright (c) 2002-2003, Yannick Verschueren, Copyright (c) 2001-2003, David Janssens</string>
-        <key>description</key>
-        <string>The OpenJPEG library is an open-source JPEG 2000 codec written in C language.</string>
-        <key>license</key>
-        <string>BSD</string>
-        <key>license_file</key>
-        <string>LICENSES/openjpeg.txt</string>
-        <key>name</key>
-        <string>openjpeg</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1880,21 +1874,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/openjpeg.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2002-2014, Universite catholique de Louvain, Belgium, Copyright (c) 2002-2012, Professor Benoit Macq, Copyright (c) 2003-2012, Antonin Descampe, Copyright (c) 2003-2009, Francois-Olivier Devaux, Copyright (c) 2005, Herve Drolon, FreeImage Team, Copyright (c) 2002-2003, Yannick Verschueren, Copyright (c) 2001-2003, David Janssens</string>
         <key>version</key>
         <string>2.4.0</string>
+        <key>name</key>
+        <string>openjpeg</string>
+        <key>description</key>
+        <string>The OpenJPEG library is an open-source JPEG 2000 codec written in C language.</string>
       </map>
       <key>openssl</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 1998-2023 The OpenSSL Project.  All rights reserved; Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)</string>
-        <key>description</key>
-        <string>Secure Sockets Layer (SSL v2/v3) and Transport Layer Security (TLS v1) Library</string>
-        <key>license</key>
-        <string>openssl</string>
-        <key>license_file</key>
-        <string>LICENSES/openssl.txt</string>
-        <key>name</key>
-        <string>openssl</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1940,23 +1934,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>openssl</string>
+        <key>license_file</key>
+        <string>LICENSES/openssl.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 1998-2023 The OpenSSL Project.  All rights reserved; Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)</string>
         <key>version</key>
         <string>1.1.1v</string>
+        <key>name</key>
+        <string>openssl</string>
+        <key>description</key>
+        <string>Secure Sockets Layer (SSL v2/v3) and Transport Layer Security (TLS v1) Library</string>
       </map>
       <key>sdbus-cpp</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-sdbus-cpp</string>
-        <key>copyright</key>
-        <string>Copyright (c) 22016 - 2021 KISTLER INSTRUMENTE AG, Winterthur, Switzerland, (C) 2016 - 2022 Stanislav Angelovic stanislav.angelovic@protonmail.com</string>
-        <key>description</key>
-        <string>High-level C++ D-Bus library for Linux designed to provide easy-to-use yet powerful API in modern C++</string>
-        <key>license</key>
-        <string>LGPL</string>
-        <key>license_file</key>
-        <string>LICENSES/sdbus-cpp.txt</string>
-        <key>name</key>
-        <string>sdbus-cpp</string>
         <key>platforms</key>
         <map>
           <key>linux64</key>
@@ -1974,23 +1966,23 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>linux64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>LGPL</string>
+        <key>license_file</key>
+        <string>LICENSES/sdbus-cpp.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 22016 - 2021 KISTLER INSTRUMENTE AG, Winterthur, Switzerland, (C) 2016 - 2022 Stanislav Angelovic stanislav.angelovic@protonmail.com</string>
         <key>version</key>
         <string>1.2.0</string>
+        <key>name</key>
+        <string>sdbus-cpp</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-sdbus-cpp</string>
+        <key>description</key>
+        <string>High-level C++ D-Bus library for Linux designed to provide easy-to-use yet powerful API in modern C++</string>
       </map>
       <key>sentry</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-sentry</string>
-        <key>copyright</key>
-        <string>Copyright (c) Sentry</string>
-        <key>description</key>
-        <string>The official Sentry SDK for Apple and Native</string>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/sentry.txt</string>
-        <key>name</key>
-        <string>sentry</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2036,21 +2028,23 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/sentry.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) Sentry</string>
         <key>version</key>
         <string>8.13.1-0.6.6</string>
+        <key>name</key>
+        <string>sentry</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-sentry</string>
+        <key>description</key>
+        <string>The official Sentry SDK for Apple and Native</string>
       </map>
       <key>slvoice</key>
       <map>
-        <key>copyright</key>
-        <string>2010 Vivox, including audio coding using Polycom¨ Siren14TM (ITU-T Rec. G.722.1 Annex C)</string>
-        <key>description</key>
-        <string>Vivox SDK components</string>
-        <key>license</key>
-        <string>Mixed</string>
-        <key>license_file</key>
-        <string>LICENSES/vivox_licenses.txt</string>
-        <key>name</key>
-        <string>slvoice</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2108,19 +2102,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>Mixed</string>
+        <key>license_file</key>
+        <string>LICENSES/vivox_licenses.txt</string>
+        <key>copyright</key>
+        <string>2010 Vivox, including audio coding using Polycom¨ Siren14TM (ITU-T Rec. G.722.1 Annex C)</string>
         <key>version</key>
         <string>4.10.0000.32327.5fc3fe7c.558436</string>
+        <key>name</key>
+        <string>slvoice</string>
+        <key>description</key>
+        <string>Vivox SDK components</string>
       </map>
       <key>threejs</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright © 2010-2021 three.js authors</string>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/THREEJS_LICENSE.txt</string>
-        <key>name</key>
-        <string>threejs</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -2138,23 +2134,19 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>common</string>
           </map>
         </map>
-        <key>version</key>
-        <string>0.135.0</string>
-      </map>
-      <key>tinygltf</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://bitbucket.org/lindenlab/3p-tinygltf</string>
-        <key>copyright</key>
-        <string>// Copyright (c) 2015 - Present Syoyo Fujita, Aurélien Chatelain and many contributors.</string>
-        <key>description</key>
-        <string>tinygltf import library</string>
         <key>license</key>
         <string>MIT</string>
         <key>license_file</key>
-        <string>LICENSES/tinygltf_license.txt</string>
+        <string>LICENSES/THREEJS_LICENSE.txt</string>
+        <key>copyright</key>
+        <string>Copyright © 2010-2021 three.js authors</string>
+        <key>version</key>
+        <string>0.135.0</string>
         <key>name</key>
-        <string>tinygltf</string>
+        <string>threejs</string>
+      </map>
+      <key>tinygltf</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -2172,27 +2164,27 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/tinygltf_license.txt</string>
+        <key>copyright</key>
+        <string>// Copyright (c) 2015 - Present Syoyo Fujita, Aurélien Chatelain and many contributors.</string>
+        <key>version</key>
+        <string>v2.8.18</string>
+        <key>name</key>
+        <string>tinygltf</string>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-tinygltf</string>
+        <key>description</key>
+        <string>tinygltf import library</string>
         <key>source</key>
         <string>https://bitbucket.org/lindenlab/3p-tinygltf</string>
         <key>source_type</key>
         <string>git</string>
-        <key>version</key>
-        <string>v2.8.18</string>
       </map>
       <key>tracy</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://bitbucket.org/lindenlab/3p-tracy</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2017-2022, Bartosz Taudul (wolf@nereid.pl)</string>
-        <key>description</key>
-        <string>Tracy Profiler Library</string>
-        <key>license</key>
-        <string>bsd</string>
-        <key>license_file</key>
-        <string>LICENSES/tracy_license.txt</string>
-        <key>name</key>
-        <string>tracy</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2222,25 +2214,27 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>bsd</string>
+        <key>license_file</key>
+        <string>LICENSES/tracy_license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2017-2022, Bartosz Taudul (wolf@nereid.pl)</string>
+        <key>version</key>
+        <string>v0.9.0</string>
+        <key>name</key>
+        <string>tracy</string>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-tracy</string>
+        <key>description</key>
+        <string>Tracy Profiler Library</string>
         <key>source</key>
         <string>https://bitbucket.org/lindenlab/3p-tracy</string>
         <key>source_type</key>
         <string>git</string>
-        <key>version</key>
-        <string>v0.9.0</string>
       </map>
       <key>tut</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright 2002-2006 Vladimir Dyuzhev, Copyright 2007 Denis Kononenko, Copyright 2008-2009 Michał Rzechonek</string>
-        <key>description</key>
-        <string>TUT is a small and portable unit test framework for C++.</string>
-        <key>license</key>
-        <string>bsd</string>
-        <key>license_file</key>
-        <string>LICENSES/tut.txt</string>
-        <key>name</key>
-        <string>tut</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -2258,21 +2252,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>bsd</string>
+        <key>license_file</key>
+        <string>LICENSES/tut.txt</string>
+        <key>copyright</key>
+        <string>Copyright 2002-2006 Vladimir Dyuzhev, Copyright 2007 Denis Kononenko, Copyright 2008-2009 Michał Rzechonek</string>
         <key>version</key>
         <string>2008.11.30</string>
+        <key>name</key>
+        <string>tut</string>
+        <key>description</key>
+        <string>TUT is a small and portable unit test framework for C++.</string>
       </map>
       <key>uriparser</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 2007, Weijia Song &lt;songweijia@gmail.com&gt;, Sebastian Pipping &lt;webmaster@hartwork.org&gt;</string>
-        <key>description</key>
-        <string>uriparser is a strictly RFC 3986 compliant URI parsing and handling library written in C. uriparser is cross-platform, fast, supports Unicode and is licensed under the New BSD license.</string>
-        <key>license</key>
-        <string>New BSD license</string>
-        <key>license_file</key>
-        <string>LICENSES/uriparser.txt</string>
-        <key>name</key>
-        <string>uriparser</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2318,19 +2312,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>New BSD license</string>
+        <key>license_file</key>
+        <string>LICENSES/uriparser.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 2007, Weijia Song &lt;songweijia@gmail.com&gt;, Sebastian Pipping &lt;webmaster@hartwork.org&gt;</string>
         <key>version</key>
         <string>0.9.7</string>
+        <key>name</key>
+        <string>uriparser</string>
+        <key>description</key>
+        <string>uriparser is a strictly RFC 3986 compliant URI parsing and handling library written in C. uriparser is cross-platform, fast, supports Unicode and is licensed under the New BSD license.</string>
       </map>
       <key>vlc-bin</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 1998-2020 VLC authors and VideoLAN</string>
-        <key>license</key>
-        <string>GPL2</string>
-        <key>license_file</key>
-        <string>LICENSES/vlc.txt</string>
-        <key>name</key>
-        <string>vlc-bin</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2362,23 +2358,19 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>GPL2</string>
+        <key>license_file</key>
+        <string>LICENSES/vlc.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1998-2020 VLC authors and VideoLAN</string>
         <key>version</key>
         <string>3.0.18</string>
+        <key>name</key>
+        <string>vlc-bin</string>
       </map>
       <key>vulkan_gltf</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://bitbucket.org/lindenlab/3p-vulkan-gltf-pbr</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2018 Sascha Willems</string>
-        <key>description</key>
-        <string>Vulkan GLTF Sample Implementation</string>
-        <key>license</key>
-        <string>Copyright (c) 2018 Sascha Willems</string>
-        <key>license_file</key>
-        <string>LICENSES/vulkan_gltf.txt</string>
-        <key>name</key>
-        <string>vulkan_gltf</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2418,21 +2410,23 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>Copyright (c) 2018 Sascha Willems</string>
+        <key>license_file</key>
+        <string>LICENSES/vulkan_gltf.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2018 Sascha Willems</string>
         <key>version</key>
         <string>1</string>
+        <key>name</key>
+        <string>vulkan_gltf</string>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-vulkan-gltf-pbr</string>
+        <key>description</key>
+        <string>Vulkan GLTF Sample Implementation</string>
       </map>
       <key>xmlrpc-epi</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright: (C) 2000 Epinions, Inc.</string>
-        <key>description</key>
-        <string>XMLRPC Library</string>
-        <key>license</key>
-        <string>xmlrpc-epi</string>
-        <key>license_file</key>
-        <string>LICENSES/xmlrpc-epi.txt</string>
-        <key>name</key>
-        <string>xmlrpc-epi</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2478,21 +2472,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>xmlrpc-epi</string>
+        <key>license_file</key>
+        <string>LICENSES/xmlrpc-epi.txt</string>
+        <key>copyright</key>
+        <string>Copyright: (C) 2000 Epinions, Inc.</string>
         <key>version</key>
         <string>0.54.1</string>
+        <key>name</key>
+        <string>xmlrpc-epi</string>
+        <key>description</key>
+        <string>XMLRPC Library</string>
       </map>
       <key>xxhash</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2012-2021 Yann Collet</string>
-        <key>description</key>
-        <string>Extremely fast non-cryptographic hash algorithm</string>
-        <key>license</key>
-        <string>BSD 2-Clause</string>
-        <key>license_file</key>
-        <string>LICENSES/xxhash.txt</string>
-        <key>name</key>
-        <string>xxhash</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -2510,23 +2504,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>BSD 2-Clause</string>
+        <key>license_file</key>
+        <string>LICENSES/xxhash.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2012-2021 Yann Collet</string>
         <key>version</key>
         <string>0.8.2</string>
+        <key>name</key>
+        <string>xxhash</string>
+        <key>description</key>
+        <string>Extremely fast non-cryptographic hash algorithm</string>
       </map>
       <key>zlib-ng</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-zlib-ng</string>
-        <key>copyright</key>
-        <string>Copyright (C) 1995-2017 Jean-loup Gailly and Mark Adler</string>
-        <key>description</key>
-        <string>zlib replacement with optimizations for next generation systems.</string>
-        <key>license</key>
-        <string>zlib</string>
-        <key>license_file</key>
-        <string>LICENSES/zlib-ng.txt</string>
-        <key>name</key>
-        <string>zlib-ng</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2572,24 +2564,24 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>zlib</string>
+        <key>license_file</key>
+        <string>LICENSES/zlib-ng.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1995-2017 Jean-loup Gailly and Mark Adler</string>
         <key>version</key>
         <string>2.1.3</string>
+        <key>name</key>
+        <string>zlib-ng</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-zlib-ng</string>
+        <key>description</key>
+        <string>zlib replacement with optimizations for next generation systems.</string>
       </map>
     </map>
     <key>package_description</key>
     <map>
-      <key>canonical_repo</key>
-      <string>https://git.alchemyviewer.org/alchemy</string>
-      <key>copyright</key>
-      <string>Copyright (c) 2013-2023, Alchemy Development Group</string>
-      <key>description</key>
-      <string>Alchemy Viewer</string>
-      <key>license</key>
-      <string>LGPL</string>
-      <key>license_file</key>
-      <string>docs/LICENSE-source.txt</string>
-      <key>name</key>
-      <string>Alchemy Viewer</string>
       <key>platforms</key>
       <map>
         <key>common</key>
@@ -2600,10 +2592,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <map>
               <key>configure</key>
               <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
                 <key>command</key>
                 <string>cmake</string>
                 <key>options</key>
@@ -2612,16 +2600,17 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                </array>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
               </map>
               <key>name</key>
               <string>Coverity</string>
             </map>
             <key>RelWithDebInfo</key>
             <map>
-              <key>build</key>
-              <map>
-              </map>
               <key>configure</key>
               <map>
                 <key>command</key>
@@ -2632,7 +2621,10 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=TRUE</string>
-                </array>
+</array>
+              </map>
+              <key>build</key>
+              <map>
               </map>
               <key>name</key>
               <string>RelWithDebInfo</string>
@@ -2641,10 +2633,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <map>
               <key>configure</key>
               <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
                 <key>command</key>
                 <string>cmake</string>
                 <key>options</key>
@@ -2653,16 +2641,17 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                </array>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
               </map>
               <key>name</key>
               <string>RelWithDebInfoOS</string>
             </map>
             <key>Release</key>
             <map>
-              <key>build</key>
-              <map>
-              </map>
               <key>configure</key>
               <map>
                 <key>command</key>
@@ -2673,7 +2662,10 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=TRUE</string>
-                </array>
+</array>
+              </map>
+              <key>build</key>
+              <map>
               </map>
               <key>name</key>
               <string>Release</string>
@@ -2682,10 +2674,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <map>
               <key>configure</key>
               <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
                 <key>command</key>
                 <string>cmake</string>
                 <key>options</key>
@@ -2694,7 +2682,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                </array>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
               </map>
               <key>name</key>
               <string>ReleaseOS</string>
@@ -2705,12 +2697,24 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         </map>
         <key>darwin64</key>
         <map>
-          <key>build_directory</key>
-          <string>build-darwin-64</string>
           <key>configurations</key>
           <map>
             <key>Coverity</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>command</key>
+                <string>cmake</string>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Unix Makefiles</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2722,27 +2726,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>make</string>
                   <string>-j</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>command</key>
-                <string>cmake</string>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Unix Makefiles</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>Coverity</string>
             </map>
             <key>RelWithDebInfo</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Xcode</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2754,19 +2756,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
                   <string>-parallelizeTargets</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Xcode</string>
-                </array>
+</array>
               </map>
               <key>default</key>
               <string>True</string>
@@ -2775,6 +2765,14 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             </map>
             <key>RelWithDebInfoOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Xcode</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2786,21 +2784,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
                   <string>-parallelizeTargets</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Xcode</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>RelWithDebInfoOS</string>
             </map>
             <key>Release</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Xcode</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2812,25 +2814,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
                   <string>-parallelizeTargets</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Xcode</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>Release</string>
             </map>
             <key>ReleaseOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Xcode</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2842,31 +2840,31 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
                   <string>-parallelizeTargets</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Xcode</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>ReleaseOS</string>
             </map>
           </map>
+          <key>build_directory</key>
+          <string>build-darwin-64</string>
           <key>name</key>
           <string>darwin64</string>
         </map>
         <key>linux</key>
         <map>
-          <key>build_directory</key>
-          <string>build-linux-$AUTOBUILD_ADDRSIZE</string>
           <key>configurations</key>
           <map>
             <key>Coverity</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Unix Makefiles</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2878,21 +2876,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>make</string>
                   <string>-j</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Unix Makefiles</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>Coverity</string>
             </map>
             <key>RelWithDebInfo</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Ninja</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2905,19 +2907,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--parallel</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Ninja</string>
-                </array>
+</array>
               </map>
               <key>default</key>
               <string>True</string>
@@ -2926,6 +2916,14 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             </map>
             <key>RelWithDebInfoOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Ninja</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2938,21 +2936,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--parallel</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Ninja</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>RelWithDebInfoOS</string>
             </map>
             <key>Release</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Ninja</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2965,25 +2967,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--parallel</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Ninja</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>Release</string>
             </map>
             <key>ReleaseOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Ninja</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2996,15 +2994,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--parallel</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Ninja</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>ReleaseOS</string>
@@ -3018,17 +3008,33 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
               <string>default</string>
             </map>
           </map>
+          <key>build_directory</key>
+          <string>build-linux-$AUTOBUILD_ADDRSIZE</string>
           <key>name</key>
           <string>linux</string>
         </map>
         <key>windows</key>
         <map>
-          <key>build_directory</key>
-          <string>build-vc-$AUTOBUILD_ADDRSIZE</string>
           <key>configurations</key>
           <map>
             <key>RelWithDebInfo</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
+                  <string>-A</string>
+                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
+                  <string>-T</string>
+                  <string>host=x64</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>..\indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -3041,23 +3047,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--</string>
                   <string>/m</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>..\indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
-                  <string>-A</string>
-                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
-                  <string>-T</string>
-                  <string>host=x64</string>
-                </array>
+</array>
               </map>
               <key>default</key>
               <string>True</string>
@@ -3066,6 +3056,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             </map>
             <key>RelWithDebInfoOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
+                  <string>-A</string>
+                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
+                  <string>-DUNATTENDED:BOOL=ON</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>..\indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -3078,28 +3083,29 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>RelWithDebInfo</string>
                   <string>--</string>
                   <string>/m</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>..\indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
-                  <string>-A</string>
-                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
-                  <string>-DUNATTENDED:BOOL=ON</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>RelWithDebInfoOS</string>
             </map>
             <key>Release</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
+                  <string>-A</string>
+                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
+                  <string>-T</string>
+                  <string>host=x64</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>..\indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -3112,29 +3118,29 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--</string>
                   <string>/m</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>..\indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
-                  <string>-A</string>
-                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
-                  <string>-T</string>
-                  <string>host=x64</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>Release</string>
             </map>
             <key>ReleaseOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
+                  <string>-A</string>
+                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
+                  <string>-T</string>
+                  <string>host=x64</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>..\indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -3147,38 +3153,32 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--</string>
                   <string>/m</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>..\indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
-                  <string>-A</string>
-                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
-                  <string>-T</string>
-                  <string>host=x64</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>ReleaseOS</string>
             </map>
           </map>
+          <key>build_directory</key>
+          <string>build-vc-$AUTOBUILD_ADDRSIZE</string>
           <key>name</key>
           <string>windows</string>
         </map>
       </map>
+      <key>license</key>
+      <string>LGPL</string>
+      <key>license_file</key>
+      <string>docs/LICENSE-source.txt</string>
+      <key>copyright</key>
+      <string>Copyright (c) 2013-2023, Alchemy Development Group</string>
       <key>version_file</key>
       <string>newview/viewer_version.txt</string>
+      <key>name</key>
+      <string>Alchemy Viewer</string>
+      <key>canonical_repo</key>
+      <string>https://git.alchemyviewer.org/alchemy</string>
+      <key>description</key>
+      <string>Alchemy Viewer</string>
     </map>
-    <key>type</key>
-    <string>autobuild</string>
-    <key>version</key>
-    <string>1.3</string>
   </map>
 </llsd>
