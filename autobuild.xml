@@ -1378,22 +1378,6 @@
             <key>name</key>
             <string>darwin64</string>
           </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>creds</key>
-              <string>gitlab</string>
-              <key>hash</key>
-              <string>f0d5a4733498fbc779bed2639ea5a14cf2cf888c7e74c446e24df00d593e69c2edce17592ea69da7fff3ef8070672534d074a7654d3e18c691dcef5cc4c4ec1e</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.577418/llphysicsextensions_tpv-1.0.577418-windows-577418.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
@@ -2075,18 +2059,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>name</key>
             <string>linux64</string>
           </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>6e0ed41653955afe8eeb8945776cf07b</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/98683/871560/slvoice-4.10.0000.32327.5fc3fe7c.571099-windows-571099.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
@@ -2384,18 +2356,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>58eea384be49ba756ce9c5e66669540b</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/101318/891520/vulkan_gltf-1-windows-572743.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
           </map>
           <key>windows64</key>
           <map>

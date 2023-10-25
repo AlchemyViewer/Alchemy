@@ -46,6 +46,7 @@
 #include "llviewernetwork.h"
 #include "llviewerregion.h"
 #include "llpanel.h"
+#include "stringize.h"
 
 
 const F64 CURRENCY_ESTIMATE_FREQUENCY = 2.0;
@@ -159,7 +160,7 @@ void LLCurrencyUIManager::Impl::updateCurrencyInfo()
 		mLocalCurrencyEstimated = true;
 		return;
 	}
-	
+
 	LLXMLRPCValue keywordArgs = LLXMLRPCValue::createStruct();
 	keywordArgs.appendString("agentId", gAgent.getID().asString());
 	keywordArgs.appendString(
@@ -171,8 +172,10 @@ void LLCurrencyUIManager::Impl::updateCurrencyInfo()
 	keywordArgs.appendInt("viewerMajorVersion", LLVersionInfo::instance().getMajor());
 	keywordArgs.appendInt("viewerMinorVersion", LLVersionInfo::instance().getMinor());
 	keywordArgs.appendInt("viewerPatchVersion", LLVersionInfo::instance().getPatch());
-	keywordArgs.appendInt("viewerBuildVersion", LLVersionInfo::instance().getBuild());
-	
+	// With GitHub builds, the build number is too big to fit in a 32-bit int,
+	// and XMLRPC_VALUE doesn't deal with integers wider than int. Use string.
+	keywordArgs.appendString("viewerBuildVersion", stringize(LLVersionInfo::instance().getBuild()));
+
 	LLXMLRPCValue params = LLXMLRPCValue::createArray();
 	params.append(keywordArgs);
 
@@ -246,7 +249,9 @@ void LLCurrencyUIManager::Impl::startCurrencyBuy(const std::string& password)
 	keywordArgs.appendInt("viewerMajorVersion", LLVersionInfo::instance().getMajor());
 	keywordArgs.appendInt("viewerMinorVersion", LLVersionInfo::instance().getMinor());
 	keywordArgs.appendInt("viewerPatchVersion", LLVersionInfo::instance().getPatch());
-	keywordArgs.appendInt("viewerBuildVersion", LLVersionInfo::instance().getBuild());
+	// With GitHub builds, the build number is too big to fit in a 32-bit int,
+	// and XMLRPC_VALUE doesn't deal with integers wider than int. Use string.
+	keywordArgs.appendString("viewerBuildVersion", stringize(LLVersionInfo::instance().getBuild()));
 
 	LLXMLRPCValue params = LLXMLRPCValue::createArray();
 	params.append(keywordArgs);

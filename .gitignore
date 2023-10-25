@@ -82,3 +82,4 @@ web/config.*
 web/locale.*
 web/secondlife.com.*
 /Pipfile.lock
+.env

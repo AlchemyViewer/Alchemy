@@ -38,6 +38,7 @@
 #include "llcoros.h"
 #include "llcorehttputil.h"
 #include "llurlregistry.h"
+#include "stringize.h"
 
 #include <nlohmann/json.hpp>
 
@@ -160,12 +161,12 @@ void LLTranslationAPIHandler::verifyKeyCoro(LLTranslate::EService service, LLSD 
     LLCore::HttpHeaders::ptr_t httpHeaders(std::make_shared<LLCore::HttpHeaders>());
 
 
-    std::string user_agent = llformat("%s %d.%d.%d (%d)",
-        LLVersionInfo::instance().getChannel().c_str(),
-        LLVersionInfo::instance().getMajor(),
-        LLVersionInfo::instance().getMinor(),
-        LLVersionInfo::instance().getPatch(),
-        LLVersionInfo::instance().getBuild());
+    std::string user_agent = stringize(
+        LLVersionInfo::instance().getChannel(), ' ',
+        LLVersionInfo::instance().getMajor(), '.',
+        LLVersionInfo::instance().getMinor(), '.',
+        LLVersionInfo::instance().getPatch(), " (",
+        LLVersionInfo::instance().getBuild(), ')');
 
     initHttpHeader(httpHeaders, user_agent, key);
 
@@ -215,12 +216,12 @@ void LLTranslationAPIHandler::translateMessageCoro(LanguagePair_t fromTo, std::s
     LLCore::HttpHeaders::ptr_t httpHeaders(std::make_shared<LLCore::HttpHeaders>());
 
 
-    std::string user_agent = llformat("%s %d.%d.%d (%d)",
-        LLVersionInfo::instance().getChannel().c_str(),
-        LLVersionInfo::instance().getMajor(),
-        LLVersionInfo::instance().getMinor(),
-        LLVersionInfo::instance().getPatch(),
-        LLVersionInfo::instance().getBuild());
+    std::string user_agent = stringize(
+        LLVersionInfo::instance().getChannel(), ' ',
+        LLVersionInfo::instance().getMajor(), '.',
+        LLVersionInfo::instance().getMinor(), '.',
+        LLVersionInfo::instance().getPatch(), " (",
+        LLVersionInfo::instance().getBuild(), ')');
 
     initHttpHeader(httpHeaders, user_agent);
     httpOpts->setSSLVerifyPeer(false);

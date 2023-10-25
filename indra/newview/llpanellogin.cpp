@@ -65,6 +65,7 @@
 #include "lltrans.h"
 #include "llglheaders.h"
 #include "llpanelloginlistener.h"
+#include "stringize.h"
 
 #include <boost/algorithm/string.hpp>
 
@@ -859,9 +860,8 @@ void LLPanelLogin::loadLoginPage()
 	}
 
 	// Channel and Version
-	params["version"] = llformat("%s (%d)",
-								 LLVersionInfo::instance().getShortVersion().c_str(),
-								 LLVersionInfo::instance().getBuild());
+	params["version"] = stringize(LLVersionInfo::instance().getShortVersion(), " (",
+								  LLVersionInfo::instance().getBuild(), ')');
 	params["channel"] = LLVersionInfo::instance().getChannel();
 
 	// Grid

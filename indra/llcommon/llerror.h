@@ -425,12 +425,9 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 #define LL_NEWLINE '\n'
 
 // Use this only in LL_ERRS or in a place that LL_ERRS may not be used
-#define LLERROR_CRASH               \
-{                                   \
-    int* make_me_crash = NULL;      \
-    /* coverity[var_deref_op] */    \
-    *make_me_crash = 0;             \
-    exit(*make_me_crash);           \
+#define LLERROR_CRASH                                   \
+{                                                       \
+    crashdriver([](int* ptr){ *ptr = 0; exit(*ptr); }); \
 }
 
 #define LL_ENDL                                         \
@@ -506,6 +503,9 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 // Use this if you need to pass LLError::ELevel as a variable.
 #define LL_VLOGS(level, ...)      llvlog(level, false, ##__VA_ARGS__)
 #define LL_VLOGS_ONCE(level, ...) llvlog(level, true,  ##__VA_ARGS__)
+
+// used by LLERROR_CRASH
+void crashdriver(void (*)(int*));
 
 /*
 // Check at run-time whether logging is enabled, without generating output.

@@ -2392,20 +2392,15 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIE
       add_dependencies(generate_symbols ${VIEWER_BINARY_NAME})
     endif (WINDOWS)
     if (DARWIN)
-      add_custom_command(OUTPUT "${VIEWER_SYMBOL_FILE}"
-        # See above comments about "tar ...j"
-        COMMAND "tar"
+      # Have to run dsymutil first, then pack up the resulting .dSYM directory
+      add_custom_command(OUTPUT "${VIEWER_APP_DSYM}"
+        COMMAND "dsymutil"
         ARGS
-          "cjf"
-          "${VIEWER_SYMBOL_FILE}"
-          "-C"
-          "${VIEWER_APP_DSYM}/.."
-          "${product}.dSYM"
-        DEPENDS "${VIEWER_APP_DSYM}"
-        COMMENT "Packing dSYM into ${VIEWER_SYMBOL_FILE}"
+          ${VIEWER_APP_EXE}
+        COMMENT "Generating ${VIEWER_APP_DSYM}"
         )
-      add_custom_target(dsym_tarball DEPENDS "${VIEWER_SYMBOL_FILE}")
-      add_dependencies(dsym_tarball ${VIEWER_BINARY_NAME})
+      add_custom_target(dsym_generate DEPENDS "${VIEWER_APP_DSYM}")
+      add_dependencies(dsym_generate ${VIEWER_BINARY_NAME})
       add_custom_command(OUTPUT "${VIEWER_APP_XCARCHIVE}"
         COMMAND "zip"
         ARGS
@@ -2423,24 +2418,22 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIE
       add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/dsym.stamp"
         COMMAND rm -rf "${VIEWER_APP_DSYM}"
         COMMAND touch "${CMAKE_CURRENT_BINARY_DIR}/dsym.stamp"
-        DEPENDS "${VIEWER_SYMBOL_FILE}" "${VIEWER_APP_XCARCHIVE}"
+        DEPENDS "${VIEWER_APP_XCARCHIVE}"
         COMMENT "Cleaning up dSYM"
         )
       add_custom_target(generate_symbols DEPENDS
         "${VIEWER_APP_DSYM}"
-        "${VIEWER_SYMBOL_FILE}"
         "${VIEWER_APP_XCARCHIVE}"
         "${CMAKE_CURRENT_BINARY_DIR}/dsym.stamp"
         )
-      add_dependencies(generate_symbols dsym_tarball dsym_xcarchive)
+      add_dependencies(generate_symbols dsym_xcarchive)
     endif (DARWIN)
     if (LINUX)
       # TBD
     endif (LINUX)
-  endif (USE_BUGSPLAT)
 
-  # for both Bugsplat and Breakpad
-  add_dependencies(llpackage generate_symbols)
+    add_dependencies(llpackage generate_symbols)
+  endif (USE_BUGSPLAT)
 endif ()
 
 if (LL_TESTS)
