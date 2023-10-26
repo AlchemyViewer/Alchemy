@@ -48,6 +48,8 @@
 
 #include <array>
 
+#include <array>
+
 class LLVertexBuffer;
 class LLCubeMap;
 class LLImageGL;
