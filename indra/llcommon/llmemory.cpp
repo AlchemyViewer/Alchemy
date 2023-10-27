@@ -300,7 +300,7 @@ U64 LLMemory::getCurrentRSS()
 
 	// ru_maxrss (since Linux 2.6.32)
 	// This is the maximum resident set size used (in kilobytes).
-	return usage.ru_maxrss * sysconf(_SC_PAGESIZE);
+	return usage.ru_maxrss * 1024;
 }
 
 #else
