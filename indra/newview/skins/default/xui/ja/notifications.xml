@@ -1672,7 +1672,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 			<button name="Cancel" text="キャンセル"/>
 		</form>
 	</notification>
-	<notification label="選択したアイテムのリネーム" name="RenameItem">
+	<notification label="選択したアイテムの名前変更" name="RenameItem">
 以下の新しい名前を入力してください：
 [NAME]
 		<tag>confirm</tag>
@@ -3972,7 +3972,7 @@ Your L$ balance is shown in the upper-right.
 		このリストから[MAX_SELECT]個までのアイテムを選択できます。
 	</notification>
 	<notification name="VoiceInviteP2P">
-		[NAME]があなたをボイスチャットコールに招待しています。
+		[NAME]からボイスチャットコールの招待を受けています。
 「受け入れる」をクリックするか、断る場合は「却下する」をクリックしてください。「ブロック」をクリックすると、この発信者をブロックします。
 		<tag>confirm</tag>
 		<tag>voice</tag>
@@ -3995,7 +3995,7 @@ Your L$ balance is shown in the upper-right.
 		[NAME]はインベントリを受け取り、自動的にブロックが解除されました。
 	</notification>
 	<notification name="VoiceInviteGroup">
-		[NAME]は &lt;nolink&gt;[GROUP]&lt;/nolink&gt;のボイスチャットコールに参加しました。
+		[NAME]は、&lt;nolink&gt;[GROUP]&lt;/nolink&gt;のボイスチャットコールに参加しようとしています。
 「受け入れる」をクリックするか、断る場合は「却下する」をクリックしてください。「ブロック」をクリックすると、この発信者をブロックします。
 		<tag>group</tag>
 		<tag>confirm</tag>
@@ -4011,7 +4011,7 @@ Your L$ balance is shown in the upper-right.
 		</form>
 	</notification>
 	<notification name="VoiceInviteAdHoc">
-		[NAME]は、会話チャットでボイスチャットコールに参加しました。
+		[NAME]は、会話チャットでのボイスチャットコールへ参加しようとしています。
 「受け入れる」をクリックするか、断る場合は「却下する」をクリックしてください。「ブロック」をクリックすると、この発信者をブロックします。
 		<form name="form">
 			<button name="Accept" text="受け入れる"/>
@@ -4125,7 +4125,7 @@ Your L$ balance is shown in the upper-right.
 		<tag>fail</tag>
 	</notification>
 	<notification name="VoiceNotAllowed">
-		あなたには[VOICE_CHANNEL_NAME]のボイスチャットに接続する権限がありません。
+		あなたは、[VOICE_CHANNEL_NAME]のボイスチャットに接続する権限がありません。
 		<tag>fail</tag>
 		<tag>voice</tag>
 		<unique>
@@ -5948,7 +5948,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="RenameAOMustBeASCII">
-		ＡＯセット「[AO_SET_NAME]」をリネームすることができませんでした。
+		ＡＯセット「[AO_SET_NAME]」を名前変更することができませんでした。
 名前には、「:」または「|」を除く任意のアスキー文字を含めることができます。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
