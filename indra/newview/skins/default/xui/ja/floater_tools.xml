@@ -268,7 +268,9 @@
 				<text name="pathfinding_attributes_label">
 					経路探索属性：
 				</text>
-				<text name="pathfinding_attributes_value"/>
+				<text name="pathfinding_attributes_value">
+					物理的
+				</text>
 			</panel>
 		</panel>
 		<!-- Object tab -->

@@ -293,7 +293,7 @@
 			<menu_item_separator/>
 			<menu_item_check label="古いネーミングを有効化" name="Enable Legacy Naming"/>
 			<menu_item_check label="共有された衣装を有効化" name="Enable Shared Wear"/>
-			<menu_item_check label="着用中の共有されたアイテム名をリネーム" name="Rename Shared Items on Wear"/>
+			<menu_item_check label="共有された着用中のアイテムの名前変更" name="Rename Shared Items on Wear"/>
 			<menu_item_separator/>
 			<menu_item_check label="ロック…" name="Locks">
 			</menu_item_check>
