@@ -1016,11 +1016,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0baa546aafcfb62b3a3c2920aeb90c970ee51c22d8d28fab0a8fa247c0383049b6d9b79c0c6d68b28eb1b000ae42b86c19aeddc284f65ad2b730a02a14fb35ee</string>
+              <string>a9c34269458c59dc1d2a9fcc10597c7b8ef10d1df9532449bd1411e0392348a5f4e5347178c1929e858ce6714816fb18ea1fe7a2a35a95d28e3f042779a127b7</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/3.0.0.2139/libjpeg_turbo-3.0.0-darwin64-2139.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/3.0.1.2197/libjpeg_turbo-3.0.1-darwin64-2197.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1030,11 +1030,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>00d1f7e8f5193a15f397530e689027be152389b5d81d71a4b35deea0230dd51efe67ae16b1d1e3782ccc17da10bbbdd3d41c1fd3a9578a0c51b2a42e0b5be85c</string>
+              <string>2a44c29efa2779983aed00e621f15309fb40e0184ef8ca837ead8f7b2e2d28ca74ea32ca80e38757b8c8befcffe53f284fb4eae3b2d62bed198f1986585e21d9</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/3.0.0.2139/libjpeg_turbo-3.0.0-linux64-2139.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/3.0.1.2197/libjpeg_turbo-3.0.1-linux64-2197.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1044,11 +1044,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>383ffe98a412cf818dc097b76c5e8f2ec4e434ae0249ef1535f58445a6496b7936f89340a4238f2ba093afe72bcf3c98aa4de211519aba7c714f10aa02492bd0</string>
+              <string>3494965064cde6e601a8ccf43d5d8a0f72588ca3c2e5e3192428f8266ece8c96ac31e18ece54d5d30012ab947cd3fc5a76306b1e53a4fc263117edee2d63205f</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/3.0.0.2139/libjpeg_turbo-3.0.0-windows64-2139.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/3.0.1.2197/libjpeg_turbo-3.0.1-windows64-2197.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1061,7 +1061,7 @@
         <key>copyright</key>
         <string>Copyright (C)2009-2023 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
         <key>version</key>
-        <string>3.0.0</string>
+        <string>3.0.1</string>
         <key>name</key>
         <string>libjpeg-turbo</string>
         <key>canonical_repo</key>
