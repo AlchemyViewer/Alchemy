@@ -108,7 +108,7 @@ variables:
     - source .venv/bin/activate
     - pip3 install --upgrade llbase autobuild dmgbuild certifi sentry-cli cmake
   script:
-    - autobuild configure -c Release -- -DENABLE_SIGNING=ON -DUSE_LTO=${ENABLE_LTO} -DHAVOK_TPV=${USE_HAVOK} -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
+    - autobuild configure -c Release -- -DENABLE_SIGNING=ON -DUSE_LTO=OFF -DHAVOK_TPV=${USE_HAVOK} -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
     - autobuild graph -c Release --graph-file alchemy-darwin${AUTOBUILD_ADDRSIZE}-dependencies.svg build-darwin-64/autobuild-package.xml
     - if [ "$USE_SENTRY" = "TRUE" ]; then sentry-cli debug-files upload --include-sources build-darwin-64/newview/Release/*.app.dSYM build-darwin-64/newview/Release/*.app/Contents/MacOS/ build-darwin-64/newview/Release/*.app/Contents/Frameworks/ build-darwin-*/packages/lib/release/*.dSYM; fi
