@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<!-- 
+<!--
 This file contains strings that used to be hardcoded in the source.
 It is only for those strings which do not belong in a floater.
 For example, the strings used in avatar chat bubbles, and strings
@@ -89,7 +89,7 @@ that are returned from one component and may appear in many places
 	<!-- about dialog/support string-->
 	<string name="AboutHeader">
 		[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2].[VIEWER_VERSION_3]（[ADDRESS_SIZE]bit）
-[[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]
+		[[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]
 	</string>
 	<string name="AboutCompiler">
 		コンパイラのバージョン：[COMPILER] [COMPILER_VERSION]
@@ -99,25 +99,25 @@ that are returned from one component and may appear in many places
 	</string>
 	<string name="AboutPosition">
 		あなたは、現在[REGION]の[POSITION_LOCAL_0,number,1]，[POSITION_LOCAL_1,number,1]，[POSITION_LOCAL_2,number,1]にいます。
-位置は、&lt;nolink&gt;[HOSTNAME]&lt;/nolink&gt;です。（[HOSTIP]）
-SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
-（グローバル座標は、[POSITION_0,number,1]，[POSITION_1,number,1]，[POSITION_2,number,1]です。）
-[SERVER_VERSION]
-[SERVER_RELEASE_NOTES_URL]</string>
+		位置は、&lt;nolink&gt;[HOSTNAME]&lt;/nolink&gt;です。（[HOSTIP]）
+		SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
+		（グローバル座標は、[POSITION_0,number,1]，[POSITION_1,number,1]，[POSITION_2,number,1]です。）
+		[SERVER_VERSION]
+		[SERVER_RELEASE_NOTES_URL]</string>
 	<string name="AboutPositionRLVShowLoc">
-あなたは、[REGION]にいます。
-[SERVER_VERSION]
-[SERVER_RELEASE_NOTES_URL]
+		あなたは、[REGION]にいます。
+		[SERVER_VERSION]
+		[SERVER_RELEASE_NOTES_URL]
 	</string>
 	<!-- *NOTE: Do not translate text like GPU, Graphics Card, etc -
-	Most PC users who know what these mean will be used to the English versions,
-	and this info sometimes gets sent to support. -->
+						Most PC users who know what these mean will be used to the English versions,
+						and this info sometimes gets sent to support. -->
 	<string name="AboutSystem">
 		ＣＰＵ：[CPU]
-メモリ：[MEMORY_MB]㎆
-ＯＳのバージョン：[OS_VERSION]
-グラフィックカード製造元：[GRAPHICS_CARD_VENDOR]
-グラフィックカード:[GRAPHICS_CARD]
+		メモリ：[MEMORY_MB]㎆
+		ＯＳのバージョン：[OS_VERSION]
+		グラフィックカード製造元：[GRAPHICS_CARD_VENDOR]
+		グラフィックカード:[GRAPHICS_CARD]
 	</string>
 	<string name="AboutDriver">
 		Windowsグラフィックドライババージョン：[GRAPHICS_DRIVER_VERSION]
@@ -126,26 +126,26 @@ SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 		OpenGLバージョン：[OPENGL_VERSION]</string>
 	<string name="AboutSettings">
 		ウィンドウサイズ:[WINDOW_WIDTH]x[WINDOW_HEIGHT]
-フォントサイズ調整：[FONT_SIZE_ADJUSTMENT]pt
-ＵＩスケーリング：[UI_SCALE]
-描画距離：[DRAW_DISTANCE]ｍ
-帯域幅：[NET_BANDWITH]kbit／秒
-ＬＯＤ係数：[LOD_FACTOR]
-描画の質：[RENDER_QUALITY]
-高度な光源モデル：[GPU_SHADERS]
-テクスチャメモリ：[TEXTURE_MEMORY]㎆
+		フォントサイズ調整：[FONT_SIZE_ADJUSTMENT]pt
+		ＵＩスケーリング：[UI_SCALE]
+		描画距離：[DRAW_DISTANCE]ｍ
+		帯域幅：[NET_BANDWITH]kbit／秒
+		ＬＯＤ係数：[LOD_FACTOR]
+		描画の質：[RENDER_QUALITY]
+		高度な光源モデル：[GPU_SHADERS]
+		テクスチャメモリ：[TEXTURE_MEMORY]㎆
 	</string>
 	<string name="AboutOSXHiDPI">
 		高ＤＰＩ表示モード：[HIDPI]
 	</string>
 	<string name="AboutLibs">
 		RestrainedLove API：[RLV_VERSION]
-libcurlのバージョン：[LIBCURL_VERSION]
-J2Cデコーダーのバージョン：[J2C_VERSION]
-オーディオドライバのバージョン：[AUDIO_DRIVER_VERSION]
-[CEF_VERSION]
-LibVLCのバージョン：[LIBVLC_VERSION]
-ボイスサーバーのバージョン：[VOICE_VERSION]
+		libcurlのバージョン：[LIBCURL_VERSION]
+		J2Cデコーダーのバージョン：[J2C_VERSION]
+		オーディオドライバのバージョン：[AUDIO_DRIVER_VERSION]
+		[CEF_VERSION]
+		LibVLCのバージョン：[LIBVLC_VERSION]
+		ボイスサーバーのバージョン：[VOICE_VERSION]
 	</string>
 	<string name="AboutTraffic">
 		パケット損失：[PACKETS_LOST,number,0]／[PACKETS_IN,number,0]（[PACKETS_PCT,number,1]％）
@@ -268,7 +268,8 @@ LibVLCのバージョン：[LIBVLC_VERSION]
 	<string name="Quit">
 		終了
 	</string>
-	<string name="create_account_url"> https://join.secondlife.com/?lang=ja&amp;sourceid=[sourceid]
+	<string name="create_account_url">
+		https://join.secondlife.com/?lang=ja&amp;sourceid=[sourceid]
 	</string>
 	<string name="AgniGridLabel">
 		Second Lifeメイングリッド（Agni）
@@ -281,13 +282,13 @@ LibVLCのバージョン：[LIBVLC_VERSION]
 	</string>
 	<string name="LoginFailedViewerNotPermitted">
 		お使いの古いビューアでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアをダウンロードしてください：https://www.alchemyviewer.org/downloads
-
-詳細については、ＦＡＱを参照してください：
-https://secondlife.com/viewer-access-faq
+		
+		詳細については、ＦＡＱを参照してください：
+		https://secondlife.com/viewer-access-faq
 	</string>
 	<string name="LoginFailed">
 		システムの問題により、ログインプロセスが完了しませんでした。数分後にもう一度試してください。
-これがエラーであると思われる場合は、サポートにお問い合わせください。
+		これがエラーであると思われる場合は、サポートにお問い合わせください。
 	</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">
 		ビューアの更新（オプション）があります：[VERSION]
@@ -306,11 +307,13 @@ https://secondlife.com/viewer-access-faq
 ・２段階認証（使用している場合）
 また、Caps Lockが入っていないこともご確認ください。
 	</string>
-	<string name="LoginFailedPasswordChanged"> セキュリティ上の理由により、あなたのパスワードは変更されました。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP）へ移動し、
+	<string name="LoginFailedPasswordChanged">
+		セキュリティ上の理由により、あなたのパスワードは変更されました。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP）へ移動し、
 秘密の質問に答えて、パスワードをリセットしてください。
 ご迷惑をおかけして申し訳ございません。
 	</string>
-	<string name="LoginFailedPasswordReset"> 弊社はシステムを若干変更しました。お手数ですが、パスワードのリセットをお願いします。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP ）に移動し、
+	<string name="LoginFailedPasswordReset">
+		弊社はシステムを若干変更しました。お手数ですが、パスワードのリセットをお願いします。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP ）に移動し、
 秘密の質問に答えて、パスワードをリセットしてください。
 ご迷惑をおかけして申し訳ございません。
 	</string>
@@ -689,7 +692,8 @@ https://secondlife.com/viewer-access-faq
 	<string name="TooltipNotecardOwnerRestrictedDrop">
 		制限のない「次の所有者」の
 許可のみノートカードに
-添付できます。</string>
+添付できます。
+	</string>
 	<string name="TooltipTextureRestrictedDrop">
 		無制限のコピーおよび
 譲渡可能権限を持つテクスチャのみが
@@ -3230,16 +3234,20 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="InventoryInboxNoItems">
 		マーケットプレイスで購入した商品はここに表示されます。その後、アイテムをインベントリにドラッグすれば、それらのアイテムを使用できます。
 	</string>
-	<string name="MarketplaceURL"> https://marketplace.[MARKETPLACE_DOMAIN_NAME]/?lang=ja-JP
+	<string name="MarketplaceURL">
+		https://marketplace.[MARKETPLACE_DOMAIN_NAME]/?lang=ja-JP
 	</string>
 	<string name="MarketplaceURL_CreateStore">
 		https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%8A%E3%83%AC%E3%83%83%E3%82%B8%E3%83%99%E3%83%BC%E3%82%B9/%E3%83%9E%E3%83%BC%E3%82%B1%E3%83%83%E3%83%88%E3%83%97%E3%83%AC%E3%82%A4%E3%82%B9%E3%81%A7%E8%B2%A9%E5%A3%B2%E3%81%99%E3%82%8B-r769/
 	</string>
-	<string name="MarketplaceURL_Dashboard"> https://marketplace.[MARKETPLACE_DOMAIN_NAME]/merchants/store/dashboard?lang=ja-JP
+	<string name="MarketplaceURL_Dashboard">
+		https://marketplace.[MARKETPLACE_DOMAIN_NAME]/merchants/store/dashboard?lang=ja-JP
 	</string>
-	<string name="MarketplaceURL_Imports"> https://marketplace.[MARKETPLACE_DOMAIN_NAME]/merchants/store/imports?lang=ja-JP
+	<string name="MarketplaceURL_Imports">
+		https://marketplace.[MARKETPLACE_DOMAIN_NAME]/merchants/store/imports?lang=ja-JP
 	</string>
-	<string name="MarketplaceURL_LearnMore"> https://marketplace.[MARKETPLACE_DOMAIN_NAME]/learn_more?lang=ja-JP
+	<string name="MarketplaceURL_LearnMore">
+		https://marketplace.[MARKETPLACE_DOMAIN_NAME]/learn_more?lang=ja-JP
 	</string>
 	<string name="InventoryPlayAnimationTooltip">
 		「再生」オプションでウィンドウを開きます。
@@ -3369,7 +3377,8 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="MarketplaceUpdating">
 		アップデート中…
 	</string>
-	<string name="UploadFeeInfo"> 料金はサブスクリプションのレベルにより異なります。レベルが高いほど、料金が下がります。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細]
+	<string name="UploadFeeInfo">
+		料金はサブスクリプションのレベルにより異なります。レベルが高いほど、料金が下がります。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細]
 	</string>
 	<string name="Open landmarks">
 		ランドマークを開く
@@ -3385,9 +3394,9 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="worn" value=" （着用中）"/>
 	<string name="link" value=" 　リンク"/>
 	<string name="broken_link" value=" 　壊れたリンク"/>
-	<string name="no_transfer_lbl" value="　再販・譲渡不可" />
-	<string name="no_modify_lbl" value="　編集不可" />
-	<string name="no_copy_lbl" value="　コピー不可" />
+	<string name="no_transfer_lbl" value="　再販・譲渡不可"/>
+	<string name="no_modify_lbl" value="　編集不可"/>
+	<string name="no_copy_lbl" value="　コピー不可"/>
 	<string name="LoadingContents">
 		コンテンツを読み込んでいます…
 	</string>
@@ -4415,19 +4424,19 @@ For AI Character: Get the closest navigable point to the point provided.
 		オブジェクト名
 	</string>
 	<string name="InvOfferOwnedByGroup">
-		グループが所有している
+		グループの所有する
 	</string>
 	<string name="InvOfferOwnedByUnknownGroup">
-		不明なグループが所有している
+		不明なグループの所有する
 	</string>
 	<string name="InvOfferOwnedBy">
-		が所有している
+		を所有する
 	</string>
 	<string name="InvOfferOwnedByUnknownUser">
-		不明なユーザーが所有している
+		不明なユーザーの所有する
 	</string>
 	<string name="InvOfferGaveYou">
-		を渡してきました。
+		から以下のアイテムが渡されました：
 	</string>
 	<string name="InvOfferDecline">
 		&lt;nolink&gt;[NAME]&lt;/nolink&gt;からの[DESC]を却下しました。
@@ -4481,7 +4490,7 @@ For AI Character: Get the closest navigable point to the point provided.
 	</string>
 	<string name="UnknownFileExtension">
 		不明な拡張子：%s
-使用可能な拡張子：.wav，.tga，.bmp，.jpg，.jpeg，.bvh
+		使用可能な拡張子：.wav，.tga，.bmp，.jpg，.jpeg，.bvh
 	</string>
 	<string name="MuteObject2">
 		オブジェクトのブロック
@@ -4640,7 +4649,7 @@ For AI Character: Get the closest navigable point to the point provided.
 		住宅用
 	</string>
 	<!--
-	<string name="Shopping">ショッピング</string>
+						<string name="Shopping">ショッピング</string>
 	-->
 	<string name="Stage">
 		ステージ
@@ -4696,7 +4705,8 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="IntelDriverPage">
 		https://www.intel.co.jp/content/www/jp/ja/support/detect.html
 	</string>
-	<string name="NvidiaDriverPage"> https://www.nvidia.com/Download/index.aspx?lang=ja-jp
+	<string name="NvidiaDriverPage">
+		https://www.nvidia.com/Download/index.aspx?lang=ja-jp
 	</string>
 	<string name="AMDDriverPage">
 		https://www.amd.com/ja/support
@@ -6399,7 +6409,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		このセッションにいるユーザーはあなただけです。
 	</string>
 	<string name="offline_message">
-		[NAME]はオフライン中です。
+		[NAME]はオフラインです。
 	</string>
 	<string name="invite_message">
 		このボイスチャットに応答・接続する場合は、[BUTTON NAME]をクリックしてください。
@@ -6485,12 +6495,14 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 	<string name="premium_voice_morphing_url">
 		https://secondlife.com/destination/voice-morphing-premium
 	</string>
-	<string name="lindenhomes_get_home_url"> https://secondlife.com/land/lindenhomes/member.php?lang=ja-JP
+	<string name="lindenhomes_get_home_url">
+		https://secondlife.com/land/lindenhomes/member.php?lang=ja-JP
 	</string>
 	<string name="lindenhomes_my_home_url">
 		https://land.secondlife.com/ja-JP/lindenhomes/my-home.php
 	</string>
-	<string name="membership_url"> https://accounts.secondlife.com/change_membership/?lang=ja-JP
+	<string name="membership_url">
+		https://accounts.secondlife.com/change_membership/?lang=ja-JP
 	</string>
 	<!-- Financial operations strings -->
 	<string name="paid_you_ldollars">
@@ -6882,7 +6894,8 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 	<!-- language specific white-space characters, delimiters, spacers, item separation symbols -->
 	<string name="sentences_separator" value="　"/>
 	<string name="words_separator" value="、"/>
-	<string name="server_is_down"> 大変申し訳ございませんが、予期しない問題が発生しました。サービスに関する既知の問題については、https://status.secondlifegrid.net/?lang=ja-JP をご覧ください。
+	<string name="server_is_down">
+		大変申し訳ございませんが、予期しない問題が発生しました。サービスに関する既知の問題については、https://status.secondlifegrid.net/?lang=ja-JP をご覧ください。
 問題が引き続き発生する場合は、お使いのネットワークやファイアウォールの設定を調べてください。
 	</string>
 	<string name="dateTimeWeekdaysNames">
@@ -7202,7 +7215,8 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 	<string name="-">
 		-
 	</string>
-	<string name="="> =
+	<string name="=">
+		=
 	</string>
 	<string name="`">
 		`

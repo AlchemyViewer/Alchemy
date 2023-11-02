@@ -58,7 +58,7 @@
 		現在使用中の[APP_NAME]のバージョンでは、受け取った通知メッセージを表示することができません。
 最新のビューアがインストールされている事をご確認ください。
 
-エラー詳細：「 [_NAME] 」という通知メッセージは、notifications.xmlに定義されていませんでした。
+エラー詳細：「[_NAME]」という通知メッセージは、notifications.xmlに定義されていませんでした。
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
@@ -179,22 +179,22 @@
 	<notification name="MerchantForceValidateListing">
 		リストを作成するために、リストするコンテンツの階層を固定しました。
 		<tag>confirm</tag>
-		<usetemplate ignoretext="リストの作成によりコンテンツの階層が修正されることを警告する" name="okignore" yestext="ＯＫ"/>
+		<usetemplate ignoretext="リストの作成によりコンテンツの階層が修正されることを警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmMerchantActiveChange">
 		この操作により、このリストの有効な内容が変更されます。続けてもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="マーケットプレイスで有効なリストを変更する前に確認する" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="マーケットプレイスで有効なリストを変更する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmMerchantMoveInventory">
 		マーケットプレイスのリストウィンドウにドラッグしたアイテムは、元の場所からコピーされるのではなく移動となります。続けてもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="アイテムをインベントリからマーケットプレイスに移動する前に確認する" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="アイテムをインベントリからマーケットプレイスに移動する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmListingCutOrDelete">
 		リストフォルダを移動または削除すると、マーケットプレイスのリストが削除されます。マーケットプレイスのリストを維持する場合は、変更するバージョンフォルダの中身を移動または削除してください。続けてもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="マーケットプレイスからリストを移動または削除する前に確認する" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="マーケットプレイスからリストを移動または削除する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmCopyToMarketplace">
 		これらのアイテムの１つまたは複数をマーケットプレイスにコピーする権限がありません。移動するか、残したままにすることはできます。
@@ -204,12 +204,12 @@
 	<notification name="ConfirmMerchantUnlist">
 		この操作により、このリストが削除されます。続けてもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="マーケットプレイスで有効なリストを削除する前に確認する" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="マーケットプレイスの有効なリストを削除する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmMerchantClearVersion">
 		この操作により、現在のリストのバージョンフォルダが無効になります。続けてもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="マーケットプレイスでリストのバージョンフォルダを無効にする前に確認する" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="マーケットプレイスでリストのバージョンフォルダを無効にする前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="AlertMerchantListingNotUpdated">
 		このリストをアップデートできませんでした。
@@ -536,7 +536,7 @@ L$が不足しているので、このグループに参加することができ
 
 *警告*
 
-これにより、グループに譲渡された「再販・譲渡不可」のオブジェクトは削除されます！ 
+これにより、グループに譲渡された「再販・譲渡不可」のオブジェクトは削除されます！
 オブジェクト：[N]
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
@@ -860,7 +860,7 @@ L$が不足しているので、このグループに参加することができ
 		ダウンロードをリクエストしたファイルは、[APP_NAME]ではサポートされていません。
 		<unique/>
 		<tag>confirm</tag>
-		<usetemplate ignoretext="サポートされていないファイルのダウンロードを警告する" name="okignore" yestext="ＯＫ"/>
+		<usetemplate ignoretext="サポートされていないファイルのダウンロードの警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="CannotWriteFile">
 		ファイル[[FILE]]に書き込むことができませんでした。
@@ -976,7 +976,7 @@ L$が不足しているので、このグループに参加することができ
 	</notification>
 	<notification name="FreezeAvatarFullname">
 		[AVATAR_NAMES]をフリーズしますか？
-フリーズされた人は一時的に動けなくなり、チャットなど、この世界に対する関わりを持つことができなくなります。
+フリーズされた人は一時的に動けなくなり、チャットなど、このワールドに対する関わりを持つことができなくなります。
 		<tag>confirm</tag>
 		<usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="解除" yestext="フリーズ"/>
 	</notification>
@@ -1057,7 +1057,7 @@ L$が不足しているので、このグループに参加することができ
 	</notification>
 	<notification name="PromptGoToCurrencyPage">
 		[EXTRA]
-  
+
 [_URL] に移動してリンデンドル購入に関する情報を確認しますか？
 		<url name="url">https://secondlife.com/my/lindex/?lang=ja-JP</url>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
@@ -1727,7 +1727,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	<notification name="ConfirmItemDeleteHasLinks">
 		１つ以上のアイテムにポイントするリンクがあります。このアイテムを削除する場合、そのリンクは永久に機能しなくなります。
 まず最初にリンクを削除することを強くお勧めします。
-  
+
 これらのアイテムを削除しますか？
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
@@ -1741,14 +1741,14 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	</notification>
 	<notification name="ConfirmObjectDeleteNoCopy">
 		選択したアイテムのうち、少なくとも１つがコピーできません。
-  
+
 本当に削除しますか？
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmObjectDeleteNoOwn">
 		選択したアイテムの１つ以上を所有していません。
-  
+
 これらのアイテムを削除しますか？
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
@@ -1788,7 +1788,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	</notification>
 	<notification name="ConfirmObjectTakeLock">
 		少なくとも１つのオブジェクトがロックされています。
-  
+
 本当にこのまま取得を続けてもよろしいですか？
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
@@ -1953,7 +1953,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 次の更新日：[VALID_TO]
 ＭＤ５フィンガープリント：[SHA1_DIGEST]
 ＳＨＡ１フィンガープリント：[MD5_DIGEST]
-キー使用法：[KEYUSAGE] 
+キー使用法：[KEYUSAGE]
 拡張キー使用法：[EXTENDEDKEYUSAGE]
 サブジェクトキー認識別子：[SUBJECTKEYIDENTIFIER]
 		<tag>fail</tag>
@@ -1966,11 +1966,11 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 　発行元：[ISSUER_NAME_STRING]
 　有効日：[VALID_FROM]
 　次の更新日：[VALID_TO]
-　ＭＤ５フィンガープリント：[SHA1_DIGEST] 
+　ＭＤ５フィンガープリント：[SHA1_DIGEST]
 　ＳＨＡ１フィンガープリント：[MD5_DIGEST]
-　キー使用法：[KEYUSAGE] 
-　拡張キー使用法：[EXTENDEDKEYUSAGE] 
-　サブジェクトキー認識別子：[SUBJECTKEYIDENTIFIER] 
+　キー使用法：[KEYUSAGE]
+　拡張キー使用法：[EXTENDEDKEYUSAGE]
+　サブジェクトキー認識別子：[SUBJECTKEYIDENTIFIER]
 
 この認証局を信頼しますか？
 		<tag>confirm</tag>
@@ -2093,7 +2093,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 		服装およびシェイプが読み込まれるまでは、容姿の変更はできません。
 	</notification>
 	<notification name="ClassifiedMustBeAlphanumeric">
-		クラシファイド広告の名前は、アルファベットか数字で始めます。句読点から始めることはできません。
+		クラシファイド広告の名前は、英数字から始めてください。句読点から始めることはできません。
 	</notification>
 	<notification name="CantSetBuyObject">
 		オブジェクトが販売対象ではないため、オブジェクトの購入ができません。
@@ -2183,7 +2183,7 @@ OKをクリックして、ダウンロードとインストールを開始しま
 	<notification name="WebLaunchLSLWiki">
 		LSLポータルでスクリプトに関する情報を確認しますか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="ブラウザを起動して LSL ポータルを見るとき" name="okcancelignore" notext="キャンセル" yestext="ページに移動"/>
+		<usetemplate ignoretext="ブラウザを起動してＬＳＬポータルを見るとき" name="okcancelignore" notext="キャンセル" yestext="ページに移動"/>
 	</notification>
 	<notification name="ReturnToOwner">
 		選択したオブジェクトを、所有者に返却しますか？「再販・譲渡可」の譲渡されたオブジェクトは、以前の所有者に返却されます。
@@ -2224,7 +2224,7 @@ OKをクリックして、ダウンロードとインストールを開始しま
 オークションにかけたい場合は、売り出し設定を解除してから行ってください。
 		<tag>fail</tag>
 	</notification>
-	<notification label="名前でのオブジェクトのブロックに失敗しました" name="MuteByNameFailed">
+	<notification label="名前でのオブジェクトのブロック失敗" name="MuteByNameFailed">
 		この名前は既にブロック済みです。
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
@@ -2246,7 +2246,7 @@ OKをクリックして、ダウンロードとインストールを開始しま
 	</notification>
 	<notification name="DoNotDisturbModeSet">
 		「取り込み中」がオンになっています。通信の受信は通知されません。
-  
+
 ・他の居住者はあなたの「取り込み中」応答を受け取ります。（「初期設定」＞「全般」で設定）
 ・音声通話は拒否されます。
 		<usetemplate ignoretext="ログイン状態を「取り込み中」モードに変更したとき" name="okignore" yestext="ＯＫ"/>
@@ -2285,7 +2285,7 @@ OKをクリックして、ダウンロードとインストールを開始しま
 		</form>
 	</notification>
 	<notification name="KickAllUsers">
-		どのようなメッセージをつけて、グリッドにいる全員を追い出しますか？
+		どのようなメッセージを添えて、グリッドにいる全員を追い出しますか？
 		<tag>win</tag>
 		<tag>confirm</tag>
 		<form name="form">
@@ -2335,14 +2335,16 @@ OKをクリックして、ダウンロードとインストールを開始しま
 		<tag>fail</tag>
 	</notification>
 	<!-- *NOTE: This should never happen -->
-	<notification name="AgentDisplayNameUpdateThresholdExceeded">申し訳ありませんが、表示名を変更できるようになるまで、さらに長く待つ必要があります。
+	<notification name="AgentDisplayNameUpdateThresholdExceeded">
+		申し訳ありませんが、表示名を変更できるようになるまで、さらに長く待つ必要があります。
 
 https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%8A%E3%83%AC%E3%83%83%E3%82%B8%E3%83%99%E3%83%BC%E3%82%B9/%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E5%90%8D%E3%81%A8%E8%A1%A8%E7%A4%BA%E5%90%8D-r1333/ を参照してください。
 
 あとでもう一度お試しください。
 		<tag>fail</tag>
 	</notification>
-	<notification name="AgentDisplayNameSetBlocked">申し訳ありませんが、要求された名前には禁止ワードが含まれているため、設定できませんでした。
+	<notification name="AgentDisplayNameSetBlocked">
+		申し訳ありませんが、要求された名前には禁止ワードが含まれているため、設定できませんでした。
 
 別の名前をお試しください。
 		<tag>fail</tag>
@@ -2505,7 +2507,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="すべての不動産" yestext="この不動産"/>
 	</notification>
 	<notification label="不動産を選択" name="EstateTrustedExperienceAdd">
-		この不動産のキー リストにのみ追加しますか、それとも[ALL_ESTATES]のキーリストに追加しますか？
+		この不動産のキーリストにのみ追加しますか、それとも[ALL_ESTATES]のキーリストに追加しますか？
 		<tag>confirm</tag>
 		<usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="すべての不動産" yestext="この不動産"/>
 	</notification>
@@ -2565,7 +2567,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<form name="form">
 			<button name="ＯＫ" text="初期設定の変更"/>
 			<button default="true" name="Cancel" text="キャンセル"/>
-			<ignore name="ignore" text="リージョンの横断：訪問しようとしているリージョンには現在の初期設定により除外されたコンテンツが含まれています。"/>
+			<ignore name="ignore" text="リージョンの横断：訪問しようとしているリージョンに初期設定により除外されたコンテンツが含まれているときの警告"/>
 		</form>
 	</notification>
 	<notification name="RegionEntryAccessBlocked_PreferencesOutOfSync">
@@ -2613,7 +2615,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<form name="form">
 			<button name="ＯＫ" text="変更して続ける"/>
 			<button name="Cancel" text="キャンセル"/>
-			<ignore name="ignore" text="テレポート（再起動可能）：訪問しようとしているリージョンには、現在の初期設定により除外されたコンテンツが含まれています。"/>
+			<ignore name="ignore" text="テレポート（再起動可能）：訪問しようとしているリージョンに、初期設定により除外されたコンテンツが含まれているときの警告"/>
 		</form>
 	</notification>
 	<notification name="TeleportEntryAccessBlocked_Change">
@@ -2627,7 +2629,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<form name="form">
 			<button name="ＯＫ" text="初期設定の変更"/>
 			<button name="Cancel" text="キャンセル"/>
-			<ignore name="ignore" text="テレポート（再起動不可）：訪問しようとしているリージョンには、現在の初期設定により除外されたコンテンツが含まれています。"/>
+			<ignore name="ignore" text="テレポート（再起動不可）：訪問しようとしているリージョンに、初期設定により除外されたコンテンツが含まれているときの警告"/>
 		</form>
 	</notification>
 	<notification name="TeleportEntryAccessBlocked_PreferencesOutOfSync">
@@ -2677,7 +2679,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<form name="form">
 			<button name="ＯＫ" text="初期設定の変更"/>
 			<button name="Cancel" text="キャンセル"/>
-			<ignore name="ignore" text="取得しようとしている土地には、現在の初期設定により除外されたコンテンツが含まれています。"/>
+			<ignore name="ignore" text="取得しようとしている土地には、現在の初期設定により除外されているコンテンツが含まれているときの警告"/>
 		</form>
 	</notification>
 	<notification name="LandBuyAccessBlocked">
@@ -2706,7 +2708,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<form name="form">
 			<button name="ＯＫ" text="初期設定の変更"/>
 			<button name="Cancel" text="キャンセル"/>
-			<ignore name="ignore" text="購入しようとしている土地には現在の初期設定により除外されたコンテンツが含まれています。"/>
+			<ignore name="ignore" text="購入しようとしている土地には現在の初期設定により除外されたコンテンツが含まれているときの警告"/>
 		</form>
 	</notification>
 	<notification name="TooManyPrimsSelected">
@@ -2914,18 +2916,18 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate ignoretext="スクリプト入りのオブジェクトを壊す恐れのある「コピー不可」のアイテムを動かす前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ClickActionNotPayable">
-		警告：クリックで「オブジェクトに支払う」設定をしました。スクリプトにmoney()イベントが追加されると動作します。
+		警告：クリックで「オブジェクトに支払う」を設定しました。スクリプトにmoney()イベントが追加されると動作します。
 		<form name="form">
 			<ignore name="ignore" text="オブジェクト作成時に、money() スクリプトを入れずに「オブジェクトに支払う」アクションを設定したとき"/>
 		</form>
 	</notification>
 	<notification name="PayConfirmation">
-		[TARGET]にL$ [AMOUNT]を支払うことを確認してください。
+		[TARGET]にL$ [AMOUNT]を支払ってもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="支払い前に確認 (合計金額がL$ 200を超える場合)" name="okcancelignore" notext="キャンセル" yestext="支払い"/>
+		<usetemplate ignoretext="支払い前に確認（合計金額がL$ 200を超える場合）" name="okcancelignore" notext="キャンセル" yestext="支払い"/>
 	</notification>
 	<notification name="PayObjectFailed">
-		支払いが失敗しました：オブジェクトが見つかりませんでした。
+		支払いに失敗しました：オブジェクトが見つかりませんでした。
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
@@ -2939,7 +2941,8 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		このオブジェクトには、あなたがコピーできるアイテムはありません。
 		<tag>fail</tag>
 	</notification>
-	<notification name="WebLaunchAccountHistory"> [https://secondlife.com/my/account/?lang=ja-JP マイアカウント]
+	<notification name="WebLaunchAccountHistory">
+		[https://secondlife.com/my/account/?lang=ja-JP マイアカウント]
 ページに移動してアカウント履歴を確認しますか？
 		<tag>confirm</tag>
 		<usetemplate ignoretext="ブラウザを起動してアカウント履歴を見るとき" name="okcancelignore" notext="キャンセル" yestext="ページに移動"/>
@@ -2968,7 +2971,8 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<unique/>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
-	<notification name="DeleteItems">[QUESTION]
+	<notification name="DeleteItems">
+		[QUESTION]
 		<tag>confirm</tag>
 		<form name="form">
 			<ignore name="ignore" text="アイテムを削除する前の確認"/>
@@ -2978,7 +2982,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 	</notification>
 	<notification name="DeleteFilteredItems">
 		あなたのインベントリには現在フィルタがかけられているため、削除しようとしているアイテムによっては表示されないことがあります。
-  
+
 これらのアイテムを削除しますか？
 		<tag>confirm</tag>
 		<usetemplate ignoretext="フィルリングされたアイテムを削除する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
@@ -2990,7 +2994,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate ignoretext="アイテム画像削除時の確認" name="okcancelignore" notext="キャンセル" yestext="削除"/>
 	</notification>
 	<notification name="ThumbnailDimentionsLimit">
-		一辺が６４～２５６ピクセルの正方形の画像のみサポートしています。
+		サムネイルとして使用できる画像は、一辺が６４～２５６ピクセルの正方形の画像のみです。
 		<unique/>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
@@ -3005,8 +3009,8 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmUnlink">
-		これは、リンクセットによる広範囲の選択です。リンクを解除すると、もう一度リンクできなくなる可能性があります。
-そのような場合に備えて、リンクセットを自分のインベントリにコピーできます。
+		これは、リンクセットによる広範囲の選択です。リンクを解除すると、再度リンクできなくなる可能性があります。
+そのような場合に備えて、リンクセットを自分のインベントリにコピーすることができます。
 		<tag>confirm</tag>
 		<usetemplate ignoretext="リンクセットのリンクを解除する前の確認" name="okcancelignore" notext="キャンセル" yestext="リンクを外す"/>
 	</notification>
@@ -3052,16 +3056,16 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 
 ⑴嫌がらせの報告の手順。居住者が、[CURRENT_GRID]権限システムを悪用していると思われる場合（たとえば、CopyBotまたは同様のコピーツールを使用して、知的財産権を侵害していると思われる場合）は、不正使用報告を提出することができます。不正行為チームは、[SECOND_LIFE][http://secondlife.com/corporate/tos.php 利用規約]や、[http://jp.secondlife.com/corporate/cs.php コミュニティ・スタンダード]に違反する行為を調査し、に違反する行為に対する適切な処罰を下します。ただし、担当チームは[SECOND_LIFE]の世界からコンテンツを削除して欲しいというリクエストには応じません。
 
-⑵DMCA またはコンテンツ削除プロセス。[CURRENT_GRID]からコンテンツの削除をリクエストするには、[https://www.lindenlab.com/legal/intellectual-property-infringement-notification-policy ＤＣＭＡポリシー]に規定されている有効な権利侵害通知を提出する必要があります。
+⑵ＤＣＭＡまたはコンテンツ削除プロセス。[CURRENT_GRID]からコンテンツの削除をリクエストするには、[https://www.lindenlab.com/legal/intellectual-property-infringement-notification-policy ＤＣＭＡポリシー]に規定されている有効な権利侵害通知を提出する必要があります。
 
-このまま嫌がらせの報告を続けたい場合は、このウィンドウを閉じて報告の送信を完了してください。特定のカテゴリ「コピー Bot 及び権限の悪用」を選択する必要がある場合があります。
+このまま嫌がらせの報告を続けたい場合は、このウィンドウを閉じて報告の送信を完了してください。特定のカテゴリ「コピーＢｏｔ及び権限の悪用」を選択する必要がある場合があります。
 
 ご協力ありがとうございます。
 
 [CURRENT_GRID]
 	</notification>
 	<notification name="FailedRequirementsCheck">
-		以下の必要なコンポーネントが、[FLOATER]から抜け落ちています
+		以下の必要なコンポーネントが、[FLOATER]から抜け落ちています：
 [COMPONENTS]
 		<tag>fail</tag>
 	</notification>
@@ -3070,7 +3074,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 選択されたオブジェクトと置き換えますか？
 		<tag>confirm</tag>
 		<form name="form">
-			<ignore name="ignore" save_option="true" text="装着しているアイテムと選択したアイテムを入れ替える"/>
+			<ignore name="ignore" save_option="true" text="装着しているアイテムと選択したアイテムの入れ替え"/>
 			<button ignore="自動的に差し替える" name="Yes" text="ＯＫ"/>
 			<button ignore="差し替えない" name="No" text="キャンセル"/>
 		</form>
@@ -3143,10 +3147,16 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<tag>confirm</tag>
 		<usetemplate ignoretext="紛失物フォルダを空にする前の確認" name="okcancelignore" notext="いいえ" yestext="はい"/>
 	</notification>
+	<notification name="ConfirmReplaceLink">
+		リンクを身体部位の種類「[TYPE]」と一致しないアイテムと置き換えようとしています。
+このまま続けてもよろしいですか？
+		<tag>confirm</tag>
+		<usetemplate ignoretext="リンク置き換え前の確認" name="okcancelignore" notext="いいえ" yestext="はい"/>
+	</notification>
 	<notification name="CopySLURL">
 		次のSLurlがクリップボードにコピーされました：
 [SLURL]
-  
+
 Webページにリンクすると、他人がこの場所に簡単にアクセスできます。Webブラウザのアドレスバーに貼り付けて試してみてください。
 		<form name="form">
 			<ignore name="ignore" text="クリップボードにSLurlをコピーする"/>
@@ -3226,7 +3236,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	</notification>
 	<notification name="NotAgeVerified">
 		訪問しようとしている場所は、１８歳以上の住人に制限されています。
-		<usetemplate ignoretext="年齢制限付きのエリアを訪問する年齢に達していません。" name="okignore" yestext="ＯＫ"/>
+		<usetemplate ignoretext="年齢制限付きのエリアを訪問する年齢に達していない場合" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="NotAgeVerified_Notify">
 		この場所への入場は、１８歳以上に制限されています。
@@ -3234,11 +3244,11 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	</notification>
 	<notification name="Cannot enter parcel: no payment info on file">
 		支払情報が登録されていないため、このエリアを訪れることができません。[CURRENT_GRID]サイトで登録を行いますか？
-  
+
 [_URL]
 		<tag>confirm</tag>
 		<url name="url" option="0">https://secondlife.com/my/account/index.php?lang=ja-JP</url>
-		<usetemplate ignoretext="支払情報が登録されていません" name="okcancelignore" notext="いいえ" yestext="はい"/>
+		<usetemplate ignoretext="支払情報が登録されていない場合" name="okcancelignore" notext="いいえ" yestext="はい"/>
 	</notification>
 	<notification name="MissingString">
 		文字列[STRING_NAME]がstrings.xmlに含まれていません。
@@ -3915,7 +3925,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	</notification>
 	<notification name="ScriptQuestionCaution">
 		警告：オブジェクト「&lt;nolink&gt;[OBJECTNAME]&lt;/nolink&gt;」は、あなたのリンデンドルアカウントへの完全なアクセスを求めています。アクセスを許可すると、追加の警告なしで、いつでもアカウントから資金が削除されたり、アカウントが完全に空になったりする可能性があります。
-  
+
 アカウントへのアクセスが必要な理由が十分に理解できない場合は、アクセスを許可しないでください。
 		<tag>confirm</tag>
 		<form name="form">
@@ -4273,7 +4283,7 @@ Your L$ balance is shown in the upper-right.
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		フォルダは一度に１つしか共有できません。
-  
+
 次のアイテムを共有しますか？
 
 &lt;nolink&gt;[ITEMS]&lt;/nolink&gt;
@@ -4366,7 +4376,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</notification>
 	<notification name="NoVoiceConnect-GIAB">
 		ボイスサーバーに接続できません。
-  
+
 ボイスチャットによるコミュニケーションが利用できません。
 お使いのネットワークやファイアウォールの設定を確認してください。
 		<tag>voice</tag>
@@ -4392,11 +4402,11 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</notification>
 	<notification name="LivePreviewUnavailable">コ
 		ピー禁止／譲渡不可のため、このテクスチャを表示できません。
-		<usetemplate ignoretext="コピー禁止／譲渡不可のテクスチャでライブプレビューモードを使用できないことを警告する" name="okignore" yestext="ＯＫ"/>
+		<usetemplate ignoretext="コピー禁止／譲渡不可のテクスチャでライブプレビューモードが使用できないことの警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="LivePreviewUnavailablePBR">
 		コピー禁止／譲渡不可のため、このマテリアルを表示できません。
-		<usetemplate ignoretext="コピー禁止／譲渡不可のマテリアルでライブプレビューモードを使用できないことを警告する" name="okignore" yestext="ＯＫ"/>
+		<usetemplate ignoretext="コピー禁止／譲渡不可のマテリアルでライブプレビューモードが使用できないことの警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="FacePasteFailed">
 		ペーストに失敗しました：[REASON]
@@ -4412,7 +4422,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</notification>
 	<notification name="FacePasteTexturePermissions">
 		アクセス許可が制限されたテクスチャを適用したため、オブジェクトはテクスチャの持つアクセス制限を継承します。
-		<usetemplate ignoretext="ペースト：権限が制限されているテクスチャを適用した。" name="notifyignore"/>
+		<usetemplate ignoretext="ペースト：権限が制限されているテクスチャを適用した" name="notifyignore"/>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmLeaveCall">
@@ -4488,7 +4498,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<tag>funds</tag>
 	</notification>
 	<notification name="LowMemory">
-		メモリプール残量が少なくなっています。クラッシュを避けるため[APP_NAME]の機能の一部は無効になりました。他のアプリケーションを終了し、状況が継続または再発する場合には[APP_NAME]を再起動してください。
+		メモリプール残量が少なくなっています。クラッシュを避けるため[APP_NAME]の機能の一部は無効になりました。他のアプリケーションを終了し、状況が継続または再発する場合は[APP_NAME]を再起動してください。
 	</notification>
 	<notification name="ForceQuitDueToLowMemory">
 		メモリ不足のため３０秒以内に[APP_NAME]は終了します。
@@ -4499,7 +4509,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="SOCKS_CONNECT_ERROR">
-		ＳＯＣＫＳ　５プロキシ「[HOST]:[PORT]」 が接続を拒絶したため、ＴＣＰチャンネルを開くことができませんでした。
+		ＳＯＣＫＳ　５プロキシ「[HOST]:[PORT]」が接続を拒絶したため、ＴＣＰチャンネルを開くことができませんでした。
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
@@ -4648,28 +4658,28 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</notification>
 	<notification name="PathfindingLinksets_WarnOnPhantom">
 		選択された一部のリンクセットはファントムフラグが切り替えられます。
-  
+
 続けてもよろしいですか？
 		<tag>confirm</tag>
 		<usetemplate ignoretext="リンクセットのファントムフラグの切替えができなかった時" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="PathfindingLinksets_MismatchOnRestricted">
-		一部の選択されたリンクセットは、リンクセットへの権限が制限されているため、「[REQUESTED_TYPE]」に設定できません。これらのリンクセットは代わりに「[RESTRICTED_TYPE]」 に設定されます。
-  
+		一部の選択されたリンクセットは、リンクセットへの権限が制限されているため、「[REQUESTED_TYPE]」に設定できません。これらのリンクセットは代わりに「[RESTRICTED_TYPE]」に設定されます。
+
 続けてもよろしいですか？
 		<tag>confirm</tag>？
 		<usetemplate ignoretext="リンクセットの権限制限のため変更ができなかった時" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="PathfindingLinksets_MismatchOnVolume">
 		選択された一部のリンクセットは、形状が凸状でないため「[REQUESTED_TYPE]」に設定できません。
-  
+
 続けてもよろしいですか？
 		<tag>confirm</tag>
 		<usetemplate ignoretext="リンクセットの形状が凸状でないため変更できなかった時" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="PathfindingLinksets_WarnOnPhantom_MismatchOnRestricted">
 		選択された一部のリンクセットはファントムフラグが切り替えられます。
-  
+
 一部の選択されたリンクセットは、リンクセットへの権限が制限されているため「[REQUESTED_TYPE]」に設定できません。これらのリンクセットは代わりに「[RESTRICTED_TYPE]」に設定されます。
 
 続けてもよろしいですか？
@@ -4678,7 +4688,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</notification>
 	<notification name="PathfindingLinksets_WarnOnPhantom_MismatchOnVolume">
 		選択された一部のリンクセットはファントムフラグが切り替えられます。
-  
+
 選択された一部のリンクセットは、形状が凸状でないため「[REQUESTED_TYPE]」に設定できません。
 
 続けてもよろしいですか？
@@ -4705,12 +4715,12 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
 続けてもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="リンクセットの一部のファントムフラグが切り替えられ、他のリンクセットはリンクセットへの権限が制限され、また形状が凸状でないため設定できません。" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="リンクセットをファントムフラグが切り替えるときに、権限が制限ているか形状が凸状でないため設定できないとき" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="PathfindingLinksets_ChangeToFlexiblePath">
 		選択されたオブジェクトはナビメッシュに影響を与えます。オブジェクトをフレキシブルパスに変更すると、ナビメッシュから削除されます。
 		<tag>confirm</tag>
-		<usetemplate ignoretext="選択されたオブジェクトはナビメッシュに影響を与えます。オブジェクトをフレキシブルパスに変更すると、ナビメッシュから削除されます。" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="選択したオブジェクトをフレキシブルパスに変更する際にナビメッシュから削除されることの確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<global name="UnsupportedGLRequirements">
 		[APP_NAME]の動作に必要なハードウェア要件を満たしていないようです。[APP_NAME]にはマルチテクスチャをサポートするOpenGLグラフィックカードが必要です。
@@ -4737,20 +4747,20 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		[NUM_ITEMS]個のアイテムを返却しようとしています。
 このまま続けてもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="複数のアイテムを返しますか？" name="okcancelignore" notext="いいえ" yestext="はい"/>
+		<usetemplate ignoretext="複数のアイテムを返却する前の確認" name="okcancelignore" notext="いいえ" yestext="はい"/>
 	</notification>
 	<notification name="PathfindingDeleteMultipleItems">
 		[NUM_ITEMS]個のアイテムを削除しようとしています。
 このまま続けてもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate ignoretext="複数のアイテムを削除しますか？" name="okcancelignore" notext="いいえ" yestext="はい"/>
+		<usetemplate ignoretext="複数のアイテムを削除する前の確認" name="okcancelignore" notext="いいえ" yestext="はい"/>
 	</notification>
 	<notification name="AvatarFrozen">
-		[AV_FREEZER]によってあなたはフリーズされています。世界を動かすことも、世界とインタラクションすることもできません。
+		[AV_FREEZER]によってあなたはフリーズされています。ワールドを動かすことも、ワールドとインタラクションすることもできません。
 		<tag>fail</tag>
 	</notification>
 	<notification name="AvatarFrozenDuration">
-		[AV_FREEZER]によって、あなたは[AV_FREEZE_TIME]秒間フリーズされました。世界を動かすことも、世界とインタラクションすることもできません。
+		[AV_FREEZER]によって、あなたは[AV_FREEZE_TIME]秒間フリーズされました。ワールドを動かすことも、ワールドとインタラクションすることもできません。
 		<tag>fail</tag>
 	</notification>
 	<notification name="YouFrozeAvatar">
@@ -4782,7 +4792,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<tag>fail</tag>
 	</notification>
 	<notification name="CantRezOnLand">
-		この土地の所有者はのRezを許可していないため、[OBJECT_POS]をRezすることができません。土地ツールを使用して、土地の所有を確認してください。
+		この土地の所有者はのRezを許可していないため、[OBJECT_POS]をRezすることができません。土地ツールを使用して、土地所有者を確認してください。
 		<tag>fail</tag>
 	</notification>
 	<notification name="RezFailTooManyRequests">
@@ -5641,16 +5651,16 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	<notification name="PreferenceChatClearLog">
 		これにより、過去の会話のログ、およびそのファイルのすべてのバックアップが削除されます。
 		<tag>confirm</tag>
-		<usetemplate ignoretext="以前の会話のログを削除する前に確認してください。" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="過去の会話ログを削除する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="PreferenceChatDeleteTranscripts">
 		これにより、以前のすべての会話のテキストが削除されます。過去の会話のリストには影響しません。
 .txtおよびtxt.backupの拡張子が付いたすべてのファイルが[FOLDER]フォルダから削除されます。
 		<tag>confirm</tag>
-		<usetemplate ignoretext="テキストを削除するまえに確認してください。" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="テキストを削除する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="PreferenceChatPathChanged">
-		ファイルを移動できません。以前のパスがリストアされました。
+		ファイルを移動できません。以前のパスに復帰させました。
 		<usetemplate ignoretext="ファイルを移動できないとき" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="DefaultObjectPermissions">
@@ -5727,7 +5737,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい"/>
 	</notification>
 	<notification name="PersonalSettingsConfirmReset">
-		適用されているすべての個人的光源設定を削除しようとしています。
+		適用されているすべての個人の光源設定を削除しようとしています。
 本当に続けてもよろしいですか？
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい"/>
@@ -5742,7 +5752,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<usetemplate ignoretext="譲渡不可な自然環境の設定をインポートする前の確認" name="okcancelignore" notext="いいえ" yestext="はい"/>
 	</notification>
 	<notification name="NoEditFromLibrary">
-		ライブラリから直接自然環境の設定を編集することはできません。 
+		ライブラリから直接自然環境の設定を編集することはできません。
 ご自身のインベントリにコピーして再度お試しください。
 		<tag>fail</tag>
 	</notification>
@@ -5777,7 +5787,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
     [MESSAGE]
 		<tag>confirm</tag>
 		<form name="form">
-			<input name="token" type="text" />
+			<input name="token" type="text"/>
 			<ignore name="ignore" text="このコンピューターを３０日間記録する"/>
 			<button default="true" index="0" name="continue" text="続ける"/>
 			<button index="1" name="cancel" text="キャンセル"/>
@@ -5805,7 +5815,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
 他の人にこのオブジェクトを見てもらいたい場合は、オブジェクトを削除して、アバターのアタッチメントポイントに再度アタッチします。
 		<tag>confirm</tag>
-		<usetemplate ignoretext="リグメッシュがＨＵＤポイントにアタッチされている場合に警告します。" name="okignore" yestext="ＯＫ"/>
+		<usetemplate ignoretext="リグメッシュがＨＵＤポイントにアタッチされている場合の警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="EnableAutoFPSWarning">
 		自動ＦＰＳを有効にしようとしています。保存されていないグラフィック設定はすべて失われます。
@@ -5887,7 +5897,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	<notification name="ConfirmRemoveSkin">
 		[SKIN]を削除してもよろしいですか？これにより、ハードディスクから完全に消去されます。
 		<tag>confirm</tag>
-		<usetemplate ignoretext="Confirm removing skins" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="スキンの削除確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="RemoveSkinSuccess">
 		[SKIN]の削除に成功しました。
@@ -5958,7 +5968,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</notification>
 	<notification name="AOForeignItemsFound">
 		アニメーションオーバーライダーは、構成に属さない項目を少なくとも１つ見つけました。
-移動されたアイテムがないか、「遺失物」フォルダーを確認してください。
+移動されたアイテムがないか、「遺失物」フォルダを確認してください。
 	</notification>
 	<notification name="AOImportSetAlreadyExists">
 		この名前のアニメーションセットはすでに存在します。
