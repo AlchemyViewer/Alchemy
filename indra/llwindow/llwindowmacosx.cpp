@@ -185,7 +185,7 @@ LLWindowMacOSX::LLWindowMacOSX(LLWindowCallbacks* callbacks,
 			return;
 		}
 
-		//start with arrow cursor
+        //start with arrow cursor
 		initCursors();
 		setCursor( UI_CURSOR_ARROW );
 		
@@ -624,7 +624,7 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 		mGLView = createOpenGLView(mWindow, mFSAASamples, enable_vsync);
 		mContext = getCGLContextObj(mGLView);
 		gGLManager.mVRAM = getVramSize(mGLView);
-        
+
         if(!mPixelFormat)
         {
             CGLPixelFormatAttribute attribs[] =
@@ -651,6 +651,7 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
                 CGLChoosePixelFormat (attribs, &mPixelFormat, &numPixelFormats);
             }
         }
+
 	}
 	
 	// This sets up our view to recieve text from our non-inline text input window.
@@ -1919,9 +1920,11 @@ public:
 
 void* LLWindowMacOSX::createSharedContext()
 {
-    LL_INFOS() << "Creating shared context" << LL_ENDL;
     sharedContext* sc = new sharedContext();
-    CGLCreateContext(mPixelFormat, mContext, &(sc->mContext));
+    CGLError err = CGLCreateContext(mPixelFormat, mContext, &(sc->mContext));
+    llassert(err == kCGLNoError);
+
+    CGLEnable(mContext, kCGLCEMPEngine);
 
     return (void *)sc;
 }
@@ -1929,6 +1932,25 @@ void* LLWindowMacOSX::createSharedContext()
 void LLWindowMacOSX::makeContextCurrent(void* context)
 {
     CGLSetCurrentContext(((sharedContext*)context)->mContext);
+
+    //enable multi-threaded OpenGL
+	if (sUseMultGL)
+	{
+		CGLError cgl_err;
+		CGLContextObj ctx = CGLGetCurrentContext();
+
+		cgl_err =  CGLEnable( ctx, kCGLCEMPEngine);
+
+		if (cgl_err != kCGLNoError )
+		{
+			LL_INFOS("GLInit") << "Multi-threaded OpenGL not available." << LL_ENDL;
+		}
+		else
+		{
+            LL_INFOS("GLInit") << "Multi-threaded OpenGL enabled." << LL_ENDL;
+		}
+	}
+	
 }
 
 void LLWindowMacOSX::destroySharedContext(void* context)
