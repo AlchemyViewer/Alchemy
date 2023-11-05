@@ -48,7 +48,7 @@
 		<combo_box label="画像レイヤー" name="layer_types">
 			<combo_box.item label="カラー" name="Colors" value="colors"/>
 			<combo_box.item label="色深度" name="Depth" value="depth"/>
-			<combo_box.item label="色深度（２４ビット）" name="Depth24" value="depth24" />
+			<combo_box.item label="色深度（２４ビット）" name="Depth24" value="depth24"/>
 		</combo_box>
 		<check_box label="インターフェース" name="ui_check"/>
 		<check_box label="ＨＵＤ" name="hud_check"/>
@@ -60,11 +60,11 @@
 		</combo_box>
 	</panel>
 	<panel_container name="panel_container">
-		<panel name="panel_snapshot_options" filename="panel_snapshot_options.xml"/>
-		<panel name="panel_snapshot_profile" filename="panel_snapshot_profile.xml"/>
-		<panel name="panel_snapshot_postcard" filename="panel_snapshot_postcard.xml"/>
-		<panel name="panel_snapshot_inventory" filename="panel_snapshot_inventory.xml"/>
-		<panel name="panel_snapshot_local" filename="panel_snapshot_local.xml"/>
+		<panel name="panel_snapshot_options"/>
+		<panel name="panel_snapshot_profile"/>
+		<panel name="panel_snapshot_postcard"/>
+		<panel name="panel_snapshot_inventory"/>
+		<panel name="panel_snapshot_local"/>
 	</panel_container>
 	<view_border name="status_hr"/>
 	<panel name="succeeded_panel">

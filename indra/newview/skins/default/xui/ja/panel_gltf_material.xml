@@ -3,7 +3,7 @@
 	<check_box label="両面に適用" name="double sided"/>
 	<panel name="base_color_texture_pnl">
 		<text name="base_color_lbl">
-			ベースカラー：
+			ベースカラー（アルベド）：
 		</text>
 		<texture_picker name="base_color_texture" tool_tip="ベースカラー（アルベド）マップを指定します。アルファチャネルはオプションで透明度で使用されます。"/>
 		<text name="base_color_upload_fee">
@@ -14,7 +14,7 @@
 		</text>
 		<color_swatch name="base color"/>
 		<text name="base_color_transparency_lbl">
-			アルファ
+			アルファ（透過）
 		</text>
 		<spinner name="transparency"/>
 		<text name="alpha_mode_lbl">
@@ -49,7 +49,7 @@
 	</panel>
 	<panel name="emissive_texture_pnl">
 		<text name="emissive_lbl">
-			エミッシブ：
+			放射（エミッシブ）：
 		</text>
 		<texture_picker name="emissive_texture" tool_tip="放射（エミッシブ）マップを指定します。"/>
 		<text name="emissive_upload_fee">
@@ -62,7 +62,7 @@
 	</panel>
 	<panel name="normal_texture_pnl">
 		<text name="normal_lbl">
-			ノーマル：
+			法線（ノーマル）：
 		</text>
 		<texture_picker name="normal_texture" tool_tip="法線（ノーマル）マップを指定します。"/>
 		<text name="normal_upload_fee">

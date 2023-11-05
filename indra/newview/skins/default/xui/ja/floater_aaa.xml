@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Test Floater" title="フローターのテスト">
 	<text left="0" follows="left|top|bottom" top="5" clip_partial="true" bottom="-5" width="100" valign="top">ここに
 記載される

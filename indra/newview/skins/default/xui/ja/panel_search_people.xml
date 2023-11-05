@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="panel_search_people">
 	<panel.string name="SeachFilteredOnShortWordsEmpty">
 		検索語句が短すぎるため、検索は実行されませんでした。

@@ -9,7 +9,7 @@
 	<scroll_container name="stack">
 		<panel name="scroll_content_panel">
 			<toolbar name="toybox_toolbar">
-				<button_panel />
+				<button_panel/>
 				<button_icon_and_text/>
 			</toolbar>
 		</panel>
