@@ -361,7 +361,9 @@ void LLAvatarNameCache::requestNamesViaCapability()
 	std::vector<LLUUID> agent_ids;
 	agent_ids.reserve(128);
 	
+#ifdef SHOW_DEBUG
 	U32 ids = 0;
+#endif
 	for(auto it = mAskQueue.begin(); it != mAskQueue.end();)
 	{
 		LLUUID agent_id = *it;
@@ -372,13 +374,17 @@ void LLAvatarNameCache::requestNamesViaCapability()
 			// ...starting new request
 			url += mNameLookupURL;
 			url += "?ids=";
+#ifdef SHOW_DEBUG
 			ids = 1;
+#endif
 		}
 		else
 		{
 			// ...continuing existing request
 			url += "&ids=";
+#ifdef SHOW_DEBUG
 			ids++;
+#endif
 		}
 		url += agent_id.asString();
 		agent_ids.push_back(agent_id);
