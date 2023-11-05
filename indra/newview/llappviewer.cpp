@@ -4114,6 +4114,8 @@ bool LLAppViewer::initCache()
 		if (gSavedSettings.getBool("PurgeCacheSelective"))
 		{
 			purgeCacheSelective(gSavedSettings.getLLSD("PurgeCacheSelectiveData"));
+			gSavedSettings.setLLSD("PurgeCacheSelectiveData", LLSD());
+			gSavedSettings.setBOOL("PurgeCacheSelective", false);
 		}
 	}
 

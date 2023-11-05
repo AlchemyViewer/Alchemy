@@ -513,7 +513,9 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
                 // Faces
                 //----------------------------------------------------------------
                 U32 i;
+#ifdef SHOW_DEBUG
                 U32 numTris = 0;
+#endif
                 for (i = 0; i < numFaces; i++)
                 {
                         S16 face[3];
@@ -557,8 +559,9 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
 //                              }
 //                              face_list->put(i);
 //                      }
-
+#ifdef SHOW_DEBUG
                         numTris++;
+#endif
                 }
 
 #ifdef SHOW_DEBUG
