@@ -1066,10 +1066,9 @@ bool LLInventoryItem::fromLLSD(const LLSD& sd, bool is_new)
         if (i->first == INV_THUMBNAIL_LABEL)
         {
             const LLSD &thumbnail_map = i->second;
-            const std::string w = INV_ASSET_ID_LABEL;
-            if (thumbnail_map.has(w))
+            if (thumbnail_map.has(INV_ASSET_ID_LABEL))
             {
-                mThumbnailUUID = thumbnail_map[w];
+                mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
             }
             /* Example:
                 <key> asset_id </key>
@@ -1082,8 +1081,7 @@ bool LLInventoryItem::fromLLSD(const LLSD& sd, bool is_new)
                 <integer> 1 </key>
             */
         }
-
-        if (i->first == INV_THUMBNAIL_ID_LABEL)
+        else if (i->first == INV_THUMBNAIL_ID_LABEL)
         {
             mThumbnailUUID = i->second.asUUID();
         }
@@ -1308,6 +1306,7 @@ void LLInventoryCategory::packMessage(LLMessageSystem* msg) const
 
 bool LLInventoryCategory::fromLLSD(const LLSD& sd)
 {
+#if 0  // old implementation.  makes a LOT of temporary copies and LLSD::safe(impl) calls
     std::string w;
 
     w = INV_FOLDER_ID_LABEL_WS;
@@ -1359,6 +1358,57 @@ bool LLInventoryCategory::fromLLSD(const LLSD& sd)
         LLStringUtil::replaceNonstandardASCII(mName, ' ');
         LLStringUtil::replaceChar(mName, '|', ' ');
     }
+#else  // if 0 - new implementation follows
+	mThumbnailUUID.setNull();
+
+	// iterate as map to avoid making unnecessary temp copies of everything
+	LLSD::map_const_iterator i, end;
+	end = sd.endMap();
+	for (i = sd.beginMap(); i != end; ++i)
+	{
+		if (i->first == INV_FOLDER_ID_LABEL_WS)
+		{
+			mUUID = i->second;
+		}
+
+		if (i->first == INV_PARENT_ID_LABEL)
+		{
+			mParentUUID = i->second;
+		}
+
+		if (i->first == INV_THUMBNAIL_LABEL)
+		{
+			const LLSD& thumbnail_map = i->second;
+			if (thumbnail_map.has(INV_ASSET_ID_LABEL))
+			{
+				mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
+			}
+		}
+		else if (i->first == INV_THUMBNAIL_ID_LABEL)
+		{
+			mThumbnailUUID = i->second;
+		}
+
+		if (i->first == INV_ASSET_TYPE_LABEL)
+		{
+			S8 type = (U8)i->second.asInteger();
+			mPreferredType = static_cast<LLFolderType::EType>(type);
+		}
+
+		if (i->first == INV_ASSET_TYPE_LABEL_WS)
+		{
+			S8 type = (U8)i->second.asInteger();
+			mPreferredType = static_cast<LLFolderType::EType>(type);
+		}
+
+		if (i->first == INV_NAME_LABEL)
+		{
+			mName = i->second.asString();
+			LLStringUtil::replaceNonstandardASCII(mName, ' ');
+			LLStringUtil::replaceChar(mName, '|', ' ');
+		}
+	}
+#endif
     return true;
 }
 
@@ -1499,6 +1549,7 @@ LLSD LLInventoryCategory::exportLLSD() const
 
 bool LLInventoryCategory::importLLSD(const LLSD& cat_data)
 {
+#if 0
 	if (cat_data.has(INV_FOLDER_ID_LABEL))
 	{
 		setUUID(cat_data[INV_FOLDER_ID_LABEL].asUUID());
@@ -1531,6 +1582,47 @@ bool LLInventoryCategory::importLLSD(const LLSD& cat_data)
 		LLStringUtil::replaceNonstandardASCII(mName, ' ');
 		LLStringUtil::replaceChar(mName, '|', ' ');
 	}
+#else  // if 0 - new implementation follows
+
+	// iterate as map to avoid making unnecessary temp copies of everything
+	LLSD::map_const_iterator i, end;
+	end = cat_data.endMap();
+	for (i = cat_data.beginMap(); i != end; ++i)
+	{
+		if (i->first == INV_FOLDER_ID_LABEL)
+		{
+			setUUID(i->second.asUUID());
+		}
+		if (i->first == INV_PARENT_ID_LABEL)
+		{
+			setParent(i->second.asUUID());
+		}
+		if (i->first == INV_ASSET_TYPE_LABEL)
+		{
+			setType(LLAssetType::lookup(i->second.asString()));
+		}
+		if (i->first == INV_PREFERRED_TYPE_LABEL)
+		{
+			setPreferredType(LLFolderType::lookup(i->second.asString()));
+		}
+		if (i->first == INV_THUMBNAIL_LABEL)
+		{
+			LLUUID thumbnail_uuid;
+			const LLSD& thumbnail_data = i->second;
+			if (thumbnail_data.has(INV_ASSET_ID_LABEL))
+			{
+				thumbnail_uuid = thumbnail_data[INV_ASSET_ID_LABEL].asUUID();
+			}
+			setThumbnailUUID(thumbnail_uuid);
+		}
+		if (i->first == INV_NAME_LABEL)
+		{
+			mName = i->second.asString();
+			LLStringUtil::replaceNonstandardASCII(mName, ' ');
+			LLStringUtil::replaceChar(mName, '|', ' ');
+		}
+	}
+#endif
 
 	return true;
 }
