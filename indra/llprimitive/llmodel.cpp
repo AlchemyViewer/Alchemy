@@ -991,7 +991,7 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, BOOL nowrite, BO
 
         if (mdl.has("submodel_id"))
         { //write out submodel id
-        header["submodel_id"] = (LLSD::Integer)mdl["submodel_id"];
+			header["submodel_id"] = (LLSD::Integer)mdl["submodel_id"];
         }
 
 	std::string out[MODEL_NAMES_LENGTH];
@@ -1172,16 +1172,20 @@ bool LLModel::loadModel(std::istream& is)
 		}
 	}
 	
-	if (header.has("material_list"))
+	const auto& header_map = header.map();
+
+	auto it = header_map.find("material_list");
+	if (it != header_map.end())
 	{ //load material list names
 		mMaterialList.clear();
-		for (U32 i = 0; i < header["material_list"].size(); ++i)
+		for (U32 i = 0; i < it->second.size(); ++i)
 		{
-			mMaterialList.push_back(header["material_list"][i].asString());
+			mMaterialList.push_back(it->second[i].asString());
 		}
 	}
 
-	mSubmodelID = header.has("submodel_id") ? header["submodel_id"].asInteger() : false;
+	it = header_map.find("submodel_id");
+	mSubmodelID = it != header_map.end() ? it->second.asInteger() : false;
     
     static const std::array<std::string, 5> lod_name = {{
         "lowest_lod",
@@ -1456,9 +1460,12 @@ LLMeshSkinInfo::LLMeshSkinInfo(const LLUUID& mesh_id, const LLSD& skin) :
 
 void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 {
-	if (skin.has("joint_names"))
+	const auto& skin_map = skin.map();
+
+	auto it = skin_map.find("joint_names");
+	if (it != skin_map.end())
 	{
-		const auto& joint_names = skin["joint_names"];
+		const auto& joint_names = it->second;
 		for(const auto& jnt_llsd : joint_names.array())
 		{
 			mJointNames.emplace_back(jnt_llsd.asString());
@@ -1466,9 +1473,10 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 		}
 	}
 
-	if (skin.has("bind_shape_matrix"))
+	it = skin_map.find("bind_shape_matrix");
+	if (it != skin_map.end())
 	{
-		const auto& bind_shape_mat = skin["bind_shape_matrix"];
+		const auto& bind_shape_mat = it->second.array();
 		LLMatrix4 mat;
 		for (auto j = 0; j < 4; j++)
 		{
@@ -1480,10 +1488,11 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 		mBindShapeMatrix.loadu(mat);
 	}
 
-	if (skin.has("inverse_bind_matrix"))
+	it = skin_map.find("inverse_bind_matrix");
+	if (it != skin_map.end())
 	{
-		const auto& inv_bind_mat = skin["inverse_bind_matrix"];
-		for (auto i = 0; i < inv_bind_mat.size(); ++i)
+		const auto& inv_bind_mat = it->second.array();
+		for (size_t i = 0, size = inv_bind_mat.size(); i < size; ++i)
 		{
 			LLMatrix4 mat;
 			for (auto j = 0; j < 4; j++)
@@ -1511,10 +1520,11 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
         }
 	}
 
-	if (skin.has("alt_inverse_bind_matrix"))
+	it = skin_map.find("alt_inverse_bind_matrix");
+	if (it != skin_map.end())
 	{
-		const auto& alt_inv_bind_mat = skin["alt_inverse_bind_matrix"];
-		for (auto i = 0; i < alt_inv_bind_mat.size(); ++i)
+		const auto& alt_inv_bind_mat = it->second.array();
+		for (size_t i = 0, size = alt_inv_bind_mat.size(); i < size; ++i)
 		{
 			LLMatrix4 mat;
 			for (auto j = 0; j < 4; j++)
@@ -1529,14 +1539,16 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 		}
 	}
 
-	if (skin.has("pelvis_offset"))
+	it = skin_map.find("pelvis_offset");
+	if (it != skin_map.end())
 	{
-		mPelvisOffset = skin["pelvis_offset"].asReal();
+		mPelvisOffset = it->second.asReal();
 	}
 
-    if (skin.has("lock_scale_if_joint_position"))
+	it = skin_map.find("lock_scale_if_joint_position");
+	if (it != skin_map.end())
     {
-        mLockScaleIfJointPosition = skin["lock_scale_if_joint_position"].asBoolean();
+        mLockScaleIfJointPosition = it->second.asBoolean();
     }
 	else
 	{
