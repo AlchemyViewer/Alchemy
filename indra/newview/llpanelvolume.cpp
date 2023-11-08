@@ -775,6 +775,7 @@ void LLPanelVolume::sendIsReflectionProbe()
     }
     else
     {
+        LLNotificationsUtil::add("CantSelectReflectionProbe");
         volobjp->setIsReflectionProbe(value);
     }
 }
@@ -791,6 +792,7 @@ void LLPanelVolume::doSendIsReflectionProbe(const LLSD & notification, const LLS
         }
         LLVOVolume* volobjp = (LLVOVolume*)objectp;
 
+        LLNotificationsUtil::add("CantSelectReflectionProbe");
         volobjp->setIsReflectionProbe(true);
 
         { // has become a reflection probe, slam to a 10m sphere and pop up a message
