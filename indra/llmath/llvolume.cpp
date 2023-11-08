@@ -2422,7 +2422,9 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 		{
 			LLVolumeFace& face = mVolumeFaces[i];
 
-			if (mdl[i].has("NoGeometry"))
+			const auto& mdl_face = mdl[i];
+
+			if (mdl_face.has("NoGeometry"))
 			{ //face has no geometry, continue
 				face.resizeIndices(3);
 				face.resizeVertices(1);
@@ -2433,11 +2435,11 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 				continue;
 			}
 
-			LLSD::Binary pos = mdl[i]["Position"];
-			LLSD::Binary norm = mdl[i]["Normal"];
-            LLSD::Binary tangent = mdl[i]["Tangent"];
-			LLSD::Binary tc = mdl[i]["TexCoord0"];
-			LLSD::Binary idx = mdl[i]["TriangleList"];
+			const LLSD::Binary& pos = mdl_face["Position"];
+			const LLSD::Binary& norm = mdl_face["Normal"];
+			const LLSD::Binary& tangent = mdl_face["Tangent"];
+			const LLSD::Binary& tc = mdl_face["TexCoord0"];
+			const LLSD::Binary& idx = mdl_face["TriangleList"];
 
 			//copy out indices
             S32 num_indices = idx.size() / 2;
@@ -2484,19 +2486,19 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 			LLVector2 min_tc; 
 			LLVector2 max_tc; 
 		
-			minp.setValue(mdl[i]["PositionDomain"]["Min"]);
-			maxp.setValue(mdl[i]["PositionDomain"]["Max"]);
+			minp.setValue(mdl_face["PositionDomain"]["Min"]);
+			maxp.setValue(mdl_face["PositionDomain"]["Max"]);
 			LLVector4a min_pos, max_pos;
 			min_pos.load3(minp.mV);
 			max_pos.load3(maxp.mV);
 
-			min_tc.setValue(mdl[i]["TexCoord0Domain"]["Min"]);
-			max_tc.setValue(mdl[i]["TexCoord0Domain"]["Max"]);
+			min_tc.setValue(mdl_face["TexCoord0Domain"]["Min"]);
+			max_tc.setValue(mdl_face["TexCoord0Domain"]["Max"]);
 
             //unpack normalized scale/translation
-            if (mdl[i].has("NormalizedScale"))
+            if (mdl_face.has("NormalizedScale"))
             {
-                face.mNormalizedScale.setValue(mdl[i]["NormalizedScale"]);
+                face.mNormalizedScale.setValue(mdl_face["NormalizedScale"]);
             }
             else
             {
@@ -2615,7 +2617,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 				}
 			}
 
-			if (mdl[i].has("Weights"))
+			if (mdl_face.has("Weights"))
 			{
 				face.allocateWeights(num_verts);
                 if (!face.mWeights && num_verts)
@@ -2626,12 +2628,13 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                     continue;
                 }
 
-				LLSD::Binary weights = mdl[i]["Weights"];
+				const LLSD::Binary& weights = mdl_face["Weights"];
 
 				U32 idx = 0;
 
 				U32 cur_vertex = 0;
-				while (idx < weights.size() && cur_vertex < num_verts)
+				size_t weight_size = weights.size();
+				while (idx < weight_size && cur_vertex < num_verts)
 				{
 					const U8 END_INFLUENCES = 0xFF;
 					U8 joint = weights[idx++];
@@ -2641,7 +2644,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                     U32 joints[4] = {0,0,0,0};
 					LLVector4 joints_with_weights(0,0,0,0);
 
-					while (joint != END_INFLUENCES && idx < weights.size())
+					while (joint != END_INFLUENCES && idx < weight_size)
 					{
 						U16 influence = weights[idx++];
 						influence |= ((U16) weights[idx++] << 8);
