@@ -775,6 +775,20 @@ void LLPanelVolume::sendIsReflectionProbe()
     }
     else
     {
+        if (value)
+        {
+            LLNotificationsUtil::add("CantSelectReflectionProbe");
+        }
+        else if (objectp->flagPhantom())
+        {
+            LLViewerObject* root = objectp->getRootEdit();
+            bool in_linkeset = root != objectp || objectp->numChildren() > 0;
+            if (in_linkeset)
+            {
+                // In linkset with a phantom flag
+                objectp->setFlags(FLAGS_PHANTOM, FALSE);
+            }
+        }
         volobjp->setIsReflectionProbe(value);
     }
 }
@@ -791,6 +805,7 @@ void LLPanelVolume::doSendIsReflectionProbe(const LLSD & notification, const LLS
         }
         LLVOVolume* volobjp = (LLVOVolume*)objectp;
 
+        LLNotificationsUtil::add("CantSelectReflectionProbe");
         volobjp->setIsReflectionProbe(true);
 
         { // has become a reflection probe, slam to a 10m sphere and pop up a message
@@ -1207,6 +1222,17 @@ void LLPanelVolume::onPasteLight()
         }
         else
         {
+            if (objectp->flagPhantom())
+            {
+                LLViewerObject* root = objectp->getRootEdit();
+                bool in_linkeset = root != objectp || objectp->numChildren() > 0;
+                if (in_linkeset)
+                {
+                    // In linkset with a phantom flag
+                    objectp->setFlags(FLAGS_PHANTOM, FALSE);
+                }
+            }
+
             volobjp->setIsReflectionProbe(false);
         }
     }

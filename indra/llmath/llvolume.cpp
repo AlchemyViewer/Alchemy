@@ -2435,11 +2435,13 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 				continue;
 			}
 
-			const LLSD::Binary& pos = mdl_face["Position"];
-			const LLSD::Binary& norm = mdl_face["Normal"];
-			const LLSD::Binary& tangent = mdl_face["Tangent"];
-			const LLSD::Binary& tc = mdl_face["TexCoord0"];
-			const LLSD::Binary& idx = mdl_face["TriangleList"];
+			const LLSD::Binary& pos = mdl_face["Position"].asBinary();
+			const LLSD::Binary& norm = mdl_face["Normal"].asBinary();
+#if 0 // keep this code for now in case we decide to add support for on-the-wire tangents
+			const LLSD::Binary& tangent = mdl_face["Tangent"].asBinary();
+#endif
+			const LLSD::Binary& tc = mdl_face["TexCoord0"].asBinary();
+			const LLSD::Binary& idx = mdl_face["TriangleList"].asBinary();
 
 			//copy out indices
             S32 num_indices = idx.size() / 2;
@@ -2628,7 +2630,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                     continue;
                 }
 
-				const LLSD::Binary& weights = mdl_face["Weights"];
+				const LLSD::Binary& weights = mdl_face["Weights"].asBinary();
 
 				U32 idx = 0;
 

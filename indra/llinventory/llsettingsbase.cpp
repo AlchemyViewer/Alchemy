@@ -172,18 +172,21 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
 
     //llassert(mix >= 0.0f && mix <= 1.0f);
 
-    for (const auto& llsd_pair : settings.map())
+    const auto& other_map = other.map();
+    const auto& settings_map = settings.map();
+    for (const auto& llsd_pair : settings_map)
     {
         const std::string& key_name = llsd_pair.first;
         const LLSD& value = llsd_pair.second;
 
-        if (skip.find(key_name) != skip.end())
+        if (skip.contains(key_name))
             continue;
 
         LLSD other_value;
-        if (other.has(key_name))
+        auto it = other_map.find(key_name);
+        if (it != other_map.end())
         {
-            other_value = other[key_name];
+            other_value = it->second;
         }
         else
         {
@@ -211,13 +214,17 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
 
     // Special handling cases
     // Flags
-    if (settings.has(SETTING_FLAGS))
     {
-        U32 flags = (U32)settings[SETTING_FLAGS].asInteger();
-        if (other.has(SETTING_FLAGS))
-            flags |= (U32)other[SETTING_FLAGS].asInteger();
+        auto it = settings_map.find(SETTING_FLAGS);
+        if (it != settings_map.end())
+        {
+            U32 flags = (U32)it->second.asInteger();
+            it = other_map.find(SETTING_FLAGS);
+            if (it != other_map.end())
+                flags |= (U32)it->second.asInteger();
 
-        newSettings[SETTING_FLAGS] = LLSD::Integer(flags);
+            newSettings[SETTING_FLAGS] = LLSD::Integer(flags);
+        }
     }
 
     // Now add anything that is in other but not in the settings
@@ -225,10 +232,10 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     {
         const std::string& key_name = llsd_pair.first;
 
-        if (skip.find(key_name) != skip.end())
+        if (skip.contains(key_name))
             continue;
 
-        if (settings.has(key_name))
+        if (settings_map.contains(key_name))
             continue;
 
         parammapping_t::const_iterator def_iter = defaults.find(key_name);
@@ -250,10 +257,10 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     for (const auto& llsd_pair : other.map())
     {
         // TODO: Should I blend this in instead?
-        if (skip.find(llsd_pair.first) == skip.end())
+        if (!skip.contains(llsd_pair.first))
             continue;
 
-        if (!settings.has(llsd_pair.first))
+        if (!settings_map.contains(llsd_pair.first))
             continue;
     
         newSettings[llsd_pair.first] = llsd_pair.second;
