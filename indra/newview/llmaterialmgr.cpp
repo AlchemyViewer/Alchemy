@@ -691,12 +691,8 @@ void LLMaterialMgr::processGetQueue()
 			return;
 		}
 
-		LLSD::Binary materialBinary;
-		materialBinary.resize(materialSize);
-		memcpy(materialBinary.data(), materialString.data(), materialSize);
-
 		LLSD postData = LLSD::emptyMap();
-		postData[MATERIALS_CAP_ZIP_FIELD] = materialBinary;
+		postData[MATERIALS_CAP_ZIP_FIELD] = LLSD::Binary(materialString.begin(), materialString.end());
 
         LLCore::HttpHandler::ptr_t handler = std::make_shared<LLMaterialHttpHandler>("POST",
 				boost::bind(&LLMaterialMgr::onGetResponse, this, _1, _2, region_id)
@@ -979,12 +975,8 @@ void LLMaterialMgr::processPutQueue()
 
 		if (materialSize > 0)
 		{
-			LLSD::Binary materialBinary;
-			materialBinary.resize(materialSize);
-			memcpy(materialBinary.data(), materialString.data(), materialSize);
-
 			LLSD putData = LLSD::emptyMap();
-			putData[MATERIALS_CAP_ZIP_FIELD] = materialBinary;
+			putData[MATERIALS_CAP_ZIP_FIELD] = LLSD::Binary(materialString.begin(), materialString.end());
 
 			LL_DEBUGS("Materials") << "put for " << itRequest->second.size() << " faces to region " << itRequest->first->getName() << LL_ENDL;
 

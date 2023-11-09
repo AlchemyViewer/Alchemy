@@ -989,8 +989,8 @@ LLSD llsd_clone(LLSD value, LLSD filter)
 
     case LLSD::TypeBinary:
     {
-        LLSD::Binary bin(value.asBinary().begin(), value.asBinary().end());
-        clone = LLSD::Binary(std::move(bin));
+        const auto& bin = value.asBinary();
+        clone = LLSD::Binary(bin.begin(), bin.end());
         break;
     }
     default:
