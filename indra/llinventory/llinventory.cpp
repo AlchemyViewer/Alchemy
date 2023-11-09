@@ -900,167 +900,167 @@ bool LLInventoryItem::fromLLSD(const LLSD& sd, bool is_new)
     // TODO - figure out if this should be moved into the noclobber fields above
     mThumbnailUUID.setNull();
 
-    // iterate as map to avoid making unnecessary temp copies of everything
-    LLSD::map_const_iterator i, end;
-    end = sd.endMap();
-    for (i = sd.beginMap(); i != end; ++i)
-    {
-        if (i->first == INV_ITEM_ID_LABEL)
-        {
-            mUUID = i->second;
-            continue;
-        }
+	const auto& sdMap = sd.map();
+	auto itEnd = sdMap.end();
 
-        if (i->first == INV_PARENT_ID_LABEL)
-        {
-            mParentUUID = i->second;
-            continue;
-        }
+	auto it = sdMap.find(INV_ITEM_ID_LABEL);
+	if (it != itEnd)
+	{
+		mUUID = it->second;
+	}
 
-        if (i->first == INV_THUMBNAIL_LABEL)
-        {
-            const LLSD &thumbnail_map = i->second;
-            if (thumbnail_map.has(INV_ASSET_ID_LABEL))
-            {
-                mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
-            }
-            /* Example:
-                <key> asset_id </key>
-                <uuid> acc0ec86 - 17f2 - 4b92 - ab41 - 6718b1f755f7 </uuid>
-                <key> perms </key>
-                <integer> 8 </integer>
-                <key>service</key>
-                <integer> 3 </integer>
-                <key>version</key>
-                <integer> 1 </key>
-            */
-          continue;
-      }
-        else if (i->first == INV_THUMBNAIL_ID_LABEL)
-        {
-            mThumbnailUUID = i->second.asUUID();
-            continue;
-        }
+	it = sdMap.find(INV_PARENT_ID_LABEL);
+	if (it != itEnd)
+	{
+		mParentUUID = it->second;
+	}
 
-        if (i->first == INV_PERMISSIONS_LABEL)
-        {
-            mPermissions = ll_permissions_from_sd(i->second);
-            continue;
-        }
+	it = sdMap.find(INV_THUMBNAIL_LABEL);
+	if (it != itEnd)
+	{
+		const LLSD& thumbnail_map = it->second;
+		if (thumbnail_map.has(INV_ASSET_ID_LABEL))
+		{
+			mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
+		}
+		/* Example:
+			<key> asset_id </key>
+			<uuid> acc0ec86 - 17f2 - 4b92 - ab41 - 6718b1f755f7 </uuid>
+			<key> perms </key>
+			<integer> 8 </integer>
+			<key>service</key>
+			<integer> 3 </integer>
+			<key>version</key>
+			<integer> 1 </key>
+		*/
+	}
+	else
+	{
+		it = sdMap.find(INV_THUMBNAIL_ID_LABEL);
+		if (it != itEnd)
+		{
+			mThumbnailUUID = it->second.asUUID();
+		}
+	}
 
-        if (i->first == INV_SALE_INFO_LABEL)
-        {
-            // Sale info used to contain next owner perm. It is now in
-            // the permissions. Thus, we read that out, and fix legacy
-            // objects. It's possible this op would fail, but it
-            // should pick up the vast majority of the tasks.
-            BOOL has_perm_mask = FALSE;
-            U32  perm_mask     = 0;
-            if (!mSaleInfo.fromLLSD(i->second, has_perm_mask, perm_mask))
-            {
-                return false;
-            }
-            if (has_perm_mask)
-            {
-                if (perm_mask == PERM_NONE)
-                {
-                    perm_mask = mPermissions.getMaskOwner();
-                }
-                // fair use fix.
-                if (!(perm_mask & PERM_COPY))
-                {
-                    perm_mask |= PERM_TRANSFER;
-                }
-                mPermissions.setMaskNext(perm_mask);
-            }
-            continue;
-        }
+	it = sdMap.find(INV_PERMISSIONS_LABEL);
+	if (it != itEnd)
+	{
+		mPermissions = ll_permissions_from_sd(it->second);
+	}
 
-        if (i->first == INV_SHADOW_ID_LABEL)
-        {
-            mAssetUUID = i->second;
-            LLXORCipher cipher(MAGIC_ID.mData, UUID_BYTES);
-            cipher.decrypt(mAssetUUID.mData, UUID_BYTES);
-            continue;
-        }
+	it = sdMap.find(INV_SALE_INFO_LABEL);
+	if (it != itEnd)
+	{
+		// Sale info used to contain next owner perm. It is now in
+		// the permissions. Thus, we read that out, and fix legacy
+		// objects. It's possible this op would fail, but it
+		// should pick up the vast majority of the tasks.
+		BOOL has_perm_mask = FALSE;
+		U32  perm_mask = 0;
+		if (!mSaleInfo.fromLLSD(it->second, has_perm_mask, perm_mask))
+		{
+			return false;
+		}
+		if (has_perm_mask)
+		{
+			if (perm_mask == PERM_NONE)
+			{
+				perm_mask = mPermissions.getMaskOwner();
+			}
+			// fair use fix.
+			if (!(perm_mask & PERM_COPY))
+			{
+				perm_mask |= PERM_TRANSFER;
+			}
+			mPermissions.setMaskNext(perm_mask);
+		}
+	}
 
-        if (i->first == INV_ASSET_ID_LABEL)
-        {
-            mAssetUUID = i->second;
-            continue;
-        }
+	it = sdMap.find(INV_SHADOW_ID_LABEL);
+	if (it != itEnd)
+	{
+		mAssetUUID = it->second;
+		LLXORCipher cipher(MAGIC_ID.mData, UUID_BYTES);
+		cipher.decrypt(mAssetUUID.mData, UUID_BYTES);
+	}
 
-        if (i->first == INV_LINKED_ID_LABEL)
-        {
-            mAssetUUID = i->second;
-            continue;
-        }
+	it = sdMap.find(INV_ASSET_ID_LABEL);
+	if (it != itEnd)
+	{
+		mAssetUUID = it->second;
+	}
 
-        if (i->first == INV_ASSET_TYPE_LABEL)
-        {
-            LLSD const &label = i->second;
-            if (label.isString())
-            {
-                mType = LLAssetType::lookup(label.asString().c_str());
-            }
-            else if (label.isInteger())
-            {
-                S8 type = (U8) label.asInteger();
-                mType   = static_cast<LLAssetType::EType>(type);
-            }
-            continue;
-        }
+	it = sdMap.find(INV_LINKED_ID_LABEL);
+	if (it != itEnd)
+	{
+		mAssetUUID = it->second;
+	}
 
-        if (i->first == INV_INVENTORY_TYPE_LABEL)
-        {
-            LLSD const &label = i->second;
-            if (label.isString())
-            {
-                mInventoryType = LLInventoryType::lookup(label.asString().c_str());
-            }
-            else if (label.isInteger())
-            {
-                S8 type        = (U8) label.asInteger();
-                mInventoryType = static_cast<LLInventoryType::EType>(type);
-            }
-            continue;
-        }
+	it = sdMap.find(INV_ASSET_TYPE_LABEL);
+	if (it != itEnd)
+	{
+		LLSD const& label = it->second;
+		if (label.isString())
+		{
+			mType = LLAssetType::lookup(label.asString().c_str());
+		}
+		else if (label.isInteger())
+		{
+			S8 type = (U8)label.asInteger();
+			mType = static_cast<LLAssetType::EType>(type);
+		}
+	}
 
-        if (i->first == INV_FLAGS_LABEL)
-        {
-            LLSD const &label = i->second;
-            if (label.isBinary())
-            {
-                mFlags = ll_U32_from_sd(label);
-            }
-            else if (label.isInteger())
-            {
-                mFlags = label.asInteger();
-            }
-            continue;
-        }
+	it = sdMap.find(INV_INVENTORY_TYPE_LABEL);
+	if (it != itEnd)
+	{
+		LLSD const& label = it->second;
+		if (label.isString())
+		{
+			mInventoryType = LLInventoryType::lookup(label.asString().c_str());
+		}
+		else if (label.isInteger())
+		{
+			S8 type = (U8)label.asInteger();
+			mInventoryType = static_cast<LLInventoryType::EType>(type);
+		}
+	}
 
-        if (i->first == INV_NAME_LABEL)
-        {
-            mName = i->second.asString();
-            LLStringUtil::replaceNonstandardASCII(mName, ' ');
-            LLStringUtil::replaceChar(mName, '|', ' ');
-            continue;
-        }
+	it = sdMap.find(INV_FLAGS_LABEL);
+	if (it != itEnd)
+	{
+		LLSD const& label = it->second;
+		if (label.isBinary())
+		{
+			mFlags = ll_U32_from_sd(label);
+		}
+		else if (label.isInteger())
+		{
+			mFlags = label.asInteger();
+		}
+	}
 
-        if (i->first == INV_DESC_LABEL)
-        {
-            mDescription = i->second.asString();
-            LLStringUtil::replaceNonstandardASCII(mDescription, ' ');
-            continue;
-        }
+	it = sdMap.find(INV_NAME_LABEL);
+	if (it != itEnd)
+	{
+		mName = it->second.asString();
+		LLStringUtil::replaceNonstandardASCII(mName, ' ');
+		LLStringUtil::replaceChar(mName, '|', ' ');
+	}
 
-        if (i->first == INV_CREATION_DATE_LABEL)
-        {
-            mCreationDate = i->second.asInteger();
-            continue;
-        }
-    }
+	it = sdMap.find(INV_DESC_LABEL);
+	if (it != itEnd)
+	{
+		mDescription = it->second.asString();
+		LLStringUtil::replaceNonstandardASCII(mDescription, ' ');
+	}
+
+	it = sdMap.find(INV_CREATION_DATE_LABEL);
+	if (it != itEnd)
+	{
+		mCreationDate = it->second.asInteger();
+	}
 
 	// Need to convert 1.0 simstate files to a useful inventory type
 	// and potentially deal with bad inventory tyes eg, a landmark
@@ -1171,59 +1171,59 @@ bool LLInventoryCategory::fromLLSD(const LLSD& sd)
 {
 	mThumbnailUUID.setNull();
 
-	// iterate as map to avoid making unnecessary temp copies of everything
-	LLSD::map_const_iterator i, end;
-	end = sd.endMap();
-	for (i = sd.beginMap(); i != end; ++i)
+	const auto& sdMap = sd.map();
+	auto itEnd = sdMap.end();
+
+	auto it = sdMap.find(INV_FOLDER_ID_LABEL_WS);
+	if (it != itEnd)
 	{
-		if (i->first == INV_FOLDER_ID_LABEL_WS)
-		{
-			mUUID = i->second;
-			continue;
-		}
+		mUUID = it->second;
+	}
 
-		if (i->first == INV_PARENT_ID_LABEL)
-		{
-			mParentUUID = i->second;
-			continue;
-		}
+	it = sdMap.find(INV_PARENT_ID_LABEL);
+	if (it != itEnd)
+	{
+		mParentUUID = it->second;
+	}
 
-		if (i->first == INV_THUMBNAIL_LABEL)
+	it = sdMap.find(INV_THUMBNAIL_LABEL);
+	if (it != itEnd)
+	{
+		const LLSD& thumbnail_map = it->second;
+		if (thumbnail_map.has(INV_ASSET_ID_LABEL))
 		{
-			const LLSD& thumbnail_map = i->second;
-			if (thumbnail_map.has(INV_ASSET_ID_LABEL))
-			{
-				mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
-			}
-			continue;
+			mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
 		}
-		else if (i->first == INV_THUMBNAIL_ID_LABEL)
+	}
+	else
+	{
+		it = sdMap.find(INV_THUMBNAIL_ID_LABEL);
+		if (it != itEnd)
 		{
-			mThumbnailUUID = i->second;
-			continue;
+			mThumbnailUUID = it->second;
 		}
+	}
 
-		if (i->first == INV_ASSET_TYPE_LABEL)
-		{
-			S8 type = (U8)i->second.asInteger();
-			mPreferredType = static_cast<LLFolderType::EType>(type);
-			continue;
-		}
+	it = sdMap.find(INV_ASSET_TYPE_LABEL);
+	if (it != itEnd)
+	{
+		S8 type = (U8)it->second.asInteger();
+		mPreferredType = static_cast<LLFolderType::EType>(type);
+	}
 
-		if (i->first == INV_ASSET_TYPE_LABEL_WS)
-		{
-			S8 type = (U8)i->second.asInteger();
-			mPreferredType = static_cast<LLFolderType::EType>(type);
-			continue;
-		}
+	it = sdMap.find(INV_ASSET_TYPE_LABEL_WS);
+	if (it != itEnd)
+	{
+		S8 type = (U8)it->second.asInteger();
+		mPreferredType = static_cast<LLFolderType::EType>(type);
+	}
 
-		if (i->first == INV_NAME_LABEL)
-		{
-			mName = i->second.asString();
-			LLStringUtil::replaceNonstandardASCII(mName, ' ');
-			LLStringUtil::replaceChar(mName, '|', ' ');
-			continue;
-		}
+	it = sdMap.find(INV_NAME_LABEL);
+	if (it != itEnd)
+	{
+		mName = it->second.asString();
+		LLStringUtil::replaceNonstandardASCII(mName, ' ');
+		LLStringUtil::replaceChar(mName, '|', ' ');
 	}
 
     return true;
@@ -1366,49 +1366,46 @@ LLSD LLInventoryCategory::exportLLSD() const
 
 bool LLInventoryCategory::importLLSD(const LLSD& cat_data)
 {
-	// iterate as map to avoid making unnecessary temp copies of everything
-	LLSD::map_const_iterator i, end;
-	end = cat_data.endMap();
-	for (i = cat_data.beginMap(); i != end; ++i)
+	const auto& sdMap = cat_data.map();
+	auto itEnd = sdMap.end();
+
+	auto it = sdMap.find(INV_FOLDER_ID_LABEL);
+	if (it != itEnd)
 	{
-		if (i->first == INV_FOLDER_ID_LABEL)
+		setUUID(it->second.asUUID());
+	}
+	it = sdMap.find(INV_PARENT_ID_LABEL);
+	if (it != itEnd)
+	{
+		setParent(it->second.asUUID());
+	}
+	it = sdMap.find(INV_ASSET_TYPE_LABEL);
+	if (it != itEnd)
+	{
+		setType(LLAssetType::lookup(it->second.asString()));
+	}
+	it = sdMap.find(INV_PREFERRED_TYPE_LABEL);
+	if (it != itEnd)
+	{
+		setPreferredType(LLFolderType::lookup(it->second.asString()));
+	}
+	it = sdMap.find(INV_THUMBNAIL_LABEL);
+	if (it != itEnd)
+	{
+		LLUUID thumbnail_uuid;
+		const LLSD& thumbnail_data = it->second;
+		if (thumbnail_data.has(INV_ASSET_ID_LABEL))
 		{
-			setUUID(i->second.asUUID());
-			continue;
+			thumbnail_uuid = thumbnail_data[INV_ASSET_ID_LABEL].asUUID();
 		}
-		if (i->first == INV_PARENT_ID_LABEL)
-		{
-			setParent(i->second.asUUID());
-			continue;
-		}
-		if (i->first == INV_ASSET_TYPE_LABEL)
-		{
-			setType(LLAssetType::lookup(i->second.asString()));
-			continue;
-		}
-		if (i->first == INV_PREFERRED_TYPE_LABEL)
-		{
-			setPreferredType(LLFolderType::lookup(i->second.asString()));
-			continue;
-		}
-		if (i->first == INV_THUMBNAIL_LABEL)
-		{
-			LLUUID thumbnail_uuid;
-			const LLSD& thumbnail_data = i->second;
-			if (thumbnail_data.has(INV_ASSET_ID_LABEL))
-			{
-				thumbnail_uuid = thumbnail_data[INV_ASSET_ID_LABEL].asUUID();
-			}
-			setThumbnailUUID(thumbnail_uuid);
-			continue;
-		}
-		if (i->first == INV_NAME_LABEL)
-		{
-			mName = i->second.asString();
-			LLStringUtil::replaceNonstandardASCII(mName, ' ');
-			LLStringUtil::replaceChar(mName, '|', ' ');
-			continue;
-		}
+		setThumbnailUUID(thumbnail_uuid);
+	}
+	it = sdMap.find(INV_NAME_LABEL);
+	if (it != itEnd)
+	{
+		mName = it->second.asString();
+		LLStringUtil::replaceNonstandardASCII(mName, ' ');
+		LLStringUtil::replaceChar(mName, '|', ' ');
 	}
 
 	return true;
