@@ -52,11 +52,7 @@ public:
  */
 	LL_FORCE_INLINE __m128i load_unaligned_si128(const U8* p) const
 	{
-#if defined(__SSE3__)
-		return _mm_lddqu_si128(reinterpret_cast<const __m128i*>(p));
-#else
 		return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p));
-#endif
 	}
 
 	bool operator==(const LLMaterialID& rhs) const

@@ -834,7 +834,7 @@ bool llsd_equals(const LLSD& lhs, const LLSD& rhs, int bits)
     case LLSD::TypeMap:
     {
         // Build a set of all rhs keys.
-        std::set<LLSD::String> rhskeys;
+        boost::unordered_set<LLSD::String> rhskeys;
         for (LLSD::map_const_iterator rmi(rhs.beginMap()), rmend(rhs.endMap());
              rmi != rmend; ++rmi)
         {
