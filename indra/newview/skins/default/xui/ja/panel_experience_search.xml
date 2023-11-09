@@ -31,7 +31,7 @@
 			コンテンツの最大レーティング：
 		</text>
 		<icons_combo_box label="Moderate" name="maturity">
-			<icons_combo_box.drop_down_button />
+			<icons_combo_box.drop_down_button/>
 			<icons_combo_box.item label="Adult" name="Adult" value="42"/>
 			<icons_combo_box.item label="Moderate" name="Mature" value="21"/>
 			<icons_combo_box.item label="General" name="PG" value="13"/>

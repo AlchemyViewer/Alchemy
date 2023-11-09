@@ -4,7 +4,7 @@
 		<!--Image Panel-->
 		<panel label="画像" name="colortone_settings">
 			<!--LUT Control-->
-			<text follows="left|top" height="15" left="10" top_pad="8" width="60" layout="topleft" tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。 カスタムＬＵＴには完全なファイル名が必要です！" value="有効なＬＵＴ："/>
+			<text tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。 カスタムＬＵＴには完全なファイル名が必要です！" value="有効なＬＵＴ："/>
 			<!--TODO: Make more flexible?-->
 			<combo_box tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。 カスタムＬＵＴには完全なファイル名が必要です！" name="colorlut_combo">
 				<combo_box.item label="なし" name="lut_none" value=""/>
@@ -87,17 +87,17 @@
 			<!--Probe Detail-->
 			<text tool_tip="レンダリングを許可するプローブタイプの最大値を制御します。静的のみは動的プローブの設定を上書きします。リアルタイムは、１フレームおきに最も近い動的プローブを更新します。" value="プローブの詳細："/>
 			<combo_box tool_tip="レンダリングを許可するプローブタイプの最大値を制御します。静的のみは動的プローブの設定を上書きします。リアルタイムは、１フレームおきに最も近い動的プローブを更新します。" name="probeDetail_combo">
-				<combo_box.item label="静的のみ" name="probeDetail_static" value="0" />
-				<combo_box.item label="静的＋動的" name="probeDetail_dynamic" value="1" />
-				<combo_box.item label="リアルタイム" name="probeDetail_realtime" value="2" />
+				<combo_box.item label="静的のみ" name="probeDetail_static" value="0"/>
+				<combo_box.item label="静的＋動的" name="probeDetail_dynamic" value="1"/>
+				<combo_box.item label="リアルタイム" name="probeDetail_realtime" value="2"/>
 			</combo_box>
 			<!--Probe Coverage-->
-			<text tool_tip="反射プローブの使用を制御します。自動プローブはビューアによって「ベストエフォート」配置で生成されます。これをマニュアル＋地形もしくは、マニュアルのみに設定することで、マニュアルプローブがない過度に暗いエリアでの問題を解消することができます。" value="プローブのカバレッジ：" />
+			<text tool_tip="反射プローブの使用を制御します。自動プローブはビューアによって「ベストエフォート」配置で生成されます。これをマニュアル＋地形もしくは、マニュアルのみに設定することで、マニュアルプローブがない過度に暗いエリアでの問題を解消することができます。" value="プローブのカバレッジ："/>
 			<combo_box tool_tip="反射プローブの使用を制御します。自動プローブはビューアによって「ベストエフォート」配置で生成されます。これをマニュアル＋地形もしくは、マニュアルのみに設定することで、マニュアルプローブがない過度に暗いエリアでの問題を解消することができます。" name="probeCoverage_combo">
-				<combo_box.item label="None/Sky Probe" name="probeCoverage_none" value="0" />
-				<combo_box.item label="Manual Only" name="probeCoverage_manual" value="1" />
-				<combo_box.item label="Manual + Terrain" name="probeCoverage_terrain" value="2" />
-				<combo_box.item label="Everything" name="probeCoverage_everything" value="3" />
+				<combo_box.item label="None/Sky Probe" name="probeCoverage_none" value="0"/>
+				<combo_box.item label="Manual Only" name="probeCoverage_manual" value="1"/>
+				<combo_box.item label="Manual + Terrain" name="probeCoverage_terrain" value="2"/>
+				<combo_box.item label="Everything" name="probeCoverage_everything" value="3"/>
 			</combo_box>
 			<!--Probe Draw Distance-->
 			<text tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。" value="プローブの描画距離："/>
@@ -116,7 +116,7 @@
 			</combo_box>
 			<!--Anisotropic Filtering-->
 			<text tool_tip="異方性フィルタリングの品質を制御します。" value="異方性フィルタリング："/>
-			<combo_box allow_tool_tip="異方性フィルタリングの品質を制御します。" name="anisotropicfilter_combo">
+			<combo_box tool_tip="異方性フィルタリングの品質を制御します。" name="anisotropicfilter_combo">
 				<combo_box.item label="無効" name="anisotropicfilter_off" value="0"/>
 				<combo_box.item label="低（✕２）" name="anisotropicfilter_2" value="2"/>
 				<combo_box.item label="中（✕４）" name="anisotropicfilter_4" value="4"/>
@@ -164,7 +164,6 @@
 			<slider_bar name="shadowres_slider" tool_tip="シャドウマップ解像度の乗数。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！"/>
 			<spinner name="shadowres_spinner" tool_tip="シャドウマップ解像度の乗数。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！"/>
 			<button name="shadowRes_default_btn"/>
-
 			<!--Shadow Bias-->
 			<text tool_tip="影の原点に近すぎる面を無視することで、セルフシャドウイングエラーを減らします。 値を小さくすると、より多くのシャドウエラーが発生しますが、より細かく正確な影が可能になります。" value="影のバイアス："/>
 			<slider_bar name="shadow_bias_slider" tool_tip="影の原点に近すぎる面を無視することで、セルフシャドウイングエラーを減らします。 値を小さくすると、より多くのシャドウエラーが発生しますが、より細かく正確な影が可能になります。"/>
@@ -190,7 +189,6 @@
 			<slider_bar name="shadow_blur_slider" tool_tip="影とＳＳＡＯのブラーの両方を制御します。 値が低いと、ＳＳＡＯノイズが目立つ場合があります。"/>
 			<spinner name="shadow_blur_spinner" tool_tip="影とＳＳＡＯのブラーの両方を制御します。 値が低いと、ＳＳＡＯノイズが目立つ場合があります。"/>
 			<button name="blur_default_btn"/>
-
 			<!--Blur Distance-->
 			<text tool_tip="ブラーを発生させるカメラからの距離を制御します。値を大きくすると、カメラ付近のブラーが軽減されます。影ブラーを下げたときにＳＳＡＯノイズが発生した場合は、これを影の鮮明化に使用してみてください！" value="ブラー距離："/>
 			<slider_bar name="shadow_blurdist_slider" tool_tip="ブラーを発生させるカメラからの距離を制御します。値を大きくすると、カメラ付近のブラーが軽減されます。影ブラーを下げたときにＳＳＡＯノイズが発生した場合は、これを影の鮮明化に使用してみてください！"/>
@@ -219,7 +217,6 @@
 			<slider_bar name="ssao_scale_slider" tool_tip="オクルージョンをチェックするサーフェスからの距離を決定します。高い＝オクルージョンが広い　注：値を大きくすると、アーティファクトが生じる可能性があります。"/>
 			<spinner name="ssao_scale_spinner" tool_tip="オクルージョンをチェックするサーフェスからの距離を決定します。高い＝オクルージョンが広い　注：値を大きくすると、アーティファクトが生じる可能性があります。"/>
 			<button name="ssaoScale_default_btn"/>
-
 			<!--SSAO Max Scale-->
 			<text tool_tip="オクルージョンに使用する最大画面半径を決定します。注：値を大きくすると、アーティファクトが発生する可能性があります。" value="ＳＳＡＯの最大値："/>
 			<slider_bar name="ssao_maxScale_slider" tool_tip="オクルージョンに使用する最大画面半径を決定します。注：値を大きくすると、アーティファクトが発生する可能性があります。"/>
@@ -229,7 +226,7 @@
 		<!--Glow Panel-->
 		<panel label="グロー" name="glow_settings">
 			<!--Glow Toggle-->
-			<check_box label="グローシェーダーの使用" tool_tip="グロー切り替え（レンダラーがリロードされます！）" control_name="RenderGlow"/>
+			<check_box label="グローシェーダーの使用" tool_tip="グロー切り替え（レンダラーがリロードされます！）"/>
 			<!--Glow Iterations-->
 			<text tool_tip="使用するグローシェーダのパスの数。パスが増えると、全体的に強くなり、柔らかくなり、幅が広くなり、レンダリングが遅くなります。" value="反復数："/>
 			<slider_bar name="glow_iteration_slider" tool_tip="使用するグローシェーダのパスの数。パスが増えると、全体的に強くなり、柔らかくなり、幅が広くなり、レンダリングが遅くなります。"/>

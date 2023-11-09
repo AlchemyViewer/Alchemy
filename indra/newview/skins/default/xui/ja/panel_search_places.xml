@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="panel_search_places">
 	<text name="search_title" value="検索語句を入力："/>
 	<check_box label="" name="pg_all"/>

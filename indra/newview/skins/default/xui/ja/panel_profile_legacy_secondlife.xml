@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="セカンドライフ" name="avatar_secondlife_tab">
 	<layout_stack >
 		<layout_panel name="avatar_info_top">

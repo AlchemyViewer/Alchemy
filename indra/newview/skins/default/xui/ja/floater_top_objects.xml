@@ -61,7 +61,7 @@
 	<button label="テレポート先" name="teleport_to_btn"/>
 	<button label="プロフィール" name="profile_btn"/>
 	<button label="不動産からキック" name="estate_kick_btn"/>
-	<button label="不動産からバン" name="estate_ban_btn" />
+	<button label="不動産からバン" name="estate_ban_btn"/>
 	<button label="選択内容を無効化" name="disable_selected_btn"/>
 	<button label="すべて無効化" name="disable_all_btn"/>
 </floater>

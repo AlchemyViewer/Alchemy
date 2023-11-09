@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="floater_test_line_editor">
 	<line_editor name="enabled_line_editor" tool_tip="有効なラインエディタ">ラインエディタを有効化</line_editor>
 	<line_editor name="ascii_line_editor" prevalidate_callback="ascii" tool_tip="アスキー文字のみ使用可能なラインエディタです。">アスキー文字のみのラインエディタ</line_editor>

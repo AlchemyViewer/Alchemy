@@ -89,7 +89,7 @@ that are returned from one component and may appear in many places
 	<!-- about dialog/support string-->
 	<string name="AboutHeader">
 		[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2].[VIEWER_VERSION_3]（[ADDRESS_SIZE]bit）
-		[[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]
+[[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]
 	</string>
 	<string name="AboutCompiler">
 		コンパイラのバージョン：[COMPILER] [COMPILER_VERSION]
@@ -99,25 +99,26 @@ that are returned from one component and may appear in many places
 	</string>
 	<string name="AboutPosition">
 		あなたは、現在[REGION]の[POSITION_LOCAL_0,number,1]，[POSITION_LOCAL_1,number,1]，[POSITION_LOCAL_2,number,1]にいます。
-		位置は、&lt;nolink&gt;[HOSTNAME]&lt;/nolink&gt;です。（[HOSTIP]）
-		SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
-		（グローバル座標は、[POSITION_0,number,1]，[POSITION_1,number,1]，[POSITION_2,number,1]です。）
-		[SERVER_VERSION]
-		[SERVER_RELEASE_NOTES_URL]</string>
+位置は、&lt;nolink&gt;[HOSTNAME]&lt;/nolink&gt;です。（[HOSTIP]）
+SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
+（グローバル座標は、[POSITION_0,number,1]，[POSITION_1,number,1]，[POSITION_2,number,1]です。）
+[SERVER_VERSION]
+[SERVER_RELEASE_NOTES_URL]
+	</string>
 	<string name="AboutPositionRLVShowLoc">
 		あなたは、[REGION]にいます。
-		[SERVER_VERSION]
-		[SERVER_RELEASE_NOTES_URL]
+[SERVER_VERSION]
+[SERVER_RELEASE_NOTES_URL]
 	</string>
 	<!-- *NOTE: Do not translate text like GPU, Graphics Card, etc -
-						Most PC users who know what these mean will be used to the English versions,
-						and this info sometimes gets sent to support. -->
+	Most PC users who know what these mean will be used to the English versions,
+	and this info sometimes gets sent to support. -->
 	<string name="AboutSystem">
 		ＣＰＵ：[CPU]
-		メモリ：[MEMORY_MB]㎆
-		ＯＳのバージョン：[OS_VERSION]
-		グラフィックカード製造元：[GRAPHICS_CARD_VENDOR]
-		グラフィックカード:[GRAPHICS_CARD]
+メモリ：[MEMORY_MB]㎆
+ＯＳのバージョン：[OS_VERSION]
+グラフィックカード製造元：[GRAPHICS_CARD_VENDOR]
+グラフィックカード:[GRAPHICS_CARD]
 	</string>
 	<string name="AboutDriver">
 		Windowsグラフィックドライババージョン：[GRAPHICS_DRIVER_VERSION]
@@ -126,26 +127,26 @@ that are returned from one component and may appear in many places
 		OpenGLバージョン：[OPENGL_VERSION]</string>
 	<string name="AboutSettings">
 		ウィンドウサイズ:[WINDOW_WIDTH]x[WINDOW_HEIGHT]
-		フォントサイズ調整：[FONT_SIZE_ADJUSTMENT]pt
-		ＵＩスケーリング：[UI_SCALE]
-		描画距離：[DRAW_DISTANCE]ｍ
-		帯域幅：[NET_BANDWITH]kbit／秒
-		ＬＯＤ係数：[LOD_FACTOR]
-		描画の質：[RENDER_QUALITY]
-		高度な光源モデル：[GPU_SHADERS]
-		テクスチャメモリ：[TEXTURE_MEMORY]㎆
+フォントサイズ調整：[FONT_SIZE_ADJUSTMENT]pt
+ＵＩスケーリング：[UI_SCALE]
+描画距離：[DRAW_DISTANCE]ｍ
+帯域幅：[NET_BANDWITH]kbit／秒
+ＬＯＤ係数：[LOD_FACTOR]
+描画の質：[RENDER_QUALITY]
+高度な光源モデル：[GPU_SHADERS]
+テクスチャメモリ：[TEXTURE_MEMORY]㎆
 	</string>
 	<string name="AboutOSXHiDPI">
 		高ＤＰＩ表示モード：[HIDPI]
 	</string>
 	<string name="AboutLibs">
 		RestrainedLove API：[RLV_VERSION]
-		libcurlのバージョン：[LIBCURL_VERSION]
-		J2Cデコーダーのバージョン：[J2C_VERSION]
-		オーディオドライバのバージョン：[AUDIO_DRIVER_VERSION]
-		[CEF_VERSION]
-		LibVLCのバージョン：[LIBVLC_VERSION]
-		ボイスサーバーのバージョン：[VOICE_VERSION]
+libcurlのバージョン：[LIBCURL_VERSION]
+J2Cデコーダーのバージョン：[J2C_VERSION]
+オーディオドライバのバージョン：[AUDIO_DRIVER_VERSION]
+[CEF_VERSION]
+LibVLCのバージョン：[LIBVLC_VERSION]
+ボイスサーバーのバージョン：[VOICE_VERSION]
 	</string>
 	<string name="AboutTraffic">
 		パケット損失：[PACKETS_LOST,number,0]／[PACKETS_IN,number,0]（[PACKETS_PCT,number,1]％）
@@ -282,13 +283,13 @@ that are returned from one component and may appear in many places
 	</string>
 	<string name="LoginFailedViewerNotPermitted">
 		お使いの古いビューアでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアをダウンロードしてください：https://www.alchemyviewer.org/downloads
-		
-		詳細については、ＦＡＱを参照してください：
-		https://secondlife.com/viewer-access-faq
+
+詳細については、ＦＡＱを参照してください：
+https://secondlife.com/viewer-access-faq
 	</string>
 	<string name="LoginFailed">
-		システムの問題により、ログインプロセスが完了しませんでした。数分後にもう一度試してください。
-		これがエラーであると思われる場合は、サポートにお問い合わせください。
+		システムの問題により、ログイン処理が完了しませんでした。数分後にもう一度試してください。
+これがエラーであると思われる場合は、サポートにお問い合わせください。
 	</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">
 		ビューアの更新（オプション）があります：[VERSION]
@@ -696,7 +697,7 @@ that are returned from one component and may appear in many places
 	</string>
 	<string name="TooltipTextureRestrictedDrop">
 		無制限のコピーおよび
-譲渡可能権限を持つテクスチャのみが
+譲渡権限を持つテクスチャのみが
 許可されます。
 	</string>
 	<!-- searching - generic -->
@@ -886,7 +887,7 @@ that are returned from one component and may appear in many places
 	</string>
 	<!-- llvoavatar. Displayed in the avatar chat bubble -->
 	<string name="AvatarEditingAppearance">
-		（容姿の編集中）
+		（容姿を編集中）
 	</string>
 	<string name="AvatarAway">
 		一時退席中
@@ -3795,13 +3796,13 @@ For AI Character: Get the closest navigable point to the point provided.
 		あなたは、全員から見えるようになりました。
 	</string>
 	<string name="av_render_not_everyone">
-		あなたは、周囲にいる一部の人から、見えない可能性があります。
+		あなたは、周囲にいる一部の人から見えていない可能性があります。
 	</string>
 	<string name="av_render_over_half">
-		あなたは、周囲にいる半分以上の人から、見えない可能性があります。
+		あなたは、周囲にいる半分以上の人から見えていない可能性があります。
 	</string>
 	<string name="av_render_most_of">
-		あなたは、周囲にいるほとんどの人から、見えない可能性があります。
+		あなたは、周囲にいるほとんどの人から見えていない可能性があります。
 	</string>
 	<string name="av_render_anyone">
 		あなたは、周囲の誰からも見えていない可能性があります。
@@ -3829,10 +3830,10 @@ For AI Character: Get the closest navigable point to the point provided.
 		[HUD_DETAILS]は、使用されているテクスチャが多すぎます。
 	</string>
 	<!-- AgeYearsA = singular,
-						AgeYearsB = plural,
-						AgeYearsC = plural for non-English languages like Russian
-						For example, LLTrans::getCountString("AgeYears", 3) is plural form B
-						in English and form C in Russian -->
+	AgeYearsB = plural,
+	AgeYearsC = plural for non-English languages like Russian
+	For example, LLTrans::getCountString("AgeYears", 3) is plural form B
+	in English and form C in Russian -->
 	<string name="AgeYearsA">
 		[COUNT]年
 	</string>
@@ -4317,7 +4318,7 @@ For AI Character: Get the closest navigable point to the point provided.
 		オブジェクトの中身
 	</string>
 	<string name="PanelContentsNewScript">
-		新規スクリプト
+		新しいスクリプト
 	</string>
 	<string name="DoNotDisturbModeResponseDefault">
 		この住民が「取り込み中」をオンにすると、あなたのメッセージが後で表示されるようになります。
@@ -4363,7 +4364,7 @@ For AI Character: Get the closest navigable point to the point provided.
 		リージョンの設定
 	</string>
 	<string name="NoEnvironmentSettings">
-		このリージョンは環境設定をサポートしていません。
+		このリージョンは自然環境の設定をサポートしていません。
 	</string>
 	<string name="EnvironmentSun">
 		太陽
@@ -4378,7 +4379,7 @@ For AI Character: Get the closest navigable point to the point provided.
 		雲の音
 	</string>
 	<string name="EnvironmentNormalMap">
-		ノーマル・マップ
+		法線（ノーマル）マップ
 	</string>
 	<string name="EnvironmentTransparent">
 		透過
@@ -4388,17 +4389,17 @@ For AI Character: Get the closest navigable point to the point provided.
 		クリック回数：[TELEPORT]テレポート、[MAP]マップ、[PROFILE]プロフィール
 	</string>
 	<string name="ClassifiedUpdateAfterPublish">
-		（掲載後更新）
+		（掲載後に更新）
 	</string>
 	<!-- panel picks -->
 	<string name="NoPicksClassifiedsText">
 		ピックやクラシファイド広告を作成していません。作成するには、下にある「＋」ボタンをクリックします。
 	</string>
 	<string name="NoPicksText">
-		ピックを作成していません。「新規」ボタンをクリックしてピックを作成する。
+		ピックを作成していません。「新規」ボタンをクリックしてピックを作成できます。
 	</string>
 	<string name="NoClassifiedsText">
-		クラシファイド広告を作成していません。「新規」ボタンをクリックしてクラシファイド広告を作成する。
+		クラシファイド広告を作成していません。「新規」ボタンをクリックしてクラシファイド広告を作成できます。
 	</string>
 	<string name="NoAvatarPicksClassifiedsText">
 		ピック、またはクラシファイド広告がありません
@@ -6976,7 +6977,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		プレミアム
 	</string>
 	<string name="Premium_PlusMembership">
-		プレミアムプラス
+		プレミアム・プラス
 	</string>
 	<!-- No need to translate -->
 	<string name="InternalMembership">
@@ -7864,7 +7865,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		物理形状に不正な確認データがあります。物理モデルを修正してください。
 	</string>
 	<string name="Mav_Details_MAV_BLOCK_MISSING">
-		データがありません。高ＬＯＤが存在し、有効であることを確認してください。設定されていない場合は、物理モデルを設定します。
+		データがありません。高ＬｏＤが存在し、有効であることを確認してください。設定されていない場合は、物理モデルを設定します。
 	</string>
 	<string name="Mav_Details_MAV_UNKNOWN_VERSION">
 		物理形状のバージョンが正しくありません。物理モデルに正しいバージョンを設定してください。
@@ -7890,7 +7891,7 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 	</string>
 	<!-- Alchemy Strings -->
 	<string name="NotifyIncomingMessage">
-		[NAME]さんからメッセージが届いています…
+		[NAME]さんからのメッセージが届いています…
 	</string>
 	<string name="AvatarTyping">
 		入力中

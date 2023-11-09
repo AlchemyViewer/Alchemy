@@ -97,7 +97,7 @@
 	<menu_item_separator name="Settings Separator"/>
 	<menu_item_call label="自分にのみ適用" name="Settings Apply Local"/>
 	<menu_item_call label="区画に適用" name="Settings Apply Parcel"/>
-	<menu_item_separator name="Subfolder Separator" />
+	<menu_item_separator name="Subfolder Separator"/>
 	<menu label="新規作成" name="create_new">
 		<menu_item_call label="新しいフォルダ" name="New Folder"/>
 		<menu_item_call label="新しいスクリプト" name="New Script"/>
