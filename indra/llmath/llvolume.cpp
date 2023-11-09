@@ -2630,7 +2630,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                     continue;
                 }
 
-				const LLSD::Binary& weights = mdl_face["Weights"];
+				const LLSD::Binary& weights = mdl_face["Weights"].asBinary();
 
 				U32 idx = 0;
 
