@@ -385,13 +385,12 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
             continue;
         }
 
-        LLSD::map_const_iterator iter;
-        for (iter = result.beginMap(); iter != result.endMap(); ++iter)
+        for (const auto& iter : result.map())
         {
-            regionp->setCapability(iter->first, iter->second);
+            regionp->setCapability(iter.first, iter.second);
 
             LL_DEBUGS("AppInit", "Capabilities")
-                << "Capability '" << iter->first << "' is '" << iter->second << "'" << LL_ENDL;
+                << "Capability '" << iter.first << "' is '" << iter.second << "'" << LL_ENDL;
         }
 
 #if 0

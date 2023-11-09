@@ -202,7 +202,7 @@ class LLMeshHeader
 {
 public:
 
-    LLMeshHeader() {}
+	LLMeshHeader() = default;
 
     explicit LLMeshHeader(const LLSD& header)
     {
@@ -211,7 +211,7 @@ public:
 
     void fromLLSD(const LLSD& header)
     {
-        const char* lod[] =
+        static const char* lod[] =
         {
             "lowest_lod",
             "low_lod",
