@@ -174,12 +174,15 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
 
     const auto& other_map = other.map();
     const auto& settings_map = settings.map();
+    const auto skipEnd = skip.end();
+    const auto settingsEnd = settings_map.end();
+
     for (const auto& llsd_pair : settings_map)
     {
         const std::string& key_name = llsd_pair.first;
         const LLSD& value = llsd_pair.second;
 
-        if (skip.contains(key_name))
+        if (skip.find(key_name) != skipEnd)
             continue;
 
         LLSD other_value;
@@ -232,10 +235,10 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     {
         const std::string& key_name = llsd_pair.first;
 
-        if (skip.contains(key_name))
+        if (skip.find(key_name) != skipEnd)
             continue;
 
-        if (settings_map.contains(key_name))
+        if (settings_map.find(key_name) != settingsEnd)
             continue;
 
         parammapping_t::const_iterator def_iter = defaults.find(key_name);
@@ -257,10 +260,10 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     for (const auto& llsd_pair : other.map())
     {
         // TODO: Should I blend this in instead?
-        if (!skip.contains(llsd_pair.first))
+        if (skip.find(llsd_pair.first) == skipEnd)
             continue;
 
-        if (!settings_map.contains(llsd_pair.first))
+        if (settings_map.find(llsd_pair.first) == settingsEnd)
             continue;
     
         newSettings[llsd_pair.first] = llsd_pair.second;

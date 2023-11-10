@@ -834,7 +834,7 @@ bool llsd_equals(const LLSD& lhs, const LLSD& rhs, int bits)
     case LLSD::TypeMap:
     {
         // Build a set of all rhs keys.
-        std::set<LLSD::String> rhskeys;
+        boost::unordered_set<LLSD::String> rhskeys;
         for (LLSD::map_const_iterator rmi(rhs.beginMap()), rmend(rhs.endMap());
              rmi != rmend; ++rmi)
         {
@@ -989,8 +989,8 @@ LLSD llsd_clone(LLSD value, LLSD filter)
 
     case LLSD::TypeBinary:
     {
-        LLSD::Binary bin(value.asBinary().begin(), value.asBinary().end());
-        clone = LLSD::Binary(std::move(bin));
+        const auto& bin = value.asBinary();
+        clone = LLSD::Binary(bin.begin(), bin.end());
         break;
     }
     default:
