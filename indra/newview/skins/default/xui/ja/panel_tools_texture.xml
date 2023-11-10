@@ -21,9 +21,9 @@
 		<combo_box.item label="メディア" name="Media" value="Media"/>
 	</combo_box>
 	<radio_group name="radio_material_type">
-		<radio_item label="テクスチャ (ディフューズ）" name="Texture (diffuse)" value="0"/>
-		<radio_item label="法線 (ノーマル）" name="Bumpiness (normal)" value="1"/>
-		<radio_item label="鏡面反射 (スペキュラ）" name="Shininess (specular)" value="2"/>
+		<radio_item label="テクスチャ（ディフューズ）" name="Texture (diffuse)" value="0"/>
+		<radio_item label="法線（ノーマル）" name="Bumpiness (normal)" value="1"/>
+		<radio_item label="鏡面反射（スペキュラ）" name="Shininess (specular)" value="2"/>
 	</radio_group>
 	<radio_group name="radio_pbr_type">
 		<radio_item label="完全なマテリアル" name="Complete material" value="0"/>
@@ -81,7 +81,7 @@
 		<combo_box.item label="テクスチャを使用" name="Use texture" value="Use texture"/>
 		-->
 	</combo_box>
-	<texture_picker label="光沢テクスチャ" name="shinytexture control" tool_tip="クリックして光沢（グロッシネス）マップのテクスチャを選択します。"/>
+	<texture_picker label="光沢マップ" name="shinytexture control" tool_tip="クリックで光沢（グロッシネス）マップのテクスチャを選択します。"/>
 	<text name="label shininess">
 		輝き
 	</text>

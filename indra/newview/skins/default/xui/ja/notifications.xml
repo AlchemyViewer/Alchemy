@@ -831,7 +831,7 @@ L$が不足しているので、このグループに参加することができ
 	</notification>
 	<notification name="ScriptCannotUndo">
 		あなたのスクリプトのバージョンでは、変更を元に戻すことはできませんでした。
-サーバーの最新保存バージョンをロードしますか？
+最後にサーバーに保存されたバージョンを読み込みますか？
 （**警告**：この操作後元に戻すことはできません）
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
@@ -2941,8 +2941,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		このオブジェクトには、あなたがコピーできるアイテムはありません。
 		<tag>fail</tag>
 	</notification>
-	<notification name="WebLaunchAccountHistory">
-		[https://secondlife.com/my/account/?lang=ja-JP マイアカウント]
+	<notification name="WebLaunchAccountHistory"> [https://secondlife.com/my/account/?lang=ja-JP マイアカウント]
 ページに移動してアカウント履歴を確認しますか？
 		<tag>confirm</tag>
 		<usetemplate ignoretext="ブラウザを起動してアカウント履歴を見るとき" name="okcancelignore" notext="キャンセル" yestext="ページに移動"/>
@@ -3349,6 +3348,12 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 		<tag>fail</tag>
     マテリアル対応リージョンに接続されていません。
 	</notification>
+	<notification name="CantSelectReflectionProbe">
+		<unique/>
+    反射プローブを設置しましたが、「反射プローブの選択」が無効になっています。反射プローブを選択できるようにするには、「ビルド」＞「オプション」＞「反射プローブを選択」にチェックを入れてください。
+		<tag>confirm</tag>
+		<usetemplate ignoretext="次回から表示しない" name="okignore" yestext="はい"/>
+	</notification>
 	<notification name="ScriptMissing">
 		データベースにスクリプトがありません。
 		<tag>fail</tag>
@@ -3358,7 +3363,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 		<tag>fail</tag>
 	</notification>
 	<notification name="UnableToLoadScript">
-		スクリプトをロードできません。もう一度試してください。
+		スクリプトを読み込めません。もう一度試してください。
 		<tag>fail</tag>
 	</notification>
 	<notification name="IncompleteInventory">
@@ -5223,7 +5228,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<tag>fail</tag>
 	</notification>
 	<notification name="RezFailureTookTooLong">
-		リクエストされたオブジェクトのロードに時間がかかりすぎたため、Rezに失敗しました。
+		リクエストされたオブジェクトの読み込みに時間がかかりすぎたため、Rezに失敗しました。
 		<tag>fail</tag>
 	</notification>
 	<notification name="FailedToPlaceObjAtLoc">
@@ -5612,7 +5617,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<tag>fail</tag>
 	</notification>
 	<notification name="DroppedMoneyTransferRequest">
-		システムロードにより、支払いを実行できません。
+		システムに過負荷がかかっているため、支払いを実行できませんでした。
 		<tag>fail</tag>
 	</notification>
 	<notification name="CantPayNoAgent">
