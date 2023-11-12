@@ -2306,11 +2306,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>5f5b0814eb8e54299c8bdf22b1d6dc61bb4cff6af1a377037b7fcc450752e8fb7f4e0ba5961c37b33225c71f49e7173814791662f667cbc1c2b9eba8be18d639</string>
+              <string>4eeda8fc5d9c72c5561cfc38f72e7aad2c5b89f74f47f8bb5b1151e4532c1b7a6bda71414241275f881d3baf19b87930bcb0eae4c31373557a6fd1c8c899502e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.18.1820/vlc_bin-3.0.18-darwin64-1820.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.20.2227/vlc_bin-3.0.20-darwin64-2227.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2320,11 +2320,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c0cbbf5d4ec89e2aa2855408a3ed5aaa06842d018ddd12d5324bc14c85886d6824bd1ab306d5aa322b1f85b954318b0a7ddaae9b78b34aa4267192d046f18c85</string>
+              <string>9d51b045a69076f7f48f76d1c9ef6e910d5ebf2085c6f89932f171b888432000e6c6f76eba1e959daf8839b2b402958f57233d6827ef2cf38bcf8c5a3c489911</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.18.1820/vlc_bin-3.0.18-windows64-1820.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.20.2227/vlc_bin-3.0.20-windows64-2227.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2337,7 +2337,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>copyright</key>
         <string>Copyright (C) 1998-2020 VLC authors and VideoLAN</string>
         <key>version</key>
-        <string>3.0.18</string>
+        <string>3.0.20</string>
         <key>name</key>
         <string>vlc-bin</string>
       </map>
