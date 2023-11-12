@@ -69,9 +69,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 %%INSTALL_FILES%%
 
 [InstallDelete]
-Type: files; Name: "{app}\app_settings"
-Type: files; Name: "{app}\llplugin"
-Type: files; Name: "{app}\skins"
+Type: filesandordirs; Name: "{app}\app_settings"
+Type: filesandordirs; Name: "{app}\llplugin"
+Type: filesandordirs; Name: "{app}\skins"
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--set InstallLanguage {language}"
