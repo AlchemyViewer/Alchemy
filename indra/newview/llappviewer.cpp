@@ -3028,9 +3028,13 @@ void LLAppViewer::initStrings()
 	}
 }
 
+extern void init_gl_globals();
+
 bool LLAppViewer::initWindow()
 {
 	LL_INFOS("AppInit") << "Initializing window..." << LL_ENDL;
+
+	init_gl_globals();
 
 	// store setting in a global for easy access and modification
 	gHeadlessClient = gSavedSettings.getBOOL("HeadlessClient");
