@@ -48,7 +48,7 @@
 		<spinner name="roughness factor"/>
 	</panel>
 	<panel name="emissive_texture_pnl">
-		<text name="emissive_lbl">
+		<text name="emissive_lbl" width="128">
 			放射（エミッシブ）：
 		</text>
 		<texture_picker name="emissive_texture" tool_tip="放射（エミッシブ）マップを指定します。"/>
@@ -61,7 +61,7 @@
 		<color_swatch name="emissive color"/>
 	</panel>
 	<panel name="normal_texture_pnl">
-		<text name="normal_lbl">
+		<text name="normal_lbl" width="128">
 			法線（ノーマル）：
 		</text>
 		<texture_picker name="normal_texture" tool_tip="法線（ノーマル）マップを指定します。"/>
