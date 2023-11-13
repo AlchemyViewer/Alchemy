@@ -952,4 +952,7 @@ with the same filename but different name
 
   <texture name="social_discord" file_name="alchemy/discord_32.png" preload="false" />
   <texture name="social_mastodon" file_name="alchemy/mastodon_32.png" preload="false" />
+
+  <texture name="Cam_Recall" file_name="icons/Cam_Recall.png"/>
+  <texture name="Cam_Save" file_name="icons/Cam_Save.png"/>
 </textures>

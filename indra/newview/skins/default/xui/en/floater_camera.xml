@@ -68,14 +68,14 @@
          label=""
          layout="topleft"
          left_delta="0"
-         image_overlay="Icon_Gear"
-         name="gear_btn"
+         image_overlay="Cam_Save"
+         name="save_cam_pos_btn"
          tab_stop="false"
-         tool_tip="My Camera Presets"
+         tool_tip="Save current camera position and focus"
          top_pad="0"
          width="23">
          <button.commit_callback
-         function="CameraPresets.ShowPresetsList"/>
+           function="Camera.SavePosition"/>
         </button>
         <button
          height="28"
@@ -83,15 +83,14 @@
          layout="topleft"
          top_pad="0"
          left_delta="0"
-         image_overlay="PanOrbit_Off"
-         name="pan_btn"
+         image_overlay="Cam_Recall"
+         name="restore_cam_pos_btn"
          tab_stop="false"
          tool_tip="Use precise controls"
          width="23">
          <button.commit_callback
-         function="Floater.Toggle"
-         parameter="prefs_view_advanced"/>
-         </button>
+           function="Camera.RestorePosition"/>
+        </button>
     </panel>
     <panel
      border="false"
@@ -276,6 +275,19 @@
          value="default" />
       </combo_box>
       <button
+        height="18"
+        width="18"  
+        layout="topleft"
+        mouse_opaque="true"
+        name="gear_btn"
+        tool_tip="Save current camera position and focus"
+        top_delta="2"
+        left_pad="5" 
+        image_overlay="Icon_Gear">
+        <button.commit_callback
+        function="CameraPresets.ShowPresetsList"/>
+      </button>
+      <button
         follows="top|left"
         height="23"
         label="Save as preset..."
@@ -286,6 +298,20 @@
         width="131">
         <button.commit_callback
           function="CameraPresets.Save"/>
+      </button>
+      <button
+        height="18"
+        width="18"  
+        layout="topleft"
+        mouse_opaque="true"
+        name="pan_btn"
+        tool_tip="Use precise controls"
+        top_delta="2"
+        left_pad="5" 
+        image_overlay="PanOrbit_Off">
+        <button.commit_callback
+        function="Floater.Toggle"
+        parameter="prefs_view_advanced"/>
       </button>
   </panel>
 </floater>

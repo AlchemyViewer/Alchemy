@@ -55,6 +55,7 @@
 #include "rlvactions.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
+#include "llnotificationsutil.h"
 
 using namespace LLAvatarAppearanceDefines;
 
@@ -3199,6 +3200,57 @@ S32 LLAgentCamera::directionToKey(S32 direction)
 	return 0;
 }
 
+void LLAgentCamera::storeCameraPosition()
+{
+	gSavedPerAccountSettings.setVector3d("ALStoredCameraPos", getCameraPositionGlobal());
+
+	// get a vector pointing forward from the camera view manually, getFocusTargetGlobal() will
+	// not return useful values if the camera is in flycam mode or was just switched out of
+	// flycam  mode and not repositioned after
+	LLVector3d forward = LLVector3d(1.0, 0.0, 0.0) * LLViewerCamera::getInstance()->getQuaternion() + getCameraPositionGlobal();
+	gSavedPerAccountSettings.setVector3d("ALStoredCameraFocus", forward);
+
+	LLUUID stored_camera_focus_object_id = LLUUID::null;
+	if (mFocusObject)
+	{
+		stored_camera_focus_object_id = mFocusObject->getID();
+	}
+	gSavedPerAccountSettings.setString("ALStoredCameraFocusObjectId", stored_camera_focus_object_id.asString());
+}
+
+void LLAgentCamera::loadCameraPosition()
+{
+	LLVector3d stored_camera_pos = gSavedPerAccountSettings.getVector3d("ALStoredCameraPos");
+	LLVector3d stored_camera_focus = gSavedPerAccountSettings.getVector3d("ALStoredCameraFocus");
+	LLUUID stored_camera_focus_object_id = LLUUID(gSavedPerAccountSettings.getString("ALStoredCameraFocusObjectId"));
+
+	F32 renderFarClip = gSavedSettings.getF32("RenderFarClip");
+	F32 far_clip_squared = renderFarClip * renderFarClip;
+
+	if (stored_camera_pos.isNull())
+	{
+		LLNotificationsUtil::add("LoadCameraPositionNoneSaved", LLSD());
+		return;
+	}
+
+	if (dist_vec_squared(gAgent.getPositionGlobal(), stored_camera_pos) > far_clip_squared)
+	{
+		LLNotificationsUtil::add("LoadCameraPositionOutsideDrawDistance", LLSD());
+		return;
+	}
+
+	// switch off flycam mode if needed
+	if (LLViewerJoystick::getInstance()->getOverrideCamera())
+	{
+		handle_toggle_flycam();
+
+		// exiting from flycam usually keeps the camera where it is but here we want it to actually move
+		LLViewerJoystick::getInstance()->setCameraNeedsUpdate(true);
+	}
+
+	unlockView();
+	setCameraPosAndFocusGlobal(stored_camera_pos, stored_camera_focus, stored_camera_focus_object_id);
+}
 
 // EOF
 

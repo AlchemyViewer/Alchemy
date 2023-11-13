@@ -356,6 +356,9 @@ LLFloaterCamera::LLFloaterCamera(const LLSD& val)
 	mCommitCallbackRegistrar.add("CameraPresets.ChangeView", boost::bind(&LLFloaterCamera::onClickCameraItem, _2));
 	mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset, this));
 	mCommitCallbackRegistrar.add("CameraPresets.ShowPresetsList", boost::bind(&LLFloaterReg::showInstance, "camera_presets", LLSD(), FALSE));
+
+	mCommitCallbackRegistrar.add("Camera.SavePosition", [](LLUICtrl* ctrl, const LLSD& param) { gAgentCamera.storeCameraPosition(); });
+	mCommitCallbackRegistrar.add("Camera.RestorePosition", [](LLUICtrl* ctrl, const LLSD& param) { gAgentCamera.loadCameraPosition(); });
 }
 
 // virtual
@@ -647,5 +650,5 @@ void LLFloaterCamera::collapse()
 	BOOL collapse = gSavedSettings.getBOOL("AlchemyCameraExpanded");
 	mBtnCollapse->setImageOverlay(collapse ? "Conv_toolbar_collapse" : "Conv_toolbar_expand");
 	getChild<LLPanel>("buttons_panel")->setVisible(collapse);
-	reshape(collapse ? 362 : 210, getRect().getHeight(), FALSE);
+	reshape(collapse ? 370 : 210, getRect().getHeight(), FALSE);
 }
