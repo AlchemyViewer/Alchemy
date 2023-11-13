@@ -108,11 +108,12 @@ public:
 
 	inline void setIdentity()
 	{
-		const __m128 ones = _mm_set_ps(1.f,0.f,0.f,1.f);
-		mMatrix[0] = _mm_movelh_ps(ones,_mm_setzero_ps());
-		mMatrix[1] = _mm_movehl_ps(_mm_setzero_ps(),ones);
-		mMatrix[2] = _mm_movelh_ps(_mm_setzero_ps(),ones);
-		mMatrix[3] = _mm_movehl_ps(ones,_mm_setzero_ps());
+		const LLQuad ones = _mm_set_ps(1.f,0.f,0.f,1.f);
+		const LLQuad zeroes = _mm_setzero_ps();
+		mMatrix[0] = _mm_movelh_ps(ones, zeroes);
+		mMatrix[1] = _mm_movehl_ps(zeroes,ones);
+		mMatrix[2] = _mm_movelh_ps(zeroes,ones);
+		mMatrix[3] = _mm_movehl_ps(ones, zeroes);
 	}
 
 	inline void load4a(const F32* src)

@@ -865,7 +865,7 @@ LLRender::LLRender()
 	mLightHash = 0;
 	
 	//Init base matrix for each mode
-	for(S32 i = 0; i < NUM_MATRIX_MODES; ++i)
+	for(U32 i = 0; i < NUM_MATRIX_MODES; ++i)
 	{
 		mMatrix[i][0].setIdentity();
 	}
