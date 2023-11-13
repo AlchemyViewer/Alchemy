@@ -243,7 +243,7 @@ void LLInventoryGalleryContextMenu::doToSelected(const LLSD& userdata)
         {
             LLVector3d global_pos;
             landmark->getGlobalPos(global_pos);
-            boost::function<void(std::string& slurl)> copy_slurl_to_clipboard_cb = [](const std::string& slurl)
+            boost::function<void(std::string& slurl)> copy_slurl_to_clipboard_cb = [](std::string& slurl)
             {
                gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(slurl));
                LLSD args;

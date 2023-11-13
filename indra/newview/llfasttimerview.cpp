@@ -1112,7 +1112,7 @@ void LLFastTimerView::drawLineGraph()
 				cur_max_calls = llmax(cur_max_calls, calls);
 			}
 			F32 x = mGraphRect.mRight - j * (F32)(mGraphRect.getWidth())/(mRecording.getNumRecordedPeriods()-1);
-			F32 y;
+			F32 y = 0.f;
 			switch(mDisplayType)
 {
 			case DISPLAY_TIME:

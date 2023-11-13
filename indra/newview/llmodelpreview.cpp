@@ -2759,6 +2759,10 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
             m = m.inverse().transpose();
             mat_normal.loadu(m.m);
         }
+        else
+        {
+            mat_normal.setIdentity();
+        }
 
         S32 num_faces = mdl->getNumVolumeFaces();
         for (S32 i = 0; i < num_faces; ++i)
