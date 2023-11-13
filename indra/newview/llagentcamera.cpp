@@ -1927,8 +1927,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 				local_camera_offset = gAgent.getFrameAgent().rotateToAbsolute( local_camera_offset );
 			}
 
-			static LLCachedControl<bool> disable_camera_collision(gSavedSettings, "AlchemyDisableCameraCollision", false);
-			if (!disable_camera_collision && !mCameraCollidePlane.isExactlyZero() && (!isAgentAvatarValid() || !gAgentAvatarp->isSitting()))
+			if (!mCameraCollidePlane.isExactlyZero() && (!isAgentAvatarValid() || !gAgentAvatarp->isSitting()))
 			{
 				LLVector3 plane_normal;
 				plane_normal.setVec(mCameraCollidePlane.mV);
@@ -2097,8 +2096,9 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 		bool fCamAvDistClamped, fCamAvDistLocked = false; float nCamAvDistLimitMin, nCamAvDistLimitMax;
 		if ((fCamAvDistClamped = RlvActions::getCameraAvatarDistanceLimits(nCamAvDistLimitMin, nCamAvDistLimitMax)))
 			fCamAvDistLocked = nCamAvDistLimitMin == nCamAvDistLimitMax;
-		float nCamOriginDistLimitMin, nCamOriginDistLimitMax;
-		bool fCamOriginDistClamped = RlvActions::getCameraOriginDistanceLimits(nCamOriginDistLimitMin, nCamOriginDistLimitMax);
+		bool fCamOriginDistClamped, fCamOriginDistLocked = false; float nCamOriginDistLimitMin, nCamOriginDistLimitMax;
+		if ((fCamOriginDistClamped = RlvActions::getCameraOriginDistanceLimits(nCamOriginDistLimitMin, nCamOriginDistLimitMax)))
+			fCamOriginDistLocked = nCamOriginDistLimitMin == nCamOriginDistLimitMax;
 
 		// Check focus distance limits
 		if ( (fCamOriginDistClamped) && (!fCamAvDistLocked) )
