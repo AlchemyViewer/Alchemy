@@ -86,7 +86,7 @@
          image_overlay="Cam_Recall"
          name="restore_cam_pos_btn"
          tab_stop="false"
-         tool_tip="Use precise controls"
+         tool_tip="Restore saved camera position and focus"
          width="23">
          <button.commit_callback
            function="Camera.RestorePosition"/>
