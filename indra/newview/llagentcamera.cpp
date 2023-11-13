@@ -2288,6 +2288,22 @@ void LLAgentCamera::handleScrollWheel(S32 clicks)
 		}
 		else if (mFocusOnAvatar && (mCameraMode == CAMERA_MODE_THIRD_PERSON))
 		{
+			MASK mask = gKeyboard->currentMask(TRUE);
+			if (mask & MASK_SHIFT)
+			{
+				LLVector3d offset = gSavedSettings.getVector3d("FocusOffsetRearView");
+				offset.mdV[VZ] += 0.1f * (F32)clicks;
+				gSavedSettings.setVector3d("FocusOffsetRearView", offset);
+				return;
+			}
+			else if (mask & MASK_CONTROL)
+			{
+				LLVector3 offset = gSavedSettings.getVector3("CameraOffsetRearView");
+				offset.mV[VZ] += 0.1f * (F32)clicks;
+				gSavedSettings.setVector3("CameraOffsetRearView", offset);
+				return;
+			}
+
 			F32 camera_offset_initial_mag = getCameraOffsetInitial().magVec();
 			
 //			F32 current_zoom_fraction = mTargetCameraDistance / (camera_offset_initial_mag * gSavedSettings.getF32("CameraOffsetScale"));
