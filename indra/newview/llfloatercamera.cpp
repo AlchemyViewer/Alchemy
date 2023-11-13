@@ -368,9 +368,9 @@ BOOL LLFloaterCamera::postBuild()
 	mTrack = getChild<LLJoystickCameraTrack>(PAN);
 	mPresetCombo = getChild<LLComboBox>("preset_combo");
 
-	getChild<LLTextBox>("precise_ctrs_label")->setShowCursorHand(false);
-	getChild<LLTextBox>("precise_ctrs_label")->setSoundFlags(LLView::MOUSE_UP);
-	getChild<LLTextBox>("precise_ctrs_label")->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), FALSE));
+	//getChild<LLTextBox>("precise_ctrs_label")->setShowCursorHand(false);
+	//getChild<LLTextBox>("precise_ctrs_label")->setSoundFlags(LLView::MOUSE_UP);
+	//getChild<LLTextBox>("precise_ctrs_label")->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), FALSE));
 
 	mPresetCombo->setCommitCallback(boost::bind(&LLFloaterCamera::onCustomPresetSelected, this));
 	LLPresetsManager::getInstance()->setPresetListChangeCameraCallback(boost::bind(&LLFloaterCamera::populatePresetCombo, this));
@@ -379,6 +379,10 @@ BOOL LLFloaterCamera::postBuild()
 
 	// ensure that appearance mode is handled while building. See EXT-7796.
 	handleAvatarEditingAppearance(sAppearanceEditing);
+
+	mBtnCollapse = getChild<LLButton>("collapse_btn");
+	mBtnCollapse->setCommitCallback(boost::bind(&LLFloaterCamera::toggleCollapse, this));
+	collapse();
 
 	return LLFloater::postBuild();
 }
@@ -629,4 +633,19 @@ void LLFloaterCamera::onCustomPresetSelected()
 	{
 		switchToPreset(selected_preset);
 	}
+}
+
+void LLFloaterCamera::toggleCollapse()
+{
+	BOOL setting = !gSavedSettings.getBOOL("AlchemyCameraExpanded");
+	gSavedSettings.setBOOL("AlchemyCameraExpanded", setting);
+	collapse();
+}
+
+void LLFloaterCamera::collapse()
+{
+	BOOL collapse = gSavedSettings.getBOOL("AlchemyCameraExpanded");
+	mBtnCollapse->setImageOverlay(collapse ? "Conv_toolbar_collapse" : "Conv_toolbar_expand");
+	getChild<LLPanel>("buttons_panel")->setVisible(collapse);
+	reshape(collapse ? 362 : 210, getRect().getHeight(), FALSE);
 }
