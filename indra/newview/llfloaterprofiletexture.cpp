@@ -115,7 +115,7 @@ void LLFloaterProfileTexture::updateDimensions()
         S32 width = old_floater_rect.getWidth() - old_image_rect.getWidth() + mLastWidth;
         S32 height = old_floater_rect.getHeight() - old_image_rect.getHeight() + mLastHeight;
 
-        const F32 MAX_DIMENTIONS = 512; // most profiles are supposed to be 256x256
+        const F32 MAX_DIMENTIONS = 1024; // most profiles are supposed to be 256x256
 
         S32 biggest_dim = llmax(width, height);
         if (biggest_dim > MAX_DIMENTIONS)
