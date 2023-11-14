@@ -224,7 +224,7 @@ if (LINUX)
   if (USE_ASAN OR USE_LEAKSAN OR USE_UBSAN OR USE_THDSAN)
     add_compile_options(-Og -fno-omit-frame-pointer)
   else ()
-    add_compile_options(-O3 -ffast-math)
+    add_compile_options(-O3)
   endif ()
 
   # Enable these flags so we have a read only GOT and some linking opts
@@ -236,7 +236,6 @@ if (DARWIN)
   add_link_options("LINKER:-headerpad_max_install_names" "LINKER:-search_paths_first" "LINKER:-dead_strip")
   add_compile_options(
     -O3
-    -ffast-math
     -gdwarf-2
     -fno-strict-aliasing
     -msse4.2
