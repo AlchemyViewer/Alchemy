@@ -626,7 +626,7 @@ void LLViewerPartSourceSpiral::update(const F32 dt)
 {
 	if (!mImagep)
 	{
-		mImagep = LLViewerFetchedTexture::sPixieEffectImagep;
+		mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
 	}
 
 	const F32 RATE = 0.025f;
@@ -799,7 +799,7 @@ void LLViewerPartSourceBeam::update(const F32 dt)
 
 		if (!mImagep)
 		{
-			mImagep = LLViewerFetchedTexture::sPixieEffectImagep;
+			mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
 		}
 
 		LLViewerPart* part = new LLViewerPart();
@@ -886,7 +886,7 @@ void LLViewerPartSourceChat::update(const F32 dt)
 {
 	if (!mImagep)
 	{
-		mImagep = LLViewerFetchedTexture::sPixieEffectImagep;
+		mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
 	}
 
 
