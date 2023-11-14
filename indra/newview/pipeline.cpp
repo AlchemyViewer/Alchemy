@@ -10344,36 +10344,57 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
 bool LLPipeline::hasRenderBatches(const U32 type) const
 {
+	if( !sCull )
+		return {};
+
 	return sCull->getRenderMapSize(type) > 0;
 }
 
 LLCullResult::drawinfo_iterator LLPipeline::beginRenderMap(U32 type)
 {
+	if( !sCull )
+		return {};
+
 	return sCull->beginRenderMap(type);
 }
 
 LLCullResult::drawinfo_iterator LLPipeline::endRenderMap(U32 type)
 {
+	if( !sCull )
+		return {};
+
 	return sCull->endRenderMap(type);
 }
 
 LLCullResult::sg_iterator LLPipeline::beginAlphaGroups()
 {
+	if( !sCull )
+		return {};
+
 	return sCull->beginAlphaGroups();
 }
 
 LLCullResult::sg_iterator LLPipeline::endAlphaGroups()
 {
+	if( !sCull )
+		return {};
+
 	return sCull->endAlphaGroups();
 }
 
 LLCullResult::sg_iterator LLPipeline::beginRiggedAlphaGroups()
 {
+	if( !sCull )
+		return {};
+
     return sCull->beginRiggedAlphaGroups();
 }
 
 LLCullResult::sg_iterator LLPipeline::endRiggedAlphaGroups()
 {
+	if( !sCull )
+		return {};
+
     return sCull->endRiggedAlphaGroups();
 }
 
