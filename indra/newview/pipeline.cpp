@@ -514,7 +514,6 @@ void LLPipeline::init()
 	connectRefreshCachedSettingsSafe("RenderDeferredSSAO");
 	connectRefreshCachedSettingsSafe("RenderShadowResolutionScale");
 	connectRefreshCachedSettingsSafe("RenderDelayCreation");
-	connectRefreshCachedSettingsSafe("RenderAnimateRes");
 	connectRefreshCachedSettingsSafe("FreezeTime");
 	connectRefreshCachedSettingsSafe("DebugBeaconLineWidth");
 	connectRefreshCachedSettingsSafe("RenderHighlightBrightness");
@@ -1049,7 +1048,6 @@ void LLPipeline::refreshCachedSettings()
 	RenderDeferredSSAO = gSavedSettings.getBOOL("RenderDeferredSSAO");
 	RenderShadowResolutionScale = gSavedSettings.getF32("RenderShadowResolutionScale");
 	RenderDelayCreation = gSavedSettings.getBOOL("RenderDelayCreation");
-	RenderAnimateRes = gSavedSettings.getBOOL("RenderAnimateRes");
 	FreezeTime = gSavedSettings.getBOOL("FreezeTime");
 	DebugBeaconLineWidth = gSavedSettings.getS32("DebugBeaconLineWidth");
 	RenderHighlightBrightness = gSavedSettings.getF32("RenderHighlightBrightness");
@@ -1905,15 +1903,6 @@ void LLPipeline::createObject(LLViewerObject* vobj)
 	}
 
 	markRebuild(drawablep, LLDrawable::REBUILD_ALL);
-
-	if (drawablep->getVOVolume() && RenderAnimateRes)
-	{
-		// fun animated res
-		drawablep->updateXform(TRUE);
-		drawablep->clearState(LLDrawable::MOVE_UNDAMPED);
-		drawablep->setScale(LLVector3(0,0,0));
-		drawablep->makeActive();
-	}
 }
 
 
