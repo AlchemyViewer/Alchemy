@@ -83,7 +83,7 @@ struct LLVBCache
     std::chrono::steady_clock::time_point touched;
 };
 
-static boost::unordered_flat_map<U64, LLVBCache> sVBCache;
+static boost::unordered_map<U64, LLVBCache> sVBCache;
 
 static const GLenum sGLTextureType[] =
 {
