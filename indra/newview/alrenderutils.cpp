@@ -316,7 +316,7 @@ void ALRenderUtil::refreshState()
 bool ALRenderUtil::setupTonemap()
 {
 	mTonemapType = gSavedSettings.getU32("RenderToneMapType");
-	if (mTonemapType >= TONEMAP_COUNT || (mTonemapType == ALTonemap::TONEMAP_AMD && (gGLManager.mGLVersion < 4.20f || !gDeferredPostTonemapLPMProgram.isComplete())))
+	if (mTonemapType >= TONEMAP_COUNT || (mTonemapType == ALTonemap::TONEMAP_AMD &&  !gDeferredPostTonemapLPMProgram.isComplete()))
 	{
 		mTonemapType = ALTonemap::TONEMAP_ACES_HILL;
 	}
