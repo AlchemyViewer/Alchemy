@@ -483,6 +483,17 @@ class WindowsManifest(ViewerManifest):
             self.path("vcruntime140.dll")
             self.path("vcruntime140_1.dll")
 
+            with self.prefix(dst="llplugin"):
+                self.path("concrt140.dll")
+                self.path("msvcp140.dll")
+                self.path("msvcp140_1.dll")
+                self.path("msvcp140_2.dll")
+                self.path("msvcp140_atomic_wait.dll")
+                self.path("msvcp140_codecvt_ids.dll")
+                self.path("vccorlib140.dll")
+                self.path("vcruntime140.dll")
+                self.path("vcruntime140_1.dll")
+
             # SLVoice executable
             with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
                 self.path("SLVoice.exe")
