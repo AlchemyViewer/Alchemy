@@ -538,7 +538,6 @@ public:
     static LLPointer<LLViewerFetchedTexture> sSmokeImagep; // Old "Default" translucent texture
     static LLViewerFetchedTexture* getSmokeImage();
 	static LLPointer<LLViewerFetchedTexture> sPixieSmallImagep; // Small pixmap for default particle tex
-	static LLPointer<LLViewerFetchedTexture> sPixieEffectImagep; // Small pixmap for default particle tex
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
 	static LLPointer<LLViewerFetchedTexture> sDefaultDiffuseImagep;
 // [/SL:KB]

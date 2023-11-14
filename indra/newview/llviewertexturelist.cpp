@@ -129,9 +129,6 @@ void LLViewerTextureList::doPreloadImages()
 	// Set the default particle image
 	LLViewerFetchedTexture::sPixieSmallImagep = LLViewerTextureManager::getFetchedTextureFromFile("pixiesmall.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
 
-	// Set the default particle image
-	LLViewerFetchedTexture::sPixieEffectImagep = LLViewerTextureManager::getFetchedTextureFromFile("PixieSmall.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
-
 	image_list->initFromFile();
 	
 	// turn off clamping and bilinear filtering for uv picking images
