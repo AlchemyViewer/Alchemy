@@ -864,8 +864,8 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 		}
 	}	
 
-	S32 shadow_detail = RenderShadowDetail;
-	bool ssao = RenderDeferredSSAO;
+	//S32 shadow_detail = RenderShadowDetail;
+	//bool ssao = RenderDeferredSSAO;
 		
 	//allocate deferred rendering color buffers
 	if (!mRT->deferredScreen.allocate(resX, resY, GL_RGBA, true)) return false;
@@ -877,14 +877,14 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 
     mRT->deferredScreen.shareDepthBuffer(mRT->screen);
 
-	if (shadow_detail > 0 || ssao || gSavedSettings.getU32("RenderSharpenMethod") != ALRenderUtil::SHARPEN_NONE)
+	//if (shadow_detail > 0 || ssao || gSavedSettings.getU32("RenderSharpenMethod") != ALRenderUtil::SHARPEN_NONE)
 	{ //only need mRT->deferredLight for shadows OR ssao OR sharpening
 		if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
 	}
-	else
-	{
-		mRT->deferredLight.release();
-	}
+	//else
+	//{
+	//	mRT->deferredLight.release();
+	//}
 
     allocateShadowBuffer(resX, resY);
 
@@ -7443,8 +7443,8 @@ void LLPipeline::renderFinalize()
 		}
 		else
 		{
-			mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mPostFXMap);
-			mALRenderUtil->renderColorGrade(&mPostFXMap, &mPostMap);
+			mALRenderUtil->renderTonemap(&mRT->screen, &mExposureMap, &mRT->deferredLight);
+			mALRenderUtil->renderColorGrade(&mRT->deferredLight, &mPostMap);
 		}
 	}
 
