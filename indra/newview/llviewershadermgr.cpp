@@ -2910,7 +2910,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			gRlvSphereProgram.createShader(NULL, NULL);
 		}
 		// [/RLV:KB]
-
+#ifndef LL_DARWIN
 		if (gGLManager.mGLVersion >= 4.59f)
 		{
 			gDeferredPostCASProgram.mName = "Contrast Adaptive Sharpen Shader";
@@ -2935,6 +2935,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			gDeferredPostTonemapLPMProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_AMD));
 			gDeferredPostTonemapLPMProgram.createShader(NULL, NULL); // Ignore return value for this shader
 		}
+#endif
 	}
 
 	return success;
