@@ -47,7 +47,7 @@ BOOL LLFloaterGenericText::postBuild()
 {
 	setTitle(mTitle);
 	getChild<LLTextEditor>("payload")->setText(mContents);
-	return TRUE;
+	return LLFloater::postBuild();
 }
 
 void LLFloaterGenericText::onClickClose()
