@@ -5395,7 +5395,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 			else if(volight->isAttachment())
 			{
 				LLVOAvatar* avatarp = volight->getAvatar();
-				if (avatarp && (avatarp->isTooComplex() || avatarp->isInMuteList()))
+				if (avatarp && avatarp->isVisuallyMuted())
 				{
 					drawable->clearState(LLDrawable::NEARBY_LIGHT);
 					continue;
@@ -5459,7 +5459,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 			else if (light->isAttachment())
 			{
 				LLVOAvatar* av = light->getAvatar();
-            	if (av && (av->isTooComplex() || av->isInMuteList() || av->isTooSlow()))
+            	if (av && av->isVisuallyMuted())
 				{
 					// avatars that are already in the list will be removed by removeMutedAVsLights
 					continue;
@@ -10016,15 +10016,10 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
     LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID()
                               << " is " << ( visually_muted ? "" : "not ") << "visually muted"
                               << LL_ENDL;
-	bool too_complex = !for_profile && !preview_avatar && avatar->isTooComplex();
-    LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID()
-                              << " is " << ( too_complex ? "" : "not ") << "too complex"
-                              << LL_ENDL;
-
     pushRenderTypeMask();
 
-    if (visually_muted || too_complex)
-    {
+    if (visually_muted)
+	{
         // only show jelly doll geometry
 		andRenderTypeMask(LLPipeline::RENDER_TYPE_AVATAR,
 							LLPipeline::RENDER_TYPE_CONTROL_AV,
@@ -10232,7 +10227,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
 	F32 old_alpha = LLDrawPoolAvatar::sMinimumAlpha;
 
-	if (visually_muted || too_complex)
+	if (visually_muted)
 	{ //disable alpha masking for muted avatars (get whole skin silhouette)
 		LLDrawPoolAvatar::sMinimumAlpha = 0.f;
 	}
@@ -10278,7 +10273,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
 		LLGLDisable blend(GL_BLEND);
 
-		if (visually_muted || too_complex)
+		if (visually_muted)
 		{
 			gGL.setColorMask(true, true);
 		}
