@@ -127,7 +127,10 @@ void LLViewerTextureList::doPreloadImages()
 	LLViewerFetchedTexture::sDefaultIrradiancePBRp = LLViewerTextureManager::getFetchedTextureFromFile("default_irradiance.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
 	
 	// Set the default particle image
-	LLViewerFetchedTexture::sPixieSmallImagep = LLViewerTextureManager::getFetchedTextureFromFile("PixieSmall.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
+	LLViewerFetchedTexture::sPixieSmallImagep = LLViewerTextureManager::getFetchedTextureFromFile("pixiesmall.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
+
+	// Set the default particle image
+	LLViewerFetchedTexture::sPixieEffectImagep = LLViewerTextureManager::getFetchedTextureFromFile("PixieSmall.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
 
 	image_list->initFromFile();
 	
