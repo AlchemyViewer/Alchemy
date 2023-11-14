@@ -4,12 +4,15 @@
   <font name="default" comment="default font files (global fallbacks)">
     <file>DejaVuSans.ttf</file>
     <file>NotoSans-Regular.ttf</file>
+    <file load_collection="true">NotoSansCJK-Regular.ttc</file>
+    <file>NotoSansTamil-Regular.ttf</file>
+    <file>NotoSansOriya-Regular.ttf</file>
+    <file>NotoSansDevanagari-Regular.ttf</file>
+    <file>NotoNaskhArabicUI-Regular.ttf</file>
+    <file>NotoLoopedThaiUI-Regular.ttf</file>
     <file>NotoSansSymbols-Regular.ttf</file>
     <file>NotoSansSymbols2-Regular.ttf</file>
     <file>NotoSansMath-Regular.ttf</file>
-    <file>NotoNaskhArabicUI-Regular.ttf</file>
-    <file>NotoLoopedThaiUI-Regular.ttf</file>
-    <file>NotoSansCJK-Regular.ttc</file>
     <os name="Windows">
       <file>meiryo.TTC</file>
       <file>MSGOTHIC.TTC</file>
@@ -42,10 +45,13 @@
 	comment="Name of bold sans-serif font">
     <file>DejaVuSans-Bold.ttf</file>
     <file>NotoSans-Bold.ttf</file>
-    <file>NotoSansSymbols-Bold.ttf</file>
+    <file load_collection="true">NotoSansCJK-Bold.ttc</file>
+    <file>NotoSansTamil-Bold.ttf</file>
+    <file>NotoSansOriya-Bold.ttf</file>
+    <file>NotoSansDevanagari-Bold.ttf</file>
     <file>NotoNaskhArabicUI-Bold.ttf</file>
     <file>NotoLoopedThaiUI-Bold.ttf</file>
-    <file>NotoSansCJK-Bold.ttc</file>
+    <file>NotoSansSymbols-Bold.ttf</file>
     <os name="Windows">
       <file>arialbd.ttf</file>
       </os>
@@ -62,7 +68,7 @@
     <file>NotoSansMath-Regular.ttf</file>
     <file>NotoNaskhArabicUI-Regular.ttf</file>
     <file>NotoLoopedThaiUI-Regular.ttf</file>
-    <file>NotoSansCJK-Regular.ttc</file>
+    <file load_collection="true">NotoSansCJK-Regular.ttc</file>
     <os name="Windows">
       <file>arial.ttf</file>
       </os>
@@ -76,10 +82,13 @@
 	font_style="BOLD">
     <file>DejaVuSans-Bold.ttf</file>
     <file>NotoSans-Bold.ttf</file>
-    <file>NotoSansSymbols-Bold.ttf</file>
+    <file load_collection="true">NotoSansCJK-Bold.ttc</file>
+    <file>NotoSansTamil-Bold.ttf</file>
+    <file>NotoSansOriya-Bold.ttf</file>
+    <file>NotoSansDevanagari-Bold.ttf</file>
     <file>NotoNaskhArabicUI-Bold.ttf</file>
-    <file>NotoNaskhArabicUI-Regular.ttf</file>
-    <file>NotoSansCJK-Bold.ttc</file>
+    <file>NotoLoopedThaiUI-Bold.ttf</file>
+    <file>NotoSansSymbols-Bold.ttf</file>
   </font>
 
   <font name="SansSerif"
