@@ -378,11 +378,6 @@ LLGroupNotificationListItem::~LLGroupNotificationListItem()
 
 LLGroupNoticeNotificationListItem::~LLGroupNoticeNotificationListItem()
 {
-	if (mInventoryOffer != nullptr)
-	{
-        delete mInventoryOffer;
-        mInventoryOffer = nullptr;
-	}
 }
 
 BOOL LLGroupNoticeNotificationListItem::postBuild()
