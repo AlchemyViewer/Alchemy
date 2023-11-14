@@ -2886,8 +2886,17 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 	// These shaders are non-critical and do not fail shader load
 	if (success)
 	{
+		{
+			gDeferredPostDLSProgram.mName = "DLS Shader";
+			gDeferredPostDLSProgram.mFeatures.hasSrgb = true;
+			gDeferredPostDLSProgram.mShaderFiles.clear();
+			gDeferredPostDLSProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
+			gDeferredPostDLSProgram.mShaderFiles.push_back(make_pair("alchemy/DLSF.glsl", GL_FRAGMENT_SHADER));
+			gDeferredPostDLSProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+			gDeferredPostDLSProgram.createShader(NULL, NULL);
+		}
+
 		// [RLVa:KB] - @setsphere
-		if (success)
 		{
 			gRlvSphereProgram.mName = "RLVa Sphere Post Processing Shader";
 			gRlvSphereProgram.mFeatures.isDeferred = true;
@@ -2898,20 +2907,9 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 			else
 				gRlvSphereProgram.mShaderFiles.push_back(make_pair("deferred/rlvFLegacy.glsl", GL_FRAGMENT_SHADER));
 			gRlvSphereProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-			success = gRlvSphereProgram.createShader(NULL, NULL);
+			gRlvSphereProgram.createShader(NULL, NULL);
 		}
 		// [/RLV:KB]
-
-		if (success)
-		{
-			gDeferredPostDLSProgram.mName = "DLS Shader";
-			gDeferredPostDLSProgram.mFeatures.hasSrgb = true;
-			gDeferredPostDLSProgram.mShaderFiles.clear();
-			gDeferredPostDLSProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
-			gDeferredPostDLSProgram.mShaderFiles.push_back(make_pair("alchemy/DLSF.glsl", GL_FRAGMENT_SHADER));
-			gDeferredPostDLSProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-			success = gDeferredPostDLSProgram.createShader(NULL, NULL);
-		}
 
 		if (gGLManager.mGLVersion >= 4.59f)
 		{
