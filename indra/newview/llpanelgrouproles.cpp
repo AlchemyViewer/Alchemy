@@ -1089,7 +1089,7 @@ void LLPanelGroupMembersSubTab::handleMemberSelect()
 		else
 		{
 			// This could happen if changes are not synced right on sub-panel change.
-			LL_WARNS() << "No group role data for " << iter->second << LL_ENDL;
+			LL_WARNS() << "No group role data for " << iter->second.get() << LL_ENDL;
 		}
 	}
 	mAssignedRolesList->setEnabled(TRUE);
