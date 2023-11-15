@@ -1234,7 +1234,7 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 	{
 		LLSD folders(content["folders"]);
 		
-		for (const auto& folder_sd : folders.array())
+		for (const auto& folder_sd : folders.asArray())
 		{	
 			//LLUUID agent_id = folder_sd["agent_id"];
 
@@ -1256,7 +1256,7 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 				LLSD items(folder_sd["items"]);
 			    LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
 				
-				for (const auto& item : items.array())
+				for (const auto& item : items.asArray())
 			    {	
                     const LLUUID lost_uuid(gInventory.findCategoryUUIDForType(LLFolderType::FT_LOST_AND_FOUND));
 
@@ -1284,7 +1284,7 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 			}
 
 			LLSD categories(folder_sd["categories"]);
-			for (const auto& category : categories.array())
+			for (const auto& category : categories.asArray())
 			{	
 				tcategory->fromLLSD(category); 
 				
@@ -1301,7 +1301,7 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 
 			LLSD items(folder_sd["items"]);
 			LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
-			for (const auto& item : items.array())
+			for (const auto& item : items.asArray())
 			{	
 				titem->unpackMessage(item);
 				
@@ -1322,7 +1322,7 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 	if (content.has("bad_folders"))
 	{
 		LLSD bad_folders(content["bad_folders"]);
-		for (const auto& folder_sd : bad_folders.array())
+		for (const auto& folder_sd : bad_folders.asArray())
 		{
 			// These folders failed on the dataserver.  We probably don't want to retry them.
 			LL_WARNS(LOG_INV) << "Folder " << folder_sd["folder_id"].asString() 
@@ -1416,7 +1416,7 @@ void BGFolderHttpHandler::processFailure(LLCore::HttpStatus status, LLCore::Http
 	if (false)
 	{
 		// timed out or curl failure
-		for (const auto& folder_sd : mRequestSD["folders"].array())
+		for (const auto& folder_sd : mRequestSD["folders"].asArray())
 		{
 			LLUUID folder_id(folder_sd["folder_id"].asUUID());
 			const BOOL recursive = getIsRecursive(folder_id);
@@ -1450,7 +1450,7 @@ void BGFolderHttpHandler::processFailure(const char * const reason, LLCore::Http
 	LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstance();
 	if (true)
 	{
-		for (const auto& folder_sd : mRequestSD["folders"].array())
+		for (const auto& folder_sd : mRequestSD["folders"].asArray())
 		{
 			LLUUID folder_id(folder_sd["folder_id"].asUUID());
 			const BOOL recursive = getIsRecursive(folder_id);

@@ -372,7 +372,7 @@ void LLMaterial::fromLLSD(const LLSD& material_data)
 {
     if (!material_data.isMap()) return;
 
-    const auto& material_map = material_data.map();
+    const auto& material_map = material_data.asMap();
     const auto& material_end = material_map.end();
 
     auto it = material_map.find(MATERIALS_CAP_NORMAL_MAP_FIELD);

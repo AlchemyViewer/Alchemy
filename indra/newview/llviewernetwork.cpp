@@ -346,7 +346,7 @@ bool LLGridManager::addGrid(LLSD& grid_data)
 										 <<"  login page:  "<<grid_data[GRID_LOGIN_PAGE_VALUE].asString()<<"\n"
 										 <<"  web profile: "<<grid_data[GRID_WEB_PROFILE_VALUE].asString()<<"\n";
 				/* still in LL_DEBUGS */ 
-				for (const LLSD& login_uris : grid_data[GRID_LOGIN_URI_VALUE].array())
+				for (const LLSD& login_uris : grid_data[GRID_LOGIN_URI_VALUE].asArray())
 				{
 					LL_CONT << "  login uri:   "<<login_uris.asString()<<"\n";
 				}
@@ -670,7 +670,7 @@ void LLGridManager::saveGridList()
 std::map<std::string, std::string> LLGridManager::getKnownGrids() const
 {
 	std::map<std::string, std::string> result;
-	for(const auto& grid_pair : mGridList.map())
+	for(const auto& grid_pair : mGridList.asMap())
 	{
 		// skip temp grids. since this is just for "grid label mappings for UI purposes"
 		if (grid_pair.second.has(GRID_TEMPORARY) && grid_pair.second[GRID_TEMPORARY].asBoolean())
@@ -738,7 +738,7 @@ std::string LLGridManager::getGrid(const std::string& grid) const
 	else
 	{
 		// search the grid list for a grid with a matching id
-		for(const auto& grid_pair : mGridList.map())
+		for(const auto& grid_pair : mGridList.asMap())
 		{
 			if (grid_pair.second.has(GRID_ID_VALUE))
 			{
@@ -773,7 +773,7 @@ std::string LLGridManager::getGridByProbing(const std::string& grid) const
 	else
 	{
 		// search the grid list for a grid with a matching id
-		for (const auto& grid_pair : mGridList.map())
+		for (const auto& grid_pair : mGridList.asMap())
 		{
 			if (grid_pair.second.has(GRID_ID_VALUE))
 			{
@@ -802,7 +802,7 @@ std::string LLGridManager::getGridByAttribute(const std::string& attribute, cons
 {
 	if (attribute.empty() || value.empty()) return LLStringUtil::null;
 	
-	for(const auto& grid_iter : mGridList.map())
+	for(const auto& grid_iter : mGridList.asMap())
 	{
 		if (grid_iter.second.has(attribute)
 			&& LLStringUtil::compareInsensitive(value, grid_iter.second[attribute].asString()) == 0)
@@ -871,7 +871,7 @@ void LLGridManager::getLoginURIs(const std::string& grid, std::vector<std::strin
 	{
         if (mGridList[grid_name][GRID_LOGIN_URI_VALUE].isArray())
         {
-		    for (const LLSD& llsd_uri : mGridList[grid_name][GRID_LOGIN_URI_VALUE].array())
+		    for (const LLSD& llsd_uri : mGridList[grid_name][GRID_LOGIN_URI_VALUE].asArray())
 		    {
 			    uris.push_back(llsd_uri.asString());
 		    }

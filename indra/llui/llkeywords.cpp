@@ -137,11 +137,11 @@ std::string LLKeywords::getArguments(LLSD& arguments)
 	if (arguments.isArray())
 	{
 		U32 argsCount = arguments.size();
-		for (const LLSD& args : arguments.array())
+		for (const LLSD& args : arguments.asArray())
 		{
 			if (args.isMap())
 			{
-				for (const auto& llsd_pair : args.map())
+				for (const auto& llsd_pair : args.asMap())
 				{
 					argString += llsd_pair.second.get("type").asString() + " " + llsd_pair.first;
 					if (argsCount-- > 1)
@@ -290,7 +290,7 @@ void LLKeywords::processTokens()
 	addToken(LLKeywordToken::TT_TWO_SIDED_DELIMITER, "/*", syntax_lsl_comment_color, "Comment (multi-line)\nNon-functional commentary or disabled code", "*/" );
 	addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS, "\"", syntax_lsl_comment_color, "String literal", "\"" );
 
-	for (const auto& llsd_pair : mSyntax.map())
+	for (const auto& llsd_pair : mSyntax.asMap())
 	{
 		if (llsd_pair.first == "llsd-lsl-syntax-version")
 		{
@@ -354,13 +354,13 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
 
 	if (tokens.isMap())
 	{
-		for (const auto& token_pair : tokens.map())
+		for (const auto& token_pair : tokens.asMap())
 		{
 			if (token_pair.second.isMap())
 			{
 				mAttributes.clear();
 				LLSD arguments = LLSD();
-				for (const auto& token_inner_pair : token_pair.second.map())
+				for (const auto& token_inner_pair : token_pair.second.asMap())
 				{
 					if (token_inner_pair.first == "arguments")
 					{ 

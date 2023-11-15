@@ -2243,7 +2243,7 @@ void LLGroupMgr::processCapGroupMembersRequest(const LLSD& content)
 		if (!member_iter_start->second.isMap()) continue;
 
 		const LLUUID member_id(member_iter_start->first);
-		const auto& member_info = member_iter_start->second.map();
+		const auto& member_info = member_iter_start->second.asMap();
 		const auto member_info_end = member_info.end();
 
 		auto it = member_info.find("last_login");

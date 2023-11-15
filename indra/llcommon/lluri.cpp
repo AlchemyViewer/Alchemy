@@ -446,7 +446,7 @@ LLURI LLURI::buildHTTP(const std::string& prefix,
 	if (path.isArray())
 	{
 		// break out and escape each path component
-		for (const auto& llsd_val : path.array())
+		for (const auto& llsd_val : path.asArray())
 		{
 			const std::string& str = llsd_val.asStringRef();
 			LL_DEBUGS() << "PATH: inserting " << str << LL_ENDL;

@@ -385,7 +385,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
             continue;
         }
 
-        for (const auto& iter : result.map())
+        for (const auto& iter : result.asMap())
         {
             regionp->setCapability(iter.first, iter.second);
 
@@ -495,7 +495,7 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCompleteCoro(U64 regionHandle)
         // remove the http_result from the llsd
         result.erase("http_result");
 
-         for (const auto& llsd_pair : result.map())
+         for (const auto& llsd_pair : result.asMap())
         {
             regionp->setCapabilityDebug(llsd_pair.first, llsd_pair.second);
             //LL_INFOS()<<"BaseCapabilitiesCompleteTracker New Caps "<<iter->first<<" "<< iter->second<<LL_ENDL;

@@ -1683,7 +1683,7 @@ void LLEnvironment::updateGLVariablesForSettings(LLShaderUniforms* uniforms, con
     LLShaderUniforms* shader = &uniforms[LLGLSLShader::SG_ANY];
     //_WARNS("RIDER") << "----------------------------------------------------------------" << LL_ENDL;
     const LLSettingsBase::parammapping_t& params = psetting->getParameterMap();
-    const auto& settings_map = psetting->mSettings.map();
+    const auto& settings_map = psetting->mSettings.asMap();
     for (const auto &it: params)
     {
         LLSD value;
@@ -1691,7 +1691,7 @@ void LLEnvironment::updateGLVariablesForSettings(LLShaderUniforms* uniforms, con
         auto legacy_haze_it = settings_map.find(LLSettingsSky::SETTING_LEGACY_HAZE);
         if (legacy_haze_it != settings_map.end())
         {
-            const auto& legacy_map = legacy_haze_it->second.map();
+            const auto& legacy_map = legacy_haze_it->second.asMap();
             auto legacy_setting_it = legacy_map.find(it.first);
             if (legacy_setting_it != legacy_map.end())
             {

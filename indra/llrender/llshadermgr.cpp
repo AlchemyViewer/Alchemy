@@ -1029,7 +1029,7 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
 
 			if (old_cache_version == current_cache_version)
 			{
-				for (const auto& data_pair : in_data.map())
+				for (const auto& data_pair : in_data.asMap())
 				{
 					ProgramBinaryData binary_info = ProgramBinaryData();
 					binary_info.mBinaryFormat = data_pair.second["binary_format"].asInteger();

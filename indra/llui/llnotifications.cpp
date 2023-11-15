@@ -268,7 +268,7 @@ LLSD LLNotificationForm::asLLSD() const
 
 LLSD LLNotificationForm::getElement(std::string_view element_name)
 {
-	for (const LLSD& llsd_val : mFormData.array())
+	for (const LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["name"].asString() == element_name) return llsd_val;
 	}
@@ -278,7 +278,7 @@ LLSD LLNotificationForm::getElement(std::string_view element_name)
 
 bool LLNotificationForm::hasElement(std::string_view element_name) const
 {
-	for (const LLSD& llsd_val : mFormData.array())
+	for (const LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["name"].asString() == element_name) return true;
 	}
@@ -300,7 +300,7 @@ void LLNotificationForm::getElements(LLSD& elements, S32 offset)
 
 bool LLNotificationForm::getElementEnabled(std::string_view element_name) const
 {
-	for (const LLSD& llsd_val : mFormData.array())
+	for (const LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["name"].asString() == element_name)
 		{
@@ -313,7 +313,7 @@ bool LLNotificationForm::getElementEnabled(std::string_view element_name) const
 
 void LLNotificationForm::setElementEnabled(std::string_view element_name, bool enabled)
 {
-	for (LLSD& llsd_val : mFormData.array())
+	for (LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["name"].asString() == element_name)
 		{
@@ -339,7 +339,7 @@ void LLNotificationForm::append(const LLSD& sub_form)
 {
 	if (sub_form.isArray())
 	{
-		for (const auto& llsd_val : sub_form.array())
+		for (const auto& llsd_val : sub_form.asArray())
 		{
 			mFormData.append(llsd_val);
 		}
@@ -348,7 +348,7 @@ void LLNotificationForm::append(const LLSD& sub_form)
 
 void LLNotificationForm::formatElements(const LLSD& substitutions)
 {
-	for (LLSD& llsd_val : mFormData.array())
+	for (LLSD& llsd_val : mFormData.asArray())
 	{
 		// format "text" component of each form element
 		if (llsd_val.has("text"))
@@ -368,7 +368,7 @@ void LLNotificationForm::formatElements(const LLSD& substitutions)
 
 std::string LLNotificationForm::getDefaultOption()
 {
-	for (const LLSD& llsd_val : mFormData.array())
+	for (const LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["default"]) return llsd_val["name"].asString();
 	}
@@ -648,7 +648,7 @@ S32 LLNotification::getSelectedOption(const LLSD& notification, const LLSD& resp
 //static
 std::string LLNotification::getSelectedOptionName(const LLSD& response)
 {
-	for (const auto& llsd_pair : response.map())
+	for (const auto& llsd_pair : response.asMap())
 	{
 		if (llsd_pair.second.isBoolean() && llsd_pair.second.asBoolean())
 		{

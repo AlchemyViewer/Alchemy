@@ -254,7 +254,7 @@ void LLParamSDParserUtilities::readSDValues(read_sd_cb_t cb, const LLSD& sd, LLI
 {
 	if (sd.isMap())
 	{
-		for (const auto& llsd_pair : sd.map())
+		for (const auto& llsd_pair : sd.asMap())
 		{
 			stack.push_back(make_pair(llsd_pair.first, true));
 			readSDValues(cb, llsd_pair.second, stack);
@@ -263,7 +263,7 @@ void LLParamSDParserUtilities::readSDValues(read_sd_cb_t cb, const LLSD& sd, LLI
 	}
 	else if (sd.isArray())
 	{
-		for (const auto& llsd_val : sd.array())
+		for (const auto& llsd_val : sd.asArray())
 		{
 			stack.push_back(make_pair(std::string(), true));
 			readSDValues(cb, llsd_val, stack);

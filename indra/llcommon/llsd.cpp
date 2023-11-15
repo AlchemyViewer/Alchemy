@@ -100,6 +100,9 @@ protected:
 	
 	U32 mUseCount;
 
+	const LLSD::map_t& map() const { static thread_local const LLSD::map_t empty; return empty; }
+	const std::vector<LLSD>& array() const { static thread_local const std::vector<LLSD> empty; return empty; }
+
 public:
 	static void reset(Impl*& var, Impl* impl);
 		///< safely set var to refer to the new impl (possibly shared)
@@ -140,7 +143,9 @@ public:
 	virtual UUID	asUUID() const				{ return LLUUID(); }
 	virtual Date	asDate() const				{ return LLDate(); }
 	virtual URI		asURI() const				{ return LLURI(); }
-	virtual const Binary&	asBinary() const	{ static const std::vector<U8> empty; return empty; }
+	virtual const Binary&	asBinary() const	{ static thread_local const std::vector<U8> empty; return empty; }
+	virtual const map_t& asMap() const			{ return map(); };
+	virtual const array_t& asArray() const		{ return array(); };
 
 	virtual const String& asStringRef() const { static const std::string empty; return empty; } 
 	
@@ -155,15 +160,10 @@ public:
 	virtual void erase(size_t)					{ }
 	virtual const LLSD& ref(size_t) const		{ return undef(); }
 
-	virtual const LLSD::map_t& map() const { static const LLSD::map_t empty; return empty; }
-	virtual LLSD::map_t& map() { static LLSD::map_t empty; return empty; }
-	LLSD::map_const_iterator beginMap() const { return endMap(); }
-	LLSD::map_const_iterator endMap() const { return map().end(); }
-	virtual const std::vector<LLSD>& array() const { static const std::vector<LLSD> empty; return empty; }
-	virtual std::vector<LLSD>& array() { static std::vector<LLSD> empty; return empty; }
-	LLSD::array_const_iterator beginArray() const { return endArray(); }
-	LLSD::array_const_iterator endArray() const { return array().end(); }
-
+	virtual LLSD::map_const_iterator beginMap() const { return endMap(); }
+	virtual LLSD::map_const_iterator endMap() const { return map().end(); }
+	virtual LLSD::array_const_iterator beginArray() const { return endArray(); }
+	virtual LLSD::array_const_iterator endArray() const { return array().end(); }
 
 	virtual void dumpStats() const;
 	virtual void calcStats(S32 type_counts[], S32 share_counts[]) const;
@@ -393,6 +393,9 @@ namespace
 
         LLSD::Boolean asBoolean() const override { return !mData.empty(); }
 
+		LLSD::map_t& asMap() { return mData; };
+		const LLSD::map_t& asMap() const override { return mData; };
+
         bool has(const std::string_view) const override;
 
 		using LLSD::Impl::get; // Unhiding get(size_t)
@@ -407,8 +410,10 @@ namespace
 
 		size_t size() const override { return mData.size(); }
 
-		DataMap& map() final override { return mData; }
-		const DataMap& map() const final override { return mData; }
+		LLSD::map_iterator beginMap() { return mData.begin(); }
+		LLSD::map_iterator endMap() { return mData.end(); }
+		LLSD::map_const_iterator beginMap() const override { return mData.begin(); }
+		LLSD::map_const_iterator endMap() const override { return mData.end(); }
 
         void dumpStats() const override;
         void calcStats(S32 type_counts[], S32 share_counts[]) const override;
@@ -537,6 +542,9 @@ namespace
 
         LLSD::Boolean asBoolean() const override { return !mData.empty(); }
 
+		DataVector& asArray() { return mData; };
+		const DataVector& asArray() const override { return mData; };
+
 		using LLSD::Impl::get; // Unhiding get(LLSD::String)
 		using LLSD::Impl::erase; // Unhiding erase(LLSD::String)
 		using LLSD::Impl::ref; // Unhiding ref(LLSD::String)
@@ -549,8 +557,12 @@ namespace
 		              LLSD& ref(size_t);
 		virtual const LLSD& ref(size_t) const override; 
 
-		DataVector& array() final override { return mData; }
-		const DataVector& array() const final override { return mData; }
+		LLSD::array_iterator beginArray() { return mData.begin(); }
+		LLSD::array_iterator endArray() { return mData.end(); }
+		LLSD::reverse_array_iterator rbeginArray() { return mData.rbegin(); }
+		LLSD::reverse_array_iterator rendArray() { return mData.rend(); }
+		virtual LLSD::array_const_iterator beginArray() const { return mData.begin(); }
+		virtual LLSD::array_const_iterator endArray() const { return mData.end(); }
 
         void calcStats(S32 type_counts[], S32 share_counts[]) const override;
 	};
@@ -906,6 +918,11 @@ LLSD::Date		LLSD::asDate() const	{ return safe(impl).asDate(); }
 LLSD::URI		LLSD::asURI() const		{ return safe(impl).asURI(); }
 const LLSD::Binary&	LLSD::asBinary() const	{ return safe(impl).asBinary(); }
 
+LLSD::map_t& LLSD::asMap() { return makeMap(impl).asMap(); };
+const LLSD::map_t& LLSD::asMap() const { return safe(impl).asMap(); };
+LLSD::array_t& LLSD::asArray() { return makeArray(impl).asArray(); };
+const LLSD::array_t& LLSD::asArray() const { return safe(impl).asArray(); };
+
 const LLSD::String& LLSD::asStringRef() const { return safe(impl).asStringRef(); }
 
 // const char * helpers
@@ -1017,24 +1034,18 @@ const char *LLSD::dump(const LLSD &llsd)
 	return llsd_dump(llsd, false);
 }
 
-LLSD::map_t& LLSD::map() { return makeMap(impl).map(); }
-const LLSD::map_t& LLSD::map() const { return safe(impl).map(); }
+LLSD::map_iterator			LLSD::beginMap()		{ return makeMap(impl).beginMap(); }
+LLSD::map_iterator			LLSD::endMap()			{ return makeMap(impl).endMap(); }
+LLSD::map_const_iterator	LLSD::beginMap() const	{ return safe(impl).beginMap(); }
+LLSD::map_const_iterator	LLSD::endMap() const	{ return safe(impl).endMap(); }
 
-LLSD::map_iterator			LLSD::beginMap()		{ return map().begin(); }
-LLSD::map_iterator			LLSD::endMap()			{ return map().end(); }
-LLSD::map_const_iterator	LLSD::beginMap() const	{ return map().cbegin(); }
-LLSD::map_const_iterator	LLSD::endMap() const	{ return map().cend(); }
+LLSD::array_iterator		LLSD::beginArray()		{ return makeArray(impl).beginArray(); }
+LLSD::array_iterator		LLSD::endArray()		{ return makeArray(impl).endArray(); }
+LLSD::array_const_iterator	LLSD::beginArray() const{ return safe(impl).beginArray(); }
+LLSD::array_const_iterator	LLSD::endArray() const	{ return safe(impl).endArray(); }
 
-std::vector<LLSD>& LLSD::array() { return makeArray(impl).array(); }
-const std::vector<LLSD>& LLSD::array() const { return safe(impl).array(); }
-
-LLSD::array_iterator		LLSD::beginArray()		{ return array().begin(); }
-LLSD::array_iterator		LLSD::endArray()		{ return array().end(); }
-LLSD::array_const_iterator	LLSD::beginArray() const{ return array().cbegin(); }
-LLSD::array_const_iterator	LLSD::endArray() const	{ return array().cend(); }
-
-LLSD::reverse_array_iterator	LLSD::rbeginArray()		{ return array().rbegin(); }
-LLSD::reverse_array_iterator	LLSD::rendArray()		{ return array().rend(); }
+LLSD::reverse_array_iterator	LLSD::rbeginArray()		{ return makeArray(impl).rbeginArray(); }
+LLSD::reverse_array_iterator	LLSD::rendArray()		{ return makeArray(impl).rendArray(); }
 
 namespace llsd
 {

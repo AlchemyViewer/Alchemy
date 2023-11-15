@@ -412,7 +412,7 @@ std::string LLSLURL::getSLURLString() const
 		{
 			std::string app_url;
 			app_url += LLGridManager::getInstance()->getAppSLURLBase() + "/" + mAppCmd;
-			for(const LLSD& entry : mAppPath.array())
+			for(const LLSD& entry : mAppPath.asArray())
 			{
 				app_url += "/" + entry.asString();
 			}

@@ -177,7 +177,7 @@ void LLDerenderList::load()
 		return;
 	}
 
-	for (const LLSD& sdEntry : inSD.array())
+	for (const LLSD& sdEntry : inSD.asArray())
 	{
 		auto pEntry = LLDerenderEntry::fromLLSD(sdEntry);
 		if (pEntry->isValid())

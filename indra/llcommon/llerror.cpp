@@ -922,7 +922,7 @@ namespace LLError
 namespace {
 	void setLevels(LevelMap& map, const LLSD& list, LLError::ELevel level)
 	{
-		for (const auto& i : list.array())
+		for (const auto& i : list.asArray())
 		{
 			map[i.asString()] = level;
 		}
