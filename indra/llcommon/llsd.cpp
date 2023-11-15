@@ -100,8 +100,8 @@ protected:
 	
 	U32 mUseCount;
 
-	const LLSD::map_t& map() const { static thread_local const LLSD::map_t empty; return empty; }
-	const std::vector<LLSD>& array() const { static thread_local const std::vector<LLSD> empty; return empty; }
+	const LLSD::map_t& map() const { static const LLSD::map_t empty; return empty; }
+	const std::vector<LLSD>& array() const { static const std::vector<LLSD> empty; return empty; }
 
 public:
 	static void reset(Impl*& var, Impl* impl);
@@ -143,7 +143,7 @@ public:
 	virtual UUID	asUUID() const				{ return LLUUID(); }
 	virtual Date	asDate() const				{ return LLDate(); }
 	virtual URI		asURI() const				{ return LLURI(); }
-	virtual const Binary&	asBinary() const	{ static thread_local const std::vector<U8> empty; return empty; }
+	virtual const Binary&	asBinary() const	{ static const std::vector<U8> empty; return empty; }
 	virtual const map_t& asMap() const			{ return map(); };
 	virtual const array_t& asArray() const		{ return array(); };
 
