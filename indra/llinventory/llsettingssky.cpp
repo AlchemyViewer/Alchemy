@@ -276,7 +276,7 @@ bool validateRayleighLayers(LLSD &value, U32 flags)
     if (value.isArray())
     {
         bool allGood = true;
-        for (LLSD& layerConfig : value.array())
+        for (LLSD& layerConfig : value.asArray())
         {
             if (layerConfig.type() == LLSD::TypeMap)
             {
@@ -317,7 +317,7 @@ bool validateAbsorptionLayers(LLSD &value, U32 flags)
     if (value.isArray())
     {
         bool allGood = true;   
-        for (LLSD& layerConfig : value.array())
+        for (LLSD& layerConfig : value.asArray())
         {
             if (layerConfig.type() == LLSD::TypeMap)
             {
@@ -358,7 +358,7 @@ bool validateMieLayers(LLSD &value, U32 flags)
     if (value.isArray())
     {
         bool allGood = true;
-        for (LLSD& layerConfig : value.array())
+        for (LLSD& layerConfig : value.asArray())
         {
             if (layerConfig.type() == LLSD::TypeMap)
             {
@@ -1028,11 +1028,11 @@ LLColor3 LLSettingsSky::getLightDiffuse() const
 LLColor3 LLSettingsSky::getColor(const std::string& key, const LLColor3& default_value) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
-    const auto& settings_map = mSettings.map();
+    const auto& settings_map = mSettings.asMap();
     auto legacy_it = settings_map.find(SETTING_LEGACY_HAZE);
     if (legacy_it != settings_map.end())
     {
-        const auto& legacy_map = legacy_it->second.map();
+        const auto& legacy_map = legacy_it->second.asMap();
         auto legacy_settings_it = legacy_map.find(key);
         if (legacy_settings_it != legacy_map.end())
         {
@@ -1052,11 +1052,11 @@ LLColor3 LLSettingsSky::getColor(const std::string& key, const LLColor3& default
 F32 LLSettingsSky::getFloat(const std::string& key, F32 default_value) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
-    const auto& settings_map = mSettings.map();
+    const auto& settings_map = mSettings.asMap();
     auto legacy_it = settings_map.find(SETTING_LEGACY_HAZE);
     if (legacy_it != settings_map.end())
     {
-        const auto& legacy_map = legacy_it->second.map();
+        const auto& legacy_map = legacy_it->second.asMap();
         auto legacy_settings_it = legacy_map.find(key);
         if (legacy_settings_it != legacy_map.end())
         {

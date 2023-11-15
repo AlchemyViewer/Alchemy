@@ -513,10 +513,10 @@ void LLSpeakerMgr::updateSpeakerList()
                     S32 updated = 0;
 					while (member_it != gdatap->mMembers.end())
 					{
-						LLGroupMemberData* member = member_it->second;
+						LLGroupMemberData* member = member_it->second.get();
                         LLUUID id = member_it->first;
 						// Add only members who are online and not already in the list
-						if ((member->getOnlineStatus() == "Online") && (mSpeakers.find(id) == mSpeakers.end()))
+						if ((member && member->getOnlineStatus() == "Online") && (mSpeakers.find(id) == mSpeakers.end()))
 						{
 							LLPointer<LLSpeaker> speakerp = setSpeaker(id, "", LLSpeaker::STATUS_VOICE_ACTIVE, LLSpeaker::SPEAKER_AGENT);
 							speakerp->mIsModerator = ((member->getAgentPowers() & GP_SESSION_MODERATOR) == GP_SESSION_MODERATOR);
@@ -677,7 +677,7 @@ void LLIMSpeakerMgr::setSpeakers(const LLSD& speakers)
 
 	if ( speakers.has("agent_info") && speakers["agent_info"].isMap() )
 	{
-		for(const auto& llsd_pair : speakers["agent_info"].map())
+		for(const auto& llsd_pair : speakers["agent_info"].asMap())
 		{
 			const LLUUID agent_id(llsd_pair.first);
 
@@ -705,7 +705,7 @@ void LLIMSpeakerMgr::setSpeakers(const LLSD& speakers)
 	{
 		//older, more decprecated way.  Need here for
 		//using older version of servers
-		for(const auto& llsd_val : speakers["agents"].array())
+		for(const auto& llsd_val : speakers["agents"].asArray())
 		{
 			const LLUUID agent_id = llsd_val.asUUID();
 
@@ -723,7 +723,7 @@ void LLIMSpeakerMgr::updateSpeakers(const LLSD& update)
 
 	if ( update.has("agent_updates") && update["agent_updates"].isMap() )
 	{
-		for(const auto& llsd_pair : update["agent_updates"].map())
+		for(const auto& llsd_pair : update["agent_updates"].asMap())
 		{
 			LLUUID agent_id(llsd_pair.first);
 			LLPointer<LLSpeaker> speakerp = findSpeaker(agent_id);
@@ -775,7 +775,7 @@ void LLIMSpeakerMgr::updateSpeakers(const LLSD& update)
 	}
 	else if ( update.has("updates") && update["updates"].isMap() )
 	{
-		for (const auto& llsd_pair : update["updates"].map())
+		for (const auto& llsd_pair : update["updates"].asMap())
 		{
 			LLUUID agent_id(llsd_pair.first);
 			LLPointer<LLSpeaker> speakerp = findSpeaker(agent_id);

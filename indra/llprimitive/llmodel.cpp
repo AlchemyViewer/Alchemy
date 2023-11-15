@@ -1172,7 +1172,7 @@ bool LLModel::loadModel(std::istream& is)
 		}
 	}
 	
-	const auto& header_map = header.map();
+	const auto& header_map = header.asMap();
 
 	auto it = header_map.find("material_list");
 	if (it != header_map.end())
@@ -1460,13 +1460,13 @@ LLMeshSkinInfo::LLMeshSkinInfo(const LLUUID& mesh_id, const LLSD& skin) :
 
 void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 {
-	const auto& skin_map = skin.map();
+	const auto& skin_map = skin.asMap();
 
 	auto it = skin_map.find("joint_names");
 	if (it != skin_map.end())
 	{
 		const auto& joint_names = it->second;
-		for(const auto& jnt_llsd : joint_names.array())
+		for(const auto& jnt_llsd : joint_names.asArray())
 		{
 			mJointNames.emplace_back(jnt_llsd.asString());
 			mJointNums.emplace_back(-1);
@@ -1476,7 +1476,7 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 	it = skin_map.find("bind_shape_matrix");
 	if (it != skin_map.end())
 	{
-		const auto& bind_shape_mat = it->second.array();
+		const auto& bind_shape_mat = it->second.asArray();
 		LLMatrix4 mat;
 		for (auto j = 0; j < 4; j++)
 		{
@@ -1491,7 +1491,7 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 	it = skin_map.find("inverse_bind_matrix");
 	if (it != skin_map.end())
 	{
-		const auto& inv_bind_mat = it->second.array();
+		const auto& inv_bind_mat = it->second.asArray();
 		for (size_t i = 0, size = inv_bind_mat.size(); i < size; ++i)
 		{
 			LLMatrix4 mat;
@@ -1523,7 +1523,7 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
 	it = skin_map.find("alt_inverse_bind_matrix");
 	if (it != skin_map.end())
 	{
-		const auto& alt_inv_bind_mat = it->second.array();
+		const auto& alt_inv_bind_mat = it->second.asArray();
 		for (size_t i = 0, size = alt_inv_bind_mat.size(); i < size; ++i)
 		{
 			LLMatrix4 mat;

@@ -482,7 +482,7 @@ void LLFloaterReg::registerControlVariables()
 	}
 
 	const LLSD& exclude_list = LLUI::getInstance()->mSettingGroups["config"]->getLLSD("always_showable_floaters");
-	for (const auto& llsd_var : exclude_list.array())
+	for (const auto& llsd_var : exclude_list.asArray())
 	{
 		sAlwaysShowableList.insert(llsd_var.asString());
 	}

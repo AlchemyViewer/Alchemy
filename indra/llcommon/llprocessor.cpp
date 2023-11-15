@@ -325,7 +325,7 @@ public:
 		out << "// CPU Extensions" << std::endl;
 		out << "//////////////////////////" << std::endl;
 		
-		for(const auto& llsd_pair : mProcessorInfo["extension"].map())
+		for(const auto& llsd_pair : mProcessorInfo["extension"].asMap())
 		{
 			out << "  " << llsd_pair.first << std::endl;
 		}

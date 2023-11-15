@@ -93,7 +93,7 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
 {
     LLSD newSettings;
 
-    for (const auto& llsd_pair : settings.map())
+    for (const auto& llsd_pair : settings.asMap())
     {
         const std::string& key_name = llsd_pair.first;
         const LLSD& value = llsd_pair.second;
@@ -106,7 +106,7 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
             break;
         case LLSD::TypeArray:
             newSettings[key_name] = LLSD::emptyArray();
-            for (const auto& llsd_val : value.array())
+            for (const auto& llsd_val : value.asArray())
             {
                 newSettings[key_name].append(llsd_val);
             }
@@ -127,7 +127,7 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
 
     if (!other.isUndefined())
     {
-        for (const auto& llsd_pair : other.map())
+        for (const auto& llsd_pair : other.asMap())
         {
             const std::string& key_name = llsd_pair.first;
             const LLSD& value = llsd_pair.second;
@@ -140,7 +140,7 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
                 break;
             case LLSD::TypeArray:
                 newSettings[key_name] = LLSD::emptyArray();
-                for (const auto& llsd_val : value.array())
+                for (const auto& llsd_val : value.asArray())
                 {
                     newSettings[key_name].append(llsd_val);
                 }
@@ -172,8 +172,8 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
 
     //llassert(mix >= 0.0f && mix <= 1.0f);
 
-    const auto& other_map = other.map();
-    const auto& settings_map = settings.map();
+    const auto& other_map = other.asMap();
+    const auto& settings_map = settings.asMap();
     const auto skipEnd = skip.end();
     const auto settingsEnd = settings_map.end();
 
@@ -231,7 +231,7 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     }
 
     // Now add anything that is in other but not in the settings
-    for (const auto& llsd_pair : other.map())
+    for (const auto& llsd_pair : other.asMap())
     {
         const std::string& key_name = llsd_pair.first;
 
@@ -257,7 +257,7 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     }
 
     // Note: writes variables from skip list, bug?
-    for (const auto& llsd_pair : other.map())
+    for (const auto& llsd_pair : other.asMap())
     {
         // TODO: Should I blend this in instead?
         if (skip.find(llsd_pair.first) == skipEnd)
@@ -512,7 +512,7 @@ LLSD LLSettingsBase::settingValidation(LLSD &settings, const validation_list_t &
     }
 
     // strip extra entries
-    for (const auto& setting_pair : settings.map())
+    for (const auto& setting_pair : settings.asMap())
     {
         if (validated.find(setting_pair.first) == validated.end())
         {

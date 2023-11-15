@@ -402,7 +402,7 @@ bool LLTextParser::loadKeywords()
 		return false;
 	}
 
-	for (const LLSD& sdEntry : sdIn.array())
+	for (const LLSD& sdEntry : sdIn.asArray())
 	{
 		mHighlightEntries.push_back(LLHighlightEntry(sdEntry));
 	}

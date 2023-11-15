@@ -262,7 +262,7 @@ void LLPanelGroupInvite::impl::addRoleNames(LLGroupMgrGroupData* gdatap)
 	//get the member data for the agent if it exists
 	if (agent_iter != gdatap->mMembers.end())
 	{
-		member_data = (*agent_iter).second;
+		member_data = (*agent_iter).second.get();
 		if (member_data && mRoleNames)
 		{
 			is_owner = member_data->isOwner();

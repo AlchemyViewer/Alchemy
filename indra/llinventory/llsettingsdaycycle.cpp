@@ -204,7 +204,7 @@ bool LLSettingsDay::initialize(bool validate_frames)
 
     std::map<std::string, LLSettingsBase::ptr_t> used;
 
-    for (const auto& llsd_pair : frames.map())
+    for (const auto& llsd_pair : frames.asMap())
     {
         const std::string& name = llsd_pair.first;
         const LLSD& data = llsd_pair.second;
@@ -238,7 +238,7 @@ bool LLSettingsDay::initialize(bool validate_frames)
     {
         mDayTracks[i].clear();
         LLSD curtrack = tracks[i];
-        for (const auto& llsd_val : curtrack.array())
+        for (const auto& llsd_val : curtrack.asArray())
         {
             LLSettingsBase::TrackPosition keyframe = LLSettingsBase::TrackPosition(llsd_val[SETTING_KEYKFRAME].asReal());
             keyframe = llclamp(keyframe, 0.0f, 1.0f);
@@ -467,7 +467,7 @@ namespace
 
         S32 framecount(0);
 
-        for (auto& llsd_val : value.array())
+        for (auto& llsd_val : value.asArray())
         {
             S32 index = 0;
             while (index < llsd_val.size())
@@ -533,7 +533,7 @@ namespace
         bool hasSky(false);
         bool hasWater(false);
 
-        for (const auto& llsd_pair : value.map())
+        for (const auto& llsd_pair : value.asMap())
         {
             LLSD frame = llsd_pair.second;
 

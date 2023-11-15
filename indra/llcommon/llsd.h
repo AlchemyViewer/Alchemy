@@ -184,6 +184,8 @@ public:
 		typedef LLDate			Date;
 		typedef LLURI			URI;
 		typedef std::vector<U8>	Binary;
+		typedef std::map<String, LLSD, std::less<>>					map_t;
+		typedef std::vector<LLSD> array_t;
 	//@}
 	
 	/** @name Scalar Constructors */
@@ -286,6 +288,14 @@ public:
 		URI		asURI() const;
 		const Binary&	asBinary() const;
 
+		// Direct access to underlying map. Will return empty map on any non-map type.
+		map_t& asMap();
+		const map_t& asMap() const; 
+
+		// Direct access to underlying std::vector. Will return empty vector on any non-map type.
+		array_t& asArray();
+		const array_t& asArray() const;
+
 		// asStringRef on any non-string type will return a ref to an empty string.
 		const String&	asStringRef() const;
 
@@ -359,25 +369,18 @@ public:
 	//@{
 		size_t size() const;
 
-		typedef std::map<String, LLSD, std::less<>>					map_t;
 		typedef map_t::iterator		map_iterator;
 		typedef map_t::const_iterator	map_const_iterator;
 		
-		map_t& map();
-		const map_t& map() const;
-
 		map_iterator		beginMap();
 		map_iterator		endMap();
 		map_const_iterator	beginMap() const;
 		map_const_iterator	endMap() const;
 		
-		typedef std::vector<LLSD>::iterator			array_iterator;
-		typedef std::vector<LLSD>::const_iterator	array_const_iterator;
-		typedef std::vector<LLSD>::reverse_iterator reverse_array_iterator;
+		typedef array_t::iterator			array_iterator;
+		typedef array_t::const_iterator	array_const_iterator;
+		typedef array_t::reverse_iterator reverse_array_iterator;
 		
-		std::vector<LLSD>& array();
-		const std::vector<LLSD>& array() const;
-
 		array_iterator			beginArray();
 		array_iterator			endArray();
 		array_const_iterator	beginArray() const;

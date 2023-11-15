@@ -1190,7 +1190,7 @@ void LLFloaterIMSession::processAgentListUpdates(const LLSD& body)
 	if (body.isMap() && body.has("agent_updates") && body["agent_updates"].isMap())
 	{
 		LLSD::map_const_iterator update_it;
-		for(const auto& agent_update : body["agent_updates"].map())
+		for(const auto& agent_update : body["agent_updates"].asMap())
 		{
 			LLUUID agent_id(agent_update.first);
 			LLSD agent_data = agent_update.second;

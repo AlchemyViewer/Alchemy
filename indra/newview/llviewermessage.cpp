@@ -6775,7 +6775,7 @@ void send_lures(const LLSD& notification, const LLSD& response)
 	msg->nextBlockFast(_PREHASH_Info);
 	msg->addU8Fast(_PREHASH_LureType, (U8)0); // sim will fill this in.
 	msg->addStringFast(_PREHASH_Message, text);
-	for(const auto& llsd_val : notification["payload"]["ids"].array())
+	for(const auto& llsd_val : notification["payload"]["ids"].asArray())
 	{
 		LLUUID target_id = llsd_val.asUUID();
 

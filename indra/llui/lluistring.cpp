@@ -70,7 +70,7 @@ void LLUIString::setArgs(const LLSD& sd)
 	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	
 	if (!sd.isMap()) return;
-	for(const auto& llsd_pair : sd.map())
+	for(const auto& llsd_pair : sd.asMap())
 	{
 		setArg(llsd_pair.first, llsd_pair.second.asString());
 	}

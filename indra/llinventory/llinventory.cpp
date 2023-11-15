@@ -900,7 +900,7 @@ bool LLInventoryItem::fromLLSD(const LLSD& sd, bool is_new)
     // TODO - figure out if this should be moved into the noclobber fields above
     mThumbnailUUID.setNull();
 
-	const auto& sdMap = sd.map();
+	const auto& sdMap = sd.asMap();
 	auto itEnd = sdMap.end();
 
 	auto it = sdMap.find(INV_ITEM_ID_LABEL);
@@ -1171,7 +1171,7 @@ bool LLInventoryCategory::fromLLSD(const LLSD& sd)
 {
 	mThumbnailUUID.setNull();
 
-	const auto& sdMap = sd.map();
+	const auto& sdMap = sd.asMap();
 	auto itEnd = sdMap.end();
 
 	auto it = sdMap.find(INV_FOLDER_ID_LABEL_WS);
@@ -1366,7 +1366,7 @@ LLSD LLInventoryCategory::exportLLSD() const
 
 bool LLInventoryCategory::importLLSD(const LLSD& cat_data)
 {
-	const auto& sdMap = cat_data.map();
+	const auto& sdMap = cat_data.asMap();
 	auto itEnd = sdMap.end();
 
 	auto it = sdMap.find(INV_FOLDER_ID_LABEL);

@@ -286,7 +286,7 @@ BOOL compare_llsd_with_template(
 		LLSD value;
 
 		resultant_llsd = LLSD::emptyMap();
-		for (const auto& template_pair : template_llsd.map())
+		for (const auto& template_pair : template_llsd.asMap())
 		{
 			if ( llsd_to_test.has(template_pair.first) )
 			{
@@ -680,7 +680,7 @@ std::string llsd_matches(const LLSD& prototype, const LLSD& data, const std::str
         out << colon(pfx);
         const char* init = "Map missing keys: ";
         const char* sep = init;
-        for (const auto& prototype_pair : prototype.map())
+        for (const auto& prototype_pair : prototype.asMap())
         {
             if (! data.has(prototype_pair.first))
             {
@@ -695,7 +695,7 @@ std::string llsd_matches(const LLSD& prototype, const LLSD& data, const std::str
         }
         // Good, the data block contains all the keys required by the
         // prototype. Now match the prototype entries.
-        for (const auto& prototype_pair : prototype.map())
+        for (const auto& prototype_pair : prototype.asMap())
         {
             std::string match(llsd_matches(prototype_pair.second, data[prototype_pair.first],
                                            STRINGIZE("['" << prototype_pair.first << "']")));
@@ -957,7 +957,7 @@ LLSD llsd_clone(LLSD value, LLSD filter)
     {
     case LLSD::TypeMap:
         clone = LLSD::emptyMap();
-        for (const auto& value_pair : value.map())
+        for (const auto& value_pair : value.asMap())
         {
             if (has_filter)
             {
@@ -981,7 +981,7 @@ LLSD llsd_clone(LLSD value, LLSD filter)
         break;
     case LLSD::TypeArray:
         clone = LLSD::emptyArray();
-        for (const auto& llsd_val : value.array())
+        for (const auto& llsd_val : value.asArray())
         {
             clone.append(llsd_clone(llsd_val, filter));
         }
@@ -1008,7 +1008,7 @@ LLSD llsd_shallow(LLSD value, LLSD filter)
     if (value.isMap())
     {
         shallow = LLSD::emptyMap();
-        for (const auto& value_pair : value.map())
+        for (const auto& value_pair : value.asMap())
         {
             if (has_filter)
             {
@@ -1033,7 +1033,7 @@ LLSD llsd_shallow(LLSD value, LLSD filter)
     else if (value.isArray())
     {
         shallow = LLSD::emptyArray();
-        for (const auto& llsd_val : value.array())
+        for (const auto& llsd_val : value.asArray())
         {
             shallow.append(llsd_val);
         }

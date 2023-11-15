@@ -379,7 +379,7 @@ void LLGroupActions::processLeaveGroupDataResponse(const LLUUID group_id)
 	//get the member data for the group
 	if ( mit != gdatap->mMembers.end() )
 	{
-		LLGroupMemberData* member_data = (*mit).second;
+		LLGroupMemberData* member_data = (*mit).second.get();
 
 		if ( member_data && member_data->isOwner() && gdatap->mMemberCount == 1)
 		{

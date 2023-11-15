@@ -286,7 +286,7 @@ public:
 				LLGroupMgrGroupData::member_list_t::iterator mi = gdatap->mMembers.find(participant_uuid);
 				if (mi != gdatap->mMembers.end())
 				{
-					LLGroupMemberData* member_data = (*mi).second;
+					LLGroupMemberData* member_data = (*mi).second.get();
 					// Is the member an owner?
 					if (member_data && member_data->isInRole(gdatap->mOwnerRole))
 					{

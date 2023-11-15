@@ -91,7 +91,7 @@ freely, subject to the following restrictions:
 
 3. This notice may not be removed or altered from any source distribution.
 */
- 
+
 /*
    reads .cube files
    returns a vector of bytes
@@ -316,7 +316,7 @@ void ALRenderUtil::refreshState()
 bool ALRenderUtil::setupTonemap()
 {
 	mTonemapType = gSavedSettings.getU32("RenderToneMapType");
-	if (mTonemapType >= TONEMAP_COUNT || (mTonemapType == ALTonemap::TONEMAP_AMD && (gGLManager.mGLVersion < 4.20f || !gDeferredPostTonemapLPMProgram.isComplete())))
+	if (mTonemapType >= TONEMAP_COUNT || (mTonemapType == ALTonemap::TONEMAP_AMD &&  !gDeferredPostTonemapLPMProgram.isComplete()))
 	{
 		mTonemapType = ALTonemap::TONEMAP_ACES_HILL;
 	}
@@ -647,17 +647,17 @@ void ALRenderUtil::renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst)
 	static LLCachedControl<bool> no_post(gSavedSettings, "RenderDisablePostProcessing", false);
 	static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", true);
 	LLGLSLShader* tone_shader = nullptr;
-	if (mCGLut != 0 )
+	if (mCGLut != 0)
 	{
 		tone_shader = no_post && gFloaterTools->isAvailable() ? &gDeferredPostColorCorrectLUTProgram[2] : // no post (no gamma, no exposure, no tonemapping)
-        LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust) == 0.f ? &gDeferredPostColorCorrectLUTProgram[1] :
-        &gDeferredPostColorCorrectLUTProgram[0];
+			LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust) == 0.f ? &gDeferredPostColorCorrectLUTProgram[1] :
+			&gDeferredPostColorCorrectLUTProgram[0];
 	}
 	else
 	{
-	    tone_shader = no_post && gFloaterTools->isAvailable() ? &gDeferredPostColorCorrectProgram[2] : // no post (no gamma, no exposure, no tonemapping)
-        LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust) == 0.f ? &gDeferredPostColorCorrectProgram[1] :
-        &gDeferredPostColorCorrectProgram[0];
+		tone_shader = no_post && gFloaterTools->isAvailable() ? &gDeferredPostColorCorrectProgram[2] : // no post (no gamma, no exposure, no tonemapping)
+			LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust) == 0.f ? &gDeferredPostColorCorrectProgram[1] :
+			&gDeferredPostColorCorrectProgram[0];
 	}
 
 	tone_shader->bind();
@@ -701,9 +701,17 @@ bool ALRenderUtil::setupSharpen()
 	if (LLPipeline::sRenderDeferred)
 	{
 		mSharpenMethod = gSavedSettings.getU32("RenderSharpenMethod");
-		if (mSharpenMethod >= SHARPEN_COUNT 
-			|| (mSharpenMethod == ALSharpen::SHARPEN_CAS && (gGLManager.mGLVersion < 4.2f || !gDeferredPostCASProgram.isComplete())) 
-			|| (mSharpenMethod == ALSharpen::SHARPEN_DLS && !gDeferredPostDLSProgram.isComplete()))
+		if (mSharpenMethod >= SHARPEN_COUNT)
+		{
+			mSharpenMethod = ALSharpen::SHARPEN_CAS;
+		}
+
+		if (mSharpenMethod == ALSharpen::SHARPEN_CAS && !gDeferredPostCASProgram.isComplete())
+		{
+			mSharpenMethod = ALSharpen::SHARPEN_DLS;
+		}
+
+		if (mSharpenMethod == ALSharpen::SHARPEN_DLS && !gDeferredPostDLSProgram.isComplete())
 		{
 			mSharpenMethod = ALSharpen::SHARPEN_NONE;
 		}
@@ -783,7 +791,7 @@ void ALRenderUtil::renderSharpen(LLRenderTarget* src, LLRenderTarget* dst)
 
 		sharpen_shader->uniform4uiv(cas_param_0, 1, const0);
 		sharpen_shader->uniform4uiv(cas_param_1, 1, const1);
-		
+
 		sharpen_shader->uniform2f(out_screen_res, dst->getWidth(), dst->getHeight());
 	}
 
