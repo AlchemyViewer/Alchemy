@@ -87,7 +87,11 @@ bool agentCanAddToRole(const LLUUID& group_id,
 		return false;
 	}
 	
-	LLGroupMemberData* member_data = (*mi).second;
+	LLGroupMemberData* member_data = (*mi).second.get();
+	if (!member_data)
+	{
+		return false;
+	}
 
 	// Owners can add to any role.
 	if ( member_data->isInRole(gdatap->mOwnerRole) )
@@ -967,7 +971,7 @@ void LLPanelGroupMembersSubTab::handleMemberSelect()
 	{
 		// Count how many selected users are in this role.
 		const LLUUID& role_id = iter->first;
-		LLGroupRoleData* group_role_data = iter->second;
+		LLGroupRoleData* group_role_data = iter->second.get();
 
 		if (group_role_data)
 		{
@@ -1001,7 +1005,7 @@ void LLPanelGroupMembersSubTab::handleMemberSelect()
 					LLGroupMgrGroupData::member_list_t::iterator mi = 
 									gdatap->mMembers.find((*member_iter));
 					if (mi == gdatap->mMembers.end()) continue;
-					LLGroupMemberData* member_data = (*mi).second;
+					LLGroupMemberData* member_data = (*mi).second.get();
 					// Is the member an owner?
 					if ( member_data && member_data->isInRole(gdatap->mOwnerRole) )
 					{
@@ -1102,7 +1106,7 @@ void LLPanelGroupMembersSubTab::handleMemberSelect()
 		LLGroupMgrGroupData::member_list_t::iterator mi = gdatap->mMembers.find(gAgent.getID());
 		if (mi != gdatap->mMembers.end())
 		{
-			LLGroupMemberData* member_data = (*mi).second;
+			LLGroupMemberData* member_data = (*mi).second.get();
 
 			if ( member_data && member_data->isInRole(gdatap->mOwnerRole) )
 			{
@@ -1573,7 +1577,7 @@ U64 LLPanelGroupMembersSubTab::getAgentPowersBasedOnRoleChanges(const LLUUID& ag
 		return GP_NO_POWERS;
 	}
 
-	LLGroupMemberData* member_data = (*iter).second;
+	LLGroupMemberData* member_data = (*iter).second.get();
 	if (!member_data)
 	{
 		LL_WARNS() << "LLPanelGroupMembersSubTab::getAgentPowersBasedOnRoleChanges() -- Null member data for member with UUID " << agent_id << LL_ENDL;
@@ -1827,7 +1831,7 @@ void LLPanelGroupMembersSubTab::updateMembers()
 		{
 			if (matchesSearchFilter(av_name.getAccountName()))
 			{
-				addMemberToList(mMemberProgress->second);
+				addMemberToList(mMemberProgress->second.get());
 			}
 		}
 		else
@@ -1842,7 +1846,7 @@ void LLPanelGroupMembersSubTab::updateMembers()
 				}
 				mAvatarNameCacheConnections.erase(it);
 			}
-			mAvatarNameCacheConnections[mMemberProgress->first] = LLAvatarNameCache::get(mMemberProgress->first, boost::bind(&LLPanelGroupMembersSubTab::onNameCache, this, gdatap->getMemberVersion(), mMemberProgress->second, _2, _1));
+			mAvatarNameCacheConnections[mMemberProgress->first] = LLAvatarNameCache::get(mMemberProgress->first, boost::bind(&LLPanelGroupMembersSubTab::onNameCache, this, gdatap->getMemberVersion(), mMemberProgress->second.get(), _2, _1));
 		}
 	}
 
@@ -2436,7 +2440,7 @@ void LLPanelGroupRolesSubTab::buildMembersList()
 		LLGroupMgrGroupData::role_list_t::iterator rit = gdatap->mRoles.find(item->getUUID());
 		if (rit != gdatap->mRoles.end())
 		{
-			LLGroupRoleData* rdatap = (*rit).second;
+			LLGroupRoleData* rdatap = (*rit).second.get();
 			if (rdatap)
 			{
 				uuid_vec_t::const_iterator mit = rdatap->getMembersBegin();
@@ -2832,7 +2836,7 @@ void LLPanelGroupRolesSubTab::saveRoleChanges(bool select_saved_role)
 		{
 			role_members_count = gdatap->mMemberCount;
 		}
-		else if(LLGroupRoleData* grd = get_ptr_in_map(gdatap->mRoles, mSelectedRole))
+		else if(LLGroupRoleData* grd = gdatap->mRoles[mSelectedRole].get())
 		{
 			role_members_count = grd->getTotalMembersInRole();
 		}
@@ -3046,7 +3050,7 @@ void LLPanelGroupActionsSubTab::handleActionSelect()
 
 		for ( ; it != end; ++it)
 		{
-			gmd = (*it).second;
+			gmd = (*it).second.get();
 			if (!gmd) continue;
 			if ((gmd->getAgentPowers() & power_mask) == power_mask)
 			{
@@ -3067,7 +3071,7 @@ void LLPanelGroupActionsSubTab::handleActionSelect()
 
 		for ( ; it != end; ++it)
 		{
-			rmd = (*it).second;
+			rmd = (*it).second.get();
 			if (!rmd) continue;
 			if ((rmd->getRoleData().mRolePowers & power_mask) == power_mask)
 			{
@@ -3260,7 +3264,7 @@ void LLPanelGroupBanListSubTab::handleDeleteBanEntry()
 	LLGroupMgrGroupData::member_list_t::iterator mi = gdatap->mMembers.find(gAgent.getID());
 	if (mi != gdatap->mMembers.end())
 	{
-		LLGroupMemberData* member_data = (*mi).second;
+		LLGroupMemberData* member_data = (*mi).second.get();
 		if ( member_data && member_data->isInRole(gdatap->mOwnerRole) )
 		{
 			can_ban_members	= true;

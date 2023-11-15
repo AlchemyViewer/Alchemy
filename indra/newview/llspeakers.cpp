@@ -513,10 +513,10 @@ void LLSpeakerMgr::updateSpeakerList()
                     S32 updated = 0;
 					while (member_it != gdatap->mMembers.end())
 					{
-						LLGroupMemberData* member = member_it->second;
+						LLGroupMemberData* member = member_it->second.get();
                         LLUUID id = member_it->first;
 						// Add only members who are online and not already in the list
-						if ((member->getOnlineStatus() == "Online") && (mSpeakers.find(id) == mSpeakers.end()))
+						if ((member && member->getOnlineStatus() == "Online") && (mSpeakers.find(id) == mSpeakers.end()))
 						{
 							LLPointer<LLSpeaker> speakerp = setSpeaker(id, "", LLSpeaker::STATUS_VOICE_ACTIVE, LLSpeaker::SPEAKER_AGENT);
 							speakerp->mIsModerator = ((member->getAgentPowers() & GP_SESSION_MODERATOR) == GP_SESSION_MODERATOR);

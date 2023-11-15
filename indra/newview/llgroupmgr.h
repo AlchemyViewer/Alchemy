@@ -102,7 +102,8 @@ public:
 
 	BOOL isInRole(const LLUUID& role_id) { return (mRolesList.find(role_id) != mRolesList.end()); }
 
-private:
+	const role_list_t& getRoles() { return mRolesList; }
+
 	LLUUID	mID;
 	S32		mContribution;
 	U64		mAgentPowers;
@@ -273,8 +274,8 @@ public:
 	void banMemberById(const LLUUID& participant_uuid);
 	
 public:
-	typedef	boost::unordered_map<LLUUID, LLGroupMemberData*> member_list_t;
-	typedef	boost::unordered_map<LLUUID,LLGroupRoleData*> role_list_t;
+	typedef	boost::unordered_map<LLUUID, std::unique_ptr<LLGroupMemberData>> member_list_t;
+	typedef	boost::unordered_map<LLUUID, std::unique_ptr<LLGroupRoleData>> role_list_t;
 	typedef std::map<lluuid_pair,LLRoleMemberChange,lluuid_pair_less> change_map_t;
 	typedef boost::unordered_map<LLUUID,LLRoleData> role_data_map_t;
 	typedef boost::unordered_map<LLUUID,LLGroupBanData> ban_list_t;
