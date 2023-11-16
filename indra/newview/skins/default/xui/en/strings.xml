@@ -160,7 +160,7 @@ If you feel this is an error, please contact support.</string>
 	<string name="LoginFailedAlreadyLoggedIn">This agent is already logged in.</string>
 	<string name="LoginFailedAuthenticationFailed">Sorry! We couldn't log you in.
 Please check to make sure you entered the right
-    * Username (like yiffmaster69 or steller.sunshine)
+    * Username (like bobsmith12 or steller.sunshine)
     * Password
     * Second Factor Token (if enabled)
 Also, please make sure your Caps Lock key is off.</string>

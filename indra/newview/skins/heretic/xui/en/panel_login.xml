@@ -71,7 +71,7 @@
           max_chars="128"
           combo_editor.commit_on_focus_lost="false"
           combo_editor.prevalidate_callback="ascii"
-          tool_tip="The account name you chose when you registered, like yiffmaster420 or Steller Sunshine"
+          tool_tip="The account name you chose when you registered, like bobsmith12 or Steller Sunshine"
           top_pad="0"
           name="username_combo"
           width="178">
