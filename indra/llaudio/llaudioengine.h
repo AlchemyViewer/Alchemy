@@ -51,7 +51,7 @@ const F32 ATTACHED_OBJECT_TIMEOUT = 5.0f;
 const F32 DEFAULT_MIN_DISTANCE = 2.0f;
 
 #define LL_MAX_AUDIO_CHANNELS 30
-#define LL_MAX_AUDIO_BUFFERS 40 // Some extra for preloading, maybe?
+#define LL_MAX_AUDIO_BUFFERS 60 // Some extra for preloading, maybe?
 
 class LLAudioSource;
 class LLAudioData;
@@ -258,6 +258,13 @@ private:
 private:
 	void setDefaults();
 	LLStreamingAudioInterface *mStreamingAudioImpl;
+
+	boost::unordered_map<LLUUID,U32> mCorruptData;
+
+public:
+	void markSoundCorrupt(LLUUID const&);
+	bool isCorruptSound(LLUUID const&) const;
+
 };
 
 

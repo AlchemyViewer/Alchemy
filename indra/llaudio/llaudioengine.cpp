@@ -642,6 +642,9 @@ bool LLAudioEngine::preloadSound(const LLUUID &uuid)
 {
 	LL_DEBUGS("AudioEngine")<<"( "<<uuid<<" )"<<LL_ENDL;
 
+	if (isCorruptSound(uuid))
+		return false;
+
 	getAudioData(uuid);	// We don't care about the return value, this is just to make sure
 									// that we have an entry, which will mean that the audio engine knows about this
 
@@ -1924,4 +1927,24 @@ bool LLAudioData::load()
 	}
 	mBufferp->mAudioDatap = this;
 	return true;
+}
+
+const U32 MAX_SOUND_RETRIES = 25;
+
+void LLAudioEngine::markSoundCorrupt(const LLUUID& sound_id)
+{
+	auto itr = mCorruptData.find(sound_id);
+	if (mCorruptData.end() == itr)
+		mCorruptData[sound_id] = 1;
+	else if (itr->second != MAX_SOUND_RETRIES)
+		itr->second += 1;
+}
+
+bool LLAudioEngine::isCorruptSound(const LLUUID& sound_id) const
+{
+	auto itr = mCorruptData.find(sound_id);
+	if (mCorruptData.end() == itr)
+		return false;
+
+	return itr->second == MAX_SOUND_RETRIES;
 }
