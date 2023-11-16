@@ -37,7 +37,7 @@ class LLFloaterMessageLog;
 typedef boost::circular_buffer<LogPayload> LogPayloadList;
 typedef std::shared_ptr<LLEasyMessageLogEntry> FloaterMessageItem;
 typedef std::vector<FloaterMessageItem> FloaterMessageList;
-typedef boost::container::flat_map<U64, FloaterMessageItem> HTTPConvoMap;
+typedef boost::unordered_map<U64, FloaterMessageItem> HTTPConvoMap;
 
 class LLMessageLogFilter
 {
@@ -51,8 +51,8 @@ public:
 	std::string asString() const { return mInputString; }
 
 	//these should probably be unordered_sets
-	boost::container::flat_set<std::string> mPositiveNames;
-	boost::container::flat_set<std::string> mNegativeNames;
+	boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> mPositiveNames;
+	boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> mNegativeNames;
 
 protected:
 	std::string mInputString;

@@ -185,7 +185,7 @@ typedef std::set<LLUUID>					AskQueue;
 typedef std::list<PendingReply*>			ReplyQueue;
 typedef std::map<LLUUID,U32>				PendingQueue;
 typedef boost::unordered_flat_map<LLUUID, LLCacheNameEntry*> Cache;
-typedef boost::unordered_flat_map<std::string, LLUUID> 		ReverseCache;
+typedef boost::unordered_flat_map<std::string, LLUUID, al::string_hash, std::equal_to<>> 		ReverseCache;
 
 class LLCacheName::Impl
 {

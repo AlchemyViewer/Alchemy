@@ -696,7 +696,7 @@ public:
     std::vector<LLPointer<LLReflectionMap> > mReflectionMaps;
 
 	mutable tex_matrix_t mWorldMapTiles;
-	boost::unordered_flat_set<std::string> mGodNames;
+	boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> mGodNames;
 
 	LLEasyMessageSender mMessageSender;
 	using url_mapping_t = boost::unordered_multimap<std::string, std::string>;

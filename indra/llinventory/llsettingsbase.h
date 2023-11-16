@@ -95,7 +95,7 @@ public:
     };
     // Contains settings' names (map key), related shader id-key and default
     // value for revert in case we need to reset shader (no need to search each time)
-    typedef boost::unordered_flat_map<std::string, DefaultParam>  parammapping_t;
+    typedef boost::unordered_flat_map<std::string, DefaultParam, al::string_hash, std::equal_to<>>  parammapping_t;
 
     typedef PTR_NAMESPACE::shared_ptr<LLSettingsBase> ptr_t;
 
@@ -329,7 +329,7 @@ protected:
     LLSettingsBase();
     LLSettingsBase(const LLSD setting);
 
-    typedef boost::unordered_flat_set<std::string>   stringset_t;
+    typedef boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>>   stringset_t;
     
     // combining settings objects. Customize for specific setting types
     virtual void lerpSettings(const LLSettingsBase &other, BlendFactor mix);
