@@ -43,6 +43,7 @@
 
 #include "lllistener.h"
 #include "boost/unordered/unordered_flat_map.hpp"
+#include "boost/unordered_map.hpp"
 
 const F32 LL_WIND_UPDATE_INTERVAL = 0.1f;
 const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
