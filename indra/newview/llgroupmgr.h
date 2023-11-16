@@ -77,7 +77,7 @@ class LLGroupMemberData
 friend class LLGroupMgrGroupData;
 
 public:
-	typedef boost::unordered_flat_map<LLUUID, LLGroupRoleData*> role_list_t;
+	typedef boost::unordered_map<LLUUID,LLGroupRoleData*> role_list_t;
 	
 	LLGroupMemberData(const LLUUID& id, 
 						S32 contribution,
@@ -102,8 +102,6 @@ public:
 
 	BOOL isInRole(const LLUUID& role_id) { return (mRolesList.find(role_id) != mRolesList.end()); }
 
-	const role_list_t& getRoles() { return mRolesList; }
-
 	LLUUID	mID;
 	S32		mContribution;
 	U64		mAgentPowers;
@@ -116,6 +114,36 @@ public:
 struct LLRoleData
 {
 	LLRoleData() : mRolePowers(0), mChangeType(RC_UPDATE_NONE) { }
+
+	LLRoleData(const LLRoleData& rd) 
+	{
+		*this = rd;
+	}
+
+	LLRoleData(LLRoleData&& rd) 
+	{
+		*this = std::move(rd);
+	}
+
+	LLRoleData& operator=(const LLRoleData& rd)
+	{
+		mRoleName = rd.mRoleName;
+		mRoleTitle = rd.mRoleTitle;
+		mRoleDescription = rd.mRoleDescription;
+		mRolePowers = rd.mRolePowers;
+		mChangeType = rd.mChangeType;
+		return *this;
+	};
+
+	LLRoleData& operator=(LLRoleData&& rd) noexcept
+	{
+		mRoleName = std::move(rd.mRoleName);
+		mRoleTitle = std::move(rd.mRoleTitle);
+		mRoleDescription = std::move(rd.mRoleDescription);
+		mRolePowers = rd.mRolePowers;
+		mChangeType = rd.mChangeType;
+		return *this;
+	};
 
 	std::string mRoleName;
 	std::string mRoleTitle;

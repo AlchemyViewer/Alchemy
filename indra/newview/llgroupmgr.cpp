@@ -250,8 +250,12 @@ BOOL LLGroupMgrGroupData::getRoleData(const LLUUID& role_id, LLRoleData& role_da
 	role_list_t::const_iterator rit = mRoles.find(role_id);
 	if (rit != mRoles.end())
 	{
-		role_data = (*rit).second->getRoleData();
-		return TRUE;
+		auto& role_datap = rit->second;
+		if (role_datap)
+		{
+			role_data = role_datap->getRoleData();
+			return TRUE;
+		}
 	}
 
 	// This role must not exist.
@@ -1451,11 +1455,11 @@ LLGroupMgrGroupData* LLGroupMgr::createGroupData(const LLUUID& id)
 {
 	LLGroupMgrGroupData* group_datap = NULL;
 
-	group_map_t::iterator existing_group = LLGroupMgr::getInstance()->mGroups.find(id);
-	if (existing_group == LLGroupMgr::getInstance()->mGroups.end())
+	group_map_t::iterator existing_group = mGroups.find(id);
+	if (existing_group == mGroups.end())
 	{
 		group_datap = new LLGroupMgrGroupData(id);
-		LLGroupMgr::getInstance()->addGroup(group_datap);
+		addGroup(group_datap);
 	}
 	else
 	{
@@ -1472,8 +1476,8 @@ LLGroupMgrGroupData* LLGroupMgr::createGroupData(const LLUUID& id)
 
 bool LLGroupMgr::hasPendingPropertyRequest(const LLUUID & id)
 {
-    properties_request_map_t::iterator existing_req = LLGroupMgr::getInstance()->mPropRequests.find(id);
-    if (existing_req != LLGroupMgr::getInstance()->mPropRequests.end())
+    properties_request_map_t::iterator existing_req = mPropRequests.find(id);
+    if (existing_req != mPropRequests.end())
     {
         if (gFrameTime - existing_req->second < MIN_GROUP_PROPERTY_REQUEST_FREQ)
         {
@@ -1481,7 +1485,7 @@ bool LLGroupMgr::hasPendingPropertyRequest(const LLUUID & id)
         }
         else
         {
-            LLGroupMgr::getInstance()->mPropRequests.erase(existing_req);
+            mPropRequests.erase(existing_req);
         }
     }
     return false;
@@ -1489,7 +1493,7 @@ bool LLGroupMgr::hasPendingPropertyRequest(const LLUUID & id)
 
 void LLGroupMgr::addPendingPropertyRequest(const LLUUID& id)
 {
-    LLGroupMgr::getInstance()->mPropRequests.insert_or_assign(id, gFrameTime);
+    mPropRequests.insert_or_assign(id, gFrameTime);
 }
 
 void LLGroupMgr::notifyObservers(LLGroupChange gc)
@@ -1579,12 +1583,12 @@ void LLGroupMgr::sendGroupPropertiesRequest(const LLUUID& group_id)
 	// This will happen when we get the reply
 	//LLGroupMgrGroupData* group_datap = createGroupData(group_id);
 	
-    if (LLGroupMgr::getInstance()->hasPendingPropertyRequest(group_id))
+    if (hasPendingPropertyRequest(group_id))
     {
         LL_DEBUGS("GrpMgr") << "LLGroupMgr::sendGroupPropertiesRequest suppressed repeat for " << group_id << LL_ENDL;
         return;
     }
-    LLGroupMgr::getInstance()->addPendingPropertyRequest(group_id);
+    addPendingPropertyRequest(group_id);
 
 	LLMessageSystem* msg = gMessageSystem;
 	msg->newMessageFast(_PREHASH_GroupProfileRequest);
@@ -1926,7 +1930,7 @@ void LLGroupMgr::sendGroupMemberEjects(const LLUUID& group_id,
 				for (LLGroupMemberData::role_list_t::iterator rit = member_data->roleBegin();
 					rit != member_data->roleEnd(); ++rit)
 				{
-					if ((*rit).first.notNull() && (*rit).second != 0)
+					if ((*rit).first.notNull() && (*rit).second != nullptr)
 					{
 						(*rit).second->removeMember(ejected_member_id);
 					}
@@ -2213,7 +2217,7 @@ void LLGroupMgr::processCapGroupMembersRequest(const LLSD& content)
 		// Set mMemberDataComplete for correct handling of empty responses. See MAINT-5237
 		group_datap->mMemberDataComplete = true;
 		group_datap->mChanged = TRUE;
-		LLGroupMgr::getInstance()->notifyObservers(GC_MEMBER_DATA);
+		notifyObservers(GC_MEMBER_DATA);
 		return;
 	}
 	

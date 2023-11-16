@@ -423,6 +423,10 @@ void LLPanelGroupRoles::setGroupID(const LLUUID& id)
 	if ( button )
 		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_INVITE));
 
+	button = getChild<LLButton>("export_list");
+	if (button)
+		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_VISIBLE_IN_DIR));
+
 	if(mSubTabContainer)
 		mSubTabContainer->selectTab(1);
 	group_roles_tab->mFirstOpen = TRUE;
@@ -1089,7 +1093,7 @@ void LLPanelGroupMembersSubTab::handleMemberSelect()
 		else
 		{
 			// This could happen if changes are not synced right on sub-panel change.
-			LL_WARNS() << "No group role data for " << iter->second->getID() << LL_ENDL;
+			LL_WARNS() << "No group role data for " << iter->first << LL_ENDL;
 		}
 	}
 	mAssignedRolesList->setEnabled(TRUE);
@@ -1815,6 +1819,15 @@ void LLPanelGroupMembersSubTab::updateMembers()
 		mMembersList->deleteAllItems();
 	}
 
+	for (avatar_name_cache_connection_map_t::iterator it = mAvatarNameCacheConnections.begin(); it != mAvatarNameCacheConnections.end(); ++it)
+	{
+		if (it->second.connected())
+		{
+			it->second.disconnect();
+		}
+	}
+	mAvatarNameCacheConnections.clear();
+
 	LLGroupMgrGroupData::member_list_t::iterator end = gdatap->mMembers.end();
 
 	LLTimer update_time;
@@ -2403,7 +2416,7 @@ void LLPanelGroupRolesSubTab::handleRoleSelect()
 	mSelectedRole = item->getUUID();
 	buildMembersList();
 
-	mCopyRoleButton->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_ROLE_CREATE));
+	mCopyRoleButton->setEnabled((gdatap->mRoles.size() < (U32)MAX_ROLES) && gAgent.hasPowerInGroup(mGroupID, GP_ROLE_CREATE));
 	can_delete = can_delete && gAgent.hasPowerInGroup(mGroupID,
 													  GP_ROLE_DELETE);
 	mDeleteRoleButton->setEnabled(can_delete);
