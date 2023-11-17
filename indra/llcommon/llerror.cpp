@@ -499,7 +499,7 @@ namespace
 	}
 
 
-	typedef boost::unordered_flat_map<std::string, LLError::ELevel> LevelMap;
+	typedef boost::unordered_flat_map<std::string, LLError::ELevel, al::string_hash, std::equal_to<>> LevelMap;
 	typedef std::vector<LLError::RecorderPtr> Recorders;
 	typedef std::vector<LLError::CallSite*> CallSiteVector;
 

@@ -164,7 +164,7 @@ using namespace LLAvatarAppearanceDefines;
 
 typedef LLPointer<LLViewerObject> LLViewerObjectPtr;
 
-static boost::unordered_flat_map<std::string, LLStringExplicit> sDefaultItemLabels;
+static boost::unordered_flat_map<std::string, LLStringExplicit, al::string_hash, std::equal_to<>> sDefaultItemLabels;
 
 BOOL enable_land_build(void*);
 BOOL enable_object_build(void*);

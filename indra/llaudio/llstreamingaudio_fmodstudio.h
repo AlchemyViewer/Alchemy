@@ -82,6 +82,8 @@ private:
 	std::string mPendingURL;
 	F32 mGain;
 
+    bool mWasAlreadyPlaying;
+
 	LLSD *mMetaData;
 	bool mNewMetadata;
 };

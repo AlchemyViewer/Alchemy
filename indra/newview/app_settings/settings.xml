@@ -17569,7 +17569,7 @@
     <key>Type</key>
     <string>U32</string>
     <key>Value</key>
-    <integer>4000</integer>
+    <integer>7000</integer>
   </map>
   <key>DisablePrecacheDelayAfterTeleporting</key>
   <map>
