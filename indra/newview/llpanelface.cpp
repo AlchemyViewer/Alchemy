@@ -1861,8 +1861,6 @@ public:
     {
         gInventory.removeObserver(this);
         mChangePending = false;
-
-        LLInventoryObserver::~LLInventoryObserver();
     }
 };
 
