@@ -265,7 +265,7 @@ namespace LLInitParam
 	private:
 		struct Inaccessable{};
 	public:
-		typedef boost::unordered_flat_map<std::string, T, al::string_hash, std::equal_to<>> value_name_map_t;
+		typedef boost::unordered_map<std::string, T, al::string_hash, std::equal_to<>> value_name_map_t;
 		typedef Inaccessable name_t;
 		typedef TypeValues<T> type_value_t;
 		typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t>	param_value_t;
@@ -327,7 +327,7 @@ namespace LLInitParam
 	{
 		typedef TypeValuesHelper<T, DERIVED_TYPE, IS_SPECIALIZED> self_t;
 	public:
-		typedef typename boost::unordered_flat_map<std::string, T, al::string_hash, std::equal_to<>> value_name_map_t;
+		typedef typename boost::unordered_map<std::string, T, al::string_hash, std::equal_to<>> value_name_map_t;
 		typedef std::string name_t;
 		typedef self_t type_value_t;
 		typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;
