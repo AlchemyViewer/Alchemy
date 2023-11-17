@@ -640,17 +640,27 @@ void LLFloaterTexturePicker::draw()
 
 		// If the floater is focused, don't apply its alpha to the texture (STORM-677).
 		const F32 alpha = getTransparencyType() == TT_ACTIVE ? 1.0f : getCurrentTransparency();
-		if( mTexturep )
+        LLViewerTexture* texture = nullptr;
+        if (mGLTFMaterial)
+        {
+            texture = mGLTFMaterial->getUITexture();
+        }
+        else
+        {
+            texture = mTexturep.get();
+        }
+
+		if( texture )
 		{
-			if( mTexturep->getComponents() == 4 )
+			if( texture->getComponents() == 4 )
 			{
 				gl_rect_2d_checkerboard( interior, alpha );
 			}
 
-			gl_draw_scaled_image( interior.mLeft, interior.mBottom, interior.getWidth(), interior.getHeight(), mTexturep, UI_VERTEX_COLOR % alpha );
+			gl_draw_scaled_image( interior.mLeft, interior.mBottom, interior.getWidth(), interior.getHeight(), texture, UI_VERTEX_COLOR % alpha );
 
 			// Pump the priority
-			mTexturep->addTextureStats( (F32)(interior.getWidth() * interior.getHeight()) );
+			texture->addTextureStats( (F32)(interior.getWidth() * interior.getHeight()) );
 		}
 		else if (!mFallbackImage.isNull())
 		{
