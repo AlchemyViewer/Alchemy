@@ -331,7 +331,7 @@ public:
 		LLSD get(const std::string_view) const;
 		LLSD getKeys() const;				// Return an LLSD array with keys as strings
 		void insert(const std::string_view, const LLSD&);
-		void erase(const std::string_view);
+		void erase(const String&);
 		LLSD& with(const std::string_view, const LLSD&);
 		
 		LLSD& operator[](const std::string_view);

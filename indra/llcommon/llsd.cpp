@@ -152,7 +152,7 @@ public:
 	virtual bool has(const std::string_view) const		{ return false; }
 	virtual LLSD get(const std::string_view) const		{ return LLSD(); }
 	virtual LLSD getKeys() const				{ return LLSD::emptyArray(); }
-	virtual void erase(std::string_view)			{ }
+	virtual void erase(const String&)			{ }
 	virtual const LLSD& ref(const std::string_view) const{ return undef(); }
 	
 	virtual size_t size() const					{ return 0; }
@@ -404,7 +404,7 @@ namespace
         LLSD get(const std::string_view) const override;
         LLSD getKeys() const override;
 		void insert(const std::string_view k, const LLSD& v);
-        void erase(const std::string_view) override;
+        void erase(const LLSD::String&) override;
 		LLSD& ref(const std::string_view);
         const LLSD& ref(const std::string_view) const override;
 
@@ -467,7 +467,7 @@ namespace
 		mData.emplace(k, v);
 	}
 	
-	void ImplMap::erase(const std::string_view k)
+	void ImplMap::erase(const LLSD::String& k)
 	{
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
 		mData.erase(k);
@@ -951,7 +951,7 @@ LLSD& LLSD::with(const std::string_view k, const LLSD& v)
 											makeMap(impl).insert(k, v); 
 											return *this;
 										}
-void LLSD::erase(const std::string_view k)		{ makeMap(impl).erase(k); }
+void LLSD::erase(const String& k)		{ makeMap(impl).erase(k); }
 
 LLSD&		LLSD::operator[](const std::string_view k)
 { 
