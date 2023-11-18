@@ -623,11 +623,11 @@ void LLWorldMap::updateRegions(S32 x0, S32 y0, S32 x1, S32 y1)
 
 	// Remove blocks that have been request more than BLOCK_UPDATE_TIMER ago
 	// so we re-request them for an update
-	for (block_last_update_map_t::iterator it = mMapBlockLastUpdateOffsets.begin(); it != mMapBlockLastUpdateOffsets.end(); ++it)
+	for (const auto& it : mMapBlockLastUpdateOffsets)
 	{
-		if ((time_now - it->second) <= BLOCK_UPDATE_TIMER)
+		if ((time_now - it.second) <= BLOCK_UPDATE_TIMER)
 		{
-			new_offsets[it->first] = it->second;
+			new_offsets[it.first] = it.second;
 		}
 	}
 	mMapBlockLastUpdateOffsets.swap(new_offsets);

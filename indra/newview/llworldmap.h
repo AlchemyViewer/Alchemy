@@ -217,7 +217,7 @@ public:
 	void reloadItems(bool force = false);	// Reload the items (people, hub, etc...)
 
 	// Region Map access
-	typedef boost::unordered_flat_map<U64, std::unique_ptr<LLSimInfo>> sim_info_map_t;
+	typedef boost::unordered_map<U64, std::unique_ptr<LLSimInfo>> sim_info_map_t;
 	const LLWorldMap::sim_info_map_t& getRegionMap() const { return mSimInfoMap; }
 	void updateRegions(S32 x0, S32 y0, S32 x1, S32 y1);		// Requests region info for a rectangle of regions (in grid coordinates)
 

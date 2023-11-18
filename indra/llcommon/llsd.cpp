@@ -403,9 +403,9 @@ namespace
 		using LLSD::Impl::ref; // Unhiding ref(size_t)
         LLSD get(const std::string_view) const override;
         LLSD getKeys() const override;
-		        void insert(const LLSD::String& k, const LLSD& v);
+		void insert(const std::string_view k, const LLSD& v);
         void erase(const LLSD::String&) override;
-		              LLSD& ref(const std::string_view);
+		LLSD& ref(const std::string_view);
         const LLSD& ref(const std::string_view) const override;
 
 		size_t size() const override { return mData.size(); }
@@ -461,10 +461,10 @@ namespace
 		return keys;
 	}
 
-	void ImplMap::insert(const LLSD::String& k, const LLSD& v)
+	void ImplMap::insert(const std::string_view k, const LLSD& v)
 	{
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-		mData.emplace(DataMap::value_type(k, v));
+		mData.emplace(k, v);
 	}
 	
 	void ImplMap::erase(const LLSD::String& k)
@@ -944,9 +944,9 @@ LLSD LLSD::emptyMap()
 bool LLSD::has(const std::string_view k) const	{ return safe(impl).has(k); }
 LLSD LLSD::get(const std::string_view k) const	{ return safe(impl).get(k); }
 LLSD LLSD::getKeys() const				{ return safe(impl).getKeys(); } 
-void LLSD::insert(const String& k, const LLSD& v) {	makeMap(impl).insert(k, v); }
+void LLSD::insert(const std::string_view k, const LLSD& v) {	makeMap(impl).insert(k, v); }
 
-LLSD& LLSD::with(const String& k, const LLSD& v)
+LLSD& LLSD::with(const std::string_view k, const LLSD& v)
 										{ 
 											makeMap(impl).insert(k, v); 
 											return *this;

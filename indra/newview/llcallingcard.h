@@ -111,9 +111,9 @@ public:
 
 	// add or remove agents from buddy list. Each method takes a set
 	// of buddies and returns how many were actually added or removed.
-	typedef boost::unordered_flat_map<LLUUID, LLRelationship*> buddy_map_t;
+	typedef boost::unordered_map<LLUUID, LLRelationship*> buddy_map_t;
 
-	S32 addBuddyList(const buddy_map_t& buddies);
+	S32 addBuddyList(const buddy_map_t buddies);
 	//S32 removeBuddyList(const buddy_list_t& exes);
 	void copyBuddyList(buddy_map_t& buddies) const;
 

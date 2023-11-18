@@ -533,17 +533,17 @@ struct hash<LLSD>
         }
         case LLSD::TypeMap:
         {
-            for (LLSD::map_const_iterator itm = s.beginMap(); itm != s.endMap(); ++itm)
+            for (const auto& llsd_pair : s.asMap())
             {
-                boost::hash_combine(seed, (*itm).first);
-                boost::hash_combine(seed, (*itm).second);
+                boost::hash_combine(seed, llsd_pair.first);
+                boost::hash_combine(seed, llsd_pair.second);
             }
             break;
         }
         case LLSD::TypeArray:
-            for (LLSD::array_const_iterator ita = s.beginArray(); ita != s.endArray(); ++ita)
+            for (const auto& llsd_val : s.asArray())
             {
-                boost::hash_combine(seed, (*ita));
+                boost::hash_combine(seed, llsd_val);
             }
             break;
         case LLSD::TypeUndefined:

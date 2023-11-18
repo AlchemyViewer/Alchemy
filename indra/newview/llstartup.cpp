@@ -1931,28 +1931,32 @@ bool idle_startup()
 			{
 				LLUUID agent_id;
 				S32 has_rights = 0, given_rights = 0;
-				LLSD buddy_id = (*it)["buddy_id"];
-				if(buddy_id.isDefined())
+				const auto& buddy_map = it->asMap();
+				auto buddy_end = buddy_map.end();
+
+				auto buddy_it = buddy_map.find("buddy_id");
+				if(buddy_it != buddy_end)
 				{
-					agent_id = buddy_id.asUUID();
+					agent_id = buddy_it->second.asUUID();
 				}
 				else continue;
 
-				LLSD buddy_rights_has = (*it)["buddy_rights_has"];
-				if(buddy_rights_has.isDefined())
+				buddy_it = buddy_map.find("buddy_rights_has");
+				if(buddy_it != buddy_end)
 				{
-					has_rights = buddy_rights_has.asInteger();
+					has_rights = buddy_it->second.asInteger();
 				}
 
-				LLSD buddy_rights_given = (*it)["buddy_rights_given"];
-				if(buddy_rights_given.isDefined())
+
+				buddy_it = buddy_map.find("buddy_rights_given");
+				if (buddy_it != buddy_end)
 				{
-					given_rights = buddy_rights_given.asInteger();
+					given_rights = buddy_it->second.asInteger();
 				}
 
 				list[agent_id] = new LLRelationship(given_rights, has_rights, false);
 			}
-			LLAvatarTracker::instance().addBuddyList(list);
+			LLAvatarTracker::instance().addBuddyList(std::move(list));
 			display_startup();
  		}
 
