@@ -330,9 +330,9 @@ public:
 		bool has(const std::string_view) const;
 		LLSD get(const std::string_view) const;
 		LLSD getKeys() const;				// Return an LLSD array with keys as strings
-		void insert(const String&, const LLSD&);
-		void erase(const String&);
-		LLSD& with(const String&, const LLSD&);
+		void insert(const std::string_view, const LLSD&);
+		void erase(const std::string_view);
+		LLSD& with(const std::string_view, const LLSD&);
 		
 		LLSD& operator[](const std::string_view);
 		LLSD& operator[](const char* c) { return (*this)[al::safe_string_view(c)]; }

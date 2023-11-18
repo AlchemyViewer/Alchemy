@@ -152,7 +152,7 @@ public:
 	virtual bool has(const std::string_view) const		{ return false; }
 	virtual LLSD get(const std::string_view) const		{ return LLSD(); }
 	virtual LLSD getKeys() const				{ return LLSD::emptyArray(); }
-	virtual void erase(const String&)			{ }
+	virtual void erase(std::string_view)			{ }
 	virtual const LLSD& ref(const std::string_view) const{ return undef(); }
 	
 	virtual size_t size() const					{ return 0; }
@@ -403,9 +403,9 @@ namespace
 		using LLSD::Impl::ref; // Unhiding ref(size_t)
         LLSD get(const std::string_view) const override;
         LLSD getKeys() const override;
-		        void insert(const LLSD::String& k, const LLSD& v);
-        void erase(const LLSD::String&) override;
-		              LLSD& ref(const std::string_view);
+		void insert(const std::string_view k, const LLSD& v);
+        void erase(const std::string_view) override;
+		LLSD& ref(const std::string_view);
         const LLSD& ref(const std::string_view) const override;
 
 		size_t size() const override { return mData.size(); }
@@ -461,13 +461,13 @@ namespace
 		return keys;
 	}
 
-	void ImplMap::insert(const LLSD::String& k, const LLSD& v)
+	void ImplMap::insert(const std::string_view k, const LLSD& v)
 	{
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-		mData.emplace(DataMap::value_type(k, v));
+		mData.emplace(k, v);
 	}
 	
-	void ImplMap::erase(const LLSD::String& k)
+	void ImplMap::erase(const std::string_view k)
 	{
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
 		mData.erase(k);
@@ -944,14 +944,14 @@ LLSD LLSD::emptyMap()
 bool LLSD::has(const std::string_view k) const	{ return safe(impl).has(k); }
 LLSD LLSD::get(const std::string_view k) const	{ return safe(impl).get(k); }
 LLSD LLSD::getKeys() const				{ return safe(impl).getKeys(); } 
-void LLSD::insert(const String& k, const LLSD& v) {	makeMap(impl).insert(k, v); }
+void LLSD::insert(const std::string_view k, const LLSD& v) {	makeMap(impl).insert(k, v); }
 
-LLSD& LLSD::with(const String& k, const LLSD& v)
+LLSD& LLSD::with(const std::string_view k, const LLSD& v)
 										{ 
 											makeMap(impl).insert(k, v); 
 											return *this;
 										}
-void LLSD::erase(const String& k)		{ makeMap(impl).erase(k); }
+void LLSD::erase(const std::string_view k)		{ makeMap(impl).erase(k); }
 
 LLSD&		LLSD::operator[](const std::string_view k)
 { 
