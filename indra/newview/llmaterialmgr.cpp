@@ -454,9 +454,8 @@ void LLMaterialMgr::onGetResponse(bool success, const LLSD& content, const LLUUI
 
 	llassert(response_data.isArray());
 	LL_DEBUGS("Materials") << "response has "<< response_data.size() << " materials" << LL_ENDL;
-	for (LLSD::array_const_iterator itMaterial = response_data.beginArray(); itMaterial != response_data.endArray(); ++itMaterial)
+	for (const LLSD& material_data : response_data.asArray())
 	{
-		const LLSD& material_data = *itMaterial;
 		llassert(material_data.isMap());
 
 		llassert(material_data.has(MATERIALS_CAP_OBJECT_ID_FIELD));
@@ -498,9 +497,8 @@ void LLMaterialMgr::onGetAllResponse(bool success, const LLSD& content, const LL
 
 	llassert(response_data.isArray());
 	LL_DEBUGS("Materials") << "response has "<< response_data.size() << " materials" << LL_ENDL;
-	for (LLSD::array_const_iterator itMaterial = response_data.beginArray(); itMaterial != response_data.endArray(); ++itMaterial)
+	for (const LLSD& material_data : response_data.asArray())
 	{
-		const LLSD& material_data = *itMaterial;
 		llassert(material_data.isMap());
 
 		llassert(material_data.has(MATERIALS_CAP_OBJECT_ID_FIELD));
@@ -562,11 +560,12 @@ void LLMaterialMgr::onPutResponse(bool success, const LLSD& content)
 	{
 		llassert(response_data.isArray());
 		LL_DEBUGS("Materials") << "response has "<< response_data.size() << " materials" << LL_ENDL;
+		#           ifdef SHOW_ASSERT   
 		for (LLSD::array_const_iterator faceIter = response_data.beginArray(); faceIter != response_data.endArray(); ++faceIter)
 		{
-#           ifdef SHOW_ASSERT                  // same condition that controls llassert()
+               // same condition that controls llassert()
 			const LLSD& face_data = *faceIter; // conditional to avoid unused variable warning
-#           endif
+
 			llassert(face_data.isMap());
 
 			llassert(face_data.has(MATERIALS_CAP_OBJECT_ID_FIELD));
@@ -583,6 +582,7 @@ void LLMaterialMgr::onPutResponse(bool success, const LLSD& content)
 
 			// *TODO: do we really still need to process this?
 		}
+#           endif
 	}
 }
 
