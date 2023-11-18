@@ -951,111 +951,123 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
     onUpdateReceived(result, type, body);
 
     if (callback && !callback.empty())
-    {   
-// ALCHMERGE
-#if 0
+    {
 // [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
-		uuid_list_t ids;
-		switch (type)
-		{
-			case COPYLIBRARYCATEGORY:
-				if (result.has("category_id"))
-				{
-					ids.insert(result["category_id"]);
-				}
-				break;
-			case COPYINVENTORY:
-				{
-					AISUpdate::parseUUIDArray(result, "_created_items", ids);
-					AISUpdate::parseUUIDArray(result, "_created_categories", ids);
-				}
-				break;
-			case UPDATECATEGORY:
-				{
-					AISUpdate::parseUUIDArray(result, "_updated_categories", ids);
-				}
-				break;
-			default:
-				break;
-		}
-
-		// If we were feeling daring we'd call LLInventoryCallback::fire for every item but it would take additional work to investigate whether all LLInventoryCallback derived classes
-		// were designed to handle multiple fire calls (with legacy link creation only one would ever fire per link creation) so we'll be cautious and only call for the first one for now
-		// (note that the LL code as written below will always call fire once with the NULL UUID for anything but CopyLibraryCategoryCommand so even the above is an improvement)
-		callback( (!ids.empty()) ? *ids.begin() : LLUUID::null);
-// [/SL:KB]
-//        LLUUID id(LLUUID::null);
-//
-//        if (result.has("category_id") && (type == COPYLIBRARYCATEGORY))
-//	    {
-//		    id = result["category_id"];
-//	    }
-//
-//        callback(id);
-#else
-        bool needs_callback = true;
-        LLUUID id(LLUUID::null);
-
+        uuid_list_t ids;
         switch (type)
         {
-        case COPYLIBRARYCATEGORY:
-        case FETCHCATEGORYCATEGORIES:
-        case FETCHCATEGORYCHILDREN:
-        case FETCHCATEGORYSUBSET:
-        case FETCHCATEGORYLINKS:
-        case FETCHCOF:
-            if (result.has("category_id"))
-            {
-                id = result["category_id"];
-            }
-            break;
-        case FETCHITEM:
-            if (result.has("item_id"))
-            {
-                // Error message might contain an item_id!!!
-                id = result["item_id"];
-            }
-            if (result.has("linked_id"))
-            {
-                id = result["linked_id"];
-            }
-            break;
-        case CREATEINVENTORY:
-            // CREATEINVENTORY can have multiple callbacks
-            if (result.has("_created_categories"))
-            {
-                LLSD& cats = result["_created_categories"];
-                LLSD::array_const_iterator cat_iter;
-                for (cat_iter = cats.beginArray(); cat_iter != cats.endArray(); ++cat_iter)
+            case COPYLIBRARYCATEGORY:
+            case FETCHCATEGORYCATEGORIES:
+            case FETCHCATEGORYCHILDREN:
+            case FETCHCATEGORYSUBSET:
+            case FETCHCATEGORYLINKS:
+            case FETCHCOF:
+                if (result.has("category_id"))
                 {
-                    LLUUID cat_id = *cat_iter;
-                    callback(cat_id);
-                    needs_callback = false;
+                    ids.emplace(result["category_id"]);
                 }
-            }
-            if (result.has("_created_items"))
-            {
-                LLSD& items = result["_created_items"];
-                LLSD::array_const_iterator item_iter;
-                for (item_iter = items.beginArray(); item_iter != items.endArray(); ++item_iter)
+                break;
+            case FETCHITEM:
+                if (result.has("linked_id"))
                 {
-                    LLUUID item_id = *item_iter;
-                    callback(item_id);
-                    needs_callback = false;
+                    ids.emplace(result["linked_id"]);
                 }
+                else if (result.has("item_id"))
+                {
+                    // Error message might contain an item_id!!!
+                    ids.emplace(result["item_id"]);
+                }
+                break;
+            case COPYINVENTORY:
+            case CREATEINVENTORY:
+            {
+                AISUpdate::parseUUIDArray(result, "_created_categories", ids);
+                AISUpdate::parseUUIDArray(result, "_created_items", ids);
             }
             break;
-        default:
+            case UPDATECATEGORY:
+            {
+                AISUpdate::parseUUIDArray(result, "_updated_categories", ids);
+            }
             break;
+            default:
+                break;
         }
 
-        if (needs_callback)
+        // Call callback at least once regardless of failure.
+        if (ids.empty())
         {
-            // Call callback at least once regardless of failure.
-            // UPDATEITEM doesn't expect an id
+            ids.emplace(LLUUID::null);
+        }
+
+        for (const auto& id : ids)
+        {
             callback(id);
         }
-#endif
+
+// [/SL:KB]
+        //bool needs_callback = true;
+        //LLUUID id(LLUUID::null);
+
+        //switch (type)
+        //{
+        //case COPYLIBRARYCATEGORY:
+        //case FETCHCATEGORYCATEGORIES:
+        //case FETCHCATEGORYCHILDREN:
+        //case FETCHCATEGORYSUBSET:
+        //case FETCHCATEGORYLINKS:
+        //case FETCHCOF:
+        //    if (result.has("category_id"))
+        //    {
+        //        id = result["category_id"];
+        //    }
+        //    break;
+        //case FETCHITEM:
+        //    if (result.has("item_id"))
+        //    {
+        //        // Error message might contain an item_id!!!
+        //        id = result["item_id"];
+        //    }
+        //    if (result.has("linked_id"))
+        //    {
+        //        id = result["linked_id"];
+        //    }
+        //    break;
+        //case CREATEINVENTORY:
+        //    // CREATEINVENTORY can have multiple callbacks
+        //    if (result.has("_created_categories"))
+        //    {
+        //        LLSD& cats = result["_created_categories"];
+        //        LLSD::array_const_iterator cat_iter;
+        //        for (cat_iter = cats.beginArray(); cat_iter != cats.endArray(); ++cat_iter)
+        //        {
+        //            LLUUID cat_id = *cat_iter;
+        //            callback(cat_id);
+        //            needs_callback = false;
+        //        }
+        //    }
+        //    if (result.has("_created_items"))
+        //    {
+        //        LLSD& items = result["_created_items"];
+        //        LLSD::array_const_iterator item_iter;
+        //        for (item_iter = items.beginArray(); item_iter != items.endArray(); ++item_iter)
+        //        {
+        //            LLUUID item_id = *item_iter;
+        //            callback(item_id);
+        //            needs_callback = false;
+        //        }
+        //    }
+        //    break;
+        //default:
+        //    break;
+        //}
+
+        //if (needs_callback)
+        //{
+        //    // Call callback at least once regardless of failure.
+        //    // UPDATEITEM doesn't expect an id
+        //    callback(id);
+        //}
     }
 
 }
@@ -1530,11 +1542,9 @@ void AISUpdate::parseUUIDArray(const LLSD& content, const std::string& name, uui
 {
 	if (content.has(name))
 	{
-		for(LLSD::array_const_iterator it = content[name].beginArray(),
-				end = content[name].endArray();
-				it != end; ++it)
+		for(const auto& sd : content.asArray())
 		{
-			ids.insert((*it).asUUID());
+			ids.insert(sd.asUUID());
 		}
 	}
 }
