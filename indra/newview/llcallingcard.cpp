@@ -234,20 +234,20 @@ const LLUUID& LLAvatarTracker::getAvatarID()
 	}
 }
 
-S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
+S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t buds)
 {
 	using namespace std;
 
 	U32 new_buddy_count = 0;
 	LLUUID agent_id;
-	for(buddy_map_t::const_iterator itr = buds.begin(); itr != buds.end(); ++itr)
+	for(const auto& itr : buds)
 	{
-		agent_id = (*itr).first;
+		agent_id = (itr).first;
 		buddy_map_t::const_iterator existing_buddy = mBuddyInfo.find(agent_id);
 		if(existing_buddy == mBuddyInfo.end())
 		{
 			++new_buddy_count;
-			mBuddyInfo[agent_id] = (*itr).second;
+			mBuddyInfo[agent_id] = (itr).second;
 
 			// pre-request name for notifications?
 			LLAvatarName av_name;
@@ -265,7 +265,7 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
 		else
 		{
 			LLRelationship* e_r = (*existing_buddy).second;
-			LLRelationship* n_r = (*itr).second;
+			LLRelationship* n_r = (itr).second;
 			LL_WARNS() << "!! Add buddy for existing buddy: " << agent_id
 					<< " [" << (e_r->isOnline() ? "Online" : "Offline") << "->" << (n_r->isOnline() ? "Online" : "Offline")
 					<< ", " <<  e_r->getRightsGrantedTo() << "->" << n_r->getRightsGrantedTo()
