@@ -115,7 +115,7 @@ public:
 	void parseMeta(const LLSD& update);
 	void parseContent(const LLSD& update);
 // [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
-	static void parseUUIDArray(const LLSD& content, const std::string& name, uuid_list_t& ids);
+	static void parseUUIDArray(const LLSD& content, const std::string_view name, uuid_list_t& ids);
 // [/SL:KB]
 //	void parseUUIDArray(const LLSD& content, const std::string& name, uuid_list_t& ids);
 	void parseLink(const LLSD& link_map, S32 depth);

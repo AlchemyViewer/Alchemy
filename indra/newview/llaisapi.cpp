@@ -1538,7 +1538,7 @@ void AISUpdate::parseEmbedded(const LLSD& embedded, S32 depth)
 	}
 }
 
-void AISUpdate::parseUUIDArray(const LLSD& content, const std::string& name, uuid_list_t& ids)
+void AISUpdate::parseUUIDArray(const LLSD& content, const std::string_view name, uuid_list_t& ids)
 {
 	if (content.has(name))
 	{
