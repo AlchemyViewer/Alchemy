@@ -968,14 +968,14 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 }
                 break;
             case FETCHITEM:
-                if (result.has("linked_id"))
-                {
-                    ids.emplace(result["linked_id"]);
-                }
-                else if (result.has("item_id"))
+                if (result.has("item_id"))
                 {
                     // Error message might contain an item_id!!!
                     ids.emplace(result["item_id"]);
+                }
+                if (result.has("linked_id"))
+                {
+                    ids.emplace(result["linked_id"]);
                 }
                 break;
             case COPYINVENTORY:
@@ -1542,7 +1542,7 @@ void AISUpdate::parseUUIDArray(const LLSD& content, const std::string& name, uui
 {
 	if (content.has(name))
 	{
-		for(const auto& sd : content.asArray())
+		for(const auto& sd : content[name].asArray())
 		{
 			ids.insert(sd.asUUID());
 		}
