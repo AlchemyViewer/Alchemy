@@ -36,7 +36,7 @@ Teleporting...
   <text
    height="20"
    use_ellipses="true"
-   font="SanSerifHuge"
+   font="SansSerifHuge"
    type="string"
    length="1"
    follows="top|right"
