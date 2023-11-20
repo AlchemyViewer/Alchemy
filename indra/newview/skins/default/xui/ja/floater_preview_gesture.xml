@@ -65,7 +65,7 @@
 	<text name="help_label">
 		待機ステップを入れていない場合、すべてのステップが同時に実行されます。
 	</text>
-	<check_box label="アクティブ" name="active_check" tool_tip="アクティブなジェスチャーは、トリガーとなる語句を入力するか、ホットキーを押すことで実行されます。通常、同じキーバインディングを使用するゼスチャーがある場合、そのゼスチャーは非アクティブになります。"/>
+	<check_box label="アクティブ" name="active_check" tool_tip="アクティブなジェスチャーは、トリガーとなる語句を入力するか、ホットキーを押すことで実行されます。通常、同じキーバインディングを使用するジェスチャーがある場合、そのジェスチャーは非アクティブになります。"/>
 	<button label="プレビュー" name="preview_btn"/>
 	<button label="保存" name="save_btn"/>
 </floater>
