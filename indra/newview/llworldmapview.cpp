@@ -150,6 +150,7 @@ void LLWorldMapView::initClass()
 	
 	sStringsMap["loading"] = LLTrans::getString("texture_loading");
 	sStringsMap["offline"] = LLTrans::getString("worldmap_offline");
+	sStringsMap["agent_position"] = LLTrans::getString("worldmap_agent_position");
 }
 
 // static
@@ -581,7 +582,7 @@ void LLWorldMapView::draw()
 		drawTracking(pos_global,
 					 lerp(LLColor4::yellow, LLColor4::orange, 0.4f),
 					 TRUE,
-					 "You are here",
+					 sStringsMap["agent_position"],
 					 "",
 					 LLFontGL::getFontSansSerifSmall()->getLineHeight()); // offset vertically by one line, to avoid overlap with target tracking
 	}

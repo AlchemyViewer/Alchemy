@@ -523,6 +523,7 @@ http://secondlife.com/support for help fixing this problem.
 	<string name="worldmap_offline">Offline</string>
 	<string name="worldmap_item_tooltip_format">[AREA] m² L$[PRICE] ([SQMPRICE] L$/m²)</string>
 	<string name="worldmap_results_none_found">None found.</string>
+	<string name="worldmap_agent_position">You are here</string>
 
 	<!-- animations uploading status codes -->
 	<string name="Ok">OK</string>
