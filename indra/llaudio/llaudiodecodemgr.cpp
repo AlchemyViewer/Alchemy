@@ -555,7 +555,7 @@ class LLAudioDecodeMgr::Impl
 
   protected:
     std::deque<LLUUID> mDecodeQueue;
-    std::map<LLUUID, LLPointer<LLVorbisDecodeState>> mDecodes;
+    std::unordered_map<LLUUID, LLPointer<LLVorbisDecodeState>> mDecodes;
 };
 
 LLAudioDecodeMgr::Impl::Impl()

@@ -241,9 +241,7 @@ void LLAudioEngine::idle()
 	LLAudioSource *max_sourcep = nullptr; // Maximum priority source without a channel
 	for (auto iter = mAllSources.begin(), iter_end = mAllSources.end(); iter != iter_end;)
 	{
-		// Move on to the next source
-		auto copy_iter = iter++;
-		LLAudioSource *sourcep = copy_iter->second;
+		LLAudioSource *sourcep = iter->second;
 
 		// Update this source
 		sourcep->update();
@@ -253,12 +251,13 @@ void LLAudioEngine::idle()
 		{
 			// The source is done playing, clean it up.
 			delete sourcep;
-			mAllSources.erase(copy_iter);
+            iter = mAllSources.erase(iter);
 			continue;
 		}
 
 		if (sourcep->isMuted())
 		{
+			++iter;
 		  	continue;
 		}
 
@@ -271,6 +270,9 @@ void LLAudioEngine::idle()
 				max_sourcep = sourcep;
 			}
 		}
+
+		// Move on to the next source
+		iter++;
 	}
 
 	// Now, do priority-based organization of audio sources.
@@ -943,6 +945,9 @@ LLAudioSource * LLAudioEngine::findAudioSource(const LLUUID &source_id)
 LLAudioData * LLAudioEngine::getAudioData(const LLUUID &audio_uuid)
 {
 	LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
+	if( isCorruptSound( audio_uuid ) )
+		return 0;
+
 	auto iter = mAllData.find(audio_uuid);
 	if (iter == mAllData.end())
 	{
@@ -1248,6 +1253,9 @@ void LLAudioEngine::assetCallback(const LLUUID &uuid, LLAssetType::EType type, v
 
 void LLAudioEngine::logSoundPlay(const LLUUID& id, LLVector3d position, S32 type, const LLUUID& assetid, const LLUUID& ownerid, const LLUUID& sourceid, bool is_trigger, bool is_looped)
 {
+	if(isCorruptSound(assetid))
+		return;
+
 	pruneSoundLog();
 	if (mSoundHistory.size() > 2048)
 		return; // Might clear out oldest entries before giving up?
@@ -1388,6 +1396,7 @@ void LLAudioSource::update()
 			{
 				LL_WARNS() << "Marking LLAudioSource corrupted for " << adp->getID() << LL_ENDL;
 				mCorrupted = true ;
+				gAudiop->markSoundCorrupt( adp->getID() );
 			}
 		}
 	}
@@ -1946,5 +1955,5 @@ bool LLAudioEngine::isCorruptSound(const LLUUID& sound_id) const
 	if (mCorruptData.end() == itr)
 		return false;
 
-	return itr->second == MAX_SOUND_RETRIES;
+	return itr->second >= MAX_SOUND_RETRIES;
 }
