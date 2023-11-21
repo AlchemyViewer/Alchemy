@@ -3751,7 +3751,7 @@ void LLPipeline::renderHighlights()
 		for (U32 i = 0; i < count; i++)
 		{
 			LLFace *facep = mSelectedFaces[i];
-			if (!facep || (facep->getDrawable() && facep->getDrawable()->isDead()))
+			if (!facep || !facep->getDrawable() || facep->getDrawable()->isDead())
 			{
 				LL_WARNS() << "Bad face on selection" << LL_ENDL;
 				continue;
@@ -3799,7 +3799,7 @@ void LLPipeline::renderHighlights()
 		for (U32 i = 0; i < count; i++)
 		{
 			LLFace *facep = mSelectedFaces[i];
-			if (!facep || (facep->getDrawable() && facep->getDrawable()->isDead()))
+			if (!facep || !facep->getDrawable() || facep->getDrawable()->isDead())
 			{
 				LL_WARNS() << "Bad face on selection" << LL_ENDL;
 				continue;
@@ -3829,7 +3829,7 @@ void LLPipeline::renderHighlights()
 		for (U32 i = 0; i < count; i++)
 		{
 			LLFace *facep = mSelectedFaces[i];
-			if (!facep || (facep->getDrawable() && facep->getDrawable()->isDead()))
+			if (!facep || !facep->getDrawable() || facep->getDrawable()->isDead())
 			{
 				LL_WARNS() << "Bad face on selection" << LL_ENDL;
 				continue;
