@@ -137,6 +137,11 @@ void LLTextBox::setClickedCallback( boost::function<void (void*)> cb, void* user
 	mClickedCallback = boost::bind(cb, userdata);
 }
 
+void LLTextBox::clearClickedCallback()
+{
+	mClickedCallback.clear();
+}
+
 S32 LLTextBox::getTextPixelWidth()
 {
 	return getTextBoundingRect().getWidth();

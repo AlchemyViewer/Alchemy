@@ -29,6 +29,8 @@
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrl.h"
+#include "lltrans.h"
+#include "llurlaction.h"
 
 // Viewer includes
 #include "llviewercontrol.h"
@@ -37,12 +39,10 @@ static LLPanelInjector<ALPanelMusicTicker> t_music_ticker("music_ticker");
 
 ALPanelMusicTicker::ALPanelMusicTicker() : LLPanel(),
 	mPlayState(STATE_PLAYING), 
+	mStationScrollChars(0),
 	mArtistScrollChars(0), 
 	mTitleScrollChars(0), 
-	mCurScrollChar(0),
-	mArtistText(nullptr),
-	mTitleText(nullptr),
-	mVisualizer(nullptr)
+	mCurScrollChar(0)
 {
 }
 
@@ -56,6 +56,7 @@ ALPanelMusicTicker::~ALPanelMusicTicker()
 
 BOOL ALPanelMusicTicker::postBuild()
 {
+	mStationText = getChild<LLTextBox>("station_text");
 	mArtistText =	getChild<LLTextBox>("artist_text");
 	mTitleText	=	getChild<LLTextBox>("title_text");
 	mVisualizer =	getChild<LLUICtrl>("visualizer_box");
@@ -90,6 +91,8 @@ void ALPanelMusicTicker::reshape(S32 width, S32 height, BOOL called_from_parent/
 	LLPanel::reshape(width, height, called_from_parent);
 	if(width_changed)
 	{
+		if (mStationText)
+			mStationScrollChars = countExtraChars(mStationText, mszStation);
 		if(mTitleText)
 			mTitleScrollChars = countExtraChars(mTitleText, mszTitle);
 		if(mArtistText)
@@ -118,6 +121,9 @@ void ALPanelMusicTicker::metadataUpdateCallback(const LLSD& metadata)
 			LLSD artist = metadata["ARTIST"];
 			LLSD title = metadata["TITLE"];
 
+			std::string station = metadata.has("TRSN") ? metadata["TRSN"].asString() : metadata.has("icy-name") ? metadata["icy-name"].asString() : LLTrans::getString("NowPlaying");
+			std::string station_url = metadata.has("URL") ? metadata["URL"].asString() : metadata.has("icy-url") ? metadata["icy-url"].asString() : std::string();
+			dirty |= setStation(station, station_url);
 			dirty |= setArtist(artist.isDefined() ? artist.asString() : LLStringUtil::null);
 			dirty |= setTitle(title.isDefined() ? title.asString() : LLStringUtil::null);
 	}
@@ -172,8 +178,9 @@ bool ALPanelMusicTicker::setPaused(bool pause)
 	mPlayState = pause ? STATE_PAUSED : STATE_PLAYING;
 	if(pause)
 	{
-		setArtist(mszPaused);
-		setTitle(mszPaused);
+		setStation(mszPaused, LLStringUtil::null);
+		setArtist(LLStringUtil::null);
+		setTitle(LLStringUtil::null);
 	}
 	return true;
 }
@@ -182,10 +189,31 @@ void ALPanelMusicTicker::resetTicker()
 {
 	mScrollTimer.reset();
 	mCurScrollChar = 0;
+	if (mStationText)
+		mStationText->setText(LLStringExplicit(mszStation.substr(0, mszStation.length() - mStationScrollChars)));
 	if(mArtistText)
 		mArtistText->setText(LLStringExplicit(mszArtist.substr(0, mszArtist.length() - mArtistScrollChars)));
 	if(mTitleText)
 		mTitleText->setText(LLStringExplicit(mszTitle.substr(0, mszTitle.length() - mTitleScrollChars)));
+}
+
+bool ALPanelMusicTicker::setStation(const std::string& station, const std::string& url)
+{
+	if (!mStationText || (mszStation == station && mszStationURL == url))
+		return false;
+	mszStation = station;
+	mszStationURL = url;
+	if (mszStationURL.empty())
+	{
+		mStationText->clearClickedCallback();
+	}
+	else
+	{
+		mStationText->setClickedCallback([this](void*) { if (!mszStationURL.empty()) LLUrlAction::openURL(mszStationURL); });
+	}
+	mStationText->setText(mszStation);
+	mStationScrollChars = countExtraChars(mStationText, mszStation);
+	return true;
 }
 
 bool ALPanelMusicTicker::setArtist(const std::string &artist)
@@ -229,11 +257,11 @@ S32 ALPanelMusicTicker::countExtraChars(LLTextBox *texbox, const std::string &te
 void ALPanelMusicTicker::iterateTickerOffset()
 {
 	if((mPlayState != STATE_PAUSED)
-	   && (mArtistScrollChars || mTitleScrollChars)
+	   && (mStationScrollChars || mArtistScrollChars || mTitleScrollChars)
 	   && ((!mCurScrollChar && mScrollTimer.getElapsedTimeF32() >= 5.f)
 		   || (mCurScrollChar && mScrollTimer.getElapsedTimeF32() >= .5f)))
 	{
-		if(++mCurScrollChar > llmax(mArtistScrollChars, mTitleScrollChars))
+		if(++mCurScrollChar > llmax(mStationScrollChars, llmax(mArtistScrollChars, mTitleScrollChars)))
 		{
 			if(mScrollTimer.getElapsedTimeF32() >= 2.f)	//pause for a bit when it reaches beyond last character.
 				resetTicker();	
@@ -241,6 +269,10 @@ void ALPanelMusicTicker::iterateTickerOffset()
 		else
 		{
 			mScrollTimer.reset();
+			if (mStationText && mCurScrollChar <= mStationScrollChars)
+			{
+				mStationText->setText(LLStringExplicit(mszStation.substr(mCurScrollChar, mszStation.length() - mStationScrollChars + mCurScrollChar)));
+			}
 			if(mArtistText && mCurScrollChar <= mArtistScrollChars)
 			{
 				mArtistText->setText(LLStringExplicit(mszArtist.substr(mCurScrollChar, mszArtist.length()-mArtistScrollChars + mCurScrollChar)));

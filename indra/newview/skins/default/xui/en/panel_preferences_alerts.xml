@@ -34,7 +34,7 @@
      height="16"
      label="When my friends log in or out"
      layout="topleft"
-     left_delta="150"
+     left_delta="130"
      name="friends_online_notify_checkbox"     
      width="30" />
     <check_box
@@ -50,7 +50,7 @@
      height="16"
      label="When I get L$"
      layout="topleft"
-     left_delta="-320"
+     left_delta="-300"
      top_pad="4"	
      name="notify_money_received_checkbox"     
      width="300" /> 
@@ -59,9 +59,17 @@
      height="16"
      label="When music stream titles change"
      layout="topleft"
-     left_delta="150"
+     left_delta="130"
      name="music_stream_title"     
-     width="30" />  
+     width="30" />
+     <check_box
+     control_name="ShowStreamInfoToChat"
+     height="16"
+     label="In Nearby Chat"
+     layout="topleft"
+     left_delta="190"
+     name="music_stream_title_checkbox_chat"     
+     width="20" />
     <text
      type="string"
      length="1"

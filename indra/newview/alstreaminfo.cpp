@@ -41,6 +41,8 @@
 #include "llfloater.h"
 #include "llfloaterreg.h"
 
+#include "llnotifications.h"
+
 ALStreamInfo::ALStreamInfo()
 {
 	if (gAudiop && gAudiop->getStreamingAudioImpl() && gAudiop->getStreamingAudioImpl()->supportsMetaData())
@@ -62,8 +64,10 @@ void ALStreamInfo::handleMetadataUpdate(const LLSD& metadata)
 	static LLCachedControl<bool> show_stream_info(gSavedSettings, "ShowStreamInfo", false);
 	if (!show_stream_info) return;
 
+	bool stream_info_to_chat = gSavedSettings.getBOOL("ShowStreamInfoToChat");
+
 	LLFloater* music_ticker = LLFloaterReg::findInstance("music_ticker");
-	if (music_ticker)
+	if (!stream_info_to_chat && music_ticker)
 		return;
 
 	if (metadata.size() > 0)
@@ -86,15 +90,30 @@ void ALStreamInfo::handleMetadataUpdate(const LLSD& metadata)
 		if (metadata.has("ARTIST"))
 			info << metadata["ARTIST"].asString();
 		args["INFO"] = info.str();
+
+		std::string station_url;
 		if (metadata.has("URL"))
-			LLNotificationsUtil::add("StreamInfo", args,
-				LLSD().with("respond_on_mousedown", TRUE),
-				boost::bind(&LLUrlAction::openURL, metadata["URL"].asString()));
+			station_url = metadata["URL"].asString();
 		else if (metadata.has("icy-url"))
-			LLNotificationsUtil::add("StreamInfo", args,
-				LLSD().with("respond_on_mousedown", TRUE),
-				boost::bind(&LLUrlAction::openURL, metadata["icy-url"].asString()));
+			station_url = metadata["icy-url"].asString();
+
+		LLNotification::Params notify_params;
+		notify_params.name = "StreamInfo";
+		notify_params.substitutions = args;
+		if (!station_url.empty())
+		{
+			notify_params.payload = payload.with("respond_on_mousedown", TRUE);
+
+			LLNotification::Params::Functor functor_p;
+			functor_p.function = [=](const LLSD&, const LLSD&) {LLUrlAction::openURL(station_url); };
+			notify_params.functor = functor_p;
+		}
 		else
-			LLNotificationsUtil::add("StreamInfo", args);
+		{
+			notify_params.payload = payload;
+		}
+
+		notify_params.force_to_chat = stream_info_to_chat;
+		LLNotificationPtr notification = LLNotifications::instance().add(notify_params);
 	}
 }

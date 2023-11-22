@@ -2,8 +2,8 @@
 <panel
  layout="topleft"
  follows="top|right|left"
- width="300"
- height="46"
+ width="350"
+ height="66"
  name="music_ticker"
  class="music_ticker">
     <string name="paused">
@@ -12,23 +12,12 @@
     <string name="loading">
         (loading...)
     </string>
-    <icon
-     top="23"
-     color="AlAshGrey"
-     follows="left|top|right" 
-     height="1"
-     layout="topleft"
-     image_name="white.tga"
-     left="0"
-     mouse_opaque="false"
-     name="ticker_background"
-     width="244" />
     <locate
      top="0"
      bottom="-1"
      left="244"
      name="visualizer_box"
-     width="60"
+     width="110"
      follows="top|right"
      use_bounding_rect="true"
      layout="topleft"/>
@@ -42,47 +31,42 @@
      left="244"
      mouse_opaque="false"
      name="visualizer_grid"
-     width="60" />
+     width="110" />
     <text
      text_color="AlBlue"
-     bg_visible="false"
-     border_visible="false"
-     layout="topleft"
-     top="2"
-     follows="top|left"
-     font="SansSerifBoldLarge"
-     h_pad="0"
-     halign="left"
-     height="16"
-     left="4"
-     mouse_opaque="false"
-     name="artist_label"
-     v_pad="0"
-     width="50">
-        Artist:
-    </text>
-    <text
      bg_visible="false" 
      border_visible="false"
      layout="topleft"
      top="2" 
      follows="top|left|right"
-     font="SansSerifLarge" 
+     font="SansSerifBoldLarge" 
      h_pad="0" 
      halign="left" 
      height="16" 
-     left="56"
+     left="4"
      mouse_opaque="false" 
-     name="artist_text" 
+     name="station_text" 
      v_pad="0" 
-     width="193">
+     width="240">
+     Bark
     </text>
-    <text 
+    <icon
+     top="20"
+     color="AlAshGrey"
+     follows="left|top|right" 
+     height="1"
+     layout="topleft"
+     image_name="white.tga"
+     left="0"
+     mouse_opaque="false"
+     name="ticker_sep1"
+     width="244" />
+     <text 
      text_color="AlBlue" 
      bg_visible="false"
      border_visible="false" 
      layout="topleft"
-     top="26" 
+     top="23" 
      follows="top|left"
      font="SansSerifBoldLarge"
      h_pad="0" 
@@ -95,21 +79,68 @@
      width="50">
         Title:
     </text>
-    <text 
+    <text
+     bg_visible="false" 
+     border_visible="false"
+     layout="topleft"
+     top="23" 
+     follows="top|left|right"
+     font="SansSerifLarge" 
+     h_pad="0" 
+     halign="left" 
+     height="16" 
+     left="57"
+     mouse_opaque="false" 
+     name="title_text" 
+     v_pad="0" 
+     width="188">
+     Woof
+    </text>
+    <icon
+     top="44"
+     color="AlAshGrey"
+     follows="left|top|right" 
+     height="1"
+     layout="topleft"
+     image_name="white.tga"
+     left="0"
+     mouse_opaque="false"
+     name="ticker_sep2"
+     width="244" 
+     />
+     <text 
+     text_color="AlBlue" 
+     bg_visible="false"
+     border_visible="false" 
+     layout="topleft"
+     top="46" 
+     follows="top|left"
+     font="SansSerifBoldLarge"
+     h_pad="0" 
+     halign="left" 
+     height="16" 
+     left="4"
+     mouse_opaque="false"
+     name="artist_label" 
+     v_pad="0" 
+     width="50">
+        Artist:
+    </text>
+    <text
      bg_visible="false" 
      border_visible="false" 
      layout="topleft"
-     top="26"
+     top="46"
      follows="top|left|right"
      font="SansSerifLarge"
      h_pad="0"
      halign="left"
      height="16"
-     left="50"
+     left="57"
      mouse_opaque="false"
-     name="title_text"
+     name="artist_text"
      v_pad="0"
-     width="193">
-     Cummies
+     width="188">
+     Arf
     </text>
 </panel>
