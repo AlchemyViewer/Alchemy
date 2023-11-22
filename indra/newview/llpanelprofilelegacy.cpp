@@ -736,8 +736,8 @@ void LLPanelProfileLegacy::onCommitModifyObjectsRights(LLUICtrl* ctrl)
 {
 	if (ctrl->getValue().asBoolean()) // We want to confirm that the user really wants to grant object rights
 	{
-		LLNotificationsUtil::add("ConfirmGrantModifyRights",
-								 LLSD().with("AGENT", LLSLURL("agent", getAvatarId(), "inspect").getSLURLString()),
+		LLNotificationsUtil::add("GrantModifyRights",
+								 LLSD().with("NAME", LLSLURL("agent", getAvatarId(), "inspect").getSLURLString()),
 								 LLSD(),
 								 boost::bind(&LLPanelProfileLegacy::handleConfirmModifyRightsCallback, this, _1, _2));
 	}
@@ -1085,7 +1085,7 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::onClickDelete()
 	{
 		LLSD args;
 		args["PICK"] = value[PICK_NAME];
-		LLNotificationsUtil::add("DeleteAvatarPick", args, LLSD(), 
+		LLNotificationsUtil::add("ProfileDeletePick", args, LLSD(), 
 			boost::bind(&LLPanelProfilePicks::callbackDeletePick, this, _1, _2));
 		return;
 	}
@@ -1093,8 +1093,8 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::onClickDelete()
 	if (value.isDefined())
 	{
 		LLSD args;
-		args["NAME"] = value[CLASSIFIED_NAME];
-		LLNotificationsUtil::add("DeleteClassified", args, LLSD(), 
+		args["CLASSIFIED"] = value[CLASSIFIED_NAME];
+		LLNotificationsUtil::add("ProfileDeleteClassified", args, LLSD(), 
 			boost::bind(&LLPanelProfilePicks::callbackDeleteClassified, this, _1, _2));
 		return;
 	}
