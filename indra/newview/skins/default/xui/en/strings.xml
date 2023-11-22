@@ -4427,6 +4427,7 @@ and report the problem.
   <string name="AvatarTyping">Typing</string>
   <string name="UnknownAvatar">Unknown Avatar</string>
   <string name="NotAvailableOnPlatform">Not availalbe on this platform</string>
+  <string name="NowPlaying">Now Playing</string>
   <string name="GridInfoTitle">GRID INFO</string>
 
   <!-- <LSL Preprocessor -->

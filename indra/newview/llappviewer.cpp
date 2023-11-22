@@ -264,6 +264,8 @@ using namespace LL;
 #include "aldiscordmanager.h"
 #endif
 
+#include "alstreaminfo.h"
+
 // *FIX: These extern globals should be cleaned up.
 // The globals either represent state/config/resource-storage of either
 // this app, or another 'component' of the viewer. App globals should be
@@ -1779,6 +1781,8 @@ bool LLAppViewer::cleanup()
 		delete gAudiop;
 		gAudiop = nullptr;
 	}
+
+	ALStreamInfo::deleteSingleton();
 
 	// Note: this is where LLFeatureManager::getInstance()-> used to be deleted.
 

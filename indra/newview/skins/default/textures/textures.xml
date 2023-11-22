@@ -433,6 +433,7 @@ with the same filename but different name
   <texture name="Movement_TurnRight_On" file_name="bottomtray/Movement_TurnRight_On.png" preload="false" />
   <texture name="Movement_Up_Off" file_name="bottomtray/Movement_Up_Off.png" preload="false" />
   <texture name="Movement_Up_On" file_name="bottomtray/Movement_Up_On.png" preload="false" />
+  <texture name="MusicNote" file_name="icons/MusicNote.png" preload="false" />
 
   <texture name="NavBar_BG" file_name="navbar/NavBar_BG.png" preload="true" scale.left="1" scale.top="1" scale.right="0" scale.bottom="0" />
   <texture name="NavBar_BG_NoFav_Bevel" file_name="navbar/NavBar_BG_NoFav_Bevel.png" preload="true" scale.left="1" scale.top="1" scale.right="0" scale.bottom="0" />

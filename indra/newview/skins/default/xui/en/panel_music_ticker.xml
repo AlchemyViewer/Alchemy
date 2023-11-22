@@ -4,7 +4,8 @@
  follows="top|right|left"
  width="300"
  height="46"
- name="music_ticker">
+ name="music_ticker"
+ class="music_ticker">
     <string name="paused">
         (not playing)
     </string>

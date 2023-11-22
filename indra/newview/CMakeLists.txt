@@ -99,9 +99,11 @@ set(viewer_SOURCE_FILES
     alpanelaopulldown.cpp
     alpanelmusicticker.cpp
     alpanelradaralert.cpp
+    alpanelstreaminfo.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
     alrenderutils.cpp
+    alstreaminfo.cpp
     altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
@@ -827,9 +829,11 @@ set(viewer_HEADER_FILES
     alpanelaopulldown.h
     alpanelmusicticker.h
     alpanelradaralert.h
+    alpanelstreaminfo.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
     alrenderutils.h
+    alstreaminfo.h
     altoolalign.h
     alunzip.h
     alviewermenu.h
