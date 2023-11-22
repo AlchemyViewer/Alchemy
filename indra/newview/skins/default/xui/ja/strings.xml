@@ -1131,6 +1131,9 @@ https://secondlife.com/viewer-access-faq
 	<string name="worldmap_results_none_found">
 		何も見つかりませんでした。
 	</string>
+	<string name="worldmap_agent_position">
+		現在地
+	</string>
 	<!-- animations uploading status codes -->
 	<string name="Ok">
 		ＯＫ
