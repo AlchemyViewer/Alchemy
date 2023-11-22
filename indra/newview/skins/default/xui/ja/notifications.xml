@@ -5945,6 +5945,12 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		[REGION]から[AGENT]が去りました。
 		<tag>radar</tag>
 	</notification>
+	<notification name="StreamInfo">
+		<tag>StreamInfo</tag>
+[STATION]
+
+[INFO]
+	</notification>
 	<notification name="AutoAcceptedInventory">
 		[NAME]が渡してきた[ITEM]は、自動的に受け入れられ、インベントリに配置されました。
 	</notification>
