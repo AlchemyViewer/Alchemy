@@ -117,8 +117,7 @@ LLStreamingAudio_FMODSTUDIO::LLStreamingAudio_FMODSTUDIO(FMOD::System *system) :
     mFMODInternetStreamChannelp(nullptr),
     mGain(1.0f),
     mWasAlreadyPlaying(false),
-    mMetaData(nullptr),
-    mNewMetadata(true)
+    mMetadata(LLSD::emptyMap())
 {
     // Number of milliseconds of audio to buffer for the audio card.
     // Must be larger than the usual Second Life frame stutter time.
@@ -168,7 +167,6 @@ void LLStreamingAudio_FMODSTUDIO::start(const std::string& url)
             LL_INFOS() << "Starting internet stream: " << url << LL_ENDL;
             mCurrentInternetStreamp = new LLAudioStreamManagerFMODSTUDIO(mSystem, mStreamGroup, url);
             mURL = url;
-            mMetaData = new LLSD;
         }
         else
         {
@@ -237,7 +235,8 @@ void LLStreamingAudio_FMODSTUDIO::update()
         LL_INFOS() << "Starting internet stream: " << mPendingURL << LL_ENDL;
         mCurrentInternetStreamp = new LLAudioStreamManagerFMODSTUDIO(mSystem, mStreamGroup, mPendingURL);
         mURL = mPendingURL;
-        mMetaData = new LLSD;
+        mMetadata = LLSD::emptyMap();
+        mMetadataUpdateSignal(mMetadata);
         mPendingURL.clear();
     }
 
@@ -294,19 +293,15 @@ void LLStreamingAudio_FMODSTUDIO::update()
 
     if (mFMODInternetStreamChannelp)
     {
-        if(!mMetaData)
-            mMetaData = new LLSD;
-
         FMOD::Sound *sound = nullptr;
 
         if(mFMODInternetStreamChannelp->getCurrentSound(&sound) == FMOD_OK && sound)
         {
             FMOD_TAG tag;
             S32 tagcount, dirtytagcount;
-            if(sound->getNumTags(&tagcount, &dirtytagcount) == FMOD_OK && dirtytagcount)
+            if(sound->getNumTags(&tagcount, &dirtytagcount) == FMOD_OK && dirtytagcount > 0)
             {
-                mMetaData->clear();
-                mNewMetadata = true;
+                mMetadata = LLSD::emptyMap();
 
                 for(S32 i = 0; i < tagcount; ++i)
                 {
@@ -352,11 +347,11 @@ void LLStreamingAudio_FMODSTUDIO::update()
                     switch (tag.datatype)
                     {
                         case(FMOD_TAGDATATYPE_INT):
-                            (*mMetaData)[name]=*(LLSD::Integer*)(tag.data);
+                           mMetadata[name]=*(LLSD::Integer*)(tag.data);
                             LL_INFOS() << tag.name << ": " << *(int*)(tag.data) << LL_ENDL;
                             break;
                         case(FMOD_TAGDATATYPE_FLOAT):
-                            (*mMetaData)[name]=*(LLSD::Real*)(tag.data);
+                            mMetadata[name]=*(LLSD::Real*)(tag.data);
                             LL_INFOS() << tag.name << ": " << *(float*)(tag.data) << LL_ENDL;
                             break;
                         case(FMOD_TAGDATATYPE_STRING):
@@ -364,7 +359,7 @@ void LLStreamingAudio_FMODSTUDIO::update()
                             std::string out = rawstr_to_utf8(std::string((char*)tag.data,tag.datalen));
                             if (out.length() && out[out.size() - 1] == 0)
                                 out.erase(out.size() - 1);
-                            (*mMetaData)[name]=out;
+                            mMetadata[name]=out;
                             LL_INFOS() << tag.name << "(RAW): " << out << LL_ENDL;
                             break;
                         }
@@ -376,7 +371,7 @@ void LLStreamingAudio_FMODSTUDIO::update()
                             std::string out((char*)tag.data + offs, tag.datalen - offs);
                             if (out.length() && out[out.size() - 1] == 0)
                                 out.erase(out.size() - 1);
-                            (*mMetaData)[name] = out;
+                            mMetadata[name] = out;
                             LL_INFOS() << tag.name << "(UTF8): " << out << LL_ENDL;
                             break;
                         }
@@ -385,7 +380,7 @@ void LLStreamingAudio_FMODSTUDIO::update()
                             std::string out = utf16input_to_utf8((unsigned char*)tag.data, tag.datalen, UTF16);
                             if (out.length() && out[out.size() - 1] == 0)
                                 out.erase(out.size() - 1);
-                            (*mMetaData)[name] = out;
+                            mMetadata[name] = out;
                             LL_INFOS() << tag.name << "(UTF16): " << out << LL_ENDL;
                             break;
                         }
@@ -394,7 +389,7 @@ void LLStreamingAudio_FMODSTUDIO::update()
                             std::string out = utf16input_to_utf8((unsigned char*)tag.data, tag.datalen, UTF16BE);
                             if (out.length() && out[out.size() - 1] == 0)
                                 out.erase(out.size() - 1);
-                            (*mMetaData)[name] = out;
+                            mMetadata[name] = out;
                             LL_INFOS() << tag.name << "(UTF16BE): " << out << LL_ENDL;
                             break;
                         }
@@ -402,6 +397,8 @@ void LLStreamingAudio_FMODSTUDIO::update()
                             break;
                     }
                 }
+
+                mMetadataUpdateSignal(mMetadata);
             }
 
             if (starving)
@@ -428,11 +425,8 @@ void LLStreamingAudio_FMODSTUDIO::stop()
     mPendingURL.clear();
     mWasAlreadyPlaying = false;
 
-    if(mMetaData)
-    {
-        delete mMetaData;
-        mMetaData = nullptr;
-    }
+    mMetadata = LLSD::emptyMap();
+    mMetadataUpdateSignal(mMetadata);
     
     if (mFMODInternetStreamChannelp)
     {
@@ -522,19 +516,6 @@ void LLStreamingAudio_FMODSTUDIO::setGain(F32 vol)
         vol = llclamp(vol * vol, 0.f, 1.f);	//should vol be squared here?
 
         Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setVolume(vol), "FMOD::Channel::setVolume");
-    }
-}
-
-bool LLStreamingAudio_FMODSTUDIO::hasNewMetaData()
-{
-    if (mCurrentInternetStreamp && mNewMetadata)
-    {
-        mNewMetadata = false;
-        return true;
-    }
-    else
-    {
-        return false;
     }
 }
 

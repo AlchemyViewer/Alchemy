@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
- width="320"
- height="39"
+ width="360"
+ height="46"
  layout="topleft"
- min_width="300"
- min_height="39"
+ min_width="280"
+ min_height="46"
  name="floater_music_ticker"
  positioning="cascading"
  title=""
@@ -21,7 +21,7 @@
    filename="panel_music_ticker.xml"
    layout="topleft"
    follows="all"
-   width="296"
+   width="336"
    top="0"
    mouse_opaque="false"/>
 </floater>

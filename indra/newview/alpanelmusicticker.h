@@ -30,6 +30,7 @@ class ALPanelMusicTicker final : public LLPanel
 {
 public:
 	ALPanelMusicTicker();	//ctor
+	~ALPanelMusicTicker();
 
 	BOOL postBuild() final override;
 	void draw() final override;
@@ -43,6 +44,8 @@ private:
 	bool setTitle(const std::string &title);	//returns true on change
 	S32 countExtraChars(LLTextBox *texbox, const std::string &text);	//calculates how many characters are truncated by bounds.
 	void iterateTickerOffset();	//Logic that actually shuffles the text to the left.
+
+	void metadataUpdateCallback(const LLSD&);
 
 	enum ePlayState
 	{
@@ -67,6 +70,8 @@ private:
 	LLTextBox* mArtistText;
 	LLTextBox* mTitleText;
 	LLUICtrl* mVisualizer;
+
+	boost::signals2::connection mMetadataUpdateConnection;
 };
 
 #endif // AL_PANELMUSICTICKER_H

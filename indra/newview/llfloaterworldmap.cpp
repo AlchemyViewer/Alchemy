@@ -191,7 +191,7 @@ public:
 		
 		//Get the ID
 		LLUUID id;
-		if (!id.set( params[0].asStringRef(), FALSE ))
+		if (!id.set( params[0].asString(), FALSE))
 		{
 			return false;
 		}
@@ -299,6 +299,7 @@ void* LLFloaterWorldMap::createWorldMapView(void* data)
 BOOL LLFloaterWorldMap::postBuild()
 {
     mMapView = dynamic_cast<LLWorldMapView*>(getChild<LLPanel>("objects_mapview"));
+	mMapView->setPan(0, 0, true);
 
 	mTeleportButton = getChild<LLButton>("Teleport");
 	mShowDestinationButton = getChild<LLButton>("Show Destination");
