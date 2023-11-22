@@ -388,7 +388,7 @@
     follows="left|top"
     layout="topleft" 
     height="15"
-    top_pad="8"
+    top_pad="5"
     tool_tip="Uncheck this to hide media attached to other avatars nearby"
     label="Play media attached to other avatars"
     left="20"
