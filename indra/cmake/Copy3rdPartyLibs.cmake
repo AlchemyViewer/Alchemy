@@ -130,6 +130,7 @@ if(WINDOWS)
             vccorlib${MSVC_VER}.dll
             vcruntime${MSVC_VER}.dll
             vcruntime${MSVC_VER}_1.dll
+            vcruntime${MSVC_VER}_threads.dll
             )
         if(EXISTS "${registry_path}/${release_msvc_file}")
             to_staging_dirs(
