@@ -54,8 +54,6 @@ class LLStreamingAudio_MediaPlugins final : public LLStreamingAudioInterface
 	void setBufferSizes(U32 streambuffertime, U32 decodebuffertime) override {};
 
 	virtual bool supportsMetaData() override { return false; }
-	virtual const LLSD *getMetaData() override { return nullptr; }
-	virtual bool hasNewMetaData() override { return false; }
 	virtual bool supportsWaveData() override { return false; }
 	virtual bool getWaveData(float* arr, S32 count, S32 stride = 1) override { return false; }
 

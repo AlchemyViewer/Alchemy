@@ -46,6 +46,14 @@ ALPanelMusicTicker::ALPanelMusicTicker() : LLPanel(),
 {
 }
 
+ALPanelMusicTicker::~ALPanelMusicTicker()
+{
+	if (mMetadataUpdateConnection.connected())
+	{
+		mMetadataUpdateConnection.disconnect();
+	}
+}
+
 BOOL ALPanelMusicTicker::postBuild()
 {
 	mArtistText =	getChild<LLTextBox>("artist_text");
@@ -54,8 +62,17 @@ BOOL ALPanelMusicTicker::postBuild()
 	mszLoading	=	getString("loading");
 	mszPaused	=	getString("paused");
 	mOscillatorColor = LLUIColorTable::getInstance()->getColor("ALMediaTickerOscillatorColor");
-	
-	setPaused(true);
+
+	if (gAudiop && gAudiop->getStreamingAudioImpl() && gAudiop->getStreamingAudioImpl()->supportsMetaData())
+	{
+		mMetadataUpdateConnection = gAudiop->getStreamingAudioImpl()->setMetadataUpdatedCallback([this](const LLSD& metadata) { metadataUpdateCallback(metadata); });
+
+		metadataUpdateCallback(gAudiop->getStreamingAudioImpl()->getMetadata());
+	}
+	else
+	{
+		metadataUpdateCallback(LLSD());
+	}
 
 	return LLPanel::postBuild();
 }
@@ -83,45 +100,34 @@ void ALPanelMusicTicker::reshape(S32 width, S32 height, BOOL called_from_parent/
 
 void ALPanelMusicTicker::updateTickerText() //called via draw.
 {
-	if(!gAudiop)
-		return;
+	iterateTickerOffset();
+}
 
-	bool stream_paused = gAudiop->getStreamingAudioImpl()->isPlaying() != 1;	//will return 1 if playing.
+void ALPanelMusicTicker::metadataUpdateCallback(const LLSD& metadata)
+{
+	bool stream_paused = true;
+	
+	if (gAudiop && gAudiop->getStreamingAudioImpl())
+	{
+		stream_paused = gAudiop->getStreamingAudioImpl()->isPlaying() != 1;	//will return 1 if playing.
+	}
 
 	bool dirty = setPaused(stream_paused);
-	if(!stream_paused)
+	if (!stream_paused)
 	{
-		if (dirty || gAudiop->getStreamingAudioImpl()->hasNewMetaData())
-		{
-			const LLSD* metadata = gAudiop->getStreamingAudioImpl()->getMetaData();
-			LLSD artist = metadata ? metadata->get("ARTIST") : LLSD();
-			LLSD title = metadata ? metadata->get("TITLE") : LLSD();
-	
-			dirty |= setArtist(artist.isDefined() ? artist.asString() : mszLoading);
-			dirty |= setTitle(title.isDefined() ? title.asString() : mszLoading);
-			if(artist.isDefined() && title.isDefined())
-				mLoadTimer.stop();
-			else if(dirty)
-				mLoadTimer.start();
-			else if(mLoadTimer.getStarted() && mLoadTimer.getElapsedTimeF64() > 10.f) //It has been 10 seconds.. give up.
-			{
-				if(!artist.isDefined())
-					dirty |= setArtist(LLStringUtil::null);
-				if(!title.isDefined())
-					dirty |= setTitle(LLStringUtil::null);
-				mLoadTimer.stop();
-			}
-		}
+			LLSD artist = metadata["ARTIST"];
+			LLSD title = metadata["TITLE"];
+
+			dirty |= setArtist(artist.isDefined() ? artist.asString() : LLStringUtil::null);
+			dirty |= setTitle(title.isDefined() ? title.asString() : LLStringUtil::null);
 	}
-	if(dirty)
+	if (dirty)
 		resetTicker();
-	else 
-		iterateTickerOffset();
 }
 
 void ALPanelMusicTicker::drawOscilloscope() //called via draw.
 {
-	if(!gAudiop || !mVisualizer || !gAudiop->getStreamingAudioImpl()->supportsWaveData())
+	if(!gAudiop || !mVisualizer || !gAudiop->getStreamingAudioImpl() || !gAudiop->getStreamingAudioImpl()->supportsWaveData())
 		return;
 
 	static const S32 NUM_LINE_STRIPS = 64;			//How many lines to draw. 64 is more than enough.

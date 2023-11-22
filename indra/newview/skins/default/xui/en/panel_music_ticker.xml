@@ -3,7 +3,7 @@
  layout="topleft"
  follows="top|right|left"
  width="300"
- height="38"
+ height="46"
  name="music_ticker">
     <string name="paused">
         (not playing)
@@ -12,7 +12,7 @@
         (loading...)
     </string>
     <icon
-     top="19"
+     top="23"
      color="AlAshGrey"
      follows="left|top|right" 
      height="1"
@@ -47,9 +47,9 @@
      bg_visible="false"
      border_visible="false"
      layout="topleft"
-     top="0"
+     top="2"
      follows="top|left"
-     font="SansSerifBold"
+     font="SansSerifBoldLarge"
      h_pad="0"
      halign="left"
      height="16"
@@ -64,13 +64,13 @@
      bg_visible="false" 
      border_visible="false"
      layout="topleft"
-     top="0" 
+     top="2" 
      follows="top|left|right"
-     font="SansSerifBold" 
+     font="SansSerifLarge" 
      h_pad="0" 
      halign="left" 
      height="16" 
-     left="50"
+     left="56"
      mouse_opaque="false" 
      name="artist_text" 
      v_pad="0" 
@@ -81,9 +81,9 @@
      bg_visible="false"
      border_visible="false" 
      layout="topleft"
-     top="19" 
+     top="26" 
      follows="top|left"
-     font="SansSerifBold"
+     font="SansSerifBoldLarge"
      h_pad="0" 
      halign="left" 
      height="16" 
@@ -98,9 +98,9 @@
      bg_visible="false" 
      border_visible="false" 
      layout="topleft"
-     top="19"
+     top="26"
      follows="top|left|right"
-     font="SansSerifBold"
+     font="SansSerifLarge"
      h_pad="0"
      halign="left"
      height="16"
@@ -109,5 +109,6 @@
      name="title_text"
      v_pad="0"
      width="193">
+     Cummies
     </text>
 </panel>
