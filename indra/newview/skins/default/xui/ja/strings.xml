@@ -303,7 +303,7 @@ https://secondlife.com/viewer-access-faq
 	<string name="LoginFailedAuthenticationFailed">
 		申し訳ありませんが、ログインできませんでした。
 以下の情報が正しく入力されたことを確認してください：
-・ユーザー名（bobsmith12 または steller.sunshine など）
+・ユーザー名（bobsmith12またはsteller.sunshineなど）
 ・パスワード
 ・２段階認証（使用している場合）
 また、Caps Lockが入っていないこともご確認ください。

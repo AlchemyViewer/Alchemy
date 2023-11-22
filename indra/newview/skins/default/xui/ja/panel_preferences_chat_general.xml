@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="テキストチャット" name="chat">
 	<panel name="general_chat_settings">
-		<check_box label="近くのチャットでゼスチャーをオートコンプリート" name="auto_complete_gestures"/>
-		<check_box label="チャット時にタイピングアニメーションを再生" name="play_typing_animation"/>
+		<check_box label="ローカルチャットでジェスチャーを自動補完" tool_tip="このオプションは、ローカルチャットに書き込む際に、ビューアがジェスチャー名を自動的に補完しようとするかどうかを切り替えます。" name="auto_complete_gestures"/>
+		<check_box label="チャット時にタイピングアニメーションを再生" tool_tip="このオプションは、ローカルチャットでメッセージを入力している間、タイピングアニメーションを表示するかどうかを切り替えます。"  name="play_typing_animation"/>
 		<check_box label="オフライン時にＩＭが送られてきたときにメールを送る（[EMAIL]）" name="send_im_to_email"/>
-		<text name="email_settings"> [https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]
+		<text name="email_settings">
+			[https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]
 		</text>
 		<text name="font_size">
 			フォントサイズ：
@@ -100,12 +101,12 @@
 			保存：
 		</text>
 		<combo_box name="conversation_log_combo">
-			<item label="ログとテキストチャット" name="log_and_transcripts" value="2"/>
+			<item label="ログと会話履歴" name="log_and_transcripts" value="2"/>
 			<item label="ログのみ" name="log_only" value="1"/>
-			<item label="ログかテキストチャットなし" name="no_log_or_transcript" value="0"/>
+			<item label="ログか会話履歴なし" name="no_log_or_transcript" value="0"/>
 		</combo_box>
 		<button label="ログをクリア…" name="clear_log"/>
-		<button label="テキストチャットを削除…" name="delete_transcripts"/>
+		<button label="会話履歴を削除…" name="delete_transcripts"/>
 		<text name="log_location_label">
 			場所：
 		</text>
@@ -114,5 +115,5 @@
 	</panel>
 	<button label="翻訳…" name="ok_btn"/>
 	<button name="autoreplace_showgui" label="自動置換…"/>
-	<button name="spellcheck_showgui" label="スペルチェック…."/>
+	<button name="spellcheck_showgui" label="スペルチェック…"/>
 </panel>
