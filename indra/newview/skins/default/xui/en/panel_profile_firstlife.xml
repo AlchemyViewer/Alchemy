@@ -23,6 +23,8 @@
      name="real_world_pic"
      image_name="Generic_Person_Large"
      follows="top|left"
+	 interactable="true"
+	 for_profile="true"
      layout="topleft"
      top="10"
      left="8"

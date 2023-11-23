@@ -80,6 +80,7 @@ Account: [ACCTTYPE]
        layout="topleft"
        follows="all"
        interactable="true"
+	   for_profile="true"
        top="0"
        left="2"
        bottom="-1"

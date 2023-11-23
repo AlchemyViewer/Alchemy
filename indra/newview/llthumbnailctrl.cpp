@@ -48,6 +48,7 @@ LLThumbnailCtrl::Params::Params()
 , border_visible("show_visible", false)
 , interactable("interactable", false)
 , show_loading("show_loading", true)
+, for_profile("for_profile", false)
 {}
 
 LLThumbnailCtrl::LLThumbnailCtrl(const LLThumbnailCtrl::Params& p)
@@ -57,7 +58,9 @@ LLThumbnailCtrl::LLThumbnailCtrl(const LLThumbnailCtrl::Params& p)
 ,   mFallbackImagep(p.fallback_image)
 ,   mInteractable(p.interactable())
 ,   mShowLoadingPlaceholder(p.show_loading())
+,   mInited(false)
 ,   mInitImmediately(true)
+,   mForProfile(p.for_profile)
 {
     mLoadingPlaceholderString = LLTrans::getString("texture_loading");
     
@@ -84,6 +87,10 @@ LLThumbnailCtrl::~LLThumbnailCtrl()
 
 void LLThumbnailCtrl::draw()
 {
+    if (!mInited)
+    {
+        initImage();
+    }
     LLRect draw_rect = getLocalRect();
     
     if (mBorderVisible)
@@ -173,8 +180,8 @@ void LLThumbnailCtrl::draw()
 
 void LLThumbnailCtrl::clearTexture()
 {
-    mTexturep = nullptr;
-    mImagep = nullptr;
+    setValue(LLSD());
+    mInited = true; // nothing to do
 }
 
 // virtual
@@ -190,11 +197,11 @@ void LLThumbnailCtrl::setValue(const LLSD& value)
     
 	LLUICtrl::setValue(tvalue);
     
-    clearTexture();
+    unloadImage();
 
     if (mInitImmediately)
     {
-        loadImage(tvalue);
+        initImage();
     }
 }
 
@@ -208,11 +215,14 @@ BOOL LLThumbnailCtrl::handleHover(S32 x, S32 y, MASK mask)
     return LLUICtrl::handleHover(x, y, mask);
 }
 
-void LLThumbnailCtrl::loadImage(const LLSD& tvalue)
+void LLThumbnailCtrl::initImage()
 {
-    clearTexture();
-
-    if (!getVisible()) return;
+    if (mInited)
+    {
+        return;
+    }
+    mInited = true;
+    LLSD tvalue = getValue();
 
     if (tvalue.isUUID())
     {
@@ -220,16 +230,13 @@ void LLThumbnailCtrl::loadImage(const LLSD& tvalue)
         if (imageAssetID.notNull())
         {
             // Should it support baked textures?
-            mTexturep = LLViewerTextureManager::getFetchedTexture(imageAssetID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_THUMBNAIL);
+            mTexturep = LLViewerTextureManager::getFetchedTexture(imageAssetID, FTT_DEFAULT, MIPMAP_YES, mForProfile ? LLGLTexture::BOOST_PREVIEW : LLGLTexture::BOOST_THUMBNAIL);
 
             mTexturep->forceToSaveRawImage(0);
 
-            LLRect draw_rect = getLocalRect();
-            if (mBorderVisible)
-            {
-                draw_rect.stretch(-1);
-            }
-            mTexturep->setKnownDrawSize(draw_rect.getWidth(), draw_rect.getHeight());
+            S32 desired_draw_width = MAX_IMAGE_SIZE;
+            S32 desired_draw_height = MAX_IMAGE_SIZE;
+            mTexturep->setKnownDrawSize(desired_draw_width, desired_draw_height);
         }
     }
     else if (tvalue.isString())
@@ -247,19 +254,21 @@ void LLThumbnailCtrl::loadImage(const LLSD& tvalue)
     }
 }
 
+void LLThumbnailCtrl::unloadImage()
+{
+    mTexturep = nullptr;
+    mImagep = nullptr;
+    mInited = false;
+}
+
 void LLThumbnailCtrl::onVisibilityChange(BOOL new_visibility)
 {
-    LLUICtrl::onVisibilityChange(new_visibility);
+    if (!new_visibility && mInited)
     {
-        if (new_visibility)
-        {
-            loadImage(getValue());
-        }
-        else
-        {
-            clearTexture();
-        }
+        unloadImage();
     }
+
+    LLUICtrl::onVisibilityChange(new_visibility);
 }
 
 

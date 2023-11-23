@@ -53,6 +53,7 @@ public:
         Optional<bool>             border_visible;
         Optional<bool>             interactable;
         Optional<bool>             show_loading;
+        Optional<bool>             for_profile;
         
 		Params();
 	};
@@ -69,16 +70,20 @@ public:
     void setInitImmediately(bool val) { mInitImmediately = val; }
     void clearTexture();
     
-    void loadImage(const LLSD& tvalue);
-
     virtual BOOL handleHover(S32 x, S32 y, MASK mask) override;
     void onVisibilityChange(BOOL new_visibility) override;
+
+protected:
+    void initImage();
+    void unloadImage();
 	
 private:
     bool mBorderVisible;
     bool mInteractable;
     bool mShowLoadingPlaceholder;
+    bool mInited;
     bool mInitImmediately;
+    bool mForProfile;
     std::string mLoadingPlaceholderString;
     LLViewBorder* mBorder;
     LLUIColor mBorderColor;
