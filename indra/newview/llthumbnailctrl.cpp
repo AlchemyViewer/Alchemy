@@ -57,7 +57,7 @@ LLThumbnailCtrl::LLThumbnailCtrl(const LLThumbnailCtrl::Params& p)
 ,   mFallbackImagep(p.fallback_image)
 ,   mInteractable(p.interactable())
 ,   mShowLoadingPlaceholder(p.show_loading())
-,	mPriority(LLGLTexture::BOOST_PREVIEW)
+,   mInitImmediately(true)
 {
     mLoadingPlaceholderString = LLTrans::getString("texture_loading");
     
@@ -105,6 +105,8 @@ void LLThumbnailCtrl::draw()
         }
         
         gl_draw_scaled_image( draw_rect.mLeft, draw_rect.mBottom, draw_rect.getWidth(), draw_rect.getHeight(), mTexturep, UI_VERTEX_COLOR % alpha);
+        
+        mTexturep->setKnownDrawSize(draw_rect.getWidth(), draw_rect.getHeight());
     }
     else if( mImagep.notNull() )
     {
@@ -188,13 +190,27 @@ void LLThumbnailCtrl::setValue(const LLSD& value)
     
 	LLUICtrl::setValue(tvalue);
     
-    loadImage(tvalue);
+    clearTexture();
+
+    if (mInitImmediately)
+    {
+        loadImage(tvalue);
+    }
+}
+
+BOOL LLThumbnailCtrl::handleHover(S32 x, S32 y, MASK mask)
+{
+    if (mInteractable && getEnabled())
+    {
+        getWindow()->setCursor(UI_CURSOR_HAND);
+        return TRUE;
+    }
+    return LLUICtrl::handleHover(x, y, mask);
 }
 
 void LLThumbnailCtrl::loadImage(const LLSD& tvalue)
 {
-    mTexturep = nullptr;
-    mImagep = nullptr;
+    clearTexture();
 
     if (!getVisible()) return;
 
@@ -204,9 +220,8 @@ void LLThumbnailCtrl::loadImage(const LLSD& tvalue)
         if (imageAssetID.notNull())
         {
             // Should it support baked textures?
-            mTexturep = LLViewerTextureManager::getFetchedTexture(imageAssetID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+            mTexturep = LLViewerTextureManager::getFetchedTexture(imageAssetID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_THUMBNAIL);
 
-            mTexturep->setBoostLevel(mPriority);
             mTexturep->forceToSaveRawImage(0);
 
             LLRect draw_rect = getLocalRect();
@@ -230,16 +245,6 @@ void LLThumbnailCtrl::loadImage(const LLSD& tvalue)
             mImagep->getImage()->setKnownDrawSize(draw_rect.getWidth(), draw_rect.getHeight());
         }
     }
-}
-
-BOOL LLThumbnailCtrl::handleHover(S32 x, S32 y, MASK mask)
-{
-    if (mInteractable && getEnabled())
-    {
-        getWindow()->setCursor(UI_CURSOR_HAND);
-        return TRUE;
-    }
-    return LLUICtrl::handleHover(x, y, mask);
 }
 
 void LLThumbnailCtrl::onVisibilityChange(BOOL new_visibility)

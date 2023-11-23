@@ -66,6 +66,7 @@ public:
 	virtual void draw() override;
 
 	virtual void setValue(const LLSD& value ) override;
+    void setInitImmediately(bool val) { mInitImmediately = val; }
     void clearTexture();
     
     void loadImage(const LLSD& tvalue);
@@ -74,10 +75,10 @@ public:
     void onVisibilityChange(BOOL new_visibility) override;
 	
 private:
-	S32 mPriority;
     bool mBorderVisible;
     bool mInteractable;
     bool mShowLoadingPlaceholder;
+    bool mInitImmediately;
     std::string mLoadingPlaceholderString;
     LLViewBorder* mBorder;
     LLUIColor mBorderColor;
