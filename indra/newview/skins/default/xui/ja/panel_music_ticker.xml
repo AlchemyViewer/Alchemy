@@ -7,15 +7,22 @@
 	<string name="loading">
 		（読み込んでいます…）
 	</string>
-	<icon name="ticker_background" width="284"/>
-	<locate left="284" name="visualizer_box" width="60"/>
-	<icon left="284" name="visualizer_grid" width="60"/>
-	<text name="artist_label" width="85">
+	<locate left="264" name="visualizer_box"/>
+	<icon left="264" name="visualizer_grid"/>
+	<text name="station_text">
+		バーク
+	</text>
+	<icon name="ticker_sep1" width="264"/>
+	<text name="title_label" width="80">
+		曲名：
+	</text>
+	<text left="86" name="title_text" width="220">
+		ウーフ
+	</text>
+	<text name="artist_label" width="80">
 		アーティスト：
 	</text>
-	<text left="85" name="artist_text" width="200"/>
-	<text left="27" name="title_label" width="60">
-		タイトル：
+	<text left="86" name="artist_text" width="220">
+		アーフ
 	</text>
-	<text left="85" name="title_text" width="200"/>
 </panel>
