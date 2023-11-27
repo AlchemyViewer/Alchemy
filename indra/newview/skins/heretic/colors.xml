@@ -1155,9 +1155,15 @@
   <color
    name="ProfileOnlineIndicatorColor"
    reference="Green" />
-  <color
-   name="ALMediaTickerOscillatorColor"
-   reference="EmphasisColor"/>
+   <color
+    name="MusicTickerGridColor" 
+    reference="White_50"/>
+   <color
+    name="ALMediaTickerOscillatorColor" 
+    reference="EmphasisColor"/>
+   <color
+    name="MusicTickerEmphasisColor" 
+    reference="EmphasisColor"/>
   <color
    name="FriendChatColor"
    reference="White" />

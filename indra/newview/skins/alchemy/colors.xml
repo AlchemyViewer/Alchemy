@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <colors>
     <color
-     name="ALMediaTickerOscillatorColor" 
-     reference="AlBlue"/>
-    <color
      name="AlBlue"
      value="0 0.631 0.874 1" />
     <color
@@ -607,7 +604,7 @@
      reference="Green" />
     <color
      name="MapAvatarFriendColor"
-     reference="Yellow" />
+     reference="AlBlue" />
     <color
      name="MapAvatarLindenColor"
      value="0 1 1 1" />  
@@ -1098,9 +1095,6 @@
    name="AvatarDefaultColor"
    reference="MapAvatarColor" />
   <color
-   name="AvatarFriendColor"
-   reference="MapAvatarFriendColor" />
-  <color
    name="AvatarLindenColor"
    reference="MapAvatarLindenColor" />
   <color
@@ -1154,4 +1148,13 @@
   <color
     name="SearchableControlHighlightColor" 
     reference="AlDangerRed"/>
+  <color
+    name="MusicTickerGridColor" 
+    reference="AlAshGrey"/>
+  <color
+    name="ALMediaTickerOscillatorColor" 
+    reference="AlBlue"/>
+  <color
+    name="MusicTickerEmphasisColor" 
+    reference="AlBlue"/>
 </colors>

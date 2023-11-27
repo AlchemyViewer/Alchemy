@@ -1105,4 +1105,13 @@
    <color
     name="Yellow"
     value="1 1 0 1"/>
+   <color
+    name="MusicTickerGridColor" 
+    reference="White_50"/>
+   <color
+    name="ALMediaTickerOscillatorColor" 
+    reference="EmphasisColor"/>
+   <color
+    name="MusicTickerEmphasisColor" 
+    reference="EmphasisColor"/>
 </colors>

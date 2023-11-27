@@ -24,7 +24,7 @@
     <icon
      top="0"
      bottom="-1"
-     color="AlAshGrey"
+     color="MusicTickerGridColor"
      follows="top|right"
      layout="topleft"
      image_name="Ticker_Grid"
@@ -33,7 +33,7 @@
      name="visualizer_grid"
      width="110" />
     <text
-     text_color="AlBlue"
+     text_color="MusicTickerEmphasisColor"
      bg_visible="false" 
      border_visible="false"
      layout="topleft"
@@ -52,7 +52,7 @@
     </text>
     <icon
      top="20"
-     color="AlAshGrey"
+     color="MusicTickerGridColor"
      follows="left|top|right" 
      height="1"
      layout="topleft"
@@ -62,7 +62,7 @@
      name="ticker_sep1"
      width="244" />
      <text 
-     text_color="AlBlue" 
+     text_color="MusicTickerEmphasisColor" 
      bg_visible="false"
      border_visible="false" 
      layout="topleft"
@@ -98,7 +98,7 @@
     </text>
     <icon
      top="44"
-     color="AlAshGrey"
+     color="MusicTickerGridColor"
      follows="left|top|right" 
      height="1"
      layout="topleft"
@@ -109,7 +109,7 @@
      width="244" 
      />
      <text 
-     text_color="AlBlue" 
+     text_color="MusicTickerEmphasisColor" 
      bg_visible="false"
      border_visible="false" 
      layout="topleft"

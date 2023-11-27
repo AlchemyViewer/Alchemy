@@ -612,7 +612,10 @@
     <color
      name="MapAvatarSelfColor"
      value="0.53125 0 0.498047 1" />
-    <color
+	<color
+     name="MapAvatarLindenColor"
+     value="0 1 1 1" />
+	<color
      name="MapChatRingColor"
      reference="White_25" />
     <color
@@ -707,6 +710,9 @@
     <color
      name="NameTagFriend"
      value="0.447 0.784 0.663 1" />
+	<color
+     name="NameTagSelf"
+     reference="White" />
     <color
      name="NameTagLegacy"
      reference="White" />
@@ -1128,4 +1134,13 @@
   <color
    name="FriendChatColor"
    reference="White" />
+   <color
+    name="MusicTickerGridColor" 
+    reference="White_50"/>
+   <color
+    name="ALMediaTickerOscillatorColor" 
+    reference="EmphasisColor"/>
+   <color
+    name="MusicTickerEmphasisColor" 
+    reference="EmphasisColor"/>
 </colors>
