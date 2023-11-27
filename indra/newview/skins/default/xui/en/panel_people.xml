@@ -223,6 +223,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                left="3"
                keep_one_selected="false"
                multi_select="true"
+			   use_colorizer="true"
                name="avatar_list"
                right="-1"
                top="2" />

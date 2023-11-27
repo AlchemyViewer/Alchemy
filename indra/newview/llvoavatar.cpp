@@ -37,6 +37,7 @@
 #include "sound_ids.h"
 #include "raytrace.h"
 
+#include "alavatargroups.h"
 #include "alaoengine.h"
 #include "llagent.h" //  Get state values from here
 #include "llagentbenefits.h"
@@ -3428,6 +3429,8 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 		}
 	}
 
+	LLColor4 name_tag_color = getNameTagColor(is_friend);
+
 	// Rebuild name tag if state change detected
 	if (!mNameIsSet
 		|| new_name
@@ -3439,10 +3442,9 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 		|| is_appearance != mNameAppearance 
 		|| is_friend != mNameFriend
 		|| is_cloud != mNameCloud
-		|| is_typing != mTypingLast)
+		|| is_typing != mTypingLast
+		|| name_tag_color != mNameTagColor)
 	{
-		LLColor4 name_tag_color = getNameTagColor(is_friend);
-
 		clearNameTag();
 
 		if (is_away || is_muted || is_do_not_disturb || is_appearance || (is_typing && !use_chat_bubble))
@@ -3563,6 +3565,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 		mNameCloud = is_cloud;
 		mTypingLast = is_typing;
 		mTitle = title ? title->getString() : "";
+		mNameTagColor = name_tag_color;
 		LLStringFn::replace_ascii_controlchars(mTitle,LL_UNKNOWN_CHAR);
 		new_name = TRUE;
 	}
@@ -3576,11 +3579,9 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 		std::deque<LLChat>::iterator chat_iter = mChats.begin(), chat_iter_end = mChats.end();
 		mNameText->clearString();
 
-		static LLUIColor user_chat_color = LLUIColorTable::instance().getColor("UserChatColor");
 		static LLUIColor agent_chat_color = LLUIColorTable::instance().getColor("AgentChatColor");
-		static LLUIColor friend_chat_color = LLUIColorTable::instance().getColor("FriendChatColor");
 		
-		LLColor4 new_chat =  isSelf() ? user_chat_color : isInBuddyList() ? friend_chat_color : agent_chat_color ;
+		LLColor4 new_chat = ALAvatarGroups::instance().getAvatarColor(getID(), agent_chat_color, ALAvatarGroups::COLOR_CHAT);
 		LLColor4 normal_chat = lerp(new_chat, LLColor4(0.8f, 0.8f, 0.8f, 1.f), 0.7f);
 		LLColor4 old_chat = lerp(normal_chat, LLColor4(0.6f, 0.6f, 0.6f, 1.f), 0.7f);
 		if (mTyping && mChats.size() >= MAX_BUBBLE_CHAT_UTTERANCES) 
@@ -3768,32 +3769,29 @@ LLColor4 LLVOAvatar::getNameTagColor(bool is_friend)
 		sNameTagColors[NameTagLegacy] = inst.getColor("NameTagLegacy");
 	}
 
-	static LLUICachedControl<bool> show_friends("NameTagShowFriends", false);
-	ENameColor color_name;
-	if (show_friends && is_friend)
-	{
-
-		color_name = ENameColor::NameTagFriend;
-	}
-	else if (LLAvatarName::useDisplayNames())
+	LLColor4 color_name;
+	if (LLAvatarName::useDisplayNames())
 	{
 		// ...color based on whether username "matches" a computed display name
 		LLAvatarName av_name;
 		if (LLAvatarNameCache::get(getID(), &av_name) && av_name.isDisplayNameDefault())
 		{
-			color_name = ENameColor::NameTagMatch;
+			color_name = sNameTagColors[ENameColor::NameTagMatch];
 		}
 		else
 		{
-			color_name = ENameColor::NameTagMismatch;
+			color_name = sNameTagColors[ENameColor::NameTagMismatch];
 		}
 	}
 	else
 	{
 		// ...not using display names
-		color_name = ENameColor::NameTagLegacy;
+		color_name = sNameTagColors[ENameColor::NameTagLegacy];
 	}
-	return sNameTagColors[color_name];
+
+	color_name = ALAvatarGroups::instance().getAvatarColor(getID(), color_name, ALAvatarGroups::COLOR_NAMETAG);
+
+	return color_name;
 }
 
 void LLVOAvatar::idleUpdateBelowWater()

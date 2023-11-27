@@ -607,6 +607,17 @@
       <key>Value</key>
       <real>0.15</real>
     </map>
+    <key>AlchemyNearbyColorize</key>
+    <map>
+      <key>Comment</key>
+      <string>Sync nearby list name colors to minimap</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
     <key>AlchemyNearbyPeopleClickAction</key>
     <map>
     <key>Comment</key>

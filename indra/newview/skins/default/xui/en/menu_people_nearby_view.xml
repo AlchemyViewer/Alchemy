@@ -129,4 +129,13 @@
          function="CheckControl"
          parameter="AlchemyRadarAlerts" />
 	</menu_item_check>
+	<menu_item_separator layout="topleft" />
+	<menu_item_check name ="color_nearby" label="Sync nearby colors to minimap">
+		<menu_item_check.on_check
+         function="CheckControl"
+         parameter="AlchemyNearbyColorize" />
+		<menu_item_check.on_click
+         function="ToggleControl"
+         parameter="AlchemyNearbyColorize" />
+	</menu_item_check>
 </toggleable_menu>

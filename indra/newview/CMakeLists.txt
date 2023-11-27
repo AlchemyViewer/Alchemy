@@ -87,6 +87,7 @@ set(viewer_SOURCE_FILES
     alaoengine.cpp
     alaoset.cpp
     alavataractions.cpp
+    alavatargroups.cpp
     alchatcommand.cpp
     alcontrolcache.cpp
     alfloaterao.cpp
@@ -817,6 +818,7 @@ set(viewer_HEADER_FILES
     alaoengine.h
     alaoset.h
     alavataractions.h
+    alavatargroups.h
     alchatcommand.h
     alcontrolcache.h
     alfloaterao.h

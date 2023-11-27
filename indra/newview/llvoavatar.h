@@ -1117,6 +1117,7 @@ private:
 	bool			mNameCloud;
 	F32				mNameAlpha;
 	BOOL      		mRenderGroupTitles;
+	LLColor4		mNameTagColor;
 
 	//--------------------------------------------------------------------
 	// Display the name (then optionally fade it out)

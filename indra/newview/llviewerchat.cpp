@@ -37,6 +37,7 @@
 #include "llviewerregion.h"
 #include "llworld.h"
 #include "llinstantmessage.h" //SYSTEM_FROM
+#include "alavatargroups.h"
 
 // LLViewerChat
 LLViewerChat::font_change_signal_t LLViewerChat::sChatFontChangedSignal;
@@ -44,11 +45,6 @@ LLViewerChat::font_change_signal_t LLViewerChat::sChatFontChangedSignal;
 //static 
 void LLViewerChat::getChatColor(const LLChat& chat, LLColor4& r_color)
 {
-	if(chat.mMuted)
-	{
-		r_color= LLUIColorTable::instance().getColor("LtGray");
-	}
-	else
 	{
 		switch(chat.mSourceType)
 		{
@@ -68,14 +64,9 @@ void LLViewerChat::getChatColor(const LLChat& chat, LLColor4& r_color)
 					}
 					else
 					{
-						if(LLAvatarTracker::instance().isBuddy(chat.mFromID))
-						{
-							r_color = LLUIColorTable::instance().getColor("FriendChatColor");
-						}
-						else
-						{
-							r_color = LLUIColorTable::instance().getColor("AgentChatColor");
-						}
+						r_color = LLUIColorTable::instance().getColor("AgentChatColor");
+
+						r_color = ALAvatarGroups::instance().getAvatarColor(chat.mFromID, r_color, ALAvatarGroups::COLOR_CHAT);
 					}
 				}
 				break;
@@ -144,14 +135,7 @@ void LLViewerChat::getChatColor(const LLChat& chat, std::string& r_color_name, F
 					}
 					else
 					{
-						if(LLAvatarTracker::instance().isBuddy(chat.mFromID))
-						{
-							r_color_name = "FriendChatColor";
-						}
-						else
-						{
-							r_color_name = "AgentChatColor";
-						}
+						r_color_name = ALAvatarGroups::instance().getAvatarColorName(chat.mFromID, "AgentChatColor", ALAvatarGroups::COLOR_CHAT);
 					}
 				}
 				break;

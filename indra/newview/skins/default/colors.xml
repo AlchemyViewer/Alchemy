@@ -57,6 +57,9 @@
 	 name="DkGray2"
 	 value="0.169 0.169 0.169 1" />
 	<color
+	 name="Grey3"
+	 value="0.4 0.4 0.4 1" />
+	<color
 	 name="MouseGray"
 	 value="0.191 0.191 0.191 1" />
 	<color
@@ -131,6 +134,9 @@
   <color
       name="Orange"
       value="1 .82 .46 1" />
+	<color
+     name="LindenBlue"
+     value="0.149 0.788 1.0 1.0" />
 
   <!-- This color name makes potentially unused colors show up bright purple.
   Leave this here until all Unused? are removed below, otherwise
@@ -611,10 +617,13 @@
      reference="Yellow" />
     <color
      name="MapAvatarSelfColor"
-     value="0.53125 0 0.498047 1" />
+     reference="White" />
 	<color
      name="MapAvatarLindenColor"
-     value="0 1 1 1" />
+     reference="LindenBlue" />
+	<color
+     name="MapAvatarMutedColor"
+     reference="Grey3" />
 	<color
      name="MapChatRingColor"
      reference="White_25" />
@@ -713,6 +722,12 @@
 	<color
      name="NameTagSelf"
      reference="White" />
+	<color
+     name="NameTagMuted"
+     reference="Grey3" />
+	<color
+     name="NameTagLinden"
+     reference="LindenBlue" />
     <color
      name="NameTagLegacy"
      reference="White" />
@@ -963,6 +978,15 @@
      name="UserChatColor"
      reference="Yellow" />
     <color
+     name="FriendChatColor"
+     reference="White" />
+    <color
+     name="LindenChatColor"
+     reference="LindenBlue" />
+    <color
+     name="MutedChatColor"
+     reference="Grey3" />
+	<color
      name="llOwnerSayChatColor"
      reference="LtYellow" />
 
@@ -1131,9 +1155,6 @@
   <color
    name="FPSTextColor"
    reference="EmphasisColor" />
-  <color
-   name="FriendChatColor"
-   reference="White" />
    <color
     name="MusicTickerGridColor" 
     reference="White_50"/>
