@@ -1684,6 +1684,16 @@ function="World.EnvPreset"
                   <menu_item_check.on_click
                    function="View.HighlightTransparent" />
                 </menu_item_check>
+                <menu_item_check
+                       label="Grab objects with Ctrl-Drag"
+                       name="EnableCtrlDragMovement">
+                    <menu_item_check.on_check
+                     function="CheckControl"
+                     parameter="EnableGrab" />
+                    <menu_item_check.on_click
+                     function="ToggleControl"
+                     parameter="EnableGrab" />
+                </menu_item_check>
         <menu_item_separator/>
           
           <menu_item_check
