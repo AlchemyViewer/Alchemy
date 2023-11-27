@@ -530,7 +530,7 @@ void LLFloaterCamera::onClickCameraItem(const LLSD& param)
 		LLFloaterCamera* camera_floater = LLFloaterCamera::findInstance();
 		if (camera_floater)
 		{
-			camera_floater->switchMode(CAMERA_CTRL_MODE_FREE_CAMERA);
+			camera_floater->mCurrMode == CAMERA_CTRL_MODE_FREE_CAMERA ? camera_floater->switchMode(CAMERA_CTRL_MODE_PAN) : camera_floater->switchMode(CAMERA_CTRL_MODE_FREE_CAMERA);
 			camera_floater->updateItemsSelection();
 		}
 	}
