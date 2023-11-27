@@ -239,6 +239,7 @@
 			<menu_item_check label="反射プローブのボリュームを表示" name="Show Reflection Probe Volumes"/>
 			<menu_item_check label="選択ビームを表示する" name="Show Selection Beam"/>
 			<menu_item_check label="ハイライトを透過" name="Highlight Transparent"/>
+			<menu_item_check label="Ctrl＋ドラッグでオブジェクトを掴む" name="EnableCtrlDragMovement"/>
 			<menu_item_separator/>
 			<menu_item_check label="ポストプロセッシングを無効化" name="No Post"/>
 			<menu_item_separator/>
@@ -337,10 +338,10 @@
 			<menu_item_check label="パーティクルを非表示" name="Hide Particles"/>
 			<menu_item_check label="選択を非表示" name="Hide Selected"/>
 			<menu_item_check label="透明部分をハイライト" name="Highlight Transparent"/>
-			<menu_item_check label="マウスルックのときに十字線を表示" name="ShowCrosshairs"/>
-			<!-- 
-			<menu create_jump_keys="true" label="ホバーでTips表示" name="Hover Tips" tear_off="true">
-				<menu_item_check label="Tips表示" name="Show Tips" shortcut="control|shift|T"/>
+			<menu_item_check label="マウスルックのときにクロスヘアーを表示" name="ShowCrosshairs"/>
+			<!--
+			<menu label="ホバー時のツールチップ" name="Hover Tips">
+				<menu_item_check label="ツールチップを表示" name="Show Tips"/>
 				<menu_item_separator/>
 				<menu_item_check label="土地のツールチップを表示" name="Land Tips"/>
 				<menu_item_check label="すべてのオブジェクトのツールチップを表示" name="Tips On All Objects"/>
@@ -350,7 +351,7 @@
 		<menu label="レンダリング種別" name="Rendering Types">
 			<menu_item_check label="シンプル" name="Rendering Type Simple"/>
 			<menu_item_check label="アルファ" name="Rendering Type Alpha"/>
-			<menu_item_check label="木" name="Rendering Type Tree"/>
+			<menu_item_check label="樹木" name="Rendering Type Tree"/>
 			<menu_item_check label="アバター" name="Rendering Type Character"/>
 			<menu_item_check label="アニメッシュ" name="Rendering Type Control Avatar"/>
 			<menu_item_check label="サーフェスパッチ" name="Rendering Type Surface Patch"/>
@@ -374,7 +375,7 @@
 			<menu_item_check label="フレキシブルオブジェクト" name="Flexible Objects"/>
 		</menu>
 		<menu label="ＲＬＶａ" name="RLVa Embedded"/>
-		<menu_item_check label="プラグイン読み取りスレッドを使用" name="Use Plugin Read Thread"/>
+		<menu_item_check label="プラグイン読み取りスレッドの使用" name="Use Plugin Read Thread"/>
 		<menu_item_call label="グループキャッシュのクリア" name="ClearGroupCache"/>
 		<menu_item_check label="マウスの平滑化" name="Mouse Smoothing"/>
 		<menu_item_call label="リリースキー" name="Release Keys"/>
@@ -405,7 +406,7 @@
 			<menu_item_check label="テクスチャのコンソール" name="Texture Console"/>
 			<menu_item_check label="デバッグコンソール" name="Debug Console"/>
 			<menu_item_call label="通知コンソール" name="Notifications"/>
-			<menu_item_check label="リージョンデバッグコンソール" name="Region Debug Console"/>
+			<menu_item_check label="リージョンのデバッグコンソール" name="Region Debug Console"/>
 			<menu_item_check label="ファーストタイマー" name="Fast Timers"/>
 			<menu_item_check label="メモリ" name="Memory"/>
 			<menu_item_check label="シーンの統計" name="Scene Statistics"/>
@@ -559,7 +560,7 @@
 			<menu_item_call label="SelectMgrをダンプ" name="Dump SelectMgr"/>
 			<menu_item_call label="インベントリの出力" name="Dump Inventory"/>
 			<menu_item_call label="タイマーをダンプ" name="Dump Timers"/>
-			<menu_item_call label="フォーカスホールダーをダンプ" name="Dump Focus Holder"/>
+			<menu_item_call label="フォーカスホルダーをダンプ" name="Dump Focus Holder"/>
 			<menu_item_call label="選択したオブジェクト情報をプリント" name="Print Selected Object Info"/>
 			<menu_item_call label="エージェント情報をプリント" name="Print Agent Info"/>
 			<menu_item_separator/>
@@ -591,23 +592,23 @@
 				<menu_item_call label="スカート" name="Grab Skirt"/>
 			</menu>
 			<menu label="キャラクターテスト" name="Character Tests">
-				<menu_item_call label="容姿をXMLに保存する" name="Appearance To XML"/>
+				<menu_item_call label="容姿をＸＭＬとして保存する" name="Appearance To XML"/>
 				<menu_item_call label="キャラクタジオメトリの切り替え" name="Toggle Character Geometry"/>
 				<menu_item_call label="男性アバターのテスト" name="Test Male"/>
 				<menu_item_call label="女性アバターのテスト" name="Test Female"/>
-				<menu_item_check label="選択アバター許可" name="Allow Select Avatar"/>
+				<menu_item_check label="アバター選択を許可" name="Allow Select Avatar"/>
 			</menu>
 			<menu label="アニメーションの速度" name="Animation Speed">
 				<menu_item_call label="すべてのアニメーションを１０％速く" name="All Animations 10 Faster"/>
 				<menu_item_call label="すべてのアニメーションを１０％遅く" name="All Animations 10 Slower"/>
 				<menu_item_call label="すべてのアニメーションの速度をリセット" name="Reset All Animation Speed"/>
-				<menu_item_check label="アニメーションをスローモーション" name="Slow Motion Animations"/>
+				<menu_item_check label="アニメーションをスローモーションにする" name="Slow Motion Animations"/>
 			</menu>
 			<menu_item_call label="パラメータを強制的にデフォルトにする" name="Force Params to Default"/>
 			<menu_item_check label="アニメーション情報" name="Animation Info"/>
-			<menu_item_check label="見ているものを表示する" name="Show Look At"/>
+			<menu_item_check label="見えているものを表示する" name="Show Look At"/>
 			<menu_item_check label="クリックした場所を表示する" name="Show Point At"/>
-			<menu_item_check label="結合部のアップデートのデバッグ" name="Debug Joint Updates"/>
+			<menu_item_check label="ジョイント部分の更新のデバッグ" name="Debug Joint Updates"/>
 			<menu_item_check label="ＬｏＤを無効にする" name="Disable LOD"/>
 			<menu_item_check label="キャラクターVisのデバッグ" name="Debug Character Vis"/>
 			<menu_item_check label="スケルトンの衝突判定を表示する" name="Show Collision Skeleton"/>
