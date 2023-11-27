@@ -391,8 +391,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     if (!item->getPermissions().allowModifyBy(gAgent.getID(), gAgent.getGroupID()) ||
         !item->getPermissions().allowCopyBy(gAgent.getID(), gAgent.getGroupID()))
     {
-        std::string buffer = "Skipping: " + item->getName() + "(Permissions)";
-        floater->addStringMessage(buffer);
+        floater->addProcessingMessage("CompilePermissions", LLSDMap("ITEM_NAME", item->getName()));
         return true;
     }
 
@@ -538,14 +537,13 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     {
         std::string buffer = std::string("Compilation of \"") + inventory->getName() + std::string("\" succeeded");
 
-        floater->addStringMessage(buffer);
         LL_INFOS() << buffer << LL_ENDL;
+		floater->addProcessingMessage("CompileSuccess", LLSDMap("SCRIPT", inventory->getName()));
     }
     else
     {
         LLSD compile_errors = result["errors"];
-        std::string buffer = std::string("Compilation of \"") + inventory->getName() + std::string("\" failed:");
-        floater->addStringMessage(buffer);
+		floater->addProcessingMessage("CompileFailure", LLSDMap("SCRIPT", inventory->getName()));
         for (LLSD::array_const_iterator line = compile_errors.beginArray();
             line < compile_errors.endArray(); line++)
         {
@@ -576,7 +574,7 @@ bool LLFloaterCompileQueue::startQueue()
 
             LLCoreHttpUtil::HttpCoroutineAdapter::callbackHttpGet(lookup_url,
                 success, failure);
-            return TRUE;
+            return true;
         }
 		else
 		{
@@ -906,7 +904,7 @@ void LLFloaterScriptQueue::objectScriptProcessingQueueCoro(std::string action, L
             floater.check();
         }
 
-        floater->addStringMessage("Done");
+        floater->addStringMessage(floater->getString("Done"));
         floater->getChildView("close")->setEnabled(TRUE);
     }
     catch (const LLCheckedHandleBase::Stale &)
@@ -997,7 +995,7 @@ void LLFloaterCompileQueue::scriptPreprocComplete(const LLUUID& asset_id, LLScri
 		if (object)
 		{
 			std::string scriptName = data->mItem->getName();
-			std::string url = object->getRegion()->getCapability("UpdateScriptTask");
+			const std::string url = object->getRegion() ? object->getRegion()->getCapability("UpdateScriptTask") : std::string();
 			if (!url.empty())
 			{
 				queue->addProcessingMessage("CompileQueuePreprocessingComplete", LLSD().with("SCRIPT", scriptName));
