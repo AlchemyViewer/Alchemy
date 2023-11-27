@@ -137,7 +137,7 @@ void main()
     vec3  light_dir   = (sun_up_factor == 1) ? sun_dir : moon_dir;
 
     vec4 baseColor     = texture(diffuseRect, tc);
-    vec4 spec        = texture(specularRect, vary_fragcoord.xy); // NOTE: PBR linear Emissive
+    vec4 spec        = texture(specularRect, tc); // NOTE: PBR linear Emissive
 
 #if defined(HAS_SUN_SHADOW) || defined(HAS_SSAO)
     vec2 scol_ambocc = texture(lightMap, vary_fragcoord.xy).rg;
@@ -184,7 +184,7 @@ void main()
 
     if (GET_GBUFFER_FLAG(GBUFFER_FLAG_HAS_PBR))
     {
-        vec3 orm = texture(specularRect, tc).rgb; 
+        vec3 orm = spec.rgb; 
         float perceptualRoughness = orm.g;
         float metallic = orm.b;
         float ao = orm.r;
