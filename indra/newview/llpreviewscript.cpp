@@ -501,7 +501,11 @@ BOOL LLScriptEdCore::postBuild()
 	});
 
 	childSetCommitCallback("lsl errors", &LLScriptEdCore::onErrorList, this);
-	childSetAction("Save_btn", boost::bind(&LLScriptEdCore::doSave,this,FALSE, true));
+	mSaveBtn = getChild<LLButton>("Save_btn");
+	mSaveBtn->setCommitCallback(boost::bind(&LLScriptEdCore::doSave, this, FALSE, true));
+	mSaveBtn->setEnabled((hasChanged() || (mLSLProc && !mCompiling && mHasScriptData)) && !mScriptRemoved);
+	mSaveBtn->setLabel((!mLSLProc || hasChanged()) ? LLTrans::getString("save_file_verb") : LLTrans::getString("recompile_script_verb"));
+
 	childSetAction("Edit_btn", boost::bind(&LLScriptEdCore::openInExternalEditor, this));
 
 	initMenu();
@@ -797,8 +801,8 @@ bool LLScriptEdCore::hasChanged()
 
 void LLScriptEdCore::draw()
 {
-	BOOL script_changed	= hasChanged();
-	getChildView("Save_btn")->setEnabled(script_changed && !mScriptRemoved);
+	mSaveBtn->setEnabled((hasChanged() || (mLSLProc && !mCompiling && mHasScriptData)) && !mScriptRemoved);
+	mSaveBtn->setLabel((!mLSLProc || hasChanged()) ? LLTrans::getString("save_file_verb") : LLTrans::getString("recompile_script_verb"));
 
 	if( mEditor->hasFocus() )
 	{
@@ -1171,6 +1175,8 @@ void LLScriptEdCore::doSave(BOOL close_after_save, bool sync /*= true*/)
 {
 	mErrorList->deleteAllItems();
 	mErrorList->setCommentText(std::string());
+
+	mCompiling = true;
 
 	if (mLSLPreprocEnabled && mLSLProc)
 	{
@@ -1784,6 +1790,8 @@ void LLPreviewLSL::callbackLSLCompileSucceeded()
 	mScriptEd->mErrorList->addCommentText(LLTrans::getString("CompileSuccessful"));
 	mScriptEd->mErrorList->addCommentText(LLTrans::getString("SaveComplete"));
 
+	mScriptEd->mCompiling = false;
+
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
 	// Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
 	if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
@@ -1812,6 +1820,8 @@ void LLPreviewLSL::callbackLSLCompileFailed(const LLSD& compile_errors)
 		mScriptEd->mErrorList->addElement(row);
 	}
 	mScriptEd->selectFirstError();
+
+	mScriptEd->mCompiling = false;
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
 	// Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
@@ -2183,6 +2193,8 @@ void LLLiveLSLEditor::callbackLSLCompileSucceeded(const LLUUID& task_id,
 	LL_DEBUGS() << "LSL Bytecode saved" << LL_ENDL;
 	mScriptEd->mErrorList->addCommentText(LLTrans::getString("CompileSuccessful"));
 	mScriptEd->mErrorList->addCommentText(LLTrans::getString("SaveComplete"));
+
+	mScriptEd->mCompiling = false;
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
 	// Script was successfully saved so delete our backup copy if we have one and the editor is still pristine

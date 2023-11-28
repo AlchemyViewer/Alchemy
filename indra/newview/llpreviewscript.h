@@ -208,8 +208,10 @@ private:
 	BOOL			mScriptRemoved;
 	BOOL			mSaveDialogShown;
     LLUUID          mAssetID;
+	bool			mCompiling = false;
 
 	LLTextBox*		mLineCol;
+	LLButton*		mSaveBtn;
 	// NaCl - LSL Preprocessor
 	std::unique_ptr<FSLSLPreprocessor>	mLSLProc;
 	FSLSLPreProcViewer*	mPostEditor;
