@@ -1349,6 +1349,9 @@ https://secondlife.com/viewer-access-faq
 	<string name="zip_files">
 		Zipファイル
 	</string>
+	<string name="recompile_script_verb">
+		再コンパイル
+	</string>
 	<!-- LSL Usage Hover Tips -->
 	<!-- NOTE: For now these are set as translate="false", until DEV-40761 is implemented (to internationalize the rest of tooltips in the same window).
 This has no effect on viewer code, but prevents Linden Lab internal localization tool from scraping these strings.  -->
@@ -3947,25 +3950,37 @@ For AI Character: Get the closest navigable point to the point provided.
 		サーバー上にスクリプトが見つかりません。
 	</string>
 	<string name="CompileQueueProblemDownloading">
-		ダウンロードに問題があります
+		ダウンロードに問題があります。
 	</string>
 	<string name="CompileQueueInsufficientPermDownload">
-		権限不足のためスクリプトをダウンロードできません。
-	</string>
-	<string name="CompileQueueInsufficientPermFor">
-		権限不足：
-	</string>
-	<string name="CompileQueueUnknownFailure">
-		原因不明の失敗によりダウンロードができません
+		権限が不足しているためスクリプトをダウンロードできません。
 	</string>
 	<string name="CompileNoExperiencePerm">
-		[EXPERIENCE]体験による[SCRIPT]スクリプトのスキップ。
+		[EXPERIENCE]体験による[SCRIPT]スクリプトをスキップします。
 	</string>
 	<string name="CompileQueueTitle">
-		再コンパイル進行
+		再コンパイルしています。
 	</string>
 	<string name="CompileQueueStart">
 		再コンパイル
+	</string>
+	<string name="CompileQueuePreprocessing">
+		スクリプト「[SCRIPT]」のプリプロセッシング
+	</string>
+	<string name="CompileQueuePreprocessingComplete">
+		スクリプト「[SCRIPT]」のプリプロセッシングが完了しました。
+	</string>
+	<string name="CompileQueueCompiling">
+		「[SCRIPT]」のコンパイルをしています…
+	</string>
+	<string name="CompileSuccess">
+		「[SCRIPT]」のコンパイルに成功しました。
+	</string>
+	<string name="CompileFailure">
+		「[SCRIPT]」のコンパイルに失敗しました：
+	</string>
+	<string name="CompilePermissions">
+		スキップしています：[ITEM_NAME]（権限）
 	</string>
 	<string name="ResetQueueTitle">
 		進行をリセット
@@ -3996,13 +4011,13 @@ For AI Character: Get the closest navigable point to the point provided.
 		コンパイルが完了しました！
 	</string>
 	<string name="CompileSuccessfulSaving">
-		コンパイル完了、保存しています…
+		コンパイルが完了しました。保存しています…
 	</string>
 	<string name="SaveComplete">
-		保存完了。
+		保存しました。
 	</string>
 	<string name="UploadFailed">
-		ファイルのアップロードが失敗しました:
+		ファイルのアップロードに失敗しました：
 	</string>
 	<string name="ObjectOutOfRange">
 		スクリプト（オブジェクトが範囲外にあります）
@@ -4098,7 +4113,7 @@ For AI Character: Get the closest navigable point to the point provided.
 		この不動産
 	</string>
 	<string name="AndNMore">
-		および[EXTRA_COUNT]つの不動産
+		および[EXTRA_COUNT]個の不動産
 	</string>
 	<!-- script limits floater -->
 	<string name="ScriptLimitsParcelScriptMemory">
@@ -4598,7 +4613,7 @@ For AI Character: Get the closest navigable point to the point provided.
 		土地のレンタル
 	</string>
 	<string name="Property Rental">
-		プロパティのレンタル
+		財産のレンタル
 	</string>
 	<string name="Special Attraction">
 		特別なアトラクション
@@ -4653,7 +4668,9 @@ For AI Character: Get the closest navigable point to the point provided.
 		住宅用
 	</string>
 	<!--
-						<string name="Shopping">ショッピング</string>
+	<string name="Shopping">
+		ショッピング
+	</string>
 	-->
 	<string name="Stage">
 		ステージ
@@ -4840,10 +4857,10 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		お腹の大きさ
 	</string>
 	<string name="Big">
-		大
+		大きい
 	</string>
 	<string name="Big Butt">
-		大
+		大きく
 	</string>
 	<string name="Big Hair Back">
 		髪の大部分：後ろ
@@ -4855,10 +4872,10 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		髪の大部分：上部
 	</string>
 	<string name="Big Head">
-		大
+		大きく
 	</string>
 	<string name="Big Pectorals">
-		大
+		大きく
 	</string>
 	<string name="Big Spikes">
 		とげあり
@@ -4885,7 +4902,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		体の精細度
 	</string>
 	<string name="Body Fat">
-		太っている
+		太った
 	</string>
 	<string name="Body Freckles">
 		体のしみ・そばかす
@@ -4897,7 +4914,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		体の厚み
 	</string>
 	<string name="Body Thin">
-		痩せている
+		痩せた
 	</string>
 	<string name="Bow Legged">
 		股
@@ -4915,7 +4932,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		両目の間の幅
 	</string>
 	<string name="Broad">
-		広
+		広く
 	</string>
 	<string name="Brow Size">
 		眉毛上の隆起
@@ -5041,7 +5058,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		左右の減衰
 	</string>
 	<string name="Bushy Eyebrows">
-		太
+		太く
 	</string>
 	<string name="Bushy Hair">
 		ぼさぼさヘア
@@ -5104,19 +5121,19 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		顔の中心寄りの目
 	</string>
 	<string name="Closed">
-		クローズ
+		閉じた
 	</string>
 	<string name="Closed Back">
-		後ろとじ
+		後ろ閉じ
 	</string>
 	<string name="Closed Front">
-		前とじ
+		前閉じ
 	</string>
 	<string name="Closed Left">
-		左とじ
+		左閉じ
 	</string>
 	<string name="Closed Right">
-		右とじ
+		右閉じ
 	</string>
 	<string name="Coin Purse">
 		コイン入れ
@@ -5242,7 +5259,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		離れた目
 	</string>
 	<string name="Fat Lips">
-		大
+		厚く
 	</string>
 	<string name="Female">
 		女性
@@ -5257,10 +5274,10 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		広がった袖口
 	</string>
 	<string name="Flat">
-		平ら
+		平坦
 	</string>
 	<string name="Flat Butt">
-		小
+		平坦に
 	</string>
 	<string name="Flat Head">
 		平坦な頭
@@ -5293,7 +5310,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		刈られていない髪
 	</string>
 	<string name="Full Hair Sides">
-		サイドの髪
+		横髪
 	</string>
 	<string name="Full Sides">
 		生え揃ったサイド
@@ -5368,13 +5385,13 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		身長
 	</string>
 	<string name="High">
-		高
+		高く
 	</string>
 	<string name="High Heels">
 		ハイヒール
 	</string>
 	<string name="High Jaw">
-		高
+		長く
 	</string>
 	<string name="High Platforms">
 		厚底
@@ -5383,7 +5400,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		高めでタイト
 	</string>
 	<string name="Higher">
-		高
+		高く
 	</string>
 	<string name="Hip Length">
 		腰の長さ
@@ -5440,10 +5457,10 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		内股
 	</string>
 	<string name="Large">
-		大
+		広く
 	</string>
 	<string name="Large Hands">
-		大
+		大きく
 	</string>
 	<string name="Left Part">
 		左分け
@@ -5455,31 +5472,31 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		脚の筋肉
 	</string>
 	<string name="Less">
-		小
+		少なく
 	</string>
 	<string name="Less Body Fat">
-		少なめ
+		痩せた
 	</string>
 	<string name="Less Curtains">
-		少なめ
+		少なく
 	</string>
 	<string name="Less Freckles">
-		少なめ
+		少なく
 	</string>
 	<string name="Less Full">
-		薄い
+		薄く
 	</string>
 	<string name="Less Gravity">
-		少
+		軽く
 	</string>
 	<string name="Less Love">
-		少
+		愛らしくない
 	</string>
 	<string name="Less Muscles">
-		少なめ
+		少なく
 	</string>
 	<string name="Less Muscular">
-		少なめ
+		少なく
 	</string>
 	<string name="Less Rosy">
 		少な目
@@ -5488,19 +5505,19 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		丸み少な目
 	</string>
 	<string name="Less Saddle">
-		小
+		少なく
 	</string>
 	<string name="Less Square">
-		小
+		角を少なく
 	</string>
 	<string name="Less Volume">
 		ボリューム少な目
 	</string>
 	<string name="Less soul">
-		小
+		小さく
 	</string>
 	<string name="Lighter">
-		軽い
+		軽く
 	</string>
 	<string name="Lip Cleft">
 		唇の裂け目
@@ -5521,7 +5538,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		唇の前後幅
 	</string>
 	<string name="Lip Width">
-		口の大きさ
+		口の幅
 	</string>
 	<string name="Lipgloss">
 		リップグロス
@@ -5533,61 +5550,61 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		口紅の色
 	</string>
 	<string name="Long">
-		ロング
+		長さ
 	</string>
 	<string name="Long Head">
 		前後幅が広い頭
 	</string>
 	<string name="Long Hips">
-		長
+		長く
 	</string>
 	<string name="Long Legs">
-		長
+		長く
 	</string>
 	<string name="Long Neck">
-		長
+		長く
 	</string>
 	<string name="Long Pigtails">
-		長
+		長く
 	</string>
 	<string name="Long Ponytail">
-		長
+		長く
 	</string>
 	<string name="Long Torso">
-		長
+		長く
 	</string>
 	<string name="Long arms">
-		長
+		長く
 	</string>
 	<string name="Loose Pants">
-		ゆったり
+		ゆるく
 	</string>
 	<string name="Loose Shirt">
-		ゆるめ
+		ゆるく
 	</string>
 	<string name="Loose Sleeves">
-		ゆるめ
+		ゆるく
 	</string>
 	<string name="Love Handles">
 		ウエスト周り
 	</string>
 	<string name="Low">
-		低
+		低く
 	</string>
 	<string name="Low Heels">
 		ローヒール
 	</string>
 	<string name="Low Jaw">
-		低
+		短く
 	</string>
 	<string name="Low Platforms">
-		低め
+		低く
 	</string>
 	<string name="Low and Loose">
 		低めでゆったり
 	</string>
 	<string name="Lower">
-		低
+		低く
 	</string>
 	<string name="Lower Bridge">
 		鼻筋
@@ -5602,70 +5619,70 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		真ん中分け
 	</string>
 	<string name="More">
-		大
+		より多く
 	</string>
 	<string name="More Blush">
 		きつめ
 	</string>
 	<string name="More Body Fat">
-		多め
+		太く
 	</string>
 	<string name="More Curtains">
-		多め
+		多く
 	</string>
 	<string name="More Eyeshadow">
-		あり
+		多く
 	</string>
 	<string name="More Freckles">
-		多め
+		多く
 	</string>
 	<string name="More Full">
-		厚い
+		厚く
 	</string>
 	<string name="More Gravity">
-		大
+		重く
 	</string>
 	<string name="More Lipstick">
 		あり
 	</string>
 	<string name="More Love">
-		大
+		愛らしく
 	</string>
 	<string name="More Lower Lip">
 		下唇
 	</string>
 	<string name="More Muscles">
-		多め
+		多く
 	</string>
 	<string name="More Muscular">
-		筋骨隆々
+		筋肉質に
 	</string>
 	<string name="More Rosy">
 		多め
 	</string>
 	<string name="More Round">
-		まる
+		丸顔
 	</string>
 	<string name="More Saddle">
-		大
+		広く
 	</string>
 	<string name="More Sloped">
 		なだらか
 	</string>
 	<string name="More Square">
-		四角
+		角顔
 	</string>
 	<string name="More Upper Lip">
 		上唇
 	</string>
 	<string name="More Vertical">
-		垂直
+		垂直に
 	</string>
 	<string name="More Volume">
-		大
+		多く
 	</string>
 	<string name="More soul">
-		大
+		多く
 	</string>
 	<string name="Moustache">
 		口ひげ
@@ -5692,19 +5709,19 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		マニキュアの色
 	</string>
 	<string name="Narrow">
-		狭
+		狭く
 	</string>
 	<string name="Narrow Back">
-		狭
+		狭く
 	</string>
 	<string name="Narrow Front">
-		狭
+		狭く
 	</string>
 	<string name="Narrow Lips">
 		おちょぼ口
 	</string>
 	<string name="Natural">
-		ナチュラル
+		自然に
 	</string>
 	<string name="Neck Length">
 		首の長さ
@@ -5773,7 +5790,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		鼻の幅
 	</string>
 	<string name="Nostril Division">
-		鼻の穴の高さ
+		鼻の穴の位置
 	</string>
 	<string name="Nostril Width">
 		鼻の穴の幅
@@ -5785,16 +5802,16 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		オープン
 	</string>
 	<string name="Open Back">
-		後ろあき
+		後開き
 	</string>
 	<string name="Open Front">
-		前あき
+		前開き
 	</string>
 	<string name="Open Left">
-		左あき
+		左開き
 	</string>
 	<string name="Open Right">
-		右あき
+		右開き
 	</string>
 	<string name="Orange">
 		オレンジ
@@ -5863,7 +5880,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		ピンク
 	</string>
 	<string name="Pinker">
-		ピンク
+		ピンクに
 	</string>
 	<string name="Platform Height">
 		靴底の高さ
@@ -5875,7 +5892,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		尖った
 	</string>
 	<string name="Pointy Heels">
-		幅狭
+		尖ったヒール
 	</string>
 	<string name="Ponytail">
 		ポニーテール
@@ -5914,10 +5931,10 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		まるっこい
 	</string>
 	<string name="Ruddiness">
-		血色
+		血色の良さ
 	</string>
 	<string name="Ruddy">
-		良い
+		血色
 	</string>
 	<string name="Rumpled Hair">
 		くしゃくしゃヘア
@@ -5971,40 +5988,40 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		シャツのフィット感
 	</string>
 	<string name="Shirt Wrinkles">
-		シャツのしわ
+		シャツの皺
 	</string>
 	<string name="Shoe Height">
-		靴の長さ
+		靴の高さ
 	</string>
 	<string name="Short">
-		ショート
+		短く
 	</string>
 	<string name="Short Arms">
-		短
+		短く
 	</string>
 	<string name="Short Legs">
-		短
+		短く
 	</string>
 	<string name="Short Neck">
-		短
+		短く
 	</string>
 	<string name="Short Pigtails">
-		短
+		短く
 	</string>
 	<string name="Short Ponytail">
-		短
+		短く
 	</string>
 	<string name="Short Sideburns">
-		短め
+		短く
 	</string>
 	<string name="Short Torso">
-		短
+		短く
 	</string>
 	<string name="Short hips">
-		短
+		短く
 	</string>
 	<string name="Shoulders">
-		肩
+		肩幅
 	</string>
 	<string name="Side Fringe">
 		横髪の毛先
@@ -6016,10 +6033,10 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		横髪
 	</string>
 	<string name="Sides Hair Down">
-		下げる
+		伸ばす
 	</string>
 	<string name="Sides Hair Up">
-		上げる
+		刈り上げる
 	</string>
 	<string name="Skinny Neck">
 		細い首
@@ -6052,13 +6069,13 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		スリット：右
 	</string>
 	<string name="Small">
-		小
+		小さい
 	</string>
 	<string name="Small Hands">
-		小
+		小さく
 	</string>
 	<string name="Small Head">
-		小
+		小さく
 	</string>
 	<string name="Smooth">
 		滑らか
@@ -6094,7 +6111,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		痩けた頬
 	</string>
 	<string name="Sunken Chest">
-		小
+		平坦に
 	</string>
 	<string name="Sunken Eyes">
 		くぼんだ目
@@ -6106,7 +6123,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		前へ
 	</string>
 	<string name="Tall">
-		高い
+		高さ
 	</string>
 	<string name="Taper Back">
 		後ろに先細
@@ -6118,22 +6135,22 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		幅広
 	</string>
 	<string name="Thick Neck">
-		太い首
+		太く
 	</string>
 	<string name="Thick Toe">
-		厚い足
+		厚く
 	</string>
 	<string name="Thin">
 		薄い
 	</string>
 	<string name="Thin Eyebrows">
-		細い眉
+		細く
 	</string>
 	<string name="Thin Lips">
-		小
+		細く
 	</string>
 	<string name="Thin Nose">
-		細い鼻
+		細く
 	</string>
 	<string name="Tight Chin">
 		引き締まった顎
@@ -6208,16 +6225,16 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		白髪
 	</string>
 	<string name="Wide">
-		広
+		広く
 	</string>
 	<string name="Wide Back">
-		広
+		背面を広く
 	</string>
 	<string name="Wide Front">
-		広
+		前面を広く
 	</string>
 	<string name="Wide Lips">
-		広い唇
+		広く
 	</string>
 	<string name="Wild">
 		ワイルド
@@ -6240,7 +6257,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		ロケーション履歴
 	</string>
 	<string name="LocationCtrlForSaleTooltip">
-		この土地を購入
+		この土地を購入する
 	</string>
 	<string name="LocationCtrlVoiceTooltip">
 		ここではボイスを利用できません。
@@ -6349,7 +6366,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		（保存日時：[LONG_TIMESTAMP]）
 	</string>
 	<string name="IM_unblock_only_groups_friends">
-		このメッセージを表示するには、「初期設定」の「プライバシー」で「フレンドとグループ以外からはコールとIMを受信しない」チェックボックスをオフにします。
+		このメッセージを表示するには、「初期設定」の「プライバシー」で「フレンドとグループ以外からはコールとＩＭを受信しない」チェックボックスをオフにします。
 	</string>
 	<string name="OnlineStatus">
 		オンライン
