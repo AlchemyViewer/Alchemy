@@ -312,10 +312,6 @@ std::string LLLogChat::timestamp2LogString(U32 timestamp, bool withdate)
 		static const std::string timestamp_short_fmt = fmt::format(FMT_STRING("[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
         timeStr = timestamp_short_fmt;
 	}
-	if (gSavedSettings.getBOOL("ChatTimestampSeconds"))
-	{
-		timeStr += fmt::format(":[{}]", LLTrans::getString ("TimeSec"));
-	}
 
 	LLSD substitution;
     if (timestamp == 0)
