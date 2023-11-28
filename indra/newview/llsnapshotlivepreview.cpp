@@ -567,6 +567,7 @@ void LLSnapshotLivePreview::generateThumbnailImage(BOOL force_update)
                                          mAllowRenderUI && gSavedSettings.getBOOL("RenderUIInSnapshot"),
                                          gSavedSettings.getBOOL("RenderHUDInSnapshot"),
                                          FALSE,
+                                         gSavedSettings.getBOOL("RenderSnapshotNoPost"),
                                          mSnapshotBufferType) )
         {
             raw = NULL ;
@@ -730,6 +731,7 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
                 previewp->mAllowRenderUI && gSavedSettings.getBOOL("RenderUIInSnapshot"),
                 gSavedSettings.getBOOL("RenderHUDInSnapshot"),
                 FALSE,
+                gSavedSettings.getBOOL("RenderSnapshotNoPost"),
                 previewp->mSnapshotBufferType,
                 previewp->getMaxImageSize());
         if (success)
