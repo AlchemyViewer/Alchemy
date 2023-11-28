@@ -43,6 +43,8 @@
 #include "llviewershadermgr.h"
 #include "pipeline.h"
 
+extern BOOL gSnapshotNoPost;
+
 #ifndef LL_WINDOWS
 #define A_GCC 1
 #if LL_GNUC
@@ -644,8 +646,9 @@ void ALRenderUtil::renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst)
 {
 	dst->bindTarget();
 
-	static LLCachedControl<bool> no_post(gSavedSettings, "RenderDisablePostProcessing", false);
+	static LLCachedControl<bool> buildNoPost(gSavedSettings, "RenderDisablePostProcessing", false);
 	static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", true);
+	bool no_post = gSnapshotNoPost || (buildNoPost && gFloaterTools->isAvailable());
 	LLGLSLShader* tone_shader = nullptr;
 	if (mCGLut != 0)
 	{
