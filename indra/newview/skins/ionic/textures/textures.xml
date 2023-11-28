@@ -36,4 +36,9 @@ with the same filename but different name
   <texture name="TextField_Search_Off" file_name="widgets/TextField_Off.png" preload="true" scale.left="9" scale.top="12" scale.right="248" scale.bottom="12" />
   <texture name="TextField_Disabled" file_name="widgets/TextField_Disabled.png" preload="true" scale.left="9" scale.top="12" scale.right="248" scale.bottom="12" />
   <texture name="TextField_Active" file_name="widgets/TextField_Active.png" preload="true" scale.left="9" scale.top="12" scale.right="248" scale.bottom="12" />
+  <texture name="Info_Off" file_name="icons/Info_Off.png" preload="false" />
+  <texture name="Info_Over" file_name="icons/Info_Over.png" preload="false" />
+  <texture name="Info_Press" file_name="icons/Info_Press.png" preload="false" />
+  <texture name="Inspector_I" file_name="icons/Info_Off.png" preload="false" />
+  <texture name="Parcel_VoiceNo_Light" file_name="icons/Parcel_VoiceNo_Dark.png" preload="false" />
 </textures>
