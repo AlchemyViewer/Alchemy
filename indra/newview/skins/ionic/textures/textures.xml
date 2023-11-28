@@ -40,4 +40,5 @@ with the same filename but different name
   <texture name="Info_Over" file_name="icons/Info_Over.png" preload="false" />
   <texture name="Info_Press" file_name="icons/Info_Press.png" preload="false" />
   <texture name="Inspector_I" file_name="icons/Info_Off.png" preload="false" />
+  <texture name="Parcel_VoiceNo_Light" file_name="icons/Parcel_VoiceNo_Dark.png" preload="false" />
 </textures>
