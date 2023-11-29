@@ -697,7 +697,7 @@ void LLPreviewNotecard::onBackupTimer()
 			std::stringstream strmNotecard;
 			notecard.exportStream(strmNotecard);
 
-			std::ofstream outNotecardFile(mBackupFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+			llofstream outNotecardFile(mBackupFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
 			if (outNotecardFile.is_open())
 			{
 				outNotecardFile << strmNotecard.rdbuf();

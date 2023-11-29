@@ -141,7 +141,7 @@ protected:
 // static
 static bool removeEmbeddedMarkers(const std::string& strFilename)
 {
-	std::ifstream inNotecardFile(strFilename.c_str(), std::ios::in | std::ios::binary);
+	llifstream inNotecardFile(strFilename.c_str(), std::ios::in | std::ios::binary);
 	if (!inNotecardFile.is_open())
 		return false;
 
@@ -166,7 +166,7 @@ static bool removeEmbeddedMarkers(const std::string& strFilename)
 		idxText = strText.find('\xF4', idxText + 1);
 	}
 
-	std::ofstream outNotecardFile(strFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+	llofstream outNotecardFile(strFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!outNotecardFile.is_open())
 		return false;
 
@@ -328,7 +328,7 @@ void LLAssetRecoverQueue::onCreateItem(const LLUUID& idItem)
 
 		std::string strCapsUrl, strBuffer;
 
-		std::ifstream inNotecardFile(itItem->strPath.c_str(), std::ios::in | std::ios::binary);
+		llifstream inNotecardFile(itItem->strPath.c_str(), std::ios::in | std::ios::binary);
 		if (inNotecardFile.is_open())
 		{
 			strBuffer.assign((std::istreambuf_iterator<char>(inNotecardFile)), std::istreambuf_iterator<char>());
