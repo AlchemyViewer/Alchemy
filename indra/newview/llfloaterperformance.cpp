@@ -515,7 +515,7 @@ void LLFloaterPerformance::setFPSText()
     getChild<LLTextBox>("fps_value")->setValue(current_fps);
 
     std::string fps_text = getString("fps_text");
-    static LLCachedControl<bool> vsync_enabled(gSavedSettings, "RenderVSyncEnable", true);
+    static LLCachedControl<bool> vsync_enabled(gSavedSettings, "RenderVSyncEnable", false);
     S32 refresh_rate = gViewerWindow->getWindow()->getRefreshRate();
     if (vsync_enabled && (refresh_rate > 0) && (current_fps >= refresh_rate))
     {

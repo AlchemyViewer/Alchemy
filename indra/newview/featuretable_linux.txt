@@ -1,4 +1,4 @@
-version 53
+version 54
 // The version number above should be incremented IF AND ONLY IF some
 // change has been made that is sufficiently important to justify
 // resetting the graphics preferences of all users to the recommended
@@ -74,6 +74,7 @@ RenderGLMultiThreadedMedia         1   0
 RenderReflectionProbeResolution 1 128
 RenderScreenSpaceReflections 1  1
 RenderToneMapType 1 1
+RenderVSyncEnable 1 0
 
 
 //
