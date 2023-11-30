@@ -7874,11 +7874,11 @@ bool LLVOAvatar::hasPendingAttachedMeshes()
                                         continue;
                                     }
 
-                                    if (pvobj->isSkinInfoUnavaliable())
-                                    {
-                                        // Load failed or info not present, don't expect it
-                                        continue;
-                                    }
+                                    //if (pvobj->isSkinInfoUnavaliable())
+                                    //{
+                                    //    // Load failed or info not present, don't expect it
+                                    //    continue;
+                                    //}
                                 }
 
                                 // objectchild is not ready
