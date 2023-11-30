@@ -359,9 +359,6 @@ void LLStatusBar::refresh()
 		gMenuBarView->reshape(MENU_RIGHT, gMenuBarView->getRect().getHeight());
 	}
 
-	mSGBandwidth->setVisible(net_stats_visible);
-	mSGPacketLoss->setVisible(net_stats_visible);
-
 	// update the master volume button state
 	bool mute_audio = LLAppViewer::instance()->getMasterSystemAudioMute();
 	mBtnVolume->setToggleState(mute_audio);
@@ -391,6 +388,8 @@ void LLStatusBar::refresh()
 
 void LLStatusBar::setVisibleForMouselook(bool visible)
 {
+	static LLCachedControl<bool> show_net_stats(gSavedSettings, "ShowNetStats", false);
+
 	mTextTime->setVisible(visible);
 	mBalanceBG->setVisible(visible);
 	mBoxBalance->setVisible(visible);
@@ -398,8 +397,8 @@ void LLStatusBar::setVisibleForMouselook(bool visible)
 	//mBtnAO->setVisible(visible);
 	mBtnVolume->setVisible(visible);
 	mMediaToggle->setVisible(visible);
-	mSGBandwidth->setVisible(visible);
-	mSGPacketLoss->setVisible(visible);
+	mSGBandwidth->setVisible(visible && show_net_stats);
+	mSGPacketLoss->setVisible(visible && show_net_stats);
 	mSearchPanel->setVisible(visible && gSavedSettings.getBOOL("MenuSearch"));
 	setBackgroundVisible(visible);
 	mIconPresetsCamera->setVisible(visible);
