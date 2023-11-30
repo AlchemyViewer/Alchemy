@@ -3414,14 +3414,14 @@ void LLViewerObject::processTaskInvFile(void** user_data, S32 error_code, LLExtS
 
 			LLInventoryObject::object_list_t::iterator it = object->mInventory->begin();
 			LLInventoryObject::object_list_t::iterator end = object->mInventory->end();
-			std::list<LLUUID>& pending_lst = object->mPendingInventoryItemsIDs;
+			auto& pending_lst = object->mPendingInventoryItemsIDs;
 
 			for (; it != end && pending_lst.size(); ++it)
 			{
 				LLViewerInventoryItem* item = dynamic_cast<LLViewerInventoryItem*>(it->get());
 				if(item && item->getType() != LLAssetType::AT_CATEGORY)
 				{
-					std::list<LLUUID>::iterator id_it = std::find(pending_lst.begin(), pending_lst.end(), item->getAssetUUID());
+					auto id_it = pending_lst.find(item->getAssetUUID());
 					if (id_it != pending_lst.end())
 					{
 						pending_lst.erase(id_it);
@@ -3568,10 +3568,7 @@ bool LLViewerObject::isAssetInInventory(LLViewerInventoryItem* item, LLAssetType
         // but if it gets to store more types, it will need to verify type as well
         // since null can be a shared default id and it is fine to need a null
         // script and a null material simultaneously.
-        std::list<LLUUID>::iterator begin = mPendingInventoryItemsIDs.begin();
-        std::list<LLUUID>::iterator end = mPendingInventoryItemsIDs.end();
-
-        bool is_fetching = std::find(begin, end, item->getAssetUUID()) != end;
+		bool is_fetching = mPendingInventoryItemsIDs.contains(item->getAssetUUID());
 
         // null is the default asset for materials and default for scripts
         // so need to check type as well
@@ -3602,7 +3599,7 @@ void LLViewerObject::updateMaterialInventory(LLViewerInventoryItem* item, U8 key
         return;
     }
 
-    mPendingInventoryItemsIDs.push_back(item->getAssetUUID());
+    mPendingInventoryItemsIDs.insert(item->getAssetUUID());
     updateInventory(item, key, is_new);
 }
 
