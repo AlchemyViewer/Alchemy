@@ -8499,7 +8499,7 @@ BOOL LLVOAvatar::updateIsFullyLoaded()
                    || (mLoadedCallbackTextures < mCallbackTextureList.size() && mLastTexCallbackAddedTime.getElapsedTimeF32() < MAX_TEXTURE_WAIT_TIME_SEC)
                    || !mPendingAttachment.empty()
                    || (rez_status < 3 && !isFullyBaked())
-                   || hasPendingAttachedMeshes()
+                   //|| hasPendingAttachedMeshes()
                   );
 	}
 	updateRezzedStatusTimers(rez_status);
