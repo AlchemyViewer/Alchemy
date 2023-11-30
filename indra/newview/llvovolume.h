@@ -334,7 +334,6 @@ public:
 	BOOL setIsFlexible(BOOL is_flexible);
 
     const LLMeshSkinInfo* getSkinInfo() const;
-    const bool isSkinInfoUnavaliable() const { return mSkinInfoUnavaliable; }
 
     //convenience accessor for mesh ID (which is stored in sculpt id for legacy reasons)
     const LLUUID& getMeshID() const { return getVolume()->getParams().getSculptID(); }
@@ -485,7 +484,7 @@ private:
 
 	LLPointer<LLRiggedVolume> mRiggedVolume;
 
-	bool mSkinInfoUnavaliable;
+	bool mSkinInfoFailed;
 	LLConstPointer<LLMeshSkinInfo> mSkinInfo;
 	// statics
 public:
