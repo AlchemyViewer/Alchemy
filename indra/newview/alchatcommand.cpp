@@ -29,7 +29,7 @@
 #include "object_flags.h"
 
 // viewer includes
-#include "alaoengine.h"
+//#include "alaoengine.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llagentui.h"
@@ -287,6 +287,7 @@ bool ALChatCommand::parseCommand(std::string data)
 			}
 			return true;
 		}
+#if 0
         else if (cmd == utf8str_tolower(sAOCommand()))
 		{
 			std::string subcmd;
@@ -325,6 +326,7 @@ bool ALChatCommand::parseCommand(std::string data)
 				}
 			}
 		}
+#endif
         else if (cmd == "/sendmenu")
         {
             S32 channel;

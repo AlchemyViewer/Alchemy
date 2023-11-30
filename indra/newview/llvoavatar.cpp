@@ -38,7 +38,7 @@
 #include "raytrace.h"
 
 #include "alavatargroups.h"
-#include "alaoengine.h"
+//#include "alaoengine.h"
 #include "llagent.h" //  Get state values from here
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -3147,7 +3147,7 @@ void LLVOAvatar::idleUpdateLoadingEffect()
 					LL_INFOS("Avatar") << avString() << "self isFullyLoaded, mFirstFullyVisible" << LL_ENDL;
 					LLAppearanceMgr::instance().onFirstFullyVisible();
 
-					ALAOEngine::instance().onLoginComplete();
+					//ALAOEngine::instance().onLoginComplete();
 				}
 				else
 				{
@@ -3799,10 +3799,10 @@ void LLVOAvatar::idleUpdateBelowWater()
 	F32 avatar_height = (F32)(getPositionGlobal().mdV[VZ]);
 	F32 water_height = getRegion()->getWaterHeight();
 
-	BOOL was_below_water = mBelowWater;
+//	BOOL was_below_water = mBelowWater;
 	mBelowWater = avatar_height < water_height;
-	if (isSelf() && mBelowWater != was_below_water)
-        ALAOEngine::instance().checkBelowWater(mBelowWater);
+//	if (isSelf() && mBelowWater != was_below_water)
+//        ALAOEngine::instance().checkBelowWater(mBelowWater);
 }
 
 void LLVOAvatar::slamPosition()
@@ -6283,7 +6283,7 @@ BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 #ifdef SHOW_DEBUG
 	LL_DEBUGS("Motion") << "motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
 #endif
-
+#if 0
 	LLUUID remap_id;
 	if(isSelf())
 	{
@@ -6306,7 +6306,9 @@ BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 	{
 		remap_id = remapMotionID(id);
 	}
-	
+#else
+LLUUID remap_id = remapMotionID(id);
+#endif
 #ifdef SHOW_DEBUG
 	if (remap_id != id)
 	{
@@ -6331,6 +6333,7 @@ BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 	LL_DEBUGS("Motion") << "Motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
 #endif
 
+#if 0
 	LLUUID remap_id;
 	if(isSelf())
 	{
@@ -6353,7 +6356,9 @@ BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 	{
 		remap_id = remapMotionID(id);
 	}
-	
+#else
+LLUUID remap_id = remapMotionID(id);
+#endif
 #ifdef SHOW_DEBUG
 	if (remap_id != id)
 	{

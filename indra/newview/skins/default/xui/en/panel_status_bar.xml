@@ -160,16 +160,7 @@
      top="4"
      name="presets_icon_graphic"
      width="16" />
-    <button
-     follows="right|top"
-     height="16"
-     image_selected="Move"
-     image_unselected="Move_Off"
-     is_toggle="true"
-     left_pad="5"
-     top="2"
-     name="ao_btn"
-     width="16" />
+
     <button
      follows="right|top"
      height="16"

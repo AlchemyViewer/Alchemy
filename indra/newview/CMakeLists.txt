@@ -84,19 +84,19 @@ endif()
 
 set(viewer_SOURCE_FILES
     alcinematicmode.cpp
-    alaoengine.cpp
-    alaoset.cpp
+    #alaoengine.cpp
+    #alaoset.cpp
     alavataractions.cpp
     alavatargroups.cpp
     alchatcommand.cpp
     alcontrolcache.cpp
-    alfloaterao.cpp
+    #alfloaterao.cpp
     alfloaterexploresounds.cpp
     alfloatergenerictext.cpp
     alfloaterlightbox.cpp
     alfloaterparticleeditor.cpp
     alfloaterregiontracker.cpp
-    alpanelaomini.cpp
+    #alpanelaomini.cpp
     alpanelaopulldown.cpp
     alpanelmusicticker.cpp
     alpanelradaralert.cpp
@@ -815,19 +815,19 @@ set(viewer_HEADER_FILES
     CMakeLists.txt
     ViewerInstall.cmake
     alcinematicmode.h
-    alaoengine.h
-    alaoset.h
+    #alaoengine.h
+    #alaoset.h
     alavataractions.h
     alavatargroups.h
     alchatcommand.h
     alcontrolcache.h
-    alfloaterao.h
+    #alfloaterao.h
     alfloaterexploresounds.h
     alfloatergenerictext.h
     alfloaterlightbox.h
     alfloaterparticleeditor.h
     alfloaterregiontracker.h
-    alpanelaomini.h
+    #alpanelaomini.h
     alpanelaopulldown.h
     alpanelmusicticker.h
     alpanelradaralert.h
