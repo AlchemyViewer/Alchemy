@@ -35,9 +35,7 @@ in vec3 vary_position;
 in vec4 vertex_color;
 in vec2 vary_texcoord0;
 
-#ifdef WATER_FOG
-vec4 applyWaterFogView(vec3 pos, vec4 color);
-#endif
+vec4 applyWaterFogViewLinear(vec3 pos, vec4 color);
 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cl);
@@ -84,20 +82,16 @@ void main()
     vec3 additive;
     vec3 atten;
     calcAtmosphericVars(pos.xyz, vec3(0), 1.0, sunlit, amblit, additive, atten);
+
+    color.rgb = srgb_to_linear(color.rgb);
+
+#ifdef IS_ALPHA
+    color.rgb = atmosFragLighting(color.rgb, additive, atten);
 #endif
 
-#ifdef WATER_FOG
-    
-    vec4 fogged = applyWaterFogView(pos, vec4(color.rgb, final_alpha));
+    vec4 fogged = applyWaterFogViewLinear(pos, vec4(color.rgb, final_alpha));
     color.rgb = fogged.rgb;
     color.a   = fogged.a;
-#else
-    color.a   = final_alpha;
-#endif
-
-#ifndef IS_HUD
-    color.rgb = srgb_to_linear(color.rgb);
-    color.rgb = atmosFragLighting(color.rgb, additive, atten);
 #endif
 
     frag_color = max(color, vec4(0));

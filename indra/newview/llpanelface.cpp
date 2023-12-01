@@ -1926,8 +1926,7 @@ void LLPanelFace::updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, 
 
         if (objectp->isAttachment())
         {
-            pbr_ctrl->setImmediateFilterPermMask(PERM_COPY | PERM_TRANSFER | PERM_MODIFY);
-            pbr_ctrl->setDnDFilterPermMask(PERM_COPY | PERM_TRANSFER | PERM_MODIFY);
+            pbr_ctrl->setFilterPermissionMasks(PERM_COPY | PERM_TRANSFER | PERM_MODIFY);
         }
         else
         {
