@@ -214,6 +214,9 @@ BOOL LLStatusBar::postBuild()
 
 	mTextFPS = getChild<LLTextBox>("FPSText");
 
+	static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
+	mTextFPS->setVisible(show_fps);
+
 	// Adding Net Stat Graph
 	S32 x = getRect().getWidth() - 2;
 	S32 y = 0;
@@ -254,6 +257,10 @@ BOOL LLStatusBar::postBuild()
 
 	mSGPacketLoss = LLUICtrlFactory::create<LLStatGraph>(pgp);
 	addChild(mSGPacketLoss);
+
+	static LLCachedControl<bool> show_net_stats(gSavedSettings, "ShowNetStats", false);
+	mSGBandwidth->setVisible(show_net_stats);
+	mSGPacketLoss->setVisible(show_net_stats);
 
 	mPanelPresetsCameraPulldown = new LLPanelPresetsCameraPulldown();
 	addChild(mPanelPresetsCameraPulldown);
@@ -389,7 +396,8 @@ void LLStatusBar::refresh()
 void LLStatusBar::setVisibleForMouselook(bool visible)
 {
 	static LLCachedControl<bool> show_net_stats(gSavedSettings, "ShowNetStats", false);
-
+	static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
+	static LLCachedControl<bool> show_menu_search(gSavedSettings, "MenuSearch", false);
 	mTextTime->setVisible(visible);
 	mBalanceBG->setVisible(visible);
 	mBoxBalance->setVisible(visible);
@@ -399,11 +407,11 @@ void LLStatusBar::setVisibleForMouselook(bool visible)
 	mMediaToggle->setVisible(visible);
 	mSGBandwidth->setVisible(visible && show_net_stats);
 	mSGPacketLoss->setVisible(visible && show_net_stats);
-	mSearchPanel->setVisible(visible && gSavedSettings.getBOOL("MenuSearch"));
+	mSearchPanel->setVisible(visible && show_menu_search);
 	setBackgroundVisible(visible);
 	mIconPresetsCamera->setVisible(visible);
 	mIconPresetsGraphic->setVisible(visible);
-	mTextFPS->setVisible(visible);
+	mTextFPS->setVisible(visible && show_fps);
 }
 
 void LLStatusBar::debitBalance(S32 debit)
