@@ -996,9 +996,10 @@ private:
 	// Animation state data
 	//--------------------------------------------------------------------
 public:
-	typedef boost::unordered_map<LLUUID, S32>::iterator AnimIterator;
-	boost::unordered_map<LLUUID, S32>		mSignaledAnimations; // requested state of Animation name/value
-	boost::unordered_map<LLUUID, S32>		mPlayingAnimations; // current state of Animation name/value
+	// DOG NOTE - LET GOOD ENOUGH BE
+	typedef std::map<LLUUID, S32>::iterator AnimIterator;
+	std::map<LLUUID, S32> 					mSignaledAnimations; // requested state of Animation name/value
+	std::map<LLUUID, S32> 					mPlayingAnimations; // current state of Animation name/value
 
 	typedef std::multimap<LLUUID, LLUUID> 	AnimationSourceMap;
 	typedef AnimationSourceMap::iterator 	AnimSourceIterator;

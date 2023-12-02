@@ -6104,7 +6104,7 @@ void LLVOAvatar::processAnimationStateChanges()
 		{
 			if (mSignaledAnimations.find(source_it->second) == mSignaledAnimations.end())
 			{
-				mAnimationSources.erase(source_it++);
+				source_it = mAnimationSources.erase(source_it);
 			}
 			else
 			{
