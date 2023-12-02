@@ -852,11 +852,6 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 	mRT->width = resX;
 	mRT->height = resY;
 
-    if (!is_aux_alloc && LLPipeline::sRenderTransparentWater)
-    { //water reflection texture
-        if (!mWaterDis.allocate(resX, resY, GL_RGBA, true)) return false;
-    }
-
 	if (!is_aux_alloc && RenderUIBuffer)
 	{
 		if (!mRT->uiScreen.allocate(resX,resY, GL_RGBA))
@@ -877,6 +872,11 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 	if (!mRT->screen.allocate(resX, resY, screenFormat)) return false;
 
     mRT->deferredScreen.shareDepthBuffer(mRT->screen);
+
+	if (!is_aux_alloc && LLPipeline::sRenderTransparentWater)
+	{ //water reflection texture
+		if (!mWaterDis.allocate(resX, resY, screenFormat, true)) return false;
+	}
 
 	//if (shadow_detail > 0 || ssao || gSavedSettings.getU32("RenderSharpenMethod") != ALRenderUtil::SHARPEN_NONE)
 	{ //only need mRT->deferredLight for shadows OR ssao OR sharpening
