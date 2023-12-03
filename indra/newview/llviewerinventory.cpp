@@ -81,6 +81,7 @@ void no_op_llsd_func(const LLSD&) {}
 void no_op() {}
 
 static const char * const LOG_INV("Inventory");
+static const char * const LOG_LOCAL("InventoryLocalize");
 static const char * const LOG_NOTECARD("copy_inventory_from_notecard");
 
 static const std::string INV_OWNER_ID("owner_id");
@@ -117,7 +118,7 @@ public:
 	bool localizeInventoryObjectName(std::string& object_name)
 	{
 #ifdef SHOW_DEBUG
-		LL_DEBUGS("InventoryLocalize") << "Searching for localization: " << object_name << LL_ENDL;
+		LL_DEBUGS(LOG_LOCAL) << "Searching for localization: " << object_name << LL_ENDL;
 #endif
 
 		std::map<std::string, std::string>::const_iterator dictionary_iter = mInventoryItemsDict.find(object_name);
@@ -127,7 +128,7 @@ public:
 		{
 			object_name = dictionary_iter->second;
 #ifdef SHOW_DEBUG
-			LL_DEBUGS("InventoryLocalize") << "Found, new name is: " << object_name << LL_ENDL;
+			LL_DEBUGS(LOG_LOCAL) << "Found, new name is: " << object_name << LL_ENDL;
 #endif
 		}
 		return found;
