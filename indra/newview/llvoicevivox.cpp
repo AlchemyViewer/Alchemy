@@ -550,13 +550,17 @@ bool viewerChoosesConnectionHandles()
 void LLVivoxVoiceClient::connectorCreate()
 {
 	std::ostringstream stream;
-	std::string logdir = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "");
+	// Transition to stateConnectorStarted when the connector handle comes back.
+	std::string logdir = gSavedSettings.getString("VivoxLogDirectory");
+	if (logdir.empty())
+	{
+		logdir = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "");
+	}
 	if (LLStringUtil::endsWith(logdir, gDirUtilp->getDirDelimiter()))
 	{
 		logdir = logdir.substr(0, logdir.size() - gDirUtilp->getDirDelimiter().size());
 	}
 	
-	// Transition to stateConnectorStarted when the connector handle comes back.
 	std::string vivoxLogLevel = gSavedSettings.getString("VivoxDebugLevel");
     if ( vivoxLogLevel.empty() )
     {
