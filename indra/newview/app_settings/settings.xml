@@ -11779,6 +11779,17 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
+	<key>RenderParcelSelectionToMaxHeight</key>
+	<map>
+		<key>Comment</key>
+		<string>Display selected parcel outline to max build height</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>Boolean</string>
+		<key>Value</key>
+		<integer>0</integer>
+	</map>
     <key>RenderShaderCacheEnabled</key>
     <map>
       <key>Comment</key>

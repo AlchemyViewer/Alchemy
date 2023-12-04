@@ -550,13 +550,17 @@ bool viewerChoosesConnectionHandles()
 void LLVivoxVoiceClient::connectorCreate()
 {
 	std::ostringstream stream;
-	std::string logdir = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "");
+	// Transition to stateConnectorStarted when the connector handle comes back.
+	std::string logdir = gSavedSettings.getString("VivoxLogDirectory");
+	if (logdir.empty())
+	{
+		logdir = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "");
+	}
 	if (LLStringUtil::endsWith(logdir, gDirUtilp->getDirDelimiter()))
 	{
 		logdir = logdir.substr(0, logdir.size() - gDirUtilp->getDirDelimiter().size());
 	}
 	
-	// Transition to stateConnectorStarted when the connector handle comes back.
 	std::string vivoxLogLevel = gSavedSettings.getString("VivoxDebugLevel");
     if ( vivoxLogLevel.empty() )
     {
@@ -1061,7 +1065,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
                 {
                     voice_port->setValue(LLSD(port_nr), false);
                     params.args.add("-i");
-                    params.args.add(llformat("127.0.0.1:%u", gSavedSettings.getU32("VivoxVoicePort")));
+                    params.args.add(llformat("%s:%u", gSavedSettings.getString("VivoxVoiceHost").c_str(), gSavedSettings.getU32("VivoxVoicePort")));
                 }
             }
 
@@ -1087,7 +1091,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
 
             sGatewayPtr = LLProcess::create(params);
 
-            mDaemonHost = LLHost(gSavedSettings.getString("VivoxVoiceHost").c_str(), gSavedSettings.getU32("VivoxVoicePort"));
+            mDaemonHost = LLHost(gSavedSettings.getString("VivoxVoiceHost"), gSavedSettings.getU32("VivoxVoicePort"));
         }
         else
         {
@@ -5005,7 +5009,6 @@ bool LLVivoxVoiceClient::checkParcelChanged(bool update)
 				{
 					mCurrentParcelLocalID = parcelLocalID;
 					mCurrentRegionName = regionName;
-					mAreaVoiceDisabled = false;
 				}
 				return true;
 			}
@@ -5359,7 +5362,12 @@ bool LLVivoxVoiceClient::inProximalChannel()
 
 std::string LLVivoxVoiceClient::sipURIFromID(const LLUUID &id)
 {
-	std::string result = fmt::format(FMT_COMPILE("sip:{}@{}"), nameFromID(id), mVoiceSIPURIHostName);
+	std::string result;
+	result = "sip:";
+	result += nameFromID(id);
+	result += "@";
+	result += mVoiceSIPURIHostName;
+	
 	return result;
 }
 
@@ -5368,8 +5376,12 @@ std::string LLVivoxVoiceClient::sipURIFromAvatar(LLVOAvatar *avatar)
 	std::string result;
 	if(avatar)
 	{
-		result = fmt::format(FMT_COMPILE("sip:{}@{}"), nameFromID(avatar->getID()), mVoiceSIPURIHostName);
+		result = "sip:";
+		result += nameFromID(avatar->getID());
+		result += "@";
+		result += mVoiceSIPURIHostName;
 	}
+	
 	return result;
 }
 
@@ -5464,8 +5476,14 @@ std::string LLVivoxVoiceClient::displayNameFromAvatar(LLVOAvatar *avatar)
 
 std::string LLVivoxVoiceClient::sipURIFromName(std::string_view name)
 {
-	std::string result = fmt::format(FMT_COMPILE("sip:{}@{}"), name, mVoiceSIPURIHostName);
+	std::string result;
+	result = "sip:";
+	result += name;
+	result += "@";
+	result += mVoiceSIPURIHostName;
+
 //	LLStringUtil::toLower(result);
+
 	return result;
 }
 
@@ -6077,7 +6095,7 @@ LLVivoxVoiceClient::sessionState::~sessionState()
     if (mMyIterator != mSession.end())
         mSession.erase(mMyIterator);
 
-    removeAllParticipants();
+	removeAllParticipants();
 }
 
 bool LLVivoxVoiceClient::sessionState::isCallBackPossible()
