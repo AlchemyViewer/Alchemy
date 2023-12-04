@@ -339,6 +339,8 @@ void LLPresetsManager::getCameraControlNames(std::vector<std::string>& names)
 		"CameraOffsetRearView",
 		"FocusOffsetRearView",
 		"AvatarSitRotation",
+		"ZoomTime",
+		"CameraPositionSmoothing"
 	};
     names = camera_controls;
 }
