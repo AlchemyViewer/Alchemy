@@ -1674,6 +1674,29 @@ function="World.EnvPreset"
                      function="ToggleControl"
                      parameter="ShowSelectionBeam" />
                 </menu_item_check>
+	        <menu_item_check
+	         label="Show Parcel Boundary Outline"
+	         name="RenderParcelSelection">
+			  <menu_item_check.on_check
+				 function="CheckControl"
+				 parameter="RenderParcelSelection" />
+			  <menu_item_check.on_click
+				 function="ToggleControl"
+				 parameter="RenderParcelSelection" />
+			</menu_item_check>
+	        <menu_item_check
+	         label="Show Boundary up to maximum build height"
+	         name="RenderParcelSelectionToMaxHeight">
+			  <menu_item_check.on_check
+				 function="CheckControl"
+				 parameter="RenderParcelSelectionToMaxHeight" />
+			  <menu_item_check.on_click
+				 function="ToggleControl"
+				 parameter="RenderParcelSelectionToMaxHeight" />
+				<menu_item_check.on_enable
+				   function="CheckControl"
+				   parameter="RenderParcelSelection" />
+			</menu_item_check>
                 <menu_item_check
                        label="Highlight Transparent"
                        name="Highlight Transparent"
@@ -1684,6 +1707,7 @@ function="World.EnvPreset"
                   <menu_item_check.on_click
                    function="View.HighlightTransparent" />
                 </menu_item_check>
+		    	<menu_item_separator/>
                 <menu_item_check
                        label="Grab objects with Ctrl-Drag"
                        name="EnableCtrlDragMovement">
