@@ -280,7 +280,7 @@
         layout="topleft"
         mouse_opaque="true"
         name="gear_btn"
-        tool_tip="Save current camera position and focus"
+        tool_tip="My Camera Presets"
         top_delta="2"
         left_pad="5" 
         image_overlay="Icon_Gear">
