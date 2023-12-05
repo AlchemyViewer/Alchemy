@@ -506,14 +506,7 @@ void LLDrawPoolAvatar::beginRigid()
 
 	if (gPipeline.shadersLoaded())
 	{
-		if (LLPipeline::sUnderWaterRender)
-		{
-			sVertexProgram = &gObjectAlphaMaskNoColorWaterProgram;
-		}
-		else
-		{
-			sVertexProgram = &gObjectAlphaMaskNoColorProgram;
-		}
+		sVertexProgram = &gObjectAlphaMaskNoColorProgram;
 		
 		if (sVertexProgram != NULL)
 		{	//eyeballs render with the specular shader

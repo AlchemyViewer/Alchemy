@@ -184,10 +184,6 @@ void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
     {
         shader = &gHUDFullbrightProgram;
     }
-    else if (LLPipeline::sUnderWaterRender)
-    {
-        shader = &gDeferredFullbrightWaterProgram;
-    }
     else
     {
         shader = &gDeferredFullbrightProgram;
@@ -215,10 +211,6 @@ void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
     if (LLPipeline::sRenderingHUDs)
     {
         shader = &gHUDFullbrightAlphaMaskProgram;
-    }
-    else if (LLPipeline::sUnderWaterRender)
-    {
-        shader = &gDeferredFullbrightAlphaMaskWaterProgram;
     }
     else
     {
