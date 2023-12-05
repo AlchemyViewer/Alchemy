@@ -604,7 +604,7 @@
      reference="Green" />
     <color
      name="MapAvatarFriendColor"
-     reference="AlBlue" />
+     reference="Yellow" />
     <color
      name="MapAvatarLindenColor"
      value="0 1 1 1" />  
