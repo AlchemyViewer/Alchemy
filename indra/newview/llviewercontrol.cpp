@@ -265,7 +265,10 @@ static bool validateAnisotropicFiltering(const LLSD& val)
 static bool handleVSyncChanged(const LLSD& newvalue)
 {
     LLPerfStats::tunables.vsyncEnabled = newvalue.asBoolean();
-    gViewerWindow->getWindow()->toggleVSync(newvalue.asBoolean());
+    if (gViewerWindow && gViewerWindow->getWindow())
+    {
+        gViewerWindow->getWindow()->toggleVSync(newvalue.asBoolean());
+    }
 
     if(newvalue.asBoolean() == true)
     {
