@@ -147,7 +147,7 @@ void main()
 #endif
 
 #if TONEMAP_METHOD == 1 // Aces Hill method
-    diff.rgb = mix(ACES_Hill(diff.rgb), diff.rgb, 0.333);
+    diff.rgb = mix(ACES_Hill(diff.rgb), diff.rgb, 0.3);
 #elif TONEMAP_METHOD == 2 // Uchimura's Gran Turismo method
     diff.rgb = uchimura(diff.rgb);
 #elif TONEMAP_METHOD == 3 // AMD Tonemapper
