@@ -27,7 +27,7 @@
 		<menu_item_call label="SLurlをコピー" name="Copy SLurl"/>
 		<menu_item_call label="ＩＤをコピー" name="Copy ID"/>
 	</context_menu>
-	<context_menu label="Manage" name="Manage">
+	<context_menu label="管理" name="Manage">
 		<menu_item_call label="ブロック" name="Avatar Mute"/>
 		<menu_item_call label="パーティクル所有者をブロック" name="Mute Particle"/>
 		<menu_item_call label="嫌がらせの報告" name="abuse"/>

@@ -238,7 +238,10 @@
 			<menu_item_check label="選択した光の効果範囲を表示する" name="Show Light Radius for Selection"/>
 			<menu_item_check label="反射プローブのボリュームを表示" name="Show Reflection Probe Volumes"/>
 			<menu_item_check label="選択ビームを表示する" name="Show Selection Beam"/>
+			<menu_item_check label="区画の境界のアウトラインを表示" name="RenderParcelSelection"/>
+			<menu_item_check label="ビルドできる最大高度の境界を表示" name="RenderParcelSelectionToMaxHeight"/>
 			<menu_item_check label="ハイライトを透過" name="Highlight Transparent"/>
+			<menu_item_separator/>
 			<menu_item_check label="Ctrl＋ドラッグでオブジェクトを掴む" name="EnableCtrlDragMovement"/>
 			<menu_item_separator/>
 			<menu_item_check label="ポストプロセッシングを無効化" name="No Post"/>

@@ -10,7 +10,7 @@
 	</panel.string>
 	<text name="lbl2">
 		通知は１４日間保存されます。
-１日の制限数は２００通です。
+１日に送信できる通知は２００件までです。
 	</text>
 	<scroll_list name="notice_list">
 		<scroll_list.columns label="" name="icon"/>
