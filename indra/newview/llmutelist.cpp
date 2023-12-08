@@ -229,7 +229,7 @@ bool LLMuteList::isLinden(const std::string& name)
 		const auto& gods = region->getGods();
 		if (gods.empty()) return false;
 		
-		return (gods.find(name) != gods.cend() || gods.find(last_name) != gods.cend());
+		return (gods.find(username) != gods.cend() || gods.find(last_name) != gods.cend());
 	}
 	return false;
 }
