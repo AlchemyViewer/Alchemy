@@ -211,6 +211,12 @@ public:
 	U16 getCRC16() const;
 	U32 getCRC32() const;
 
+	inline U64 getDigest64() const
+	{
+		U64* tmp = (U64*)mData;
+		return tmp[0] ^ tmp[1];
+	}
+
 	friend std::size_t hash_value(LLUUID const& id)
 	{
 		return boost::hash_value(id.mData);
