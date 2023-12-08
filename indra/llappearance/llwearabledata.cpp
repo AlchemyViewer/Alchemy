@@ -195,10 +195,11 @@ void LLWearableData::pullCrossWearableValues(const LLWearableType::EType type)
 	{
 		if( param )
 		{
-			if(param->isDriverParam())
+			LLDriverParam *driver_param = dynamic_cast<LLDriverParam*>(param);
+			if(driver_param)
 			{
 				// parameter is a driver parameter, have it update its cross-driven params
-				static_cast<LLDriverParam*>(param)->updateCrossDrivenParams(type);
+				driver_param->updateCrossDrivenParams(type);
 			}
 		}
 	}

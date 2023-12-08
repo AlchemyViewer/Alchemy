@@ -104,8 +104,8 @@ public:
 	/*virtual*/ const LLVector4a&	getAvgDistortion() override { return mDefaultVec; }
 	/*virtual*/ F32					getMaxDistortion() override { return 0.1f; }
 	/*virtual*/ LLVector4a			getVertexDistortion(S32 index, LLPolyMesh *poly_mesh) override {return LLVector4a(0.001f, 0.001f, 0.001f);}
-	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh) override {index = 0; poly_mesh = NULL; return &mDefaultVec;};
-	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override {index = 0; poly_mesh = NULL; return NULL;};
+	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh) override { if( index ){ *index = 0;} if( poly_mesh ){ *poly_mesh = NULL; } return &mDefaultVec; };
+	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override { if( index ){ *index = 0;} if( poly_mesh ){ *poly_mesh = NULL; } return NULL; };
 
 protected:
 	LLPolySkeletalDistortion(const LLPolySkeletalDistortion& pOther) = default;

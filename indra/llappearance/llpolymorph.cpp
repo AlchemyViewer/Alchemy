@@ -445,7 +445,8 @@ LLVector4a LLPolyMorphTarget::getVertexDistortion(S32 requested_index, LLPolyMes
 //-----------------------------------------------------------------------------
 const LLVector4a *LLPolyMorphTarget::getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh)
 {
-	if (!mMorphData) return nullptr;
+	static LLVector4a zero = LLVector4a::getZero();
+	if (!mMorphData) return &zero;
 
 	LLVector4a* resultVec;
 	mMorphData->mCurrentIndex = 0;
@@ -471,7 +472,8 @@ const LLVector4a *LLPolyMorphTarget::getFirstDistortion(U32 *index, LLPolyMesh *
 //-----------------------------------------------------------------------------
 const LLVector4a *LLPolyMorphTarget::getNextDistortion(U32 *index, LLPolyMesh **poly_mesh)
 {
-	if (!mMorphData) return nullptr;
+	static LLVector4a zero = LLVector4a::getZero();
+	if (!mMorphData) return &zero;
 
 	LLVector4a* resultVec;
 	mMorphData->mCurrentIndex++;

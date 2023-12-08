@@ -734,8 +734,7 @@ void LLWearable::writeToAvatar(LLAvatarAppearance* avatarp)
 	{
 		// cross-wearable parameters are not authoritative, as they are driven by a different wearable. So don't copy the values to the
 		// avatar object if cross wearable. Cross wearable params get their values from the avatar, they shouldn't write the other way.
-		LLViewerVisualParam* viewer_param = (LLViewerVisualParam*)param;
-		if((viewer_param->getWearableType() == mType) && (!viewer_param->getCrossWearable()) )
+		if( (((LLViewerVisualParam*)param)->getWearableType() == mType) && (!((LLViewerVisualParam*)param)->getCrossWearable()) )
 		{
 			S32 param_id = param->getID();
 			F32 weight = getVisualParamWeight(param_id);
