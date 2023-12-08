@@ -2227,6 +2227,7 @@ void LLLiveLSLEditor::callbackLSLCompileFailed(const LLSD& compile_errors)
 	}
 	mScriptEd->selectFirstError();
 	mIsSaving = FALSE;
+	mScriptEd->mCompiling = false;
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
 	// Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
