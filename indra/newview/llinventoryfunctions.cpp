@@ -2397,7 +2397,8 @@ std::string get_searchable_creator_name(LLInventoryModel* model, const LLUUID& i
         if(item)
         {
             LLAvatarName av_name;
-            if (LLAvatarNameCache::get(item->getCreatorUUID(), &av_name))
+            const auto& creatorId {item->getCreatorUUID()};
+            if (creatorId.notNull() && LLAvatarNameCache::get(creatorId, &av_name))
             {
                 std::string username = av_name.getUserName();
                 LLStringUtil::toUpper(username);

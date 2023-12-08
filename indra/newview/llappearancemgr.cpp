@@ -1588,10 +1588,12 @@ void LLAppearanceMgr::wearItemsOnAvatar(const uuid_vec_t& item_ids_to_wear,
         }
 
 // [RLVa:KB] - Checked: 2013-02-12 (RLVa-1.4.8)
-		if ( (rlv_handler_t::isEnabled()) && (!rlvPredCanWearItem(item_to_wear, (replace) ? RLV_WEAR_REPLACE : RLV_WEAR_ADD)) )
-		{
-			continue;
-		}
+        if ( (rlv_handler_t::isEnabled()) && (!rlvPredCanWearItem(item_to_wear, (item_to_wear->getType() == LLAssetType::AT_BODYPART || replace) ? RLV_WEAR_REPLACE : RLV_WEAR_ADD)) )
+        {
+            LL_DEBUGS("Avatar") << "inventory item cannot be worn because of RLV restriction, skipping "
+                                << item_to_wear->getName() << " id " << item_id_to_wear << LL_ENDL;
+            continue;
+        }
 // [/RLVa:KB]
 
         switch (item_to_wear->getType())
@@ -3454,7 +3456,10 @@ private:
 // [SL:KB] - Patch: Appearance-AISFilter | Checked: 2015-05-02 (Catznip-3.7)
 void LLAppearanceMgr::removeCOFItemLinks(const LLUUID& item_id, LLPointer<LLInventoryCallback> cb, bool immediate_delete)
 // [/SL:KB]
-{	LLInventoryModel::cat_array_t cat_array;
+{
+	gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
+
+	LLInventoryModel::cat_array_t cat_array;
 	LLInventoryModel::item_array_t item_array;
 	gInventory.collectDescendents(LLAppearanceMgr::getCOF(),
 								  cat_array,
@@ -3470,25 +3475,22 @@ void LLAppearanceMgr::removeCOFItemLinks(const LLUUID& item_id, LLPointer<LLInve
 			{
 				RLV_ASSERT(rlvPredCanRemoveItem(item));
 			}
+			remove_inventory_item(item->getUUID(), cb, immediate_delete);
 // [/RLVa:KB]
-
 //			if (item->getType() == LLAssetType::AT_OBJECT)
-// [RLVa:KB] - Checked: 2013-02-12 (RLVa-1.4.8)
-			if (immediate_delete)
-// [/RLVa:KB]
-			{
-				// Immediate delete
-				remove_inventory_item(item->getUUID(), cb, true);
-				gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
-			}
-			else
-			{
-				// Delayed delete
-				// Pointless to update item_id label here since link still exists and first notifyObservers
-				// call will restore (wear) suffix, mark for update after deletion
-				LLPointer<LLUpdateOnCOFLinkRemove> cb_label = new LLUpdateOnCOFLinkRemove(item_id, cb);
-				remove_inventory_item(item->getUUID(), cb_label, false);
-			}
+//			{
+//				// Immediate delete
+//				remove_inventory_item(item->getUUID(), cb, true);
+//				gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
+//			}
+//			else
+//			{
+//				// Delayed delete
+//				// Pointless to update item_id label here since link still exists and first notifyObservers
+//				// call will restore (wear) suffix, mark for update after deletion
+//				LLPointer<LLUpdateOnCOFLinkRemove> cb_label = new LLUpdateOnCOFLinkRemove(item_id, cb);
+//				remove_inventory_item(item->getUUID(), cb_label, false);
+//			}
 		}
 	}
 }

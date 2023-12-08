@@ -968,28 +968,22 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 }
                 break;
             case FETCHITEM:
-                if (result.has("item_id"))
-                {
-                    // Error message might contain an item_id!!!
-                    ids.emplace(result["item_id"]);
-                }
                 if (result.has("linked_id"))
                 {
                     ids.emplace(result["linked_id"]);
                 }
+                else if (result.has("item_id"))
+                {
+                    // Error message might contain an item_id!!!
+                    ids.emplace(result["item_id"]);
+                }
                 break;
-            case COPYINVENTORY:
             case CREATEINVENTORY:
-            {
+                {
                 AISUpdate::parseUUIDArray(result, "_created_categories", ids);
                 AISUpdate::parseUUIDArray(result, "_created_items", ids);
-            }
-            break;
-            case UPDATECATEGORY:
-            {
-                AISUpdate::parseUUIDArray(result, "_updated_categories", ids);
-            }
-            break;
+                }
+                break;
             default:
                 break;
         }

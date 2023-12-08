@@ -330,11 +330,15 @@ void LLAttachmentsMgr::linkRecentlyArrivedAttachments()
         if (ids_to_link.size())
         {
 // [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
-			LLPointer<LLInventoryCallback> cb = new LLRegisterAttachmentCallback();
+			LLPointer<LLInventoryCallback> cb = NULL;
 			for (const LLUUID& idAttach : ids_to_link)
 			{
 				if (std::find(mPendingAttachLinks.begin(), mPendingAttachLinks.end(), idAttach) == mPendingAttachLinks.end())
 				{
+					if (cb.isNull())
+					{
+						cb = new LLRegisterAttachmentCallback();
+					}
 					LLAppearanceMgr::instance().addCOFItemLink(idAttach, cb);
 					mPendingAttachLinks.insert(idAttach);
 				}

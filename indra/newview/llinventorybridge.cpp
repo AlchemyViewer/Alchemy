@@ -5175,7 +5175,7 @@ std::string LLMarketplaceFolderBridge::getLabelSuffix() const
     
     if (mIsLoading && mTimeSinceRequestStart.getElapsedTimeF32() >= folder_loading_message_delay())
     {
-        return llformat(" ( %s ) ", LLTrans::getString("LoadingData").c_str());
+        return llformat(" (%s) ", LLTrans::getString("LoadingData").c_str());
     }
     
     std::string suffix = "";
