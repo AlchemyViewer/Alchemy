@@ -6777,8 +6777,8 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
 	LLViewerObject* root_object = (LLViewerObject*)vobj->getRoot();
 	LL_DEBUGS("AnimatedObjects") << "trying to add attachment overrides for root object " << root_object->getID() << " prim is " << vobj << LL_ENDL;
 #endif
-	if (vobj->isMesh() &&
-		((vobj->getVolume() && !vobj->getVolume()->isMeshAssetLoaded()) || !gMeshRepo.meshRezEnabled()))
+	if (!vobj->isMesh() ||
+		(((vobj->getVolume() && !vobj->getVolume()->isMeshAssetLoaded()) || !gMeshRepo.meshRezEnabled())))
 	{
 #ifdef SHOW_DEBUG
         LL_DEBUGS("AnimatedObjects") << "failed to add attachment overrides for root object " << root_object->getID() << " mesh asset not loaded" << LL_ENDL;
@@ -6786,8 +6786,7 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
 		return;
 	}
 	const LLMeshSkinInfo*  pSkinData = nullptr;
-
-	if ( vobj && vobj->isMesh() && (pSkinData = vobj->getSkinInfo()) && vobj->getVolume() && vobj->getVolume()->isMeshAssetLoaded() && gMeshRepo.meshRezEnabled())
+	if (pSkinData = vobj->getSkinInfo())
 	{
 		const int bindCnt = pSkinData->mAlternateBindMatrix.size();								
         const int jointCnt = pSkinData->mJointNames.size();
