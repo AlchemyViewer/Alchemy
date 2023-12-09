@@ -234,6 +234,7 @@ extern LLGLSLShader         gDeferredShadowGLTFAlphaMaskProgram;
 extern LLGLSLShader         gDeferredShadowGLTFAlphaBlendProgram;
 extern LLGLSLShader			gDeferredShadowFullbrightAlphaMaskProgram;
 extern LLGLSLShader			gDeferredPostProgram;
+extern LLGLSLShader			gDeferredPostProgramNoNear;
 extern LLGLSLShader			gDeferredCoFProgram;
 extern LLGLSLShader			gDeferredDoFCombineProgram;
 extern LLGLSLShader			gFXAAProgram[4];

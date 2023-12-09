@@ -171,6 +171,7 @@ F32 LLPipeline::RenderGlowWidth;
 F32 LLPipeline::RenderGlowStrength;
 bool LLPipeline::RenderGlowNoise;
 bool LLPipeline::RenderDepthOfField;
+bool LLPipeline::RenderDepthOfFieldNearBlur;
 bool LLPipeline::RenderDepthOfFieldInEditMode;
 bool LLPipeline::RenderFocusPointLocked;
 bool LLPipeline::RenderFocusPointFollowsPointer;
@@ -586,6 +587,7 @@ void LLPipeline::init()
 	connectRefreshCachedSettingsSafe("RenderAttachedParticles");
 	connectRefreshCachedSettingsSafe("RenderFocusPointLocked");
 	connectRefreshCachedSettingsSafe("RenderFocusPointFollowsPointer");
+	connectRefreshCachedSettingsSafe("RenderDepthOfFieldNearBlur");
 }
 
 LLPipeline::~LLPipeline()
@@ -1076,6 +1078,7 @@ void LLPipeline::refreshCachedSettings()
 	RenderGlowNoise = gSavedSettings.getBOOL("RenderGlowNoise");
 	RenderDepthOfField = gSavedSettings.getBOOL("RenderDepthOfField");
 	RenderDepthOfFieldInEditMode = gSavedSettings.getBOOL("RenderDepthOfFieldInEditMode");
+	RenderDepthOfFieldNearBlur = gSavedSettings.getBool("RenderDepthOfFieldNearBlur");
 	RenderFocusPointLocked = gSavedSettings.getBOOL("RenderFocusPointLocked");
 	RenderFocusPointFollowsPointer = gSavedSettings.getBOOL("RenderFocusPointFollowsPointer");
 	CameraFocusTransitionTime = gSavedSettings.getF32("CameraFocusTransitionTime");
@@ -7368,17 +7371,19 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 
 				gGL.setColorMask(true, false);
 
-				gDeferredPostProgram.bind();
-				gDeferredPostProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mPostHelperMap, LLTexUnit::TFO_POINT);
+				LLGLSLShader& post_program = RenderDepthOfFieldNearBlur ? gDeferredPostProgram : gDeferredPostProgramNoNear;
 
-				gDeferredPostProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, dst->getWidth(), dst->getHeight());
-				gDeferredPostProgram.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
-				gDeferredPostProgram.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
+				post_program.bind();
+				post_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mPostHelperMap, LLTexUnit::TFO_POINT);
+
+				post_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, dst->getWidth(), dst->getHeight());
+				post_program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
+				post_program.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
 
 				mScreenTriangleVB->setBuffer();
 				mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-				gDeferredPostProgram.unbind();
+				post_program.unbind();
 
 				src->flush();
 				gGL.setColorMask(true, true);

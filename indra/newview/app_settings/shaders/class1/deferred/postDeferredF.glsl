@@ -83,6 +83,7 @@ void main()
 		float PI = 3.14159265358979323846264;
 
 		// sample quite uniformly spaced points within a circle, for a circular 'bokeh'		
+#if FRONT_BLUR
 		if (sc > 0.5)
 		{
 			while (sc > 0.5)
@@ -100,6 +101,9 @@ void main()
 			}
 		}
 		else if (sc < -0.5)
+#else
+		if (sc < -0.5)
+#endif
 		{
 			sc = abs(sc);
 			while (sc > 0.5)
