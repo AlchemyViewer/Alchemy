@@ -49,7 +49,7 @@
 // Linden library includes
 #include "llwindow.h"			// setMouseClipping()
 
-//#include "alavatarcolormgr.h"
+#include "alavatargroups.h"
 #include "llavatarnamecache.h"
 #include "llagent.h"
 #include "llnetmap.h"
@@ -201,9 +201,14 @@ void LLToolGun::draw()
 				continue;
 			}
 
+			LLColor4 marker_color = LLColor4::white;
+			if(show_iff_markers || !target_rendered)
+				marker_color = ALAvatarGroups::instance().getAvatarColor(id, LLColor4::white, ALAvatarGroups::COLOR_MINIMAP);
+			marker_color.mV[VALPHA] = 0.75f;
+
 			if (show_iff_markers)
 			{
-				LLTracker::instance()->drawMarker(targetPosition, crosshair_color, true);
+				LLTracker::instance()->drawMarker(targetPosition, marker_color, true);
 			}
 
 			if (!target_rendered && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES))
@@ -213,6 +218,8 @@ void LLToolGun::draw()
 
 				if (magicVector.mdV[VX] > -0.75 && magicVector.mdV[VX] < 0.75 && magicVector.mdV[VZ] > 0.0 && magicVector.mdV[VY] > -1.5 && magicVector.mdV[VY] < 1.5) // Do not fuck with these, cheater. :(
 				{
+					crosshair_color = marker_color;
+
 					LLAvatarName avatarName;
 					std::string targetName = unknown_agent;
 					if (LLAvatarNameCache::get(id, &avatarName))
