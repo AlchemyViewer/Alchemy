@@ -235,7 +235,7 @@ protected:
 
 private:
     static void reportObjectCostFailure(LLSD &objectList);
-    void fetchObjectCostsCoro(std::string url);
+    void fetchObjectCostsCoro(std::string url, uuid_hash_set_t staleObjects);
 
     static void reportPhysicsFlagFailure(LLSD &obejectList);
     void fetchPhisicsFlagsCoro(std::string url);

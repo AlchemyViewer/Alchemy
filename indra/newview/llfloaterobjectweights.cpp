@@ -203,13 +203,11 @@ void LLFloaterObjectWeights::refresh()
 				LLAccountingCostManager::getInstance()->addObject((*iter)->getObject()->getID());
 			}
 
-			std::string url = region->getCapability("ResourceCostSelected");
-			if (!url.empty())
 			{
 				// Update the transaction id before the new fetch request
 				generateTransactionID();
 
-				LLAccountingCostManager::getInstance()->fetchCosts(Roots, url, getObserverHandle());
+				LLAccountingCostManager::getInstance()->fetchCosts(Roots, getObserverHandle());
 				toggleWeightsLoadingIndicators(true);
 			}
 		}

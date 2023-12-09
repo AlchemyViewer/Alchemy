@@ -1107,21 +1107,43 @@ void LLViewerObjectList::fetchObjectCosts()
 	// issue http request for stale object physics costs
 	if (!mStaleObjectCost.empty())
 	{
-		LLViewerRegion* regionp = gAgent.getRegion();
+		boost::unordered_map<LLViewerRegion*, uuid_hash_set_t> regionObjectMap{};
 
-		if (regionp)
+		// Swap it for thread safety since we're going to iterate over it
+		uuid_hash_set_t staleObjectCostIds{};
+		staleObjectCostIds.swap(mStaleObjectCost);
+
+		for (const auto& staleObjectId : staleObjectCostIds)
 		{
-			std::string url = regionp->getCapability("GetObjectCost");
+			LLViewerObject* staleObject = findObject(staleObjectId);
+			if (staleObject && staleObject->getRegion())
+			{
+				if (regionObjectMap.find(staleObject->getRegion()) == regionObjectMap.end())
+				{
+					regionObjectMap.insert(std::make_pair(staleObject->getRegion(), uuid_hash_set_t()));
+				}
+
+				regionObjectMap[staleObject->getRegion()].insert(staleObjectId);
+			}
+		}
+
+		for (const auto& region : regionObjectMap)
+		{
+			std::string url;
+			if(region.first->capabilitiesReceived())
+				url = region.first->getCapability("GetObjectCost");
 
 			if (!url.empty())
 			{
-                LLCoros::instance().launch("LLViewerObjectList::fetchObjectCostsCoro",
-                    boost::bind(&LLViewerObjectList::fetchObjectCostsCoro, this, url));
+				LLCoros::instance().launch("LLViewerObjectList::fetchObjectCostsCoro",
+					boost::bind(&LLViewerObjectList::fetchObjectCostsCoro, this, url, region.second));
 			}
 			else
 			{
-				mStaleObjectCost.clear();
-				mPendingObjectCost.clear();
+				for (const auto& objectId : region.second)
+				{
+					mPendingObjectCost.erase(objectId);
+				}
 			}
 		}
 	}
@@ -1138,22 +1160,18 @@ void LLViewerObjectList::reportObjectCostFailure(LLSD &objectList)
 }
 
 
-void LLViewerObjectList::fetchObjectCostsCoro(std::string url)
+void LLViewerObjectList::fetchObjectCostsCoro(std::string url, uuid_hash_set_t staleObjects)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
         httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("genericPostCoro", httpPolicy));
     LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
-
-
     uuid_set_t diff;
 
-    std::set_difference(mStaleObjectCost.begin(), mStaleObjectCost.end(),
+    std::set_difference(staleObjects.begin(), staleObjects.end(),
         mPendingObjectCost.begin(), mPendingObjectCost.end(), 
         std::inserter(diff, diff.begin()));
-
-    mStaleObjectCost.clear();
 
     if (diff.empty())
     {
@@ -1764,10 +1782,8 @@ void LLViewerObjectList::clearAllMapObjectsInRegion(LLViewerRegion* regionp)
 {
 	std::set<LLViewerObject*> dead_object_list ;
 	std::set<LLViewerObject*> region_object_list ;
-	for (vobj_list_t::iterator iter = mMapObjects.begin(); iter != mMapObjects.end(); ++iter)
+	for (LLViewerObject* objectp : mMapObjects)
 	{
-		LLViewerObject* objectp = *iter;
-
 		if(objectp->isDead())
 		{
 			dead_object_list.insert(objectp) ;			
