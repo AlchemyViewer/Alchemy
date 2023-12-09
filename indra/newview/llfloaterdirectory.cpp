@@ -53,7 +53,9 @@
 #include "llproductinforequest.h"
 
 SearchQuery::SearchQuery()
-:	category("category", ""), query("query")
+:   category("category", ""),
+    collection("collection", ""),
+    query("query")
 {}
 
 static const std::array<std::string, 6> sSearchPanels{ {"panel_search_people", "panel_search_groups", "panel_search_places", "panel_search_classifieds", "panel_search_events", "panel_search_landsales"} };

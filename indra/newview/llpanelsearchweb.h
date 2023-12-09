@@ -60,6 +60,8 @@ private:
 	LLButton* mBtnReload;
 	LLButton* mBtnStop;
 	
+	std::set<std::string> mSearchType;
+	std::set<std::string> mCollectionType;
 	LLSD mCategoryPaths;
 	//U8 mSearchGodLevel;
 	LLMediaCtrl* mWebBrowser;

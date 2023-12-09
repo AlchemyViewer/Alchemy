@@ -56,6 +56,7 @@ typedef enum {
 struct SearchQuery : public LLInitParam::Block<SearchQuery>
 {
 	Optional<std::string> category;
+	Optional<std::string> collection;
 	Optional<std::string> query;
 	
 	SearchQuery();

@@ -54,15 +54,25 @@ LLPanelSearchWeb::LLPanelSearchWeb()
 ,	mBtnStop(nullptr)
 ,	mWebBrowser(nullptr)
 {
+	mSearchType.insert("standard");
+	mSearchType.insert("land");
+	mSearchType.insert("classified");
+
+	mCollectionType.insert("events");
+	mCollectionType.insert("destinations");
+	mCollectionType.insert("places");
+	mCollectionType.insert("groups");
+	mCollectionType.insert("people");
+
 	mCategoryPaths = LLSD::emptyMap();
-	mCategoryPaths["all"]          = "search";
-	mCategoryPaths["people"]       = "search/people";
-	mCategoryPaths["places"]       = "search/places";
-	mCategoryPaths["events"]       = "search/events";
-	mCategoryPaths["groups"]       = "search/groups";
-	mCategoryPaths["wiki"]         = "search/wiki";
+	mCategoryPaths["all"] = "search";
+	mCategoryPaths["people"] = "search/people";
+	mCategoryPaths["places"] = "search/places";
+	mCategoryPaths["events"] = "search/events";
+	mCategoryPaths["groups"] = "search/groups";
+	mCategoryPaths["wiki"] = "search/wiki";
 	mCategoryPaths["destinations"] = "destinations";
-	
+
 	mCommitCallbackRegistrar.add("WebContent.Back", boost::bind(&LLPanelSearchWeb::onClickBack, this));
 	mCommitCallbackRegistrar.add("WebContent.Forward", boost::bind(&LLPanelSearchWeb::onClickForward, this));
 	mCommitCallbackRegistrar.add("WebContent.Reload", boost::bind(&LLPanelSearchWeb::onClickReload, this));
@@ -91,21 +101,37 @@ void LLPanelSearchWeb::loadUrl(const SearchQuery& p)
 	if (!mWebBrowser || !p.validateBlock()) return;
 
 	mWebBrowser->setTrustedContent(true);
-	// work out the subdir to use based on the requested category
-	LLSD subs = LLSD().with("CATEGORY", "");
 
+	// work out the subdir to use based on the requested category
+	LLSD subs;
 	if (LLGridManager::instance().isInSecondlife())
 	{
-		subs["TYPE"] = "standard";
-
-		const std::array<std::string, 5> collections = { {"events", "destinations","places","groups","people"} };
-
-		std::string collection_args("");
-		for (auto it = collections.begin(); it != collections.end(); ++it)
+		if (mSearchType.find(p.category.getValue()) != mSearchType.end())
 		{
-			collection_args += "&collection_chosen=" + std::string(*it);
+			subs["TYPE"] = p.category.getValue();
 		}
-		subs["COLLECTION"] = collection_args;
+		else
+		{
+			subs["TYPE"] = "standard";
+		}
+
+		subs["COLLECTION"] = "";
+		if (subs["TYPE"] == "standard")
+		{
+			if (mCollectionType.find(p.collection) != mCollectionType.end())
+			{
+				subs["COLLECTION"] = "&collection_chosen=" + std::string(p.collection);
+			}
+			else
+			{
+				std::string collection_args("");
+				for (std::set<std::string>::iterator it = mCollectionType.begin(); it != mCollectionType.end(); ++it)
+				{
+					collection_args += "&collection_chosen=" + std::string(*it);
+				}
+				subs["COLLECTION"] = collection_args;
+			}
+		}
 	}
 	else
 	{
@@ -116,15 +142,6 @@ void LLPanelSearchWeb::loadUrl(const SearchQuery& p)
 
 	// add the search query string
 	subs["QUERY"] = LLURI::escape(p.query);
-
-	// add the permissions token that login.cgi gave us
-	// We use "search_token", and fallback to "auth_token" if not present.
-	LLSD search_token = LLLoginInstance::getInstance()->getResponse("search_token");
-	if (search_token.asString().empty())
-	{
-		search_token = LLLoginInstance::getInstance()->getResponse("auth_token");
-	}
-	subs["AUTH_TOKEN"] = search_token.asString();
 
 	// add the user's preferred maturity (can be changed via prefs)
 	std::string maturity;
