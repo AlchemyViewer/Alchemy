@@ -169,7 +169,7 @@
 			    <stat_bar name="packetsinstat"
                     label="Packets In"
                     orientation="horizontal"
-                    stat="packetsinstat"
+                    stat="Packets In"
                     unit_label="/sec" 
                     bar_max="1024.f" 
                     tick_spacing="128.f"
