@@ -199,7 +199,7 @@ Maximum animation length is [MAX_LENGTH] seconds.
      label_width="88"
      layout="topleft"
      left="10"
-     max_val="4"
+     max_val="6"
      name="priority"
      tool_tip="Controls which other animations can be overridden by this animation"
      width="160" />
