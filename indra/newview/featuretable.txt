@@ -306,7 +306,6 @@ RenderShadowDetail			0	0
 RenderReflectionProbeDetail	0	-1
 
 list Intel
-RenderAnisotropicLevel			1	0
 RenderFSAASamples			1	0
 RenderGLContextCoreProfile  1   0
 RenderGLMultiThreadedMedia  1   0

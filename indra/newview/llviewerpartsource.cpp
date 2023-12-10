@@ -305,9 +305,6 @@ void LLViewerPartSourceScript::update(const F32 dt)
 				continue;
 			}
 
-			if (mPartSysData.mPartData.mFlags & LLPartData::LL_PART_RIBBON_MASK && mLastPart && (mLastPart->mPosAgent-mPosAgent).magVec() <= .005f)
-				continue; //Skip if parent isn't far enough away.
-
 			LLViewerPart* part = new LLViewerPart();
 
 			part->init(this, mImagep, NULL);

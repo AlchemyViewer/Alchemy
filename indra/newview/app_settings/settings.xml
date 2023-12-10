@@ -471,17 +471,6 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-    <key>AISCommandFilterMask</key>
-    <map>
-      <key>Comment</key>
-      <string>AIS command filter (death by Kitty if you change this)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>U32</string>
-      <key>Value</key>
-      <integer>65247</integer>
-    </map>
     <key>AlertedUnsupportedHardware</key>
     <map>
       <key>Comment</key>
@@ -12701,7 +12690,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <boolean>1</boolean>
+      <integer>1</integer>
     </map>
     <key>NearbyListShowIcons</key>
     <map>

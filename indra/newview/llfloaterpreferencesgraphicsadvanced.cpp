@@ -67,13 +67,6 @@ BOOL LLFloaterPreferenceGraphicsAdvanced::postBuild()
     // sets this when 8x and 16x are indeed available
     //
 #if !LL_DARWIN
-    if (gGLManager.mIsIntel || gGLManager.mGLVersion < 3.f)
-    { //remove FSAA settings above "4x"
-        LLComboBox* combo = getChild<LLComboBox>("fsaa");
-        combo->remove("8x");
-        combo->remove("16x");
-    }
-
     LLCheckBoxCtrl *use_HiDPI = getChild<LLCheckBoxCtrl>("use HiDPI");
     use_HiDPI->setVisible(FALSE);
 #endif
