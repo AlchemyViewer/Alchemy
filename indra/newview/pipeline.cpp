@@ -875,10 +875,9 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 
     mRT->deferredScreen.shareDepthBuffer(mRT->screen);
 
-	if (!is_aux_alloc && LLPipeline::sRenderTransparentWater)
-	{ //water reflection texture
-		if (!mWaterDis.allocate(resX, resY, screenFormat, true)) return false;
-	}
+    //water reflection texture (always needed as scratch space whether or not transparent water is enabled)
+    mWaterDis.allocate(resX, resY, GL_RGBA16F, true);
+
 
 	//if (shadow_detail > 0 || ssao || gSavedSettings.getU32("RenderSharpenMethod") != ALRenderUtil::SHARPEN_NONE)
 	{ //only need mRT->deferredLight for shadows OR ssao OR sharpening
@@ -7610,7 +7609,7 @@ void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
     }
 }
 
-void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_target)
+void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_target, LLRenderTarget* depth_target)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LLRenderTarget* deferred_target       = &mRT->deferredScreen;
@@ -7649,7 +7648,14 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_DEPTH, deferred_target->getUsage());
     if (channel > -1)
     {
-        gGL.getTexUnit(channel)->bind(deferred_target, TRUE);
+        if (depth_target)
+        {
+            gGL.getTexUnit(channel)->bind(depth_target, TRUE);
+        }
+        else
+        {
+            gGL.getTexUnit(channel)->bind(deferred_target, TRUE);
+        }
         stop_glerror();
     }
 
@@ -8310,16 +8316,41 @@ void LLPipeline::doAtmospherics()
 
     if (RenderDeferredAtmospheric)
     {
+        {
+            // copy depth buffer for use in haze shader (use water displacement map as temp storage)
+            LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
+
+            LLRenderTarget& src = gPipeline.mRT->screen;
+            LLRenderTarget& depth_src = gPipeline.mRT->deferredScreen;
+            LLRenderTarget& dst = gPipeline.mWaterDis;
+
+            mRT->screen.flush();
+            dst.bindTarget();
+            gCopyDepthProgram.bind();
+
+            S32 diff_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DIFFUSE_MAP);
+            S32 depth_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DEFERRED_DEPTH);
+
+            gGL.getTexUnit(diff_map)->bind(&src);
+            gGL.getTexUnit(depth_map)->bind(&depth_src, true);
+
+            gGL.setColorMask(false, false);
+            gPipeline.mScreenTriangleVB->setBuffer();
+            gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+            dst.flush();
+            mRT->screen.bindTarget();
+        }
+
         LLGLEnable blend(GL_BLEND);
         gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO, LLRender::BF_SOURCE_ALPHA);
-
         gGL.setColorMask(true, true);
 
         // apply haze
         LLGLSLShader& haze_shader = gHazeProgram;
 
         LL_PROFILE_GPU_ZONE("haze");
-        bindDeferredShader(haze_shader);
+        bindDeferredShader(haze_shader, nullptr, &mWaterDis);
 
         LLEnvironment& environment = LLEnvironment::instance();
         haze_shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
@@ -8345,6 +8376,32 @@ void LLPipeline::doWaterHaze()
 
     if (RenderDeferredAtmospheric)
     {
+        // copy depth buffer for use in haze shader (use water displacement map as temp storage)
+        {
+            LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
+
+            LLRenderTarget& src = gPipeline.mRT->screen;
+            LLRenderTarget& depth_src = gPipeline.mRT->deferredScreen;
+            LLRenderTarget& dst = gPipeline.mWaterDis;
+
+            mRT->screen.flush();
+            dst.bindTarget();
+            gCopyDepthProgram.bind();
+
+            S32 diff_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DIFFUSE_MAP);
+            S32 depth_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DEFERRED_DEPTH);
+
+            gGL.getTexUnit(diff_map)->bind(&src);
+            gGL.getTexUnit(depth_map)->bind(&depth_src, true);
+
+            gGL.setColorMask(false, false);
+            gPipeline.mScreenTriangleVB->setBuffer();
+            gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+            dst.flush();
+            mRT->screen.bindTarget();
+        }
+
         LLGLEnable blend(GL_BLEND);
         gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO, LLRender::BF_SOURCE_ALPHA);
 
@@ -8354,7 +8411,7 @@ void LLPipeline::doWaterHaze()
         LLGLSLShader& haze_shader = gHazeWaterProgram;
 
         LL_PROFILE_GPU_ZONE("haze");
-        bindDeferredShader(haze_shader);
+        bindDeferredShader(haze_shader, nullptr, &mWaterDis);
 
         haze_shader.uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
 
@@ -8372,7 +8429,7 @@ void LLPipeline::doWaterHaze()
         else
         {
             //render water patches like LLDrawPoolWater does
-            LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_LEQUAL);
+            LLGLDepthTest depth(GL_FALSE);
             LLGLDisable   cull(GL_CULL_FACE);
 
             gGLLastMatrix = NULL;
