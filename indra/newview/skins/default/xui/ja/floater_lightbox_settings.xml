@@ -4,9 +4,9 @@
 		<!--Image Panel-->
 		<panel label="画像" name="colortone_settings">
 			<!--LUT Control-->
-			<text tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。 カスタムＬＵＴには完全なファイル名が必要です！" value="有効なＬＵＴ："/>
+			<text tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。カスタムＬＵＴには完全なファイル名が必要です！" value="有効なＬＵＴ："/>
 			<!--TODO: Make more flexible?-->
-			<combo_box tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。 カスタムＬＵＴには完全なファイル名が必要です！" name="colorlut_combo">
+			<combo_box tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。カスタムＬＵＴには完全なファイル名が必要です！" name="colorlut_combo">
 				<combo_box.item label="なし" name="lut_none" value=""/>
 				<combo_box.item label="ナチュラル" name="lut_neutral" value="NeutralLUT.png"/>
 				<combo_box.item label="クロスプロセス‐暖色" name="lut_xprocess_warm" value="CrossWarm.png"/>
@@ -94,10 +94,10 @@
 			<!--Probe Coverage-->
 			<text tool_tip="反射プローブの使用を制御します。自動プローブはビューアによって「ベストエフォート」配置で生成されます。これをマニュアル＋地形もしくは、マニュアルのみに設定することで、マニュアルプローブがない過度に暗いエリアでの問題を解消することができます。" value="プローブのカバレッジ："/>
 			<combo_box tool_tip="反射プローブの使用を制御します。自動プローブはビューアによって「ベストエフォート」配置で生成されます。これをマニュアル＋地形もしくは、マニュアルのみに設定することで、マニュアルプローブがない過度に暗いエリアでの問題を解消することができます。" name="probeCoverage_combo">
-				<combo_box.item label="None/Sky Probe" name="probeCoverage_none" value="0"/>
-				<combo_box.item label="Manual Only" name="probeCoverage_manual" value="1"/>
-				<combo_box.item label="Manual + Terrain" name="probeCoverage_terrain" value="2"/>
-				<combo_box.item label="Everything" name="probeCoverage_everything" value="3"/>
+				<combo_box.item label="なし／空のプローブ" name="probeCoverage_none" value="0"/>
+				<combo_box.item label="手動のみ" name="probeCoverage_manual" value="1"/>
+				<combo_box.item label="手動＋地形" name="probeCoverage_terrain" value="2"/>
+				<combo_box.item label="すべて" name="probeCoverage_everything" value="3"/>
 			</combo_box>
 			<!--Probe Draw Distance-->
 			<text tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。" value="プローブの描画距離："/>

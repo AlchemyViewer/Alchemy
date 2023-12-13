@@ -24,10 +24,10 @@
 	<view name="contents_view">
 		<layout_stack name="main_stack">
 			<layout_panel name="toolbar_panel">
-				<menu_button name="view_options_btn" tool_tip="表示／並び替えのオプション"/>
-				<menu_button name="gear_btn" tool_tip="選択した人物に対する操作"/>
-				<button name="add_btn" tool_tip="この会話に他の人物を追加する"/>
-				<button name="voice_call_btn" tool_tip="ボイスチャット接続を開く"/>
+				<menu_button name="view_options_btn" tool_tip="表示／並べ替えのオプションを表示します。"/>
+				<menu_button name="gear_btn" tool_tip="選択した人物に対する操作を表示します。"/>
+				<button name="add_btn" tool_tip="この会話に他の人物を追加します。"/>
+				<button name="voice_call_btn" tool_tip="ボイスチャット接続を開きます。"/>
 				<panel name="nearby_toolbar">
 					<button name="chat_history_btn" tool_tip="チャット履歴を見る"/>
 				</panel>
@@ -55,7 +55,7 @@
 					</flyout_button>
 				</panel>
 				<button name="close_btn" tool_tip="この会話を終了します。"/>
-				<button name="expand_collapse_btn" tool_tip="このペインの開閉します。"/>
+				<button name="expand_collapse_btn" tool_tip="このペインを開閉します。"/>
 				<button name="tear_off_btn"/>
 			</layout_panel>
 			<layout_panel name="body_panel">
@@ -75,7 +75,7 @@
 						<avatar_icon name="avatar_icon"/>
 						<group_icon name="group_chat_icon"/>
 						<icon name="nearby_chat_icon"/>
-						<chat_editor name="chat_editor"/>
+						<chat_editor label="送信先" name="chat_editor"/>
 					</layout_panel>
 					<layout_panel name="input_button_layout_panel">
 						<button name="minz_btn" tool_tip="メッセージパネルの表示／非表示の切り替えを行います。"/>
