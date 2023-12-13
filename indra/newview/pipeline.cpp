@@ -8314,6 +8314,11 @@ void LLPipeline::doAtmospherics()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
+    if (sImpostorRender)
+    { // do not attempt atmospherics on impostors
+        return;
+    }
+
     if (RenderDeferredAtmospheric)
     {
         {
@@ -8373,6 +8378,10 @@ void LLPipeline::doAtmospherics()
 void LLPipeline::doWaterHaze()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    if (sImpostorRender)
+    { // do not attempt water haze on impostors
+        return;
+    }
 
     if (RenderDeferredAtmospheric)
     {
