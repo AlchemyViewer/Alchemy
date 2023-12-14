@@ -106,6 +106,12 @@ const F32 GROUND_TO_AIR_CAMERA_TRANSITION_START_TIME = 0.5f;
 
 const F32 OBJECT_EXTENTS_PADDING = 0.5f;
 
+static bool isDisableCameraConstraints()
+{
+	static LLCachedControl<bool> sDisableCameraConstraints(gSavedSettings, "DisableCameraConstraints", false);
+	return sDisableCameraConstraints;
+}
+
 // The agent instance.
 LLAgentCamera gAgentCamera;
 
@@ -591,9 +597,10 @@ LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 origi
 BOOL LLAgentCamera::calcCameraMinDistance(F32 &obj_min_distance)
 {
 	BOOL soft_limit = FALSE; // is the bounding box to be treated literally (volumes) or as an approximation (avatars)
-	if (!mFocusObject || mFocusObject->isDead() || 
+
+	if (!mFocusObject || mFocusObject->isDead() ||
 		mFocusObject->isMesh() ||
-		ALControlCache::DisableCameraConstraints)
+		isDisableCameraConstraints())
 	{
 		obj_min_distance = 0.f;
 		return TRUE;
@@ -763,39 +770,44 @@ F32 LLAgentCamera::getCameraZoomFraction(bool get_third_person)
 		// already [0,1]
 		return mHUDTargetZoom;
 	}
-	else if (get_third_person || (mFocusOnAvatar && cameraThirdPerson()))
+
+	if (isDisableCameraConstraints())
+	{
+		return mCameraZoomFraction;
+	}
+
+	if (get_third_person || (mFocusOnAvatar && cameraThirdPerson()))
 	{
 		return clamp_rescale(mCameraZoomFraction, MIN_ZOOM_FRACTION, MAX_ZOOM_FRACTION, 1.f, 0.f);
 	}
-	else if (cameraCustomizeAvatar())
+
+	if (cameraCustomizeAvatar())
 	{
 		F32 distance = (F32)mCameraFocusOffsetTarget.magVec();
 		return clamp_rescale(distance, APPEARANCE_MIN_ZOOM, APPEARANCE_MAX_ZOOM, 1.f, 0.f );
 	}
-	else
-	{
-		F32 min_zoom;
-		F32 max_zoom = getCameraMaxZoomDistance();
 
-		F32 distance = (F32)mCameraFocusOffsetTarget.magVec();
-		if (mFocusObject.notNull())
+	F32 min_zoom;
+	F32 max_zoom = getCameraMaxZoomDistance();
+
+	F32 distance = (F32)mCameraFocusOffsetTarget.magVec();
+	if (mFocusObject.notNull())
+	{
+		if (mFocusObject->isAvatar())
 		{
-			if (mFocusObject->isAvatar())
-			{
-				min_zoom = AVATAR_MIN_ZOOM;
-			}
-			else
-			{
-				min_zoom = OBJECT_MIN_ZOOM;
-			}
+			min_zoom = AVATAR_MIN_ZOOM;
 		}
 		else
 		{
-			min_zoom = LAND_MIN_ZOOM;
+			min_zoom = OBJECT_MIN_ZOOM;
 		}
-
-		return clamp_rescale(distance, min_zoom, max_zoom, 1.f, 0.f);
 	}
+	else
+	{
+		min_zoom = LAND_MIN_ZOOM;
+	}
+
+	return clamp_rescale(distance, min_zoom, max_zoom, 1.f, 0.f);
 }
 
 void LLAgentCamera::setCameraZoomFraction(F32 fraction)
@@ -807,6 +819,10 @@ void LLAgentCamera::setCameraZoomFraction(F32 fraction)
 	if (selection->getObjectCount() && selection->getSelectType() == SELECT_TYPE_HUD)
 	{
 		mHUDTargetZoom = fraction;
+	}
+	else if (isDisableCameraConstraints())
+	{
+		mCameraZoomFraction = fraction;
 	}
 	else if (mFocusOnAvatar && cameraThirdPerson())
 	{
@@ -845,6 +861,7 @@ void LLAgentCamera::setCameraZoomFraction(F32 fraction)
 // [/RLVa:KB]
 //		mCameraFocusOffsetTarget = camera_offset_dir * rescale(fraction, 0.f, 1.f, max_zoom, min_zoom);
 	}
+
 	startCameraAnimation();
 }
 
@@ -949,15 +966,15 @@ void LLAgentCamera::cameraZoomIn(const F32 fraction)
 		return;
 	}
 
-
-	LLVector3d	camera_offset_unit(mCameraFocusOffsetTarget);
-	F32 min_zoom = LAND_MIN_ZOOM;
+	LLVector3d camera_offset_unit(mCameraFocusOffsetTarget);
 	F32 current_distance = (F32)camera_offset_unit.normalize();
 	F32 new_distance = current_distance * fraction;
 
-	static LLCachedControl<bool> disable_camera_limits(gSavedSettings, "AlchemyCameraNoZoomLimit", false);
-	if (!disable_camera_limits)
+	// Unless camera is unlocked
+	if (!isDisableCameraConstraints())
 	{
+		F32 min_zoom = LAND_MIN_ZOOM;
+
 		// Don't move through focus point
 		if (mFocusObject)
 		{
@@ -972,30 +989,17 @@ void LLAgentCamera::cameraZoomIn(const F32 fraction)
 				min_zoom = OBJECT_MIN_ZOOM;
 			}
 		}
-	
-		new_distance = llmax(new_distance, min_zoom); 
-	}
 
-	F32 max_distance = getCameraMaxZoomDistance(true);
+		new_distance = llmax(new_distance, min_zoom);
 
-    max_distance = llmin(max_distance, current_distance * 4.f); //Scaled max relative to current distance.  MAINT-3154
+		F32 max_distance = getCameraMaxZoomDistance();
+		max_distance = llmin(max_distance, current_distance * 4.f); //Scaled max relative to current distance.  MAINT-3154
+		new_distance = llmin(new_distance, max_distance);
 
-	if (new_distance > max_distance)
-	{
-		new_distance = max_distance;
-
-		/*
-		// Unless camera is unlocked
-		if (!LLViewerCamera::sDisableCameraConstraints)
+		if (cameraCustomizeAvatar())
 		{
-			return;
+			new_distance = llclamp(new_distance, APPEARANCE_MIN_ZOOM, APPEARANCE_MAX_ZOOM);
 		}
-		*/
-	}
-
-	if(cameraCustomizeAvatar())
-	{
-		new_distance = llclamp( new_distance, APPEARANCE_MIN_ZOOM, APPEARANCE_MAX_ZOOM );
 	}
 
 // [RLVa:KB] - Checked: 2.0.0
@@ -1026,19 +1030,22 @@ void LLAgentCamera::cameraOrbitIn(const F32 meters)
 			changeCameraToMouselook(FALSE);
 		}
 
-		mCameraZoomFraction = llclamp(mCameraZoomFraction, MIN_ZOOM_FRACTION, MAX_ZOOM_FRACTION);
+		if (!isDisableCameraConstraints())
+		{
+			mCameraZoomFraction = llclamp(mCameraZoomFraction, MIN_ZOOM_FRACTION, MAX_ZOOM_FRACTION);
+		}
 	}
 	else
 	{
 		LLVector3d	camera_offset_unit(mCameraFocusOffsetTarget);
 		F32 current_distance = (F32)camera_offset_unit.normalize();
 		F32 new_distance = current_distance - meters;
-		
-		static LLCachedControl<bool> disable_camera_limits(gSavedSettings, "AlchemyCameraNoZoomLimit", false);
-		if (!disable_camera_limits)
+
+		// Unless camera is unlocked
+		if (!isDisableCameraConstraints())
 		{
 			F32 min_zoom = LAND_MIN_ZOOM;
-			
+
 			// Don't move through focus point
 			if (mFocusObject.notNull())
 			{
@@ -1053,22 +1060,14 @@ void LLAgentCamera::cameraOrbitIn(const F32 meters)
 			}
 
 			new_distance = llmax(new_distance, min_zoom);
-		}
 
-		F32 max_distance = getCameraMaxZoomDistance(true);
+			F32 max_distance = getCameraMaxZoomDistance();
+			new_distance = llmin(new_distance, max_distance);
 
-		if (new_distance > max_distance)
-		{
-			// Unless camera is unlocked
-            if (!ALControlCache::DisableCameraConstraints)
+			if (CAMERA_MODE_CUSTOMIZE_AVATAR == getCameraMode())
 			{
-				return;
+				new_distance = llclamp(new_distance, APPEARANCE_MIN_ZOOM, APPEARANCE_MAX_ZOOM);
 			}
-		}
-
-		if( CAMERA_MODE_CUSTOMIZE_AVATAR == getCameraMode() )
-		{
-			new_distance = llclamp( new_distance, APPEARANCE_MIN_ZOOM, APPEARANCE_MAX_ZOOM );
 		}
 
 // [RLVa:KB] - Checked: 2.0.0
@@ -1081,7 +1080,6 @@ void LLAgentCamera::cameraOrbitIn(const F32 meters)
 		cameraZoomIn(1.f);
 	}
 }
-
 
 //-----------------------------------------------------------------------------
 // cameraPanIn()
@@ -1928,7 +1926,8 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 				local_camera_offset = gAgent.getFrameAgent().rotateToAbsolute( local_camera_offset );
 			}
 
-			if (!mCameraCollidePlane.isExactlyZero() && (!isAgentAvatarValid() || !gAgentAvatarp->isSitting()))
+			if (!isDisableCameraConstraints() && !mCameraCollidePlane.isExactlyZero() &&
+				(!isAgentAvatarValid() || !gAgentAvatarp->isSitting()))
 			{
 				LLVector3 plane_normal;
 				plane_normal.setVec(mCameraCollidePlane.mV);
@@ -2050,7 +2049,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 
 	auto& worldInst = LLWorld::instance();
 
-	if (!ALControlCache::DisableCameraConstraints && !gAgent.isGodlike())
+	if (!isDisableCameraConstraints() && !gAgent.isGodlike())
 	{
 		LLViewerRegion* regionp = worldInst.getRegionFromPosGlobal(camera_position_global);
 		bool constrain = true;
@@ -2126,15 +2125,13 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(BOOL *hit_limit)
 
 	// Don't let camera go underground
 	F32 camera_min_off_ground = getCameraMinOffGround();
-
 	camera_land_height = worldInst.resolveLandHeightGlobal(camera_position_global);
-
-	if (camera_position_global.mdV[VZ] < camera_land_height + camera_min_off_ground)
+	F32 minZ = llmax(F_ALMOST_ZERO, camera_land_height + camera_min_off_ground);
+	if (camera_position_global.mdV[VZ] < minZ)
 	{
-		camera_position_global.mdV[VZ] = camera_land_height + camera_min_off_ground;
+		camera_position_global.mdV[VZ] = minZ;
 		isConstrained = TRUE;
 	}
-
 
 	if (hit_limit)
 	{
@@ -2336,7 +2333,13 @@ F32 LLAgentCamera::getCameraMinOffGround()
 	{
 		return 0.f;
 	}
-    return ALControlCache::DisableCameraConstraints ? -1000.f : 0.5f;
+
+	if (isDisableCameraConstraints())
+	{
+		return -1000.f;
+	}
+
+	return 0.5f;
 }
 
 

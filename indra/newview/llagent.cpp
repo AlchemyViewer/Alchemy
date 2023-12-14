@@ -511,7 +511,11 @@ void LLAgent::init()
 	
 	// *Note: this is where LLViewerCamera::getInstance() used to be constructed.
 
-	setFlying( gSavedSettings.getBOOL("FlyingAtExit") );
+    bool is_flying = gSavedSettings.getBOOL("FlyingAtExit");
+    if(is_flying)
+    {
+        setFlying(is_flying);
+    }
 
 	*mEffectColor = LLUIColorTable::instance().getColor("EffectColor");
 
@@ -2741,30 +2745,31 @@ void LLAgent::setStartPosition( U32 location_id )
 
     body["HomeLocation"] = homeLocation;
 
-	if (!requestPostCapability("HomeLocation", body,
-		boost::bind(&LLAgent::setStartPositionSuccess, this, _1)))
+    if (!requestPostCapability("HomeLocation", body, 
+            boost::bind(&LLAgent::setStartPositionSuccess, this, _1)))
 	{
-		LLMessageSystem* msg = gMessageSystem;
-		msg->newMessageFast(_PREHASH_SetStartLocationRequest);
-		msg->nextBlockFast(_PREHASH_AgentData);
-		msg->addUUIDFast(_PREHASH_AgentID, gAgentID);
-		msg->addUUIDFast(_PREHASH_SessionID, gAgentSessionID);
-		msg->nextBlockFast(_PREHASH_StartLocationData);
-		// corrected by sim
-		msg->addStringFast(_PREHASH_SimName, "");
-		msg->addU32Fast(_PREHASH_LocationID, homeLocation["LocationId"].asInteger());
-		msg->addVector3Fast(_PREHASH_LocationPos,
-			ll_vector3_from_sdmap(homeLocation["LocationPos"]));
-		msg->addVector3Fast(_PREHASH_LocationLookAt,
-			ll_vector3_from_sdmap(homeLocation["LocationLookAt"]));
-		gAgent.sendReliableMessage();
+		if(LLGridManager::instance().isInSecondlife())
+		{
+			LL_WARNS() << "Unable to post to HomeLocation capability." << LL_ENDL;
+		}
+		else
+		{
+			LLMessageSystem* msg = gMessageSystem;
+			msg->newMessageFast(_PREHASH_SetStartLocationRequest);
+			msg->nextBlockFast(_PREHASH_AgentData);
+			msg->addUUIDFast(_PREHASH_AgentID, gAgentID);
+			msg->addUUIDFast(_PREHASH_SessionID, gAgentSessionID);
+			msg->nextBlockFast(_PREHASH_StartLocationData);
+			// corrected by sim
+			msg->addStringFast(_PREHASH_SimName, "");
+			msg->addU32Fast(_PREHASH_LocationID, homeLocation["LocationId"].asInteger());
+			msg->addVector3Fast(_PREHASH_LocationPos,
+				ll_vector3_from_sdmap(homeLocation["LocationPos"]));
+			msg->addVector3Fast(_PREHASH_LocationLookAt,
+				ll_vector3_from_sdmap(homeLocation["LocationLookAt"]));
+			gAgent.sendReliableMessage();
+		}
 	}
-
-    const U32 HOME_INDEX = 1;
-    if( HOME_INDEX == location_id )
-    {
-        setHomePosRegion( mRegionp->getHandle(), getPositionAgent() );
-    }
 }
 
 void LLAgent::setStartPositionSuccess(const LLSD &result)

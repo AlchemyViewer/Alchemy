@@ -60,7 +60,6 @@ else()
 endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
       "Build type.  One of: Debug Release RelWithDebInfo" FORCE)

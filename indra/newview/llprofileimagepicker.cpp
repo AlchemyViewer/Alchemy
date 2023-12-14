@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "llprofileimagepicker.h"
 
+#include "llavatariconctrl.h"
 #include "llagent.h"
 #include "llloadingindicator.h"
 #include "llnotificationsutil.h"
@@ -202,6 +203,13 @@ void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::s
     LLUUID result = post_profile_image(cap_url, data, path_to_image);
 
     cb(result);
+
+    if (type == PROFILE_IMAGE_SL && result.notNull())
+    {
+        LLAvatarIconIDCache::getInstance()->add(gAgentID, result);
+        // Should trigger callbacks in icon controls
+        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(gAgentID);
+    }
 
     // Cleanup
     LLFile::remove(path_to_image);

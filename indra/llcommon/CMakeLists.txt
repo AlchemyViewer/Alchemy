@@ -19,8 +19,10 @@ include(XXHash)
 
 
 set(llcommon_SOURCE_FILES
+    apply.cpp
     commoncontrol.cpp
     indra_constants.cpp
+    lazyeventapi.cpp
     llapp.cpp
     llapr.cpp
     llassettype.cpp
@@ -117,12 +119,16 @@ set(llcommon_SOURCE_FILES
 set(llcommon_HEADER_FILES
     CMakeLists.txt
 
+    always_return.h
+    apply.h
     chrono.h
     classic_callback.h
     commoncontrol.h
     ctype_workaround.h
     fix_macros.h
+    function_types.h
     indra_constants.h
+    lazyeventapi.h
     linden_common.h
     llalignedarray.h
     llapp.h
@@ -329,9 +335,11 @@ if (LL_TESTS)
 
   #set(TEST_DEBUG on)
   set(test_libs llcommon)
+  LL_ADD_INTEGRATION_TEST(apply "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(bitpack "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(classic_callback "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(lazyeventapi "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llbase64 "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llcond "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lldate "" "${test_libs}")
