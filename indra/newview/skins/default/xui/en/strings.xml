@@ -82,7 +82,6 @@ Draw distance: [DRAW_DISTANCE]m
 Bandwidth: [NET_BANDWITH]kbit/s
 LOD factor: [LOD_FACTOR]
 Render quality: [RENDER_QUALITY]
-Advanced Lighting Model: [GPU_SHADERS]
 Texture memory: [TEXTURE_MEMORY]MB
 Texture cache: [TEXTURE_CACHE_INFO]
 Disk cache: [DISK_CACHE_INFO]
