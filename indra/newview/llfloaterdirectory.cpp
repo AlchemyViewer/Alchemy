@@ -98,7 +98,7 @@ BOOL LLFloaterDirectory::postBuild()
 	getChild<LLButton>("PageDn")->setCommitCallback(boost::bind(&LLFloaterDirectory::choosePage, this, _1));
 	showDetailPanel(LLStringUtil::null); // hide all the panels
 	paginate();
-	return TRUE;
+	return LLFloater::postBuild();
 }
 
 void LLFloaterDirectory::onOpen(const LLSD& key)
