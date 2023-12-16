@@ -315,7 +315,7 @@ def save_translation_file(per_lang_data, aux_data, outfile):
         worksheet.set_column('B:B', 80, wrap_format)
         
     print("Writing", outfile)
-    writer.save()
+    writer.close()
 
 if __name__ == "__main__":
 
@@ -325,7 +325,7 @@ if __name__ == "__main__":
     parser.add_argument("--deleted", action="store_true", default = False, help="show all translated entities which don't exist in english")
     parser.add_argument("--skip_spreadsheet", action="store_true", default = False, help="skip creating the translation spreadsheet")
     parser.add_argument("--rev", help="revision with modified strings, default HEAD", default="HEAD")
-    parser.add_argument("--rev_base", help="previous revision to compare against, default master", default="master")
+    parser.add_argument("--rev_base", help="previous revision to compare against, default main", default="main")
     parser.add_argument("--base_lang", help="base language, default en (normally leave unchanged - other values are only useful for testing)", default="en")
     parser.add_argument("--lang", help="target languages, or 'all_valid' or 'supported'; default is 'supported'", nargs="+", default = ["supported"])
     args = parser.parse_args()
@@ -397,7 +397,7 @@ if __name__ == "__main__":
     if args.deleted:
         deletion_file = "Translate_deletions.txt"
         print("Saving deletion info to", deletion_file)
-        with open(deletion_file,"w") as f:
+        with open(deletion_file,"w", encoding="utf-8") as f:
             for lang in langs:
                 find_deletions(mod_tree, base_tree, lang, args, f)
 
