@@ -1577,15 +1577,15 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen& size, BO
 		attrib_list[cur_attrib++] = 0;
 
 		U32 end_attrib = 0;
-		if (mFSAASamples > 0)
-		{
-			end_attrib = cur_attrib;
-			attrib_list[cur_attrib++] = WGL_SAMPLE_BUFFERS_ARB;
-			attrib_list[cur_attrib++] = GL_TRUE;
+		//if (mFSAASamples > 0)
+		//{
+		//	end_attrib = cur_attrib;
+		//	attrib_list[cur_attrib++] = WGL_SAMPLE_BUFFERS_ARB;
+		//	attrib_list[cur_attrib++] = GL_TRUE;
 
-			attrib_list[cur_attrib++] = WGL_SAMPLES_ARB;
-			attrib_list[cur_attrib++] = mFSAASamples;
-		}
+		//	attrib_list[cur_attrib++] = WGL_SAMPLES_ARB;
+		//	attrib_list[cur_attrib++] = mFSAASamples;
+		//}
 
 		// End the list
 		attrib_list[cur_attrib++] = 0;
@@ -1596,33 +1596,33 @@ BOOL LLWindowWin32::switchContext(BOOL fullscreen, const LLCoordScreen& size, BO
 		// First we try and get a 32 bit depth pixel format
 		BOOL result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
 		
-		while(!result && mFSAASamples > 0) 
-		{
-			LL_WARNS() << "FSAASamples: " << mFSAASamples << " not supported." << LL_ENDL ;
+		//while(!result && mFSAASamples > 0) 
+		//{
+		//	LL_WARNS() << "FSAASamples: " << mFSAASamples << " not supported." << LL_ENDL ;
 
-			mFSAASamples /= 2 ; //try to decrease sample pixel number until to disable anti-aliasing
-			if(mFSAASamples < 2)
-			{
-				mFSAASamples = 0 ;
-			}
+		//	mFSAASamples /= 2 ; //try to decrease sample pixel number until to disable anti-aliasing
+		//	if(mFSAASamples < 2)
+		//	{
+		//		mFSAASamples = 0 ;
+		//	}
 
-			if (mFSAASamples > 0)
-			{
-				attrib_list[end_attrib + 3] = mFSAASamples;
-			}
-			else
-			{
-				cur_attrib = end_attrib ;
-				end_attrib = 0 ;
-				attrib_list[cur_attrib++] = 0 ; //end
-			}
-			result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
+		//	if (mFSAASamples > 0)
+		//	{
+		//		attrib_list[end_attrib + 3] = mFSAASamples;
+		//	}
+		//	else
+		//	{
+		//		cur_attrib = end_attrib ;
+		//		end_attrib = 0 ;
+		//		attrib_list[cur_attrib++] = 0 ; //end
+		//	}
+		//	result = wglChoosePixelFormatARB(mhDC, attrib_list, NULL, 256, pixel_formats, &num_formats);
 
-			if(result)
-			{
-				LL_WARNS() << "Only support FSAASamples: " << mFSAASamples << LL_ENDL ;
-			}
-		}
+		//	if(result)
+		//	{
+		//		LL_WARNS() << "Only support FSAASamples: " << mFSAASamples << LL_ENDL ;
+		//	}
+		//}
 
 		if (!result)
 		{
