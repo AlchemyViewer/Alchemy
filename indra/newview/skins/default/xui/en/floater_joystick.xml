@@ -899,7 +899,16 @@
      layout="topleft"
      left="359"
      name="SpaceNavigatorDefaults"
-     top="437"
+     top="417"
+     width="200" />
+     <button
+     follows="left|top"
+     height="22"
+     label="Xbox Defaults"
+     layout="topleft"
+     left="359"
+     name="XboxDefaults"
+     top="445"
      width="200" />
     <button
      follows="right|bottom"
@@ -909,7 +918,7 @@
      layout="topleft"
      left_delta="0"
      name="ok_btn"
-     top_pad="9"
+     top_pad="7"
      width="98" />
     <button
      follows="right|bottom"

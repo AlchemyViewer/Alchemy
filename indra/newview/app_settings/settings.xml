@@ -18124,5 +18124,16 @@
 		<key>Value</key>
 		<string>0</string>
 	</map>
+	<key>JoystickInvertPitch</key>
+	<map>
+		<key>Comment</key>
+		<string>Invert pitch of joystick input</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>Boolean</string>
+		<key>Value</key>
+		<integer>0</integer>
+	</map>
 </map>
 </llsd>

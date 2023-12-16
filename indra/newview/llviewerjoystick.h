@@ -72,6 +72,7 @@ public:
 	void setOverrideCamera(bool val);
 	bool toggleFlycam();
 	void setSNDefaults();
+	void setXboxDefaults();
 	bool isDeviceUUIDSet();
 	LLSD getDeviceUUID(); //unconverted, OS dependent value wrapped into LLSD, for comparison/search
 	std::string getDeviceUUIDString(); // converted readable value for settings
@@ -88,6 +89,7 @@ protected:
 	void agentJump();
 	void resetDeltas(S32 axis[]);
 	void loadDeviceIdFromSettings();
+	void refreshFromSettings();
 #if LIB_NDOF
 	static NDOF_HotPlugResult HotPlugAddCallback(NDOF_Device *dev);
 	static void HotPlugRemovalCallback(NDOF_Device *dev);
@@ -105,8 +107,35 @@ private:
 	U32						mJoystickRun;
 	LLSD					mLastDeviceUUID; // _GUID as U8 binary map, integer 1 for no device/ndof's device
 	
-	static F32				sLastDelta[7];
-	static F32				sDelta[7];
+	// SETTINGS
+	
+	// [1 0 2 4  3  5]
+	// [Z X Y RZ RX RY]
+	// Device prefs
+	bool mJoystickEnabled;
+	LLSD mJoystickId;
+	S32 mJoystickAxis[7];
+	bool m3DCursor;
+	bool mAutoLeveling;
+	bool mZoomDirect;
+	bool mInvertPitch;
+
+	// Modes prefs
+	bool mAvatarEnabled;
+	bool mBuildEnabled;
+	bool mFlycamEnabled;
+	F32 mAvatarAxisScale[6];
+	F32 mBuildAxisScale[6];
+	F32 mFlycamAxisScale[7];
+	F32 mAvatarAxisDeadZone[6];
+	F32 mBuildAxisDeadZone[6];
+	F32 mFlycamAxisDeadZone[7];
+	F32 mAvatarFeathering;
+	F32 mBuildFeathering;
+	F32 mFlycamFeathering;
+
+	static std::array<F32, 7> sLastDelta;
+	static std::array<F32, 7> sDelta;
 };
 
 #endif

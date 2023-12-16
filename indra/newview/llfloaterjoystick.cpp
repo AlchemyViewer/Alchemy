@@ -113,10 +113,15 @@ void LLFloaterJoystick::draw()
         refreshListOfDevices();
     }
 
+	if (gFrameIntervalSeconds.value() == 0.0f)
+	{
+		joystick->updateStatus();
+	}
+
 	for (U32 i = 0; i < 6; i++)
 	{
 		F32 value = joystick->getJoystickAxis(i);
-		sample(*sJoystickAxes[i], value * gFrameIntervalSeconds.value());
+		sample(*sJoystickAxes[i], value);
 		if (mAxisStatsBar[i])
 		{
 			F32 minbar, maxbar;
@@ -135,7 +140,7 @@ void LLFloaterJoystick::draw()
 BOOL LLFloaterJoystick::postBuild()
 {		
 	center();
-	F32 range = gSavedSettings.getBOOL("Cursor3D") ? 128.f : 2.f;
+	F32 range = gSavedSettings.getBOOL("Cursor3D") ? 128.f : 0.5f;
 
 	for (U32 i = 0; i < 6; i++)
 	{
@@ -155,6 +160,7 @@ BOOL LLFloaterJoystick::postBuild()
 	childSetCommitCallback("JoystickFlycamEnabled",onCommitJoystickEnabled,this);
 
 	childSetAction("SpaceNavigatorDefaults", onClickRestoreSNDefaults, this);
+	childSetAction("XboxDefaults", onClickRestoreXboxDefaults, this);
 	childSetAction("cancel_btn", onClickCancel, this);
 	childSetAction("ok_btn", onClickOK, this);
 
@@ -431,6 +437,11 @@ void LLFloaterJoystick::onClickRestoreSNDefaults(void *joy_panel)
 	setSNDefaults();
 }
 
+void LLFloaterJoystick::onClickRestoreXboxDefaults(void* joy_panel)
+{
+	setXboxDefaults();
+}
+
 void LLFloaterJoystick::onClickCancel(void *joy_panel)
 {
 	if (joy_panel)
@@ -467,6 +478,11 @@ void LLFloaterJoystick::onClickCloseBtn(bool app_quitting)
 void LLFloaterJoystick::setSNDefaults()
 {
 	LLViewerJoystick::getInstance()->setSNDefaults();
+}
+
+void LLFloaterJoystick::setXboxDefaults()
+{
+	LLViewerJoystick::getInstance()->setXboxDefaults();
 }
 
 void LLFloaterJoystick::onClose(bool app_quitting)
