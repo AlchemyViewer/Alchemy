@@ -2,7 +2,6 @@
 <panel
  background_visible="false"
  height="40"
- label="stream_info_toast"
  layout="topleft"
  left="0"
  name="stream_info"

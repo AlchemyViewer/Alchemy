@@ -1798,7 +1798,7 @@ Bitte überprüfen Sie http://status.secondlifegrid.net, um herauszufinden, ob e
 	<string name="Object Management">Objektmanagement</string>
 	<string name="Accounting">Kontoführung</string>
 	<string name="Notices">Mitteilungen</string>
-	<string name="Chat" value=" Chat:">Chat</string>
+	<string name="Chat">Chat</string>
 	<string name="BaseMembership">Basis</string>
 	<string name="PremiumMembership">Premium</string>
 	<string name="Premium_PlusMembership">Premium Plus</string>

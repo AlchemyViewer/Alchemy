@@ -77,7 +77,6 @@ Voice Server Version: [VOICE_VERSION]</string>
 	<string name="LoginFailedNoNetwork">Erreur réseau : impossible d'établir la connexion. Veuillez vérifier votre connexion réseau.</string>
 	<string name="LoginFailedHeader">Échec de la connexion.</string>
 	<string name="Quit">Quitter</string>
-	<string name="create_account_url">http://join.secondlife.com/?sourceid=[sourceid]</string>
 	<string name="AgniGridLabel">Grille principale de Second Life (Agni)</string>
 	<string name="AditiGridLabel">Grille de test bêta Second Life (Aditi)</string>
 	<string name="ViewerDownloadURL">http://secondlife.com/download</string>
@@ -159,24 +158,6 @@ Veuillez réessayer de vous connecter dans une minute.</string>
 	<string name="YouHaveBeenDisconnected">Vous avez été déconnecté de la région où vous étiez.</string>
 	<string name="SentToInvalidRegion">Vous avez été transféré vers une région non valide.</string>
 	<string name="TestingDisconnect">Test de déconnexion du client</string>
-	<string name="SocialFacebookConnecting">Connexion à Facebook…</string>
-	<string name="SocialFacebookPosting">Publication…</string>
-	<string name="SocialFacebookDisconnecting">Déconnexion de Facebook…</string>
-	<string name="SocialFacebookErrorConnecting">Un problème est survenu lors de la connexion à Facebook.</string>
-	<string name="SocialFacebookErrorPosting">Un problème est survenu lors de la publication sur Facebook.</string>
-	<string name="SocialFacebookErrorDisconnecting">Un problème est survenu lors de la déconnexion à Facebook.</string>
-	<string name="SocialFlickrConnecting">Connexion à Flickr...</string>
-	<string name="SocialFlickrPosting">Publication…</string>
-	<string name="SocialFlickrDisconnecting">Déconnexion de Flickr...</string>
-	<string name="SocialFlickrErrorConnecting">Un problème est survenu lors de la connexion à Flickr.</string>
-	<string name="SocialFlickrErrorPosting">Un problème est survenu lors de la publication sur Flickr.</string>
-	<string name="SocialFlickrErrorDisconnecting">Un problème est survenu lors de la déconnexion de Flickr.</string>
-	<string name="SocialTwitterConnecting">Connexion à Twitter...</string>
-	<string name="SocialTwitterPosting">Publication…</string>
-	<string name="SocialTwitterDisconnecting">Déconnexion de Twitter...</string>
-	<string name="SocialTwitterErrorConnecting">Un problème est survenu lors de la connexion à Twitter.</string>
-	<string name="SocialTwitterErrorPosting">Un problème est survenu lors de la publication sur Twitter.</string>
-	<string name="SocialTwitterErrorDisconnecting">Un problème est survenu lors de la déconnexion de Twitter.</string>
 	<string name="BlackAndWhite">Noir et blanc</string>
 	<string name="Colors1970">Couleurs des années 1970</string>
 	<string name="Intense">Intense</string>
@@ -963,7 +944,7 @@ Si vous continuez de recevoir ce message, contactez l’assistance Second Life �
 	<string name="GroupMoneyBalance">Solde</string>
 	<string name="GroupMoneyCredits">Crédits</string>
 	<string name="GroupMoneyDebits">Débits</string>
-	<string name="GroupMoneyDate">[weekday,datetime,utc] [day,datetime,utc] [mth,datetime,utc] [year,datetime,utc]</string>
+	<string name="GroupMoneyStartDate">Transactions since [weekday,datetime,utc] [day,datetime,utc] [mth,datetime,utc] [year,datetime,utc]</string>
 	<string name="AcquiredItems">Objets acquis</string>
 	<string name="Cancel">Annuler</string>
 	<string name="UploadingCosts">Le chargement de [NAME] coûte [AMOUNT] L$</string>
@@ -1072,12 +1053,6 @@ Utilisation du mode fenêtré.</string>
 	<string name="MBDevContextErr">Impossible de créer le contexte GL</string>
 	<string name="MBPixelFmtErr">Impossible de trouver le format pixel approprié</string>
 	<string name="MBPixelFmtDescErr">Impossible de trouver la description du format pixel</string>
-	<string name="MBTrueColorWindow">[APP_NAME] nécessite True Color (32 bits) pour s'exécuter.
-Accédez aux paramètres d'affichage de votre ordinateur et réglez le mode couleur sur 32 bits.</string>
-	<string name="MBAlpha">[APP_NAME] ne peut pas s'exécuter, car il n'y pas de canal alpha 8 bits accessible.  En général, ceci vient de problèmes avec le pilote de la carte vidéo.
-Assurez-vous d'avoir installé le pilote de carte vidéo le plus récent possible.
-Assurez-vous aussi que votre écran est réglé sur True Color (32 bits) sous Panneau de configuration &gt; Affichage &gt; Paramètres.
-Si ce message persiste, veuillez aller sur la page [SUPPORT_SITE].</string>
 	<string name="MBPixelFmtSetErr">Impossible de trouver le format pixel approprié</string>
 	<string name="MBGLContextErr">Impossible de créer le contexte de rendu GL</string>
 	<string name="MBGLContextActErr">Impossible d'activer le contexte de rendu GL</string>
@@ -1616,9 +1591,6 @@ Si ce message persiste, veuillez aller sur la page [SUPPORT_SITE].</string>
 	<string name="inventory_item_offered-im">Objet de l’inventaire [ITEM_NAME] offert</string>
 	<string name="inventory_folder_offered-im">Dossier de l’inventaire [ITEM_NAME] offert</string>
 	<string name="share_alert">Faire glisser les objets de l'inventaire ici</string>
-	<string name="facebook_post_success">Vous avez publié sur Facebook.</string>
-	<string name="flickr_post_success">Vous avez publié sur Flickr.</string>
-	<string name="twitter_post_success">Vous avez publié sur Twitter.</string>
 	<string name="no_session_message">(Session IM inexistante)</string>
 	<string name="only_user_message">Vous êtes le seul participant à cette session.</string>
 	<string name="offline_message">[NAME] est hors ligne.</string>
@@ -1799,7 +1771,7 @@ Veuillez vous reporter à http://status.secondlifegrid.net afin de déterminer s
 	<string name="Object Management">Gestion des objets</string>
 	<string name="Accounting">Comptabilité</string>
 	<string name="Notices">Notices</string>
-	<string name="Chat" value=" Chat :">Chat</string>
+	<string name="Chat">Chat</string>
 	<string name="BaseMembership">Base</string>
 	<string name="PremiumMembership">Premium</string>
 	<string name="Premium_PlusMembership">Premium Plus</string>
@@ -1935,8 +1907,6 @@ Essayez avec le chemin d'accès à l'éditeur entre guillemets doubles
 	<string name="Command_Compass_Label">Boussole</string>
 	<string name="Command_Destinations_Label">Destinations</string>
 	<string name="Command_Environments_Label">Mes environnements</string>
-	<string name="Command_Facebook_Label">Facebook</string>
-	<string name="Command_Flickr_Label">Flickr</string>
 	<string name="Command_Gestures_Label">Gestes</string>
 	<string name="Command_Grid_Status_Label">État de la grille</string>
 	<string name="Command_HowTo_Label">Aide rapide</string>
@@ -1946,7 +1916,6 @@ Essayez avec le chemin d'accès à l'éditeur entre guillemets doubles
 	<string name="Command_MarketplaceListings_Label">Place du marché</string>
 	<string name="Command_MiniMap_Label">Mini-carte</string>
 	<string name="Command_Move_Label">Marcher / Courir / Voler</string>
-	<string name="Command_Outbox_Label">Boîte d'envoi vendeur</string>
 	<string name="Command_People_Label">Personnes</string>
 	<string name="Command_Picks_Label">Favoris</string>
 	<string name="Command_Places_Label">Lieux</string>
@@ -1956,7 +1925,6 @@ Essayez avec le chemin d'accès à l'éditeur entre guillemets doubles
 	<string name="Command_Search_Label">Recherche</string>
 	<string name="Command_Snapshot_Label">Photo</string>
 	<string name="Command_Speak_Label">Parler</string>
-	<string name="Command_Twitter_Label">Twitter</string>
 	<string name="Command_View_Label">Caméra</string>
 	<string name="Command_Voice_Label">Paramètres vocaux</string>
 	<string name="Command_AboutLand_Tooltip">Information sur le terrain que vous visitez</string>
@@ -1968,8 +1936,6 @@ Essayez avec le chemin d'accès à l'éditeur entre guillemets doubles
 	<string name="Command_Compass_Tooltip">Boussole</string>
 	<string name="Command_Destinations_Tooltip">Destinations intéressantes</string>
 	<string name="Command_Environments_Tooltip">Mes environnements</string>
-	<string name="Command_Facebook_Tooltip">Publier sur Facebook</string>
-	<string name="Command_Flickr_Tooltip">Charger sur Flickr</string>
 	<string name="Command_Gestures_Tooltip">Gestes de votre avatar</string>
 	<string name="Command_Grid_Status_Tooltip">Afficher l’état actuel de la grille</string>
 	<string name="Command_HowTo_Tooltip">Comment effectuer les opérations courantes</string>
@@ -1979,7 +1945,6 @@ Essayez avec le chemin d'accès à l'éditeur entre guillemets doubles
 	<string name="Command_MarketplaceListings_Tooltip">Vendez votre création</string>
 	<string name="Command_MiniMap_Tooltip">Afficher les personnes près de vous</string>
 	<string name="Command_Move_Tooltip">Faire bouger votre avatar</string>
-	<string name="Command_Outbox_Tooltip">Transférer des articles vers votre place de marché afin de les vendre.</string>
 	<string name="Command_People_Tooltip">Amis, groupes et personnes près de vous</string>
 	<string name="Command_Picks_Tooltip">Lieux à afficher comme favoris dans votre profil</string>
 	<string name="Command_Places_Tooltip">Lieux enregistrés</string>
@@ -1989,7 +1954,6 @@ Essayez avec le chemin d'accès à l'éditeur entre guillemets doubles
 	<string name="Command_Search_Tooltip">Trouver des lieux, personnes, événements</string>
 	<string name="Command_Snapshot_Tooltip">Prendre une photo</string>
 	<string name="Command_Speak_Tooltip">Parler aux personnes près de vous en utilisant votre micro</string>
-	<string name="Command_Twitter_Tooltip">Twitter</string>
 	<string name="Command_View_Tooltip">Changer l'angle de la caméra</string>
 	<string name="Command_Voice_Tooltip">Commandes de réglage du volume des appels et des personnes près de vous dans Second Life.</string>
 	<string name="Toolbar_Bottom_Tooltip">actuellement dans la barre d'outils du bas</string>
