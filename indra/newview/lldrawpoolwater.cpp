@@ -119,6 +119,7 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
         LLRenderTarget& depth_src = gPipeline.mRT->deferredScreen;
         LLRenderTarget& dst = gPipeline.mWaterDis;
 
+        src.flush();
         dst.bindTarget();
         gCopyDepthProgram.bind();
 
