@@ -269,9 +269,6 @@ LibVLCのバージョン：[LIBVLC_VERSION]
 	<string name="Quit">
 		終了
 	</string>
-	<string name="create_account_url">
-		https://join.secondlife.com/?lang=ja&amp;sourceid=[sourceid]
-	</string>
 	<string name="AgniGridLabel">
 		Second Lifeメイングリッド（Agni）
 	</string>
@@ -4504,9 +4501,6 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="UploadingCosts">
 		[NAME]のアップロード料金は L$ [AMOUNT]です。
 	</string>
-	<string name="BuyingCosts">
-		これをL$ [AMOUNT]で購入します。
-	</string>
 	<string name="UnknownFileExtension">
 		不明な拡張子：%s
 		使用可能な拡張子：.wav，.tga，.bmp，.jpg，.jpeg，.bvh
@@ -6986,7 +6980,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 	<string name="Notices">
 		通知
 	</string>
-	<string name="Chat" value="チャット：">
+	<string name="Chat">
 		チャット
 	</string>
 	<!-- SL Membership -->

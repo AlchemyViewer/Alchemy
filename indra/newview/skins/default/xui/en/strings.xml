@@ -26,7 +26,8 @@
 	<string name="StartupClearingDiskCache">Obliterating asset cache...</string>
 	<string name="StartupClearingObjectCache">Obliterating object cache...</string>
 	<string name="StartupClearingShaderCache">Obliterating shader cache...</string>
-	<string name="StartupInitializingDiskCache">Initializing Disk Cache...</string>
+	<string name="StartupInitializingDiskCache">Initializing disk cache...</string>
+	<string name="StartupInitializingTextureCache">Initializing texture cache...</string>
 	<string name="StartupInitializingTextureCache0">Fluffing texture cache...</string>
 	<string name="StartupInitializingTextureCache1">Reticulating splines...</string>
 	<string name="StartupInitializingTextureCache2">Preheating texture baking oven...</string>
