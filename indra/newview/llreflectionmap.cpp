@@ -231,7 +231,8 @@ F32 LLReflectionMap::getNearClip()
 
 bool LLReflectionMap::getIsDynamic()
 {
-    if (gSavedSettings.getS32("RenderReflectionProbeDetail") > (S32) LLReflectionMapManager::DetailLevel::STATIC_ONLY &&
+    static LLCachedControl<S32> sProbeDetail(gSavedSettings, "RenderReflectionProbeDetail", -1);
+    if (sProbeDetail > (S32) LLReflectionMapManager::DetailLevel::STATIC_ONLY &&
         mViewerObject && 
         mViewerObject->getVolume())
     {

@@ -201,7 +201,8 @@ void display_update_camera()
 	F32 final_far = gAgentCamera.mDrawDistance;
     if (gCubeSnapshot)
     {
-        final_far = gSavedSettings.getF32("RenderReflectionProbeDrawDistance");
+		static LLCachedControl<F32> ref_probe_draw_dist(gSavedSettings, "RenderReflectionProbeDrawDistance", 64);
+        final_far = ref_probe_draw_dist;
     }
     else if (CAMERA_MODE_CUSTOMIZE_AVATAR == gAgentCamera.getCameraMode())
         
