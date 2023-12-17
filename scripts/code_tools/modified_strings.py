@@ -300,8 +300,8 @@ def save_translation_file(per_lang_data, aux_data, outfile):
         worksheet.set_column('A:B', 60, wrap_format)
         worksheet.set_column('C:C', 60, wrap_unlocked_format)
         worksheet.set_column('D:E', 40, wrap_unlocked_format)
-        worksheet.set_column('F:F', 50, wrap_format, {'hidden': True})
-        worksheet.set_column('G:H', 30, wrap_format, {'hidden': True})
+        worksheet.set_column('F:F', 50, wrap_format)
+        worksheet.set_column('G:H', 30, wrap_format)
 
         # Lock the top row (column headers) in place while scrolling
         worksheet.freeze_panes(1, 0)
