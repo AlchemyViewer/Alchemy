@@ -151,6 +151,7 @@
      left_pad="8"
      top="2"
      name="presets_icon_camera"
+	 tool_tip="My Camera Presets"
      width="18" />
     <icon
      follows="right|top"
@@ -159,6 +160,7 @@
      left_pad="8"
      top="4"
      name="presets_icon_graphic"
+	 tool_tip="Graphics Presets"
      width="16" />
 
     <button

@@ -16,7 +16,7 @@
 	<menu_item_separator name="separator_utils"/>
 	<context_menu label="管理" name="manage_menu">
 		<menu_item_check label="ブロック／解除" name="block_unblock"/>
-		<menu_item_call label="嫌がらせの報告" name="abuse"/>
+		<menu_item_call label="嫌がらせの報告" name="report_abuse"/>
 		<menu_item_call label="フリーズ" name="freeze"/>
 		<menu_item_call label="追放" name="eject"/>
 		<menu_item_call label="ホームにテレポート" name="teleporthome"/>

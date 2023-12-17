@@ -360,7 +360,6 @@
 			<menu_item_check label="サーフェスパッチ" name="Rendering Type Surface Patch"/>
 			<menu_item_check label="空" name="Rendering Type Sky"/>
 			<menu_item_check label="水面" name="Rendering Type Water"/>
-			<menu_item_check label="地表" name="Rendering Type Ground"/>
 			<menu_item_check label="ボリューム" name="Rendering Type Volume"/>
 			<menu_item_check label="草" name="Rendering Type Grass"/>
 			<menu_item_check label="雲" name="Rendering Type Clouds"/>
@@ -415,7 +414,6 @@
 			<menu_item_check label="メモリ" name="Memory"/>
 			<menu_item_check label="シーンの統計" name="Scene Statistics"/>
 			<menu_item_check label="シーンの読み込みモニター" name="Scene Loading Monitor"/>
-			<menu_item_call label="テクスチャ取得デバッグコンソール" name="Texture Fetch Debug Console"/>
 			<menu_item_separator/>
 			<menu_item_call label="リージョン情報をデバッグコンソールへ" name="Region Info to Debug Console"/>
 			<menu_item_call label="グループ情報をデバッグコンソールへ" name="Group Info to Debug Console"/>
@@ -457,7 +455,6 @@
 			<menu_item_check label="カメラのオフセット" name="Camera Offset"/>
 			<menu_item_check label="フレームレートをランダム化" name="Randomize Framerate"/>
 			<menu_item_check label="周期的な遅いフレーム" name="Periodic Slow Frame"/>
-			<menu_item_check label="フレームテスト" name="Frame Test"/>
 			<menu_item_call label="フレームのプロフィール" name="Frame Profile"/>
 			<menu_item_call label="ベンチマーク" name="Benchmark"/>
 		</menu>
@@ -476,7 +473,6 @@
 			<menu_item_check label="側面" name="Face Area"/>
 			<menu_item_check label="ＬｏＤ情報" name="LOD Info"/>
 			<menu_item_check label="三角形の数" name="Triangle Count"/>
-			<menu_item_check label="ビルド・キュー" name="Build Queue"/>
 			<menu_item_check label="光源" name="Lights"/>
 			<menu_item_check label="反射プローブ" name="Reflection Probes"/>
 			<menu_item_check label="パーティクル" name="Particles"/>
@@ -500,7 +496,6 @@
 			<menu_item_check label="ワイヤーフレーム" name="Wireframe"/>
 			<menu_item_check label="オブジェクト間のオクルージョン" name="Object-Object Occlusion"/>
 			<menu_item_separator/>
-			<menu_item_check label="高度な光源モデル" name="Advanced Lighting Model"/>
 			<menu_item_check label="　太陽・月・プロジェクタからの影" name="Shadows from Sun/Moon/Projectors"/>
 			<menu_item_check label="　ＳＳＡＯと影のスムージング" name="SSAO and Shadow Smoothing"/>
 			<menu_item_separator/>
@@ -514,7 +509,6 @@
 			<menu_item_check label="フル解像度テクスチャ" name="Rull Res Textures"/>
 			<menu_item_check label="装着された光源を描画する" name="Render Attached Lights"/>
 			<menu_item_check label="取り付けられたパーティクルを描画する" name="Render Attached Particles"/>
-			<menu_item_check label="マウスオーバーで強調表示する" name="Hover Glow Objects"/>
 			<menu_item_separator/>
 			<menu_item_check label="シェーダーキャッシュを有効化" name="Enable Shader Cache"/>
 			<menu_item_call label="シェーダーキャッシュをクリア" name="Shader Cache Clear"/>
@@ -560,7 +554,6 @@
 		</menu>
 		<menu label="ＵＩ" name="UI">
 			<menu_item_call label="メディアブラウザ" name="Media Browser"/>
-			<menu_item_call label="ＦＢ接続テスト" name="FB Connect Test"/>
 			<menu_item_call label="SelectMgrをダンプ" name="Dump SelectMgr"/>
 			<menu_item_call label="インベントリの出力" name="Dump Inventory"/>
 			<menu_item_call label="タイマーをダンプ" name="Dump Timers"/>
@@ -577,13 +570,10 @@
 			<menu_item_check label="WindowProcのデバッグ" name="Debug WindowProc"/>
 		</menu>
 		<menu label="ＸＵＩ" name="XUI">
+			<menu_item_call label="ＸＵＩプレビューツール" name="UI Preview Tool"/>
 			<menu_item_call label="色の設定をリロード" name="Reload Color Settings"/>
 			<menu_item_call label="フォントテストを表示" name="Show Font Test"/>
-			<menu_item_call label="ＸＭＬから読み込む" name="Load from XML"/>
-			<menu_item_call label="ＸＭＬに保存" name="Save to XML"/>
 			<menu_item_check label="ＸＵＩ名を表示" name="Show XUI Names"/>
-			<menu_item_check label="デバッグ情報をビューに表示" name="DebugViews"/>
-			<menu_item_call label="ＸＵＩプレビューツール" name="UI Preview Tool"/>
 			<menu_item_call label="テストＩＭを送信する" name="Send Test IMs"/>
 			<menu_item_call label="名前キャッシュをフラッシュ" name="Flush Names Caches"/>
 		</menu>
@@ -627,7 +617,6 @@
 			<menu_item_call label="ローカルテクスチャをダンプ" name="Dump Local Textures"/>
 		</menu>
 		<menu_item_separator/>
-		<menu_item_check label="ＨＴＴＰテクスチャ" name="HTTP Textures"/>
 		<menu_item_call label="圧縮画像" name="Compress Images"/>
 		<menu_item_call label="圧縮ファイルテスト" name="Compress File Test"/>
 		<menu_item_call label="Visual Leak Detectorを有効にする" name="Enable Visual Leak Detector"/>
