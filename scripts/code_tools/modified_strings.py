@@ -66,6 +66,7 @@ translate_attribs = [
     "label",
     "label_selected",
     "tool_tip",
+    "default_text",
     "ignoretext",
     "yestext",
     "notext",
