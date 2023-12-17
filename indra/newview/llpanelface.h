@@ -238,6 +238,8 @@ protected:
 	static void		onCommitPlanarAlign(		LLUICtrl* ctrl, void* userdata);
 	static void		onCommitRepeatsPerMeter(	LLUICtrl* ctrl, void* userinfo);
 
+	void onClickBtnSelectSameTexture(const LLUICtrl* ctrl, const LLSD& user_data);
+
     void            onCommitGLTFTextureScaleU(LLUICtrl* ctrl);
     void            onCommitGLTFTextureScaleV(LLUICtrl* ctrl);
     void            onCommitGLTFRotation(LLUICtrl* ctrl);

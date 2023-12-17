@@ -471,6 +471,7 @@ LLPanelFace::LLPanelFace()
     USE_TEXTURE = LLTrans::getString("use_texture");
     mCommitCallbackRegistrar.add("PanelFace.menuDoToSelected", boost::bind(&LLPanelFace::menuDoToSelected, this, _2));
     mEnableCallbackRegistrar.add("PanelFace.menuEnable", boost::bind(&LLPanelFace::menuEnableItem, this, _2));
+	mCommitCallbackRegistrar.add("BuildTool.SelectSameTexture", boost::bind(&LLPanelFace::onClickBtnSelectSameTexture, this, _1, _2));
 }
 
 LLPanelFace::~LLPanelFace()
@@ -1787,6 +1788,10 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 		calcp->setVar(LLCalc::TEX_ROTATION, childGetValue("TexRot").asReal());
         calcp->setVar(LLCalc::TEX_TRANSPARENCY, mCtrlColorTransp->getValue().asReal());
         calcp->setVar(LLCalc::TEX_GLOW, mCtrlGlow->getValue().asReal());
+
+		getChild<LLUICtrl>("btn_select_same_diff")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && mTextureCtrl->getEnabled() && identical_diffuse);
+		getChild<LLUICtrl>("btn_select_same_norm")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && mBumpyTextureCtrl->getEnabled() && identical_norm);
+		getChild<LLUICtrl>("btn_select_same_spec")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && mShinyTextureCtrl->getEnabled() && identical_spec);
 	}
 	else
 	{
@@ -1992,6 +1997,8 @@ void LLPanelFace::updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, 
         gltfCtrlTextureOffsetU->setEnabled(new_state);
         gltfCtrlTextureOffsetV->setEnabled(new_state);
 
+        getChild<LLUICtrl>("btn_select_same_pbr")->setEnabled(LLSelectMgr::getInstance()->getTEMode() && new_state && identical_pbr);
+
         // Control values will be set once per frame in
         // setMaterialOverridesFromSelection
         sMaterialOverrideSelection.setDirty();
@@ -2010,6 +2017,7 @@ void LLPanelFace::updateVisibilityGLTF(LLViewerObject* objectp /*= nullptr */)
     const bool show_pbr_render_material_id = show_pbr && (pbr_type == PBRTYPE_RENDER_MATERIAL_ID);
 
     getChildView("pbr_control")->setVisible(show_pbr_render_material_id);
+    getChildView("btn_select_same_pbr")->setVisible(show_pbr_render_material_id);
 
     getChildView("pbr_from_inventory")->setVisible(show_pbr_render_material_id);
     getChildView("edit_selected_pbr")->setVisible(show_pbr_render_material_id && !inventory_pending);
@@ -2909,6 +2917,7 @@ void LLPanelFace::updateVisibility(LLViewerObject* objectp /* = nullptr */)
 	getChildView("TexRot")->setVisible(show_texture);
 	getChildView("TexOffsetU")->setVisible(show_texture);
 	getChildView("TexOffsetV")->setVisible(show_texture);
+	getChild<LLUICtrl>("btn_select_same_diff")->setVisible(show_texture);
 
 	// Specular map controls
     mShinyTextureCtrl->setVisible(show_shininess);
@@ -2929,6 +2938,7 @@ void LLPanelFace::updateVisibility(LLViewerObject* objectp /* = nullptr */)
 	getChildView("shinyRot")->setVisible(show_shininess);
 	getChildView("shinyOffsetU")->setVisible(show_shininess);
 	getChildView("shinyOffsetV")->setVisible(show_shininess);
+	getChild<LLUICtrl>("btn_select_same_spec")->setVisible(show_shininess);
 
 	// Normal map controls
 	if (show_bumpiness)
@@ -2943,6 +2953,7 @@ void LLPanelFace::updateVisibility(LLViewerObject* objectp /* = nullptr */)
 	getChildView("bumpyRot")->setVisible(show_bumpiness);
 	getChildView("bumpyOffsetU")->setVisible(show_bumpiness);
 	getChildView("bumpyOffsetV")->setVisible(show_bumpiness);
+	getChild<LLUICtrl>("btn_select_same_norm")->setVisible(show_bumpiness);
 
     getChild<LLSpinCtrl>("rptctrl")->setVisible(show_material || show_media);
 
@@ -5389,3 +5400,86 @@ void LLPanelFace::LLSelectedTE::getMaxDiffuseRepeats(F32& repeats, bool& identic
 	identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &max_diff_repeats_func, repeats );
 }
 
+void LLPanelFace::onClickBtnSelectSameTexture(const LLUICtrl* ctrl, const LLSD& user_data)
+{
+	char channel = user_data.asStringRef()[0];
+
+	std::unordered_set<LLViewerObject*> objects;
+
+	// get a list of all linksets where at least one face is selected
+	for (auto iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
+		iter != LLSelectMgr::getInstance()->getSelection()->valid_end(); iter++)
+	{
+		objects.insert((*iter)->getObject()->getRootEdit());
+	}
+
+	// clean out the selection
+	LLSelectMgr::getInstance()->deselectAll();
+
+	// select all faces of all linksets that were found before
+	LLObjectSelectionHandle handle;
+	for(auto objectp : objects)
+	{
+		handle = LLSelectMgr::getInstance()->selectObjectAndFamily(objectp, true, false);
+	}
+
+	// grab the texture ID from the texture selector
+	LLTextureCtrl* texture_control = mTextureCtrl;
+	if (channel == 'n')
+	{
+		texture_control = mBumpyTextureCtrl;
+	}
+	else if (channel == 's')
+	{
+		texture_control = mShinyTextureCtrl;
+	}
+    else if (channel == 'p')
+    {
+        texture_control = getChild<LLTextureCtrl>("pbr_control");
+    }
+
+	LLUUID id = texture_control->getImageAssetID();
+
+	// go through all selected links in all selecrted linksets
+	for (auto iter = handle->begin(); iter != handle->end(); iter++)
+	{
+		LLSelectNode* node = *iter;
+		LLViewerObject* objectp = node->getObject();
+
+		U8 te_count = objectp->getNumTEs();
+
+		for (U8 i = 0; i < te_count; i++)
+		{
+			LLUUID image_id = objectp->getRenderMaterialID(i); // Always check PBR material to prevent selection of non-editable faces
+            if (image_id.isNull())
+            {
+                if (channel == 'd')
+                {
+                    image_id = objectp->getTEImage(i)->getID();
+                }
+                else
+                {
+                    const LLMaterialPtr mat = objectp->getTE(i)->getMaterialParams();
+                    if (mat.notNull())
+                    {
+                        if (channel == 'n')
+                        {
+                            image_id = mat->getNormalID();
+                        }
+                        else if (channel == 's')
+                        {
+                            image_id = mat->getSpecularID();
+                        }
+                    }
+                }
+            }
+
+			// deselect all faces that use a different texture UUID
+			if (image_id != id)
+			{
+				objectp->setTESelected(i, false);
+				node->selectTE(i, false);
+			}
+		}
+	}
+}
