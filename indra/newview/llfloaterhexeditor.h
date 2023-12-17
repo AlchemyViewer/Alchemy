@@ -18,6 +18,8 @@
 #include "llinventory.h"
 #include "llviewertexture.h"
 
+class LLViewerInventoryItem;
+
 class LLFloaterHexEditor : public LLFloater
 {
 public:
@@ -26,7 +28,7 @@ public:
 	void onOpen(const LLSD& key) override;
 	BOOL postBuild() override;
 
-	LLInventoryItem* mItem;
+	LLViewerInventoryItem* mItem;
 	LLAssetType::EType mAssetType;
 	LLHexEditor* mEditor;
 
@@ -43,7 +45,7 @@ public:
 
 
 
-	static void download(LLInventoryItem* item, loaded_callback_func onImage, LLGetAssetCallback onAsset);
+	static void download(LLViewerInventoryItem* item, loaded_callback_func onImage, LLGetAssetCallback onAsset);
 	static void onSaveComplete(const LLUUID& asset_uuid, void* user_data, S32 status, LLExtStat ext_status);
 
 private:

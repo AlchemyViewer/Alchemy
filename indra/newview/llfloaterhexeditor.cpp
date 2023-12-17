@@ -23,6 +23,7 @@
 #include "llviewermenufile.h"
 #include "llviewerregion.h"
 #include "llviewertexturelist.h"
+#include "llviewerinventory.h"
 
 
 LLFloaterHexEditor::LLFloaterHexEditor(const LLSD& key)
@@ -89,13 +90,19 @@ void LLFloaterHexEditor::onOpen(const LLSD& key)
 }
 
 // static
-void LLFloaterHexEditor::download(LLInventoryItem* item, loaded_callback_func onImage, LLGetAssetCallback onAsset)
+void LLFloaterHexEditor::download(LLViewerInventoryItem* item, loaded_callback_func onImage, LLGetAssetCallback onAsset)
 {
     if (item == nullptr)
     {
         LL_WARNS("Hex") << "Could not download null pointer encountered!" << LL_ENDL;
 		return;
     }
+	if (!LLAssetType::lookupIsAssetIDKnowable(item->getType()) || !(item->getIsFullPerm() || gAgent.isGodlikeWithoutAdminMenuFakery()))
+	{
+		LL_WARNS("Hex") << "Insufficient permissions!" << LL_ENDL;
+		return;
+	}
+
     switch (item->getType())
     {
         case LLAssetType::AT_TEXTURE:
