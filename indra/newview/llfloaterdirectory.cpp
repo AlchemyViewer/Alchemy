@@ -51,6 +51,7 @@
 #include "llpanelsearchbase.h"
 #include "llpanelsearchweb.h"
 #include "llproductinforequest.h"
+#include "llviewercontrol.h"
 
 SearchQuery::SearchQuery()
 :   category("category", ""),
@@ -98,6 +99,12 @@ BOOL LLFloaterDirectory::postBuild()
 	getChild<LLButton>("PageDn")->setCommitCallback(boost::bind(&LLFloaterDirectory::choosePage, this, _1));
 	showDetailPanel(LLStringUtil::null); // hide all the panels
 	paginate();
+
+	if (!mTabContainer->selectTab(gSavedSettings.getS32("AlchemyLastDirectoryTab")))
+	{
+		mTabContainer->selectFirstTab();
+	}
+
 	return LLFloater::postBuild();
 }
 
@@ -110,6 +117,14 @@ void LLFloaterDirectory::onOpen(const LLSD& key)
 		mTabContainer->selectTabPanel(mPanelWeb);
 	}
 	onTabChanged();
+}
+
+void LLFloaterDirectory::onClose(bool app_quitting)
+{
+	if (mTabContainer)
+	{
+		gSavedSettings.setS32("AlchemyLastDirectoryTab", mTabContainer->getCurrentPanelIndex());
+	}
 }
 
 void LLFloaterDirectory::setProgress(bool working)

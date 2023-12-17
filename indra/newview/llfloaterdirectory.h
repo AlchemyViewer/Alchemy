@@ -96,6 +96,7 @@ public:
 	LLFloaterDirectory(const Params& key);
 	BOOL postBuild() override;
 	void onOpen(const LLSD& key) override;
+	void onClose(bool app_quitting) override;
 	
 	static void processSearchPeopleReply(LLMessageSystem* msg, void**);
 	static void processSearchGroupsReply(LLMessageSystem* msg, void**);

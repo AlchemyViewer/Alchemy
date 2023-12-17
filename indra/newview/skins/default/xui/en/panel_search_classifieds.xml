@@ -3,7 +3,8 @@
  height="70"
  layout="topleft"
  name="panel_search_classifieds"
- width="602">
+ width="602"
+ default_tab_group="2">
   <text
    follows="left|top|right"
    height="16"
@@ -80,6 +81,7 @@
    top_delta="-1"
    width="18"/>
   <search_editor
+   tab_group="2"
    follows="top|left|right"
    search_button_visible="true"
    height="22"

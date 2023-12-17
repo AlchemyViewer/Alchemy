@@ -3,7 +3,8 @@
  height="70"
  class="panel_search_people"
  name="panel_search_people"
- width="602">
+ width="602"
+ default_tab_group="2">
   <panel.string name="SeachFilteredOnShortWordsEmpty">
    Your search terms were too short so no search was performed.
   </panel.string>
@@ -17,6 +18,7 @@
    value="Enter search terms:"
    width="255" />
   <search_editor
+   tab_group="2"
    follows="top|left|right"
    search_button_visible="true"
    height="22"

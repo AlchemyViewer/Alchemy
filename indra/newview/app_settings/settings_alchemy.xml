@@ -409,6 +409,19 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>AlchemyLastDirectoryTab</key>
+    <map>
+      <key>Comment</key>
+      <string>Last active tab in directory floater</string>
+	  <key>HideFromEditor</key>
+	  <integer>1</integer>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>AlchemyLookAtClampEnabled</key>
     <map>
       <key>Comment</key>
