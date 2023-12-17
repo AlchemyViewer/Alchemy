@@ -83,7 +83,7 @@
        follows="bottom|left" 
        image_overlay="Copy"
        image_overlay_alignment="left"
-       tool_tip="Copy the info the clipboard."
+       tool_tip="Copy the About information to the clipboard."
        name="copy_btn"
        label="Copy Info"
        left="3"
