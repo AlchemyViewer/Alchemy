@@ -33,6 +33,6 @@
 		<menu_item_call label="表示名をコピー" name="Copy Display Name"/>
 		<menu_item_call label="アカウント名をコピー" name="Copy Account Name"/>
 		<menu_item_call label="SLurlをコピー" name="Copy SLurl"/>
-		<menu_item_call label="ＩＤをコピー" name="Copy ID"/>
+		<menu_item_call label="ＵＵＩＤをコピー" name="Copy ID"/>
 	</context_menu>
 </toggleable_menu>
