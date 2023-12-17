@@ -956,7 +956,7 @@
              left="10"
              name="Name:"
              top="5"
-             width="90">
+             width="70">
                 Name:
             </text>
             <line_editor
@@ -967,7 +967,7 @@
              name="Object Name"
              select_on_focus="true"
              top_delta="0"
-             width="170"
+             width="210"
              tool_tip="The name is limited to 63 characters. Longer prim names are cut short. Names can only consist of printable characters found in the ASCII-7 (non-extended) character set, with the exception of the vertical bar/pipe &apos;|&apos;." />
             <text
              follows="left|top"
@@ -975,7 +975,7 @@
              left="10"
              name="Description:"
              top_pad="3"
-             width="90">
+             width="70">
                 Description:
             </text>
             <line_editor
@@ -986,7 +986,7 @@
              name="Object Description"
              select_on_focus="true"
              top_delta="0"
-             width="170"
+             width="210"
              tool_tip="When people have &apos;Hover Tips on All Objects&apos; selected in the viewer's settings, they'll see the object description pop-up for any object under their mouse pointer. The prim description is limited to 127 bytes any string longer then that will be truncated." />
             <text
              type="string"
@@ -997,19 +997,9 @@
              layout="topleft"
              name="Creator:"
              top_pad="7"
-             width="90">
+             width="70">
                 Creator:
             </text>
-            <avatar_icon
-             default_icon_name="Generic_Person"
-             height="18"
-             follows="left|top"
-             layout="topleft"
-             left_pad="1"
-             name="Creator Icon"
-             visible="false"
-             top_delta="0"
-             width="18" />
             <!-- *NOTE: Intentionally wide for long names -->
             <text
              type="string"
@@ -1022,7 +1012,7 @@
              font="SansSerifSmall"
              top_delta="-1"
              translate="false"
-             width="170"
+             width="205"
              word_wrap="true"
              use_ellipses="true">
                 TestString PleaseIgnore (please.ignore)
@@ -1036,29 +1026,9 @@
              layout="topleft"
              name="Owner:"
              top_pad="3"
-             width="90">
+             width="70">
                 Owner:
             </text>
-            <avatar_icon
-             default_icon_name="Generic_Person"
-             height="18"
-             follows="left|top"
-             layout="topleft"
-             left_pad="1"
-             name="Owner Icon"
-             visible="false"
-             top_delta="0"
-             width="18" />
-            <group_icon
-             default_icon_name="Generic_Group"
-             height="18"
-             follows="left|top"
-             layout="topleft"
-             left_pad="-18"
-             name="Owner Group Icon"
-             visible="false"
-             top_delta="0"
-             width="18" />
             <!-- *NOTE: Intentionally wide for long names -->
             <text
              type="string"
@@ -1071,7 +1041,7 @@
              left_pad="1"
              top_delta="-1"
              translate="false"
-             width="170"
+             width="205"
              word_wrap="true"
              use_ellipses="true">
                 TestString PleaseIgnore (please.ignore)
@@ -1085,23 +1055,31 @@
              height="18"
              name="Group:"
              top_pad="3"
-             width="75">
+             width="70">
                 Group:
             </text>
-            <name_box
+            <text
+             type="string"
+             length="1"
              follows="left|top"
-             height="18"
-             initial_value="Loading..."
+             height="29"
              layout="topleft"
-             left_pad="23"
-             name="Group Name Proxy"
-             width="142" />
+             name="Group Name"
+             font="SansSerifSmall"
+             left_pad="1"
+             top_delta="-1"
+             translate="false"
+             width="177"
+             word_wrap="true"
+             use_ellipses="true">
+                Loading...
+            </text>
             <button
 			 follows="top|left"
 			 height="23"
 			 image_overlay="Edit_Wrench"
 			 layout="topleft"
-			 left_pad="13"
+			 left_pad="5"
 			 name="button set group"
 			 tab_stop="false"
 			 tool_tip="Choose a group to share this object's permissions"
@@ -2885,6 +2863,7 @@ even though the user gets a free copy.
 		</panel>
         </tab_container>
 	<panel
+   visible="false"
 	 follows="left|top"
      height="384"
      layout="topleft"
