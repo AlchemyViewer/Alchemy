@@ -74,6 +74,9 @@ public:
 	/// copy a Url to the clipboard
 	static void copyURLToClipboard(std::string url);
 
+	/// copy a UUID to the clipboard
+	static void copyUUIDToClipboard(std::string url);
+
 	/// if the Url specifies an SL command in the form like 'app/{cmd}/{id}/*', show its profile
 	static void showProfile(std::string url);
 	static std::string getUserID(std::string url);

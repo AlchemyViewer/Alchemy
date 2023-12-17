@@ -499,6 +499,7 @@ private:
 	static void		showNameDetails(std::string id, bool is_group);
 	static void		copyNameToClipboard(std::string id, bool is_group);
 	static void		copySLURLToClipboard(std::string id, bool is_group);
+	static void		copyUUIDToClipboard(std::string id);
 
 	S32				mLineHeight;	// the max height of a single line
 	S32				mScrollLines;	// how many lines we've scrolled down

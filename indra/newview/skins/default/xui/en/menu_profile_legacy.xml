@@ -126,7 +126,7 @@
 	 function="RLV.CanShowName" />
   </menu_item_call>
   <menu_item_call
-   label="Copy ID"
+   label="Copy UUID"
    name="Copy ID">
 	<menu_item_call.on_click
 	 function="Avatar.CopyData"

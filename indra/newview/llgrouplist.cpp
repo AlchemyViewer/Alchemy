@@ -29,17 +29,20 @@
 #include "llgrouplist.h"
 
 // libs
+#include "llclipboard.h"
 #include "llbutton.h"
 #include "llgroupiconctrl.h"
 #include "llmenugl.h"
 #include "lltextbox.h"
 #include "lltextutil.h"
 #include "lltrans.h"
+#include "llwindow.h"
 
 // newview
 #include "llagent.h"
 #include "llgroupactions.h"
 #include "llfloaterreg.h"
+#include "llslurl.h"
 #include "llviewercontrol.h"	// for gSavedSettings
 #include "llviewermenu.h"		// for gMenuHolder
 #include "llvoiceclient.h"
@@ -377,6 +380,24 @@ bool LLGroupList::onContextMenuItemClick(const LLSD& userdata)
 	{
 		LLGroupActions::leave(selected_group);
 	}
+    else if (action == "copy_label")
+    {
+        std::string group_name;
+        gCacheName->getGroupName(LLUUID(selected_group), group_name);
+        LLWString wstr = utf8str_to_wstring(group_name);
+        LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+    }
+    else if (action == "copy_slurl")
+    {
+        std::string slurl = LLSLURL("group", selected_group, "about").getSLURLString();
+        LLWString wstr = utf8str_to_wstring(slurl);
+        LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+    }
+    else if (action == "copy_uuid")
+    {
+        LLWString wstr = utf8str_to_wstring(selected_group.asString());
+        LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+    }
 
 	return true;
 }

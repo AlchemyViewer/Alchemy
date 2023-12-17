@@ -2165,6 +2165,7 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
 	registrar.add("Url.ShowOnMap", boost::bind(&LLUrlAction::showLocationOnMap, url));
 	registrar.add("Url.CopyLabel", boost::bind(&LLUrlAction::copyLabelToClipboard, url));
 	registrar.add("Url.CopyUrl", boost::bind(&LLUrlAction::copyURLToClipboard, url));
+	registrar.add("Url.CopyUUID", boost::bind(&LLUrlAction::copyUUIDToClipboard, url));
 
 	// create and return the context menu from the XUI file
 

@@ -1436,6 +1436,11 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
     {
         LLAvatarActions::toggleBlock(agent_id);
     }
+    else if (item_name == "copy_user_slurl")
+    {
+        LLWString wstr = utf8str_to_wstring(LLSLURL("agent", getAvatarId(), "about").getSLURLString());
+        LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+    }
     else if (item_name == "copy_user_id")
     {
         LLWString wstr = utf8str_to_wstring(getAvatarId().asString());

@@ -151,7 +151,7 @@
        parameter="slurl"/>
     </menu_item_call>
     <menu_item_call
-     label="Copy ID"
+     label="Copy UUID"
      name="copy_uuid">
       <menu_item_call.on_click
        function="Avatar.CopyData"
