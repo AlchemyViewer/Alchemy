@@ -110,7 +110,7 @@
     </menu_item_call>
   <menu_item_separator name="separator_utils"/>
   <context_menu
-   label="Utilities"
+   label="Actions"
    name="utils_menu">
     <menu_item_call
      label="Copy Username"
