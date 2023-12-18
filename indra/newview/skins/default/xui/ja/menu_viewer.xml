@@ -323,6 +323,7 @@
 		<menu_item_call label="ウィンドウサイズ設定…" name="Set Window Size..."/>
 		<menu_item_separator/>
 		<menu_item_check label="オブジェクトの選択距離の制限" name="Limit Select Distance"/>
+		<menu_item_check label="ドラッグ距離の制限" name="Limit Drag Distance"/>
 		<menu_item_check label="カメラの距離移動を制限しない" name="Disable Camera Distance"/>
 		<menu_item_check label="最小ズーム距離を無効化" name="Disable Minimum Zoom Distance"/>
 		<menu_item_check label="ＳＩＭのカメラの衝突面を無効化" name="Disable Sim Camera Collision Plane"/>

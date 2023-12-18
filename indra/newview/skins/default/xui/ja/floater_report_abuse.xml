@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="floater_report_abuse" title="嫌がらせの報告">
-	<floater.string name="Screenshot">スクリーンショット</floater.string>
-	<check_box label="このスクリーンショットを使用" name="screen_check"/>
+	<floater.string name="Screenshot">
+		スクリーンショット
+	</floater.string>
+	<floater.string name="chat_report_format">
+		時間：[MSG_TIME]
+説明：[MSG_DESCRIPTION]
+	</floater.string>
+	<texture_picker name="screenshot"/>
+	<button tool_tip="スクリーンショットをリフレッシュします。" name="refresh_screenshot"/>
 	<text name="reporter_title">
 		報告者：
 	</text>

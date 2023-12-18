@@ -35,4 +35,8 @@
 		<radio_item label="立つ時" name="Standing" value="2"/>
 		<radio_item label="両方" name="Both"/>
 	</radio_group>
+	<text name="World Effects">
+    ワールドエフェクト：
+	</text>
+	<check_box label="スクリプトの通信時にパーティクルエフェクトを作成" tool_tip="有効にすると、スクリプトが通信するときにスクリプト化されたオブジェクトに渦巻きのパーティクルライトが表示されるようになります。" name="EffectScriptChatParticles"/>
 </panel>

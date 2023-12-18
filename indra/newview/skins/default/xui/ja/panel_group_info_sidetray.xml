@@ -15,6 +15,9 @@
 	<panel name="group_info_top">
 		<text_editor name="group_name" value="（読み込んでいます…）"/>
 		<line_editor label="新しいグループ名を入力してください" name="group_name_editor"/>
+		<text name="Key:" value="キー："/>
+		<line_editor name="group_key"/>
+		<menu_button name="clipboard_group" tool_tip="ペースト時のオプション"/>
 	</panel>
 	<layout_stack name="layout">
 		<layout_panel name="group_accordions">

@@ -62,8 +62,8 @@
 		<text name="Group_label">
 			グループ：
 		</text>
-		<button name="button set group" tool_tip="このオブジェクト権限を共有するグループを選択します。"/>
-		<name_box initial_value="読み込んでいます…" name="Group Name Proxy"/>
+		<text name="Group Name"/>
+		<button name="button set group" tool_tip="このオブジェクトの権限を共有するグループを選択してください。" />
 		<button label="譲渡" label_selected="譲渡" name="button deed" tool_tip="このアイテムを譲渡すると「次の所有者」の権限が適用されます。グループ共有オブジェクトは、グループのオフィサーが譲渡できます。"/>
 		<text name="label click action">
 			クリックで：
