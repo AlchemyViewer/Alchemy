@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <context_menu name="Multi-Selected People Context Menu">
-	<menu_item_call label="フレンド登録" name="add_friends"/>
-	<menu_item_call label="フレンドを削除" name="remove_friends"/>
+	<menu_item_call label="フレンドに追加" name="add_friends"/>
+	<menu_item_call label="フレンドから削除" name="remove_friends"/>
 	<menu_item_call label="ＩＭ" name="im"/>
 	<menu_item_call label="コール" name="call"/>
 	<menu_item_call label="共有" name="share"/>
@@ -15,11 +15,12 @@
 		<menu_item_call label="不動産からキック" name="estatekick"/>
 		<menu_item_call label="不動産からバン" name="estateban"/>
 	</context_menu>
-	<context_menu label="ユーティリティ" name="utils_menu">
+	<context_menu label="操作" name="utils_menu">
+		<menu_item_call label="フルネームをコピー" name="copy_full_name"/>
 		<menu_item_call label="ユーザ名をコピー" name="copy_username"/>
 		<menu_item_call label="表示名をコピー" name="copy_display_name"/>
-		<menu_item_call label="アカウント名をコピー" name="copy_account_name"/>
+		<menu_item_call label="エージェント名をコピー" name="copy_username"/>
 		<menu_item_call label="SLurlをコピー" name="copy_slurl"/>
-		<menu_item_call label="ＩＤをコピー" name="copy_uuid"/>
+		<menu_item_call label="ＵＵＩＤをコピー" name="copy_uuid"/>
 	</context_menu>
 </context_menu>

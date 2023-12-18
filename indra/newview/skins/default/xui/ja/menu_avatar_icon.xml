@@ -7,8 +7,8 @@
 	<menu_item_call label="音声通話" name="Voice Call"/>
 	<menu_item_call label="チャット履歴…" name="Chat History"/>
 	<menu_item_separator name="separator_chat_history"/>
-	<menu_item_call label="フレンドを追加…" name="Add Friend"/>
-	<menu_item_call label="フレンドを削除…" name="Remove Friend"/>
+	<menu_item_call label="フレンドに追加…" name="Add Friend"/>
+	<menu_item_call label="フレンドから削除…" name="Remove Friend"/>
 	<menu_item_call label="グループに勧誘…" name="Invite Group"/>
 	<menu_item_separator name="separator_invite_to_group"/>
 	<menu_item_call label="ズームイン" name="Zoom In"/>
@@ -28,11 +28,11 @@
 	<menu_item_separator name="Group Ban Separator"/>
 	<menu_item_call label="メンバーをバン" name="BanMember"/>
 	<menu_item_separator/>
-	<context_menu label="ユーティリティ" name="Utilities">
-		<menu_item_call label="ユーザ名をコピー" name="Copy Username"/>
+	<context_menu label="操作" name="Utilities">
+		<menu_item_call label="フルネームをコピー" name="Copy Full Name"/>
 		<menu_item_call label="表示名をコピー" name="Copy Display Name"/>
-		<menu_item_call label="アカウント名をコピー" name="Copy Account Name"/>
+		<menu_item_call label="エージェント名をコピー" name="Copy Username"/>
 		<menu_item_call label="SLurlをコピー" name="Copy SLurl"/>
-		<menu_item_call label="ＩＤをコピー" name="Copy ID"/>
+		<menu_item_call label="ＵＵＩＤをコピー" name="Copy ID"/>
 	</context_menu>
 </toggleable_menu>
