@@ -76,6 +76,9 @@
 			<icon tool_tip="フレンドは、自分がマップのどこにいるかを知ることができません。" name="cant_see_on_map"/>
 			<icon tool_tip="フレンドは、自分のオブジェクトを編集できます。" name="can_edit_objects"/>
 			<icon tool_tip="フレンドは、自分のオブジェクトを編集できません。" name="cant_edit_objects"/>
+			<text name="Key:" value="キー："/>
+			<line_editor name="user_key"/>
+			<menu_button name="clipboard_avatar_params" tool_tip="ペースト時のオプション"/>
 		</layout_panel>
 		<layout_panel name="about_panel">
 			<text_editor name="sl_description_edit"/>
