@@ -102,6 +102,7 @@ protected:
 	void reposButton(LLButton* button);
 	void reposButtons();
 	
+	void onCommitMenu(const LLSD& userdata);
 
 protected:
 	bool	apply(LLPanelGroupTab* tab);

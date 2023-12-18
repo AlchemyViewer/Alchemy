@@ -29,6 +29,7 @@
 
 // Library includes
 #include "llbutton.h"
+#include "llclipboard.h"
 #include "llfloatersidepanelcontainer.h"
 #include "lltabcontainer.h"
 #include "lltextbox.h"
@@ -43,6 +44,7 @@
 #include "llfloater.h"
 #include "llgroupactions.h"
 #include "llfloatergroupprofile.h"
+#include "llslurl.h"
 
 #include "llagent.h" 
 
@@ -93,6 +95,7 @@ LLPanelGroup::LLPanelGroup()
 	// Set up the factory callbacks.
 	// Roles sub tabs
 	LLGroupMgr::getInstance()->addObserver(this);
+	mCommitCallbackRegistrar.add("Profile.Commit", [this](LLUICtrl*, const LLSD& userdata) { onCommitMenu(userdata); });
 }
 
 
@@ -378,6 +381,8 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
 		group_name_ctrl->setToolTip(group_name);
 	}
 
+	getChild<LLUICtrl>("group_key")->setValue(str_group_id);
+
 	bool is_null_group_id = group_id.isNull();
 	if(mButtonApply)
 		mButtonApply->setVisible(!is_null_group_id);
@@ -426,6 +431,9 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
 		tab_experiences->setVisible(false);
 
 		getChild<LLUICtrl>("group_name")->setVisible(false);
+		getChild<LLUICtrl>("Key:")->setVisible(false);
+		getChild<LLUICtrl>("group_key")->setVisible(false);
+		getChild<LLUICtrl>("clipboard_group")->setVisible(false);
 		getChild<LLUICtrl>("group_name_editor")->setVisible(true);
 
 		if(mButtonCall)
@@ -458,6 +466,9 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
 		tab_experiences->setVisible(is_member);
 
 		getChild<LLUICtrl>("group_name")->setVisible(true);
+		getChild<LLUICtrl>("Key:")->setVisible(true);
+		getChild<LLUICtrl>("group_key")->setVisible(true);
+		getChild<LLUICtrl>("clipboard_group")->setVisible(true);
 		getChild<LLUICtrl>("group_name_editor")->setVisible(false);
 
 		if(mButtonApply)
@@ -627,4 +638,26 @@ void LLPanelGroup::showNotice(const std::string& subject,
 
 }
 
-
+void LLPanelGroup::onCommitMenu(const LLSD& userdata)
+{
+	const std::string item_name = userdata.asString();
+	if (item_name == "copy_group_slurl")
+	{
+		LLWString wstr = utf8str_to_wstring(LLSLURL("group", mID, "about").getSLURLString());
+		LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+	}
+	else if (item_name == "copy_group_id")
+	{
+		LLWString wstr = utf8str_to_wstring(mID.asString());
+		LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+	}
+	else if (item_name == "copy_group_name")
+	{
+		std::string name;
+		if (gCacheName->getGroupName(mID, name))
+		{
+			LLWString wstr = utf8str_to_wstring(name);
+			LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
+		}
+	}
+}

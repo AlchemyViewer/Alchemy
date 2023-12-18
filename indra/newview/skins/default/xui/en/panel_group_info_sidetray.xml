@@ -28,14 +28,14 @@ background_visible="true"
     </panel.string>
     <panel
       name="group_info_top"
-      follows="top|left"
+      follows="top|left|right"
       top="0"
       left="0"
-      height="29"
-      width="313"
+      height="45"
+      width="308"
       layout="topleft">
     <button
-     follows="top|right"
+     follows="top|left"
      height="24"
      image_hover_unselected="BackButton_Over"
      image_pressed="BackButton_Press"
@@ -67,26 +67,63 @@ background_visible="true"
       word_wrap="false"
       mouse_opaque="false"/>
     <line_editor
-     follows="left|top"
+     follows="left|top|right"
      font="SansSerif"
      label="Type your new group name here"
      layout="topleft"
-     left_delta="10"
+     left_delta="0"
      max_length_bytes="35"
      name="group_name_editor"
      top_delta="5"
      width="270"
      height="20"
      visible="false" />
+     <text
+     top_pad="4"
+     left="6"
+     height="16"
+     width="25"
+     layout="topleft"
+     follows="left|top"
+     name="Key:"
+     value="Key:"/>
+    <line_editor
+     top_delta="-1"
+     left_pad="0"
+     height="16"
+     layout="topleft"
+     follows="left|top|right"
+     name="group_key"
+     border_thickness="0"
+     use_bg_color="false"
+     background_image_disabled=""
+     background_image_focused=""
+     enabled="false"
+     max_length_bytes="254"
+     value="00000000-0000-0000-0000-000000000000"
+     width="258"/>
+     <menu_button
+     menu_filename="menu_copy_paste_group_profile.xml"
+     follows="top|right"
+     height="15"
+     image_disabled="ClipboardMenu_Disabled"
+     image_selected="ClipboardMenu_Press"
+     image_unselected="ClipboardMenu_Off"
+     layout="topleft"
+     top_delta="0"
+     right="-1"
+     name="clipboard_group"
+     tool_tip="Paste options"
+     width="22"/>
     </panel>
    <layout_stack
      name="layout"
      orientation="vertical"
       follows="all"
-     left="8"
+     left="0"
      top_pad="0"
-     height="506"
-     width="292"
+     height="491"
+     width="310"
      border_size="0">
    <layout_panel
        bg_alpha_color="PanelDefaultBackgroundColor"
@@ -99,7 +136,7 @@ background_visible="true"
        auto_resize="true"
        user_resize="true"
        height="513"
-       width="313">
+       width="310">
    <accordion
      left="0"
      top="0"
@@ -109,7 +146,7 @@ background_visible="true"
      layout="topleft"
      name="groups_accordion"
      height="513"
-     width="313">
+     width="310">
          <accordion_tab
             expanded="true"
             layout="topleft"
