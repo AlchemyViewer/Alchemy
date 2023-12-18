@@ -2907,7 +2907,8 @@ void LLPanelFace::updateVisibility(LLViewerObject* objectp /* = nullptr */)
 	getChildView("combobox alphamode")->setVisible(show_texture && show_material);
 	getChildView("label maskcutoff")->setVisible(false);
 	getChildView("maskcutoff")->setVisible(false);
-	if (show_texture && show_material)
+    getChild<LLUICtrl>("btn_select_same_diff")->setVisible(show_texture && show_material);
+    if (show_texture && show_material)
 	{
 		updateAlphaControls();
 	}
@@ -2917,7 +2918,6 @@ void LLPanelFace::updateVisibility(LLViewerObject* objectp /* = nullptr */)
 	getChildView("TexRot")->setVisible(show_texture);
 	getChildView("TexOffsetU")->setVisible(show_texture);
 	getChildView("TexOffsetV")->setVisible(show_texture);
-	getChild<LLUICtrl>("btn_select_same_diff")->setVisible(show_texture);
 
 	// Specular map controls
     mShinyTextureCtrl->setVisible(show_shininess);
