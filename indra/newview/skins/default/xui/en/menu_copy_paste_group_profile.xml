@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<toggleable_menu
+ layout="topleft"
+ name="Copy Group Profile Menu">
+  <menu_item_call
+   label="Copy Group Name"
+   layout="topleft"
+   name="copy_group_name">
+    <menu_item_call.on_click
+     function="Profile.Commit"
+     parameter="copy_group_name"/>
+  </menu_item_call>
+  <menu_item_call
+   label="Copy SLurl"
+   layout="topleft"
+   name="copy_slurl">
+    <menu_item_call.on_click
+     function="Profile.Commit"
+     parameter="copy_group_slurl"/>
+  </menu_item_call>
+  <menu_item_call
+   label="Copy UUID"
+   layout="topleft"
+   name="copy_id">
+    <menu_item_call.on_click
+     function="Profile.Commit"
+     parameter="copy_group_id"/>
+  </menu_item_call>
+</toggleable_menu>

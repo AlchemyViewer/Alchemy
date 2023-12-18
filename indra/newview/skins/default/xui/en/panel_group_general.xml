@@ -49,7 +49,7 @@ Hover your mouse over the options for more help.
      type="string"
      height="16"
      length="1"
-     left_pad="8"
+     left_pad="6"
      name="prepend_founded_by"
      top_delta="0">
       Founder:
@@ -58,7 +58,7 @@ Hover your mouse over the options for more help.
       follows="left|top|right"
      height="16"
      layout="topleft"
-     left_delta="-2"
+     left_delta="0"
      name="founder_name"
      top_pad="2"
      use_ellipses="true"

@@ -476,11 +476,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3a2e26f01656a6634023d83f2a53a36a373c61b6af1d00517543050a09826113a2f99121ece20c2c0b581aab9020aeb7cdfe972fa331ea94f3862556a70eae19</string>
+              <string>decc2db6e9f4188567f5c9c45d7043a52a34ca3150e35c5fd6573c522f7d95d23bb63480986d5f56847e5fa275621aafe5d2903bd1e37a8dd0a9c3a47ed11a89</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-darwin64-2178.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16.2285/dullahan-1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16-darwin64-2285.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -490,11 +490,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ab9d290a61fb038e6c0ba9ce4efa5f431238e1ab9d4de2c28da1ad0114926af9b716db90cb216816ec8a1de3680d358913851e316d8df6b5eea5302989d9f3bc</string>
+              <string>e61dbbe0280cf578f217c6fee6f9ad6bdb13e8b325e86b733cd3250bf787f39d20079caa55031c3c1184db87048e490cedfcd1fdc0a28fde422ed60696b257e0</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-linux64-2178.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16.2285/dullahan-1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16-linux64-2285.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -504,11 +504,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e88cd99c9d71b2dd1297007bcfdac224d5401cdfadd7aeb069195392274559f7f63ee312061d3441ba7505a4e649ccea67f9d8f3f3c56c9cce638b35c29b6eb5</string>
+              <string>26318a6d7628feb176ed7a5bad66d8a6a6d3c69e319bcac515c56194a573a10c0638b193bcfa63d296f876421d82d40b44075a2362d42166e37fa9c5bd348cee</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-windows64-2178.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16.2285/dullahan-1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16-windows64-2285.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -521,7 +521,7 @@
         <key>copyright</key>
         <string>Copyright (c) 2017, Linden Research, Inc.</string>
         <key>version</key>
-        <string>1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54</string>
+        <string>1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16</string>
         <key>name</key>
         <string>dullahan</string>
         <key>description</key>
@@ -598,11 +598,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>fa5d856b9608b15d9ec89bb1869c382e92235cc4099475acf7a54b7a759493cf188098e77997d4de845f55d4f9bdaba2443d3030646acb10f690bfc895a9ba49</string>
+              <string>8d4f9a01214ddcc414ce2501e1462bccb8f04e15b4274376bec23b26e4441fe74e59cde026ca59c00aef2efc5cfed49fcf87965e16a2d7184ed33da667642584</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.19.2199/fmodstudio-2.02.19-darwin64-2199.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.20.2284/fmodstudio-2.02.20-darwin64-2284.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -614,11 +614,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>9e75cd818a2d476222c9d0445fe57ff1036cfd0d860c29e22c5f69aaf529adf0afccdeea271f8bd0fa4df8ec8a0c46f5a683e762418b6bc571453908f7c7315f</string>
+              <string>4058c0124712270c2874250a829124813408b49d07c3202c225c677088d01af59a5899ad7575cd932b1cfd39e2768fc9d1f43a9a2cbb83c63ad9478ef978535e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.19.2199/fmodstudio-2.02.19-linux64-2199.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.20.2284/fmodstudio-2.02.20-linux64-2284.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -630,11 +630,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>863ce55621614cb05bc8c1dc0ea313553c6dcb85c8ae9aee67dd04cb3910e78412e7fbefc18ed1281fa726af87d7b7a2b87023784405049fbd27a7dbd8909880</string>
+              <string>89365c56c2c83f4d83aad236c304ba321529ddc4c4124f3abb43965104f85fc1c470b2e53dc24c86c5c62b65923b5f1dc1aff803489b6f19393227b374c861ae</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.19.2199/fmodstudio-2.02.19-windows64-2199.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.20.2284/fmodstudio-2.02.20-windows64-2284.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -647,7 +647,7 @@
         <key>copyright</key>
         <string>FMOD Studio, Copyright (c) Firelight Technologies Pty Ltd.</string>
         <key>version</key>
-        <string>2.02.19</string>
+        <string>2.02.20</string>
         <key>name</key>
         <string>fmodstudio</string>
         <key>description</key>
