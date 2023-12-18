@@ -107,7 +107,7 @@ public:
 
 	void onLoadScreenshotDialog(const LLSD& notification, const LLSD& response);
 
-	void takeNewSnapshot();
+	void takeNewSnapshot(bool refresh);
 
 private:
 	static void show(const LLUUID& object_id, const std::string& avatar_name = LLStringUtil::null, const LLUUID& experience_id = LLUUID::null);
