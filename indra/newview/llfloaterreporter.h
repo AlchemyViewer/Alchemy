@@ -125,6 +125,7 @@ private:
 	void callbackAvatarID(const uuid_vec_t& ids, const std::vector<LLAvatarName> names);
 	void setFromAvatarID(const LLUUID& avatar_id);
 	void onAvatarNameCache(const LLUUID& avatar_id, const LLAvatarName& av_name);
+	void onUpdateScreenshot();
 
 	static void requestAbuseCategoriesCoro(std::string url, LLHandle<LLFloater> handle);
     static void finishedARPost(const LLSD &);
