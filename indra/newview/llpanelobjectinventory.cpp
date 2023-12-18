@@ -1993,6 +1993,13 @@ BOOL LLPanelObjectInventory::handleKeyHere( KEY key, MASK mask )
 	BOOL handled = FALSE;
 	switch (key)
 	{
+	case KEY_RETURN:
+		if (mask == MASK_NONE)
+		{
+			LLPanelObjectInventory::doToSelected(LLSD("task_open"));
+			handled = TRUE;
+		}
+		break;
 	case KEY_DELETE:
 #if LL_DARWIN
 	case KEY_BACKSPACE:
