@@ -2280,8 +2280,18 @@ function="World.EnvPreset"
              parameter="AlchemyIgnoreSimCameraConstraint" />
         </menu_item_check>
         <menu_item_separator/>
-
-        <menu_item_check
+		<menu_item_check
+         label="Avatar Nimble"
+         name="Avatar Ignore Prejump">
+			<menu_item_check.on_check
+             function="CheckControl"
+             parameter="AlchemyNimble" />
+			<menu_item_check.on_click
+             function="ToggleControl"
+             parameter="AlchemyNimble" />
+		</menu_item_check>
+		<menu_item_separator/>
+		<menu_item_check
          label="High-res Snapshot"
          name="HighResSnapshot">
             <menu_item_check.on_check

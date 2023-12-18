@@ -513,6 +513,7 @@ private:
 	BOOL 			mbFlagsDirty;
 	BOOL 			mbFlagsNeedReset;				// ! HACK ! For preventing incorrect flags sent when crossing region boundaries
 	
+	BOOL			mIgnorePrejump;
 	//--------------------------------------------------------------------
 	// Animations
 	//--------------------------------------------------------------------
