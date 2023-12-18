@@ -2249,6 +2249,16 @@ function="World.EnvPreset"
              function="ToggleControl"
              parameter="LimitSelectDistance" />
         </menu_item_check>
+		<menu_item_check
+         label="Limit Drag Distance"
+         name="Limit Drag Distance">
+			<menu_item_check.on_check
+             function="CheckControl"
+             parameter="LimitDragDistance" />
+			<menu_item_check.on_click
+             function="ToggleControl"
+             parameter="LimitDragDistance" />
+		</menu_item_check>
         <menu_item_check
          label="Disable Camera Constraints"
          name="Disable Camera Distance">
