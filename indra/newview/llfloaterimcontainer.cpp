@@ -1316,6 +1316,10 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
 		{
 			ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_ACCOUNT_NAME);
 		}
+		else if ("copy_full_name" == command)
+		{
+			ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_COMPLETE_NAME);
+			}
 		else if ("copy_slurl" == command)
 		{
 			ALAvatarActions::copyData(userID, ALAvatarActions::E_DATA_SLURL);
@@ -1354,6 +1358,10 @@ void LLFloaterIMContainer::doToParticipants(const std::string& command, uuid_vec
 		else if ("copy_account_name" == command)
 		{
 			ALAvatarActions::copyData(selectedIDS, ALAvatarActions::E_DATA_ACCOUNT_NAME);
+		}
+		else if ("copy_full_name" == command)
+		{
+			ALAvatarActions::copyData(selectedIDS, ALAvatarActions::E_DATA_COMPLETE_NAME);
 		}
 		else if ("copy_slurl" == command)
 		{

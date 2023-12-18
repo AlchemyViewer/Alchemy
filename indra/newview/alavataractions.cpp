@@ -103,6 +103,13 @@ void ALAvatarActions::copyData(const uuid_vec_t& ids, ECopyDataType type)
 				data_string.append(av_name.getDisplayName(true));
 				break;
 			}
+			case E_DATA_COMPLETE_NAME:
+			{
+				LLAvatarName av_name;
+				LLAvatarNameCache::get(id, &av_name);
+				data_string.append(av_name.getCompleteName(true, true));
+				break;
+			}
 			case E_DATA_SLURL:
 				data_string.append(LLSLURL("agent", id, "about").getSLURLString());
 				break;
@@ -137,6 +144,10 @@ void ALAvatarActions::copyData(const LLUUID& id, const LLSD& userdata)
 	else if (item_name == "display_name")
 	{
 		copyData(id, E_DATA_DISPLAY_NAME);
+	}
+	else if (item_name == "full_name")
+	{
+		copyData(id, E_DATA_COMPLETE_NAME);
 	}
 	else if (item_name == "id")
 	{
