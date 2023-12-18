@@ -123,11 +123,11 @@
    label="Actions"
    name="utils_menu">
     <menu_item_call
-     label="Copy Username"
-     name="copy_username">
+     label="Copy Full Name"
+     name="copy_full_name">
       <menu_item_call.on_click
        function="Avatar.CopyData"
-       parameter="user_name"/>
+       parameter="full_name"/>
     </menu_item_call>
     <menu_item_call
      label="Copy Display Name"
@@ -137,11 +137,11 @@
        parameter="display_name"/>
     </menu_item_call>
     <menu_item_call
-     label="Copy Account Name"
-     name="copy_account_name">
+     label="Copy Agent Name"
+     name="copy_username">
       <menu_item_call.on_click
        function="Avatar.CopyData"
-       parameter="account_name"/>
+       parameter="user_name"/>
     </menu_item_call>
     <menu_item_call
      label="Copy SLurl"

@@ -754,6 +754,9 @@ LLPanelProfileSecondLife::LLPanelProfileSecondLife()
     , mWaitingForImageUpload(false)
     , mAllowPublish(false)
 {
+    mCommitCallbackRegistrar.add("Profile.Commit", [this](LLUICtrl*, const LLSD& userdata) { onCommitMenu(userdata); });
+    mEnableCallbackRegistrar.add("Profile.EnableItem", [this](LLUICtrl*, const LLSD& userdata) { return onEnableMenu(userdata); });
+    mEnableCallbackRegistrar.add("Profile.CheckItem", [this](LLUICtrl*, const LLSD& userdata) { return onCheckMenu(userdata); });
 }
 
 LLPanelProfileSecondLife::~LLPanelProfileSecondLife()
@@ -839,14 +842,7 @@ void LLPanelProfileSecondLife::onOpen(const LLSD& key)
         mGroupList->enableForAgent(false);
     }
 
-    // Init menu, menu needs to be created in scope of a registar to work correctly.
-    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
-    commit.add("Profile.Commit", [this](LLUICtrl*, const LLSD& userdata) { onCommitMenu(userdata); });
-
-    LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
-    enable.add("Profile.EnableItem", [this](LLUICtrl*, const LLSD& userdata) { return onEnableMenu(userdata); });
-    enable.add("Profile.CheckItem", [this](LLUICtrl*, const LLSD& userdata) { return onCheckMenu(userdata); });
-
+    // Init menu
     if (own_profile)
     {
         mAgentActionMenuButton->setMenu("menu_profile_self.xml", LLMenuButton::MP_BOTTOM_RIGHT);
@@ -865,6 +861,8 @@ void LLPanelProfileSecondLife::onOpen(const LLSD& key)
         updateOnlineStatus();
         fillRightsData();
     }
+
+    getChild<LLUICtrl>("user_key")->setValue(avatar_id.asString());
 
     mAvatarNameCacheConnection = LLAvatarNameCache::get(getAvatarId(), boost::bind(&LLPanelProfileSecondLife::onAvatarNameCache, this, _1, _2));
 }
@@ -1451,7 +1449,8 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
         onShowAgentPermissionsDialog();
     }
     else if (item_name == "copy_display_name"
-        || item_name == "copy_username")
+        || item_name == "copy_username"
+        || item_name == "copy_full_name")
     {
         LLAvatarName av_name;
         if (!LLAvatarNameCache::get(getAvatarId(), &av_name))
@@ -1468,6 +1467,10 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
         else if (item_name == "copy_username")
         {
             wstr = utf8str_to_wstring(av_name.getUserName());
+        }
+        else if (item_name == "copy_full_name")
+        {
+            wstr = utf8str_to_wstring(av_name.getCompleteName(true, true));
         }
         LLClipboard::instance().copyToClipboard(wstr, 0, wstr.size());
     }
@@ -1548,7 +1551,8 @@ bool LLPanelProfileSecondLife::onEnableMenu(const LLSD& userdata)
         return LLAvatarActions::isFriend(agent_id);
     }
     else if (item_name == "copy_display_name"
-        || item_name == "copy_username")
+        || item_name == "copy_username"
+        || item_name == "copy_full_name")
     {
         return !mAvatarNameCacheConnection.connected();
     }
