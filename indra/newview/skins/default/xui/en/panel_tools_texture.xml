@@ -66,7 +66,7 @@
              name="colorswatch"
              tool_tip="Click to open color picker"
              top="20"
-             width="54" />
+             width="70" />
             <text
              type="string"
              length="1"
@@ -78,7 +78,7 @@
              text_readonly_color="LabelDisabledColor"
              top="6"
              width="110">
-                Transparency %
+                Transparency
             </text>
             <spinner
              decimal_digits="0"
@@ -91,7 +91,7 @@
              max_val="100"
              name="ColorTrans"
              top_pad="4"
-             width="80" />
+             width="70" />
             <text
              type="string"
              length="1"
@@ -114,7 +114,7 @@
              left_delta="0"
              name="glow"
              top_pad="4"
-             width="77" />
+             width="70" />
             <check_box
              height="19"
              label="Full Bright"
@@ -152,7 +152,7 @@
              top_pad="5"
              width="90">
                 <combo_box.item
-                 label="Textures"
+                 label="Legacy Materials"
                  name="Materials"
                  value="Materials" />
                 <combo_box.item
@@ -257,7 +257,7 @@
              allow_no_texture="true"
              follows="left|top"
              height="80"
-             label="Material"
+             label="PBR Material"
              layout="topleft"
              left="10"
              name="pbr_control"
@@ -265,6 +265,7 @@
              top_pad="71"
              width="64" />
             <button
+            visible="false"
              follows="left|top"
              height="23"
              layout="topleft"
@@ -288,6 +289,7 @@
                 Loading contents...
             </text>
             <button
+            visible="false"
              follows="left|top"
              height="23"
              layout="topleft"
@@ -297,6 +299,7 @@
              label="Edit Selected"
              width="140"/>
             <button
+            visible="false"
              follows="left|top"
              height="23"
              layout="topleft"
@@ -311,7 +314,7 @@
              fallback_image="materials_ui_x_24.png"
              follows="left|top"
              height="80"
-             label="Texture       "
+             label="Diffuse"
              layout="topleft"
              left="10"
              name="texture control"
@@ -319,6 +322,7 @@
              top_delta="-54"
              width="64" />
             <text
+            visible="false"
              type="string"
              length="1"
              follows="left|top"
@@ -332,6 +336,7 @@
                 Alpha mode
             </text>
             <combo_box
+            visible="false"
              height="23"
              layout="topleft"
              left_delta="0"
@@ -356,6 +361,7 @@
                  value="Emissive mask" />
             </combo_box>
             <text
+            visible="false"
              type="string"
              length="1"
              follows="left|top"
@@ -369,6 +375,7 @@
                 Mask cutoff
             </text>
             <spinner
+            visible="false"
              decimal_digits="0"
              min_val="0"
              max_val="255"
@@ -388,7 +395,7 @@
              fallback_image="materials_ui_x_24.png"
              follows="left|top"
              height="80"
-             label="Texture       "
+             label="Normal"
              layout="topleft"
              left="10"
              name="bumpytexture control"
@@ -396,6 +403,7 @@
              top_delta="-55"
              width="64" />
             <text
+            visible="false"
              type="string"
              length="1"
              follows="left|top"
@@ -409,6 +417,7 @@
                 Bumpiness
             </text>
             <combo_box
+            visible="false"
              height="23"
              layout="topleft"
              left_delta="0"
@@ -502,7 +511,7 @@
              fallback_image="materials_ui_x_24.png"
              follows="left|top"
              height="80"
-             label="Texture       "
+             label="Specular"
              layout="topleft"
              left="10"
              name="shinytexture control"
@@ -519,16 +528,16 @@
              left_pad="10"
              text_readonly_color="LabelDisabledColor"
              top_delta="4"
-             width="90">
+             width="116">
                 Shininess
             </text>
             <combo_box
              height="23"
              layout="topleft"
-             left_pad="10"
+             left_pad="11"
              name="combobox shininess"
              top_delta="-6"
-             width="90">
+             width="69">
                 <combo_box.item
                  label="None"
                  name="None"
@@ -559,7 +568,7 @@
              follows="left|top"
              height="10"
              layout="topleft"
-             left_delta="-100"
+             left_delta="-127"
              name="label glossiness"
              text_readonly_color="LabelDisabledColor"
              top_pad="7"
@@ -576,16 +585,16 @@
              increment="1"
              layout="topleft"
              top_delta="-4"
-             left_pad="10"
+             left_pad="6"
              name="glossiness"
-             width="64" />
+             width="69" />
             <text
              type="string"
              length="1"
              follows="left|top"
              height="10"
              layout="topleft"
-             left_delta="-126"
+             left_delta="-122"
              name="label environment"
              text_readonly_color="LabelDisabledColor"
              top_pad="8"
@@ -602,16 +611,16 @@
              initial_value="0"
              layout="topleft"
              top_delta="-4"
-             left_pad="10"
+             left_pad="6"
              name="environment"
-             width="64" />
+             width="69" />
             <text
              type="string"
              length="1"
              follows="left|top"
              height="10"
              layout="topleft"
-             left_delta="-126"
+             left_delta="-122"
              name="label shinycolor"
              text_readonly_color="LabelDisabledColor"
              top_pad="8"
@@ -625,12 +634,13 @@
              height="45"
              label=""
              layout="topleft"
-             left_pad="10"
+             left_pad="6"
              name="shinycolorswatch"
              tool_tip="Click to open color picker"
              top_delta="-4"
-             width="64" />
+             width="69" />
             <text
+            visible="false"
 			 follows="left|top|right"
 			 height="9"
 			 layout="topleft"
@@ -643,6 +653,7 @@
 			 URL of chosen media, if any, goes here
 			 </text>
 			<button
+          visible="false"
 			 follows="top|left"
 			 height="18"
 			 layout="topleft"
@@ -653,6 +664,7 @@
 			 label="Choose..."
 			 width="85"/>
 			<button
+          visible="false"
 			 follows="top|left"
 			 height="18"
 			 layout="topleft"
@@ -663,6 +675,7 @@
 			 label="Remove"
 			 width="85"/>
             <button
+          visible="false"
 			 follows="left|top"
 			 height="18"
 			 label="Align"
@@ -682,17 +695,17 @@
              left="10"
              name="tex gen"
              text_readonly_color="LabelDisabledColor"
-             top_pad="46"
-             width="140">
+             top_pad="51"
+             width="196">
                 Mapping
             </text>
             <combo_box
              height="23"
              layout="topleft"
-             left_pad="0"
+             left_pad="5"
              name="combobox texgen"
              top_pad="-13"
-             width="125">
+             width="69">
                 <combo_box.item
                  label="Default"
                  name="Default"
@@ -707,20 +720,20 @@
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="TexScaleU"
-             top_pad="5"
+             top_pad="1"
              width="265" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-100"
@@ -734,7 +747,7 @@
              initial_value=""
 			 label="Repeats per meter"
              layout="topleft"
-			 label_width="205"
+			 label_width="194"
              left="10"
              max_val="100"
              min_val="-100"
@@ -748,7 +761,7 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="205"
+			 label_width="194"
              left="10"
              max_val="360"
              min_val="-360"
@@ -759,7 +772,7 @@
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-1"
@@ -771,7 +784,7 @@
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-1"
@@ -783,7 +796,7 @@
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-100"
@@ -796,7 +809,7 @@
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-100"
@@ -812,7 +825,7 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="205"
+			 label_width="194"
              left="10"
              max_val="360"
              min_val="-360"
@@ -823,7 +836,7 @@
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-1"
@@ -835,7 +848,7 @@
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-1"
@@ -847,7 +860,7 @@
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-100"
@@ -860,7 +873,7 @@
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-100"
@@ -876,7 +889,7 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="205"
+			 label_width="194"
              left="10"
              max_val="360"
              min_val="-360"
@@ -887,7 +900,7 @@
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-1"
@@ -899,7 +912,7 @@
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-1"
@@ -912,7 +925,7 @@
              height="19"
              initial_value="1"
              label="Scale u"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-100"
@@ -925,7 +938,7 @@
              height="19"
              initial_value="1"
              label="Scale v"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-100"
@@ -937,7 +950,7 @@
              height="19"
              initial_value="0"
              label="Rotation"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-360"
@@ -949,7 +962,7 @@
              height="19"
              initial_value="0"
              label="Offset u"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-999"
@@ -961,7 +974,7 @@
              height="19"
              initial_value="0"
              label="Offset v"
-             label_width="205"
+             label_width="194"
              layout="topleft"
              left="10"
              min_val="-999"
@@ -996,12 +1009,12 @@
              layout="topleft"
              follows="right|top"
              height="23"
-             left_pad="0"
-             top_delta="-10"
+             left_pad="5"
+             top_delta="-18"
              label="Align"
              name="button align textures"
              tool_tip="Align current texture layers"
-             width="84" />
+             width="69" />
             <web_browser
              visible="false"
              enabled="false"
