@@ -42,6 +42,7 @@ class LLComboBox;
 class LLNameBox;
 class LLViewerObject;
 class LLTextBase;
+class LLTextBox;
 
 class LLSidepanelTaskInfo : public LLPanel
 {
@@ -100,7 +101,7 @@ protected:
 	void disablePermissions();
 
 private:
-	LLNameBox*		mLabelGroupName;		// group name
+	LLTextBox*		mLabelGroupName;		// group name
 
 	LLUUID			mCreatorID;
 	LLUUID			mOwnerID;

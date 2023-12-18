@@ -207,37 +207,38 @@
 			width="78">
 			    Group:
 	     </text>
-      		<button
-			 follows="top|left"
-			 height="10"
-			 image_disabled="Activate_Checkmark"
-			 image_selected="Activate_Checkmark"
-			 image_unselected="Activate_Checkmark"
-			 image_color="White_50"
-			 layout="topleft"
-			 left_pad="0"
-			 top_delta="0"
-			 name="button set group"
-			 tab_stop="false"
-			 tool_tip="Choose a group to share this object's permissions"
-			 width="10" />
-            <name_box
-             follows="left|top"
-             height="18"
-             initial_value="Loading..."
+	     <text
+			    type="string"
+			    follows="left|right|top"
+			    font="SansSerifSmall"
+			    height="15"
+			    layout="topleft"
+			    name="Group Name"
+             left_pad="0"
+             top_delta="0"
+			    translate="false"
+             use_ellipses="true" 
+			    width="200">
+	     </text>
+             <button
+             follows="top|left"
+             height="23"
+             image_overlay="Edit_Wrench"
              layout="topleft"
-             left_pad="5"
-             top_delta="-1"
-             name="Group Name Proxy"
-             width="150" />
-            <button
+             left_pad="8"
+             top_delta="-3"
+             name="button set group"
+             tab_stop="false"
+             tool_tip="Choose a group to share this object's permissions"
+             width="23" />
+             <button
              follows="top|left"
              height="23"
              label="Deed"
              label_selected="Deed"
              layout="topleft"
              name="button deed"
-             top_pad="0"
+             top_pad="3"
              left="81"
              tool_tip="Deeding gives this item away with next owner permissions. Group shared objects can be deeded by a group officer."
              width="100" />

@@ -115,7 +115,7 @@ BOOL LLSidepanelTaskInfo::postBuild()
 
 	mDeedBtn = getChild<LLButton>("button deed");
 
-	mLabelGroupName = getChild<LLNameBox>("Group Name Proxy");
+	mLabelGroupName = getChild<LLTextBox>("Group Name");
 
 	childSetCommitCallback("Object Name",						LLSidepanelTaskInfo::onCommitName,this);
 	getChild<LLLineEditor>("Object Name")->setPrevalidate(LLTextValidate::validateASCIIPrintableNoPipe);
@@ -458,25 +458,17 @@ void LLSidepanelTaskInfo::refresh()
 
 	// update group text field
 	getChildView("Group:")->setEnabled(TRUE);
-	getChild<LLUICtrl>("Group Name")->setValue(LLStringUtil::null);
 	LLUUID group_id;
 	BOOL groups_identical = LLSelectMgr::getInstance()->selectGetGroup(group_id);
 	if (groups_identical)
 	{
-		if (mLabelGroupName)
-		{
-			mLabelGroupName->setNameID(group_id,TRUE);
-			mLabelGroupName->setEnabled(TRUE);
-		}
+		mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+		mLabelGroupName->setEnabled(TRUE);
 	}
 	else
 	{
-		if (mLabelGroupName)
-		{
-			mLabelGroupName->setNameID(LLUUID::null, TRUE);
-			mLabelGroupName->refresh(LLUUID::null, std::string(), true);
-			mLabelGroupName->setEnabled(FALSE);
-		}
+		mLabelGroupName->setValue(LLStringUtil::null);
+		mLabelGroupName->setEnabled(TRUE);
 	}
 	
 	getChildView("button set group")->setEnabled(owners_identical && (mOwnerID == gAgent.getID()) && is_nonpermanent_enforced);
@@ -968,10 +960,8 @@ void LLSidepanelTaskInfo::onClickGroup()
 
 void LLSidepanelTaskInfo::cbGroupID(LLUUID group_id)
 {
-	if (mLabelGroupName)
-	{
-		mLabelGroupName->setNameID(group_id, TRUE);
-	}
+	mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+	mLabelGroupName->setEnabled(TRUE);
 	LLSelectMgr::getInstance()->sendGroup(group_id);
 }
 
