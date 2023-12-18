@@ -26,6 +26,17 @@ Text: [MSG_DESCRIPTION]
      name="screenshot"
      top="20"
      width="220" />
+     <button
+     follows="top|left"
+     halign="center"
+     height="23"
+     image_overlay="Refresh_Off"
+     layout="topleft"
+     tool_tip="Refresh Screenshot"
+     name="refresh_screenshot"
+     left_pad="5"
+     top="126"
+     width="25"/>
     <text
      type="string"
      length="1"
@@ -36,7 +47,7 @@ Text: [MSG_DESCRIPTION]
      layout="topleft"
      left="10"
      name="reporter_title"
-     top_pad="-2"
+     top_pad="15"
      width="100">
         Reporter:
     </text>
@@ -366,7 +377,7 @@ Text: [MSG_DESCRIPTION]
      type="string"
      length="1"
      follows="left|top"
-     height="22"
+     height="13"
      layout="topleft"
      name="bug_aviso"
      left_pad="10"

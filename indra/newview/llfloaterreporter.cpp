@@ -208,6 +208,9 @@ BOOL LLFloaterReporter::postBuild()
 	std::string reporter = LLSLURL("agent", gAgent.getID(), "inspect").getSLURLString();
 	getChild<LLUICtrl>("reporter_field")->setValue(reporter);
 
+	getChild<LLButton>("refresh_screenshot")->setCommitCallback([this](LLUICtrl*, const LLSD&) 
+		{doAfterInterval(boost::bind(&LLFloaterReporter::takeNewSnapshot, this, true), gSavedSettings.getF32("AbuseReportScreenshotDelay")); });
+
 	// request categories
 	if (gAgent.getRegion()
 		&& gAgent.getRegion()->capabilitiesReceived())
@@ -263,7 +266,7 @@ void LLFloaterReporter::onIdle(void* user_data)
 		if (floater_reporter->mSnapshotTimer.getStarted() && floater_reporter->mSnapshotTimer.getElapsedTimeF32() > screenshot_delay)
 		{
 			floater_reporter->mSnapshotTimer.stop();
-			floater_reporter->takeNewSnapshot();
+			floater_reporter->takeNewSnapshot(false);
 		}
 	}
 }
@@ -937,7 +940,7 @@ void LLFloaterReporter::takeScreenshot(bool use_prev_screenshot)
 	}
 }
 
-void LLFloaterReporter::takeNewSnapshot()
+void LLFloaterReporter::takeNewSnapshot(bool refresh)
 {
 	childSetEnabled("send_btn", true);
 	mImageRaw = new LLImageRaw;
@@ -954,7 +957,7 @@ void LLFloaterReporter::takeNewSnapshot()
 	}
 	setVisible(TRUE);
 
-	if(gSavedPerAccountSettings.getBOOL("PreviousScreenshotForReport"))
+	if(gSavedPerAccountSettings.getBOOL("PreviousScreenshotForReport") && !refresh)
 	{
 		std::string screenshot_filename(gDirUtilp->getLindenUserDir() + gDirUtilp->getDirDelimiter() + SCREEN_PREV_FILENAME);
 		mPrevImageRaw = new LLImageRaw;

@@ -62,7 +62,7 @@
 // [/RLVa:KB]
 
 // Longest time, in seconds, to wait for all animations to stop playing
-const F32 MAX_WAIT_ANIM_SECS = 30.f;
+const F32 MAX_WAIT_ANIM_SECS = 60.f;
 
 // Lightweight constructor.
 // init() does the heavy lifting.
@@ -543,7 +543,7 @@ void LLGestureMgr::playGesture(LLMultiGesture* gesture)
 // [/RLVa:KB]
 
 	// Reset gesture to first step
-	gesture->mCurrentStep = 0;
+	gesture->reset();
 
 	// Add to list of playing
 	gesture->mPlaying = TRUE;

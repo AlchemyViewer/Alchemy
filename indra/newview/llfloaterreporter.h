@@ -107,7 +107,7 @@ public:
 
 	void onLoadScreenshotDialog(const LLSD& notification, const LLSD& response);
 
-	void takeNewSnapshot();
+	void takeNewSnapshot(bool refresh);
 
 private:
 	static void show(const LLUUID& object_id, const std::string& avatar_name = LLStringUtil::null, const LLUUID& experience_id = LLUUID::null);
@@ -125,6 +125,7 @@ private:
 	void callbackAvatarID(const uuid_vec_t& ids, const std::vector<LLAvatarName> names);
 	void setFromAvatarID(const LLUUID& avatar_id);
 	void onAvatarNameCache(const LLUUID& avatar_id, const LLAvatarName& av_name);
+	void onUpdateScreenshot();
 
 	static void requestAbuseCategoriesCoro(std::string url, LLHandle<LLFloater> handle);
     static void finishedARPost(const LLSD &);

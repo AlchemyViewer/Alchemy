@@ -444,6 +444,7 @@ LLAgent::LLAgent() :
 	mFrameAgent(),
 
 	mIsDoNotDisturb(false),
+	mIgnorePrejump(FALSE),
 
 	mControlFlags(0x00000000),
 	mbFlagsDirty(FALSE),
@@ -524,6 +525,9 @@ void LLAgent::init()
 	mLastKnownResponseMaturity = static_cast<U8>(gSavedSettings.getU32("PreferredMaturity"));
 	mLastKnownRequestMaturity = mLastKnownResponseMaturity;
 	mIsDoSendMaturityPreferenceToServer = true;
+
+	mIgnorePrejump = gSavedSettings.getBOOL("AlchemyNimble");
+	gSavedSettings.getControl("AlchemyNimble")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD&) { mIgnorePrejump = new_val.asBoolean(); });
 
 	auto controlp = gSavedSettings.getControl("AlchemyMotionResetsCamera");
 	controlp->getSignal()->connect([&](LLControlVariable* control, const LLSD& new_val, const LLSD&) { mMovementResetCamera = new_val.asBoolean(); });
@@ -1630,7 +1634,14 @@ LLQuaternion LLAgent::getQuat() const
 //-----------------------------------------------------------------------------
 U32 LLAgent::getControlFlags()
 {
-	return mControlFlags;
+	if (LLAgent::mIgnorePrejump)
+	{
+		return mControlFlags | AGENT_CONTROL_FINISH_ANIM;
+	}
+	else
+	{
+		return mControlFlags;
+	}
 }
 
 //-----------------------------------------------------------------------------
