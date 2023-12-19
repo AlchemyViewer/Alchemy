@@ -1437,6 +1437,9 @@ even though the user gets a free copy.
          name="Object"
          top="16"
          width="295">
+         <panel.string name="paste_position">Paste Position [VALUE]</panel.string>
+         <panel.string name="paste_size">Paste Size [VALUE]</panel.string>
+         <panel.string name="paste_rotation">Paste Rotation [VALUE]</panel.string>
             <check_box
              height="19"
              label="Locked"
@@ -1479,19 +1482,6 @@ even though the user gets a free copy.
              name="object_horizontal"
              top_pad="10"
              width="95" />
-            <menu_button
-             menu_filename="menu_copy_paste_pos.xml"
-             follows="top|left"
-             height="11"
-             image_disabled="ClipboardSmallMenu_Disabled"
-             image_selected="ClipboardSmallMenu_Press"
-             image_unselected="ClipboardSmallMenu_Off"
-             layout="topleft"
-             left_delta="0"
-             top_pad="13"
-             name="clipboard_pos_btn"
-             tool_tip="Paste options"
-             width="19"/>
             <text
              type="string"
              length="1"
@@ -1500,8 +1490,8 @@ even though the user gets a free copy.
              layout="topleft"
              name="label position"
              tool_tip="Position (meters)"
-             left_pad="8"
-             top_delta="0"
+             left="5"
+             top_pad="13"
              width="121">
                 Position (m)
             </text>
@@ -1514,7 +1504,7 @@ even though the user gets a free copy.
              label="X"
              label_width="10"
              layout="topleft"
-             left_delta="-27"
+             left_delta="0"
              max_val="512"
              min_val="-256"
              name="Pos X"
@@ -1553,27 +1543,44 @@ even though the user gets a free copy.
              text_enabled_color="0 0.8 1 .65"
              top_pad="3"
              width="87" />
-            <menu_button
-             menu_filename="menu_copy_paste_size.xml"
-             follows="top|left"
-             height="11"
-             image_disabled="ClipboardSmallMenu_Disabled"
-             image_selected="ClipboardSmallMenu_Press"
-             image_unselected="ClipboardSmallMenu_Off"
-             layout="topleft"
-             left_delta="0"
-             top_pad="13"
-             name="clipboard_size_btn"
-             tool_tip="Paste options"
-             width="19"/>
+            <button
+             follows="top|right"
+             height="19" 
+             top_delta="-43"
+             left_pad="5"
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_position_btn"
+             tool_tip="Copy Position"
+             width="20" />
+            <button
+             follows="top|right"
+             height="19"
+             top_pad="3"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_position_btn"
+             tool_tip="Paste Position"
+             width="20" />
+             <button
+             visible="false"
+             follows="top|right"
+             height="19"
+             top_pad="3"
+             mouse_opaque="true"
+             tab_stop="false"
+             label="p"
+             name="pip_pos_btn"
+             tool_tip=""
+             width="20" />
             <text
              type="string"
              length="1"
              follows="left|top"
              height="10"
              layout="topleft"
-             left_pad="8"
-             top_delta="0"
+             left="5"
+             top_pad="5"
              name="label size"
              tool_tip="Size (meters)"
              width="121">
@@ -1588,7 +1595,7 @@ even though the user gets a free copy.
              label="X"
              label_width="10"
              layout="topleft"
-             left_delta="-27"
+             left_delta="0"
              max_val="64"
              min_val="0.01"
              name="Scale X"
@@ -1627,27 +1634,44 @@ even though the user gets a free copy.
              text_enabled_color="1 1 1 1"
              top_pad="3"
              width="87" />
-            <menu_button
-             menu_filename="menu_copy_paste_rot.xml"
-             follows="top|left"
-             height="11"
-             image_disabled="ClipboardSmallMenu_Disabled"
-             image_selected="ClipboardSmallMenu_Press"
-             image_unselected="ClipboardSmallMenu_Off"
-             layout="topleft"
-             left_delta="0"
-             top_pad="13"
-             name="clipboard_rot_btn"
-             tool_tip="Paste options"
-             width="19"/>
+             <button
+             follows="top|right"
+             height="19" 
+             top_delta="-43"
+             left_pad="5"
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_size_btn"
+             tool_tip="Copy Size"
+             width="20" />
+            <button
+             follows="top|right"
+             height="19"
+             top_pad="3"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_size_btn"
+             tool_tip="Paste Size"
+             width="20" />
+             <button
+             visible="false"
+             follows="top|right"
+             height="19"
+             top_pad="3"
+             mouse_opaque="true"
+             tab_stop="false"
+             label="p"
+             name="pip_size_btn"
+             tool_tip=""
+             width="20" />
             <text
              type="string"
              length="1"
              follows="left|top"
              height="10"
              layout="topleft"
-             left_pad="8"
-             top_delta="0"
+             left="5"
+             top_pad="5"
              name="label rotation"
              tool_tip="Rotation (degrees)"
              width="121">
@@ -1662,7 +1686,7 @@ even though the user gets a free copy.
              label="X"
              label_width="10"
              layout="topleft"
-             left_delta="-27"
+             left_delta="0"
              max_val="9999"
              min_val="-9999"
              name="Rot X"
@@ -1701,6 +1725,36 @@ even though the user gets a free copy.
              text_enabled_color="1 1 1 1"
              top_pad="3"
              width="87" />
+             <button
+             follows="top|right"
+             height="19" 
+             top_delta="-43"
+             left_pad="5"
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_rotation_btn"
+             tool_tip="Copy Rotation"
+             width="20" />
+            <button
+             follows="top|right"
+             height="19"
+             top_pad="3"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_rotation_btn"
+             tool_tip="Paste Rotation"
+             width="20" />
+             <button
+             visible="false"
+             follows="top|right"
+             height="19"
+             top_pad="3"
+             mouse_opaque="true"
+             tab_stop="false"
+             label="p"
+             name="pip_rotation_btn"
+             tool_tip=""
+             width="20" />
  <!--           <text
              type="string"
              length="1"
@@ -1728,7 +1782,7 @@ even though the user gets a free copy.
              layout="topleft"
              name="comboBaseType"
              top="6"
-             left="125"
+             left="120"
              width="125">
                 <combo_box.item
                  label="Box"
@@ -1819,19 +1873,27 @@ even though the user gets a free copy.
                  value="Path33Profile5"
                  label="33->HalfCircle" />
             </combo_box>
-            <menu_button
-              menu_filename="menu_copy_paste_object.xml"
+              <button
               follows="top|left"
-              height="15"
-              image_disabled="ClipboardMenu_Disabled"
-              image_selected="ClipboardMenu_Press"
-              image_unselected="ClipboardMenu_Off"
-              layout="topleft"
-              left_pad="8"
-              top_delta="2"
-              name="clipboard_obj_params_btn"
-              tool_tip="Paste options"
-              width="22"/>
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              tab_stop="false"
+              image_overlay="Clipboard_Copy"
+              name="copy_primparams_btn"
+              tool_tip="Copy Primitive Parameters"
+              width="20" />
+              <button
+              follows="top|left"
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              mouse_opaque="true"
+              tab_stop="false"
+              image_overlay="Clipboard_Paste"
+              name="paste_primparams_btn"
+              tool_tip="Paste Primitive Parameters"
+              width="20" />
             <text
              type="string"
              length="1"

@@ -141,8 +141,12 @@ BOOL	LLPanelObject::postBuild()
 	childSetCommitCallback("Phantom Checkbox Ctrl",onCommitPhantom,this);
 
 	// Position
-	mMenuClipboardPos = getChild<LLMenuButton>("clipboard_pos_btn");
 	mLabelPosition = getChild<LLTextBox>("label position");
+	mBtnCopyPosition = findChild<LLButton>("copy_position_btn");
+	mBtnCopyPosition->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyPos(); });
+	mBtnPastePosition = findChild<LLButton>("paste_position_btn");
+	mBtnPastePosition->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPastePos(); });
+
 	mCtrlPosX = getChild<LLSpinCtrl>("Pos X");
 	childSetCommitCallback("Pos X",onCommitPosition,this);
 	mCtrlPosY = getChild<LLSpinCtrl>("Pos Y");
@@ -151,8 +155,12 @@ BOOL	LLPanelObject::postBuild()
 	childSetCommitCallback("Pos Z",onCommitPosition,this);
 
 	// Scale
-	mMenuClipboardSize = getChild<LLMenuButton>("clipboard_size_btn");
 	mLabelSize = getChild<LLTextBox>("label size");
+	mBtnCopySize = findChild<LLButton>("copy_size_btn");
+	mBtnCopySize->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopySize(); });
+	mBtnPasteSize = findChild<LLButton>("paste_size_btn");
+	mBtnPasteSize->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteSize(); });
+
 	mCtrlScaleX = getChild<LLSpinCtrl>("Scale X");
 	childSetCommitCallback("Scale X",onCommitScale,this);
 
@@ -165,8 +173,12 @@ BOOL	LLPanelObject::postBuild()
 	childSetCommitCallback("Scale Z",onCommitScale,this);
 
 	// Rotation
-	mMenuClipboardRot = getChild<LLMenuButton>("clipboard_rot_btn");
 	mLabelRotation = getChild<LLTextBox>("label rotation");
+	mBtnCopyRotation = findChild<LLButton>("copy_rotation_btn");
+	mBtnCopyRotation->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyRot(); });
+	mBtnPasteRotation = findChild<LLButton>("paste_rotation_btn");
+	mBtnPasteRotation->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteRot(); });
+
 	mCtrlRotX = getChild<LLSpinCtrl>("Rot X");
 	childSetCommitCallback("Rot X",onCommitRotation,this);
 	mCtrlRotY = getChild<LLSpinCtrl>("Rot Y");
@@ -177,10 +189,13 @@ BOOL	LLPanelObject::postBuild()
 	//--------------------------------------------------------
 		
 	// Base Type
+	mBtnCopyPrimParams = findChild<LLButton>("copy_primparams_btn");
+	mBtnCopyPrimParams->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyParams(); });
+	mBtnPastePrimParams = findChild<LLButton>("paste_primparams_btn");
+	mBtnPastePrimParams->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteParams(); });
+
 	mComboBaseType = getChild<LLComboBox>("comboBaseType");
 	childSetCommitCallback("comboBaseType",onCommitParametric,this);
-
-	mMenuClipboardParams = getChild<LLMenuButton>("clipboard_obj_params_btn");
 
 	// Cut
 	mLabelCut = getChild<LLTextBox>("text cut");
@@ -459,8 +474,9 @@ void LLPanelObject::getState( )
 		calcp->clearVar(LLCalc::Z_POS);
 	}
 
-	mMenuClipboardPos->setEnabled(enable_move);
 	mLabelPosition->setEnabled( enable_move );
+	mBtnCopyPosition->setEnabled(enable_move);
+	mBtnPastePosition->setEnabled(enable_move && mHasClipboardPos);
 	mCtrlPosX->setEnabled(enable_move);
 	mCtrlPosY->setEnabled(enable_move);
 	mCtrlPosZ->setEnabled(enable_move);
@@ -485,8 +501,9 @@ void LLPanelObject::getState( )
 		calcp->setVar(LLCalc::Z_SCALE, 0.f);
 	}
 
-	mMenuClipboardSize->setEnabled(enable_scale);
 	mLabelSize->setEnabled( enable_scale );
+	mBtnCopySize->setEnabled(enable_scale);
+	mBtnPasteSize->setEnabled(enable_scale && mHasClipboardSize);
 	mCtrlScaleX->setEnabled( enable_scale );
 	mCtrlScaleY->setEnabled( enable_scale );
 	mCtrlScaleZ->setEnabled( enable_scale );
@@ -517,8 +534,9 @@ void LLPanelObject::getState( )
 		calcp->clearVar(LLCalc::Z_ROT);
 	}
 
-	mMenuClipboardRot->setEnabled(enable_rotate);
 	mLabelRotation->setEnabled( enable_rotate );
+	mBtnCopyRotation->setEnabled(enable_rotate);
+	mBtnPasteRotation->setEnabled(enable_rotate && mHasClipboardRot);
 	mCtrlRotX->setEnabled( enable_rotate );
 	mCtrlRotY->setEnabled( enable_rotate );
 	mCtrlRotZ->setEnabled( enable_rotate );
@@ -1096,8 +1114,10 @@ void LLPanelObject::getState( )
 	}
 
 	// Update field enablement
+	mBtnCopyPrimParams->setEnabled(enabled);
+	mBtnPastePrimParams->setEnabled(enabled && mClipboardParams.isMap() && (mClipboardParams.size() != 0));
+
 	mComboBaseType	->setEnabled( enabled );
-	mMenuClipboardParams->setEnabled(enabled);
 
 	mLabelCut		->setEnabled( enabled );
 	mSpinCutBegin	->setEnabled( enabled );
@@ -1254,7 +1274,8 @@ void LLPanelObject::getState( )
 			}
 
 			mComboBaseType->setEnabled(!isMesh);
-			mMenuClipboardParams->setEnabled(!isMesh);
+			mBtnCopyPrimParams->setEnabled(!isMesh);
+			mBtnPastePrimParams->setEnabled(!isMesh);
 
 			if (mCtrlSculptType)
 			{
@@ -2156,6 +2177,14 @@ void LLPanelObject::clearCtrls()
 	mLabelRadiusOffset->setEnabled( FALSE );
 	mLabelRevolutions->setEnabled( FALSE );
 	
+	mBtnCopyPosition->setEnabled(FALSE);
+	mBtnPastePosition->setEnabled(FALSE);
+	mBtnCopySize->setEnabled(FALSE);
+	mBtnPasteSize->setEnabled(FALSE);
+	mBtnCopyRotation->setEnabled(FALSE);
+	mBtnPasteRotation->setEnabled(FALSE);
+	mBtnCopyPrimParams->setEnabled(FALSE);
+	mBtnPastePrimParams->setEnabled(FALSE);
 	getChildView("scale_hole")->setEnabled(FALSE);
 	getChildView("scale_taper")->setEnabled(FALSE);
 	getChildView("advanced_cut")->setEnabled(FALSE);
@@ -2394,7 +2423,11 @@ void LLPanelObject::onCopyPos()
     std::string stringVec = llformat("<%g, %g, %g>", mClipboardPos.mV[VX], mClipboardPos.mV[VY], mClipboardPos.mV[VZ]);
     LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(stringVec));
 
+    LLStringUtil::format_map_t args;
+    args["VALUE"] = stringVec;
+    mBtnPastePosition->setToolTip(getString("paste_position", args));
     mHasClipboardPos = true;
+	refresh();
 }
 
 void LLPanelObject::onCopySize()
@@ -2404,7 +2437,12 @@ void LLPanelObject::onCopySize()
     std::string stringVec = llformat("<%g, %g, %g>", mClipboardSize.mV[VX], mClipboardSize.mV[VY], mClipboardSize.mV[VZ]);
     LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(stringVec));
 
+    LLStringUtil::format_map_t args;
+    args["VALUE"] = stringVec;
+    mBtnPasteSize->setToolTip(getString("paste_size", args));
+
     mHasClipboardSize = true;
+	refresh();
 }
 
 void LLPanelObject::onCopyRot()
@@ -2414,7 +2452,12 @@ void LLPanelObject::onCopyRot()
     std::string stringVec = llformat("<%g, %g, %g>", mClipboardRot.mV[VX], mClipboardRot.mV[VY], mClipboardRot.mV[VZ]);
     LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(stringVec));
 
+    LLStringUtil::format_map_t args;
+    args["VALUE"] = stringVec;
+    mBtnPasteRotation->setToolTip(getString("paste_rotation", args));
+
     mHasClipboardRot = true;
+	refresh();
 }
 
 void LLPanelObject::onPastePos()
@@ -2513,6 +2556,7 @@ void LLPanelObject::onCopyParams()
 
         mClipboardParams["sculpt"]["type"] = sculpt_params->getSculptType();
     }
+	refresh();
 }
 
 void LLPanelObject::onPasteParams()

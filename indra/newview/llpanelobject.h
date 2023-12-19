@@ -104,7 +104,6 @@ protected:
 protected:
 	// Per-object options
 	LLComboBox*		mComboBaseType;
-	LLMenuButton*	mMenuClipboardParams;
 
 	LLTextBox*		mLabelCut;
 	LLSpinCtrl*		mSpinCutBegin;
@@ -144,20 +143,17 @@ protected:
 	LLTextBox*		mLabelRevolutions;
 	LLSpinCtrl*		mSpinRevolutions;
 
-	LLMenuButton*   mMenuClipboardPos;
 	LLTextBox*		mLabelPosition;
 	LLSpinCtrl*		mCtrlPosX;
 	LLSpinCtrl*		mCtrlPosY;
 	LLSpinCtrl*		mCtrlPosZ;
 
-	LLMenuButton*   mMenuClipboardSize;
 	LLTextBox*		mLabelSize;
 	LLSpinCtrl*		mCtrlScaleX;
 	LLSpinCtrl*		mCtrlScaleY;
 	LLSpinCtrl*		mCtrlScaleZ;
 	BOOL			mSizeChanged;
 
-	LLMenuButton*   mMenuClipboardRot;
 	LLTextBox*		mLabelRotation;
 	LLSpinCtrl*		mCtrlRotX;
 	LLSpinCtrl*		mCtrlRotY;
@@ -173,6 +169,15 @@ protected:
 	LLComboBox      *mCtrlSculptType;
 	LLCheckBoxCtrl  *mCtrlSculptMirror;
 	LLCheckBoxCtrl  *mCtrlSculptInvert;
+
+	LLButton		*mBtnCopyPosition = nullptr;
+	LLButton		*mBtnPastePosition = nullptr;
+	LLButton		*mBtnCopySize = nullptr;
+	LLButton		*mBtnPasteSize = nullptr;
+	LLButton		*mBtnCopyRotation = nullptr;
+	LLButton		*mBtnPasteRotation = nullptr;
+	LLButton		*mBtnCopyPrimParams = nullptr;
+	LLButton		*mBtnPastePrimParams = nullptr;
 
 	LLVector3		mCurEulerDegrees;		// to avoid sending rotation when not changed
 	BOOL			mIsPhysical;			// to avoid sending "physical" when not changed
