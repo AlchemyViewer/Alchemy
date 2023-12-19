@@ -56,6 +56,7 @@
 #include "lltool.h"
 #include "lltoolcomp.h"
 #include "lltoolmgr.h"
+#include "lltoolpipette.h"
 #include "llui.h"
 #include "llviewerobject.h"
 #include "llviewerregion.h"
@@ -146,6 +147,8 @@ BOOL	LLPanelObject::postBuild()
 	mBtnCopyPosition->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyPos(); });
 	mBtnPastePosition = findChild<LLButton>("paste_position_btn");
 	mBtnPastePosition->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPastePos(); });
+	mBtnPipettePosition = findChild<LLButton>("pipette_position_btn");
+	mBtnPipettePosition->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipettePos(); });
 
 	mCtrlPosX = getChild<LLSpinCtrl>("Pos X");
 	childSetCommitCallback("Pos X",onCommitPosition,this);
@@ -160,6 +163,8 @@ BOOL	LLPanelObject::postBuild()
 	mBtnCopySize->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopySize(); });
 	mBtnPasteSize = findChild<LLButton>("paste_size_btn");
 	mBtnPasteSize->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteSize(); });
+	mBtnPipetteSize = findChild<LLButton>("pipette_size_btn");
+	mBtnPipetteSize->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipetteSize(); });
 
 	mCtrlScaleX = getChild<LLSpinCtrl>("Scale X");
 	childSetCommitCallback("Scale X",onCommitScale,this);
@@ -178,6 +183,8 @@ BOOL	LLPanelObject::postBuild()
 	mBtnCopyRotation->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyRot(); });
 	mBtnPasteRotation = findChild<LLButton>("paste_rotation_btn");
 	mBtnPasteRotation->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteRot(); });
+	mBtnPipetteRotation = findChild<LLButton>("pipette_rotation_btn");
+	mBtnPipetteRotation->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipetteRot(); });
 
 	mCtrlRotX = getChild<LLSpinCtrl>("Rot X");
 	childSetCommitCallback("Rot X",onCommitRotation,this);
@@ -193,6 +200,8 @@ BOOL	LLPanelObject::postBuild()
 	mBtnCopyPrimParams->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyParams(); });
 	mBtnPastePrimParams = findChild<LLButton>("paste_primparams_btn");
 	mBtnPastePrimParams->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteParams(); });
+	mBtnPipettePrimParams = findChild<LLButton>("pipette_primparams_btn");
+	mBtnPipettePrimParams->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipetteParams(); });
 
 	mComboBaseType = getChild<LLComboBox>("comboBaseType");
 	childSetCommitCallback("comboBaseType",onCommitParametric,this);
@@ -477,6 +486,7 @@ void LLPanelObject::getState( )
 	mLabelPosition->setEnabled( enable_move );
 	mBtnCopyPosition->setEnabled(enable_move);
 	mBtnPastePosition->setEnabled(enable_move && mHasClipboardPos);
+	mBtnPipettePosition->setEnabled(enable_move);
 	mCtrlPosX->setEnabled(enable_move);
 	mCtrlPosY->setEnabled(enable_move);
 	mCtrlPosZ->setEnabled(enable_move);
@@ -504,6 +514,7 @@ void LLPanelObject::getState( )
 	mLabelSize->setEnabled( enable_scale );
 	mBtnCopySize->setEnabled(enable_scale);
 	mBtnPasteSize->setEnabled(enable_scale && mHasClipboardSize);
+	mBtnPipetteSize->setEnabled(enable_scale);
 	mCtrlScaleX->setEnabled( enable_scale );
 	mCtrlScaleY->setEnabled( enable_scale );
 	mCtrlScaleZ->setEnabled( enable_scale );
@@ -537,6 +548,7 @@ void LLPanelObject::getState( )
 	mLabelRotation->setEnabled( enable_rotate );
 	mBtnCopyRotation->setEnabled(enable_rotate);
 	mBtnPasteRotation->setEnabled(enable_rotate && mHasClipboardRot);
+	mBtnPipetteRotation->setEnabled(enable_rotate);
 	mCtrlRotX->setEnabled( enable_rotate );
 	mCtrlRotY->setEnabled( enable_rotate );
 	mCtrlRotZ->setEnabled( enable_rotate );
@@ -1116,7 +1128,7 @@ void LLPanelObject::getState( )
 	// Update field enablement
 	mBtnCopyPrimParams->setEnabled(enabled);
 	mBtnPastePrimParams->setEnabled(enabled && mClipboardParams.isMap() && (mClipboardParams.size() != 0));
-
+	mBtnPipettePrimParams->setEnabled(enabled);
 	mComboBaseType	->setEnabled( enabled );
 
 	mLabelCut		->setEnabled( enabled );
@@ -1276,6 +1288,7 @@ void LLPanelObject::getState( )
 			mComboBaseType->setEnabled(!isMesh);
 			mBtnCopyPrimParams->setEnabled(!isMesh);
 			mBtnPastePrimParams->setEnabled(!isMesh);
+			mBtnPipettePrimParams->setEnabled(!isMesh);
 
 			if (mCtrlSculptType)
 			{
@@ -2606,4 +2619,184 @@ void LLPanelObject::onPasteParams()
 
         objectp->updateVolume(params);
     }
+}
+
+void LLPanelObject::onClickPipettePos()
+{
+	bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipettePosition->getToggleState();
+	if (!fEnabled)
+	{
+		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onPosSelect, this, _1, _2, _3));
+		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+		mBtnPipettePosition->setToggleState(TRUE);
+	}
+	else
+	{
+		LLToolMgr::getInstance()->clearTransientTool();
+	}
+}
+
+void LLPanelObject::onClickPipetteSize()
+{
+	bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipetteSize->getToggleState();
+	if (!fEnabled)
+	{
+		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onSizeSelect, this, _1, _2, _3));
+		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+		mBtnPipetteSize->setToggleState(TRUE);
+	}
+	else
+	{
+		LLToolMgr::getInstance()->clearTransientTool();
+	}
+}
+
+void LLPanelObject::onClickPipetteRot()
+{
+	bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipetteRotation->getToggleState();
+	if (!fEnabled)
+	{
+		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onRotSelect, this, _1, _2, _3));
+		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+		mBtnPipetteRotation->setToggleState(TRUE);
+	}
+	else
+	{
+		LLToolMgr::getInstance()->clearTransientTool();
+	}
+}
+
+void LLPanelObject::onClickPipetteParams()
+{
+	bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipettePrimParams->getToggleState();
+	if (!fEnabled)
+	{
+		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onParamsSelect, this, _1, _2, _3));
+		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+		mBtnPipettePrimParams->setToggleState(TRUE);
+	}
+	else
+	{
+		LLToolMgr::getInstance()->clearTransientTool();
+	}
+}
+
+void LLPanelObject::onPosSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+	if (success && obj && mObject && obj->permMove() && mObject->permMove())
+	{
+		LLVector3 selected_pos = obj->getPositionEdit();
+
+		// Clamp pos on non-attachments, just keep the prims within the region
+		if (!mObject->isAttachment())
+		{
+			F32 max_width = mObject->getRegion() ? mObject->getRegion()->getWidth() : REGION_WIDTH_METERS; // meters
+			selected_pos.mV[VX] = llclamp(selected_pos.mV[VX], 0.f, max_width);
+			selected_pos.mV[VY] = llclamp(selected_pos.mV[VY], 0.f, max_width);
+			//height will get properly clamped by sendPosition
+		}
+		else
+		{
+			selected_pos.clampLength(MAX_ATTACHMENT_DIST);
+		}
+
+		mCtrlPosX->set(selected_pos.mV[VX]);
+		mCtrlPosY->set(selected_pos.mV[VY]);
+		mCtrlPosZ->set(selected_pos.mV[VZ]);
+
+		sendPosition(FALSE);
+	}
+	mBtnPipettePosition->setToggleState(FALSE);
+}
+
+void LLPanelObject::onSizeSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+	if (success && obj && mObject && obj->permModify() && mObject->permModify())
+	{
+		LLVector3 selected_scale = obj->getScale();
+
+		F32 min_scale = SL_MIN_PRIM_SCALE;
+		F32 max_scale = SL_DEFAULT_MAX_PRIM_SCALE;
+		if (LLViewerRegion* regionp = mObject->getRegion())
+		{
+			min_scale = regionp->getMinPrimScale();
+			max_scale = regionp->getMaxPrimScale();
+		}
+
+		selected_scale.mV[VX] = llclamp(selected_scale.mV[VX], min_scale, max_scale);
+		selected_scale.mV[VY] = llclamp(selected_scale.mV[VY], min_scale, max_scale);
+		selected_scale.mV[VZ] = llclamp(selected_scale.mV[VZ], min_scale, max_scale);
+
+		mCtrlScaleX->set(selected_scale.mV[VX]);
+		mCtrlScaleY->set(selected_scale.mV[VY]);
+		mCtrlScaleZ->set(selected_scale.mV[VZ]);
+
+		sendScale(FALSE);
+	}
+	mBtnPipetteSize->setToggleState(FALSE);
+}
+
+void LLPanelObject::onRotSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+	if (success && obj && mObject && obj->permMove() && mObject->permMove())
+	{
+		LLQuaternion selected_rot = obj->getRotationEdit();
+
+		LLVector3 new_euler_angles;
+		selected_rot.getEulerAngles(&(new_euler_angles.mV[VX]), &(new_euler_angles.mV[VY]), &(new_euler_angles.mV[VZ]));
+		new_euler_angles *= RAD_TO_DEG;
+		new_euler_angles.mV[VX] = fmod(ll_round(new_euler_angles.mV[VX], OBJECT_ROTATION_PRECISION) + 360.f, 360.f);
+		new_euler_angles.mV[VY] = fmod(ll_round(new_euler_angles.mV[VY], OBJECT_ROTATION_PRECISION) + 360.f, 360.f);
+		new_euler_angles.mV[VZ] = fmod(ll_round(new_euler_angles.mV[VZ], OBJECT_ROTATION_PRECISION) + 360.f, 360.f);
+
+		mCtrlRotX->set(new_euler_angles.mV[VX]);
+		mCtrlRotY->set(new_euler_angles.mV[VY]);
+		mCtrlRotZ->set(new_euler_angles.mV[VZ]);
+
+		sendRotation(FALSE);
+	}
+	mBtnPipetteRotation->setToggleState(FALSE);
+}
+
+void LLPanelObject::onParamsSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+	if (success && (obj && obj->permModify() && !obj->isMesh()) && (mObject && mObject->permModify() && !mObject->isMesh()))
+	{
+		if (obj->getVolume() && LL_PCODE_VOLUME == obj->getPCode())
+		{
+			LLSculptParams sculpt_params;
+			if (obj->getSculptParams())
+			{
+				const LLSculptParams* hit_sculpt_params = (LLSculptParams*)obj->getSculptParams();
+				LLUUID sculpt_texture = hit_sculpt_params->getSculptTexture();
+				if (!get_can_copy_texture(sculpt_texture))
+				{
+					sculpt_texture = LLUUID(SCULPT_DEFAULT_TEXTURE);
+				}
+
+				LLSculptParams sculpt_params;
+				LLUUID sculpt_id = sculpt_texture;
+				U8 sculpt_type = hit_sculpt_params->getSculptType();;
+				sculpt_params.setSculptTexture(sculpt_id, sculpt_type);
+				mObject->setParameterEntry(LLNetworkData::PARAMS_SCULPT, sculpt_params, TRUE);
+			}
+			else
+			{
+				LLSculptParams* sculpt_params = (LLSculptParams*)mObject->getSculptParams();
+				if (sculpt_params)
+				{
+					mObject->setParameterEntryInUse(LLNetworkData::PARAMS_SCULPT, FALSE, TRUE);
+				}
+			}
+
+			LLVolumeParams new_params = obj->getVolume()->getParams();
+			new_params.setSculptID(sculpt_params.getSculptTexture(), sculpt_params.getSculptType());
+			mObject->updateVolume(new_params);
+		}
+	}
+	mBtnPipettePrimParams->setToggleState(FALSE);
 }

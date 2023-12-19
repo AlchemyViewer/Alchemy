@@ -620,8 +620,6 @@ BOOL LLFloaterTexturePicker::postBuild()
 
 	mSavedFolderState.setApply(FALSE);
 
-	LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1));
-	
 	getChild<LLComboBox>("l_bake_use_texture_combo_box")->setCommitCallback(onBakeTextureSelect, this);
 
 	setBakeTextureEnabled(TRUE);
@@ -996,6 +994,7 @@ void LLFloaterTexturePicker::onBtnPipette()
 	pipette_active = !pipette_active;
 	if (pipette_active)
 	{
+		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1, _2));
 		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
 	}
 	else

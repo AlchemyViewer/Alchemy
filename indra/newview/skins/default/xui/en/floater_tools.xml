@@ -1563,15 +1563,15 @@ even though the user gets a free copy.
              tool_tip="Paste Position"
              width="20" />
              <button
-             visible="false"
              follows="top|right"
              height="19"
              top_pad="3"
              mouse_opaque="true"
              tab_stop="false"
-             label="p"
-             name="pip_pos_btn"
-             tool_tip=""
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga" 
+             name="pipette_position_btn"
+             tool_tip="Paste Position using the Pipette tool"
              width="20" />
             <text
              type="string"
@@ -1654,16 +1654,16 @@ even though the user gets a free copy.
              tool_tip="Paste Size"
              width="20" />
              <button
-             visible="false"
              follows="top|right"
              height="19"
              top_pad="3"
              mouse_opaque="true"
              tab_stop="false"
-             label="p"
-             name="pip_size_btn"
-             tool_tip=""
-             width="20" />
+             name="pipette_size_btn"
+             tool_tip="Paste Size using the Pipette tool"
+             width="20" 
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga"/>
             <text
              type="string"
              length="1"
@@ -1745,15 +1745,15 @@ even though the user gets a free copy.
              tool_tip="Paste Rotation"
              width="20" />
              <button
-             visible="false"
              follows="top|right"
              height="19"
              top_pad="3"
              mouse_opaque="true"
              tab_stop="false"
-             label="p"
-             name="pip_rotation_btn"
-             tool_tip=""
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga"
+             name="pipette_rotation_btn"
+             tool_tip="Paste Rotation using the Pipette tool"
              width="20" />
  <!--           <text
              type="string"
@@ -1783,7 +1783,7 @@ even though the user gets a free copy.
              name="comboBaseType"
              top="6"
              left="120"
-             width="125">
+             width="105">
                 <combo_box.item
                  label="Box"
                  name="Box"
@@ -1893,6 +1893,18 @@ even though the user gets a free copy.
               image_overlay="Clipboard_Paste"
               name="paste_primparams_btn"
               tool_tip="Paste Primitive Parameters"
+              width="20" />
+              <button
+              follows="top|left"
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              mouse_opaque="true"
+              tab_stop="false"
+              image_selected="eye_button_active.tga"
+              image_unselected="eye_button_inactive.tga"
+              name="pipette_primparams_btn"
+              tool_tip="Paste Primitive Parameters using the Pipette tool"
               width="20" />
             <text
              type="string"

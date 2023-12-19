@@ -111,11 +111,10 @@ class LLFloaterTexturePicker final : public LLFloater
     static void		onBtnTransparent(void* userdata);
 	static void		onBtnBlank(void* userdata);
 	static void		onBtnNone(void* userdata);
-    static void		onBtnClear(void* userdata);
     static void		onApplyUUID(void* userdata);
 	void			onSelectionChange(const std::deque<LLFolderViewItem*> &items, BOOL user_action);
 	static void		onApplyImmediateCheck(LLUICtrl* ctrl, void* userdata);
-	void			onTextureSelect(const LLTextureEntry& te);
+	void			onTextureSelect(LLViewerObject* obj, const LLTextureEntry& te);
 
 	static void		onModeSelect(LLUICtrl* ctrl, void *userdata);
 	static void		onBtnAdd(void* userdata);
@@ -191,12 +190,13 @@ private:
     S32 mMinDim;
     LLTextureCtrl::EPickInventoryType mInventoryPickType;
 
-
 	texture_selected_callback mTextureSelectedCallback;
 	floater_close_callback mOnFloaterCloseCallback;
 	floater_commit_callback mOnFloaterCommitCallback;
 	set_image_asset_id_callback mSetImageAssetIDCallback;
 	set_on_update_image_stats_callback mOnUpdateImageStatsCallback;
+
+	boost::signals2::scoped_connection mPipetteConnection;
 
 	BOOL mBakeTextureEnabled;
 

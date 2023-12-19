@@ -103,12 +103,24 @@ BOOL LLToolPipette::handleToolTip(S32 x, S32 y, MASK mask)
 	return TRUE;
 }
 
-void LLToolPipette::setTextureEntry(const LLTextureEntry* entry)
+void LLToolPipette::handleDeselect()
+{
+	mHitObj = nullptr;
+	mTextureEntry = {};
+	if (!mSignal.empty())
+	{
+		mSignal(false, mHitObj, mTextureEntry);
+	}
+	mSignal.disconnect_all_slots();
+}
+
+void LLToolPipette::signalCallback(LLViewerObject* hit_obj, const LLTextureEntry* entry)
 {
 	if (entry)
 	{
+		mHitObj = hit_obj;
 		mTextureEntry = *entry;
-		mSignal(mTextureEntry);
+		mSignal(true, mHitObj, mTextureEntry);
 	}
 }
 
@@ -125,7 +137,7 @@ void LLToolPipette::pickCallback(const LLPickInfo& pick_info)
 		//TODO: this should highlight the selected face only
 		LLSelectMgr::getInstance()->highlightObjectOnly(hit_obj);
 		const LLTextureEntry* entry = hit_obj->getTE(pick_info.mObjectFace);
-		LLToolPipette::getInstance()->setTextureEntry(entry);
+		LLToolPipette::getInstance()->signalCallback(hit_obj, entry);
 	}
 }
 

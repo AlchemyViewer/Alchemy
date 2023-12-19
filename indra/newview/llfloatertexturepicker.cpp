@@ -550,8 +550,6 @@ BOOL LLFloaterTexturePicker::postBuild()
 
 	mSavedFolderState.setApply(FALSE);
 
-	LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1));
-	
 	getChild<LLComboBox>("l_bake_use_texture_combo_box")->setCommitCallback(onBakeTextureSelect, this);
 
 	setBakeTextureEnabled(TRUE);
@@ -936,6 +934,8 @@ void LLFloaterTexturePicker::onBtnPipette()
 	pipette_active = !pipette_active;
 	if (pipette_active)
 	{
+		LLToolMgr::getInstance()->clearTransientTool();
+		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _2, _3));
 		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
 	}
 	else
@@ -1504,8 +1504,10 @@ void LLFloaterTexturePicker::onPickerCallback(const std::vector<std::string>& fi
     }
 }
 
-void LLFloaterTexturePicker::onTextureSelect( const LLTextureEntry& te )
+void LLFloaterTexturePicker::onTextureSelect( LLViewerObject* obj, const LLTextureEntry& te )
 {
+	if (mPipetteConnection.connected()) mPipetteConnection.disconnect();
+
 	LLUUID inventory_item_id = findItemID(te.getID(), TRUE);
 	if (inventory_item_id.notNull())
 	{
