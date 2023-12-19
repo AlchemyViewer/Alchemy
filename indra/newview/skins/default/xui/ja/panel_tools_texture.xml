@@ -5,7 +5,7 @@
 	</text>
 	<color_swatch label="" name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます。"/>
 	<text name="color trans">
-		透過度％
+		透過度
 	</text>
 	<text name="glow label">
 		グロー
@@ -16,7 +16,7 @@
 		マテリアル
 	</text>
 	<combo_box name="combobox matmedia" width="100">
-		<combo_box.item label="ブリン・フォン反射" name="Materials" value="Materials"/>
+		<combo_box.item label="テクスチャ" name="Materials" value="Materials"/>
 		<combo_box.item label="物理基準レンダリング（ＰＢＲ）" name="PBR" value="PBR"/>
 		<combo_box.item label="メディア" name="Media" value="Media"/>
 	</combo_box>
@@ -33,14 +33,14 @@
 		<radio_item label="放射（エミッシブ）" name="Emissive" value="4"/>
 	</radio_group>
 	<menu_button name="clipboard_texture_params_btn" tool_tip="ペースト時のオプション"/>
-	<texture_picker label="マテリアル" name="pbr_control" tool_tip="クリックでＰＢＲマテリアルを選択します。"/>
+	<texture_picker label="ＰＢＲマテリアル" name="pbr_control" tool_tip="クリックでＰＢＲマテリアルを選択します。"/>
 	<button name="pbr_from_inventory" label="インベントリから選択"/>
 	<text name="material_permissions_loading_label">
 		コンテンツを読み込んでいます…
 	</text>
 	<button name="edit_selected_pbr" label="選択を編集"/>
 	<button name="save_selected_pbr" label="インベントリに保存"/>
-	<texture_picker label="テクスチャ" name="texture control" tool_tip="クリックで画像を選択します。"/>
+	<texture_picker label="ディフューズ" name="texture control" tool_tip="クリックで画像を選択します。"/>
 	<text name="label alphamode">
 		アルファモード
 	</text>
@@ -53,7 +53,7 @@
 	<text name="label maskcutoff">
 		マスクカットオフ
 	</text>
-	<texture_picker label="法線テクスチャ" name="bumpytexture control" tool_tip="クリックで画像を選択します。"/>
+	<texture_picker label="法線" name="bumpytexture control" tool_tip="クリックで法線（ノーマル）マップのテクスチャを選択します。"/>
 	<text name="label bumpiness">
 		凹凸
 	</text>
@@ -80,9 +80,9 @@
 		<combo_box.item label="テクスチャを使用" name="Use texture" value="Use texture"/>
 		-->
 	</combo_box>
-	<texture_picker label="光沢マップ" name="shinytexture control" tool_tip="クリックで光沢（グロッシネス）マップのテクスチャを選択します。"/>
+	<texture_picker label="鏡面反射" name="shinytexture control" tool_tip="クリックで鏡面反射（スペキュラ）マップのテクスチャを選択します。"/>
 	<text name="label shininess">
-		輝き
+		光の鋭さ
 	</text>
 	<combo_box name="combobox shininess">
 		<combo_box.item label="なし" name="None"/>

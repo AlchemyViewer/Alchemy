@@ -304,21 +304,27 @@
 			<spinner label="Ｘ" name="Pos X"/>
 			<spinner label="Ｙ" name="Pos Y"/>
 			<spinner label="Ｚ" name="Pos Z"/>
-			<menu_button name="clipboard_pos_btn" tool_tip="ペーストオプション"/>
+			<button name="copy_position_btn" tool_tip="位置をコピーします。"/>
+			<button name="paste_position_btn" tool_tip="位置をペーストします。"/>
+			<button name="pipette_position_btn" tool_tip="ピペットツールで位置をペーストします。"/>
 			<text name="label size">
 				サイズ（メートル）
 			</text>
 			<spinner label="Ｘ" name="Scale X"/>
 			<spinner label="Ｙ" name="Scale Y"/>
 			<spinner label="Ｚ" name="Scale Z"/>
-			<menu_button name="clipboard_size_btn" tool_tip="ペーストオプション"/>
+			<button name="copy_size_btn" tool_tip="サイズをコピーします。"/>
+			<button name="paste_size_btn" tool_tip="サイズをペーストします。"/>
+			<button name="pipette_size_btn" tool_tip="ピペットツールでサイズをペーストします。"/>
 			<text name="label rotation">
 				回転（角度）
 			</text>
 			<spinner label="Ｘ" name="Rot X"/>
 			<spinner label="Ｙ" name="Rot Y"/>
 			<spinner label="Ｚ" name="Rot Z"/>
-			<menu_button name="clipboard_rot_btn" tool_tip="ペーストオプション"/>
+			<button name="copy_rotation_btn" tool_tip="回転をコピーします。" />
+			<button name="paste_rotation_btn" tool_tip="回転をペーストします。" />
+			<button name="pipette_rotation_btn" tool_tip="ピペットツールで回転をペーストします。" />
 			<!--
 			<text name="label basetype">プリムの種類</text>
 			-->
@@ -350,6 +356,9 @@
 				<combo_item name="Path33Profile5" value="Path33Profile5" label="３３→半円"/>
 				<!-- End Working33 by Gregory Maurer -->
 			</combo_box>
+			<button name="copy_primparams_btn" tool_tip="プリムのパラメータをコピーします。"/>
+			<button name="paste_primparams_btn" tool_tip="プリムのパラメータをペーストします。"/>
+			<button name="pipette_primparams_btn" tool_tip="ピペットツールでプリムのパラメータをペーストします。"/>
 			<text name="text cut">
 				パスカット（始点と終点）
 			</text>
@@ -437,6 +446,9 @@
 			<panel.string name="Convex Hull">
 				凸包
 			</panel.string>
+			<button name="copy_features_btn" tool_tip="特徴のパラメータをコピーします。"/>
+			<button name="paste_features_btn" tool_tip="特徴のパラメータをペーストします。"/>
+			<button name="pipette_features_btn" tool_tip="ピペットツールで特徴のパラメータをペーストします。"/>
 			<text name="select_single">
 				プリムを１つだけ選択して編集してください。
 			</text>
