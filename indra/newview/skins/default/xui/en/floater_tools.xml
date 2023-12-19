@@ -2418,19 +2418,39 @@ even though the user gets a free copy.
 	<panel.string name="None">None</panel.string>
 	<panel.string name="Prim">Prim</panel.string>
 	<panel.string name="Convex Hull">Convex Hull</panel.string>
-            <menu_button
-              menu_filename="menu_copy_paste_features.xml"
+              <button
               follows="top|left"
-              height="15"
-              image_disabled="ClipboardMenu_Disabled"
-              image_selected="ClipboardMenu_Press"
-              image_unselected="ClipboardMenu_Off"
-              layout="topleft"
-              left="258"
+              height="19"
+              left="225"
               top="8"
-              name="clipboard_features_params_btn"
-              tool_tip="Paste options"
-              width="22"/>
+              tab_stop="false"
+              image_overlay="Clipboard_Copy"
+              name="copy_features_btn"
+              tool_tip="Copy Feature Parameters"
+              width="20" />
+              <button
+              follows="top|left"
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              mouse_opaque="true"
+              tab_stop="false"
+              image_overlay="Clipboard_Paste"
+              name="paste_features_btn"
+              tool_tip="Paste Feature Parameters"
+              width="20" />
+              <button
+              follows="top|left"
+              height="19"
+              left_pad="1"
+              top_delta="0"
+              mouse_opaque="true"
+              tab_stop="false"
+              image_selected="eye_button_active.tga"
+              image_unselected="eye_button_inactive.tga"
+              name="pipette_features_btn"
+              tool_tip="Paste Feature Parameters using the Pipette tool"
+              width="20" />
             <text
              type="string"
              length="1"
@@ -2627,19 +2647,39 @@ even though the user gets a free copy.
             name="light texture control"
             tool_tip="Click to choose a projection image (only has effect with deferred rendering enabled)"
             width="32" />
-         <menu_button
-              menu_filename="menu_copy_paste_light.xml"
-              follows="top|left"
-              height="15"
-              image_disabled="ClipboardMenu_Disabled"
-              image_selected="ClipboardMenu_Press"
-              image_unselected="ClipboardMenu_Off"
-              layout="topleft"
-              left="258"
-              top_delta="0"
-              name="clipboard_light_params_btn"
-              tool_tip="Paste options"
-              width="22"/>
+            <button
+            follows="top|left"
+            height="19"
+            left="225"
+            top_delta="0"
+            tab_stop="false"
+            image_overlay="Clipboard_Copy"
+            name="copy_light_btn"
+            tool_tip="Copy Light and Reflection Probe Parameters"
+            width="20" />
+            <button
+            follows="top|left"
+            height="19"
+            left_pad="1"
+            top_delta="0"
+            mouse_opaque="true"
+            tab_stop="false"
+            image_overlay="Clipboard_Paste"
+            name="paste_light_btn"
+            tool_tip="Paste Light and Reflection Probe Parameters"
+            width="20" />
+            <button
+            follows="top|left"
+            height="19"
+            left_pad="1"
+            top_delta="0"
+            mouse_opaque="true"
+            tab_stop="false"
+            image_selected="eye_button_active.tga"
+            image_unselected="eye_button_inactive.tga"
+            name="pipette_light_btn"
+            tool_tip="Paste Light and Reflection Probe Parameters using the Pipette tool"
+            width="20" />
           <spinner
              follows="left|top"
              height="19"

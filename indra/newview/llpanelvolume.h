@@ -31,6 +31,7 @@
 #include "llpanel.h"
 #include "llpointer.h"
 #include "llvolume.h"
+#include "lltextureentry.h"
 
 class LLSpinCtrl;
 class LLCheckBoxCtrl;
@@ -92,7 +93,12 @@ public:
     void            onPasteFeatures();
     void            onCopyLight();
     void            onPasteLight();
- 
+    void			onClickPipetteFeatures();
+    void			onClickPipetteLight();
+
+    void onFeaturesSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+    void onLightSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+
     void        menuDoToSelected(const LLSD& userdata);
     bool        menuEnableItem(const LLSD& userdata);
 
@@ -154,8 +160,12 @@ protected:
     LLSpinCtrl*     mSpinPhysicsDensity    = nullptr;
     LLSpinCtrl*     mSpinPhysicsRestitution = nullptr;
 
-    LLMenuButton*   mMenuClipboardFeatures;
-    LLMenuButton*   mMenuClipboardLight;
+    LLButton* mBtnCopyFeatures = nullptr;
+    LLButton* mBtnPasteFeatures = nullptr;
+    LLButton* mBtnPipetteFeatures = nullptr;
+    LLButton* mBtnCopyLight = nullptr;
+    LLButton* mBtnPasteLight = nullptr;
+    LLButton* mBtnPipetteLight = nullptr;
 
     LLSD            mClipboardParams;
 };
