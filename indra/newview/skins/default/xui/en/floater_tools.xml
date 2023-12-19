@@ -174,9 +174,9 @@
     </text>
    <radio_group
      layout="topleft"
-     left="10"
+     left="5"
       height="70"
-      top="59"
+      top="55"
      name="focus_radio_group">
         <radio_item
          top_pad="6"
@@ -211,9 +211,9 @@
 	     function="BuildTool.commitZoom"/>
 	</slider_bar>
    <radio_group
-      left="10"
+      left="5"
       height="70"
-      top="59"
+      top="55"
      layout="topleft"
      name="move_radio_group">
         <radio_item
@@ -285,7 +285,7 @@
      follows="left|top"
      height="20"
      image_overlay="BackArrow_Off"
-     top_pad="0"
+     top_pad="1"
      layout="topleft"
      name="prev_part_btn"
      tool_tip="Select previous linked part or face"
@@ -325,14 +325,14 @@
      layout="topleft"
      left_pad="2"
      name="unlink_btn"
-     width="90">
+     width="60">
 	  <button.commit_callback
 	     function="BuildTool.UnlinkObjects"/>
     </button>
         <combo_box
      height="20"
      layout="topleft"
-     left_pad="4"
+     left_pad="2"
      follows="left|top"
      name="combobox grid mode"
      tool_tip="Choose the type of grid ruler for positioning the object"
@@ -360,7 +360,7 @@
      layout="topleft"
      left="143"
      name="checkbox uniform"
-     top="48"
+     top="44"
      label_text.wrap="true"
      label_text.width="120"
      width="134" />
@@ -401,6 +401,15 @@
      layout="topleft"
      top_pad="-2"
      name="checkbox selection"
+     width="134" />
+     <check_box
+     control_name="SelectReflectionProbes"
+     height="18"
+     initial_value="false"
+     label="Select Reflection Probes"
+     layout="topleft"
+     top_pad="-2"
+     name="checkbox select probes"
      width="134" />
     <button
      left_pad="0"
