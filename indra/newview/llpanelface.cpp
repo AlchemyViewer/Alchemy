@@ -449,9 +449,16 @@ BOOL	LLPanelFace::postBuild()
 		mCtrlGlow->setCommitCallback(LLPanelFace::onCommitGlow, this);
 	}
 
-    mMenuClipboardColor = getChild<LLMenuButton>("clipboard_color_params_btn");
-    mMenuClipboardTexture = getChild<LLMenuButton>("clipboard_texture_params_btn");
-    
+    mBtnCopyColor = findChild<LLButton>("copy_color_btn");
+    mBtnCopyColor->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyColor(); });
+    mBtnPasteColor = findChild<LLButton>("paste_color_btn");
+    mBtnPasteColor->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteColor(); });
+
+    mBtnCopyTextures = findChild<LLButton>("copy_texture_btn");
+    mBtnCopyTextures->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyTexture(); });
+    mBtnPasteTextures = findChild<LLButton>("paste_texture_btn");
+    mBtnPasteTextures->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteTexture(); });
+
     mTitleMedia = getChild<LLMediaCtrl>("title_media");
     mTitleMediaText = getChild<LLTextBox>("media_info");
 
@@ -1777,7 +1784,9 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 		}
         S32 selected_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
         BOOL single_volume = (selected_count == 1);
-        mMenuClipboardColor->setEnabled(editable && single_volume);
+
+        mBtnCopyColor->setEnabled(editable&& single_volume);
+        mBtnPasteColor->setEnabled(editable&& single_volume&& mClipboardParams.has("color"));
 
 		// Set variable values for numeric expressions
 		LLCalc* calcp = LLCalc::getInstance();
@@ -2034,12 +2043,14 @@ void LLPanelFace::updateVisibilityGLTF(LLViewerObject* objectp /*= nullptr */)
 void LLPanelFace::updateCopyTexButton()
 {
     LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
-    mMenuClipboardTexture->setEnabled(objectp && objectp->getPCode() == LL_PCODE_VOLUME && objectp->permModify() 
+    bool enable = (objectp && objectp->getPCode() == LL_PCODE_VOLUME && objectp->permModify()
                                                     && !objectp->isPermanentEnforced() && !objectp->isInventoryPending() 
                                                     && (LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1)
                                                     && LLMaterialEditor::canClipboardObjectsMaterial());
+    mBtnCopyTextures->setEnabled(enable);
+    mBtnPasteTextures->setEnabled(enable && mClipboardParams.has("texture"));
     std::string tooltip = (objectp && objectp->isInventoryPending()) ? LLTrans::getString("LoadingContents") : getString("paste_options");
-    mMenuClipboardTexture->setToolTip(tooltip);
+    mBtnPasteTextures->setToolTip(tooltip);
 }
 
 void LLPanelFace::refresh()
@@ -4040,6 +4051,8 @@ void LLPanelFace::onCopyColor()
             }
         }
     }
+
+    refresh();
 }
 
 void LLPanelFace::onPasteColor()
@@ -4354,6 +4367,7 @@ void LLPanelFace::onCopyTexture()
             }
         }
     }
+    refresh();
 }
 
 void LLPanelFace::onPasteTexture()

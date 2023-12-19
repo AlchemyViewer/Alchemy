@@ -25,22 +25,42 @@
             </panel.string>
             <panel.string
              name="paste_options">
-              Paste options
+             Paste Texture Parameters
             </panel.string>
 
-            <menu_button
-             menu_filename="menu_copy_paste_color.xml"
+            <button
              follows="top|left"
-             height="15"
-             image_disabled="ClipboardMenu_Disabled"
-             image_selected="ClipboardMenu_Press"
-             image_unselected="ClipboardMenu_Off"
              layout="topleft"
+             height="19" 
              left="258"
-             top="8"
-             name="clipboard_color_params_btn"
-             tool_tip="Paste options"
-             width="22"/>
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_color_btn"
+             tool_tip="Copy Color Parameters"
+             width="20" />
+            <button
+             follows="top|left"
+             layout="topleft"
+             height="19"
+             top_pad="1"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_color_btn"
+             tool_tip="Paste Color Parameters"
+             width="20" />
+             <button
+             visible="false"
+             follows="top|left"
+             layout="topleft"
+             height="19"
+             top_pad="1"
+             mouse_opaque="true"
+             tab_stop="false"
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga" 
+             name="pipette_color_btn"
+             tool_tip="Paste Color Parameters using the Pipette tool"
+             width="20" />
             <text
              type="string"
              length="1"
@@ -238,19 +258,40 @@
                 name="Normal"
                 value="4"/>
             </radio_group>
-            <menu_button
-                menu_filename="menu_copy_paste_texture.xml"
-                follows="top|left"
-                height="15"
-                image_disabled="ClipboardMenu_Disabled"
-                image_selected="ClipboardMenu_Press"
-                image_unselected="ClipboardMenu_Off"
-                layout="topleft"
-                left="258"
-                top_delta="0"
-                name="clipboard_texture_params_btn"
-                tool_tip="Paste options"
-                width="22"/>
+            <button
+             follows="top|left"
+             layout="topleft"
+             height="19" 
+             left="258"
+             top_delta="0"
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_texture_btn"
+             tool_tip="Copy Texture Parameters"
+             width="20" />
+            <button
+             follows="top|left"
+             layout="topleft"
+             height="19"
+             top_pad="1"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_texture_btn"
+             tool_tip="Paste Texture Parameters"
+             width="20" />
+             <button
+             visible="false"
+             follows="top|left"
+             layout="topleft"
+             height="19"
+             top_pad="1"
+             mouse_opaque="true"
+             tab_stop="false"
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga" 
+             name="pipette_texture_btn"
+             tool_tip="Paste Texture Parameters using the Pipette tool"
+             width="20" />
 
             <texture_picker
              can_apply_immediately="true"
@@ -262,7 +303,7 @@
              left="10"
              name="pbr_control"
              tool_tip="Click to choose a pbr material"
-             top_pad="71"
+             top_pad="25"
              width="64" />
             <button
             visible="false"

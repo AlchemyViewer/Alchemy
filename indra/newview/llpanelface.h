@@ -492,8 +492,10 @@ private:
 
     void setMaterialOverridesFromSelection();
 
-    LLMenuButton*   mMenuClipboardColor;
-    LLMenuButton*   mMenuClipboardTexture;
+	LLButton* mBtnCopyColor = nullptr;
+	LLButton* mBtnPasteColor = nullptr;
+	LLButton* mBtnCopyTextures = nullptr;
+	LLButton* mBtnPasteTextures = nullptr;
 
 	bool mIsAlpha;
 	
