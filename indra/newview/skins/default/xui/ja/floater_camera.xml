@@ -46,5 +46,6 @@
 		</combo_box>
 		<button name="gear_btn" tool_tip="カメラのプリセット"/>
 		<button label="プリセットを保存…" name="save_preset_btn"/>
+		<button name="precise_controls_btn" tool_tip="小数点単位の操作を使用"/>
 	</panel>
 </floater>
