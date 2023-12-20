@@ -228,7 +228,7 @@
 				<icon name="lod_status_message_icon"/>
 				<text name="lod_status_message_text"/>
 				<view_border name="lod_tab_border"/>
-				<check_box name="gen_normals" lavel="法線を生成"/>
+				<check_box name="gen_normals" label="法線を生成"/>
 				<text name="crease_label" value="折り目の角度："/>
 				<spinner name="crease_angle"/>
 			</panel>
