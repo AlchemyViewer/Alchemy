@@ -6789,7 +6789,7 @@ void LLVOAvatar::addAttachmentOverridesForObject(LLViewerObject *vo, std::set<LL
 		return;
 	}
 	const LLMeshSkinInfo*  pSkinData = nullptr;
-	if (pSkinData = vobj->getSkinInfo())
+	if ((pSkinData = vobj->getSkinInfo()))
 	{
 		const int bindCnt = pSkinData->mAlternateBindMatrix.size();								
         const int jointCnt = pSkinData->mJointNames.size();
