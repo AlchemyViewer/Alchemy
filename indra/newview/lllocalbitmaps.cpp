@@ -1127,14 +1127,11 @@ bool LLLocalBitmapMgr::checkTextureDimensions(std::string filename)
 		return false;
 	}
 
-	S32 max_width = gSavedSettings.getS32("max_texture_dimension_X");
-	S32 max_height = gSavedSettings.getS32("max_texture_dimension_Y");
-
-	if ((image_info.getWidth() > max_width) || (image_info.getHeight() > max_height))
+	if ((image_info.getWidth() > MAX_IMAGE_SIZE) || (image_info.getHeight() > MAX_IMAGE_SIZE))
 	{
 		LLStringUtil::format_map_t args;
-		args["WIDTH"] = llformat("%d", max_width);
-		args["HEIGHT"] = llformat("%d", max_height);
+		args["WIDTH"] = llformat("%d", MAX_IMAGE_SIZE);
+		args["HEIGHT"] = llformat("%d", MAX_IMAGE_SIZE);
 		mImageLoadError = LLTrans::getString("texture_load_dimensions_error", args);
 
 		LLSD notif_args;
