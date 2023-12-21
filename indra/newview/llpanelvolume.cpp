@@ -1324,7 +1324,7 @@ void LLPanelVolume::onClickPipetteLight()
 
 void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
 {
-    if (success && obj && mObject.get() && obj->permModify() && mObject->permModify())
+    if (success && obj && mObject.get() && obj != mObject.get() && obj->permModify() && mObject->permModify())
     {
         LLVOVolume* volobjp = NULL;
         if (mObject && (mObject->getPCode() == LL_PCODE_VOLUME))
@@ -1413,7 +1413,7 @@ void LLPanelVolume::onClickPipetteFeatures()
 
 void LLPanelVolume::onFeaturesSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
 {
-    if (success && obj && mObject.get() && obj->permModify() && mObject->permModify())
+    if (success && obj && mObject.get() && obj != mObject.get() && obj->permModify() && mObject->permModify())
     {
         LLVOVolume* volobjp = NULL;
         if (mObject && (mObject->getPCode() == LL_PCODE_VOLUME))

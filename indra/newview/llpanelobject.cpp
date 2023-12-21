@@ -2764,7 +2764,7 @@ void LLPanelObject::onRotSelect(bool success, LLViewerObject* obj, const LLTextu
 
 void LLPanelObject::onParamsSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
 {
-	if (success && (obj && obj->permModify() && !obj->isMesh()) && (mObject && mObject->permModify() && !mObject->isMesh()))
+	if (success && obj != mObject && (obj && obj->permModify() && !obj->isMesh()) && (mObject && mObject->permModify() && !mObject->isMesh()))
 	{
 		if (obj->getVolume() && LL_PCODE_VOLUME == obj->getPCode())
 		{
@@ -2793,8 +2793,22 @@ void LLPanelObject::onParamsSelect(bool success, LLViewerObject* obj, const LLTe
 				}
 			}
 
-			LLVolumeParams new_params = obj->getVolume()->getParams();
-			new_params.setSculptID(sculpt_params.getSculptTexture(), sculpt_params.getSculptType());
+			LLVolumeParams new_params;
+			new_params.copyParams(obj->getVolume()->getParams());
+			
+			LLVOVolume* volobjp = (LLVOVolume*)obj;
+			if (volobjp->isFlexible())
+			{
+				if (new_params.getPathParams().getCurveType() == LL_PCODE_PATH_LINE)
+				{
+					new_params.getPathParams().setCurveType(LL_PCODE_PATH_FLEXIBLE);
+				}
+			}
+			else if (new_params.getPathParams().getCurveType() == LL_PCODE_PATH_FLEXIBLE)
+			{
+				new_params.getPathParams().setCurveType(LL_PCODE_PATH_LINE);
+			}
+			
 			mObject->updateVolume(new_params);
 		}
 	}
