@@ -842,7 +842,14 @@ void LLPanelProfileSecondLife::onOpen(const LLSD& key)
         mGroupList->enableForAgent(false);
     }
 
-    // Init menu
+    // Init menu, menu needs to be created in scope of a registar to work correctly.
+    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
+    commit.add("Profile.Commit", [this](LLUICtrl*, const LLSD& userdata) { onCommitMenu(userdata); });
+
+    LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
+    enable.add("Profile.EnableItem", [this](LLUICtrl*, const LLSD& userdata) { return onEnableMenu(userdata); });
+    enable.add("Profile.CheckItem", [this](LLUICtrl*, const LLSD& userdata) { return onCheckMenu(userdata); });
+
     if (own_profile)
     {
         mAgentActionMenuButton->setMenu("menu_profile_self.xml", LLMenuButton::MP_BOTTOM_RIGHT);
