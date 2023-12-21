@@ -2252,17 +2252,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 	strm.avail_in = size;
 	strm.next_in = const_cast<U8*>(in);
 
-	S32 ret = inflateInit(&strm);
-	switch (ret)
-	{
-	case Z_STREAM_ERROR:
-		return ZR_DATA_ERROR;
-	case Z_VERSION_ERROR:
-		return ZR_VERSION_ERROR;
-	case Z_MEM_ERROR:
-		return ZR_MEM_ERROR;
-	}
-
+	S32 ret = inflateInit2(&strm, MAX_WBITS);
 	do
 	{
 		strm.avail_out = CHUNK;
@@ -2278,7 +2268,6 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 			return ZR_DATA_ERROR;
 		}
 		case Z_STREAM_ERROR:
-		case Z_BUF_ERROR:
 		{
 			inflateEnd(&strm);
 			free(result);
@@ -2293,23 +2282,25 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 		}
 		}
 
-		U32 have = CHUNK-strm.avail_out;
-
-		U8* new_result = (U8*)realloc(result, cur_size + have);
-		if (new_result == NULL)
+		llssize have = CHUNK-strm.avail_out;
+		if (have > 0)
 		{
-			inflateEnd(&strm);
-			if (result)
+			U8* new_result = (U8*)realloc(result, cur_size + have);
+			if (new_result == NULL)
 			{
-				free(result);
+				inflateEnd(&strm);
+				if (result)
+				{
+					free(result);
+				}
+				return ZR_MEM_ERROR;
 			}
-			return ZR_MEM_ERROR;
+			result = new_result;
+			memcpy(result + cur_size, out.get(), have);
+			cur_size += have;
 		}
-		result = new_result;
-		memcpy(result+cur_size, out.get(), have);
-		cur_size += have;
 
-	} while (ret == Z_OK && ret != Z_STREAM_END);
+	} while (strm.avail_out == 0 && ret != Z_STREAM_END);
 
 	inflateEnd(&strm);
 
