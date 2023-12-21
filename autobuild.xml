@@ -476,11 +476,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>decc2db6e9f4188567f5c9c45d7043a52a34ca3150e35c5fd6573c522f7d95d23bb63480986d5f56847e5fa275621aafe5d2903bd1e37a8dd0a9c3a47ed11a89</string>
+              <string>3a2e26f01656a6634023d83f2a53a36a373c61b6af1d00517543050a09826113a2f99121ece20c2c0b581aab9020aeb7cdfe972fa331ea94f3862556a70eae19</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16.2285/dullahan-1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16-darwin64-2285.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-darwin64-2178.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -490,11 +490,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e61dbbe0280cf578f217c6fee6f9ad6bdb13e8b325e86b733cd3250bf787f39d20079caa55031c3c1184db87048e490cedfcd1fdc0a28fde422ed60696b257e0</string>
+              <string>ab9d290a61fb038e6c0ba9ce4efa5f431238e1ab9d4de2c28da1ad0114926af9b716db90cb216816ec8a1de3680d358913851e316d8df6b5eea5302989d9f3bc</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16.2285/dullahan-1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16-linux64-2285.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-linux64-2178.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -504,11 +504,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>26318a6d7628feb176ed7a5bad66d8a6a6d3c69e319bcac515c56194a573a10c0638b193bcfa63d296f876421d82d40b44075a2362d42166e37fa9c5bd348cee</string>
+              <string>e88cd99c9d71b2dd1297007bcfdac224d5401cdfadd7aeb069195392274559f7f63ee312061d3441ba7505a4e649ccea67f9d8f3f3c56c9cce638b35c29b6eb5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16.2285/dullahan-1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16-windows64-2285.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-windows64-2178.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -521,7 +521,7 @@
         <key>copyright</key>
         <string>Copyright (c) 2017, Linden Research, Inc.</string>
         <key>version</key>
-        <string>1.14.0_121.0.1_g7a4b55f_chromium-121.0.6167.16</string>
+        <string>1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54</string>
         <key>name</key>
         <string>dullahan</string>
         <key>description</key>
