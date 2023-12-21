@@ -1121,13 +1121,6 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 				
 				if (!mSkinInfo && !mSkinInfoUnavaliable)
 				{
-#if 1 // ALCHEMY
-					const LLMeshSkinInfo* skin_info = gMeshRepo.getSkinInfo(volume_params.getSculptID(), this);
-					if (skin_info)
-					{
-						notifySkinInfoLoaded(skin_info);
-					}
-#else
                     LLUUID mesh_id = volume_params.getSculptID();
                     if (gMeshRepo.hasHeader(mesh_id) && !gMeshRepo.hasSkinInfo(mesh_id))
                     {
@@ -1144,7 +1137,6 @@ BOOL LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
                             notifySkinInfoLoaded(skin_info);
                         }
                     }
-#endif
 				}
 			}
 			else // otherwise is sculptie
@@ -1220,7 +1212,6 @@ void LLVOVolume::notifyMeshLoaded()
 	mSculptChanged = TRUE;
 	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
 
-#if 0 // ALCHEMY
     if (!mSkinInfo && !mSkinInfoUnavaliable)
     {
         // Header was loaded, update skin info state from header
@@ -1230,7 +1221,6 @@ void LLVOVolume::notifyMeshLoaded()
             mSkinInfoUnavaliable = true;
         }
     }
-#endif
 
     LLVOAvatar *av = getAvatar();
     if (av && !isAnimatedObject())
