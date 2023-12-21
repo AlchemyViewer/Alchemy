@@ -211,7 +211,7 @@ public:
 
     void fromLLSD(const LLSD& header)
     {
-        static const char* lod[] =
+        const char* lod[] =
         {
             "lowest_lod",
             "low_lod",
