@@ -587,7 +587,6 @@ BOOL LLPanelProfilePick::postBuild()
     mSaveButton = getChild<LLButton>("save_changes_btn");
     mCreateButton = getChild<LLButton>("create_changes_btn");
     mCancelButton = getChild<LLButton>("cancel_changes_btn");
-    mSetCurrentLocationButton = getChild<LLButton>("set_to_curr_location_btn");
 
     mSnapshotCtrl = getChild<LLTextureCtrl>("pick_snapshot");
     mSnapshotCtrl->setCommitCallback(boost::bind(&LLPanelProfilePick::onSnapshotChanged, this));
