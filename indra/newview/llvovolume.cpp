@@ -1235,13 +1235,11 @@ void LLVOVolume::notifyMeshLoaded()
     LLVOAvatar *av = getAvatar();
     if (av && !isAnimatedObject())
     {
-        av->addAttachmentOverridesForObject(this);
         av->notifyAttachmentMeshLoaded();
     }
     LLControlAvatar *cav = getControlAvatar();
     if (cav && isAnimatedObject())
     {
-        cav->addAttachmentOverridesForObject(this);
         cav->notifyAttachmentMeshLoaded();
     }
     updateVisualComplexity();
@@ -1252,7 +1250,22 @@ void LLVOVolume::notifySkinInfoLoaded(const LLMeshSkinInfo* skin)
     mSkinInfoUnavaliable = false;
 	mSkinInfo = skin;
 
-	notifyMeshLoaded();
+	mSculptChanged = TRUE;
+	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
+
+	LLVOAvatar* av = getAvatar();
+	if (av && !isAnimatedObject())
+	{
+		av->addAttachmentOverridesForObject(this);
+		av->notifyAttachmentMeshLoaded();
+	}
+	LLControlAvatar* cav = getControlAvatar();
+	if (cav && isAnimatedObject())
+	{
+		cav->addAttachmentOverridesForObject(this);
+		cav->notifyAttachmentMeshLoaded();
+	}
+	updateVisualComplexity();
 }
 
 void LLVOVolume::notifySkinInfoUnavailable()
