@@ -54,7 +54,7 @@ extern void APIENTRY gl_debug_callback(GLenum source,
 ;
 #endif
 
-thread_local LLRender gGL = LLRender();
+thread_local LLRender gGL;
 
 // Handy copies of last good GL matrices
 LLMatrix4a	gGLModelView;
@@ -66,7 +66,7 @@ LLMatrix4a	gGLProjection;
 LLMatrix4a gGLDeltaModelView;
 LLMatrix4a gGLInverseDeltaModelView;
 
-S32			gGLViewport[4] = {};
+S32			gGLViewport[4];
 
 
 U32 LLRender::sUICalls = 0;
@@ -119,21 +119,6 @@ static const GLenum sGLBlendFactor[] =
 
 	GL_ZERO // 'BF_UNDEF'
 };
-
-void init_gl_globals()
-{
-	gGLManager = LLGLManager();
-	gGL = LLRender();
-
-	gGLModelView.setIdentity();
-	gGLLastModelView.setIdentity();
-	gGLLastProjection.setIdentity();
-	gGLProjection.setIdentity();
-
-	// transform from last frame's camera space to this frame's camera space (and inverse)
-	gGLDeltaModelView.setIdentity();
-	gGLInverseDeltaModelView.setIdentity();
-}
 
 LLTexUnit::LLTexUnit(S32 index)
 	: mCurrTexType(TT_NONE),
