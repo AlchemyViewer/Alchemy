@@ -1464,7 +1464,7 @@ BOOL LLViewerFetchedTexture::preCreateTexture(S32 usename/*= 0*/)
         // from local images, but this might become unsafe in case of changes to fetcher
         if (mBoostLevel == BOOST_PREVIEW)
         {
-            mRawImage->biasedScaleToPowerOfTwo(1024);
+            mRawImage->biasedScaleToPowerOfTwo(LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT);
         }
         else
         { // leave black border, do not scale image content
