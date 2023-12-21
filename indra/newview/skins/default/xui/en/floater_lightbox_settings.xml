@@ -25,7 +25,6 @@
 		<!--Image Panel-->
 		<panel
 			label="Image"
-			class="colortone_settings"
 			layout="topleft"
 			name="colortone_settings"
 			can_resize="false">
@@ -637,7 +636,6 @@
 		<!--Rendering Panel-->
 		<panel
 			label="Rendering"
-			class="render_settings"
 			layout="topleft"
 			name="render_settings">
 			<!--Probe Detail-->
@@ -1047,7 +1045,6 @@
 		<!--Shadows/SSAO Panel-->
 		<panel
 			label="Shadows"
-			class="shadow_settings"
 			layout="topleft"
 			name="shadow_settings">
 			<!--TODO: Display a warning message and disable this panel if Advanced Lighting Model is disabled?-->
@@ -1749,7 +1746,6 @@
 		<!--Glow Panel-->
 		<panel
 			label="Glow"
-			class="glow_settings"
 			layout="topleft"
 			name="glow_settings">
 			<!--Glow Toggle-->
@@ -1979,7 +1975,6 @@
 		<!--DOF Panel-->
 		<panel
 			label="DoF"
-			class="dof_settings"
 			layout="topleft"
 			name="dof_settings">
 			<!--DOF Toggle-->
