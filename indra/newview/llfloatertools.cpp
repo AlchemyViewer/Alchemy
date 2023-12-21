@@ -858,6 +858,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
 	if (mCheckStretchUniformLabel) mCheckStretchUniformLabel->setVisible( edit_visible );
 	if (mCheckActualRoot) mCheckActualRoot->setVisible( edit_visible );
 	getChild<LLUICtrl>("checkbox selection")->setVisible( edit_visible );
+	getChild<LLUICtrl>("checkbox select probes")->setVisible(edit_visible);
 
 	// Create buttons
 	BOOL create_visible = (tool == LLToolCompCreate::getInstance());
