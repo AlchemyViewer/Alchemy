@@ -48,8 +48,6 @@ namespace LLTinyGLTFHelper
     LLImageRaw* getTexture(const std::string& folder, const tinygltf::Model& model, S32 texture_index, std::string& name);
     LLImageRaw* getTexture(const std::string& folder, const tinygltf::Model& model, S32 texture_index);
 
-    LLImageRaw* getTexture(const std::string& folder, const tinygltf::Model& model, S32 texture_index);
-
     bool loadModel(const std::string& filename, tinygltf::Model& model_out);
 
     bool getMaterialFromModel(
