@@ -2763,125 +2763,115 @@ void LLMeshRepoThread::notifyLoadedMeshes()
 		return;
 	}
 
-	if (!mLoadedQ.empty())
+	std::deque<LoadedMesh> loaded_queue;
+	std::deque<LODRequest> unavil_queue;
+	std::vector<LLMeshSkinInfo*> skin_info_q;
+	std::deque<UUIDBasedRequest> skin_info_unavail_q;
+	std::deque<std::unique_ptr<LLModel::Decomposition>> decomp_q;
+	std::deque<std::unique_ptr<LLModel::Decomposition>> physics_q;
 	{
-		std::deque<LoadedMesh> loaded_queue;
-
 		LLMutexLock mtx_lock(mMutex);
 		if (!mLoadedQ.empty())
 		{
 			loaded_queue.swap(mLoadedQ);
-			mtx_lock.unlock();
-
-			update_metrics = true;
-
-			// Process the elements free of the lock
-			for (const auto& mesh : loaded_queue)
-			{
-				if (mesh.mVolume && mesh.mVolume->getNumVolumeFaces() > 0)
-				{
-					gMeshRepo.notifyMeshLoaded(mesh.mMeshParams, mesh.mVolume);
-				}
-				else
-				{
-					gMeshRepo.notifyMeshUnavailable(mesh.mMeshParams,
-						LLVolumeLODGroup::getVolumeDetailFromScale(mesh.mVolume->getDetail()));
-				}
-			}
 		}
-	}
 
-	if (!mUnavailableQ.empty())
-	{
-		std::deque<LODRequest> unavil_queue;
-
-		LLMutexLock mtx_lock(mMutex);
 		if (!mUnavailableQ.empty())
 		{
 			unavil_queue.swap(mUnavailableQ);
-			mtx_lock.unlock();
-
-			update_metrics = true;
-
-			// Process the elements free of the lock
-			for (const auto& req : unavil_queue)
-			{
-				gMeshRepo.notifyMeshUnavailable(req.mMeshParams, req.mLOD);
-			}
 		}
-	}
 
-	if (!mSkinInfoQ.empty())
-	{
-		std::vector<LLMeshSkinInfo*> skin_info_q;
-
-		LLMutexTrylock mtx_lock(mMutex);
-		if (mtx_lock.isLocked() && !mSkinInfoQ.empty())
+		if (!mSkinInfoQ.empty())
 		{
 			skin_info_q.swap(mSkinInfoQ);
-			mtx_lock.unlock();
-
-			// Process the elements free of the lock
-			for (auto& skin_info : skin_info_q)
-			{
-				gMeshRepo.notifySkinInfoReceived(skin_info);
-			}
 		}
-	}
 
-	if (!mSkinUnavailableQ.empty())
-	{
-		std::deque<UUIDBasedRequest> skin_info_unavail_q;
-
-		LLMutexTrylock mtx_lock(mMutex);
-		if (mtx_lock.isLocked() && !mSkinUnavailableQ.empty())
+		if (!mSkinUnavailableQ.empty())
 		{
 			skin_info_unavail_q.swap(mSkinUnavailableQ);
-			mtx_lock.unlock();
-
-			// Process the elements free of the lock
-			for (const auto& skin_info : skin_info_unavail_q)
-			{
-				gMeshRepo.notifySkinInfoUnavailable(skin_info.mId);
-			}
 		}
-	}
 
-	if (!mDecompositionQ.empty())
-	{
-		std::deque<std::unique_ptr<LLModel::Decomposition>> decomp_q;
-
-		LLMutexTrylock mtx_lock(mMutex);
-		if (mtx_lock.isLocked() && !mDecompositionQ.empty())
+		if (!mDecompositionQ.empty())
 		{
 			decomp_q.swap(mDecompositionQ);
-			mtx_lock.unlock();
-
-			// Process the elements free of the lock
-			for (auto& decomp : decomp_q)
-			{
-				gMeshRepo.notifyDecompositionReceived(std::move(decomp));
-			}
 		}
-	}
 
-	if (!mPhysicsQ.empty())
-	{
-		std::deque<std::unique_ptr<LLModel::Decomposition>> physics_q;
-
-		LLMutexTrylock mtx_lock(mMutex);
-		if (mtx_lock.isLocked() && !mPhysicsQ.empty())
+		if (!mPhysicsQ.empty())
 		{
 			physics_q.swap(mPhysicsQ);
-			mtx_lock.unlock();
+		}
+	}
 
-			// Process the elements free of the lock
-			for (auto& decomp : physics_q)
+
+	if (!loaded_queue.empty())
+	{
+		update_metrics = true;
+
+		// Process the elements free of the lock
+		for (const auto& mesh : loaded_queue)
+		{
+			if (mesh.mVolume && mesh.mVolume->getNumVolumeFaces() > 0)
 			{
-				gMeshRepo.notifyPhysicsReceived(std::move(decomp));
+				gMeshRepo.notifyMeshLoaded(mesh.mMeshParams, mesh.mVolume);
+			}
+			else
+			{
+				gMeshRepo.notifyMeshUnavailable(mesh.mMeshParams,
+					LLVolumeLODGroup::getVolumeDetailFromScale(mesh.mVolume->getDetail()));
 			}
 		}
 	}
+
+	if (!unavil_queue.empty())
+	{
+		update_metrics = true;
+
+		// Process the elements free of the lock
+		for (const auto& req : unavil_queue)
+		{
+			gMeshRepo.notifyMeshUnavailable(req.mMeshParams, req.mLOD);
+		}
+	}
+
+
+
+	if (!skin_info_q.empty())
+	{
+		// Process the elements free of the lock
+		for (auto& skin_info : skin_info_q)
+		{
+			gMeshRepo.notifySkinInfoReceived(skin_info);
+		}
+	}
+
+	if (!skin_info_unavail_q.empty())
+	{
+		// Process the elements free of the lock
+		for (const auto& skin_info : skin_info_unavail_q)
+		{
+			gMeshRepo.notifySkinInfoUnavailable(skin_info.mId);
+		}
+	}
+
+	if (!decomp_q.empty())
+	{
+		// Process the elements free of the lock
+		for (auto& decomp : decomp_q)
+		{
+			gMeshRepo.notifyDecompositionReceived(std::move(decomp));
+		}
+	}
+
+
+	if (!physics_q.empty())
+	{
+		// Process the elements free of the lock
+		for (auto& decomp : physics_q)
+		{
+			gMeshRepo.notifyPhysicsReceived(std::move(decomp));
+		}
+	}
+
 
 	if (update_metrics)
 	{
