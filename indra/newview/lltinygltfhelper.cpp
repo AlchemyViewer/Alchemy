@@ -194,26 +194,23 @@ bool LLTinyGLTFHelper::loadModel(const std::string& filename, tinygltf::Model& m
         std::string        error_msg;
         std::string        warn_msg;
 
-        std::string filename_lc = filename;
-        LLStringUtil::toLower(filename_lc);
-
         // Load a tinygltf model fom a file. Assumes that the input filename has already been
         // been sanitized to one of (.gltf , .glb) extensions, so does a simple find to distinguish.
         bool decode_successful = false;
-        if (std::string::npos == filename_lc.rfind(".gltf"))
+        if (exten == "glb")
         {  // file is binary
-            decode_successful = loader.LoadBinaryFromFile(&model_in, &error_msg, &warn_msg, filename_lc);
+            decode_successful = loader.LoadBinaryFromFile(&model_in, &error_msg, &warn_msg, filename);
         }
         else
         {  // file is ascii
-            decode_successful = loader.LoadASCIIFromFile(&model_in, &error_msg, &warn_msg, filename_lc);
+            decode_successful = loader.LoadASCIIFromFile(&model_in, &error_msg, &warn_msg, filename);
         }
 
         if (!decode_successful)
         {
-            LL_WARNS("GLTF") << "Cannot load, error: Failed to decode" << error_msg
-                << ", warning:" << warn_msg
-                << " file: " << filename
+            LL_WARNS("GLTF") << "Cannot load, error: Failed to decode with error: '" << error_msg
+                << "', warning: '" << warn_msg
+                << "' file: " << filename
                 << LL_ENDL;
             return false;
         }
