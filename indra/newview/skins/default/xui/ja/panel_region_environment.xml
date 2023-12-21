@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="自然環境の設定" name="panel_env_info">
 	<string name="str_label_use_default">
-		既定の設定を使用
+		デフォルト設定を使用
 	</string>
 	<string name="str_label_use_region">
-		リージョンの設定を使用
+		リージョン設定を使用
 	</string>
 	<string name="str_altitude_desription">
 		空 [INDEX]（[ALTITUDE]ｍ）

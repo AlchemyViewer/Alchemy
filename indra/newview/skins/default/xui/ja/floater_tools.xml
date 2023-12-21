@@ -49,7 +49,7 @@
 		リンク数：
 	</floater.string>
 	<floater.string name="selected_faces">
-		面数：
+		面：
 	</floater.string>
 	<button name="button focus" tool_tip="注視"/>
 	<button name="button move" tool_tip="移動"/>
@@ -92,6 +92,7 @@
 	<check_box label="グリッドにスナップ" name="checkbox snap to grid"/>
 	<check_box label="ルートの軸を編集する" name="checkbox actual root"/>
 	<check_box label="選択のアウトラインを表示" name="checkbox selection"/>
+	<check_box label="反射プローブを選択する" name="checkbox select probes"/>
 	<button label="オプション…" label_selected="オプション…" name="Options..." tool_tip="グリッドオプションを表示します。"/>
 	<button name="ToolCube" tool_tip="立方体（キューブ）"/>
 	<button name="ToolPrism" tool_tip="三角柱（プリズム）"/>
@@ -395,7 +396,7 @@
 			<spinner label="Ｘ" name="Taper Scale X"/>
 			<spinner label="Ｙ" name="Taper Scale Y"/>
 			<text name="text topshear">
-				上部層
+				上部せん断
 			</text>
 			<spinner label="Ｘ" name="Shear X"/>
 			<spinner label="Ｙ" name="Shear Y"/>

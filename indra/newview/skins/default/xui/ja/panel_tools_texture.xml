@@ -40,7 +40,7 @@
 	</text>
 	<button name="edit_selected_pbr" label="選択を編集"/>
 	<button name="save_selected_pbr" label="インベントリに保存"/>
-	<texture_picker label="ディフューズ" name="texture control" tool_tip="クリックで画像を選択します。"/>
+	<texture_picker label="ディフューズ" name="texture control" tool_tip="クリックで拡散（ディフューズ）マップのテクスチャを選択します。"/>
 	<text name="label alphamode">
 		アルファモード
 	</text>
@@ -100,7 +100,7 @@
 		<combo_box.item label="なし" name="None" value="None"/>
 		<combo_box.item label="低" name="Low" value="Low"/>
 		<combo_box.item label="中" name="Medium" value="Medium"/>
-		<combo_box.item label="高い" name="High" value="High"/>
+		<combo_box.item label="高" name="High" value="High"/>
 	</combo_box>
 	<text name="label environment">
 		自然環境
@@ -149,11 +149,11 @@
 	<spinner label="垂直オフセット" name="gltfTextureOffsetV"/>
 	<!-- END PBR Material texture transform parameters -->
 	<check_box label="平面を揃える" name="checkbox planar align" tool_tip="テクスチャを最後に選択された面を基準に揃えます。平面テクスチャのマッピングが必要です。"/>
-	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同時に調整します。"/>
+	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同期させます。"/>
 	<button label="揃える" label_selected="揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
 	<web_browser name="title_media"/>
-	<button label="すべてを検索" name="btn_select_same_diff" tool_tip="この面と同じディフューズテクスチャを貼り付けた、すべての面を選択します。" />
-	<button label="すべてを検索" name="btn_select_same_norm" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。" />
-	<button label="すべてを検索" name="btn_select_same_spec" tool_tip="この面と同じ鏡面反射（スペキュラ）マップを貼り付けた、すべての面を選択します。"/>
-	<button label="すべてを検索" name="btn_select_same_pbr" tool_tip="この面と同じＰＢＲマテリアルを貼り付けた、すべての面を選択します。" />
+	<button label="全て検索" name="btn_select_same_diff" tool_tip="この面と同じディフューズ（拡散反射）マップを貼り付けた、すべての面を選択します。" />
+	<button label="全て検索" name="btn_select_same_norm" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。" />
+	<button label="全て検索" name="btn_select_same_spec" tool_tip="この面と同じ鏡面反射（スペキュラ）マップを貼り付けた、すべての面を選択します。"/>
+	<button label="全て検索" name="btn_select_same_pbr" tool_tip="この面と同じＰＢＲマテリアルを貼り付けた、すべての面を選択します。" />
 </panel>
