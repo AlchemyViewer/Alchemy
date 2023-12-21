@@ -4640,7 +4640,7 @@ void process_camera_constraint(LLMessageSystem *mesgsys, void **user_data)
 	LLVector4 cameraCollidePlane;
 	if(disable_sim_cam_constraint)
 	{
-		cameraCollidePlane.clearVec();	
+		cameraCollidePlane.zeroVec();
 	}
 	else
 	{
