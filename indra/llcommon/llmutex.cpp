@@ -31,65 +31,6 @@
 
 //============================================================================
 
-void LLMutex::lock()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	mMutex.lock();
-}
-
-void LLMutex::unlock()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	mMutex.unlock();
-}
-
-bool LLMutex::isLocked()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	if (!mMutex.try_lock())
-	{
-		return true;
-	}
-	else
-	{
-		mMutex.unlock();
-		return false;
-	}
-}
-
-bool LLMutex::try_lock()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	return mMutex.try_lock();
-}
-
-//============================================================================
-
-LLCondition::LLCondition() :
-	LLMutex()
-{
-}
-
-
-void LLCondition::wait()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	std::unique_lock<std::recursive_mutex> lock(mMutex);
-	mCond.wait(lock);
-}
-
-void LLCondition::signal()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	mCond.notify_one();
-}
-
-void LLCondition::broadcast()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-	mCond.notify_all();
-}
-
 //---------------------------------------------------------------------
 //
 // LLScopedLock

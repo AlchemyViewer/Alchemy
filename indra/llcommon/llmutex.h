@@ -48,11 +48,38 @@ class LL_COMMON_API LLMutex
 {
 public:
 	LLMutex() = default;
-	
-	void lock();		// blocks
-	bool try_lock();		// non-blocking, returns true if lock held.
-	void unlock();		// undefined behavior when called on mutex not being held
-	bool isLocked(); 	// non-blocking, but does do a lock/unlock so not free
+
+	void lock()		// blocks
+	{
+		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+		mMutex.lock();
+	}
+
+	bool try_lock()		// non-blocking, returns true if lock held.
+	{
+		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+		return mMutex.try_lock();
+	}
+
+	void unlock()		// undefined behavior when called on mutex not being held
+	{
+		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+		mMutex.unlock();
+	}
+
+	bool isLocked() 	// non-blocking, but does do a lock/unlock so not free
+	{
+		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+		if (!mMutex.try_lock())
+		{
+			return true;
+		}
+		else
+		{
+			mMutex.unlock();
+			return false;
+		}
+	}
 
 protected:
 	std::recursive_mutex	mMutex;
@@ -62,11 +89,29 @@ protected:
 class LL_COMMON_API LLCondition final : public LLMutex
 {
 public:
-	LLCondition();
+	LLCondition() :
+		LLMutex()
+	{
+	}
 	
-	void wait();		// blocks
-	void signal();
-	void broadcast();
+	void wait()		// blocks
+	{
+		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+		std::unique_lock<std::recursive_mutex> lock(mMutex);
+		mCond.wait(lock);
+	}
+
+	void signal()
+	{
+		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+		mCond.notify_one();
+	}
+
+	void broadcast()
+	{
+		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+		mCond.notify_all();
+	}
 	
 protected:
 	std::condition_variable_any mCond;
