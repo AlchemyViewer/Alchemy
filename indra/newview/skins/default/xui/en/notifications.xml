@@ -9163,7 +9163,7 @@ Select residents to share with.
     icon="alert.tga"
     type="alert">
       [LABEL] failed to upload: [MESSAGE]
-[DETAILS]See SecondLife.log for details
+[DETAILS]See Alchemy.log for details
   </notification>
 
   <notification
@@ -9172,7 +9172,7 @@ Select residents to share with.
     type="alert">
       [LABEL] failed to upload: [MESSAGE]
 
-See SecondLife.log for details
+See Alchemy.log for details
   </notification>
    
   <notification
