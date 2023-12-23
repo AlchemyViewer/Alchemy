@@ -27,6 +27,8 @@
 #ifndef LL_LLFLOATERIMNEARBYCHAT_H
 #define LL_LLFLOATERIMNEARBYCHAT_H
 
+#include "alchatcommand.h"
+#include "llagent.h"
 #include "llfloaterimsessiontab.h"
 #include "llcombobox.h"
 #include "llgesturemgr.h"
@@ -80,6 +82,9 @@ public:
 	static void sendChatFromViewer(const std::string &utf8text, EChatType type, BOOL animate);
 	static void sendChatFromViewer(const LLWString &wtext, EChatType type, BOOL animate);
 
+	template <class T>
+	static void processChat(T* editor, EChatType type);
+
 	static bool isWordsName(const std::string& name);
 
 	void showHistory();
@@ -100,7 +105,7 @@ protected:
 
 public:
 	static LLWString stripChannelNumber(const LLWString &mesg, S32* channel);
-	EChatType processChatTypeTriggers(EChatType type, std::string &str);
+	static EChatType processChatTypeTriggers(EChatType type, std::string &str);
 
 protected:
 	void displaySpeakingIndicator();
@@ -120,5 +125,55 @@ private:
 
 	boost::signals2::scoped_connection mChatChannelConnection;
 };
+
+template <class T>
+void LLFloaterIMNearbyChat::processChat(T* editor, EChatType type)
+{
+	if (editor)
+	{
+		LLWString text = editor->getWText();
+		LLWStringUtil::trim(text);
+		LLWStringUtil::replaceChar(text, 182, '\n'); // Convert paragraph symbols back into newlines.
+		if (!text.empty())
+		{
+			// Check if this is destined for another channel
+			S32 channel = 0;
+			stripChannelNumber(text, &channel);
+
+			std::string utf8text = wstring_to_utf8str(text);
+			// Try to trigger a gesture, if not chat to a script.
+			std::string utf8_revised_text;
+			if (0 == channel)
+			{
+				applyOOCClose(utf8text);
+				applyMUPose(utf8text);
+
+				// discard returned "found" boolean
+				if (!LLGestureMgr::instance().triggerAndReviseString(utf8text, &utf8_revised_text))
+				{
+					utf8_revised_text = utf8text;
+				}
+			}
+			else
+			{
+				utf8_revised_text = utf8text;
+			}
+
+			utf8_revised_text = utf8str_trim(utf8_revised_text);
+
+			type = processChatTypeTriggers(type, utf8_revised_text);
+
+			if (!utf8_revised_text.empty() && !ALChatCommand::parseCommand(utf8_revised_text))
+			{
+				// Chat with animation
+				sendChatFromViewer(utf8_revised_text, type, gSavedSettings.getBOOL("PlayTypingAnim"));
+			}
+		}
+
+		editor->setText(LLStringExplicit(""));
+	}
+
+	gAgent.stopTyping();
+}
 
 #endif // LL_LLFLOATERIMNEARBYCHAT_H

@@ -91,6 +91,7 @@
 #include "llagentbenefits.h"
 // [/SL:KB]
 #include "llbox.h"
+#include "llchatbar.h"
 #include "llchicletbar.h"
 #include "llconsole.h"
 #include "llviewercontrol.h"
@@ -3217,7 +3218,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 
 	if( keyboard_focus )
 	{
-		if ((focusedFloaterName == "nearby_chat") || (focusedFloaterName == "im_container") || (focusedFloaterName == "impanel"))
+		if ((focusedFloaterName == "chatbar") || (focusedFloaterName == "nearby_chat") || (focusedFloaterName == "im_container") || (focusedFloaterName == "impanel"))
 		{
 			if (gSavedSettings.getBOOL("ArrowKeysAlwaysMove"))
 			{
@@ -3292,24 +3293,37 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 	// If "Pressing letter keys starts local chat" option is selected, we are not in mouselook, 
 	// no view has keyboard focus, this is a printable character key (and no modifier key is 
 	// pressed except shift), then give focus to nearby chat (STORM-560)
-	static const LLCachedControl<S32> letter_keys_Focus_chat_bar(gSavedSettings, "LetterKeysFocusChatBar");
+	static const LLCachedControl<bool> letter_keys_Focus_chat_bar(gSavedSettings, "LetterKeysFocusChatBar");
 	if ( LLStartUp::getStartupState() >= STATE_STARTED && 
 		letter_keys_Focus_chat_bar && !gAgentCamera.cameraMouselook() &&
 		!keyboard_focus && key < 0x80 && (mask == MASK_NONE || mask == MASK_SHIFT) )
 	{
-		// Initialize nearby chat if it's missing
-		LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
-		if (!nearby_chat)
-		{	
-			LLSD name("im_container");
-			LLFloaterReg::toggleInstanceOrBringToFront(name);
-		}
-
-		LLChatEntry* chat_editor = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat")->getChatBox();
-		if (chat_editor)
+        static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+		if (!sChatInWindow)
 		{
-			// passing NULL here, character will be added later when it is handled by character handler.
-			nearby_chat->startChat(NULL);
+			// Initialize nearby chat if it's missing
+			LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
+			if (!nearby_chat)
+			{
+				LLSD name("im_container");
+				LLFloaterReg::toggleInstanceOrBringToFront(name);
+			}
+			
+			LLChatEntry* chat_editor = nearby_chat->getChatBox();
+			if (chat_editor)
+			{
+				// passing NULL here, character will be added later when it is handled by character handler.
+				nearby_chat->startChat(nullptr);
+				return TRUE;
+			}
+		}
+		else
+		{
+			LLChatBar* chat_bar = LLFloaterReg::findTypedInstance<LLChatBar>("chatbar");
+			if (!chat_bar)
+				LLFloaterReg::toggleInstanceOrBringToFront("chatbar");
+			
+			LLChatBar::startChat(nullptr);
 			return TRUE;
 		}
 	}

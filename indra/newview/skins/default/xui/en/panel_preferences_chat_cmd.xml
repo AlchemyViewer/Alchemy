@@ -172,7 +172,7 @@
         width="240"/>
     <!--home-->
     <text
-        top="-25"
+        top="-24"
         follows="left|top"
         left_delta="255"
         height="18"
@@ -264,6 +264,25 @@
         text_pad_left="5"
         name="AlchemyChatCommandResyncAnim"
         control_name="AlchemyChatCommandResyncAnim"
+        enabled_control="AlchemyChatCommandEnable"
+        width="240"/>
+    <!--Set Channel-->
+    <text
+        top_pad="5"
+        follows="left|top"
+        height="18"
+        name="calc_txt"
+        width="240">
+        Set Nearby Chat Channel
+    </text>
+    <line_editor
+        top_pad="0"
+        follows="left|top"
+        height="20"
+        max_length_chars="256"
+        text_pad_left="5"
+        name="AlchemyChatCommandSetChatChannel"
+        control_name="AlchemyChatCommandSetChatChannel"
         enabled_control="AlchemyChatCommandEnable"
         width="240"/>
     <!--rezplat-->

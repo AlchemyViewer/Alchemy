@@ -34,6 +34,7 @@
 #include "llmath.h"
 #include "llagent.h"
 #include "llagentcamera.h"
+#include "llchatbar.h"
 #include "llfloaterimnearbychat.h"
 #include "llfocusmgr.h"
 #include "llkeybind.h" // LLKeyData
@@ -669,7 +670,15 @@ bool start_chat( EKeystate s )
     if (KEYSTATE_DOWN != s) return true;
 
 	// start chat
-	LLFloaterIMNearbyChat::startChat(NULL);
+	static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+	if (!sChatInWindow)
+	{
+		LLFloaterIMNearbyChat::startChat(nullptr);
+	}
+	else
+	{
+		LLChatBar::startChat(nullptr);
+	}
 	return true;
 }
 
@@ -685,16 +694,31 @@ bool start_gesture( EKeystate s )
 	if (KEYSTATE_UP == s &&
 		! (focus_ctrlp && focus_ctrlp->acceptsTextInput()))
 	{
- 		if ((LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->getCurrentChat().empty())
- 		{
- 			// No existing chat in chat editor, insert '/'
- 			LLFloaterIMNearbyChat::startChat("/");
- 		}
- 		else
- 		{
- 			// Don't overwrite existing text in chat editor
- 			LLFloaterIMNearbyChat::startChat(NULL);
- 		}
+		static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+        if (!sChatInWindow)
+        {
+            if ((LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->getCurrentChat().empty())
+            {
+                // No existing chat in chat editor, insert '/'
+                LLFloaterIMNearbyChat::startChat("/");
+            }
+            else
+            {
+                // Don't overwrite existing text in chat editor
+                LLFloaterIMNearbyChat::startChat(nullptr);
+            }
+        }
+		else
+		{
+			if ((LLFloaterReg::getTypedInstance<LLChatBar>("chatbar"))->getCurrentChat().empty())
+			{
+				LLChatBar::startChat("/");
+			}
+			else
+			{
+				LLChatBar::startChat(nullptr);
+			}
+		}
 	}
 	return true;
 }

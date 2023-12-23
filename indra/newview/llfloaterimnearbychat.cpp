@@ -152,6 +152,7 @@ BOOL LLFloaterIMNearbyChat::postBuild()
 	mInputEditor->setFocusLostCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxFocusLost, this));
 	mInputEditor->setFocusReceivedCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxFocusReceived, this));
 	changeChannelLabel(gSavedSettings.getS32("AlchemyNearbyChatChannel"));
+	mInputEditor->setFont(LLViewerChat::getChatFont());
 
 	// Title must be defined BEFORE call to addConversationListItem() because
 	// it is used to show the item's name in the conversations list
@@ -491,10 +492,14 @@ void LLFloaterIMNearbyChat::onChatBoxKeystroke()
 
 	S32 length = raw_text.length();
 
-	if( (length > 0)
-	    && (raw_text[0] != '/')		// forward slash is used for escape (eg. emote) sequences
-		    && (raw_text[0] != ':')	// colon is used in for MUD poses
-	  )
+	//	if( (length > 0)
+	//	    && (raw_text[0] != '/')		// forward slash is used for escape (eg. emote) sequences
+	//		    && (raw_text[0] != ':')	// colon is used in for MUD poses
+	//	  )
+	// [RLVa:KB] - Checked: 2010-03-26 (RLVa-1.2.0b) | Modified: RLVa-1.0.0d
+// [RLVa:KB] - Checked: 2010-03-26 (RLVa-1.2.0b) | Modified: RLVa-1.0.0d
+	if ((length > 0) && (raw_text[0] != '/') && (raw_text[0] != ':') && (!RlvActions::hasBehaviour(RLV_BHVR_REDIRCHAT)))
+// [/RLVa:KB]
 	{
 		gAgent.startTyping();
 	}
@@ -519,6 +524,7 @@ void LLFloaterIMNearbyChat::onChatBoxKeystroke()
 	*/
 
 	KEY key = gKeyboard->currentKey();
+
 
 	// Ignore "special" keys, like backspace, arrows, etc.
 	if (gSavedSettings.getBOOL("ChatAutocompleteGestures")
@@ -603,51 +609,7 @@ EChatType LLFloaterIMNearbyChat::processChatTypeTriggers(EChatType type, std::st
 
 void LLFloaterIMNearbyChat::sendChat( EChatType type )
 {
-	if (mInputEditor)
-	{
-		LLWString text = mInputEditor->getWText();
-		LLWStringUtil::trim(text);
-		LLWStringUtil::replaceChar(text,182,'\n'); // Convert paragraph symbols back into newlines.
-		if (!text.empty())
-		{
-			// Check if this is destined for another channel
-			S32 channel = 0;
-			stripChannelNumber(text, &channel);
-			
-			std::string utf8text = wstring_to_utf8str(text);
-			// Try to trigger a gesture, if not chat to a script.
-			std::string utf8_revised_text;
-			if (0 == channel)
-			{
-				applyOOCClose(utf8text);
-                applyMUPose(utf8text);
-
-				// discard returned "found" boolean
-				if(!LLGestureMgr::instance().triggerAndReviseString(utf8text, &utf8_revised_text))
-				{
-					utf8_revised_text = utf8text;
-				}
-			}
-			else
-			{
-				utf8_revised_text = utf8text;
-			}
-
-			utf8_revised_text = utf8str_trim(utf8_revised_text);
-
-			type = processChatTypeTriggers(type, utf8_revised_text);
-
-			if (!utf8_revised_text.empty() && !ALChatCommand::parseCommand(utf8_revised_text))
-			{
-				// Chat with animation
-				sendChatFromViewer(utf8_revised_text, type, gSavedSettings.getBOOL("PlayTypingAnim"));
-			}
-		}
-
-		mInputEditor->setText(LLStringExplicit(""));
-	}
-
-	gAgent.stopTyping();
+	processChat(mInputEditor, type);
 
 	// If the user wants to stop chatting on hitting return, lose focus
 	// and go out of chat mode.

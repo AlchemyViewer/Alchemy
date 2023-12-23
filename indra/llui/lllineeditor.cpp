@@ -165,7 +165,8 @@ LLLineEditor::LLLineEditor(const LLLineEditor::Params& p)
 	mPreeditBgColor(p.preedit_bg_color()),
 	mGLFont(p.font),
 	mContextMenuHandle(),
-    mShowContextMenu(true)
+    mShowContextMenu(true),
+	mAutoreplaceCallback()
 {
 	llassert( mMaxLengthBytes > 0 );
 
@@ -1034,6 +1035,23 @@ void LLLineEditor::addChar(const llwchar uni_char)
 	else
 	{
 		LLUI::reportBadKeystroke();
+	}
+
+	if (!mReadOnly && mAutoreplaceCallback != NULL)
+	{
+		// autoreplace the text, if necessary
+		S32 replacement_start;
+		S32 replacement_length;
+		LLWString replacement_string;
+		S32 new_cursor_pos = mCursorPos;
+		mAutoreplaceCallback(replacement_start, replacement_length, replacement_string, new_cursor_pos, getWText());
+
+		if (replacement_length > 0 || !replacement_string.empty())
+		{
+			mText.erase(replacement_start, replacement_length);
+			mText.insert(replacement_start, replacement_string);
+			setCursor(new_cursor_pos);
+		}
 	}
 
 	getWindow()->hideCursorUntilMouseMove();
