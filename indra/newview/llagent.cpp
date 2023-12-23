@@ -5392,6 +5392,12 @@ void LLAgent::requestAgentUserInfoCoro(std::string capurl)
         return;
     }
 
+	if (result.size() == 0 || !result.isMap())
+	{
+		LL_WARNS("UserInfo") << "Failed to get user information." << LL_ENDL;
+		return;
+	}
+
     bool im_via_email = false;
     bool is_verified_email = false;
     std::string email;
@@ -5401,9 +5407,11 @@ void LLAgent::requestAgentUserInfoCoro(std::string capurl)
 		im_via_email = result["im_via_email"].asBoolean();
 
 	if (result.has("is_verified"))
-		im_via_email = result["is_verified"].asBoolean();
+		is_verified_email = result["is_verified"].asBoolean();
 
-    email = result["email"].asString();
+	if (result.has("email"))
+    	email = result["email"].asString();
+
     dir_visibility = result["directory_visibility"].asString();
 
     // TODO: This should probably be changed.  I'm not entirely comfortable 
