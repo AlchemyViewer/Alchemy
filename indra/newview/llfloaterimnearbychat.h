@@ -83,6 +83,7 @@ public:
 	static bool isWordsName(const std::string& name);
 
 	void showHistory();
+	void changeChannelLabel(S32 channel);
 
 protected:
 	static BOOL matchChatTypeTrigger(const std::string& in_str, std::string* out_str);
@@ -97,9 +98,11 @@ protected:
 	/*virtual*/ void onTearOffClicked();
 	/*virtual*/ void onClickCloseBtn(bool app_qutting = false);
 
+public:
 	static LLWString stripChannelNumber(const LLWString &mesg, S32* channel);
 	EChatType processChatTypeTriggers(EChatType type, std::string &str);
 
+protected:
 	void displaySpeakingIndicator();
 
 	// Which non-zero channel did we last chat on?
@@ -114,6 +117,8 @@ private:
 	/*virtual*/ void refresh();
 
 	std::vector<LLChat> mMessageArchive;
+
+	boost::signals2::scoped_connection mChatChannelConnection;
 };
 
 #endif // LL_LLFLOATERIMNEARBYCHAT_H

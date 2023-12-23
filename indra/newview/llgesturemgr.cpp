@@ -1018,8 +1018,7 @@ void LLGestureMgr::runStep(LLMultiGesture* gesture, LLGestureStep* step)
 
 			if(!chat_text.empty() && !ALChatCommand::parseCommand(chat_text))
 			{
-				(LLFloaterReg::getTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))->
-						sendChatFromViewer(chat_text, CHAT_TYPE_NORMAL, animate);
+				LLFloaterIMNearbyChat::sendChatFromViewer(chat_text, CHAT_TYPE_NORMAL, animate);
 			}
 
 			gesture->mCurrentStep++;

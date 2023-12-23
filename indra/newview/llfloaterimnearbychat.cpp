@@ -119,6 +119,8 @@ LLFloaterIMNearbyChat::LLFloaterIMNearbyChat(const LLSD& llsd)
 	mEnableCallbackRegistrar.add("Avatar.CheckGearItem", boost::bind(&cb_do_nothing));
 
     mMinFloaterHeight = EXPANDED_MIN_HEIGHT;
+
+	mChatChannelConnection = gSavedSettings.getControl("AlchemyNearbyChatChannel")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) { changeChannelLabel(newval.asInteger()); });
 }
 
 //static
@@ -149,7 +151,7 @@ BOOL LLFloaterIMNearbyChat::postBuild()
 	mInputEditor->setKeystrokeCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxKeystroke, this));
 	mInputEditor->setFocusLostCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxFocusLost, this));
 	mInputEditor->setFocusReceivedCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxFocusReceived, this));
-	mInputEditor->setLabel(LLTrans::getString("NearbyChatTitle"));
+	changeChannelLabel(gSavedSettings.getS32("AlchemyNearbyChatChannel"));
 
 	// Title must be defined BEFORE call to addConversationListItem() because
 	// it is used to show the item's name in the conversations list
@@ -717,6 +719,18 @@ void LLFloaterIMNearbyChat::displaySpeakingIndicator()
 	}
 }
 
+void LLFloaterIMNearbyChat::changeChannelLabel(S32 channel)
+{
+	if (channel == 0)
+		mInputEditor->setLabel(LLTrans::getString("NearbyChatTitle"));
+	else
+	{
+		LLStringUtil::format_map_t args;
+		args["CHANNEL"] = llformat("%d", channel);
+		mInputEditor->setLabel(LLTrans::getString("NearbyChatTitleChannel", args));
+	}
+}
+
 void LLFloaterIMNearbyChat::sendChatFromViewer(const std::string &utf8text, EChatType type, BOOL animate)
 {
 	sendChatFromViewer(utf8str_to_wstring(utf8text), type, animate);
@@ -725,7 +739,7 @@ void LLFloaterIMNearbyChat::sendChatFromViewer(const std::string &utf8text, ECha
 void LLFloaterIMNearbyChat::sendChatFromViewer(const LLWString &wtext, EChatType type, BOOL animate)
 {
 	// Look for "/20 foo" channel chats.
-	S32 channel = 0;
+	S32 channel = gSavedSettings.getS32("AlchemyNearbyChatChannel");
 	LLWString out_text = stripChannelNumber(wtext, &channel);
 	std::string utf8_out_text = wstring_to_utf8str(out_text);
 	std::string utf8_text = wstring_to_utf8str(wtext);
@@ -857,8 +871,6 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
 	{
 		// This a special "/20" speak on a channel
 		S32 pos = 0;
-		if(mesg[1] == '-')
-			pos++;
 
 		// Copy the channel number into a string
 		LLWString channel_string;
@@ -881,8 +893,6 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
 		}
 		
 		sLastSpecialChatChannel = strtol(wstring_to_utf8str(channel_string).c_str(), NULL, 10);
-		if(mesg[1] == '-')
-			sLastSpecialChatChannel = -sLastSpecialChatChannel;
 		*channel = sLastSpecialChatChannel;
 		return mesg.substr(pos, mesg.length() - pos);
 	}
