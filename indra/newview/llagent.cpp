@@ -2448,6 +2448,18 @@ void LLAgent::endAnimationUpdateUI()
 			{
 				skip_list.insert(LLFloaterReg::findInstance("beacons"));
 			}
+			if (LLFloaterReg::findInstance("nearby_chat"))
+			{
+				skip_list.insert(LLFloaterReg::findInstance("nearby_chat"));
+			}
+			if (LLFloaterReg::findInstance("stats"))
+			{
+				skip_list.insert(LLFloaterReg::findInstance("stats"));
+			}
+			if (LLFloaterReg::findInstance("chatbar"))
+			{
+				skip_list.insert(LLFloaterReg::findInstance("chatbar"));
+			}
 			LLFloaterIMContainer* im_box = LLFloaterReg::getTypedInstance<LLFloaterIMContainer>("im_container");
 			LLFloaterIMContainer::floater_list_t conversations;
 			im_box->getDetachedConversationFloaters(conversations);
@@ -2568,8 +2580,11 @@ void LLAgent::endAnimationUpdateUI()
 		LLFloaterReg::hideVisibleInstances(exceptions);
 #else // Use this for now
 		LLFloaterView::skip_list_t skip_list;
+		skip_list.insert(LLFloaterReg::findInstance("beacons")); // <alchemy/>
 		skip_list.insert(LLFloaterReg::findInstance("mini_map"));
-		skip_list.insert(LLFloaterReg::findInstance("beacons"));
+		skip_list.insert(LLFloaterReg::findInstance("nearby_chat"));
+		skip_list.insert(LLFloaterReg::findInstance("stats")); // <alchemy/>
+		skip_list.insert(LLFloaterReg::findInstance("chatbar")); // <alchemy/>
 		gFloaterView->pushVisibleAll(FALSE, skip_list);
 #endif
 
