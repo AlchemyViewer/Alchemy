@@ -603,9 +603,12 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 			&& gSavedSettings.getBOOL("UseChatBubbles") )
 		|| mChannel.isDead()
 		|| !mChannel.get()->getShowToasts() )
-		&& nearby_chat->isMessagePaneExpanded())
-		// to prevent toasts in Do Not Disturb mode
-		return;//no need in toast if chat is visible or if bubble chat is enabled
+		|| nearby_chat->isMessagePanelVisible())
+		// <RYE>
+		// no need to toast if bubble chat is enabled or nearby chat toasts are disabled
+		// or if in Do Not Disturb mode
+		// or if conversation is visible and selected and not collapsed
+		return;
 
 	// arrange a channel on a screen
 	if(!mChannel.get()->getVisible())
@@ -644,37 +647,38 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 			toast_msg = chat_msg.mText;
 		}
 
-		bool chat_overlaps = false;
-		if(nearby_chat->getChatHistory())
-		{
-			LLRect chat_rect = nearby_chat->getChatHistory()->calcScreenRect();
-			for (std::list<LLView*>::const_iterator child_iter = gFloaterView->getChildList()->begin();
-				 child_iter != gFloaterView->getChildList()->end(); ++child_iter)
-			{
-				LLView *view = *child_iter;
-				const LLRect& rect = view->getRect();
-				if(view->isInVisibleChain() && (rect.overlaps(chat_rect)))
-				{
-					if(!nearby_chat->getChatHistory()->hasAncestor(view))
-					{
-						chat_overlaps = true;
-					}
-					break;
-				}
-			}
-		}
-		//Don't show nearby toast, if conversation is visible and selected
-		if ((nearby_chat->hasFocus()) ||
-			(LLFloater::isVisible(nearby_chat) && nearby_chat->isTornOff() && !nearby_chat->isMinimized()) ||
-		    ((im_box->getSelectedSession().isNull() && !chat_overlaps &&
-				((LLFloater::isVisible(im_box) && !nearby_chat->isTornOff() && !im_box->isMinimized())
-						|| (LLFloater::isVisible(nearby_chat) && nearby_chat->isTornOff() && !nearby_chat->isMinimized())))))
-		{
-			if(nearby_chat->isMessagePaneExpanded())
-			{
-				return;
-			}
-		}
+		// This is insane.
+		//bool chat_overlaps = false;
+		//if(nearby_chat->getChatHistory())
+		//{
+		//	LLRect chat_rect = nearby_chat->getChatHistory()->calcScreenRect();
+		//	for (std::list<LLView*>::const_iterator child_iter = gFloaterView->getChildList()->begin();
+		//		 child_iter != gFloaterView->getChildList()->end(); ++child_iter)
+		//	{
+		//		LLView *view = *child_iter;
+		//		const LLRect& rect = view->getRect();
+		//		if(view->isInVisibleChain() && (rect.overlaps(chat_rect)))
+		//		{
+		//			if(!nearby_chat->getChatHistory()->hasAncestor(view))
+		//			{
+		//				chat_overlaps = true;
+		//			}
+		//			break;
+		//		}
+		//	}
+		//}
+		////Don't show nearby toast, if conversation is visible and selected
+		//if ((nearby_chat->hasFocus()) ||
+		//	(LLFloater::isVisible(nearby_chat) && nearby_chat->isTornOff() && !nearby_chat->isMinimized()) ||
+		//    ((im_box->getSelectedSession().isNull() && !chat_overlaps &&
+		//		((LLFloater::isVisible(im_box) && !nearby_chat->isTornOff() && !im_box->isMinimized())
+		//				|| (LLFloater::isVisible(nearby_chat) && nearby_chat->isTornOff() && !nearby_chat->isMinimized())))))
+		//{
+		//	if(nearby_chat->isMessagePaneExpanded())
+		//	{
+		//		return;
+		//	}
+		//}
 
         //Will show toast when chat preference is set        
         if((gSavedSettings.getString("NotificationNearbyChatOptions") == "toast") || !nearby_chat->isMessagePaneExpanded())
