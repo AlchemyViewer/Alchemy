@@ -295,7 +295,7 @@ void LLFloaterIMNearbyChat::setVisible(BOOL visible)
 {
 	LLFloaterIMSessionTab::setVisible(visible);
 
-	if(visible)
+	if(visible && isMessagePaneExpanded())
 	{
 		removeScreenChat();
 	}
@@ -306,7 +306,7 @@ void LLFloaterIMNearbyChat::setVisibleAndFrontmost(BOOL take_focus, const LLSD& 
 {
 	LLFloaterIMSessionTab::setVisibleAndFrontmost(take_focus, key);
 
-	if(matchesKey(key))
+	if(!isTornOff() && matchesKey(key))
 	{
 		LLFloaterIMContainer::getInstance()->selectConversationPair(mSessionID, true, take_focus);
 	}
@@ -632,6 +632,10 @@ void LLFloaterIMNearbyChat::sendChat( EChatType type )
 	if (gSavedSettings.getBOOL("CloseChatOnReturn"))
 	{
 		stopChat();
+		if (isTornOff())
+		{
+			closeHostedFloater();
+		}
 	}
 }
 
