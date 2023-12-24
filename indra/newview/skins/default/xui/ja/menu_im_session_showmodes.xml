@@ -6,5 +6,8 @@
 	<menu_item_check name="IMShowTime" label="発言時刻を表示"/>
 	<menu_item_check name="IMShowNamesForP2PConv" label="１対１の会話で名前を表示"/>
 	<menu_item_separator/>
+	<menu_item_check label="「:」を「/me」として扱う" name="EnableMUPoseChat"/>
+	<menu_item_check label="((ＯＯＣ))で自動的にカッコを閉じる parentheses" name="EnableAutoCloseOOC"/>
+	<menu_item_separator/>
 	<menu_item_check label="チャットのアラート…" name="Chat Alerts"/>
 </toggleable_menu>
