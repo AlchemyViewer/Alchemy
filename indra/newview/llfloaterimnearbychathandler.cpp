@@ -679,7 +679,8 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 		//}
 
         //Will show toast when chat preference is set        
-        if((gSavedSettings.getString("NotificationNearbyChatOptions") == "toast") || !nearby_chat->isMessagePanelVisible())
+		static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+        if((gSavedSettings.getString("NotificationNearbyChatOptions") == "toast") || (sChatInWindow))
         {
             // Add a nearby chat toast.
             LLUUID id;
