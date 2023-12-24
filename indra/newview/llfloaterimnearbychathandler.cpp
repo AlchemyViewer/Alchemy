@@ -597,8 +597,6 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 	// Send event on to LLEventStream
 	sChatWatcher->post(chat);
 
-    LLFloaterIMContainer* im_box = LLFloaterReg::getTypedInstance<LLFloaterIMContainer>("im_container");
-
 	if((  ( chat_msg.mSourceType == CHAT_SOURCE_AGENT
 			&& gSavedSettings.getBOOL("UseChatBubbles") )
 		|| mChannel.isDead()
@@ -681,7 +679,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 		//}
 
         //Will show toast when chat preference is set        
-        if((gSavedSettings.getString("NotificationNearbyChatOptions") == "toast") || !nearby_chat->isMessagePaneExpanded())
+        if((gSavedSettings.getString("NotificationNearbyChatOptions") == "toast") || !nearby_chat->isMessagePanelVisible())
         {
             // Add a nearby chat toast.
             LLUUID id;
