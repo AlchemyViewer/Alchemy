@@ -983,7 +983,8 @@ void LLFloaterIMSessionTab::onOpen(const LLSD& key)
 	{
 		LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(getHost());
 		// Show the messages pane when opening a floater hosted in the Conversations
-		host_floater->collapseMessagesPane(false);
+		if (host_floater)
+            host_floater->collapseMessagesPane(false);
 	}
 
 	mInputButtonPanel->setVisible(isTornOff());

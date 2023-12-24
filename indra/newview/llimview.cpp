@@ -349,17 +349,23 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
 		&& !is_session_focused
 		&& !is_dnd_msg) //prevent flashing FUI button because the conversation floater will have already opened
 	{
-		if(!LLMuteList::getInstance()->isMuted(participant_id))
-    {
-			if(!gAgent.isDoNotDisturb())
-    	{
-				gToolBarView->flashCommand(LLCommandId("chat"), true, im_box->isMinimized());
-    	}
-			else
+		// Prevent flashing for nearby chat when chat bar is active
+		static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+		if (!sChatInWindow
+			|| (participant_id.notNull() && session_id.notNull()))
+		{
+			if (!LLMuteList::getInstance()->isMuted(participant_id))
 			{
-				store_dnd_message = true;
+				if (!gAgent.isDoNotDisturb())
+				{
+					gToolBarView->flashCommand(LLCommandId("chat"), true, im_box->isMinimized());
+				}
+				else
+				{
+					store_dnd_message = true;
+				}
 			}
-    }
+		}
 	}
 
     // 4. Toast
