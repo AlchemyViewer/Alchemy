@@ -366,7 +366,7 @@ public:
 	virtual void    setDocked(bool docked, bool pop_on_undock = true);
 
 	virtual void    setTornOff(bool torn_off) { mTornOff = torn_off; }
-	bool isTornOff() {return mTornOff;}
+	bool isTornOff() const {return mTornOff;}
 	void setOpenPositioning(LLFloaterEnums::EOpenPositioning pos) {mPositioning = pos;}
 
 

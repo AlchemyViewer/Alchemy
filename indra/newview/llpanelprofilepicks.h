@@ -229,7 +229,6 @@ protected:
     LLTextureCtrl*      mSnapshotCtrl;
     LLLineEditor*       mPickName;
     LLTextEditor*       mPickDescription;
-    LLButton*           mSetCurrentLocationButton;
     LLButton*           mSaveButton;
     LLButton*           mCreateButton;
     LLButton*           mCancelButton;
