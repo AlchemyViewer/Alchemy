@@ -1250,11 +1250,6 @@ void LLPanelObject::getState( )
 	mLabelRevolutions->setVisible( revolutions_visible );
 	mSpinRevolutions ->setVisible( revolutions_visible );
 
-	mCtrlSculptTexture->setVisible(sculpt_texture_visible);
-	mLabelSculptType->setVisible(sculpt_texture_visible);
-	mCtrlSculptType->setVisible(sculpt_texture_visible);
-
-
 	// sculpt texture
 	if (selected_item == MI_SCULPT)
 	{
@@ -1314,12 +1309,12 @@ void LLPanelObject::getState( )
 			if (mCtrlSculptInvert)
 			{
 				mCtrlSculptInvert->set(sculpt_invert);
-				mCtrlSculptInvert->setEnabled(editable);
+				mCtrlSculptInvert->setEnabled(editable && !isMesh);
 			}
 
 			if (mLabelSculptType)
 			{
-				mLabelSculptType->setEnabled(TRUE);
+				mLabelSculptType->setEnabled(TRUE && !isMesh);
 			}
 			
 		}
@@ -1329,6 +1324,9 @@ void LLPanelObject::getState( )
 		mSculptTextureRevert = LLUUID::null;		
 	}
 
+	mCtrlSculptTexture->setVisible(sculpt_texture_visible && !isMesh);
+	mLabelSculptType->setVisible(sculpt_texture_visible && !isMesh);
+	mCtrlSculptType->setVisible(sculpt_texture_visible && !isMesh);
 	mCtrlSculptMirror->setVisible(sculpt_texture_visible && !isMesh);
 	mCtrlSculptInvert->setVisible(sculpt_texture_visible && !isMesh);
 

@@ -52,6 +52,13 @@ public:
 	BOOL		handleKeyHere(KEY key, MASK mask) override;
 	void		onFocusLost() override;
 
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+	/*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
+
+	typedef boost::signals2::signal<void (LLUICtrl* ctrl, S32 width, S32 height)> reshape_signal_t;
+	boost::signals2::connection setReshapeCallback(const reshape_signal_t::slot_type& cb);
+// [/SL:KB]
+
 	void		refresh() override;
 	void		refreshGestures();
 
@@ -93,6 +100,10 @@ protected:
 	LLComboBox*		mGestureCombo;
 
 	LLChatBarGestureObserver* mObserver;
+
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+	reshape_signal_t*		mReshapeSignal = nullptr;
+// [/SL:KB]
 
 	boost::signals2::connection mChatFontSizeConnection;
 };

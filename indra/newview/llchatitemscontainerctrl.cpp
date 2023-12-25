@@ -379,7 +379,10 @@ void	LLFloaterIMNearbyChatToastPanel::snapToMessageHeight	()
 
 	panel_rect.setLeftTopAndSize( panel_rect.mLeft, panel_rect.mTop, panel_rect.getWidth(), new_height);
 	
-	reshape( getRect().getWidth(), getRect().getHeight(), 1);
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-08-27 (Catznip-2.1)
+	reshape( panel_rect.getWidth(), panel_rect.getHeight(), 1);
+// [/SL:KB]
+//	reshape( getRect().getWidth(), getRect().getHeight(), 1);
 	
 	setRect(panel_rect);
 
