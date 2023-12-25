@@ -106,6 +106,9 @@ LLFloaterIMNearbyChat::LLFloaterIMNearbyChat(const LLSD& llsd)
 :	LLFloaterIMSessionTab(LLSD(LLUUID::null)),
 	//mOutputMonitor(NULL),
 	mSpeakerMgr(NULL),
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+	mReshapeSignal(NULL),
+// [/SL:KB]
 	mExpandedHeight(COLLAPSED_HEIGHT + EXPANDED_HEIGHT)
 {
     mIsP2PChat = false;
@@ -122,6 +125,14 @@ LLFloaterIMNearbyChat::LLFloaterIMNearbyChat(const LLSD& llsd)
 
 	mChatChannelConnection = gSavedSettings.getControl("AlchemyNearbyChatChannel")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) { changeChannelLabel(newval.asInteger()); });
 }
+
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+LLFloaterIMNearbyChat::~LLFloaterIMNearbyChat()
+{
+	delete mReshapeSignal;
+	mChatChannelConnection.disconnect();
+}
+// [/SL:KB]
 
 //static
 LLFloaterIMNearbyChat* LLFloaterIMNearbyChat::buildFloater(const LLSD& key)
@@ -295,7 +306,7 @@ void LLFloaterIMNearbyChat::setVisible(BOOL visible)
 {
 	LLFloaterIMSessionTab::setVisible(visible);
 
-	if(visible && isMessagePaneExpanded())
+	if(visible && isMessagePaneExpanded()) // <alchemy/>
 	{
 		removeScreenChat();
 	}
@@ -306,7 +317,7 @@ void LLFloaterIMNearbyChat::setVisibleAndFrontmost(BOOL take_focus, const LLSD& 
 {
 	LLFloaterIMSessionTab::setVisibleAndFrontmost(take_focus, key);
 
-	if(!isTornOff() && matchesKey(key))
+	if(!isTornOff() && matchesKey(key)) // <alchemy/>
 	{
 		LLFloaterIMContainer::getInstance()->selectConversationPair(mSessionID, true, take_focus);
 	}
@@ -406,6 +417,28 @@ bool LLFloaterIMNearbyChat::isChatVisible() const
 
 	return isVisible;
 }
+
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+// virtual
+void LLFloaterIMNearbyChat::reshape(S32 width, S32 height, BOOL called_from_parent)
+{
+	LLFloater::reshape(width, height, called_from_parent);
+
+	if (mReshapeSignal)
+	{
+		(*mReshapeSignal)(this, width, height);
+	}
+}
+
+boost::signals2::connection LLFloaterIMNearbyChat::setReshapeCallback(const reshape_signal_t::slot_type& cb)
+{
+	if (!mReshapeSignal)
+	{
+		mReshapeSignal = new reshape_signal_t();
+	}
+	return mReshapeSignal->connect(cb); 
+}
+// [/SL:KB]
 
 void LLFloaterIMNearbyChat::showHistory()
 {

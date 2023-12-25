@@ -108,6 +108,10 @@ LLChatBar::~LLChatBar()
 	LLGestureMgr::instance().removeObserver(mObserver);
 	delete mObserver;
 	mObserver = nullptr;
+
+	delete mReshapeSignal;
+	mReshapeSignal = nullptr;
+
 	if (mChatFontSizeConnection.connected())
 		mChatFontSizeConnection.disconnect();
 	// LLView destructor cleans up children
@@ -477,3 +481,25 @@ void LLChatBar::onCommitGesture(LLUICtrl* ctrl)
 		mGestureCombo->setFocus(FALSE);
 	}
 }
+
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+// virtual
+void LLChatBar::reshape(S32 width, S32 height, BOOL called_from_parent)
+{
+	LLFloater::reshape(width, height, called_from_parent);
+
+	if (mReshapeSignal)
+	{
+		(*mReshapeSignal)(this, width, height);
+	}
+}
+
+boost::signals2::connection LLChatBar::setReshapeCallback(const reshape_signal_t::slot_type& cb)
+{
+	if (!mReshapeSignal)
+	{
+		mReshapeSignal = new reshape_signal_t();
+	}
+	return mReshapeSignal->connect(cb);
+}
+// [/SL:KB]

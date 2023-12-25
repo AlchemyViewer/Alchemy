@@ -7836,6 +7836,39 @@
       <key>Value</key>
       <integer>23</integer>
     </map>
+	<key>NearbyToastHeightRatio</key>
+	<map>
+		<key>Comment</key>
+		<string>Percentage of the window height that nearby chat toasts can appear in</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>S32</string>
+		<key>Value</key>
+		<integer>85</integer>
+	</map>
+	<key>NearbyToastOffset</key>
+	<map>
+		<key>Comment</key>
+		<string>Nearby chat toast offset from the bottom of the screen</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>S32</string>
+		<key>Value</key>
+		<integer>70</integer>
+	</map>
+	<key>NearbyToastWidth</key>
+	<map>
+		<key>Comment</key>
+		<string>Width of the nearby chat toasts (or 0 to have the toasts follow the width of the chat bar)</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>S32</string>
+		<key>Value</key>
+		<integer>0</integer>
+	</map>
     <key>StartUpToastLifeTime</key>
     <map>
       <key>Comment</key>
