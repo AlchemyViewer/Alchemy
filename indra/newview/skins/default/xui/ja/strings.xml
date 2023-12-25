@@ -6561,7 +6561,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		[SOURCES]は、何か新しいことを言いました。
 	</string>
 	<string name="teleport_preamble_compact_chat">
-		あなたは現在、
+		現在地：
 	</string>
 	<string name="session_initialization_timed_out_error">
 		セッションの初期化がタイムアウトしました。
