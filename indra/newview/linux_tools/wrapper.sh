@@ -47,6 +47,9 @@ export SDL_VIDEO_X11_WMCLASS=Alchemy
 ## - Enable threaded mesa GL impl
 export mesa_glthread=true
 
+## - Enable nvidia threaded GL
+export __GL_THREADED_OPTIMIZATIONS=1
+
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
 
