@@ -136,6 +136,8 @@
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="full_name"/>
+      <menu_item_call.on_enable
+       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy Display Name"
@@ -143,6 +145,8 @@
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="display_name"/>
+      <menu_item_call.on_enable
+       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy Agent Name"
@@ -150,17 +154,12 @@
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="user_name"/>
+      <menu_item_call.on_enable
+       function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy SLurl"
      name="copy_slurl">
-      <menu_item_call.on_click
-       function="Avatar.CopyData"
-       parameter="slurl"/>
-    </menu_item_call>
-    <menu_item_call
-     label="Copy SLurl"
-     name="Copy SLurl">
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="slurl"/>
