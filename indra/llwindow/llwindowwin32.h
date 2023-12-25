@@ -244,7 +244,6 @@ protected:
 	BOOL			mMouseVanish;
 private:
 	HMODULE mOpenGL32DLL;
-
     // Cached values of GetWindowRect and GetClientRect to be used by app thread
     void updateWindowRect();
     RECT mRect; 
