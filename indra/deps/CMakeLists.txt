@@ -79,7 +79,7 @@ if(USE_NFD)
   FetchContent_Declare(
     nfd
     GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
-    GIT_TAG        v1.1.0
+    GIT_TAG        v1.1.1
     )
 
   set(NFD_PORTAL ON)
