@@ -738,7 +738,7 @@ void send_viewer_stats(bool include_preferences)
         // The 32-bit and 64-bit versions normally exist in:
         //     C:\Windows\System32
         //     C:\Windows\SysWOW64
-        HMODULE vulkan_loader = LoadLibraryA("vulkan-1.dll");
+        HMODULE vulkan_loader = LoadLibrary(TEXT("vulkan-1.dll"));
         if (NULL != vulkan_loader)
         {
             vulkan_detected = true;

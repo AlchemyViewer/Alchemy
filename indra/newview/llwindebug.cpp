@@ -105,10 +105,10 @@ void  LLWinDebug::initSingleton()
 		std::string local_dll_name = gDirUtilp->findFile("dbghelp.dll", gDirUtilp->getWorkingDir(), gDirUtilp->getExecutableDir());
 
 		HMODULE hDll = NULL;
-		hDll = LoadLibraryA(local_dll_name.c_str());
+		hDll = LoadLibrary(ll_convert_string_to_wide(local_dll_name).c_str());
 		if (!hDll)
 		{
-			hDll = LoadLibrary(L"dbghelp.dll");
+			hDll = LoadLibrary(TEXT("dbghelp.dll"));
 		}
 
 		if (!hDll)
@@ -155,7 +155,7 @@ void LLWinDebug::writeDumpToFile(MINIDUMP_TYPE type, MINIDUMP_EXCEPTION_INFORMAT
 		{
 			std::string dump_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, filename);
 
-			HANDLE hFile = CreateFileA(dump_path.c_str(),
+			HANDLE hFile = CreateFileW(ll_convert_string_to_wide(dump_path).c_str(),
 										GENERIC_WRITE,
 										FILE_SHARE_WRITE,
 										NULL,
