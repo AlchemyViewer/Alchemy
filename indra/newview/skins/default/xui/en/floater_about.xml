@@ -47,7 +47,7 @@
        left="20"
        mouse_opaque="true"
        name="discord_icon"
-       tooltip="[APP_NAME] on Discord"
+       tool_tip="[APP_NAME] on Discord"
        top="140"
        width="42">
         <icon.commit_callback
@@ -63,7 +63,7 @@
        left_pad="20"
        mouse_opaque="true"
        name="mastodon_icon"
-       tooltip="[APP_NAME] on Mastodon"
+       tool_tip="[APP_NAME] on Mastodon"
        top="140"
        width="30">
         <icon.commit_callback
