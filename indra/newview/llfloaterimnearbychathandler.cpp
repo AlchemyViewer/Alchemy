@@ -533,7 +533,7 @@ S32 LLFloaterIMNearbyChatScreenChannel::getToastWidth()
 				// We're using the width of the nearby chat floater since it'll be nearly the width of the nearby chat bar anyway
 				if ((!pNearbyChat->isMinimized()) && ((pNearbyChat->isTornOff()) || (!pNearbyChat->getHost()) || (!pNearbyChat->getHost()->isMinimized())))
 				{
-					s_nLastToastWidth = llmax(pNearbyChat->getRect().getWidth(), 350);
+					s_nLastToastWidth = llmax(pNearbyChat->getRect().getWidth(), 400);
 				}
 			}
 		}
@@ -550,7 +550,7 @@ S32 LLFloaterIMNearbyChatScreenChannel::getToastWidth()
 				// We're using the width of the chatbar floater
 				//if ((!pNearbyChat->isMinimized()) && ((pNearbyChat->isTornOff()) || (!pNearbyChat->getHost()) || (!pNearbyChat->getHost()->isMinimized())))
 				{
-					s_nLastToastWidth = llmax(pNearbyChat->getRect().getWidth(), 350);
+					s_nLastToastWidth = llmax(pNearbyChat->getRect().getWidth(), 400);
 				}
 			}
 		}
