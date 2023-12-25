@@ -19,7 +19,14 @@
 	<floater.string name="RegionNameMsg">
 		リージョン：[REGION_NAME]
 	</floater.string>
-	<floater.string name="ToolTipMsg">[REGION]（ダブルクリックでマップを表示。Shift＋ドラッグで水平・垂直移動）
+	<floater.string name="ToolTipHintMsg">
+		ダブルクリックでマップを開く
+	</floater.string>
+	<floater.string name="AltToolTipHintMsg">
+		ダブルクリックでテレポート
+	</floater.string>
+	<floater.string name="ToolTipMsg">
+		[REGION]（ダブルクリックでマップを表示。Shift＋ドラッグで水平・垂直移動）
 	</floater.string>
 	<floater.string name="AltToolTipMsg">
 		[REGION]（ダブルクリックでテレポート。Shift＋ドラッグで水平・垂直移動）

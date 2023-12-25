@@ -1,8 +1,24 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="テクスチャ" name="Texture">
+	<panel.string name="paste_error_face_selection_mismatch">
+		複数の面をコピーしたい場合は、対象オブジェクトは同じ数の面が選択されていなければなりません。
+	</panel.string>
+	<panel.string name="paste_error_object_face_count_mismatch">
+		オブジェクトの全ての面をコピーしたい場合は、対象オブジェクトの面数が同じでなければなりません。
+	</panel.string>
+	<panel.string name="paste_error_inventory_not_found">
+		インベントリに１つ以上のテクスチャがありません。
+	</panel.string>
+	<panel.string name="paste_options">
+		ペースト時のオプション
+	</panel.string>
+	<button name="copy_color_btn" tool_tip="色のパラメータをコピーします。"/>
+	<button name="paste_color_btn" tool_tip="色のパラメータをペーストします。"/>
+	<button name="pipette_color_btn" tool_tip="ピペットツールで色のパラメータをペーストします。"/>
 	<text name="color label">
 		色
 	</text>
+	<!-- label is blank because control places it below the box -->
 	<color_swatch label="" name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます。"/>
 	<text name="color trans">
 		透過度
@@ -152,8 +168,8 @@
 	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同期させます。"/>
 	<button label="揃える" label_selected="揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
 	<web_browser name="title_media"/>
-	<button label="全て検索" name="btn_select_same_diff" tool_tip="この面と同じディフューズ（拡散反射）マップを貼り付けた、すべての面を選択します。" />
-	<button label="全て検索" name="btn_select_same_norm" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。" />
+	<button label="全て検索" name="btn_select_same_diff" tool_tip="この面と同じディフューズ（拡散反射）マップを貼り付けた、すべての面を選択します。"/>
+	<button label="全て検索" name="btn_select_same_norm" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。"/>
 	<button label="全て検索" name="btn_select_same_spec" tool_tip="この面と同じ鏡面反射（スペキュラ）マップを貼り付けた、すべての面を選択します。"/>
-	<button label="全て検索" name="btn_select_same_pbr" tool_tip="この面と同じＰＢＲマテリアルを貼り付けた、すべての面を選択します。" />
+	<button label="全て検索" name="btn_select_same_pbr" tool_tip="この面と同じＰＢＲマテリアルを貼り付けた、すべての面を選択します。"/>
 </panel>

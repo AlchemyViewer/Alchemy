@@ -85,7 +85,7 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 				Checkbox_Off
 			</panel.string>
 			<filter_editor label="役割でフィルタ" name="filter_input"/>
-			<scroll_list name="role_list">
+			<scroll_list name="role_list" tool_tip="能力を選択して詳細を表示します。">
 				<scroll_list.columns label="役割" name="name"/>
 				<scroll_list.columns label="タイトル" name="title"/>
 				<scroll_list.columns label="＃" name="members"/>

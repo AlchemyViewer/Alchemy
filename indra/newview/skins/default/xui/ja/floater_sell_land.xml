@@ -27,7 +27,6 @@
 			</text>
 			<line_editor name="price">
 				0
-
 			</line_editor>
 			<text name="price_per_m">
 				（1㎡あたりL$ [PER_METER]）
@@ -40,6 +39,7 @@
 			</text>
 			<combo_box name="sell_to">
 				<combo_box.item label="‐１つ選択‐" name="--selectone--"/>
+				<combo_box.item label="自身のみ" name="Myself" value="self"/>
 				<combo_box.item label="指定なし・誰にでも販売" name="Anyone"/>
 				<combo_box.item label="特定の人物：" name="Specificuser:"/>
 			</combo_box>

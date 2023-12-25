@@ -294,6 +294,15 @@
 		</panel>
 		<!-- Object tab -->
 		<panel label="オブジェクト" name="Object">
+			<panel.string name="paste_position">
+				位置のペースト：[VALUE]
+			</panel.string>
+			<panel.string name="paste_size">
+				サイズのペースト：[VALUE]
+			</panel.string>
+			<panel.string name="paste_rotation">
+				回転のペースト：[VALUE]
+			</panel.string>
 			<check_box label="ロック" name="checkbox locked" tool_tip="オブジェクトの移動や削除を抑止します。意図しない編集を避けるために、ビルド中によく使用されます。"/>
 			<check_box label="物理的" name="Physical Checkbox Ctrl" tool_tip="オブジェクトを押したり、重力の影響を受けるようにします。"/>
 			<check_box label="一時的" name="Temporary Checkbox Ctrl" tool_tip="作成から１分後にオブジェクトを削除します。"/>
@@ -323,9 +332,9 @@
 			<spinner label="Ｘ" name="Rot X"/>
 			<spinner label="Ｙ" name="Rot Y"/>
 			<spinner label="Ｚ" name="Rot Z"/>
-			<button name="copy_rotation_btn" tool_tip="回転をコピーします。" />
-			<button name="paste_rotation_btn" tool_tip="回転をペーストします。" />
-			<button name="pipette_rotation_btn" tool_tip="ピペットツールで回転をペーストします。" />
+			<button name="copy_rotation_btn" tool_tip="回転をコピーします。"/>
+			<button name="paste_rotation_btn" tool_tip="回転をペーストします。"/>
+			<button name="pipette_rotation_btn" tool_tip="ピペットツールで回転をペーストします。"/>
 			<!--
 			<text name="label basetype">プリムの種類</text>
 			-->
@@ -472,7 +481,7 @@
 			<texture_picker label="射影画像" name="light texture control" tool_tip="クリックで射影テクスチャを選択します。（遅延レンダリング有効時のみ）"/>
 			<menu_button name="clipboard_light_params_btn" tool_tip="ペースト時のオプションを指定します。"/>
 			<spinner label="輝度" name="Light Intensity"/>
-			<spinner label="ＦＯＶ" name="Light FOV"/>
+			<spinner label="ＦｏＶ" name="Light FOV"/>
 			<spinner label="半径" name="Light Radius"/>
 			<spinner label="焦点" name="Light Focus"/>
 			<spinner label="光の弱まり" name="Light Falloff"/>

@@ -27,7 +27,7 @@
 		<layout_panel name="avatar_desc">
 			<text_editor name="sl_about"/>
 			<text name="www"/>
-			<line_editor name="www_edit"/>
+			<line_editor name="www_edit" tool_tip="Webサイトへのリンクを入力します。"/>
 		</layout_panel>
 		<layout_panel name="avatar_perm">
 			<text name="permissions_label">

@@ -7,5 +7,5 @@
 	<icon name="rating_icon_moderate"/>
 	<check_box label="" name="adult_all"/>
 	<icon name="rating_icon_adult"/>
-	<search_editor label="検索" name="search_bar"/>
+	<search_editor label="検索" name="search_bar" tool_tip="検索語句を入力してください。"/>
 </panel>
