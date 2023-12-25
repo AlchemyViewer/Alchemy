@@ -2477,7 +2477,7 @@ std::vector<std::string> LLWindowSDL::getDynamicFallbackFontList()
 #if LL_LINUX
 	// Use libfontconfig to find us a nice ordered list of fallback fonts
 	// specific to this system.
-	std::string final_fallback("/usr/share/fonts/truetype/kochi/kochi-gothic.ttf");
+	std::string final_fallback("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
 	const int max_font_count_cutoff = 40; // fonts are expensive in the current system, don't enumerate an arbitrary number of them
 	// Our 'ideal' font properties which define the sorting results.
 	// slant=0 means Roman, index=0 means the first face in a font file
