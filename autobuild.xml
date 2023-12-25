@@ -1306,11 +1306,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>334ec2aa9fedcb7eb5396cc54dc7165318f2d15261ecf4ccb79deaa623351638b5b6909149bd30dcd57e934eac0061c1b15c6353f143c8534de4890bd7c092c8</string>
+              <string>0957fc9ceb2c4d843e2d913c7814e49a3bd5eaeea2cbacd00bd15edae168307c7639bc12c0d1dbed5c138a199939db50ec64915d9e00656db41132bff2d13499</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/125/packages/generic/llca/2023.1015.0309.2181/llca-2023.1015.0309-common-2181.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/125/packages/generic/llca/2023.1225.0655.2302/llca-2023.1225.0655-common-2302.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -1324,7 +1324,7 @@
         <string>Copyright (c) 2020, Alchemy Development Group; data provided by the Mozilla NSS Project.
       </string>
         <key>version</key>
-        <string>2023.1015.0309</string>
+        <string>2023.1225.0655</string>
         <key>name</key>
         <string>llca</string>
       </map>
