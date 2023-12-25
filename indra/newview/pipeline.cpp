@@ -7909,7 +7909,8 @@ void LLPipeline::renderDeferredLighting()
             deferred_light_target->flush();
         }
 
-        if (RenderDeferredSSAO)
+		static LLCachedControl<bool> always_soften_shadows(gSavedSettings, "RenderAlwaysSoftenShadows", false);
+        if (RenderDeferredSSAO || (RenderShadowDetail > 0 && always_soften_shadows))
         {
             // soften direct lighting lightmap
             LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - soften shadow");
@@ -8007,7 +8008,7 @@ void LLPipeline::renderDeferredLighting()
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
 
-            unbindDeferredShader(gDeferredSoftenProgram);
+            unbindDeferredShader(soften_shader);
         }
 
         static LLCachedControl<S32> local_light_count(gSavedSettings, "RenderLocalLightCount", 256);
