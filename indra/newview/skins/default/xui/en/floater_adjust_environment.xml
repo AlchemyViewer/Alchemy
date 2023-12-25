@@ -253,7 +253,7 @@
                           layout="topleft"
                           left_delta="-5"
                           name="probe_ambiance_label"
-                          tooltip="Irradiance control.  When not zero, enables HDR lighting model."
+                          tool_tip="Irradiance control.  When not zero, enables HDR lighting model."
                           top_pad="15"
                           width="180">Reflection Probe Ambiance (HDR):</text>
                   <slider decimal_digits="2"

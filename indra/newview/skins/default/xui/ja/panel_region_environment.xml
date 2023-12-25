@@ -47,7 +47,7 @@
 		<layout_panel name="pnl_environment_config">
 			<layout_stack name="ls_environment_config">
 				<layout_panel name="pnl_environment_config">
-					<layout_stack name="ls_environment_config2">
+					<layout_stack name="ls_environment_current">
 						<layout_panel name="pnl_environment_current">
 							<text name="select_environment_label">
 								自然環境の設定を選択
