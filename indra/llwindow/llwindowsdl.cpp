@@ -471,11 +471,11 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-	if (mFSAASamples > 0)
-	{
-		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, mFSAASamples);
-	}
+	// if (mFSAASamples > 0)
+	// {
+	// 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+	// 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, mFSAASamples);
+	// }
 
 	if (LLRender::sGLCoreProfile)
 	{
