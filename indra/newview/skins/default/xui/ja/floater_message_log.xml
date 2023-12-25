@@ -16,15 +16,15 @@
 			</scroll_list>
 		</layout_panel>
 		<layout_panel name="message_panel">
-			<menu_button name="filter_choice_btn"/>
+			<menu_button name="filter_choice_btn" tool_tip="選択でフィルタリングします。"/>
 			<line_editor name="filter_edit"/>
 			<button name="filter_apply_btn" label="✔"/>
 			<button name="clear_log_btn" label="Ｃ"/>
 			<scroll_list name="message_log">
-				<scroll_list.columns name="sequence" label="＃" width="48"/>
-				<scroll_list.columns name="protocol" label="プロトコル" width="48"/>
-				<scroll_list.columns name="verb" label="動詞" width="56"/>
-				<scroll_list.columns name="net" label="ホスト" width="120"/>
+				<scroll_list.columns name="sequence" label="＃"/>
+				<scroll_list.columns name="protocol" label="プロトコル"/>
+				<scroll_list.columns name="verb" label="動詞"/>
+				<scroll_list.columns name="net" label="ホスト"/>
 				<scroll_list.columns name="name" label="種類"/>
 			</scroll_list>
 			<text name="log_status_text"/>

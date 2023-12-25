@@ -22,7 +22,7 @@
 		リマインドしない
 	</panel.string>
 	<button name="back_btn"/>
-	<text name="title"/>
+	<text name="title" value="イベント情報"/>
 	<scroll_container name="profile_scroll">
 		<panel name="scroll_content_panel">
 			<panel name="snapshot_panel">

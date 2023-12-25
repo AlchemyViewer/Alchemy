@@ -255,12 +255,14 @@
 			<check_box label="被写体深度" tool_tip="被写体深度の切り替え"/>
 			<check_box label="マウスに追従" tool_tip="ＤｏＦのフォーカス ポイントがマウスカーソルに追従できるようにします。"/>
 			<check_box label="フォーカスをロック（Alt＋Shift＋X）" tool_tip="ＤｏＦの現在のフォーカスポイントをロックします。"/>
+			<check_box label="前景のブラーを有効化" tool_tip="このオプションは、被写界深度使用時に前景のぼかしを切り替えるもので、必要に応じて背景のみをぼかすことができます。" name="RenderDepthOfFieldFront"/>
 			<!--DOF Resolution-->
 			<!--TODO: Ensure this setting is temporary? Large CoC @ Full Res has caused Login-Crashes on other viewers, even on high end GPUs!-->
 			<text tool_tip="被写界深度（ＤｏＦ）のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" value="ＤｏＦ解像度："/>
 			<combo_box tool_tip="被写界深度（ＤｏＦ）のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" name="dof_res_combo">
 				<combo_box.item label="１／４" name="dof_quarterres" value="0.25"/>
 				<combo_box.item label="１／２" name="dof_halfres" value="0.5"/>
+				<combo_box.item label="３／４" name="dof_threefourthres" value="0.7"/>
 				<combo_box.item label="完全" name="dof_fullres" value="1.0"/>
 			</combo_box>
 			<!--DOF FoV-->

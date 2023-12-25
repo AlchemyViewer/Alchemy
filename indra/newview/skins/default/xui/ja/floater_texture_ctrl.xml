@@ -25,6 +25,9 @@
 	<text name="size_lbl">
 		[DIMENSIONS]
 	</text>
+	<text name="over_limit_lbl">
+		選択されているテクスチャは[TEXDIM]です。インベントリ画像は[MINTEXDIM]以上の正方形である必要があります。
+	</text>
 	<!--  middle: inventory mode -->
 	<button label="デフォルト" label_selected="デフォルト" name="Default"/>
 	<button label="透明" label_selected="透明" name="Transparent"/>

@@ -327,6 +327,7 @@
 		<menu_item_check label="カメラの距離移動を制限しない" name="Disable Camera Distance"/>
 		<menu_item_check label="最小ズーム距離を無効化" name="Disable Minimum Zoom Distance"/>
 		<menu_item_check label="ＳＩＭのカメラの衝突面を無効化" name="Disable Sim Camera Collision Plane"/>
+		<menu_item_check label="アバターを身軽に" name="Avatar Ignore Prejump"/>
 		<menu_item_separator/>
 		<menu_item_check label="高解像度スナップショット" name="HighResSnapshot"/>
 		<menu_item_check label="スナップショットをディスクに保存" name="QuietSnapshotsToDisk"/>
@@ -343,14 +344,12 @@
 			<menu_item_check label="選択を非表示" name="Hide Selected"/>
 			<menu_item_check label="透明部分をハイライト" name="Highlight Transparent"/>
 			<menu_item_check label="マウスルックのときにクロスヘアーを表示" name="ShowCrosshairs"/>
-			<!--
 			<menu label="ホバー時のツールチップ" name="Hover Tips">
 				<menu_item_check label="ツールチップを表示" name="Show Tips"/>
 				<menu_item_separator/>
 				<menu_item_check label="土地のツールチップを表示" name="Land Tips"/>
 				<menu_item_check label="すべてのオブジェクトのツールチップを表示" name="Tips On All Objects"/>
 			</menu>
-			-->
 		</menu>
 		<menu label="レンダリング種別" name="Rendering Types">
 			<menu_item_check label="シンプル" name="Rendering Type Simple"/>

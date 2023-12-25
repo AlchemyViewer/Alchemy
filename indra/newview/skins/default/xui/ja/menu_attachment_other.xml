@@ -25,6 +25,7 @@
 		<menu_item_call label="ユーザ名をコピー" name="Copy Username"/>
 		<menu_item_call label="表示名をコピー" name="copy_display_name"/>
 		<menu_item_call label="エージェント名をコピー" name="copy_username"/>
+		<menu_item_call label="SLurlをコピー" name="copy_slurl"/>
 		<menu_item_call label="SLurlをコピー" name="Copy SLurl"/>
 		<menu_item_call label="エージェントのＵＵＩＤをコピー" name="Copy Agent ID"/>
 	</context_menu>
@@ -45,4 +46,5 @@
 	<menu_item_separator/>
 	<menu_item_call label="オブジェクトのプロフィール" name="Object Profile"/>
 	<menu_item_call label="オブジェクトの調査" name="Object Inspect"/>
+	<menu_item_call label="オブジェクトのＵＵＩＤをコピー" name="Copy Object ID"/>
 </context_menu>
