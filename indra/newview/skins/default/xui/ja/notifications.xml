@@ -152,6 +152,10 @@
 		在庫フォルダへのコピーまたは移動がエラーにより失敗しました：[ERROR_CODE]
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
+	<notification name="MyOutfitsPasteFailed">
+		１つ以上のアイテムが「アウトフィット」内で使用できませんでした。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
 	<notification name="MerchantPasteFailed">
 		マーケットプレイスのリストへのコピーまたは移動が以下のエラーにより失敗しました：[ERROR_CODE]
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
@@ -748,6 +752,9 @@ L$が不足しているので、このグループに参加することができ
 	<notification name="CacheWillClear">
 		キャッシュは、[APP_NAME]再起動後にクリアされます。
 	</notification>
+	<notification name="WebCacheWillClear">
+		Webブラウザのキャッシュは、[APP_NAME]再起動後にクリアされます。
+  </notification>
 	<notification name="CacheWillBeMoved">
 		キャッシュは、[APP_NAME]再起動後が移動されます。
 注意：キャッシュがクリアされます。
@@ -1200,6 +1207,10 @@ L$が不足しているので、このグループに参加することができ
 		この場所のランドマークは、既に持っています。
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="CannotCreateLandmarkNotOwner">
+		この土地の所有者が許可していないためランドマークを作成することができませんでした。
+		<tag>fail</tag>
 	</notification>
 	<notification label="フォルダ作成" name="CreateLandmarkFolder">
 		<unique/>
@@ -3082,6 +3093,17 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 			<button ignore="「取り込み中」モードを維持する" name="No" text="キャンセル"/>
 		</form>
 	</notification>
+	<notification label="区画で再生中のメディア" name="ParcelPlayingMedia">
+		この場所では下記のメディアが再生されています：
+[URL]
+再生してもよろしいですか？
+		<tag>confirm</tag>
+		<form name="form">
+			<ignore name="ignore" text="この土地では常にこのオプションを選択する。"/>
+			<button ignore="Play Media" name="Yes" text="再生する"/>
+			<button ignore="Ignore Media" name="No" text="再生しない"/>
+		</form>
+	</notification>
 	<notification name="ConfirmDeleteProtectedCategory">
 		「[FOLDERNAME]」は、システムフォルダです。
 システムフォルダを削除すると不安定になることがあります。このまま続けてもよろしいですか？
@@ -3311,6 +3333,14 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	</notification>
 	<notification name="NotecardNoPermissions">
 		このノートカードを見る権限がありません。
+		<tag>fail</tag>
+	</notification>
+	<notification name="MaterialMissing">
+		マテリアルがデーターベースにありませんでした。
+		<tag>fail</tag>
+	</notification>
+	<notification name="MaterialNoPermissions">
+		このマテリアルを見る権限がありません。
 		<tag>fail</tag>
 	</notification>
 	<notification name="RezItemNoPermissions">
@@ -4395,8 +4425,35 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 [REASON]
 		<tag>fail</tag>
 	</notification>
+	<notification name="CannotUploadMaterial">
+		ファイルアップロード時に問題が発生しました。
+		<tag>fail</tag>
+	</notification>
+	<notification label="マテリアルの保存" name="SaveMaterialAs">
+		<unique/>
+		このマテリアルに名前をつけてください：
+		<tag>confirm</tag>
+		<form name="form">
+			<input name="message" type="text">
+			[DESC]
+		</input>
+			<button name="ＯＫ" text="OK"/>
+			<button name="キャンセル" text="Cancel"/>
+		</form>
+	</notification>
+	<notification name="InvalidMaterialName">
+		空でない名前を入力してください。
+		<tag>fail</tag>
+	</notification>
+	<notification name="UsavedMaterialChanges">
+		保存されていない変更があります。
+		<form name="form">
+			<button name="discard" text="変更を破棄"/>
+			<button name="keep" text="編集を続ける"/>
+		</form>
+	</notification>
 	<notification name="LivePreviewUnavailable">コ
-		ピー禁止／譲渡不可のため、このテクスチャを表示できません。
+		コピー禁止／譲渡不可のため、このテクスチャを表示できません。
 		<usetemplate ignoretext="コピー禁止／譲渡不可のテクスチャでライブプレビューモードが使用できないことの警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="LivePreviewUnavailablePBR">
@@ -4717,22 +4774,48 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<tag>confirm</tag>
 		<usetemplate ignoretext="選択したオブジェクトをフレキシブルパスに変更する際にナビメッシュから削除されることの確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
-	<global name="UnsupportedCPUAmount">796</global>
-	<global name="UnsupportedRAMAmount">510</global>
-	<global name="UnsupportedGPU">‐あなたのグラフィックカードは、必須動作環境の条件を満たしていません。</global>
-	<global name="UnsupportedRAM">‐あなたのシステムメモリは、必須動作環境の条件を満たしていません。</global>
-	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">自分の土地を持っている場合、そこを「ホーム」に設定できます。持っていない場合は、マップから「情報ハブ」をお探しください。</global>
+	<global name="UnsupportedIntelDriver">
+		インストールされているIntelグラフィックスドライバ[GPUNAME]（バージョン[VERSION]）は古いため、プログラムのクラッシュの原因になりえます。最新のIntelドライバーに更新することを強くお勧めします。
+
+Intelドライバーのウェブサイトを確認しますか？
+	</global>
+	<global name="UnsupportedCPUAmount">
+		796
+	</global>
+	<global name="UnsupportedRAMAmount">
+		510
+	</global>
+	<global name="UnsupportedGPU">
+		‐あなたのグラフィックカードは、必須動作環境の条件を満たしていません。
+
+	</global>
+	<global name="UnsupportedRAM">
+		‐あなたのシステムメモリは、必須動作環境の条件を満たしていません。
+
+	</global>
+	<global name="LLLeapUpdaterFailure">
+		アップデーターサービス[UPDATER_APP]の起動に失敗しました。ビューアが正しくインストールされ、実行に必要な権限があることを確認してください。引き続き問題が発生する場合は、[SUPPORT_SITE]をご覧ください。
+  </global>
+	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">
+		自分の土地を持っている場合、そこを「ホーム」に設定できます。持っていない場合は、マップから「情報ハブ」をお探しください。
+	</global>
 	<global name="You died and have been teleported to your home location">死んでしまったので、ホームにテレポートされました。</global>
-	<notification name="LocalBitmapsUpdateFileNotFound">[FNAME]が見つからなかったため、更新できませんでした。
+	<notification name="LocalBitmapsUpdateFileNotFound">
+		[FNAME]が見つからなかったため、更新できませんでした。
 このファイルに対する今後の更新を無効にします。
 	</notification>
-	<notification name="LocalBitmapsUpdateFailedFinal">[FNAME]は、[NRETRIES]回の試行で開くこともデコードすることもできなかったため、壊れているとみなしました。
+	<notification name="LocalBitmapsUpdateFailedFinal">
+		[FNAME]は、[NRETRIES]回の試行で開くこともデコードすることもできなかったため、壊れているとみなしました。
 このファイルに対する今後の更新を無効にします。
 	</notification>
 	<notification name="LocalBitmapsVerifyFail">
 		開いたりデコードすることができない、無効である、もしくは読み取り不能な画像ファイル「[FNAME]」を追加しようとしました。
 この試行はキャンセルされました。
 	</notification>
+	<notification name="LocalGLTFVerifyFail">
+		開いたりデコードすることができない、無効または読み取り不可能なＧＬＴＦマテリアル[FNAME]を追加しようとしました。
+読み込みはキャンセルされました。
+  </notification>
 	<notification name="PathfindingReturnMultipleItems">
 		[NUM_ITEMS]個のアイテムを返却しようとしています。
 このまま続けてもよろしいですか？
@@ -5643,6 +5726,11 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<tag>confirm</tag>
 		<usetemplate ignoretext="過去の会話ログを削除する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
+	<notification name="PreferenceControlsDefaults">
+		コントロールのデフォルト値を復元しますか？
+		<tag>confirm</tag>
+		<usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="現在のモード" yestext="全てのモード"/>
+	</notification>
 	<notification name="PreferenceChatDeleteTranscripts">
 		これにより、以前のすべての会話のテキストが削除されます。過去の会話のリストには影響しません。
 .txtおよびtxt.backupの拡張子が付いたすべてのファイルが[FOLDER]フォルダから削除されます。
@@ -5663,6 +5751,16 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		チャット履歴ファイルが前の操作でビジーです。２、３分経ってからもう一度試すか、別の人とのチャットを選択してください。
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="AddPaymentMethod">
+		次のページで、L$の金額を入力し、
+注文ボタンをクリックしてください。
+チェックアウト時に支払い方法を追加できます。
+		<tag>confirm</tag>
+		<form name="form">
+			<button name="Continue" text="続ける"/>
+			<button name="Cancel" text="キャンセル"/>
+		</form>
 	</notification>
 	<notification name="OutfitPhotoLoadError">
 		[REASON]
