@@ -163,8 +163,8 @@ if (WINDOWS)
   string(REPLACE "/Ob2" "/Ob3" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
   string(REPLACE "/Ob2" "/Ob3" CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
 
-  # configure win32 API for 7 and above compatibility
-  set(WINVER "0x0601" CACHE STRING "Win32 API Target version (see http://msdn.microsoft.com/en-us/library/aa383745%28v=VS.85%29.aspx)")
+  # configure win32 API for 10 and above compatibility
+  set(WINVER "0x0A00" CACHE STRING "Win32 API Target version (see http://msdn.microsoft.com/en-us/library/aa383745%28v=VS.85%29.aspx)")
   add_compile_definitions(WINVER=${WINVER} _WIN32_WINNT=${WINVER})
 endif (WINDOWS)
 
