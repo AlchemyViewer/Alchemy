@@ -6,6 +6,6 @@
 	<menu_item_check label="「:」を「/me」として扱う" name="EnableMUPoseChat"/>
 	<menu_item_check label="((ＯＯＣ))で自動的にカッコを閉じる parentheses" name="EnableAutoCloseOOC"/>
 	<menu_item_separator/>
-	<menu_item_call label="シャウト（コントロールキー）"/>
+	<menu_item_call label="シャウト（コントロールキー）" name="shout"/>
 	<menu_item_call label="ささやき（コントロール‐シフト）" name="whisper"/>
 </toggleable_menu>

@@ -61,11 +61,7 @@
 			<layout_panel name="body_panel">
 				<layout_stack name="im_panels">
 					<layout_panel name="right_part_holder">
-						<layout_stack name="translate_and_chat_stack">
-							<layout_panel name="translate_chat_checkbox_lp">
-								<check_box label="チャットを翻訳" name="translate_chat_checkbox"/>
-							</layout_panel>
-						</layout_stack>
+						<layout_stack name="translate_and_chat_stack"/>
 					</layout_panel>
 				</layout_stack>
 			</layout_panel>
@@ -75,7 +71,7 @@
 						<avatar_icon name="avatar_icon"/>
 						<group_icon name="group_chat_icon"/>
 						<icon name="nearby_chat_icon"/>
-						<chat_editor label="送信先" name="chat_editor"/>
+						<chat_editor name="chat_editor"/>
 					</layout_panel>
 					<layout_panel name="input_button_layout_panel">
 						<button name="minz_btn" tool_tip="メッセージパネルの表示／非表示の切り替えを行います。"/>

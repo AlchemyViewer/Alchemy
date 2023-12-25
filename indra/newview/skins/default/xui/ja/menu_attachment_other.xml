@@ -12,9 +12,9 @@
 		<menu_item_call label="スケルトンをリセット" name="Reset Skeleton"/>
 		<menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations"/>
 		<menu_item_separator/>
-		<menu_item_call name="通常の描画設定" label="Remove from exceptions"/>
-		<menu_item_check name="常に完全描画する" label="Always full detail"/>
-		<menu_item_check name="描画しない" label="Never full detail"/>
+		<menu_item_call label="通常の描画設定" name="RenderNormally"/>
+		<menu_item_check label="常に完全描画する" name="AlwaysRenderFully"/>
+		<menu_item_check label="描画しない" name="DoNotRender"/>
 		<menu_item_separator/>
 		<menu_item_call label="描画の例外設定…" name="RenderExceptions"/>
 	</context_menu>
@@ -22,7 +22,6 @@
 		<menu_item_call label="テクスチャのデバッグ…" name="Debug..."/>
 		<menu_item_call label="ＸＭＬとしてダンプ" name="Dump XML"/>
 		<menu_item_call label="フルネームをコピー" name="copy_full_name"/>
-		<menu_item_call label="ユーザ名をコピー" name="Copy Username"/>
 		<menu_item_call label="表示名をコピー" name="copy_display_name"/>
 		<menu_item_call label="エージェント名をコピー" name="copy_username"/>
 		<menu_item_call label="SLurlをコピー" name="copy_slurl"/>

@@ -48,7 +48,9 @@
 		<radio_item label="メタリック／ラフネス" name="Metallic/roughness" value="3"/>
 		<radio_item label="放射（エミッシブ）" name="Emissive" value="4"/>
 	</radio_group>
-	<menu_button name="clipboard_texture_params_btn" tool_tip="ペースト時のオプション"/>
+	<button name="copy_texture_btn" tool_tip="テクスチャパラメータをコピーします。"/>
+	<button name="paste_texture_btn" tool_tip="テクスチャパラメータをペーストします。"/>
+	<button name="pipette_texture_btn" tool_tip="ピペットツールでテクスチャパラメータをペーストします。"/>
 	<texture_picker label="ＰＢＲマテリアル" name="pbr_control" tool_tip="クリックでＰＢＲマテリアルを選択します。"/>
 	<button name="pbr_from_inventory" label="インベントリから選択"/>
 	<text name="material_permissions_loading_label">
@@ -166,7 +168,7 @@
 	<!-- END PBR Material texture transform parameters -->
 	<check_box label="平面を揃える" name="checkbox planar align" tool_tip="テクスチャを最後に選択された面を基準に揃えます。平面テクスチャのマッピングが必要です。"/>
 	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同期させます。"/>
-	<button label="揃える" label_selected="揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
+	<button label="揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
 	<web_browser name="title_media"/>
 	<button label="全て検索" name="btn_select_same_diff" tool_tip="この面と同じディフューズ（拡散反射）マップを貼り付けた、すべての面を選択します。"/>
 	<button label="全て検索" name="btn_select_same_norm" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。"/>

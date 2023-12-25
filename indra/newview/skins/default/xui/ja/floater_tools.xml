@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater name="toolbox floater" short_title="ビルド" title="ビルドツール">
+<floater name="toolbox floater" short_title="ビルド">
 	<floater.string name="grid_screen_text">
 		スクリーン
 	</floater.string>
@@ -93,7 +93,7 @@
 	<check_box label="ルートの軸を編集する" name="checkbox actual root"/>
 	<check_box label="選択のアウトラインを表示" name="checkbox selection"/>
 	<check_box label="反射プローブを選択する" name="checkbox select probes"/>
-	<button label="オプション…" label_selected="オプション…" name="Options..." tool_tip="グリッドオプションを表示します。"/>
+	<button name="Options..." tool_tip="グリッドオプションを表示します。"/>
 	<button name="ToolCube" tool_tip="立方体（キューブ）"/>
 	<button name="ToolPrism" tool_tip="三角柱（プリズム）"/>
 	<button name="ToolPyramid" tool_tip="四角錐（ピラミッド）"/>
@@ -216,8 +216,6 @@
 				グループ：
 			</text>
 			<button name="button set group" tool_tip="このオブジェクトの権限を共有するグループを選択します。"/>
-			<name_box initial_value="読み込んでいます…" name="Group Name Proxy"/>
-			<button label="設定…" label_selected="設定…" name="button set group" tool_tip="このオブジェクト権限を共有したいグループを選択します。"/>
 			<check_box label="共有" name="checkbox share with group" tool_tip="設定したグループのメンバー全員に、このオブジェクトの修正権限を与えます。譲渡しない限り、役割による制限は有効にできません。"/>
 			<button label="譲渡" label_selected="譲渡" name="button deed" tool_tip="このアイテムを譲渡すると「次の所有者」の権限が適用されます。グループ共有オブジェクトは、グループのオフィサーが譲渡できます。"/>
 			<text name="label click action">
@@ -308,7 +306,7 @@
 			<check_box label="一時的" name="Temporary Checkbox Ctrl" tool_tip="作成から１分後にオブジェクトを削除します。"/>
 			<check_box label="ファントム" name="Phantom Checkbox Ctrl" tool_tip="オブジェクトが他のオブジェクトやアバターと衝突しないようにします。"/>
 			<view_border name="object_horizontal"/>
-			<text name="label position">
+			<text name="label position" tool_tip="位置（メートル）">
 				位置（メートル）
 			</text>
 			<spinner label="Ｘ" name="Pos X"/>
@@ -317,7 +315,7 @@
 			<button name="copy_position_btn" tool_tip="位置をコピーします。"/>
 			<button name="paste_position_btn" tool_tip="位置をペーストします。"/>
 			<button name="pipette_position_btn" tool_tip="ピペットツールで位置をペーストします。"/>
-			<text name="label size">
+			<text name="label size" tool_tip="サイズ（メートル）">
 				サイズ（メートル）
 			</text>
 			<spinner label="Ｘ" name="Scale X"/>
@@ -326,8 +324,8 @@
 			<button name="copy_size_btn" tool_tip="サイズをコピーします。"/>
 			<button name="paste_size_btn" tool_tip="サイズをペーストします。"/>
 			<button name="pipette_size_btn" tool_tip="ピペットツールでサイズをペーストします。"/>
-			<text name="label rotation">
-				回転（角度）
+			<text name="label rotation" tool_tip="回転（角度）">
+				回転角°
 			</text>
 			<spinner label="Ｘ" name="Rot X"/>
 			<spinner label="Ｙ" name="Rot Y"/>
@@ -338,8 +336,6 @@
 			<!--
 			<text name="label basetype">プリムの種類</text>
 			-->
-			<button name="copy_params_btn" tool_tip="オブジェクトのパラメータをクリップボードにコピーします。"/>
-			<button name="paste_params_btn" tool_tip="オブジェクトのパラメータをクリップボードにペーストします。"/>
 			<combo_box name="comboBaseType">
 				<combo_box.item label="箱" name="Box"/>
 				<combo_box.item label="円柱（シリンダー）" name="Cylinder"/>
@@ -420,7 +416,7 @@
 			</text>
 			<spinner label="始" name="Path Limit Begin"/>
 			<spinner label="終" name="Path Limit End"/>
-			<text name="text taper2" tool_tip="すべてのプリムタイプに対応しているとは限りません。">
+			<text name="text taper2">
 				側面のテーパー
 			</text>
 			<spinner label="Ｘ" name="Taper X"/>
@@ -439,7 +435,7 @@
 			<text name="label sculpt type">
 				縫い目の種類
 			</text>
-			<combo_box name="sculpt type control" tool_tip="「なし」オプションは、「平面」と同一であるため削除されました。">
+			<combo_box name="sculpt type control">
 				<combo_box.item label="球体（スフィア）" name="Sphere"/>
 				<combo_box.item label="円環（トーラス）" name="Torus"/>
 				<combo_box.item label="平面／なし" name="Plane"/>
@@ -477,9 +473,11 @@
 			<spinner label="Ｚ軸方向の力" name="FlexForceZ"/>
 			<!-- 作用は射影テクスチャマッピングなので意訳 -->
 			<check_box label="射影元" name="Light Checkbox Ctrl" tool_tip="オブジェクトが投影元になります。"/>
-			<color_swatch label="色" name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます"/>
+			<color_swatch name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます"/>
 			<texture_picker label="射影画像" name="light texture control" tool_tip="クリックで射影テクスチャを選択します。（遅延レンダリング有効時のみ）"/>
-			<menu_button name="clipboard_light_params_btn" tool_tip="ペースト時のオプションを指定します。"/>
+			<button name="copy_light_btn" tool_tip="光源と反射プローブのパラメータをコピーします。"/>
+			<button name="paste_light_btn" tool_tip="光源と反射プローブのパラメータをペーストします。"/>
+			<button name="pipette_light_btn" tool_tip="ピペットツールで光源と反射プローブのパラメータをペーストします。" />
 			<spinner label="輝度" name="Light Intensity"/>
 			<spinner label="ＦｏＶ" name="Light FOV"/>
 			<spinner label="半径" name="Light Radius"/>
@@ -488,8 +486,8 @@
 			<spinner label="光の雰囲気" name="Light Ambiance"/>
 			<check_box label="反射プローブ" name="Reflection Probe" tool_tip="ＰＢＲが有効な場合に、このボリューム内のオブジェクトが光の反射をどのように受け取るかを調整します。"/>
 			<combo_box name="Probe Volume Type" tool_tip="プローブの影響量を選択してください。">
-				<combo_box.item label="球状" name="Sphere" value="Sphere"/>
-				<combo_box.item label="箱状" name="Box" value="Box"/>
+				<combo_box.item label="球状（スフィア）" name="Sphere" value="Sphere"/>
+				<combo_box.item label="箱状（ボックス）" name="Box" value="Box"/>
 			</combo_box>
 			<check_box label="動的" name="Probe Dynamic" tool_tip="有効にすると、アバターはこのプローブ範囲内の反射に影響されて表示されます。"/>
 			<spinner label="雰囲気" name="Probe Ambiance"/>

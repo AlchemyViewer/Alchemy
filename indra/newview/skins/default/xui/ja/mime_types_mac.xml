@@ -228,11 +228,6 @@
 			ムービー（flv）
 		</label>
 	</mimetype>
-	<mimetype name="application/octet-stream">
-		<label name="video/octet-stream">
-			ムービー
-		</label>
-	</mimetype>
 	<mimetype name="video/quicktime">
 		<label name="video/quicktime_label">
 			ムービー（QuickTime）

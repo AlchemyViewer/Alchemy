@@ -16,7 +16,7 @@
 		<text name="prepend_founded_by">
 			創設者：
 		</text>
-		<name_box initial_value="（取得中）" name="founder_name"/>
+		<name_box name="founder_name"/>
 		<text name="join_cost_text">
 			無料
 		</text>
@@ -25,11 +25,6 @@
 	<text_editor name="charter">
 		グループの理念、指針を記入してください。
 	</text_editor>
-	<name_list name="visible_members">
-		<name_list.columns label="メンバー" name="name"/>
-		<name_list.columns label="タイトル" name="title"/>
-		<name_list.columns label="ログイン" name="status"/>
-	</name_list>
 	<text name="my_group_settngs_label">
 		自分の設定
 	</text>

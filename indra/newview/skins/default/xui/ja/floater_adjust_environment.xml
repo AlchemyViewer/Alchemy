@@ -57,7 +57,7 @@
 						雲のスケール：
 					</text>
 					<slider name="cloud_scale"/>
-					<text name="probe_ambiance_label" tool_tip="放射照度制御。０以外の場合、ＨＤＲライティングモデルが有効になります。">
+					<text name="probe_ambiance_label">
 						環境反射プローブ（ＨＤＲ）：
 					</text>
 					<slider name="probe_ambiance" tool_tip="環境ベースの間接照明の強度を指定します。 0の場合、ＨＤＲスケールは明るさになります。"/>

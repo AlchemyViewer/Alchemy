@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="worldmap" title="ワールドマップ">
-	<string name="collapse_icon" value="map_ui_collapse_icon.png"/>
-	<string name="expand_icon" value="map_ui_expand_icon.png"/>
-	<string name="collapse_tooltip" value="マップ操作パネルを隠します。"/>
-	<string name="expand_tooltip" value="マップ操作パネルを表示します。"/>
 	<layout_stack name="control_stack">
 		<layout_panel name="map_lp">
 			<panel name="objects_mapview"/>

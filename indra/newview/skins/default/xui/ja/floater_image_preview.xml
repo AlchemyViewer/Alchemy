@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater name="Image Preview" title="">
-	<text name="name_label">名前：</text>
-	<text name="description_label">説明：</text>
-	<text name="preview_label">プレビュー：</text>
+<floater name="Image Preview">
+	<text name="name_label">
+		名前：
+	</text>
+	<text name="description_label">
+		説明：
+	</text>
+	<text name="preview_label">
+		プレビュー：
+	</text>
 	<combo_box label="服装の種類" name="clothing_type_combo">
 		<item label="画像" name="Image" value="画像"/>
 		<item label="髪型" name="Hair" value="髪型"/>

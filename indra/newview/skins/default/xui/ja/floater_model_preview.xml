@@ -345,9 +345,6 @@
 					[X]×[Y]×[Z]
 				</text>
 				<check_box label="テクスチャを含む" name="upload_textures"/>
-				<text name="include_label">
-					アバターモデル専用：
-				</text>
 				<check_box label="スキンの重さを含む" name="upload_skin"/>
 				<check_box label="ジョイント位置を含む" name="upload_joints"/>
 				<check_box label="ジョイント位置が定義されている場合、スケールをロックします。" name="lock_scale_if_joint_position"/>
@@ -364,7 +361,7 @@
 				<text name="pelvis_offset_label">
 					Ｚオフセット（アバターの上下調整）：
 				</text>
-				<spinner name="pelvis_offset"/>
+				<spinner name="pelvis_offset" value="0.0"/>
 				<text name="skin_too_many_joints">
 					スキンされたジョイントが多すぎます。
 				</text>

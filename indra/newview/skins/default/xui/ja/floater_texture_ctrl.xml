@@ -33,7 +33,7 @@
 	<button label="透明" label_selected="透明" name="Transparent"/>
 	<button label="ブランク" label_selected="ブランク" name="Blank"/>
 	<button label="なし" label_selected="なし" name="None"/>
-	<button label="" label_selected="" name="Pipette"/>
+	<button name="Pipette"/>
 	<text name="preview_disabled" value="プレビュー無効"/>
 	<filter_editor label="テクスチャをフィルタ" name="inventory search editor"/>
 	<asset_filtered_inv_panel name="inventory panel"/>

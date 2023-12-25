@@ -56,7 +56,7 @@
 				<combo_box.item label="ＡＭＤトーンマッパー" name="toneAMD" value="3"/>
 				<combo_box.item label="アンチャーテッド" name="toneUncharted" value="4"/>
 			</combo_box>
-			<button name="exposure_default_btn" label="リセット" tool_tip="トーンマップスライダーをリセット"/>
+			<button name="exposure_default_btn" label="リセット"/>
 			<text tool_tip="トーンマッパーを介して画像全体の明るさを調整します。" value="露光："/>
 			<slider_bar name="exposure_slider" tool_tip="トーンマッパーを介して画像全体の明るさを調整します。"/>
 			<spinner name="exposure_spinner" tool_tip="トーンマッパーを介して画像全体の明るさを調整します。"/>
@@ -194,8 +194,6 @@
 			<slider_bar name="shadow_blurdist_slider" tool_tip="ブラーを発生させるカメラからの距離を制御します。値を大きくすると、カメラ付近のブラーが軽減されます。影ブラーを下げたときにＳＳＡＯノイズが発生した場合は、これを影の鮮明化に使用してみてください！"/>
 			<spinner name="shadow_blurdist_spinner" tool_tip="ブラーを発生させるカメラからの距離を制御します。値を大きくすると、カメラ付近のブラーが軽減されます。影ブラーを下げたときにＳＳＡＯノイズが発生した場合は、これを影の鮮明化に使用してみてください。"/>
 			<button name="blurdist_default_btn"/>
-			<!--SSAO Settings-->
-			<view_border name="ssao_divider"/>
 			<!--SSAO Toggle-->
 			<!--TODO: Disable Sliders if not enabled?-->
 			<check_box label="スクリーンスペースアンビエントオクルージョンを使用する" tool_tip="ＳＳＡＯの切り替え（影もなめらかになります！）"/>

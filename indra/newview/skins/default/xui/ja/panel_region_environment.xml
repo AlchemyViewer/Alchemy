@@ -30,15 +30,6 @@
 	<string name="str_region_env">
 		（リージョンの環境）
 	</string>
-	<text name="env_help_text">
-		このタブでの設定は、不動産内のすべてのリージョンに影響します。
-	</text>
-	<text name="estate_text">
-		不動産：
-	</text>
-	<text name="estate_name">
-		（不明）
-	</text>
 	<layout_stack name="ls_main">
 		<layout_panel name="pnl_environment_region_msg">
 			<text name="region_text_lbl">

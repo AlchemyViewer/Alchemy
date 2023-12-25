@@ -2,8 +2,8 @@
 <panel label="テキストチャット" name="chat">
 	<panel name="general_chat_settings">
 		<check_box label="近くのチャット入力でチャットバーを使用する" name="use_chat_bar"/>
-		<check_box label="ローカルチャットでジェスチャーを自動補完する" tool_tip="このオプションは、ローカルチャットに書き込む際に、ビューアがジェスチャー名を自動的に補完しようとするかどうかを切り替えます。" name="auto_complete_gestures"/>
-		<check_box label="チャット時にタイピングアニメーションを再生する" tool_tip="このオプションは、ローカルチャットでメッセージを入力している間、タイピングアニメーションを表示するかどうかを切り替えます。" name="play_typing_animation"/>
+		<check_box label="ローカルチャットでジェスチャーを自動補完する" name="auto_complete_gestures"/>
+		<check_box label="チャット時にタイピングアニメーションを再生する" name="play_typing_animation"/>
 		<check_box label="オフライン時にＩＭが送られてきたときにメールを送る（[EMAIL]）" name="send_im_to_email"/>
 		<text name="email_settings">
 			[https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]
@@ -68,7 +68,7 @@
 		<combo_box name="NearbyChatOptions">
 			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>
 			<item label="メッセージをポップアップ" name="PopUpMessage" value="toast"/>
-			<item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash"/>
+			<item label="ツールバーのボタンをフラッシュ" name="FlashToolBarButton" value="flash"/>
 			<item label="アクションなし" name="NoAction" value="noaction"/>
 		</combo_box>
 		<check_box label="サウンド再生" name="play_sound_nearby_chat_im">
@@ -79,7 +79,7 @@
 		<combo_box name="ObjectIMOptions">
 			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>
 			<item label="メッセージをポップアップ" name="PopUpMessage" value="toast"/>
-			<item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash"/>
+			<item label="ツールバーのボタンをフラッシュ" name="FlashToolBarButton" value="flash"/>
 			<item label="アクションなし" name="NoAction" value="noaction"/>
 		</combo_box>
 		<check_box label="サウンド再生" name="play_sound_object_im"/>

@@ -36,23 +36,6 @@
 						<stat_bar name="nummaterials" label="個"/>
 					</stat_view>
 				</stat_view>
-				<stat_view label="メモリ使用量" name="memory">
-					<stat_bar label="ＬＬトレース" name="LLTrace"/>
-					<stat_bar label="ＵＩ" name="LLView"/>
-					<stat_bar label="フォント" name="LLFontFreetype"/>
-					<stat_bar label="インベントリ" name="LLInventoryObject"/>
-					<stat_bar label="ビューアオブジェクト" name="LLViewerObject"/>
-					<stat_bar label="八分木グループデータ" name="LLViewerOctreeGroup"/>
-					<stat_bar label="八分木データ" name="LLViewerOctreeEntry"/>
-					<stat_bar label="ビューアのオブジェクトキャッシュ" name="LLVOCacheEntry"/>
-					<stat_bar label="描画可能オブジェクト" name="LLDrawable"/>
-					<stat_bar label="顔データ" name="LLFace"/>
-					<stat_bar label="描画情報" name="LLDrawInfo"/>
-					<stat_bar label="テクスチャデータ" name="LLTexture"/>
-					<stat_bar label="画像データ" name="LLImage"/>
-					<stat_bar label="ＧＬ画像データ" name="LLImageGL"/>
-					<stat_bar label="頂点バッファ" name="LLVertexBuffer"/>
-				</stat_view>
 				<stat_view label="ネットワーク" name="network">
 					<stat_bar label="パケットイン" name="packetsinstat"/>
 					<stat_bar label="パケットアウト" name="packetsoutstat"/>

@@ -30,11 +30,9 @@
 	<text name="LabelCreatorTitle">
 		制作者：
 	</text>
-	<button label="プロフィール…" label_selected="" name="BtnCreator"/>
 	<text name="LabelOwnerTitle">
 		所有者：
 	</text>
-	<button label="プロフィール…" label_selected="" name="BtnOwner"/>
 	<text name="LabelAcquiredTitle">
 		入手日時：
 	</text>
@@ -83,7 +81,4 @@
 		<combo_box.item label="オリジナル" name="Original"/>
 	</combo_box>
 	<spinner label="価格：" name="Edit Cost"/>
-	<text name="CurrencySymbol">
-		L$
-	</text>
 </floater>
