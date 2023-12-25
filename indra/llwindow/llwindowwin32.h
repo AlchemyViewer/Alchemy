@@ -38,50 +38,6 @@
 #include "llmutex.h"
 #include "workqueue.h"
 
-#ifndef DPI_ENUMS_DECLARED
-
-typedef enum PROCESS_DPI_AWARENESS {
-	PROCESS_DPI_UNAWARE = 0,
-	PROCESS_SYSTEM_DPI_AWARE = 1,
-	PROCESS_PER_MONITOR_DPI_AWARE = 2
-} PROCESS_DPI_AWARENESS;
-
-typedef enum MONITOR_DPI_TYPE {
-	MDT_EFFECTIVE_DPI = 0,
-	MDT_ANGULAR_DPI = 1,
-	MDT_RAW_DPI = 2,
-	MDT_DEFAULT = MDT_EFFECTIVE_DPI
-} MONITOR_DPI_TYPE;
-
-#endif
-
-typedef HRESULT(WINAPI* SetProcessDpiAwareness_t)(_In_ PROCESS_DPI_AWARENESS value);
-
-typedef HRESULT(WINAPI* GetProcessDpiAwareness_t)(
-	_In_ HANDLE hprocess,
-	_Out_ PROCESS_DPI_AWARENESS *value);
-
-typedef HRESULT(WINAPI* GetDpiForMonitor_t)(
-	_In_ HMONITOR hmonitor,
-	_In_ MONITOR_DPI_TYPE dpiType,
-	_Out_ UINT *dpiX,
-	_Out_ UINT *dpiY);
-
-typedef UINT(WINAPI* GetDpiForWindow_t)(_In_ HWND hwnd);
-
-typedef UINT(WINAPI* GetDpiForSystem_t)(VOID);
-
-typedef BOOL(WINAPI* AdjustWindowRectExForDpi_t)(
-	_Inout_ LPRECT lpRect,
-	_In_ DWORD dwStyle,
-	_In_ BOOL bMenu,
-	_In_ DWORD dwExStyle,
-	_In_ UINT dpi);
-
-typedef int(WINAPI* GetSystemMetricsForDpi_t)(
-	_In_ int nIndex,
-	_In_ UINT dpi);
-
 class LLWindowWin32 final : public LLWindow
 {
 public:
@@ -290,14 +246,6 @@ private:
 	HMODULE mOpenGL32DLL;
 	HMODULE mUser32DLL;
 	HMODULE mShellcoDLL;
-
-	SetProcessDpiAwareness_t pSetProcessDpiAwareness;
-	GetProcessDpiAwareness_t pGetProcessDpiAwareness;
-	GetDpiForMonitor_t pGetDpiForMonitor;
-	GetDpiForWindow_t pGetDpiForWindow;
-	GetDpiForSystem_t pGetDpiForSystem;
-	AdjustWindowRectExForDpi_t pAdjustWindowRectExForDpi;
-	GetSystemMetricsForDpi_t pGetSystemMetricsForDpi;
 
     // Cached values of GetWindowRect and GetClientRect to be used by app thread
     void updateWindowRect();

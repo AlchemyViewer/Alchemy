@@ -55,6 +55,7 @@
 #include <mapi.h>
 #include <process.h>	// for _spawn
 #include <shellapi.h>
+#include <ShellScalingApi.h>
 #include <fstream>
 #include <Imm.h>
 #include <iomanip>
@@ -73,8 +74,10 @@
 #include <Dbt.h.>
 #include <wingdi.h>
 #include <Windowsx.h>
+
 #pragma comment(lib, "dxguid.lib") // needed for llurlentry test to build on some systems
 #pragma comment(lib, "dinput8")
+#pragma comment(lib, "Shcore")
 
 #include "../newview/res/resource.h"
 
@@ -407,13 +410,6 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 	, mOpenGL32DLL(nullptr)
 	, mUser32DLL(nullptr)
 	, mShellcoDLL(nullptr)
-	, pSetProcessDpiAwareness(nullptr)
-	, pGetProcessDpiAwareness(nullptr)
-	, pGetDpiForMonitor(nullptr)
-	, pGetDpiForWindow(nullptr)
-	, pGetDpiForSystem(nullptr)
-	, pAdjustWindowRectExForDpi(nullptr)
-	, pGetSystemMetricsForDpi(nullptr)
 {
     sMainThreadId = LLThread::currentID();
     mWindowThread = new LLWindowWin32Thread();
@@ -497,68 +493,14 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 	mUser32DLL = LoadLibrary(TEXT("User32.dll"));
 	if (mUser32DLL != nullptr)
 	{
-		pGetDpiForWindow = (GetDpiForWindow_t) GetProcAddress(mUser32DLL, "GetDpiForWindow");
-		if (pGetDpiForWindow != nullptr)
-		{
-			LL_INFOS() << "Successfully got address for function GetDpiForWindow" << LL_ENDL;
-		}
-		else
-		{
-			LL_INFOS() << "Failed to get address for function GetDpiForWindow" << LL_ENDL;
-		}
 
-		pGetDpiForSystem = (GetDpiForSystem_t)GetProcAddress(mUser32DLL, "GetDpiForSystem");
-		if (pGetDpiForSystem != nullptr)
-		{
-			LL_INFOS() << "Successfully got address for function GetDpiForSystem" << LL_ENDL;
-		}
-		else
-		{
-			LL_INFOS() << "Failed to get address for function GetDpiForSystem" << LL_ENDL;
-		}
-
-		pAdjustWindowRectExForDpi = (AdjustWindowRectExForDpi_t) GetProcAddress(mUser32DLL, "AdjustWindowRectExForDpi");
-		if (pAdjustWindowRectExForDpi != nullptr)
-		{
-			LL_INFOS() << "Successfully got address for function AdjustWindowRectExForDpi" << LL_ENDL;
-		}
-		else
-		{
-			LL_INFOS() << "Failed to get address for function AdjustWindowRectExForDpi" << LL_ENDL;
-		}
-
-		pGetSystemMetricsForDpi = (GetSystemMetricsForDpi_t) GetProcAddress(mUser32DLL, "GetSystemMetricsForDpi");
-		if (pGetSystemMetricsForDpi != nullptr)
-		{
-			LL_INFOS() << "Successfully got address for function GetSystemMetricsForDpi" << LL_ENDL;
-		}
-		else
-		{
-			LL_INFOS() << "Failed to get address for function GetSystemMetricsForDpi" << LL_ENDL;
-		}
 	}
 
 	mShellcoDLL = LoadLibrary(TEXT("shcore.dll"));
 	if (mShellcoDLL != nullptr)
 	{
-		pGetProcessDpiAwareness = (GetProcessDpiAwareness_t) GetProcAddress(mShellcoDLL, "GetProcessDpiAwareness");
-		if (pGetProcessDpiAwareness != nullptr)
-		{
-			LL_INFOS() << "Successfully got address for function GetProcessDpiAwareness" << LL_ENDL;
-		}
-		else
-		{
-			LL_INFOS() << "Failed to get address for function GetProcessDpiAwareness" << LL_ENDL;
-		}
-		pGetDpiForMonitor = (GetDpiForMonitor_t) GetProcAddress(mShellcoDLL, "GetDpiForMonitor");
-		if (pGetDpiForMonitor != nullptr)
-		{
-			LL_INFOS() << "Successfully got address for function GetDpiForMonitor" << LL_ENDL;
-		}
-		else
-		{
-			LL_INFOS() << "Failed to get address for function GetDpiForMonitor" << LL_ENDL;
-		}
+
+
 	}
 
 	mFSAASamples = fsaa_samples;
@@ -666,23 +608,15 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 	S32 virtual_screen_y;
 	S32 virtual_screen_width;
 	S32 virtual_screen_height;
-	if (pGetDpiForSystem && pGetSystemMetricsForDpi)
-	{
-		UINT sysdpi = pGetDpiForSystem();
-		window_border_y = pGetSystemMetricsForDpi(SM_CYBORDER, sysdpi);
-		virtual_screen_x = pGetSystemMetricsForDpi(SM_XVIRTUALSCREEN, sysdpi);
-		virtual_screen_y = pGetSystemMetricsForDpi(SM_YVIRTUALSCREEN, sysdpi);
-		virtual_screen_width = pGetSystemMetricsForDpi(SM_CXVIRTUALSCREEN, sysdpi);
-		virtual_screen_height = pGetSystemMetricsForDpi(SM_CYVIRTUALSCREEN, sysdpi);
-	}
-	else
-	{
-		window_border_y = GetSystemMetrics(SM_CYBORDER);
-		virtual_screen_x = GetSystemMetrics(SM_XVIRTUALSCREEN);
-		virtual_screen_y = GetSystemMetrics(SM_YVIRTUALSCREEN);
-		virtual_screen_width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-		virtual_screen_height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-	}
+
+    {
+        UINT sysdpi = GetDpiForSystem();
+        window_border_y = GetSystemMetricsForDpi(SM_CYBORDER, sysdpi);
+        virtual_screen_x = GetSystemMetricsForDpi(SM_XVIRTUALSCREEN, sysdpi);
+        virtual_screen_y = GetSystemMetricsForDpi(SM_YVIRTUALSCREEN, sysdpi);
+        virtual_screen_width = GetSystemMetricsForDpi(SM_CXVIRTUALSCREEN, sysdpi);
+        virtual_screen_height = GetSystemMetricsForDpi(SM_CYVIRTUALSCREEN, sysdpi);
+    }
 
 	if (x < virtual_screen_x) x = virtual_screen_x;
 	if (y < virtual_screen_y - window_border_y) y = virtual_screen_y - window_border_y;
@@ -705,21 +639,15 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 		wc.cbWndExtra = 0;
 
 		wc.hInstance = mhInstance;
-		if (pGetDpiForSystem && pGetSystemMetricsForDpi)
+
 		{
-			UINT sysdpi = pGetDpiForSystem();
+			UINT sysdpi = GetDpiForSystem();
 			wc.hIcon = (HICON)LoadImage(mhInstance,
 				mIconResource, IMAGE_ICON,
-				pGetSystemMetricsForDpi(SM_CXICON, sysdpi),
-				pGetSystemMetricsForDpi(SM_CYICON, sysdpi), LR_SHARED);
+				GetSystemMetricsForDpi(SM_CXICON, sysdpi),
+				GetSystemMetricsForDpi(SM_CYICON, sysdpi), LR_SHARED);
 		}
-		else
-		{
-			wc.hIcon = (HICON)LoadImage(mhInstance,
-				mIconResource, IMAGE_ICON,
-				::GetSystemMetrics(SM_CXICON),
-				::GetSystemMetrics(SM_CYICON), LR_SHARED);
-		}
+
 		wc.hIconSm = NULL;
 
 		// We will set the cursor ourselves
@@ -1234,21 +1162,16 @@ BOOL LLWindowWin32::setSizeImpl(const LLCoordWindow size)
 	DWORD dw_ex_style = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
 	DWORD dw_style = WS_OVERLAPPEDWINDOW;
 
-	if (pAdjustWindowRectExForDpi != nullptr && pGetDpiForWindow != nullptr)
 	{
-		UINT dpi = pGetDpiForWindow((HWND) getPlatformWindow());
+		UINT dpi = GetDpiForWindow((HWND) getPlatformWindow());
 		if (dpi != 0)
 		{
-			pAdjustWindowRectExForDpi(&window_rect, dw_style, FALSE, dw_ex_style, dpi);
+			AdjustWindowRectExForDpi(&window_rect, dw_style, FALSE, dw_ex_style, dpi);
 		}
 		else
 		{
 			AdjustWindowRectEx(&window_rect, dw_style, FALSE, dw_ex_style);
 		}
-	}
-	else
-	{
-		AdjustWindowRectEx(&window_rect, dw_style, FALSE, dw_ex_style);
 	}
 
 	return setSizeImpl(LLCoordScreen(window_rect.right - window_rect.left, window_rect.bottom - window_rect.top));
@@ -4583,19 +4506,17 @@ bool LLWindowWin32::getInputDevices(U32 device_type_filter, void * di8_devices_c
 F32 LLWindowWin32::getSystemUISize()
 {
 	HWND hWnd = (HWND) getPlatformWindow();
-	if (pGetDpiForWindow != nullptr)
 	{
-		auto dpi = pGetDpiForWindow(hWnd);
+		auto dpi = GetDpiForWindow(hWnd);
 		if (dpi != 0)
 		{
 			return F32(dpi) / F32(USER_DEFAULT_SCREEN_DPI);
 		}
 	}
 
-	if (pGetProcessDpiAwareness != nullptr && pGetDpiForMonitor != nullptr)
 	{
 		PROCESS_DPI_AWARENESS dpi_awareness;
-		pGetProcessDpiAwareness(GetCurrentProcess(), &dpi_awareness);
+		GetProcessDpiAwareness(GetCurrentProcess(), &dpi_awareness);
 		if (dpi_awareness == PROCESS_PER_MONITOR_DPI_AWARE)
 		{
 			POINT    pt;
@@ -4608,7 +4529,7 @@ F32 LLWindowWin32::getSystemUISize()
 			pt.x = (rect.left + rect.right) / 2;
 			pt.y = (rect.top + rect.bottom) / 2;
 			auto hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-			hr = pGetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
+			hr = GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpix, &dpiy);
 			if (hr == S_OK)
 			{
 				return F32(dpix) / F32(USER_DEFAULT_SCREEN_DPI);
