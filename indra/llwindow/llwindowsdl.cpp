@@ -457,7 +457,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
    	mSDLFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
 
 	// Setup default backing colors
-    GLint redBits{8}, greenBits{8}, blueBits{8}, alphaBits{8};
+    GLint redBits{8}, greenBits{8}, blueBits{8}, alphaBits{0};
 	
 	GLint depthBits{24}, stencilBits{8};
 
@@ -465,7 +465,6 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, greenBits);
 	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, blueBits);
 	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, alphaBits);
-	SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 32);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depthBits);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencilBits);
 
@@ -699,7 +698,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     // fixme: actually, it's REALLY important for picking that we get at
     // least 8 bits each of red,green,blue.  Alpha we can be a bit more
     // relaxed about if we have to.
-    if (colorBits < 32)
+    if (colorBits < 24)
     {
         close();
         setupFailure("Alchemy requires True Color (32-bit) to run in a window.\n"
@@ -711,18 +710,18 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
         return FALSE;
     }
 
-    if (alphaBits < 8)
-    {
-        close();
-        setupFailure("Alchemy is unable to run because it can't get an 8 bit alpha\n"
-                     "channel.  Usually this is due to video card driver issues.\n"
-                     "Please make sure you have the latest video card drivers installed.\n"
-                     "Also be sure your monitor is set to True Color (32-bit) in\n"
-                     "Control Panels -> Display -> Settings.\n"
-                     "If you continue to receive this message, contact customer service.",
-                     "Error", OSMB_OK);
-        return FALSE;
-    }
+    // if (alphaBits < 8)
+    // {
+    //     close();
+    //     setupFailure("Alchemy is unable to run because it can't get an 8 bit alpha\n"
+    //                  "channel.  Usually this is due to video card driver issues.\n"
+    //                  "Please make sure you have the latest video card drivers installed.\n"
+    //                  "Also be sure your monitor is set to True Color (32-bit) in\n"
+    //                  "Control Panels -> Display -> Settings.\n"
+    //                  "If you continue to receive this message, contact customer service.",
+    //                  "Error", OSMB_OK);
+    //     return FALSE;
+    // }
 
 	LL_PROFILER_GPU_CONTEXT;
 
