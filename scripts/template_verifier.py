@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """\
 @file template_verifier.py
@@ -279,7 +280,7 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
     # retrieve the contents of the local template
     current = fetch(current_url)
     hexdigest = hashlib.blake2b(current).hexdigest()
-    if not options.force_verification:
+    if options.force_verification == False:
         # Early exist if the template hasn't changed.
         b2_url = "%s.b2" % current_url
         current_b2b = fetch(b2_url)
