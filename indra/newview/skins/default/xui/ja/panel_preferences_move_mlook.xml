@@ -12,8 +12,10 @@
 	<slider name="mouse_sensitivity"/>
 	<check_box label="反転" name="invert_mouse"/>
 	<text name="Combat Features">
-		コンバット機能：
+		ゲームプレイ機能：
 	</text>
+	<check_box label="マウスルック時の手順を表示する" name="alchemy_mlook_instructions" tool_tip="マウスルックのオーバーレイに説明テキストを表示します。"/>
+	<check_box label="マウスルック時に位置とヘルスを表示" name="alchemy_mlook_iff" tool_tip="マウスルックオーバーレイにユーザーの現在位置とヘルスを表示する。"/>
 	<check_box label="照準にユーザーを表示する" name="alchemy_mlook_iff" tool_tip="マウスルック時の照準にユーザーの名前と距離を表示します。"/>
 	<check_box label="画面外のユーザーに矢印を表示" name="alchemy_mlook_iff_markers" tool_tip="画面外のユーザーのいる方角の画面端に矢印を表示します。"/>
 	<slider name="iff_range_slider"/>

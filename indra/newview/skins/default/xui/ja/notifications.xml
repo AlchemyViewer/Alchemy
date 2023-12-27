@@ -6165,4 +6165,10 @@ Intelドライバーのウェブサイトを確認しますか？
 グラフィック設定をリセットしますか?
 		<usetemplate name="yesnocancelbuttons" yestext="リセットする" notext="このままにする" canceltext="リセットしない"/>
 	</notification>
+	<notification name="LoadCameraPositionNoneSaved">
+		カメラビューはまだ保存されていません。
+	</notification>
+	<notification name="LoadCameraPositionOutsideDrawDistance">
+		カメラの位置が描画距離を超えているため、カメラビューを復元できませんでした。
+	</notification>
 </notifications>
