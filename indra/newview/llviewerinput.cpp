@@ -481,6 +481,29 @@ bool camera_spin_under_sitting( EKeystate s )
 	return true;
 }
 
+bool camera_roll_left(EKeystate s)
+{
+    if (KEYSTATE_UP == s) return true;
+    gAgentCamera.unlockView();
+    gAgentCamera.setRollLeftKey(get_orbit_rate());
+    return true;
+}
+
+bool camera_roll_right(EKeystate s)
+{
+    if (KEYSTATE_UP == s) return true;
+    gAgentCamera.unlockView();
+    gAgentCamera.setRollRightKey(get_orbit_rate());
+    return true;
+}
+
+bool camera_roll_reset(EKeystate s)
+{
+    if (KEYSTATE_UP == s) return true;
+    gAgentCamera.mCameraRollAngle = 0.f;
+    return true;
+}
+
 bool camera_move_forward( EKeystate s )
 {
 	if( KEYSTATE_UP == s  ) return true;
@@ -1069,7 +1092,10 @@ REGISTER_KEYBOARD_ACTION("teleport_to", teleport_to);
 REGISTER_KEYBOARD_ACTION("walk_to", walk_to);
 REGISTER_KEYBOARD_GLOBAL_ACTION("toggle_voice", toggle_voice);
 REGISTER_KEYBOARD_GLOBAL_ACTION("voice_follow_key", voice_follow_key);
-REGISTER_KEYBOARD_ACTION(script_mouse_handler_name, script_trigger_lbutton);
+REGISTER_KEYBOARD_ACTION("script_trigger_lbutton", script_trigger_lbutton);
+REGISTER_KEYBOARD_ACTION("roll_left", camera_roll_left);
+REGISTER_KEYBOARD_ACTION("roll_right", camera_roll_right);
+REGISTER_KEYBOARD_ACTION("roll_reset", camera_roll_reset);
 #undef REGISTER_KEYBOARD_ACTION
 
 LLViewerInput::LLViewerInput()

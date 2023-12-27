@@ -187,7 +187,9 @@ LLAgentCamera::LLAgentCamera() :
 	mPanLeftKey(0.f),
 	mPanRightKey(0.f),
 	mPanInKey(0.f),
-	mPanOutKey(0.f)
+	mPanOutKey(0.f),
+	mRollLeftKey(0.f),
+	mRollRightKey(0.f)
 {
 	mFollowCam.setMaxCameraDistantFromSubject( MAX_CAMERA_DISTANCE_FROM_AGENT );
 
@@ -197,6 +199,7 @@ LLAgentCamera::LLAgentCamera() :
 
 	resetPanDiff();
 	resetOrbitDiff();
+	resetCameraRoll();
 }
 
 // Requires gSavedSettings to be initialized.
@@ -374,6 +377,7 @@ void LLAgentCamera::resetView(BOOL reset_camera, BOOL change_camera)
 	}
 	resetPanDiff();
 	resetOrbitDiff();
+	resetCameraRoll();
 	mHUDTargetZoom = 1.f;
 
     if (LLSelectMgr::getInstance()->mAllowSelectAvatar)
@@ -927,6 +931,19 @@ void LLAgentCamera::cameraOrbitOver(const F32 angle)
 	}
 }
 
+//-----------------------------------------------------------------------------
+// cameraRollOver()
+//-----------------------------------------------------------------------------
+void LLAgentCamera::cameraRollOver(const F32 angle)
+{
+	mRollAngle += fmod(angle, F_TWO_PI);
+}
+
+void LLAgentCamera::resetCameraRoll()
+{
+	mRollAngle = 0.f;
+}
+
 void LLAgentCamera::resetCameraOrbit()
 {
 	LLVector3 camera_offset_unit(mCameraFocusOffsetTarget);
@@ -940,6 +957,7 @@ void LLAgentCamera::resetCameraOrbit()
 
 	cameraZoomIn(1.f);
 	resetOrbitDiff();
+	resetCameraRoll();
 }
 
 void LLAgentCamera::resetOrbitDiff()
@@ -1246,6 +1264,8 @@ void LLAgentCamera::updateCamera()
         return;
     }
 
+	//BD - Camera Rolling
+	//     Make sure we always start with a neutral camera roll.
 	// - changed camera_skyward to the new global "mCameraUpVector"
 	mCameraUpVector = LLVector3::z_axis;
 	//LLVector3	camera_skyward(0.f, 0.f, 1.f);
@@ -1312,6 +1332,7 @@ void LLAgentCamera::updateCamera()
 	const F32 ORBIT_OVER_RATE = 90.f * DEG_TO_RAD;			// radians per second
 	const F32 ORBIT_AROUND_RATE = 90.f * DEG_TO_RAD;		// radians per second
 	const F32 PAN_RATE = 5.f;								// meters per second
+	const F32 ROLL_RATE = 45.f * DEG_TO_RAD;				// radians per second
 
 	if (gAgentCamera.getOrbitUpKey() || gAgentCamera.getOrbitDownKey())
 	{
@@ -1351,6 +1372,12 @@ void LLAgentCamera::updateCamera()
 	{
 		F32 input_rate = gAgentCamera.getPanUpKey() - gAgentCamera.getPanDownKey();
 		cameraPanUp(input_rate * PAN_RATE / gFPSClamped );
+	}
+
+	if (getRollLeftKey() || getRollRightKey())
+	{
+		F32 input_rate = getRollRightKey() - getRollLeftKey();
+		cameraRollOver(input_rate * ROLL_RATE / gFPSClamped);
 	}
 
 	// Clear camera keyboard keys.
@@ -1616,6 +1643,18 @@ void LLAgentCamera::updateCamera()
 		torso_joint->setScale(torso_scale);
 		chest_joint->setScale(chest_scale);
 	}
+
+	//     We have do this at the very end to make sure it takes all previous calculations into
+	//     account and then applies our roll on top of it, besides it wouldn't even work otherwise.
+	LLQuaternion rot_quat = vwr_camera.getQuaternion();
+	LLMatrix3 rot_mat(mRollAngle, 0.f, 0.f);
+	rot_quat = LLQuaternion(rot_mat)*rot_quat;
+	
+	LLMatrix3 mat(rot_quat);
+	
+	vwr_camera.mXAxis = LLVector3(mat.mMatrix[0]);
+	vwr_camera.mYAxis = LLVector3(mat.mMatrix[1]);
+	vwr_camera.mZAxis = LLVector3(mat.mMatrix[2]);
 }
 
 void LLAgentCamera::updateLastCamera()
@@ -2694,6 +2733,7 @@ void LLAgentCamera::switchCameraPreset(ECameraPreset preset)
 
 	resetPanDiff();
 	resetOrbitDiff();
+	resetCameraRoll();
 
 	gSavedSettings.setU32("CameraPresetType", mCameraPreset);
 }
@@ -3183,6 +3223,8 @@ void LLAgentCamera::clearOrbitKeys()
 	mOrbitDownKey		= 0.f;
 	mOrbitInKey			= 0.f;
 	mOrbitOutKey		= 0.f;
+	mRollLeftKey		= 0.f;
+	mRollRightKey		= 0.f;
 }
 
 void LLAgentCamera::clearPanKeys()
@@ -3212,6 +3254,7 @@ void LLAgentCamera::storeCameraPosition()
 	// flycam  mode and not repositioned after
 	LLVector3d forward = LLVector3d(1.0, 0.0, 0.0) * LLViewerCamera::getInstance()->getQuaternion() + getCameraPositionGlobal();
 	gSavedPerAccountSettings.setVector3d("ALStoredCameraFocus", forward);
+	gSavedPerAccountSettings.setF32("ALStoredCameraRoll", mRollAngle);
 
 	LLUUID stored_camera_focus_object_id = LLUUID::null;
 	if (mFocusObject)
@@ -3225,6 +3268,7 @@ void LLAgentCamera::loadCameraPosition()
 {
 	LLVector3d stored_camera_pos = gSavedPerAccountSettings.getVector3d("ALStoredCameraPos");
 	LLVector3d stored_camera_focus = gSavedPerAccountSettings.getVector3d("ALStoredCameraFocus");
+	F32 stored_camera_roll = gSavedPerAccountSettings.getF32("ALStoredCameraRoll");
 	LLUUID stored_camera_focus_object_id = LLUUID(gSavedPerAccountSettings.getString("ALStoredCameraFocusObjectId"));
 
 	F32 renderFarClip = gSavedSettings.getF32("RenderFarClip");
@@ -3253,6 +3297,8 @@ void LLAgentCamera::loadCameraPosition()
 
 	unlockView();
 	setCameraPosAndFocusGlobal(stored_camera_pos, stored_camera_focus, stored_camera_focus_object_id);
+
+	mRollAngle = stored_camera_roll;
 }
 
 // EOF
