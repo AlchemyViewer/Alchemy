@@ -227,13 +227,13 @@ private:
 	region_remove_signal_t mRegionRemovedSignal;
 
 	// Number of points on edge
-	static U32 mWidth;
-	static U32 mLength;
+	U32 mWidth = 256;
+	U32 mLength = 256;
 
 	// meters/point, therefore mWidth * mScale = meters per edge
-	static const F32 mScale;
+	F32 mScale = 1.f;
 
-	static F32 mWidthInMeters;
+	F32 mWidthInMeters;
 	F32 mRegionMaxHeight;
 	F32 mRegionMinPrimScale;
 	F32 mRegionMaxPrimScale;
@@ -257,7 +257,7 @@ private:
 	//
 
 	std::list<LLPointer<LLVOWater> > mHoleWaterObjects;
-    static const S32 EDGE_WATER_OBJECTS_COUNT = 8;
+    static constexpr S32 EDGE_WATER_OBJECTS_COUNT = 8;
     LLPointer<LLVOWater> mEdgeWaterObjects[EDGE_WATER_OBJECTS_COUNT];
 
 	LLPointer<LLViewerTexture> mDefaultWaterTexturep;

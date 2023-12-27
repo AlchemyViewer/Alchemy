@@ -79,20 +79,16 @@ const S32 OS_MAX_LINK_OBJECTS = 8191;	// Magic and arbitrary
 
 extern LLColor4U MAX_WATER_COLOR;
 
-U32 LLWorld::mWidth = 256;
-U32 LLWorld::mLength = 256;
-
-// meters/point, therefore mWidth * mScale = meters per edge
-const F32 LLWorld::mScale = 1.f;
-
-F32 LLWorld::mWidthInMeters = mWidth * mScale;
-
 //
 // Functions
 //
 
 // allocate the stack
 LLWorld::LLWorld() :
+	mWidth(256),
+	mLength(256),
+	mScale(1.f),
+	mWidthInMeters(mWidth * mScale),
 	mRefreshLimits(true),
 	mLandFarClip(DEFAULT_FAR_PLANE),
 	mLastPacketsIn(0),
