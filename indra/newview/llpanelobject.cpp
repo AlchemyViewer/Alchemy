@@ -2762,7 +2762,7 @@ void LLPanelObject::onRotSelect(bool success, LLViewerObject* obj, const LLTextu
 
 void LLPanelObject::onParamsSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
 {
-	if (success && obj != mObject && (obj && obj->permModify() && !obj->isMesh()) && (mObject && mObject->permModify() && !mObject->isMesh()))
+	if (success && obj != mObject.get() && (obj && obj->permModify() && !obj->isMesh()) && (mObject && mObject->permModify() && !mObject->isMesh()))
 	{
 		if (obj->getVolume() && LL_PCODE_VOLUME == obj->getPCode())
 		{
