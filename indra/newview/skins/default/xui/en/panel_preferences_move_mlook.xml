@@ -15,7 +15,7 @@
    length="1"
    height="10"
    layout="topleft"
-   left="78"
+   left="75"
    name="mouse_lbl"
    width="270"
    top_pad="15">
@@ -98,15 +98,37 @@
    top_pad="10"
    width="160"
    wrap="true">
-    Combat Features:
+    Gameplay Features:
   </text>
+  <check_box
+   control_name="AlchemyMouselookInstructions"
+   follows="left|top"
+   height="20"
+   label="Show Mouselook Instructions"
+   layout="topleft"
+   left_delta="5"
+   name="alchemy_mlook_instructions"
+   tool_tip="Shows instructional text in mouselook overlay."
+   top_pad="0"
+   width="256" />
+   <check_box
+   control_name="AlchemyMouselookPosition"
+   follows="left|top"
+   height="20"
+   label="Show Position and Health in Mouselook"
+   layout="topleft"
+   left_delta="0"
+   name="alchemy_mlook_iff"
+   tool_tip="Shows user's current position and health in mouselook overlay."
+   top_pad="0"
+   width="256" />
   <check_box
    control_name="AlchemyMouselookIFF"
    follows="left|top"
    height="20"
    label="Show User In Crosshairs"
    layout="topleft"
-   left_delta="5"
+   left_delta="0"
    name="alchemy_mlook_iff"
    tool_tip="Shows user's name and distance in mouselook's crosshairs."
    top_pad="0"

@@ -1723,5 +1723,27 @@
 			<key>Value</key>
 			<integer>0</integer>
 		</map>
+		<key>AlchemyMouselookInstructions</key>
+		<map>
+			<key>Comment</key>
+			<string>Draw instructional overlay for mouselook - Press esc to leave</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>Boolean</string>
+			<key>Value</key>
+			<integer>1</integer>
+		</map>
+		<key>AlchemyMouselookPosition</key>
+		<map>
+			<key>Comment</key>
+			<string>Draw position and health in mouselook</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>Boolean</string>
+			<key>Value</key>
+			<integer>1</integer>
+		</map>
 	</map>
 </llsd>
