@@ -46,10 +46,19 @@
 		<columns name="lst_action" value="カメラの中心を縮小"/>
 	</rows>
 	<rows name="spin_around_ccw" value="spin_around_ccw">
-		<columns name="lst_action" tool_tip="対象に対して、カメラを反時計回りに回します。" value="反時計回り"/>
+		<columns name="lst_action" tool_tip="カメラを対象に対して、反時計回りに回します。" value="反時計回り"/>
 	</rows>
 	<rows name="spin_around_cw" value="spin_around_cw">
-		<columns name="lst_action" tool_tip="対象に対して、カメラをカメラを時計回りに回します。" value="時計回り"/>
+		<columns name="lst_action" tool_tip="カメラを対象に対して、時計回りに回します。" value="時計回り"/>
+	</rows>
+	<rows name="roll_left" value="roll_left">
+		<columns name="lst_action" tool_tip="カメラを対象に対して、左回転で傾けます。" value="左に傾ける"/>
+	</rows>
+	<rows name="roll_right" value="roll_right">
+		<columns name="lst_action" tool_tip="カメラを対象に対して、右回転で傾けます。" value="右に傾ける" />
+	</rows>
+	<rows name="roll_reset" value="roll_reset">
+		<columns name="lst_action" tool_tip="カメラの左右の傾きをリセットします。" value="傾きをリセット" />
 	</rows>
 	<rows name="move_forward_sitting" value="move_forward_sitting">
 		<columns name="lst_action" value="座った状態でカメラを近づける"/>
