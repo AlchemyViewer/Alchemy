@@ -84,11 +84,11 @@
 										<button name="skip_forward_btn" tool_tip="次のステップ"/>
 									</layout_panel>
 								</layout_stack>
-								<layout_panel name="frames_lp">
-									<button label="[FRAME]を追加" name="add_frame"/>
-									<button label="[FRAME]を読み込む" name="btn_load_frame"/>
-									<button label="[FRAME]を削除" name="delete_frame"/>
-								</layout_panel>
+							</layout_panel>
+							<layout_panel name="frames_lp">
+								<button label="[FRAME]を追加" name="add_frame"/>
+								<button label="[FRAME]を読み込む" name="btn_load_frame"/>
+								<button label="[FRAME]を削除" name="delete_frame"/>
 							</layout_panel>
 						</layout_stack>
 					</panel>
