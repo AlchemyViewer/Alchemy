@@ -81,11 +81,15 @@ protected:
 	void	onCameraTrack();
 	void	onCameraRotate();
 	F32		getOrbitRate(F32 time);
+	void	onRollLeftHeldDown();
+	void	onRollRightHeldDown();
 
 private:
 	LLButton*	mPlusBtn;
 	LLButton*	mMinusBtn;
 	LLSlider*	mSlider;
+	LLButton*	mRollLeft;
+	LLButton*	mRollRight;
 };
 
 LLPanelCameraItem::Params::Params()
@@ -164,13 +168,17 @@ static LLPanelInjector<LLPanelCameraZoom> t_camera_zoom_panel("camera_zoom_panel
 LLPanelCameraZoom::LLPanelCameraZoom()
 :	mPlusBtn( NULL ),
 	mMinusBtn( NULL ),
-	mSlider( NULL )
+	mSlider( NULL ),
+	mRollLeft( NULL ),
+	mRollRight( NULL )
 {
 	mCommitCallbackRegistrar.add("Zoom.minus", boost::bind(&LLPanelCameraZoom::onZoomMinusHeldDown, this));
 	mCommitCallbackRegistrar.add("Zoom.plus", boost::bind(&LLPanelCameraZoom::onZoomPlusHeldDown, this));
 	mCommitCallbackRegistrar.add("Slider.value_changed", boost::bind(&LLPanelCameraZoom::onSliderValueChanged, this));
 	mCommitCallbackRegistrar.add("Camera.track", boost::bind(&LLPanelCameraZoom::onCameraTrack, this));
 	mCommitCallbackRegistrar.add("Camera.rotate", boost::bind(&LLPanelCameraZoom::onCameraRotate, this));
+	mCommitCallbackRegistrar.add("Camera.roll_left", boost::bind(&LLPanelCameraZoom::onRollLeftHeldDown, this));
+	mCommitCallbackRegistrar.add("Camera.roll_right", boost::bind(&LLPanelCameraZoom::onRollRightHeldDown, this));
 }
 
 BOOL LLPanelCameraZoom::postBuild()
@@ -178,6 +186,8 @@ BOOL LLPanelCameraZoom::postBuild()
 	mPlusBtn  = getChild <LLButton> ("zoom_plus_btn");
 	mMinusBtn = getChild <LLButton> ("zoom_minus_btn");
 	mSlider   = getChild <LLSlider> ("zoom_slider");
+	mRollLeft	= getChild <LLButton> ("roll_left");
+	mRollRight	= getChild <LLButton> ("roll_right");
 	return LLPanel::postBuild();
 }
 
@@ -205,6 +215,20 @@ void LLPanelCameraZoom::onZoomMinusHeldDown()
 	F32 time = mMinusBtn->getHeldDownTime();
 	gAgentCamera.unlockView();
 	gAgentCamera.setOrbitOutKey(getOrbitRate(time));
+}
+
+void LLPanelCameraZoom::onRollLeftHeldDown()
+{
+	F32 time = mRollLeft->getHeldDownTime();
+	gAgentCamera.unlockView();
+	gAgentCamera.setRollLeftKey(getOrbitRate(time));
+}
+
+void LLPanelCameraZoom::onRollRightHeldDown()
+{
+	F32 time = mRollRight->getHeldDownTime();
+	gAgentCamera.unlockView();
+	gAgentCamera.setRollRightKey(getOrbitRate(time));
 }
 
 void LLPanelCameraZoom::onCameraTrack()

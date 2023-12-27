@@ -123,8 +123,38 @@
               sound_flags="3"
               visible="true"
               tool_tip="Orbit camera around focus"
-              top="5"
-              width="78" />                      
+              top="3"
+              width="78" /> 
+           <button
+              follows="top|left"
+              height="18"
+              image_selected="VirtualTrackball_Rotate_Left_Active"
+              image_unselected="VirtualTrackball_Rotate_Left"
+              layout="topleft"
+              left_delta="0"
+              name="roll_left"
+              width="18"
+              top="66">
+             <commit_callback
+                function="Camera.roll_left" />
+             <mouse_held_callback
+                function="Camera.roll_left" />
+           </button>
+           <button
+              follows="top|left"
+              height="18"
+              image_selected="VirtualTrackball_Rotate_Right_Active"
+              image_unselected="VirtualTrackball_Rotate_Right"
+              layout="topleft"
+              left_delta="60"
+              name="roll_right"
+              width="18"
+              top="66">
+             <commit_callback
+                function="Camera.roll_right" />
+             <mouse_held_callback
+                function="Camera.roll_right" />
+           </button>                     
            <button
               follows="top|left"
               height="18"
@@ -180,7 +210,7 @@
          scale_image="false"
          sound_flags="3"
          tool_tip="Move camera up and down, left and right"
-         top="5"
+         top="3"
          width="78"/>
         </panel>
     </panel>
