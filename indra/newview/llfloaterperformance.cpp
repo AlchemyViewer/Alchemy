@@ -125,7 +125,6 @@ BOOL LLFloaterPerformance::postBuild()
     mSettingsPanel->getChild<LLButton>("advanced_btn")->setCommitCallback(boost::bind(&LLFloaterPerformance::onClickAdvanced, this));
     mSettingsPanel->getChild<LLButton>("defaults_btn")->setCommitCallback(boost::bind(&LLFloaterPerformance::onClickDefaults, this));
     mSettingsPanel->getChild<LLRadioGroup>("graphics_quality")->setCommitCallback(boost::bind(&LLFloaterPerformance::onChangeQuality, this, _2));
-    mSettingsPanel->getChild<LLCheckBoxCtrl>("advanced_lighting_model")->setMouseDownCallback(boost::bind(&LLFloaterPerformance::onClickAdvancedLighting, this));
     mSettingsPanel->getChild<LLComboBox>("ShadowDetail")->setMouseDownCallback(boost::bind(&LLFloaterPerformance::onClickShadows, this));
 
     mNearbyPanel->getChild<LLButton>("exceptions_btn")->setCommitCallback(boost::bind(&LLFloaterPerformance::onClickExceptions, this));
@@ -683,19 +682,9 @@ void LLFloaterPerformance::changeQualityLevel(const std::string& notif)
 bool is_ALM_available()
 {
     bool bumpshiny = LLCubeMap::sUseCubeMaps && LLFeatureManager::getInstance()->isFeatureAvailable("RenderObjectBump") && gSavedSettings.getBOOL("RenderObjectBump");
-    bool shaders = gSavedSettings.getBOOL("WindLightUseAtmosShaders");
     
     return LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred") &&
-        bumpshiny &&
-        shaders;
-}
-
-void LLFloaterPerformance::onClickAdvancedLighting()
-{
-    if (!is_ALM_available())
-    {
-        changeQualityLevel("AdvancedLightingConfirm");
-    }
+        bumpshiny;
 }
 
 void LLFloaterPerformance::onClickShadows()

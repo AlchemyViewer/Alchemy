@@ -128,7 +128,6 @@ void LLFloaterPreferenceGraphicsAdvanced::refresh()
     updateSliderText(getChild<LLSliderCtrl>("TerrainMeshDetail",	true), getChild<LLTextBox>("TerrainMeshDetailText",		true));
     updateSliderText(getChild<LLSliderCtrl>("RenderPostProcess",	true), getChild<LLTextBox>("PostProcessText",			true));
     updateSliderText(getChild<LLSliderCtrl>("SkyMeshDetail",		true), getChild<LLTextBox>("SkyMeshDetailText",			true));
-    updateSliderText(getChild<LLSliderCtrl>("TerrainDetail",		true), getChild<LLTextBox>("TerrainDetailText",			true));	
     LLAvatarComplexityControls::setIndirectControls();
     setMaxNonImpostorsText(
         gSavedSettings.getU32("RenderAvatarMaxNonImpostors"),
@@ -232,56 +231,10 @@ void LLFloaterPreferenceGraphicsAdvanced::setMaxNonImpostorsText(U32 value, LLTe
 
 void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
 {	
-    LLCheckBoxCtrl* ctrl_wind_light    = getChild<LLCheckBoxCtrl>("WindLightUseAtmosShaders");
-    LLCheckBoxCtrl* ctrl_deferred = getChild<LLCheckBoxCtrl>("UseLightShaders");
     LLComboBox* ctrl_shadows = getChild<LLComboBox>("ShadowDetail");
     LLTextBox* shadows_text = getChild<LLTextBox>("RenderShadowDetailText");
     LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");
-    LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
-    LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
-    LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
     LLComboBox* ctrl_anisotropic = getChild<LLComboBox>("anisotropic_filter");
-
-    // disabled windlight
-    if (!LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))
-    {
-        ctrl_wind_light->setEnabled(FALSE);
-        ctrl_wind_light->setValue(FALSE);
-
-        sky->setEnabled(FALSE);
-        sky_text->setEnabled(FALSE);
-
-        //deferred needs windlight, disable deferred
-        ctrl_shadows->setEnabled(FALSE);
-        ctrl_shadows->setValue(0);
-        shadows_text->setEnabled(FALSE);
-
-        ctrl_ssao->setEnabled(FALSE);
-        ctrl_ssao->setValue(FALSE);
-
-        ctrl_dof->setEnabled(FALSE);
-        ctrl_dof->setValue(FALSE);
-
-        ctrl_deferred->setEnabled(FALSE);
-        ctrl_deferred->setValue(FALSE);
-    }
-
-    // disabled deferred
-    if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"))
-    {
-        ctrl_shadows->setEnabled(FALSE);
-        ctrl_shadows->setValue(0);
-        shadows_text->setEnabled(FALSE);
-
-        ctrl_ssao->setEnabled(FALSE);
-        ctrl_ssao->setValue(FALSE);
-
-        ctrl_dof->setEnabled(FALSE);
-        ctrl_dof->setValue(FALSE);
-
-        ctrl_deferred->setEnabled(FALSE);
-        ctrl_deferred->setValue(FALSE);
-    }
 
     // disabled deferred SSAO
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferredSSAO"))
@@ -306,19 +259,6 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
 
 void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 {
-    // Bump & Shiny	
-    LLCheckBoxCtrl* bumpshiny_ctrl = getChild<LLCheckBoxCtrl>("BumpShiny");
-    bool bumpshiny = LLCubeMap::sUseCubeMaps && LLFeatureManager::getInstance()->isFeatureAvailable("RenderObjectBump");
-    bumpshiny_ctrl->setEnabled(bumpshiny ? TRUE : FALSE);
-
-    // Vertex Shaders, Global Shader Enable
-    // SL-12594 Basic shaders are always enabled. DJH TODO clean up now-orphaned state handling code
-    LLSliderCtrl* terrain_detail = getChild<LLSliderCtrl>("TerrainDetail");   // can be linked with control var
-    LLTextBox* terrain_text = getChild<LLTextBox>("TerrainDetailText");
-
-    terrain_detail->setEnabled(FALSE);
-    terrain_text->setEnabled(FALSE);
-
     // WindLight
     //LLCheckBoxCtrl* ctrl_wind_light = getChild<LLCheckBoxCtrl>("WindLightUseAtmosShaders");
     //ctrl_wind_light->setEnabled(TRUE);
@@ -328,16 +268,6 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
     sky_text->setEnabled(TRUE);
 
     BOOL enabled = TRUE;
-#if 0 // deferred always on now
-    //Deferred/SSAO/Shadows
-    LLCheckBoxCtrl* ctrl_deferred = getChild<LLCheckBoxCtrl>("UseLightShaders");
-
-    enabled = LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred") &&
-        ((bumpshiny_ctrl && bumpshiny_ctrl->get()) ? TRUE : FALSE) &&
-        (ctrl_wind_light->get()) ? TRUE : FALSE;
-
-    ctrl_deferred->setEnabled(enabled);
-#endif
 
     LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");
     LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
@@ -384,11 +314,6 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 		af_combo->remove("16x");
 	}
 
-    // if no windlight shaders, turn off nighttime brightness, gamma, and fog distance
-    LLUICtrl* gamma_ctrl = getChild<LLUICtrl>("gamma");
-    gamma_ctrl->setEnabled(!gPipeline.canUseWindLightShaders());
-    getChildView("(brightness, lower is brighter)")->setEnabled(!gPipeline.canUseWindLightShaders());
-    getChildView("fog")->setEnabled(!gPipeline.canUseWindLightShaders());
     getChildView("antialiasing restart")->setVisible(!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"));
 
     // now turn off any features that are unavailable

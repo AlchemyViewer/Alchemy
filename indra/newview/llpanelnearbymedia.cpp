@@ -907,7 +907,7 @@ bool LLPanelNearByMedia::shouldShow(LLViewerMediaImpl* impl)
 void LLPanelNearByMedia::onAdvancedButtonClick()
 {	
 	// bring up the prefs floater
-	LLFloaterPreference* prefsfloater = dynamic_cast<LLFloaterPreference*>(LLFloaterReg::showInstance("preferences"));
+	LLFloaterPreference* prefsfloater = LLFloaterReg::showTypedInstance<LLFloaterPreference>("preferences");
 	if (prefsfloater)
 	{
 		// grab the 'audio' panel from the preferences floater and

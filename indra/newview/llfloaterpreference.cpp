@@ -299,9 +299,7 @@ public:
     {
         if (params.size() < 1) return false;
 
-        LLFloaterPreference* prefsfloater = dynamic_cast<LLFloaterPreference*>
-            (LLFloaterReg::showInstance("preferences"));
-
+        LLFloaterPreference* prefsfloater = LLFloaterReg::showTypedInstance<LLFloaterPreference>("preferences");
         if (prefsfloater)
         {
             // find 'controls' panel and bring it the front
@@ -385,7 +383,6 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 	gSavedSettings.getControl("UseDisplayNames")->getCommitSignal()->connect(boost::bind(&handleDisplayNamesOptionChanged,  _2));
 
 	gSavedSettings.getControl("AppearanceCameraMovement")->getCommitSignal()->connect(boost::bind(&handleAppearanceCameraMovementChanged,  _2));
-    gSavedSettings.getControl("WindLightUseAtmosShaders")->getCommitSignal()->connect(boost::bind(&LLFloaterPreference::onAtmosShaderChange, this));
 
 	LLAvatarPropertiesProcessor::getInstance()->addObserver( gAgent.getID(), this );
 
@@ -948,6 +945,7 @@ LLFloaterPreference::~LLFloaterPreference()
 	if (mGridListChangedConnection.connected())
 		mGridListChangedConnection.disconnect();
 #endif
+	LLAvatarPropertiesProcessor::getInstance()->removeObserver(gAgent.getID(), this);
 	LLConversationLog::instance().removeObserver(this);
     mComplexityChangedSignal.disconnect();
 }
@@ -1005,8 +1003,6 @@ void LLFloaterPreference::apply()
 	
 	std::string cache_location = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "");
 	setCacheLocation(cache_location);
-	
-	LLViewerMedia::getInstance()->setCookiesEnabled(getChild<LLUICtrl>("cookies_enabled")->getValue());
 	
 	if (hasChild("web_proxy_enabled", TRUE) &&hasChild("web_proxy_editor", TRUE) && hasChild("web_proxy_port", TRUE))
 	{
@@ -2180,22 +2176,6 @@ void LLFloaterPreference::onClickAdvanced()
 void LLFloaterPreference::onClickActionChange()
 {
     updateClickActionControls();
-}
-
-void LLFloaterPreference::onAtmosShaderChange()
-{
-    LLCheckBoxCtrl* ctrl_alm = getChild<LLCheckBoxCtrl>("UseLightShaders");
-    if(ctrl_alm)
-    {
-        //Deferred/SSAO/Shadows
-        BOOL bumpshiny = LLCubeMap::sUseCubeMaps && LLFeatureManager::getInstance()->isFeatureAvailable("RenderObjectBump") && gSavedSettings.getBOOL("RenderObjectBump");
-        BOOL shaders = gSavedSettings.getBOOL("WindLightUseAtmosShaders");
-        BOOL enabled = LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred") &&
-                        bumpshiny &&
-                        shaders;
-
-        ctrl_alm->setEnabled(enabled);
-    }
 }
 
 void LLFloaterPreference::onClickPermsDefault()
