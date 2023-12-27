@@ -109,9 +109,6 @@ public:
 	void refreshLocationCtrl();
 // [/RLVa:KB]
 private:
-	// the distance between navigation panel and favorites panel in pixels
-	const static S32 FAVBAR_TOP_PADDING = 10;
-
 	void rebuildTeleportHistoryMenu();
 	void showTeleportHistoryMenu(LLUICtrl* btn_ctrl);
 	void invokeSearch(std::string search_text);

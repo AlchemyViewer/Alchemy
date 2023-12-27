@@ -60,7 +60,7 @@ enum VoiceGesticulationLevel
 	NUM_VOICE_GESTICULATION_LEVELS
 };
 
-const static int NUM_VOICE_SYMBOL_WAVES = 7;
+constexpr int NUM_VOICE_SYMBOL_WAVES = 7;
 
 //----------------------------------------------------
 // LLVoiceVisualizer class 

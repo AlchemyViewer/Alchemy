@@ -39,8 +39,8 @@ class LLGroupHeader;
 
 class LLWind  
 {
-	static const size_t WIND_SIZE = 16;
-	static const size_t ARRAY_SIZE = WIND_SIZE * WIND_SIZE;
+	static constexpr size_t WIND_SIZE = 16;
+	static constexpr size_t ARRAY_SIZE = WIND_SIZE * WIND_SIZE;
 public:
 	static constexpr F32 WIND_SCALE_HACK = 2.0f; // hack to make wind speeds more realistic
 
