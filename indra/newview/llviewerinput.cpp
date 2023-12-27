@@ -500,7 +500,7 @@ bool camera_roll_right(EKeystate s)
 bool camera_roll_reset(EKeystate s)
 {
     if (KEYSTATE_UP == s) return true;
-    gAgentCamera.mCameraRollAngle = 0.f;
+    gAgentCamera.resetCameraRoll();
     return true;
 }
 
