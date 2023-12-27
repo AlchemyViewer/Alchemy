@@ -2184,26 +2184,26 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
 
         if (mIsFriendSignal)
         {
-            bool isFriend = *(*mIsFriendSignal)(LLUUID(LLUrlAction::getUserID(url)));
-            LLView* addFriendButton = menu->getChild<LLView>("add_friend");
-            LLView* removeFriendButton = menu->getChild<LLView>("remove_friend");
+            LLView* addFriendButton = menu->findChild<LLView>("add_friend");
+            LLView* removeFriendButton = menu->findChild<LLView>("remove_friend");
 
             if (addFriendButton && removeFriendButton)
             {
-                addFriendButton->setEnabled(!isFriend);
+				bool isFriend = *(*mIsFriendSignal)(LLUUID(LLUrlAction::getUserID(url)));
+				addFriendButton->setEnabled(!isFriend);
                 removeFriendButton->setEnabled(isFriend);
             }
         }
 
         if (mIsObjectBlockedSignal)
         {
-            bool is_blocked = *(*mIsObjectBlockedSignal)(LLUUID(LLUrlAction::getObjectId(url)), LLUrlAction::getObjectName(url));
-            LLView* blockButton = menu->getChild<LLView>("block_object");
-            LLView* unblockButton = menu->getChild<LLView>("unblock_object");
+            LLView* blockButton = menu->findChild<LLView>("block_object");
+            LLView* unblockButton = menu->findChild<LLView>("unblock_object");
 
             if (blockButton && unblockButton)
             {
-                blockButton->setVisible(!is_blocked);
+				bool is_blocked = *(*mIsObjectBlockedSignal)(LLUUID(LLUrlAction::getObjectId(url)), LLUrlAction::getObjectName(url));
+				blockButton->setVisible(!is_blocked);
                 unblockButton->setVisible(is_blocked);
             }
         }
