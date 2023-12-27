@@ -90,8 +90,8 @@
 
     <binding key="" mask="NONE" mouse="LMB" command="script_trigger_lbutton"/>
 
-    <binding key="Q" mask="CTL_ALT" command="roll_left"/>
-    <binding key="E" mask="CTL_ALT" command="roll_right"/>
+    <binding key="Q" mask="SHIFT" command="roll_left"/>
+    <binding key="E" mask="SHIFT" command="roll_right"/>
     <binding key="Q" mask="CTL_SHIFT" command="roll_reset"/>
     <binding key="E" mask="CTL_SHIFT" command="roll_reset"/>
   </third_person>
@@ -168,8 +168,8 @@
 
     <binding key="" mask="NONE" mouse="LMB" command="script_trigger_lbutton"/>
     
-    <binding key="Q" mask="CTL_ALT" command="roll_left"/>
-    <binding key="E" mask="CTL_ALT" command="roll_right"/>
+    <binding key="Q" mask="SHIFT" command="roll_left"/>
+    <binding key="E" mask="SHIFT" command="roll_right"/>
     <binding key="Q" mask="CTL_SHIFT" command="roll_reset"/>
     <binding key="E" mask="CTL_SHIFT" command="roll_reset"/>
   </sitting>
