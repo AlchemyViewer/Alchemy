@@ -13059,4 +13059,18 @@ Would you like to reset the graphic preferences?
   canceltext="Never reset"/>
  </notification>
 
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionNoneSaved"
+   type="notify">
+No camera view has been saved yet.
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionOutsideDrawDistance"
+   type="notify">
+Can't restore the camera view because the camera position is beyond draw distance.
+  </notification>
+
 </notifications>
