@@ -30,8 +30,10 @@
 #include "llfloaterimsession.h"
 #include "llfloaterimcontainer.h"
 
+#include "llclipboard.h"
 #include "llfloaterreg.h"
 #include "lllayoutstack.h"
+#include "llslurl.h"
 #include "llfloaterimnearbychat.h"
 
 #include "alavataractions.h"
@@ -1482,6 +1484,24 @@ void LLFloaterIMContainer::doToSelectedGroup(const LLSD& userdata)
     {
         LLGroupActions::leave(mSelectedSession);
     }
+	else if (action == "copy_group_name")
+	{
+		if (auto group = LLGroupMgr::getInstance()->getGroupData(mSelectedSession))
+		{
+			LLWString wstr = utf8str_to_wstring(group->mName);
+			LLClipboard::instance().copyToClipboard(wstr, 0, wstr.length());
+		}
+	}
+	else if (action == "copy_group_slurl")
+	{
+		LLWString wstr = utf8str_to_wstring(LLSLURL("group", mSelectedSession, "about").getSLURLString());
+		LLClipboard::instance().copyToClipboard(wstr, 0, wstr.length());
+	}
+	else if (action == "copy_group_id")
+	{
+		LLWString wstr = utf8str_to_wstring(mSelectedSession.asString());
+		LLClipboard::instance().copyToClipboard(wstr, 0, wstr.length());
+	}
 }
 
 bool LLFloaterIMContainer::enableContextMenuItem(const LLSD& userdata)

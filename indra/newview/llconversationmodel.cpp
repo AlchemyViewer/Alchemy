@@ -461,6 +461,10 @@ void LLConversationItemSession::buildContextMenu(LLMenuGL& menu, U32 flags)
         items.push_back(std::string("group_profile"));
         items.push_back(std::string("activate_group"));
         items.push_back(std::string("leave_group"));
+		items.push_back(std::string("separator_group_copy"));
+		items.push_back(std::string("copy_group_name"));
+		items.push_back(std::string("copy_group_slurl"));
+		items.push_back(std::string("copy_group_id"));
     }
     else if(this->getType() == CONV_SESSION_AD_HOC)
     {
