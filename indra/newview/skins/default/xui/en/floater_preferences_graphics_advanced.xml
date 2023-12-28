@@ -5,6 +5,7 @@
   name="prefs_graphics_advanced"
   help_topic="Preferences_Graphics_Advanced"
   single_instance="true"
+  reuse_instance="false"
   save_rect="true"
   title="ADVANCED GRAPHICS PREFERENCES"
   width="800">

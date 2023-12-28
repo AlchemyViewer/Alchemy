@@ -13073,4 +13073,11 @@ No camera view has been saved yet.
 Can't restore the camera view because the camera position is beyond draw distance.
   </notification>
 
+  <notification
+   icon="alertmodal.tga"
+   name="CantRestoreToWorldNoCopy"
+   type="alertmodal">
+Restore to Last Position is not allowed for no copy items to prevent possible content loss.
+  </notification>
+
 </notifications>

@@ -9,6 +9,7 @@
  help_topic="preferences"
  save_rect="true"
  single_instance="true"
+ reuse_instance="false"
  title="PREFERENCES"
  width="658">
     <floater.string
@@ -186,11 +187,11 @@ https://accounts.secondlife.com/change_email/
          label="Interface"
          layout="topleft"
          name="interface" />
-        <panel
+        <!--<panel
          filename="panel_preferences_grids.xml"
          label="Grids"
          layout="topleft"
-         name="grids" />
+         name="grids" />-->
     </tab_container>
 
 </floater>

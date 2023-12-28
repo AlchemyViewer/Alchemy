@@ -4116,12 +4116,15 @@ void LLWindowWin32::interruptLanguageTextInput()
 
 void LLWindowWin32::handleStartCompositionMessage()
 {
-	// Let IME know the font to use in feedback UI.
-	LOGFONT logfont;
-	fillCompositionLogfont(&logfont);
-	HIMC himc = LLWinImm::getContext(mWindowHandle);
-	LLWinImm::setCompositionFont(himc, &logfont);
-	LLWinImm::releaseContext(mWindowHandle, himc);
+    if (mPreeditor && LLWinImm::isAvailable())
+    {
+        // Let IME know the font to use in feedback UI.
+        LOGFONT logfont;
+        fillCompositionLogfont(&logfont);
+        HIMC himc = LLWinImm::getContext(mWindowHandle);
+        LLWinImm::setCompositionFont(himc, &logfont);
+        LLWinImm::releaseContext(mWindowHandle, himc);
+    }
 }
 
 // Handle WM_IME_COMPOSITION message.

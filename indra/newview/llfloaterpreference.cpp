@@ -196,8 +196,6 @@ typedef struct skin_t
 // if creating/destroying these is too slow, we'll need to create
 // a static member and update all our static callbacks
 
-void handleNameTagOptionChanged(const LLSD& newvalue);	
-void handleDisplayNamesOptionChanged(const LLSD& newvalue);	
 bool callback_clear_browser_cache(const LLSD& notification, const LLSD& response);
 bool callback_clear_cache(const LLSD& notification, const LLSD& response);
 
@@ -247,26 +245,7 @@ bool callback_clear_browser_cache(const LLSD& notification, const LLSD& response
 	return false;
 }
 
-void handleNameTagOptionChanged(const LLSD& newvalue)
-{
-	LLAvatarNameCache::getInstance()->setUseUsernames(gSavedSettings.getBOOL("NameTagShowUsernames"));
-	LLVOAvatar::invalidateNameTags();
-}
 
-void handleDisplayNamesOptionChanged(const LLSD& newvalue)
-{
-	LLAvatarNameCache::getInstance()->setUseDisplayNames(newvalue.asBoolean());
-	LLVOAvatar::invalidateNameTags();
-}
-
-void handleAppearanceCameraMovementChanged(const LLSD& newvalue)
-{
-	if(!newvalue.asBoolean() && gAgentCamera.getCameraMode() == CAMERA_MODE_CUSTOMIZE_AVATAR)
-	{
-		gAgentCamera.changeCameraToDefault();
-		gAgentCamera.resetView();
-	}
-}
 
 void fractionFromDecimal(F32 decimal_val, S32& numerator, S32& denominator)
 {
@@ -299,9 +278,7 @@ public:
     {
         if (params.size() < 1) return false;
 
-        LLFloaterPreference* prefsfloater = dynamic_cast<LLFloaterPreference*>
-            (LLFloaterReg::showInstance("preferences"));
-
+        LLFloaterPreference* prefsfloater = LLFloaterReg::showTypedInstance<LLFloaterPreference>("preferences");
         if (prefsfloater)
         {
             // find 'controls' panel and bring it the front
@@ -379,13 +356,6 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 	sSkin = gSavedSettings.getString("SkinCurrent");
 
 	mCommitCallbackRegistrar.add("Pref.ClickActionChange",		boost::bind(&LLFloaterPreference::onClickActionChange, this));
-
-	gSavedSettings.getControl("NameTagShowUsernames")->getCommitSignal()->connect(boost::bind(&handleNameTagOptionChanged,  _2));	
-	gSavedSettings.getControl("NameTagShowFriends")->getCommitSignal()->connect(boost::bind(&handleNameTagOptionChanged,  _2));	
-	gSavedSettings.getControl("UseDisplayNames")->getCommitSignal()->connect(boost::bind(&handleDisplayNamesOptionChanged,  _2));
-
-	gSavedSettings.getControl("AppearanceCameraMovement")->getCommitSignal()->connect(boost::bind(&handleAppearanceCameraMovementChanged,  _2));
-    gSavedSettings.getControl("WindLightUseAtmosShaders")->getCommitSignal()->connect(boost::bind(&LLFloaterPreference::onAtmosShaderChange, this));
 
 	LLAvatarPropertiesProcessor::getInstance()->addObserver( gAgent.getID(), this );
 
@@ -948,8 +918,10 @@ LLFloaterPreference::~LLFloaterPreference()
 	if (mGridListChangedConnection.connected())
 		mGridListChangedConnection.disconnect();
 #endif
+	LLAvatarPropertiesProcessor::getInstance()->removeObserver(gAgent.getID(), this);
 	LLConversationLog::instance().removeObserver(this);
     mComplexityChangedSignal.disconnect();
+	mDnDModeConnection.disconnect();
 }
 
 void LLFloaterPreference::draw()
@@ -1005,8 +977,6 @@ void LLFloaterPreference::apply()
 	
 	std::string cache_location = gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "");
 	setCacheLocation(cache_location);
-	
-	LLViewerMedia::getInstance()->setCookiesEnabled(getChild<LLUICtrl>("cookies_enabled")->getValue());
 	
 	if (hasChild("web_proxy_enabled", TRUE) &&hasChild("web_proxy_editor", TRUE) && hasChild("web_proxy_port", TRUE))
 	{
@@ -1101,9 +1071,8 @@ void LLFloaterPreference::onOpen(const LLSD& key)
 {
 
 	// this variable and if that follows it are used to properly handle do not disturb mode response message
-	static bool initialized = FALSE;
 	// if user is logged in and we haven't initialized do not disturb mode response yet, do it
-	if (!initialized && LLStartUp::getStartupState() == STATE_STARTED)
+	if (!mDnDInit && LLStartUp::getStartupState() == STATE_STARTED)
 	{
 		// Special approach is used for do not disturb response localization, because "DoNotDisturbModeResponse" is
 		// in non-localizable xml, and also because it may be changed by user and in this case it shouldn't be localized.
@@ -1111,10 +1080,10 @@ void LLFloaterPreference::onOpen(const LLSD& key)
 		// was added into per account settings.
 
 		// initialization should happen once,so setting variable to TRUE
-		initialized = TRUE;
+		mDnDInit = true;
 		// this connection is needed to properly set "DoNotDisturbResponseChanged" setting when user makes changes in
 		// do not disturb response message.
-		gSavedPerAccountSettings.getControl("DoNotDisturbModeResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onDoNotDisturbResponseChanged, this));
+		mDnDModeConnection = gSavedPerAccountSettings.getControl("DoNotDisturbModeResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onDoNotDisturbResponseChanged, this));
 	}
 	gAgent.sendAgentUserInfoRequest();
 
@@ -2182,22 +2151,6 @@ void LLFloaterPreference::onClickActionChange()
     updateClickActionControls();
 }
 
-void LLFloaterPreference::onAtmosShaderChange()
-{
-    LLCheckBoxCtrl* ctrl_alm = getChild<LLCheckBoxCtrl>("UseLightShaders");
-    if(ctrl_alm)
-    {
-        //Deferred/SSAO/Shadows
-        BOOL bumpshiny = LLCubeMap::sUseCubeMaps && LLFeatureManager::getInstance()->isFeatureAvailable("RenderObjectBump") && gSavedSettings.getBOOL("RenderObjectBump");
-        BOOL shaders = gSavedSettings.getBOOL("WindLightUseAtmosShaders");
-        BOOL enabled = LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred") &&
-                        bumpshiny &&
-                        shaders;
-
-        ctrl_alm->setEnabled(enabled);
-    }
-}
-
 void LLFloaterPreference::onClickPermsDefault()
 {
 	LLFloaterReg::showInstance("perms_default");
@@ -2490,7 +2443,7 @@ BOOL LLPanelPreference::postBuild()
 	if (hasChild("max_bandwidth", TRUE))
 	{
 		mBandWidthUpdater = new LLPanelPreference::Updater(boost::bind(&handleBandwidthChanged, _1), BANDWIDTH_UPDATER_TIMEOUT);
-		gSavedSettings.getControl("ThrottleBandwidthKBPS")->getSignal()->connect(boost::bind(&LLPanelPreference::Updater::update, mBandWidthUpdater, _2));
+		mBandwithConnection = gSavedSettings.getControl("ThrottleBandwidthKBPS")->getSignal()->connect(boost::bind(&LLPanelPreference::Updater::update, mBandWidthUpdater, _2));
 	}
 
 #ifndef LL_LINUX
@@ -2517,6 +2470,7 @@ BOOL LLPanelPreference::postBuild()
 
 LLPanelPreference::~LLPanelPreference()
 {
+	mBandwithConnection.disconnect();
 	if (mBandWidthUpdater)
 	{
 		delete mBandWidthUpdater;

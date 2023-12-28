@@ -262,9 +262,13 @@ static GLuint gen_buffer()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
 
     GLuint ret = 0;
-    constexpr U32 pool_size = 4096;
+    static constexpr U32 pool_size = 4096;
 
-    thread_local static GLuint sNamePool[pool_size];
+    thread_local static std::unique_ptr<GLuint[]> sNamePool;
+    if (!sNamePool)
+    {
+        sNamePool = std::make_unique<GLuint[]>(pool_size);
+    }
     thread_local static U32 sIndex = 0;
 
     if (sIndex == 0)
@@ -273,13 +277,13 @@ static GLuint gen_buffer()
         sIndex = pool_size;
         if (!gGLManager.mIsAMD)
         {
-            glGenBuffers(pool_size, sNamePool);
+            glGenBuffers(pool_size, sNamePool.get());
         }
         else
         { // work around for AMD driver bug
             for (U32 i = 0; i < pool_size; ++i)
             {
-                glGenBuffers(1, sNamePool + i);
+                glGenBuffers(1, sNamePool.get() + i);
             }
         }
     }

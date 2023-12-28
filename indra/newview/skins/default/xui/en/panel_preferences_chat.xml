@@ -22,14 +22,12 @@
 			<panel
 				label="General"
 				name="chat_pref_general"
-				class="chat_pref_general"
 				filename="panel_preferences_chat_general.xml"
 				layout="topleft"
 				follows="top|left" />
             <panel
 				label="Commands"
 				name="chat_pref_cmd"
-				class="chat_pref_cmd"
 				filename="panel_preferences_chat_cmd.xml"
 				layout="topleft"
 				follows="top|left" />

@@ -161,7 +161,7 @@
     radio_style="false"
     width="400"
     top_pad="5"/>
-  <text
+  <!--<text
      type="string"
      length="1"
      follows="left|top"
@@ -207,7 +207,7 @@
     mouse_opaque="true"
     name="update_show_release_notes"
     width="400"
-    top_pad="5"/>
+    top_pad="5"/>-->
   <text
      type="string"
      length="1"
