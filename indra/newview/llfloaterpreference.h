@@ -262,6 +262,11 @@ private:
 	bool mSearchDataDirty;
 
     boost::signals2::connection	mComplexityChangedSignal;
+	boost::signals2::connection mDnDModeConnection;
+	boost::signals2::connection mChatBubbleOpacityConnection;
+	boost::signals2::connection mPreferredMaturityConnection;
+
+	bool mDnDInit = false;
 
 	void onUpdateFilterTerm( bool force = false );
 	void collectSearchableItems();
@@ -314,6 +319,7 @@ private:
 	string_color_map_t mSavedColors;
 
 	Updater* mBandWidthUpdater;
+	boost::signals2::connection mBandwithConnection;
 	LOG_CLASS(LLPanelPreference);
 };
 

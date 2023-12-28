@@ -673,6 +673,27 @@ void handleFPSTuningStrategyChanged(const LLSD& newValue)
     const auto newval = gSavedSettings.getU32("TuningFPSStrategy");
     LLPerfStats::tunables.userFPSTuningStrategy = newval;
 }
+
+void handleNameTagOptionChanged(const LLSD& newvalue)
+{
+    LLAvatarNameCache::getInstance()->setUseUsernames(gSavedSettings.getBOOL("NameTagShowUsernames"));
+    LLVOAvatar::invalidateNameTags();
+}
+
+void handleDisplayNamesOptionChanged(const LLSD& newvalue)
+{
+    LLAvatarNameCache::getInstance()->setUseDisplayNames(newvalue.asBoolean());
+    LLVOAvatar::invalidateNameTags();
+}
+
+void handleAppearanceCameraMovementChanged(const LLSD& newvalue)
+{
+    if (!newvalue.asBoolean() && gAgentCamera.getCameraMode() == CAMERA_MODE_CUSTOMIZE_AVATAR)
+    {
+        gAgentCamera.changeCameraToDefault();
+        gAgentCamera.resetView();
+    }
+}
 ////////////////////////////////////////////////////////////////////////////
 
 LLPointer<LLControlVariable> setting_get_control(LLControlGroup& group, const std::string& setting)
@@ -867,7 +888,12 @@ void settings_setup_listeners()
 	setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeDistance", LLHUDText::onFadeSettingsChanged);
 	setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeRange", LLHUDText::onFadeSettingsChanged);
 	setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
-	gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
+    gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
+
+    setting_setup_signal_listener(gSavedSettings, "NameTagShowUsernames", handleNameTagOptionChanged);
+    setting_setup_signal_listener(gSavedSettings, "NameTagShowFriends", handleNameTagOptionChanged);
+    setting_setup_signal_listener(gSavedSettings, "UseDisplayNames", handleDisplayNamesOptionChanged);
+    setting_setup_signal_listener(gSavedSettings, "AppearanceCameraMovement", handleAppearanceCameraMovementChanged);
 }
 
 #if TEST_CACHED_CONTROL
