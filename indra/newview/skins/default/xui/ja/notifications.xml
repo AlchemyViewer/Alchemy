@@ -3828,10 +3828,12 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	</notification>
 	<notification name="RegionRestartMinutes">
 		このリージョン「[NAME]」は、[SECONDS]分後に再起動されます。
-このまま、このリージョンに留まっているとログアウトされます。</notification>
+このまま、このリージョンに留まっているとログアウトされます。
+	</notification>
 	<notification name="RegionRestartSeconds">
 		このリージョン「[NAME]」は、[SECONDS]秒後に再起動されます。
-このまま、このリージョンに留まっているとログアウトされます。</notification>
+このまま、このリージョンに留まっているとログアウトされます。
+	</notification>
 	<notification name="LoadWebPage">Webページ[URL] を開きますか？
 
 [MESSAGE]
@@ -3975,7 +3977,7 @@ Your L$ balance is shown in the upper-right.
 	</notification>
 	-->
 	<notification name="BuyLindenDollarSuccess">
-		お支払ありがとうございます。
+		お支払いただき、ありがとうございます。
 
 あなたのL$残高は、処理が完了するとアップデートされます。処理に２０分以上かかった場合、お取り引きがキャンセルされることがあります。その場合は、購入金額はあなたの US$残高に追加されます。 [https://secondlife.com/my/account/?lang=ja-JP マイアカウント]の取引履歴ページで、支払状況を確認できます。
 		<tag>funds</tag>
@@ -4172,7 +4174,8 @@ Your L$ balance is shown in the upper-right.
 	</notification>
 	<notification name="ThrottledSLURL">
 		短期間のあいだに、信用できないブラウザから複数のSLurlが送られてきました。
-安全のために数秒間ブロックされます。</notification>
+安全のために数秒間ブロックされます。
+	</notification>
 	<notification name="IMToast">[MESSAGE]
 		<tag>security</tag>
 		<form name="form">
@@ -4774,19 +4777,19 @@ Intelドライバーのウェブサイトを確認しますか？
 	</global>
 	<global name="UnsupportedGPU">
 		‐あなたのグラフィックカードは、必須動作環境の条件を満たしていません。
-
 	</global>
 	<global name="UnsupportedRAM">
 		‐あなたのシステムメモリは、必須動作環境の条件を満たしていません。
-
 	</global>
 	<global name="LLLeapUpdaterFailure">
 		アップデーターサービス[UPDATER_APP]の起動に失敗しました。ビューアが正しくインストールされ、実行に必要な権限があることを確認してください。引き続き問題が発生する場合は、[SUPPORT_SITE]をご覧ください。
-  </global>
+	</global>
 	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">
 		自分の土地を持っている場合、そこを「ホーム」に設定できます。持っていない場合は、マップから「情報ハブ」をお探しください。
 	</global>
-	<global name="You died and have been teleported to your home location">死んでしまったので、ホームにテレポートされました。</global>
+	<global name="You died and have been teleported to your home location">
+		死んでしまったので、ホームにテレポートされました。
+	</global>
 	<notification name="LocalBitmapsUpdateFileNotFound">
 		[FNAME]が見つからなかったため、更新できませんでした。
 このファイルに対する今後の更新を無効にします。
@@ -6112,9 +6115,11 @@ Intelドライバーのウェブサイトを確認しますか？
 		</form>
 	</notification>
 	<notification name="RevokedMapRights">
-		[NAME]さんの地図上の位置を検索する権限が取り消されました。</notification>
+		[NAME]さんの地図上の位置を検索する権限が取り消されました。
+	</notification>
 	<notification name="GrantedMapRights">
-		[NAME]さんから、地図上で自分の位置を見つける許可が与えられました。</notification>
+		[NAME]さんから、地図上で自分の位置を見つける許可が与えられました。
+	</notification>
 	<notification label="非セキュアなログインの警告" name="InsecureLogin">
 		[GRID]はログイン用の安全な接続を提供しません。
 ログイン情報は平文で送信されるため、スヌーピングに対して脆弱になる可能性があります。
@@ -6170,5 +6175,8 @@ Intelドライバーのウェブサイトを確認しますか？
 	</notification>
 	<notification name="LoadCameraPositionOutsideDrawDistance">
 		カメラの位置が描画距離を超えているため、カメラビューを復元できませんでした。
+	</notification>
+	<notification name="CantRestoreToWorldNoCopy">
+		コンテンツ損失の可能性を防ぐため、コピーされていないアイテムについては、最後の位置に復元することはできません。
 	</notification>
 </notifications>
