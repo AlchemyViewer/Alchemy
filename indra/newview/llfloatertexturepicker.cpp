@@ -935,7 +935,7 @@ void LLFloaterTexturePicker::onBtnPipette()
 	if (pipette_active)
 	{
 		LLToolMgr::getInstance()->clearTransientTool();
-		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _2, _3));
+		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1, _3));
 		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
 	}
 	else
@@ -1504,39 +1504,40 @@ void LLFloaterTexturePicker::onPickerCallback(const std::vector<std::string>& fi
     }
 }
 
-void LLFloaterTexturePicker::onTextureSelect( LLViewerObject* obj, const LLTextureEntry& te )
+void LLFloaterTexturePicker::onTextureSelect(bool success, const LLTextureEntry& te )
 {
-	if (mPipetteConnection.connected()) mPipetteConnection.disconnect();
-
-	LLUUID inventory_item_id = findItemID(te.getID(), TRUE);
-	if (inventory_item_id.notNull())
+	if (success)
 	{
-		LLToolPipette::getInstance()->setResult(TRUE, "");
-        if (mInventoryPickType == LLTextureCtrl::PICK_MATERIAL)
-        {
-            // tes have no data about material ids
-            // Plus gltf materials are layered with overrides,
-            // which mean that end result might have no id.
-            LL_WARNS() << "tes have no data about material ids" << LL_ENDL;
-        }
-        else
-        {
-            setImageID(te.getID());
-        }
-
-		mNoCopyTextureSelected = FALSE;
-		LLInventoryItem* itemp = gInventory.getItem(inventory_item_id);
-
-		if (itemp && !itemp->getPermissions().allowCopyBy(gAgent.getID()))
+		LLUUID inventory_item_id = findItemID(te.getID(), TRUE);
+		if (inventory_item_id.notNull())
 		{
-			// no copy texture
-			mNoCopyTextureSelected = TRUE;
+			LLToolPipette::getInstance()->setResult(TRUE, "");
+			if (mInventoryPickType == LLTextureCtrl::PICK_MATERIAL)
+			{
+				// tes have no data about material ids
+				// Plus gltf materials are layered with overrides,
+				// which mean that end result might have no id.
+				LL_WARNS() << "tes have no data about material ids" << LL_ENDL;
+			}
+			else
+			{
+				setImageID(te.getID());
+			}
+
+			mNoCopyTextureSelected = FALSE;
+			LLInventoryItem* itemp = gInventory.getItem(inventory_item_id);
+
+			if (itemp && !itemp->getPermissions().allowCopyBy(gAgent.getID()))
+			{
+				// no copy texture
+				mNoCopyTextureSelected = TRUE;
+			}
+
+			commitIfImmediateSet();
 		}
-		
-		commitIfImmediateSet();
-	}
-	else
-	{
-		LLToolPipette::getInstance()->setResult(FALSE, LLTrans::getString("InventoryNoTexture"));
+		else
+		{
+			LLToolPipette::getInstance()->setResult(FALSE, LLTrans::getString("InventoryNoTexture"));
+		}
 	}
 }

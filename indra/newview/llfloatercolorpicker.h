@@ -122,7 +122,7 @@ class LLFloaterColorPicker final
 			   void onClickPipette ( );
 		static void onTextCommit ( LLUICtrl* ctrl, void* data );
 		static void onImmediateCheck ( LLUICtrl* ctrl, void* data );
-			   void onColorSelect(class LLViewerObject* obj, const class LLTextureEntry& te);
+			   void onColorSelect(bool success, const class LLTextureEntry& te);
 		void menuDoToSelected(const LLSD& userdata);
 	private:
 		// mutators for color values, can raise event to preview changes at object
@@ -197,8 +197,6 @@ class LLFloaterColorPicker final
         F32       mContextConeInAlpha;
         F32       mContextConeOutAlpha;
         F32       mContextConeFadeTime;
-
-		boost::signals2::scoped_connection mPipetteConnection;
 };
 
 #endif // LL_LLFLOATERCOLORPICKER_H

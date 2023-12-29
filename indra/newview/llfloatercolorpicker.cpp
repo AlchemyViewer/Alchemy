@@ -435,7 +435,7 @@ void LLFloaterColorPicker::onClickPipette( )
 	if (pipette_active)
 	{
 		LLToolMgr::getInstance()->clearTransientTool();
-		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _2, _3));
+		LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1, _3));
 		LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
 	}
 	else
@@ -471,10 +471,13 @@ void LLFloaterColorPicker::onImmediateCheck( LLUICtrl* ctrl, void* data)
 	}
 }
 
-void LLFloaterColorPicker::onColorSelect(LLViewerObject* obj, const LLTextureEntry& te)
+void LLFloaterColorPicker::onColorSelect(bool success, const LLTextureEntry& te)
 {
 	// Pipete
-	selectCurRgb(te.getColor().mV[VRED], te.getColor().mV[VGREEN], te.getColor().mV[VBLUE]);
+	if (success)
+	{
+		selectCurRgb(te.getColor().mV[VRED], te.getColor().mV[VGREEN], te.getColor().mV[VBLUE]);
+	}
 }
 
 void LLFloaterColorPicker::onMouseCaptureLost()
@@ -1152,8 +1155,6 @@ void LLFloaterColorPicker::setActive(BOOL active)
 
 void LLFloaterColorPicker::stopUsingPipette()
 {
-	if (mPipetteConnection.connected()) mPipetteConnection.disconnect();
-
 	if (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance())
 	{
 		LLToolMgr::getInstance()->clearTransientTool();
