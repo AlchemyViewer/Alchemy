@@ -264,12 +264,13 @@ static GLuint gen_buffer()
     GLuint ret = 0;
     static constexpr U32 pool_size = 4096;
 
-    thread_local static std::unique_ptr<GLuint[]> sNamePool;
-    if (!sNamePool)
-    {
-        sNamePool = std::make_unique<GLuint[]>(pool_size);
-    }
+#if ENABLE_GL_WORK_QUEUE
+    thread_local static alignas(16) GLuint sNamePool[pool_size];
     thread_local static U32 sIndex = 0;
+#else
+    static alignas(16) GLuint sNamePool[pool_size];
+    static U32 sIndex = 0;
+#endif
 
     if (sIndex == 0)
     {
@@ -277,13 +278,13 @@ static GLuint gen_buffer()
         sIndex = pool_size;
         if (!gGLManager.mIsAMD)
         {
-            glGenBuffers(pool_size, sNamePool.get());
+            glGenBuffers(pool_size, sNamePool);
         }
         else
         { // work around for AMD driver bug
             for (U32 i = 0; i < pool_size; ++i)
             {
-                glGenBuffers(1, sNamePool.get() + i);
+                glGenBuffers(1, sNamePool + i);
             }
         }
     }
