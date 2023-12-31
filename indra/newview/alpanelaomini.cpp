@@ -32,8 +32,8 @@
 #include "llviewerprecompiledheaders.h"
 #include "alpanelaomini.h"
 
-#include "alaoengine.h"
-#include "alfloaterao.h"
+#include "aoengine.h"
+#include "ao.h"
 #include "llfloaterreg.h"
 #include "llcombobox.h"
 
@@ -64,8 +64,8 @@ BOOL ALPanelAOMini::postBuild()
 {
 	mSetList = getChild<LLComboBox>("set_list");
 	mSetList->setCommitCallback(boost::bind(&ALPanelAOMini::onSelectSet, this, _2));
-	mReloadCallback = ALAOEngine::instance().setReloadCallback(boost::bind(&ALPanelAOMini::updateSetList, this));
-	mSetChangedCallback = ALAOEngine::instance().setSetChangedCallback(boost::bind(&ALPanelAOMini::onSetChanged, this, _1));
+	mReloadCallback = AOEngine::instance().setReloadCallback(boost::bind(&ALPanelAOMini::updateSetList, this));
+	mSetChangedCallback = AOEngine::instance().setSetChangedCallback(boost::bind(&ALPanelAOMini::onSetChanged, this, _1));
 	
 	return TRUE;
 }
@@ -75,17 +75,17 @@ BOOL ALPanelAOMini::postBuild()
 
 void ALPanelAOMini::updateSetList()
 {
-	const std::vector<ALAOSet*>& list = ALAOEngine::getInstance()->getSetList();
+	const std::vector<AOSet*>& list = AOEngine::getInstance()->getSetList();
 	if (list.empty())
 	{
 		return;
 	}
 	mSetList->removeall();
-	for (ALAOSet* set : list)
+	for (AOSet* set : list)
 	{
 		mSetList->add(set->getName(), &set, ADD_BOTTOM, true);
 	}
-	const std::string& current_set = ALAOEngine::instance().getCurrentSetName();
+	const std::string& current_set = AOEngine::instance().getCurrentSetName();
 	mSetList->selectByValue(LLSD(current_set));
 }
 
@@ -104,31 +104,31 @@ void ALPanelAOMini::onSetChanged(const std::string& set_name)
 
 void ALPanelAOMini::onSelectSet(const LLSD& userdata)
 {
-	ALAOSet* selected_set = ALAOEngine::instance().getSetByName(userdata.asString());
+	AOSet* selected_set = AOEngine::instance().getSetByName(userdata.asString());
 	if (selected_set)
 	{
-		ALAOEngine::instance().selectSet(selected_set);
+		AOEngine::instance().selectSet(selected_set);
 	}
 }
 
 void ALPanelAOMini::onClickSit(const LLSD& userdata)
 {
-	const std::string& current_set = ALAOEngine::instance().getCurrentSetName();
-	ALAOSet* selected_set = ALAOEngine::instance().getSetByName(current_set);
+	const std::string& current_set = AOEngine::instance().getCurrentSetName();
+	AOSet* selected_set = AOEngine::instance().getSetByName(current_set);
 	if (selected_set)
 	{
-		ALAOEngine::instance().setOverrideSits(selected_set, userdata.asBoolean());
+		AOEngine::instance().setOverrideSits(selected_set, userdata.asBoolean());
 	}
 }
 
 void ALPanelAOMini::onClickNext()
 {
-	ALAOEngine::instance().cycle(ALAOEngine::CycleNext);
+	AOEngine::instance().cycle(AOEngine::CycleNext);
 }
 
 void ALPanelAOMini::onClickPrevious()
 {
-	ALAOEngine::instance().cycle(ALAOEngine::CyclePrevious);
+	AOEngine::instance().cycle(AOEngine::CyclePrevious);
 }
 
 void ALPanelAOMini::openAOFloater()

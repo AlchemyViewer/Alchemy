@@ -32,6 +32,7 @@
 #include "lltransfersourceasset.h" 
 #include "llavatarnamecache.h"	// IDEVO
 
+#include "aoengine.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llagentwearables.h"
@@ -3964,9 +3965,9 @@ LLFolderType::EType LLFolderBridge::getPreferredType() const
 	if(cat)
 	{
 		const std::string& cat_name(cat->getName());
-/*		if (cat_name == ROOT_AO_FOLDER)
+		if (cat_name == ROOT_AO_FOLDER)
 			preferred_type = LLFolderType::FT_ANIM_OVERRIDES;
-		else */
+		else 
 		if (cat_name == "#Firestorm" || cat_name == "#Phoenix"
 				 || cat_name == "#Kokua")
 			preferred_type = LLFolderType::FT_TOXIC;

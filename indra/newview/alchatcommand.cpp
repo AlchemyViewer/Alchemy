@@ -29,7 +29,7 @@
 #include "object_flags.h"
 
 // viewer includes
-//#include "alaoengine.h"
+#include "aoengine.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llagentui.h"
@@ -287,7 +287,6 @@ bool ALChatCommand::parseCommand(std::string data)
 			}
 			return true;
 		}
-#if 0
         else if (cmd == utf8str_tolower(sAOCommand()))
 		{
 			std::string subcmd;
@@ -305,28 +304,27 @@ bool ALChatCommand::parseCommand(std::string data)
 				}
 				else if (subcmd == "sit")
 				{
-					auto ao_set = ALAOEngine::instance().getSetByName(ALAOEngine::instance().getCurrentSetName());
+					auto ao_set = AOEngine::instance().getSetByName(AOEngine::instance().getCurrentSetName());
 					if (input >> subcmd)
 					{
 						if (subcmd == "on")
 						{
-							ALAOEngine::instance().setOverrideSits(ao_set, true);
+							AOEngine::instance().setOverrideSits(ao_set, true);
 
 						}
 						else if (subcmd == "off")
 						{
-							ALAOEngine::instance().setOverrideSits(ao_set, false);
+							AOEngine::instance().setOverrideSits(ao_set, false);
 						}
 					}
 					else
 					{
-						ALAOEngine::instance().setOverrideSits(ao_set, !ao_set->getSitOverride());
+						AOEngine::instance().setOverrideSits(ao_set, !ao_set->getSitOverride());
 					}
 					return true;
 				}
 			}
 		}
-#endif
         else if (cmd == "/sendmenu")
         {
             S32 channel;

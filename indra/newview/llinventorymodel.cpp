@@ -960,12 +960,11 @@ const LLUUID LLInventoryModel::findCategoryUUIDForNameInRoot(std::string const& 
 		cats = get_ptr_in_map(mParentChildCategoryTree, root_id);
 		if (cats)
 		{
-			U32 count = cats->size();
-			for (U32 i = 0; i < count; ++i)
+			for (const auto& cat : *cats)
 			{
-				if (cats->at(i)->getName() == folder_name)
+				if (cat->getName() == folder_name)
 				{
-					LLUUID const& folder_id = cats->at(i)->getUUID();
+					LLUUID const& folder_id = cat->getUUID();
 					if (rv.isNull() || folder_id < rv)
 					{
 						rv = folder_id;

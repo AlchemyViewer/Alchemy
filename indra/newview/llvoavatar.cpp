@@ -38,7 +38,7 @@
 #include "raytrace.h"
 
 #include "alavatargroups.h"
-//#include "alaoengine.h"
+#include "aoengine.h"
 #include "llagent.h" //  Get state values from here
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -3147,7 +3147,7 @@ void LLVOAvatar::idleUpdateLoadingEffect()
 					LL_INFOS("Avatar") << avString() << "self isFullyLoaded, mFirstFullyVisible" << LL_ENDL;
 					LLAppearanceMgr::instance().onFirstFullyVisible();
 
-					//ALAOEngine::instance().onLoginComplete();
+					AOEngine::instance().onLoginComplete();
 				}
 				else
 				{
@@ -3799,10 +3799,12 @@ void LLVOAvatar::idleUpdateBelowWater()
 	F32 avatar_height = (F32)(getPositionGlobal().mdV[VZ]);
 	F32 water_height = getRegion()->getWaterHeight();
 
-//	BOOL was_below_water = mBelowWater;
-	mBelowWater = avatar_height < water_height;
-//	if (isSelf() && mBelowWater != was_below_water)
-//        ALAOEngine::instance().checkBelowWater(mBelowWater);
+	BOOL wasBelowWater = mBelowWater;
+	mBelowWater =  avatar_height < water_height;
+	if (isSelf() && wasBelowWater != mBelowWater)
+	{
+		AOEngine::instance().checkBelowWater(mBelowWater);
+	}
 }
 
 void LLVOAvatar::slamPosition()
@@ -6286,12 +6288,12 @@ BOOL LLVOAvatar::startMotion(const LLUUID& id, F32 time_offset)
 #ifdef SHOW_DEBUG
 	LL_DEBUGS("Motion") << "motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
 #endif
-#if 0
+#if 1
 	LLUUID remap_id;
-	if(isSelf())
+	if (isSelf())
 	{
-        remap_id = ALAOEngine::getInstance()->override(id, true);
-		if(remap_id.isNull())
+		remap_id = AOEngine::getInstance()->override(id, true);
+		if (remap_id.isNull())
 		{
 			remap_id = remapMotionID(id);
 		}
@@ -6336,11 +6338,11 @@ BOOL LLVOAvatar::stopMotion(const LLUUID& id, BOOL stop_immediate)
 	LL_DEBUGS("Motion") << "Motion requested " << id.asString() << " " << gAnimLibrary.animationName(id) << LL_ENDL;
 #endif
 
-#if 0
+#if 1
 	LLUUID remap_id;
-	if(isSelf())
+	if (isSelf())
 	{
-        remap_id = ALAOEngine::getInstance()->override(id, false);
+		remap_id = AOEngine::getInstance()->override(id, false);
 		if (remap_id.isNull())
 		{
 			remap_id = remapMotionID(id);

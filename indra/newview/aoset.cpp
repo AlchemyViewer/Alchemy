@@ -1,12 +1,10 @@
 /**
- * @file alaoset.cpp
+ * @file aoset.cpp
  * @brief Implementation of an Animation Overrider set of animations
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2011, Zi Ree @ Second Life
- * Copyright (C) 2016, Cinder <cinder@sdf.org>
- * Copyright (C) 2020, Rye Mutt <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,29 +24,29 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alaoengine.h"
-#include "alaoset.h"
+#include "aoengine.h"
+#include "aoset.h"
 #include "llanimationstates.h"
+#include "llinventorymodel.h"
 
-static const std::string sDefaultSetName = "** New AO Set **";
-
-ALAOSet::ALAOSet(const LLUUID& inventoryID)
-:	LLEventTimer(10000.0f)
-,	mInventoryID(inventoryID)
-,	mName(sDefaultSetName)
-,	mSitOverride(false)
-,	mSmart(false)
-,	mMouselookDisable(false)
-,	mComplete(false)
-,	mCurrentMotion(LLUUID())
-,	mDirty(false)
+AOSet::AOSet(const LLUUID inventoryID)
+:	LLEventTimer(10000.0f),
+	mInventoryID(inventoryID),
+	mName("** New AO Set **"),
+	mSitOverride(false),
+	mSmart(false),
+	mMouselookStandDisable(false),
+	mComplete(false),
+	mDirty(false),
+	mCurrentMotion(LLUUID())
 {
 	LL_DEBUGS("AOEngine") << "Creating new AO set: " << this << LL_ENDL;
 
 	// ZHAO names first, alternate names following, separated by | characters
 	// keep number and order in sync with the enum in the declaration
-	static const std::array<std::string, AOSTATES_MAX> sStateNames {{
-		"Standing|Standing mode 1|Stand.1|Stand.2|Stand.3",
+	const std::string stateNames[AOSTATES_MAX]=
+	{
+		"Standing|Stand.1|Stand.2|Stand.3",
 		"Walking|Walk.N",
 		"Running",
 		"Sitting|Sit.N",
@@ -73,10 +71,11 @@ ALAOSet::ALAOSet(const LLUUID& inventoryID)
 		"Swimming Forward|Swim.N",
 		"Swimming Up|Swim.U",
 		"Swimming Down|Swim.D"
-	}};
+	};
 
 	// keep number and order in sync with the enum in the declaration
-	static const std::array<LLUUID, AOSTATES_MAX> sStateUUIDs {{
+	const LLUUID stateUUIDs[AOSTATES_MAX]=
+	{
 		ANIM_AGENT_STAND,
 		ANIM_AGENT_WALK,
 		ANIM_AGENT_RUN,
@@ -102,16 +101,16 @@ ALAOSet::ALAOSet(const LLUUID& inventoryID)
 		ANIM_AGENT_FLY,			// needs special treatment
 		ANIM_AGENT_HOVER_UP,	// needs special treatment
 		ANIM_AGENT_HOVER_DOWN	// needs special treatment
-	}};
+	};
 
 	for (S32 index = 0; index < AOSTATES_MAX; ++index)
 	{
 		std::vector<std::string> stateNameList;
-		LLStringUtil::getTokens(sStateNames[index], stateNameList, "|");
+		LLStringUtil::getTokens(stateNames[index], stateNameList, "|");
 
 		mStates[index].mName = stateNameList[0];			// for quick reference
 		mStates[index].mAlternateNames = stateNameList;		// to get all possible names, including mName
-		mStates[index].mRemapID = sStateUUIDs[index];
+		mStates[index].mRemapID = stateUUIDs[index];
 		mStates[index].mInventoryUUID = LLUUID::null;
 		mStates[index].mCurrentAnimation = 0;
 		mStates[index].mCurrentAnimationID = LLUUID::null;
@@ -119,27 +118,27 @@ ALAOSet::ALAOSet(const LLUUID& inventoryID)
 		mStates[index].mRandom = false;
 		mStates[index].mCycleTime = 0.0f;
 		mStates[index].mDirty = false;
-		mStateNames.push_back(stateNameList[0]);
+		mStateNames.emplace_back(stateNameList[0]);
 	}
 	stopTimer();
 }
 
-ALAOSet::~ALAOSet()
+AOSet::~AOSet()
 {
 	LL_DEBUGS("AOEngine") << "Set deleted: " << this << LL_ENDL;
 }
 
-ALAOSet::AOState* ALAOSet::getState(S32 name)
+AOSet::AOState* AOSet::getState(S32 eName)
 {
-	return &mStates[name];
+	return &mStates[eName];
 }
 
-ALAOSet::AOState* ALAOSet::getStateByName(const std::string& name)
+AOSet::AOState* AOSet::getStateByName(const std::string& name)
 {
 	for (S32 index = 0; index < AOSTATES_MAX; ++index)
 	{
 		AOState* state = &mStates[index];
-		for (U32 names = 0; names < state->mAlternateNames.size(); ++names)
+		for (auto names = 0; names < state->mAlternateNames.size(); ++names)
 		{
 			if (state->mAlternateNames[names].compare(name) == 0)
 			{
@@ -150,7 +149,7 @@ ALAOSet::AOState* ALAOSet::getStateByName(const std::string& name)
 	return nullptr;
 }
 
-ALAOSet::AOState* ALAOSet::getStateByRemapID(const LLUUID& id)
+AOSet::AOState* AOSet::getStateByRemapID(const LLUUID& id)
 {
 	LLUUID remap_id = id;
 	if (remap_id == ANIM_AGENT_SIT_GROUND)
@@ -168,40 +167,59 @@ ALAOSet::AOState* ALAOSet::getStateByRemapID(const LLUUID& id)
 	return nullptr;
 }
 
-const LLUUID& ALAOSet::getAnimationForState(AOState* state) const
+const LLUUID& AOSet::getAnimationForState(AOState* state) const
 {
-	if (!state) return LLUUID::null;
-	
-	size_t num_animations = state->mAnimations.size();
-	if (num_animations)
+	if (state)
 	{
-		if (state->mCycle)
+		auto numOfAnimations = state->mAnimations.size();
+		if (numOfAnimations)
 		{
-			if (state->mRandom)
+			if (state->mCycle)
 			{
-				state->mCurrentAnimation = ll_frand() * num_animations;
-				LL_DEBUGS("AOEngine") << "randomly chosen " << state->mCurrentAnimation << " of " << num_animations << LL_ENDL;
-			}
-			else
-			{
-				state->mCurrentAnimation++;
-				if (state->mCurrentAnimation >= state->mAnimations.size())
+				if (state->mRandom)
 				{
-					state->mCurrentAnimation = 0;
+					state->mCurrentAnimation = ll_frand() * numOfAnimations;
+					LL_DEBUGS("AOEngine") << "randomly chosen " << state->mCurrentAnimation << " of " << numOfAnimations << LL_ENDL;
 				}
-				LL_DEBUGS("AOEngine") << "cycle " << state->mCurrentAnimation << " of " << num_animations << LL_ENDL;
+				else
+				{
+					state->mCurrentAnimation++;
+					if (state->mCurrentAnimation >= state->mAnimations.size())
+					{
+						state->mCurrentAnimation = 0;
+					}
+					LL_DEBUGS("AOEngine") << "cycle " << state->mCurrentAnimation << " of " << numOfAnimations << LL_ENDL;
+				}
 			}
+
+			AOAnimation& anim = state->mAnimations[state->mCurrentAnimation];
+
+			if (anim.mAssetUUID.isNull())
+			{
+				LL_DEBUGS("AOEngine") << "Asset UUID for chosen animation " << anim.mName << " not yet known, try to find it." << LL_ENDL;
+
+				if(LLViewerInventoryItem* item = gInventory.getItem(anim.mInventoryUUID) ; item)
+				{
+					LL_DEBUGS("AOEngine") << "Found asset UUID for chosen animation: " << item->getAssetUUID() << " - Updating AOAnimation.mAssetUUID" << LL_ENDL;
+					anim.mAssetUUID = item->getAssetUUID();
+				}
+				else
+				{
+					LL_DEBUGS("AOEngine") << "Inventory UUID " << anim.mInventoryUUID << " for chosen animation " << anim.mName << " still returns no asset." << LL_ENDL;
+				}
+			}
+
+			return anim.mAssetUUID;
 		}
-		return state->mAnimations[state->mCurrentAnimation].mAssetUUID;
-	}
-	else
-	{
-		LL_DEBUGS("AOEngine") << "animation state has no animations assigned" << LL_ENDL;
+		else
+		{
+			LL_DEBUGS("AOEngine") << "animation state has no animations assigned" << LL_ENDL;
+		}
 	}
 	return LLUUID::null;
 }
 
-void ALAOSet::startTimer(F32 timeout)
+void AOSet::startTimer(F32 timeout)
 {
 	mEventTimer.stop();
 	mPeriod = timeout;
@@ -209,14 +227,94 @@ void ALAOSet::startTimer(F32 timeout)
 	LL_DEBUGS("AOEngine") << "Starting state timer for " << getName() << " at " << timeout << LL_ENDL;
 }
 
-void ALAOSet::stopTimer()
+void AOSet::stopTimer()
 {
 	LL_DEBUGS("AOEngine") << "State timer for " << getName() << " stopped." << LL_ENDL;
 	mEventTimer.stop();
 }
 
-BOOL ALAOSet::tick()
+BOOL AOSet::tick()
 {
-	ALAOEngine::instance().cycleTimeout(this);
+	AOEngine::instance().cycleTimeout(this);
 	return FALSE;
+}
+
+const LLUUID& AOSet::getInventoryUUID() const
+{
+	return mInventoryID;
+}
+
+void AOSet::setInventoryUUID(const LLUUID& inventoryID)
+{
+	mInventoryID = inventoryID;
+}
+
+const std::string& AOSet::getName() const
+{
+	return mName;
+}
+
+void AOSet::setName(const std::string& name)
+{
+	mName=name;
+}
+
+bool AOSet::getSitOverride() const
+{
+	return mSitOverride;
+}
+
+void AOSet::setSitOverride(bool override_sit)
+{
+	mSitOverride = override_sit;
+}
+
+bool AOSet::getSmart() const
+{
+	return mSmart;
+}
+
+void AOSet::setSmart(bool smart)
+{
+	mSmart = smart;
+}
+
+bool AOSet::getMouselookStandDisable() const
+{
+	return mMouselookStandDisable;
+}
+
+void AOSet::setMouselookStandDisable(bool disable)
+{
+	mMouselookStandDisable = disable;
+}
+
+bool AOSet::getComplete() const
+{
+	return mComplete;
+}
+
+void AOSet::setComplete(bool complete)
+{
+	mComplete = complete;
+}
+
+bool AOSet::getDirty() const
+{
+	return mDirty;
+}
+
+void AOSet::setDirty(bool dirty)
+{
+	mDirty = dirty;
+}
+
+void AOSet::setMotion(const LLUUID& motion)
+{
+	mCurrentMotion = motion;
+}
+
+const LLUUID& AOSet::getMotion() const
+{
+	return mCurrentMotion;
 }

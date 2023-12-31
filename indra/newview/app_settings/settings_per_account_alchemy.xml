@@ -1,26 +1,84 @@
 <llsd>
   <map>
-    <key>AlchemyAOEnable</key>
-    <map>
-      <key>Comment</key>
-      <string>Use Animation Overrides</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
-    <key>ALDiscordIntegration</key>
-    <map>
-      <key>Comment</key>
-      <string>Enable discord integration</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
+	<key>AlchemyAOEnable</key>
+	<map>
+		<key>Comment</key>
+		<string>Use the viewer side Animation Overrider</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>Boolean</string>
+		<key>Value</key>
+		<integer>0</integer>
+	</map>
+	<key>PauseAO</key>
+	<map>
+		<key>Comment</key>
+		<string>Pause the viewer side Animation Overrider</string>
+		<key>Persist</key>
+		<integer>0</integer>
+		<key>Type</key>
+		<string>Boolean</string>
+		<key>Value</key>
+		<integer>0</integer>
+	</map>
+	<key>UseAOStands</key>
+	<map>
+		<key>Comment</key>
+		<string>Use the viewer side Animation Overrider for standing and turning animations when enabled</string>
+		<key>Persist</key>
+		<integer>0</integer>
+		<key>Type</key>
+		<string>Boolean</string>
+		<key>Value</key>
+		<integer>1</integer>
+	</map>
+	<key>UseFullAOInterface</key>
+	<map>
+		<key>Comment</key>
+		<string>Use the full Animation Overrider interface (TRUE) or the small, reduced interface (FALSE).</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>Boolean</string>
+		<key>Value</key>
+		<integer>0</integer>
+	</map>
+	<key>LockAOFolders</key>
+	<map>
+		<key>Comment</key>
+		<string>Keep the AO folders in Inventory safe from manual changes.</string>
+		<key>Type</key>
+		<string>Boolean</string>
+		<key>Value</key>
+		<integer>1</integer>
+	</map>
+	<key>floater_rect_ao_full</key>
+	<map>
+		<key>Comment</key>
+		<string>Position and size for the full Animation Overrider interface. The defaults are just dummy values.</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>Rect</string>
+		<key>Value</key>
+		<array>
+			<integer>0</integer>
+			<integer>0</integer>
+			<integer>0</integer>
+			<integer>0</integer>
+		</array>
+	</map>
+	<key>ALDiscordIntegration</key>
+	<map>
+		<key>Comment</key>
+		<string>Enable discord integration</string>
+		<key>Persist</key>
+		<integer>1</integer>
+		<key>Type</key>
+		<string>Boolean</string>
+		<key>Value</key>
+		<integer>1</integer>
     </map>
     <key>ALDiscordShareLocationRegion</key>
     <map>

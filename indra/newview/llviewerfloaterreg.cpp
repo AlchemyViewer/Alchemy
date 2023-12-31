@@ -31,7 +31,7 @@
 #include "llfloaterreg.h"
 #include "llviewerfloaterreg.h"
 
-//#include "alfloaterao.h"
+#include "ao.h"
 #include "alfloaterexploresounds.h"
 #include "alfloatergenerictext.h"
 #include "alfloaterlightbox.h"
@@ -552,7 +552,7 @@ void LLViewerFloaterReg::registerFloaters()
 
 	// *NOTE: Please keep these alphabetized for easier merges
 
-	//LLFloaterReg::add("ao", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterAO>);
+	LLFloaterReg::add("ao", "floater_ao.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FloaterAO>);
     LLFloaterReg::add("asset_hex_editor", "floater_hex_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterHexEditor>);
 	LLFloaterReg::add("chatbar", "floater_chatbar.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLChatBar>);
 	LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);

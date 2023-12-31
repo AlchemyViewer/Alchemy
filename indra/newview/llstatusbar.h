@@ -106,7 +106,7 @@ private:
 	void onMouseEnterPresetsCamera();
 	void onMouseEnterPresets();
 	void onMouseEnterQuickSettings();
-	//void onMouseEnterAO();
+	void onMouseEnterAO();
 	void onMouseEnterVolume();
 	void onMouseEnterNearbyMedia();
 	void onClickScreen(S32 x, S32 y);
@@ -138,7 +138,7 @@ private:
 	LLIconCtrl	*mIconPresetsCamera;
 	LLIconCtrl	*mIconPresetsGraphic;
 	LLButton	*mBtnQuickSettings;
-	//LLButton	*mBtnAO;
+	LLButton	*mBtnAO;
 	LLButton	*mBtnVolume;
 	LLTextBox	*mBoxBalance;
 	LLButton	*mBtnBuyL;
@@ -155,7 +155,7 @@ private:
 	LLFrameTimer*	mHealthTimer;
 	LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
 	LLPanelPresetsPulldown* mPanelPresetsPulldown;
-	//ALPanelAOPulldown* mPanelAOPulldown;	
+	ALPanelAOPulldown* mPanelAOPulldown;	
 	ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown;
 	LLPanelVolumePulldown* mPanelVolumePulldown;
 	LLPanelNearByMedia*	mPanelNearByMedia;
