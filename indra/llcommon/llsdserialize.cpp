@@ -36,6 +36,7 @@
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
+#include <boost/align/aligned_allocator.hpp>
 
 #ifdef LL_USESYSTEMLIBS
 # include <zlib.h>
@@ -2240,10 +2241,10 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 
 	constexpr llssize CHUNK = (1024 * 1024) * 10;
 
-	static thread_local std::unique_ptr<U8[]> out;
-	if (!out)
+	static thread_local std::vector<U8, boost::alignment::aligned_allocator<U8, 16>> out;
+	if (out.empty())
 	{
-		out = std::unique_ptr<U8[]>(new(std::nothrow) U8[CHUNK]);
+		out.resize(CHUNK);
 	}
 		
 	strm.zalloc = Z_NULL;
@@ -2256,7 +2257,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 	do
 	{
 		strm.avail_out = CHUNK;
-		strm.next_out = out.get();
+		strm.next_out = out.data();
 		ret = inflate(&strm, Z_NO_FLUSH);
 		switch (ret)
 		{
@@ -2296,7 +2297,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 				return ZR_MEM_ERROR;
 			}
 			result = new_result;
-			memcpy(result + cur_size, out.get(), have);
+			memcpy(result + cur_size, out.data(), have);
 			cur_size += have;
 		}
 
