@@ -374,10 +374,11 @@ void LLAgentCamera::resetView(BOOL reset_camera, BOOL change_camera)
 		setFocusOnAvatar(TRUE, ANIMATE);
 
 		mCameraFOVZoomFactor = 0.f;
+
+		resetCameraRoll();
 	}
 	resetPanDiff();
 	resetOrbitDiff();
-	resetCameraRoll();
 	mHUDTargetZoom = 1.f;
 
     if (LLSelectMgr::getInstance()->mAllowSelectAvatar)
