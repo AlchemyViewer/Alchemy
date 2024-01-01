@@ -45,9 +45,9 @@ with the same filename but different name
   <texture name="AddItem_Off" file_name="icons/AddItem_Off.png" preload="false" />
   <texture name="AddItem_Press" file_name="icons/AddItem_Press.png" preload="false" />
 
-  <texture name="add_payment_image_center"  file_name="windows/add_payment_image_center.png" preload="true" />
-  <texture name="add_payment_image_left"  file_name="windows/add_payment_image_left.png" preload="true" />
-  <texture name="add_payment_image_right"  file_name="windows/add_payment_image_right.png" preload="true" />
+  <texture name="add_payment_image_center"  file_name="windows/add_payment_image_center.png" preload="false" />
+  <texture name="add_payment_image_left"  file_name="windows/add_payment_image_left.png" preload="false" />
+  <texture name="add_payment_image_right"  file_name="windows/add_payment_image_right.png" preload="false" />
 
   <texture name="Arrow_Left_Off" file_name="navbar/Arrow_Left_Off.png" preload="true" />
   <texture name="Arrow_Right_Off" file_name="navbar/Arrow_Right_Off.png" preload="true" />
@@ -77,7 +77,7 @@ with the same filename but different name
   <texture name="BackButton_Over" file_name="icons/back_arrow_over.png" preload="false" scale.left="22" scale.top="12" scale.right="25" scale.bottom="12" />
   <texture name="BackButton_Press" file_name="icons/back_arrow_press.png" preload="false" scale.left="22" scale.top="12" scale.right="25" scale.bottom="12" />
 
-  <texture name="Error_Tag_Background" file_name="widgets/Error_Tag_Background.png" preload="true" scale.left="12" scale.top="2" scale.right="36" scale.bottom="2" />
+  <texture name="Error_Tag_Background" file_name="widgets/Error_Tag_Background.png" preload="false" scale.left="12" scale.top="2" scale.right="36" scale.bottom="2" />
   <texture name="New_Tag_Background" file_name="widgets/New_Tag_Background.png" preload="true" scale.left="12" scale.top="2" scale.right="36" scale.bottom="2" />
   <texture name="New_Tag_Border" file_name="widgets/New_Tag_Border.png" preload="true" scale.left="12" scale.top="2" scale.right="36" scale.bottom="2" />
 
@@ -90,7 +90,7 @@ with the same filename but different name
   <texture name="BreadCrumbBtn_Left_Off" file_name="widgets/BreadCrumbBtn_Left_Off.png" preload="false"/>
   <texture name="BreadCrumbBtn_Left_Over" file_name="widgets/BreadCrumbBtn_Left_Over.png" preload="false"/>
   <texture name="BreadCrumbBtn_Left_Press" file_name="widgets/BreadCrumbBtn_Left_Press.png" preload="false"/>
- 
+
   <texture name="BreadCrumbBtn_Middle_Disabled" file_name="widgets/BreadCrumbBtn_Middle_Disabled.png" preload="false"/>
   <texture name="BreadCrumbBtn_Middle_Off" file_name="widgets/BreadCrumbBtn_Middle_Off.png" preload="false"/>
   <texture name="BreadCrumbBtn_Middle_Over" file_name="widgets/BreadCrumbBtn_Middle_Over.png" preload="false"/>
@@ -101,10 +101,10 @@ with the same filename but different name
   <texture name="BreadCrumbBtn_Right_Over" file_name="widgets/BreadCrumbBtn_Right_Over.png" preload="false"/>
   <texture name="BreadCrumbBtn_Right_Press" file_name="widgets/BreadCrumbBtn_Right_Press.png" preload="false"/>
 
-  <texture name="BuyArrow_Over" file_name="navbar/BuyArrow_Over.png" preload="true" scale.left="0" scale.top="1" scale.right="0" scale.bottom="0"  />
-  <texture name="BuyArrow_Press" file_name="navbar/BuyArrow_Press.png" preload="true" scale.left="1" scale.top="1" scale.right="0" scale.bottom="0"  />
+  <texture name="BuyArrow_Over" file_name="navbar/BuyArrow_Over.png" preload="false" scale.left="0" scale.top="1" scale.right="0" scale.bottom="0"  />
+  <texture name="BuyArrow_Press" file_name="navbar/BuyArrow_Press.png" preload="false" scale.left="1" scale.top="1" scale.right="0" scale.bottom="0"  />
 
-  <texture name="Cam_Avatar_Off" file_name="bottomtray/Cam_Avatar_Off.png" preload="true" />
+  <texture name="Cam_Avatar_Off" file_name="bottomtray/Cam_Avatar_Off.png" preload="false" />
   <texture name="Cam_FreeCam_Off" file_name="bottomtray/Cam_FreeCam_Off.png" preload="false" />
   <texture name="Cam_Orbit_Off" file_name="bottomtray/Cam_Orbit_Off.png" preload="false" />
   <texture name="Cam_Pan_Off" file_name="bottomtray/Cam_Pan_Off.png" preload="false" />
@@ -155,7 +155,7 @@ with the same filename but different name
   <texture name="Command_MiniMap_Icon"      file_name="toolbar_icons/mini_map.png"     preload="true" />
   <texture name="Command_Move_Icon"         file_name="toolbar_icons/move.png"         preload="true" />
   <texture name="Command_Environments_Icon" file_name="toolbar_icons/environments.png" preload="true" />
-  <texture name="Command_Panic_Icon"        file_name="toolbar_icons/panic.png"        preload="true" />
+  <texture name="Command_Panic_Icon"        file_name="toolbar_icons/panic.png"        preload="false" />
   <texture name="Command_People_Icon"       file_name="toolbar_icons/people.png"       preload="true" />
   <texture name="Command_Performance_Icon"  file_name="toolbar_icons/performance.png"  preload="true" />
   <texture name="Command_Picks_Icon"        file_name="toolbar_icons/picks.png"        preload="true" />
@@ -675,10 +675,10 @@ with the same filename but different name
   <texture name="Snapshot_Email" file_name="snapshot_email.png" preload="false" />
   <texture name="Snapshot_Inventory" file_name="toolbar_icons/inventory.png" preload="false" />
   <texture name="Snapshot_Profile" file_name="toolbar_icons/profile.png" preload="false" />
-  <texture name="startup_logo"  file_name="windows/startup_logo.png" preload="true" />
+  <texture name="startup_logo"  file_name="windows/startup_logo.png" preload="false" />
 
-  <texture name="login_sl_logo"  file_name="windows/login_sl_logo.png" preload="true" />
-  <texture name="login_sl_logo_small"  file_name="windows/login_sl_logo_small.png" preload="true" />
+  <texture name="login_sl_logo"  file_name="windows/login_sl_logo.png" preload="false" />
+  <texture name="login_sl_logo_small"  file_name="windows/login_sl_logo_small.png" preload="false" />
 
   <texture name="Stepper_Down_Off" file_name="widgets/Stepper_Down_Off.png" preload="false" />
   <texture name="Stepper_Down_Press" file_name="widgets/Stepper_Down_Press.png" preload="false" />
@@ -762,11 +762,11 @@ with the same filename but different name
 
   <texture name="UpArrow_Off" file_name="icons/UpArrow_Off.png" preload="false" />
 
-  <texture name="Video_URL_Off" file_name="icons/Video_URL_Off.png" preload="true" />
-  
+  <texture name="Video_URL_Off" file_name="icons/Video_URL_Off.png" preload="false" />
+
   <texture name="Vertical Drag Handle" file_name="widgets/vertical_drag_handle.png" scale.left="2" scale.right="7" scale.bottom="8" scale.top="120"  scale_type="scale_outer"/>
 
-    <texture name="VirtualTrackball_Moon_Back" file_name="widgets/track_control_moon_back.png" />
+  <texture name="VirtualTrackball_Moon_Back" file_name="widgets/track_control_moon_back.png" />
   <texture name="VirtualTrackball_Moon_Front" file_name="widgets/track_control_moon_front.png" />
   <texture name="VirtualTrackball_Rotate_Bottom" file_name="widgets/track_control_rotate_bottom.png" />
   <texture name="VirtualTrackball_Rotate_Left" file_name="widgets/track_control_rotate_left_side.png" />
@@ -907,10 +907,10 @@ with the same filename but different name
   <texture name="Progress_11" file_name="icons/Progress_11.png" preload="true" />
   <texture name="Progress_12" file_name="icons/Progress_12.png" preload="true" />
 
-  <texture name="bevel_background" file_name="widgets/bevel_background.png" preload="true" scale.left="12" scale.top="15" scale.right="108" scale.bottom="2"/>
-  <texture name="buy_off" file_name="widgets/buy_off.png" preload="true" scale.left="2" scale.top="15" scale.right="67" scale.bottom="4"/>
-  <texture name="buy_over" file_name="widgets/buy_over.png" preload="true" scale.left="2" scale.top="15" scale.right="67" scale.bottom="4"/>
-  <texture name="buy_press" file_name="widgets/buy_press.png" preload="true" scale.left="2" scale.top="15" scale.right="67" scale.bottom="4"/>
+  <texture name="bevel_background" file_name="widgets/bevel_background.png" preload="false" scale.left="12" scale.top="15" scale.right="108" scale.bottom="2"/>
+  <texture name="buy_off" file_name="widgets/buy_off.png" preload="false" scale.left="2" scale.top="15" scale.right="67" scale.bottom="4"/>
+  <texture name="buy_over" file_name="widgets/buy_over.png" preload="false" scale.left="2" scale.top="15" scale.right="67" scale.bottom="4"/>
+  <texture name="buy_press" file_name="widgets/buy_press.png" preload="false" scale.left="2" scale.top="15" scale.right="67" scale.bottom="4"/>
   
   <texture name="hint_background" file_name="windows/hint_background.png" preload="false" scale.left="8" scale.top="70" scale.right="195" scale.bottom="11"/>
   <texture name="hint_arrow_left" file_name="windows/hint_arrow_left.png" preload="false"/>
