@@ -265,10 +265,10 @@ static GLuint gen_buffer()
     static constexpr U32 pool_size = 4096;
 
 #if ENABLE_GL_WORK_QUEUE
-    thread_local static alignas(16) GLuint sNamePool[pool_size];
+    alignas(16) thread_local static GLuint sNamePool[pool_size];
     thread_local static U32 sIndex = 0;
 #else
-    static alignas(16) GLuint sNamePool[pool_size];
+    alignas(16) static GLuint sNamePool[pool_size];
     static U32 sIndex = 0;
 #endif
 

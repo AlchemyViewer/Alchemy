@@ -1306,7 +1306,7 @@ void LLImageGL::generateTextures(S32 numTextures, U32 *textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     static constexpr U32 pool_size = 1024;
-    static thread_local U32 name_pool[pool_size]; // pool of texture names
+    alignas(16) static thread_local U32 name_pool[pool_size]; // pool of texture names
     static thread_local U32 name_count = 0; // number of available names in the pool
 
     if (name_count == 0)
