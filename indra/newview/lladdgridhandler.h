@@ -36,7 +36,7 @@
 class LLAddGridHandler : public LLCommandHandler
 {
 public:
-	LLAddGridHandler() : LLCommandHandler("addgrid", UNTRUSTED_ALLOW) { }
+	LLAddGridHandler() : LLCommandHandler("addgrid", UNTRUSTED_THROTTLE) { }
 	
 	bool handle(const LLSD& tokens, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web) override;
 };
