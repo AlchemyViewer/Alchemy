@@ -670,7 +670,7 @@ with the same filename but different name
   <texture name="OBJECT_Icon" file_name="icons/object_icon.png" preload="true" />
   <texture name="Unknown_Icon" file_name="icons/unknown_icon.png" preload="true" />
 
-  <texture name="Snapshot_Off" file_name="bottomtray/Snapshot_Off.png" preload="true" scale.left="4" scale.top="19" scale.right="22" scale.bottom="4" />
+  <texture name="Snapshot_Off" file_name="bottomtray/Snapshot_Off.png" preload="false" scale.left="4" scale.top="19" scale.right="22" scale.bottom="4" />
   <texture name="Snapshot_Download" file_name="snapshot_download.png" preload="false" />
   <texture name="Snapshot_Email" file_name="snapshot_email.png" preload="false" />
   <texture name="Snapshot_Inventory" file_name="toolbar_icons/inventory.png" preload="false" />
@@ -689,14 +689,14 @@ with the same filename but different name
   <texture name="StopReload_Off" file_name="icons/StopReload_Off.png" preload="false" />
   <texture name="StopReload_Over" file_name="icons/StopReload_Over.png" preload="false" />
 
-  <texture name="Sync_Disabled" file_name="icons/Sync_Disabled.png" preload="true" />
-  <texture name="Sync_Enabled" file_name="icons/Sync_Enabled.png" preload="true" />
-  <texture name="Sync_Progress_1" file_name="icons/Sync_Progress_1.png" preload="true" />
-  <texture name="Sync_Progress_2" file_name="icons/Sync_Progress_2.png" preload="true" />
-  <texture name="Sync_Progress_3" file_name="icons/Sync_Progress_3.png" preload="true" />
-  <texture name="Sync_Progress_4" file_name="icons/Sync_Progress_4.png" preload="true" />
-  <texture name="Sync_Progress_5" file_name="icons/Sync_Progress_5.png" preload="true" />
-  <texture name="Sync_Progress_6" file_name="icons/Sync_Progress_6.png" preload="true" />
+  <texture name="Sync_Disabled" file_name="icons/Sync_Disabled.png" preload="false" />
+  <texture name="Sync_Enabled" file_name="icons/Sync_Enabled.png" preload="false" />
+  <texture name="Sync_Progress_1" file_name="icons/Sync_Progress_1.png" preload="false" />
+  <texture name="Sync_Progress_2" file_name="icons/Sync_Progress_2.png" preload="false" />
+  <texture name="Sync_Progress_3" file_name="icons/Sync_Progress_3.png" preload="false" />
+  <texture name="Sync_Progress_4" file_name="icons/Sync_Progress_4.png" preload="false" />
+  <texture name="Sync_Progress_5" file_name="icons/Sync_Progress_5.png" preload="false" />
+  <texture name="Sync_Progress_6" file_name="icons/Sync_Progress_6.png" preload="false" />
 
   <texture name="TabIcon_Close_Off" file_name="taskpanel/TabIcon_Close_Off.png" preload="false" />
   <texture name="TabIcon_Home_Selected" file_name="taskpanel/TabIcon_Home_Selected.png" preload="false" />
