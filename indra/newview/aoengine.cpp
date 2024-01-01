@@ -130,7 +130,7 @@ void AOEngine::clear(bool from_timer)
 	mSets.clear();
 
 	mCurrentSet = nullptr;
-	mSetChangedSignal(mCurrentSet->getName());
+	mSetChangedSignal(std::string());
 
 	//<ND/> FIRE-3801; We cannot delete any AOSet object if we're called from a timer tick. AOSet is derived from LLEventTimer and destruction will
 	// fail in ~LLInstanceTracker when a destructor runs during iteration.
