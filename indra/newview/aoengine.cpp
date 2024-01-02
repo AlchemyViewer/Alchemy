@@ -1469,7 +1469,10 @@ void AOEngine::update()
 				{
 					mDefaultSet = newSet;
 					mCurrentSet = newSet;
-					mSetChangedSignal(mCurrentSet->getName());
+					if (mCurrentSet)
+					{
+						mSetChangedSignal(mCurrentSet->getName());
+					}
 				}
 				else
 				{
@@ -1633,7 +1636,10 @@ void AOEngine::selectSet(AOSet* set)
 	}
 
 	mCurrentSet = set;
-	mSetChangedSignal(mCurrentSet->getName());
+	if (mCurrentSet)
+	{
+		mSetChangedSignal(mCurrentSet->getName());
+	}
 
 	if (mEnabled)
 	{
