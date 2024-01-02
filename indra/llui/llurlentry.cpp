@@ -62,9 +62,10 @@ std::string LLUrlEntryBase::getIcon(const std::string &url)
 
 LLStyle::Params LLUrlEntryBase::getStyle() const
 {
+	static const LLUIColor html_link_col = LLUIColorTable::instance().getColor("HTMLLinkColor");
 	LLStyle::Params style_params;
-	style_params.color = LLUIColorTable::instance().getColor("HTMLLinkColor");
-	style_params.readonly_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+	style_params.color = html_link_col;
+	style_params.readonly_color = html_link_col;
 	style_params.font.style = "UNDERLINE";
 	return style_params;
 }

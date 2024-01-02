@@ -2683,11 +2683,12 @@ void LLInventoryGalleryItem::draw()
         LLPanel::draw();
 
         // Draw border
-        LLUIColor border_color = LLUIColorTable::instance().getColor(mSelected ? "MenuItemHighlightBgColor" : "TextFgTentativeColor", LLColor4::white);
+        static LLUIColor border_color_unselected = LLUIColorTable::instance().getColor("TextFgTentativeColor", LLColor4::white);
+        static LLUIColor border_color_selected = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", LLColor4::white);
         LLRect border = mThumbnailCtrl->getRect();
         border.mRight = border.mRight + 1;
         border.mTop = border.mTop + 1;
-        gl_rect_2d(border, border_color.get(), FALSE);
+        gl_rect_2d(border, mSelected ? border_color_selected.get() : border_color_unselected.get(), FALSE);
     }
 }
 
