@@ -1460,9 +1460,8 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 
 				// Add link to avatar's inspector and delimiter to message.
 				mEditor->appendText(std::string(link_params.link_href), prependNewLineState, link_params);
-				mEditor->appendText(delimiter, prependNewLineState, body_message_params);
-
 				prependNewLineState = false;
+				mEditor->appendText(delimiter, prependNewLineState, body_message_params);
 			}
             else if (teleport_separator)
             {
