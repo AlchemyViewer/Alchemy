@@ -27,6 +27,10 @@
 	<menu_item_call label="グループのプロフィール" name="group_profile"/>
 	<menu_item_call label="このグループをアクティブ化" name="activate_group"/>
 	<menu_item_call label="このグループから脱退する" name="leave_group"/>
+	<menu_item_separator name="separator_group_copy"/>
+	<menu_item_call label="グループ名をコピー" name="copy_group_name"/>
+	<menu_item_call label="グループのSLurlをコピー" name="copy_group_slurl"/>
+	<menu_item_call label="グループのＵＵＩＤをコピー" name="copy_group_id"/>
 	<menu_item_separator name="Moderator Options Separator"/>
 	<context_menu label="モデレーターのオプション" name="Moderator Options">
 		<menu_item_check label="テキストチャットを許可" name="AllowTextChat"/>
