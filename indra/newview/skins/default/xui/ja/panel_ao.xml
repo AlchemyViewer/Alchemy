@@ -2,9 +2,10 @@
 <panel name="animation_overrider_outer_panel">
 	<!-- Main Panel -->
 	<panel name="animation_overrider_panel">
-		<check_box name="ao_enable" label="ＡＯを有効化" tool_tip="アニメーションオーバーライドを有効化したり無効化したりできます。"/>
+		<check_box name="ao_enable" label="ＡＯを有効化" tool_tip="アニメーションオーバーライドを有効化したり無効化できます。"/>
 		<combo_box name="ao_set_selection_combo" tool_tip="編集したいアニメーションを選択してください。"/>
 		<button name="ao_activate" tool_tip="このアニメーションを今すぐ有効化します。"/>
+		<icon/>
 		<check_box name="ao_default" label="デフォルト" tool_tip="このアニメーションセットを、ログイン時に再生されるデフォルトのセットにします。"/>
 		<button name="ao_add" tool_tip="新しいアニメーションセットを追加します。"/>
 		<button name="ao_remove" tool_tip="このアニメーションセットを削除します。"/>
@@ -28,14 +29,15 @@
 		<button name="ao_reload" label="リロード" tool_tip="アニメーションオーバーライド設定をリロードします。"/>
 		<layout_stack name="next_previous_buttons_stack">
 			<layout_panel name="next_previous_buttons_stack_left">
-				<button name="ao_previous" tool_tip="現在の状態の前のアニメーションに切り替えます。"/>
+				<button name="ao_previous" tool_tip="前のステートのアニメーションに切り替えます。"/>
 			</layout_panel>
 			<layout_panel name="next_previous_buttons_stack_right">
-				<button name="ao_next" tool_tip="現在の状態の次のアニメーションに切り替えます。"/>
+				<button name="ao_next" tool_tip="次のステートのアニメーションに切り替えます。"/>
 			</layout_panel>
 		</layout_stack>
+		<button name="ao_less" tool_tip="インターフェースを縮小表示にします。"/>
 	</panel>
-	<!-- Cute Reload Cover Panel -->
+	<!-- Reload Cover Panel -->
 	<panel name="ao_reload_cover">
 		<panel name="ao_reload_text_panel">
 			<view_border name="ao_reload_view_border"/>
@@ -55,5 +57,14 @@
 				</layout_panel>
 			</layout_stack>
 		</panel>
+	</panel>
+	<!-- Small Panel -->
+	<panel name="animation_overrider_panel_small">
+		<check_box name="ao_enable" label="ＡＯを有効化" tool_tip="アニメーションオーバーライドを有効化したり無効化できます。"/>
+		<combo_box name="ao_set_selection_combo_small" tool_tip="編集したいアニメーションセットを選択してください。"/>
+		<button name="ao_more" tool_tip="インターフェースをフルサイズ表示にします。"/>
+		<button name="ao_previous_small" tool_tip="前のステートのアニメーションに切り替えます。"/>
+		<button name="ao_next_small" tool_tip="次のステートのアニメーションに切り替えます。"/>
+		<check_box name="ao_sit_override_small" label="座った時" tool_tip="座るアニメーションをオーバーライドする場合は、これをチェックします。"/>
 	</panel>
 </panel>
