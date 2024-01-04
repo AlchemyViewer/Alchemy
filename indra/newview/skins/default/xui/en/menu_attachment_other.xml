@@ -2,7 +2,7 @@
 <!-- *NOTE: See also menu_avatar_other.xml -->
 <context_menu
  layout="topleft"
- name="Avatar Pie">
+ name="Avatar Attachment Pie">
   <menu_item_call
    label="View Profile"
    name="Profile...">
@@ -174,7 +174,7 @@
   </context_menu>
   <context_menu
    label="Manage"
-   name="Manage">
+   name="Avatar Attachment Manage">
     <menu_item_call
      enabled="false"
      label="Block"
