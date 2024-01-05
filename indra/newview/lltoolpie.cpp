@@ -1964,12 +1964,16 @@ BOOL LLToolPie::handleRightClickPick()
 // [/RLVa:KB]
 				if (is_other_attachment)
 				{
-					gMenuAttachmentOther->getChild<LLUICtrl>("Avatar Mute")->setValue(mute_msg);
+					if(auto av_manage = gMenuHolder->findChild<LLUICtrl>("Avatar Attachment Manage"))
+						if(auto av_mute = av_manage->findChild<LLUICtrl>("Avatar Mute"))
+							av_mute->setValue(mute_msg);
 					gMenuAttachmentOther->show(x, y);
 				}
 				else
 				{
-					gMenuAvatarOther->getChild<LLUICtrl>("Avatar Mute")->setValue(mute_msg);
+					if (auto av_manage = gMenuHolder->findChild<LLUICtrl>("Avatar Manage"))
+						if (auto av_mute = av_manage->findChild<LLUICtrl>("Avatar Mute"))
+							av_mute->setValue(mute_msg);
 					gMenuAvatarOther->show(x, y);
 				}
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-1.1.0l
