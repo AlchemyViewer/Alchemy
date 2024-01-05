@@ -23,6 +23,5 @@
 		<panel label="操作" name="controls"/>
 		<panel label="スキン" name="skins"/>
 		<panel label="インターフェース" name="interface"/>
-		<panel label="グリッド" name="grids"/>
 	</tab_container>
 </floater>
