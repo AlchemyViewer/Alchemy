@@ -75,6 +75,10 @@ public:
 
 	/*virtual*/ LLSD getValue() const { return mColor.getValue(); }
 	const LLColor4&	get()							{ return mColor; }
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+	/*virtual*/ BOOL isDirty() const;	// Returns TRUE if user changed value at all
+	/*virtual*/ void resetDirty();		// Clear dirty state
+// [/SL:KB]
 	
 	void			set(const LLColor4& color, BOOL update_picker = FALSE, BOOL from_event = FALSE);
 	void			setOriginal(const LLColor4& color);
@@ -103,6 +107,9 @@ public:
 protected:
 	bool					mValid;
 	LLColor4				mColor;
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+	LLColor4				mPrevColor;
+// [/SL:KB]
 	LLUIColor				mBorderColor;
 	LLTextBox*				mCaption;
 	LLHandle<LLFloater>		mPickerHandle;
