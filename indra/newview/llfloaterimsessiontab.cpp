@@ -463,8 +463,7 @@ void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD &args)
 		tmp_chat.mFromName = chat.mFromName;
 		LLSD chat_args;
 		if (args) chat_args = args;
-		chat_args["use_plain_text_chat_history"] =
-				gSavedSettings.getBOOL("PlainTextChatHistory");
+		chat_args["chat_history_style"] = gSavedSettings.getS32("AlchemyChatHistoryStyle");
 		chat_args["show_time"] = gSavedSettings.getBOOL("IMShowTime");
 		chat_args["show_names_for_p2p_conv"] =
 				!mIsP2PChat || gSavedSettings.getBOOL("IMShowNamesForP2PConv");
@@ -663,9 +662,14 @@ void LLFloaterIMSessionTab::onIMSessionMenuItemClicked(const LLSD& userdata)
 {
 	std::string item = userdata.asString();
 
-	if (item == "compact_view" || item == "expanded_view")
+	if (item == "fancy_compact_view" || item == "compact_view" || item == "expanded_view")
 	{
-		gSavedSettings.setBOOL("PlainTextChatHistory", item == "compact_view");
+		S32 newset = 0;
+		if (item == "fancy_compact_view")
+			newset = 2;
+		else if (item == "compact_view")
+			newset = 1;
+		gSavedSettings.setS32("AlchemyChatHistoryStyle", newset);
 	}
 	else
 	{
@@ -679,9 +683,17 @@ void LLFloaterIMSessionTab::onIMSessionMenuItemClicked(const LLSD& userdata)
 bool LLFloaterIMSessionTab::onIMCompactExpandedMenuItemCheck(const LLSD& userdata)
 {
 	std::string item = userdata.asString();
-	bool is_plain_text_mode = gSavedSettings.getBOOL("PlainTextChatHistory");
-
-	return is_plain_text_mode? item == "compact_view" : item == "expanded_view";
+	S32 chat_history_mode = gSavedSettings.getS32("AlchemyChatHistoryStyle");
+	switch (chat_history_mode)
+	{
+	default:
+	case 0:
+		return item == "expanded_view";
+	case 1:
+		return item == "compact_view";
+	case 2:
+		return item == "fancy_compact_view";
+	}
 }
 
 
@@ -694,7 +706,7 @@ bool LLFloaterIMSessionTab::onIMShowModesMenuItemCheck(const LLSD& userdata)
 bool LLFloaterIMSessionTab::onIMShowModesMenuItemEnable(const LLSD& userdata)
 {
 	std::string item = userdata.asString();
-	bool plain_text = gSavedSettings.getBOOL("PlainTextChatHistory");
+	bool plain_text = gSavedSettings.getS32("AlchemyChatHistoryStyle") >= 1;
 	bool is_not_names = (item != "IMShowNamesForP2PConv");
 	return (plain_text && (is_not_names || mIsP2PChat));
 }

@@ -1164,4 +1164,13 @@
    <color
     name="MusicTickerEmphasisColor" 
     reference="EmphasisColor"/>
+  <color
+   name="ChatHeaderDisplayNameColor"
+   reference="White" />
+  <color
+   name="ChatHeaderTimestampColor"
+   reference="White" />
+    <color
+     name="AlchemyFancyChatDividerColor"
+     reference="White" />
 </colors>

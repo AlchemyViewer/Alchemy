@@ -1055,7 +1055,10 @@ protected:
 private:
 	void setTimeField(const LLChat& chat)
 	{
-		LLTextBox* time_box = getChild<LLTextBox>("time_box");
+		LLTextBox* time_box = mTimeBoxTextBox;
+
+		static LLUIColor timestamp_color = LLUIColorTable::instance().getColor("ChatHeaderTimestampColor"); // <alchemy/>
+		time_box->setColor(timestamp_color); // <alchemy/>
 
 		LLRect rect_before = time_box->getRect();
 
@@ -1168,7 +1171,7 @@ LLChatHistory::LLChatHistory(const LLChatHistory::Params& p)
 	editor_params.rect = getLocalRect();
 	editor_params.follows.flags = FOLLOWS_ALL;
 	editor_params.enabled = false; // read only
-	editor_params.show_context_menu = "true";
+	editor_params.show_context_menu = true;
 	editor_params.trusted_content = false;
 	mEditor = LLUICtrlFactory::create<LLTextEditor>(editor_params, this);
 	mEditor->setIsFriendCallback(LLAvatarActions::isFriend);
@@ -1277,6 +1280,7 @@ void LLChatHistory::clear()
 {
 	mLastFromName.clear();
 	mEditor->clear();
+	mEditor->blockUndo(); // AL:LL:WTF: why is chat history a text editor with an undo stack...
 	mLastFromID = LLUUID::null;
 }
 
@@ -1285,7 +1289,8 @@ static LLTrace::BlockTimerStatHandle FTM_APPEND_MESSAGE("Append Chat Message");
 void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LLStyle::Params& input_append_params)
 {
 	LL_RECORD_BLOCK_TIME(FTM_APPEND_MESSAGE);
-	bool use_plain_text_chat_history = args["use_plain_text_chat_history"].asBoolean();
+	bool use_plain_text_chat_history = args["chat_history_style"].asInteger() >= 1;
+	bool use_irssi_text_chat_history = args["chat_history_style"].asInteger() >= 2;
 	bool square_brackets = false; // square brackets necessary for a system messages
 
 	llassert(mEditor);
@@ -1327,10 +1332,10 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 	}
 
 	LLColor4 txt_color = LLUIColorTable::instance().getColor("White");
-	LLColor4 name_color(txt_color);
+	LLColor4 name_color = LLUIColorTable::instance().getColor("ChatHeaderDisplayNameColor"); // <alchemy/>
 
 	LLViewerChat::getChatColor(chat,txt_color);
-	LLFontGL* fontp = LLViewerChat::getChatFont();	
+	LLFontGL* fontp = LLViewerChat::getChatFont();
 	std::string font_name = LLFontGL::nameFromFont(fontp);
 	std::string font_size = LLFontGL::sizeFromFont(fontp);	
 
@@ -1391,17 +1396,23 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 	}
 
 	bool prependNewLineState = mEditor->getText().size() != 0;
+	static LLCachedControl<S32> name_column(gSavedSettings, "AlchemyFancyChatNameWidth", 18);
+	static LLCachedControl<bool> alchemyPlainChatNameBold(gSavedSettings, "AlchemyPlainChatNameBold", false);
+	static LLCachedControl<std::string> alchemyFancyChatDivider(gSavedSettings, "AlchemyFancyChatDivider", " | ");
+	static LLUIColor fancy_chat_divider_color = LLUIColorTable::instance().getColor("AlchemyFancyChatDividerColor");
 
 	// compact mode: show a timestamp and name
 	if (use_plain_text_chat_history)
 	{
-		square_brackets = chat.mSourceType == CHAT_SOURCE_SYSTEM;
+		square_brackets = chat.mSourceType == CHAT_SOURCE_SYSTEM && !use_irssi_text_chat_history;
 
-		LLStyle::Params timestamp_style(body_message_params);
+		name_params.color(fancy_chat_divider_color);
+		name_params.readonly_color(fancy_chat_divider_color);
 
 		// out of the timestamp
 		if (args["show_time"].asBoolean())
 		{
+			LLStyle::Params timestamp_style(body_message_params);
 			if (!message_from_log)
 			{
 				LLColor4 timestamp_color = LLUIColorTable::instance().getColor("ChatTimestampColor");
@@ -1441,14 +1452,38 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 				// set the link for the object name to be the objectim SLapp
 				// (don't let object names with hyperlinks override our objectim Url)
 				LLStyle::Params link_params(body_message_params);
-				LLColor4 link_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+				static LLUIColor link_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
 				link_params.color = link_color;
 				link_params.readonly_color = link_color;
 				link_params.is_link = true;
 				link_params.link_href = url;
 
-				mEditor->appendText(chat.mFromName + delimiter, prependNewLineState, link_params);
-				prependNewLineState = false;
+				if (use_irssi_text_chat_history)
+				{
+					if (irc_me)
+					{
+						mEditor->appendText("<" + std::string(name_column - 1, ' ') + "*>", prependNewLineState, link_params);
+						prependNewLineState = false;
+						mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
+						mEditor->appendText(chat.mFromName + delimiter, prependNewLineState, link_params);
+					}
+					else
+					{
+						LLWString from_text = utf8string_to_wstring(chat.mFromName);
+						S32 i = from_text.length();
+						if (i > name_column) from_text.erase(name_column);
+						else if (i < name_column) from_text = LLWString(name_column - i, ' ') + from_text;
+
+						mEditor->appendText("<" + wstring_to_utf8str(from_text) + ">", prependNewLineState, link_params);
+						prependNewLineState = false;
+						mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
+					}
+				}
+				else
+				{
+					mEditor->appendText(chat.mFromName + delimiter, prependNewLineState, link_params);
+					prependNewLineState = false;
+				}
 			}
 //			else if ( chat.mFromName != SYSTEM_FROM && chat.mFromID.notNull() && !message_from_log && chat.mSourceType != CHAT_SOURCE_REGION)
 // [RLVa:KB] - Checked: 2010-04-22 (RLVa-1.2.0f) | Added: RLVa-1.2.0f
@@ -1458,13 +1493,47 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 				LLStyle::Params link_params(body_message_params);
 				link_params.overwriteFrom(LLStyleMap::instance().lookupAgent(chat.mFromID));
 
-				// Add link to avatar's inspector and delimiter to message.
-				mEditor->appendText(std::string(link_params.link_href), prependNewLineState, link_params);
-				prependNewLineState = false;
-				mEditor->appendText(delimiter, prependNewLineState, body_message_params);
+				if (use_irssi_text_chat_history)
+				{
+					if (irc_me)
+					{
+						mEditor->appendText("<" + std::string(name_column - 1, ' ') + "*>", prependNewLineState, link_params);
+						prependNewLineState = false;
+						mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
+						LLStyle::Params link_params2(body_message_params);
+						link_params2.use_default_link_style = false;
+						link_params2.link_href = link_params.link_href;
+						mEditor->appendText(std::string(link_params.link_href) + delimiter, prependNewLineState, link_params2);
+					}
+					else 
+					{
+						LLWString from_text = utf8string_to_wstring(chat.mFromName);
+						std::string text_padding;
+						S32 i = from_text.length();
+						if (i >= name_column) from_text = from_text.substr(0, name_column);
+						else if (i < name_column) text_padding = std::string(name_column - i, ' ');
+
+						mEditor->appendText("<" + text_padding + "[" + std::string(link_params.link_href) + " " + wstring_to_utf8str(from_text) + "]>", prependNewLineState, link_params);
+						prependNewLineState = false;
+						mEditor->appendText(alchemyFancyChatDivider, false, name_params);
+					}
+				}
+				else
+				{
+					// Add link to avatar's inspector and delimiter to message.
+					mEditor->appendText(std::string(link_params.link_href), prependNewLineState, link_params);
+					prependNewLineState = false;
+					mEditor->appendText(delimiter, prependNewLineState, body_message_params);
+				}
 			}
             else if (teleport_separator)
             {
+				if(use_irssi_text_chat_history)
+				{
+					mEditor->appendText("<" + std::string(name_column - 1, ' ') + "*>", prependNewLineState, body_message_params);
+					prependNewLineState = false;
+					mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
+				}
                 std::string tp_text = LLTrans::getString("teleport_preamble_compact_chat");
                 mEditor->appendText(tp_text + " <nolink>" + chat.mFromName + "</nolink>",
                     prependNewLineState, body_message_params);
@@ -1472,9 +1541,33 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
             }
 			else
 			{
-				mEditor->appendText("<nolink>" + chat.mFromName + "</nolink>" + delimiter,
-						prependNewLineState, body_message_params);
-				prependNewLineState = false;
+				if (use_irssi_text_chat_history)
+				{
+					if (irc_me)
+					{
+						mEditor->appendText("<" + std::string(name_column - 1, ' ') + "*>", prependNewLineState, body_message_params);
+						prependNewLineState = false;
+						mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
+						mEditor->appendText(std::string("<nolink>").append(chat.mFromName).append("</nolink>").append(delimiter), prependNewLineState, body_message_params);
+					}
+					else
+					{
+						LLWString from_text = utf8string_to_wstring(chat.mFromName);
+						S32 i = from_text.length();
+						if (i >= name_column) from_text = from_text.substr(0, name_column);
+						else if (i < name_column) from_text = LLWString(name_column - i, ' ') + from_text;
+
+						mEditor->appendText("<<nolink>" + wstring_to_utf8str(from_text) + "</nolink>>", prependNewLineState, body_message_params);
+						prependNewLineState = false;
+						mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
+					}
+				}
+				else
+				{
+					mEditor->appendText("<nolink>" + chat.mFromName + "</nolink>" + delimiter,
+							prependNewLineState, body_message_params);
+					prependNewLineState = false;
+				}
 			}
 		}
 	}

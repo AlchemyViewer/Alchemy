@@ -1157,4 +1157,7 @@
   <color
     name="MusicTickerEmphasisColor" 
     reference="AlBlue"/>
+  <color
+     name="AlchemyFancyChatDividerColor"
+     reference="AlchemyText" />
 </colors>

@@ -3,6 +3,16 @@
  name="menu_modes"
  left="0" bottom="0" visible="false"
  mouse_opaque="false">
+	<menu_item_check
+       label="IRC view"
+       name="fancy_compact_view">
+		<menu_item_check.on_click
+		   function="IMSession.Menu.Action"
+		   parameter="fancy_compact_view"/>
+		<menu_item_check.on_check
+		   function="IMSession.Menu.CompactExpandedModes.CheckItem"
+		   parameter="fancy_compact_view"/>
+	</menu_item_check>
     <menu_item_check
        label="Compact view"
        name="compact_view">

@@ -1756,5 +1756,49 @@
 			<key>Value</key>
 			<integer>0</integer>
 		</map>
+		<key>AlchemyFancyChatDivider</key>
+		<map>
+			<key>Comment</key>
+			<string>Divider style for fancy chat</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>String</string>
+			<key>Value</key>
+			<string> │ </string>
+		</map>
+		<key>AlchemyFancyChatNameWidth</key>
+		<map>
+			<key>Comment</key>
+			<string>Width of name field in fancy chat</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>S32</string>
+			<key>Value</key>
+			<integer>18</integer>
+		</map>
+		<key>AlchemyPlainChatNameBold</key>
+		<map>
+			<key>Comment</key>
+			<string>If true, names will be bold in plain text chat</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>Boolean</string>
+			<key>Value</key>
+			<integer>0</integer>
+		</map>
+		<key>AlchemyChatHistoryStyle</key>
+		<map>
+			<key>Comment</key>
+			<string>0 - Expanded 1 - Plain 2 - Fancy Plain</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>S32</string>
+			<key>Value</key>
+			<integer>0</integer>
+		</map>
 	</map>
 </llsd>
