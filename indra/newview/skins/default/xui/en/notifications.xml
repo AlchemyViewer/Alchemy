@@ -12786,6 +12786,13 @@ Insufficient permissions to read notecard.
 
   <notification
    icon="notifytip.tga"
+   name="AOImportComplete"
+   type="notifytip">
+Animation Overrider notecard import complete!
+  </notification>
+	
+  <notification
+   icon="notifytip.tga"
    name="AOImportCreateSetFailed"
    type="notifytip">
 Error while creating import set.
