@@ -4251,7 +4251,7 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
 		return;
 	}
 
-	if (LLMaterialTable::basic.isCollisionSound(sound_id) && !gSavedSettings.getBOOL("EnableCollisionSounds"))
+	if ((LLMaterialTable::basic.isCollisionSound(sound_id) || LLMaterialTable::basic.getGroundCollisionSoundUUID(0) == sound_id) && !gSavedSettings.getBOOL("EnableCollisionSounds"))
 	{
 		return;
 	}
