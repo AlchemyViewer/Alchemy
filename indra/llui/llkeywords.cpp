@@ -284,11 +284,12 @@ void LLKeywords::processTokens()
 
 	// Add 'standard' stuff: Quotes, Comments, Strings, Labels, etc. before processing the LLSD
 	static LLUIColor syntax_lsl_comment_color = LLUIColorTable::instance().getColor("SyntaxLslComment");
+	static LLUIColor syntax_lsl_literal_color = LLUIColorTable::instance().getColor("SyntaxLslStringLiteral");
 	std::string delimiter;
 	addToken(LLKeywordToken::TT_LABEL, "@", getColorGroup("misc-flow-label"), "Label\nTarget for jump statement", delimiter );
 	addToken(LLKeywordToken::TT_ONE_SIDED_DELIMITER, "//", syntax_lsl_comment_color, "Comment (single-line)\nNon-functional commentary or disabled code", delimiter );
 	addToken(LLKeywordToken::TT_TWO_SIDED_DELIMITER, "/*", syntax_lsl_comment_color, "Comment (multi-line)\nNon-functional commentary or disabled code", "*/" );
-	addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS, "\"", syntax_lsl_comment_color, "String literal", "\"" );
+	addToken(LLKeywordToken::TT_DOUBLE_QUOTATION_MARKS, "\"", syntax_lsl_literal_color, "String literal", "\"" );
 
 	for (const auto& llsd_pair : mSyntax.asMap())
 	{
