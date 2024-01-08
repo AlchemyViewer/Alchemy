@@ -6054,6 +6054,9 @@ Intelドライバーのウェブサイトを確認しますか？
 	<notification name="AOImportPermissionDenied">
 		ノートカードを読み取るための十分な権限がありません。
 	</notification>
+	<notification name="AOImportComplete">
+		アニメーションオーバーライダーのノートカードのインポートが完了しました！
+  </notification>
 	<notification name="AOImportCreateSetFailed">
 		インポートセット作成時にエラーが発生しました。
 	</notification>
