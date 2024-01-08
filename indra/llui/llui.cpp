@@ -604,6 +604,7 @@ namespace LLInitParam
 		U8 fontstyle = 0;
 		fontstyle = LLFontGL::getStyleFromString(style());
 		LLFontDescriptor desc(name(), size(), fontstyle);
+		desc = desc.normalize();
 		const LLFontGL* fontp = LLFontGL::getFont(desc);
 		if (fontp)
 		{

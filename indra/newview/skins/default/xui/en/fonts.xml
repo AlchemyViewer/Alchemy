@@ -7,6 +7,7 @@
     <file load_collection="true">NotoSansCJK-Regular.ttc</file>
     <file>NotoSansTamil-Regular.ttf</file>
     <file>NotoSansOriya-Regular.ttf</file>
+    <file>NotoSansKannada-Regular.ttf</file>
     <file>NotoSansDevanagari-Regular.ttf</file>
     <file>NotoNaskhArabicUI-Regular.ttf</file>
     <file>NotoLoopedThaiUI-Regular.ttf</file>
@@ -41,34 +42,8 @@
     </os>
   </font>
 
-  <font name="SansSerifBold"
-	comment="Name of bold sans-serif font">
-    <file>DejaVuSans-Bold.ttf</file>
-    <file>NotoSans-Bold.ttf</file>
-    <file load_collection="true">NotoSansCJK-Bold.ttc</file>
-    <file>NotoSansTamil-Bold.ttf</file>
-    <file>NotoSansOriya-Bold.ttf</file>
-    <file>NotoSansDevanagari-Bold.ttf</file>
-    <file>NotoNaskhArabicUI-Bold.ttf</file>
-    <file>NotoLoopedThaiUI-Bold.ttf</file>
-    <file>NotoSansSymbols-Bold.ttf</file>
-    <os name="Windows">
-      <file>arialbd.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>Helvetica.dfont</file>
-      </os>
-  </font>
-
   <font name="SansSerif" comment="Name of san-serif font (Truetype file name)">
     <file>DejaVuSans.ttf</file>
-    <file>NotoSans-Regular.ttf</file>
-    <file>NotoSansSymbols-Regular.ttf</file>
-    <file>NotoSansSymbols2-Regular.ttf</file>
-    <file>NotoSansMath-Regular.ttf</file>
-    <file>NotoNaskhArabicUI-Regular.ttf</file>
-    <file>NotoLoopedThaiUI-Regular.ttf</file>
-    <file load_collection="true">NotoSansCJK-Regular.ttc</file>
     <os name="Windows">
       <file>arial.ttf</file>
       </os>
@@ -85,10 +60,17 @@
     <file load_collection="true">NotoSansCJK-Bold.ttc</file>
     <file>NotoSansTamil-Bold.ttf</file>
     <file>NotoSansOriya-Bold.ttf</file>
+    <file>NotoSansKannada-Bold.ttf</file>
     <file>NotoSansDevanagari-Bold.ttf</file>
     <file>NotoNaskhArabicUI-Bold.ttf</file>
     <file>NotoLoopedThaiUI-Bold.ttf</file>
     <file>NotoSansSymbols-Bold.ttf</file>
+    <os name="Windows">
+      <file>arialbd.ttf</file>
+    </os>
+    <os name="Mac">
+      <file>Helvetica.dfont</file>
+    </os>
   </font>
 
   <font name="SansSerif"
@@ -111,6 +93,18 @@
     <file>NotoSansMono-Regular.ttf</file>
   </font>
 
+  <font name="Monospace" font_style="BOLD">
+    <file>DejaVuSansMono-Bold.ttf</file>
+  </font>
+
+  <font name="Monospace" font_style="ITALIC">
+    <file>DejaVuSansMono-Oblique.ttf</file>
+  </font>
+
+  <font name="Monospace" font_style="BOLD|ITALIC">
+    <file>DejaVuSansMono-BoldOblique.ttf</file>
+  </font>
+	
   <font name="DejaVu"
 	comment="Name of DejaVu font">
     <file>DejaVuSans.ttf</file>
