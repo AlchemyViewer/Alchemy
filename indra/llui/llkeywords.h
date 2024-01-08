@@ -37,6 +37,8 @@
 #include <deque>
 #include "llpointer.h"
 
+class LLStyle;
+typedef LLPointer<LLStyle> LLStyleSP;
 class LLTextSegment;
 typedef LLPointer<LLTextSegment> LLTextSegmentPtr;
 
@@ -198,6 +200,8 @@ protected:
     std::string                                              getAttribute(std::string_view key);
 
 	std::string	getArguments(LLSD& arguments);
+
+	LLStyleSP getDefaultStyle(const LLTextEditor& editor);
 };
 
 #endif  // LL_LLKEYWORDS_H

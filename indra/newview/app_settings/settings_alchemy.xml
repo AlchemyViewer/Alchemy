@@ -1800,5 +1800,49 @@
 			<key>Value</key>
 			<integer>0</integer>
 		</map>
+		<key>NotecardFontName</key>
+		<map>
+			<key>Comment</key>
+			<string>Name of font for Notecard Editors</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>String</string>
+			<key>Value</key>
+			<string>SansSerif</string>
+		</map>
+		<key>NotecardFontSize</key>
+		<map>
+			<key>Comment</key>
+			<string>Size of font for Notecard Editors</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>String</string>
+			<key>Value</key>
+			<string>Medium</string>
+		</map>
+		<key>ScriptFontName</key>
+		<map>
+			<key>Comment</key>
+			<string>Name of font for Script Editors</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>String</string>
+			<key>Value</key>
+			<string>Monospace</string>
+		</map>
+		<key>ScriptFontSize</key>
+		<map>
+			<key>Comment</key>
+			<string>Size of font for Script Editors</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>String</string>
+			<key>Value</key>
+			<string>Monospace</string>
+		</map>
 	</map>
 </llsd>

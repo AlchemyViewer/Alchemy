@@ -41,10 +41,11 @@ public:
 		Params();
 	};
 	
-	virtual ~LLScriptEditor() {};
+	virtual ~LLScriptEditor();
 	
 	// LLView override
 	virtual void	draw();
+	BOOL	postBuild() override;
 	
 	void	initKeywords();
 	void	loadKeywords();
@@ -65,6 +66,9 @@ private:
 	
 	LLKeywords	mKeywords;
 	bool		mShowLineNumbers;
+
+	boost::signals2::connection mFontNameConnection;
+	boost::signals2::connection mFontSizeConnection;
 };
 
 #endif // LL_SCRIPTEDITOR_H

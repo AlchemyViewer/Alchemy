@@ -201,4 +201,342 @@
 	     comment="Size of small font (points, or 1/72 of an inch)"
 	     size="7.6"
 	     />
+
+	<!--NotoSans-->
+	<font name="NotoSans">
+		<file>NotoSans-Regular.ttf</file>
+	</font>
+
+	<font name="NotoSans" font_style="BOLD">
+		<file>NotoSans-Bold.ttf</file>
+	</font>
+
+	<font name="NotoSans" font_style="ITALIC">
+		<file>NotoSans-Italic.ttf</file>
+	</font>
+
+	<font name="NotoSans" font_style="BOLD|ITALIC">
+		<file>NotoSans-BoldItalic.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="NotoSans" size="8.0" />
+	<font_size name="Huge" font="NotoSans" size="16.0" />
+	<font_size name="Large" font="NotoSans" size="11.6" />
+	<font_size name="Medium" font="NotoSans" size="9.6" />
+	<font_size name="Small" font="NotoSans" size="8.6" />
+
+	<!--NotoSerif-->
+	<font name="NotoSerif">
+		<file>NotoSerif-Regular.ttf</file>
+	</font>
+
+	<font name="NotoSerif" font_style="BOLD">
+		<file>NotoSerif-Bold.ttf</file>
+	</font>
+
+	<font name="NotoSerif" font_style="ITALIC">
+		<file>NotoSerif-Italic.ttf</file>
+	</font>
+
+	<font name="NotoSerif" font_style="BOLD|ITALIC">
+		<file>NotoSerif-BoldItalic.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="NotoSerif" size="8.0" />
+	<font_size name="Huge" font="NotoSerif" size="16.0" />
+	<font_size name="Large" font="NotoSerif" size="11.6" />
+	<font_size name="Medium" font="NotoSerif" size="9.6" />
+	<font_size name="Small" font="NotoSerif" size="8.6" />
+
+	<!--OpenDyslexic-->
+	<font name="OpenDyslexic">
+		<file>OpenDyslexic-Regular.otf</file>
+	</font>
+
+	<font name="OpenDyslexic" font_style="BOLD">
+		<file>OpenDyslexic-Bold.otf</file>
+	</font>
+
+	<font name="OpenDyslexic" font_style="ITALIC">
+		<file>OpenDyslexic-Italic.otf</file>
+	</font>
+
+	<font name="OpenDyslexic" font_style="BOLD|ITALIC">
+		<file>OpenDyslexic-BoldItalic.otf</file>
+	</font>
+
+	<font_size name="Monospace" font="OpenDyslexic" size="8.0" />
+	<font_size name="Huge" font="OpenDyslexic" size="16.0" />
+	<font_size name="Large" font="OpenDyslexic" size="11.6" />
+	<font_size name="Medium" font="OpenDyslexic" size="9.6" />
+	<font_size name="Small" font="OpenDyslexic" size="8.6" />
+
+	<!--Source Sans 3-->
+	<font name="SourceSans">
+		<file>SourceSans3-Regular.ttf</file>
+	</font>
+
+	<font name="SourceSans" font_style="BOLD">
+		<file>SourceSans3-Bold.ttf</file>
+	</font>
+
+	<font name="SourceSans" font_style="ITALIC">
+		<file>SourceSans3-It.ttf</file>
+	</font>
+
+	<font name="SourceSans" font_style="BOLD|ITALIC">
+		<file>SourceSans3-BoldIt.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="SourceSans" size="8.0" />
+	<font_size name="Huge" font="SourceSans" size="16.0" />
+	<font_size name="Large" font="SourceSans" size="11.6" />
+	<font_size name="Medium" font="SourceSans" size="9.6" />
+	<font_size name="Small" font="SourceSans" size="8.6" />
+
+	<!--Ubuntu-->
+	<font name="Ubuntu">
+		<file>Ubuntu-R.ttf</file>
+	</font>
+
+	<font name="Ubuntu" font_style="BOLD">
+		<file>Ubuntu-B.ttf</file>
+	</font>
+
+	<font name="Ubuntu" font_style="ITALIC">
+		<file>Ubuntu-RI.ttf</file>
+	</font>
+
+	<font name="Ubuntu" font_style="BOLD|ITALIC">
+		<file>Ubuntu-BI.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="Ubuntu" size="8.0" />
+	<font_size name="Huge" font="Ubuntu" size="16.0" />
+	<font_size name="Large" font="Ubuntu" size="11.6" />
+	<font_size name="Medium" font="Ubuntu" size="9.6" />
+	<font_size name="Small" font="Ubuntu" size="8.6" />
+
+	<!--Monospace Fonts-->
+
+	<!--Cascadia Code-->
+	<font name="CascadiaCode">
+		<file>CascadiaMono-Regular.ttf</file>
+	</font>
+
+	<font name="CascadiaCode" font_style="BOLD">
+		<file>CascadiaMono-Bold.ttf</file>
+	</font>
+
+	<font name="CascadiaCode" font_style="ITALIC">
+		<file>CascadiaMono-Italic.ttf</file>
+	</font>
+
+	<font name="CascadiaCode" font_style="BOLD|ITALIC">
+		<file>CascadiaMono-BoldItalic.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="CascadiaCode" size="8.0" />
+	<font_size name="Huge" font="CascadiaCode" size="16.0" />
+	<font_size name="Large" font="CascadiaCode" size="11.6" />
+	<font_size name="Medium" font="CascadiaCode" size="9.6" />
+	<font_size name="Small" font="CascadiaCode" size="8.6" />
+
+	<!--Fira Code-->
+	<font name="FiraCode">
+		<file>FiraCode-Regular.ttf</file>
+	</font>
+
+	<font name="FiraCode" font_style="BOLD">
+		<file>FiraCode-Bold.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="FiraCode" size="8.0" />
+	<font_size name="Huge" font="FiraCode" size="16.0" />
+	<font_size name="Large" font="FiraCode" size="11.6" />
+	<font_size name="Medium" font="FiraCode" size="9.6" />
+	<font_size name="Small" font="FiraCode" size="8.6" />
+
+	<!--Jetbrains Mono-->
+	<font name="JetbrainsMono">
+		<file>JetBrainsMonoNL-Regular.ttf</file>
+	</font>
+
+	<font name="JetbrainsMono" font_style="BOLD">
+		<file>JetBrainsMonoNL-Bold.ttf</file>
+	</font>
+
+	<font name="JetbrainsMono" font_style="ITALIC">
+		<file>JetBrainsMonoNL-Italic.ttf</file>
+	</font>
+
+	<font name="JetbrainsMono" font_style="BOLD|ITALIC">
+		<file>JetBrainsMonoNL-BoldItalic.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="JetbrainsMono" size="8.0" />
+	<font_size name="Huge" font="JetbrainsMono" size="16.0" />
+	<font_size name="Large" font="JetbrainsMono" size="11.6" />
+	<font_size name="Medium" font="JetbrainsMono" size="9.6" />
+	<font_size name="Small" font="JetbrainsMono" size="8.6" />
+
+	<!--Monaspace Argon-->
+	<font name="MonaspaceArgon">
+		<file>MonaspaceArgon-Regular.otf</file>
+	</font>
+
+	<font name="MonaspaceArgon" font_style="BOLD">
+		<file>MonaspaceArgon-Bold.otf</file>
+	</font>
+
+	<font name="MonaspaceArgon" font_style="ITALIC">
+		<file>MonaspaceArgon-Italic.otf</file>
+	</font>
+
+	<font name="MonaspaceArgon" font_style="BOLD|ITALIC">
+		<file>MonaspaceArgon-BoldItalic.otf</file>
+	</font>
+
+	<font_size name="Monospace" font="MonaspaceArgon" size="8.0" />
+	<font_size name="Huge" font="MonaspaceArgon" size="16.0" />
+	<font_size name="Large" font="MonaspaceArgon" size="11.6" />
+	<font_size name="Medium" font="MonaspaceArgon" size="9.6" />
+	<font_size name="Small" font="MonaspaceArgon" size="8.6" />
+
+	<!--Monaspace Krypton-->
+	<font name="MonaspaceKrypton">
+		<file>MonaspaceKrypton-Regular.otf</file>
+	</font>
+
+	<font name="MonaspaceKrypton" font_style="BOLD">
+		<file>MonaspaceKrypton-Bold.otf</file>
+	</font>
+
+	<font name="MonaspaceKrypton" font_style="ITALIC">
+		<file>MonaspaceKrypton-Italic.otf</file>
+	</font>
+
+	<font name="MonaspaceKrypton" font_style="BOLD|ITALIC">
+		<file>MonaspaceKrypton-BoldItalic.otf</file>
+	</font>
+
+	<font_size name="Monospace" font="MonaspaceKrypton" size="8.0" />
+	<font_size name="Huge" font="MonaspaceKrypton" size="16.0" />
+	<font_size name="Large" font="MonaspaceKrypton" size="11.6" />
+	<font_size name="Medium" font="MonaspaceKrypton" size="9.6" />
+	<font_size name="Small" font="MonaspaceKrypton" size="8.6" />
+
+	<!--Monaspace Neon-->
+	<font name="MonaspaceNeon">
+		<file>MonaspaceNeon-Regular.otf</file>
+	</font>
+
+	<font name="MonaspaceNeon" font_style="BOLD">
+		<file>MonaspaceNeon-Bold.otf</file>
+	</font>
+
+	<font name="MonaspaceNeon" font_style="ITALIC">
+		<file>MonaspaceNeon-Italic.otf</file>
+	</font>
+
+	<font name="MonaspaceNeon" font_style="BOLD|ITALIC">
+		<file>MonaspaceNeon-BoldItalic.otf</file>
+	</font>
+
+	<font_size name="Monospace" font="MonaspaceNeon" size="8.0" />
+	<font_size name="Huge" font="MonaspaceNeon" size="16.0" />
+	<font_size name="Large" font="MonaspaceNeon" size="11.6" />
+	<font_size name="Medium" font="MonaspaceNeon" size="9.6" />
+	<font_size name="Small" font="MonaspaceNeon" size="8.6" />
+
+	<!--Monaspace Xenon-->
+	<font name="MonaspaceXenon">
+		<file>MonaspaceXenon-Regular.otf</file>
+	</font>
+
+	<font name="MonaspaceXenon" font_style="BOLD">
+		<file>MonaspaceXenon-Bold.otf</file>
+	</font>
+
+	<font name="MonaspaceXenon" font_style="ITALIC">
+		<file>MonaspaceXenon-Italic.otf</file>
+	</font>
+
+	<font name="MonaspaceXenon" font_style="BOLD|ITALIC">
+		<file>MonaspaceXenon-BoldItalic.otf</file>
+	</font>
+
+	<font_size name="Monospace" font="MonaspaceXenon" size="8.0" />
+	<font_size name="Huge" font="MonaspaceXenon" size="16.0" />
+	<font_size name="Large" font="MonaspaceXenon" size="11.6" />
+	<font_size name="Medium" font="MonaspaceXenon" size="9.6" />
+	<font_size name="Small" font="MonaspaceXenon" size="8.6" />
+
+	<!--Noto Sans Mono-->
+	<font name="NotoSansMono">
+		<file>NotoSansMono-Regular.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="NotoSansMono" size="8.0" />
+	<font_size name="Huge" font="NotoSansMono" size="16.0" />
+	<font_size name="Large" font="NotoSansMono" size="11.6" />
+	<font_size name="Medium" font="NotoSansMono" size="9.6" />
+	<font_size name="Small" font="NotoSansMono" size="8.6" />
+
+	<!--OpenDyslexicMono-->
+	<font name="OpenDyslexicMono">
+		<file>OpenDyslexicMono-Regular.otf</file>
+	</font>
+
+	<font_size name="Monospace" font="OpenDyslexicMono" size="8.0" />
+	<font_size name="Huge" font="OpenDyslexicMono" size="16.0" />
+	<font_size name="Large" font="OpenDyslexicMono" size="11.6" />
+	<font_size name="Medium" font="OpenDyslexicMono" size="9.6" />
+	<font_size name="Small" font="OpenDyslexicMono" size="8.6" />
+
+	<!--Source Code Pro-->
+	<font name="SourceCodePro">
+		<file>SourceCodePro-Regular.ttf</file>
+	</font>
+
+	<font name="SourceCodePro" font_style="BOLD">
+		<file>SourceSans3-Bold.ttf</file>
+	</font>
+
+	<font name="SourceCodePro" font_style="ITALIC">
+		<file>SourceSans3-It.ttf</file>
+	</font>
+
+	<font name="SourceCodePro" font_style="BOLD|ITALIC">
+		<file>SourceSans3-BoldIt.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="SourceCodePro" size="8.0" />
+	<font_size name="Huge" font="SourceCodePro" size="16.0" />
+	<font_size name="Large" font="SourceCodePro" size="11.6" />
+	<font_size name="Medium" font="SourceCodePro" size="9.6" />
+	<font_size name="Small" font="SourceCodePro" size="8.6" />
+
+	<!--Ubuntu Mono-->
+	<font name="UbuntuMono">
+		<file>UbuntuMono-R.ttf</file>
+	</font>
+
+	<font name="UbuntuMono" font_style="BOLD">
+		<file>UbuntuMono-B.ttf</file>
+	</font>
+
+	<font name="UbuntuMono" font_style="ITALIC">
+		<file>UbuntuMono-RI.ttf</file>
+	</font>
+
+	<font name="UbuntuMono" font_style="BOLD|ITALIC">
+		<file>UbuntuMono-BI.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="UbuntuMono" size="8.0" />
+	<font_size name="Huge" font="UbuntuMono" size="16.0" />
+	<font_size name="Large" font="UbuntuMono" size="11.6" />
+	<font_size name="Medium" font="UbuntuMono" size="9.6" />
+	<font_size name="Small" font="UbuntuMono" size="8.6" />
 </fonts>

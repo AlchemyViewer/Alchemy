@@ -31,6 +31,8 @@
 #include "llsyntaxid.h"
 #include "lllocalcliprect.h"
 
+#include "llviewercontrol.h"
+
 const S32	UI_TEXTEDITOR_LINE_NUMBER_MARGIN = 32;
 
 static LLDefaultChildRegistry::Register<LLScriptEditor> r("script_editor");
@@ -49,6 +51,33 @@ LLScriptEditor::LLScriptEditor(const Params& p)
 		mHPad += UI_TEXTEDITOR_LINE_NUMBER_MARGIN;
 		updateRects();
 	}
+}
+
+LLScriptEditor::~LLScriptEditor() 
+{
+	mFontNameConnection.disconnect();
+	mFontSizeConnection.disconnect();
+}
+
+BOOL LLScriptEditor::postBuild()
+{
+	if (auto fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("ScriptFontName"), gSavedSettings.getString("ScriptFontSize"), 0).normalize()))
+	{
+		setFont(fontp);
+	}
+
+	auto font_callback = [this](LLControlVariable*, const LLSD& newval, const LLSD&)
+		{
+			if (auto fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("ScriptFontName"), gSavedSettings.getString("ScriptFontSize"), 0).normalize()))
+			{
+				setFont(fontp);
+				clearSegments();
+				loadKeywords();
+			}
+		};
+	mFontNameConnection = gSavedSettings.getControl("ScriptFontName")->getCommitSignal()->connect(font_callback);
+	mFontSizeConnection = gSavedSettings.getControl("ScriptFontSize")->getCommitSignal()->connect(font_callback);
+	return LLTextEditor::postBuild();
 }
 
 void LLScriptEditor::draw()
@@ -88,7 +117,6 @@ void LLScriptEditor::drawLineNumbers()
 	
 	if (mShowLineNumbers)
 	{
-		S32 left = 0;
 		S32 top = getRect().getHeight();
 		S32 bottom = 0;
 		
@@ -110,7 +138,7 @@ void LLScriptEditor::drawLineNumbers()
 			// draw the line numbers
 			if(line.mLineNum != last_line_num && line.mRect.mTop <= scrolled_view_rect.mTop)
 			{
-				const LLFontGL *num_font = LLFontGL::getFontMonospace();
+				const LLFontGL *num_font = getFont();
 				const LLWString ltext = utf8str_to_wstring(llformat("%d", line.mLineNum ));
 				BOOL is_cur_line = cursor_line == line.mLineNum;
 				const U8 style = is_cur_line ? LLFontGL::BOLD : LLFontGL::NORMAL;
