@@ -85,11 +85,36 @@ LLPreviewNotecard::LLPreviewNotecard(const LLSD& key) //const LLUUID& item_id,
 LLPreviewNotecard::~LLPreviewNotecard()
 {
 	delete mLiveFile;
+	mFontNameConnection.disconnect();
+	mFontSizeConnection.disconnect();
 }
 
 BOOL LLPreviewNotecard::postBuild()
 {
 	mEditor = getChild<LLViewerTextEditor>("Notecard Editor");
+	if (auto fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("NotecardFontName"), gSavedSettings.getString("NotecardFontSize"), 0).normalize()))
+	{
+		mEditor->setFont(fontp);
+	}
+	mFontNameConnection = gSavedSettings.getControl("NotecardFontName")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) 
+		{ 
+			std::string text = mEditor->getText();
+			if (auto fontp = LLFontGL::getFont(LLFontDescriptor(newval.asString(), gSavedSettings.getString("NotecardFontSize"), 0).normalize()))
+			{
+				mEditor->setFont(fontp);
+			}
+			mEditor->setText(text);
+		});
+	mFontSizeConnection = gSavedSettings.getControl("NotecardFontSize")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) 
+		{
+			std::string text = mEditor->getText();
+			if (auto fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("NotecardFontName"), newval.asString(), 0).normalize()))
+			{
+				mEditor->setFont(fontp);
+			}
+			mEditor->setText(text);
+		});
+
 	mEditor->setNotecardInfo(mItemUUID, mObjectID, getKey());
 	mEditor->makePristine();
 

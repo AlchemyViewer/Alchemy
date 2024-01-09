@@ -140,6 +140,9 @@ protected:
 	LLUUID mObjectID;
 
 	LLLiveLSLFile* mLiveFile;
+
+	boost::signals2::connection mFontNameConnection;
+	boost::signals2::connection mFontSizeConnection;
 };
 
 
