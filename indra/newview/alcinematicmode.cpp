@@ -20,12 +20,13 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alcinematicmode.h"
-#include "llviewerwindow.h"
-#include "llmoveview.h"
-#include "llnavigationbar.h"
+
+#include "llagentcamera.h"
 #include "llchicletbar.h"
 #include "llhudtext.h"
-#include <llagentcamera.h>
+#include "llmoveview.h"
+#include "llnavigationbar.h"
+#include "llviewerwindow.h"
 
 bool ALCinematicMode::_enabled = false;
 
