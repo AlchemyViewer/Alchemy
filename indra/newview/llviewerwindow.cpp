@@ -3359,7 +3359,7 @@ BOOL LLViewerWindow::handleUnicodeChar(llwchar uni_char, MASK mask)
 	// until all keystrokes have been entered. JC
 	// HACK: Numeric keypad <enter> on Mac is Unicode 3
 	// HACK: Control-M on Windows is Unicode 13
-	if ((uni_char == 13 && mask != MASK_CONTROL)
+	if ((uni_char == 13 && mask != MASK_CONTROL && mask != MASK_SHIFT)
 	    || (uni_char == 3 && mask == MASK_NONE) )
 	{
 		if (mask != MASK_ALT)

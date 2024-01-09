@@ -186,9 +186,11 @@ void LLViewerChat::getChatColor(const LLChat& chat, std::string& r_color_name, F
 LLFontGL* LLViewerChat::getChatFont()
 {
 	S32 font_size = gSavedSettings.getS32("ChatFontSize");
-	LLFontGL* fontp = NULL;
-	switch(font_size)
+	LLFontGL* fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("ChatFontName"), getChatFontSizeStr(font_size), 0).normalize());
+	if (!fontp)
 	{
+		switch (font_size)
+		{
 		case -1:
 			fontp = LLFontGL::getFontMonospace();
 			break;
@@ -205,10 +207,9 @@ LLFontGL* LLViewerChat::getChatFont()
 		case 3:
 			fontp = LLFontGL::getFontSansSerifHuge();
 			break;
+		}
 	}
-	
 	return fontp;
-	
 }
 
 //static
@@ -217,6 +218,31 @@ S32 LLViewerChat::getChatFontSize()
 	return gSavedSettings.getS32("ChatFontSize");
 }
 
+//static
+std::string LLViewerChat::getChatFontSizeStr(S32 size)
+{
+	std::string ret;
+	switch (size)
+	{
+	case -1:
+		ret = "Monospace";
+		break;
+	case 0:
+		ret = "Small";
+		break;
+	default:
+	case 1:
+		ret = "Medium";
+		break;
+	case 2:
+		ret = "Large";
+		break;
+	case 3:
+		ret = "Huge";
+		break;
+	}
+	return ret;
+}
 
 //static
 void LLViewerChat::formatChatMsg(const LLChat& chat, std::string& formated_msg)

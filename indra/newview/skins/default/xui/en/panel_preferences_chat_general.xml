@@ -73,13 +73,112 @@
 		 [https://accounts.secondlife.com/change_email Open email notification settings for offline IMs]
 		</text>
 
+        <text
+        layout="topleft"
+        follows="left|top"
+        left="280"
+        height="12"
+        name="font_name"
+        width="80"
+        top="0">
+      Font Name:
+    </text>
+
+    <combo_box
+        control_name="ChatFontName"
+        height="23"
+        layout="topleft"
+        follows="left|top"
+        name="chat_font_name"
+        left_pad="5"
+        top_delta="-5"
+        width="120">
+      <item
+          label="IBM Plex"
+          name="IBMPlex"
+          value="IBMPlex"/>
+      <item
+          label="Noto Sans"
+          name="NotoSans"
+          value="NotoSans"/>
+      <item
+          label="Open Dyslexic"
+          name="OpenDyslexic"
+          value="OpenDyslexic"/>
+      <item
+          label="Sans Serif"
+          name="SansSerif"
+          value="SansSerif"/>
+      <item
+          label="Source Sans"
+          name="SourceSans"
+          value="SourceSans"/>
+      <item
+          label="Ubuntu"
+          name="Ubuntu"
+          value="Ubuntu"/>
+     <item
+          label="Cascadia Code"
+          name="CascadiaCode"
+          value="CascadiaCode" />
+     <item
+          label="Fira Code"
+          name="FiraCode"
+          value="FiraCode" />
+     <item
+          label="IBM Plex Mono"
+          name="IBMPlexMono"
+          value="IBMPlexMono"/>
+     <item
+          label="Jetbrains Mono"
+          name="JetbrainsMono"
+          value="JetbrainsMono" />
+     <item
+          label="Monaspace Argon"
+          name="MonaspaceArgon"
+          value="MonaspaceArgon" />
+     <item
+          label="Monaspace Krypton"
+          name="MonaspaceKrypton"
+          value="MonaspaceKrypton" />
+     <item
+          label="Monaspace Neon"
+          name="MonaspaceNeon"
+          value="MonaspaceNeon" />
+     <item
+          label="Monaspace Xenon"
+          name="MonaspaceXenon"
+          value="MonaspaceXenon" />
+     <item
+          label="Monospace"
+          name="Monospace"
+          value="Monospace" />
+     <item
+          label="Noto Sans Mono"
+          name="NotoSansMono"
+          value="NotoSansMono" />
+     <item
+          label="Open Dyslexic Mono"
+          name="OpenDyslexicMono"
+          value="OpenDyslexicMono" />
+     <item
+          label="Source Code Pro"
+          name="SourceCodePro"
+          value="SourceCodePro" />
+     <item
+          label="Ubuntu Mono"
+          name="UbuntuMono"
+          value="UbuntuMono" />
+    </combo_box>
+
     <text
         layout="topleft"
-        left="345"
+        follows="left|top"
+        left="280"
         height="12"
         name="font_size"
-        width="120"
-        top="0">
+        width="80"
+        top_pad="7">
       Font size:
     </text>
 
@@ -87,10 +186,11 @@
         control_name="ChatFontSize"
         height="23"
         layout="topleft"
-        left="341"
+        follows="left|top"
         name="chat_font_size"
-        top_pad="5"
-        width="100">
+        left_pad="5"
+        top_delta="-5"
+        width="120">
       <item
           label="Monospace"
           name="Monospace"
@@ -118,8 +218,8 @@
         height="16"
         label="Bubble Chat"
         layout="topleft"
-        top_pad="4"
-        left_delta="0"
+        top_pad="5"
+        left_delta="-5"
         name="bubble_text_chat"
         width="330">
     </check_box>

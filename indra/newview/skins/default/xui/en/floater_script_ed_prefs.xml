@@ -2,7 +2,7 @@
 <floater
  legacy_header_height="18"
  can_resize="false"
- height="602"
+ height="645"
  layout="topleft"
  name="floater_script_colors"
  help_topic="script_colors"
@@ -372,16 +372,139 @@ default
          bg_opaque_color="0 0 0 0.3"
          border="true"
          follows="left|top"
-         height="140"
+         height="185"
          layout="topleft"
          left="10"
          name="editor_panel"
          right="-10">
+     <text
+          type="string"
+          length="1"
+          top_pad="5"
+          follows="top|left"
+          height="16"
+          width="60"
+          word_wrap="true"
+          layout="topleft"
+          left="10"
+          name="script_font_label">
+          Font
+     </text>
+     <combo_box
+         allow_text_entry="false"
+         tool_tip="What font you would like to use in the script editor"
+         control_name="ScriptFontName"
+         follows="left|top"
+         height="16"
+         layout="topleft"
+         max_chars="128"
+         name="script_font_combo"
+         left_pad="5"
+         width="117">
+         <combo_box.item
+              label="Cascadia Code"
+              name="CascadiaCode"
+              value="CascadiaCode" />
+         <combo_box.item
+              label="Fira Code"
+              name="FiraCode"
+              value="FiraCode" />
+		 <combo_box.item.item
+			  label="IBM Plex Mono"
+			  name="IBMPlexMono"
+			  value="IBMPlexMono"/>
+         <combo_box.item
+              label="Jetbrains Mono"
+              name="JetbrainsMono"
+              value="JetbrainsMono" />
+         <combo_box.item
+              label="Monaspace Argon"
+              name="MonaspaceArgon"
+              value="MonaspaceArgon" />
+         <combo_box.item
+              label="Monaspace Krypton"
+              name="MonaspaceKrypton"
+              value="MonaspaceKrypton" />
+         <combo_box.item
+              label="Monaspace Neon"
+              name="MonaspaceNeon"
+              value="MonaspaceNeon" />
+         <combo_box.item
+              label="Monaspace Xenon"
+              name="MonaspaceXenon"
+              value="MonaspaceXenon" />
+         <combo_box.item
+              label="Monospace"
+              name="Monospace"
+              value="Monospace" />
+         <combo_box.item
+              label="Noto Sans Mono"
+              name="NotoSansMono"
+              value="NotoSansMono" />
+         <combo_box.item
+              label="Open Dyslexic Mono"
+              name="OpenDyslexicMono"
+              value="OpenDyslexicMono" />
+         <combo_box.item
+              label="Source Code Pro"
+              name="SourceCodePro"
+              value="SourceCodePro" />
+         <combo_box.item
+              label="Ubuntu Mono"
+              name="UbuntuMono"
+              value="UbuntuMono" />
+     </combo_box>
+     <text
+          type="string"
+          length="1"
+          top_pad="5"
+          follows="top|left"
+          height="16"
+          width="60"
+          word_wrap="true"
+          layout="topleft"
+          left="10"
+          name="script_font_size_label">
+          Font Size
+     </text>
+     <combo_box
+         allow_text_entry="false"
+         tool_tip="What font you would like to use in the script editor"
+         control_name="ScriptFontSize"
+         follows="left|top"
+         height="16"
+         layout="topleft"
+         max_chars="128"
+         name="script_font_size_combo"
+         left_pad="5"
+         width="117">
+         <combo_box.item
+              label="Monospace"
+              name="Monospace"
+              value="Monospace" />
+         <combo_box.item
+              label="Small"
+              name="Small"
+              value="Small" />
+         <combo_box.item
+              label="Medium"
+              name="Medium"
+              value="Medium" />
+         <combo_box.item
+              label="Large"
+              name="Large"
+              value="Large" />
+         <combo_box.item
+              label="Huge"
+              name="Huge"
+              value="Huge" />
+     </combo_box>
 	<check_box
 		control_name="AlchemyLSLPreprocessor"
 		follows="left|top"
 		height="16"
 		top_pad="5"
+          left="10"
 		label="Enable LSL preprocessor"
 		tool_tip="When checked, the LSL preprocessor is enabled."
 		name="preproc_checkbox" />
@@ -443,7 +566,7 @@ default
 		max_length_chars="4096"
 		name="preprocinclude_location"
 		top_pad="0"
-		width="283" />
+		width="273" />
 	<button
 		follows="left|top"
 		height="23"

@@ -544,7 +544,9 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
 
 	S32 text_len = wtext.size() + 1;
 
-	seg_list->push_back( new LLNormalTextSegment( defaultColor, 0, text_len, editor ) );
+	LLStyleSP style = getDefaultStyle(editor);
+	style->setColor(defaultColor);
+	seg_list->push_back( new LLNormalTextSegment( style, 0, text_len, editor ) );
 
 	const llwchar* base = wtext.c_str();
 	const llwchar* cur = base;
@@ -554,7 +556,7 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
 		{
 			if( *cur == '\n' )
 			{
-				LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(cur-base);
+				LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(getDefaultStyle(editor), cur-base);
 				text_segment->setToken( 0 );
 				insertSegment( *seg_list, text_segment, text_len, defaultColor, editor);
 				cur++;
@@ -703,7 +705,10 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
 
 					insertSegments(wtext, *seg_list,cur_delimiter, text_len, seg_start, seg_end, defaultColor, editor);
 					/*
-					LLTextSegmentPtr text_segment = new LLNormalTextSegment( cur_delimiter->getColor(), seg_start, seg_end, editor );
+					LLStyleSP seg_style = getDefaultStyle(editor);
+					seg_style->setColor(defaultColor);
+					LLTextSegmentPtr text_segment = new LLNormalTextSegment( seg_style, seg_start, seg_end, editor );
+
 					text_segment->setToken( cur_delimiter );
 					insertSegment( seg_list, text_segment, text_len, defaultColor, editor);
 					*/
@@ -758,12 +763,14 @@ void LLKeywords::insertSegments(const LLWString& wtext, std::vector<LLTextSegmen
 	{
 		if (pos!=seg_start)
 		{
-			LLTextSegmentPtr text_segment = new LLNormalTextSegment( cur_token->getColor(), seg_start, pos, editor );
+			LLStyleSP style = getDefaultStyle(editor);
+			style->setColor(cur_token->getColor());
+			LLTextSegmentPtr text_segment = new LLNormalTextSegment( style, seg_start, pos, editor );
 			text_segment->setToken( cur_token );
 			insertSegment( seg_list, text_segment, text_len, defaultColor, editor);
 		}
 
-		LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(pos);
+		LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(getDefaultStyle(editor), pos);
 		text_segment->setToken( cur_token );
 		insertSegment( seg_list, text_segment, text_len, defaultColor, editor);
 
@@ -771,7 +778,9 @@ void LLKeywords::insertSegments(const LLWString& wtext, std::vector<LLTextSegmen
 		pos = wtext.find('\n',seg_start);
 	}
 
-	LLTextSegmentPtr text_segment = new LLNormalTextSegment( cur_token->getColor(), seg_start, seg_end, editor );
+	LLStyleSP style = getDefaultStyle(editor);
+	style->setColor(cur_token->getColor());
+	LLTextSegmentPtr text_segment = new LLNormalTextSegment( style, seg_start, seg_end, editor );
 	text_segment->setToken( cur_token );
 	insertSegment( seg_list, text_segment, text_len, defaultColor, editor);
 }
@@ -793,8 +802,17 @@ void LLKeywords::insertSegment(std::vector<LLTextSegmentPtr>& seg_list, LLTextSe
 
 	if( new_seg_end < text_len )
 	{
-		seg_list.push_back( new LLNormalTextSegment( defaultColor, new_seg_end, text_len, editor ) );
+		LLStyleSP style = getDefaultStyle(editor);
+		style->setColor(defaultColor);
+		seg_list.push_back( new LLNormalTextSegment( style, new_seg_end, text_len, editor ) );
 	}
+}
+
+LLStyleSP LLKeywords::getDefaultStyle(const LLTextEditor& editor)
+{
+	LLStyleSP style(new LLStyle(LLStyle::Params()));
+	style->setFont(editor.getFont());
+	return style;
 }
 
 #ifdef _DEBUG

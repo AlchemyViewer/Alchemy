@@ -13,7 +13,7 @@
  single_instance="true"
  save_visibility="true"
  sound_flags="0"
- width="295">
+ width="308">
   <floater.string
      name="grid_screen_text">
     Screen
@@ -887,7 +887,7 @@
      tab_height="20"
      open_tabs_on_drag_and_drop="true"
      top="203"
-     width="295">
+     width="308">
 	
 <panel
 	 border="false"
@@ -1553,17 +1553,17 @@ even though the user gets a free copy.
              top_pad="3"
              width="87" />
             <button
-             follows="top|right"
+             follows="top|left"
              height="19" 
              top_delta="-43"
-             left_pad="5"
+             left_pad="0"
              tab_stop="false"
              image_overlay="Clipboard_Copy"
              name="copy_position_btn"
              tool_tip="Copy Position"
              width="20" />
             <button
-             follows="top|right"
+             follows="top|left"
              height="19"
              top_pad="3"
              tab_stop="false"
@@ -1572,7 +1572,7 @@ even though the user gets a free copy.
              tool_tip="Paste Position"
              width="20" />
              <button
-             follows="top|right"
+             follows="top|left"
              height="19"
              top_pad="3"
              mouse_opaque="true"
@@ -1644,7 +1644,7 @@ even though the user gets a free copy.
              top_pad="3"
              width="87" />
              <button
-             follows="top|right"
+             follows="top|left"
              height="19" 
              top_delta="-43"
              left_pad="5"
@@ -1654,7 +1654,7 @@ even though the user gets a free copy.
              tool_tip="Copy Size"
              width="20" />
             <button
-             follows="top|right"
+             follows="top|left"
              height="19"
              top_pad="3"
              tab_stop="false"
@@ -1663,7 +1663,7 @@ even though the user gets a free copy.
              tool_tip="Paste Size"
              width="20" />
              <button
-             follows="top|right"
+             follows="top|left"
              height="19"
              top_pad="3"
              mouse_opaque="true"
@@ -1735,7 +1735,7 @@ even though the user gets a free copy.
              top_pad="3"
              width="87" />
              <button
-             follows="top|right"
+             follows="top|left"
              height="19" 
              top_delta="-43"
              left_pad="5"
@@ -1745,7 +1745,7 @@ even though the user gets a free copy.
              tool_tip="Copy Rotation"
              width="20" />
             <button
-             follows="top|right"
+             follows="top|left"
              height="19"
              top_pad="3"
              tab_stop="false"
@@ -1754,7 +1754,7 @@ even though the user gets a free copy.
              tool_tip="Paste Rotation"
              width="20" />
              <button
-             follows="top|right"
+             follows="top|left"
              height="19"
              top_pad="3"
              mouse_opaque="true"
@@ -1788,6 +1788,7 @@ even though the user gets a free copy.
              width="0"/>
             <combo_box
              height="19"
+             follows="top|left"
              layout="topleft"
              name="comboBaseType"
              top="6"
@@ -2016,6 +2017,7 @@ even though the user gets a free copy.
             <combo_box
              height="23"
              layout="topleft"
+             follows="top|left"
              left_delta="0"
              name="hole"
              top_pad="-2"
@@ -2421,7 +2423,7 @@ even though the user gets a free copy.
               <button
               follows="top|left"
               height="19"
-              left="225"
+              left="235"
               top="8"
               tab_stop="false"
               image_overlay="Clipboard_Copy"
@@ -2462,7 +2464,7 @@ even though the user gets a free copy.
              top="5"
              width="252"
              word_wrap="true">
-                Select only one primitive to edit features.
+                Select only one prim to edit features.
             </text>
             <text
              type="string"
@@ -2649,8 +2651,9 @@ even though the user gets a free copy.
             width="32" />
             <button
             follows="top|left"
+            layout="topleft"
             height="19"
-            left="225"
+            left="235"
             top_delta="0"
             tab_stop="false"
             image_overlay="Clipboard_Copy"
@@ -2844,6 +2847,7 @@ even though the user gets a free copy.
             <combo_box
              height="19"
              layout="topleft"
+             follows="top|left"
              name="material"
              top_pad="5"
              width="150">

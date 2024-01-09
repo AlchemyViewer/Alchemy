@@ -167,6 +167,7 @@
             <combo_box
              height="23"
              layout="topleft"
+             follows="top|left"
              left="10"
              name="combobox matmedia"
              top_pad="5"
@@ -380,6 +381,7 @@
             visible="false"
              height="23"
              layout="topleft"
+             follows="top|left"
              left_delta="0"
              name="combobox alphamode"
              top_pad="4"
@@ -461,6 +463,7 @@
             visible="false"
              height="23"
              layout="topleft"
+             follows="top|left"
              left_delta="0"
              name="combobox bumpiness"
              top_pad="4"
@@ -575,6 +578,7 @@
             <combo_box
              height="23"
              layout="topleft"
+             follows="left|top"
              left_pad="11"
              name="combobox shininess"
              top_delta="-6"
@@ -626,7 +630,7 @@
              increment="1"
              layout="topleft"
              top_delta="-4"
-             left_pad="6"
+             left_pad="11"
              name="glossiness"
              width="69" />
             <text
@@ -635,7 +639,7 @@
              follows="left|top"
              height="10"
              layout="topleft"
-             left_delta="-122"
+             left_delta="-127"
              name="label environment"
              text_readonly_color="LabelDisabledColor"
              top_pad="8"
@@ -652,7 +656,7 @@
              initial_value="0"
              layout="topleft"
              top_delta="-4"
-             left_pad="6"
+             left_pad="11"
              name="environment"
              width="69" />
             <text
@@ -661,7 +665,7 @@
              follows="left|top"
              height="10"
              layout="topleft"
-             left_delta="-122"
+             left_delta="-127"
              name="label shinycolor"
              text_readonly_color="LabelDisabledColor"
              top_pad="8"
@@ -675,7 +679,7 @@
              height="45"
              label=""
              layout="topleft"
-             left_pad="6"
+             left_pad="11"
              name="shinycolorswatch"
              tool_tip="Click to open color picker"
              top_delta="-4"
@@ -743,10 +747,11 @@
             <combo_box
              height="23"
              layout="topleft"
+             follows="left|top"
              left_pad="5"
              name="combobox texgen"
              top_pad="-13"
-             width="69">
+             width="70">
                 <combo_box.item
                  label="Default"
                  name="Default"
@@ -761,26 +766,26 @@
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="TexScaleU"
              top_pad="1"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="TexScaleV"
-             width="265" />
+             width="271" />
             <spinner
              decimal_digits="1"
              follows="left|top"
@@ -788,12 +793,12 @@
              initial_value=""
 			 label="Repeats per meter"
              layout="topleft"
-			 label_width="194"
+			 label_width="200"
              left="10"
              max_val="100"
              min_val="-100"
              name="rptctrl"
-             width="265" />
+             width="271" />
            <spinner
              decimal_digits="2"
              follows="left|top"
@@ -802,61 +807,61 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="194"
+			 label_width="200"
              left="10"
              max_val="360"
              min_val="-360"
              name="TexRot"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="TexOffsetU"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="TexOffsetV"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="bumpyScaleU"
              top_delta="-115"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="bumpyScaleV"
-             width="265" />
+             width="271" />
            <spinner
              decimal_digits="2"
              follows="left|top"
@@ -866,61 +871,61 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="194"
+			 label_width="200"
              left="10"
              max_val="360"
              min_val="-360"
              name="bumpyRot"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="bumpyOffsetU"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="bumpyOffsetV"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="shinyScaleU"
              top_delta="-115"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="shinyScaleV"
-             width="265" />
+             width="271" />
            <spinner
              decimal_digits="2"
              follows="left|top"
@@ -930,98 +935,98 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="194"
+			 label_width="200"
              left="10"
              max_val="360"
              min_val="-360"
              name="shinyRot"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="shinyOffsetU"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="shinyOffsetV"
-             width="265" />
+             width="271" />
             <!-- BEGIN PBR Material texture transform parameters -->
             <spinner
              follows="left|top"
              height="19"
              initial_value="1"
              label="Scale u"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="gltfTextureScaleU"
              top_delta="-115"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="1"
              label="Scale v"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="gltfTextureScaleV"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Rotation"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-360"
              max_val="360"
              name="gltfTextureRotation"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Offset u"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-999"
              max_val="999"
              name="gltfTextureOffsetU"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Offset v"
-             label_width="194"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-999"
              max_val="999"
              name="gltfTextureOffsetV"
-             width="265" />
+             width="271" />
             <!-- END PBR Material texture transform parameters -->
             <check_box
              follows="top|left"
@@ -1048,7 +1053,7 @@
              width="199" />
             <button
              layout="topleft"
-             follows="right|top"
+             follows="left|top"
              height="23"
              left_pad="5"
              top_delta="-18"
@@ -1071,9 +1076,9 @@
             <button
              enabled="true"
              layout="topleft"
-             follows="right|top"
+             follows="left|top"
              height="23"
-             left="15"
+             left="10"
              top="232"
              label="Find All"
              name="btn_select_same_diff"
@@ -1086,7 +1091,7 @@
             <button
              enabled="true"
              layout="topleft"
-             follows="right|top"
+             follows="left|top"
              height="23"
              left_delta="0"
              label="Find All"
@@ -1100,7 +1105,7 @@
             <button
              enabled="true"
              layout="topleft"
-             follows="right|top"
+             follows="left|top"
              height="23"
              left_delta="0"
              label="Find All"
@@ -1114,7 +1119,7 @@
             <button
              enabled="true"
              layout="topleft"
-             follows="right|top"
+             follows="left|top"
              height="23"
              left_delta="0"
              label="Find All"
