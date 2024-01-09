@@ -125,7 +125,7 @@
           label="Fira Code"
           name="FiraCode"
           value="FiraCode" />
-      <item
+     <item
           label="IBM Plex Mono"
           name="IBMPlexMono"
           value="IBMPlexMono"/>

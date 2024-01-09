@@ -266,10 +266,10 @@
 	</font>
 
 	<font_size name="Monospace" font="OpenDyslexic" size="8.0" />
-	<font_size name="Huge" font="OpenDyslexic" size="16.0" />
-	<font_size name="Large" font="OpenDyslexic" size="11.4" />
-	<font_size name="Medium" font="OpenDyslexic" size="9.4" />
-	<font_size name="Small" font="OpenDyslexic" size="8.4" />
+	<font_size name="Huge" font="OpenDyslexic" size="14.0" />
+	<font_size name="Large" font="OpenDyslexic" size="10.6" />
+	<font_size name="Medium" font="OpenDyslexic" size="8.6" />
+	<font_size name="Small" font="OpenDyslexic" size="7.6" />
 
 	<!--Source Sans 3-->
 	<font name="SourceSans">
@@ -290,9 +290,9 @@
 
 	<font_size name="Monospace" font="SourceSans" size="8.0" />
 	<font_size name="Huge" font="SourceSans" size="16.0" />
-	<font_size name="Large" font="SourceSans" size="11.4" />
-	<font_size name="Medium" font="SourceSans" size="9.4" />
-	<font_size name="Small" font="SourceSans" size="8.4" />
+	<font_size name="Large" font="SourceSans" size="11.6" />
+	<font_size name="Medium" font="SourceSans" size="10.0" />
+	<font_size name="Small" font="SourceSans" size="9.0" />
 
 	<!--Ubuntu-->
 	<font name="Ubuntu">
@@ -512,10 +512,10 @@
 	</font>
 
 	<font_size name="Monospace" font="OpenDyslexicMono" size="8.0" />
-	<font_size name="Huge" font="OpenDyslexicMono" size="16.0" />
-	<font_size name="Large" font="OpenDyslexicMono" size="11.4" />
-	<font_size name="Medium" font="OpenDyslexicMono" size="9.4" />
-	<font_size name="Small" font="OpenDyslexicMono" size="8.4" />
+	<font_size name="Huge" font="OpenDyslexicMono" size="14.0" />
+	<font_size name="Large" font="OpenDyslexicMono" size="10.6" />
+	<font_size name="Medium" font="OpenDyslexicMono" size="8.6" />
+	<font_size name="Small" font="OpenDyslexicMono" size="7.6" />
 
 	<!--Source Code Pro-->
 	<font name="SourceCodePro">
