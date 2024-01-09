@@ -1633,9 +1633,9 @@ void LLMenuItemBranchDownGL::draw( void )
 	{
 		color = mDisabledColor.get();
 	}
-	getFont()->render( mLabel.getWString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
-				   LLFontGL::HCENTER, LLFontGL::BOTTOM, LLFontGL::NORMAL);
-
+	getFont()->render(mLabel.getWString(), 0, 
+					  (F32)getRect().getWidth() / 2.f, (getRect().getHeight() - getFont()->getLineHeight()) / 2, color,
+					  LLFontGL::HCENTER, LLFontGL::BOTTOM, LLFontGL::NORMAL);
 
 	// underline navigation key only when keyboard navigation has been initiated
 	if (getMenu()->jumpKeysActive() && LLMenuGL::getKeyboardMode())

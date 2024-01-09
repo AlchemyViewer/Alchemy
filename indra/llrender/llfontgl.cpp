@@ -448,7 +448,7 @@ F32 LLFontGL::getDescenderHeight() const
 
 S32 LLFontGL::getLineHeight() const
 { 
-	return llceil(mFontFreetype->getAscenderHeight() / sScaleY) + llceil(mFontFreetype->getDescenderHeight() / sScaleY);
+	return llfloor((mFontFreetype->getAscenderHeight() + mFontFreetype->getDescenderHeight()) / sScaleY);
 }
 
 S32 LLFontGL::getWidth(const std::string& utf8text) const

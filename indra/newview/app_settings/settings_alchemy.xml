@@ -1800,6 +1800,17 @@
 			<key>Value</key>
 			<integer>0</integer>
 		</map>
+		<key>ChatFontName</key>
+		<map>
+			<key>Comment</key>
+			<string>Name of font for Chat Editors and Messages</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>String</string>
+			<key>Value</key>
+			<string>SansSerif</string>
+		</map>
 		<key>NotecardFontName</key>
 		<map>
 			<key>Comment</key>

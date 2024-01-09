@@ -1,206 +1,229 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <fonts>
 
-  <font name="default" comment="default font files (global fallbacks)">
-    <file>DejaVuSans.ttf</file>
-    <file>NotoSans-Regular.ttf</file>
-    <file load_collection="true">NotoSansCJK-Regular.ttc</file>
-    <file>NotoSansTamil-Regular.ttf</file>
-    <file>NotoSansOriya-Regular.ttf</file>
-    <file>NotoSansKannada-Regular.ttf</file>
-    <file>NotoSansDevanagari-Regular.ttf</file>
-    <file>NotoNaskhArabicUI-Regular.ttf</file>
-    <file>NotoLoopedThaiUI-Regular.ttf</file>
-    <file>NotoSansSymbols-Regular.ttf</file>
-    <file>NotoSansSymbols2-Regular.ttf</file>
-    <file>NotoSansMath-Regular.ttf</file>
-    <os name="Windows">
-      <file>meiryo.TTC</file>
-      <file>MSGOTHIC.TTC</file>
-      <file>gulim.ttc</file>
-      <file>simhei.ttf</file>
-      <file>ArialUni.ttf</file>
-      <file>msyh.ttc</file>
-      <file load_collection="true">Cambria.ttc</file>
-      <file>malgun.ttf</file>
-      <file>micross.ttf</file>
-      <file>seguiemj.ttf</file>
-    </os>
-    <os name="Mac">
-      <file>ヒラギノ角ゴシック W3.ttc</file>  
-      <file>ヒラギノ角ゴ Pro W3.otf</file>
-      <file>ヒラギノ角ゴ ProN W3.otf</file>
-      <file>ヒラギノ明朝 ProN W3.ttc</file>
-      <file>AppleGothic.dfont</file>
-      <file>AppleGothic.ttf</file>
-      <file>AppleSDGothicNeo-Regular.otf</file>
-      <file>AppleSDGothicNeo.ttc</file>
-      <file>华文细黑.ttf</file>
-      <file>PingFang.ttc</file>
-      <file>STIXGeneral.otf</file>
-      <file>Thonburi.ttc</file>
-    </os>
-  </font>
+	<font name="default" comment="default font files (global fallbacks)">
+		<file>DejaVuSans.ttf</file>
+		<file>NotoSans-Regular.ttf</file>
+		<file load_collection="true">NotoSansCJK-Regular.ttc</file>
+		<file>NotoSansTamil-Regular.ttf</file>
+		<file>NotoSansOriya-Regular.ttf</file>
+		<file>NotoSansKannada-Regular.ttf</file>
+		<file>NotoSansDevanagari-Regular.ttf</file>
+		<file>NotoNaskhArabicUI-Regular.ttf</file>
+		<file>NotoLoopedThaiUI-Regular.ttf</file>
+		<file>NotoSansSymbols-Regular.ttf</file>
+		<file>NotoSansSymbols2-Regular.ttf</file>
+		<file>NotoSansMath-Regular.ttf</file>
+		<os name="Windows">
+			<file>meiryo.TTC</file>
+			<file>MSGOTHIC.TTC</file>
+			<file>gulim.ttc</file>
+			<file>simhei.ttf</file>
+			<file>ArialUni.ttf</file>
+			<file>msyh.ttc</file>
+			<file load_collection="true">Cambria.ttc</file>
+			<file>malgun.ttf</file>
+			<file>micross.ttf</file>
+			<file>seguiemj.ttf</file>
+		</os>
+		<os name="Mac">
+			<file>ヒラギノ角ゴシック W3.ttc</file>
+			<file>ヒラギノ角ゴ Pro W3.otf</file>
+			<file>ヒラギノ角ゴ ProN W3.otf</file>
+			<file>ヒラギノ明朝 ProN W3.ttc</file>
+			<file>AppleGothic.dfont</file>
+			<file>AppleGothic.ttf</file>
+			<file>AppleSDGothicNeo-Regular.otf</file>
+			<file>AppleSDGothicNeo.ttc</file>
+			<file>华文细黑.ttf</file>
+			<file>PingFang.ttc</file>
+			<file>STIXGeneral.otf</file>
+			<file>Thonburi.ttc</file>
+		</os>
+	</font>
 
-  <font name="SansSerif" comment="Name of san-serif font (Truetype file name)">
-    <file>DejaVuSans.ttf</file>
-    <os name="Windows">
-      <file>arial.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>Helvetica.dfont</file>
-      </os>
-  </font>
+	<font name="SansSerif" comment="Name of san-serif font (Truetype file name)">
+		<file>DejaVuSans.ttf</file>
+		<os name="Windows">
+			<file>arial.ttf</file>
+		</os>
+		<os name="Mac">
+			<file>Helvetica.dfont</file>
+		</os>
+	</font>
 
-  <font name="SansSerif"
-	comment="Name of bold sans-serif font"
-	font_style="BOLD">
-    <file>DejaVuSans-Bold.ttf</file>
-    <file>NotoSans-Bold.ttf</file>
-    <file load_collection="true">NotoSansCJK-Bold.ttc</file>
-    <file>NotoSansTamil-Bold.ttf</file>
-    <file>NotoSansOriya-Bold.ttf</file>
-    <file>NotoSansKannada-Bold.ttf</file>
-    <file>NotoSansDevanagari-Bold.ttf</file>
-    <file>NotoNaskhArabicUI-Bold.ttf</file>
-    <file>NotoLoopedThaiUI-Bold.ttf</file>
-    <file>NotoSansSymbols-Bold.ttf</file>
-    <os name="Windows">
-      <file>arialbd.ttf</file>
-    </os>
-    <os name="Mac">
-      <file>Helvetica.dfont</file>
-    </os>
-  </font>
+	<font name="SansSerif"
+	  comment="Name of bold sans-serif font"
+	  font_style="BOLD">
+		<file>DejaVuSans-Bold.ttf</file>
+		<file>NotoSans-Bold.ttf</file>
+		<file load_collection="true">NotoSansCJK-Bold.ttc</file>
+		<file>NotoSansTamil-Bold.ttf</file>
+		<file>NotoSansOriya-Bold.ttf</file>
+		<file>NotoSansKannada-Bold.ttf</file>
+		<file>NotoSansDevanagari-Bold.ttf</file>
+		<file>NotoNaskhArabicUI-Bold.ttf</file>
+		<file>NotoLoopedThaiUI-Bold.ttf</file>
+		<file>NotoSansSymbols-Bold.ttf</file>
+		<os name="Windows">
+			<file>arialbd.ttf</file>
+		</os>
+		<os name="Mac">
+			<file>Helvetica.dfont</file>
+		</os>
+	</font>
 
-  <font name="SansSerif"
-	comment="Name of italic sans-serif font"
-	font_style="ITALIC">
-    <file>DejaVuSans-Oblique.ttf</file>
-    <file>NotoSans-Italic.ttf</file>
-  </font>
+	<font name="SansSerif"
+	  comment="Name of italic sans-serif font"
+	  font_style="ITALIC">
+		<file>DejaVuSans-Oblique.ttf</file>
+		<file>NotoSans-Italic.ttf</file>
+	</font>
 
-  <font name="SansSerif"
-	comment="Name of bold italic sans-serif font"
-	font_style="BOLD|ITALIC">
-    <file>DejaVuSans-BoldOblique.ttf</file>
-    <file>NotoSans-BoldItalic.ttf</file>
-  </font>
+	<font name="SansSerif"
+	  comment="Name of bold italic sans-serif font"
+	  font_style="BOLD|ITALIC">
+		<file>DejaVuSans-BoldOblique.ttf</file>
+		<file>NotoSans-BoldItalic.ttf</file>
+	</font>
 
-  <font name="Monospace"
-	comment="Name of monospace font">
-    <file>DejaVuSansMono.ttf</file>
-    <file>NotoSansMono-Regular.ttf</file>
-  </font>
+	<font name="Monospace"
+	  comment="Name of monospace font">
+		<file>DejaVuSansMono.ttf</file>
+		<file>NotoSansMono-Regular.ttf</file>
+	</font>
 
-  <font name="Monospace" font_style="BOLD">
-    <file>DejaVuSansMono-Bold.ttf</file>
-  </font>
+	<font name="Monospace" font_style="BOLD">
+		<file>DejaVuSansMono-Bold.ttf</file>
+	</font>
 
-  <font name="Monospace" font_style="ITALIC">
-    <file>DejaVuSansMono-Oblique.ttf</file>
-  </font>
+	<font name="Monospace" font_style="ITALIC">
+		<file>DejaVuSansMono-Oblique.ttf</file>
+	</font>
 
-  <font name="Monospace" font_style="BOLD|ITALIC">
-    <file>DejaVuSansMono-BoldOblique.ttf</file>
-  </font>
-	
-  <font name="DejaVu"
-	comment="Name of DejaVu font">
-    <file>DejaVuSans.ttf</file>
-  </font>
+	<font name="Monospace" font_style="BOLD|ITALIC">
+		<file>DejaVuSansMono-BoldOblique.ttf</file>
+	</font>
 
-  <font name="DejaVu"
-	comment="Name of DejaVu font (bold)"
-	font_style="BOLD">
-    <file>DejaVuSans-Bold.ttf</file>
-  </font>
+	<font name="DejaVu"
+	  comment="Name of DejaVu font">
+		<file>DejaVuSans.ttf</file>
+	</font>
 
-  <font name="DejaVu"
-	comment="Name of DejaVu font (italic)"
-	font_style="ITALIC">
-    <file>DejaVuSans-Oblique.ttf</file>
-  </font>
+	<font name="DejaVu"
+	  comment="Name of DejaVu font (bold)"
+	  font_style="BOLD">
+		<file>DejaVuSans-Bold.ttf</file>
+	</font>
 
-  <font name="DejaVu"
-	comment="Name of DejaVu font (bold italic)"
-	font_style="BOLD|ITALIC">
-    <file>DejaVuSans-BoldOblique.ttf</file>
-  </font>
+	<font name="DejaVu"
+	  comment="Name of DejaVu font (italic)"
+	  font_style="ITALIC">
+		<file>DejaVuSans-Oblique.ttf</file>
+	</font>
 
-  <font name="Helvetica"
-	comment="Name of Helvetica font">
-    <file>DejaVuSans.ttf</file>
-    <os name="Windows">
-      <file>arial.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>arial.ttf</file>
-      </os>
-  </font>
+	<font name="DejaVu"
+	  comment="Name of DejaVu font (bold italic)"
+	  font_style="BOLD|ITALIC">
+		<file>DejaVuSans-BoldOblique.ttf</file>
+	</font>
 
-  <font name="Helvetica"
-	comment="Name of Helvetica font (bold)"
-	font_style="BOLD">
-    <file>DejaVuSans-Bold.ttf</file>
-    <os name="Windows">
-      <file>arialbd.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>arialbd.ttf</file>
-      </os>
-  </font>
+	<font name="Helvetica"
+	  comment="Name of Helvetica font">
+		<file>DejaVuSans.ttf</file>
+		<os name="Windows">
+			<file>arial.ttf</file>
+		</os>
+		<os name="Mac">
+			<file>arial.ttf</file>
+		</os>
+	</font>
 
-  <font name="Helvetica"
-	comment="Name of Helvetica font (italic)"
-	font_style="ITALIC">
-    <file>DejaVuSans-Oblique.ttf</file>
-    <os name="Windows">
-      <file>ariali.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>ariali.ttf</file>
-      </os>
-  </font>
+	<font name="Helvetica"
+	  comment="Name of Helvetica font (bold)"
+	  font_style="BOLD">
+		<file>DejaVuSans-Bold.ttf</file>
+		<os name="Windows">
+			<file>arialbd.ttf</file>
+		</os>
+		<os name="Mac">
+			<file>arialbd.ttf</file>
+		</os>
+	</font>
 
-  <font name="Helvetica"
-	comment="Name of Helvetica font (bold italic)"
-	font_style="BOLD|ITALIC">
-    <file>DejaVuSans-BoldOblique.ttf</file>
-    <os name="Windows">
-      <file>arialbi.ttf</file>
-      </os>
-    <os name="Mac">
-      <file>arialbi.ttf</file>
-      </os>
-  </font>
+	<font name="Helvetica"
+	  comment="Name of Helvetica font (italic)"
+	  font_style="ITALIC">
+		<file>DejaVuSans-Oblique.ttf</file>
+		<os name="Windows">
+			<file>ariali.ttf</file>
+		</os>
+		<os name="Mac">
+			<file>ariali.ttf</file>
+		</os>
+	</font>
 
-  <font name="OverrideTest"
-	comment="Name of font to test overriding">
-    <file>times.ttf</file>
-    <file>DejaVuSans.ttf</file>
-  </font>
+	<font name="Helvetica"
+	  comment="Name of Helvetica font (bold italic)"
+	  font_style="BOLD|ITALIC">
+		<file>DejaVuSans-BoldOblique.ttf</file>
+		<os name="Windows">
+			<file>arialbi.ttf</file>
+		</os>
+		<os name="Mac">
+			<file>arialbi.ttf</file>
+		</os>
+	</font>
 
-  <font_size name="Monospace"
-	     comment="Size for monospaced font (points, or 1/72 of an inch)"
-	     size="8.0"
+	<font name="OverrideTest"
+	  comment="Name of font to test overriding">
+		<file>times.ttf</file>
+		<file>DejaVuSans.ttf</file>
+	</font>
+
+	<font_size name="Monospace"
+		   comment="Size for monospaced font (points, or 1/72 of an inch)"
+		   size="8.0"
 	     />
-  <font_size name="Huge"
-	     comment="Size of huge font (points, or 1/72 of an inch)"
-	     size="16.0"
+	<font_size name="Huge"
+		   comment="Size of huge font (points, or 1/72 of an inch)"
+		   size="16.0"
 	     />
-  <font_size name="Large"
-	     comment="Size of large font (points, or 1/72 of an inch)"
-	     size="10.6"
+	<font_size name="Large"
+		   comment="Size of large font (points, or 1/72 of an inch)"
+		   size="11.4"
 	     />
-  <font_size name="Medium"
-	     comment="Size of medium font (points, or 1/72 of an inch)"
-	     size="8.6"
+	<font_size name="Medium"
+		   comment="Size of medium font (points, or 1/72 of an inch)"
+		   size="9.4"
 	     />
-  <font_size name="Small"
-	     comment="Size of small font (points, or 1/72 of an inch)"
-	     size="7.6"
+	<font_size name="Small"
+		   comment="Size of small font (points, or 1/72 of an inch)"
+		   size="8.4"
 	     />
+
+	<!--IBM Plex-->
+	<font name="IBMPlex">
+		<file>IBMPlexSans-Regular.ttf</file>
+	</font>
+
+	<font name="IBMPlex" font_style="BOLD">
+		<file>IBMPlexSans-Bold.ttf</file>
+	</font>
+
+	<font name="IBMPlex" font_style="ITALIC">
+		<file>IBMPlexSans-Italic.ttf</file>
+	</font>
+
+	<font name="IBMPlex" font_style="BOLD|ITALIC">
+		<file>IBMPlexSans-BoldItalic.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="IBMPlex" size="8.0" />
+	<font_size name="Huge" font="IBMPlex" size="16.0" />
+	<font_size name="Large" font="IBMPlex" size="11.4" />
+	<font_size name="Medium" font="IBMPlex" size="9.4" />
+	<font_size name="Small" font="IBMPlex" size="8.4" />
 
 	<!--NotoSans-->
 	<font name="NotoSans">
@@ -221,32 +244,9 @@
 
 	<font_size name="Monospace" font="NotoSans" size="8.0" />
 	<font_size name="Huge" font="NotoSans" size="16.0" />
-	<font_size name="Large" font="NotoSans" size="11.6" />
-	<font_size name="Medium" font="NotoSans" size="9.6" />
-	<font_size name="Small" font="NotoSans" size="8.6" />
-
-	<!--NotoSerif-->
-	<font name="NotoSerif">
-		<file>NotoSerif-Regular.ttf</file>
-	</font>
-
-	<font name="NotoSerif" font_style="BOLD">
-		<file>NotoSerif-Bold.ttf</file>
-	</font>
-
-	<font name="NotoSerif" font_style="ITALIC">
-		<file>NotoSerif-Italic.ttf</file>
-	</font>
-
-	<font name="NotoSerif" font_style="BOLD|ITALIC">
-		<file>NotoSerif-BoldItalic.ttf</file>
-	</font>
-
-	<font_size name="Monospace" font="NotoSerif" size="8.0" />
-	<font_size name="Huge" font="NotoSerif" size="16.0" />
-	<font_size name="Large" font="NotoSerif" size="11.6" />
-	<font_size name="Medium" font="NotoSerif" size="9.6" />
-	<font_size name="Small" font="NotoSerif" size="8.6" />
+	<font_size name="Large" font="NotoSans" size="11.4" />
+	<font_size name="Medium" font="NotoSans" size="9.4" />
+	<font_size name="Small" font="NotoSans" size="8.4" />
 
 	<!--OpenDyslexic-->
 	<font name="OpenDyslexic">
@@ -267,9 +267,9 @@
 
 	<font_size name="Monospace" font="OpenDyslexic" size="8.0" />
 	<font_size name="Huge" font="OpenDyslexic" size="16.0" />
-	<font_size name="Large" font="OpenDyslexic" size="11.6" />
-	<font_size name="Medium" font="OpenDyslexic" size="9.6" />
-	<font_size name="Small" font="OpenDyslexic" size="8.6" />
+	<font_size name="Large" font="OpenDyslexic" size="11.4" />
+	<font_size name="Medium" font="OpenDyslexic" size="9.4" />
+	<font_size name="Small" font="OpenDyslexic" size="8.4" />
 
 	<!--Source Sans 3-->
 	<font name="SourceSans">
@@ -290,9 +290,9 @@
 
 	<font_size name="Monospace" font="SourceSans" size="8.0" />
 	<font_size name="Huge" font="SourceSans" size="16.0" />
-	<font_size name="Large" font="SourceSans" size="11.6" />
-	<font_size name="Medium" font="SourceSans" size="9.6" />
-	<font_size name="Small" font="SourceSans" size="8.6" />
+	<font_size name="Large" font="SourceSans" size="11.4" />
+	<font_size name="Medium" font="SourceSans" size="9.4" />
+	<font_size name="Small" font="SourceSans" size="8.4" />
 
 	<!--Ubuntu-->
 	<font name="Ubuntu">
@@ -313,9 +313,9 @@
 
 	<font_size name="Monospace" font="Ubuntu" size="8.0" />
 	<font_size name="Huge" font="Ubuntu" size="16.0" />
-	<font_size name="Large" font="Ubuntu" size="11.6" />
-	<font_size name="Medium" font="Ubuntu" size="9.6" />
-	<font_size name="Small" font="Ubuntu" size="8.6" />
+	<font_size name="Large" font="Ubuntu" size="11.4" />
+	<font_size name="Medium" font="Ubuntu" size="9.4" />
+	<font_size name="Small" font="Ubuntu" size="8.4" />
 
 	<!--Monospace Fonts-->
 
@@ -338,9 +338,9 @@
 
 	<font_size name="Monospace" font="CascadiaCode" size="8.0" />
 	<font_size name="Huge" font="CascadiaCode" size="16.0" />
-	<font_size name="Large" font="CascadiaCode" size="11.6" />
-	<font_size name="Medium" font="CascadiaCode" size="9.6" />
-	<font_size name="Small" font="CascadiaCode" size="8.6" />
+	<font_size name="Large" font="CascadiaCode" size="11.4" />
+	<font_size name="Medium" font="CascadiaCode" size="9.4" />
+	<font_size name="Small" font="CascadiaCode" size="8.4" />
 
 	<!--Fira Code-->
 	<font name="FiraCode">
@@ -353,9 +353,32 @@
 
 	<font_size name="Monospace" font="FiraCode" size="8.0" />
 	<font_size name="Huge" font="FiraCode" size="16.0" />
-	<font_size name="Large" font="FiraCode" size="11.6" />
-	<font_size name="Medium" font="FiraCode" size="9.6" />
-	<font_size name="Small" font="FiraCode" size="8.6" />
+	<font_size name="Large" font="FiraCode" size="11.4" />
+	<font_size name="Medium" font="FiraCode" size="9.4" />
+	<font_size name="Small" font="FiraCode" size="8.4" />
+
+	<!--IBM Plex-->
+	<font name="IBMPlexMono">
+		<file>IBMPlexMono-Regular.ttf</file>
+	</font>
+
+	<font name="IBMPlexMono" font_style="BOLD">
+		<file>IBMPlexMono-Bold.ttf</file>
+	</font>
+
+	<font name="IBMPlexMono" font_style="ITALIC">
+		<file>IBMPlexMono-Italic.ttf</file>
+	</font>
+
+	<font name="IBMPlexMono" font_style="BOLD|ITALIC">
+		<file>IBMPlexMono-BoldItalic.ttf</file>
+	</font>
+
+	<font_size name="Monospace" font="IBMPlexMono" size="8.0" />
+	<font_size name="Huge" font="IBMPlexMono" size="16.0" />
+	<font_size name="Large" font="IBMPlexMono" size="11.4" />
+	<font_size name="Medium" font="IBMPlexMono" size="9.4" />
+	<font_size name="Small" font="IBMPlexMono" size="8.4" />
 
 	<!--Jetbrains Mono-->
 	<font name="JetbrainsMono">
@@ -376,9 +399,9 @@
 
 	<font_size name="Monospace" font="JetbrainsMono" size="8.0" />
 	<font_size name="Huge" font="JetbrainsMono" size="16.0" />
-	<font_size name="Large" font="JetbrainsMono" size="11.6" />
-	<font_size name="Medium" font="JetbrainsMono" size="9.6" />
-	<font_size name="Small" font="JetbrainsMono" size="8.6" />
+	<font_size name="Large" font="JetbrainsMono" size="11.4" />
+	<font_size name="Medium" font="JetbrainsMono" size="9.4" />
+	<font_size name="Small" font="JetbrainsMono" size="8.4" />
 
 	<!--Monaspace Argon-->
 	<font name="MonaspaceArgon">
@@ -399,9 +422,9 @@
 
 	<font_size name="Monospace" font="MonaspaceArgon" size="8.0" />
 	<font_size name="Huge" font="MonaspaceArgon" size="16.0" />
-	<font_size name="Large" font="MonaspaceArgon" size="11.6" />
-	<font_size name="Medium" font="MonaspaceArgon" size="9.6" />
-	<font_size name="Small" font="MonaspaceArgon" size="8.6" />
+	<font_size name="Large" font="MonaspaceArgon" size="11.4" />
+	<font_size name="Medium" font="MonaspaceArgon" size="9.4" />
+	<font_size name="Small" font="MonaspaceArgon" size="8.4" />
 
 	<!--Monaspace Krypton-->
 	<font name="MonaspaceKrypton">
@@ -422,9 +445,9 @@
 
 	<font_size name="Monospace" font="MonaspaceKrypton" size="8.0" />
 	<font_size name="Huge" font="MonaspaceKrypton" size="16.0" />
-	<font_size name="Large" font="MonaspaceKrypton" size="11.6" />
-	<font_size name="Medium" font="MonaspaceKrypton" size="9.6" />
-	<font_size name="Small" font="MonaspaceKrypton" size="8.6" />
+	<font_size name="Large" font="MonaspaceKrypton" size="11.4" />
+	<font_size name="Medium" font="MonaspaceKrypton" size="9.4" />
+	<font_size name="Small" font="MonaspaceKrypton" size="8.4" />
 
 	<!--Monaspace Neon-->
 	<font name="MonaspaceNeon">
@@ -445,9 +468,9 @@
 
 	<font_size name="Monospace" font="MonaspaceNeon" size="8.0" />
 	<font_size name="Huge" font="MonaspaceNeon" size="16.0" />
-	<font_size name="Large" font="MonaspaceNeon" size="11.6" />
-	<font_size name="Medium" font="MonaspaceNeon" size="9.6" />
-	<font_size name="Small" font="MonaspaceNeon" size="8.6" />
+	<font_size name="Large" font="MonaspaceNeon" size="11.4" />
+	<font_size name="Medium" font="MonaspaceNeon" size="9.4" />
+	<font_size name="Small" font="MonaspaceNeon" size="8.4" />
 
 	<!--Monaspace Xenon-->
 	<font name="MonaspaceXenon">
@@ -468,9 +491,9 @@
 
 	<font_size name="Monospace" font="MonaspaceXenon" size="8.0" />
 	<font_size name="Huge" font="MonaspaceXenon" size="16.0" />
-	<font_size name="Large" font="MonaspaceXenon" size="11.6" />
-	<font_size name="Medium" font="MonaspaceXenon" size="9.6" />
-	<font_size name="Small" font="MonaspaceXenon" size="8.6" />
+	<font_size name="Large" font="MonaspaceXenon" size="11.4" />
+	<font_size name="Medium" font="MonaspaceXenon" size="9.4" />
+	<font_size name="Small" font="MonaspaceXenon" size="8.4" />
 
 	<!--Noto Sans Mono-->
 	<font name="NotoSansMono">
@@ -479,9 +502,9 @@
 
 	<font_size name="Monospace" font="NotoSansMono" size="8.0" />
 	<font_size name="Huge" font="NotoSansMono" size="16.0" />
-	<font_size name="Large" font="NotoSansMono" size="11.6" />
-	<font_size name="Medium" font="NotoSansMono" size="9.6" />
-	<font_size name="Small" font="NotoSansMono" size="8.6" />
+	<font_size name="Large" font="NotoSansMono" size="11.4" />
+	<font_size name="Medium" font="NotoSansMono" size="9.4" />
+	<font_size name="Small" font="NotoSansMono" size="8.4" />
 
 	<!--OpenDyslexicMono-->
 	<font name="OpenDyslexicMono">
@@ -490,9 +513,9 @@
 
 	<font_size name="Monospace" font="OpenDyslexicMono" size="8.0" />
 	<font_size name="Huge" font="OpenDyslexicMono" size="16.0" />
-	<font_size name="Large" font="OpenDyslexicMono" size="11.6" />
-	<font_size name="Medium" font="OpenDyslexicMono" size="9.6" />
-	<font_size name="Small" font="OpenDyslexicMono" size="8.6" />
+	<font_size name="Large" font="OpenDyslexicMono" size="11.4" />
+	<font_size name="Medium" font="OpenDyslexicMono" size="9.4" />
+	<font_size name="Small" font="OpenDyslexicMono" size="8.4" />
 
 	<!--Source Code Pro-->
 	<font name="SourceCodePro">
@@ -513,9 +536,9 @@
 
 	<font_size name="Monospace" font="SourceCodePro" size="8.0" />
 	<font_size name="Huge" font="SourceCodePro" size="16.0" />
-	<font_size name="Large" font="SourceCodePro" size="11.6" />
-	<font_size name="Medium" font="SourceCodePro" size="9.6" />
-	<font_size name="Small" font="SourceCodePro" size="8.6" />
+	<font_size name="Large" font="SourceCodePro" size="11.4" />
+	<font_size name="Medium" font="SourceCodePro" size="9.4" />
+	<font_size name="Small" font="SourceCodePro" size="8.4" />
 
 	<!--Ubuntu Mono-->
 	<font name="UbuntuMono">
@@ -536,7 +559,7 @@
 
 	<font_size name="Monospace" font="UbuntuMono" size="8.0" />
 	<font_size name="Huge" font="UbuntuMono" size="16.0" />
-	<font_size name="Large" font="UbuntuMono" size="11.6" />
-	<font_size name="Medium" font="UbuntuMono" size="9.6" />
-	<font_size name="Small" font="UbuntuMono" size="8.6" />
+	<font_size name="Large" font="UbuntuMono" size="11.4" />
+	<font_size name="Medium" font="UbuntuMono" size="9.4" />
+	<font_size name="Small" font="UbuntuMono" size="8.4" />
 </fonts>

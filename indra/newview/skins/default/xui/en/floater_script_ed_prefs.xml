@@ -409,6 +409,10 @@ default
               label="Fira Code"
               name="FiraCode"
               value="FiraCode" />
+		 <combo_box.item.item
+			  label="IBM Plex Mono"
+			  name="IBMPlexMono"
+			  value="IBMPlexMono"/>
          <combo_box.item
               label="Jetbrains Mono"
               name="JetbrainsMono"
