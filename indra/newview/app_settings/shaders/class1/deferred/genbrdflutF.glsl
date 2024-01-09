@@ -84,7 +84,7 @@ vec2 hammersley2d(uint i, uint N)
 vec3 importanceSample_GGX(vec2 Xi, float a2, vec3 normal) 
 {
 	// Maps a 2D point to a hemisphere with spread based on roughness
-	float phi = 2.0 * PI * Xi.x;
+	float phi = 2.0 * PI * Xi.x + random(normal.xz) * 0.1;
 	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a2 - 1.0) * Xi.y));
 	float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
 	vec3 H = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
@@ -92,7 +92,7 @@ vec3 importanceSample_GGX(vec2 Xi, float a2, vec3 normal)
 	// Tangent space
 	vec3 up = abs(normal.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
 	vec3 tangentX = normalize(cross(up, normal));
-	vec3 tangentY = cross(normal, tangentX);
+	vec3 tangentY = normalize(cross(normal, tangentX));
 
 	// Convert to world Space
 	return normalize(tangentX * H.x + tangentY * H.y + normal * H.z);
@@ -127,7 +127,7 @@ vec2 BRDF(float NoV, float roughness)
 			float G = V_SmithGGXCorrelated(NoV, dotNL, a2);
 			float G_Vis = G * dotVH / dotNH;
 			float Fc = pow(1.0 - dotVH, 5.0);
-			LUT += vec2(Fc * G_Vis, G_Vis);
+			LUT += vec2((1.0 - Fc) * G_Vis, Fc * G_Vis);
 		}
 	}
 	return LUT / float(NUM_SAMPLES);
@@ -135,5 +135,5 @@ vec2 BRDF(float NoV, float roughness)
 
 void main() 
 {
-	outColor = vec4(BRDF(vary_uv.s, vary_uv.t), 0.0, 1.0);
+	outColor = vec4(BRDF(vary_uv.s, 1.0-vary_uv.t), 0.0, 1.0);
 }

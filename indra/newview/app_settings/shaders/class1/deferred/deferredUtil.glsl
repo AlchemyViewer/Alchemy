@@ -381,17 +381,14 @@ vec3 pbrIbl(vec3 diffuseColor,
             float perceptualRough)
 {
     // retrieve a scale and bias to F0. See [1], Figure 3
-    vec2 brdf = BRDF(clamp(nv, 0, 1), perceptualRough);
+	vec2 brdf = BRDF(clamp(nv, 0, 1), 1.0-perceptualRough);
     vec3 diffuseLight = irradiance;
     vec3 specularLight = radiance;
     
-    vec3 energy = mix(brdf.xxx, brdf.yyy, specularColor);
+	vec3 diffuse = diffuseLight * diffuseColor;
+	vec3 specular = specularLight * (specularColor * brdf.x + brdf.y);
 
-    vec3 diffuse = diffuseLight * diffuseColor * (1.0 - energy);
-    vec3 specular = specularLight * energy;
-
-    specular *= computeSpecularAO(nv, ao, perceptualRough * perceptualRough) * (1.0 + specularColor * (1.0 / brdf.y - 1.0));
-
+    specular *= computeSpecularAO(nv, ao, perceptualRough * perceptualRough);
     return (diffuse * ao) + specular;
 }
 
