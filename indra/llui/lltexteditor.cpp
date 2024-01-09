@@ -1786,14 +1786,9 @@ BOOL LLTextEditor::handleSpecialKey(const KEY key, const MASK mask)
 		}
 		else if (mask == MASK_SHIFT)
 		{
-			if( mCursorPos > 0 )
 			{
-				const LLWString& text = getWText();
-				if( '\n' != text[ mCursorPos - 1 ] )
-				{
-					addLineBreakChar();
-					handled = TRUE;
-				}
+				addLineBreakChar();
+				handled = TRUE;
 			}
 		}
 		else
