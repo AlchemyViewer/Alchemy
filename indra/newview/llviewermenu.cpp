@@ -8560,18 +8560,6 @@ class LLToolsSelectBySurrounding : public view_listener_t
 	}
 };
 
-class LLToolsShowHiddenSelection : public view_listener_t
-{
-	bool handleEvent(const LLSD& userdata)
-	{
-		// TomY TODO Merge these
-		LLSelectMgr::sRenderHiddenSelections = !LLSelectMgr::sRenderHiddenSelections;
-
-		gSavedSettings.setBOOL("RenderHiddenSelections", LLSelectMgr::sRenderHiddenSelections);
-		return true;
-	}
-};
-
 class LLToolsShowSelectionLightRadius : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
@@ -9867,7 +9855,6 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToolsSelectInvisibleObjects(), "Tools.SelectInvisibleObjects");
     view_listener_t::addMenu(new LLToolsSelectReflectionProbes(), "Tools.SelectReflectionProbes");
 	view_listener_t::addMenu(new LLToolsSelectBySurrounding(), "Tools.SelectBySurrounding");
-	view_listener_t::addMenu(new LLToolsShowHiddenSelection(), "Tools.ShowHiddenSelection");
 	view_listener_t::addMenu(new LLToolsShowSelectionLightRadius(), "Tools.ShowSelectionLightRadius");
 	view_listener_t::addMenu(new LLToolsEditLinkedParts(), "Tools.EditLinkedParts");
 	view_listener_t::addMenu(new LLToolsSnapObjectXY(), "Tools.SnapObjectXY");
