@@ -492,8 +492,6 @@ private:
 	void setGodnames();
 
 public:
-	void loadCacheMiscExtras(U32 local_id);
-
     void applyCacheMiscExtras(LLViewerObject* obj);
 
 	struct CompareDistance

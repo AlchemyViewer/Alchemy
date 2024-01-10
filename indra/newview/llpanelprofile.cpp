@@ -62,7 +62,7 @@
 #include "llcommandhandler.h"
 #include "llfloaterprofiletexture.h"
 #include "llfloaterreg.h"
-#include "llfloatertexturepicker.h"
+#include "lltexturectrl.h"
 #include "llfilepicker.h"
 #include "llfirstuse.h"
 #include "llgroupactions.h"
@@ -1772,7 +1772,8 @@ void LLPanelProfileSecondLife::onShowTexturePicker()
                 PERM_NONE,
                 PERM_NONE,
                 FALSE,
-                NULL);
+                NULL,
+                PICK_TEXTURE);
 
             mFloaterTexturePickerHandle = texture_floaterp->getHandle();
 
@@ -2108,7 +2109,8 @@ void LLPanelProfileFirstLife::onChangePhoto()
                 PERM_NONE,
                 PERM_NONE,
                 FALSE,
-                NULL);
+                NULL,
+                PICK_TEXTURE);
 
             mFloaterTexturePickerHandle = texture_floaterp->getHandle();
 

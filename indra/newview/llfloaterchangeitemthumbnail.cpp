@@ -37,7 +37,7 @@
 #include "llinventoryobserver.h"
 #include "llfloaterreg.h"
 #include "llfloatersimplesnapshot.h"
-#include "llfloatertexturepicker.h"
+#include "lltexturectrl.h"
 #include "lllineeditor.h"
 #include "llnotificationsutil.h"
 #include "lltextbox.h"
@@ -753,7 +753,8 @@ void LLFloaterChangeItemThumbnail::showTexturePicker(const LLUUID &thumbnail_id)
             PERM_NONE,
             PERM_NONE,
             FALSE,
-            NULL);
+            NULL,
+            PICK_TEXTURE);
 
         mPickerHandle = floaterp->getHandle();
 

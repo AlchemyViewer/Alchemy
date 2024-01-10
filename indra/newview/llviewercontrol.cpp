@@ -694,6 +694,11 @@ void handleAppearanceCameraMovementChanged(const LLSD& newvalue)
         gAgentCamera.resetView();
     }
 }
+
+void handleRenderHiddenSelection(const LLSD& newvalue)
+{
+    LLSelectMgr::sRenderHiddenSelections = newvalue.asBoolean();
+}
 ////////////////////////////////////////////////////////////////////////////
 
 LLPointer<LLControlVariable> setting_get_control(LLControlGroup& group, const std::string& setting)
@@ -895,6 +900,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "NameTagShowFriends", handleNameTagOptionChanged);
     setting_setup_signal_listener(gSavedSettings, "UseDisplayNames", handleDisplayNamesOptionChanged);
     setting_setup_signal_listener(gSavedSettings, "AppearanceCameraMovement", handleAppearanceCameraMovementChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderHiddenSelections", handleRenderHiddenSelection);
 }
 
 #if TEST_CACHED_CONTROL

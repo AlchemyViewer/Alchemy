@@ -1,3 +1,4 @@
+
 /** 
  * @file lltexturectrl.h
  * @author Richard Nelson, James Cook
@@ -41,6 +42,7 @@
 #include "llwindow.h"
 
 class LLComboBox;
+class LLFilterEditor;
 class LLFloaterTexturePicker;
 class LLInventoryItem;
 class LLViewerFetchedTexture;
@@ -69,6 +71,13 @@ enum LLPickerSource
     PICKER_UNKNOWN, // on cancel, default ids
 };
 
+typedef enum e_pick_inventory_type
+{
+    PICK_TEXTURE_MATERIAL = 0,
+    PICK_TEXTURE = 1,
+    PICK_MATERIAL = 2,
+} EPickInventoryType;
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // LLTextureCtrl
 
@@ -83,13 +92,6 @@ public:
 		TEXTURE_SELECT,
 		TEXTURE_CANCEL
 	} ETexturePickOp;
-
-    typedef enum e_pick_inventory_type
-    {
-        PICK_TEXTURE_MATERIAL = 0,
-        PICK_TEXTURE = 1,
-        PICK_MATERIAL = 2,
-    } EPickInventoryType;
 
 public:
 	struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
@@ -277,23 +279,24 @@ private:
 	S32						 	mLabelWidth;
 	bool						mOpenTexPreview;
 	bool						mBakeTextureEnabled;
-    LLTextureCtrl::EPickInventoryType mInventoryPickType;
+    EPickInventoryType mInventoryPickType;
 };
-#if 0
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // LLFloaterTexturePicker
-typedef boost::function<void(LLTextureCtrl::ETexturePickOp op, LLPickerSource source, const LLUUID& asset_id, const LLUUID& inventory_id, const LLUUID& tracking_id)> floater_commit_callback;
-typedef boost::function<void()> floater_close_callback;
-typedef boost::function<void(const LLUUID& asset_id)> set_image_asset_id_callback;
-typedef boost::function<void(LLPointer<LLViewerTexture> texture)> set_on_update_image_stats_callback;
+typedef std::function<void(LLTextureCtrl::ETexturePickOp op, LLPickerSource source, const LLUUID& asset_id, const LLUUID& inventory_id, const LLUUID& tracking_id)> floater_commit_callback;
+typedef std::function<void()> floater_close_callback;
+typedef std::function<void(const LLUUID& asset_id)> set_image_asset_id_callback;
+typedef std::function<void(LLPointer<LLViewerTexture> texture)> set_on_update_image_stats_callback;
 
-class LLFloaterTexturePicker : public LLFloater
+class LLFloaterTexturePicker final : public LLFloater
 {
 public:
 	LLFloaterTexturePicker(
 		LLView* owner,
 		LLUUID image_asset_id,
 		LLUUID default_image_asset_id,
+		LLUUID transparent_image_asset_id,
 		LLUUID blank_image_asset_id,
 		BOOL tentative,
 		BOOL allow_no_texture,
@@ -301,8 +304,8 @@ public:
 		PermissionMask immediate_filter_perm_mask,
 		PermissionMask dnd_filter_perm_mask,
 		BOOL can_apply_immediately,
-		LLUIImagePtr fallback_image_name
-		);
+		LLUIImagePtr fallback_image_name,
+		EPickInventoryType pick_type);
 
 	virtual ~LLFloaterTexturePicker();
 
@@ -346,6 +349,7 @@ public:
 	void setSetImageAssetIDCallback(const set_image_asset_id_callback& cb) { mSetImageAssetIDCallback = cb; }
 	void setOnUpdateImageStatsCallback(const set_on_update_image_stats_callback& cb) { mOnUpdateImageStatsCallback = cb; }
 	const LLUUID& getDefaultImageAssetID() { return mDefaultImageAssetID; }
+    const LLUUID& getTransparentImageAssetID() { return mTransparentImageAssetID; }
 	const LLUUID& getBlankImageAssetID() { return mBlankImageAssetID; }
 
 	static void		onBtnSetToDefault(void* userdata);
@@ -353,11 +357,13 @@ public:
 	static void		onBtnCancel(void* userdata);
 	void			onBtnPipette();
 	//static void		onBtnRevert( void* userdata );
+    static void		onBtnTransparent(void* userdata);
 	static void		onBtnBlank(void* userdata);
 	static void		onBtnNone(void* userdata);
+    static void		onApplyUUID(void* userdata);
 	void			onSelectionChange(const std::deque<LLFolderViewItem*> &items, BOOL user_action);
 	static void		onApplyImmediateCheck(LLUICtrl* ctrl, void* userdata);
-	void			onTextureSelect(const LLTextureEntry& te);
+	void			onTextureSelect(bool success, const LLTextureEntry& te);
 
 	static void		onModeSelect(LLUICtrl* ctrl, void *userdata);
 	static void		onBtnAdd(void* userdata);
@@ -370,7 +376,7 @@ public:
 	void 			setLocalTextureEnabled(BOOL enabled);
 	void 			setBakeTextureEnabled(BOOL enabled);
 
-    void setInventoryPickType(LLTextureCtrl::EPickInventoryType type);
+    void setInventoryPickType(EPickInventoryType type);
     void setImmediateFilterPermMask(PermissionMask mask);
 
     static void		onPickerCallback(const std::vector<std::string>& filenames, LLHandle<LLFloater> handle);
@@ -388,6 +394,7 @@ protected:
 	LLUUID				mImageAssetID; // Currently selected texture
 	LLUIImagePtr		mFallbackImage; // What to show if currently selected texture is null.
 	LLUUID				mDefaultImageAssetID;
+    LLUUID				mTransparentImageAssetID;
 	LLUUID				mBlankImageAssetID;
 	BOOL				mTentative;
 	BOOL				mAllowNoTexture;
@@ -418,6 +425,7 @@ protected:
     LLButton*           mDefaultBtn;
     LLButton*           mNoneBtn;
     LLButton*           mBlankBtn;
+	LLButton*			mTransparentBtn;
     LLButton*           mPipetteBtn;
     LLButton*           mSelectBtn;
     LLButton*           mCancelBtn;
@@ -429,7 +437,7 @@ private:
     bool mLimitsSet;
     S32 mMaxDim;
     S32 mMinDim;
-    LLTextureCtrl::EPickInventoryType mInventoryPickType;
+    EPickInventoryType mInventoryPickType;
 
 
 	texture_selected_callback mTextureSelectedCallback;
@@ -442,5 +450,5 @@ private:
 
     static S32 sLastPickerMode;
 };
-#endif
+
 #endif  // LL_LLTEXTURECTRL_H
