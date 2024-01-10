@@ -69,6 +69,13 @@ enum LLPickerSource
     PICKER_UNKNOWN, // on cancel, default ids
 };
 
+typedef enum e_pick_inventory_type
+{
+    PICK_TEXTURE_MATERIAL = 0,
+    PICK_TEXTURE = 1,
+    PICK_MATERIAL = 2,
+} EPickInventoryType;
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // LLTextureCtrl
 
@@ -83,13 +90,6 @@ public:
 		TEXTURE_SELECT,
 		TEXTURE_CANCEL
 	} ETexturePickOp;
-
-    typedef enum e_pick_inventory_type
-    {
-        PICK_TEXTURE_MATERIAL = 0,
-        PICK_TEXTURE = 1,
-        PICK_MATERIAL = 2,
-    } EPickInventoryType;
 
 public:
 	struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
@@ -277,7 +277,7 @@ private:
 	S32						 	mLabelWidth;
 	bool						mOpenTexPreview;
 	bool						mBakeTextureEnabled;
-    LLTextureCtrl::EPickInventoryType mInventoryPickType;
+    EPickInventoryType mInventoryPickType;
 };
 #if 0
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -301,8 +301,8 @@ public:
 		PermissionMask immediate_filter_perm_mask,
 		PermissionMask dnd_filter_perm_mask,
 		BOOL can_apply_immediately,
-		LLUIImagePtr fallback_image_name
-		);
+		LLUIImagePtr fallback_image_name,
+		EPickInventoryType pick_type);
 
 	virtual ~LLFloaterTexturePicker();
 
@@ -370,7 +370,7 @@ public:
 	void 			setLocalTextureEnabled(BOOL enabled);
 	void 			setBakeTextureEnabled(BOOL enabled);
 
-    void setInventoryPickType(LLTextureCtrl::EPickInventoryType type);
+    void setInventoryPickType(EPickInventoryType type);
     void setImmediateFilterPermMask(PermissionMask mask);
 
     static void		onPickerCallback(const std::vector<std::string>& filenames, LLHandle<LLFloater> handle);
@@ -429,7 +429,7 @@ private:
     bool mLimitsSet;
     S32 mMaxDim;
     S32 mMinDim;
-    LLTextureCtrl::EPickInventoryType mInventoryPickType;
+    EPickInventoryType mInventoryPickType;
 
 
 	texture_selected_callback mTextureSelectedCallback;
