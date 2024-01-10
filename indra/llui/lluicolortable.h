@@ -34,7 +34,7 @@
 
 #include "v4color.h"
 
-#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_node_map.hpp>
 
 class LLUIColor;
 
@@ -44,7 +44,7 @@ class LLUIColorTable final : public LLSingleton<LLUIColorTable>
 	LOG_CLASS(LLUIColorTable);
 
 	// consider using sorted vector, can be much faster
-	typedef boost::unordered_flat_map<std::string, LLUIColor, al::string_hash, std::equal_to<>>  string_color_map_t;
+	typedef boost::unordered_node_map<std::string, LLUIColor, al::string_hash, std::equal_to<>>  string_color_map_t;
 
 public:
 	struct ColorParams : LLInitParam::ChoiceBlock<ColorParams>
