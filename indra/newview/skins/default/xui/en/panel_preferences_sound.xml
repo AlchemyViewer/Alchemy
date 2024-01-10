@@ -465,16 +465,6 @@
     width="200" />
   </radio_group>
   <check_box
-   control_name="LipSyncEnabled"
-   follows="left|top"
-   height="15"
-   label="Move avatar lips when speaking"
-   layout="topleft"
-   left="20"
-   name="enable_lip_sync"
-   top_pad="10" 
-   width="237"/>
-  <check_box
    follows="top|left"
    enabled_control="EnableVoiceChat"
    control_name="PushToTalkToggle"
@@ -486,6 +476,16 @@
    width="237"
    tool_tip="When in toggle mode, press and release the trigger key ONCE to switch your microphone on or off. When not in toggle mode, the microphone broadcasts your voice only while the trigger is being held down."
    top_pad="5"/>
+  <check_box
+   control_name="LipSyncEnabled"
+   follows="left|top"
+   height="15"
+   label="Move avatar lips when speaking"
+   layout="topleft"
+   left="20"
+   name="enable_lip_sync"
+   top_pad="5" 
+   width="237"/>
   <button
    control_name="ShowDeviceSettings"
    follows="left|top"
@@ -494,7 +494,7 @@
    label="Voice Input/Output devices"
    layout="topleft"
    left_pad="60"
-   top_delta="-6"
+   top_delta="-4"
    name="device_settings_btn"
    width="180">
   </button>

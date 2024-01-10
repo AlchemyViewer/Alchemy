@@ -25,9 +25,9 @@
      height="16"
      label="When I spend L$"
      layout="topleft"
-     left_delta="50"
+     left="15"
      name="notify_money_spend_checkbox"
-     top_pad="4"
+     top_pad="6"
      width="300" />
     <check_box
      control_name="ChatOnlineNotification"
@@ -39,10 +39,11 @@
      width="30" />
     <check_box
      control_name="AlchemyOnlineOfflineToChat"
+     enabled_control="ChatOnlineNotification"
      height="16"
      label="In Nearby Chat"
      layout="topleft"
-     left_delta="170"
+     left_delta="210"
      name="friends_online_notify_checkbox_chat"     
      width="20" />
     <check_box
@@ -50,7 +51,7 @@
      height="16"
      label="When I get L$"
      layout="topleft"
-     left_delta="-300"
+     left="15"
      top_pad="4"	
      name="notify_money_received_checkbox"     
      width="300" /> 
@@ -64,10 +65,11 @@
      width="30" />
      <check_box
      control_name="ShowStreamInfoToChat"
+     enabled_control="ShowStreamInfo"
      height="16"
      label="In Nearby Chat"
      layout="topleft"
-     left_delta="190"
+     left_delta="230"
      name="music_stream_title_checkbox_chat"     
      width="20" />
     <text

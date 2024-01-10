@@ -147,16 +147,7 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(const LLSD& notification, bool 
 	LLColor4 textColor = LLUIColorTable::instance().getColor(color_name);
 	textColor.mV[VALPHA] =notification["color_alpha"].asReal();
 	
-	S32 font_size = notification["font_size"].asInteger();
-
-	LLFontGL*       messageFont;
-	switch(font_size)
-	{
-		case 0:	messageFont = LLFontGL::getFontSansSerifSmall(); break;
-		default:
-		case 1: messageFont = LLFontGL::getFontSansSerif();	    break;
-		case 2:	messageFont = LLFontGL::getFontSansSerifBig();	break;
-	}
+	LLFontGL* messageFont = LLViewerChat::getChatFont();
 
 // [SL:KB] - Patch: Chat-Alerts | Checked: Catznip-5.3
 	// Copied from LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
@@ -252,17 +243,6 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
 //	LLColor4 textColor = LLUIColorTable::instance().getColor(color_name);
 //	textColor.mV[VALPHA] =notification["color_alpha"].asReal();
 	
-	S32 font_size = notification["font_size"].asInteger();
-
-	LLFontGL*       messageFont;
-	switch(font_size)
-	{
-		case 0:	messageFont = LLFontGL::getFontSansSerifSmall(); break;
-		default:
-		case 1: messageFont = LLFontGL::getFontSansSerif();	    break;
-		case 2:	messageFont = LLFontGL::getFontSansSerifBig();	break;
-	}
-	
 	mMsgText = getChild<LLChatMsgBox>("msg_text", false);
 	mMsgText->setContentTrusted(false);
 	mMsgText->setIsFriendCallback(LLAvatarActions::isFriend);
@@ -285,6 +265,7 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
 			LLColor4 user_name_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
 			style_params_name.color(user_name_color);
 
+			LLFontGL* messageFont = LLViewerChat::getChatFont();
 			std::string font_name = LLFontGL::nameFromFont(messageFont);
 			std::string font_style_size = LLFontGL::sizeFromFont(messageFont);
 			style_params_name.font.name(font_name);

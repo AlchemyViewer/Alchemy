@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater
-	width="365"
+	width="367"
 	height="380"
 	layout="topleft"
 	min_height="500"
@@ -21,7 +21,7 @@
 		tab_position="top"
 		tab_stop="false"
 		tab_min_width="70"
-		width="363">
+		width="365">
 		<!--Image Panel-->
 		<panel
 			label="Image"
@@ -286,7 +286,7 @@
 				height="15"
 				left="10"
 				top_pad="9"
-				width="70"
+				width="90"
 				layout="topleft"
 				tool_tip="Which algorithm should translate HDR values to SDR Colorspace"
 				value="Tonemapper:" />
@@ -297,11 +297,11 @@
 				follows="left|top"
 				height="16"
 				layout="topleft"
-				left_delta="70"
+				left_pad="5"
 				max_chars="128"
 				name="tonemap_type_combo"
-				top_pad="-16"
-				width="117">
+				top_delta="0"
+				width="90">
 				<combo_box.item
 					label="ACES"
 					name="toneACES"
@@ -311,7 +311,7 @@
 					name="toneUchimura"
 					value="2" />
 				<combo_box.item
-					label="AMD Tonemapper"
+					label="AMD LPM"
 					name="toneAMD"
 					value="3" />
 				<combo_box.item
@@ -326,9 +326,9 @@
 				height="20"
 				right="-2"
 				top_pad="-18"
-				label="Reset Tonemapper Sliders"
+				label="Reset Tonemap Sliders"
 				halign="left"
-				width="155"
+				width="160"
 				scale_image="true"
 				image_overlay="Refresh_Off"
 				image_overlay_alignment="right">
