@@ -3756,39 +3756,41 @@ void LLVOAvatar::idleUpdateNameTagAlpha(bool new_name, F32 alpha)
 
 LLColor4 LLVOAvatar::getNameTagColor(bool is_friend)
 {
-	enum ENameColor { NameTagFriend = 0, NameTagMatch, NameTagMismatch, NameTagLegacy, Size};
-	static std::vector<LLUIColor> sNameTagColors;
-	if (sNameTagColors.empty())
-	{
-		sNameTagColors.resize(ENameColor::Size);
+	//enum ENameColor { NameTagFriend = 0, NameTagMatch, NameTagMismatch, NameTagLegacy, Size};
+	//static std::vector<LLUIColor> sNameTagColors;
+	//if (sNameTagColors.empty())
+	//{
+	//	sNameTagColors.resize(ENameColor::Size);
 
-		auto& inst = LLUIColorTable::instance();
-		sNameTagColors[NameTagFriend] = inst.getColor("NameTagFriend");
-		sNameTagColors[NameTagMatch] = inst.getColor("NameTagMatch");
-		sNameTagColors[NameTagMismatch] = inst.getColor("NameTagMismatch");
-		sNameTagColors[NameTagLegacy] = inst.getColor("NameTagLegacy");
-	}
+	//	auto& inst = LLUIColorTable::instance();
+	//	sNameTagColors[NameTagFriend] = inst.getColor("NameTagFriend");
+	//	sNameTagColors[NameTagMatch] = inst.getColor("NameTagMatch");
+	//	sNameTagColors[NameTagMismatch] = inst.getColor("NameTagMismatch");
+	//	sNameTagColors[NameTagLegacy] = inst.getColor("NameTagLegacy");
+	//}
 
-	LLColor4 color_name;
-	if (LLAvatarName::useDisplayNames())
-	{
-		// ...color based on whether username "matches" a computed display name
-		LLAvatarName av_name;
-		if (LLAvatarNameCache::get(getID(), &av_name) && av_name.isDisplayNameDefault())
-		{
-			color_name = sNameTagColors[ENameColor::NameTagMatch];
-		}
-		else
-		{
-			color_name = sNameTagColors[ENameColor::NameTagMismatch];
-		}
-	}
-	else
-	{
-		// ...not using display names
-		color_name = sNameTagColors[ENameColor::NameTagLegacy];
-	}
+	//LLColor4 color_name;
+	//if (LLAvatarName::useDisplayNames())
+	//{
+	//	// ...color based on whether username "matches" a computed display name
+	//	LLAvatarName av_name;
+	//	if (LLAvatarNameCache::get(getID(), &av_name) && av_name.isDisplayNameDefault())
+	//	{
+	//		color_name = sNameTagColors[ENameColor::NameTagMatch];
+	//	}
+	//	else
+	//	{
+	//		color_name = sNameTagColors[ENameColor::NameTagMismatch];
+	//	}
+	//}
+	//else
+	//{
+	//	// ...not using display names
+	//	color_name = sNameTagColors[ENameColor::NameTagLegacy];
+	//}
 
+	static LLUIColor name_tag_match = LLUIColorTable::instance().getColor("NameTagMatch");
+	LLColor4 color_name = name_tag_match;
 	color_name = ALAvatarGroups::instance().getAvatarColor(getID(), color_name, ALAvatarGroups::COLOR_NAMETAG);
 
 	return color_name;
