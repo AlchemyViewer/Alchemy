@@ -19,14 +19,15 @@
      type="string"
      length="1"
      follows="left|top"
-     height="12"
+     height="18"
      layout="topleft"
      left="20"
      mouse_opaque="false"
      name="privacy_text"
      top="4"
      text_color="LtGray_50"
-     width="60">
+     width="60"
+     valign="center">
      Privacy:
     </text>
     <check_box
@@ -97,11 +98,13 @@
       type="string"
       length="1"
       follows="left|top"
-      height="14"
+      height="20"
       layout="topleft"
       left="20"
       name="mylookat"
       width="200"
+      top_pad="0"
+      valign="center"
       text_color="LtGray_50">
          Inventory:
       </text>
@@ -135,10 +138,12 @@
          type="string"
          length="1"
          follows="left|top"
-         height="14"
+         height="20"
          layout="topleft"
          left="20"
+         top_pad="0"
          name="mylookat"
+         valign="center"
          width="200"
          text_color="LtGray_50">
             My LookAt:
@@ -201,7 +206,8 @@
      name="block_list_label"
      top_delta="3"
      text_color="LtGray_50"
-     width="300">
+     width="320"
+     font="SansSerifSmall">
        (People and/or Objects you have blocked)
     </text>
 
@@ -229,7 +235,7 @@
       name="cache_size_label_l"
       top_delta="3"
       text_color="LtGray_50"
-      width="300">
+      width="320">
     (Locations, images, web, search history)
   </text>
     </panel>

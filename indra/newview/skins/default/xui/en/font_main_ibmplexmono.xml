@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<fonts>
+  <font name="default">
+    <file>IBMPlexMono-Regular.ttf</file>
+  </font>
+
+  <font name="SansSerif">
+    <file>IBMPlexMono-Regular.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD">
+    <file>IBMPlexMono-Bold.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="ITALIC">
+    <file>IBMPlexMono-Italic.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD|ITALIC">
+    <file>IBMPlexMono-BoldItalic.ttf</file>
+  </font>
+
+  <font name="OverrideTest">
+    <file>IBMPlexMono-Regular.ttf</file>
+  </font>
+
+	<font_size name="Huge" size="16.0" />
+	<font_size name="Large" size="11.0" />
+	<font_size name="Medium" size="9.0" />
+	<font_size name="Small" size="8.0" />
+</fonts>

@@ -2210,7 +2210,14 @@ LLViewerWindow::LLViewerWindow(const Params& p)
 	// Init font system, load default fonts and generate basic glyphs
 	// currently it takes aprox. 0.5 sec and we would load these fonts anyway
 	// before login screen.
-	LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
+	std::vector<std::string> font_files(1, "fonts.xml");
+	std::string strFontOverride = gSavedSettings.getString("FontOverrideMain");
+	if (!strFontOverride.empty())
+		font_files.push_back(strFontOverride);
+	strFontOverride = gSavedSettings.getString("FontOverrideMonospace");
+	if (!strFontOverride.empty())
+		font_files.push_back(strFontOverride);
+	LLFontGL::initClass(font_files, gSavedSettings.getF32("FontScreenDPI"),
 		mDisplayScale.mV[VX],
 		mDisplayScale.mV[VY],
 		gDirUtilp->getAppRODataDir());
@@ -6256,8 +6263,14 @@ void LLViewerWindow::initFonts(F32 zoom_factor)
 #else
 	font_dir = gDirUtilp->getAppRODataDir();
 #endif
-
-	LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
+	std::vector<std::string> font_files(1, "fonts.xml");
+	std::string strFontOverride = gSavedSettings.getString("FontOverrideMain");
+	if (!strFontOverride.empty())
+		font_files.push_back(strFontOverride);
+	strFontOverride = gSavedSettings.getString("FontOverrideMonospace");
+	if (!strFontOverride.empty())
+		font_files.push_back(strFontOverride);
+	LLFontGL::initClass(font_files, gSavedSettings.getF32("FontScreenDPI"),
 								mDisplayScale.mV[VX] * zoom_factor,
 								mDisplayScale.mV[VY] * zoom_factor,
 								font_dir);

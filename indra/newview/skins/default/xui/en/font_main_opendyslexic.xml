@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<fonts>
+  <font name="default">
+    <file>OpenDyslexic-Regular.otf</file>
+  </font>
+
+  <font name="SansSerifBold">
+    <file>OpenDyslexic-Bold.otf</file>
+  </font>
+
+  <font name="SansSerif">
+    <file>OpenDyslexic-Regular.otf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD">
+    <file>OpenDyslexic-Bold.otf</file>
+  </font>
+
+  <font name="SansSerif" font_style="ITALIC">
+    <file>OpenDyslexic-Italic.otf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD|ITALIC">
+    <file>OpenDyslexic-BoldItalic.otf</file>
+  </font>
+
+  <font name="OverrideTest">
+    <file>OpenDyslexic-Regular.otf</file>
+  </font>
+
+	<font_size name="Huge" size="14.0" />
+	<font_size name="Large" size="10.5" />
+	<font_size name="Medium" size="8.5" />
+	<font_size name="Small" size="7.5" />
+</fonts>

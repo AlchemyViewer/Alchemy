@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<fonts>
+	<font name="Monospace">
+		<file>UbuntuMono-R.ttf</file>
+	</font>
+
+	<font name="Monospace" font_style="BOLD">
+		<file>UbuntuMono-B.ttf</file>
+	</font>
+
+	<font name="Monospace" font_style="ITALIC">
+		<file>UbuntuMono-RI.ttf</file>
+	</font>
+
+	<font name="Monospace" font_style="BOLD|ITALIC">
+		<file>UbuntuMono-BI.ttf</file>
+	</font>
+
+	<font_size name="Monospace" size="8.0" />
+</fonts>

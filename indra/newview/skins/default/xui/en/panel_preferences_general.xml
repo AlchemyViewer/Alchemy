@@ -113,7 +113,7 @@
      left="30"
      top_pad="8"
      name="maturity_desired_prompt"
-     width="200">
+     width="225">
         I want to access content rated:
     </text>
 	<text
@@ -122,7 +122,7 @@
      follows="left|top"
      height="15"
      layout="topleft"
-     left_pad="5"
+     left_pad="2"
      name="maturity_desired_textbox"
      width="200">
     </text>
@@ -200,7 +200,7 @@
     type="string"
     length="1"
     follows="left|top"
-    height="15"
+    height="16"
     layout="topleft"
     left="30"
     name="name_tags_textbox"
@@ -210,7 +210,7 @@
    </text>
    <radio_group
      control_name="AvatarNameTagMode"
-     height="20"
+     height="15"
      layout="topleft"
      left="35"
      top_pad="0" 
@@ -251,7 +251,7 @@
      layout="topleft"
      left="35"
      name="show_my_name_checkbox1"
-	 top_pad="2"
+	 top_pad="5"
      width="100" />
    <check_box
      control_name="NameTagShowUsernames"
@@ -299,7 +299,7 @@
 	 type="string"
 	 length="1"
 	 follows="left|top"
-	 height="15"
+	 height="18"
 	 layout="topleft"
 	 left="30"
 	 name="inworld_typing_rg_label"
@@ -312,7 +312,7 @@
      height="34"
      layout="topleft"
      left="35"
-     top_pad="0" 
+     top_pad="2" 
      name="inworld_typing_preference">
         <radio_item
          label="Starts local chat"

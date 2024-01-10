@@ -163,7 +163,7 @@ public:
 	void generateASCIIglyphs();
 
 
-	static void initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::string& app_dir, bool create_gl_textures = true);
+	static void initClass(const std::vector<std::string>& font_files, F32 screen_dpi, F32 x_scale, F32 y_scale, const std::string& app_dir, bool create_gl_textures = true);
 
 	// Load sans-serif, sans-serif-small, etc.
 	// Slow, requires multiple seconds to load fonts.

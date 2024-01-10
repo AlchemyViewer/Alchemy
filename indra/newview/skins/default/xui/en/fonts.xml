@@ -376,9 +376,9 @@
 
 	<font_size name="Monospace" font="IBMPlexMono" size="8.0" />
 	<font_size name="Huge" font="IBMPlexMono" size="16.0" />
-	<font_size name="Large" font="IBMPlexMono" size="11.4" />
-	<font_size name="Medium" font="IBMPlexMono" size="9.4" />
-	<font_size name="Small" font="IBMPlexMono" size="8.4" />
+	<font_size name="Large" font="IBMPlexMono" size="11.0" />
+	<font_size name="Medium" font="IBMPlexMono" size="9.0" />
+	<font_size name="Small" font="IBMPlexMono" size="8.0" />
 
 	<!--Jetbrains Mono-->
 	<font name="JetbrainsMono">

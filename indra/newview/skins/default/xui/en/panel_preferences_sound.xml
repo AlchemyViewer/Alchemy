@@ -401,7 +401,7 @@
    top_pad="8"
    width="120"
    name="media_autoplay_label">
-    Auto-play media
+    Auto-play media:
   </text>
   <combo_box
         control_name="ParcelMediaAutoPlayEnable"
@@ -409,7 +409,7 @@
         follows="left|top"
         layout="topleft"
         height="23"
-        left_pad="-15"
+        left_pad="11"
         top_delta="-4"
         name="media_auto_play_combo"
         width="115">
@@ -493,10 +493,10 @@
    is_toggle="true"
    label="Voice Input/Output devices"
    layout="topleft"
-   left_pad="60"
+   left_pad="40"
    top_delta="-4"
    name="device_settings_btn"
-   width="180">
+   width="210">
   </button>
     <panel
     layout="topleft"

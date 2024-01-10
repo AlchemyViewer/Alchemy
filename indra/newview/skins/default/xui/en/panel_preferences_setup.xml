@@ -225,7 +225,7 @@
 	label="Adjust proxy settings"
     follows="left|top"
     height="23"
-	width="140" 
+	width="160" 
     label_selected="Browse"
     layout="topleft"
     left_delta="50"
@@ -236,4 +236,3 @@
 		  function="Pref.Proxy" />
   </button>
 </panel>
-

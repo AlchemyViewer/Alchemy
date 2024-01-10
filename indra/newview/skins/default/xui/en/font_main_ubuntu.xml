@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<fonts>
+  <font name="default">
+    <file>Ubuntu-R.ttf</file>
+  </font>
+
+  <font name="SansSerif">
+    <file>Ubuntu-R.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD">
+    <file>Ubuntu-B.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="ITALIC">
+    <file>Ubuntu-RI.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD|ITALIC">
+    <file>Ubuntu-BI.ttf</file>
+  </font>
+
+  <font name="OverrideTest">
+    <file>Ubuntu-R.ttf</file>
+  </font>
+
+	<font_size name="Huge" size="16.0" />
+	<font_size name="Large" size="11.4" />
+	<font_size name="Medium" size="9.4" />
+	<font_size name="Small" size="8.4" />
+</fonts>
