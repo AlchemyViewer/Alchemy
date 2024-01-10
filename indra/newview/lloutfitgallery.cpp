@@ -38,7 +38,7 @@
 #include "llfloaterperms.h"
 #include "llfloaterreg.h"
 #include "llfloatersimplesnapshot.h"
-#include "llfloatertexturepicker.h"
+#include "lltexturectrl.h"
 #include "llimagedimensionsinfo.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodel.h"

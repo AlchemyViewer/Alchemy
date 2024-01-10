@@ -37,7 +37,7 @@
 #include "llinventoryobserver.h"
 #include "llfloaterreg.h"
 #include "llfloatersimplesnapshot.h"
-#include "llfloatertexturepicker.h"
+#include "lltexturectrl.h"
 #include "lllineeditor.h"
 #include "llnotificationsutil.h"
 #include "lltextbox.h"
