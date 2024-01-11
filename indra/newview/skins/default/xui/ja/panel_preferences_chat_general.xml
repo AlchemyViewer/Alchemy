@@ -5,9 +5,32 @@
 		<check_box label="ローカルチャットでジェスチャーを自動補完する" name="auto_complete_gestures"/>
 		<check_box label="チャット時にタイピングアニメーションを再生する" name="play_typing_animation"/>
 		<check_box label="オフライン時にＩＭが送られてきたときにメールを送る（[EMAIL]）" name="send_im_to_email"/>
-		<text name="email_settings">
-			[https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]
+		<text name="email_settings"> [https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]
 		</text>
+		<text name="font_name">
+			フォント名：
+		</text>
+		<combo_box name="chat_font_name">
+			<item label="IBM Plex" name="IBMPlex" value="IBMPlex"/>
+			<item label="Noto Sans" name="NotoSans" value="NotoSans"/>
+			<item label="Open Dyslexic" name="OpenDyslexic" value="OpenDyslexic"/>
+			<item label="Sans Serif" name="SansSerif" value="SansSerif"/>
+			<item label="Source Sans" name="SourceSans" value="SourceSans"/>
+			<item label="Ubuntu" name="Ubuntu" value="Ubuntu"/>
+			<item label="Cascadia Code" name="CascadiaCode" value="CascadiaCode"/>
+			<item label="Fira Code" name="FiraCode" value="FiraCode"/>
+			<item label="IBM Plex Mono" name="IBMPlexMono" value="IBMPlexMono"/>
+			<item label="Jetbrains Mono" name="JetbrainsMono" value="JetbrainsMono"/>
+			<item label="Monaspace Argon" name="MonaspaceArgon" value="MonaspaceArgon"/>
+			<item label="Monaspace Krypton" name="MonaspaceKrypton" value="MonaspaceKrypton"/>
+			<item label="Monaspace Neon" name="MonaspaceNeon" value="MonaspaceNeon"/>
+			<item label="Monaspace Xenon" name="MonaspaceXenon" value="MonaspaceXenon"/>
+			<item label="Monospace" name="Monospace" value="Monospace"/>
+			<item label="Noto Sans Mono" name="NotoSansMono" value="NotoSansMono"/>
+			<item label="Open Dyslexic Mono" name="OpenDyslexicMono" value="OpenDyslexicMono"/>
+			<item label="Source Code Pro" name="SourceCodePro" value="SourceCodePro"/>
+			<item label="Ubuntu Mono" name="UbuntuMono" value="UbuntuMono"/>
+		</combo_box>
 		<text name="font_size">
 			フォントサイズ：
 		</text>

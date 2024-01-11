@@ -337,7 +337,7 @@
 			<text name="label basetype">プリムの種類</text>
 			-->
 			<combo_box name="comboBaseType">
-				<combo_box.item label="箱" name="Box"/>
+				<combo_box.item label="箱（ボックス）" name="Box"/>
 				<combo_box.item label="円柱（シリンダー）" name="Cylinder"/>
 				<combo_box.item label="三角錐（プリズム）" name="Prism"/>
 				<combo_box.item label="球体（スフィア）" name="Sphere"/>
@@ -438,7 +438,7 @@
 			<combo_box name="sculpt type control">
 				<combo_box.item label="球体（スフィア）" name="Sphere"/>
 				<combo_box.item label="円環（トーラス）" name="Torus"/>
-				<combo_box.item label="平面／なし" name="Plane"/>
+				<combo_box.item label="平面" name="Plane"/>
 				<combo_box.item label="円柱（シリンダー）" name="Cylinder"/>
 			</combo_box>
 		</panel>
@@ -456,7 +456,7 @@
 			<button name="paste_features_btn" tool_tip="特徴のパラメータをペーストします。"/>
 			<button name="pipette_features_btn" tool_tip="ピペットツールで特徴のパラメータをペーストします。"/>
 			<text name="select_single">
-				プリムを１つだけ選択して編集してください。
+				編集したいプリムを１つだけ選択してください。
 			</text>
 			<text name="edit_object">
 				オブジェクトの特徴を編集：

@@ -59,6 +59,34 @@ default
 		スクリプトオプション：
 	</text>
 	<panel name="editor_panel">
+		<text name="script_font_label">
+			フォント
+		</text>
+		<combo_box tool_tip="スクリプトエディタで使用するフォントを選択することができます。" name="script_font_combo">
+			<combo_box.item label="Cascadia Code" name="CascadiaCode" value="CascadiaCode"/>
+			<combo_box.item label="Fira Code" name="FiraCode" value="FiraCode"/>
+			<combo_box.item label="IBM Plex Mono" name="IBMPlexMono" value="IBMPlexMono"/>
+			<combo_box.item label="Jetbrains Mono" name="JetbrainsMono" value="JetbrainsMono"/>
+			<combo_box.item label="Monaspace Argon" name="MonaspaceArgon" value="MonaspaceArgon"/>
+			<combo_box.item label="Monaspace Krypton" name="MonaspaceKrypton" value="MonaspaceKrypton"/>
+			<combo_box.item label="Monaspace Neon" name="MonaspaceNeon" value="MonaspaceNeon"/>
+			<combo_box.item label="Monaspace Xenon" name="MonaspaceXenon" value="MonaspaceXenon"/>
+			<combo_box.item label="Monospace" name="Monospace" value="Monospace"/>
+			<combo_box.item label="Noto Sans Mono" name="NotoSansMono" value="NotoSansMono"/>
+			<combo_box.item label="Open Dyslexic Mono" name="OpenDyslexicMono" value="OpenDyslexicMono"/>
+			<combo_box.item label="Source Code Pro" name="SourceCodePro" value="SourceCodePro"/>
+			<combo_box.item label="Ubuntu Mono" name="UbuntuMono" value="UbuntuMono"/>
+		</combo_box>
+		<text name="script_font_size_label">
+			フォントサイズ
+		</text>
+		<combo_box tool_tip="スクリプトエディタで使用するフォントサイズを選択することができます。" name="script_font_size_combo">
+			<combo_box.item label="等幅" name="Monospace" value="Monospace"/>
+			<combo_box.item label="小" name="Small" value="Small"/>
+			<combo_box.item label="中" name="Medium" value="Medium"/>
+			<combo_box.item label="大" name="Large" value="Large"/>
+			<combo_box.item label="特大" name="Huge" value="Huge"/>
+		</combo_box>
 		<check_box label="ＬＳＬプリプロセッサを有効化" tool_tip="チェックすると、ＬＳＬプリプロセッサが有効になります。" name="preproc_checkbox"/>
 		<check_box label="スクリプト最適化" tool_tip="チェックすると、ＬＳＬプリプロセッサはスクリプトによって使用されるスペースを最適化します。" name="preprocoptimizer_checkbox"/>
 		<check_box label="switch()ステートメント" tool_tip="チェックすると、ＬＳＬプリプロセッサはスクリプトフロー制御にswitch()ステートメントの使用を許可します。" name="preprocswitch_checkbox"/>
