@@ -162,7 +162,7 @@
 				left="0"
 				name="cost_text_border"
 				top_pad="6"
-				width="365" />
+				width="376" />
 			<!--Sharpen Controls-->
 			<text
 				follows="left|top"
@@ -279,7 +279,7 @@
 				left="0"
 				name="cost_text_border"
 				top_pad="7"
-				width="365" />
+				width="376" />
 			<!--Tonemapper Control-->
 			<text
 				follows="left|top"
@@ -378,7 +378,7 @@
 				name="tonemapper_dynamic_text1"
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="12"
 				width="100"
 				layout="topleft"
@@ -415,7 +415,7 @@
 				name="tonemapper_dynamic_text2"
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="12"
 				width="100"
 				layout="topleft"
@@ -452,7 +452,7 @@
 				name="tonemapper_dynamic_text3"
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="12"
 				width="100"
 				layout="topleft"
@@ -489,7 +489,7 @@
 				name="tonemapper_dynamic_text4"
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="12"
 				width="100"
 				layout="topleft"
@@ -526,7 +526,7 @@
 				name="tonemapper_dynamic_text5"
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="12"
 				width="100"
 				layout="topleft"
@@ -563,7 +563,7 @@
 				name="tonemapper_dynamic_text6"
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="12"
 				width="100"
 				layout="topleft"
@@ -600,7 +600,7 @@
 				name="tonemapper_dynamic_text7"
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="12"
 				width="100"
 				layout="topleft"
@@ -1089,9 +1089,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="6"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Multiplier for shadowmap resolution. Use number input to override safe limits. High multipliers may overload and crash GPU drivers, especially on VRAM-limited systems!"
 				value="Shadow Resolution: " />
@@ -1142,9 +1142,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
 				value="Shadow Bias:" />
@@ -1195,9 +1195,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Used to reduce shadow errors by offsetting the entire shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
 				value="Shadow Offset:" />
@@ -1248,9 +1248,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Reduces self-shadowing errors by ignoring faces too close to the shadow's origins. Smaller values allow more fine/accurate shadows at the cost of more shadow errors."
 				value="Spot Shadow Bias:" />
@@ -1301,9 +1301,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Used to reduce shadow errors by offsetting the entire projector shadowmap. Smaller values allow more accurate shadows and less light bleed from thin objects at the cost of possible shadow errors at extreme angles from source."
 				value="Spot Shadow Offset:" />
@@ -1354,9 +1354,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Controls both Shadow and SSAO blurring. Low values may cause SSAO noise to become apparent."
 				value="Shadow Blur:" />
@@ -1407,9 +1407,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Controls how far away from the camera should blurring occur. Larger values reduce blur near the camera. Try using this for shadow sharpening if you encounter SSAO noise when lowering Shadow Blur!"
 				value="Blur Distance:" />
@@ -1480,9 +1480,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="4"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Controls the value of the SSAO HSV transform."
 				value="SSAO Value:" />
@@ -1533,9 +1533,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Controls the saturation of the SSAO HSV transform."
 				value="SSAO Saturation:" />
@@ -1587,9 +1587,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Occlusion sensitivity factor, larger = more."
 				value="SSAO Factor:" />
@@ -1640,9 +1640,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
 				value="SSAO Scale:" />
@@ -1693,9 +1693,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="15"
 				top_pad="5"
-				width="110"
+				width="130"
 				layout="topleft"
 				tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
 				value="SSAO Max Scale:" />
@@ -1752,7 +1752,7 @@
 			<check_box
 				follows="left|top"
 				height="15"
-				left="8"
+				left="3"
 				top_pad="7"
 				width="80"
 				layout="topleft"
@@ -1763,9 +1763,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="4"
-				width="60"
+				width="80"
 				layout="topleft"
 				tool_tip="How many passes of the glow shader to use. More passes makes it overall stronger, softer, wider, and slower to render."
 				value="Iterations:" />
@@ -1816,9 +1816,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="5"
-				width="60"
+				width="80"
 				layout="topleft"
 				tool_tip="Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
 				value="Resolution:" />
@@ -1869,9 +1869,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="5"
-				width="60"
+				width="80"
 				layout="topleft"
 				tool_tip="Overall strength of the glow shader."
 				value="Strength:" />
@@ -1922,9 +1922,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="5"
-				width="60"
+				width="90"
 				layout="topleft"
 				tool_tip="Softness or width of glow, eventually gets pixelated at higher sizes."
 				value="Softness:" />
@@ -1982,7 +1982,7 @@
 			<check_box
 				follows="left|top"
 				height="15"
-				left="8"
+				left="5"
 				top_pad="4"
 				width="80"
 				layout="topleft"
@@ -1992,7 +1992,7 @@
 			<check_box
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="4"
 				width="80"
 				layout="topleft"
@@ -2003,7 +2003,7 @@
 			<check_box
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="4"
 				width="80"
 				layout="topleft"
@@ -2019,7 +2019,7 @@
 				name="RenderDepthOfFieldFront"
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="4"
 				width="80"
 				layout="topleft"
@@ -2029,9 +2029,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="4"
-				width="80"
+				width="120"
 				layout="topleft"
 				tool_tip="What fraction of screen resolution should be used for rendering Depth of Field. NOTE: Viewer may become unresponsive if DoF becomes intense when Full Resolution is used."
 				value="DoF Resolution: " />
@@ -2042,7 +2042,7 @@
 				follows="left|top"
 				height="16"
 				layout="topleft"
-				left="120"
+				left="135"
 				max_chars="128"
 				name="dof_res_combo"
 				top_pad="-16"
@@ -2068,9 +2068,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="8"
-				width="70"
+				width="120"
 				layout="topleft"
 				tool_tip="Vertical FoV for DoF calculations"
 				value="Field of View:" />
@@ -2082,7 +2082,7 @@
 				layout="topleft"
 				max_val="175"
 				min_val="10"
-				left="130"
+				left="135"
 				right="-75"
 				name="dof_fov_slider"
 				tool_tip="Vertical FoV for DoF calculations"
@@ -2121,9 +2121,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="5"
-				width="65"
+				width="120"
 				layout="topleft"
 				tool_tip="Simulated camera aperture f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
 				value="Aperture (f):" />
@@ -2135,7 +2135,7 @@
 				layout="topleft"
 				max_val="256"
 				min_val="0.5"
-				left="130"
+				left="135"
 				right="-75"
 				name="dof_fstop_slider"
 				tool_tip="Simulated camera aperture f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
@@ -2174,9 +2174,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="5"
-				width="100"
+				width="120"
 				layout="topleft"
 				tool_tip="Focal length of simulated camera."
 				value="Focal Length (mm):" />
@@ -2188,7 +2188,7 @@
 				layout="topleft"
 				max_val="600"
 				min_val="10"
-				left="130"
+				left="135"
 				right="-75"
 				name="dof_length_slider"
 				tool_tip="Focal length of simulated camera."
@@ -2228,9 +2228,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="5"
-				width="80"
+				width="120"
 				layout="topleft"
 				tool_tip="Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
 				value="CoC Maximum:" />
@@ -2242,7 +2242,7 @@
 				layout="topleft"
 				max_val="40"
 				min_val="0"
-				left="130"
+				left="135"
 				right="-75"
 				name="dof_coc_slider"
 				tool_tip="Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
@@ -2281,9 +2281,9 @@
 			<text
 				follows="left|top"
 				height="15"
-				left="30"
+				left="5"
 				top_pad="5"
-				width="100"
+				width="120"
 				layout="topleft"
 				tool_tip="Time it takes for the camera to transition to a new focal point."
 				value="Transition Time (s):" />
@@ -2295,7 +2295,7 @@
 				layout="topleft"
 				max_val="2"
 				min_val="0"
-				left="130"
+				left="135"
 				right="-75"
 				name="dof_focaltime_slider"
 				tool_tip="Time it takes for the camera to transition to a new focal point."

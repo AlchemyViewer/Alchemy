@@ -205,10 +205,22 @@
 	<!--IBM Plex-->
 	<font name="IBMPlex">
 		<file>IBMPlexSans-Regular.ttf</file>
+		<file>IBMPlexSansJP-Regular.ttf</file>
+		<file>IBMPlexSansKR-Regular.ttf</file>
+		<file>IBMPlexSansThai-Regular.ttf</file>
+		<file>IBMPlexSansHebrew-Regular.ttf</file>
+		<file>IBMPlexSansDevanagari-Regular.ttf</file>
+		<file>IBMPlexSansArabic-Regular.ttf</file>
 	</font>
 
 	<font name="IBMPlex" font_style="BOLD">
 		<file>IBMPlexSans-Bold.ttf</file>
+		<file>IBMPlexSansJP-Bold.ttf</file>
+		<file>IBMPlexSansKR-Bold.ttf</file>
+		<file>IBMPlexSansThai-Bold.ttf</file>
+		<file>IBMPlexSansHebrew-Bold.ttf</file>
+		<file>IBMPlexSansDevanagari-Bold.ttf</file>
+		<file>IBMPlexSansArabic-Bold.ttf</file>
 	</font>
 
 	<font name="IBMPlex" font_style="ITALIC">
@@ -221,9 +233,9 @@
 
 	<font_size name="Monospace" font="IBMPlex" size="8.0" />
 	<font_size name="Huge" font="IBMPlex" size="16.0" />
-	<font_size name="Large" font="IBMPlex" size="11.4" />
-	<font_size name="Medium" font="IBMPlex" size="9.4" />
-	<font_size name="Small" font="IBMPlex" size="8.4" />
+	<font_size name="Large" font="IBMPlex" size="12.0" />
+	<font_size name="Medium" font="IBMPlex" size="10.0" />
+	<font_size name="Small" font="IBMPlex" size="9.0" />
 
 	<!--NotoSans-->
 	<font name="NotoSans">
