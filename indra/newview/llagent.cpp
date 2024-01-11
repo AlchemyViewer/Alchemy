@@ -31,6 +31,7 @@
 
 #include "pipeline.h"
 
+#include "alcinematicmode.h"
 #include "llagentaccess.h"
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -2420,7 +2421,7 @@ void LLAgent::endAnimationUpdateUI()
 			LLPanelTopInfoBar::getInstance()->setVisible(TRUE);
 		}
 
-		LLChicletBar::getInstance()->setVisible(TRUE);
+		LLChicletBar::getInstance()->setVisible(!ALCinematicMode::isEnabled());
 
 		LLPanelStandStopFlying::getInstance()->setVisible(TRUE);
 

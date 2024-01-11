@@ -57,6 +57,8 @@
 // [/RLVa:KB]
 #include "llnotificationsutil.h"
 
+#include "alcinematicmode.h"
+
 using namespace LLAvatarAppearanceDefines;
 
 extern LLMenuBarGL* gMenuBarView;
@@ -2482,7 +2484,7 @@ void LLAgentCamera::changeCameraToDefault()
 	{
 		changeCameraToThirdPerson();
 	}
-	if (gSavedSettings.getBOOL("HideUIControls"))
+	if (ALCinematicMode::isEnabled() ||  gSavedSettings.getBOOL("HideUIControls"))
 	{
 		gViewerWindow->setUIVisibility(false);
 		LLPanelStandStopFlying::getInstance()->setVisible(false);

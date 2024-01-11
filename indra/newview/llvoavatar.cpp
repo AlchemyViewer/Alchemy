@@ -126,7 +126,6 @@
 
 #include "llperfstats.h"
 
-#include "alcinematicmode.h"
 #include "llsidepanelappearance.h"
 #include "llviewermenufile.h"
 
