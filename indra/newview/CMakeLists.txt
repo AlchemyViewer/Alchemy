@@ -2149,6 +2149,10 @@ if( TARGET media_plugin_libvlc )
   target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE USE_VLC=1)
 endif()
 
+if(BUILD_EXPIREY)
+  target_compile_definitions(${VIEWER_BINARY_NAME} PRIVATE BUILD_EXPIREY=1)
+endif()
+
 if(USE_NFD)
   target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC nfd )
 endif()

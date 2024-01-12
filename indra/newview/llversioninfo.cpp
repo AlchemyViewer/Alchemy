@@ -185,6 +185,7 @@ std::string LLVersionInfo::getReleaseNotes()
 
 bool LLVersionInfo::isViewerExpired()
 {
+#ifdef BUILD_EXPIREY
 	static const U64 BUILD_TIME(UNIX_TIMESTAMP);
 	static const U64Seconds TEST_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 14)); // 14 days
 	static const U64Seconds PROJECT_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 30)); // 30 days
@@ -210,5 +211,7 @@ bool LLVersionInfo::isViewerExpired()
 		break;
 	}
 	}
+#endif
 	return false;
+
 }
