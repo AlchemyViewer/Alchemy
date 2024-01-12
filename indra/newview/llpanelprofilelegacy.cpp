@@ -556,7 +556,7 @@ LLPanel* LLPanelProfileLegacy::expandTab(const std::string& name) const
 LLPanel* LLPanelProfileLegacy::getExpandedTab() const
 {
     const LLAccordionCtrlTab* tab = getChild<LLAccordionCtrl>("avatar_accordion")->getExpandedTab();
-    return tab->getChild<LLPanel>(tab->getName() + "_panel");
+    return tab ? tab->getChild<LLPanel>(tab->getName() + "_panel") : nullptr;
 }
 
 void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
