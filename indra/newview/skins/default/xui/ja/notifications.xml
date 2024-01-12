@@ -2093,8 +2093,10 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 		未加工の地形ファイルをダウンロードしました：[DOWNLOAD_PATH]
 	</notification>
 	<!-- RequiredUpdate does not display release notes URL because we don't get
-    that from login.cgi's login failure message. -->
-	<notification name="RequiredUpdate">ログインするには、バージョン[VERSION]が必要です。以下からダウンロードしてください。
+	that from login.cgi's login failure message. -->
+	<notification name="RequiredUpdate">
+		ログインするには、バージョン[VERSION]が必要です。
+下記アドレスから最新バージョンをダウンロードしてください。
 https://www.alchemyviewer.org/downloads.html
 		<tag>confirm</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
@@ -2141,7 +2143,8 @@ OKをクリックして、ダウンロードとインストールを開始しま
 		<tag>confirm</tag>
 		<usetemplate ignoretext="ブラウザを起動して、Webページを閲覧するとき" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
-	<notification name="WebLaunchJoinNow"> [https://secondlife.com/my/account/?lang=ja-JP マイアカウント]ページに移動してアカウントを管理しますか？
+	<notification name="WebLaunchJoinNow">
+		[https://secondlife.com/my/account/?lang=ja-JP マイアカウント]ページに移動してアカウントを管理しますか？
 		<tag>confirm</tag>
 		<usetemplate ignoretext="ブラウザを起動して、アカウントを管理するとき" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
@@ -2252,12 +2255,14 @@ OKをクリックして、ダウンロードとインストールを開始しま
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
-	<notification name="GroupLimitInfo"> ベーシック会員の住民は、最大[MAX_BASIC]個のグループまで参加することができます。プレミアム会員は最大[MAX_PREMIUM]個まで参加可能です。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細またはアップグレード]
+	<notification name="GroupLimitInfo">
+		ベーシック会員の住民は、最大[MAX_BASIC]個のグループまで参加することができます。プレミアム会員は最大[MAX_PREMIUM]個まで参加可能です。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細またはアップグレード]
 		<tag>group</tag>
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="閉じる"/>
 	</notification>
-	<notification name="GroupLimitInfoPlus"> ベーシック会員の住人は、最大[MAX_BASIC]個までグループに参加できます。プレミアム会員は最大[MAX_PREMIUM]個まで参加可能です。プレミアム・プラス会員は最大[MAX_PREMIUM_PLUS]個です。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細またはアップグレード]
+	<notification name="GroupLimitInfoPlus">
+		ベーシック会員の住人は、最大[MAX_BASIC]個までグループに参加できます。プレミアム会員は最大[MAX_PREMIUM]個まで参加可能です。プレミアム・プラス会員は最大[MAX_PREMIUM_PLUS]個です。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細またはアップグレード]
 		<tag>group</tag>
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="閉じる"/>
@@ -2607,7 +2612,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		</form>
 	</notification>
 	<notification name="TeleportEntryAccessBlocked_Change">
-		訪問しようとしているリージョンには、 [REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は[REGIONMATURITY]コンテンツを除外するように設定されています。
+		訪問しようとしているリージョンには、[REGIONMATURITY]コンテンツが含まれていますが、現在の初期設定は[REGIONMATURITY]コンテンツを除外するように設定されています。
 初期設定を変更するか、テレポートを取り消すことができます。初期設定を変更した後、もう一度テレポートを実行する必要があります。
 		<unique>
 			<context>REGIONMATURITY</context>
@@ -2642,7 +2647,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="LandClaimAccessBlocked">
-		取得しようとしている土地には現在の初期設定を超えるレーティング区分が含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
+		取得しようとしている土地には、現在の初期設定を超えるレーティング区分が含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
@@ -2929,7 +2934,8 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		このオブジェクトには、あなたがコピーできるアイテムはありません。
 		<tag>fail</tag>
 	</notification>
-	<notification name="WebLaunchAccountHistory"> [https://secondlife.com/my/account/?lang=ja-JP マイアカウント]
+	<notification name="WebLaunchAccountHistory">
+		[https://secondlife.com/my/account/?lang=ja-JP マイアカウント]
 ページに移動してアカウント履歴を確認しますか？
 		<tag>confirm</tag>
 		<usetemplate ignoretext="ブラウザを起動してアカウント履歴を見るとき" name="okcancelignore" notext="キャンセル" yestext="ページに移動"/>

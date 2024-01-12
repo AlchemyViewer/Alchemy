@@ -309,7 +309,7 @@
 		<menu_item_check label="リダイレクトされた長文チャット分割" name="Split Long Redirected Chat"/>
 		<menu_item_separator/>
 		<menu_item_check label="一時的な装着物を許可" name="Allow Temporary Attachments"/>
-		<menu_item_check label="#RLVへの譲渡を禁止" name="Forbid Give to #RLV"/>
+		<menu_item_check label="#RLVへの受け渡しを禁止" name="Forbid Give to #RLV"/>
 		<menu_item_check label="衣類の交換をアンロック" name="Wear Replaces Unlocked"/>
 		<menu_item_separator/>
 		<menu_item_check label="コンソール…" name="Console"/>
@@ -365,7 +365,6 @@
 			<menu_item_check label="雲" name="Rendering Type Clouds"/>
 			<menu_item_check label="パーティクル" name="Rendering Type Particles"/>
 			<menu_item_check label="衝突" name="Rendering Type Bump"/>
-			<menu_item_check label="ＰＢＲ" name="Rendering Type PBR"/>
 		</menu>
 		<menu label="レンダリング機能" name="Rendering Features">
 			<menu_item_check label="ＵＩ" name="ToggleUI"/>
