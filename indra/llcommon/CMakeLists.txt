@@ -124,6 +124,7 @@ set(llcommon_HEADER_FILES
     chrono.h
     classic_callback.h
     commoncontrol.h
+    compile_time.h
     ctype_workaround.h
     fix_macros.h
     function_types.h

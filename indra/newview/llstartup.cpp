@@ -915,6 +915,19 @@ bool idle_startup()
 
 	if (STATE_LOGIN_CLEANUP == LLStartUp::getStartupState())
 	{
+		if (LLVersionInfo::instance().isViewerExpired())
+		{
+			LL_INFOS() << "This version of " << LLVersionInfo::instance().getChannelAndVersion() << " has expired and can no longer log in." << LL_ENDL;
+			LLSD args;
+			args["VIEWER_CHANNEL"] = LLVersionInfo::instance().getChannelAndVersion();
+			LLNotificationsUtil::add("ViewerBuildExpired", args, LLSD(), login_alert_done);
+			reset_login();
+			gSavedSettings.setBOOL("AutoLogin", FALSE);
+			show_connect_box = true;
+			transition_back_to_login_panel("");
+			return FALSE;
+		}
+
 		// Post login screen, we should see if any settings have changed that may
 		// require us to either start/stop or change the socks proxy. As various communications
 		// past this point may require the proxy to be up.

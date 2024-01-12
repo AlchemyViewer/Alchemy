@@ -97,6 +97,8 @@ public:
     } ViewerMaturity;
     ViewerMaturity getViewerMaturity();
 
+	bool isViewerExpired();
+
 	/// get the release-notes URL, once it becomes available -- until then,
 	/// return empty string
 	std::string getReleaseNotes();

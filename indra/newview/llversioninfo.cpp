@@ -32,6 +32,8 @@
 #include "llversioninfo.h"
 #include "stringize.h"
 
+#include "compile_time.h"
+
 #if ! defined(LL_VIEWER_CHANNEL)       \
  || ! defined(LL_VIEWER_VERSION_MAJOR) \
  || ! defined(LL_VIEWER_VERSION_MINOR) \
@@ -179,4 +181,34 @@ const std::string& LLVersionInfo::getBuildConfig()
 std::string LLVersionInfo::getReleaseNotes()
 {
     return mReleaseNotes;
+}
+
+bool LLVersionInfo::isViewerExpired()
+{
+	static const U64 BUILD_TIME(UNIX_TIMESTAMP);
+	static const U64Seconds TEST_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 14)); // 14 days
+	static const U64Seconds PROJECT_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 30)); // 30 days
+	static const U64Seconds BETA_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 60)); // 60 days
+
+	switch (getViewerMaturity())
+	{
+	case RELEASE_VIEWER:
+		break;
+	case TEST_VIEWER:
+	{
+		if (LLTimer::getTotalSeconds() > TEST_EXPIREY) return true;
+		break;
+	}
+	case PROJECT_VIEWER:
+	{
+		if (LLTimer::getTotalSeconds() > PROJECT_EXPIREY) return true;
+		break;
+	}
+	case BETA_VIEWER:
+	{
+		if (LLTimer::getTotalSeconds() > BETA_EXPIREY) return true;
+		break;
+	}
+	}
+	return false;
 }

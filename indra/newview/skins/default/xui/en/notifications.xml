@@ -4353,7 +4353,7 @@ Finished download of raw terrain file to:
    name="RequiredUpdate"
    type="alertmodal">
 Version [VERSION] is required for login.
-Please download from https://www.alchemyviewer.org/downloads
+Please download the latest version from https://www.alchemyviewer.org/downloads
     <tag>confirm</tag>
     <usetemplate
      name="okbutton"
@@ -13087,4 +13087,16 @@ Can't restore the camera view because the camera position is beyond draw distanc
 Restore to Last Position is not allowed for no copy items to prevent possible content loss.
   </notification>
 
+  <notification
+   icon="alertmodal.tga"
+   name="ViewerBuildExpired"
+   type="alertmodal">
+[VIEWER_CHANNEL] has expired and is no longer able to log in.
+Please download the latest version from https://www.alchemyviewer.org/downloads
+    <tag>confirm</tag>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+	
 </notifications>
