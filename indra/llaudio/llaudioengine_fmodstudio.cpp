@@ -195,7 +195,7 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
 
 	// initialize the FMOD engine
     result = mSystem->init(LL_MAX_AUDIO_CHANNELS + EXTRA_SOUND_CHANNELS, fmod_flags, 0);
-    if (Check_FMOD_Error(result, "Error initializing FMOD Studio with default settins, retrying with other format"))
+    if (Check_FMOD_Error(result, "Error initializing FMOD Studio with default settings, retrying with other format"))
     {
         result = mSystem->setSoftwareFormat(44100, FMOD_SPEAKERMODE_STEREO, 0/*- ignore*/);
         if (Check_FMOD_Error(result, "Error setting sotware format. Can't init."))

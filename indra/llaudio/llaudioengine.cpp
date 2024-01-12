@@ -1951,6 +1951,8 @@ void LLAudioEngine::markSoundCorrupt(const LLUUID& sound_id)
 
 bool LLAudioEngine::isCorruptSound(const LLUUID& sound_id) const
 {
+	if (sound_id.isNull()) return true;
+
 	auto itr = mCorruptData.find(sound_id);
 	if (mCorruptData.end() == itr)
 		return false;

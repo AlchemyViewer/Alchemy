@@ -4200,7 +4200,7 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
 	LLVector3	pos_local;
 
 	msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_SoundID, sound_id);
-	if (gAudiop->isCorruptSound(sound_id))
+	if (gAudiop && gAudiop->isCorruptSound(sound_id))
 		return;
 
 	msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_OwnerID, owner_id);
