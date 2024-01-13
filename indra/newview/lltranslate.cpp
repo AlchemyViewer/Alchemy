@@ -703,7 +703,7 @@ bool LLAzureTranslationHandler::parseResponse(
         return false;
 	}
 
-    if (!root.is_object() || !root.is_array()) // empty response? should not happen
+    if (!root.is_array()) // empty response? should not happen
     {
         return false;
     }
