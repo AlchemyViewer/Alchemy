@@ -108,16 +108,23 @@ const U8* LLFontManager::loadFont(const std::string& filename, long& out_size)
 		return nullptr;
 	}
 
-	U8* in_buf = new U8[out_size];
-	if (fread(in_buf, 1, out_size, filep) != out_size)
+	std::unique_ptr<U8[]> out_ptr;
+	try
+	{
+		out_ptr = std::make_unique<U8[]>(out_size);
+	}
+	catch (const std::bad_alloc&)
 	{
 		out_size = 0;
-        delete [] in_buf;
+		return nullptr;
+	}
+	if (fread(out_ptr.get(), 1, out_size, filep) != out_size)
+	{
+		out_size = 0;
 		return nullptr;
 	}
 	filep.close();
 
-	std::unique_ptr<U8[]> out_ptr(in_buf);
 	auto pCache = std::make_unique<LoadedFont>(filename, std::move(out_ptr), out_size);
 	itr = mLoadedFonts.emplace(filename, std::move(pCache)).first;
 	return itr->second->mAddress.get();
