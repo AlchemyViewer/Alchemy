@@ -921,7 +921,6 @@ bool idle_startup()
 			LLSD args;
 			args["VIEWER_CHANNEL"] = LLVersionInfo::instance().getChannelAndVersion();
 			LLNotificationsUtil::add("ViewerBuildExpired", args, LLSD(), login_alert_done);
-			reset_login();
 			gSavedSettings.setBOOL("AutoLogin", FALSE);
 			show_connect_box = true;
 			transition_back_to_login_panel("");
@@ -1325,6 +1324,9 @@ bool idle_startup()
 		{
 			if(process_login_success_response(first_sim_size_x, first_sim_size_y))
 			{
+				// Setup crash report metadata
+				LLAppViewer::instance()->setCrashUserMetadata(gAgentID, gUserCredential->userID());
+
 				// Pass the user information to the voice chat server interface.
 				LLVoiceClient::getInstance()->userAuthorized(gUserCredential->userID(), gAgentID);
 				// create the default proximal channel
