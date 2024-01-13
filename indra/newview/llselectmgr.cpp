@@ -4274,9 +4274,12 @@ BOOL LLSelectMgr::selectGetAggregateTexturePermissions(LLAggregatePermissions& r
 
 BOOL LLSelectMgr::isMovableAvatarSelected()
 {
-	if (mAllowSelectAvatar)
+	if (mAllowSelectAvatar && getSelection()->getObjectCount() == 1)
 	{
-		return (getSelection()->getObjectCount() == 1) && (getSelection()->getFirstRootObject()->isAvatar()) && getSelection()->getFirstMoveableNode(TRUE);
+		if (auto ret = getSelection()->getFirstRootObject())
+		{
+			return  (ret->isAvatar()) && getSelection()->getFirstMoveableNode(TRUE);
+		}
 	}
 	return FALSE;
 }
