@@ -1369,11 +1369,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>696d74ee37482abd7ee62ab68eb851c60d46f4055e7b003a9ac811a56c2917fa5259bb370cda8e6bf43645d5466c0b1d6ffe32aafac3c2f9f566b941db6924a9</string>
+              <string>1fe4cbb09fc2e7e85f304880351ebf923a6e13473193ecbe8fdbd23a7215362e41b7be69bfd02125f349cdd90b0748a2db51fe5bbccac109c62dc9ddd7aafc39</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.579391/llphysicsextensions_tpv-1.0.579391-darwin64-579391.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.7493682926/llphysicsextensions_tpv-1.0.7493682926-darwin64-7493682926.tar.bz2</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1385,11 +1385,11 @@
               <key>creds</key>
               <string>gitlab</string>
               <key>hash</key>
-              <string>2ba67fd9f731c062d48ef1c0ef6440eda1d48829f553412f52379291fac9bfedd3d16c9dfc880e7e10110e6ff62d27d0773424d4451f33c5d456ecd591d0d2be</string>
+              <string>a6f38ee871f498741a1274dbc3dcc6205b9f9aebb10cc00bf86cec49426358627afb47632a39c2abcfae6468975554b1530a6bb1a1c5ff74283440f838bc4259</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.579391/llphysicsextensions_tpv-1.0.579391-windows64-579391.tar.bz2</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.7493682926/llphysicsextensions_tpv-1.0.7493682926-windows64-7493682926.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1402,7 +1402,7 @@
         <key>copyright</key>
         <string>Copyright (c) 2010, Linden Research, Inc.</string>
         <key>version</key>
-        <string>1.0.579391</string>
+        <string>1.0.7493682926</string>
         <key>name</key>
         <string>llphysicsextensions_tpv</string>
       </map>
