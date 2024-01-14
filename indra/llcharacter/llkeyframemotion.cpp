@@ -2166,7 +2166,7 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 		}
 		else
 		{
-			LL_WARNS() << "Failed to load asset for animation " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
+			LL_WARNS() << "Failed to load asset for animation " << motionp->getName() << ": " << motionp->getID() << LL_ENDL;
 			motionp->mAssetStatus = ASSET_FETCH_FAILED;
 		}
 	}
