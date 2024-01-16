@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater
-	width="376"
+	width="400"
 	height="380"
 	layout="topleft"
 	min_height="500"
@@ -21,7 +21,7 @@
 		tab_position="top"
 		tab_stop="false"
 		tab_min_width="70"
-		width="375">
+		width="400">
 		<!--Image Panel-->
 		<panel
 			label="Image"
@@ -162,7 +162,7 @@
 				left="0"
 				name="cost_text_border"
 				top_pad="6"
-				width="376" />
+				width="500" />
 			<!--Sharpen Controls-->
 			<text
 				follows="left|top"
@@ -279,7 +279,7 @@
 				left="0"
 				name="cost_text_border"
 				top_pad="7"
-				width="376" />
+				width="500" />
 			<!--Tonemapper Control-->
 			<text
 				follows="left|top"
@@ -712,7 +712,49 @@
 					name="probeCoverage_everything"
 					value="3" />
 			</combo_box>
+			
+			<check_box
+				follows="left|top"
+				height="15"
+				left="8"
+				top_pad="6"
+				width="80"
+				layout="topleft"
+				label="Screen Space Reflections"
+				tool_tip="Enable Screen Space Reflections (Expensive!)"
+				control_name="RenderScreenSpaceReflections" />
+			<combo_box
+				enabled_control="RenderScreenSpaceReflections"
+				follows="top|left"
+				layout="topleft"
+				height="16"
+				width="150"
+				right="-2"
+				top_pad="-16"
+				max_chars="128"
+				allow_text_entry="false"
+				tool_tip="Quality of SSR, can get really expensive!"
+				control_name="RenderScreenSpaceReflectionGlossySamples"
+				name="SSR_combo">
+				<combo_box.item
+					label="Low (4 Samples)"
+					name="SSR_Low"
+					value="4" />
+				<combo_box.item
+					label="Medium (8 Samples)"
+					name="SSR_Medium"
+					value="8" />
+				<combo_box.item
+					label="High (16 Samples)"
+					name="SSR_High"
+					value="16" />
+				<combo_box.item
+					label="Ultra (32 Samples)"
+					name="SSR_Ultra"
+					value="32" />
+			</combo_box>
 			<!--Probe Draw Distance-->
+			<!--
 			<text
 				follows="left|top"
 				height="15"
@@ -749,7 +791,7 @@
 				increment="64"
 				name="probeDist_spinner"
 				tool_tip="(Default: 64m) Maximum object distance to be considered for a reflection probe. Higher distances will allow probes to be more accurate to a scene at the cost of generation time and/or performance."
-				control_name="RenderReflectionProbeDrawDistance" />
+				control_name="RenderReflectionProbeDrawDistance" />-->
 			<view_border
 				bevel_style="none"
 				height="0"
@@ -757,7 +799,7 @@
 				left="0"
 				name="cost_text_border"
 				top_pad="14"
-				width="365" />
+				width="500" />
 			<!--Anti-Aliasing-->
 			<text
 				follows="left|top"
@@ -861,7 +903,7 @@
 				left="0"
 				name="cost_text_border"
 				top_pad="7"
-				width="365" />
+				width="500" />
 			<!--Resolution Scale-->
 			<!--TODO: Disable if AA is also disabled. This option causes broken rendering otherwise! Bug maybe?-->
 			<text
@@ -1041,6 +1083,41 @@
 				increment="1"
 				name="max_avatar_spinner"
 				control_name="RenderAvatarMaxNonImpostors" />
+			<!--Max Local Lights-->
+			<text
+				follows="left|top"
+				height="15"
+				left="10"
+				top_pad="12"
+				width="120"
+				layout="topleft"
+				value="Max Local Lights:" />
+			<slider_bar
+				top_pad="-18"
+				height="20"
+				increment="8"
+				follows="left|top|right"
+				layout="topleft"
+				max_val="4096"
+				min_val="8"
+				left="130"
+				right="-55"
+				name="local_light_slider_bar"
+				control_name="RenderLocalLightCount" />
+			<spinner
+				top_pad="-20"
+				height="15"
+				label_width="0"
+				right="-2"
+				decimal_digits="0"
+				follows="top|right"
+				layout="topleft"
+				max_val="4096"
+				min_val="8"
+				width="55"
+				increment="8"
+				name="local_light_spinner"
+				control_name="RenderLocalLightCount" />
 		</panel>
 		<!--Shadows/SSAO Panel-->
 		<panel
@@ -1464,7 +1541,7 @@
 				left="0"
 				name="cost_text_border"
 				top_pad="7"
-				width="492" />
+				width="500" />
 			<!--SSAO Toggle-->
 			<!--TODO: Disable Sliders if not enabled?-->
 			<check_box
@@ -1478,6 +1555,7 @@
 				tool_tip="Toggles SSAO (Also toggles Shadow Smoothing!)"
 				control_name="RenderDeferredSSAO" />
 			<text
+				enabled_control="RenderDeferredSSAO"
 				follows="left|top"
 				height="15"
 				left="15"
@@ -1487,6 +1565,7 @@
 				tool_tip="Controls the value of the SSAO HSV transform."
 				value="SSAO Value:" />
 			<slider
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-18"
 				height="20"
 				increment=".01"
@@ -1501,6 +1580,7 @@
 				tool_tip="Controls the value of the SSAO HSV transform.."
 				control_name="RenderSSAOEffectValue" />
 			<spinner
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -1516,6 +1596,7 @@
 				tool_tip="Controls the value of the SSAO HSV transform."
 				control_name="RenderSSAOEffectValue" />
 			<button
+				enabled_control="RenderDeferredSSAO"
 				name="ssaoVal_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -1531,6 +1612,7 @@
 					parameter="RenderSSAOEffectValue" />
 			</button>
 			<text
+				enabled_control="RenderDeferredSSAO"
 				follows="left|top"
 				height="15"
 				left="15"
@@ -1540,6 +1622,7 @@
 				tool_tip="Controls the saturation of the SSAO HSV transform."
 				value="SSAO Saturation:" />
 			<slider
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-18"
 				height="20"
 				increment=".01"
@@ -1554,6 +1637,7 @@
 				tool_tip="Controls the saturation of the SSAO HSV transform."
 				control_name="RenderSSAOEffectSat" />
 			<spinner
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -1569,6 +1653,7 @@
 				tool_tip="Controls the saturation of the SSAO HSV transform."
 				control_name="RenderSSAOEffectSat" />
 			<button
+				enabled_control="RenderDeferredSSAO"
 				name="ssaoStrength_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -1585,6 +1670,7 @@
 			</button>
 			<!--SSAO Factor-->
 			<text
+				enabled_control="RenderDeferredSSAO"
 				follows="left|top"
 				height="15"
 				left="15"
@@ -1594,6 +1680,7 @@
 				tool_tip="Occlusion sensitivity factor, larger = more."
 				value="SSAO Factor:" />
 			<slider_bar
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-18"
 				height="20"
 				increment=".1"
@@ -1607,6 +1694,7 @@
 				tool_tip="Occlusion sensitivity factor, larger = more."
 				control_name="RenderSSAOFactor" />
 			<spinner
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -1622,6 +1710,7 @@
 				tool_tip="Occlusion sensitivity factor, larger = more."
 				control_name="RenderSSAOFactor" />
 			<button
+				enabled_control="RenderDeferredSSAO"
 				name="ssaoFactor_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -1638,6 +1727,7 @@
 			</button>
 			<!--SSAO Scale-->
 			<text
+				enabled_control="RenderDeferredSSAO"
 				follows="left|top"
 				height="15"
 				left="15"
@@ -1647,6 +1737,7 @@
 				tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
 				value="SSAO Scale:" />
 			<slider_bar
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-18"
 				height="20"
 				increment="10"
@@ -1660,6 +1751,7 @@
 				tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
 				control_name="RenderSSAOScale" />
 			<spinner
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -1675,6 +1767,7 @@
 				tool_tip="Determines distance from surface to check for occlusion. Higher = Wider occlusion NOTE: Large values may produce artifacts."
 				control_name="RenderSSAOScale" />
 			<button
+				enabled_control="RenderDeferredSSAO"
 				name="ssaoScale_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -1691,6 +1784,7 @@
 			</button>
 			<!--SSAO Max Scale-->
 			<text
+				enabled_control="RenderDeferredSSAO"
 				follows="left|top"
 				height="15"
 				left="15"
@@ -1700,6 +1794,7 @@
 				tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
 				value="SSAO Max Scale:" />
 			<slider_bar
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-18"
 				height="20"
 				increment="10"
@@ -1713,6 +1808,7 @@
 				tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
 				control_name="RenderSSAOMaxScale" />
 			<spinner
+				enabled_control="RenderDeferredSSAO"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -1728,6 +1824,7 @@
 				tool_tip="Determines max screen radius to use for occlusion. NOTE: Large values may produce artifacts."
 				control_name="RenderSSAOMaxScale" />
 			<button
+				enabled_control="RenderDeferredSSAO"
 				name="ssaoMaxScale_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -1761,6 +1858,7 @@
 				control_name="RenderGlow" />
 			<!--Glow Iterations-->
 			<text
+				enabled_control="RenderGlow"
 				follows="left|top"
 				height="15"
 				left="5"
@@ -1770,6 +1868,7 @@
 				tool_tip="How many passes of the glow shader to use. More passes makes it overall stronger, softer, wider, and slower to render."
 				value="Iterations:" />
 			<slider_bar
+				enabled_control="RenderGlow"
 				top_pad="-18"
 				height="20"
 				increment="1"
@@ -1783,6 +1882,7 @@
 				tool_tip="How many passes of the glow shader to use. More passes makes it overall stronger, softer, wider, and slower to render."
 				control_name="RenderGlowIterations" />
 			<spinner
+				enabled_control="RenderGlow"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -1798,6 +1898,7 @@
 				tool_tip="How many passes of the glow shader to use. More passes makes it overall stronger, softer, wider, and slower to render."
 				control_name="RenderGlowIterations" />
 			<button
+				enabled_control="RenderGlow"
 				name="glowIteration_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -1814,6 +1915,7 @@
 			</button>
 			<!--Glow Resolution-->
 			<text
+				enabled_control="RenderGlow"
 				follows="left|top"
 				height="15"
 				left="5"
@@ -1823,6 +1925,7 @@
 				tool_tip="Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
 				value="Resolution:" />
 			<slider_bar
+				enabled_control="RenderGlow"
 				top_pad="-18"
 				height="20"
 				increment="1"
@@ -1836,6 +1939,7 @@
 				tool_tip="Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
 				control_name="RenderGlowResolutionPow" />
 			<spinner
+				enabled_control="RenderGlow"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -1851,6 +1955,7 @@
 				tool_tip="Overall resolution of glow. Higher values allow for wider glow. Use in conjunction with other glow settings for best effect."
 				control_name="RenderGlowResolutionPow" />
 			<button
+				enabled_control="RenderGlow"
 				name="glowRes_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -1867,6 +1972,7 @@
 			</button>
 			<!--Glow Strength-->
 			<text
+				enabled_control="RenderGlow"
 				follows="left|top"
 				height="15"
 				left="5"
@@ -1876,6 +1982,7 @@
 				tool_tip="Overall strength of the glow shader."
 				value="Strength:" />
 			<slider_bar
+				enabled_control="RenderGlow"
 				top_pad="-18"
 				height="20"
 				increment="0.005"
@@ -1889,6 +1996,7 @@
 				tool_tip="Overall strength of the glow shader."
 				control_name="RenderGlowStrength" />
 			<spinner
+				enabled_control="RenderGlow"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -1904,6 +2012,7 @@
 				tool_tip="Overall strength of the glow shader."
 				control_name="RenderGlowStrength" />
 			<button
+				enabled_control="RenderGlow"
 				name="glowStrength_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -1920,6 +2029,7 @@
 			</button>
 			<!--Glow Softness-->
 			<text
+				enabled_control="RenderGlow"
 				follows="left|top"
 				height="15"
 				left="5"
@@ -1929,6 +2039,7 @@
 				tool_tip="Softness or width of glow, eventually gets pixelated at higher sizes."
 				value="Softness:" />
 			<slider_bar
+				enabled_control="RenderGlow"
 				top_pad="-18"
 				height="20"
 				increment=".05"
@@ -1942,6 +2053,7 @@
 				tool_tip="Softness or width of glow, eventually gets pixelated at higher sizes."
 				control_name="RenderGlowWidth" />
 			<spinner
+				enabled_control="RenderGlow"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -1957,6 +2069,7 @@
 				tool_tip="Softness or width of glow, eventually gets pixelated at higher sizes."
 				control_name="RenderGlowWidth" />
 			<button
+				enabled_control="RenderGlow"
 				name="glowWidth_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -2036,6 +2149,7 @@
 				tool_tip="What fraction of screen resolution should be used for rendering Depth of Field. NOTE: Viewer may become unresponsive if DoF becomes intense when Full Resolution is used."
 				value="DoF Resolution: " />
 			<combo_box
+				enabled_control="RenderDepthOfField"
 				allow_text_entry="false"
 				tool_tip="What fraction of screen resolution should be used for rendering Depth of Field. NOTE: Viewer may become unresponsive if DoF becomes intense when Full Resolution is used."
 				control_name="CameraDoFResScale"
@@ -2075,6 +2189,7 @@
 				tool_tip="Vertical FoV for DoF calculations"
 				value="Field of View:" />
 			<slider_bar
+				enabled_control="RenderDepthOfField"
 				top_pad="-18"
 				height="20"
 				increment="1"
@@ -2088,6 +2203,7 @@
 				tool_tip="Vertical FoV for DoF calculations"
 				control_name="CameraFieldOfView" />
 			<spinner
+				enabled_control="RenderDepthOfField"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -2103,6 +2219,7 @@
 				tool_tip="Vertical FoV for DoF calculations"
 				control_name="CameraFieldOfView" />
 			<button
+				enabled_control="RenderDepthOfField"
 				name="dofFOV_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -2128,6 +2245,7 @@
 				tool_tip="Simulated camera aperture f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
 				value="Aperture (f):" />
 			<slider_bar
+				enabled_control="RenderDepthOfField"
 				top_pad="-18"
 				height="20"
 				increment=".1"
@@ -2141,6 +2259,7 @@
 				tool_tip="Simulated camera aperture f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
 				control_name="CameraFNumber" />
 			<spinner
+				enabled_control="RenderDepthOfField"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -2156,6 +2275,7 @@
 				tool_tip="Simulated camera aperture f-value. Smaller f-stops result in a narrower focal range. Larger increases focal range."
 				control_name="CameraFNumber" />
 			<button
+				enabled_control="RenderDepthOfField"
 				name="dofFNumber_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -2172,6 +2292,7 @@
 			</button>
 			<!--Focal Length-->
 			<text
+				enabled_control="RenderDepthOfField"
 				follows="left|top"
 				height="15"
 				left="5"
@@ -2181,6 +2302,7 @@
 				tool_tip="Focal length of simulated camera."
 				value="Focal Length (mm):" />
 			<slider_bar
+				enabled_control="RenderDepthOfField"
 				top_pad="-18"
 				height="20"
 				increment="5"
@@ -2194,6 +2316,7 @@
 				tool_tip="Focal length of simulated camera."
 				control_name="CameraFocalLength" />
 			<spinner
+				enabled_control="RenderDepthOfField"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -2209,6 +2332,7 @@
 				tool_tip="Focal length of simulated camera."
 				control_name="CameraFocalLength" />
 			<button
+				enabled_control="RenderDepthOfField"
 				name="dofFocal_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -2226,6 +2350,7 @@
 			<!--Circle of Confusion-->
 			<!--TODO: This can get dangerous on low-end machines! See DoF Resolution-->
 			<text
+				enabled_control="RenderDepthOfField"
 				follows="left|top"
 				height="15"
 				left="5"
@@ -2235,6 +2360,7 @@
 				tool_tip="Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
 				value="CoC Maximum:" />
 			<slider_bar
+				enabled_control="RenderDepthOfField"
 				top_pad="-18"
 				height="20"
 				increment=".5"
@@ -2248,6 +2374,7 @@
 				tool_tip="Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
 				control_name="CameraMaxCoF" />
 			<spinner
+				enabled_control="RenderDepthOfField"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -2263,6 +2390,7 @@
 				tool_tip="Circle of Confusion, blur intensity of out objects out of focus. This limits the amount of blur applied. High values produce softer out of focus objects, but can cause the viewer or system to become unresponsive"
 				control_name="CameraMaxCoF" />
 			<button
+				enabled_control="RenderDepthOfField"
 				name="dofCOF_default_btn"
 				follows="top|right"
 				layout="topleft"
@@ -2279,6 +2407,7 @@
 			</button>
 			<!--Focus Transition Time-->
 			<text
+				enabled_control="RenderDepthOfField"
 				follows="left|top"
 				height="15"
 				left="5"
@@ -2288,6 +2417,7 @@
 				tool_tip="Time it takes for the camera to transition to a new focal point."
 				value="Transition Time (s):" />
 			<slider_bar
+				enabled_control="RenderDepthOfField"
 				top_pad="-18"
 				height="20"
 				increment=".1"
@@ -2301,6 +2431,7 @@
 				tool_tip="Time it takes for the camera to transition to a new focal point."
 				control_name="CameraFocusTransitionTime" />
 			<spinner
+				enabled_control="RenderDepthOfField"
 				top_pad="-20"
 				height="15"
 				label_width="0"
@@ -2316,6 +2447,7 @@
 				tool_tip="Time it takes for the camera to transition to a new focal point."
 				control_name="CameraFocusTransitionTime" />
 			<button
+				enabled_control="RenderDepthOfField"
 				name="dofTime_default_btn"
 				follows="top|right"
 				layout="topleft"
