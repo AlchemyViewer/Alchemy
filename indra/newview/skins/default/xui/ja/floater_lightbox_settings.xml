@@ -99,10 +99,19 @@
 				<combo_box.item label="手動＋地形" name="probeCoverage_terrain" value="2"/>
 				<combo_box.item label="すべて" name="probeCoverage_everything" value="3"/>
 			</combo_box>
+			<check_box label="スクリーン・スペース・リフレクション" tool_tip="スクリーンスペースリフレクションを有効にします。（高負荷です！）"/>
+			<combo_box tool_tip="ＳＳＲの品質です。リアリティが向上しますが、高負荷がかかる可能性があります！" name="SSR_combo">
+				<combo_box.item label="低（４サンプル）" name="SSR_Low"/>
+				<combo_box.item label="中（８サンプル）" name="SSR_Medium"/>
+				<combo_box.item label="高 （１６サンプル）" name="SSR_High"/>
+				<combo_box.item label="最高（３２サンプル）" name="SSR_Ultra" />
+			</combo_box>
 			<!--Probe Draw Distance-->
-			<text tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。" value="プローブの描画距離："/>
-			<slider_bar name="probeDist_slider" tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。"/>
-			<spinner name="probeDist_spinner" tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。"/>
+			<!--
+								<text tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。" value="プローブの描画距離："/>
+								<slider_bar name="probeDist_slider" tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。"/>
+								<spinner name="probeDist_spinner" tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。"/>
+			-->
 			<view_border name="cost_text_border"/>
 			<!--Anti-Aliasing-->
 			<text tool_tip="アンチエイリアスの品質を操作します。" value="アンチエイリアス："/>
@@ -144,8 +153,12 @@
 			<text value="最大アバター数："/>
 			<slider_bar name="max_avatar_slider_bar"/>
 			<spinner name="max_avatar_spinner"/>
+			<!--Max Local Lights-->
+			<text value="最大ローカル光源数："/>
+			<slider_bar name="local_light_slider_bar"/>
+			<spinner name="local_light_spinner"/>
 		</panel>
-		<!--Shadows/SSAOmPanel-->
+		<!--Shadows/SSAO Panel-->
 		<panel label="影" name="shadow_settings">
 			<!--TODO: Display a warning message and disable this panel if Advanced Lighting Model is disabled?-->
 			<!--Shadow Detail-->
@@ -158,8 +171,8 @@
 			</combo_box>
 			<!--Shadow Resolution-->
 			<!--TODO: While this option is exceptionally powerful, this option as-is is extremely dangerous!
-      Login-crash dangerous on anything lower than a 1080Ti. Either needs to be limited via reported
-      VRAM and/or GPU String, or this value needs to be flagged as temporary!-->
+								Login-crash dangerous on anything lower than a 1080Ti. Either needs to be limited via reported
+								VRAM and/or GPU String, or this value needs to be flagged as temporary!-->
 			<text tool_tip="シャドウマップ解像度の乗数。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！" value="影の解像度： "/>
 			<slider_bar name="shadowres_slider" tool_tip="シャドウマップ解像度の乗数。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！"/>
 			<spinner name="shadowres_spinner" tool_tip="シャドウマップ解像度の乗数。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！"/>
