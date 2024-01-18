@@ -22,7 +22,7 @@
 		<text name="balance" tool_tip="クリックしてL$残高を更新" value="L$ ??"/>
 		<!-- 以下のwidthは消さないこと -->
 		<button label="L$を購入" name="buyL" tool_tip="クリックしてL$を購入します" width="60"/>
-		<button label="ショップ" name="goShop" tool_tip="Second Lifeのマーケットプレイスを開きます。" width="70"/>
+		<button label="ショップ" name="goShop" tool_tip="Second Lifeのマーケットプレイスを開きます。" width="80"/>
 	</panel>
 	<text name="TimeText" tool_tip="現在時刻（太平洋）">
 		午前　24：00 PST

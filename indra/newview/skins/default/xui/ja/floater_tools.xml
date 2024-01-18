@@ -133,14 +133,14 @@
 	</text>
 	<button label="適用" label_selected="適用" name="button apply to selection" tool_tip="選択した土地を修正します。"/>
 	<text name="link_num_obj_count" tool_tip="このリンク数は正確でない可能性があります。">
-		[DESC]　[NUM]
+		[DESC] [NUM]
 	</text>
 	<text name="selection_empty">
 		選択されていません。
 	</text>
 	<text name="selection_count"/>
 	<text name="remaining_capacity">
-		[CAPACITY_STRING]　[secondlife:///app/openfloater/object_weights 詳細情報]
+		[CAPACITY_STRING] [secondlife:///app/openfloater/object_weights 詳細情報]
 	</text>
 	<view_border name="cost_text_border"/>
 	<tab_container name="Object Info Tabs">
