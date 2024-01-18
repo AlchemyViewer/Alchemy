@@ -1962,7 +1962,7 @@ even though the user gets a free copy.
              layout="topleft"
              left="125"
              name="text hollow"
-             top_pad="2"
+             top_pad="4"
              width="68">
                 Hollow
             </text>
@@ -2010,7 +2010,7 @@ even though the user gets a free copy.
              layout="topleft"
              left="125"
              name="Hollow Shape"
-             top_pad="2"
+             top_pad="4"
              width="150">
                 Hollow Shape
             </text>
@@ -2047,7 +2047,7 @@ even though the user gets a free copy.
              layout="topleft"
              left_delta="0"
              name="text twist"
-             top_pad="2"
+             top_pad="4"
              width="150">
                 Twist (begin/end)
             </text>
@@ -2089,7 +2089,7 @@ even though the user gets a free copy.
              layout="topleft"
              left="125"
              name="scale_taper"
-             top_pad="2"
+             top_pad="4"
              width="150">
                 Taper
             </text>
@@ -2142,7 +2142,7 @@ even though the user gets a free copy.
              layout="topleft"
              left="125"
              name="text topshear"
-             top_pad="2"
+             top_pad="4"
              width="141">
                 Top Shear
             </text>
@@ -2185,7 +2185,7 @@ even though the user gets a free copy.
              layout="topleft"
              left="125"
              name="advanced_cut"
-             top_pad="2"
+             top_pad="4"
              width="150">
                 Profile Cut (begin/end)
             </text>
@@ -2249,7 +2249,7 @@ even though the user gets a free copy.
              layout="topleft"
              left="125"
              name="text taper2"
-             top_pad="2"
+             top_pad="4"
              width="150">
                 Taper Profile
             </text>
@@ -2292,7 +2292,7 @@ even though the user gets a free copy.
              layout="topleft"
              left="125"
              name="text radius delta"
-             top_pad="2"
+             top_pad="4"
              width="78">
                 Radius
             </text>

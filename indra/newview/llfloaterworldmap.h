@@ -35,6 +35,7 @@
 #include "llfloater.h"
 #include "llmapimagetype.h"
 #include "lltracker.h"
+#include "llremoteparcelrequest.h"
 #include "llslurl.h"
 
 class LLCtrlListInterface;
@@ -50,7 +51,7 @@ class LLCheckBoxCtrl;
 class LLSliderCtrl;
 class LLSpinCtrl;
 
-class LLFloaterWorldMap final : public LLFloater
+class LLFloaterWorldMap final : public LLRemoteParcelInfoObserver, public LLFloater
 {
 public:
 	LLFloaterWorldMap(const LLSD& key);
@@ -161,6 +162,17 @@ protected:
 
     void            onTeleportFinished();
 
+	// LLRemoteParcelInfoObserver
+	void	requestParcelInfo(const LLVector3d& pos_global, const LLVector3d& region_origin);
+
+	void	processParcelInfo(const LLParcelData& parcel_data) override;
+	void	setParcelID(const LLUUID& parcel_id) override;
+	void	setErrorStatus(S32 status, const std::string& reason) override;
+
+	bool		mShowParcelInfo;
+	LLVector3d	mParcelPosGlobal;
+	LLUUID		mParcelID;
+
 private:
     LLWorldMapView* mMapView; // Panel displaying the map
 
@@ -223,7 +235,7 @@ private:
 	LLUICtrl*				mTeleportCoordSpinY = nullptr;
 	LLUICtrl*				mTeleportCoordSpinZ = nullptr;
 
-	LLSliderCtrl*				mZoomSlider = nullptr;
+	LLSliderCtrl*			mZoomSlider = nullptr;
 
     boost::signals2::connection mTeleportFinishConnection;
 };
