@@ -13,6 +13,9 @@
 	<check_box label="フレンドとグループ以外からはコールとＩＭを受信しない" name="voice_call_friends_only_check"/>
 	<check_box label="プロフィールを検索結果に表示する" name="online_searchresults"/>
 	<check_box label="コールが終了したら自動的にマイクのスイッチを切る" name="auto_disengage_mic_check"/>
+	<check_box label="Discord連携を有効化" name="Enable_Discord_Integration"/>
+	<check_box label="Discord上でユーザ名を表示" name="Discord_Integration_Show_Name"/>
+	<check_box label="Discord上でリージョン名を表示" name="Discord_Integration_Show_Region"/>
 	<text name="mylookat">
 		インベントリ：
 	</text>
