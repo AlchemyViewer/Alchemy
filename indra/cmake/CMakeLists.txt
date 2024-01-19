@@ -52,6 +52,7 @@ set(cmake_SOURCE_FILES
         SDL2.cmake
         Sentry.cmake
         TemplateCheck.cmake
+        Tracy.cmake
         Tut.cmake
         UI.cmake
         UnixInstall.cmake
