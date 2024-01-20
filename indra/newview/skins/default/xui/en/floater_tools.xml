@@ -2629,7 +2629,7 @@ even though the user gets a free copy.
              color="0.5 0.5 0.5 1"
 	     border.border_thickness="0"
              follows="left|top"
-             height="20"
+             height="50"
              layout="topleft"
              left_pad="10"
              top_pad="-17"
