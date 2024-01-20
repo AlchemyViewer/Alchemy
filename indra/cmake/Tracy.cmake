@@ -12,6 +12,8 @@ if (USE_TRACY)
 
   #target_include_directories( ll::tracy SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/tracy)
 
+  target_link_libraries( ll::tracy INTERFACE TracyClient)
+
 # See: indra/llcommon/llprofiler.h
   target_compile_definitions(ll::tracy INTERFACE LL_PROFILER_CONFIGURATION=3 )
 endif (USE_TRACY)
