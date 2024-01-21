@@ -61,19 +61,19 @@ public:
 	static LLFloaterWorldMap* getInstance();
 
 	static void *createWorldMapView(void* data);
-	BOOL postBuild();
+	BOOL postBuild() override;
 
-	/*virtual*/ void onOpen(const LLSD& key);
-	/*virtual*/ void onClose(bool app_quitting);
+	/*virtual*/ void onOpen(const LLSD& key) override;
+	/*virtual*/ void onClose(bool app_quitting) override;
 
 	static void reloadIcons(void*);
 
-	/*virtual*/ void reshape( S32 width, S32 height, BOOL called_from_parent = TRUE );
-	/*virtual*/ BOOL handleHover(S32 x, S32 y, MASK mask);
-	/*virtual*/ BOOL handleScrollWheel(S32 x, S32 y, S32 clicks);
-	/*virtual*/ void draw();
+	/*virtual*/ void reshape( S32 width, S32 height, BOOL called_from_parent = TRUE ) override;
+	/*virtual*/ BOOL handleHover(S32 x, S32 y, MASK mask) override;
+	/*virtual*/ BOOL handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+	/*virtual*/ void draw() override;
 
-	/*virtual*/ void onFocusLost();
+	/*virtual*/ void onFocusLost() override;
 
 	// methods for dealing with inventory. The observe() method is
 	// called during program startup. inventoryUpdated() will be
