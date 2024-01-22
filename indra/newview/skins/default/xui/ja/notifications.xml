@@ -6188,4 +6188,10 @@ Intelドライバーのウェブサイトを確認しますか？
 	<notification name="CantRestoreToWorldNoCopy">
 		コンテンツ損失の可能性を防ぐため、コピーされていないアイテムについては、最後の位置に復元することはできません。
 	</notification>
+	<notification name="ViewerBuildExpired">
+		[VIEWER_CHANNEL]の有効期限が切れたため、ログインできなくなりました。
+https://www.alchemyviewer.org/downloads から最新バージョンのビューアをダウンロードしてください。
+		<tag>confirm</tag>
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
 </notifications>

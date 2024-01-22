@@ -18,6 +18,9 @@
 	<check_box label="マウスルック時に位置とヘルスを表示" name="alchemy_mlook_iff" tool_tip="マウスルックオーバーレイにユーザーの現在位置とヘルスを表示する。"/>
 	<check_box label="照準にユーザーを表示する" name="alchemy_mlook_iff" tool_tip="マウスルック時の照準にユーザーの名前と距離を表示します。"/>
 	<check_box label="画面外のユーザーに矢印を表示" name="alchemy_mlook_iff_markers" tool_tip="画面外のユーザーのいる方角の画面端に矢印を表示します。"/>
+	<text name="IFF Range">
+		マウスルックの範囲：
+	</text>
 	<slider name="iff_range_slider"/>
 	<spinner label="" name="iff_range_spinner"/>
 </panel>
