@@ -2295,7 +2295,7 @@ void LLTextureCtrl::draw()
 		gl_draw_scaled_image( interior.mLeft, interior.mBottom, interior.getWidth(), interior.getHeight(), preview, UI_VERTEX_COLOR % alpha);
         if (mTexturep)
         {
-			mTexturep->addTextureStats( (F32)(interior.getWidth() * interior.getHeight()) );
+            mTexturep->addTextureStats( (F32)(interior.getWidth() * interior.getHeight()) );
         }
 	}
 	else if (!mFallbackImage.isNull())
