@@ -201,25 +201,12 @@ void LLDrawPoolTerrain::drawLoop()
 	{
 		for (LLFace* facep : mDrawFace)
 		{
+
 			if (!facep || !facep->getDrawable() || !facep->getDrawable()->getRegion())
 				continue;
 
-			LLMatrix4a* model_matrix = &(facep->getDrawable()->getRegion()->mRenderMatrix);
-			if(model_matrix && model_matrix->isIdentity())
-			{
-				model_matrix = NULL;
-			}
-			if (model_matrix != gGLLastMatrix)
-			{
-				llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
-				gGLLastMatrix = model_matrix;
-				gGL.loadMatrix(gGLModelView);
-				if (model_matrix)
-				{
-					gGL.multMatrix(*model_matrix);
-				}
-				gPipeline.mMatrixOpCount++;
-			}
+            llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
+            LLRenderPass::applyModelMatrix(&facep->getDrawable()->getRegion()->mRenderMatrix);
 
 			facep->renderIndexed();
 		}

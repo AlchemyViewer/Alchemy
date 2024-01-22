@@ -16308,7 +16308,7 @@
       <key>Type</key>
       <string>S32</string>
       <key>Value</key>
-      <integer>2048</integer>
+      <integer>1024</integer>
     </map>
     <key>max_texture_dimension_Y</key>
     <map>
@@ -16319,7 +16319,7 @@
       <key>Type</key>
       <string>S32</string>
       <key>Value</key>
-      <integer>2048</integer>
+      <integer>1024</integer>
     </map>
     <!-- End of back compatibility settings -->
     <key>teleport_offer_invitation_max_length</key>
