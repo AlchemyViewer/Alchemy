@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="worldmap" title="ワールドマップ">
+	<floater.string name="UnnamedParcel">（名前のない区画）</floater.string>
 	<layout_stack name="control_stack">
 		<layout_panel name="map_lp">
 			<panel name="objects_mapview"/>
