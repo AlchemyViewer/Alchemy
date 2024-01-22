@@ -53,10 +53,10 @@ export __GL_THREADED_OPTIMIZATIONS=1
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
 
-SCRIPTSRC=`readlink -f "$0" || echo "$0"`
-RUN_PATH=`dirname "${SCRIPTSRC}" || echo .`
+SCRIPTSRC=$(readlink -f "$0" || echo "$0")
+RUN_PATH=$(dirname "${SCRIPTSRC}" || echo .)
 echo "Running from ${RUN_PATH}"
-cd "${RUN_PATH}"
+cd "${RUN_PATH}" || return
 
 # Re-register the secondlife:// protocol handler every launch, for now.
 ./etc/register_secondlifeprotocol.sh
@@ -85,7 +85,7 @@ done
 SANDBOX_BIN=bin/llplugin/chrome-sandbox
 # if set-user-id = false || is writable || executable = false || read is false || is owned by effective uid || is owned by effective gid
 OPTOUT_FILE="bin/llplugin/.user_does_not_want_chrome_sandboxing_and_accepts_the_risks"
-if [[ !(-u $SANDBOX_BIN) || (-w $SANDBOX_BIN) || !(-x $SANDBOX_BIN) || !(-r $SANDBOX_BIN) || ( -O $SANDBOX_BIN) || (-G $SANDBOX_BIN) ]]; then
+if [[ ! (-u $SANDBOX_BIN) || (-w $SANDBOX_BIN) || ! (-x $SANDBOX_BIN) || ! (-r $SANDBOX_BIN) || ( -O $SANDBOX_BIN) || (-G $SANDBOX_BIN) ]]; then
     echo "$SANDBOX_BIN permissions are not set properly to run under sandboxing."
     if [ ! -f "$OPTOUT_FILE" ]; then
         SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -115,7 +115,7 @@ LL_RUN_ERR=$?
 # Handle any resulting errors
 if [ $LL_RUN_ERR -ne 0 ]; then
 	# generic error running the binary
-	echo '*** Bad shutdown ($LL_RUN_ERR). ***'
+	echo "*** Bad shutdown ($LL_RUN_ERR). ***"
 	if [ "$(uname -m)" = "x86_64" ]; then
 		echo
 		cat << EOFMARKER
