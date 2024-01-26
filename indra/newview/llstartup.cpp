@@ -675,60 +675,68 @@ bool idle_startup()
 			gAudiop = NULL;
 
 #ifdef LL_FMODSTUDIO
-			if (!gAudiop
-#if !LL_WINDOWS
-				&& NULL == getenv("LL_BAD_FMODSTUDIO_DRIVER")
-#endif // !LL_WINDOWS
-				)
+			if (!gAudiop && LLStringUtil::getenv("LL_BAD_FMODSTUDIO_DRIVER").empty())
 			{
 				gAudiop = (LLAudioEngine *) new LLAudioEngine_FMODSTUDIO(gSavedSettings.getBOOL("FMODProfilerEnable"), gSavedSettings.getU32("FMODResampleMethod"));
+				if (gAudiop)
+				{
+#if LL_WINDOWS
+					// FMOD Ex on Windows needs the window handle to stop playing audio
+					// when window is minimized. JC
+					void* window_handle = (HWND)gViewerWindow->getPlatformWindow();
+#else
+					void* window_handle = NULL;
+#endif
+					if (!gAudiop->init(window_handle, LLAppViewer::instance()->getSecondLifeTitle()))
+					{
+						LL_WARNS("AppInit") << "Unable to initialize FMOD audio engine" << LL_ENDL;
+						delete gAudiop;
+						gAudiop = NULL;
+					}
+				}
 			}
 #endif
 
 #ifdef LL_OPENAL
-			if (!gAudiop
-#if !LL_WINDOWS
-				&& NULL == getenv("LL_BAD_OPENAL_DRIVER")
-#endif // !LL_WINDOWS
-				)
+			if (!gAudiop && LLStringUtil::getenv("LL_BAD_OPENAL_DRIVER").empty())
 			{
 				gAudiop = (LLAudioEngine *) new LLAudioEngine_OpenAL();
+				if (gAudiop)
+				{
+#if LL_WINDOWS
+					// FMOD Ex on Windows needs the window handle to stop playing audio
+					// when window is minimized. JC
+					void* window_handle = (HWND)gViewerWindow->getPlatformWindow();
+#else
+					void* window_handle = NULL;
+#endif
+					if (!gAudiop->init(window_handle, LLAppViewer::instance()->getSecondLifeTitle()))
+					{
+						LL_WARNS("AppInit") << "Unable to initialize OpenAL audio engine" << LL_ENDL;
+						delete gAudiop;
+						gAudiop = NULL;
+					}
+				}
 			}
 #endif
             
 			if (gAudiop)
 			{
-#if LL_WINDOWS
-				// FMOD Ex on Windows needs the window handle to stop playing audio
-				// when window is minimized. JC
-				void* window_handle = (HWND)gViewerWindow->getPlatformWindow();
-#else
-				void* window_handle = NULL;
-#endif
-				if (gAudiop->init(window_handle, LLAppViewer::instance()->getSecondLifeTitle()))
+				if (FALSE == gSavedSettings.getBOOL("UseMediaPluginsForStreamingAudio"))
 				{
-					if (FALSE == gSavedSettings.getBOOL("UseMediaPluginsForStreamingAudio"))
-					{
-						LL_INFOS("AppInit") << "Using default impl to render streaming audio" << LL_ENDL;
-						gAudiop->setStreamingAudioImpl(gAudiop->createDefaultStreamingAudioImpl());
-					}
-
-					// if the audio engine hasn't set up its own preferred handler for streaming audio
-					// then set up the generic streaming audio implementation which uses media plugins
-					if (NULL == gAudiop->getStreamingAudioImpl())
-					{
-						LL_INFOS("AppInit") << "Using media plugins to render streaming audio" << LL_ENDL;
-						gAudiop->setStreamingAudioImpl(new LLStreamingAudio_MediaPlugins());
-					}
-
-					gAudiop->setMuted(TRUE);
+					LL_INFOS("AppInit") << "Using default impl to render streaming audio" << LL_ENDL;
+					gAudiop->setStreamingAudioImpl(gAudiop->createDefaultStreamingAudioImpl());
 				}
-				else
+
+				// if the audio engine hasn't set up its own preferred handler for streaming audio
+				// then set up the generic streaming audio implementation which uses media plugins
+				if (NULL == gAudiop->getStreamingAudioImpl())
 				{
-					LL_WARNS("AppInit") << "Unable to initialize audio engine" << LL_ENDL;
-					delete gAudiop;
-					gAudiop = NULL;
+					LL_INFOS("AppInit") << "Using media plugins to render streaming audio" << LL_ENDL;
+					gAudiop->setStreamingAudioImpl(new LLStreamingAudio_MediaPlugins());
 				}
+
+				gAudiop->setMuted(TRUE);
 			}
 		}
 		
