@@ -79,9 +79,11 @@ void ALDiscordManager::init()
 	discord::Core* core{};
 	auto result = discord::Core::Create(DISCORD_CLIENTID, DiscordCreateFlags_NoRequireDiscord, &core);
 	mDiscord.reset(core);
-	if (!mDiscord) {
-		LL_WARNS() << "Failed to instantiate discord core! (err " << static_cast<int>(result)
+	if (result != discord::Result::Ok || !mDiscord)
+	{
+		LL_WARNS() << "Failed to create discord core! (err " << static_cast<int>(result)
 			<< ")" << LL_ENDL;
+		mDiscord.reset(nullptr);
 		return;
 	}
 
