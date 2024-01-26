@@ -669,7 +669,7 @@ void LLFloaterTexturePicker::draw()
             {
                 mGLTFMaterial = (LLFetchedGLTFMaterial*) gGLTFMaterialList.getMaterial(mImageAssetID);
                 llassert(mGLTFMaterial == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(gGLTFMaterialList.getMaterial(mImageAssetID)) != nullptr);
-                if (mGLTFPreview.isNull() || mGLTFMaterial.isNull() || (old_material.notNull() && (*old_material.get() != *mGLTFMaterial.get())))
+                if (mGLTFPreview.isNull() || mGLTFMaterial.isNull() || (old_material.notNull() && (old_material.get() != mGLTFMaterial.get())))
                 {
                     // Only update the preview if needed, since gGLTFMaterialPreviewMgr does not cache the preview.
                     if (mGLTFMaterial.isNull())
@@ -2243,7 +2243,7 @@ void LLTextureCtrl::draw()
             if (mInventoryPickType == PICK_MATERIAL)
             {
                 mGLTFMaterial = gGLTFMaterialList.getMaterial(mImageAssetID);
-                if (mGLTFPreview.isNull() || mGLTFMaterial.isNull() || (old_material.notNull() && (*old_material.get() != *mGLTFMaterial.get())))
+                if (mGLTFPreview.isNull() || mGLTFMaterial.isNull() || (old_material.notNull() && (old_material.get() != mGLTFMaterial.get())))
                 {
                     // Only update the preview if needed, since gGLTFMaterialPreviewMgr does not cache the preview.
                     if (mGLTFMaterial.isNull())

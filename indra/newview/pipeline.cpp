@@ -179,7 +179,6 @@ F32 LLPipeline::CameraFocusTransitionTime;
 F32 LLPipeline::CameraFNumber;
 F32 LLPipeline::CameraFocalLength;
 F32 LLPipeline::CameraFieldOfView;
-S32 LLPipeline::RenderLocalLightCount;
 F32 LLPipeline::RenderShadowNoise;
 F32 LLPipeline::RenderShadowBlurSize;
 F32 LLPipeline::RenderSSAOScale;
@@ -550,7 +549,6 @@ void LLPipeline::init()
 	connectRefreshCachedSettingsSafe("CameraFNumber");
 	connectRefreshCachedSettingsSafe("CameraFocalLength");
 	connectRefreshCachedSettingsSafe("CameraFieldOfView");
-	connectRefreshCachedSettingsSafe("RenderLocalLightCount");
 	connectRefreshCachedSettingsSafe("RenderShadowNoise");
 	connectRefreshCachedSettingsSafe("RenderShadowBlurSize");
 	connectRefreshCachedSettingsSafe("RenderSSAOScale");
@@ -1091,7 +1089,6 @@ void LLPipeline::refreshCachedSettings()
 	CameraFNumber = gSavedSettings.getF32("CameraFNumber");
 	CameraFocalLength = gSavedSettings.getF32("CameraFocalLength");
 	CameraFieldOfView = gSavedSettings.getF32("CameraFieldOfView");
-	RenderLocalLightCount = gSavedSettings.getS32("RenderLocalLightCount");
 	RenderShadowNoise = gSavedSettings.getF32("RenderShadowNoise");
 	RenderShadowBlurSize = gSavedSettings.getF32("RenderShadowBlurSize");
 	RenderSSAOScale = gSavedSettings.getF32("RenderSSAOScale");
@@ -5362,7 +5359,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 		return;
 	}
 
-    const S32 local_light_count = LLPipeline::RenderLocalLightCount;
+	static LLCachedControl<S32> local_light_count(gSavedSettings, "RenderLocalLightCount", 256);
 
 	if (local_light_count >= 1)
 	{
@@ -5629,7 +5626,7 @@ void LLPipeline::setupHWLights()
 
 	mLightMovingMask = 0;
 	
-    const S32 local_light_count = LLPipeline::RenderLocalLightCount;
+	static LLCachedControl<S32> local_light_count(gSavedSettings, "RenderLocalLightCount", 256);
 
 	if (local_light_count >= 1)
 	{
@@ -8015,7 +8012,7 @@ void LLPipeline::renderDeferredLighting()
             unbindDeferredShader(soften_shader);
         }
 
-        const S32 local_light_count = LLPipeline::RenderLocalLightCount;
+		static LLCachedControl<S32> local_light_count(gSavedSettings, "RenderLocalLightCount", 256);
 
         if (local_light_count > 0)
         {
