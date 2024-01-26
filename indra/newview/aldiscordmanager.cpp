@@ -103,11 +103,11 @@ void ALDiscordManager::init()
 				LL_DEBUGS() << "Discord: " << message << LL_ENDL;
 				break;
 			}
-			case discord::LogLevel::Debug:
-			{
-				LL_DEBUGS() << "Discord: " << message << LL_ENDL;
-				break;
-			}
+			//case discord::LogLevel::Debug:
+			//{
+			//	LL_DEBUGS() << "Discord: " << message << LL_ENDL;
+			//	break;
+			//}
 			}
 		});
 
