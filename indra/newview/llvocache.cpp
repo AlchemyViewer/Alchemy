@@ -1598,7 +1598,7 @@ void LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
     LL_DEBUGS("GLTF") << "Beginning reading extras cache for handle " << handle << ", " << num_entries << " entries" << LL_ENDL;
 
     LLSD entry_llsd;
-    for (U32 i = 0; i < num_entries && !in.eof(); i++)
+    for (U32 i = 0; i < num_entries && in.good(); i++)
     {
         static const U32 max_size = 4096;
         bool success = LLSDSerialize::deserialize(entry_llsd, in, max_size);
