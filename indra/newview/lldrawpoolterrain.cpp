@@ -206,7 +206,12 @@ void LLDrawPoolTerrain::drawLoop()
 				continue;
 
             llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
-            LLRenderPass::applyModelMatrix(&facep->getDrawable()->getRegion()->mRenderMatrix);
+			LLMatrix4a* model_matrix = &(facep->getDrawable()->getRegion()->mRenderMatrix);
+			if (model_matrix && model_matrix->isIdentity())
+			{
+				model_matrix = NULL;
+			}
+            LLRenderPass::applyModelMatrix(model_matrix);
 
 			facep->renderIndexed();
 		}
