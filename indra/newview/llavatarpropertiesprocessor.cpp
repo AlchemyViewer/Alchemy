@@ -175,7 +175,7 @@ void LLAvatarPropertiesProcessor::initAgentProfileCapRequest(const LLUUID& avata
     addPendingRequest(avatar_id, APT_PICKS);
     addPendingRequest(avatar_id, APT_GROUPS);
     addPendingRequest(avatar_id, APT_NOTES);
-    LLCoros::instance().launch("requestAgentUserInfoCoro",
+    LLCoros::instance().launch("requestAvatarPropertiesCoro",
         boost::bind(requestAvatarPropertiesCoro, cap_url, avatar_id));
 }
 

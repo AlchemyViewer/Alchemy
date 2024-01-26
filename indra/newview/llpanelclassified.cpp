@@ -116,6 +116,10 @@ LLPanelClassifiedInfo::LLPanelClassifiedInfo()
 
 LLPanelClassifiedInfo::~LLPanelClassifiedInfo()
 {
+	if (getAvatarId().notNull())
+	{
+		LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+	}
 	sAllPanels.remove(this);
 }
 
@@ -207,6 +211,7 @@ void LLPanelClassifiedInfo::onOpen(const LLSD& key)
 
 	LLAvatarPropertiesProcessor::getInstance()->addObserver(getAvatarId(), this);
 	LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoRequest(getClassifiedId());
+
 	gGenericDispatcher.addHandler("classifiedclickthrough", &sClassifiedClickThrough);
 
 	if (gAgent.getRegion())

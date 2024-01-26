@@ -357,7 +357,7 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 
 	mCommitCallbackRegistrar.add("Pref.ClickActionChange",		boost::bind(&LLFloaterPreference::onClickActionChange, this));
 
-	LLAvatarPropertiesProcessor::getInstance()->addObserver( gAgent.getID(), this );
+	LLAvatarPropertiesProcessor::getInstance()->addObserver(LLUUID::null, this);
 
     mComplexityChangedSignal = gSavedSettings.getControl("RenderAvatarMaxComplexity")->getCommitSignal()->connect(boost::bind(&LLFloaterPreference::updateComplexityText, this));
 
@@ -406,7 +406,7 @@ void LLFloaterPreference::saveAvatarProperties( void )
         {
             mAllowPublish = allowPublish;
 
-            LLCoros::instance().launch("requestAgentUserInfoCoro",
+            LLCoros::instance().launch("saveAvatarPropertiesCoro",
                 boost::bind(saveAvatarPropertiesCoro, cap_url, allowPublish));
         }
     }
@@ -918,7 +918,7 @@ LLFloaterPreference::~LLFloaterPreference()
 	if (mGridListChangedConnection.connected())
 		mGridListChangedConnection.disconnect();
 #endif
-	LLAvatarPropertiesProcessor::getInstance()->removeObserver(gAgent.getID(), this);
+	LLAvatarPropertiesProcessor::getInstance()->removeObserver(LLUUID::null, this);
 	LLConversationLog::instance().removeObserver(this);
     mComplexityChangedSignal.disconnect();
 	mDnDModeConnection.disconnect();
@@ -952,8 +952,6 @@ void LLFloaterPreference::saveSettings()
 
 void LLFloaterPreference::apply()
 {
-	LLAvatarPropertiesProcessor::getInstance()->addObserver( gAgent.getID(), this );
-	
 	LLTabContainer* tabcontainer = getChild<LLTabContainer>("pref core");
 	if (sSkin != gSavedSettings.getString("SkinCurrent"))
 	{
