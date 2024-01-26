@@ -146,10 +146,10 @@
 	<tab_container name="Object Info Tabs">
 		<panel label="一般" name="General">
 			<panel.string name="text deed continued">
-				再譲渡
+				続けて寄贈
 			</panel.string>
 			<panel.string name="text deed">
-				譲渡
+				寄贈
 			</panel.string>
 			<panel.string name="text modify info 1">
 				このオブジェクトは、修正することができます。
@@ -216,8 +216,8 @@
 				グループ：
 			</text>
 			<button name="button set group" tool_tip="このオブジェクトの権限を共有するグループを選択します。"/>
-			<check_box label="共有" name="checkbox share with group" tool_tip="設定したグループのメンバー全員に、このオブジェクトの修正権限を与えます。譲渡しない限り、役割による制限は有効にできません。"/>
-			<button label="譲渡" label_selected="譲渡" name="button deed" tool_tip="このアイテムを譲渡すると「次の所有者」の権限が適用されます。グループ共有オブジェクトは、グループのオフィサーが譲渡できます。"/>
+			<check_box label="共有" name="checkbox share with group" tool_tip="設定したグループのメンバー全員に、このオブジェクトの修正権限を与えます。寄贈しない限り、役割による制限は有効にできません。"/>
+			<button label="寄贈" label_selected="寄贈" name="button deed" tool_tip="このアイテムを寄贈すると「次の所有者」の権限が適用されます。グループ共有オブジェクトは、グループのオフィサーが寄贈できます。"/>
 			<text name="label click action">
 				クリックで：
 			</text>
