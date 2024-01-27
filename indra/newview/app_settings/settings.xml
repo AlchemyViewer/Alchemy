@@ -13515,7 +13515,7 @@
       <key>Comment</key>
       <string>If TRUE, do not load textures for in-world content</string>
       <key>Persist</key>
-      <integer>1</integer>
+      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
