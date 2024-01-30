@@ -3204,7 +3204,7 @@ void LLIMMgr::addMessage(
             // Fetch group chat history, enabled by default.
             if (gSavedPerAccountSettings.getBOOL("FetchGroupChatHistory"))
             {
-                std::string chat_url = gAgent.getRegion()->getCapability("ChatSessionRequest");
+                std::string chat_url = gAgent.getRegionCapability("ChatSessionRequest");
                 LLCoros::instance().launch("chatterBoxHistoryCoro",
                     boost::bind(&chatterBoxHistoryCoro, chat_url, session_id, from, msg, timestamp));
             }
@@ -4057,7 +4057,7 @@ public:
                     // Send request for chat history, if enabled.
                     if (gSavedPerAccountSettings.getBOOL("FetchGroupChatHistory"))
                     {
-                        std::string url = gAgent.getRegion()->getCapability("ChatSessionRequest");
+                        std::string url = gAgent.getRegionCapability("ChatSessionRequest");
                         LLCoros::instance().launch("chatterBoxHistoryCoro",
                             boost::bind(&chatterBoxHistoryCoro, url, session_id, "", "", 0));
                     }
@@ -4222,7 +4222,7 @@ public:
 			if ((pGroupOptions && !pGroupOptions->mReceiveGroupChat)
 				|| LLMuteList::instance().isGroupMuted(session_id))
 			{
-				const std::string strUrl = gAgent.getRegion()->getCapability("ChatSessionRequest");
+				const std::string strUrl = gAgent.getRegionCapability("ChatSessionRequest");
 				if (!strUrl.empty())
 				{
 					LLSD sdData;
