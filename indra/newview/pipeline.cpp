@@ -897,7 +897,7 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 
 	if (!is_aux_alloc)
 	{
-		if (!mSceneMap.allocate(resX, resY, GL_RGB, true)) return false;
+		if (!mSceneMap.allocate(resX, resY, GL_RGB16F, true)) return false;
 
 		if (!mPostMap.allocate(resX, resY, GL_RGBA)) return false;
 		if (!mPostFXMap.allocate(resX, resY, GL_RGBA)) return false;
