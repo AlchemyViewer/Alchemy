@@ -55,8 +55,7 @@
 #include "llmeshoptimizer.h"
 #include "lltimer.h"
 
-#include "mikktspace/mikktspace.h"
-#include "mikktspace/mikktspace.c" // insert mikktspace implementation into llvolume object file
+#include "mikktspace/mikktspace.hh"
 
 #define DEBUG_SILHOUETTE_BINORMALS 0
 #define DEBUG_SILHOUETTE_NORMALS 0 // TomY: Use this to display normals using the silhouette
@@ -5458,25 +5457,25 @@ public:
 struct MikktData
 {
     LLVolumeFace* face;
-    std::vector<LLVector3> p;
-    std::vector<LLVector3> n;
-    std::vector<LLVector2> tc;
-    std::vector<LLVector4> w;
-    std::vector<LLVector4> t;
+    std::vector<LLVector3> p_data;
+    std::vector<LLVector3> n_data;
+    std::vector<LLVector2> tc_data;
+    std::vector<LLVector4> w_data;
+    std::vector<LLVector4> t_data;
 
     MikktData(LLVolumeFace* f)
         : face(f)
     {
         U32 count = face->mNumIndices;
 
-        p.resize(count);
-        n.resize(count);
-        tc.resize(count);
-        t.resize(count);
+        p_data.resize(count);
+        n_data.resize(count);
+        tc_data.resize(count);
+        t_data.resize(count);
 
         if (face->mWeights)
         {
-            w.resize(count);
+            w_data.resize(count);
         }
 
 
@@ -5487,12 +5486,12 @@ struct MikktData
         {
             U32 idx = face->mIndices[i];
 
-            p[i].set(face->mPositions[idx].getF32ptr());
-            p[i].scaleVec(face->mNormalizedScale); //put mesh in original coordinate frame when reconstructing tangents
-            n[i].set(face->mNormals[idx].getF32ptr());
-            n[i].scaleVec(inv_scale);
-            n[i].normalize();
-            tc[i].set(face->mTexCoords[idx]);
+            p_data[i].set(face->mPositions[idx].getF32ptr());
+            p_data[i].scaleVec(face->mNormalizedScale); //put mesh in original coordinate frame when reconstructing tangents
+            n_data[i].set(face->mNormals[idx].getF32ptr());
+            n_data[i].scaleVec(inv_scale);
+            n_data[i].normalize();
+            tc_data[i].set(face->mTexCoords[idx]);
 
             if (idx >= face->mNumVertices)
             {
@@ -5507,12 +5506,45 @@ struct MikktData
 
             if (face->mWeights)
             {
-                w[i].set(face->mWeights[idx].getF32ptr());
+                w_data[i].set(face->mWeights[idx].getF32ptr());
             }
         }
     }
-};
 
+	uint32_t GetNumFaces()
+	{
+		return uint32_t(face->mNumIndices / 3);
+	}
+
+	uint32_t GetNumVerticesOfFace(const uint32_t face_num)
+	{
+		return 3;
+	}
+
+	mikk::float3 GetPosition(const uint32_t face_num, const uint32_t vert_num)
+	{
+		F32* v = p_data[face_num * 3 + vert_num].mV;
+		return mikk::float3(v);
+	}
+
+	mikk::float3 GetTexCoord(const uint32_t face_num, const uint32_t vert_num)
+	{
+		F32* uv = tc_data[face_num * 3 + vert_num].mV;
+		return mikk::float3(uv[0], uv[1], 1.0f);
+	}
+
+	mikk::float3 GetNormal(const uint32_t face_num, const uint32_t vert_num)
+	{
+		F32* normal = n_data[face_num * 3 + vert_num].mV;
+		return mikk::float3(normal);
+	}
+
+	void SetTangentSpace(const uint32_t face_num, const uint32_t vert_num, mikk::float3 T, bool orientation)
+	{
+		S32 i = face_num * 3 + vert_num;
+		t_data[i].set(T.x, T.y, T.z, orientation ? 1.0f : -1.0f);
+	}
+};
 
 bool LLVolumeFace::cacheOptimize(bool gen_tangents)
 { //optimize for vertex cache according to Forsyth method: 
@@ -5524,79 +5556,26 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
     { // generate mikkt space tangents before cache optimizing since the index buffer may change
         // a bit of a hack to do this here, but this function gets called exactly once for the lifetime of a mesh
         // and is executed on a background thread
-        SMikkTSpaceInterface ms;
-
-        ms.m_getNumFaces = [](const SMikkTSpaceContext* pContext)
-        {
-            MikktData* data = (MikktData*)pContext->m_pUserData;
-            LLVolumeFace* face = data->face;
-            return face->mNumIndices / 3;
-        };
-
-        ms.m_getNumVerticesOfFace = [](const SMikkTSpaceContext* pContext, const int iFace)
-        {
-            return 3;
-        };
-
-        ms.m_getPosition = [](const SMikkTSpaceContext* pContext, float fvPosOut[], const int iFace, const int iVert)
-        {
-            MikktData* data = (MikktData*)pContext->m_pUserData;
-            F32* v = data->p[iFace * 3 + iVert].mV;
-            fvPosOut[0] = v[0];
-            fvPosOut[1] = v[1];
-            fvPosOut[2] = v[2];
-        };
-
-        ms.m_getNormal = [](const SMikkTSpaceContext* pContext, float fvNormOut[], const int iFace, const int iVert)
-        {
-            MikktData* data = (MikktData*)pContext->m_pUserData;
-            F32* n = data->n[iFace * 3 + iVert].mV;
-            fvNormOut[0] = n[0];
-            fvNormOut[1] = n[1];
-            fvNormOut[2] = n[2];
-        };
-
-        ms.m_getTexCoord = [](const SMikkTSpaceContext* pContext, float fvTexcOut[], const int iFace, const int iVert)
-        {
-            MikktData* data = (MikktData*)pContext->m_pUserData;
-            F32* tc = data->tc[iFace * 3 + iVert].mV;
-            fvTexcOut[0] = tc[0];
-            fvTexcOut[1] = tc[1];
-        };
-
-        ms.m_setTSpaceBasic = [](const SMikkTSpaceContext* pContext, const float fvTangent[], const float fSign, const int iFace, const int iVert)
-        {
-            MikktData* data = (MikktData*)pContext->m_pUserData;
-            S32 i = iFace * 3 + iVert;
-            
-            data->t[i].set(fvTangent);
-            data->t[i].mV[3] = fSign;
-        };
-
-        ms.m_setTSpace = nullptr;
-
         MikktData data(this);
-
-        SMikkTSpaceContext ctx = { &ms, &data };
-
-        genTangSpaceDefault(&ctx);
+		mikk::Mikktspace ctx(data);
+		ctx.genTangSpace();
 
         //re-weld
         meshopt_Stream mos[] =
         {
-            { &data.p[0], sizeof(LLVector3), sizeof(LLVector3) },
-            { &data.n[0], sizeof(LLVector3), sizeof(LLVector3) },
-            { &data.t[0], sizeof(LLVector4), sizeof(LLVector4) },
-            { &data.tc[0], sizeof(LLVector2), sizeof(LLVector2) },
-            { data.w.empty() ? nullptr : &data.w[0], sizeof(LLVector4), sizeof(LLVector4) }
+            { &data.p_data[0], sizeof(LLVector3), sizeof(LLVector3) },
+            { &data.n_data[0], sizeof(LLVector3), sizeof(LLVector3) },
+            { &data.t_data[0], sizeof(LLVector4), sizeof(LLVector4) },
+            { &data.tc_data[0], sizeof(LLVector2), sizeof(LLVector2) },
+            { data.w_data.empty() ? nullptr : &data.w_data[0], sizeof(LLVector4), sizeof(LLVector4) }
         };
 
         std::vector<U32> remap;
-        remap.resize(data.p.size());
+        remap.resize(data.p_data.size());
 
-        U32 stream_count = data.w.empty() ? 4 : 5;
+        U32 stream_count = data.w_data.empty() ? 4 : 5;
 
-        U32 vert_count = meshopt_generateVertexRemapMulti(&remap[0], nullptr, data.p.size(), data.p.size(), mos, stream_count);
+        U32 vert_count = meshopt_generateVertexRemapMulti(&remap[0], nullptr, data.p_data.size(), data.p_data.size(), mos, stream_count);
 
         if (vert_count < 65535)
         {
@@ -5606,7 +5585,7 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
             //copy results back into volume
             resizeVertices(vert_count);
 
-            if (!data.w.empty())
+            if (!data.w_data.empty())
             {
                 allocateWeights(vert_count);
             }
@@ -5619,15 +5598,15 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
                 U32 dst_idx = remap[i];
                 mIndices[i] = dst_idx;
 
-                mPositions[dst_idx].load3(data.p[src_idx].mV);
-                mNormals[dst_idx].load3(data.n[src_idx].mV);
-                mTexCoords[dst_idx] = data.tc[src_idx];
+                mPositions[dst_idx].load3(data.p_data[src_idx].mV);
+                mNormals[dst_idx].load3(data.n_data[src_idx].mV);
+                mTexCoords[dst_idx] = data.tc_data[src_idx];
 
-                mTangents[dst_idx].loadua(data.t[src_idx].mV);
+                mTangents[dst_idx].loadua(data.t_data[src_idx].mV);
 
                 if (mWeights)
                 {
-                    mWeights[dst_idx].loadua(data.w[src_idx].mV);
+                    mWeights[dst_idx].loadua(data.w_data[src_idx].mV);
                 }
             }
 

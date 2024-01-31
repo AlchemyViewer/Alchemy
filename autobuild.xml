@@ -1415,11 +1415,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b88eec8af116d2b2c7c7933f7ccb47899bd433a715d28c7999138d3c7a31e4435c5f56f885e3a212f53beb5fd2a6fa7b2b98c4333d749e690385f79b00eecbe4</string>
+              <string>0bdb34f2c021c76abb87f4641fbfcf84c05c1cabccbd89e51c85c7ec374fee5225e1f4c4684ad0b06ee0ca946ac587c5ba2117d84ddf0258b96dd1ac10743819</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/204/packages/generic/mikktspace/1.1888/mikktspace-1-common-1888.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/204/packages/generic/mikktspace/2.2330/mikktspace-2-common-2330.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -1432,7 +1432,7 @@
         <key>copyright</key>
         <string>Copyright (C) 2011 by Morten S. Mikkelsen</string>
         <key>version</key>
-        <string>1</string>
+        <string>2</string>
         <key>name</key>
         <string>mikktspace</string>
         <key>canonical_repo</key>
