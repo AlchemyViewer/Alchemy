@@ -5579,9 +5579,6 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
 
         if (vert_count < 65535)
         {
-            std::vector<U32> indices;
-            indices.resize(mNumIndices);
-
             //copy results back into volume
             resizeVertices(vert_count);
 
