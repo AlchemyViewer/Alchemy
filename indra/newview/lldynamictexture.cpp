@@ -189,7 +189,7 @@ BOOL LLViewerDynamicTexture::updateAllInstances()
 		return TRUE;
 	}
 
-    LLRenderTarget& bake_target = gPipeline.mAuxillaryRT.deferredScreen;
+    LLRenderTarget& bake_target = gPipeline.mBake;
 
 	if (!bake_target.isComplete())
     {

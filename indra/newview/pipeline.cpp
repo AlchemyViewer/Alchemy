@@ -217,7 +217,7 @@ S32 LLPipeline::RenderBufferVisualization;
 F32 LLPipeline::RenderNormalMapScale;
 LLTrace::EventStatHandle<S64> LLPipeline::sStatBatchSize("renderbatchsize");
 
-const U32 LLPipeline::MAX_BAKE_WIDTH = 512;
+const U32 LLPipeline::MAX_BAKE_WIDTH = 1024;
 
 const F32 BACKLIGHT_DAY_MAGNITUDE_OBJECT = 0.1f;
 const F32 BACKLIGHT_NIGHT_MAGNITUDE_OBJECT = 0.08f;
@@ -1173,6 +1173,7 @@ void LLPipeline::releaseGLBuffers()
 	releaseLUTBuffers();
 
 	mWaterDis.release();
+    mBake.release();
 	
     mSceneMap.release();
 
@@ -1251,6 +1252,9 @@ void LLPipeline::createGLBuffers()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     stop_glerror();
 	assertInitialized();
+
+    // Use FBO for bake tex
+    mBake.allocate(1024, 1024, GL_RGBA, true); // SL-12781 Build > Upload > Model; 3D Preview
 
 	stop_glerror();
 

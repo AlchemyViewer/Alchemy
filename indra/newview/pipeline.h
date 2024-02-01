@@ -739,6 +739,7 @@ public:
 	LLRenderTarget				mWaterDis;
 
     static const U32 MAX_BAKE_WIDTH;
+	LLRenderTarget				mBake;
 
 	//texture for making the glow
 	LLRenderTarget				mGlow[3];
