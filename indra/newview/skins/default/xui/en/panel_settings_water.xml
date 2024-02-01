@@ -243,7 +243,7 @@
                             layout="topleft"
                             left="10"
                             top="90"
-                            width="215">
+                            width="150">
                         Reflection Wavelet Scale
                     </text>
                     <slider
