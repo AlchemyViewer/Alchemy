@@ -471,6 +471,12 @@ bool ALRenderUtil::setupColorGrade()
 		if (!lut_name.empty())
 		{
 			std::string lut_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut", lut_name);
+
+			if(!gDirUtilp->fileExists(lut_path))
+			{
+				lut_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut", lut_name);
+			}
+
 			if (!lut_path.empty())
 			{
 				std::string temp_exten = gDirUtilp->getExtension(lut_path);
