@@ -70,13 +70,20 @@ void ALFloaterLightBox::populateLUTCombo()
 {
 	LLComboBox* lut_combo = getChild<LLComboBox>("colorlut_combo");
 	const std::string& user_luts = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
-	if(boost::filesystem::is_directory(user_luts))
+	
+#if LL_WINDOWS
+	boost::filesystem::path user_luts_path(ll_convert_string_to_wide(user_luts));
+#else
+	boost::filesystem::path user_luts_path(user_luts);
+#endif
+	
+	if(boost::filesystem::is_directory(user_luts_path))
 	{
-		if(!boost::filesystem::is_empty(user_luts))
+		if(!boost::filesystem::is_empty(user_luts_path))
 		{
 			lut_combo->addSeparator();
 		}
-		for (boost::filesystem::directory_entry& lut : boost::filesystem::directory_iterator(user_luts))
+		for (boost::filesystem::directory_entry& lut : boost::filesystem::directory_iterator(user_luts_path))
 		{
 			std::string lut_stem = lut.path().stem().string();
 			std::string lut_filename = lut.path().filename().string();
