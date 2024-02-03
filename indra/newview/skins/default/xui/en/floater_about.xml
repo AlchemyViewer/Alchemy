@@ -71,6 +71,7 @@
          parameter="https://mastodon.social/@alchemyviewer" />
       </icon>
       <button
+       visible="false"
        follows="bottom|left" 
        tool_tip="Check for and download updates."
        name="update_btn"
