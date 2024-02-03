@@ -5,6 +5,5 @@
 
 ## Resources
 * [Alchemy Website](http://www.alchemyviewer.org)
-* [Downloads](https://alchemyviewer.org/pages/downloads.html)
-* [Issue Tracker](https://git.alchemyviewer.org/alchemy/alchemy/issues)
-* [Wiki](https://git.alchemyviewer.org/alchemy/alchemy/wikis/home)
+* [Downloads](https://alchemyviewer.org/downloads)
+* [Issue Tracker](https://git.alchemyviewer.org/alchemy/viewer/issues)
