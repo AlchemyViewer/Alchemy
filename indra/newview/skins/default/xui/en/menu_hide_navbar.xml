@@ -53,4 +53,15 @@
 		function="CheckControl"
 		parameter="ShowNetStats" />
 	</menu_item_check>
+	<menu_item_check
+         label="Show seconds in clock"
+         layout="topleft"
+         name="ShowStatusBarSeconds">
+		<on_click
+		  function="ToggleControl"
+		  parameter="ShowStatusBarSeconds" />
+		<on_check
+		function="CheckControl"
+		parameter="ShowStatusBarSeconds" />
+	</menu_item_check>
 </menu>

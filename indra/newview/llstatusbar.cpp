@@ -174,7 +174,7 @@ BOOL LLStatusBar::postBuild()
 
 	mPanelPopupHolder = gViewerWindow->getRootView()->getChildView("popup_holder");
 
-	mTextTime = getChild<LLTextBox>("TimeText" );
+	mTextTime = getChild<LLTextBox>("TimeText");
 	
 	mBtnBuyL = getChild<LLButton>("buyL");
 	mBtnBuyL->setCommitCallback(boost::bind(&LLStatusBar::onClickBuyCurrency, this));
@@ -320,6 +320,7 @@ void LLStatusBar::refresh()
 {
 	static LLCachedControl<bool> show_net_stats(gSavedSettings, "ShowNetStats", false);
 	static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
+	static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
 	bool net_stats_visible = show_net_stats;
 
 	if (net_stats_visible)
@@ -334,7 +335,7 @@ void LLStatusBar::refresh()
 	}
 	
 	// update clock every 10 seconds
-	if(mClockUpdateTimer.getElapsedTimeF32() > 10.f)
+	if(mClockUpdateTimer.getElapsedTimeF32() > 10.f || (show_clock_seconds && mClockUpdateTimer.getElapsedTimeF32() > 1.f))
 	{
 		mClockUpdateTimer.reset();
 
@@ -344,7 +345,8 @@ void LLStatusBar::refresh()
 		utc_time = time_corrected();
 
 		static const std::string timeStrTemplate = getString("time");
-		std::string timeStr = timeStrTemplate;
+		static const std::string timeStrSecondsTemplate = getString("timeSeconds");
+		std::string timeStr = show_clock_seconds ? timeStrSecondsTemplate : timeStrTemplate;
 		LLSD substitution;
 		substitution["datetime"] = (S32) utc_time;
 		LLStringUtil::format (timeStr, substitution);
