@@ -29,6 +29,7 @@
 
 #include "stdtypes.h"
 #include "llthread.h"
+#include "lltimer.h"
 
 #include <mutex>
 #include <condition_variable>
@@ -209,7 +210,8 @@ public:
 				mLocked = mMutex->try_lock();
 				if (mLocked)
 					break;
-				std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+				ms_sleep(delay_ms);
+				//std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
 			}
 		}
 	}
