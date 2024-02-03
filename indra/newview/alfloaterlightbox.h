@@ -50,6 +50,7 @@ public:
 	void onClickResetGroupDefault(const LLSD& userdata);
     void updateTonemapper();
     void updateCAS();
+    void populateLUTCombo();
 
     boost::signals2::scoped_connection mTonemapConnection;
 	boost::signals2::scoped_connection mCASConnection;

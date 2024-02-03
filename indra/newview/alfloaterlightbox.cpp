@@ -53,9 +53,10 @@ ALFloaterLightBox::~ALFloaterLightBox()
 
 BOOL ALFloaterLightBox::postBuild()
 {
-    updateTonemapper();
-    mTonemapConnection = gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateTonemapper(); });
+	updateTonemapper();
+	mTonemapConnection = gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateTonemapper(); });
 	mCASConnection = gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateCAS(); });
+	populateLUTCombo();
 	return TRUE;
 }
 
@@ -63,6 +64,50 @@ void ALFloaterLightBox::draw()
 {
     updateCAS();
     LLFloater::draw();
+}
+
+void ALFloaterLightBox::populateLUTCombo()
+{
+	LLComboBox* lut_combo = getChild<LLComboBox>("colorlut_combo");
+	const std::string& user_luts = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
+	
+	boost::system::error_code ec;
+#if LL_WINDOWS
+	boost::filesystem::path user_luts_path(ll_convert_string_to_wide(user_luts));
+#else
+	boost::filesystem::path user_luts_path(user_luts);
+#endif
+	
+	if(boost::filesystem::is_directory(user_luts_path, ec))
+	{
+		if(ec.failed())
+		{
+			LL_WARNS() << "Error checking user LUTs directory: " << ec.message() << LL_ENDL;
+			return;
+		}
+		if(!boost::filesystem::is_empty(user_luts_path, ec) && !ec.failed())
+		{
+			if(ec.failed())
+			{
+				LL_WARNS() << "Error checking contents of user LUTs directory: " << ec.message() << LL_ENDL;
+				return;
+			}
+			lut_combo->addSeparator();
+		}
+		for (boost::filesystem::directory_iterator lut(user_luts_path, ec); lut != boost::filesystem::directory_iterator(); ++lut)
+		{
+			if(ec.failed())
+			{
+				LL_WARNS() << "Error reading user LUT file: " << ec.message() << LL_ENDL;
+				continue;
+			}
+			std::string lut_stem = lut->path().stem().string();
+			std::string lut_filename = lut->path().filename().string();
+			lut_combo->add(lut_stem, lut_filename);
+		}
+		lut_combo->selectByValue(gSavedSettings.getString("RenderColorGradeLUT"));
+		lut_combo->resetDirty();
+	}
 }
 
 void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
