@@ -6140,7 +6140,8 @@ BOOL LLVOAvatar::processSingleAnimationStateChange( const LLUUID& anim_id, BOOL 
 	{
 		if (anim_id == ANIM_AGENT_TYPE)
 		{
-			if (gAudiop)
+			static LLCachedControl<bool> play_typing_sound(gSavedSettings, "PlayTypingSound", true);
+			if (gAudiop && play_typing_sound)
 			{
 				LLVector3d char_pos_global = gAgent.getPosGlobalFromAgent(getCharacterPosition());
 				if (LLViewerParcelMgr::getInstance()->canHearSound(char_pos_global)
