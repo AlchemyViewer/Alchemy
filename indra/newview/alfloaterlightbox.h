@@ -35,7 +35,6 @@
 
 #include "llfloater.h"
 #include <string>
-using namespace std;
 
 class ALFloaterLightBox final : public LLFloater
 {

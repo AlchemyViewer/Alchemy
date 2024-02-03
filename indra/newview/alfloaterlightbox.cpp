@@ -57,8 +57,8 @@ BOOL ALFloaterLightBox::postBuild()
 	updateTonemapper();
 	updateCAS();
 
-	mTonemapConnection = gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateTonemapper(); });
-	mCASConnection = gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateCAS(); });
+	mTonemapConnection = gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&) { updateTonemapper(); });
+	mCASConnection = gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&) { updateCAS(); });
 
 	return LLFloater::postBuild();
 }
