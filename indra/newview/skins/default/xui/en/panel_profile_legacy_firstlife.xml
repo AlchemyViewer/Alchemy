@@ -32,7 +32,7 @@
    left="3"
    height="200"
    layout="topleft"
-   max_length="253"
+   max_length="65000"
    name="fl_about"
    top="134"
    right="-4"

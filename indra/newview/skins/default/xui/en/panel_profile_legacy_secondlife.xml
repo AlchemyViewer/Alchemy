@@ -183,7 +183,7 @@
        follows="all"
        left="3"
        layout="topleft"
-       max_length="512"
+       max_length="65000"
        name="sl_about"
        top="0"
        bottom="-20"
