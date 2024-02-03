@@ -53,16 +53,18 @@ ALFloaterLightBox::~ALFloaterLightBox()
 
 BOOL ALFloaterLightBox::postBuild()
 {
+	populateLUTCombo();
 	updateTonemapper();
+	updateCAS();
+
 	mTonemapConnection = gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateTonemapper(); });
 	mCASConnection = gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){ updateCAS(); });
-	populateLUTCombo();
-	return TRUE;
+
+	return LLFloater::postBuild();
 }
 
 void ALFloaterLightBox::draw()
 {
-    updateCAS();
     LLFloater::draw();
 }
 
@@ -101,8 +103,13 @@ void ALFloaterLightBox::populateLUTCombo()
 				LL_WARNS() << "Error reading user LUT file: " << ec.message() << LL_ENDL;
 				continue;
 			}
-			std::string lut_stem = lut->path().stem().string();
-			std::string lut_filename = lut->path().filename().string();
+#if LL_WINDOWS
+			std::string lut_stem = ll_convert_wide_to_string(lut->path().stem().native());
+			std::string lut_filename = ll_convert_wide_to_string(lut->path().filename().native());
+#else
+			std::string lut_stem = lut->path().stem().native();
+			std::string lut_filename = lut->path().filename().native();
+#endif
 			lut_combo->add(lut_stem, lut_filename);
 		}
 		lut_combo->selectByValue(gSavedSettings.getString("RenderColorGradeLUT"));

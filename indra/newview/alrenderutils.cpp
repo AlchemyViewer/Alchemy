@@ -470,11 +470,11 @@ bool ALRenderUtil::setupColorGrade()
 		std::string lut_name = gSavedSettings.getString("RenderColorGradeLUT");
 		if (!lut_name.empty())
 		{
-			std::string lut_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut", lut_name);
+			std::string lut_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut", lut_name);
 
-			if(!gDirUtilp->fileExists(lut_path))
+			if(lut_path.empty())
 			{
-				lut_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut", lut_name);
+				lut_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut", lut_name);
 			}
 
 			if (!lut_path.empty())
