@@ -67,7 +67,7 @@ BOOL ALPanelAOMini::postBuild()
 	mReloadCallback = AOEngine::instance().setReloadCallback(boost::bind(&ALPanelAOMini::updateSetList, this));
 	mSetChangedCallback = AOEngine::instance().setSetChangedCallback(boost::bind(&ALPanelAOMini::onSetChanged, this, _1));
 	
-	return TRUE;
+	return LLPanel::postBuild();
 }
 
 /////////////////////////////////////

@@ -175,7 +175,7 @@ BOOL ALFloaterParticleEditor::postBuild()
 
 	onParameterChange();
 
-	return TRUE;
+	return LLFloater::postBuild();
 }
 
 BOOL ALFloaterParticleEditor::canClose()

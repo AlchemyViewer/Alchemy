@@ -89,7 +89,7 @@ BOOL ALFloaterExploreSounds::postBuild()
 	mObjectSounds = getChild<LLCheckBoxCtrl>("objects_chk");
 	mPaused = getChild<LLCheckBoxCtrl>("pause_chk");
 
-	return TRUE;
+	return LLFloater::postBuild();
 }
 
 void ALFloaterExploreSounds::handleSelection()
