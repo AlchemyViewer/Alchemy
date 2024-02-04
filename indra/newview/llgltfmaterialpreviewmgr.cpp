@@ -34,7 +34,6 @@
 #include "llenvironment.h"
 #include "llselectmgr.h"
 #include "llviewercamera.h"
-#include "llviewercontrol.h"
 #include "llviewerobject.h"
 #include "llviewershadermgr.h"
 #include "llviewertexturelist.h"
@@ -96,7 +95,7 @@ namespace
 {
     void fetch_texture_for_ui(LLPointer<LLViewerFetchedTexture>& img, const LLUUID& id)
     {
-        if (!img && id.notNull())
+        if (id.notNull())
         {
             if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(id))
             {
@@ -335,7 +334,7 @@ void set_preview_sphere_material(PreviewSphere& preview_sphere, LLPointer<LLFetc
         info->mGLTFMaterial = material;
         LLVertexBuffer* buf = info->mVertexBuffer.get();
         LLStrider<LLColor4U> colors;
-        const S32 count = info->mEnd - info->mStart + 1;
+        const S32 count = info->mEnd - info->mStart;
         buf->getColorStrider(colors, info->mStart, count);
         for (S32 i = 0; i < count; ++i)
         {
@@ -418,8 +417,7 @@ BOOL LLGLTFPreviewTexture::render()
     SetTemporarily<LLPipeline::RenderTargetPack*> use_auxiliary_render_target(&gPipeline.mRT, &gPipeline.mAuxillaryRT);
 
     const LLVector4a light_dir(1.0f, 1.0f, 1.0f, 0.f);
-    const S32 old_local_light_count = gSavedSettings.get<S32>("RenderLocalLightCount");
-    gSavedSettings.set<S32>("RenderLocalLightCount", 0);
+    SetTemporarily<S32> sun_light_only(&LLPipeline::RenderLocalLightCount, 0);
 
     gPipeline.mReflectionMapManager.forceDefaultProbeAndUpdateUniforms();
 
@@ -524,7 +522,6 @@ BOOL LLGLTFPreviewTexture::render()
     // Clean up
     gPipeline.setupHWLights();
     gPipeline.mReflectionMapManager.forceDefaultProbeAndUpdateUniforms(false);
-    gSavedSettings.set<S32>("RenderLocalLightCount", old_local_light_count);
 
     return TRUE;
 }
