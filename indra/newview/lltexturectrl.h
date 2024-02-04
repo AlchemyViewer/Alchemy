@@ -252,8 +252,6 @@ private:
 	commit_callback_t		 	mOnCloseCallback;
 	texture_selected_callback	mOnTextureSelectedCallback;
 	LLPointer<LLViewerFetchedTexture> mTexturep;
-	LLPointer<LLFetchedGLTFMaterial> mGLTFMaterial;
-	LLPointer<LLViewerTexture> mGLTFPreview;
 	LLUIColor				 	mBorderColor;
 	LLUUID					 	mImageItemID;
 	LLUUID					 	mImageAssetID;
@@ -391,7 +389,6 @@ protected:
 
 	LLPointer<LLViewerTexture> mTexturep;
     LLPointer<LLFetchedGLTFMaterial> mGLTFMaterial;
-    LLPointer<LLViewerTexture> mGLTFPreview;
 	LLView*				mOwner;
 
 	LLUUID				mImageAssetID; // Currently selected texture
