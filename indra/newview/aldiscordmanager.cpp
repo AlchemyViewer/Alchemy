@@ -90,24 +90,27 @@ void ALDiscordManager::init()
 	mDiscord->SetLogHook(
 		discord::LogLevel::Info, [](discord::LogLevel level, const char* message)
 		{
-			switch (level)
+			if (message)
 			{
-			case discord::LogLevel::Error:
-			case discord::LogLevel::Warn:
-			{
-				LL_WARNS() << "Discord: " << message << LL_ENDL;
-				break;
-			}
-			case discord::LogLevel::Info:
-			{
-				LL_DEBUGS() << "Discord: " << message << LL_ENDL;
-				break;
-			}
-			//case discord::LogLevel::Debug:
-			//{
-			//	LL_DEBUGS() << "Discord: " << message << LL_ENDL;
-			//	break;
-			//}
+				switch (level)
+				{
+				case discord::LogLevel::Error:
+				case discord::LogLevel::Warn:
+				{
+					LL_WARNS() << "Discord: " << message << LL_ENDL;
+					break;
+				}
+				//case discord::LogLevel::Info:
+				//{
+				//	LL_DEBUGS() << "Discord: " << message << LL_ENDL;
+				//	break;
+				//}
+				//case discord::LogLevel::Debug:
+				//{
+				//	LL_DEBUGS() << "Discord: " << message << LL_ENDL;
+				//	break;
+				//}
+				}
 			}
 		});
 

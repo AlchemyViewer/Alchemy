@@ -1169,7 +1169,7 @@ BOOL LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        gPBRGlowProgram.mName = " PBR Glow Shader";
+        gPBRGlowProgram.mName = "PBR Glow Shader";
         gPBRGlowProgram.mFeatures.hasSrgb = true;
         gPBRGlowProgram.mShaderFiles.clear();
         gPBRGlowProgram.mShaderFiles.push_back(make_pair("deferred/pbrglowV.glsl", GL_VERTEX_SHADER));
