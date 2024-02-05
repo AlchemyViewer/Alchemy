@@ -301,16 +301,20 @@ std::string LLLogChat::cleanFileName(std::string filename)
 
 std::string LLLogChat::timestamp2LogString(U32 timestamp, bool withdate)
 {
+	static const LLCachedControl<bool> show_timestamp_seconds(gSavedSettings, "ChatTimestampSeconds", false);
+
 	std::string timeStr;
 	if (withdate)
 	{
 		static const std::string timestamp_long_fmt = fmt::format(FMT_STRING("[{}]/[{}]/[{}] [{}]:[{}]"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
-        timeStr = timestamp_long_fmt;
+		static const std::string timestamp_long_sec_fmt = fmt::format(FMT_STRING("[{}]/[{}]/[{}] [{}]:[{}]:[{}]"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"), LLTrans::getString("TimeSec"));
+        timeStr = show_timestamp_seconds ? timestamp_long_sec_fmt : timestamp_long_fmt;
 	}
 	else
 	{
 		static const std::string timestamp_short_fmt = fmt::format(FMT_STRING("[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
-        timeStr = timestamp_short_fmt;
+		static const std::string timestamp_short_sec_fmt = fmt::format(FMT_STRING("[{}]:[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"), LLTrans::getString("TimeSec"));
+        timeStr = show_timestamp_seconds ? timestamp_short_sec_fmt : timestamp_short_fmt;
 	}
 
 	LLSD substitution;
