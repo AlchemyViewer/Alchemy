@@ -116,9 +116,9 @@ void main()
 	float distance = length(fragPosLocal.xyz - SPHERE_ORIGIN);
 
 	// Linear non-branching interpolation of the strength of the sphere effect (replaces if/elseif/else for x < min, min <= x <= max and x > max)
-	float effectStrength = SPHERE_VALUEMIN + mix(0, SPHERE_VALUEMAX - SPHERE_VALUEMIN, (distance - SPHERE_DISTMIN) / (SPHERE_DISTMAX - SPHERE_DISTMIN));
-	effectStrength = mix(effectStrength, mix(0, SPHERE_VALUEMIN, SPHERE_DISTEXTEND.x), distance < SPHERE_DISTMIN);
-	effectStrength = mix(effectStrength, mix(0, SPHERE_VALUEMAX, SPHERE_DISTEXTEND.y), distance > SPHERE_DISTMAX);
+	float effectStrength = SPHERE_VALUEMIN + mix(0.0, SPHERE_VALUEMAX - SPHERE_VALUEMIN, (distance - SPHERE_DISTMIN) / (SPHERE_DISTMAX - SPHERE_DISTMIN));
+	effectStrength = mix(effectStrength, mix(0.0, SPHERE_VALUEMIN, SPHERE_DISTEXTEND.x), distance < SPHERE_DISTMIN);
+	effectStrength = mix(effectStrength, mix(0.0, SPHERE_VALUEMAX, SPHERE_DISTEXTEND.y), distance > SPHERE_DISTMAX);
 
 	vec3 fragColor ;
 	switch (rlvEffectMode)
@@ -132,7 +132,7 @@ void main()
 			break;
 		case 2:		// Blur (variable)
 			fragColor = texture(diffuseRect, fragTC).rgb;
-			fragColor = mix(fragColor, blurVariable(diffuseRect, fragTC, SPHERE_PARAMS.x, BLUR_DIRECTION, effectStrength), bool(effectStrength > 0));
+			fragColor = mix(fragColor, blurVariable(diffuseRect, fragTC, SPHERE_PARAMS.x, BLUR_DIRECTION, effectStrength), bvec3(effectStrength > 0.0));
 			break;
 		case 3:		// ChromaticAberration
 			fragColor = chromaticAberration(diffuseRect, fragTC, SPHERE_PARAMS.xy, SPHERE_PARAMS.zw, effectStrength);
@@ -140,8 +140,8 @@ void main()
 		case 4:		// Pixelate
 			{
 				effectStrength = sign(effectStrength);
-				float pixelWidth = max(1, round(SPHERE_PARAMS.x * effectStrength)) / screen_res.x; 
-				float pixelHeight = max(1, round(SPHERE_PARAMS.y * effectStrength)) / screen_res.y;
+				float pixelWidth = max(1.0, round(SPHERE_PARAMS.x * effectStrength)) / screen_res.x; 
+				float pixelHeight = max(1.0, round(SPHERE_PARAMS.y * effectStrength)) / screen_res.y;
 				fragTC = vec2(pixelWidth * floor(fragTC.x / pixelWidth), pixelHeight * floor(fragTC.y / pixelHeight));
 				fragColor = texture(diffuseRect, fragTC).rgb;
 			}
