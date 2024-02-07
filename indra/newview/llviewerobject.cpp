@@ -2066,14 +2066,14 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
 				if(mesgsys != NULL)
 				{
-				LLViewerObjectList::getUUIDFromLocal(parent_uuid,
+					gObjectList.getUUIDFromLocal(parent_uuid,
 														parent_id,
 														mesgsys->getSenderIP(),
 														mesgsys->getSenderPort());
 				}
 				else
 				{
-					LLViewerObjectList::getUUIDFromLocal(parent_uuid,
+					gObjectList.getUUIDFromLocal(parent_uuid,
 														parent_id,
 														mRegionp->getHost().getAddress(),
 														mRegionp->getHost().getPort());
@@ -2229,14 +2229,14 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
 					if(mesgsys != NULL)
 					{
-					LLViewerObjectList::getUUIDFromLocal(parent_uuid,
+						gObjectList.getUUIDFromLocal(parent_uuid,
 														parent_id,
 														gMessageSystem->getSenderIP(),
 														gMessageSystem->getSenderPort());
 					}
 					else
 					{
-						LLViewerObjectList::getUUIDFromLocal(parent_uuid,
+						gObjectList.getUUIDFromLocal(parent_uuid,
 														parent_id,
 														mRegionp->getHost().getAddress(),
 														mRegionp->getHost().getPort());

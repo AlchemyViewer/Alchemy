@@ -102,8 +102,6 @@ extern LLPipeline	gPipeline;
 
 // Statics for object lookup tables.
 U32						LLViewerObjectList::sSimulatorMachineIndex = 1; // Not zero deliberately, to speed up index check.
-boost::unordered_flat_map<U64, U32>		LLViewerObjectList::sIPAndPortToIndex;
-boost::unordered_flat_map<U64, LLUUID>		LLViewerObjectList::sIndexAndLocalIDToUUID;
 
 LLViewerObjectList::LLViewerObjectList()
 {
@@ -141,17 +139,17 @@ void LLViewerObjectList::getUUIDFromLocal(LLUUID &id,
 {
 	U64 ipport = (((U64)ip) << 32) | (U64)port;
 
-	U32 index = sIPAndPortToIndex[ipport];
+	U32 index = mIPAndPortToIndex[ipport];
 
 	if (!index)
 	{
 		index = sSimulatorMachineIndex++;
-		sIPAndPortToIndex[ipport] = index;
+		mIPAndPortToIndex[ipport] = index;
 	}
 
 	U64	indexid = (((U64)index) << 32) | (U64)local_id;
 
-	id = get_if_there(sIndexAndLocalIDToUUID, indexid, LLUUID::null);
+	id = get_if_there(mIndexAndLocalIDToUUID, indexid, LLUUID::null);
 }
 
 U64 LLViewerObjectList::getIndex(const U32 local_id,
@@ -160,7 +158,7 @@ U64 LLViewerObjectList::getIndex(const U32 local_id,
 {
 	U64 ipport = (((U64)ip) << 32) | (U64)port;
 
-	U32 index = sIPAndPortToIndex[ipport];
+	U32 index = mIPAndPortToIndex[ipport];
 
 	if (!index)
 	{
@@ -180,14 +178,14 @@ BOOL LLViewerObjectList::removeFromLocalIDTable(const LLViewerObject* objectp)
 		U32 ip = objectp->getRegion()->getHost().getAddress();
 		U32 port = objectp->getRegion()->getHost().getPort();
 		U64 ipport = (((U64)ip) << 32) | (U64)port;
-		U32 index = sIPAndPortToIndex[ipport];
+		U32 index = mIPAndPortToIndex[ipport];
 		
 		// LL_INFOS() << "Removing object from table, local ID " << local_id << ", ip " << ip << ":" << port << LL_ENDL;
 		
 		U64	indexid = (((U64)index) << 32) | (U64)local_id;
 		
-		auto iter = sIndexAndLocalIDToUUID.find(indexid);
-		if (iter == sIndexAndLocalIDToUUID.end())
+		auto iter = mIndexAndLocalIDToUUID.find(indexid);
+		if (iter == mIndexAndLocalIDToUUID.end())
 		{
 			return FALSE;
 		}
@@ -195,7 +193,7 @@ BOOL LLViewerObjectList::removeFromLocalIDTable(const LLViewerObject* objectp)
 		// Found existing entry
 		if (iter->second == objectp->getID())
 		{   // Full UUIDs match, so remove the entry
-			sIndexAndLocalIDToUUID.erase(iter);
+			mIndexAndLocalIDToUUID.erase(iter);
 			return TRUE;
 		}
 		// UUIDs did not match - this would zap a valid entry, so don't erase it
@@ -213,17 +211,17 @@ void LLViewerObjectList::setUUIDAndLocal(const LLUUID &id,
 {
 	U64 ipport = (((U64)ip) << 32) | (U64)port;
 
-	U32 index = sIPAndPortToIndex[ipport];
+	U32 index = mIPAndPortToIndex[ipport];
 
 	if (!index)
 	{
 		index = sSimulatorMachineIndex++;
-		sIPAndPortToIndex[ipport] = index;
+		mIPAndPortToIndex[ipport] = index;
 	}
 
 	U64	indexid = (((U64)index) << 32) | (U64)local_id;
 
-	sIndexAndLocalIDToUUID[indexid] = id;
+	mIndexAndLocalIDToUUID[indexid] = id;
 	
 	//LL_INFOS() << "Adding object to table, full ID " << id
 	//	<< ", local ID " << local_id << ", ip " << ip << ":" << port << LL_ENDL;

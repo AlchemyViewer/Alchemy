@@ -179,18 +179,18 @@ public:
 	// used to discount stats from this frame
 	BOOL mWasPaused;
 
-	static void getUUIDFromLocal(LLUUID &id,
+	void getUUIDFromLocal(LLUUID &id,
 								const U32 local_id,
 								const U32 ip,
 								const U32 port);
-	static void setUUIDAndLocal(const LLUUID &id,
+	void setUUIDAndLocal(const LLUUID &id,
 								const U32 local_id,
 								const U32 ip,
 								const U32 port); // Requires knowledge of message system info!
 
-	static BOOL removeFromLocalIDTable(const LLViewerObject* objectp);
+	BOOL removeFromLocalIDTable(const LLViewerObject* objectp);
 	// Used ONLY by the orphaned object code.
-	static U64 getIndex(const U32 local_id, const U32 ip, const U32 port);
+	U64 getIndex(const U32 local_id, const U32 ip, const U32 port);
 
 	S32 mNumUnknownUpdates;
 	S32 mNumDeadObjectUpdates;
@@ -227,9 +227,9 @@ protected:
 	S32 mCurLazyUpdateIndex;
 
 	static U32 sSimulatorMachineIndex;
-	static boost::unordered_flat_map<U64, U32> sIPAndPortToIndex;
+	boost::unordered_flat_map<U64, U32> mIPAndPortToIndex;
 
-	static boost::unordered_flat_map<U64, LLUUID> sIndexAndLocalIDToUUID;
+	boost::unordered_flat_map<U64, LLUUID> mIndexAndLocalIDToUUID;
 
 	friend class LLViewerObject;
 
