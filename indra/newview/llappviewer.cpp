@@ -1772,6 +1772,8 @@ bool LLAppViewer::cleanup()
 
 	LL_INFOS() << "Global stuff deleted" << LL_ENDL;
 
+	ALStreamInfo::deleteSingleton();
+
 	if (gAudiop)
 	{
         LL_INFOS() << "Shutting down audio" << LL_ENDL;
@@ -1782,8 +1784,6 @@ bool LLAppViewer::cleanup()
 		delete gAudiop;
 		gAudiop = nullptr;
 	}
-
-	ALStreamInfo::deleteSingleton();
 
 	// Note: this is where LLFeatureManager::getInstance()-> used to be deleted.
 
