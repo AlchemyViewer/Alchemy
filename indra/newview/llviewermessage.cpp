@@ -4094,7 +4094,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
 		U32	local_id;
 		mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, local_id, i);
 
-		LLViewerObjectList::getUUIDFromLocal(id, local_id, ip, port); 
+		gObjectList.getUUIDFromLocal(id, local_id, ip, port);
 		if (id.isNull())
 		{
 			LL_DEBUGS("Messaging") << "Unknown kill for local " << local_id << LL_ENDL;
@@ -4313,7 +4313,7 @@ void process_attached_sound(LLMessageSystem *msg, void **user_data)
 	U8 flags;
 
 	msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_SoundID, sound_id);
-	if (gAudiop->isCorruptSound(sound_id))
+	if (gAudiop && gAudiop->isCorruptSound(sound_id))
 		return;
 
 	msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_ObjectID, object_id);
