@@ -4313,7 +4313,7 @@ void process_attached_sound(LLMessageSystem *msg, void **user_data)
 	U8 flags;
 
 	msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_SoundID, sound_id);
-	if (gAudiop->isCorruptSound(sound_id))
+	if (gAudiop && gAudiop->isCorruptSound(sound_id))
 		return;
 
 	msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_ObjectID, object_id);
