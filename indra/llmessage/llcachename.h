@@ -29,6 +29,7 @@
 
 #include <boost/bind.hpp>
 #include <boost/signals2.hpp>
+#include <boost/unordered_map.hpp>
 
 class LLMessageSystem;
 class LLHost;
@@ -127,15 +128,16 @@ public:
 	void dumpStats();	// Dumps the sizes of the cache and associated queues.
 	void clear();		// Deletes all entries from the cache
 
-	static std::string getDefaultName();
+	std::string getDefaultName();
 
 	// Returns "Resident", the default last name for SLID-based accounts
 	// that have no last name.
 	static std::string getDefaultLastName();
 
-	static void localizeCacheName(std::string key, std::string value);
-	static std::map<std::string, std::string> sCacheName;
+	void localizeCacheName(std::string key, std::string value);
+
 private:
+	boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> sCacheName;
 
 	class Impl;
 	Impl& impl;

@@ -53,7 +53,6 @@ const U32 PENDING_TIMEOUT_SECS = 5 * 60;
 
 // Globals
 LLCacheName* gCacheName = NULL;
-std::map<std::string, std::string> LLCacheName::sCacheName;
 
 /// ---------------------------------------------------------------------------
 /// class LLCacheNameEntry
@@ -215,7 +214,7 @@ public:
 	Impl(LLMessageSystem* msg);
 	~Impl();
 
-	BOOL getName(const LLUUID& id, std::string& first, std::string& last);
+	BOOL getName(const LLUUID& id, std::string& first, std::string& last, const std::string& nobody, const std::string& waiting);
 
 	boost::signals2::connection addPending(const LLUUID& id, const LLCacheNameCallback& callback);
 	void addPending(const LLUUID& id, const LLHost& host);
@@ -402,11 +401,11 @@ void LLCacheName::exportFile(std::ostream& ostr)
 }
 
 
-BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last)
+BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last, const std::string& nobody, const std::string& waiting)
 {
 	if(id.isNull())
 	{
-		first = sCacheName["nobody"];
+		first = nobody;
 		last.clear();
 		return TRUE;
 	}
@@ -420,7 +419,7 @@ BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::strin
 	}
 	else
 	{
-		first = sCacheName["waiting"];
+		first = waiting;
 		last.clear();
 		if (!isRequestPending(id))
 		{
@@ -443,7 +442,7 @@ void LLCacheName::localizeCacheName(std::string key, std::string value)
 BOOL LLCacheName::getFullName(const LLUUID& id, std::string& fullname)
 {
 	std::string first_name, last_name;
-	BOOL res = impl.getName(id, first_name, last_name);
+	BOOL res = impl.getName(id, first_name, last_name, sCacheName["nobody"], sCacheName["waiting"]);
 	fullname = buildFullName(first_name, last_name);
 	return res;
 }
