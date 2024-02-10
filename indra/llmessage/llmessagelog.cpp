@@ -118,6 +118,8 @@ void LLMessageLog::setCallback(LogCallback callback)
 /* static */
 void LLMessageLog::log(LLHost from_host, LLHost to_host, U8* data, S32 data_size)
 {
+    if (!haveLogger()) return;
+
 	if(!data_size || data == nullptr) return;
 
 	LogPayload payload = std::make_shared<LLMessageLogEntry>(from_host, to_host, data, data_size);
@@ -146,6 +148,8 @@ EHTTPMethod convertEMethodToEHTTPMethod(const LLCore::HttpOpRequest::EMethod e_m
 /* static */
 void LLMessageLog::log(const LLCore::HttpRequestQueue::opPtr_t& op)
 {
+    if (!haveLogger()) return;
+
     auto req = std::static_pointer_cast<LLCore::HttpOpRequest>(op);
     U8* data = nullptr;
     size_t data_size = 0;
@@ -167,6 +171,8 @@ void LLMessageLog::log(const LLCore::HttpRequestQueue::opPtr_t& op)
 /* static */
 void LLMessageLog::log(LLCore::HttpResponse* response)
 {
+    if (!haveLogger()) return;
+
     U8* data = nullptr;
     size_t data_size = 0;
     LLCore::BufferArray * body = response->getBody();
