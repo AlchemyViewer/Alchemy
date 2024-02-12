@@ -280,6 +280,9 @@ void BDFloaterPoser::onClickPoseSave()
 {
 	//BD - Values don't matter when not editing.
 	onPoseSave(2, 0.1f, false);
+
+	//BD - Flash the poses button to give the user a visual cue where it went.
+	getChild<LLButton>("extend")->setFlashing(true, true);
 }
 
 void BDFloaterPoser::onPoseSave(S32 type, F32 time, bool editing)
@@ -412,7 +415,7 @@ void BDFloaterPoser::onPoseSave(S32 type, F32 time, bool editing)
 					//     as well as all attachment bones and collision volumes.
 					if (joint->mHasPosition || it > JOINTS)
 					{
-						vec3 = joint->getTargetPosition();
+						vec3 = it > JOINTS ? joint->getPosition() : joint->getTargetPosition();
 						record[line]["position"] = vec3.getValue();
 					}
 
