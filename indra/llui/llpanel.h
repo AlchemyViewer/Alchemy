@@ -38,6 +38,7 @@
 #include "llbadgeholder.h"
 #include <list>
 #include <queue>
+#include <boost/unordered/unordered_map.hpp>
 
 const S32 LLPANEL_BORDER_WIDTH = 1;
 const BOOL BORDER_YES = TRUE;
@@ -127,6 +128,7 @@ public:
 	virtual 	void	clearCtrls(); // overridden in LLPanelObject and LLPanelVolume
 
 	// Border controls
+	const LLViewBorder* getBorder() const { return mBorder; }
 	void addBorder( LLViewBorder::Params p);
 	void addBorder();
 	void			removeBorder();
@@ -249,7 +251,7 @@ private:
 	LLButton*		mDefaultBtn;
 	LLUIString		mLabel;
 
-	typedef absl::node_hash_map<std::string, std::string> ui_string_map_t;
+	typedef boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> ui_string_map_t;
 	ui_string_map_t	mUIStrings;
 
 
@@ -310,8 +312,9 @@ public:
 template<typename T>
 	LLPanelInjector<T>::LLPanelInjector(const std::string& tag) 
 {
-	LLRegisterPanelClass::instanceFast().addPanelClass(tag,&LLRegisterPanelClass::defaultPanelClassBuilder<T>);
+	LLRegisterPanelClass::instance().addPanelClass(tag,&LLRegisterPanelClass::defaultPanelClassBuilder<T>);
 }
 
+void set_child_visible(LLView* parent, const std::string& child_name, bool visible);
 
 #endif

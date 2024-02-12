@@ -337,6 +337,7 @@ private:
 	LLCheckBoxCtrl*	mCheckEditGroupObjects;
 	LLCheckBoxCtrl*	mCheckAllObjectEntry;
 	LLCheckBoxCtrl*	mCheckGroupObjectEntry;
+	LLCheckBoxCtrl* mCheckEditLand;
 	LLCheckBoxCtrl*	mCheckSafe;
 	LLCheckBoxCtrl*	mCheckFly;
 	LLCheckBoxCtrl*	mCheckGroupScripts;
@@ -413,6 +414,7 @@ protected:
 private:
 	LLUUID mLastRegionID;
 	F64 mNextUpdateTime; //seconds since client start
+    LLTextBox* mTextEstateOwner;
 };
 
 #endif

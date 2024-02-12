@@ -104,7 +104,7 @@ public:
 	void setAvatarToolTip(const std::string& tooltip);
 	void setHighlight(const std::string& highlight);
 	void setState(EItemState item_style);
-	void setAvatarId(const LLUUID& id, const LLUUID& session_id, bool ignore_status_changes = false, bool is_resident = true);
+	void setAvatarId(const LLUUID& id, const LLUUID& session_id, bool ignore_status_changes = false, bool is_resident = true, bool use_colorizer = false);
 	void setTextField(const std::string& text);
 	void setTextFieldDistance(F32 distance);
 	void setTextFieldSeconds(U32 secs_since);
@@ -151,6 +151,8 @@ protected:
 	LLIconCtrl* mIconPermissionEditTheirs = nullptr;
 	/// Indicator for permission to show their position on the map.
 	LLIconCtrl* mIconPermissionMapTheirs = nullptr;
+	/// Indicator for permission to see their online status.
+	LLIconCtrl* mIconPermissionOnlineTheirs = nullptr;
 
 	LLIconCtrl* mIconHovered = nullptr;
 
@@ -179,6 +181,7 @@ private:
 		ALIC_PERMISSION_EDIT_MINE,
 		ALIC_PERMISSION_EDIT_THEIRS,
 		ALIC_PERMISSION_MAP_THEIRS,
+		ALIC_PERMISSION_ONLINE_THEIRS,
 		ALIC_NAME,
 		ALIC_ICON,
 		ALIC_COUNT,
@@ -236,6 +239,7 @@ private:
 // [RLVa:KB] - Checked: RLVa-1.2.0
 	bool mRlvCheckShowNames;
 // [/RLVa:KB]
+	bool mColorize;
 
 	/// indicates whether to show icons representing permissions granted
 	EShowPermissionType mShowPermissions;

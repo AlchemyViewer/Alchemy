@@ -34,6 +34,8 @@
 #include "lluuid.h"
 #include "v3dmath.h"
 
+#include "boost/unordered_map.hpp"
+
 class LLMessageSystem;
 class LLHost;
 
@@ -99,7 +101,7 @@ private:
 	};
 
 	static std::pair<LLUUID, U64> mLocalRegion;
-	typedef std::map<LLUUID, CacheInfo> region_map_t;
+	typedef boost::unordered_map<LLUUID, CacheInfo> region_map_t;
 	static region_map_t mRegions;
 	typedef std::multimap<LLUUID, region_handle_callback_t> region_callback_map_t;
 	static region_callback_map_t sRegionCallbackMap;

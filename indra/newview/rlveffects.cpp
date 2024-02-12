@@ -51,7 +51,7 @@ RlvOverlayEffect::~RlvOverlayEffect()
 // static
 ERlvCmdRet RlvOverlayEffect::onAlphaValueChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvOverlayEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvOverlayEffect>(idRlvObj))
+	if (RlvOverlayEffect* pEffect = LLVfxManager::instance().getEffect<RlvOverlayEffect>(idRlvObj))
 	{
 		pEffect->m_nAlpha = (newValue) ? boost::get<float>(newValue.value()) : c_DefaultAlpha;
 	}
@@ -61,7 +61,7 @@ ERlvCmdRet RlvOverlayEffect::onAlphaValueChanged(const LLUUID& idRlvObj, const b
 // static
 ERlvCmdRet RlvOverlayEffect::onColorValueChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvOverlayEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvOverlayEffect>(idRlvObj))
+	if (RlvOverlayEffect* pEffect = LLVfxManager::instance().getEffect<RlvOverlayEffect>(idRlvObj))
 	{
 		pEffect->m_Color = LLColor3( (newValue) ? boost::get<LLVector3>(newValue.value()).mV : c_DefaultColor);
 	}
@@ -71,7 +71,7 @@ ERlvCmdRet RlvOverlayEffect::onColorValueChanged(const LLUUID& idRlvObj, const b
 // static
 ERlvCmdRet RlvOverlayEffect::onTextureChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvOverlayEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvOverlayEffect>(idRlvObj))
+	if (RlvOverlayEffect* pEffect = LLVfxManager::instance().getEffect<RlvOverlayEffect>(idRlvObj))
 	{
 		if (newValue)
 			pEffect->setImage(boost::get<LLUUID>(newValue.value()));
@@ -114,10 +114,7 @@ void RlvOverlayEffect::run(const LLVisualEffectParams*)
 {
 	if (m_pImage)
 	{
-		if (LLGLSLShader::sNoFixedFunction)
-		{
-			gUIProgram.bind();
-		}
+		gUIProgram.bind();
 
 		int nWidth = gViewerWindow->getWorldViewWidthScaled();
 		int nHeight = gViewerWindow->getWorldViewHeightScaled();
@@ -144,10 +141,7 @@ void RlvOverlayEffect::run(const LLVisualEffectParams*)
 		gGL.flush();
 		gViewerWindow->setup3DRender();
 
-		if (LLGLSLShader::sNoFixedFunction)
-		{
-			gUIProgram.unbind();
-		}
+		gUIProgram.unbind();
 	}
 }
 
@@ -181,7 +175,7 @@ RlvSphereEffect::~RlvSphereEffect()
 // static
 ERlvCmdRet RlvSphereEffect::onModeChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		pEffect->m_eMode = (ESphereMode)((newValue) ? boost::get<int>(newValue.value()) : c_SphereDefaultMode);
 	}
@@ -191,7 +185,7 @@ ERlvCmdRet RlvSphereEffect::onModeChanged(const LLUUID& idRlvObj, const boost::o
 // static
 ERlvCmdRet RlvSphereEffect::onOriginChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		pEffect->m_eOrigin = (ESphereOrigin)((newValue) ? boost::get<int>(newValue.value()) : c_SphereDefaultOrigin);
 	}
@@ -201,7 +195,7 @@ ERlvCmdRet RlvSphereEffect::onOriginChanged(const LLUUID& idRlvObj, const boost:
 // static
 ERlvCmdRet RlvSphereEffect::onColorChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		LLVector4 vecColor = (newValue) ? LLVector4(boost::get<LLVector3>(newValue.value()), 1.0f) : LLVector4(c_SphereDefaultColor);
 		if (!pEffect->m_nTweenDuration)
@@ -215,7 +209,7 @@ ERlvCmdRet RlvSphereEffect::onColorChanged(const LLUUID& idRlvObj, const boost::
 // static
 ERlvCmdRet RlvSphereEffect::onDistMinChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		float nDistanceMin = (newValue) ? boost::get<float>(newValue.value()) : c_SphereDefaultDistance;
 		if (!pEffect->m_nTweenDuration)
@@ -229,7 +223,7 @@ ERlvCmdRet RlvSphereEffect::onDistMinChanged(const LLUUID& idRlvObj, const boost
 // static
 ERlvCmdRet RlvSphereEffect::onDistMaxChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		float nDistanceMax = (newValue) ? boost::get<float>(newValue.value()) : c_SphereDefaultDistance;
 		if (!pEffect->m_nTweenDuration)
@@ -243,7 +237,7 @@ ERlvCmdRet RlvSphereEffect::onDistMaxChanged(const LLUUID& idRlvObj, const boost
 // static
 ERlvCmdRet RlvSphereEffect::onDistExtendChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		pEffect->m_eDistExtend = (ESphereDistExtend)((newValue) ? boost::get<int>(newValue.value()) : c_SphereDefaultDistanceExtend);
 	}
@@ -253,7 +247,7 @@ ERlvCmdRet RlvSphereEffect::onDistExtendChanged(const LLUUID& idRlvObj, const bo
 // static
 ERlvCmdRet RlvSphereEffect::onParamsChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		LLVector4 params = LLVector4((newValue) ? boost::get<LLVector4>(newValue.value()).mV : c_SphereDefaultColor);
 		if (!pEffect->m_nTweenDuration)
@@ -267,7 +261,7 @@ ERlvCmdRet RlvSphereEffect::onParamsChanged(const LLUUID& idRlvObj, const boost:
 // static
 ERlvCmdRet RlvSphereEffect::onTweenDurationChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		pEffect->m_nTweenDuration = (newValue) ? boost::get<float>(newValue.value()) : 0;
 	}
@@ -277,7 +271,7 @@ ERlvCmdRet RlvSphereEffect::onTweenDurationChanged(const LLUUID& idRlvObj, const
 // static
 ERlvCmdRet RlvSphereEffect::onValueMinChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		float nValueMin = (newValue) ? boost::get<float>(newValue.value()) : c_SphereDefaultAlpha;;
 		if (!pEffect->m_nTweenDuration)
@@ -291,7 +285,7 @@ ERlvCmdRet RlvSphereEffect::onValueMinChanged(const LLUUID& idRlvObj, const boos
 // static
 ERlvCmdRet RlvSphereEffect::onValueMaxChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue)
 {
-	if (RlvSphereEffect* pEffect = LLVfxManager::instanceFast().getEffect<RlvSphereEffect>(idRlvObj))
+	if (RlvSphereEffect* pEffect = LLVfxManager::instance().getEffect<RlvSphereEffect>(idRlvObj))
 	{
 		float nValueMax = (newValue) ? boost::get<float>(newValue.value()) : c_SphereDefaultAlpha;
 		if (!pEffect->m_nTweenDuration)
@@ -304,10 +298,7 @@ ERlvCmdRet RlvSphereEffect::onValueMaxChanged(const LLUUID& idRlvObj, const boos
 
 void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 {
-	LLMatrix4a proj = get_current_projection();
-	proj.invert();
-	pShader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, proj.getF32ptr());
-	pShader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, gPipeline.mScreen.getWidth(), gPipeline.mScreen.getHeight());
+	pShader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, gPipeline.mRT->screen.getWidth(), gPipeline.mRT->screen.getHeight());
 	pShader->uniform1i(LLShaderMgr::RLV_EFFECT_MODE, llclamp((int)m_eMode, 0, (int)ESphereMode::Count));
 
 	// Pass the sphere origin to the shader
@@ -315,7 +306,7 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
 	switch (m_eOrigin)
 	{
 		case ESphereOrigin::Camera:
-			posSphereOrigin.setVec(LLViewerCamera::instanceFast().getOrigin(), 1.0f);
+			posSphereOrigin.setVec(LLViewerCamera::instance().getOrigin(), 1.0f);
 			break;
 		case ESphereOrigin::Avatar:
 		default:
@@ -360,40 +351,20 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
 	if (nDiffuseChannel > -1)
 	{
 		pParams->m_pSrcBuffer->bindTexture(0, nDiffuseChannel);
-		gGL.getTexUnit(nDiffuseChannel)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+		gGL.getTexUnit(nDiffuseChannel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
 	}
 
-	S32 nDepthChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mDeferredDepth.getUsage());
+	S32 nDepthChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mRT->deferredScreen.getUsage());
 	if (nDepthChannel > -1)
 	{
-		gGL.getTexUnit(nDepthChannel)->bind(&gPipeline.mDeferredDepth, TRUE);
+		gGL.getTexUnit(nDepthChannel)->bind(&gPipeline.mRT->deferredScreen, TRUE);
 	}
 
-	gGL.matrixMode(LLRender::MM_PROJECTION);
-	gGL.pushMatrix();
-	gGL.loadIdentity();
-	gGL.matrixMode(LLRender::MM_MODELVIEW);
-	gGL.pushMatrix();
-	gGL.loadMatrix(gGLModelView);
-
-	LLVector2 tc1(0, 0);
-	LLVector2 tc2((F32)gPipeline.mScreen.getWidth() * 2, (F32)gPipeline.mScreen.getHeight() * 2);
-	gGL.begin(LLRender::TRIANGLE_STRIP);
-	gGL.texCoord2f(tc1.mV[0], tc1.mV[1]);
-	gGL.vertex2f(-1, -1);
-	gGL.texCoord2f(tc1.mV[0], tc2.mV[1]);
-	gGL.vertex2f(-1, 3);
-	gGL.texCoord2f(tc2.mV[0], tc1.mV[1]);
-	gGL.vertex2f(3, -1);
-	gGL.end();
-
-	gGL.matrixMode(LLRender::MM_PROJECTION);
-	gGL.popMatrix();
-	gGL.matrixMode(LLRender::MM_MODELVIEW);
-	gGL.popMatrix();
+	gPipeline.mScreenTriangleVB->setBuffer();
+	gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
 	pShader->disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pParams->m_pSrcBuffer->getUsage());
-	pShader->disableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mDeferredDepth.getUsage());
+	pShader->disableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mRT->deferredScreen.getUsage());
 
 	if (pParams->m_pDstBuffer)
 	{
@@ -401,19 +372,19 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
 	}
 }
 
-LLTrace::BlockTimerStatHandle FTM_RLV_EFFECT_SPHERE("Post-process (RLVa sphere)");
-
 void RlvSphereEffect::run(const LLVisualEffectParams* pParams)
 {
-	LL_RECORD_BLOCK_TIME(FTM_RLV_EFFECT_SPHERE);
-	LLGLDepthTest depth(GL_FALSE, GL_FALSE);
-
-	gRlvSphereProgram.bind();
-	setShaderUniforms(&gRlvSphereProgram);
-
-	const LLShaderEffectParams* pShaderParams = static_cast<const LLShaderEffectParams*>(pParams);
-	switch (m_eMode)
+	LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("Post-process (RLVa sphere)");
+	if (gRlvSphereProgram.isComplete())
 	{
+		LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+
+		gRlvSphereProgram.bind();
+		setShaderUniforms(&gRlvSphereProgram);
+
+		const LLShaderEffectParams* pShaderParams = static_cast<const LLShaderEffectParams*>(pParams);
+		switch (m_eMode)
+		{
 		case ESphereMode::Blend:
 		case ESphereMode::ChromaticAberration:
 		case ESphereMode::Pixelate:
@@ -428,9 +399,10 @@ void RlvSphereEffect::run(const LLVisualEffectParams* pParams)
 			break;
 		default:
 			llassert(true);
-	}
+		}
 
-	gRlvSphereProgram.unbind();
+		gRlvSphereProgram.unbind();
+	}
 }
 
 // ====================================================================================

@@ -118,34 +118,12 @@ BOOL LLViewerDynamicTexture::render()
 //-----------------------------------------------------------------------------
 void LLViewerDynamicTexture::preRender(BOOL clear_depth)
 {
-	gPipeline.allocatePhysicsBuffer();
-	llassert(mFullWidth <= static_cast<S32>(gPipeline.mBake.getWidth()));
-	llassert(mFullHeight <= static_cast<S32>(gPipeline.mBake.getHeight()));
+     //use the bottom left corner
+	mOrigin.set(0, 0);
 
-	if (gGLManager.mHasFramebufferObject && gPipeline.mBake.isComplete())
-	{ //using offscreen render target, just use the bottom left corner
-		mOrigin.set(0, 0);
-	}
-	else
-	{ // force rendering to on-screen portion of frame buffer
-		LLCoordScreen window_pos;
-		gViewerWindow->getWindow()->getPosition( &window_pos );
-		mOrigin.set(0, gViewerWindow->getWindowHeightRaw() - mFullHeight);  // top left corner
-
-		if (window_pos.mX < 0)
-		{
-			mOrigin.mX = -window_pos.mX;
-		}
-		if (window_pos.mY < 0)
-		{
-			mOrigin.mY += window_pos.mY;
-			mOrigin.mY = llmax(mOrigin.mY, 0) ;
-		}
-	}
-
-	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 	// Set up camera
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	mCamera.setOrigin(*camera);
 	mCamera.setAxes(*camera);
 	mCamera.setAspect(camera->getAspect());
@@ -188,11 +166,11 @@ void LLViewerDynamicTexture::postRender(BOOL success)
 	gViewerWindow->setup2DViewport();
 
 	// restore camera
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	camera->setOrigin(mCamera);
 	camera->setAxes(mCamera);
 	camera->setAspect(mCamera.getAspect());
-	camera->setView(mCamera.getView());
+	camera->setViewNoBroadcast(mCamera.getView());
 	camera->setNear(mCamera.getNear());
 }
 
@@ -203,21 +181,28 @@ void LLViewerDynamicTexture::postRender(BOOL success)
 //-----------------------------------------------------------------------------
 BOOL LLViewerDynamicTexture::updateAllInstances()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
 	sNumRenders = 0;
 	if (gGLManager.mIsDisabled)
 	{
 		return TRUE;
 	}
 
-	bool use_fbo = gGLManager.mHasFramebufferObject && gPipeline.mBake.isComplete();
+    LLRenderTarget& bake_target = gPipeline.mBake;
 
-	if (use_fbo)
-	{
-		gPipeline.mBake.bindTarget();
-        gPipeline.mBake.clear();
-	}
+	if (!bake_target.isComplete())
+    {
+        llassert(false);
+		return FALSE;
+    }
+    llassert(bake_target.getWidth() >= LLPipeline::MAX_BAKE_WIDTH);
+    llassert(bake_target.getHeight() >= LLPipeline::MAX_BAKE_WIDTH);
 
-	LLGLSLShader::bindNoShader();
+    bake_target.bindTarget();
+    bake_target.clear();
+
+	LLGLSLShader::unbind();
 	LLVertexBuffer::unbind();
 	
 	BOOL result = FALSE;
@@ -228,11 +213,14 @@ BOOL LLViewerDynamicTexture::updateAllInstances()
 		{
 			if (dynamicTexture->needsRender())
 			{				
+                llassert(dynamicTexture->getFullWidth() <= LLPipeline::MAX_BAKE_WIDTH);
+                llassert(dynamicTexture->getFullHeight() <= LLPipeline::MAX_BAKE_WIDTH);
+
 				glClear(GL_DEPTH_BUFFER_BIT);
 				gDepthDirty = TRUE;
 								
 				gGL.color4f(1,1,1,1);
-                dynamicTexture->setBoundTarget(use_fbo ? &gPipeline.mBake : nullptr);
+                dynamicTexture->setBoundTarget(&bake_target);
 				dynamicTexture->preRender();	// Must be called outside of startRender()
 				result = FALSE;
 				if (dynamicTexture->render())
@@ -249,10 +237,7 @@ BOOL LLViewerDynamicTexture::updateAllInstances()
 		}
 	}
 
-	if (use_fbo)
-	{
-		gPipeline.mBake.flush();
-	}
+	bake_target.flush();
 
     gGL.flush();
 

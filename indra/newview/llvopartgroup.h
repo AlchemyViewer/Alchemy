@@ -40,16 +40,9 @@ class LLVOPartGroup : public LLAlphaObject
 {
 public:
 
-	//vertex buffer for holding all particles
-	static LLPointer<LLVertexBuffer> sVB;
-	static S32 sVBSlotFree[LL_MAX_PARTICLE_COUNT];
-	static S32 *sVBSlotCursor;
-
 	static void initClass();
 	static void restoreGL();
 	static void destroyGL();
-	static S32 findAvailableVBSlot();
-	static void freeVBSlot(S32 idx);
 
 	enum
 	{
@@ -63,28 +56,29 @@ public:
 
 	LLVOPartGroup(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
 
-	/*virtual*/ BOOL    isActive() const; // Whether this object needs to do an idleUpdate.
-	void idleUpdate(LLAgent &agent, const F64 &time);
+	/*virtual*/ BOOL    isActive() const override; // Whether this object needs to do an idleUpdate.
+	void idleUpdate(LLAgent &agent, const F64 &time) override;
 
-	virtual F32 getBinRadius();
-	virtual void updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax);
-	virtual U32 getPartitionType() const;
+	F32 getBinRadius() override;
+	void updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax) override;
+	U32 getPartitionType() const override;
 	
 	/*virtual*/ BOOL lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
 										  S32 face,
 										  BOOL pick_transparent,
 										  BOOL pick_rigged,
+                                          BOOL pick_unselectable,
 										  S32* face_hit,
 										  LLVector4a* intersection,
 										  LLVector2* tex_coord,
 										  LLVector4a* normal,
-										  LLVector4a* tangent);
+										  LLVector4a* tangent) override;
 
-	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent);
-	/*virtual*/ void updateTextures();
+	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent) override;
+	/*virtual*/ void updateTextures() override;
 
-	/*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline);
-	/*virtual*/ BOOL        updateGeometry(LLDrawable *drawable);
+	/*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) override;
+	/*virtual*/ BOOL        updateGeometry(LLDrawable *drawable) override;
 	void		getGeometry(const LLViewerPart& part,							
 								LLStrider<LLVector4a>& verticesp);
 				
@@ -94,11 +88,11 @@ public:
 								LLStrider<LLVector2>& texcoordsp,
 								LLStrider<LLColor4U>& colorsp, 
 								LLStrider<LLColor4U>& emissivep,
-								LLStrider<U16>& indicesp);
+								LLStrider<U16>& indicesp) override;
 
-	void updateFaceSize(S32 idx) { }
-	F32 getPartSize(S32 idx);
-	void getBlendFunc(S32 idx, U32& src, U32& dst);
+	void updateFaceSize(S32 idx) override { }
+	F32 getPartSize(S32 idx) override;
+	void getBlendFunc(S32 idx, LLRender::eBlendFactor& src, LLRender::eBlendFactor& dst) override;
 	LLUUID getPartOwner(S32 idx);
 	LLUUID getPartSource(S32 idx);
 
@@ -123,9 +117,9 @@ public:
 	{
 	}
 protected:
-	LLDrawable* createDrawable(LLPipeline *pipeline);
-	U32 getPartitionType() const;
-	virtual LLVector3 getCameraPosition() const;
+	LLDrawable* createDrawable(LLPipeline *pipeline) override;
+	U32 getPartitionType() const override;
+	virtual LLVector3 getCameraPosition() const override;
 };
 
 #endif // LL_LLVOPARTGROUP_H

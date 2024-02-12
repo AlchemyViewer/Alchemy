@@ -188,13 +188,13 @@ private:
     bool                        isRemovingFrameAllowed();
     bool                        isAddingFrameAllowed();
 
+    void                        showHDRNotification(const LLSettingsDay::ptr_t &pday);
+
     LLSettingsDay::ptr_t        mEditDay; // edited copy
     LLSettingsDay::Seconds      mDayLength;
     U32                         mCurrentTrack;
     std::string                 mLastFrameSlider;
     bool                        mShiftCopyEnabled;
-
-    LLUUID                      mExpectingAssetId;
 
     LLButton*                   mAddFrameButton;
     LLButton*                   mDeleteFrameButton;

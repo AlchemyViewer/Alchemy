@@ -70,32 +70,20 @@ static LLDefaultChildRegistry::Register<LLProfileDropTarget> r("profile_drop_tar
 LLPanelProfileTab::LLPanelProfileTab()
 : LLPanel()
 , mAvatarId(LLUUID::null)
-, mLoading(false)
-, mLoaded(false)
-, mEmbedded(false)
+, mLoadingState(PROFILE_INIT)
 , mSelfProfile(false)
 {
 }
 
 LLPanelProfileTab::~LLPanelProfileTab()
 {
-    if(getAvatarId().notNull())
-    {
-        LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(getAvatarId(),this);
-    }
 }
 
 void LLPanelProfileTab::setAvatarId(const LLUUID& avatar_id)
 {
     if (avatar_id.notNull())
     {
-        if (getAvatarId().notNull())
-        {
-            LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(mAvatarId, this);
-        }
         mAvatarId = avatar_id;
-        LLAvatarPropertiesProcessor::getInstanceFast()->addObserver(getAvatarId(), this);
-
         mSelfProfile = (getAvatarId() == gAgentID);
     }
 }
@@ -108,11 +96,11 @@ void LLPanelProfileTab::onOpen(const LLSD& key)
     setApplyProgress(true);
 }
 
-void LLPanelProfileTab::updateButtons()
+void LLPanelProfileTab::setLoaded()
 {
     setApplyProgress(false);
 
-    mLoaded = true;
+    mLoadingState = PROFILE_LOADED;
 }
 
 void LLPanelProfileTab::setApplyProgress(bool started)
@@ -131,5 +119,37 @@ void LLPanelProfileTab::setApplyProgress(bool started)
         {
             indicator->stop();
         }
+    }
+
+    LLView* panel = findChild<LLView>("indicator_stack");
+    if (panel)
+    {
+        panel->setVisible(started);
+    }
+}
+
+LLPanelProfilePropertiesProcessorTab::LLPanelProfilePropertiesProcessorTab()
+    : LLPanelProfileTab()
+{
+}
+
+LLPanelProfilePropertiesProcessorTab::~LLPanelProfilePropertiesProcessorTab()
+{
+    if (getAvatarId().notNull())
+    {
+        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+    }
+}
+
+void LLPanelProfilePropertiesProcessorTab::setAvatarId(const LLUUID & avatar_id)
+{
+    if (avatar_id.notNull())
+    {
+        if (getAvatarId().notNull())
+        {
+            LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+        }
+        LLPanelProfileTab::setAvatarId(avatar_id);
+        LLAvatarPropertiesProcessor::getInstance()->addObserver(getAvatarId(), this);
     }
 }

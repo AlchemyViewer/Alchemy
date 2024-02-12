@@ -151,6 +151,8 @@ public:
 
 		void setTrustedContent(bool trusted);
 
+        void setAllowFileDownload(bool allow) { mAllowFileDownload = allow; }
+
 		// over-rides
 		virtual BOOL handleKeyHere( KEY key, MASK mask);
 		virtual BOOL handleKeyUpHere(KEY key, MASK mask);
@@ -203,7 +205,8 @@ public:
 				mClearCache,
 				mHoverTextChanged,
 				mDecoupleTextureSize,
-				mUpdateScrolls;
+				mUpdateScrolls,
+                mAllowFileDownload;
 
 		std::string mHomePageUrl,
 					mHomePageMimeType,

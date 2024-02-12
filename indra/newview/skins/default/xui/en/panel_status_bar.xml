@@ -11,7 +11,6 @@
  mouse_opaque="false"
  name="status"
  top="19"
- tab_stop="false"
  width="1000">
     <panel.string
      name="packet_loss_tooltip">
@@ -25,6 +24,10 @@
      name="time">
         [hour12, datetime, slt]:[min, datetime, slt] [ampm, datetime, slt] [timezone,datetime, slt]
     </panel.string>
+	<panel.string
+     name="timeSeconds">
+		[hour12, datetime, slt]:[min, datetime, slt]:[second, datetime, slt] [ampm, datetime, slt] [timezone,datetime, slt]
+	</panel.string>
     <panel.string
      name="timeTooltip">
         [weekday, datetime, slt], [day, datetime, slt] [month, datetime, slt] [year, datetime, slt]
@@ -111,10 +114,8 @@
      top="0"
      width="80" />
     <button
-     halign="left"
      font="SansSerifSmall"
      follows="right|top|bottom"
-     imgoverlay_label_space="7"
      image_overlay="Command_MiniCart_Icon"
      image_overlay_alignment="left"
      image_hover_unselected="PushButton_Over"
@@ -128,7 +129,7 @@
      name="goShop"
      tool_tip="Open Second Life Marketplace"
      top="0"
-     width="65" />
+     width="80" />
   </panel>
     <text
      type="string"
@@ -152,6 +153,7 @@
      left_pad="8"
      top="2"
      name="presets_icon_camera"
+	 tool_tip="My Camera Presets"
      width="18" />
     <icon
      follows="right|top"
@@ -160,6 +162,7 @@
      left_pad="8"
      top="4"
      name="presets_icon_graphic"
+	 tool_tip="Graphics Presets"
      width="16" />
     <button
      follows="right|top"

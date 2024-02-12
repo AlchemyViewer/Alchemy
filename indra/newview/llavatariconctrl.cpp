@@ -204,7 +204,7 @@ LLAvatarIconCtrl::~LLAvatarIconCtrl()
 {
 	if (mAvatarId.notNull())
 	{
-		LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(mAvatarId, this);
+		LLAvatarPropertiesProcessor::getInstance()->removeObserver(mAvatarId, this);
 		// Name callbacks will be automatically disconnected since LLUICtrl is trackable
 	}
 
@@ -220,7 +220,7 @@ void LLAvatarIconCtrl::setValue(const LLSD& value)
 	if (value.isUUID())
 	{
 		LLAvatarPropertiesProcessor* app =
-			LLAvatarPropertiesProcessor::getInstanceFast();
+			LLAvatarPropertiesProcessor::getInstance();
 		if (mAvatarId.notNull())
 		{
 			app->removeObserver(mAvatarId, this);
@@ -247,6 +247,11 @@ void LLAvatarIconCtrl::setValue(const LLSD& value)
 				app->addObserver(mAvatarId, this);
 				app->sendAvatarPropertiesRequest(mAvatarId);
 			}
+            else if (gAgentID == mAvatarId)
+            {
+                // Always track any changes to our own icon id
+                app->addObserver(mAvatarId, this);
+            }
 		}
 	}
 	else
@@ -278,7 +283,8 @@ bool LLAvatarIconCtrl::updateFromCache()
 	const LLUUID& icon_id = *icon_id_ptr;
 
 	// Update the avatar
-	if (icon_id.notNull())
+	static LLCachedControl<bool> UseDefaultImage(gSavedSettings, "AlchemyUseDefaultAvatarIcon", false);
+	if (icon_id.notNull() && !UseDefaultImage)
 	{
 		LLIconCtrl::setValue(icon_id);
 	}
@@ -303,6 +309,10 @@ void LLAvatarIconCtrl::processProperties(void* data, EAvatarProcessorType type)
 			{
 				return;
 			}
+
+// [SL:KB] - Patch: Control-AvatarIconCtrl | Checked: 2014-02-20 (Catznip-3.7)
+			LLAvatarPropertiesProcessor::getInstance()->removeObserver(mAvatarId, this);
+// [/SL:KB]
 
 			LLAvatarIconIDCache::getInstance()->add(mAvatarId,avatar_data->image_id);
 			updateFromCache();

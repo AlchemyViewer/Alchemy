@@ -28,8 +28,10 @@
 #ifndef LL_AUDIOENGINE_H
 #define LL_AUDIOENGINE_H
 
+#include <array>
 #include <list>
 #include <map>
+#include <array>
 
 #include "v3math.h"
 #include "v3dmath.h"
@@ -40,8 +42,8 @@
 #include "llextendedstatus.h"
 
 #include "lllistener.h"
-#include "absl/container/node_hash_map.h"
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
+#include "boost/unordered_map.hpp"
 
 const F32 LL_WIND_UPDATE_INTERVAL = 0.1f;
 const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
@@ -49,8 +51,8 @@ const F32 LL_WIND_UNDERWATER_CENTER_FREQ = 20.f;
 const F32 ATTACHED_OBJECT_TIMEOUT = 5.0f;
 const F32 DEFAULT_MIN_DISTANCE = 2.0f;
 
-#define MAX_CHANNELS 30
-#define MAX_BUFFERS 60	// Some extra for preloading, maybe?
+#define LL_MAX_AUDIO_CHANNELS 30
+#define LL_MAX_AUDIO_BUFFERS 60 // Some extra for preloading, maybe?
 
 class LLAudioSource;
 class LLAudioData;
@@ -91,15 +93,16 @@ public:
 	virtual ~LLAudioEngine() = default;
 
 	// initialization/startup/shutdown
-	virtual bool init(const S32 num_channels, void *userdata, const std::string &app_title);
+	virtual bool init(void *userdata, const std::string &app_title);
 	virtual std::string getDriverName(bool verbose) = 0;
+	virtual LLStreamingAudioInterface *createDefaultStreamingAudioImpl() const = 0;
 	virtual void shutdown();
 
 	// Used by the mechanics of the engine
 	//virtual void processQueue(const LLUUID &sound_guid);
 	virtual void setListener(const LLVector3& pos, const LLVector3& vel, const LLVector3& up, const LLVector3& at);
 	virtual void updateWind(LLVector3 direction, F32 camera_height_above_water) = 0;
-	virtual void idle(F32 max_decode_time = 0.f);
+	virtual void idle();
 	virtual void updateChannels();
 
 	//
@@ -214,7 +217,6 @@ protected:
 
 	S32 mLastStatus;
 	
-	S32 mNumChannels;
 	bool mEnableWind;
 
 	LLUUID mCurrentTransfer; // Audio file currently being transferred by the system
@@ -223,17 +225,17 @@ protected:
 	// A list of all audio sources that are known to the viewer at this time.
 	// This is most likely a superset of the ones that we actually have audio
 	// data for, or are playing back.
-	typedef absl::flat_hash_map<LLUUID, LLAudioSource *> source_map;
-	typedef absl::flat_hash_map<LLUUID, LLAudioData *> data_map;
+	typedef boost::unordered_flat_map<LLUUID, LLAudioSource *> source_map;
+	typedef boost::unordered_flat_map<LLUUID, LLAudioData *> data_map;
 
 	source_map mAllSources;
 	data_map mAllData;
 
-	LLAudioChannel *mChannels[MAX_CHANNELS];
+    std::array<LLAudioChannel*, LL_MAX_AUDIO_CHANNELS> mChannels;
 
 	// Buffers needs to change into a different data structure, as the number of buffers
 	// that we have active should be limited by RAM usage, not count.
-	LLAudioBuffer *mBuffers[MAX_BUFFERS];
+    std::array<LLAudioBuffer*, LL_MAX_AUDIO_BUFFERS> mBuffers;
 	
 	F32 mMasterGain;
 	F32 mInternalGain;			// Actual gain set; either mMasterGain or 0 when mMuted is true.
@@ -252,11 +254,18 @@ public:
 private:
 	S32 mSoundHistoryPruneCounter = 0;
 
-	using sound_history_map = absl::node_hash_map<LLUUID, LLSoundHistoryItem>;
+	using sound_history_map = boost::unordered_flat_map<LLUUID, std::unique_ptr<LLSoundHistoryItem>>;
 	sound_history_map mSoundHistory;
 private:
 	void setDefaults();
 	LLStreamingAudioInterface *mStreamingAudioImpl;
+
+	boost::unordered_map<LLUUID,U32> mCorruptData;
+
+public:
+	void markSoundCorrupt(LLUUID const&);
+	bool isCorruptSound(LLUUID const&) const;
+
 };
 
 
@@ -282,8 +291,8 @@ public:
 
 	void addAudioData(LLAudioData *adp, bool set_current = TRUE);
 
-	void setAmbient(const bool ambient)						{ mAmbient = ambient; }
-	bool isAmbient() const									{ return mAmbient; }
+	void setForcedPriority(const bool ambient)						{ mForcedPriority = ambient; }
+	bool isForcedPriority() const									{ return mForcedPriority; }
 
 	void setLoop(const bool loop)							{ mLoop = loop; }
 	bool isLoop() const										{ return mLoop; }
@@ -322,7 +331,13 @@ public:
 	LLAudioBuffer *getCurrentBuffer();
 
 	bool setupChannel();
-	bool play(const LLUUID &audio_id);	// Start the audio source playing
+
+    // Stop the audio source, reset audio id even if muted
+    void stop();
+
+    // Start the audio source playing,
+    // takes mute into account to preserve previous id if nessesary
+    bool play(const LLUUID &audio_id);
 
 	bool hasPendingPreloads() const;	// Has preloads that haven't been done yet
 
@@ -338,7 +353,7 @@ protected:
 	F32				mPriority;
 	F32				mGain;
 	bool			mSourceMuted;
-	bool			mAmbient;
+	bool			mForcedPriority; // ignore mute, set high priority, researved for sound preview and UI
 	bool			mLoop;
 	bool			mSyncMaster;
 	bool			mSyncSlave;
@@ -357,7 +372,7 @@ protected:
 	LLAudioData		*mCurrentDatap;
 	LLAudioData		*mQueuedDatap;
 
-	typedef absl::flat_hash_map<LLUUID, LLAudioData *> data_map;
+	typedef boost::unordered_flat_map<LLUUID, LLAudioData *> data_map;
 	data_map mPreloadMap;
 
 	LLFrameTimer mAgeTimer;
@@ -375,32 +390,36 @@ protected:
 
 class LLAudioData
 {
-public:
-	LLAudioData(const LLUUID &uuid);
-	bool load();
+  public:
+    LLAudioData(const LLUUID &uuid);
+    bool load();
 
-	LLUUID getID() const				{ return mID; }
-	LLAudioBuffer *getBuffer() const	{ return mBufferp; }
+    LLUUID         getID() const { return mID; }
+    LLAudioBuffer *getBuffer() const { return mBufferp; }
 
-	bool	hasLocalData() const		{ return mHasLocalData; }
-	bool	hasDecodedData() const		{ return mHasDecodedData; }
-	bool	hasCompletedDecode() const	{ return mHasCompletedDecode; }
-	bool	hasValidData() const		{ return mHasValidData; }
+    bool hasLocalData() const { return mHasLocalData; }
+    bool hasDecodedData() const { return mHasDecodedData; }
+    bool hasCompletedDecode() const { return mHasCompletedDecode; }
+    bool hasDecodeFailed() const { return mHasDecodeFailed; }
+    bool hasWAVLoadFailed() const { return mHasWAVLoadFailed; }
 
-	void	setHasLocalData(const bool hld)		{ mHasLocalData = hld; }
-	void	setHasDecodedData(const bool hdd)	{ mHasDecodedData = hdd; }
-	void	setHasCompletedDecode(const bool hcd)	{ mHasCompletedDecode = hcd; }
-	void	setHasValidData(const bool hvd)		{ mHasValidData = hvd; }
+    void setHasLocalData(const bool hld) { mHasLocalData = hld; }
+    void setHasDecodedData(const bool hdd) { mHasDecodedData = hdd; }
+    void setHasCompletedDecode(const bool hcd) { mHasCompletedDecode = hcd; }
+    void setHasDecodeFailed(const bool hdf) { mHasDecodeFailed = hdf; }
+    void setHasWAVLoadFailed(const bool hwlf) { mHasWAVLoadFailed = hwlf; }
 
-	friend class LLAudioEngine; // Severe laziness, bad.
+    friend class LLAudioEngine;  // Severe laziness, bad.
 
-protected:
-	LLUUID mID;
-	LLAudioBuffer *mBufferp;	// If this data is being used by the audio system, a pointer to the buffer will be set here.
-	bool mHasLocalData;			// Set true if the sound asset file is available locally
-	bool mHasDecodedData;		// Set true if the sound file has been decoded
-	bool mHasCompletedDecode;	// Set true when the sound is decoded
-	bool mHasValidData;			// Set false if decoding failed, meaning the sound asset is bad
+  protected:
+    LLUUID         mID;
+    LLAudioBuffer *mBufferp;             // If this data is being used by the audio system, a pointer to the buffer will be set here.
+    bool           mHasLocalData;        // Set true if the encoded sound asset file is available locally
+    bool           mHasDecodedData;      // Set true if the decoded sound file is available on disk
+    bool           mHasCompletedDecode;  // Set true when the sound is decoded
+    bool           mHasDecodeFailed;     // Set true if decoding failed, meaning the sound asset is bad
+    bool mHasWAVLoadFailed;  // Set true if loading the decoded WAV file failed, meaning the sound asset should be decoded instead if
+                             // possible
 };
 
 
@@ -476,16 +495,16 @@ struct SoundData
 	S32 type;
 	LLVector3d pos_global;
 
-	SoundData(const LLUUID &audio_uuid_in, 
-		const LLUUID& owner_id_in, 
-		const F32 gain_in,
-		const S32 type_in = LLAudioEngine::AUDIO_TYPE_NONE,
-		const LLVector3d &pos_global_in = LLVector3d::zero) :
-		audio_uuid(audio_uuid_in),
-		owner_id(owner_id_in),
-		gain(gain_in),
-		type(type_in),
-		pos_global(pos_global_in)
+	SoundData(const LLUUID &audio_uuid, 
+		const LLUUID& owner_id, 
+		const F32 gain, 					  
+		const S32 type = LLAudioEngine::AUDIO_TYPE_NONE,
+		const LLVector3d &pos_global = LLVector3d::zero) :
+		audio_uuid(audio_uuid),
+		owner_id(owner_id),
+		gain(gain),
+		type(type),
+		pos_global(pos_global)
 	{
 	}
 };

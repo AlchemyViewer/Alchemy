@@ -1,10 +1,10 @@
 /** 
- * @file llviewertexturelinumimagest.h
+ * @file llviewertexturelist.h
  * @brief Object for managing the list of images within a region
  *
- * $LicenseInfo:firstyear=2000&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2022&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2022, Linden Research, Inc.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -35,8 +35,6 @@
 #include <list>
 #include <set>
 #include "lluiimage.h"
-
-#include "absl/container/flat_hash_map.h"
 
 const U32 LL_IMAGE_REZ_LOSSLESS_CUTOFF = 128;
 
@@ -91,10 +89,12 @@ struct LLTextureKey
 		return lhs.textureId == rhs.textureId && lhs.textureType == rhs.textureType;
 	}
 
-	template <typename H>
-	friend H AbslHashValue(H h, const LLTextureKey& id) 
+	friend std::size_t hash_value(LLTextureKey const& id)
 	{
-		return H::combine(std::move(h), id.textureId, id.textureType);
+		std::size_t seed = 0;
+		boost::hash_combine(seed, id.textureId);
+		boost::hash_combine(seed, id.textureType);
+		return seed;
 	}
 };
 
@@ -105,11 +105,21 @@ class LLViewerTextureList
 	friend class LLLocalBitmap;
 	
 public:
-	static BOOL createUploadFile(const std::string& filename, const std::string& out_filename, const U8 codec);
-	static LLPointer<LLImageJ2C> convertToUploadFile(LLPointer<LLImageRaw> raw_image);
+    static bool createUploadFile(LLPointer<LLImageRaw> raw_image,
+                                 const std::string& out_filename,
+                                 const S32 max_image_dimentions = LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT,
+                                 const S32 min_image_dimentions = 0);
+    static BOOL createUploadFile(const std::string& filename,
+                                 const std::string& out_filename,
+                                 const U8 codec,
+                                 const S32 max_image_dimentions = LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT,
+                                 const S32 min_image_dimentions = 0,
+                                 bool force_square = false);
+	static LLPointer<LLImageJ2C> convertToUploadFile(LLPointer<LLImageRaw> raw_image,
+                                                     const S32 max_image_dimentions = LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT,
+                                                     bool force_square = false,
+                                                     bool force_lossless = false);
 	static void processImageNotInDatabase( LLMessageSystem *msg, void **user_data );
-	static void receiveImageHeader(LLMessageSystem *msg, void **user_data);
-	static void receiveImagePacket(LLMessageSystem *msg, void **user_data);
 
 public:
 	LLViewerTextureList();
@@ -137,23 +147,23 @@ public:
 
 	void handleIRCallback(void **data, const S32 number);
 
-	S32Megabytes	getMaxResidentTexMem() const	{ return mMaxResidentTexMemInMegaBytes; }
-	S32Megabytes getMaxTotalTextureMem() const   { return mMaxTotalTextureMemInMegaBytes;}
 	S32 getNumImages()					{ return mImageList.size(); }
 
-	void updateMaxResidentTexMem(S32Megabytes mem);
-	
+	// Local UI images
+    // Local UI images
 	void doPreloadImages();
+    // Network images. Needs caps and cache to work
 	void doPrefetchImages();
 
 	void clearFetchingRequests();
 	void setDebugFetching(LLViewerFetchedTexture* tex, S32 debug_level);
 
-	static S32Megabytes getMinVideoRamSetting();
-	static S32Megabytes getMaxVideoRamSetting(bool get_recommended, float mem_multiplier);
-	
 private:
-	void updateImagesDecodePriorities();
+    // do some book keeping on the specified texture
+    // - updates decode priority
+    // - updates desired discard level
+    // - cleans up textures that haven't been referenced in awhile
+    void updateImageDecodePriority(LLViewerFetchedTexture* imagep);
 	F32  updateImagesCreateTextures(F32 max_time);
 	F32  updateImagesFetchTextures(F32 max_time);
 	void updateImagesUpdateStats();
@@ -224,21 +234,16 @@ public:
     
 private:
     using uuid_map_t = std::map< LLTextureKey, LLPointer<LLViewerFetchedTexture> >;
-    using uuid_hash_map_t = absl::flat_hash_map< LLTextureKey, LLViewerFetchedTexture* >;
     uuid_map_t mUUIDMap;
-    uuid_hash_map_t mUUIDHashMap;
     LLTextureKey mLastUpdateKey;
-    LLTextureKey mLastFetchKey;
 	
-	typedef std::set<LLPointer<LLViewerFetchedTexture>, LLViewerFetchedTexture::Compare> image_priority_list_t;	
+    typedef std::set < LLPointer<LLViewerFetchedTexture> > image_priority_list_t;
 	image_priority_list_t mImageList;
 
 	// simply holds on to LLViewerFetchedTexture references to stop them from being purged too soon
 	std::set<LLPointer<LLViewerFetchedTexture> > mImagePreloads;
 
 	BOOL mInitialized ;
-	S32Megabytes	mMaxResidentTexMemInMegaBytes;
-	S32Megabytes mMaxTotalTextureMemInMegaBytes;
 	LLFrameTimer mForceDecodeTimer;
 	
 private:
@@ -283,7 +288,7 @@ private:
 		LLRect mImageClipRegion;
 	};
 
-	typedef absl::flat_hash_map< std::string, LLPointer<LLUIImage> > uuid_ui_image_map_t;
+	typedef boost::unordered_map< std::string, LLPointer<LLUIImage> > uuid_ui_image_map_t;
 	uuid_ui_image_map_t mUIImages;
 
 	//

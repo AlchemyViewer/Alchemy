@@ -43,12 +43,12 @@
 
 #include "llsingleton.h" // includes llerror which we need here so we can skip the include here
 
-class LLViewerEventRecorder final : public LLSingleton<LLViewerEventRecorder>
+class LLViewerEventRecorder final : public LLSimpleton<LLViewerEventRecorder>
 {
-  LLSINGLETON(LLViewerEventRecorder);
-  ~LLViewerEventRecorder();
-
- public:
+public:
+    LLViewerEventRecorder();
+    ~LLViewerEventRecorder();
+   
   void updateMouseEventInfo(S32 local_x,S32 local_y, S32 global_x, S32 global_y,  std::string mName);
   void setMouseLocalCoords(S32 x,S32 y);
   void setMouseGlobalCoords(S32 x,S32 y);

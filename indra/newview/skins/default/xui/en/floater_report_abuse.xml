@@ -11,6 +11,11 @@
      name="Screenshot">
         Screenshot
     </floater.string>
+    <floater.string
+     name="chat_report_format">
+Time: [MSG_TIME]
+Text: [MSG_DESCRIPTION]
+    </floater.string>
     <texture_picker
      allow_no_texture="true"
      default_image_name="None"
@@ -19,8 +24,19 @@
      layout="topleft"
      left="60"
      name="screenshot"
-     top="15"
+     top="20"
      width="220" />
+     <button
+     follows="top|left"
+     halign="center"
+     height="23"
+     image_overlay="Refresh_Off"
+     layout="topleft"
+     tool_tip="Refresh Screenshot"
+     name="refresh_screenshot"
+     left_pad="5"
+     top="126"
+     width="25"/>
     <text
      type="string"
      length="1"
@@ -31,7 +47,7 @@
      layout="topleft"
      left="10"
      name="reporter_title"
-     top_pad="-2"
+     top_pad="15"
      width="100">
         Reporter:
     </text>
@@ -361,7 +377,7 @@
      type="string"
      length="1"
      follows="left|top"
-     height="22"
+     height="13"
      layout="topleft"
      name="bug_aviso"
      left_pad="10"

@@ -89,7 +89,8 @@ LLDir::LLDir()
 	mTempDir(""),
 	mDirDelimiter("/"), // fallback to forward slash if not overridden
 	mLanguage("en"),
-	mUserName("undefined")
+	mUserName("undefined"),
+	mGrid("")
 {
 }
 
@@ -105,13 +106,15 @@ std::vector<std::string> LLDir::getFilesInDir(const std::string &dirname)
 
     std::vector<std::string> v;
     
-    if (exists(p))
+	boost::system::error_code ec;
+    if (boost::filesystem::exists(p, ec) && !ec.failed())
     {
-        if (is_directory(p))
+        if (boost::filesystem::is_directory(p, ec) && !ec.failed())
         {
             boost::filesystem::directory_iterator end_iter;
-            for (boost::filesystem::directory_iterator dir_itr(p);
-                 dir_itr != end_iter;
+			boost::filesystem::directory_iterator dir_itr(p, ec);
+			if (ec.failed()) return v;
+            for (; dir_itr != end_iter;
                  ++dir_itr)
             {
                 if (boost::filesystem::is_regular_file(dir_itr->status()))
@@ -184,44 +187,41 @@ S32 LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask)
 
 U32 LLDir::deleteDirAndContents(const std::string& dir_name)
 {
-    //Removes the directory and its contents.  Returns number of files deleted.
-	
+	//Removes the directory and its contents.  Returns number of files deleted.
+
 	U32 num_deleted = 0;
-
-	try
-	{
+	boost::system::error_code ec;
 #ifdef LL_WINDOWS // or BOOST_WINDOWS_API
-		boost::filesystem::path dir_path(ll_convert_string_to_wide(dir_name));
+	boost::filesystem::path dir_path(ll_convert_string_to_wide(dir_name));
 #else
-		boost::filesystem::path dir_path(dir_name);
+	boost::filesystem::path dir_path(dir_name);
 #endif
-
-	   if (boost::filesystem::exists (dir_path))
-	   {
-	      if (!boost::filesystem::is_empty (dir_path))
-		  {   // Directory has content
-			  boost::system::error_code ec;
-			  num_deleted = boost::filesystem::remove_all(dir_path, ec);
-			  if (ec.failed())
-			  {
-				  LL_WARNS() << "Failed to delete file " << dir_path << ": " << ec.message() << LL_ENDL;
-			  }
-		  }
-		  else
-		  {   // Directory is empty
-			 boost::system::error_code ec;
-			 num_deleted = boost::filesystem::remove(dir_path, ec);
-			 if (ec.failed())
-			 {
-				 LL_WARNS() << "Failed to delete folder " << dir_path << ": " << ec.message() << LL_ENDL;
-			 }
-		  }
-	   }
+	bool exists = boost::filesystem::exists(dir_path, ec);
+	if (ec.failed())
+	{
+		LL_WARNS() << "Failed to delete path " << dir_path << ": " << ec.message() << LL_ENDL;
+		return num_deleted;
 	}
-	catch (const boost::filesystem::filesystem_error &er)
-	{ 
-		LL_WARNS() << "Failed to delete " << dir_name << " with error " << er.code().message() << LL_ENDL;
-	} 
+	if (exists)
+	{
+		if (!boost::filesystem::is_empty(dir_path, ec) && !ec.failed())
+		{   // Directory has content
+
+			num_deleted = boost::filesystem::remove_all(dir_path, ec);
+			if (ec.failed())
+			{
+				LL_WARNS() << "Failed to delete file " << dir_path << ": " << ec.message() << LL_ENDL;
+			}
+		}
+		else if(!ec.failed())
+		{   // Directory is empty
+			num_deleted = boost::filesystem::remove(dir_path, ec);
+			if (ec.failed())
+			{
+				LL_WARNS() << "Failed to delete folder " << dir_path << ": " << ec.message() << LL_ENDL;
+			}
+		}
+	}
 	return num_deleted;
 }
 
@@ -916,7 +916,7 @@ std::string LLDir::getForbiddenFileChars()
 	return "\\/:*?\"<>|";
 }
 
-void LLDir::setLindenUserDir(const std::string &username)
+void LLDir::setLindenUserDir(const std::string &username, const std::string &gridname)
 {
 	// if the username isn't set, that's bad
 	if (!username.empty())
@@ -926,7 +926,13 @@ void LLDir::setLindenUserDir(const std::string &username)
 		std::string userlower(username);
 		LLStringUtil::toLower(userlower);
 		LLStringUtil::replaceChar(userlower, ' ', '_');
-		mLindenUserDir = add(getOSUserAppDir(), userlower);
+		std::string gridlower(gridname);
+		LLStringUtil::toLower(gridlower);
+		LLStringUtil::replaceChar(gridlower, ' ', '_');
+		const std::string& logname = (gridlower.empty())
+			? userlower : userlower.append(".").append(gridlower);
+		
+		mLindenUserDir = add(getOSUserAppDir(), logname);
 	}
 	else
 	{
@@ -950,10 +956,12 @@ void LLDir::setChatLogsDir(const std::string &path)
 
 void LLDir::updatePerAccountChatLogsDir()
 {
-	mPerAccountChatLogsDir = add(getChatLogsDir(), mUserName);
+	const std::string& logname = (mGrid.empty())
+		? mUserName : mUserName.append(".").append(mGrid);
+	mPerAccountChatLogsDir = add(getChatLogsDir(), logname);
 }
 
-void LLDir::setPerAccountChatLogsDir(const std::string &username)
+void LLDir::setPerAccountChatLogsDir(const std::string &username, const std::string &gridname)
 {
 	// if both first and last aren't set, assume we're grabbing the cached dir
 	if (!username.empty())
@@ -963,8 +971,12 @@ void LLDir::setPerAccountChatLogsDir(const std::string &username)
 		std::string userlower(username);
 		LLStringUtil::toLower(userlower);
 		LLStringUtil::replaceChar(userlower, ' ', '_');
-
+		std::string gridlower(gridname);
+		LLStringUtil::toLower(gridlower);
+		LLStringUtil::replaceChar(gridlower, ' ', '_');
+		
 		mUserName = userlower;
+		mGrid = gridlower;
 		updatePerAccountChatLogsDir();
 	}
 	else
@@ -1033,7 +1045,7 @@ bool LLDir::setCacheDir(const std::string &path)
 	if (path.empty() )
 	{
 		// reset to default
-		mCacheDir = "";
+		mCacheDir.clear();
 		return true;
 	}
 	else
@@ -1073,17 +1085,17 @@ void LLDir::dumpCurrentDirectories(LLError::ELevel level)
 	LL_VLOGS(level, "AppInit", "Directories") << "  UserSkinDir:           " << getUserSkinDir() << LL_ENDL;
 }
 
-void LLDir::append(std::string& destpath, const std::string& name) const
+void LLDir::append(std::string& destpath, std::string_view name) const
 {
 	// Delegate question of whether we need a separator to helper method.
 	SepOff sepoff(needSep(destpath, name));
 	if (sepoff.first)               // do we need a separator?
 	{
-		destpath += mDirDelimiter;
+		destpath.append(mDirDelimiter);
 	}
 	// If destpath ends with a separator, AND name starts with one, skip
 	// name's leading separator.
-	destpath += name.substr(sepoff.second);
+	destpath.append(name.substr(sepoff.second));
 }
 
 // static 
@@ -1119,7 +1131,7 @@ std::string LLDir::escapePathString(std::string_view str)
 	return escaped_str.str();
 }
 
-LLDir::SepOff LLDir::needSep(const std::string& path, const std::string& name) const
+LLDir::SepOff LLDir::needSep(std::string_view path, std::string_view name) const
 {
 	if (path.empty() || name.empty())
 	{

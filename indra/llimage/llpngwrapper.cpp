@@ -258,7 +258,6 @@ void LLPngWrapper::normalizeImage()
 	}
 
 	const F64 SCREEN_GAMMA = 2.2;
-
 	if (png_get_gAMA(mReadPngPtr, mReadInfoPtr, &mGamma))
 	{
 		png_set_gamma(mReadPngPtr, SCREEN_GAMMA, mGamma);

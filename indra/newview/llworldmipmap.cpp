@@ -27,7 +27,9 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llworldmipmap.h"
+#include "llagent.h"
 #include "llviewercontrol.h"		// LLControlGroup
+#include "llviewerregion.h"
 
 #include "llviewertexturelist.h"
 #include "math.h"	// log()
@@ -70,7 +72,7 @@ void LLWorldMipmap::equalizeBoostLevels()
 	{
 		sublevel_tiles_t& level_mipmap = mWorldObjectsMipMap[level];
 		// For each tile
-		for (sublevel_tiles_t::iterator iter = level_mipmap.begin(); iter != level_mipmap.end(); iter++)
+		for (sublevel_tiles_t::iterator iter = level_mipmap.begin(), end_it = level_mipmap.end(); iter != end_it; ++iter)
 		{
 			LLPointer<LLViewerFetchedTexture> img = iter->second;
 			S32 current_boost_level = img->getBoostLevel();
@@ -112,7 +114,7 @@ void LLWorldMipmap::dropBoostLevels()
 	{
 		sublevel_tiles_t& level_mipmap = mWorldObjectsMipMap[level];
 		// For each tile
-		for (sublevel_tiles_t::iterator iter = level_mipmap.begin(); iter != level_mipmap.end(); iter++)
+		for (sublevel_tiles_t::iterator iter = level_mipmap.begin(), end_it = level_mipmap.end(); iter != end_it; iter++)
 		{
 			LLPointer<LLViewerFetchedTexture> img = iter->second;
 			img->setBoostLevel(LLGLTexture::BOOST_NONE);
@@ -149,9 +151,16 @@ LLPointer<LLViewerFetchedTexture> LLWorldMipmap::getObjectsTile(U32 grid_x, U32 
 			// Load it 
 			LLPointer<LLViewerFetchedTexture> img = loadObjectsTile(grid_x, grid_y, level);
 			// Insert the image in the map
-			level_mipmap.insert(sublevel_tiles_t::value_type( handle, img ));
-			// Find the element again in the map (it's there now...)
-			found = level_mipmap.find(handle);
+			const auto& ret = level_mipmap.emplace(handle, img);
+			if (ret.second)
+			{
+				// Find the element again in the map (it's there now...)
+				found = ret.first;
+			}
+			else
+			{
+				return nullptr;
+			}
 		}
 		else
 		{
@@ -181,7 +190,9 @@ LLPointer<LLViewerFetchedTexture> LLWorldMipmap::getObjectsTile(U32 grid_x, U32 
 LLPointer<LLViewerFetchedTexture> LLWorldMipmap::loadObjectsTile(U32 grid_x, U32 grid_y, S32 level)
 {
 	// Get the grid coordinates
-	std::string imageurl = gSavedSettings.getString("CurrentMapServerURL") + llformat("map-%d-%d-%d-objects.jpg", level, grid_x, grid_y);
+	LLViewerRegion* regionp = gAgent.getRegion();
+	std::string imageurl = regionp != nullptr ? regionp->getMapServerURL() : gSavedSettings.getString("CurrentMapServerURL");
+	imageurl.append(llformat("map-%d-%d-%d-objects.jpg", level, grid_x, grid_y));
 
 	// DO NOT COMMIT!! DEBUG ONLY!!!
 	// Use a local jpeg for every tile to test map speed without S3 access
@@ -189,10 +200,10 @@ LLPointer<LLViewerFetchedTexture> LLWorldMipmap::loadObjectsTile(U32 grid_x, U32
 	// END DEBUG
 	//LL_INFOS("WorldMap") << "LLWorldMipmap::loadObjectsTile(), URL = " << imageurl << LL_ENDL;
 
-	LLPointer<LLViewerFetchedTexture> img = LLViewerTextureManager::getFetchedTextureFromUrl(imageurl, FTT_MAP_TILE, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
-	LL_INFOS("MAPURL") << "fetching map tile from " << imageurl << LL_ENDL;
-
-	img->setBoostLevel(LLGLTexture::BOOST_MAP);
+	LLPointer<LLViewerFetchedTexture> img = LLViewerTextureManager::getFetchedTextureFromUrl(imageurl, FTT_MAP_TILE, TRUE, LLGLTexture::BOOST_MAP, LLViewerTexture::LOD_TEXTURE);
+#if SHOW_DEBUG
+	LL_DEBUGS("MAPURL") << "fetching map tile from " << imageurl << LL_ENDL;
+#endif
 
 	// Return the smart pointer
 	return img;
@@ -217,19 +228,16 @@ void LLWorldMipmap::cleanMissedTilesFromLevel(S32 level)
 	// Iterate through the subresolution level and suppress the tiles that are marked as missing
 	// Note: erasing in a map while iterating through it is bug prone. Using a postfix increment is mandatory here.
 	sublevel_tiles_t& level_mipmap = mWorldObjectsMipMap[level-1];
-	sublevel_tiles_t::iterator it = level_mipmap.begin();
-	while (it != level_mipmap.end())
+	for (auto it = level_mipmap.begin(), end = level_mipmap.end(); it != end;)
 	{
-		LLPointer<LLViewerFetchedTexture> img = it->second;
-		if (img->isMissingAsset())
+		auto copy_it = it++;
+		LLPointer<LLViewerFetchedTexture> img = copy_it->second;
+		if (img->isMissingAsset()) 
 		{
-			level_mipmap.erase(it++);
-		}
-		else
-		{
-			++it;
+			level_mipmap.erase(copy_it);
 		}
 	}
+
 	return;
 }
 

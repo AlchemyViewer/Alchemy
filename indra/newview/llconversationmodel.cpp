@@ -182,6 +182,7 @@ void LLConversationItem::buildParticipantMenuOptions(menuentry_vec_t& items, U32
 		items.push_back(std::string("map"));
 		items.push_back(std::string("share"));
 		items.push_back(std::string("pay"));
+        items.push_back(std::string("report_abuse"));
 		items.push_back(std::string("block_unblock"));
 		items.push_back(std::string("MuteText"));
 		items.push_back(std::string("report_abuse"));
@@ -209,7 +210,7 @@ void LLConversationItem::buildParticipantMenuOptions(menuentry_vec_t& items, U32
 		items.push_back(std::string("utils_menu"));
 		items.push_back(std::string("copy_username"));
 		items.push_back(std::string("copy_display_name"));
-		items.push_back(std::string("copy_account_name"));
+		items.push_back(std::string("copy_full_name"));
 		items.push_back(std::string("copy_slurl"));
 		items.push_back(std::string("copy_uuid"));
 	}
@@ -460,6 +461,10 @@ void LLConversationItemSession::buildContextMenu(LLMenuGL& menu, U32 flags)
         items.push_back(std::string("group_profile"));
         items.push_back(std::string("activate_group"));
         items.push_back(std::string("leave_group"));
+		items.push_back(std::string("separator_group_copy"));
+		items.push_back(std::string("copy_group_name"));
+		items.push_back(std::string("copy_group_slurl"));
+		items.push_back(std::string("copy_group_id"));
     }
     else if(this->getType() == CONV_SESSION_AD_HOC)
     {
@@ -650,7 +655,7 @@ void LLConversationItemParticipant::setDisplayModeratorRole(bool displayRole)
 
 bool LLConversationItemParticipant::isVoiceMuted()
 {
-	return mIsModeratorMuted || LLMuteList::getInstanceFast()->isMuted(mUUID, LLMute::flagVoiceChat);
+	return mIsModeratorMuted || LLMuteList::getInstance()->isMuted(mUUID, LLMute::flagVoiceChat);
 }
 
 //

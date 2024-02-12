@@ -161,7 +161,7 @@
     radio_style="false"
     width="400"
     top_pad="5"/>
-  <text
+  <!--<text
      type="string"
      length="1"
      follows="left|top"
@@ -175,7 +175,7 @@
     Software updates:
   </text>
   <combo_box
-     control_name="UpdaterServiceSetting"
+     control_name="AlchemyUpdatePreference"
      follows="left|top"
      height="23"
      layout="topleft"
@@ -186,28 +186,16 @@
         <combo_box.item
          label="Install each update automatically"
          name="Install_automatically"
-         value="3" />
+         value="0" />
         <combo_box.item
          label="Ask me when an optional update is ready to install"
          name="Install_ask"
          value="1" />
         <combo_box.item
-         label="Install only mandatory updates"
+         label="Ask me when to download and install updates"
          name="Install_manual"
-         value="0" />
+         value="2" />
   </combo_box>
-  <check_box
-    top_delta="4"
-    enabled="true"
-    follows="left|top"
-    height="14"
-    control_name="UpdaterWillingToTest"
-    label="Willing to update to release candidates"
-    left_delta="0"
-    mouse_opaque="true"
-    name="update_willing_to_test"
-    width="400"           
-    top_pad="5"/>
   <check_box
     top_delta="4"
     enabled="true"
@@ -219,7 +207,7 @@
     mouse_opaque="true"
     name="update_show_release_notes"
     width="400"
-    top_pad="5"/>
+    top_pad="5"/>-->
   <text
      type="string"
      length="1"
@@ -237,7 +225,7 @@
 	label="Adjust proxy settings"
     follows="left|top"
     height="23"
-	width="140" 
+	width="160" 
     label_selected="Browse"
     layout="topleft"
     left_delta="50"

@@ -101,7 +101,7 @@ class LLGroupListItem : public LLPanel
 	, public LLGroupMgrObserver
 {
 public:
-    LLGroupListItem(bool for_agent);
+    LLGroupListItem(bool for_agent, bool show_icons);
 	~LLGroupListItem();
 	/*virtual*/ BOOL postBuild();
 	/*virtual*/ void setValue(const LLSD& value);
@@ -120,18 +120,23 @@ public:
 
     void setVisibleInProfile(bool visible);
 private:
-	void setActive(bool active);
+	void setBold(bool bold);
 	void onInfoBtnClick();
 	void onProfileBtnClick();
+    void onVisibilityBtnClick(bool new_visibility);
 
 	LLTextBox*	mGroupNameBox;
 	LLUUID		mGroupID;
 	LLGroupIconCtrl* mGroupIcon;
-	LLButton*	mInfoBtn;
+    LLButton*	mInfoBtn;
+    LLButton*	mProfileBtn;
+    LLButton*	mVisibilityHideBtn;
+    LLButton*	mVisibilityShowBtn;
 
 	std::string	mGroupName;
+    bool        mForAgent;
 	LLStyle::Params mGroupNameStyle;
 
-	static S32	sIconWidth; // icon width + padding
+	S32	mIconWidth;
 };
 #endif // LL_LLGROUPLIST_H

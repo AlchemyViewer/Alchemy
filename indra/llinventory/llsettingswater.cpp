@@ -32,15 +32,8 @@
 #include "llfasttimer.h"
 #include "v3colorutil.h"
 #include "indra_constants.h"
+#include <boost/bind.hpp>
 
-//=========================================================================
-namespace
-{
-     LLTrace::BlockTimerStatHandle FTM_BLEND_WATERVALUES("Blending Water Environment");
-     LLTrace::BlockTimerStatHandle FTM_UPDATE_WATERVALUES("Update Water Environment");
-}
-
-//=========================================================================
 const std::string LLSettingsWater::SETTING_BLUR_MULTIPLIER("blur_multiplier");
 const std::string LLSettingsWater::SETTING_FOG_COLOR("water_fog_color");
 const std::string LLSettingsWater::SETTING_FOG_DENSITY("water_fog_density");
@@ -230,42 +223,38 @@ const LLSettingsWater::validation_list_t& LLSettingsWater::validationList()
     static validation_list_t validation;
 
     if (validation.empty())
-    {   // Note the use of LLSD(LLSDArray()()()...) This is due to an issue with the 
-        // copy constructor for LLSDArray.  Directly binding the LLSDArray as 
-        // a parameter without first wrapping it in a pure LLSD object will result 
-        // in deeply nested arrays like this [[[[[[[[[[v1,v2,v3]]]]]]]]]]
-
+    {
         validation.push_back(Validator(SETTING_BLUR_MULTIPLIER, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, LLSD(LLSDArray(-0.5f)(0.5f)))));
+            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(-0.5f, 0.5f))));
         validation.push_back(Validator(SETTING_FOG_COLOR, true, LLSD::TypeArray,
             boost::bind(&Validator::verifyVectorMinMax, boost::placeholders::_1, boost::placeholders::_2,
-                LLSD(LLSDArray(0.0f)(0.0f)(0.0f)(1.0f)),
-                LLSD(LLSDArray(1.0f)(1.0f)(1.0f)(1.0f)))));
+                llsd::array(0.0f, 0.0f, 0.0f, 1.0f),
+                llsd::array(1.0f, 1.0f, 1.0f, 1.0f))));
         validation.push_back(Validator(SETTING_FOG_DENSITY, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, LLSD(LLSDArray(-10.0f)(10.0f)))));
+            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.001f, 100.0f))));
         validation.push_back(Validator(SETTING_FOG_MOD, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, LLSD(LLSDArray(0.0f)(20.0f)))));
+            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 20.0f))));
         validation.push_back(Validator(SETTING_FRESNEL_OFFSET, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, LLSD(LLSDArray(0.0f)(1.0f)))));
+            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 1.0f))));
         validation.push_back(Validator(SETTING_FRESNEL_SCALE, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, LLSD(LLSDArray(0.0f)(1.0f)))));
+            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 1.0f))));
         validation.push_back(Validator(SETTING_NORMAL_MAP, true, LLSD::TypeUUID));
         validation.push_back(Validator(SETTING_NORMAL_SCALE, true, LLSD::TypeArray,
             boost::bind(&Validator::verifyVectorMinMax, boost::placeholders::_1, boost::placeholders::_2,
-                LLSD(LLSDArray(0.0f)(0.0f)(0.0f)),
-                LLSD(LLSDArray(10.0f)(10.0f)(10.0f)))));
+                llsd::array(0.0f, 0.0f, 0.0f),
+                llsd::array(10.0f, 10.0f, 10.0f))));
         validation.push_back(Validator(SETTING_SCALE_ABOVE, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, LLSD(LLSDArray(0.0f)(3.0f)))));
+            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 3.0f))));
         validation.push_back(Validator(SETTING_SCALE_BELOW, true, LLSD::TypeReal,
-            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, LLSD(LLSDArray(0.0f)(3.0f)))));
+            boost::bind(&Validator::verifyFloatRange, boost::placeholders::_1, boost::placeholders::_2, llsd::array(0.0f, 3.0f))));
         validation.push_back(Validator(SETTING_WAVE1_DIR, true, LLSD::TypeArray,
             boost::bind(&Validator::verifyVectorMinMax, boost::placeholders::_1, boost::placeholders::_2,
-                LLSD(LLSDArray(-20.0f)(-20.0f)),
-                LLSD(LLSDArray(20.0f)(20.0f)))));
+                llsd::array(-20.0f, -20.0f),
+                llsd::array(20.0f, 20.0f))));
         validation.push_back(Validator(SETTING_WAVE2_DIR, true, LLSD::TypeArray,
             boost::bind(&Validator::verifyVectorMinMax, boost::placeholders::_1, boost::placeholders::_2,
-                LLSD(LLSDArray(-20.0f)(-20.0f)),
-                LLSD(LLSDArray(20.0f)(20.0f)))));
+                llsd::array(-20.0f, -20.0f),
+                llsd::array(20.0f, 20.0f))));
     }
 
     return validation;
@@ -303,6 +292,19 @@ F32 LLSettingsWater::getModifiedWaterFogDensityFast(F32 fog_density, F32 underwa
     if (underwater && underwater_fog_mod > 0.0f)
     {
         underwater_fog_mod = llclamp(underwater_fog_mod, 0.0f, 10.0f);
+        // BUG-233797/BUG-233798 -ve underwater fog density can cause (unrecoverable) blackout.
+        // raising a negative number to a non-integral power results in a non-real result (which is NaN for our purposes)
+        // Two methods were tested, number 2 is being used:
+        // 1) Force the fog_mod to be integral. The effect is unlikely to be nice, but it is better than blackness.
+        // In this method a few of the combinations are "usable" but the water colour is effectively inverted (blue becomes yellow)
+        // this seems to be unlikely to be a desirable use case for the majority.
+        // 2) Force density to be an arbitrary non-negative (i.e. 1) when underwater and modifier is not an integer (1 was aribtrarily chosen as it gives at least some notion of fog in the transition)
+        // This is more restrictive, effectively forcing a density under certain conditions, but allowing the range of #1 and avoiding blackness in other cases
+        // at the cost of overriding the fog density. 
+        if(fog_density < 0.0f && underwater_fog_mod != (F32)ll_round(underwater_fog_mod) )
+        {
+            fog_density = 1.0f;
+        }
         fog_density = pow(fog_density, underwater_fog_mod);
     }
     return fog_density;

@@ -74,6 +74,9 @@ public:
 	/// copy a Url to the clipboard
 	static void copyURLToClipboard(std::string url);
 
+	/// copy a UUID to the clipboard
+	static void copyUUIDToClipboard(std::string url);
+
 	/// if the Url specifies an SL command in the form like 'app/{cmd}/{id}/*', show its profile
 	static void showProfile(std::string url);
 	static std::string getUserID(std::string url);
@@ -82,6 +85,7 @@ public:
 	static void sendIM(std::string url);
 	static void addFriend(std::string url);
 	static void removeFriend(std::string url);
+    static void reportAbuse(std::string url);
 	static void blockObject(std::string url);
 	static void unblockObject(std::string url);
 

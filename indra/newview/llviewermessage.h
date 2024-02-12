@@ -35,6 +35,7 @@
 #include "message.h"
 #include "llnotifications.h"
 #include "llextendedstatus.h"
+#include "llinventoryobserver.h"
 
 #include <boost/function.hpp>
 #include <boost/signals2.hpp>
@@ -202,7 +203,7 @@ void invalid_message_callback(LLMessageSystem*, void*, EMessageException);
 
 void process_initiate_download(LLMessageSystem* msg, void**);
 void start_new_inventory_observer();
-void open_inventory_offer(const uuid_vec_t& items, const std::string& from_name);
+void open_inventory_offer(const uuid_vec_t& items, const std::string& from_name, bool manual_offer = false);
 
 // Returns true if item is not in certain "quiet" folder which don't need UI
 // notification (e.g. trash, cof, lost-and-found) and agent is not AFK, false otherwise.
@@ -268,6 +269,20 @@ private:
 	typedef std::map<std::string, respond_function_t> respond_function_map_t;
 
 	respond_function_map_t mRespondFunctions;
+};
+
+class LLOpenAgentOffer : public LLInventoryFetchItemsObserver
+{
+public:
+	LLOpenAgentOffer(const LLUUID& object_id, const std::string& from_name, bool is_manual_accept) : 
+		LLInventoryFetchItemsObserver(object_id),
+		mFromName(from_name),
+		mIsManuallyAccepted(is_manual_accept) {}
+	/*virtual*/ void startFetch();
+	/*virtual*/ void done();
+private:
+	std::string mFromName;
+	bool		mIsManuallyAccepted;
 };
 
 void process_feature_disabled_message(LLMessageSystem* msg, void**);

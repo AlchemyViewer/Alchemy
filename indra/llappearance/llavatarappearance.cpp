@@ -202,10 +202,10 @@ void LLAvatarAppearance::initInstance()
 	mRoot = createAvatarJoint();
 	mRoot->setName( "mRoot" );
 
-	for (const auto& mesh_entry_pair : sAvatarDictionary->getMeshEntries())
+	for (const LLAvatarAppearanceDictionary::MeshEntries::value_type& mesh_pair : sAvatarDictionary->getMeshEntries())
 	{
-		const EMeshIndex mesh_index = mesh_entry_pair.first;
-		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_entry_pair.second;
+		const EMeshIndex mesh_index = mesh_pair.first;
+		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_pair.second;
 		LLAvatarJoint* joint = createAvatarJoint();
 		joint->setName(mesh_dict->mName);
 		joint->setMeshID(mesh_index);
@@ -246,10 +246,10 @@ void LLAvatarAppearance::initInstance()
 	//-------------------------------------------------------------------------
 	// associate baked textures with meshes
 	//-------------------------------------------------------------------------
-	for (const auto& mesh_entry_pair : sAvatarDictionary->getMeshEntries())
+	for (const LLAvatarAppearanceDictionary::MeshEntries::value_type& mesh_pair : sAvatarDictionary->getMeshEntries())
 	{
-		const EMeshIndex mesh_index = mesh_entry_pair.first;
-		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_entry_pair.second;
+		const EMeshIndex mesh_index = mesh_pair.first;
+		const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_pair.second;
 		const EBakedTextureIndex baked_texture_index = mesh_dict->mBakedID;
 		// Skip it if there's no associated baked texture.
 		if (baked_texture_index == BAKED_NUM_INDICES) continue;
@@ -278,19 +278,18 @@ LLAvatarAppearance::~LLAvatarAppearance()
 		delete_and_clear(mBakedTextureDatas[i].mTexLayerSet);
 		mBakedTextureDatas[i].mJointMeshes.clear();
 
-		for (morph_list_t::iterator iter2 = mBakedTextureDatas[i].mMaskedMorphs.begin();
-			 iter2 != mBakedTextureDatas[i].mMaskedMorphs.end(); iter2++)
+		for (LLMaskedMorph* masked_morph : mBakedTextureDatas[i].mMaskedMorphs)
 		{
-			LLMaskedMorph* masked_morph = (*iter2);
 			delete masked_morph;
 		}
 	}
 
-	if (mRoot)
-    {
-        mRoot->removeAllChildren();
-        delete mRoot;
-    }
+	if (mRoot) 
+	{
+		mRoot->removeAllChildren();
+		delete mRoot;
+		mRoot = nullptr;
+	}
 	mJointMap.clear();
 
 	clearSkeleton();
@@ -299,11 +298,8 @@ LLAvatarAppearance::~LLAvatarAppearance()
 	std::for_each(mPolyMeshes.begin(), mPolyMeshes.end(), DeletePairedPointer());
 	mPolyMeshes.clear();
 
-	for (avatar_joint_list_t::iterator jointIter = mMeshLOD.begin();
-		 jointIter != mMeshLOD.end(); 
-		 ++jointIter)
+	for (LLAvatarJoint* joint : mMeshLOD)
 	{
-		LLAvatarJoint* joint = *jointIter;
 		std::for_each(joint->mMeshParts.begin(), joint->mMeshParts.end(), DeletePointer());
 		joint->mMeshParts.clear();
 	}
@@ -455,10 +451,9 @@ void LLAvatarAppearance::compareJointStateMaps(joint_state_map_t& last_state,
     if (!last_state.empty() && (last_state != curr_state))
     {
         S32 diff_count = 0;
-        joint_state_map_t::iterator it;
-        for (it=last_state.begin(); it != last_state.end(); ++it)
+        for (joint_state_map_t::value_type& pair : last_state)
         {
-            const std::string& key = it->first;
+            const std::string& key = pair.first;
             if (last_state[key] != curr_state[key])
             {
                 LL_DEBUGS("AvatarBodySize") << "BodySize change " << key << " " << last_state[key] << "->" << curr_state[key] << LL_ENDL;
@@ -531,7 +526,10 @@ void LLAvatarAppearance::computeBodySize()
 
 	F32 old_offset = mAvatarOffset.mV[VZ];
 
-	mAvatarOffset.mV[VZ] = getVisualParamWeight(AVATAR_HOVER);
+// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
+	mAvatarOffset.mV[VZ] = getAvatarOffset();
+// [/RLVa:KB]
+//	mAvatarOffset.mV[VZ] = getVisualParamWeight(AVATAR_HOVER);
 
 	mPelvisToFoot = hip.mV[VZ] * pelvis_scale.mV[VZ] -
 				 	knee.mV[VZ] * hip_scale.mV[VZ] -
@@ -558,12 +556,20 @@ void LLAvatarAppearance::computeBodySize()
 	if (new_body_size != mBodySize || old_offset != mAvatarOffset.mV[VZ])
 	{
 		mBodySize = new_body_size;
+		bodySizeChanged();
 
 #ifdef SHOW_DEBUG
         compareJointStateMaps(mLastBodySizeState, mCurrBodySizeState);
 #endif
 	}
 }
+
+// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
+F32 LLAvatarAppearance::getAvatarOffset() /*const*/
+{
+	return getVisualParamWeight(AVATAR_HOVER);
+}
+// [/RLVa:KB]
 
 //-----------------------------------------------------------------------------
 // parseSkeletonFile()
@@ -675,10 +681,8 @@ BOOL LLAvatarAppearance::setupBone(const LLAvatarBoneInfo* info, LLJoint* parent
 
 
 	// setup children
-	LLAvatarBoneInfo::bones_t::const_iterator iter;
-	for (iter = info->mChildren.begin(); iter != info->mChildren.end(); ++iter)
+	for (LLAvatarBoneInfo* child_info : info->mChildren)
 	{
-		LLAvatarBoneInfo *child_info = *iter;
 		if (!setupBone(child_info, joint, volume_num, joint_num))
 		{
 			return FALSE;
@@ -730,10 +734,8 @@ BOOL LLAvatarAppearance::buildSkeleton(const LLAvatarSkeletonInfo *info)
 
 	S32 current_joint_num = 0;
 	S32 current_volume_num = 0;
-	LLAvatarSkeletonInfo::bone_info_list_t::const_iterator iter;
-	for (iter = info->mBoneInfoList.begin(); iter != info->mBoneInfoList.end(); ++iter)
+	for (LLAvatarBoneInfo* bone_info : info->mBoneInfoList)
 	{
-		LLAvatarBoneInfo *bone_info = *iter;
 		if (!setupBone(bone_info, NULL, current_volume_num, current_joint_num))
 		{
 			LL_ERRS() << "Error parsing bone in skeleton file" << LL_ENDL;
@@ -811,14 +813,10 @@ void LLAvatarAppearance::buildCharacter()
 	//-------------------------------------------------------------------------
 	// clear mesh data
 	//-------------------------------------------------------------------------
-	for (avatar_joint_list_t::iterator jointIter = mMeshLOD.begin();
-		 jointIter != mMeshLOD.end(); ++jointIter)
+	for (LLAvatarJoint* joint : mMeshLOD)
 	{
-		LLAvatarJoint* joint = *jointIter;
-		for (avatar_joint_mesh_list_t::iterator meshIter = joint->mMeshParts.begin();
-			 meshIter != joint->mMeshParts.end(); ++meshIter)
+		for (LLAvatarJointMesh* mesh : joint->mMeshParts)
 		{
-			LLAvatarJointMesh * mesh = *meshIter;
 			mesh->setMesh(NULL);
 		}
 	}
@@ -927,6 +925,9 @@ BOOL LLAvatarAppearance::loadAvatar()
 		return FALSE;
 	}
 
+	// initialize mJointAliasMap
+	getJointAliases();
+
 	// avatar_lad.xml : <skeleton>
 	if( !loadSkeletonNode() )
 	{
@@ -999,12 +1000,8 @@ BOOL LLAvatarAppearance::loadAvatar()
 	}
 
 	// avatar_lad.xml : <morph_masks>
-	for (LLAvatarXmlInfo::morph_info_list_t::iterator iter = sAvatarXmlInfo->mMorphMaskInfoList.begin();
-		 iter != sAvatarXmlInfo->mMorphMaskInfoList.end();
-		 ++iter)
+	for (LLAvatarXmlInfo::LLAvatarMorphInfo* info : sAvatarXmlInfo->mMorphMaskInfoList)
 	{
-		LLAvatarXmlInfo::LLAvatarMorphInfo *info = *iter;
-
 		EBakedTextureIndex baked = sAvatarDictionary->findBakedByRegionName(info->mRegion);
 		if (baked != BAKED_NUM_INDICES)
 		{
@@ -1023,11 +1020,8 @@ BOOL LLAvatarAppearance::loadAvatar()
 	loadLayersets();
 	
 	// avatar_lad.xml : <driver_parameters>
-	for (LLAvatarXmlInfo::driver_info_list_t::iterator iter = sAvatarXmlInfo->mDriverInfoList.begin();
-		 iter != sAvatarXmlInfo->mDriverInfoList.end(); 
-		 ++iter)
+	for (LLDriverParamInfo* info : sAvatarXmlInfo->mDriverInfoList)
 	{
-		LLDriverParamInfo *info = *iter;
 		LLDriverParam* driver_param = new LLDriverParam( this );
 		if (driver_param->setInfo(info))
 		{
@@ -1047,7 +1041,6 @@ BOOL LLAvatarAppearance::loadAvatar()
 			return FALSE;
 		}
 	}
-
 	
 	return TRUE;
 }
@@ -1060,11 +1053,8 @@ BOOL LLAvatarAppearance::loadSkeletonNode ()
 	mRoot->addChild( mSkeleton[0] );
 
 	// make meshes children before calling parent version of the function
-	for (avatar_joint_list_t::iterator iter = mMeshLOD.begin();
-		 iter != mMeshLOD.end(); 
-		 ++iter)
+	for (LLAvatarJoint* joint : mMeshLOD)
 	{
-		LLAvatarJoint *joint = *iter;
 		joint->mUpdateXform = FALSE;
 		joint->setMeshesToChildren();
 	}
@@ -1074,7 +1064,6 @@ BOOL LLAvatarAppearance::loadSkeletonNode ()
 	mRoot->addChild(mMeshLOD[MESH_ID_UPPER_BODY]);
 	mRoot->addChild(mMeshLOD[MESH_ID_LOWER_BODY]);
 	mRoot->addChild(mMeshLOD[MESH_ID_SKIRT]);
-	mRoot->addChild(mMeshLOD[MESH_ID_HEAD]);
 
 	LLAvatarJoint *skull = (LLAvatarJoint*)mRoot->findJoint("mSkull");
 	if (skull)
@@ -1096,12 +1085,9 @@ BOOL LLAvatarAppearance::loadSkeletonNode ()
 
 	// SKELETAL DISTORTIONS
 	{
-		LLAvatarXmlInfo::skeletal_distortion_info_list_t::iterator iter;
-		for (iter = sAvatarXmlInfo->mSkeletalDistortionInfoList.begin();
-			 iter != sAvatarXmlInfo->mSkeletalDistortionInfoList.end(); 
-			 ++iter)
+		for (LLViewerVisualParamInfo* visual_param_info : sAvatarXmlInfo->mSkeletalDistortionInfoList)
 		{
-			LLPolySkeletalDistortionInfo *info = (LLPolySkeletalDistortionInfo*)*iter;
+			LLPolySkeletalDistortionInfo *info = (LLPolySkeletalDistortionInfo*)visual_param_info;
 			LLPolySkeletalDistortion *param = new LLPolySkeletalDistortion(this);
 			if (!param->setInfo(info))
 			{
@@ -1125,11 +1111,8 @@ BOOL LLAvatarAppearance::loadSkeletonNode ()
 //-----------------------------------------------------------------------------
 BOOL LLAvatarAppearance::loadMeshNodes()
 {
-	for (LLAvatarXmlInfo::mesh_info_list_t::const_iterator meshinfo_iter = sAvatarXmlInfo->mMeshInfoList.begin();
-		 meshinfo_iter != sAvatarXmlInfo->mMeshInfoList.end(); 
-		 ++meshinfo_iter)
+	for (const LLAvatarXmlInfo::LLAvatarMeshInfo* info : sAvatarXmlInfo->mMeshInfoList)
 	{
-		const LLAvatarXmlInfo::LLAvatarMeshInfo *info = *meshinfo_iter;
 		const std::string &type = info->mType;
 		S32 lod = info->mLOD;
 
@@ -1141,10 +1124,10 @@ BOOL LLAvatarAppearance::loadMeshNodes()
 			switch(lod)
 			  case 0:
 				mesh = &mHairMesh0; */
-		for (const auto& mesh_entry_pair : sAvatarDictionary->getMeshEntries())
+		for (const LLAvatarAppearanceDictionary::MeshEntries::value_type& mesh_pair : sAvatarDictionary->getMeshEntries())
 		{
-			const EMeshIndex mesh_index = mesh_entry_pair.first;
-			const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_entry_pair.second;
+			const EMeshIndex mesh_index = mesh_pair.first;
+			const LLAvatarAppearanceDictionary::MeshEntry *mesh_dict = mesh_pair.second;
 			if (type.compare(mesh_dict->mName) == 0)
 			{
 				mesh_id = mesh_index;
@@ -1212,20 +1195,17 @@ BOOL LLAvatarAppearance::loadMeshNodes()
 		mesh->setMesh( poly_mesh );
 		mesh->setLOD( info->mMinPixelArea );
 
-		for (LLAvatarXmlInfo::LLAvatarMeshInfo::morph_info_list_t::const_iterator xmlinfo_iter = info->mPolyMorphTargetInfoList.begin();
-			 xmlinfo_iter != info->mPolyMorphTargetInfoList.end(); 
-			 ++xmlinfo_iter)
+		for (const LLAvatarXmlInfo::LLAvatarMeshInfo::morph_info_pair_t& info_pair : info->mPolyMorphTargetInfoList)
 		{
-			const LLAvatarXmlInfo::LLAvatarMeshInfo::morph_info_pair_t *info_pair = &(*xmlinfo_iter);
 			LLPolyMorphTarget *param = new LLPolyMorphTarget(mesh->getMesh());
-			if (!param->setInfo((LLPolyMorphTargetInfo*)info_pair->first))
+			if (!param->setInfo((LLPolyMorphTargetInfo*)info_pair.first))
 			{
 				delete param;
 				return FALSE;
 			}
 			else
 			{
-				if (info_pair->second)
+				if (info_pair.second)
 				{
 					addSharedVisualParam(param);
 					param->setParamLocation(isSelf() ? LOC_AV_SELF : LOC_AV_OTHER);
@@ -1248,11 +1228,8 @@ BOOL LLAvatarAppearance::loadMeshNodes()
 BOOL LLAvatarAppearance::loadLayersets()
 {
 	BOOL success = TRUE;
-	for (LLAvatarXmlInfo::layer_info_list_t::const_iterator layerset_iter = sAvatarXmlInfo->mLayerInfoList.begin();
-		 layerset_iter != sAvatarXmlInfo->mLayerInfoList.end(); 
-		 ++layerset_iter)
+	for (LLTexLayerSetInfo* layerset_info : sAvatarXmlInfo->mLayerInfoList)
 	{
-		LLTexLayerSetInfo *layerset_info = *layerset_iter;
 		if (isSelf())
 		{
 			// Construct a layerset for each one specified in avatar_lad.xml and initialize it as such.
@@ -1268,12 +1245,12 @@ BOOL LLAvatarAppearance::loadLayersets()
 
 			// scan baked textures and associate the layerset with the appropriate one
 			EBakedTextureIndex baked_index = BAKED_NUM_INDICES;
-			for (const auto& baked_tex_pair : sAvatarDictionary->getBakedTextures())
+			for (const LLAvatarAppearanceDictionary::BakedTextures::value_type& baked_pair : sAvatarDictionary->getBakedTextures())
 			{
-				const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_tex_pair.second;
+				const LLAvatarAppearanceDictionary::BakedEntry *baked_dict = baked_pair.second;
 				if (layer_set->isBodyRegion(baked_dict->mName))
 				{
-					baked_index = baked_tex_pair.first;
+					baked_index = baked_pair.first;
 					// ensure both structures are aware of each other
 					mBakedTextureDatas[baked_index].mTexLayerSet = layer_set;
 					layer_set->setBakedTexIndex(baked_index);
@@ -1289,11 +1266,8 @@ BOOL LLAvatarAppearance::loadLayersets()
 			}
 
 			// scan morph masks and let any affected layers know they have an associated morph
-			for (LLAvatarAppearance::morph_list_t::const_iterator morph_iter = mBakedTextureDatas[baked_index].mMaskedMorphs.begin();
-				morph_iter != mBakedTextureDatas[baked_index].mMaskedMorphs.end();
-				 ++morph_iter)
+			for (LLMaskedMorph* morph : mBakedTextureDatas[baked_index].mMaskedMorphs)
 			{
-				LLMaskedMorph *morph = *morph_iter;
 				LLTexLayerInterface* layer = layer_set->findLayerByName(morph->mLayer);
 				if (layer)
 				{
@@ -1309,7 +1283,6 @@ BOOL LLAvatarAppearance::loadLayersets()
 		else // !isSelf()
 		{
 			// Construct a layerset for each one specified in avatar_lad.xml and initialize it as such.
-			LLTexLayerSetInfo *layerset_info = *layerset_iter;
 			layerset_info->createVisualParams(this);
 		}
 	}
@@ -1509,14 +1482,14 @@ BOOL LLAvatarAppearance::teToColorParams( ETextureIndex te, U32 *param_name )
 	return TRUE;
 }
 
-void LLAvatarAppearance::setClothesColor( ETextureIndex te, const LLColor4& new_color)
+void LLAvatarAppearance::setClothesColor( ETextureIndex te, const LLColor4& new_color, bool upload_bake )
 {
 	U32 param_name[3];
 	if( teToColorParams( te, param_name ) )
 	{
-		setVisualParamWeight( param_name[0], new_color.mV[VX]);
-		setVisualParamWeight( param_name[1], new_color.mV[VY]);
-		setVisualParamWeight( param_name[2], new_color.mV[VZ]);
+		setVisualParamWeight( param_name[0], new_color.mV[VX], upload_bake );
+		setVisualParamWeight( param_name[1], new_color.mV[VY], upload_bake );
+		setVisualParamWeight( param_name[2], new_color.mV[VZ], upload_bake );
 	}
 }
 
@@ -1586,7 +1559,7 @@ BOOL LLAvatarAppearance::allocateCollisionVolumes( U32 num )
         delete_and_clear_array(mCollisionVolumes);
         mNumCollisionVolumes = 0;
 
-        mCollisionVolumes = new(std::nothrow) LLAvatarJointCollisionVolume[num];
+        mCollisionVolumes = new LLAvatarJointCollisionVolume[num];
         if (!mCollisionVolumes)
         {
             LL_WARNS() << "Failed to allocate collision volumes" << LL_ENDL;
@@ -1729,7 +1702,8 @@ BOOL LLAvatarSkeletonInfo::parseXml(LLXmlTreeNode* node)
 }
 
 //Make aliases for joint and push to map.
-void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo *bone_info)
+/* static */
+void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo* bone_info, joint_alias_map_t& joint_alias_map)
 {
     if (! bone_info->mIsJoint )
     {
@@ -1737,61 +1711,59 @@ void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo *bone_info)
     }
     
     std::string bone_name = bone_info->mName;
-    mJointAliasMap[bone_name] = bone_name; //Actual name is a valid alias.
+    joint_alias_map[bone_name] = bone_name;  // Actual name is a valid alias.
     
     std::string aliases = bone_info->mAliases;
     
-    boost::char_separator<char> sep(" ");
-    boost::tokenizer<boost::char_separator<char> > tok(aliases, sep);
-    for(boost::tokenizer<boost::char_separator<char> >::iterator i = tok.begin(); i != tok.end(); ++i)
+    boost::char_separator sep(" ");
+    boost::tokenizer tok(aliases, sep);
+    for(auto i = tok.begin(); i != tok.end(); ++i)
     {
-        if ( mJointAliasMap.find(*i) != mJointAliasMap.end() )
+        if (joint_alias_map.find(*i) != joint_alias_map.end())
         {
-            LL_WARNS() << "avatar skeleton:  Joint alias \"" << *i << "\" remapped from " << mJointAliasMap[*i] << " to " << bone_name << LL_ENDL;
+            LL_WARNS() << "avatar skeleton:  Joint alias \"" << *i << "\" remapped from " << joint_alias_map[*i] << " to " << bone_name << LL_ENDL;
         }
-        mJointAliasMap[*i] = bone_name;
+        joint_alias_map[*i] = bone_name;
     }
 
     for (LLAvatarBoneInfo* bone : bone_info->mChildren)
     {
-        makeJointAliases(bone);
+        makeJointAliases(bone, joint_alias_map);
     }
 }
 
-const LLAvatarAppearance::joint_alias_map_t& LLAvatarAppearance::getJointAliases ()
+/* static */
+LLAvatarAppearance::joint_alias_map_t LLAvatarAppearance::buildJointAliases()
+{
+    joint_alias_map_t map;
+    for (LLAvatarBoneInfo* bone_info : sAvatarSkeletonInfo->mBoneInfoList)
+    {
+        makeJointAliases(bone_info, map);
+    }
+
+    for (LLAvatarXmlInfo::LLAvatarAttachmentInfo* info : sAvatarXmlInfo->mAttachmentInfoList)
+    {
+        std::string                              bone_name = info->mName;
+
+        // Also accept the name with spaces substituted with
+        // underscores. This gives a mechanism for referencing such joints
+        // in daes, which don't allow spaces.
+        std::string sub_space_to_underscore = bone_name;
+        LLStringUtil::replaceChar(sub_space_to_underscore, ' ', '_');
+        if (sub_space_to_underscore != bone_name)
+        {
+            map[sub_space_to_underscore] = bone_name;
+        }
+    }
+    return map;
+}
+
+const LLAvatarAppearance::joint_alias_map_t& LLAvatarAppearance::getJointAliases()
 {
     if (mJointAliasMap.empty())
     {
-        
-        LLAvatarSkeletonInfo::bone_info_list_t::const_iterator iter;
-        for (iter = sAvatarSkeletonInfo->mBoneInfoList.begin(); 
-             iter != sAvatarSkeletonInfo->mBoneInfoList.end();
-             ++iter)
-        {
-            //LLAvatarBoneInfo *bone_info = *iter;
-            makeJointAliases( *iter );
-        }
-
-        LLAvatarXmlInfo::attachment_info_list_t::iterator attach_iter;
-        for (attach_iter = sAvatarXmlInfo->mAttachmentInfoList.begin();
-             attach_iter != sAvatarXmlInfo->mAttachmentInfoList.end(); 
-             ++attach_iter)
-        {
-            LLAvatarXmlInfo::LLAvatarAttachmentInfo *info = *attach_iter;
-            std::string bone_name = info->mName;
-            
-            // Also accept the name with spaces substituted with
-            // underscores. This gives a mechanism for referencing such joints
-            // in daes, which don't allow spaces.
-            std::string sub_space_to_underscore = bone_name;
-            LLStringUtil::replaceChar(sub_space_to_underscore, ' ', '_');
-            if (sub_space_to_underscore != bone_name)
-            {
-                mJointAliasMap[sub_space_to_underscore] = bone_name;
-            }
-        }
+        mJointAliasMap = buildJointAliases();
     }
-
     return mJointAliasMap;
 } 
 
@@ -2165,7 +2137,7 @@ BOOL LLAvatarAppearance::LLAvatarXmlInfo::parseXmlMorphNodes(LLXmlTreeNode* root
 LLAvatarAppearance::LLMaskedMorph::LLMaskedMorph(LLVisualParam *morph_target, BOOL invert, std::string layer) :
 			mMorphTarget(morph_target), 
 			mInvert(invert),
-			mLayer(layer)
+			mLayer(std::move(layer))
 {
 	LLPolyMorphTarget *target = dynamic_cast<LLPolyMorphTarget*>(morph_target);
 	if (target)

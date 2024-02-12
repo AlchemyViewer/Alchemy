@@ -52,7 +52,7 @@
    name="preview_media"
    width="128"
    height="128"
-   start_url="about:blank"
+   start_url=""
    decouple_texture_size="true" />
   
   <text
@@ -92,10 +92,7 @@
    label="Reset"
    left_delta="233" 
    name="current_url_reset_btn" 
-   width="110" > 
-   <button.commit_callback
-	     function="Media.ResetCurrentUrl"/>
-  </button>
+   width="110"/>
   <check_box 
    bottom_delta="-25" 
    enabled="true" 

@@ -72,7 +72,7 @@ public:
 	/// Statistics for the HTTP 
 	struct TransferStats
 	{
-		typedef boost::shared_ptr<TransferStats> ptr_t;
+		typedef std::shared_ptr<TransferStats> ptr_t;
 
 		TransferStats() : mSizeDownload(0.0), mTotalTime(0.0), mSpeedDownload(0.0) {}
 		F64 mSizeDownload;
@@ -189,7 +189,7 @@ public:
 			mStats = stats;
 		}
 
-	TransferStats::ptr_t getTransferStats()
+	TransferStats::ptr_t getTransferStats() const
 		{
 			return mStats;
 		}
@@ -213,6 +213,8 @@ public:
         {
             return mRequestMethod;
         }
+    void setRequestId(U64 id) { mRequestId = id; }
+    U64 getRequestId() const { return mRequestId; }
 
 protected:
 	// Response data here
@@ -225,10 +227,11 @@ protected:
 	std::string			mContentType;
 	unsigned int		mRetries;
 	unsigned int		m503Retries;
-    std::string         mRequestUrl;
-    std::string         mRequestMethod;
+	std::string		mRequestUrl;
+	std::string		mRequestMethod;
 
 	TransferStats::ptr_t	mStats;
+	U64			mRequestId;
 };
 
 

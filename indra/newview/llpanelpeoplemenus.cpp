@@ -154,9 +154,9 @@ void PeopleContextMenu::buildContextMenu(class LLMenuGL& menu, U32 flags)
 		items.push_back(std::string("offer_teleport"));
 		items.push_back(std::string("separator_utils"));
 		items.push_back(std::string("utils_menu"));
-		items.push_back(std::string("copy_username"));
+		items.push_back(std::string("copy_full_name"));
 		items.push_back(std::string("copy_display_name"));
-		items.push_back(std::string("copy_account_name"));
+		items.push_back(std::string("copy_username"));
 		items.push_back(std::string("copy_slurl"));
 		items.push_back(std::string("copy_uuid"));
 	}
@@ -181,9 +181,9 @@ void PeopleContextMenu::buildContextMenu(class LLMenuGL& menu, U32 flags)
 		items.push_back(std::string("block_unblock"));
 		items.push_back(std::string("report_abuse"));
 		items.push_back(std::string("utils_menu"));
-		items.push_back(std::string("copy_username"));
+		items.push_back(std::string("copy_full_name"));
 		items.push_back(std::string("copy_display_name"));
-		items.push_back(std::string("copy_account_name"));
+		items.push_back(std::string("copy_username"));
 		items.push_back(std::string("copy_slurl"));
 		items.push_back(std::string("copy_uuid"));
 	}
@@ -279,7 +279,7 @@ bool PeopleContextMenu::enableContextMenuItem(const LLSD& userdata)
 	{
 		const LLUUID& id = mUUIDs.front();
 
-		return (LLAvatarTracker::instance().isBuddyOnline(id) && is_agent_mappable(id))
+		return (LLAvatarTracker::instance().isBuddyOnline(id) && LLAvatarActions::isAgentMappable(id))
 					|| gAgent.isGodlike();
 	}
 	else if(item == std::string("can_offer_teleport"))
@@ -431,9 +431,9 @@ void NearbyPeopleContextMenu::buildContextMenu(class LLMenuGL& menu, U32 flags)
 			}
 		}
 		items.push_back(std::string("utils_menu"));
-		items.push_back(std::string("copy_username"));
+		items.push_back(std::string("copy_full_name"));
 		items.push_back(std::string("copy_display_name"));
-		items.push_back(std::string("copy_account_name"));
+		items.push_back(std::string("copy_username"));
 		items.push_back(std::string("copy_slurl"));
 		items.push_back(std::string("copy_uuid"));
 	}
@@ -476,9 +476,9 @@ void NearbyPeopleContextMenu::buildContextMenu(class LLMenuGL& menu, U32 flags)
 			}
 		}
 		items.push_back(std::string("utils_menu"));
-		items.push_back(std::string("copy_username"));
+		items.push_back(std::string("copy_full_name"));
 		items.push_back(std::string("copy_display_name"));
-		items.push_back(std::string("copy_account_name"));
+		items.push_back(std::string("copy_username"));
 		items.push_back(std::string("copy_slurl"));
 		items.push_back(std::string("copy_uuid"));
 	}

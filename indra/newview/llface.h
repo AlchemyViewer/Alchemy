@@ -47,15 +47,16 @@ class LLTextureEntry;
 class LLVertexProgram;
 class LLViewerTexture;
 class LLGeometryManager;
-class LLTextureAtlasSlot;
 class LLDrawInfo;
+class LLMeshSkinInfo;
 
 const F32 MIN_ALPHA_SIZE = 1024.f;
 const F32 MIN_TEX_ANIM_SIZE = 512.f;
 const U8 FACE_DO_NOT_BATCH_TEXTURES = 255;
 
-class LLFace : public LLTrace::MemTrackableNonVirtual<LLFace, 16>
+class alignas(16) LLFace
 {
+    LL_ALIGN_NEW
 public:
 	LLFace(const LLFace& rhs) = delete;
 	LLFace& operator=(const LLFace& rhs) = delete;
@@ -74,8 +75,8 @@ public:
 
 public:
 	LLFace(LLDrawable* drawablep, LLViewerObject* objp)
-	:	LLTrace::MemTrackableNonVirtual<LLFace, 16>("LLFace")
 	{
+        LL_PROFILE_ZONE_SCOPED;
 		init(drawablep, objp);
 	}
 	~LLFace()  { destroy(); }
@@ -116,12 +117,6 @@ public:
 
 	S32             getIndexInTex(U32 ch) const {llassert(ch < LLRender::NUM_TEXTURE_CHANNELS); return mIndexInTex[ch];}
 	void            setIndexInTex(U32 ch, S32 index) { llassert(ch < LLRender::NUM_TEXTURE_CHANNELS);  mIndexInTex[ch] = index ;}
-
-	void			renderSetColor() const;
-	S32				renderElements(const U16 *index_array) const;
-	S32				renderIndexed ();
-	S32				renderIndexed (U32 mask);
-	S32				pushVertices(const U16* index_array) const;
 	
 	void			setWorldMatrix(const LLMatrix4& mat);
 	const LLTextureEntry* getTextureEntry()	const { return mVObjp->getTE(mTEOffset); }
@@ -132,7 +127,7 @@ public:
 	LLViewerObject*	getViewerObject()	const	{ return mVObjp; }
 	S32				getLOD()			const	{ return mVObjp.notNull() ? mVObjp->getLOD() : 0; }
 	void			setPoolType(U32 type)		{ mPoolType = type; }
-	S32				getTEOffset()				{ return mTEOffset; }
+	S32				getTEOffset()       const   { return mTEOffset; }
 	LLViewerTexture*	getTexture(U32 ch = LLRender::DIFFUSE_MAP) const;
 
 	void			setViewerObject(LLViewerObject* object);
@@ -142,20 +137,23 @@ public:
 	void			setDrawable(LLDrawable *drawable);
 	void			setTEOffset(const S32 te_offset);
 	
+    void            renderIndexed();
 
 	void			setFaceColor(const LLColor4& color); // override material color
 	void			unsetFaceColor(); // switch back to material color
 	const LLColor4&	getFaceColor() const { return mFaceColor; } 
-	const LLColor4& getRenderColor() const;
+	
 
 	//for volumes
 	void updateRebuildFlags();
 	bool canRenderAsMask(); // logic helper
 	BOOL getGeometryVolume(const LLVolume& volume,
-						const S32 &f,
-						const LLMatrix4a& mat_vert, const LLMatrix4a& mat_normal,
-						const U16 &index_offset,
-						bool force_rebuild = false);
+                            S32 face_index,
+                            const LLMatrix4a& mat_vert,
+                            const LLMatrix4a& mat_normal,
+                            U16 index_offset,
+                            bool force_rebuild = false,
+                            bool no_debug_assert = false);
 
 	// For avatar
 	U16			 getGeometryAvatar(
@@ -222,19 +220,21 @@ public:
 	void setVertexBuffer(LLVertexBuffer* buffer);
 	void clearVertexBuffer(); //sets mVertexBuffer to NULL
 	LLVertexBuffer* getVertexBuffer()	const	{ return mVertexBuffer; }
-	U32 getRiggedVertexBufferDataMask() const;
 	S32 getRiggedIndex(U32 type) const;
-	void setRiggedIndex(U32 type, S32 index);
 
-	static U32 getRiggedDataMask(U32 type);
+    // used to preserve draw order of faces that are batched together. 
+    // Allows content creators to manipulate linked sets and face ordering 
+    // for consistent alpha sorting results, particularly for rigged attachments
+    void setDrawOrderIndex(U32 index) { mDrawOrderIndex = index; }
+    U32 getDrawOrderIndex() const { return mDrawOrderIndex; }
 
-	void	notifyAboutCreatingTexture(LLViewerTexture *texture);
-	void	notifyAboutMissingAsset(LLViewerTexture *texture);
-
+    // return true if this face is in an alpha draw pool
+    bool isInAlphaPool() const;
 public: //aligned members
 	LLVector4a		mExtents[2];
 
 private:
+    friend class LLViewerTextureList;
 	F32         adjustPartialOverlapPixelArea(F32 cos_angle_to_view_dir, F32 radius );
 	BOOL        calcPixelArea(F32& cos_angle_to_view_dir, F32& radius) ;
 public:
@@ -252,7 +252,12 @@ public:
 	F32			mLastSkinTime;
 	F32			mLastMoveTime;
 	LLMatrix4a*	mTextureMatrix;
-	LLDrawInfo* mDrawInfo;
+	LLDrawInfo* mDrawInfo = nullptr;
+    LLVOAvatar* mAvatar = nullptr;
+    LLMeshSkinInfo* mSkinInfo = nullptr;
+    
+    // return mSkinInfo->mHash or 0 if mSkinInfo is null
+    U64 getSkinHash();
 
 private:
 	LLPointer<LLVertexBuffer> mVertexBuffer;
@@ -263,10 +268,10 @@ private:
 	LLColor4	mFaceColor;			// overrides material color if state |= USE_FACE_COLOR
 	
 	U16			mGeomCount;			// vertex count for this face
-	U16			mGeomIndex;			// index into draw pool
+	U16			mGeomIndex;			// starting index into mVertexBuffer's vertex array
 	U8			mTextureIndex;		// index of texture channel to use for pseudo-atlasing
 	U32			mIndicesCount;
-	U32			mIndicesIndex;		// index into draw pool for indices (yeah, I know!)
+	U32			mIndicesIndex;		// index into mVertexBuffer's index array
 	S32         mIndexInTex[LLRender::NUM_TEXTURE_CHANNELS];
 
 	LLXformMatrix* mXform;
@@ -296,6 +301,8 @@ private:
 	bool        mHasMedia ;
 	bool        mIsMediaAllowed;
 
+    U32 mDrawOrderIndex = 0; // see setDrawOrderIndex
+	
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
 	mutable bool                       mShowDiffTexture;
 	mutable LLPointer<LLViewerTexture> mOrigDiffTexture;

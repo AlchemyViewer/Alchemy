@@ -26,15 +26,13 @@
 
 #include "llviewerprecompiledheaders.h"
 #include "llvocache.h"
-#include "llerror.h"
 #include "llregionhandle.h"
 #include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
 #include "lldrawable.h"
 #include "llviewerregion.h"
-#include "pipeline.h"
 #include "llagentcamera.h"
-#include "llmemory.h"
+#include "llsdserialize.h"
 
 //static variables
 U32 LLVOCacheEntry::sMinFrameRange = 0;
@@ -57,14 +55,104 @@ BOOL check_write(LLAPRFile* apr_file, void* src, S32 n_bytes)
 	return apr_file->write(src, n_bytes) == n_bytes ;
 }
 
+bool LLGLTFOverrideCacheEntry::fromLLSD(const LLSD& data)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    
+    llassert(data.has("local_id"));
+    llassert(data.has("object_id"));
+    llassert(data.has("region_handle_x") && data.has("region_handle_y"));
+
+    if (!data.has("local_id"))
+    {
+        return false;
+    }
+
+    if (data.has("region_handle_x") && data.has("region_handle_y"))
+    {
+        // TODO start requiring this once server sends this for all messages
+        U32 region_handle_y = data["region_handle_y"].asInteger();
+        U32 region_handle_x = data["region_handle_x"].asInteger();
+        mRegionHandle = to_region_handle(region_handle_x, region_handle_y);
+    }
+    else
+    {
+        return false;
+    }
+
+    mLocalId = data["local_id"].asInteger();
+    mObjectId = data["object_id"];
+
+    // message should be interpreted thusly:
+    ///  sides is a list of face indices
+    //   gltf_llsd is a list of corresponding GLTF override LLSD
+    //   any side not represented in "sides" has no override
+    if (data.has("sides") && data.has("gltf_llsd"))
+    {
+        LLSD const& sides = data.get("sides");
+        LLSD const& gltf_llsd = data.get("gltf_llsd");
+
+        if (sides.isArray() && gltf_llsd.isArray() &&
+            sides.size() != 0 &&
+            sides.size() == gltf_llsd.size())
+        {
+            for (int i = 0; i < sides.size(); ++i)
+            {
+                S32 side_idx = sides[i].asInteger();
+                mSides[side_idx] = gltf_llsd[i];
+                LLGLTFMaterial* override_mat = new LLGLTFMaterial();
+                override_mat->applyOverrideLLSD(gltf_llsd[i]);
+                mGLTFMaterial[side_idx] = override_mat;
+            }
+        }
+        else
+        {
+            LL_WARNS_IF(sides.size() != 0, "GLTF") << "broken override cache entry" << LL_ENDL;
+        }
+    }
+
+    llassert(mSides.size() == mGLTFMaterial.size());
+#ifdef SHOW_ASSERT
+    for (auto const & side : mSides)
+    {
+        // check that mSides and mGLTFMaterial have exactly the same keys present
+        llassert(mGLTFMaterial.count(side.first) == 1);
+    }
+#endif
+
+    return true;
+}
+
+LLSD LLGLTFOverrideCacheEntry::toLLSD() const
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    LLSD data;
+    U32 region_handle_x, region_handle_y;
+    from_region_handle(mRegionHandle, &region_handle_x, &region_handle_y);
+    data["region_handle_y"] = LLSD::Integer(region_handle_y);
+    data["region_handle_x"] = LLSD::Integer(region_handle_x);
+
+    data["object_id"] = mObjectId;
+    data["local_id"] = (LLSD::Integer) mLocalId;
+
+    llassert(mSides.size() == mGLTFMaterial.size());
+    for (auto const & side : mSides)
+    {
+        // check that mSides and mGLTFMaterial have exactly the same keys present
+        llassert(mGLTFMaterial.count(side.first) == 1);
+        data["sides"].append(LLSD::Integer(side.first));
+        data["gltf_llsd"].append(side.second);
+    }
+
+    return data;
+}
 
 //---------------------------------------------------------------------------
 // LLVOCacheEntry
 //---------------------------------------------------------------------------
 
 LLVOCacheEntry::LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &dp)
-:	LLTrace::MemTrackable<LLVOCacheEntry, 16>("LLVOCacheEntry"),
-	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
+:	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
 	mLocalID(local_id),
 	mCRC(crc),
 	mUpdateFlags(-1),
@@ -83,8 +171,7 @@ LLVOCacheEntry::LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &
 }
 
 LLVOCacheEntry::LLVOCacheEntry()
-:	LLTrace::MemTrackable<LLVOCacheEntry, 16>("LLVOCacheEntry"),
-	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
+:	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
 	mLocalID(0),
 	mCRC(0),
 	mUpdateFlags(-1),
@@ -102,8 +189,7 @@ LLVOCacheEntry::LLVOCacheEntry()
 }
 
 LLVOCacheEntry::LLVOCacheEntry(LLAPRFile* apr_file)
-:	LLTrace::MemTrackable<LLVOCacheEntry, 16>("LLVOCacheEntry"),
-	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY), 
+:	LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY), 
 	mBuffer(NULL),
 	mUpdateFlags(-1),
 	mState(INACTIVE),
@@ -173,7 +259,7 @@ LLVOCacheEntry::~LLVOCacheEntry()
 }
 
 void LLVOCacheEntry::updateEntry(U32 crc, LLDataPackerBinaryBuffer &dp)
-{
+{ 
 	if(mCRC != crc)
 	{
 		mCRC = crc;
@@ -311,7 +397,7 @@ LLVOCacheEntry* LLVOCacheEntry::getChild()
 	return child;
 }
 
-LLDataPackerBinaryBuffer *LLVOCacheEntry::getDP()
+LLDataPackerBinaryBuffer *LLVOCacheEntry::getDP() const
 {
 	if (mDP.getBufferSize() == 0)
 	{
@@ -359,6 +445,7 @@ S32 LLVOCacheEntry::writeToBuffer(U8 *data_buffer) const
     return ENTRY_HEADER_SIZE + size;
 }
 
+#ifndef LL_TEST
 //static 
 void LLVOCacheEntry::updateDebugSettings()
 {
@@ -369,15 +456,6 @@ void LLVOCacheEntry::updateDebugSettings()
 	}
 	timer.reset();
 
-	//the number of frames invisible objects stay in memory
-	static LLCachedControl<U32> inv_obj_time(gSavedSettings,"NonvisibleObjectsInMemoryTime");
-	sMinFrameRange = inv_obj_time - 1; //make 0 to be the maximum 
-
-	//min radius: all objects within this radius remain loaded in memory
-	static LLCachedControl<F32> min_radius(gSavedSettings,"SceneLoadMinRadius");
-	sNearRadius = llmin((F32)min_radius, gAgentCamera.mDrawDistance); //can not exceed the draw distance
-	sNearRadius = llmax(sNearRadius, 1.f); //minimum value is 1.0m
-
 	//objects within the view frustum whose visible area is greater than this threshold will be loaded
 	static LLCachedControl<F32> front_pixel_threshold(gSavedSettings,"SceneLoadFrontPixelThreshold");
 	sFrontPixelThreshold = front_pixel_threshold;
@@ -387,30 +465,40 @@ void LLVOCacheEntry::updateDebugSettings()
 	sRearPixelThreshold = rear_pixel_threshold;
 	sRearPixelThreshold = llmax(sRearPixelThreshold, sFrontPixelThreshold); //can not be smaller than sFrontPixelThreshold.
 
-	// a percentage of draw distance beyond which all objects outside of view frustum will be unloaded, regardless of pixel threshold
-	static LLCachedControl<F32> rear_max_radius_frac(gSavedSettings,"SceneLoadRearMaxRadiusFraction");
-	sRearFarRadius = llmax(rear_max_radius_frac * gAgentCamera.mDrawDistance / 100.f, 1.0f); //minimum value is 1.0m
-	sRearFarRadius = llmax(sRearFarRadius, (F32)min_radius); //can not be less than "SceneLoadMinRadius".
-	sRearFarRadius = llmin(sRearFarRadius, gAgentCamera.mDrawDistance); //can not be more than the draw distance.
-
-	//make the above parameters adaptive to memory usage
+	//make parameters adaptive to memory usage
 	//starts to put restrictions from low_mem_bound_MB, apply tightest restrictions when hits high_mem_bound_MB
 	static LLCachedControl<U32> low_mem_bound_MB(gSavedSettings,"SceneLoadLowMemoryBound");
 	static LLCachedControl<U32> high_mem_bound_MB(gSavedSettings,"SceneLoadHighMemoryBound");
 	
 	LLMemory::updateMemoryInfo() ;
 	U32 allocated_mem = LLMemory::getAllocatedMemKB().value();
-	allocated_mem /= 1024; //convert to MB.
-	if(allocated_mem < low_mem_bound_MB)
-	{
-		return; 
-	}
-	F32 adjust_factor = llmax(0.f, (F32)(high_mem_bound_MB - allocated_mem) / (high_mem_bound_MB - low_mem_bound_MB));
+    static const F32 KB_to_MB = 1.f / 1024.f;
+	U32 clamped_memory = llclamp(allocated_mem * KB_to_MB, (F32) low_mem_bound_MB, (F32) high_mem_bound_MB);
+    const F32 adjust_range = high_mem_bound_MB - low_mem_bound_MB;
+    const F32 adjust_factor = (high_mem_bound_MB - clamped_memory) / adjust_range; // [0, 1]
 
-	sRearFarRadius = llmin(adjust_factor * sRearFarRadius, 96.f);  //[0.f, 96.f]
-	sMinFrameRange = (U32)llclamp(adjust_factor * sMinFrameRange, 10.f, 64.f);  //[10, 64]
-	sNearRadius    = llmax(adjust_factor * sNearRadius, 1.0f);
+    //min radius: all objects within this radius remain loaded in memory
+    static LLCachedControl<F32> min_radius(gSavedSettings,"SceneLoadMinRadius");
+    static const F32 MIN_RADIUS = 1.0f;
+    const F32 draw_radius = gAgentCamera.mDrawDistance;
+    const F32 clamped_min_radius = llclamp((F32) min_radius, MIN_RADIUS, draw_radius); // [1, mDrawDistance]
+    sNearRadius = MIN_RADIUS + ((clamped_min_radius - MIN_RADIUS) * adjust_factor);
+
+    // a percentage of draw distance beyond which all objects outside of view frustum will be unloaded, regardless of pixel threshold
+    static LLCachedControl<F32> rear_max_radius_frac(gSavedSettings,"SceneLoadRearMaxRadiusFraction");
+    const F32 min_radius_plus_one = sNearRadius + 1.f;
+    const F32 max_radius = rear_max_radius_frac * gAgentCamera.mDrawDistance;
+    const F32 clamped_max_radius = llclamp(max_radius, min_radius_plus_one, draw_radius); // [sNearRadius, mDrawDistance]
+    sRearFarRadius = min_radius_plus_one + ((clamped_max_radius - min_radius_plus_one) * adjust_factor);
+
+    //the number of frames invisible objects stay in memory
+    static LLCachedControl<U32> inv_obj_time(gSavedSettings,"NonvisibleObjectsInMemoryTime");
+    static const U32 MIN_FRAMES = 10;
+    static const U32 MAX_FRAMES = 64;
+    const U32 clamped_frames = inv_obj_time ? llclamp((U32) inv_obj_time, MIN_FRAMES, MAX_FRAMES) : MAX_FRAMES; // [10, 64], with zero => 64
+    sMinFrameRange = MIN_FRAMES + ((clamped_frames - MIN_FRAMES) * adjust_factor);
 }
+#endif // LL_TEST
 
 //static 
 F32 LLVOCacheEntry::getSquaredPixelThreshold(bool is_front)
@@ -426,7 +514,7 @@ F32 LLVOCacheEntry::getSquaredPixelThreshold(bool is_front)
 	}
 
 	//object projected area threshold
-	F32 pixel_meter_ratio = LLViewerCamera::getInstanceFast()->getPixelMeterRatio();
+	F32 pixel_meter_ratio = LLViewerCamera::getInstance()->getPixelMeterRatio();
 	F32 projection_threshold = pixel_meter_ratio > 0.f ? threshold / pixel_meter_ratio : 0.f;
 	projection_threshold *= projection_threshold;
 
@@ -615,7 +703,6 @@ void LLVOCacheGroup::handleChildAddition(const OctreeNode* parent, OctreeNode* c
 }
 
 LLVOCachePartition::LLVOCachePartition(LLViewerRegion* regionp)
-:	LLTrace::MemTrackable<LLVOCachePartition>("LLVOCachePartition")
 {
 	mLODPeriod = 16;
 	mRegionp = regionp;
@@ -630,6 +717,13 @@ LLVOCachePartition::LLVOCachePartition(LLViewerRegion* regionp)
 	mCullHistory = -1;
 
 	new LLVOCacheGroup(mOctree, this);
+}
+
+LLVOCachePartition::~LLVOCachePartition()
+{
+    // SL-17276 make sure to do base class cleanup while this instance
+    // can still be treated as an LLVOCachePartition 
+    cleanup();
 }
 
 bool LLVOCachePartition::addEntry(LLViewerOctreeEntry* entry)
@@ -872,6 +966,7 @@ void LLVOCachePartition::selectBackObjects(LLCamera &camera, F32 pixel_threshold
 	return;
 }
 
+#ifndef LL_TEST
 S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
 {
 	static LLCachedControl<bool> use_object_cache_occlusion(gSavedSettings,"UseObjectCacheOcclusion");
@@ -938,6 +1033,7 @@ S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
 	}
 	return 1;
 }
+#endif // LL_TEST
 
 void LLVOCachePartition::setCullHistory(BOOL has_new_object)
 {
@@ -1011,8 +1107,9 @@ void LLVOCachePartition::removeOccluder(LLVOCacheGroup* group)
 //-------------------------------------------------------------------
 //LLVOCache
 //-------------------------------------------------------------------
-// Format string used to construct filename for the object cache
+// Format strings used to construct filename for the object cache
 static const char OBJECT_CACHE_FILENAME[] = "objects_%d_%d.slc";
+static const char OBJECT_CACHE_EXTRAS_FILENAME[] = "objects_%d_%d_extras.slec";
 
 const U32 MAX_NUM_OBJECT_ENTRIES = 128 ;
 const U32 MIN_ENTRIES_TO_PURGE = 16 ;
@@ -1025,9 +1122,12 @@ LLVOCache::LLVOCache(bool read_only) :
 	mInitialized(false),
 	mReadOnly(read_only),
 	mNumEntries(0),
-	mCacheSize(1)
+	mCacheSize(1),
+    mEnabled(true)
 {
+#ifndef LL_TEST
 	mEnabled = gSavedSettings.getBOOL("ObjectCacheEnabled");
+#endif
 	mLocalAPRFilePoolp = new LLVolatileAPRPool("VOCache Pool") ;
 }
 
@@ -1079,6 +1179,8 @@ void LLVOCache::initCache(ELLPath location, U32 size, U32 cache_version)
 
 	readCacheHeader();	
 
+	LL_INFOS() << "Viewer Object Cache Versions - expected: " << cache_version << " found: " << mMetaInfo.mVersion <<  LL_ENDL;
+
 	if( mMetaInfo.mVersion != cache_version
 		|| mMetaInfo.mAddressSize != expected_address) 
 	{
@@ -1089,7 +1191,8 @@ void LLVOCache::initCache(ELLPath location, U32 size, U32 cache_version)
 			clearCacheInMemory();
 		}
 		else //delete the current cache if the format does not match.
-		{			
+		{
+			LL_INFOS() << "Viewer Object Cache Versions unmatched.  clearing cache." <<  LL_ENDL;
 			removeCache();
 		}
 	}	
@@ -1202,6 +1305,15 @@ void LLVOCache::getObjectCacheFilename(U64 handle, std::string& filename)
 			   llformat(OBJECT_CACHE_FILENAME, region_x, region_y));
 
 	return ;
+}
+
+std::string LLVOCache::getObjectCacheExtrasFilename(U64 handle)
+{
+    U32 region_x, region_y;
+
+    grid_from_region_handle(handle, &region_x, &region_y);
+    return gDirUtilp->getExpandedFilename(LL_PATH_CACHE, object_cache_dirname,
+               llformat(OBJECT_CACHE_EXTRAS_FILENAME, region_x, region_y));
 }
 
 void LLVOCache::removeFromCache(HeaderEntryInfo* entry)
@@ -1428,7 +1540,83 @@ void LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
 
 	return ;
 }
-	
+
+void LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map)
+{
+    if(!mEnabled)
+    {
+        LL_WARNS() << "Not reading cache for handle " << handle << "): Cache is currently disabled." << LL_ENDL;
+        return ;
+    }
+    llassert_always(mInitialized);
+
+    handle_entry_map_t::iterator iter = mHandleEntryMap.find(handle) ;
+    if(iter == mHandleEntryMap.end()) //no cache
+    {
+        LL_WARNS() << "No handle map entry for " << handle << LL_ENDL;
+        return;
+    }
+
+    std::string filename(getObjectCacheExtrasFilename(handle));
+    llifstream in(filename, std::ios::in | std::ios::binary);
+
+    std::string line;
+    std::getline(in, line);
+    if(!in.good()) {
+        LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
+        return;
+    }
+
+    if(!LLUUID::validate(line))
+    {
+        LL_WARNS() << "Failed reading extras cache for handle" << handle << ". invalid uuid line: '" << line << "'" << LL_ENDL;
+        return;
+    }
+
+    LLUUID cache_id(line);
+    if(cache_id != id)
+    {
+        LL_INFOS() << "Cache ID doesn't match for this region, discarding" << LL_ENDL;
+        return;
+    }
+
+    U32 num_entries;  // if removal was enabled during write num_entries might be wrong
+    std::getline(in, line);
+    if(!in.good()) {
+        LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
+        return;
+    }
+    try {
+        num_entries = std::stol(line);
+    }
+    catch(const std::logic_error&)  // either invalid_argument or out_of_range
+    {
+        LL_WARNS() << "Failed reading extras cache for handle " << handle << ". unreadable num_entries" << LL_ENDL;
+        return;
+    }
+
+    LL_DEBUGS("GLTF") << "Beginning reading extras cache for handle " << handle << ", " << num_entries << " entries" << LL_ENDL;
+
+    LLSD entry_llsd;
+    for (U32 i = 0; i < num_entries && !in.eof(); i++)
+    {
+        static const U32 max_size = 4096;
+        bool success = LLSDSerialize::deserialize(entry_llsd, in, max_size);
+        // check bool(in) this time since eof is not a failure condition here
+        if(!success || !in) {
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << ", entry number " << i << LL_ENDL;
+            return;
+        }
+
+        LLGLTFOverrideCacheEntry entry;
+        entry.fromLLSD(entry_llsd);
+        U32 local_id = entry_llsd["local_id"].asInteger();
+        cache_extras_entry_map[local_id] = entry;
+    }
+
+    LL_DEBUGS("GLTF") << "Completed reading extras cache for handle " << handle << ", " << num_entries << " entries" << LL_ENDL;
+}
+
 void LLVOCache::purgeEntries(U32 size)
 {
 	while(mHeaderEntryQueue.size() > size)
@@ -1439,6 +1627,7 @@ void LLVOCache::purgeEntries(U32 size)
 		mHeaderEntryQueue.erase(iter) ;
 		removeFromCache(entry) ;
 		delete entry;
+        // TODO also delete extras
 	}
 	mNumEntries = mHandleEntryMap.size() ;
 }
@@ -1564,4 +1753,63 @@ void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry:
 	}
 
 	return ;
+}
+
+void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, BOOL dirty_cache, bool removal_enabled)
+{
+    if(!mEnabled)
+    {
+        LL_WARNS() << "Not writing extras cache for handle " << handle << "): Cache is currently disabled." << LL_ENDL;
+        return;
+    }
+    llassert_always(mInitialized);
+
+    if(mReadOnly)
+    {
+        LL_WARNS() << "Not writing extras cache for handle " << handle << "): Cache is currently in read-only mode." << LL_ENDL;
+        return;
+    }
+
+    std::string filename(getObjectCacheExtrasFilename(handle));
+    llofstream out(filename, std::ios::out | std::ios::binary);
+    if(!out.good())
+    {
+        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
+        return;
+        // TODO - clean up broken cache file
+    }
+
+    out << id << '\n';
+    if(!out.good())
+    {
+        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
+        return;
+        // TODO - clean up broken cache file
+    }
+
+    U32 num_entries = cache_extras_entry_map.size();
+    out << num_entries << '\n';
+    if(!out.good())
+    {
+        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
+        return;
+        // TODO - clean up broken cache file
+    }
+
+    for (auto const & entry : cache_extras_entry_map)
+    {
+        S32 local_id = entry.first;
+        LLSD entry_llsd = entry.second.toLLSD();
+        entry_llsd["local_id"] = local_id;
+        LLSDSerialize::serialize(entry_llsd, out, LLSDSerialize::LLSD_XML);
+        out << '\n';
+        if(!out.good())
+        {
+            LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
+            return;
+            // TODO - clean up broken cache file
+        }
+    }
+
+    LL_DEBUGS("GLTF") << "Completed writing extras cache for handle " << handle << ", " << num_entries << " entries" << LL_ENDL;
 }

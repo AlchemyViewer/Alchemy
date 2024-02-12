@@ -71,8 +71,6 @@ public:
     static LLFloaterIMSessionTab* findConversation(const LLUUID& uuid);
     static LLFloaterIMSessionTab* getConversation(const LLUUID& uuid);
 
-	// show/hide the translation check box
-	void showTranslationCheckbox(const BOOL visible = FALSE);
 
 	bool isNearbyChat() {return mIsNearbyChat;}
 
@@ -98,7 +96,7 @@ public:
 	LLConversationItem* getCurSelectedViewModelItem();
 	void forceReshape();
 	virtual BOOL handleKeyHere( KEY key, MASK mask );
-	bool isMessagePaneExpanded(){return mMessagePaneExpanded;}
+	bool isMessagePaneExpanded() const {return mMessagePaneExpanded;}
 	void setMessagePaneExpanded(bool expanded){mMessagePaneExpanded = expanded;}
 	void restoreFloater();
 	void saveCollapsedState();
@@ -146,6 +144,9 @@ protected:
 
 	std::string appendTime();
 	void assignResizeLimits();
+	
+	static void applyMUPose(std::string& text);
+	static void applyOOCClose(std::string& text);
 
 	S32  mFloaterExtraWidth;
 
@@ -154,6 +155,7 @@ protected:
 
 	bool mMessagePaneExpanded;
 	bool mIsParticipantListExpanded;
+    S32 mMinFloaterHeight;
 
 
 	LLIMModel::LLIMSession* mSession;
@@ -191,7 +193,6 @@ protected:
 // [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
 	LLPanel* mExtendedButtonPanel = nullptr;
 // [/SL:KB]
-    LLUICtrl* mTranslationCheckBox;
 
 private:
 	// Handling selection and contextual menu

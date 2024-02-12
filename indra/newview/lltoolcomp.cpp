@@ -44,6 +44,7 @@
 #include "lltoolmgr.h"
 #include "lltoolselectrect.h"
 #include "lltoolplacer.h"
+#include "llviewerinput.h"
 #include "llviewermenu.h"
 #include "llviewerobject.h"
 #include "llviewerwindow.h"
@@ -113,7 +114,7 @@ void LLToolComposite::handleSelect()
 {
 	if (!ALControlCache::EditLinkedParts)
 	{
-		LLSelectMgr::getInstanceFast()->promoteSelectionToRoot();
+		LLSelectMgr::getInstance()->promoteSelectionToRoot();
 	}
 	mCur = mDefault; 
 	mCur->handleSelect(); 
@@ -150,7 +151,7 @@ BOOL LLToolCompInspect::handleMouseDown(S32 x, S32 y, MASK mask)
 {
 	BOOL handled = FALSE;
 
-	if (mCur == LLToolCamera::getInstanceFast())
+	if (mCur == LLToolCamera::getInstance())
 	{
 		handled = mCur->handleMouseDown(x, y, mask);
 	}
@@ -167,14 +168,14 @@ BOOL LLToolCompInspect::handleMouseDown(S32 x, S32 y, MASK mask)
 BOOL LLToolCompInspect::handleMouseUp(S32 x, S32 y, MASK mask)
 {
 	BOOL handled = LLToolComposite::handleMouseUp(x, y, mask);
-	mIsToolCameraActive = getCurrentTool() == LLToolCamera::getInstanceFast();
+	mIsToolCameraActive = getCurrentTool() == LLToolCamera::getInstance();
 	return handled;
 }
 
 void LLToolCompInspect::pickCallback(const LLPickInfo& pick_info)
 {
 	LLViewerObject* hit_obj = pick_info.getObject();
-	LLToolCompInspect * tool_inspectp = LLToolCompInspect::getInstanceFast();
+	LLToolCompInspect * tool_inspectp = LLToolCompInspect::getInstance();
 
 	if (!tool_inspectp->mMouseDown)
 	{
@@ -183,7 +184,7 @@ void LLToolCompInspect::pickCallback(const LLPickInfo& pick_info)
 		return;
 	}
 
-	LLSelectMgr * mgr_selectp = LLSelectMgr::getInstanceFast();
+	LLSelectMgr * mgr_selectp = LLSelectMgr::getInstance();
 	if( hit_obj && mgr_selectp->getSelection()->getObjectCount()) {
 		LLEditMenuHandler::gEditMenuHandler = mgr_selectp;
 	}
@@ -204,7 +205,7 @@ BOOL LLToolCompInspect::handleKey(KEY key, MASK mask)
 
 	if(KEY_ALT == key)
 	{
-		setCurrentTool(LLToolCamera::getInstanceFast());
+		setCurrentTool(LLToolCamera::getInstance());
 		mIsToolCameraActive = TRUE;
 		handled = TRUE;
 	}
@@ -224,7 +225,7 @@ void LLToolCompInspect::onMouseCaptureLost()
 
 void LLToolCompInspect::keyUp(KEY key, MASK mask)
 {
-	if (KEY_ALT == key && mCur == LLToolCamera::getInstanceFast())
+	if (KEY_ALT == key && mCur == LLToolCamera::getInstance())
 	{
 		setCurrentTool(mDefault);
 		mIsToolCameraActive = FALSE;
@@ -267,7 +268,8 @@ BOOL LLToolCompTranslate::handleHover(S32 x, S32 y, MASK mask)
 BOOL LLToolCompTranslate::handleMouseDown(S32 x, S32 y, MASK mask)
 {
 	mMouseDown = TRUE;
-	gViewerWindow->pickAsync(x, y, mask, pickCallback, /*BOOL pick_transparent*/ TRUE, LLFloaterReg::instanceVisible("build"));
+    gViewerWindow->pickAsync(x, y, mask, pickCallback, /*BOOL pick_transparent*/ FALSE, LLFloaterReg::instanceVisible("build"), FALSE,
+        gSavedSettings.getBOOL("SelectReflectionProbes"));;
 	return TRUE;
 }
 
@@ -275,9 +277,9 @@ void LLToolCompTranslate::pickCallback(const LLPickInfo& pick_info)
 {
 	LLViewerObject* hit_obj = pick_info.getObject();
 
-	auto tool_comp_translate = LLToolCompTranslate::getInstanceFast();
+	auto tool_comp_translate = LLToolCompTranslate::getInstance();
 
-	LLToolCompTranslate::getInstanceFast()->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
+	LLToolCompTranslate::getInstance()->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
 	if (!tool_comp_translate->mMouseDown)
 	{
 		// fast click on object, but mouse is already up...just do select
@@ -289,7 +291,7 @@ void LLToolCompTranslate::pickCallback(const LLPickInfo& pick_info)
 	{
 		if (tool_comp_translate->mManip->getSelection()->getObjectCount())
 		{
-			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
+			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstance();
 		}
 
 		BOOL can_move = tool_comp_translate->mManip->canAffectSelection();
@@ -325,11 +327,11 @@ LLTool* LLToolCompTranslate::getOverrideTool(MASK mask)
 {
 	if (mask == MASK_CONTROL)
 	{
-		return LLToolCompRotate::getInstanceFast();
+		return LLToolCompRotate::getInstance();
 	}
 	else if (mask == (MASK_CONTROL | MASK_SHIFT))
 	{
-		return LLToolCompScale::getInstanceFast();
+		return LLToolCompScale::getInstance();
 	}
 	return LLToolComposite::getOverrideTool(mask);
 }
@@ -345,7 +347,9 @@ BOOL LLToolCompTranslate::handleDoubleClick(S32 x, S32 y, MASK mask)
 	}
 	// Nothing selected means the first mouse click was probably
 	// bad, so try again.
-	return FALSE;
+	// This also consumes the event to prevent things like double-click
+	// teleport from triggering.
+	return handleMouseDown(x, y, mask);
 }
 
 
@@ -401,7 +405,7 @@ void LLToolCompScale::pickCallback(const LLPickInfo& pick_info)
 {
 	LLViewerObject* hit_obj = pick_info.getObject();
 
-	auto tool_comp_scale = LLToolCompScale::getInstanceFast();
+	auto tool_comp_scale = LLToolCompScale::getInstance();
 
 	tool_comp_scale->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
 	if (!tool_comp_scale->mMouseDown)
@@ -416,7 +420,7 @@ void LLToolCompScale::pickCallback(const LLPickInfo& pick_info)
 	{
 		if (tool_comp_scale->mManip->getSelection()->getObjectCount())
 		{
-			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
+			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstance();
 		}
 		if(	LLManip::LL_NO_PART != tool_comp_scale->mManip->getHighlightedPart() )
 		{
@@ -446,7 +450,7 @@ LLTool* LLToolCompScale::getOverrideTool(MASK mask)
 {
 	if (mask == MASK_CONTROL)
 	{
-		return LLToolCompRotate::getInstanceFast();
+		return LLToolCompRotate::getInstance();
 	}
 
 	return LLToolComposite::getOverrideTool(mask);
@@ -480,6 +484,18 @@ void LLToolCompScale::render()
 		LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
 		mManip->renderGuidelines();
 	}
+}
+
+BOOL LLToolCompScale::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
+{
+	LLToolCompScale::getInstance()->mManip->handleMiddleMouseDown(x,y,mask);
+	return handleMouseDown(x,y,mask);
+}
+
+BOOL LLToolCompScale::handleMiddleMouseUp(S32 x, S32 y, MASK mask)
+{
+	LLToolCompScale::getInstance()->mManip->handleMiddleMouseUp(x,y,mask);
+	return handleMouseUp(x,y,mask);
 }
 
 //-----------------------------------------------------------------------
@@ -532,7 +548,7 @@ void LLToolCompCreate::pickCallback(const LLPickInfo& pick_info)
 	MASK mask = (pick_info.mKeyMask & ~MASK_SHIFT);
 	mask = (mask & ~MASK_CONTROL);
 
-	auto tool_comp_create = LLToolCompCreate::getInstanceFast();
+	auto tool_comp_create = LLToolCompCreate::getInstance();
 	tool_comp_create->setCurrentTool(tool_comp_create->mSelectRect );
 	tool_comp_create->mSelectRect->handlePick( pick_info );
 }
@@ -604,7 +620,7 @@ void LLToolCompRotate::pickCallback(const LLPickInfo& pick_info)
 {
 	LLViewerObject* hit_obj = pick_info.getObject();
 
-	auto tool_comp_rotate = LLToolCompRotate::getInstanceFast();
+	auto tool_comp_rotate = LLToolCompRotate::getInstance();
 	tool_comp_rotate->mManip->highlightManipulators(pick_info.mMousePt.mX, pick_info.mMousePt.mY);
 	if (!tool_comp_rotate->mMouseDown)
 	{
@@ -617,7 +633,7 @@ void LLToolCompRotate::pickCallback(const LLPickInfo& pick_info)
 	{
 		if (tool_comp_rotate->mManip->getSelection()->getObjectCount())
 		{
-			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstanceFast();
+			LLEditMenuHandler::gEditMenuHandler = LLSelectMgr::getInstance();
 		}
 		if(	LLManip::LL_NO_PART != tool_comp_rotate->mManip->getHighlightedPart() )
 		{
@@ -647,7 +663,7 @@ LLTool* LLToolCompRotate::getOverrideTool(MASK mask)
 {
 	if (mask == (MASK_CONTROL | MASK_SHIFT))
 	{
-		return LLToolCompScale::getInstanceFast();
+		return LLToolCompScale::getInstance();
 	}
 	return LLToolComposite::getOverrideTool(mask);
 }
@@ -698,7 +714,7 @@ LLToolCompGun::LLToolCompGun()
 	mDefault = mGun;
 
 	mTimerFOV.stop();
-	mStartFOV = mOriginalFOV = mTargetFOV = LLViewerCamera::getInstanceFast()->getAndSaveDefaultFOV();
+	mStartFOV = mOriginalFOV = mTargetFOV = LLViewerCamera::getInstance()->getAndSaveDefaultFOV();
 }
 
 
@@ -721,7 +737,7 @@ BOOL LLToolCompGun::handleHover(S32 x, S32 y, MASK mask)
 	// item selected from context menu.
 	if ( mCur == mNull && !gPopupMenuView->getVisible() )
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
+		LLSelectMgr::getInstance()->deselectAll();
 		setCurrentTool( (LLTool*) mGrab );
 	}
 
@@ -754,7 +770,7 @@ BOOL LLToolCompGun::handleHover(S32 x, S32 y, MASK mask)
 BOOL LLToolCompGun::handleMouseDown(S32 x, S32 y, MASK mask)
 { 
 	// if the left button is grabbed, don't put up the pie menu
-	if (gAgent.leftButtonGrabbed())
+	if (gAgent.leftButtonGrabbed() && gViewerInput.isLMouseHandlingDefault(MODE_FIRST_PERSON))
 	{
 		gAgent.setControlFlags(AGENT_CONTROL_ML_LBUTTON_DOWN);
 		return FALSE;
@@ -762,16 +778,16 @@ BOOL LLToolCompGun::handleMouseDown(S32 x, S32 y, MASK mask)
 
 	// On mousedown, start grabbing
 	gGrabTransientTool = this;
-	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
+	LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
 
-	return LLToolGrab::getInstanceFast()->handleMouseDown(x, y, mask);
+	return LLToolGrab::getInstance()->handleMouseDown(x, y, mask);
 }
 
 
 BOOL LLToolCompGun::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
 	// if the left button is grabbed, don't put up the pie menu
-	if (gAgent.leftButtonGrabbed())
+	if (gAgent.leftButtonGrabbed() && gViewerInput.isLMouseHandlingDefault(MODE_FIRST_PERSON))
 	{
 		gAgent.setControlFlags(AGENT_CONTROL_ML_LBUTTON_DOWN);
 		return FALSE;
@@ -779,9 +795,9 @@ BOOL LLToolCompGun::handleDoubleClick(S32 x, S32 y, MASK mask)
 
 	// On mousedown, start grabbing
 	gGrabTransientTool = this;
-	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
+	LLToolMgr::getInstance()->getCurrentToolset()->selectTool( (LLTool*) mGrab );
 
-	return LLToolGrab::getInstanceFast()->handleDoubleClick(x, y, mask);
+	return LLToolGrab::getInstance()->handleDoubleClick(x, y, mask);
 }
 
 
@@ -793,11 +809,11 @@ BOOL LLToolCompGun::handleRightMouseDown(S32 x, S32 y, MASK mask)
 
 		if (!mTimerFOV.getStarted())
 		{
-			mStartFOV = LLViewerCamera::getInstanceFast()->getAndSaveDefaultFOV();
+			mStartFOV = LLViewerCamera::getInstance()->getAndSaveDefaultFOV();
 			mOriginalFOV = mStartFOV;
 		}
 		else
-			mStartFOV = LLViewerCamera::getInstanceFast()->getDefaultFOV();
+			mStartFOV = LLViewerCamera::getInstance()->getDefaultFOV();
 
 		mTargetFOV = gSavedPerAccountSettings.getF32("AlchemyMouselookAlternativeFOV");
 		mTimerFOV.start();
@@ -813,7 +829,7 @@ BOOL LLToolCompGun::handleRightMouseUp(S32 x, S32 y, MASK mask)
 {
 	mRightMouseDown = false;
 
-	mStartFOV = LLViewerCamera::getInstanceFast()->getDefaultFOV();
+	mStartFOV = LLViewerCamera::getInstance()->getDefaultFOV();
 	mTargetFOV = mOriginalFOV;
 	mTimerFOV.start();
 
@@ -822,7 +838,10 @@ BOOL LLToolCompGun::handleRightMouseUp(S32 x, S32 y, MASK mask)
 
 BOOL LLToolCompGun::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-	gAgent.setControlFlags(AGENT_CONTROL_ML_LBUTTON_UP);
+    if (gViewerInput.isLMouseHandlingDefault(MODE_FIRST_PERSON))
+    {
+        gAgent.setControlFlags(AGENT_CONTROL_ML_LBUTTON_UP);
+    }
 	setCurrentTool( (LLTool*) mGun );
 	return TRUE;
 }
@@ -848,7 +867,7 @@ void	LLToolCompGun::handleDeselect()
 	LLToolComposite::handleDeselect();
 	if (mRightMouseDown || mTimerFOV.getStarted())
 	{
-		LLViewerCamera::getInstanceFast()->loadDefaultFOV();
+		LLViewerCamera::getInstance()->loadDefaultFOV();
 		mRightMouseDown = false;
 		mTimerFOV.stop();
 	}
@@ -860,7 +879,7 @@ BOOL LLToolCompGun::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
 	if(mRightMouseDown)
 	{
-		mStartFOV = LLViewerCamera::getInstanceFast()->getDefaultFOV();
+		mStartFOV = LLViewerCamera::getInstance()->getDefaultFOV();
 
 		gSavedPerAccountSettings.setF32(
 			"AlchemyMouselookAlternativeFOV",
@@ -882,7 +901,7 @@ void LLToolCompGun::draw()
 {
 	if(mTimerFOV.getStarted())
 	{
-		if(!LLViewerCamera::getInstanceFast()->mSavedFOVLoaded && mStartFOV != mTargetFOV)
+		if(!LLViewerCamera::getInstance()->mSavedFOVLoaded && mStartFOV != mTargetFOV)
 		{
 			F32 timer = mTimerFOV.getElapsedTimeF32();
 
@@ -890,10 +909,10 @@ void LLToolCompGun::draw()
 			static LLCachedControl<F32> ml_zoom_time(gSavedSettings, "AlchemyMouseLookZoomTime", 6.66f);
 			if(timer > ml_zoom_timeout)
 			{
-				LLViewerCamera::getInstanceFast()->setDefaultFOV(mTargetFOV);
+				LLViewerCamera::getInstance()->setDefaultFOV(mTargetFOV);
 				mTimerFOV.stop();
 			}
-			else LLViewerCamera::getInstanceFast()->setDefaultFOV(ll_lerp(mStartFOV, mTargetFOV, timer * ml_zoom_time));
+			else LLViewerCamera::getInstance()->setDefaultFOV(ll_lerp(mStartFOV, mTargetFOV, timer * ml_zoom_time));
 		}
 		else mTimerFOV.stop();
 	}

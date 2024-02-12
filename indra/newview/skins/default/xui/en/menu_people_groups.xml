@@ -43,6 +43,40 @@
      parameter="call" />
   </menu_item_call>
   <menu_item_separator />
+	<menu_item_call
+     label="Copy Name"
+     layout="topleft"
+     name="copy_label">
+		<menu_item_call.on_click
+		 function="People.Groups.Action"
+		 parameter="copy_label" />
+		<menu_item_call.on_enable
+		 function="People.Groups.Enable"
+		 parameter="copy_label" />
+	</menu_item_call>
+	<menu_item_call
+     label="Copy SLurl"
+     layout="topleft"
+     name="copy_slurl">
+		<menu_item_call.on_click
+		 function="People.Groups.Action"
+		 parameter="copy_slurl" />
+		<menu_item_call.on_enable
+		 function="People.Groups.Enable"
+		 parameter="copy_slurl" />
+	</menu_item_call>
+	<menu_item_call
+     label="Copy UUID"
+     layout="topleft"
+     name="copy_uuid">
+		<menu_item_call.on_click
+		 function="People.Groups.Action"
+		 parameter="copy_uuid" />
+		<menu_item_call.on_enable
+		 function="People.Groups.Enable"
+		 parameter="copy_uuid" />
+	</menu_item_call>
+  <menu_item_separator />
   <menu_item_call
    label="Leave"
    name="Leave">

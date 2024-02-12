@@ -77,14 +77,36 @@ public:
 	BOOL setSize(LLCoordScreen size);
 	BOOL setSize(LLCoordWindow size);
 	virtual void setMinSize(U32 min_width, U32 min_height, bool enforce_immediately = true);
-	virtual BOOL switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL disable_vsync, const LLCoordScreen * const posp = NULL) = 0;
-	virtual BOOL setCursorPosition(LLCoordWindow position) = 0;
+	virtual BOOL switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL enable_vsync, const LLCoordScreen * const posp = NULL) = 0;
+
+    //create a new GL context that shares a namespace with this Window's main GL context and make it current on the current thread
+    // returns a pointer to be handed back to destroySharedConext/makeContextCurrent
+    virtual void* createSharedContext() = 0;
+    //make the given context current on the current thread
+    virtual void makeContextCurrent(void* context) = 0;
+    //destroy the given context that was retrieved by createSharedContext()
+    //Must be called on the same thread that called createSharedContext()
+    virtual void destroySharedContext(void* context) = 0;
+
+    virtual void toggleVSync(bool enable_vsync) = 0;
+
+    virtual BOOL setCursorPosition(LLCoordWindow position) = 0;
 	virtual BOOL getCursorPosition(LLCoordWindow *position) = 0;
+#if LL_WINDOWS
+    virtual BOOL getCursorDelta(LLCoordCommon* delta) = 0;
+#endif
 	virtual void showCursor() = 0;
 	virtual void hideCursor() = 0;
 	virtual BOOL isCursorHidden() = 0;
 	virtual void showCursorFromMouseMove() = 0;
 	virtual void hideCursorUntilMouseMove() = 0;
+
+    // Provide a way to set the Viewer window title after the
+    // windows has been created. The initial use case for this
+    // is described in SL-16102 (update window title with agent 
+    // name, location etc. for non-interactive viewer) but it
+    // may also be useful in other cases.
+    virtual void setTitle(const std::string title);
 
 	// These two functions create a way to make a busy cursor instead
 	// of an arrow when someone's busy doing something. Draw an
@@ -96,7 +118,8 @@ public:
 
 	// Sets cursor, may set to arrow+hourglass
 	virtual void setCursor(ECursorType cursor) { mNextCursor = cursor; };
-	virtual ECursorType getCursor() const;
+    virtual ECursorType getCursor() const;
+    virtual ECursorType getNextCursor() const { return mNextCursor; };
 	virtual void updateCursor() = 0;
 
 	virtual void captureMouse() = 0;
@@ -111,7 +134,6 @@ public:
 	virtual BOOL pasteTextFromPrimary(LLWString &dst);
 	virtual BOOL copyTextToPrimary(const LLWString &src);
  
-	virtual void setWindowTitle(const std::string& title) {}
 	virtual void flashIcon(F32 seconds) = 0;
 	virtual F32 getGamma() = 0;
 	virtual BOOL setGamma(const F32 gamma) = 0; // Set the gamma
@@ -140,7 +162,10 @@ public:
 	virtual F32	getNativeAspectRatio() = 0;
 	virtual F32 getPixelAspectRatio() = 0;
 	virtual void setNativeAspectRatio(F32 aspect) = 0;
-	
+
+	// query VRAM usage
+	virtual U32 getAvailableVRAMMegabytes() = 0;
+
 	virtual void beforeDialog() {};	// prepare to put up an OS dialog (if special measures are required, such as in fullscreen mode)
 	virtual void afterDialog() {};	// undo whatever was done in beforeDialog()
 
@@ -174,6 +199,8 @@ public:
     // windows only DirectInput8 for joysticks
     virtual void* getDirectInput8() { return NULL; };
     virtual bool getInputDevices(U32 device_type_filter, void * devices_callback, void* userdata) { return false; };
+
+    virtual S32 getRefreshRate() { return mRefreshRate; }
 protected:
 	LLWindow(LLWindowCallbacks* callbacks, BOOL fullscreen, U32 flags);
 	virtual ~LLWindow() = default;
@@ -207,6 +234,7 @@ protected:
 	U16			mHighSurrogate;
 	S32			mMinWindowWidth;
 	S32			mMinWindowHeight;
+    S32         mRefreshRate;
 
  	// Handle a UTF-16 encoding unit received from keyboard.
  	// Converting the series of UTF-16 encoding units to UTF-32 data,
@@ -274,10 +302,13 @@ public:
 		U32 flags = 0,
 		BOOL fullscreen = FALSE,
 		BOOL clearBg = FALSE,
-		BOOL disable_vsync = TRUE,
+		BOOL enable_vsync = FALSE,
 		BOOL use_gl = TRUE,
 		BOOL ignore_pixel_depth = FALSE,
-		U32 fsaa_samples = 0);
+		U32 fsaa_samples = 0,
+        U32 max_cores = 0,
+        U32 max_vram = 0,
+        F32 max_gl_version = 4.6f);
 	static BOOL destroyWindow(LLWindow* window);
 	static BOOL isWindowValid(LLWindow *window);
 };

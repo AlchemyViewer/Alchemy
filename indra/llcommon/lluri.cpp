@@ -341,7 +341,8 @@ void LLURI::parseAuthorityAndPathUsingOpaque()
 {
 	if (mScheme == "http" || mScheme == "https" ||
 		mScheme == "ftp" || mScheme == "secondlife" || 
-		mScheme == "x-grid-location-info")
+		mScheme == "x-grid-info" ||
+		mScheme == "x-grid-location-info") // legacy
 	{
 		if (mEscapedOpaque.substr(0,2) != "//")
 		{
@@ -445,7 +446,7 @@ LLURI LLURI::buildHTTP(const std::string& prefix,
 	if (path.isArray())
 	{
 		// break out and escape each path component
-		for (const auto& llsd_val : path.array())
+		for (const auto& llsd_val : path.asArray())
 		{
 			const std::string& str = llsd_val.asStringRef();
 			LL_DEBUGS() << "PATH: inserting " << str << LL_ENDL;
@@ -510,11 +511,20 @@ LLURI LLURI::buildHTTP(const std::string& prefix,
 }
 
 // static
+LLURI LLURI::buildHTTP(const std::string& scheme,
+	const std::string& prefix,
+	const LLSD& path,
+	const LLSD& query)
+{
+	return buildHTTP(fmt::format(FMT_STRING("{:s}://{:s}"), scheme, prefix), path, query);
+}
+
+// static
 LLURI LLURI::buildHTTP(const std::string& host,
 					   const U32& port,
 					   const LLSD& path)
 {
-	return LLURI::buildHTTP(llformat("%s:%u", host.c_str(), port), path);
+	return LLURI::buildHTTP(fmt::format(FMT_STRING("{:s}:{:d}"), host, port), path);
 }
 
 // static
@@ -523,7 +533,7 @@ LLURI LLURI::buildHTTP(const std::string& host,
 					   const LLSD& path,
 					   const LLSD& query)
 {
-	return LLURI::buildHTTP(llformat("%s:%u", host.c_str(), port), path, query);
+	return LLURI::buildHTTP(fmt::format(FMT_STRING("{:s}:{:d}"), host, port), path, query);
 }
 
 std::string LLURI::asString() const
@@ -593,6 +603,14 @@ std::string LLURI::hostName() const
 	return unescape(host);
 }
 
+std::string LLURI::hostNameAndPort() const
+{
+	std::string user, host, port;
+	findAuthorityParts(mEscapedAuthority, user, host, port);
+	return port.empty() ? unescape(host) : unescape(host + ":" + port);
+}
+
+
 std::string LLURI::userName() const
 {
 	std::string user, userPass, host, port;
@@ -648,14 +666,10 @@ LLSD LLURI::pathArray() const
 {
 	typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
 	boost::char_separator<char> sep("/", "", boost::drop_empty_tokens);
-	tokenizer tokens(mEscapedPath, sep);
-	tokenizer::iterator it = tokens.begin();
-	tokenizer::iterator end = tokens.end();
-
 	LLSD params;
-	for ( ; it != end; ++it)
+	for (const std::string& str : tokenizer(mEscapedPath, sep))
 	{
-		params.append(*it);
+		params.append(str);
 	}
 	return params;
 }

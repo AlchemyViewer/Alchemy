@@ -37,8 +37,6 @@ static 	LLInitParam::Parser::parser_write_func_map_t sWriteFuncs;
 static 	LLInitParam::Parser::parser_inspect_func_map_t sInspectFuncs;
 static const LLSD NO_VALUE_MARKER;
 
-LLTrace::BlockTimerStatHandle FTM_SD_PARAM_ADAPTOR("LLSD to LLInitParam conversion");
-
 //
 // LLParamSDParser
 //
@@ -115,11 +113,9 @@ void LLParamSDParser::writeSDImpl(LLSD& sd, const LLInitParam::BaseBlock& block,
 /*virtual*/ std::string LLParamSDParser::getCurrentElementName()
 {
 	std::string full_name = "sd";
-	for (name_stack_t::iterator it = mNameStack.begin();	
-		it != mNameStack.end();
-		++it)
+	for (name_stack_t::value_type& stack_pair : mNameStack)
 	{
-		full_name += llformat("[%s]", it->first.c_str());
+		full_name += llformat("[%s]", stack_pair.first.c_str());
 	}
 
 	return full_name;
@@ -258,7 +254,7 @@ void LLParamSDParserUtilities::readSDValues(read_sd_cb_t cb, const LLSD& sd, LLI
 {
 	if (sd.isMap())
 	{
-		for (const auto& llsd_pair : sd.map())
+		for (const auto& llsd_pair : sd.asMap())
 		{
 			stack.push_back(make_pair(llsd_pair.first, true));
 			readSDValues(cb, llsd_pair.second, stack);
@@ -267,7 +263,7 @@ void LLParamSDParserUtilities::readSDValues(read_sd_cb_t cb, const LLSD& sd, LLI
 	}
 	else if (sd.isArray())
 	{
-		for (const auto& llsd_val : sd.array())
+		for (const auto& llsd_val : sd.asArray())
 		{
 			stack.push_back(make_pair(std::string(), true));
 			readSDValues(cb, llsd_val, stack);

@@ -47,6 +47,7 @@
 
 #include "llagent.h"
 #include "llappviewer.h"
+#include "llavataractions.h"
 #include "llavatarname.h"
 #include "llfloateravatarpicker.h"
 #include "llbutton.h" 
@@ -79,6 +80,7 @@
 #include "llviewercontrol.h"
 #include "lluictrlfactory.h"
 #include "llviewerinventory.h"
+#include "llviewermenufile.h"
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
 #include "llviewerregion.h"
@@ -315,7 +317,6 @@ void LLFloaterRegionInfo::onOpen(const LLSD& key)
 	}
 	refreshFromRegion(gAgent.getRegion());
 	requestRegionInfo();
-	requestMeshRezInfo();
 
 	if (!mGodLevelChangeSlot.connected())
 	{
@@ -367,7 +368,7 @@ void LLFloaterRegionInfo::requestRegionInfo()
 void LLFloaterRegionInfo::processEstateOwnerRequest(LLMessageSystem* msg,void**)
 {
 	static LLDispatcher dispatch;
-	LLFloaterRegionInfo* floater = LLFloaterReg::getTypedInstance<LLFloaterRegionInfo>("region_info");
+	LLFloaterRegionInfo* floater = LLFloaterReg::findTypedInstance<LLFloaterRegionInfo>("region_info");
 	if(!floater)
 	{
 		return;
@@ -655,11 +656,11 @@ void LLFloaterRegionInfo::refreshFromRegion(LLViewerRegion* region)
 	}
 
 	// call refresh from region on all panels
-	std::for_each(
-		mInfoPanels.begin(),
-		mInfoPanels.end(),
-		[region](LLPanelRegionInfo* panelp) { panelp->refreshFromRegion(region); });
-    mEnvironmentPanel->refreshFromRegion(region);
+	for (const auto& infoPanel : mInfoPanels)
+	{
+		infoPanel->refreshFromRegion(region);
+	}
+	mEnvironmentPanel->refreshFromRegion(region);
 }
 
 // public
@@ -1004,19 +1005,6 @@ bool LLPanelRegionGeneralInfo::onMessageCommit(const LLSD& notification, const L
 	return false;
 }
 
-void LLFloaterRegionInfo::requestMeshRezInfo()
-{
-	std::string sim_console_url = gAgent.getRegionCapability("SimConsoleAsync");
-
-	if (!sim_console_url.empty())
-	{
-		std::string request_str = "get mesh_rez_enabled";
-		
-        LLCoreHttpUtil::HttpCoroutineAdapter::messageHttpPost(sim_console_url, LLSD(request_str),
-            "Requested mesh_rez_enabled", "Error requesting mesh_rez_enabled");
-	}
-}
-
 // setregioninfo
 // strings[0] = 'Y' - block terraform, 'N' - not
 // strings[1] = 'Y' - block fly, 'N' - not
@@ -1322,6 +1310,7 @@ void LLPanelRegionDebugInfo::onClickDebugConsole(void* data)
 
 BOOL LLPanelRegionTerrainInfo::validateTextureSizes()
 {
+    static const S32 MAX_TERRAIN_TEXTURE_SIZE = 1024;
 	for(S32 i = 0; i < TERRAIN_TEXTURE_COUNT; ++i)
 	{
 		std::string buffer;
@@ -1343,20 +1332,19 @@ BOOL LLPanelRegionTerrainInfo::validateTextureSizes()
 			LLSD args;
 			args["TEXTURE_NUM"] = i+1;
 			args["TEXTURE_BIT_DEPTH"] = llformat("%d",components * 8);
+            args["MAX_SIZE"] = MAX_TERRAIN_TEXTURE_SIZE;
 			LLNotificationsUtil::add("InvalidTerrainBitDepth", args);
 			return FALSE;
 		}
 
-//		if (width > 512 || height > 512)
-// [AL:SE] - Patch: Estate-LargeTerrain
-		if (width > 1024 || height > 1024)
-// [/AL:SE]
+		if (width > MAX_TERRAIN_TEXTURE_SIZE || height > MAX_TERRAIN_TEXTURE_SIZE)
 		{
 
 			LLSD args;
 			args["TEXTURE_NUM"] = i+1;
 			args["TEXTURE_SIZE_X"] = width;
 			args["TEXTURE_SIZE_Y"] = height;
+            args["MAX_SIZE"] = MAX_TERRAIN_TEXTURE_SIZE;
 			LLNotificationsUtil::add("InvalidTerrainSize", args);
 			return FALSE;
 			
@@ -1580,13 +1568,14 @@ bool LLPanelRegionTerrainInfo::callbackTextureHeights(const LLSD& notification, 
 // static
 void LLPanelRegionTerrainInfo::onClickDownloadRaw(void* data)
 {
-	LLFilePicker& picker = LLFilePicker::instance();
-	if (!picker.getSaveFile(LLFilePicker::FFSAVE_RAW, "terrain.raw"))
-	{
-		LL_WARNS() << "No file" << LL_ENDL;
-		return;
-	}
-	std::string filepath = picker.getFirstFile();
+	LLDir::getScrubbedFileName(LLRegionInfoModel::instance().mSimName+"_terrain.raw");
+	LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelRegionTerrainInfo::onClickDownloadRawCallback, _1, data), LLFilePicker::FFSAVE_RAW, LLDir::getScrubbedFileName(LLRegionInfoModel::instance().mSimName + "_terrain.raw"));
+}
+
+// static
+void LLPanelRegionTerrainInfo::onClickDownloadRawCallback(const std::vector<std::string>& filenames, void* data)
+{
+	std::string filepath = filenames[0];
 	gXferManager->expectFileForRequest(filepath);
 
 	LLPanelRegionTerrainInfo* self = (LLPanelRegionTerrainInfo*)data;
@@ -1600,13 +1589,13 @@ void LLPanelRegionTerrainInfo::onClickDownloadRaw(void* data)
 // static
 void LLPanelRegionTerrainInfo::onClickUploadRaw(void* data)
 {
-	LLFilePicker& picker = LLFilePicker::instance();
-	if (!picker.getOpenFile(LLFilePicker::FFLOAD_RAW))
-	{
-		LL_WARNS() << "No file" << LL_ENDL;
-		return;
-	}
-	std::string filepath = picker.getFirstFile();
+	LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelRegionTerrainInfo::onClickUploadRawCallback, data, _1), LLFilePicker::FFLOAD_RAW, false);
+}
+
+// static
+void LLPanelRegionTerrainInfo::onClickUploadRawCallback(void* data, const std::vector<std::string>& filenames)
+{
+	std::string filepath = filenames[0];
 	gXferManager->expectFileForTransfer(filepath);
 
 	LLPanelRegionTerrainInfo* self = (LLPanelRegionTerrainInfo*)data;
@@ -1829,7 +1818,7 @@ void LLPanelEstateInfo::updateControls(LLViewerRegion* region)
 	setCtrlsEnabled(god || owner || manager);
 	
 	getChildView("apply_btn")->setEnabled(FALSE);
-
+    getChildView("estate_owner")->setEnabled(TRUE);
 	getChildView("message_estate_btn")->setEnabled(god || owner || manager);
 	getChildView("kick_user_from_estate_btn")->setEnabled(god || owner || manager);
 
@@ -1881,6 +1870,7 @@ BOOL LLPanelEstateInfo::postBuild()
 	initCtrl("allow_direct_teleport");
 	initCtrl("limit_payment");
 	initCtrl("limit_age_verified");
+    initCtrl("limit_bots");
 	initCtrl("voice_chat_check");
     initCtrl("parcel_access_override");
 
@@ -1890,6 +1880,8 @@ BOOL LLPanelEstateInfo::postBuild()
 	getChild<LLUICtrl>("parcel_access_override")->setCommitCallback(boost::bind(&LLPanelEstateInfo::onChangeAccessOverride, this));
 
 	getChild<LLUICtrl>("externally_visible_radio")->setFocus(TRUE);
+
+    getChild<LLTextBox>("estate_owner")->setIsFriendCallback(LLAvatarActions::isFriend);
 
 	return LLPanelRegionInfo::postBuild();
 }
@@ -1902,12 +1894,14 @@ void LLPanelEstateInfo::refresh()
 	getChildView("Only Allow")->setEnabled(public_access);
 	getChildView("limit_payment")->setEnabled(public_access);
 	getChildView("limit_age_verified")->setEnabled(public_access);
+    getChildView("limit_bots")->setEnabled(public_access);
 
 	// if this is set to false, then the limit fields are meaningless and should be turned off
 	if (public_access == false)
 	{
 		getChild<LLUICtrl>("limit_payment")->setValue(false);
 		getChild<LLUICtrl>("limit_age_verified")->setValue(false);
+        getChild<LLUICtrl>("limit_bots")->setValue(false);
 	}
 }
 
@@ -1924,6 +1918,7 @@ void LLPanelEstateInfo::refreshFromEstate()
 	getChild<LLUICtrl>("limit_payment")->setValue(estate_info.getDenyAnonymous());
 	getChild<LLUICtrl>("limit_age_verified")->setValue(estate_info.getDenyAgeUnverified());
     getChild<LLUICtrl>("parcel_access_override")->setValue(estate_info.getAllowAccessOverride());
+    getChild<LLUICtrl>("limit_bots")->setValue(estate_info.getDenyScriptedAgents());
 
 	// Ensure appriopriate state of the management UI
 	updateControls(gAgent.getRegion());
@@ -1967,6 +1962,7 @@ bool LLPanelEstateInfo::callbackChangeLindenEstate(const LLSD& notification, con
 			estate_info.setDenyAgeUnverified(getChild<LLUICtrl>("limit_age_verified")->getValue().asBoolean());
 			estate_info.setAllowVoiceChat(getChild<LLUICtrl>("voice_chat_check")->getValue().asBoolean());
             estate_info.setAllowAccessOverride(getChild<LLUICtrl>("parcel_access_override")->getValue().asBoolean());
+            estate_info.setDenyScriptedAgents(getChild<LLUICtrl>("limit_bots")->getValue().asBoolean());
             // JIGGLYPUFF
             //estate_info.setAllowAccessOverride(getChild<LLUICtrl>("")->getValue().asBoolean());
 			// send the update to sim
@@ -2111,6 +2107,8 @@ bool LLPanelEstateCovenant::refreshFromRegion(LLViewerRegion* region)
 	
 	LLTextBox* region_landtype = getChild<LLTextBox>("region_landtype_text");
 	region_landtype->setText(region->getLocalizedSimProductName());
+
+    getChild<LLButton>("reset_covenant")->setEnabled(gAgent.isGodlike() || (region && region->canManageEstate()));
 	
 	// let the parent class handle the general data collection. 
 	bool rv = LLPanelRegionInfo::refreshFromRegion(region);
@@ -2135,6 +2133,7 @@ BOOL LLPanelEstateCovenant::postBuild()
 {
 	mEstateNameText = getChild<LLTextBox>("estate_name_text");
 	mEstateOwnerText = getChild<LLTextBox>("estate_owner_text");
+    mEstateOwnerText->setIsFriendCallback(LLAvatarActions::isFriend);
 	mLastModifiedText = getChild<LLTextBox>("covenant_timestamp_text");
 	mEditor = getChild<LLViewerTextEditor>("covenant_editor");
 	LLButton* reset_button = getChild<LLButton>("reset_covenant");
@@ -2266,35 +2265,30 @@ void LLPanelEstateCovenant::onLoadComplete(const LLUUID& asset_uuid,
 		if(0 == status)
 		{
 			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-			if (file.open())
+
+			S32 file_length = file.getSize();
+
+			std::vector<char> buffer(file_length+1);
+			file.read((U8*)&buffer[0], file_length);
+			// put a EOS at the end
+			buffer[file_length] = 0;
+
+			if( (file_length > 19) && !strncmp( &buffer[0], "Linden text version", 19 ) )
 			{
-				S32 file_length = file.getSize();
-
-				std::vector<char> buffer(file_length + 1);
-				if (file.read((U8*)&buffer[0], file_length))
+				if( !panelp->mEditor->importBuffer( &buffer[0], file_length+1 ) )
 				{
-					file.close();
-					// put a EOS at the end
-					buffer[file_length] = 0;
-
-					if ((file_length > 19) && !strncmp(&buffer[0], "Linden text version", 19))
-					{
-						if (!panelp->mEditor->importBuffer(&buffer[0], file_length + 1))
-						{
-							LL_WARNS() << "Problem importing estate covenant." << LL_ENDL;
-							LLNotificationsUtil::add("ProblemImportingEstateCovenant");
-						}
-						else
-						{
-							panelp->sendChangeCovenantID(asset_uuid);
-						}
-					}
-					else
-					{
-						// Version 0 (just text, doesn't include version number)
-						panelp->sendChangeCovenantID(asset_uuid);
-					}
+					LL_WARNS() << "Problem importing estate covenant." << LL_ENDL;
+					LLNotificationsUtil::add("ProblemImportingEstateCovenant");
 				}
+				else
+				{
+					panelp->sendChangeCovenantID(asset_uuid);	
+				}
+			}
+			else
+			{
+				// Version 0 (just text, doesn't include version number)
+				panelp->sendChangeCovenantID(asset_uuid);
 			}
 		}
 		else
@@ -2804,7 +2798,7 @@ BOOL LLPanelEstateAccess::postBuild()
 	if (banned_name_list)
 	{
 		banned_name_list->setCommitOnSelectionChange(TRUE);
-		banned_name_list->setMaxItemCount(ESTATE_MAX_ACCESS_IDS);
+		banned_name_list->setMaxItemCount(ESTATE_MAX_BANNED_IDS);
 	}
 
 	getChild<LLUICtrl>("banned_search_input")->setCommitCallback(boost::bind(&LLPanelEstateAccess::onBannedSearchEdit, this, _2));
@@ -2948,10 +2942,10 @@ void LLPanelEstateAccess::onClickAddBannedAgent()
 {
 	LLCtrlListInterface *list = childGetListInterface("banned_avatar_name_list");
 	if (!list) return;
-	if (list->getItemCount() >= ESTATE_MAX_ACCESS_IDS)
+	if (list->getItemCount() >= ESTATE_MAX_BANNED_IDS)
 	{
 		LLSD args;
-		args["MAX_BANNED"] = llformat("%d", ESTATE_MAX_ACCESS_IDS);
+		args["MAX_BANNED"] = llformat("%d", ESTATE_MAX_BANNED_IDS);
 		LLNotificationsUtil::add("MaxBannedAgentsOnRegion", args);
 		return;
 	}
@@ -3189,13 +3183,13 @@ void LLPanelEstateAccess::accessAddCore3(const uuid_vec_t& ids, std::vector<LLAv
 		LLNameListCtrl* name_list = panel->getChild<LLNameListCtrl>("banned_avatar_name_list");
 		LLNameListCtrl* em_list = panel->getChild<LLNameListCtrl>("estate_manager_name_list");
 		int currentCount = (name_list ? name_list->getItemCount() : 0);
-		if (ids.size() + currentCount > ESTATE_MAX_ACCESS_IDS)
+		if (ids.size() + currentCount > ESTATE_MAX_BANNED_IDS)
 		{
 			LLSD args;
 			args["NUM_ADDED"] = llformat("%d", ids.size());
-			args["MAX_AGENTS"] = llformat("%d", ESTATE_MAX_ACCESS_IDS);
+			args["MAX_AGENTS"] = llformat("%d", ESTATE_MAX_BANNED_IDS);
 			args["LIST_TYPE"] = LLTrans::getString("RegionInfoListTypeBannedAgents");
-			args["NUM_EXCESS"] = llformat("%d", (ids.size() + currentCount) - ESTATE_MAX_ACCESS_IDS);
+			args["NUM_EXCESS"] = llformat("%d", (ids.size() + currentCount) - ESTATE_MAX_BANNED_IDS);
 			LLNotificationsUtil::add("MaxAgentOnRegionBatch", args);
 			delete change_info;
 			return;
@@ -3539,8 +3533,8 @@ void LLPanelEstateAccess::updateLists()
 void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 {
 	LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-	LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t	httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("requestEstateGetAccessoCoro", httpPolicy));
-	LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+	LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t	httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestEstateGetAccessoCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
 	LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -3561,7 +3555,7 @@ void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 
 		allowed_agent_name_list->clearSortOrder();
 		allowed_agent_name_list->deleteAllItems();
-		for (const auto& llsd_val : result["AllowedAgents"].array())
+		for (const auto& llsd_val : result["AllowedAgents"].asArray())
 		{ 
 			LLUUID id = llsd_val["id"].asUUID();
 			allowed_agent_name_list->addNameItem(id);
@@ -3574,13 +3568,13 @@ void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 	{
 		LLStringUtil::format_map_t args;
 		args["[BANNEDAGENTS]"] = llformat("%d", result["BannedAgents"].size());
-		args["[MAXBANNED]"] = llformat("%d", ESTATE_MAX_ACCESS_IDS);
+		args["[MAXBANNED]"] = llformat("%d", ESTATE_MAX_BANNED_IDS);
 		std::string msg = LLTrans::getString("RegionInfoBannedResidents", args);
 		panel->getChild<LLUICtrl>("ban_resident_label")->setValue(LLSD(msg));
 
 		banned_agent_name_list->clearSortOrder();
 		banned_agent_name_list->deleteAllItems();
-		for (const auto& llsd_val : result["BannedAgents"].array())
+		for (const auto& llsd_val : result["BannedAgents"].asArray())
 		{
 			LLSD item;
 			item["id"] = llsd_val["id"].asUUID();
@@ -3623,7 +3617,7 @@ void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 
 		allowed_group_name_list->clearSortOrder();
 		allowed_group_name_list->deleteAllItems();
-		for (const auto& llsd_val : result["AllowedGroups"].array())
+		for (const auto& llsd_val : result["AllowedGroups"].asArray())
 		{
 			LLUUID id = llsd_val["id"].asUUID();
 			allowed_group_name_list->addGroupNameItem(id);
@@ -3642,7 +3636,7 @@ void LLPanelEstateAccess::requestEstateGetAccessCoro(std::string url)
 
 		estate_manager_name_list->clearSortOrder();
 		estate_manager_name_list->deleteAllItems();
-		for (const auto& llsd_val : result["Managers"].array())
+		for (const auto& llsd_val : result["Managers"].asArray())
 		{
 			LLUUID id = llsd_val["agent_id"].asUUID();
 			estate_manager_name_list->addNameItem(id);
@@ -3688,7 +3682,7 @@ void LLPanelEstateAccess::searchAgent(LLNameListCtrl* listCtrl, const std::strin
 	if (!search_string.empty())
 	{
 		listCtrl->setSearchColumn(0); // name column
-		listCtrl->selectItemByPrefix(search_string, FALSE);
+		listCtrl->searchItems(search_string, false, true);
 	}
 	else
 	{

@@ -29,6 +29,8 @@
 
 #include "llmodelloader.h"
 
+#include "dae/daeErrorHandler.h"
+
 class DAE;
 class daeElement;
 class domProfile_COMMON;
@@ -60,7 +62,7 @@ public:
         U32									maxJointsPerMesh,
 		U32									modelLimit,
         bool								preprocess);
-	virtual ~LLDAELoader() = default;
+	virtual ~LLDAELoader();
 
 	virtual bool OpenFile(const std::string& filename);
 
@@ -90,9 +92,6 @@ protected:
 	bool verifyController( domController* pController );
 
 	static bool addVolumeFacesFromDomMesh(LLModel* model, domMesh* mesh, LLSD& log_msg);
-	static bool createVolumeFacesFromDomMesh(LLModel* model, domMesh *mesh);
-
-	static LLModel* loadModelFromDomMesh(domMesh* mesh);
 
 	// Loads a mesh breaking it into one or more models as necessary
 	// to get around volume face limitations while retaining >8 materials
@@ -106,6 +105,14 @@ protected:
 	static std::string preprocessDAE(std::string filename);
 
 private:
+	class LLDAELogHandler final : public daeErrorHandler
+	{
+	public:
+		void handleError(daeString msg) override;
+		void handleWarning(daeString msg) override;
+	};
+
+	std::unique_ptr<LLDAELogHandler> mHandler;
 	U32 mGeneratedModelLimit; // Attempt to limit amount of generated submodels
 	bool mPreprocessDAE;
 

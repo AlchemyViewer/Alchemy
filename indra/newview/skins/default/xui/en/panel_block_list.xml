@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ follows="all"
+ height="300"
+ label="BLOCKED LIST"
+ layout="topleft"
+ name="panel_block_list"
+ width="350">
+    <scroll_list
+     draw_border="false"
+     draw_heading="true"
+     draw_stripes="true"
+     follows="all"
+     height="275"
+     layout="topleft"
+     left="1"
+     multi_select="true"
+     name="block_list"
+     right="-1"
+     tool_tip="List of currently blocked Residents / Objects."
+     top="0" >
+        <scroll_list.columns
+         label="Name"
+         name="item_name" />
+        <scroll_list.columns
+         label="Block Type"
+         name="item_type"
+         width="100" />
+        <scroll_list.columns
+         can_sort="false"
+         halign="center"
+         label="T"
+         name="item_text"
+         tool_tip="Text"
+         width="20" />
+        <scroll_list.columns
+         can_sort="false"
+         halign="center"
+         label="V"
+         name="item_voice"
+         tool_tip="Voice"
+         width="20" />
+        <scroll_list.columns
+         can_sort="false"
+         halign="center"
+         label="P"
+         name="item_particles"
+         tool_tip="Particles"
+         width="20" />
+        <scroll_list.columns
+         can_sort="false"
+         halign="center"
+         label="S"
+         name="item_sounds"
+         tool_tip="Object Sounds"
+         width="20" />
+    </scroll_list>
+    <panel
+     follows="left|right|bottom"
+     height="25"
+     left="1"
+     layout="topleft"
+     name="bottom_panel"
+     right="-1"
+     top_pad="0" >
+        <button 
+         follows="left|bottom"
+         height="25"
+         image_hover_unselected="Toolbar_Left_Over"
+         image_overlay="AddItem_Off"
+         image_overlay_alignment="left"
+         image_selected="Toolbar_Left_Selected"
+         image_unselected="Toolbar_Left_Off"
+         label="Block Resident"
+         left="1"
+         name="block_resident_btn"
+         tool_tip="Pick a resident to block"
+         top="0"
+         width="119">
+            <button.commit_callback
+             function="Block.AddAvatar" />
+        </button>
+        <button 
+         follows="left|bottom"
+         height="25"
+         image_hover_unselected="Toolbar_Middle_Over"
+         image_overlay="AddItem_Off"
+         image_overlay_alignment="left"
+         image_selected="Toolbar_Middle_Selected"
+         image_unselected="Toolbar_Middle_Off"
+         label="Block Object"
+         left_pad="1"
+         name="block_object_btn"
+         tool_tip="Pick an object to block by name"
+         width="109">
+            <button.commit_callback
+             function="Block.AddByName" />
+        </button>
+        <icon  
+         follows="left|bottom|right"
+         height="25"
+         image_name="Toolbar_Middle_Off"
+         left_pad="1"
+         right="-80"
+         name="derenderx_spacer_icon" />
+        <button 
+         enabled="false"
+         follows="bottom|right"
+         height="25"
+         image_hover_unselected="Toolbar_Right_Over"
+         image_overlay="TrashItem_Off"
+         image_overlay_alignment="left"
+         image_selected="Toolbar_Right_Selected"
+         image_unselected="Toolbar_Right_Off"
+         label="Unblock"
+         left_pad="1"
+         name="block_trash_btn"
+         tool_tip="Remove selected items from the blocked list"
+         width="79">
+            <button.commit_callback
+             function="Block.Remove" />
+        </button>
+    </panel>
+</panel>

@@ -60,13 +60,13 @@ public:
 	 * By default Pick will be created for current Agent location.
 	 * Use setPickData to change Pick properties.
 	 */
-	/*virtual*/ void onOpen(const LLSD& key);
+	/*virtual*/ void onOpen(const LLSD& key) override;
 
-	/*virtual*/ BOOL postBuild();
+	/*virtual*/ BOOL postBuild() override;
 
-	/*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
+	/*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
 
-	/*virtual*/ void processProperties(void* data, EAvatarProcessorType type);
+	/*virtual*/ void processProperties(void* data, EAvatarProcessorType type) override;
 
 	/**
 	 * Sends remote parcel info request to resolve parcel name from its ID.
@@ -84,9 +84,9 @@ public:
 	virtual void setEditPickCallback(const commit_callback_t& cb);
 
 	//This stuff we got from LLRemoteParcelObserver, in the last one we intentionally do nothing
-	/*virtual*/ void processParcelInfo(const LLParcelData& parcel_data);
-	/*virtual*/ void setParcelID(const LLUUID& parcel_id) { mParcelId = parcel_id; }
-	/*virtual*/ void setErrorStatus(S32 status, const std::string& reason) {};
+	/*virtual*/ void processParcelInfo(const LLParcelData& parcel_data) override;
+	/*virtual*/ void setParcelID(const LLUUID& parcel_id) override { mParcelId = parcel_id; }
+	/*virtual*/ void setErrorStatus(S32 status, const std::string& reason) override {};
 
 protected:
 
@@ -148,8 +148,6 @@ protected:
 
 	void onClickBack();
 
-protected:
-
 	S32						mScrollingPanelMinHeight;
 	S32						mScrollingPanelWidth;
 	LLScrollContainer*		mScrollContainer;
@@ -166,7 +164,7 @@ protected:
 /**
  * Panel for creating/editing Pick.
  */
-class LLPanelPickEdit : public LLPanelPickInfo
+class LLPanelPickEdit final : public LLPanelPickInfo
 {
 	LOG_CLASS(LLPanelPickEdit);
 public:
@@ -176,13 +174,10 @@ public:
 	 */
 	static LLPanelPickEdit* create();
 
-	/*virtual*/ ~LLPanelPickEdit();
-
-	/*virtual*/ void onOpen(const LLSD& key);
-
+	~LLPanelPickEdit() = default;
+	void onOpen(const LLSD& key) override;
 	virtual void setPickData(const LLPickData* pick_data);
-
-	/*virtual*/ BOOL postBuild();
+	BOOL postBuild() override;
 
 	/**
 	 * Sets "Save" button click callback
@@ -197,23 +192,23 @@ public:
 	/**
 	 * Resets panel and all cantrols to unedited state
 	 */
-	/*virtual*/ void resetDirty();
+	void resetDirty() override;
 
 	/**
 	 * Returns true if any of Pick properties was changed by user.
 	 */
-	/*virtual*/ BOOL isDirty() const;
+	BOOL isDirty() const override;
 
-	/*virtual*/ void processProperties(void* data, EAvatarProcessorType type);
+	void processProperties(void* data, EAvatarProcessorType type) override;
+
+	/**
+	* Sends Pick properties to server.
+	*/
+	void sendUpdate();
 
 protected:
 
 	LLPanelPickEdit();
-
-	/**
-	 * Sends Pick properties to server.
-	 */
-	void sendUpdate();
 
 	/**
 	 * Called when snapshot image changes.
@@ -225,7 +220,7 @@ protected:
 	 */
 	void onPickChanged(LLUICtrl* ctrl);
 
-	/*virtual*/ void resetData();
+	/*virtual*/ void resetData() override;
 
 	/**
 	 * Enables/disables "Save" button
@@ -244,8 +239,6 @@ protected:
 
 	std::string getLocationNotice();
 
-protected:
-
 	bool mLocationChanged;
 	bool mNeedData;
 	bool mNewPick;
@@ -255,8 +248,6 @@ private:
 	void initTexturePickerMouseEvents();
         void onTexturePickerMouseEnter(LLUICtrl* ctrl);
 	void onTexturePickerMouseLeave(LLUICtrl* ctrl);
-
-private:
 
 	LLIconCtrl* text_icon;
 };

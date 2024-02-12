@@ -27,7 +27,6 @@
 #ifndef LL_LLTHREAD_H
 #define LL_LLTHREAD_H
 
-#include "llapp.h"
 #include "llapr.h"
 #include "llrefcount.h"
 #include <thread>
@@ -50,6 +49,7 @@ public:
         QUITTING= 2,    // Someone wants this thread to quit
         CRASHED = -1    // An uncaught exception was thrown by the thread
     } EThreadStatus;
+
     typedef std::thread::id id_t;
 
     LLThread(const std::string& name, apr_pool_t *poolp = NULL);
@@ -84,32 +84,24 @@ public:
 
     LLVolatileAPRPool* getLocalAPRFilePool() { return mLocalAPRFilePoolp ; }
 
-    id_t getID() const { return mID; }
+    id_t getID() const;
 
-    // Called by threads *not* created via LLThread to register some
-    // internal state used by LLMutex.  You must call this once early
-    // in the running thread to prevent collisions with the main thread.
-    static void registerThreadID();
-    
 private:
     bool                mPaused;
-    std::thread::native_handle_type mNativeHandle; // for termination in case of issues
-    
+
     // static function passed to APR thread creation routine
     void threadRun();
 
 protected:
     std::string         mName;
-    class LLCondition*  mRunCondition;
-    LLMutex*            mDataLock;
-
-    std::thread        *mThreadp;
-    EThreadStatus       mStatus;
-    id_t                mID;
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-    LLTrace::ThreadRecorder* mRecorder;
+    std::unique_ptr<class LLCondition>  mRunCondition;
+    std::unique_ptr<LLMutex>            mDataLock;
+    std::unique_ptr<std::thread>        mThreadp;
+    std::atomic_int                     mStatus;
+    std::thread::native_handle_type     mNativeHandle;
+#if 0
+    std::unique_ptr<LLTrace::ThreadRecorder> mRecorder;
 #endif
-
     //a local apr_pool for APRFile operations in this thread. If it exists, LLAPRFile::sAPRFilePoolp should not be used.
     //Note: this pool is used by APRFile ONLY, do NOT use it for any other purposes.
     //      otherwise it will cause severe memory leaking!!! --bao

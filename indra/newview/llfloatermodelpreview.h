@@ -73,6 +73,7 @@ public:
     /*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE);
 	
 	void initModelPreview();
+	static bool showModelPreview();
 
 	BOOL handleMouseDown(S32 x, S32 y, MASK mask);
 	BOOL handleMouseUp(S32 x, S32 y, MASK mask);
@@ -90,7 +91,7 @@ public:
 	void clearAvatarTab(); // clears table
 	void updateAvatarTab(bool highlight_overrides); // populates table and data as nessesary
 
-	void setDetails(F32 x, F32 y, F32 z, F32 streaming_cost, F32 physics_cost);
+	void setDetails(F32 x, F32 y, F32 z);
 	void setPreviewLOD(S32 lod);
 	
 	void onBrowseLOD(S32 lod);
@@ -196,9 +197,7 @@ protected:
 	std::map<std::string, bool> mViewOptionDisabled;
 	
 	//store which lod mode each LOD is using
-	// 0 - load from file
-	// 1 - auto generate
-	// 2 - use LoD above
+	// See eLoDMode
 	S32 mLODMode[4];
 
 	std::unique_ptr<LLMutex> mStatusLock;
@@ -222,6 +221,7 @@ private:
 
 	void resetUploadOptions();
 	void clearLogTab();
+	void prepareToLoadModel(S32 lod);
 
 	void createSmoothComboBox(LLComboBox* combo_box, float min, float max);
 

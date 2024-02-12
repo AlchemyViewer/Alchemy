@@ -37,7 +37,7 @@
 #include "lluuid.h"
 #include "message.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 // llsd serialization constants
 static const std::string AGENTS("agents");
@@ -53,7 +53,6 @@ const U32 PENDING_TIMEOUT_SECS = 5 * 60;
 
 // Globals
 LLCacheName* gCacheName = NULL;
-std::map<std::string, std::string> LLCacheName::sCacheName;
 
 /// ---------------------------------------------------------------------------
 /// class LLCacheNameEntry
@@ -183,9 +182,9 @@ void ReplySender::flush()
 
 typedef std::set<LLUUID>					AskQueue;
 typedef std::list<PendingReply*>			ReplyQueue;
-typedef std::map<LLUUID,U32>				PendingQueue;
-typedef absl::flat_hash_map<LLUUID, LLCacheNameEntry*> Cache;
-typedef absl::flat_hash_map<std::string, LLUUID> 		ReverseCache;
+typedef boost::unordered_map<LLUUID,U32>				PendingQueue;
+typedef boost::unordered_flat_map<LLUUID, LLCacheNameEntry*> Cache;
+typedef boost::unordered_flat_map<std::string, LLUUID, al::string_hash, std::equal_to<>> 		ReverseCache;
 
 class LLCacheName::Impl
 {
@@ -215,7 +214,7 @@ public:
 	Impl(LLMessageSystem* msg);
 	~Impl();
 
-	BOOL getName(const LLUUID& id, std::string& first, std::string& last);
+	BOOL getName(const LLUUID& id, std::string& first, std::string& last, const std::string& nobody, const std::string& waiting);
 
 	boost::signals2::connection addPending(const LLUUID& id, const LLCacheNameCallback& callback);
 	void addPending(const LLUUID& id, const LLHost& host);
@@ -402,11 +401,11 @@ void LLCacheName::exportFile(std::ostream& ostr)
 }
 
 
-BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last)
+BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last, const std::string& nobody, const std::string& waiting)
 {
 	if(id.isNull())
 	{
-		first = sCacheName["nobody"];
+		first = nobody;
 		last.clear();
 		return TRUE;
 	}
@@ -420,7 +419,7 @@ BOOL LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::strin
 	}
 	else
 	{
-		first = sCacheName["waiting"];
+		first = waiting;
 		last.clear();
 		if (!isRequestPending(id))
 		{
@@ -443,7 +442,7 @@ void LLCacheName::localizeCacheName(std::string key, std::string value)
 BOOL LLCacheName::getFullName(const LLUUID& id, std::string& fullname)
 {
 	std::string first_name, last_name;
-	BOOL res = impl.getName(id, first_name, last_name);
+	BOOL res = impl.getName(id, first_name, last_name, sCacheName["nobody"], sCacheName["waiting"]);
 	fullname = buildFullName(first_name, last_name);
 	return res;
 }
@@ -543,7 +542,8 @@ std::string LLCacheName::buildUsername(const std::string& full_name)
 
 		if (lastname != "Resident")
 		{
-			username = absl::StrCat(username, ".", lastname);
+			username += ".";
+			username += lastname;
 		}
 		
 		LLStringUtil::toLower(username);
@@ -552,7 +552,9 @@ std::string LLCacheName::buildUsername(const std::string& full_name)
 
 	// if the input wasn't a correctly formatted legacy name, just return it  
 	// cleaned up from a potential terminal "Resident"
-	return cleanFullName(full_name);
+    std::string clean_name = cleanFullName(full_name);
+    LLStringUtil::toLower(clean_name);
+	return clean_name;
 }
 
 //static 
@@ -586,7 +588,7 @@ std::string LLCacheName::buildLegacyName(const std::string& complete_name)
 				{
 					cap_letter = last_name.substr(0, 1);
 					LLStringUtil::toUpper(cap_letter);
-					legacy_name = absl::StrCat(legacy_name, " ", cap_letter, last_name.substr(1));
+					legacy_name = fmt::format("{} {}{}", legacy_name, cap_letter, last_name.substr(1));
 				}
 			}
 

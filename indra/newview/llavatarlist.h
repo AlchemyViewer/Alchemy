@@ -59,7 +59,8 @@ public:
 						show_distance,	// *HACK: my sinuses hurt and i want pizza.
 						show_info_btn,
 						show_profile_btn,
-						show_speaking_indicator;
+						show_speaking_indicator,
+						use_colorize;
 		Optional<EShowPermissionType, ShowPermissionTypeNames> show_permissions_granted;
 		Params();
 	};
@@ -143,6 +144,7 @@ private:
 // [RLVa:KB] - RLVa-1.2.0
 	bool mRlvCheckShowNames;
 // [/RLVa:KB]
+	bool mUseColorizer;
 
 	LLTimer*				mLITUpdateTimer; // last interaction time update timer
 	std::string				mIconParamName;

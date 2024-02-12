@@ -137,7 +137,7 @@ void LLAvatarName::fromString(const std::string& full_name)
 		mLegacyLastName = full_name.substr(index+1);
 		if (mLegacyLastName != "Resident")
 		{
-			mUsername = absl::StrCat(mLegacyFirstName, ".", mLegacyLastName);
+			mUsername = fmt::format(FMT_COMPILE("{}.{}"), mLegacyFirstName, mLegacyLastName);
 			mDisplayName = full_name;
 			LLStringUtil::toLower(mUsername);
 		}
@@ -183,11 +183,11 @@ std::string LLAvatarName::getCompleteName(bool use_parentheses, bool force_use_c
 			{
 				if(use_parentheses)
 				{
-				    name = absl::StrCat(mDisplayName, " (", mUsername, ")");
+				    name = fmt::format(FMT_COMPILE("{} ({})"), mDisplayName, mUsername);
 				}
 				else
 				{
-				    name = absl::StrCat(mDisplayName, "  [ ", mUsername, " ]");
+				    name = fmt::format(FMT_COMPILE("{} [ {} ]"), mDisplayName, mUsername);
 				}
 			}
 			else
@@ -210,8 +210,7 @@ std::string LLAvatarName::getLegacyName() const
 		return mDisplayName;
 	}
 
-	std::string name = absl::StrCat(mLegacyFirstName, " ", mLegacyLastName);
-	return name;
+	return fmt::format("{} {}", mLegacyFirstName, mLegacyLastName);
 }
 
 std::string LLAvatarName::getDisplayName(bool force_use_display_name) const
@@ -246,12 +245,12 @@ std::string LLAvatarName::getUserName(bool lowercase) const
 	{
 		if(lowercase)
 		{
-		    name = absl::StrCat(mLegacyFirstName, ".", mLegacyLastName);
+		    name = fmt::format("{}.{}", mLegacyFirstName, mLegacyLastName);
 		    LLStringUtil::toLower(name);
 		}
 		else
 		{
-		    name = absl::StrCat(mLegacyFirstName, " ", mLegacyLastName);
+		    name = fmt::format("{} {}", mLegacyFirstName, mLegacyLastName);
 	    }
 	}
 	return name;

@@ -88,11 +88,12 @@ LLViewerAssetDictionary::LLViewerAssetDictionary()
 
 	addEntry(LLViewerAssetType::AT_NONE, 				new ViewerAssetEntry(DAD_NONE));
     addEntry(LLViewerAssetType::AT_SETTINGS,            new ViewerAssetEntry(DAD_SETTINGS));
+    addEntry(LLViewerAssetType::AT_MATERIAL,            new ViewerAssetEntry(DAD_MATERIAL));
 };
 
 EDragAndDropType LLViewerAssetType::lookupDragAndDropType(EType asset_type)
 {
-	const LLViewerAssetDictionary *dict = LLViewerAssetDictionary::getInstanceFast();
+	const LLViewerAssetDictionary *dict = LLViewerAssetDictionary::getInstance();
 	const ViewerAssetEntry *entry = dict->lookup(asset_type);
 	if (entry)
 		return entry->mDadType;

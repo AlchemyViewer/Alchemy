@@ -32,6 +32,9 @@
 #include "llsdserialize.h"
 #include "u64.h"
 
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
 /**
  * Constructor.
  *
@@ -341,10 +344,14 @@ void* LLPluginMessage::getValuePointer(const std::string &key) const
 std::string LLPluginMessage::generate(void) const
 {
 	std::ostringstream result;
-	
+
+#if LL_DEBUG
 	// Pretty XML may be slightly easier to deal with while debugging...
 //	LLSDSerialize::toXML(mMessage, result);
 	LLSDSerialize::toPrettyXML(mMessage, result);
+#else
+	LLSDSerialize::toXML(mMessage, result);
+#endif
 	
 	return result.str();
 }
@@ -359,11 +366,8 @@ int LLPluginMessage::parse(const std::string &message)
 	// clear any previous state
 	clear();
 
-	std::istringstream input(message);
-	
-	S32 parse_result = LLSDSerialize::fromXML(mMessage, input);
-	
-	return (int)parse_result;
+	boost::iostreams::stream<boost::iostreams::array_source> input(message.data(), message.size());
+	return LLSDSerialize::fromXML(mMessage, input);
 }
 
 

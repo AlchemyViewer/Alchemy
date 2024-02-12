@@ -46,6 +46,10 @@
 #include "llvector4a.h"
 #include <boost/align/aligned_allocator.hpp>
 
+#include <array>
+
+#include <array>
+
 class LLVertexBuffer;
 class LLCubeMap;
 class LLImageGL;
@@ -55,7 +59,10 @@ class LLMatrix4a;
 
 #define LL_MATRIX_STACK_DEPTH 32
 
-class LLTexUnit
+constexpr U32 LL_NUM_TEXTURE_LAYERS = 32;
+constexpr U32 LL_NUM_LIGHT_UNITS = 8;
+
+class LLTexUnit 
 {
 	friend class LLRender;
 public:
@@ -66,6 +73,7 @@ public:
 		TT_TEXTURE = 0,			// Standard 2D Texture
 		TT_RECT_TEXTURE,	    // Non power of 2 texture
 		TT_CUBE_MAP,		    // 6-sided cube map texture
+        TT_CUBE_MAP_ARRAY,	    // Array of cube maps
 		TT_MULTISAMPLE_TEXTURE, // see GL_ARB_texture_multisample
         TT_TEXTURE_3D,          // standard 3D Texture
 		TT_NONE, 		        // No texture type is currently enabled        
@@ -85,6 +93,13 @@ public:
 		TFO_TRILINEAR,			// Equal to: min=linear, mag=linear, mip=linear.
 		TFO_ANISOTROPIC			// Equal to: min=anisotropic, max=anisotropic, mip=linear.
 	} eTextureFilterOptions;
+
+	typedef enum
+	{
+		TMG_NONE = 0,			// Mipmaps are not automatically generated for this texture.
+		TMG_AUTO,				// Mipmaps are automatically generated for this texture.
+		TMG_MANUAL				// Mipmaps are manually generated for this texture.
+	} eTextureMipGeneration;
 
 	typedef enum 
 	{
@@ -108,10 +123,7 @@ public:
 		TBO_LERP_VERT_ALPHA,		// Interpolate based on Vertex Alpha (VA): ( Source1 * VA + Source2 * (1-VA) )
 		TBO_LERP_TEX_ALPHA,			// Interpolate based on Texture Alpha (TA): ( Source1 * TA + Source2 * (1-TA) )
 		TBO_LERP_PREV_ALPHA,		// Interpolate based on Previous Alpha (PA): ( Source1 * PA + Source2 * (1-PA) )
-		TBO_LERP_CONST_ALPHA,		// Interpolate based on Const Alpha (CA): ( Source1 * CA + Source2 * (1-CA) )
-		TBO_LERP_VERT_COLOR			// Interpolate based on Vertex Col (VC): ( Source1 * VC + Source2 * (1-VC) )
-										// *Note* TBO_LERP_VERTEX_COLOR only works with setTextureColorBlend(),
-										// and falls back to TBO_LERP_VERTEX_ALPHA for setTextureAlphaBlend().
+		TBO_LERP_CONST_ALPHA		// Interpolate based on Const Alpha (CA): ( Source1 * CA + Source2 * (1-CA) )
 	} eTextureBlendOp;
 
 	typedef enum 
@@ -134,13 +146,7 @@ public:
 		TBS_ONE_MINUS_CONST_ALPHA
 	} eTextureBlendSrc;
 
-    typedef enum
-    {
-        TCS_LINEAR = 0,
-        TCS_SRGB
-    } eTextureColorSpace;
-
-	LLTexUnit(S32 index);
+	LLTexUnit(S32 index = -1);
 
 	// Refreshes renderer state of the texture unit to the cached values
 	// Needed when the render context has changed and invalidated the current state
@@ -161,8 +167,19 @@ public:
 	
 	// Binds the LLImageGL to this texture unit 
 	// (automatically enables the unit for the LLImageGL's texture type)
-	bool bind(LLImageGL* texture, bool for_rendering = false, bool forceBind = false);
+	bool bind(LLImageGL* texture, bool for_rendering = false, bool forceBind = false, S32 usename = 0);
     bool bind(LLTexture* texture, bool for_rendering = false, bool forceBind = false);
+
+    // bind implementation for inner loops
+    // makes the following assumptions:
+    //  - No need for gGL.flush() 
+    //  - texture is not null
+    //  - gl_tex->getTexName() is not zero
+    //  - This texture is not being bound redundantly
+    //  - USE_SRGB_DECODE is disabled
+    //  - mTexOptionsDirty is false
+    //  - 
+    void bindFast(LLTexture* texture);
 
 	// Binds a cubemap to this texture unit 
 	// (automatically enables the texture unit for cubemaps)
@@ -180,6 +197,9 @@ public:
 	// (only if there's a texture of the given type currently bound)
 	void unbind(eTextureType type);
 
+    // Fast but unsafe version of unbind
+    void unbindFast(eTextureType type);
+
 	// Sets the addressing mode used to sample the texture
 	// Warning: this stays set for the bound texture forever, 
 	// make sure you want to permanently change the address mode  for the bound texture.
@@ -190,15 +210,6 @@ public:
 	// make sure you want to permanently change the filtering for the bound texture.
 	void setTextureFilteringOption(LLTexUnit::eTextureFilterOptions option);
 
-	void setTextureBlendType(eTextureBlendType type);
-
-	inline void setTextureColorBlend(eTextureBlendOp op, eTextureBlendSrc src1, eTextureBlendSrc src2 = TBS_PREV_COLOR)
-	{ setTextureCombiner(op, src1, src2, false); }
-
-	// NOTE: If *_COLOR enums are passed to src1 or src2, the corresponding *_ALPHA enum will be used instead.
-	inline void setTextureAlphaBlend(eTextureBlendOp op, eTextureBlendSrc src1, eTextureBlendSrc src2 = TBS_PREV_ALPHA)
-	{ setTextureCombiner(op, src1, src2, true); }
-
 	static U32 getInternalType(eTextureType type);
 
 	U32 getCurrTexture(void) { return mCurrTexture; }
@@ -207,22 +218,12 @@ public:
 
 	void setHasMipMaps(bool hasMips) { mHasMipMaps = hasMips; }
 
-    void setTextureColorSpace(eTextureColorSpace space);
-
-    eTextureColorSpace getCurrColorSpace() { return mTexColorSpace; }
-
 protected:
-	const S32			mIndex;
+    friend class LLRender;
+
+	S32		        	mIndex;
 	U32					mCurrTexture;
 	eTextureType		mCurrTexType;
-	eTextureBlendType	mCurrBlendType;
-	eTextureBlendOp		mCurrColorOp;
-	eTextureBlendSrc	mCurrColorSrc1;
-	eTextureBlendSrc	mCurrColorSrc2;
-	eTextureBlendOp		mCurrAlphaOp;
-	eTextureBlendSrc	mCurrAlphaSrc1;
-	eTextureBlendSrc	mCurrAlphaSrc2;
-    eTextureColorSpace  mTexColorSpace;
 	S32					mCurrColorScale;
 	S32					mCurrAlphaScale;
 	bool				mHasMipMaps;
@@ -232,13 +233,12 @@ protected:
 	void setAlphaScale(S32 scale);
 	GLint getTextureSource(eTextureBlendSrc src);
 	GLint getTextureSourceType(eTextureBlendSrc src, bool isAlpha = false);
-	void setTextureCombiner(eTextureBlendOp op, eTextureBlendSrc src1, eTextureBlendSrc src2, bool isAlpha = false);
 };
 
 class LLLightState
 {
 public:
-	LLLightState(S32 index);
+	LLLightState(S32 index = -1);
 
 	void enable();
 	void disable();
@@ -254,6 +254,8 @@ public:
 	void setSpotCutoff(const F32& cutoff);
 	void setSpotDirection(const LLVector3& direction);
     void setSunPrimary(bool v);
+    void setSize(F32 size);
+    void setFalloff(F32 falloff);
 
 protected:
 	friend class LLRender;
@@ -274,6 +276,8 @@ protected:
 
 	F32 mSpotExponent;
 	F32 mSpotCutoff;
+    F32 mSize = 0.f;
+    F32 mFalloff = 0.f;
 };
 
 class LLRender
@@ -281,7 +285,7 @@ class LLRender
 	friend class LLTexUnit;
 public:
 
-	enum eTexIndex
+	enum eTexIndex : U8
 	{
 		DIFFUSE_MAP           = 0,
         ALTERNATE_DIFFUSE_MAP = 1,
@@ -290,14 +294,15 @@ public:
 		NUM_TEXTURE_CHANNELS  = 3,
 	};
 
-	enum eVolumeTexIndex
+	enum eVolumeTexIndex : U8
 	{
 		LIGHT_TEX = 0,
 		SCULPT_TEX,
 		NUM_VOLUME_TEXTURE_CHANNELS,
 	};
 	
-	typedef enum {
+	enum eGeomModes : U8
+    {
 		TRIANGLES = 0,
 		TRIANGLE_STRIP,
 		TRIANGLE_FAN,
@@ -306,9 +311,9 @@ public:
 		LINE_STRIP,
 		LINE_LOOP,
 		NUM_MODES
-	} eGeomModes;
+	};
 
-	typedef enum 
+	enum eCompareFunc : U8
 	{
 		CF_NEVER = 0,
 		CF_ALWAYS,
@@ -319,9 +324,9 @@ public:
 		CF_GREATER_EQUAL,
 		CF_GREATER,
 		CF_DEFAULT
-	}  eCompareFunc;
+	};
 
-	typedef enum 
+	enum eBlendType : U8
 	{
 		BT_ALPHA = 0,
 		BT_ADD,
@@ -330,25 +335,26 @@ public:
 		BT_MULT_ALPHA,
 		BT_MULT_X2,
 		BT_REPLACE
-	} eBlendType;
+	};
 
-	typedef enum 
+    // WARNING:  this MUST match the LL_PART_BF enum in LLPartData, so set values explicitly in case someone 
+    // decides to add more or reorder them
+	enum eBlendFactor : U8
 	{
 		BF_ONE = 0,
-		BF_ZERO,
-		BF_DEST_COLOR,
-		BF_SOURCE_COLOR,
-		BF_ONE_MINUS_DEST_COLOR,
-		BF_ONE_MINUS_SOURCE_COLOR,
-		BF_DEST_ALPHA,
-		BF_SOURCE_ALPHA,
-		BF_ONE_MINUS_DEST_ALPHA,
-		BF_ONE_MINUS_SOURCE_ALPHA,
-
+		BF_ZERO = 1,
+		BF_DEST_COLOR = 2,
+		BF_SOURCE_COLOR = 3,
+		BF_ONE_MINUS_DEST_COLOR = 4,
+		BF_ONE_MINUS_SOURCE_COLOR = 5,
+		BF_DEST_ALPHA = 6,
+		BF_SOURCE_ALPHA = 7,
+		BF_ONE_MINUS_DEST_ALPHA = 8, 
+		BF_ONE_MINUS_SOURCE_ALPHA = 9,
 		BF_UNDEF
-	} eBlendFactor;
+	};
 
-	typedef enum
+	enum eMatrixMode : U8
 	{
 		MM_MODELVIEW = 0,
 		MM_PROJECTION,
@@ -358,19 +364,18 @@ public:
 		MM_TEXTURE3,
 		NUM_MATRIX_MODES,
 		MM_TEXTURE
-	} eMatrixMode;
+	};
 
 	LLRender();
 	~LLRender();
-	void init() ;
+    void init(bool needs_vertex_buffer);
+    void initVertexBuffer();
+    void resetVertexBuffer();
 	void shutdown();
 	
 	// Refreshes renderer state to the cached values
 	// Needed when the render context has changed and invalidated the current state
 	void refreshState(void);
-
-	void resetVertexBuffers();
-	void restoreVertexBuffers();
 
 	void translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
 	void scalef(const GLfloat& x, const GLfloat& y, const GLfloat& z);
@@ -402,6 +407,8 @@ public:
 
 	void translateUI(F32 x, F32 y, F32 z);
 	void scaleUI(F32 x, F32 y, F32 z);
+	// Rotates vertices, pre-translation/scale
+	void rotateUI(LLQuaternion& rot);
 	void pushUIMatrix();
 	void popUIMatrix();
 	void loadUIIdentity();
@@ -412,6 +419,7 @@ public:
 
 	void begin(const GLuint& mode);
 	void end();
+
 	LL_FORCE_INLINE void vertex2i(const GLint& x, const GLint& y) { vertex4a(LLVector4a((GLfloat)x,(GLfloat)y,0.f)); }
 	LL_FORCE_INLINE void vertex2f(const GLfloat& x, const GLfloat& y) { vertex4a(LLVector4a(x,y,0.f)); }
 	LL_FORCE_INLINE void vertex3f(const GLfloat& x, const GLfloat& y, const GLfloat& z) { vertex4a(LLVector4a(x,y,z)); }
@@ -444,8 +452,6 @@ public:
 	void setColorMask(bool writeColor, bool writeAlpha);
 	void setColorMask(bool writeColorR, bool writeColorG, bool writeColorB, bool writeAlpha);
 	void setSceneBlendType(eBlendType type);
-
-	void setAlphaRejectSettings(eCompareFunc func, F32 value = 0.01f);
 
 	// applies blend func to both color and alpha
 	void blendFunc(eBlendFactor sfactor, eBlendFactor dfactor);
@@ -499,17 +505,15 @@ private:
 	U32				mMode;
 	U32				mCurrTextureUnitIndex;
 	bool				mCurrColorMask[4];
-	eCompareFunc			mCurrAlphaFunc;
-	F32				mCurrAlphaFuncVal;
 	F32				mLineWidth;
 
 	LLPointer<LLVertexBuffer>	mBuffer;
 	LLStrider<LLVector4a>		mVerticesp;
 	LLStrider<LLVector2>		mTexcoordsp;
 	LLStrider<LLColor4U>		mColorsp;
-	std::vector<LLTexUnit*>		mTexUnits;
-	LLTexUnit*			mDummyTexUnit;
-	std::vector<LLLightState*> mLightState;
+	std::array<LLTexUnit, LL_NUM_TEXTURE_LAYERS> mTexUnits;
+	LLTexUnit			mDummyTexUnit;
+	std::array<LLLightState, LL_NUM_LIGHT_UNITS> mLightState;
 
 	eBlendFactor mCurrBlendColorSFactor;
 	eBlendFactor mCurrBlendColorDFactor;
@@ -518,6 +522,7 @@ private:
 
 	std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIOffset;
 	std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIScale;
+	std::vector<LLQuaternion> mUIRotation;
 
 	bool			mPrimitiveReset;
 };
@@ -527,8 +532,10 @@ extern LLMatrix4a gGLLastModelView;
 extern LLMatrix4a gGLLastProjection;
 extern LLMatrix4a gGLProjection;
 extern S32 gGLViewport[4];
+extern LLMatrix4a gGLDeltaModelView;
+extern LLMatrix4a gGLInverseDeltaModelView;
 
-extern LLRender gGL;
+extern thread_local LLRender gGL;
 
 // This rotation matrix moves the default OpenGL reference frame 
 // (-Z at, Y up) to Cory's favorite reference frame (X at, Z up)
@@ -555,12 +562,7 @@ void set_current_projection(const LLMatrix4a& mat);
 void set_last_modelview(const LLMatrix4a& mat);
 void set_last_projection(const LLMatrix4a& mat);
 
-#if LL_RELEASE_FOR_DOWNLOAD
-    #define LL_SHADER_LOADING_WARNS(...) LL_WARNS_ONCE("ShaderLoading")
-    #define LL_SHADER_UNIFORM_ERRS(...)  LL_WARNS_ONCE("Shader")
-#else
-    #define LL_SHADER_LOADING_WARNS(...) LL_WARNS()
-    #define LL_SHADER_UNIFORM_ERRS(...)  LL_ERRS("Shader")    
-#endif
+#define LL_SHADER_LOADING_WARNS(...) LL_WARNS()
+#define LL_SHADER_UNIFORM_ERRS(...)  LL_ERRS("Shader")
 
 #endif

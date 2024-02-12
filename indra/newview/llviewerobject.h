@@ -28,6 +28,7 @@
 #define LL_LLVIEWEROBJECT_H
 
 #include <map>
+#include <unordered_map>
 
 #include "llassetstorage.h"
 //#include "llhudicon.h"
@@ -43,6 +44,7 @@
 #include "llvertexbuffer.h"
 #include "llbbox.h"
 #include "llrigginginfo.h"
+#include "llreflectionmap.h"
 
 class LLAgent;			// TODO: Get rid of this.
 class LLAudioSource;
@@ -111,8 +113,7 @@ struct PotentialReturnableObject
 class LLViewerObject 
 :	public LLPrimitive, 
 	public LLRefCount, 
-	public LLGLUpdate,
-	public LLTrace::MemTrackable<LLViewerObject>
+	public LLGLUpdate
 {
 protected:
 	virtual ~LLViewerObject(); // use unref()
@@ -130,11 +131,15 @@ private:
 	bool mSculptParamsInUse = false;
 	bool mLightImageParamsInUse = false;
 	bool mExtendedMeshParamsInUse = false;
+	bool mRenderMaterialParamsInUse = false;
+	bool mReflectionProbeParamsInUse = false;
 	std::unique_ptr<LLFlexibleObjectData> mFlexibleObjectData;
 	std::unique_ptr<LLLightParams> mLightParams;
 	std::unique_ptr<LLSculptParams> mSculptParams;
 	std::unique_ptr<LLLightImageParams> mLightImageParams;
 	std::unique_ptr<LLExtendedMeshParams> mExtendedMeshParams;
+	std::unique_ptr<LLRenderMaterialParams> mRenderMaterialParams;
+	std::unique_ptr<LLReflectionProbeParams> mReflectionProbeParams;
 
 public:
 	typedef std::list<LLPointer<LLViewerObject> > child_list_t;
@@ -193,6 +198,19 @@ public:
 	const std::string& getAttachmentItemName() const;
 
 	virtual LLVOAvatar* getAvatar() const;  //get the avatar this object is attached to, or NULL if object is not an attachment
+    
+    bool hasRenderMaterialParams() const;
+    void setHasRenderMaterialParams(bool has_params);
+
+    const LLUUID& getRenderMaterialID(U8 te) const;
+
+    // set the RenderMaterialID for the given TextureEntry
+    // te - TextureEntry index to set, or -1 for all TEs
+    // id - asset id of material asset
+    // update_server - if true, will send updates to server and clear most overrides
+    void setRenderMaterialID(S32 te, const LLUUID& id, bool update_server = true, bool local_origin = true);
+    void setRenderMaterialIDs(const LLUUID& id);
+
 	virtual BOOL	isHUDAttachment() const { return FALSE; }
 	virtual BOOL	isTempAttachment() const;
 
@@ -211,9 +229,11 @@ public:
 	virtual U32 getNumVertices() const;
 	virtual U32 getNumIndices() const;
 	S32 getNumFaces() const { return mNumFaces; }
+	S32 getNumVisibleFaces() const;
 
 	// Graphical stuff for objects - maybe broken out into render class later?
 	virtual void updateTextures();
+    virtual void faceMappingChanged() {}
 	virtual void boostTexturePriority(BOOL boost_children = TRUE);	// When you just want to boost priority of this object
 	
 	virtual LLDrawable* createDrawable(LLPipeline *pipeline);
@@ -225,6 +245,8 @@ public:
 	F32					getRotTime() { return mRotTime; }
 private:
 	void				resetRotTime();
+    void				setRenderMaterialIDs(const LLRenderMaterialParams* material_params, bool local_origin);
+    void                rebuildMaterial();
 public:
 	void				resetRot();
 	void				applyAngularVelocity(F32 dt);
@@ -253,6 +275,7 @@ public:
 	virtual BOOL isMesh() const						{ return FALSE; }
 	virtual BOOL isRiggedMesh() const				{ return FALSE; }
 	virtual BOOL hasLightTexture() const			{ return FALSE; }
+    virtual BOOL isReflectionProbe() const          { return FALSE; }
 
 	// This method returns true if the object is over land owned by
 	// the agent, one of its groups, or it encroaches and 
@@ -297,6 +320,7 @@ public:
 									  S32 face = -1,                          // which face to check, -1 = ALL_SIDES
 									  BOOL pick_transparent = FALSE,
 									  BOOL pick_rigged = FALSE,
+                                      BOOL pick_unselectable = TRUE,
 									  S32* face_hit = NULL,                   // which face was hit
 									  LLVector4a* intersection = NULL,         // return the intersection point
 									  LLVector2* tex_coord = NULL,            // return the texture coordinates of the intersection point
@@ -336,6 +360,7 @@ public:
 
 	/*virtual*/	void	setNumTEs(const U8 num_tes);
 	/*virtual*/	void	setTE(const U8 te, const LLTextureEntry &texture_entry);
+    void updateTEMaterialTextures(U8 te);
 	/*virtual*/ S32		setTETexture(const U8 te, const LLUUID &uuid);
 	/*virtual*/ S32		setTENormalMap(const U8 te, const LLUUID &uuid);
 	/*virtual*/ S32		setTESpecularMap(const U8 te, const LLUUID &uuid);
@@ -360,6 +385,7 @@ public:
 	/*virtual*/ S32     setTEGlow(const U8 te, const F32 glow);
 	/*virtual*/ S32     setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID);
 	/*virtual*/ S32		setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialParams);
+    virtual     S32     setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* mat);
 
 	// Used by Materials update functions to properly kick off rebuilds
 	// of VBs etc when materials updates require changes.
@@ -374,7 +400,7 @@ public:
 	LLViewerTexture		*getTEImage(const U8 te) const;
 	LLViewerTexture		*getTENormalMap(const U8 te) const;
 	LLViewerTexture		*getTESpecularMap(const U8 te) const;
-	
+
 	bool 						isImageAlphaBlended(const U8 te) const;
 
 	void fitFaceTexture(const U8 face);
@@ -441,17 +467,15 @@ public:
 
 	void sendMaterialUpdate() const;
 
-	void setCanSelect(BOOL canSelect);
-
-	void setDebugText(const std::string &utf8text);
+	void setDebugText(const std::string &utf8text, const LLColor4& color = LLColor4::white);
+	void appendDebugText(const std::string &utf8text);
 	void initHudText();
 	void restoreHudText();
 	void setIcon(LLViewerTexture* icon_image);
 	void clearIcon();
 
-    void recursiveMarkForUpdate(BOOL priority);
-	virtual void markForUpdate(BOOL priority);
-	void markForUnload(BOOL priority);
+    void recursiveMarkForUpdate();
+	virtual void markForUpdate();
 	void updateVolume(const LLVolumeParams& volume_params);
 	virtual	void updateSpatialExtents(LLVector4a& min, LLVector4a& max);
 	virtual F32 getBinRadius();
@@ -493,16 +517,16 @@ public:
 	// manager until we have better iterators.
 	void updateInventory(LLViewerInventoryItem* item, U8 key, bool is_new);
 	void updateInventoryLocal(LLInventoryItem* item, U8 key); // Update without messaging.
-	void updateTextureInventory(LLViewerInventoryItem* item, U8 key, bool is_new);
+	void updateMaterialInventory(LLViewerInventoryItem* item, U8 key, bool is_new);
 	LLInventoryObject* getInventoryObject(const LLUUID& item_id);
+	LLInventoryItem* getInventoryItem(const LLUUID& item_id);
 
 	// Get content except for root category
 	void getInventoryContents(LLInventoryObject::object_list_t& objects);
 	LLInventoryObject* getInventoryRoot();
 	LLViewerInventoryItem* getInventoryItemByAsset(const LLUUID& asset_id);
+    LLViewerInventoryItem* getInventoryItemByAsset(const LLUUID& asset_id, LLAssetType::EType type);
 	S16 getInventorySerial() const { return mInventorySerialNum; }
-
-	bool isTextureInInventory(LLViewerInventoryItem* item);
 
 	// These functions does viewer-side only object inventory modifications
 	void updateViewerInventoryAsset(
@@ -596,7 +620,7 @@ public:
 
 	virtual S32 getLOD() const { return 3; } 
 	virtual U32 getPartitionType() const;
-	virtual void dirtySpatialGroup(BOOL priority = FALSE) const;
+	void dirtySpatialGroup() const;
 	virtual void dirtyMesh();
 
 	const LLFlexibleObjectData* getFlexibleObjectData() const { return mFlexibleObjectDataInUse ? mFlexibleObjectData.get() : nullptr; }
@@ -604,6 +628,8 @@ public:
 	const LLSculptParams* getSculptParams() const { return mSculptParamsInUse ? mSculptParams.get() : nullptr; }
 	const LLLightImageParams* getLightImageParams() const { return mLightImageParamsInUse ? mLightImageParams.get() : nullptr; }
 	const LLExtendedMeshParams* getExtendedMeshParams() const { return mExtendedMeshParamsInUse ? mExtendedMeshParams.get() : nullptr; }
+	 LLRenderMaterialParams* getRenderMaterialParams() const { return mRenderMaterialParamsInUse ? mRenderMaterialParams.get() : nullptr; }
+	LLReflectionProbeParams* getReflectionProbeParams() const { return mReflectionProbeParamsInUse ? mReflectionProbeParams.get() : nullptr; }
 
 	bool setParameterEntry(U16 param_type, const LLNetworkData& new_value, bool local_origin);
 	bool setParameterEntryInUse(U16 param_type, BOOL in_use, bool local_origin);
@@ -612,6 +638,14 @@ public:
 	virtual void parameterChanged(U16 param_type, bool local_origin);
 	virtual void parameterChanged(U16 param_type, LLNetworkData* data, BOOL in_use, bool local_origin);
 	
+    bool isShrinkWrapped() const { return mShouldShrinkWrap; }
+
+    // Used to improve performance.  If an object is likely to rebuild its vertex buffer often
+    // as a side effect of some update (color update, scale, etc), setting this to true
+    // will cause it to be pushed deeper into the octree and isolate it from other nodes
+    // so that nearby objects won't attempt to share a vertex buffer with this object.
+    void shrinkWrap();
+
 	friend class LLViewerObjectList;
 	friend class LLViewerMediaList;
 
@@ -637,6 +671,9 @@ public:
 	std::vector<LLVector3> mUnselectedChildrenPositions ;
 
 private:
+    void setObjectCostStale();
+    bool isAssetInInventory(LLViewerInventoryItem* item, LLAssetType::EType type);
+
 	ExtraParameter* createNewParameterEntry(U16 param_type);
 	const ExtraParameter& getExtraParameterEntry(U16 param_type) const
 	{
@@ -694,7 +731,6 @@ public:
 		LL_VO_SKY =					LL_PCODE_APP | 0x60,
 		LL_VO_VOID_WATER =			LL_PCODE_APP | 0x70,
 		LL_VO_WATER =				LL_PCODE_APP | 0x80,
-		LL_VO_GROUND =				LL_PCODE_APP | 0x90,
 		LL_VO_PART_GROUP =			LL_PCODE_APP | 0xa0,
 		LL_VO_TRIANGLE_TORUS =		LL_PCODE_APP | 0xb0,
 		LL_VO_HUD_PART_GROUP =		LL_PCODE_APP | 0xc0,
@@ -723,10 +759,10 @@ public:
 	LLPointer<LLViewerTexture> *mTEImages;
 	LLPointer<LLViewerTexture> *mTENormalMaps;
 	LLPointer<LLViewerTexture> *mTESpecularMaps;
-
-	// Selection, picking and rendering variables
-	U32				mGLName;			// GL "name" used by selection code
-	BOOL			mbCanSelect;		// true if user can select this object by clicking
+    
+    // true if user can select this object by clicking under any circumstances (even if pick_unselectable is true)
+    // can likely be factored out
+    BOOL			mbCanSelect;
 
 private:
 	// Grabbed from UPDATE_FLAGS
@@ -750,6 +786,8 @@ public:
 
 	// Replace textures with web pages on this object while drawing
 	BOOL mRenderMedia;
+
+    bool mRiggedAttachedWarned;
 
 	// In bits
 	S32				mBestUpdatePrecision;
@@ -846,7 +884,7 @@ protected:
 
 	// IDs of of all items in the object's content which are added to the object's content,
 	// but not updated on the server yet. After item was updated, its ID will be removed from this list.
-	std::list<LLUUID> mPendingInventoryItemsIDs;
+	boost::unordered_set<LLUUID> mPendingInventoryItemsIDs;
 
 	// This is the object's inventory from the viewer's perspective.
 	LLInventoryObject::object_list_t* mInventory;
@@ -894,6 +932,9 @@ protected:
 	F32 mLinksetCost;
 	F32 mPhysicsCost;
 	F32 mLinksetPhysicsCost;
+    
+    // If true, "shrink wrap" this volume in its spatial partition.  See "shrinkWrap"
+    bool mShouldShrinkWrap = false;
 
 	bool mCostStale;
 	mutable bool mPhysicsShapeUnknown;
@@ -953,6 +994,15 @@ private:
 	LLUUID mAttachmentItemID; // ItemID of the associated object is in user inventory.
 	EObjectUpdateType	mLastUpdateType;
 	BOOL	mLastUpdateCached;
+
+public:
+    // reflection probe state
+    bool mIsReflectionProbe = false;  // if true, this object should register itself with LLReflectionProbeManager
+    LLPointer<LLReflectionMap> mReflectionProbe = nullptr; // reflection probe coupled to this viewer object.  If not null, should be deregistered when this object is destroyed
+
+    // the amount of GPU time (in ms) it took to render this object according to LLPipeline::profileAvatar
+    // -1.f if no profile data available
+    F32 mGPURenderTime = -1.f;
 };
 
 ///////////////////
@@ -1002,7 +1052,7 @@ public:
 								LLStrider<LLColor4U>& emissivep,
 								LLStrider<U16>& indicesp) = 0;
 
-	virtual void getBlendFunc(S32 face, U32& src, U32& dst);
+	virtual void getBlendFunc(S32 face, LLRender::eBlendFactor& src, LLRender::eBlendFactor& dst);
 
 	F32 mDepth;
 };

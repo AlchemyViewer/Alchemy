@@ -40,6 +40,7 @@
 #include "llinventorymodel.h"
 #include "llinventoryobserver.h"
 #include "llmenubutton.h"
+#include "lloutfitobserver.h"
 #include "llscrolllistctrl.h"
 #include "llviewermenu.h"
 #include "llviewerregion.h"
@@ -50,6 +51,9 @@
 #include "rlvcommon.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
+#include "lltextbox.h"
+#include "llresmgr.h"
+#include "lltrans.h"
 
 // Context menu and Gear menu helper.
 static void edit_outfit()
@@ -234,12 +238,11 @@ static LLPanelInjector<LLPanelWearing> t_panel_wearing("panel_wearing");
 
 LLPanelWearing::LLPanelWearing()
 	:	LLPanelAppearanceTab()
-	,	mCOFItemsList(NULL)
+	,	mCOFItemsList(nullptr)
+	,	mAvatarComplexityLabel(nullptr)
 	,	mIsInitialized(false)
 	,	mAttachmentsChangedConnection()
 {
-	mCategoriesObserver = new LLInventoryCategoriesObserver();
-
 	mGearMenu = new LLWearingGearMenu(this);
 	mContextMenu = new LLWearingContextMenu();
 	mAttachmentsMenu = new LLTempAttachmentsContextMenu(this);
@@ -250,12 +253,6 @@ LLPanelWearing::~LLPanelWearing()
 	delete mGearMenu;
 	delete mContextMenu;
 	delete mAttachmentsMenu;
-
-	if (gInventory.containsObserver(mCategoriesObserver))
-	{
-		gInventory.removeObserver(mCategoriesObserver);
-	}
-	delete mCategoriesObserver;
 
 	if (mAttachmentsChangedConnection.connected())
 	{
@@ -277,6 +274,8 @@ BOOL LLPanelWearing::postBuild()
 	mTempItemsList = getChild<LLScrollListCtrl>("temp_attachments_list");
 	mTempItemsList->setFgUnselectedColor(LLColor4::white);
 	mTempItemsList->setRightMouseDownCallback(boost::bind(&LLPanelWearing::onTempAttachmentsListRightClick, this, _1, _2, _3));
+
+	mAvatarComplexityLabel = getChild<LLTextBox>("avatar_complexity_label");
 
 	LLMenuButton* menu_gear_btn = getChild<LLMenuButton>("options_gear_btn");
 
@@ -301,10 +300,8 @@ void LLPanelWearing::onOpen(const LLSD& /*info*/)
 		if (!category)
 			return;
 
-		gInventory.addObserver(mCategoriesObserver);
-
 		// Start observing changes in Current Outfit category.
-		mCategoriesObserver->addCategory(cof, boost::bind(&LLWearableItemsList::updateList, mCOFItemsList, cof));
+        LLOutfitObserver::instance().addCOFChangedCallback(boost::bind(&LLWearableItemsList::updateList, mCOFItemsList, cof));
 
 		// Fetch Current Outfit contents and refresh the list to display
 		// initially fetched items. If not all items are fetched now
@@ -461,9 +458,15 @@ bool LLPanelWearing::populateAttachmentsList(bool update)
 			}
 			else
 			{
-				row["columns"][1]["value"] = "Loading...";
+				row["columns"][1]["value"] = LLTrans::getString("LoadingData");
 				populated = false;
 			}
+			std::string complexity_string;
+			LLLocale locale("");
+			LLResMgr::getInstance()->getIntegerString(complexity_string, mTempItemComplexityMap[attachment->getID()]);
+			row["columns"][2]["column"] = "weight";
+			row["columns"][2]["value"] = complexity_string;
+			row["columns"][2]["halign"] = "right";
 			mTempItemsList->addElement(row);
 			mAttachmentsMap[attachment->getID()] = attachment;
 		}
@@ -486,8 +489,8 @@ void LLPanelWearing::getAttachmentLimitsCoro(std::string url)
 {
 	LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
 	LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-	httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("getAttachmentLimitsCoro", httpPolicy));
-	LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+	httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getAttachmentLimitsCoro", httpPolicy));
+	LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
 	LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -573,8 +576,8 @@ void LLPanelWearing::onEditAttachment()
 	LLScrollListItem* item = mTempItemsList->getFirstSelected();
 	if (item)
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
-		LLSelectMgr::getInstanceFast()->selectObjectAndFamily(mAttachmentsMap[item->getUUID()]);
+		LLSelectMgr::getInstance()->deselectAll();
+		LLSelectMgr::getInstance()->selectObjectAndFamily(mAttachmentsMap[item->getUUID()]);
 		handle_object_edit();
 	}
 }
@@ -584,9 +587,9 @@ void LLPanelWearing::onRemoveAttachment()
 	LLScrollListItem* item = mTempItemsList->getFirstSelected();
 	if (item && item->getUUID().notNull())
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
-		LLSelectMgr::getInstanceFast()->selectObjectAndFamily(mAttachmentsMap[item->getUUID()]);
-		LLSelectMgr::getInstanceFast()->sendDropAttachment();
+		LLSelectMgr::getInstance()->deselectAll();
+		LLSelectMgr::getInstance()->selectObjectAndFamily(mAttachmentsMap[item->getUUID()]);
+		LLSelectMgr::getInstance()->sendDetach();
 	}
 }
 
@@ -625,5 +628,17 @@ void LLPanelWearing::copyToClipboard()
 	}
 
 	LLClipboard::instance().copyToClipboard(utf8str_to_wstring(text),0,text.size());
+}
+
+void LLPanelWearing::updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity)
+{
+	std::string complexity_string;
+	LLLocale locale("");
+	LLResMgr::getInstance()->getIntegerString(complexity_string, complexity);
+
+	mAvatarComplexityLabel->setTextArg("[WEIGHT]", complexity_string);
+	
+	mTempItemComplexityMap = temp_item_complexity;
+	updateAttachmentsList();
 }
 // EOF

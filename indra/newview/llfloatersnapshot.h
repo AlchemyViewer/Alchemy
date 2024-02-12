@@ -35,6 +35,7 @@
 class LLSpinCtrl;
 class LLSnapshotLivePreview;
 class LLToolset;
+class LLTextBox;
 
 class LLFloaterSnapshotBase : public LLFloater
 {
@@ -59,9 +60,9 @@ public:
 
 	const LLRect& getThumbnailPlaceholderRect() { return mThumbnailPlaceholder->getRect(); }
 
-	void setRefreshLabelVisible(bool value) { mRefreshLabel->setVisible(value); }
-	void setSuccessLabelPanelVisible(bool value) { mSucceessLblPanel->setVisible(value); }
-	void setFailureLabelPanelVisible(bool value) { mFailureLblPanel->setVisible(value); }
+	void setRefreshLabelVisible(bool value) { if (mRefreshLabel) mRefreshLabel->setVisible(value); }
+	void setSuccessLabelPanelVisible(bool value) { if (mSucceessLblPanel) mSucceessLblPanel->setVisible(value); }
+	void setFailureLabelPanelVisible(bool value) { if (mFailureLblPanel) mFailureLblPanel->setVisible(value); }
 	void inventorySaveFailed();
 
 	class ImplBase;
@@ -72,6 +73,8 @@ protected:
 	LLUICtrl* mThumbnailPlaceholder;
 	LLUICtrl *mRefreshBtn, *mRefreshLabel;
 	LLUICtrl *mSucceessLblPanel, *mFailureLblPanel;
+	LLUICtrl* mFreezeFrameCheck = nullptr;
+	LLTextBox* m360Label = nullptr;
 };
 
 class LLFloaterSnapshotBase::ImplBase
@@ -88,6 +91,7 @@ public:
 		mLastToolset(NULL),
 		mAspectRatioCheckOff(false),
 		mNeedRefresh(false),
+        mSkipReshaping(false),
 		mStatus(STATUS_READY),
 		mFloater(floater)
 	{}
@@ -99,6 +103,7 @@ public:
 
 	static void onClickNewSnapshot(void* data);
 	static void onClickAutoSnap(LLUICtrl *ctrl, void* data);
+	static void onClickNoPost(LLUICtrl *ctrl, void* data);
 	static void onClickFilter(LLUICtrl *ctrl, void* data);
 	static void onClickUICheck(LLUICtrl *ctrl, void* data);
 	static void onClickHUDCheck(LLUICtrl *ctrl, void* data);
@@ -120,6 +125,7 @@ public:
 	static BOOL updatePreviewList(bool initialized);
 
 	void setAdvanced(bool advanced) { mAdvanced = advanced; }
+    void setSkipReshaping(bool skip) { mSkipReshaping = skip; }
 
 	virtual LLSnapshotModel::ESnapshotLayerType getLayerType(LLFloaterSnapshotBase* floater) = 0;
 	virtual void checkAutoSnapshot(LLSnapshotLivePreview* floater, BOOL update_thumbnail = FALSE);
@@ -135,6 +141,7 @@ public:
 	bool mAspectRatioCheckOff;
 	bool mNeedRefresh;
 	bool mAdvanced;
+    bool mSkipReshaping;
 	EStatus mStatus;
 };
 
@@ -153,6 +160,7 @@ public:
 	static void update();
 
 	void onExtendFloater();
+    void on360Snapshot();
 
 	static LLFloaterSnapshot* getInstance();
 	static LLFloaterSnapshot* findInstance();

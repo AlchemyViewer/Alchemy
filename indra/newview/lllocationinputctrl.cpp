@@ -57,12 +57,15 @@
 #include "llstatusbar.h"			// getHealth()
 #include "lltrans.h"
 #include "llviewerinventory.h"
+#include "llviewernetwork.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llurllineeditorctrl.h"
 #include "llagentui.h"
+#include "llworld.h"
+#include "llworldmap.h"
 // [RLVa:KB] - Checked: 2010-04-05 (RLVa-1.2.0d)
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -395,7 +398,9 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
 		LL_WARNS() << "Error loading navigation bar context menu" << LL_ENDL;
 		
 	}
-	getTextEntry()->setRightMouseUpCallback(boost::bind(&LLLocationInputCtrl::onTextEditorRightClicked,this,_2,_3,_4));
+    //don't show default context menu
+    getTextEntry()->setShowContextMenu(false);
+    getTextEntry()->setRightMouseDownCallback(boost::bind(&LLLocationInputCtrl::onTextEditorRightClicked, this, _2, _3, _4));
 	updateWidgetlayout();
 
 	// Connecting signal for updating location on "Show Coordinates" setting change.
@@ -493,7 +498,7 @@ BOOL LLLocationInputCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 				LLSD value = item->getValue();
 				if (value.has("tooltip"))
 				{
-					LLToolTipMgr::instanceFast().show(value["tooltip"]);
+					LLToolTipMgr::instance().show(value["tooltip"]);
 				}
 			}
 		}
@@ -746,10 +751,12 @@ void LLLocationInputCtrl::onLocationPrearrange(const LLSD& data)
 				LLSD value;
 				value["item_type"] = TELEPORT_HISTORY;
 				value["global_pos"] = result->mGlobalPos.getValue();
-				std::string region_name = result->mTitle.substr(0, result->mTitle.find(','));
-				//TODO*: add Surl to teleportitem or parse region name from title
-				value["tooltip"] = LLSLURL(region_name, result->mGlobalPos).getSLURLString();
-				add(result->getTitle(), value); 
+				value["local_pos"] = result->mLocalPos.getValue();
+				value["grid"] = result->mGrid;
+				value["region"] = result->mRegion;
+				value["tooltip"] = LLSLURL(result->mGrid, result->mRegion, result->mLocalPos).getSLURLString();
+
+				add(result->getTitle(), value);
 			}
 			result = std::find_if(result + 1, th_items.end(), boost::bind(
 									&LLLocationInputCtrl::findTeleportItemsByTitle, this,
@@ -841,7 +848,7 @@ void LLLocationInputCtrl::refreshParcelIcons()
 	// Our "cursor" moving right to left
 	S32 x = mAddLandmarkBtn->getRect().mLeft;
 
-	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstanceFast();
+	LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
 
 	LLViewerRegion* agent_region = gAgent.getRegion();
 	LLParcel* agent_parcel = vpm->getAgentParcel();
@@ -890,7 +897,7 @@ void LLLocationInputCtrl::refreshParcelIcons()
 		mParcelIcon[SCRIPTS_ICON]->setVisible( !allow_scripts );
 		mParcelIcon[DAMAGE_ICON]->setVisible(  allow_damage );
 		mParcelIcon[PATHFINDING_DIRTY_ICON]->setVisible(mIsNavMeshDirty);
-		mParcelIcon[PATHFINDING_DISABLED_ICON]->setVisible(!mIsNavMeshDirty && !pathfinding_dynamic_enabled);
+		mParcelIcon[PATHFINDING_DISABLED_ICON]->setVisible(!mIsNavMeshDirty && !pathfinding_dynamic_enabled && !LLGridManager::getInstance()->isInOpenSim());
 
 		mDamageText->setVisible(allow_damage);
 		mParcelIcon[SEE_AVATARS_ICON]->setVisible( !see_avs );
@@ -1035,6 +1042,10 @@ void LLLocationInputCtrl::rebuildLocationHistory(const std::string& filter)
 		//location history can contain only typed locations
 		value["item_type"] = TYPED_REGION_SLURL;
 		value["global_pos"] = it->mGlobalPos.getValue();
+		value["local_pos"] = it->mLocalPos.getValue();
+		value["grid"] = it->mGrid;
+		value["region"] = it->mRegion;
+		value["tooltip"] = LLSLURL(it->mGrid, it->mRegion, it->mLocalPos).getSLURLString();
 		add(it->getLocation(), value);
 	}
 }
@@ -1132,7 +1143,7 @@ void LLLocationInputCtrl::changeLocationPresentation()
 		//needs unescaped one
 		LLSLURL slurl;
 		LLAgentUI::buildSLURL(slurl, false);
-		mTextEntry->setText(LLURI::unescape(slurl.getSLURLString()));
+		mTextEntry->setText(slurl.getSLURLString());
 		mTextEntry->selectAll();
 
 		mMaturityButton->setVisible(FALSE);

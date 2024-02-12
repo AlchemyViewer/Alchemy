@@ -688,7 +688,6 @@ extern char const* const _PREHASH_GroupRolesCount;
 extern char const* const _PREHASH_SimulatorBlock;
 extern char const* const _PREHASH_GroupID;
 extern char const* const _PREHASH_AgentVel;
-extern char const* const _PREHASH_RequestImage;
 extern char const* const _PREHASH_NetStats;
 extern char const* const _PREHASH_AgentPos;
 extern char const* const _PREHASH_AgentSit;
@@ -1095,7 +1094,6 @@ extern char const* const _PREHASH_SortOrder;
 extern char const* const _PREHASH_Hunter;
 extern char const* const _PREHASH_SunAngVelocity;
 extern char const* const _PREHASH_BinaryBucket;
-extern char const* const _PREHASH_ImagePacket;
 extern char const* const _PREHASH_StartGroupProposal;
 extern char const* const _PREHASH_EnergyLevel;
 extern char const* const _PREHASH_PriceForListing;
@@ -1435,6 +1433,7 @@ extern char const* const _PREHASH_IMViaEMail;
 extern char const* const _PREHASH_RentPrice;
 extern char const* const _PREHASH_GenericMessage;
 extern char const* const _PREHASH_LargeGenericMessage;
+extern char const* const _PREHASH_GenericStreamingMessage;
 extern char const* const _PREHASH_ChildAgentAlive;
 extern char const* const _PREHASH_AssetType;
 extern char const* const _PREHASH_SpawnPointBlock;
@@ -1445,6 +1444,11 @@ extern char const* const _PREHASH_AvatarNotesReply;
 extern char const* const _PREHASH_CacheID;
 extern char const* const _PREHASH_OwnerMask;
 extern char const* const _PREHASH_TransferInventoryAck;
+extern char const* const _PREHASH_ParcelExtendedFlags;
+extern char const* const _PREHASH_RegionSizeX;
+extern char const* const _PREHASH_RegionSizeY;
+extern char const* const _PREHASH_SizeX;
+extern char const* const _PREHASH_SizeY;
 
 
 #endif

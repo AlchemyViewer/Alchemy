@@ -70,40 +70,73 @@
 #include "llavatarnamecache.h"
 #include "llcachename.h"
 
+#include "llinventoryfunctions.h"
+#include "llviewerregion.h"
+
 // [RLVa:KB] - Checked: 2010-08-25 (RLVa-1.2.2a)
 #include "llslurl.h"
 #include "rlvactions.h"
 #include "rlvcommon.h"
 // [/RLVa:KB]
 
+// base and own must have EXPORT, next owner must be UNRESTRICTED
+bool can_set_export(const U32& base, const U32& own, const U32& next)
+{
+	return base & PERM_EXPORT && own & PERM_EXPORT && (next & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED;
+}
+
+bool perms_allow_export(const LLPermissions& perms)
+{
+	return perms.getMaskBase() & PERM_EXPORT && perms.getMaskEveryone() & PERM_EXPORT;
+}
+
+bool is_asset_exportable(const LLUUID& asset_id)
+{
+	if (asset_id.isNull()) return true; // Don't permission-check null textures
+	LLViewerInventoryCategory::cat_array_t cats;
+	LLViewerInventoryItem::item_array_t items;
+	LLAssetIDMatches asset_id_matches(asset_id);
+	gInventory.collectDescendentsIf(LLUUID::null, cats, items, true, asset_id_matches, false);
+	
+	for (U32 i = 0; i < items.size(); ++i)
+	{
+		if (perms_allow_export(items[i]->getPermissions())) return true;
+	}
+	return false;
+}
+
 U8 string_value_to_click_action(std::string p_value);
 std::string click_action_to_string_value( U8 action);
 
 U8 string_value_to_click_action(std::string p_value)
 {
-	if(p_value == "Touch")
+	if (p_value == "Touch")
 	{
 		return CLICK_ACTION_TOUCH;
 	}
-	if(p_value == "Sit")
+	if (p_value == "Sit")
 	{
 		return CLICK_ACTION_SIT;
 	}
-	if(p_value == "Buy")
+	if (p_value == "Buy")
 	{
 		return CLICK_ACTION_BUY;
 	}
-	if(p_value == "Pay")
+	if (p_value == "Pay")
 	{
 		return CLICK_ACTION_PAY;
 	}
-	if(p_value == "Open")
+	if (p_value == "Open")
 	{
 		return CLICK_ACTION_OPEN;
 	}
-	if(p_value == "Zoom")
+	if (p_value == "Zoom")
 	{
 		return CLICK_ACTION_ZOOM;
+	}
+	if (p_value == "Ignore")
+	{
+		return CLICK_ACTION_IGNORE;
 	}
 	if (p_value == "None")
 	{
@@ -134,6 +167,9 @@ std::string click_action_to_string_value( U8 action)
 			break;
 		case CLICK_ACTION_ZOOM:
 			return "Zoom";
+			break;
+		case CLICK_ACTION_IGNORE:
+			return "Ignore";
 			break;
 		case CLICK_ACTION_DISABLED:
 			return "None";
@@ -169,6 +205,8 @@ BOOL LLPanelPermissions::postBuild()
 	childSetCommitCallback("checkbox allow everyone move",LLPanelPermissions::onCommitEveryoneMove,this);
 
 	childSetCommitCallback("checkbox allow everyone copy",LLPanelPermissions::onCommitEveryoneCopy,this);
+
+	childSetCommitCallback("checkbox allow export", LLPanelPermissions::onCommitExport, this);
 	
 	childSetCommitCallback("checkbox for sale",LLPanelPermissions::onCommitSaleInfo,this);
 
@@ -182,7 +220,7 @@ BOOL LLPanelPermissions::postBuild()
 	childSetCommitCallback("clickaction",LLPanelPermissions::onCommitClickAction,this);
 	childSetCommitCallback("search_check",LLPanelPermissions::onCommitIncludeInSearch,this);
 	
-	mLabelGroupName = getChild<LLNameBox>("Group Name Proxy");
+	mLabelGroupName = getChild<LLTextBox>("Group Name");
 	mLabelOwnerName = getChild<LLTextBox>("Owner Name");
 	mLabelCreatorName = getChild<LLTextBox>("Creator Name");
 
@@ -213,26 +251,22 @@ void LLPanelPermissions::disableAll()
 	getChild<LLUICtrl>("pathfinding_attributes_value")->setValue(LLStringUtil::null);
 
 	getChildView("Creator:")->setEnabled(FALSE);
-	getChild<LLUICtrl>("Creator Icon")->setVisible(FALSE);
 	mLabelCreatorName->setValue(LLStringUtil::null);
 	mLabelCreatorName->setEnabled(FALSE);
 
 	getChildView("Owner:")->setEnabled(FALSE);
-	getChild<LLUICtrl>("Owner Icon")->setVisible(FALSE);
-	getChild<LLUICtrl>("Owner Group Icon")->setVisible(FALSE);
 	mLabelOwnerName->setValue(LLStringUtil::null);
 	mLabelOwnerName->setEnabled(FALSE);
 
 	getChildView("Group:")->setEnabled(FALSE);
-	getChild<LLUICtrl>("Group Name Proxy")->setValue(LLStringUtil::null);
-	getChildView("Group Name Proxy")->setEnabled(FALSE);
+	mLabelGroupName->setValue(LLStringUtil::null);
+	mLabelGroupName->setEnabled(FALSE);
 	getChildView("button set group")->setEnabled(FALSE);
 
 	getChild<LLUICtrl>("Object Name")->setValue(LLStringUtil::null);
 	getChildView("Object Name")->setEnabled(FALSE);
 	getChildView("Name:")->setEnabled(FALSE);
-	getChild<LLUICtrl>("Group Name")->setValue(LLStringUtil::null);
-	getChildView("Group Name")->setEnabled(FALSE);
+
 	getChildView("Description:")->setEnabled(FALSE);
 	getChild<LLUICtrl>("Object Description")->setValue(LLStringUtil::null);
 	getChildView("Object Description")->setEnabled(FALSE);
@@ -246,6 +280,9 @@ void LLPanelPermissions::disableAll()
 	getChild<LLUICtrl>("checkbox allow everyone copy")->setValue(FALSE);
 	getChildView("checkbox allow everyone copy")->setEnabled(FALSE);
 
+	getChild<LLCheckBoxCtrl>("checkbox allow export")->setValue(FALSE);
+	getChild<LLCheckBoxCtrl>("checkbox allow export")->setEnabled(FALSE);
+	
 	//Next owner can:
 	getChildView("Next owner can:")->setEnabled(FALSE);
 	getChild<LLUICtrl>("checkbox next owner can modify")->setValue(FALSE);
@@ -279,17 +316,17 @@ void LLPanelPermissions::disableAll()
 		combo_click_action->setEnabled(FALSE);
 		combo_click_action->clear();
 	}
-	getChildView("B:")->setVisible(								FALSE);
-	getChildView("O:")->setVisible(								FALSE);
-	getChildView("G:")->setVisible(								FALSE);
-	getChildView("E:")->setVisible(								FALSE);
-	getChildView("N:")->setVisible(								FALSE);
-	getChildView("F:")->setVisible(								FALSE);
+	getChildView("B:")->setVisible(FALSE);
+	getChildView("O:")->setVisible(FALSE);
+	getChildView("G:")->setVisible(FALSE);
+	getChildView("E:")->setVisible(FALSE);
+	getChildView("N:")->setVisible(FALSE);
+	getChildView("F:")->setVisible(FALSE);
 }
 
 void LLPanelPermissions::refresh()
 {
-	LLSelectMgr* select_mgr = LLSelectMgr::getInstanceFast();
+	LLSelectMgr* select_mgr = LLSelectMgr::getInstance();
 
 	LLButton*	BtnDeedToGroup = getChild<LLButton>("button deed");
 	if(BtnDeedToGroup)
@@ -329,6 +366,7 @@ void LLPanelPermissions::refresh()
 	}
 
 	// figure out a few variables
+	const bool supports_export = objectp->getRegion() && objectp->getRegion()->getRegionAllowsExport();
 	const BOOL is_one_object = (object_count == 1);
 	
 	// BUG: fails if a root and non-root are both single-selected.
@@ -414,7 +452,7 @@ void LLPanelPermissions::refresh()
 	//style_params.font.size = LLFontGL::sizeFromFont(fontp);
 	//style_params.font.style = "UNDERLINE";
 
-	LLAvatarName av_name;
+	//LLAvatarName av_name;
 	//style_params.link_href = creator_app_link;
 // [RLVa:KB] - Checked: RLVa-2.0.1
 	// Only anonymize the creator if all of the selection was created by the same avie who's also the owner or they're a nearby avie
@@ -518,25 +556,17 @@ void LLPanelPermissions::refresh()
 
 	// update group text field
 	getChildView("Group:")->setEnabled(TRUE);
-	getChild<LLUICtrl>("Group Name")->setValue(LLStringUtil::null);
 	LLUUID group_id;
 	BOOL groups_identical = select_mgr->selectGetGroup(group_id);
 	if (groups_identical)
 	{
-		if (mLabelGroupName)
-		{
-			mLabelGroupName->setNameID(group_id,TRUE);
-			mLabelGroupName->setEnabled(TRUE);
-		}
+		mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+		mLabelGroupName->setEnabled(TRUE);
 	}
 	else
 	{
-		if (mLabelGroupName)
-		{
-			mLabelGroupName->setNameID(LLUUID::null, TRUE);
-			mLabelGroupName->refresh(LLUUID::null, std::string(), true);
-			mLabelGroupName->setEnabled(FALSE);
-		}
+		mLabelGroupName->setValue(LLStringUtil::null);
+		mLabelGroupName->setEnabled(TRUE);
 	}
 	
 	getChildView("button set group")->setEnabled(root_selected && owners_identical && (mOwnerID == gAgent.getID()) && is_nonpermanent_enforced);
@@ -563,13 +593,23 @@ void LLPanelPermissions::refresh()
 	}
 	else
 	{
-		getChild<LLUICtrl>("Object Name")->setValue(LLStringUtil::null);
-		LineEditorObjectDesc->setText(LLStringUtil::null);
+		if (keyboard_focus_view != LineEditorObjectName)
+		{
+			getChild<LLUICtrl>("Object Name")->setValue(getString("multiple selection"));
+		}
+
+		if (LineEditorObjectDesc)
+		{
+			if (keyboard_focus_view != LineEditorObjectDesc)
+			{
+				LineEditorObjectDesc->setText(getString("multiple selection"));
+			}
+		}
 	}
 
 	// figure out the contents of the name, description, & category
 	BOOL edit_name_desc = FALSE;
-	if (is_one_object && objectp->permModify() && !objectp->isPermanentEnforced())
+	if (/*is_one_object && */objectp->permModify() && !objectp->isPermanentEnforced())
 	{
 		edit_name_desc = TRUE;
 	}
@@ -711,14 +751,27 @@ void LLPanelPermissions::refresh()
 	{
 		if (valid_base_perms)
 		{
-			getChild<LLUICtrl>("B:")->setValue("B: " + mask_to_string(base_mask_on));
+			std::string perm_string = mask_to_string(base_mask_on);
+			if (!supports_export && base_mask_on & PERM_EXPORT) // Hide Export when not available
+				perm_string.erase(perm_string.find_last_of("E"));
+			getChild<LLUICtrl>("B:")->setValue("B: " + perm_string);
 			getChildView("B:")->setVisible(TRUE);
-			getChild<LLUICtrl>("O:")->setValue("O: " + mask_to_string(owner_mask_on));
+
+			perm_string = mask_to_string(owner_mask_on);
+			if (!supports_export && owner_mask_on & PERM_EXPORT) // Hide Export when not available
+				perm_string.erase(perm_string.find_last_of("E"));
+			getChild<LLUICtrl>("O:")->setValue("O: " + perm_string);
 			getChildView("O:")->setVisible(TRUE);
+
 			getChild<LLUICtrl>("G:")->setValue("G: " + mask_to_string(group_mask_on));
 			getChildView("G:")->setVisible(TRUE);
-			getChild<LLUICtrl>("E:")->setValue("E: " + mask_to_string(everyone_mask_on));
+
+			perm_string = mask_to_string(everyone_mask_on);
+			if (!supports_export && everyone_mask_on & PERM_EXPORT) // Hide Export when not available
+				perm_string.erase(perm_string.find_last_of("E"));
+			getChild<LLUICtrl>("E:")->setValue("E: " + perm_string);
 			getChildView("E:")->setVisible(TRUE);
+
 			getChild<LLUICtrl>("N:")->setValue("N: " + mask_to_string(next_owner_mask_on));
 			getChildView("N:")->setVisible(TRUE);
 		}
@@ -803,6 +856,45 @@ void LLPanelPermissions::refresh()
 		getChildView("checkbox allow everyone copy")->setEnabled(FALSE);
 	}
 
+	// Is this user allowed to toggle export on this object?
+	if (supports_export && self_owned && mCreatorID == mOwnerID
+		&& can_set_export(base_mask_on, owner_mask_on, next_owner_mask_on))
+	{
+		bool can_export = false;
+		LLInventoryObject::object_list_t objects;
+		objectp->getInventoryContents(objects);
+		if (!objects.empty())
+		{
+			for (LLInventoryObject::object_list_t::iterator i = objects.begin(); i != objects.end(); ++i) //The object's inventory must have EXPORT.
+			{
+				LLViewerInventoryItem* item = static_cast<LLViewerInventoryItem*>(i->get()); //getInventoryContents() filters out categories, static_cast.
+				can_export = perms_allow_export(item->getPermissions());
+				if (!can_export) break;
+			}
+		}
+		else
+			can_export = true;
+
+		if(can_export)
+		{
+			for (U8 i = 0; i < objectp->getNumTEs(); ++i) // Can the textures be exported?
+			{
+				if (LLTextureEntry* texture = objectp->getTE(i))
+				{
+					can_export = is_asset_exportable(texture->getID());
+					if(!can_export) break;
+				}
+			}
+		}
+		getChildView("checkbox allow export")->setEnabled(can_export);
+		getChildView("checkbox allow export")->setVisible(true);
+	}
+	else
+	{
+		getChildView("checkbox allow export")->setEnabled(false);
+		getChildView("checkbox allow export")->setVisible(supports_export);
+	}
+
 	if (has_change_sale_ability && (owner_mask_on & PERM_TRANSFER))
 	{
 		getChildView("checkbox for sale")->setEnabled(can_transfer || (!can_transfer && num_for_sale));
@@ -811,10 +903,11 @@ void LLPanelPermissions::refresh()
 		getChild<LLUICtrl>("checkbox for sale")->setTentative( 				is_for_sale_mixed);
 		getChildView("sale type")->setEnabled(num_for_sale && can_transfer && !is_sale_price_mixed);
 
-		getChildView("Next owner can:")->setEnabled(TRUE);
-		getChildView("checkbox next owner can modify")->setEnabled(base_mask_on & PERM_MODIFY);
-		getChildView("checkbox next owner can copy")->setEnabled(base_mask_on & PERM_COPY);
-		getChildView("checkbox next owner can transfer")->setEnabled(next_owner_mask_on & PERM_COPY);
+		bool no_export = everyone_mask_off & PERM_EXPORT; // Next owner perms can't be changed if set
+		getChildView("Next owner can:")->setEnabled(no_export);
+		getChildView("checkbox next owner can modify")->setEnabled(no_export && base_mask_on & PERM_MODIFY);
+		getChildView("checkbox next owner can copy")->setEnabled(no_export && base_mask_on & PERM_COPY);
+		getChildView("checkbox next owner can transfer")->setEnabled(no_export && next_owner_mask_on & PERM_COPY);
 	}
 	else 
 	{
@@ -883,6 +976,30 @@ void LLPanelPermissions::refresh()
 		{
 			getChild<LLUICtrl>("checkbox allow everyone copy")->setValue(TRUE);
 			getChild<LLUICtrl>("checkbox allow everyone copy")->setTentative(	TRUE);
+		}
+		
+		if (supports_export)
+		{
+			if(everyone_mask_on & PERM_EXPORT)
+			{
+				getChild<LLUICtrl>("checkbox allow export")->setValue(TRUE);
+				getChild<LLUICtrl>("checkbox allow export")->setTentative(	FALSE);
+			}
+			else if(everyone_mask_off & PERM_EXPORT)
+			{
+				getChild<LLUICtrl>("checkbox allow export")->setValue(FALSE);
+				getChild<LLUICtrl>("checkbox allow export")->setTentative(	FALSE);
+			}
+			else
+			{
+				getChild<LLUICtrl>("checkbox allow export")->setValue(TRUE);
+				getChild<LLUICtrl>("checkbox allow export")->setTentative(	TRUE);
+			}
+		}
+		else
+		{
+			childSetValue("checkbox allow export", false);
+			getChild<LLUICtrl>("checkbox allow export")->setTentative(false);
 		}
 	}
 
@@ -980,12 +1097,12 @@ void LLPanelPermissions::refresh()
 	getChild<LLUICtrl>("search_check")->setValue(include_in_search);
 	getChild<LLUICtrl>("search_check")->setTentative( 				!all_include_in_search);
 
-	// Click action (touch, sit, buy)
+	// Click action (touch, sit, buy, pay, open, play, open media, zoom, ignore)
 	U8 click_action = 0;
 	if (select_mgr->selectionGetClickAction(&click_action))
 	{
 		LLComboBox*	combo_click_action = getChild<LLComboBox>("clickaction");
-		if(combo_click_action)
+		if (combo_click_action)
 		{
 			const std::string combo_value = click_action_to_string_value(click_action);
 			combo_click_action->setValue(LLSD(combo_value));
@@ -1059,21 +1176,21 @@ void LLPanelPermissions::updateCreatorName(const LLUUID& creator_id, const LLAva
 void LLPanelPermissions::onClickClaim(void*)
 {
 	// try to claim ownership
-	LLSelectMgr::getInstanceFast()->sendOwner(gAgent.getID(), gAgent.getGroupID());
+	LLSelectMgr::getInstance()->sendOwner(gAgent.getID(), gAgent.getGroupID());
 }
 
 // static
 void LLPanelPermissions::onClickRelease(void*)
 {
 	// try to release ownership
-	LLSelectMgr::getInstanceFast()->sendOwner(LLUUID::null, LLUUID::null);
+	LLSelectMgr::getInstance()->sendOwner(LLUUID::null, LLUUID::null);
 }
 
 void LLPanelPermissions::onClickGroup()
 {
 	LLUUID owner_id;
 	std::string name;
-	BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, name);
+	BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(owner_id, name);
 	LLFloater* parent_floater = gFloaterView->getParentFloater(this);
 
 	if(owners_identical && (owner_id == gAgent.getID()))
@@ -1095,11 +1212,9 @@ void LLPanelPermissions::onClickGroup()
 
 void LLPanelPermissions::cbGroupID(LLUUID group_id)
 {
-	if(mLabelGroupName)
-	{
-		mLabelGroupName->setNameID(group_id, TRUE);
-	}
-	LLSelectMgr::getInstanceFast()->sendGroup(group_id);
+	mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+	mLabelGroupName->setEnabled(TRUE);
+	LLSelectMgr::getInstance()->sendGroup(group_id);
 }
 
 bool callback_deed_to_group(const LLSD& notification, const LLSD& response)
@@ -1108,10 +1223,10 @@ bool callback_deed_to_group(const LLSD& notification, const LLSD& response)
 	if (0 == option)
 	{
 		LLUUID group_id;
-		BOOL groups_identical = LLSelectMgr::getInstanceFast()->selectGetGroup(group_id);
+		BOOL groups_identical = LLSelectMgr::getInstance()->selectGetGroup(group_id);
 		if(group_id.notNull() && groups_identical && (gAgent.hasPowerInGroup(group_id, GP_OBJECT_DEED)))
 		{
-			LLSelectMgr::getInstanceFast()->sendOwner(LLUUID::null, group_id, FALSE);
+			LLSelectMgr::getInstance()->sendOwner(LLUUID::null, group_id, FALSE);
 		}
 	}
 	return false;
@@ -1129,7 +1244,7 @@ void LLPanelPermissions::onClickDeedToGroup(void* data)
 // static
 void LLPanelPermissions::onCommitPerm(LLUICtrl *ctrl, void *data, U8 field, U32 perm)
 {
-	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 	if(!object) return;
 
 	// Checkbox will have toggled itself
@@ -1137,7 +1252,7 @@ void LLPanelPermissions::onCommitPerm(LLUICtrl *ctrl, void *data, U8 field, U32 
 	LLCheckBoxCtrl *check = (LLCheckBoxCtrl *)ctrl;
 	BOOL new_state = check->get();
 	
-	LLSelectMgr::getInstanceFast()->selectionSetObjectPermissions(field, new_state, perm);
+	LLSelectMgr::getInstance()->selectionSetObjectPermissions(field, new_state, perm);
 }
 
 // static
@@ -1181,6 +1296,13 @@ void LLPanelPermissions::onCommitNextOwnerTransfer(LLUICtrl* ctrl, void* data)
 }
 
 // static
+void LLPanelPermissions::onCommitExport(LLUICtrl* ctrl, void* data)
+{
+	//LL_INFOS() << "LLPanelPermissions::onCommitExport" << LL_ENDL;
+	onCommitPerm(ctrl, data, PERM_EVERYONE, PERM_EXPORT);
+}
+
+// static
 void LLPanelPermissions::onCommitName(LLUICtrl*, void* data)
 {
 	LLPanelPermissions* self = (LLPanelPermissions*)data;
@@ -1189,8 +1311,8 @@ void LLPanelPermissions::onCommitName(LLUICtrl*, void* data)
 	{
 		return;
 	}
-	LLSelectMgr::getInstanceFast()->selectionSetObjectName(tb->getText());
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLSelectMgr::getInstance()->selectionSetObjectName(tb->getText());
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 	if (selection->isAttachment() && (selection->getNumNodes() == 1) && !tb->getText().empty())
 	{
 		LLUUID object_id = selection->getFirstObject()->getAttachmentItemID();
@@ -1216,8 +1338,8 @@ void LLPanelPermissions::onCommitDesc(LLUICtrl*, void* data)
 	{
 		return;
 	}
-	LLSelectMgr::getInstanceFast()->selectionSetObjectDescription(le->getText());
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLSelectMgr::getInstance()->selectionSetObjectDescription(le->getText());
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 	if (selection->isAttachment() && (selection->getNumNodes() == 1))
 	{
 		LLUUID object_id = selection->getFirstObject()->getAttachmentItemID();
@@ -1269,7 +1391,7 @@ void LLPanelPermissions::setAllSaleInfo()
 	if (price < 0)
 		sale_type = LLSaleInfo::FS_NOT;
 
-	LLSelectMgr* select_mgr = LLSelectMgr::getInstanceFast();
+	LLSelectMgr* select_mgr = LLSelectMgr::getInstance();
 
 	LLSaleInfo old_sale_info;
 	select_mgr->selectGetSaleInfo(old_sale_info);
@@ -1330,14 +1452,14 @@ void LLPanelPermissions::onCommitClickAction(LLUICtrl* ctrl, void*)
 	if (click_action == CLICK_ACTION_BUY)
 	{
 		LLSaleInfo sale_info;
-		LLSelectMgr::getInstanceFast()->selectGetSaleInfo(sale_info);
+		LLSelectMgr::getInstance()->selectGetSaleInfo(sale_info);
 		if (!sale_info.isForSale())
 		{
 			LLNotificationsUtil::add("CantSetBuyObject");
 
 			// Set click action back to its old value
 			U8 click_action = 0;
-			LLSelectMgr::getInstanceFast()->selectionGetClickAction(&click_action);
+			LLSelectMgr::getInstance()->selectionGetClickAction(&click_action);
 			std::string item_value = click_action_to_string_value(click_action);
 			box->setValue(LLSD(item_value));
 			return;
@@ -1347,14 +1469,14 @@ void LLPanelPermissions::onCommitClickAction(LLUICtrl* ctrl, void*)
 	{
 		// Verify object has script with money() handler
 		LLSelectionPayable payable;
-		bool can_pay = LLSelectMgr::getInstanceFast()->getSelection()->applyToObjects(&payable);
+		bool can_pay = LLSelectMgr::getInstance()->getSelection()->applyToObjects(&payable);
 		if (!can_pay)
 		{
 			// Warn, but do it anyway.
 			LLNotificationsUtil::add("ClickActionNotPayable");
 		}
 	}
-	LLSelectMgr::getInstanceFast()->selectionSetClickAction(click_action);
+	LLSelectMgr::getInstance()->selectionSetClickAction(click_action);
 }
 
 // static
@@ -1363,7 +1485,7 @@ void LLPanelPermissions::onCommitIncludeInSearch(LLUICtrl* ctrl, void*)
 	LLCheckBoxCtrl* box = (LLCheckBoxCtrl*)ctrl;
 	llassert(box);
 
-	LLSelectMgr::getInstanceFast()->selectionSetIncludeInSearch(box->get());
+	LLSelectMgr::getInstance()->selectionSetIncludeInSearch(box->get());
 }
 
 

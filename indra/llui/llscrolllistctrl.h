@@ -110,6 +110,9 @@ public:
 		Optional<bool>	multi_select,
 						commit_on_keyboard_movement,
 						commit_on_selection_change,
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+						select_on_focus,
+// [/SL:KB]
 						mouse_wheel_opaque;
 
 		Optional<ESelectionType, SelectionTypeNames> selection_type;
@@ -179,11 +182,15 @@ public:
 	virtual LLScrollListColumn* getColumn(S32 index);
     virtual LLScrollListColumn* getColumn(std::string_view name);
 	virtual S32 getNumColumns() const { return mColumnsIndexed.size(); }
+	virtual S32 getPageLines() const { return mPageLines; }
 
 	// Adds a single element, from an array of:
 	// "columns" => [ "column" => column name, "value" => value, "type" => type, "font" => font, "font-style" => style ], "id" => uuid
 	// Creates missing columns automatically.
 	virtual LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL);
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+	virtual LLScrollListItem* addElement(const LLSD& element, const LLScrollListItem::commit_signal_t::slot_type& cb, EAddPosition pos = ADD_BOTTOM);
+// [/SL:KB]
 	virtual LLScrollListItem* addRow(LLScrollListItem *new_item, const LLScrollListItem::Params& value, EAddPosition pos = ADD_BOTTOM);
 	virtual LLScrollListItem* addRow(const LLScrollListItem::Params& value, EAddPosition pos = ADD_BOTTOM);
 	// Simple add element. Takes a single array of:
@@ -228,6 +235,9 @@ public:
 	BOOL			selectItemAt(S32 x, S32 y, MASK mask);
 	
 	void			deleteSingleItem( S32 index );
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-3.5
+	void			deleteSingleItem(LLScrollListItem* itemp);
+// [/SL:KB]
 	void			deleteItems(const LLSD& sd);
 	void 			deleteSelectedItems();
 	//BD
@@ -257,6 +267,7 @@ public:
 	S32				getItemIndex( const LLUUID& item_id ) const;
 
 	void setCommentText( const std::string& comment_text);
+	void addCommentText( const std::string& comment_text);
 	LLScrollListItem* addSeparator(EAddPosition pos);
 
 	// "Simple" interface: use this when you're creating a list that contains only unique strings, only
@@ -264,11 +275,19 @@ public:
 	virtual LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos = ADD_BOTTOM, const LLSD& id = LLSD());
 
 	BOOL			selectItemByLabel( const std::string& item, BOOL case_sensitive = TRUE, S32 column = 0 );		// FALSE if item not found
-	BOOL			selectItemByPrefix(const std::string& target, BOOL case_sensitive = TRUE);
-	BOOL			selectItemByPrefix(const LLWString& target, BOOL case_sensitive = TRUE);
+	BOOL			selectItemByPrefix(const std::string& target, BOOL case_sensitive = TRUE, S32 column = -1);
+	BOOL			selectItemByPrefix(const LLWString& target, BOOL case_sensitive = TRUE, S32 column = -1);
 	LLScrollListItem*  getItemByLabel( const std::string& item, BOOL case_sensitive = TRUE, S32 column = 0 );
 	const std::string	getSelectedItemLabel(S32 column = 0) const;
 	LLSD			getSelectedValue();
+
+    // If multi select is on, select all element that include substring,
+    // otherwise select first match only.
+    // If focus is true will scroll to selection.
+    // Returns number of results.
+    // Note: at the moment search happens in one go and is expensive
+    U32			searchItems(const std::string& substring, bool case_sensitive = false, bool focus = true);
+    U32			searchItems(const LLWString& substring, bool case_sensitive = false, bool focus = true);
 
 	// DEPRECATED: Use LLSD versions of setCommentText() and getSelectedValue().
 	// "StringUUID" interface: use this when you're creating a list that contains non-unique strings each of which
@@ -309,6 +328,9 @@ public:
 	S32  getRowPadding() const					{ return mColumnPadding; }
 	void setCommitOnKeyboardMovement(BOOL b)	{ mCommitOnKeyboardMovement = b; }
 	void setCommitOnSelectionChange(BOOL b)		{ mCommitOnSelectionChange = b; }
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-3.3
+	void setCommitOnDelete(BOOL b)				{ mCommitOnDelete = b; }
+// [/SL:KB]
 	void setAllowKeyboardMovement(BOOL b)		{ mAllowKeyboardMovement = b; }
 
 	void			setMaxSelectable(U32 max_selected) { mMaxSelectable = max_selected; }
@@ -317,6 +339,7 @@ public:
 
 	virtual S32		getScrollPos() const;
 	virtual void	setScrollPos( S32 pos );
+	S32 getPageLines() { return mPageLines; }
 	S32 getSearchColumn();
 	void			setSearchColumn(S32 column) { mSearchColumn = column; }
 	S32				getColumnIndexFromOffset(S32 x);
@@ -325,9 +348,14 @@ public:
 
 	void			clearSearchString() { mSearchString.clear(); }
 
+	void			setFilterString(const std::string& str);
+	void			setFilterColumn(S32 col) { mFilterColumn = col; }
+	bool			isFiltered(const LLScrollListItem* item) const;
+
 	// support right-click context menus for avatar/group lists
 	enum ContextMenuType { MENU_NONE, MENU_AVATAR, MENU_GROUP };
 	void setContextMenu(const ContextMenuType &menu) { mContextMenuType = menu; }
+    ContextMenuType getContextMenuType() { return mContextMenuType; }
 
 	// Overridden from LLView
 	/*virtual*/ void    draw();
@@ -397,9 +425,14 @@ public:
 	S32 getTotalStaticColumnWidth() { return mTotalStaticColumnWidth; }
 
 	const std::string&     getSortColumnName();
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-3.5
+	S32				getSortColumnIndex() const;
+// [/SL:KB]
 	BOOL			getSortAscending() { return mSortColumns.empty() ? TRUE : mSortColumns.back().second; }
 	BOOL			hasSortOrder() const;
 	void			clearSortOrder();
+
+	void			setAlternateSort() { mAlternateSort = true; }
 
 	S32		selectMultiple( uuid_vec_t ids );
 	// conceptually const, but mutates mItemList
@@ -410,6 +443,9 @@ public:
 	// manually call this whenever editing list items in place to flag need for resorting
 	void			setNeedsSort(bool val = true) { mSorted = !val; }
 	void			dirtyColumns(); // some operation has potentially affected column layout or ordering
+	S32				getLinesPerPage();
+
+    bool highlightMatchingItems(const std::string& filter_str);
 
 	boost::signals2::connection setSortCallback(sort_signal_t::slot_type cb )
 	{
@@ -419,6 +455,8 @@ public:
 
 	boost::signals2::connection setIsFriendCallback(const is_friend_signal_t::slot_type& cb);
 
+
+	std::vector<LLScrollListColumn::Params> getColumnInitParams() const { return mColumnInitParams; }
 
 protected:
 	// "Full" interface: use this when you're creating a list that has one or more of the following:
@@ -455,15 +493,16 @@ private:
 	void			deselectItem(LLScrollListItem* itemp);
 	void			commitIfChanged();
 	BOOL			setSort(S32 column, BOOL ascending);
-	S32				getLinesPerPage();
 
 	static void		showProfile(std::string id, bool is_group);
 	static void		sendIM(std::string id);
 	static void		addFriend(std::string id);
 	static void		removeFriend(std::string id);
+    static void		reportAbuse(std::string id, bool is_group);
 	static void		showNameDetails(std::string id, bool is_group);
 	static void		copyNameToClipboard(std::string id, bool is_group);
 	static void		copySLURLToClipboard(std::string id, bool is_group);
+	static void		copyUUIDToClipboard(std::string id);
 
 	S32				mLineHeight;	// the max height of a single line
 	S32				mScrollLines;	// how many lines we've scrolled down
@@ -475,6 +514,12 @@ private:
 	bool			mAllowKeyboardMovement;
 	bool			mCommitOnKeyboardMovement;
 	bool			mCommitOnSelectionChange;
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-3.3
+	bool			mCommitOnDelete;
+// [/SL:KB]
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+	bool			mSelectOnFocus = true;
+// [/SL:KB]
 	bool			mSelectionChanged;
 	ESelectionType	mSelectionType;
 	bool			mNeedsScroll;
@@ -484,6 +529,8 @@ private:
 	bool			mDisplayColumnHeaders;
 	bool			mColumnsDirty;
 	bool			mColumnWidthsDirty;
+
+	bool			mAlternateSort;
 
 	mutable item_list	mItemList;
 
@@ -522,11 +569,16 @@ private:
 	LLWString		mSearchString;
 	LLFrameTimer	mSearchTimer;
 	
+	std::string		mFilterString;
+	S32				mFilterColumn;
+	bool			mIsFiltered;
+
 	S32				mSearchColumn;
 	S32				mNumDynamicWidthColumns;
 	S32				mTotalStaticColumnWidth;
 	S32				mTotalColumnPadding;
 
+	std::vector<LLScrollListColumn::Params> mColumnInitParams;
 	mutable bool	mSorted;
 	
 	typedef std::map<std::string, LLScrollListColumn*, std::less<>> column_map_t;

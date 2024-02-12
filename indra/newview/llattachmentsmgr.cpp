@@ -31,6 +31,7 @@
 #include "llagent.h"
 #include "llappearancemgr.h"
 #include "llinventorymodel.h"
+#include "llstartup.h"
 #include "lltooldraganddrop.h" // pack_permissions_slam
 #include "llviewerinventory.h"
 #include "llviewerregion.h"
@@ -153,22 +154,22 @@ void LLAttachmentsMgr::onIdle()
 		return;
 	}
 
-    if (LLApp::isExiting())
-    {
-        return;
-    }
+	if (LLApp::isExiting())
+	{
+		return;
+	}
 
 	requestPendingAttachments();
 
-    linkRecentlyArrivedAttachments();
+	linkRecentlyArrivedAttachments();
 
-    expireOldAttachmentRequests();
+	expireOldAttachmentRequests();
 
-    expireOldDetachRequests();
+	expireOldDetachRequests();
 
 //    checkInvalidCOFLinks();
-    
-    spamStatusInfo();
+	
+	spamStatusInfo();
 }
 
 void LLAttachmentsMgr::requestPendingAttachments()
@@ -300,6 +301,13 @@ void LLAttachmentsMgr::linkRecentlyArrivedAttachments()
             return;
         }
 
+        if (LLAppearanceMgr::instance().getCOFVersion() == LLViewerInventoryCategory::VERSION_UNKNOWN)
+        {
+            // Wait for cof to load
+            LL_DEBUGS_ONCE("Avatar") << "Received atachments, but cof isn't loaded yet, postponing processing" << LL_ENDL;
+            return;
+        }
+
         LL_DEBUGS("Avatar") << "ATT checking COF linkability for " << mRecentlyArrivedAttachments.size()
                             << " recently arrived items" << LL_ENDL;
 
@@ -322,11 +330,15 @@ void LLAttachmentsMgr::linkRecentlyArrivedAttachments()
         if (ids_to_link.size())
         {
 // [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
-			LLPointer<LLInventoryCallback> cb = new LLRegisterAttachmentCallback();
+			LLPointer<LLInventoryCallback> cb = NULL;
 			for (const LLUUID& idAttach : ids_to_link)
 			{
 				if (std::find(mPendingAttachLinks.begin(), mPendingAttachLinks.end(), idAttach) == mPendingAttachLinks.end())
 				{
+					if (cb.isNull())
+					{
+						cb = new LLRegisterAttachmentCallback();
+					}
 					LLAppearanceMgr::instance().addCOFItemLink(idAttach, cb);
 					mPendingAttachLinks.insert(idAttach);
 				}
@@ -479,7 +491,7 @@ void LLAttachmentsMgr::onAttachmentArrived(const LLUUID& inv_item_id)
 {
     LLTimer timer;
     bool expected = mAttachmentRequests.getTime(inv_item_id, timer);
-    if (!expected)
+    if (!expected && LLStartUp::getStartupState() > STATE_WEARABLES_WAIT)
     {
         LLInventoryItem *item = gInventory.getItem(inv_item_id);
         LL_WARNS() << "ATT Attachment was unexpected or arrived after " << MAX_ATTACHMENT_REQUEST_LIFETIME << " seconds: "
@@ -523,10 +535,14 @@ void LLAttachmentsMgr::onDetachCompleted(const LLUUID& inv_item_id)
             LL_DEBUGS("Avatar") << "ATT all detach requests have completed" << LL_ENDL;
         }
     }
-    else
+    else if (!LLApp::isExiting())
     {
         LL_WARNS() << "ATT unexpected detach for "
                    << (item ? item->getName() : "UNKNOWN") << " id " << inv_item_id << LL_ENDL;
+    }
+    else
+    {
+        LL_DEBUGS("Avatar") << "ATT detach on shutdown for " << (item ? item->getName() : "UNKNOWN") << " " << inv_item_id << LL_ENDL;
     }
 
 //    LL_DEBUGS("Avatar") << "ATT detached item flagging as questionable for COF link checking "
@@ -572,6 +588,10 @@ bool LLAttachmentsMgr::isAttachmentStateComplete() const
 //
 //void LLAttachmentsMgr::checkInvalidCOFLinks()
 //{
+//	if (!gInventory.isInventoryUsable())
+//	{
+//		return;
+//	}
 //        LLInventoryModel::cat_array_t cat_array;
 //        LLInventoryModel::item_array_t item_array;
 //        gInventory.collectDescendents(LLAppearanceMgr::instance().getCOF(),

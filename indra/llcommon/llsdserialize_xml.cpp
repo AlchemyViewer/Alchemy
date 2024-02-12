@@ -29,13 +29,15 @@
 
 #include <iostream>
 #include <deque>
+#include <stack>
 
 #include "apr_base64.h"
-#include <boost/regex.hpp>
+
+#include "llregex.h"
 
 extern "C"
 {
-#if LL_DARWIN || defined(LL_USESYSTEMLIBS)
+#if defined(LL_USESYSTEMLIBS)
 # include <expat.h>
 #else
 # include "expat/expat.h"
@@ -191,12 +193,12 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 			// *FIX: memory inefficient.
 			// *TODO: convert to use LLBase64
 			ostr << pre << "<binary encoding=\"base64\">";
-			int b64_buffer_length = apr_base64_encode_len(buffer.size());
+			int b64_buffer_length = apr_base64_encode_len(narrow(buffer.size()));
 			char* b64_buffer = new char[b64_buffer_length];
 			b64_buffer_length = apr_base64_encode_binary(
 				b64_buffer,
 				&buffer[0],
-				buffer.size());
+				narrow(buffer.size()));
 			ostr.write(b64_buffer, b64_buffer_length - 1);
 			delete[] b64_buffer;
 			ostr << "</binary>" << post;
@@ -219,6 +221,13 @@ std::string LLSDXMLFormatter::escapeString(const std::string& in)
 	std::string::const_iterator end = in.end();
 	for(; it != end; ++it)
 	{
+		// See http://en.wikipedia.org/wiki/Valid_characters_in_XML
+		if( *it >= 0 && *it < 20 && *it != 0x09 && *it != 0x0A && *it != 0x0D )
+		{
+			out << "?";
+			continue;
+		}
+
 		switch((*it))
 		{
 		case '<':
@@ -255,7 +264,7 @@ public:
 	S32 parse(std::istream& input, LLSD& data);
 	S32 parseLines(std::istream& input, LLSD& data);
 
-	void parsePart(const char *buf, int len);
+	void parsePart(const char *buf, llssize len);
 	
 	void reset();
 
@@ -303,8 +312,9 @@ private:
 	bool mInLLSDElement;			// true if we're on LLSD
 	bool mGracefullStop;			// true if we found the </llsd
 	
-	typedef std::deque<LLSD*> LLSDRefStack;
+	typedef std::vector<LLSD*> LLSDRefStack;
 	LLSDRefStack mStack;
+	std::vector<Element> mStackElements;
 	
 	int mDepth;
 	bool mSkipping;
@@ -505,7 +515,8 @@ void LLSDXMLParser::Impl::reset()
 	mGracefullStop = false;
 
 	mStack.clear();
-	
+	mStackElements.clear();
+
 	mSkipping = false;
 	
 	mCurrentKey.clear();
@@ -537,7 +548,7 @@ LLSDXMLParser::Impl::findAttribute(const XML_Char* name, const XML_Char** pairs)
 	return NULL;
 }
 
-void LLSDXMLParser::Impl::parsePart(const char* buf, int len)
+void LLSDXMLParser::Impl::parsePart(const char* buf, llssize len)
 {
 	if ( buf != NULL 
 		&& len > 0 )
@@ -592,19 +603,24 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 	}
 
 	Element element = readElement(name);
-	
+	mStackElements.push_back(element);
 	mCurrentContent.clear();
 
 	switch (element)
 	{
 		case ELEMENT_LLSD:
-			if (mInLLSDElement) { return startSkipping(); }
+			if (mInLLSDElement)
+			{
+				mStackElements.pop_back();
+				return startSkipping();
+			}
 			mInLLSDElement = true;
 			return;
 	
 		case ELEMENT_KEY:
 			if (mStack.empty()  ||  !(mStack.back()->isMap()))
 			{
+				mStackElements.pop_back();
 				return startSkipping();
 			}
 			return;
@@ -612,7 +628,11 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 		case ELEMENT_BINARY:
 		{
 			const XML_Char* encoding = findAttribute("encoding", attributes);
-			if(encoding && strcmp("base64", encoding) != 0) { return startSkipping(); }
+			if(encoding && strcmp("base64", encoding) != 0)
+			{
+				mStackElements.pop_back();
+				return startSkipping();
+			}
 			break;
 		}
 		
@@ -622,7 +642,11 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 	}
 	
 
-	if (!mInLLSDElement) { return startSkipping(); }
+	if (!mInLLSDElement)
+	{
+		mStackElements.pop_back();
+		return startSkipping();
+	}
 	
 	if (mStack.empty())
 	{
@@ -630,7 +654,11 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 	}
 	else if (mStack.back()->isMap())
 	{
-		if (mCurrentKey.empty()) { return startSkipping(); }
+		if (mCurrentKey.empty())
+		{
+			mStackElements.pop_back();
+			return startSkipping();
+		}
 		
 		LLSD& map = *mStack.back();
 		LLSD& newElement = map[mCurrentKey];
@@ -647,6 +675,7 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 	}
 	else {
 		// improperly nested value in a non-structure
+		mStackElements.pop_back();
 		return startSkipping();
 	}
 
@@ -683,8 +712,9 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
 		return;
 	}
 	
-	Element element = readElement(name);
-	
+	Element element = mStackElements.back(); //readElement(name);
+	mStackElements.pop_back();
+
 	switch (element)
 	{
 		case ELEMENT_LLSD:
@@ -775,9 +805,8 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
 			// created by python and other non-linden systems - DEV-39358
 			// Fortunately we have very little binary passing now,
 			// so performance impact shold be negligible. + poppy 2009-09-04
-			boost::regex r;
-			r.assign("\\s");
-			std::string stripped = boost::regex_replace(mCurrentContent, r, "");
+			static const boost::regex binary_regex("\\s");
+			std::string stripped = ll_regex_replace(mCurrentContent, binary_regex, "");
 			S32 len = apr_base64_decode_len(stripped.c_str());
 			std::vector<U8> data;
 			data.resize(len);
@@ -910,7 +939,7 @@ LLSDXMLParser::~LLSDXMLParser()
 	delete &impl;
 }
 
-void LLSDXMLParser::parsePart(const char *buf, int len)
+void LLSDXMLParser::parsePart(const char *buf, llssize len)
 {
 	impl.parsePart(buf, len);
 }
@@ -918,6 +947,8 @@ void LLSDXMLParser::parsePart(const char *buf, int len)
 // virtual
 S32 LLSDXMLParser::doParse(std::istream& input, LLSD& data, S32 max_depth) const
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD
+
 	#ifdef XML_PARSER_PERFORMANCE_TESTS
 	XML_Timer timer( &parseTime );
 	#endif	// XML_PARSER_PERFORMANCE_TESTS

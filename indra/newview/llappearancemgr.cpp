@@ -38,8 +38,11 @@
 #include "llgesturemgr.h"
 #include "llinventorybridge.h"
 #include "llinventoryfunctions.h"
+#include "llinventorymodelbackgroundfetch.h"
 #include "llinventoryobserver.h"
+#include "llmd5.h"
 #include "llnotificationsutil.h"
+#include "llmd5.h"
 #include "lloutfitobserver.h"
 #include "lloutfitslist.h"
 #include "llselectmgr.h"
@@ -143,11 +146,14 @@ public:
 	// requests will be throttled from a non-trusted browser
 	LLAppearanceHandler() : LLCommandHandler("appearance", UNTRUSTED_THROTTLE) {}
 
-	bool handle(const LLSD& params, const LLSD& query_map, LLMediaCtrl* web)
+	bool handle(const LLSD& params,
+                const LLSD& query_map,
+                const std::string& grid,
+                LLMediaCtrl* web)
 	{
 		// support secondlife:///app/appearance/show, but for now we just
 		// make all secondlife:///app/appearance SLapps behave this way
-		if (!LLUI::getInstanceFast()->mSettingGroups["config"]->getBOOL("EnableAppearance"))
+		if (!LLUI::getInstance()->mSettingGroups["config"]->getBOOL("EnableAppearance"))
 		{
 			LLNotificationsUtil::add("NoAppearance", LLSD(), LLSD(), std::string("SwitchToStandardSkinAndQuit"));
 			return true;
@@ -528,10 +534,10 @@ void LLUpdateAppearanceOnDestroy::fire(const LLUUID& inv_item)
 
 LLUpdateAppearanceOnDestroy::~LLUpdateAppearanceOnDestroy()
 {
-	if (!LLApp::isExiting())
+	if (LLApp::isRunning())
 	{
 		// speculative fix for MAINT-1150
-		LL_INFOS("Avatar") << self_av_string() << "done update appearance on destroy" << LL_ENDL;
+		//LL_INFOS("Avatar") << self_av_string() << "done update appearance on destroy" << LL_ENDL;
 
 		selfStopPhase("update_appearance_on_destroy");
 
@@ -549,7 +555,7 @@ LLUpdateAppearanceAndEditWearableOnDestroy::LLUpdateAppearanceAndEditWearableOnD
 LLRequestServerAppearanceUpdateOnDestroy::~LLRequestServerAppearanceUpdateOnDestroy()
 {
 	LL_DEBUGS("Avatar") << "ATT requesting server appearance update" << LL_ENDL;
-    if (!LLApp::isExiting())
+    if (LLApp::isRunning())
     {
         LLAppearanceMgr::instance().requestServerAppearanceUpdate();
     }
@@ -575,12 +581,77 @@ void edit_wearable_and_customize_avatar(LLUUID item_id)
 
 LLUpdateAppearanceAndEditWearableOnDestroy::~LLUpdateAppearanceAndEditWearableOnDestroy()
 {
-	if (!LLApp::isExiting())
+	if (LLApp::isRunning())
 	{
 		LLAppearanceMgr::instance().updateAppearanceFromCOF(
 			true,true,
 			boost::bind(edit_wearable_and_customize_avatar, mItemID));
 	}
+}
+
+class LLBrokenLinkObserver : public LLInventoryObserver
+{
+public:
+    LLUUID mUUID;
+    bool mEnforceItemRestrictions;
+    bool mEnforceOrdering;
+    nullary_func_t mPostUpdateFunc;
+
+    LLBrokenLinkObserver(const LLUUID& uuid,
+                          bool enforce_item_restrictions ,
+                          bool enforce_ordering ,
+                          nullary_func_t post_update_func) :
+        mUUID(uuid),
+        mEnforceItemRestrictions(enforce_item_restrictions),
+        mEnforceOrdering(enforce_ordering),
+        mPostUpdateFunc(post_update_func)
+    {
+    }
+    /* virtual */ void changed(U32 mask);
+    void postProcess();
+};
+
+void LLBrokenLinkObserver::changed(U32 mask)
+{
+    if (mask & LLInventoryObserver::REBUILD)
+    {
+        // This observer should be executed after LLInventoryPanel::itemChanged(),
+        // but if it isn't, consider calling updateAppearanceFromCOF with a delay
+        const uuid_set_t& changed_item_ids = gInventory.getChangedIDs();
+        for (uuid_set_t::const_iterator it = changed_item_ids.begin(); it != changed_item_ids.end(); ++it)
+        {
+            const LLUUID& id = *it;
+            if (id == mUUID)
+            {
+                // Might not be processed yet and it is not a
+                // good idea to update appearane here, postpone.
+                doOnIdleOneTime([this]()
+                                {
+                                    postProcess();
+                                });
+
+                gInventory.removeObserver(this);
+                return;
+            }
+        }
+    }
+}
+
+void LLBrokenLinkObserver::postProcess()
+{
+    LLViewerInventoryItem* item = gInventory.getItem(mUUID);
+    llassert(item && !item->getIsBrokenLink()); // the whole point was to get a correct link
+    if (item && item->getIsBrokenLink())
+    {
+        LL_INFOS_ONCE("Avatar") << "Outfit link broken despite being regenerated" << LL_ENDL;
+        LL_DEBUGS("Avatar", "Inventory") << "Outfit link " << mUUID << " \"" << item->getName() << "\" is broken despite being regenerated" << LL_ENDL;
+    }
+
+    LLAppearanceMgr::instance().updateAppearanceFromCOF(
+        mEnforceItemRestrictions ,
+        mEnforceOrdering ,
+        mPostUpdateFunc);
+    delete this;
 }
 
 
@@ -1036,7 +1107,7 @@ void LLWearableHoldingPattern::recoverMissingWearable(LLWearableType::EType type
 	
 		// Try to recover by replacing missing wearable with a new one.
 	LLNotificationsUtil::add("ReplacedMissingWearable");
-	LL_DEBUGS("Avatar") << "Wearable of type '" << LLWearableType::getInstanceFast()->getTypeName(type)
+	LL_DEBUGS("Avatar") << "Wearable of type '" << LLWearableType::getInstance()->getTypeName(type)
 				<< "' could not be downloaded.  Replaced inventory item with default wearable." << LL_ENDL;
 	LLViewerWearable* wearable = LLWearableList::instance().createNewWearable(type, gAgentAvatarp);
 
@@ -1359,25 +1430,6 @@ static void removeDuplicateItems(LLInventoryModel::item_array_t& items)
 
 const std::string LLAppearanceMgr::sExpectedTextureName = "OutfitPreview";
 
-// [SL:KB] - Patch: Appearance-WearableDuplicateAssets | Checked: 2015-06-30 (Catznip-3.7)
-static void removeDuplicateWearableItemsByAssetID(LLInventoryModel::item_array_t& items)
-{
-	std::set<LLUUID> idsAsset;
-	items.erase(std::remove_if(items.begin(), items.end(), 
-		[&idsAsset](const LLViewerInventoryItem* pItem)
-		{
-			if (pItem->isWearableType())
-			{
-				const LLUUID& idAsset = pItem->getAssetUUID();
-				if ( (idAsset.notNull()) &&  (idsAsset.end() != idsAsset.find(idAsset)) )
-					return true;
-				idsAsset.insert(idAsset);
-			}
-			return false;
-		}), items.end());
-}
-// [/SL:KB]
-
 const LLUUID LLAppearanceMgr::getCOF() const
 {
 	return gInventory.findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT);
@@ -1536,10 +1588,12 @@ void LLAppearanceMgr::wearItemsOnAvatar(const uuid_vec_t& item_ids_to_wear,
         }
 
 // [RLVa:KB] - Checked: 2013-02-12 (RLVa-1.4.8)
-		if ( (rlv_handler_t::isEnabled()) && (!rlvPredCanWearItem(item_to_wear, (replace) ? RLV_WEAR_REPLACE : RLV_WEAR_ADD)) )
-		{
-			continue;
-		}
+        if ( (rlv_handler_t::isEnabled()) && (!rlvPredCanWearItem(item_to_wear, (item_to_wear->getType() == LLAssetType::AT_BODYPART || replace) ? RLV_WEAR_REPLACE : RLV_WEAR_ADD)) )
+        {
+            LL_DEBUGS("Avatar") << "inventory item cannot be worn because of RLV restriction, skipping "
+                                << item_to_wear->getName() << " id " << item_id_to_wear << LL_ENDL;
+            continue;
+        }
 // [/RLVa:KB]
 
         switch (item_to_wear->getType())
@@ -1760,12 +1814,18 @@ void LLAppearanceMgr::shallowCopyCategory(const LLUUID& src_id, const LLUUID& ds
 	{
 		parent_id = gInventory.getRootFolderID();
 	}
-	LLUUID subfolder_id = gInventory.createNewCategory( parent_id,
-														LLFolderType::FT_NONE,
-														src_cat->getName());
-	shallowCopyCategoryContents(src_id, subfolder_id, cb);
+	gInventory.createNewCategory(
+        parent_id,
+        LLFolderType::FT_NONE,
+        src_cat->getName(),
+        [src_id, cb](const LLUUID &new_id)
+    {
+        LLAppearanceMgr::getInstance()->shallowCopyCategoryContents(src_id, new_id, cb);
 
-	gInventory.notifyObservers();
+        gInventory.notifyObservers();
+    },
+        src_cat->getThumbnailUUID()
+    );
 }
 
 void LLAppearanceMgr::slamCategoryLinks(const LLUUID& src_id, const LLUUID& dst_id,
@@ -2138,7 +2198,7 @@ void LLAppearanceMgr::filterWearableItems(
                 continue;
 //            S32 start_index = llmax(0,size-max_per_type);
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2010-05-11 (Catznip-2.0)
-			S32 start_index = llmax(0, size - ((LLWearableType::getInstanceFast()->getAllowMultiwear((LLWearableType::EType)i)) ? max_per_type : 1));
+			S32 start_index = llmax(0, size - ((LLWearableType::getInstance()->getAllowMultiwear((LLWearableType::EType)i)) ? max_per_type : 1));
 // [/SL:KB[
             for (S32 j = start_index; j<size; j++)
             {
@@ -2248,9 +2308,6 @@ void LLAppearanceMgr::updateCOF(LLInventoryModel::item_array_t& body_items_new,
 // [/RLVa:KB]
 	// Reduce wearables to max of one per type.
 	removeDuplicateItems(wear_items);
-// [SL:KB] - Patch: Appearance-WearableDuplicateAssets | Checked: 2011-07-24 (Catznip-2.6.0e) | Added: Catznip-2.6.0e
-	removeDuplicateWearableItemsByAssetID(wear_items);
-// [/SL:KB]
 	filterWearableItems(wear_items, 0, LLAgentWearables::MAX_CLOTHING_LAYERS);
 
 	//
@@ -2632,6 +2689,39 @@ void LLAppearanceMgr::updateAppearanceFromCOF(bool enforce_item_restrictions,
 
 	LL_DEBUGS("Avatar") << self_av_string() << "starting" << LL_ENDL;
 
+    if (gInventory.hasPosiblyBrockenLinks())
+    {
+        // Inventory has either broken links or links that
+        // haven't loaded yet.
+        // Check if LLAppearanceMgr needs to wait.
+        LLUUID current_outfit_id = getCOF();
+        LLInventoryModel::item_array_t cof_items;
+        LLInventoryModel::cat_array_t cof_cats;
+        LLFindBrokenLinks is_brocken_link;
+        gInventory.collectDescendentsIf(current_outfit_id,
+            cof_cats,
+            cof_items,
+            LLInventoryModel::EXCLUDE_TRASH,
+            is_brocken_link);
+
+        if (cof_items.size() > 0)
+        {
+            // Some links haven't loaded yet, but fetch isn't complete so
+            // links are likely fine and we will have to wait for them to
+            // load
+            if (LLInventoryModelBackgroundFetch::getInstance()->folderFetchActive())
+            {
+
+                LLBrokenLinkObserver* observer = new LLBrokenLinkObserver(cof_items.front()->getUUID(),
+                                                                            enforce_item_restrictions,
+                                                                            enforce_ordering,
+                                                                            post_update_func);
+                gInventory.addObserver(observer);
+                return;
+            }
+        }
+    }
+
 	if (enforce_item_restrictions)
 	{
 		// The point here is just to call
@@ -2722,10 +2812,6 @@ void LLAppearanceMgr::updateAppearanceFromCOF(bool enforce_item_restrictions,
 	removeDuplicateItems(obj_items);
 	removeDuplicateItems(gest_items);
 	filterWearableItems(wear_items, LLAgentWearables::MAX_CLOTHING_LAYERS, LLAgentWearables::MAX_CLOTHING_LAYERS);
-// [/SL:KB]
-// [SL:KB] - Patch: Appearance-WearableDuplicateAssets | Checked: 2011-07-24 (Catznip-2.6.0e) | Added: Catznip-2.6.0e
-	// Wearing two wearables that share the same asset causes some issues
-	removeDuplicateWearableItemsByAssetID(wear_items);
 // [/SL:KB]
 
 	dumpItemArray(wear_items,"asset_dump: wear_item");
@@ -2988,9 +3074,23 @@ void LLAppearanceMgr::wearInventoryCategory(LLInventoryCategory* category, bool 
     else
 	{
 		selfStartPhase("wear_inventory_category_fetch");
-		callAfterCategoryFetch(category->getUUID(),boost::bind(&LLAppearanceMgr::wearCategoryFinal,
-															   &LLAppearanceMgr::instance(),
-															   category->getUUID(), copy, append));
+        if (AISAPI::isAvailable() && category->getPreferredType() == LLFolderType::FT_OUTFIT)
+        {
+            // for reliability just fetch it whole, linked items included
+            LLUUID cat_id = category->getUUID();
+            LLInventoryModelBackgroundFetch::getInstance()->fetchFolderAndLinks(
+                                cat_id,
+                                [cat_id, copy, append]
+                                {
+                                    LLAppearanceMgr::instance().wearCategoryFinal(cat_id, copy, append);
+                                });
+        }
+        else
+        {
+            callAfterCategoryFetch(category->getUUID(), boost::bind(&LLAppearanceMgr::wearCategoryFinal,
+                                                                    &LLAppearanceMgr::instance(),
+                                                                    category->getUUID(), copy, append));
+        }
 	}
 }
 
@@ -2999,7 +3099,7 @@ S32 LLAppearanceMgr::getActiveCopyOperations() const
 	return LLCallAfterInventoryCopyMgr::getInstanceCount(); 
 }
 
-void LLAppearanceMgr::wearCategoryFinal(LLUUID& cat_id, bool copy_items, bool append)
+void LLAppearanceMgr::wearCategoryFinal(const LLUUID& cat_id, bool copy_items, bool append)
 {
 	LL_INFOS("Avatar") << self_av_string() << "starting" << LL_ENDL;
 
@@ -3047,22 +3147,29 @@ void LLAppearanceMgr::wearCategoryFinal(LLUUID& cat_id, bool copy_items, bool ap
 		{
 			pid = gInventory.getRootFolderID();
 		}
-		
-		LLUUID new_cat_id = gInventory.createNewCategory(
+
+		gInventory.createNewCategory(
 			pid,
 			LLFolderType::FT_NONE,
-			name);
+            name,
+            [cat_id, append](const LLUUID& new_cat_id)
+        {
+            LLInventoryModel::cat_array_t* cats;
+            LLInventoryModel::item_array_t* items;
+            gInventory.getDirectDescendentsOf(cat_id, cats, items);
+            // Create a CopyMgr that will copy items, manage its own destruction
+            new LLCallAfterInventoryCopyMgr(
+                *items, new_cat_id, std::string("wear_inventory_category_callback"),
+                boost::bind(&LLAppearanceMgr::wearInventoryCategoryOnAvatar,
+                    LLAppearanceMgr::getInstance(),
+                    gInventory.getCategory(new_cat_id),
+                    append));
 
-		// Create a CopyMgr that will copy items, manage its own destruction
-		new LLCallAfterInventoryCopyMgr(
-			*items, new_cat_id, std::string("wear_inventory_category_callback"),
-			boost::bind(&LLAppearanceMgr::wearInventoryCategoryOnAvatar,
-						LLAppearanceMgr::getInstance(),
-						gInventory.getCategory(new_cat_id),
-						append));
-
-		// BAP fixes a lag in display of created dir.
-		gInventory.notifyObservers();
+            // BAP fixes a lag in display of created dir.
+            gInventory.notifyObservers();
+        },
+            cat->getThumbnailUUID()
+        );
 	}
 	else
 	{
@@ -3246,13 +3353,6 @@ void LLAppearanceMgr::addCOFItemLink(const LLInventoryItem *item,
 				// MULTI-WEARABLES: make sure we don't go over clothing limits
 				remove_inventory_item(inv_item->getUUID(), cb);
 			}
-// [SL:KB] - Patch: Appearance-WearableDuplicateAssets | Checked: 2011-07-24 (Catznip-2.6.0e) | Added: Catznip-2.6.0e
-			else if ( (vitem->getWearableType() == wearable_type) && (vitem->getAssetUUID() == inv_item->getAssetUUID()) )
-			{
-				// Only allow one wearable per unique asset
-				linked_already = true;
-			}
-// [/SL:KB]
 		}
 	}
 
@@ -3370,7 +3470,10 @@ private:
 // [SL:KB] - Patch: Appearance-AISFilter | Checked: 2015-05-02 (Catznip-3.7)
 void LLAppearanceMgr::removeCOFItemLinks(const LLUUID& item_id, LLPointer<LLInventoryCallback> cb, bool immediate_delete)
 // [/SL:KB]
-{	LLInventoryModel::cat_array_t cat_array;
+{
+	gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
+
+	LLInventoryModel::cat_array_t cat_array;
 	LLInventoryModel::item_array_t item_array;
 	gInventory.collectDescendents(LLAppearanceMgr::getCOF(),
 								  cat_array,
@@ -3386,25 +3489,22 @@ void LLAppearanceMgr::removeCOFItemLinks(const LLUUID& item_id, LLPointer<LLInve
 			{
 				RLV_ASSERT(rlvPredCanRemoveItem(item));
 			}
+			remove_inventory_item(item->getUUID(), cb, immediate_delete);
 // [/RLVa:KB]
-
 //			if (item->getType() == LLAssetType::AT_OBJECT)
-// [RLVa:KB] - Checked: 2013-02-12 (RLVa-1.4.8)
-			if (immediate_delete)
-// [/RLVa:KB]
-			{
-				// Immediate delete
-				remove_inventory_item(item->getUUID(), cb, true);
-				gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
-			}
-			else
-			{
-				// Delayed delete
-				// Pointless to update item_id label here since link still exists and first notifyObservers
-				// call will restore (wear) suffix, mark for update after deletion
-				LLPointer<LLUpdateOnCOFLinkRemove> cb_label = new LLUpdateOnCOFLinkRemove(item_id, cb);
-				remove_inventory_item(item->getUUID(), cb_label, false);
-			}
+//			{
+//				// Immediate delete
+//				remove_inventory_item(item->getUUID(), cb, true);
+//				gInventory.addChangedMask(LLInventoryObserver::LABEL, item_id);
+//			}
+//			else
+//			{
+//				// Delayed delete
+//				// Pointless to update item_id label here since link still exists and first notifyObservers
+//				// call will restore (wear) suffix, mark for update after deletion
+//				LLPointer<LLUpdateOnCOFLinkRemove> cb_label = new LLUpdateOnCOFLinkRemove(item_id, cb);
+//				remove_inventory_item(item->getUUID(), cb_label, false);
+//			}
 		}
 	}
 }
@@ -3540,7 +3640,7 @@ void LLAppearanceMgr::copyLibraryGestures()
 
 	// Copy gestures
 	LLUUID lib_gesture_cat_id =
-		gInventory.findLibraryCategoryUUIDForType(LLFolderType::FT_GESTURE,false);
+		gInventory.findLibraryCategoryUUIDForType(LLFolderType::FT_GESTURE);
 	if (lib_gesture_cat_id.isNull())
 	{
 		LL_WARNS() << "Unable to copy gestures, source category not found" << LL_ENDL;
@@ -4051,7 +4151,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
 
         if (cofVersion == LLViewerInventoryCategory::VERSION_UNKNOWN)
         {
-            LL_WARNS("AVatar") << "COF version is unknown... not requesting until COF version is known." << LL_ENDL;
+            LL_INFOS("AVatar") << "COF version is unknown... not requesting until COF version is known." << LL_ENDL;
             return;
         }
         else
@@ -4074,7 +4174,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
         LL_DEBUGS("Avatar") << "Will send request for cof_version " << cofVersion << LL_ENDL;
 
         bRetry = false;
-        LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest());
+        LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
         if (gSavedSettings.getBOOL("DebugForceAppearanceRequestFailure"))
         {
@@ -4124,7 +4224,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
                 // through the UDP and be handled in LLVOAvatar::processAvatarAppearance
                 // this should ensure that we receive a new canonical COF from the sim
                 // host. Hopefully it will return before the timeout.
-                LLAvatarPropertiesProcessor::getInstanceFast()->sendAvatarTexturesRequest(gAgent.getID());
+                LLAvatarPropertiesProcessor::getInstance()->sendAvatarTexturesRequest(gAgent.getID());
 
                 bRetry = true;
                 // Wait for a 1/2 second before trying again.  Just to keep from asking too quickly.
@@ -4160,6 +4260,105 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
 
     } while (bRetry);
 }
+
+// [SL:KB] - Patch: Appearance-Misc
+// Bad hack but if the viewer and server COF versions get out of sync all appearance requests will start to fail from that point on and require a relog to fix
+void LLAppearanceMgr::syncCofVersionAndRefresh()
+{
+	LLCoros::instance().launch("syncCofVersionAndRefreshCoro", 
+		boost::bind(&LLAppearanceMgr::syncCofVersionAndRefreshCoro, this));
+}
+
+void LLAppearanceMgr::syncCofVersionAndRefreshCoro()
+{
+	// If we don't have a region, report it as an error
+	if (gAgent.getRegion() == NULL)
+	{
+		LL_WARNS("Avatar") << "Region not set, cannot request cof_version increment" << LL_ENDL;
+		return;
+	}
+
+	std::string url = gAgent.getRegion()->getCapability("IncrementCOFVersion");
+	if (url.empty())
+	{
+		LL_WARNS("Avatar") << "No cap for IncrementCofVersion." << LL_ENDL;
+		return;
+	}
+
+	LL_INFOS("Avatar") << "Requesting cof_version be incremented via capability to: " << url << LL_ENDL;
+
+	LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(
+		std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("syncCofVersionAndRefreshCoro", LLCore::HttpRequest::DEFAULT_POLICY_ID));
+
+	llcoro::suspend();
+	S32 retryCount(0);
+	bool bRetry;
+	do
+	{
+		// Actually send the request.
+		LL_DEBUGS("Avatar") << "Will send request COF sync" << LL_ENDL;
+
+		bRetry = false;
+	    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+
+		LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
+
+		LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+		LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+		if (!status)
+		{
+			std::string message = (result.has("error")) ? result["error"].asString() : status.toString();
+			LL_WARNS("Avatar") << "Appearance Failure. server responded with \"" << message << "\"" << LL_ENDL;
+
+			// Wait for a 1/2 second before trying again.  Just to keep from asking too quickly.
+			if (++retryCount > BAKE_RETRY_MAX_COUNT)
+			{
+				LL_WARNS("Avatar") << "COF increment retry count exceeded!" << LL_ENDL;
+				break;
+			}
+			F32 timeout = pow(BAKE_RETRY_TIMEOUT, static_cast<float>(retryCount)) - 1.0f;
+
+			LL_WARNS("Avatar") << "COF increment retry #" << retryCount << " in " << timeout << " seconds." << LL_ENDL;
+
+			llcoro::suspendUntilTimeout(timeout); 
+			bRetry = true;
+		}
+		else
+		{
+			LL_INFOS("Avatar") << "Successfully incremented agent's COF." << LL_ENDL;
+
+			result.erase(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+
+			if (!result.isMap())
+			{
+				LL_WARNS("Avatar") << "Malformed response contents" << LL_ENDL;
+				bRetry = true;
+				continue;
+			}
+
+			// Slam the server version onto the local version
+			LLViewerInventoryCategory* pCOF = gInventory.getCategory(LLAppearanceMgr::instance().getCOF());
+			if (pCOF)
+			{
+				S32 cofVersion = result["version"].asInteger();
+				LL_INFOS("Avatar") << "Slamming server COF version: was " << pCOF->getVersion() << " now " << cofVersion << LL_ENDL;
+				pCOF->setVersion(cofVersion);
+				llassert(gAgentAvatarp->mLastUpdateReceivedCOFVersion < cofVersion);
+				gAgentAvatarp->mLastUpdateReceivedCOFVersion = cofVersion;
+			}
+
+			// The viewer version tends to be ahead of the server version so make sure our new request doesn't appear to be stale
+			gAgentAvatarp->mLastUpdateRequestCOFVersion = gAgentAvatarp->mLastUpdateReceivedCOFVersion;
+
+		}
+
+	} while (bRetry);
+
+	// Try and request an update even if we fail
+	LLAppearanceMgr::instance().requestServerAppearanceUpdate();
+}
+// [/SL:KB]
 
 /*static*/
 void LLAppearanceMgr::debugAppearanceUpdateCOF(const LLSD& content)
@@ -4321,26 +4520,15 @@ void LLAppearanceMgr::makeNewOutfitLinks(const std::string& new_folder_name, boo
 
 	// First, make a folder in the My Outfits directory.
 	const LLUUID parent_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS);
-    if (AISAPI::isAvailable())
-	{
-		// cap-based category creation was buggy until recently. use
-		// existence of AIS as an indicator the fix is present. Does
-		// not actually use AIS to create the category.
-		inventory_func_type func = boost::bind(&LLAppearanceMgr::onOutfitFolderCreated,this,_1,show_panel);
-		gInventory.createNewCategory(
-			parent_id,
-			LLFolderType::FT_OUTFIT,
-			new_folder_name,
-			func);
-	}
-	else
-	{		
-		LLUUID folder_id = gInventory.createNewCategory(
-			parent_id,
-			LLFolderType::FT_OUTFIT,
-			new_folder_name);
-		onOutfitFolderCreated(folder_id, show_panel);
-	}
+
+    gInventory.createNewCategory(
+        parent_id,
+        LLFolderType::FT_OUTFIT,
+        new_folder_name,
+        [show_panel](const LLUUID &new_cat_id)
+        {
+            LLAppearanceMgr::getInstance()->onOutfitFolderCreated(new_cat_id, show_panel);
+        });
 }
 
 void LLAppearanceMgr::wearBaseOutfit()
@@ -4500,7 +4688,7 @@ bool LLAppearanceMgr::moveWearable(LLViewerInventoryItem* item, bool closer_to_b
 	bool result = false;
 	if ((result = gAgentWearables.moveWearable(item, closer_to_body)))
 	{
-		gAgentAvatarp->wearableUpdated(item->getWearableType());
+		gAgentAvatarp->wearableUpdated(item->getWearableType(), false);
 	}
 
 	setOutfitDirty(true);
@@ -4710,6 +4898,73 @@ public:
 	~CallAfterCategoryFetchStage1()
 	{
 	}
+    /*virtual*/ void startFetch()
+    {
+        bool ais3 = AISAPI::isAvailable();
+        for (uuid_vec_t::const_iterator it = mIDs.begin(); it != mIDs.end(); ++it)
+        {
+            LLViewerInventoryCategory* cat = gInventory.getCategory(*it);
+            if (!cat) continue;
+            if (cat->getVersion() == LLViewerInventoryCategory::VERSION_UNKNOWN)
+            {
+                // CHECK IT: isCategoryComplete() checks both version and descendant count but
+                // fetch() only works for Unknown version and doesn't care about descentants,
+                // as result fetch won't start and folder will potentially get stuck as
+                // incomplete in observer.
+                // Likely either both should use only version or both should check descendants.
+                cat->fetch();		//blindly fetch it without seeing if anything else is fetching it.
+                mIncomplete.push_back(*it);	//Add to list of things being downloaded for this observer.
+            }
+            else if (!isCategoryComplete(cat))
+            {
+                LL_DEBUGS("Inventory") << "Categoty " << *it << " incomplete despite having version" << LL_ENDL;
+                LLInventoryModelBackgroundFetch::instance().scheduleFolderFetch(*it, true);
+                mIncomplete.push_back(*it);
+            }
+            else if (ais3)
+            {
+                LLInventoryModel::cat_array_t* cats;
+                LLInventoryModel::item_array_t* items;
+                gInventory.getDirectDescendentsOf(cat->getUUID(), cats, items);
+
+                if (items)
+                {
+                    S32 complete_count = 0;
+                    S32 incomplete_count = 0;
+                    for (LLInventoryModel::item_array_t::const_iterator it = items->begin(); it < items->end(); ++it)
+                    {
+                        if (!(*it)->isFinished())
+                        {
+                            incomplete_count++;
+                        }
+                        else
+                        {
+                            complete_count++;
+                        }
+                    }
+                    // AIS can fetch couple items, but if there
+                    // is more than a dozen it will be very slow
+                    // it's faster to get whole folder in such case
+                    if (incomplete_count > LLInventoryFetchItemsObserver::MAX_INDIVIDUAL_ITEM_REQUESTS
+                        || (incomplete_count > 1 && complete_count == 0))
+                    {
+                        LLInventoryModelBackgroundFetch::instance().scheduleFolderFetch(*it, true);
+                        mIncomplete.push_back(*it);
+                    }
+                    else
+                    {
+                        // let stage2 handle incomplete ones
+                        mComplete.push_back(*it);
+                    }
+                }
+                // else should have been handled by isCategoryComplete
+            }
+            else
+            {
+                mComplete.push_back(*it);
+            }
+        }
+    }
 	virtual void done()
 	{
         if (mComplete.empty())
@@ -4727,13 +4982,11 @@ public:
 		// What we do here is get the complete information on the
 		// items in the requested category, and set up an observer
 		// that will wait for that to happen.
-		LLInventoryModel::cat_array_t cat_array;
-		LLInventoryModel::item_array_t item_array;
-		gInventory.collectDescendents(mComplete.front(),
-									  cat_array,
-									  item_array,
-									  LLInventoryModel::EXCLUDE_TRASH);
-		S32 count = item_array.size();
+        LLInventoryModel::cat_array_t* cats;
+        LLInventoryModel::item_array_t* items;
+        gInventory.getDirectDescendentsOf(mComplete.front(), cats, items);
+
+		S32 count = items->size();
 		if(!count)
 		{
 			LL_WARNS() << "Nothing fetched in category " << mComplete.front()
@@ -4745,11 +4998,13 @@ public:
 			return;
 		}
 
-		LL_INFOS() << "stage1 got " << item_array.size() << " items, passing to stage2 " << LL_ENDL;
+        LLViewerInventoryCategory* cat = gInventory.getCategory(mComplete.front());
+        S32 version = cat ? cat->getVersion() : -2;
+		LL_INFOS() << "stage1, category " << mComplete.front() << " got " << count << " items, version " << version << " passing to stage2 " << LL_ENDL;
 		uuid_vec_t ids;
 		for(S32 i = 0; i < count; ++i)
 		{
-			ids.push_back(item_array.at(i)->getUUID());
+			ids.push_back(items->at(i)->getUUID());
 		}
 		
 		gInventory.removeObserver(this);
@@ -4774,18 +5029,54 @@ protected:
 	nullary_func_t mCallable;
 };
 
+void callAfterCOFFetch(nullary_func_t cb)
+{
+    if (AISAPI::isAvailable())
+    {
+        // For reliability assume that we have no relevant cache, so
+        // fetch cof along with items cof's links point to.
+        LLInventoryModelBackgroundFetch::getInstance()->fetchCOF(cb);
+    }
+    else
+    {
+        LL_INFOS() << "AIS API v3 not available, using callAfterCategoryFetch" << LL_ENDL;
+        LLUUID cat_id = LLAppearanceMgr::instance().getCOF();
+        LLViewerInventoryCategory* cat = gInventory.getCategory(cat_id);
+
+        // Special case, startup should have marked cof as FETCH_RECURSIVE
+        // to prevent dupplicate request, remove that
+        cat->setFetching(LLViewerInventoryCategory::FETCH_NONE);
+        callAfterCategoryFetch(cat_id, cb);
+    }
+}
+
 void callAfterCategoryFetch(const LLUUID& cat_id, nullary_func_t cb)
 {
-	CallAfterCategoryFetchStage1 *stage1 = new CallAfterCategoryFetchStage1(cat_id, cb);
-	stage1->startFetch();
-	if (stage1->isFinished())
-	{
-		stage1->done();
-	}
-	else
-	{
-		gInventory.addObserver(stage1);
-	}
+    CallAfterCategoryFetchStage1* stage1 = new CallAfterCategoryFetchStage1(cat_id, cb);
+    stage1->startFetch();
+    if (stage1->isFinished())
+    {
+        stage1->done();
+    }
+    else
+    {
+        gInventory.addObserver(stage1);
+    }
+}
+
+void callAfterCategoryLinksFetch(const LLUUID &cat_id, nullary_func_t cb)
+{
+    if (AISAPI::isAvailable())
+    {
+        // Assume that we have no relevant cache. Fetch folder, and items folder's links point to.
+        LLInventoryModelBackgroundFetch::getInstance()->fetchFolderAndLinks(cat_id, cb);
+    }
+    else
+    {
+        LL_WARNS() << "AIS API v3 not available, can't use AISAPI::FetchCOF" << LL_ENDL;
+        callAfterCategoryFetch(cat_id, cb);
+    }
+    
 }
 
 void add_wearable_type_counts(const uuid_vec_t& ids,
@@ -4848,8 +5139,10 @@ public:
 	// not allowed from outside the app
 	LLWearFolderHandler() : LLCommandHandler("wear_folder", UNTRUSTED_BLOCK) { }
 
-	bool handle(const LLSD& tokens, const LLSD& query_map,
-				LLMediaCtrl* web)
+	bool handle(const LLSD& tokens,
+                const LLSD& query_map,
+                const std::string& grid,
+                LLMediaCtrl* web)
 	{
 		LLSD::UUID folder_uuid;
 
@@ -4873,6 +5166,7 @@ public:
 																			  "Quick Appearance");
 			if ( gInventory.getCategory( folder_uuid ) != NULL )
 			{
+				// Assume this is coming from the predefined avatars web floater
 				LLAppearanceMgr::getInstance()->wearInventoryCategory(category, true, false);
 				
 				// *TODOw: This may not be necessary if initial outfit is chosen already -- josh

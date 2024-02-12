@@ -36,6 +36,7 @@
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
+#include <boost/align/aligned_allocator.hpp>
 
 #ifdef LL_USESYSTEMLIBS
 # include <zlib.h>
@@ -48,12 +49,13 @@
 #endif
 
 #include "lldate.h"
+#include "llmemorystream.h"
 #include "llsd.h"
 #include "llstring.h"
 #include "lluri.h"
 
 // File constants
-static const int MAX_HDR_LEN = 20;
+static const size_t MAX_HDR_LEN = 20;
 static const S32 UNZIP_LLSD_MAX_DEPTH = 96;
 static const char LEGACY_NON_HEADER[] = "<llsd>";
 const std::string LLSD_BINARY_HEADER("LLSD/Binary");
@@ -63,6 +65,23 @@ const std::string LLSD_NOTATION_HEADER("llsd/notation");
 //used to deflate a gzipped asset (currently used for navmeshes)
 #define windowBits 15
 #define ENABLE_ZLIB_GZIP 32
+
+// If we published this in llsdserialize.h, we could use it in the
+// implementation of LLSDOStreamer's operator<<().
+template <class Formatter>
+void format_using(const LLSD& data, std::ostream& ostr,
+                  LLSDFormatter::EFormatterOptions options=LLSDFormatter::OPTIONS_PRETTY_BINARY)
+{
+    LLPointer<Formatter> f{ new Formatter };
+    f->format(data, ostr, options);
+}
+
+template <class Parser>
+S32 parse_using(std::istream& istr, LLSD& data, size_t max_bytes, S32 max_depth=-1)
+{
+    LLPointer<Parser> p{ new Parser };
+    return p->parse(istr, data, max_bytes, max_depth);
+}
 
 /**
  * LLSDSerialize
@@ -86,10 +105,10 @@ void LLSDSerialize::serialize(const LLSD& sd, std::ostream& str, ELLSD_Serialize
 		f = new LLSDXMLFormatter;
 		break;
 
-    case LLSD_NOTATION:
-        str << "<? " << LLSD_NOTATION_HEADER << " ?>\n";
-        f = new LLSDNotationFormatter;
-        break;
+	case LLSD_NOTATION:
+		str << "<? " << LLSD_NOTATION_HEADER << " ?>\n";
+		f = new LLSDNotationFormatter;
+		break;
 
 	default:
 		LL_WARNS() << "serialize request for unknown ELLSD_Serialize" << LL_ENDL;
@@ -102,20 +121,39 @@ void LLSDSerialize::serialize(const LLSD& sd, std::ostream& str, ELLSD_Serialize
 }
 
 // static
-bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, S32 max_bytes)
+bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
 {
-	LLPointer<LLSDParser> p = NULL;
 	char hdr_buf[MAX_HDR_LEN + 1] = ""; /* Flawfinder: ignore */
-	int i;
-	int inbuf = 0;
-	bool legacy_no_header = false;
 	bool fail_if_not_legacy = false;
-	std::string header;
 
-	/*
-	 * Get the first line before anything.
-	 */
-	str.get(hdr_buf, MAX_HDR_LEN, '\n');
+    /*
+     * Get the first line before anything. Don't read more than max_bytes:
+     * this get() overload reads no more than (count-1) bytes into the
+     * specified buffer. In the usual case when max_bytes exceeds
+     * sizeof(hdr_buf), get() will read no more than sizeof(hdr_buf)-2.
+     */
+    llssize max_hdr_read = MAX_HDR_LEN;
+	if (max_bytes != LLSDSerialize::SIZE_UNLIMITED)
+	{
+        max_hdr_read = llmin(max_bytes + 1, max_hdr_read);
+	}
+    str.get(hdr_buf, max_hdr_read, '\n');
+	auto inbuf = str.gcount();
+
+	// https://en.cppreference.com/w/cpp/io/basic_istream/get
+	// When the get() above sees the specified delimiter '\n', it stops there
+	// without pulling it from the stream. If it turns out that the stream
+	// does NOT contain a header, and the content includes meaningful '\n',
+	// it's important to pull that into hdr_buf too.
+	if (inbuf < max_bytes && str.get(hdr_buf[inbuf]))
+	{
+		// got the delimiting '\n'
+		++inbuf;
+		// None of the following requires that hdr_buf contain a final '\0'
+		// byte. We could store one if needed, since even the incremented
+		// inbuf won't exceed sizeof(hdr_buf)-1, but there's no need.
+	}
+	std::string header{ hdr_buf, static_cast<std::string::size_type>(inbuf) };
 	if (str.fail())
 	{
 		str.clear();
@@ -123,79 +161,97 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, S32 max_bytes)
 	}
 
 	if (!strncasecmp(LEGACY_NON_HEADER, hdr_buf, strlen(LEGACY_NON_HEADER))) /* Flawfinder: ignore */
-	{
-		legacy_no_header = true;
-		inbuf = (int)str.gcount();
+	{	// Create a LLSD XML parser, and parse the first chunk read above.
+		LLSDXMLParser x;
+		x.parsePart(hdr_buf, inbuf);	// Parse the first part that was already read
+		auto parsed = x.parse(str, sd, max_bytes - inbuf); // Parse the rest of it
+		// Formally we should probably check (parsed != PARSE_FAILURE &&
+		// parsed > 0), but since PARSE_FAILURE is -1, this suffices.
+		return (parsed > 0);
 	}
-	else
+
+	if (fail_if_not_legacy)
 	{
-		if (fail_if_not_legacy)
-			goto fail;
-		/*
-		* Remove the newline chars
-		*/
-		for (i = 0; i < MAX_HDR_LEN; i++)
-		{
-			if (hdr_buf[i] == 0 || hdr_buf[i] == '\r' ||
-				hdr_buf[i] == '\n')
-			{
-				hdr_buf[i] = 0;
-				break;
-			}
-		}
-		header = hdr_buf;
+		LL_WARNS() << "deserialize LLSD parse failure" << LL_ENDL;
+		return false;
+	}
 
-		std::string::size_type start = std::string::npos;
-		std::string::size_type end = std::string::npos;
-		start = header.find_first_not_of("<? ");
-		if (start != std::string::npos)
-		{
-			end = header.find_first_of(" ?", start);
-		}
-		if ((start == std::string::npos) || (end == std::string::npos))
-			goto fail;
+	/*
+	* Remove the newline chars
+	*/
+	std::string::size_type lastchar = header.find_last_not_of("\r\n");
+	if (lastchar != std::string::npos)
+	{
+		// It's important that find_last_not_of() returns size_type, which is
+		// why lastchar explicitly declares the type above. erase(size_type)
+		// erases from that offset to the end of the string, whereas
+		// erase(iterator) erases only a single character.
+		header.erase(lastchar+1);
+	}
 
-		header = header.substr(start, end - start);
-		ws(str);
+	// trim off the <? ... ?> header syntax
+	auto start = header.find_first_not_of("<? ");
+	if (start != std::string::npos)
+	{
+		auto end = header.find_first_of(" ?", start);
+		if (end != std::string::npos)
+		{
+			header = header.substr(start, end - start);
+			ws(str);
+		}
 	}
 	/*
 	 * Create the parser as appropriate
 	 */
-	if (legacy_no_header)
-	{	// Create a LLSD XML parser, and parse the first chunk read above
-		LLSDXMLParser* x = new LLSDXMLParser();
-		x->parsePart(hdr_buf, inbuf);	// Parse the first part that was already read
-		x->parseLines(str, sd);			// Parse the rest of it
-		delete x;
-		return true;
-	}
-
-	if (header == LLSD_BINARY_HEADER)
+	if (0 == LLStringUtil::compareInsensitive(header, LLSD_BINARY_HEADER))
 	{
-		p = new LLSDBinaryParser;
+		return (parse_using<LLSDBinaryParser>(str, sd, max_bytes-inbuf) > 0);
 	}
-	else if (header == LLSD_XML_HEADER)
+	else if (0 == LLStringUtil::compareInsensitive(header, LLSD_XML_HEADER))
 	{
-		p = new LLSDXMLParser;
+		return (parse_using<LLSDXMLParser>(str, sd, max_bytes-inbuf) > 0);
 	}
-	else if (header == LLSD_NOTATION_HEADER)
+	else if (0 == LLStringUtil::compareInsensitive(header, LLSD_NOTATION_HEADER))
 	{
-		p = new LLSDNotationParser;
+		return (parse_using<LLSDNotationParser>(str, sd, max_bytes-inbuf) > 0);
 	}
-	else
+	else // no header we recognize
 	{
-		LL_WARNS() << "deserialize request for unknown ELLSD_Serialize" << LL_ENDL;
+		LLPointer<LLSDParser> p;
+		if (inbuf && hdr_buf[0] == '<')
+		{
+			// looks like XML
+			LL_DEBUGS() << "deserialize request with no header, assuming XML" << LL_ENDL;
+			p = new LLSDXMLParser;
+		}
+		else
+		{
+			// assume notation
+			LL_DEBUGS() << "deserialize request with no header, assuming notation" << LL_ENDL;
+			p = new LLSDNotationParser;
+		}
+		// Since we've already read 'inbuf' bytes into 'hdr_buf', prepend that
+		// data to whatever remains in 'str'.
+		LLMemoryStreamBuf already(reinterpret_cast<const U8*>(hdr_buf), inbuf);
+		cat_streambuf prebuff(&already, str.rdbuf());
+		std::istream  prepend(&prebuff);
+#if 1
+		return (p->parse(prepend, sd, max_bytes) > 0);
+#else
+		// debugging the reconstituted 'prepend' stream
+		// allocate a buffer that we hope is big enough for the whole thing
+		std::vector<char> wholemsg((max_bytes == size_t(SIZE_UNLIMITED))? 1024 : max_bytes);
+		prepend.read(wholemsg.data(), std::min(max_bytes, wholemsg.size()));
+		LLMemoryStream replay(reinterpret_cast<const U8*>(wholemsg.data()), prepend.gcount());
+		auto success{ p->parse(replay, sd, prepend.gcount()) > 0 };
+		{
+			LL_DEBUGS() << (success? "parsed: $$" : "failed: '")
+						<< std::string(wholemsg.data(), llmin(prepend.gcount(), 100)) << "$$"
+						<< LL_ENDL;
+		}
+		return success;
+#endif
 	}
-
-	if (p.notNull())
-	{
-		p->parse(str, sd, max_bytes);
-		return true;
-	}
-
-fail:
-	LL_WARNS() << "deserialize LLSD parse failure" << LL_ENDL;
-	return false;
 }
 
 /**
@@ -255,7 +311,7 @@ F64 ll_ntohd(F64 netdouble)
  * @return Returns number of bytes read off of the stream. Returns
  * PARSE_FAILURE (-1) on failure.
  */
-int deserialize_string(std::istream& istr, std::string& value, S32 max_bytes);
+llssize deserialize_string(std::istream& istr, std::string& value, llssize max_bytes);
 
 /**
  * @brief Parse a delimited string. 
@@ -266,7 +322,7 @@ int deserialize_string(std::istream& istr, std::string& value, S32 max_bytes);
  * @return Returns number of bytes read off of the stream. Returns
  * PARSE_FAILURE (-1) on failure.
  */
-int deserialize_string_delim(std::istream& istr, std::string& value, char d);
+llssize deserialize_string_delim(std::istream& istr, std::string& value, char d);
 
 /**
  * @brief Read a raw string off the stream.
@@ -280,10 +336,10 @@ int deserialize_string_delim(std::istream& istr, std::string& value, char d);
  * @return Returns number of bytes read off of the stream. Returns
  * PARSE_FAILURE (-1) on failure.
  */
-int deserialize_string_raw(
+llssize deserialize_string_raw(
 	std::istream& istr,
 	std::string& value,
-	S32 max_bytes);
+	llssize max_bytes);
 
 /**
  * @brief helper method for dealing with the different notation boolean format.
@@ -295,7 +351,7 @@ int deserialize_string_raw(
  * @return Returns number of bytes read off of the stream. Returns
  * PARSE_FAILURE (-1) on failure.
  */
-int deserialize_boolean(
+llssize deserialize_boolean(
 	std::istream& istr,
 	LLSD& data,
 	const std::string& compare,
@@ -328,7 +384,7 @@ LLSDParser::LLSDParser()
 {
 }
 
-S32 LLSDParser::parse(std::istream& istr, LLSD& data, S32 max_bytes, S32 max_depth)
+S32 LLSDParser::parse(std::istream& istr, LLSD& data, llssize max_bytes, S32 max_depth)
 {
 	mCheckLimits = (LLSDSerialize::SIZE_UNLIMITED == max_bytes) ? false : true;
 	mMaxBytesLeft = max_bytes;
@@ -358,7 +414,7 @@ std::istream& LLSDParser::get(
 	char delim) const
 {
 	istr.get(s, n, delim);
-	if(mCheckLimits) mMaxBytesLeft -= (int)istr.gcount();
+	if(mCheckLimits) mMaxBytesLeft -= istr.gcount();
 	return istr;
 }
 
@@ -368,7 +424,7 @@ std::istream& LLSDParser::get(
 		char delim) const		
 {
 	istr.get(sb, delim);
-	if(mCheckLimits) mMaxBytesLeft -= (int)istr.gcount();
+	if(mCheckLimits) mMaxBytesLeft -= istr.gcount();
 	return istr;
 }
 
@@ -392,11 +448,11 @@ std::istream& LLSDParser::read(
 	std::streamsize n) const
 {
 	istr.read(s, n);
-	if(mCheckLimits) mMaxBytesLeft -= (int)istr.gcount();
+	if(mCheckLimits) mMaxBytesLeft -= istr.gcount();
 	return istr;
 }
 
-void LLSDParser::account(S32 bytes) const
+void LLSDParser::account(llssize bytes) const
 {
 	if(mCheckLimits) mMaxBytesLeft -= bytes;
 }
@@ -409,6 +465,7 @@ void LLSDParser::account(S32 bytes) const
 // virtual
 S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) const
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD
 	// map: { string:object, string:object }
 	// array: [ object, object, object ]
 	// undef: !
@@ -494,7 +551,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
 		c = istr.peek();
 		if(isalpha(c))
 		{
-			int cnt = deserialize_boolean(
+			auto cnt = deserialize_boolean(
 				istr,
 				data,
 				NOTATION_FALSE_SERIAL,
@@ -524,7 +581,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
 		c = istr.peek();
 		if(isalpha(c))
 		{
-			int cnt = deserialize_boolean(istr,data,NOTATION_TRUE_SERIAL,true);
+			auto cnt = deserialize_boolean(istr,data,NOTATION_TRUE_SERIAL,true);
 			if(PARSE_FAILURE == cnt) parse_count = cnt;
 			else account(cnt);
 		}
@@ -600,7 +657,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
 		c = get(istr); // pop the 'l'
 		c = get(istr); // pop the delimiter
 		std::string str;
-		int cnt = deserialize_string_delim(istr, str, c);
+		auto cnt = deserialize_string_delim(istr, str, c);
 		if(PARSE_FAILURE == cnt)
 		{
 			parse_count = PARSE_FAILURE;
@@ -623,7 +680,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
 		c = get(istr); // pop the 'd'
 		c = get(istr); // pop the delimiter
 		std::string str;
-		int cnt = deserialize_string_delim(istr, str, c);
+		auto cnt = deserialize_string_delim(istr, str, c);
 		if(PARSE_FAILURE == cnt)
 		{
 			parse_count = PARSE_FAILURE;
@@ -655,7 +712,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
 
 	default:
 		parse_count = PARSE_FAILURE;
-		LL_INFOS() << "Unrecognized character while parsing: int(" << (int)c
+		LL_INFOS() << "Unrecognized character while parsing: int(" << int(c)
 			<< ")" << LL_ENDL;
 		break;
 	}
@@ -668,6 +725,7 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
 
 S32 LLSDNotationParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) const
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD
 	// map: { string:object, string:object }
 	map = LLSD::emptyMap();
 	S32 parse_count = 0;
@@ -686,7 +744,7 @@ S32 LLSDNotationParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) c
 				{
 					putback(istr, c);
 					found_name = true;
-					int count = deserialize_string(istr, name, mMaxBytesLeft);
+					auto count = deserialize_string(istr, name, mMaxBytesLeft);
 					if(PARSE_FAILURE == count) return PARSE_FAILURE;
 					account(count);
 				}
@@ -728,6 +786,7 @@ S32 LLSDNotationParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) c
 
 S32 LLSDNotationParser::parseArray(std::istream& istr, LLSD& array, S32 max_depth) const
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD
 	// array: [ object, object, object ]
 	array = LLSD::emptyArray();
 	S32 parse_count = 0;
@@ -767,8 +826,9 @@ S32 LLSDNotationParser::parseArray(std::istream& istr, LLSD& array, S32 max_dept
 
 bool LLSDNotationParser::parseString(std::istream& istr, LLSD& data) const
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD
 	std::string value;
-	int count = deserialize_string(istr, value, mMaxBytesLeft);
+	auto count = deserialize_string(istr, value, mMaxBytesLeft);
 	if(PARSE_FAILURE == count) return false;
 	account(count);
 	data = value;
@@ -777,6 +837,7 @@ bool LLSDNotationParser::parseString(std::istream& istr, LLSD& data) const
 
 bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD
 	// binary: b##"ff3120ab1"
 	// or: b(len)"..."
 
@@ -795,13 +856,13 @@ bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
 	{
 		// We probably have a valid raw binary stream. determine
 		// the size, and read it.
-		S32 len = strtol(buf + 2, NULL, 0);
+		auto len = strtol(buf + 2, NULL, 0);
 		if(mCheckLimits && (len > mMaxBytesLeft)) return false;
 		std::vector<U8> value;
 		if(len)
 		{
 			value.resize(len);
-			account((int)fullread(istr, (char *)&value[0], len));
+			account(fullread(istr, (char *)&value[0], len));
 		}
 		c = get(istr); // strip off the trailing double-quote
 		data = value;
@@ -871,6 +932,7 @@ bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
 // virtual
 S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) const
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD
 /**
  * Undefined: '!'<br>
  * Boolean: '1' for true '0' for false<br>
@@ -990,7 +1052,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
 	case '"':
 	{
 		std::string value;
-		int cnt = deserialize_string_delim(istr, value, c);
+		auto cnt = deserialize_string_delim(istr, value, c);
 		if(PARSE_FAILURE == cnt)
 		{
 			parse_count = PARSE_FAILURE;
@@ -1077,7 +1139,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
 			if(size > 0)
 			{
 				value.resize(size);
-				account((int)fullread(istr, (char*)&value[0], size));
+				account(fullread(istr, (char*)&value[0], size));
 			}
 			data = value;
 		}
@@ -1091,7 +1153,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
 
 	default:
 		parse_count = PARSE_FAILURE;
-		LL_INFOS() << "Unrecognized character while parsing: int(" << (int)c
+		LL_INFOS() << "Unrecognized character while parsing: int(" << int(c)
 			<< ")" << LL_ENDL;
 		break;
 	}
@@ -1125,7 +1187,7 @@ S32 LLSDBinaryParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) con
 		case '\'':
 		case '"':
 		{
-			int cnt = deserialize_string_delim(istr, name, c);
+			auto cnt = deserialize_string_delim(istr, name, c);
 			if(PARSE_FAILURE == cnt) return PARSE_FAILURE;
 			account(cnt);
 			break;
@@ -1209,7 +1271,7 @@ bool LLSDBinaryParser::parseString(
 	if(size)
 	{
 		buf.resize(size);
-		account((int)fullread(istr, &buf[0], size));
+		account(fullread(istr, &buf[0], size));
 		value.assign(buf.begin(), buf.end());
 	}
 	return true;
@@ -1405,7 +1467,7 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 				ostr << std::uppercase;
 				auto oldfill(ostr.fill('0'));
 				auto oldwidth(ostr.width());
-				for (int i = 0; i < buffer.size(); i++)
+				for (size_t i = 0; i < buffer.size(); i++)
 				{
 					// have to restate setw() before every conversion
 					ostr << std::setw(2) << (int) buffer[i];
@@ -1564,7 +1626,7 @@ void LLSDBinaryFormatter::formatString(
 /**
  * local functions
  */
-int deserialize_string(std::istream& istr, std::string& value, S32 max_bytes)
+llssize deserialize_string(std::istream& istr, std::string& value, llssize max_bytes)
 {
 	int c = istr.get();
 	if(istr.fail())
@@ -1574,7 +1636,7 @@ int deserialize_string(std::istream& istr, std::string& value, S32 max_bytes)
 		return LLSDParser::PARSE_FAILURE;
 	}
 
-	int rv = LLSDParser::PARSE_FAILURE;
+	llssize rv = LLSDParser::PARSE_FAILURE;
 	switch(c)
 	{
 	case '\'':
@@ -1594,7 +1656,7 @@ int deserialize_string(std::istream& istr, std::string& value, S32 max_bytes)
 	return rv + 1; // account for the character grabbed at the top.
 }
 
-int deserialize_string_delim(
+llssize deserialize_string_delim(
 	std::istream& istr,
 	std::string& value,
 	char delim)
@@ -1604,7 +1666,7 @@ int deserialize_string_delim(
 	bool found_hex = false;
 	bool found_digit = false;
 	U8 byte = 0;
-	int count = 0;
+	llssize count = 0;
 
 	while (true)
 	{
@@ -1619,7 +1681,7 @@ int deserialize_string_delim(
 		}
 
 		char next_char = (char)next_byte; // Now that we know it's not EOF
-		
+
 		if(found_escape)
 		{
 			// next character(s) is a special sequence.
@@ -1697,16 +1759,16 @@ int deserialize_string_delim(
 	return count;
 }
 
-int deserialize_string_raw(
+llssize deserialize_string_raw(
 	std::istream& istr,
 	std::string& value,
-	S32 max_bytes)
+	llssize max_bytes)
 {
-	int count = 0;
+	llssize count = 0;
 	const S32 BUF_LEN = 20;
 	char buf[BUF_LEN];		/* Flawfinder: ignore */
 	istr.get(buf, BUF_LEN - 1, ')');
-	count += (int)istr.gcount();
+	count += istr.gcount();
 	int c = istr.get();
 	c = istr.get();
 	count += 2;
@@ -1715,13 +1777,13 @@ int deserialize_string_raw(
 		// We probably have a valid raw string. determine
 		// the size, and read it.
 		// *FIX: This is memory inefficient.
-		S32 len = strtol(buf + 1, NULL, 0);
+		auto len = strtol(buf + 1, NULL, 0);
 		if((max_bytes>0)&&(len>max_bytes)) return LLSDParser::PARSE_FAILURE;
 		std::vector<char> buf;
 		if(len)
 		{
 			buf.resize(len);
-			count += (int)fullread(istr, (char *)&buf[0], len);
+			count += fullread(istr, (char *)&buf[0], len);
 			value.assign(buf.begin(), buf.end());
 		}
 		c = istr.get();
@@ -2010,7 +2072,7 @@ void serialize_string(const std::string& value, std::ostream& str)
 	}
 }
 
-int deserialize_boolean(
+llssize deserialize_boolean(
 	std::istream& istr,
 	LLSD& data,
 	const std::string& compare,
@@ -2027,7 +2089,7 @@ int deserialize_boolean(
 	//  * set data to LLSD::null
 	//  * return LLSDParser::PARSE_FAILURE (-1)
 	//
-	int bytes_read = 0;
+	llssize bytes_read = 0;
 	std::string::size_type ii = 0;
 	char c = istr.peek();
 	while((++ii < compare.size())
@@ -2064,7 +2126,7 @@ std::string zip_llsd(LLSD& data)
 
 	LLSDSerialize::toBinary(data, llsd_strm);
 
-	const U32 CHUNK = 1024 * 256;
+	const llssize CHUNK = 1024 * 256;
 
 	z_stream strm;
 	strm.zalloc = Z_NULL;
@@ -2094,7 +2156,7 @@ std::string zip_llsd(LLSD& data)
 		}
 	}
 
-	strm.avail_in = source.size();
+	strm.avail_in = narrow(source.size());
 	strm.next_in = (U8*) source.data();
 	U8* output = NULL;
 
@@ -2161,12 +2223,8 @@ std::string zip_llsd(LLSD& data)
 // and deserializes from that copy using LLSDSerialize
 LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is, S32 size)
 {
-	std::unique_ptr<U8[]> in;
-	try
-	{
-		in = std::unique_ptr<U8[]>(new U8[size]);
-	}
-	catch(const std::bad_alloc&)
+	std::unique_ptr<U8[]> in = std::unique_ptr<U8[]>(new(std::nothrow) U8[size]);
+	if (!in)
 	{
 		return ZR_MEM_ERROR;
 	}
@@ -2178,22 +2236,15 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is,
 LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32 size)
 {
 	U8* result = NULL;
-	U32 cur_size = 0;
+	llssize cur_size = 0;
 	z_stream strm;
-		
-	constexpr U32 CHUNK = 1024 * 256;
 
-	static thread_local std::unique_ptr<U8[]> out;
-	if (!out)
+	constexpr llssize CHUNK = (1024 * 1024) * 10;
+
+	static thread_local std::vector<U8, boost::alignment::aligned_allocator<U8, 16>> out;
+	if (out.empty())
 	{
-		try
-		{
-			out = std::unique_ptr<U8[]>(new U8[CHUNK]);
-		}
-		catch (const std::bad_alloc&)
-		{
-			return ZR_MEM_ERROR;
-		}
+		out.resize(CHUNK);
 	}
 		
 	strm.zalloc = Z_NULL;
@@ -2202,21 +2253,11 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 	strm.avail_in = size;
 	strm.next_in = const_cast<U8*>(in);
 
-	S32 ret = inflateInit(&strm);
-	switch (ret)
-	{
-	case Z_STREAM_ERROR:
-		return ZR_DATA_ERROR;
-	case Z_VERSION_ERROR:
-		return ZR_VERSION_ERROR;
-	case Z_MEM_ERROR:
-		return ZR_MEM_ERROR;
-	}
-
+	S32 ret = inflateInit2(&strm, MAX_WBITS);
 	do
 	{
 		strm.avail_out = CHUNK;
-		strm.next_out = out.get();
+		strm.next_out = out.data();
 		ret = inflate(&strm, Z_NO_FLUSH);
 		switch (ret)
 		{
@@ -2228,7 +2269,6 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 			return ZR_DATA_ERROR;
 		}
 		case Z_STREAM_ERROR:
-		case Z_BUF_ERROR:
 		{
 			inflateEnd(&strm);
 			free(result);
@@ -2243,23 +2283,25 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 		}
 		}
 
-		U32 have = CHUNK-strm.avail_out;
-
-		U8* new_result = (U8*)realloc(result, cur_size + have);
-		if (new_result == NULL)
+		llssize have = CHUNK-strm.avail_out;
+		if (have > 0)
 		{
-			inflateEnd(&strm);
-			if (result)
+			U8* new_result = (U8*)realloc(result, cur_size + have);
+			if (new_result == NULL)
 			{
-				free(result);
+				inflateEnd(&strm);
+				if (result)
+				{
+					free(result);
+				}
+				return ZR_MEM_ERROR;
 			}
-			return ZR_MEM_ERROR;
+			result = new_result;
+			memcpy(result + cur_size, out.data(), have);
+			cur_size += have;
 		}
-		result = new_result;
-		memcpy(result+cur_size, out.get(), have);
-		cur_size += have;
 
-	} while (ret == Z_OK && ret != Z_STREAM_END);
+	} while (strm.avail_out == 0 && ret != Z_STREAM_END);
 
 	inflateEnd(&strm);
 
@@ -2288,7 +2330,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 //This unzip function will only work with a gzip header and trailer - while the contents
 //of the actual compressed data is the same for either format (gzip vs zlib ), the headers
 //and trailers are different for the formats.
-U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, std::istream& is, S32 size )
+U8* unzip_llsdNavMesh( bool& valid, size_t& outsize, std::istream& is, S32 size )
 {
 	if (size == 0)
 	{
@@ -2310,7 +2352,7 @@ U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, std::istream& is, S32
 	return unzip_llsdNavMesh(valid, outsize, in.get(), size);
 }
 
-U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, const U8* in, S32 size )
+U8* unzip_llsdNavMesh( bool& valid, size_t& outsize, const U8* in, S32 size )
 {
 	if (size == 0)
 	{
@@ -2399,7 +2441,7 @@ U8* unzip_llsdNavMesh( bool& valid, unsigned int& outsize, const U8* in, S32 siz
 	return result;
 }
 
-char* strip_deprecated_header(char* in, U32& cur_size, U32* header_size)
+char* strip_deprecated_header(char* in, llssize& cur_size, llssize* header_size)
 {
 	const char* deprecated_header = "<? LLSD/Binary ?>";
 	constexpr size_t deprecated_header_size = 17;

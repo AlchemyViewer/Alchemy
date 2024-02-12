@@ -134,6 +134,7 @@ LLAvatarList::Params::Params()
 , show_profile_btn("show_profile_btn", true)
 , show_speaking_indicator("show_speaking_indicator", true)
 , show_permissions_granted("show_permissions_granted", SP_NEVER)
+, use_colorize("use_colorizer", false)
 {
 }
 
@@ -155,6 +156,7 @@ LLAvatarList::LLAvatarList(const Params& p)
 // [RLVa:KB] - Checked: RLVa-1.2.0
 , mRlvCheckShowNames(false)
 // [/RLVa:KB]
+, mUseColorizer(p.use_colorize)
 {
 	setCommitOnSelectionChange(true);
 
@@ -442,7 +444,7 @@ void LLAvatarList::addNewItem(const LLUUID& id, const std::string& name, BOOL is
 	item->setRlvCheckShowNames(mRlvCheckShowNames);
 // [/RLVa:KB]
 	// This sets the name as a side effect
-	item->setAvatarId(id, mSessionID, mIgnoreOnlineStatus);
+	item->setAvatarId(id, mSessionID, mIgnoreOnlineStatus, true, mUseColorizer);
 	item->setOnline(mIgnoreOnlineStatus ? true : is_online);
 	item->showTextField(mShowLastInteractionTime || mShowDistance);
 
@@ -462,7 +464,7 @@ void LLAvatarList::addNewItem(const LLUUID& id, const std::string& name, BOOL is
 BOOL LLAvatarList::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
 	BOOL handled = LLUICtrl::handleRightMouseDown(x, y, mask);
-	if (mContextMenu)
+	if ( mContextMenu)
 	{
 		uuid_vec_t selected_uuids;
 		getSelectedUUIDs(selected_uuids);
@@ -478,7 +480,7 @@ BOOL LLAvatarList::handleMouseDown(S32 x, S32 y, MASK mask)
 	S32 screen_x;
 	S32 screen_y;
 	localPointToScreen(x, y, &screen_x, &screen_y);
-	LLToolDragAndDrop::getInstanceFast()->setDragStart(screen_x, screen_y);
+	LLToolDragAndDrop::getInstance()->setDragStart(screen_x, screen_y);
 
 	return LLFlatListViewEx::handleMouseDown(x, y, mask);
 }
@@ -502,7 +504,7 @@ BOOL LLAvatarList::handleHover(S32 x, S32 y, MASK mask)
 		S32 screen_y;
 		localPointToScreen(x, y, &screen_x, &screen_y);
 
-		if(LLToolDragAndDrop::getInstanceFast()->isOverThreshold(screen_x, screen_y))
+		if(LLToolDragAndDrop::getInstance()->isOverThreshold(screen_x, screen_y))
 		{
 			// First, create the global drag and drop object
 			std::vector<EDragAndDropType> types;
@@ -510,7 +512,7 @@ BOOL LLAvatarList::handleHover(S32 x, S32 y, MASK mask)
 			getSelectedUUIDs(cargo_ids);
 			types.resize(cargo_ids.size(), DAD_PERSON);
 			LLToolDragAndDrop::ESource src = LLToolDragAndDrop::SOURCE_PEOPLE;
-			LLToolDragAndDrop::getInstanceFast()->beginMultiDrag(types, cargo_ids, src);
+			LLToolDragAndDrop::getInstance()->beginMultiDrag(types, cargo_ids, src);
 		}
 	}
 
@@ -561,7 +563,7 @@ void LLAvatarList::updateLastInteractionTimes()
 	{
 		// *TODO: error handling
 		LLAvatarListItem* item = static_cast<LLAvatarListItem*>(*it);
-		S32 secs_since = now - (S32) LLRecentPeople::instanceFast().getDate(item->getAvatarId()).secondsSinceEpoch();
+		S32 secs_since = now - (S32) LLRecentPeople::instance().getDate(item->getAvatarId()).secondsSinceEpoch();
 		if (secs_since >= 0)
 			item->setTextFieldSeconds(secs_since);
 	}
@@ -574,7 +576,7 @@ void LLAvatarList::updateDistances()
 	
 	static LLCachedControl<F32> near_me_range(gSavedSettings, "NearMeRange");
 	LLWorld::pos_map_t positions;
-	LLWorld::getInstanceFast()->getAvatars(&positions, gAgent.getPositionGlobal(), near_me_range);
+	LLWorld::getInstance()->getAvatars(&positions, gAgent.getPositionGlobal(), near_me_range);
 
 	for (auto itemp : items)
 	{

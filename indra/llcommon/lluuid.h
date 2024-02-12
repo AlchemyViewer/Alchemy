@@ -35,9 +35,6 @@
 #include "llpreprocessor.h"
 #include <immintrin.h>
 
-#include "absl/hash/hash.h"
-#include "absl/strings/str_format.h"
-
 class LLMutex;
 
 static constexpr S32 UUID_BYTES = 16;
@@ -57,9 +54,10 @@ public:
 	//
 	// CREATORS
 	//
-	LLUUID() = default;
+	LLUUID();
 	explicit LLUUID(const char *in_string); // Convert from string.
 	explicit LLUUID(const std::string_view in_string); // Convert from string.
+	~LLUUID() = default;
 
 	//
 	// MANIPULATORS
@@ -69,7 +67,7 @@ public:
 
 	//static versions of above for use in initializer expressions such as constructor params, etc. 
 	static LLUUID generateNewID();	
-	static LLUUID generateNewID(const std::string& stream);	//static version of above for use in initializer expressions such as constructor params, etc. 
+	static LLUUID generateNewID(const std::string& stream);
 
 private:
     BOOL    parseInternalScalar(const char* in_string, bool broken_format, bool emit);
@@ -99,11 +97,7 @@ public:
 	 */
 	LL_FORCE_INLINE __m128i load_unaligned_si128(const U8* p) const
 	{
-#if defined(__SSE3__)
-		return _mm_lddqu_si128(reinterpret_cast<const __m128i*>(p));
-#else
 		return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p));
-#endif
 	}
 
 	BOOL isNull() const // Faster than comparing to LLUUID::null.
@@ -112,7 +106,7 @@ public:
 #if defined(__SSE4_1__)
 		return _mm_test_all_zeros(mm, mm) != 0;
 #else
-		mm = _mm_cmpeq_epi8(mm, _mm_setzero_si128());
+		mm = _mm_cmpeq_epi32(mm, _mm_setzero_si128());
 		return _mm_movemask_epi8(mm) == 0xFFFF;
 #endif
 	}
@@ -127,19 +121,7 @@ public:
 
 	// JC: These must return real bool's (not BOOLs) or else use of the STL
 	// will generate bool-to-int performance warnings.
-	bool operator==(const LLUUID& rhs) const
-	{
-		__m128i mm_left = load_unaligned_si128(mData);
-		__m128i mm_right = load_unaligned_si128(rhs.mData);
-
-		__m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
-#if defined(__SSE4_1__)
-		return _mm_test_all_ones(mm_cmp);
-#else
-		return _mm_movemask_epi8(mm_cmp) == 0xFFFF;
-#endif
-	}
-
+	bool operator==(const LLUUID& rhs) const;
 	bool operator!=(const LLUUID& rhs) const
 	{
 		return !((*this) == rhs);
@@ -176,7 +158,7 @@ public:
 		cmp = (cmp - 1u) ^ cmp;
 		rcmp = (rcmp - 1u) ^ rcmp;
 
-		return static_cast<uint16_t>(cmp) < static_cast<uint16_t>(rcmp);
+		return cmp < rcmp;
 	}
 
 	bool operator>(const LLUUID& rhs) const
@@ -184,29 +166,6 @@ public:
 		return rhs < (*this);
 	}
 	// END BOOST
-
-
-	inline size_t hash() const
-	{
-		return absl::Hash<LLUUID>{}(*this);
-	}
-
-	template <typename H>
-	friend H AbslHashValue(H h, const LLUUID& id) {
-		return H::combine_contiguous(std::move(h), id.mData, UUID_BYTES);
-	}
-
-	friend absl::FormatConvertResult<absl::FormatConversionCharSet::kString>
-		AbslFormatConvert(const LLUUID& id,
-			const absl::FormatConversionSpec& spec,
-			absl::FormatSink* s) {
-		if (spec.conversion_char() == absl::FormatConversionChar::s) {
-            char uuid_str[UUID_STR_SIZE] = {}; // will be null-terminated
-            id.to_chars(uuid_str);
-			s->Append(uuid_str);
-		}
-		return { true };
-	}
 
 	// xor functions. Useful since any two random uuids xored together
 	// will yield a determinate third random unique id that can be
@@ -252,18 +211,29 @@ public:
 	U16 getCRC16() const;
 	U32 getCRC32() const;
 
+	inline U64 getDigest64() const
+	{
+		U64* tmp = (U64*)mData;
+		return tmp[0] ^ tmp[1];
+	}
+
+	friend std::size_t hash_value(LLUUID const& id)
+	{
+		return boost::hash_value(id.mData);
+	}
+
 	static BOOL validate(const std::string_view in_string); // Validate that the UUID string is legal.
 
 	static const LLUUID null;
 	static LLMutex sMutex;
 
-	static U32 getRandomSeed();
 	static S32 getNodeID(unsigned char * node_id);
 
 	static BOOL parseUUID(const std::string& buf, LLUUID* value);
 
 	U8 mData[UUID_BYTES] = {};
 };
+
 static_assert(std::is_trivially_copyable<LLUUID>::value, "LLUUID must be trivial copy");
 static_assert(std::is_trivially_move_assignable<LLUUID>::value, "LLUUID must be trivial move");
 static_assert(std::is_standard_layout<LLUUID>::value, "LLUUID must be a standard layout type");
@@ -292,18 +262,7 @@ namespace std {
 	{
 		size_t operator()(const LLUUID & id) const
 		{
-			return id.hash();
-		}
-	};
-}
-
-namespace boost 
-{
-	template <> struct hash<LLUUID>
-	{
-		size_t operator()(const LLUUID& id) const
-		{
-			return id.hash();
+			return boost::hash_value(id.mData);
 		}
 	};
 }

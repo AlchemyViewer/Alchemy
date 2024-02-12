@@ -41,7 +41,7 @@ class LLVivoxProtocolParser;
 #include "llcoros.h"
 #include <queue>
 
-#if LL_DARWIN || defined(LL_USESYSTEMLIBS)
+#if defined(LL_USESYSTEMLIBS)
 # include <expat.h>
 #else
 # include "expat/expat.h"
@@ -73,8 +73,6 @@ public:
 
 	// Returns true if vivox has successfully logged in and is not in error state	
 	virtual bool isVoiceWorking() const override;
-	
-	virtual bool singletoneInstanceExists() override;
 
 	/////////////////////
 	/// @name Tuning
@@ -296,8 +294,8 @@ protected:
 		bool mAvatarIDValid;
 		bool mIsSelf;
 	};
-    typedef boost::shared_ptr<participantState> participantStatePtr_t;
-    typedef boost::weak_ptr<participantState> participantStateWptr_t;
+    typedef std::shared_ptr<participantState> participantStatePtr_t;
+    typedef std::weak_ptr<participantState> participantStateWptr_t;
 
     typedef std::map<const std::string, participantStatePtr_t> participantMap;
     typedef std::map<const LLUUID, participantStatePtr_t> participantUUIDMap;
@@ -305,8 +303,10 @@ protected:
 	struct sessionState
 	{
     public:
-        typedef boost::shared_ptr<sessionState> ptr_t;
-        typedef boost::weak_ptr<sessionState> wptr_t;
+        typedef std::shared_ptr<sessionState> ptr_t;
+        typedef std::weak_ptr<sessionState> wptr_t;
+
+		using session_wptr_set = std::set<wptr_t, std::owner_less<wptr_t>>;
 
         typedef boost::function<void(const ptr_t &)> sessionFunc_t;
 
@@ -372,8 +372,8 @@ protected:
     private:
         sessionState();
 
-        static std::set<wptr_t> mSession;   // canonical list of outstanding sessions.
-        std::set<wptr_t>::iterator  mMyIterator;    // used for delete
+        static session_wptr_set mSession;   // canonical list of outstanding sessions.
+		session_wptr_set::iterator  mMyIterator;    // used for delete
 
         static void for_eachPredicate(const wptr_t &a, sessionFunc_t func);
 
@@ -383,7 +383,7 @@ protected:
         static bool testByCallerId(const LLVivoxVoiceClient::sessionState::wptr_t &a, LLUUID participantId);
 
 	};
-    typedef boost::shared_ptr<sessionState> sessionStatePtr_t;
+    typedef std::shared_ptr<sessionState> sessionStatePtr_t;
 
     typedef std::map<std::string, sessionStatePtr_t> sessionMap;
 	
@@ -465,6 +465,7 @@ protected:
 	void participantAddedEvent(std::string &sessionHandle, std::string &sessionGroupHandle, std::string &uriString, std::string &alias, std::string &nameString, std::string &displayNameString, int participantType);
 	void participantRemovedEvent(std::string &sessionHandle, std::string &sessionGroupHandle, std::string &uriString, std::string &alias, std::string &nameString);
 	void participantUpdatedEvent(std::string &sessionHandle, std::string &sessionGroupHandle, std::string &uriString, std::string &alias, bool isModeratorMuted, bool isSpeaking, int volume, F32 energy);
+	void voiceServiceConnectionStateChangedEvent(int statusCode, std::string &statusString, std::string &build_id);
 	void auxAudioPropertiesEvent(F32 energy);
 	void messageEvent(std::string &sessionHandle, std::string &uriString, std::string &alias, std::string &messageHeader, std::string &messageBody, std::string &applicationString);
 	void sessionNotificationEvent(std::string &sessionHandle, std::string &uriString, std::string &notificationType);
@@ -603,7 +604,11 @@ protected:
 	void avatarNameResolved(const LLUUID &id, const std::string &name);
     static void predAvatarNameResolution(const LLVivoxVoiceClient::sessionStatePtr_t &session, LLUUID id, std::string name);
 
-	boost::signals2::connection mAvatarNameCacheConnection;
+	boost::signals2::scoped_connection mAvatarNameCacheConnection;
+    boost::signals2::scoped_connection mVivoxVadAutoCon;
+    boost::signals2::scoped_connection mVivoxVadAHangoverCon;
+    boost::signals2::scoped_connection mVivoxVadNoiseCon;
+    boost::signals2::scoped_connection mVivoxVadSensitivityCon;
 
 	/////////////////////////////
 	// Voice fonts
@@ -667,12 +672,10 @@ private:
 	
 	LLHost mDaemonHost;
 	LLSocket::ptr_t mSocket;
-	bool mConnected;
 	
 	// We should kill the voice daemon in case of connection alert 
 	bool mTerminateDaemon;
 	
-	LLPumpIO *mPump;
 	friend class LLVivoxProtocolParser;
 	
 	std::string mAccountName;
@@ -917,7 +920,10 @@ private:
     bool    mIsProcessingChannels;
     bool    mIsCoroutineActive;
 
-    static bool sShuttingDown; // corutines can last longer than vivox so we need a static variable as a shutdown flag
+    // This variables can last longer than vivox in coroutines so we need them as static
+    static bool sShuttingDown;
+    static bool sConnected;
+    static LLPumpIO* sPump;
 
     LLEventMailDrop mVivoxPump;
 };
@@ -969,6 +975,7 @@ protected:
 	std::string		actionString;
 	std::string		connectorHandle;
 	std::string		versionID;
+	std::string		mBuildID;
 	std::string		accountHandle;
 	std::string		sessionHandle;
 	std::string		sessionGroupHandle;
@@ -1042,10 +1049,8 @@ class LLVivoxSecurity final : public LLSingleton<LLVivoxSecurity>
     std::string     connectorHandle() { return mConnectorHandle; };
     std::string     accountHandle()    { return mAccountHandle;    };
 
-#ifdef LL_LINUX
     void setConnectorHandle(const std::string& handle) { mConnectorHandle = handle; }
     void setAccountHandle(const std::string& handle) { mAccountHandle = handle; }
-#endif
     
   private:
     std::string     mConnectorHandle;

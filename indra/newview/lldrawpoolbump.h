@@ -32,6 +32,8 @@
 #include "lltextureentry.h"
 #include "lluuid.h"
 
+#include <unordered_map>
+
 class LLImageRaw;
 class LLSpatialGroup;
 class LLDrawInfo;
@@ -46,52 +48,40 @@ public:
 	static U32 sVertexMask;
 	BOOL mShiny;
 	
-	virtual U32 getVertexDataMask() { return sVertexMask; }
+	virtual U32 getVertexDataMask() override { return sVertexMask; }
 
 	LLDrawPoolBump();
 
-	virtual void render(S32 pass = 0);
-	virtual void beginRenderPass( S32 pass );
-	virtual void endRenderPass( S32 pass );
-	virtual S32	 getNumPasses();
-	/*virtual*/ void prerender();
-	/*virtual*/ void pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, BOOL batch_textures = FALSE);
+	/*virtual*/ void prerender() override;
 
-	void renderBump(U32 type, U32 mask);
-	void renderGroup(LLSpatialGroup* group, U32 type, U32 mask, BOOL texture);
+	void pushBumpBatches(U32 type);
+	void renderGroup(LLSpatialGroup* group, U32 type, bool texture) override;
 		
 	S32 numBumpPasses();
-	
-	void beginShiny(bool invisible = false);
-	void renderShiny(bool invisible = false);
-	void endShiny(bool invisible = false);
 	
 	void beginFullbrightShiny();
 	void renderFullbrightShiny();
 	void endFullbrightShiny();
 
-	void beginBump(U32 pass = LLRenderPass::PASS_BUMP);
+	void beginBump();
 	void renderBump(U32 pass = LLRenderPass::PASS_BUMP);
 	void endBump(U32 pass = LLRenderPass::PASS_BUMP);
 
-	static void bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& diffuse_channel, S32& cube_channel, bool invisible);
-	static void unbindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& diffuse_channel, S32& cube_channel, bool invisible);
+	static void bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& diffuse_channel, S32& cube_channel);
+	static void unbindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& diffuse_channel, S32& cube_channel);
 
-	virtual S32 getNumDeferredPasses();
-	/*virtual*/ void beginDeferredPass(S32 pass);
-	/*virtual*/ void endDeferredPass(S32 pass);
-	/*virtual*/ void renderDeferred(S32 pass);
+	virtual S32 getNumDeferredPasses() override;
+	/*virtual*/ void renderDeferred(S32 pass) override;
 
-	virtual S32 getNumPostDeferredPasses() { return 2; }
-	/*virtual*/ void beginPostDeferredPass(S32 pass);
-	/*virtual*/ void endPostDeferredPass(S32 pass);
-	/*virtual*/ void renderPostDeferred(S32 pass);
+    virtual S32 getNumPostDeferredPasses() override { return 1; }
+	/*virtual*/ void renderPostDeferred(S32 pass) override;
 
 	static BOOL bindBumpMap(LLDrawInfo& params, S32 channel = -2);
 	static BOOL bindBumpMap(LLFace* face, S32 channel = -2);
 
 private:
-	static BOOL bindBumpMap(U8 bump_code, LLViewerTexture* tex, F32 vsize, S32 channel);
+	static BOOL bindBumpMap(U8 bump_code, LLViewerTexture* tex, S32 channel);
+    bool mRigged = false; // if true, doing a rigged pass
 
 };
 
@@ -121,7 +111,6 @@ public:
 	static void clear();
 	static void addstandard();
 
-	static void init();
 	static void shutdown();
 	static void restoreGL();
 	static void destroyGL();
@@ -161,37 +150,14 @@ private:
 	static void onSourceLoaded( BOOL success, LLViewerTexture *src_vi, LLImageRaw* src, LLUUID& source_asset_id, EBumpEffect bump );
 
 private:
-	typedef absl::flat_hash_map<LLUUID, LLPointer<LLViewerTexture> > bump_image_map_t;
+	typedef boost::unordered_map<LLUUID, LLPointer<LLViewerTexture> > bump_image_map_t;
 	bump_image_map_t mBrightnessEntries;
 	bump_image_map_t mDarknessEntries;
+    static LL::WorkQueue::weak_t sMainQueue;
+    static LL::WorkQueue::weak_t sTexUpdateQueue;
+    static LLRenderTarget sRenderTarget;
 };
 
 extern LLBumpImageList gBumpImageList;
-
-class LLDrawPoolInvisible final : public LLDrawPoolBump
-{
-public:
-	LLDrawPoolInvisible() : LLDrawPoolBump(LLDrawPool::POOL_INVISIBLE) { }
-
-	enum
-	{
-		VERTEX_DATA_MASK = LLVertexBuffer::MAP_VERTEX
-	};
-	
-	virtual U32 getVertexDataMask() { return VERTEX_DATA_MASK; }
-
-	virtual void prerender() { }
-
-	virtual void render(S32 pass = 0);
-	virtual void beginRenderPass( S32 pass ) { }
-	virtual void endRenderPass( S32 pass ) { }
-	virtual S32	 getNumPasses() {return 1;}
-
-	virtual S32 getNumDeferredPasses() { return 1; }
-	/*virtual*/ void beginDeferredPass(S32 pass);
-	/*virtual*/ void endDeferredPass(S32 pass);
-	/*virtual*/ void renderDeferred(S32 pass);
-};
-
 
 #endif // LL_LLDRAWPOOLBUMP_H

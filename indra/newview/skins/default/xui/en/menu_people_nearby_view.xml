@@ -44,6 +44,47 @@
          parameter="sort_arrival"/>
   </menu_item_check>
     <menu_item_separator layout="topleft" />
+    <menu_item_check
+       label="Click to IM"
+       name="click_im">
+      <menu_item_check.on_click
+         function="People.Nearby.ViewSort.Action"
+         parameter="click_im"/>
+      <menu_item_check.on_check
+         function="People.Nearby.ViewSort.CheckItem"
+         parameter="click_im"/>
+    </menu_item_check>
+    <menu_item_check
+       label="Click to view profile"
+       name="click_profile">
+      <menu_item_check.on_click
+         function="People.Nearby.ViewSort.Action"
+         parameter="click_profile"/>
+      <menu_item_check.on_check
+         function="People.Nearby.ViewSort.CheckItem"
+         parameter="click_profile"/>
+    </menu_item_check>
+    <menu_item_check
+       label="Click to zoom in"
+       name="click_zoom">
+      <menu_item_check.on_click
+         function="People.Nearby.ViewSort.Action"
+         parameter="click_zoom"/>
+      <menu_item_check.on_check
+         function="People.Nearby.ViewSort.CheckItem"
+         parameter="click_zoom"/>
+    </menu_item_check>	
+    <menu_item_check
+       label="Click to teleport to"
+       name="click_teleport">
+      <menu_item_check.on_click
+         function="People.Nearby.ViewSort.Action"
+         parameter="click_teleport"/>
+      <menu_item_check.on_check
+         function="People.Nearby.ViewSort.CheckItem"
+         parameter="click_teleport"/>
+    </menu_item_check>	
+    <menu_item_separator layout="topleft" />	
     <menu_item_check name="view_icons" label="View People Icons">
         <menu_item_check.on_click
          function="People.Nearby.ViewSort.Action"
@@ -68,4 +109,33 @@
          function="CheckControl"
          parameter="NearbyListHideUsernames" />
     </menu_item_check>
+    <menu_item_separator layout="topleft" />
+	<menu_item_check name ="radar_alerts" label="Show Radar Alerts">
+		<menu_item_check.on_check
+         function="CheckControl"
+         parameter="AlchemyRadarAlerts" />
+		<menu_item_check.on_click
+         function="ToggleControl"
+         parameter="AlchemyRadarAlerts" />
+	</menu_item_check>
+	<menu_item_check name ="radar_alerts_chat" label="Log Alerts to Chat">
+		<menu_item_check.on_check
+         function="CheckControl"
+         parameter="AlchemyRadarAlertsToChat" />
+		<menu_item_check.on_click
+         function="ToggleControl"
+         parameter="AlchemyRadarAlertsToChat" />
+		<menu_item_check.on_enable
+         function="CheckControl"
+         parameter="AlchemyRadarAlerts" />
+	</menu_item_check>
+	<menu_item_separator layout="topleft" />
+	<menu_item_check name="color_nearby" label="Sync nearby colors to minimap">
+		<menu_item_check.on_check
+         function="CheckControl"
+         parameter="AlchemyNearbyColorize" />
+		<menu_item_check.on_click
+         function="ToggleControl"
+         parameter="AlchemyNearbyColorize" />
+	</menu_item_check>
 </toggleable_menu>

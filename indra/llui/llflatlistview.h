@@ -167,6 +167,12 @@ public:
 	 */
 	virtual LLPanel* getItemByValue(const LLSD& value) const;
 
+	/**
+	 * Check for item by value in list
+	 * @return bool whether item exists by value or not
+	 */
+	virtual bool valueExists(const LLSD& value) const;
+
 	template<class T>
 	T* getTypedItemByValue(const LLSD& value) const
 	{

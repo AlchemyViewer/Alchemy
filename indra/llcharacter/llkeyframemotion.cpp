@@ -247,13 +247,20 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		// request asset
 		mAssetStatus = ASSET_FETCHED;
 
-        LL_DEBUGS("Animation") << "Requesting data fetch for: " << mID << LL_ENDL;
-		character_id = new LLUUID(mCharacter->getID());
-		gAssetStorage->getAssetData(mID,
-						LLAssetType::AT_ANIMATION,
-						onLoadComplete,
-						(void *)character_id,
-						FALSE);
+        if (mID.notNull())
+        {
+            LL_DEBUGS("Animation") << "Requesting data fetch for: " << mID << LL_ENDL;
+            character_id = new LLUUID(mCharacter->getID());
+            gAssetStorage->getAssetData(mID,
+                                        LLAssetType::AT_ANIMATION,
+                                        onLoadComplete,
+                                        (void*)character_id,
+                                        FALSE);
+        }
+        else
+        {
+            LL_INFOS("Animation") << "Attempted to fetch animation " << mName << " with null id for character " << mCharacter->getID() << LL_ENDL;
+        }
 
 		return STATUS_HOLD;
 	case ASSET_FETCHED:
@@ -305,38 +312,35 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 	// Load named file by concatenating the character prefix with the motion name.
 	// Load data into a buffer to be parsed.
 	//-------------------------------------------------------------------------
+	U8 *anim_data;
+	S32 anim_file_size;
+
 	BOOL success = FALSE;
-	U8* anim_data = nullptr;
-	S32 anim_file_size = 0;
-
+	LLFileSystem* anim_file = new LLFileSystem(mID, LLAssetType::AT_ANIMATION);
+	if (!anim_file || !anim_file->getSize())
 	{
-		LLFileSystem anim_file(mID, LLAssetType::AT_ANIMATION);
-		if (!anim_file.open() || !anim_file.getSize())
-		{
-			// request asset over network on next call to load
-			mAssetStatus = ASSET_NEEDS_FETCH;
+		delete anim_file;
+		anim_file = NULL;
+		
+		// request asset over network on next call to load
+		mAssetStatus = ASSET_NEEDS_FETCH;
 
-			return STATUS_HOLD;
+		return STATUS_HOLD;
+	}
+	else
+	{
+		anim_file_size = anim_file->getSize();
+		anim_data = new(std::nothrow) U8[anim_file_size];
+		if (anim_data)
+		{
+			success = anim_file->read(anim_data, anim_file_size);	/*Flawfinder: ignore*/
 		}
 		else
 		{
-			anim_file_size = anim_file.getSize();
-			anim_data = new(std::nothrow) U8[anim_file_size];
-			if (anim_data)
-			{
-				success = anim_file.read(anim_data, anim_file_size);
-				if (!success)
-				{
-					delete[] anim_data;
-					anim_data = nullptr;
-					LL_WARNS() << "Failed to read animation from cache. ID: " << mID << LL_ENDL;
-				}
-			}
-			else
-			{
-				LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << " " << mID << LL_ENDL;
-			}
+			LL_WARNS() << "Failed to allocate buffer: " << anim_file_size << mID << LL_ENDL;
 		}
+		delete anim_file;
+		anim_file = NULL;
 	}
 
 	if (!success)
@@ -346,7 +350,9 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		return STATUS_FAILURE;
 	}
 
+#ifdef SHOW_DEBUG
 	LL_DEBUGS() << "Loading keyframe data for: " << getName() << ":" << getID() << " (" << anim_file_size << " bytes)" << LL_ENDL;
+#endif
 
 	LLDataPackerBinaryBuffer dp(anim_data, anim_file_size);
 
@@ -379,10 +385,8 @@ BOOL LLKeyframeMotion::setupPose()
 	}
 
 	// initialize joint constraints
-	for (JointMotionList::constraint_list_t::iterator iter = mJointMotionList->mConstraints.begin();
-		 iter != mJointMotionList->mConstraints.end(); ++iter)
+	for (JointConstraintSharedData* shared_constraintp : mJointMotionList->mConstraints)
 	{
-		JointConstraintSharedData* shared_constraintp = *iter;
 		JointConstraint* constraintp = new JointConstraint(shared_constraintp);
 		initializeConstraint(constraintp);
 		mConstraints.push_front(constraintp);
@@ -430,6 +434,7 @@ BOOL LLKeyframeMotion::onActivate()
 //-----------------------------------------------------------------------------
 BOOL LLKeyframeMotion::onUpdate(F32 time, U8* joint_mask)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 	// llassert(time >= 0.f);		// This will fire
 	time = llmax(0.f, time);
 
@@ -516,19 +521,15 @@ void LLKeyframeMotion::applyConstraints(F32 time, U8* joint_mask)
 	if (mCharacter->getSkeletonSerialNum() != mLastSkeletonSerialNum)
 	{
 		mLastSkeletonSerialNum = mCharacter->getSkeletonSerialNum();
-		for (constraint_list_t::iterator iter = mConstraints.begin();
-			 iter != mConstraints.end(); ++iter)
+		for (JointConstraint* constraintp : mConstraints)
 		{
-			JointConstraint* constraintp = *iter;
 			initializeConstraint(constraintp);
 		}
 	}
 
 	// apply constraints
-	for (constraint_list_t::iterator iter = mConstraints.begin();
-		 iter != mConstraints.end(); ++iter)
+	for (JointConstraint* constraintp : mConstraints)
 	{
-		JointConstraint* constraintp = *iter;
 		applyConstraint(constraintp, time, joint_mask);
 	}
 }
@@ -538,10 +539,8 @@ void LLKeyframeMotion::applyConstraints(F32 time, U8* joint_mask)
 //-----------------------------------------------------------------------------
 void LLKeyframeMotion::onDeactivate()
 {
-	for (constraint_list_t::iterator iter = mConstraints.begin();
-		 iter != mConstraints.end(); ++iter)
+	for (JointConstraint* constraintp : mConstraints)
 	{
-		JointConstraint* constraintp = *iter;
 		deactivateConstraint(constraintp);
 	}
 }
@@ -974,8 +973,11 @@ void LLKeyframeMotion::applyConstraint(JointConstraint* constraint, F32 time, U8
 
 //-----------------------------------------------------------------------------
 // deserialize()
+//
+// allow_invalid_joints should be true when handling existing content, to avoid breakage.
+// During upload, we should be more restrictive and reject such animations.
 //-----------------------------------------------------------------------------
-BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
+BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, bool allow_invalid_joints)
 {
 	BOOL old_version = FALSE;
     auto joint_motion_list = std::make_unique<LLKeyframeMotion::JointMotionList>();
@@ -1096,6 +1098,15 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 		return FALSE;
 	}
 
+	//SL-17206 hack to alter Female_land loop setting, while current behavior won't be changed serverside
+	LLUUID const female_land_anim("ca1baf4d-0a18-5a1f-0330-e4bd1e71f09e");
+	LLUUID const formal_female_land_anim("6a9a173b-61fa-3ad5-01fa-a851cfc5f66a");
+	if (female_land_anim == asset_id || formal_female_land_anim == asset_id)
+	{
+		LL_WARNS() << "Animation(" << asset_id << ") won't be looped." << LL_ENDL;
+		joint_motion_list->mLoop = FALSE;
+	}
+
 	//-------------------------------------------------------------------------
 	// get easeIn and easeOut
 	//-------------------------------------------------------------------------
@@ -1139,6 +1150,8 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 	// get number of joint motions
 	//-------------------------------------------------------------------------
 	U32 num_motions = 0;
+    S32 rotation_dupplicates = 0;
+    S32 position_dupplicates = 0;
 	if (!dp.unpackU32(num_motions, "num_joints"))
 	{
 		LL_WARNS() << "can't read number of joints"
@@ -1195,6 +1208,7 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 		if (joint)
 		{
             S32 joint_num = joint->getJointNum();
+			joint_name = joint->getName(); // canonical name in case this is an alias.
 //			LL_INFOS() << "  joint: " << joint_name << LL_ENDL;
             if ((joint_num >= (S32)LL_CHARACTER_MAX_ANIMATED_JOINTS) || (joint_num < 0))
             {
@@ -1209,7 +1223,10 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 		{
 			LL_WARNS() << "invalid joint name: " << joint_name
                        << " for animation " << asset_id << LL_ENDL;
-			//return FALSE;
+			if (!allow_invalid_joints)
+			{
+				return FALSE;
+			}
 		}
 
 		joint_motion->mJointName = std::move(joint_name); // Do not use joint_name after this point.
@@ -1366,6 +1383,12 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 
 		std::sort(rCurve->mKeys.begin(), rCurve->mKeys.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
 
+        if (joint_motion->mRotationCurve.mNumKeys > joint_motion->mRotationCurve.mKeys.size())
+        {
+            rotation_dupplicates++;
+            LL_INFOS() << "Motion: " << asset_id << " had dupplicate rotation keys that were removed" << LL_ENDL;
+        }
+
 		//---------------------------------------------------------------------
 		// scan position curve header
 		//---------------------------------------------------------------------
@@ -1470,8 +1493,23 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id)
 
 		std::sort(pCurve->mKeys.begin(), pCurve->mKeys.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
 
+        if (joint_motion->mPositionCurve.mNumKeys > joint_motion->mPositionCurve.mKeys.size())
+        {
+            position_dupplicates++;
+        }
+
 		joint_motion->mUsage = joint_state->getUsage();
 	}
+
+    if (rotation_dupplicates > 0)
+    {
+        LL_INFOS() << "Motion: " << asset_id << " had " << rotation_dupplicates << " dupplicate rotation keys that were removed" << LL_ENDL;
+    }
+
+    if (position_dupplicates > 0)
+    {
+        LL_INFOS() << "Motion: " << asset_id << " had " << position_dupplicates << " dupplicate position keys that were removed" << LL_ENDL;
+    }
 
 	//-------------------------------------------------------------------------
 	// get number of constraints
@@ -1752,13 +1790,15 @@ BOOL LLKeyframeMotion::serialize(LLDataPacker& dp) const
 		JointMotion* joint_motionp = mJointMotionList->getJointMotion(i);
 		success &= dp.packString(joint_motionp->mJointName, "joint_name");
 		success &= dp.packS32(joint_motionp->mPriority, "joint_priority");
-		success &= dp.packS32(joint_motionp->mRotationCurve.mNumKeys, "num_rot_keys");
+        success &= dp.packS32(joint_motionp->mRotationCurve.mKeys.size(), "num_rot_keys");
 
-		LL_DEBUGS("BVH") << "Joint " << joint_motionp->mJointName << LL_ENDL;
-		for (RotationCurve::key_map_t::iterator iter = joint_motionp->mRotationCurve.mKeys.begin();
-			 iter != joint_motionp->mRotationCurve.mKeys.end(); ++iter)
+        LL_DEBUGS("BVH") << "Joint " << i
+            << " name: " << joint_motionp->mJointName
+            << " Rotation keys: " << joint_motionp->mRotationCurve.mKeys.size()
+            << " Position keys: " << joint_motionp->mPositionCurve.mKeys.size() << LL_ENDL;
+        for (RotationCurve::key_map_t::value_type& rot_pair : joint_motionp->mRotationCurve.mKeys)
 		{
-			RotationKey& rot_key = iter->second;
+			RotationKey& rot_key = rot_pair.second;
 			U16 time_short = F32_to_U16(rot_key.mTime, 0.f, mJointMotionList->mDuration);
 			success &= dp.packU16(time_short, "time");
 
@@ -1776,11 +1816,10 @@ BOOL LLKeyframeMotion::serialize(LLDataPacker& dp) const
 			LL_DEBUGS("BVH") << "  rot: t " << rot_key.mTime << " angles " << rot_angles.mV[VX] <<","<< rot_angles.mV[VY] <<","<< rot_angles.mV[VZ] << LL_ENDL;
 		}
 
-		success &= dp.packS32(joint_motionp->mPositionCurve.mNumKeys, "num_pos_keys");
-		for (PositionCurve::key_map_t::iterator iter = joint_motionp->mPositionCurve.mKeys.begin();
-			 iter != joint_motionp->mPositionCurve.mKeys.end(); ++iter)
+		success &= dp.packS32(joint_motionp->mPositionCurve.mKeys.size(), "num_pos_keys");
+		for (PositionCurve::key_map_t::value_type& pos_pair : joint_motionp->mPositionCurve.mKeys)
 		{
-			PositionKey& pos_key = iter->second;
+			PositionKey& pos_key = pos_pair.second;
 			U16 time_short = F32_to_U16(pos_key.mTime, 0.f, mJointMotionList->mDuration);
 			success &= dp.packU16(time_short, "time");
 
@@ -1799,10 +1838,8 @@ BOOL LLKeyframeMotion::serialize(LLDataPacker& dp) const
 
 	success &= dp.packS32(mJointMotionList->mConstraints.size(), "num_constraints");
     LL_DEBUGS("BVH") << "num_constraints " << mJointMotionList->mConstraints.size() << LL_ENDL;
-	for (JointMotionList::constraint_list_t::const_iterator iter = mJointMotionList->mConstraints.begin();
-		 iter != mJointMotionList->mConstraints.end(); ++iter)
+	for (JointConstraintSharedData* shared_constraintp : mJointMotionList->mConstraints)
 	{
-		JointConstraintSharedData* shared_constraintp = *iter;
 		success &= dp.packU8(shared_constraintp->mChainLength, "chain_length");
 		success &= dp.packU8(shared_constraintp->mConstraintType, "constraint_type");
 		char source_volume[16]; /* Flawfinder: ignore */
@@ -1860,8 +1897,9 @@ U32	LLKeyframeMotion::getFileSize()
 //-----------------------------------------------------------------------------
 // dumpToFile()
 //-----------------------------------------------------------------------------
-void LLKeyframeMotion::dumpToFile(const std::string& name)
+bool LLKeyframeMotion::dumpToFile(const std::string& name)
 {
+	bool succ = false;
     if (isLoaded())
     {
         std::string outfile_base;
@@ -1878,10 +1916,24 @@ void LLKeyframeMotion::dumpToFile(const std::string& name)
             const LLUUID& id = getID();
             outfile_base = id.asString();
         }
-        std::string outfilename = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,outfile_base + ".anim");
+
+		if (gDirUtilp->getExtension(outfile_base).empty())
+		{
+			outfile_base += ".anim";
+		}
+		std::string outfilename;
+		if (gDirUtilp->getDirName(outfile_base).empty())
+		{
+			outfilename = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,outfile_base);
+		}
+		else
+		{
+			outfilename = outfile_base;
+		}
         if (LLFile::isfile(outfilename))
         {
-            return;
+			LL_WARNS() << outfilename << " already exists, write failed" << LL_ENDL;
+            return false;
         }
 
         S32 file_size = getFileSize();
@@ -1895,11 +1947,13 @@ void LLKeyframeMotion::dumpToFile(const std::string& name)
             outfile.open(outfilename, LL_APR_WPB);
             if (outfile.getFileHandle())
             {
-                outfile.write(buffer, file_size);
+                S32 wrote_bytes = outfile.write(buffer, file_size);
+				succ = (wrote_bytes == file_size);
             }
         }
         delete [] buffer;
     }
+	return succ;
 }
 
 //-----------------------------------------------------------------------------
@@ -2090,23 +2144,14 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 				return;
 			}
 			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-			if (!file.open())
-			{
-				return;
-			}
 			S32 size = file.getSize();
 			
-			std::unique_ptr<U8[]> buffer(new U8[size]);
-			if (!file.read((U8*)buffer.get(), size))	/*Flawfinder: ignore*/
-			{
-				LL_WARNS() << "Failed to load asset for animation from cache " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
-				motionp->mAssetStatus = ASSET_FETCH_FAILED;
-				return;
-			}
+			U8* buffer = new U8[size];
+			file.read((U8*)buffer, size);	/*Flawfinder: ignore*/
 
 			LL_DEBUGS("Animation") << "Loading keyframe data for: " << motionp->getName() << ":" << motionp->getID() << " (" << size << " bytes)" << LL_ENDL;
 			
-			LLDataPackerBinaryBuffer dp(buffer.get(), size);
+			LLDataPackerBinaryBuffer dp(buffer, size);
 			if (motionp->deserialize(dp, asset_uuid))
 			{
 				motionp->mAssetStatus = ASSET_LOADED;
@@ -2115,12 +2160,13 @@ void LLKeyframeMotion::onLoadComplete(const LLUUID& asset_uuid,
 			{
 				LL_WARNS() << "Failed to decode asset for animation " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
 				motionp->mAssetStatus = ASSET_FETCH_FAILED;
-				return;
 			}
+			
+			delete[] buffer;
 		}
 		else
 		{
-			LL_WARNS() << "Failed to load asset for animation " << motionp->getName() << ":" << motionp->getID() << LL_ENDL;
+			LL_WARNS() << "Failed to load asset for animation " << motionp->getName() << ": " << motionp->getID() << LL_ENDL;
 			motionp->mAssetStatus = ASSET_FETCH_FAILED;
 		}
 	}
@@ -2145,14 +2191,13 @@ void LLKeyframeDataCache::dumpDiagInfo()
 	LL_INFOS() << "-----------------------------------------------------" << LL_ENDL;
 
 	// print each loaded mesh, and it's memory usage
-	for (keyframe_data_map_t::iterator map_it = sKeyframeDataMap.begin();
-		 map_it != sKeyframeDataMap.end(); ++map_it)
+	for (keyframe_data_map_t::value_type& data_pair : sKeyframeDataMap)
 	{
 		U32 joint_motion_kb;
 
-		LLKeyframeMotion::JointMotionList *motion_list_p = map_it->second;
+		LLKeyframeMotion::JointMotionList *motion_list_p = data_pair.second;
 
-		LL_INFOS() << "Motion: " << map_it->first << LL_ENDL;
+		LL_INFOS() << "Motion: " << data_pair.first << LL_ENDL;
 
 		joint_motion_kb = motion_list_p->dumpDiagInfo();
 

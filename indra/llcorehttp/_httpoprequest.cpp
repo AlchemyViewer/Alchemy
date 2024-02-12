@@ -46,7 +46,6 @@
 
 #include "llhttpconstants.h"
 #include "llproxy.h"
-
 #include "httpstats.h"
 
 // *DEBUG:  "[curl:bugs] #1420" problem and testing.
@@ -125,6 +124,7 @@ static const char * const LOG_CORE("CoreHttp");
 namespace LLCore
 {
 
+std::function<void(LLCore::HttpResponse* response)> HttpOpRequest::sMessageLogFunc = nullptr;
 
 HttpOpRequest::HttpOpRequest()
 	: HttpOperation(),
@@ -154,7 +154,8 @@ HttpOpRequest::HttpOpRequest()
 	  mPolicyRetryLimit(HTTP_RETRY_COUNT_DEFAULT),
 	  mPolicyMinRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MIN_DEFAULT)),
 	  mPolicyMaxRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MAX_DEFAULT)),
-	  mCallbackSSLVerify(NULL)
+	  mCallbackSSLVerify(NULL),
+	  mRequestId(0)
 {
 	// *NOTE:  As members are added, retry initialization/cleanup
 	// may need to be extended in @see prepareRequest().
@@ -201,20 +202,23 @@ HttpOpRequest::~HttpOpRequest()
 
 void HttpOpRequest::stageFromRequest(HttpService * service)
 {
-    HttpOpRequest::ptr_t self(boost::dynamic_pointer_cast<HttpOpRequest>(shared_from_this()));
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    HttpOpRequest::ptr_t self(std::dynamic_pointer_cast<HttpOpRequest>(shared_from_this()));
     service->getPolicy().addOp(self);			// transfers refcount
 }
 
 
 void HttpOpRequest::stageFromReady(HttpService * service)
 {
-    HttpOpRequest::ptr_t self(boost::dynamic_pointer_cast<HttpOpRequest>(shared_from_this()));
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    HttpOpRequest::ptr_t self(std::dynamic_pointer_cast<HttpOpRequest>(shared_from_this()));
     service->getTransport().addOp(self);		// transfers refcount
 }
 
 
 void HttpOpRequest::stageFromActive(HttpService * service)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 	if (mReplyLength)
 	{
 		// If non-zero, we received and processed a Content-Range
@@ -251,6 +255,7 @@ void HttpOpRequest::stageFromActive(HttpService * service)
 
 void HttpOpRequest::visitNotifier(HttpRequest * request)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 	if (mUserHandler)
 	{
 		HttpResponse * response = new HttpResponse();
@@ -260,6 +265,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
         response->setRequestURL(mReqURL);
 
         response->setRequestMethod(methodToString(mReqMethod));
+        response->setRequestId(mRequestId);
 
         if (mReplyOffset || mReplyLength)
 		{
@@ -269,7 +275,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
 		response->setContentType(mReplyConType);
 		response->setRetries(mPolicyRetries, mPolicy503Retries);
 		
-		HttpResponse::TransferStats::ptr_t stats = HttpResponse::TransferStats::ptr_t(new HttpResponse::TransferStats);
+		HttpResponse::TransferStats::ptr_t stats = std::make_shared<HttpResponse::TransferStats>();
 
 		curl_easy_getinfo(mCurlHandle, CURLINFO_SIZE_DOWNLOAD, &stats->mSizeDownload);
 		curl_easy_getinfo(mCurlHandle, CURLINFO_TOTAL_TIME, &stats->mTotalTime);
@@ -278,7 +284,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
 		response->setTransferStats(stats);
 
 		mUserHandler->onCompleted(this->getHandle(), response);
-
+		if (sMessageLogFunc != nullptr) sMessageLogFunc(response);
 		response->release();
 	}
 }
@@ -293,6 +299,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
 
 HttpStatus HttpOpRequest::cancel()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 	mStatus = HttpStatus(HttpStatus::LLCORE, HE_OP_CANCELED);
 
 	addAsReply();
@@ -302,12 +309,12 @@ HttpStatus HttpOpRequest::cancel()
 
 
 HttpStatus HttpOpRequest::setupGet(HttpRequest::policy_t policy_id,
-								   HttpRequest::priority_t priority,
 								   const std::string & url,
                                    const HttpOptions::ptr_t & options,
 								   const HttpHeaders::ptr_t & headers)
 {
-	setupCommon(policy_id, priority, url, NULL, options, headers);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+	setupCommon(policy_id, url, NULL, options, headers);
 	mReqMethod = HOR_GET;
 	
 	return HttpStatus();
@@ -315,14 +322,14 @@ HttpStatus HttpOpRequest::setupGet(HttpRequest::policy_t policy_id,
 
 
 HttpStatus HttpOpRequest::setupGetByteRange(HttpRequest::policy_t policy_id,
-											HttpRequest::priority_t priority,
 											const std::string & url,
 											size_t offset,
 											size_t len,
                                             const HttpOptions::ptr_t & options,
                                             const HttpHeaders::ptr_t & headers)
 {
-	setupCommon(policy_id, priority, url, NULL, options, headers);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+	setupCommon(policy_id, url, NULL, options, headers);
 	mReqMethod = HOR_GET;
 	mReqOffset = offset;
 	mReqLength = len;
@@ -336,13 +343,13 @@ HttpStatus HttpOpRequest::setupGetByteRange(HttpRequest::policy_t policy_id,
 
 
 HttpStatus HttpOpRequest::setupPost(HttpRequest::policy_t policy_id,
-									HttpRequest::priority_t priority,
 									const std::string & url,
 									BufferArray * body,
                                     const HttpOptions::ptr_t & options,
                                     const HttpHeaders::ptr_t & headers)
 {
-	setupCommon(policy_id, priority, url, body, options, headers);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+	setupCommon(policy_id, url, body, options, headers);
 	mReqMethod = HOR_POST;
 	
 	return HttpStatus();
@@ -350,13 +357,13 @@ HttpStatus HttpOpRequest::setupPost(HttpRequest::policy_t policy_id,
 
 
 HttpStatus HttpOpRequest::setupPut(HttpRequest::policy_t policy_id,
-								   HttpRequest::priority_t priority,
 								   const std::string & url,
 								   BufferArray * body,
                                    const HttpOptions::ptr_t & options,
 								   const HttpHeaders::ptr_t & headers)
 {
-	setupCommon(policy_id, priority, url, body, options, headers);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+	setupCommon(policy_id, url, body, options, headers);
 	mReqMethod = HOR_PUT;
 	
 	return HttpStatus();
@@ -364,12 +371,12 @@ HttpStatus HttpOpRequest::setupPut(HttpRequest::policy_t policy_id,
 
 
 HttpStatus HttpOpRequest::setupDelete(HttpRequest::policy_t policy_id,
-    HttpRequest::priority_t priority,
     const std::string & url,
     const HttpOptions::ptr_t & options,
     const HttpHeaders::ptr_t & headers)
 {
-    setupCommon(policy_id, priority, url, NULL, options, headers);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    setupCommon(policy_id, url, NULL, options, headers);
     mReqMethod = HOR_DELETE;
 
     return HttpStatus();
@@ -377,13 +384,13 @@ HttpStatus HttpOpRequest::setupDelete(HttpRequest::policy_t policy_id,
 
 
 HttpStatus HttpOpRequest::setupPatch(HttpRequest::policy_t policy_id,
-    HttpRequest::priority_t priority,
     const std::string & url,
     BufferArray * body,
     const HttpOptions::ptr_t & options,
     const HttpHeaders::ptr_t & headers)
 {
-    setupCommon(policy_id, priority, url, body, options, headers);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    setupCommon(policy_id, url, body, options, headers);
     mReqMethod = HOR_PATCH;
 
     return HttpStatus();
@@ -391,12 +398,12 @@ HttpStatus HttpOpRequest::setupPatch(HttpRequest::policy_t policy_id,
 
 
 HttpStatus HttpOpRequest::setupCopy(HttpRequest::policy_t policy_id,
-    HttpRequest::priority_t priority,
     const std::string & url,
     const HttpOptions::ptr_t & options,
     const HttpHeaders::ptr_t &headers)
 {
-    setupCommon(policy_id, priority, url, NULL, options, headers);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    setupCommon(policy_id, url, NULL, options, headers);
     mReqMethod = HOR_COPY;
 
     return HttpStatus();
@@ -404,28 +411,28 @@ HttpStatus HttpOpRequest::setupCopy(HttpRequest::policy_t policy_id,
 
 
 HttpStatus HttpOpRequest::setupMove(HttpRequest::policy_t policy_id,
-    HttpRequest::priority_t priority,
     const std::string & url,
     const HttpOptions::ptr_t & options,
     const HttpHeaders::ptr_t &headers)
 {
-    setupCommon(policy_id, priority, url, NULL, options, headers);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    setupCommon(policy_id, url, NULL, options, headers);
     mReqMethod = HOR_MOVE;
 
     return HttpStatus();
 }
 
+static U64 sRequestId = 0;
 
 void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
-								HttpRequest::priority_t priority,
 								const std::string & url,
 								BufferArray * body,
                                 const HttpOptions::ptr_t & options,
 								const HttpHeaders::ptr_t & headers)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 	mProcFlags = 0U;
 	mReqPolicy = policy_id;
-	mReqPriority = priority;
 	mReqURL = url;
 	if (body)
 	{
@@ -466,6 +473,7 @@ void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
 // *TODO:  Move this to _httplibcurl where it belongs.
 HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 	// Scrub transport and result data for retried op case
 	mCurlActive = false;
 	mCurlHandle = NULL;
@@ -509,7 +517,6 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_NOPROGRESS, 1);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_URL, mReqURL.c_str());
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_PRIVATE, getHandle());
-	check_curl_easy_setopt(mCurlHandle, CURLOPT_ENCODING, "");
 
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_AUTOREFERER, 1);
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_MAXREDIRS, HTTP_REDIRECTS_DEFAULT);
@@ -522,6 +529,11 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 
 	check_curl_easy_setopt(mCurlHandle, CURLOPT_COOKIEFILE, "");
 
+	if(!gpolicy.mUserAgent.empty())
+	{
+		check_curl_easy_setopt(mCurlHandle, CURLOPT_USERAGENT, gpolicy.mUserAgent.c_str());
+	}
+
 	if (gpolicy.mSslCtxCallback)
 	{
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_SSL_CTX_FUNCTION, curlSslCtxCallback);
@@ -532,7 +544,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 	long follow_redirect(1L);
 	long sslPeerV(0L);
 	long sslHostV(0L);
-    long dnsCacheTimeout(-1L);
+    long dnsCacheTimeout(600); // Refetch dns after 600 seconds
     long nobody(0L);
 
 	if (mReqOptions)
@@ -573,18 +585,18 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 		LLProxy::applyProxySettings(mCurlHandle);
 
 	}
-	else if (gpolicy.mHttpProxy.size())
+	else if (!gpolicy.mHttpProxy.empty())
 	{
 		// *TODO:  This is fine for now but get fuller socks5/
 		// authentication thing going later....
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_PROXY, gpolicy.mHttpProxy.c_str());
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
 	}
-	if (gpolicy.mCAPath.size())
+	if (!gpolicy.mCAPath.empty())
 	{
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_CAPATH, gpolicy.mCAPath.c_str());
 	}
-	if (gpolicy.mCAFile.size())
+	if (!gpolicy.mCAFile.empty())
 	{
 		check_curl_easy_setopt(mCurlHandle, CURLOPT_CAINFO, gpolicy.mCAFile.c_str());
 	}
@@ -599,7 +611,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 	case HOR_POST:
 		{
 			check_curl_easy_setopt(mCurlHandle, CURLOPT_POST, 1);
-			check_curl_easy_setopt(mCurlHandle, CURLOPT_ENCODING, "");
+
 			long data_size(0);
 			if (mReqBody)
 			{
@@ -647,12 +659,12 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 		break;
 	}
 
-	if (!mReqHeaders || !mReqHeaders->find("Connection"))
+	if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_CONNECTION))
 	{
         mCurlHeaders = curl_slist_append(mCurlHeaders, "Connection: keep-alive");
 	}
 
-	if (!mReqHeaders || !mReqHeaders->find("Keep-Alive"))
+	if (!mReqHeaders || !mReqHeaders->find(HTTP_OUT_HEADER_KEEP_ALIVE))
 	{
         mCurlHeaders = curl_slist_append(mCurlHeaders, "Keep-Alive: 300");
 	}
@@ -739,13 +751,6 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 		//
 		// xfer_timeout *= cpolicy.mPipelining;
 		xfer_timeout *= 2L;
-
-		// Also try requesting HTTP/2.
-/******************************/
-		// but for test purposes, only if overriding VIEWERASSET
-		if (getenv("VIEWERASSET"))
-/******************************/
-		check_curl_easy_setopt(mCurlHandle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
 	}
 	// *DEBUG:  Enable following override for timeout handling and "[curl:bugs] #1420" tests
     //if (cpolicy.mPipelining)
@@ -780,6 +785,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
 
 size_t HttpOpRequest::writeCallback(void * data, size_t size, size_t nmemb, void * userdata)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     HttpOpRequest::ptr_t op(HttpOpRequest::fromHandle<HttpOpRequest>(userdata));
 
 	if (! op->mReplyBody)
@@ -795,6 +801,7 @@ size_t HttpOpRequest::writeCallback(void * data, size_t size, size_t nmemb, void
 		
 size_t HttpOpRequest::readCallback(void * data, size_t size, size_t nmemb, void * userdata)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     HttpOpRequest::ptr_t op(HttpOpRequest::fromHandle<HttpOpRequest>(userdata));
 
 	if (! op->mReqBody)
@@ -826,6 +833,7 @@ size_t HttpOpRequest::readCallback(void * data, size_t size, size_t nmemb, void 
 
 int HttpOpRequest::seekCallback(void *userdata, curl_off_t offset, int origin)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     HttpOpRequest::ptr_t op(HttpOpRequest::fromHandle<HttpOpRequest>(userdata));
 
     if (!op->mReqBody)
@@ -857,6 +865,7 @@ int HttpOpRequest::seekCallback(void *userdata, curl_off_t offset, int origin)
 		
 size_t HttpOpRequest::headerCallback(void * data, size_t size, size_t nmemb, void * userdata)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 	static const char status_line[] = "HTTP/";
 	static const size_t status_line_len = sizeof(status_line) - 1;
 	static const char con_ran_line[] = "content-range";
@@ -948,7 +957,7 @@ size_t HttpOpRequest::headerCallback(void * data, size_t size, size_t nmemb, voi
 		// Save headers in response
 		if (! op->mReplyHeaders)
 		{
-			op->mReplyHeaders = HttpHeaders::ptr_t(new HttpHeaders);
+			op->mReplyHeaders = std::make_shared<HttpHeaders>();
 		}
 		op->mReplyHeaders->append(name, value ? value : "");
 	}
@@ -1006,6 +1015,7 @@ size_t HttpOpRequest::headerCallback(void * data, size_t size, size_t nmemb, voi
 
 CURLcode HttpOpRequest::curlSslCtxCallback(CURL *curl, void *sslctx, void *userdata)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     HttpOpRequest::ptr_t op(HttpOpRequest::fromHandle<HttpOpRequest>(userdata));
 
     if (op->mCallbackSSLVerify)
@@ -1032,6 +1042,7 @@ CURLcode HttpOpRequest::curlSslCtxCallback(CURL *curl, void *sslctx, void *userd
 
 int HttpOpRequest::sslCertVerifyCallback(X509_STORE_CTX *ctx, void *param)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     HttpOpRequest::ptr_t op(HttpOpRequest::fromHandle<HttpOpRequest>(param));
 
 	if (op->mCallbackSSLVerify)
@@ -1044,6 +1055,7 @@ int HttpOpRequest::sslCertVerifyCallback(X509_STORE_CTX *ctx, void *param)
 
 int HttpOpRequest::debugCallback(CURL * handle, curl_infotype info, char * buffer, size_t len, void * userdata)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     HttpOpRequest::ptr_t op(HttpOpRequest::fromHandle<HttpOpRequest>(userdata));
 
 	std::string safe_line;

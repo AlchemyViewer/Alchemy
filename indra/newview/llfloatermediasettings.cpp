@@ -148,12 +148,24 @@ void LLFloaterMediaSettings::apply()
 		sInstance->mPanelMediaSettingsPermissions->preApply();
 		sInstance->mPanelMediaSettingsPermissions->getValues( settings, false );
 			
-		LLSelectMgr::getInstanceFast()->selectionSetMedia( LLTextureEntry::MF_HAS_MEDIA, settings );
+		LLSelectMgr::getInstance()->selectionSetMedia( LLTextureEntry::MF_HAS_MEDIA, settings );
 
 		sInstance->mPanelMediaSettingsGeneral->postApply();
 		sInstance->mPanelMediaSettingsSecurity->postApply();
 		sInstance->mPanelMediaSettingsPermissions->postApply();
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void LLFloaterMediaSettings::onOpen(const LLSD& key)
+{
+    if (mPanelMediaSettingsGeneral)
+    {
+        // media is expensive, so only load it when nessesary.
+        // If we need to preload it, set volume to 0 and any pause
+        // if applicable, then unpause here
+        mPanelMediaSettingsGeneral->updateMediaPreview();
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

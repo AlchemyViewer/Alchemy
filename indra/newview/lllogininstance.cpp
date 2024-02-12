@@ -60,6 +60,7 @@
 #include "llsdserialize.h"
 #include "lltrans.h"
 
+#include <boost/regex.hpp>
 #include <sstream>
 
 const S32 LOGIN_MAX_RETRIES = 8; // Viewer should not autmatically retry login
@@ -85,6 +86,7 @@ LLLoginInstance::LLLoginInstance() :
 	mLoginModule(new LLLogin()),
 	mNotifications(NULL),
 	mLoginState("offline"),
+    mSaveMFA(true),
 	mAttemptComplete(false),
 	mTransferRate(0.0f),
 	mDispatcher("LLLoginInstance", "change")
@@ -164,13 +166,12 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
 	//requested_options.append("inventory-meat");
 	//requested_options.append("inventory-skel-targets");
 #if (!defined LL_MINIMIAL_REQUESTED_OPTIONS)
-	if(FALSE == gSavedSettings.getBOOL("NoInventoryLibrary"))
-	{
-		requested_options.append("inventory-lib-root");
-		requested_options.append("inventory-lib-owner");
-		requested_options.append("inventory-skel-lib");
+
+    // Not requesting library will trigger mFatalNoLibraryRootFolder
+	requested_options.append("inventory-lib-root");
+	requested_options.append("inventory-lib-owner");
+	requested_options.append("inventory-skel-lib");
 	//	requested_options.append("inventory-meat-lib");
-	}
 
 	requested_options.append("initial-outfit");
 	requested_options.append("gestures");
@@ -199,7 +200,19 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
 		gSavedSettings.setBOOL("UseDebugMenus", TRUE);
 		requested_options.append("god-connect");
 	}
-	
+
+	// Hey guys, let's stuff all the opensim options right here, ok?
+	if (LLGridManager::getInstance()->isInOpenSim())
+	{
+		requested_options.append("avatar_picker_url");
+		requested_options.append("classified_fee");
+		requested_options.append("currency");
+		requested_options.append("destination_guide_url");
+		requested_options.append("max_groups");
+		requested_options.append("profile-server-url");
+		requested_options.append("search");
+	}
+
 	LLSD request_params;
 
     unsigned char hashed_unique_id_string[MD5HEX_STR_SIZE];
@@ -224,8 +237,9 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
 	request_params["id0"] = mSerialNumber;
 	request_params["host_id"] = gSavedSettings.getString("HostID");
 	request_params["extended_errors"] = true; // request message_id and message_args
+	request_params["token"] = "";
 
-    // log request_params _before_ adding the credentials   
+    // log request_params _before_ adding the credentials or sensitive MFA hash data
     LL_DEBUGS("LLLogin") << "Login parameters: " << LLSDOStreamer<LLSDNotationFormatter>(request_params) << LL_ENDL;
 
     // Copy the credentials into the request after logging the rest
@@ -237,6 +251,33 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
     {
         request_params[it->first] = it->second;
     }
+
+    std::string mfa_hash = gSavedSettings.getString("MFAHash"); //non-persistent to enable testing
+    std::string grid(LLGridManager::getInstance()->getGridId());
+    std::string user_id = user_credential->userID();
+    if (gSecAPIHandler)
+    {
+        if (mfa_hash.empty())
+        {
+            // normal execution, mfa_hash was not set from debug setting so load from protected store
+            LLSD data_map = gSecAPIHandler->getProtectedData("mfa_hash", grid);
+            if (data_map.isMap() && data_map.has(user_id))
+            {
+                mfa_hash = data_map[user_id].asString();
+            }
+        }
+        else
+        {
+            // SL-16888 the mfa_hash is being overridden for testing so save it for consistency for future login requests
+            gSecAPIHandler->addToProtectedMap("mfa_hash", grid, user_id, mfa_hash);
+        }
+    }
+    else
+    {
+        LL_WARNS() << "unable to access protected store for mfa_hash" << LL_ENDL;
+    }
+
+    request_params["mfa_hash"] = mfa_hash;
 
 	// Specify desired timeout/retry options
 	LLSD http_params;
@@ -250,6 +291,7 @@ void LLLoginInstance::constructAuthParams(LLPointer<LLCredential> user_credentia
 	mRequestData["params"] = request_params;
 	mRequestData["options"] = requested_options;
 	mRequestData["http_params"] = http_params;
+    mRequestData["wait_for_updater"] = false;
 }
 
 bool LLLoginInstance::handleLoginEvent(const LLSD& event)
@@ -406,6 +448,17 @@ void LLLoginInstance::handleLoginFailure(const LLSD& event)
                 boost::bind(&LLLoginInstance::syncWithUpdater, this, resp, _1, _2));
         }
     }
+    else if(reason_response == "mfa_challenge")
+    {
+        LL_DEBUGS("LLLogin") << " MFA challenge" << LL_ENDL;
+
+        if (gViewerWindow)
+        {
+            gViewerWindow->setShowProgress(FALSE);
+        }
+
+        showMFAChallange(LLTrans::getString(response["message_id"].asString()));
+    }
     else if(   reason_response == "key"
             || reason_response == "presence"
             || reason_response == "connect"
@@ -481,23 +534,79 @@ void LLLoginInstance::handleIndeterminate(const LLSD& event)
 
 bool LLLoginInstance::handleTOSResponse(bool accepted, const std::string& key)
 {
-	if(accepted)
-	{	
-		LL_INFOS("LLLogin") << "LLLoginInstance::handleTOSResponse: accepted" << LL_ENDL;
+    if(accepted)
+    {
+        LL_INFOS("LLLogin") << "LLLoginInstance::handleTOSResponse: accepted " << LL_ENDL;
 
-		// Set the request data to true and retry login.
-		mRequestData["params"][key] = true; 
-		reconnect();
-	}
-	else
-	{
-		LL_INFOS("LLLogin") << "LLLoginInstance::handleTOSResponse: attemptComplete" << LL_ENDL;
+        // Set the request data to true and retry login.
+        mRequestData["params"][key] = true;
 
-		attemptComplete();
-	}
+        if (!mRequestData["params"]["token"].asString().empty())
+        {
+            // SL-18511 this TOS failure happened while we are in the middle of an MFA challenge/response.
+            // the previously entered token is very likely expired, so prompt again
+            showMFAChallange(LLTrans::getString("LoginFailedAuthenticationMFARequired"));
+        }
+        else
+        {
+            reconnect();
+        }
+    }
+    else
+    {
+        LL_INFOS("LLLogin") << "LLLoginInstance::handleTOSResponse: attemptComplete" << LL_ENDL;
 
-	LLEventPumps::instance().obtain(TOS_REPLY_PUMP).stopListening(TOS_LISTENER_NAME);
-	return true;
+        attemptComplete();
+    }
+
+    LLEventPumps::instance().obtain(TOS_REPLY_PUMP).stopListening(TOS_LISTENER_NAME);
+    return true;
+}
+
+void LLLoginInstance::showMFAChallange(const std::string& message)
+{
+    LLSD args(llsd::map("MESSAGE", message));
+    LLSD payload;
+    if (gSavedSettings.getBOOL("RememberUser"))
+    {
+        LLNotificationsUtil::add("PromptMFATokenWithSave", args, payload,
+                                 boost::bind(&LLLoginInstance::handleMFAChallenge, this, _1, _2));
+    }
+    else
+    {
+        LLNotificationsUtil::add("PromptMFAToken", args, payload,
+                                 boost::bind(&LLLoginInstance::handleMFAChallenge, this, _1, _2));
+    }
+}
+
+bool LLLoginInstance::handleMFAChallenge(LLSD const & notif, LLSD const & response)
+{
+    bool continue_clicked = response["continue"].asBoolean();
+    std::string token = response["token"].asString();
+    LL_DEBUGS("LLLogin") << "PromptMFAToken: response: " << response << " continue_clicked" << continue_clicked << LL_ENDL;
+
+    // strip out whitespace - SL-17034/BUG-231938
+    token = boost::regex_replace(token, boost::regex("\\s"), "");
+
+    if (continue_clicked && !token.empty())
+    {
+        LL_INFOS("LLLogin") << "PromptMFAToken: token submitted" << LL_ENDL;
+
+        // Set the request data to true and retry login.
+        mRequestData["params"]["token"] = token;
+        mSaveMFA = response.has("ignore") ? response["ignore"].asBoolean() : false;
+        reconnect();
+    } else {
+        LL_INFOS("LLLogin") << "PromptMFAToken: no token, attemptComplete" << LL_ENDL;
+        attemptComplete();
+    }
+    return true;
+}
+
+void LLLoginInstance::attemptComplete()
+{
+	mAttemptComplete = true;
+	LLGridManager::getInstance()->setLoggedIn(mLoginState == LLStringExplicit("online")); 
 }
 
 std::string construct_start_string()

@@ -158,7 +158,7 @@ public:
 
 	// typedef std::map<std::string,std::pair<std::list<std::string>,std::list<std::string> > > DiffMap; // this version copies the lists etc., and thus is bad memory-wise
 	typedef std::list<std::string> StringList;
-	typedef boost::shared_ptr<StringList> StringListPtr;
+	typedef std::shared_ptr<StringList> StringListPtr;
 	typedef std::map<std::string, std::pair<StringListPtr,StringListPtr> > DiffMap;
 	DiffMap mDiffsMap;							// map, of filename to pair of list of changed element paths and list of errors
 
@@ -459,6 +459,7 @@ BOOL LLFloaterUIPreview::postBuild()
 	main_panel_tmp->getChild<LLButton>("save_floater")->setClickedCallback(boost::bind(&LLFloaterUIPreview::onClickSaveFloater, this, PRIMARY_FLOATER));
 	main_panel_tmp->getChild<LLButton>("save_all_floaters")->setClickedCallback(boost::bind(&LLFloaterUIPreview::onClickSaveAll, this, PRIMARY_FLOATER));
 
+	getChild<LLButton>("refresh_btn")->setClickedCallback(boost::bind(&LLFloaterUIPreview::refreshList, this));
 	getChild<LLButton>("export_schema")->setClickedCallback(boost::bind(&LLFloaterUIPreview::onClickExportSchema, this));
 	getChild<LLUICtrl>("show_rectangles")->setCommitCallback(
 		boost::bind(&LLFloaterUIPreview::onClickShowRectangles, this, _2));
@@ -1019,7 +1020,7 @@ void LLFloaterUIPreview::onClickEditFloater()
 void LLFloaterUIPreview::onClickBrowseForEditor()
 {
     // Let the user choose an executable through the file picker dialog box
-    (new LLFilePickerReplyThread(boost::bind(&LLFloaterUIPreview::getExecutablePath, this, _1), LLFilePicker::FFLOAD_EXE, false))->getFile();
+    LLFilePickerReplyThread::startPicker(boost::bind(&LLFloaterUIPreview::getExecutablePath, this, _1), LLFilePicker::FFLOAD_EXE, false);
 }
 
 void LLFloaterUIPreview::getExecutablePath(const std::vector<std::string>& filenames)
@@ -1073,7 +1074,7 @@ void LLFloaterUIPreview::getExecutablePath(const std::vector<std::string>& filen
 void LLFloaterUIPreview::onClickBrowseForDiffs()
 {
 	// create load dialog box
-    (new LLFilePickerReplyThread(boost::bind(&LLFloaterUIPreview::getDiffsFilePath, this, _1), LLFilePicker::FFLOAD_XML, false))->getFile();
+    LLFilePickerReplyThread::startPicker(boost::bind(&LLFloaterUIPreview::getDiffsFilePath, this, _1), LLFilePicker::FFLOAD_XML, false);
 }
 
 void LLFloaterUIPreview::getDiffsFilePath(const std::vector<std::string>& filenames)
@@ -1151,7 +1152,8 @@ void LLFloaterUIPreview::onClickToggleDiffHighlighting()
 						child->getAttributeString("message",error_message);
 						if(mDiffsMap.find(error_file) != mDiffsMap.end())
 						{
-							mDiffsMap.insert(std::make_pair(error_file,std::make_pair(StringListPtr(new StringList), StringListPtr(new StringList))));
+							mDiffsMap.insert(std::make_pair(error_file,std::make_pair(std::make_shared<StringList>(),
+                                                                                      std::make_shared<StringList>())));
 						}
 						mDiffsMap[error_file].second->push_back(error_message);
 					}
@@ -1213,7 +1215,7 @@ void LLFloaterUIPreview::scanDiffFile(LLXmlTreeNode* file_node)
 			child->getAttributeString("id",id);
 			if(mDiffsMap.find(file_name) == mDiffsMap.end())
 			{
-				mDiffsMap.insert(std::make_pair(file_name,std::make_pair(StringListPtr(new StringList), StringListPtr(new StringList))));
+				mDiffsMap.insert(std::make_pair(file_name,std::make_pair(std::make_shared<StringList>(), std::make_shared<StringList>())));
 			}
 			mDiffsMap[file_name].first->push_back(std::string(id.c_str()));
 		}

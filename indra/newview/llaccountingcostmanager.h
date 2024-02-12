@@ -58,8 +58,7 @@ public:
 	//Store an object that will be eventually fetched
 	void addObject( const LLUUID& objectID );
 	//Request quotas for object list
-	void fetchCosts( eSelectionType selectionType, const std::string& url,
-			const LLHandle<LLAccountingCostObserver>& observer_handle );
+	void fetchCosts( eSelectionType selectionType, const LLHandle<LLAccountingCostObserver>& observer_handle);
 	//Delete a specific object from the pending list
 	void removePendingObject( const LLUUID& objectID );
 	
@@ -70,7 +69,7 @@ private:
 	//a fetch has been instigated.
 	uuid_set_t mPendingObjectQuota;
 
-    void accountingCostCoro(std::string url, eSelectionType selectionType, const LLHandle<LLAccountingCostObserver> observerHandle);
+    void accountingCostCoro(std::string url, eSelectionType selectionType, const LLHandle<LLAccountingCostObserver> observerHandle, uuid_set_t object_list);
 
 };
 //===============================================================================

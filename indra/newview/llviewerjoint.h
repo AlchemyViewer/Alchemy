@@ -35,7 +35,6 @@
 
 class LLFace;
 class LLViewerJointMesh;
-class LLViewerJoint;
 
 //-----------------------------------------------------------------------------
 // class LLViewerJoint
@@ -50,8 +49,6 @@ public:
 	// *TODO: Only used for LLVOAvatarSelf::mScreenp.  *DOES NOT INITIALIZE mResetAfterRestoreOldXform*
 	LLViewerJoint(const std::string &name, LLJoint *parent = NULL);
 	virtual ~LLViewerJoint();
-
-	LLViewerJoint* asViewerJoint() override { return static_cast<LLViewerJoint*>(this); }
 
 	// Render character hierarchy.
 	// Traverses the entire joint hierarchy, setting up

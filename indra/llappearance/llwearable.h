@@ -33,7 +33,6 @@
 #include "llwearabletype.h"
 #include "llsortedvector.h"
 
-class LLMD5;
 class LLVisualParam;
 class LLTexGlobalColorInfo;
 class LLTexGlobalColor;
@@ -96,23 +95,20 @@ public:
 
 	void				setLocalTextureObject(S32 index, LLLocalTextureObject &lto);
 	void				addVisualParam(LLVisualParam *param);
-	void 				setVisualParamWeight(S32 index, F32 value);
+	void 				setVisualParamWeight(S32 index, F32 value, bool upload_bake);
 	F32					getVisualParamWeight(S32 index) const;
 	LLVisualParam*		getVisualParam(S32 index) const;
 	void				getVisualParams(visual_param_vec_t &list);
-	void				animateParams(F32 delta);
+	void				animateParams(F32 delta, bool upload_bake);
 
 	LLColor4			getClothesColor(S32 te) const;
-	void 				setClothesColor( S32 te, const LLColor4& new_color);
+	void 				setClothesColor( S32 te, const LLColor4& new_color, bool upload_bake);
 
 	virtual void		revertValues();
 	virtual void		saveValues();
 
 	// Something happened that requires the wearable to be updated (e.g. worn/unworn).
 	virtual void		setUpdated() const = 0;
-
-	// Update the baked texture hash.
-	virtual void		addToBakedTextureHash(LLMD5& hash) const = 0;
 
 	typedef LLSortedVector<S32, LLVisualParam *>    visual_param_index_map_t;
 	visual_param_index_map_t mVisualParamIndexMap;

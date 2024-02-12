@@ -239,7 +239,7 @@ std::string currentOsName()
 	return "Windows";
 #elif LL_DARWIN
 	return "Mac";
-#elif LL_SDL || LL_MESA_HEADLESS
+#elif LL_LINUX
 	return "Linux";
 #else
 	return "";
@@ -351,7 +351,15 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
 			if (child->getAttributeString("name",size_name) &&
 				child->getAttributeF32("size",size_value))
 			{
-				registry->mFontSizes[size_name] = size_value;
+// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
+				std::string font_name;
+				// The default font size will be stored under an empty string; named fonts can specify their own custom sizes
+				if ( (!child->hasAttribute("font")) || (child->getAttributeString("font", font_name)) )
+				{
+					registry->mFontSizes[std::pair<std::string, std::string>(font_name, size_name)] = size_value;
+				}
+// [/SL:KB]
+//				registry->mFontSizes[size_name] = size_value;
 			}
 
 		}
@@ -359,14 +367,26 @@ bool init_from_xml(LLFontRegistry* registry, LLXMLNodePtr node)
 	return true;
 }
 
-bool LLFontRegistry::nameToSize(const std::string& size_name, F32& size)
+//bool LLFontRegistry::nameToSize(const std::string& size_name, F32& size)
+// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
+bool LLFontRegistry::nameToSize(const std::string& font_name, const std::string& size_name, F32& size)
+// [/SL:KB]
 {
-	font_size_map_t::iterator it = mFontSizes.find(size_name);
+//	font_size_map_t::iterator it = mFontSizes.find(size_name);
+// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
+	font_size_map_t::iterator it = mFontSizes.find(std::pair<std::string, std::string>(font_name, size_name));
+// [/SL:KB]
 	if (it != mFontSizes.end())
 	{
 		size = it->second;
 		return true;
 	}
+// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
+	if (!font_name.empty())
+	{
+		return nameToSize(LLStringUtil::null, size_name, size);
+	}
+// [/SL:KB]
 	return false;
 }
 
@@ -381,7 +401,10 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
 	// First decipher the requested size.
 	LLFontDescriptor norm_desc = desc.normalize();
 	F32 point_size;
-	bool found_size = nameToSize(norm_desc.getSize(),point_size);
+//	bool found_size = nameToSize(norm_desc.getSize(),point_size);
+// [SL:KB] - Patch: UI-Font | Checked: 2012-10-10 (Catznip-3.3)
+	bool found_size = nameToSize(norm_desc.getName(), norm_desc.getSize(), point_size);
+// [/SL:KB]
 	if (!found_size)
 	{
 		LL_WARNS() << "createFont unrecognized size " << norm_desc.getSize() << LL_ENDL;
@@ -597,6 +620,11 @@ LLFontGL *LLFontRegistry::getFont(const LLFontDescriptor& desc)
 					<<" style=[" << ((S32) desc.getStyle()) << "]"
 					<< " size=[" << desc.getSize() << "]" << LL_ENDL;
 		}
+		else
+		{
+			//generate glyphs for ASCII chars to avoid stalls later
+			fontp->generateASCIIglyphs();
+		}
 		return fontp;
 	}
 }
@@ -703,7 +731,10 @@ void LLFontRegistry::dump()
 		 size_it != mFontSizes.end();
 		 ++size_it)
 	{
-		LL_INFOS() << "Size: " << size_it->first << " => " << size_it->second << LL_ENDL;
+// [SL:KB] - Patch: UI-Font | Checked: 2012-10-08 (Catznip-3.3)
+		LL_INFOS() << "Size: <" << size_it->first.first << "," << size_it->first.second << "> => " << size_it->second << LL_ENDL;
+// [/SL:KB]
+//		LL_INFOS() << "Size: " << size_it->first << " => " << size_it->second << LL_ENDL;
 	}
 	for (font_reg_map_t::iterator font_it = mFontMap.begin();
 		 font_it != mFontMap.end();

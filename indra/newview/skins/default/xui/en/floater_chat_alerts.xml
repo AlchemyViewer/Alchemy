@@ -141,6 +141,7 @@
     Play sound :
   </text>
   <line_editor
+   mouse_opaque="false"
    enabled="false"
    follows="bottom|left|right"
    halign="center"

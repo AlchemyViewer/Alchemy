@@ -29,8 +29,7 @@
 #define LL_STATIC_STRING_TABLE_H
 
 #include "lldefs.h"
-#include "absl/hash/hash.h"
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 #include "llstl.h"
 
 class LLStaticHashedString
@@ -52,7 +51,7 @@ protected:
 
 	size_t makehash(const std::string& s)
 	{
-		return absl::Hash<std::string>{}(s);
+		return boost::hash<std::string>{}(s);
 	}
 
 	std::string string;
@@ -66,7 +65,7 @@ struct LLStaticStringHasher
 };
 
 template< typename MappedObject >
-using LLStaticStringTable = absl::flat_hash_map<LLStaticHashedString, MappedObject, LLStaticStringHasher>;
+using LLStaticStringTable = boost::unordered_flat_map<LLStaticHashedString, MappedObject, LLStaticStringHasher>;
 
 #endif
 

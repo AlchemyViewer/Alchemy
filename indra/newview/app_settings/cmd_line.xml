@@ -55,7 +55,7 @@
     <key>debugsession</key>
     <map>
       <key>desc</key>
-      <string>Run as if RenderDebugGL is TRUE, but log errors until end of session.</string>
+      <string>Run as if RenderDebugGLSession is TRUE, but log errors until end of session.</string>
       <key>map-to</key>
       <string>DebugSession</string>
     </map>
@@ -207,14 +207,20 @@
     <map>
       <key>map-to</key>
       <string>NoAudio</string>
-    </map>    
+    </map>
 
-    <key>noinvlib</key>
+    <key>nofmod</key>
+    <map>
+      <key>map-to</key>
+      <string>UseMediaPluginsForStreamingAudio</string>
+    </map>
+
+    <key>noninteractive</key>
     <map>
       <key>desc</key>
-      <string>Do not request the inventory library.</string>
+      <string>Run in semi-headless mode where only login and logout need to work.</string>
       <key>map-to</key>
-      <string>NoInventoryLibrary</string>
+      <string>NonInteractive</string>
     </map>
 
     <key>nonotifications</key>
@@ -415,6 +421,5 @@
       <key>map-to</key>
       <string>CmdLineSkipUpdater</string>
     </map>
-
   </map>
 </llsd>

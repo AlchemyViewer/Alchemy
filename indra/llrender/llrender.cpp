@@ -37,15 +37,37 @@
 #include "llshadermgr.h"
 #include "llmatrix4a.h"
 #include "alglmath.h"
+#include "hbxxh.h"
 
-LLRender gGL;
+#if GL_ARB_debug_output
+#ifndef APIENTRY
+#define APIENTRY
+#endif
+
+extern void APIENTRY gl_debug_callback(GLenum source,
+                                GLenum type,
+                                GLuint id,
+                                GLenum severity,
+                                GLsizei length,
+                                const GLchar* message,
+                                GLvoid* userParam)
+;
+#endif
+
+thread_local LLRender gGL;
 
 // Handy copies of last good GL matrices
 LLMatrix4a	gGLModelView;
 LLMatrix4a	gGLLastModelView;
 LLMatrix4a	gGLLastProjection;
 LLMatrix4a	gGLProjection;
+
+// transform from last frame's camera space to this frame's camera space (and inverse)
+LLMatrix4a gGLDeltaModelView;
+LLMatrix4a gGLInverseDeltaModelView;
+
 S32			gGLViewport[4];
+
 
 U32 LLRender::sUICalls = 0;
 U32 LLRender::sUIVerts = 0;
@@ -55,14 +77,20 @@ bool LLRender::sGLCoreProfile = false;
 bool LLRender::sNsightDebugSupport = false;
 LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 
-static const U32 LL_NUM_TEXTURE_LAYERS = 32; 
-static const U32 LL_NUM_LIGHT_UNITS = 8;
+struct LLVBCache
+{
+    LLPointer<LLVertexBuffer> vb;
+    std::chrono::steady_clock::time_point touched;
+};
+
+static boost::unordered_map<U64, LLVBCache> sVBCache;
 
 static const GLenum sGLTextureType[] =
 {
 	GL_TEXTURE_2D,
 	GL_TEXTURE_RECTANGLE,
 	GL_TEXTURE_CUBE_MAP,
+    GL_TEXTURE_CUBE_MAP_ARRAY,
 	GL_TEXTURE_2D_MULTISAMPLE,
     GL_TEXTURE_3D
 };
@@ -72,18 +100,6 @@ static const GLint sGLAddressMode[] =
 	GL_REPEAT,
 	GL_MIRRORED_REPEAT,
 	GL_CLAMP_TO_EDGE
-};
-
-static const GLenum sGLCompareFunc[] =
-{
-	GL_NEVER,
-	GL_ALWAYS,
-	GL_LESS,
-	GL_LEQUAL,
-	GL_EQUAL,
-	GL_NOTEQUAL,
-	GL_GEQUAL,
-	GL_GREATER
 };
 
 const U32 immediate_mask = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_TEXCOORD0;
@@ -105,11 +121,8 @@ static const GLenum sGLBlendFactor[] =
 };
 
 LLTexUnit::LLTexUnit(S32 index)
-	: mCurrTexType(TT_NONE), mCurrBlendType(TB_MULT), 
-	mCurrColorOp(TBO_MULT), mCurrAlphaOp(TBO_MULT),
-	mCurrColorSrc1(TBS_TEX_COLOR), mCurrColorSrc2(TBS_PREV_COLOR),
-	mCurrAlphaSrc1(TBS_TEX_ALPHA), mCurrAlphaSrc2(TBS_PREV_ALPHA),
-    mCurrColorScale(1), mCurrAlphaScale(1), mCurrTexture(0), mTexColorSpace(TCS_SRGB),
+	: mCurrTexType(TT_NONE),
+    mCurrColorScale(1), mCurrAlphaScale(1), mCurrTexture(0),
 	mHasMipMaps(false),
 	mIndex(index)
 {
@@ -131,43 +144,14 @@ void LLTexUnit::refreshState(void)
 	
 	glActiveTexture(GL_TEXTURE0 + mIndex);
 
-	//
-	// Per apple spec, don't call glEnable/glDisable when index exceeds max texture units
-	// http://www.mailinglistarchive.com/html/mac-opengl@lists.apple.com/2008-07/msg00653.html
-	//
-	bool enableDisable = !LLGLSLShader::sNoFixedFunction && 
-		(mIndex < gGLManager.mNumTextureUnits) && mCurrTexType != LLTexUnit::TT_MULTISAMPLE_TEXTURE;
-		
 	if (mCurrTexType != TT_NONE)
 	{
-		if (enableDisable)
-		{
-			glEnable(sGLTextureType[mCurrTexType]);
-		}
-		
 		glBindTexture(sGLTextureType[mCurrTexType], mCurrTexture);
 	}
 	else
 	{
-		if (enableDisable)
-		{
-			glDisable(GL_TEXTURE_2D);
-		}
-		
 		glBindTexture(GL_TEXTURE_2D, 0);	
 	}
-
-	if (mCurrBlendType != TB_COMBINE)
-	{
-		setTextureBlendType(mCurrBlendType);
-	}
-	else
-	{
-		setTextureCombiner(mCurrColorOp, mCurrColorSrc1, mCurrColorSrc2, false);
-		setTextureCombiner(mCurrAlphaOp, mCurrAlphaSrc1, mCurrAlphaSrc2, true);
-	}
-
-    setTextureColorSpace(mTexColorSpace);
 }
 
 void LLTexUnit::activate(void)
@@ -188,25 +172,14 @@ void LLTexUnit::enable(eTextureType type)
 
 	if ( (mCurrTexType != type || gGL.mDirty) && (type != TT_NONE) )
 	{
-		stop_glerror();
 		activate();
-		stop_glerror();
 		if (mCurrTexType != TT_NONE && !gGL.mDirty)
 		{
 			disable(); // Force a disable of a previous texture type if it's enabled.
-			stop_glerror();
 		}
 		mCurrTexType = type;
 
 		gGL.flush();
-		if (!LLGLSLShader::sNoFixedFunction && 
-			type != LLTexUnit::TT_MULTISAMPLE_TEXTURE &&
-			mIndex < gGLManager.mNumTextureUnits)
-		{
-			stop_glerror();
-			glEnable(sGLTextureType[type]);
-			stop_glerror();
-		}
 	}
 }
 
@@ -216,24 +189,33 @@ void LLTexUnit::disable(void)
 
 	if (mCurrTexType != TT_NONE)
 	{
-		activate();
 		unbind(mCurrTexType);
-		gGL.flush();
-		if (!LLGLSLShader::sNoFixedFunction &&
-			mCurrTexType != LLTexUnit::TT_MULTISAMPLE_TEXTURE &&
-			mIndex < gGLManager.mNumTextureUnits)
-		{
-			glDisable(sGLTextureType[mCurrTexType]);
-		}
-
-        setTextureColorSpace(TCS_SRGB);
-		
 		mCurrTexType = TT_NONE;
 	}
 }
 
+void LLTexUnit::bindFast(LLTexture* texture)
+{
+    LLImageGL* gl_tex = texture->getGLTexture();
+    texture->setActive();
+    glActiveTexture(GL_TEXTURE0 + mIndex);
+    gGL.mCurrTextureUnitIndex = mIndex;
+    mCurrTexture = gl_tex->getTexName();
+    if (!mCurrTexture)
+    {
+        LL_PROFILE_ZONE_NAMED("MISSING TEXTURE");
+        //if deleted, will re-generate it immediately
+        texture->forceImmediateUpdate();
+        gl_tex->forceUpdateBindStats();
+        texture->bindDefaultImage(mIndex);
+    }
+    glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
+    mHasMipMaps = gl_tex->mHasMipMaps;
+}
+
 bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 	stop_glerror();
 	if (mIndex >= 0)
 	{
@@ -252,7 +234,7 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 					enable(gl_tex->getTarget());
 					mCurrTexture = gl_tex->getTexName();
 					glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
-					if(gl_tex->updateBindStats(gl_tex->mTextureMemory))
+					if(gl_tex->updateBindStats())
 					{
 						texture->setActive() ;
 						texture->updateBindStatsForTester() ;
@@ -264,7 +246,6 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 						setTextureAddressMode(gl_tex->mAddressMode);
 						setTextureFilteringOption(gl_tex->mFilterOption);
                     }
-                    setTextureColorSpace(mTexColorSpace);
 				}
 			}
 			else
@@ -278,6 +259,7 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 		}
 		else
 		{
+#if SHOW_DEBUG
 			if (texture)
 			{
 				LL_DEBUGS() << "NULL LLTexUnit::bind GL image" << LL_ENDL;
@@ -286,6 +268,7 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 			{
 				LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
 			}
+#endif
 			return false;
 		}
 	}
@@ -297,18 +280,22 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
 	return true;
 }
 
-bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind)
+bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32 usename)
 {
 	stop_glerror();
 	if (mIndex < 0) return false;
 
+    U32 texname = usename ? usename : texture->getTexName();
+
 	if(!texture)
 	{
+#if SHOW_DEBUG
 		LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
+#endif
 		return false;
 	}
 
-	if(!texture->getTexName())
+	if(!texname)
 	{
 		if(LLImageGL::sDefaultGLTexture && LLImageGL::sDefaultGLTexture->getTexName())
 		{
@@ -318,7 +305,7 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind)
 		return false ;
 	}
 
-	if ((mCurrTexture != texture->getTexName()) || forceBind)
+	if ((mCurrTexture != texname) || forceBind)
 	{
 		gGL.flush();
 		stop_glerror();
@@ -326,10 +313,10 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind)
 		stop_glerror();
 		enable(texture->getTarget());
 		stop_glerror();
-		mCurrTexture = texture->getTexName();
+		mCurrTexture = texname;
 		glBindTexture(sGLTextureType[texture->getTarget()], mCurrTexture);
 		stop_glerror();
-		texture->updateBindStats(texture->mTextureMemory);		
+        texture->updateBindStats();
 		mHasMipMaps = texture->mHasMipMaps;
 		if (texture->mTexOptionsDirty)
 		{
@@ -339,7 +326,6 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind)
 			setTextureFilteringOption(texture->mFilterOption);
 			stop_glerror();
 		}
-        setTextureColorSpace(mTexColorSpace);
 	}
 
 	stop_glerror();
@@ -361,21 +347,20 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap)
 
 	if (mCurrTexture != cubeMap->mImages[0]->getTexName())
 	{
-		if (gGLManager.mHasCubeMap && LLCubeMap::sUseCubeMaps)
+		if (LLCubeMap::sUseCubeMaps)
 		{
 			activate();
 			enable(LLTexUnit::TT_CUBE_MAP);
             mCurrTexture = cubeMap->mImages[0]->getTexName();
 			glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
 			mHasMipMaps = cubeMap->mImages[0]->mHasMipMaps;
-			cubeMap->mImages[0]->updateBindStats(cubeMap->mImages[0]->mTextureMemory);
+			cubeMap->mImages[0]->updateBindStats();
 			if (cubeMap->mImages[0]->mTexOptionsDirty)
 			{
 				cubeMap->mImages[0]->mTexOptionsDirty = false;
 				setTextureAddressMode(cubeMap->mImages[0]->mAddressMode);
 				setTextureFilteringOption(cubeMap->mImages[0]->mFilterOption);
             }
-            setTextureColorSpace(mTexColorSpace);
 			return true;
 		}
 		else
@@ -396,10 +381,7 @@ bool LLTexUnit::bind(LLRenderTarget* renderTarget, bool bindDepth)
 
 	if (bindDepth)
 	{
-		if (renderTarget->hasStencil())
-		{
-			LL_ERRS() << "Cannot bind a render buffer for sampling.  Allocate render target without a stencil buffer if sampling of depth buffer is required." << LL_ENDL;
-		}
+        llassert(renderTarget->getDepth()); // target MUST have a depth buffer attachment
 
 		bindManual(renderTarget->getUsage(), renderTarget->getDepth());
 	}
@@ -427,7 +409,6 @@ bool LLTexUnit::bindManual(eTextureType type, U32 texture, bool hasMips)
 		mCurrTexture = texture;
 		glBindTexture(sGLTextureType[type], texture);
         mHasMipMaps = hasMips;
-        setTextureColorSpace(mTexColorSpace);
 	}
 	return true;
 }
@@ -448,9 +429,7 @@ void LLTexUnit::unbind(eTextureType type)
 	{
 		mCurrTexture = 0;
 
-        // Always make sure our texture color space is reset to linear.  SRGB sampling should be opt-in in the vast majority of cases.  Also prevents color space "popping".
-        mTexColorSpace = TCS_SRGB;
-		if (LLGLSLShader::sNoFixedFunction && type == LLTexUnit::TT_TEXTURE)
+		if (type == LLTexUnit::TT_TEXTURE)
 		{
 			glBindTexture(sGLTextureType[type], sWhiteTexture);
 		}
@@ -460,6 +439,26 @@ void LLTexUnit::unbind(eTextureType type)
 		}
 		stop_glerror();
 	}
+}
+
+void LLTexUnit::unbindFast(eTextureType type)
+{
+    activate();
+
+    // Disabled caching of binding state.
+    if (mCurrTexType == type)
+    {
+        mCurrTexture = 0;
+
+        if (type == LLTexUnit::TT_TEXTURE)
+        {
+            glBindTexture(sGLTextureType[type], sWhiteTexture);
+        }
+        else
+        {
+            glBindTexture(sGLTextureType[type], 0);
+        }
+    }
 }
 
 void LLTexUnit::setTextureAddressMode(eTextureAddressMode mode)
@@ -472,9 +471,9 @@ void LLTexUnit::setTextureAddressMode(eTextureAddressMode mode)
 
 	glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_S, sGLAddressMode[mode]);
 	glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_T, sGLAddressMode[mode]);
-	if (mCurrTexType == TT_CUBE_MAP)
+	if (mCurrTexType == TT_CUBE_MAP || mCurrTexType == TT_TEXTURE_3D)
 	{
-		glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
+		glTexParameteri (sGLTextureType[mCurrTexType], GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
 	}
 }
 
@@ -520,67 +519,18 @@ void LLTexUnit::setTextureFilteringOption(LLTexUnit::eTextureFilterOptions optio
 		}
 	}
 
-	if (gGLManager.mHasAnisotropic)
+	if (gGLManager.mHasTextureFilterAnisotropic)
 	{
 		if (option == TFO_ANISOTROPIC && LLRender::sAnisotropicFilteringLevel > 1.f)
 		{
-			F32 aniso_level = llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mGLMaxAnisotropy);
-			glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso_level);
+			F32 aniso_level = llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mMaxAnisotropy);
+			glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY, aniso_level);
 		}
 		else
 		{
-			glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.f);
+			glTexParameterf(sGLTextureType[mCurrTexType], GL_TEXTURE_MAX_ANISOTROPY, 1.f);
 		}
 	}
-}
-
-void LLTexUnit::setTextureBlendType(eTextureBlendType type)
-{
-	if (LLGLSLShader::sNoFixedFunction)
-	{ //texture blend type means nothing when using shaders
-		return;
-	}
-
-	if (mIndex < 0) return;
-
-	// Do nothing if it's already correctly set.
-	if (mCurrBlendType == type && !gGL.mDirty)
-	{
-		return;
-	}
-
-	gGL.flush();
-
-	activate();
-	mCurrBlendType = type;
-	S32 scale_amount = 1;
-	switch (type) 
-	{
-		case TB_REPLACE:
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-			break;
-		case TB_ADD:
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_ADD);
-			break;
-		case TB_MULT:
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-			break;
-		case TB_MULT_X2:
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-			scale_amount = 2;
-			break;
-		case TB_ALPHA_BLEND:
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
-			break;
-		case TB_COMBINE:
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
-			break;
-		default:
-			LL_ERRS() << "Unknown Texture Blend Type: " << type << LL_ENDL;
-			break;
-	}
-	setColorScale(scale_amount);
-	setAlphaScale(1);
 }
 
 GLint LLTexUnit::getTextureSource(eTextureBlendSrc src)
@@ -659,159 +609,6 @@ GLint LLTexUnit::getTextureSourceType(eTextureBlendSrc src, bool isAlpha)
 	}
 }
 
-void LLTexUnit::setTextureCombiner(eTextureBlendOp op, eTextureBlendSrc src1, eTextureBlendSrc src2, bool isAlpha)
-{
-	if (LLGLSLShader::sNoFixedFunction)
-	{ //register combiners do nothing when not using fixed function
-		return;
-	}	
-
-	if (mIndex < 0) return;
-
-	activate();
-	if (mCurrBlendType != TB_COMBINE || gGL.mDirty)
-	{
-		mCurrBlendType = TB_COMBINE;
-		gGL.flush();
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
-	}
-	
-	// We want an early out, because this function does a LOT of stuff.
-	if ( ( (isAlpha && (mCurrAlphaOp == op) && (mCurrAlphaSrc1 == src1) && (mCurrAlphaSrc2 == src2))
-			|| (!isAlpha && (mCurrColorOp == op) && (mCurrColorSrc1 == src1) && (mCurrColorSrc2 == src2)) ) && !gGL.mDirty)
-	{
-		return;
-	}
-
-	gGL.flush();
-
-	// Get the gl source enums according to the eTextureBlendSrc sources passed in
-	GLint source1 = getTextureSource(src1);
-	GLint source2 = getTextureSource(src2);
-	// Get the gl operand enums according to the eTextureBlendSrc sources passed in
-	GLint operand1 = getTextureSourceType(src1, isAlpha);
-	GLint operand2 = getTextureSourceType(src2, isAlpha);
-	// Default the scale amount to 1
-	S32 scale_amount = 1;
-	GLenum comb_enum, src0_enum, src1_enum, src2_enum, operand0_enum, operand1_enum, operand2_enum;
-	
-	if (isAlpha)
-	{
-		// Set enums to ALPHA ones
-		comb_enum = GL_COMBINE_ALPHA;
-		src0_enum = GL_SOURCE0_ALPHA;
-		src1_enum = GL_SOURCE1_ALPHA;
-		src2_enum = GL_SOURCE2_ALPHA;
-		operand0_enum = GL_OPERAND0_ALPHA;
-		operand1_enum = GL_OPERAND1_ALPHA;
-		operand2_enum = GL_OPERAND2_ALPHA;
-
-		// cache current combiner
-		mCurrAlphaOp = op;
-		mCurrAlphaSrc1 = src1;
-		mCurrAlphaSrc2 = src2;
-	}
-	else 
-	{
-		// Set enums to RGB ones
-		comb_enum = GL_COMBINE_RGB;
-		src0_enum = GL_SOURCE0_RGB;
-		src1_enum = GL_SOURCE1_RGB;
-		src2_enum = GL_SOURCE2_RGB;
-		operand0_enum = GL_OPERAND0_RGB;
-		operand1_enum = GL_OPERAND1_RGB;
-		operand2_enum = GL_OPERAND2_RGB;
-
-		// cache current combiner
-		mCurrColorOp = op;
-		mCurrColorSrc1 = src1;
-		mCurrColorSrc2 = src2;
-	}
-
-	switch(op)
-	{
-		case TBO_REPLACE:
-			// Slightly special syntax (no second sources), just set all and return.
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_REPLACE);
-			glTexEnvi(GL_TEXTURE_ENV, src0_enum, source1);
-			glTexEnvi(GL_TEXTURE_ENV, operand0_enum, operand1);
-			(isAlpha) ? setAlphaScale(1) : setColorScale(1);
-			return;
-
-		case TBO_MULT:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_MODULATE);
-			break;
-
-		case TBO_MULT_X2:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_MODULATE);
-			scale_amount = 2;
-			break;
-
-		case TBO_MULT_X4:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_MODULATE);
-			scale_amount = 4;
-			break;
-
-		case TBO_ADD:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_ADD);
-			break;
-
-		case TBO_ADD_SIGNED:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_ADD_SIGNED);
-			break;
-
-		case TBO_SUBTRACT:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_SUBTRACT);
-			break;
-
-		case TBO_LERP_VERT_ALPHA:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_INTERPOLATE);
-			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_PRIMARY_COLOR);
-			glTexEnvi(GL_TEXTURE_ENV, operand2_enum, GL_SRC_ALPHA);
-			break;
-
-		case TBO_LERP_TEX_ALPHA:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_INTERPOLATE);
-			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_TEXTURE);
-			glTexEnvi(GL_TEXTURE_ENV, operand2_enum, GL_SRC_ALPHA);
-			break;
-
-		case TBO_LERP_PREV_ALPHA:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_INTERPOLATE);
-			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_PREVIOUS);
-			glTexEnvi(GL_TEXTURE_ENV, operand2_enum, GL_SRC_ALPHA);
-			break;
-
-		case TBO_LERP_CONST_ALPHA:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_INTERPOLATE);
-			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_CONSTANT);
-			glTexEnvi(GL_TEXTURE_ENV, operand2_enum, GL_SRC_ALPHA);
-			break;
-
-		case TBO_LERP_VERT_COLOR:
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_INTERPOLATE);
-			glTexEnvi(GL_TEXTURE_ENV, src2_enum, GL_PRIMARY_COLOR);
-			glTexEnvi(GL_TEXTURE_ENV, operand2_enum, (isAlpha) ? GL_SRC_ALPHA : GL_SRC_COLOR);
-			break;
-
-		default:
-			LL_WARNS() << "Unknown eTextureBlendOp: " << op << ".  Setting op to replace." << LL_ENDL;
-			// Slightly special syntax (no second sources), just set all and return.
-			glTexEnvi(GL_TEXTURE_ENV, comb_enum, GL_REPLACE);
-			glTexEnvi(GL_TEXTURE_ENV, src0_enum, source1);
-			glTexEnvi(GL_TEXTURE_ENV, operand0_enum, operand1);
-			(isAlpha) ? setAlphaScale(1) : setColorScale(1);
-			return;
-	}
-
-	// Set sources, operands, and scale accordingly
-	glTexEnvi(GL_TEXTURE_ENV, src0_enum, source1);
-	glTexEnvi(GL_TEXTURE_ENV, operand0_enum, operand1);
-	glTexEnvi(GL_TEXTURE_ENV, src1_enum, source2);
-	glTexEnvi(GL_TEXTURE_ENV, operand1_enum, operand2);
-	(isAlpha) ? setAlphaScale(scale_amount) : setColorScale(scale_amount);
-}
-
 void LLTexUnit::setColorScale(S32 scale)
 {
 	if (mCurrColorScale != scale || gGL.mDirty)
@@ -847,28 +644,6 @@ void LLTexUnit::debugTextureUnit(void)
 	}
 }
 
-void LLTexUnit::setTextureColorSpace(eTextureColorSpace space)
-{
-    mTexColorSpace = space;
-
-    if (gGLManager.mHasTexturesRGBDecode)
-    {
-        if (space == TCS_LINEAR)
-        {
-            glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_SRGB_DECODE_EXT, GL_DECODE_EXT);
-        }
-        else
-        {
-            glTexParameteri(sGLTextureType[mCurrTexType], GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
-        }
-
-        if (gDebugGL)
-        {
-			stop_glerror();
-        }
-    }
-}
-
 LLLightState::LLLightState(S32 index)
 : mIndex(index),
   mEnabled(false),
@@ -894,26 +669,12 @@ LLLightState::LLLightState(S32 index)
 
 void LLLightState::enable()
 {
-	if (!mEnabled)
-	{
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glEnable(GL_LIGHT0+mIndex);
-		}
-		mEnabled = true;
-	}
+	mEnabled = true;
 }
 
 void LLLightState::disable()
 {
-	if (mEnabled)
-	{
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glDisable(GL_LIGHT0+mIndex);
-		}
-		mEnabled = false;
-	}
+	mEnabled = false;
 }
 
 void LLLightState::setDiffuse(const LLColor4& diffuse)
@@ -922,10 +683,6 @@ void LLLightState::setDiffuse(const LLColor4& diffuse)
 	{
 		++gGL.mLightHash;
 		mDiffuse = diffuse;
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glLightfv(GL_LIGHT0+mIndex, GL_DIFFUSE, mDiffuse.mV);
-		}
 	}
 }
 
@@ -947,16 +704,30 @@ void LLLightState::setSunPrimary(bool v)
     }
 }
 
+void LLLightState::setSize(F32 v)
+{
+    if (mSize != v)
+    {
+        ++gGL.mLightHash;
+        mSize = v;
+    }
+}
+
+void LLLightState::setFalloff(F32 v)
+{
+    if (mFalloff != v)
+    {
+        ++gGL.mLightHash;
+        mFalloff = v;
+    }
+}
+
 void LLLightState::setAmbient(const LLColor4& ambient)
 {
 	if (mAmbient != ambient)
 	{
 		++gGL.mLightHash;
 		mAmbient = ambient;
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glLightfv(GL_LIGHT0+mIndex, GL_AMBIENT, mAmbient.mV);
-		}
 	}
 }
 
@@ -966,10 +737,6 @@ void LLLightState::setSpecular(const LLColor4& specular)
 	{
 		++gGL.mLightHash;
 		mSpecular = specular;
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glLightfv(GL_LIGHT0+mIndex, GL_SPECULAR, mSpecular.mV);
-		}
 	}
 }
 
@@ -978,20 +745,11 @@ void LLLightState::setPosition(const LLVector4& position)
 	//always set position because modelview matrix may have changed
 	++gGL.mLightHash;
 	mPosition = position;
-	if (!LLGLSLShader::sNoFixedFunction)
-	{
-		glLightfv(GL_LIGHT0+mIndex, GL_POSITION, mPosition.mV);
-	}
-	else
-	{ //transform position by current modelview matrix
-		LLVector4a pos;
-		pos.loadua(position.mV);
-
-		gGL.getModelviewMatrix().rotate4(pos,pos);
-
-		mPosition.set(pos.getF32ptr());
-	}
-
+	//transform position by current modelview matrix
+	LLVector4a pos;
+	pos.loadua(position.mV);
+	gGL.getModelviewMatrix().rotate4(pos,pos);
+	mPosition.set(pos.getF32ptr());
 }
 
 void LLLightState::setConstantAttenuation(const F32& atten)
@@ -1000,10 +758,6 @@ void LLLightState::setConstantAttenuation(const F32& atten)
 	{
 		mConstantAtten = atten;
 		++gGL.mLightHash;
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glLightf(GL_LIGHT0+mIndex, GL_CONSTANT_ATTENUATION, atten);
-		}
 	}
 }
 
@@ -1013,10 +767,6 @@ void LLLightState::setLinearAttenuation(const F32& atten)
 	{
 		++gGL.mLightHash;
 		mLinearAtten = atten;
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glLightf(GL_LIGHT0+mIndex, GL_LINEAR_ATTENUATION, atten);
-		}
 	}
 }
 
@@ -1026,10 +776,6 @@ void LLLightState::setQuadraticAttenuation(const F32& atten)
 	{
 		++gGL.mLightHash;
 		mQuadraticAtten = atten;
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glLightf(GL_LIGHT0+mIndex, GL_QUADRATIC_ATTENUATION, atten);
-		}
 	}
 }
 
@@ -1039,10 +785,6 @@ void LLLightState::setSpotExponent(const F32& exponent)
 	{
 		++gGL.mLightHash;
 		mSpotExponent = exponent;
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glLightf(GL_LIGHT0+mIndex, GL_SPOT_EXPONENT, exponent);
-		}
 	}
 }
 
@@ -1052,10 +794,6 @@ void LLLightState::setSpotCutoff(const F32& cutoff)
 	{
 		++gGL.mLightHash;
 		mSpotCutoff = cutoff;
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glLightf(GL_LIGHT0+mIndex, GL_SPOT_CUTOFF, cutoff);
-		}
 	}
 }
 
@@ -1064,19 +802,12 @@ void LLLightState::setSpotDirection(const LLVector3& direction)
 	//always set direction because modelview matrix may have changed
 	++gGL.mLightHash;
 	mSpotDirection = direction;
-	if (!LLGLSLShader::sNoFixedFunction)
-	{
-		glLightfv(GL_LIGHT0+mIndex, GL_SPOT_DIRECTION, direction.mV);
-	}
-	else
-	{ //transform direction by current modelview matrix
-		LLVector4a dir;
-		dir.load3(direction.mV);
+	//transform direction by current modelview matrix
+	LLVector4a dir;
+	dir.load3(direction.mV);
+	gGL.getModelviewMatrix().rotate(dir,dir);
 
-		gGL.getModelviewMatrix().rotate(dir,dir);
-
-		mSpotDirection.set(dir.getF32ptr());
-	}
+	mSpotDirection.set(dir.getF32ptr());
 }
 
 LLRender::LLRender()
@@ -1087,16 +818,14 @@ LLRender::LLRender()
     mLineWidth(1.f),
 	mPrimitiveReset(false)
 {	
-	mTexUnits.reserve(LL_NUM_TEXTURE_LAYERS);
 	for (U32 i = 0; i < LL_NUM_TEXTURE_LAYERS; i++)
 	{
-		mTexUnits.push_back(new LLTexUnit(i));
+        mTexUnits[i].mIndex = i;
 	}
-	mDummyTexUnit = new LLTexUnit(-1);
 
 	for (U32 i = 0; i < LL_NUM_LIGHT_UNITS; ++i)
 	{
-		mLightState.push_back(new LLLightState(i));
+        mLightState[i].mIndex = i;
 	}
 
 	for (U32 i = 0; i < 4; i++)
@@ -1104,8 +833,6 @@ LLRender::LLRender()
 		mCurrColorMask[i] = true;
 	}
 
-	mCurrAlphaFunc = CF_DEFAULT;
-	mCurrAlphaFuncVal = 0.01f;
 	mCurrBlendColorSFactor = BF_UNDEF;
 	mCurrBlendAlphaSFactor = BF_UNDEF;
 	mCurrBlendColorDFactor = BF_UNDEF;
@@ -1123,7 +850,7 @@ LLRender::LLRender()
 	mLightHash = 0;
 	
 	//Init base matrix for each mode
-	for(S32 i = 0; i < NUM_MATRIX_MODES; ++i)
+	for(U32 i = 0; i < NUM_MATRIX_MODES; ++i)
 	{
 		mMatrix[i][0].setIdentity();
 	}
@@ -1135,28 +862,58 @@ LLRender::~LLRender()
 	shutdown();
 }
 
-void LLRender::init()
+void LLRender::init(bool needs_vertex_buffer)
 {
-	restoreVertexBuffers();
+#if GL_ARB_debug_output && !LL_DARWIN
+    if (gGLManager.mHasDebugOutput && gDebugGL)
+    { //setup debug output callback
+        //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW_ARB, 0, NULL, GL_TRUE);
+        glDebugMessageCallback((GLDEBUGPROC) gl_debug_callback, NULL);
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    }
+#endif
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    gGL.setAmbientLightColor(LLColor4::black);
+
+    glCullFace(GL_BACK);
+
+    // necessary for reflection maps
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+    if (needs_vertex_buffer)
+    {
+        initVertexBuffer();
+    }
+}
+
+void LLRender::initVertexBuffer()
+{
+	llassert_always(mBuffer.isNull());
+	stop_glerror();
+    mBuffer = new LLVertexBuffer(immediate_mask);
+	stop_glerror();
+    mBuffer->allocateBuffer(4096, 0);
+	stop_glerror();
+	mBuffer->getVertexStrider(mVerticesp);
+	stop_glerror();
+	mBuffer->getTexCoord0Strider(mTexcoordsp);
+	stop_glerror();
+	mBuffer->getColorStrider(mColorsp);
+	stop_glerror();
+}
+
+void LLRender::resetVertexBuffer()
+{
+    mBuffer = NULL;
 }
 
 void LLRender::shutdown()
 {
-	for (U32 i = 0; i < mTexUnits.size(); i++)
-	{
-		delete mTexUnits[i];
-	}
-	mTexUnits.clear();
-	delete mDummyTexUnit;
-	mDummyTexUnit = NULL;
-
-	for (U32 i = 0; i < mLightState.size(); ++i)
-	{
-		delete mLightState[i];
-	}
-	mLightState.clear();
-
-	mBuffer = nullptr;
+    resetVertexBuffer();
 }
 
 void LLRender::refreshState(void)
@@ -1167,40 +924,16 @@ void LLRender::refreshState(void)
 
 	for (U32 i = 0; i < mTexUnits.size(); i++)
 	{
-		mTexUnits[i]->refreshState();
+		mTexUnits[i].refreshState();
 	}
 	
-	mTexUnits[active_unit]->activate();
-	stop_glerror();
+	mTexUnits[active_unit].activate();
 
 	setColorMask(mCurrColorMask[0], mCurrColorMask[1], mCurrColorMask[2], mCurrColorMask[3]);
-	stop_glerror();
 	
-	setAlphaRejectSettings(mCurrAlphaFunc, mCurrAlphaFuncVal);
-	stop_glerror();
+    flush();
 
 	mDirty = false;
-}
-
-void LLRender::resetVertexBuffers()
-{
-	mBuffer = nullptr;
-}
-
-void LLRender::restoreVertexBuffers()
-{
-	llassert_always(mBuffer.isNull());
-	stop_glerror();
-	mBuffer = new LLVertexBuffer(immediate_mask, 0);
-	stop_glerror();
-	mBuffer->allocateBuffer(4096, 0, TRUE);
-	stop_glerror();
-	mBuffer->getVertexStrider(mVerticesp);
-	stop_glerror();
-	mBuffer->getTexCoord0Strider(mTexcoordsp);
-	stop_glerror();
-	mBuffer->getColorStrider(mColorsp);
-	stop_glerror();
 }
 
 void LLRender::syncLightState()
@@ -1219,35 +952,40 @@ void LLRender::syncLightState()
         LLVector4 position[LL_NUM_LIGHT_UNITS];
         LLVector3 direction[LL_NUM_LIGHT_UNITS];
         LLVector4 attenuation[LL_NUM_LIGHT_UNITS];
-		LLVector3 light_diffuse[LL_NUM_LIGHT_UNITS];
+        LLVector3 diffuse[LL_NUM_LIGHT_UNITS];
+        LLVector3 diffuse_b[LL_NUM_LIGHT_UNITS];
+        bool      sun_primary[LL_NUM_LIGHT_UNITS];
+        LLVector2 size[LL_NUM_LIGHT_UNITS];
 
         for (U32 i = 0; i < LL_NUM_LIGHT_UNITS; i++)
         {
-            LLLightState *light = mLightState[i];
+            LLLightState *light = &mLightState[i];
 
             position[i]  = light->mPosition;
             direction[i] = light->mSpotDirection;
             attenuation[i].set(light->mLinearAtten, light->mQuadraticAtten, light->mSpecular.mV[2], light->mSpecular.mV[3]);
-			light_diffuse[i].set(light->mDiffuse.mV);
+            diffuse[i].set(light->mDiffuse.mV);
+            diffuse_b[i].set(light->mDiffuseB.mV);
+            sun_primary[i] = light->mSunIsPrimary;
+            size[i].set(light->mSize, light->mFalloff);
         }
 
         shader->uniform4fv(LLShaderMgr::LIGHT_POSITION, LL_NUM_LIGHT_UNITS, position[0].mV);
         shader->uniform3fv(LLShaderMgr::LIGHT_DIRECTION, LL_NUM_LIGHT_UNITS, direction[0].mV);
         shader->uniform4fv(LLShaderMgr::LIGHT_ATTENUATION, LL_NUM_LIGHT_UNITS, attenuation[0].mV);
-        shader->uniform3fv(LLShaderMgr::LIGHT_DIFFUSE, LL_NUM_LIGHT_UNITS, light_diffuse[0].mV);
-        shader->uniform4fv(LLShaderMgr::LIGHT_AMBIENT, 1, mAmbientLightColor.mV);
-        shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, mLightState[0]->mSunIsPrimary ? 1 : 0);
-        shader->uniform4fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
-        shader->uniform4fv(LLShaderMgr::SUNLIGHT_COLOR, 1, mLightState[0]->mDiffuse.mV);
-        shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, mLightState[0]->mDiffuseB.mV);
+        shader->uniform2fv(LLShaderMgr::LIGHT_DEFERRED_ATTENUATION, LL_NUM_LIGHT_UNITS, size[0].mV);
+        shader->uniform3fv(LLShaderMgr::LIGHT_DIFFUSE, LL_NUM_LIGHT_UNITS, diffuse[0].mV);
+        shader->uniform3fv(LLShaderMgr::LIGHT_AMBIENT, 1, mAmbientLightColor.mV);
+        shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_primary[0] ? 1 : 0);
+        //shader->uniform3fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
+        //shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, diffuse[0].mV);
+        //shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, diffuse_b[0].mV);
     }
 }
 
 void LLRender::syncMatrices()
 {
-	stop_glerror();
-
-	static const U32 name[] = 
+    static const U32 name[] = 
 	{
 		LLShaderMgr::MODELVIEW_MATRIX,
 		LLShaderMgr::PROJECTION_MATRIX,
@@ -1260,6 +998,7 @@ void LLRender::syncMatrices()
 	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
 	static LLMatrix4a cached_mvp;
+    static LLMatrix4a cached_inv_mdv;
 	static U32 cached_mvp_mdv_hash = 0xFFFFFFFF;
 	static U32 cached_mvp_proj_hash = 0xFFFFFFFF;
 	
@@ -1277,6 +1016,13 @@ void LLRender::syncMatrices()
 		{ //update modelview, normal, and MVP
 			const LLMatrix4a& mat = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
 
+            // if MDV has changed, update the cached inverse as well
+            if (cached_mvp_mdv_hash != mMatHash[MM_MODELVIEW])
+            {
+                cached_inv_mdv = mat;
+				cached_inv_mdv.invert();
+            }
+
 			shader->uniformMatrix4fv(name[MM_MODELVIEW], 1, GL_FALSE, mat.getF32ptr());
 			shader->mMatHash[MM_MODELVIEW] = mMatHash[MM_MODELVIEW];
 
@@ -1286,8 +1032,7 @@ void LLRender::syncMatrices()
 			{
 				if (cached_normal_hash != mMatHash[i])
 				{
-					cached_normal = mat;
-					cached_normal.invert();
+					cached_normal = cached_inv_mdv;
 					cached_normal.transpose();
 					cached_normal_hash = mMatHash[i];
 				}
@@ -1301,6 +1046,11 @@ void LLRender::syncMatrices()
 
 				shader->uniformMatrix3fv(LLShaderMgr::NORMAL_MATRIX, 1, GL_FALSE, norms[0].mV);
 			}
+
+            if (shader->getUniformLocation(LLShaderMgr::INVERSE_MODELVIEW_MATRIX))
+            {                
+	            shader->uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_MATRIX, 1, GL_FALSE, cached_inv_mdv.getF32ptr()); 
+            }
 
 			//update MVP matrix
 			mvp_done = true;
@@ -1323,14 +1073,23 @@ void LLRender::syncMatrices()
 		{ //update projection matrix, normal, and MVP
 			const LLMatrix4a& mat = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
 
-            // it would be nice to have this automatically track the state of the proj matrix
-            // but certain render paths (deferred lighting) require it to be mismatched *sigh*
-            //if (shader->getUniformLocation(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
-            //{
-	        //    LLMatrix4a inv_proj = mat
-			//    mat.invert();
-	        //    shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.getF32ptr());
-            //}
+            // GZ: This was previously disabled seemingly due to a bug involving the deferred renderer's regular pushing and popping of mats.
+			// We're reenabling this and cleaning up the code around that - that would've been the appropriate course initially.
+			// Anything beyond the standard proj and inv proj mats are special cases.  Please setup special uniforms accordingly in the future.
+            if (shader->getUniformLocation(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
+            {
+	            LLMatrix4a inv_proj = mat;
+	            inv_proj.invert();
+	            shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.getF32ptr());
+            }
+
+			// Used by some full screen effects - such as full screen lights, glow, etc.
+            if (shader->getUniformLocation(LLShaderMgr::IDENTITY_MATRIX))
+            {
+				LLMatrix4a identity;
+				identity.setIdentity();
+                shader->uniformMatrix4fv(LLShaderMgr::IDENTITY_MATRIX, 1, GL_FALSE, identity.getF32ptr());
+            }
 
 			shader->uniformMatrix4fv(name[MM_PROJECTION], 1, GL_FALSE, mat.getF32ptr());
 			shader->mMatHash[MM_PROJECTION] = mMatHash[MM_PROJECTION];
@@ -1368,41 +1127,6 @@ void LLRender::syncMatrices()
 			syncLightState();
 		}
 	}
-	else if (!LLGLSLShader::sNoFixedFunction)
-	{
-		static const GLenum mode[] = 
-		{
-			GL_MODELVIEW,
-			GL_PROJECTION,
-			GL_TEXTURE,
-			GL_TEXTURE,
-			GL_TEXTURE,
-			GL_TEXTURE,
-		};
-
-		for (U32 i = 0; i < MM_TEXTURE0; ++i)
-		{
-			if (mMatHash[i] != mCurMatHash[i])
-			{
-				glMatrixMode(mode[i]);
-				glLoadMatrixf(mMatrix[i][mMatIdx[i]].getF32ptr());
-				mCurMatHash[i] = mMatHash[i];
-			}
-		}
-
-		for (U32 i = MM_TEXTURE0; i < NUM_MATRIX_MODES; ++i)
-		{
-			if (mMatHash[i] != mCurMatHash[i])
-			{
-				gGL.getTexUnit(i-MM_TEXTURE0)->activate();
-				glMatrixMode(mode[i]);
-				glLoadMatrixf(mMatrix[i][mMatIdx[i]].getF32ptr());
-				mCurMatHash[i] = mMatHash[i];
-			}
-		}
-	}
-
-	stop_glerror();
 }
 
 void LLRender::translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z)
@@ -1613,6 +1337,18 @@ void LLRender::scaleUI(F32 x, F32 y, F32 z)
 	mUIScale.back().mul(scale);
 }
 
+void LLRender::rotateUI(LLQuaternion& rot)
+{
+	if (mUIRotation.empty())
+	{
+		mUIRotation.push_back(rot);
+	}
+	else
+	{
+		mUIRotation.push_back(mUIRotation.back()*rot);
+	}
+}
+
 void LLRender::pushUIMatrix()
 {
 	if (mUIOffset.empty())
@@ -1632,6 +1368,10 @@ void LLRender::pushUIMatrix()
 	{
 		mUIScale.push_back(mUIScale.back());
 	}
+	if (!mUIRotation.empty())
+	{
+		mUIRotation.push_back(mUIRotation.back());
+	}
 }
 
 void LLRender::popUIMatrix()
@@ -1643,6 +1383,10 @@ void LLRender::popUIMatrix()
 
 	mUIOffset.pop_back();
 	mUIScale.pop_back();
+	if (!mUIRotation.empty())
+	{
+		mUIRotation.pop_back();
+	}
 }
 
 LLVector3 LLRender::getUITranslation()
@@ -1672,6 +1416,8 @@ void LLRender::loadUIIdentity()
 	}
 	mUIOffset.back().splat(0.f);
 	mUIScale.back().splat(1.f);
+	if (!mUIRotation.empty())
+		mUIRotation.push_back(LLQuaternion());
 }
 
 void LLRender::setColorMask(bool writeColor, bool writeAlpha)
@@ -1731,55 +1477,6 @@ void LLRender::setSceneBlendType(eBlendType type)
 	}
 }
 
-void LLRender::setAlphaRejectSettings(eCompareFunc func, F32 value)
-{
-	flush();
-
-	if (LLGLSLShader::sNoFixedFunction)
-	{ //glAlphaFunc is deprecated in OpenGL 3.3
-		return;
-	}
-
-	if (mCurrAlphaFunc != func ||
-		mCurrAlphaFuncVal != value)
-	{
-		mCurrAlphaFunc = func;
-		mCurrAlphaFuncVal = value;
-		if (func == CF_DEFAULT)
-		{
-			glAlphaFunc(GL_GREATER, 0.01f);
-		} 
-		else
-		{
-			glAlphaFunc(sGLCompareFunc[func], value);
-		}
-	}
-
-	if (gDebugGL)
-	{ //make sure cached state is correct
-		GLint cur_func = 0;
-		glGetIntegerv(GL_ALPHA_TEST_FUNC, &cur_func);
-
-		if (func == CF_DEFAULT)
-		{
-			func = CF_GREATER;
-		}
-
-		if (cur_func != sGLCompareFunc[func])
-		{
-			LL_ERRS() << "Alpha test function corrupted!" << LL_ENDL;
-		}
-
-		F32 ref = 0.f;
-		glGetFloatv(GL_ALPHA_TEST_REF, &ref);
-
-		if (ref != value)
-		{
-			LL_ERRS() << "Alpha test value corrupted!" << LL_ENDL;
-		}
-	}
-}
-
 void LLRender::blendFunc(eBlendFactor sfactor, eBlendFactor dfactor)
 {
 	llassert(sfactor < BF_UNDEF);
@@ -1803,12 +1500,7 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
 	llassert(color_dfactor < BF_UNDEF);
 	llassert(alpha_sfactor < BF_UNDEF);
 	llassert(alpha_dfactor < BF_UNDEF);
-	if (!gGLManager.mHasBlendFuncSeparate)
-	{
-		LL_WARNS_ONCE("render") << "no glBlendFuncSeparate(), using color-only blend func" << LL_ENDL;
-		blendFunc(color_sfactor, color_dfactor);
-		return;
-	}
+	
 	if (mCurrBlendColorSFactor != color_sfactor || mCurrBlendColorDFactor != color_dfactor ||
 	    mCurrBlendAlphaSFactor != alpha_sfactor || mCurrBlendAlphaDFactor != alpha_dfactor)
 	{
@@ -1817,8 +1509,9 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
 		mCurrBlendColorDFactor = color_dfactor;
 		mCurrBlendAlphaDFactor = alpha_dfactor;
 		flush();
-		glBlendFuncSeparate(sGLBlendFactor[color_sfactor], sGLBlendFactor[color_dfactor],
-				       sGLBlendFactor[alpha_sfactor], sGLBlendFactor[alpha_dfactor]);
+        
+        glBlendFuncSeparate(sGLBlendFactor[color_sfactor], sGLBlendFactor[color_dfactor],
+                           sGLBlendFactor[alpha_sfactor], sGLBlendFactor[alpha_dfactor]);
 	}
 }
 
@@ -1826,14 +1519,14 @@ LLTexUnit* LLRender::getTexUnit(U32 index)
 {
 	if (index < mTexUnits.size())
 	{
-		return mTexUnits[index];
+		return &mTexUnits[index];
 	}
 	else 
 	{
 #ifdef SHOW_DEBUG
 		LL_DEBUGS() << "Non-existing texture unit layer requested: " << index << LL_ENDL;
 #endif
-		return mDummyTexUnit;
+		return &mDummyTexUnit;
 	}
 }
 
@@ -1841,7 +1534,7 @@ LLLightState* LLRender::getLight(U32 index)
 {
 	if (index < mLightState.size())
 	{
-		return mLightState[index];
+		return &mLightState[index];
 	}
 	
 	return NULL;
@@ -1849,14 +1542,11 @@ LLLightState* LLRender::getLight(U32 index)
 
 void LLRender::setAmbientLightColor(const LLColor4& color)
 {
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE
 	if (color != mAmbientLightColor)
 	{
 		++mLightHash;
 		mAmbientLightColor = color;
-		if (!LLGLSLShader::sNoFixedFunction)
-		{
-			glLightModelfv(GL_LIGHT_MODEL_AMBIENT, color.mV);
-		}
 	}
 }
 void LLRender::setLineWidth(F32 line_width)
@@ -1943,6 +1633,8 @@ void LLRender::flush()
 {
 	if (mCount > 0)
 	{
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+        llassert(LLGLSLShader::sCurBoundShaderPtr != nullptr);
 		if (!mUIOffset.empty())
 		{
 			sUICalls++;
@@ -1972,16 +1664,110 @@ void LLRender::flush()
 
 		mCount = 0;
 
-		if (mBuffer->useVBOs() && !mBuffer->isLocked())
-		{ //hack to only flush the part of the buffer that was updated (relies on stream draw using buffersubdata)
-			mBuffer->getVertexStrider(mVerticesp, 0, count);
-			mBuffer->getTexCoord0Strider(mTexcoordsp, 0, count);
-			mBuffer->getColorStrider(mColorsp, 0, count);
-		}
-		
-		mBuffer->flush();
-		mBuffer->setBuffer(immediate_mask);
-		mBuffer->drawArrays(mMode, 0, count);
+        if (mBuffer)
+        {
+
+            HBXXH64 hash;
+            U32 attribute_mask = LLGLSLShader::sCurBoundShaderPtr->mAttributeMask;
+
+            {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache hash");
+
+                hash.update((U8*)mVerticesp.get(), count * sizeof(LLVector4a));
+                if (attribute_mask & LLVertexBuffer::MAP_TEXCOORD0)
+                {
+                    hash.update((U8*)mTexcoordsp.get(), count * sizeof(LLVector2));
+                }
+
+                if (attribute_mask & LLVertexBuffer::MAP_COLOR)
+                {
+                    hash.update((U8*)mColorsp.get(), count * sizeof(LLColor4U));
+                }
+
+                hash.finalize();
+            }
+            
+            
+            U64 vhash = hash.digest();
+
+            // check the VB cache before making a new vertex buffer
+            // This is a giant hack to deal with (mostly) our terrible UI rendering code
+            // that was built on top of OpenGL immediate mode.  Huge performance wins
+            // can be had by not uploading geometry to VRAM unless absolutely necessary.
+            // Most of our usage of the "immediate mode" style draw calls is actually
+            // sending the same geometry over and over again.
+            // To leverage this, we maintain a running hash of the vertex stream being
+            // built up before a flush, and then check that hash against a VB 
+            // cache just before creating a vertex buffer in VRAM
+            auto cache = sVBCache.find(vhash);
+
+            LLPointer<LLVertexBuffer> vb;
+
+            if (cache != sVBCache.end())
+            {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache hit");
+                // cache hit, just use the cached buffer
+                vb = cache->second.vb;
+                cache->second.touched = std::chrono::steady_clock::now();
+            }
+            else
+            {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache miss");
+                vb = new LLVertexBuffer(attribute_mask);
+                vb->allocateBuffer(count, 0);
+
+                vb->setBuffer();
+
+                vb->setPositionData((LLVector4a*) mVerticesp.get());
+
+                if (attribute_mask & LLVertexBuffer::MAP_TEXCOORD0)
+                {
+                    vb->setTexCoordData(mTexcoordsp.get());
+                }
+
+                if (attribute_mask & LLVertexBuffer::MAP_COLOR)
+                {
+                    vb->setColorData(mColorsp.get());
+                }
+
+                vb->unbind();
+
+                sVBCache[vhash] = { vb , std::chrono::steady_clock::now() };
+
+                static U32 miss_count = 0;
+                miss_count++;
+                if (miss_count > 1024)
+                {
+                    LL_PROFILE_ZONE_NAMED_CATEGORY_VERTEX("vb cache clean");
+                    miss_count = 0;
+                    auto now = std::chrono::steady_clock::now();
+
+                    using namespace std::chrono_literals;
+                    // every 1024 misses, clean the cache of any VBs that haven't been touched in the last second
+                    for (auto iter = sVBCache.begin(); iter != sVBCache.end(); )
+                    {
+                        if (now - iter->second.touched > 1s)
+                        {
+							auto old_iter = iter++;
+                            sVBCache.erase(old_iter);
+                        }
+                        else
+                        {
+                            ++iter;
+                        }
+                    }
+                }
+            }
+
+            vb->setBuffer();
+			vb->drawArrays(mMode, 0, count);
+        }
+        else
+        {
+            // mBuffer is present in main thread and not present in an image thread
+            LL_ERRS() << "A flush call from outside main rendering thread" << LL_ENDL;
+        }
+
 		
 		mVerticesp[0] = mVerticesp[count];
 		mTexcoordsp[0] = mTexcoordsp[count];
@@ -2040,12 +1826,32 @@ void LLRender::vertex4a(const LLVector4a& vertex)
 
 	if (mUIOffset.empty())
 	{
+		if (!mUIRotation.empty() && mUIRotation.back().isNotIdentity())
+		{
+			LLVector4 vert(vertex.getF32ptr());
+			mVerticesp[mCount].loadua((vert*mUIRotation.back()).mV);
+		}
+		else
+		{
 		mVerticesp[mCount] = vertex;
+		}
 	}
 	else
 	{
-		mVerticesp[mCount].setAdd(vertex, mUIOffset.back());
-		mVerticesp[mCount].mul(mUIScale.back());
+		if (!mUIRotation.empty() && mUIRotation.back().isNotIdentity())
+		{
+			LLVector4 vert(vertex.getF32ptr());
+			vert = vert * mUIRotation.back();
+			LLVector4a postrot_vert;
+			postrot_vert.loadua(vert.mV);
+			mVerticesp[mCount].setAdd(postrot_vert, mUIOffset.back());
+			mVerticesp[mCount].mul(mUIScale.back());
+		}
+		else
+		{
+			mVerticesp[mCount].setAdd(vertex, mUIOffset.back());
+			mVerticesp[mCount].mul(mUIScale.back());
+		}
 	}
 
 	mCount++;
@@ -2204,8 +2010,7 @@ void LLRender::texCoord2fv(const GLfloat* tc)
 
 void LLRender::color4ub(const GLubyte& r, const GLubyte& g, const GLubyte& b, const GLubyte& a)
 {
-	if (!LLGLSLShader::sCurBoundShaderPtr ||
-		LLGLSLShader::sCurBoundShaderPtr->mAttributeMask & LLVertexBuffer::MAP_COLOR)
+	if (!LLGLSLShader::sCurBoundShaderPtr || LLGLSLShader::sCurBoundShaderPtr->mAttributeMask & LLVertexBuffer::MAP_COLOR)
 	{
 		mColorsp[mCount] = LLColor4U(r,g,b,a);
 	}
@@ -2245,7 +2050,7 @@ void LLRender::color3fv(const GLfloat* c)
 void LLRender::diffuseColor3f(F32 r, F32 g, F32 b)
 {
 	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-	llassert(!LLGLSLShader::sNoFixedFunction || shader != NULL);
+	llassert(shader != NULL);
 
 	if (shader)
 	{
@@ -2260,7 +2065,7 @@ void LLRender::diffuseColor3f(F32 r, F32 g, F32 b)
 void LLRender::diffuseColor3fv(const F32* c)
 {
 	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-	llassert(!LLGLSLShader::sNoFixedFunction || shader != NULL);
+	llassert(shader != NULL);
 
 	if (shader)
 	{
@@ -2275,7 +2080,7 @@ void LLRender::diffuseColor3fv(const F32* c)
 void LLRender::diffuseColor4f(F32 r, F32 g, F32 b, F32 a)
 {
 	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-	llassert(!LLGLSLShader::sNoFixedFunction || shader != NULL);
+	llassert(shader != NULL);
 
 	if (shader)
 	{
@@ -2290,7 +2095,7 @@ void LLRender::diffuseColor4f(F32 r, F32 g, F32 b, F32 a)
 void LLRender::diffuseColor4fv(const F32* c)
 {
 	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-	llassert(!LLGLSLShader::sNoFixedFunction || shader != NULL);
+	llassert(shader != NULL);
 
 	if (shader)
 	{
@@ -2305,7 +2110,7 @@ void LLRender::diffuseColor4fv(const F32* c)
 void LLRender::diffuseColor4ubv(const U8* c)
 {
 	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-	llassert(!LLGLSLShader::sNoFixedFunction || shader != NULL);
+	llassert(shader != NULL);
 
 	if (shader)
 	{
@@ -2320,7 +2125,7 @@ void LLRender::diffuseColor4ubv(const U8* c)
 void LLRender::diffuseColor4ub(U8 r, U8 g, U8 b, U8 a)
 {
 	LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-	llassert(!LLGLSLShader::sNoFixedFunction || shader != NULL);
+	llassert(shader != NULL);
 
 	if (shader)
 	{
@@ -2354,6 +2159,9 @@ void LLRender::debugTexUnits(void)
 					break;
 				case LLTexUnit::TT_CUBE_MAP:
 					LL_CONT << "Cube Map";
+					break;
+				case LLTexUnit::TT_TEXTURE_3D:
+					LL_CONT << "Texture 3D";
 					break;
 				default:
 					LL_CONT << "ARGH!!! NONE!";

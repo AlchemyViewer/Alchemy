@@ -386,9 +386,9 @@ OutputIter ll_transform_n(
 // select... with the stl. Look up usage on the sgi website.
 
 template <class _Pair>
-struct _LLSelect1st 
+struct _LLSelect1st
 {
-  const typename _Pair::first_type& operator()(const _Pair& __x) const {
+  const auto& operator()(const _Pair& __x) const {
     return __x.first;
   }
 };
@@ -396,7 +396,7 @@ struct _LLSelect1st
 template <class _Pair>
 struct _LLSelect2nd
 {
-  const typename _Pair::second_type& operator()(const _Pair& __x) const {
+  const auto& operator()(const _Pair& __x) const {
     return __x.second;
   }
 };
@@ -406,52 +406,51 @@ template <class _Pair> struct llselect2nd : public _LLSelect2nd<_Pair> {};
 
 // helpers to deal with the fact that MSDev does not package
 // bind... with the stl. Again, this is from sgi.
-template <class _Operation>
+template <class _Operation, typename _Arg1>
 class llbinder1st
 {
 protected:
   _Operation op;
-  typename _Operation::first_argument_type value;
+  _Arg1 value;
 public:
-  llbinder1st(const _Operation& __x,
-			  const typename _Operation::first_argument_type& __y)
+  llbinder1st(const _Operation& __x, const _Arg1& __y)
       : op(__x), value(__y) {}
-	typename _Operation::result_type
-	operator()(const typename _Operation::second_argument_type& __x) const {
-		return op(value, __x);
-	}
+    template <typename _Arg2>
+    auto
+    operator()(const _Arg2& __x) const {
+        return op(value, __x);
+    }
 };
 
 template <class _Operation, class _Tp>
-inline llbinder1st<_Operation>
+inline auto
 llbind1st(const _Operation& __oper, const _Tp& __x)
 {
-  typedef typename _Operation::first_argument_type _Arg1_type;
-  return llbinder1st<_Operation>(__oper, _Arg1_type(__x));
+  return llbinder1st<_Operation, _Tp>(__oper, __x);
 }
 
-template <class _Operation>
+template <class _Operation, typename _Arg2>
 class llbinder2nd
 {
 protected:
 	_Operation op;
-	typename _Operation::second_argument_type value;
+	_Arg2 value;
 public:
 	llbinder2nd(const _Operation& __x,
-				const typename _Operation::second_argument_type& __y)
+				const _Arg2& __y)
 		: op(__x), value(__y) {}
-	typename _Operation::result_type
-	operator()(const typename _Operation::first_argument_type& __x) const {
+	template <typename _Arg1>
+	auto
+	operator()(const _Arg1& __x) const {
 		return op(__x, value);
 	}
 };
 
 template <class _Operation, class _Tp>
-inline llbinder2nd<_Operation>
+inline auto
 llbind2nd(const _Operation& __oper, const _Tp& __x)
 {
-  typedef typename _Operation::second_argument_type _Arg2_type;
-  return llbinder2nd<_Operation>(__oper, _Arg2_type(__x));
+  return llbinder2nd<_Operation, _Tp>(__oper, __x);
 }
 
 /**

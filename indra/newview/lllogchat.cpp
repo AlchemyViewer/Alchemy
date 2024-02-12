@@ -41,13 +41,15 @@
 
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/regex.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/local_time_adjustor.hpp>
 
-const S32 LOG_RECALL_SIZE = 2048;
+const S32 LOG_RECALL_SIZE = 20480;
 
 const std::string LL_IM_TIME("time");
+const std::string LL_IM_DATE_TIME("datetime");
 const std::string LL_IM_TEXT("message");
 const std::string LL_IM_FROM("from");
 const std::string LL_IM_FROM_ID("from_id");
@@ -119,14 +121,14 @@ void append_to_last_message(std::list<LLSD>& messages, const std::string& line)
 	messages.back()[LL_IM_TEXT] = im_text;
 }
 
-std::string remove_utf8_bom(const char* buf)
+const char* remove_utf8_bom(const char* buf)
 {
-	std::string res(buf);
-	if (res[0] == (char)0xEF && res[1] == (char)0xBB && res[2] == (char)0xBF)
-	{
-		res.erase(0, 3);
+    const char* start = buf;
+	if (start[0] == (char)0xEF && start[1] == (char)0xBB && start[2] == (char)0xBF)
+	{   // If string starts with the magic bytes, return pointer after it.
+        start += 3;
 	}
-	return res;
+	return start;
 }
 
 class LLLogChatTimeScanner final : public LLSingleton<LLLogChatTimeScanner>
@@ -297,22 +299,33 @@ std::string LLLogChat::cleanFileName(std::string filename)
 	return filename;
 }
 
-std::string LLLogChat::timestamp(bool withdate)
+std::string LLLogChat::timestamp2LogString(U32 timestamp, bool withdate)
 {
+	static const LLCachedControl<bool> show_timestamp_seconds(gSavedSettings, "ChatTimestampSeconds", false);
+
 	std::string timeStr;
 	if (withdate)
 	{
 		static const std::string timestamp_long_fmt = fmt::format(FMT_STRING("[{}]/[{}]/[{}] [{}]:[{}]"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
-        timeStr = timestamp_long_fmt;
+		static const std::string timestamp_long_sec_fmt = fmt::format(FMT_STRING("[{}]/[{}]/[{}] [{}]:[{}]:[{}]"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"), LLTrans::getString("TimeSec"));
+        timeStr = show_timestamp_seconds ? timestamp_long_sec_fmt : timestamp_long_fmt;
 	}
 	else
 	{
 		static const std::string timestamp_short_fmt = fmt::format(FMT_STRING("[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
-        timeStr = timestamp_short_fmt;
+		static const std::string timestamp_short_sec_fmt = fmt::format(FMT_STRING("[{}]:[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"), LLTrans::getString("TimeSec"));
+        timeStr = show_timestamp_seconds ? timestamp_short_sec_fmt : timestamp_short_fmt;
 	}
 
 	LLSD substitution;
-	substitution["datetime"] = (S32)time_corrected();
+    if (timestamp == 0)
+    {
+        substitution["datetime"] = (S32)time_corrected();
+    }
+    else
+    {   // timestamp is correct utc already
+        substitution["datetime"] = (S32)timestamp;
+    }
 
 	LLStringUtil::format (timeStr, substitution);
 	return timeStr;
@@ -334,7 +347,7 @@ void LLLogChat::saveHistory(const std::string& filename,
 		llassert(tmp_filename.size());
 		return;
 	}
-	
+
 	llofstream file(LLLogChat::makeLogFileName(filename).c_str(), std::ios_base::app);
 	if (!file.is_open())
 	{
@@ -345,7 +358,7 @@ void LLLogChat::saveHistory(const std::string& filename,
 	LLSD item;
 
 	if (gSavedPerAccountSettings.getBOOL("LogTimestamp"))
-		 item["time"] = LLLogChat::timestamp(gSavedPerAccountSettings.getBOOL("LogTimestampDate"));
+		 item["time"] = LLLogChat::timestamp2LogString(0, gSavedPerAccountSettings.getBOOL("LogTimestampDate"));
 
 	item["from_id"]	= from_id;
 	item["message"]	= line;
@@ -353,7 +366,7 @@ void LLLogChat::saveHistory(const std::string& filename,
 	//adding "Second Life:" for all system messages to make chat log history parsing more reliable
 	if (from.empty() && from_id.isNull())
 	{
-		item["from"] = SYSTEM_FROM; 
+		item["from"] = SYSTEM_FROM;
 	}
 	else
 	{
@@ -372,36 +385,59 @@ void LLLogChat::loadChatHistory(const std::string& file_name, std::list<LLSD>& m
 {
 	if (file_name.empty())
 	{
-		LL_WARNS("LLLogChat::loadChatHistory") << "Session name is Empty!" << LL_ENDL;
+		LL_WARNS("LLLogChat::loadChatHistory") << "Local history file name is empty!" << LL_ENDL;
 		return ;
 	}
 
 	bool load_all_history = load_params.has("load_all_history") ? load_params["load_all_history"].asBoolean() : false;
 
-	LLFILE* fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), "r");/*Flawfinder: ignore*/
+    // Stat the file to find it and get the last history entry time
+    llstat stat_data;
+
+    std::string log_file_name = LLLogChat::makeLogFileName(file_name);
+    LL_DEBUGS("ChatHistory") << "First attempt to stat chat history file " << log_file_name << LL_ENDL;
+
+    S32 no_stat = LLFile::stat(log_file_name, &stat_data);
+
+    if (no_stat)
+    {
+        if (is_group)
+        {
+            std::string old_name(file_name);
+            old_name.erase(old_name.size() - GROUP_CHAT_SUFFIX.size());     // trim off " (group)"
+            log_file_name = LLLogChat::makeLogFileName(old_name);
+            LL_DEBUGS("ChatHistory") << "Attempting to stat adjusted chat history file " << log_file_name << LL_ENDL;
+            no_stat = LLFile::stat(log_file_name, &stat_data);
+            if (!no_stat)
+            {   // Found it without "(group)", copy to new naming style.  We already have the mod time in stat_data
+                log_file_name = LLLogChat::makeLogFileName(file_name);
+                LL_DEBUGS("ChatHistory") << "Attempt to stat copied history file " << log_file_name << LL_ENDL;
+                LLFile::copy(LLLogChat::makeLogFileName(old_name), log_file_name);
+            }
+        }
+        if (no_stat)
+        {
+            log_file_name = LLLogChat::oldLogFileName(file_name);
+            LL_DEBUGS("ChatHistory") << "Attempt to stat old history file name " << log_file_name << LL_ENDL;
+            no_stat = LLFile::stat(log_file_name, &stat_data);
+            if (no_stat)
+            {
+                LL_DEBUGS("ChatHistory") << "No previous conversation log file found for " << file_name << LL_ENDL;
+                return;						//No previous conversation with this name.
+            }
+        }
+    }
+
+    // If we got here, we managed to stat the file.
+    // Open the file to read
+    LLFILE* fptr = LLFile::fopen(log_file_name, "r");       /*Flawfinder: ignore*/
 	if (!fptr)
-	{
-		if (is_group)
-		{
-			std::string old_name(file_name);
-			old_name.erase(old_name.size() - GROUP_CHAT_SUFFIX.size());
-			fptr = LLFile::fopen(LLLogChat::makeLogFileName(old_name), "r");
-			if (fptr)
-			{
-				fclose(fptr);
-				LLFile::copy(LLLogChat::makeLogFileName(old_name), LLLogChat::makeLogFileName(file_name));
-			}
-			fptr = LLFile::fopen(LLLogChat::makeLogFileName(file_name), "r");
-		}
-		if (!fptr)
-		{
-			fptr = LLFile::fopen(LLLogChat::oldLogFileName(file_name), "r");/*Flawfinder: ignore*/
-			if (!fptr)
-			{
-				return;						//No previous conversation with this name.
-			}
-		}
+	{   // Ok, this is strange but not really tragic in the big picture of things
+        LL_WARNS("ChatHistory") << "Unable to read file " << log_file_name << " after stat was successful" << LL_ENDL;
+        return;
 	}
+
+    S32 save_num_messages = messages.size();
 
 	char buffer[LOG_RECALL_SIZE];		/*Flawfinder: ignore*/
 	char *bptr;
@@ -420,6 +456,7 @@ void LLLogChat::loadChatHistory(const std::string& file_name, std::list<LLSD>& m
 	while (fgets(buffer, LOG_RECALL_SIZE, fptr)  && !feof(fptr))
 	{
 		len = strlen(buffer) - 1;		/*Flawfinder: ignore*/
+        // backfill any end of line characters with nulls
 		for (bptr = (buffer + len); (*bptr == '\n' || *bptr == '\r') && bptr>buffer; bptr--)	*bptr='\0';
 
 		if (firstline)
@@ -452,6 +489,10 @@ void LLLogChat::loadChatHistory(const std::string& file_name, std::list<LLSD>& m
 		}
 	}
 	fclose(fptr);
+
+    LL_DEBUGS("ChatHistory") << "Read " << (messages.size() - save_num_messages)
+        << " messages of chat history from " << log_file_name
+        << " file mod time " << (F64)stat_data.st_mtime << LL_ENDL;
 }
 
 bool LLLogChat::historyThreadsFinished(LLUUID session_id)
@@ -559,8 +600,11 @@ void LLLogChat::triggerHistorySignal()
 // static
 std::string LLLogChat::oldLogFileName(std::string filename)
 {
-	// get Users log directory and add final OS dependent delimiter
-	std::string directory = absl::StrCat(gDirUtilp->getPerAccountChatLogsDir(), gDirUtilp->getDirDelimiter());
+	// get Users log directory
+	std::string directory = gDirUtilp->getPerAccountChatLogsDir();
+
+	// add final OS dependent delimiter
+	directory += gDirUtilp->getDirDelimiter();
 
 	// lest make sure the file name has no invalid characters before making the pattern
 	filename = cleanFileName(filename);
@@ -579,12 +623,12 @@ std::string LLLogChat::oldLogFileName(std::string filename)
 
 	if (allfiles.size() == 0)  // if no result from date search, return generic filename
 	{
-		scanResult = absl::StrCat(directory, filename, ".", LL_TRANSCRIPT_FILE_EXTENSION);
+		scanResult = directory + filename + '.' + LL_TRANSCRIPT_FILE_EXTENSION;
 	}
 	else 
 	{
 		sort(allfiles.begin(), allfiles.end());
-		scanResult = absl::StrCat(directory, allfiles.back());
+		scanResult = directory + allfiles.back();
 		// this file is now the most recent version of the file.
 	}
 
@@ -624,7 +668,7 @@ void LLLogChat::getListOfTranscriptFiles(std::vector<std::string>& list_of_trans
 void LLLogChat::getListOfTranscriptBackupFiles(std::vector<std::string>& list_of_transcriptions)
 {
 	// create search pattern
-	std::string pattern = absl::StrCat("*.", LL_TRANSCRIPT_FILE_EXTENSION, ".backup*");
+	std::string pattern = "*." + LL_TRANSCRIPT_FILE_EXTENSION + ".backup*";
 	findTranscriptFiles(pattern, list_of_transcriptions);
 }
 
@@ -657,7 +701,7 @@ bool LLLogChat::moveTranscripts(const std::string originDirectory,
 		//The target directory contains that file already, so lets store it
 		if(LLFile::isfile(newFullPath))
 		{
-			backupFileName = absl::StrCat(newFullPath, ".backup");
+			backupFileName = newFullPath + ".backup";
 
 			//If needed store backup file as .backup1 etc.
 			while(LLFile::isfile(backupFileName))
@@ -720,7 +764,7 @@ void LLLogChat::deleteTranscripts()
 	getListOfTranscriptFiles(list_of_transcriptions);
 	getListOfTranscriptBackupFiles(list_of_transcriptions);
 
-	for (const std::string& fullpath : list_of_transcriptions)
+	for(const std::string& fullpath : list_of_transcriptions)
 	{
 		S32 retry_count = 0;
 		while (retry_count < 5)
@@ -813,7 +857,8 @@ bool LLLogChat::isTranscriptFileFound(std::string fullname)
 		{
 			//matching a timestamp
 			boost::match_results<std::string::const_iterator> matches;
-			if (ll_regex_match(remove_utf8_bom(buffer), matches, TIMESTAMP))
+            std::string line(remove_utf8_bom(buffer));
+			if (ll_regex_match(line, matches, TIMESTAMP))
 			{
 				result = true;
 			}
@@ -823,7 +868,7 @@ bool LLLogChat::isTranscriptFileFound(std::string fullname)
 	return result;
 }
 
-//*TODO mark object's names in a special way so that they will be distinguishable form avatar name 
+//*TODO mark object's names in a special way so that they will be distinguishable form avatar name
 //which are more strict by its nature (only firstname and secondname)
 //Example, an object's name can be written like "Object <actual_object's_name>"
 void LLChatLogFormatter::format(const LLSD& im, std::ostream& ostr) const
@@ -841,7 +886,7 @@ void LLChatLogFormatter::format(const LLSD& im, std::ostream& ostr) const
 		ostr << '[' << timestamp << ']' << TWO_SPACES;
 	}
 	
-	//*TODO mark object's names in a special way so that they will be distinguishable form avatar name 
+	//*TODO mark object's names in a special way so that they will be distinguishable from avatar name 
 	//which are more strict by its nature (only firstname and secondname)
 	//Example, an object's name can be written like "Object <actual_object's_name>"
 	if (im[LL_IM_FROM].isDefined())
@@ -904,7 +949,9 @@ bool LLChatLogParser::parse(std::string& raw, LLSD& im, const LLSD& parse_params
 		timestamp.erase(0, 1);
 		timestamp.erase(timestamp.length()-1, 1);
 
-		if (cut_off_todays_date)
+        im[LL_IM_DATE_TIME] = timestamp;    // Retain full date-time for merging chat histories
+
+        if (cut_off_todays_date)
 		{
 			LLLogChatTimeScanner::instance().checkAndCutOffDate(timestamp);
 		}
@@ -912,9 +959,9 @@ bool LLChatLogParser::parse(std::string& raw, LLSD& im, const LLSD& parse_params
 		im[LL_IM_TIME] = timestamp;
 	}
 	else
-	{
-		//timestamp is optional
-		im[LL_IM_TIME] = "";
+	{   //timestamp is optional
+        im[LL_IM_DATE_TIME] = "";
+        im[LL_IM_TIME] = "";
 	}
 
 	bool has_stuff = matches[IDX_STUFF].matched;

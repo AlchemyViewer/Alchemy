@@ -1,0 +1,16 @@
+repos:
+  - repo: https://github.com/secondlife/git-hooks.git 
+    rev: v1.0.0
+    hooks:
+      - id: opensource-license
+      - id: llsd
+      - id: no-trigraphs
+      - id: copyright
+      - id: end-of-file
+        files: \.(cpp|c|h|py|glsl|cmake|txt)$
+        exclude: language.txt
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-xml
+      - id: mixed-line-ending

@@ -67,7 +67,7 @@ protected:
 	bool filterFloaterViewXXX(std::string_view, const LLSD&);
 	boost::signals2::connection m_ConnFloaterViewXXX;					// viewnote, viewscript, viewtexture
 
-	bool filterPanelShowLoc(const std::string&, const std::string&, const LLSD& );
+	bool filterPanelShowLoc(std::string_view, std::string_view, const LLSD& );
 	boost::signals2::connection m_ConnPanelShowLoc;						// showloc
 
 	/*

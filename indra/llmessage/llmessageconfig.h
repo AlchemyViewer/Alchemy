@@ -29,6 +29,16 @@
 
 #include <string>
 #include "llsd.h"
+#include "lllivefile.h"
+
+static constexpr char messageConfigFileName[] = "message.xml";
+static constexpr F32 messageConfigRefreshRate = 5.f; // seconds
+
+static std::string sServerName;
+static std::string sConfigDir;
+
+static std::string sServerDefault;
+static LLSD sMessages;
 
 class LLSD;
 
@@ -52,5 +62,37 @@ public:
 	static bool onlySendLatest(const std::string& msg_name);
 	static bool isCapBanned(const std::string& cap_name);
 	static LLSD getConfigForMessage(const std::string& msg_name);
+};
+
+class LLMessageConfigFile : public LLLiveFile
+{
+public:
+	LLMessageConfigFile() :
+		LLLiveFile(filename(), messageConfigRefreshRate),
+		mMaxQueuedEvents(0)
+            { }
+
+	static std::string filename();
+
+	LLSD mMessages;
+	std::string mServerDefault;
+	
+	static LLMessageConfigFile& instance();
+		// return the singleton configuration file
+
+	/* virtual */ bool loadFile() override;
+	void loadServerDefaults(const LLSD& data);
+	void loadMaxQueuedEvents(const LLSD& data);
+	void loadMessages(const LLSD& data);
+	void loadCapBans(const LLSD& data);
+	void loadMessageBans(const LLSD& data);
+	bool isCapBanned(const std::string& cap_name) const;
+
+public:
+	LLSD mCapBans;
+	S32 mMaxQueuedEvents;
+
+private:
+	static constexpr S32 DEFAULT_MAX_QUEUED_EVENTS = 100;
 };
 #endif // LL_MESSAGECONFIG_H

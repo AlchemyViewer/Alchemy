@@ -119,6 +119,11 @@ enum EHTTPMethod
 // Parses 'Retry-After' header contents and returns seconds until retry should occur.
 bool getSecondsUntilRetryAfter(const std::string& retry_after, F32& seconds_to_wait);
 
+const std::string& httpMethodAsVerb(EHTTPMethod method);
+EHTTPMethod httpVerbAsMethod(const std::string&);
+
+std::string get_base_cap_url(std::string url);
+
 //// HTTP Headers /////
 
 // Outgoing headers. Do *not* use these to check incoming headers.
@@ -178,6 +183,7 @@ extern const std::string HTTP_OUT_HEADER_VARY;
 extern const std::string HTTP_OUT_HEADER_VIA;
 extern const std::string HTTP_OUT_HEADER_WARNING;
 extern const std::string HTTP_OUT_HEADER_WWW_AUTHENTICATE;
+extern const std::string HTTP_OUT_HEADER_SL_UDP_LISTEN_PORT;
 
 // Incoming headers are normalized to lower-case.
 extern const std::string HTTP_IN_HEADER_ACCEPT_LANGUAGE;
@@ -196,7 +202,9 @@ extern const std::string HTTP_IN_HEADER_X_FORWARDED_FOR;
 
 extern const std::string HTTP_CONTENT_LLSD_XML;
 extern const std::string HTTP_CONTENT_OCTET_STREAM;
+extern const std::string HTTP_CONTENT_OGG_STREAM;
 extern const std::string HTTP_CONTENT_VND_LL_MESH;
+extern const std::string HTTP_CONTENT_VND_LL_ANIMATION;
 extern const std::string HTTP_CONTENT_XML;
 extern const std::string HTTP_CONTENT_JSON;
 extern const std::string HTTP_CONTENT_TEXT_HTML;

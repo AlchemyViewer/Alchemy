@@ -36,14 +36,17 @@
 #include "llfloaterevent.h"
 #include "llagent.h"
 #include "llcommandhandler.h"	// secondlife:///app/... support
+#include "lltrans.h"
 
 class LLEventHandler : public LLCommandHandler
 {
 public:
 	// requires trusted browser to trigger
 	LLEventHandler() : LLCommandHandler("event", UNTRUSTED_THROTTLE) { }
-	bool handle(const LLSD& params, const LLSD& query_map,
-				LLMediaCtrl* web)
+	bool handle(const LLSD& params,
+                const LLSD& query_map,
+                const std::string& grid,
+				LLMediaCtrl* web) override
 	{
 		if (params.size() < 2)
 		{
@@ -163,11 +166,13 @@ bool LLEventNotifier::handleResponse(U32 eventId, const LLSD& notification, cons
 	return true;
 }
 
-bool LLEventNotifier::add(U32 eventId, F64 eventEpoch, const std::string& eventDateStr, const std::string &eventName)
+bool LLEventNotifier::add(const LLEventStruct& event)
 {
-	LLEventNotification *new_enp = new LLEventNotification(eventId, eventEpoch, eventDateStr, eventName);
+	if (mNewEventSignal(event)) { return false; }
+
+	LLEventNotification *new_enp = new LLEventNotification(event.eventId, event.eventEpoch, event.eventDateStr, event.eventName);
 	
-	LL_INFOS() << "Add event " << eventName << " id " << eventId << " date " << eventDateStr << LL_ENDL;
+	LL_INFOS() << "Add event " << event.eventName << " id " << event.eventId << " date " << event.eventDateStr << LL_ENDL;
 	if(!new_enp->isValid())
 	{
 		delete new_enp;
@@ -208,7 +213,18 @@ void LLEventNotifier::processEventInfoReply(LLMessageSystem *msg, void **)
 	msg->getStringFast(_PREHASH_EventData, _PREHASH_Date, eventd_date);
 	msg->getU32Fast(_PREHASH_EventData, _PREHASH_DateUTC, event_time_utc);
 	
-	gEventNotifier.add(event_id, (F64)event_time_utc, eventd_date, event_name);
+	LLEventStruct event(event_id, (F64)event_time_utc, eventd_date, event_name);
+    msg->getString(_PREHASH_EventData, _PREHASH_Creator, event.creator);
+	msg->getString(_PREHASH_EventData, _PREHASH_Category, event.category);
+    msg->getString(_PREHASH_EventData, _PREHASH_Desc, event.desc);
+    msg->getU32(_PREHASH_EventData, _PREHASH_Duration, event.duration);
+    msg->getU32(_PREHASH_EventData, _PREHASH_Cover, event.cover);
+    msg->getU32(_PREHASH_EventData, _PREHASH_Amount, event.amount);
+    msg->getString(_PREHASH_EventData, _PREHASH_SimName, event.simName);
+    msg->getVector3d(_PREHASH_EventData, _PREHASH_GlobalPos, event.globalPos);
+    msg->getU32(_PREHASH_EventData, _PREHASH_EventFlags, event.flags);
+	
+	gEventNotifier.add(event);
 }	
 	
 	
@@ -218,8 +234,35 @@ void LLEventNotifier::load(const LLSD& event_options)
 		end = event_options.endArray(); resp_it != end; ++resp_it)
 	{
 		LLSD response = *resp_it;
+        LLDate date;
+        bool is_iso8601_date = false;
 
-		add(response["event_id"].asInteger(), response["event_date_ut"], response["event_date"].asString(), response["event_name"].asString());
+        if (response["event_date"].isDate())
+        {
+            date = response["event_date"].asDate();
+            is_iso8601_date = true;
+        }
+        else if (date.fromString(response["event_date"].asString()))
+        {
+            is_iso8601_date = true;
+        }
+
+		std::string dateStr = response["event_date"].asString();
+
+        if (is_iso8601_date)
+        {
+            std::string iso8601date = 
+				"[" + LLTrans::getString("LTimeYear") + "]-[" + LLTrans::getString("LTimeMthNum") + "]-["
+                    + LLTrans::getString("LTimeDay") + "] [" + LLTrans::getString("LTimeHour") + "]:["
+                    + LLTrans::getString("LTimeMin") + "]:[" + LLTrans::getString("LTimeSec") + "]";
+
+            LLSD substitution;
+            substitution["datetime"] = date;
+            LLStringUtil::format(iso8601date, substitution);
+            dateStr = iso8601date;
+        }
+
+        add(LLEventStruct(response["event_id"].asInteger(), response["event_date_ut"], dateStr, response["event_name"].asString()));
 	}
 }
 

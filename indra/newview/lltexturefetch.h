@@ -48,8 +48,8 @@ class LLTextureFetchWorker;
 class LLImageDecodeThread;
 class LLHost;
 class LLViewerAssetStats;
-class LLTextureFetchDebugger;
 class LLTextureCache;
+class LLTextureFetchTester;
 
 // Interface class
 
@@ -58,13 +58,15 @@ class LLTextureFetch final : public LLWorkerThread
 	friend class LLTextureFetchWorker;
 	
 public:
-	LLTextureFetch(LLTextureCache* cache, LLImageDecodeThread* imagedecodethread, bool threaded, bool qa_mode);
+    static std::string getStateString(S32 state);
+
+	LLTextureFetch(LLTextureCache* cache, bool threaded, bool qa_mode);
 	~LLTextureFetch();
 
 	class TFRequest;
 	
     // Threads:  Tmain
-	/*virtual*/ S32 update(F32 max_time_ms) override;
+	/*virtual*/ size_t update(F32 max_time_ms) override;
 	
 	// called in the main thread after the TextureCacheThread shuts down.
     // Threads:  Tmain
@@ -75,7 +77,7 @@ public:
 	void shutDownImageDecodeThread();
 
 	// Threads:  T* (but Tmain mostly)
-	bool createRequest(FTType f_type, const std::string& url, const LLUUID& id, const LLHost& host, F32 priority,
+	S32 createRequest(FTType f_type, const std::string& url, const LLUUID& id, const LLHost& host, F32 priority,
 					   S32 w, S32 h, S32 c, S32 discard, bool needs_aux, bool can_use_http);
 
 	// Requests that a fetch operation be deleted from the queue.
@@ -100,12 +102,6 @@ public:
 	// Threads:  T*
 	bool updateRequestPriority(const LLUUID& id, F32 priority);
 
-    // Threads:  T*
-	bool receiveImageHeader(const LLHost& host, const LLUUID& id, U8 codec, U16 packets, U32 totalbytes, U16 data_size, U8* data);
-
-    // Threads:  T*
-	bool receiveImagePacket(const LLHost& host, const LLUUID& id, U16 packet_num, U16 data_size, U8* data);
-
     // Threads:  T* (but not safe)
 	void setTextureBandwidth(F32 bandwidth) { mTextureBandwidth = bandwidth; }
 	
@@ -115,10 +111,11 @@ public:
     // Threads:  T*
 	BOOL isFromLocalCache(const LLUUID& id);
 
-	// @return	Magic number giving the internal state of the
-	//			request.  We should make these codes public if we're
-	//			going to return them as a status value.
-	//
+    // get the current fetch state, if any, from the given UUID
+    S32 getFetchState(const LLUUID& id);
+
+	// @return	Fetch state of given image and associates statistics
+	//          See also getStateString
     // Threads:  T*
 	S32 getFetchState(const LLUUID& id, F32& decode_progress_p, F32& requested_priority_p,
 					  U32& fetch_priority_p, F32& fetch_dtime_p, F32& request_dtime_p, bool& can_use_http);
@@ -136,7 +133,7 @@ public:
 	U32 getTotalNumHTTPRequests();
 	
     // Threads:  T*
-    S32 getPending() const override { return mCommandsSize + mRequestQueueSize; }
+    size_t getPending() override;
 
     // Threads:  T*
 	void lockQueue() { mQueueMutex.lock(); }
@@ -226,12 +223,6 @@ public:
 	// ----------------------------------
 	
 protected:
-	// Threads:  T* (but Ttf in practice)
-	void addToNetworkQueue(LLTextureFetchWorker* worker);
-
-	// Threads:  T*
-	void removeFromNetworkQueue(LLTextureFetchWorker* worker, bool cancel);
-
     // Threads:  T*
 	void addToHTTPQueue(const LLUUID& id);
 
@@ -250,9 +241,6 @@ protected:
 	bool runCondition() override;
 
 private:
-    // Threads:  Tmain
-	void sendRequestListToSimulators();
-	
 	// Threads:  Ttf
 	/*virtual*/ void startThread(void) override;
 	
@@ -312,26 +300,24 @@ public:
     static LLTrace::CountStatHandle<F64>        sCacheAttempt;
     static LLTrace::SampleStatHandle<F32Seconds> sCacheReadLatency;
     static LLTrace::SampleStatHandle<F32Seconds> sTexDecodeLatency;
+	static LLTrace::SampleStatHandle<F32Seconds> sCacheWriteLatency;
     static LLTrace::SampleStatHandle<F32Seconds> sTexFetchLatency;
     static LLTrace::EventStatHandle<LLUnit<F32, LLUnits::Percent> > sCacheHitRate;
 
 private:
 	LLMutex mQueueMutex;        //to protect mRequestMap and mCommands only
-	LLMutex mNetworkQueueMutex; //to protect mNetworkQueue, mHTTPTextureQueue and mCancelQueue.
+	LLMutex mNetworkQueueMutex; //to protect mHTTPTextureQueue
 
 	LLTextureCache* mTextureCache;
-	LLImageDecodeThread* mImageDecodeThread;
 	
 	// Map of all requests by UUID
-	typedef absl::flat_hash_map<LLUUID,LLTextureFetchWorker*> map_t;
+	typedef boost::unordered_map<LLUUID,LLTextureFetchWorker*> map_t;
 	map_t mRequestMap;													// Mfq
 
 	// Set of requests that require network data
 	typedef std::set<LLUUID> queue_t;
-	queue_t mNetworkQueue;												// Mfnq
 	queue_t mHTTPTextureQueue;											// Mfnq
 	typedef std::map<LLHost,std::set<LLUUID> > cancel_queue_t;
-	cancel_queue_t mCancelQueue;										// Mfnq
 	F32 mTextureBandwidth;												// <none>
 	std::atomic<F32> mMaxBandwidth;
 #ifndef LL_RELEASE_FOR_DOWNLOAD
@@ -406,11 +392,10 @@ public:
 		FROM_HTTP_ONLY,
 		INVALID_SOURCE
 	};
+
+	static LLTextureFetchTester* sTesterp;
+
 private:
-	//debug use
-	LLTextureFetchDebugger* mFetchDebugger;
-	bool mFetcherLocked;
-	
 	e_tex_source mFetchSource;
 	e_tex_source mOriginFetchSource;
 
@@ -418,10 +403,6 @@ private:
 	//LLAdaptiveRetryPolicy mFetchRetryPolicy;
 	
 public:
-	//debug use
-	LLTextureFetchDebugger* getFetchDebugger() { return mFetchDebugger;}
-	void lockFetcher(bool lock) { mFetcherLocked = lock;}
-
 	void setLoadSource(e_tex_source source) {mFetchSource = source;}
 	void resetLoadSource() {mFetchSource = mOriginFetchSource;}
 	bool canLoadFromCache() { return mFetchSource != FROM_HTTP_ONLY;}
@@ -429,214 +410,25 @@ public:
 
 //debug use
 class LLViewerFetchedTexture;
-class LLTextureFetchDebugger : public LLCore::HttpHandler
+
+class LLTextureFetchTester : public LLMetricPerformanceTesterBasic
 {
-	friend class LLTextureFetch;
 public:
-	LLTextureFetchDebugger(LLTextureFetch* fetcher, LLTextureCache* cache, LLImageDecodeThread* imagedecodethread) ;
-	~LLTextureFetchDebugger();
+	LLTextureFetchTester();
+	~LLTextureFetchTester();
 
-public:
-	enum e_debug_state
-	{
-		IDLE = 0,
-		START_DEBUG,
-		READ_CACHE,
-		WRITE_CACHE,
-		DECODING,
-		HTTP_FETCHING,
-		GL_TEX,
-		REFETCH_VIS_CACHE,
-		REFETCH_VIS_HTTP,
-		REFETCH_ALL_CACHE,
-		REFETCH_ALL_HTTP,
-		INVALID
-	};
+	void updateStats(const std::map<S32, F32> states_timers, const F32 fetch_time, const F32 other_states_time, const S32 file_size);
 
-private:	
-	struct FetchEntry
-	{
-		enum e_curl_state
-		{
-			CURL_NOT_DONE = 0,
-			CURL_IN_PROGRESS,
-			CURL_DONE
-		};
-		LLUUID mID;
-		S32 mRequestedSize;
-		S32 mDecodedLevel;
-		S32 mFetchedSize;
-		S32 mDecodedSize;
-		BOOL mNeedsAux;
-		U32 mCacheHandle;
-		LLPointer<LLImageFormatted> mFormattedImage;
-		LLPointer<LLImageRaw> mRawImage;
-		e_curl_state mCurlState;
-		S32 mCurlReceivedSize;
-		LLCore::HttpHandle mHttpHandle;
-
-		FetchEntry() :
-			mDecodedLevel(-1),
-			mFetchedSize(0),
-			mDecodedSize(0),
-			mHttpHandle(LLCORE_HTTP_HANDLE_INVALID)
-			{}
-		FetchEntry(LLUUID& id, S32 r_size, /*S32 f_discard, S32 c,*/ S32 level, S32 f_size, S32 d_size) :
-			mID(id),
-			mRequestedSize(r_size),
-			mDecodedLevel(level),
-			mFetchedSize(f_size),
-			mDecodedSize(d_size),
-			mNeedsAux(false),
-			mHttpHandle(LLCORE_HTTP_HANDLE_INVALID)
-			{}
-	};
-	typedef std::vector<FetchEntry> fetch_list_t;
-	fetch_list_t mFetchingHistory;
-
-	typedef std::map<LLCore::HttpHandle, S32> handle_fetch_map_t;
-	handle_fetch_map_t mHandleToFetchIndex;
-
-	void setDebuggerState(e_debug_state new_state) { mDebuggerState = new_state; }
-	e_debug_state mDebuggerState;
-	
-	F32 mCacheReadTime;
-	F32 mCacheWriteTime;
-	F32 mDecodingTime;
-	F32 mHTTPTime;
-	F32 mGLCreationTime;
-
-	F32 mTotalFetchingTime;
-	F32 mRefetchVisCacheTime;
-	F32 mRefetchVisHTTPTime;
-	F32 mRefetchAllCacheTime;
-	F32 mRefetchAllHTTPTime;
-
-	LLTimer mTimer;
-	
-	LLTextureFetch* mFetcher;
-	LLTextureCache* mTextureCache;
-	LLImageDecodeThread* mImageDecodeThread;
-	LLCore::HttpHeaders::ptr_t mHttpHeaders;
-	LLCore::HttpRequest::policy_t mHttpPolicyClass;
-	
-	S32 mNumFetchedTextures;
-	S32 mNumCacheHits;
-	S32 mNumVisibleFetchedTextures;
-	S32 mNumVisibleFetchingRequests;
-	U32 mFetchedData;
-	U32 mDecodedData;
-	U32 mVisibleFetchedData;
-	U32 mVisibleDecodedData;
-	U32 mRenderedData;
-	U32 mRenderedDecodedData;
-	U32 mFetchedPixels;
-	U32 mRenderedPixels;
-	U32 mRefetchedVisData;
-	U32 mRefetchedVisPixels;
-	U32 mRefetchedAllData;
-	U32 mRefetchedAllPixels;
-
-	BOOL mFreezeHistory;
-	BOOL mStopDebug;
-	BOOL mClearHistory;
-	BOOL mRefetchNonVis;
-
-	std::string mHTTPUrl;
-	S32 mNbCurlRequests;
-	S32 mNbCurlCompleted;
-
-	std::map< LLPointer<LLViewerFetchedTexture>, std::vector<S32> > mRefetchList; // treats UI textures as normal textures
-	std::vector< LLPointer<LLViewerFetchedTexture> > mTempTexList;
-	S32 mTempIndex;
-	S32 mHistoryListIndex;
-
-public:
-	bool update(F32 max_time); //called in the main thread once per frame
-
-	//fetching history
-	void clearHistory();
-	void addHistoryEntry(LLTextureFetchWorker* worker);
-	
-	// Inherited from LLCore::HttpHandler
-	// Threads:  Ttf
-	virtual void onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response);
-
-	void startWork(e_debug_state state);
-	void setStopDebug() {mStopDebug = TRUE;}
-	void tryToStopDebug(); //stop everything
-	void callbackCacheRead(S32 id, bool success, LLImageFormatted* image,
-						   S32 imagesize, BOOL islocal);
-	void callbackCacheWrite(S32 id, bool success);
-	void callbackDecoded(S32 id, bool success, LLImageRaw* raw, LLImageRaw* aux);
-	void callbackHTTP(FetchEntry & fetch, LLCore::HttpResponse * response);
-
-	e_debug_state getState()             {return mDebuggerState;}
-	S32  getNumFetchedTextures()         {return mNumFetchedTextures;}
-	S32  getNumFetchingRequests()        {return mFetchingHistory.size();}
-	S32  getNumCacheHits()               {return mNumCacheHits;}
-	S32  getNumVisibleFetchedTextures()  {return mNumVisibleFetchedTextures;}
-	S32  getNumVisibleFetchingRequests() {return mNumVisibleFetchingRequests;}
-	U32  getFetchedData()                {return mFetchedData;}
-	U32  getDecodedData()                {return mDecodedData;}
-	U32  getVisibleFetchedData()         {return mVisibleFetchedData;}
-	U32  getVisibleDecodedData()         {return mVisibleDecodedData;}
-	U32  getRenderedData()               {return mRenderedData;}
-	U32  getRenderedDecodedData()        {return mRenderedDecodedData;}
-	U32  getFetchedPixels()              {return mFetchedPixels;}
-	U32  getRenderedPixels()             {return mRenderedPixels;}
-	U32  getRefetchedVisData()              {return mRefetchedVisData;}
-	U32  getRefetchedVisPixels()            {return mRefetchedVisPixels;}
-	U32  getRefetchedAllData()              {return mRefetchedAllData;}
-	U32  getRefetchedAllPixels()            {return mRefetchedAllPixels;}
-
-	F32  getCacheReadTime()     {return mCacheReadTime;}
-	F32  getCacheWriteTime()    {return mCacheWriteTime;}
-	F32  getDecodeTime()        {return mDecodingTime;}
-	F32  getGLCreationTime()    {return mGLCreationTime;}
-	F32  getHTTPTime()          {return mHTTPTime;}
-	F32  getTotalFetchingTime() {return mTotalFetchingTime;}
-	F32  getRefetchVisCacheTime() {return mRefetchVisCacheTime;}
-	F32  getRefetchVisHTTPTime()  {return mRefetchVisHTTPTime;}
-	F32  getRefetchAllCacheTime() {return mRefetchAllCacheTime;}
-	F32  getRefetchAllHTTPTime()  {return mRefetchAllHTTPTime;}
+protected:
+	/*virtual*/ void outputTestRecord(LLSD* sd);
 
 private:
-	void init();
-	void clearTextures();//clear fetching results of all textures.
-	void clearCache();
-	void makeRefetchList();
-	void scanRefetchList();
 
-	void lockFetcher();
-	void unlockFetcher();
+	F32 mTextureFetchTime;
+	F32 mSkippedStatesTime;
+	S32 mFileSize;
 
-	void lockCache();
-	void unlockCache();
-
-	void lockDecoder();
-	void unlockDecoder();
-	
-	S32 fillCurlQueue();
-
-	void startDebug();
-	void debugCacheRead();
-	void debugCacheWrite();	
-	void debugHTTP();
-	void debugDecoder();
-	void debugGLTextureCreation();
-	void debugRefetchVisibleFromCache();
-	void debugRefetchVisibleFromHTTP();
-	void debugRefetchAllFromCache();
-	void debugRefetchAllFromHTTP();
-
-	bool processStartDebug(F32 max_time);
-	bool processGLCreation(F32 max_time);
-
-private:
-	static bool sDebuggerEnabled;
-public:
-	static bool isEnabled() {return sDebuggerEnabled;}
+	std::map<S32, F32> mStateTimersMap;
 };
 #endif // LL_LLTEXTUREFETCH_H
 

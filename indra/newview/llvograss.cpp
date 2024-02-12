@@ -38,7 +38,6 @@
 #include "llsky.h"
 #include "llsurface.h"
 #include "llsurfacepatch.h"
-#include "llvosky.h"
 #include "llviewercamera.h"
 #include "llviewertexturelist.h"
 #include "llviewerregion.h"
@@ -267,7 +266,7 @@ U32 LLVOGrass::processUpdateMessage(LLMessageSystem *mesgsys,
 
 	if (mDrawable)
 	{
-		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME, TRUE);
+		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
 	}
 
 	return retval;
@@ -293,12 +292,12 @@ void LLVOGrass::idleUpdate(LLAgent &agent, const F64 &time)
 	if (!LLVOTree::isTreeRenderingStopped() && !mNumBlades)//restart grass rendering
 	{
 		mNumBlades = GRASS_MAX_BLADES;
-		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 		return;
 	}
 	if (mPatch && (mLastPatchUpdateTime != mPatch->getLastUpdateTime()))
 	{
-		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME, TRUE);
+		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
 	}
 
 	return;
@@ -316,7 +315,7 @@ void LLVOGrass::setPixelAreaAndAngle(LLAgent &agent)
 	mAppAngle = (F32) atan2( max_scale, range) * RAD_TO_DEG;
 
 	// Compute pixels per meter at the given range
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 	F32 pixels_per_meter = viewerCamera.getViewHeightInPixels() / (tan(viewerCamera.getView()) * range);
 
 	// Assume grass texture is a 5 meter by 5 meter sprite at the grass object's center
@@ -352,7 +351,7 @@ BOOL LLVOGrass::updateLOD()
 		{
 			mNumBlades = 0 ;
             face->setSize(0, 0);
-			gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+			gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 		}
 		return TRUE ;
 	}
@@ -377,7 +376,7 @@ BOOL LLVOGrass::updateLOD()
 		{
 			face->setSize(mNumBlades*8, mNumBlades*12);
 		}
-		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 	}
 	else if (num_blades <= (mNumBlades >> 1))
 	{
@@ -390,7 +389,7 @@ BOOL LLVOGrass::updateLOD()
 		{
 			face->setSize(mNumBlades*8, mNumBlades*12);
 		}
-		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 		return TRUE;
 	}
 
@@ -405,11 +404,9 @@ LLDrawable* LLVOGrass::createDrawable(LLPipeline *pipeline)
 	return mDrawable;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_GRASS("Update Grass");
-
 BOOL LLVOGrass::updateGeometry(LLDrawable *drawable)
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_GRASS);
+	LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWABLE("Update Grass");
 
 	dirtySpatialGroup();
 
@@ -457,7 +454,7 @@ void LLVOGrass::plantBlades()
 		face->mCenterLocal = mPosition + mRegionp->getOriginAgent();
 	}
 
-	auto& viewerCamera = LLViewerCamera::instanceFast();
+	auto& viewerCamera = LLViewerCamera::instance();
 	mDepth = (face->mCenterLocal - viewerCamera.getOrigin())* viewerCamera.getAtAxis();
 	mDrawable->setPosition(face->mCenterLocal);
 	mDrawable->movePartition();
@@ -595,7 +592,7 @@ U32 LLVOGrass::getPartitionType() const
 }
 
 LLGrassPartition::LLGrassPartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, GL_STREAM_DRAW, regionp)
+: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, regionp)
 {
 	mDrawableType = LLPipeline::RENDER_TYPE_GRASS;
 	mPartitionType = LLViewerRegion::PARTITION_GRASS;
@@ -603,16 +600,13 @@ LLGrassPartition::LLGrassPartition(LLViewerRegion* regionp)
 	mDepthMask = TRUE;
 	mSlopRatio = 0.1f;
 	mRenderPass = LLRenderPass::PASS_GRASS;
-	mBufferUsage = GL_DYNAMIC_DRAW;
 }
 
 void LLGrassPartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_count, U32& index_count)
 {
-	group->mBufferUsage = mBufferUsage;
-
 	mFaceList.clear();
 
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 	{
 		LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();
@@ -625,11 +619,6 @@ void LLGrassPartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_count
 		LLAlphaObject* obj = (LLAlphaObject*) drawablep->getVObj().get();
 		obj->mDepth = 0.f;
 		
-		if (drawablep->isAnimating())
-		{
-			group->mBufferUsage = GL_STREAM_DRAW;
-		}
-
 		U32 count = 0;
 		for (S32 j = 0; j < drawablep->getNumFaces(); ++j)
 		{
@@ -662,11 +651,9 @@ void LLGrassPartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_count
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_REBUILD_GRASS_VB("Grass VB");
-
 void LLGrassPartition::getGeometry(LLSpatialGroup* group)
 {
-	LL_RECORD_BLOCK_TIME(FTM_REBUILD_GRASS_VB);
+    LL_PROFILE_ZONE_SCOPED;
 
 	std::sort(mFaceList.begin(), mFaceList.end(), LLFace::CompareDistanceGreater());
 
@@ -710,8 +697,7 @@ void LLGrassPartition::getGeometry(LLSpatialGroup* group)
 
 		S32 idx = draw_vec.size()-1;
 
-		BOOL fullbright = facep->isState(LLFace::FULLBRIGHT);
-		F32 vsize = facep->getVirtualSize();
+		bool fullbright = facep->isState(LLFace::FULLBRIGHT);
 
 		if (idx >= 0 && draw_vec[idx]->mEnd == facep->getGeomIndex()-1 &&
 			draw_vec[idx]->mTexture == facep->getTexture() &&
@@ -722,7 +708,6 @@ void LLGrassPartition::getGeometry(LLSpatialGroup* group)
 		{
 			draw_vec[idx]->mCount += facep->getIndicesCount();
 			draw_vec[idx]->mEnd += facep->getGeomCount();
-			draw_vec[idx]->mVSize = llmax(draw_vec[idx]->mVSize, vsize);
 		}
 		else
 		{
@@ -734,17 +719,13 @@ void LLGrassPartition::getGeometry(LLSpatialGroup* group)
 				//facep->getTexture(),
 				buffer, object->isSelected(), fullbright);
 
-			const LLVector4a* exts = group->getObjectExtents();
-			info->mExtents[0] = exts[0];
-			info->mExtents[1] = exts[1];
-			info->mVSize = vsize;
 			draw_vec.push_back(info);
 			//for alpha sorting
 			facep->setDrawInfo(info);
 		}
 	}
 
-	buffer->flush();
+	buffer->unmapBuffer();
 	mFaceList.clear();
 }
 
@@ -755,13 +736,13 @@ void LLVOGrass::updateDrawable(BOOL force_damped)
 	if (mDrawable.notNull())
 	{
 		mDrawable->updateXform(TRUE);
-		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 	}
 	clearChanged(SHIFTED);
 }
 
 // virtual 
-BOOL LLVOGrass::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, S32 *face_hitp,
+BOOL LLVOGrass::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, BOOL pick_unselectable, S32 *face_hitp,
 									  LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
 	
 {

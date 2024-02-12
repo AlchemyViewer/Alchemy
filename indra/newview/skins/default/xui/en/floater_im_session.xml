@@ -431,20 +431,6 @@
                          right="-1"
                          bottom="-1">
                             <layout_panel
-                             auto_resize="false"
-                             height="26"
-                             name="translate_chat_checkbox_lp">
-                                <check_box
-                                 top="10"
-                                 control_name="TranslateChat"
-                                 enabled="true"
-                                 height="16"
-                                 label="Translate chat"
-                                 left="5"
-                                 name="translate_chat_checkbox"
-                                 width="230" />
-                            </layout_panel>
-                            <layout_panel
                              name="chat_holder">
                                 <chat_history
                                  font="SansSerifSmall"
@@ -516,7 +502,7 @@
                          is_expandable="true"
                          text_tentative_color="TextFgTentativeColor"
                          name="chat_editor"
-                         max_length="1023"
+                         max_length="5000"
                          spellcheck="true"
                          tab_group="3"
                          bottom="-4"

@@ -50,10 +50,13 @@ class LLScrollListItem
 {
 	friend class LLScrollListCtrl;
 public:
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+	typedef boost::function<void(const LLSD& value, LLScrollListCell* cell)> commit_callback_t;
+	typedef boost::signals2::signal<void(const LLSD& value, LLScrollListCell* cell)> commit_signal_t;
+// [/SL:KB]
+
 	//BD - Cells ~ Thanks to Liru
 	struct Contents : public LLInitParam::Block<Contents>
-	{
-		Multiple<LLScrollListCell::Params>	columns;
 		Contents()
 		:	columns("columns")
 		{
@@ -65,8 +68,12 @@ public:
 	struct Params : public LLInitParam::Block<Params>
 	{
 		Optional<bool>		enabled;
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+		Optional<commit_callback_t> commit_callback;
+// [/SL:KB]
 		Optional<void*>		userdata;
 		Optional<LLSD>		value;
+		Optional<LLSD>		alt_value;
 		
 		Ignored				name; // use for localization tools
 		Ignored				type; 
@@ -80,6 +87,7 @@ public:
 		Params()
 		:	enabled("enabled", true),
 			value("value"),
+			alt_value("alt_value"),
 			name("name"),
 			type("type"),
 			length("length"),
@@ -123,6 +131,7 @@ public:
 
 	virtual LLUUID	getUUID() const			{ return mItemValue.asUUID(); }
 	LLSD	getValue() const				{ return mItemValue; }
+	LLSD	getAltValue() const				{ return mItemAltValue; }
 	
 	void	setRect(LLRect rect)			{ mRectangle = rect; }
 	LLRect	getRect() const					{ return mRectangle; }
@@ -159,6 +168,7 @@ private:
 	bool	mFlaggedDead = false;
 	void*	mUserdata;
 	LLSD	mItemValue;
+	LLSD	mItemAltValue;
 	std::string	mToolTip;
 	std::vector<LLScrollListCell *> mColumns;
 	LLRect  mRectangle;

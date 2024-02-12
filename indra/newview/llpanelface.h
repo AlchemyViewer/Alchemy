@@ -29,10 +29,13 @@
 
 #include "v4color.h"
 #include "llpanel.h"
+#include "llgltfmaterial.h"
 #include "llmaterial.h"
 #include "llmaterialmgr.h"
 #include "lltextureentry.h"
 #include "llselectmgr.h"
+
+#include <memory>
 
 class LLButton;
 class LLCheckBoxCtrl;
@@ -47,7 +50,12 @@ class LLUICtrl;
 class LLViewerObject;
 class LLFloater;
 class LLMaterialID;
+class LLMediaCtrl;
+class LLMenuButton;
 class LLRadioGroup;
+
+class PBRPickerAgentListener;
+class PBRPickerObjectListener;
 
 // Represents an edit for use in replicating the op across one or more materials in the selection set.
 //
@@ -98,8 +106,13 @@ public:
 	virtual ~LLPanelFace();
 
 	void			refresh();
-	void			setMediaURL(const std::string& url);
-	void			setMediaType(const std::string& mime_type);
+    void			refreshMedia();
+    void			unloadMedia();
+
+    static void onMaterialOverrideReceived(const LLUUID& object_id, S32 side);
+
+    /*virtual*/ void onVisibilityChange(BOOL new_visibility);
+    /*virtual*/ void draw();
 
 	LLMaterialPtr createDefaultMaterial(LLMaterialPtr current_material)
 	{
@@ -113,8 +126,16 @@ public:
 	}
 
 	LLRender::eTexIndex getTextureChannelToEdit();
+    LLRender::eTexIndex getTextureDropChannel();
+    LLGLTFMaterial::TextureInfo getPBRDropChannel();
 
 protected:
+    void			navigateToTitleMedia(const std::string url);
+    bool			selectedMediaEditable();
+    void			clearMediaSettings();
+    void			updateMediaSettings();
+    void			updateMediaTitle();
+
 	void			getState();
 
 	void			sendTexture();			// applies and sends texture
@@ -125,9 +146,15 @@ protected:
 	void			sendTexGen();				// applies and sends bump map
 	void			sendShiny(U32 shininess);			// applies and sends shininess
 	void			sendFullbright();		// applies and sends full bright
-	void        sendGlow();
-	void			sendMedia();
+	void			sendGlow();
     void            alignTestureLayer();
+
+    void            updateCopyTexButton();
+
+    void 	onCommitPbr(const LLSD& data);
+    void 	onCancelPbr(const LLSD& data);
+    void 	onSelectPbr(const LLSD& data);
+    static BOOL onDragPbr(LLUICtrl* ctrl, LLInventoryItem* item);
 
 	// this function is to return TRUE if the drag should succeed.
 	static BOOL onDragTexture(LLUICtrl* ctrl, LLInventoryItem* item);
@@ -150,6 +177,9 @@ protected:
 	void 	onSelectShinyColor(const LLSD& data);
 
 	void 	onCloseTexturePicker(const LLSD& data);
+
+    static bool deleteMediaConfirm(const LLSD& notification, const LLSD& response);
+    static bool multipleFacesSelectedConfirm(const LLSD& notification, const LLSD& response);
 
 	// Make UI reflect state of currently selected material (refresh)
 	// and UI mode (e.g. editing normal map v diffuse map)
@@ -192,9 +222,14 @@ protected:
 	static void		onCommitMaterialGloss(			LLUICtrl* ctrl, void* userdata);
 	static void		onCommitMaterialEnv(				LLUICtrl* ctrl, void* userdata);
 	static void		onCommitMaterialMaskCutoff(	LLUICtrl* ctrl, void* userdata);
+	static void		onCommitMaterialID( LLUICtrl* ctrl, void* userdata);
 
 	static void		onCommitMaterialsMedia(	LLUICtrl* ctrl, void* userdata);
 	static void		onCommitMaterialType(	LLUICtrl* ctrl, void* userdata);
+    static void		onCommitPbrType(LLUICtrl* ctrl, void* userdata);
+	static void 	onClickBtnEditMedia(LLUICtrl* ctrl, void* userdata);
+	static void 	onClickBtnDeleteMedia(LLUICtrl* ctrl, void* userdata);
+	static void 	onClickBtnAddMedia(LLUICtrl* ctrl, void* userdata);
 	static void		onCommitBump(				LLUICtrl* ctrl, void* userdata);
 	static void		onCommitTexGen(			LLUICtrl* ctrl, void* userdata);
 	static void		onCommitShiny(				LLUICtrl* ctrl, void* userdata);
@@ -203,8 +238,32 @@ protected:
 	static void    onCommitGlow(				LLUICtrl* ctrl, void *userdata);
 	static void		onCommitPlanarAlign(		LLUICtrl* ctrl, void* userdata);
 	static void		onCommitRepeatsPerMeter(	LLUICtrl* ctrl, void* userinfo);
+
+	void onClickBtnSelectSameTexture(const LLUICtrl* ctrl, const LLSD& user_data);
+
+    void            onCommitGLTFTextureScaleU(LLUICtrl* ctrl);
+    void            onCommitGLTFTextureScaleV(LLUICtrl* ctrl);
+    void            onCommitGLTFRotation(LLUICtrl* ctrl);
+    void            onCommitGLTFTextureOffsetU(LLUICtrl* ctrl);
+    void            onCommitGLTFTextureOffsetV(LLUICtrl* ctrl);
+
 	static void		onClickAutoFix(void*);
     static void		onAlignTexture(void*);
+    static void 	onClickBtnLoadInvPBR(void* userdata);
+    static void 	onClickBtnEditPBR(void* userdata);
+    static void 	onClickBtnSavePBR(void* userdata);
+
+public: // needs to be accessible to selection manager
+    void            onCopyColor(); // records all selected faces
+    void            onPasteColor(); // to specific face
+    void            onPasteColor(LLViewerObject* objectp, S32 te); // to specific face
+    void            onCopyTexture();
+    void            onPasteTexture();
+    void            onPasteTexture(LLViewerObject* objectp, S32 te);
+
+protected:
+    void            menuDoToSelected(const LLSD& userdata);
+    bool            menuEnableItem(const LLSD& userdata);
 
 	static F32     valueGlow(LLViewerObject* object, S32 face);
 
@@ -216,7 +275,6 @@ public:
     LLColorSwatchCtrl* mShinyColorSwatch = nullptr;
 
     LLComboBox* mComboTexGen   = nullptr;
-    LLComboBox* mComboMatMedia = nullptr;
     LLComboBox* mComboBumpiness = nullptr;
     LLComboBox* mComboShininess = nullptr;
     LLComboBox* mComboAlphaMode    = nullptr;
@@ -235,7 +293,6 @@ public:
     LLSpinCtrl* mSpinMaskCutoff  = nullptr;
 
 private:
-
 	bool		isAlpha() { return mIsAlpha; }
 
 	// Convenience funcs to keep the visual flack to a minimum
@@ -244,10 +301,10 @@ private:
 	LLUUID	getCurrentSpecularMap();
 	U32		getCurrentShininess();
 	U32		getCurrentBumpiness();
-	U8			getCurrentDiffuseAlphaMode();
-	U8			getCurrentAlphaMaskCutoff();
-	U8			getCurrentEnvIntensity();
-	U8			getCurrentGlossiness();
+	U8		getCurrentDiffuseAlphaMode();
+	U8		getCurrentAlphaMaskCutoff();
+	U8		getCurrentEnvIntensity();
+	U8		getCurrentGlossiness();
 	F32		getCurrentBumpyRot();
 	F32		getCurrentBumpyScaleU();
 	F32		getCurrentBumpyScaleV();
@@ -259,16 +316,16 @@ private:
 	F32		getCurrentShinyOffsetU();
 	F32		getCurrentShinyOffsetV();
 
+    LLComboBox *mComboMatMedia;
+    LLMediaCtrl *mTitleMedia;
+    LLTextBox *mTitleMediaText;
+
 	// Update visibility of controls to match current UI mode
 	// (e.g. materials vs media editing)
 	//
 	// Do NOT call updateUI from within this function.
 	//
-	void updateVisibility();
-
-	// Make material(s) reflect current state of UI (apply edit)
-	//
-	void updateMaterial();
+	void updateVisibility(LLViewerObject* objectp = nullptr);
 
 	// Hey look everyone, a type-safe alternative to copy and paste! :)
 	//
@@ -323,7 +380,7 @@ private:
 
 					U32		new_alpha_mode			= new_material->getDiffuseAlphaMode();
 					LLUUID	new_normal_map_id		= new_material->getNormalID();
-					LLUUID	new_spec_map_id		= new_material->getSpecularID();
+					LLUUID	new_spec_map_id			= new_material->getSpecularID();
 
 					if ((new_alpha_mode == LLMaterial::DIFFUSE_ALPHA_MODE_BLEND) && !is_alpha_face)
 					{
@@ -355,7 +412,7 @@ private:
 			LLPanelFace *_panel;
 			const LLUUID & _only_for_object_id;
 		} editor(p, &edit, only_for_object_id);
-		LLSelectMgr::getInstanceFast()->selectionSetMaterialParams(&editor, te);
+		LLSelectMgr::getInstance()->selectionSetMaterialParams(&editor, te);
 	}
 
 	template<
@@ -387,7 +444,7 @@ private:
 			}
 			DataType _default;
 		} GetFunc(default_value);
-		identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &GetFunc, data_value, has_tolerance, tolerance);
+		identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &GetFunc, data_value, has_tolerance, tolerance);
 		data_to_return = data_value;
 	}
 
@@ -409,7 +466,7 @@ private:
 			}
 			DataType _default;
 		} GetTEValFunc(default_value);
-		identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &GetTEValFunc, data_value, has_tolerance, tolerance );
+		identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &GetTEValFunc, data_value, has_tolerance, tolerance );
 		data_to_return = data_value;
 	}
 
@@ -425,22 +482,64 @@ private:
 	 * If agent selects texture which is not allowed to be applied for the currently selected object,
 	 * all controls of the floater texture picker which allow to apply the texture will be disabled.
 	 */
-	void onTextureSelectionChanged(LLInventoryItem* itemp);
+    void onTextureSelectionChanged(LLInventoryItem* itemp);
+    void onPbrSelectionChanged(LLInventoryItem* itemp);
+
+    void updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, bool& has_faces_without_pbr, bool force_set_values);
+    void updateVisibilityGLTF(LLViewerObject* objectp = nullptr);
+
+    void updateSelectedGLTFMaterials(std::function<void(LLGLTFMaterial*)> func);
+    void updateGLTFTextureTransform(float value, U32 pbr_type, std::function<void(LLGLTFMaterial::TextureTransform*)> edit);
+
+    void setMaterialOverridesFromSelection();
+
+	LLButton* mBtnCopyColor = nullptr;
+	LLButton* mBtnPasteColor = nullptr;
+	LLButton* mBtnCopyTextures = nullptr;
+	LLButton* mBtnPasteTextures = nullptr;
 
 	bool mIsAlpha;
 	
-	/* These variables interlock processing of materials updates sent to
-	 * the sim.  mUpdateInFlight is set to flag that an update has been
-	 * sent to the sim and not acknowledged yet, and cleared when an
-	 * update is received from the sim.  mUpdatePending is set when
-	 * there's an update in flight and another UI change has been made
-	 * that needs to be sent as a materials update, and cleared when the
-	 * update is sent.  This prevents the sim from getting spammed with
-	 * update messages when, for example, the user holds down the
-	 * up-arrow on a spinner, and avoids running afoul of its throttle.
-	 */
-	bool mUpdateInFlight;
-	bool mUpdatePending;
+    LLSD            mClipboardParams;
+
+    LLSD mMediaSettings;
+    bool mNeedMediaTitle;
+
+    class Selection
+    {
+    public:
+        void connect();
+
+        // Returns true if the selected objects or sides have changed since
+        // this was last called, and no object update is pending
+        bool update();
+
+        // Prevents update() returning true until the provided object is
+        // updated. Necessary to prevent controls updating when the mouse is
+        // held down.
+        void setDirty() { mChanged = true; };
+
+        // Callbacks
+        void onSelectionChanged() { mNeedsSelectionCheck = true; }
+        void onSelectedObjectUpdated(const LLUUID &object_id, S32 side);
+
+    protected:
+        bool compareSelection();
+
+        bool mChanged = false;
+
+        boost::signals2::scoped_connection mSelectConnection;
+        bool mNeedsSelectionCheck = true;
+        S32 mSelectedObjectCount = 0;
+        S32 mSelectedTECount = 0;
+        LLUUID mSelectedObjectID;
+        S32 mLastSelectedSide = -1;
+    };
+
+    static Selection sMaterialOverrideSelection;
+
+    std::unique_ptr<PBRPickerAgentListener> mAgentInventoryListener;
+    std::unique_ptr<PBRPickerObjectListener> mVOInventoryListener;
 
 public:
 	#if defined(DEF_GET_MAT_STATE)
@@ -527,10 +626,10 @@ public:
 	class LLSelectedTE
 	{
 	public:
-
 		static void getFace(class LLFace*& face_to_return, bool& identical_face);
 		static void getImageFormat(LLGLenum& image_format_to_return, bool& identical_face);
 		static void getTexId(LLUUID& id, bool& identical);
+        static void getPbrMaterialId(LLUUID& id, bool& identical, bool& has_pbr, bool& has_faces_without_pbr);
 		static void getObjectScaleS(F32& scale_s, bool& identical);
 		static void getObjectScaleT(F32& scale_t, bool& identical);
 		static void getMaxDiffuseRepeats(F32& repeats, bool& identical);

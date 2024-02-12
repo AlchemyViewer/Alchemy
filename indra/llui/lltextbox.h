@@ -59,6 +59,7 @@ public:
 	void			setRightAlign()							{ mHAlign = LLFontGL::RIGHT; }
 	void			setHAlign( LLFontGL::HAlign align )		{ mHAlign = align; }
 	void			setClickedCallback( boost::function<void (void*)> cb, void* userdata = NULL );
+	void			clearClickedCallback();
 
 	void			reshapeToFitText(BOOL called_from_parent = FALSE);
 
@@ -68,6 +69,8 @@ public:
 	/*virtual*/ LLSD	getValue() const;
 	/*virtual*/ BOOL	setTextArg( const std::string& key, const LLStringExplicit& text );
 
+    void updateCurrencySymbols();
+
 	void			setShowCursorHand(bool show_cursor) { mShowCursorHand = show_cursor; }
 
 protected:
@@ -76,6 +79,12 @@ protected:
 	LLUIString			mText;
 	callback_t			mClickedCallback;
 	bool				mShowCursorHand;
+
+protected:
+	virtual std::string _getSearchText() const
+	{
+		return LLTextBase::_getSearchText() + mText.getString();
+	}
 };
 
 // Build time optimization, generate once in .cpp file

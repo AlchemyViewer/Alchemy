@@ -27,7 +27,7 @@
 #ifndef LL_LLXMLPARSER_H
 #define LL_LLXMLPARSER_H
 
-#if LL_DARWIN || defined(LL_USESYSTEMLIBS)
+#if defined(LL_USESYSTEMLIBS)
 # include <expat.h>
 #else
 # include "expat/expat.h"

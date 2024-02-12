@@ -402,7 +402,7 @@ const std::string LLSpellChecker::getDictionaryUserPath()
 // static
 bool LLSpellChecker::getUseSpellCheck()
 {
-	return LLSpellChecker::instanceFast().mHunspell;
+	return LLSpellChecker::instance().mHunspell;
 }
 
 bool LLSpellChecker::canRemoveDictionary(const std::string& dict_language)
@@ -481,8 +481,8 @@ boost::signals2::connection LLSpellChecker::setSettingsChangeCallback(const sett
 void LLSpellChecker::setUseSpellCheck(const std::string& dict_language)
 {
 	if ( (((dict_language.empty()) && (getUseSpellCheck())) || (!dict_language.empty())) && 
-		 (LLSpellChecker::instanceFast().mDictLanguage != dict_language) )
+		 (LLSpellChecker::instance().mDictLanguage != dict_language) )
 	{
-		LLSpellChecker::instanceFast().initHunspell(dict_language);
+		LLSpellChecker::instance().initHunspell(dict_language);
 	}
 }

@@ -217,6 +217,7 @@ public:
 					remainptr += written;
 					remainlen -= written;
 
+#if SHOW_DEBUG
 					char msgbuf[512];
 					LL_DEBUGS("LLProcess") << "wrote " << written << " of " << towrite
 										   << " bytes to " << mDesc
@@ -224,6 +225,7 @@ public:
 										   << " code " << err << ": "
 										   << apr_strerror(err, msgbuf, sizeof(msgbuf))
 										   << LL_ENDL;
+#endif
 
 					// The parent end of this pipe is nonblocking. If we weren't able
 					// to write everything we wanted, don't keep banging on it -- that
@@ -271,6 +273,14 @@ public:
 			.listen(LLEventPump::inventName("ReadPipe"),
 					boost::bind(&ReadPipeImpl::tick, this, _1));
 	}
+
+    ~ReadPipeImpl()
+    {
+        if (mConnection.connected())
+        {
+            mConnection.disconnect();
+        }
+    }
 
 	// Much of the implementation is simply connecting the abstract virtual
 	// methods with implementation data concealed from the base class.
@@ -386,7 +396,9 @@ public:
 					// Handle EOF specially: it's part of normal-case processing.
 					if (err == APR_EOF)
 					{
+#if SHOW_DEBUG
 						LL_DEBUGS("LLProcess") << "EOF on " << mDesc << LL_ENDL;
+#endif
 					}
 					else
 					{
@@ -406,8 +418,10 @@ public:
 				// received. Make sure we commit those later. (Don't commit them
 				// now, that would invalidate the buffer iterator sequence!)
 				tocommit += gotten;
+#if SHOW_DEBUG
 				LL_DEBUGS("LLProcess") << "filled " << gotten << " of " << toread
 									   << " bytes from " << mDesc << LL_ENDL;
+#endif
 
 				// The parent end of this pipe is nonblocking. If we weren't even
 				// able to fill this buffer, don't loop to try to fill the next --
@@ -521,6 +535,7 @@ LLProcess::LLProcess(const LLSDOrParams& params):
 	// preserve existing semantics, we promise that mAttached defaults to the
 	// same setting as mAutokill.
 	mAttached(params.attached.isProvided()? params.attached : params.autokill),
+    mPool(NULL),
 	mPipes(NSLOTS)
 {
 	// Hmm, when you construct a ptr_vector with a size, it merely reserves
@@ -541,8 +556,14 @@ LLProcess::LLProcess(const LLSDOrParams& params):
 
 	mPostend = params.postend;
 
+    apr_pool_create(&mPool, gAPRPoolp);
+    if (!mPool)
+    {
+        LLTHROW(LLProcessError(STRINGIZE("failed to create apr pool")));
+    }
+
 	apr_procattr_t *procattr = NULL;
-	chkapr(apr_procattr_create(&procattr, gAPRPoolp));
+	chkapr(apr_procattr_create(&procattr, mPool));
 
 	// IQA-490, CHOP-900: On Windows, ask APR to jump through hoops to
 	// constrain the set of handles passed to the child process. Before we
@@ -681,14 +702,14 @@ LLProcess::LLProcess(const LLSDOrParams& params):
 	// one. Hand-expand chkapr() macro so we can fill in the actual command
 	// string instead of the variable names.
 	if (ll_apr_warn_status(apr_proc_create(&mProcess, argv[0], &argv[0], NULL, procattr,
-										   gAPRPoolp)))
+										   mPool)))
 	{
 		LLTHROW(LLProcessError(STRINGIZE(params << " failed")));
 	}
 
 	// arrange to call status_callback()
 	apr_proc_other_child_register(&mProcess, &LLProcess::status_callback, this, mProcess.in,
-								  gAPRPoolp);
+                                  mPool);
 	// and make sure we poll it once per "mainloop" tick
 	sProcessListener.addPoll(*this);
 	mStatus.mState = RUNNING;
@@ -807,6 +828,12 @@ LLProcess::~LLProcess()
 	{
 		kill("destructor");
 	}
+
+    if (mPool)
+    {
+        apr_pool_destroy(mPool);
+        mPool = NULL;
+    }
 }
 
 bool LLProcess::kill(const std::string& who)

@@ -74,6 +74,7 @@
 // [RLVa:KB] - Checked: 2010-09-16 (RLVa-1.2.1a)
 #include "rlvhandler.h"
 // [/RLVa:KB]
+#include "llresmgr.h"
 
 static LLPanelInjector<LLPanelOutfitEdit> t_outfit_edit("panel_outfit_edit");
 
@@ -101,7 +102,7 @@ std::string LLShopURLDispatcher::resolveURL(LLWearableType::EType wearable_type,
 {
 	const std::string prefix = "MarketplaceURL";
 	const std::string sex_str = (sex == SEX_MALE) ? "Male" : "Female";
-	const std::string type_str = LLWearableType::getInstanceFast()->getTypeName(wearable_type);
+	const std::string type_str = LLWearableType::getInstance()->getTypeName(wearable_type);
 
 	std::string setting_name = prefix;
 
@@ -177,7 +178,7 @@ public:
 private:
 	static void onCreate(const LLSD& param)
 	{
-		LLWearableType::EType type = LLWearableType::getInstanceFast()->typeNameToType(param.asString());
+		LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(param.asString());
 		if (type == LLWearableType::WT_NONE)
 		{
 			LL_WARNS() << "Invalid wearable type" << LL_ENDL;
@@ -192,7 +193,7 @@ private:
 	{
 		LLView* menu_clothes	= gMenuHolder->getChildView("COF.Gear.New_Clothes", FALSE);
 		LLView* menu_bp			= gMenuHolder->getChildView("COF.Gear.New_Body_Parts", FALSE);
-		LLWearableType * wearable_type_inst = LLWearableType::getInstanceFast();
+		LLWearableType * wearable_type_inst = LLWearableType::getInstance();
 
 		for (U8 i = LLWearableType::WT_SHAPE; i != (U8) LLWearableType::WT_COUNT; ++i)
 		{
@@ -407,7 +408,9 @@ LLPanelOutfitEdit::LLPanelOutfitEdit()
 	mWearableListManager(NULL),
 	mPlusBtn(NULL),
 	mWearablesGearMenuBtn(NULL),
-	mGearMenuBtn(NULL)
+	mGearMenuBtn(NULL),
+	mAvatarComplexityLabel(NULL),
+	mAvatarComplexityAddingLabel(NULL)
 {
 	mSavedFolderState = new LLSaveFolderState();
 	mSavedFolderState->setApply(FALSE);
@@ -572,6 +575,9 @@ BOOL LLPanelOutfitEdit::postBuild()
 	getChild<LLButton>(SAVE_BTN)->setCommitCallback(boost::bind(&LLPanelOutfitEdit::saveOutfit, this, false));
 	getChild<LLButton>(SAVE_AS_BTN)->setCommitCallback(boost::bind(&LLPanelOutfitEdit::saveOutfit, this, true));
 
+	mAvatarComplexityLabel = getChild<LLTextBox>("avatar_complexity_label");
+	mAvatarComplexityAddingLabel = getChild<LLTextBox>("avatar_complexity_adding_label");
+
 	onOutfitChanging(gAgentWearables.isCOFChangeInProgress());
 	return TRUE;
 }
@@ -708,8 +714,12 @@ void LLPanelOutfitEdit::onFolderViewFilterCommitted(LLUICtrl* ctrl)
 	LLOpenFoldersWithSelection opener;
 	mInventoryItemsPanel->getRootFolder()->applyFunctorRecursively(opener);
 	mInventoryItemsPanel->getRootFolder()->scrollToShowSelection();
-	
-	LLInventoryModelBackgroundFetch::instance().start();
+
+    if (!LLInventoryModelBackgroundFetch::instance().inventoryFetchStarted())
+    {
+        llassert(false); // this should have been done on startup
+        LLInventoryModelBackgroundFetch::instance().start();
+    }
 }
 
 void LLPanelOutfitEdit::onListViewFilterCommitted(LLUICtrl* ctrl)
@@ -746,8 +756,12 @@ void LLPanelOutfitEdit::onSearchEdit(const std::string& string)
 		mInventoryItemsPanel->getRootFolder()->applyFunctorRecursively(opener);
 		mInventoryItemsPanel->getRootFolder()->scrollToShowSelection();
 	}
-	
-	LLInventoryModelBackgroundFetch::instance().start();
+
+    if (!LLInventoryModelBackgroundFetch::instance().inventoryFetchStarted())
+    {
+        llassert(false); // this should have been done on startup
+        LLInventoryModelBackgroundFetch::instance().start();
+    }
 	
 	if (mInventoryItemsPanel->getFilterSubString().empty() && mSearchString.empty())
 	{
@@ -1448,4 +1462,13 @@ void LLPanelOutfitEdit::saveOutfit(bool as_new)
 	} 	
 }
 
+void LLPanelOutfitEdit::updateAvatarComplexity(U32 complexity)
+{
+	std::string complexity_string;
+	LLLocale locale("");
+	LLResMgr::getInstance()->getIntegerString(complexity_string, complexity);
+
+	mAvatarComplexityLabel->setTextArg("[WEIGHT]", complexity_string);
+	mAvatarComplexityAddingLabel->setTextArg("[WEIGHT]", complexity_string);
+}
 // EOF

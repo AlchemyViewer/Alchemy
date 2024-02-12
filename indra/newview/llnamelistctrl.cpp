@@ -67,7 +67,9 @@ LLNameListCtrl::LLNameListCtrl(const LLNameListCtrl::Params& p)
 	mNameColumn(p.name_column.column_name),
 	mAllowCallingCardDrop(p.allow_calling_card_drop),
 	mShortNames(p.short_names),
-	mPendingLookupsRemaining(0)
+	mPendingLookupsRemaining(0),
+    mHoverIconName("Info_Small"),
+    mNameListType(INDIVIDUAL)
 {}
 
 // public
@@ -134,7 +136,12 @@ BOOL LLNameListCtrl::handleDragAndDrop(
 
 void LLNameListCtrl::showInspector(const LLUUID& avatar_id, bool is_group, bool is_experience)
 {
-	if(is_experience)
+    if (isSpecialType())
+    {
+        mIconClickedSignal(avatar_id);
+        return;
+    }
+    if(is_experience)
 	{
 		LLFloaterReg::showInstance("experience_profile", avatar_id, true);
 		return;
@@ -215,14 +222,16 @@ BOOL LLNameListCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 	S32 column_index = getColumnIndexFromOffset(x);
 	LLNameListItem* hit_item = dynamic_cast<LLNameListItem*>(hitItem(x, y));
 	LLFloater* floater = gFloaterView->getParentFloater(this);
-	if (floater 
+
+
+    if (floater 
 		&& floater->isFrontmost()
 		&& hit_item
-		&& column_index == mNameColumnIndex)
+		&& ((column_index == mNameColumnIndex) || isSpecialType()))
 	{
-		// ...this is the column with the avatar name
-		LLUUID avatar_id = hit_item->getUUID();
-		if (avatar_id.notNull())
+        // ...this is the column with the avatar name
+		LLUUID item_id = isSpecialType() ? hit_item->getSpecialID() : hit_item->getUUID();
+		if (item_id.notNull())
 		{
 			// ...valid avatar id
 
@@ -230,13 +239,13 @@ BOOL LLNameListCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 			if (hit_cell)
 			{
 				S32 row_index = getItemIndex(hit_item);
-				LLRect cell_rect = getCellRect(row_index, column_index);
+				LLRect cell_rect = getCellRect(row_index, isSpecialType() ? getNumColumns() - 1 : column_index);
 				// Convert rect local to screen coordinates
 				LLRect sticky_rect;
 				localRectToScreen(cell_rect, &sticky_rect);
 
 				// Spawn at right side of cell
-				LLPointer<LLUIImage> icon = LLUI::getUIImage("Info_Small");
+				LLPointer<LLUIImage> icon = LLUI::getUIImage(mHoverIconName);
 				S32 screenX = sticky_rect.mRight - info_icon_size;
 				S32 screenY = sticky_rect.mTop - (sticky_rect.getHeight() - icon->getHeight()) / 2;
 				LLCoordGL pos(screenX, screenY);
@@ -250,7 +259,7 @@ BOOL LLNameListCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 
 					LLToolTip::Params params;
 					params.background_visible(false);
-					params.click_callback(boost::bind(&LLNameListCtrl::showInspector, this, avatar_id, is_group, is_experience));
+					params.click_callback(boost::bind(&LLNameListCtrl::showInspector, this, item_id, is_group, is_experience));
 					params.delay_time(0.0f);		// spawn instantly on hover
 					params.image(icon);
 					params.message("");
@@ -269,6 +278,25 @@ BOOL LLNameListCtrl::handleToolTip(S32 x, S32 y, MASK mask)
 		handled = LLScrollListCtrl::handleToolTip(x, y, mask);
 	}
 	return handled;
+}
+
+// virtual
+BOOL LLNameListCtrl::handleRightMouseDown(S32 x, S32 y, MASK mask)
+{
+    LLNameListItem* hit_item = dynamic_cast<LLNameListItem*>(hitItem(x, y));
+    LLFloater* floater = gFloaterView->getParentFloater(this);
+    if (floater && floater->isFrontmost() && hit_item)
+    {
+        if(hit_item->isGroup())
+        {
+            ContextMenuType prev_menu = getContextMenuType();
+            setContextMenu(MENU_GROUP);
+            BOOL handled = LLScrollListCtrl::handleRightMouseDown(x, y, mask);
+            setContextMenu(prev_menu);
+            return handled;
+        }
+    }
+    return LLScrollListCtrl::handleRightMouseDown(x, y, mask);    
 }
 
 // public
@@ -305,6 +333,16 @@ LLScrollListItem* LLNameListCtrl::addElement(const LLSD& element, EAddPosition p
 	return addNameItemRow(item_params, pos);
 }
 
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+LLScrollListItem* LLNameListCtrl::addElement(const LLSD& element, const LLScrollListItem::commit_signal_t::slot_type& cb, EAddPosition pos)
+{
+	LLNameListCtrl::NameItem item_params;
+	LLParamSDParser parser;
+	parser.readSD(element, item_params);
+	item_params.commit_callback = cb;
+	return addNameItemRow(item_params, pos);
+}
+// [/SL:KB]
 
 LLScrollListItem* LLNameListCtrl::addNameItemRow(
 	const LLNameListCtrl::NameItem& name_item,
@@ -321,6 +359,7 @@ LLScrollListItem* LLNameListCtrl::addNameItemRow(
 
 	// use supplied name by default
 	std::string fullname = name_item.name;
+
 	switch(name_item.target)
 	{
 	case GROUP:
@@ -339,8 +378,10 @@ LLScrollListItem* LLNameListCtrl::addNameItemRow(
 		}
 		break;
 	case SPECIAL:
-		// just use supplied name
-		break;
+        {
+        item->setSpecialID(name_item.special_id());
+        return item;
+        }
 	case INDIVIDUAL:
 		{
 			LLAvatarName av_name;
@@ -351,7 +392,7 @@ LLScrollListItem* LLNameListCtrl::addNameItemRow(
 			else if (LLAvatarNameCache::get(id, &av_name))
 			{
 				if (mShortNames)
-					fullname = av_name.getDisplayName();
+					fullname = av_name.getDisplayName(true);
 				else
 					fullname = av_name.getCompleteName();
 			}
@@ -398,6 +439,7 @@ LLScrollListItem* LLNameListCtrl::addNameItemRow(
 	if (cell)
 	{
 		cell->setValue(prefix + fullname);
+		cell->setAltValue(name_item.alt_value());
 	}
 
 	dirtyColumns();
@@ -420,7 +462,8 @@ void LLNameListCtrl::removeNameItem(const LLUUID& agent_id)
 	for (item_list::iterator it = getItemList().begin(); it != getItemList().end(); it++)
 	{
 		LLScrollListItem* item = *it;
-		if (item->getUUID() == agent_id)
+        LLUUID cur_id = isSpecialType() ? dynamic_cast<LLNameListItem*>(item)->getSpecialID() : item->getUUID();
+        if (cur_id == agent_id)
 		{
 			idx = getItemIndex(item);
 			break;
@@ -449,6 +492,34 @@ LLScrollListItem* LLNameListCtrl::getNameItemByAgentId(const LLUUID& agent_id)
 		}
 	}
 	return NULL;
+}
+
+void LLNameListCtrl::selectItemBySpecialId(const LLUUID& special_id)
+{
+    if (special_id.isNull())
+    {
+        return;
+    }
+
+    for (item_list::iterator it = getItemList().begin(); it != getItemList().end(); it++)
+    {
+        LLNameListItem* item = dynamic_cast<LLNameListItem*>(*it);
+        if (item && item->getSpecialID() == special_id)
+        {
+            item->setSelected(TRUE);
+            break;
+        }
+    }
+}
+
+LLUUID LLNameListCtrl::getSelectedSpecialId()
+{
+    LLNameListItem* item = dynamic_cast<LLNameListItem*>(getFirstSelected());
+    if(item)
+    {
+        return item->getSpecialID();
+    }
+    return LLUUID();
 }
 
 void LLNameListCtrl::onAvatarNameCache(const LLUUID& agent_id,

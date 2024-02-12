@@ -7,15 +7,28 @@
 *.pyc
 *.rej
 *.swp
+*.vcxproj
+*.filters
+*.sln
+*.depend
+*.stamp
+*.rc
+
 *~
 
 # Specific paths and/or names
+.venv
+CMakeCache.txt
+cmake_install.cmake
 LICENSES
 build-*
 debian/files
 debian/secondlife-appearance-utility*
 debian/secondlife-viewer*
 indra/.distcc
+indra/out/*
+
+indra/packages/*
 indra/CMakeFiles
 indra/build-vc[0-9]*
 indra/lib/mono/1.0/*.dll
@@ -37,6 +50,7 @@ indra/newview/dbghelp.dll
 indra/newview/filters.xml
 indra/newview/fmod.dll
 indra/newview/fmod.log
+indra/newview/installers/windows/*.ico
 indra/newview/mozilla-theme
 indra/newview/mozilla-universal-darwin.tgz
 indra/newview/pilot.txt
@@ -47,6 +61,7 @@ indra/newview/search_history.txt
 indra/newview/teleport_history.txt
 indra/newview/typed_locations.txt
 indra/newview/vivox-runtime
+indra/newview/skins/default/html/common/equirectangular/js
 indra/server-linux-*
 indra/temp
 indra/test/linden_file.dat
@@ -66,3 +81,6 @@ trivial_change_force_build
 web/config.*
 web/locale.*
 web/secondlife.com.*
+/Pipfile.lock
+.env
+.vscode

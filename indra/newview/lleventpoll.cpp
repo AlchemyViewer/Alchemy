@@ -29,6 +29,7 @@
 #include "lleventpoll.h"
 #include "llappviewer.h"
 #include "llagent.h"
+#include "llviewernetwork.h"
 
 #include "llsdserialize.h"
 #include "lleventtimer.h"
@@ -69,6 +70,7 @@ namespace Details
 
         bool                            mDone;
         LLCore::HttpRequest::ptr_t      mHttpRequest;
+        LLCore::HttpOptions::ptr_t		mHttpOptions;
         LLCore::HttpRequest::policy_t   mHttpPolicy;
         std::string                     mSenderIp;
         int                             mCounter;
@@ -88,6 +90,7 @@ namespace Details
     LLEventPollImpl::LLEventPollImpl(const LLHost &sender) :
         mDone(false),
         mHttpRequest(),
+        mHttpOptions(),
         mHttpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID),
         mSenderIp(),
         mCounter(sNextCounter++)
@@ -95,18 +98,25 @@ namespace Details
     {
         LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
 
-        mHttpRequest = LLCore::HttpRequest::ptr_t(new LLCore::HttpRequest);
-        mHttpPolicy = app_core_http.getPolicy(LLAppCoreHttp::AP_LONG_POLL);
+        mHttpRequest = std::make_shared<LLCore::HttpRequest>();
+        mHttpPolicy  = app_core_http.getPolicy(LLAppCoreHttp::AP_LONG_POLL);
+        mHttpOptions = std::make_shared<LLCore::HttpOptions>();
+        if (!LLGridManager::instance().isInSecondlife())
+        {
+            mHttpOptions->setRetries(0);
+            mHttpOptions->setTransferTimeout(60);
+        }
+
         mSenderIp = sender.getIPandPort();
     }
 
     void LLEventPollImpl::handleMessage(const LLSD& content)
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_APP;
         std::string	msg_name = content["message"];
         LLSD message;
         message["sender"] = mSenderIp;
         message["body"] = content["body"];
-
         LLMessageSystem::dispatch(msg_name, message);
     }
 
@@ -140,7 +150,7 @@ namespace Details
 
     void LLEventPollImpl::eventPollCoro(std::string url)
     {
-        LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("EventPoller", mHttpPolicy));
+        LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("EventPoller", mHttpPolicy));
         LLSD acknowledge;
         int errorCount = 0;
         int counter = mCounter; // saved on the stack for logging. 
@@ -148,6 +158,14 @@ namespace Details
         LL_DEBUGS("LLEventPollImpl") << " <" << counter << "> entering coroutine." << LL_ENDL;
 
         mAdapter = httpAdapter;
+
+        LL::WorkQueue::ptr_t main_queue = nullptr;
+
+        // HACK -- grab the mainloop workqueue to move execution of the handler
+        // to a place that's safe in the main thread
+#if 1
+        main_queue = LL::WorkQueue::getInstance("mainloop");
+#endif
 
         // continually poll for a server update until we've been flagged as 
         // finished 
@@ -161,7 +179,7 @@ namespace Details
 //              << LLSDXMLStreamer(request) << LL_ENDL;
 
             LL_DEBUGS("LLEventPollImpl") << " <" << counter << "> posting and yielding." << LL_ENDL;
-            LLSD result = httpAdapter->postAndSuspend(mHttpRequest, url, request);
+            LLSD result = httpAdapter->postAndSuspend(mHttpRequest, url, request, mHttpOptions);
 
 //          LL_DEBUGS("LLEventPollImpl::eventPollCoro") << "<" << counter << "> result = "
 //              << LLSDXMLStreamer(result) << LL_ENDL;
@@ -179,7 +197,7 @@ namespace Details
 
             if (!status)
             {
-                if (status == LLCore::HttpStatus(LLCore::HttpStatus::EXT_CURL_EASY, CURLE_OPERATION_TIMEDOUT))
+                if (status == LLCore::HttpStatus(LLCore::HttpStatus::EXT_CURL_EASY, CURLE_OPERATION_TIMEDOUT) || status == LLCore::HttpStatus(HTTP_BAD_GATEWAY))
                 {   // A standard timeout response we get this when there are no events.
                     LL_DEBUGS("LLEventPollImpl") << "All is very quiet on target server. It may have gone idle?" << LL_ENDL;
                     errorCount = 0;
@@ -247,8 +265,9 @@ namespace Details
             errorCount = 0;
 
             if (!result.isMap() ||
-                !result.get("events") ||
-                !result.get("id"))
+                !result.has("events") ||
+                !result["events"].isArray() ||
+                !result.has("id"))
             {
                 LL_WARNS("LLEventPollImpl") << " <" << counter << "> received event poll with no events or id key: " << result << LL_ENDL;
                 continue;
@@ -265,13 +284,26 @@ namespace Details
             // was LL_INFOS() but now that CoarseRegionUpdate is TCP @ 1/second, it'd be too verbose for viewer logs. -MG
             LL_DEBUGS("LLEventPollImpl") << " <" << counter << "> " << events.size() << "events (id " << acknowledge << ")" << LL_ENDL;
 
+
             LLSD::array_const_iterator i = events.beginArray();
             LLSD::array_const_iterator end = events.endArray();
             for (; i != end; ++i)
             {
                 if (i->has("message"))
                 {
-                    handleMessage(*i);
+                    if (main_queue)
+                    { // shuttle to a sensible spot in the main thread instead
+                        // of wherever this coroutine happens to be executing
+                        const LLSD& msg = *i;
+                        main_queue->post([this, msg]()
+                            { 
+                                handleMessage(msg); 
+                            });
+                    }
+                    else
+                    {
+                        handleMessage(*i);
+                    }
                 }
             }
         }

@@ -446,7 +446,6 @@ void LLJoystickCameraRotate::updateSlop()
 
 BOOL LLJoystickCameraRotate::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-	gAgent.setMovementLocked(TRUE);
 	updateSlop();
 
 	// Set initial offset based on initial click location
@@ -494,7 +493,12 @@ BOOL LLJoystickCameraRotate::handleMouseDown(S32 x, S32 y, MASK mask)
 		mInitialQuadrant = JQ_RIGHT;
 	}
 
-	return LLJoystick::handleMouseDown(x, y, mask);
+	BOOL res = LLJoystick::handleMouseDown(x, y, mask);
+	if (res != FALSE)
+	{
+		gAgent.setMovementLocked(TRUE);
+	}
+	return res;
 }
 
 BOOL LLJoystickCameraRotate::handleMouseUp(S32 x, S32 y, MASK mask)

@@ -31,113 +31,36 @@
 
 //============================================================================
 
-void LLMutex::lock()
+//---------------------------------------------------------------------
+//
+// LLScopedLock
+//
+LLScopedLock::LLScopedLock(std::mutex* mutex) : mMutex(mutex)
 {
-	if(isSelfLocked())
-	{ //redundant lock
-		mCount++;
-		return;
-	}
-	
-	mMutex.Lock();
-	
-#if MUTEX_DEBUG
-	// Have to have the lock before we can access the debug info
-	auto id = LLThread::currentID();
-	if (mIsLocked[id] != FALSE)
-		LL_ERRS() << "Already locked in Thread: " << id << LL_ENDL;
-	mIsLocked[id] = TRUE;
-#endif
-
-	mLockingThread = absl::Hash<std::thread::id>{}(LLThread::currentID());
-}
-
-void LLMutex::unlock()
-{
-	if (mCount > 0)
-	{ //not the root unlock
-		mCount--;
-		return;
-	}
-	
-#if MUTEX_DEBUG
-	// Access the debug info while we have the lock
-	auto id = LLThread::currentID();
-	if (mIsLocked[id] != TRUE)
-		LL_ERRS() << "Not locked in Thread: " << id << LL_ENDL;	
-	mIsLocked[id] = FALSE;
-#endif
-
-	mLockingThread = 0;
-	mMutex.Unlock();
-}
-
-bool LLMutex::isLocked()
-{
-	if (!mMutex.TryLock())
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+	if(mutex)
 	{
-		return true;
+		mutex->lock();
+		mLocked = true;
 	}
 	else
 	{
-		mMutex.Unlock();
-		return false;
+		mLocked = false;
 	}
 }
 
-bool LLMutex::isSelfLocked()
+LLScopedLock::~LLScopedLock()
 {
-	return mLockingThread == absl::Hash<std::thread::id>{}(LLThread::currentID());
+	unlock();
 }
 
-bool LLMutex::trylock()
+void LLScopedLock::unlock()
 {
-	if(isSelfLocked())
-	{ //redundant lock
-		mCount++;
-		return true;
-	}
-	
-	if (!mMutex.TryLock())
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+	if(mLocked)
 	{
-		return false;
+		mLocked = false;
+		mMutex->unlock();
 	}
-	
-#if MUTEX_DEBUG
-	// Have to have the lock before we can access the debug info
-	auto id = LLThread::currentID();
-	if (mIsLocked[id] != FALSE)
-		LL_ERRS() << "Already locked in Thread: " << id << LL_ENDL;
-	mIsLocked[id] = TRUE;
-#endif
-
-	mLockingThread = absl::Hash<std::thread::id>{}(LLThread::currentID());
-	return true;
 }
-
-//============================================================================
-
-LLCondition::LLCondition() :
-	LLMutex()
-{
-}
-
-
-void LLCondition::wait()
-{
-	mMutex.Lock();
-	mCond.Wait(&mMutex);
-	mMutex.Unlock();
-}
-
-void LLCondition::signal()
-{
-	mCond.Signal();
-}
-
-void LLCondition::broadcast()
-{
-	mCond.SignalAll();
-}
-
 //============================================================================

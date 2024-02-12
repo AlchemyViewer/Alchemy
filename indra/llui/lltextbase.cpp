@@ -320,8 +320,8 @@ bool LLTextBase::truncate()
 {
 	BOOL did_truncate = FALSE;
 
-	// First rough check - if we're less than 1/4th the size, we're OK
-	if (getLength() >= S32(mMaxTextByteLength / 4))
+	// First rough check - if we're less than 1/2th the size, we're OK
+	if (getLength() >= S32(mMaxTextByteLength / 2))
 	{	
 		// Have to check actual byte size
 		S32 utf8_byte_size = 0;
@@ -378,6 +378,123 @@ void LLTextBase::onValueChange(S32 start, S32 end)
 {
 }
 
+std::vector<LLRect> LLTextBase::getSelectionRects(const highlight_list_t& highlights)
+{
+    // Nor supposed to be called without selection
+    llassert(hasSelection());
+    llassert(!mLineInfoList.empty());
+
+    std::vector<LLRect> selection_rects;
+
+	//		S32 selection_left		= llmin( mSelectionStart, mSelectionEnd );
+	//		S32 selection_right		= llmax( mSelectionStart, mSelectionEnd );
+
+    // Skip through the lines we aren't drawing.
+    LLRect content_display_rect = getVisibleDocumentRect();
+
+    // binary search for line that starts before top of visible buffer
+    line_list_t::const_iterator line_iter = std::lower_bound(mLineInfoList.begin(), mLineInfoList.end(), content_display_rect.mTop, compare_bottom());
+    line_list_t::const_iterator end_iter = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), content_display_rect.mBottom, compare_top());
+
+	//		bool done = false;
+	// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
+	highlight_list_t::const_iterator itHighlight = highlights.begin();
+	// [/SL:KB]
+
+    // Find the coordinates of the selected area
+	//		for (;line_iter != end_iter && !done; ++line_iter)
+	// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
+	for (; (line_iter != end_iter) && (itHighlight != highlights.end()); ++line_iter)
+		// [/SL:KB]
+	{
+		// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
+					// Find a highlight range with an end index larger than the start of this line
+		while ((itHighlight != highlights.end()) && (line_iter->mDocIndexStart > itHighlight->second))
+			++itHighlight;
+
+		// Draw all highlights on the current line
+		while ((itHighlight != highlights.end()) && (itHighlight->first < line_iter->mDocIndexEnd))
+		{
+			// Keep the names of these to change fewer lines of LL code
+			S32 selection_left = llmin(itHighlight->first, itHighlight->second);
+			S32 selection_right = llmax(itHighlight->first, itHighlight->second);
+			// [/SL:KB]
+
+			// is selection visible on this line?
+			if (line_iter->mDocIndexEnd > selection_left && line_iter->mDocIndexStart < selection_right)
+			{
+				segment_set_t::iterator segment_iter;
+				S32 segment_offset;
+				getSegmentAndOffset(line_iter->mDocIndexStart, &segment_iter, &segment_offset);
+
+		        // Use F32 otherwise a string of multiple segments
+		        // will accumulate a large error
+		        F32 left_precise = line_iter->mRect.mLeft;
+		        F32 right_precise = line_iter->mRect.mLeft;
+
+				for (; segment_iter != mSegments.end(); ++segment_iter, segment_offset = 0)
+				{
+					LLTextSegmentPtr segmentp = *segment_iter;
+
+					S32 segment_line_start = segmentp->getStart() + segment_offset;
+					S32 segment_line_end = llmin(segmentp->getEnd(), line_iter->mDocIndexEnd);
+
+					if (segment_line_start > segment_line_end) break;
+
+                	F32 segment_width = 0.f;
+					S32 segment_height = 0;
+
+					// if selection after beginning of segment
+					if (selection_left >= segment_line_start)
+					{
+						S32 num_chars = llmin(selection_left, segment_line_end) - segment_line_start;
+                    	segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                    	left_precise += segment_width;
+					}
+
+					// if selection_right == segment_line_end then that means we are the first character of the next segment
+					// or first character of the next line, in either case we want to add the length of the current segment
+					// to the selection rectangle and continue.
+					// if selection right > segment_line_end then selection spans end of current segment...
+					if (selection_right >= segment_line_end)
+					{
+						// extend selection slightly beyond end of line
+						// to indicate selection of newline character (use "n" character to determine width)
+						S32 num_chars = segment_line_end - segment_line_start;
+                    	segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                    	right_precise += segment_width;
+					}
+					// else if selection ends on current segment...
+					else
+					{
+						S32 num_chars = selection_right - segment_line_start;
+                    	segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                    	right_precise += segment_width;
+
+						break;
+					}
+				}
+
+				LLRect selection_rect;
+            	selection_rect.mLeft = left_precise;
+            	selection_rect.mRight = right_precise;
+				selection_rect.mBottom = line_iter->mRect.mBottom;
+				selection_rect.mTop = line_iter->mRect.mTop;
+
+				selection_rects.push_back(selection_rect);
+			}
+
+			// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
+							// Only advance if the highlight ends on the current line
+			if (itHighlight->second > line_iter->mDocIndexEnd)
+				break;
+			++itHighlight;
+		}
+		// [/SL:KB]
+	}
+
+	return selection_rects;
+}
 
 // Draws the black box behind the selected text
 //void LLTextBase::drawSelectionBackground()
@@ -401,115 +518,16 @@ void LLTextBase::drawHighlightsBackground(const highlight_list_t& highlights, co
 	if (!mLineInfoList.empty())
 // [/SL:KB]
 	{
-		std::vector<LLRect> selection_rects;
-
-//		S32 selection_left		= llmin( mSelectionStart, mSelectionEnd );
-//		S32 selection_right		= llmax( mSelectionStart, mSelectionEnd );
-
-		// Skip through the lines we aren't drawing.
-		LLRect content_display_rect = getVisibleDocumentRect();
-
-		// binary search for line that starts before top of visible buffer
-		line_list_t::const_iterator line_iter = std::lower_bound(mLineInfoList.begin(), mLineInfoList.end(), content_display_rect.mTop, compare_bottom());
-		line_list_t::const_iterator end_iter = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), content_display_rect.mBottom, compare_top());
-
-//		bool done = false;
-// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
-		highlight_list_t::const_iterator itHighlight = highlights.begin();
-// [/SL:KB]
-
-		// Find the coordinates of the selected area
-//		for (;line_iter != end_iter && !done; ++line_iter)
-// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
-		for (; (line_iter != end_iter) && (itHighlight != highlights.end()); ++line_iter)
-// [/SL:KB]
-		{
-// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
-			// Find a highlight range with an end index larger than the start of this line
-			while ( (itHighlight != highlights.end()) && (line_iter->mDocIndexStart > itHighlight->second) )
-				++itHighlight;
-
-			// Draw all highlights on the current line
-			while ( (itHighlight != highlights.end()) && (itHighlight->first < line_iter->mDocIndexEnd) )
-			{
-				// Keep the names of these to change fewer lines of LL code
-				S32 selection_left  = llmin(itHighlight->first, itHighlight->second);
-				S32 selection_right = llmax(itHighlight->first, itHighlight->second) ;
-// [/SL:KB]
-
-				// is selection visible on this line?
-				if (line_iter->mDocIndexEnd > selection_left && line_iter->mDocIndexStart < selection_right)
-				{
-					segment_set_t::iterator segment_iter;
-					S32 segment_offset;
-					getSegmentAndOffset(line_iter->mDocIndexStart, &segment_iter, &segment_offset);
-				
-					LLRect selection_rect;
-					selection_rect.mLeft = line_iter->mRect.mLeft;
-					selection_rect.mRight = line_iter->mRect.mLeft;
-					selection_rect.mBottom = line_iter->mRect.mBottom;
-					selection_rect.mTop = line_iter->mRect.mTop;
-					
-					for(;segment_iter != mSegments.end(); ++segment_iter, segment_offset = 0)
-					{
-						LLTextSegmentPtr segmentp = *segment_iter;
-
-						S32 segment_line_start = segmentp->getStart() + segment_offset;
-						S32 segment_line_end = llmin(segmentp->getEnd(), line_iter->mDocIndexEnd);
-
-						if (segment_line_start > segment_line_end) break;
-
-						S32 segment_width = 0;
-						S32 segment_height = 0;
-
-						// if selection after beginning of segment
-						if(selection_left >= segment_line_start)
-						{
-							S32 num_chars = llmin(selection_left, segment_line_end) - segment_line_start;
-							segmentp->getDimensions(segment_offset, num_chars, segment_width, segment_height);
-							selection_rect.mLeft += segment_width;
-						}
-
-						// if selection_right == segment_line_end then that means we are the first character of the next segment
-						// or first character of the next line, in either case we want to add the length of the current segment
-						// to the selection rectangle and continue.
-						// if selection right > segment_line_end then selection spans end of current segment...
-						if (selection_right >= segment_line_end)
-						{
-							// extend selection slightly beyond end of line
-							// to indicate selection of newline character (use "n" character to determine width)
-							S32 num_chars = segment_line_end - segment_line_start;
-							segmentp->getDimensions(segment_offset, num_chars, segment_width, segment_height);
-							selection_rect.mRight += segment_width;
-						}
-						// else if selection ends on current segment...
-						else
-						{
-							S32 num_chars = selection_right - segment_line_start;
-							segmentp->getDimensions(segment_offset, num_chars, segment_width, segment_height);
-							selection_rect.mRight += segment_width;
-
-							break;
-						}
-					}
-					selection_rects.push_back(selection_rect);
-				}
-
-// [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
-				// Only advance if the highlight ends on the current line
-				if (itHighlight->second > line_iter->mDocIndexEnd)
-					break;
-				++itHighlight;
-			}
-// [/SL:KB]
-		}
+        std::vector<LLRect> selection_rects = getSelectionRects(highlights);
 		
 		// Draw the selection box (we're using a box instead of reversing the colors on the selected text).
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 //		const LLColor4& color = mSelectedBGColor;
 		F32 alpha = hasFocus() ? 0.7f : 0.3f;
 		alpha *= getDrawContext().mAlpha;
+
 		LLColor4 selection_color(color.mV[VRED], color.mV[VGREEN], color.mV[VBLUE], alpha);
+        LLRect content_display_rect = getVisibleDocumentRect();
 
 		for (LLRect selection_rect : selection_rects)
 		{
@@ -743,7 +761,7 @@ void LLTextBase::drawText(const std::pair<S32, S32>& line_range)
 						std::string word = wstring_to_utf8str(wstrText.substr(word_start, word_end - word_start));
 
 						// Don't process words shorter than 3 characters
-						if ( (word.length() >= 3) && (!LLSpellChecker::instanceFast().checkSpelling(word)) )
+						if ( (word.length() >= 3) && (!LLSpellChecker::instance().checkSpelling(word)) )
 						{
 							mMisspellRanges.push_back(std::pair<U32, U32>(word_start, word_end));
 						}
@@ -935,7 +953,8 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
 
 	getViewModel()->getEditableDisplay().insert(pos, wstr);
 
-	if ( truncate() )
+	//HACK: If we are readonly we shouldn't need to truncate
+	if ( !mReadOnly && truncate() )
 	{
 		insert_len = getLength() - old_len;
 	}
@@ -1400,9 +1419,9 @@ void LLTextBase::draw()
 		drawCursor();
 	}
  
-	mDocumentView->setVisible(FALSE);
+	mDocumentView->setVisibleDirect(FALSE);
 	LLUICtrl::draw();
-	mDocumentView->setVisible(TRUE);
+	mDocumentView->setVisibleDirect(TRUE);
 }
 
 
@@ -1495,7 +1514,7 @@ void LLTextBase::addToDictionary()
 {
 	if (canAddToDictionary())
 	{
-		LLSpellChecker::instanceFast().addToCustomDictionary(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToCustomDictionary(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -1508,7 +1527,7 @@ void LLTextBase::addToIgnore()
 {
 	if (canAddToIgnore())
 	{
-		LLSpellChecker::instanceFast().addToIgnoreList(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToIgnoreList(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -1594,17 +1613,21 @@ S32 LLTextBase::getLeftOffset(S32 width)
 	case LLFontGL::HCENTER:
 		return mHPad + llmax(0, (mVisibleTextRect.getWidth() - width - mHPad) / 2);
 	case LLFontGL::RIGHT:
-		return mVisibleTextRect.getWidth() - width;
+        {
+            // Font's rendering rounds string size, if value gets rounded
+            // down last symbol might not have enough space to render,
+            // compensate by adding an extra pixel as padding
+            const S32 right_padding = 1;
+            return llmax(mHPad, mVisibleTextRect.getWidth() - width - right_padding);
+        }
 	default:
 		return mHPad;
 	}
 }
 
-
-static LLTrace::BlockTimerStatHandle FTM_TEXT_REFLOW ("Text Reflow");
 void LLTextBase::reflow()
 {
-	LL_RECORD_BLOCK_TIME(FTM_TEXT_REFLOW);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
 	updateSegments();
 
@@ -1674,11 +1697,14 @@ void LLTextBase::reflow()
 		{
 			// find first element whose end comes after start_index
 			line_list_t::iterator iter = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), start_index, line_end_compare());
-			line_start_index = iter->mDocIndexStart;
-			line_count = iter->mLineNum;
-			cur_top = iter->mRect.mTop;
-			getSegmentAndOffset(iter->mDocIndexStart, &seg_iter, &seg_offset);
-			mLineInfoList.erase(iter, mLineInfoList.end());
+            if (iter != mLineInfoList.end())
+            {
+                line_start_index = iter->mDocIndexStart;
+                line_count = iter->mLineNum;
+                cur_top = iter->mRect.mTop;
+                getSegmentAndOffset(iter->mDocIndexStart, &seg_iter, &seg_offset);
+                mLineInfoList.erase(iter, mLineInfoList.end());
+            }
 		}
 
 		S32 line_height = 0;
@@ -1967,10 +1993,9 @@ void LLTextBase::removeDocumentChild(LLView* view)
 }
 
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_TEXT_SEGMENTS("Update Text Segments");
 void LLTextBase::updateSegments()
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_TEXT_SEGMENTS);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	createDefaultSegment();
 }
 
@@ -2111,7 +2136,7 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
 	// work out the XUI menu file to use for this url
 	LLUrlMatch match;
 	std::string url = in_url;
-	if (! LLUrlRegistry::instanceFast().findUrl(url, match))
+	if (! LLUrlRegistry::instance().findUrl(url, match))
 	{
 		return;
 	}
@@ -2135,10 +2160,12 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
 	registrar.add("Url.ShowProfile", boost::bind(&LLUrlAction::showProfile, url));
 	registrar.add("Url.AddFriend", boost::bind(&LLUrlAction::addFriend, url));
 	registrar.add("Url.RemoveFriend", boost::bind(&LLUrlAction::removeFriend, url));
+    registrar.add("Url.ReportAbuse", boost::bind(&LLUrlAction::reportAbuse, url));
 	registrar.add("Url.SendIM", boost::bind(&LLUrlAction::sendIM, url));
 	registrar.add("Url.ShowOnMap", boost::bind(&LLUrlAction::showLocationOnMap, url));
 	registrar.add("Url.CopyLabel", boost::bind(&LLUrlAction::copyLabelToClipboard, url));
 	registrar.add("Url.CopyUrl", boost::bind(&LLUrlAction::copyURLToClipboard, url));
+	registrar.add("Url.CopyUUID", boost::bind(&LLUrlAction::copyUUIDToClipboard, url));
 
 	// create and return the context menu from the XUI file
 
@@ -2157,26 +2184,26 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
 
         if (mIsFriendSignal)
         {
-            bool isFriend = *(*mIsFriendSignal)(LLUUID(LLUrlAction::getUserID(url)));
-            LLView* addFriendButton = menu->getChild<LLView>("add_friend");
-            LLView* removeFriendButton = menu->getChild<LLView>("remove_friend");
+            LLView* addFriendButton = menu->findChild<LLView>("add_friend");
+            LLView* removeFriendButton = menu->findChild<LLView>("remove_friend");
 
             if (addFriendButton && removeFriendButton)
             {
-                addFriendButton->setEnabled(!isFriend);
+				bool isFriend = *(*mIsFriendSignal)(LLUUID(LLUrlAction::getUserID(url)));
+				addFriendButton->setEnabled(!isFriend);
                 removeFriendButton->setEnabled(isFriend);
             }
         }
 
         if (mIsObjectBlockedSignal)
         {
-            bool is_blocked = *(*mIsObjectBlockedSignal)(LLUUID(LLUrlAction::getObjectId(url)), LLUrlAction::getObjectName(url));
-            LLView* blockButton = menu->getChild<LLView>("block_object");
-            LLView* unblockButton = menu->getChild<LLView>("unblock_object");
+            LLView* blockButton = menu->findChild<LLView>("block_object");
+            LLView* unblockButton = menu->findChild<LLView>("unblock_object");
 
             if (blockButton && unblockButton)
             {
-                blockButton->setVisible(!is_blocked);
+				bool is_blocked = *(*mIsObjectBlockedSignal)(LLUUID(LLUrlAction::getObjectId(url)), LLUrlAction::getObjectName(url));
+				blockButton->setVisible(!is_blocked);
                 unblockButton->setVisible(is_blocked);
             }
         }
@@ -2230,18 +2257,16 @@ static LLUIImagePtr image_from_icon_name(const std::string& icon_name)
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_PARSE_HTML("Parse HTML");
-
-
 
 void LLTextBase::appendTextImpl(const std::string &new_text, const LLStyle::Params& input_params)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	LLStyle::Params style_params(input_params);
 	style_params.fillFrom(getStyleParams());
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
 	const LLHighlightEntry* pEntry = NULL;
-	if ( (mParseHighlights) && (LLTextParser::instanceFast().parseFullLineHighlights(new_text, mHighlightsMask, &pEntry)) )
+	if ( (mParseHighlights) && (LLTextParser::instance().parseFullLineHighlights(new_text, mHighlightsMask, &pEntry)) )
 	{
 		if (mHighlightsSignal)
 			(*mHighlightsSignal)(new_text, pEntry);
@@ -2255,11 +2280,10 @@ void LLTextBase::appendTextImpl(const std::string &new_text, const LLStyle::Para
 	S32 part = (S32)LLTextParser::WHOLE;
 	if (mParseHTML && !style_params.is_link) // Don't search for URLs inside a link segment (STORM-358).
 	{
-		LL_RECORD_BLOCK_TIME(FTM_PARSE_HTML);
 		S32 start=0,end=0;
 		LLUrlMatch match;
 		std::string text = new_text;
-		auto& url_reg = LLUrlRegistry::instanceFast();
+		auto& url_reg = LLUrlRegistry::instance();
 		while (url_reg.findUrl(text, match,
 				boost::bind(&LLTextBase::replaceUrl, this, _1, _2, _3),isContentTrusted() || mAlwaysShowIcons))
 		{
@@ -2267,7 +2291,10 @@ void LLTextBase::appendTextImpl(const std::string &new_text, const LLStyle::Para
 			end = match.getEnd()+1;
 
 			LLStyle::Params link_params(style_params);
-			link_params.overwriteFrom(match.getStyle());
+			if (link_params.use_default_link_style)
+			{
+				link_params.overwriteFrom(match.getStyle());
+			}
 
 			// output the text before the Url
 			if (start > 0)
@@ -2350,11 +2377,9 @@ void LLTextBase::setLastSegmentToolTip(const std::string &tooltip)
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_APPEND_TEXT("Append Text");
-
 void LLTextBase::appendText(const std::string &new_text, bool prepend_newline, const LLStyle::Params& input_params)
 {
-	LL_RECORD_BLOCK_TIME(FTM_APPEND_TEXT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	if (new_text.empty()) 
 		return;
 
@@ -2483,10 +2508,10 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
 	{
 		LLStyle::Params highlight_params(style_params);
 
-//		LLSD pieces = LLTextParser::instanceFast().parsePartialLineHighlights(new_text, highlight_params.color(), (LLTextParser::EHighlightPosition)highlight_part);
+//		LLSD pieces = LLTextParser::instance().parsePartialLineHighlights(new_text, highlight_params.color(), (LLTextParser::EHighlightPosition)highlight_part);
 //		for (S32 i = 0; i < pieces.size(); i++)
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
-		LLTextParser::partial_results_t results = LLTextParser::instanceFast().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
+		LLTextParser::partial_results_t results = LLTextParser::instance().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
 		for (LLTextParser::partial_results_t::const_iterator itResult = results.begin(); itResult != results.end(); ++itResult)
 // [/SL:KB]
 		{
@@ -2692,7 +2717,7 @@ S32 LLTextBase::getDocIndexFromLocalCoord( S32 local_x, S32 local_y, BOOL round,
 	}
 	
 	S32 pos = getLength();
-	S32 start_x = line_iter->mRect.mLeft + doc_rect.mLeft;
+	F32 start_x = line_iter->mRect.mLeft + doc_rect.mLeft;
 
 	segment_set_t::iterator line_seg_iter;
 	S32 line_seg_offset;
@@ -2704,8 +2729,9 @@ S32 LLTextBase::getDocIndexFromLocalCoord( S32 local_x, S32 local_y, BOOL round,
 
 		S32 segment_line_start = segmentp->getStart() + line_seg_offset;
 		S32 segment_line_length = llmin(segmentp->getEnd(), line_iter->mDocIndexEnd) - segment_line_start;
-		S32 text_width, text_height;
-		bool newline = segmentp->getDimensions(line_seg_offset, segment_line_length, text_width, text_height);
+        F32 text_width;
+        S32 text_height;
+		bool newline = segmentp->getDimensionsF32(line_seg_offset, segment_line_length, text_width, text_height);
 
 		if(newline)
 		{
@@ -2725,8 +2751,9 @@ S32 LLTextBase::getDocIndexFromLocalCoord( S32 local_x, S32 local_y, BOOL round,
 			S32 offset;
 			if (!segmentp->canEdit())
 			{
-				S32 segment_width, segment_height;
-				segmentp->getDimensions(0, segmentp->getEnd() - segmentp->getStart(), segment_width, segment_height);
+                F32 segment_width;
+                S32 segment_height;
+				segmentp->getDimensionsF32(0, segmentp->getEnd() - segmentp->getStart(), segment_width, segment_height);
 				if (round && local_x - start_x > segment_width / 2)
 				{
 					offset = segment_line_length;
@@ -2773,16 +2800,10 @@ LLRect LLTextBase::getDocRectFromDocIndex(S32 pos) const
 		return LLRect();
 	}
 
-	LLRect doc_rect;
-
 	// clamp pos to valid values
 	pos = llclamp(pos, 0, mLineInfoList.back().mDocIndexEnd - 1);
 
 	line_list_t::const_iterator line_iter = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), pos, line_end_compare());
-
-	doc_rect.mLeft = line_iter->mRect.mLeft; 
-	doc_rect.mBottom = line_iter->mRect.mBottom;
-	doc_rect.mTop = line_iter->mRect.mTop;
 
 	segment_set_t::iterator line_seg_iter;
 	S32 line_seg_offset;
@@ -2791,6 +2812,8 @@ LLRect LLTextBase::getDocRectFromDocIndex(S32 pos) const
 	getSegmentAndOffset(line_iter->mDocIndexStart, &line_seg_iter, &line_seg_offset);
 	getSegmentAndOffset(pos, &cursor_seg_iter, &cursor_seg_offset);
 
+    F32 doc_left_precise = line_iter->mRect.mLeft;
+
 	while(line_seg_iter != mSegments.end())
 	{
 		const LLTextSegmentPtr segmentp = *line_seg_iter;
@@ -2798,24 +2821,31 @@ LLRect LLTextBase::getDocRectFromDocIndex(S32 pos) const
 		if (line_seg_iter == cursor_seg_iter)
 		{
 			// cursor advanced to right based on difference in offset of cursor to start of line
-			S32 segment_width, segment_height;
-			segmentp->getDimensions(line_seg_offset, cursor_seg_offset - line_seg_offset, segment_width, segment_height);
-			doc_rect.mLeft += segment_width;
+            F32 segment_width;
+            S32 segment_height;
+			segmentp->getDimensionsF32(line_seg_offset, cursor_seg_offset - line_seg_offset, segment_width, segment_height);
+            doc_left_precise += segment_width;
 
 			break;
 		}
 		else
 		{
 			// add remainder of current text segment to cursor position
-			S32 segment_width, segment_height;
-			segmentp->getDimensions(line_seg_offset, (segmentp->getEnd() - segmentp->getStart()) - line_seg_offset, segment_width, segment_height);
-			doc_rect.mLeft += segment_width;
+            F32 segment_width;
+            S32 segment_height;
+			segmentp->getDimensionsF32(line_seg_offset, (segmentp->getEnd() - segmentp->getStart()) - line_seg_offset, segment_width, segment_height);
+            doc_left_precise += segment_width;
 			// offset will be 0 for all segments after the first
 			line_seg_offset = 0;
 			// go to next text segment on this line
 			++line_seg_iter;
 		}
 	}
+
+    LLRect doc_rect;
+    doc_rect.mLeft = doc_left_precise;
+    doc_rect.mBottom = line_iter->mRect.mBottom;
+    doc_rect.mTop = line_iter->mRect.mTop;
 
 	// set rect to 0 width
 	doc_rect.mRight = doc_rect.mLeft; 
@@ -3621,13 +3651,13 @@ BOOL LLNormalTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 	if (mToken && !mToken->getToolTip().empty())
 	{
 		const LLWString& wmsg = mToken->getToolTip();
-		LLToolTipMgr::instanceFast().show(wstring_to_utf8str(wmsg));
+		LLToolTipMgr::instance().show(wstring_to_utf8str(wmsg));
 		return TRUE;
 	}
 	// or do we have an explicitly set tooltip (e.g., for Urls)
 	if (!mTooltip.empty())
 	{
-		LLToolTipMgr::instanceFast().show(mTooltip);
+		LLToolTipMgr::instance().show(mTooltip);
 		return TRUE;
 	}
 
@@ -3654,7 +3684,7 @@ bool LLNormalTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& w
 		height = mFontHeight;
 		const LLWString &text = getWText();
 		// if last character is a newline, then return true, forcing line break
-		width = mStyle->getFont()->getWidthF32(text.c_str(), mStart + first_char, num_chars);
+		width = mStyle->getFont()->getWidthF32(text.c_str(), mStart + first_char, num_chars, true);
 	}
 	return false;
 }
@@ -3967,7 +3997,7 @@ BOOL LLImageTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 {
 	if (!mTooltip.empty())
 	{
-		LLToolTipMgr::instanceFast().show(mTooltip);
+		LLToolTipMgr::instance().show(mTooltip);
 		return TRUE;
 	}
 

@@ -29,6 +29,7 @@
 
 
 #include "httpcommon.h"
+#include <boost/noncopyable.hpp>
 #include "_refcounted.h"
 
 
@@ -60,7 +61,7 @@ class HttpOptions : private boost::noncopyable
 public:
 	HttpOptions();
 
-	typedef boost::shared_ptr<HttpOptions> ptr_t;
+	typedef std::shared_ptr<HttpOptions> ptr_t;
 
     virtual ~HttpOptions() = default;						// Use release()
 

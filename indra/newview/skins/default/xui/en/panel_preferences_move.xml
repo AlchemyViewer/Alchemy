@@ -23,14 +23,12 @@
 			<panel
 				label="General Move and View"
 				name="general_move_panel"
-				class="general_move_panel"
 				filename="panel_preferences_move_general.xml"
 				layout="topleft"
 				follows="all" />
 			<panel
 				label="Mouselook"
 				name="mlook_panel"
-				class="mlook_panel"
 				filename="panel_preferences_move_mlook.xml"
 				layout="topleft"
 				follows="all" />

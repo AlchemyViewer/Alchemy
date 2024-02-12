@@ -39,7 +39,6 @@
 #include "llcommon.h"
 #include "llapr.h"
 #include "llerrorcontrol.h"
-#include "llerrorthread.h"
 #include "llframetimer.h"
 #include "lllivefile.h"
 #include "llmemory.h"
@@ -94,17 +93,13 @@ BOOL LLApp::sDisableCrashlogger = FALSE;
 BOOL LLApp::sLogInSignal = FALSE;
 
 // static
-LLApp::EAppStatus LLApp::sStatus = LLApp::APP_STATUS_STOPPED; // Keeps track of application status
+// Keeps track of application status
+LLScalarCond<LLApp::EAppStatus> LLApp::sStatus{LLApp::APP_STATUS_STOPPED};
 LLAppErrorHandler LLApp::sErrorHandler = NULL;
 BOOL LLApp::sErrorThreadRunning = FALSE;
 
 
-LLApp::LLApp() : mThreadErrorp(NULL)
-{
-	commonCtor();
-}
-
-void LLApp::commonCtor()
+LLApp::LLApp()
 {
 	assert_main_thread();		// Make sure we record the main thread
 	on_main_thread();			// Make sure we record the main thread
@@ -132,12 +127,6 @@ void LLApp::commonCtor()
 	sApplication = this;
 }
 
-LLApp::LLApp(LLErrorThread *error_thread) :
-	mThreadErrorp(error_thread)
-{
-	commonCtor();
-}
-
 
 LLApp::~LLApp()
 {
@@ -147,13 +136,6 @@ LLApp::~LLApp()
 	mLiveFiles.clear();
 
 	setStopped();
-	// HACK: wait for the error thread to clean itself
-	ms_sleep(20);
-	if (mThreadErrorp)
-	{
-		delete mThreadErrorp;
-		mThreadErrorp = NULL;
-	}
 
 	SUBSYSTEM_CLEANUP_DBG(LLCommon);
 }
@@ -349,7 +331,7 @@ void EnableCrashingOnCrashes()
 	typedef BOOL (WINAPI *tSetPolicy)(DWORD dwFlags);
 	const DWORD EXCEPTION_SWALLOWING = 0x1;
 
-	HMODULE kernel32 = LoadLibraryA("kernel32.dll");
+	HMODULE kernel32 = LoadLibrary(TEXT("kernel32.dll"));
 	tGetPolicy pGetPolicy = (tGetPolicy)GetProcAddress(kernel32,
 		"GetProcessUserModeExceptionPolicy");
 	tSetPolicy pSetPolicy = (tSetPolicy)GetProcAddress(kernel32,
@@ -373,43 +355,17 @@ void LLApp::setupErrorHandling(bool second_instance)
 
 #if defined(LL_WINDOWS)
 
-#if LL_SEND_CRASH_REPORTS && ! defined(USE_SENTRY)
-	EnableCrashingOnCrashes();
-
-	// This sets a callback to handle w32 signals to the console window.
-	// The viewer shouldn't be affected, sicne its a windowed app.
-	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) ConsoleCtrlHandler, TRUE);
-#endif // LL_SEND_CRASH_REPORTS && ! defined(USE_SENTRY)
 #else  // ! LL_WINDOWS
 	//
+#if ! defined(AL_SENTRY)
 	// Start up signal handling.
 	//
 	// There are two different classes of signals.  Synchronous signals are delivered to a specific
 	// thread, asynchronous signals can be delivered to any thread (in theory)
 	//
 	setup_signals();
+#endif // ! AL_SENTRY
 #endif // ! LL_WINDOWS
-
-#if defined(USE_SENTRY)
-    // do not start our own error thread
-#else // ! USE_SENTRY
-	startErrorThread();
-#endif
-}
-
-void LLApp::startErrorThread()
-{
-	//
-	// Start the error handling thread, which is responsible for taking action
-	// when the app goes into the APP_STATUS_ERROR state
-	//
-	if(!mThreadErrorp)
-	{
-		LL_INFOS() << "Starting error thread" << LL_ENDL;
-		mThreadErrorp = new LLErrorThread();
-		mThreadErrorp->setUserData((void *) this);
-		mThreadErrorp->start();
-	}
 }
 
 void LLApp::setErrorHandler(LLAppErrorHandler handler)
@@ -445,7 +401,8 @@ static std::map<LLApp::EAppStatus, const char*> statusDesc
 // static
 void LLApp::setStatus(EAppStatus status)
 {
-    sStatus = status;
+    // notify everyone waiting on sStatus any time its value changes
+    sStatus.set_all(status);
 
     // This can also happen very late in the application lifecycle -- don't
     // resurrect a deleted LLSingleton
@@ -471,7 +428,7 @@ void LLApp::setStatus(EAppStatus status)
 // static
 void LLApp::setError()
 {
-	// set app status to ERROR so that the LLErrorThread notices
+	// set app status to ERROR
 	setStatus(APP_STATUS_ERROR);
 }
 
@@ -503,28 +460,28 @@ void LLApp::setStopped()
 // static
 bool LLApp::isStopped()
 {
-	return (APP_STATUS_STOPPED == sStatus);
+	return (APP_STATUS_STOPPED == sStatus.get());
 }
 
 
 // static
 bool LLApp::isRunning()
 {
-	return (APP_STATUS_RUNNING == sStatus);
+	return (APP_STATUS_RUNNING == sStatus.get());
 }
 
 
 // static
 bool LLApp::isError()
 {
-	return (APP_STATUS_ERROR == sStatus);
+	return (APP_STATUS_ERROR == sStatus.get());
 }
 
 
 // static
 bool LLApp::isQuitting()
 {
-	return (APP_STATUS_QUITTING == sStatus);
+	return (APP_STATUS_QUITTING == sStatus.get());
 }
 
 // static
@@ -636,16 +593,16 @@ void setup_signals()
 	act.sa_flags = SA_SIGINFO;
 
 	// Synchronous signals
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGABRT, &act, NULL);
 #endif
 	sigaction(SIGALRM, &act, NULL);
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGBUS, &act, NULL);
 	sigaction(SIGFPE, &act, NULL);
 #endif
 	sigaction(SIGHUP, &act, NULL);
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGILL, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 	sigaction(SIGSEGV, &act, NULL);
@@ -679,16 +636,16 @@ void clear_signals()
 	act.sa_flags = SA_SIGINFO;
 
 	// Synchronous signals
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGABRT, &act, NULL);
 #endif
 	sigaction(SIGALRM, &act, NULL);
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGBUS, &act, NULL);
 	sigaction(SIGFPE, &act, NULL);
 #endif
 	sigaction(SIGHUP, &act, NULL);
-#if !defined(USE_SENTRY)
+#if !defined(AL_SENTRY)
 	sigaction(SIGILL, &act, NULL);
 	sigaction(SIGPIPE, &act, NULL);
 	sigaction(SIGSEGV, &act, NULL);

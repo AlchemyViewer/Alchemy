@@ -47,8 +47,7 @@
 #include <string_view>
 #include "string.h"
 
-#include "absl/synchronization/mutex.h"
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #include "llapp.h"
 #include "llapr.h"
@@ -120,6 +119,7 @@ namespace {
 		virtual void recordMessage(LLError::ELevel level,
 									const std::string& message) override
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
 			int syslogPriority = LOG_CRIT;
 			switch (level) {
 				case LLError::LEVEL_DEBUG:	syslogPriority = LOG_DEBUG;	break;
@@ -179,6 +179,7 @@ namespace {
         virtual void recordMessage(LLError::ELevel level,
                                     const std::string& message) override
         {
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
             if (LLError::getAlwaysFlush())
             {
                 mFile << message << std::endl;
@@ -207,7 +208,7 @@ namespace {
         {
             return LLError::getEnabledLogTypesMask() & 0x04;
         }
-
+        
         LL_FORCE_INLINE std::string createBoldANSI()
         {
             std::string ansi_code;
@@ -233,10 +234,10 @@ namespace {
         LL_FORCE_INLINE std::string createANSI(const std::string& color)
         {
             std::string ansi_code;
-            ansi_code += '\033';
-            ansi_code += "[";
+            ansi_code  += '\033';
+            ansi_code  += "[";
             ansi_code += "38;5;";
-            ansi_code += color;
+            ansi_code  += color;
             ansi_code += "m";
 
             return ansi_code;
@@ -245,6 +246,7 @@ namespace {
 		virtual void recordMessage(LLError::ELevel level,
 					   const std::string& message) override
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
             // The default colors for error, warn and debug are now a bit more pastel
             // and easier to read on the default (black) terminal background but you 
             // now have the option to set the color of each via an environment variables:
@@ -274,6 +276,7 @@ namespace {
 			}
             else
             {
+                LL_PROFILE_ZONE_NAMED("fprintf");
                  fprintf(stderr, "%s\n", message.c_str());
             }
 		}
@@ -283,6 +286,7 @@ namespace {
 
         LL_FORCE_INLINE void writeANSI(const std::string& ansi_code, const std::string& message)
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
             static std::string s_ansi_bold = createBoldANSI();  // bold text
             static std::string s_ansi_reset = createResetANSI();  // reset
 			// ANSI color code escape sequence, message, and reset in one fprintf call
@@ -319,6 +323,7 @@ namespace {
 		virtual void recordMessage(LLError::ELevel level,
 								   const std::string& message) override
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
 			mBuffer->addLine(message);
 		}
 	
@@ -345,6 +350,7 @@ namespace {
 		virtual void recordMessage(LLError::ELevel level,
 								   const std::string& message) override
 		{
+            LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
 			debugger_print(message);
 		}
 	};
@@ -493,7 +499,7 @@ namespace
 	}
 
 
-	typedef absl::flat_hash_map<std::string, LLError::ELevel> LevelMap;
+	typedef boost::unordered_flat_map<std::string, LLError::ELevel, al::string_hash, std::equal_to<>> LevelMap;
 	typedef std::vector<LLError::RecorderPtr> Recorders;
 	typedef std::vector<LLError::CallSite*> CallSiteVector;
 
@@ -560,8 +566,6 @@ namespace
     protected:
 		Globals();
 	public:
-		std::ostringstream messageStream;
-		bool messageStreamInUse;
 		std::string mFatalMessage;
 
 		void addCallSite(LLError::CallSite&);
@@ -578,8 +582,7 @@ namespace
 	};
 
 	Globals::Globals()
-		: messageStream(),
-		messageStreamInUse(false),
+		:
 		callSites(),
         mSettingsConfig(new SettingsConfig())
 	{
@@ -603,11 +606,9 @@ namespace
 	
 	void Globals::invalidateCallSites()
 	{
-		for (CallSiteVector::const_iterator i = callSites.begin();
-			 i != callSites.end();
-			 ++i)
+		for (LLError::CallSite* site : callSites)
 		{
-            (*i)->invalidate();
+            site->invalidate();
 		}
 		
 		callSites.clear();
@@ -774,7 +775,7 @@ namespace
 		}
 
 #if LL_WINDOWS
-		LLError::RecorderPtr recordToWinDebug = boost::make_shared<RecordToWinDebug>();
+		LLError::RecorderPtr recordToWinDebug = std::make_shared<RecordToWinDebug>();
 		LLError::addRecorder(std::move(recordToWinDebug));
 #endif
 
@@ -921,7 +922,7 @@ namespace LLError
 namespace {
 	void setLevels(LevelMap& map, const LLSD& list, LLError::ELevel level)
 	{
-		for (const auto& i : list.array())
+		for (const auto& i : list.asArray())
 		{
 			map[i.asString()] = level;
 		}
@@ -1084,7 +1085,7 @@ namespace LLError
     //
     // NOTE!!! Requires external mutex lock!!!
     template <typename RECORDER>
-    std::pair<boost::shared_ptr<RECORDER>, Recorders::iterator>
+    std::pair<std::shared_ptr<RECORDER>, Recorders::iterator>
     findRecorderPos(SettingsConfigPtr &s)
     {
         // Since we promise to return an iterator, use a classic iterator
@@ -1095,7 +1096,7 @@ namespace LLError
             // *it is a RecorderPtr, a shared_ptr<Recorder>. Use a
             // dynamic_pointer_cast to try to downcast to test if it's also a
             // shared_ptr<RECORDER>.
-            auto ptr = boost::dynamic_pointer_cast<RECORDER>(*it);
+            auto ptr = std::dynamic_pointer_cast<RECORDER>(*it);
             if (ptr)
             {
                 // found the entry we want
@@ -1115,7 +1116,7 @@ namespace LLError
     // shared_ptr might be empty (operator!() returns true) if there was no
     // such RECORDER subclass instance in mRecorders.
     template <typename RECORDER>
-    boost::shared_ptr<RECORDER> findRecorder()
+    std::shared_ptr<RECORDER> findRecorder()
     {
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
         LLMutexLock lock(&s->mRecorderMutex);
@@ -1148,7 +1149,7 @@ namespace LLError
 
 		if (!file_name.empty())
 		{
-			boost::shared_ptr<RecordToFile> recordToFile = boost::make_shared<RecordToFile>(file_name);
+			auto recordToFile = std::make_shared<RecordToFile>(file_name);
 			if (recordToFile->okay())
 			{
 				addRecorder(std::move(recordToFile));
@@ -1166,7 +1167,7 @@ namespace LLError
     {
         if (! findRecorder<RecordToStderr>())
         {
-			RecorderPtr recordToStdErr = boost::make_shared<RecordToStderr>(stderrLogWantsTime());
+			RecorderPtr recordToStdErr = std::make_shared<RecordToStderr>(stderrLogWantsTime());
             addRecorder(std::move(recordToStdErr));
         }
     }
@@ -1178,7 +1179,7 @@ namespace LLError
 
 		if (fixedBuffer)
 		{
-			RecorderPtr recordToFixedBuffer = boost::make_shared<RecordToFixedBuffer>(fixedBuffer);
+			RecorderPtr recordToFixedBuffer = std::make_shared<RecordToFixedBuffer>(fixedBuffer);
 			addRecorder(std::move(recordToFixedBuffer));
 		}
 	}
@@ -1229,18 +1230,15 @@ namespace
 
 	void writeToRecorders(const LLError::CallSite& site, const std::string& message)
 	{
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
 		LLError::ELevel level = site.mLevel;
 		SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
 
         std::string escaped_message;
 
         LLMutexLock lock(&s->mRecorderMutex);
-		for (Recorders::const_iterator i = s->mRecorders.begin();
-			i != s->mRecorders.end();
-			++i)
+		for (LLError::RecorderPtr& r : s->mRecorders)
 		{
-			LLError::RecorderPtr r = *i;
-
             if (!r->enabled())
             {
                 continue;
@@ -1305,26 +1303,16 @@ namespace {
 		LOG_MUTEX,
 		STACKS_MUTEX
 	};
-
-	ABSL_CONST_INIT absl::Mutex sLogMutex(absl::kConstInit);
-	ABSL_CONST_INIT absl::Mutex sStackMutex(absl::kConstInit);
-
+	// Some logging calls happen very early in processing -- so early that our
+	// module-static variables aren't yet initialized. getMutex() wraps a
+	// function-static LLMutex so that early calls can still have a valid
+	// LLMutex instance.
 	template <MutexDiscriminator MTX>
-	absl::Mutex* getMutex()
+	LLMutex* getMutex()
 	{
-		return nullptr;
-	}
-
-	template <>
-	absl::Mutex* getMutex<LOG_MUTEX>()
-	{
-		return &sLogMutex;
-	}
-
-	template <>
-	absl::Mutex* getMutex<STACKS_MUTEX>()
-	{
-		return &sStackMutex;
+		// guaranteed to be initialized the first time control reaches here
+		static LLMutex sMutex;
+		return &sMutex;
 	}
 
 	bool checkLevelMap(const LevelMap& map, const std::string& key,
@@ -1372,7 +1360,8 @@ namespace LLError
 
 	bool Log::shouldLog(CallSite& site)
 	{
-		AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(), 5);
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+		LLMutexTrylock lock(getMutex<LOG_MUTEX>(), 5);
 		if (!lock.isLocked())
 		{
 			return false;
@@ -1392,7 +1381,7 @@ namespace LLError
 		if (site.mClassInfo != typeid(NoClassInfo))
 #endif // LL_LINUX
 		{
-			function_name = absl::StrCat(class_name, "::", function_name);
+			function_name = fmt::format(FMT_COMPILE("{}::{}"), class_name, function_name);
 		}
 
 		ELevel compareLevel = s->mDefaultLevel;
@@ -1416,7 +1405,8 @@ namespace LLError
 
 	void Log::flush(const std::ostringstream& out, const CallSite& site)
 	{
-		AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(),5);
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LOGGING
+		LLMutexTrylock lock(getMutex<LOG_MUTEX>(),5);
 		if (!lock.isLocked())
 		{
 			return;
@@ -1459,7 +1449,10 @@ namespace LLError
 		if (site.mLevel == LEVEL_ERROR)
 		{
 			g->mFatalMessage = message;
-			s->mCrashFunction(message);
+            if (s->mCrashFunction)
+            {
+                s->mCrashFunction(message);
+            }
 		}
 	}
 }
@@ -1527,7 +1520,7 @@ namespace LLError
 		const size_t BUF_SIZE = 64;
 		char time_str[BUF_SIZE];	/* Flawfinder: ignore */
 		
-		int chars = strftime(time_str, BUF_SIZE, 
+		auto chars = strftime(time_str, BUF_SIZE, 
 								  "%Y-%m-%dT%H:%M:%SZ",
 								  gmtime(&now));
 
@@ -1542,7 +1535,7 @@ namespace LLError
     //static
     void LLCallStacks::push(const char* function, const int line)
     {
-		AbslMutexMaybeTrylock lock(getMutex<STACKS_MUTEX>(), 5);
+        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
         if (!lock.isLocked())
         {
             return;
@@ -1567,7 +1560,7 @@ namespace LLError
     //static
     void LLCallStacks::end(const std::ostringstream& out)
     {
-		AbslMutexMaybeTrylock lock(getMutex<STACKS_MUTEX>(), 5);
+        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
         if (!lock.isLocked())
         {
             return;
@@ -1584,7 +1577,7 @@ namespace LLError
     //static
     void LLCallStacks::print()
     {
-		AbslMutexMaybeTrylock lock(getMutex<STACKS_MUTEX>(), 5);
+        LLMutexTrylock lock(getMutex<STACKS_MUTEX>(), 5);
         if (!lock.isLocked())
         {
             return;
@@ -1622,19 +1615,18 @@ namespace LLError
     }
 }
 
-bool debugLoggingEnabled(const std::string& tag)
+void crashdriver(void (*callback)(int*))
 {
-	AbslMutexMaybeTrylock lock(getMutex<LOG_MUTEX>(), 5);
-    if (!lock.isLocked())
-    {
-        return false;
-    }
+    // The LLERROR_CRASH macro used to have inline code of the form:
+    //int* make_me_crash = NULL;
+    //*make_me_crash = 0;
 
-    SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
-    LLError::ELevel level = LLError::LEVEL_DEBUG;
-    bool res = checkLevelMap(s->mTagLevelMap, tag, level);
-    return res;
+    // But compilers are getting smart enough to recognize that, so we must
+    // assign to an address supplied by a separate source file. We could do
+    // the assignment here in crashdriver() -- but then BugSplat would group
+    // all LL_ERRS() crashes as the fault of this one function, instead of
+    // identifying the specific LL_ERRS() source line. So instead, do the
+    // assignment in a lambda in the caller's source. We just provide the
+    // nullptr target.
+    callback(nullptr);
 }
-
-
-

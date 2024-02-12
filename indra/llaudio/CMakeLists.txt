@@ -7,23 +7,6 @@ include(LLAudio)
 include(FMODSTUDIO)
 include(OPENAL)
 include(LLCommon)
-include(LLMath)
-include(LLMessage)
-include(LLFileSystem)
-
-include_directories(
-    ${LLAUDIO_INCLUDE_DIRS}
-    ${LLCOMMON_INCLUDE_DIRS}
-    ${LLMATH_INCLUDE_DIRS}
-    ${LLMESSAGE_INCLUDE_DIRS}
-    ${LLFILESYSTEM_INCLUDE_DIRS}
-    ${OGG_INCLUDE_DIRS}
-    ${VORBISENC_INCLUDE_DIRS}
-    ${VORBISFILE_INCLUDE_DIRS}
-    ${VORBIS_INCLUDE_DIRS}
-    ${OPENAL_INCLUDE_DIRS}
-    ${FREEAULT_INCLUDE_DIRS}
-    )
 
 set(llaudio_SOURCE_FILES
     llaudioengine.cpp
@@ -43,10 +26,7 @@ set(llaudio_HEADER_FILES
     llwindgen.h
     )
 
-if (USE_FMODSTUDIO)
-    include_directories(
-        ${FMODSTUDIO_INCLUDE_DIR}
-        )
+if (TARGET ll::fmodstudio)
     list(APPEND llaudio_SOURCE_FILES
          llaudioengine_fmodstudio.cpp
          lllistener_fmodstudio.cpp
@@ -58,14 +38,9 @@ if (USE_FMODSTUDIO)
          lllistener_fmodstudio.h
          llstreamingaudio_fmodstudio.h
          )
-endif (USE_FMODSTUDIO)
+endif ()
 
-if (USE_OPENAL)
-  include_directories(
-    ${OPENAL_LIBRARIES}
-    ${FREEALUT_LIBRARIES}
-    )
-
+if (TARGET ll::openal)
   list(APPEND llaudio_SOURCE_FILES
     llaudioengine_openal.cpp
     lllistener_openal.cpp
@@ -75,25 +50,27 @@ if (USE_OPENAL)
     llaudioengine_openal.h
     lllistener_openal.h
     )
-endif (USE_OPENAL)
-
-set_source_files_properties(${llaudio_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
+endif ()
 
 list(APPEND llaudio_SOURCE_FILES ${llaudio_HEADER_FILES})
 
 add_library (llaudio ${llaudio_SOURCE_FILES})
-target_link_libraries(
-    llaudio
-    ${LLCOMMON_LIBRARIES}
-    ${LLMATH_LIBRARIES}
-    ${LLMESSAGE_LIBRARIES}
-    ${LLFILESYSTEM_LIBRARIES}
-    ${VORBISENC_LIBRARIES}
-    ${VORBISFILE_LIBRARIES}
-    ${VORBIS_LIBRARIES}
-    ${OGG_LIBRARIES}
+target_include_directories( llaudio  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries( llaudio
+        PUBLIC
+        llcommon
+        llmath
+        llmessage
+        llfilesystem
+        ll::vorbis
     )
+
+if( TARGET ll::openal )
+    target_link_libraries( llaudio PUBLIC ll::openal )
+endif()
+if( TARGET ll::fmodstudio )
+    target_link_libraries( llaudio PUBLIC ll::fmodstudio )
+endif()
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llaudio
@@ -101,3 +78,5 @@ if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0")
     [["linden_common.h"]]
     )
 endif()
+
+

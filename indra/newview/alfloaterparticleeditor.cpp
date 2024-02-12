@@ -175,7 +175,7 @@ BOOL ALFloaterParticleEditor::postBuild()
 
 	onParameterChange();
 
-	return TRUE;
+	return LLFloater::postBuild();
 }
 
 BOOL ALFloaterParticleEditor::canClose()
@@ -373,7 +373,7 @@ void ALFloaterParticleEditor::onClickTargetPicker()
 	mPickTargetButton->setToggleState(TRUE);
 	mPickTargetButton->setEnabled(FALSE);
 	LLToolObjPicker::getInstance()->setExitCallback(onTargetPicked, this);
-	LLToolMgr::getInstanceFast()->setTransientTool(LLToolObjPicker::getInstance());
+	LLToolMgr::getInstance()->setTransientTool(LLToolObjPicker::getInstance());
 }
 
 // static
@@ -383,7 +383,7 @@ void ALFloaterParticleEditor::onTargetPicked(void* userdata)
 
 	const LLUUID picked = LLToolObjPicker::getInstance()->getObjectID();
 
-	LLToolMgr::getInstanceFast()->clearTransientTool();
+	LLToolMgr::getInstance()->clearTransientTool();
 
 	self->mPickTargetButton->setEnabled(TRUE);
 	self->mPickTargetButton->setToggleState(FALSE);
@@ -605,7 +605,7 @@ void ALFloaterParticleEditor::callbackReturned(const LLUUID& inventoryItemID)
 	LLBufferedAssetUploadInfo::taskUploadFinish_f proc =
 		boost::bind(&ALFloaterParticleEditor::finishUpload, _1, _2, _3, _4, true, mObject->getID());
 	LLResourceUploadInfo::ptr_t uploadInfo(new LLScriptAssetUpload(mObject->getID(), inventoryItemID,
-		LLScriptAssetUpload::MONO, true, LLUUID::null, script, proc));
+		LLScriptAssetUpload::MONO, true, LLUUID::null, script, proc, nullptr));
 	LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
 
     if (mCloseAfterSave) closeFloater();

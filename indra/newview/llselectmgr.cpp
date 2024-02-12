@@ -57,12 +57,12 @@
 #include "llviewerwindow.h"
 #include "lldrawable.h"
 #include "llfloaterinspect.h"
-#include "llfloaterproperties.h"
 #include "llfloaterreporter.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llframetimer.h"
 #include "llfocusmgr.h"
+#include "llgltfmateriallist.h"
 #include "llhudeffecttrail.h"
 #include "llhudmanager.h"
 #include "llinventorymodel.h"
@@ -91,6 +91,7 @@
 #include "llviewerstats.h"
 #include "llvoavatarself.h"
 #include "llvovolume.h"
+#include "llworld.h"
 #include "pipeline.h"
 #include "llviewershadermgr.h"
 #include "llpanelface.h"
@@ -111,7 +112,7 @@ const F32 SILHOUETTE_UPDATE_THRESHOLD_SQUARED = 0.02f;
 const S32 MAX_SILS_PER_FRAME = 50;
 const S32 MAX_OBJECTS_PER_PACKET = 254;
 // For linked sets
-const S32 MAX_CHILDREN_PER_TASK = 255;
+//const S32 MAX_CHILDREN_PER_TASK = 255;
 
 //
 // Globals
@@ -163,7 +164,7 @@ struct LLDeRezInfo
 
 LLSelectionCallbackData::LLSelectionCallbackData()
 {
-    LLSelectMgr *instance = LLSelectMgr::getInstanceFast();
+    LLSelectMgr *instance = LLSelectMgr::getInstance();
     LLObjectSelectionHandle selection = instance->getSelection();
     if (!selection->getNumNodes())
     {
@@ -214,8 +215,6 @@ void LLSelectMgr::cleanupGlobals()
 	LLSelectMgr::getInstance()->clearSelections();
 }
 
-// Build time optimization, generate this function once here
-template class LLSelectMgr* LLSingleton<class LLSelectMgr>::getInstance();
 //-----------------------------------------------------------------------------
 // LLSelectMgr()
 //-----------------------------------------------------------------------------
@@ -317,14 +316,29 @@ void LLSelectMgr::resetObjectOverrides(LLObjectSelectionHandle selected_handle)
 {
     struct f : public LLSelectedNodeFunctor
     {
+        f(bool a, LLSelectMgr* p) : mAvatarOverridesPersist(a), mManager(p) {}
+        bool mAvatarOverridesPersist;
+        LLSelectMgr* mManager;
         virtual bool apply(LLSelectNode* node)
         {
+            if (mAvatarOverridesPersist)
+            {
+                LLViewerObject* object = node->getObject();
+                if (object && !object->getParent())
+                {
+                    LLVOAvatar* avatar = object->asAvatar();
+                    if (avatar)
+                    {
+                        mManager->mAvatarOverridesMap.emplace(avatar->getID(), AvatarPositionOverride(node->mLastPositionLocal, node->mLastRotation, object));
+                    }
+                }
+            }
             node->mLastPositionLocal.setVec(0, 0, 0);
             node->mLastRotation = LLQuaternion();
             node->mLastScale.setVec(0, 0, 0);
             return true;
         }
-    } func;
+    } func(mAllowSelectAvatar, this);
 
     selected_handle->applyToNodes(&func);
 }
@@ -356,6 +370,93 @@ void LLSelectMgr::overrideObjectUpdates()
 		}
 	} func;
 	getSelection()->applyToNodes(&func);
+}
+
+void LLSelectMgr::resetAvatarOverrides()
+{
+    mAvatarOverridesMap.clear();
+}
+
+void LLSelectMgr::overrideAvatarUpdates()
+{
+    if (mAvatarOverridesMap.size() == 0)
+    {
+        return;
+    }
+
+    if (!mAllowSelectAvatar || !gFloaterTools)
+    {
+        resetAvatarOverrides();
+        return;
+    }
+
+    if (!gFloaterTools->getVisible() && getSelection()->isEmpty())
+    {
+        // when user switches selection, floater is invisible and selection is empty
+        LLToolset *toolset = LLToolMgr::getInstance()->getCurrentToolset();
+        if (toolset->isShowFloaterTools()
+            && toolset->isToolSelected(0)) // Pie tool
+        {
+            resetAvatarOverrides();
+            return;
+        }
+    }
+
+    // remove selected avatars from this list,
+    // but set object overrides to make sure avatar won't snap back 
+    struct f : public LLSelectedNodeFunctor
+    {
+        f(LLSelectMgr* p) : mManager(p) {}
+        LLSelectMgr* mManager;
+        virtual bool apply(LLSelectNode* selectNode)
+        {
+            LLViewerObject* object = selectNode->getObject();
+            if (object && !object->getParent())
+            {
+                LLVOAvatar* avatar = object->asAvatar();
+                if (avatar)
+                {
+                    uuid_av_override_map_t::iterator iter = mManager->mAvatarOverridesMap.find(avatar->getID());
+                    if (iter != mManager->mAvatarOverridesMap.end())
+                    {
+                        if (selectNode->mLastPositionLocal.isExactlyZero())
+                        {
+                            selectNode->mLastPositionLocal = iter->second.mLastPositionLocal;
+                        }
+                        if (selectNode->mLastRotation == LLQuaternion())
+                        {
+                            selectNode->mLastRotation = iter->second.mLastRotation;
+                        }
+                        mManager->mAvatarOverridesMap.erase(iter);
+                    }
+                }
+            }
+            return true;
+        }
+    } func(this);
+    getSelection()->applyToNodes(&func);
+
+    // Override avatar positions
+    uuid_av_override_map_t::iterator it = mAvatarOverridesMap.begin();
+    while (it != mAvatarOverridesMap.end())
+    {
+        if (it->second.mObject->isDead())
+        {
+            it = mAvatarOverridesMap.erase(it);
+        }
+        else
+        {
+            if (!it->second.mLastPositionLocal.isExactlyZero())
+            {
+                it->second.mObject->setPosition(it->second.mLastPositionLocal);
+            }
+            if (it->second.mLastRotation != LLQuaternion())
+            {
+                it->second.mObject->setRotation(it->second.mLastRotation);
+            }
+            it++;
+        }
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -580,7 +681,7 @@ BOOL LLSelectMgr::removeObjectFromSelections(const LLUUID &id)
 	BOOL object_found = FALSE;
 	LLTool *tool = NULL;
 
-	tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+	tool = LLToolMgr::getInstance()->getCurrentTool();
 
 	// It's possible that the tool is editing an object that is not selected
 	LLViewerObject* tool_editing_object = tool->getEditingObject();
@@ -632,11 +733,12 @@ bool LLSelectMgr::linkObjects()
 	}
 
 	S32 object_count = getSelection()->getObjectCount();
-	if (object_count > MAX_CHILDREN_PER_TASK + 1)
+	S32 max_objects = LLWorld::getInstance()->getRegionMaxLinkObjects();
+	if (object_count > max_objects + 1)
 	{
 		LLSD args;
 		args["COUNT"] = llformat("%d", object_count);
-		int max = MAX_CHILDREN_PER_TASK+1;
+		int max = max_objects + 1;
 		args["MAX"] = llformat("%d", max);
 		LLNotificationsUtil::add("UnableToLinkObjects", args);
 		return true;
@@ -959,10 +1061,6 @@ void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, BOOL undoab
 	// check to see if object is already in list
 	LLSelectNode *nodep = mSelectedObjects->findNode(objectp);
 
-	// Reset (in anticipation of being set to an appropriate value by panel refresh, if they're up)
-	//
-	setTextureChannel(LLRender::DIFFUSE_MAP);
-
 	// if not in list, add it
 	if (!nodep)
 	{
@@ -1087,8 +1185,8 @@ void LLSelectMgr::highlightObjectOnly(LLViewerObject* objectp)
 		return;
 	}
 	
-	if ((gSavedSettings.getBOOL("SelectOwnedOnly") && !objectp->permYouOwner()) 
-		|| (gSavedSettings.getBOOL("SelectMovableOnly") && (!objectp->permMove() ||  objectp->isPermanentEnforced())))
+    if ((gSavedSettings.getBOOL("SelectOwnedOnly") && !objectp->permYouOwner())
+        || (gSavedSettings.getBOOL("SelectMovableOnly") && (!objectp->permMove() || objectp->isPermanentEnforced())))
 	{
 		// only select my own objects
 		return;
@@ -1378,7 +1476,6 @@ void LLSelectMgr::getGrid(LLVector3& origin, LLQuaternion &rotation, LLVector3 &
 		case SELECT_TYPE_WORLD:
 			mGridScale = LLVector3(1.f, 1.f, 1.f) * ALControlCache::GridResolution;
 			break;
-
 		}
 	}
 	llassert(mGridOrigin.isFinite());
@@ -1567,6 +1664,11 @@ void LLSelectMgr::dump()
 	{
 		LLViewerObject* objectp = (*iter)->getObject();
 		LL_INFOS() << "Object " << count << " type " << LLPrimitive::pCodeToString(objectp->getPCode()) << LL_ENDL;
+// [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
+		LL_INFOS() << "  isRoot " << objectp->isRoot() << LL_ENDL;
+		LL_INFOS() << "  idLocal " << objectp->getLocalID() << LL_ENDL;
+		LL_INFOS() << "  idGlobal " << objectp->getID() << LL_ENDL;
+// [/SL:KB]
 		LL_INFOS() << "  hasLSL " << objectp->flagScripted() << LL_ENDL;
 		LL_INFOS() << "  hasTouch " << objectp->flagHandleTouch() << LL_ENDL;
 		LL_INFOS() << "  hasMoney " << objectp->flagTakesMoney() << LL_ENDL;
@@ -1645,6 +1747,7 @@ void LLObjectSelection::applyNoCopyTextureToTEs(LLViewerInventoryItem* item)
 
 		S32 num_tes = llmin((S32)object->getNumTEs(), (S32)object->getNumFaces());
 		bool texture_copied = false;
+        bool updated = false;
 		for (S32 te = 0; te < num_tes; ++te)
 		{
 			if (node->isTESelected(te))
@@ -1653,27 +1756,89 @@ void LLObjectSelection::applyNoCopyTextureToTEs(LLViewerInventoryItem* item)
 				// without making any copies
 				if (!texture_copied)
 				{
-					LLToolDragAndDrop::handleDropTextureProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
+					LLToolDragAndDrop::handleDropMaterialProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
 					texture_copied = true;
 				}
 
 				// apply texture for the selected faces
 				add(LLStatViewer::EDIT_TEXTURE, 1);
 				object->setTEImage(te, image);
-				dialog_refresh_all();
-
-				// send the update to the simulator
-				object->sendTEUpdate();
+                updated = true;
 			}
 		}
+
+        if (updated) // not nessesary? sendTEUpdate update supposed to be done by sendfunc
+        {
+            dialog_refresh_all();
+
+            // send the update to the simulator
+            object->sendTEUpdate();
+        }
 	}
 }
+
+bool LLObjectSelection::applyRestrictedPbrMaterialToTEs(LLViewerInventoryItem* item)
+{
+    if (!item)
+    {
+        return false;
+    }
+
+    LLUUID asset_id = item->getAssetUUID();
+    if (asset_id.isNull())
+    {
+        asset_id = LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID;
+    }
+
+    bool material_copied_all_faces = true;
+
+    for (iterator iter = begin(); iter != end(); ++iter)
+    {
+        LLSelectNode* node = *iter;
+        LLViewerObject* object = (*iter)->getObject();
+        if (!object)
+        {
+            continue;
+        }
+
+        S32 num_tes = llmin((S32)object->getNumTEs(), (S32)object->getNumFaces());
+        bool material_copied = false;
+        for (S32 te = 0; te < num_tes; ++te)
+        {
+            if (node->isTESelected(te))
+            {
+                //(no-copy), (no-modify), and (no-transfer) materials must be moved to the object's inventory only once
+                // without making any copies
+                if (!material_copied && asset_id.notNull())
+                {
+                    material_copied = (bool)LLToolDragAndDrop::handleDropMaterialProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
+                }
+                if (!material_copied)
+                {
+                    // Applying the material is not possible for this object given the current inventory
+					material_copied_all_faces = false;
+                    break;
+                }
+
+                // apply texture for the selected faces
+                // blank out most override data on the server
+                //add(LLStatViewer::EDIT_TEXTURE, 1);
+                object->setRenderMaterialID(te, asset_id);
+            }
+        }
+    }
+
+    LLGLTFMaterialList::flushUpdates();
+
+    return material_copied_all_faces;
+}
+
 
 //-----------------------------------------------------------------------------
 // selectionSetImage()
 //-----------------------------------------------------------------------------
 // *TODO: re-arch texture applying out of lltooldraganddrop
-void LLSelectMgr::selectionSetImage(const LLUUID& imageid)
+bool LLSelectMgr::selectionSetImage(const LLUUID& imageid)
 {
 	// First for (no copy) textures and multiple object selection
 	LLViewerInventoryItem* item = gInventory.getItem(imageid);
@@ -1681,9 +1846,11 @@ void LLSelectMgr::selectionSetImage(const LLUUID& imageid)
 		&& !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID())
 		&& (mSelectedObjects->getNumNodes() > 1) )
 	{
-		LL_WARNS() << "Attempted to apply no-copy texture to multiple objects"
-				<< LL_ENDL;
-		return;
+         LL_DEBUGS() << "Attempted to apply no-copy texture " << imageid
+             << " to multiple objects" << LL_ENDL;
+
+        LLNotificationsUtil::add("FailedToApplyTextureNoCopyToMultiple");
+        return false;
 	}
 
 	struct f : public LLSelectedTEFunctor
@@ -1693,27 +1860,32 @@ void LLSelectMgr::selectionSetImage(const LLUUID& imageid)
 		f(LLViewerInventoryItem* item, const LLUUID& id) : mItem(item), mImageID(id) {}
 		bool apply(LLViewerObject* objectp, S32 te)
 		{
-		    if(objectp && !objectp->permModify())
+		    if(!objectp || !objectp->permModify())
 		    {
 		        return false;
 		    }
+
+            // Might be better to run willObjectAcceptInventory
+            if (mItem && objectp->isAttachment())
+            {
+                const LLPermissions& perm = mItem->getPermissions();
+                BOOL unrestricted = ((perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED) ? TRUE : FALSE;
+                if (!unrestricted)
+                {
+                    // Attachments are in world and in inventory simultaneously,
+                    // at the moment server doesn't support such a situation.
+                    return false;
+                }
+            }
+
 		    if (mItem)
 			{
-				if (te == -1) // all faces
-				{
-					LLToolDragAndDrop::dropTextureAllFaces(objectp,
-														   mItem,
-														   LLToolDragAndDrop::SOURCE_AGENT,
-														   LLUUID::null);
-				}
-				else // one face
-				{
-					LLToolDragAndDrop::dropTextureOneFace(objectp,
-														  te,
-														  mItem,
-														  LLToolDragAndDrop::SOURCE_AGENT,
-														  LLUUID::null);
-				}
+                LLToolDragAndDrop::dropTextureOneFace(objectp,
+                                                      te,
+                                                      mItem,
+                                                      LLToolDragAndDrop::SOURCE_AGENT,
+                                                      LLUUID::null,
+                                                      false);
 			}
 			else // not an inventory item
 			{
@@ -1761,6 +1933,127 @@ void LLSelectMgr::selectionSetImage(const LLUUID& imageid)
 		}
 	} sendfunc(item);
 	getSelection()->applyToObjects(&sendfunc);
+
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// selectionSetGLTFMaterial()
+//-----------------------------------------------------------------------------
+bool LLSelectMgr::selectionSetGLTFMaterial(const LLUUID& mat_id)
+{
+    // First for (no copy) textures and multiple object selection
+    LLViewerInventoryItem* item = gInventory.getItem(mat_id);
+    if (item
+        && !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID())
+        && (mSelectedObjects->getNumNodes() > 1))
+    {
+        LL_DEBUGS() << "Attempted to apply no-copy material " << mat_id
+            << "to multiple objects" << LL_ENDL;
+
+        LLNotificationsUtil::add("FailedToApplyGLTFNoCopyToMultiple");
+        return false;
+    }
+
+    struct f : public LLSelectedTEFunctor
+    {
+        LLViewerInventoryItem* mItem;
+        LLUUID mMatId;
+        bool material_copied_any_face = false;
+        bool material_copied_all_faces = true;
+        f(LLViewerInventoryItem* item, const LLUUID& id) : mItem(item), mMatId(id) {}
+        bool apply(LLViewerObject* objectp, S32 te)
+        {
+            if (!objectp || !objectp->permModify())
+            {
+                return false;
+            }
+            LLUUID asset_id = mMatId;
+            if (mItem)
+            {
+                const LLPermissions& perm = mItem->getPermissions();
+                bool from_library = perm.getOwner() == ALEXANDRIA_LINDEN_ID;
+                if (objectp->isAttachment())
+                {
+                    bool unrestricted = (perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED;
+
+                    if (!unrestricted && !from_library)
+                    {
+                        // Attachments are in world and in inventory simultaneously,
+                        // at the moment server doesn't support such a situation.
+                        return false;
+                    }
+                }
+
+                if (!from_library
+                    // Check if item may be copied into the object's inventory
+                    && !LLToolDragAndDrop::handleDropMaterialProtections(objectp, mItem, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null))
+                {
+                    return false;
+                }
+
+                asset_id = mItem->getAssetUUID();
+                if (asset_id.isNull())
+                {
+                    asset_id = LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID;
+                }
+            }
+
+            // Blank out most override data on the object and send to server
+            objectp->setRenderMaterialID(te, asset_id);
+
+            return true;
+        }
+    };
+
+    bool success = true;
+    if (item
+        &&  (!item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()) ||
+             !item->getPermissions().allowOperationBy(PERM_TRANSFER, gAgent.getID()) ||
+             !item->getPermissions().allowOperationBy(PERM_MODIFY, gAgent.getID())
+            )
+        && item->getPermissions().getOwner() != ALEXANDRIA_LINDEN_ID
+        )
+    {
+        success = success && getSelection()->applyRestrictedPbrMaterialToTEs(item);
+    }
+    else
+    {
+        f setfunc(item, mat_id);
+        success = success && getSelection()->applyToTEs(&setfunc);
+    }
+
+    struct g : public LLSelectedObjectFunctor
+    {
+        LLViewerInventoryItem* mItem;
+        g(LLViewerInventoryItem* item) : mItem(item) {}
+        virtual bool apply(LLViewerObject* object)
+        {
+            if (object && !object->permModify())
+            {
+                return false;
+            }
+
+            if (!mItem)
+            {
+                // 1 particle effect per object				
+                LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_BEAM, TRUE);
+                effectp->setSourceObject(gAgentAvatarp);
+                effectp->setTargetObject(object);
+                effectp->setDuration(LL_HUD_DUR_SHORT);
+                effectp->setColor(LLColor4U(gAgent.getEffectColor()));
+            }
+
+            dialog_refresh_all();
+            object->sendTEUpdate();
+            return true;
+        }
+    } sendfunc(item);
+    success = success && getSelection()->applyToObjects(&sendfunc);
+
+    LLGLTFMaterialList::flushUpdates();
+
+    return success;
 }
 
 //-----------------------------------------------------------------------------
@@ -1940,6 +2233,48 @@ BOOL LLSelectMgr::selectionRevertTextures()
 	return revert_successful;
 }
 
+void LLSelectMgr::selectionRevertGLTFMaterials()
+{
+    struct f : public LLSelectedTEFunctor
+    {
+        LLObjectSelectionHandle mSelectedObjects;
+        f(LLObjectSelectionHandle sel) : mSelectedObjects(sel) {}
+        bool apply(LLViewerObject* objectp, S32 te)
+        {
+            if (objectp && !objectp->permModify())
+            {
+                return false;
+            }
+
+            LLSelectNode* nodep = mSelectedObjects->findNode(objectp);
+            if (nodep && te < (S32)nodep->mSavedGLTFMaterialIds.size())
+            {
+                // Restore base material
+                LLUUID asset_id = nodep->mSavedGLTFMaterialIds[te];
+
+                // Update material locally
+                objectp->setRenderMaterialID(te, asset_id, false /*wait for LLGLTFMaterialList update*/);
+                objectp->setTEGLTFMaterialOverride(te, nodep->mSavedGLTFOverrideMaterials[te]);
+
+                // Enqueue update to server
+                if (asset_id.notNull())
+                {
+                    // Restore overrides and base material
+                    LLGLTFMaterialList::queueApply(objectp, te, asset_id, nodep->mSavedGLTFOverrideMaterials[te]);
+                } 
+                else
+                {
+                    //blank override out
+                    LLGLTFMaterialList::queueApply(objectp, te, asset_id);
+                }
+
+            }
+            return true;
+        }
+    } setfunc(mSelectedObjects);
+    getSelection()->applyToTEs(&setfunc);
+}
+
 void LLSelectMgr::selectionSetBumpmap(U8 bumpmap, const LLUUID &image_id)
 {
 	struct f : public LLSelectedTEFunctor
@@ -1968,8 +2303,20 @@ void LLSelectMgr::selectionSetBumpmap(U8 bumpmap, const LLUUID &image_id)
     if (item && !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()))
     {
         LLViewerObject *object = mSelectedObjects->getFirstRootObject();
-        if (!object) return;
-        LLToolDragAndDrop::handleDropTextureProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
+        if (!object)
+        {
+            return;
+        }
+        const LLPermissions& perm = item->getPermissions();
+        BOOL unrestricted = ((perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED) ? TRUE : FALSE;
+        BOOL attached = object->isAttachment();
+        if (attached && !unrestricted)
+        {
+            // Attachments are in world and in inventory simultaneously,
+            // at the moment server doesn't support such a situation.
+            return;
+        }
+        LLToolDragAndDrop::handleDropMaterialProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
     }
     getSelection()->applyToTEs(&setfunc);
 	
@@ -2028,8 +2375,20 @@ void LLSelectMgr::selectionSetShiny(U8 shiny, const LLUUID &image_id)
     if (item && !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()))
     {
         LLViewerObject *object = mSelectedObjects->getFirstRootObject();
-        if (!object) return;
-        LLToolDragAndDrop::handleDropTextureProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
+        if (!object)
+        {
+            return;
+        }
+        const LLPermissions& perm = item->getPermissions();
+        BOOL unrestricted = ((perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED) ? TRUE : FALSE;
+        BOOL attached = object->isAttachment();
+        if (attached && !unrestricted)
+        {
+            // Attachments are in world and in inventory simultaneously,
+            // at the moment server doesn't support such a situation.
+            return;
+        }
+        LLToolDragAndDrop::handleDropMaterialProtections(object, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
     }
     getSelection()->applyToTEs(&setfunc);
 
@@ -3700,27 +4059,27 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
 			const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
 			// attempt to derez into the trash.
 			LLDeRezInfo info(DRD_TRASH, trash_id);
-			LLSelectMgr::getInstanceFast()->sendListToRegions("DeRezObject",
+			LLSelectMgr::getInstance()->sendListToRegions("DeRezObject",
                                                           packDeRezHeader,
                                                           packObjectLocalID,
                                                           logNoOp,
                                                           (void*) &info,
                                                           SEND_ONLY_ROOTS);
 			// VEFFECT: Delete Object - one effect for all deletes
-			if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral") && (LLSelectMgr::getInstanceFast()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD))
+			if (!gSavedSettings.getBOOL("AlchemyDisableEffectSpiral") && (LLSelectMgr::getInstance()->mSelectedObjects->mSelectType != SELECT_TYPE_HUD))
 			{
 				LLHUDEffectSpiral *effectp = (LLHUDEffectSpiral *)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_POINT, TRUE);
-				effectp->setPositionGlobal( LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal() );
+				effectp->setPositionGlobal( LLSelectMgr::getInstance()->getSelectionCenterGlobal() );
 				effectp->setColor(LLColor4U(gAgent.getEffectColor()));
 				F32 duration = 0.5f;
-				duration += LLSelectMgr::getInstanceFast()->mSelectedObjects->getObjectCount() / 64.f;
+				duration += LLSelectMgr::getInstance()->mSelectedObjects->getObjectCount() / 64.f;
 				effectp->setDuration(duration);
 			}
 
 			gAgentCamera.setLookAt(LOOKAT_TARGET_CLEAR);
 
 			// Keep track of how many objects have been deleted.
-			add(LLStatViewer::DELETE_OBJECT, LLSelectMgr::getInstanceFast()->mSelectedObjects->getObjectCount());
+			add(LLStatViewer::DELETE_OBJECT, LLSelectMgr::getInstance()->mSelectedObjects->getObjectCount());
 		}
 		break;
 	case 1:
@@ -3916,9 +4275,12 @@ BOOL LLSelectMgr::selectGetAggregateTexturePermissions(LLAggregatePermissions& r
 
 BOOL LLSelectMgr::isMovableAvatarSelected()
 {
-	if (mAllowSelectAvatar)
+	if (mAllowSelectAvatar && getSelection()->getObjectCount() == 1)
 	{
-		return (getSelection()->getObjectCount() == 1) && (getSelection()->getFirstRootObject()->isAvatar()) && getSelection()->getFirstMoveableNode(TRUE);
+		if (auto ret = getSelection()->getFirstRootObject())
+		{
+			return  (ret->isAvatar()) && getSelection()->getFirstMoveableNode(TRUE);
+		}
 	}
 	return FALSE;
 }
@@ -4440,7 +4802,7 @@ void LLSelectMgr::deselectAllIfTooFar()
 // [RLVa:KB] - Checked: 2010-04-11 (RLVa-1.2.0e) | Modified: RLVa-0.2.0f
 	static RlvCachedBehaviourModifier<float> s_nFartouchDist(RLV_MODIFIER_FARTOUCHDIST);
 
-	BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instanceFast().inEdit();
+	BOOL fRlvFartouch = gRlvHandler.hasBehaviour(RLV_BHVR_FARTOUCH) && LLToolMgr::instance().inEdit();
 	if ( (ALControlCache::LimitSelectDistance || (fRlvFartouch) )
 // [/RLVa:KB]
 		&& (!mSelectedObjects->getPrimaryObject() || !mSelectedObjects->getPrimaryObject()->isAvatar())
@@ -4477,7 +4839,7 @@ void LLSelectMgr::selectionSetObjectName(const std::string& name)
 	std::string name_copy(name);
 
 	// we only work correctly if 1 object is selected.
-	if(mSelectedObjects->getRootObjectCount() == 1)
+	if(mSelectedObjects->getRootObjectCount() >= 1)
 	{
 		sendListToRegions("ObjectName",
 						  packAgentAndSessionID,
@@ -4486,7 +4848,7 @@ void LLSelectMgr::selectionSetObjectName(const std::string& name)
 						  (void*)(&name_copy),
 						  SEND_ONLY_ROOTS);
 	}
-	else if(mSelectedObjects->getObjectCount() == 1)
+	else if(mSelectedObjects->getObjectCount() >= 1)
 	{
 		sendListToRegions("ObjectName",
 						  packAgentAndSessionID,
@@ -4502,7 +4864,7 @@ void LLSelectMgr::selectionSetObjectDescription(const std::string& desc)
 	std::string desc_copy(desc);
 
 	// we only work correctly if 1 object is selected.
-	if(mSelectedObjects->getRootObjectCount() == 1)
+	if(mSelectedObjects->getRootObjectCount() >= 1)
 	{
 		sendListToRegions("ObjectDescription",
 						  packAgentAndSessionID,
@@ -4511,7 +4873,7 @@ void LLSelectMgr::selectionSetObjectDescription(const std::string& desc)
 						  (void*)(&desc_copy),
 						  SEND_ONLY_ROOTS);
 	}
-	else if(mSelectedObjects->getObjectCount() == 1)
+	else if(mSelectedObjects->getObjectCount() >= 1)
 	{
 		sendListToRegions("ObjectDescription",
 						  packAgentAndSessionID,
@@ -4568,7 +4930,7 @@ void LLSelectMgr::sendAttach(LLObjectSelectionHandle selection_handle, U8 attach
 		return;
 	}
 
-	BOOL build_mode = LLToolMgr::getInstanceFast()->inEdit();
+	BOOL build_mode = LLToolMgr::getInstance()->inEdit();
 	// Special case: Attach to default location for this object.
 	if (0 == attachment_point ||
 		get_if_there(gAgentAvatarp->mAttachmentPoints, (S32)attachment_point, (LLViewerJointAttachment*)NULL))
@@ -5125,7 +5487,7 @@ void LLSelectMgr::packPermissions(LLSelectNode* node, void *user_data)
 	gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, node->getObject()->getLocalID());
 
 	gMessageSystem->addU8Fast(_PREHASH_Field,	data->mField);
-	gMessageSystem->addBOOLFast(_PREHASH_Set,		data->mSet);
+	gMessageSystem->addU8Fast(_PREHASH_Set,		data->mSet);
 	gMessageSystem->addU32Fast(_PREHASH_Mask,		data->mMask);
 }
 
@@ -5154,8 +5516,8 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 	LLViewerRegion*	last_region;
 	LLViewerRegion*	current_region;
 
-	S32 objects_sent = 0;
-	S32 packets_sent = 0;
+//	S32 objects_sent = 0;
+//	S32 packets_sent = 0;
 	S32 objects_in_this_packet = 0;
 
 	bool link_operation = message_name == "ObjectLink";
@@ -5287,7 +5649,7 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 			(*pack_body)(node, user_data);
             // do any related logging
             (*log_func)(node, user_data);
-			++objects_sent;
+//			++objects_sent;
 			++objects_in_this_packet;
 
 			// and on to the next object
@@ -5305,7 +5667,7 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 		{
 			// otherwise send current message and start new one
 			gMessageSystem->sendReliable( last_region->getHost());
-			packets_sent++;
+//			packets_sent++;
 			objects_in_this_packet = 0;
 
 			gMessageSystem->newMessage(message_name.c_str());
@@ -5322,7 +5684,7 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 				{
 					// add root instance into new message
 					(*pack_body)(linkset_root, user_data);
-					++objects_sent;
+//					++objects_sent;
 					++objects_in_this_packet;
 				}
 			}
@@ -5336,7 +5698,7 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 	if (gMessageSystem->getCurrentSendTotal() > 0)
 	{
 		gMessageSystem->sendReliable( current_region->getHost());
-		packets_sent++;
+//		packets_sent++;
 	}
 	else
 	{
@@ -5455,7 +5817,7 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 				return (node->getObject() && node->getObject()->mID == mID);
 			}
 		} func(id);
-		LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstNode(&func);
+		LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode(&func);
 
 		if (!node)
 		{
@@ -5463,13 +5825,19 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 		}
 		else
 		{
+            // save texture data as soon as we get texture perms first time
+            bool save_textures = !node->mValid;
 			if (node->mInventorySerial != inv_serial && node->getObject())
 			{
 				node->getObject()->dirtyInventory();
+
+                // Even if this isn't object's first udpate, inventory changed
+                // and some of the applied textures might have been in inventory
+                // so update texture list.
+                save_textures = true;
 			}
 
-			// save texture data as soon as we get texture perms first time
-			if (!node->mValid)
+			if (save_textures)
 			{
 				BOOL can_copy = FALSE;
 				BOOL can_transfer = FALSE;
@@ -5504,9 +5872,38 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 
 				if (can_copy && can_transfer)
 				{
-					// this should be the only place that saved textures is called
 					node->saveTextures(texture_ids);
 				}
+
+                if (can_copy && can_transfer && node->getObject()->getVolume())
+                {
+                    uuid_vec_t material_ids;
+                    gltf_materials_vec_t override_materials;
+                    LLVOVolume* vobjp = (LLVOVolume*)node->getObject();
+                    for (int i = 0; i < vobjp->getNumTEs(); ++i)
+                    {
+                        material_ids.push_back(vobjp->getRenderMaterialID(i));
+
+                        // Make a copy to ensure we won't affect live material
+                        // with any potential changes nor live changes will be
+                        // reflected in a saved copy.
+                        // Like changes from local material (reuses pointer) or
+                        // from live editor (revert mechanics might modify this)
+                        LLGLTFMaterial* old_override = node->getObject()->getTE(i)->getGLTFMaterialOverride();
+                        if (old_override)
+                        {
+                            LLPointer<LLGLTFMaterial> mat = new LLGLTFMaterial(*old_override);
+                            override_materials.push_back(mat);
+                        }
+                        else
+                        {
+                            override_materials.push_back(nullptr);
+                        }
+                    }
+                    // processObjectProperties does not include overrides so this
+                    // might need to be moved to LLGLTFMaterialOverrideDispatchHandler
+                    node->saveGLTFMaterials(material_ids, override_materials);
+                }
 			}
 
 			node->mValid = TRUE;
@@ -5584,7 +5981,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 	else if (request_flags & OBJECT_PAY_REQUEST)
 	{
 		// check if the owner of the paid object is muted
-		LLMuteList::getInstanceFast()->autoRemove(owner_id, LLMuteList::AR_MONEY);
+		LLMuteList::getInstance()->autoRemove(owner_id, LLMuteList::AR_MONEY);
 	}
 
 	// Now look through all of the hovered nodes
@@ -5597,7 +5994,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
 			return (node->getObject() && node->getObject()->mID == mID);
 		}
 	} func(id);
-	LLSelectNode* node = LLSelectMgr::getInstanceFast()->mHoverObjects->getFirstNode(&func);
+	LLSelectNode* node = LLSelectMgr::getInstance()->mHoverObjects->getFirstNode(&func);
 
 	if (node)
 	{
@@ -5623,7 +6020,7 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 
 	if (reset_list)
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
+		LLSelectMgr::getInstance()->deselectAll();
 	}
 
 	LLUUID full_id;
@@ -5649,7 +6046,7 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
 	}
 
 	// Don't select, just highlight
-	LLSelectMgr::getInstanceFast()->highlightObjectAndFamily(objects);
+	LLSelectMgr::getInstance()->highlightObjectAndFamily(objects);
 }
 
 void LLSelectMgr::updateSilhouettes()
@@ -5794,7 +6191,7 @@ void LLSelectMgr::updateSilhouettes()
 		num_sils_genned	= 0;
 
 		// render silhouettes for highlighted objects
-		const auto& viewer_cam_origin = LLViewerCamera::instanceFast().getOrigin();
+		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
 		//BOOL subtracting_from_selection = (gKeyboard->currentMask(TRUE) == MASK_CONTROL);
 		for (S32 pass = 0; pass < 2; pass++)
 		{
@@ -5857,8 +6254,6 @@ void LLSelectMgr::updateSilhouettes()
 		// clear flags after traversing node list (as child objects need to refer to parent flags, etc)
 		objectp->clearChanged(LLXform::MOVED | LLXform::SILHOUETTE);
 	}
-	
-	//gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
 }
 
 void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handle, S32& num_sils_genned, std::vector<LLViewerObject*>& changed_objects)
@@ -5869,7 +6264,7 @@ void LLSelectMgr::updateSelectionSilhouette(LLObjectSelectionHandle object_handl
 
 		//mSilhouetteImagep->bindTexture();
 		//glAlphaFunc(GL_GREATER, sHighlightAlphaTest);
-		const auto& viewer_cam_origin = LLViewerCamera::instanceFast().getOrigin();
+		const auto& viewer_cam_origin = LLViewerCamera::instance().getOrigin();
 		for (S32 pass = 0; pass < 2; pass++)
 		{
 			for (LLSelectNode* node : object_handle->begin_end())
@@ -5932,7 +6327,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 		gGL.pushMatrix();
 		gGL.loadIdentity();
 		F32 depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-		auto& viewerCamera = LLViewerCamera::instanceFast();
+		auto& viewerCamera = LLViewerCamera::instance();
 		gGL.ortho(-0.5f * viewerCamera.getAspect(), 0.5f * viewerCamera.getAspect(), -0.5f, 0.5f, 0.f, depth);
 
 		gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -5953,9 +6348,6 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 
 	auto renderMeshSelection_f = [fogCfx, wireframe_selection](LLSelectNode* node, LLViewerObject* objectp, LLColor4 hlColor)
 	{
-		//Need to because crash on ATI 3800 (and similar cards) MAINT-5018 
-		LLGLDisable multisample(LLPipeline::RenderFSAASamples > 0 ? GL_MULTISAMPLE : 0);
-
 		LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
 		if (shader)
@@ -6224,10 +6616,29 @@ LLSelectNode::LLSelectNode(const LLSelectNode& nodep)
 	mSavedShinyColors = nodep.mSavedShinyColors;
 	
 	saveTextures(nodep.mSavedTextures);
+    saveGLTFMaterials(nodep.mSavedGLTFMaterialIds, nodep.mSavedGLTFOverrideMaterials);
 }
 
 LLSelectNode::~LLSelectNode()
 {
+    LLSelectMgr *manager = LLSelectMgr::getInstance();
+    if (manager->mAllowSelectAvatar
+        && (!mLastPositionLocal.isExactlyZero()
+            || mLastRotation != LLQuaternion()))
+    {
+        LLViewerObject* object = getObject(); //isDead() check
+        if (object && !object->getParent())
+        {
+            LLVOAvatar* avatar = object->asAvatar();
+            if (avatar)
+            {
+                // Avatar was moved and needs to stay that way
+                manager->mAvatarOverridesMap.emplace(avatar->getID(), LLSelectMgr::AvatarPositionOverride(mLastPositionLocal, mLastRotation, object));
+            }
+        }
+    }
+
+
 	delete mPermissions;
 	mPermissions = NULL;
 }
@@ -6274,7 +6685,7 @@ S32 LLSelectNode::getLastSelectedTE() const
 	return mLastTESelected;
 }
 
-LLViewerObject* LLSelectNode::getObject()
+LLViewerObject* LLSelectNode::getObject() const
 {
 	if (!mObject)
 	{
@@ -6282,7 +6693,7 @@ LLViewerObject* LLSelectNode::getObject()
 	}
 	else if (mObject->isDead())
 	{
-		mObject = NULL;
+		mObject = nullptr;
 	}
 	return mObject;
 }
@@ -6331,6 +6742,27 @@ void LLSelectNode::saveTextures(const uuid_vec_t& textures)
 	{
 		mSavedTextures = textures;
 	}
+}
+
+void LLSelectNode::saveGLTFMaterials(const uuid_vec_t& materials, const gltf_materials_vec_t& override_materials)
+{
+    if (mObject.notNull())
+    {
+        mSavedGLTFMaterialIds.clear();
+        mSavedGLTFOverrideMaterials.clear();
+
+        for (uuid_vec_t::const_iterator materials_it = materials.begin();
+            materials_it != materials.end(); ++materials_it)
+        {
+            mSavedGLTFMaterialIds.push_back(*materials_it);
+        }
+
+        for (gltf_materials_vec_t::const_iterator mat_it = override_materials.begin();
+            mat_it != override_materials.end(); ++mat_it)
+        {
+            mSavedGLTFOverrideMaterials.push_back(*mat_it);
+        }
+    }
 }
 
 void LLSelectNode::saveTextureScaleRatios(LLRender::eTexIndex index_to_query)
@@ -6532,7 +6964,7 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 	LLVolume *volume = objectp->getVolume();
 	if (volume)
 	{
-		auto& viewerCamera = LLViewerCamera::instanceFast();
+		auto& viewerCamera = LLViewerCamera::instance();
 
 		F32 silhouette_thickness;
 		if (isAgentAvatarValid() && is_hud_object)
@@ -6554,22 +6986,9 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 		{
 			gGL.flush();
 			gGL.blendFunc(LLRender::BF_SOURCE_COLOR, LLRender::BF_ONE);
-            if (!LLGLSLShader::sNoFixedFunction)
-            {
-                LLGLEnable fog(GL_FOG);
-                glFogi(GL_FOG_MODE, GL_LINEAR);
-                float d = (viewerCamera.getPointOfInterest() - viewerCamera.getOrigin()).magVec();
-                LLColor4 fogCol = color * (F32) llclamp((LLSelectMgr::getInstanceFast()->getSelectionCenterGlobal() -
-                                   gAgentCamera.getCameraPositionGlobal()).magVec() /
-                                      (LLSelectMgr::getInstanceFast()->getBBoxOfSelection().getExtentLocal().magVec() * 4),
-                                  0.0, 1.0);
-                glFogf(GL_FOG_START, d);
-                glFogf(GL_FOG_END, d * (1 + (viewerCamera.getView() / viewerCamera.getDefaultFOV())));
-                glFogfv(GL_FOG_COLOR, fogCol.mV);
-            }
-
+			
             LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE, GL_GEQUAL);
-			gGL.setAlphaRejectSettings(LLRender::CF_DEFAULT);
+            gGL.flush();
 			gGL.begin(LLRender::LINES);
 			{
 				gGL.color4f(color.mV[VRED], color.mV[VGREEN], color.mV[VBLUE], 0.4f);
@@ -6661,7 +7080,7 @@ void dialog_refresh_all()
 	// make cleaning up the functions below easier.  Also, sometimes entities
 	// outside the selection manager change properties of selected objects
 	// and call into this function.  Yuck.
-	LLSelectMgr::getInstanceFast()->mUpdateSignal();
+	LLSelectMgr::getInstance()->mUpdateSignal();
 
 	// *TODO: Eliminate all calls into outside classes below, make those
 	// objects register with the update signal.
@@ -6678,8 +7097,6 @@ void dialog_refresh_all()
 	{
 		gMenuAttachmentOther->arrange();
 	}
-
-	LLFloaterProperties::dirtyAll();
 
 	LLFloaterInspect* inspect_instance = LLFloaterReg::findTypedInstance<LLFloaterInspect>("inspect");
 	if(inspect_instance)
@@ -6715,7 +7132,7 @@ S32 get_family_count(LLViewerObject *parent)
 		}
 		else
 		{
-			if (LLSelectMgr::getInstanceFast()->canSelectObject(child))
+			if (LLSelectMgr::getInstance()->canSelectObject(child))
 			{
 				count += get_family_count( child );
 			}
@@ -6735,6 +7152,10 @@ void LLSelectMgr::updateSelectionCenter()
 	const F32 MOVE_SELECTION_THRESHOLD = 1.f;		//  Movement threshold in meters for updating selection
 													//  center (tractor beam)
 
+    // override any avatar updates received
+    // Works only if avatar was repositioned
+    // and edit floater is visible
+    overrideAvatarUpdates();
 	//override any object updates received
 	//for selected objects
 	overrideObjectUpdates();
@@ -6795,7 +7216,7 @@ void LLSelectMgr::updateSelectionCenter()
 	
 	if (gAgentID.notNull())
 	{
-		LLTool		*tool = LLToolMgr::getInstanceFast()->getCurrentTool();
+		LLTool		*tool = LLToolMgr::getInstance()->getCurrentTool();
 		if (mShowSelection)
 		{
 			LLVector3d select_center_global;
@@ -7052,9 +7473,9 @@ void LLSelectMgr::validateSelection()
 	{
 		virtual bool apply(LLViewerObject* object)
 		{
-			if (!instanceFast().canSelectObject(object))
+			if (!instance().canSelectObject(object))
 			{
-				instanceFast().deselectObjectOnly(object);
+				instance().deselectObjectOnly(object);
 			}
 			return true;
 		}
@@ -7205,7 +7626,7 @@ void LLObjectSelection::moveNodeToFront(LLSelectNode *nodep)
 void LLObjectSelection::removeNode(LLSelectNode *nodep)
 {
 	mSelectNodeMap.erase(nodep->getObject());
-	if (nodep->getObject() == mPrimaryObject)
+	if (nodep->getObject() == mPrimaryObject.get())
 	{
 		mPrimaryObject = NULL;
 	}
@@ -7423,10 +7844,10 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
 					   }
 				   }
 
-				   for (const auto& tex_cost_pair : textures)
+				   for (LLVOVolume::texture_cost_t::iterator iter = textures.begin(); iter != textures.end(); ++iter)
 				   {
 					   // add the cost of each individual texture in the linkset
-					   cost += tex_cost_pair.second;
+					   cost += LLVOVolume::getTextureCost(*iter);
 				   }
 
 				   textures.clear();
@@ -7444,10 +7865,10 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
 					computed_objects.insert(object->getID());
 			}
 
-			for (const auto& tex_cost_pair : textures)
+			for (LLVOVolume::texture_cost_t::iterator iter = textures.begin(); iter != textures.end(); ++iter)
 			{
 				// add the cost of each individual texture in the linkset
-				cost += tex_cost_pair.second;
+				cost += LLVOVolume::getTextureCost(*iter);
 			}
 
 			textures.clear();
@@ -7911,7 +8332,7 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 		// calculate the distance of the object closest to the camera origin
 		F32 min_dist_squared = F32_MAX; // value will be overridden in the loop
 		
-		const auto& origin = LLViewerCamera::getInstanceFast()->getOrigin();
+		const auto& origin = LLViewerCamera::getInstance()->getOrigin();
 
 		LLVector3 obj_pos;
 		for (LLSelectNode* nodep : selection->root_begin_end())
@@ -7933,16 +8354,16 @@ bool LLSelectMgr::selectionMove(const LLVector3& displ,
 							displ.mV[2] * min_dist);
 
 		// equates to: Displ_global = Displ * M_cam_axes_in_global_frame
-		displ_global = LLViewerCamera::getInstanceFast()->rotateToAbsolute(displ_global);
+		displ_global = LLViewerCamera::getInstance()->rotateToAbsolute(displ_global);
 	}
 
 	LLQuaternion new_rot;
 	if (update_rotation)
 	{
 		// let's calculate the rotation around each camera axes 
-		LLQuaternion qx(roll, LLViewerCamera::getInstanceFast()->getAtAxis());
-		LLQuaternion qy(pitch, LLViewerCamera::getInstanceFast()->getLeftAxis());
-		LLQuaternion qz(yaw, LLViewerCamera::getInstanceFast()->getUpAxis());
+		LLQuaternion qx(roll, LLViewerCamera::getInstance()->getAtAxis());
+		LLQuaternion qy(pitch, LLViewerCamera::getInstance()->getLeftAxis());
+		LLQuaternion qz(yaw, LLViewerCamera::getInstance()->getUpAxis());
 		new_rot.setQuat(qx * qy * qz);
 	}
 	
@@ -8112,6 +8533,7 @@ DEF_DUMMY_CHECK_FUNCTOR(int)
 DEF_DUMMY_CHECK_FUNCTOR(LLColor4)
 DEF_DUMMY_CHECK_FUNCTOR(LLMediaEntry)
 DEF_DUMMY_CHECK_FUNCTOR(LLPointer<LLMaterial>)
+DEF_DUMMY_CHECK_FUNCTOR(LLPointer<LLGLTFMaterial>)
 DEF_DUMMY_CHECK_FUNCTOR(std::string)
 DEF_DUMMY_CHECK_FUNCTOR(std::vector<std::string>)
 

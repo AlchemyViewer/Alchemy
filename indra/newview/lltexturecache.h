@@ -34,6 +34,8 @@
 
 #include "llworkerthread.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 class LLImageFormatted;
 class LLTextureCacheWorker;
 class LLImageRaw;
@@ -113,19 +115,19 @@ public:
 	LLTextureCache(bool threaded);
 	~LLTextureCache();
 
-	/*virtual*/ S32 update(F32 max_time_ms);	
+	/*virtual*/ size_t update(F32 max_time_ms);
 	
 	void purgeCache(ELLPath location, bool remove_dir = true);
 	void setReadOnly(BOOL read_only) ;
 	S64 initCache(ELLPath location, S64 maxsize, BOOL texture_cache_mismatch);
 
-	handle_t readFromCache(const std::string& local_filename, const LLUUID& id, U32 priority, S32 offset, S32 size,
+	handle_t readFromCache(const std::string& local_filename, const LLUUID& id, S32 offset, S32 size,
 						   ReadResponder* responder);
 
-	handle_t readFromCache(const LLUUID& id, U32 priority, S32 offset, S32 size,
+	handle_t readFromCache(const LLUUID& id, S32 offset, S32 size,
 						   ReadResponder* responder);
 	bool readComplete(handle_t handle, bool abort);
-	handle_t writeToCache(const LLUUID& id, U32 priority, U8* data, S32 datasize, S32 imagesize, LLPointer<LLImageRaw> rawimage, S32 discardlevel,
+	handle_t writeToCache(const LLUUID& id, U8* data, S32 datasize, S32 imagesize, LLPointer<LLImageRaw> rawimage, S32 discardlevel,
 						  WriteResponder* responder);
 	LLPointer<LLImageRaw> readFromFastCache(const LLUUID& id, S32& discardlevel);
 	bool writeComplete(handle_t handle, bool abort = false);
@@ -204,7 +206,7 @@ private:
 	// so it needs own pool (not thread safe by itself, relies onto header's mutex)
 	LLVolatileAPRPool*   mHeaderAPRFilePoolp;
 	
-	typedef absl::flat_hash_map<handle_t, LLTextureCacheWorker*> handle_map_t;
+	typedef boost::unordered_flat_map<handle_t, LLTextureCacheWorker*> handle_map_t;
 	handle_map_t mReaders;
 	handle_map_t mWriters;
 
@@ -225,7 +227,7 @@ private:
 	EntriesInfo mHeaderEntriesInfo;
 	std::set<S32> mFreeList; // deleted entries
 	std::set<LLUUID> mLRU;
-	typedef absl::flat_hash_map<LLUUID, S32> id_map_t;
+	typedef boost::unordered_flat_map<LLUUID, S32> id_map_t;
 	id_map_t mHeaderIDMap;
 
 	LLAPRFile*   mFastCachep;
@@ -234,12 +236,12 @@ private:
 
 	// BODIES (TEXTURES minus headers)
 	std::string mTexturesDirName;
-	typedef absl::flat_hash_map<LLUUID,S32> size_map_t;
+	typedef boost::unordered_map<LLUUID,S32> size_map_t;
 	size_map_t mTexturesSizeMap;
 	S64 mTexturesSizeTotal;
 	LLAtomicBool mDoPurge;
 
-	typedef absl::flat_hash_map<S32, Entry> idx_entry_map_t;
+	typedef std::map<S32, Entry> idx_entry_map_t;
 	idx_entry_map_t mUpdatedEntryMap;
 	typedef std::vector<std::pair<S32, Entry> > idx_entry_vector_t;
 	idx_entry_vector_t mPurgeEntryList;

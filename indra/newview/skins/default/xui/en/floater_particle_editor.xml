@@ -25,8 +25,8 @@
    orientation="horizontal"
    show_drag_handle="true">
     <layout_panel
-     bg_alpha_color="DkGray2"
-     bg_opaque_color="DkGray2"
+     bg_alpha_color="PanelDefaultBackgroundColor"
+     bg_opaque_color="PanelDefaultBackgroundColor"
      background_visible="true"
      background_opaque="true"
      name="layout_master"

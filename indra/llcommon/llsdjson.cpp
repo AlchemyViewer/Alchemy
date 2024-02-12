@@ -68,7 +68,7 @@ LLSD LlsdFromJson(const nlohmann::json &val)
         break;
     case nlohmann::json::value_t::object:
         result = LLSD::emptyMap();
-        for (auto it = val.cbegin(); it != val.cend(); ++it)
+        for (auto it = val.cbegin(), end = val.cend(); it != end; ++it)
         {
             result[it.key()] = LlsdFromJson(it.value());
         }

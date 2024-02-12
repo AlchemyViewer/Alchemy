@@ -9,20 +9,12 @@
 #   LINUX   - Linux
 #   WINDOWS - Windows
 
+include_guard()
 # Relative and absolute paths to subtrees.
-
-if(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
-set(${CMAKE_CURRENT_LIST_FILE}_INCLUDED "YES")
 
 if(NOT DEFINED COMMON_CMAKE_DIR)
     set(COMMON_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake")
 endif(NOT DEFINED COMMON_CMAKE_DIR)
-
-get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-option(GEN_IS_MULTI_CONFIG "" ${_isMultiConfig})
-mark_as_advanced(GEN_IS_MULTI_CONFIG)
-
-string(TOUPPER "${CMAKE_BUILD_TYPE}" UPPERCASE_CMAKE_BUILD_TYPE)
 
 set(LIBS_CLOSED_PREFIX)
 set(LIBS_OPEN_PREFIX)
@@ -30,13 +22,18 @@ set(SCRIPTS_PREFIX ../scripts)
 set(VIEWER_PREFIX)
 set(INTEGRATION_TESTS_PREFIX)
 
-option(LL_TESTS "Build and run unit and integration tests (disable for build timing runs to reduce variation" ON)
+option(LL_TESTS "Build and run unit and integration tests (disable for build timing runs to reduce variation" OFF)
+if(DEFINED ENV{LL_TESTS})
+  set(LL_TESTS $ENV{LL_TESTS} CACHE STRING "Build and run unit and integration tests (disable for build timing runs to reduce variation" FORCE)
+else()
+  set(LL_TESTS "" CACHE STRING "Build and run unit and integration tests (disable for build timing runs to reduce variation")
+endif()
+
 option(ENABLE_MEDIA_PLUGINS "Turn off building media plugins if they are imported by third-party library mechanism" ON)
 
 # Compiler and toolchain options
 option(INCREMENTAL_LINK "Use incremental linking on win32 builds (enable for faster links on some machines)" OFF)
 option(USE_LTO "Enable global and interprocedural optimizations" OFF)
-option(FULL_DEBUG_SYMS "Enable Generation of full pdb on msvc" OFF)
 option(USE_ASAN "Enable address sanitizer for detection of memory issues" OFF)
 option(USE_LEAKSAN "Enable address sanitizer for detection of memory leaks" OFF)
 option(USE_UBSAN "Enable undefined behavior sanitizer" OFF)
@@ -50,6 +47,8 @@ set(VIEWER_SYMBOL_FILE "" CACHE STRING "Name of tarball into which to place symb
 
 option(USE_CEF "Enable CEF media plugin" ON)
 option(USE_VLC "Enable VLC media plugin" ON)
+
+option(BUILD_EXPIREY "Use build expirey system" ON)
 
 if(LIBS_CLOSED_DIR)
   file(TO_CMAKE_PATH "${LIBS_CLOSED_DIR}" LIBS_CLOSED_DIR)
@@ -81,10 +80,8 @@ set(TEMPLATE_VERIFIER_MASTER_URL "https://git.alchemyviewer.org/alchemy/master-m
 # If someone has specified an address size, use that to determine the
 # architecture.  Otherwise, let the architecture specify the address size.
 if (ADDRESS_SIZE EQUAL 32)
-  #message(STATUS "ADDRESS_SIZE is 32")
   set(ARCH i686)
 elseif (ADDRESS_SIZE EQUAL 64)
-  #message(STATUS "ADDRESS_SIZE is 64")
   set(ARCH x86_64)
 else (ADDRESS_SIZE EQUAL 32)
     #message(STATUS "ADDRESS_SIZE is UNDEFINED")
@@ -103,15 +100,6 @@ endif (ADDRESS_SIZE EQUAL 32)
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
   set(WINDOWS ON BOOL FORCE)
-  if (ADDRESS_SIZE EQUAL 64)
-    set(LL_ARCH ${ARCH}_win64)
-    set(LL_ARCH_DIR ${ARCH}-win64)
-  elseif (ADDRESS_SIZE EQUAL 32)
-    set(LL_ARCH ${ARCH}_win32)
-    set(LL_ARCH_DIR ${ARCH}-win32)
-  else()
-    message(FATAL_ERROR "Unkown Architecture!")
-  endif ()
 endif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -137,17 +125,14 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   endif (DPKG_RESULT EQUAL 0)
 
 
-  set(LL_ARCH ${ARCH}_linux)
-  set(LL_ARCH_DIR ${ARCH}-linux)
-
-  if (INSTALL_PROPRIETARY)
+  #if (INSTALL_PROPRIETARY)
     # Only turn on headless if we can find osmesa libraries.
-    include(FindPkgConfig)
+    # include(FindPkgConfig)
     #pkg_check_modules(OSMESA osmesa)
     #if (OSMESA_FOUND)
     #  set(BUILD_HEADLESS ON CACHE BOOL "Build headless libraries.")
     #endif (OSMESA_FOUND)
-  endif (INSTALL_PROPRIETARY)
+  #endif (INSTALL_PROPRIETARY)
 
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
@@ -159,26 +144,11 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   if (XCODE_VERSION LESS 12.0.0)
     message( FATAL_ERROR "Xcode 12.0.0 or greater is required." )
   endif ()
-  message( "Building with " ${CMAKE_OSX_SYSROOT} )
+  message( STATUS "Building with " ${CMAKE_OSX_SYSROOT} )
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
-
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL 3)
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH NO)
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_STRICT_ALIASING NO)
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_SYMBOLS_PRIVATE_EXTERN YES)
-  if(USE_LTO)
-    set(CMAKE_XCODE_ATTRIBUTE_LLVM_LTO YES_THIN)
-  endif()
 
   set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS YES)
   set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT dwarf-with-dsym)
-  set(CMAKE_XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING YES)
-
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_X86_VECTOR_INSTRUCTIONS sse4.2)
-
-  # C++ specifics
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++17")
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
 
   # Obj-C
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
@@ -186,22 +156,16 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   # Disable codesigning, for now it's handled with snake
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO)
+  set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO)
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "")
-
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_RANGE_LOOP_ANALYSIS YES)
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_STRICT_PROTOTYPES YES)
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_WARN_SUSPICIOUS_MOVE YES)
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_HIDDEN_VIRTUAL_FUNCTIONS YES)
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_NON_VIRTUAL_DESTRUCTOR YES)
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_UNINITIALIZED_AUTOS YES)
   
+  set(CMAKE_XCODE_ATTRIBUTE_DISABLE_MANUAL_TARGET_ORDER_BUILD_WARNING YES)
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_64_TO_32_BIT_CONVERSION NO)
+
   set(ADDRESS_SIZE 64)
   set(ARCH x86_64)
   set(CMAKE_OSX_ARCHITECTURES x86_64)
-
-  set(LL_ARCH ${ARCH}_darwin)
-  set(LL_ARCH_DIR universal-darwin)
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 # Default deploy grid
@@ -210,11 +174,21 @@ set(GRID agni CACHE STRING "Target Grid")
 set(ENABLE_SIGNING OFF CACHE BOOL "Enable signing the viewer")
 set(SIGNING_IDENTITY "" CACHE STRING "Specifies the signing identity to use, if necessary.")
 
+if (DEFINED ENV{VIEWER_ENABLE_SIGNING})
+  set(ENABLE_SIGNING $ENV{VIEWER_ENABLE_SIGNING} CACHE BOOL "" FORCE)
+endif()
+
+if(DEFINED ENV{VIEWER_SIGNING_IDENTITY})
+  set(SIGNING_IDENTITY $ENV{VIEWER_SIGNING_IDENTITY} CACHE STRING "Specifies the signing identity to use, if necessary." FORCE)
+endif()
+
 set(VERSION_BUILD "0" CACHE STRING "Revision number passed in from the outside")
-set(USESYSTEMLIBS OFF CACHE BOOL "Use libraries from your system rather than Linden-supplied prebuilt libraries.")
 
 set(USE_PRECOMPILED_HEADERS ON CACHE BOOL "Enable use of precompiled header directives where supported.")
 
+set(VIEWER_UPDATE_SERVICE "https://git.alchemyviewer.org/api/v4/projects/198/packages/generic" CACHE STRING "Update service URL")
+
 source_group("CMake Rules" FILES CMakeLists.txt)
 
-endif(NOT DEFINED ${CMAKE_CURRENT_LIST_FILE}_INCLUDED)
+get_property(LL_GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+

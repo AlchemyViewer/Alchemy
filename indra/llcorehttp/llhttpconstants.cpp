@@ -31,6 +31,8 @@
 // for curl_getdate() (apparently parsing RFC 1123 dates is hard)
 #include <curl/curl.h>
 
+#include <boost/algorithm/string.hpp>
+
 // Outgoing headers. Do *not* use these to check incoming headers.
 // For incoming headers, use the lower-case headers, below.
 const std::string HTTP_OUT_HEADER_ACCEPT("Accept");
@@ -88,6 +90,7 @@ const std::string HTTP_OUT_HEADER_VARY("Vary");
 const std::string HTTP_OUT_HEADER_VIA("Via");
 const std::string HTTP_OUT_HEADER_WARNING("Warning");
 const std::string HTTP_OUT_HEADER_WWW_AUTHENTICATE("WWW-Authenticate");
+const std::string HTTP_OUT_HEADER_SL_UDP_LISTEN_PORT("X-SecondLife-UDP-Listen-Port");
 
 // Incoming headers are normalized to lower-case.
 const std::string HTTP_IN_HEADER_ACCEPT_LANGUAGE("accept-language");
@@ -104,7 +107,9 @@ const std::string HTTP_IN_HEADER_X_FORWARDED_FOR("x-forwarded-for");
 
 const std::string HTTP_CONTENT_LLSD_XML("application/llsd+xml");
 const std::string HTTP_CONTENT_OCTET_STREAM("application/octet-stream");
-const std::string HTTP_CONTENT_VND_LL_MESH("application/vnd.ll.mesh");
+const std::string HTTP_CONTENT_OGG_STREAM("application/ogg");
+const std::string HTTP_CONTENT_VND_LL_MESH("application/vnd.ll.animation");
+const std::string HTTP_CONTENT_VND_LL_ANIMATION("application/vnd.ll.mesh");
 const std::string HTTP_CONTENT_XML("application/xml");
 const std::string HTTP_CONTENT_JSON("application/json");
 const std::string HTTP_CONTENT_TEXT_HTML("text/html");
@@ -133,3 +138,78 @@ const std::string HTTP_VERB_MOVE("MOVE");
 const std::string HTTP_VERB_OPTIONS("OPTIONS");
 const std::string HTTP_VERB_PATCH("PATCH");
 const std::string HTTP_VERB_COPY("COPY");
+
+const std::string& httpMethodAsVerb(EHTTPMethod method)
+{
+	static const std::string VERBS [10] =
+	{
+		HTTP_VERB_INVALID,
+		HTTP_VERB_HEAD,
+		HTTP_VERB_GET,
+		HTTP_VERB_PUT,
+		HTTP_VERB_POST,
+		HTTP_VERB_DELETE,
+		HTTP_VERB_MOVE,
+		HTTP_VERB_OPTIONS,
+		HTTP_VERB_PATCH,
+		HTTP_VERB_COPY
+	};
+	if (((S32) method <= 0) || ((S32) method >= HTTP_METHOD_COUNT))
+	{
+		return VERBS[0];
+	}
+	return VERBS[method];
+}
+
+EHTTPMethod httpVerbAsMethod(const std::string& verb)
+{
+	static const std::string VERBS [10] = {
+		HTTP_VERB_INVALID,
+		HTTP_VERB_HEAD,
+		HTTP_VERB_GET,
+		HTTP_VERB_PUT,
+		HTTP_VERB_POST,
+		HTTP_VERB_DELETE,
+		HTTP_VERB_MOVE,
+		HTTP_VERB_OPTIONS,
+		HTTP_VERB_PATCH,
+		HTTP_VERB_COPY
+	};
+
+	for (int i = 0; i<HTTP_METHOD_COUNT; ++i)
+	{
+        if (VERBS[i] == verb)
+        {
+            return static_cast<EHTTPMethod>(i);
+        }
+	}
+	return HTTP_INVALID;
+}
+
+std::string get_base_cap_url(std::string url)
+{
+	std::vector<std::string> url_parts;
+	boost::algorithm::split(url_parts, url, boost::is_any_of("/"));
+
+	// This is a normal linden-style CAP url.
+	if(url_parts.size() >= 4 && url_parts[3] == "cap")
+	{
+		url_parts.resize(5);
+		return boost::algorithm::join(url_parts, "/");
+	}
+	// Maybe OpenSim? Just cut off the query string and last /.
+	else
+	{
+		size_t query_pos = url.find_first_of('\?');
+
+		if(query_pos != std::string::npos)
+		{
+			LLStringUtil::truncate(url, query_pos);
+		}
+
+		static const std::string tokens(" /\?");
+		LLStringUtil::trimTail(url, tokens);
+
+		return url;
+	}
+}

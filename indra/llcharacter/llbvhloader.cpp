@@ -44,6 +44,14 @@ using namespace std;
 
 #define INCHES_TO_METERS 0.02540005f
 
+/// The .bvh does not have a formal spec, and different readers interpret things in their own way.
+/// In OUR usage, frame 0 is used in optimization and is not considered to be part of the animation.
+const S32 NUMBER_OF_IGNORED_FRAMES_AT_START = 1;
+/// In our usage, the last frame is used only to indicate what the penultimate frame should be interpolated towards.
+///  I.e., the animation only plays up to the start of the last frame. There is no hold or exptrapolation past that point..
+/// Thus there are two frame of the total that do not contribute to the total running time of the animation.
+const S32 NUMBER_OF_UNPLAYED_FRAMES = NUMBER_OF_IGNORED_FRAMES_AT_START + 1;
+
 const F32 POSITION_KEYFRAME_THRESHOLD_SQUARED = 0.03f * 0.03f;
 const F32 ROTATION_KEYFRAME_THRESHOLD = 0.01f;
 
@@ -148,10 +156,9 @@ LLBVHLoader::LLBVHLoader(const char* buffer, ELoadStatus &loadStatus, S32 &error
 	}
     
     // Recognize all names we've been told are legal.
-    std::map<std::string, std::string>::iterator iter;
-    for (iter = joint_alias_map.begin(); iter != joint_alias_map.end(); iter++)
+    for (std::map<std::string, std::string>::value_type& alias_pair : joint_alias_map)
     {
-        makeTranslation( iter->first , iter->second );
+        makeTranslation( alias_pair.first , alias_pair.second );
     }
 	
 	char error_text[128];		/* Flawfinder: ignore */
@@ -508,7 +515,7 @@ ELoadStatus LLBVHLoader::loadAliases(const char * filename)
     {
         if ( LLSDSerialize::fromXML(aliases_sd, input_stream) )
         {
-            for(const auto& alias_pair : aliases_sd.map())
+            for(const auto& alias_pair : aliases_sd.asMap())
             {
                 LLSD::String alias_name = alias_pair.first;
                 LLSD::String joint_name = alias_pair.second;
@@ -863,7 +870,10 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
 		return E_ST_NO_FRAME_TIME;
 	}
 
-	mDuration = (F32)mNumFrames * mFrameTime;
+	// If the user only supplies one animation frame (after the ignored reference frame 0), hold for mFrameTime.
+	// If the user supples exactly one total frame, it isn't clear if that is a pose or reference frame, and the
+	// behavior is not defined. In this case, retain historical undefined behavior.
+	mDuration = llmax((F32)(mNumFrames - NUMBER_OF_UNPLAYED_FRAMES), 1.0f) * mFrameTime;
 	if (!mLoop)
 	{
 		mLoopOutPoint = mDuration;
@@ -937,10 +947,8 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
 //------------------------------------------------------------------------
 void LLBVHLoader::applyTranslations()
 {
-	JointVector::iterator ji;
-	for (ji = mJoints.begin(); ji != mJoints.end(); ++ji )
+	for (Joint* joint : mJoints)
 	{
-		Joint *joint = *ji;
 		//----------------------------------------------------------------
 		// Look for a translation for this joint.
 		// If none, skip to next joint
@@ -1053,10 +1061,8 @@ void LLBVHLoader::optimize()
 		mEaseOut *= factor;
 	}
 
-	JointVector::iterator ji;
-	for (ji = mJoints.begin(); ji != mJoints.end(); ++ji)
+	for (Joint* joint : mJoints)
 	{
-		Joint *joint = *ji;
 		BOOL pos_changed = FALSE;
 		BOOL rot_changed = FALSE;
 
@@ -1281,15 +1287,12 @@ U32 LLBVHLoader::getOutputSize()
 // writes contents to datapacker
 BOOL LLBVHLoader::serialize(LLDataPacker& dp)
 {
-	JointVector::iterator ji;
-	KeyVector::iterator ki;
 	F32 time;
 
 	// count number of non-ignored joints
 	S32 numJoints = 0;
-	for (ji=mJoints.begin(); ji!=mJoints.end(); ++ji)
+	for (Joint* joint : mJoints)
 	{
-		Joint *joint = *ji;
 		if ( ! joint->mIgnore )
 			numJoints++;
 	}
@@ -1308,11 +1311,8 @@ BOOL LLBVHLoader::serialize(LLDataPacker& dp)
 	dp.packU32(mHand, "hand_pose");
 	dp.packU32(numJoints, "num_joints");
 
-	for (	ji = mJoints.begin();
-			ji != mJoints.end();
-			++ji )
+	for (Joint* joint : mJoints)
 	{
-		Joint *joint = *ji;
 		// if ignored, skip it
 		if ( joint->mIgnore )
 			continue;
@@ -1335,43 +1335,39 @@ BOOL LLBVHLoader::serialize(LLDataPacker& dp)
 		Joint *mergeParent = NULL;
 		Joint *mergeChild = NULL;
 
-		JointVector::iterator mji;
-		for (mji=mJoints.begin(); mji!=mJoints.end(); ++mji)
+		for (Joint* mjoint : mJoints)
 		{
-			Joint *mjoint = *mji;
 			if ( !joint->mMergeParentName.empty() && (mjoint->mName == joint->mMergeParentName) )
 			{
-				mergeParent = *mji;
+				mergeParent = mjoint;
 			}
 			if ( !joint->mMergeChildName.empty() && (mjoint->mName == joint->mMergeChildName) )
 			{
-				mergeChild = *mji;
+				mergeChild = mjoint;
 			}
 		}
 
 		dp.packS32(joint->mNumRotKeys, "num_rot_keys");
 
 		LLQuaternion::Order order = bvhStringToOrder( joint->mOrder );
-		S32 outcount = 0;
-		S32 frame = 1;
-		for (	ki = joint->mKeys.begin();
-				ki != joint->mKeys.end();
-				++ki )
+		S32 frame = 0;
+		for (Key& key : joint->mKeys)
 		{
-			if ((frame == 1) && joint->mRelativeRotationKey)
+
+			if ((frame == 0) && joint->mRelativeRotationKey)
 			{
-				first_frame_rot = mayaQ( ki->mRot[0], ki->mRot[1], ki->mRot[2], order);
+				first_frame_rot = mayaQ( key.mRot[0], key.mRot[1], key.mRot[2], order);
 				
 				fixup_rot.shortestArc(LLVector3::z_axis * first_frame_rot * frameRot, LLVector3::z_axis);
 			}
 
-			if (ki->mIgnoreRot)
+			if (key.mIgnoreRot)
 			{
 				frame++;
 				continue;
 			}
 
-			time = (F32)frame * mFrameTime;
+			time = llmax((F32)(frame - NUMBER_OF_IGNORED_FRAMES_AT_START), 0.0f) * mFrameTime; // Time elapsed before this frame starts.
 
 			if (mergeParent)
 			{
@@ -1404,7 +1400,7 @@ BOOL LLBVHLoader::serialize(LLDataPacker& dp)
 				mergeChildRot.loadIdentity();
 			}
 
-			LLQuaternion inRot = mayaQ( ki->mRot[0], ki->mRot[1], ki->mRot[2], order);
+			LLQuaternion inRot = mayaQ( key.mRot[0], key.mRot[1], key.mRot[2], order);
 
 			LLQuaternion outRot =  frameRotInv* mergeChildRot * inRot * mergeParentRot * ~first_frame_rot * frameRot * offsetRot;
 
@@ -1419,7 +1415,6 @@ BOOL LLBVHLoader::serialize(LLDataPacker& dp)
 			dp.packU16(x, "rot_angle_x");
 			dp.packU16(y, "rot_angle_y");
 			dp.packU16(z, "rot_angle_z");
-			outcount++;
 			frame++;
 		}
 		
@@ -1431,25 +1426,23 @@ BOOL LLBVHLoader::serialize(LLDataPacker& dp)
 			LLVector3 relPos = joint->mRelativePosition;
 			LLVector3 relKey;
 
-			frame = 1;
-			for (	ki = joint->mKeys.begin();
-					ki != joint->mKeys.end();
-					++ki )
+			frame = 0;
+			for (Key& key : joint->mKeys)
 			{
-				if ((frame == 1) && joint->mRelativePositionKey)
+				if ((frame == 0) && joint->mRelativePositionKey)
 				{
-					relKey.setVec(ki->mPos);
+					relKey.setVec(key.mPos);
 				}
 
-				if (ki->mIgnorePos)
+				if (key.mIgnorePos)
 				{
 					frame++;
 					continue;
 				}
 
-				time = (F32)frame * mFrameTime;
+				time = llmax((F32)(frame - NUMBER_OF_IGNORED_FRAMES_AT_START), 0.0f) * mFrameTime; // Time elapsed before this frame starts.
 
-				LLVector3 inPos = (LLVector3(ki->mPos) - relKey) * ~first_frame_rot;// * fixup_rot;
+				LLVector3 inPos = (LLVector3(key.mPos) - relKey) * ~first_frame_rot;// * fixup_rot;
 				LLVector3 outPos = inPos * frameRot * offsetRot;
 
 				outPos *= INCHES_TO_METERS;
@@ -1482,24 +1475,22 @@ BOOL LLBVHLoader::serialize(LLDataPacker& dp)
 	S32 num_constraints = (S32)mConstraints.size();
 	dp.packS32(num_constraints, "num_constraints");
 
-	for (ConstraintVector::iterator constraint_it = mConstraints.begin();
-		constraint_it != mConstraints.end();
-		constraint_it++)
+	for (Constraint& constraint : mConstraints)
 		{
-			U8 byte = constraint_it->mChainLength;
+			U8 byte = constraint.mChainLength;
 			dp.packU8(byte, "chain_length");
 			
-			byte = constraint_it->mConstraintType;
+			byte = constraint.mConstraintType;
 			dp.packU8(byte, "constraint_type");
-			dp.packBinaryDataFixed((U8*)constraint_it->mSourceJointName, 16, "source_volume");
-			dp.packVector3(constraint_it->mSourceOffset, "source_offset");
-			dp.packBinaryDataFixed((U8*)constraint_it->mTargetJointName, 16, "target_volume");
-			dp.packVector3(constraint_it->mTargetOffset, "target_offset");
-			dp.packVector3(constraint_it->mTargetDir, "target_dir");
-			dp.packF32(constraint_it->mEaseInStart,	"ease_in_start");
-			dp.packF32(constraint_it->mEaseInStop,	"ease_in_stop");
-			dp.packF32(constraint_it->mEaseOutStart,	"ease_out_start");
-			dp.packF32(constraint_it->mEaseOutStop,	"ease_out_stop");
+			dp.packBinaryDataFixed((U8*)constraint.mSourceJointName, 16, "source_volume");
+			dp.packVector3(constraint.mSourceOffset, "source_offset");
+			dp.packBinaryDataFixed((U8*)constraint.mTargetJointName, 16, "target_volume");
+			dp.packVector3(constraint.mTargetOffset, "target_offset");
+			dp.packVector3(constraint.mTargetDir, "target_dir");
+			dp.packF32(constraint.mEaseInStart,	"ease_in_start");
+			dp.packF32(constraint.mEaseInStop,	"ease_in_stop");
+			dp.packF32(constraint.mEaseOutStart,	"ease_out_start");
+			dp.packF32(constraint.mEaseOutStop,	"ease_out_stop");
 		}
 
 	

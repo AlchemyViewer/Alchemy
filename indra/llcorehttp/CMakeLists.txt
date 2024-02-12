@@ -6,20 +6,11 @@ include(00-Common)
 include(CURL)
 include(OpenSSL)
 include(NGHTTP2)
-include(ZLIB)
+include(ZLIBNG)
 include(LLCoreHttp)
 include(LLAddBuildTest)
-include(LLMessage)
 include(LLCommon)
 include(Tut)
-
-include_directories (${CMAKE_CURRENT_SOURCE_DIR})
-
-include_directories(
-    ${LLMESSAGE_INCLUDE_DIRS}
-    ${LLCOMMON_INCLUDE_DIRS}
-    ${LLCOREHTTP_INCLUDE_DIRS}
-    )
 
 set(llcorehttp_SOURCE_FILES
     bufferarray.cpp
@@ -78,8 +69,6 @@ set(llcorehttp_HEADER_FILES
     _thread.h
     )
 
-set_source_files_properties(${llcorehttp_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
 if (DARWIN OR LINUX)
   # Boost headers define unused members in condition_variable so...
   set_source_files_properties(${llcorehttp_SOURCE_FILES}
@@ -90,17 +79,18 @@ list(APPEND llcorehttp_SOURCE_FILES ${llcorehttp_HEADER_FILES})
 
 add_library (llcorehttp ${llcorehttp_SOURCE_FILES})
 target_link_libraries(
-  llcorehttp
-  PUBLIC
-  llcommon
-  ${CURL_LIBRARIES}
-  ${NGHTTP2_LIBRARIES}
-  ${OPENSSL_LIBRARIES}
-  ${CRYPTO_LIBRARIES}
-  ${NGHTTP2_LIBRARIES}
-  ${BOOST_THREAD_LIBRARY}
-  ${BOOST_SYSTEM_LIBRARY}
+        llcorehttp
+        PUBLIC
+        llcommon
+        ll::libcurl
+        ll::openssl
+        ll::nghttp2
   )
+target_include_directories( llcorehttp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+# llmessage depends on llcorehttp, yet llcorehttp also depends on llmessage (at least for includes).
+# Cannot/Should not use target_link_libraries here to add llmessage to the dependencies, as that would
+# lead to circular dependencies (or in case of cmake, the first project declaring it's dependencies wins)
+target_include_directories( llcorehttp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../llmessage)
 
 if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
   target_precompile_headers(llcorehttp
@@ -117,7 +107,6 @@ if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0")
   <curl/curl.h>
   )
 endif()
-
 
 # tests
 set(LLCOREHTTP_TESTS ON CACHE BOOL
@@ -137,26 +126,15 @@ if (LL_TESTS AND LLCOREHTTP_TESTS)
       tests/test_bufferstream.hpp
       )
 
-  set_source_files_properties(${llcorehttp_TEST_HEADER_FILES}
-                              PROPERTIES HEADER_FILE_ONLY TRUE)
-
   list(APPEND llcorehttp_TEST_SOURCE_FILES ${llcorehttp_TEST_HEADER_FILES})
 
   # LL_ADD_PROJECT_UNIT_TESTS(llcorehttp "${llcorehttp_TEST_SOURCE_FILES}")
 
   #    set(TEST_DEBUG on)
   set(test_libs
-      ${LLCOREHTTP_LIBRARIES}
-      ${WINDOWS_LIBRARIES}
-      ${LLMESSAGE_LIBRARIES}
-      ${LLCOMMON_LIBRARIES}
-      ${CURL_LIBRARIES}
-      ${NGHTTP2_LIBRARIES}
-      ${OPENSSL_LIBRARIES}
-      ${CRYPTO_LIBRARIES}
-      ${NGHTTP2_LIBRARIES}
-      ${BOOST_THREAD_LIBRARY}
-      ${BOOST_SYSTEM_LIBRARY}
+          llcorehttp
+          llmessage
+          llcommon
       )
 
   # If http_proxy is in the current environment (e.g. to fetch s3-proxy
@@ -171,40 +149,40 @@ if (LL_TESTS AND LLCOREHTTP_TESTS)
                           )
  
 if (DARWIN)
-  # Path inside the app bundle where we'll need to copy libraries
-  set(LL_TEST_DESTINATION_DIR
-    ${CMAKE_BINARY_DIR}/sharedlibs/Resources
-  )
+  # # Path inside the app bundle where we'll need to copy libraries
+  # set(LL_TEST_DESTINATION_DIR
+  #   ${CMAKE_BINARY_DIR}/sharedlibs/Resources
+  # )
 
-  # Create the Contents/Resources directory
-  add_custom_command(
-    TARGET INTEGRATION_TEST_llcorehttp PRE_BUILD
-    COMMAND ${CMAKE_COMMAND}
-    ARGS
-      -E
-      make_directory
-      ${LL_TEST_DESTINATION_DIR}
-    COMMENT "Creating Resources directory in app bundle."
-  )
+  # # Create the Contents/Resources directory
+  # add_custom_command(
+  #   TARGET INTEGRATION_TEST_llcorehttp PRE_BUILD
+  #   COMMAND ${CMAKE_COMMAND}
+  #   ARGS
+  #     -E
+  #     make_directory
+  #     ${LL_TEST_DESTINATION_DIR}
+  #   COMMENT "Creating Resources directory in app bundle."
+  # )
   
-  # Copy the required libraries to the package app. We used to use a sequence
-  # of '${CMAKE_COMMAND} -E copy' commands, but 'cmake -E copy' does only a
-  # single file at a time: it doesn't understand wildcards. 'cmake -E copy' is
-  # for portability. This operation is Darwin-specific. We can count on the
-  # 'cp' command.
-  set(copy_dylibs
-    libapr-1.0.dylib
-    libaprutil-1.0.dylib
-    ${EXPAT_COPY}
-    )
+  # # Copy the required libraries to the package app. We used to use a sequence
+  # # of '${CMAKE_COMMAND} -E copy' commands, but 'cmake -E copy' does only a
+  # # single file at a time: it doesn't understand wildcards. 'cmake -E copy' is
+  # # for portability. This operation is Darwin-specific. We can count on the
+  # # 'cp' command.
+  # set(copy_dylibs
+  #   libapr-1.0.dylib
+  #   libaprutil-1.0.dylib
+  #   ${EXPAT_COPY}
+  #   )
 
-  add_custom_command(TARGET INTEGRATION_TEST_llcorehttp PRE_BUILD
-    WORKING_DIRECTORY "${AUTOBUILD_INSTALL_DIR}/lib/release"
-    COMMAND cp -v
-    ${copy_dylibs}
-    ${LL_TEST_DESTINATION_DIR}
-    DEPENDS ${copy_dylibs}
-  )
+  # add_custom_command(TARGET INTEGRATION_TEST_llcorehttp PRE_BUILD
+  #   WORKING_DIRECTORY "${AUTOBUILD_INSTALL_DIR}/lib/release"
+  #   COMMAND cp -v
+  #   ${copy_dylibs}
+  #   ${LL_TEST_DESTINATION_DIR}
+  #   DEPENDS ${copy_dylibs}
+  # )
 
 endif (DARWIN)
 
@@ -216,17 +194,9 @@ endif (DARWIN)
       )
 
   set(example_libs
-      ${LEGACY_STDIO_LIBS}
-      ${LLCOREHTTP_LIBRARIES}
-      ${WINDOWS_LIBRARIES}
-      ${LLMESSAGE_LIBRARIES}
-      ${LLCOMMON_LIBRARIES}
-      ${CURL_LIBRARIES}
-      ${OPENSSL_LIBRARIES}
-      ${CRYPTO_LIBRARIES}
-      ${NGHTTP2_LIBRARIES}
-      ${BOOST_THREAD_LIBRARY}
-      ${BOOST_SYSTEM_LIBRARY}
+          llcorehttp
+          llmessage
+          llcommon
       )
 
   add_executable(http_texture_load

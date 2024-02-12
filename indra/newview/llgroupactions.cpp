@@ -36,6 +36,7 @@
 #include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llgroupmgr.h"
+#include "llfloatergroupprofile.h"
 #include "llfloaterimcontainer.h"
 #include "llimview.h" // for gIMMgr
 #include "llnotificationsutil.h"
@@ -59,8 +60,36 @@ class LLGroupCommandHandler : public LLCommandHandler
 public:
 	// requires trusted browser to trigger
 	LLGroupCommandHandler() : LLCommandHandler("group", UNTRUSTED_THROTTLE) { }
-	bool handle(const LLSD& tokens, const LLSD& query_map,
-				LLMediaCtrl* web)
+
+    virtual bool canHandleUntrusted(
+        const LLSD& params,
+        const LLSD& query_map,
+        LLMediaCtrl* web,
+        const std::string& nav_type)
+    {
+        if (params.size() < 1)
+        {
+            return true; // don't block, will fail later
+        }
+
+        if (nav_type == NAV_TYPE_CLICKED
+            || nav_type == NAV_TYPE_EXTERNAL)
+        {
+            return true;
+        }
+
+        const std::string verb = params[0].asString();
+        if (verb == "create")
+        {
+            return false;
+        }
+        return true;
+    }
+
+	bool handle(const LLSD& tokens,
+                const LLSD& query_map,
+                const std::string& grid,
+                LLMediaCtrl* web)
 	{
 		if (LLStartUp::getStartupState() < STATE_STARTED)
 		{
@@ -181,8 +210,7 @@ public:
 	virtual void processGroupData() = 0;
 protected:
 	LLUUID mGroupId;
-private:
-	bool mRequestProcessed;
+    bool mRequestProcessed;
 };
 
 class LLFetchLeaveGroupData: public LLFetchGroupMemberData
@@ -195,6 +223,22 @@ public:
 	 {
 		 LLGroupActions::processLeaveGroupDataResponse(mGroupId);
 	 }
+     void changed(LLGroupChange gc)
+     {
+         if (gc == GC_PROPERTIES && !mRequestProcessed)
+         {
+             LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupId);
+             if (!gdatap)
+             {
+                 LL_WARNS() << "GroupData was NULL" << LL_ENDL;
+             } 
+             else
+             {
+                 processGroupData();
+                 mRequestProcessed = true;
+             }
+         }
+     }
 };
 
 LLFetchLeaveGroupData* gFetchLeaveGroupData = NULL;
@@ -336,7 +380,7 @@ void LLGroupActions::processLeaveGroupDataResponse(const LLUUID group_id)
 	//get the member data for the group
 	if ( mit != gdatap->mMembers.end() )
 	{
-		LLGroupMemberData* member_data = (*mit).second;
+		LLGroupMemberData* member_data = (*mit).second.get();
 
 		if ( member_data && member_data->isOwner() && gdatap->mMemberCount == 1)
 		{
@@ -394,10 +438,22 @@ void LLGroupActions::show(const LLUUID& group_id)
 
 	LLSD params;
 	params["group_id"] = group_id;
-	params["open_tab_name"] = "panel_group_info_sidetray";
 
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	if (gSavedSettings.getBool("ShowGroupFloaters")) 
+	{
+		LLFloaterGroupProfile::showInstance(params, TRUE);
+	}
+	else
+	{
+		LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+		LLFloater *floater = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>("people");
+		if (!floater->isFrontmost())
+		{
+			floater->setVisibleAndFrontmost(TRUE, params);
+		}	
+	}
 }
+
 
 // [SL:KB] - Patch: Notification-GroupCreateNotice | Checked: 2012-02-16 (Catznip-3.2)
 // static
@@ -410,9 +466,14 @@ void LLGroupActions::showNotices(const LLUUID& group_id)
 	sdParams["group_id"] = group_id;
 	sdParams["action"] = "view_notices";
 
-	sdParams["open_tab_name"] = "panel_group_info_sidetray";
-
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", sdParams);
+	if (gSavedSettings.getBool("ShowGroupFloaters")) 
+	{
+		LLFloaterGroupProfile::showInstance(sdParams, TRUE);
+	}
+	else
+	{
+		LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", sdParams);
+	}
 }
 
 // static
@@ -422,31 +483,49 @@ void LLGroupActions::viewChatHistory(const LLUUID& group_id)
 }
 // [/SL:KB]
 
-void LLGroupActions::refresh_notices()
+void LLGroupActions::refresh_notices(const LLUUID& group_id)
 {
-	if(!isGroupUIVisible())
-		return;
-
 	LLSD params;
-	params["group_id"] = LLUUID::null;
-	params["open_tab_name"] = "panel_group_info_sidetray";
+	params["group_id"] = group_id;
 	params["action"] = "refresh_notices";
 
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	if (gSavedSettings.getBool("ShowGroupFloaters")) 
+	{
+		if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
+		{
+			LLFloaterGroupProfile::showInstance(params, FALSE);
+		}
+	}
+	else
+	{
+		if (isGroupUIVisible())
+		{
+			LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+		}
+	}
 }
 
 //static 
 void LLGroupActions::refresh(const LLUUID& group_id)
 {
-	if(!isGroupUIVisible())
-		return;
-
 	LLSD params;
 	params["group_id"] = group_id;
-	params["open_tab_name"] = "panel_group_info_sidetray";
 	params["action"] = "refresh";
 
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	if (gSavedSettings.getBool("ShowGroupFloaters")) 
+	{
+		if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
+		{
+			LLFloaterGroupProfile::showInstance(params, TRUE);
+		}
+	}
+	else
+	{
+		if (isGroupUIVisible())
+		{
+			LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+		}
+	}
 }
 
 //static 
@@ -454,24 +533,29 @@ void LLGroupActions::createGroup()
 {
 	LLSD params;
 	params["group_id"] = LLUUID::null;
-	params["open_tab_name"] = "panel_group_creation_sidetray";
 	params["action"] = "create";
 
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_creation_sidetray", params);
-
+	if (gSavedSettings.getBool("ShowGroupFloaters"))
+	{
+		LLFloaterGroupProfile::showInstance(params, TRUE);
+	}
+	else
+	{
+		LLFloaterSidePanelContainer::showPanel("people", "panel_group_creation_sidetray", params);
+	}
 }
 //static
 void LLGroupActions::closeGroup(const LLUUID& group_id)
 {
-	if(!isGroupUIVisible())
-		return;
+	LLFloaterReg::hideInstance("group_profile", LLSD(group_id));
 
-	LLSD params;
-	params["group_id"] = group_id;
-	params["open_tab_name"] = "panel_group_info_sidetray";
-	params["action"] = "close";
-
-	LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	if (isGroupUIVisible())
+	{
+		LLSD params;
+		params["group_id"] = group_id;
+		params["action"] = "close";
+		LLFloaterSidePanelContainer::showPanel("people", "panel_group_info_sidetray", params);
+	}
 }
 
 
@@ -492,6 +576,8 @@ LLUUID LLGroupActions::startIM(const LLUUID& group_id)
 	LLGroupData group_data;
 	if (gAgent.getGroupData(group_id, group_data))
 	{
+		// Unmute the group if the user tries to start a session with it.
+		LLMuteList::instance().removeGroup(group_id);
 		LLUUID session_id = gIMMgr->addSession(
 			group_data.mName,
 			IM_SESSION_GROUP_START,

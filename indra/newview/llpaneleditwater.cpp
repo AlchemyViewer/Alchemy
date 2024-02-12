@@ -88,7 +88,7 @@ BOOL LLPanelSettingsWaterMainTab::postBuild()
     getChild<LLUICtrl>(FIELD_WATER_UNDERWATER_MOD)->setCommitCallback([this](LLUICtrl *, const LLSD& value ) { onFogUnderWaterChanged(value.asReal()); });
 
     mTxtNormalMap->setDefaultImageAssetID(LLSettingsWater::GetDefaultWaterNormalAssetId());
-    mTxtNormalMap->setBlankImageAssetID(LLUUID( gSavedSettings.getString( "DefaultBlankNormalTexture" )));
+    mTxtNormalMap->setBlankImageAssetID(BLANK_OBJECT_NORMAL);
     mTxtNormalMap->setCommitCallback([this](LLUICtrl *, const LLSD & val) { onNormalMapChanged(val.asUUID()); });
 
     getChild<LLUICtrl>(FIELD_WATER_WAVE2_XY)->setCommitCallback([this](LLUICtrl *, const LLSD & val) { onSmallWaveChanged(LLVector2(val)); });

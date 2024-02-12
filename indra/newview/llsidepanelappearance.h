@@ -33,7 +33,7 @@
 #include "llinventory.h"
 #include "llpaneloutfitedit.h"
 
-class LLFilterEditor;
+class LLSearchEditor;
 class LLCurrentlyWornFetchObserver;
 class LLPanelEditWearable;
 class LLViewerWearable;
@@ -74,6 +74,8 @@ public:
 	LLPanelEditWearable* getWearableEditPanel() { return mEditWearable; }
 // [/RLVa:KB]
 
+	static void updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity);
+
 private:
 	void onFilterEdit(const std::string& search_string);
 	void onVisibilityChanged ( const LLSD& new_visibility );
@@ -85,7 +87,7 @@ private:
 	void toggleOutfitEditPanel(BOOL visible, BOOL disable_camera_switch = FALSE);
 	void toggleWearableEditPanel(BOOL visible, LLViewerWearable* wearable = NULL, BOOL disable_camera_switch = FALSE);
 
-	LLFilterEditor*			mFilterEditor;
+	LLSearchEditor*			mFilterEditor;
 	LLPanelOutfitsInventory* mPanelOutfitsInventory;
 	LLPanelOutfitEdit*		mOutfitEdit;
 	LLPanelEditWearable*	mEditWearable;
@@ -103,6 +105,8 @@ private:
 
 	// Gets set to true when we're opened for the first time.
 	bool mOpened;
+
+	U32 mLastAvatarComplexity;
 };
 
 #endif //LL_LLSIDEPANELAPPEARANCE_H

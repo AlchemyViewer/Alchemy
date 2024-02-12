@@ -156,7 +156,7 @@ BOOL LLVLComposition::generateHeights(const F32 x, const F32 y,
 	const F32 xyScaleInv = (1.f / xyScale);
 	const F32 zScaleInv = (1.f / zScale);
 
-	const F32 inv_width = 1.f/mWidth;
+	const F32 inv_width = 1.f/(F32)mWidth;
 
 	// OK, for now, just have the composition value equal the height at the point.
 	for (S32 j = y_begin; j < y_end; j++)
@@ -254,6 +254,7 @@ BOOL LLVLComposition::generateComposition()
 BOOL LLVLComposition::generateTexture(const F32 x, const F32 y,
 									  const F32 width, const F32 height)
 {
+	LL_PROFILE_ZONE_SCOPED
 	llassert(mSurfacep);
 	llassert(x >= 0.f);
 	llassert(y >= 0.f);
@@ -286,6 +287,12 @@ BOOL LLVLComposition::generateTexture(const F32 x, const F32 y,
 			BOOL delete_raw = (mDetailTextures[i]->reloadRawImage(ddiscard) != NULL) ;
 			if(mDetailTextures[i]->getRawImageLevel() != ddiscard)//raw iamge is not ready, will enter here again later.
 			{
+                if (mDetailTextures[i]->getFetchPriority() <= 0.0f && !mDetailTextures[i]->hasSavedRawImage())
+                {
+                    mDetailTextures[i]->setBoostLevel(LLGLTexture::BOOST_MAP);
+                    mDetailTextures[i]->forceToRefetchTexture(ddiscard);
+                }
+
 				if(delete_raw)
 				{
 					mDetailTextures[i]->destroyRawImage() ;

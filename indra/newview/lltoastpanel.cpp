@@ -30,6 +30,8 @@
 #include "llcheckboxctrl.h"
 #include "llpanelgenerictip.h"
 #include "llpanelonlinestatus.h"
+#include "alpanelradaralert.h"
+#include "alpanelstreaminfo.h"
 #include "llnotifications.h"
 #include "lltoastnotifypanel.h"
 #include "lltoastpanel.h"
@@ -113,7 +115,8 @@ void LLToastPanel::snapToMessageHeight(LLTextBase* message, S32 maxLineCount)
 LLToastPanel* LLToastPanel::buidPanelFromNotification(
 		const LLNotificationPtr& notification)
 {
-	LLToastPanel* res = NULL;
+    LL_PROFILE_ZONE_SCOPED
+    LLToastPanel* res = NULL;
 
 	//process tip toast panels
 	if ("notifytip" == notification->getType())
@@ -122,6 +125,14 @@ LLToastPanel* LLToastPanel::buidPanelFromNotification(
 		if ("FriendOnlineOffline" == notification->getName())
 		{
 			res = new LLPanelOnlineStatus(notification);
+		}
+		else if (notification->matchesTag("radar"))
+		{
+			res = new ALPanelRadarAlert(notification);
+		}
+		else if (notification->matchesTag("StreamInfo"))
+		{
+			res = new ALPanelStreamInfo(notification);
 		}
 		// in all other case we use generic tip panel
 		else

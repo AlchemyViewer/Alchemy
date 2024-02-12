@@ -401,7 +401,8 @@ bool LLConversationLogList::isActionEnabled(const LLSD& userdata)
 			 "can_invite_to_group"	== command_name ||
 			 "can_share"			== command_name ||
 			 "can_block"			== command_name ||
-			 "can_pay"				== command_name)
+			 "can_pay"				== command_name ||
+			 "report_abuse"			== command_name)
 	{
 		return is_p2p;
 	}
@@ -411,7 +412,7 @@ bool LLConversationLogList::isActionEnabled(const LLSD& userdata)
 	}
 	else if ("can_show_on_map" == command_name)
 	{
-		return is_p2p && ((LLAvatarTracker::instance().isBuddyOnline(selected_id) && is_agent_mappable(selected_id)) || gAgent.isGodlike());
+		return is_p2p && ((LLAvatarTracker::instance().isBuddyOnline(selected_id) && LLAvatarActions::isAgentMappable(selected_id)) || gAgent.isGodlike());
 	}
 
 	return false;

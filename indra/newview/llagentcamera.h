@@ -144,11 +144,7 @@ private:
 	/** Camera preset in Third Person Mode */
 	ECameraPreset mCameraPreset; 
 
-	/** Initial camera offset */
-//	LLPointer<LLControlVariable> mCameraOffsetInitial;
 // [RLVa:KB] - @setcam_eyeoffset
-	// Renamed to catch their uses
-	LLPointer<LLControlVariable> mCameraOffsetInitialControl;
 	LLPointer<LLControlVariable> mRlvCameraOffsetInitialControl;
 // [/RLVa:KB]
 
@@ -156,11 +152,8 @@ private:
 	LLPointer<LLControlVariable> mRlvCameraOffsetScaleControl;
 // [/RLVa:KB]
 
-	/** Initial focus offset */
 //	LLPointer<LLControlVariable> mFocusOffsetInitial;
 // [RLVa:KB] - @setcam_focusoffset
-	// Renamed to catch their uses
-	LLPointer<LLControlVariable> mFocusOffsetInitialControl;
 	LLPointer<LLControlVariable> mRlvFocusOffsetInitialControl;
 // [/RLVa:KB]
 
@@ -185,7 +178,6 @@ private:
 	F32				mTargetCameraDistance;			// Target camera offset from avatar
 	F32				mCameraFOVZoomFactor;			// Amount of fov zoom applied to camera when zeroing in on an object
 	F32				mCameraCurrentFOVZoomFactor;	// Interpolated fov zoom
-	F32				mCameraFOVDefault;				// Default field of view that is basis for FOV zoom effect
 	LLVector4		mCameraCollidePlane;			// Colliding plane for camera
 	F32				mCameraZoomFraction;			// Mousewheel driven fraction of zoom
 	LLVector3		mCameraPositionAgent;			// Camera position in agent coordinates
@@ -200,7 +192,6 @@ private:
 	// Follow
 	//--------------------------------------------------------------------
 public:
-	void			setUsingFollowCam(bool using_follow_cam);
 	bool 			isfollowCamLocked();
 private:
 	LLFollowCam 	mFollowCam; 			// Ventrella
@@ -266,7 +257,6 @@ private:
 	LLPointer<LLViewerObject> mFocusObject;
 	F32				mFocusObjectDist;
 	LLVector3		mFocusObjectOffset;
-	F32				mFocusDotRadius; 				// Meters
 	BOOL			mTrackFocusObject;
 	
 	//--------------------------------------------------------------------
@@ -300,8 +290,10 @@ public:
 	void			cameraOrbitAround(const F32 radians);	// Rotate camera CCW radians about build focus point
 	void			cameraOrbitOver(const F32 radians);		// Rotate camera forward radians over build focus point
 	void			cameraOrbitIn(const F32 meters);		// Move camera in toward build focus point
+	void			cameraRollOver(const F32 radians);		// Roll the camera
 	void			resetCameraOrbit();
 	void			resetOrbitDiff();
+	void			resetCameraRoll();
 	//--------------------------------------------------------------------
 	// Zoom
 	//--------------------------------------------------------------------
@@ -406,6 +398,8 @@ public:
 	F32				getOrbitDownKey() const		{ return mOrbitDownKey; }
 	F32				getOrbitInKey() const		{ return mOrbitInKey; }
 	F32				getOrbitOutKey() const		{ return mOrbitOutKey; }
+	F32				getRollLeftKey() const		{ return mRollLeftKey; }
+	F32				getRollRightKey() const		{ return mRollRightKey; }
 
 	void			setOrbitLeftKey(F32 mag)	{ mOrbitLeftKey = mag; }
 	void			setOrbitRightKey(F32 mag)	{ mOrbitRightKey = mag; }
@@ -413,8 +407,11 @@ public:
 	void			setOrbitDownKey(F32 mag)	{ mOrbitDownKey = mag; }
 	void			setOrbitInKey(F32 mag)		{ mOrbitInKey = mag; }
 	void			setOrbitOutKey(F32 mag)		{ mOrbitOutKey = mag; }
+	void			setRollLeftKey(F32 mag) { mRollLeftKey = mag; }
+	void			setRollRightKey(F32 mag) { mRollRightKey = mag; }
 
 	void			clearOrbitKeys();
+
 private:
 	F32				mOrbitLeftKey;
 	F32				mOrbitRightKey;
@@ -425,6 +422,10 @@ private:
 
 	F32				mOrbitAroundRadians;
 	F32				mOrbitOverAngle;
+
+	F32				mRollLeftKey;
+	F32				mRollRightKey;
+	F32				mRollAngle = 0.f;
 
 	//--------------------------------------------------------------------
 	// Pan
@@ -458,6 +459,9 @@ private:
 /**                    Keys
  **                                                                            **
  *******************************************************************************/
+public:
+	void			storeCameraPosition();
+	void			loadCameraPosition();
 };
 
 extern LLAgentCamera gAgentCamera;

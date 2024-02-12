@@ -281,9 +281,11 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
 					if (now >= state.mThrottleEnd)
 					{
 						// Throttle expired, move to next window
+#ifdef SHOW_DEBUG
 						LL_DEBUGS(LOG_CORE) << "Throttle expired with " << state.mThrottleLeft
 											<< " requests to go and " << state.mRequestCount
 											<< " requests issued." << LL_ENDL;
+#endif
 						state.mThrottleLeft = state.mOptions.mThrottleRate;
 						state.mThrottleEnd = now + HttpTime(1000000);
 					}
@@ -310,9 +312,11 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
 					if (now >= state.mThrottleEnd)
 					{
 						// Throttle expired, move to next window
+#ifdef SHOW_DEBUG
 						LL_DEBUGS(LOG_CORE) << "Throttle expired with " << state.mThrottleLeft
 											<< " requests to go and " << state.mRequestCount
 											<< " requests issued." << LL_ENDL;
+#endif
 						state.mThrottleLeft = state.mOptions.mThrottleRate;
 						state.mThrottleEnd = now + HttpTime(1000000);
 					}
@@ -335,37 +339,6 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
 
 	return result;
 }
-
-
-bool HttpPolicy::changePriority(HttpHandle handle, HttpRequest::priority_t priority)
-{
-	for (int policy_class(0); policy_class < mClasses.size(); ++policy_class)
-	{
-		ClassState & state(*mClasses[policy_class]);
-		// We don't scan retry queue because a priority change there
-		// is meaningless.  The request will be issued based on retry
-		// intervals not priority value, which is now moot.
-		
-		// Scan ready queue for requests that match policy
-		HttpReadyQueue::container_type & c(state.mReadyQueue.get_container());
-		for (HttpReadyQueue::container_type::iterator iter(c.begin()); c.end() != iter;)
-		{
-			HttpReadyQueue::container_type::iterator cur(iter++);
-
-			if ((*cur)->getHandle() == handle)
-			{
-				HttpOpRequest::ptr_t op(*cur);
-				c.erase(cur);									// All iterators are now invalidated
-				op->mReqPriority = priority;
-				state.mReadyQueue.push(op);						// Re-insert using adapter class
-				return true;
-			}
-		}
-	}
-	
-	return false;
-}
-
 
 bool HttpPolicy::cancel(HttpHandle handle)
 {
@@ -443,12 +416,14 @@ bool HttpPolicy::stageAfterCompletion(const HttpOpRequest::ptr_t &op)
 						   << " (" << op->mStatus.toTerseString() << ")"
 						   << LL_ENDL;
 	}
+#ifdef SHOW_DEBUG
 	else if (op->mPolicyRetries)
 	{
         LL_DEBUGS(LOG_CORE) << "HTTP request " << op->getHandle()
 							<< " succeeded on retry " << op->mPolicyRetries << "."
 							<< LL_ENDL;
 	}
+#endif
 
 	op->stageFromActive(mService);
 

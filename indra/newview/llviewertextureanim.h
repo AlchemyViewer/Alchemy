@@ -44,7 +44,7 @@ public:
 	LLViewerTextureAnim(LLVOVolume* vobj);
 	virtual ~LLViewerTextureAnim();
 
-	/*virtual*/ void reset();
+	/*virtual*/ void reset() override;
 
 	S32 animateTextures(F32 &off_s, F32 &off_t, F32 &scale_s, F32 &scale_t, F32 &rotate);
 	enum

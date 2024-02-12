@@ -31,13 +31,15 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-copy-dtor"
 #endif
+#include <boost/call_traits.hpp>
 #include <boost/optional/optional.hpp>
-#include <absl/container/flat_hash_map.h>
+#include <boost/unordered/unordered_flat_map.hpp>
 #if LL_GNUC && GCC_VERSION >= 90000
 #pragma GCC diagnostic pop
 #endif
 #include <string>
 #include <cstdio>
+#include <cwchar>                   // std::wcslen()
 //#include <locale>
 #include <iomanip>
 #include <algorithm>
@@ -150,6 +152,22 @@ struct char_traits<U16>
 };
 #endif
 
+namespace al 
+{
+	struct string_hash 
+	{
+		using hash_type = boost::hash<std::string_view>;
+		using is_transparent = void;
+		[[nodiscard]] size_t operator()(const char* txt) const { return hash_type{}(txt); }
+		[[nodiscard]] size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
+		[[nodiscard]] size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
+	};
+
+	inline std::string_view safe_string_view(const char* p) {
+		return p ? std::string_view(p) : std::string_view();
+	}
+}
+
 class LL_COMMON_API LLStringOps
 {
 private:
@@ -157,7 +175,7 @@ private:
 	static long sLocalTimeOffset;
 	static bool sPacificDaylightTime;
 
-	static absl::flat_hash_map<std::string, std::string> datetimeToCodes;
+	static boost::unordered_flat_map<std::string, std::string, al::string_hash, std::equal_to<>> datetimeToCodes;
 
 public:
 	static std::vector<std::string> sWeekDayList;
@@ -315,6 +333,7 @@ public:
 
 	static void	trimHead(string_type& string);
 	static void	trimTail(string_type& string);
+	static void trimTail(string_type& string, const string_type& tokens);
 	static void	trim(string_type& string)	{ trimHead(string); trimTail(string); }
 	static void truncate(string_type& string, size_type count);
 
@@ -538,13 +557,70 @@ struct ll_convert_impl<T, T>
     T operator()(const T& in) const { return in; }
 };
 
+// simple construction from char*
+template<typename T>
+struct ll_convert_impl<T, const typename T::value_type*>
+{
+    T operator()(const typename T::value_type* in) const { return { in }; }
+};
+
 // specialize ll_convert_impl<TO, FROM> to return EXPR
 #define ll_convert_alias(TO, FROM, EXPR)                    \
 template<>                                                  \
 struct ll_convert_impl<TO, FROM>                            \
 {                                                           \
-    TO operator()(const FROM& in) const { return EXPR; }    \
+    /* param_type optimally passes both char* and string */ \
+    TO operator()(typename boost::call_traits<FROM>::param_type in) const { return EXPR; } \
 }
+
+// If all we're doing is copying characters, pass this to ll_convert_alias as
+// EXPR. Since it expands into the 'return EXPR' slot in the ll_convert_impl
+// specialization above, it implies TO{ in.begin(), in.end() }.
+#define LL_CONVERT_COPY_CHARS { in.begin(), in.end() }
+
+// Generic name for strlen() / wcslen() - the default implementation should
+// (!) work with U16 and llwchar, but we don't intend to engage it.
+template <typename CHARTYPE>
+size_t ll_convert_length(const CHARTYPE* zstr)
+{
+    const CHARTYPE* zp;
+    // classic C string scan
+    for (zp = zstr; *zp; ++zp)
+        ;
+    return (zp - zstr);
+}
+
+// specialize where we have a library function; may use intrinsic operations
+template <>
+inline size_t ll_convert_length<wchar_t>(const wchar_t* zstr) { return std::wcslen(zstr); }
+template <>
+inline size_t ll_convert_length<char>   (const char*    zstr) { return std::strlen(zstr); }
+
+// ll_convert_forms() is short for a bunch of boilerplate. It defines
+// longname(const char*, len), longname(const char*), longname(const string&)
+// and longname(const string&, len) so calls written pre-ll_convert() will
+// work. Most of these overloads will be unified once we turn on C++17 and can
+// use std::string_view.
+// It also uses aliasmacro to ensure that both ll_convert<OUTSTR>(const char*)
+// and ll_convert<OUTSTR>(const string&) will work.
+#define ll_convert_forms(aliasmacro, OUTSTR, INSTR, longname)           \
+LL_COMMON_API OUTSTR longname(const INSTR::value_type* in, size_t len); \
+inline auto longname(const INSTR& in, size_t len)                       \
+{                                                                       \
+    return longname(in.c_str(), len);                                   \
+}                                                                       \
+inline auto longname(const INSTR::value_type* in)                       \
+{                                                                       \
+    return longname(in, ll_convert_length(in));                         \
+}                                                                       \
+inline auto longname(const INSTR& in)                                   \
+{                                                                       \
+    return longname(in.c_str(), in.length());                           \
+}                                                                       \
+/* string param */                                                      \
+aliasmacro(OUTSTR, INSTR, longname(in));                                \
+/* char* param */                                                       \
+aliasmacro(OUTSTR, const INSTR::value_type*, longname(in))
 
 // Make the incoming string a utf8 string. Replaces any unknown glyph
 // with the UNKNOWN_CHARACTER. Once any unknown glyph is found, the rest
@@ -582,63 +658,47 @@ LL_COMMON_API std::string rawstr_to_utf8(const std::string& raw);
 // LL_WCHAR_T_NATIVE.
 typedef std::basic_string<U16> llutf16string;
 
-#if ! defined(LL_WCHAR_T_NATIVE)
-// wchar_t is identical to U16, and std::wstring is identical to llutf16string.
-// Defining an ll_convert alias involving llutf16string would collide with the
-// comparable preferred alias involving std::wstring. (In this scenario, if
-// you pass llutf16string, it will engage the std::wstring specialization.)
-#define ll_convert_u16_alias(TO, FROM, EXPR) // nothing
-#else  // defined(LL_WCHAR_T_NATIVE)
-// wchar_t is a distinct native type, so llutf16string is also a distinct
-// type, and there IS a point to converting separately to/from llutf16string.
-// (But why? Windows APIs are still defined in terms of wchar_t, and
-// in this scenario llutf16string won't work for them!)
-#define ll_convert_u16_alias(TO, FROM, EXPR) ll_convert_alias(TO, FROM, EXPR)
+// Considering wchar_t, llwchar and U16, there are three relevant cases:
+#if LLWCHAR_IS_WCHAR_T         // every which way but Windows
+// llwchar is identical to wchar_t, LLWString is identical to std::wstring.
+// U16 is distinct, llutf16string is distinct (though pretty useless).
+// Given conversions to/from LLWString and to/from llutf16string, conversions
+// involving std::wstring would collide.
+#define ll_convert_wstr_alias(TO, FROM, EXPR) // nothing
+// but we can define conversions involving llutf16string without collisions
+#define  ll_convert_u16_alias(TO, FROM, EXPR) ll_convert_alias(TO, FROM, EXPR)
 
-#if LL_WINDOWS
-// LL_WCHAR_T_NATIVE is defined on non-Windows systems because, in fact,
-// wchar_t is native. Everywhere but Windows, we use it for llwchar (see
-// stdtypes.h). That makes LLWString identical to std::wstring, so these
-// aliases for std::wstring would collide with those for LLWString. Only
-// define on Windows, where converting between std::wstring and llutf16string
-// means copying chars.
-ll_convert_alias(llutf16string, std::wstring, llutf16string(in.begin(), in.end()));
-ll_convert_alias(std::wstring, llutf16string,  std::wstring(in.begin(), in.end()));
-#endif // LL_WINDOWS
-#endif // defined(LL_WCHAR_T_NATIVE)
+#elif defined(LL_WCHAR_T_NATIVE)    // Windows, either clang or MS /Zc:wchar_t
+// llwchar (32-bit), wchar_t (16-bit) and U16 are all different types.
+// Conversions to/from LLWString, to/from std::wstring and to/from llutf16string
+// can all be defined.
+#define ll_convert_wstr_alias(TO, FROM, EXPR) ll_convert_alias(TO, FROM, EXPR)
+#define  ll_convert_u16_alias(TO, FROM, EXPR) ll_convert_alias(TO, FROM, EXPR)
 
-LL_COMMON_API LLWString utf16str_to_wstring(const llutf16string &utf16str, S32 len);
-LL_COMMON_API LLWString utf16str_to_wstring(const llutf16string &utf16str);
-ll_convert_u16_alias(LLWString, llutf16string, utf16str_to_wstring(in));
+#else  // ! LL_WCHAR_T_NATIVE: Windows with MS /Zc:wchar_t-
+// wchar_t is identical to U16, std::wstring is identical to llutf16string.
+// Given conversions to/from LLWString and to/from std::wstring, conversions
+// involving llutf16string would collide.
+#define  ll_convert_u16_alias(TO, FROM, EXPR) // nothing
+// but we can define conversions involving std::wstring without collisions
+#define ll_convert_wstr_alias(TO, FROM, EXPR) ll_convert_alias(TO, FROM, EXPR)
+#endif
 
-LL_COMMON_API llutf16string wstring_to_utf16str(const LLWString &utf32str, S32 len);
-LL_COMMON_API llutf16string wstring_to_utf16str(const LLWString &utf32str);
-ll_convert_u16_alias(llutf16string, LLWString, wstring_to_utf16str(in));
+ll_convert_forms(ll_convert_u16_alias, LLWString,     llutf16string, utf16str_to_wstring);
+ll_convert_forms(ll_convert_u16_alias, llutf16string, LLWString,     wstring_to_utf16str);
+ll_convert_forms(ll_convert_u16_alias, llutf16string, std::string,   utf8str_to_utf16str);
+ll_convert_forms(ll_convert_alias,     LLWString,     std::string,   utf8str_to_wstring);
 
-LL_COMMON_API llutf16string utf8str_to_utf16str ( const std::string& utf8str, S32 len);
-LL_COMMON_API llutf16string utf8str_to_utf16str ( const std::string& utf8str );
-ll_convert_u16_alias(llutf16string, std::string, utf8str_to_utf16str(in));
-
-LL_COMMON_API LLWString utf8str_to_wstring(const std::string &utf8str, S32 len);
-LL_COMMON_API LLWString utf8str_to_wstring(const std::string &utf8str);
 // Same function, better name. JC
 inline LLWString utf8string_to_wstring(const std::string& utf8_string) { return utf8str_to_wstring(utf8_string); }
-// best name of all
-ll_convert_alias(LLWString, std::string, utf8string_to_wstring(in));
 
-//
-LL_COMMON_API S32 wchar_to_utf8chars(llwchar inchar, char* outchars);
+LL_COMMON_API std::ptrdiff_t wchar_to_utf8chars(llwchar inchar, char* outchars);
 
-LL_COMMON_API std::string wstring_to_utf8str(const LLWString &utf32str, S32 len);
-LL_COMMON_API std::string wstring_to_utf8str(const LLWString &utf32str);
-ll_convert_alias(std::string, LLWString, wstring_to_utf8str(in));
-LL_COMMON_API std::string utf16str_to_utf8str(const llutf16string &utf16str, S32 len);
-LL_COMMON_API std::string utf16str_to_utf8str(const llutf16string &utf16str);
-ll_convert_u16_alias(std::string, llutf16string, utf16str_to_utf8str(in));
+ll_convert_forms(ll_convert_alias,     std::string, LLWString,     wstring_to_utf8str);
+ll_convert_forms(ll_convert_u16_alias, std::string, llutf16string, utf16str_to_utf8str);
 
-#if LL_WINDOWS
+// an older alias for utf16str_to_utf8str(llutf16string)
 inline std::string wstring_to_utf8str(const llutf16string &utf16str) { return utf16str_to_utf8str(utf16str);}
-#endif
 
 // Length of this UTF32 string in bytes when transformed to UTF8
 LL_COMMON_API S32 wstring_utf8_length(const LLWString& wstr); 
@@ -717,40 +777,54 @@ LL_COMMON_API std::string utf8str_removeCRLF(const std::string& utf8str);
 //@{
 
 /**
- * @brief Convert a wide string to std::string
+ * @brief Convert a wide string to/from std::string
+ * Convert a Windows wide string to/from our LLWString
  *
  * This replaces the unsafe W2A macro from ATL.
  */
-LL_COMMON_API std::string ll_convert_wide_to_string(std::wstring_view in, unsigned int code_page);
-LL_COMMON_API std::string ll_convert_wide_to_string(std::wstring_view in); // default CP_UTF8
-ll_convert_alias(std::string, std::wstring, ll_convert_wide_to_string(in));
+// Avoid requiring this header to #include the Windows header file declaring
+// our actual default code_page by delegating this function to our .cpp file.
+LL_COMMON_API unsigned int ll_wstring_default_code_page();
 
-/**
- * Converts a string to wide string.
- */
-LL_COMMON_API std::wstring ll_convert_string_to_wide(std::string_view in,
-	unsigned int code_page);
-// default CP_UTF8
-LL_COMMON_API std::wstring ll_convert_string_to_wide(std::string_view in);
-ll_convert_alias(std::wstring, std::string, ll_convert_string_to_wide(in));
+// This is like ll_convert_forms(), with the added complexity of a code page
+// parameter that may or may not be passed.
+#define ll_convert_cp_forms(aliasmacro, OUTSTR, INSTR, longname)    \
+/* declare the only nontrivial implementation (in .cpp file) */     \
+LL_COMMON_API OUTSTR longname(                                      \
+    const INSTR::value_type* in,                                    \
+    size_t len,                                                     \
+    unsigned int code_page=ll_wstring_default_code_page());         \
+/* if passed only a char pointer, scan for nul terminator */        \
+inline auto longname(const INSTR::value_type* in)                   \
+{                                                                   \
+    return longname(in, ll_convert_length(in));                     \
+}                                                                   \
+/* if passed string and length, extract its char pointer */         \
+inline auto longname(                                               \
+    const INSTR& in,                                                \
+    size_t len,                                                     \
+    unsigned int code_page=ll_wstring_default_code_page())          \
+{                                                                   \
+    return longname(in.c_str(), len, code_page);                    \
+}                                                                   \
+/* if passed only a string object, no scan, pass known length */    \
+inline auto longname(const INSTR& in)                               \
+{                                                                   \
+    return longname(in.c_str(), in.length());                       \
+}                                                                   \
+aliasmacro(OUTSTR, INSTR, longname(in));                            \
+aliasmacro(OUTSTR, const INSTR::value_type*, longname(in))
 
-/**
- * Convert a Windows wide string to our LLWString
- */
-LL_COMMON_API LLWString ll_convert_wide_to_wstring(std::wstring_view in);
-ll_convert_alias(LLWString, std::wstring, ll_convert_wide_to_wstring(in));
-
-/**
- * Convert LLWString to Windows wide string
- */
-LL_COMMON_API std::wstring ll_convert_wstring_to_wide(LLWStringView in);
-ll_convert_alias(std::wstring, LLWString, ll_convert_wstring_to_wide(in));
+ll_convert_cp_forms(ll_convert_wstr_alias, std::string,  std::wstring, ll_convert_wide_to_string);
+ll_convert_cp_forms(ll_convert_wstr_alias, std::wstring, std::string,  ll_convert_string_to_wide);
+   ll_convert_forms(ll_convert_wstr_alias, LLWString,    std::wstring, ll_convert_wide_to_wstring);
+   ll_convert_forms(ll_convert_wstr_alias, std::wstring, LLWString,    ll_convert_wstring_to_wide);
 
 /**
  * Converts incoming string into utf8 string
  *
  */
-LL_COMMON_API std::string ll_convert_string_to_utf8_string(std::string_view in);
+LL_COMMON_API std::string ll_convert_string_to_utf8_string(const std::string& in);
 
 /// Get Windows message string for passed GetLastError() code
 // VS 2013 doesn't let us forward-declare this template, which is what we
@@ -1376,13 +1450,29 @@ void LLStringUtilBase<T>::trimHead(string_type& string)
 template<class T> 
 void LLStringUtilBase<T>::trimTail(string_type& string)
 {			
-	if( string.size() )
+	if(!string.empty())
 	{
 		size_type len = string.length();
 		size_type i = len;
 		while( i > 0 && LLStringOps::isSpace( string[i-1] ) )
 		{
-			i--;
+			--i;
+		}
+
+		string.erase( i, len - i );
+	}
+}
+
+template<class T>
+void LLStringUtilBase<T>::trimTail(string_type& string, const string_type& tokens)
+{
+	if(!string.empty())
+	{
+		size_type len = string.length();
+		size_type i = len;
+		while( i > 0 && (tokens.find_first_of(string[i-1]) != string_type::npos) )
+		{
+			--i;
 		}
 
 		string.erase( i, len - i );
@@ -1395,6 +1485,9 @@ void LLStringUtilBase<T>::trimTail(string_type& string)
 template<class T>
 void LLStringUtilBase<T>::addCRLF(string_type& string)
 {
+	if (string.empty())
+		return;
+
 	const T LF = 10;
 	const T CR = 13;
 
@@ -1437,6 +1530,9 @@ void LLStringUtilBase<T>::addCRLF(string_type& string)
 template<class T> 
 void LLStringUtilBase<T>::removeCRLF(string_type& string)
 {
+	if (string.empty())
+		return;
+
 	const T CR = 13;
 
 	size_type cr_count = 0;
@@ -1940,5 +2036,15 @@ void LLStringUtilBase<T>::truncate(string_type& string, size_type count)
 	size_type cur_size = string.size();
 	string.resize(count < cur_size ? count : cur_size);
 }
+
+// The good thing about *declaration* macros, vs. usage macros, is that now
+// we're done with them: we don't need them to bleed into the consuming source
+// file.
+#undef ll_convert_alias
+#undef ll_convert_u16_alias
+#undef ll_convert_wstr_alias
+#undef LL_CONVERT_COPY_CHARS
+#undef ll_convert_forms
+#undef ll_convert_cp_forms
 
 #endif  // LL_STRING_H

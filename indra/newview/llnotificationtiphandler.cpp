@@ -66,7 +66,7 @@ void LLTipHandler::initChannel()
 }
 
 //--------------------------------------------------------------------------
-bool LLTipHandler::processNotification(const LLNotificationPtr& notification)
+bool LLTipHandler::processNotification(const LLNotificationPtr& notification, bool should_log)
 {
 	if(mChannel.isDead())
 	{
@@ -80,7 +80,7 @@ bool LLTipHandler::processNotification(const LLNotificationPtr& notification)
 	}
 
 		// archive message in nearby chat
-	if (notification->canLogToChat())
+	if (notification->canLogToChat() || notification->isSendToChatForced())
 	{
 		LLHandlerUtil::logToNearbyChat(notification, CHAT_SOURCE_SYSTEM);
 	}

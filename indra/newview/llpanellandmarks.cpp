@@ -29,6 +29,7 @@
 #include "llpanellandmarks.h"
 
 #include "llbutton.h"
+#include "llfloaterprofile.h"
 #include "llfloaterreg.h"
 #include "llnotificationsutil.h"
 #include "llsdutil.h"
@@ -441,8 +442,14 @@ void LLLandmarksPanel::initLandmarksPanel(LLPlacesInventoryPanel* inventory_list
 	LLPlacesFolderView* root_folder = dynamic_cast<LLPlacesFolderView*>(inventory_list->getRootFolder());
 	if (root_folder)
 	{
-		root_folder->setupMenuHandle(LLInventoryType::IT_CATEGORY, mGearFolderMenu->getHandle());
-		root_folder->setupMenuHandle(LLInventoryType::IT_LANDMARK, mGearLandmarkMenu->getHandle());
+        if (mGearFolderMenu)
+        {
+            root_folder->setupMenuHandle(LLInventoryType::IT_CATEGORY, mGearFolderMenu->getHandle());
+        }
+        if (mGearLandmarkMenu)
+        {
+            root_folder->setupMenuHandle(LLInventoryType::IT_LANDMARK, mGearLandmarkMenu->getHandle());
+        }
 
 		root_folder->setParentLandmarksPanel(this);
 	}
@@ -465,13 +472,23 @@ void LLLandmarksPanel::initListCommandsHandlers()
 	mSortingMenu = LLUICtrlFactory::getInstance()->createFromFile<LLToggleableMenu>("menu_places_gear_sorting.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
 	mAddMenu = LLUICtrlFactory::getInstance()->createFromFile<LLToggleableMenu>("menu_place_add_button.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
 
-	mGearLandmarkMenu->setVisibilityChangeCallback(boost::bind(&LLLandmarksPanel::onMenuVisibilityChange, this, _1, _2));
-	mGearFolderMenu->setVisibilityChangeCallback(boost::bind(&LLLandmarksPanel::onMenuVisibilityChange, this, _1, _2));
+    if (mGearLandmarkMenu)
+    {
+        mGearLandmarkMenu->setVisibilityChangeCallback(boost::bind(&LLLandmarksPanel::onMenuVisibilityChange, this, _1, _2));
+        // show menus even if all items are disabled
+        mGearLandmarkMenu->setAlwaysShowMenu(TRUE);
+    } // Else corrupted files?
 
-	// show menus even if all items are disabled
-	mGearLandmarkMenu->setAlwaysShowMenu(TRUE);
-	mGearFolderMenu->setAlwaysShowMenu(TRUE);
-	mAddMenu->setAlwaysShowMenu(TRUE);
+    if (mGearFolderMenu)
+    {
+        mGearFolderMenu->setVisibilityChangeCallback(boost::bind(&LLLandmarksPanel::onMenuVisibilityChange, this, _1, _2));
+        mGearFolderMenu->setAlwaysShowMenu(TRUE);
+    }
+
+    if (mAddMenu)
+    {
+        mAddMenu->setAlwaysShowMenu(TRUE);
+    }
 }
 
 void LLLandmarksPanel::updateMenuVisibility(LLUICtrl* menu)
@@ -640,11 +657,11 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
 
 	if ("collapse_all" == command_name)
 	{
-		return has_expanded_folders(mCurrentSelectedList->getRootFolder());
+		return mCurrentSelectedList && has_expanded_folders(mCurrentSelectedList->getRootFolder());
 	}
 	else if ("expand_all" == command_name)
 	{
-		return has_collapsed_folders(mCurrentSelectedList->getRootFolder());
+		return mCurrentSelectedList && has_collapsed_folders(mCurrentSelectedList->getRootFolder());
 	}
 	else if ("sort_by_date"	== command_name)
 	{
@@ -966,12 +983,12 @@ bool LLLandmarksPanel::canItemBeModified(const std::string& command_name, LLFold
 
 	// then ask LLFolderView permissions
 
-	LLFolderView* root_folder = mCurrentSelectedList->getRootFolder();
+	LLFolderView* root_folder = mCurrentSelectedList ? mCurrentSelectedList->getRootFolder() : nullptr;
 
 	if ("copy" == command_name)
 	{
 		// we shouldn't be able to copy folders from My Inventory Panel
-		return can_be_modified && root_folder->canCopy();
+		return can_be_modified && root_folder && root_folder->canCopy();
 	}
 	else if ("collapse" == command_name)
 	{
@@ -988,7 +1005,7 @@ bool LLLandmarksPanel::canItemBeModified(const std::string& command_name, LLFold
 
 		if ("cut" == command_name)
 		{
-			can_be_modified = root_folder->canCut();
+			can_be_modified = root_folder && root_folder->canCut();
 		}
 		else if ("rename" == command_name)
 		{
@@ -1000,7 +1017,7 @@ bool LLLandmarksPanel::canItemBeModified(const std::string& command_name, LLFold
 		}
 		else if("paste" == command_name)
 		{
-			can_be_modified = root_folder->canPaste();
+			can_be_modified = root_folder && root_folder->canPaste();
 		}
 		else
 		{
@@ -1009,17 +1026,6 @@ bool LLLandmarksPanel::canItemBeModified(const std::string& command_name, LLFold
 	}
 
 	return can_be_modified;
-}
-
-void LLLandmarksPanel::onPickPanelExit( LLPanelPickEdit* pick_panel, LLView* owner, const LLSD& params)
-{
-	pick_panel->setVisible(FALSE);
-	owner->removeChild(pick_panel);
-	//we need remove  observer to  avoid  processParcelInfo in the future.
-	LLRemoteParcelInfoProcessor::getInstance()->removeObserver(params["parcel_id"].asUUID(), this);
-
-	delete pick_panel;
-	pick_panel = NULL;
 }
 
 bool LLLandmarksPanel::handleDragAndDropToTrash(BOOL drop, EDragAndDropType cargo_type, void* cargo_data , EAcceptance* accept)
@@ -1078,35 +1084,18 @@ void LLLandmarksPanel::doShowOnMap(LLLandmark* landmark)
 		LLFloaterReg::showInstance("world_map", "center");
 	}
 
-	mGearLandmarkMenu->setItemEnabled("show_on_map", TRUE);
+    if (mGearLandmarkMenu)
+    {
+        mGearLandmarkMenu->setItemEnabled("show_on_map", TRUE);
+    }
 }
 
 void LLLandmarksPanel::doProcessParcelInfo(LLLandmark* landmark,
 										   LLInventoryItem* inv_item,
 										   const LLParcelData& parcel_data)
 {
-	LLPanelPickEdit* panel_pick = LLPanelPickEdit::create();
 	LLVector3d landmark_global_pos;
 	landmark->getGlobalPos(landmark_global_pos);
-
-	// let's toggle pick panel into  panel places
-	LLPanel* panel_places = NULL;
-	LLFloaterSidePanelContainer* floaterp = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>("places");
-	if (floaterp)
-	{
-		panel_places = floaterp->findChild<LLPanel>("main_panel");
-	}
-
-	if (!panel_places)
-	{
-		llassert(NULL != panel_places);
-		return;
-	}
-	panel_places->addChild(panel_pick);
-	LLRect paren_rect(panel_places->getRect());
-	panel_pick->reshape(paren_rect.getWidth(),paren_rect.getHeight(), TRUE);
-	panel_pick->setRect(paren_rect);
-	panel_pick->onOpen(LLSD());
 
 	LLPickData data;
 	data.pos_global = landmark_global_pos;
@@ -1114,20 +1103,8 @@ void LLLandmarksPanel::doProcessParcelInfo(LLLandmark* landmark,
 	data.desc = inv_item->getDescription();
 	data.snapshot_id = parcel_data.snapshot_id;
 	data.parcel_id = parcel_data.parcel_id;
-	panel_pick->setPickData(&data);
 
-	LLSD params;
-	params["parcel_id"] = parcel_data.parcel_id;
-	/* set exit callback to get back onto panel places
-	 in callback we will make cleaning up( delete pick_panel instance,
-	 remove landmark panel from observer list
-	*/
-	panel_pick->setExitCallback(boost::bind(&LLLandmarksPanel::onPickPanelExit,this,
-			panel_pick, panel_places,params));
-	panel_pick->setSaveCallback(boost::bind(&LLLandmarksPanel::onPickPanelExit,this,
-		panel_pick, panel_places,params));
-	panel_pick->setCancelCallback(boost::bind(&LLLandmarksPanel::onPickPanelExit,this,
-					panel_pick, panel_places,params));
+    LLAvatarActions::createPick(data);
 }
 
 void LLLandmarksPanel::doCreatePick(LLLandmark* landmark, const LLUUID &item_id)
@@ -1141,9 +1118,13 @@ void LLLandmarksPanel::doCreatePick(LLLandmark* landmark, const LLUUID &item_id)
 	LLUUID region_id;
 	landmark->getGlobalPos(pos_global);
 	landmark->getRegionID(region_id);
-	LLVector3 region_pos((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
-					  (F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
-					  (F32)pos_global.mdV[VZ]);
+	LLVector3 region_pos = landmark->getRegionPos();
+	if (region_pos.isNull())
+	{
+		region_pos.set((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
+			(F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
+			(F32)pos_global.mdV[VZ]);
+	}
 
 	LLSD body;
 	std::string url = region->getCapability("RemoteParcelRequest");

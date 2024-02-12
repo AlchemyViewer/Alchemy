@@ -51,7 +51,7 @@ void HttpHeaders::append(const std::string & name, const std::string & value)
         }
     }
 
-	mHeaders.push_back(value_type(name, value));
+	mHeaders.emplace_back(name, value);
 }
 
 
@@ -66,7 +66,7 @@ void HttpHeaders::append(const char * name, const char * value)
         }
     }
 
-	mHeaders.push_back(value_type(name, value));
+	mHeaders.emplace_back(name, value);
 }
 
 
@@ -108,7 +108,7 @@ void HttpHeaders::appendNormal(const char * header, size_t size)
 		name.assign(header, size);
 	}
 
-	mHeaders.push_back(value_type(name, value));
+    mHeaders.emplace_back(name, value);
 }
 
 

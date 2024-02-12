@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<floater
+   height="235"
+   help_topic="floater_clear_cache"
+   layout="topleft"
+   name="clear_cache"
+   title="Clear Cache"
+   width="290">
+   <text
+      type="string"
+      length="1"
+      follows="top|left"
+      layout="topleft"
+      name="region_name"
+      word_wrap="true"
+      left="40"
+      width="230">
+      What cache data do you wish to clear?
+   </text>
+   <check_box
+      height="16"
+      label="Textures"
+      layout="topleft"
+      name="clear_textures"
+      tool_tip="If checked, all texture cache data will be cleared. "
+      width="130"
+      left="50"
+      top_pad="12"
+      value="true" />
+   <check_box
+      height="16"
+      label="Assets (Meshes, Sounds, Animations)"
+      layout="topleft"
+      name="clear_assets"
+      tool_tip="If checked, all asset cache data inlcuding meshes, animations, sounds, and other miscellaneous asset data will be cleared. "
+      width="130"
+      left="50"
+      top_pad="10"
+      value="true" />
+   <check_box
+      height="16"
+      label="Inventory"
+      layout="topleft"
+      name="clear_inventory"
+      tool_tip="If checked, all inventory cache data will be cleared. "
+      width="130"
+      left="50"
+      top_pad="10"
+      value="true" />
+   <check_box
+      height="16"
+      label="Region Objects"
+      layout="topleft"
+      name="clear_regions"
+      tool_tip="If checked, region interest list and object update cache will be cleared. "
+      width="130"
+      left="50"
+      top_pad="10"
+      value="true" />
+   <check_box
+      height="16"
+      label="Shaders"
+      layout="topleft"
+      name="clear_shaders"
+      tool_tip="If checked, precompiled shader cache data will be cleared."
+      width="130"
+      left="50"
+      top_pad="10"
+      value="true" />
+   <check_box
+      height="16"
+      label="Web Data and Cookies"
+      layout="topleft"
+      name="clear_web"
+      tool_tip="If checked, all web browser data will be cleared. "
+      width="130"
+      left="50"
+      top_pad="10"
+      value="true" />
+   <check_box
+      height="16"
+      label="Misc Data"
+      layout="topleft"
+      name="clear_userdata"
+      tool_tip="If checked, all mute list, experience, avatar and group name caches will be cleared. "
+      width="130"
+      left="50"
+      top_pad="10"
+      value="true" />
+   <button
+      enabled="false"
+      follows="top|left"
+      height="25"
+      label="Clear Selected"
+      layout="topleft"
+      top="205"
+      left="5"
+      name="clear_selected"
+      width="90" />
+   <button
+      follows="bottom|right"
+      height="25"
+      label="Clear All"
+      layout="topleft"
+      left_pad="5"
+      name="clear_all"
+      width="90" />
+   <button
+      follows="bottom|right"
+      height="25"
+      label="Cancel"
+      layout="topleft"
+      left_pad="5"
+      name="cancel"
+      width="90" />
+</floater>

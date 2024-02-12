@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<fonts>
+  <font name="default">
+    <file>SourceSans3.ttf</file>
+  </font>
+
+  <font name="SansSerifBold">
+    <file>SourceSans3-Bold.ttf</file>
+  </font>
+
+  <font name="SansSerif">
+    <file>SourceSans3.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD">
+    <file>SourceSans3-Bold.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="ITALIC">
+    <file>SourceSans3-It.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD|ITALIC">
+    <file>SourceSans3-BoldIt.ttf</file>
+  </font>
+
+  <font name="OverrideTest">
+    <file>SourceSans3.ttf</file>
+  </font>
+
+	<font_size name="Huge"   size="16.0" />
+	<font_size name="Large"  size="11.6" />
+	<font_size name="Medium" size="10.0" />
+	<font_size name="Small"  size="9.0" />
+</fonts>

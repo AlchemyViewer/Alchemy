@@ -195,7 +195,7 @@ BOOL LLTool::handleKey(KEY key, MASK mask)
 LLTool* LLTool::getOverrideTool(MASK mask)
 {
 	// NOTE: if in flycam mode, ALT-ZOOM camera should be disabled
-	if (LLViewerJoystick::getInstanceFast()->getOverrideCamera())
+	if (LLViewerJoystick::getInstance()->getOverrideCamera())
 	{
 		return NULL;
 	}
@@ -205,7 +205,7 @@ LLTool* LLTool::getOverrideTool(MASK mask)
 	{
 		if (mask & MASK_ALT)
 		{
-			return LLToolCamera::getInstanceFast();
+			return LLToolCamera::getInstance();
 		}
 	}
 	return NULL;

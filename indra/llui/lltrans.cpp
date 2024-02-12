@@ -35,9 +35,6 @@
 
 #include <map>
 
-#include <absl/strings/str_format.h>
-#include <absl/strings/str_cat.h>
-
 LLTrans::template_map_t LLTrans::sStringTemplates;
 LLTrans::template_map_t LLTrans::sDefaultStringTemplates;
 LLStringUtil::format_map_t LLTrans::sDefaultArgs;
@@ -141,16 +138,12 @@ bool LLTrans::parseLanguageStrings(LLXMLNodePtr &root)
 	return true;
 }
 
-
-
-static LLTrace::BlockTimerStatHandle FTM_GET_TRANS("Translate string");
-
 //static 
 std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::format_map_t& msg_args, bool def_string)
 {
 	// Don't care about time as much as call count.  Make sure we're not
 	// calling LLTrans::getString() in an inner loop. JC
-	LL_RECORD_BLOCK_TIME(FTM_GET_TRANS);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	
 	if (def_string)
 	{
@@ -170,7 +163,7 @@ std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::fo
 	else
 	{
 		LL_WARNS_ONCE("configuration") << "Missing String in strings.xml: [" << xml_desc << "]" << LL_ENDL;
-		return absl::StrCat("MissingString(", xml_desc, ")");
+		return fmt::format("MissingString({})", xml_desc);
 	}
 }
 
@@ -190,7 +183,7 @@ std::string LLTrans::getDefString(std::string_view xml_desc, const LLStringUtil:
 	else
 	{
 		LL_WARNS_ONCE("configuration") << "Missing String in strings.xml: [" << xml_desc << "]" << LL_ENDL;
-		return absl::StrCat("MissingString(", xml_desc, ")");
+		return fmt::format("MissingString({})", xml_desc);
 	}
 }
 
@@ -199,7 +192,7 @@ std::string LLTrans::getString(std::string_view xml_desc, const LLSD& msg_args, 
 {
 	// Don't care about time as much as call count.  Make sure we're not
 	// calling LLTrans::getString() in an inner loop. JC
-	LL_RECORD_BLOCK_TIME(FTM_GET_TRANS);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
 	if (def_string)
 	{
@@ -216,7 +209,7 @@ std::string LLTrans::getString(std::string_view xml_desc, const LLSD& msg_args, 
 	else
 	{
 		LL_WARNS_ONCE("configuration") << "Missing String in strings.xml: [" << xml_desc << "]" << LL_ENDL;
-		return absl::StrCat("MissingString(", xml_desc, ")");
+		return fmt::format("MissingString({})", xml_desc);
 	}
 }
 
@@ -233,14 +226,14 @@ std::string LLTrans::getDefString(std::string_view xml_desc, const LLSD& msg_arg
 	else
 	{
 		LL_WARNS_ONCE("configuration") << "Missing String in strings.xml: [" << xml_desc << "]" << LL_ENDL;
-		return absl::StrCat("MissingString(", xml_desc, ")");
+		return fmt::format("MissingString({})", xml_desc);
 	}
 }
 
 //static 
 bool LLTrans::findString(std::string &result, std::string_view xml_desc, const LLStringUtil::format_map_t& msg_args)
 {
-	LL_RECORD_BLOCK_TIME(FTM_GET_TRANS);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	
 	template_map_t::iterator iter = sStringTemplates.find(xml_desc);
 	if (iter != sStringTemplates.end())
@@ -262,7 +255,7 @@ bool LLTrans::findString(std::string &result, std::string_view xml_desc, const L
 //static
 bool LLTrans::findString(std::string &result, std::string_view xml_desc, const LLSD& msg_args)
 {
-	LL_RECORD_BLOCK_TIME(FTM_GET_TRANS);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
 	template_map_t::iterator iter = sStringTemplates.find(xml_desc);
 	if (iter != sStringTemplates.end())
@@ -340,7 +333,7 @@ std::string LLTrans::getCountString(const std::string_view language, const std::
 	args["[COUNT]"] = fmt::to_string(count);
 
 	// Look up "AgeYearsB" or "AgeWeeksC" including the "form"
-	std::string key = absl::StrCat(xml_desc, form);
+	std::string key = fmt::format("{}{}", xml_desc, form);
 	return getString(key, args);
 }
 

@@ -40,7 +40,7 @@
 #include "rlvactions.h"
 // [/RLVa:KB]
 
-#include <boost/regex.hpp>
+#include "llregex.h"
 
 using namespace LLNotificationsUI;
 
@@ -71,7 +71,7 @@ void LLOfferHandler::initChannel()
 }
 
 //--------------------------------------------------------------------------
-bool LLOfferHandler::processNotification(const LLNotificationPtr& notification)
+bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, bool should_log)
 {
 	if(mChannel.isDead())
 	{
@@ -164,9 +164,8 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification)
 				|| notification->getName() == "TeleportOffered_MaturityExceeded"
 				|| notification->getName() == "TeleportOffered_MaturityBlocked"))
 			{
-				boost::regex r("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>( - )?",
-					boost::regex::perl|boost::regex::icase);
-				std::string stripped_msg = boost::regex_replace(notification->getMessage(), r, "");
+				static const boost::regex r("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>( - )?", boost::regex::perl|boost::regex::icase);
+				std::string stripped_msg = ll_regex_replace(notification->getMessage(), r, "");
 				LLHandlerUtil::logToIMP2P(notification->getPayload()["from_id"], stripped_msg,file_only);
 			}
 			else
@@ -181,14 +180,14 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification)
 
 /*virtual*/ void LLOfferHandler::onChange(LLNotificationPtr p)
 {
-	LLToastNotifyPanel* panelp = LLToastNotifyPanel::getInstance(p->getID());
+	auto panelp = LLToastNotifyPanel::getInstance(p->getID());
 	if (panelp)
 	{
 		//
 		// HACK: if we're dealing with a notification embedded in IM, update it
 		// otherwise remove its toast
 		//
-		if (dynamic_cast<LLIMToastNotifyPanel*>(panelp))
+		if (dynamic_cast<LLIMToastNotifyPanel*>(panelp.get()))
 		{
 			panelp->updateNotification();
 		}

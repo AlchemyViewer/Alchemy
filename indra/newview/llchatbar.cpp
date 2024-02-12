@@ -28,6 +28,7 @@
 
 #include "llchatbar.h"
 
+#include "llautoreplace.h"
 #include "llfontgl.h"
 #include "llrect.h"
 #include "llerror.h"
@@ -35,6 +36,9 @@
 #include "llstring.h"
 #include "message.h"
 #include "llfocusmgr.h"
+#include "llfloater.h"
+#include "llfloaterreg.h"
+#include "lltrans.h"
 
 #include "alchatcommand.h"
 #include "llagent.h"
@@ -43,6 +47,7 @@
 #include "llcommandhandler.h"	// secondlife:///app/chat/ support
 #include "llviewercontrol.h"
 #include "llgesturemgr.h"
+#include "llfloaterimnearbychat.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
 #include "llstatusbar.h"
@@ -65,19 +70,12 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 
-//
-// Globals
-//
-const F32 AGENT_TYPING_TIMEOUT = 5.f;	// seconds
-
-LLChatBar *gChatBar = NULL;
-
-class LLChatBarGestureObserver : public LLGestureManagerObserver
+class LLChatBarGestureObserver final : public LLGestureManagerObserver
 {
 public:
 	LLChatBarGestureObserver(LLChatBar* chat_barp) : mChatBar(chat_barp){}
-	virtual ~LLChatBarGestureObserver() {}
-	virtual void changed() { mChatBar->refreshGestures(); }
+	virtual ~LLChatBarGestureObserver() = default;
+	void changed() override { mChatBar->refreshGestures(); }
 private:
 	LLChatBar* mChatBar;
 };
@@ -92,16 +90,16 @@ extern void send_chat_from_viewer(std::string utf8_out_text, EChatType type, S32
 // Functions
 //
 
-LLChatBar::LLChatBar() 
-:	LLPanel(),
-	mInputEditor(NULL),
+LLChatBar::LLChatBar(const LLSD& key)
+:	LLFloater(key),
+	mInputEditor(nullptr),
 	mGestureLabelTimer(),
-	mLastSpecialChatChannel(0),
 	mIsBuilt(FALSE),
-	mGestureCombo(NULL),
-	mObserver(NULL)
+	mGestureCombo(nullptr),
+	mObserver(nullptr)
 {
-	//setIsChrome(TRUE);
+	mCommitCallbackRegistrar.add("Chatbar.Shout", boost::bind(&LLChatBar::sendChat, this, CHAT_TYPE_SHOUT));
+	mCommitCallbackRegistrar.add("Chatbar.Whisper", boost::bind(&LLChatBar::sendChat, this, CHAT_TYPE_WHISPER));
 }
 
 
@@ -109,20 +107,29 @@ LLChatBar::~LLChatBar()
 {
 	LLGestureMgr::instance().removeObserver(mObserver);
 	delete mObserver;
-	mObserver = NULL;
+	mObserver = nullptr;
+
+	delete mReshapeSignal;
+	mReshapeSignal = nullptr;
+
+	if (mChatFontSizeConnection.connected())
+		mChatFontSizeConnection.disconnect();
 	// LLView destructor cleans up children
 }
 
+//-----------------------------------------------------------------------
+// Overrides
+//-----------------------------------------------------------------------
+
 BOOL LLChatBar::postBuild()
 {
-	getChild<LLUICtrl>("Say")->setCommitCallback(boost::bind(&LLChatBar::onClickSay, this, _1));
-
 	// * NOTE: mantipov: getChild with default parameters returns dummy widget.
 	// Seems this class will be completle removed
 	// attempt to bind to an existing combo box named gesture
 	setGestureCombo(findChild<LLComboBox>( "Gesture"));
 
 	mInputEditor = getChild<LLLineEditor>("Chat Editor");
+	mInputEditor->setAutoreplaceCallback(boost::bind(&LLAutoReplace::autoreplaceCallback, LLAutoReplace::getInstance(), _1, _2, _3, _4, _5));
 	mInputEditor->setKeystrokeCallback(&onInputEditorKeystroke, this);
 	mInputEditor->setFocusLostCallback(boost::bind(&LLChatBar::onInputEditorFocusLost));
 	mInputEditor->setFocusReceivedCallback(boost::bind(&LLChatBar::onInputEditorGainFocus));
@@ -137,14 +144,15 @@ BOOL LLChatBar::postBuild()
 	
 	mInputEditor->setFont(LLViewerChat::getChatFont());
 
-	mIsBuilt = TRUE;
+	mChatFontSizeConnection = gSavedSettings.getControl("ChatFontSize")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { mInputEditor->setFont(LLViewerChat::getChatFont()); });
 
 	return TRUE;
 }
 
-//-----------------------------------------------------------------------
-// Overrides
-//-----------------------------------------------------------------------
+void LLChatBar::onOpen(const LLSD& key)
+{
+	mInputEditor->setFocus(TRUE);
+}
 
 // virtual
 BOOL LLChatBar::handleKeyHere( KEY key, MASK mask )
@@ -153,7 +161,13 @@ BOOL LLChatBar::handleKeyHere( KEY key, MASK mask )
 
 	if( KEY_RETURN == key )
 	{
-		if (mask == MASK_CONTROL)
+		if (mask == (MASK_CONTROL | MASK_SHIFT))
+		{
+			// whisper
+			sendChat(CHAT_TYPE_WHISPER);
+			handled = TRUE;
+		}
+		else if (mask == MASK_CONTROL)
 		{
 			// shout
 			sendChat(CHAT_TYPE_SHOUT);
@@ -167,7 +181,7 @@ BOOL LLChatBar::handleKeyHere( KEY key, MASK mask )
 		}
 	}
 	// only do this in main chatbar
-	else if ( KEY_ESCAPE == key && gChatBar == this)
+	else if ( KEY_ESCAPE == key)
 	{
 		stopChat();
 
@@ -175,6 +189,11 @@ BOOL LLChatBar::handleKeyHere( KEY key, MASK mask )
 	}
 
 	return handled;
+}
+
+void LLChatBar::onFocusLost()
+{
+	stopChat();
 }
 
 void LLChatBar::refresh()
@@ -188,13 +207,10 @@ void LLChatBar::refresh()
 		mGestureLabelTimer.stop();
 	}
 
-	if ((gAgent.getTypingTime() > AGENT_TYPING_TIMEOUT) && (gAgent.getRenderState() & AGENT_STATE_TYPING))
+	if ((gAgent.getTypingTime() > LLAgent::TYPING_TIMEOUT_SECS) && (gAgent.getRenderState() & AGENT_STATE_TYPING))
 	{
 		gAgent.stopTyping();
 	}
-
-	getChildView("Say")->setEnabled(mInputEditor->getText().size() > 0);
-
 }
 
 void LLChatBar::refreshGestures()
@@ -204,7 +220,7 @@ void LLChatBar::refreshGestures()
 		//store current selection so we can maintain it
 		std::string cur_gesture = mGestureCombo->getValue().asString();
 		mGestureCombo->selectFirstItem();
-		std::string label = mGestureCombo->getValue().asString();;
+
 		// clear
 		mGestureCombo->clearRows();
 
@@ -278,12 +294,12 @@ void LLChatBar::setIgnoreArrowKeys(BOOL b)
 	}
 }
 
-BOOL LLChatBar::inputEditorHasFocus()
+BOOL LLChatBar::inputEditorHasFocus() const
 {
 	return mInputEditor && mInputEditor->hasFocus();
 }
 
-std::string LLChatBar::getCurrentChat()
+std::string LLChatBar::getCurrentChat() const
 {
 	return mInputEditor ? mInputEditor->getText() : LLStringUtil::null;
 }
@@ -308,134 +324,37 @@ void LLChatBar::setGestureCombo(LLComboBox* combo)
 // Internal functions
 //-----------------------------------------------------------------------
 
-// If input of the form "/20foo" or "/20 foo", returns "foo" and channel 20.
-// Otherwise returns input and channel 0.
-LLWString LLChatBar::stripChannelNumber(const LLWString &mesg, S32* channel)
-{
-	if (mesg[0] == '/'
-		&& mesg[1] == '/')
-	{
-		// This is a "repeat channel send"
-		*channel = mLastSpecialChatChannel;
-		return mesg.substr(2, mesg.length() - 2);
-	}
-	else if (mesg[0] == '/'
-			 && mesg[1]
-			 && (LLStringOps::isDigit(mesg[1])
-				 || (mesg[1] == '-' && mesg[2] && LLStringOps::isDigit(mesg[2]))))
-	{
-		// This a special "/20" speak on a channel
-		S32 pos = 0;
-
-		// Copy the channel number into a string
-		LLWString channel_string;
-		llwchar c;
-		do
-		{
-			c = mesg[pos+1];
-			channel_string.push_back(c);
-			pos++;
-		}
-		while(c && pos < 64 && (LLStringOps::isDigit(c) || (pos == 1 && c == '-')));
-		
-		// Move the pointer forward to the first non-whitespace char
-		// Check isspace before looping, so we can handle "/33foo"
-		// as well as "/33 foo"
-		while(c && iswspace(c))
-		{
-			c = mesg[pos+1];
-			pos++;
-		}
-		
-		mLastSpecialChatChannel = strtol(wstring_to_utf8str(channel_string).c_str(), NULL, 10);
-		*channel = mLastSpecialChatChannel;
-		return mesg.substr(pos, mesg.length() - pos);
-	}
-	else
-	{
-		// This is normal chat.
-		*channel = 0;
-		return mesg;
-	}
-}
-
-
 void LLChatBar::sendChat( EChatType type )
 {
-	if (mInputEditor)
-	{
-		LLWString text = mInputEditor->getConvertedText();
-		if (!text.empty())
-		{
-			// store sent line in history, duplicates will get filtered
-			if (mInputEditor) mInputEditor->updateHistory();
-			// Check if this is destined for another channel
-			S32 channel = 0;
-			stripChannelNumber(text, &channel);
-			
-			std::string utf8text = wstring_to_utf8str(text);
-			// Try to trigger a gesture, if not chat to a script.
-			std::string utf8_revised_text;
-			if (0 == channel)
-			{
-				// discard returned "found" boolean
-				LLGestureMgr::instance().triggerAndReviseString(utf8text, &utf8_revised_text);
-			}
-			else
-			{
-				utf8_revised_text = utf8text;
-			}
-
-			utf8_revised_text = utf8str_trim(utf8_revised_text);
-
-			if (!utf8_revised_text.empty() && !ALChatCommand::parseCommand(utf8_revised_text))
-			{
-				// Chat with animation
-				sendChatFromViewer(utf8_revised_text, type, gSavedSettings.getBOOL("PlayChatAnim"));
-			}
-		}
-	}
-
-	getChild<LLUICtrl>("Chat Editor")->setValue(LLStringUtil::null);
-
-	gAgent.stopTyping();
+	LLFloaterIMNearbyChat::processChat(mInputEditor, type);
 
 	// If the user wants to stop chatting on hitting return, lose focus
 	// and go out of chat mode.
-	if (gChatBar == this && gSavedSettings.getBOOL("CloseChatOnReturn"))
+	if (gSavedSettings.getBOOL("CloseChatBarOnReturn"))
 	{
 		stopChat();
 	}
 }
 
-
 //-----------------------------------------------------------------------
 // Static functions
 //-----------------------------------------------------------------------
 
-// static 
+// static
 void LLChatBar::startChat(const char* line)
 {
-	//TODO* remove DUMMY chat
-	//if(gBottomTray && gBottomTray->getChatBox())
-	//{
-	//	gBottomTray->setVisible(TRUE);
-	//	gBottomTray->getChatBox()->setFocus(TRUE);
-	//}
-
-	// *TODO Vadim: Why was this code commented out?
-
-// 	gChatBar->setVisible(TRUE);
-// 	gChatBar->setKeyboardFocus(TRUE);
-// 	gSavedSettings.setBOOL("ChatVisible", TRUE);
-// 
-// 	if (line && gChatBar->mInputEditor)
-// 	{
-// 		std::string line_string(line);
-// 		gChatBar->mInputEditor->setText(line_string);
-// 	}
-// 	// always move cursor to end so users don't obliterate chat when accidentally hitting WASD
-// 	gChatBar->mInputEditor->setCursorToEnd();
+	LLChatBar* bar = LLFloaterReg::getTypedInstance<LLChatBar>("chatbar");
+	bar->setVisible(TRUE);
+	bar->setFocus(TRUE);
+	bar->mInputEditor->setFocus(TRUE);
+	
+	if (line)
+	{
+		std::string line_string(line);
+		bar->mInputEditor->setText(line_string);
+	}
+ 	// always move cursor to end so users don't obliterate chat when accidentally hitting WASD
+	bar->mInputEditor->setCursorToEnd();
 }
 
 
@@ -443,29 +362,20 @@ void LLChatBar::startChat(const char* line)
 // static
 void LLChatBar::stopChat()
 {
-	//TODO* remove DUMMY chat
-	//if(gBottomTray && gBottomTray->getChatBox())
-	///{
-	//	gBottomTray->getChatBox()->setFocus(FALSE);
-	//}
+	LLChatBar* bar = LLFloaterReg::getTypedInstance<LLChatBar>("chatbar");
+	bar->mInputEditor->setFocus(FALSE);
+	bar->setVisible(FALSE);
+	gAgent.stopTyping();
+}
 
-	// *TODO Vadim: Why was this code commented out?
-
-// 	// In simple UI mode, we never release focus from the chat bar
-// 	gChatBar->setKeyboardFocus(FALSE);
-// 
-// 	// If we typed a movement key and pressed return during the
-// 	// same frame, the keyboard handlers will see the key as having
-// 	// gone down this frame and try to move the avatar.
-// 	gKeyboard->resetKeys();
-// 	gKeyboard->resetMaskKeys();
-// 
-// 	// stop typing animation
-// 	gAgent.stopTyping();
-// 
-// 	// hide chat bar so it doesn't grab focus back
-// 	gChatBar->setVisible(FALSE);
-// 	gSavedSettings.setBOOL("ChatVisible", FALSE);
+// static
+void LLChatBar::updateChatFont()
+{
+	LLChatBar* bar = LLFloaterReg::getTypedInstance<LLChatBar>("chatbar");
+	if (bar)
+	{
+		bar->mInputEditor->setFont(LLViewerChat::getChatFont());
+	}
 }
 
 // static
@@ -482,7 +392,13 @@ void LLChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
 
 	S32 length = raw_text.length();
 
-	if( (length > 0) && (raw_text[0] != '/') )  // forward slash is used for escape (eg. emote) sequences
+//	if( (length > 0)
+//	    && (raw_text[0] != '/')		// forward slash is used for escape (eg. emote) sequences
+//		    && (raw_text[0] != ':')	// colon is used in for MUD poses
+//	  )
+// [RLVa:KB] - Checked: 2010-03-26 (RLVa-1.2.0b) | Modified: RLVa-1.0.0d
+	if ( (length > 0) && (raw_text[0] != '/') && (raw_text[0] != ':') && (!RlvActions::hasBehaviour(RLV_BHVR_REDIRCHAT)) )
+// [/RLVa:KB]
 	{
 		gAgent.startTyping();
 	}
@@ -491,25 +407,11 @@ void LLChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
 		gAgent.stopTyping();
 	}
 
-	/* Doesn't work -- can't tell the difference between a backspace
-	   that killed the selection vs. backspace at the end of line.
-	if (length > 1 
-		&& text[0] == '/'
-		&& key == KEY_BACKSPACE)
-	{
-		// the selection will already be deleted, but we need to trim
-		// off the character before
-		std::string new_text = raw_text.substr(0, length-1);
-		self->mInputEditor->setText( new_text );
-		self->mInputEditor->setCursorToEnd();
-		length = length - 1;
-	}
-	*/
-
 	KEY key = gKeyboard->currentKey();
 
 	// Ignore "special" keys, like backspace, arrows, etc.
-	if (length > 1 
+	if (gSavedSettings.getBOOL("ChatAutocompleteGestures")
+		&& length > 1 
 		&& raw_text[0] == '/'
 		&& key < KEY_SPECIAL)
 	{
@@ -531,11 +433,6 @@ void LLChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
 				self->mInputEditor->setSelection(length, outlength);
 			}
 		}
-
-		//LL_INFOS() << "GESTUREDEBUG " << trigger 
-		//	<< " len " << length
-		//	<< " outlen " << out_str.getLength()
-		//	<< LL_ENDL;
 	}
 }
 
@@ -549,94 +446,7 @@ void LLChatBar::onInputEditorFocusLost()
 // static
 void LLChatBar::onInputEditorGainFocus()
 {
-	//LLFloaterChat::setHistoryCursorAndScrollToEnd();
-}
 
-void LLChatBar::onClickSay( LLUICtrl* ctrl )
-{
-	std::string cmd = ctrl->getValue().asString();
-	e_chat_type chat_type = CHAT_TYPE_NORMAL;
-	if (cmd == "shout")
-	{
-		chat_type = CHAT_TYPE_SHOUT;
-	}
-	else if (cmd == "whisper")
-	{
-		chat_type = CHAT_TYPE_WHISPER;
-	}
-	sendChat(chat_type);
-}
-
-void LLChatBar::sendChatFromViewer(const std::string &utf8text, EChatType type, BOOL animate)
-{
-	sendChatFromViewer(utf8str_to_wstring(utf8text), type, animate);
-}
-
-void LLChatBar::sendChatFromViewer(const LLWString &wtext, EChatType type, BOOL animate)
-{
-	// as soon as we say something, we no longer care about teaching the user
-	// how to chat
-	gWarningSettings.setBOOL("FirstOtherChatBeforeUser", FALSE);
-
-	// Look for "/20 foo" channel chats.
-	S32 channel = 0;
-	LLWString out_text = stripChannelNumber(wtext, &channel);
-	std::string utf8_out_text = wstring_to_utf8str(out_text);
-	if (!utf8_out_text.empty())
-	{
-		utf8_out_text = utf8str_truncate(utf8_out_text, MAX_MSG_STR_LEN);
-	}
-
-	std::string utf8_text = wstring_to_utf8str(wtext);
-	utf8_text = utf8str_trim(utf8_text);
-	if (!utf8_text.empty())
-	{
-		utf8_text = utf8str_truncate(utf8_text, MAX_STRING - 1);
-	}
-
-// [RLVa:KB] - Checked: 2010-03-27 (RLVa-1.2.0b) | Modified: RLVa-1.2.0b
-	// RELEASE-RLVa: [SL-2.0.0] This entire class appears to be dead/non-functional?
-	if ( (0 == channel) && (RlvActions::isRlvEnabled()) )
-	{
-		// Adjust the (public) chat "volume" on chat and gestures (also takes care of playing the proper animation)
-		type = RlvActions::checkChatVolume(type);
-		animate &= !RlvActions::hasBehaviour( (!RlvUtil::isEmote(utf8_text)) ? RLV_BHVR_REDIRCHAT : RLV_BHVR_REDIREMOTE );
-	}
-// [/RLVa:KB]
-
-	// Don't animate for chats people can't hear (chat to scripts)
-	if (animate && (channel == 0))
-	{
-		if (type == CHAT_TYPE_WHISPER)
-		{
-			LL_DEBUGS() << "You whisper " << utf8_text << LL_ENDL;
-			gAgent.sendAnimationRequest(ANIM_AGENT_WHISPER, ANIM_REQUEST_START);
-		}
-		else if (type == CHAT_TYPE_NORMAL)
-		{
-			LL_DEBUGS() << "You say " << utf8_text << LL_ENDL;
-			gAgent.sendAnimationRequest(ANIM_AGENT_TALK, ANIM_REQUEST_START);
-		}
-		else if (type == CHAT_TYPE_SHOUT)
-		{
-			LL_DEBUGS() << "You shout " << utf8_text << LL_ENDL;
-			gAgent.sendAnimationRequest(ANIM_AGENT_SHOUT, ANIM_REQUEST_START);
-		}
-		else
-		{
-			LL_INFOS() << "send_chat_from_viewer() - invalid volume" << LL_ENDL;
-			return;
-		}
-	}
-	else
-	{
-		if (type != CHAT_TYPE_START && type != CHAT_TYPE_STOP)
-		{
-			LL_DEBUGS() << "Channel chat: " << utf8_text << LL_ENDL;
-		}
-	}
-
-	send_chat_from_viewer(utf8_out_text, type, channel);
 }
 
 void LLChatBar::onCommitGesture(LLUICtrl* ctrl)
@@ -661,13 +471,35 @@ void LLChatBar::onCommitGesture(LLUICtrl* ctrl)
 		if (!revised_text.empty() && !ALChatCommand::parseCommand(revised_text))
 		{
 			// Don't play nodding animation
-			sendChatFromViewer(revised_text, CHAT_TYPE_NORMAL, FALSE);
+			LLFloaterIMNearbyChat::sendChatFromViewer(revised_text, CHAT_TYPE_NORMAL, FALSE);
 		}
 	}
 	mGestureLabelTimer.start();
-	if (mGestureCombo != NULL)
+	if (mGestureCombo != nullptr)
 	{
 		// free focus back to chat bar
 		mGestureCombo->setFocus(FALSE);
 	}
 }
+
+// [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
+// virtual
+void LLChatBar::reshape(S32 width, S32 height, BOOL called_from_parent)
+{
+	LLFloater::reshape(width, height, called_from_parent);
+
+	if (mReshapeSignal)
+	{
+		(*mReshapeSignal)(this, width, height);
+	}
+}
+
+boost::signals2::connection LLChatBar::setReshapeCallback(const reshape_signal_t::slot_type& cb)
+{
+	if (!mReshapeSignal)
+	{
+		mReshapeSignal = new reshape_signal_t();
+	}
+	return mReshapeSignal->connect(cb);
+}
+// [/SL:KB]

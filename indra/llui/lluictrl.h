@@ -175,6 +175,7 @@ public:
 	bool setControlValue(const LLSD& value);
 	void setControlVariable(LLControlVariable* control);
     virtual void setControlName(std::string_view control, LLView* context = NULL);
+    void removeControlVariable();
 	
 	LLControlVariable* getControlVariable() { return mControlVariable; } 
 	

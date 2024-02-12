@@ -40,7 +40,7 @@
 #include "llrefcount.h"
 #include "llsortedvector.h"
 
-#include <absl/container/flat_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLPolyMesh;
 
@@ -193,9 +193,10 @@ public:
 	void addVisualParam(LLVisualParam *param);
 	void addSharedVisualParam(LLVisualParam *param);
 
-	virtual BOOL setVisualParamWeight(const LLVisualParam *which_param, F32 weight);
-	virtual BOOL setVisualParamWeight(const char* param_name, F32 weight);
-	virtual BOOL setVisualParamWeight(S32 index, F32 weight);
+	virtual BOOL setVisualParamWeight(const LLVisualParam *which_param, F32 weight, bool upload_bake = false );
+	virtual BOOL setVisualParamWeight(const char* param_name, F32 weight, bool upload_bake = false);
+	virtual BOOL setVisualParamWeight(S32 index, F32 weight, bool upload_bake = false);
+
 
 	// get visual param weight by param or name
 	F32 getVisualParamWeight(LLVisualParam *distortion);
@@ -221,9 +222,9 @@ public:
 	S32 getVisualParamCountInGroup(const EVisualParamGroup group) const
 	{
 		S32 rtn = 0;
-		for (const auto& pair : mVisualParamSortedVector)
+		for (const auto& index_pair : mVisualParamSortedVector)
 		{
-			if (pair.second->getGroup() == group)
+			if (index_pair.second->getGroup() == group)
 			{
 				++rtn;
 			}
@@ -259,7 +260,7 @@ public:
 protected:
 	LLMotionController	mMotionController;
 
-	typedef absl::flat_hash_map<std::string, void *> animation_data_map_t;
+	typedef boost::unordered_flat_map<std::string, void *, al::string_hash, std::equal_to<>> animation_data_map_t;
 	animation_data_map_t mAnimationData;
 
 	F32					mPreferredPelvisHeight;
@@ -270,9 +271,9 @@ protected:
 
 private:
 	// visual parameter stuff
-	typedef absl::flat_hash_map<S32, LLVisualParam *> 		visual_param_index_map_t;	//Hash map for fast lookup.
+	typedef boost::unordered_flat_map<S32, LLVisualParam *> 		visual_param_index_map_t;	//Hash map for fast lookup.
 	typedef LLSortedVector<S32,LLVisualParam *>				visual_param_sorted_vec_t;	//Contiguous sorted array.
-	typedef absl::flat_hash_map<char *, LLVisualParam *> 	visual_param_name_map_t;
+	typedef boost::unordered_flat_map<char *, LLVisualParam *> 	visual_param_name_map_t;
 
 	visual_param_sorted_vec_t::iterator 			mCurIterator;
 	visual_param_sorted_vec_t						mVisualParamSortedVector;

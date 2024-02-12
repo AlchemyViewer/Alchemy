@@ -76,6 +76,8 @@ BOOL LLFloaterBulkPermission::postBuild()
 	mBulkChangeIncludeSounds = gSavedSettings.getBOOL("BulkChangeIncludeSounds");
 	mBulkChangeIncludeTextures = gSavedSettings.getBOOL("BulkChangeIncludeTextures");
 	mBulkChangeIncludeSettings = gSavedSettings.getBOOL("BulkChangeIncludeSettings");
+    mBulkChangeIncludeMaterials = gSavedSettings.getBOOL("BulkChangeIncludeMaterials");
+
 	mBulkChangeShareWithGroup = gSavedSettings.getBOOL("BulkChangeShareWithGroup");
 	mBulkChangeEveryoneCopy = gSavedSettings.getBOOL("BulkChangeEveryoneCopy");
 	mBulkChangeNextOwnerModify = gSavedSettings.getBOOL("BulkChangeNextOwnerModify");
@@ -111,7 +113,7 @@ void LLFloaterBulkPermission::doApply()
 	LLScrollListCtrl* list = getChild<LLScrollListCtrl>("queue output");
 	list->deleteAllItems();
 	ModifiableGatherer gatherer(mObjectIDs);
-	LLSelectMgr::getInstanceFast()->getSelection()->applyToNodes(&gatherer);
+	LLSelectMgr::getInstance()->getSelection()->applyToNodes(&gatherer);
 	if(mObjectIDs.empty())
 	{
 		list->setCommentText(getString("nothing_to_modify_text"));
@@ -188,6 +190,8 @@ void LLFloaterBulkPermission::onCloseBtn()
 	gSavedSettings.setBOOL("BulkChangeIncludeSounds", mBulkChangeIncludeSounds);
 	gSavedSettings.setBOOL("BulkChangeIncludeTextures", mBulkChangeIncludeTextures);
 	gSavedSettings.setBOOL("BulkChangeIncludeSettings", mBulkChangeIncludeSettings);
+    gSavedSettings.setBOOL("BulkChangeIncludeMaterials", mBulkChangeIncludeMaterials);
+
 	gSavedSettings.setBOOL("BulkChangeShareWithGroup", mBulkChangeShareWithGroup);
 	gSavedSettings.setBOOL("BulkChangeEveryoneCopy", mBulkChangeEveryoneCopy);
 	gSavedSettings.setBOOL("BulkChangeNextOwnerModify", mBulkChangeNextOwnerModify);
@@ -284,6 +288,7 @@ void LLFloaterBulkPermission::doCheckUncheckAll(BOOL check)
 	gSavedSettings.setBOOL("BulkChangeIncludeSounds"    , check);
 	gSavedSettings.setBOOL("BulkChangeIncludeTextures"  , check);
 	gSavedSettings.setBOOL("BulkChangeIncludeSettings"  , check);
+    gSavedSettings.setBOOL("BulkChangeIncludeMaterials"  , check);
 }
 
 
@@ -306,6 +311,7 @@ void LLFloaterBulkPermission::handleInventory(LLViewerObject* viewer_obj, LLInve
 			( asstype == LLAssetType::AT_LSL_TEXT  && gSavedSettings.getBOOL("BulkChangeIncludeScripts"   )) ||
 			( asstype == LLAssetType::AT_SOUND     && gSavedSettings.getBOOL("BulkChangeIncludeSounds"    )) ||
 			( asstype == LLAssetType::AT_SETTINGS  && gSavedSettings.getBOOL("BulkChangeIncludeSettings"  )) ||
+            ( asstype == LLAssetType::AT_MATERIAL  && gSavedSettings.getBOOL("BulkChangeIncludeMaterials")) ||
 			( asstype == LLAssetType::AT_TEXTURE   && gSavedSettings.getBOOL("BulkChangeIncludeTextures"  )))
 		{
 			LLViewerObject* object = gObjectList.findObject(viewer_obj->getID());

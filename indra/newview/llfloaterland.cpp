@@ -192,7 +192,7 @@ void send_parcel_select_objects(S32 parcel_local_id, U32 return_type,
 
 	// Since new highlight will be coming in, drop any highlights
 	// that exist right now.
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 
 	msg->newMessageFast(_PREHASH_ParcelSelectObjects);
 	msg->nextBlockFast(_PREHASH_AgentData);
@@ -293,7 +293,7 @@ void LLFloaterLand::onVisibilityChanged(const LLSD& visible)
 	if (!visible.asBoolean())
 	{
 		// Might have been showing owned objects
-		LLSelectMgr::getInstanceFast()->unhighlightAll();
+		LLSelectMgr::getInstance()->unhighlightAll();
 
 		// Save which panel we had open
 		sLastTab = mTabLand->getCurrentPanelIndex();
@@ -452,7 +452,8 @@ BOOL LLPanelLandGeneral::postBuild()
 
 	mEditDesc = getChild<LLTextEditor>("Description");
 	mEditDesc->setCommitOnFocusLost(TRUE);
-	mEditDesc->setCommitCallback(onCommitAny, this);	
+	mEditDesc->setCommitCallback(onCommitAny, this);
+    mEditDesc->setContentTrusted(false);
 	// No prevalidate function - historically the prevalidate function was broken,
 	// allowing residents to put in characters like U+2661 WHITE HEART SUIT, so
 	// preserve that ability.
@@ -664,8 +665,7 @@ void LLPanelLandGeneral::refresh()
 		BOOL estate_manager_sellable = !parcel->getAuctionID()
 										&& gAgent.canManageEstate()
 										// estate manager/owner can only sell parcels owned by estate owner
-										&& regionp
-										&& (parcel->getOwnerID() == regionp->getOwner());
+										&& regionp;
 		BOOL owner_sellable = region_xfer && !parcel->getAuctionID()
 							&& LLViewerParcelMgr::isParcelModifiableByAgent(
 										parcel, GP_LAND_SET_SALE_INFO);
@@ -749,6 +749,7 @@ void LLPanelLandGeneral::refresh()
 		BOOL can_edit_identity = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_CHANGE_IDENTITY);
 		mEditName->setEnabled(can_edit_identity);
 		mEditDesc->setEnabled(can_edit_identity);
+        mEditDesc->setParseURLs(!can_edit_identity);
 
 		BOOL can_edit_agent_only = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_NO_POWERS);
 		mBtnSetGroup->setEnabled(can_edit_agent_only && !parcel->getIsGroupOwned());
@@ -1484,7 +1485,7 @@ bool LLPanelLandObjects::callbackReturnOwnerObjects(const LLSD& notification, co
 		}
 	}
 
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1506,7 +1507,7 @@ bool LLPanelLandObjects::callbackReturnGroupObjects(const LLSD& notification, co
 			send_return_objects_message(parcel->getLocalID(), RT_GROUP);
 		}
 	}
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1524,7 +1525,7 @@ bool LLPanelLandObjects::callbackReturnOtherObjects(const LLSD& notification, co
 			send_return_objects_message(parcel->getLocalID(), RT_OTHER);
 		}
 	}
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1558,7 +1559,7 @@ bool LLPanelLandObjects::callbackReturnOwnerList(const LLSD& notification, const
 			}
 		}
 	}
-	LLSelectMgr::getInstanceFast()->unhighlightAll();
+	LLSelectMgr::getInstance()->unhighlightAll();
 	LLViewerParcelMgr::getInstance()->sendParcelPropertiesUpdate( parcel );
 	refresh();
 	return false;
@@ -1912,6 +1913,7 @@ LLPanelLandOptions::LLPanelLandOptions(LLParcelSelectionHandle& parcel)
 	mCheckEditGroupObjects(NULL),
 	mCheckAllObjectEntry(NULL),
 	mCheckGroupObjectEntry(NULL),
+	mCheckEditLand(NULL),
 	mCheckSafe(NULL),
 	mCheckFly(NULL),
 	mCheckGroupScripts(NULL),
@@ -1945,6 +1947,9 @@ BOOL LLPanelLandOptions::postBuild()
 
 	mCheckGroupObjectEntry = getChild<LLCheckBoxCtrl>( "group object entry check");
 	childSetCommitCallback("group object entry check", onCommitAny, this);
+	
+	mCheckEditLand = getChild<LLCheckBoxCtrl>( "edit land check");
+	childSetCommitCallback("edit land check", onCommitAny, this);
 	
 	mCheckGroupScripts = getChild<LLCheckBoxCtrl>( "check group scripts");
 	childSetCommitCallback("check group scripts", onCommitAny, this);
@@ -2002,7 +2007,6 @@ BOOL LLPanelLandOptions::postBuild()
 		mSnapshotCtrl->setAllowNoTexture ( TRUE );
 		mSnapshotCtrl->setImmediateFilterPermMask(PERM_COPY | PERM_TRANSFER);
 		mSnapshotCtrl->setDnDFilterPermMask(PERM_COPY | PERM_TRANSFER);
-		mSnapshotCtrl->setNonImmediateFilterPermMask(PERM_COPY | PERM_TRANSFER);
 	}
 	else
 	{
@@ -2051,6 +2055,8 @@ void LLPanelLandOptions::refresh()
 
 		mCheckGroupObjectEntry	->set(FALSE);
 		mCheckGroupObjectEntry	->setEnabled(FALSE);
+		mCheckEditLand		->set(FALSE);
+		mCheckEditLand		->setEnabled(FALSE);
 
 		mCheckSafe			->set(FALSE);
 		mCheckSafe			->setEnabled(FALSE);
@@ -2100,6 +2106,10 @@ void LLPanelLandOptions::refresh()
 
 		mCheckGroupObjectEntry	->set( parcel->getAllowGroupObjectEntry() ||  parcel->getAllowAllObjectEntry());
 		mCheckGroupObjectEntry	->setEnabled( can_change_options && !parcel->getAllowAllObjectEntry() );
+		
+		BOOL can_change_terraform = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_EDIT);
+		mCheckEditLand		->set( parcel->getAllowTerraform() );
+		mCheckEditLand		->setEnabled( can_change_terraform );
 		
 		mCheckSafe			->set( !parcel->getAllowDamage() );
 		mCheckSafe			->setEnabled( can_change_options );
@@ -2318,7 +2328,7 @@ void LLPanelLandOptions::onCommitAny(LLUICtrl *ctrl, void *userdata)
 	BOOL create_group_objects	= self->mCheckEditGroupObjects->get() || self->mCheckEditObjects->get();
 	BOOL all_object_entry		= self->mCheckAllObjectEntry->get();
 	BOOL group_object_entry	= self->mCheckGroupObjectEntry->get() || self->mCheckAllObjectEntry->get();
-	BOOL allow_terraform	= false; // removed from UI so always off now - self->mCheckEditLand->get();
+    BOOL allow_terraform	= self->mCheckEditLand->get();
 	BOOL allow_damage		= !self->mCheckSafe->get();
 	BOOL allow_fly			= self->mCheckFly->get();
 	BOOL allow_landmark		= TRUE; // cannot restrict landmark creation
@@ -2468,6 +2478,7 @@ BOOL LLPanelLandAccess::postBuild()
 	{
 		mListBanned->sortByColumnIndex(0, TRUE); // ascending
 		mListBanned->setContextMenu(LLScrollListCtrl::MENU_AVATAR);
+		mListBanned->setAlternateSort();
 	}
 
 	return TRUE;
@@ -2570,11 +2581,12 @@ void LLPanelLandAccess::refresh()
 			{
 				const LLAccessEntry& entry = (*cit).second;
 				std::string duration;
+				S32 seconds = -1;
 				if (entry.mTime != 0)
 				{
 					LLStringUtil::format_map_t args;
 					S32 now = time(NULL);
-					S32 seconds = entry.mTime - now;					
+					seconds = entry.mTime - now;					
 					if (seconds < 0) seconds = 0;
 
 					if (seconds >= 7200)
@@ -2611,6 +2623,7 @@ void LLPanelLandAccess::refresh()
 				columns[0]["column"] = "name"; // to be populated later
 				columns[1]["column"] = "duration";
 				columns[1]["value"] = duration;
+				columns[1]["alt_value"] = entry.mTime != 0 ? std::to_string(seconds) : "Always";
 				mListBanned->addElement(item);
 			}
 			mListBanned->sortByName(TRUE);
@@ -3051,7 +3064,8 @@ BOOL LLPanelLandCovenant::postBuild()
 {
 	mLastRegionID = LLUUID::null;
 	mNextUpdateTime = 0;
-
+    mTextEstateOwner = getChild<LLTextBox>("estate_owner_text");
+    mTextEstateOwner->setIsFriendCallback(LLAvatarActions::isFriend);
 	return TRUE;
 }
 
@@ -3159,8 +3173,7 @@ void LLPanelLandCovenant::updateEstateOwnerName(const std::string& name)
 	LLPanelLandCovenant* self = LLFloaterLand::getCurrentPanelLandCovenant();
 	if (self)
 	{
-		LLTextBox* editor = self->getChild<LLTextBox>("estate_owner_text");
-		if (editor) editor->setText(name);
+		self->mTextEstateOwner->setText(name);
 	}
 }
 

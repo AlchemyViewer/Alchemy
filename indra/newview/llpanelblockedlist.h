@@ -33,7 +33,10 @@
 
 class LLAvatarName;
 class LLBlockList;
+class LLMenuButton;
+class LLButton;
 
+#if 0
 class LLPanelBlockedList : public LLPanel
 {
 public:
@@ -78,9 +81,13 @@ private:
 	static void callbackBlockByName(const std::string& text);
 
 private:
-	LLBlockList* mBlockedList;
+	LLBlockList* mBlockedList = nullptr;
+	LLUICtrl*	 mBlockLimitText = nullptr;
+	LLMenuButton* mBlockedGearBtn = nullptr;
+	LLButton*	 mUnblockBtn = nullptr;
     LLHandle<LLFloater> mPicker;
 };
+#endif
 
 //-----------------------------------------------------------------------------
 // LLFloaterGetBlockedObjectName()

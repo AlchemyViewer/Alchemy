@@ -40,12 +40,15 @@
 #include "llbutton.h"
 #include "llcallingcard.h"
 #include "llcombobox.h"
+#include "llcheckboxctrl.h"
+#include "llsliderctrl.h"
 #include "llviewercontrol.h"
 #include "llcommandhandler.h"
 #include "lldraghandle.h"
 //#include "llfirstuse.h"
 #include "llfloaterreg.h"		// getTypedInstance()
 #include "llfocusmgr.h"
+#include "lliconctrl.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodel.h"
 #include "llinventorymodelbackgroundfetch.h"
@@ -57,10 +60,12 @@
 #include "llscrolllistctrl.h"
 #include "llslurl.h"
 #include "lltextbox.h"
+#include "lltoolbarview.h"
 #include "lltracker.h"
 #include "lltrans.h"
 #include "llviewerinventory.h"	// LLViewerInventoryItem
 #include "llviewermenu.h"
+#include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llviewerstats.h"
 #include "llviewertexture.h"
@@ -84,13 +89,15 @@
 //---------------------------------------------------------------------------
 // Constants
 //---------------------------------------------------------------------------
-static const F32 MAP_ZOOM_TIME = 0.2f;
 
 // Merov: we switched from using the "world size" (which varies depending where the user went) to a fixed
 // width of 512 regions max visible at a time. This makes the zoom slider works in a consistent way across
 // sessions and doesn't prevent the user to pan the world if it was to grow a lot beyond that limit.
 // Currently (01/26/09), this value allows the whole grid to be visible in a 1024x1024 window.
 static const S32 MAX_VISIBLE_REGIONS = 512;
+
+
+const S32 HIDE_BEACON_PAD = 133;
 
 // It would be more logical to have this inside the method where it is used but to compile under gcc this
 // struct has to be here.
@@ -121,11 +128,30 @@ static const F32 ZOOM_MAX = 128.f;
 class LLWorldMapHandler : public LLCommandHandler
 {
 public:
-	// requires trusted browser to trigger
-	LLWorldMapHandler() : LLCommandHandler("worldmap", UNTRUSTED_THROTTLE ) { }
-	
-	bool handle(const LLSD& params, const LLSD& query_map,
-				LLMediaCtrl* web)
+    LLWorldMapHandler() : LLCommandHandler("worldmap", UNTRUSTED_THROTTLE)
+    {
+    }
+
+    virtual bool canHandleUntrusted(
+        const LLSD& params,
+        const LLSD& query_map,
+        LLMediaCtrl* web,
+        const std::string& nav_type)
+    {
+        if (nav_type == NAV_TYPE_CLICKED
+            || nav_type == NAV_TYPE_EXTERNAL)
+        {
+            // NAV_TYPE_EXTERNAL will be throttled
+            return true;
+        }
+
+        return false;
+    }
+
+    bool handle(const LLSD& params,
+                const LLSD& query_map,
+                const std::string& grid,
+                LLMediaCtrl* web)
 	{
 		if (!LLUI::getInstance()->mSettingGroups["config"]->getBOOL("EnableWorldMap"))
 		{
@@ -158,12 +184,35 @@ LLWorldMapHandler gWorldMapHandler;
 class LLMapTrackAvatarHandler : public LLCommandHandler
 {
 public:
-	// requires trusted browser to trigger
-	LLMapTrackAvatarHandler() : LLCommandHandler("maptrackavatar", UNTRUSTED_THROTTLE) 
+	LLMapTrackAvatarHandler() : LLCommandHandler("maptrackavatar", UNTRUSTED_THROTTLE)
 	{ 
 	}
-	
-	bool handle(const LLSD& params, const LLSD& query_map, LLMediaCtrl* web)
+
+    virtual bool canHandleUntrusted(
+        const LLSD& params,
+        const LLSD& query_map,
+        LLMediaCtrl* web,
+        const std::string& nav_type)
+    {
+        if (params.size() < 1)
+        {
+            return true; // don't block, will fail later
+        }
+
+        if (nav_type == NAV_TYPE_CLICKED
+            || nav_type == NAV_TYPE_EXTERNAL)
+        {
+            // NAV_TYPE_EXTERNAL will be throttled
+            return true;
+        }
+
+        return false;
+    }
+
+    bool handle(const LLSD& params,
+                const LLSD& query_map,
+                const std::string& grid,
+                LLMediaCtrl* web)
 	{
 		if (!LLUI::getInstance()->mSettingGroups["config"]->getBOOL("EnableWorldMap"))
 		{
@@ -179,7 +228,7 @@ public:
 		
 		//Get the ID
 		LLUUID id;
-		if (!id.set( params[0].asStringRef(), FALSE ))
+		if (!id.set( params[0].asString(), FALSE))
 		{
 			return false;
 		}
@@ -286,9 +335,34 @@ void* LLFloaterWorldMap::createWorldMapView(void* data)
 
 BOOL LLFloaterWorldMap::postBuild()
 {
-	mPanel = getChild<LLPanel>("objects_mapview");
+    mMapView = dynamic_cast<LLWorldMapView*>(getChild<LLPanel>("objects_mapview"));
+	mMapView->setPan(0, 0, true);
+
+	mTeleportButton = getChild<LLButton>("Teleport");
+	mShowDestinationButton = getChild<LLButton>("Show Destination");
+	mCopySlurlButton = getChild<LLButton>("copy_slurl");
 	mTrackRegionButton = getChild<LLButton>("track_region");
+	mGoHomeButton = getChild<LLButton>("Go Home");
+
+	mPeopleCheck = getChild<LLCheckBoxCtrl>("people_chk");
+	mInfohubCheck = getChild<LLCheckBoxCtrl>("infohub_chk");
+	mTelehubCheck = getChild<LLCheckBoxCtrl>("telehub_chk");
+	mLandSaleCheck = getChild<LLCheckBoxCtrl>("land_for_sale_chk");
+	mEventsCheck = getChild<LLCheckBoxCtrl>("event_chk");
+	mEventsMatureCheck = getChild<LLCheckBoxCtrl>("events_mature_chk");
+	mEventsAdultCheck = getChild<LLCheckBoxCtrl>("events_adult_chk");
+
+	mAvatarIcon = getChild<LLUICtrl>("avatar_icon");
+	mLandmarkIcon = getChild<LLUICtrl>("landmark_icon");
+	mLocationIcon = getChild<LLUICtrl>("location_icon");
+
+	mZoomSlider = getChild<LLSliderCtrl>("zoom slider");
 	
+	mLocationsLabel = getChild<LLUICtrl>("locations_label");
+	mTeleportCoordSpinX = getChild<LLUICtrl>("teleport_coordinate_x");
+	mTeleportCoordSpinY = getChild<LLUICtrl>("teleport_coordinate_y");
+	mTeleportCoordSpinZ = getChild<LLUICtrl>("teleport_coordinate_z");
+
 	LLComboBox *avatar_combo = getChild<LLComboBox>("friend combo");
 	avatar_combo->selectFirstItem();
 	avatar_combo->setPrearrangeCallback( boost::bind(&LLFloaterWorldMap::onAvatarComboPrearrange, this) );
@@ -308,12 +382,12 @@ BOOL LLFloaterWorldMap::postBuild()
 	landmark_combo->setTextChangedCallback( boost::bind(&LLFloaterWorldMap::onComboTextEntry, this) );
 	mListLandmarkCombo = dynamic_cast<LLCtrlListInterface *>(landmark_combo);
 	
-	mCurZoomVal = log(LLWorldMapView::sMapScale/256.f)/log(2.f);
-	getChild<LLUICtrl>("zoom slider")->setValue(mCurZoomVal);
+    F32 slider_zoom = mMapView->getZoom();
+    mZoomSlider->setValue(slider_zoom);
+    
+    //getChild<LLPanel>("expand_btn_panel")->setMouseDownCallback(boost::bind(&LLFloaterWorldMap::onExpandCollapseBtn, this));
 	
 	setDefaultBtn(NULL);
-	
-	mZoomTimer.stop();
 	
 	onChangeMaturity();
 	
@@ -323,8 +397,13 @@ BOOL LLFloaterWorldMap::postBuild()
 // virtual
 LLFloaterWorldMap::~LLFloaterWorldMap()
 {
+	if (mParcelID.notNull())
+	{
+		LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelID, this);
+	}
+
 	// All cleaned up by LLView destructor
-	mPanel = NULL;
+    mMapView = NULL;
 	
 	// Inventory deletes all observers on shutdown
 	mInventory = NULL;
@@ -334,6 +413,8 @@ LLFloaterWorldMap::~LLFloaterWorldMap()
 	mFriendObserver = NULL;
 	
 	gFloaterWorldMap = NULL;
+
+    mTeleportFinishConnection.disconnect();
 }
 
 //static
@@ -346,30 +427,32 @@ LLFloaterWorldMap* LLFloaterWorldMap::getInstance()
 void LLFloaterWorldMap::onClose(bool app_quitting)
 {
 	// While we're not visible, discard the overlay images we're using
-	LLWorldMap::getInstanceFast()->clearImageRefs();
+	LLWorldMap::getInstance()->clearImageRefs();
+    mTeleportFinishConnection.disconnect();
 }
 
 // virtual
 void LLFloaterWorldMap::onOpen(const LLSD& key)
 {
-	bool center_on_target = (key.asString() == "center");
+    mTeleportFinishConnection = LLViewerParcelMgr::getInstance()->
+        setTeleportFinishedCallback(boost::bind(&LLFloaterWorldMap::onTeleportFinished, this));
+ 
+    bool center_on_target = (key.asString() == "center");
 	
 	mIsClosing = FALSE;
 	
-	LLWorldMapView* map_panel;
-	map_panel = (LLWorldMapView*)gFloaterWorldMap->mPanel;
-	map_panel->clearLastClick();
+    mMapView->clearLastClick();
 	
 	{
 		// reset pan on show, so it centers on you again
 		if (!center_on_target)
 		{
-			LLWorldMapView::setPan(0, 0, TRUE);
+            mMapView->setPan(0, 0, true);
 		}
-		map_panel->updateVisibleBlocks();
+        mMapView->updateVisibleBlocks();
 		
 		// Reload items as they may have changed
-		LLWorldMap::getInstanceFast()->reloadItems();
+		LLWorldMap::getInstance()->reloadItems();
 		
 		// We may already have a bounding box for the regions of the world,
 		// so use that to adjust the view.
@@ -380,7 +463,7 @@ void LLFloaterWorldMap::onOpen(const LLSD& key)
 		
 		// Start speculative download of landmarks
 		const LLUUID landmark_folder_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_LANDMARK);
-		LLInventoryModelBackgroundFetch::instanceFast().start(landmark_folder_id);
+		LLInventoryModelBackgroundFetch::instance().start(landmark_folder_id);
 		
 		getChild<LLUICtrl>("location")->setFocus( TRUE);
 		gFocusMgr.triggerFocusFlash();
@@ -401,7 +484,7 @@ void LLFloaterWorldMap::onOpen(const LLSD& key)
 // static
 void LLFloaterWorldMap::reloadIcons(void*)
 {
-	LLWorldMap::getInstanceFast()->reloadItems();
+	LLWorldMap::getInstance()->reloadItems();
 }
 
 // virtual
@@ -414,18 +497,21 @@ BOOL LLFloaterWorldMap::handleHover(S32 x, S32 y, MASK mask)
 
 BOOL LLFloaterWorldMap::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
-	if (!isMinimized() && isFrontmost())
-	{
-		if(mPanel->pointInView(x, y))
-		{
-			F32 slider_value = (F32)getChild<LLUICtrl>("zoom slider")->getValue().asReal();
-			slider_value += ((F32)clicks * -0.3333f);
-			getChild<LLUICtrl>("zoom slider")->setValue(LLSD(slider_value));
-			return TRUE;
-		}
-	}
-	
-	return LLFloater::handleScrollWheel(x, y, clicks);
+    if (!isMinimized() && isFrontmost())
+    {
+        S32 map_x = x - mMapView->getRect().mLeft;
+        S32 map_y = y - mMapView->getRect().mBottom;
+        if (mMapView->pointInView(map_x, map_y))
+        {
+            F32 old_slider_zoom = (F32) mZoomSlider->getValue().asReal();
+            F32 slider_zoom     = old_slider_zoom + ((F32) clicks * -0.3333f);
+            mZoomSlider->setValue(LLSD(slider_zoom));
+            mMapView->zoomWithPivot(slider_zoom, map_x, map_y);
+            return true;
+        }
+    }
+
+    return LLFloater::handleScrollWheel(x, y, clicks);
 }
 
 
@@ -448,32 +534,34 @@ void LLFloaterWorldMap::draw()
 	LLViewerRegion* regionp = gAgent.getRegion();
 	bool agent_on_prelude = (regionp && regionp->isPrelude());
 	bool enable_go_home = gAgent.isGodlike() || !agent_on_prelude;
-	getChildView("Go Home")->setEnabled(enable_go_home);
-	
+// [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
+	mGoHomeButton->setEnabled(enable_go_home && ((!rlv_handler_t::isEnabled()) || !(gRlvHandler.hasBehaviour(RLV_BHVR_TPLM) && gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC))));
+// [/RLVa:KB]
+
 	updateLocation();
 	
 	LLTracker::ETrackingStatus tracking_status = LLTracker::getTrackingStatus(); 
 	if (LLTracker::TRACKING_AVATAR == tracking_status)
 	{
-		getChild<LLUICtrl>("avatar_icon")->setColor( map_track_color);
+		mAvatarIcon->setColor( map_track_color);
 	}
 	else
 	{
-		getChild<LLUICtrl>("avatar_icon")->setColor( map_track_disabled_color);
+		mAvatarIcon->setColor( map_track_disabled_color);
 	}
 	
 	if (LLTracker::TRACKING_LANDMARK == tracking_status)
 	{
-		getChild<LLUICtrl>("landmark_icon")->setColor( map_track_color);
+		mLandmarkIcon->setColor( map_track_color);
 	}
 	else
 	{
-		getChild<LLUICtrl>("landmark_icon")->setColor( map_track_disabled_color);
+		mLandmarkIcon->setColor( map_track_disabled_color);
 	}
 	
 	if (LLTracker::TRACKING_LOCATION == tracking_status)
 	{
-		getChild<LLUICtrl>("location_icon")->setColor( map_track_color);
+		mLocationIcon->setColor( map_track_color);
 	}
 	else
 	{
@@ -483,11 +571,11 @@ void LLFloaterWorldMap::draw()
 			double value = fmod(seconds, 2);
 			value = 0.5 + 0.5*cos(value * F_PI);
 			LLColor4 loading_color(0.0, F32(value/2), F32(value), 1.0);
-			getChild<LLUICtrl>("location_icon")->setColor( loading_color);
+			mLocationIcon->setColor( loading_color);
 		}
 		else
 		{
-			getChild<LLUICtrl>("location_icon")->setColor( map_track_disabled_color);
+			mLocationIcon->setColor( map_track_disabled_color);
 		}
 	}
 	
@@ -497,45 +585,28 @@ void LLFloaterWorldMap::draw()
 		centerOnTarget(TRUE);
 	}
 	
-	getChildView("Teleport")->setEnabled((BOOL)tracking_status);
+	mTeleportButton->setEnabled((BOOL)tracking_status);
 	//	getChildView("Clear")->setEnabled((BOOL)tracking_status);
-	getChildView("Show Destination")->setEnabled((BOOL)tracking_status || LLWorldMap::getInstanceFast()->isTracking());
-	getChildView("copy_slurl")->setEnabled((mSLURL.isValid()) );
-	mTrackRegionButton->setEnabled((BOOL) tracking_status || LLWorldMap::getInstanceFast()->isTracking());
-// [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
-	childSetEnabled("Go Home", 
-		(!rlv_handler_t::isEnabled()) || !(gRlvHandler.hasBehaviour(RLV_BHVR_TPLM) && gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)));
-// [/RLVa:KB]
+	mShowDestinationButton->setEnabled((BOOL)tracking_status || LLWorldMap::getInstance()->isTracking());
+	mCopySlurlButton->setEnabled((mSLURL.isValid()) );
+	mTrackRegionButton->setEnabled((BOOL) tracking_status || LLWorldMap::getInstance()->isTracking());
 	
 	setMouseOpaque(TRUE);
 	getDragHandle()->setMouseOpaque(TRUE);
-	
-	//RN: snaps to zoom value because interpolation caused jitter in the text rendering
-	if (!mZoomTimer.getStarted() && mCurZoomVal != (F32)getChild<LLUICtrl>("zoom slider")->getValue().asReal())
-	{
-		mZoomTimer.start();
-	}
-	F32 interp = mZoomTimer.getElapsedTimeF32() / MAP_ZOOM_TIME;
-	if (interp > 1.f)
-	{
-		interp = 1.f;
-		mZoomTimer.stop();
-	}
-	mCurZoomVal = ll_lerp(mCurZoomVal, (F32)getChild<LLUICtrl>("zoom slider")->getValue().asReal(), interp);
-	F32 map_scale = 256.f*pow(2.f, mCurZoomVal);
-	LLWorldMapView::setScale( map_scale );
+
+    mMapView->zoom((F32)mZoomSlider->getValue().asReal());
 	
 	// Enable/disable checkboxes depending on the zoom level
 	// If above threshold level (i.e. low res) -> Disable all checkboxes
 	// If under threshold level (i.e. high res) -> Enable all checkboxes
-	bool enable = LLWorldMapView::showRegionInfo();
-	getChildView("people_chk")->setEnabled(enable);
-	getChildView("infohub_chk")->setEnabled(enable);
-	getChildView("telehub_chk")->setEnabled(enable);
-	getChildView("land_for_sale_chk")->setEnabled(enable);
-	getChildView("event_chk")->setEnabled(enable);
-	getChildView("events_mature_chk")->setEnabled(enable);
-	getChildView("events_adult_chk")->setEnabled(enable);
+    bool enable = mMapView->showRegionInfo();
+	mPeopleCheck->setEnabled(enable);
+	mInfohubCheck->setEnabled(enable);
+	mTelehubCheck->setEnabled(enable);
+	mLandSaleCheck->setEnabled(enable);
+	mEventsCheck->setEnabled(enable);
+	mEventsMatureCheck->setEnabled(enable);
+	mEventsAdultCheck->setEnabled(enable);
 	
 	LLFloater::draw();
 }
@@ -545,9 +616,103 @@ void LLFloaterWorldMap::draw()
 // Internal utility functions
 //-------------------------------------------------------------------------
 
+void LLFloaterWorldMap::requestParcelInfo(const LLVector3d& pos_global, const LLVector3d& region_origin)
+{
+	if (pos_global == mParcelPosGlobal)
+	{
+		return;
+	}
+
+	LLViewerRegion* region = gAgent.getRegion();
+	if (!region)
+	{
+		return;
+	}
+
+	auto pos_region = LLVector3(pos_global - region_origin);
+
+	LLSD body;
+	std::string url = region->getCapability("RemoteParcelRequest");
+	if (!url.empty())
+	{
+		mParcelPosGlobal = pos_global;
+		if (mParcelID.notNull())
+		{
+			LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelID, this);
+			mParcelID.setNull();
+		}
+
+		LLRemoteParcelInfoProcessor::instance().requestRegionParcelInfo(url,
+																		region->getRegionID(), pos_region, pos_global,
+																		getObserverHandle() );
+
+	}
+	else
+	{
+		LL_WARNS() << "Cannot request parcel details: Cap not found" << LL_ENDL;
+	}
+}
+
+void LLFloaterWorldMap::processParcelInfo(const LLParcelData& parcel_data)
+{
+	if (parcel_data.parcel_id == mParcelID)
+	{
+		LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelID, this);
+
+		LLVector3d tracker_pos = LLTracker::getTrackedPositionGlobal();
+		if (!mShowParcelInfo ||
+			(tracker_pos.mdV[VX] != mParcelPosGlobal.mdV[VX] && tracker_pos.mdV[VY] != mParcelPosGlobal.mdV[VY]) ||
+			LLTracker::getTrackedLocationType() != LLTracker::LOCATION_NOTHING ||
+			LLTracker::getTrackingStatus() != LLTracker::TRACKING_LOCATION)
+		{
+			return;
+		}
+
+		LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(mParcelPosGlobal);
+		if (!sim_info)
+		{
+			return;
+		}
+
+		std::string sim_name = sim_info->getName();
+		U32 locX, locY;
+		from_region_handle(sim_info->getHandle(), &locX, &locY);
+		F32 region_x = mParcelPosGlobal.mdV[VX] - locX;
+		F32 region_y = mParcelPosGlobal.mdV[VY] - locY;
+		std::string full_name = llformat("%s (%d, %d, %d)",
+			sim_name.c_str(),
+			ll_round(region_x),
+			ll_round(region_y),
+			ll_round((F32)mParcelPosGlobal.mdV[VZ]));
+
+		LLTracker::trackLocation(mParcelPosGlobal, parcel_data.name.empty() ? getString("UnnamedParcel") : parcel_data.name, full_name);
+	}
+}
+
+// virtual
+void LLFloaterWorldMap::setParcelID(const LLUUID& parcel_id)
+{
+	if (mParcelID.notNull())
+	{
+		LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelID, this);
+	}
+	mParcelID = parcel_id;
+	if (mParcelID.notNull())
+	{
+		LLRemoteParcelInfoProcessor::getInstance()->addObserver(mParcelID, this);
+		LLRemoteParcelInfoProcessor::getInstance()->sendParcelInfoRequest(mParcelID);
+	}
+}
+
+// virtual
+void LLFloaterWorldMap::setErrorStatus(S32 status, const std::string& reason)
+{
+	LL_WARNS() << "Can't handle remote parcel request." << " Http Status: " << status << ". Reason : " << reason << LL_ENDL;
+}
 
 void LLFloaterWorldMap::trackAvatar( const LLUUID& avatar_id, const std::string& name )
 {
+	mShowParcelInfo = false;
 	LLCtrlSelectionInterface *iface = childGetSelectionInterface("friend combo");
 	if (!iface) return;
 	
@@ -559,7 +724,7 @@ void LLFloaterWorldMap::trackAvatar( const LLUUID& avatar_id, const std::string&
 		// convenience.
 		if(gAgent.isGodlike())
 		{
-			getChild<LLUICtrl>("teleport_coordinate_z")->setValue(LLSD(200.f));
+			mTeleportCoordSpinZ->setValue(LLSD(200.f));
 		}
 		// Don't re-request info if we already have it or we won't have it in time to teleport
 		if (mTrackedStatus != LLTracker::TRACKING_AVATAR || avatar_id != mTrackedAvatarID)
@@ -573,11 +738,12 @@ void LLFloaterWorldMap::trackAvatar( const LLUUID& avatar_id, const std::string&
 	{
 		LLTracker::stopTracking(false);
 	}
-	setDefaultBtn("Teleport");
+	setDefaultBtn(mTeleportButton);
 }
 
 void LLFloaterWorldMap::trackLandmark( const LLUUID& landmark_item_id )
 {
+	mShowParcelInfo = false;
 	LLCtrlSelectionInterface *iface = childGetSelectionInterface("landmark combo");
 	if (!iface) return;
 	
@@ -617,35 +783,37 @@ void LLFloaterWorldMap::trackLandmark( const LLUUID& landmark_item_id )
 	{
 		LLTracker::stopTracking(false);
 	}
-	setDefaultBtn("Teleport");
+	setDefaultBtn(mTeleportButton);
 }
 
 
 void LLFloaterWorldMap::trackEvent(const LLItemInfo &event_info)
 {
+	mShowParcelInfo = false;
 	mTrackedStatus = LLTracker::TRACKING_LOCATION;
 	LLTracker::trackLocation(event_info.getGlobalPosition(), event_info.getName(), event_info.getToolTip(), LLTracker::LOCATION_EVENT);
-	setDefaultBtn("Teleport");
+	setDefaultBtn(mTeleportButton);
 }
 
 void LLFloaterWorldMap::trackGenericItem(const LLItemInfo &item)
 {
+	mShowParcelInfo = false;
 	mTrackedStatus = LLTracker::TRACKING_LOCATION;
 	LLTracker::trackLocation(item.getGlobalPosition(), item.getName(), item.getToolTip(), LLTracker::LOCATION_ITEM);
-	setDefaultBtn("Teleport");
+	setDefaultBtn(mTeleportButton);
 }
 
 void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 {
-	LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromPosGlobal(pos_global);
+	LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
 	if (!sim_info)
 	{
 		// We haven't found a region for that point yet, leave the tracking to the world map
 		LLTracker::stopTracking(false);
-		LLWorldMap::getInstanceFast()->setTracking(pos_global);
+		LLWorldMap::getInstance()->setTracking(pos_global);
 		S32 world_x = S32(pos_global.mdV[0] / 256);
 		S32 world_y = S32(pos_global.mdV[1] / 256);
-		LLWorldMapMessage::getInstanceFast()->sendMapBlockRequest(world_x, world_y, world_x, world_y, true);
+		LLWorldMapMessage::getInstance()->sendMapBlockRequest(world_x, world_y, world_x, world_y, true);
 		setDefaultBtn("");
 		
 		// clicked on a non-region - turn off coord display
@@ -658,8 +826,8 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 		// Down region. Show the blue circle of death!
 		// i.e. let the world map that this and tell it it's invalid
 		LLTracker::stopTracking(false);
-		LLWorldMap::getInstanceFast()->setTracking(pos_global);
-		LLWorldMap::getInstanceFast()->setTrackingInvalid();
+		LLWorldMap::getInstance()->setTracking(pos_global);
+		LLWorldMap::getInstance()->setTrackingInvalid();
 		setDefaultBtn("");
 		
 		// clicked on a down region - turn off coord display
@@ -669,8 +837,10 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 	}
 	
 	std::string sim_name = sim_info->getName();
-	F32 region_x = (F32)fmod( pos_global.mdV[VX], (F64)REGION_WIDTH_METERS );
-	F32 region_y = (F32)fmod( pos_global.mdV[VY], (F64)REGION_WIDTH_METERS );
+	U32 locX, locY;
+	from_region_handle(sim_info->getHandle(), &locX, &locY);
+	F32 region_x = pos_global.mdV[VX] - locX;
+	F32 region_y = pos_global.mdV[VY] - locY;
 	std::string full_name = llformat("%s (%d, %d, %d)", 
 									 sim_name.c_str(), 
 									 ll_round(region_x), 
@@ -679,11 +849,21 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 	
 	std::string tooltip("");
 	mTrackedStatus = LLTracker::TRACKING_LOCATION;
-	LLWorldMap::getInstanceFast()->cancelTracking();		// The floater is taking over the tracking
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
 	LLTracker::trackLocation(pos_global, (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC)) ? full_name : RlvStrings::getString(RlvStringKeys::Hidden::Generic).c_str(), tooltip);
 // [/RLVa:KB]
 //	LLTracker::trackLocation(pos_global, full_name, tooltip);
+	LLWorldMap::getInstance()->cancelTracking();		// The floater is taking over the tracking
+
+	if (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+	{
+		mShowParcelInfo = true;
+		requestParcelInfo(pos_global, sim_info->getGlobalOrigin());
+	}
+	else
+	{
+		mShowParcelInfo = false;
+	}
 	
 	LLVector3d coord_pos = LLTracker::getTrackedPositionGlobal();
 	updateTeleportCoordsDisplay( coord_pos );
@@ -691,27 +871,23 @@ void LLFloaterWorldMap::trackLocation(const LLVector3d& pos_global)
 	// we have a valid region - turn on coord display
 	enableTeleportCoordsDisplay( true );
 	
-	setDefaultBtn("Teleport");
+	setDefaultBtn(mTeleportButton);
 }
 
 // enable/disable teleport destination coordinates 
 void LLFloaterWorldMap::enableTeleportCoordsDisplay( bool enabled )
 {
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
-	LLUICtrl* pCtrl = getChild<LLUICtrl>("events_label");
-	pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+	mLocationsLabel->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
 
-	pCtrl = getChild<LLUICtrl>("teleport_coordinate_x");
-	pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
-	pCtrl->setEnabled(enabled);
+	mTeleportCoordSpinX->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+	mTeleportCoordSpinX->setEnabled(enabled);
 
-	pCtrl = getChild<LLUICtrl>("teleport_coordinate_y");
-	pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
-	pCtrl->setEnabled(enabled);
+	mTeleportCoordSpinY->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+	mTeleportCoordSpinY->setEnabled(enabled);
 
-	pCtrl = getChild<LLUICtrl>("teleport_coordinate_z");
-	pCtrl->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
-	pCtrl->setEnabled(enabled);
+	mTeleportCoordSpinZ->setVisible(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
+	mTeleportCoordSpinZ->setEnabled(enabled);
 // [/RLVa:KB]
 //	childSetEnabled("teleport_coordinate_x", enabled );
 //	childSetEnabled("teleport_coordinate_y", enabled );
@@ -722,17 +898,32 @@ void LLFloaterWorldMap::enableTeleportCoordsDisplay( bool enabled )
 void LLFloaterWorldMap::updateTeleportCoordsDisplay( const LLVector3d& pos )
 {
 	// if we're going to update their value, we should also enable them
-	enableTeleportCoordsDisplay( true );
-	
+	enableTeleportCoordsDisplay(true);
+
 	// convert global specified position to a local one
-	F32 region_local_x = (F32)fmod( pos.mdV[VX], (F64)REGION_WIDTH_METERS );
-	F32 region_local_y = (F32)fmod( pos.mdV[VY], (F64)REGION_WIDTH_METERS );
-	F32 region_local_z = (F32)llclamp( pos.mdV[VZ], 0.0, (F64)REGION_HEIGHT_METERS );
+	F32 region_local_x;
+	F32 region_local_y;
+	F32 region_local_z;
+	LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos);
+	if (sim_info)
+	{
+		U32 locX, locY;
+		from_region_handle(sim_info->getHandle(), &locX, &locY);
+		region_local_x = pos.mdV[VX] - locX;
+		region_local_y = pos.mdV[VY] - locY;
+		region_local_z = (F32)pos.mdV[VZ];
+	}
+	else
+	{
+		region_local_x = (F32)fmod(pos.mdV[VX], (F64)REGION_WIDTH_METERS);
+		region_local_y = (F32)fmod(pos.mdV[VY], (F64)REGION_WIDTH_METERS);
+		region_local_z = (F32)llclamp(pos.mdV[VZ], 0.0, (F64)REGION_HEIGHT_METERS);
+	}
 
 	// write in the values
-	childSetValue("teleport_coordinate_x", region_local_x );
-	childSetValue("teleport_coordinate_y", region_local_y );
-	childSetValue("teleport_coordinate_z", region_local_z );
+	mTeleportCoordSpinX->setValue(region_local_x);
+	mTeleportCoordSpinY->setValue(region_local_y);
+	mTeleportCoordSpinZ->setValue(region_local_z);
 }
 
 void LLFloaterWorldMap::updateLocation()
@@ -753,7 +944,7 @@ void LLFloaterWorldMap::updateLocation()
 		{
 			// Make sure we know where we are before setting the current user position
 			std::string agent_sim_name;
-			gotSimName = LLWorldMap::getInstanceFast()->simNameFromPosGlobal( agentPos, agent_sim_name );
+			gotSimName = LLWorldMap::getInstance()->simNameFromPosGlobal( agentPos, agent_sim_name );
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
 			if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
 			{
@@ -781,14 +972,16 @@ void LLFloaterWorldMap::updateLocation()
 				
 				// Figure out where user is
 				// Set the current SLURL
-				mSLURL = LLSLURL(agent_sim_name, gAgent.getPositionGlobal());
+				mSLURL = LLSLURL(agent_sim_name, gAgent.getPositionAgent());
 			}
 		}
 		
 		return; // invalid location
 	}
 	std::string sim_name;
-	gotSimName = LLWorldMap::getInstanceFast()->simNameFromPosGlobal( pos_global, sim_name );
+	LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
+	if (sim_info)
+		sim_name = sim_info->getName();
 	if ((status != LLTracker::TRACKING_NOTHING) &&
 		(status != mTrackedStatus || pos_global != mTrackedLocation || sim_name != mTrackedSimName))
 	{
@@ -821,11 +1014,11 @@ void LLFloaterWorldMap::updateLocation()
 
 			childSetValue("location", RlvStrings::getString(RlvStringKeys::Hidden::Region));
 		}
-		else if (gotSimName)
+		else if (sim_info)
 // [/RLVa:KB]
 //		if ( gotSimName )
 		{
-			mSLURL = LLSLURL(sim_name, pos_global);
+			mSLURL = LLSLURL(sim_name, sim_info->getLocalPos(pos_global));
 		}
 		else
 		{	// Empty SLURL will disable the "Copy SLURL to clipboard" button
@@ -836,7 +1029,7 @@ void LLFloaterWorldMap::updateLocation()
 
 void LLFloaterWorldMap::trackURL(const std::string& region_name, S32 x_coord, S32 y_coord, S32 z_coord)
 {
-	LLSimInfo* sim_info = LLWorldMap::getInstanceFast()->simInfoFromName(region_name);
+	LLSimInfo* sim_info = LLWorldMap::getInstance()->simInfoFromName(region_name);
 	z_coord = llclamp(z_coord, 0, 4096);
 	if (sim_info)
 	{
@@ -846,7 +1039,7 @@ void LLFloaterWorldMap::trackURL(const std::string& region_name, S32 x_coord, S3
 		local_pos.mV[VZ] = (F32)z_coord;
 		LLVector3d global_pos = sim_info->getGlobalPos(local_pos);
 		trackLocation(global_pos);
-		setDefaultBtn("Teleport");
+		setDefaultBtn(mTeleportButton);
 	}
 	else
 	{
@@ -860,9 +1053,9 @@ void LLFloaterWorldMap::trackURL(const std::string& region_name, S32 x_coord, S3
 		
 		// pass sim name to combo box
 		gFloaterWorldMap->mCompletingRegionName = region_name;
-		LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(region_name);
+		LLWorldMapMessage::getInstance()->sendNamedRegionRequest(region_name);
 		LLStringUtil::toLower(gFloaterWorldMap->mCompletingRegionName);
-		LLWorldMap::getInstanceFast()->setTrackingCommit();
+		LLWorldMap::getInstance()->setTrackingCommit();
 	}
 }
 
@@ -1026,7 +1219,7 @@ void LLFloaterWorldMap::clearLocationSelection(BOOL clear_ui, BOOL dest_reached)
 	{
 		list->operateOnAll(LLCtrlListInterface::OP_DELETE);
 	}
-	LLWorldMap::getInstanceFast()->cancelTracking();
+	LLWorldMap::getInstance()->cancelTracking();
 	mCompletingRegionName = "";
 }
 
@@ -1050,7 +1243,7 @@ void LLFloaterWorldMap::clearAvatarSelection(BOOL clear_ui)
 	{
 		mTrackedStatus = LLTracker::TRACKING_NOTHING;
 		LLCtrlListInterface *list = mListFriendCombo;
-		if (list)
+		if (list && list->getSelectedValue().asString() != "None")
 		{
 			list->selectByValue( "None" );
 		}
@@ -1070,9 +1263,7 @@ void LLFloaterWorldMap::adjustZoomSliderBounds()
 	S32 world_height_regions = MAX_VISIBLE_REGIONS;
 	
 	// Find how much space we have to display the world
-	LLWorldMapView* map_panel;
-	map_panel = (LLWorldMapView*)mPanel;
-	LLRect view_rect = map_panel->getRect();
+    LLRect view_rect = mMapView->getRect();
 	
 	// View size in pixels
 	S32 view_width = view_rect.getWidth();
@@ -1095,7 +1286,7 @@ void LLFloaterWorldMap::adjustZoomSliderBounds()
 	
 	F32 min_power = log(pixels_per_region/256.f)/log(2.f);
 	
-	getChild<LLSliderCtrl>("zoom slider")->setMinValue(min_power);
+	mZoomSlider->setMinValue(min_power);
 }
 
 
@@ -1296,15 +1487,15 @@ void LLFloaterWorldMap::onLocationCommit()
 	
 	LLStringUtil::toLower(str);
 	mCompletingRegionName = str;
-	LLWorldMap::getInstanceFast()->setTrackingCommit();
+	LLWorldMap::getInstance()->setTrackingCommit();
 	if (str.length() >= 3)
 	{
-		LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(str);
+		LLWorldMapMessage::getInstance()->sendNamedRegionRequest(str);
 	}
 	else
 	{
 		str += "#";
-		LLWorldMapMessage::getInstanceFast()->sendNamedRegionRequest(str);
+		LLWorldMapMessage::getInstance()->sendNamedRegionRequest(str);
 	}
 }
 
@@ -1315,9 +1506,9 @@ void LLFloaterWorldMap::onCoordinatesCommit()
 		return;
 	}
 	
-	S32 x_coord = (S32)childGetValue("teleport_coordinate_x").asReal();
-	S32 y_coord = (S32)childGetValue("teleport_coordinate_y").asReal();
-	S32 z_coord = (S32)childGetValue("teleport_coordinate_z").asReal();
+	S32 x_coord = (S32)mTeleportCoordSpinX->getValue().asReal();
+	S32 y_coord = (S32)mTeleportCoordSpinY->getValue().asReal();
+	S32 z_coord = (S32)mTeleportCoordSpinZ->getValue().asReal();
 	
 	const std::string region_name = childGetValue("location").asString();
 	
@@ -1328,7 +1519,7 @@ void LLFloaterWorldMap::onClearBtn()
 {
 	mTrackedStatus = LLTracker::TRACKING_NOTHING;
 	LLTracker::stopTracking(true);
-	LLWorldMap::getInstanceFast()->cancelTracking();
+	LLWorldMap::getInstance()->cancelTracking();
 	mSLURL = LLSLURL();					// Clear the SLURL since it's invalid
 	mSetToUserPosition = TRUE;	// Revert back to the current user position
 }
@@ -1340,9 +1531,9 @@ void LLFloaterWorldMap::onShowTargetBtn()
 
 void LLFloaterWorldMap::onShowAgentBtn()
 {
-	LLWorldMapView::setPan( 0, 0, FALSE); // FALSE == animate
-	// Set flag so user's location will be displayed if not tracking anything else
-	mSetToUserPosition = TRUE;	
+    mMapView->setPanWithInterpTime(0, 0, false, 0.1f);  // false == animate
+    // Set flag so user's location will be displayed if not tracking anything else
+    mSetToUserPosition = true;
 }
 
 void LLFloaterWorldMap::onClickTeleportBtn()
@@ -1360,6 +1551,22 @@ void LLFloaterWorldMap::onCopySLURL()
 	LLNotificationsUtil::add("CopySLURL", args);
 }
 
+//void LLFloaterWorldMap::onExpandCollapseBtn()
+//{
+//    LLLayoutStack* floater_stack = getChild<LLLayoutStack>("floater_map_stack");
+//    LLLayoutPanel* controls_panel = getChild<LLLayoutPanel>("controls_lp");
+//    
+//    bool toggle_collapse = !controls_panel->isCollapsed();
+//    floater_stack->collapsePanel(controls_panel, toggle_collapse);
+//    floater_stack->updateLayout();
+//   
+//    std::string image_name = getString(toggle_collapse ? "expand_icon" : "collapse_icon");
+//    std::string tooltip = getString(toggle_collapse ? "expand_tooltip" : "collapse_tooltip");
+//    getChild<LLIconCtrl>("expand_collapse_icon")->setImage(LLUI::getUIImage(image_name));
+//    getChild<LLIconCtrl>("expand_collapse_icon")->setToolTip(tooltip);
+//    getChild<LLPanel>("expand_btn_panel")->setToolTip(tooltip);
+//}
+
 void LLFloaterWorldMap::onTrackRegion()
 {
 	ALFloaterRegionTracker* floaterp = LLFloaterReg::showTypedInstance<ALFloaterRegionTracker>("region_tracker");
@@ -1368,7 +1575,7 @@ void LLFloaterWorldMap::onTrackRegion()
 		if (LLTracker::getTrackingStatus() != LLTracker::TRACKING_NOTHING)
 		{
 			std::string sim_name;
-			if (LLWorldMap::getInstanceFast()->simNameFromPosGlobal(LLTracker::getTrackedPositionGlobal(), sim_name))
+			if (LLWorldMap::getInstance()->simNameFromPosGlobal(LLTracker::getTrackedPositionGlobal(), sim_name))
 			{
 				const std::string& temp_label = floaterp->getRegionLabelIfExists(sim_name);
 				LLSD args, payload;
@@ -1402,9 +1609,9 @@ void LLFloaterWorldMap::centerOnTarget(BOOL animate)
 			pos_global = LLTracker::getTrackedPositionGlobal() - gAgentCamera.getCameraPositionGlobal();
 		}
 	}
-	else if(LLWorldMap::getInstanceFast()->isTracking())
+	else if(LLWorldMap::getInstance()->isTracking())
 	{
-		pos_global = LLWorldMap::getInstanceFast()->getTrackedPositionGlobal() - gAgentCamera.getCameraPositionGlobal();;
+		pos_global = LLWorldMap::getInstance()->getTrackedPositionGlobal() - gAgentCamera.getCameraPositionGlobal();;
 		
 		
 		
@@ -1415,9 +1622,10 @@ void LLFloaterWorldMap::centerOnTarget(BOOL animate)
 		pos_global.clearVec();
 	}
 	
-	LLWorldMapView::setPan( -llfloor((F32)(pos_global.mdV[VX] * (F64)LLWorldMapView::sMapScale / REGION_WIDTH_METERS)), 
-						   -llfloor((F32)(pos_global.mdV[VY] * (F64)LLWorldMapView::sMapScale / REGION_WIDTH_METERS)),
-						   !animate);
+    F64 map_scale = (F64)mMapView->getScale();
+    mMapView->setPanWithInterpTime(-llfloor((F32)(pos_global.mdV[VX] * map_scale / REGION_WIDTH_METERS)),
+                           -llfloor((F32)(pos_global.mdV[VY] * map_scale / REGION_WIDTH_METERS)),
+                           !animate, 0.1f);
 	mWaitingForTracker = FALSE;
 }
 
@@ -1452,7 +1660,7 @@ void LLFloaterWorldMap::teleport()
 		&& av_tracker.haveTrackingInfo() )
 	{
 		pos_global = av_tracker.getGlobalPos();
-		pos_global.mdV[VZ] = getChild<LLUICtrl>("teleport_coordinate_z")->getValue();
+		pos_global.mdV[VZ] = mTeleportCoordSpinZ->getValue();
 	}
 	else if ( LLTracker::TRACKING_LANDMARK == tracking_status)
 	{
@@ -1588,7 +1796,14 @@ void LLFloaterWorldMap::updateSims(bool found_null_sim)
 
 	S32 num_results = 0;
 
-	std::vector<std::pair <U64, LLSimInfo*> > sim_info_vec(LLWorldMap::getInstanceFast()->getRegionMap().begin(), LLWorldMap::getInstanceFast()->getRegionMap().end());
+	const auto& region_map = LLWorldMap::getInstance()->getRegionMap();
+
+	std::vector<std::pair <U64, LLSimInfo*> > sim_info_vec;
+	sim_info_vec.reserve(region_map.size());
+	for (const auto& region_pair : region_map)
+	{
+		sim_info_vec.emplace_back(region_pair.first, region_pair.second.get());
+	}
 	std::sort(sim_info_vec.begin(), sim_info_vec.end(), SortRegionNames());
 
 	for (std::vector<std::pair <U64, LLSimInfo*> >::const_iterator it = sim_info_vec.begin(); it != sim_info_vec.end(); ++it)
@@ -1620,6 +1835,8 @@ void LLFloaterWorldMap::updateSims(bool found_null_sim)
 	
 	if (num_results > 0)
 	{
+		list->sortByColumn("sim_name", TRUE);
+
 		// if match found, highlight it and go
 		if (!match.isUndefined())
 		{
@@ -1641,6 +1858,13 @@ void LLFloaterWorldMap::updateSims(bool found_null_sim)
 	}
 }
 
+void LLFloaterWorldMap::onTeleportFinished()
+{
+    if(isInVisibleChain())
+    {
+        mMapView->setPan(0, 0, TRUE);
+    }
+}
 
 void LLFloaterWorldMap::onCommitSearchResult()
 {
@@ -1655,9 +1879,9 @@ void LLFloaterWorldMap::onCommitSearchResult()
 	}
 	LLStringUtil::toLower(sim_name);
 
-	for (const auto& sim_info_pair : LLWorldMap::getInstanceFast()->getRegionMap())
+	for (const auto& sim_info_pair : LLWorldMap::getInstance()->getRegionMap())
 	{
-		LLSimInfo* info = sim_info_pair.second;
+		LLSimInfo* info = sim_info_pair.second.get();
 		
 		if (info->isName(sim_name))
 		{
@@ -1678,7 +1902,7 @@ void LLFloaterWorldMap::onCommitSearchResult()
 			
 			getChild<LLUICtrl>("location")->setValue(sim_name);
 			trackLocation(pos_global);
-			setDefaultBtn("Teleport");
+			setDefaultBtn(mTeleportButton);
 			break;
 		}
 	}
@@ -1712,7 +1936,106 @@ void LLFloaterWorldMap::onChangeMaturity()
 
 void LLFloaterWorldMap::onFocusLost()
 {
-	gViewerWindow->showCursor();
-	LLWorldMapView* map_panel = (LLWorldMapView*)gFloaterWorldMap->mPanel;
-	map_panel->mPanning = FALSE;
+    gViewerWindow->showCursor();
+    mMapView->mPanning = false;
+}
+
+LLPanelHideBeacon::LLPanelHideBeacon() :
+	mHideButton(NULL)
+{
+}
+
+// static
+LLPanelHideBeacon* LLPanelHideBeacon::getInstance()
+{
+	static LLPanelHideBeacon* panel = getPanelHideBeacon();
+	return panel;
+}
+
+
+BOOL LLPanelHideBeacon::postBuild()
+{
+	mHideButton = getChild<LLButton>("hide_beacon_btn");
+	mHideButton->setCommitCallback(boost::bind(&LLPanelHideBeacon::onHideButtonClick, this));
+
+	gViewerWindow->setOnWorldViewRectUpdated(boost::bind(&LLPanelHideBeacon::updatePosition, this));
+
+	return TRUE;
+}
+
+//virtual
+void LLPanelHideBeacon::draw()
+{
+	if (!LLTracker::isTracking(NULL))
+	{
+        mHideButton->setVisible(false);
+        return;
+	}
+    mHideButton->setVisible(true);
+	updatePosition(); 
+	LLPanel::draw();
+}
+
+//virtual
+void LLPanelHideBeacon::setVisible(BOOL visible)
+{
+	if (gAgentCamera.getCameraMode() == CAMERA_MODE_MOUSELOOK) visible = false;
+
+	if (visible)
+	{
+		updatePosition();
+	}
+
+	LLPanel::setVisible(visible);
+}
+
+
+//static
+LLPanelHideBeacon* LLPanelHideBeacon::getPanelHideBeacon()
+{
+	LLPanelHideBeacon* panel = new LLPanelHideBeacon();
+	panel->buildFromFile("panel_hide_beacon.xml");
+
+	LL_INFOS() << "Build LLPanelHideBeacon panel" << LL_ENDL;
+
+	panel->updatePosition();
+	return panel;
+}
+
+void LLPanelHideBeacon::onHideButtonClick()
+{
+	LLFloaterWorldMap* instance = LLFloaterWorldMap::getInstance();
+	if (instance)
+	{
+		instance->onClearBtn();
+	}
+}
+
+/**
+* Updates position of the panel (similar to Stand & Stop Flying panel).
+*/
+void LLPanelHideBeacon::updatePosition()
+{
+	S32 bottom_tb_center = 0;
+	if (LLToolBar* toolbar_bottom = gToolBarView->getToolbar(LLToolBarEnums::TOOLBAR_BOTTOM))
+	{
+		bottom_tb_center = toolbar_bottom->getRect().getCenterX();
+	}
+
+	S32 left_tb_width = 0;
+	if (LLToolBar* toolbar_left = gToolBarView->getToolbar(LLToolBarEnums::TOOLBAR_LEFT))
+	{
+		left_tb_width = toolbar_left->getRect().getWidth();
+	}
+
+	if (gToolBarView != NULL && gToolBarView->getToolbar(LLToolBarEnums::TOOLBAR_LEFT)->hasButtons())
+	{
+		S32 x_pos = bottom_tb_center - getRect().getWidth() / 2 - left_tb_width;
+		setOrigin( x_pos + HIDE_BEACON_PAD, 0);
+	}
+	else 
+	{
+		S32 x_pos = bottom_tb_center - getRect().getWidth() / 2;
+		setOrigin( x_pos + HIDE_BEACON_PAD, 0);
+	}
 }

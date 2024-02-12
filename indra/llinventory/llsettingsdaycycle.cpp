@@ -41,9 +41,6 @@
 //=========================================================================
 namespace
 {
-    LLTrace::BlockTimerStatHandle FTM_BLEND_WATERVALUES("Blending Water Environment Day");
-    LLTrace::BlockTimerStatHandle FTM_UPDATE_WATERVALUES("Update Water Environment Day");
-
     template<typename T>
     inline T get_wrapping_distance(T begin, T end)
     {
@@ -207,7 +204,7 @@ bool LLSettingsDay::initialize(bool validate_frames)
 
     std::map<std::string, LLSettingsBase::ptr_t> used;
 
-    for (const auto& llsd_pair : frames.map())
+    for (const auto& llsd_pair : frames.asMap())
     {
         const std::string& name = llsd_pair.first;
         const LLSD& data = llsd_pair.second;
@@ -241,7 +238,7 @@ bool LLSettingsDay::initialize(bool validate_frames)
     {
         mDayTracks[i].clear();
         LLSD curtrack = tracks[i];
-        for (const auto& llsd_val : curtrack.array())
+        for (const auto& llsd_val : curtrack.asArray())
         {
             LLSettingsBase::TrackPosition keyframe = LLSettingsBase::TrackPosition(llsd_val[SETTING_KEYKFRAME].asReal());
             keyframe = llclamp(keyframe, 0.0f, 1.0f);
@@ -443,8 +440,8 @@ LLSD LLSettingsDay::defaults()
         }
 
         LLSD tracks;
-        tracks.append(LLSDArray(waterTrack));
-        tracks.append(LLSDArray(skyTrack));
+        tracks.append(llsd::array(waterTrack));
+        tracks.append(llsd::array(skyTrack));
 
         dfltsetting[SETTING_TRACKS] = tracks;
         dfltsetting[SETTING_FRAMES] = frames;
@@ -470,7 +467,7 @@ namespace
 
         S32 framecount(0);
 
-        for (auto& llsd_val : value.array())
+        for (auto& llsd_val : value.asArray())
         {
             S32 index = 0;
             while (index < llsd_val.size())
@@ -536,7 +533,7 @@ namespace
         bool hasSky(false);
         bool hasWater(false);
 
-        for (const auto& llsd_pair : value.map())
+        for (const auto& llsd_pair : value.asMap())
         {
             LLSD frame = llsd_pair.second;
 

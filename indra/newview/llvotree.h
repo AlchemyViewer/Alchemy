@@ -61,7 +61,6 @@ public:
 	/*virtual*/ void idleUpdate(LLAgent &agent, const F64 &time) override;
 	
 	// Graphical stuff for objects - maybe broken out into render class later?
-	/*virtual*/ void render(LLAgent &agent);
 	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent) override;
 	/*virtual*/ void updateTextures() override;
 
@@ -112,6 +111,7 @@ public:
 										  S32 face = -1,                        // which face to check, -1 = ALL_SIDES
 										  BOOL pick_transparent = FALSE,
 										  BOOL pick_rigged = FALSE,
+                                          BOOL pick_unselectable = TRUE,
 										  S32* face_hit = NULL,                 // which face was hit
 										  LLVector4a* intersection = NULL,       // return the intersection point
 										  LLVector2* tex_coord = NULL,          // return the texture coordinates of the intersection point

@@ -48,9 +48,11 @@
 #include "lltexturectrl.h"
 #include "llcombobox.h"
 //#include "llfirstuse.h"
+#include "llfloaterreg.h"
 #include "llfocusmgr.h"
 #include "llmanipscale.h"
 #include "llinventorymodel.h"
+#include "llmenubutton.h"
 #include "llpreviewscript.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
@@ -60,6 +62,7 @@
 #include "lltoolcomp.h"
 #include "lltooldraganddrop.h"
 #include "lltoolmgr.h"
+#include "lltoolpipette.h"
 #include "lltrans.h"
 #include "llui.h"
 #include "llviewerobject.h"
@@ -174,6 +177,15 @@ BOOL	LLPanelVolume::postBuild()
         mLightAmbiance->setCommitCallback(std::bind(onCommitLight, std::placeholders::_1, this));
 	}
 	
+    // REFLECTION PROBE Parameters
+    {
+        childSetCommitCallback("Reflection Probe", onCommitIsReflectionProbe, this);
+        childSetCommitCallback("Probe Dynamic", onCommitProbe, this);
+        childSetCommitCallback("Probe Volume Type", onCommitProbe, this);
+        childSetCommitCallback("Probe Ambiance", onCommitProbe, this);
+        childSetCommitCallback("Probe Near Clip", onCommitProbe, this);
+    }
+
 	// PHYSICS Parameters
 	{
         mLabelPhysicsShapeType = getChild<LLTextBox>("label physicsshapetype");
@@ -198,6 +210,20 @@ BOOL	LLPanelVolume::postBuild()
 		mSpinPhysicsRestitution = getChild<LLSpinCtrl>("Physics Restitution");
 		mSpinPhysicsRestitution->setCommitCallback(boost::bind(&LLPanelVolume::sendPhysicsRestitution, this, _1, mSpinPhysicsRestitution));
 	}
+
+    mBtnCopyFeatures = findChild<LLButton>("copy_features_btn");
+    mBtnCopyFeatures->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyFeatures(); });
+    mBtnPasteFeatures = findChild<LLButton>("paste_features_btn");
+    mBtnPasteFeatures->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteFeatures(); });
+    mBtnPipetteFeatures = findChild<LLButton>("pipette_features_btn");
+    mBtnPipetteFeatures->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipetteFeatures(); });
+
+    mBtnCopyLight = findChild<LLButton>("copy_light_btn");
+    mBtnCopyLight->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCopyLight(); });
+    mBtnPasteLight = findChild<LLButton>("paste_light_btn");
+    mBtnPasteLight->setCommitCallback([this](LLUICtrl*, const LLSD&) { onPasteLight(); });
+    mBtnPipetteLight = findChild<LLButton>("pipette_light_btn");
+    mBtnPipetteLight->setCommitCallback([this](LLUICtrl*, const LLSD&) { onClickPipetteLight(); });
 
 	std::map<std::string, std::string> material_name_map;
 	material_name_map["Stone"]= LLTrans::getString("Stone");
@@ -239,6 +265,8 @@ LLPanelVolume::LLPanelVolume()
 {
 	setMouseOpaque(FALSE);
 
+    mCommitCallbackRegistrar.add("PanelVolume.menuDoToSelected", boost::bind(&LLPanelVolume::menuDoToSelected, this, _2));
+    mEnableCallbackRegistrar.add("PanelVolume.menuEnable", boost::bind(&LLPanelVolume::menuEnableItem, this, _2));
 }
 
 
@@ -249,11 +277,11 @@ LLPanelVolume::~LLPanelVolume()
 
 void LLPanelVolume::getState( )
 {
-	LLViewerObject* objectp = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+	LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 	LLViewerObject* root_objectp = objectp;
 	if(!objectp)
 	{
-		objectp = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+		objectp = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 		// *FIX: shouldn't we just keep the child?
 		if (objectp)
 		{
@@ -297,14 +325,14 @@ void LLPanelVolume::getState( )
 
 	LLUUID owner_id;
 	std::string owner_name;
-	LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
+	LLSelectMgr::getInstance()->selectGetOwner(owner_id, owner_name);
 
 	// BUG? Check for all objects being editable?
 	BOOL editable = root_objectp->permModify() && !root_objectp->isPermanentEnforced();
-	BOOL single_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME )
-		&& LLSelectMgr::getInstanceFast()->getSelection()->getObjectCount() == 1;
-    BOOL single_root_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME ) && 
-        LLSelectMgr::getInstanceFast()->getSelection()->getRootObjectCount() == 1;
+	BOOL single_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME )
+		&& LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1;
+    BOOL single_root_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME ) && 
+        LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() == 1;
 
 	// Select Single Message
 	if (single_volume)
@@ -368,6 +396,15 @@ void LLPanelVolume::getState( )
 		mLightTextureCtrl->setEnabled(FALSE);
 		mLightTextureCtrl->setValid(FALSE);
 
+        if (objectp->isAttachment())
+        {
+            mLightTextureCtrl->setImmediateFilterPermMask(PERM_COPY | PERM_TRANSFER);
+        }
+        else
+        {
+            mLightTextureCtrl->setImmediateFilterPermMask(PERM_NONE);
+        }
+
 		mLightIntensity->setEnabled(false);
         mLightRadius->setEnabled(false);
         mLightFalloff->setEnabled(false);
@@ -376,6 +413,43 @@ void LLPanelVolume::getState( )
         mLightFocus->setEnabled(false);
         mLightAmbiance->setEnabled(false);
 	}
+
+    // Reflection Probe
+    BOOL is_probe = volobjp && volobjp->isReflectionProbe();
+    getChild<LLUICtrl>("Reflection Probe")->setValue(is_probe);
+    getChildView("Reflection Probe")->setEnabled(editable && single_volume && volobjp && !volobjp->isMesh());
+
+    bool probe_enabled = is_probe && editable && single_volume;
+
+    getChildView("Probe Dynamic")->setEnabled(probe_enabled);
+    getChildView("Probe Volume Type")->setEnabled(probe_enabled);
+    getChildView("Probe Ambiance")->setEnabled(probe_enabled);
+    getChildView("Probe Near Clip")->setEnabled(probe_enabled);
+
+    if (!probe_enabled)
+    {
+        getChild<LLComboBox>("Probe Volume Type", true)->clear();
+        getChild<LLSpinCtrl>("Probe Ambiance", true)->clear();
+        getChild<LLSpinCtrl>("Probe Near Clip", true)->clear();
+        getChild<LLCheckBoxCtrl>("Probe Dynamic", true)->clear();
+    }
+    else
+    {
+        std::string volume_type;
+        if (volobjp->getReflectionProbeIsBox())
+        {
+            volume_type = "Box";
+        }
+        else
+        {
+            volume_type = "Sphere";
+        }
+
+        getChild<LLComboBox>("Probe Volume Type", true)->setValue(volume_type);
+        getChild<LLSpinCtrl>("Probe Ambiance", true)->setValue(volobjp->getReflectionProbeAmbiance());
+        getChild<LLSpinCtrl>("Probe Near Clip", true)->setValue(volobjp->getReflectionProbeNearClip());
+        getChild<LLCheckBoxCtrl>("Probe Dynamic", true)->setValue(volobjp->getReflectionProbeIsDynamic());
+    }
 
     // Animated Mesh
 	BOOL is_animated_mesh = single_root_volume && root_volobjp && root_volobjp->isAnimatedObject();
@@ -424,7 +498,6 @@ void LLPanelVolume::getState( )
 			gAgentAvatarp->updateMeshVisibility();
 		}
 	}
-	
 
 	// Flexible properties
 	BOOL is_flexible = volobjp && volobjp->isFlexible();
@@ -501,7 +574,7 @@ void LLPanelVolume::getState( )
 			return object->getMaterial();
 		}
 	} func;
-	bool material_same = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &func, material_code );
+	bool material_same = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &func, material_code );
 	std::string LEGACY_FULLBRIGHT_DESC = LLTrans::getString("Fullbright");
 	if (editable && single_volume && material_same)
 	{
@@ -579,6 +652,13 @@ void LLPanelVolume::getState( )
 
 	mObject = objectp;
 	mRootObject = root_objectp;
+
+    mBtnCopyFeatures->setEnabled(editable&& single_volume && volobjp); // Note: physics doesn't need to be limited by single volume
+    mBtnPasteFeatures->setEnabled(editable&& single_volume && volobjp && mClipboardParams.has("features"));
+    mBtnPipetteFeatures->setEnabled(editable&& single_volume && volobjp);
+    mBtnCopyLight->setEnabled(editable&& single_volume && volobjp);
+    mBtnPasteLight->setEnabled(editable&& single_volume && volobjp && mClipboardParams.has("light"));
+    mBtnPipetteLight->setEnabled(editable&& single_volume && volobjp);
 }
 
 // static
@@ -601,13 +681,6 @@ void LLPanelVolume::refresh()
 	{
 		mRootObject = NULL;
 	}
-
-	BOOL visible = LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_DEFERRED) > 0 ? TRUE : FALSE;
-
-	mLightFOV->setVisible(visible);
-    mLightFocus->setVisible(visible);
-    mLightAmbiance->setVisible(visible);
-	mLightTextureCtrl->setVisible( visible);
 
 	bool enable_mesh = false;
 
@@ -658,6 +731,11 @@ void LLPanelVolume::clearCtrls()
     mLightFocus->setEnabled(false);
     mLightAmbiance->setEnabled(false);
 
+    getChildView("Reflection Probe")->setEnabled(false);;
+    getChildView("Probe Volume Type")->setEnabled(false);
+    getChildView("Probe Dynamic")->setEnabled(false);
+    getChildView("Probe Ambiance")->setEnabled(false);
+    getChildView("Probe Near Clip")->setEnabled(false);
     mCheckAnimesh->setEnabled(false);
     mCheckFlexible1D->setEnabled(false);
     mSpinSections->setEnabled(false);
@@ -695,6 +773,87 @@ void LLPanelVolume::sendIsLight()
 	LL_INFOS() << "update light sent" << LL_ENDL;
 }
 
+void notify_cant_select_reflection_probe()
+{
+    if (!gSavedSettings.getBOOL("SelectReflectionProbes"))
+    {
+        LLNotificationsUtil::add("CantSelectReflectionProbe");
+    }
+}
+
+void LLPanelVolume::sendIsReflectionProbe()
+{
+    LLViewerObject* objectp = mObject;
+    if (!objectp || (objectp->getPCode() != LL_PCODE_VOLUME))
+    {
+        return;
+    }
+    LLVOVolume* volobjp = (LLVOVolume*)objectp;
+
+    BOOL value = getChild<LLUICtrl>("Reflection Probe")->getValue();
+    BOOL old_value = volobjp->isReflectionProbe();
+
+    if (value && value != old_value)
+    { // defer to notification util as to whether or not we *really* make this object a reflection probe
+        LLNotificationsUtil::add("ReflectionProbeApplied", LLSD(), LLSD(), boost::bind(&LLPanelVolume::doSendIsReflectionProbe, this, _1, _2));
+    }
+    else
+    {
+        if (value)
+        {
+            notify_cant_select_reflection_probe();
+        }
+        else if (objectp->flagPhantom())
+        {
+            LLViewerObject* root = objectp->getRootEdit();
+            bool in_linkeset = root != objectp || objectp->numChildren() > 0;
+            if (in_linkeset)
+            {
+                // In linkset with a phantom flag
+                objectp->setFlags(FLAGS_PHANTOM, FALSE);
+            }
+        }
+        volobjp->setIsReflectionProbe(value);
+    }
+}
+
+void LLPanelVolume::doSendIsReflectionProbe(const LLSD & notification, const LLSD & response)
+{
+    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    if (option == 0) // YES
+    {
+        LLViewerObject* objectp = mObject;
+        if (!objectp || (objectp->getPCode() != LL_PCODE_VOLUME))
+        {
+            return;
+        }
+        LLVOVolume* volobjp = (LLVOVolume*)objectp;
+
+        notify_cant_select_reflection_probe();
+        volobjp->setIsReflectionProbe(true);
+
+        { // has become a reflection probe, slam to a 10m sphere and pop up a message
+            // warning people about the pitfalls of reflection probes
+
+            auto* select_mgr = LLSelectMgr::getInstance();
+
+            select_mgr->selectionUpdatePhantom(true);
+            select_mgr->selectionSetGLTFMaterial(LLUUID::null);
+            select_mgr->selectionSetAlphaOnly(0.f);
+
+            LLVolumeParams params;
+            params.getPathParams().setCurveType(LL_PCODE_PATH_CIRCLE);
+            params.getProfileParams().setCurveType(LL_PCODE_PROFILE_CIRCLE_HALF);
+            mObject->updateVolume(params);
+        }
+    }
+    else
+    {
+        // cancelled, touch up UI state
+        getChild<LLUICtrl>("Reflection Probe")->setValue(false);
+    }
+}
+
 void LLPanelVolume::sendIsFlexible()
 {
 	LLViewerObject* objectp = mObject;
@@ -713,7 +872,7 @@ void LLPanelVolume::sendIsFlexible()
 
 		if (objectp->getClickAction() == CLICK_ACTION_SIT)
 		{
-			LLSelectMgr::getInstanceFast()->selectionSetClickAction(CLICK_ACTION_NONE);
+			LLSelectMgr::getInstance()->selectionSetClickAction(CLICK_ACTION_NONE);
 		}
 
 	}
@@ -721,7 +880,7 @@ void LLPanelVolume::sendIsFlexible()
 	if (volobjp->setIsFlexible(is_flexible))
 	{
 		mObject->sendShapeUpdate();
-		LLSelectMgr::getInstanceFast()->selectionUpdatePhantom(volobjp->flagPhantom());
+		LLSelectMgr::getInstance()->selectionUpdatePhantom(volobjp->flagPhantom());
 	}
 
 	LL_INFOS() << "update flexible sent" << LL_ENDL;
@@ -730,7 +889,7 @@ void LLPanelVolume::sendIsFlexible()
 void LLPanelVolume::sendPhysicsShapeType(LLUICtrl* ctrl, void* userdata)
 {
 	U8 type = ctrl->getValue().asInteger();
-	LLSelectMgr::getInstanceFast()->selectionSetPhysicsType(type);
+	LLSelectMgr::getInstance()->selectionSetPhysicsType(type);
 
 	refreshCost();
 }
@@ -738,30 +897,30 @@ void LLPanelVolume::sendPhysicsShapeType(LLUICtrl* ctrl, void* userdata)
 void LLPanelVolume::sendPhysicsGravity(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetGravity(val);
+	LLSelectMgr::getInstance()->selectionSetGravity(val);
 }
 
 void LLPanelVolume::sendPhysicsFriction(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetFriction(val);
+	LLSelectMgr::getInstance()->selectionSetFriction(val);
 }
 
 void LLPanelVolume::sendPhysicsRestitution(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetRestitution(val);
+	LLSelectMgr::getInstance()->selectionSetRestitution(val);
 }
 
 void LLPanelVolume::sendPhysicsDensity(LLUICtrl* ctrl, void* userdata)
 {
 	F32 val = ctrl->getValue().asReal();
-	LLSelectMgr::getInstanceFast()->selectionSetDensity(val);
+	LLSelectMgr::getInstance()->selectionSetDensity(val);
 }
 
 void LLPanelVolume::refreshCost()
 {
-	LLViewerObject* obj = LLSelectMgr::getInstanceFast()->getSelection()->getFirstObject();
+	LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstObject();
 	
 	if (obj)
 	{
@@ -827,6 +986,523 @@ void LLPanelVolume::onLightSelectTexture(const LLSD& data)
 	setLightTextureID(id, mLightTextureCtrl->getImageItemID(), volobjp);
 }
 
+void LLPanelVolume::onCopyFeatures()
+{
+    LLViewerObject* objectp = mObject;
+    if (!objectp)
+    {
+        return;
+    }
+
+    LLSD clipboard;
+
+    LLVOVolume *volobjp = NULL;
+    if (objectp && (objectp->getPCode() == LL_PCODE_VOLUME))
+    {
+        volobjp = (LLVOVolume *)objectp;
+    }
+
+    // Flexi Prim
+    if (volobjp && volobjp->isFlexible())
+    {
+        LLFlexibleObjectData *attributes = (LLFlexibleObjectData *)objectp->getFlexibleObjectData();
+        if (attributes)
+        {
+            clipboard["flex"]["lod"] = attributes->getSimulateLOD();
+            clipboard["flex"]["gav"] = attributes->getGravity();
+            clipboard["flex"]["ten"] = attributes->getTension();
+            clipboard["flex"]["fri"] = attributes->getAirFriction();
+            clipboard["flex"]["sen"] = attributes->getWindSensitivity();
+            LLVector3 force = attributes->getUserForce();
+            clipboard["flex"]["forx"] = force.mV[0];
+            clipboard["flex"]["fory"] = force.mV[1];
+            clipboard["flex"]["forz"] = force.mV[2];
+        }
+    }
+
+    // Physics
+    {
+        clipboard["physics"]["shape"] = objectp->getPhysicsShapeType();
+        clipboard["physics"]["gravity"] = objectp->getPhysicsGravity();
+        clipboard["physics"]["friction"] = objectp->getPhysicsFriction();
+        clipboard["physics"]["density"] = objectp->getPhysicsDensity();
+        clipboard["physics"]["restitution"] = objectp->getPhysicsRestitution();
+
+        U8 material_code = 0;
+        struct f : public LLSelectedTEGetFunctor<U8>
+        {
+            U8 get(LLViewerObject* object, S32 te)
+            {
+                return object->getMaterial();
+            }
+        } func;
+        bool material_same = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue(&func, material_code);
+        // This should always be true since material should be per object.
+        if (material_same)
+        {
+            clipboard["physics"]["material"] = material_code;
+        }
+    }
+
+    mClipboardParams["features"] = clipboard;
+
+    refresh();
+}
+
+void LLPanelVolume::onPasteFeatures()
+{
+    LLViewerObject* objectp = mObject;
+    if (!objectp && mClipboardParams.has("features"))
+    {
+        return;
+    }
+
+    LLSD &clipboard = mClipboardParams["features"];
+
+    LLVOVolume *volobjp = NULL;
+    if (objectp && (objectp->getPCode() == LL_PCODE_VOLUME))
+    {
+        volobjp = (LLVOVolume *)objectp;
+    }
+
+    // Physics
+    bool is_root = objectp->isRoot();
+
+    // Not sure if phantom should go under physics, but doesn't fit elsewhere
+    BOOL is_phantom = clipboard["is_phantom"].asBoolean() && is_root;
+    LLSelectMgr::getInstance()->selectionUpdatePhantom(is_phantom);
+
+    BOOL is_physical = clipboard["is_physical"].asBoolean() && is_root;
+    LLSelectMgr::getInstance()->selectionUpdatePhysics(is_physical);
+
+    if (clipboard.has("physics"))
+    {
+        objectp->setPhysicsShapeType((U8)clipboard["physics"]["shape"].asInteger());
+        U8 cur_material = objectp->getMaterial();
+        U8 material = (U8)clipboard["physics"]["material"].asInteger() | (cur_material & ~LL_MCODE_MASK);
+
+        objectp->setMaterial(material);
+        objectp->sendMaterialUpdate();
+        objectp->setPhysicsGravity(clipboard["physics"]["gravity"].asReal());
+        objectp->setPhysicsFriction(clipboard["physics"]["friction"].asReal());
+        objectp->setPhysicsDensity(clipboard["physics"]["density"].asReal());
+        objectp->setPhysicsRestitution(clipboard["physics"]["restitution"].asReal());
+        objectp->updateFlags(TRUE);
+    }
+
+    // Flexible
+    bool is_flexible = clipboard.has("flex");
+    if (is_flexible && volobjp->canBeFlexible())
+    {
+        LLVOVolume *volobjp = (LLVOVolume *)objectp;
+        BOOL update_shape = FALSE;
+
+        // do before setParameterEntry or it will think that it is already flexi
+        update_shape = volobjp->setIsFlexible(is_flexible);
+
+        if (objectp->getClickAction() == CLICK_ACTION_SIT)
+        {
+            objectp->setClickAction(CLICK_ACTION_NONE);
+        }
+
+        LLFlexibleObjectData *attributes = (LLFlexibleObjectData *)objectp->getFlexibleObjectData();
+        if (attributes)
+        {
+            LLFlexibleObjectData new_attributes;
+            new_attributes = *attributes;
+            new_attributes.setSimulateLOD(clipboard["flex"]["lod"].asInteger());
+            new_attributes.setGravity(clipboard["flex"]["gav"].asReal());
+            new_attributes.setTension(clipboard["flex"]["ten"].asReal());
+            new_attributes.setAirFriction(clipboard["flex"]["fri"].asReal());
+            new_attributes.setWindSensitivity(clipboard["flex"]["sen"].asReal());
+            F32 fx = (F32)clipboard["flex"]["forx"].asReal();
+            F32 fy = (F32)clipboard["flex"]["fory"].asReal();
+            F32 fz = (F32)clipboard["flex"]["forz"].asReal();
+            LLVector3 force(fx, fy, fz);
+            new_attributes.setUserForce(force);
+            objectp->setParameterEntry(LLNetworkData::PARAMS_FLEXIBLE, new_attributes, true);
+        }
+
+        if (update_shape)
+        {
+            mObject->sendShapeUpdate();
+            LLSelectMgr::getInstance()->selectionUpdatePhantom(volobjp->flagPhantom());
+        }
+    }
+    else
+    {
+        LLVOVolume *volobjp = (LLVOVolume *)objectp;
+        if (volobjp->setIsFlexible(false))
+        {
+            mObject->sendShapeUpdate();
+            LLSelectMgr::getInstance()->selectionUpdatePhantom(volobjp->flagPhantom());
+        }
+    }
+}
+
+void LLPanelVolume::onCopyLight()
+{
+    LLViewerObject* objectp = mObject;
+    if (!objectp)
+    {
+        return;
+    }
+
+    LLSD clipboard;
+
+    LLVOVolume *volobjp = NULL;
+    if (objectp && (objectp->getPCode() == LL_PCODE_VOLUME))
+    {
+        volobjp = (LLVOVolume *)objectp;
+    }
+
+    // Light Source
+    if (volobjp && volobjp->getIsLight())
+    {
+        clipboard["light"]["intensity"] = volobjp->getLightIntensity();
+        clipboard["light"]["radius"] = volobjp->getLightRadius();
+        clipboard["light"]["falloff"] = volobjp->getLightFalloff();
+        LLColor3 color = volobjp->getLightSRGBColor();
+        clipboard["light"]["r"] = color.mV[0];
+        clipboard["light"]["g"] = color.mV[1];
+        clipboard["light"]["b"] = color.mV[2];
+
+        // Spotlight
+        if (volobjp->isLightSpotlight())
+        {
+            LLUUID id = volobjp->getLightTextureID();
+            if (id.notNull() && get_can_copy_texture(id))
+            {
+                clipboard["spot"]["id"] = id;
+                LLVector3 spot_params = volobjp->getSpotLightParams();
+                clipboard["spot"]["fov"] = spot_params.mV[0];
+                clipboard["spot"]["focus"] = spot_params.mV[1];
+                clipboard["spot"]["ambiance"] = spot_params.mV[2];
+            }
+        }
+    }
+
+    if (volobjp && volobjp->isReflectionProbe())
+    {
+        clipboard["reflection_probe"]["is_box"] = volobjp->getReflectionProbeIsBox();
+        clipboard["reflection_probe"]["ambiance"] = volobjp->getReflectionProbeAmbiance();
+        clipboard["reflection_probe"]["near_clip"] = volobjp->getReflectionProbeNearClip();
+        clipboard["reflection_probe"]["dynamic"] = volobjp->getReflectionProbeIsDynamic();
+    }
+
+    mClipboardParams["light"] = clipboard;
+
+    refresh();
+}
+
+void LLPanelVolume::onPasteLight()
+{
+    LLViewerObject* objectp = mObject;
+    if (!objectp && mClipboardParams.has("light"))
+    {
+        return;
+    }
+
+    LLSD &clipboard = mClipboardParams["light"];
+
+    LLVOVolume *volobjp = NULL;
+    if (objectp && (objectp->getPCode() == LL_PCODE_VOLUME))
+    {
+        volobjp = (LLVOVolume *)objectp;
+    }
+
+    // Light Source
+    if (volobjp)
+    {
+        if (clipboard.has("light"))
+        {
+            volobjp->setIsLight(TRUE);
+            volobjp->setLightIntensity((F32)clipboard["light"]["intensity"].asReal());
+            volobjp->setLightRadius((F32)clipboard["light"]["radius"].asReal());
+            volobjp->setLightFalloff((F32)clipboard["light"]["falloff"].asReal());
+            F32 r = (F32)clipboard["light"]["r"].asReal();
+            F32 g = (F32)clipboard["light"]["g"].asReal();
+            F32 b = (F32)clipboard["light"]["b"].asReal();
+            volobjp->setLightSRGBColor(LLColor3(r, g, b));
+        }
+        else
+        {
+            volobjp->setIsLight(FALSE);
+        }
+
+        if (clipboard.has("spot"))
+        {
+            volobjp->setLightTextureID(clipboard["spot"]["id"].asUUID());
+            LLVector3 spot_params;
+            spot_params.mV[0] = (F32)clipboard["spot"]["fov"].asReal();
+            spot_params.mV[1] = (F32)clipboard["spot"]["focus"].asReal();
+            spot_params.mV[2] = (F32)clipboard["spot"]["ambiance"].asReal();
+            volobjp->setSpotLightParams(spot_params);
+        }
+
+        if (clipboard.has("reflection_probe"))
+        {
+            volobjp->setIsReflectionProbe(TRUE);
+            volobjp->setReflectionProbeIsBox(clipboard["reflection_probe"]["is_box"].asBoolean());
+            volobjp->setReflectionProbeAmbiance((F32)clipboard["reflection_probe"]["ambiance"].asReal());
+            volobjp->setReflectionProbeNearClip((F32)clipboard["reflection_probe"]["near_clip"].asReal());
+            volobjp->setReflectionProbeIsDynamic(clipboard["reflection_probe"]["dynamic"].asBoolean());
+        }
+        else
+        {
+            if (objectp->flagPhantom())
+            {
+                LLViewerObject* root = objectp->getRootEdit();
+                bool in_linkeset = root != objectp || objectp->numChildren() > 0;
+                if (in_linkeset)
+                {
+                    // In linkset with a phantom flag
+                    objectp->setFlags(FLAGS_PHANTOM, FALSE);
+                }
+            }
+
+            volobjp->setIsReflectionProbe(false);
+        }
+    }
+}
+
+void LLPanelVolume::menuDoToSelected(const LLSD& userdata)
+{
+    std::string command = userdata.asString();
+
+    // paste
+    if (command == "features_paste")
+    {
+        onPasteFeatures();
+    }
+    else if (command == "light_paste")
+    {
+        onPasteLight();
+    }
+    // copy
+    else if (command == "features_copy")
+    {
+        onCopyFeatures();
+    }
+    else if (command == "light_copy")
+    {
+        onCopyLight();
+    }
+}
+
+bool LLPanelVolume::menuEnableItem(const LLSD& userdata)
+{
+    std::string command = userdata.asString();
+
+    // paste options
+    if (command == "features_paste")
+    {
+        return mClipboardParams.has("features");
+    }
+    else if (command == "light_paste")
+    {
+        return mClipboardParams.has("light");
+    }
+    return false;
+}
+
+void LLPanelVolume::onClickPipetteLight()
+{
+    bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipetteLight->getToggleState();
+    if (!fEnabled)
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelVolume::onLightSelect, this, _1, _2, _3));
+        LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+        mBtnPipetteLight->setToggleState(TRUE);
+    }
+    else
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+    }
+}
+
+void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+    if (success && obj && mObject.get() && obj != mObject.get() && obj->permModify() && mObject->permModify())
+    {
+        LLVOVolume* volobjp = NULL;
+        if (mObject && (mObject->getPCode() == LL_PCODE_VOLUME))
+        {
+            volobjp = (LLVOVolume*)mObject.get();
+        }
+
+        LLVOVolume* hit_volobjp = NULL;
+        if (obj && (obj->getPCode() == LL_PCODE_VOLUME))
+        {
+            hit_volobjp = (LLVOVolume*)obj;
+        }
+
+        // Light Source
+        if (volobjp && hit_volobjp)
+        {
+            // Light Source
+            if (hit_volobjp->getIsLight())
+            {
+                volobjp->setIsLight(TRUE);
+                volobjp->setLightIntensity(hit_volobjp->getLightIntensity());
+                volobjp->setLightRadius(hit_volobjp->getLightRadius());
+                volobjp->setLightFalloff(hit_volobjp->getLightFalloff());
+                volobjp->setLightSRGBColor(hit_volobjp->getLightSRGBColor());
+
+                // Spotlight
+                if (hit_volobjp->isLightSpotlight())
+                {
+                    LLUUID id = hit_volobjp->getLightTextureID();
+                    if (id.notNull() && get_can_copy_texture(id))
+                    {
+                        volobjp->setLightTextureID(id);
+                        volobjp->setSpotLightParams(hit_volobjp->getSpotLightParams());
+                    }
+                }
+            }
+            else
+            {
+                volobjp->setIsLight(FALSE);
+            }
+
+            if (hit_volobjp->isReflectionProbe())
+            {
+                volobjp->setIsReflectionProbe(TRUE);
+                volobjp->setReflectionProbeIsBox(hit_volobjp->getReflectionProbeIsBox());
+                volobjp->setReflectionProbeAmbiance(hit_volobjp->getReflectionProbeAmbiance());
+                volobjp->setReflectionProbeNearClip(hit_volobjp->getReflectionProbeNearClip());
+                volobjp->setReflectionProbeIsDynamic(hit_volobjp->getReflectionProbeIsDynamic());
+            }
+            else
+            {
+                if (volobjp->flagPhantom())
+                {
+                    LLViewerObject* root = volobjp->getRootEdit();
+                    bool in_linkeset = root != volobjp || volobjp->numChildren() > 0;
+                    if (in_linkeset)
+                    {
+                        // In linkset with a phantom flag
+                        volobjp->setFlags(FLAGS_PHANTOM, FALSE);
+                    }
+                }
+
+                volobjp->setIsReflectionProbe(false);
+            }
+            refresh();
+        }
+    }
+    mBtnPipetteLight->setToggleState(FALSE);
+}
+
+void LLPanelVolume::onClickPipetteFeatures()
+{
+    bool fEnabled = (LLToolMgr::getInstance()->getCurrentTool() == LLToolPipette::getInstance()) && mBtnPipetteFeatures->getToggleState();
+    if (!fEnabled)
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelVolume::onFeaturesSelect, this, _1, _2, _3));
+        LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
+        mBtnPipetteFeatures->setToggleState(TRUE);
+    }
+    else
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+    }
+}
+
+void LLPanelVolume::onFeaturesSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te)
+{
+    if (success && obj && mObject.get() && obj != mObject.get() && obj->permModify() && mObject->permModify())
+    {
+        LLVOVolume* volobjp = NULL;
+        if (mObject && (mObject->getPCode() == LL_PCODE_VOLUME))
+        {
+            volobjp = (LLVOVolume*)mObject.get();
+        }
+
+        LLVOVolume* hit_volobjp = NULL;
+        if (obj && (obj->getPCode() == LL_PCODE_VOLUME))
+        {
+            hit_volobjp = (LLVOVolume*)obj;
+        }
+
+        // Light Source
+        if (volobjp && hit_volobjp)
+        {
+            // Physics
+            //bool is_root = volobjp->isRoot();
+
+            //// Not sure if phantom should go under physics, but doesn't fit elsewhere
+            //BOOL is_phantom = clipboard["is_phantom"].asBoolean() && is_root;
+            //LLSelectMgr::getInstance()->selectionUpdatePhantom(is_phantom);
+
+            //BOOL is_physical = clipboard["is_physical"].asBoolean() && is_root;
+            //LLSelectMgr::getInstance()->selectionUpdatePhysics(is_physical);
+
+            {
+                volobjp->setPhysicsShapeType(hit_volobjp->getPhysicsShapeType());
+                U8 cur_material = volobjp->getMaterial();
+                U8 material = (U8)hit_volobjp->getMaterial() | (cur_material & ~LL_MCODE_MASK);
+
+                volobjp->setMaterial(material);
+                volobjp->sendMaterialUpdate();
+                volobjp->setPhysicsGravity(hit_volobjp->getPhysicsGravity());
+                volobjp->setPhysicsFriction(hit_volobjp->getPhysicsFriction());
+                volobjp->setPhysicsDensity(hit_volobjp->getPhysicsDensity());
+                volobjp->setPhysicsRestitution(hit_volobjp->getPhysicsRestitution());
+                volobjp->updateFlags(TRUE);
+            }
+
+            // Flexible
+            bool is_flexible = hit_volobjp->isFlexible();
+            if (is_flexible && volobjp->canBeFlexible())
+            {
+                BOOL update_shape = FALSE;
+
+                // do before setParameterEntry or it will think that it is already flexi
+                update_shape = volobjp->setIsFlexible(is_flexible);
+
+                if (volobjp->getClickAction() == CLICK_ACTION_SIT)
+                {
+                    volobjp->setClickAction(CLICK_ACTION_NONE);
+                }
+
+                LLFlexibleObjectData* attributes = (LLFlexibleObjectData*)volobjp->getFlexibleObjectData();
+                if (attributes)
+                {
+                    LLFlexibleObjectData new_attributes;
+                    new_attributes = *attributes;
+                    new_attributes.setSimulateLOD(attributes->getSimulateLOD());
+                    new_attributes.setGravity(attributes->getGravity());
+                    new_attributes.setTension(attributes->getTension());
+                    new_attributes.setAirFriction(attributes->getAirFriction());
+                    new_attributes.setWindSensitivity(attributes->getWindSensitivity());
+                    LLVector3 force = attributes->getUserForce();
+                    new_attributes.setUserForce(force);
+                    volobjp->setParameterEntry(LLNetworkData::PARAMS_FLEXIBLE, new_attributes, true);
+                }
+
+                if (update_shape)
+                {
+                    mObject->sendShapeUpdate();
+                    LLSelectMgr::getInstance()->selectionUpdatePhantom(volobjp->flagPhantom());
+                }
+            }
+            else
+            {
+                if (volobjp->setIsFlexible(false))
+                {
+                    mObject->sendShapeUpdate();
+                    LLSelectMgr::getInstance()->selectionUpdatePhantom(volobjp->flagPhantom());
+                }
+            }
+            refresh();
+        }
+    }
+    mBtnPipetteFeatures->setToggleState(FALSE);
+}
+
 // static
 void LLPanelVolume::onCommitMaterial( LLUICtrl* ctrl, void* userdata )
 {
@@ -854,7 +1530,7 @@ void LLPanelVolume::onCommitMaterial( LLUICtrl* ctrl, void* userdata )
 					objectp->setPhysicsRestitution(LLMaterialTable::basic.getRestitution(material_code));
 				}
 			}
-			LLSelectMgr::getInstanceFast()->selectionSetMaterial(material_code);
+			LLSelectMgr::getInstance()->selectionSetMaterial(material_code);
 		}
 	}
 }
@@ -917,6 +1593,59 @@ void LLPanelVolume::onCommitLight( LLUICtrl* ctrl, void* userdata )
 	
 }
 
+//static 
+void LLPanelVolume::onCommitProbe(LLUICtrl* ctrl, void* userdata)
+{
+    LLPanelVolume* self = (LLPanelVolume*)userdata;
+    LLViewerObject* objectp = self->mObject;
+    if (!objectp || (objectp->getPCode() != LL_PCODE_VOLUME))
+    {
+        return;
+    }
+    LLVOVolume* volobjp = (LLVOVolume*)objectp;
+
+    volobjp->setReflectionProbeAmbiance((F32)self->getChild<LLUICtrl>("Probe Ambiance")->getValue().asReal());
+    volobjp->setReflectionProbeNearClip((F32)self->getChild<LLUICtrl>("Probe Near Clip")->getValue().asReal());
+    volobjp->setReflectionProbeIsDynamic(self->getChild<LLUICtrl>("Probe Dynamic")->getValue().asBoolean());
+
+    std::string shape_type = self->getChild<LLUICtrl>("Probe Volume Type")->getValue().asString();
+
+    bool is_box = shape_type == "Box";
+
+    if (volobjp->setReflectionProbeIsBox(is_box))
+    {
+        // make the volume match the probe
+        auto* select_mgr = LLSelectMgr::getInstance();
+
+        select_mgr->selectionUpdatePhantom(true);
+        select_mgr->selectionSetGLTFMaterial(LLUUID::null);
+        select_mgr->selectionSetAlphaOnly(0.f);
+
+        U8 profile, path;
+
+        if (!is_box)
+        {
+            profile = LL_PCODE_PROFILE_CIRCLE_HALF;
+            path = LL_PCODE_PATH_CIRCLE;
+
+            F32 scale = volobjp->getScale().mV[0];
+            volobjp->setScale(LLVector3(scale, scale, scale), FALSE);
+            LLSelectMgr::getInstance()->sendMultipleUpdate(UPD_ROTATION | UPD_POSITION | UPD_SCALE);
+        }
+        else
+        {
+            profile = LL_PCODE_PROFILE_SQUARE;
+            path = LL_PCODE_PATH_LINE;
+        }
+        
+        LLVolumeParams params;
+        params.getProfileParams().setCurveType(profile);
+        params.getPathParams().setCurveType(path);
+        objectp->updateVolume(params);
+    }
+
+}
+
 // static
 void LLPanelVolume::onCommitIsLight( LLUICtrl* ctrl, void* userdata )
 {
@@ -930,13 +1659,35 @@ void LLPanelVolume::setLightTextureID(const LLUUID &asset_id, const LLUUID &item
     if (volobjp)
     {
         LLViewerInventoryItem* item = gInventory.getItem(item_id);
+
+        if (item && volobjp->isAttachment())
+        {
+            const LLPermissions& perm = item->getPermissions();
+            BOOL unrestricted = ((perm.getMaskBase() & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED) ? TRUE : FALSE;
+            if (!unrestricted)
+            {
+                // Attachments are in world and in inventory simultaneously,
+                // at the moment server doesn't support such a situation.
+                return;
+            }
+        }
+
         if (item && !item->getPermissions().allowOperationBy(PERM_COPY, gAgent.getID()))
         {
-            LLToolDragAndDrop::handleDropTextureProtections(volobjp, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
+            LLToolDragAndDrop::handleDropMaterialProtections(volobjp, item, LLToolDragAndDrop::SOURCE_AGENT, LLUUID::null);
         }    
         volobjp->setLightTextureID(asset_id);
     }
 }
+//----------------------------------------------------------------------------
+
+// static
+void LLPanelVolume::onCommitIsReflectionProbe(LLUICtrl* ctrl, void* userdata)
+{
+    LLPanelVolume* self = (LLPanelVolume*)userdata;
+    self->sendIsReflectionProbe();
+}
+
 //----------------------------------------------------------------------------
 
 // static

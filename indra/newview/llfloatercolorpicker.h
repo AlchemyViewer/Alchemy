@@ -104,9 +104,6 @@ class LLFloaterColorPicker final
 		void setMouseDownInSwatch (BOOL mouse_down_in_swatch);
 		BOOL getMouseDownInSwatch () { return mMouseDownInSwatch; }
 
-		void setRevertOnCancel (BOOL revertOnCancel) { mRevertOnCancel = revertOnCancel; };
-		BOOL getRevertOnCancel () { return mRevertOnCancel; }
-
 		BOOL isColorChanged ();
 
 		// called when text entries (RGB/HSL etc.) are changed by user
@@ -125,7 +122,8 @@ class LLFloaterColorPicker final
 			   void onClickPipette ( );
 		static void onTextCommit ( LLUICtrl* ctrl, void* data );
 		static void onImmediateCheck ( LLUICtrl* ctrl, void* data );
-			   void onColorSelect( const class LLTextureEntry& te );
+			   void onColorSelect(bool success, const class LLTextureEntry& te);
+		void menuDoToSelected(const LLSD& userdata);
 	private:
 		// mutators for color values, can raise event to preview changes at object
 		void selectCurRgb ( F32 curRIn, F32 curGIn, F32 curBIn );
@@ -148,8 +146,6 @@ class LLFloaterColorPicker final
 		BOOL mMouseDownInLumRegion;
 		BOOL mMouseDownInHueRegion;
 		BOOL mMouseDownInSwatch;
-
-		BOOL mRevertOnCancel;
 
 		const S32 mRGBViewerImageLeft;
 		const S32 mRGBViewerImageTop;
@@ -201,7 +197,6 @@ class LLFloaterColorPicker final
         F32       mContextConeInAlpha;
         F32       mContextConeOutAlpha;
         F32       mContextConeFadeTime;
-
 };
 
 #endif // LL_LLFLOATERCOLORPICKER_H

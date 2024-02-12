@@ -35,6 +35,7 @@
 // STL headers
 // std headers
 #include <atomic>
+#include <stdexcept>
 // external library headers
 #include <boost/bind.hpp>
 #include <boost/fiber/fiber.hpp>
@@ -122,11 +123,7 @@ LLCoros::LLCoros():
     // Previously we used
     // boost::context::guarded_stack_allocator::default_stacksize();
     // empirically this is insufficient.
-#if ADDRESS_SIZE == 64
-    mStackSize(512*1024),
-#else
-    mStackSize(256*1024),
-#endif
+    mStackSize(768*1024),
     // mCurrent does NOT own the current CoroData instance -- it simply
     // points to it. So initialize it with a no-op deleter.
     mCurrent{ [](CoroData*){} }
@@ -210,6 +207,22 @@ std::string LLCoros::logname()
     return data.mName.empty()? data.getKey() : data.mName;
 }
 
+void LLCoros::saveException(const std::string& name, std::exception_ptr exc)
+{
+    mExceptionQueue.emplace(name, exc);
+}
+
+void LLCoros::rethrow()
+{
+    if (! mExceptionQueue.empty())
+    {
+        ExceptionData front = mExceptionQueue.front();
+        mExceptionQueue.pop();
+        LL_WARNS("LLCoros") << "Rethrowing exception from coroutine " << front.name << LL_ENDL;
+        std::rethrow_exception(front.exception);
+    }
+}
+
 void LLCoros::setStackSize(S32 stacksize)
 {
     LL_DEBUGS("LLCoros") << "Setting coroutine stack size to " << stacksize << LL_ENDL;
@@ -245,36 +258,38 @@ std::string LLCoros::launch(const std::string& prefix, const callable_t& callabl
     // protected_fixedsize_stack sets a guard page past the end of the new
     // stack so that stack underflow will result in an access violation
     // instead of weird, subtle, possibly undiagnosed memory stomps.
-    boost::fibers::fiber newCoro(boost::fibers::launch::dispatch,
-                                 std::allocator_arg,
-                                 boost::fibers::protected_fixedsize_stack(mStackSize),
-                                 [this, &name, &callable](){ toplevel(name, callable); });
-    // You have two choices with a fiber instance: you can join() it or you
-    // can detach() it. If you try to destroy the instance before doing
-    // either, the program silently terminates. We don't need this handle.
-    newCoro.detach();
+
+    try
+    {
+        boost::fibers::fiber newCoro(boost::fibers::launch::dispatch,
+            std::allocator_arg,
+            boost::fibers::protected_fixedsize_stack(mStackSize),
+            [this, &name, &callable]() { toplevel(name, callable); });
+
+        // You have two choices with a fiber instance: you can join() it or you
+        // can detach() it. If you try to destroy the instance before doing
+        // either, the program silently terminates. We don't need this handle.
+        newCoro.detach();
+    }
+    catch (std::bad_alloc&)
+    {
+        // Out of memory on stack allocation?
+        printActiveCoroutines();
+        LL_ERRS("LLCoros") << "Bad memory allocation in LLCoros::launch(" << prefix << ")!" << LL_ENDL;
+    }
+
     return name;
 }
+
+namespace
+{
 
 #if LL_WINDOWS
 
 static const U32 STATUS_MSC_EXCEPTION = 0xE06D7363; // compiler specific
 
-U32 cpp_exception_filter(U32 code, struct _EXCEPTION_POINTERS *exception_infop, const std::string& name)
+U32 exception_filter(U32 code, struct _EXCEPTION_POINTERS *exception_infop)
 {
-    // C++ exceptions were logged in toplevelTryWrapper, but not SEH
-    // log SEH exceptions here, to make sure it gets into bugsplat's 
-    // report and because __try won't allow std::string operations
-    if (code != STATUS_MSC_EXCEPTION)
-    {
-        LL_WARNS() << "SEH crash in " << name << ", code: " << code << LL_ENDL;
-    }
-    // Handle bugsplat here, since GetExceptionInformation() can only be
-    // called from within filter for __except(filter), not from __except's {}
-    // Bugsplat should get all exceptions, C++ and SEH
-    LLApp::instance()->reportCrashToBugsplat(exception_infop);
-
-    // Only convert non C++ exceptions.
     if (code == STATUS_MSC_EXCEPTION)
     {
         // C++ exception, go on
@@ -287,29 +302,38 @@ U32 cpp_exception_filter(U32 code, struct _EXCEPTION_POINTERS *exception_infop, 
     }
 }
 
-void LLCoros::winlevel(const std::string& name, const callable_t& callable)
+void sehandle(const LLCoros::callable_t& callable)
 {
     __try
     {
-        toplevelTryWrapper(name, callable);
+        callable();
     }
-    __except (cpp_exception_filter(GetExceptionCode(), GetExceptionInformation(), name))
+    __except (exception_filter(GetExceptionCode(), GetExceptionInformation()))
     {
-        // convert to C++ styled exception for handlers other than bugsplat
+        // convert to C++ styled exception
         // Note: it might be better to use _se_set_translator
         // if you want exception to inherit full callstack
-        //
-        // in case of bugsplat this will get to exceptionTerminateHandler and
-        // looks like fiber will terminate application after that
         char integer_string[512];
-        snprintf(integer_string, 512, "SEH crash in %s, code: %lu\n", name.c_str(), GetExceptionCode());
+        snprintf(integer_string, 512, "SEH, code: %lu\n", GetExceptionCode());
         throw std::exception(integer_string);
     }
 }
 
-#endif
+#else  // ! LL_WINDOWS
 
-void LLCoros::toplevelTryWrapper(const std::string& name, const callable_t& callable)
+inline void sehandle(const LLCoros::callable_t& callable)
+{
+    callable();
+}
+
+#endif // ! LL_WINDOWS
+
+} // anonymous namespace
+
+// Top-level wrapper around caller's coroutine callable.
+// Normally we like to pass strings and such by const reference -- but in this
+// case, we WANT to copy both the name and the callable to our local stack!
+void LLCoros::toplevel(std::string name, callable_t callable)
 {
     // keep the CoroData on this top-level function's stack frame
     CoroData corodata(name);
@@ -319,12 +343,12 @@ void LLCoros::toplevelTryWrapper(const std::string& name, const callable_t& call
     // run the code the caller actually wants in the coroutine
     try
     {
-        callable();
+        sehandle(callable);
     }
     catch (const Stop& exc)
     {
         LL_INFOS("LLCoros") << "coroutine " << name << " terminating because "
-            << exc.what() << LL_ENDL;
+                            << exc.what() << LL_ENDL;
     }
     catch (const LLContinueError&)
     {
@@ -335,25 +359,11 @@ void LLCoros::toplevelTryWrapper(const std::string& name, const callable_t& call
     }
     catch (...)
     {
-        // Any OTHER kind of uncaught exception will cause the viewer to
-        // crash, hopefully informatively.
+        // Stash any OTHER kind of uncaught exception in the rethrow() queue
+        // to be rethrown by the main fiber.
         LOG_UNHANDLED_EXCEPTION(STRINGIZE("coroutine " << name));
-        // to not modify callstack
-        throw;
+        LLCoros::instance().saveException(name, std::current_exception());
     }
-}
-
-// Top-level wrapper around caller's coroutine callable.
-// Normally we like to pass strings and such by const reference -- but in this
-// case, we WANT to copy both the name and the callable to our local stack!
-void LLCoros::toplevel(std::string name, callable_t callable)
-{
-#if LL_WINDOWS
-    // Can not use __try in functions that require unwinding, so use one more wrapper
-    winlevel(name, callable);
-#else
-    toplevelTryWrapper(name, callable);
-#endif
 }
 
 //static

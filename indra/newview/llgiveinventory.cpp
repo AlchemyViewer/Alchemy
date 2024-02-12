@@ -350,7 +350,7 @@ void LLGiveInventory::logInventoryOffer(const LLUUID& to_agent, const LLUUID &im
 			std::string full_name = LLCacheName::buildUsername(av_name.getUserName());
 			LLUIString message = LLTrans::getString(message_name + "-im");
 			message.setArgs(args);
-			LLIMModel::instance().logToFile(full_name, LLTrans::getString("ALCHEMY"), im_session_id, message.getString());
+			LLIMModel::instance().logToFile(full_name, LLTrans::getString("APP_NAME"), im_session_id, message.getString());
 		}
 	}
 }
@@ -474,7 +474,7 @@ bool LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
 	if ( (!RlvActions::isRlvEnabled()) ||
 	     (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
 	{
-		LLRecentPeople::instanceFast().add(to_agent);
+		LLRecentPeople::instance().add(to_agent);
 	}
 	return true;
 // [/RLVa:KB]
@@ -564,7 +564,7 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
 	if ( (!RlvActions::isRlvEnabled()) ||
 	     (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
 	{
-		LLRecentPeople::instanceFast().add(to_agent);
+		LLRecentPeople::instance().add(to_agent);
 	}
 // [/RLVa:KB]
 

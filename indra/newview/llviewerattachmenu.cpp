@@ -67,11 +67,11 @@ void LLViewerAttachMenu::populateMenus(const std::string& attach_to_menu_name, c
 
 		if (LLTrans::findString(translated_submenu_name, submenu_name))
 		{
-			p.name = (" ") + translated_submenu_name + " ";
+			p.name = attachment->getIsHUDAttachment() ? translated_submenu_name : fmt::format(FMT_STRING("{} ({})"), translated_submenu_name, attach_pair.first);
 		}
 		else
 		{
-			p.name = submenu_name;
+			p.name = attachment->getIsHUDAttachment() ? submenu_name : fmt::format(FMT_STRING("{} ({})"), submenu_name, attach_pair.first);
 		}
 
 		LLSD cbparams;

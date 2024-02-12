@@ -215,7 +215,7 @@ void LLViewerPartSourceScript::update(const F32 dt)
 		first_run = TRUE;
 	}
 
-	LLViewerCamera& vwrCamera = LLViewerCamera::instanceFast();
+	LLViewerCamera& vwrCamera = LLViewerCamera::instance();
 
 	F32 max_time = llmax(1.f, 10.f*mPartSysData.mBurstRate);
 	dt_update = llmin(max_time, dt_update);
@@ -304,9 +304,6 @@ void LLViewerPartSourceScript::update(const F32 dt)
 				// Limit particle generation
 				continue;
 			}
-
-			if (mPartSysData.mPartData.mFlags & LLPartData::LL_PART_RIBBON_MASK && mLastPart && (mLastPart->mPosAgent-mPosAgent).magVec() <= .005f)
-				continue; //Skip if parent isn't far enough away.
 
 			LLViewerPart* part = new LLViewerPart();
 

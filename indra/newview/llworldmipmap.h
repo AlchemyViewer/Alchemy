@@ -33,6 +33,8 @@
 #include "indra_constants.h"	// REGION_WIDTH_UNITS
 #include "llregionhandle.h"		// to_region_handle()
 
+#include "boost/unordered/unordered_flat_map.hpp"
+
 class LLViewerFetchedTexture;
 
 // LLWorldMipmap : Mipmap handling of all the tiles used to render the world at any resolution.
@@ -53,8 +55,8 @@ class LLWorldMipmap
 {
 public:
 	// Parameters of the mipmap
-	static const S32 MAP_LEVELS = 8;		// Number of subresolution levels computed by the mapserver
-	static const S32 MAP_TILE_SIZE = 256;	// Width in pixels of the tiles computed by the mapserver
+	static constexpr S32 MAP_LEVELS = 8;		// Number of subresolution levels computed by the mapserver
+	static constexpr S32 MAP_TILE_SIZE = 256;	// Width in pixels of the tiles computed by the mapserver
 
 	LLWorldMipmap();
 	~LLWorldMipmap();
@@ -84,7 +86,7 @@ private:
 
 	// The mipmap is organized by resolution level (MAP_LEVELS of them). Each resolution level is an std::map
 	// using a region_handle as a key and storing a smart pointer to the image as a value.
-	typedef std::map<U64, LLPointer<LLViewerFetchedTexture> > sublevel_tiles_t;
+	typedef boost::unordered_flat_map<U64, LLPointer<LLViewerFetchedTexture> > sublevel_tiles_t;
 	sublevel_tiles_t mWorldObjectsMipMap[MAP_LEVELS];
 //	sublevel_tiles_t mWorldTerrainMipMap[MAP_LEVELS];
 

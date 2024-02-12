@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """\
 @file template_verifier.py
@@ -35,7 +36,6 @@ each other.
 
 import sys
 import os.path
-import certifi
 
 # Look for indra/lib/python in all possible parent directories ...
 # This is an improvement over the setup-path.py method used previously:
@@ -142,7 +142,7 @@ def fetch(url):
         with open(file_name, 'rb') as f:
             return f.read()
     else:
-        with urllib.request.urlopen(url, cafile=certifi.where()) as res:
+        with urllib.request.urlopen(url) as res:
             body = res.read()
             if res.status > 299:
                 sys.exit("ERROR: Unable to download %s. HTTP status %d.\n%s" % (url, res.status, body.decode("utf-8")))
@@ -240,7 +240,7 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
         default=False,  help="""Set to true to attempt use local cached copy of the master template.""")
     parser.add_option(
         '-f', '--force', action='store_true', dest='force_verification',
-        default=False, help="""Set to true to skip the sha_256 check and force template verification.""")
+        default=False, help="""Set to true to skip the blake2 check and force template verification.""")
 
     options, args = parser.parse_args(sysargs)
 
@@ -279,13 +279,13 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
 
     # retrieve the contents of the local template
     current = fetch(current_url)
-    hexdigest = hashlib.sha256(current).hexdigest()
-    if not options.force_verification:
+    hexdigest = hashlib.blake2b(current).hexdigest()
+    if options.force_verification == False:
         # Early exist if the template hasn't changed.
-        sha_url = "%s.sha256" % current_url
-        current_sha = fetch(sha_url)
-        if hexdigest == current_sha:
-            print("Message template SHA_256 has not changed.")
+        b2_url = "%s.b2" % current_url
+        current_b2b = fetch(b2_url)
+        if hexdigest == current_b2b:
+            print("Message template BLAKE2 has not changed.")
             sys.exit(0)
 
     # and check for syntax
@@ -320,10 +320,10 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
     if acceptable:
         explain("--- PASS ---", compat)
         if options.force_verification == False:
-            print("Updating sha256 to %s" % hexdigest)
-            sha_filename = "%s.sha256" % current_filename
-            with open(sha_filename, 'w') as sha_file:
-                sha_file.write(hexdigest)
+            print("Updating blake2 hash to %s" % hexdigest)
+            b2_filename = "%s.b2" % current_filename
+            with open(b2_filename, 'w') as b2_file:
+                b2_file.write(hexdigest)
     else:
         explain("*** FAIL ***", compat)
         return 1

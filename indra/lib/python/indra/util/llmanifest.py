@@ -40,6 +40,7 @@ import itertools
 import operator
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -127,7 +128,7 @@ BASE_ARGUMENTS=[
          but not application name (used internally)""",
          default=None),
     dict(name='configuration',
-         description="""The build configuration used.""",
+         description="""The build configurations sub directory used.""",
          default="Release"),
     dict(name='dest', description='Destination directory.', default=DEFAULT_SRCTREE),
     dict(name='grid',
@@ -159,6 +160,12 @@ BASE_ARGUMENTS=[
          default=None),
     dict(name='versionfile',
          description="""The name of a file containing the full version number."""),
+    dict(name='updateurl',
+         description="""This specifies the updater service URL for delta package generation""",
+         default="https://update.alchemyviewer.org"),
+    dict(name='gendelta',
+         description="""Enable generation of delta updates on windows""",
+         default=None),
     ]
 
 def usage(arguments, srctree=""):
@@ -452,7 +459,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
             # if we restore the length of each stack to what it was before the
             # current prefix() block, it doesn't matter whether end_prefix()
             # was called or not.
-            for stack, prevlen in self.prevlen.items():
+            for stack, prevlen in list(self.prevlen.items()):
                 # find the attribute in 'self.manifest' named by 'stack', and
                 # truncate that list back to 'prevlen'
                 del getattr(self.manifest, stack)[prevlen:]
@@ -533,15 +540,15 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         self.cmakedirs(path)
         return path
 
-    def run_command(self, command):
+    def run_command(self, command, **kwds):
         """ 
         Runs an external command.  
         Raises ManifestError exception if the command returns a nonzero status.
         """
-        print("Running command:", command)
+        print("Running command:", shlex.join(command))
         sys.stdout.flush()
         try:
-            subprocess.check_call(command)
+            subprocess.check_call(command, **kwds)
         except subprocess.CalledProcessError as err:
             raise ManifestError( "Command %s returned non-zero status (%s)"
                                 % (command, err.returncode) )
@@ -618,7 +625,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
                 organize[frozenset(missingfile.tried)].add(missingfile.pattern)
             # Now dump all the patterns sought in each group of 'tried'
             # directories.
-            for tried, patterns in organize.items():
+            for tried, patterns in list(organize.items()):
                 print("  Could not find in:")
                 for dir in sorted(tried):
                     print("    %s" % dir)
@@ -869,7 +876,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
                 break
         else:
             # no more prefixes left to try
-            print("\nunable to find '%s'; looked in:\n  %s" % (src, '\n  '.join(try_prefixes)))
+            print(("\nunable to find '%s'; looked in:\n  %s" % (src, '\n  '.join(try_prefixes))))
             if err_if_missing == True:
                 self.missing.append(MissingFile(pattern=src, tried=try_prefixes))
             # At this point 'count' might never have been successfully
@@ -883,33 +890,47 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         return count
 
     def path_optional(self, src, dst=None):
-        """
-        For a number of our self.path() calls, not only do we want
-        to deal with the absence of src, we also want to remember
-        which were present. Return either an empty list (absent)
-        or a list containing dst (present). Concatenate these
-        return values to get a list of all libs that are present.
-        """
-        if dst is None:
+        sys.stdout.flush()
+        if src == None:
+            raise ManifestError("No source file, dst is " + dst)
+        if dst == None:
             dst = src
+        dst = os.path.join(self.get_dst_prefix(), dst)
+        sys.stdout.write("Processing %s => %s ... " % (src, self._relative_dst_path(dst)))
 
-        # This was simple before we started needing to pass
-        # wildcards. Fortunately, self.path() ends up appending a
-        # (source, dest) pair to self.file_list for every expanded
-        # file processed. Remember its size before the call.
-        oldlen = len(self.file_list)
-        try:
-            self.path(src, dst, False)
-            # The dest appended to self.file_list has been prepended
-            # with self.get_dst_prefix(). Strip it off again.
-            added = [os.path.relpath(d, self.get_dst_prefix())
-                     for s, d in self.file_list[oldlen:]]
-        except (ManifestError, MissingError) as err:
-            print("Warning: %s" % err.msg, file=sys.stderr)
-            added = []
-        if not added:
-            print("Skipping %s" % dst)
-        return added
+        def try_path(src):
+            # expand globs
+            count = 0
+            if self.wildcard_pattern.search(src):
+                for s,d in self.expand_globs(src, dst):
+                    assert(s != d)
+                    count += self.process_file(s, d)
+            else:
+                # if we're specifying a single path (not a glob),
+                # we should error out if it doesn't exist
+                self.check_file_exists(src)
+                count += self.process_either(src, dst)
+            return count
+
+        try_prefixes = [self.get_src_prefix(), self.get_artwork_prefix(), self.get_build_prefix()]
+        for pfx in try_prefixes:
+            try:
+                count = try_path(os.path.join(pfx, src))
+            except MissingError:
+                # if we produce MissingError, just try the next prefix
+                continue
+            # If we actually found nonzero files, stop looking
+            if count:
+                break
+        else:
+            sys.stdout.write("Skipping %s\n" % (src))
+            return 0
+
+        print("%d files" % count)
+
+        # Let caller check whether we processed as many files as expected. In
+        # particular, let caller notice 0.
+        return count
 
     def do(self, *actions):
         self.actions = actions

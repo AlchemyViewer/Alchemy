@@ -63,7 +63,6 @@
 #include "llcontrolavatar.h"
 #include "lldrawable.h"
 #include "llface.h"
-#include "llfloaterproperties.h"
 #include "llfloatertools.h"
 #include "llfollowcam.h"
 #include "llhudtext.h"
@@ -84,11 +83,10 @@
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
 #include "llvograss.h"
-#include "llvoground.h"
+#include "llvosky.h"
 #include "llvolume.h"
 #include "llvolumemessage.h"
 #include "llvopartgroup.h"
-#include "llvosky.h"
 #include "llvosurfacepatch.h"
 #include "llvotree.h"
 #include "llvovolume.h"
@@ -107,6 +105,8 @@
 #include "llcleanup.h"
 #include "llcallstack.h"
 #include "llmeshrepository.h"
+#include "llgltfmateriallist.h"
+#include "llgl.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvactions.h"
 #include "rlvcommon.h"
@@ -150,23 +150,36 @@ const S32 MAX_OBJECT_BINARY_DATA_SIZE = 60 + 16;
 const F64 INVENTORY_UPDATE_WAIT_TIME_DESYNC = 5; // seconds
 const F64 INVENTORY_UPDATE_WAIT_TIME_OUTDATED = 1;
 
-static LLTrace::BlockTimerStatHandle FTM_CREATE_OBJECT("Create Object");
-
 // static
 LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp, S32 flags)
 {
+    LL_PROFILE_ZONE_SCOPED;
 #ifdef SHOW_DEBUG
     LL_DEBUGS("ObjectUpdate") << "creating " << id << LL_ENDL;
     dumpStack("ObjectUpdateStack");
 #endif
     
 	LLViewerObject *res = NULL;
-	LL_RECORD_BLOCK_TIME(FTM_CREATE_OBJECT);
-	
+
+	if (gNonInteractive
+		&& pcode != LL_PCODE_LEGACY_AVATAR
+		&& pcode != LL_VO_SURFACE_PATCH
+		&& pcode != LL_VO_WATER
+		&& pcode != LL_VO_VOID_WATER
+		&& pcode != LL_VO_WL_SKY
+		&& pcode != LL_VO_SKY
+		&& pcode != LL_VO_PART_GROUP
+		)
+	{
+		return res;
+	}
 	switch (pcode)
 	{
 	case LL_PCODE_VOLUME:
-	  res = new LLVOVolume(id, pcode, regionp); break;
+	{
+		res = new LLVOVolume(id, pcode, regionp); break;
+		break;
+	}
 	case LL_PCODE_LEGACY_AVATAR:
 	{
 		if (id == gAgentID)
@@ -174,8 +187,8 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
 			if (!gAgentAvatarp)
 			{
 				gAgentAvatarp = new LLVOAvatarSelf(id, pcode, regionp);
+				gAgentWearables.setAvatarObject(gAgentAvatarp); // Set before instance init
 				gAgentAvatarp->initInstance();
-				gAgentWearables.setAvatarObject(gAgentAvatarp);
 			}
 			else 
 			{
@@ -226,8 +239,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
 		res = new LLVOVoidWater(id, pcode, regionp); break;
 	case LL_VO_WATER:
 		res = new LLVOWater(id, pcode, regionp); break;
-	case LL_VO_GROUND:
-	  res = new LLVOGround(id, pcode, regionp); break;
 	case LL_VO_PART_GROUP:
 	  res = new LLVOPartGroup(id, pcode, regionp); break;
 	case LL_VO_HUD_PART_GROUP:
@@ -238,12 +249,12 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
 	  LL_WARNS() << "Unknown object pcode " << (S32)pcode << LL_ENDL;
 	  res = NULL; break;
 	}
+
 	return res;
 }
 
 LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp, BOOL is_global)
-:	LLTrace::MemTrackable<LLViewerObject>("LLViewerObject"),
-	LLPrimitive(),
+:	LLPrimitive(),
 	mChildList(),
 	mID(id),
 	mLocalID(0),
@@ -252,7 +263,6 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
 	mTEImages(NULL),
 	mTENormalMaps(NULL),
 	mTESpecularMaps(NULL),
-	mGLName(0),
 	mbCanSelect(TRUE),
 	mFlags(0),
 	mPhysicsShapeType(0),
@@ -310,7 +320,8 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
 	mLastUpdateCached(FALSE),
 	mExtraParameterList(LLNetworkData::PARAMS_MAX >> 4),
 	mCachedMuteListUpdateTime(0),
-	mCachedOwnerInMuteList(false)
+	mCachedOwnerInMuteList(false),
+	mRiggedAttachedWarned(false)
 {
 	if (!is_global)
 	{
@@ -337,6 +348,13 @@ LLViewerObject::~LLViewerObject()
 {
 	deleteTEImages();
 
+    // unhook from reflection probe manager
+    if (mReflectionProbe.notNull())
+    {
+        mReflectionProbe->mViewerObject = nullptr;
+        mReflectionProbe = nullptr;
+    }
+
 	if(mInventory)
 	{
 		mInventory->clear();  // will deref and delete entries
@@ -349,6 +367,13 @@ LLViewerObject::~LLViewerObject()
 		mPartSourcep->setDead();
 		mPartSourcep = NULL;
 	}
+
+    if (mText)
+    {
+        // something recovered LLHUDText when object was already dead
+        mText->markDead();
+        mText = NULL;
+    }
 
 	// Delete memory associated with extra parameters.
 	mExtraParameterList.clear();
@@ -391,6 +416,7 @@ void LLViewerObject::markDead()
 {
 	if (!mDead)
 	{
+        LL_PROFILE_ZONE_SCOPED;
 		//LL_INFOS() << "Marking self " << mLocalID << " as dead." << LL_ENDL;
 		
 		// Root object of this hierarchy unlinks itself.
@@ -487,12 +513,35 @@ void LLViewerObject::markDead()
 
 		if (flagCameraSource())
 		{
-			LLFollowCamMgr::getInstanceFast()->removeFollowCamParams(mID);
+			LLFollowCamMgr::getInstance()->removeFollowCamParams(mID);
 		}
+
+        if (mReflectionProbe.notNull())
+        {
+            mReflectionProbe->mViewerObject = nullptr;
+            mReflectionProbe = nullptr;
+        }
 
 		sNumZombieObjects++;
 	}
 }
+
+S32 LLViewerObject::getNumVisibleFaces() const 
+{ 
+	int v{0}; 
+	if(mDrawable.notNull())
+	{ 
+		for (int i = 0;i < mDrawable->getNumFaces();i++)
+		{
+			const LLFace* f = mDrawable->getFace(i);
+			if (f && f->getTextureEntry() && f->getTextureEntry()->getAlpha() != 0.0f)
+			{
+				v++;
+			}
+		} 
+	}
+	return v;
+};
 
 void LLViewerObject::dump() const
 {
@@ -714,10 +763,8 @@ void LLViewerObject::setNameValueList(const std::string& name_value_list)
 BOOL LLViewerObject::isAnySelected() const
 {
     bool any_selected = isSelected();
-    for (child_list_t::const_iterator iter = mChildList.begin();
-         iter != mChildList.end(); iter++)
+    for (const LLViewerObject* child : mChildList)
     {
-        const LLViewerObject* child = *iter;
         any_selected = any_selected || child->isSelected();
     }
     return any_selected;
@@ -751,10 +798,8 @@ bool LLViewerObject::isReturnable()
 // [/RLVa:KB]
 	std::vector<LLBBox> boxes;
 	boxes.push_back(LLBBox(getPositionRegion(), getRotationRegion(), getScale() * -0.5f, getScale() * 0.5f).getAxisAligned());
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (const LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		boxes.push_back( LLBBox(child->getPositionRegion(), child->getRotationRegion(), child->getScale() * -0.5f, child->getScale() * 0.5f).getAxisAligned());
 	}
 
@@ -779,9 +824,8 @@ bool LLViewerObject::isReturnable()
 			//to test for any edge overlap
 			buildReturnablesForChildrenVO( returnables, this, pTargetRegion );
 			//Add it's children
-			for (child_list_t::iterator iter = mChildList.begin();  iter != mChildList.end(); iter++)
+			for (LLViewerObject* pChild : mChildList)
 			{
-				LLViewerObject* pChild = *iter;		
 				buildReturnablesForChildrenVO( returnables, pChild, pTargetRegion );
 			}
 		}	
@@ -819,9 +863,8 @@ void LLViewerObject::buildReturnablesForChildrenVO( std::vector<PotentialReturna
 	constructAndAddReturnable( returnables, pChild, pTargetRegion );
 	
 	//We want to handle any children VO's as well
-	for (child_list_t::iterator iter = pChild->mChildList.begin();  iter != pChild->mChildList.end(); iter++)
+	for (LLViewerObject* pChildofChild : mChildList)
 	{
-		LLViewerObject* pChildofChild = *iter;
 		buildReturnablesForChildrenVO( returnables, pChildofChild, pTargetRegion );
 	}
 }
@@ -856,10 +899,8 @@ bool LLViewerObject::crossesParcelBounds()
 {
 	std::vector<LLBBox> boxes;
 	boxes.push_back(LLBBox(getPositionRegion(), getRotationRegion(), getScale() * -0.5f, getScale() * 0.5f).getAxisAligned());
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (const LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		boxes.push_back(LLBBox(child->getPositionRegion(), child->getRotationRegion(), child->getScale() * -0.5f, child->getScale() * 0.5f).getAxisAligned());
 	}
 
@@ -884,9 +925,9 @@ BOOL LLViewerObject::setParent(LLViewerObject* parent)
 
 void LLViewerObject::addChild(LLViewerObject *childp)
 {
-	for (child_list_t::iterator i = mChildList.begin(); i != mChildList.end(); ++i)
+	for (const LLViewerObject* child : mChildList)
 	{
-		if (*i == childp)
+		if (child == childp)
 		{	//already has child
 			return;
 		}
@@ -920,7 +961,7 @@ void LLViewerObject::afterReparent()
 
 void LLViewerObject::removeChild(LLViewerObject *childp)
 {
-	for (child_list_t::iterator i = mChildList.begin(); i != mChildList.end(); ++i)
+	for (auto i = mChildList.begin(), end = mChildList.end(); i != end; ++i)
 	{
 		if (*i == childp)
 		{
@@ -946,19 +987,17 @@ void LLViewerObject::removeChild(LLViewerObject *childp)
 	
 	if (childp->isSelected())
 	{
-		LLSelectMgr::getInstanceFast()->deselectObjectAndFamily(childp);
+		LLSelectMgr::getInstance()->deselectObjectAndFamily(childp);
 		BOOL add_to_end = TRUE;
-		LLSelectMgr::getInstanceFast()->selectObjectAndFamily(childp, add_to_end);
+		LLSelectMgr::getInstance()->selectObjectAndFamily(childp, add_to_end);
 	}
 }
 
 void LLViewerObject::addThisAndAllChildren(std::vector<LLViewerObject*>& objects)
 {
 	objects.push_back(this);
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		if (!child->isAvatar())
 		{
 			child->addThisAndAllChildren(objects);
@@ -974,10 +1013,8 @@ void LLViewerObject::addThisAndNonJointChildren(std::vector<LLViewerObject*>& ob
 	{
 		return;
 	}
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		if ( (!child->isAvatar()))
 		{
 			child->addThisAndNonJointChildren(objects);
@@ -990,10 +1027,8 @@ void LLViewerObject::addThisAndNonJointChildren(std::vector<LLViewerObject*>& ob
 BOOL LLViewerObject::isChild(const LLViewerObject *childp) const
 // [/RLVa:KB]
 {
-	for (child_list_t::const_iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (const LLViewerObject* testchild : mChildList)
 	{
-		LLViewerObject* testchild = *iter;
 		if (testchild == childp)
 			return TRUE;
 	}
@@ -1027,7 +1062,7 @@ BOOL LLViewerObject::setDrawableParent(LLDrawable* parentp)
 		parentp->setState(LLDrawable::ACTIVE_CHILD);
 	}
 
-	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME, TRUE);
+	gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
 	if(	(old_parent != parentp && old_parent)
 		|| (parentp && parentp->isActive()))
 	{
@@ -1129,6 +1164,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 					 const EObjectUpdateType update_type,
 					 LLDataPacker *dp)
 {
+    LL_PROFILE_ZONE_SCOPED;
 #ifdef SHOW_DEBUG
 	LL_DEBUGS_ONCE("SceneLoadTiming") << "Received viewer object data" << LL_ENDL;
 
@@ -1138,7 +1174,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
 	U32 retval = 0x0;
 	
-	auto& worldInst = LLWorld::instanceFast();
+	auto& worldInst = LLWorld::instance();
 
 	// If region is removed from the list it is also deleted.
 	if (!worldInst.isRegionListed(mRegionp))
@@ -1209,7 +1245,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 	U16 valswizzle[4];
 #endif
 	U16	*val;
-	const F32 size = worldInst.getRegionWidthInMeters();	
+	const F32 size = mRegionp->getWidth();	
 	const F32 MAX_HEIGHT = worldInst.getRegionMaxHeight();
 	const F32 MIN_HEIGHT = worldInst.getRegionMinHeight();
 	S32 length;
@@ -1249,7 +1285,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 				LL_INFOS() << "Full:" << getID() << LL_ENDL;
 #endif
 				//clear cost and linkset cost
-				mCostStale = true;
+				setObjectCostStale();
 				if (isSelected())
 				{
 					gFloaterTools->dirty();
@@ -1276,6 +1312,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 				mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_ObjectData, data, length, block_num, MAX_OBJECT_BINARY_DATA_SIZE);
 
 				mTotalCRC = crc;
+                // Might need to update mSourceMuted here to properly pick up new radius
 				mSoundCutOffRadius = cutoff;
 
 				// Owner ID used for sound muting or particle system muting
@@ -1810,7 +1847,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 #ifdef DEBUG_UPDATE_TYPE
 				LL_INFOS() << "CompFull:" << getID() << LL_ENDL;
 #endif
-				mCostStale = true;
+				setObjectCostStale();
 
 				if (isSelected())
 				{
@@ -2029,14 +2066,14 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
 				if(mesgsys != NULL)
 				{
-				LLViewerObjectList::getUUIDFromLocal(parent_uuid,
+					gObjectList.getUUIDFromLocal(parent_uuid,
 														parent_id,
 														mesgsys->getSenderIP(),
 														mesgsys->getSenderPort());
 				}
 				else
 				{
-					LLViewerObjectList::getUUIDFromLocal(parent_uuid,
+					gObjectList.getUUIDFromLocal(parent_uuid,
 														parent_id,
 														mRegionp->getHost().getAddress(),
 														mRegionp->getHost().getPort());
@@ -2192,14 +2229,14 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
 					if(mesgsys != NULL)
 					{
-					LLViewerObjectList::getUUIDFromLocal(parent_uuid,
+						gObjectList.getUUIDFromLocal(parent_uuid,
 														parent_id,
 														gMessageSystem->getSenderIP(),
 														gMessageSystem->getSenderPort());
 					}
 					else
 					{
-						LLViewerObjectList::getUUIDFromLocal(parent_uuid,
+						gObjectList.getUUIDFromLocal(parent_uuid,
 														parent_id,
 														mRegionp->getHost().getAddress(),
 														mRegionp->getHost().getPort());
@@ -2445,6 +2482,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 			color.setVec(1.f, 0.f, 0.f, 1.f);
 		}
 		gPipeline.addDebugBlip(getPositionAgent(), color);
+		LL_DEBUGS("MessageBlip") << "Update type " << (S32)update_type << " blip for local " << mLocalID << " at " << getPositionAgent() << LL_ENDL;
 	}
 
 	const F32 MAG_CUTOFF = F_APPROXIMATELY_ZERO;
@@ -2477,18 +2515,24 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 	// Additionally, if any child is selected, need to update the dialogs and selection
 	// center.
 	BOOL needs_refresh = mUserSelected;
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
+	for (const LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *iter;
 		needs_refresh = needs_refresh || child->mUserSelected;
 	}
 
+    static LLCachedControl<bool> allow_select_avatar(gSavedSettings, "AllowSelectAvatar", FALSE);
 	if (needs_refresh)
 	{
-		LLSelectMgr::getInstanceFast()->updateSelectionCenter();
+		LLSelectMgr::getInstance()->updateSelectionCenter();
 		dialog_refresh_all();
-	} 
+	}
+    else if (allow_select_avatar && asAvatar())
+    {
+        // Override any avatar position updates received
+        // Works only if avatar was repositioned using build
+        // tools and build floater is visible
+        LLSelectMgr::getInstance()->overrideAvatarUpdates();
+    }
 
 
 	// Mark update time as approx. now, with the ping delay.
@@ -2505,7 +2549,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 		{
 // 			LL_DEBUGS() << "Clearing force invisible: " << mID << ":" << getPCodeString() << ":" << getPositionAgent() << LL_ENDL;
 			mDrawable->clearState(LLDrawable::FORCE_INVISIBLE);
-			gPipeline.markRebuild( mDrawable, LLDrawable::REBUILD_ALL, TRUE );
+			gPipeline.markRebuild( mDrawable, LLDrawable::REBUILD_ALL);
 		}
 	}
 
@@ -2543,9 +2587,6 @@ void LLViewerObject::loadFlags(U32 flags)
 
 void LLViewerObject::idleUpdate(LLAgent &agent, const F64 &frame_time)
 {
-	//static LLTrace::BlockTimerStatHandle ftm("Viewer Object");
-	//LL_RECORD_BLOCK_TIME(ftm);
-
 	if (!mDead)
 	{
 		if (!mStatic && sVelocityInterpolate && !isSelected())
@@ -2669,7 +2710,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
 		new_pos = new_pos + getPositionRegion();
 		new_v = new_v + vel;
 
-		auto& worldInst = LLWorld::instanceFast();
+		auto& worldInst = LLWorld::instance();
 
 		// Clamp interpolated position to minimum underground and maximum region height
 		LLVector3d new_pos_global = mRegionp->getPosGlobalFromRegion(new_pos);
@@ -2837,7 +2878,7 @@ void LLViewerObject::doUpdateInventory(
 		// make sure that the serial number does not match.
 		deleteInventoryItem(item_id);
 		LLPermissions perm(item->getPermissions());
-		LLPermissions* obj_perm = LLSelectMgr::getInstanceFast()->findObjectPermissions(this);
+		LLPermissions* obj_perm = LLSelectMgr::getInstance()->findObjectPermissions(this);
 		bool is_atomic = ((S32)LLAssetType::AT_OBJECT == item->getType()) ? false : true;
 		if(obj_perm)
 		{
@@ -3120,29 +3161,32 @@ void LLViewerObject::updateControlAvatar()
     if (is_animated_object)
     {
         bool any_rigged_mesh = root->isRiggedMesh();
-        LLViewerObject::const_child_list_t& child_list = root->getChildren();
-        for (LLViewerObject::const_child_list_t::const_iterator iter = child_list.begin();
-             iter != child_list.end(); ++iter)
-        {
-            const LLViewerObject* child = *iter;
-            any_rigged_mesh = any_rigged_mesh || child->isRiggedMesh();
-        }
+		if (!any_rigged_mesh)
+		{
+			LLViewerObject::const_child_list_t& child_list = root->getChildren();
+			for (const LLViewerObject* child : child_list)
+			{
+				any_rigged_mesh = child->isRiggedMesh();
+				if (any_rigged_mesh)
+					break;
+			}
+		}
         should_have_control_avatar = is_animated_object && any_rigged_mesh;
     }
 
     if (should_have_control_avatar && !has_control_avatar)
     {
-        std::string vobj_name = llformat("Vol%p", root);
 #ifdef SHOW_DEBUG
-        LL_DEBUGS("AnimatedObjects") << vobj_name << " calling linkControlAvatar()" << LL_ENDL;
+		std::string vobj_name = llformat("Vol%p", root);
+		LL_DEBUGS("AnimatedObjects") << vobj_name << " calling linkControlAvatar()" << LL_ENDL;
 #endif
         root->linkControlAvatar();
     }
     if (!should_have_control_avatar && has_control_avatar)
     {
-        std::string vobj_name = llformat("Vol%p", root);
 #ifdef SHOW_DEBUG
-        LL_DEBUGS("AnimatedObjects") << vobj_name << " calling unlinkControlAvatar()" << LL_ENDL;
+		std::string vobj_name = llformat("Vol%p", root);
+		LL_DEBUGS("AnimatedObjects") << vobj_name << " calling unlinkControlAvatar()" << LL_ENDL;
 #endif
         root->unlinkControlAvatar();
     }
@@ -3151,7 +3195,7 @@ void LLViewerObject::updateControlAvatar()
         getControlAvatar()->updateAnimations();
         if (isSelected())
         {
-            LLSelectMgr::getInstanceFast()->pauseAssociatedAvatars();
+            LLSelectMgr::getInstance()->pauseAssociatedAvatars();
         }
     }
 }
@@ -3183,7 +3227,7 @@ void LLViewerObject::linkControlAvatar()
             //if (!cav->mRootVolp->isAnySelected())
             {
                 cav->updateVolumeGeom();
-                cav->mRootVolp->recursiveMarkForUpdate(TRUE);
+                cav->mRootVolp->recursiveMarkForUpdate();
             }
         }
     }
@@ -3370,14 +3414,14 @@ void LLViewerObject::processTaskInvFile(void** user_data, S32 error_code, LLExtS
 
 			LLInventoryObject::object_list_t::iterator it = object->mInventory->begin();
 			LLInventoryObject::object_list_t::iterator end = object->mInventory->end();
-			std::list<LLUUID>& pending_lst = object->mPendingInventoryItemsIDs;
+			auto& pending_lst = object->mPendingInventoryItemsIDs;
 
 			for (; it != end && pending_lst.size(); ++it)
 			{
 				LLViewerInventoryItem* item = dynamic_cast<LLViewerInventoryItem*>(it->get());
 				if(item && item->getType() != LLAssetType::AT_CATEGORY)
 				{
-					std::list<LLUUID>::iterator id_it = std::find(pending_lst.begin(), pending_lst.end(), item->getAssetUUID());
+					auto id_it = pending_lst.find(item->getAssetUUID());
 					if (id_it != pending_lst.end())
 					{
 						pending_lst.erase(id_it);
@@ -3501,8 +3545,11 @@ void LLViewerObject::doInventoryCallback()
 
 void LLViewerObject::removeInventory(const LLUUID& item_id)
 {
-	// close any associated floater properties
-	LLFloaterReg::hideInstance("properties", item_id);
+    // close associated floater properties
+    LLSD params;
+    params["id"] = item_id;
+    params["object"] = mID;
+    LLFloaterReg::hideInstance("item_properties", params);
 
 	LLMessageSystem* msg = gMessageSystem;
 	msg->newMessageFast(_PREHASH_RemoveTaskInventory);
@@ -3517,31 +3564,49 @@ void LLViewerObject::removeInventory(const LLUUID& item_id)
 	++mExpectedInventorySerialNum;
 }
 
-bool LLViewerObject::isTextureInInventory(LLViewerInventoryItem* item)
+bool LLViewerObject::isAssetInInventory(LLViewerInventoryItem* item, LLAssetType::EType type)
 {
-	bool result = false;
+    bool result = false;
 
-	if (item && LLAssetType::AT_TEXTURE == item->getType())
-	{
-		std::list<LLUUID>::iterator begin = mPendingInventoryItemsIDs.begin();
-		std::list<LLUUID>::iterator end = mPendingInventoryItemsIDs.end();
+    if (item)
+    {
+        // For now mPendingInventoryItemsIDs only stores textures and materials
+        // but if it gets to store more types, it will need to verify type as well
+        // since null can be a shared default id and it is fine to need a null
+        // script and a null material simultaneously.
+		bool is_fetching = mPendingInventoryItemsIDs.contains(item->getAssetUUID());
 
-		bool is_fetching = std::find(begin, end, item->getAssetUUID()) != end;
-		bool is_fetched = getInventoryItemByAsset(item->getAssetUUID()) != NULL;
+        // null is the default asset for materials and default for scripts
+        // so need to check type as well
+        bool is_fetched = getInventoryItemByAsset(item->getAssetUUID(), type) != NULL;
 
-		result = is_fetched || is_fetching;
-	}
+        result = is_fetched || is_fetching;
+    }
 
-	return result;
+    return result;
 }
 
-void LLViewerObject::updateTextureInventory(LLViewerInventoryItem* item, U8 key, bool is_new)
+void LLViewerObject::updateMaterialInventory(LLViewerInventoryItem* item, U8 key, bool is_new)
 {
-	if (item && !isTextureInInventory(item))
-	{
-		mPendingInventoryItemsIDs.push_back(item->getAssetUUID());
-		updateInventory(item, key, is_new);
-	}
+    if (!item)
+    {
+        return;
+    }
+    if (LLAssetType::AT_TEXTURE != item->getType()
+        && LLAssetType::AT_MATERIAL != item->getType())
+    {
+        // Not supported
+        return;
+    }
+
+    if (isAssetInInventory(item, item->getType()))
+    {
+        // already there
+        return;
+    }
+
+    mPendingInventoryItemsIDs.insert(item->getAssetUUID());
+    updateInventory(item, key, is_new);
 }
 
 void LLViewerObject::updateInventory(
@@ -3611,6 +3676,17 @@ LLInventoryObject* LLViewerObject::getInventoryObject(const LLUUID& item_id)
 	return rv;
 }
 
+LLInventoryItem* LLViewerObject::getInventoryItem(const LLUUID& item_id)
+{
+	LLInventoryObject* iobj = getInventoryObject(item_id);
+	if (!iobj || iobj->getType() == LLAssetType::AT_CATEGORY)
+	{
+		return NULL;
+	}
+	LLInventoryItem* item = dynamic_cast<LLInventoryItem*>(iobj);
+	return item;
+}
+
 void LLViewerObject::getInventoryContents(LLInventoryObject::object_list_t& objects)
 {
 	if(mInventory)
@@ -3666,6 +3742,44 @@ LLViewerInventoryItem* LLViewerObject::getInventoryItemByAsset(const LLUUID& ass
 	return rv;
 }
 
+LLViewerInventoryItem* LLViewerObject::getInventoryItemByAsset(const LLUUID& asset_id, LLAssetType::EType type)
+{
+    if (mInventoryDirty)
+        LL_WARNS() << "Peforming inventory lookup for object " << mID << " that has dirty inventory!" << LL_ENDL;
+
+    LLViewerInventoryItem* rv = NULL;
+    if (type == LLAssetType::AT_CATEGORY)
+    {
+        // Whatever called this shouldn't be trying to get a folder by asset
+        // categories don't have assets
+        llassert(0);
+        return rv;
+    }
+
+    if (mInventory)
+    {
+        LLViewerInventoryItem* item = NULL;
+
+        LLInventoryObject::object_list_t::iterator it = mInventory->begin();
+        LLInventoryObject::object_list_t::iterator end = mInventory->end();
+        for (; it != end; ++it)
+        {
+            LLInventoryObject* obj = *it;
+            if (obj->getType() == type)
+            {
+                // *FIX: gank-ass down cast!
+                item = (LLViewerInventoryItem*)obj;
+                if (item->getAssetUUID() == asset_id)
+                {
+                    rv = item;
+                    break;
+                }
+            }
+        }
+    }
+    return rv;
+}
+
 void LLViewerObject::updateViewerInventoryAsset(
 					const LLViewerInventoryItem* item,
 					const LLUUID& new_asset)
@@ -3702,7 +3816,7 @@ void LLViewerObject::setPixelAreaAndAngle(LLAgent &agent)
 	// I don't think there's a better way to do this without calculating distance per-poly
 	F32 range = sqrt(dx*dx + dy*dy + dz*dz) - min_scale/2;
 
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	if (range < 0.001f || isHUDAttachment())		// range == zero
 	{
 		mAppAngle = 180.f;
@@ -3765,7 +3879,7 @@ void LLViewerObject::setScale(const LLVector3 &scale, BOOL damped)
 		{
 			if (!mOnMap)
 			{
-				llassert_always(LLWorld::getInstanceFast()->getRegionFromHandle(getRegion()->getHandle()));
+				llassert_always(LLWorld::getInstance()->getRegionFromHandle(getRegion()->getHandle()));
 
 				gObjectList.addToMap(this);
 				mOnMap = TRUE;
@@ -3780,6 +3894,16 @@ void LLViewerObject::setScale(const LLVector3 &scale, BOOL damped)
 			}
 		}
 	}
+}
+
+void LLViewerObject::setObjectCostStale()
+{
+	mCostStale = true;
+    // *NOTE: This is harmlessly redundant for Blinn-Phong material updates, as
+    // the root prim currently gets set stale anyway due to other property
+    // updates. But it is needed for GLTF material ID updates.
+    // -Cosmic,2023-06-27
+    getRootEdit()->mCostStale = true;
 }
 
 void LLViewerObject::setObjectCost(F32 cost)
@@ -3879,10 +4003,8 @@ F32 LLViewerObject::getLinksetPhysicsCost()
 F32 LLViewerObject::recursiveGetEstTrianglesMax() const
 {
     F32 est_tris = getEstTrianglesMax();
-    for (child_list_t::const_iterator iter = mChildList.begin();
-         iter != mChildList.end(); iter++)
-    {
-        const LLViewerObject* child = *iter;
+	for (const LLViewerObject* child : mChildList)
+	{
         if (!child->isAvatar())
         {
             est_tris += child->recursiveGetEstTrianglesMax();
@@ -3969,6 +4091,7 @@ U32 LLViewerObject::recursiveGetTriangleCount(S32* vcount) const
 // prim's scale. Should revisit at some point.
 F32 LLViewerObject::recursiveGetScaledSurfaceArea() const
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
     F32 area = 0.f;
     const LLDrawable* drawable = mDrawable;
     if (drawable)
@@ -4071,7 +4194,7 @@ void LLViewerObject::updateTextures()
 
 void LLViewerObject::boostTexturePriority(BOOL boost_children /* = TRUE */)
 {
-	if (isDead())
+	if (isDead() || !getVolume())
 	{
 		return;
 	}
@@ -4092,10 +4215,8 @@ void LLViewerObject::boostTexturePriority(BOOL boost_children /* = TRUE */)
 	
 	if (boost_children)
 	{
-		for (child_list_t::iterator iter = mChildList.begin();
-			 iter != mChildList.end(); iter++)
+		for (LLViewerObject* child : mChildList)
 		{
-			LLViewerObject* child = *iter;
 			child->boostTexturePriority();
 		}
 	}
@@ -4222,6 +4343,11 @@ LLNameValue *LLViewerObject::getNVPair(const std::string& name) const
 	char		*canonical_name;
 
 	canonical_name = gNVNameTable.addString(name);
+	// It's possible for addString to return NULL.
+	if (canonical_name == NULL)
+	{
+		return NULL;
+	}
 
 	// If you access a map with a name that isn't in it, it will add the name and a null pointer.
 	// So first check if the data is in the map.
@@ -4239,7 +4365,7 @@ LLNameValue *LLViewerObject::getNVPair(const std::string& name) const
 void LLViewerObject::updatePositionCaches() const
 {
 	// If region is removed from the list it is also deleted.
-	if(mRegionp && LLWorld::instanceFast().isRegionListed(mRegionp))
+	if(mRegionp && LLWorld::instance().isRegionListed(mRegionp))
 	{
 		if (!isRoot())
 		{
@@ -4257,7 +4383,7 @@ void LLViewerObject::updatePositionCaches() const
 const LLVector3d LLViewerObject::getPositionGlobal() const
 {	
 	// If region is removed from the list it is also deleted.
-	if(mRegionp && LLWorld::instanceFast().isRegionListed(mRegionp))
+	if(mRegionp && LLWorld::instance().isRegionListed(mRegionp))
 	{
 		LLVector3d position_global = mRegionp->getPosGlobalFromRegion(getPositionRegion());
 
@@ -4277,7 +4403,7 @@ const LLVector3d LLViewerObject::getPositionGlobal() const
 const LLVector3 &LLViewerObject::getPositionAgent() const
 {
 	// If region is removed from the list it is also deleted.
-	if(mRegionp && LLWorld::instanceFast().isRegionListed(mRegionp))
+	if(mRegionp && LLWorld::instance().isRegionListed(mRegionp))
 	{
 		if (mDrawable.notNull() && (!mDrawable->isRoot() && getParent()))
 		{
@@ -4612,6 +4738,7 @@ BOOL LLViewerObject::lineSegmentIntersect(const LLVector4a& start, const LLVecto
 										  S32 face,
 										  BOOL pick_transparent,
 										  BOOL pick_rigged,
+                                          BOOL pick_unselectable,
 										  S32* face_hit,
 										  LLVector4a* intersection,
 										  LLVector2* tex_coord,
@@ -4775,8 +4902,37 @@ void LLViewerObject::setNumTEs(const U8 num_tes)
 		{
 			deleteTEImages();
 		}
+
+        S32 original_tes = getNumTEs();
+
 		LLPrimitive::setNumTEs(num_tes);
 		setChanged(TEXTURE);
+
+        // touch up GLTF materials
+        if (original_tes > 0)
+        {
+            for (int i = original_tes; i < getNumTEs(); ++i)
+            {
+                LLTextureEntry* src = getTE(original_tes - 1);
+                LLTextureEntry* tep = getTE(i);
+                setRenderMaterialID(i, getRenderMaterialID(original_tes - 1), false);
+
+                if (tep)
+                {
+                    LLGLTFMaterial* base_material = src->getGLTFMaterial();
+                    LLGLTFMaterial* override_material = src->getGLTFMaterialOverride();
+                    if (base_material && override_material)
+                    {
+                        tep->setGLTFMaterialOverride(new LLGLTFMaterial(*override_material));
+
+                        LLGLTFMaterial* render_material = new LLFetchedGLTFMaterial();
+                        *render_material = *base_material;
+                        render_material->applyOverride(*override_material);
+                        tep->setGLTFRenderMaterial(render_material);
+                    }
+                }
+            }
+        }
 
 		if (mDrawable.notNull())
 		{
@@ -4803,6 +4959,9 @@ void LLViewerObject::sendMaterialUpdate() const
 //formerly send_object_shape(LLViewerObject *object)
 void LLViewerObject::sendShapeUpdate()
 {
+	LLViewerRegion* regionp = getRegion();
+	if(!regionp) return;
+
 	gMessageSystem->newMessageFast(_PREHASH_ObjectShape);
 	gMessageSystem->nextBlockFast(_PREHASH_AgentData);
 	gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
@@ -4812,13 +4971,15 @@ void LLViewerObject::sendShapeUpdate()
 
 	LLVolumeMessage::packVolumeParams(&getVolume()->getParams(), gMessageSystem);
 
-	LLViewerRegion *regionp = getRegion();
 	gMessageSystem->sendReliable( regionp->getHost() );
 }
 
 
 void LLViewerObject::sendTEUpdate() const
 {
+	LLViewerRegion* regionp = getRegion();
+	if(!regionp) return;
+
 	LLMessageSystem* msg = gMessageSystem;
 	msg->newMessageFast(_PREHASH_ObjectImage);
 
@@ -4841,7 +5002,6 @@ void LLViewerObject::sendTEUpdate() const
 
 	packTEMessage(msg);
 
-	LLViewerRegion *regionp = getRegion();
 	msg->sendReliable( regionp->getHost() );
 }
 
@@ -4898,31 +5058,91 @@ void LLViewerObject::updateAvatarMeshVisibility(const LLUUID& id, const LLUUID& 
 	}
 }
 
-void LLViewerObject::setTE(const U8 te, const LLTextureEntry &texture_entry)
+
+void LLViewerObject::setTE(const U8 te, const LLTextureEntry& texture_entry)
 {
-	LLUUID old_image_id;
-	if (getTE(te))
-	{
-		old_image_id = getTE(te)->getID();
-	}
-		
-	LLPrimitive::setTE(te, texture_entry);
+    LLUUID old_image_id;
+    if (getTE(te))
+    {
+        old_image_id = getTE(te)->getID();
+    }
 
-		const LLUUID& image_id = getTE(te)->getID();
-	LLViewerTexture* bakedTexture = getBakedTextureForMagicId(image_id);
-	mTEImages[te] = bakedTexture ? bakedTexture : LLViewerTextureManager::getFetchedTexture(image_id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+    LLPrimitive::setTE(te, texture_entry);
 
-	
-	updateAvatarMeshVisibility(image_id,old_image_id);
+    const LLUUID& image_id = getTE(te)->getID();
+    LLViewerTexture* bakedTexture = getBakedTextureForMagicId(image_id);
+    mTEImages[te] = bakedTexture ? bakedTexture : LLViewerTextureManager::getFetchedTexture(image_id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
 
+    updateAvatarMeshVisibility(image_id, old_image_id);
+
+    updateTEMaterialTextures(te);
+}
+
+void LLViewerObject::updateTEMaterialTextures(U8 te)
+{
 	if (getTE(te)->getMaterialParams().notNull())
 	{
 		const LLUUID& norm_id = getTE(te)->getMaterialParams()->getNormalID();
-		mTENormalMaps[te] = LLViewerTextureManager::getFetchedTexture(norm_id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_ALM, LLViewerTexture::LOD_TEXTURE);
+		mTENormalMaps[te] = LLViewerTextureManager::getFetchedTexture(norm_id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
 		
 		const LLUUID& spec_id = getTE(te)->getMaterialParams()->getSpecularID();
-		mTESpecularMaps[te] = LLViewerTextureManager::getFetchedTexture(spec_id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_ALM, LLViewerTexture::LOD_TEXTURE);
+		mTESpecularMaps[te] = LLViewerTextureManager::getFetchedTexture(spec_id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
 	}
+
+    LLFetchedGLTFMaterial* mat = (LLFetchedGLTFMaterial*) getTE(te)->getGLTFRenderMaterial();
+    llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(getTE(te)->getGLTFRenderMaterial()) != nullptr);
+    LLUUID mat_id = getRenderMaterialID(te);
+    if (mat == nullptr && mat_id.notNull())
+    {
+        mat = (LLFetchedGLTFMaterial*) gGLTFMaterialList.getMaterial(mat_id);
+        llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(gGLTFMaterialList.getMaterial(mat_id)) != nullptr);
+        if (mat->isFetching())
+        { // material is not loaded yet, rebuild draw info when the object finishes loading
+            mat->onMaterialComplete([id=getID()]
+                {
+                    LLViewerObject* obj = gObjectList.findObject(id);
+                    if (obj)
+                    {
+                        obj->markForUpdate();
+                    }
+                });
+        }
+        getTE(te)->setGLTFMaterial(mat);
+    }
+    else if (mat_id.isNull() && mat != nullptr)
+    {
+        mat = nullptr;
+        getTE(te)->setGLTFMaterial(nullptr);
+    }
+
+    auto fetch_texture = [this](const LLUUID& id)
+    {
+        LLViewerFetchedTexture* img = nullptr;
+        if (id.notNull())
+        {
+            if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(id))
+            {
+                 // TODO -- fall back to LLTextureEntry::mGLTFRenderMaterial when overriding with baked texture
+                LLViewerTexture* viewerTexture = getBakedTextureForMagicId(id);
+                img = viewerTexture ? dynamic_cast<LLViewerFetchedTexture*>(viewerTexture) : nullptr;
+            }
+            else
+            {
+                img = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+                img->addTextureStats(64.f * 64.f, TRUE);
+            }
+        }
+
+        return img;
+    };
+
+    if (mat != nullptr)
+    {
+        mat->mBaseColorTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]);
+        mat->mNormalTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL]);
+        mat->mMetallicRoughnessTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS]);
+        mat->mEmissiveTexture= fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE]);
+    }
 }
 
 void LLViewerObject::refreshBakeTexture()
@@ -4964,7 +5184,7 @@ S32 LLViewerObject::setTETextureCore(const U8 te, LLViewerTexture *image)
 	const LLUUID& uuid = image->getID();
 	S32 retval = 0;
 	if (uuid != getTE(te)->getID() ||
-		uuid.isNull())
+		uuid == LLUUID::null)
 	{
 		retval = LLPrimitive::setTETexture(te, uuid);
 		LLViewerTexture* baked_texture = getBakedTextureForMagicId(uuid);
@@ -4984,7 +5204,7 @@ S32 LLViewerObject::setTENormalMapCore(const U8 te, LLViewerTexture *image)
 	S32 retval = TEM_CHANGE_TEXTURE;
 	const LLUUID& uuid = image ? image->getID() : LLUUID::null;
 	if (uuid != getTE(te)->getID() ||
-		uuid.isNull())
+		uuid == LLUUID::null)
 	{
 		LLTextureEntry* tep = getTE(te);
 		LLMaterial* mat = NULL;
@@ -5007,7 +5227,7 @@ S32 LLViewerObject::setTESpecularMapCore(const U8 te, LLViewerTexture *image)
 	S32 retval = TEM_CHANGE_TEXTURE;
 	const LLUUID& uuid = image ? image->getID() : LLUUID::null;
 	if (uuid != getTE(te)->getID() ||
-		uuid.isNull())
+		uuid == LLUUID::null)
 	{
 		LLTextureEntry* tep = getTE(te);
 		LLMaterial* mat = NULL;
@@ -5066,14 +5286,14 @@ S32 LLViewerObject::setTETexture(const U8 te, const LLUUID& uuid)
 S32 LLViewerObject::setTENormalMap(const U8 te, const LLUUID& uuid)
 {
 	LLViewerFetchedTexture *image = (uuid.isNull()) ? NULL : LLViewerTextureManager::getFetchedTexture(
-		uuid, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_ALM, LLViewerTexture::LOD_TEXTURE, 0, 0, LLHost());
+		uuid, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE, 0, 0, LLHost());
 	return setTENormalMapCore(te, image);
 }
 
 S32 LLViewerObject::setTESpecularMap(const U8 te, const LLUUID& uuid)
 {
 	LLViewerFetchedTexture *image = (uuid.isNull()) ? NULL : LLViewerTextureManager::getFetchedTexture(
-		uuid, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_ALM, LLViewerTexture::LOD_TEXTURE, 0, 0, LLHost());
+		uuid, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE, 0, 0, LLHost());
 	return setTESpecularMapCore(te, image);
 }
 
@@ -5117,7 +5337,7 @@ S32 LLViewerObject::setTEBumpmap(const U8 te, const U8 bump)
 		if (mDrawable.notNull() && retval)
 		{
 			gPipeline.markTextured(mDrawable);
-			gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY, TRUE);
+			gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
 		}
 	}
 	return retval;
@@ -5207,10 +5427,8 @@ S32 LLViewerObject::setTEMediaFlags(const U8 te, const U8 media_flags)
 		setChanged(TEXTURE);
 		if (mDrawable.notNull() && retval)
 		{
-			gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_TCOORD, TRUE);
+			gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_TCOORD);
 			gPipeline.markTextured(mDrawable);
-			// JC - probably only need this if changes texture coords
-			//gPipeline.markRebuild(mDrawable);
 		}
 	}
 	return retval;
@@ -5281,8 +5499,62 @@ S32 LLViewerObject::setTEMaterialParams(const U8 te, const LLMaterialPtr pMateri
 	setTENormalMap(te, (pMaterialParams) ? pMaterialParams->getNormalID() : LLUUID::null);
 	setTESpecularMap(te, (pMaterialParams) ? pMaterialParams->getSpecularID() : LLUUID::null);
 
-	refreshMaterials();
 	return retval;
+}
+
+S32 LLViewerObject::setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* override_mat)
+{
+    LL_PROFILE_ZONE_SCOPED;
+    S32 retval = TEM_CHANGE_NONE;
+
+    LLTextureEntry* tep = getTE(te);
+    if (!tep)
+    { // this could happen if the object is not fully formed yet
+        // returning TEM_CHANGE_NONE here signals to LLGLTFMaterialList to queue the override for later
+        return retval;
+    }
+
+    LLFetchedGLTFMaterial* src_mat = (LLFetchedGLTFMaterial*) tep->getGLTFMaterial();
+    llassert(src_mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(tep->getGLTFMaterial()) != nullptr);
+    // if override mat exists, we must also have a source mat
+    if (!src_mat)
+    {
+        // we can get into this state if an override has arrived before the viewer has
+        // received or handled an update, return TEM_CHANGE_NONE to signal to LLGLTFMaterialList that it
+        // should queue the update for later
+        return retval;
+    }
+
+    if(src_mat->isFetching())
+    {
+        // if still fetching, we need to wait until it is done and try again
+        return retval;
+    }
+
+    retval = tep->setGLTFMaterialOverride(override_mat);
+
+    if (retval)
+    {
+        if (override_mat)
+        {
+            LLFetchedGLTFMaterial* render_mat = new LLFetchedGLTFMaterial(*src_mat);
+            render_mat->applyOverride(*override_mat);
+            tep->setGLTFRenderMaterial(render_mat);
+            retval = TEM_CHANGE_TEXTURE;
+
+            for (LLGLTFMaterial::local_tex_map_t::value_type &val : override_mat->mTrackingIdToLocalTexture)
+            {
+                LLLocalBitmapMgr::getInstance()->associateGLTFMaterial(val.first, override_mat);
+            }
+
+        }
+        else if (tep->setGLTFRenderMaterial(nullptr))
+        {
+            retval = TEM_CHANGE_TEXTURE;
+        }
+    }
+
+    return retval;
 }
 
 void LLViewerObject::refreshMaterials()
@@ -5366,6 +5638,7 @@ S32 LLViewerObject::setTERotation(const U8 te, const F32 r)
 	if (mDrawable.notNull() && retval)
 	{
 		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_TCOORD);
+        shrinkWrap();
 	}
 	return retval;
 }
@@ -5388,7 +5661,7 @@ LLViewerTexture *LLViewerObject::getTEImage(const U8 face) const
 		}
 	}
 
-	LL_ERRS() << llformat("Requested Image from invalid face: %d/%d",face,getNumTEs()) << LL_ENDL;
+	LL_ERRS() << "Requested Image from invalid face: " << face <<"/" << getNumTEs() << LL_ENDL;
 
 	return NULL;
 }
@@ -5466,7 +5739,6 @@ void LLViewerObject::fitFaceTexture(const U8 face)
 {
 	LL_INFOS() << "fitFaceTexture not implemented" << LL_ENDL;
 }
-
 
 LLBBox LLViewerObject::getBoundingBoxAgent() const
 {
@@ -5552,19 +5824,7 @@ S32 LLViewerObject::countInventoryContents(LLAssetType::EType type)
 	return count;
 }
 
-
-void LLViewerObject::setCanSelect(BOOL canSelect)
-{
-	mbCanSelect = canSelect;
-	for (child_list_t::iterator iter = mChildList.begin();
-		 iter != mChildList.end(); iter++)
-	{
-		LLViewerObject* child = *iter;
-		child->mbCanSelect = canSelect;
-	}
-}
-
-void LLViewerObject::setDebugText(const std::string &utf8text)
+void LLViewerObject::setDebugText(const std::string &utf8text, const LLColor4& color)
 {
 	if (utf8text.empty() && !mText)
 	{
@@ -5575,11 +5835,28 @@ void LLViewerObject::setDebugText(const std::string &utf8text)
 	{
 	    initHudText();
 	}
-	mText->setColor(LLColor4::white);
+	mText->setColor(color);
 	mText->setString(utf8text);
 	mText->setZCompare(FALSE);
 	mText->setDoFade(FALSE);
 	updateText();
+}
+
+void LLViewerObject::appendDebugText(const std::string &utf8text)
+{
+    if (utf8text.empty() && !mText)
+    {
+        return;
+    }
+
+    if (!mText)
+    {
+        initHudText();
+    }
+    mText->addLine(utf8text, LLColor4::white);
+    mText->setZCompare(FALSE);
+    mText->setDoFade(FALSE);
+    updateText();
 }
 
 void LLViewerObject::initHudText()
@@ -5701,7 +5978,7 @@ bool LLViewerObject::isOwnerInMuteList(LLUUID id)
 	}
 	else
 	{
-		muted = LLMuteList::getInstanceFast()->isMuted(owner_id);
+		muted = LLMuteList::getInstance()->isMuted(owner_id);
 
 		const F64 SECONDS_BETWEEN_MUTE_UPDATES = 1;
 		mCachedMuteListUpdateTime = now + SECONDS_BETWEEN_MUTE_UPDATES;
@@ -5777,7 +6054,7 @@ void LLViewerObject::setParticleSource(const LLPartSysData& particle_parameters,
 			mPartSourcep->setImage(image);
 		}
 	}
-	LLViewerPartSim::getInstanceFast()->addPartSource(pss);
+	LLViewerPartSim::getInstance()->addPartSource(pss);
 }
 
 void LLViewerObject::unpackParticleSource(const S32 block_num, const LLUUID& owner_id)
@@ -5799,7 +6076,7 @@ void LLViewerObject::unpackParticleSource(const S32 block_num, const LLUUID& own
 	{
 		LLPointer<LLViewerPartSourceScript> pss = LLViewerPartSourceScript::unpackPSS(this, NULL, block_num);
 		//If the owner is muted, don't create the system
-		if(LLMuteList::getInstanceFast()->isMuted(owner_id, LLMute::flagParticles)) return;
+		if(LLMuteList::getInstance()->isMuted(owner_id, LLMute::flagParticles)) return;
 
 		// We need to be able to deal with a particle source that hasn't changed, but still got an update!
 		if (pss)
@@ -5807,7 +6084,7 @@ void LLViewerObject::unpackParticleSource(const S32 block_num, const LLUUID& own
 // 			LL_INFOS() << "Making particle system with owner " << owner_id << LL_ENDL;
 			pss->setOwnerUUID(owner_id);
 			mPartSourcep = pss;
-			LLViewerPartSim::getInstanceFast()->addPartSource(pss);
+			LLViewerPartSim::getInstance()->addPartSource(pss);
 		}
 	}
 	if (mPartSourcep)
@@ -5847,14 +6124,14 @@ void LLViewerObject::unpackParticleSource(LLDataPacker &dp, const LLUUID& owner_
 	{
 		LLPointer<LLViewerPartSourceScript> pss = LLViewerPartSourceScript::unpackPSS(this, NULL, dp, legacy);
 		//If the owner is muted, don't create the system
-		if(LLMuteList::getInstanceFast()->isMuted(owner_id, LLMute::flagParticles)) return;
+		if(LLMuteList::getInstance()->isMuted(owner_id, LLMute::flagParticles)) return;
 		// We need to be able to deal with a particle source that hasn't changed, but still got an update!
 		if (pss)
 		{
 // 			LL_INFOS() << "Making particle system with owner " << owner_id << LL_ENDL;
 			pss->setOwnerUUID(owner_id);
 			mPartSourcep = pss;
-			LLViewerPartSim::getInstanceFast()->addPartSource(pss);
+			LLViewerPartSim::getInstance()->addPartSource(pss);
 		}
 	}
 	if (mPartSourcep)
@@ -5942,7 +6219,7 @@ void LLViewerObject::setAttachedSound(const LLUUID &audio_uuid, const LLUUID& ow
 		else if (flags & LL_SOUND_FLAG_STOP)
         {
 			// Just shut off the sound
-			mAudioSourcep->play(LLUUID::null);
+			mAudioSourcep->stop();
 		}
 		return;
 	}
@@ -5981,7 +6258,7 @@ void LLViewerObject::setAttachedSound(const LLUUID &audio_uuid, const LLUUID& ow
 		mAudioSourcep->setQueueSounds(queue);
 		if(!queue) // stop any current sound first to avoid "farts of doom" (SL-1541) -MG
 		{
-			mAudioSourcep->play(LLUUID::null);
+			mAudioSourcep->stop();
 		}
 		
 		// Play this sound if region maturity permits
@@ -6085,9 +6362,23 @@ LLViewerObject::ExtraParameter* LLViewerObject::createNewParameterEntry(U16 para
 		  in_use = &mExtendedMeshParamsInUse;
 		  break;
       }
+      case LLNetworkData::PARAMS_RENDER_MATERIAL:
+      {
+		  mRenderMaterialParams = std::make_unique<LLRenderMaterialParams>();
+		  new_block = mRenderMaterialParams.get();
+		  in_use = &mRenderMaterialParamsInUse;
+          break;
+      }
+      case LLNetworkData::PARAMS_REFLECTION_PROBE:
+      {
+	      mReflectionProbeParams = std::make_unique<LLReflectionProbeParams>();
+		  new_block = mReflectionProbeParams.get();
+		  in_use = &mReflectionProbeParamsInUse;
+          break;
+      }
 	  default:
 	  {
-			LL_INFOS() << "Unknown param type. (" << llformat("0x%2x", param_type) << ")" << LL_ENDL;
+		  LL_INFOS_ONCE() << "Unknown param type. (" << llformat("0x%2x", param_type) << ")" << LL_ENDL;
 		  break;
 	  }
 	};
@@ -6097,6 +6388,7 @@ LLViewerObject::ExtraParameter* LLViewerObject::createNewParameterEntry(U16 para
 	{
 		entry.in_use = in_use;
 		*entry.in_use = false; // not in use yet
+        llassert(mExtraParameterList[param_type] == nullptr); // leak -- redundantly allocated parameter entry
 		entry.data = new_block;
 		return &entry;
 	}
@@ -6161,6 +6453,11 @@ void LLViewerObject::parameterChanged(U16 param_type, LLNetworkData* data, BOOL 
 {
 	if (local_origin)
 	{
+        // *NOTE: Do not send the render material ID in this way as it will get
+        // out-of-sync with other sent client data.
+        // See LLViewerObject::setRenderMaterialID and LLGLTFMaterialList
+        llassert(param_type != LLNetworkData::PARAMS_RENDER_MATERIAL);
+
 		LLViewerRegion* regionp = getRegion();
 		if(!regionp) return;
 
@@ -6192,6 +6489,14 @@ void LLViewerObject::parameterChanged(U16 param_type, LLNetworkData* data, BOOL 
 			LL_WARNS() << "Failed to send object extra parameters: " << param_type << LL_ENDL;
 		}
 	}
+    else
+    {
+        if (param_type == LLNetworkData::PARAMS_RENDER_MATERIAL)
+        {
+            const LLRenderMaterialParams* params = in_use ? getRenderMaterialParams() : nullptr;
+            setRenderMaterialIDs(params, local_origin);
+        }
+    }
 }
 
 void LLViewerObject::setDrawableState(U32 state, BOOL recursive)
@@ -6202,10 +6507,8 @@ void LLViewerObject::setDrawableState(U32 state, BOOL recursive)
 	}
 	if (recursive)
 	{
-		for (child_list_t::iterator iter = mChildList.begin();
-			 iter != mChildList.end(); iter++)
+		for (LLViewerObject* child : mChildList)
 		{
-			LLViewerObject* child = *iter;
 			child->setDrawableState(state, recursive);
 		}
 	}
@@ -6219,10 +6522,8 @@ void LLViewerObject::clearDrawableState(U32 state, BOOL recursive)
 	}
 	if (recursive)
 	{
-		for (child_list_t::iterator iter = mChildList.begin();
-			 iter != mChildList.end(); iter++)
+		for (LLViewerObject* child : mChildList)
 		{
-			LLViewerObject* child = *iter;
 			child->clearDrawableState(state, recursive);
 		}
 	}
@@ -6237,10 +6538,8 @@ BOOL LLViewerObject::isDrawableState(U32 state, BOOL recursive) const
 	}
 	if (recursive)
 	{
-		for (child_list_t::const_iterator iter = mChildList.begin();
-			 (iter != mChildList.end()) && matches; iter++)
+		for (LLViewerObject* child : mChildList)
 		{
-			LLViewerObject* child = *iter;
 			matches &= child->isDrawableState(state, recursive);
 		}
 	}
@@ -6275,7 +6574,7 @@ BOOL LLViewerObject::permYouOwner() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (!LLGridManager::getInstanceFast()->isInProductionGrid()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 		{
 			return TRUE;
@@ -6312,7 +6611,7 @@ BOOL LLViewerObject::permOwnerModify() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (!LLGridManager::getInstanceFast()->isInProductionGrid()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 	{
 			return TRUE;
@@ -6336,7 +6635,7 @@ BOOL LLViewerObject::permModify() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (!LLGridManager::getInstanceFast()->isInProductionGrid()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 	{
 			return TRUE;
@@ -6360,7 +6659,7 @@ BOOL LLViewerObject::permCopy() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (!LLGridManager::getInstanceFast()->isInProductionGrid()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 		{
 			return TRUE;
@@ -6384,7 +6683,7 @@ BOOL LLViewerObject::permMove() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (!LLGridManager::getInstanceFast()->isInProductionGrid()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 		{
 			return TRUE;
@@ -6408,7 +6707,7 @@ BOOL LLViewerObject::permTransfer() const
 		return TRUE;
 #else
 # ifdef TOGGLE_HACKED_GODLIKE_VIEWER
-		if (!LLGridManager::getInstanceFast()->isInProductionGrid()
+		if (LLGridManager::getInstance()->isInSLBeta()
             && (gAgent.getGodLevel() >= GOD_MAINTENANCE))
 		{
 			return TRUE;
@@ -6447,35 +6746,25 @@ void LLViewerObject::updateVolume(const LLVolumeParams& volume_params)
 	{
 		// Transmit the update to the simulator
 		sendShapeUpdate();
-		markForUpdate(TRUE);
+		markForUpdate();
 	}
 }
 
-void LLViewerObject::recursiveMarkForUpdate(BOOL priority)
+void LLViewerObject::recursiveMarkForUpdate()
 {
-    for (LLViewerObject::child_list_t::iterator iter = mChildList.begin();
-         iter != mChildList.end(); iter++)
-    {
-        LLViewerObject* child = *iter;
-        child->markForUpdate(priority);
+	for (LLViewerObject* child : mChildList)
+	{
+        child->markForUpdate();
     }
-    markForUpdate(priority);
+    markForUpdate();
 }
 
-void LLViewerObject::markForUpdate(BOOL priority)
+void LLViewerObject::markForUpdate()
 {
 	if (mDrawable.notNull())
 	{
 		gPipeline.markTextured(mDrawable);
-		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY, priority);
-	}
-}
-
-void LLViewerObject::markForUnload(BOOL priority)
-{
-	if (mDrawable.notNull())
-	{
-		gPipeline.markRebuild(mDrawable, LLDrawable::FOR_UNLOAD, priority);
+		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_GEOMETRY);
 	}
 }
 
@@ -6515,9 +6804,8 @@ void LLViewerObject::setRegion(LLViewerRegion *regionp)
 	mLatestRecvPacketID = 0;
 	mRegionp = regionp;
 
-	for (child_list_t::iterator i = mChildList.begin(); i != mChildList.end(); ++i)
+	for (LLViewerObject* child : mChildList)
 	{
-		LLViewerObject* child = *i;
 		child->setRegion(regionp);
 	}
 
@@ -6622,7 +6910,7 @@ void LLViewerObject::setPhysicsShapeType(U8 type)
 	if (type != mPhysicsShapeType)
 	{
 		mPhysicsShapeType = type;
-		mCostStale = true;
+		setObjectCostStale();
 	}
 }
 
@@ -6701,7 +6989,7 @@ U32 LLViewerObject::getPartitionType() const
 	return LLViewerRegion::PARTITION_NONE; 
 }
 
-void LLViewerObject::dirtySpatialGroup(BOOL priority) const
+void LLViewerObject::dirtySpatialGroup() const
 {
 	if (mDrawable)
 	{
@@ -6709,7 +6997,7 @@ void LLViewerObject::dirtySpatialGroup(BOOL priority) const
 		if (group)
 		{
 			group->dirtyGeom();
-			gPipeline.markRebuild(group, priority);
+			gPipeline.markRebuild(group);
 		}
 	}
 }
@@ -6719,11 +7007,6 @@ void LLViewerObject::dirtyMesh()
 	if (mDrawable)
 	{
 		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
-		/*LLSpatialGroup* group = mDrawable->getSpatialGroup();
-		if (group)
-		{
-			group->dirtyMesh();
-		}*/
 	}
 }
 
@@ -6732,7 +7015,7 @@ F32 LLAlphaObject::getPartSize(S32 idx)
 	return 0.f;
 }
 
-void LLAlphaObject::getBlendFunc(S32 face, U32& src, U32& dst)
+void LLAlphaObject::getBlendFunc(S32 face, LLRender::eBlendFactor& src, LLRender::eBlendFactor& dst)
 {
 
 }
@@ -6744,7 +7027,7 @@ void LLStaticViewerObject::updateDrawable(BOOL force_damped)
 	if (mDrawable.notNull())
 	{
 		mDrawable->updateXform(TRUE);
-		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 	}
 	clearChanged(SHIFTED);
 }
@@ -6756,10 +7039,8 @@ void LLViewerObject::saveUnselectedChildrenPosition(std::vector<LLVector3>& posi
 		return ;
 	}
 
-	for (LLViewerObject::child_list_t::const_iterator iter = mChildList.begin();
-			iter != mChildList.end(); iter++)
+	for (const LLViewerObject* childp : mChildList)
 	{
-		LLViewerObject* childp = *iter;
 		if (!childp->isSelected() && childp->mDrawable.notNull())
 		{
 			positions.push_back(childp->getPositionEdit());		
@@ -6776,10 +7057,8 @@ void LLViewerObject::saveUnselectedChildrenRotation(std::vector<LLQuaternion>& r
 		return ;
 	}
 
-	for (LLViewerObject::child_list_t::const_iterator iter = mChildList.begin();
-			iter != mChildList.end(); iter++)
+	for (const LLViewerObject* childp : mChildList)
 	{
-		LLViewerObject* childp = *iter;
 		if (!childp->isSelected() && childp->mDrawable.notNull())
 		{
 			rotations.push_back(childp->getRotationEdit());				
@@ -6801,10 +7080,8 @@ void LLViewerObject::resetChildrenRotationAndPosition(const std::vector<LLQuater
 	S32 index = 0 ;
 	LLQuaternion inv_rotation = ~getRotationEdit() ;
 	LLVector3 offset = getPositionEdit() ;
-	for (LLViewerObject::child_list_t::const_iterator iter = mChildList.begin();
-			iter != mChildList.end(); iter++)
+	for (LLViewerObject* childp : mChildList)
 	{
-		LLViewerObject* childp = *iter;
 		if (!childp->isSelected() && childp->mDrawable.notNull())
 		{
 			if (childp->getPCode() != LL_PCODE_LEGACY_AVATAR)
@@ -6860,10 +7137,8 @@ void LLViewerObject::resetChildrenPosition(const LLVector3& offset, BOOL simplif
 		}
 	}
 
-	for (LLViewerObject::child_list_t::const_iterator iter = mChildList.begin();
-			iter != mChildList.end(); iter++)
+	for (LLViewerObject* childp : mChildList)
 	{
-		LLViewerObject* childp = *iter;
 
 		if (!childp->isSelected() && childp->mDrawable.notNull())
 		{
@@ -6993,6 +7268,221 @@ LLVOAvatar* LLViewerObject::getAvatar() const
 	return NULL;
 }
 
+bool LLViewerObject::hasRenderMaterialParams() const
+{
+    return mRenderMaterialParamsInUse; // getParameterEntryInUse(LLNetworkData::PARAMS_RENDER_MATERIAL);
+}
+
+void LLViewerObject::setHasRenderMaterialParams(bool has_materials)
+{
+    bool had_materials = hasRenderMaterialParams();
+
+    if (had_materials != has_materials)
+    {
+        if (has_materials)
+        {
+            setParameterEntryInUse(LLNetworkData::PARAMS_RENDER_MATERIAL, TRUE, true);
+        }
+        else
+        {
+            setParameterEntryInUse(LLNetworkData::PARAMS_RENDER_MATERIAL, FALSE, true);
+        }
+    }
+}
+
+const LLUUID& LLViewerObject::getRenderMaterialID(U8 te) const
+{
+    const LLRenderMaterialParams* param_block = getRenderMaterialParams();
+    if (param_block)
+    {
+        return param_block->getMaterial(te);
+    }
+
+    return LLUUID::null;
+}
+
+void LLViewerObject::rebuildMaterial()
+{
+    llassert(!isDead());
+
+    faceMappingChanged();
+    gPipeline.markTextured(mDrawable);
+}
+
+void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool update_server, bool local_origin)
+{
+    // implementation is delicate
+
+    // if update is bound for server, should always null out GLTFRenderMaterial and clear GLTFMaterialOverride even if ids haven't changed
+    //  (the case where ids haven't changed indicates the user has reapplied the original material, in which case overrides should be dropped)
+    // otherwise, should only null out the render material where ids or overrides have changed
+    //  (the case where ids have changed but overrides are still present is from unsynchronized updates from the simulator, or synchronized
+    //  updates with solely transform overrides)
+
+    llassert(!update_server || local_origin);
+
+    S32 start_idx = 0;
+    S32 end_idx = getNumTEs();
+
+    if (te_in != -1)
+    {
+        start_idx = te_in;
+        end_idx = start_idx + 1;
+    }
+
+    start_idx = llmax(start_idx, 0);
+    end_idx = llmin(end_idx, (S32) getNumTEs());
+
+    LLRenderMaterialParams* param_block = const_cast<LLRenderMaterialParams*>(getRenderMaterialParams());
+    if (!param_block && id.notNull())
+    { // block doesn't exist, but it will need to
+        param_block = (LLRenderMaterialParams*)createNewParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL)->data;
+    }
+
+
+    LLFetchedGLTFMaterial* new_material = nullptr;
+    if (id.notNull())
+    {
+        new_material = gGLTFMaterialList.getMaterial(id);
+    }
+        
+    // update local state
+    for (S32 te = start_idx; te < end_idx; ++te)
+    {
+        LLTextureEntry* tep = getTE(te);
+        
+        // If local_origin=false (i.e. it's from the server), we know the
+        // material has updated or been created, because extra params are
+        // checked for equality on unpacking. In that case, checking the
+        // material ID for inequality won't work, because the material ID has
+        // already been set.
+        bool material_changed = !local_origin || !param_block || id != param_block->getMaterial(te);
+
+        if (update_server)
+        { 
+            // Clear most overrides so the render material better matches the material
+            // ID (preserve transforms). If overrides become passthrough, set the overrides
+            // to nullptr.
+            if (tep->setBaseMaterial())
+            {
+                material_changed = true;
+            }
+        }
+
+        if (update_server || material_changed)
+        { 
+            tep->setGLTFRenderMaterial(nullptr);
+        }
+
+        if (new_material != tep->getGLTFMaterial())
+        {
+            tep->setGLTFMaterial(new_material, !update_server);
+        }
+
+        if (material_changed && new_material)
+        {
+            // Sometimes, the material may change out from underneath the overrides.
+            // This is usually due to the server sending a new material ID, but
+            // the overrides have not changed due to being only texture
+            // transforms. Re-apply the overrides to the render material here,
+            // if present.
+            const LLGLTFMaterial* override_material = tep->getGLTFMaterialOverride();
+            if (override_material)
+            {
+                new_material->onMaterialComplete([obj_id = getID(), te]()
+                    {
+                        LLViewerObject* obj = gObjectList.findObject(obj_id);
+                        if (!obj) { return; }
+                        LLTextureEntry* tep = obj->getTE(te);
+                        if (!tep) { return; }
+                        const LLGLTFMaterial* new_material = tep->getGLTFMaterial();
+                        if (!new_material) { return; }
+                        const LLGLTFMaterial* override_material = tep->getGLTFMaterialOverride();
+                        if (!override_material) { return; }
+                        LLGLTFMaterial* render_material = new LLFetchedGLTFMaterial();
+                        *render_material = *new_material;
+                        render_material->applyOverride(*override_material);
+                        tep->setGLTFRenderMaterial(render_material);
+                    });
+            }
+        }
+    }
+
+    // signal to render pipe that render batches must be rebuilt for this object
+    if (!new_material)
+    {
+        rebuildMaterial();
+    }
+    else
+    {
+        new_material->onMaterialComplete([obj_id = getID()]()
+            {
+                LLViewerObject* obj = gObjectList.findObject(obj_id);
+                if (obj)
+                {
+                    obj->rebuildMaterial();
+                }
+            });
+    }
+
+    // predictively update LLRenderMaterialParams (don't wait for server)
+    if (param_block)
+    { // update existing parameter block
+        for (S32 te = start_idx; te < end_idx; ++te)
+        {
+            param_block->setMaterial(te, id);
+        }
+    }
+
+    if (update_server)
+    {
+        // update via ModifyMaterialParams cap (server will echo back changes)
+        for (S32 te = start_idx; te < end_idx; ++te)
+        {
+            // This sends a cleared version of this object's current material
+            // override, but the override should already be cleared due to
+            // calling setBaseMaterial above.
+            LLGLTFMaterialList::queueApply(this, te, id);
+        }
+    }
+
+    if (!update_server)
+    {
+        // Land impact may have changed
+        setObjectCostStale();
+    }
+}
+
+void LLViewerObject::setRenderMaterialIDs(const LLUUID& id)
+{
+    setRenderMaterialID(-1, id);
+}
+
+void LLViewerObject::setRenderMaterialIDs(const LLRenderMaterialParams* material_params, bool local_origin)
+{
+    if (!local_origin)
+    {
+        for (S32 te = 0; te < getNumTEs(); ++te)
+        {
+            const LLUUID& id = material_params ? material_params->getMaterial(te) : LLUUID::null;
+            // We know material_params has updated or been created, because
+            // extra params are checked for equality on unpacking.
+            setRenderMaterialID(te, id, false, false);
+        }
+    }
+}
+
+void LLViewerObject::shrinkWrap()
+{
+    if (!mShouldShrinkWrap)
+    {
+        mShouldShrinkWrap = true;
+        if (mDrawable)
+        { // we weren't shrink wrapped before but we are now, update the spatial partition
+            gPipeline.markPartitionMove(mDrawable);
+        }
+    }
+}
 
 class ObjectPhysicsProperties : public LLHTTPNode
 {
@@ -7021,7 +7511,7 @@ public:
 				}
 			} func(local_id);
 
-			LLSelectNode* node = LLSelectMgr::getInstanceFast()->getSelection()->getFirstNode(&func);
+			LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->getFirstNode(&func);
 
 			if (node)
 			{

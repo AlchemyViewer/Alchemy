@@ -53,8 +53,10 @@
 #include "llviewerwindow.h"
 #include "llfocusmgr.h"
 #include "llviewercontrol.h"
+#include "llviewermenufile.h"
 
 #include "roles_constants.h"
+#include "llfilepicker.h"
 
 static LLPanelInjector<LLPanelGroupRoles> t_panel_group_roles("panel_group_roles");
 
@@ -85,7 +87,11 @@ bool agentCanAddToRole(const LLUUID& group_id,
 		return false;
 	}
 	
-	LLGroupMemberData* member_data = (*mi).second;
+	LLGroupMemberData* member_data = (*mi).second.get();
+	if (!member_data)
+	{
+		return false;
+	}
 
 	// Owners can add to any role.
 	if ( member_data->isInRole(gdatap->mOwnerRole) )
@@ -416,6 +422,10 @@ void LLPanelGroupRoles::setGroupID(const LLUUID& id)
 	LLButton* button = getChild<LLButton>("member_invite");
 	if ( button )
 		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_INVITE));
+
+	button = getChild<LLButton>("export_list");
+	if (button)
+		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_VISIBLE_IN_DIR));
 
 	if(mSubTabContainer)
 		mSubTabContainer->selectTab(1);
@@ -852,6 +862,13 @@ BOOL LLPanelGroupMembersSubTab::postBuildSubTab(LLView* root)
 		button->setClickedCallback(onInviteMember, this);
 		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_INVITE));
 	}
+	
+	button = parent->getChild<LLButton>("export_list", recurse);
+	if (button)
+	{
+		button->setClickedCallback(boost::bind(&LLPanelGroupMembersSubTab::onExportMembersToCSV, this));
+		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_VISIBLE_IN_DIR));
+	}
 
 	mEjectBtn = parent->getChild<LLButton>("member_eject", recurse);
 	if ( mEjectBtn )
@@ -872,6 +889,10 @@ BOOL LLPanelGroupMembersSubTab::postBuildSubTab(LLView* root)
 
 void LLPanelGroupMembersSubTab::setGroupID(const LLUUID& id)
 {
+	LLButton* button = getChild<LLButton>("export_list");
+	if (button)
+		button->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_MEMBER_VISIBLE_IN_DIR));
+
 	//clear members list
 	if(mMembersList) mMembersList->deleteAllItems();
 	if(mAssignedRolesList) mAssignedRolesList->deleteAllItems();
@@ -954,7 +975,7 @@ void LLPanelGroupMembersSubTab::handleMemberSelect()
 	{
 		// Count how many selected users are in this role.
 		const LLUUID& role_id = iter->first;
-		LLGroupRoleData* group_role_data = iter->second;
+		LLGroupRoleData* group_role_data = iter->second.get();
 
 		if (group_role_data)
 		{
@@ -988,7 +1009,7 @@ void LLPanelGroupMembersSubTab::handleMemberSelect()
 					LLGroupMgrGroupData::member_list_t::iterator mi = 
 									gdatap->mMembers.find((*member_iter));
 					if (mi == gdatap->mMembers.end()) continue;
-					LLGroupMemberData* member_data = (*mi).second;
+					LLGroupMemberData* member_data = (*mi).second.get();
 					// Is the member an owner?
 					if ( member_data && member_data->isInRole(gdatap->mOwnerRole) )
 					{
@@ -1072,7 +1093,7 @@ void LLPanelGroupMembersSubTab::handleMemberSelect()
 		else
 		{
 			// This could happen if changes are not synced right on sub-panel change.
-			LL_WARNS() << "No group role data for " << iter->second << LL_ENDL;
+			LL_WARNS() << "No group role data for " << iter->first << LL_ENDL;
 		}
 	}
 	mAssignedRolesList->setEnabled(TRUE);
@@ -1089,7 +1110,7 @@ void LLPanelGroupMembersSubTab::handleMemberSelect()
 		LLGroupMgrGroupData::member_list_t::iterator mi = gdatap->mMembers.find(gAgent.getID());
 		if (mi != gdatap->mMembers.end())
 		{
-			LLGroupMemberData* member_data = (*mi).second;
+			LLGroupMemberData* member_data = (*mi).second.get();
 
 			if ( member_data && member_data->isInRole(gdatap->mOwnerRole) )
 			{
@@ -1560,7 +1581,7 @@ U64 LLPanelGroupMembersSubTab::getAgentPowersBasedOnRoleChanges(const LLUUID& ag
 		return GP_NO_POWERS;
 	}
 
-	LLGroupMemberData* member_data = (*iter).second;
+	LLGroupMemberData* member_data = (*iter).second.get();
 	if (!member_data)
 	{
 		LL_WARNS() << "LLPanelGroupMembersSubTab::getAgentPowersBasedOnRoleChanges() -- Null member data for member with UUID " << agent_id << LL_ENDL;
@@ -1798,6 +1819,15 @@ void LLPanelGroupMembersSubTab::updateMembers()
 		mMembersList->deleteAllItems();
 	}
 
+	for (avatar_name_cache_connection_map_t::iterator it = mAvatarNameCacheConnections.begin(); it != mAvatarNameCacheConnections.end(); ++it)
+	{
+		if (it->second.connected())
+		{
+			it->second.disconnect();
+		}
+	}
+	mAvatarNameCacheConnections.clear();
+
 	LLGroupMgrGroupData::member_list_t::iterator end = gdatap->mMembers.end();
 
 	LLTimer update_time;
@@ -1814,7 +1844,7 @@ void LLPanelGroupMembersSubTab::updateMembers()
 		{
 			if (matchesSearchFilter(av_name.getAccountName()))
 			{
-				addMemberToList(mMemberProgress->second);
+				addMemberToList(mMemberProgress->second.get());
 			}
 		}
 		else
@@ -1829,7 +1859,7 @@ void LLPanelGroupMembersSubTab::updateMembers()
 				}
 				mAvatarNameCacheConnections.erase(it);
 			}
-			mAvatarNameCacheConnections[mMemberProgress->first] = LLAvatarNameCache::get(mMemberProgress->first, boost::bind(&LLPanelGroupMembersSubTab::onNameCache, this, gdatap->getMemberVersion(), mMemberProgress->second, _2, _1));
+			mAvatarNameCacheConnections[mMemberProgress->first] = LLAvatarNameCache::get(mMemberProgress->first, boost::bind(&LLPanelGroupMembersSubTab::onNameCache, this, gdatap->getMemberVersion(), mMemberProgress->second.get(), _2, _1));
 		}
 	}
 
@@ -1947,6 +1977,47 @@ void LLPanelGroupMembersSubTab::handleBanMember()
 	handleEjectMembers();
 }
 
+void LLPanelGroupMembersSubTab::onExportMembersToCSV()
+{
+	if (mPendingMemberUpdate) return;
+
+	LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupID);
+	if (gdatap)
+	{
+		LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelGroupMembersSubTab::exportMembersToCSVCallback, this, _1), LLFilePicker::FFSAVE_CSV, LLDir::getScrubbedFileName(gdatap->mName + "_members.csv"));
+	}
+}
+
+void LLPanelGroupMembersSubTab::exportMembersToCSVCallback(const std::vector<std::string>& filenames)
+{
+	LLGroupMgrGroupData* gdatap = LLGroupMgr::getInstance()->getGroupData(mGroupID);
+	if (!gdatap)
+	{
+		return;
+	}
+	std::string fullpath = filenames[0];
+	
+	LLAPRFile outfile;
+	outfile.open(fullpath, LL_APR_WB );
+	apr_file_t* file = outfile.getFileHandle();
+	if (!file) return;
+	
+	apr_file_printf(file, "Group membership record for %s", gdatap->mName.c_str());
+	
+	LLSD memberlist;
+	LLAvatarName av_name;
+	for (LLGroupMgrGroupData::member_list_t::const_iterator member_itr = gdatap->mMembers.begin();
+		 member_itr != gdatap->mMembers.end();
+		 ++member_itr)
+	{
+		LLAvatarNameCache::get(member_itr->first, &av_name);
+		apr_file_printf(file, "\n%s,%s,%s",
+						member_itr->first.asString().c_str(),
+						av_name.getLegacyName().c_str(),
+						member_itr->second->getOnlineStatus().c_str());
+	}
+	apr_file_printf(file, "\n");
+}
 
 // LLPanelGroupRolesSubTab ///////////////////////////////////////////////
 static LLPanelInjector<LLPanelGroupRolesSubTab> t_panel_group_roles_subtab("panel_group_roles_subtab");
@@ -2345,7 +2416,7 @@ void LLPanelGroupRolesSubTab::handleRoleSelect()
 	mSelectedRole = item->getUUID();
 	buildMembersList();
 
-	mCopyRoleButton->setEnabled(gAgent.hasPowerInGroup(mGroupID, GP_ROLE_CREATE));
+	mCopyRoleButton->setEnabled((gdatap->mRoles.size() < (U32)MAX_ROLES) && gAgent.hasPowerInGroup(mGroupID, GP_ROLE_CREATE));
 	can_delete = can_delete && gAgent.hasPowerInGroup(mGroupID,
 													  GP_ROLE_DELETE);
 	mDeleteRoleButton->setEnabled(can_delete);
@@ -2382,7 +2453,7 @@ void LLPanelGroupRolesSubTab::buildMembersList()
 		LLGroupMgrGroupData::role_list_t::iterator rit = gdatap->mRoles.find(item->getUUID());
 		if (rit != gdatap->mRoles.end())
 		{
-			LLGroupRoleData* rdatap = (*rit).second;
+			LLGroupRoleData* rdatap = (*rit).second.get();
 			if (rdatap)
 			{
 				uuid_vec_t::const_iterator mit = rdatap->getMembersBegin();
@@ -2778,7 +2849,7 @@ void LLPanelGroupRolesSubTab::saveRoleChanges(bool select_saved_role)
 		{
 			role_members_count = gdatap->mMemberCount;
 		}
-		else if(LLGroupRoleData* grd = get_ptr_in_map(gdatap->mRoles, mSelectedRole))
+		else if(LLGroupRoleData* grd = gdatap->mRoles[mSelectedRole].get())
 		{
 			role_members_count = grd->getTotalMembersInRole();
 		}
@@ -2992,7 +3063,7 @@ void LLPanelGroupActionsSubTab::handleActionSelect()
 
 		for ( ; it != end; ++it)
 		{
-			gmd = (*it).second;
+			gmd = (*it).second.get();
 			if (!gmd) continue;
 			if ((gmd->getAgentPowers() & power_mask) == power_mask)
 			{
@@ -3013,7 +3084,7 @@ void LLPanelGroupActionsSubTab::handleActionSelect()
 
 		for ( ; it != end; ++it)
 		{
-			rmd = (*it).second;
+			rmd = (*it).second.get();
 			if (!rmd) continue;
 			if ((rmd->getRoleData().mRolePowers & power_mask) == power_mask)
 			{
@@ -3206,7 +3277,7 @@ void LLPanelGroupBanListSubTab::handleDeleteBanEntry()
 	LLGroupMgrGroupData::member_list_t::iterator mi = gdatap->mMembers.find(gAgent.getID());
 	if (mi != gdatap->mMembers.end())
 	{
-		LLGroupMemberData* member_data = (*mi).second;
+		LLGroupMemberData* member_data = (*mi).second.get();
 		if ( member_data && member_data->isInRole(gdatap->mOwnerRole) )
 		{
 			can_ban_members	= true;

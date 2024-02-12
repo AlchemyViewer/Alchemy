@@ -98,6 +98,11 @@ namespace {
     const std::string TABS_SKYS("sky_tabs");
     const std::string TABS_WATER("water_tabs");
 
+    // 'Play' buttons
+    const std::string BTN_PLAY("play_btn");
+    const std::string BTN_SKIP_BACK("skip_back_btn");
+    const std::string BTN_SKIP_FORWARD("skip_forward_btn");
+
     const std::string EVNT_DAYTRACK("DayCycle.Track");
     const std::string EVNT_PLAY("DayCycle.PlayActions");
 
@@ -470,6 +475,8 @@ void LLFloaterEditExtDayCycle::refresh()
 void LLFloaterEditExtDayCycle::setEditSettingsAndUpdate(const LLSettingsBase::ptr_t &settings)
 {
     setEditDayCycle(std::dynamic_pointer_cast<LLSettingsDay>(settings));
+
+    showHDRNotification(std::dynamic_pointer_cast<LLSettingsDay>(settings));
 }
 
 void LLFloaterEditExtDayCycle::setEditDayCycle(const LLSettingsDay::ptr_t &pday)
@@ -660,6 +667,7 @@ void LLFloaterEditExtDayCycle::onButtonApply(LLUICtrl *ctrl, const LLSD &data)
     if (ctrl_action == ACTION_SAVE)
     {
         doApplyUpdateInventory(dayclone);
+        clearDirtyFlag();
     }
     else if (ctrl_action == ACTION_SAVEAS)
     {
@@ -1205,6 +1213,11 @@ void LLFloaterEditExtDayCycle::updateButtons()
     mDeleteFrameButton->setEnabled(can_manipulate && isRemovingFrameAllowed());
     mLoadFrame->setEnabled(can_manipulate);
 
+    BOOL enable_play = mEditDay ? TRUE : FALSE;
+    childSetEnabled(BTN_PLAY, enable_play);
+    childSetEnabled(BTN_SKIP_BACK, enable_play);
+    childSetEnabled(BTN_SKIP_FORWARD, enable_play);
+
     // update track buttons
     bool extended_env = LLEnvironment::instance().isExtendedEnvironmentEnabled();
     for (S32 track = 0; track < LLSettingsDay::TRACK_MAX; ++track)
@@ -1513,7 +1526,7 @@ bool LLFloaterEditExtDayCycle::isAddingFrameAllowed()
 
 void LLFloaterEditExtDayCycle::doImportFromDisk()
 {   // Load a a legacy Windlight XML from disk.
-    (new LLFilePickerReplyThread(boost::bind(&LLFloaterEditExtDayCycle::loadSettingFromFile, this, _1), LLFilePicker::FFLOAD_XML, false))->getFile();
+    LLFilePickerReplyThread::startPicker(boost::bind(&LLFloaterEditExtDayCycle::loadSettingFromFile, this, _1), LLFilePicker::FFLOAD_XML, false);
 }
 
 void LLFloaterEditExtDayCycle::loadSettingFromFile(const std::vector<std::string>& filenames)
@@ -1575,15 +1588,23 @@ void LLFloaterEditExtDayCycle::onIdlePlay(void* user_data)
     {
         LLFloaterEditExtDayCycle* self = (LLFloaterEditExtDayCycle*)user_data;
 
-        F32 prcnt_played = self->mPlayTimer.getElapsedTimeF32() / DAY_CYCLE_PLAY_TIME_SECONDS;
-        F32 new_frame = fmod(self->mPlayStartFrame + prcnt_played, 1.f);
+        if (self->mSkyBlender == nullptr || self->mWaterBlender == nullptr)
+        {
+            self->stopPlay();
+        }
+        else
+        {
 
-        self->mTimeSlider->setCurSliderValue(new_frame); // will do the rounding
-        self->mSkyBlender->setPosition(new_frame);
-        self->mWaterBlender->setPosition(new_frame);
-        self->synchronizeTabs();
-        self->updateTimeAndLabel();
-        self->updateButtons();
+            F32 prcnt_played = self->mPlayTimer.getElapsedTimeF32() / DAY_CYCLE_PLAY_TIME_SECONDS;
+            F32 new_frame = fmod(self->mPlayStartFrame + prcnt_played, 1.f);
+
+            self->mTimeSlider->setCurSliderValue(new_frame); // will do the rounding
+            self->mSkyBlender->setPosition(new_frame);
+            self->mWaterBlender->setPosition(new_frame);
+            self->synchronizeTabs();
+            self->updateTimeAndLabel();
+            self->updateButtons();
+        }
     }
 }
 
@@ -1688,6 +1709,30 @@ void LLFloaterEditExtDayCycle::onPickerCommitSetting(LLUUID item_id, S32 track)
     {
         LLSettingsVOBase::getSettingsAsset(itemp->getAssetUUID(),
             [this, track, frame, item_id](LLUUID asset_id, LLSettingsBase::ptr_t settings, S32 status, LLExtStat) { onAssetLoadedForInsertion(item_id, asset_id, settings, status, track, mCurrentTrack, frame); });
+    }
+}
+
+void LLFloaterEditExtDayCycle::showHDRNotification(const LLSettingsDay::ptr_t &pday)
+{
+    for (U32 i = LLSettingsDay::TRACK_GROUND_LEVEL; i <= LLSettingsDay::TRACK_MAX; i++)
+    {
+        LLSettingsDay::CycleTrack_t &day_track = pday->getCycleTrack(i);
+
+        LLSettingsDay::CycleTrack_t::iterator iter = day_track.begin();
+        LLSettingsDay::CycleTrack_t::iterator end = day_track.end();
+
+        while (iter != end)
+        {
+            LLSettingsSky::ptr_t sky = std::static_pointer_cast<LLSettingsSky>(iter->second);
+            if (sky
+                && sky->canAutoAdjust()
+                && sky->getReflectionProbeAmbiance(true) != 0.f) 
+            {
+                LLNotificationsUtil::add("AutoAdjustHDRSky");
+                return;
+            }
+            iter++;
+        }
     }
 }
 

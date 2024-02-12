@@ -93,21 +93,30 @@ public:
 
         FT_SETTINGS = 56,
 
+        FT_MATERIAL = 57,
+
+		FT_ANIM_OVERRIDES = 58,
+		FT_TOXIC = 59,
+		FT_RLV = 60,
+
+		FT_LOCAL = 69,
+
 		FT_SUITCASE = 100,
 
-		FT_ANIM_OVERRIDES,
-		FT_TOXIC,
-		FT_RLV,
 
 		FT_COUNT,
 
 		FT_NONE = -1
+
+        // When adding, see note at bottom of LLAssetType::Etype
 	};
 
 	static EType 				lookup(const std::string_view type_name);
 	static const std::string&	lookup(EType folder_type);
 
 	static bool 				lookupIsProtectedType(EType folder_type);
+	static bool 				lookupIsAutomaticType(EType folder_type);
+	static bool 				lookupIsSingletonType(EType folder_type);
 	static bool 				lookupIsEnsembleType(EType folder_type);
 
 	static LLAssetType::EType	folderTypeToAssetType(LLFolderType::EType folder_type);

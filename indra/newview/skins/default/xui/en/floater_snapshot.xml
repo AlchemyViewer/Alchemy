@@ -5,7 +5,7 @@
  can_minimize="true"
  can_resize="false"
  can_close="true"
- height="455"
+ height="475"
  layout="topleft"
  name="Snapshot"
  single_instance="true"
@@ -115,7 +115,7 @@
 	   top_delta="0"
        width="31" />
 	<panel
-     height="159"
+     height="179"
      layout="topleft"
 	 follows="top|left"
      left="0"
@@ -160,6 +160,10 @@
              label="Depth"
              name="Depth"
              value="depth" />
+            <combo_box.item
+             label="Depth (24 bit)"
+             name="Depth24"
+             value="depth24" />
         </combo_box>
         <check_box
          label="Interface"
@@ -193,6 +197,14 @@
          top_pad="1"
          width="180"
          name="auto_snapshot_check" />
+        <check_box
+         label="No post-processing"
+         layout="topleft"
+         height="16"
+         left="10"
+         top_pad="1"
+         width="180"
+         name="no_post_check" />
         <text
          type="string"
          length="1"
@@ -391,8 +403,8 @@
     name="thumbnail_placeholder"
     top="23"
 	left="215"
-	width="400"
-	height="400"
+	width="420"
+	height="420"
     follows="top|left"/>
   <view_border 
    bevel_style="in" 
@@ -400,7 +412,7 @@
    layout="topleft"
    name="img_info_border"
    top_pad="0"
-   right="-10"
+   right="-130"
    follows="left|top|right"
    left_delta="0"/>
    <text
@@ -411,11 +423,10 @@
     height="14"
     layout="topleft"
     left="220"
-	right="-20"
     halign="left"
     name="image_res_text"
     top_delta="5"
-    width="200">
+    width="250">
        [WIDTH]px (width) x [HEIGHT]px (height)
    </text>
    <text
@@ -423,7 +434,7 @@
     font="SansSerifSmall"
     height="14"
     layout="topleft"
-    left="-65"
+    left="-185"
     length="1"
     halign="right"
     name="file_size_label"
@@ -431,5 +442,20 @@
     type="string"
     width="50">
        [SIZE] KB
+   </text>
+   <text
+    follows="right|top"
+    font="SansSerifSmall"
+    height="14"
+    layout="topleft"
+    left="-130"
+    length="1"
+    halign="right"
+    name="360_label"
+    text_color="HTMLLinkColor"
+    top_delta="0"
+    type="string"
+    width="115">
+    Take a 360 snapshot
    </text>
 </floater>

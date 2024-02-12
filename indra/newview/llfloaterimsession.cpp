@@ -321,7 +321,8 @@ void LLFloaterIMSession::sendMsgFromInputEditor()
 			{
 				// Truncate and convert to UTF8 for transport
 				std::string utf8_text = wstring_to_utf8str(text);
-
+				applyOOCClose(utf8_text);
+                applyMUPose(utf8_text);
 				sendMsg(utf8_text);
 
 				mInputEditor->setText(LLStringUtil::null);
@@ -338,7 +339,7 @@ void LLFloaterIMSession::sendMsg(const std::string& msg)
 {
 //	const std::string utf8_text = utf8str_truncate(msg, MAX_MSG_BUF_SIZE - 1);
 // [RLVa:KB] - Checked: 2010-11-30 (RLVa-1.3.0)
-	std::string utf8_text = utf8str_truncate(msg, MAX_MSG_BUF_SIZE - 1);
+	std::string utf8_text = msg;
 
 	if ( (RlvActions::hasBehaviour(RLV_BHVR_SENDIM)) || (RlvActions::hasBehaviour(RLV_BHVR_SENDIMTO)) )
 	{
@@ -490,12 +491,17 @@ BOOL LLFloaterIMSession::postBuild()
 
 	BOOL result = LLFloaterIMSessionTab::postBuild();
 
-	mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN);
+//	mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN);
+// [SL:KB]
+	mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN * 5);
+// [/SL:KB]
+
 	mInputEditor->setAutoreplaceCallback(boost::bind(&LLAutoReplace::autoreplaceCallback, LLAutoReplace::getInstance(), _1, _2, _3, _4, _5));
 	mInputEditor->setFocusReceivedCallback( boost::bind(onInputEditorFocusReceived, _1, this) );
 	mInputEditor->setFocusLostCallback( boost::bind(onInputEditorFocusLost, _1, this) );
 	mInputEditor->setKeystrokeCallback( boost::bind(onInputEditorKeystroke, _1, this) );
 	mInputEditor->setCommitCallback(boost::bind(onSendMsg, _1, this));
+	mInputEditor->setFont(LLViewerChat::getChatFont());
 
 	setDocked(true);
 
@@ -988,6 +994,7 @@ void LLFloaterIMSession::updateMessages()
 			std::string from = msg["from"].asString();
 			std::string message = msg["message"].asString();
 			bool is_history = msg["is_history"].asBoolean();
+			bool is_region_msg = msg["is_region_msg"].asBoolean();
 
 			LLChat chat;
 			chat.mFromID = from_id;
@@ -995,6 +1002,10 @@ void LLFloaterIMSession::updateMessages()
 			chat.mFromName = from;
 			chat.mTimeStr = time;
 			chat.mChatStyle = is_history ? CHAT_STYLE_HISTORY : chat.mChatStyle;
+            if (is_region_msg)
+            {
+                chat.mSourceType = CHAT_SOURCE_REGION;
+            }
 
 			// process offer notification
 			if (msg.has("notification_id"))
@@ -1180,7 +1191,7 @@ void LLFloaterIMSession::processAgentListUpdates(const LLSD& body)
 	if (body.isMap() && body.has("agent_updates") && body["agent_updates"].isMap())
 	{
 		LLSD::map_const_iterator update_it;
-		for(const auto& agent_update : body["agent_updates"].map())
+		for(const auto& agent_update : body["agent_updates"].asMap())
 		{
 			LLUUID agent_id(agent_update.first);
 			LLSD agent_data = agent_update.second;

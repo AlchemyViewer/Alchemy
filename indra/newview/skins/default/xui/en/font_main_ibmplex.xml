@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<fonts>
+  <font name="default">
+    <file>IBMPlexSans-Regular.ttf</file>
+		<file>IBMPlexSansJP-Regular.ttf</file>
+		<file>IBMPlexSansKR-Regular.ttf</file>
+		<file>IBMPlexSansThai-Regular.ttf</file>
+		<file>IBMPlexSansHebrew-Regular.ttf</file>
+		<file>IBMPlexSansDevanagari-Regular.ttf</file>
+		<file>IBMPlexSansArabic-Regular.ttf</file>
+  </font>
+
+  <font name="SansSerif">
+    <file>IBMPlexSans-Regular.ttf</file>
+		<file>IBMPlexSansJP-Regular.ttf</file>
+		<file>IBMPlexSansKR-Regular.ttf</file>
+		<file>IBMPlexSansThai-Regular.ttf</file>
+		<file>IBMPlexSansHebrew-Regular.ttf</file>
+		<file>IBMPlexSansDevanagari-Regular.ttf</file>
+		<file>IBMPlexSansArabic-Regular.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD">
+    <file>IBMPlexSans-Bold.ttf</file>
+		<file>IBMPlexSansJP-Bold.ttf</file>
+		<file>IBMPlexSansKR-Bold.ttf</file>
+		<file>IBMPlexSansThai-Bold.ttf</file>
+		<file>IBMPlexSansHebrew-Bold.ttf</file>
+		<file>IBMPlexSansDevanagari-Bold.ttf</file>
+		<file>IBMPlexSansArabic-Bold.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="ITALIC">
+    <file>IBMPlexSans-Italic.ttf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD|ITALIC">
+    <file>IBMPlexSans-BoldItalic.ttf</file>
+  </font>
+
+  <font name="OverrideTest">
+    <file>IBMPlexSans-Regular.ttf</file>
+  </font>
+
+	<font_size name="Huge" size="16.0" />
+	<font_size name="Large" size="12.0" />
+	<font_size name="Medium" size="10.0" />
+	<font_size name="Small" size="9.0" />
+</fonts>

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel label="テキストチャット" name="chat">
+	<panel name="general_chat_settings">
+		<check_box label="近くのチャット入力でチャットバーを使用する" name="use_chat_bar"/>
+		<check_box label="ローカルチャットでジェスチャーを自動補完する" name="auto_complete_gestures"/>
+		<check_box label="チャット時にタイピングアニメーションを再生する" name="play_typing_animation"/>
+		<check_box label="オフライン時にＩＭが送られてきたときにメールを送る（[EMAIL]）" name="send_im_to_email"/>
+		<text name="email_settings"> [https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]
+		</text>
+		<text name="font_name">
+			フォント名：
+		</text>
+		<combo_box name="chat_font_name">
+			<item label="IBM Plex" name="IBMPlex" value="IBMPlex"/>
+			<item label="Noto Sans" name="NotoSans" value="NotoSans"/>
+			<item label="Open Dyslexic" name="OpenDyslexic" value="OpenDyslexic"/>
+			<item label="Sans Serif" name="SansSerif" value="SansSerif"/>
+			<item label="Source Sans" name="SourceSans" value="SourceSans"/>
+			<item label="Ubuntu" name="Ubuntu" value="Ubuntu"/>
+			<item label="Cascadia Code" name="CascadiaCode" value="CascadiaCode"/>
+			<item label="Fira Code" name="FiraCode" value="FiraCode"/>
+			<item label="IBM Plex Mono" name="IBMPlexMono" value="IBMPlexMono"/>
+			<item label="Jetbrains Mono" name="JetbrainsMono" value="JetbrainsMono"/>
+			<item label="Monaspace Argon" name="MonaspaceArgon" value="MonaspaceArgon"/>
+			<item label="Monaspace Krypton" name="MonaspaceKrypton" value="MonaspaceKrypton"/>
+			<item label="Monaspace Neon" name="MonaspaceNeon" value="MonaspaceNeon"/>
+			<item label="Monaspace Xenon" name="MonaspaceXenon" value="MonaspaceXenon"/>
+			<item label="Monospace" name="Monospace" value="Monospace"/>
+			<item label="Noto Sans Mono" name="NotoSansMono" value="NotoSansMono"/>
+			<item label="Open Dyslexic Mono" name="OpenDyslexicMono" value="OpenDyslexicMono"/>
+			<item label="Source Code Pro" name="SourceCodePro" value="SourceCodePro"/>
+			<item label="Ubuntu Mono" name="UbuntuMono" value="UbuntuMono"/>
+		</combo_box>
+		<text name="font_size">
+			フォントサイズ：
+		</text>
+		<combo_box name="chat_font_size">
+			<item label="等幅" name="Monospace" value="-1"/>
+			<item label="小" name="Small" value="0"/>
+			<item label="中" name="Medium" value="1"/>
+			<item label="大" name="Large" value="2"/>
+			<item label="特大" name="Huge" value="3"/>
+		</combo_box>
+		<check_box label="吹き出しチャット" name="bubble_text_chat"/>
+	</panel>
+	<panel name="im_notification_settings">
+		<text name="friend_ims">
+			フレンドのＩＭ：
+		</text>
+		<combo_box control_name="NotificationFriendIMOptions" name="FriendIMOptions">
+			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>
+			<item label="メッセージをポップアップ" name="PopUpMessage" value="toast"/>
+			<item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash"/>
+			<item label="アクションなし" name="NoAction" value="noaction"/>
+		</combo_box>
+		<check_box label="サウンド再生" name="play_sound_friend_im">
+		</check_box>
+		<text name="non_friend_ims">
+			フレンドでない人からのＩＭ：
+		</text>
+		<combo_box name="NonFriendIMOptions">
+			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>
+			<item label="メッセージをポップアップ" name="PopUpMessage" value="toast"/>
+			<item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash"/>
+			<item label="アクションなし" name="NoAction" value="noaction"/>
+		</combo_box>
+		<check_box label="サウンド再生" name="play_sound_non_friend_im"/>
+		<text name="conference_ims">
+			会話ＩＭ：
+		</text>
+		<combo_box name="ConferenceIMOptions">
+			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>
+			<item label="メッセージをポップアップ" name="PopUpMessage" value="toast"/>
+			<item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash"/>
+			<item label="アクションなし" name="NoAction" value="noaction"/>
+		</combo_box>
+		<check_box label="サウンド再生" name="play_sound_conference_im"/>
+		<text name="group_chat">
+			グループチャット：
+		</text>
+		<combo_box name="GroupChatOptions">
+			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>
+			<item label="メッセージをポップアップ" name="PopUpMessage" value="toast"/>
+			<item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton" value="flash"/>
+			<item label="アクションなし" name="NoAction" value="noaction"/>
+		</combo_box>
+		<check_box label="サウンド再生" name="play_sound_group_chat_im"/>
+		<text name="nearby_chat">
+			近くのチャット：
+		</text>
+		<combo_box name="NearbyChatOptions">
+			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>
+			<item label="メッセージをポップアップ" name="PopUpMessage" value="toast"/>
+			<item label="ツールバーのボタンをフラッシュ" name="FlashToolBarButton" value="flash"/>
+			<item label="アクションなし" name="NoAction" value="noaction"/>
+		</combo_box>
+		<check_box label="サウンド再生" name="play_sound_nearby_chat_im">
+		</check_box>
+		<text name="object_ims">
+			オブジェクトからのＩＭ：
+		</text>
+		<combo_box name="ObjectIMOptions">
+			<item label="会話ウィンドウを開く" name="OpenConversationsWindow" value="openconversations"/>
+			<item label="メッセージをポップアップ" name="PopUpMessage" value="toast"/>
+			<item label="ツールバーのボタンをフラッシュ" name="FlashToolBarButton" value="flash"/>
+			<item label="アクションなし" name="NoAction" value="noaction"/>
+		</combo_box>
+		<check_box label="サウンド再生" name="play_sound_object_im"/>
+		<text name="notifications_alert">
+			すべての通知を一時的に停止するには、「コミュニケーション」＞「取り込み中」を選択します。
+		</text>
+	</panel>
+	<panel name="play_sound_settings">
+		<text name="play_sound">
+			再生するサウンド：
+		</text>
+		<check_box label="新しい会話" name="new_conversation"/>
+		<check_box label="音声通話の着信" name="incoming_voice_call"/>
+		<check_box label="テレポートのオファー" name="teleport_offer"/>
+		<check_box label="インベントリのオファー" name="inventory_offer"/>
+		<view_border name="cost_text_border"/>
+	</panel>
+	<panel name="log_settings">
+		<text name="logging_label">
+			保存：
+		</text>
+		<combo_box name="conversation_log_combo">
+			<item label="ログと会話履歴" name="log_and_transcripts" value="2"/>
+			<item label="ログのみ" name="log_only" value="1"/>
+			<item label="ログか会話履歴なし" name="no_log_or_transcript" value="0"/>
+		</combo_box>
+		<button label="ログをクリア…" name="clear_log"/>
+		<button label="会話履歴を削除…" name="delete_transcripts"/>
+		<text name="log_location_label">
+			場所：
+		</text>
+		<line_editor name="log_path_string"/>
+		<button label="ブラウズ…" label_selected="ブラウズ" name="log_path_button"/>
+	</panel>
+	<button label="翻訳…" name="ok_btn"/>
+	<button name="autoreplace_showgui" label="自動置換…"/>
+	<button name="spellcheck_showgui" label="スペルチェック…"/>
+</panel>

@@ -63,7 +63,7 @@ void LLFloaterSpellCheckerSettings::draw()
 
 BOOL LLFloaterSpellCheckerSettings::postBuild(void)
 {
-	gSavedSettings.getControl("SpellCheck")->getSignal()->connect(boost::bind(&LLFloaterSpellCheckerSettings::refreshDictionaries, this, false));
+	mSpellcheckCtrlConnection = gSavedSettings.getControl("SpellCheck")->getSignal()->connect(boost::bind(&LLFloaterSpellCheckerSettings::refreshDictionaries, this, false));
 	LLSpellChecker::setSettingsChangeCallback(boost::bind(&LLFloaterSpellCheckerSettings::onSpellCheckSettingsChange, this));
 	getChild<LLUICtrl>("spellcheck_remove_btn")->setCommitCallback(boost::bind(&LLFloaterSpellCheckerSettings::onBtnRemove, this));
 	getChild<LLUICtrl>("spellcheck_import_btn")->setCommitCallback(boost::bind(&LLFloaterSpellCheckerSettings::onBtnImport, this));
@@ -101,6 +101,8 @@ void LLFloaterSpellCheckerSettings::onBtnMove(const std::string& from, const std
 
 void LLFloaterSpellCheckerSettings::onClose(bool app_quitting)
 {
+	mSpellcheckCtrlConnection.disconnect();
+
 	if (app_quitting)
 	{
 		// don't save anything
@@ -259,7 +261,7 @@ BOOL LLFloaterSpellCheckerImport::postBuild(void)
 
 void LLFloaterSpellCheckerImport::onBtnBrowse()
 {
-	(new LLFilePickerReplyThread(boost::bind(&LLFloaterSpellCheckerImport::importSelectedDictionary, this, _1), LLFilePicker::FFLOAD_DICTIONARY, false))->getFile();
+	LLFilePickerReplyThread::startPicker(boost::bind(&LLFloaterSpellCheckerImport::importSelectedDictionary, this, _1), LLFilePicker::FFLOAD_DICTIONARY, false);
 }
 
 void LLFloaterSpellCheckerImport::importSelectedDictionary(const std::vector<std::string>& filenames)

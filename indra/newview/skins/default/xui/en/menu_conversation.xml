@@ -132,6 +132,13 @@
         <on_click function="Avatar.DoToSelected" parameter="pay" />
         <on_enable function="Avatar.EnableItem" parameter="can_pay" />
     </menu_item_call>
+    <menu_item_call
+     label="Report Abuse"
+     layout="topleft"
+     name="report_abuse">
+       <on_click function="Avatar.DoToSelected" parameter="report_abuse" />
+       <on_enable function="Avatar.EnableItem" parameter="report_abuse" />
+    </menu_item_call>
     <menu_item_check
      label="Block Voice"
      layout="topleft"
@@ -159,7 +166,6 @@
      layout="topleft"
      name="group_profile">
         <on_click function="Group.DoToSelected" parameter="group_profile"/>
-        <on_enable function="Avatar.EnableItem" parameter="can_group_profile" />
     </menu_item_call>	
     <menu_item_call
      label="Activate Group"
@@ -175,6 +181,25 @@
         <on_click function="Group.DoToSelected" parameter="leave_group"/>
         <on_enable function="Avatar.EnableItem" parameter="can_leave_group" />
     </menu_item_call>
+	<menu_item_separator layout="topleft" name="separator_group_copy"/>
+    <menu_item_call
+     label="Copy Name"
+     layout="topleft"
+     name="copy_group_name">
+        <on_click function="Group.DoToSelected" parameter="copy_group_name"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy SLurl"
+     layout="topleft"
+     name="copy_group_slurl">
+        <on_click function="Group.DoToSelected" parameter="copy_group_slurl"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Copy UUID"
+     layout="topleft"
+     name="copy_group_id">
+        <on_click function="Group.DoToSelected" parameter="copy_group_id"/>
+    </menu_item_call>	
 	<menu_item_separator layout="topleft" name="Moderator Options Separator"/>
 	<context_menu
 	 label="Moderator Options"
@@ -230,14 +255,14 @@
 	</menu_item_call>
   <menu_item_separator name="separator_utils"/>
   <context_menu
-   label="Utilities"
+   label="Actions"
    name="utils_menu">
     <menu_item_call
-     label="Copy Username"
-     name="copy_username">
+     label="Copy Full Name"
+     name="copy_full_name">
       <menu_item_call.on_click
        function="Avatar.DoToSelected"
-       parameter="copy_username"/>
+       parameter="copy_full_name"/>
     </menu_item_call>
     <menu_item_call
      label="Copy Display Name"
@@ -247,11 +272,11 @@
        parameter="copy_display_name"/>
     </menu_item_call>
     <menu_item_call
-     label="Copy Account Name"
-     name="copy_account_name">
+     label="Copy Agent Name"
+     name="copy_username">
       <menu_item_call.on_click
        function="Avatar.DoToSelected"
-       parameter="copy_account_name"/>
+       parameter="copy_username"/>
     </menu_item_call>
     <menu_item_call
      label="Copy SLurl"
@@ -261,7 +286,7 @@
        parameter="copy_slurl"/>
     </menu_item_call>
     <menu_item_call
-     label="Copy ID"
+     label="Copy UUID"
      name="copy_uuid">
       <menu_item_call.on_click
        function="Avatar.DoToSelected"

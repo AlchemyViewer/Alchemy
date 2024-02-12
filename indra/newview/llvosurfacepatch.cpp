@@ -45,8 +45,6 @@
 
 F32 LLVOSurfacePatch::sLODFactor = 1.f;
 
-//============================================================================
-
 LLVOSurfacePatch::LLVOSurfacePatch(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
 	:	LLStaticViewerObject(id, pcode, regionp),
 		mDirtiedPatch(FALSE),
@@ -138,21 +136,21 @@ LLDrawable *LLVOSurfacePatch::createDrawable(LLPipeline *pipeline)
 	return mDrawable;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_TERRAIN("Update Terrain");
 
 void LLVOSurfacePatch::updateGL()
 {
 	if (mPatchp)
 	{
+		LL_PROFILE_ZONE_SCOPED
 		mPatchp->updateGL();
 	}
 }
 
 BOOL LLVOSurfacePatch::updateGeometry(LLDrawable *drawable)
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_TERRAIN);
+    LL_PROFILE_ZONE_SCOPED;
 
-	dirtySpatialGroup(TRUE);
+	dirtySpatialGroup();
 	
 	S32 min_comp, max_comp, range;
 	min_comp = lltrunc(mPatchp->getMinComposition());
@@ -390,7 +388,6 @@ void LLVOSurfacePatch::updateNorthGeometry(LLFace *facep,
 										LLStrider<U16> &indicesp,
 										U32 &index_offset)
 {
-	S32 vertex_count = 0;
 	S32 i, x, y;
 
 	S32 num_vertices;
@@ -425,7 +422,6 @@ void LLVOSurfacePatch::updateNorthGeometry(LLFace *facep,
 			normalsp++;
 			texCoords0p++;
 			texCoords1p++;
-			vertex_count++;
 		}
 
 		// North patch
@@ -438,7 +434,6 @@ void LLVOSurfacePatch::updateNorthGeometry(LLFace *facep,
 			normalsp++;
 			texCoords0p++;
 			texCoords1p++;
-			vertex_count++;
 		}
 
 
@@ -475,7 +470,6 @@ void LLVOSurfacePatch::updateNorthGeometry(LLFace *facep,
 			normalsp++;
 			texCoords0p++;
 			texCoords1p++;
-			vertex_count++;
 		}
 
 		// Iterate through the north patch's points
@@ -489,7 +483,6 @@ void LLVOSurfacePatch::updateNorthGeometry(LLFace *facep,
 			normalsp++;
 			texCoords0p++;
 			texCoords1p++;
-			vertex_count++;
 		}
 
 
@@ -533,7 +526,6 @@ void LLVOSurfacePatch::updateNorthGeometry(LLFace *facep,
 			normalsp++;
 			texCoords0p++;
 			texCoords1p++;
-			vertex_count++;
 		}
 
 		// Iterate through the north patch's points
@@ -547,7 +539,6 @@ void LLVOSurfacePatch::updateNorthGeometry(LLFace *facep,
 			normalsp++;
 			texCoords0p++;
 			texCoords1p++;
-			vertex_count++;
 		}
 
 		for (i = 0; i < length; i++)
@@ -787,7 +778,7 @@ void LLVOSurfacePatch::dirtyGeom()
 {
 	if (mDrawable)
 	{
-		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+		gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 		LLFace* facep = mDrawable->getFace(0);
 		if (facep)
 		{
@@ -862,7 +853,7 @@ void LLVOSurfacePatch::getGeomSizesEast(const S32 stride, const S32 east_stride,
 	}
 }
 
-BOOL LLVOSurfacePatch::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, S32 *face_hitp,
+BOOL LLVOSurfacePatch::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, BOOL pick_unselectable, S32 *face_hitp,
 									  LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
 	
 {
@@ -983,7 +974,7 @@ U32 LLVOSurfacePatch::getPartitionType() const
 }
 
 LLTerrainPartition::LLTerrainPartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolTerrain::VERTEX_DATA_MASK, FALSE, GL_DYNAMIC_DRAW, regionp)
+: LLSpatialPartition(LLDrawPoolTerrain::VERTEX_DATA_MASK, FALSE, regionp)
 {
 	mOcclusionEnabled = FALSE;
 	mInfiniteFarClip = TRUE;
@@ -991,15 +982,9 @@ LLTerrainPartition::LLTerrainPartition(LLViewerRegion* regionp)
 	mPartitionType = LLViewerRegion::PARTITION_TERRAIN;
 }
 
-LLVertexBuffer* LLTerrainPartition::createVertexBuffer(U32 type_mask, U32 usage)
-{
-	return new LLVertexBuffer(LLVOSurfacePatch::VERTEX_DATA_MASK, GL_DYNAMIC_DRAW);
-}
-
-static LLTrace::BlockTimerStatHandle FTM_REBUILD_TERRAIN_VB("Terrain VB");
 void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
 {
-	LL_RECORD_BLOCK_TIME(FTM_REBUILD_TERRAIN_VB);
+    LL_PROFILE_ZONE_SCOPED;
 
 	LLVertexBuffer* buffer = group->mVertexBuffer;
 
@@ -1019,10 +1004,8 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
 	U32 indices_index = 0;
 	U32 index_offset = 0;
 
-	for (std::vector<LLFace*>::iterator i = mFaceList.begin(); i != mFaceList.end(); ++i)
+	for (LLFace* facep : mFaceList)
 	{
-		LLFace* facep = *i;
-
 		facep->setIndicesIndex(indices_index);
 		facep->setGeomIndex(index_offset);
 		facep->setVertexBuffer(buffer);
@@ -1034,7 +1017,7 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
 		index_offset += facep->getGeomCount();
 	}
 
-	buffer->flush();
+	buffer->unmapBuffer();
 	mFaceList.clear();
 }
 

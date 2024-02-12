@@ -43,6 +43,8 @@
 
 #include <boost/preprocessor.hpp>
 
+#include <array>
+
 //..................................................................................
 //..................................................................................
 // Helper macrose's for generate cycle unwrap templates
@@ -586,7 +588,7 @@ static void bilinear_scale(const U8 *src, U32 srcW, U32 srcH, U32 srcCh, U32 src
 
 //static
 std::string LLImage::sLastErrorMessage;
-LLMutex LLImage::sMutex(LLMutex::E_CONST_INIT);
+LLMutex* LLImage::sMutex = NULL;
 bool LLImage::sUseNewByteRange = false;
 S32  LLImage::sMinimalReverseByteRangePercent = 75;
 
@@ -595,11 +597,14 @@ void LLImage::initClass(bool use_new_byte_range, S32 minimal_reverse_byte_range_
 {
 	sUseNewByteRange = use_new_byte_range;
     sMinimalReverseByteRangePercent = minimal_reverse_byte_range_percent;
+	sMutex = new LLMutex();
 }
 
 //static
 void LLImage::cleanupClass()
 {
+	delete sMutex;
+	sMutex = NULL;
 }
 
 //static
@@ -612,7 +617,7 @@ const std::string& LLImage::getLastError()
 //static
 void LLImage::setLastError(const std::string& message)
 {
-	LLMutexLock m(&sMutex);
+	LLMutexLock m(sMutex);
 	sLastErrorMessage = message;
 }
 
@@ -621,8 +626,7 @@ void LLImage::setLastError(const std::string& message)
 //---------------------------------------------------------------------------
 
 LLImageBase::LLImageBase()
-:	LLTrace::MemTrackable<LLImageBase>("LLImage"),
-	mData(NULL),
+:	mData(NULL),
 	mDataSize(0),
 	mWidth(0),
 	mHeight(0),
@@ -671,7 +675,6 @@ void LLImageBase::sanityCheck()
 void LLImageBase::deleteData()
 {
 	ll_aligned_free_16(mData);
-	disclaimMem(mDataSize);
 	mDataSize = 0;
 	mData = NULL;
 }
@@ -729,7 +732,6 @@ U8* LLImageBase::allocateData(S32 size)
 		}
 	}
 	mDataSize = size;
-	claimMem(mDataSize);
 
 	return mData;
 }
@@ -750,9 +752,7 @@ U8* LLImageBase::reallocateData(S32 size)
 		ll_aligned_free_16(mData) ;
 	}
 	mData = new_datap;
-	disclaimMem(mDataSize);
 	mDataSize = size;
-	claimMem(mDataSize);
 	mBadBufferAllocation = false;
 	return mData;
 }
@@ -801,7 +801,6 @@ U8* LLImageBase::allocateDataSize(S32 width, S32 height, S32 ncomponents, S32 si
 // LLImageRaw
 //---------------------------------------------------------------------------
 
-S64 LLImageRaw::sGlobalRawMemory = 0;
 S32 LLImageRaw::sRawImageCount = 0;
 
 LLImageRaw::LLImageRaw()
@@ -816,6 +815,15 @@ LLImageRaw::LLImageRaw(U16 width, U16 height, S8 components)
 	//llassert( S32(width) * S32(height) * S32(components) <= MAX_IMAGE_DATA_SIZE );
 	allocateDataSize(width, height, components);
 	++sRawImageCount;
+}
+
+LLImageRaw::LLImageRaw(const U8* data, U16 width, U16 height, S8 components)
+    : LLImageBase()
+{
+    if (allocateDataSize(width, height, components))
+    {
+        memcpy(getData(), data, width * height * components);
+    }
 }
 
 LLImageRaw::LLImageRaw(U8 *data, U16 width, U16 height, S8 components, bool no_copy)
@@ -850,23 +858,25 @@ LLImageRaw::~LLImageRaw()
 U8* LLImageRaw::allocateData(S32 size)
 {
 	U8* res = LLImageBase::allocateData(size);
-	sGlobalRawMemory += getDataSize();
 	return res;
 }
 
 // virtual
 U8* LLImageRaw::reallocateData(S32 size)
 {
-	sGlobalRawMemory -= getDataSize();
 	U8* res = LLImageBase::reallocateData(size);
-	sGlobalRawMemory += getDataSize();
 	return res;
+}
+
+void LLImageRaw::releaseData()
+{
+    LLImageBase::setSize(0, 0, 0);
+    LLImageBase::setDataAndSize(nullptr, 0);
 }
 
 // virtual
 void LLImageRaw::deleteData()
 {
-	sGlobalRawMemory -= getDataSize();
 	LLImageBase::deleteData();
 }
 
@@ -881,8 +891,6 @@ void LLImageRaw::setDataAndSize(U8 *data, S32 width, S32 height, S8 components)
 
 	LLImageBase::setSize(width, height, components) ;
 	LLImageBase::setDataAndSize(data, width * height * components) ;
-	
-	sGlobalRawMemory += getDataSize();
 }
 
 bool LLImageRaw::resize(U16 width, U16 height, S8 components)
@@ -984,6 +992,43 @@ void LLImageRaw::verticalFlip()
 }
 
 
+bool LLImageRaw::optimizeAwayAlpha()
+{
+    if (getComponents() == 4)
+    {
+        U8* data = getData();
+        U32 pixels = getWidth() * getHeight();
+
+        // check alpha channel for all 255
+        for (U32 i = 0; i < pixels; ++i)
+        {
+            if (data[i * 4 + 3] != 255)
+            {
+                return false;
+            }
+        }
+
+        // alpha channel is all 255, make a new copy of data without alpha channel
+        U8* new_data = (U8*) ll_aligned_malloc_16(getWidth() * getHeight() * 3);
+
+        for (U32 i = 0; i < pixels; ++i)
+        {
+            U32 di = i * 3;
+            U32 si = i * 4;
+            for (U32 j = 0; j < 3; ++j)
+            {
+                new_data[di+j] = data[si+j];
+            }
+        }
+
+        setDataAndSize(new_data, getWidth(), getHeight(), 3);
+
+        return true;
+    }
+
+    return false;
+}
+
 void LLImageRaw::expandToPowerOfTwo(S32 max_dim, bool scale_image)
 {
 	// Find new sizes
@@ -1068,8 +1113,8 @@ void LLImageRaw::composite( LLImageRaw* src )
 		return;
 	}
 
-	llassert(3 == src->getComponents());
-	llassert(3 == dst->getComponents());
+	// llassert(3 == src->getComponents());
+	// llassert(3 == dst->getComponents());
 
 	if( 3 == dst->getComponents() )
 	{
@@ -1110,7 +1155,7 @@ void LLImageRaw::compositeScaled4onto3(LLImageRaw* src)
 	llassert( (4 == src->getComponents()) && (3 == dst->getComponents()) );
 
 	S32 temp_data_size = src->getWidth() * dst->getHeight() * src->getComponents();
-	llassert_always(temp_data_size > 0);
+	llassert(temp_data_size > 0);
 	std::vector<U8> temp_buffer(temp_data_size);
 
 	// Vertical: scale but no composite
@@ -1132,12 +1177,31 @@ void LLImageRaw::compositeUnscaled4onto3( LLImageRaw* src )
 {
 	LLImageRaw* dst = this;  // Just for clarity.
 
-	llassert( (3 == src->getComponents()) || (4 == src->getComponents()) );
+	llassert( (4 == src->getComponents()) || (3 == dst->getComponents()) );
 	llassert( (src->getWidth() == dst->getWidth()) && (src->getHeight() == dst->getHeight()) );
 
 	U8* src_data = src->getData();
 	U8* dst_data = dst->getData();
 	S32 pixels = getWidth() * getHeight();
+
+	if(!src_data)
+	{
+		LL_WARNS() << "source is null!" << LL_ENDL;
+		return;
+	}
+	if(!dst_data)
+	{
+		LL_WARNS() << "destination is null!" << LL_ENDL;
+		return;
+	}
+	auto src_comps = src->getComponents();
+	if( src_comps != 4)
+	{
+		// This should never be reached, buit apparently it is.
+		LL_WARNS() << "src has incorrect number of layers (" << src_comps << ")" << LL_ENDL;
+		return;
+	}
+
 	while( pixels-- )
 	{
 		U8 alpha = src_data[3];
@@ -1781,14 +1845,8 @@ bool LLImageRaw::validateSrcAndDst(std::string func, LLImageRaw* src, LLImageRaw
 }
 
 //----------------------------------------------------------------------------
-
-static struct
-{
-	const char* exten;
-	EImageCodec codec;
-}
-file_extensions[] =
-{
+std::array<std::pair<const char*, EImageCodec>, 11> file_extensions =
+{ {
 	{ "bmp", IMG_CODEC_BMP },
 	{ "tga", IMG_CODEC_TGA },
 	{ "j2c", IMG_CODEC_J2C },
@@ -1800,8 +1858,8 @@ file_extensions[] =
 	{ "dxt", IMG_CODEC_DXT },
 	{ "png", IMG_CODEC_PNG },
 	{ "webp", IMG_CODEC_WEBP }
-};
-#define NUM_FILE_EXTENSIONS LL_ARRAY_SIZE(file_extensions)
+} };
+
 #if 0
 static std::string find_file(std::string &name, S8 *codec)
 {
@@ -1825,10 +1883,10 @@ EImageCodec LLImageBase::getCodecFromExtension(const std::string& exten)
 {
 	if (!exten.empty())
 	{
-		for (int i = 0; i < (int)(NUM_FILE_EXTENSIONS); i++)
+		for (const auto& exten_pair : file_extensions)
 		{
-			if (exten == file_extensions[i].exten)
-				return file_extensions[i].codec;
+			if (exten == exten_pair.first)
+				return exten_pair.second;
 		}
 	}
 	return IMG_CODEC_INVALID;
@@ -2079,7 +2137,7 @@ bool LLImageFormatted::decodeChannels(LLImageRaw* raw_image,F32  decode_time, S3
 U8* LLImageFormatted::allocateData(S32 size)
 {
 	U8* res = LLImageBase::allocateData(size); // calls deleteData()
-	sGlobalFormattedMemory += getDataSize();
+	if(res) sGlobalFormattedMemory += getDataSize();
 	return res;
 }
 
@@ -2088,7 +2146,7 @@ U8* LLImageFormatted::reallocateData(S32 size)
 {
 	sGlobalFormattedMemory -= getDataSize();
 	U8* res = LLImageBase::reallocateData(size);
-	sGlobalFormattedMemory += getDataSize();
+	if(res) sGlobalFormattedMemory += getDataSize();
 	return res;
 }
 
@@ -2166,7 +2224,7 @@ bool LLImageFormatted::load(const std::string &filename, int load_size)
 {
 	resetLastError();
 
-	apr_off_t file_size = 0;
+	S32 file_size = 0;
 	LLAPRFile infile ;
 	infile.open(filename, LL_APR_RB, NULL, &file_size);
 	apr_file_t* apr_file = infile.getFileHandle();
@@ -2259,9 +2317,7 @@ void LLImageBase::setDataAndSize(U8 *data, S32 size)
 { 
 	ll_assert_aligned(data, 16);
 	mData = data; 
-	disclaimMem(mDataSize); 
 	mDataSize = size; 
-	claimMem(mDataSize);
 }	
 
 //static

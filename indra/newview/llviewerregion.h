@@ -31,7 +31,10 @@
 // that are in to a particular region.
 #include <string>
 #include <boost/signals2.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
+#include "xform.h"
+#include "llcorehttputil.h"
 #include "llwind.h"
 #include "v3dmath.h"
 #include "llstring.h"
@@ -41,6 +44,8 @@
 #include "llcapabilityprovider.h"
 #include "m4math.h"					// LLMatrix4
 #include "llframetimer.h"
+#include "llreflectionmap.h"
+#include "lleasymessagesender.h"
 
 // Surface id's
 #define LAND  1
@@ -68,6 +73,7 @@ class LLHost;
 class LLBBox;
 class LLSpatialGroup;
 class LLDrawable;
+class LLGLTFOverrideCacheEntry;
 class LLViewerRegionImpl;
 class LLViewerOctreeGroup;
 class LLVOCachePartition;
@@ -155,6 +161,8 @@ public:
 	// Draw lines in the dirt showing ownership. Return number of 
 	// vertices drawn.
 	S32 renderPropertyLines();
+    void renderPropertyLinesOnMinimap(F32 scale_pixels_per_meter, const F32* parcel_outline_color);
+
 
 	// Call this whenever you change the height data in the region.
 	// (Automatically called by LLSurfacePatch's update routine)
@@ -235,7 +243,10 @@ public:
 
 	// regions are expensive to release, this function gradually releases cache from memory
 	static void idleCleanup(F32 max_update_time);
+	F32 getWidthScaleFactor() const				{ return mWidthScaleFactor; } // Scaling for OpenSim VarRegions
 
+	S32 getRegionMaxBakes() const						{ return mMaxBakes; }
+	S32 getRegionMaxTEs() const							{ return mMaxTEs; }
 	void idleUpdate(F32 max_update_time);
 	void lightIdleUpdate();
 	bool addVisibleGroup(LLViewerOctreeGroup* group);
@@ -263,20 +274,36 @@ public:
 	void setCapabilityDebug(const std::string& name, const std::string& url);
 	bool isCapabilityAvailable(std::string_view name) const;
 	// implements LLCapabilityProvider
-    virtual const std::string& getCapability(std::string_view name) const;
+    const std::string& getCapability(std::string_view name) const override;
     const std::string& getCapabilityDebug(std::string_view name) const;
 
 
+	virtual std::set<std::string> getCapURLNames(const std::string& cap_url);
+	virtual bool isCapURLMapped(const std::string& cap_url);
+	virtual std::set<std::string> getAllCaps();
+
 	// has region received its final (not seed) capability list?
 	bool capabilitiesReceived() const;
+    bool capabilitiesError() const;
 	void setCapabilitiesReceived(bool received);
+	void setCapabilitiesError();
 	boost::signals2::connection setCapabilitiesReceivedCallback(const caps_received_signal_t::slot_type& cb);
 
 	static bool isSpecialCapabilityName(std::string_view name);
 	void logActiveCapabilities() const;
 
+	// Utilities to post and get via
+    // HTTP using the agent's policy settings and headers.
+    typedef LLCoreHttpUtil::HttpCoroutineAdapter::completionCallback_t httpCallback_t;
+    bool requestPostCapability(const std::string &capName,
+                               LLSD              &postData,
+                               httpCallback_t     cbSuccess = NULL,
+                               httpCallback_t     cbFailure = NULL);
+    bool requestGetCapability(const std::string &capName, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
+    bool requestDelCapability(const std::string &capName, httpCallback_t cbSuccess = NULL, httpCallback_t cbFailure = NULL);
+
     /// implements LLCapabilityProvider
-	/*virtual*/ const LLHost& getHost() const;
+	/*virtual*/ const LLHost& getHost() const override;
 	const U64 		&getHandle() const 			{ return mHandle; }
 
 	LLSurface		&getLand() const;
@@ -329,9 +356,9 @@ public:
 
 	typedef enum
 	{
-		CACHE_MISS_TYPE_FULL = 0,
-		CACHE_MISS_TYPE_CRC,
-		CACHE_MISS_TYPE_NONE
+		CACHE_MISS_TYPE_TOTAL = 0,	// total cache miss - object not in cache
+		CACHE_MISS_TYPE_CRC,		// object in cache, but CRC doesn't match
+		CACHE_MISS_TYPE_NONE		// not a miss:  cache hit
 	} eCacheMissType;
 
 	typedef enum
@@ -344,7 +371,10 @@ public:
 
 	// handle a full update message
 	eCacheUpdateResult cacheFullUpdate(LLDataPackerBinaryBuffer &dp, U32 flags);
-	eCacheUpdateResult cacheFullUpdate(LLViewerObject* objectp, LLDataPackerBinaryBuffer &dp, U32 flags);	
+	eCacheUpdateResult cacheFullUpdate(LLViewerObject* objectp, LLDataPackerBinaryBuffer &dp, U32 flags);
+
+    void cacheFullUpdateGLTFOverride(const LLGLTFOverrideCacheEntry &override_data);
+
 	LLVOCacheEntry* getCacheEntryForOctree(U32 local_id);
 	LLVOCacheEntry* getCacheEntry(U32 local_id, bool valid = true);
 	bool probeCache(U32 local_id, U32 crc, U32 flags, U8 &cache_miss_type);
@@ -353,7 +383,7 @@ public:
 	void requestCacheMisses();
 	void addCacheMissFull(const U32 local_id);
 	//update object cache if the object receives a full-update or terse update
-	LLViewerObject* updateCacheEntry(U32 local_id, LLViewerObject* objectp, U32 update_type);
+	LLViewerObject* updateCacheEntry(U32 local_id, LLViewerObject* objectp);
 	void findOrphans(U32 parent_id);
 	void clearCachedVisibleObjects();
 	void dumpCache();
@@ -365,8 +395,9 @@ public:
 
 	friend std::ostream& operator<<(std::ostream &s, const LLViewerRegion &region);
     /// implements LLCapabilityProvider
-    virtual std::string getDescription() const;
-    std::string getViewerAssetUrl() const { return mViewerAssetUrl; }
+    virtual std::string getDescription() const override;
+    const std::string& getLegacyHttpUrl() const { return mLegacyHttpUrl; }
+    const std::string& getViewerAssetUrl() const { return mViewerAssetUrl; }
 
 	U32 getNumOfVisibleGroups() const;
 	U32 getNumOfActiveCachedObjects() const;
@@ -398,14 +429,49 @@ public:
 
 	static BOOL isNewObjectCreationThrottleDisabled() {return sNewObjectCreationThrottle < 0;}
 
+    // rebuild reflection probe list
+    void updateReflectionProbes();
+
+	/* ================================================================
+	 * @name OpenSimExtras Simulator Features capability
+	 * @{
+	 */
+	/// Get region allows export
+	bool getRegionAllowsExport() const;
+	/// Avatar picker url
+	std::string getAvatarPickerURL() const;
+	/// Destination guide url
+	std::string getDestinationGuideURL() const;
 	/// Hypergrid map server url
 	std::string getMapServerURL() const;
+	/// Hypergrid search server url
+	std::string getSearchServerURL() const;
+	/// Buy currency server url
+	std::string getBuyCurrencyServerURL() const;
+	/// Grid login/gateway authority (0.8.1)
+	std::string getHGGrid() const;
+	/// Grid name (0.8.1)
+	std::string getHGGridName() const;
+	/// Grid nick (0.8.1)
+	std::string getHGGridNick() const;
     /// Chat Range (0.8.1)
     U32 getChatRange() const;
     /// Shout Range (0.8.1)
     U32 getShoutRange() const;
     /// Whisper Range (0.8.1)
     U32 getWhisperRange() const;
+	/// Prim Scale
+	F32 getMinPrimScale() const;
+	F32 getMaxPrimScale() const;
+	F32 getMinPhysPrimScale() const;
+	F32 getMaxPhysPrimScale() const;
+	/// Sim Z
+	F32 getMinRegionHeight() const;
+	F32 getMaxRegionHeight() const;
+
+	/// "God names" surname and full account names map
+	const auto& getGods() const { return mGodNames; };
+	//@}
 
 	typedef std::vector<LLPointer<LLViewerTexture> > tex_matrix_t;
 	const tex_matrix_t& getWorldMapTiles() const;
@@ -423,8 +489,11 @@ private:
 	void addCacheMiss(U32 id, LLViewerRegion::eCacheMissType miss_type);
 	void decodeBoundingInfo(LLVOCacheEntry* entry);
 	bool isNonCacheableObjectCreated(U32 local_id);	
+	void setGodnames();
 
 public:
+    void applyCacheMiscExtras(LLViewerObject* obj);
+
 	struct CompareDistance
 	{
 		bool operator()(const LLViewerRegion* const& lhs, const LLViewerRegion* const& rhs)
@@ -434,10 +503,12 @@ public:
 	};
 
 	void showReleaseNotes();
+	void reInitPartitions();
 
 protected:
 	void disconnectAllNeighbors();
 	void initStats();
+	void initPartitions();
 
 public:
 	LLWind  mWind;
@@ -486,7 +557,15 @@ public:
 	};
 	typedef std::set<LLViewerRegion*, CompareRegionByLastUpdate> region_priority_list_t;
 
-private:
+	void setInterestListMode(const std::string & new_mode);
+    const std::string & getInterestListMode() const { return mInterestListMode; }
+
+	void resetInterestList();
+
+	static const std::string IL_MODE_DEFAULT;
+    static const std::string IL_MODE_360;
+
+  private:
 	static S32  sNewObjectCreationThrottle;
 	LLViewerRegionImpl * mImpl;
 	LLFrameTimer         mRegionTimer;
@@ -495,6 +574,9 @@ private:
 	U64			mHandle;
 	F32			mTimeDilation;	// time dilation of physics simulation on simulator
 	S32         mLastUpdate; //last time called idleUpdate()
+	F32			mWidthScaleFactor; // Scaling for OpenSim VarRegions
+	S32			mMaxBakes; // store max bakes on the region
+	S32			mMaxTEs; // store max TEs on the region
 
 	// simulator name
 	std::string mName;
@@ -532,7 +614,8 @@ private:
 	std::string mColoName;
 	std::string mProductSKU;
 	std::string mProductName;
-	std::string mViewerAssetUrl ;
+	std::string mLegacyHttpUrl;
+	std::string mViewerAssetUrl;
 	
 	// Maps local ids to cache entries.
 	// Regions can have order 10,000 objects, so assume
@@ -540,11 +623,19 @@ private:
 	BOOL									mCacheLoaded;
 	BOOL                                    mCacheDirty;
 	BOOL	mAlive;					// can become false if circuit disconnects
-	BOOL	mCapabilitiesReceived;
 	BOOL	mSimulatorFeaturesReceived;
 	BOOL    mReleaseNotesRequested;
 	BOOL    mDead;  //if true, this region is in the process of deleting.
 	BOOL    mPaused; //pause processing the objects in the region
+
+    typedef enum
+    {
+        CAPABILITIES_STATE_INIT = 0,
+        CAPABILITIES_STATE_ERROR,
+        CAPABILITIES_STATE_RECEIVED
+    } eCababilitiesState;
+
+    eCababilitiesState	mCapabilitiesState;
 
 	typedef std::map<U32, std::vector<U32> > orphan_list_t;
 	orphan_list_t mOrphanMap;
@@ -552,10 +643,10 @@ private:
 	class CacheMissItem
 	{
 	public:
-		CacheMissItem(U32 id, LLViewerRegion::eCacheMissType miss_type) : mID(id), mType(miss_type){}
+        CacheMissItem(U32 id, LLViewerRegion::eCacheMissType miss_type) : mID(id), mType(miss_type) {}
 
-		U32                            mID;     //local object id
-		LLViewerRegion::eCacheMissType mType;   //cache miss type
+		U32                         mID;     //local object id
+        LLViewerRegion::eCacheMissType	mType;  // cache miss type
 
 		typedef std::list<CacheMissItem> cache_miss_list_t;
 	};
@@ -573,6 +664,20 @@ private:
 	bool mMeshRezEnabled = false;
 	bool mDynamicPathfindingEnabled = false;
 	bool mAvatarHoverHeightEnabled = false;
+	F32  mMinSimHeight = SL_MIN_OBJECT_Z;
+	F32  mMaxSimHeight = SL_MAX_OBJECT_Z;
+	F32  mMinPrimScale = SL_MIN_PRIM_SCALE;
+	F32  mMaxPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
+	F32  mMaxPrimScaleNoMesh = SL_DEFAULT_MAX_PRIM_SCALE_NO_MESH;
+	F32  mMinPhysPrimScale = SL_MIN_PRIM_SCALE;
+	F32  mMaxPhysPrimScale = SL_DEFAULT_MAX_PRIM_SCALE;
+	U32  mWhisperRange = 10;
+	U32  mSayRange = 20;
+	U32  mShoutRange = 100;
+	std::string mHGMapServerURL;
+	std::string mHGGridName;
+	std::string mHGGridNick;
+	std::string mHGGridURL;
 
     typedef std::map<U32, LLPointer<LLVOCacheEntry> >	   vocache_entry_map_t;
     static vocache_entry_map_t sRegionCacheCleanup;
@@ -582,7 +687,18 @@ private:
 	LLFrameTimer mRenderInfoRequestTimer;
 	LLFrameTimer mRenderInfoReportTimer;
 
+	// how the server interest list works
+    std::string mInterestListMode;
+
+    // list of reflection maps being managed by this llviewer region
+    std::vector<LLPointer<LLReflectionMap> > mReflectionMaps;
+
 	mutable tex_matrix_t mWorldMapTiles;
+	boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> mGodNames;
+
+	LLEasyMessageSender mMessageSender;
+	using url_mapping_t = boost::unordered_multimap<std::string, std::string>;
+	url_mapping_t mCapURLMappings;
 };
 
 inline BOOL LLViewerRegion::getRegionProtocol(U64 protocol) const

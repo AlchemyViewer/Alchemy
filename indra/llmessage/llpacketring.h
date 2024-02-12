@@ -53,7 +53,7 @@ public:
 	S32  receivePacket (S32 socket, char *datap);
 	S32  receiveFromRing (S32 socket, char *datap);
 
-	BOOL sendPacket(int h_socket, char * send_buffer, S32 buf_size, LLHost host);
+	BOOL sendPacket(int h_socket, char * send_buffer, S32 buf_size, const LLHost& host);
 
 	inline LLHost getLastSender();
 	inline LLHost getLastReceivingInterface();
@@ -84,7 +84,7 @@ protected:
 	LLHost mLastReceivingIF;
 
 private:
-	BOOL sendPacketImpl(int h_socket, const char * send_buffer, S32 buf_size, LLHost host);
+	BOOL sendPacketImpl(int h_socket, const char * send_buffer, S32 buf_size, const LLHost& host);
 };
 
 

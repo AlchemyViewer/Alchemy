@@ -28,18 +28,22 @@
 
 #include "linden_common.h"
 
+#include "llapp.h"
 #include "llpluginprocessparent.h"
 #include "llpluginmessagepipe.h"
 #include "llpluginmessageclasses.h"
 #include "llsdserialize.h"
 #include "stringize.h"
 
+#include "threadpool.h"
+#include "workqueue.h"
+
 #include "llapr.h"
 
 bool LLPluginProcessParent::sUseReadThread = false;
 apr_pollset_t *LLPluginProcessParent::sPollSet = NULL;
 bool LLPluginProcessParent::sPollsetNeedsRebuild = false;
-LLMutex LLPluginProcessParent::sInstancesMutex(LLMutex::E_CONST_INIT);
+LLMutex *LLPluginProcessParent::sInstancesMutex = nullptr;
 LLPluginProcessParent::mapInstances_t LLPluginProcessParent::sInstances;
 LLThread *LLPluginProcessParent::sReadThread = NULL;
 
@@ -77,6 +81,11 @@ protected:
 LLPluginProcessParent::LLPluginProcessParent(LLPluginProcessParentOwner *owner):
 	mIncomingQueueMutex()
 {
+	if(!sInstancesMutex)
+	{
+		sInstancesMutex = new LLMutex();
+	}
+	
 	mOwner = owner;
 	mBoundPort = 0;
 	mState = STATE_UNINITIALIZED;
@@ -98,7 +107,9 @@ LLPluginProcessParent::LLPluginProcessParent(LLPluginProcessParentOwner *owner):
 
 LLPluginProcessParent::~LLPluginProcessParent()
 {
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "destructor" << LL_ENDL;
+#endif
 
 	// Destroy any remaining shared memory regions
 	sharedMemoryRegionsType::iterator iter;
@@ -118,6 +129,11 @@ LLPluginProcessParent::~LLPluginProcessParent()
     {   // If we are quitting, the network sockets will already have been destroyed.
         killSockets();
     }
+
+    if (mPolling.connected())
+    {
+        mPolling.disconnect();
+    }
 }
 
 /*static*/
@@ -127,7 +143,7 @@ LLPluginProcessParent::ptr_t LLPluginProcessParent::create(LLPluginProcessParent
 
     // Don't add to the global list until fully constructed.
     {
-        LLMutexLock lock(&sInstancesMutex);
+        LLMutexLock lock(sInstancesMutex);
         sInstances.emplace(that.get(), that);
     }
 
@@ -137,7 +153,7 @@ LLPluginProcessParent::ptr_t LLPluginProcessParent::create(LLPluginProcessParent
 /*static*/
 void LLPluginProcessParent::shutdown()
 {
-    LLMutexLock lock(&sInstancesMutex);
+    LLMutexLock lock(sInstancesMutex);
 
     mapInstances_t::iterator it;
     for (it = sInstances.begin(); it != sInstances.end(); ++it)
@@ -149,6 +165,7 @@ void LLPluginProcessParent::shutdown()
             && state != STATE_ERROR)
         {
             (*it).second->setState(STATE_GOODBYE);
+            (*it).second->mOwner = NULL;
         }
         if (state != STATE_DONE)
         {
@@ -194,7 +211,7 @@ bool LLPluginProcessParent::pollTick()
         {
             // this grabs a copy of the smart pointer to ourselves to ensure that we do not
             // get destroyed until after this method returns.
-            LLMutexLock lock(&sInstancesMutex);
+            LLMutexLock lock(sInstancesMutex);
             mapInstances_t::iterator it = sInstances.find(this);
             if (it != sInstances.end())
                 that = (*it).second;
@@ -213,7 +230,7 @@ void LLPluginProcessParent::removeFromProcessing()
     // Remove from the global list before beginning destruction.
     {
         // Make sure to get the global mutex _first_ here, to avoid a possible deadlock against LLPluginProcessParent::poll()
-        LLMutexLock lock(&sInstancesMutex);
+        LLMutexLock lock(sInstancesMutex);
         {
             LLMutexLock lock2(&mIncomingQueueMutex);
             sInstances.erase(this);
@@ -312,6 +329,7 @@ void LLPluginProcessParent::idle(void)
 		// process queued messages
 		if (!mIncomingQueue.empty())
 		{
+			// Inside main thread, it is preferable not to block it on mutex.
 			LLMutexTrylock locked_mtx(&mIncomingQueueMutex);
 			if (locked_mtx.isLocked())
 			{
@@ -336,7 +354,10 @@ void LLPluginProcessParent::idle(void)
 			mMessagePipe->pumpOutput();
 			
 			// Only do input processing here if this instance isn't in a pollset.
-			if(!mPolledInput)
+			// If viewer and plugin are both shutting down, don't process further
+			// input, viewer won't be able to handle it.
+			if(!mPolledInput
+			   && !(mState >= STATE_GOODBYE && LLApp::isExiting()))
 			{
 				mMessagePipe->pumpInput();
 			}
@@ -469,14 +490,76 @@ void LLPluginProcessParent::idle(void)
 			case STATE_LISTENING:
 			    {
 				    // Launch the plugin process.
-				
 				    // Only argument to the launcher is the port number we're listening on
 				    mProcessParams.args.add(stringize(mBoundPort));
-				    if (! (mProcess = LLProcess::create(mProcessParams)))
-				    {
-					    errorState();
-				    }
-				    else
+
+				    // Launch the plugin process.
+                    if (mDebug && !mProcess)
+                    {
+						if (!(mProcess = LLProcess::create(mProcessParams)))
+						{
+							errorState();
+						}
+                    }
+					else if (!mProcess && !mProcessCreationRequested)
+					{
+						mProcessCreationRequested = true;
+						LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
+						// *NOTE: main_queue->postTo casts this refcounted smart pointer to a weak
+						// pointer
+						LL::WorkQueue::ptr_t general_queue = LL::WorkQueue::getInstance("General");
+						const LL::ThreadPool::ptr_t general_thread_pool = LL::ThreadPool::getInstance("General");
+						llassert_always(main_queue);
+						llassert_always(general_queue);
+						llassert_always(general_thread_pool);
+
+						auto process_params = mProcessParams;
+
+						bool posted = main_queue->postTo(
+							general_queue,
+							[process_params]() // Work done on general queue
+							{
+								return LLProcess::create(process_params);
+							},
+							[this](LLProcessPtr new_process) // Callback to main thread
+								mutable {
+								ptr_t that;
+								{
+									// this grabs a copy of the smart pointer to ourselves to ensure that we do not
+									// get destroyed until after this method returns.
+									LLMutexLock lock(sInstancesMutex);
+									mapInstances_t::iterator it = sInstances.find(this);
+									if (it != sInstances.end())
+										that = (*it).second;
+								}
+
+								if (that)
+								{
+									if (new_process)
+									{
+										that->mProcess = new_process;
+									}
+									else
+									{
+										that->errorState();
+									}
+								}
+
+							});
+						if (!posted)
+						{
+							// Shutdown
+							// Consider making processQueue() do a cleanup instead
+							// of starting more decodes
+							LL_WARNS("Plugin") << "Failed to dispath process creation to threadpool" << LL_ENDL;
+							if (!(mProcess = LLProcess::create(mProcessParams)))
+							{
+								errorState();
+							}
+						}
+					}
+
+					if (mProcess)
 				    {
 					    if(mDebug)
 					    {
@@ -758,7 +841,7 @@ void LLPluginProcessParent::dirtyPollSet()
 
 void LLPluginProcessParent::updatePollset()
 {
-	LLMutexLock lock(&sInstancesMutex);
+	LLMutexLock lock(sInstancesMutex);
 	if (sInstances.empty())
 	{
 		// No instances have been created yet.  There's no work to do.
@@ -862,7 +945,7 @@ void LLPluginProcessParent::setUseReadThread(bool use_read_thread)
 bool LLPluginProcessParent::poll(F64 timeout)
 {
 	{	
-		LLMutexLock mtxLock(&sInstancesMutex);
+		LLMutexLock mtxLock(sInstancesMutex);
 		if (sInstances.empty())
 		{
 			return false;
@@ -894,7 +977,7 @@ bool LLPluginProcessParent::poll(F64 timeout)
                 mapInstances_t::iterator it;
 
                 {
-                    LLMutexLock lock(&sInstancesMutex);
+                    LLMutexLock lock(sInstancesMutex);
                     it = sInstances.find(thatId);
                     if (it != sInstances.end())
                         that = (*it).second;
@@ -927,12 +1010,12 @@ bool LLPluginProcessParent::poll(F64 timeout)
 
     // Remove instances in the done state from the sInstances map.
 	{
-		LLMutexLock inst_lock(&sInstancesMutex);
+		LLMutexLock inst_lock(sInstancesMutex);
 		mapInstances_t::iterator itClean = sInstances.begin();
 		while (itClean != sInstances.end())
 		{
 			if (itClean->second->isDone())
-				sInstances.erase(itClean++);
+            	itClean = sInstances.erase(itClean);
 			else
 				++itClean;
 		}
@@ -1201,7 +1284,9 @@ std::string LLPluginProcessParent::getPluginVersion(void)
 
 void LLPluginProcessParent::setState(EState state)
 {
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "setting state to " << state << LL_ENDL;
+#endif
 	mState = state; 
 };
 

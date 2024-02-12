@@ -69,6 +69,7 @@ LLUrlRegistry::LLUrlRegistry()
 	// LLUrlEntryAgent*Name must appear before LLUrlEntryAgent since 
 	// LLUrlEntryAgent is a less specific (catchall for agent urls)
 	registerUrl(new LLUrlEntryAgent());
+    registerUrl(new LLUrlEntryChat());
 	registerUrl(new LLUrlEntryGroup());
 	registerUrl(new LLUrlEntryParcel());
 	registerUrl(new LLUrlEntryTeleport());
@@ -78,6 +79,8 @@ LLUrlRegistry::LLUrlRegistry()
 	registerUrl(new LLUrlEntryPlace());
 	registerUrl(new LLUrlEntryInventory());
     registerUrl(new LLUrlEntryExperienceProfile());
+    mUrlEntryKeybinding = new LLUrlEntryKeybinding();
+    registerUrl(mUrlEntryKeybinding);
 	//LLUrlEntrySL and LLUrlEntrySLLabel have more common pattern, 
 	//so it should be registered in the end of list
 	registerUrl(new LLUrlEntrySL());
@@ -174,7 +177,7 @@ bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LL
 	for (it = mUrlEntry.begin(); it != mUrlEntry.end(); ++it)
 	{
 		//Skip for url entry icon if content is not trusted
-		if(!is_content_trusted && (mUrlEntryIcon == *it))
+		if((mUrlEntryIcon == *it) && ((text.find("Hand") != std::string::npos) || !is_content_trusted))
 		{
 			continue;
 		}
@@ -311,4 +314,10 @@ bool LLUrlRegistry::isUrl(const LLWString &text)
 		return (match.getStart() == 0 && match.getEnd() >= text.size()-1);
 	}
 	return false;
+}
+
+void LLUrlRegistry::setKeybindingHandler(LLKeyBindingToStringHandler* handler)
+{
+    LLUrlEntryKeybinding *entry = (LLUrlEntryKeybinding*)mUrlEntryKeybinding;
+    entry->setHandler(handler);
 }

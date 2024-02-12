@@ -26,8 +26,6 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "llviewerbuildconfig.h"
-
 #include "llprogressview.h"
 
 #include "indra_constants.h"
@@ -88,7 +86,7 @@ BOOL LLProgressView::postBuild()
 	mMediaCtrl->setVisible( false );		// hidden initially
 	mMediaCtrl->addObserver( this );		// watch events
 	
-	LLViewerMedia::getInstanceFast()->setOnlyAudibleMediaTextureID(mMediaCtrl->getTextureID());
+	LLViewerMedia::getInstance()->setOnlyAudibleMediaTextureID(mMediaCtrl->getTextureID());
 
 	mCancelBtn = getChild<LLButton>("cancel_btn");
 	mCancelBtn->setClickedCallback(  LLProgressView::onCancelButtonClicked, NULL );
@@ -294,7 +292,7 @@ void LLProgressView::draw()
 		{
 			mFadeToWorldTimer.stop();
 
-			LLViewerMedia::getInstanceFast()->setOnlyAudibleMediaTextureID(LLUUID::null);
+			LLViewerMedia::getInstance()->setOnlyAudibleMediaTextureID(LLUUID::null);
 
 			// Fade is complete, release focus
 			gFocusMgr.releaseFocusIfNeeded( this );
@@ -403,11 +401,11 @@ void LLProgressView::initLogos()
 
 	S32 icon_height;
 
-#if USE_FMODSTUDIO
+#ifdef LL_FMODSTUDIO
     // original image size is 264x96, it is on longer side but
     // with no internal paddings so it gets additional padding
     icon_width = 77;
-    icon_height = 21;
+    icon_height = 20;
     S32 pad_fmod_y = 4;
     texture_start_x++;
     loadLogo(temp_str + "fmod_logo.png",
@@ -418,7 +416,7 @@ void LLProgressView::initLogos()
 
     texture_start_x += icon_width + default_pad + 1;
 #endif //LL_FMODSTUDIO
-#if LL_HAVOK
+#ifdef LL_HAVOK
     // original image size is 342x113, central element is on a larger side
     // plus internal padding, so it gets slightly more height than desired 32
     icon_width = 88;

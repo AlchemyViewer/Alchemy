@@ -43,6 +43,7 @@
 #include "llinventorymodel.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
+#include "llmd5.h"
 #include "llhelp.h"
 #include "llnotificationsutil.h"
 #include "llresmgr.h"
@@ -89,10 +90,15 @@
 #include "llexperiencecache.h"
 #include "llfloaterexperienceprofile.h"
 #include "llviewerassetupload.h"
+#include "llviewernetwork.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvhandler.h"
 #include "rlvlocks.h"
 // [/RLVa:KB]
+// NaCl - LSL Preprocessor
+#include "fslslpreproc.h"
+#include "fslslpreprocviewer.h"
+// NaCl End
 
 const std::string HELLO_LSL =
 	"default\n"
@@ -345,7 +351,7 @@ LLScriptEdCore::LLScriptEdCore(
 	const std::string& sample,
 	const LLHandle<LLFloater>& floater_handle,
 	void (*load_callback)(void*),
-	void (*save_callback)(void*, BOOL),
+	void (*save_callback)(void*, BOOL, bool),
 //	void (*search_replace_callback) (void* userdata),
 	void* userdata,
 	bool live,
@@ -366,8 +372,12 @@ LLScriptEdCore::LLScriptEdCore(
 	mLiveHelpHistorySize(0),
 	mEnableSave(FALSE),
 	mLiveFile(NULL),
+	mLSLPreprocEnabled(LLCachedControl<bool>(gSavedSettings,"AlchemyLSLPreprocessor", FALSE)),
 	mLive(live),
 	mContainer(container),
+	mPostEditor(NULL),
+	mCurrentEditor(NULL),
+	mPreprocTab(NULL),
 	mHasScriptData(FALSE),
 	mScriptRemoved(FALSE),
 	mSaveDialogShown(FALSE)
@@ -375,7 +385,15 @@ LLScriptEdCore::LLScriptEdCore(
 	setFollowsAll();
 	setBorderVisible(FALSE);
 
-	setXMLFilename("panel_script_ed.xml");
+	if (gSavedSettings.getBOOL("AlchemyLSLPreprocessor"))
+	{
+		setXMLFilename("panel_script_ed_preproc.xml");
+		mLSLProc = std::make_unique<FSLSLPreprocessor>(this);
+	}
+	else
+	{
+		setXMLFilename("panel_script_ed.xml");
+	}
 	llassert_always(mContainer != NULL);
 }
 
@@ -395,6 +413,10 @@ LLScriptEdCore::~LLScriptEdCore()
 	if (mSyntaxIDConnection.connected())
 	{
 		mSyntaxIDConnection.disconnect();
+	}
+	if (mTogglePreprocConnection.connected())
+	{
+		mTogglePreprocConnection.disconnect();
 	}
 }
 
@@ -449,6 +471,7 @@ void LLLiveLSLEditor::onToggleExperience( LLUICtrl *ui, void* userdata )
 
 BOOL LLScriptEdCore::postBuild()
 {
+	mLineCol=getChild<LLTextBox>("line_col");
 // [SL:KB] - Patch: Build-ScriptEditor | Checked: 2014-01-29 (Catznip-3.6)
 	mMenuBar = getChild<LLMenuBarGL>("script_menu");
 // [/SL:KB]
@@ -461,8 +484,28 @@ BOOL LLScriptEdCore::postBuild()
 
 	mEditor = getChild<LLScriptEditor>("Script Editor");
 
+	mCurrentEditor = mEditor;
+	if (mLSLPreprocEnabled)
+	{
+		mPostEditor = getChild<FSLSLPreProcViewer>("Post Editor");
+		mPostEditor->setFollowsAll();
+		mPostEditor->setEnabled(TRUE);
+
+		mPreprocTab = getChild<LLTabContainer>("Tabset");
+		mPreprocTab->setCommitCallback(boost::bind(&LLScriptEdCore::onPreprocTabChanged, this, _2));
+	}
+
+	mTogglePreprocConnection = gSavedSettings.getControl("AlchemyLSLPreprocessor")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&){
+		mErrorList->setCommentText(LLTrans::getString("preproc_toggle_warning"));
+		mErrorList->deleteAllItems(); // Make it visible
+	});
+
 	childSetCommitCallback("lsl errors", &LLScriptEdCore::onErrorList, this);
-	childSetAction("Save_btn", boost::bind(&LLScriptEdCore::doSave,this,FALSE));
+	mSaveBtn = getChild<LLButton>("Save_btn");
+	mSaveBtn->setCommitCallback(boost::bind(&LLScriptEdCore::doSave, this, FALSE, true));
+	mSaveBtn->setEnabled((hasChanged() || (mLSLProc && !mCompiling && mHasScriptData)) && !mScriptRemoved);
+	mSaveBtn->setLabel((!mLSLProc || hasChanged()) ? LLTrans::getString("save_file_verb") : LLTrans::getString("recompile_script_verb"));
+
 	childSetAction("Edit_btn", boost::bind(&LLScriptEdCore::openInExternalEditor, this));
 
 	initMenu();
@@ -479,6 +522,7 @@ BOOL LLScriptEdCore::postBuild()
 void LLScriptEdCore::processKeywords()
 {
 	LL_DEBUGS("SyntaxLSL") << "Processing keywords" << LL_ENDL;
+	mFunctions->clearRows();
 	mEditor->clearSegments();
 	mEditor->initKeywords();
 	mEditor->loadKeywords();
@@ -509,6 +553,13 @@ void LLScriptEdCore::processKeywords()
 	{
 		mFunctions->add(*iter);
 	}
+
+	if (mLSLPreprocEnabled && mPostEditor)
+	{
+		mPostEditor->clearSegments();
+		mPostEditor->initKeywords();
+		mPostEditor->loadKeywords();
+	}
 }
 
 void LLScriptEdCore::initMenu()
@@ -517,50 +568,52 @@ void LLScriptEdCore::initMenu()
 	LLMenuItemCallGL* menuItem;
 	
 	menuItem = getChild<LLMenuItemCallGL>("Save");
-	menuItem->setClickCallback(boost::bind(&LLScriptEdCore::doSave, this, FALSE));
+	menuItem->setClickCallback(boost::bind(&LLScriptEdCore::doSave, this, FALSE, true));
 	menuItem->setEnableCallback(boost::bind(&LLScriptEdCore::hasChanged, this));
 	
 	menuItem = getChild<LLMenuItemCallGL>("Revert All Changes");
-	menuItem->setClickCallback(boost::bind(&LLScriptEdCore::onBtnUndoChanges, this));
-	menuItem->setEnableCallback(boost::bind(&LLScriptEdCore::hasChanged, this));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ onBtnUndoChanges(); });
+	menuItem->setEnableCallback([&](LLUICtrl*, const LLSD&){ return (mCurrentEditor == mEditor && hasChanged()); });
 
 	menuItem = getChild<LLMenuItemCallGL>("Undo");
-	menuItem->setClickCallback(boost::bind(&LLTextEditor::undo, mEditor));
-	menuItem->setEnableCallback(boost::bind(&LLTextEditor::canUndo, mEditor));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ mCurrentEditor->undo(); });
+	menuItem->setEnableCallback([&](LLUICtrl*, const LLSD&){ return mCurrentEditor->canUndo(); });
 
 	menuItem = getChild<LLMenuItemCallGL>("Redo");
-	menuItem->setClickCallback(boost::bind(&LLTextEditor::redo, mEditor));
-	menuItem->setEnableCallback(boost::bind(&LLTextEditor::canRedo, mEditor));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ mCurrentEditor->redo(); });
+	menuItem->setEnableCallback([&](LLUICtrl*, const LLSD&){ return mCurrentEditor->canRedo(); });
 
 	menuItem = getChild<LLMenuItemCallGL>("Cut");
-	menuItem->setClickCallback(boost::bind(&LLTextEditor::cut, mEditor));
-	menuItem->setEnableCallback(boost::bind(&LLTextEditor::canCut, mEditor));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ mCurrentEditor->cut(); });
+	menuItem->setEnableCallback([&](LLUICtrl*, const LLSD&){ return mCurrentEditor->canCut(); });
 
 	menuItem = getChild<LLMenuItemCallGL>("Copy");
-	menuItem->setClickCallback(boost::bind(&LLTextEditor::copy, mEditor));
-	menuItem->setEnableCallback(boost::bind(&LLTextEditor::canCopy, mEditor));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ mCurrentEditor->copy(); });
+	menuItem->setEnableCallback([&](LLUICtrl*, const LLSD&){ return mCurrentEditor->canCopy(); });
 
 	menuItem = getChild<LLMenuItemCallGL>("Paste");
-	menuItem->setClickCallback(boost::bind(&LLTextEditor::paste, mEditor));
-	menuItem->setEnableCallback(boost::bind(&LLTextEditor::canPaste, mEditor));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ mCurrentEditor->paste(); });
+	menuItem->setEnableCallback([&](LLUICtrl*, const LLSD&){ return mCurrentEditor->canPaste(); });
 
 // [SL:KB] - Patch: Build-ScriptEditor | Checked: 2014-01-29 (Catznip-3.6)
 	menuItem = getChild<LLMenuItemCallGL>("Delete");
-	menuItem->setClickCallback(boost::bind(&LLTextEditor::doDelete, mEditor));
-	menuItem->setEnableCallback(boost::bind(&LLTextEditor::canDoDelete, mEditor));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ mCurrentEditor->doDelete(); });
+	menuItem->setEnableCallback([&](LLUICtrl*, const LLSD&){ return mCurrentEditor->canUndo(); });
 // [/SL:KB]
 
 	menuItem = getChild<LLMenuItemCallGL>("Select All");
-	menuItem->setClickCallback(boost::bind(&LLTextEditor::selectAll, mEditor));
-	menuItem->setEnableCallback(boost::bind(&LLTextEditor::canSelectAll, mEditor));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ mCurrentEditor->selectAll(); });
+	menuItem->setEnableCallback([&](LLUICtrl*, const LLSD&){ return mCurrentEditor->canSelectAll(); });
 
 	menuItem = getChild<LLMenuItemCallGL>("Deselect");
-	menuItem->setClickCallback(boost::bind(&LLTextEditor::deselect, mEditor));
-	menuItem->setEnableCallback(boost::bind(&LLTextEditor::canDeselect, mEditor));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ mCurrentEditor->deselect(); });
+	menuItem->setEnableCallback([&](LLUICtrl*, const LLSD&){ return mCurrentEditor->canDeselect(); });
 
 	menuItem = getChild<LLMenuItemCallGL>("Search / Replace...");
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-26 (Catznip-2.3)
-	menuItem->setClickCallback(boost::bind(&LLFloaterSearchReplace::show, mEditor));
+	menuItem->setClickCallback([&](LLUICtrl*, const LLSD&){ 
+		LLFloaterSearchReplace* floater = LLFloaterSearchReplace::show(mCurrentEditor);
+		floater->setCanReplace(mCurrentEditor == mEditor); });
 // [/SL:KB]
 //	menuItem->setClickCallback(boost::bind(&LLFloaterScriptSearch::show, this));
 
@@ -579,14 +632,56 @@ void LLScriptEdCore::initMenu()
 	menuItem->setEnableCallback(boost::bind(&LLScriptEdCore::enableSaveToFileMenu, this));
 }
 
+
+// NaCl - LSL Preprocessor
+void LLScriptEdCore::onPreprocTabChanged(const std::string& tab_name)
+{
+	mCurrentEditor = (tab_name == "Preprocessed" ? mPostEditor : mEditor);
+	LLFloaterSearchReplace* search_floater = LLFloaterSearchReplace::findInstance();
+	if (search_floater && (search_floater->getEditor() == mEditor || search_floater->getEditor() == mPostEditor))
+	{
+		search_floater->setCanReplace(mCurrentEditor == mEditor);
+	}
+	childSetEnabled("Insert...", mCurrentEditor == mEditor);
+}
+// NaCl End
+
 void LLScriptEdCore::setScriptText(const std::string& text, BOOL is_valid)
 {
 	if (mEditor)
 	{
-		mEditor->setText(text);
+		// NaCl - LSL Preprocessor
+		std::string ntext = text;
+		if (mLSLPreprocEnabled && mLSLProc)
+		{
+			if (mPostEditor)
+			{
+				mPostEditor->setText(ntext);
+			}
+			ntext = mLSLProc->decode(ntext);
+		}
+		LLStringUtil::replaceTabsWithSpaces(ntext, mEditor->spacesPerTab());
+		// NaCl End
+		mEditor->setText(ntext);
 		mHasScriptData = is_valid;
 	}
 }
+
+// NaCl - LSL Preprocessor
+std::string LLScriptEdCore::getScriptText()
+{
+	if (mLSLPreprocEnabled && mPostEditor)
+	{
+		//return mPostEditor->getText();
+		return mPostScript;
+	}
+	else if (mEditor)
+	{
+		return mEditor->getText();
+	}
+	return std::string();
+}
+// NaCl End
 
 void LLScriptEdCore::makeEditorPristine()
 {
@@ -627,29 +722,19 @@ bool LLScriptEdCore::loadScriptText(const std::string& filename)
 //	buffer[nread] = '\0';
 //	fclose(file);
 //
-//	mEditor->setText(LLStringExplicit(buffer));
+//    std::string text = std::string(buffer);
+//    LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
+//
+//    mEditor->setText(text);
 //	delete[] buffer;
 //
 //	return true;
 }
 
-bool LLScriptEdCore::writeToFile(const std::string& filename)
+bool LLScriptEdCore::writeToFile(const std::string& filename, bool unprocessed)
 {
 // [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
-	if (!mEditor->writeToFile(filename))
-	{
-		LL_WARNS() << "Unable to write to " << filename << LL_ENDL;
-
-		LLSD row;
-		row["columns"][0]["value"] = "Error writing to local file. Is your hard drive full?";
-		row["columns"][0]["font"] = "SANSSERIF_SMALL";
-		mErrorList->addElement(row);
-		return false;
-	}
-	return true;
-// [/SL:KB]
-//	LLFILE* fp = LLFile::fopen(filename, "wb");
-//	if (!fp)
+//	if (!mEditor->writeToFile(filename))
 //	{
 //		LL_WARNS() << "Unable to write to " << filename << LL_ENDL;
 //
@@ -659,18 +744,37 @@ bool LLScriptEdCore::writeToFile(const std::string& filename)
 //		mErrorList->addElement(row);
 //		return false;
 //	}
-//
-//	std::string utf8text = mEditor->getText();
-//
-//	// Special case for a completely empty script - stuff in one space so it can store properly.  See SL-46889
-//	if (utf8text.size() == 0)
-//	{
-//		utf8text = " ";
-//	}
-//
-//	fputs(utf8text.c_str(), fp);
-//	fclose(fp);
 //	return true;
+// [/SL:KB]
+	LLFILE* fp = LLFile::fopen(filename, "wb");
+	if (!fp)
+	{
+		LL_WARNS() << "Unable to write to " << filename << LL_ENDL;
+
+		LLSD row;
+		row["columns"][0]["value"] = "Error writing to local file. Is your hard drive full?";
+		row["columns"][0]["font"] = "SANSSERIF_SMALL";
+		mErrorList->addElement(row);
+		return false;
+	}
+
+	// NaCl - LSL Preprocessor
+	std::string utf8text;
+	if(!unprocessed)
+		utf8text = getScriptText();
+	else
+		utf8text = mEditor->getText();
+	// NaCl End
+
+	// Special case for a completely empty script - stuff in one space so it can store properly.  See SL-46889
+	if (utf8text.size() == 0)
+	{
+		utf8text = " ";
+	}
+
+	fputs(utf8text.c_str(), fp);
+	fclose(fp);
+	return true;
 }
 
 void LLScriptEdCore::sync()
@@ -683,7 +787,7 @@ void LLScriptEdCore::sync()
         if (LLFile::stat(tmp_file, &s) == 0) // file exists
         {
             mLiveFile->ignoreNextUpdate();
-            writeToFile(tmp_file);
+            writeToFile(tmp_file, mLSLPreprocEnabled);
         }
     }
 }
@@ -697,8 +801,8 @@ bool LLScriptEdCore::hasChanged()
 
 void LLScriptEdCore::draw()
 {
-	BOOL script_changed	= hasChanged();
-	getChildView("Save_btn")->setEnabled(script_changed && !mScriptRemoved);
+	mSaveBtn->setEnabled((hasChanged() || (mLSLProc && !mCompiling && mHasScriptData)) && !mScriptRemoved);
+	mSaveBtn->setLabel((!mLSLProc || hasChanged()) ? LLTrans::getString("save_file_verb") : LLTrans::getString("recompile_script_verb"));
 
 	if( mEditor->hasFocus() )
 	{
@@ -710,11 +814,23 @@ void LLScriptEdCore::draw()
 		args["[LINE]"] = llformat ("%d", line);
 		args["[COLUMN]"] = llformat ("%d", column);
 		cursor_pos = LLTrans::getString("CursorPos", args);
-		getChild<LLUICtrl>("line_col")->setValue(cursor_pos);
+		mLineCol->setValue(cursor_pos);
+	}
+	else if (mPostEditor && mPostEditor->hasFocus())
+	{
+		S32 line = 0;
+		S32 column = 0;
+		mPostEditor->getCurrentLineAndColumn( &line, &column, FALSE );  // don't include wordwrap
+		LLStringUtil::format_map_t args;
+		std::string cursor_pos;
+		args["[LINE]"] = llformat ("%d", line);
+		args["[COLUMN]"] = llformat ("%d", column);
+		cursor_pos = LLTrans::getString("CursorPos", args);
+		mLineCol->setValue(cursor_pos);
 	}
 	else
 	{
-		getChild<LLUICtrl>("line_col")->setValue(LLStringUtil::null);
+		mLineCol->setValue(LLStringUtil::null);
 	}
 
 	updateDynamicHelp();
@@ -1055,44 +1171,39 @@ void LLScriptEdCore::onBtnInsertFunction(LLUICtrl *ui, void* userdata)
 	self->setHelpPage(self->mFunctions->getSimple());
 }
 
-void LLScriptEdCore::doSave( BOOL close_after_save )
+void LLScriptEdCore::doSave(BOOL close_after_save, bool sync /*= true*/)
+{
+	mErrorList->deleteAllItems();
+	mErrorList->setCommentText(std::string());
+
+	mCompiling = true;
+
+	if (mLSLPreprocEnabled && mLSLProc)
+	{
+		LL_INFOS() << "passing to preproc" << LL_ENDL;
+		mLSLProc->preprocess_script(close_after_save, sync);
+	}
+	else
+	{
+		if( mSaveCallback )
+		{
+			mSaveCallback( mUserdata, close_after_save, sync );
+		}
+	}
+}
+
+void LLScriptEdCore::doSaveComplete( void* userdata, BOOL close_after_save, bool sync)
 {
 	add(LLStatViewer::LSL_SAVES, 1);
 
 	if( mSaveCallback )
 	{
-		mSaveCallback( mUserdata, close_after_save );
+		mSaveCallback( mUserdata, close_after_save, sync );
 	}
 }
 
 void LLScriptEdCore::openInExternalEditor()
 {
-	delete mLiveFile; // deletes file
-
-	// Generate a suitable filename
-    std::string script_name = mScriptName;
-    std::string forbidden_chars = "<>:\"\\/|?*";
-    for (std::string::iterator c = forbidden_chars.begin(); c != forbidden_chars.end(); c++)
-    {
-        script_name.erase(std::remove(script_name.begin(), script_name.end(), *c), script_name.end());
-    }
-	std::string filename = mContainer->getTmpFileName(script_name);
-
-    // Save the script to a temporary file.
-    if (!writeToFile(filename))
-    {
-        // In case some characters from script name are forbidden
-        // and not accounted for, name is too long or some other issue,
-        // try file that doesn't include script name
-        script_name.clear();
-        filename = mContainer->getTmpFileName(script_name);
-        writeToFile(filename);
-    }
-
-	// Start watching file changes.
-	mLiveFile = new LLLiveLSLFile(filename, boost::bind(&LLScriptEdContainer::onExternalChange, mContainer, _1));
-	mLiveFile->addToEventTimer();
-
 	// Open it in external editor.
 	{
 		LLExternalEditor ed;
@@ -1114,6 +1225,35 @@ void LLScriptEdCore::openInExternalEditor()
 			LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", msg));
 			return;
 		}
+
+		// Script contents clobbered when Edit button
+		// clicked with preprocessor active. Fix from NaCl (code moved
+		// from above).
+		delete mLiveFile; // deletes file
+
+		// Generate a suitable filename
+		std::string script_name = mScriptName;
+		std::string forbidden_chars = "<>:\"\\/|?*";
+		for (std::string::iterator c = forbidden_chars.begin(); c != forbidden_chars.end(); c++)
+		{
+			script_name.erase(std::remove(script_name.begin(), script_name.end(), *c), script_name.end());
+		}
+		std::string filename = mContainer->getTmpFileName(script_name);
+
+		// Save the script to a temporary file.
+		if (!writeToFile(filename, mLSLPreprocEnabled))
+		{
+			// In case some characters from script name are forbidden
+			// and not accounted for, name is too long or some other issue,
+			// try file that doesn't include script name
+			script_name.clear();
+			filename = mContainer->getTmpFileName(script_name);
+			writeToFile(filename, mLSLPreprocEnabled);
+		}
+
+		// Start watching file changes.
+		mLiveFile = new LLLiveLSLFile(filename, boost::bind(&LLScriptEdContainer::onExternalChange, mContainer, _1));
+		mLiveFile->addToEventTimer();
 
 		status = ed.run(filename);
 		if (status != LLExternalEditor::EC_SUCCESS)
@@ -1150,11 +1290,24 @@ void LLScriptEdCore::onErrorList(LLUICtrl*, void* user_data)
 		sscanf(line.c_str(), "%d %d", &row, &column);
 		//LL_INFOS() << "LLScriptEdCore::onErrorList() - " << row << ", "
 		//<< column << LL_ENDL;
+		if (gSavedSettings.getBOOL("AlchemyLSLPreprocessor") && self->mPostEditor && self->mPreprocTab)
+		{
+			self->mPreprocTab->selectTabByName("Preprocessed");
+			self->getChild<LLPanel>("Preprocessed")->setFocus(TRUE);
+			self->mPostEditor->setFocus(TRUE);
 // [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
-		self->mEditor->scrollTo(row, column);
+			self->mPostEditor->scrollTo(row, column);
 // [/SL:KB]
-//		self->mEditor->setCursor(row, column);
-		self->mEditor->setFocus(TRUE);
+//			self->mPostEditor->setCursor(row, column);
+		}
+		else
+		{
+// [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
+			self->mEditor->scrollTo(row, column);
+// [/SL:KB]
+//			self->mEditor->setCursor(row, column);
+			self->mEditor->setFocus(TRUE);
+		}
 	}
 }
 
@@ -1213,6 +1366,27 @@ void LLScriptEdCore::deleteBridges()
 // virtual
 BOOL LLScriptEdCore::handleKeyHere(KEY key, MASK mask)
 {
+	bool just_control = MASK_CONTROL == (mask & MASK_MODIFIERS);
+
+	if(('S' == key) && just_control)
+	{
+		if(mSaveCallback)
+		{
+			// don't close after saving
+			// NaCl - LSL Preprocessor
+			if (!hasChanged())
+			{
+				LL_INFOS("Scriptsave") << "Save Not Needed" << LL_ENDL;
+				return TRUE;
+			}
+			doSave(FALSE);
+			// NaCl End
+				
+			//mSaveCallback(mUserdata, FALSE);
+		}
+
+		return TRUE;
+	}
 // [SL:KB] - Patch: Build-ScriptEditor | Checked: 2014-01-29 (Catznip-3.6)
 	if (mMenuBar->handleAcceleratorKey(key, mask))
 	{
@@ -1248,7 +1422,7 @@ BOOL LLScriptEdCore::handleKeyHere(KEY key, MASK mask)
 
 void LLScriptEdCore::onBtnLoadFromFile( void* data )
 {
-	(new LLFilePickerReplyThread(boost::bind(&LLScriptEdCore::loadScriptFromFile, _1, data), LLFilePicker::FFLOAD_SCRIPT, false))->getFile();
+	LLFilePickerReplyThread::startPicker(boost::bind(&LLScriptEdCore::loadScriptFromFile, _1, data), LLFilePicker::FFLOAD_SCRIPT, false);
 }
 
 void LLScriptEdCore::loadScriptFromFile(const std::vector<std::string>& filenames, void* data)
@@ -1289,7 +1463,7 @@ void LLScriptEdCore::onBtnSaveToFile( void* userdata )
 
 	if( self->mSaveCallback )
 	{
-		(new LLFilePickerReplyThread(boost::bind(&LLScriptEdCore::saveScriptToFile, _1, userdata), LLFilePicker::FFSAVE_SCRIPT, self->mScriptName))->getFile();
+		LLFilePickerReplyThread::startPicker(boost::bind(&LLScriptEdCore::saveScriptToFile, _1, userdata), LLFilePicker::FFSAVE_SCRIPT, self->mScriptName);
 	}
 }
 
@@ -1298,12 +1472,12 @@ void LLScriptEdCore::saveScriptToFile(const std::vector<std::string>& filenames,
 	LLScriptEdCore* self = (LLScriptEdCore*)data;
 	if (self)
 	{
-		std::string filename = filenames[0];
-		std::string scriptText = self->mEditor->getText();
+		const std::string& filename = filenames[0];
+		const std::string& scriptText = self->mEditor->getText();
 		llofstream fout(filename.c_str());
 		fout << (scriptText);
 		fout.close();
-		self->mSaveCallback(self->mUserdata, FALSE);
+		self->mSaveCallback(self->mUserdata, FALSE, true);
 	}
 }
 
@@ -1494,7 +1668,7 @@ void LLScriptEdContainer::onBackupTimer()
 	{
 		if (mBackupFilename.empty())
 			mBackupFilename = getBackupFileName();
-		mScriptEd->writeToFile(mBackupFilename);
+		mScriptEd->writeToFile(mBackupFilename, true);
 	}
 }
 // [/SL:KB]
@@ -1529,7 +1703,13 @@ bool LLScriptEdContainer::onExternalChange(const std::string& filename)
 	}
 
 	// Disable sync to avoid recursive load->save->load calls.
-	saveIfNeeded(false);
+	// LSL preprocessor
+	//  Don't call saveIfNeeded directly, as we might have to run the
+	// preprocessor first. saveIfNeeded will be invoked via callback. Make sure
+	// to pass sync = false - we don't need to update the external editor in this
+	// case or the next save will be ignored!
+	//saveIfNeeded(false);
+	mScriptEd->doSave(FALSE, false);
 	return true;
 }
 
@@ -1607,8 +1787,10 @@ void LLPreviewLSL::draw()
 void LLPreviewLSL::callbackLSLCompileSucceeded()
 {
 	LL_INFOS() << "LSL Bytecode saved" << LL_ENDL;
-	mScriptEd->mErrorList->setCommentText(LLTrans::getString("CompileSuccessful"));
-	mScriptEd->mErrorList->setCommentText(LLTrans::getString("SaveComplete"));
+	mScriptEd->mErrorList->addCommentText(LLTrans::getString("CompileSuccessful"));
+	mScriptEd->mErrorList->addCommentText(LLTrans::getString("SaveComplete"));
+
+	mScriptEd->mCompiling = false;
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
 	// Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
@@ -1638,6 +1820,8 @@ void LLPreviewLSL::callbackLSLCompileFailed(const LLSD& compile_errors)
 		mScriptEd->mErrorList->addElement(row);
 	}
 	mScriptEd->selectFirstError();
+
+	mScriptEd->mCompiling = false;
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
 	// Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
@@ -1739,11 +1923,11 @@ void LLPreviewLSL::onLoad(void* userdata)
 }
 
 // static
-void LLPreviewLSL::onSave(void* userdata, BOOL close_after_save)
+void LLPreviewLSL::onSave(void* userdata, BOOL close_after_save, bool sync)
 {
 	LLPreviewLSL* self = (LLPreviewLSL*)userdata;
 	self->mCloseAfterSave = close_after_save;
-	self->saveIfNeeded();
+	self->saveIfNeeded(sync);
 }
 
 /*static*/
@@ -1765,6 +1949,32 @@ void LLPreviewLSL::finishedLSLUpload(LLUUID itemId, LLSD response)
     }
 }
 
+bool LLPreviewLSL::failedLSLUpload(LLUUID itemId, LLUUID taskId, LLSD response, std::string reason)
+{
+    LLSD floater_key;
+    if (taskId.notNull())
+    {
+        floater_key["taskid"] = taskId;
+        floater_key["itemid"] = itemId;
+    }
+    else
+    {
+        floater_key = LLSD(itemId);
+    }
+
+    LLPreviewLSL* preview = LLFloaterReg::findTypedInstance<LLPreviewLSL>("preview_script", floater_key);
+    if (preview)
+    {
+        // unfreeze floater
+        LLSD errors;
+        errors.append(LLTrans::getString("UploadFailed") + reason);
+        preview->callbackLSLCompileFailed(errors);
+        return true;
+    }
+
+    return false;
+}
+
 // Save needs to compile the text in the buffer. If the compile
 // succeeds, then save both assets out to the database. If the compile
 // fails, go ahead and save the text anyway.
@@ -1779,7 +1989,6 @@ void LLPreviewLSL::saveIfNeeded(bool sync /*= true*/)
     }
 
     mPendingUploads = 0;
-    mScriptEd->mErrorList->deleteAllItems();
     mScriptEd->mEditor->makePristine();
 
     if (sync)
@@ -1791,21 +2000,45 @@ void LLPreviewLSL::saveIfNeeded(bool sync /*= true*/)
     const LLInventoryItem *inv_item = getItem();
     // save it out to asset server
     std::string url = gAgent.getRegion()->getCapability("UpdateScriptAgent");
+
+	// NaCL - LSL Preprocessor
+	mScriptEd->enableSave(FALSE); // Clear the enable save flag (FIRE-10173)
+	bool inventory_mono = gSavedSettings.getBOOL("AlchemyInventoryScriptsMono");
+	if (gSavedSettings.getBOOL("AlchemyLSLPreprocessor"))
+	{
+		bool mono_directive = FSLSLPreprocessor::mono_directive(mScriptEd->getScriptText(), inventory_mono);
+		if (mono_directive != inventory_mono)
+		{
+			std::string message;
+			if (mono_directive)
+			{
+				message = LLTrans::getString("fs_preprocessor_mono_directive_override");
+			}
+			else
+			{
+				message = LLTrans::getString("fs_preprocessor_lsl2_directive_override");
+			}
+			inventory_mono = mono_directive;
+			mScriptEd->mErrorList->addCommentText(message);
+		}
+	}
+	// NaCl End
+
     if(inv_item)
     {
         getWindow()->incBusyCount();
         mPendingUploads++;
         if (!url.empty())
         {
-            std::string buffer(mScriptEd->mEditor->getText());
+            std::string buffer(mScriptEd->getScriptText());
 
             LLUUID old_asset_id = inv_item->getAssetUUID().isNull() ? mScriptEd->getAssetID() : inv_item->getAssetUUID();
-
             LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(mItemUUID, buffer, 
                 [old_asset_id](LLUUID itemId, LLUUID, LLUUID, LLSD response) {
                     LLFileSystem::removeFile(old_asset_id, LLAssetType::AT_LSL_TEXT);
                     LLPreviewLSL::finishedLSLUpload(itemId, response);
-                }));
+                },
+                LLPreviewLSL::failedLSLUpload, inventory_mono ? LLScriptAssetUpload::MONO : LLScriptAssetUpload::LSL2));
 
             LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
         }
@@ -1824,61 +2057,43 @@ void LLPreviewLSL::onLoadComplete(const LLUUID& asset_uuid, LLAssetType::EType t
 	{
 		if(0 == status)
 		{
-			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-			if (file.open())
+			LLFileSystem file(asset_uuid, type);
+			S32 file_length = file.getSize();
+
+			std::vector<char> buffer(file_length+1);
+			file.read((U8*)&buffer[0], file_length);
+
+			// put a EOS at the end
+			buffer[file_length] = 0;
+			preview->mScriptEd->setScriptText(LLStringExplicit(&buffer[0]), TRUE);
+			preview->mScriptEd->mEditor->makePristine();
+
+			std::string script_name = DEFAULT_SCRIPT_NAME;
+			LLInventoryItem* item = gInventory.getItem(*item_uuid);
+			BOOL is_modifiable = FALSE;
+			if (item)
 			{
-				S32 file_length = file.getSize();
-
-				std::vector<char> buffer(file_length + 1);
-				if (file.read((U8*)&buffer[0], file_length))
+				if (!item->getName().empty())
 				{
-					file.close();
-
-					// put a EOS at the end
-					buffer[file_length] = 0;
-					preview->mScriptEd->setScriptText(LLStringExplicit(&buffer[0]), TRUE);
-					preview->mScriptEd->mEditor->makePristine();
-
-					std::string script_name = DEFAULT_SCRIPT_NAME;
-					LLInventoryItem* item = gInventory.getItem(*item_uuid);
-					BOOL is_modifiable = FALSE;
-					if (item)
-					{
-						if (!item->getName().empty())
-						{
-							script_name = item->getName();
-						}
-						if (gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
-						{
-							is_modifiable = TRUE;
-						}
-					}
-					preview->mScriptEd->setScriptName(script_name);
-					preview->mScriptEd->setEnableEditing(is_modifiable);
-					preview->mScriptEd->setAssetID(asset_uuid);
-					preview->mAssetStatus = PREVIEW_ASSET_LOADED;
+					script_name = item->getName();
+				}
+				if (gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
+				{
+					is_modifiable = TRUE;
+				}
+			}
+			preview->mScriptEd->setScriptName(script_name);
+			preview->mScriptEd->setEnableEditing(is_modifiable);
+            preview->mScriptEd->setAssetID(asset_uuid);
+			preview->mAssetStatus = PREVIEW_ASSET_LOADED;
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-					// Start the timer which will perform regular backup saves
-					if (!preview->isBackupRunning())
-					{
-						preview->startBackupTimer(60.0f);
-					}
-// [/SL:KB]
-				}
-				else
-				{
-					LLNotificationsUtil::add("UnableToLoadScript");
-					preview->mAssetStatus = PREVIEW_ASSET_ERROR;
-					LL_WARNS() << "Problem loading script: " << status << LL_ENDL;
-				}
-			}
-			else
+			// Start the timer which will perform regular backup saves
+			if (!preview->isBackupRunning())
 			{
-				LLNotificationsUtil::add("UnableToLoadScript");
-				preview->mAssetStatus = PREVIEW_ASSET_ERROR;
-				LL_WARNS() << "Problem loading script: " << status << LL_ENDL;
+				preview->startBackupTimer(60.0f);
 			}
+// [/SL:KB]
 		}
 		else
 		{
@@ -1951,7 +2166,8 @@ BOOL LLLiveLSLEditor::postBuild()
 
 	mMonoCheckbox =	getChild<LLCheckBoxCtrl>("mono");
 	childSetCommitCallback("mono", &LLLiveLSLEditor::onMonoCheckboxClicked, this);
-	getChildView("mono")->setEnabled(FALSE);
+	mMonoCheckbox->setEnabled(FALSE);
+	mMonoCheckbox->setVisible(LLGridManager::instance().isInSecondlife());
 
 	mScriptEd->mEditor->makePristine();
 	mScriptEd->mEditor->setFocus(TRUE);
@@ -1975,10 +2191,10 @@ void LLLiveLSLEditor::callbackLSLCompileSucceeded(const LLUUID& task_id,
 												  bool is_script_running)
 {
 	LL_DEBUGS() << "LSL Bytecode saved" << LL_ENDL;
-	mScriptEd->mErrorList->setCommentText(LLTrans::getString("CompileSuccessful"));
-	mScriptEd->mErrorList->setCommentText(LLTrans::getString("SaveComplete"));
-	getChild<LLCheckBoxCtrl>("running")->set(is_script_running);
-	mIsSaving = FALSE;
+	mScriptEd->mErrorList->addCommentText(LLTrans::getString("CompileSuccessful"));
+	mScriptEd->mErrorList->addCommentText(LLTrans::getString("SaveComplete"));
+
+	mScriptEd->mCompiling = false;
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
 	// Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
@@ -1988,6 +2204,8 @@ void LLLiveLSLEditor::callbackLSLCompileSucceeded(const LLUUID& task_id,
 	}
 // [/SL:KB]
 
+	getChild<LLCheckBoxCtrl>("running")->set(is_script_running);
+	mIsSaving = FALSE;
 	closeIfNeeded();
 }
 
@@ -2009,6 +2227,7 @@ void LLLiveLSLEditor::callbackLSLCompileFailed(const LLSD& compile_errors)
 	}
 	mScriptEd->selectFirstError();
 	mIsSaving = FALSE;
+	mScriptEd->mCompiling = false;
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
 	// Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
@@ -2018,6 +2237,7 @@ void LLLiveLSLEditor::callbackLSLCompileFailed(const LLSD& compile_errors)
 	}
 // [/SL:KB]
 
+	mIsSaving = FALSE;
 	closeIfNeeded();
 }
 
@@ -2146,6 +2366,14 @@ void LLLiveLSLEditor::onLoadComplete(const LLUUID& asset_id,
 	{
 		if( LL_ERR_NOERR == status )
 		{
+			if( !instance->getItem() )
+			{
+				LL_WARNS() << "getItem() returns 0, item went away while loading script()" << LL_ENDL;
+				instance->mAssetStatus = PREVIEW_ASSET_ERROR;
+				delete floater_key;
+				return;
+			}
+
 			instance->loadScriptText(asset_id, type);
 			instance->mScriptEd->setEnableEditing(TRUE);
 			instance->mAssetStatus = PREVIEW_ASSET_LOADED;
@@ -2183,19 +2411,10 @@ void LLLiveLSLEditor::onLoadComplete(const LLUUID& asset_id,
 
 void LLLiveLSLEditor::loadScriptText(const LLUUID &uuid, LLAssetType::EType type)
 {
-	LLFileSystem file(uuid, type, LLFileSystem::READ);
-	if (!file.open())
-	{
-		return;
-	}
+	LLFileSystem file(uuid, type);
 	S32 file_length = file.getSize();
 	std::vector<char> buffer(file_length + 1);
-	if (!file.read((U8*)&buffer[0], file_length))
-	{
-		LL_WARNS() << "Error reading " << uuid << ":" << type << LL_ENDL;
-	}
-
-	file.close();
+	file.read((U8*)&buffer[0], file_length);
 
 	if (file.getLastBytesRead() != file_length ||
 		file_length <= 0)
@@ -2428,14 +2647,13 @@ void LLLiveLSLEditor::saveIfNeeded(bool sync /*= true*/)
     // save the script
     mScriptEd->enableSave(FALSE);
     mScriptEd->mEditor->makePristine();
-    mScriptEd->mErrorList->deleteAllItems();
-    mScriptEd->mEditor->makePristine();
 
     if (sync)
     {
         mScriptEd->sync();
     }
     bool isRunning = getChild<LLCheckBoxCtrl>("running")->get();
+	mIsSaving = TRUE;
     getWindow()->incBusyCount();
     mPendingUploads++;
 
@@ -2443,7 +2661,7 @@ void LLLiveLSLEditor::saveIfNeeded(bool sync /*= true*/)
 
     if (!url.empty())
     {
-        std::string buffer(mScriptEd->mEditor->getText());
+		std::string buffer(mScriptEd->getScriptText());
         LLUUID old_asset_id = mScriptEd->getAssetID();
 
         LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(mObjectUUID, mItemUUID, 
@@ -2452,7 +2670,8 @@ void LLLiveLSLEditor::saveIfNeeded(bool sync /*= true*/)
                 [isRunning, old_asset_id](LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response) { 
                         LLFileSystem::removeFile(old_asset_id, LLAssetType::AT_LSL_TEXT);
                         LLLiveLSLEditor::finishLSLUpload(itemId, taskId, newAssetId, response, isRunning);
-                }));
+                },
+                nullptr)); // needs failure handling?
 
         LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
     }
@@ -2481,14 +2700,13 @@ void LLLiveLSLEditor::onLoad(void* userdata)
 }
 
 // static
-void LLLiveLSLEditor::onSave(void* userdata, BOOL close_after_save)
+void LLLiveLSLEditor::onSave(void* userdata, BOOL close_after_save, bool sync)
 {
 	LLLiveLSLEditor* self = (LLLiveLSLEditor*)userdata;
 	if(self)
 	{
 		self->mCloseAfterSave = close_after_save;
-		self->mScriptEd->mErrorList->setCommentText("");
-		self->saveIfNeeded();
+		self->saveIfNeeded(sync);
 	}
 }
 

@@ -59,7 +59,6 @@ LLImageJ2C::LLImageJ2C() : 	LLImageFormatted(IMG_CODEC_J2C),
 							mAreaUsedForDataSizeCalcs(0)
 {
 	mImpl.reset(fallbackCreateLLImageJ2CImpl());
-	claimMem(mImpl);
 
 	// Clear data size table
 	for( S32 i = 0; i <= MAX_DISCARD_LEVEL; i++)
@@ -143,6 +142,7 @@ bool LLImageJ2C::initEncode(LLImageRaw &raw_image, int blocks_size, int precinct
 
 bool LLImageJ2C::decode(LLImageRaw *raw_imagep, F32 decode_time)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	return decodeChannels(raw_imagep, decode_time, 0, 4);
 }
 
@@ -150,6 +150,7 @@ bool LLImageJ2C::decode(LLImageRaw *raw_imagep, F32 decode_time)
 // Returns true to mean done, whether successful or not.
 bool LLImageJ2C::decodeChannels(LLImageRaw *raw_imagep, F32 decode_time, S32 first_channel, S32 max_channel_count )
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	LLTimer elapsed;
 
 	bool res = true;
@@ -348,7 +349,7 @@ bool LLImageJ2C::loadAndValidate(const std::string &filename)
 	
 	resetLastError();
 
-	apr_off_t file_size = 0;
+	S32 file_size = 0;
 	LLAPRFile infile ;
 	infile.open(filename, LL_APR_RB, NULL, &file_size);
 	apr_file_t* apr_file = infile.getFileHandle() ;

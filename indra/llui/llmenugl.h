@@ -234,7 +234,9 @@ class LLMenuItemSeparatorGL : public LLMenuItemGL
 public:
 	struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
 	{
-		Params() = default;
+        Optional<EnableCallbackParam > on_visible;
+        Params() : on_visible("on_visible")
+        {}
 	};
 	LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params& p = LLMenuItemSeparatorGL::Params());
 
@@ -243,7 +245,12 @@ public:
 	/*virtual*/ BOOL handleMouseUp(S32 x, S32 y, MASK mask);
 	/*virtual*/ BOOL handleHover(S32 x, S32 y, MASK mask);
 
+    virtual void buildDrawLabel();
+
 	/*virtual*/ U32 getNominalHeight( void ) const;
+
+private:
+    enable_signal_t mVisibleSignal;
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -442,6 +449,7 @@ public:
 	/*virtual*/ void drawBackground(LLMenuItemGL* itemp, F32 alpha);
 	/*virtual*/ void setVisible(BOOL visible);
 	/*virtual*/ bool addChild(LLView* view, S32 tab_group = 0);
+    /*virtual*/ void deleteAllChildren();
 	/*virtual*/ void removeChild( LLView* ctrl);
 	/*virtual*/ BOOL postBuild();
 	
@@ -753,13 +761,13 @@ public:
 	// onCommit() - do the primary funcationality of the menu item.
 	virtual void	onCommit( void );
 
-	LLContextMenu*	getBranch() { return mBranchHandle.get(); }
+	LLContextMenu*	getBranch() { return mBranch.get(); }
 	void			setHighlight( BOOL highlight );
 
 protected:
 	void	showSubMenu();
 
-	LLHandle<LLContextMenu> mBranchHandle;
+	LLHandle<LLContextMenu> mBranch;
 };
 
 
@@ -872,6 +880,8 @@ public:
 	virtual BOOL handleKeyHere(KEY key, MASK mask);
 	virtual void translate(S32 x, S32 y);
 
+	void updateSize();
+
 private:
 	LLTearOffMenu(LLMenuGL* menup);
 	
@@ -879,7 +889,8 @@ private:
 	
 	LLView*		mOldParent;
 	LLMenuGL*	mMenu;
-	F32			mTargetHeight;
+	S32			mTargetHeight;
+    bool        mQuitRequested;
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

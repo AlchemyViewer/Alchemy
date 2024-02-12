@@ -192,7 +192,7 @@ No tutorial is currently available.
    icon="alertmodal.tga"
    name="BadInstallation"
    type="alertmodal">
- An error occurred while updating [APP_NAME].  Please [https://www.alchemyviewer.org/pages/downloads.html download the latest version] of the Viewer.
+ An error occurred while updating [APP_NAME].  Please [https://www.alchemyviewer.org/downloads download the latest version] of the Viewer.
     <tag>fail</tag>
     <usetemplate
      name="okbutton"
@@ -210,6 +210,19 @@ Make sure your Internet connection is working properly.
 	<usetemplate
      name="okbutton"
      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="LoginFailedToParse"
+   type="alertmodal">
+    <tag>fail</tag>
+Viewer received malformed response from server. Please, make sure your Internet connection is working properly and try again later.
+
+If you feel this is in error, please contact Support.
+    <usetemplate
+       name="okbutton"
+       yestext="OK"/>
   </notification>
 
   <notification
@@ -628,7 +641,7 @@ Save all changes to clothing/body parts?
    icon="alertmodal.tga"
    name="AllowMultipleViewers"
    type="alertmodal">
-    Running multiple Second Life viewers is not supported. It can lead to texture cache collisions, corruption and degraded visuals and performance.
+    Running multiple [APP_NAME] viewers is not supported. It can lead to texture cache collisions, corruption and degraded visuals and performance.
     <usetemplate
      name="okbutton"
      yestext="OK"/>
@@ -1075,7 +1088,7 @@ Your selling price will be L$[SALE_PRICE] and will be authorized for sale to [NA
    icon="alertmodal.tga"
    name="ConfirmLandSaleToAnyoneChange"
    type="alertmodal">
-ATTENTION: Clicking &apos;sell to anyone&apos; makes your land available to the entire [SECOND_LIFE] community, even those not in this region.
+ATTENTION: Clicking &apos;sell to anyone&apos; makes your land available to the entire [CURRENT_GRID] community, even those not in this region.
 
 The selected [LAND_SIZE] m² land is being set for sale.
 Your selling price will be L$[SALE_PRICE] and will be authorized for sale to [NAME].
@@ -1326,7 +1339,7 @@ There was a problem uploading a report screenshot due to the following reason: [
    name="MustAgreeToLogIn"
    type="alertmodal">
    <tag>fail</tag>
-You must agree to the Second Life Terms and Conditions, Privacy Policy, and Terms of Service to continue logging into [SECOND_LIFE].
+You must agree to the [CURRENT_GRID] Terms and Conditions, Privacy Policy, and Terms of Service to continue logging into [CURRENT_GRID].
   </notification>
 
   <notification
@@ -1341,6 +1354,25 @@ You must agree to the Second Life Terms and Conditions, Privacy Policy, and Term
      yestext="OK"/>
   </notification>
   
+  <notification
+   icon="alertmodal.tga"
+   name="CouldNotBuyCurrencyOS"
+   type="alertmodal">
+[TITLE]
+[MESSAGE]
+    <tag>confirm</tag>
+    <url
+	option="0"
+	name="url"
+	target = "_external">
+		[LINK]
+    </url>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="No"
+     yestext="OK"/>
+  </notification>
+
   <notification
    icon="alertmodal.tga"
    name="CouldNotPutOnOutfit"
@@ -1391,7 +1423,7 @@ Please enter your Password to log in.
 Oops! Something was left blank.
 You need to enter the Username name of your avatar.
 
-You need an account to enter [SECOND_LIFE]. Would you like to create one now?
+You need an account to enter [CURRENT_GRID]. Would you like to create one now?
     <tag>confirm</tag>
     <url
 	option="0"
@@ -1483,7 +1515,19 @@ Insufficient funds to create classified.
 
   <notification
    icon="alertmodal.tga"
-   name="DeleteAvatarPick"
+   name="ProfileDeleteClassified"
+   type="alertmodal">
+Delete classified &lt;nolink&gt;[CLASSIFIED]&lt;/nolink&gt;?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ProfileDeletePick"
    type="alertmodal">
 Delete pick &lt;nolink&gt;[PICK]&lt;/nolink&gt;?
     <tag>confirm</tag>
@@ -1491,6 +1535,32 @@ Delete pick &lt;nolink&gt;[PICK]&lt;/nolink&gt;?
      name="okcancelbuttons"
      notext="Cancel"
      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alert.tga"
+   name="ProfileUnpublishedClassified"
+   type="alertmodal">
+    You have unpublished classifieds. They will be lost if you close the window.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alert.tga"
+   name="ProfileUnsavedChanges"
+   type="alertmodal">
+    You have unsaved changes.
+    <tag>confirm</tag>
+    <tag>save</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Discard"
+     yestext="Save"/>
   </notification>
 
   <notification
@@ -1509,7 +1579,7 @@ Delete pick &lt;nolink&gt;[PICK]&lt;/nolink&gt;?
    icon="alertmodal.tga"
    name="PromptGoToEventsPage"
    type="alertmodal">
-Go to the [SECOND_LIFE] events web page?
+Go to the [CURRENT_GRID] events web page?
     <tag>confirm</tag>
     <url option="0" name="url">
 
@@ -1567,6 +1637,13 @@ Would you like to disable all popups which can be skipped?
    type="alertmodal">
 Cache will be cleared after you restart [APP_NAME].
   </notification>
+	
+  <notification
+   icon="alertmodal.tga"
+   name="WebCacheWillClear"
+   type="alertmodal">
+Web Browser caches will be cleared after you restart [APP_NAME].
+  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -1615,7 +1692,7 @@ Changing language will take effect after you restart [APP_NAME].
    icon="alertmodal.tga"
    name="GoToAuctionPage"
    type="alertmodal">
-    Go to the [SECOND_LIFE] web page to see auction details or make a bid?
+    Go to the [CURRENT_GRID] web page to see auction details or make a bid?
     <tag>confirm</tag>
     <url option="0" name="url">
 			http://secondlife.com/auctions/auction-detail.php?id=[AUCTION_ID]
@@ -1775,7 +1852,7 @@ The object may be out of range or may have been deleted.
   type="alert">
     <unique/>
     <tag>confirm</tag>
-    You have requested a file download, which is not supported within [ALCHEMY].
+    You have requested a file download, which is not supported within [APP_NAME].
     <usetemplate
      ignoretext="Warn about unsupported file downloads"
      name="okignore"
@@ -1852,6 +1929,41 @@ Graphics Quality will be set to Low to avoid some common driver errors. This wil
 We recommend updating your graphics card drivers.
 Graphics Quality can be raised in Preferences &gt; Graphics.
   <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="AutoFPSConfirmDisable"
+   type="alertmodal">
+Changing this setting will disable automatic adjustment and turn off 'Automatic settings'.
+Are you sure you want to continue?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Continue"/>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AdvancedLightingConfirm"
+   type="alertmodal">
+To turn on advanced lighting, we need to increase quality to level 4.
+    <tag>confirm</tag>
+  <usetemplate
+   name="okcancelbuttons"
+   notext="Cancel"
+   yestext="OK"/>
+  </notification>
+  <notification
+ icon="alertmodal.tga"
+   name="ShadowsConfirm"
+   type="alertmodal">
+To enable shadows, we need to increase quality to level 4.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="OK"/>
   </notification>
 
   <notification
@@ -2309,7 +2421,7 @@ Wrong chunk size in WAV file:
    icon="alertmodal.tga"
    name="SoundFileInvalidTooLong"
    type="alertmodal">
-Audio file is too long (30 second maximum):
+Audio file is too long (60 second maximum):
 [FILE]
   <tag>fail</tag>
   </notification>
@@ -2405,6 +2517,7 @@ Please try again later.
   <notification
    icon="notifytip.tga"
    name="LandmarkCreated"
+   log_to_chat="false"
    type="notifytip">
 You have added "[LANDMARK_NAME]" to your [FOLDER_NAME] folder.
   </notification>
@@ -3067,13 +3180,21 @@ This is usually a temporary failure. Please customize and save the wearable agai
    icon="alertmodal.tga"
    name="YouHaveBeenLoggedOut"
    type="alertmodal">
-Darn. You have been logged out of [SECOND_LIFE].
+Darn. You have been logged out of [CURRENT_GRID].
 
 [MESSAGE]
     <usetemplate
      name="okcancelbuttons"
      notext="Quit"
      yestext="View IM &amp; Chat"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="InventoryUnusable"
+   type="alertmodal">
+There was a problem loading your inventory. First, try logging out and logging in again. If you see this message again, contact Support to correct the problem.
+    <tag>fail</tag>
   </notification>
 
   <notification
@@ -3314,6 +3435,30 @@ See https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
        name="Cancel"
        text="Cancel"/>
     </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="Rename Selected Item"
+   name="RenameItem"
+   type="alertmodal">
+    Choose a new name for:
+[NAME]
+   <tag>confirm</tag>
+    <form name="form">
+    <input name="new_name" type="text" width="300">
+      [NAME]
+    </input>
+    <button
+     default="true"
+     index="0"
+     name="OK"
+     text="OK"/>
+    <button
+     index="1"
+     name="Cancel"
+     text="Cancel"/>
+   </form>
   </notification>
 
   <notification
@@ -3679,7 +3824,7 @@ You may want to set a new home location.
    type="alertmodal">
    <tag>fail</tag>
 Your clothing is still downloading.
-You can use [SECOND_LIFE] normally and other people will see you correctly.
+You can use [CURRENT_GRID] normally and other people will see you correctly.
     <form name="form">
       <ignore name="ignore"
        text="Clothing is taking a long time to download"/>
@@ -3736,7 +3881,7 @@ Your [https://community.secondlife.com/t5/English-Knowledge-Base/Avatar-Renderin
 
 [APP_NAME] installation is complete.
 
-If this is your first time using [SECOND_LIFE], you will need to create an account before you can log in.
+If this is your first time using [CURRENT_GRID], you will need to create an account before you can log in.
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"
@@ -3774,7 +3919,7 @@ We&apos;re having trouble connecting. There may be a problem with your Internet 
 You can either check your Internet connection and try again in a few minutes, click Help to view the [SUPPORT_SITE], or click Teleport to attempt to teleport home.
     <url option="1" name="url">
 
-			http://secondlife.com/support/
+			https://git.alchemyviewer.org/alchemy/alchemy-next/issues
     </url>
     <form name="form">
       <button
@@ -3802,7 +3947,7 @@ We&apos;re having trouble connecting. There may be a problem with your Internet 
 
 You can either check your Internet connection and try again in a few minutes or click Help to view the [SUPPORT_SITE].
     <url option="1" name="url">
-			http://secondlife.com/support/
+			https://git.alchemyviewer.org/alchemy/alchemy-next/issues
     </url>
     <form name="form">
       <button
@@ -3836,7 +3981,7 @@ Local Data you are deleting is shared between multiple grids, are you sure you w
 Your character will appear in a moment.
 
 Use arrow keys to walk.
-Press the F1 key at any time for help or to learn more about [SECOND_LIFE].
+Press the F1 key at any time for help or to learn more about [CURRENT_GRID].
 Please choose the male or female avatar. You can change your mind later.
     <usetemplate
      name="okcancelbuttons"
@@ -4014,7 +4159,7 @@ Are you sure you want to return objects owned by [USER_NAME]?
 Couldn&apos;t set region textures:
 Terrain texture [TEXTURE_NUM] has an invalid bit depth of [TEXTURE_BIT_DEPTH].
 
-Replace texture [TEXTURE_NUM] with a 24-bit 512x512 or smaller image then click &quot;Apply&quot; again.
+Replace texture [TEXTURE_NUM] with a 24-bit [MAX_SIZE]x[MAX_SIZE] or smaller image then click &quot;Apply&quot; again.
   <tag>fail</tag>
   </notification>
 
@@ -4025,7 +4170,7 @@ Replace texture [TEXTURE_NUM] with a 24-bit 512x512 or smaller image then click 
 Couldn&apos;t set region textures:
 Terrain texture [TEXTURE_NUM] is too large at [TEXTURE_SIZE_X]x[TEXTURE_SIZE_Y].
 
-Replace texture [TEXTURE_NUM] with a 24-bit 512x512 or smaller image then click &quot;Apply&quot; again.
+Replace texture [TEXTURE_NUM] with a 24-bit [MAX_SIZE]x[MAX_SIZE] or smaller image then click &quot;Apply&quot; again.
   </notification>
 
   <notification
@@ -4208,7 +4353,7 @@ Finished download of raw terrain file to:
    name="RequiredUpdate"
    type="alertmodal">
 Version [VERSION] is required for login.
-Please download from https://www.alchemyviewer.org/pages/downloads.html
+Please download the latest version from https://www.alchemyviewer.org/downloads
     <tag>confirm</tag>
     <usetemplate
      name="okbutton"
@@ -4316,7 +4461,7 @@ Go to your [http://secondlife.com/account/ Dashboard] to manage your account?
    icon="alertmodal.tga"
    name="WebLaunchSecurityIssues"
    type="alertmodal">
-Visit the [SECOND_LIFE] Wiki for details of how to report a security issue.
+Visit the [CURRENT_GRID] Wiki for details of how to report a security issue.
     <tag>confirm</tag>
     <usetemplate
      ignoretext="Launch my browser to learn how to report a Security Issue"
@@ -4329,7 +4474,7 @@ Visit the [SECOND_LIFE] Wiki for details of how to report a security issue.
    icon="alertmodal.tga"
    name="WebLaunchQAWiki"
    type="alertmodal">
-Visit the [SECOND_LIFE] QA Wiki.
+Visit the [CURRENT_GRID] QA Wiki.
     <tag>confirm</tag>
     <usetemplate
      ignoretext="Launch my browser to view the QA Wiki"
@@ -4342,7 +4487,7 @@ Visit the [SECOND_LIFE] QA Wiki.
    icon="alertmodal.tga"
    name="WebLaunchPublicIssue"
    type="alertmodal">
-Visit the [SECOND_LIFE] Public Issue Tracker, where you can report bugs and other issues.
+Visit the [CURRENT_GRID] Public Issue Tracker, where you can report bugs and other issues.
     <tag>confirm</tag>
     <usetemplate
      ignoretext="Launch my browser to use the Public Issue Tracker"
@@ -4797,7 +4942,7 @@ Request a teleport to [NAME] with the following message
     <tag>confirm</tag>
     <form name="form">
       <input name="message" type="text">
-
+May I join you?
       </input>
       <button
        default="true"
@@ -5972,6 +6117,22 @@ You have updated the location of this pick but the other details will retain the
 
   <notification
    icon="alertmodal.tga"
+   name="ApplyInventoryToObject"
+   type="alertmodal">
+You are applying &apos;no copy&apos; inventory item.
+This item will be moved to object's inventory, not copied.
+
+Move the inventory item?
+    <tag>confirm</tag>
+    <usetemplate
+     ignoretext="Warn me before I apply &apos;no-copy&apos; items to an object"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="MoveInventoryFromObject"
    type="alertmodal">
 You have selected &apos;no copy&apos; inventory items.
@@ -6163,7 +6324,54 @@ Are you sure you want to delete them?
      notext="Cancel"
      yestext="OK"/>
   </notification>
-  
+
+  <notification
+   icon="alertmodal.tga"
+   name="DeleteThumbnail"
+   type="alertmodal">
+    <unique/>
+    Delete the image for this item? There is no undo.
+    <tag>confirm</tag>
+    <usetemplate
+     ignoretext="Warn me that thumbnail will be permanently removed"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ThumbnailDimentionsLimit"
+   type="alertmodal">
+    <unique/>
+    Only square images from 64 to 256 pixels per side are allowed.
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ThumbnailInsufficientPermissions"
+   type="alertmodal">
+    <unique/>
+    Only copy and transfer free images can be assigned as thumbnails.
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ThumbnailOutfitPhoto"
+   type="alertmodal">
+    <unique/>
+    To add an image to an outfit, use the Outfit Gallery window, or right-click on the outfit folder and select "Image..."
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
   <notification
      icon="alertmodal.tga"
      name="ConfirmUnlink"
@@ -6245,15 +6453,15 @@ Dear Resident,
 
 You appear to be reporting intellectual property infringement. Please make sure you are reporting it correctly:
 
-(1) The Abuse Process. You may submit an abuse report if you believe a Resident is exploiting the [SECOND_LIFE] permissions system, for example, by using CopyBot or similar copying tools, to infringe intellectual property rights. The Abuse Team investigates and issues appropriate disciplinary action for behavior that violates the [SECOND_LIFE] [http://secondlife.com/corporate/tos.php Terms of Service] or [http://secondlife.com/corporate/cs.php Community Standards]. However, the Abuse Team does not handle and will not respond to requests to remove content from the [SECOND_LIFE] world.
+(1) The Abuse Process. You may submit an abuse report if you believe a Resident is exploiting the [CURRENT_GRID] permissions system, for example, by using CopyBot or similar copying tools, to infringe intellectual property rights. The Abuse Team investigates and issues appropriate disciplinary action for behavior that violates the [CURRENT_GRID] Terms of Service and Community Standards. However, the Abuse Team does not handle and will not respond to requests to remove content from the [CURRENT_GRID] world.
 
-(2) The DMCA or Content Removal Process. To request removal of content from [SECOND_LIFE], you MUST submit a valid notification of infringement as provided in our [http://secondlife.com/corporate/dmca.php DMCA Policy].
+(2) The DMCA or Content Removal Process. To request removal of content from [CURRENT_GRID], you MUST submit a valid notification of infringement as provided in our [http://secondlife.com/corporate/dmca.php DMCA Policy].
 
 If you still wish to continue with the abuse process, please close this window and finish submitting your report.  You may need to select the specific category &apos;CopyBot or Permissions Exploit&apos;.
 
 Thank you,
 
-Linden Lab
+[CURRENT_GRID]
   </notification>
 
   <notification
@@ -6401,6 +6609,22 @@ Your trash is overflowing. This may cause problems logging in.
          name="okcancelbuttons"
          notext="I will empty trash later"
          yestext="Check trash folder"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="InventoryLimitReachedAIS"
+   type="notifytip">
+Your inventory is experiencing issues. Please, contact support.
+  <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="InventoryLimitReachedAISAlert"
+   type="alertmodal">
+Your inventory is experiencing issues. Please, contact support.
+  <tag>fail</tag>
   </notification>
 
   <notification
@@ -6679,7 +6903,7 @@ Would you like to automatically wear the clothing you are about to create?
    icon="alertmodal.tga"
    name="Cannot enter parcel: no payment info on file"
    type="alertmodal">
-You must have payment information on file to visit this area.  Do you want to go to the [SECOND_LIFE] website and set this up?
+You must have payment information on file to visit this area.  Do you want to go to the [CURRENT_GRID] website and set this up?
 
 [_URL]
     <tag>confirm</tag>
@@ -6879,6 +7103,22 @@ You don&apos;t have permission to view this notecard.
 
   <notification
    icon="notifytip.tga"
+   name="MaterialMissing"
+   type="notifytip">
+    Material is missing from database.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="MaterialNoPermissions"
+   type="notifytip">
+    You don&apos;t have permission to view this material.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
    name="RezItemNoPermissions"
    type="notifytip">
 Insufficient permissions to rez object.
@@ -6906,6 +7146,39 @@ Unable to transfer inventory across parent estates.
 Unable to load notecard.
 Please try again.
   <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="UnableToLoadMaterial"
+   type="alertmodal">
+Unable to load material.
+Please try again.
+    <tag>fail</tag>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="MissingMaterialCaps"
+   type="notifytip">
+    <tag>fail</tag>
+    Not connected to a materials capable region.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="CantSelectReflectionProbe"
+   type="alertmodal">
+    <unique/>
+    You have placed a reflection probe, but 'Select Reflection Probes' is disabled. To be able to select reflection probes, check Build &gt; Options &gt; Select Reflection Probes.
+    <tag>confirm</tag>
+    <usetemplate
+     ignoretext="Warn if Reflection Probes selection is disabled."
+     name="okignore"
+     yestext="OK"/>
   </notification>
 
   <notification
@@ -8241,7 +8514,7 @@ Do not allow access if you do not fully understand why it wants access to your a
    name="ScriptDialog"
    show_toast="false"
    type="notify">
-[NAME]&apos;s &apos;&lt;nolink&gt;[TITLE]&lt;/nolink&gt;&apos;
+[NAME]&apos;s &apos;&lt;nolink&gt;[TITLE]&lt;/nolink&gt;&apos; on channel [CHANNEL]
 [MESSAGE]
     <form name="form">
       <button
@@ -8469,15 +8742,6 @@ Click Accept to join the chat or Decline to decline the invitation. Click Block 
        name="Mute"
        text="Block"/>
     </form>
-  </notification>
-
-  <notification
-   icon="alertmodal.tga"
-   name="InviteAdHocBlocked"
-   persist="false"
-   type="notify">
-[NAME_SLURL] tried to add you to a conference which was blocked due to your privacy settings.
-    <tag>group</tag>
   </notification>
 
   <notification
@@ -8827,6 +9091,8 @@ Your voice has been muted by moderator.
     name="BulkUploadCostConfirmation"
     type="alertmodal">
 This will upload [COUNT] items at a total cost of L$[COST]. Do you wish to continue with the upload?
+
+[FILES]
     <usetemplate
      name="okcancelbuttons"
      notext="Cancel"
@@ -8897,7 +9163,7 @@ Select residents to share with.
     icon="alert.tga"
     type="alert">
       [LABEL] failed to upload: [MESSAGE]
-[DETAILS]See SecondLife.log for details
+[DETAILS]See Alchemy.log for details
   </notification>
 
   <notification
@@ -8906,7 +9172,7 @@ Select residents to share with.
     type="alert">
       [LABEL] failed to upload: [MESSAGE]
 
-See SecondLife.log for details
+See Alchemy.log for details
   </notification>
    
   <notification
@@ -9040,6 +9306,13 @@ Avatar '[NAME]' became cloud.
 
   <notification
    icon="notifytip.tga"
+   name="AvatarRezSelfBakeForceUpdateNotification"
+   type="notifytip">
+The viewer has detected that you may appear as a cloud and is attempting to fix this automatically.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
    name="AvatarRezArrivedNotification"
    type="notifytip">
 ( [EXISTENCE] seconds alive )
@@ -9153,7 +9426,64 @@ Unable to upload texture.
 [REASON]   
   <tag>fail</tag>  
   </notification>
-  
+
+  <notification
+   icon="alertmodal.tga"
+   name="CannotUploadMaterial"
+   type="alertmodal">
+There was a problem uploading the file
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+ icon="alertmodal.tga"
+ label="Save Material"
+ name="SaveMaterialAs"
+ type="alertmodal">
+    <unique/>
+    Name this material:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="message" type="text">
+        [DESC]
+      </input>
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="OK"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="InvalidMaterialName"
+   type="alertmodal">
+Please enter a non-empty name
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="UsavedMaterialChanges"
+   type="alertmodal">
+    You have unsaved changes.
+    <form name="form">
+      <button
+       index="0"
+       name="discard"
+       text="Discard changes"/>
+      <button
+       index="1"
+       name="keep"
+       text="Keep editing"/>
+    </form>
+  </notification>
+
   <notification
    icon="alertmodal.tga"
    name="LivePreviewUnavailable"
@@ -9164,6 +9494,61 @@ We cannot display a preview of this texture because it is no-copy and/or no-tran
     ignoretext="Warn me that Live Preview mode is not available for no-copy and/or no-transfer textures"
     name="okignore"
     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="LivePreviewUnavailablePBR"
+   type="alert">
+   
+We cannot display a preview of this material because it is no-copy, no-transfer, and/or no-modify.
+  <usetemplate
+    ignoretext="Warn me that Live Preview mode is not available for no-copy, no-transfer, and/or no-modify materials"
+    name="okignore"
+    yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="FacePasteFailed"
+   type="alertmodal">
+Paste failed. [REASON]
+   <usetemplate
+    name="okbutton"
+    yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="FailedToApplyTextureNoCopyToMultiple"
+   type="alertmodal">
+Failed to apply texture. You can not apply a no-copy texture to multiple objects.
+   <usetemplate
+    name="okbutton"
+    yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="FailedToApplyGLTFNoCopyToMultiple"
+   type="alertmodal">
+Failed to apply GLTF material. You can not apply a no-copy material to multiple objects.
+   <usetemplate
+    name="okbutton"
+    yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="FacePasteTexturePermissions"
+   type="alertmodal">
+    You applied a texture with limited permissions, object will inherit permissions from texture.
+    <usetemplate
+     ignoretext="Paste: You applied a texture with limited permissions"
+     name="notifyignore"/>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
   </notification>
 
   <notification
@@ -9756,23 +10141,11 @@ Do you wish to continue?
     The selected object affects the navmesh.  Changing it to a Flexible Path will remove it from the navmesh.
     <tag>confirm</tag>
     <usetemplate
-     ignoretext="The selected object affects the navmesh.  Changing it to a Flexible Path will remove it from the navmesh."
+     ignoretext="The selected object affects the navmesh. Changing it to a Flexible Path will remove it from the navmesh."
      name="okcancelignore"
      notext="Cancel"
      yestext="OK"/>
   </notification>
-
-  <global name="UnsupportedShaderRequirements">
-You do not appear to meet the hardware requirements for [APP_NAME]. [APP_NAME] requires OpenGL 2.0 or later shader support. If this is the case, you may want to make sure that you have the latest drivers for your graphics card, and service packs and patches for your operating system.
-
-If you continue to have problems, please visit the [SUPPORT_SITE].
-  </global>
-
-  <global name="UnsupportedGLRequirements">
-You do not appear to have the proper hardware requirements for [APP_NAME]. [APP_NAME] requires an OpenGL graphics card that has multitexture support. If this is the case, you may want to make sure that you have the latest drivers for your graphics card, and service packs and patches for your operating system.
-
-If you continue to have problems, please visit the [SUPPORT_SITE].
-  </global>
 
   <global name="UnsupportedIntelDriver">
 The installed Intel graphics driver for [GPUNAME], version [VERSION], is significantly out of date and is known to cause excessive rates of program crashes. You are strongly advised to update to a current Intel driver
@@ -9834,6 +10207,15 @@ Disabling future updates for this file.
    persist="true"
    type="notify">
 Attempted to add an invalid or unreadable image file [FNAME] which could not be opened or decoded.
+Attempt cancelled.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="LocalGLTFVerifyFail"
+   persist="true"
+   type="notify">
+Attempted to add an invalid or unreadable GLTF material [FNAME] which could not be opened or decoded.
 Attempt cancelled.
   </notification>
 
@@ -11814,7 +12196,7 @@ This Region does not support environmental settings.
  
   <notification
    icon="alertmodal.tga"
-   label="Save Outfit"
+   label="Save Environmental Settings"
    name="SaveSettingAs"
    type="alertmodal">
     <unique/>
@@ -11961,6 +12343,150 @@ Unable to load the track into [TRACK].
 Unable to load the track from [TRACK1] into [TRACK2].
   <tag>fail</tag>
   </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="CompressionTestResults"
+   type="alertmodal">
+Test result for gzip level 6 file compression with [FILE] of size [SIZE] KB:
+Packing: [PACK_TIME]s [PSIZE]KB
+Unpacking: [UNPACK_TIME]s [USIZE]KB
+    <tag>fail</tag>
+  </notification>
+
+    <notification
+     icon="alertmodal.tga"
+     label="Prompt for MFA Token"
+     name="PromptMFAToken"
+     type="alertmodal">
+        [MESSAGE]
+        <tag>confirm</tag>
+        <form name="form">
+            <input name="token" type="text" width="400" />
+            <button
+             default="true"
+             index="0"
+             name="continue"
+             text="Continue"/>
+            <button
+             index="1"
+             name="cancel"
+             text="Cancel"/>
+        </form>
+    </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="Prompt for MFA Token"
+   name="PromptMFATokenWithSave"
+   type="alertmodal">
+    [MESSAGE]
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="token" type="text" width="400" />
+      <ignore
+       name="ignore"
+       checkbox_only="true"
+       text="Remember this computer for 30 days."/>
+      <button
+       default="true"
+       index="0"
+       name="continue"
+       text="Continue"/>
+      <button
+       index="1"
+       name="cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="Create subfolder"
+   name="CreateSubfolder"
+   type="alertmodal">
+    <unique/>
+    Name the new folder:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="message" type="text">
+        [DESC]
+      </input>
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="OK"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="SameFolderRequired"
+   type="alert">
+    Selected items must be in the same folder.
+    <tag>fail</tag>
+    <usetemplate
+      name="okbutton"
+      yestext="OK"/>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="RiggedMeshAttachedToHUD"
+    type="alertmodal">
+    An object "[NAME]" attached to HUD point "[POINT]" contains rigged mesh.
+
+Rigged mesh objects are designed for attachment to the avatar. You will see this object but no one else will.
+
+If you want others to see this object, remove it and re-attach it to an avatar attachment point.
+    <tag>confirm</tag>
+    <usetemplate
+        ignoretext="Warn me when rigged mesh is attached to HUD point."
+        name="okignore"
+        yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="EnableAutoFPSWarning"
+   type="alertmodal">
+You are about to enable AutoFPS. All unsaved graphics settings will be lost.
+
+Would you like to save them first?
+      <tag>confirm</tag>
+      <usetemplate
+       name="okcancelbuttons"
+       notext="No"
+       yestext="Yes"/>
+  </notification>
+    
+  <notification
+    icon="notifytip.tga"
+    name="ReflectionProbeApplied"
+    persist="true"
+    type="alertmodal">
+    WARNING: You have made your object a Reflection Probe.  This will implicitly change the object to mimic its influence volume and will make irreversible changes to the object.  Do you want to continue?
+   <usetemplate
+       ignoretext="Reflection Probe tips"
+       name="okcancelignore"
+       notext="Cancel"
+       yestext="OK"/>
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="AutoAdjustHDRSky"
+    type="alertmodal">
+      You are editing a non-HDR sky that has been automatically converted to HDR. To remove HDR and tone mapping, set Reflection Probe Ambiance to zero.
+    <usetemplate
+        ignoretext="HDR Sky adjustment warning"
+        name="okignore"
+        yestext="OK"/>
+  </notification>
   
   <!-- ALCHEMY BELOW THIS LINE -->
     <notification
@@ -11985,6 +12511,89 @@ Unable to load the track from [TRACK1] into [TRACK2].
    type="notifytip"
    log_to_im="true">
     Dice Roll: [RESULT]
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="DumpArchetypeSuccess"
+   type="notify">
+    Successfully saved appearance to [FILE_PATH].
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="InvalidGrid"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+    '[GRID]' is not a valid grid identifier.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="MalformedGridInfo"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+    [GRID] provided malformed grid info.
+
+    Please contact them for support.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="CannotRemoveConnectedGrid"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+    [GRID] cannot be removed while you are connected to it.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="ConfirmRemoveGrid"
+   type="alertmodal">
+    <tag>opensim</tag>
+    <tag>confirm</tag>
+    Are you sure you want to remove [GRID] from the grid list?
+    <usetemplate
+     ignoretext="Confirm removing grids"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="RemoveGridFailure"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+    Failed to remove [GRID] from the list.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="CantAddGrid"
+   type="alertmodal">
+    <tag>fail</tag>
+    <tag>opensim</tag>
+Could not get grid info for [GRID].
+Error: [STATUS] [REASON]
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddGridSuccess"
+   type="alertmodal">
+    <form name="form">
+      <ignore name="ignore"
+       text="A grid was added to the grid list"/>
+    </form>
+    <tag>fail</tag>
+    <tag>opensim</tag>
+[GRID] has been added to your grid list.
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="SecondLifePasswordTooLong"
+   type="notify">
+    Due to a bug in the [CURRENT_GRID] signup process, your password is longer than 16 characters and had been truncated to allow logging in.
   </notification>
 
   <notification
@@ -12062,6 +12671,34 @@ the region &quot;[REGION]&quot;?
        text="Cancel"/>
     </form>
   </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="RadarAlertEnter"
+   log_to_chat="false"
+   type="notifytip">
+    <tag>radar</tag>
+    [AGENT] has entered [REGION].
+   </notification>
+   <notification
+    icon="notifytip.tga"
+    name="RadarAlertLeave"
+    log_to_chat="false"
+    type="notifytip">
+     <tag>radar</tag>
+     [AGENT] has left [REGION].
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="StreamInfo"
+   log_to_chat="false"
+   type="notifytip">
+    <tag>StreamInfo</tag>
+[STATION]
+
+[INFO]
+   </notification>
 
   <notification
    icon="notify.tga"
@@ -12147,6 +12784,13 @@ An animation set with this name already exists.
 Insufficient permissions to read notecard.
   </notification>
 
+  <notification
+   icon="notifytip.tga"
+   name="AOImportComplete"
+   type="notifytip">
+Animation Overrider notecard import complete!
+  </notification>
+	
   <notification
    icon="notifytip.tga"
    name="AOImportCreateSetFailed"
@@ -12307,14 +12951,53 @@ Your privilege to find [NAME]&apos;s map location has been revoked.
 [NAME] has given you permission to find their location on the map.
   </notification>
   
-    <notification
-    icon="notifytip.tga"
-    name="AlwaysRunEnabled"
-    persist="true"
-    log_to_chat="true"
-    type="notifytip">
+  <notification
+    icon="alertmodal.tga"
+    label="Warn on insecure login"
+    name="InsecureLogin"
+    type="alertmodal">
+[GRID] does not provide a secure connection for login.
+Login details will be sent in plaintext where they may be vulnerable to snooping.
+
+Are you sure you wish to continue?
+    <tag>confirm</tag>
+    <usetemplate
+     ignoretext="Warn me before I login using an insecure connection"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ShapeImportGenericFail"
+   type="notifytip">
+    <tag>fail</tag>
+    There was a problem importing [FILENAME]. Please see the log for more details.
+  </notification>
+  <notification
+   icon="notifytip.tga"
+   name="ShapeImportVersionFail"
+   type="notifytip">
+    <tag>fail</tag>
+    Shape import failed. Are you sure [FILENAME] is an avatar genepool file?
+  </notification>
+
+  <notification
+	icon="notifytip.tga"
+	name="SnapshotDetected"
+	type="notifytip">
+	[NAME] took a snapshot! :O
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="AlwaysRunEnabled"
+   persist="true"
+   log_to_chat="true"
+   type="notifytip">
 Always Run enabled.
-    </notification>
+  </notification>
   <notification
     icon="notifytip.tga"
     name="AlwaysRunDisabled"
@@ -12366,4 +13049,54 @@ Always Run disabled.
 	 Irrevocably destroying object. Hope you didn't need that.
  </notification>
 
+ <notification
+  icon="notify"
+  name="AskForDisplayPreferencesReset"
+  type="alertmodal">
+Your Graphic card seems to have changed
+
+from &apos;[LAST_GPU]&apos;
+to &apos;[THIS_GPU]&apos;
+
+Would you like to reset the graphic preferences?
+  <usetemplate
+  name="yesnocancelbuttons"
+  yestext="Reset now"
+  notext="Leave as-is"
+  canceltext="Never reset"/>
+ </notification>
+
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionNoneSaved"
+   type="notify">
+No camera view has been saved yet.
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="LoadCameraPositionOutsideDrawDistance"
+   type="notify">
+Can't restore the camera view because the camera position is beyond draw distance.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="CantRestoreToWorldNoCopy"
+   type="alertmodal">
+Restore to Last Position is not allowed for no copy items to prevent possible content loss.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ViewerBuildExpired"
+   type="alertmodal">
+[VIEWER_CHANNEL] has expired and is no longer able to log in.
+Please download the latest version from https://www.alchemyviewer.org/downloads
+    <tag>confirm</tag>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+	
 </notifications>

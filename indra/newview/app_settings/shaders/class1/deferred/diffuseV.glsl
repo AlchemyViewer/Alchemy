@@ -27,26 +27,40 @@ uniform mat3 normal_matrix;
 uniform mat4 texture_matrix0;
 uniform mat4 modelview_projection_matrix;
 
-ATTRIBUTE vec3 position;
-ATTRIBUTE vec4 diffuse_color;
-ATTRIBUTE vec3 normal;
-ATTRIBUTE vec2 texcoord0;
+in vec3 position;
+in vec4 diffuse_color;
+in vec3 normal;
+in vec2 texcoord0;
 
-VARYING vec3 vary_normal;
+out vec3 vary_normal;
 
-VARYING vec4 vertex_color;
-VARYING vec2 vary_texcoord0;
+out vec4 vertex_color;
+out vec2 vary_texcoord0;
 
 void passTextureIndex();
 
+#ifdef HAS_SKIN
+mat4 getObjectSkinnedTransform();
+uniform mat4 projection_matrix;
+uniform mat4 modelview_matrix;
+#endif
+
 void main()
 {
-	//transform vertex
+#ifdef HAS_SKIN
+    mat4 mat = getObjectSkinnedTransform();
+    mat = modelview_matrix * mat;
+    vec4 pos = mat * vec4(position.xyz, 1.0);
+    gl_Position = projection_matrix * pos;
+    vary_normal = normalize((mat*vec4(normal.xyz+position.xyz,1.0)).xyz-pos.xyz);
+#else
 	gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0); 
+    vary_normal = normalize(normal_matrix * normal);
+#endif
+	
 	vary_texcoord0 = (texture_matrix0 * vec4(texcoord0,0,1)).xy;
 	
 	passTextureIndex();
-	vary_normal = normalize(normal_matrix * normal);
-	
+
 	vertex_color = diffuse_color;
 }

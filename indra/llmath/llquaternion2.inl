@@ -26,9 +26,6 @@
 
 #include "llquaternion2.h"
 
-static const LLQuad LL_V4A_PLUS_ONE = {1.f, 1.f, 1.f, 1.f};
-static const LLQuad LL_V4A_MINUS_ONE = {-1.f, -1.f, -1.f, -1.f};
-
 // Ctor from LLQuaternion
 inline LLQuaternion2::LLQuaternion2( const LLQuaternion& quat )
 {
@@ -103,14 +100,14 @@ inline void LLQuaternion2::normalize()
 // Quantize this quaternion to 8 bit precision
 inline void LLQuaternion2::quantize8()
 {
-	mQ.quantize8( LL_V4A_MINUS_ONE, LL_V4A_PLUS_ONE );
+	mQ.quantize8(_mm_set1_ps(-1.f), _mm_set1_ps(1.f));
 	normalize();
 }
 
 // Quantize this quaternion to 16 bit precision
 inline void LLQuaternion2::quantize16()
 {
-	mQ.quantize16( LL_V4A_MINUS_ONE, LL_V4A_PLUS_ONE );
+	mQ.quantize16(_mm_set1_ps(-1.f), _mm_set1_ps(1.f));
 	normalize();
 }
 

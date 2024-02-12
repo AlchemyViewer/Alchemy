@@ -48,7 +48,7 @@ public:
 	/*virtual*/ void setInfoType(EInfoType type);
 
     // Sets CREATE_LANDMARK infotype and creates landmark at desired folder
-    void setInfoAndCreateLandmark(const LLUUID& fodler_id);
+    void setInfoAndCreateLandmark(const LLUUID& folder_id);
 
 	/*virtual*/ void processParcelInfo(const LLParcelData& parcel_data);
 
@@ -56,6 +56,7 @@ public:
 	void displayItemInfo(const LLInventoryItem* pItem);
 
 	void toggleLandmarkEditMode(BOOL enabled);
+	void setCanEdit(BOOL enabled);
 
 	const std::string& getLandmarkTitle() const;
 	const std::string getLandmarkNotes() const;

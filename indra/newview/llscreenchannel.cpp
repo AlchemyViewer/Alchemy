@@ -49,24 +49,25 @@ using namespace LLNotificationsUI;
 
 bool LLScreenChannel::mWasStartUpToastShown = false;
 
-LLTrace::BlockTimerStatHandle FTM_GET_CHANNEL_RECT("Calculate Notification Channel Region");
 LLRect LLScreenChannelBase::getChannelRect()
 {
-	LL_RECORD_BLOCK_TIME(FTM_GET_CHANNEL_RECT);
+    LL_PROFILE_ZONE_SCOPED;
+
+	LLRect channel_rect;
+	LLRect chiclet_rect;
 
 	if (mFloaterSnapRegion == NULL)
 	{
-		mFloaterSnapRegion = gViewerWindow->getRootView()->getChildView("floater_snap_region");
+		mFloaterSnapRegion = gViewerWindow->getFloaterSnapRegion();
+		//if(!mFloaterSnapRegion) mFloaterSnapRegion = gViewerWindow->getRootView()->getChildView("floater_snap_region");
 	}
 	
 	if (mChicletRegion == NULL)
 	{
-		mChicletRegion = gViewerWindow->getRootView()->getChildView("chiclet_container");
+		mChicletRegion = gViewerWindow->getChicletContainer();
+		//if(!mChicletRegion) mChicletRegion = gViewerWindow->getRootView()->getChildView("chiclet_container");
 	}
 	
-	LLRect channel_rect;
-	LLRect chiclet_rect;
-
 	mFloaterSnapRegion->localRectToScreen(mFloaterSnapRegion->getLocalRect(), &channel_rect);
 	mChicletRegion->localRectToScreen(mChicletRegion->getLocalRect(), &chiclet_rect);
 
@@ -104,12 +105,12 @@ BOOL LLScreenChannelBase::postBuild()
 {
 	if (mFloaterSnapRegion == NULL)
 	{
-		mFloaterSnapRegion = gViewerWindow->getRootView()->getChildView("floater_snap_region");
+		mFloaterSnapRegion = gViewerWindow->getFloaterSnapRegion();
 	}
 	
 	if (mChicletRegion == NULL)
 	{
-		mChicletRegion = gViewerWindow->getRootView()->getChildView("chiclet_container");
+		mChicletRegion = gViewerWindow->getChicletContainer();
 	}
 	
 	return TRUE;
@@ -260,7 +261,8 @@ void LLScreenChannel::updatePositionAndSize(LLRect new_world_rect)
 //--------------------------------------------------------------------------
 void LLScreenChannel::addToast(const LLToast::Params& p)
 {
-	bool store_toast = false, show_toast = false;
+    LL_PROFILE_ZONE_SCOPED
+    bool store_toast = false, show_toast = false;
 
 	if (mDisplayToastsAlways)
 	{

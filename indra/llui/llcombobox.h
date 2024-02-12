@@ -105,6 +105,8 @@ protected:
     std::string _getSearchText() const override;
     void onSetHighlight() const override;
 
+    void imageLoaded();
+
 public:
 	// LLView interface
     void	onFocusLost() override;
@@ -154,10 +156,16 @@ public:
 
 	// Sets the label, which doesn't have to exist in the label.
 	// This is probably a UI abuse.
-	void			setLabel(const LLStringExplicit& name);
+// [SL:KB] - Patch: Control-ComboBox | Checked: Catznip-6.4
+	virtual void	setLabel(const LLStringExplicit& name);
+// [/SL:KB]
+//	void			setLabel(const LLStringExplicit& name);
 
 	// Updates the combobox label to match the selected list item.
-	void			updateLabel();
+// [SL:KB] - Patch: Control-ComboBox | Checked: Catznip-6.4
+	virtual void	updateLabel();
+// [/SL:KB]
+//	void			updateLabel();
 
 	BOOL			remove(const std::string& name);	// remove item "name", return TRUE if found and removed
 	
@@ -245,6 +253,7 @@ private:
 	commit_callback_t	mTextChangedCallback;
 	commit_callback_t	mSelectionCallback;
 	boost::signals2::connection mTopLostSignalConnection;
+    boost::signals2::connection mImageLoadedConnection;
 	commit_signal_t		mOnReturnSignal;
 	S32                 mLastSelectedIndex;
 };

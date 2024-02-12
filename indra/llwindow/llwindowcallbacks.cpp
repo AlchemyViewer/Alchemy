@@ -170,10 +170,16 @@ void LLWindowCallbacks::handleDataCopy(LLWindow *window, S32 data_type, void *da
 {
 }
 
-LLWindowCallbacks::DragNDropResult LLWindowCallbacks::handleDragNDrop(LLWindow *window, LLCoordGL pos, MASK mask, DragNDropAction action, std::string data )
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+LLWindowCallbacks::DragNDropResult LLWindowCallbacks::handleDragNDrop(LLWindow *window, LLCoordGL pos, MASK mask, DragNDropAction action, DragNDropType type, const std::vector<std::string>& data)
 {
 	return LLWindowCallbacks::DND_NONE;
 }
+// [/SL:KB]
+//LLWindowCallbacks::DragNDropResult LLWindowCallbacks::handleDragNDrop(LLWindow *window, LLCoordGL pos, MASK mask, DragNDropAction action, std::string data )
+//{
+//	return LLWindowCallbacks::DND_NONE;
+//}
 
 BOOL LLWindowCallbacks::handleTimerEvent(LLWindow *window)
 {

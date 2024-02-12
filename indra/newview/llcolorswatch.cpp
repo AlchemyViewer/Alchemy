@@ -128,10 +128,25 @@ BOOL LLColorSwatchCtrl::handleUnicodeCharHere(llwchar uni_char)
 	return LLUICtrl::handleUnicodeCharHere(uni_char);
 }
 
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+BOOL LLColorSwatchCtrl::isDirty() const
+{
+	return (mColor != mPrevColor);
+}
+
+void LLColorSwatchCtrl::resetDirty()
+{
+	mPrevColor = mColor;
+}
+// [/SL:KB]
+
 // forces color of this swatch and any associated floater to the input value, if currently invalid
 void LLColorSwatchCtrl::setOriginal(const LLColor4& color)
 {
 	mColor = color;
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+	mPrevColor = mColor;
+// [/SL:KB]
 	LLFloaterColorPicker* pickerp = (LLFloaterColorPicker*)mPickerHandle.get();
 	if (pickerp)
 	{
@@ -142,6 +157,9 @@ void LLColorSwatchCtrl::setOriginal(const LLColor4& color)
 void LLColorSwatchCtrl::set(const LLColor4& color, BOOL update_picker, BOOL from_event)
 {
 	mColor = color; 
+// [SL:KB] - Patch: Control-ColorSwatchCtrl | Checked: 2012-08-28 (Catznip-3.3)
+	mPrevColor = mColor;
+// [/SL:KB]
 	LLFloaterColorPicker* pickerp = (LLFloaterColorPicker*)mPickerHandle.get();
 	if (pickerp && update_picker)
 	{
@@ -290,9 +308,14 @@ void LLColorSwatchCtrl::onColorChanged ( void* data, EColorPickOp pick_op )
 									pickerp->getCurG (), 
 									pickerp->getCurB (), 
 									subject->mColor.mV[VALPHA] ); // keep current alpha
-			subject->mColor = updatedColor;
-			subject->setControlValue(updatedColor.getValue());
-			pickerp->setRevertOnCancel(TRUE);
+
+            bool color_changed = subject->mColor != updatedColor;
+            if (color_changed)
+            {
+                subject->mColor = updatedColor;
+                subject->setControlValue(updatedColor.getValue());
+            }
+
 			if (pick_op == COLOR_CANCEL && subject->mOnCancelCallback)
 			{
 				subject->mOnCancelCallback( subject, LLSD());
@@ -306,6 +329,13 @@ void LLColorSwatchCtrl::onColorChanged ( void* data, EColorPickOp pick_op )
 				// just commit change
 				subject->onCommit ();
 			}
+
+            if (pick_op == COLOR_CANCEL || pick_op == COLOR_SELECT)
+            {
+                // both select and cancel close LLFloaterColorPicker
+                // but COLOR_CHANGE does not
+                subject->setFocus(TRUE);
+            }
 		}
 	}
 }

@@ -62,6 +62,8 @@
 #include <boost/regex.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
+#include "dae/daeErrorHandler.h"
+
 std::string colladaVersion[VERSIONTYPE_COUNT+1] = 
 {
 	"1.4.0",
@@ -146,7 +148,11 @@ bool get_dom_sources(const domInputLocalOffset_Array& inputs, S32& pos_offset, S
 	return true;
 }
 
-LLModel::EModelStatus load_face_from_dom_triangles(std::vector<LLVolumeFace>& face_list, std::vector<std::string>& materials, domTrianglesRef& tri)
+LLModel::EModelStatus load_face_from_dom_triangles(
+    std::vector<LLVolumeFace>& face_list,
+    std::vector<std::string>& materials,
+    domTrianglesRef& tri,
+    LLSD& log_msg)
 {
 	LLVolumeFace face;
 	std::vector<LLVolumeFace::VertexData> verts;
@@ -166,12 +172,18 @@ LLModel::EModelStatus load_face_from_dom_triangles(std::vector<LLVolumeFace>& fa
 
 	if ( !get_dom_sources(inputs, pos_offset, tc_offset, norm_offset, idx_stride, pos_source, tc_source, norm_source))
 	{
+        LLSD args;
+        args["Message"] = "ParsingErrorBadElement";
+        log_msg.append(args);
 		return LLModel::BAD_ELEMENT;
 	}
 
 	if (!pos_source || !pos_source->getFloat_array())
 	{
 		LL_WARNS() << "Unable to process mesh without position data; invalid model;  invalid model." << LL_ENDL;
+        LLSD args;
+        args["Message"] = "ParsingErrorPositionInvalidModel";
+        log_msg.append(args);
 		return LLModel::BAD_ELEMENT;
 	}
 
@@ -195,6 +207,20 @@ LLModel::EModelStatus load_face_from_dom_triangles(std::vector<LLVolumeFace>& fa
 	}
 	
 	LLVolumeFace::VertexMapData::PointMap point_map;
+
+    if (idx_stride <= 0
+        || (pos_source && pos_offset >= idx_stride)
+        || (tc_source && tc_offset >= idx_stride)
+        || (norm_source && norm_offset >= idx_stride))
+    {
+        // Looks like these offsets should fit inside idx_stride
+        // Might be good idea to also check idx.getCount()%idx_stride != 0
+        LL_WARNS() << "Invalid pos_offset " << pos_offset <<  ", tc_offset " << tc_offset << " or norm_offset " << norm_offset << LL_ENDL;
+		LLSD args;
+        args["Message"] = "ParsingErrorPositionInvalidModel";
+        log_msg.append(args);
+        return LLModel::BAD_ELEMENT;
+    }
 	
 	for (U32 i = 0; i < idx.getCount(); i += idx_stride)
 	{
@@ -306,7 +332,10 @@ LLModel::EModelStatus load_face_from_dom_triangles(std::vector<LLVolumeFace>& fa
 			// VFExtents change
 			face.mExtents[0].set(v[0], v[1], v[2]);
 			face.mExtents[1].set(v[0], v[1], v[2]);
-			point_map.clear();
+
+            verts.clear();
+            indices.clear();
+            point_map.clear();
 		}
 	}
 
@@ -340,7 +369,11 @@ LLModel::EModelStatus load_face_from_dom_triangles(std::vector<LLVolumeFace>& fa
 	return LLModel::NO_ERRORS ;
 }
 
-LLModel::EModelStatus load_face_from_dom_polylist(std::vector<LLVolumeFace>& face_list, std::vector<std::string>& materials, domPolylistRef& poly, LLSD& log_msg)
+LLModel::EModelStatus load_face_from_dom_polylist(
+    std::vector<LLVolumeFace>& face_list,
+    std::vector<std::string>& materials,
+    domPolylistRef& poly,
+    LLSD& log_msg)
 {
 	domPRef p = poly->getP();
 	domListOfUInts& idx = p->getValue();
@@ -367,6 +400,10 @@ LLModel::EModelStatus load_face_from_dom_polylist(std::vector<LLVolumeFace>& fac
 
 	if (!get_dom_sources(inputs, pos_offset, tc_offset, norm_offset, idx_stride, pos_source, tc_source, norm_source))
 	{
+        LL_WARNS() << "Bad element." << LL_ENDL;
+        LLSD args;
+        args["Message"] = "ParsingErrorBadElement";
+        log_msg.append(args);
 		return LLModel::BAD_ELEMENT;
 	}
 
@@ -418,6 +455,9 @@ LLModel::EModelStatus load_face_from_dom_polylist(std::vector<LLVolumeFace>& fac
 				if (!cv.getPosition().isFinite3())
 				{
 					LL_WARNS() << "Found NaN while loading position data from DAE-Model, invalid model." << LL_ENDL;
+                    LLSD args;
+                    args["Message"] = "PositionNaN";
+                    log_msg.append(args);
 					return LLModel::BAD_ELEMENT;
 				}
 			}
@@ -450,6 +490,10 @@ LLModel::EModelStatus load_face_from_dom_polylist(std::vector<LLVolumeFace>& fac
 				if (!cv.getNormal().isFinite3())
 				{
 					LL_WARNS() << "Found NaN while loading normals from DAE-Model, invalid model." << LL_ENDL;
+                    LLSD args;
+                    args["Message"] = "NormalsNaN";
+                    log_msg.append(args);
+
 					return LLModel::BAD_ELEMENT;
 				}
 			}
@@ -767,6 +811,9 @@ LLModel::EModelStatus load_face_from_dom_polygons(std::vector<LLVolumeFace>& fac
 		}
 	}
 
+    // Viewer can only fit U16 vertices, shouldn't we do some checks here and return overflow if result has more?
+    llassert(vert_idx.size() < U16_MAX);
+
 	//build vertex array from map
 	std::vector<LLVolumeFace::VertexData> new_verts;
 	new_verts.resize(vert_idx.size());
@@ -784,7 +831,12 @@ LLModel::EModelStatus load_face_from_dom_polygons(std::vector<LLVolumeFace>& fac
 	for (U32 i = 0; i < verts.size(); ++i)
 	{
 		indices[i] = vert_idx[verts[i]];
-		llassert(!i || (indices[i-1] != indices[i]));
+        if (i % 3 != 0) // assumes GL_TRIANGLES, compare 0-1, 1-2, 3-4, 4-5 but not 2-3 or 5-6
+        {
+            // A faulty degenerate triangle detection (triangle with 0 area),
+            // probably should be a warning and not an assert
+            llassert(!i || (indices[i-1] != indices[i]));
+        }
 	}
 
 	// DEBUG just build an expanded triangle list
@@ -856,6 +908,14 @@ LLDAELoader::LLDAELoader(
   mGeneratedModelLimit(modelLimit),
   mPreprocessDAE(preprocess)
 {
+	mHandler = std::make_unique<LLDAELogHandler>();
+	daeErrorHandler::setErrorHandler(mHandler.get());
+}
+
+LLDAELoader::~LLDAELoader()
+{
+	daeErrorHandler::setErrorHandler(nullptr);
+	mHandler.reset();
 }
 
 struct ModelSort
@@ -900,6 +960,9 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 	if (!dom)
 	{
 		LL_INFOS() <<" Error with dae - traditionally indicates a corrupt file."<<LL_ENDL;
+        LLSD args;
+        args["Message"] = "ParsingErrorCorrupt";
+        mWarningsArray.append(args);
 		setLoadState( ERROR_PARSING );
 		return false;
 	}
@@ -927,6 +990,9 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 	if (!doc)
 	{
 		LL_WARNS() << "can't find internal doc" << LL_ENDL;
+        LLSD args;
+        args["Message"] = "ParsingErrorNoDoc";
+        mWarningsArray.append(args);
 		return false;
 	}
 	
@@ -934,6 +1000,9 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 	if (!root)
 	{
 		LL_WARNS() << "document has no root" << LL_ENDL;
+        LLSD args;
+        args["Message"] = "ParsingErrorNoRoot";
+        mWarningsArray.append(args);
 		return false;
 	}
 	
@@ -949,6 +1018,9 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 		if (!result)
 		{
 			LL_INFOS() << "Could not verify controller" << LL_ENDL;
+            LLSD args;
+            args["Message"] = "ParsingErrorBadElement";
+            mWarningsArray.append(args);
 			setLoadState( ERROR_PARSING );
 			return true;
 		}
@@ -1082,6 +1154,9 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 	if (!scene)
 	{
 		LL_WARNS() << "document has no visual_scene" << LL_ENDL;
+        LLSD args;
+        args["Message"] = "ParsingErrorNoScene";
+        mWarningsArray.append(args);
 		setLoadState( ERROR_PARSING );
 		return true;
 	}
@@ -1090,11 +1165,14 @@ bool LLDAELoader::OpenFile(const std::string& filename)
 
 	bool badElement = false;
 	
-	processElement( scene, badElement, &dae );
+	processElement( scene, badElement, &dae);
 	
 	if ( badElement )
 	{
 		LL_INFOS()<<"Scene could not be parsed"<<LL_ENDL;
+        LLSD args;
+        args["Message"] = "ParsingErrorCantParseScene";
+        mWarningsArray.append(args);
 		setLoadState( ERROR_PARSING );
 	}
 	
@@ -1168,18 +1246,19 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 
 			LLMeshSkinInfo& skin_info = model->mSkinInfo;
 
-			LLMatrix4 mat;
-			for (auto i = 0; i < 4; i++)
+            LLMatrix4 mat;
+			for (int i = 0; i < 4; i++)
 			{
-				for(auto j = 0; j < 4; j++)
+				for(int j = 0; j < 4; j++)
 				{
-					mat.mMatrix[i][j] = dom_value[i + j*4];
+                    mat.mMatrix[i][j] = dom_value[i + j*4];
 				}
 			}
 
-			LLMatrix4 trans = normalized_transformation;
-			trans *= mat;
-			skin_info.mBindShapeMatrix.loadu(trans);							
+            skin_info.mBindShapeMatrix.loadu(mat);
+
+			LLMatrix4a trans(normalized_transformation);
+            matMul(trans, skin_info.mBindShapeMatrix, skin_info.mBindShapeMatrix);
 		}
 
 
@@ -1386,21 +1465,23 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 						domListOfFloats& transform = t->getValue();
 						S32 count = transform.getCount()/16;
 
-						for (auto k = 0; k < count; ++k)
+						for (S32 k = 0; k < count; ++k)
 						{
 							LLMatrix4 mat;
 
-							for (auto i = 0; i < 4; i++)
+							for (int i = 0; i < 4; i++)
 							{
-								for(auto j = 0; j < 4; j++)
+								for(int j = 0; j < 4; j++)
 								{
 									mat.mMatrix[i][j] = transform[k*16 + i + j*4];
 								}
 							}
-							
-							LLMatrix4a mat4a;
-							mat4a.loadu(mat);
-							model->mSkinInfo.mInvBindMatrix.push_back(mat4a);
+
+							LLMatrix4a inv_bind(mat);
+							model->mSkinInfo.mInvBindMatrix.push_back(inv_bind);
+							LLMatrix4a inv_bind_shape;
+							inv_bind_shape.setMul(inv_bind, model->mSkinInfo.mBindShapeMatrix);
+							model->mSkinInfo.mInvBindShapeMatrix.push_back(inv_bind_shape);
 						}
 					}
 				}
@@ -1474,11 +1555,9 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
 			if (mJointMap.find(lookingForJoint) != mJointMap.end()
 				&& model->mSkinInfo.mInvBindMatrix.size() > i)
 			{
-				alignas(16) F32 bind_matrix[16];
-				model->mSkinInfo.mInvBindMatrix[i].store4a(bind_matrix);
-				LLMatrix4 newInverse(bind_matrix);
+				LLMatrix4 newInverse = LLMatrix4(model->mSkinInfo.mInvBindMatrix[i].getF32ptr());
 				newInverse.setTranslation( mJointList[lookingForJoint].getTranslation() );
-				model->mSkinInfo.mAlternateBindMatrix.push_back( newInverse );
+				model->mSkinInfo.mAlternateBindMatrix.push_back( LLMatrix4a(newInverse) );
             }
 			else
 			{
@@ -1941,7 +2020,7 @@ daeElement* LLDAELoader::getChildFromElement( daeElement* pElement, std::string 
     return NULL;
 }
 
-void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* dae )
+void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* dae)
 {
 	LLMatrix4 saved_transform;
 	bool pushed_mat = false;
@@ -2035,6 +2114,11 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 					if (mTransform.determinant() < 0)
 					{ //negative scales are not supported
 						LL_INFOS() << "Negative scale detected, unsupported transform.  domInstance_geometry: " << getElementLabel(instance_geo) << LL_ENDL;
+                        LLSD args;
+                        args["Message"] = "NegativeScaleTrans";
+                        args["LABEL"] = getElementLabel(instance_geo);
+                        mWarningsArray.append(args);
+
 						badElement = true;
 					}
 
@@ -2058,6 +2142,10 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 					if (transformation.determinant() < 0)
 					{ //negative scales are not supported
 						LL_INFOS() << "Negative scale detected, unsupported post-normalization transform.  domInstance_geometry: " << getElementLabel(instance_geo) << LL_ENDL;
+                        LLSD args;
+                        args["Message"] = "NegativeScaleNormTrans";
+                        args["LABEL"] = getElementLabel(instance_geo);
+                        mWarningsArray.append(args);
 						badElement = true;
 					}
 
@@ -2099,6 +2187,9 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 		else 
 		{
 			LL_INFOS()<<"Unable to resolve geometry URL."<<LL_ENDL;
+            LLSD args;
+            args["Message"] = "CantResolveGeometryUrl";
+            mWarningsArray.append(args);
 			badElement = true;			
 		}
 
@@ -2389,7 +2480,7 @@ bool LLDAELoader::addVolumeFacesFromDomMesh(LLModel* pModel,domMesh* mesh, LLSD&
 	{
 		domTrianglesRef& tri = tris.get(i);
 
-		status = load_face_from_dom_triangles(pModel->getVolumeFaces(), pModel->getMaterialList(), tri);
+		status = load_face_from_dom_triangles(pModel->getVolumeFaces(), pModel->getMaterialList(), tri, log_msg);
 		pModel->mStatus = status;
 		if(status != LLModel::NO_ERRORS)
 		{
@@ -2416,6 +2507,7 @@ bool LLDAELoader::addVolumeFacesFromDomMesh(LLModel* pModel,domMesh* mesh, LLSD&
 	for (U32 i = 0; i < polygons.getCount(); ++i)
 	{
 		domPolygonsRef& poly = polygons.get(i);
+
 		status = load_face_from_dom_polygons(pModel->getVolumeFaces(), pModel->getMaterialList(), poly);
 
 		if(status != LLModel::NO_ERRORS)
@@ -2426,20 +2518,6 @@ bool LLDAELoader::addVolumeFacesFromDomMesh(LLModel* pModel,domMesh* mesh, LLSD&
 	}
 
 	return (status == LLModel::NO_ERRORS);
-}
-
-//static 
-LLModel* LLDAELoader::loadModelFromDomMesh(domMesh *mesh)
-{
-	LLVolumeParams volume_params;
-	volume_params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
-	LLModel* ret = new LLModel(volume_params, 0.f); 
-	createVolumeFacesFromDomMesh(ret, mesh);
-    if (ret->mLabel.empty())
-    {
-	    ret->mLabel = getElementLabel(mesh);
-    }
-    return ret;
 }
 
 //static diff version supports creating multiple models when material counts spill
@@ -2499,9 +2577,10 @@ bool LLDAELoader::loadModelsFromDomMesh(domMesh* mesh, std::vector<LLModel*>& mo
 
 		ret->trimVolumeFacesToSize(LL_SCULPT_MESH_MAX_FACES, &remainder);
 
+        // remove unused/redundant vertices after normalizing
 		if (!mNoOptimize)
 		{
-			ret->optimizeVolumeFaces();
+			ret->remapVolumeFaces();
 		}
 
 		volume_faces = remainder.size();
@@ -2519,6 +2598,7 @@ bool LLDAELoader::loadModelsFromDomMesh(domMesh* mesh, std::vector<LLModel*>& mo
 			next->getVolumeFaces() = remainder;
 			next->mNormalizedScale = ret->mNormalizedScale;
 			next->mNormalizedTranslation = ret->mNormalizedTranslation;
+
 			if ( ret->mMaterialList.size() > LL_SCULPT_MESH_MAX_FACES)
 			{
 				next->mMaterialList.assign(ret->mMaterialList.begin() + LL_SCULPT_MESH_MAX_FACES, ret->mMaterialList.end());
@@ -2533,30 +2613,11 @@ bool LLDAELoader::loadModelsFromDomMesh(domMesh* mesh, std::vector<LLModel*>& mo
 	return true;
 }
 
-bool LLDAELoader::createVolumeFacesFromDomMesh(LLModel* pModel, domMesh* mesh)
+void LLDAELoader::LLDAELogHandler::handleError(daeString msg)
 {
-	if (mesh)
-	{
-		pModel->ClearFacesAndMaterials();
-
-		LLSD placeholder;
-		addVolumeFacesFromDomMesh(pModel, mesh, placeholder);
-
-		if (pModel->getNumVolumeFaces() > 0)
-		{
-			pModel->normalizeVolumeFaces();
-			pModel->optimizeVolumeFaces();
-
-			if (pModel->getNumVolumeFaces() > 0)
-			{
-				return true;
-			}
-		}
-	}
-	else
-	{	
-		LL_WARNS() << "no mesh found" << LL_ENDL;
-	}
-
-	return false;
+	LL_WARNS() << msg << LL_ENDL;
+}
+void LLDAELoader::LLDAELogHandler::handleWarning(daeString msg)
+{
+	LL_WARNS() << msg << LL_ENDL;
 }

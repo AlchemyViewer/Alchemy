@@ -89,7 +89,7 @@ public:
 	/*virtual*/ void changed(const LLUUID& session_id, U32 mask) {};
 
 	// static data update, called from message handler
-	static void updateUserInfo(const std::string& visibility, bool im_via_email, bool is_verified_email);
+	static void updateUserInfo(const std::string& visibility, bool im_via_email, bool is_verified_email, const std::string& email);
 
 	// refresh all the graphics preferences menus
 	static void refreshEnabledGraphics();
@@ -101,9 +101,8 @@ public:
 	static void updateShowFavoritesCheckbox(bool val);
 
 	void processProperties( void* pData, EAvatarProcessorType type );
-	void processProfileProperties(const LLAvatarData* pAvatarData );
-	void storeAvatarProperties( const LLAvatarData* pAvatarData );
 	void saveAvatarProperties( void );
+    static void saveAvatarPropertiesCoro(const std::string url, bool allow_publish);
 	void selectPrivacyPanel();
 	void selectChatPanel();
 	void getControlNames(std::vector<std::string>& names);
@@ -111,9 +110,10 @@ public:
 	void updateClickActionViews();
     void updateSearchableItems();
 
-protected:	
 	void		onBtnOK(const LLSD& userdata);
 	void		onBtnCancel(const LLSD& userdata);
+
+protected:	
 
 	void		onClickClearCache();			// Clear viewer texture cache, file cache on next startup
 	void		onClickBrowserClearCache();		// Clear web history and caches as well as viewer caches above
@@ -145,6 +145,9 @@ public:
 	// cancel() can restore them.	
 	void saveSettings();
 
+	void saveIgnoredNotifications();
+	void restoreIgnoredNotifications();
+
 	void setCacheLocation(const LLStringExplicit& location);
 
 	void onClickSetCache();
@@ -159,7 +162,7 @@ public:
 	void changeLogPath(const std::vector<std::string>& filenames, std::string proposed_name);
 	bool moveTranscriptsAndLog();
 	void enableHistory();
-	void setPersonalInfo(const std::string& visibility, bool im_via_email, bool is_verified_email);
+	void setPersonalInfo(const std::string& visibility, bool im_via_email, bool is_verified_email, const std::string& email);
 	void refreshEnabledState();
 	void onCommitWindowedMode();
 	void refresh();	// Refresh enable/disable
@@ -173,6 +176,7 @@ public:
 	void applyResolution();
 	void onChangeMaturity();
 	void onChangeModelFolder();
+    void onChangePBRFolder();
 	void onChangeTextureFolder();
 	void onChangeSoundFolder();
 	void onChangeAnimationFolder();
@@ -184,6 +188,7 @@ public:
 	void onClickAutoReplace();
 	void onClickSpellChecker();
 	void onClickRenderExceptions();
+	void onClickAutoAdjustments();
 	void onClickAdvanced();
 	void applyUIColor(LLUICtrl* ctrl, const LLSD& param);
 	void getUIColor(LLUICtrl* ctrl, const LLSD& param);
@@ -194,18 +199,33 @@ public:
 	void saveCameraPreset(std::string& preset);
 	void saveGraphicsPreset(std::string& preset);
 
+    void setRecommendedSettings();
+    void resetAutotuneSettings();
+
 private:
 
 	void onDeleteTranscripts();
 	void onDeleteTranscriptsResponse(const LLSD& notification, const LLSD& response);
 	void updateDeleteTranscriptsButton();
 	void updateMaxComplexity();
+    void updateComplexityText();
 	static bool loadFromFilename(const std::string& filename, std::map<std::string, std::string> &label_map);
 
-	
+#ifndef LL_HAVOK
+	void refreshGridList();
+	void onClickAddGrid();
+    void onClickActivateGrid();
+	void onClickRemoveGrid();
+	void onClickRefreshGrid();
+	void onClickDebugGrid();
+	void onSelectGrid(const LLSD& data);
+	bool handleRemoveGridCB(const LLSD& notification, const LLSD& response);
+#endif
+
 	void loadUserSkins();
 	void reloadSkinList();
 	void onAddSkin();
+	void onAddSkinCallback(const std::vector<std::string>& filenames);
 	void onRemoveSkin();
 	void callbackRemoveSkin(const LLSD& notification, const LLSD& response);
 	void onApplySkin();
@@ -224,21 +244,35 @@ private:
 	bool mOriginalHideOnlineStatus;
 	std::string mDirectoryVisibility;
 	
-	LLAvatarData mAvatarProperties;
+	bool mAllowPublish; // Allow showing agent in search
 	std::string mSavedCameraPreset;
 	std::string mSavedGraphicsPreset;
 
 	typedef std::map<std::string, skin_t> skinmap_t;
 	skinmap_t mUserSkins;
 	
+#if !LL_HAVOK
+	boost::signals2::connection mGridListChangedConnection;
+#endif
+
 	LOG_CLASS(LLFloaterPreference);
 
 	LLSearchEditor *mFilterEdit;
 	std::unique_ptr< ll::prefs::SearchData > mSearchData;
 	bool mSearchDataDirty;
 
+    boost::signals2::connection	mComplexityChangedSignal;
+	boost::signals2::connection mDnDModeConnection;
+	boost::signals2::connection mChatBubbleOpacityConnection;
+	boost::signals2::connection mPreferredMaturityConnection;
+
+	bool mDnDInit = false;
+
 	void onUpdateFilterTerm( bool force = false );
 	void collectSearchableItems();
+    void filterIgnorableNotifications();
+
+    std::map<std::string, bool> mIgnorableNotifs;
 };
 
 class LLPanelPreference : public LLPanel
@@ -285,6 +319,7 @@ private:
 	string_color_map_t mSavedColors;
 
 	Updater* mBandWidthUpdater;
+	boost::signals2::connection mBandwithConnection;
 	LOG_CLASS(LLPanelPreference);
 };
 
@@ -363,37 +398,13 @@ private:
 	S32 mEditingMode;
 };
 
-class LLFloaterPreferenceGraphicsAdvanced final : public LLFloater
-{
-  public: 
-	LLFloaterPreferenceGraphicsAdvanced(const LLSD& key);
-	~LLFloaterPreferenceGraphicsAdvanced();
-	/*virtual*/ BOOL postBuild();
-	void onOpen(const LLSD& key);
-	void onClickCloseBtn(bool app_quitting);
-	void disableUnavailableSettings();
-	void refreshEnabledGraphics();
-	void refreshEnabledState();
-	void updateSliderText(LLSliderCtrl* ctrl, LLTextBox* text_box);
-	void updateMaxNonImpostors();
-	void setMaxNonImpostorsText(U32 value, LLTextBox* text_box);
-	void updateMaxComplexity();
-	void setMaxComplexityText(U32 value, LLTextBox* text_box);
-	static void setIndirectControls();
-	static void setIndirectMaxNonImpostors();
-	static void setIndirectMaxArc();
-	void refresh();
-	// callback for when client modifies a render option
-	void onRenderOptionEnable();
-    void onAdvancedAtmosphericsEnable();
-	LOG_CLASS(LLFloaterPreferenceGraphicsAdvanced);
-};
-
 class LLAvatarComplexityControls
 {
   public: 
-	static void updateMax(LLSliderCtrl* slider, LLTextBox* value_label);
-	static void setText(U32 value, LLTextBox* text_box);
+	static void updateMax(LLSliderCtrl* slider, LLTextBox* value_label, bool short_val = false);
+	static void setText(U32 value, LLTextBox* text_box, bool short_val = false);
+	static void updateMaxRenderTime(LLSliderCtrl* slider, LLTextBox* value_label, bool short_val = false);
+	static void setRenderTimeText(F32 value, LLTextBox* text_box, bool short_val = false);
 	static void setIndirectControls();
 	static void setIndirectMaxNonImpostors();
 	static void setIndirectMaxArc();

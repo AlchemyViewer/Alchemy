@@ -61,10 +61,10 @@ namespace tut
 
     struct StaticData
     {
-        LLMutex mMutex;          // LockStatic looks for mMutex
+        std::mutex mMutex;          // LockStatic looks for mMutex
         bool ran{false};
     };
-    typedef llthread::LockStaticLL<StaticData> LockStatic;
+    typedef llthread::LockStatic<StaticData> LockStatic;
 
     template<> template<>
     void object::test<2>()

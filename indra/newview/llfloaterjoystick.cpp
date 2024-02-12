@@ -113,17 +113,22 @@ void LLFloaterJoystick::draw()
         refreshListOfDevices();
     }
 
+	if (gFrameIntervalSeconds.value() == 0.0f)
+	{
+		joystick->updateStatus();
+	}
+
 	for (U32 i = 0; i < 6; i++)
 	{
 		F32 value = joystick->getJoystickAxis(i);
-		sample(*sJoystickAxes[i], value * gFrameIntervalSeconds.value());
+		sample(*sJoystickAxes[i], value);
 		if (mAxisStatsBar[i])
 		{
 			F32 minbar, maxbar;
 			mAxisStatsBar[i]->getRange(minbar, maxbar);
-			if (llabs(value) > maxbar)
+			F32 range = llabs(value);
+			if (range > maxbar)
 			{
-				F32 range = llabs(value);
 				mAxisStatsBar[i]->setRange(-range, range);
 			}
 		}
@@ -135,7 +140,7 @@ void LLFloaterJoystick::draw()
 BOOL LLFloaterJoystick::postBuild()
 {		
 	center();
-	F32 range = gSavedSettings.getBOOL("Cursor3D") ? 128.f : 2.f;
+	F32 range = gSavedSettings.getBOOL("Cursor3D") ? 128.f : 0.5f;
 
 	for (U32 i = 0; i < 6; i++)
 	{
@@ -155,6 +160,7 @@ BOOL LLFloaterJoystick::postBuild()
 	childSetCommitCallback("JoystickFlycamEnabled",onCommitJoystickEnabled,this);
 
 	childSetAction("SpaceNavigatorDefaults", onClickRestoreSNDefaults, this);
+	childSetAction("XboxDefaults", onClickRestoreXboxDefaults, this);
 	childSetAction("cancel_btn", onClickCancel, this);
 	childSetAction("ok_btn", onClickOK, this);
 
@@ -292,7 +298,7 @@ void LLFloaterJoystick::refreshListOfDevices()
         std::string desc = LLViewerJoystick::getInstance()->getDescription();
         if (!desc.empty())
         {
-            LLSD value = LLSD::Integer(0);
+            LLSD value = LLSD::Integer(1); // value for selection
             addDevice(desc, value);
             mHasDeviceList = true;
         }
@@ -392,6 +398,9 @@ void LLFloaterJoystick::onCommitJoystickEnabled(LLUICtrl*, void *joy_panel)
 
     LLSD value = self->mJoysticksCombo->getValue();
     bool joystick_enabled = true;
+    // value is 0 for no device,
+    // 1 for a device on Mac (single device, no list support yet)
+    // binary packed guid for a device on windows (can have multiple devices)
     if (value.isInteger())
     {
         // ndof already has a device selected, we are just setting it enabled or disabled
@@ -400,7 +409,7 @@ void LLFloaterJoystick::onCommitJoystickEnabled(LLUICtrl*, void *joy_panel)
     else
     {
         LLViewerJoystick::getInstance()->initDevice(value);
-        // else joystick is enabled, because combobox holds id of device
+        // else joystick is enabled, because combobox holds id of the device
         joystick_enabled = true;
     }
     gSavedSettings.setBOOL("JoystickEnabled", joystick_enabled);
@@ -426,6 +435,11 @@ void LLFloaterJoystick::onCommitJoystickEnabled(LLUICtrl*, void *joy_panel)
 void LLFloaterJoystick::onClickRestoreSNDefaults(void *joy_panel)
 {
 	setSNDefaults();
+}
+
+void LLFloaterJoystick::onClickRestoreXboxDefaults(void* joy_panel)
+{
+	setXboxDefaults();
 }
 
 void LLFloaterJoystick::onClickCancel(void *joy_panel)
@@ -464,6 +478,11 @@ void LLFloaterJoystick::onClickCloseBtn(bool app_quitting)
 void LLFloaterJoystick::setSNDefaults()
 {
 	LLViewerJoystick::getInstance()->setSNDefaults();
+}
+
+void LLFloaterJoystick::setXboxDefaults()
+{
+	LLViewerJoystick::getInstance()->setXboxDefaults();
 }
 
 void LLFloaterJoystick::onClose(bool app_quitting)

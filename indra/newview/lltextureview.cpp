@@ -49,6 +49,8 @@
 #include "llviewerobjectlist.h"
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
+#include "llviewerwindow.h"
+#include "llwindow.h"
 #include "llvovolume.h"
 #include "llviewerstats.h"
 #include "llworld.h"
@@ -117,8 +119,8 @@ public:
 			LLTextureBar* bar2p = (LLTextureBar*)i2;
 			LLViewerFetchedTexture *i1p = bar1p->mImagep;
 			LLViewerFetchedTexture *i2p = bar2p->mImagep;
-			F32 pri1 = i1p->getDecodePriority(); // i1p->mRequestedDownloadPriority
-			F32 pri2 = i2p->getDecodePriority(); // i2p->mRequestedDownloadPriority
+			F32 pri1 = i1p->getMaxVirtualSize();
+			F32 pri2 = i2p->getMaxVirtualSize();
 			if (pri1 > pri2)
 				return true;
 			else if (pri2 > pri1)
@@ -173,11 +175,7 @@ void LLTextureBar::draw()
 	{
 		color = LLColor4::green4;
 	}
-	else if (mImagep->getBoostLevel() > LLGLTexture::BOOST_ALM)
-	{
-		color = LLColor4::magenta; // except none and alm
-	}
-	else if (mImagep->getDecodePriority() <= 0.0f)
+	else if (mImagep->getMaxVirtualSize() <= 0.0f)
 	{
 		color = LLColor4::grey; color[VALPHA] = .7f;
 	}
@@ -202,26 +200,13 @@ void LLTextureBar::draw()
 	std::string uuid_str;
 	mImagep->mID.toString(uuid_str);
 	uuid_str = uuid_str.substr(0,7);
-	if (mTextureView->mOrderFetch)
-	{
-		tex_str = llformat("%s %7.0f %d(%d) 0x%08x(%8.0f)",
-						   uuid_str.c_str(),
-						   mImagep->mMaxVirtualSize,
-						   mImagep->mDesiredDiscardLevel,
-						   mImagep->mRequestedDiscardLevel,
-						   mImagep->mFetchPriority,
-						   mImagep->getDecodePriority());
-	}
-	else
-	{
-		tex_str = llformat("%s %7.0f %d(%d) %8.0f(0x%08x)",
-						   uuid_str.c_str(),
-						   mImagep->mMaxVirtualSize,
-						   mImagep->mDesiredDiscardLevel,
-						   mImagep->mRequestedDiscardLevel,
-						   mImagep->getDecodePriority(),
-						   mImagep->mFetchPriority);
-	}
+	
+    tex_str = llformat("%s %7.0f %d(%d)",
+        uuid_str.c_str(),
+        mImagep->mMaxVirtualSize,
+        mImagep->mDesiredDiscardLevel,
+        mImagep->mRequestedDiscardLevel);
+
 
 	LLFontGL::getFontMonospace()->renderUTF8(tex_str, 0, title_x1, getRect().getHeight(),
 									 color, LLFontGL::LEFT, LLFontGL::TOP);
@@ -234,7 +219,6 @@ void LLTextureBar::draw()
 		{ "DSK", LLColor4::cyan },	// LOAD_FROM_TEXTURE_CACHE
 		{ "DSK", LLColor4::blue },	// CACHE_POST
 		{ "NET", LLColor4::green },	// LOAD_FROM_NETWORK
-		{ "SIM", LLColor4::green },	// LOAD_FROM_SIMULATOR
 		{ "HTW", LLColor4::green },	// WAIT_HTTP_RESOURCE
 		{ "HTW", LLColor4::green },	// WAIT_HTTP_RESOURCE2
 		{ "REQ", LLColor4::yellow },// SEND_HTTP_REQ
@@ -435,6 +419,15 @@ void LLAvatarTexBar::draw()
 
 		LLColor4 text_color = LLColor4::white;
 
+		if (layerset_buffer->uploadNeeded())
+		{
+			text_color = LLColor4::red;
+		}
+		if (layerset_buffer->uploadInProgress())
+		{
+			text_color = LLColor4::magenta;
+		}
+
 		std::string text = layerset_buffer->dumpTextureInfo();
 		LLFontGL::getFontMonospace()->renderUTF8(text, 0, l_offset, v_offset + line_height*line_num,
 												 text_color, LLFontGL::LEFT, LLFontGL::TOP); //, LLFontGL::BOLD, LLFontGL::DROP_SHADOW_SOFT);
@@ -500,10 +493,6 @@ private:
 
 void LLGLTexMemBar::draw()
 {
-	S32Megabytes bound_mem = LLViewerTexture::sBoundTextureMemory;
- 	S32Megabytes max_bound_mem = LLViewerTexture::sMaxBoundTextureMemory;
-	S32Megabytes total_mem = LLViewerTexture::sTotalTextureMemory;
-	S32Megabytes max_total_mem = LLViewerTexture::sMaxTotalTextureMem;
 	F32 discard_bias = LLViewerTexture::sDesiredDiscardBias;
 	F32 cache_usage = LLAppViewer::getTextureCache()->getUsage().valueInUnits<LLUnits::Megabytes>();
 	F32 cache_max_usage = LLAppViewer::getTextureCache()->getMaxUsage().valueInUnits<LLUnits::Megabytes>();
@@ -512,7 +501,7 @@ void LLGLTexMemBar::draw()
 	F32Bytes total_texture_downloaded = gTotalTextureData;
 	F32Bytes total_object_downloaded = gTotalObjectData;
 	U32 total_http_requests = LLAppViewer::getTextureFetch()->getTotalNumHTTPRequests();
-	U32 total_active_cached_objects = LLWorld::getInstanceFast()->getNumOfActiveCachedObjects();
+	U32 total_active_cached_objects = LLWorld::getInstance()->getNumOfActiveCachedObjects();
 	U32 total_objects = gObjectList.getNumObjects();
 	F32 x_right = 0.0;
 
@@ -549,13 +538,10 @@ void LLGLTexMemBar::draw()
     U32 texFetchLatMed = U32(recording.getMean(LLTextureFetch::sTexFetchLatency).value() * 1000.0f);
     U32 texFetchLatMax = U32(recording.getMax(LLTextureFetch::sTexFetchLatency).value() * 1000.0f);
 
-	text = llformat("GL Tot: %d/%d MB Bound: %4d/%4d MB FBO: %d MB Raw Tot: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
-					total_mem.value(),
-					max_total_mem.value(),
-					bound_mem.value(),
-					max_bound_mem.value(),
+    text = llformat("GL Free: %d MB Sys Free: %d MB FBO: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
+                    gViewerWindow->getWindow()->getAvailableVRAMMegabytes(),
+                    LLMemory::getAvailableMemKB()/1024,
 					LLRenderTarget::sBytesAllocated/(1024*1024),
-					LLImageRaw::sGlobalRawMemory >> 20,
 					discard_bias,
 					cache_usage,
 					cache_max_usage);
@@ -615,7 +601,8 @@ void LLGLTexMemBar::draw()
 											 &x_right, FALSE);
 
 	F32Kilobits bandwidth(LLAppViewer::getTextureFetch()->getTextureBandwidth());
-	F32Kilobits max_bandwidth(gSavedSettings.getF32("ThrottleBandwidthKBPS"));
+	static LLCachedControl<F32> band_width(gSavedSettings,"ThrottleBandwidthKBPS", 3000.0f);
+	F32Kilobits max_bandwidth(band_width());
 	color = bandwidth > max_bandwidth ? LLColor4::red : bandwidth > max_bandwidth*.75f ? LLColor4::yellow : text_color;
 	color[VALPHA] = text_color[VALPHA];
 	text = llformat("BW:%.0f/%.0f",bandwidth.value(), max_bandwidth.value());
@@ -835,7 +822,7 @@ void LLTextureView::draw()
 				LL_INFOS() << imagep->getID()
 						<< "\t" << tex_mem
 						<< "\t" << imagep->getBoostLevel()
-						<< "\t" << imagep->getDecodePriority()
+						<< "\t" << imagep->getMaxVirtualSize()
 						<< "\t" << imagep->getWidth()
 						<< "\t" << imagep->getHeight()
 						<< "\t" << cur_discard
@@ -844,8 +831,8 @@ void LLTextureView::draw()
 
 			if (imagep->getID() == LLAppViewer::getTextureFetch()->mDebugID)
 			{
-				static S32 debug_count = 0;
-				++debug_count; // for breakpoints
+//				static S32 debug_count = 0;
+//				++debug_count; // for breakpoints
 			}
 			
 			F32 pri;
@@ -855,7 +842,7 @@ void LLTextureView::draw()
 			}
 			else
 			{
-				pri = imagep->getDecodePriority();
+				pri = imagep->getMaxVirtualSize();
 			}
 			pri = llclamp(pri, 0.0f, HIGH_PRIORITY-1.f);
 			
@@ -866,7 +853,7 @@ void LLTextureView::draw()
 
 			if (!mOrderFetch)
 			{
-				if (pri < HIGH_PRIORITY && LLSelectMgr::getInstanceFast())
+				if (pri < HIGH_PRIORITY && LLSelectMgr::getInstance())
 				{
 					struct f : public LLSelectedTEFunctor
 					{
@@ -878,7 +865,7 @@ void LLTextureView::draw()
 						}
 					} func(imagep);
 					const bool firstonly = true;
-					bool match = LLSelectMgr::getInstanceFast()->getSelection()->applyToTEs(&func, firstonly);
+					bool match = LLSelectMgr::getInstance()->getSelection()->applyToTEs(&func, firstonly);
 					if (match)
 					{
 						pri += 3*HIGH_PRIORITY;
@@ -887,7 +874,7 @@ void LLTextureView::draw()
 
 				if (pri < HIGH_PRIORITY && (cur_discard< 0 || desired_discard < cur_discard))
 				{
-					LLSelectNode* hover_node = LLSelectMgr::instanceFast().getHoverNode();
+					LLSelectNode* hover_node = LLSelectMgr::instance().getHoverNode();
 					if (hover_node)
 					{
 						LLViewerObject *objectp = hover_node->getObject();

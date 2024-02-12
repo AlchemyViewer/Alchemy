@@ -40,10 +40,23 @@
 #include "httpoptions.h"
 #include "httpheaders.h"
 #include "bufferarray.h"
+#include "llversioninfo.h"
 #include "llviewercontrol.h"
+#include "stringize.h"
 
 // Have to include these last to avoid queue redefinition!
+
+#ifdef LL_USESYSTEMLIBS
+#include <xmlrpc.h>
+#else
 #include <xmlrpc-epi/xmlrpc.h>
+#endif
+// <xmlrpc-epi/queue.h> contains a harmful #define queue xmlrpc_queue. This
+// breaks any use of std::queue. Ditch that #define: if any of our code wants
+// to reference xmlrpc_queue, let it reference it directly.
+#if defined(queue)
+#undef queue
+#endif
 
 #include "llappviewer.h"
 #include "lltrans.h"
@@ -175,7 +188,7 @@ public:
 
 	virtual void onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response);
 
-	typedef boost::shared_ptr<LLXMLRPCTransaction::Handler> ptr_t;
+	typedef std::shared_ptr<LLXMLRPCTransaction::Handler> ptr_t;
 
 private:
 
@@ -265,6 +278,15 @@ void LLXMLRPCTransaction::Handler::onCompleted(LLCore::HttpHandle handle,
 	// the contents of a buffer array are potentially noncontiguous, so we
 	// will need to copy them into an contiguous block of memory for XMLRPC.
 	LLCore::BufferArray *body = response->getBody();
+    if (!body)
+    {
+        mImpl->setStatus(LLXMLRPCTransaction::StatusXMLRPCError);
+        LL_WARNS() << "LLXMLRPCTransaction XMLRPC error:"
+            << "Response has no body! OpenSim grid admins screw the pooch again!" << LL_ENDL;
+        LL_WARNS() << "LLXMLRPCTransaction request URI: "
+            << mImpl->mURI << LL_ENDL;
+        return;
+    }
 	char * bodydata = new char[body->size()];
 
 	body->read(0, bodydata, body->size());
@@ -341,17 +363,15 @@ LLXMLRPCTransaction::Impl::Impl(const std::string& uri,
 
 void LLXMLRPCTransaction::Impl::init(XMLRPC_REQUEST request, bool useGzip, const LLSD& httpParams)
 {
-	LLCore::HttpOptions::ptr_t httpOpts;
-	LLCore::HttpHeaders::ptr_t httpHeaders;
-
+	// LLRefCounted starts with a 1 ref, so don't add a ref in the smart pointer
+	LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
+	LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
 
 	if (!mHttpRequest)
 	{
-		mHttpRequest = LLCore::HttpRequest::ptr_t(new LLCore::HttpRequest);
+		mHttpRequest = LLCore::HttpRequest::ptr_t(std::make_shared<LLCore::HttpRequest>());
 	}
 
-	// LLRefCounted starts with a 1 ref, so don't add a ref in the smart pointer
-	httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions()); 
 
 	// delay between repeats will start from 5 sec and grow to 20 sec with each repeat
 	httpOpts->setMinBackoff(5E6L);
@@ -373,10 +393,16 @@ void LLXMLRPCTransaction::Impl::init(XMLRPC_REQUEST request, bool useGzip, const
 	httpOpts->setSSLVerifyPeer(vefifySSLCert);
 	httpOpts->setSSLVerifyHost(vefifySSLCert);
 
-	// LLRefCounted starts with a 1 ref, so don't add a ref in the smart pointer
-	httpHeaders = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
-
 	httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_TEXT_XML);
+
+	std::string user_agent = stringize(
+		LLVersionInfo::instance().getChannel(), ' ',
+		LLVersionInfo::instance().getMajor(), '.',
+		LLVersionInfo::instance().getMinor(), '.',
+		LLVersionInfo::instance().getPatch(), " (",
+		LLVersionInfo::instance().getBuild(), ')');
+
+	httpHeaders->append(HTTP_OUT_HEADER_USER_AGENT, user_agent);
 
 	///* Setting the DNS cache timeout to -1 disables it completely.
 	//This might help with bug #503 */
@@ -393,9 +419,9 @@ void LLXMLRPCTransaction::Impl::init(XMLRPC_REQUEST request, bool useGzip, const
 	
 	XMLRPC_Free(requestText);
 
-	mHandler = LLXMLRPCTransaction::Handler::ptr_t(new Handler( mHttpRequest, this ));
+	mHandler = std::make_shared<Handler>( mHttpRequest, this );
 
-	mPostH = mHttpRequest->requestPost(LLCore::HttpRequest::DEFAULT_POLICY_ID, 0, 
+	mPostH = mHttpRequest->requestPost(LLCore::HttpRequest::DEFAULT_POLICY_ID,
 		mURI, body.get(), httpOpts, httpHeaders, mHandler);
 
 }
@@ -498,11 +524,10 @@ void LLXMLRPCTransaction::Impl::setHttpStatus(const LLCore::HttpStatus &status)
 		message = LLTrans::getString("couldnt_resolve_host", args);
 		break;
 
-	case CURLE_SSL_PEER_CERTIFICATE:
+	case CURLE_PEER_FAILED_VERIFICATION:
 		message = LLTrans::getString("ssl_peer_certificate");
 		break;
 
-	case CURLE_SSL_CACERT:
 	case CURLE_SSL_CONNECT_ERROR:		
 		message = LLTrans::getString("ssl_connect_error");
 		break;

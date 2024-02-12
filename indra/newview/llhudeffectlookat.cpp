@@ -35,6 +35,7 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llvoavatar.h"
+#include "llvoavatarself.h" // for gAgentAvatarp
 #include "lldrawable.h"
 #include "llviewerobjectlist.h"
 #include "llrendersphere.h"
@@ -42,9 +43,10 @@
 #include "llglheaders.h"
 #include "llxmltree.h"
 
-#include "llavatarnamecache.h"
-#include "llhudrender.h"
 #include "llviewercontrol.h"
+
+
+BOOL LLHUDEffectLookAt::sDebugLookAt = FALSE;
 
 // packet layout
 const S32 SOURCE_AVATAR = 0;
@@ -241,8 +243,7 @@ static BOOL loadAttentions()
 LLHUDEffectLookAt::LLHUDEffectLookAt(const U8 type) : 
 	LLHUDEffect(type), 
 	mKillTime(0.f),
-	mLastSendTime(0.f),
-	mDebugLookAt(gSavedSettings, "AlchemyLookAtShow", false)
+	mLastSendTime(0.f)
 {
 	clearLookAtTarget();
 	// parse the default sets
@@ -419,19 +420,39 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 
 	F32 current_time  = mTimer.getElapsedTimeF32();
 
-	// type of lookat behavior or target object has changed
-	BOOL lookAtChanged = (target_type != mTargetType) || (object != mTargetObject);
-
-	// lookat position has moved a certain amount and we haven't just sent an update
-	lookAtChanged = lookAtChanged || ((dist_vec_squared(position, mLastSentOffsetGlobal) > MIN_DELTAPOS_FOR_UPDATE_SQUARED) && 
-		((current_time - mLastSendTime) > (1.f / MAX_SENDS_PER_SEC)));
-
-	if (lookAtChanged)
+	bool looking_at_self = false;
+	if (object && object->isAvatar())
 	{
-		mLastSentOffsetGlobal = position;
-		F32 timeout = (*mAttentions)[target_type].mTimeout;
-		setDuration(timeout);
-		setNeedsSendToSim(TRUE);
+		if (auto avatarp = object->asAvatar())
+		{
+			if (avatarp->isSelf())
+			{
+				looking_at_self = true;
+			}
+		}
+	}
+	static LLCachedControl<bool> clamp_lookat_enabled(gSavedSettings, "AlchemyLookAtClampEnabled", false);
+	bool clamp_lookat = clamp_lookat_enabled && isAgentAvatarValid() && !looking_at_self && 
+						(*mAttentions)[target_type].mName != "Respond" &&
+						(*mAttentions)[target_type].mName != "Conversation" &&
+						(*mAttentions)[target_type].mName != "AutoListen";
+
+	if (!clamp_lookat)
+	{
+		// type of lookat behavior or target object has changed
+		bool lookAtChanged = (target_type != mTargetType) || (object != mTargetObject.get());
+
+		// lookat position has moved a certain amount and we haven't just sent an update
+		lookAtChanged = lookAtChanged || ((dist_vec_squared(position, mLastSentOffsetGlobal) > MIN_DELTAPOS_FOR_UPDATE_SQUARED) && 
+			((current_time - mLastSendTime) > (1.f / MAX_SENDS_PER_SEC)));
+
+		if (lookAtChanged)
+		{
+			mLastSentOffsetGlobal = position;
+			F32 timeout = (*mAttentions)[target_type].mTimeout;
+			setDuration(timeout);
+			setNeedsSendToSim(TRUE);
+		}
 	}
  
 	if (target_type == LOOKAT_TARGET_CLEAR)
@@ -444,11 +465,53 @@ BOOL LLHUDEffectLookAt::setLookAt(ELookAtType target_type, LLViewerObject *objec
 		mTargetObject = object;
 		if (object)
 		{
-			mTargetOffsetGlobal.setVec(position);
+			if(clamp_lookat)
+			{
+				// Pretend to look at the object
+				mTargetOffsetGlobal.setVec(object->getPositionGlobal() + (LLVector3d)(position * object->getRotationRegion()));
+				mTargetObject = NULL;
+			}
+			else
+			{
+				mTargetOffsetGlobal.setVec(position);
+			}
 		}
 		else
 		{
 			mTargetOffsetGlobal = gAgent.getPosGlobalFromAgent(position);
+		}
+
+		if (clamp_lookat)
+		{
+			static LLCachedControl<F32> lookat_clamp_distance(gSavedSettings, "AlchemyLookAtClampDistance", 1.0f);
+			auto head_position = gAgent.getPosGlobalFromAgent(gAgentAvatarp->mHeadp->getWorldPosition());
+			auto distance = dist_vec(mTargetOffsetGlobal, head_position);
+
+			if (distance > lookat_clamp_distance)
+			{
+				auto distance_from_object = (mTargetOffsetGlobal - head_position) * (lookat_clamp_distance / distance);
+				mTargetOffsetGlobal.setVec(head_position + distance_from_object);
+			}
+
+			bool lookat_changed = target_type != mTargetType;
+
+			// update position
+			if (!lookat_changed)
+			{
+				auto distance_difference = dist_vec_squared(gAgent.getPosAgentFromGlobal(mTargetOffsetGlobal), mLastSentOffsetGlobal);
+				auto time_difference = (current_time - mLastSendTime);
+				if (distance_difference > MIN_DELTAPOS_FOR_UPDATE_SQUARED && time_difference > (1.f / MAX_SENDS_PER_SEC))
+				{
+					lookat_changed = true;
+				}
+			}
+			if (lookat_changed)
+			{
+				mLastSentOffsetGlobal = gAgent.getPosAgentFromGlobal(mTargetOffsetGlobal);
+				F32 timeout = (*mAttentions)[target_type].mTimeout;
+				setDuration(timeout);
+				setNeedsSendToSim(TRUE);
+			}
 		}
 		mKillTime = mTimer.getElapsedTimeF32() + mDuration;
 
@@ -500,23 +563,17 @@ void LLHUDEffectLookAt::setSourceObject(LLViewerObject* objectp)
 //-----------------------------------------------------------------------------
 void LLHUDEffectLookAt::render()
 {
-	if (mDebugLookAt && mSourceObject.notNull())
+	if (sDebugLookAt && mSourceObject.notNull())
 	{
-		static LLCachedControl<bool> isOwnHidden(gSavedSettings, "AlchemyLookAtHideSelf", true);
-		static LLCachedControl<bool> isPrivate(gSavedSettings, "AlchemyLookAtPrivate", false);
-
-		if ((isOwnHidden || isPrivate) && static_cast<LLVOAvatar*>(mSourceObject.get())->isSelf())
-			return;
-
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
-		LLGLDisable gls_stencil(GL_STENCIL_TEST);
+		//LLGLDisable gls_stencil(GL_STENCIL_TEST);
 
 		LLVector3 target = mTargetPos + ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->mHeadp->getWorldPosition();
 		gGL.matrixMode(LLRender::MM_MODELVIEW);
 		gGL.pushMatrix();
 		gGL.translatef(target.mV[VX], target.mV[VY], target.mV[VZ]);
-		gGL.scalef(0.1f, 0.1f, 0.1f);
+		gGL.scalef(0.3f, 0.3f, 0.3f);
 		gGL.begin(LLRender::LINES);
 		{
 			LLColor3 color = (*mAttentions)[mTargetType].mColor;
@@ -529,62 +586,8 @@ void LLHUDEffectLookAt::render()
 
 			gGL.vertex3f(0.f, 0.f, -1.f);
 			gGL.vertex3f(0.f, 0.f, 1.f);
-
-			static LLCachedControl<bool> lookAtLines(gSavedSettings, "AlchemyLookAtLines", false);
-			if(lookAtLines)
-			{
-				const std::string targname = (*mAttentions)[mTargetType].mName;
-				if(targname != "None" && targname != "Idle" && targname != "AutoListen")
-				{
-					LLVector3 dist = (mSourceObject->getWorldPosition() - mTargetPos) * 10;
-					gGL.vertex3f(0.f, 0.f, 0.f);
-					gGL.vertex3f(dist.mV[VX], dist.mV[VY], dist.mV[VZ] + 0.5f);
-				}
-			}
-		}
-		gGL.end();
+		} gGL.end();
 		gGL.popMatrix();
-
-		static LLCachedControl<U32> lookAtNames(gSavedSettings, "AlchemyLookAtNames", 0);
-		if(lookAtNames > 0)
-		{
-			std::string text;
-			LLAvatarName av_name;
-			LLAvatarNameCache::get(static_cast<LLVOAvatar*>(mSourceObject.get())->getID(), &av_name);
-			switch (lookAtNames)
-			{
-				case 1: // Display Name (user.name)
-					text = av_name.getCompleteName();
-					break;
-				case 2: // Display Name
-					text = av_name.getDisplayName();
-					break;
-				case 3: // First Last
-					text = av_name.getUserName();
-					break;
-				default: //user.name
-					text = av_name.getAccountName();
-					break;
-			}
-
-			const LLFontGL* fontp = LLFontGL::getFontSansSerif();
-			gGL.pushMatrix();
-
-			LLWString wstr(utf8str_to_wstring(text));
-
-			hud_render_text(
-				wstr,
-				target + LLVector3(0.f, 0.f, 0.15f),
-				*fontp,
-				LLFontGL::NORMAL, 
-				LLFontGL::NO_SHADOW,
-				-0.5f * fontp->getWidthF32(wstr.c_str()),
-				0.0f,
-				(*mAttentions)[mTargetType].mColor, 
-				FALSE
-			);
-			gGL.popMatrix();
-		}
 	}
 }
 
@@ -636,6 +639,11 @@ void LLHUDEffectLookAt::update()
 				((LLVOAvatar*)(LLViewerObject*)mSourceObject)->startMotion(ANIM_AGENT_HEAD_ROT);
 			}
 		}
+	}
+
+	if (sDebugLookAt)
+	{
+		((LLVOAvatar*)(LLViewerObject*)mSourceObject)->addDebugText((*mAttentions)[mTargetType].mName);
 	}
 }
 

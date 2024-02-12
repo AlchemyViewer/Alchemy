@@ -74,7 +74,9 @@ BOOL ALFloaterExploreSounds::postBuild()
 	getChild<LLButton>("look_at_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleLookAt, this));
 	getChild<LLButton>("stop_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleStop, this));
 	getChild<LLButton>("bl_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::blacklistSound, this));
-	getChild<LLButton>("stop_locally_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleStopLocally, this));
+	
+	mStopLocalButton = getChild<LLButton>("stop_locally_btn");
+	mStopLocalButton->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleStopLocally, this));
 
 	mHistoryScroller = getChild<LLScrollListCtrl>("sound_list");
 	mHistoryScroller->setCommitCallback(boost::bind(&ALFloaterExploreSounds::handleSelection, this));
@@ -87,7 +89,7 @@ BOOL ALFloaterExploreSounds::postBuild()
 	mObjectSounds = getChild<LLCheckBoxCtrl>("objects_chk");
 	mPaused = getChild<LLCheckBoxCtrl>("pause_chk");
 
-	return TRUE;
+	return LLFloater::postBuild();
 }
 
 void ALFloaterExploreSounds::handleSelection()
@@ -113,7 +115,7 @@ LLSoundHistoryItem ALFloaterExploreSounds::getItem(const LLUUID& itemID)
 	auto found = sound_log.find(itemID);
 	if (found != sound_log.end())
 	{
-		return found->second;
+		return *found->second;
 	}
 	else
 	{
@@ -187,7 +189,7 @@ BOOL ALFloaterExploreSounds::tick()
 		{
 			for (const auto& sound_pair : gAudiop->getSoundLog())
 			{
-				history.push_back(sound_pair.second);
+				history.push_back(*sound_pair.second);
 			}
 			LLSoundHistoryItemCompare c;
 			history.sort(c);
@@ -348,7 +350,7 @@ BOOL ALFloaterExploreSounds::tick()
 		}
 	}
 
-	childSetEnabled("stop_locally_btn", mLocalPlayingAudioSourceIDs.size() > 0);
+	mStopLocalButton->setEnabled(mLocalPlayingAudioSourceIDs.size() > 0);
 
 	return FALSE;
 }
@@ -377,7 +379,7 @@ void ALFloaterExploreSounds::handlePlayLocally()
 		}
 	}
 
-	childSetEnabled("stop_locally_btn", mLocalPlayingAudioSourceIDs.size() > 0);
+	mStopLocalButton->setEnabled(mLocalPlayingAudioSourceIDs.size() > 0);
 }
 
 void ALFloaterExploreSounds::handleLookAt()
@@ -442,8 +444,8 @@ void ALFloaterExploreSounds::handleStop()
 				auto iter = sound_log.find(item.mID);
 				if (iter != sound_log.end())
 				{
-					iter->second.mPlaying = false;
-					iter->second.mTimeStopped = LLTimer::getElapsedSeconds();
+					iter->second->mPlaying = false;
+					iter->second->mTimeStopped = LLTimer::getElapsedSeconds();
 				}
 				else
 				{

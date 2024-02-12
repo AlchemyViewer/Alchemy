@@ -28,12 +28,15 @@
 #define LL_LLVIEWERINPUT_H
 
 #include "llkeyboard.h" // For EKeystate
-#include "llinitparam.h"
 
-#include "absl/container/flat_hash_set.h"
-#include "absl/container/flat_hash_map.h"
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 const S32 MAX_KEY_BINDINGS = 128; // was 60
+const S32 keybindings_xml_version = 1;
+const std::string script_mouse_handler_name = "script_trigger_lbutton";
+
+class LLWindow;
 
 class LLNamedFunction
 {
@@ -52,6 +55,7 @@ public:
     MASK			mMask;
 
     LLKeyFunc		mFunction;
+    std::string     mFunctionName;
 };
 
 class LLMouseBinding
@@ -61,6 +65,7 @@ public:
     MASK			mMask;
 
     LLKeyFunc		mFunction;
+    std::string     mFunctionName;
 };
 
 
@@ -73,11 +78,7 @@ typedef enum e_keyboard_mode
 	MODE_COUNT
 } EKeyboardMode;
 
-class LLWindow;
-
-void bind_keyboard_functions();
-
-class LLViewerInput
+class LLViewerInput : public LLKeyBindingToStringHandler
 {
 public:
 	struct KeyBinding : public LLInitParam::Block<KeyBinding>
@@ -103,11 +104,12 @@ public:
 							third_person,
 							sitting,
 							edit_avatar;
-
+		Optional<S32> xml_version; // 'xml', because 'version' appears to be reserved
 		Keys();
 	};
 
 	LLViewerInput();
+    virtual ~LLViewerInput();
 
 	BOOL			handleKey(KEY key, MASK mask, BOOL repeated);
 	BOOL			handleKeyUp(KEY key, MASK mask);
@@ -122,7 +124,7 @@ public:
 	S32				loadBindingsXML(const std::string& filename);										// returns number bound, 0 on error
 	EKeyboardMode	getMode() const;
 
-	static BOOL		modeFromString(const std::string& string, S32 *mode);			// False on failure
+	static bool		modeFromString(const std::string& string, S32 *mode);			// False on failure
 	static BOOL		mouseFromString(const std::string& string, EMouseClickType *mode);// False on failure
 
     bool            scanKey(KEY key,
@@ -134,7 +136,11 @@ public:
     BOOL            handleMouse(LLWindow *window_impl, LLCoordGL pos, MASK mask, EMouseClickType clicktype, BOOL down);
     void            scanMouse();
 
-    bool            isMouseBindUsed(const EMouseClickType mouse, const MASK mask = MASK_NONE, const S32 mode = MODE_THIRD_PERSON);
+    bool            isMouseBindUsed(const EMouseClickType mouse, const MASK mask, const S32 mode) const;
+    bool            isLMouseHandlingDefault(const S32 mode) const { return mLMouseDefaultHandling[mode]; }
+
+    // inherited from LLKeyBindingToStringHandler
+    virtual std::string getKeyBindingAsString(const std::string& mode, const std::string& control) const override;
 
 private:
     bool            scanKey(const std::vector<LLKeyboardBinding> &binding,
@@ -174,14 +180,15 @@ private:
     // to send what we think function wants based on collection of bools (mKeyRepeated, mKeyLevel, mKeyDown)
     std::vector<LLKeyboardBinding>	mKeyBindings[MODE_COUNT];
     std::vector<LLMouseBinding>		mMouseBindings[MODE_COUNT];
+    bool							mLMouseDefaultHandling[MODE_COUNT]; // Due to having special priority
 
     // keybindings that do not consume event and are handled earlier, before floaters
     std::vector<LLKeyboardBinding>	mGlobalKeyBindings[MODE_COUNT];
     std::vector<LLMouseBinding>		mGlobalMouseBindings[MODE_COUNT];
 
-	typedef absl::flat_hash_map<U32, U32> key_remap_t;
+	typedef boost::unordered_flat_map<U32, U32> key_remap_t;
 	key_remap_t		mRemapKeys[MODE_COUNT];
-	absl::flat_hash_set<KEY>	mKeysSkippedByUI;
+	boost::unordered_flat_set<KEY>	mKeysSkippedByUI;
 	BOOL			mKeyHandledByUI[KEY_COUNT];		// key processed successfully by UI
 
     // This is indentical to what llkeyboard does (mKeyRepeated, mKeyLevel, mKeyDown e t c),

@@ -73,14 +73,14 @@
               right="-2"
               bottom="-2"
               background_visible="true"
-              bg_alpha_color="DkGray2">
+              bg_alpha_color="PanelDefaultBackgroundColor">
                 <asset_filtered_inv_panel
                     allow_multi_select="false"
                     allow_drag="false"
                     accepts_drag_and_drop="false"
                     suppress_folder_menu="true"
                     bg_visible="true"
-                    bg_alpha_color="DkGray2"
+                    bg_alpha_color="PanelDefaultBackgroundColor"
                     border="false"
                     follows="all"
                     layout="topleft"
@@ -89,7 +89,7 @@
                     top="1"
                     right="-4"
                     bottom="-1"
-                    filter_asset_type="settings" />
+                    filter_asset_types="settings" />
             </panel>
         </layout_panel>
         <layout_panel name="pnl_combo"

@@ -126,13 +126,7 @@ BOOL LLDataPacker::unpackFixed(F32 &value, const char *name,
 		total_bits++;
 	}
 
-	S32 min_val;
 	U32 max_val;
-	if (is_signed)
-	{
-		min_val = 1 << int_bits;
-		min_val *= -1;
-	}
 	max_val = 1 << int_bits;
 
 	F32 fixed_val;
@@ -304,6 +298,11 @@ BOOL LLDataPackerBinaryBuffer::unpackBinaryData(U8 *value, S32 &size, const char
 	}
 
 	htolememcpy(&size, mCurBufferp, MVT_S32, 4);
+	if (size < 0)
+	{
+		LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData unpacked invalid size, aborting!" << LL_ENDL;
+		return FALSE;
+	}
 	mCurBufferp += 4;
 
 	if (!verifyLength(size, name))
@@ -760,14 +759,13 @@ BOOL LLDataPackerAsciiBuffer::packString(const std::string& value, const char *n
 
 BOOL LLDataPackerAsciiBuffer::unpackString(std::string& value, const char *name)
 {
-	BOOL success = TRUE;
 	char valuestr[DP_BUFSIZE]; /*Flawfinder: ignore*/
 	if (!getValueStr(name, valuestr, DP_BUFSIZE))  // NULL terminated
 	{
 		return FALSE;
 	}
 	value = valuestr;
-	return success;
+	return TRUE;
 }
 
 

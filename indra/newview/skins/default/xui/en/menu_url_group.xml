@@ -25,4 +25,11 @@
         <menu_item_call.on_click
          function="Url.CopyUrl" />
     </menu_item_call>
+	<menu_item_call
+     label="Copy UUID to clipboard"
+     layout="topleft"
+     name="url_copy_uuid">
+		<menu_item_call.on_click
+         function="Url.CopyUUID" />
+	</menu_item_call>
 </context_menu>

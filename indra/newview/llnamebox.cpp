@@ -33,6 +33,7 @@
 #include "llui.h"
 #include "llviewercontrol.h"
 #include "lluuid.h"
+#include "llslurl.h"
 
 #include "llcachename.h"
 #include "llavatarnamecache.h"
@@ -112,9 +113,9 @@ void LLNameBox::setName(const std::string& name, BOOL is_group)
 		std::string url;
 
 		if (is_group)
-			url = "[secondlife:///app/group/" + mNameID.asString() + "/about " + name + "]";
+			url = "[" + LLSLURL("group", mNameID, "about").getSLURLString() + "]";
 		else
-			url = "[secondlife:///app/agent/" + mNameID.asString() + "/about " + name + "]";
+			url = "[" + LLSLURL("agent", mNameID, "about").getSLURLString() + "]";
 
 		setText(url);
 	}

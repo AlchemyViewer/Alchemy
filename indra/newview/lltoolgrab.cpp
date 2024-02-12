@@ -51,6 +51,7 @@
 #include "lltoolmgr.h"
 #include "lltoolpie.h"
 #include "llviewercamera.h"
+#include "llviewerinput.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h" 
 #include "llviewerregion.h"
@@ -121,7 +122,7 @@ void LLToolGrabBase::handleDeselect()
 	if (!mValidSelection && (override_mask != MASK_NONE || (gFloaterTools && gFloaterTools->getVisible())))
 	{
 		LLMenuGL::sMenuContainer->hideMenus();
-		LLSelectMgr::getInstanceFast()->validateSelection();
+		LLSelectMgr::getInstance()->validateSelection();
 	}
 
 }
@@ -143,7 +144,6 @@ BOOL LLToolGrabBase::handleMouseDown(S32 x, S32 y, MASK mask)
 		LL_INFOS() << "LLToolGrab handleMouseDown" << LL_ENDL;
 	}
 
-	// call the base class to propogate info to sim
 	LLTool::handleMouseDown(x, y, mask);
 
 	// leftButtonGrabbed() checks if controls are reserved by scripts, but does not take masks into account
@@ -153,24 +153,37 @@ BOOL LLToolGrabBase::handleMouseDown(S32 x, S32 y, MASK mask)
 		gViewerWindow->pickAsync(x, y, mask, pickCallback, /*BOOL pick_transparent*/ TRUE);
 	}
 	mClickedInMouselook = gAgentCamera.cameraMouselook();
+
+    if (mClickedInMouselook && gViewerInput.isLMouseHandlingDefault(MODE_FIRST_PERSON))
+    {
+        // LLToolCompGun::handleMouseDown handles the event if ML controls are grabed,
+        // but LLToolGrabBase is often the end point for mouselook clicks if ML controls
+        // are not grabbed and LLToolGrabBase::handleMouseDown consumes the event,
+        // so send clicks from here.
+        // We are sending specifically CONTROL_LBUTTON_DOWN instead of _ML_ version.
+        gAgent.setControlFlags(AGENT_CONTROL_LBUTTON_DOWN);
+
+        // Todo: LLToolGrabBase probably shouldn't consume the event if there is nothing
+        // to grab in Mouselook, it intercepts handling in scanMouse
+    }
 	return TRUE;
 }
 
 void LLToolGrabBase::pickCallback(const LLPickInfo& pick_info)
 {
-	LLToolGrab::getInstanceFast()->mGrabPick = pick_info;
+	LLToolGrab::getInstance()->mGrabPick = pick_info;
 	LLViewerObject	*objectp = pick_info.getObject();
 
 	BOOL extend_select = (pick_info.mKeyMask & MASK_SHIFT);
 
-	if (!extend_select && !LLSelectMgr::getInstanceFast()->getSelection()->isEmpty())
+	if (!extend_select && !LLSelectMgr::getInstance()->getSelection()->isEmpty())
 	{
-		LLSelectMgr::getInstanceFast()->deselectAll();
-		LLToolGrab::getInstanceFast()->mDeselectedThisClick = TRUE;
+		LLSelectMgr::getInstance()->deselectAll();
+		LLToolGrab::getInstance()->mDeselectedThisClick = TRUE;
 	}
 	else
 	{
-		LLToolGrab::getInstanceFast()->mDeselectedThisClick = FALSE;
+		LLToolGrab::getInstance()->mDeselectedThisClick = FALSE;
 	}
 
 	// if not over object, do nothing
@@ -180,13 +193,13 @@ void LLToolGrabBase::pickCallback(const LLPickInfo& pick_info)
 	if ( (!objectp) || ((RlvActions::isRlvEnabled()) && (!RlvActions::canTouch(objectp, pick_info.mObjectOffset))) )
 // [/RLVa:KB]
 	{
-		LLToolGrab::getInstanceFast()->setMouseCapture(TRUE);
-		LLToolGrab::getInstanceFast()->mMode = GRAB_NOOBJECT;
-		LLToolGrab::getInstanceFast()->mGrabPick.mObjectID.setNull();
+		LLToolGrab::getInstance()->setMouseCapture(TRUE);
+		LLToolGrab::getInstance()->mMode = GRAB_NOOBJECT;
+		LLToolGrab::getInstance()->mGrabPick.mObjectID.setNull();
 	}
 	else
 	{
-		LLToolGrab::getInstanceFast()->handleObjectHit(LLToolGrab::getInstanceFast()->mGrabPick);
+		LLToolGrab::getInstance()->handleObjectHit(LLToolGrab::getInstance()->mGrabPick);
 	}
 }
 
@@ -297,7 +310,7 @@ BOOL LLToolGrabBase::handleObjectHit(const LLPickInfo& info)
 		startSpin();
 	}
 
-	LLSelectMgr::getInstanceFast()->updateSelectionCenter();		// update selection beam
+	LLSelectMgr::getInstance()->updateSelectionCenter();		// update selection beam
 
 	// update point at
 	LLViewerObject *edit_object = info.getObject();
@@ -551,8 +564,8 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 	const F32 RADIANS_PER_PIXEL_X = 0.01f;
 	const F32 RADIANS_PER_PIXEL_Y = 0.01f;
 
-	S32 dx = x - (gViewerWindow->getWorldViewWidthScaled() / 2);
-	S32 dy = y - (gViewerWindow->getWorldViewHeightScaled() / 2);
+    S32 dx = gViewerWindow->getCurrentMouseDX();
+    S32 dy = gViewerWindow->getCurrentMouseDY();
 
 	if (dx != 0 || dy != 0)
 	{
@@ -578,7 +591,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			LLQuaternion rotation_around_vertical( dx*RADIANS_PER_PIXEL_X, up );
 
 			// y motion maps to rotation around left axis
-			const LLVector3 &agent_left = LLViewerCamera::getInstanceFast()->getLeftAxis();
+			const LLVector3 &agent_left = LLViewerCamera::getInstance()->getLeftAxis();
 			LLQuaternion rotation_around_left( dy*RADIANS_PER_PIXEL_Y, agent_left );
 
 			// compose with current rotation
@@ -603,14 +616,14 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			//------------------------------------------------------
 
 			LLVector3d x_part;
-			x_part.setVec(LLViewerCamera::getInstanceFast()->getLeftAxis());
+			x_part.setVec(LLViewerCamera::getInstance()->getLeftAxis());
 			x_part.mdV[VZ] = 0.0;
 			x_part.normVec();
 
 			LLVector3d y_part;
 			if( mVerticalDragging )
 			{
-				y_part.setVec(LLViewerCamera::getInstanceFast()->getUpAxis());
+				y_part.setVec(LLViewerCamera::getInstance()->getUpAxis());
 				// y_part.setVec(0.f, 0.f, 1.f);
 			}
 			else
@@ -652,7 +665,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			*/
 
 			// Don't let object centers go underground.
-			F32 land_height = LLWorld::getInstanceFast()->resolveLandHeightGlobal(grab_point_global);
+			F32 land_height = LLWorld::getInstance()->resolveLandHeightGlobal(grab_point_global);
 
 			if (grab_point_global.mdV[VZ] < land_height)
 			{
@@ -660,12 +673,12 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			}
 
 			// For safety, cap heights where objects can be dragged
-			if (grab_point_global.mdV[VZ] > MAX_OBJECT_Z)
+			if (grab_point_global.mdV[VZ] > LLWorld::getInstance()->getRegionMaxHeight())
 			{
-				grab_point_global.mdV[VZ] = MAX_OBJECT_Z;
+				grab_point_global.mdV[VZ] = LLWorld::getInstance()->getRegionMaxHeight();
 			}
 
-			grab_point_global = LLWorld::getInstanceFast()->clipToVisibleRegions(mDragStartPointGlobal, grab_point_global);
+			grab_point_global = LLWorld::getInstance()->clipToVisibleRegions(mDragStartPointGlobal, grab_point_global);
 			// propagate constrained grab point back to grab offset
 			mGrabHiddenOffsetFromCamera = grab_point_global - gAgentCamera.getCameraPositionGlobal();
 
@@ -673,7 +686,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 			LLVector3 grab_pos_agent = gAgent.getPosAgentFromGlobal( grab_point_global );
 
 			LLCoordGL grab_center_gl( gViewerWindow->getWorldViewWidthScaled() / 2, gViewerWindow->getWorldViewHeightScaled() / 2);
-			LLViewerCamera::getInstanceFast()->projectPosAgentToScreen(grab_pos_agent, grab_center_gl);
+			LLViewerCamera::getInstance()->projectPosAgentToScreen(grab_pos_agent, grab_center_gl);
 
 			const S32 ROTATE_H_MARGIN = gViewerWindow->getWorldViewWidthScaled() / 20;
 			const F32 ROTATE_ANGLE_PER_SECOND = 30.f * DEG_TO_RAD;
@@ -733,7 +746,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
 
 		gViewerWindow->moveCursorToCenter();
 
-		LLSelectMgr::getInstanceFast()->updateSelectionCenter();
+		LLSelectMgr::getInstance()->updateSelectionCenter();
 
 	}
 
@@ -832,14 +845,14 @@ void LLToolGrabBase::handleHoverNonPhysical(S32 x, S32 y, MASK mask)
 			//------------------------------------------------------
 
 			LLVector3d x_part;
-			x_part.setVec(LLViewerCamera::getInstanceFast()->getLeftAxis());
+			x_part.setVec(LLViewerCamera::getInstance()->getLeftAxis());
 			x_part.mdV[VZ] = 0.0;
 			x_part.normVec();
 
 			LLVector3d y_part;
 			if( mVerticalDragging )
 			{
-				y_part.setVec(LLViewerCamera::getInstanceFast()->getUpAxis());
+				y_part.setVec(LLViewerCamera::getInstance()->getUpAxis());
 				// y_part.setVec(0.f, 0.f, 1.f);
 			}
 			else
@@ -985,8 +998,17 @@ void LLToolGrabBase::handleHoverFailed(S32 x, S32 y, MASK mask)
 
 BOOL LLToolGrabBase::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-	// call the base class to propogate info to sim
 	LLTool::handleMouseUp(x, y, mask);
+
+    if (gAgentCamera.cameraMouselook() && gViewerInput.isLMouseHandlingDefault(MODE_FIRST_PERSON))
+    {
+        // LLToolCompGun::handleMouseUp handles the event if ML controls are grabed,
+        // but LLToolGrabBase is often the end point for mouselook clicks if ML controls
+        // are not grabbed and LToolGrabBase::handleMouseUp consumes the event,
+        // so send clicks from here.
+        // We are sending specifically CONTROL_LBUTTON_UP instead of _ML_ version.
+        gAgent.setControlFlags(AGENT_CONTROL_LBUTTON_UP);
+    }
 
 	if( hasMouseCapture() )
 	{
@@ -1047,7 +1069,7 @@ void LLToolGrabBase::onMouseCaptureLost()
 			LLVector3 grab_point_agent = objectp->getRenderPosition();
 
 			LLCoordGL gl_point;
-			if (LLViewerCamera::getInstanceFast()->projectPosAgentToScreen(grab_point_agent, gl_point))
+			if (LLViewerCamera::getInstance()->projectPosAgentToScreen(grab_point_agent, gl_point))
 			{
 				LLUI::setMousePositionScreen(gl_point.mX, gl_point.mY);
 			}
@@ -1071,7 +1093,7 @@ void LLToolGrabBase::onMouseCaptureLost()
 
 	mGrabPick.mObjectID.setNull();
 
-	LLSelectMgr::getInstanceFast()->updateSelectionCenter();
+	LLSelectMgr::getInstance()->updateSelectionCenter();
 	gAgentCamera.setPointAt(POINTAT_TARGET_CLEAR);
 	gAgentCamera.setLookAt(LOOKAT_TARGET_CLEAR);
 

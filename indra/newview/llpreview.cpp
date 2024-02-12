@@ -149,8 +149,11 @@ const LLInventoryItem *LLPreview::getItem() const
 	}
 	else if (mObjectUUID.isNull())
 	{
-		// it's an inventory item, so get the item.
-		item = gInventory.getItem(mItemUUID);
+        if (mItemUUID.notNull())
+        {
+            // it's an inventory item, so get the item.
+            item = gInventory.getItem(mItemUUID);
+        }
 	}
 	else
 	{
@@ -216,11 +219,11 @@ void LLPreview::onCommit()
 					LLViewerObject* obj = gAgentAvatarp->getWornAttachment( item->getUUID() );
 					if( obj )
 					{
-						LLSelectMgr::getInstanceFast()->deselectAll();
-						LLSelectMgr::getInstanceFast()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
-						LLSelectMgr::getInstanceFast()->selectionSetObjectDescription( getChild<LLUICtrl>("desc")->getValue().asString() );
+						LLSelectMgr::getInstance()->deselectAll();
+						LLSelectMgr::getInstance()->addAsIndividual( obj, SELECT_ALL_TES, FALSE );
+						LLSelectMgr::getInstance()->selectionSetObjectDescription( getChild<LLUICtrl>("desc")->getValue().asString() );
 
-						LLSelectMgr::getInstanceFast()->deselectAll();
+						LLSelectMgr::getInstance()->deselectAll();
 					}
 				}
 			}
@@ -284,14 +287,22 @@ void LLPreview::refreshFromItem()
 // static
 BOOL LLPreview::canModify(const LLUUID taskUUID, const LLInventoryItem* item)
 {
+    const LLViewerObject* object = nullptr;
 	if (taskUUID.notNull())
 	{
-		LLViewerObject* object = gObjectList.findObject(taskUUID);
-		if(object && !object->permModify())
-		{
-			// No permission to edit in-world inventory
-			return FALSE;
-		}
+		object = gObjectList.findObject(taskUUID);
+	}
+
+	return canModify(object, item);
+}
+
+// static
+BOOL LLPreview::canModify(const LLViewerObject* object, const LLInventoryItem* item)
+{
+	if (object && !object->permModify())
+	{
+        // No permission to edit in-world inventory
+        return FALSE;
 	}
 
 	return item && gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE);

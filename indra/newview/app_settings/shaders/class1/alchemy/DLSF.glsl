@@ -23,20 +23,12 @@
  * $/LicenseInfo$
  */
 
-#extension GL_ARB_shader_texture_lod : enable
-#extension GL_EXT_gpu_shader4 : enable
-
 /*[EXTRA_CODE_HERE]*/
 
-#ifdef DEFINE_GL_FRAGCOLOR
 out vec4 frag_color;
-#else
-#define frag_color gl_FragColor
-#endif
+in vec2 vary_fragcoord;
 
-VARYING vec2 vary_fragcoord;
-
-uniform sampler2D tex0;
+uniform sampler2D diffuseRect;
 
 uniform vec3 sharpen_params;
 
@@ -48,9 +40,6 @@ uniform vec3 sharpen_params;
 #define kSharpnessMax (-1.0 / 6.5)
 #define kDenoiseMin (0.001)
 #define kDenoiseMax (-0.1)
-
-vec3 linear_to_srgb(vec3 cl);
-vec3 srgb_to_linear(vec3 cl);
 
 float GetLuma(vec4 p)
 {
@@ -86,17 +75,17 @@ void main()
     ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     */
 
-    vec4 x = texture2DLod(tex0, vary_fragcoord, 0.f);
+    vec4 x = textureLod(diffuseRect, vary_fragcoord, 0.f);
 
-    vec4 a = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2(-1,  0));
-    vec4 b = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 1,  0));
-    vec4 c = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 0,  1));
-    vec4 d = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 0, -1));
+    vec4 a = textureLodOffset(diffuseRect, vary_fragcoord, 0.0, ivec2(-1,  0));
+    vec4 b = textureLodOffset(diffuseRect, vary_fragcoord, 0.0, ivec2( 1,  0));
+    vec4 c = textureLodOffset(diffuseRect, vary_fragcoord, 0.0, ivec2( 0,  1));
+    vec4 d = textureLodOffset(diffuseRect, vary_fragcoord, 0.0, ivec2( 0, -1));
 
-    vec4 e = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2(-1, -1));
-    vec4 f = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 1,  1));
-    vec4 g = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2(-1,  1));
-    vec4 h = texture2DLodOffset(tex0, vary_fragcoord, 0.0, ivec2( 1, -1));
+    vec4 e = textureLodOffset(diffuseRect, vary_fragcoord, 0.0, ivec2(-1, -1));
+    vec4 f = textureLodOffset(diffuseRect, vary_fragcoord, 0.0, ivec2( 1,  1));
+    vec4 g = textureLodOffset(diffuseRect, vary_fragcoord, 0.0, ivec2(-1,  1));
+    vec4 h = textureLodOffset(diffuseRect, vary_fragcoord, 0.0, ivec2( 1, -1));
 
     float lx = GetLuma(x);
 
@@ -169,8 +158,6 @@ void main()
     x.x += delta;
     x.y += delta;
     x.z += delta;
-
-    x.rgb = linear_to_srgb(x.rgb);
 
     frag_color = x;
 }

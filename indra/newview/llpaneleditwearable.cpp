@@ -50,6 +50,7 @@
 #include "llnotificationsutil.h"
 
 #include "llcolorswatch.h"
+#include "llfilepicker.h"
 #include "lltexturectrl.h"
 #include "lltextureentry.h"
 #include "llviewercontrol.h"    // gSavedSettings
@@ -61,6 +62,7 @@
 #include "llcommandhandler.h"
 #include "lltextutil.h"
 #include "llappearancemgr.h"
+#include "llviewermenufile.h"
 
 // register panel with appropriate XML
 static LLPanelInjector<LLPanelEditWearable> t_edit_wearable("panel_edit_wearable");
@@ -294,15 +296,15 @@ LLEditWearableDictionary::Subparts::Subparts()
         addEntry(SUBPART_GLOVES, new SubpartEntry(SUBPART_GLOVES, "mTorso", "gloves", "gloves_main_param_list", "gloves_main_tab", LLVector3d(0.f, 0.f, 0.f), LLVector3d(-1.f, 0.15f, 0.f),SEX_BOTH));
         addEntry(SUBPART_UNDERSHIRT, new SubpartEntry(SUBPART_UNDERSHIRT, "mTorso", "undershirt", "undershirt_main_param_list", "undershirt_main_tab", LLVector3d(0.f, 0.f, 0.3f), LLVector3d(-1.f, 0.15f, 0.3f),SEX_BOTH));
         addEntry(SUBPART_UNDERPANTS, new SubpartEntry(SUBPART_UNDERPANTS, "mPelvis", "underpants", "underpants_main_param_list", "underpants_main_tab", LLVector3d(0.f, 0.f, -0.5f), LLVector3d(-1.6f, 0.15f, -0.5f),SEX_BOTH));
-        addEntry(SUBPART_ALPHA, new SubpartEntry(SUBPART_ALPHA, "mPelvis", "alpha", "alpha_main_param_list", "alpha_main_tab", LLVector3d(0.f, 0.f, 0.1f), LLVector3d(-2.5f, 0.5f, 0.8f),SEX_BOTH));
-        addEntry(SUBPART_TATTOO, new SubpartEntry(SUBPART_TATTOO, "mPelvis", "tattoo", "tattoo_main_param_list", "tattoo_main_tab", LLVector3d(0.f, 0.f, 0.1f), LLVector3d(-2.5f, 0.5f, 0.8f),SEX_BOTH));
-		addEntry(SUBPART_UNIVERSAL, new SubpartEntry(SUBPART_UNIVERSAL, "mPelvis", "universal", "universal_main_param_list", "universal_main_tab", LLVector3d(0.f, 0.f, 0.1f), LLVector3d(-2.5f, 0.5f, 0.8f), SEX_BOTH));
+        addEntry(SUBPART_ALPHA, new SubpartEntry(SUBPART_ALPHA, "mPelvis", "alpha", "", "", LLVector3d(0.f, 0.f, 0.1f), LLVector3d(-2.5f, 0.5f, 0.8f),SEX_BOTH));
+        addEntry(SUBPART_TATTOO, new SubpartEntry(SUBPART_TATTOO, "mPelvis", "tattoo", "", "", LLVector3d(0.f, 0.f, 0.1f), LLVector3d(-2.5f, 0.5f, 0.8f),SEX_BOTH));
+		addEntry(SUBPART_UNIVERSAL, new SubpartEntry(SUBPART_UNIVERSAL, "mPelvis", "universal", "", "", LLVector3d(0.f, 0.f, 0.1f), LLVector3d(-2.5f, 0.5f, 0.8f), SEX_BOTH));
 
 		addEntry(SUBPART_PHYSICS_BREASTS_UPDOWN, new SubpartEntry(SUBPART_PHYSICS_BREASTS_UPDOWN, "mTorso", "physics_breasts_updown", "physics_breasts_updown_param_list", "physics_breasts_updown_tab", LLVector3d(0.f, 0.f, 0.3f), LLVector3d(0.f, 0.f, 0.f),SEX_FEMALE));
         addEntry(SUBPART_PHYSICS_BREASTS_INOUT, new SubpartEntry(SUBPART_PHYSICS_BREASTS_INOUT, "mTorso", "physics_breasts_inout", "physics_breasts_inout_param_list", "physics_breasts_inout_tab", LLVector3d(0.f, 0.f, 0.3f), LLVector3d(0.f, 0.f, 0.f),SEX_FEMALE));
         addEntry(SUBPART_PHYSICS_BREASTS_LEFTRIGHT, new SubpartEntry(SUBPART_PHYSICS_BREASTS_LEFTRIGHT, "mTorso", "physics_breasts_leftright", "physics_breasts_leftright_param_list", "physics_breasts_leftright_tab", LLVector3d(0.f, 0.f, 0.3f), LLVector3d(0.f, 0.f, 0.f),SEX_FEMALE));
-        addEntry(SUBPART_PHYSICS_BELLY_UPDOWN, new SubpartEntry(SUBPART_PHYSICS_BELLY_UPDOWN, "mTorso", "physics_belly_updown", "physics_belly_updown_param_list", "physics_belly_updown_tab", LLVector3d(0.f, 0.f, 0.3f), LLVector3d(0.f, 0.f, 0.f),SEX_BOTH));
-        addEntry(SUBPART_PHYSICS_BUTT_UPDOWN, new SubpartEntry(SUBPART_PHYSICS_BUTT_UPDOWN, "mTorso", "physics_butt_updown", "physics_butt_updown_param_list", "physics_butt_updown_tab", LLVector3d(0.f, 0.f, 0.3f), LLVector3d(0.f, 0.f, 0.f),SEX_BOTH));
+        addEntry(SUBPART_PHYSICS_BELLY_UPDOWN, new SubpartEntry(SUBPART_PHYSICS_BELLY_UPDOWN, "mTorso", "physics_belly_updown", "physics_belly_updown_param_list", "physics_belly_tab", LLVector3d(0.f, 0.f, 0.3f), LLVector3d(0.f, 0.f, 0.f),SEX_BOTH));
+        addEntry(SUBPART_PHYSICS_BUTT_UPDOWN, new SubpartEntry(SUBPART_PHYSICS_BUTT_UPDOWN, "mTorso", "physics_butt_updown", "physics_butt_updown_param_list", "physics_butt_tab", LLVector3d(0.f, 0.f, 0.3f), LLVector3d(0.f, 0.f, 0.f),SEX_BOTH));
         addEntry(SUBPART_PHYSICS_BUTT_LEFTRIGHT, new SubpartEntry(SUBPART_PHYSICS_BUTT_LEFTRIGHT, "mTorso", "physics_butt_leftright", "physics_butt_leftright_param_list", "physics_butt_leftright_tab", LLVector3d(0.f, 0.f, 0.f), LLVector3d(0.f, 0.f, 0.f),SEX_BOTH));
         addEntry(SUBPART_PHYSICS_ADVANCED, new SubpartEntry(SUBPART_PHYSICS_ADVANCED, "mTorso", "physics_advanced", "physics_advanced_param_list", "physics_advanced_tab", LLVector3d(0.f, 0.f, 0.f), LLVector3d(0.f, 0.f, 0.f),SEX_BOTH));
 }
@@ -574,7 +576,6 @@ static void init_texture_ctrl(LLPanelEditWearable* self, LLPanel* panel, const L
                 // Don't allow (no copy) or (notransfer) textures to be selected.
                 texture_ctrl->setImmediateFilterPermMask(PERM_NONE);
                 texture_ctrl->setDnDFilterPermMask(PERM_NONE);
-                texture_ctrl->setNonImmediateFilterPermMask(PERM_NONE);
         }
 }
 
@@ -720,6 +721,9 @@ BOOL LLPanelEditWearable::postBuild()
 
         mBtnBack->setClickedCallback(boost::bind(&LLPanelEditWearable::onBackButtonClicked, this));
 
+	getChild<LLButton>("import_btn")->setClickedCallback(boost::bind(&LLPanelEditWearable::onClickedImportBtn, this));
+
+
         mNameEditor = getChild<LLLineEditor>("description");
 
         mPanelTitle = getChild<LLTextBox>("edit_wearable_title");
@@ -738,10 +742,10 @@ BOOL LLPanelEditWearable::postBuild()
         // Setting the visibility callback is applied only to the bodyparts panel
         // because currently they are the only ones whose 'wearable_accordion' has
         // multiple accordion tabs (see EXT-8164 for details).
-        setWearablePanelVisibilityChangeCallback(mPanelShape);
-        setWearablePanelVisibilityChangeCallback(mPanelSkin);
-        setWearablePanelVisibilityChangeCallback(mPanelEyes);
-        setWearablePanelVisibilityChangeCallback(mPanelHair);
+        //setWearablePanelVisibilityChangeCallback(mPanelShape);
+        //setWearablePanelVisibilityChangeCallback(mPanelSkin);
+        //setWearablePanelVisibilityChangeCallback(mPanelEyes);
+        //setWearablePanelVisibilityChangeCallback(mPanelHair);
 
         //clothes
         mPanelShirt = getChild<LLPanel>("edit_shirt_panel");
@@ -794,7 +798,11 @@ BOOL LLPanelEditWearable::postBuild()
         
                         const std::string accordion_tab = subpart_entry->mAccordionTab;
         
-                        LLAccordionCtrlTab *tab = getChild<LLAccordionCtrlTab>(accordion_tab);
+                        if (accordion_tab.empty())
+                        {
+                            continue;
+                        }
+                        LLAccordionCtrlTab *tab = findChild<LLAccordionCtrlTab>(accordion_tab);
         
                         if (!tab)
                         {
@@ -940,11 +948,11 @@ void LLPanelEditWearable::onCommitSexChange()
         LLViewerWearable*     wearable = gAgentWearables.getViewerWearable(type, index);
         if (wearable)
         {
-                wearable->setVisualParamWeight(param->getID(), is_new_sex_male);
+                wearable->setVisualParamWeight(param->getID(), is_new_sex_male, false);
         }
-        param->setWeight( is_new_sex_male);
+        param->setWeight( is_new_sex_male, FALSE);
 
-        gAgentAvatarp->updateSexDependentLayerSets();
+        gAgentAvatarp->updateSexDependentLayerSets(FALSE);
 
         gAgentAvatarp->updateVisualParams();
         showWearable(mWearablePtr, TRUE, TRUE);
@@ -981,7 +989,7 @@ void LLPanelEditWearable::onTexturePickerCommit(const LLUICtrl* ctrl)
 							{
 								gAgentAvatarp->setLocalTexture(entry->mTextureIndex, image, FALSE, index);
 								LLVisualParamHint::requestHintUpdates();
-								gAgentAvatarp->wearableUpdated(type);
+								gAgentAvatarp->wearableUpdated(type, false);
 							}
 							else
 							{
@@ -1010,9 +1018,9 @@ void LLPanelEditWearable::onColorSwatchCommit(const LLUICtrl* ctrl)
                         const LLColor4& new_color = LLColor4(ctrl->getValue());
                         if( old_color != new_color )
                         {
-                                getWearable()->setClothesColor(entry->mTextureIndex, new_color);
+                                getWearable()->setClothesColor(entry->mTextureIndex, new_color, true);
                                 LLVisualParamHint::requestHintUpdates();
-                                gAgentAvatarp->wearableUpdated(getWearable()->getType());
+                                gAgentAvatarp->wearableUpdated(getWearable()->getType(), false);
                         }
                 }
                 else
@@ -1113,7 +1121,7 @@ void LLPanelEditWearable::saveChanges(bool force_save_as)
 				// Remove old link
 				remove_inventory_item(link_item->getUUID(), gAgentAvatarp->mEndCustomizeCallback);
 			}
-			gAgentWearables.saveWearable(mWearablePtr->getType(), index, new_name);
+			gAgentWearables.saveWearable(mWearablePtr->getType(), index, TRUE, new_name);
         }
 
 	
@@ -1131,7 +1139,7 @@ void LLPanelEditWearable::revertChanges()
         mNameEditor->setText(mWearableItem->getName());
         updatePanelPickerControls(mWearablePtr->getType());
         updateTypeSpecificControls(mWearablePtr->getType());
-        gAgentAvatarp->wearableUpdated(mWearablePtr->getType());
+        gAgentAvatarp->wearableUpdated(mWearablePtr->getType(), false);
 }
 
 void LLPanelEditWearable::showWearable(LLViewerWearable* wearable, BOOL show, BOOL disable_camera_switch)
@@ -1197,16 +1205,19 @@ void LLPanelEditWearable::showWearable(LLViewerWearable* wearable, BOOL show, BO
         
                         const std::string scrolling_panel = subpart_entry->mParamList;
                         const std::string accordion_tab = subpart_entry->mAccordionTab;
+                        if (scrolling_panel.empty() || accordion_tab.empty())
+                        {
+                            continue;
+                        }
         
                         LLScrollingPanelList *panel_list = getChild<LLScrollingPanelList>(scrolling_panel);
-                        LLAccordionCtrlTab *tab = getChild<LLAccordionCtrlTab>(accordion_tab);
-			
                         if (!panel_list)
                         {
                                 LL_WARNS() << "could not get scrolling panel list: " << scrolling_panel << LL_ENDL;
                                 continue;
                         }
         
+                        LLAccordionCtrlTab *tab = getChild<LLAccordionCtrlTab>(accordion_tab);
                         if (!tab)
                         {
                                 LL_WARNS() << "could not get llaccordionctrltab from UI with name: " << accordion_tab << LL_ENDL;
@@ -1276,7 +1287,7 @@ void LLPanelEditWearable::changeCamera(U8 subpart)
 {
 	// Don't change the camera if this type doesn't have a camera switch.
 	// Useful for wearables like physics that don't have an associated physical body part.
-	if (LLWearableType::getInstanceFast()->getDisableCameraSwitch(mWearablePtr->getType()))
+	if (LLWearableType::getInstance()->getDisableCameraSwitch(mWearablePtr->getType()))
 	{
 		return;
 	}
@@ -1308,7 +1319,9 @@ void LLPanelEditWearable::changeCamera(U8 subpart)
         gMorphView->setCameraOffset( subpart_entry->mCameraOffset );
         if (gSavedSettings.getBOOL("AppearanceCameraMovement"))
         {
-                gMorphView->updateCamera();
+            // Unlock focus from avatar but don't stop animation to not interrupt ANIM_AGENT_CUSTOMIZE
+            gAgentCamera.setFocusOnAvatar(FALSE, gAgentCamera.getCameraAnimating());
+            gMorphView->updateCamera();
         }
 }
 
@@ -1336,7 +1349,10 @@ void LLPanelEditWearable::updateTypeSpecificControls(LLWearableType::EType type)
         if (type == LLWearableType::WT_SHAPE)
         {
                 // Update avatar height
-                F32 new_size = gAgentAvatarp->mBodySize.mV[VZ];
+				// The .195 is a fudge factor derived by measuring against
+				//  prims inworld, and carried forward from Phoenix. -- TS
+				F32 new_size = gAgentAvatarp->mBodySize.mV[VZ] + .195f;
+
                 if (gSavedSettings.getBOOL("HeightUnits") == FALSE)
                 {
                         // convert meters to feet
@@ -1542,6 +1558,7 @@ void LLPanelEditWearable::updateVerbs()
 
         mBtnRevert->setEnabled(is_dirty);
         getChildView("save_as_button")->setEnabled(is_dirty && can_copy);
+        childSetEnabled("import_btn", mWearableItem->getPermissions().allowModifyBy(gAgentID));
 
         if(isAgentAvatarValid())
         {
@@ -1603,7 +1620,7 @@ void LLPanelEditWearable::onInvisibilityCommit(LLCheckBoxCtrl* checkbox_ctrl, LL
                 
                 LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTexture( IMG_INVISIBLE );
 				gAgentAvatarp->setLocalTexture(te, image, FALSE, index);
-				gAgentAvatarp->wearableUpdated(getWearable()->getType());
+				gAgentAvatarp->wearableUpdated(getWearable()->getType(), false);
         }
         else
         {
@@ -1619,7 +1636,7 @@ void LLPanelEditWearable::onInvisibilityCommit(LLCheckBoxCtrl* checkbox_ctrl, LL
                 if (!image) return;
 
                 gAgentAvatarp->setLocalTexture(te, image, FALSE, index);
-                gAgentAvatarp->wearableUpdated(getWearable()->getType());
+                gAgentAvatarp->wearableUpdated(getWearable()->getType(), false);
         }
 
         updatePanelPickerControls(getWearable()->getType());
@@ -1657,13 +1674,89 @@ void LLPanelEditWearable::initPreviousAlphaTextureEntry(LLAvatarAppearanceDefine
         }
 }
 
+void LLPanelEditWearable::onClickedImportBtn()
+{
+    LLFilePickerReplyThread::startPicker(boost::bind(&LLPanelEditWearable::onClickedImportBtnCallback, this, _1), LLFilePicker::FFLOAD_XML, false);
+}
+
+void LLPanelEditWearable::onClickedImportBtnCallback(const std::vector<std::string>& filenames)
+{
+    const std::string filename = filenames[0];
+	LLXmlTree tree;
+	if (!tree.parseFile(filename, FALSE))
+	{
+		LL_WARNS("ShapeImport") << "Parsing " << filename << "failed miserably." << LL_ENDL;
+		LLNotificationsUtil::add("ShapeImportGenericFail", LLSD().with("FILENAME", filename));
+		return;
+	}
+	LLXmlTreeNode* root = tree.getRoot();
+	if (!root || !root->hasName("linden_genepool"))
+	{
+		LL_WARNS("ShapeImport") << filename << " has an invaid root node (not linden_genepool). Are you sure this is an avatar file?" << LL_ENDL;
+		LLNotificationsUtil::add("ShapeImportVersionFail", LLSD().with("FILENAME", filename));
+		return;
+	}
+	std::string version;
+	static LLStdStringHandle version_string = LLXmlTree::addAttributeString("version");
+	if(!root->getFastAttributeString(version_string, version) || (version != "1.0") )
+	{
+		LL_WARNS("ShapeImport") << "Invalid avatar file version: " << version << " in file: " << filename << LL_ENDL;
+		LLNotificationsUtil::add("ShapeImportVersionFail", LLSD().with("FILENAME", filename));
+		return;
+	}
+	LLXmlTreeNode* archetype = root->getChildByName("archetype");
+	if (archetype)
+	{
+		static const LLStdStringHandle id_handle = LLXmlTree::addAttributeString("id");
+		static const LLStdStringHandle value_handle = LLXmlTree::addAttributeString("value");
+		U32 parse_errors = 0;
+		
+		for (LLXmlTreeNode* child = archetype->getFirstChild(); child != nullptr; child = archetype->getNextChild())
+		{
+			if (!child->hasName("param")) continue;
+			S32 id;
+			F32 value;
+			if (child->getFastAttributeS32(id_handle, id)
+				&& child->getFastAttributeF32(value_handle, value))
+			{
+				LLVisualParam* visual_param = getWearable()->getVisualParam(id);
+				if (visual_param)
+					visual_param->setWeight(value, FALSE);
+			}
+			else
+			{
+				LL_WARNS("ShapeImport") << "Failed to parse parameters in " << filename << LL_ENDL;
+				++parse_errors;
+			}
+		}
+		if (parse_errors)
+		{
+			LLNotificationsUtil::add("ShapeImportGenericFail", LLSD().with("FILENAME", filename));
+		}
+		if (isAgentAvatarValid())
+		{
+			getWearable()->writeToAvatar(gAgentAvatarp);
+			gAgentAvatarp->updateVisualParams();
+			updateScrollingPanelUI();
+			LL_INFOS("ShapeImport") << "Shape import has finished with great success!" << LL_ENDL;
+		}
+		else
+			LL_WARNS("ShapeImport") << "Agent is not valid. Can't apply shape import changes" << LL_ENDL;
+	}
+	else
+	{
+		LL_WARNS("ShapeImport") << filename << " is missing the archetype." << LL_ENDL;
+		LLNotificationsUtil::add("ShapeImportGenericFail");
+	}
+}
+
 // handle secondlife:///app/metricsystem
 class LLMetricSystemHandler : public LLCommandHandler
 {
 public:
-        LLMetricSystemHandler() : LLCommandHandler("metricsystem", UNTRUSTED_THROTTLE) { }
+        LLMetricSystemHandler() : LLCommandHandler("metricsystem", UNTRUSTED_CLICK_ONLY) { }
 
-        bool handle(const LLSD& params, const LLSD& query_map, LLMediaCtrl* web)
+        bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web)
         {
                 // change height units TRUE for meters and FALSE for feet
                 BOOL new_value = (gSavedSettings.getBOOL("HeightUnits") == FALSE) ? TRUE : FALSE;

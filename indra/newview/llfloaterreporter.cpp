@@ -54,6 +54,7 @@
 #include "llbutton.h"
 #include "llfloaterreg.h"
 #include "lltexturectrl.h"
+#include "lltexteditor.h"
 #include "llscrolllistctrl.h"
 #include "lldispatcher.h"
 #include "llviewerobject.h"
@@ -207,6 +208,9 @@ BOOL LLFloaterReporter::postBuild()
 	std::string reporter = LLSLURL("agent", gAgent.getID(), "inspect").getSLURLString();
 	getChild<LLUICtrl>("reporter_field")->setValue(reporter);
 
+	getChild<LLButton>("refresh_screenshot")->setCommitCallback([this](LLUICtrl*, const LLSD&) 
+		{doAfterInterval(boost::bind(&LLFloaterReporter::takeNewSnapshot, this, true), gSavedSettings.getF32("AbuseReportScreenshotDelay")); });
+
 	// request categories
 	if (gAgent.getRegion()
 		&& gAgent.getRegion()->capabilitiesReceived())
@@ -250,9 +254,6 @@ LLFloaterReporter::~LLFloaterReporter()
 
 	mPosition.setVec(0.0f, 0.0f, 0.0f);
 
-	std::for_each(mMCDList.begin(), mMCDList.end(), DeletePointer() );
-	mMCDList.clear();
-
 	delete mResourceDatap;
 }
 
@@ -265,7 +266,7 @@ void LLFloaterReporter::onIdle(void* user_data)
 		if (floater_reporter->mSnapshotTimer.getStarted() && floater_reporter->mSnapshotTimer.getElapsedTimeF32() > screenshot_delay)
 		{
 			floater_reporter->mSnapshotTimer.stop();
-			floater_reporter->takeNewSnapshot();
+			floater_reporter->takeNewSnapshot(false);
 		}
 	}
 }
@@ -427,8 +428,8 @@ void LLFloaterReporter::requestAbuseCategoriesCoro(std::string url, LLHandle<LLF
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("requestAbuseCategoriesCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("requestAbuseCategoriesCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
 
@@ -567,8 +568,8 @@ void LLFloaterReporter::onClickCancel(void *userdata)
 void LLFloaterReporter::onClickObjPicker(void *userdata)
 {
 	LLFloaterReporter *self = (LLFloaterReporter *)userdata;
-	LLToolObjPicker::getInstanceFast()->setExitCallback(LLFloaterReporter::closePickTool, self);
-	LLToolMgr::getInstanceFast()->setTransientTool(LLToolObjPicker::getInstanceFast());
+	LLToolObjPicker::getInstance()->setExitCallback(LLFloaterReporter::closePickTool, self);
+	LLToolMgr::getInstance()->setTransientTool(LLToolObjPicker::getInstance());
 	self->mPicking = TRUE;
 	self->getChild<LLUICtrl>("object_name")->setValue(LLStringUtil::null);
 	self->getChild<LLUICtrl>("owner_name")->setValue(LLStringUtil::null);
@@ -583,10 +584,10 @@ void LLFloaterReporter::closePickTool(void *userdata)
 {
 	LLFloaterReporter *self = (LLFloaterReporter *)userdata;
 
-	LLUUID object_id = LLToolObjPicker::getInstanceFast()->getObjectID();
+	LLUUID object_id = LLToolObjPicker::getInstance()->getObjectID();
 	self->getObjectInfo(object_id);
 
-	LLToolMgr::getInstanceFast()->clearTransientTool();
+	LLToolMgr::getInstance()->clearTransientTool();
 	self->mPicking = FALSE;
 	LLButton* pick_btn = self->getChild<LLButton>("pick_btn");
 	if (pick_btn) pick_btn->setToggleState(FALSE);
@@ -669,6 +670,23 @@ void LLFloaterReporter::showFromAvatar(const LLUUID& avatar_id, const std::strin
 	show(avatar_id, avatar_name);
 }
 
+// static
+void LLFloaterReporter::showFromChat(const LLUUID& avatar_id, const std::string& avatar_name, const std::string& time, const std::string& description)
+{
+    show(avatar_id, avatar_name);
+
+    LLStringUtil::format_map_t args;
+    args["[MSG_TIME]"] = time;
+    args["[MSG_DESCRIPTION]"] = description;
+
+    LLFloaterReporter *self = LLFloaterReg::findTypedInstance<LLFloaterReporter>("reporter");
+    if (self)
+    {
+        std::string description = self->getString("chat_report_format", args);
+        self->getChild<LLUICtrl>("details_edit")->setValue(description);
+    }
+}
+
 void LLFloaterReporter::setPickedObjectProperties(const std::string& object_name, const std::string& owner_name, const LLUUID owner_id)
 {
 	getChild<LLUICtrl>("object_name")->setValue(object_name);
@@ -735,7 +753,7 @@ LLSD LLFloaterReporter::gatherReport()
 	mCopyrightWarningSeen = FALSE;
 
 	std::ostringstream summary;
-	if (!LLGridManager::getInstance()->isInProductionGrid())
+	if (LLGridManager::getInstance()->isInSLBeta())
 	{
 		summary << "Preview ";
 	}
@@ -905,11 +923,7 @@ void LLFloaterReporter::takeScreenshot(bool use_prev_screenshot)
 
 	// store in cache
     LLFileSystem j2c_file(mResourceDatap->mAssetInfo.mUuid, mResourceDatap->mAssetInfo.mType, LLFileSystem::WRITE);
-	if (j2c_file.open())
-	{
-		j2c_file.write(upload_data->getData(), upload_data->getDataSize());
-		j2c_file.close();
-	}
+    j2c_file.write(upload_data->getData(), upload_data->getDataSize());
 
 	// store in the image list so it doesn't try to fetch from the server
 	LLPointer<LLViewerFetchedTexture> image_in_list = 
@@ -926,7 +940,7 @@ void LLFloaterReporter::takeScreenshot(bool use_prev_screenshot)
 	}
 }
 
-void LLFloaterReporter::takeNewSnapshot()
+void LLFloaterReporter::takeNewSnapshot(bool refresh)
 {
 	childSetEnabled("send_btn", true);
 	mImageRaw = new LLImageRaw;
@@ -943,7 +957,7 @@ void LLFloaterReporter::takeNewSnapshot()
 	}
 	setVisible(TRUE);
 
-	if(gSavedPerAccountSettings.getBOOL("PreviousScreenshotForReport"))
+	if(gSavedPerAccountSettings.getBOOL("PreviousScreenshotForReport") && !refresh)
 	{
 		std::string screenshot_filename(gDirUtilp->getLindenUserDir() + gDirUtilp->getDirDelimiter() + SCREEN_PREV_FILENAME);
 		mPrevImageRaw = new LLImageRaw;
@@ -1040,37 +1054,3 @@ void LLFloaterReporter::onClose(bool app_quitting)
 	mSnapshotTimer.stop();
 	gSavedPerAccountSettings.setBOOL("PreviousScreenshotForReport", app_quitting);
 }
-
-
-// void LLFloaterReporter::setDescription(const std::string& description, LLMeanCollisionData *mcd)
-// {
-// 	LLFloaterReporter *self = LLFloaterReg::findTypedInstance<LLFloaterReporter>("reporter");
-// 	if (self)
-// 	{
-// 		self->getChild<LLUICtrl>("details_edit")->setValue(description);
-
-// 		for_each(self->mMCDList.begin(), self->mMCDList.end(), DeletePointer());
-// 		self->mMCDList.clear();
-// 		if (mcd)
-// 		{
-// 			self->mMCDList.push_back(new LLMeanCollisionData(mcd));
-// 		}
-// 	}
-// }
-
-// void LLFloaterReporter::addDescription(const std::string& description, LLMeanCollisionData *mcd)
-// {
-// 	LLFloaterReporter *self = LLFloaterReg::findTypedInstance<LLFloaterReporter>("reporter");
-// 	if (self)
-// 	{
-// 		LLTextEditor* text = self->getChild<LLTextEditor>("details_edit");
-// 		if (text)
-// 		{	
-// 			text->insertText(description);
-// 		}
-// 		if (mcd)
-// 		{
-// 			self->mMCDList.push_back(new LLMeanCollisionData(mcd));
-// 		}
-// 	}
-// }

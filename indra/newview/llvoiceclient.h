@@ -95,6 +95,7 @@ struct LLVoiceVersionInfo
 {
 	std::string serverType;
 	std::string serverVersion;
+	std::string mBuildVersion;
 };
 
 //////////////////////////////////
@@ -120,8 +121,6 @@ public:
     virtual void setHidden(bool hidden)=0;  //  Hides the user from voice.
 
 	virtual const LLVoiceVersionInfo& getVersion()=0;
-	
-	virtual bool singletoneInstanceExists()=0;
 	
 	/////////////////////
 	/// @name Tuning

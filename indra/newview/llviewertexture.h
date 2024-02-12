@@ -27,6 +27,7 @@
 #ifndef LL_LLVIEWERTEXTURE_H					
 #define LL_LLVIEWERTEXTURE_H
 
+#include "llatomic.h"
 #include "llgltexture.h"
 #include "lltimer.h"
 #include "llframetimer.h"
@@ -35,6 +36,7 @@
 #include "llrender.h"
 #include "llmetricperformancetester.h"
 #include "httpcommon.h"
+#include "workqueue.h"
 
 #include <map>
 #include <list>
@@ -113,7 +115,7 @@ protected:
 
 public:	
 	static void initClass();
-	static void updateClass(const F32 velocity, const F32 angular_velocity) ;
+	static void updateClass();
 	
 	LLViewerTexture(BOOL usemipmaps = TRUE);
 	LLViewerTexture(const LLUUID& id, BOOL usemipmaps) ;
@@ -132,7 +134,7 @@ public:
 	/*virtual*/ bool isActiveFetching();
 	
 	/*virtual*/ const LLUUID& getID() const { return mID; }
-	void setBoostLevel(S32 level);
+	virtual void setBoostLevel(S32 level);
 	S32  getBoostLevel() { return mBoostLevel; }
 	void setTextureListType(S32 tex_type) { mTextureListType = tex_type; }
 	S32 getTextureListType() { return mTextureListType; }
@@ -175,10 +177,7 @@ protected:
 	void cleanup() ;
 	void init(bool firstinit) ;
 	void reorganizeFaceList() ;
-	void reorganizeVolumeList() ;
-
-	void notifyAboutMissingAsset();
-	void notifyAboutCreatingTexture();
+	void reorganizeVolumeList();
 
 private:
 	friend class LLBumpImageList;
@@ -186,19 +185,18 @@ private:
 
 	virtual void switchToCachedImage();
 	
-	static bool isMemoryForTextureLow() ;
-	static bool isMemoryForTextureSuficientlyFree();
 	static void getGPUMemoryForTextures(S32Megabytes &gpu, S32Megabytes &physical);
 
+public:
+    static bool isMemoryForTextureLow();
 protected:
+    friend class LLViewerTextureList;
 	LLUUID mID;
 	S32 mTextureListType; // along with mID identifies where to search for this texture in TextureList
 
-	F32 mSelectedTime;				// time texture was last selected
-	mutable F32 mMaxVirtualSize;	// The largest virtual size of the image, in pixels - how much data to we need?	
-	mutable S32  mMaxVirtualSizeResetCounter ;
+	mutable F32 mMaxVirtualSize = 0.f;	// The largest virtual size of the image, in pixels - how much data to we need?	
+	mutable S32  mMaxVirtualSizeResetCounter;
 	mutable S32  mMaxVirtualSizeResetInterval;
-	mutable F32 mAdditionalDecodePriority;  // priority add to mDecodePriority.
 	LLFrameTimer mLastReferencedTimer;	
 
 	ll_face_list_t    mFaceList[LLRender::NUM_TEXTURE_CHANNELS]; //reverse pointer pointing to the faces using this image as texture
@@ -212,7 +210,9 @@ protected:
 	//do not use LLPointer here.
 	LLViewerMediaTexture* mParcelMedia ;
 
-	static F32 sTexelPixelRatio;
+	LL::WorkQueue::weak_t mMainQueue;
+	LL::WorkQueue::weak_t mImageQueue;
+
 public:
 	static const U32 sCurrentFileVersion;	
 	static S32 sImageCount;
@@ -221,13 +221,6 @@ public:
 	static LLFrameTimer sEvaluationTimer;
 	static F32 sDesiredDiscardBias;
 	static F32 sDesiredDiscardScale;
-	static S64Bytes sBoundTextureMemory;
-	static S64Bytes sTotalTextureMemory;
-	static S32Megabytes sMaxBoundTextureMemory;
-	static S32Megabytes sMaxTotalTextureMem;
-	static S64Bytes sMaxDesiredTextureMem ;
-	static S8  sCameraMovingDiscardBias;
-	static F32 sCameraMovingBias;
 	static S32 sMaxSculptRez ;
 	static U32 sMinLargeImageSize ;
 	static U32 sMaxSmallImageSize ;
@@ -280,7 +273,6 @@ public:
 	LLViewerFetchedTexture(const std::string& url, FTType f_type, const LLUUID& id, BOOL usemipmaps = TRUE);
 
 public:
-	static F32 maxDecodePriority();
 	
 	struct Compare
 	{
@@ -289,9 +281,10 @@ public:
 		{
 			const LLViewerFetchedTexture* lhsp = (const LLViewerFetchedTexture*)lhs;
 			const LLViewerFetchedTexture* rhsp = (const LLViewerFetchedTexture*)rhs;
+            
 			// greater priority is "less"
-			const F32 lpriority = lhsp->getDecodePriority();
-			const F32 rpriority = rhsp->getDecodePriority();
+			const F32 lpriority = lhsp->mMaxVirtualSize;
+			const F32 rpriority = rhsp->mMaxVirtualSize;
 			if (lpriority > rpriority) // higher priority
 				return true;
 			if (lpriority < rpriority)
@@ -301,16 +294,18 @@ public:
 	};
 
 public:
-	/*virtual*/ S8 getType() const ;
+	/*virtual*/ S8 getType() const override;
 	FTType getFTType() const;
-	/*virtual*/ void forceImmediateUpdate() ;
-	/*virtual*/ void dump() ;
+	/*virtual*/ void forceImmediateUpdate() override;
+	/*virtual*/ void dump() override;
 
 	// Set callbacks to get called when the image gets updated with higher 
 	// resolution versions.
 	void setLoadedCallback(loaded_callback_func cb,
 						   S32 discard_level, BOOL keep_imageraw, BOOL needs_aux,
 						   void* userdata, LLLoadedCallbackEntry::source_callback_list_t* src_callback_list, BOOL pause = FALSE);
+    void setLoadedCallbackNoAux(loaded_callback_func cb, S32 discard_level, BOOL keep_imageraw, BOOL needs_aux, void* userdata,
+                           LLLoadedCallbackEntry::source_callback_list_t* src_callback_list, BOOL pause = FALSE);
 	bool hasCallbacks() { return mLoadedCallbackList.empty() ? false : true; }	
 	void pauseLoadedCallbacks(const LLLoadedCallbackEntry::source_callback_list_t* callback_list);
 	void unpauseLoadedCallbacks(const LLLoadedCallbackEntry::source_callback_list_t* callback_list);
@@ -320,13 +315,16 @@ public:
 
 	void addToCreateTexture();
 
-
-	 // ONLY call from LLViewerTextureList
+    //call to determine if createTexture is necessary
+    BOOL preCreateTexture(S32 usename = 0);
+	 // ONLY call from LLViewerTextureList or ImageGL background thread
 	BOOL createTexture(S32 usename = 0);
+    void postCreateTexture();
+    void scheduleCreateTexture();
+
 	void destroyTexture() ;
 
 	virtual void processTextureStats() ;
-	F32  calcDecodePriority() ;
 
 	BOOL needsAux() const { return mNeedsAux; }
 
@@ -334,20 +332,12 @@ public:
 	void setTargetHost(LLHost host)			{ mTargetHost = host; }
 	LLHost getTargetHost() const			{ return mTargetHost; }
 	
-	// Set the decode priority for this image...
-	// DON'T CALL THIS UNLESS YOU KNOW WHAT YOU'RE DOING, it can mess up
-	// the priority list, and cause horrible things to happen.
-	void setDecodePriority(F32 priority = -1.0f);
-	F32 getDecodePriority() const { return mDecodePriority; };
-	F32 getAdditionalDecodePriority() const { return mAdditionalDecodePriority; };
-
-	void setAdditionalDecodePriority(F32 priority) ;
-	
 	void updateVirtualSize() ;
 
 	S32  getDesiredDiscardLevel()			 { return mDesiredDiscardLevel; }
 	void setMinDiscardLevel(S32 discard) 	{ mMinDesiredDiscardLevel = llmin(mMinDesiredDiscardLevel,(S8)discard); }
 
+    void setBoostLevel(S32 level) override;
 	bool updateFetch();
 	bool setDebugFetching(S32 debug_level);
 	bool isInDebug() const { return mInDebug; }
@@ -360,10 +350,14 @@ public:
 	// Override the computation of discard levels if we know the exact output
 	// size of the image.  Used for UI textures to not decode, even if we have
 	// more data.
-	/*virtual*/ void setKnownDrawSize(S32 width, S32 height);
+	/*virtual*/ void setKnownDrawSize(S32 width, S32 height) override;
+
+    // Set the debug text of all Viewer Objects associated with this texture
+    // to the specified text
+    void setDebugText(const std::string& text);
 
 	void setIsMissingAsset(BOOL is_missing = true);
-	/*virtual*/ BOOL isMissingAsset() const { return mIsMissingAsset; }
+	/*virtual*/ BOOL isMissingAsset() const override { return mIsMissingAsset; }
 
 	// returns dimensions of original image for local files (before power of two scaling)
 	// and returns 0 for all asset system images
@@ -406,7 +400,7 @@ public:
 	BOOL        isRawImageValid()const { return mIsRawImageValid ; }	
 	void        forceToSaveRawImage(S32 desired_discard = 0, F32 kept_time = 0.f) ;
 	void        forceToRefetchTexture(S32 desired_discard = 0, F32 kept_time = 60.f);
-	/*virtual*/ void setCachedRawImage(S32 discard_level, LLImageRaw* imageraw) ;
+	/*virtual*/ void setCachedRawImage(S32 discard_level, LLImageRaw* imageraw) override;
 	void        destroySavedRawImage() ;
 	LLImageRaw* getSavedRawImage() ;
 	BOOL        hasSavedRawImage() const ;
@@ -414,6 +408,7 @@ public:
 	BOOL		isFullyLoaded() const;
 
 	BOOL        hasFetcher() const { return mHasFetcher;}
+	bool        isFetching() const { return mIsFetching;}
 	void        setCanUseHTTP(bool can_use_http) {mCanUseHTTP = can_use_http;}
 
 	void        forceToDeleteRequest();
@@ -421,10 +416,14 @@ public:
 	void        setInFastCacheList(bool in_list) { mInFastCacheList = in_list; }
 	bool        isInFastCacheList() { return mInFastCacheList; }
 
-	/*virtual*/bool  isActiveFetching(); //is actively in fetching by the fetching pipeline.
+	/*virtual*/bool  isActiveFetching() override; //is actively in fetching by the fetching pipeline.
+
+	LLUUID		getUploader();
+	LLDate		getUploadTime();
+	std::string getComment();
 
 protected:
-	/*virtual*/ void switchToCachedImage();
+	/*virtual*/ void switchToCachedImage() override;
 	S32 getCurrentDiscardLevelForFetching() ;
 
 private:
@@ -462,11 +461,11 @@ protected:
 	S32 mRequestedDiscardLevel;
 	F32 mRequestedDownloadPriority;
 	S32 mFetchState;
+    S32 mLastFetchState = -1; // DEBUG
 	U32 mFetchPriority;
 	F32 mDownloadProgress;
 	F32 mFetchDeltaTime;
 	F32 mRequestDeltaTime;
-	F32 mDecodePriority;			// The priority for decoding this image.
 	S32	mMinDiscardLevel;
 	S8  mDesiredDiscardLevel;			// The discard level we'd LIKE to have - if we have it and there's space	
 	S8  mMinDesiredDiscardLevel;	// The minimum discard level we'd like to have
@@ -490,7 +489,7 @@ protected:
 	F32             mLastCallBackActiveTime;
 
 	LLPointer<LLImageRaw> mRawImage;
-	S32 mRawDiscardLevel;
+	S32 mRawDiscardLevel = -1;
 
 	// Used ONLY for cloth meshes right now.  Make SURE you know what you're 
 	// doing if you use it for anything else! - djs
@@ -518,17 +517,26 @@ protected:
 	LLFrameTimer mStopFetchingTimer;	// Time since mDecodePriority == 0.f.
 
 	BOOL  mInImageList;				// TRUE if image is in list (in which case don't reset priority!)
-	BOOL  mNeedsCreateTexture;	
+	// This needs to be atomic, since it is written both in the main thread
+	// and in the GL image worker thread... HB
+	LLAtomicBool mNeedsCreateTexture;	
 
 	BOOL   mForSculpt ; //a flag if the texture is used as sculpt data.
 	BOOL   mIsFetched ; //is loaded from remote or from cache, not generated locally.
+	
+	std::map<S8, std::string> mComment;
 
 public:
+    static F32 sMaxVirtualSize; //maximum possible value of mMaxVirtualSize
 	static LLPointer<LLViewerFetchedTexture> sMissingAssetImagep;	// Texture to show for an image asset that is not in the database
 	static LLPointer<LLViewerFetchedTexture> sWhiteImagep;	// Texture to show NOTHING (whiteness)
 	static LLPointer<LLViewerFetchedTexture> sDefaultImagep; // "Default" texture for error cases, the only case of fetched texture which is generated in local.
-	static LLPointer<LLViewerFetchedTexture> sSmokeImagep; // Old "Default" translucent texture
 	static LLPointer<LLViewerFetchedTexture> sFlatNormalImagep; // Flat normal map denoting no bumpiness on a surface
+	static LLPointer<LLViewerFetchedTexture> sDefaultIrradiancePBRp; // PBR: irradiance
+
+    // not sure why, but something is iffy about the loading of this particular texture, use the accessor instead of accessing directly
+    static LLPointer<LLViewerFetchedTexture> sSmokeImagep; // Old "Default" translucent texture
+    static LLViewerFetchedTexture* getSmokeImage();
 	static LLPointer<LLViewerFetchedTexture> sPixieSmallImagep; // Small pixmap for default particle tex
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
 	static LLPointer<LLViewerFetchedTexture> sDefaultDiffuseImagep;
@@ -662,6 +670,8 @@ public:
 	static LLPointer<LLViewerTexture> getLocalTexture(const LLImageRaw* raw, BOOL usemipmaps) ;
 	static LLPointer<LLViewerTexture> getLocalTexture(const U32 width, const U32 height, const U8 components, BOOL usemipmaps, BOOL generate_gl_tex = TRUE) ;
 
+    static LLViewerFetchedTexture* getFetchedTexture(const LLImageRaw* raw, FTType type, bool usemipmaps);
+
 	static LLViewerFetchedTexture* getFetchedTexture(const LLUUID &image_id,									 
 									 FTType f_type = FTT_DEFAULT,
 									 BOOL usemipmap = TRUE,
@@ -766,7 +776,6 @@ private:
 
 		void reset() ;
 
-		F32 mTotalFetchingTime ;
 		F32 mTotalGrayTime ;
 		F32 mTotalStablizingTime ;
 		F32 mStartTimeLoadingSculpties ; 

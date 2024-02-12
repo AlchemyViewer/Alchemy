@@ -60,6 +60,12 @@
        function="Avatar.ResetSkeleton" />
     </menu_item_call>
     <menu_item_call
+     label="Refresh Textures"
+     name="Refresh Textures">
+      <menu_item_call.on_click
+       function="Avatar.RefreshTexture" />
+    </menu_item_call>
+    <menu_item_call
      label="Reset Skeleton And Animations"
      name="Reset Skeleton And Animations">
       <menu_item_call.on_click
@@ -68,7 +74,7 @@
     <menu_item_separator />
     <menu_item_check
       name="RenderNormally"
-      label="Normally Render">
+      label="Normal detail">
       <menu_item_check.on_check
         function="Avatar.CheckImpostorMode"
         parameter="0" />
@@ -78,7 +84,7 @@
     </menu_item_check>
     <menu_item_check
       name="AlwaysRenderFully"
-      label="Always Render">
+      label="Always full detail">
       <menu_item_check.on_check
         function="Avatar.CheckImpostorMode"
         parameter="2" />
@@ -88,7 +94,7 @@
     </menu_item_check>
     <menu_item_check
       name="DoNotRender"
-      label="Never Render">
+      label="Never full detail">
       <menu_item_check.on_check
         function="Avatar.CheckImpostorMode"
         parameter="1" />
@@ -101,12 +107,12 @@
       label="Render Exceptions..."
       name="RenderExceptions">
       <menu_item_call.on_click
-        function="Floater.ToggleOrBringToFront"
-        parameter="avatar_render_settings" />
+	      function="View.Blocked"
+	      parameter="avatar_rendering_tab" />
     </menu_item_call>
   </context_menu>
   <context_menu
-   label="Utilities"
+   label="Actions"
    name="Utilities">
     <menu_item_call
      label="Debug Textures"
@@ -125,17 +131,17 @@
        function="Advanced.EnableAppearanceToXML"/>
     </menu_item_call>
     <menu_item_call
-     label="Copy Username"
-     name="Copy Username">
+     label="Copy Full Name"
+     name="copy_full_name">
       <menu_item_call.on_click
        function="Avatar.CopyData"
-       parameter="user_name"/>
+       parameter="full_name"/>
       <menu_item_call.on_enable
        function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy Display Name"
-     name="Copy Display Name">
+     name="copy_display_name">
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="display_name"/>
@@ -143,17 +149,17 @@
        function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
-     label="Copy Account Name"
-     name="Copy Account Name">
+     label="Copy Agent Name"
+     name="copy_username">
       <menu_item_call.on_click
        function="Avatar.CopyData"
-       parameter="account_name"/>
+       parameter="user_name"/>
       <menu_item_call.on_enable
        function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
      label="Copy SLurl"
-     name="Copy SLurl">
+     name="copy_slurl">
       <menu_item_call.on_click
        function="Avatar.CopyData"
        parameter="slurl"/>
@@ -161,7 +167,7 @@
        function="RLV.CanShowName" />
     </menu_item_call>
     <menu_item_call
-     label="Copy ID"
+     label="Copy UUID"
      name="Copy ID">
       <menu_item_call.on_click
        function="Avatar.CopyData"
@@ -170,7 +176,7 @@
   </context_menu>
   <context_menu
    label="Manage"
-   name="Manage">
+   name="Avatar Manage">
     <menu_item_call
      enabled="false"
      label="Block"

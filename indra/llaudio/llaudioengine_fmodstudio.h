@@ -57,8 +57,9 @@ public:
 	virtual ~LLAudioEngine_FMODSTUDIO() = default;
 
 	// initialization/startup/shutdown
-	bool init(const S32 num_channels, void *user_data, const std::string& app_title) final override;
+	virtual bool init(void *user_data, const std::string &app_title) final;
 	std::string getDriverName(bool verbose) final override;
+	LLStreamingAudioInterface* createDefaultStreamingAudioImpl() const override;
 	void allocateListener() final override;
 
 	void shutdown() final override;
@@ -86,7 +87,6 @@ protected:
 	FMOD::System *mSystem;
 	bool mEnableProfiler;
 	U32 mResampleMethod;
-	std::string mAppName;
 
 public:
 	static FMOD::ChannelGroup *mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT];

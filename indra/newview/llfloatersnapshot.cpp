@@ -140,6 +140,8 @@ LLSnapshotModel::ESnapshotLayerType LLFloaterSnapshot::Impl::getLayerType(LLFloa
 		type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
 	else if (id == "depth")
 		type = LLSnapshotModel::SNAPSHOT_TYPE_DEPTH;
+	else if (id == "depth24")
+		type = LLSnapshotModel::SNAPSHOT_TYPE_DEPTH24;
 	return type;
 }
 
@@ -177,15 +179,23 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
 
 	LLUICtrl* thumbnail_placeholder = floaterp->getChild<LLUICtrl>("thumbnail_placeholder");
 	thumbnail_placeholder->setVisible(mAdvanced);
-	thumbnail_placeholder->reshape(panel_width, thumbnail_placeholder->getRect().getHeight());
+
 	floaterp->getChild<LLUICtrl>("image_res_text")->setVisible(mAdvanced);
 	floaterp->getChild<LLUICtrl>("file_size_label")->setVisible(mAdvanced);
-	if(!floaterp->isMinimized())
+    if (floaterp->hasChild("360_label", TRUE))
+    { 
+        floaterp->getChild<LLUICtrl>("360_label")->setVisible(mAdvanced);
+    }
+	if (!mSkipReshaping)
 	{
-		floaterp->reshape(floater_width, floaterp->getRect().getHeight());
+        thumbnail_placeholder->reshape(panel_width, thumbnail_placeholder->getRect().getHeight());
+        if (!floaterp->isMinimized())
+        {
+            floaterp->reshape(floater_width, floaterp->getRect().getHeight());
+        }
 	}
 
-	bool use_freeze_frame = floaterp->getChild<LLUICtrl>("freeze_frame_check")->getValue().asBoolean();
+	bool use_freeze_frame = floaterp->mFreezeFrameCheck && floaterp->mFreezeFrameCheck->getValue().asBoolean();
 
 	if (use_freeze_frame)
 	{
@@ -215,10 +225,10 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
 		// freeze everything else
 		gSavedSettings.setBOOL("FreezeTime", TRUE);
 
-		if (LLToolMgr::getInstanceFast()->getCurrentToolset() != gCameraToolset)
+		if (LLToolMgr::getInstance()->getCurrentToolset() != gCameraToolset)
 		{
-			floaterp->impl->mLastToolset = LLToolMgr::getInstanceFast()->getCurrentToolset();
-			LLToolMgr::getInstanceFast()->setCurrentToolset(gCameraToolset);
+			floaterp->impl->mLastToolset = LLToolMgr::getInstance()->getCurrentToolset();
+			LLToolMgr::getInstance()->setCurrentToolset(gCameraToolset);
 		}
 	}
 	else // turning off freeze frame mode
@@ -241,7 +251,7 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
 		// restore last tool (e.g. pie menu, etc)
 		if (floaterp->impl->mLastToolset)
 		{
-			LLToolMgr::getInstanceFast()->setCurrentToolset(floaterp->impl->mLastToolset);
+			LLToolMgr::getInstance()->setCurrentToolset(floaterp->impl->mLastToolset);
 		}
 	}
 }
@@ -454,13 +464,24 @@ void LLFloaterSnapshotBase::ImplBase::onClickAutoSnap(LLUICtrl *ctrl, void* data
 {
 	LLCheckBoxCtrl *check = (LLCheckBoxCtrl *)ctrl;
 	gSavedSettings.setBOOL( "AutoSnapshot", check->get() );
-	
-	LLFloaterSnapshotBase *view = (LLFloaterSnapshotBase *)data;		
+
+	LLFloaterSnapshotBase *view = (LLFloaterSnapshotBase *)data;
 	if (view)
 	{
 		view->impl->checkAutoSnapshot(view->getPreviewView());
 		view->impl->updateControls(view);
 	}
+}
+
+// static
+void LLFloaterSnapshotBase::ImplBase::onClickNoPost(LLUICtrl *ctrl, void* data)
+{
+    BOOL no_post = ((LLCheckBoxCtrl*)ctrl)->get();
+    gSavedSettings.setBOOL("RenderSnapshotNoPost", no_post);
+
+    LLFloaterSnapshotBase* view = (LLFloaterSnapshotBase*)data;
+    view->getPreviewView()->updateSnapshot(TRUE, TRUE);
+    view->impl->updateControls(view);
 }
 
 // static
@@ -942,7 +963,7 @@ LLFloaterSnapshotBase::~LLFloaterSnapshotBase()
 
 	if (impl->mLastToolset)
 	{
-		LLToolMgr::getInstanceFast()->setCurrentToolset(impl->mLastToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
 	}
 
 	delete impl;
@@ -984,14 +1005,22 @@ BOOL LLFloaterSnapshot::postBuild()
 	getChild<LLUICtrl>("layer_types")->setValue("colors");
 	getChildView("layer_types")->setEnabled(FALSE);
 
-	getChild<LLUICtrl>("freeze_frame_check")->setValue(gSavedSettings.getBOOL("UseFreezeFrame"));
-	childSetCommitCallback("freeze_frame_check", ImplBase::onCommitFreezeFrame, this);
+	mFreezeFrameCheck = getChild<LLUICtrl>("freeze_frame_check");
+	mFreezeFrameCheck->setValue(gSavedSettings.getBOOL("UseFreezeFrame"));
+	mFreezeFrameCheck->setCommitCallback(&ImplBase::onCommitFreezeFrame, this);
 
 	getChild<LLUICtrl>("auto_snapshot_check")->setValue(gSavedSettings.getBOOL("AutoSnapshot"));
 	childSetCommitCallback("auto_snapshot_check", ImplBase::onClickAutoSnap, this);
 
+    getChild<LLUICtrl>("no_post_check")->setValue(gSavedSettings.getBOOL("RenderSnapshotNoPost"));
+    childSetCommitCallback("no_post_check", ImplBase::onClickNoPost, this);
+
     getChild<LLButton>("retract_btn")->setCommitCallback(boost::bind(&LLFloaterSnapshot::onExtendFloater, this));
     getChild<LLButton>("extend_btn")->setCommitCallback(boost::bind(&LLFloaterSnapshot::onExtendFloater, this));
+
+    getChild<LLTextBox>("360_label")->setSoundFlags(LLView::MOUSE_UP);
+    getChild<LLTextBox>("360_label")->setShowCursorHand(false);
+    getChild<LLTextBox>("360_label")->setClickedCallback(boost::bind(&LLFloaterSnapshot::on360Snapshot, this));
 
 	// Filters
 	LLComboBox* filterbox = getChild<LLComboBox>("filters_combobox");
@@ -1119,6 +1148,12 @@ void LLFloaterSnapshot::onExtendFloater()
 	impl->setAdvanced(gSavedSettings.getBOOL("AdvanceSnapshot"));
 }
 
+void LLFloaterSnapshot::on360Snapshot()
+{
+    LLFloaterReg::showInstance("360capture");
+    closeFloater();
+}
+
 //virtual
 void LLFloaterSnapshotBase::onClose(bool app_quitting)
 {
@@ -1138,7 +1173,7 @@ void LLFloaterSnapshotBase::onClose(bool app_quitting)
 
 	if (impl->mLastToolset)
 	{
-		LLToolMgr::getInstanceFast()->setCurrentToolset(impl->mLastToolset);
+		LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
 	}
 }
 
@@ -1180,7 +1215,7 @@ S32 LLFloaterSnapshotBase::notify(const LLSD& info)
 
 		// The refresh button is initially hidden. We show it after the first update,
 		// i.e. when preview appears.
-		if (!mRefreshBtn->getVisible())
+		if (mRefreshBtn && !mRefreshBtn->getVisible())
 		{
 			mRefreshBtn->setVisible(true);
 		}
@@ -1425,7 +1460,7 @@ BOOL LLSnapshotFloaterView::handleMouseDown(S32 x, S32 y, MASK mask)
 	// give floater a change to handle mouse, else camera tool
 	if (childrenHandleMouseDown(x, y, mask) == NULL)
 	{
-		LLToolMgr::getInstanceFast()->getCurrentTool()->handleMouseDown( x, y, mask );
+		LLToolMgr::getInstance()->getCurrentTool()->handleMouseDown( x, y, mask );
 	}
 	return TRUE;
 }
@@ -1441,7 +1476,7 @@ BOOL LLSnapshotFloaterView::handleMouseUp(S32 x, S32 y, MASK mask)
 	// give floater a change to handle mouse, else camera tool
 	if (childrenHandleMouseUp(x, y, mask) == NULL)
 	{
-		LLToolMgr::getInstanceFast()->getCurrentTool()->handleMouseUp( x, y, mask );
+		LLToolMgr::getInstance()->getCurrentTool()->handleMouseUp( x, y, mask );
 	}
 	return TRUE;
 }
@@ -1457,7 +1492,7 @@ BOOL LLSnapshotFloaterView::handleHover(S32 x, S32 y, MASK mask)
 	// give floater a change to handle mouse, else camera tool
 	if (childrenHandleHover(x, y, mask) == NULL)
 	{
-		LLToolMgr::getInstanceFast()->getCurrentTool()->handleHover( x, y, mask );
+		LLToolMgr::getInstance()->getCurrentTool()->handleHover( x, y, mask );
 	}
 	return TRUE;
 }

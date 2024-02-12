@@ -1,11 +1,14 @@
+
 project(deps)
 
 include(00-Common)
 include(FetchContent)
-include(Abseil)
+include(UI)
 
 set(CMAKE_FOLDER "Third Party")
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 set(deps_SOURCE_FILES
     CMakeLists.txt
@@ -19,21 +22,12 @@ add_library(deps
             ${deps_SOURCE_FILES}
             )
 
-
-if(${CMAKE_VERSION} VERSION_LESS 3.14)
-    macro(FetchContent_MakeAvailable NAME)
-        FetchContent_GetProperties(${NAME})
-        if(NOT ${NAME}_POPULATED)
-            FetchContent_Populate(${NAME})
-            add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
-        endif()
-    endmacro()
-endif()
-
 FetchContent_Declare(
   meshoptimizer
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/meshoptimizer.git
-  GIT_TAG        v0.17
+  GIT_TAG        v0.20
+  GIT_SHALLOW TRUE
+  GIT_PROGRESS TRUE
   )
 # FetchContent_Declare(
 #   Catch2
@@ -43,50 +37,17 @@ FetchContent_Declare(
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG        8.0.1
+  GIT_TAG        10.1.1
+  GIT_SHALLOW TRUE
+  GIT_PROGRESS TRUE
   )
 FetchContent_Declare(
   nlohmann_json
   GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/modernjson.git
-  GIT_TAG        v3.10.4
+  GIT_TAG        v3.11.3
+  GIT_SHALLOW TRUE
+  GIT_PROGRESS TRUE
   )
-
-FetchContent_Declare(
-  readerwriterqueue
-  GIT_REPOSITORY    https://github.com/cameron314/readerwriterqueue
-  GIT_TAG           v1.0.6
-)
-
-if(NOT USE_BINARY_ABSL)
-  FetchContent_Declare(
-    absl
-    GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/thirdparty/abseil-cpp.git
-    GIT_TAG        a198d62533e8de0c33a6311f38a3335f7930b7c7
-    )
-
-  # This is a hack because absl has dumb cmake
-  set(OLD_BUILD_TEST ${BUILD_TESTING})
-  set(BUILD_TESTING OFF)
-  FetchContent_MakeAvailable(absl)
-  set(BUILD_TESTING ${OLD_BUILD_TEST})
-
-  # Supress warnings inside abseil under MSVC
-  if(WINDOWS)
-    target_compile_options(absl_strings PRIVATE /wd4018)
-    target_compile_options(absl_str_format_internal PRIVATE /wd4018)
-    target_compile_options(absl_flags_usage_internal PRIVATE /wd4018)
-    target_compile_options(absl_random_internal_distribution_test_util PRIVATE /wd4723)
-  elseif(LINUX) 
-    target_compile_options(absl_flags PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_commandlineflag PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_internal PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_parse PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_private_handle_accessor PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_reflection PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_usage PRIVATE -Wno-non-virtual-dtor)
-    target_compile_options(absl_flags_usage_internal PRIVATE -Wno-non-virtual-dtor)
-  endif()
-endif()
 
 # #Download the rest of the libraries
 FetchContent_MakeAvailable(fmt)
@@ -100,7 +61,29 @@ set(JSON_Install OFF CACHE INTERNAL "")
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 FetchContent_MakeAvailable(nlohmann_json)
 
-FetchContent_MakeAvailable(readerwriterqueue)
+if(USE_TRACY)
+  FetchContent_Declare (
+    tracy
+    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+    GIT_TAG v0.10
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+    )
+  set(TRACY_ON_DEMAND ON)
+  set(TRACY_ONLY_LOCALHOST ON)
+  set(TRACY_FIBERS ON)
+  FetchContent_MakeAvailable(tracy)
+endif()
+
+if(USE_NFD)
+  FetchContent_Declare(
+    nfd
+    GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
+    GIT_TAG        v1.1.1
+    )
+
+  set(NFD_PORTAL ON)
+  FetchContent_MakeAvailable(nfd)
+endif()
 
 unset(CMAKE_FOLDER)
-unset(CMAKE_POSITION_INDEPENDENT_CODE)

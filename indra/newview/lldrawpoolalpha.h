@@ -35,9 +35,13 @@ class LLFace;
 class LLColor4;
 class LLGLSLShader;
 
-class LLDrawPoolAlpha final : public LLRenderPass
+class LLDrawPoolAlpha final: public LLRenderPass
 {
 public:
+
+    // set by llsettingsvo so lldrawpoolalpha has quick access to the water plane in eye space
+    static LLVector4 sWaterPlane;
+
 	enum
 	{
 		VERTEX_DATA_MASK =	LLVertexBuffer::MAP_VERTEX |
@@ -47,43 +51,41 @@ public:
 	};
 	virtual U32 getVertexDataMask() { return VERTEX_DATA_MASK; }
 
-	LLDrawPoolAlpha(U32 type = LLDrawPool::POOL_ALPHA);
+	LLDrawPoolAlpha(U32 type);
 	/*virtual*/ ~LLDrawPoolAlpha();
 
 	/*virtual*/ S32 getNumPostDeferredPasses();
-	/*virtual*/ void beginPostDeferredPass(S32 pass);
-	/*virtual*/ void endPostDeferredPass(S32 pass);
 	/*virtual*/ void renderPostDeferred(S32 pass);
-
-	/*virtual*/ void beginRenderPass(S32 pass = 0);
-	/*virtual*/ void endRenderPass( S32 pass );
 	/*virtual*/ S32	 getNumPasses() { return 1; }
 
-	virtual void render(S32 pass = 0);
+    void forwardRender(bool write_depth = false);
 	/*virtual*/ void prerender();
 
+    void renderDebugAlpha();
+
 	void renderGroupAlpha(LLSpatialGroup* group, U32 type, U32 mask, BOOL texture = TRUE);
-	void renderAlpha(U32 mask, S32 pass);
-	void renderAlphaHighlight(U32 mask);
-		
+	void renderAlpha(U32 mask, bool depth_only = false, bool rigged = false);
+	void renderAlphaHighlight();
+    bool uploadMatrixPalette(const LLDrawInfo& params);
+
 	static BOOL sShowDebugAlpha;
 
 private:
-	LLGLSLShader* current_shader;
 	LLGLSLShader* target_shader;
-	LLGLSLShader* simple_shader;
-	LLGLSLShader* fullbright_shader;	
-	LLGLSLShader* emissive_shader;
 
-    void renderSimples(U32 mask, std::vector<LLDrawInfo*>& simples);
-    void renderFullbrights(U32 mask, std::vector<LLDrawInfo*>& fullbrights);
-    void renderMaterials(U32 mask, std::vector<LLDrawInfo*>& fullbrights);
-    void renderEmissives(U32 mask, std::vector<LLDrawInfo*>& emissives);
+    // setup by beginFooPass, [0] is static variant, [1] is rigged variant
+    LLGLSLShader* simple_shader = nullptr;
+    LLGLSLShader* fullbright_shader = nullptr;
+    LLGLSLShader* emissive_shader = nullptr;
+    LLGLSLShader* pbr_emissive_shader = nullptr;
+    LLGLSLShader* pbr_shader = nullptr;
 
-    void drawEmissive(U32 mask, LLDrawInfo* draw);
-    void drawEmissiveInline(U32 mask, LLDrawInfo* draw);
-
-    bool TexSetup(LLDrawInfo* draw, bool use_shaders, bool use_material, LLGLSLShader* current_shader);
+    void drawEmissive(LLDrawInfo* draw);
+    void renderEmissives(std::vector<LLDrawInfo*>& emissives);
+    void renderRiggedEmissives(std::vector<LLDrawInfo*>& emissives);
+    void renderPbrEmissives(std::vector<LLDrawInfo*>& emissives);
+    void renderRiggedPbrEmissives(std::vector<LLDrawInfo*>& emissives);
+    bool TexSetup(LLDrawInfo* draw, bool use_material);
     void RestoreTexSetup(bool tex_setup);
 
 	// our 'normal' alpha blend function for this pass
@@ -91,6 +93,9 @@ private:
 	LLRender::eBlendFactor mColorDFactor;	
 	LLRender::eBlendFactor mAlphaSFactor;
 	LLRender::eBlendFactor mAlphaDFactor;
+
+    // if true, we're executing a rigged render pass
+    bool mRigged = false;
 };
 
 #endif // LL_LLDRAWPOOLALPHA_H

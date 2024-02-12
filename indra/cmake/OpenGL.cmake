@@ -2,10 +2,12 @@
 
 include(Variables)
 include(Prebuilt)
+include(FindOpenGL)
 
-if (BUILD_HEADLESS)
-  SET(OPENGL_HEADLESS_LIBRARIES OSMesa16 dl GLU)
-endif (BUILD_HEADLESS)
+add_library( ll::opengl INTERFACE IMPORTED )
 
-find_package(OpenGL REQUIRED)
-
+if(TARGET OpenGL::OpenGL)
+	target_link_libraries( ll::opengl INTERFACE OpenGL::OpenGL)
+elseif(TARGET OpenGL::GL)
+	target_link_libraries( ll::opengl INTERFACE OpenGL::GL)
+endif()

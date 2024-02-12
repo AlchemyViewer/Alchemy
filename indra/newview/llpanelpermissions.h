@@ -81,6 +81,7 @@ protected:
 
 	static void	onCommitClickAction(LLUICtrl* ctrl, void*);
 	static void onCommitIncludeInSearch(LLUICtrl* ctrl, void*);
+	static void onCommitExport(LLUICtrl* ctrl, void*);
 
 	static LLViewerInventoryItem* findItem(LLUUID &object_id);
 
@@ -88,7 +89,7 @@ protected:
 	void disableAll();
 	
 private:
-	LLNameBox*		mLabelGroupName;		// group name
+	LLTextBox*		mLabelGroupName;		// group name
 	LLTextBox*		mLabelOwnerName;
 	LLTextBox*		mLabelCreatorName;
 	LLUUID			mCreatorID;

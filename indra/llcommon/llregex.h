@@ -86,4 +86,19 @@ bool ll_regex_search(const S& string, const R& regex)
 		return false;
 	}
 }
+
+template <typename S, typename R, typename F>
+std::string ll_regex_replace(const S& string, const R& regex, const F& fmt)
+{
+	try
+	{
+		return boost::regex_replace(string, regex, fmt);
+	}
+	catch (const std::runtime_error& e)
+	{
+		LL_WARNS() << "error searching with '" << regex.str() << "': "
+			<< e.what() << ":\n'" << string << "'" << LL_ENDL;
+		return {};
+	}
+}
 #endif  // LLREGEX_H

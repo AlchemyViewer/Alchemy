@@ -39,6 +39,7 @@ private:
 	LLCheckBoxCtrl*		mAvatarSounds;
 	LLCheckBoxCtrl*		mObjectSounds;
 	LLCheckBoxCtrl*		mPaused;
+	LLButton*			mStopLocalButton = nullptr;
 
 	std::list<LLSoundHistoryItem> mLastHistory;
 

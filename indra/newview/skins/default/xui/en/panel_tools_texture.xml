@@ -2,7 +2,7 @@
 <panel
          border="false"
          follows="all"
-         height="420"
+         height="500"
          label="Texture"
          layout="topleft"
          left="0"
@@ -11,6 +11,56 @@
          name="Texture"
          top="0"
          width="295">
+            <panel.string
+             name="paste_error_face_selection_mismatch">
+              When multiple faces are copied, the target object must have the same number of faces selected.
+            </panel.string>
+            <panel.string
+             name="paste_error_object_face_count_mismatch">
+              When all faces of an object are copied, the target object must have the same number of faces.
+            </panel.string>
+            <panel.string
+             name="paste_error_inventory_not_found">
+              One or more texture not found in inventory.
+            </panel.string>
+            <panel.string
+             name="paste_options">
+             Paste Texture Parameters
+            </panel.string>
+
+            <button
+             follows="top|left"
+             layout="topleft"
+             height="19" 
+             left="258"
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_color_btn"
+             tool_tip="Copy Color Parameters"
+             width="20" />
+            <button
+             follows="top|left"
+             layout="topleft"
+             height="19"
+             top_pad="1"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_color_btn"
+             tool_tip="Paste Color Parameters"
+             width="20" />
+             <button
+             visible="false"
+             follows="top|left"
+             layout="topleft"
+             height="19"
+             top_pad="1"
+             mouse_opaque="true"
+             tab_stop="false"
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga" 
+             name="pipette_color_btn"
+             tool_tip="Paste Color Parameters using the Pipette tool"
+             width="20" />
             <text
              type="string"
              length="1"
@@ -36,7 +86,7 @@
              name="colorswatch"
              tool_tip="Click to open color picker"
              top="20"
-             width="64" />
+             width="70" />
             <text
              type="string"
              length="1"
@@ -48,7 +98,7 @@
              text_readonly_color="LabelDisabledColor"
              top="6"
              width="110">
-                Transparency %
+                Transparency
             </text>
             <spinner
              decimal_digits="0"
@@ -61,7 +111,7 @@
              max_val="100"
              name="ColorTrans"
              top_pad="4"
-             width="80" />
+             width="70" />
             <text
              type="string"
              length="1"
@@ -84,7 +134,7 @@
              left_delta="0"
              name="glow"
              top_pad="4"
-             width="80" />
+             width="70" />
             <check_box
              height="19"
              label="Full Bright"
@@ -93,28 +143,53 @@
              name="checkbox fullbright"
              top_pad="4"
              width="81" />
+            <view_border
+             bevel_style="none"
+             follows="top|left"
+             height="0"
+             layout="topleft"
+             left="8"
+             name="object_horizontal"
+             top_pad="4"
+             width="278" />
+            <text
+             type="string"
+             length="1"
+             follows="left|top"
+             height="10"
+             layout="topleft"
+             left="12"
+             top_pad="12"
+             name="label_matmedia"
+             width="90">
+                Material
+            </text>
             <combo_box
              height="23"
              layout="topleft"
+             follows="top|left"
              left="10"
              name="combobox matmedia"
              top_pad="5"
-             width="100">
+             width="90">
                 <combo_box.item
-                 label="Materials"
+                 label="Legacy Materials"
                  name="Materials"
                  value="Materials" />
+                <combo_box.item
+                 label="PBR Metallic Roughness"
+                 name="PBR"
+                 value="PBR" />
                 <combo_box.item
                  label="Media"
                  name="Media"
                  value="Media" />
             </combo_box>
             <radio_group
-            control_name="ComboMaterialType"
-            height="50"
+            height="84"
             layout="topleft"
-            left_pad="20"
-            top_delta="-10"
+            left_pad="5"
+            top_delta="-20"
             width="150"
             visible = "false"
             name="radio_material_type">
@@ -139,33 +214,157 @@
                 layout="topleft"
                 top_pad="1"
                 value="2"/>
-            </radio_group> 
-            <check_box
-             control_name="SyncMaterialSettings"
+            </radio_group>
+            <radio_group
+            height="84"
+            layout="topleft"
+            left_delta="0"
+            top_delta="0"
+            width="150"
+            visible = "false"
+            name="radio_pbr_type">
+                <radio_item
+                label="Complete material"
+                name="Complete material"
+                top="0"
+                layout="topleft"
+                height="16"
+                value="0"/>
+                <radio_item
+                label="Base color"
+                name="Base color"
+                layout="topleft"
+                top_pad="1" 
+                height="16" 
+                value="1"/>
+                <radio_item
+                label="Metallic/roughness"
+                name="Metallic/roughness"
+                height="16"
+                layout="topleft"
+                top_pad="1"
+                value="2"/>
+                <radio_item
+                label="Emissive"
+                name="Emissive"
+                layout="topleft"
+                top_pad="1" 
+                height="16" 
+                value="3"/>
+                <radio_item
+                label="Normal"
+                layout="topleft"
+                top_pad="1" 
+                height="16" 
+                name="Normal"
+                value="4"/>
+            </radio_group>
+            <button
              follows="top|left"
-             height="20"
-             initial_value="false"
-             label="Lock repeat"
              layout="topleft"
-             left="8"
-             name="checkbox_sync_settings"
-             tool_tip="Adjust all maps repeats simultaneously"
-             top_pad="-16"
-             width="160" />
+             height="19" 
+             left="258"
+             top_delta="0"
+             tab_stop="false"
+             image_overlay="Clipboard_Copy"
+             name="copy_texture_btn"
+             tool_tip="Copy Texture Parameters"
+             width="20" />
+            <button
+             follows="top|left"
+             layout="topleft"
+             height="19"
+             top_pad="1"
+             tab_stop="false"
+             image_overlay="Clipboard_Paste"
+             name="paste_texture_btn"
+             tool_tip="Paste Texture Parameters"
+             width="20" />
+             <button
+             visible="false"
+             follows="top|left"
+             layout="topleft"
+             height="19"
+             top_pad="1"
+             mouse_opaque="true"
+             tab_stop="false"
+             image_selected="eye_button_active.tga"
+             image_unselected="eye_button_inactive.tga" 
+             name="pipette_texture_btn"
+             tool_tip="Paste Texture Parameters using the Pipette tool"
+             width="20" />
+
+            <texture_picker
+             can_apply_immediately="true"
+             allow_no_texture="true"
+             follows="left|top"
+             height="80"
+             label="PBR Material"
+             layout="topleft"
+             left="10"
+             name="pbr_control"
+             tool_tip="Click to choose a pbr material"
+             top_pad="25"
+             width="64" />
+            <button
+            visible="false"
+             follows="left|top"
+             height="23"
+             layout="topleft"
+             left_pad="10"
+             top_delta="0"
+             name="pbr_from_inventory"
+             label="Choose from inventory"
+             width="140"/>
+            <text
+             visible="false"
+             type="string"
+             length="1"
+             follows="left|top"
+             height="10"
+             layout="topleft"
+             top_pad="4"
+             left_delta="0"
+             name="material_permissions_loading_label"
+             text_readonly_color="LabelDisabledColor"
+             width="160">
+                Loading contents...
+            </text>
+            <button
+            visible="false"
+             follows="left|top"
+             height="23"
+             layout="topleft"
+             left_delta="0"
+             top_delta="0"
+             name="edit_selected_pbr"
+             label="Edit Selected"
+             width="140"/>
+            <button
+            visible="false"
+             follows="left|top"
+             height="23"
+             layout="topleft"
+             left_delta="0"
+             top_pad="4"
+             name="save_selected_pbr"
+             label="Save to inventory"
+             width="140"/>
             <texture_picker
              can_apply_immediately="true"
              default_image_name="Default"
              fallback_image="materials_ui_x_24.png"
              follows="left|top"
              height="80"
-             label="Texture       "
+             label="Diffuse"
              layout="topleft"
              left="10"
              name="texture control"
              tool_tip="Click to choose a picture"
-             top_pad="5"
+             top_delta="-54"
              width="64" />
             <text
+            visible="false"
              type="string"
              length="1"
              follows="left|top"
@@ -179,8 +378,10 @@
                 Alpha mode
             </text>
             <combo_box
+            visible="false"
              height="23"
              layout="topleft"
+             follows="top|left"
              left_delta="0"
              name="combobox alphamode"
              top_pad="4"
@@ -203,6 +404,7 @@
                  value="Emissive mask" />
             </combo_box>
             <text
+            visible="false"
              type="string"
              length="1"
              follows="left|top"
@@ -216,6 +418,7 @@
                 Mask cutoff
             </text>
             <spinner
+            visible="false"
              decimal_digits="0"
              min_val="0"
              max_val="255"
@@ -235,7 +438,7 @@
              fallback_image="materials_ui_x_24.png"
              follows="left|top"
              height="80"
-             label="Texture       "
+             label="Normal"
              layout="topleft"
              left="10"
              name="bumpytexture control"
@@ -243,6 +446,7 @@
              top_delta="-55"
              width="64" />
             <text
+            visible="false"
              type="string"
              length="1"
              follows="left|top"
@@ -256,8 +460,10 @@
                 Bumpiness
             </text>
             <combo_box
+            visible="false"
              height="23"
              layout="topleft"
+             follows="top|left"
              left_delta="0"
              name="combobox bumpiness"
              top_pad="4"
@@ -349,7 +555,7 @@
              fallback_image="materials_ui_x_24.png"
              follows="left|top"
              height="80"
-             label="Texture       "
+             label="Specular"
              layout="topleft"
              left="10"
              name="shinytexture control"
@@ -366,16 +572,17 @@
              left_pad="10"
              text_readonly_color="LabelDisabledColor"
              top_delta="4"
-             width="90">
+             width="116">
                 Shininess
             </text>
             <combo_box
              height="23"
              layout="topleft"
-             left_pad="10"
+             follows="left|top"
+             left_pad="11"
              name="combobox shininess"
              top_delta="-6"
-             width="90">
+             width="69">
                 <combo_box.item
                  label="None"
                  name="None"
@@ -406,7 +613,7 @@
              follows="left|top"
              height="10"
              layout="topleft"
-             left_delta="-100"
+             left_delta="-127"
              name="label glossiness"
              text_readonly_color="LabelDisabledColor"
              top_pad="7"
@@ -423,16 +630,16 @@
              increment="1"
              layout="topleft"
              top_delta="-4"
-             left_pad="10"
+             left_pad="11"
              name="glossiness"
-             width="64" />
+             width="69" />
             <text
              type="string"
              length="1"
              follows="left|top"
              height="10"
              layout="topleft"
-             left_delta="-126"
+             left_delta="-127"
              name="label environment"
              text_readonly_color="LabelDisabledColor"
              top_pad="8"
@@ -449,16 +656,16 @@
              initial_value="0"
              layout="topleft"
              top_delta="-4"
-             left_pad="10"
+             left_pad="11"
              name="environment"
-             width="64" />
+             width="69" />
             <text
              type="string"
              length="1"
              follows="left|top"
              height="10"
              layout="topleft"
-             left_delta="-126"
+             left_delta="-127"
              name="label shinycolor"
              text_readonly_color="LabelDisabledColor"
              top_pad="8"
@@ -472,12 +679,13 @@
              height="45"
              label=""
              layout="topleft"
-             left_pad="10"
+             left_pad="11"
              name="shinycolorswatch"
              tool_tip="Click to open color picker"
              top_delta="-4"
-             width="64" />
+             width="69" />
             <text
+            visible="false"
 			 follows="left|top|right"
 			 height="9"
 			 layout="topleft"
@@ -490,6 +698,7 @@
 			 URL of chosen media, if any, goes here
 			 </text>
 			<button
+          visible="false"
 			 follows="top|left"
 			 height="18"
 			 layout="topleft"
@@ -498,11 +707,9 @@
 			 top_pad="4"
 			 tool_tip="Add Media"
 			 label="Choose..."
-			 width="85">
-				<button.commit_callback
-				function="BuildTool.AddMedia"/>
-			</button>
+			 width="85"/>
 			<button
+          visible="false"
 			 follows="top|left"
 			 height="18"
 			 layout="topleft"
@@ -511,11 +718,9 @@
 			 tool_tip="Delete this media texture"
 			 top_delta="0"
 			 label="Remove"
-			 width="85">
-				<button.commit_callback
-				function="BuildTool.DeleteMedia"/>
-			</button>
+			 width="85"/>
             <button
+          visible="false"
 			 follows="left|top"
 			 height="18"
 			 label="Align"
@@ -535,17 +740,18 @@
              left="10"
              name="tex gen"
              text_readonly_color="LabelDisabledColor"
-             top_pad="46"
-             width="140">
+             top_pad="51"
+             width="196">
                 Mapping
             </text>
             <combo_box
              height="23"
              layout="topleft"
-             left_pad="0"
+             follows="left|top"
+             left_pad="5"
              name="combobox texgen"
              top_pad="-13"
-             width="125">
+             width="70">
                 <combo_box.item
                  label="Default"
                  name="Default"
@@ -560,26 +766,26 @@
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="TexScaleU"
-             top_pad="5"
-             width="265" />
+             top_pad="1"
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="TexScaleV"
-             width="265" />
+             width="271" />
             <spinner
              decimal_digits="1"
              follows="left|top"
@@ -587,12 +793,12 @@
              initial_value=""
 			 label="Repeats per meter"
              layout="topleft"
-			 label_width="205"
+			 label_width="200"
              left="10"
              max_val="100"
              min_val="-100"
              name="rptctrl"
-             width="265" />
+             width="271" />
            <spinner
              decimal_digits="2"
              follows="left|top"
@@ -601,61 +807,61 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="205"
+			 label_width="200"
              left="10"
              max_val="360"
              min_val="-360"
              name="TexRot"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="TexOffsetU"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="TexOffsetV"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="bumpyScaleU"
              top_delta="-115"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="bumpyScaleV"
-             width="265" />
+             width="271" />
            <spinner
              decimal_digits="2"
              follows="left|top"
@@ -665,61 +871,61 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="205"
+			 label_width="200"
              left="10"
              max_val="360"
              min_val="-360"
              name="bumpyRot"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="bumpyOffsetU"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="bumpyOffsetV"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="shinyScaleU"
              top_delta="-115"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-100"
              max_val="100"
              name="shinyScaleV"
-             width="265" />
+             width="271" />
            <spinner
              decimal_digits="2"
              follows="left|top"
@@ -729,36 +935,99 @@
              initial_value="0"
 			 label="Rotation degrees"
              layout="topleft"
-			 label_width="205"
+			 label_width="200"
              left="10"
              max_val="360"
              min_val="-360"
              name="shinyRot"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="shinyOffsetU"
-             width="265" />
+             width="271" />
             <spinner
              follows="left|top"
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="205"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
              name="shinyOffsetV"
-             width="265" />
+             width="271" />
+            <!-- BEGIN PBR Material texture transform parameters -->
+            <spinner
+             follows="left|top"
+             height="19"
+             initial_value="1"
+             label="Scale u"
+             label_width="200"
+             layout="topleft"
+             left="10"
+             min_val="-100"
+             max_val="100"
+             name="gltfTextureScaleU"
+             top_delta="-115"
+             width="271" />
+            <spinner
+             follows="left|top"
+             height="19"
+             initial_value="1"
+             label="Scale v"
+             label_width="200"
+             layout="topleft"
+             left="10"
+             min_val="-100"
+             max_val="100"
+             name="gltfTextureScaleV"
+             width="271" />
+            <spinner
+             follows="left|top"
+             height="19"
+             initial_value="0"
+             label="Rotation"
+             label_width="200"
+             layout="topleft"
+             left="10"
+             min_val="-360"
+             max_val="360"
+             name="gltfTextureRotation"
+             width="271" />
+            <spinner
+             follows="left|top"
+             height="19"
+             initial_value="0"
+             label="Offset u"
+             label_width="200"
+             layout="topleft"
+             left="10"
+             min_val="-999"
+             max_val="999"
+             name="gltfTextureOffsetU"
+             width="271" />
+            <spinner
+             follows="left|top"
+             height="19"
+             initial_value="0"
+             label="Offset v"
+             label_width="200"
+             layout="topleft"
+             left="10"
+             min_val="-999"
+             max_val="999"
+             name="gltfTextureOffsetV"
+             width="271" />
+            <!-- END PBR Material texture transform parameters -->
             <check_box
              follows="top|left"
              height="16"
@@ -768,19 +1037,30 @@
              left="7"
              name="checkbox planar align"
              tool_tip="Align textures on all selected faces with the last selected face. Requires Planar texture mapping."
-             top_delta="16"
-             width="260" />
-			<button
-			 left="10"
-			 top="222"
-			 height="20"
-			 label="Align"
-			 label_selected="Align current texture layers"
-			 layout="topleft"
-			 name="button align textures"
-			 top_delta="0"
-			 tool_tip="Align current texture layers"
-			 width="66" />
+             top_pad="29"
+             width="203" />
+            <check_box
+             control_name="SyncMaterialSettings"
+             follows="top|left"
+             height="16"
+             initial_value="false"
+             label="Synchronize materials"
+             layout="topleft"
+             left="7"
+             top_pad="0"
+             name="checkbox_sync_settings"
+             tool_tip="Adjust all maps repeats simultaneously"
+             width="199" />
+            <button
+             layout="topleft"
+             follows="left|top"
+             height="23"
+             left_pad="5"
+             top_delta="-18"
+             label="Align"
+             name="button align textures"
+             tool_tip="Align current texture layers"
+             width="69" />
             <web_browser
              visible="false"
              enabled="false"
@@ -791,6 +1071,63 @@
              name="title_media"
              width="4"
              height="4"
-             start_url="about:blank"
+             start_url=""
              decouple_texture_size="true" />
-	   </panel>
+            <button
+             enabled="true"
+             layout="topleft"
+             follows="left|top"
+             height="23"
+             left="10"
+             top="232"
+             label="Find All"
+             name="btn_select_same_diff"
+             tool_tip="Select all faces with the same diffuse texture as this one"
+             width="64">
+             <button.commit_callback
+               function="BuildTool.SelectSameTexture"
+               parameter="diffuse"/>
+            </button>
+            <button
+             enabled="true"
+             layout="topleft"
+             follows="left|top"
+             height="23"
+             left_delta="0"
+             label="Find All"
+             name="btn_select_same_norm"
+             tool_tip="Select all faces with the same normal map as this one"
+             width="64">
+             <button.commit_callback
+               function="BuildTool.SelectSameTexture"
+               parameter="normal"/>
+            </button>
+            <button
+             enabled="true"
+             layout="topleft"
+             follows="left|top"
+             height="23"
+             left_delta="0"
+             label="Find All"
+             name="btn_select_same_spec"
+             tool_tip="Select all faces with the same specular map as this one"
+             width="64">
+             <button.commit_callback
+               function="BuildTool.SelectSameTexture"
+               parameter="specular"/>
+            </button>
+            <button
+             enabled="true"
+             layout="topleft"
+             follows="left|top"
+             height="23"
+             left_delta="0"
+             label="Find All"
+             name="btn_select_same_pbr"
+             tool_tip="Select all faces with the same PBR material as this one"
+             width="64">
+             <button.commit_callback
+               function="BuildTool.SelectSameTexture"
+               parameter="pbr"/>
+            </button>
+</panel>

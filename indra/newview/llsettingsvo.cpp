@@ -61,12 +61,17 @@
 #include "lldrawpoolwater.h"
 
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
 #include "llinventoryobserver.h"
 #include "llinventorydefines.h"
+#include "llworld.h"
 
 #include "lltrans.h"
 
 #undef  VERIFY_LEGACY_CONVERSION
+
+extern BOOL gCubeSnapshot;
 
 //=========================================================================
 namespace 
@@ -95,6 +100,20 @@ namespace
 
 
 //=========================================================================
+void LLSettingsVOBase::createNewInventoryItem(LLSettingsType::type_e stype, const LLUUID& parent_id, std::function<void(const LLUUID&)> created_cb)
+{
+    inventory_result_fn cb = NULL;
+
+    if (created_cb != NULL)
+    {
+        cb = [created_cb](LLUUID asset_id, LLUUID inventory_id, LLUUID object_id, LLSD results)
+        {
+            created_cb(inventory_id);
+        };
+    }
+    createNewInventoryItem(stype, parent_id, cb);
+}
+
 void LLSettingsVOBase::createNewInventoryItem(LLSettingsType::type_e stype, const LLUUID &parent_id, inventory_result_fn callback)
 {
     LLTransactionID tid;
@@ -123,7 +142,7 @@ void LLSettingsVOBase::createNewInventoryItem(LLSettingsType::type_e stype, cons
 
 void LLSettingsVOBase::createInventoryItem(const LLSettingsBase::ptr_t &settings, const LLUUID &parent_id, std::string settings_name, inventory_result_fn callback)
 {
-    U32 nextOwnerPerm = LLPermissions::DEFAULT.getMaskNextOwner();
+    U32 nextOwnerPerm = LLFloaterPerms::getNextOwnerPerms("Settings");
     createInventoryItem(settings, nextOwnerPerm, parent_id, settings_name, callback);
 }
 
@@ -234,9 +253,11 @@ void LLSettingsVOBase::updateInventoryItem(const LLSettingsBase::ptr_t &settings
     LLSDSerialize::serialize(settingdata, buffer, LLSDSerialize::LLSD_NOTATION);
 
     LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(inv_item_id, LLAssetType::AT_SETTINGS, buffer.str(), 
-        [settings, callback](LLUUID itemId, LLUUID newAssetId, LLUUID newItemId, LLSD response) {
+        [settings, callback](LLUUID itemId, LLUUID newAssetId, LLUUID newItemId, LLSD response)
+        {
             LLSettingsVOBase::onAgentAssetUploadComplete(itemId, newAssetId, newItemId, response, settings, callback);
-        });
+        },
+        nullptr);
 
     LLViewerAssetUpload::EnqueueInventoryUpload(agent_url, uploadInfo);
 }
@@ -265,9 +286,11 @@ void LLSettingsVOBase::updateInventoryItem(const LLSettingsBase::ptr_t &settings
     LLSDSerialize::serialize(settingdata, buffer, LLSDSerialize::LLSD_NOTATION);
 
     LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(object_id, inv_item_id, LLAssetType::AT_SETTINGS, buffer.str(),
-        [settings, callback](LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response) {
-        LLSettingsVOBase::onTaskAssetUploadComplete(itemId, taskId, newAssetId, response, settings, callback);
-    });
+        [settings, callback](LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response)
+        {
+            LLSettingsVOBase::onTaskAssetUploadComplete(itemId, taskId, newAssetId, response, settings, callback);
+        },
+        nullptr);
 
     LLViewerAssetUpload::EnqueueInventoryUpload(agent_url, uploadInfo);
 }
@@ -304,43 +327,27 @@ void LLSettingsVOBase::onAssetDownloadComplete(const LLUUID &asset_id, S32 statu
     if (!status)
     {
         LLFileSystem file(asset_id, LLAssetType::AT_SETTINGS, LLFileSystem::READ);
-        if (file.open())
+        S32 size = file.getSize();
+
+        std::string buffer(size + 1, '\0');
+        file.read((U8 *)buffer.data(), size);
+
+        boost::iostreams::stream<boost::iostreams::array_source> llsdstream(buffer.data(), buffer.size());
+        LLSD llsdsettings;
+
+        if (LLSDSerialize::deserialize(llsdsettings, llsdstream, LLSDSerialize::SIZE_UNLIMITED))
         {
-            S32 size = file.getSize();
+            settings = createFromLLSD(llsdsettings);
+        }
 
-            std::string buffer(size + 1, '\0');
-            if (file.read((U8*)buffer.data(), size))
-            {
-                file.close();
-
-                std::stringstream llsdstream(buffer);
-                LLSD llsdsettings;
-
-                if (LLSDSerialize::deserialize(llsdsettings, llsdstream, -1))
-                {
-                    settings = createFromLLSD(llsdsettings);
-                }
-
-                if (!settings)
-                {
-                    status = 1;
-                    LL_WARNS("SETTINGS") << "Unable to create settings object." << LL_ENDL;
-                }
-                else
-                {
-                    settings->setAssetId(asset_id);
-                }
-            }
-            else
-            {
-                status = 1;
-                LL_WARNS("SETTINGS") << "Unable to read settings object from cache." << LL_ENDL;
-            }
+        if (!settings)
+        {
+            status = 1;
+            LL_WARNS("SETTINGS") << "Unable to create settings object." << LL_ENDL;
         }
         else
         {
-            status = 1;
-            LL_WARNS("SETTINGS") << "Unable to open settings object from cache." << LL_ENDL;
+            settings->setAssetId(asset_id);
         }
     }
     else
@@ -395,7 +402,7 @@ LLSettingsBase::ptr_t LLSettingsVOBase::importFile(const std::string &filename)
             return LLSettingsBase::ptr_t();
         }
 
-        if (!LLSDSerialize::deserialize(settings, file, -1))
+        if (!LLSDSerialize::deserialize(settings, file, LLSDSerialize::SIZE_UNLIMITED))
         {
             LL_WARNS("SETTINGS") << "Unable to deserialize settings from '" << filename << "'" << LL_ENDL;
             return LLSettingsBase::ptr_t();
@@ -584,11 +591,11 @@ void LLSettingsVOSky::convertAtmosphericsToLegacy(LLSD& legacy, LLSD& settings)
         legacy[SETTING_BLUE_DENSITY] = ensure_array_4(legacyhaze[SETTING_BLUE_DENSITY], 1.0);
         legacy[SETTING_BLUE_HORIZON] = ensure_array_4(legacyhaze[SETTING_BLUE_HORIZON], 1.0);
 
-        legacy[SETTING_DENSITY_MULTIPLIER] = LLSDArray(legacyhaze[SETTING_DENSITY_MULTIPLIER].asReal())(0.0f)(0.0f)(1.0f);
-        legacy[SETTING_DISTANCE_MULTIPLIER] = LLSDArray(legacyhaze[SETTING_DISTANCE_MULTIPLIER].asReal())(0.0f)(0.0f)(1.0f);
+        legacy[SETTING_DENSITY_MULTIPLIER]  = llsd::array(legacyhaze[SETTING_DENSITY_MULTIPLIER].asReal(), 0.0f, 0.0f, 1.0f);
+        legacy[SETTING_DISTANCE_MULTIPLIER] = llsd::array(legacyhaze[SETTING_DISTANCE_MULTIPLIER].asReal(), 0.0f, 0.0f, 1.0f);
 
-        legacy[SETTING_HAZE_DENSITY]        = LLSDArray(legacyhaze[SETTING_HAZE_DENSITY])(0.0f)(0.0f)(1.0f);
-        legacy[SETTING_HAZE_HORIZON]        = LLSDArray(legacyhaze[SETTING_HAZE_HORIZON])(0.0f)(0.0f)(1.0f);
+        legacy[SETTING_HAZE_DENSITY]        = llsd::array(legacyhaze[SETTING_HAZE_DENSITY], 0.0f, 0.0f, 1.0f);
+        legacy[SETTING_HAZE_HORIZON]        = llsd::array(legacyhaze[SETTING_HAZE_HORIZON], 0.0f, 0.0f, 1.0f);
     }
 }
 
@@ -602,15 +609,15 @@ LLSD LLSettingsVOSky::convertToLegacy(const LLSettingsSky::ptr_t &psky, bool isA
     legacy[SETTING_CLOUD_COLOR] = ensure_array_4(settings[SETTING_CLOUD_COLOR], 1.0);
     legacy[SETTING_CLOUD_POS_DENSITY1] = ensure_array_4(settings[SETTING_CLOUD_POS_DENSITY1], 1.0);
     legacy[SETTING_CLOUD_POS_DENSITY2] = ensure_array_4(settings[SETTING_CLOUD_POS_DENSITY2], 1.0);
-    legacy[SETTING_CLOUD_SCALE] = LLSDArray(settings[SETTING_CLOUD_SCALE])(LLSD::Real(0.0))(LLSD::Real(0.0))(LLSD::Real(1.0));       
+    legacy[SETTING_CLOUD_SCALE] = llsd::array(settings[SETTING_CLOUD_SCALE], LLSD::Real(0.0), LLSD::Real(0.0), LLSD::Real(1.0));
     legacy[SETTING_CLOUD_SCROLL_RATE] = settings[SETTING_CLOUD_SCROLL_RATE];
-    legacy[SETTING_LEGACY_ENABLE_CLOUD_SCROLL] = LLSDArray(LLSD::Boolean(!is_approx_zero(settings[SETTING_CLOUD_SCROLL_RATE][0].asReal())))
-        (LLSD::Boolean(!is_approx_zero(settings[SETTING_CLOUD_SCROLL_RATE][1].asReal())));     
-    legacy[SETTING_CLOUD_SHADOW] = LLSDArray(settings[SETTING_CLOUD_SHADOW].asReal())(0.0f)(0.0f)(1.0f);    
-    legacy[SETTING_GAMMA] = LLSDArray(settings[SETTING_GAMMA])(0.0f)(0.0f)(1.0f);
+    legacy[SETTING_LEGACY_ENABLE_CLOUD_SCROLL] = llsd::array(LLSD::Boolean(!is_approx_zero(settings[SETTING_CLOUD_SCROLL_RATE][0].asReal())),
+        LLSD::Boolean(!is_approx_zero(settings[SETTING_CLOUD_SCROLL_RATE][1].asReal())));     
+    legacy[SETTING_CLOUD_SHADOW] = llsd::array(settings[SETTING_CLOUD_SHADOW].asReal(), 0.0f, 0.0f, 1.0f);    
+    legacy[SETTING_GAMMA] = llsd::array(settings[SETTING_GAMMA], 0.0f, 0.0f, 1.0f);
     legacy[SETTING_GLOW] = ensure_array_4(settings[SETTING_GLOW], 1.0);
     legacy[SETTING_LIGHT_NORMAL] = ensure_array_4(psky->getLightDirection().getValue(), 0.0f);
-    legacy[SETTING_MAX_Y] = LLSDArray(settings[SETTING_MAX_Y])(0.0f)(0.0f)(1.0f);
+    legacy[SETTING_MAX_Y] = llsd::array(settings[SETTING_MAX_Y], 0.0f, 0.0f, 1.0f);
     legacy[SETTING_STAR_BRIGHTNESS] = settings[SETTING_STAR_BRIGHTNESS].asReal() / 250.0f; // convert from 0-500 -> 0-2 ala pre-FS-compat changes
     legacy[SETTING_SUNLIGHT_COLOR] = ensure_array_4(settings[SETTING_SUNLIGHT_COLOR], 1.0f);
     
@@ -653,6 +660,7 @@ LLSD LLSettingsVOSky::convertToLegacy(const LLSettingsSky::ptr_t &psky, bool isA
 //-------------------------------------------------------------------------
 void LLSettingsVOSky::updateSettings()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     LLSettingsSky::updateSettings();
     LLVector3 sun_direction  = getSunDirection();
     LLVector3 moon_direction = getMoonDirection();
@@ -678,69 +686,111 @@ void LLSettingsVOSky::updateSettings()
 
     gSky.setSunScale(getSunScale());
     gSky.setMoonScale(getMoonScale());
-
-    //Cache settings for fast access during render
-    // Legacy? SETTING_CLOUD_SCROLL_RATE("cloud_scroll_rate")
-    mCloudPosDensityCached = LLVector4(mSettings[SETTING_CLOUD_POS_DENSITY1]);
-
-    mDensityMultiplierCached = getDensityMultiplier();
-    mDistanceMultiplierCached = getDistanceMultiplier();
-    mGammaCached = getGamma();
-    mCloudVarianceCached = getCloudVariance();
-    mMoonBrightnessCached = getMoonBrightness();
-    mStarBrightnessCached = getStarBrightness();
-
-    mSkyMoistureCached = getSkyMoistureLevel();
-    mSkyDropletRadius = getSkyDropletRadius();
-    mSkyIceLevel = getSkyIceLevel();
-
-    mSunDiffuseCached = getSunlightColor();
-    mMoonDiffuseCached = getMoonlightColor();
-    mCloudColorCached = LLColor4(getCloudColor(), 1.0);
 }
 
 void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 {
-    LLGLSLShader *shader = (LLGLSLShader *) ptarget;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+    LLVector3 light_direction = LLVector3(LLEnvironment::instance().getClampedLightNorm().mV);
 
-    if (shader->mShaderGroup == LLGLSLShader::SG_DEFAULT)
-    {
-        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, LLEnvironment::getInstanceFast()->getClampedLightNorm().mV);
-        shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, 1, LLViewerCamera::getInstanceFast()->getOrigin().mV);
-    }
-    else if (shader->mShaderGroup == LLGLSLShader::SG_SKY)
-    {
-        auto& env = LLEnvironment::instanceFast();
+    bool irradiance_pass = gCubeSnapshot && !gPipeline.mReflectionMapManager.isRadiancePass();
 
-        shader->uniform4fv(LLViewerShaderMgr::LIGHTNORM, 1, env.getClampedLightNorm().mV);
+    LLShaderUniforms* shader = &((LLShaderUniforms*)ptarget)[LLGLSLShader::SG_DEFAULT];
+	{        
+        shader->uniform3fv(LLViewerShaderMgr::LIGHTNORM, light_direction);
+        shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, LLViewerCamera::getInstance()->getOrigin());
+	} 
+    
+    shader = &((LLShaderUniforms*)ptarget)[LLGLSLShader::SG_SKY];
 
-        LLVector4 vect_c_p_d1(mCloudPosDensityCached);
-        LLVector4 cloud_scroll(env.getCloudScrollDelta());
+    shader->uniform3fv(LLViewerShaderMgr::LIGHTNORM, light_direction);
 
-        // SL-13084 EEP added support for custom cloud textures -- flip them horizontally to match the preview of Clouds > Cloud Scroll
-        // Keep in Sync!
-        // * indra\newview\llsettingsvo.cpp
-        // * indra\newview\app_settings\shaders\class2\windlight\cloudsV.glsl
-        // * indra\newview\app_settings\shaders\class1\deferred\cloudsV.glsl
-        cloud_scroll[0] = -cloud_scroll[0];
-        vect_c_p_d1 += cloud_scroll;
-        shader->uniform4fv(LLShaderMgr::CLOUD_POS_DENSITY1, 1, vect_c_p_d1.mV);
+    // Legacy? SETTING_CLOUD_SCROLL_RATE("cloud_scroll_rate")
+    LLVector4 vect_c_p_d1(mSettings[SETTING_CLOUD_POS_DENSITY1]);
+    LLVector4 cloud_scroll( LLEnvironment::instance().getCloudScrollDelta() );
 
-        shader->uniform4fv(LLShaderMgr::SUNLIGHT_COLOR, 1, mSunDiffuseCached.mV);
-        shader->uniform4fv(LLShaderMgr::MOONLIGHT_COLOR, 1, mMoonDiffuseCached.mV);
-        shader->uniform4fv(LLShaderMgr::CLOUD_COLOR, 1, mCloudColorCached.mV);
-    }
+    // SL-13084 EEP added support for custom cloud textures -- flip them horizontally to match the preview of Clouds > Cloud Scroll
+    // Keep in Sync!
+    // * indra\newview\llsettingsvo.cpp
+    // * indra\newview\app_settings\shaders\class2\windlight\cloudsV.glsl
+    // * indra\newview\app_settings\shaders\class1\deferred\cloudsV.glsl
+    cloud_scroll[0] = -cloud_scroll[0];
+    vect_c_p_d1 += cloud_scroll;
+    shader->uniform3fv(LLShaderMgr::CLOUD_POS_DENSITY1, LLVector3(vect_c_p_d1.mV));
 
+    LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
+
+    // TODO -- make these getters return vec3s
+    LLVector3 sunDiffuse = LLVector3(psky->getSunlightColor().mV);
+    LLVector3 moonDiffuse = LLVector3(psky->getMoonlightColor().mV);
+
+    shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, sunDiffuse);
+    shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, moonDiffuse);
+
+    shader->uniform3fv(LLShaderMgr::CLOUD_COLOR, LLVector3(psky->getCloudColor().mV));
+
+    shader = &((LLShaderUniforms*)ptarget)[LLGLSLShader::SG_ANY];
     shader->uniform1f(LLShaderMgr::SCENE_LIGHT_STRENGTH, mSceneLightStrength);
 
-    shader->uniform4fv(LLShaderMgr::AMBIENT, 1, getTotalAmbient().mV);
+    LLColor3 ambient(getTotalAmbient());
+
+    F32 g = getGamma();
+
+    static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", true);
+    static LLCachedControl<F32> auto_adjust_ambient_scale(gSavedSettings, "RenderSkyAutoAdjustAmbientScale", 0.75f);
+    static LLCachedControl<F32> auto_adjust_hdr_scale(gSavedSettings, "RenderSkyAutoAdjustHDRScale", 2.f);
+    static LLCachedControl<F32> auto_adjust_blue_horizon_scale(gSavedSettings, "RenderSkyAutoAdjustBlueHorizonScale", 1.f);
+    static LLCachedControl<F32> auto_adjust_blue_density_scale(gSavedSettings, "RenderSkyAutoAdjustBlueDensityScale", 1.f);
+    static LLCachedControl<F32> auto_adjust_sun_color_scale(gSavedSettings, "RenderSkyAutoAdjustSunColorScale", 1.f);
+    static LLCachedControl<F32> sunlight_scale(gSavedSettings, "RenderSkySunlightScale", 1.5f);
+    static LLCachedControl<F32> ambient_scale(gSavedSettings, "RenderSkyAmbientScale", 1.5f);
+
+    shader->uniform1f(LLShaderMgr::SKY_SUNLIGHT_SCALE, sunlight_scale);
+    shader->uniform1f(LLShaderMgr::SKY_AMBIENT_SCALE, ambient_scale);
+
+    static LLCachedControl<F32> cloud_shadow_scale(gSavedSettings, "RenderCloudShadowAmbianceFactor", 0.125f);
+    F32 probe_ambiance = getTotalReflectionProbeAmbiance(cloud_shadow_scale);
+
+    if (irradiance_pass)
+    { // during an irradiance map update, disable ambient lighting (direct lighting only) and desaturate sky color (avoid tinting the world blue)
+        shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3::zero.mV);
+    }
+    else
+    {
+        if (psky->getReflectionProbeAmbiance() != 0.f)
+        {
+            shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3(ambient.mV));
+            shader->uniform1f(LLShaderMgr::SKY_HDR_SCALE, sqrtf(g)*2.0); // use a modifier here so 1.0 maps to the "most desirable" default and the maximum value doesn't go off the rails
+        }
+        else if (psky->canAutoAdjust() && should_auto_adjust)
+        { // auto-adjust legacy sky to take advantage of probe ambiance 
+            shader->uniform3fv(LLShaderMgr::AMBIENT, (ambient * auto_adjust_ambient_scale).mV);
+            shader->uniform1f(LLShaderMgr::SKY_HDR_SCALE, auto_adjust_hdr_scale);
+            LLColor3 blue_horizon = getBlueHorizon() * auto_adjust_blue_horizon_scale;
+            LLColor3 blue_density = getBlueDensity() * auto_adjust_blue_density_scale;
+            LLColor3 sun_diffuse = getSunDiffuse() * auto_adjust_sun_color_scale;
+            
+            shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, sun_diffuse.mV);
+            shader->uniform3fv(LLShaderMgr::BLUE_DENSITY, blue_density.mV);
+            shader->uniform3fv(LLShaderMgr::BLUE_HORIZON, blue_horizon.mV);
+
+            probe_ambiance = sAutoAdjustProbeAmbiance;
+        }
+        else
+        {
+            shader->uniform1f(LLShaderMgr::SKY_HDR_SCALE, 1.f);
+            shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3(ambient.mV));
+        }
+    }
+
+    shader->uniform1f(LLShaderMgr::REFLECTION_PROBE_AMBIANCE, probe_ambiance);
 
     shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, getIsSunUp() ? 1 : 0);
     shader->uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, getSunMoonGlowFactor());
-    shader->uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, mDensityMultiplierCached);
-    shader->uniform1f(LLShaderMgr::DISTANCE_MULTIPLIER, mDistanceMultiplierCached);
-
-    shader->uniform1f(LLShaderMgr::GAMMA, mGammaCached);
+    shader->uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, getDensityMultiplier());
+    shader->uniform1f(LLShaderMgr::DISTANCE_MULTIPLIER, getDistanceMultiplier());
+    
+    shader->uniform1f(LLShaderMgr::GAMMA, g);
 }
 
 const LLSettingsSky::parammapping_t& LLSettingsVOSky::getParameterMap() const
@@ -779,6 +829,7 @@ const LLSettingsSky::parammapping_t& LLSettingsVOSky::getParameterMap() const
         param_map[SETTING_SKY_DROPLET_RADIUS] = DefaultParam(LLShaderMgr::DROPLET_RADIUS, sky_defaults[SETTING_SKY_DROPLET_RADIUS]);
         param_map[SETTING_SKY_ICE_LEVEL] = DefaultParam(LLShaderMgr::ICE_LEVEL, sky_defaults[SETTING_SKY_ICE_LEVEL]);
 
+        param_map[SETTING_REFLECTION_PROBE_AMBIANCE] = DefaultParam(LLShaderMgr::REFLECTION_PROBE_AMBIANCE, sky_defaults[SETTING_REFLECTION_PROBE_AMBIANCE]);
 // AdvancedAtmospherics TODO
 // Provide mappings for new shader params here
     }
@@ -930,15 +981,28 @@ LLSD LLSettingsVOWater::convertToLegacy(const LLSettingsWater::ptr_t &pwater)
 //-------------------------------------------------------------------------
 void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
 {
-    LLGLSLShader *shader = (LLGLSLShader *)ptarget;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
-    if (force || (shader->mShaderGroup == LLGLSLShader::SG_WATER))
+    LLEnvironment& env = LLEnvironment::instance();
+
+    auto group = LLGLSLShader::SG_ANY;
+    LLShaderUniforms* shader = &((LLShaderUniforms*)ptarget)[group];
+    
 	{
         F32 water_height = gAgent.getRegion() ? gAgent.getRegion()->getWaterHeight() : DEFAULT_WATER_HEIGHT;
 
+        if (LLViewerCamera::instance().cameraUnderWater())
+        { // when the camera is under water, use the water height at the camera position
+            LLViewerRegion* region = LLWorld::instance().getRegionFromPosAgent(LLViewerCamera::instance().getOrigin());
+            if (region)
+            {
+                water_height = region->getWaterHeight();
+            }
+        }
+
         //transform water plane to eye space
         LLVector4a enorm(0.f, 0.f, 1.f);
-        LLVector4a ep(0.f, 0.f, water_height + 0.1f);
+        LLVector4a ep(0.f, 0.f, water_height);
 
         const LLMatrix4a& mat = get_current_modelview();
         LLMatrix4a invtrans = mat;
@@ -953,32 +1017,39 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         ep.negate();
         enorm.copyComponent<3>(ep);
 
-        shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, enorm.getF32ptr());
+        LLDrawPoolAlpha::sWaterPlane = LLVector4(enorm.getF32ptr());
 
-        LLVector4 light_direction = LLEnvironment::getInstanceFast()->getClampedLightNorm();
+        shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, enorm.getF32ptr());
+
+
+        LLVector4 light_direction = env.getClampedLightNorm();
 
         F32 waterFogKS = 1.f / llmax(light_direction.mV[2], WATER_FOG_LIGHT_CLAMP);
 
         shader->uniform1f(LLShaderMgr::WATER_FOGKS, waterFogKS);
 
-        F32 eyedepth = LLViewerCamera::getInstanceFast()->getOrigin().mV[2] - water_height;
+        F32 eyedepth = LLViewerCamera::getInstance()->getOrigin().mV[2] - water_height;
         bool underwater = (eyedepth <= 0.0f);
 
-        F32 waterFogDensity = getModifiedWaterFogDensityFast(mCachedWaterFogDensity, mCachedFogMod, underwater);
+        F32 waterFogDensity = env.getCurrentWater()->getModifiedWaterFogDensity(underwater);
         shader->uniform1f(LLShaderMgr::WATER_FOGDENSITY, waterFogDensity);
 
-        shader->uniform4fv(LLShaderMgr::WATER_FOGCOLOR, 1, mCachedWaterFogColor.mV);
+        LLColor4 fog_color(env.getCurrentWater()->getWaterFogColor());
+        shader->uniform4fv(LLShaderMgr::WATER_FOGCOLOR, fog_color.mV);
 
-        F32 blend_factor = getBlendFactor();
+        shader->uniform3fv(LLShaderMgr::WATER_FOGCOLOR_LINEAR, linearColor3(fog_color).mV);
+
+        F32 blend_factor = env.getCurrentWater()->getBlendFactor();
         shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
 
         // update to normal lightnorm, water shader itself will use rotated lightnorm as necessary
-        shader->uniform4fv(LLShaderMgr::LIGHTNORM, 1, light_direction.mV);
+        shader->uniform3fv(LLShaderMgr::LIGHTNORM, light_direction.mV);
     }
 }
 
 void LLSettingsVOWater::updateSettings()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     // base class clears dirty flag so as to not trigger recursive update
     LLSettingsBase::updateSettings();
 
@@ -989,23 +1060,12 @@ void LLSettingsVOWater::updateSettings()
         pwaterpool->setOpaqueTexture(GetDefaultOpaqueTextureAssetId());
         pwaterpool->setNormalMaps(getNormalMapID(), getNextNormalMapID());
     }
-
-    mCachedWaterFogDensity= getWaterFogDensity();
-    mCachedFogMod = getFogMod();
-    mCachedWaterFogColor = LLColor4(getWaterFogColor(), 0.0f);
 }
 
 const LLSettingsWater::parammapping_t& LLSettingsVOWater::getParameterMap() const
 {
     static parammapping_t param_map;
 
-    if (param_map.empty())
-    {
-        //LLSD water_defaults = LLSettingsWater::defaults();
-        //param_map[SETTING_FOG_COLOR] = DefaultParam(LLShaderMgr::WATER_FOGCOLOR, water_defaults[SETTING_FOG_COLOR]);
-        // let this get set by LLSettingsVOWater::applySpecial so that it can properly reflect the underwater modifier
-        //param_map[SETTING_FOG_DENSITY] = DefaultParam(LLShaderMgr::WATER_FOGDENSITY, water_defaults[SETTING_FOG_DENSITY]);
-    }
     return param_map;
 }
 
@@ -1042,16 +1102,43 @@ LLSettingsDay::ptr_t LLSettingsVODay::buildFromLegacyPreset(const std::string &n
     std::set<std::string> framenames;
     std::set<std::string> notfound;
 
+    // expected and correct folder sctructure is to have
+    // three folders in widnlight's root: days, water, skies 
     std::string base_path(gDirUtilp->getDirName(path));
     std::string water_path(base_path);
     std::string sky_path(base_path);
+    std::string day_path(base_path);
 
     gDirUtilp->append(water_path, "water");
     gDirUtilp->append(sky_path, "skies");
+    gDirUtilp->append(day_path, "days");
+
+    if (!gDirUtilp->fileExists(day_path))
+    {
+        LL_WARNS("SETTINGS") << "File " << name << ".xml is not in \"days\" folder." << LL_ENDL;
+    }
+
+    if (!gDirUtilp->fileExists(water_path))
+    {
+        LL_WARNS("SETTINGS") << "Failed to find accompaniying water folder for file " << name
+            << ".xml. Falling back to using default folder" << LL_ENDL;
+
+        water_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "windlight");
+        gDirUtilp->append(water_path, "water");
+    }
+
+    if (!gDirUtilp->fileExists(sky_path))
+    {
+        LL_WARNS("SETTINGS") << "Failed to find accompaniying skies folder for file " << name
+            << ".xml. Falling back to using default folder" << LL_ENDL;
+
+        sky_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "windlight");
+        gDirUtilp->append(sky_path, "skies");
+    }
 
     newsettings[SETTING_NAME] = name;
 
-    LLSD watertrack = LLSDArray(
+    LLSD watertrack = llsd::array(
         LLSDMap(SETTING_KEYKFRAME, LLSD::Real(0.0f))
         (SETTING_KEYNAME, "water:Default"));
 
@@ -1066,7 +1153,7 @@ LLSettingsDay::ptr_t LLSettingsVODay::buildFromLegacyPreset(const std::string &n
         skytrack.append(entry);
     }
 
-    newsettings[SETTING_TRACKS] = LLSDArray(watertrack)(skytrack);
+    newsettings[SETTING_TRACKS] = llsd::array(watertrack, skytrack);
 
     LLSD frames(LLSD::emptyMap());
 
@@ -1154,7 +1241,7 @@ LLSettingsDay::ptr_t LLSettingsVODay::buildFromLegacyMessage(const LLUUID &regio
     watersettings[SETTING_NAME] = watername;
     frames[watername] = watersettings;
 
-    LLSD watertrack = LLSDArray(
+    LLSD watertrack = llsd::array(
             LLSDMap(SETTING_KEYKFRAME, LLSD::Real(0.0f))
             (SETTING_KEYNAME, watername));
 
@@ -1168,7 +1255,7 @@ LLSettingsDay::ptr_t LLSettingsVODay::buildFromLegacyMessage(const LLUUID &regio
 
     LLSD newsettings = LLSDMap
         ( SETTING_NAME, "Region (legacy)" )
-        ( SETTING_TRACKS, LLSDArray(watertrack)(skytrack))
+        ( SETTING_TRACKS, llsd::array(watertrack, skytrack))
         ( SETTING_FRAMES, frames )
         ( SETTING_TYPE, "daycycle" );
 
@@ -1349,7 +1436,7 @@ LLSD LLSettingsVODay::convertToLegacy(const LLSettingsVODay::ptr_t &pday)
         skys[name.str()] = std::static_pointer_cast<LLSettingsSky>((*it).second);
         
         F32 frame = ((tracksky.size() == 1) && (it == tracksky.begin())) ? -1.0f : (*it).first;
-        llsdcycle.append( LLSDArray(LLSD::Real(frame))(name.str()) );
+        llsdcycle.append( llsd::array(LLSD::Real(frame), name.str()) );
     }
 
     LLSD llsdskylist(LLSD::emptyMap());
@@ -1362,7 +1449,7 @@ LLSD LLSettingsVODay::convertToLegacy(const LLSettingsVODay::ptr_t &pday)
         llsdskylist[(*its).first] = llsdsky;
     }
 
-    return LLSDArray(LLSD::emptyMap())(llsdcycle)(llsdskylist)(llsdwater);
+    return llsd::array(LLSD::emptyMap(), llsdcycle, llsdskylist, llsdwater);
 }
 
 LLSettingsSkyPtr_t  LLSettingsVODay::getDefaultSky() const

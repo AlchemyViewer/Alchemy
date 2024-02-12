@@ -112,16 +112,6 @@ void LLFloaterURLEntry::headerFetchComplete(S32 status, const std::string& mime_
 		panel_media->setMediaType(mime_type);
 		panel_media->setMediaURL(mMediaURLEdit->getValue().asString());
 	}
-	else
-	{
-		LLPanelFace* panel_face = dynamic_cast<LLPanelFace*>(mPanelLandMediaHandle.get());
-		if(panel_face)
-		{
-			panel_face->setMediaType(mime_type);
-			panel_face->setMediaURL(mMediaURLEdit->getValue().asString());
-		}
-
-	}
 
 	getChildView("loading_label")->setVisible( false);
 	closeFloater();
@@ -185,10 +175,9 @@ void LLFloaterURLEntry::onBtnOK( void* userdata )
 	// We assume that an empty scheme is an http url, as this is how we will treat it.
 	if(scheme == "")
 	{
-		scheme = "http";
+		scheme = "https";
 	}
 
-	// Discover the MIME type only for "http" scheme.
 	if(!media_url.empty() && 
 	   (scheme == "http" || scheme == "https"))
 	{
@@ -204,6 +193,7 @@ void LLFloaterURLEntry::onBtnOK( void* userdata )
 	self->getChildView("ok_btn")->setEnabled(false);
 	self->getChildView("cancel_btn")->setEnabled(false);
 	self->getChildView("media_entry")->setEnabled(false);
+    self->getChildView("clear_btn")->setEnabled(false);
 }
 
 // static
@@ -211,15 +201,20 @@ void LLFloaterURLEntry::getMediaTypeCoro(std::string url, LLHandle<LLFloater> pa
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("getMediaTypeCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMediaTypeCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+    LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
+    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
 
+    httpOpts->setFollowRedirects(true);
     httpOpts->setHeadersOnly(true);
+
+    httpHeaders->append(HTTP_OUT_HEADER_ACCEPT, "*/*");
+    httpHeaders->append(HTTP_OUT_HEADER_COOKIE, "");
 
     LL_INFOS("HttpCoroutineAdapter", "genericPostCoro") << "Generic POST for " << url << LL_ENDL;
 
-    LLSD result = httpAdapter->getAndSuspend(httpRequest, url, httpOpts);
+    LLSD result = httpAdapter->getRawAndSuspend(httpRequest, url, httpOpts, httpHeaders);
 
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
@@ -234,12 +229,6 @@ void LLFloaterURLEntry::getMediaTypeCoro(std::string url, LLHandle<LLFloater> pa
     // Set empty type to none/none.  Empty string is reserved for legacy parcels
     // which have no mime type set.
     std::string resolvedMimeType = LLMIMETypes::getDefaultMimeType();
-
-    if (!status)
-    {
-        floaterUrlEntry->headerFetchComplete(status.getType(), resolvedMimeType);
-        return;
-    }
 
     LLSD resultHeaders = httpResults[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_HEADERS];
 

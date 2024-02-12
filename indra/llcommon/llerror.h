@@ -35,7 +35,9 @@
 
 #include "stdtypes.h"
 
+#include "llprofiler.h"
 #include "llpreprocessor.h"
+
 
 const int LL_ERR_NOERR = 0;
 
@@ -53,7 +55,7 @@ const int LL_ERR_NOERR = 0;
 #define SHOW_ASSERT
 #else // _DEBUG
 
-#if defined(LL_RELEASE_WITH_DEBUG_INFO) || defined(RELEASE_SHOW_ASSERT)
+#ifdef LL_RELEASE_WITH_DEBUG_INFO
 #define SHOW_ASSERT
 #endif // LL_RELEASE_WITH_DEBUG_INFO
 
@@ -69,6 +71,10 @@ const int LL_ERR_NOERR = 0;
 #define SHOW_INFO
 #endif
 
+#ifdef RELEASE_SHOW_ASSERT
+#define SHOW_ASSERT
+#endif
+
 #endif // !_DEBUG
 
 #define llassert_always_msg(func, msg) if (LL_UNLIKELY(!(func))) LL_ERRS() << "ASSERT (" << msg << ")" << LL_ENDL
@@ -77,9 +83,11 @@ const int LL_ERR_NOERR = 0;
 
 #ifdef SHOW_ASSERT
 #define llassert(func)			llassert_always_msg(func, #func)
+#define llassert_msg(func, msg)	llassert_always_msg(func, msg)
 #define llverify(func)			llassert_always_msg(func, #func)
 #else
 #define llassert(func)
+#define llassert_msg(func, msg)
 #define llverify(func)			do {if (func) {}} while(0)
 #endif
 
@@ -268,7 +276,6 @@ namespace LLError
 		// used to indicate no class info known for logging
 
     //LLCallStacks keeps track of call stacks and output the call stacks to log file
-    //when LLAppViewer::handleViewerCrash() is triggered.
     //
     //Note: to be simple, efficient and necessary to keep track of correct call stacks, 
     //LLCallStacks is designed not to be thread-safe.
@@ -360,7 +367,8 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 // if (condition) LL_INFOS() << "True" << LL_ENDL; else LL_INFOS()() << "False" << LL_ENDL;
 
 #define lllog(level, once, ...)                                         \
-	do {                                                                \
+    do {                                                                \
+        LL_PROFILE_ZONE_NAMED("lllog");                                 \
 		const char* tags[] = {"", ##__VA_ARGS__};                       \
 		static LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
 		lllog_test_()
@@ -417,12 +425,9 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 #define LL_NEWLINE '\n'
 
 // Use this only in LL_ERRS or in a place that LL_ERRS may not be used
-#define LLERROR_CRASH               \
-{                                   \
-    int* make_me_crash = NULL;      \
-    /* coverity[var_deref_op] */    \
-    *make_me_crash = 0;             \
-    exit(*make_me_crash);           \
+#define LLERROR_CRASH                                   \
+{                                                       \
+    crashdriver([](int* ptr){ *ptr = 0; exit(*ptr); }); \
 }
 
 #define LL_ENDL                                         \
@@ -499,7 +504,32 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 #define LL_VLOGS(level, ...)      llvlog(level, false, ##__VA_ARGS__)
 #define LL_VLOGS_ONCE(level, ...) llvlog(level, true,  ##__VA_ARGS__)
 
-// Check at run-time whether logging is enabled, without generating output
+/*
+// Check at run-time whether logging is enabled, without generating output.
+Resist the temptation to add a function like this because it incurs the
+expense of locking and map-searching every time control reaches it.
 bool debugLoggingEnabled(const std::string& tag);
+
+Instead of:
+
+if debugLoggingEnabled("SomeTag")
+{
+    // ... presumably expensive operation ...
+    LL_DEBUGS("SomeTag") << ... << LL_ENDL;
+}
+
+Use this:
+
+LL_DEBUGS("SomeTag");
+// ... presumably expensive operation ...
+LL_CONT << ...;
+LL_ENDL;
+
+LL_DEBUGS("SomeTag") performs the locking and map-searching ONCE, then caches
+the result in a static variable.
+*/ 
+
+// used by LLERROR_CRASH
+void crashdriver(void (*)(int*));
 
 #endif // LL_LLERROR_H

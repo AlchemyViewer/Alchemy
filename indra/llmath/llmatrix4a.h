@@ -34,6 +34,7 @@
 
 class alignas(16) LLMatrix4a
 {
+	LL_ALIGN_NEW
 public:
 	LL_ALIGN_PREFIX(16) LLVector4a mMatrix[4] LL_ALIGN_POSTFIX(16);
 public:
@@ -45,27 +46,17 @@ public:
 		ROW_TRANS
 	};
 
-	void* operator new(size_t size)
-	{
-		return ll_aligned_malloc_16(size);
-	}
-
-	void* operator new[](size_t size)
-	{
-		return ll_aligned_malloc_16(size);
-	}
-
-	void operator delete(void* ptr)
-	{
-		ll_aligned_free_16(ptr);
-	}
-
-	void operator delete[](void* ptr)
-	{
-		ll_aligned_free_16(ptr);
-	}
-
 	LLMatrix4a() = default;
+    explicit LLMatrix4a(const LLMatrix4& val)
+    {
+        loadu(val);
+    }
+
+    explicit LLMatrix4a(const F32* val)
+    {
+        loadu(val);
+    }
+
 	LLMatrix4a(const LLQuad& q1,const LLQuad& q2,const LLQuad& q3,const LLQuad& q4)
 	{
 		mMatrix[0] = q1;
@@ -73,7 +64,7 @@ public:
 		mMatrix[2] = q3;
 		mMatrix[3] = q4;
 	}
-	LLMatrix4a(const LLQuaternion2& quat)
+	explicit LLMatrix4a(const LLQuaternion2& quat)
 	{
 		const LLVector4a& xyzw = quat.getVector4a(); 
 		LLVector4a nyxwz = _mm_shuffle_ps(xyzw, xyzw, _MM_SHUFFLE(2,3,0,1));
@@ -117,11 +108,12 @@ public:
 
 	inline void setIdentity()
 	{
-		static __m128 ones = _mm_set_ps(1.f,0.f,0.f,1.f);
-		mMatrix[0] = _mm_movelh_ps(ones,_mm_setzero_ps());
-		mMatrix[1] = _mm_movehl_ps(_mm_setzero_ps(),ones);
-		mMatrix[2] = _mm_movelh_ps(_mm_setzero_ps(),ones);
-		mMatrix[3] = _mm_movehl_ps(ones,_mm_setzero_ps());
+		const LLQuad ones = _mm_set_ps(1.f,0.f,0.f,1.f);
+		const LLQuad zeroes = _mm_setzero_ps();
+		mMatrix[0] = _mm_movelh_ps(ones, zeroes);
+		mMatrix[1] = _mm_movehl_ps(zeroes,ones);
+		mMatrix[2] = _mm_movelh_ps(zeroes,ones);
+		mMatrix[3] = _mm_movehl_ps(ones, zeroes);
 	}
 
 	inline void load4a(const F32* src)
@@ -140,20 +132,20 @@ public:
 		mMatrix[3].loadua(src.mMatrix[3]);
 	}
 
-	inline void loadu(const LLMatrix3& src)
-	{
-		mMatrix[0].load3(src.mMatrix[0]);
-		mMatrix[1].load3(src.mMatrix[1]);
-		mMatrix[2].load3(src.mMatrix[2]);
-		mMatrix[3].set(0,0,0,1.f);
-	}
-
 	inline void loadu(const F32* src)
 	{
 		mMatrix[0].loadua(src+0);
 		mMatrix[1].loadua(src+4);
 		mMatrix[2].loadua(src+8);
 		mMatrix[3].loadua(src+12);
+	}
+
+	inline void loadu(const LLMatrix3& src)
+	{
+		mMatrix[0].load3(src.mMatrix[0]);
+		mMatrix[1].load3(src.mMatrix[1]);
+		mMatrix[2].load3(src.mMatrix[2]);
+		mMatrix[3].set(0,0,0,1.f);
 	}
 
 	inline void store4a(F32* dst) const
@@ -443,6 +435,8 @@ public:
 		mMatrix[3] = _mm_movehl_ps(q4,q1);
 	}
 
+    const LLVector4a& getTranslation() const { return mMatrix[3]; }
+
 //  Following procedure adapted from:
 //		http://software.intel.com/en-us/articles/optimized-matrix-library-for-use-with-the-intel-pentiumr-4-processors-sse2-instructions/
 //
@@ -682,7 +676,7 @@ public:
 	//Direct assignment of row3.
 	inline void setTranslate_affine(const LLVector3& trans)
 	{
-		static const LLVector4Logical mask = _mm_load_ps((F32*)&S_V4LOGICAL_MASK_TABLE[3*4]);
+		const LLVector4Logical mask = _mm_load_ps((F32*)&S_V4LOGICAL_MASK_TABLE[3*4]);
 
 		LLVector4a translation;
 		translation.load3(trans.mV);
@@ -747,7 +741,7 @@ public:
 
 	inline void extractRotation_affine()
 	{
-		static const LLVector4Logical mask = _mm_load_ps((F32*)&S_V4LOGICAL_MASK_TABLE[3*4]);
+		const LLVector4Logical mask = _mm_load_ps((F32*)&S_V4LOGICAL_MASK_TABLE[3*4]);
 		mMatrix[0].setSelectWithMask(mask,_mm_setzero_ps(),mMatrix[0]);
 		mMatrix[1].setSelectWithMask(mask,_mm_setzero_ps(),mMatrix[1]);
 		mMatrix[2].setSelectWithMask(mask,_mm_setzero_ps(),mMatrix[2]);
@@ -758,7 +752,7 @@ public:
 private:
 	template<bool mins> inline void init_foos(LLMatrix4a& foos) const
 	{
-		static bool done(false);
+		thread_local bool done(false);
 		if (done) return;
 		const LLVector4a delta(0.0001f);
 		foos.setIdentity();
@@ -772,8 +766,8 @@ private:
 public:
 	inline bool isIdentity() const
 	{
-		static LLMatrix4a mins;
-		static LLMatrix4a maxs;
+		thread_local LLMatrix4a mins;
+		thread_local LLMatrix4a maxs;
 
 		init_foos<false>(mins);
 		init_foos<true>(maxs);
@@ -794,6 +788,38 @@ public:
 static_assert(std::is_trivial<LLMatrix4a>::value, "LLMatrix4a must be a trivial type");
 static_assert(std::is_standard_layout<LLMatrix4a>::value, "LLMatrix4a must be a standard layout type");
 #endif
+
+inline LLVector4a rowMul(const LLVector4a &row, const LLMatrix4a &mat)
+{
+    LLVector4a result;
+    result = _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(0, 0, 0, 0)), mat.mMatrix[0]);
+    result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(1, 1, 1, 1)), mat.mMatrix[1]));
+    result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(2, 2, 2, 2)), mat.mMatrix[2]));
+    result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(3, 3, 3, 3)), mat.mMatrix[3]));
+    return result;
+}
+
+inline void matMul(const LLMatrix4a &a, const LLMatrix4a &b, LLMatrix4a &res)
+{
+    LLVector4a row0 = rowMul(a.mMatrix[0], b);
+    LLVector4a row1 = rowMul(a.mMatrix[1], b);
+    LLVector4a row2 = rowMul(a.mMatrix[2], b);
+    LLVector4a row3 = rowMul(a.mMatrix[3], b);
+
+    res.mMatrix[0] = row0;
+    res.mMatrix[1] = row1;
+    res.mMatrix[2] = row2;
+    res.mMatrix[3] = row3;
+}
+
+//Faster version of matMul wehere res must not be a or b
+inline void matMulUnsafe(const LLMatrix4a &a, const LLMatrix4a &b, LLMatrix4a &res)
+{
+    res.mMatrix[0] = rowMul(a.mMatrix[0], b);
+    res.mMatrix[1] = rowMul(a.mMatrix[1], b);
+    res.mMatrix[2] = rowMul(a.mMatrix[2], b);
+    res.mMatrix[3] = rowMul(a.mMatrix[3], b);
+}
 
 inline std::ostream& operator<<(std::ostream& s, const LLMatrix4a& m)
 {

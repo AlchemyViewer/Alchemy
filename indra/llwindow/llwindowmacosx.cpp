@@ -48,6 +48,8 @@ BOOL gHiDPISupport = TRUE;
 const S32	BITS_PER_PIXEL = 32;
 const S32	MAX_NUM_RESOLUTIONS = 32;
 
+const S32   DEFAULT_REFRESH_RATE = 60;
+
 namespace
 {
     NSKeyEventRef mRawKeyEvent = NULL;
@@ -110,7 +112,7 @@ LLWindowMacOSX::LLWindowMacOSX(LLWindowCallbacks* callbacks,
 							   const std::string& title, const std::string& name, S32 x, S32 y, S32 width,
 							   S32 height, U32 flags,
 							   BOOL fullscreen, BOOL clearBg,
-							   BOOL disable_vsync, BOOL use_gl,
+							   BOOL enable_vsync, BOOL use_gl,
 							   BOOL ignore_pixel_depth,
 							   U32 fsaa_samples)
 	: LLWindow(NULL, fullscreen, flags)
@@ -164,7 +166,7 @@ LLWindowMacOSX::LLWindowMacOSX(LLWindowCallbacks* callbacks,
 	// Stash an object pointer for OSMessageBox()
 	gWindowImplementation = this;
 	// Create the GL context and set it up for windowed or fullscreen, as appropriate.
-	if(createContext(x, y, width, height, 32, fullscreen, disable_vsync))
+	if(createContext(x, y, width, height, 32, fullscreen, enable_vsync))
 	{
 		if(mWindow != NULL)
 		{
@@ -183,7 +185,7 @@ LLWindowMacOSX::LLWindowMacOSX(LLWindowCallbacks* callbacks,
 			return;
 		}
 
-		//start with arrow cursor
+        //start with arrow cursor
 		initCursors();
 		setCursor( UI_CURSOR_ARROW );
 		
@@ -606,7 +608,7 @@ void LLWindowMacOSX::getMouseDeltas(float* delta)
 	delta[1] = mCursorLastEventDeltaY;
 }
 
-BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL disable_vsync)
+BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL enable_vsync)
 {
 	mFullscreen = fullscreen;
 	
@@ -619,10 +621,37 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 	{
 		// Our OpenGL view is already defined within SecondLife.xib.
 		// Get the view instead.
-		mGLView = createOpenGLView(mWindow, mFSAASamples, !disable_vsync);
+		mGLView = createOpenGLView(mWindow, mFSAASamples, enable_vsync);
 		mContext = getCGLContextObj(mGLView);
-
 		gGLManager.mVRAM = getVramSize(mGLView);
+
+        if(!mPixelFormat)
+        {
+            CGLPixelFormatAttribute attribs[] =
+            {
+                kCGLPFANoRecovery,
+                kCGLPFADoubleBuffer,
+                kCGLPFAClosestPolicy,
+                kCGLPFAAccelerated,
+                kCGLPFAMultisample,
+                kCGLPFASampleBuffers, static_cast<CGLPixelFormatAttribute>((mFSAASamples > 0 ? 1 : 0)),
+                kCGLPFASamples, static_cast<CGLPixelFormatAttribute>(mFSAASamples),
+                kCGLPFAStencilSize, static_cast<CGLPixelFormatAttribute>(8),
+                kCGLPFADepthSize, static_cast<CGLPixelFormatAttribute>(24),
+                kCGLPFAAlphaSize, static_cast<CGLPixelFormatAttribute>(8),
+                kCGLPFAColorSize, static_cast<CGLPixelFormatAttribute>(24),
+                kCGLPFAOpenGLProfile, static_cast<CGLPixelFormatAttribute>(kCGLOGLPVersion_GL4_Core),
+                static_cast<CGLPixelFormatAttribute>(0)
+            };
+
+            GLint numPixelFormats;
+            CGLChoosePixelFormat (attribs, &mPixelFormat, &numPixelFormats);
+            
+            if(mPixelFormat == NULL) {
+                CGLChoosePixelFormat (attribs, &mPixelFormat, &numPixelFormats);
+            }
+        }
+
 	}
 	
 	// This sets up our view to recieve text from our non-inline text input window.
@@ -642,18 +671,15 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 		}
 	}
 
+    mRefreshRate = CGDisplayModeGetRefreshRate(CGDisplayCopyDisplayMode(mDisplay));
+    if(mRefreshRate == 0)
+    {
+        //consider adding more appropriate fallback later
+        mRefreshRate = DEFAULT_REFRESH_RATE;
+    }
+
 	// Disable vertical sync for swap
-	GLint frames_per_swap = 0;
-	if (disable_vsync)
-	{
-		frames_per_swap = 0;
-	}
-	else
-	{
-		frames_per_swap = 1;
-	}
-	
-    CGLSetParameter(mContext, kCGLCPSwapInterval, &frames_per_swap);
+    toggleVSync(enable_vsync);
     
     //enable multi-threaded OpenGL
     CGLError cgl_err;
@@ -678,7 +704,7 @@ BOOL LLWindowMacOSX::createContext(int x, int y, int width, int height, int bits
 
 // We only support OS X 10.7's fullscreen app mode which is literally a full screen window that fills a virtual desktop.
 // This makes this method obsolete.
-BOOL LLWindowMacOSX::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL disable_vsync, const LLCoordScreen * const posp)
+BOOL LLWindowMacOSX::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL enable_vsync, const LLCoordScreen * const posp)
 {
 	return FALSE;
 }
@@ -1214,6 +1240,16 @@ F32 LLWindowMacOSX::getPixelAspectRatio()
 	return 1.f;
 }
 
+U32 LLWindowMacOSX::getAvailableVRAMMegabytes() {
+    // MTL (and MoltenVK) has some additional gpu data, such as recommendedMaxWorkingSetSize and currentAllocatedSize.
+    // But these are not available for OpenGL and/or our current mimimum OS version.
+    // So we will estimate.
+    static const U32 mb = 1024*1024;
+    // We're asked for total available gpu memory, but we only have allocation info on texture usage. So estimate by doubling that.
+    static const U32 total_factor = 2; // estimated total/textures
+    return gGLManager.mVRAM - (LLImageGL::getTextureBytesAllocated() * total_factor/mb);
+}
+
 //static SInt32 oldWindowLevel;
 
 // MBW -- XXX -- There's got to be a better way than this.  Find it, please...
@@ -1244,9 +1280,10 @@ BOOL LLWindowMacOSX::isClipboardTextAvailable()
 
 BOOL LLWindowMacOSX::pasteTextFromClipboard(LLWString &dst)
 {
-    unsigned short* temp = copyFromPBoard();
-	llutf16string str(temp);
-    free(temp);
+    unsigned short* pboard_data = copyFromPBoard(); // must free returned data
+	llutf16string str(pboard_data);
+    free(pboard_data);
+
 	dst = utf16str_to_wstring(str);
 	if (dst != L"")
 	{
@@ -1266,9 +1303,9 @@ BOOL LLWindowMacOSX::copyTextToClipboard(const LLWString &s)
 	return result;
 }
 
-void LLWindowMacOSX::setWindowTitle(const std::string& title)
+void LLWindowMacOSX::setTitle(const std::string title)
 {
-	setTitle(title);
+	setWindowTitle(title);
 }
 
 // protected
@@ -1283,7 +1320,7 @@ LLWindow::LLWindowResolution* LLWindowMacOSX::getSupportedResolutions(S32 &num_r
 {
 	if (!mSupportedResolutions)
 	{
-		CFArrayRef modes = CGDisplayCopyAllDisplayModes(mDisplay, NULL);
+		CFArrayRef modes = CGDisplayCopyAllDisplayModes(mDisplay, nullptr);
 
 		if(modes != NULL)
 		{
@@ -1322,7 +1359,7 @@ LLWindow::LLWindowResolution* LLWindowMacOSX::getSupportedResolutions(S32 &num_r
 					}
 				}
 			}
-			CFRelease(modes);
+            CFRelease(modes);
 		}
 	}
 
@@ -1420,6 +1457,7 @@ const char* cursorIDToName(int id)
 		case UI_CURSOR_SIZENESW:						return "UI_CURSOR_SIZENESW";
 		case UI_CURSOR_SIZEWE:							return "UI_CURSOR_SIZEWE";
 		case UI_CURSOR_SIZENS:							return "UI_CURSOR_SIZENS";
+		case UI_CURSOR_SIZEALL:							return "UI_CURSOR_SIZEALL";
 		case UI_CURSOR_NO:								return "UI_CURSOR_NO";
 		case UI_CURSOR_WORKING:							return "UI_CURSOR_WORKING";
 		case UI_CURSOR_TOOLGRAB:						return "UI_CURSOR_TOOLGRAB";
@@ -1439,6 +1477,7 @@ const char* cursorIDToName(int id)
 		case UI_CURSOR_TOOLCAMERA:						return "UI_CURSOR_TOOLCAMERA";
 		case UI_CURSOR_TOOLPAN:							return "UI_CURSOR_TOOLPAN";
 		case UI_CURSOR_TOOLZOOMIN:						return "UI_CURSOR_TOOLZOOMIN";
+		case UI_CURSOR_TOOLZOOMOUT:						return "UI_CURSOR_TOOLZOOMOUT";
 		case UI_CURSOR_TOOLPICKOBJECT3:					return "UI_CURSOR_TOOLPICKOBJECT3";
 		case UI_CURSOR_TOOLPLAY:						return "UI_CURSOR_TOOLPLAY";
 		case UI_CURSOR_TOOLPAUSE:						return "UI_CURSOR_TOOLPAUSE";
@@ -1494,6 +1533,11 @@ void LLWindowMacOSX::updateCursor()
 	
     if(mCurrentCursor == mNextCursor)
     {
+        if(mCursorHidden && mHideCursorPermanent && isCGCursorVisible())
+        {
+            hideNSCursor();            
+            adjustCursorDecouple();
+        }
         return;
     }
 
@@ -1603,6 +1647,7 @@ void LLWindowMacOSX::initCursors()
 	initPixmapCursor(UI_CURSOR_TOOLCAMERA, 7, 6);
 	initPixmapCursor(UI_CURSOR_TOOLPAN, 7, 6);
 	initPixmapCursor(UI_CURSOR_TOOLZOOMIN, 7, 6);
+    initPixmapCursor(UI_CURSOR_TOOLZOOMOUT, 7, 6);
 	initPixmapCursor(UI_CURSOR_TOOLPICKOBJECT3, 1, 1);
 	initPixmapCursor(UI_CURSOR_TOOLPLAY, 1, 1);
 	initPixmapCursor(UI_CURSOR_TOOLPAUSE, 1, 1);
@@ -1621,6 +1666,7 @@ void LLWindowMacOSX::initCursors()
 	initPixmapCursor(UI_CURSOR_SIZENESW, 10, 10);
 	initPixmapCursor(UI_CURSOR_SIZEWE, 10, 10);
 	initPixmapCursor(UI_CURSOR_SIZENS, 10, 10);
+    initPixmapCursor(UI_CURSOR_SIZEALL, 10, 10);
 
 }
 
@@ -1655,7 +1701,7 @@ void LLWindowMacOSX::hideCursor()
 
 void LLWindowMacOSX::showCursor()
 {
-	if(mCursorHidden)
+	if(mCursorHidden || !isCGCursorVisible())
 	{
 		//		LL_INFOS() << "showCursor: showing" << LL_ENDL;
 		mCursorHidden = FALSE;
@@ -1866,6 +1912,74 @@ void LLWindowMacOSX::allowLanguageTextInput(LLPreeditor *preeditor, BOOL b)
     allowDirectMarkedTextInput(b, mGLView); // mLanguageTextInputAllowed and mMarkedTextAllowed should be updated at once (by Pell Smit
 }
 
+class sharedContext 
+{
+public:
+    CGLContextObj mContext;
+};
+
+void* LLWindowMacOSX::createSharedContext()
+{
+    sharedContext* sc = new sharedContext();
+    CGLCreateContext(mPixelFormat, mContext, &(sc->mContext));
+    
+    if (sUseMultGL)
+    {
+        CGLEnable(mContext, kCGLCEMPEngine);
+    }
+
+    return (void *)sc;
+}
+
+void LLWindowMacOSX::makeContextCurrent(void* context)
+{
+    CGLSetCurrentContext(((sharedContext*)context)->mContext);
+
+    //enable multi-threaded OpenGL
+	if (sUseMultGL)
+	{
+		CGLError cgl_err;
+		CGLContextObj ctx = CGLGetCurrentContext();
+
+		cgl_err =  CGLEnable( ctx, kCGLCEMPEngine);
+
+		if (cgl_err != kCGLNoError )
+		{
+			LL_INFOS("GLInit") << "Multi-threaded OpenGL not available." << LL_ENDL;
+		}
+		else
+		{
+            LL_INFOS("GLInit") << "Multi-threaded OpenGL enabled." << LL_ENDL;
+		}
+	}
+	
+}
+
+void LLWindowMacOSX::destroySharedContext(void* context)
+{
+    LL_INFOS() << "Destroying shared context" << LL_ENDL;
+    sharedContext* sc = (sharedContext*)context;
+
+    CGLDestroyContext(sc->mContext);
+
+    delete sc;
+}
+
+void LLWindowMacOSX::toggleVSync(bool enable_vsync)
+{
+    GLint frames_per_swap = 0;
+    if (!enable_vsync)
+    {
+        frames_per_swap = 0;
+    }
+    else
+    {
+        frames_per_swap = 1;
+    }
+    
+    CGLSetParameter(mContext, kCGLCPSwapInterval, &frames_per_swap);
+}
+
 void LLWindowMacOSX::interruptLanguageTextInput()
 {
 	commitCurrentPreedit(mGLView);
@@ -1973,8 +2087,13 @@ void LLWindowMacOSX::handleDragNDrop(std::string url, LLWindowCallbacks::DragNDr
 	
 	if(!url.empty())
 	{
-		LLWindowCallbacks::DragNDropResult res =
-		mCallbacks->handleDragNDrop(this, gl_pos, mask, action, url);
+//		LLWindowCallbacks::DragNDropResult res =
+//		mCallbacks->handleDragNDrop(this, gl_pos, mask, action, url);
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+		std::vector<std::string> data;
+		data.push_back(url);
+		LLWindowCallbacks::DragNDropResult res = mCallbacks->handleDragNDrop(this, gl_pos, mask, action, LLWindowCallbacks::DNDT_DEFAULT, data);
+// [/SL:KB]
 		
 		switch (res) {
 			case LLWindowCallbacks::DND_NONE:		// No drop allowed

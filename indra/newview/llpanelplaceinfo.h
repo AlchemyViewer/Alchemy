@@ -38,7 +38,6 @@ class LLAvatarName;
 class LLExpandableTextBox;
 class LLIconCtrl;
 class LLInventoryItem;
-class LLPanelPickEdit;
 class LLParcel;
 class LLScrollContainer;
 class LLTextBox;
@@ -84,6 +83,7 @@ public:
 	// Displays information about a remote parcel.
 	// Sends a request to the server.
 	void displayParcelInfo(const LLUUID& region_id,
+						   const LLVector3& local_pos,
 						   const LLVector3d& pos_global);
 
 	/*virtual*/ void setErrorStatus(S32 status, const std::string& reason);
@@ -94,7 +94,7 @@ public:
 
 	// Create a pick for the location specified
 	// by global_pos.
-	void createPick(const LLVector3d& pos_global, LLPanelPickEdit* pick_panel);
+	void createPick(const LLVector3d& pos_global);
 
 protected:
 	static void onNameCache(LLTextBox* text, const std::string& full_name);

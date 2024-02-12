@@ -54,7 +54,7 @@
 #pragma warning(disable: 4702)
 #endif
 
-LLCoreHttpUtil::HttpCoroutineAdapter::HttpCoroutineAdapter(std::string const&, unsigned int, unsigned int)
+LLCoreHttpUtil::HttpCoroutineAdapter::HttpCoroutineAdapter(std::string const&, unsigned int)
 {
 }
 

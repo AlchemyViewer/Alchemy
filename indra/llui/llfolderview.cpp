@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2015, Kitty Barnett
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -190,9 +191,10 @@ LLFolderView::LLFolderView(const Params& p)
 	mStatusTextBox(NULL),
 	mShowItemLinkOverlays(p.show_item_link_overlays),
 	mViewModel(p.view_model),
-    mGroupedItemModel(p.grouped_item_model)
+    mGroupedItemModel(p.grouped_item_model),
+    mForceArrange(false),
+    mSingleFolderMode(false)
 {
-	claimMem(mViewModel);
     LLPanel* panel = p.parent_panel;
     mParentPanel = panel->getHandle();
 	mViewModel->setFolderView(this);
@@ -249,6 +251,8 @@ LLFolderView::LLFolderView(const Params& p)
 	addChild(mStatusTextBox);
 
 	mViewModelItem->openItem();
+
+	mAreChildrenInited = true; // root folder is a special case due to not being loaded normally, assume that it's inited.
 }
 
 // Destroys the object
@@ -337,11 +341,9 @@ S32 LLFolderView::arrange( S32* unused_width, S32* unused_height )
 	return ll_round(mTargetHeight);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_FILTER("Filter Folder View");
-
 void LLFolderView::filter( LLFolderViewFilter& filter )
 {
-	LL_RECORD_BLOCK_TIME(FTM_FILTER);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     static LLUICachedControl<S32> time_visible("FilterItemsMaxTimePerFrameVisible", 10);
     static LLUICachedControl<S32> time_invisible("FilterItemsMaxTimePerFrameUnvisible", 1);
     filter.resetTime(llclamp(mParentPanel.get()->getVisible() ? time_visible() : time_invisible(), 1, 100));
@@ -503,10 +505,9 @@ BOOL LLFolderView::changeSelection(LLFolderViewItem* selection, BOOL selected)
 	return rv;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_SANITIZE_SELECTION("Sanitize Selection");
 void LLFolderView::sanitizeSelection()
 {
-	LL_RECORD_BLOCK_TIME(FTM_SANITIZE_SELECTION);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 	// store off current item in case it is automatically deselected
 	// and we want to preserve context
 	LLFolderViewItem* original_selected_item = getCurSelectedItem();
@@ -619,6 +620,7 @@ void LLFolderView::clearSelection()
 	}
 
 	mSelectedItems.clear();
+    mNeedsScroll = false;
 }
 
 std::set<LLFolderViewItem*> LLFolderView::getSelectionList() const
@@ -675,7 +677,7 @@ void LLFolderView::draw()
 	}
 	else if (mShowEmptyMessage)
 	{
-		mStatusTextBox->setValue(getFolderViewModel()->getStatusText());
+		mStatusTextBox->setValue(getFolderViewModel()->getStatusText(mItems.empty() && mFolders.empty()));
 		mStatusTextBox->setVisible( TRUE );
 		
 		// firstly reshape message textbox with current size. This is necessary to
@@ -703,12 +705,16 @@ void LLFolderView::draw()
 		}
 	}
 
-	if (mRenameItem && mRenamer && mRenamer->getVisible() && !getVisibleRect().overlaps(mRenamer->getRect()))
-	{
-		// renamer is not connected to the item we are renaming in any form so manage it manually
-		// TODO: consider stopping on any scroll action instead of when out of visible area
-		finishRenamingItem();
-	}
+    if (mRenameItem
+        && mRenamer
+        && mRenamer->getVisible()
+        && !getVisibleRect().overlaps(mRenamer->getRect()))
+    {
+        // renamer is not connected to the item we are renaming in any form so manage it manually
+        // TODO: consider stopping on any scroll action instead of when out of visible area
+        LL_DEBUGS("Inventory") << "Renamer out of bounds, hiding" << LL_ENDL;
+        finishRenamingItem();
+    }
 
 	// skip over LLFolderViewFolder::draw since we don't want the folder icon, label, 
 	// and arrow for the root folder
@@ -740,7 +746,7 @@ void LLFolderView::closeRenamer( void )
 	if (mRenamer && mRenamer->getVisible())
 	{
 		// Triggers onRenamerLost() that actually closes the renamer.
-		LLUI::getInstanceFast()->removePopup(mRenamer);
+		LLUI::getInstance()->removePopup(mRenamer);
 	}
 }
 
@@ -841,9 +847,12 @@ void LLFolderView::autoOpenItem( LLFolderViewFolder* item )
 	mAutoOpenItems.push(item);
 	
 	item->setOpen(TRUE);
+    if(!item->isSingleFolderMode())
+    {
 	LLRect content_rect = (mScrollContainer ? mScrollContainer->getContentWindowRect() : LLRect());
 	LLRect constraint_rect(0,content_rect.getHeight(), content_rect.getWidth(), 0);
 	scrollToShowItem(item, constraint_rect);
+    }
 }
 
 void LLFolderView::closeAutoOpenedFolders()
@@ -902,7 +911,11 @@ BOOL LLFolderView::canCopy() const
 	for (selected_items_t::const_iterator selected_it = mSelectedItems.begin(); selected_it != mSelectedItems.end(); ++selected_it)
 	{
 		const LLFolderViewItem* item = *selected_it;
-		if (!item->getViewModelItem()->isItemCopyable())
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
+		const LLFolderViewFolder* folder = dynamic_cast<const LLFolderViewFolder*>(item);
+		if ( (!item->getViewModelItem()->isItemCopyable()) && ((folder) || (!item->getViewModelItem()->isItemLinkable())) )
+// [/SL:KB]
+//		if (!item->getViewModelItem()->isItemCopyable())
 		{
 			return FALSE;
 		}
@@ -914,7 +927,7 @@ BOOL LLFolderView::canCopy() const
 void LLFolderView::copy()
 {
 	// *NOTE: total hack to clear the inventory clipboard
-	LLClipboard::instanceFast().reset();
+	LLClipboard::instance().reset();
 	S32 count = mSelectedItems.size();
 	if(getVisible() && getEnabled() && (count > 0))
 	{
@@ -944,7 +957,10 @@ BOOL LLFolderView::canCut() const
 		const LLFolderViewItem* item = *selected_it;
 		const LLFolderViewModelItem* listener = item->getViewModelItem();
 
-		if (!listener || !listener->isItemRemovable())
+//		if (!listener || !listener->isItemRemovable())
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2015-07-15 (Catznip-3.8)
+		if (!listener || !listener->isItemMovable())
+// [/SL:KB]
 		{
 			return FALSE;
 		}
@@ -955,7 +971,7 @@ BOOL LLFolderView::canCut() const
 void LLFolderView::cut()
 {
 	// clear the inventory clipboard
-	LLClipboard::instanceFast().reset();
+	LLClipboard::instance().reset();
 	if(getVisible() && getEnabled() && (mSelectedItems.size() > 0))
 	{
 		// Find out which item will be selected once the selection will be cut
@@ -1047,6 +1063,8 @@ void LLFolderView::paste()
 // public rename functionality - can only start the process
 void LLFolderView::startRenamingSelectedItem( void )
 {
+    LL_DEBUGS("Inventory") << "Starting inventory renamer" << LL_ENDL;
+
 	// make sure selection is visible
 	scrollToShowSelection();
 
@@ -1070,7 +1088,7 @@ void LLFolderView::startRenamingSelectedItem( void )
 		// set focus will fail unless item is visible
 		mRenamer->setFocus( TRUE );
 		mRenamer->setTopLostCallback(boost::bind(&LLFolderView::onRenamerLost, this));
-		LLUI::getInstanceFast()->addPopup(mRenamer);
+		LLUI::getInstance()->addPopup(mRenamer);
 	}
 }
 
@@ -1282,6 +1300,11 @@ BOOL LLFolderView::handleKeyHere( KEY key, MASK mask )
 		if(mSelectedItems.size())
 		{
 			LLFolderViewItem* last_selected = getCurSelectedItem();
+            if(last_selected && last_selected->isSingleFolderMode())
+            {
+                handled = FALSE;
+                break;
+            }
 			LLFolderViewItem* parent_folder = last_selected->getParentFolder();
 			if (!last_selected->isOpen() && parent_folder && parent_folder->getParentFolder())
 			{
@@ -1453,12 +1476,12 @@ BOOL LLFolderView::handleRightMouseDown( S32 x, S32 y, MASK mask )
 			mEnableRegistrar->pushScope();
 		}
 		llassert(LLMenuGL::sMenuContainer != NULL);
-		menu = LLUICtrlFactory::getInstanceFast()->createFromFile<LLMenuGL>(mMenuFileName, LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instanceFast());
+		menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>(mMenuFileName, LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
 		if (!menu)
 		{
 			menu = LLUICtrlFactory::getDefaultWidget<LLMenuGL>("inventory_menu");
 		}
-	menu->setBackgroundColor(LLUIColorTable::instanceFast().getColor("MenuPopupBgColor"));
+	menu->setBackgroundColor(LLUIColorTable::instance().getColor("MenuPopupBgColor"));
 		mPopupMenuHandle = menu->getHandle();
 		if (mEnableRegistrar)
 		{
@@ -1469,9 +1492,19 @@ BOOL LLFolderView::handleRightMouseDown( S32 x, S32 y, MASK mask )
 			mCallbackRegistrar->popScope();
 		}
 	}
+
+    BOOL item_clicked = FALSE;
+    for (selected_items_t::iterator item_it = mSelectedItems.begin(); item_it != mSelectedItems.end(); ++item_it)
+    {
+        item_clicked |= (*item_it)->getRect().pointInRect(x, y);
+    }
+    if(!item_clicked && mSingleFolderMode)
+    {
+        clearSelection();
+    }
 	bool hide_folder_menu = mSuppressFolderMenu && isFolderSelected();
-	if ((menu && handled
-		&& ( count > 0 && (hasVisibleChildren()) )) && // show menu only if selected items are visible
+	if (menu && (mSingleFolderMode || (handled
+		&& ( count > 0 && (hasVisibleChildren()) ))) && // show menu only if selected items are visible
 		!hide_folder_menu)
 	{
 		if (mCallbackRegistrar)
@@ -1541,6 +1574,22 @@ BOOL LLFolderView::addNoOptions(LLMenuGL* menu) const
 BOOL LLFolderView::handleHover( S32 x, S32 y, MASK mask )
 {
 	return LLView::handleHover( x, y, mask );
+}
+
+LLFolderViewItem* LLFolderView::getHoveredItem() const
+{
+	return dynamic_cast<LLFolderViewItem*>(mHoveredItem.get());
+}
+
+void LLFolderView::setHoveredItem(LLFolderViewItem* itemp)
+{
+	if (mHoveredItem.get() != itemp)
+	{
+		if (itemp)
+			mHoveredItem = itemp->getHandle();
+		else
+			mHoveredItem.markDead();
+	}
 }
 
 BOOL LLFolderView::handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
@@ -1656,15 +1705,12 @@ void LLFolderView::setShowSingleSelection(bool show)
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_AUTO_SELECT("Open and Select");
-static LLTrace::BlockTimerStatHandle FTM_INVENTORY("Inventory");
-
 // Main idle routine
 void LLFolderView::update()
 {
 	// If this is associated with the user's inventory, don't do anything
 	// until that inventory is loaded up.
-	LL_RECORD_BLOCK_TIME(FTM_INVENTORY);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     
     // If there's no model, the view is in suspended state (being deleted) and shouldn't be updated
     if (getFolderViewModel() == NULL)
@@ -1684,7 +1730,8 @@ void LLFolderView::update()
     
 	// Clear the modified setting on the filter only if the filter finished after running the filter process
 	// Note: if the filter count has timed out, that means the filter halted before completing the entire set of items
-    if (filter_object.isModified() && (!filter_object.isTimedOut()))
+    bool filter_modified = filter_object.isModified();
+    if (filter_modified && (!filter_object.isTimedOut()))
 	{
 		filter_object.clearModified();
 	}
@@ -1692,7 +1739,6 @@ void LLFolderView::update()
 	// automatically show matching items, and select first one if we had a selection
 	if (mNeedsAutoSelect)
 	{
-		LL_RECORD_BLOCK_TIME(FTM_AUTO_SELECT);
 		// select new item only if a filtered item not currently selected and there was a selection
 		LLFolderViewItem* selected_itemp = mSelectedItems.empty() ? NULL : mSelectedItems.back();
 		if (!mAutoSelectOverride && selected_itemp && !selected_itemp->getViewModelItem()->potentiallyVisible())
@@ -1719,7 +1765,7 @@ void LLFolderView::update()
 	BOOL filter_finished = mViewModel->contentsReady()
 							&& (getViewModelItem()->passedFilter()
 								|| ( getViewModelItem()->getLastFilterGeneration() >= filter_object.getFirstSuccessGeneration()
-									&& !filter_object.isModified()));
+									&& !filter_modified));
 	if (filter_finished 
 		|| gFocusMgr.childHasKeyboardFocus(mParentPanel.get())
 		|| gFocusMgr.childHasMouseCapture(mParentPanel.get()))
@@ -1728,7 +1774,7 @@ void LLFolderView::update()
 		mNeedsAutoSelect = FALSE;
 	}
 
-  BOOL is_visible = isInVisibleChain();
+  BOOL is_visible = isInVisibleChain() || mForceArrange;
 
   //Puts folders/items in proper positions
   // arrange() takes the model filter flag into account and call sort() if necessary (CHUI-849)
@@ -1807,22 +1853,50 @@ void LLFolderView::update()
 
 	if (mSelectedItems.size() && mNeedsScroll)
 	{
-		scrollToShowItem(mSelectedItems.back(), constraint_rect);
+        LLFolderViewItem* scroll_to_item = mSelectedItems.back();
+		scrollToShowItem(scroll_to_item, constraint_rect);
 		// continue scrolling until animated layout change is done
-		if (filter_finished
-			&& (!needsArrange() || !is_visible))
-		{
-			mNeedsScroll = FALSE;
-		}
+        bool selected_filter_finished = getRoot()->getViewModelItem()->getLastFilterGeneration() >= filter_object.getFirstSuccessGeneration();
+        if (selected_filter_finished && scroll_to_item && scroll_to_item->getViewModelItem())
+        {
+            selected_filter_finished = scroll_to_item->getViewModelItem()->getLastFilterGeneration() >= filter_object.getFirstSuccessGeneration();
+        }
+        if (filter_finished && selected_filter_finished)
+        {
+            bool needs_arrange = needsArrange() || getRoot()->needsArrange();
+            if (mParentFolder)
+            {
+                needs_arrange |= (bool)mParentFolder->needsArrange();
+            }
+            if (!needs_arrange || !is_visible)
+            {
+                mNeedsScroll = FALSE;
+            }
+        }
 	}
 
-	if (mSignalSelectCallback)
-	{
-		//RN: we use keyboard focus as a proxy for user-explicit actions
-		BOOL take_keyboard_focus = (mSignalSelectCallback == SIGNAL_KEYBOARD_FOCUS);
-		mSelectSignal(mSelectedItems, take_keyboard_focus);
-	}
-	mSignalSelectCallback = FALSE;
+    if (mSelectedItems.size())
+    {
+        LLFolderViewItem* item = mSelectedItems.back();
+        // If the goal is to show renamer, don't callback untill
+        // item is visible or is no longer being scrolled to.
+        // Otherwise renamer will be instantly closed
+        // Todo: consider moving renamer out of selection callback
+        if (!mNeedsAutoRename || !mNeedsScroll || item->getVisible())
+        {
+            if (mSignalSelectCallback)
+            {
+                //RN: we use keyboard focus as a proxy for user-explicit actions
+                BOOL take_keyboard_focus = (mSignalSelectCallback == SIGNAL_KEYBOARD_FOCUS);
+                mSelectSignal(mSelectedItems, take_keyboard_focus);
+            }
+            mSignalSelectCallback = FALSE;
+        }
+    }
+    else
+    {
+        mSignalSelectCallback = FALSE;
+    }
 }
 
 void LLFolderView::dumpSelectionInformation()
@@ -1884,6 +1958,11 @@ void LLFolderView::updateMenuOptions(LLMenuGL* menu)
 		selected_item->buildContextMenu(*menu, flags);
 		flags = multi_select_flag;
 	}
+
+    if(mSingleFolderMode && (mSelectedItems.size() == 0))
+    {
+        buildContextMenu(*menu, flags);
+    }
 
 	// This adds a check for restrictions based on the entire
 	// selection set - for example, any one wearable may not push you
@@ -2033,7 +2112,7 @@ LLFolderViewItem* LLFolderView::getNextUnselectedItem()
 	return new_selection;
 }
 
-S32 LLFolderView::getItemHeight()
+S32 LLFolderView::getItemHeight() const
 {
 	if(!hasVisibleChildren())
 {

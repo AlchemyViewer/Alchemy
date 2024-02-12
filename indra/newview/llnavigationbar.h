@@ -102,14 +102,13 @@ public:
 
 	int getDefNavBarHeight();
 	int getDefFavBarHeight();
+
+    bool isRebakeNavMeshAvailable();
 	
 // [RLVa:KB] - Checked: 2014-03-23 (RLVa-1.4.10)
 	void refreshLocationCtrl();
 // [/RLVa:KB]
 private:
-	// the distance between navigation panel and favorites panel in pixels
-	const static S32 FAVBAR_TOP_PADDING = 10;
-
 	void rebuildTeleportHistoryMenu();
 	void showTeleportHistoryMenu(LLUICtrl* btn_ctrl);
 	void invokeSearch(std::string search_text);

@@ -24,14 +24,17 @@
  * $/LicenseInfo$
  */
 
+#ifndef LL_LLDRAGDROP32_H
+#define LL_LLDRAGDROP32_H
+
 #if LL_WINDOWS
 
 #if LL_OS_DRAGDROP_ENABLED
 
-#ifndef LL_LLDRAGDROP32_H
-#define LL_LLDRAGDROP32_H
-
 #include "llwin32headerslean.h"
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+#include <shellapi.h>
+// [/SL:KB]
 #include <ole2.h>
 
 class LLDragDropWin32
@@ -47,12 +50,8 @@ class LLDragDropWin32
 		IDropTarget* mDropTarget;
 		HWND mDropWindowHandle;
 };
-#endif // LL_LLDRAGDROP32_H
 
 #else // LL_OS_DRAGDROP_ENABLED
-
-#ifndef LL_LLDRAGDROP32_H
-#define LL_LLDRAGDROP32_H
 
 #include "llwin32headerslean.h"
 #include <ole2.h>
@@ -67,8 +66,9 @@ class LLDragDropWin32
 		bool init( HWND hWnd ) { return false; };
 		void reset() { };
 };
-#endif // LL_LLDRAGDROP32_H
 
 #endif // LL_OS_DRAGDROP_ENABLED
 
 #endif // LL_WINDOWS
+
+#endif // LL_LLDRAGDROP32_H

@@ -30,6 +30,7 @@
              function="CheckControl"
              parameter="ShowMiniLocationPanel" />
     </menu_item_check>
+	<menu_item_separator />
     <menu_item_check
          label="Show FPS"
          layout="topleft"
@@ -41,4 +42,26 @@
              function="CheckControl"
              parameter="ShowStatusBarFPS" />
     </menu_item_check>
+	<menu_item_check
+         label="Show Network Stats"
+         layout="topleft"
+         name="ShowNetStats">
+		<on_click
+		  function="ToggleControl"
+		  parameter="ShowNetStats" />
+		<on_check
+		function="CheckControl"
+		parameter="ShowNetStats" />
+	</menu_item_check>
+	<menu_item_check
+         label="Show seconds in clock"
+         layout="topleft"
+         name="ShowStatusBarSeconds">
+		<on_click
+		  function="ToggleControl"
+		  parameter="ShowStatusBarSeconds" />
+		<on_check
+		function="CheckControl"
+		parameter="ShowStatusBarSeconds" />
+	</menu_item_check>
 </menu>

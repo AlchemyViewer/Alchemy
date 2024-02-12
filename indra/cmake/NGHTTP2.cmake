@@ -1,22 +1,25 @@
-include(Prebuilt)
 include(Linking)
+include(Prebuilt)
 
-set(NGHTTP2_FIND_QUIETLY ON)
-set(NGHTTP2_FIND_REQUIRED ON)
+include_guard()
+add_library( ll::nghttp2 INTERFACE IMPORTED )
 
-if (USESYSTEMLIBS)
-  include(FindNGHTTP2)
-else (USESYSTEMLIBS)
-  use_prebuilt_binary(nghttp2)
-  if (WINDOWS)
-    set(NGHTTP2_LIBRARIES 
+use_system_binary(nghttp2)
+use_prebuilt_binary(nghttp2)
+if (WINDOWS)
+  target_link_libraries( ll::nghttp2 INTERFACE
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/nghttp2.lib
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/nghttp2.lib
-      )
-  elseif (DARWIN)
-    set(NGHTTP2_LIBRARIES libnghttp2.a)
-  else (WINDOWS)
-    set(NGHTTP2_LIBRARIES libnghttp2.a)
-  endif (WINDOWS)
-  set(NGHTTP2_INCLUDE_DIR ${LIBS_PREBUILT_DIR}/include/nghttp2)
-endif (USESYSTEMLIBS)
+  )
+elseif (LINUX)
+  target_link_libraries( ll::nghttp2 INTERFACE 
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libnghttp2.a
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libnghttp2.a
+  )
+else ()
+  target_link_libraries( ll::nghttp2 INTERFACE 
+      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libnghttp2.a
+      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libnghttp2.a
+  )
+endif ()
+target_include_directories( ll::nghttp2 SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/nghttp2)

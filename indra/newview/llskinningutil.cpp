@@ -34,7 +34,7 @@
 #include "llvolume.h"
 #include "llrigginginfo.h"
 
-#define MAT_USE_SSE     1
+#define DEBUG_SKINNING  LL_DEBUG
 
 void dump_avatar_and_skin_state(const std::string& reason, LLVOAvatar *avatar, const LLMeshSkinInfo *skin)
 {
@@ -87,11 +87,6 @@ void dump_avatar_and_skin_state(const std::string& reason, LLVOAvatar *avatar, c
 #endif
 }
 
-S32 LLSkinningUtil::getMaxJointCount()
-{
-    return (S32)LL_MAX_JOINTS_PER_MESH_OBJECT;
-}
-
 U32 LLSkinningUtil::getMeshJointCount(const LLMeshSkinInfo *skin)
 {
 	return llmin((U32)getMaxJointCount(), (U32)skin->mJointNames.size());
@@ -118,24 +113,20 @@ void LLSkinningUtil::scrubInvalidJoints(LLVOAvatar *avatar, LLMeshSkinInfo* skin
     skin->mInvalidJointsScrubbed = true;
 }
 
-#define MAT_USE_SSE 1
-
 void LLSkinningUtil::initSkinningMatrixPalette(
     LLMatrix4a* mat,
     S32 count, 
     const LLMeshSkinInfo* skin,
     LLVOAvatar *avatar)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
     initJointNums(const_cast<LLMeshSkinInfo*>(skin), avatar);
     for (U32 j = 0; j < count; ++j)
     {
         S32 joint_num = skin->mJointNums[j];
-        LLJoint *joint = NULL;
-        if (joint_num >= 0 && joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS)
-        {
-            joint = avatar->getJoint(joint_num);
-        }
-        llassert(joint);
+        LLJoint *joint = avatar->getJoint(joint_num);
+
         if (joint)
         {
             mat[j].setMul(joint->getWorldMatrix(), skin->mInvBindMatrix[j]);
@@ -183,10 +174,9 @@ void LLSkinningUtil::checkSkinWeights(LLVector4a* weights, U32 num_vertices, con
 
 void LLSkinningUtil::getPerVertexSkinMatrix(
     F32* weights,
-    LLMatrix4a* mat,
+    const LLMatrix4a* mat,
     bool handle_bad_scale,
-    LLMatrix4a& final_mat,
-    U32 max_joints)
+    LLMatrix4a& final_mat)
 {
 #ifdef SHOW_ASSERT
     bool valid_weights = true;
@@ -208,7 +198,7 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
         // >= 0.0, we can use int instead of floorf; the latter
         // allegedly has a lot of overhead due to ieeefp error
         // checking which we should not need.
-        idx[k] = llclamp((S32) floorf(w), (S32)0, (S32)max_joints-1);
+        idx[k] = llclamp((S32) floorf(w), (S32)0, (S32)getMaxJointCount() - 1);
 
         wght[k] = w - floorf(w);
         scale += wght[k];
@@ -247,6 +237,7 @@ void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)
 {
     if (!skin->mJointNumsInitialized)
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
         for (U32 j = 0; j < skin->mJointNames.size(); ++j)
         {
     #if DEBUG_SKINNING     
@@ -282,11 +273,9 @@ void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_FACE_RIGGING_INFO("Face Rigging Info");
-
 void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *avatar, LLVolumeFace& vol_face)
 {
-    LL_RECORD_BLOCK_TIME(FTM_FACE_RIGGING_INFO);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
     if (vol_face.mJointRiggingInfoTab.needsUpdate())
     {
@@ -301,12 +290,6 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                 //S32 active_verts = 0;
                 vol_face.mJointRiggingInfoTab.resize(LL_CHARACTER_MAX_ANIMATED_JOINTS);
                 LLJointRiggingInfoTab &rig_info_tab = vol_face.mJointRiggingInfoTab;
-                LLMatrix4a bind_shape = skin->mBindShapeMatrix;
-                LLMatrix4a matrixPalette[LL_CHARACTER_MAX_ANIMATED_JOINTS];
-                for (U32 i = 0; i < llmin(skin->mInvBindMatrix.size(), (size_t)LL_CHARACTER_MAX_ANIMATED_JOINTS); ++i)
-                {
-                    matrixPalette[i].setMul(skin->mInvBindMatrix[i], bind_shape);
-                }
                 for (S32 i=0; i<vol_face.mNumVertices; i++)
                 {
                     LLVector4a& pos = vol_face.mPositions[i];
@@ -338,8 +321,9 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
                             if (joint_num >= 0 && joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS)
                             {
                                 rig_info_tab[joint_num].setIsRiggedTo(true);
+
                                 LLVector4a pos_joint_space;
-                                matrixPalette[joint_index].affineTransform(pos, pos_joint_space);
+                                skin->mInvBindShapeMatrix[joint_index].affineTransform(pos, pos_joint_space);
                                 pos_joint_space.mul(wght[k]);
 
                                 LLVector4a *extents = rig_info_tab[joint_num].getRiggedExtents();

@@ -37,6 +37,7 @@
 #include "lltoolbarview.h"
 #include "llviewercontrol.h"
 #include "llxmltree.h"
+#include "llviewernetwork.h"
 
 std::map<std::string, std::string> LLFloaterGridStatus::sItemsMap;
 const std::string DEFAULT_GRID_STATUS_URL = "http://status.secondlifegrid.net/";
@@ -65,7 +66,7 @@ void LLFloaterGridStatus::onOpen(const LLSD& key)
     applyPreferredRect();
     if (mWebBrowser)
     {
-        mWebBrowser->navigateTo(DEFAULT_GRID_STATUS_URL, HTTP_CONTENT_TEXT_HTML);
+        mWebBrowser->navigateTo(LLGridManager::instance().getGridStatusURL(), HTTP_CONTENT_TEXT_HTML);
     }
 }
 
@@ -90,14 +91,18 @@ void LLFloaterGridStatus::getGridStatusRSSCoro()
 
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-    httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("getGridStatusRSSCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
-    LLCore::HttpHeaders::ptr_t httpHeaders(new LLCore::HttpHeaders);
+    httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getGridStatusRSSCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
+    LLCore::HttpHeaders::ptr_t httpHeaders(std::make_shared<LLCore::HttpHeaders>());
 
     httpOpts->setSSLVerifyPeer(false); // We want this data even if SSL fails
     httpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, HTTP_CONTENT_TEXT_XML);
-    std::string url = gSavedSettings.getString("GridStatusRSS");
+    std::string url = LLGridManager::instance().getGridStatusRSSURL();
+    if(url.empty())
+    {
+        return; // No Grid Status service
+    }
 
     LLSD result = httpAdapter->getRawAndSuspend(httpRequest, url, httpOpts, httpHeaders);
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
@@ -109,8 +114,16 @@ void LLFloaterGridStatus::getGridStatusRSSCoro()
 
     const LLSD::Binary &rawBody = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_RAW].asBinary();
     std::string body(rawBody.begin(), rawBody.end());
-
-    std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,"grid_status_rss.xml");
+    std::string fullpath;
+    if(LLGridManager::getInstance()->isInSecondlife())
+    {
+        fullpath = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "grid_status_rss.xml");
+    }
+    else
+    {
+        const std::string grid_status_file = LLDir::getScrubbedFileName(llformat("grid_status_rss.%s.xml", LLGridManager::getInstance()->getGridId().c_str()));
+        fullpath = gDirUtilp->getExpandedFilename( LL_PATH_LOGS, grid_status_file);
+    }
     if(!gSavedSettings.getBOOL("TestGridStatusRSSFromFile"))
     {
         llofstream custom_file_out(fullpath.c_str(), std::ios::trunc);
