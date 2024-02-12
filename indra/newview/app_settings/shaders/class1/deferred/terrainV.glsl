@@ -27,15 +27,16 @@ uniform mat3 normal_matrix;
 uniform mat4 texture_matrix0;
 uniform mat4 modelview_projection_matrix;
 
-ATTRIBUTE vec3 position;
-ATTRIBUTE vec3 normal;
-ATTRIBUTE vec4 diffuse_color;
-ATTRIBUTE vec2 texcoord0;
-ATTRIBUTE vec2 texcoord1;
+in vec3 position;
+in vec3 normal;
+in vec4 diffuse_color;
+in vec2 texcoord0;
+in vec2 texcoord1;
 
-VARYING vec3 vary_normal;
-VARYING vec4 vary_texcoord0;
-VARYING vec4 vary_texcoord1;
+out vec3 pos;
+out vec3 vary_normal;
+out vec4 vary_texcoord0;
+out vec4 vary_texcoord1;
 
 uniform vec4 object_plane_s;
 uniform vec4 object_plane_t;
@@ -57,7 +58,11 @@ vec4 texgen_object(vec4  vpos, vec4 tc, mat4 mat, vec4 tp0, vec4 tp1)
 void main()
 {
     //transform vertex
-    gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
+    vec4 pre_pos = vec4(position.xyz, 1.0);
+    vec4 t_pos = modelview_projection_matrix * pre_pos;
+
+    gl_Position = t_pos;
+    pos = t_pos.xyz;
 
     vary_normal = normalize(normal_matrix * normal);
     

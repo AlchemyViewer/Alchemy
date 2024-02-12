@@ -139,7 +139,7 @@ LLViewerPartGroup::LLViewerPartGroup(const LLVector3 &center_agent, const F32 bo
 	mVOPartGroupp = NULL;
 	mUniformParticles = TRUE;
 
-	mRegionp = LLWorld::getInstanceFast()->getRegionFromPosAgent(center_agent);
+	mRegionp = LLWorld::getInstance()->getRegionFromPosAgent(center_agent);
 	llassert_always(center_agent.isFinite());
 	
 	if (!mRegionp)
@@ -264,7 +264,7 @@ BOOL LLViewerPartGroup::addPart(LLViewerPart* part, F32 desired_size)
 		return FALSE;
 	}
 
-	gPipeline.markRebuild(mVOPartGroupp->mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+	gPipeline.markRebuild(mVOPartGroupp->mDrawable, LLDrawable::REBUILD_ALL);
 	
 	mParticles.push_back(part);
 	part->mSkipOffset=mSkippedTime;
@@ -281,7 +281,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 
 	LLViewerPartSim::checkParticleCount(mParticles.size());
 
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	LLViewerRegion *regionp = getRegion();
 	S32 end = (S32) mParticles.size();
 	for (S32 i = 0 ; i < (S32)mParticles.size();)
@@ -408,7 +408,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 			if (!posInGroup(part->mPosAgent, desired_size))
 			{
 				// Transfer particles between groups
-				LLViewerPartSim::getInstanceFast()->put(part) ;
+				LLViewerPartSim::getInstance()->put(part) ;
 				vector_replace_with_last(mParticles, mParticles.begin() + i);
 			}
 			else
@@ -424,7 +424,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
 		// we removed one or more particles, so flag this group for update
 		if (mVOPartGroupp.notNull())
 		{
-			gPipeline.markRebuild(mVOPartGroupp->mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+			gPipeline.markRebuild(mVOPartGroupp->mDrawable, LLDrawable::REBUILD_ALL);
 		}
 		LLViewerPartSim::decPartCount(removed);
 	}
@@ -580,7 +580,7 @@ LLViewerPartGroup *LLViewerPartSim::put(LLViewerPart* part)
 	}
 	else
 	{	
-		LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+		LLViewerCamera* camera = LLViewerCamera::getInstance();
 		F32 desired_size = calc_desired_size(camera, part->mPosAgent, part->mScale);
 
 		S32 count = (S32) mViewerPartGroups.size();
@@ -654,10 +654,9 @@ void LLViewerPartSim::shift(const LLVector3 &offset)
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_SIMULATE_PARTICLES("Simulate Particles");
-
 void LLViewerPartSim::updateSimulation()
 {
+	LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("Simulate Particles");
 	static LLFrameTimer update_timer;
 
 	const F32 dt = llmin(update_timer.getElapsedTimeAndResetF32(), 0.1f);
@@ -666,8 +665,6 @@ void LLViewerPartSim::updateSimulation()
 	{
 		return;
 	}
-
-	LL_RECORD_BLOCK_TIME(FTM_SIMULATE_PARTICLES);
 
 	// Start at a random particle system so the same
 	// particle system doesn't always get first pick at the
@@ -714,7 +711,7 @@ void LLViewerPartSim::updateSimulation()
 				if (upd && (vobj->getPCode() == LL_PCODE_VOLUME))
 				{
 					LLVOAvatar* avatarp = vobj->getAvatar();
-					if (avatarp && avatarp->isTooComplex())
+					if (avatarp && (avatarp->isTooComplex() || avatarp->isTooSlow()))
 					{
 						upd = FALSE;
 					}
@@ -763,7 +760,7 @@ void LLViewerPartSim::updateSimulation()
 		{
 			if (vobj && !vobj->isDead() && vobj->mDrawable)
 			{
-				gPipeline.markRebuild(vobj->mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+				gPipeline.markRebuild(vobj->mDrawable, LLDrawable::REBUILD_ALL);
 			}
 			mViewerPartGroups[i]->updateParticles(dt * visirate);
 			mViewerPartGroups[i]->mSkippedTime=0.0f;

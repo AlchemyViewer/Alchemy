@@ -55,11 +55,11 @@ class LLVOAvatarSelf final :
 public:
 	LLVOAvatarSelf(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
 	virtual 				~LLVOAvatarSelf();
-	virtual void			markDead();
-	virtual void 			initInstance(); // Called after construction to initialize the class.
+	void			markDead() override;
+	void 			initInstance() override; // Called after construction to initialize the class.
 	void					cleanup();
 protected:
-	/*virtual*/ BOOL		loadAvatar();
+	/*virtual*/ BOOL		loadAvatar() override;
 	BOOL					loadAvatarSelf();
 	BOOL					buildSkeletonSelf(const LLAvatarSkeletonInfo *info);
 	BOOL					buildMenus();
@@ -80,28 +80,28 @@ public:
 	boost::signals2::connection                   mRegionChangedSlot;
 
 	void					onSimulatorFeaturesReceived(const LLUUID& region_id);
-	/*virtual*/ void 		updateRegion(LLViewerRegion *regionp);
-	/*virtual*/ void   	 	idleUpdate(LLAgent &agent, const F64 &time);
+	/*virtual*/ void 		updateRegion(LLViewerRegion *regionp) override;
+	/*virtual*/ void   	 	idleUpdate(LLAgent &agent, const F64 &time) override;
 
 	//--------------------------------------------------------------------
 	// LLCharacter interface and related
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ bool 		hasMotionFromSource(const LLUUID& source_id);
-	/*virtual*/ void 		stopMotionFromSource(const LLUUID& source_id);
-	/*virtual*/ void 		requestStopMotion(LLMotion* motion);
-	/*virtual*/ LLJoint*	getJoint(const std::string &name);
+	/*virtual*/ bool 		hasMotionFromSource(const LLUUID& source_id) override;
+	/*virtual*/ void 		stopMotionFromSource(const LLUUID& source_id) override;
+	/*virtual*/ void 		requestStopMotion(LLMotion* motion) override;
+	/*virtual*/ LLJoint*	getJoint(const std::string &name) override;
 	
-	/*virtual*/ BOOL setVisualParamWeight(const LLVisualParam *which_param, F32 weight);
-	/*virtual*/ BOOL setVisualParamWeight(const char* param_name, F32 weight);
-	/*virtual*/ BOOL setVisualParamWeight(S32 index, F32 weight);
-	/*virtual*/ void updateVisualParams();
+	/*virtual*/ BOOL setVisualParamWeight(const LLVisualParam *which_param, F32 weight, bool upload_bake = false) override;
+	/*virtual*/ BOOL setVisualParamWeight(const char* param_name, F32 weight, bool upload_bake = false) override;
+	/*virtual*/ BOOL setVisualParamWeight(S32 index, F32 weight, bool upload_bake = false) override;
+	/*virtual*/ void updateVisualParams() override;
 	void writeWearablesToAvatar();
-	/*virtual*/ void idleUpdateAppearanceAnimation();
+	/*virtual*/ void idleUpdateAppearanceAnimation() override;
 
 private:
 	// helper function. Passed in param is assumed to be in avatar's parameter list.
-	BOOL setParamWeight(const LLViewerVisualParam *param, F32 weight);
+	BOOL setParamWeight(const LLViewerVisualParam *param, F32 weight, bool upload_bake = false);
 
 /********************************************************************************
  **                                                                            **
@@ -109,22 +109,22 @@ private:
  **/
 
 public:
-	/*virtual*/ bool 	isSelf() const { return true; }
-	/*virtual*/ BOOL	isValid() const;
+	/*virtual*/ bool 	isSelf() const override { return true; }
+	/*virtual*/ BOOL	isValid() const override;
 
 	//--------------------------------------------------------------------
 	// Updates
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ bool 	updateCharacter(LLAgent &agent);
-	/*virtual*/ void 	idleUpdateTractorBeam();
+	/*virtual*/ bool 	updateCharacter(LLAgent &agent) override;
+	void 				idleUpdateTractorBeam();
 	bool				checkStuckAppearance();
 
 	//--------------------------------------------------------------------
 	// Loading state
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ bool    getIsCloud() const;
+	/*virtual*/ bool    getIsCloud() const override;
 
 	//--------------------------------------------------------------------
 	// Region state
@@ -158,9 +158,9 @@ private:
 	// LLVOAvatar Constants
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/ LLViewerTexture::EBoostLevel 	getAvatarBoostLevel() const { return LLGLTexture::BOOST_AVATAR_SELF; }
-	/*virtual*/ LLViewerTexture::EBoostLevel 	getAvatarBakedBoostLevel() const { return LLGLTexture::BOOST_AVATAR_BAKED_SELF; }
-	/*virtual*/ S32 						getTexImageSize() const { return LLVOAvatar::getTexImageSize()*4; }
+	/*virtual*/ LLViewerTexture::EBoostLevel 	getAvatarBoostLevel() const override { return LLGLTexture::BOOST_AVATAR_SELF; }
+	/*virtual*/ LLViewerTexture::EBoostLevel 	getAvatarBakedBoostLevel() const override { return LLGLTexture::BOOST_AVATAR_BAKED_SELF; }
+	/*virtual*/ S32 						getTexImageSize() const override { return LLVOAvatar::getTexImageSize()*4; }
 
 /**                    Rendering
  **                                                                            **
@@ -175,14 +175,16 @@ public:
 	// Loading status
 	//--------------------------------------------------------------------
 public:
+	bool				hasPendingBakedUploads() const;
 	S32					getLocalDiscardLevel(LLAvatarAppearanceDefines::ETextureIndex type, U32 index) const;
 	bool				areTexturesCurrent() const;
 	BOOL				isLocalTextureDataAvailable(const LLViewerTexLayerSet* layerset) const;
 	BOOL				isLocalTextureDataFinal(const LLViewerTexLayerSet* layerset) const;
+	BOOL				isBakedTextureFinal(const LLAvatarAppearanceDefines::EBakedTextureIndex index) const;
 	// If you want to check all textures of a given type, pass gAgentWearables.getWearableCount() for index
-	/*virtual*/ BOOL    isTextureDefined(LLAvatarAppearanceDefines::ETextureIndex type, U32 index) const;
-	/*virtual*/ BOOL	isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex type, U32 index = 0) const;
-	/*virtual*/ BOOL	isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex type, LLViewerWearable *wearable) const;
+	/*virtual*/ BOOL    isTextureDefined(LLAvatarAppearanceDefines::ETextureIndex type, U32 index) const override;
+	/*virtual*/ BOOL	isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex type, U32 index = 0) const override;
+	/*virtual*/ BOOL	isTextureVisible(LLAvatarAppearanceDefines::ETextureIndex type, LLViewerWearable *wearable) const override;
 
 
 	//--------------------------------------------------------------------
@@ -193,19 +195,19 @@ public:
 	LLViewerFetchedTexture*	getLocalTextureGL(LLAvatarAppearanceDefines::ETextureIndex type, U32 index) const;
 	const LLUUID&		getLocalTextureID(LLAvatarAppearanceDefines::ETextureIndex type, U32 index) const;
 	void				setLocalTextureTE(U8 te, LLViewerTexture* image, U32 index);
-	/*virtual*/ void	setLocalTexture(LLAvatarAppearanceDefines::ETextureIndex type, LLViewerTexture* tex, BOOL baked_version_exits, U32 index);
+	/*virtual*/ void	setLocalTexture(LLAvatarAppearanceDefines::ETextureIndex type, LLViewerTexture* tex, BOOL baked_version_exits, U32 index) override;
 protected:
-	/*virtual*/ void	setBakedReady(LLAvatarAppearanceDefines::ETextureIndex type, BOOL baked_version_exists, U32 index);
+	/*virtual*/ void	setBakedReady(LLAvatarAppearanceDefines::ETextureIndex type, BOOL baked_version_exists, U32 index) override;
 	void				localTextureLoaded(BOOL succcess, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* aux_src, S32 discard_level, BOOL final, void* userdata);
 	void				getLocalTextureByteCount(S32* gl_byte_count) const;
-	/*virtual*/ void	addLocalTextureStats(LLAvatarAppearanceDefines::ETextureIndex i, LLViewerFetchedTexture* imagep, F32 texel_area_ratio, BOOL rendered, BOOL covered_by_baked);
+	/*virtual*/ void	addLocalTextureStats(LLAvatarAppearanceDefines::ETextureIndex i, LLViewerFetchedTexture* imagep, F32 texel_area_ratio, BOOL rendered, BOOL covered_by_baked) override;
 	LLLocalTextureObject* getLocalTextureObject(LLAvatarAppearanceDefines::ETextureIndex i, U32 index) const;
 
 private:
 	static void			onLocalTextureLoaded(BOOL succcess, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* aux_src, S32 discard_level, BOOL final, void* userdata);
 
-	/*virtual*/	void	setImage(const U8 te, LLViewerTexture *imagep, const U32 index); 
-	/*virtual*/ LLViewerTexture* getImage(const U8 te, const U32 index) const;
+	/*virtual*/	void	setImage(const U8 te, LLViewerTexture *imagep, const U32 index) override; 
+	/*virtual*/ LLViewerTexture* getImage(const U8 te, const U32 index) const override;
 
 
 	//--------------------------------------------------------------------
@@ -215,13 +217,21 @@ public:
 	LLAvatarAppearanceDefines::ETextureIndex getBakedTE(const LLViewerTexLayerSet* layerset ) const;
 	// SUNSHINE CLEANUP - dead? or update to just call request appearance update?
 	void				forceBakeAllTextures(bool slam_for_debug = false);
+
+	void				setNewBakedTexture(LLAvatarAppearanceDefines::EBakedTextureIndex i, const LLUUID &uuid);
+	void				setNewBakedTexture(LLAvatarAppearanceDefines::ETextureIndex i, const LLUUID& uuid);
+	void				setCachedBakedTexture(LLAvatarAppearanceDefines::ETextureIndex i, const LLUUID& uuid);
+	static void			processRebakeAvatarTextures(LLMessageSystem* msg, void**);
+
 protected:
-	/*virtual*/ void	removeMissingBakedTextures();
+	/*virtual*/ void	removeMissingBakedTextures() override;
 
 	//--------------------------------------------------------------------
 	// Layers
 	//--------------------------------------------------------------------
 public:
+	void 				requestLayerSetUploads();
+	void				requestLayerSetUpload(LLAvatarAppearanceDefines::EBakedTextureIndex i);
 	void				requestLayerSetUpdate(LLAvatarAppearanceDefines::ETextureIndex i);
 	LLViewerTexLayerSet* getLayerSet(LLAvatarAppearanceDefines::EBakedTextureIndex baked_index) const;
 	LLViewerTexLayerSet* getLayerSet(LLAvatarAppearanceDefines::ETextureIndex index) const;
@@ -231,11 +241,11 @@ public:
 	// Composites
 	//--------------------------------------------------------------------
 public:
-	/* virtual */ void	invalidateComposite(LLTexLayerSet* layerset);
-	/* virtual */ void	invalidateAll();
-	/* virtual */ void	setCompositeUpdatesEnabled(bool b); // only works for self
-	/* virtual */ void  setCompositeUpdatesEnabled(U32 index, bool b);
-	/* virtual */ bool 	isCompositeUpdateEnabled(U32 index);
+	/* virtual */ void	invalidateComposite(LLTexLayerSet* layerset, bool upload_result) override;
+	/* virtual */ void	invalidateAll() override;
+	/* virtual */ void	setCompositeUpdatesEnabled(bool b) override; // only works for self
+	/* virtual */ void  setCompositeUpdatesEnabled(U32 index, bool b) override;
+	/* virtual */ bool 	isCompositeUpdateEnabled(U32 index) override;
 	void				setupComposites();
 	void				updateComposites();
 
@@ -261,7 +271,7 @@ private:
  **                    MESHES
  **/
 protected:
-	/*virtual*/ void   restoreMeshData();
+	/*virtual*/ void   restoreMeshData() override;
 
 /**                    Meshes
  **                                                                            **
@@ -273,7 +283,7 @@ protected:
  **/
 
 public:
-	void				wearableUpdated(LLWearableType::EType type);
+	void				wearableUpdated(LLWearableType::EType type, bool upload_result);
 protected:
 	U32 getNumWearables(LLAvatarAppearanceDefines::ETextureIndex i) const;
 
@@ -288,9 +298,11 @@ public:
 // [RLVa:KB] - Checked: 2009-12-18 (RLVa-1.1.0i) | Added: RLVa-1.1.0i
 	LLViewerJointAttachment* getWornAttachmentPoint(const LLUUID& inv_item_id) const;
 // [/RLVa:KB]
-	/*virtual*/ const LLViewerJointAttachment *attachObject(LLViewerObject *viewer_object);
-	/*virtual*/ BOOL 	detachObject(LLViewerObject *viewer_object);
+	/*virtual*/ const LLViewerJointAttachment *attachObject(LLViewerObject *viewer_object) override;
+	/*virtual*/ BOOL 	detachObject(LLViewerObject *viewer_object) override;
 	static BOOL			detachAttachmentIntoInventory(const LLUUID& item_id);
+
+    bool hasAttachmentsInTrash();
 
 // [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
 	enum EAttachAction { ACTION_ATTACH, ACTION_DETACH };
@@ -324,7 +336,7 @@ public:
 	// Visibility
 	//--------------------------------------------------------------------
 
-    /* virtual */ bool shouldRenderRigged() const;
+    /* virtual */ bool shouldRenderRigged() const override;
     
 public:
 	bool			sendAppearanceMessage(LLMessageSystem *mesgsys) const;
@@ -332,10 +344,15 @@ public:
 	// -- care and feeding of hover height.
 	void 			setHoverIfRegionEnabled();
 	void			sendHoverHeight() const;
-	/*virtual*/ void setHoverOffset(const LLVector3& hover_offset, bool send_update=true);
+	/*virtual*/ void setHoverOffset(const LLVector3& hover_offset, bool send_update=true) override;
 
 private:
 	mutable LLVector3 mLastHoverOffsetSent;
+
+// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
+protected:
+	/*virtual*/ F32	getAvatarOffset() /*const*/ override;
+// [/RLVa:KB]
 
 /**                    Appearance
  **                                                                            **
@@ -391,6 +408,7 @@ public:
 	const std::string		debugDumpLocalTextureDataInfo(const LLViewerTexLayerSet* layerset) const; // Lists out state of this particular baked texture layer
 	const std::string		debugDumpAllLocalTextureDataInfo() const; // Lists out which baked textures are at highest LOD
 	void					sendViewerAppearanceChangeMetrics(); // send data associated with completing a change.
+	void 					checkForUnsupportedServerBakeAppearance();
 private:
 	LLFrameTimer    		mDebugSelfLoadTimer;
 	F32						mDebugTimeWearablesLoaded;
@@ -399,17 +417,7 @@ private:
 	F32 					mDebugBakedTextureTimes[LLAvatarAppearanceDefines::BAKED_NUM_INDICES][2]; // time to start upload and finish upload of each baked texture
 	void					debugTimingLocalTexLoaded(BOOL success, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* aux_src, S32 discard_level, BOOL final, void* userdata);
 
-// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
-//public:
-//	void addPendingDetach(const LLUUID& idObject);
-//	bool isPendingDetach(const LLUUID& idObject) const;
-//	void removePendingDetach(const LLUUID& idObject);
-//	void checkPendingDetach();
-//	void onTeleportDone();
-//protected:
-//	std::list<LLUUID>           mPendingObjectDetach;
-//	boost::signals2::connection mTeleportDoneConn;
-// [/SL:KB]
+	void 					checkBOMRebakeRequired();
 
     void                    appearanceChangeMetricsCoro(std::string url);
     bool                    mInitialMetric;

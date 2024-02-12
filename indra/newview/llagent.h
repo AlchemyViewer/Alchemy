@@ -61,7 +61,7 @@ class LLTeleportRequest;
 
 
 
-typedef boost::shared_ptr<LLTeleportRequest> LLTeleportRequestPtr;
+typedef std::shared_ptr<LLTeleportRequest> LLTeleportRequestPtr;
 
 //--------------------------------------------------------------------
 // Types
@@ -89,7 +89,7 @@ class LLAgentListener;
 //------------------------------------------------------------------------
 // LLAgent
 //------------------------------------------------------------------------
-class LLAgent : public LLOldEvents::LLObservable
+class LLAgent final : public LLOldEvents::LLObservable
 {
 	LOG_CLASS(LLAgent);
 
@@ -117,16 +117,21 @@ private:
 	//--------------------------------------------------------------------
 public:
 	void			onAppFocusGained();
-	void			setFirstLogin(BOOL b) 	{ mFirstLogin = b; }
+	void			setFirstLogin(bool b);
 	// Return TRUE if the database reported this login as the first for this particular user.
-	BOOL 			isFirstLogin() const 	{ return mFirstLogin; }
-	BOOL 			isInitialized() const 	{ return mInitialized; }
+	bool 			isFirstLogin() const 	{ return mFirstLogin; }
+	bool 			isInitialized() const 	{ return mInitialized; }
+
+    void            setFeatureVersion(S32 version, S32 flags);
+    S32             getFeatureVersion();
+    void            getFeatureVersionAndFlags(S32 &version, S32 &flags);
+    void            showLatestFeatureNotification(const std::string key);
 public:
 	std::string		mMOTD; 					// Message of the day
 private:
-	BOOL			mInitialized;
-	BOOL			mFirstLogin;
-	boost::shared_ptr<LLAgentListener> mListener;
+	bool			mInitialized;
+	bool			mFirstLogin;
+	std::shared_ptr<LLAgentListener> mListener;
 
 	//--------------------------------------------------------------------
 	// Session
@@ -294,9 +299,15 @@ public:
 	boost::signals2::connection     addRegionChangedCallback(const region_changed_signal_t::slot_type& cb);
 	void                            removeRegionChangedCallback(boost::signals2::connection callback);
 
+
+	void changeInterestListMode(const std::string & new_mode);
+    const std::string & getInterestListMode() const { return mInterestListMode; }
+
 private:
 	LLViewerRegion	*mRegionp;
 	region_changed_signal_t		            mRegionChangedSignal;
+
+    std::string								mInterestListMode;	// How agent wants regions to send updates
 
 	//--------------------------------------------------------------------
 	// History
@@ -512,6 +523,7 @@ private:
 	BOOL 			mbFlagsDirty;
 	BOOL 			mbFlagsNeedReset;				// ! HACK ! For preventing incorrect flags sent when crossing region boundaries
 	
+	BOOL			mIgnorePrejump;
 	//--------------------------------------------------------------------
 	// Animations
 	//--------------------------------------------------------------------
@@ -579,7 +591,6 @@ public:
 	void			roll(F32 angle);
 	void			yaw(F32 angle);
 	LLVector3		getReferenceUpVector();
-    F32             clampPitchToLimits(F32 angle);
 
 	//--------------------------------------------------------------------
 	// Autopilot
@@ -712,7 +723,7 @@ private:
 	void            startTeleportRequest();
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
-	void 			teleportRequest(const U64& region_handle, const LLVector3& pos_local, const LLVector3& look_at = LLVector3(0, 1, 0));
+	void 			teleportRequest(const LLVector3d& pos_global, const LLVector3& look_at = LLVector3(0, 1, 0));
 // [/RLVa:KB]
 //	void 			teleportRequest(const U64& region_handle,
 //									const LLVector3& pos_local,				// Go to a named location home
@@ -727,6 +738,7 @@ private:
 
 	void            handleTeleportFinished();
 	void            handleTeleportFailed();
+	void			handleServerBakeRegionTransition(const LLUUID& region_id);
 
     static void     addTPNearbyChatSeparator();
     static void     onCapabilitiesReceivedAfterTeleport();
@@ -865,6 +877,9 @@ public:
 	
 private:
 	BOOL			mShowAvatar; 		// Should we render the avatar?
+#if OPENSIM
+	U32				mAppearanceSerialNum;
+#endif
 
 	//--------------------------------------------------------------------
 	// Rendering state bitmap helpers
@@ -966,6 +981,8 @@ private:
 public:
 	void			sendMessage(); // Send message to this agent's region
 	void			sendReliableMessage();
+	void 			dumpSentAppearance(const std::string& dump_prefix);
+	void			sendAgentSetAppearance();
 	void 			sendAgentDataUpdateRequest();
 	void 			sendAgentUserInfoRequest();
 
@@ -987,6 +1004,7 @@ public:
 	static void		processAgentGroupDataUpdate(LLMessageSystem *msg, void **);
 	static void		processAgentDropGroup(LLMessageSystem *msg, void **);
 	static void		processScriptControlChange(LLMessageSystem *msg, void **);
+	static void		processAgentCachedTextureResponse(LLMessageSystem *mesgsys, void **user_data);
 	
 /**                    Messaging
  **                                                                            **
@@ -1032,5 +1050,25 @@ inline bool operator==(const LLGroupData &a, const LLGroupData &b)
 {
 	return (a.mID == b.mID);
 }
+
+class LLAgentQueryManager
+{
+	friend class LLAgent;
+	friend class LLAgentWearables;
+	
+public:
+	LLAgentQueryManager();
+	virtual ~LLAgentQueryManager();
+	
+	BOOL 			hasNoPendingQueries() const 	{ return getNumPendingQueries() == 0; }
+	S32 			getNumPendingQueries() const 	{ return mNumPendingQueries; }
+private:
+	S32				mNumPendingQueries;
+	S32				mWearablesCacheQueryID;
+	U32				mUpdateSerialNum;
+	S32		    	mActiveCacheQueries[LLAvatarAppearanceDefines::BAKED_NUM_INDICES];
+};
+
+extern LLAgentQueryManager gAgentQueryManager;
 
 #endif

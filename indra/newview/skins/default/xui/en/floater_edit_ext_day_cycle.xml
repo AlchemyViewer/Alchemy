@@ -270,6 +270,7 @@
                                 word_wrap="true"/>
 
                         <layout_stack
+                                name="track_options_ls"
                                 follows="all"
                                 height="200"
                                 animate="false"
@@ -277,6 +278,7 @@
                                 left="0"
                                 orientation="horizontal">
                             <layout_panel
+                                    name="track_options_lp"
                                     border="false"
                                     bevel_style="in"
                                     auto_resize="false"
@@ -312,6 +314,7 @@
                                     
                             </layout_panel>
                             <layout_panel
+                                    name="track_progress_lp"
                                     border="false"
                                     bevel_style="in"
                                     auto_resize="false"
@@ -342,6 +345,7 @@
                                             width="25">
                                         <button
                                                 name="skip_back_btn"
+                                                enabled="false"
                                                 follows="top"
                                                 image_overlay="SkipBackward_Off"
                                                 image_disabled="PushButton_Disabled"
@@ -373,6 +377,7 @@
                                             width="25">
                                         <button
                                                 name="play_btn"
+                                                enabled="false"
                                                 follows="top"
                                                 image_overlay="Play_Off"
                                                 image_disabled="PushButton_Disabled"
@@ -434,6 +439,7 @@
                                             width="25">
                                         <button
                                                 name="skip_forward_btn"
+                                                enabled="false"
                                                 follows="top"
                                                 image_overlay="SkipForward_Off"
                                                 image_disabled="PushButton_Disabled"
@@ -454,6 +460,7 @@
                                 </layout_stack>
                             </layout_panel>
                             <layout_panel
+                                    name="frames_lp"
                                     border="false"
                                     bevel_style="in"
                                     auto_resize="false"

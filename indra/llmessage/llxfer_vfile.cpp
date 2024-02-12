@@ -79,9 +79,9 @@ void LLXfer_VFile::cleanup ()
 	if (mTempID.notNull() &&
 		mDeleteTempFile)
 	{
-		LLFileSystem file(mTempID, mType);
-		if (file.exists())
+		if (LLFileSystem::getExists(mTempID, mType))
 		{
+			LLFileSystem file(mTempID, mType, LLFileSystem::WRITE);
 			file.remove();
 		}
 		else
@@ -91,7 +91,8 @@ void LLXfer_VFile::cleanup ()
 		}
 	}
 
-	mVFile.reset();
+	delete mVFile;
+	mVFile = NULL;
 
 	LLXfer::cleanup();
 }
@@ -184,25 +185,18 @@ S32 LLXfer_VFile::startSend (U64 xfer_id, const LLHost &remote_host)
 	mBufferLength = 0;
 	mBufferStartOffset = 0;	
 	
-	mVFile.reset();
-
+	delete mVFile;
+	mVFile = NULL;
 	if(LLFileSystem::getExists(mLocalID, mType))
 	{
-		mVFile = std::make_unique<LLFileSystem>(mLocalID, mType, LLFileSystem::READ);
-		if (!mVFile->open())
-		{
-			LL_WARNS("Xfer") << "LLXfer_VFile::startSend() can't read cache file " << mLocalID << "." << LLAssetType::lookup(mType) << LL_ENDL;
-			mVFile.reset();
-
-			return LL_ERR_FILE_NOT_FOUND;
-		}
-
+		mVFile = new LLFileSystem(mLocalID, mType, LLFileSystem::READ);
 
 		if (mVFile->getSize() <= 0)
 		{
 			LL_WARNS("Xfer") << "LLXfer_VFile::startSend() cache file " << mLocalID << "." << LLAssetType::lookup(mType)		
 				<< " has unexpected file size of " << mVFile->getSize() << LL_ENDL;
-			mVFile.reset();
+			delete mVFile;
+			mVFile = NULL;
 
 			return LL_ERR_FILE_EMPTY;
 		}
@@ -228,7 +222,8 @@ void LLXfer_VFile::closeFileHandle()
 {
 	if (mVFile)
 	{
-		mVFile.reset();
+		delete mVFile;
+		mVFile = NULL;
 	}
 }
 
@@ -242,12 +237,7 @@ S32 LLXfer_VFile::reopenFileHandle()
 	{
 		if (LLFileSystem::getExists(mLocalID, mType))
 		{
-			mVFile = std::make_unique<LLFileSystem>(mLocalID, mType, LLFileSystem::READ);
-			if (!mVFile->open())
-			{
-				LL_WARNS("Xfer") << "LLXfer_VFile::reopenFileHandle() can't read cache file " << mLocalID << "." << LLAssetType::lookup(mType) << LL_ENDL;
-				retval = LL_ERR_FILE_NOT_FOUND;
-			}
+			mVFile = new LLFileSystem(mLocalID, mType, LLFileSystem::READ);
 		}
 		else
 		{
@@ -325,12 +315,10 @@ S32 LLXfer_VFile::flush()
 	if (mBufferLength)
 	{
 		LLFileSystem file(mTempID, mType, LLFileSystem::APPEND);
-		if (file.open())
-		{
-			file.write((U8*)mBuffer, mBufferLength);
 
-			mBufferLength = 0;
-		}
+		file.write((U8*)mBuffer, mBufferLength);
+			
+		mBufferLength = 0;
 	}
 	return (retval);
 }
@@ -346,9 +334,9 @@ S32 LLXfer_VFile::processEOF()
 
 	if (!mCallbackResult)
 	{
-		LLFileSystem file(mTempID, mType);
-		if (file.exists())
+		if (LLFileSystem::getExists(mTempID, mType))
 		{
+			LLFileSystem file(mTempID, mType, LLFileSystem::WRITE);
 			if (!file.rename(mLocalID, mType))
 			{
 				LL_WARNS("Xfer") << "Cache rename of temp file failed: unable to rename " << mTempID << " to " << mLocalID << LL_ENDL;
@@ -368,7 +356,8 @@ S32 LLXfer_VFile::processEOF()
 
 	if (mVFile)
 	{
-		mVFile.reset();
+		delete mVFile;
+		mVFile = NULL;
 	}
 
 	retval = LLXfer::processEOF();

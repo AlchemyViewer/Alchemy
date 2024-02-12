@@ -127,7 +127,7 @@ std::string HttpStatus::toString() const
 	
 	if (*this)
 	{
-		return std::string();
+		return std::string("");
 	}
 	switch (getType())
 	{
@@ -176,7 +176,7 @@ std::string HttpStatus::toString() const
 		}
 		break;
 	}
-	return std::string("Unknown error");
+	return LLStringExplicit("Unknown error");
 }
 
 
@@ -284,8 +284,6 @@ CURL *getCurlTemplateHandle()
             check_curl_code(result, CURLOPT_NOSIGNAL);
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_NOPROGRESS, 1);
             check_curl_code(result, CURLOPT_NOPROGRESS);
-            result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_ACCEPT_ENCODING, "");
-            check_curl_code(result, CURLOPT_ACCEPT_ENCODING);
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_AUTOREFERER, 1);
             check_curl_code(result, CURLOPT_AUTOREFERER);
             result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_FOLLOWLOCATION, 1);
@@ -301,7 +299,7 @@ CURL *getCurlTemplateHandle()
             // about 700 or so requests and starts issuing TCP RSTs to
             // new connections.  Reuse the DNS lookups for even a few
             // seconds and no RSTs.
-            result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_DNS_CACHE_TIMEOUT, 15);
+            result = curl_easy_setopt(curlpTemplateHandle, CURLOPT_DNS_CACHE_TIMEOUT, 600); // Refetch dns after 600 seconds
             check_curl_code(result, CURLOPT_DNS_CACHE_TIMEOUT);
         }
     }
@@ -311,9 +309,8 @@ CURL *getCurlTemplateHandle()
     
 LLMutex *getCurlMutex()
 {
-	static LLMutex sHandleMutexp(LLMutex::E_CONST_INIT);
-
-    return &sHandleMutexp;
+    static LLMutex sHandleMutex;
+    return &sHandleMutex;
 }
 
 void deallocateEasyCurl(CURL *curlp)

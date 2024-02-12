@@ -27,6 +27,8 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llpanelplaceinfo.h"
+#include "llfloaterprofile.h"
+#include "llfloaterreg.h"
 
 #include "llavatarname.h"
 #include "llsdutil.h"
@@ -41,12 +43,14 @@
 #include "lltrans.h"
 
 #include "llagent.h"
+#include "llavataractions.h"
 #include "llexpandabletextbox.h"
-#include "llpanelpick.h"
 #include "llslurl.h"
 #include "lltexturectrl.h"
 #include "llviewerregion.h"
 #include "llhttpconstants.h"
+#include "llworld.h"
+#include "llworldmap.h"
 
 LLPanelPlaceInfo::LLPanelPlaceInfo()
 :	LLPanel(),
@@ -141,15 +145,35 @@ void LLPanelPlaceInfo::sendParcelInfoRequest()
 }
 
 void LLPanelPlaceInfo::displayParcelInfo(const LLUUID& region_id,
+										 const LLVector3& local_pos,
 										 const LLVector3d& pos_global)
 {
 	LLViewerRegion* region = gAgent.getRegion();
 	if (!region)
 		return;
 
-	mPosRegion.setVec((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
-					  (F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
-					  (F32)pos_global.mdV[VZ]);
+	if (!local_pos.isNull())
+	{
+		mPosRegion = local_pos;
+	}
+	else
+	{
+		const LLSimInfo* siminfo = LLWorldMap::getInstance()->simInfoFromPosGlobal(pos_global);
+		if (siminfo)
+		{
+			mPosRegion = siminfo->getLocalPos(pos_global);
+		}
+		else if (LLViewerRegion* regionp = LLWorld::instance().getRegionFromID(region_id))
+		{
+			mPosRegion = LLVector3(pos_global - regionp->getOriginGlobal());
+		}
+		else
+		{
+			mPosRegion.setVec((F32)fmod(pos_global.mdV[VX], (F64)REGION_WIDTH_METERS),
+				(F32)fmod(pos_global.mdV[VY], (F64)REGION_WIDTH_METERS),
+				(F32)pos_global.mdV[VZ]);
+		}
+	}
 
 	LLSD body;
 	std::string url = region->getCapability("RemoteParcelRequest");
@@ -287,7 +311,7 @@ void LLPanelPlaceInfo::reshape(S32 width, S32 height, BOOL called_from_parent)
 	}
 }
 
-void LLPanelPlaceInfo::createPick(const LLVector3d& pos_global, LLPanelPickEdit* pick_panel)
+void LLPanelPlaceInfo::createPick(const LLVector3d& pos_global)
 {
 	LLPickData data;
 	data.pos_global = pos_global;
@@ -296,7 +320,8 @@ void LLPanelPlaceInfo::createPick(const LLVector3d& pos_global, LLPanelPickEdit*
 	data.desc = mDescEditor->getText();
 	data.snapshot_id = mSnapshotCtrl->getImageAssetID();
 	data.parcel_id = mParcelID;
-	pick_panel->setPickData(&data);
+
+    LLAvatarActions::createPick(data);
 }
 
 // static

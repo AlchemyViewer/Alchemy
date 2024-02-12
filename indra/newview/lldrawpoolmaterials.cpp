@@ -31,8 +31,7 @@
 #include "llviewershadermgr.h"
 #include "pipeline.h"
 #include "llglcommonfunc.h"
-
-S32 diffuse_channel = -1;
+#include "llvoavatar.h"
 
 LLDrawPoolMaterials::LLDrawPoolMaterials()
 :  LLRenderPass(LLDrawPool::POOL_MATERIALS)
@@ -47,11 +46,20 @@ void LLDrawPoolMaterials::prerender()
 
 S32 LLDrawPoolMaterials::getNumDeferredPasses()
 {
-	return 12;
+    // 12 render passes times 2 (one for each rigged and non rigged)
+	return 12*2;
 }
 
 void LLDrawPoolMaterials::beginDeferredPass(S32 pass)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MATERIAL;
+
+    bool rigged = false;
+    if (pass >= 12)
+    { 
+        rigged = true;
+        pass -= 12;
+    }
 	U32 shader_idx[] = 
 	{
 		0, //LLRenderPass::PASS_MATERIAL,
@@ -72,32 +80,22 @@ void LLDrawPoolMaterials::beginDeferredPass(S32 pass)
 		15, //LLRenderPass::PASS_NORMSPEC_GLOW,
 	};
 	
-	mShader = &(gDeferredMaterialProgram[shader_idx[pass]]);
-
-	if (LLPipeline::sUnderWaterRender)
-	{
-		mShader = &(gDeferredMaterialWaterProgram[shader_idx[pass]]);
-	}
-
-	mShader->bind();
-
-    if (LLPipeline::sRenderingHUDs)
+    U32 idx = shader_idx[pass];
+    
+    mShader = &(gDeferredMaterialProgram[idx]);
+    
+    if (rigged)
     {
-        mShader->uniform1i(LLShaderMgr::NO_ATMO, 1);
-    }
-    else
-    {
-        mShader->uniform1i(LLShaderMgr::NO_ATMO, 0);
+        llassert(mShader->mRiggedVariant != nullptr);
+        mShader = mShader->mRiggedVariant;
     }
 
-	diffuse_channel = mShader->enableTexture(LLShaderMgr::DIFFUSE_MAP);
-		
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_MATERIALS);
+    gPipeline.bindDeferredShader(*mShader);
 }
 
 void LLDrawPoolMaterials::endDeferredPass(S32 pass)
 {
-	LL_RECORD_BLOCK_TIME(FTM_RENDER_MATERIALS);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_MATERIAL;
 
 	mShader->unbind();
 
@@ -106,6 +104,7 @@ void LLDrawPoolMaterials::endDeferredPass(S32 pass)
 
 void LLDrawPoolMaterials::renderDeferred(S32 pass)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MATERIAL;
 	static const U32 type_list[] = 
 	{
 		LLRenderPass::PASS_MATERIAL,
@@ -126,114 +125,175 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
 		LLRenderPass::PASS_NORMSPEC_EMISSIVE,
 	};
 
+    bool rigged = false;
+    if (pass >= 12)
+    {
+        rigged = true;
+        pass -= 12;
+    }
+
 	llassert(pass < sizeof(type_list)/sizeof(U32));
 
 	U32 type = type_list[pass];
-
-	U32 mask = mShader->mAttributeMask;
+    if (rigged)
+    {
+        type += 1;
+    }
 
 	LLCullResult::drawinfo_iterator begin = gPipeline.beginRenderMap(type);
 	LLCullResult::drawinfo_iterator end = gPipeline.endRenderMap(type);
 	
-	for (LLCullResult::drawinfo_iterator i = begin; i != end; ++i)
+    F32 lastIntensity = 0.f;
+    F32 lastFullbright = 0.f;
+    F32 lastMinimumAlpha = 0.f;
+    LLVector4 lastSpecular = LLVector4(0, 0, 0, 0);
+
+    GLint intensity = mShader->getUniformLocation(LLShaderMgr::ENVIRONMENT_INTENSITY);
+    GLint brightness = mShader->getUniformLocation(LLShaderMgr::EMISSIVE_BRIGHTNESS);
+    GLint minAlpha = mShader->getUniformLocation(LLShaderMgr::MINIMUM_ALPHA);
+    GLint specular = mShader->getUniformLocation(LLShaderMgr::SPECULAR_COLOR);
+
+    GLint diffuseChannel = mShader->enableTexture(LLShaderMgr::DIFFUSE_MAP);
+    GLint specChannel = mShader->enableTexture(LLShaderMgr::SPECULAR_MAP);
+    GLint normChannel = mShader->enableTexture(LLShaderMgr::BUMP_MAP);
+
+    LLTexture* lastNormalMap = nullptr;
+    LLTexture* lastSpecMap = nullptr;
+    LLTexture* lastDiffuse = nullptr;
+
+    gGL.getTexUnit(diffuseChannel)->unbindFast(LLTexUnit::TT_TEXTURE);
+
+    if (intensity > -1)
+    {
+        glUniform1f(intensity, lastIntensity);
+    }
+
+    if (brightness > -1)
+    {
+        glUniform1f(brightness, lastFullbright);
+    }
+
+    if (minAlpha > -1)
+    {
+        glUniform1f(minAlpha, lastMinimumAlpha);
+    }
+
+    if (specular > -1)
+    {
+        glUniform4fv(specular, 1, lastSpecular.mV);
+    }
+
+    LLVOAvatar* lastAvatar = nullptr;
+
+	for (LLCullResult::drawinfo_iterator i = begin; i != end; )
 	{
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MATERIAL("materials draw loop");
 		LLDrawInfo& params = **i;
 		
-		mShader->uniform4f(LLShaderMgr::SPECULAR_COLOR, params.mSpecColor.mV[0], params.mSpecColor.mV[1], params.mSpecColor.mV[2], params.mSpecColor.mV[3]);
-		mShader->uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, params.mEnvIntensity);
-		
-		if (params.mNormalMap)
-		{
-			params.mNormalMap->addTextureStats(params.mVSize);
-			bindNormalMap(params.mNormalMap);
-		}
-		
-		if (params.mSpecularMap)
-		{
-			params.mSpecularMap->addTextureStats(params.mVSize);
-			bindSpecularMap(params.mSpecularMap);
-		}
-		
-		mShader->setMinimumAlpha(params.mAlphaMaskCutoff);
-		mShader->uniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, params.mFullbright ? 1.f : 0.f);
+        LLCullResult::increment_iterator(i, end);
 
-		pushBatch(params, mask, TRUE);
+        if (specular > -1 && params.mSpecColor != lastSpecular)
+        {
+            lastSpecular = params.mSpecColor;
+            glUniform4fv(specular, 1, lastSpecular.mV);
+        }
+
+        if (intensity != -1 && lastIntensity != params.mEnvIntensity)
+        {
+            lastIntensity = params.mEnvIntensity;
+            glUniform1f(intensity, lastIntensity);
+        }
+ 
+        if (minAlpha > -1 && lastMinimumAlpha != params.mAlphaMaskCutoff)
+        {
+            lastMinimumAlpha = params.mAlphaMaskCutoff;
+            glUniform1f(minAlpha, lastMinimumAlpha);
+        }
+
+        F32 fullbright = params.mFullbright ? 1.f : 0.f;
+        if (brightness > -1 && lastFullbright != fullbright)
+        {
+            lastFullbright = fullbright;
+            glUniform1f(brightness, lastFullbright);
+        }
+
+        if (normChannel > -1 && params.mNormalMap != lastNormalMap)
+        {
+            lastNormalMap = params.mNormalMap;
+            llassert(lastNormalMap);
+            gGL.getTexUnit(normChannel)->bindFast(lastNormalMap);
+        }
+
+        if (specChannel > -1 && params.mSpecularMap != lastSpecMap)
+        {
+            lastSpecMap = params.mSpecularMap;
+            llassert(lastSpecMap);
+            gGL.getTexUnit(specChannel)->bindFast(lastSpecMap);
+        }
+
+        if (params.mTexture != lastDiffuse)
+        {
+            lastDiffuse = params.mTexture;
+            if (lastDiffuse)
+            {
+                gGL.getTexUnit(diffuseChannel)->bindFast(lastDiffuse);
+            }
+            else
+            {
+                gGL.getTexUnit(diffuseChannel)->unbindFast(LLTexUnit::TT_TEXTURE);
+            }
+        }
+
+        // upload matrix palette to shader
+        if (rigged && params.mAvatar.notNull())
+        {
+            if (params.mAvatar != lastAvatar)
+            {
+                const LLVOAvatar::MatrixPaletteCache& mpc = params.mAvatar->updateSkinInfoMatrixPalette(params.mSkinInfo);
+                U32 count = mpc.mMatrixPalette.size();
+
+                if (count == 0)
+                {
+                    //skin info not loaded yet, don't render
+                    return;
+                }
+
+                mShader->uniformMatrix3x4fv(LLViewerShaderMgr::AVATAR_MATRIX,
+                    count,
+                    FALSE,
+                    (GLfloat*)&(mpc.mGLMp[0]));
+            }
+        }
+
+        applyModelMatrix(params);
+
+        bool tex_setup = false;
+
+        //not batching textures or batch has only 1 texture -- might need a texture matrix
+        if (params.mTextureMatrix)
+        {
+            gGL.getTexUnit(0)->activate();
+            gGL.matrixMode(LLRender::MM_TEXTURE);
+
+            gGL.loadMatrix((GLfloat*)params.mTextureMatrix->mMatrix);
+            gPipeline.mTextureMatrixOps++;
+
+            tex_setup = true;
+        }
+
+        /*if (params.mGroup)  // TOO LATE
+        {
+            params.mGroup->rebuildMesh();
+        }*/
+
+        params.mVertexBuffer->setBuffer();
+        params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
+
+        if (tex_setup)
+        {
+            gGL.getTexUnit(0)->activate();
+            gGL.loadIdentity();
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+        }
 	}
 }
-
-void LLDrawPoolMaterials::bindSpecularMap(LLViewerTexture* tex)
-{
-	mShader->bindTexture(LLShaderMgr::SPECULAR_MAP, tex);
-}
-
-void LLDrawPoolMaterials::bindNormalMap(LLViewerTexture* tex)
-{
-	mShader->bindTexture(LLShaderMgr::BUMP_MAP, tex);
-}
-
-void LLDrawPoolMaterials::pushBatch(LLDrawInfo& params, U32 mask, BOOL texture, BOOL batch_textures)
-{
-	applyModelMatrix(params);
-	
-	bool tex_setup = false;
-	
-	const U32 tex_list_size = params.mTextureList.size();
-	if (batch_textures && tex_list_size > 1)
-	{
-		for (U32 i = 0; i < tex_list_size; ++i)
-		{
-			LLViewerTexture* texturep = params.mTextureList[i];
-			if (texturep)
-			{
-				gGL.getTexUnit(i)->bind(texturep, TRUE);
-			}
-		}
-	}
-	else
-	{ //not batching textures or batch has only 1 texture -- might need a texture matrix
-		if (params.mTextureMatrix)
-		{
-			//if (mShiny)
-			{
-				gGL.getTexUnit(0)->activate();
-				gGL.matrixMode(LLRender::MM_TEXTURE);
-			}
-			
-			gGL.loadMatrix(*params.mTextureMatrix);
-			gPipeline.mTextureMatrixOps++;
-			
-			tex_setup = true;
-		}
-		
-		if (mShaderLevel > 1 && texture)
-		{
-			if (params.mTexture.notNull())
-			{
-				gGL.getTexUnit(diffuse_channel)->bind(params.mTexture);
-				params.mTexture->addTextureStats(params.mVSize);
-			}
-			else
-			{
-				gGL.getTexUnit(diffuse_channel)->unbind(LLTexUnit::TT_TEXTURE);
-			}
-		}
-	}
-	
-	if (params.mGroup)
-	{
-		params.mGroup->rebuildMesh();
-	}
-
-	LLGLEnableFunc stencil_test(GL_STENCIL_TEST, params.mSelected, &LLGLCommonFunc::selected_stencil_test);
-
-	params.mVertexBuffer->setBuffer(mask);
-	params.mVertexBuffer->drawRange(params.mDrawMode, params.mStart, params.mEnd, params.mCount, params.mOffset);
-	gPipeline.addTrianglesDrawn(params.mCount, params.mDrawMode);
-	if (tex_setup)
-	{
-		gGL.getTexUnit(0)->activate();
-		gGL.loadIdentity();
-		gGL.matrixMode(LLRender::MM_MODELVIEW);
-	}
-}
-

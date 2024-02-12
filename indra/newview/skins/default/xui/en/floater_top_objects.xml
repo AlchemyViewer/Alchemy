@@ -283,7 +283,7 @@
      top_delta="0"
      width="100">
       <button.commit_callback
-          function="TopObjects.TeleportTo" />
+          function="TopObjects.TeleportToSelected" />
     </button>
     <button
      enabled="false"

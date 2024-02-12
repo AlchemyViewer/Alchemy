@@ -302,7 +302,9 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
         BOOL status = FALSE;
         if ( strncmp(header, HEADER_BINARY, strlen(HEADER_BINARY)) == 0 )       /*Flawfinder: ignore*/
         {
+#ifdef SHOW_DEBUG
                 LL_DEBUGS() << "Loading " << fileName << LL_ENDL;
+#endif
 
                 //----------------------------------------------------------------
                 // File Header (seek past it)
@@ -511,7 +513,9 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
                 // Faces
                 //----------------------------------------------------------------
                 U32 i;
+#ifdef SHOW_DEBUG
                 U32 numTris = 0;
+#endif
                 for (i = 0; i < numFaces; i++)
                 {
                         S16 face[3];
@@ -555,14 +559,17 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
 //                              }
 //                              face_list->put(i);
 //                      }
-
+#ifdef SHOW_DEBUG
                         numTris++;
+#endif
                 }
 
+#ifdef SHOW_DEBUG
                 LL_DEBUGS() << "verts: " << numVertices 
                          << ", faces: "   << numFaces
                          << ", tris: "    << numTris
                          << LL_ENDL;
+#endif
 
                 //----------------------------------------------------------------
                 // NumSkinJoints
@@ -612,14 +619,16 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
                                         // we reached the end of the morphs
                                         break;
                                 }
-                                LLPolyMorphData* morph_data = new LLPolyMorphData(std::string(morphName));
+                                std::string morph_name(morphName);
+                                LLPolyMorphData* morph_data = new LLPolyMorphData(morph_name);
 
                                 BOOL result = morph_data->loadBinary(fp, this);
 
                                 if (!result)
                                 {
-                                        delete morph_data;
-                                        continue;
+                                    LL_WARNS() << "Failure loading " << morph_name << " from " << fileName << LL_ENDL;
+                                    delete morph_data;
+                                    continue;
                                 }
 
                                 mMorphData.insert(morph_data);
@@ -888,11 +897,10 @@ void LLPolyMesh::dumpDiagInfo()
         LL_INFOS() << "-----------------------------------------------------" << LL_ENDL;
 
         // print each loaded mesh, and it's memory usage
-        for(LLPolyMeshSharedDataTable::iterator iter = sGlobalSharedMeshList.begin();
-            iter != sGlobalSharedMeshList.end(); ++iter)
+        for(const LLPolyMeshSharedDataTable::value_type& mesh_pair : sGlobalSharedMeshList)
         {
-                const std::string& mesh_name = iter->first;
-                LLPolyMeshSharedData* mesh = iter->second;
+                const std::string& mesh_name = mesh_pair.first;
+                LLPolyMeshSharedData* mesh = mesh_pair.second;
 
                 S32 num_verts = mesh->mNumVertices;
                 S32 num_faces = mesh->mNumFaces;
@@ -997,10 +1005,10 @@ LLPolyMorphData*        LLPolyMesh::getMorphData(const std::string_view morph_na
                 return NULL;
         for (LLPolyMorphData* morph_data : mSharedData->mMorphData)
         {
-                if (morph_data->getName() == morph_name)
-                {
-                        return morph_data;
-                }
+            if (morph_data->getName() == morph_name)
+            {
+                    return morph_data;
+            }
         }
         return NULL;
 }

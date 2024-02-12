@@ -96,6 +96,7 @@ LLAssetDictionary::LLAssetDictionary()
 	addEntry(LLAssetType::AT_WIDGET,            new AssetEntry("WIDGET",            "widget",   "widget",           false,      false,      false));
 	addEntry(LLAssetType::AT_PERSON,            new AssetEntry("PERSON",            "person",   "person",           false,      false,      false));
 	addEntry(LLAssetType::AT_SETTINGS,          new AssetEntry("SETTINGS",          "settings", "settings blob",    true,       true,       true));
+	addEntry(LLAssetType::AT_MATERIAL,          new AssetEntry("MATERIAL",          "material", "render material",  true,       true,       true));
 	addEntry(LLAssetType::AT_UNKNOWN,           new AssetEntry("UNKNOWN",           "invalid",  NULL,               false,      false,      false));
     addEntry(LLAssetType::AT_NONE,              new AssetEntry("NONE",              "-1",		NULL,		  		FALSE,		FALSE,		FALSE));
 
@@ -107,13 +108,13 @@ const std::string LLAssetType::BADLOOKUP("llassettype_bad_lookup");
 LLAssetType::EType LLAssetType::getType(std::string desc_name)
 {
 	LLStringUtil::toUpper(desc_name);
-	return LLAssetDictionary::getInstanceFast()->lookup(desc_name);
+	return LLAssetDictionary::getInstance()->lookup(desc_name);
 }
 
 // static
 const std::string &LLAssetType::getDesc(LLAssetType::EType asset_type)
 {
-	const AssetEntry *entry = LLAssetDictionary::getInstanceFast()->lookup(asset_type);
+	const AssetEntry *entry = LLAssetDictionary::getInstance()->lookup(asset_type);
 	if (entry)
 	{
 		return entry->mName;
@@ -127,7 +128,7 @@ const std::string &LLAssetType::getDesc(LLAssetType::EType asset_type)
 // static
 const char *LLAssetType::lookup(LLAssetType::EType asset_type)
 {
-	const LLAssetDictionary *dict = LLAssetDictionary::getInstanceFast();
+	const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
 	const AssetEntry *entry = dict->lookup(asset_type);
 	if (entry)
 	{
@@ -142,7 +143,7 @@ const char *LLAssetType::lookup(LLAssetType::EType asset_type)
 // static
 LLAssetType::EType LLAssetType::lookup(const char* name)
 {
-	return lookup(absl::NullSafeStringView(name));
+	return lookup(al::safe_string_view(name));
 }
 
 // static
@@ -150,13 +151,13 @@ LLAssetType::EType LLAssetType::lookup(const std::string_view type_name)
 {
 	if(type_name.empty()) return AT_UNKNOWN;
 
-	const LLAssetDictionary& dict = LLAssetDictionary::instanceFast();
-	for (const auto& dict_pair : dict)
+	const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
+	for (const LLAssetDictionary::value_type& pair : *dict)
 	{
-		const AssetEntry *entry = dict_pair.second;
+		const AssetEntry *entry = pair.second;
 		if (type_name == entry->mTypeName)
 		{
-			return dict_pair.first;
+			return pair.first;
 		}
 	}
 	return AT_UNKNOWN;
@@ -165,7 +166,7 @@ LLAssetType::EType LLAssetType::lookup(const std::string_view type_name)
 // static
 const char *LLAssetType::lookupHumanReadable(LLAssetType::EType asset_type)
 {
-	const LLAssetDictionary *dict = LLAssetDictionary::getInstanceFast();
+	const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
 	const AssetEntry *entry = dict->lookup(asset_type);
 	if (entry)
 	{
@@ -180,19 +181,19 @@ const char *LLAssetType::lookupHumanReadable(LLAssetType::EType asset_type)
 // static
 LLAssetType::EType LLAssetType::lookupHumanReadable(const char* name)
 {
-	return lookupHumanReadable(absl::NullSafeStringView(name));
+	return lookupHumanReadable(al::safe_string_view(name));
 }
 
 // static
 LLAssetType::EType LLAssetType::lookupHumanReadable(const std::string_view readable_name)
 {
-	const LLAssetDictionary& dict = LLAssetDictionary::instanceFast();
-	for (const auto& dict_pair : dict)
+	const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
+	for (const LLAssetDictionary::value_type& pair : *dict)
 	{
-		const AssetEntry *entry = dict_pair.second;
+		const AssetEntry *entry = pair.second;
 		if (entry->mHumanName && (readable_name == entry->mHumanName))
 		{
-			return dict_pair.first;
+			return pair.first;
 		}
 	}
 	return AT_NONE;
@@ -201,7 +202,7 @@ LLAssetType::EType LLAssetType::lookupHumanReadable(const std::string_view reada
 // static
 bool LLAssetType::lookupCanLink(EType asset_type)
 {
-	const LLAssetDictionary *dict = LLAssetDictionary::getInstanceFast();
+	const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
 	const AssetEntry *entry = dict->lookup(asset_type);
 	if (entry)
 	{
@@ -224,7 +225,7 @@ bool LLAssetType::lookupIsLinkType(EType asset_type)
 // static
 bool LLAssetType::lookupIsAssetFetchByIDAllowed(EType asset_type)
 {
-	const LLAssetDictionary *dict = LLAssetDictionary::getInstanceFast();
+	const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
 	const AssetEntry *entry = dict->lookup(asset_type);
 	if (entry)
 	{
@@ -236,11 +237,23 @@ bool LLAssetType::lookupIsAssetFetchByIDAllowed(EType asset_type)
 // static
 bool LLAssetType::lookupIsAssetIDKnowable(EType asset_type)
 {
-	const LLAssetDictionary *dict = LLAssetDictionary::getInstanceFast();
+	const LLAssetDictionary *dict = LLAssetDictionary::getInstance();
 	const AssetEntry *entry = dict->lookup(asset_type);
 	if (entry)
 	{
 		return entry->mCanKnow;
 	}
 	return false;
+}
+
+std::vector<std::string> LLAssetType::getAssetTypeNames()
+{
+    std::vector<std::string> names;
+    const LLAssetDictionary& dict = LLAssetDictionary::instance();
+    for (const auto& dict_pair : dict)
+    {
+        const AssetEntry* entry = dict_pair.second;
+        names.push_back(entry->mTypeName);
+    }
+    return names;
 }

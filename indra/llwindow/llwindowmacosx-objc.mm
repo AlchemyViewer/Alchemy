@@ -55,7 +55,7 @@ void setupCocoa()
             // ie. running './secondlife -set Language fr' would cause a pop-up saying can't open document 'fr'
             // when init'ing the Cocoa App window.
             [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"NSTreatUnknownArgumentsAsOpen"];
-        } // @autoreleasepool
+        }
 
 		inited = true;
 	}
@@ -91,10 +91,9 @@ unsigned short *copyFromPBoard()
             NSArray *objToPaste = [pboard readObjectsForClasses:classArray options:[NSDictionary dictionary]];
             str = [objToPaste objectAtIndex:0];
         }
-        NSUInteger len = [str length];
-        unichar* temp = (unichar*)calloc(len+1, sizeof(unichar));
-        [str getCharacters:temp range:NSMakeRange(0, len)];
-        
+        NSUInteger str_len = [str length];
+        unichar* temp = (unichar*)calloc(str_len+1, sizeof(unichar));
+        [str getCharacters:temp range:NSMakeRange(0, str_len)];
         return temp;
     }
 }
@@ -107,7 +106,7 @@ CursorRef createImageCursor(const char *fullpath, int hotspotX, int hotspotY)
         [[NSCursor alloc]
           initWithImage:
           [[NSImage alloc] initWithContentsOfFile:
-            [NSString stringWithFormat:@"%s", fullpath]
+            [NSString stringWithUTF8String:fullpath]
             ]
           hotSpot:NSMakePoint(hotspotX, hotspotY)
           ];
@@ -163,6 +162,11 @@ void showNSCursor()
 	[NSCursor unhide];
 }
 
+bool isCGCursorVisible()
+{
+    return CGCursorIsVisible();
+}
+
 void hideNSCursorTillMove(bool hide)
 {
 	[NSCursor setHiddenUntilMouseMoves:hide];
@@ -209,6 +213,7 @@ NSWindowRef createNSWindow(int x, int y, int width, int height)
                                                       styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable backing:NSBackingStoreBuffered defer:NO];
 	[window makeKeyAndOrderFront:nil];
 	[window setAcceptsMouseMovedEvents:TRUE];
+	[window setRestorable:FALSE]; // Viewer manages state from own settings
 	return (NSWindowRef)CFBridgingRetain(window);
 }
 
@@ -437,7 +442,7 @@ unsigned int getModifiers()
 	return [NSEvent modifierFlags];
 }
 
-void setTitle(const std::string& title)
+void setWindowTitle(const std::string& title)
 {
     @autoreleasepool {
         LLNSWindow *winRef = [(LLAppDelegate*)[[LLApplication sharedApplication] delegate] window];

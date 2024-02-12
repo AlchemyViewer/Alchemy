@@ -49,7 +49,7 @@ class LLOverrideBakedTextureUpdate
 public:
 	LLOverrideBakedTextureUpdate(bool temp_state)
 	{
-		U32 num_bakes = (U32) LLAvatarAppearanceDefines::BAKED_NUM_INDICES;
+		U32 num_bakes = (U32) gAgentAvatarp->getNumBakes();
 		for( U32 index = 0; index < num_bakes; ++index )
 		{
 			composite_enabled[index] = gAgentAvatarp->isCompositeUpdateEnabled(index);
@@ -59,7 +59,7 @@ public:
 
 	~LLOverrideBakedTextureUpdate()
 	{
-		U32 num_bakes = (U32)LLAvatarAppearanceDefines::BAKED_NUM_INDICES;		
+		U32 num_bakes = (U32) gAgentAvatarp->getNumBakes();		
 		for( U32 index = 0; index < num_bakes; ++index )
 		{
 			gAgentAvatarp->setCompositeUpdatesEnabled(index, composite_enabled[index]);
@@ -266,7 +266,7 @@ void LLViewerWearable::setParamsToDefaults()
 	{
 		if( (((LLViewerVisualParam*)param)->getWearableType() == mType ) && (param->isTweakable() ) )
 		{
-			setVisualParamWeight(param->getID(),param->getDefaultWeight());
+			setVisualParamWeight(param->getID(),param->getDefaultWeight(), false);
 		}
 	}
 }
@@ -351,14 +351,14 @@ void LLViewerWearable::writeToAvatar(LLAvatarAppearance *avatarp)
 	ESex new_sex = avatarp->getSex();
 	if( old_sex != new_sex )
 	{
-		viewer_avatar->updateSexDependentLayerSets();
+		viewer_avatar->updateSexDependentLayerSets(FALSE);
 	}	
 }
 
 
 // Updates the user's avatar's appearance, replacing this wearables' parameters and textures with default values.
 // static 
-void LLViewerWearable::removeFromAvatar( LLWearableType::EType type)
+void LLViewerWearable::removeFromAvatar( LLWearableType::EType type, bool upload_bake)
 {
 	if (!isAgentAvatarValid()) return;
 
@@ -377,7 +377,7 @@ void LLViewerWearable::removeFromAvatar( LLWearableType::EType type)
 		if( (((LLViewerVisualParam*)param)->getWearableType() == type) && (param->isTweakable() ) )
 		{
 			S32 param_id = param->getID();
-			gAgentAvatarp->setVisualParamWeight( param_id, param->getDefaultWeight());
+			gAgentAvatarp->setVisualParamWeight( param_id, param->getDefaultWeight(), upload_bake );
 		}
 	}
 
@@ -387,7 +387,7 @@ void LLViewerWearable::removeFromAvatar( LLWearableType::EType type)
 	}
 
 	gAgentAvatarp->updateVisualParams();
-	gAgentAvatarp->wearableUpdated(type);
+	gAgentAvatarp->wearableUpdated(type, false);
 }
 
 // Does not copy mAssetID.
@@ -462,7 +462,7 @@ void LLViewerWearable::revertValues()
 {
 	LLWearable::revertValues();
 
-	LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(LLFloaterSidePanelContainer::findPanel("appearance"));
+	LLSidepanelAppearance *panel = LLFloaterSidePanelContainer::findPanel<LLSidepanelAppearance>("appearance");
 	if( panel )
 	{
 		panel->updateScrollingPanelList();
@@ -478,7 +478,7 @@ void LLViewerWearable::saveValues()
 {
 	LLWearable::saveValues();
 
-	LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(LLFloaterSidePanelContainer::findPanel("appearance"));
+	LLSidepanelAppearance *panel = LLFloaterSidePanelContainer::findPanel<LLSidepanelAppearance>("appearance");
 	if( panel )
 	{
 		panel->updateScrollingPanelList();
@@ -561,7 +561,7 @@ void LLViewerWearable::saveNewAsset() const
 void LLViewerWearable::onSaveNewAssetComplete(const LLUUID& new_asset_id, void* userdata, S32 status, LLExtStat ext_status) // StoreAssetData callback (fixed)
 {
 	LLWearableSaveData* data = (LLWearableSaveData*)userdata;
-	const std::string& type_name = LLWearableType::getInstanceFast()->getTypeName(data->mType);
+	const std::string& type_name = LLWearableType::getInstance()->getTypeName(data->mType);
 	if(0 == status)
 	{
 		// Success
@@ -587,7 +587,7 @@ void LLViewerWearable::onSaveNewAssetComplete(const LLUUID& new_asset_id, void* 
 
 std::ostream& operator<<(std::ostream &s, const LLViewerWearable &w)
 {
-	s << "wearable " << LLWearableType::getInstanceFast()->getTypeName(w.mType) << "\n";
+	s << "wearable " << LLWearableType::getInstance()->getTypeName(w.mType) << "\n";
 	s << "    Name: " << w.mName << "\n";
 	s << "    Desc: " << w.mDescription << "\n";
 	//w.mPermissions

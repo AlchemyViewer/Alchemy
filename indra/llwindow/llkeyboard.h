@@ -29,6 +29,7 @@
 
 #include <map>
 #include <boost/function.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include "llstringtable.h"
 #include "lltimer.h"
@@ -58,7 +59,8 @@ public:
 	LLKeyboard();
 	virtual ~LLKeyboard();
 
-	void			resetKeys();
+    void			resetKeyDownAndHandle();
+    void			resetKeys();
 
 
 	F32				getCurKeyElapsedTime()	{ return getKeyDown(mCurScanKey) ? getKeyElapsedTime( mCurScanKey ) : 0.f; }
@@ -95,8 +97,10 @@ public:
 	static BOOL		maskFromString(std::string_view str, MASK *mask);		// False on failure
 	static BOOL		keyFromString(const std::string& str, KEY *key);			// False on failure
 	static std::string stringFromKey(KEY key, bool translate = true);
+    static std::string stringFromMouse(EMouseClickType click, bool translate = true);
 	static std::string stringFromAccelerator( MASK accel_mask ); // separated for convinience, returns with "+": "Shift+" or "Shift+Alt+"...
 	static std::string stringFromAccelerator( MASK accel_mask, KEY key );
+    static std::string stringFromAccelerator(MASK accel_mask, EMouseClickType click);
 
 	void setCallbacks(LLWindowCallbacks *cbs) { mCallbacks = cbs; }
 	F32				getKeyElapsedTime( KEY key );  // Returns time in seconds since key was pressed.
@@ -108,8 +112,8 @@ protected:
 	void 			addKeyName(KEY key, const std::string& name);
 
 protected:
-	absl::flat_hash_map<U32, KEY>	mTranslateKeyMap;		// Map of translations from OS keys to Linden KEYs
-	absl::flat_hash_map<KEY, U32>	mInvTranslateKeyMap;	// Map of translations from Linden KEYs to OS keys
+	boost::unordered_flat_map<U32, KEY>	mTranslateKeyMap;		// Map of translations from OS keys to Linden KEYs
+	boost::unordered_flat_map<KEY, U32>	mInvTranslateKeyMap;	// Map of translations from Linden KEYs to OS keys
 	LLWindowCallbacks *mCallbacks;
 
 	LLTimer			mKeyLevelTimer[KEY_COUNT];	// Time since level was set
@@ -127,6 +131,13 @@ protected:
 
 	static std::map<KEY,std::string> sKeysToNames;
 	static std::map<std::string,KEY> sNamesToKeys;
+};
+
+// Interface to get key from assigned command
+class LLKeyBindingToStringHandler
+{
+public:
+    virtual std::string getKeyBindingAsString(const std::string& mode, const std::string& control) const = 0;
 };
 
 extern LLKeyboard *gKeyboard;

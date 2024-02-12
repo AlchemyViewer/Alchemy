@@ -167,8 +167,8 @@ namespace ALGLMath
 		//Begin SSE intrinsics
 
 		// Declare locals
-		static const LLVector4a one(1.f);
-		static const LLVector4a two(2.f);
+		const LLVector4a one(1.f);
+		const LLVector4a two(2.f);
 		LLVector4a norm_view(
 			((windowCoordinate.mV[VX] - (F32)viewport.mLeft) / (F32)viewport.getWidth()),
 			((windowCoordinate.mV[VY] - (F32)viewport.mBottom) / (F32)viewport.getHeight()),

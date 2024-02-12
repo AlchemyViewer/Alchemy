@@ -44,11 +44,13 @@
 #include "llxmltree.h"
 #include "message.h"
 
+#include "lldrawpoolbump.h" // to init bumpmap images
 #include "lltexturecache.h"
 #include "lltexturefetch.h"
 #include "llviewercontrol.h"
 #include "llviewertexture.h"
 #include "llviewermedia.h"
+#include "llviewernetwork.h"
 #include "llviewerregion.h"
 #include "llviewerstats.h"
 #include "pipeline.h"
@@ -58,6 +60,7 @@
 #include "llviewerdisplay.h"
 #include "llviewerwindow.h"
 #include "llprogressview.h"
+
 ////////////////////////////////////////////////////////////////////////////
 
 void (*LLViewerTextureList::sUUIDCallback)(void **, const LLUUID&) = NULL;
@@ -65,11 +68,10 @@ void (*LLViewerTextureList::sUUIDCallback)(void **, const LLUUID&) = NULL;
 S32 LLViewerTextureList::sNumImages = 0;
 
 LLViewerTextureList gTextureList;
-static LLTrace::BlockTimerStatHandle FTM_PROCESS_IMAGES("Process Images");
 
 ETexListType get_element_type(S32 priority)
 {
-    return (priority == LLViewerFetchedTexture::BOOST_ICON) ? TEX_LIST_SCALE : TEX_LIST_STANDARD;
+    return (priority == LLViewerFetchedTexture::BOOST_ICON || priority == LLViewerFetchedTexture::BOOST_THUMBNAIL) ? TEX_LIST_SCALE : TEX_LIST_STANDARD;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -89,8 +91,6 @@ LLTextureKey::LLTextureKey(LLUUID id, ETexListType tex_type)
 
 LLViewerTextureList::LLViewerTextureList() 
 	: mForceResetTextureStats(FALSE),
-	mMaxResidentTexMemInMegaBytes(0),
-	mMaxTotalTextureMemInMegaBytes(0),
 	mInitialized(FALSE)
 {
 }
@@ -99,24 +99,18 @@ void LLViewerTextureList::init()
 {			
 	mInitialized = TRUE ;
 	sNumImages = 0;
-	mMaxResidentTexMemInMegaBytes = S32Megabytes(0);
-	mMaxTotalTextureMemInMegaBytes = S32Megabytes(0);
-	
-	// Update how much texture RAM we're allowed to use.
-	updateMaxResidentTexMem(S32Megabytes(0)); // 0 = use current
-	
 	doPreloadImages();
 }
 
 
 void LLViewerTextureList::doPreloadImages()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	LL_DEBUGS("ViewerImages") << "Preloading images..." << LL_ENDL;
 	
 	llassert_always(mInitialized) ;
 	llassert_always(mImageList.empty()) ;
 	llassert_always(mUUIDMap.empty()) ;
-	llassert_always(mUUIDHashMap.empty());
 
 	// Set the "missing asset" image
 	LLViewerFetchedTexture::sMissingAssetImagep = LLViewerTextureManager::getFetchedTextureFromFile("missing_asset.tga", FTT_LOCAL_FILE, MIPMAP_NO, LLViewerFetchedTexture::BOOST_UI);
@@ -126,8 +120,20 @@ void LLViewerTextureList::doPreloadImages()
 	LLTexUnit::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
 	LLUIImageList* image_list = LLUIImageList::getInstance();
 
-	// Set the default flat normal map
-	LLViewerFetchedTexture::sFlatNormalImagep = LLViewerTextureManager::getFetchedTextureFromFile("flatnormal.tga", FTT_LOCAL_FILE, MIPMAP_NO, LLViewerFetchedTexture::BOOST_BUMP);
+    // Set the default flat normal map
+    // BLANK_OBJECT_NORMAL has a version on dataserver, but it has compression artifacts
+    LLViewerFetchedTexture::sFlatNormalImagep =
+        LLViewerTextureManager::getFetchedTextureFromFile("flatnormal.tga",
+                                                          FTT_LOCAL_FILE,
+                                                          MIPMAP_NO,
+                                                          LLViewerFetchedTexture::BOOST_BUMP,
+                                                          LLViewerTexture::FETCHED_TEXTURE,
+                                                          0,
+                                                          0,
+                                                          BLANK_OBJECT_NORMAL);
+
+	// PBR: irradiance
+	LLViewerFetchedTexture::sDefaultIrradiancePBRp = LLViewerTextureManager::getFetchedTextureFromFile("default_irradiance.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
 	
 	// Set the default particle image
 	LLViewerFetchedTexture::sPixieSmallImagep = LLViewerTextureManager::getFetchedTextureFromFile("pixiesmall.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
@@ -142,9 +148,6 @@ void LLViewerTextureList::doPreloadImages()
 	//uv_test->setClamp(FALSE, FALSE);
 	//uv_test->setMipFilterNearest(TRUE, TRUE);
 
-	// prefetch specific UUIDs
-	LLViewerTextureManager::getFetchedTexture(IMG_SHOT);
-	LLViewerTextureManager::getFetchedTexture(IMG_SMOKE_POOF);
 	LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTextureFromFile("silhouette.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
 	if (image) 
 	{
@@ -161,12 +164,6 @@ void LLViewerTextureList::doPreloadImages()
 	if (image) 
 	{
 		image->setAddressMode(LLTexUnit::TAM_WRAP);
-		mImagePreloads.insert(image);
-	}
-	image = LLViewerTextureManager::getFetchedTexture(DEFAULT_WATER_NORMAL, FTT_DEFAULT, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
-	if (image) 
-	{
-		image->setAddressMode(LLTexUnit::TAM_WRAP);	
 		mImagePreloads.insert(image);
 	}
 	image = LLViewerTextureManager::getFetchedTextureFromFile("transparent.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI, LLViewerTexture::FETCHED_TEXTURE,
@@ -190,7 +187,12 @@ void LLViewerTextureList::doPreloadImages()
 		image->setAddressMode(LLTexUnit::TAM_CLAMP);
 		mImagePreloads.insert(image);
 	}
-
+	image = LLViewerTextureManager::getFetchedTextureFromFile("SoftDotNoBack.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
+	if (image)
+	{
+		image->setAddressMode(LLTexUnit::TAM_WRAP);
+		mImagePreloads.insert(image);
+	}
 	LLPointer<LLImageRaw> img_blak_square_tex(new LLImageRaw(2, 2, 3));
 	memset(img_blak_square_tex->getData(), 0, img_blak_square_tex->getDataSize());
 	LLPointer<LLViewerFetchedTexture> img_blak_square(new LLViewerFetchedTexture(img_blak_square_tex, FTT_DEFAULT, FALSE));
@@ -201,11 +203,49 @@ void LLViewerTextureList::doPreloadImages()
 
 static std::string get_texture_list_name()
 {
-	return gDirUtilp->getExpandedFilename(LL_PATH_CACHE, "texture_list_" + gSavedSettings.getString("LoginLocation") + "." + gDirUtilp->getUserName() + ".xml");
+    if (LLGridManager::getInstance()->isInSLMain())
+    {
+        return gDirUtilp->getExpandedFilename(LL_PATH_CACHE,
+            "texture_list_" + gSavedSettings.getString("LoginLocation") + "." + gDirUtilp->getUserName() + ".xml");
+    }
+    else
+    {
+        const std::string& grid_id_str = LLGridManager::getInstance()->getGridId();
+        const std::string& grid_id_lower = utf8str_tolower(grid_id_str);
+        return gDirUtilp->getExpandedFilename(LL_PATH_CACHE,
+            "texture_list_" + gSavedSettings.getString("LoginLocation") + "." + gDirUtilp->getUserName() + "." + grid_id_lower + ".xml");
+    }
 }
 
 void LLViewerTextureList::doPrefetchImages()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+
+    // todo: do not load without getViewerAssetUrl()
+    // either fail login without caps or provide this
+    // in some other way, textures won't load otherwise
+    LLViewerFetchedTexture *imagep = findImage(DEFAULT_WATER_NORMAL, TEX_LIST_STANDARD);
+    if (!imagep)
+    {
+        // add it to mImagePreloads only once
+        imagep = LLViewerTextureManager::getFetchedTexture(DEFAULT_WATER_NORMAL, FTT_DEFAULT, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
+        if (imagep)
+        {
+            imagep->setAddressMode(LLTexUnit::TAM_WRAP);
+            mImagePreloads.insert(imagep);
+        }
+    }
+
+	LLViewerFetchedTexture::sSmokeImagep = LLViewerTextureManager::getFetchedTexture(IMG_SMOKE, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_UI);
+	LLViewerFetchedTexture::sSmokeImagep->setNoDelete();
+
+    LLViewerTextureManager::getFetchedTexture(IMG_SHOT);
+    LLViewerTextureManager::getFetchedTexture(IMG_SMOKE_POOF);
+    LLViewerFetchedTexture::sSmokeImagep = LLViewerTextureManager::getFetchedTexture(IMG_SMOKE, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_UI);
+    LLViewerFetchedTexture::sSmokeImagep->setNoDelete();
+
+    LLStandardBumpmap::addstandard();
+
 	if (LLAppViewer::instance()->getPurgeCache())
 	{
 		// cache was purged, no point
@@ -229,7 +269,9 @@ void LLViewerTextureList::doPrefetchImages()
         }
         file.close();
 	}
+#ifdef SHOW_DEBUG
     S32 texture_count = 0;
+#endif
 	for (LLSD::array_const_iterator iter = imagelist.beginArray(), end = imagelist.endArray();
 		 iter != end; ++iter)
 	{
@@ -243,7 +285,9 @@ void LLViewerTextureList::doPrefetchImages()
 			LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTexture(uuid, FTT_DEFAULT, MIPMAP_TRUE, LLGLTexture::BOOST_NONE, texture_type);
 			if (image)
 			{
+#ifdef SHOW_DEBUG
                 texture_count += 1;
+#endif
 				image->addTextureStats((F32)pixel_area);
 			}
 		}
@@ -261,6 +305,7 @@ LLViewerTextureList::~LLViewerTextureList()
 
 void LLViewerTextureList::shutdown()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	// clear out preloads
 	mImagePreloads.clear();
 
@@ -326,8 +371,7 @@ void LLViewerTextureList::shutdown()
 	mLoadingStreamList.clear();
 	mCreateTextureList.clear();
 	mFastCacheList.clear();
-
-	mUUIDHashMap.clear();	
+	
 	mUUIDMap.clear();
 	
 	mImageList.clear();
@@ -337,10 +381,11 @@ void LLViewerTextureList::shutdown()
 
 void LLViewerTextureList::dump()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	LL_INFOS() << "LLViewerTextureList::dump()" << LL_ENDL;
 	for (LLViewerFetchedTexture* image : mImageList)
     {
-		LL_INFOS() << "priority " << image->getDecodePriority()
+		LL_INFOS() << "priority " << image->getMaxVirtualSize()
 		<< " boost " << image->getBoostLevel()
 		<< " size " << image->getWidth() << "x" << image->getHeight()
 		<< " discard " << image->getDiscardLevel()
@@ -380,6 +425,7 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromFile(const std::string&
 												   LLGLenum primary_format, 
 												   const LLUUID& force_id)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if(!mInitialized)
 	{
 		return NULL ;
@@ -407,6 +453,7 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromUrl(const std::string& 
 												   LLGLenum primary_format, 
 												   const LLUUID& force_id)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if(!mInitialized)
 	{
 		return NULL ;
@@ -470,7 +517,8 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromUrl(const std::string& 
 			{
 				imagep->dontDiscard();
 			}
-			if (boost_priority == LLViewerFetchedTexture::BOOST_ICON)
+			if (boost_priority == LLViewerFetchedTexture::BOOST_ICON
+                || boost_priority == LLViewerFetchedTexture::BOOST_THUMBNAIL)
 			{
 				// Agent and group Icons are downloadable content, nothing manages
 				// icon deletion yet, so they should not persist
@@ -496,6 +544,7 @@ LLViewerFetchedTexture* LLViewerTextureList::getImage(const LLUUID &image_id,
 												   LLGLenum primary_format,
 												   LLHost request_from_host)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if(!mInitialized)
 	{
 		return NULL ;
@@ -513,12 +562,6 @@ LLViewerFetchedTexture* LLViewerTextureList::getImage(const LLUUID &image_id,
 	LLPointer<LLViewerFetchedTexture> imagep = findImage(image_id, get_element_type(boost_priority));
 	if (!imagep.isNull())
 	{
-		if (boost_priority != LLViewerTexture::BOOST_ALM && imagep->getBoostLevel() == LLViewerTexture::BOOST_ALM)
-		{
-			// Workaround: we need BOOST_ALM texture for something, 'rise' to NONE
-			imagep->setBoostLevel(LLViewerTexture::BOOST_NONE);
-		}
-
 		LLViewerFetchedTexture *texture = imagep.get();
 		if (request_from_host.isOk() &&
 			!texture->getTargetHost().isOk())
@@ -558,6 +601,7 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
 												   LLGLenum primary_format,
 												   LLHost request_from_host)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	static LLCachedControl<bool> fast_cache_fetching_enabled(gSavedSettings, "FastCacheFetchEnabled", true);
 
 	LLPointer<LLViewerFetchedTexture> imagep ;
@@ -586,7 +630,8 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
 		{
 			imagep->dontDiscard();
 		}
-		if (boost_priority == LLViewerFetchedTexture::BOOST_ICON)
+		if (boost_priority == LLViewerFetchedTexture::BOOST_ICON
+            || boost_priority == LLViewerFetchedTexture::BOOST_THUMBNAIL)
 		{
 			// Agent and group Icons are downloadable content, nothing manages
 			// icon deletion yet, so they should not persist.
@@ -613,6 +658,7 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
 
 void LLViewerTextureList::findTexturesByID(const LLUUID &image_id, std::vector<LLViewerFetchedTexture*> &output)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     LLTextureKey search_key(image_id, TEX_LIST_STANDARD);
     uuid_map_t::iterator iter = mUUIDMap.lower_bound(search_key);
     while (iter != mUUIDMap.end() && iter->first.textureId == image_id)
@@ -624,8 +670,9 @@ void LLViewerTextureList::findTexturesByID(const LLUUID &image_id, std::vector<L
 
 LLViewerFetchedTexture *LLViewerTextureList::findImage(const LLTextureKey &search_key)
 {
-    auto iter = mUUIDHashMap.find(search_key);
-    if (iter == mUUIDHashMap.cend())
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    uuid_map_t::iterator iter = mUUIDMap.find(search_key);
+    if (iter == mUUIDMap.end())
         return NULL;
     return iter->second;
 }
@@ -637,6 +684,7 @@ LLViewerFetchedTexture *LLViewerTextureList::findImage(const LLUUID &image_id, E
 
 void LLViewerTextureList::addImageToList(LLViewerFetchedTexture *image)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	assert_main_thread();
 	llassert_always(mInitialized) ;
 	llassert(image);
@@ -656,16 +704,18 @@ void LLViewerTextureList::addImageToList(LLViewerFetchedTexture *image)
 
 void LLViewerTextureList::removeImageFromList(LLViewerFetchedTexture *image)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	assert_main_thread();
 	llassert_always(mInitialized) ;
 	llassert(image);
+    image->validateRefCount();
 
 	S32 count = 0;
 	if (image->isInImageList())
 	{
 		count = mImageList.erase(image) ;
 		if(count != 1) 
-	{
+	    {
 			LL_INFOS() << "Image  " << image->getID() 
 				<< " had mInImageList set but mImageList.erase() returned " << count
 				<< LL_ENDL;
@@ -677,8 +727,8 @@ void LLViewerTextureList::removeImageFromList(LLViewerFetchedTexture *image)
 			<< " but doesn't have mInImageList set"
 			<< " ref count is " << image->getNumRefs()
 			<< LL_ENDL;
-		auto iter = mUUIDHashMap.find(LLTextureKey(image->getID(), (ETexListType)image->getTextureListType()));
-		if(iter == mUUIDHashMap.cend())
+		uuid_map_t::iterator iter = mUUIDMap.find(LLTextureKey(image->getID(), (ETexListType)image->getTextureListType()));
+		if(iter == mUUIDMap.end())
 		{
 			LL_INFOS() << "Image  " << image->getID() << " is also not in mUUIDMap!" << LL_ENDL ;
 		}
@@ -691,6 +741,7 @@ void LLViewerTextureList::removeImageFromList(LLViewerFetchedTexture *image)
 			LL_INFOS() << "Image  " << image->getID() << " was in mUUIDMap with same pointer" << LL_ENDL ;
 		}
 		count = mImageList.erase(image) ;
+        llassert(count != 0);
 		if(count != 0) 
 		{	// it was in the list already?
 			LL_WARNS() << "Image  " << image->getID() 
@@ -704,6 +755,7 @@ void LLViewerTextureList::removeImageFromList(LLViewerFetchedTexture *image)
 
 void LLViewerTextureList::addImage(LLViewerFetchedTexture *new_image, ETexListType tex_type)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (!new_image)
 	{
 		return;
@@ -721,13 +773,13 @@ void LLViewerTextureList::addImage(LLViewerFetchedTexture *new_image, ETexListTy
 
 	addImageToList(new_image);
 	mUUIDMap.insert_or_assign(key, new_image);
-	mUUIDHashMap.insert_or_assign(key, new_image);
 	new_image->setTextureListType(tex_type);
 }
 
 
 void LLViewerTextureList::deleteImage(LLViewerFetchedTexture *image)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if( image)
 	{
 		if (image->hasCallbacks())
@@ -736,7 +788,6 @@ void LLViewerTextureList::deleteImage(LLViewerFetchedTexture *image)
 		}
 		LLTextureKey key(image->getID(), (ETexListType)image->getTextureListType());
 		llverify(mUUIDMap.erase(key) == 1);
-		llverify(mUUIDHashMap.erase(key) == 1);
 		sNumImages--;
 		removeImageFromList(image);
 	}
@@ -753,18 +804,10 @@ void LLViewerTextureList::dirtyImage(LLViewerFetchedTexture *image)
 }
 
 ////////////////////////////////////////////////////////////////////////////
-static LLTrace::BlockTimerStatHandle FTM_IMAGE_MARK_DIRTY("Dirty Images");
-static LLTrace::BlockTimerStatHandle FTM_IMAGE_UPDATE_PRIORITIES("Prioritize");
-static LLTrace::BlockTimerStatHandle FTM_IMAGE_CALLBACKS("Callbacks");
-static LLTrace::BlockTimerStatHandle FTM_IMAGE_FETCH("Fetch");
-static LLTrace::BlockTimerStatHandle FTM_FAST_CACHE_IMAGE_FETCH("Fast Cache Fetch");
-static LLTrace::BlockTimerStatHandle FTM_IMAGE_CREATE("Create");
-static LLTrace::BlockTimerStatHandle FTM_IMAGE_STATS("Stats");
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_TEXTURES("Update Textures");
 
 void LLViewerTextureList::updateImages(F32 max_time)
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_TEXTURES);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	static BOOL cleared = FALSE;
 	if(gTeleportDisplay)
 	{
@@ -784,72 +827,54 @@ void LLViewerTextureList::updateImages(F32 max_time)
 		using namespace LLStatViewer;
 		sample(NUM_IMAGES, sNumImages);
 		sample(NUM_RAW_IMAGES, LLImageRaw::sRawImageCount);
-		sample(GL_TEX_MEM, LLImageGL::sGlobalTextureMemory);
-		sample(GL_BOUND_MEM, LLImageGL::sBoundTextureMemory);
-		sample(RAW_MEM, F64Bytes(LLImageRaw::sGlobalRawMemory));
 		sample(FORMATTED_MEM, F64Bytes(LLImageFormatted::sGlobalFormattedMemory));
 	}
 
-	{
-		//loading from fast cache 
-		LL_RECORD_BLOCK_TIME(FTM_FAST_CACHE_IMAGE_FETCH);
-		max_time -= updateImagesLoadingFastCache(max_time);
-	}
+    // make sure each call below gets at least its "fair share" of time
+    F32 min_time = max_time * 0.33f;
+    F32 remaining_time = max_time;
 
-	{
-		LL_RECORD_BLOCK_TIME(FTM_IMAGE_UPDATE_PRIORITIES);
-		updateImagesDecodePriorities();
-	}
+	//loading from fast cache
+	remaining_time -= updateImagesLoadingFastCache(remaining_time);
+    remaining_time = llmax(remaining_time, min_time);
 
-	F32 total_max_time = max_time;
+    //dispatch to texture fetch threads
+	remaining_time -= updateImagesFetchTextures(remaining_time);
+    remaining_time = llmax(remaining_time, min_time);
 
-	{
-		LL_RECORD_BLOCK_TIME(FTM_IMAGE_FETCH);
-		max_time -= updateImagesFetchTextures(max_time);
-	}
-	
-	{
-		LL_RECORD_BLOCK_TIME(FTM_IMAGE_CREATE);
-		max_time = llmax(max_time, total_max_time*.50f); // at least 50% of max_time
-		max_time -= updateImagesCreateTextures(max_time);
-	}
+    //handle results from decode threads
+	updateImagesCreateTextures(remaining_time);
 	
 	if (!mDirtyTextureList.empty())
 	{
-		LL_RECORD_BLOCK_TIME(FTM_IMAGE_MARK_DIRTY);
 		gPipeline.dirtyPoolObjectTextures(mDirtyTextureList);
 		mDirtyTextureList.clear();
 	}
 
+	bool didone = false;
+	for (image_list_t::iterator iter = mCallbackList.begin();
+		iter != mCallbackList.end(); )
 	{
-		LL_RECORD_BLOCK_TIME(FTM_IMAGE_CALLBACKS);
-		bool didone = false;
-		for (image_list_t::iterator iter = mCallbackList.begin();
-			iter != mCallbackList.end(); )
+		//trigger loaded callbacks on local textures immediately
+		LLViewerFetchedTexture* image = *iter++;
+		if (!image->getUrl().empty())
 		{
-			//trigger loaded callbacks on local textures immediately
-			LLViewerFetchedTexture* image = *iter++;
-			if (!image->getUrl().empty())
-			{
-				// Do stuff to handle callbacks, update priorities, etc.
-				didone = image->doLoadedCallbacks();
-			}
-			else if (!didone)
-			{
-				// Do stuff to handle callbacks, update priorities, etc.
-				didone = image->doLoadedCallbacks();
-			}
+			// Do stuff to handle callbacks, update priorities, etc.
+			didone = image->doLoadedCallbacks();
+		}
+		else if (!didone)
+		{
+			// Do stuff to handle callbacks, update priorities, etc.
+			didone = image->doLoadedCallbacks();
 		}
 	}
 
-	{
-		LL_RECORD_BLOCK_TIME(FTM_IMAGE_STATS);
-		updateImagesUpdateStats();
-	}
+	updateImagesUpdateStats();
 }
 
 void LLViewerTextureList::clearFetchingRequests()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (LLAppViewer::getTextureFetch()->getNumRequests() == 0)
 	{
 		return;
@@ -863,171 +888,167 @@ void LLViewerTextureList::clearFetchingRequests()
 	}
 }
 
-void LLViewerTextureList::updateImagesDecodePriorities()
+static void touch_texture(LLViewerFetchedTexture* tex, F32 vsize)
 {
-	// Update the decode priority for N images each frame
-	{
-		F32 lazy_flush_timeout = 30.f; // stop decoding
-		F32 max_inactive_time  = 20.f; // actually delete
-		S32 min_refs = 3; // 1 for mImageList, 1 for mUUIDMap, 1 for local reference
+    if (tex)
+    {
+        tex->addTextureStats(vsize);
+    }
+}
 
-		//reset imagep->getLastReferencedTimer() when screen is showing the progress view to avoid removing pre-fetched textures too soon.
-		bool reset_timer = gViewerWindow->getProgressView()->getVisible();
-        
-        static const S32 MAX_PRIO_UPDATES = gSavedSettings.getS32("TextureFetchUpdatePriorities");         // default: 32
-		const size_t max_update_count = llmin((S32) (MAX_PRIO_UPDATES*MAX_PRIO_UPDATES*gFrameIntervalSeconds.value()) + 1, MAX_PRIO_UPDATES);
-		S32 update_counter = llmin(max_update_count, mUUIDMap.size());
-		uuid_map_t::iterator iter = mUUIDMap.upper_bound(mLastUpdateKey);
-		while ((update_counter-- > 0) && !mUUIDMap.empty())
-		{
-			if (iter == mUUIDMap.end())
-			{
-				iter = mUUIDMap.begin();
+extern BOOL gCubeSnapshot;
+
+void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imagep)
+{
+    if (imagep->isInDebug() || imagep->isUnremovable())
+    {
+        //update_counter--;
+        return; //is in debug, ignore.
+    }
+
+    llassert(!gCubeSnapshot);
+
+    static LLCachedControl<F32> bias_distance_scale(gSavedSettings, "TextureBiasDistanceScale", 1.f);
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE
+    {
+        for (U32 i = 0; i < LLRender::NUM_TEXTURE_CHANNELS; ++i)
+        {
+            for (U32 fi = 0; fi < imagep->getNumFaces(i); ++fi)
+            {
+                LLFace* face = (*(imagep->getFaceList(i)))[fi];
+
+                if (face && face->getViewerObject() && face->getTextureEntry())
+                {
+                    F32 vsize = face->getPixelArea();
+
+                    // scale desired texture resolution higher or lower depending on texture scale
+                    const LLTextureEntry* te = face->getTextureEntry();
+                    F32 min_scale = te ? llmin(fabsf(te->getScaleS()), fabsf(te->getScaleT())) : 1.f;
+                    min_scale = llmax(min_scale*min_scale, 0.1f);
+
+                    vsize /= min_scale;
+
+#if LL_DARWIN
+                    vsize /= 1.f + LLViewerTexture::sDesiredDiscardBias*(1.f+face->getDrawable()->mDistanceWRTCamera*bias_distance_scale);
+#else
+                    vsize /= LLViewerTexture::sDesiredDiscardBias;
+                    vsize /= llmax(1.f, (LLViewerTexture::sDesiredDiscardBias-1.f) * (1.f + face->getDrawable()->mDistanceWRTCamera * bias_distance_scale));
+
+                    F32 radius;
+                    F32 cos_angle_to_view_dir;
+                    BOOL in_frustum = face->calcPixelArea(cos_angle_to_view_dir, radius);
+                    if (!in_frustum || !face->getDrawable()->isVisible())
+                    { // further reduce by discard bias when off screen or occluded
+                        vsize /= LLViewerTexture::sDesiredDiscardBias;
+                    }
+#endif
+                    // if a GLTF material is present, ignore that face
+                    // as far as this texture stats go, but update the GLTF material 
+                    // stats
+                    LLFetchedGLTFMaterial* mat = te ? (LLFetchedGLTFMaterial*)te->getGLTFRenderMaterial() : nullptr;
+                    llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(te->getGLTFRenderMaterial()) != nullptr);
+                    if (mat)
+                    {
+                        touch_texture(mat->mBaseColorTexture, vsize);
+                        touch_texture(mat->mNormalTexture, vsize);
+                        touch_texture(mat->mMetallicRoughnessTexture, vsize);
+                        touch_texture(mat->mEmissiveTexture, vsize);
+                    }
+                    else
+                    {
+                        imagep->addTextureStats(vsize);
+                    }
+                }
             }
-            mLastUpdateKey = iter->first;
-			LLPointer<LLViewerFetchedTexture> imagep = iter->second;
-			++iter; // safe to increment now
+        }
+    }
 
-			if(imagep->isInDebug() || imagep->isUnremovable())
-			{
-				update_counter--;
-				continue; //is in debug, ignore.
-			}
+    //imagep->setDebugText(llformat("%.3f - %d", sqrtf(imagep->getMaxVirtualSize()), imagep->getBoostLevel()));
 
-			//
-			// Flush formatted images using a lazy flush
-			//
-			S32 num_refs = imagep->getNumRefs();
-			if (num_refs == min_refs)
-			{
-				if(reset_timer)
-				{
-					imagep->getLastReferencedTimer()->reset();
-				}
-				else if (imagep->getLastReferencedTimer()->getElapsedTimeF32() > lazy_flush_timeout)
-				{
-					// Remove the unused image from the image list
-					deleteImage(imagep);
-					imagep = NULL; // should destroy the image								
-				}
-				continue;
-			}
-			else
-			{
-				if(imagep->hasSavedRawImage())
-				{
-					if(imagep->getElapsedLastReferencedSavedRawImageTime() > max_inactive_time)
-					{
-						imagep->destroySavedRawImage() ;
-					}
-				}
+    F32 lazy_flush_timeout = 30.f; // stop decoding
+    F32 max_inactive_time = 20.f; // actually delete
+    S32 min_refs = 3; // 1 for mImageList, 1 for mUUIDMap, 1 for local reference
 
-				if(imagep->isDeleted())
-				{
-					continue ;
-				}
-				else if(imagep->isDeletionCandidate())
-				{
-					imagep->destroyTexture() ;																
-					continue ;
-				}
-				else if(imagep->isInactive())
-				{
-					if(reset_timer)
-					{
-						imagep->getLastReferencedTimer()->reset();
-					}
-					else if (imagep->getLastReferencedTimer()->getElapsedTimeF32() > max_inactive_time)
-					{
-						imagep->setDeletionCandidate() ;
-					}
-					continue ;
-				}
-				else
-				{
-					imagep->getLastReferencedTimer()->reset();
+    //
+    // Flush formatted images using a lazy flush
+    //
+    S32 num_refs = imagep->getNumRefs();
+    if (num_refs == min_refs)
+    {
+        if (imagep->getLastReferencedTimer()->getElapsedTimeF32() > lazy_flush_timeout)
+        {
+            // Remove the unused image from the image list
+            deleteImage(imagep);
+            imagep = NULL; // should destroy the image								
+        }
+        return;
+    }
+    else
+    {
+        if (imagep->hasSavedRawImage())
+        {
+            if (imagep->getElapsedLastReferencedSavedRawImageTime() > max_inactive_time)
+            {
+                imagep->destroySavedRawImage();
+            }
+        }
 
-					//reset texture state.
-					imagep->setInactive() ;										
-				}
-			}
+        if (imagep->isDeleted())
+        {
+            return;
+        }
+        else if (imagep->isDeletionCandidate())
+        {
+            imagep->destroyTexture();
+            return;
+        }
+        else if (imagep->isInactive())
+        {
+            if (imagep->getLastReferencedTimer()->getElapsedTimeF32() > max_inactive_time)
+            {
+                imagep->setDeletionCandidate();
+            }
+            return;
+        }
+        else
+        {
+            imagep->getLastReferencedTimer()->reset();
 
-			if (!imagep->isInImageList())
-			{
-				continue;
-			}
-			if(imagep->isInFastCacheList())
-			{
-				continue; //wait for loading from the fast cache.
-			}
+            //reset texture state.
+            imagep->setInactive();
+        }
+    }
 
-			imagep->processTextureStats();
-			F32 old_priority = imagep->getDecodePriority();
-			F32 old_priority_test = llmax(old_priority, 0.0f);
-			F32 decode_priority = imagep->calcDecodePriority();
-			F32 decode_priority_test = llmax(decode_priority, 0.0f);
-			// Ignore < 20% difference
-			if ((decode_priority_test < old_priority_test * .8f) ||
-				(decode_priority_test > old_priority_test * 1.25f))
-			{
-				mImageList.erase(imagep) ;
-				imagep->setDecodePriority(decode_priority);
-				mImageList.insert(imagep);
-			}
-		}
-	}
+    if (!imagep->isInImageList())
+    {
+        return;
+    }
+    if (imagep->isInFastCacheList())
+    {
+        return; //wait for loading from the fast cache.
+    }
+
+    imagep->processTextureStats();
 }
 
 void LLViewerTextureList::setDebugFetching(LLViewerFetchedTexture* tex, S32 debug_level)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if(!tex->setDebugFetching(debug_level))
 	{
 		return;
 	}
 
 	const F32 DEBUG_PRIORITY = 100000.f;
-	F32 old_priority_test = llmax(tex->getDecodePriority(), 0.0f);
-	F32 decode_priority_test = DEBUG_PRIORITY;
-	
-	// Ignore < 20% difference
-	if ((decode_priority_test < old_priority_test * .8f) ||
-		(decode_priority_test > old_priority_test * 1.25f))
-	{
-		removeImageFromList(tex);
-		tex->setDecodePriority(decode_priority_test);
-		addImageToList(tex);
-	}
+	removeImageFromList(tex);
+    tex->mMaxVirtualSize = DEBUG_PRIORITY;
+	addImageToList(tex);
 }
-
-/*
- static U8 get_image_type(LLViewerFetchedTexture* imagep, LLHost target_host)
- {
- // Having a target host implies this is a baked image.  I don't
- // believe that boost level has been set at this point. JC
- U8 type_from_host = (target_host.isOk() 
- ? LLImageBase::TYPE_AVATAR_BAKE 
- : LLImageBase::TYPE_NORMAL);
- S32 boost_level = imagep->getBoostLevel();
- U8 type_from_boost = ( (boost_level == LLViewerFetchedTexture::BOOST_AVATAR_BAKED 
- || boost_level == LLViewerFetchedTexture::BOOST_AVATAR_BAKED_SELF)
- ? LLImageBase::TYPE_AVATAR_BAKE 
- : LLImageBase::TYPE_NORMAL);
- if (type_from_host == LLImageBase::TYPE_NORMAL
- && type_from_boost == LLImageBase::TYPE_AVATAR_BAKE)
- {
- LL_WARNS() << "TAT: get_image_type() type_from_host doesn't match type_from_boost"
- << " host " << target_host
- << " boost " << imagep->getBoostLevel()
- << " imageid " << imagep->getID()
- << LL_ENDL;
- imagep->dump();
- }
- return type_from_host;
- }
- */
 
 F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (gGLManager.mIsDisabled) return 0.0f;
 	
 	//
@@ -1044,10 +1065,12 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
 		enditer = iter;
 		LLViewerFetchedTexture *imagep = *curiter;
 		imagep->createTexture();
-		if (create_timer.getElapsedTimeF32() > max_time)
-		{
-			break;
-		}
+        imagep->postCreateTexture();
+
+        if (create_timer.getElapsedTimeF32() > max_time)
+        {
+            break;
+        }
 	}
 	mCreateTextureList.erase(mCreateTextureList.begin(), enditer);
 	return create_timer.getElapsedTimeF32();
@@ -1055,6 +1078,7 @@ F32 LLViewerTextureList::updateImagesCreateTextures(F32 max_time)
 
 F32 LLViewerTextureList::updateImagesLoadingFastCache(F32 max_time)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (gGLManager.mIsDisabled) return 0.0f;
 	if(mFastCacheList.empty())
 	{
@@ -1074,10 +1098,6 @@ F32 LLViewerTextureList::updateImagesLoadingFastCache(F32 max_time)
 		enditer = iter;
 		LLViewerFetchedTexture *imagep = *curiter;
 		imagep->loadFromFastCache();
-		if (timer.getElapsedTimeF32() > max_time)
-		{
-			break;
-		}
 	}
 	mFastCacheList.erase(mFastCacheList.begin(), enditer);
 	return timer.getElapsedTimeF32();
@@ -1085,6 +1105,7 @@ F32 LLViewerTextureList::updateImagesLoadingFastCache(F32 max_time)
 
 void LLViewerTextureList::forceImmediateUpdate(LLViewerFetchedTexture* imagep)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if(!imagep)
 	{
 		return ;
@@ -1095,8 +1116,7 @@ void LLViewerTextureList::forceImmediateUpdate(LLViewerFetchedTexture* imagep)
 	}
 
 	imagep->processTextureStats();
-	F32 decode_priority = LLViewerFetchedTexture::maxDecodePriority() ;
-	imagep->setDecodePriority(decode_priority);
+    imagep->sMaxVirtualSize = LLViewerFetchedTexture::sMaxVirtualSize;
 	addImageToList(imagep);
 	
 	return ;
@@ -1104,81 +1124,71 @@ void LLViewerTextureList::forceImmediateUpdate(LLViewerFetchedTexture* imagep)
 
 F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
 {
-	LLTimer image_op_timer;
-	
-	// Update fetch for N images each frame
-	static const S32 MAX_HIGH_PRIO_COUNT = gSavedSettings.getS32("TextureFetchUpdateHighPriority");         // default: 32
-	static const S32 MAX_UPDATE_COUNT = gSavedSettings.getS32("TextureFetchUpdateMaxMediumPriority");       // default: 256
-	static const S32 MIN_UPDATE_COUNT = gSavedSettings.getS32("TextureFetchUpdateMinMediumPriority");       // default: 32
-	static const F32 MIN_PRIORITY_THRESHOLD = gSavedSettings.getF32("TextureFetchUpdatePriorityThreshold"); // default: 0.0
-	static const bool SKIP_LOW_PRIO = gSavedSettings.getBOOL("TextureFetchUpdateSkipLowPriority");          // default: false
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    typedef std::vector<LLPointer<LLViewerFetchedTexture> > entries_list_t;
+    entries_list_t entries;
 
-	size_t max_priority_count = llmin((S32) (MAX_HIGH_PRIO_COUNT*MAX_HIGH_PRIO_COUNT*gFrameIntervalSeconds.value())+1, MAX_HIGH_PRIO_COUNT);
-	max_priority_count = llmin(max_priority_count, mImageList.size());
-	
-	size_t total_update_count = mUUIDMap.size();
-	size_t max_update_count = llmin((S32) (MAX_UPDATE_COUNT*MAX_UPDATE_COUNT*gFrameIntervalSeconds.value())+1, MAX_UPDATE_COUNT);
-	max_update_count = llmin(max_update_count, total_update_count);	
-	
-	// MAX_HIGH_PRIO_COUNT high priority entries
-	typedef std::vector<LLViewerFetchedTexture*> entries_list_t;
-	entries_list_t entries;
-	size_t update_counter = max_priority_count;
-	image_priority_list_t::iterator iter1 = mImageList.begin();
-	while(update_counter > 0)
-	{
-		entries.push_back(*iter1);
-		
-		++iter1;
-		update_counter--;
-	}
-	
-	// MAX_UPDATE_COUNT cycled entries
-	update_counter = max_update_count;	
-	if(update_counter > 0)
-	{
-		uuid_map_t::iterator iter2 = mUUIDMap.upper_bound(mLastFetchKey);
-		while ((update_counter > 0) && (total_update_count > 0))
-		{
-			if (iter2 == mUUIDMap.end())
-			{
-				iter2 = mUUIDMap.begin();
-			}
-			LLViewerFetchedTexture* imagep = iter2->second;
-            // Skip the textures where there's really nothing to do so to give some times to others. Also skip the texture if it's already in the high prio set.
-            if (!SKIP_LOW_PRIO || (SKIP_LOW_PRIO && ((imagep->getDecodePriority() > MIN_PRIORITY_THRESHOLD) || imagep->hasFetcher())))
+    // update N textures at beginning of mImageList
+    U32 update_count = 0;
+    static const S32 MIN_UPDATE_COUNT = gSavedSettings.getS32("TextureFetchUpdateMinCount");       // default: 32
+    // WIP -- dumb code here
+    //update MIN_UPDATE_COUNT or 5% of other textures, whichever is greater
+    update_count = llmax((U32) MIN_UPDATE_COUNT, (U32) mUUIDMap.size()/20);
+    update_count = llmin(update_count, (U32) mUUIDMap.size());
+    
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vtluift - copy");
+
+        // copy entries out of UUID map for updating
+        entries.reserve(update_count);
+        uuid_map_t::iterator iter = mUUIDMap.upper_bound(mLastUpdateKey);
+        while (update_count-- > 0)
+        {
+            if (iter == mUUIDMap.end())
             {
-                entries.push_back(imagep);
-                update_counter--;
+                iter = mUUIDMap.begin();
             }
+            
+            if (iter->second->getGLTexture())
+            {
+                entries.push_back(iter->second);
+            }
+            ++iter;
+        }
+    }
 
-			iter2++;
-			total_update_count--;
-		}
-	}
-	
-	S32 fetch_count = 0;
-	size_t min_update_count = llmin(MIN_UPDATE_COUNT,(S32)(entries.size()-max_priority_count));
-	S32 min_count = max_priority_count + min_update_count;
-	for (entries_list_t::iterator iter3 = entries.begin();
-		 iter3 != entries.end(); )
-	{
-		LLViewerFetchedTexture* imagep = *iter3++;
-		fetch_count += (imagep->updateFetch() ? 1 : 0);
-		if (min_count <= min_update_count)
-		{
-			mLastFetchKey = LLTextureKey(imagep->getID(), (ETexListType)imagep->getTextureListType());
-		}
-		if ((min_count-- <= 0) && (image_op_timer.getElapsedTimeF32() > max_time))
-		{
-			break;
-		}
-	}
-	return image_op_timer.getElapsedTimeF32();
+    LLTimer timer;
+
+    LLPointer<LLViewerTexture> last_imagep = nullptr;
+
+    for (auto& imagep : entries)
+    {
+        if (imagep && imagep->getNumRefs() > 1) // make sure this image hasn't been deleted before attempting to update (may happen as a side effect of some other image updating)
+
+        {
+            updateImageDecodePriority(imagep);
+            imagep->updateFetch();
+        }
+
+        last_imagep = imagep;
+
+        if (timer.getElapsedTimeF32() > max_time)
+        {
+            break;
+        }
+    }
+
+    if (last_imagep)
+    {
+        mLastUpdateKey = LLTextureKey(last_imagep->getID(), (ETexListType)last_imagep->getTextureListType());
+    }
+
+	return timer.getElapsedTimeF32();
 }
 
 void LLViewerTextureList::updateImagesUpdateStats()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (mForceResetTextureStats)
 	{
 		for (image_priority_list_t::iterator iter = mImageList.begin();
@@ -1193,6 +1203,7 @@ void LLViewerTextureList::updateImagesUpdateStats()
 
 void LLViewerTextureList::decodeAllImages(F32 max_time)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	LLTimer timer;
 
 	//loading from fast cache 
@@ -1213,8 +1224,6 @@ void LLViewerTextureList::decodeAllImages(F32 max_time)
 	for (LLViewerFetchedTexture* imagep : image_list)
 	{
 		imagep->processTextureStats();
-		F32 decode_priority = imagep->calcDecodePriority();
-		imagep->setDecodePriority(decode_priority);
 		addImageToList(imagep);
 	}
 	image_list.clear();
@@ -1226,6 +1235,7 @@ void LLViewerTextureList::decodeAllImages(F32 max_time)
 		LLViewerFetchedTexture* imagep = *iter++;
 		imagep->updateFetch();
 	}
+    std::shared_ptr<LL::WorkQueue> main_queue = LLImageGLThread::sEnabledTextures ? LL::WorkQueue::getInstance("mainloop") : NULL;
 	// Run threads
 	S32 fetch_pending = 0;
 	while (1)
@@ -1233,6 +1243,13 @@ void LLViewerTextureList::decodeAllImages(F32 max_time)
 		LLAppViewer::instance()->getTextureCache()->update(1); // unpauses the texture cache thread
 		LLAppViewer::instance()->getImageDecodeThread()->update(1); // unpauses the image thread
 		fetch_pending = LLAppViewer::instance()->getTextureFetch()->update(1); // unpauses the texture fetch thread
+
+        if (LLImageGLThread::sEnabledTextures)
+        {
+            main_queue->runFor(std::chrono::milliseconds(1));
+            fetch_pending += main_queue->size();
+        }
+
 		if (fetch_pending == 0 || timer.getElapsedTimeF32() > max_time)
 		{
 			break;
@@ -1260,11 +1277,54 @@ void LLViewerTextureList::decodeAllImages(F32 max_time)
 #endif
 }
 
+bool LLViewerTextureList::createUploadFile(LLPointer<LLImageRaw> raw_image,
+                                           const std::string& out_filename,
+                                           const S32 max_image_dimentions,
+                                           const S32 min_image_dimentions)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+
+    // make a copy, since convertToUploadFile scales raw image
+    LLPointer<LLImageRaw> scale_image = new LLImageRaw(
+        raw_image->getData(),
+        raw_image->getWidth(),
+        raw_image->getHeight(),
+        raw_image->getComponents());
+
+    LLPointer<LLImageJ2C> compressedImage = LLViewerTextureList::convertToUploadFile(scale_image, max_image_dimentions);
+    if (compressedImage->getWidth() < min_image_dimentions || compressedImage->getHeight() < min_image_dimentions)
+    {
+        std::string reason = llformat("Images below %d x %d pixels are not allowed. Actual size: %d x %dpx",
+                                      min_image_dimentions,
+                                      min_image_dimentions,
+                                      compressedImage->getWidth(),
+                                      compressedImage->getHeight());
+        compressedImage->setLastError(reason);
+        return false;
+    }
+    if (compressedImage.isNull())
+    {
+        compressedImage->setLastError("Couldn't convert the image to jpeg2000.");
+        LL_INFOS() << "Couldn't convert to j2c, file : " << out_filename << LL_ENDL;
+        return false;
+    }
+    if (!compressedImage->save(out_filename))
+    {
+        compressedImage->setLastError("Couldn't create the jpeg2000 image for upload.");
+        LL_INFOS() << "Couldn't create output file : " << out_filename << LL_ENDL;
+        return false;
+    }
+    return true;
+}
 
 BOOL LLViewerTextureList::createUploadFile(const std::string& filename,
 										 const std::string& out_filename,
-										 const U8 codec)
+										 const U8 codec,
+										 const S32 max_image_dimentions,
+										 const S32 min_image_dimentions,
+										 bool force_square)
 {	
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	// Load the image
 	LLPointer<LLImageFormatted> image = LLImageFormatted::createFromType(codec);
 	if (image.isNull())
@@ -1290,8 +1350,18 @@ BOOL LLViewerTextureList::createUploadFile(const std::string& filename,
 		image->setLastError("Image files with less than 3 or more than 4 components are not supported.");
 		return FALSE;
 	}
+    if (image->getWidth() < min_image_dimentions || image->getHeight() < min_image_dimentions)
+    {
+        std::string reason = llformat("Images below %d x %d pixels are not allowed. Actual size: %d x %dpx",
+            min_image_dimentions,
+            min_image_dimentions,
+            image->getWidth(),
+            image->getHeight());
+        image->setLastError(reason);
+        return FALSE;
+    }
 	// Convert to j2c (JPEG2000) and save the file locally
-	LLPointer<LLImageJ2C> compressedImage = convertToUploadFile(raw_image);	
+	LLPointer<LLImageJ2C> compressedImage = convertToUploadFile(raw_image, max_image_dimentions, force_square);
 	if (compressedImage.isNull())
 	{
 		image->setLastError("Couldn't convert the image to jpeg2000.");
@@ -1316,14 +1386,28 @@ BOOL LLViewerTextureList::createUploadFile(const std::string& filename,
 }
 
 // note: modifies the argument raw_image!!!!
-LLPointer<LLImageJ2C> LLViewerTextureList::convertToUploadFile(LLPointer<LLImageRaw> raw_image)
+LLPointer<LLImageJ2C> LLViewerTextureList::convertToUploadFile(LLPointer<LLImageRaw> raw_image, const S32 max_image_dimentions, bool force_square, bool force_lossless)
 {
-	raw_image->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+	LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    if (force_square)
+    {
+        S32 biggest_side = llmax(raw_image->getWidth(), raw_image->getHeight());
+        S32 square_size = raw_image->biasedDimToPowerOfTwo(biggest_side, max_image_dimentions);
+
+        raw_image->scale(square_size, square_size);
+    }
+    else
+    {
+        raw_image->biasedScaleToPowerOfTwo(max_image_dimentions);
+    }
 	LLPointer<LLImageJ2C> compressedImage = new LLImageJ2C();
 	
-	if (gSavedSettings.getBOOL("LosslessJ2CUpload") &&
-		(raw_image->getWidth() * raw_image->getHeight() <= LL_IMAGE_REZ_LOSSLESS_CUTOFF * LL_IMAGE_REZ_LOSSLESS_CUTOFF))
-		compressedImage->setReversible(TRUE);
+    if (force_lossless ||
+        (gSavedSettings.getBOOL("LosslessJ2CUpload") &&
+            (raw_image->getWidth() * raw_image->getHeight() <= LL_IMAGE_REZ_LOSSLESS_CUTOFF * LL_IMAGE_REZ_LOSSLESS_CUTOFF)))
+    {
+        compressedImage->setReversible(TRUE);
+    }
 	
 
 	if (gSavedSettings.getBOOL("Jpeg2000AdvancedCompression"))
@@ -1348,292 +1432,13 @@ LLPointer<LLImageJ2C> LLViewerTextureList::convertToUploadFile(LLPointer<LLImage
 	return compressedImage;
 }
 
-// Returns min setting for TextureMemory (in MB)
-S32Megabytes LLViewerTextureList::getMinVideoRamSetting()
-{
-	U32Megabytes system_ram = gSysMemory.getPhysicalMemoryKB();
-	//min texture mem sets to 64M if total physical mem is more than 1.5GB
-	return (system_ram > U32Megabytes(1500)) ? S32Megabytes(64) : gMinVideoRam ;
-}
-
-//static
-// Returns max setting for TextureMemory (in MB)
-S32Megabytes LLViewerTextureList::getMaxVideoRamSetting(bool get_recommended, float mem_multiplier)
-{
-	S32Megabytes max_texmem;
-	if (gGLManager.mVRAM != 0)
-	{
-		// Treat any card with < 32 MB (shudder) as having 32 MB
-		//  - it's going to be swapping constantly regardless
-		S32Megabytes max_vram(gGLManager.mVRAM);
-
-		if(gGLManager.mIsATI)
-		{
-			//shrink the availabe vram for ATI cards because some of them do not handel texture swapping well.
-			max_vram = max_vram * 0.75f; 
-		}
-
-		max_vram = llmax(max_vram, getMinVideoRamSetting());
-		max_texmem = max_vram;
-		if (!get_recommended)
-			max_texmem *= 2;
-	}
-	else
-	{
-		if (!get_recommended)
-		{
-			max_texmem = S32Megabytes(512);
-		}
-		else if (gSavedSettings.getBOOL("NoHardwareProbe")) //did not do hardware detection at startup
-		{
-			max_texmem = S32Megabytes(512);
-		}
-		else
-		{
-			max_texmem = S32Megabytes(128);
-		}
-	}
-
-	S32Megabytes system_ram = gSysMemory.getPhysicalMemoryKB(); // In MB
-	//LL_INFOS() << "*** DETECTED " << system_ram << " MB of system memory." << LL_ENDL;
-	if (get_recommended)
-		max_texmem = llmin(max_texmem, system_ram/2);
-	else
-		max_texmem = llmin(max_texmem, system_ram);
-		
-    // limit the texture memory to a multiple of the default if we've found some cards to behave poorly otherwise
-	max_texmem = llmin(max_texmem, (S32Megabytes) (mem_multiplier * max_texmem));
-
-	max_texmem = llclamp(max_texmem, getMinVideoRamSetting(), gMaxVideoRam); 
-	
-	return max_texmem;
-}
-
-const S32Megabytes VIDEO_CARD_FRAMEBUFFER_MEM(12);
-const S32Megabytes MIN_MEM_FOR_NON_TEXTURE(512);
-void LLViewerTextureList::updateMaxResidentTexMem(S32Megabytes mem)
-{
-	// Initialize the image pipeline VRAM settings
-	S32Megabytes cur_mem(gSavedSettings.getS32("TextureMemory"));
-	F32 mem_multiplier = gSavedSettings.getF32("RenderTextureMemoryMultiple");
-	S32Megabytes default_mem = getMaxVideoRamSetting(true, mem_multiplier); // recommended default
-	if (mem == (S32Megabytes)0)
-	{
-		mem = cur_mem > (S32Megabytes)0 ? cur_mem : default_mem;
-	}
-	else if (mem < (S32Megabytes)0)
-	{
-		mem = default_mem;
-	}
-
-	mem = llclamp(mem, getMinVideoRamSetting(), getMaxVideoRamSetting(false, mem_multiplier));
-	if (mem != cur_mem)
-	{
-		gSavedSettings.setS32("TextureMemory", mem.value());
-		return; //listener will re-enter this function
-	}
-
-	if (gGLManager.mVRAM == 0)
-	{
-		LL_WARNS() << "VRAM amount not detected, defaulting to " << mem << " MB" << LL_ENDL;
-	}
-
-	// TODO: set available resident texture mem based on use by other subsystems
-	// currently max(12MB, VRAM/4) assumed...
-	
-	S32Megabytes vb_mem = mem;
-	S32Megabytes fb_mem = llmax(VIDEO_CARD_FRAMEBUFFER_MEM, vb_mem/4);
-	mMaxResidentTexMemInMegaBytes = (vb_mem - fb_mem) ; //in MB
-	
-#if defined(_WIN64) || defined(__amd64__) || defined(__x86_64__)
-	if (mMaxResidentTexMemInMegaBytes > gMaxVideoRam / 2)
-	{
-		mMaxTotalTextureMemInMegaBytes = gMaxVideoRam + (S32Megabytes) (mMaxResidentTexMemInMegaBytes * 0.25f);
-	}
-	else
-	{
-		mMaxTotalTextureMemInMegaBytes = mMaxResidentTexMemInMegaBytes * 2;
-	}
-#else
-	mMaxTotalTextureMemInMegaBytes = mMaxResidentTexMemInMegaBytes * 2;
-	if (mMaxResidentTexMemInMegaBytes > (S32Megabytes)640)
-	{
-		mMaxTotalTextureMemInMegaBytes -= (mMaxResidentTexMemInMegaBytes / 4);
-	}
-#endif
-
-	//system mem
-	S32Megabytes system_ram = gSysMemory.getPhysicalMemoryKB();
-
-	//minimum memory reserved for non-texture use.
-	//if system_raw >= 1GB, reserve at least 512MB for non-texture use;
-	//otherwise reserve half of the system_ram for non-texture use.
-	S32Megabytes min_non_texture_mem = llmin(system_ram / 2, MIN_MEM_FOR_NON_TEXTURE) ; 
-
-	if (mMaxTotalTextureMemInMegaBytes > system_ram - min_non_texture_mem)
-	{
-		mMaxTotalTextureMemInMegaBytes = system_ram - min_non_texture_mem ;
-	}
-	
-	LL_INFOS() << "Total Video Memory set to: " << vb_mem << " MB" << LL_ENDL;
-	LL_INFOS() << "Available Texture Memory set to: " << (vb_mem - fb_mem) << " MB" << LL_ENDL;
-	LL_INFOS() << "Total Texture Memory set to: " << mMaxTotalTextureMemInMegaBytes << " MB" << LL_ENDL;
-	LL_INFOS() << "Maxiumum Resident Texture Memory set to: " << mMaxResidentTexMemInMegaBytes << " MB" << LL_ENDL;
-}
-
 ///////////////////////////////////////////////////////////////////////////////
-
-// static
-void LLViewerTextureList::receiveImageHeader(LLMessageSystem *msg, void **user_data)
-{
-	static LLCachedControl<bool> log_texture_traffic(gSavedSettings,"LogTextureNetworkTraffic", false) ;
-
-	LL_RECORD_BLOCK_TIME(FTM_PROCESS_IMAGES);
-	
-	// Receive image header, copy into image object and decompresses 
-	// if this is a one-packet image. 
-	
-	LLUUID id;
-	
-	char ip_string[256];
-	u32_to_ip_string(msg->getSenderIP(),ip_string);
-	
-	U32Bytes received_size ;
-	if (msg->getReceiveCompressedSize())
-	{
-		received_size = (U32Bytes)msg->getReceiveCompressedSize() ;		
-	}
-	else
-	{
-		received_size = (U32Bytes)msg->getReceiveSize() ;		
-	}
-	add(LLStatViewer::TEXTURE_NETWORK_DATA_RECEIVED, received_size);
-	add(LLStatViewer::TEXTURE_PACKETS, 1);
-	
-	U8 codec;
-	U16 packets;
-	U32 totalbytes;
-	msg->getUUIDFast(_PREHASH_ImageID, _PREHASH_ID, id);
-	msg->getU8Fast(_PREHASH_ImageID, _PREHASH_Codec, codec);
-	msg->getU16Fast(_PREHASH_ImageID, _PREHASH_Packets, packets);
-	msg->getU32Fast(_PREHASH_ImageID, _PREHASH_Size, totalbytes);
-	
-	S32 data_size = msg->getSizeFast(_PREHASH_ImageData, _PREHASH_Data); 
-	if (!data_size)
-	{
-		return;
-	}
-	if (data_size < 0)
-	{
-		// msg->getSizeFast() is probably trying to tell us there
-		// was an error.
-		LL_ERRS() << "image header chunk size was negative: "
-		<< data_size << LL_ENDL;
-		return;
-	}
-	
-	// this buffer gets saved off in the packet list
-	U8 *data = new U8[data_size];
-	msg->getBinaryDataFast(_PREHASH_ImageData, _PREHASH_Data, data, data_size);
-	
-	LLViewerFetchedTexture *image = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
-	if (!image)
-	{
-		delete [] data;
-		return;
-	}
-	if(log_texture_traffic)
-	{
-		gTotalTextureBytesPerBoostLevel[image->getBoostLevel()] += received_size ;
-	}
-
-	//image->getLastPacketTimer()->reset();
-	bool res = LLAppViewer::getTextureFetch()->receiveImageHeader(msg->getSender(), id, codec, packets, totalbytes, data_size, data);
-	if (!res)
-	{
-		delete[] data;
-	}
-}
-
-// static
-void LLViewerTextureList::receiveImagePacket(LLMessageSystem *msg, void **user_data)
-{
-	static LLCachedControl<bool> log_texture_traffic(gSavedSettings,"LogTextureNetworkTraffic", false) ;
-
-	LL_RECORD_BLOCK_TIME(FTM_PROCESS_IMAGES);
-	
-	// Receives image packet, copy into image object,
-	// checks if all packets received, decompresses if so. 
-	
-	LLUUID id;
-	U16 packet_num;
-	
-	char ip_string[256];
-	u32_to_ip_string(msg->getSenderIP(),ip_string);
-	
-	U32Bytes received_size ;
-	if (msg->getReceiveCompressedSize())
-	{
-		received_size = (U32Bytes)msg->getReceiveCompressedSize() ;
-	}
-	else
-	{
-		received_size = (U32Bytes)msg->getReceiveSize() ;		
-	}
-
-	add(LLStatViewer::TEXTURE_NETWORK_DATA_RECEIVED, F64Bytes(received_size));
-	add(LLStatViewer::TEXTURE_PACKETS, 1);
-	
-	//llprintline("Start decode, image header...");
-	msg->getUUIDFast(_PREHASH_ImageID, _PREHASH_ID, id);
-	msg->getU16Fast(_PREHASH_ImageID, _PREHASH_Packet, packet_num);
-	S32 data_size = msg->getSizeFast(_PREHASH_ImageData, _PREHASH_Data); 
-	
-	if (!data_size)
-	{
-		return;
-	}
-	if (data_size < 0)
-	{
-		// msg->getSizeFast() is probably trying to tell us there
-		// was an error.
-		LL_ERRS() << "image data chunk size was negative: "
-		<< data_size << LL_ENDL;
-		return;
-	}
-	if (data_size > MTUBYTES)
-	{
-		LL_ERRS() << "image data chunk too large: " << data_size << " bytes" << LL_ENDL;
-		return;
-	}
-	U8 *data = new U8[data_size];
-	msg->getBinaryDataFast(_PREHASH_ImageData, _PREHASH_Data, data, data_size);
-	
-	LLViewerFetchedTexture *image = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
-	if (!image)
-	{
-		delete [] data;
-		return;
-	}
-	if(log_texture_traffic)
-	{
-		gTotalTextureBytesPerBoostLevel[image->getBoostLevel()] += received_size ;
-	}
-
-	//image->getLastPacketTimer()->reset();
-	bool res = LLAppViewer::getTextureFetch()->receiveImagePacket(msg->getSender(), id, packet_num, data_size, data);
-	if (!res)
-	{
-		delete[] data;
-	}
-}
-
 
 // We've been that the asset server does not contain the requested image id.
 // static
 void LLViewerTextureList::processImageNotInDatabase(LLMessageSystem *msg,void **user_data)
 {
-	LL_RECORD_BLOCK_TIME(FTM_PROCESS_IMAGES);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	LLUUID image_id;
 	msg->getUUIDFast(_PREHASH_ImageID, _PREHASH_ID, image_id);
 	
@@ -1666,6 +1471,7 @@ void LLUIImageList::cleanUp()
 
 LLUIImagePtr LLUIImageList::getUIImageByID(const LLUUID& image_id, S32 priority)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	// use id as image name
 	std::string image_name = image_id.asString();
 
@@ -1684,6 +1490,7 @@ LLUIImagePtr LLUIImageList::getUIImageByID(const LLUUID& image_id, S32 priority)
 
 LLUIImagePtr LLUIImageList::getUIImage(const std::string& image_name, S32 priority)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	// look for existing image
 	uuid_ui_image_map_t::iterator found_it = mUIImages.find(image_name);
 	if (found_it != mUIImages.end())
@@ -1701,6 +1508,7 @@ LLUIImagePtr LLUIImageList::loadUIImageByName(const std::string& name, const std
 											  BOOL use_mips, const LLRect& scale_rect, const LLRect& clip_rect, LLViewerTexture::EBoostLevel boost_priority,
 											  LLUIImage::EScaleStyle scale_style)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (boost_priority == LLGLTexture::BOOST_NONE)
 	{
 		boost_priority = LLGLTexture::BOOST_UI;
@@ -1713,6 +1521,7 @@ LLUIImagePtr LLUIImageList::loadUIImageByID(const LLUUID& id,
 											BOOL use_mips, const LLRect& scale_rect, const LLRect& clip_rect, LLViewerTexture::EBoostLevel boost_priority,
 											LLUIImage::EScaleStyle scale_style)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (boost_priority == LLGLTexture::BOOST_NONE)
 	{
 		boost_priority = LLGLTexture::BOOST_UI;
@@ -1724,6 +1533,7 @@ LLUIImagePtr LLUIImageList::loadUIImageByID(const LLUUID& id,
 LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, const std::string& name, BOOL use_mips, const LLRect& scale_rect, const LLRect& clip_rect,
 										LLUIImage::EScaleStyle scale_style)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if (!imagep) return NULL;
 
 	imagep->setAddressMode(LLTexUnit::TAM_CLAMP);
@@ -1734,8 +1544,9 @@ LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, const st
 	LLUIImagePtr new_imagep = new LLUIImage(name, imagep);
 	new_imagep->setScaleStyle(scale_style);
 
-	if (imagep->getBoostLevel() != LLGLTexture::BOOST_ICON &&
-		imagep->getBoostLevel() != LLGLTexture::BOOST_PREVIEW)
+	if (imagep->getBoostLevel() != LLGLTexture::BOOST_ICON
+        && imagep->getBoostLevel() != LLGLTexture::BOOST_THUMBNAIL
+		&& imagep->getBoostLevel() != LLGLTexture::BOOST_PREVIEW)
 	{
 		// Don't add downloadable content into this list
 		// all UI images are non-deletable and list does not support deletion
@@ -1761,6 +1572,7 @@ LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, const st
 
 LLUIImagePtr LLUIImageList::preloadUIImage(const std::string& name, const std::string& filename, BOOL use_mips, const LLRect& scale_rect, const LLRect& clip_rect, LLUIImage::EScaleStyle scale_style)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	// look for existing image
 	uuid_ui_image_map_t::iterator found_it = mUIImages.find(name);
 	if (found_it != mUIImages.end())
@@ -1775,6 +1587,7 @@ LLUIImagePtr LLUIImageList::preloadUIImage(const std::string& name, const std::s
 //static 
 void LLUIImageList::onUIImageLoaded( BOOL success, LLViewerFetchedTexture *src_vi, LLImageRaw* src, LLImageRaw* src_aux, S32 discard_level, BOOL final, void* user_data )
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	if(!success || !user_data) 
 	{
 		return;
@@ -1876,6 +1689,7 @@ struct UIImageDeclarations : public LLInitParam::Block<UIImageDeclarations>
 
 bool LLUIImageList::initFromFile()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 	// Look for textures.xml in all the right places. Pass
 	// constraint=LLDir::ALL_SKINS because we want to overlay textures.xml
 	// from all the skins directories.
@@ -1950,9 +1764,18 @@ bool LLUIImageList::initFromFile()
 			preloadUIImage(image.name, file_name, image.use_mips, image.scale, image.clip, image.scale_type);
 		}
 
-		if (cur_pass == PASS_DECODE_NOW && !gSavedSettings.getBOOL("NoPreload"))
+		if (!gSavedSettings.getBOOL("NoPreload"))
 		{
-			gTextureList.decodeAllImages(10.f); // decode preloaded images
+            if (cur_pass == PASS_DECODE_NOW)
+            {
+                // init fetching and decoding of preloaded images
+                gTextureList.decodeAllImages(9.f);
+            }
+            else
+            {
+                // decodeAllImages needs two passes to refresh stats and priorities on second pass
+                gTextureList.decodeAllImages(1.f);
+            }
 		}
 	}
 	return true;

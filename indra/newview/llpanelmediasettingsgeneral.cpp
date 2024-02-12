@@ -39,6 +39,7 @@
 #include "llagent.h"
 #include "llviewerwindow.h"
 #include "llviewermedia.h"
+#include "llvovolume.h"
 #include "llsdutil.h"
 #include "llselectmgr.h"
 #include "llbutton.h"
@@ -97,9 +98,6 @@ BOOL LLPanelMediaSettingsGeneral::postBuild()
 	// watch commit action for HOME URL
 	childSetCommitCallback( LLMediaEntry::HOME_URL_KEY, onCommitHomeURL, this);
 	childSetCommitCallback( "current_url_reset_btn",onBtnResetCurrentUrl, this);
-
-	// interrogates controls and updates widgets as required
-	updateMediaPreview();
 
 	return true;
 }
@@ -313,9 +311,6 @@ void LLPanelMediaSettingsGeneral::initValues( void* userdata, const LLSD& _media
 			data_set[ i ].ctrl_ptr->setTentative( media_settings[ tentative_key ].asBoolean() );
 		};
 	};
-
-	// interrogates controls and updates widgets as required
-	self->updateMediaPreview();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -457,10 +452,18 @@ bool LLPanelMediaSettingsGeneral::navigateHomeSelectedFace(bool only_if_current_
 					if (!only_if_current_is_empty || (media_data->getCurrentURL().empty() && media_data->getAutoPlay()))
 					{
 						viewer_media_t media_impl =
-							LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(object->getTE(face)->getMediaData()->getMediaID());
-						if(media_impl)
-						{
-							media_impl->navigateHome();
+							LLViewerMedia::getInstance()->getMediaImplFromTextureID(object->getTE(face)->getMediaData()->getMediaID());
+                        if (media_impl)
+                        {
+                            media_impl->setPriority(LLPluginClassMedia::PRIORITY_NORMAL);
+                            media_impl->navigateHome();
+
+                            if (!only_if_current_is_empty)
+                            {
+                                LLSD media_data;
+                                media_data[LLMediaEntry::CURRENT_URL_KEY] = std::string();
+                                object->getTE(face)->mergeIntoMediaData(media_data);
+                            }
 							return true;
 						}
 					}
@@ -473,9 +476,26 @@ bool LLPanelMediaSettingsGeneral::navigateHomeSelectedFace(bool only_if_current_
 	} functor_navigate_media(only_if_current_is_empty);
 	
 	bool all_face_media_navigated = false;
-	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelectionHandle selected_objects =LLSelectMgr::getInstance()->getSelection();
 	selected_objects->getSelectedTEValue( &functor_navigate_media, all_face_media_navigated );
 	
+    if (all_face_media_navigated)
+    {
+        struct functor_sync_to_server : public LLSelectedObjectFunctor
+        {
+            virtual bool apply(LLViewerObject* object)
+            {
+                LLVOVolume *volume = dynamic_cast<LLVOVolume*>(object);
+                if (volume)
+                {
+                    volume->sendMediaDataUpdate();
+                }
+                return true;
+            }
+        } sendfunc;
+        selected_objects->applyToObjects(&sendfunc);
+    }
+
 	// Note: we don't update the 'current URL' field until the media data itself changes
 
 	return all_face_media_navigated;
@@ -511,7 +531,7 @@ void LLPanelMediaSettingsGeneral::updateCurrentUrl()
 		const LLMediaEntry &  mMediaEntry;
 		
 	} func_current_url(default_media_data);
-	bool identical = LLSelectMgr::getInstanceFast()->getSelection()->getSelectedTEValue( &func_current_url, value_str );
+	bool identical = LLSelectMgr::getInstance()->getSelection()->getSelectedTEValue( &func_current_url, value_str );
 	mCurrentURL->setText(value_str);
 	mCurrentURL->setTentative(identical);
 

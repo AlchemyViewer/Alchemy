@@ -50,6 +50,8 @@
 #include "lltimer.h"
 #include "lldir.h"
 
+#include <boost/iostreams/stream.hpp>
+
 #if LL_RELEASE_WITH_DEBUG_INFO || LL_DEBUG
 #define CONTROL_ERRS LL_ERRS("ControlErrors")
 #else
@@ -203,7 +205,8 @@ LLSD LLControlVariable::getComparableValue(const LLSD& value)
 	{
 		LLPointer<LLSDNotationParser> parser = new LLSDNotationParser;
 		LLSD result;
-		std::stringstream value_stream(value.asString());
+		const auto& llsd_str = value.asStringRef();
+		boost::iostreams::stream<boost::iostreams::array_source> value_stream(llsd_str.data(), llsd_str.size());
 		if (parser->parse(value_stream, result, LLSDSerialize::SIZE_UNLIMITED) != LLSDParser::PARSE_FAILURE)
 		{
 			storable_value = result;
@@ -843,7 +846,6 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
 		return 0;
 	}
 
-	U32		item = 0;
 	U32		validitems = 0;
 	S32 version;
 	
@@ -877,8 +879,6 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
 		}
 
 		// Got an item.  Load it up.
-		item++;
-
 		// If not declared, assume it's a string
 		if (!declared)
 		{
@@ -1106,7 +1106,7 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
 	U32	validitems = 0;
 	bool hidefromsettingseditor = false;
 	
-	for(const auto& e : settings.map())
+	for(const auto& e : settings.asMap())
 	{
 		LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT;
 		std::string const & name = e.first;

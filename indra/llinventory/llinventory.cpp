@@ -40,9 +40,12 @@
 ///----------------------------------------------------------------------------
 /// Exported functions
 ///----------------------------------------------------------------------------
+// FIXME D567 - what's the point of these, especially if we don't even use them consistently?
 static const std::string INV_ITEM_ID_LABEL("item_id");
 static const std::string INV_FOLDER_ID_LABEL("cat_id");
 static const std::string INV_PARENT_ID_LABEL("parent_id");
+static const std::string INV_THUMBNAIL_LABEL("thumbnail");
+static const std::string INV_THUMBNAIL_ID_LABEL("thumbnail_id");
 static const std::string INV_ASSET_TYPE_LABEL("type");
 static const std::string INV_PREFERRED_TYPE_LABEL("preferred_type");
 static const std::string INV_INVENTORY_TYPE_LABEL("inv_type");
@@ -74,20 +77,17 @@ LLInventoryObject::LLInventoryObject(const LLUUID& uuid,
 									 const LLUUID& parent_uuid,
 									 LLAssetType::EType type,
 									 const std::string& name) 
-:	LLTrace::MemTrackable<LLInventoryObject>("LLInventoryObject"),
-	mUUID(uuid),
+:	mUUID(uuid),
 	mParentUUID(parent_uuid),
 	mType(type),
 	mName(name),
 	mCreationDate(0)
 {
-	claimMem(mName);
 	correctInventoryName(mName);
 }
 
 LLInventoryObject::LLInventoryObject() 
-:	LLTrace::MemTrackable<LLInventoryObject>("LLInventoryObject"),
-	mType(LLAssetType::AT_NONE),
+:	mType(LLAssetType::AT_NONE),
 	mCreationDate(0)
 {
 }
@@ -97,9 +97,8 @@ void LLInventoryObject::copyObject(const LLInventoryObject* other)
 	mUUID = other->mUUID;
 	mParentUUID = other->mParentUUID;
 	mType = other->mType;
-	disclaimMem(mName);
 	mName = other->mName;
-	claimMem(mName);
+	mThumbnailUUID = other->mThumbnailUUID;
 }
 
 const LLUUID& LLInventoryObject::getUUID() const
@@ -110,6 +109,11 @@ const LLUUID& LLInventoryObject::getUUID() const
 const LLUUID& LLInventoryObject::getParentUUID() const
 {
 	return mParentUUID;
+}
+
+const LLUUID& LLInventoryObject::getThumbnailUUID() const
+{
+	return mThumbnailUUID;
 }
 
 const std::string& LLInventoryObject::getName() const
@@ -152,15 +156,18 @@ void LLInventoryObject::rename(const std::string& n)
 	correctInventoryName(new_name);
 	if( !new_name.empty() && new_name != mName )
 	{
-		disclaimMem(mName);
 		mName = new_name;
-		claimMem(mName);
 	}
 }
 
 void LLInventoryObject::setParent(const LLUUID& new_parent)
 {
 	mParentUUID = new_parent;
+}
+
+void LLInventoryObject::setThumbnailUUID(const LLUUID& thumbnail_uuid)
+{
+	mThumbnailUUID = thumbnail_uuid;
 }
 
 void LLInventoryObject::setType(LLAssetType::EType type)
@@ -204,6 +211,26 @@ BOOL LLInventoryObject::importLegacyStream(std::istream& input_stream)
 		{
 			mType = LLAssetType::lookup(valuestr);
 		}
+        else if (0 == strcmp("metadata", keyword))
+        {
+            LLSD metadata(valuestr);
+            if (metadata.has("thumbnail"))
+            {
+                const LLSD& thumbnail = metadata["thumbnail"];
+                if (thumbnail.has("asset_id"))
+                {
+                    setThumbnailUUID(thumbnail["asset_id"].asUUID());
+                }
+                else
+                {
+                    setThumbnailUUID(LLUUID::null);
+                }
+            }
+            else
+            {
+                setThumbnailUUID(LLUUID::null);
+            }
+        }
 		else if(0 == strcmp("name", keyword))
 		{
 			//strcpy(valuestr, buffer + strlen(keyword) + 3);
@@ -307,7 +334,6 @@ LLInventoryItem::LLInventoryItem(const LLUUID& uuid,
 
 	LLStringUtil::replaceNonstandardASCII(mDescription, ' ');
 	LLStringUtil::replaceChar(mDescription, '|', ' ');
-	claimMem(mDescription);
 
 	mPermissions.initMasks(inv_type);
 }
@@ -336,9 +362,8 @@ void LLInventoryItem::copyItem(const LLInventoryItem* other)
 	copyObject(other);
 	mPermissions = other->mPermissions;
 	mAssetUUID = other->mAssetUUID;
-	disclaimMem(mDescription);
+    mThumbnailUUID = other->mThumbnailUUID;
 	mDescription = other->mDescription;
-	claimMem(mDescription);
 	mSaleInfo = other->mSaleInfo;
 	mInventoryType = other->mInventoryType;
 	mFlags = other->mFlags;
@@ -402,6 +427,7 @@ U32 LLInventoryItem::getCRC32() const
 	//LL_DEBUGS() << "8 crc: " << std::hex << crc << std::dec << LL_ENDL;
 	crc += (U32)mCreationDate;
 	//LL_DEBUGS() << "9 crc: " << std::hex << crc << std::dec << LL_ENDL;
+    crc += mThumbnailUUID.getCRC32();
 	return crc;
 }
 
@@ -418,9 +444,7 @@ void LLInventoryItem::setDescription(const std::string& d)
 	LLInventoryItem::correctInventoryDescription(new_desc);
 	if( new_desc != mDescription )
 	{
-		disclaimMem(mDescription);
 		mDescription = new_desc;
-		claimMem(mDescription);
 	}
 }
 
@@ -659,6 +683,26 @@ BOOL LLInventoryItem::importLegacyStream(std::istream& input_stream)
 		{
 			mType = LLAssetType::lookup(valuestr);
 		}
+        else if (0 == strcmp("metadata", keyword))
+        {
+            LLSD metadata(valuestr);
+            if (metadata.has("thumbnail"))
+            {
+                const LLSD& thumbnail = metadata["thumbnail"];
+                if (thumbnail.has("asset_id"))
+                {
+                    setThumbnailUUID(thumbnail["asset_id"].asUUID());
+                }
+                else
+                {
+                    setThumbnailUUID(LLUUID::null);
+                }
+            }
+            else
+            {
+                setThumbnailUUID(LLUUID::null);
+            }
+        }
 		else if(0 == strcmp("inv_type", keyword))
 		{
 			mInventoryType = LLInventoryType::lookup(std::string(valuestr));
@@ -700,10 +744,8 @@ BOOL LLInventoryItem::importLegacyStream(std::istream& input_stream)
 				valuestr[0] = '\000';
 			}
 
-			disclaimMem(mDescription);
 			mDescription.assign(valuestr);
 			LLStringUtil::replaceNonstandardASCII(mDescription, ' ');
-			claimMem(mDescription);
 			/* TODO -- ask Ian about this code
 			const char *donkey = mDescription.c_str();
 			if (donkey[0] == '|')
@@ -749,6 +791,13 @@ BOOL LLInventoryItem::exportLegacyStream(std::ostream& output_stream, BOOL inclu
 	mParentUUID.toString(uuid_str);
 	output_stream << "\t\tparent_id\t" << uuid_str << "\n";
 	mPermissions.exportLegacyStream(output_stream);
+
+    if (mThumbnailUUID.notNull())
+    {
+        LLSD metadata;
+        metadata["thumbnail"] = LLSD().with("asset_id", mThumbnailUUID);
+        output_stream << "\t\tmetadata\t" << metadata << "|\n";
+    }
 
 	// Check for permissions to see the asset id, and if so write it
 	// out as an asset id. Otherwise, apply our cheesy encryption.
@@ -803,6 +852,11 @@ void LLInventoryItem::asLLSD( LLSD& sd ) const
 	sd[INV_PARENT_ID_LABEL] = mParentUUID;
 	sd[INV_PERMISSIONS_LABEL] = ll_create_sd_from_permissions(mPermissions);
 
+    if (mThumbnailUUID.notNull())
+    {
+        sd[INV_THUMBNAIL_LABEL] = LLSD().with(INV_ASSET_ID_LABEL, mThumbnailUUID);
+    }
+
 	U32 mask = mPermissions.getMaskBase();
 	if(((mask & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED)
 		|| (mAssetUUID.isNull()))
@@ -832,11 +886,9 @@ void LLInventoryItem::asLLSD( LLSD& sd ) const
 	sd[INV_CREATION_DATE_LABEL] = (S32) mCreationDate;
 }
 
-LLTrace::BlockTimerStatHandle FTM_INVENTORY_SD_DESERIALIZE("Inventory SD Deserialize");
-
 bool LLInventoryItem::fromLLSD(const LLSD& sd, bool is_new)
 {
-	LL_RECORD_BLOCK_TIME(FTM_INVENTORY_SD_DESERIALIZE);
+    LL_PROFILE_ZONE_SCOPED;
 	if (is_new)
 	{
 		// If we're adding LLSD to an existing object, need avoid
@@ -844,124 +896,170 @@ bool LLInventoryItem::fromLLSD(const LLSD& sd, bool is_new)
 		mInventoryType = LLInventoryType::IT_NONE;
 		mAssetUUID.setNull();
 	}
-	std::string w;
 
-	w = INV_ITEM_ID_LABEL;
-	if (sd.has(w))
+    // TODO - figure out if this should be moved into the noclobber fields above
+    mThumbnailUUID.setNull();
+
+	const auto& sdMap = sd.asMap();
+	auto itEnd = sdMap.end();
+
+	auto it = sdMap.find(INV_ITEM_ID_LABEL);
+	if (it != itEnd)
 	{
-		mUUID = sd[w];
+		mUUID = it->second;
 	}
-	w = INV_PARENT_ID_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_PARENT_ID_LABEL);
+	if (it != itEnd)
 	{
-		mParentUUID = sd[w];
+		mParentUUID = it->second;
 	}
-	w = INV_PERMISSIONS_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_THUMBNAIL_LABEL);
+	if (it != itEnd)
 	{
-		mPermissions = ll_permissions_from_sd(sd[w]);
+		const LLSD& thumbnail_map = it->second;
+		if (thumbnail_map.has(INV_ASSET_ID_LABEL))
+		{
+			mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
+		}
+		/* Example:
+			<key> asset_id </key>
+			<uuid> acc0ec86 - 17f2 - 4b92 - ab41 - 6718b1f755f7 </uuid>
+			<key> perms </key>
+			<integer> 8 </integer>
+			<key>service</key>
+			<integer> 3 </integer>
+			<key>version</key>
+			<integer> 1 </key>
+		*/
 	}
-	w = INV_SALE_INFO_LABEL;
-	if (sd.has(w))
+	else
+	{
+		it = sdMap.find(INV_THUMBNAIL_ID_LABEL);
+		if (it != itEnd)
+		{
+			mThumbnailUUID = it->second.asUUID();
+		}
+	}
+
+	it = sdMap.find(INV_PERMISSIONS_LABEL);
+	if (it != itEnd)
+	{
+		mPermissions = ll_permissions_from_sd(it->second);
+	}
+
+	it = sdMap.find(INV_SALE_INFO_LABEL);
+	if (it != itEnd)
 	{
 		// Sale info used to contain next owner perm. It is now in
 		// the permissions. Thus, we read that out, and fix legacy
 		// objects. It's possible this op would fail, but it
 		// should pick up the vast majority of the tasks.
 		BOOL has_perm_mask = FALSE;
-		U32 perm_mask = 0;
-		if (!mSaleInfo.fromLLSD(sd[w], has_perm_mask, perm_mask))
+		U32  perm_mask = 0;
+		if (!mSaleInfo.fromLLSD(it->second, has_perm_mask, perm_mask))
 		{
-			goto fail;
+			return false;
 		}
 		if (has_perm_mask)
 		{
-			if(perm_mask == PERM_NONE)
+			if (perm_mask == PERM_NONE)
 			{
 				perm_mask = mPermissions.getMaskOwner();
 			}
 			// fair use fix.
-			if(!(perm_mask & PERM_COPY))
+			if (!(perm_mask & PERM_COPY))
 			{
 				perm_mask |= PERM_TRANSFER;
 			}
 			mPermissions.setMaskNext(perm_mask);
 		}
 	}
-	w = INV_SHADOW_ID_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_SHADOW_ID_LABEL);
+	if (it != itEnd)
 	{
-		mAssetUUID = sd[w];
+		mAssetUUID = it->second;
 		LLXORCipher cipher(MAGIC_ID.mData, UUID_BYTES);
 		cipher.decrypt(mAssetUUID.mData, UUID_BYTES);
 	}
-	w = INV_ASSET_ID_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_ASSET_ID_LABEL);
+	if (it != itEnd)
 	{
-		mAssetUUID = sd[w];
+		mAssetUUID = it->second;
 	}
-	w = INV_LINKED_ID_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_LINKED_ID_LABEL);
+	if (it != itEnd)
 	{
-		mAssetUUID = sd[w];
+		mAssetUUID = it->second;
 	}
-	w = INV_ASSET_TYPE_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_ASSET_TYPE_LABEL);
+	if (it != itEnd)
 	{
-		if (sd[w].isString())
+		LLSD const& label = it->second;
+		if (label.isString())
 		{
-			mType = LLAssetType::lookup(sd[w].asString().c_str());
+			mType = LLAssetType::lookup(label.asString().c_str());
 		}
-		else if (sd[w].isInteger())
+		else if (label.isInteger())
 		{
-			S8 type = (U8)sd[w].asInteger();
+			S8 type = (U8)label.asInteger();
 			mType = static_cast<LLAssetType::EType>(type);
 		}
 	}
-	w = INV_INVENTORY_TYPE_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_INVENTORY_TYPE_LABEL);
+	if (it != itEnd)
 	{
-		if (sd[w].isString())
+		LLSD const& label = it->second;
+		if (label.isString())
 		{
-			mInventoryType = LLInventoryType::lookup(sd[w].asString().c_str());
+			mInventoryType = LLInventoryType::lookup(label.asString().c_str());
 		}
-		else if (sd[w].isInteger())
+		else if (label.isInteger())
 		{
-			S8 type = (U8)sd[w].asInteger();
+			S8 type = (U8)label.asInteger();
 			mInventoryType = static_cast<LLInventoryType::EType>(type);
 		}
 	}
-	w = INV_FLAGS_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_FLAGS_LABEL);
+	if (it != itEnd)
 	{
-		if (sd[w].isBinary())
+		LLSD const& label = it->second;
+		if (label.isBinary())
 		{
-			mFlags = ll_U32_from_sd(sd[w]);
+			mFlags = ll_U32_from_sd(label);
 		}
-		else if(sd[w].isInteger())
+		else if (label.isInteger())
 		{
-			mFlags = sd[w].asInteger();
+			mFlags = label.asInteger();
 		}
 	}
-	w = INV_NAME_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_NAME_LABEL);
+	if (it != itEnd)
 	{
-		mName = sd[w].asString();
+		mName = it->second.asString();
 		LLStringUtil::replaceNonstandardASCII(mName, ' ');
 		LLStringUtil::replaceChar(mName, '|', ' ');
 	}
-	w = INV_DESC_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_DESC_LABEL);
+	if (it != itEnd)
 	{
-		disclaimMem(mDescription);
-		mDescription = sd[w].asString();
+		mDescription = it->second.asString();
 		LLStringUtil::replaceNonstandardASCII(mDescription, ' ');
-		claimMem(mDescription);
 	}
-	w = INV_CREATION_DATE_LABEL;
-	if (sd.has(w))
+
+	it = sdMap.find(INV_CREATION_DATE_LABEL);
+	if (it != itEnd)
 	{
-		mCreationDate = sd[w].asInteger();
+		mCreationDate = it->second.asInteger();
 	}
 
 	// Need to convert 1.0 simstate files to a useful inventory type
@@ -977,138 +1075,6 @@ bool LLInventoryItem::fromLLSD(const LLSD& sd, bool is_new)
 	mPermissions.initMasks(mInventoryType);
 
 	return true;
-fail:
-	return false;
-
-}
-
-// Deleted LLInventoryItem::exportFileXML() and LLInventoryItem::importXML()
-// because I can't find any non-test code references to it. 2009-05-04 JC
-
-S32 LLInventoryItem::packBinaryBucket(U8* bin_bucket, LLPermissions* perm_override) const
-{
-	// Figure out which permissions to use.
-	LLPermissions perm;
-	if (perm_override)
-	{
-		// Use the permissions override.
-		perm = *perm_override;
-	}
-	else
-	{
-		// Use the current permissions.
-		perm = getPermissions();
-	}
-
-	// describe the inventory item
-	char* buffer = (char*) bin_bucket;
-	std::string creator_id_str;
-
-	perm.getCreator().toString(creator_id_str);
-	std::string owner_id_str;
-	perm.getOwner().toString(owner_id_str);
-	std::string last_owner_id_str;
-	perm.getLastOwner().toString(last_owner_id_str);
-	std::string group_id_str;
-	perm.getGroup().toString(group_id_str);
-	std::string asset_id_str;
-	getAssetUUID().toString(asset_id_str);
-	S32 size = sprintf(buffer,	/* Flawfinder: ignore */
-					   "%d|%d|%s|%s|%s|%s|%s|%x|%x|%x|%x|%x|%s|%s|%d|%d|%x",
-					   getType(),
-					   getInventoryType(),
-					   getName().c_str(),
-					   creator_id_str.c_str(),
-					   owner_id_str.c_str(),
-					   last_owner_id_str.c_str(),
-					   group_id_str.c_str(),
-					   perm.getMaskBase(),
-					   perm.getMaskOwner(),
-					   perm.getMaskGroup(),
-					   perm.getMaskEveryone(),
-					   perm.getMaskNextOwner(),
-					   asset_id_str.c_str(),
-					   getDescription().c_str(),
-					   getSaleInfo().getSaleType(),
-					   getSaleInfo().getSalePrice(),
-					   getFlags()) + 1;
-
-	return size;
-}
-
-void LLInventoryItem::unpackBinaryBucket(U8* bin_bucket, S32 bin_bucket_size)
-{	
-	// Early exit on an empty binary bucket.
-	if (bin_bucket_size <= 1) return;
-
-	if (NULL == bin_bucket)
-	{
-		LL_ERRS() << "unpackBinaryBucket failed.  bin_bucket is NULL." << LL_ENDL;
-		return;
-	}
-
-	// Convert the bin_bucket into a string.
-	std::vector<char> item_buffer(bin_bucket_size+1);
-	memcpy(&item_buffer[0], bin_bucket, bin_bucket_size);	/* Flawfinder: ignore */
-	item_buffer[bin_bucket_size] = '\0';
-	std::string str(&item_buffer[0]);
-
-	LL_DEBUGS() << "item buffer: " << str << LL_ENDL;
-
-	// Tokenize the string.
-	typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-	boost::char_separator<char> sep("|", "", boost::keep_empty_tokens);
-	tokenizer tokens(str, sep);
-	tokenizer::iterator iter = tokens.begin();
-
-	// Extract all values.
-	LLUUID item_id;
-	item_id.generate();
-	setUUID(item_id);
-
-	LLAssetType::EType type;
-	type = (LLAssetType::EType)(atoi((*(iter++)).c_str()));
-	setType( type );
-	
-	LLInventoryType::EType inv_type;
-	inv_type = (LLInventoryType::EType)(atoi((*(iter++)).c_str()));
-	setInventoryType( inv_type );
-
-	std::string name((*(iter++)).c_str());
-	rename( name );
-	
-	LLUUID creator_id((*(iter++)).c_str());
-	LLUUID owner_id((*(iter++)).c_str());
-	LLUUID last_owner_id((*(iter++)).c_str());
-	LLUUID group_id((*(iter++)).c_str());
-	PermissionMask mask_base = strtoul((*(iter++)).c_str(), NULL, 16);
-	PermissionMask mask_owner = strtoul((*(iter++)).c_str(), NULL, 16);
-	PermissionMask mask_group = strtoul((*(iter++)).c_str(), NULL, 16);
-	PermissionMask mask_every = strtoul((*(iter++)).c_str(), NULL, 16);
-	PermissionMask mask_next = strtoul((*(iter++)).c_str(), NULL, 16);
-	LLPermissions perm;
-	perm.init(creator_id, owner_id, last_owner_id, group_id);
-	perm.initMasks(mask_base, mask_owner, mask_group, mask_every, mask_next);
-	setPermissions(perm);
-	//LL_DEBUGS() << "perm: " << perm << LL_ENDL;
-
-	LLUUID asset_id((*(iter++)).c_str());
-	setAssetUUID(asset_id);
-
-	std::string desc((*(iter++)).c_str());
-	setDescription(desc);
-	
-	LLSaleInfo::EForSale sale_type;
-	sale_type = (LLSaleInfo::EForSale)(atoi((*(iter++)).c_str()));
-	S32 price = atoi((*(iter++)).c_str());
-	LLSaleInfo sale_info(sale_type, price);
-	setSaleInfo(sale_info);
-	
-	U32 flags = strtoul((*(iter++)).c_str(), NULL, 16);
-	setFlags(flags);
-
-	time_t now = time(NULL);
-	setCreationDate(now);
 }
 
 ///----------------------------------------------------------------------------
@@ -1156,15 +1122,40 @@ void LLInventoryCategory::setPreferredType(LLFolderType::EType type)
 LLSD LLInventoryCategory::asLLSD() const
 {
     LLSD sd = LLSD();
-    sd["item_id"] = mUUID;
-    sd["parent_id"] = mParentUUID;
+    sd[INV_ITEM_ID_LABEL]   = mUUID;
+    sd[INV_PARENT_ID_LABEL] = mParentUUID;
     S8 type = static_cast<S8>(mPreferredType);
-    sd["type"]      = type;
-    sd["name"] = mName;
+    sd[INV_ASSET_TYPE_LABEL] = type;
+    sd[INV_NAME_LABEL] = mName;
+
+    if (mThumbnailUUID.notNull())
+    {
+        sd[INV_THUMBNAIL_LABEL] = LLSD().with(INV_ASSET_ID_LABEL, mThumbnailUUID);
+    }
 
     return sd;
 }
 
+LLSD LLInventoryCategory::asAISCreateCatLLSD() const
+{
+    LLSD sd                 = LLSD();
+    sd[INV_FOLDER_ID_LABEL_WS]  = mUUID;
+    sd[INV_PARENT_ID_LABEL] = mParentUUID;
+    S8 type                 = static_cast<S8>(mPreferredType);
+    sd[INV_ASSET_TYPE_LABEL_WS] = type;
+    sd[INV_NAME_LABEL] = mName;
+    if (mThumbnailUUID.notNull())
+    {
+        sd[INV_THUMBNAIL_LABEL] = LLSD().with(INV_ASSET_ID_LABEL, mThumbnailUUID);
+    }
+
+    return sd;
+}
+
+bool LLInventoryCategory::isPreferredTypeRoot() const
+{
+	return (mPreferredType == LLFolderType::FT_ROOT_INVENTORY || mPreferredType == 9);
+}
 
 // virtual
 void LLInventoryCategory::packMessage(LLMessageSystem* msg) const
@@ -1178,38 +1169,63 @@ void LLInventoryCategory::packMessage(LLMessageSystem* msg) const
 
 bool LLInventoryCategory::fromLLSD(const LLSD& sd)
 {
-    std::string w;
+	mThumbnailUUID.setNull();
 
-    w = INV_FOLDER_ID_LABEL_WS;
-    if (sd.has(w))
-    {
-        mUUID = sd[w];
-    }
-    w = INV_PARENT_ID_LABEL;
-    if (sd.has(w))
-    {
-        mParentUUID = sd[w];
-    }
-    w = INV_ASSET_TYPE_LABEL;
-    if (sd.has(w))
-    {
-        S8 type = (U8)sd[w].asInteger();
-        mPreferredType = static_cast<LLFolderType::EType>(type);
-    }
-	w = INV_ASSET_TYPE_LABEL_WS;
-	if (sd.has(w))
+	const auto& sdMap = sd.asMap();
+	auto itEnd = sdMap.end();
+
+	auto it = sdMap.find(INV_FOLDER_ID_LABEL_WS);
+	if (it != itEnd)
 	{
-		S8 type = (U8)sd[w].asInteger();
-        mPreferredType = static_cast<LLFolderType::EType>(type);
+		mUUID = it->second;
 	}
 
-    w = INV_NAME_LABEL;
-    if (sd.has(w))
-    {
-        mName = sd[w].asString();
-        LLStringUtil::replaceNonstandardASCII(mName, ' ');
-        LLStringUtil::replaceChar(mName, '|', ' ');
-    }
+	it = sdMap.find(INV_PARENT_ID_LABEL);
+	if (it != itEnd)
+	{
+		mParentUUID = it->second;
+	}
+
+	it = sdMap.find(INV_THUMBNAIL_LABEL);
+	if (it != itEnd)
+	{
+		const LLSD& thumbnail_map = it->second;
+		if (thumbnail_map.has(INV_ASSET_ID_LABEL))
+		{
+			mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
+		}
+	}
+	else
+	{
+		it = sdMap.find(INV_THUMBNAIL_ID_LABEL);
+		if (it != itEnd)
+		{
+			mThumbnailUUID = it->second;
+		}
+	}
+
+	it = sdMap.find(INV_ASSET_TYPE_LABEL);
+	if (it != itEnd)
+	{
+		S8 type = (U8)it->second.asInteger();
+		mPreferredType = static_cast<LLFolderType::EType>(type);
+	}
+
+	it = sdMap.find(INV_ASSET_TYPE_LABEL_WS);
+	if (it != itEnd)
+	{
+		S8 type = (U8)it->second.asInteger();
+		mPreferredType = static_cast<LLFolderType::EType>(type);
+	}
+
+	it = sdMap.find(INV_NAME_LABEL);
+	if (it != itEnd)
+	{
+		mName = it->second.asString();
+		LLStringUtil::replaceNonstandardASCII(mName, ' ');
+		LLStringUtil::replaceChar(mName, '|', ' ');
+	}
+
     return true;
 }
 
@@ -1281,6 +1297,26 @@ BOOL LLInventoryCategory::importLegacyStream(std::istream& input_stream)
 			LLStringUtil::replaceNonstandardASCII(mName, ' ');
 			LLStringUtil::replaceChar(mName, '|', ' ');
 		}
+        else if (0 == strcmp("metadata", keyword))
+        {
+            LLSD metadata(valuestr);
+            if (metadata.has("thumbnail"))
+            {
+                const LLSD& thumbnail = metadata["thumbnail"];
+                if (thumbnail.has("asset_id"))
+                {
+                    setThumbnailUUID(thumbnail["asset_id"].asUUID());
+                }
+                else
+                {
+                    setThumbnailUUID(LLUUID::null);
+                }
+            }
+            else
+            {
+                setThumbnailUUID(LLUUID::null);
+            }
+        }
 		else
 		{
 			LL_WARNS() << "unknown keyword '" << keyword
@@ -1301,6 +1337,12 @@ BOOL LLInventoryCategory::exportLegacyStream(std::ostream& output_stream, BOOL) 
 	output_stream << "\t\ttype\t" << LLAssetType::lookup(mType) << "\n";
 	output_stream << "\t\tpref_type\t" << LLFolderType::lookup(mPreferredType) << "\n";
 	output_stream << "\t\tname\t" << mName.c_str() << "|\n";
+    if (mThumbnailUUID.notNull())
+    {
+        LLSD metadata;
+        metadata["thumbnail"] = LLSD().with("asset_id", mThumbnailUUID);
+        output_stream << "\t\tmetadata\t" << metadata << "|\n";
+    }
 	output_stream << "\t}\n";
 	return TRUE;
 }
@@ -1314,30 +1356,54 @@ LLSD LLInventoryCategory::exportLLSD() const
 	cat_data[INV_PREFERRED_TYPE_LABEL] = LLFolderType::lookup(mPreferredType);
 	cat_data[INV_NAME_LABEL] = mName;
 
+    if (mThumbnailUUID.notNull())
+    {
+        cat_data[INV_THUMBNAIL_LABEL] = LLSD().with(INV_ASSET_ID_LABEL, mThumbnailUUID);
+    }
+
 	return cat_data;
 }
 
 bool LLInventoryCategory::importLLSD(const LLSD& cat_data)
 {
-	if (cat_data.has(INV_FOLDER_ID_LABEL))
+	const auto& sdMap = cat_data.asMap();
+	auto itEnd = sdMap.end();
+
+	auto it = sdMap.find(INV_FOLDER_ID_LABEL);
+	if (it != itEnd)
 	{
-		setUUID(cat_data[INV_FOLDER_ID_LABEL].asUUID());
+		setUUID(it->second.asUUID());
 	}
-	if (cat_data.has(INV_PARENT_ID_LABEL))
+	it = sdMap.find(INV_PARENT_ID_LABEL);
+	if (it != itEnd)
 	{
-		setParent(cat_data[INV_PARENT_ID_LABEL].asUUID());
+		setParent(it->second.asUUID());
 	}
-	if (cat_data.has(INV_ASSET_TYPE_LABEL))
+	it = sdMap.find(INV_ASSET_TYPE_LABEL);
+	if (it != itEnd)
 	{
-		setType(LLAssetType::lookup(cat_data[INV_ASSET_TYPE_LABEL].asString()));
+		setType(LLAssetType::lookup(it->second.asString()));
 	}
-	if (cat_data.has(INV_PREFERRED_TYPE_LABEL))
+	it = sdMap.find(INV_PREFERRED_TYPE_LABEL);
+	if (it != itEnd)
 	{
-		setPreferredType(LLFolderType::lookup(cat_data[INV_PREFERRED_TYPE_LABEL].asString()));
+		setPreferredType(LLFolderType::lookup(it->second.asString()));
 	}
-	if (cat_data.has(INV_NAME_LABEL))
+	it = sdMap.find(INV_THUMBNAIL_LABEL);
+	if (it != itEnd)
 	{
-		mName = cat_data[INV_NAME_LABEL].asString();
+		LLUUID thumbnail_uuid;
+		const LLSD& thumbnail_data = it->second;
+		if (thumbnail_data.has(INV_ASSET_ID_LABEL))
+		{
+			thumbnail_uuid = thumbnail_data[INV_ASSET_ID_LABEL].asUUID();
+		}
+		setThumbnailUUID(thumbnail_uuid);
+	}
+	it = sdMap.find(INV_NAME_LABEL);
+	if (it != itEnd)
+	{
+		mName = it->second.asString();
 		LLStringUtil::replaceNonstandardASCII(mName, ' ');
 		LLStringUtil::replaceChar(mName, '|', ' ');
 	}

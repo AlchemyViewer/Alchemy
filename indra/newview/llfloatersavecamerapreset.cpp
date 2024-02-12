@@ -64,7 +64,7 @@ BOOL LLFloaterSaveCameraPreset::postBuild()
 
 	LLPresetsManager::instance().setPresetListChangeCallback(boost::bind(&LLFloaterSaveCameraPreset::onPresetsListChange, this));
 
-	return TRUE;
+	return LLModalDialog::postBuild();
 }
 
 void LLFloaterSaveCameraPreset::onPresetNameEdited()

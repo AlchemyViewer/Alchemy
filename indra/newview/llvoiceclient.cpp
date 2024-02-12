@@ -52,7 +52,7 @@ public:
 	// requests will be throttled from a non-trusted browser
 	LLVoiceHandler() : LLCommandHandler("voice", UNTRUSTED_THROTTLE) {}
 
-	bool handle(const LLSD& params, const LLSD& query_map, LLMediaCtrl* web)
+	bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web)
 	{
 		if (params[0].asString() == "effects")
 		{
@@ -141,6 +141,7 @@ LLVoiceClient::LLVoiceClient(LLPumpIO *pump)
 
 LLVoiceClient::~LLVoiceClient()
 {
+    llassert(!mVoiceModule);
 }
 
 void LLVoiceClient::init(LLPumpIO *pump)
@@ -200,6 +201,7 @@ const LLVoiceVersionInfo LLVoiceClient::getVersion()
 		LLVoiceVersionInfo result;
 		result.serverVersion = std::string();
 		result.serverType = std::string();
+		result.mBuildVersion = std::string();
 		return result;
 	}
 }
@@ -791,7 +793,10 @@ void LLVoiceClient::addObserver(LLVoiceClientStatusObserver* observer)
 
 void LLVoiceClient::removeObserver(LLVoiceClientStatusObserver* observer)
 {
-	if (mVoiceModule && mVoiceModule->singletoneInstanceExists()) mVoiceModule->removeObserver(observer);
+    if (mVoiceModule)
+    {
+        mVoiceModule->removeObserver(observer);
+    }
 }
 
 void LLVoiceClient::addObserver(LLFriendObserver* observer)
@@ -801,7 +806,10 @@ void LLVoiceClient::addObserver(LLFriendObserver* observer)
 
 void LLVoiceClient::removeObserver(LLFriendObserver* observer)
 {
-	if (mVoiceModule && mVoiceModule->singletoneInstanceExists()) mVoiceModule->removeObserver(observer);
+    if (mVoiceModule)
+    {
+        mVoiceModule->removeObserver(observer);
+    }
 }
 
 void LLVoiceClient::addObserver(LLVoiceClientParticipantObserver* observer)
@@ -811,7 +819,10 @@ void LLVoiceClient::addObserver(LLVoiceClientParticipantObserver* observer)
 
 void LLVoiceClient::removeObserver(LLVoiceClientParticipantObserver* observer)
 {
-	if (mVoiceModule && mVoiceModule->singletoneInstanceExists()) mVoiceModule->removeObserver(observer);
+    if (mVoiceModule)
+    {
+        mVoiceModule->removeObserver(observer);
+    }
 }
 
 std::string LLVoiceClient::sipURIFromID(const LLUUID &id)

@@ -177,7 +177,7 @@ LLRenderTarget& LLSceneMonitor::getCaptureTarget()
 	if(!mFrames[0])
 	{
 		mFrames[0] = new LLRenderTarget();
-		mFrames[0]->allocate(width, height, GL_RGB, false, false, LLTexUnit::TT_TEXTURE, true);
+		mFrames[0]->allocate(width, height, GL_RGB);
 		gGL.getTexUnit(0)->bind(mFrames[0]);
 		gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
@@ -187,7 +187,7 @@ LLRenderTarget& LLSceneMonitor::getCaptureTarget()
 	else if(!mFrames[1])
 	{
 		mFrames[1] = new LLRenderTarget();
-		mFrames[1]->allocate(width, height, GL_RGB, false, false, LLTexUnit::TT_TEXTURE, true);
+		mFrames[1]->allocate(width, height, GL_RGB);
 		gGL.getTexUnit(0)->bind(mFrames[1]);
 		gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
@@ -271,7 +271,7 @@ void LLSceneMonitor::capture()
 	static LLCachedControl<F32>  scene_load_sample_time(gSavedSettings, "SceneLoadingMonitorSampleTime");
 	static bool force_capture = true;
 
-	bool enabled = LLGLSLShader::sNoFixedFunction && (monitor_enabled || mDebugViewerVisible);
+	bool enabled = monitor_enabled || mDebugViewerVisible;
 	if(mEnabled != enabled)
 	{
 		if(mEnabled)
@@ -332,9 +332,6 @@ bool LLSceneMonitor::needsUpdate() const
 	return mDiffState == NEED_DIFF;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_GENERATE_SCENE_LOAD_DITHER_TEXTURE("Generate Scene Load Dither Texture");
-static LLTrace::BlockTimerStatHandle FTM_SCENE_LOAD_IMAGE_DIFF("Scene Load Image Diff");
-
 static LLStaticHashedString sDitherScale("dither_scale");
 static LLStaticHashedString sDitherScaleS("dither_scale_s");
 static LLStaticHashedString sDitherScaleT("dither_scale_t");
@@ -356,22 +353,19 @@ void LLSceneMonitor::compare()
 		return; 
 	}
 
-	LL_RECORD_BLOCK_TIME(FTM_SCENE_LOAD_IMAGE_DIFF);
 	mDiffState = EXECUTE_DIFF;
 
 	S32 width = gViewerWindow->getWindowWidthRaw();
 	S32 height = gViewerWindow->getWindowHeightRaw();
 	if(!mDiff)
 	{
-		LL_RECORD_BLOCK_TIME(FTM_GENERATE_SCENE_LOAD_DITHER_TEXTURE);
 		mDiff = new LLRenderTarget();
-		mDiff->allocate(width, height, GL_RGBA, false, false, LLTexUnit::TT_TEXTURE, true);
+		mDiff->allocate(width, height, GL_RGBA);
 
 		generateDitheringTexture(width, height);
 	}
 	else if(mDiff->getWidth() != width || mDiff->getHeight() != height)
 	{
-		LL_RECORD_BLOCK_TIME(FTM_GENERATE_SCENE_LOAD_DITHER_TEXTURE);
 		mDiff->resize(width, height);
 		generateDitheringTexture(width, height);
 	}
@@ -427,8 +421,6 @@ void LLSceneMonitor::calcDiffAggregate()
 {
 #ifdef LL_WINDOWS
 
-	LL_RECORD_BLOCK_TIME(FTM_SCENE_LOAD_IMAGE_DIFF);
-
 	if(mDiffState != EXECUTE_DIFF && !mDebugViewerVisible)
 	{
 		return;
@@ -481,8 +473,6 @@ void LLSceneMonitor::calcDiffAggregate()
 static LLTrace::EventStatHandle<> sFramePixelDiff("FramePixelDifference");
 void LLSceneMonitor::fetchQueryResult()
 {
-	LL_RECORD_BLOCK_TIME(FTM_SCENE_LOAD_IMAGE_DIFF);
-
 	if(mDiffState == WAIT_ON_RESULT 
 		&& !LLAppViewer::instance()->quitRequested())
 	{
@@ -525,7 +515,7 @@ void LLSceneMonitor::fetchQueryResult()
 }
 
 //dump results to a file _scene_xmonitor_results.csv
-void LLSceneMonitor::dumpToFile(std::string file_name)
+void LLSceneMonitor::dumpToFile(const std::string &file_name)
 {
 	if (!hasResults()) return;
 
@@ -729,13 +719,6 @@ void LLSceneMonitorView::onTeleportFinished()
 
 void LLSceneMonitorView::onVisibilityChange(BOOL visible)
 {
-	if (!LLGLSLShader::sNoFixedFunction && visible)
-	{
-		visible = false;
-		// keep Scene monitor and its view in sycn
-		setVisible(false);
-		LL_WARNS("SceneMonitor") << "Incompatible graphical settings, Scene Monitor can't be turned on" << LL_ENDL; 
-	}
 	LLSceneMonitor::getInstance()->setDebugViewerVisible(visible);
 }
 

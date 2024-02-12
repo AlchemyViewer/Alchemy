@@ -1,68 +1,74 @@
 <?xml version="1.0" ?>
 <llsd>
 <map>
+    <key>version</key>
+    <string>1.3</string>
+    <key>type</key>
+    <string>autobuild</string>
     <key>installables</key>
     <map>
       <key>SDL2</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 1997-2020 Sam Lantinga (slouken@libsdl.org)</string>
-        <key>description</key>
-        <string>Simple DirectMedia Layer is a cross-platform multimedia library designed to provide low level access to audio, keyboard, mouse, joystick, 3D hardware via OpenGL, and 2D video framebuffer.</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>ef2b13ee228d1f1f73720f9b04aa9cc9e94aebc4d2efb94d992f6c6845034ddd453f3d1f11c54b34754e38873da8ccab325a0bedf144bde3ed6393ceb3aa490d</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.28.5.2281/SDL2-2.28.5-darwin64-2281.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>8a1052cac27cb42738b53f22d494da92a984fefaba182ce855c60b6af751cbc43d11106d7dc62167238c4aafe52a1b476bf750a502fd24af363f795a790b0652</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.28.5.2281/SDL2-2.28.5-linux64-2281.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>ee126ebe66baa71d05cf477bd12e3990986e720e630a170e5ea1010ad2a51a68a2b96e917acd98445b95bcbf2591cd3714fff23d9c6bfcb90bdd1daac254f137</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.28.5.2281/SDL2-2.28.5-windows64-2281.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
         <key>license</key>
         <string>lgpl</string>
         <key>license_file</key>
         <string>LICENSES/SDL2.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1997-2022 Sam Lantinga (slouken@libsdl.org)</string>
+        <key>version</key>
+        <string>2.28.5</string>
         <key>name</key>
         <string>SDL2</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>3606af8b8d6f369be9871ad15c6a2b40aa14a91e29e4b074168d042d215a69f3849995de29cf851e05498d52be8e067dccf08d8e2913e1dd7600b3d5b584fa1d</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.0.18.1324/SDL2-2.0.18-darwin64-1324.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>fd45ffc171bb10b9d3b3063c54134344bbdf27577e1fd82719ad15f4b015870c34b5d7d92a58fe0854a816cd38b6afa0ec2c498cb7bcfa6d70c3444b215662de</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/100/packages/generic/SDL2/2.0.18.1324/SDL2-2.0.18-linux64-1324.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>2.0.18</string>
-      </map>
-      <key>abseil-cpp</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-abseil-cpp</string>
-        <key>copyright</key>
-        <string>Copyright 2018 The Abseil Authors.</string>
         <key>description</key>
-        <string>Abseil is an open-source collection of C++ code designed to augment the C++ standard library.</string>
-        <key>license</key>
-        <string>Apache 2.0</string>
-        <key>license_file</key>
-        <string>LICENSES/abseil-cpp.txt</string>
-        <key>name</key>
-        <string>abseil-cpp</string>
+        <string>Simple DirectMedia Layer is a cross-platform multimedia library designed to provide low level access to audio, keyboard, mouse, joystick, 3D hardware via OpenGL, and 2D video framebuffer.</string>
+      </map>
+      <key>apr_suite</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -70,11 +76,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a9311bbdc102ed31e0dc62883e9dad51af1cff999243e5b3d8a7a472cd9a5262dde40797f53fa5d5b2a71ee125d52a0986e694d9b5f50fc3bbdd5d79c1eb3600</string>
+              <string>4e42b1e9e77ead4f0538cb10a486f587cef0144ccd32161f62edc7477540224e62b9e32bdcac4a82664249486bba4e2191e5fe4f91923af859d17f76b719dbb8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/9c2a82c.1323/abseil_cpp-9c2a82c-darwin64-1323.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1844/apr_suite-1.4.5-darwin64-1844.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -84,11 +90,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>261f450f4b9b68de51720a2e7e0e37a5f18ff1c2c20a795e8ae256115218f88e32328f2fcd87397b0405a036e421ffacb50be30998da049e0d160037025e8686</string>
+              <string>a0817cf401cc4af54e139c90bb1dddd636915bc6029218a3a3dfc932fcd2b3524bad89e8008370e8e7c5d21965fe8d30591918d542dca9b83b3718a38d128136</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/9c2a82c.1323/abseil_cpp-9c2a82c-linux64-1323.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1844/apr_suite-1.4.5-linux64-1844.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -98,31 +104,31 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>326595cec1e4090ad48bcf2ec9b8a2a478d338a0d854cfd16ed1b4366ba08519a8b11301fb5a11a5b454a30cebba7c1de5ebf9cbf92391c8e586e76f21a9a919</string>
+              <string>91ad66e4d6e1cd33a020460aa690b89a6942a02052fc15828dfb6439726b6eaa65793a14f1716b1800838c92399994722069040cb52ab6d520cb54623436bcbe</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/163/packages/generic/abseil-cpp/9c2a82c.1323/abseil_cpp-9c2a82c-windows64-1323.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1844/apr_suite-1.4.5-windows64-1844.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>9c2a82c</string>
-      </map>
-      <key>apr_suite</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright © 2012 The Apache Software Foundation, Licensed under the Apache License, Version 2.0.</string>
-        <key>description</key>
-        <string>Apache portable runtime project</string>
         <key>license</key>
         <string>apache</string>
         <key>license_file</key>
         <string>LICENSES/apr_suite.txt</string>
+        <key>copyright</key>
+        <string>Copyright © 2012 The Apache Software Foundation, Licensed under the Apache License, Version 2.0.</string>
+        <key>version</key>
+        <string>1.4.5</string>
         <key>name</key>
         <string>apr_suite</string>
+        <key>description</key>
+        <string>Apache portable runtime project</string>
+      </map>
+      <key>boost</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -130,11 +136,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>dc87f56f2df9c21d86e0b2d4aed7c0774c9293b4bb093a9de9be0032c18ed3e9094fcf1811b07b50ee503fa33d4edbd6239b19b0955b268f342d77fd15511c7c</string>
+              <string>ef3e1f64f7824b216eae77483561a83fa5e6306bbdf01c03c228a6521569e7c6546fa0b81325049ac24ca43ea7e26ca9ee3e42bc5465cb99753710e31e531e84</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1304/apr_suite-1.4.5-darwin64-1304.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.84.0.2293/boost-1.84.0-darwin64-2293.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -144,11 +150,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>22332a134bf8089dd1c80ff468e16884336f38e0ff0e7c6717a600f2afc5576f3328c69638b32bd1def6f309e0e03f21bddbf3b121f6b1b307535000ee78b102</string>
+              <string>64f24220f4860469a6b6e52346653a9dbcdd5e1e3846e4dde55b77b44e601e10a62258b5dedbc8a44303987b36fd3c6a94286a57bd91f4d3abd7c5aec907df65</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1304/apr_suite-1.4.5-linux64-1304.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.84.0.2293/boost-1.84.0-linux64-2293.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -158,31 +164,63 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7fd110a4adfb228b1329e71181825e51757d90c6b60192b5edca79346ffd8a80026f0c02a5e529ce1dfd1e31b0030b3a66444d145162123d38255a97f20007eb</string>
+              <string>df0308ed291a5187e000de6d8d0ea49766d159c9d91a30b307e8fc3795c2f81b975e4f64b6576aa459ed15393a400d4b4f7c80d1a3313260f0af449b936d00e9</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/111/packages/generic/apr_suite/1.4.5.1304/apr_suite-1.4.5-windows64-1304.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.84.0.2293/boost-1.84.0-windows64-2293.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.4.5</string>
-      </map>
-      <key>boost</key>
-      <map>
-        <key>copyright</key>
-        <string>(see individual source files)</string>
-        <key>description</key>
-        <string>Boost C++ Libraries</string>
         <key>license</key>
         <string>boost 1.0</string>
         <key>license_file</key>
         <string>LICENSES/boost.txt</string>
+        <key>copyright</key>
+        <string>(see individual source files)</string>
+        <key>version</key>
+        <string>1.84.0</string>
         <key>name</key>
         <string>boost</string>
+        <key>description</key>
+        <string>Boost C++ Libraries</string>
+      </map>
+      <key>branding</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3280a6c52b91ba02b630bd2d2ab0e318bf2a800db02c4bab38b2ccbe71a230cb755663348615891b9d388c2fc2bc1eaa38650e2b5421c4133f750267b2b3c538</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/199/packages/generic/branding/1.0.0.1857/branding-1.0.0-common-1857.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>All Rights Reserved.</string>
+        <key>license_file</key>
+        <string>LICENSES/branding.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2023 Alchemy Development Group</string>
+        <key>version</key>
+        <string>1.0.0</string>
+        <key>name</key>
+        <string>branding</string>
+        <key>description</key>
+        <string>Alchemy Branding Material</string>
+      </map>
+      <key>colladadom</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -190,11 +228,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a8f47350ce47739be25ae54231aa34e852661043d8432ce68a44aad047f25de3638766722d6a26dda4e2297f538ae538f1aedd891dd916c30bff62d02afcdedc</string>
+              <string>e3b80b1f30e96b88a96bf9f39ecfac8444d33962b9016e496960059287f786a5c464bc6625499ec7c283ab13df999a80aecfa6ccccb3fccd3303a7e502d45ad4</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.78.0.1305/boost-1.78.0-darwin64-1305.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.2300/colladadom-2.3.0-darwin64-2300.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -204,11 +242,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c5003d87e8e155962796b86e196aac608738a5c38b371a35772c0929204a1e75704ed98ade8c40db89066d60b0e8c3b502a5c7be93ebcfd26c25d8c1d07ae611</string>
+              <string>08115a856d50ca409f86be030b49eca5dfaf064365be9254a25f3158c0c073bd8201db39bf443a8adf7c3e91cf5a3779987721c11843a236c8b059b78166565b</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.78.0.1305/boost-1.78.0-linux64-1305.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.2300/colladadom-2.3.0-linux64-2300.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -218,29 +256,59 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>513014d4d811f118f0c0043175ca069961154cc9e760d1d523156f6277013e70d75e3b3643586e830e20d94847b24c11a455d859bd549ff9668e089f389c6c00</string>
+              <string>cee2285c81817eaf68de1343884618a2d9ba42615ed6b5feeedc1be82548a1d6190e956138ae43283a77168aad5b80c5e9ceb693a9674b76d8a50c580ffd8d4f</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/92/packages/generic/boost/1.78.0.1305/boost-1.78.0-windows64-1305.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.2300/colladadom-2.3.0-windows64-2300.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.78.0</string>
-      </map>
-      <key>colladadom</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright 2006 Sony Computer Entertainment Inc.</string>
         <key>license</key>
         <string>SCEA</string>
         <key>license_file</key>
         <string>LICENSES/collada.txt</string>
+        <key>copyright</key>
+        <string>Copyright 2006 Sony Computer Entertainment Inc.</string>
+        <key>version</key>
+        <string>2.3.0</string>
         <key>name</key>
         <string>colladadom</string>
+      </map>
+      <key>cubemaptoequirectangular</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>7d7a74d6a7a71816310b5147caf4c7f512202738ca40b4073ebac0bdd7774d2e447c7a45e29fcd3596c08c798157dea19bd061bfe64dd2fa68f9a240689ae7f3</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/175/packages/generic/cubemaptoequirectangular/1.1.0.1341/cubemaptoequirectangular-1.1.0-common-1341.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/CUBEMAPTOEQUIRECTANGULAR_LICENSE.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2017 Jaume Sanchez Elias, http://www.clicktorelease.com</string>
+        <key>version</key>
+        <string>1.1.0</string>
+        <key>name</key>
+        <string>cubemaptoequirectangular</string>
+      </map>
+      <key>curl</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -248,11 +316,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>03e16ff3c5baadbc11971c5e1ff5d7744657c1a33f7767fcf0eeff10755e3dfe1eb8a2e44cfe6a2d8622921781f2d601e987e17c44d237349586fdf651094e4b</string>
+              <string>b74a230e331f08c489489ea0459fa3430d4ffa3bc6453e444294191c3e3282a9b29ad51a81d405ed695a9a886d87755207bbf69be3c34a25f46bbf5b8cc539e7</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.1306/colladadom-2.3.0-darwin64-1306.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.54.1.2299/curl-7.54.1-darwin64-2299.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -262,11 +330,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4ca609f20cc985a3d1b6ceb3ae7127d2f6e9916354e2e08836e94f10ed1b94df8048ea52c296a6066f1e1d052b802bed5c04d228a54c5b4f7880ae0eebb157a3</string>
+              <string>48dbe649e4f2f145ac8e52cd54278be8a5825aee9730bcf7f6d8aa839db8cb3cbd023cd60816325fc1f0e17327115073d892e4c3511ed06c4840384a1b199d02</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.1306/colladadom-2.3.0-linux64-1306.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.54.1.2299/curl-7.54.1-linux64-2299.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -276,121 +344,31 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9ab9c2bbe3c9dac043cc6587947e69f62e76742586ba268c0e81938b15587ca8cb0577ba0cf541a67702675884261697ede4c033c575304286028dd8e2177a99</string>
+              <string>3bcb89d7c7da7042676ee765730073af81d4c17f9e47732eebcefb4aa3dcab98490ec6a2ad7f6b2cdd801a7ad606967b2f3774bf97525304c2a066089e27be72</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/98/packages/generic/colladadom/2.3.0.1306/colladadom-2.3.0-windows64-1306.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.54.1.2299/curl-7.54.1-windows64-2299.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>2.3.0</string>
-      </map>
-      <key>curl</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 1996 - 2017, Daniel Stenberg, (daniel@haxx.se), and many contributors</string>
-        <key>description</key>
-        <string>Library for transferring data specified with URL syntax</string>
         <key>license</key>
         <string>curl</string>
         <key>license_file</key>
         <string>LICENSES/curl.txt</string>
-        <key>name</key>
-        <string>curl</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>b21fd9aa52505da820be34bdde449a5c7c52483253369fc4b3c655730c044ac5b2eee14f56b52e70b931a5904fdcca78cc3e826cc822c8812c0ca10cd599eede</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.54.1.1308/curl-7.54.1-darwin64-1308.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>b9aff9c2a2f1ad659837cedaca0a31c6a1c610dbfebe404fcbb5fac201e267f875685ad0b014ab52a75e72e4ee5685eb66a92c922501fbfa901c735553b1d05e</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.54.1.1308/curl-7.54.1-linux64-1308.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>f732833474edb05705ebb4f9366938c00e516e202980dbba45a6e5bf4d00cc842b5a1927a399d493a969f39ace3ec6f840ac4f764796291fba23d165d0b20cdf</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/89/packages/generic/curl/7.54.1.1308/curl-7.54.1-windows64-1308.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
+        <key>copyright</key>
+        <string>Copyright (c) 1996 - 2017, Daniel Stenberg, (daniel@haxx.se), and many contributors</string>
         <key>version</key>
         <string>7.54.1</string>
-      </map>
-      <key>dbus_glib</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (C) Red Hat Inc.</string>
-        <key>description</key>
-        <string>D-Bus bindings for glib</string>
-        <key>license</key>
-        <string>Academic Free License v. 2.1</string>
-        <key>license_file</key>
-        <string>LICENSES/dbus-glib.txt</string>
         <key>name</key>
-        <string>dbus_glib</string>
-        <key>platforms</key>
-        <map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>7ee7b9aed3c0c8c09e7bf26bba7af8e1</string>
-              <key>url</key>
-              <string>http://automated-builds-secondlife-com.s3.amazonaws.com/hg/repo/p64_3p-dbus-glib/rev/314266/arch/Linux/installer/dbus_glib-0.76-linux64-314266.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>0.76</string>
+        <string>curl</string>
+        <key>description</key>
+        <string>Library for transferring data specified with URL syntax</string>
       </map>
       <key>dictionaries</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright 2014 Apache OpenOffice software</string>
-        <key>description</key>
-        <string>Spell checking dictionaries to bundled into the viewer</string>
-        <key>license</key>
-        <string>various open source</string>
-        <key>license_file</key>
-        <string>LICENSES/dictionaries.txt</string>
-        <key>name</key>
-        <string>dictionaries</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -408,21 +386,149 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>various open source</string>
+        <key>license_file</key>
+        <string>LICENSES/dictionaries.txt</string>
+        <key>copyright</key>
+        <string>Copyright 2014 Apache OpenOffice software</string>
         <key>version</key>
         <string>1.0.0</string>
+        <key>name</key>
+        <string>dictionaries</string>
+        <key>description</key>
+        <string>Spell checking dictionaries to bundled into the viewer</string>
+      </map>
+      <key>discord-gamesdk</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>74cc00abab75892574da5d8cfe0baa32a0b8071f758ed78c4f8c667b50e6949733c0773900c20cb8a34d67548f51072824724a7a7acaf43087b5b20b4ba55f99</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1834/discord_gamesdk-3.2.1-darwin64-1834.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>647331d9ec47cfe0c35cabf6404f240a4da5ac47bbb1bc323d8b751298d0906875aa59fe6a5ab35e34095811872f4bb09a7e733c04a303ea21b1a5903613b39a</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1834/discord_gamesdk-3.2.1-linux64-1834.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>1b19bc00e2b90a07fc498c0392bc86be3e87fd9787d9d31301cd69cc7c97e58e46452a0a32041f395c417a01e23be0a5f9a2febf9d1da2b7aeb84bdc5d787103</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/191/packages/generic/discord-gamesdk/3.2.1.1834/discord_gamesdk-3.2.1-windows64-1834.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>proprietary</string>
+        <key>license_file</key>
+        <string>LICENSES/discord-gamesdk.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) Discord.</string>
+        <key>version</key>
+        <string>3.2.1</string>
+        <key>name</key>
+        <string>discord-gamesdk</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-discord-gamesdk</string>
+        <key>description</key>
+        <string>Discord GameSDK for integrating with Discord</string>
       </map>
       <key>dullahan</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2017, Linden Research, Inc.</string>
-        <key>description</key>
-        <string>A headless browser SDK that uses the Chromium Embedded Framework (CEF). It is designed to make it easier to write applications that render modern web content directly to a memory buffer, inject synthesized mouse and keyboard events as well as interact with web based features like JavaScript or cookies.</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3a2e26f01656a6634023d83f2a53a36a373c61b6af1d00517543050a09826113a2f99121ece20c2c0b581aab9020aeb7cdfe972fa331ea94f3862556a70eae19</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-darwin64-2178.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>ab9d290a61fb038e6c0ba9ce4efa5f431238e1ab9d4de2c28da1ad0114926af9b716db90cb216816ec8a1de3680d358913851e316d8df6b5eea5302989d9f3bc</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-linux64-2178.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>e88cd99c9d71b2dd1297007bcfdac224d5401cdfadd7aeb069195392274559f7f63ee312061d3441ba7505a4e649ccea67f9d8f3f3c56c9cce638b35c29b6eb5</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54.2178/dullahan-1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54-windows64-2178.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
         <key>license</key>
         <string>MPL</string>
         <key>license_file</key>
         <string>LICENSES/LICENSE.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2017, Linden Research, Inc.</string>
+        <key>version</key>
+        <string>1.12.4_118.4.1_g3dd6078_chromium-118.0.5993.54</string>
         <key>name</key>
         <string>dullahan</string>
+        <key>description</key>
+        <string>A headless browser SDK that uses the Chromium Embedded Framework (CEF). It is designed to make it easier to write applications that render modern web content directly to a memory buffer, inject synthesized mouse and keyboard events as well as interact with web based features like JavaScript or cookies.</string>
+      </map>
+      <key>expat</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -430,11 +536,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b952aa00580ab401d09db89db2cb36c813eb90aa59d5a25d04a948467e6e7dd8241f4c42bdac41081e144c4a2df3a5252ff852e37983b4afb6eb5eda38746dbe</string>
+              <string>64e061836013151fbdf21545c50e0b7ffb51b83bdd95ba9a8f7b63a229824a8da6457b644c234eafaab13f21849413068123c79afce3ebe1b2cbca4e7974b586</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/0.0.0.1321/dullahan-1.12.2_96.0.17_g20e2617_chromium-96.0.4664.93-darwin64-1321.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.5.0.1816/expat-2.5.0-darwin64-1816.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -444,11 +550,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0c9565b81400202d556e1693b9f2404014a335132bd4062710581142f381200968c7f677a2737404dda9b38fdf6aa7ae676ffbf5883fca2b3934c4423a830492</string>
+              <string>d640ea81458c0a26bc8c5385cd63e5b08f4ece5125ada07baddcaf775fac5baaf5d4b031207868836ae881dadb9748aa9c62224871cc72cfbdcb0260ab00b2f8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/0.0.0.1321/dullahan-1.12.2_96.0.17_g20e2617_chromium-96.0.4664.93-linux64-1321.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.5.0.1816/expat-2.5.0-linux64-1816.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -458,89 +564,45 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b66c639cb056b99472dc1acff5c153d9023cad0ef6e1df791bc03904996f9d2ffb26fefefb6543e04c5cd58aed9010ccf44c2a905aa82422698fd3c0cc00302f</string>
+              <string>b2382a145a94fd0b5786d00fe29d43e680fe14f2bb19639f1b72e5330f7f7b2e39b610f26af9c8a06ff54ecf9db91051129e6edbb1ad15987260dfd1d4c48bde</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/103/packages/generic/dullahan/0.0.0.1321/dullahan-1.12.2_96.0.17_g20e2617_chromium-96.0.4664.93-windows64-1321.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.5.0.1816/expat-2.5.0-windows64-1816.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.12.2_96.0.17_g20e2617_chromium-96.0.4664.93</string>
-      </map>
-      <key>expat</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 1998, 1999, 2000 Thai Open Source Software Center Ltd and Clark Cooper - Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Expat maintainers.</string>
-        <key>description</key>
-        <string>Expat is an XML parser library written in C</string>
         <key>license</key>
         <string>expat</string>
         <key>license_file</key>
         <string>LICENSES/expat.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 1998, 1999, 2000 Thai Open Source Software Center Ltd and Clark Cooper - Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Expat maintainers.</string>
+        <key>version</key>
+        <string>2.5.0</string>
         <key>name</key>
         <string>expat</string>
-        <key>platforms</key>
-        <map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>461dd82088eaef90df6062c949aa8b1f26dd0e1946b64282d507dcf7356a4c6e2aa84e19d37c5ae5ea114093d6d4db1fe06f6fbfee176a764f89d68a7bcb4f5c</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.4.1.1301/expat-2.4.1-linux64-1301.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>fcf4d43850bd18c2879ef010d464055a1b530a219e61b06500efe821c7091329562b8120a4575907e9a2af06de43d868fbea2436ca71450022eea81eb678f68b</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/109/packages/generic/expat/2.4.1.1301/expat-2.4.1-windows64-1301.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>2.4.1</string>
+        <key>description</key>
+        <string>Expat is an XML parser library written in C</string>
       </map>
       <key>fmodstudio</key>
       <map>
-        <key>copyright</key>
-        <string>FMOD Studio, Copyright (c) Firelight Technologies Pty Ltd.</string>
-        <key>description</key>
-        <string>FMOD Studio audio system library</string>
-        <key>license</key>
-        <string>fmodstudio</string>
-        <key>license_file</key>
-        <string>LICENSES/fmodstudio.txt</string>
-        <key>name</key>
-        <string>fmodstudio</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
-              <string>6e2a2290a3dab3f01a51f5cd280b5b311b46fd2f244456a74d398fa25e9d93707c640057fb94dd08d078cd3e9a88f147fc905833010dddfb8471a3e32d851c28</string>
+              <string>8d4f9a01214ddcc414ce2501e1462bccb8f04e15b4274376bec23b26e4441fe74e59cde026ca59c00aef2efc5cfed49fcf87965e16a2d7184ed33da667642584</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.04.1274/fmodstudio-2.02.04-darwin64-1274.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.20.2284/fmodstudio-2.02.20-darwin64-2284.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -549,12 +611,14 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
-              <string>7f8c2f28310a5b14f3c5b723c944fa7c72a3d578f07cfead8ea6580cd965cf02f699e4f49eb3d82a6aa32646bd572456aebe100d8bd39d3268e95beec16a6f63</string>
+              <string>4058c0124712270c2874250a829124813408b49d07c3202c225c677088d01af59a5899ad7575cd932b1cfd39e2768fc9d1f43a9a2cbb83c63ad9478ef978535e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.04.1274/fmodstudio-2.02.04-linux64-1274.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.20.2284/fmodstudio-2.02.20-linux64-2284.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -563,34 +627,34 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
-              <string>4ee74085fd10b5252cbd0358ecbb3986d9b718d31b1b51588404eec122bf1ac9b72bc8f689ef676e7104c1771b81686a81c38623a96704b6354be0d138935a26</string>
+              <string>89365c56c2c83f4d83aad236c304ba321529ddc4c4124f3abb43965104f85fc1c470b2e53dc24c86c5c62b65923b5f1dc1aff803489b6f19393227b374c861ae</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.04.1274/fmodstudio-2.02.04-windows64-1274.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/49/packages/generic/fmodstudio/2.02.20.2284/fmodstudio-2.02.20-windows64-2284.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>fmodstudio</string>
+        <key>license_file</key>
+        <string>LICENSES/fmodstudio.txt</string>
+        <key>copyright</key>
+        <string>FMOD Studio, Copyright (c) Firelight Technologies Pty Ltd.</string>
         <key>version</key>
-        <string>2.02.04</string>
+        <string>2.02.20</string>
+        <key>name</key>
+        <string>fmodstudio</string>
+        <key>description</key>
+        <string>FMOD Studio audio system library</string>
       </map>
       <key>fonts</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-fonts</string>
-        <key>copyright</key>
-        <string>Various Licenses</string>
-        <key>description</key>
-        <string>A collection of fonts used by the viewer</string>
-        <key>license</key>
-        <string>various</string>
-        <key>license_file</key>
-        <string>LICENSES/fonts.txt</string>
-        <key>name</key>
-        <string>fonts</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -598,133 +662,141 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ba6f350cc13df0f1f8eb9c0033d587abdd8d3942fcd972441d4e42554d54c72ca472cb49a9c004463e94e471f3510abbec1ecfb3f1332ba4a442130c576fae76</string>
+              <string>d9993ba516691bb2f3ee35179f42a332ac6a2a1361750bf7a178ecc612cb39bcfe7e93fb8678d50faae2a9b7b82f8ed63e04c7c445f718cee8fee72331872d8c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/187d5d3.1224/fonts-187d5d3-common-1224.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/e53bac2.2319/fonts-e53bac2-common-2319.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>various</string>
+        <key>license_file</key>
+        <string>LICENSES/fonts.txt</string>
+        <key>copyright</key>
+        <string>Various Licenses</string>
         <key>version</key>
-        <string>187d5d3</string>
+        <string>e53bac2</string>
+        <key>name</key>
+        <string>fonts</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-fonts</string>
+        <key>description</key>
+        <string>A collection of fonts used by the viewer</string>
       </map>
       <key>freetype</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright 2006, 2007, 2008, 2009, 2010 by David Turner, Robert Wilhelm, and Werner Lemberg.</string>
-        <key>description</key>
-        <string>Font rendering library</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>f2b26cf9501f5fe22c63fa8ffd10c2d78a2552a5c955b48d44a322ed474feada9de37a7405376adc747243cf36fe3c75590962a55114a4b0d6dbcba7dd301492</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.13.2.2298/freetype-2.13.2-darwin64-2298.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>fe76494137e91ea94a6ae560ec2b8498d797a28f1c72cc1a3b75290b044120aaf97ff275cefa0135aa533ac2ef116c5e66e6d9a0c2883d5147da595ca1822ec9</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.13.2.2298/freetype-2.13.2-windows64-2298.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
         <key>license</key>
         <string>FreeType</string>
         <key>license_file</key>
         <string>LICENSES/freetype.txt</string>
+        <key>copyright</key>
+        <string>Copyright 2006, 2007, 2008, 2009, 2010 by David Turner, Robert Wilhelm, and Werner Lemberg.</string>
+        <key>version</key>
+        <string>2.13.2</string>
         <key>name</key>
         <string>freetype</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>ebde685f65e9281a438f3377aa9185b54cd5b187a3e7dfc117e1f322c8889bc6abdb2dad229167b5b7d4f7767b3b9d3fb2d90a8dd35f0c5c9898926709263bf3</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.11.1.1328/freetype-2.11.1-darwin64-1328.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>8f18967a394297ec9f9660d87a96fb196d433f5338dc59637511578a43525a90e7d33f666cd28edf3e2bc10989e8907b0ed93398d1c0f5489af478ee8e59340f</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.11.1.1328/freetype-2.11.1-windows64-1328.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>2.11.1</string>
+        <key>description</key>
+        <string>Font rendering library</string>
       </map>
-      <key>glod</key>
+      <key>glext</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright 2003 Jonathan Cohen, Nat Duca, David Luebke, Brenden Schubert - Johns Hopkins University and University of Virginia</string>
-        <key>license</key>
-        <string>GLOD Open-Source License   Version 1.0</string>
-        <key>license_file</key>
-        <string>LICENSES/GLOD.txt</string>
-        <key>name</key>
-        <string>glod</string>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
+          <key>common</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>999502c58fed6ac261a35394c1f98380c5a4e5991bc0138090a02a9796515a487e33087799fc3ba2bf7df2f62514059f91af4f4fdb71540d2b71ca802afebcc6</string>
+              <string>7cc58b3acb230a7e65ea5f0ff800be393eb4aa1b</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1312/glod-1.0.3-darwin64-1312.tar.zst</string>
+              <string>https://github.com/secondlife/3p-glext/releases/download/v69/glext-68-common-685b36e.tar.zst</string>
             </map>
             <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>4a5fa692403499d53b4674b32ff3f4fa1c196e618dd14f1e6327dcd10a9ab7ebf6fd220385a84a1f8629b4d020486eff2ded9bf69e3ef3308fe6a4a304fdb195</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1312/glod-1.0.3-linux64-1312.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>4dbbb434b9ee4c99896690eb3b65c54cce553798a00a0c103d3220b8f7445c870c3b7e31dd5874880982569f16c28f5412a4d5c3e9697dbb6ae36e800d693459</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/116/packages/generic/glod/1.0.3.1312/glod-1.0.3-windows64-1312.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
+            <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
+        <key>license_file</key>
+        <string>LICENSES/glext.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
         <key>version</key>
-        <string>1.0.3</string>
+        <string>68</string>
+        <key>name</key>
+        <string>glext</string>
+        <key>description</key>
+        <string>glext headers define function prototypes and constants for OpenGL extensions</string>
+      </map>
+      <key>glh_linear</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>dce3f3c01fddb400cb143c3283fe9259</string>
+              <key>url</key>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/82754/775367/glh_linear-0.0.0-common-560278.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/glh-linear.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2000 Cass Everitt</string>
+        <key>version</key>
+        <string>0.0.0</string>
+        <key>name</key>
+        <string>glh_linear</string>
+        <key>description</key>
+        <string>glh - is a platform-indepenedent C++ OpenGL helper library</string>
       </map>
       <key>gstreamer</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 2007 Free Software Foundation, Inc. &lt;http://fsf.org/&gt;</string>
-        <key>license</key>
-        <string>LGPL</string>
-        <key>license_file</key>
-        <string>LICENSES/gstreamer.txt</string>
-        <key>name</key>
-        <string>gstreamer</string>
         <key>platforms</key>
         <map>
           <key>linux64</key>
@@ -740,21 +812,81 @@
             <string>linux64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>LGPL</string>
+        <key>license_file</key>
+        <string>LICENSES/gstreamer.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 2007 Free Software Foundation, Inc. &lt;http://fsf.org/&gt;</string>
         <key>version</key>
         <string>0.10.6.314267</string>
+        <key>name</key>
+        <string>gstreamer</string>
+      </map>
+      <key>innosetup</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>bcce1475013242472bc4158d7c46692aa62a582cbe9ea4a3d54f392da97b359812c6df2aef7038866f009f7e22a8ff18679c6fbc5179ea4883409b1dd3d56a86</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/212/packages/generic/innosetup/6.2.2.2179/innosetup-6.2.2-windows64-2179.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/innosetup.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1997-2023 Jordan Russell. All rights reserved.</string>
+        <key>version</key>
+        <string>6.2.2</string>
+        <key>name</key>
+        <string>innosetup</string>
+        <key>description</key>
+        <string>Innosetup installer framework</string>
+      </map>
+      <key>jpegencoderbasic</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>1af3afbf1ce81013c5107dfb41d3fc10735f727f12260fc38cd345c748f1eafb36100ede324da44105205084b9aac32dd723fd0d1d45b686a4a922bcad9525eb</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/176/packages/generic/jpegencoderbasic/1.0.1340/jpegencoderbasic-1.0-common-1340.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>NONE</string>
+        <key>license_file</key>
+        <string>LICENSES/JPEG_ENCODER_BASIC_LICENSE.txt</string>
+        <key>copyright</key>
+        <string>Andreas Ritter, www.bytestrom.eu, 11/2009</string>
+        <key>version</key>
+        <string>1.0</string>
+        <key>name</key>
+        <string>jpegencoderbasic</string>
       </map>
       <key>kdu</key>
       <map>
-        <key>copyright</key>
-        <string>Kakadu software</string>
-        <key>description</key>
-        <string>JPEG2000 library by Kakadu</string>
-        <key>license</key>
-        <string>Kakadu</string>
-        <key>license_file</key>
-        <string>LICENSES/kdu.txt</string>
-        <key>name</key>
-        <string>kdu</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -773,12 +905,14 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
-              <string>388c77f035b7b68dbeb494c57f0479799c55ab694d330d1dc8a921145d1ad01412b042b0803d27438a05af73eecc452474919f190604adf82c47a5858c81d652</string>
+              <string>84a17ca5c055b85a479145b7a323513b67dac36f15aeed1fc909cfc827015862b85bef3b53caac41442ec45737378eff0e9f85992aac937233c4c0937e85e3b5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu/8.0.6.1253/kdu-8.0.6-linux64-1253.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu/8.0.6.2133/kdu-8.0.6-linux64-2133.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -787,34 +921,34 @@
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
-              <string>dc19ff2932abbe6ad9d023da725e1453b2804bb7cafa707856ef3480594f3de1d6f7559885ff8bd00a8c89accb83b0b805366609705ea1c53f61060a9f5c7852</string>
+              <string>b8d940e551d5909eb6f7d8253e8196ffb648845752054731618b7875358eb80e02d42e1ba0eed0e01a8a180ff9ce91e346b6b917b0032319e59d035533a942ed</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu/8.0.6.1253/kdu-8.0.6-windows64-1253.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/120/packages/generic/kdu/8.0.6.2133/kdu-8.0.6-windows64-2133.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>Kakadu</string>
+        <key>license_file</key>
+        <string>LICENSES/kdu.txt</string>
+        <key>copyright</key>
+        <string>Kakadu software</string>
         <key>version</key>
         <string>8.0.6</string>
-      </map>
-      <key>libepoxy</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libepoxy</string>
-        <key>copyright</key>
-        <string>Copyright © 2013-2014 Intel Corporation</string>
-        <key>description</key>
-        <string>Epoxy is a library for handling OpenGL function pointer management for you.</string>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/libepoxy.txt</string>
         <key>name</key>
-        <string>libepoxy</string>
+        <string>kdu</string>
+        <key>description</key>
+        <string>JPEG2000 library by Kakadu</string>
+      </map>
+      <key>libhunspell</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -822,11 +956,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>33d3e32095370c8613d7188b33b181c7cfb7b9090fab51fdbf10d27587ee47441a1abe90b23a61f944d843e611880af26b25279e95ebbdbbf0fb396c27de000d</string>
+              <string>291de8bfbef71ca67cce02ec6bb7a830ff5d81cf2f5ab758e938ff00f75bbd0774051b37ce63e3119ed28829c5d7768b29eacab3881f8b1d500918ddfccc7212</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1311/libepoxy-1.5.9-darwin64-1311.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.2.1871/libhunspell-1.7.2-darwin64-1871.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -836,11 +970,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>58383c84fb5ebe8e86ced17fa2da3d9825072e025cd6aa922c96bf9d3a4b49b30c196b4c8d6f373f68b474c03c10cd73c24da71a71fe4933ee4daa829554fdba</string>
+              <string>0bd314b8f518f1a67f6d43b1777a1c6347977de3cced2c3cbe0a3198f2ff6b1ad7a2eef02d05f847c0fe44be13019845a6712bf85672d80b6e8e9ae3de1ceb1d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1311/libepoxy-1.5.9-linux64-1311.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.2.1871/libhunspell-1.7.2-linux64-1871.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -850,31 +984,31 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8ca7b60108758a29d63e3c794c38adccf3a464cfcac6465e581bb8f9374b05cc541e18915d731e30e3dca3ed2f41092a6e5b111eae3ac7056a1c3a4f89bb9402</string>
+              <string>15fa091650ee1c5b248e131033bad34d1d540dd3e0aaf909ef0f8b4c69f3b07f133b4bcb20d088fbd8017fac4fc11b9b7dc8ccabe308265e6d2846b05f93f670</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/101/packages/generic/libepoxy/1.5.9.1311/libepoxy-1.5.9-windows64-1311.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.2.1871/libhunspell-1.7.2-windows64-1871.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.5.9</string>
-      </map>
-      <key>libhunspell</key>
-      <map>
-        <key>copyright</key>
-        <string>LGPL 2.1</string>
-        <key>description</key>
-        <string>Spell checking library</string>
         <key>license</key>
         <string>LGPL</string>
         <key>license_file</key>
         <string>LICENSES/hunspell.txt</string>
+        <key>copyright</key>
+        <string>LGPL 2.1</string>
+        <key>version</key>
+        <string>1.7.2</string>
         <key>name</key>
         <string>libhunspell</string>
+        <key>description</key>
+        <string>Spell checking library</string>
+      </map>
+      <key>libjpeg-turbo</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -882,11 +1016,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>315ddcc0b9fbcffcae4d2bdeb5f618c437f2a63ad048ba3c5e7679ddba31db9f0d4614841e9e7f75e684fe352a9a33956470ac07411b080171ed01c8fa4740a5</string>
+              <string>a9c34269458c59dc1d2a9fcc10597c7b8ef10d1df9532449bd1411e0392348a5f4e5347178c1929e858ce6714816fb18ea1fe7a2a35a95d28e3f042779a127b7</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.0.1313/libhunspell-1.7.0-darwin64-1313.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/3.0.1.2197/libjpeg_turbo-3.0.1-darwin64-2197.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -896,11 +1030,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f515db73fd58738110dc18dc79cfb3898cd2bc9f1ea8a46381f81fa20d0a334d6ffcc9efef31aafbca0a88d3e726a292a36f0997aa6e7bfb60a3dbda97afe3f5</string>
+              <string>2a44c29efa2779983aed00e621f15309fb40e0184ef8ca837ead8f7b2e2d28ca74ea32ca80e38757b8c8befcffe53f284fb4eae3b2d62bed198f1986585e21d9</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.0.1313/libhunspell-1.7.0-linux64-1313.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/3.0.1.2197/libjpeg_turbo-3.0.1-linux64-2197.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -910,33 +1044,33 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f2315fc16897d9e6f508bee69e3ec5c362ea22adc63f84e6523a0ee579e7e5d799ffd3083a151e6df784453f558a5f7e50a4900e5cd8a4b7c3d8f241dba7ffdc</string>
+              <string>3494965064cde6e601a8ccf43d5d8a0f72588ca3c2e5e3192428f8266ece8c96ac31e18ece54d5d30012ab947cd3fc5a76306b1e53a4fc263117edee2d63205f</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/107/packages/generic/libhunspell/1.7.0.1313/libhunspell-1.7.0-windows64-1313.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/3.0.1.2197/libjpeg_turbo-3.0.1-windows64-2197.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.7.0</string>
-      </map>
-      <key>libjpeg-turbo</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libjpeg-turbo</string>
-        <key>copyright</key>
-        <string>Copyright (C)2009-2020 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
-        <key>description</key>
-        <string>JPEG encoding, decoding library</string>
         <key>license</key>
         <string>libjpeg-turbo</string>
         <key>license_file</key>
         <string>LICENSES/libjpeg-turbo.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C)2009-2023 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
+        <key>version</key>
+        <string>3.0.1</string>
         <key>name</key>
         <string>libjpeg-turbo</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libjpeg-turbo</string>
+        <key>description</key>
+        <string>JPEG encoding, decoding library</string>
+      </map>
+      <key>libndofdev</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -944,59 +1078,45 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3df1cdc2ef3aa46de03bcacfd6cb5e20e00e038eab2b68e18bca53672c2be9fe64988991461c63091c1175b2f1d82de0127d3c09638c6f8caa3170af1e1ef663</string>
+              <string>32fcfd260a964ab9acca93aed0d4269b67712b7289b0d2db9b84717ebe6d9f0c7881e89a57e12d525252f954fea190623325fb7443a8e7f966ac7203f4e59657</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1318/libjpeg_turbo-2.1.2-darwin64-1318.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1813/libndofdev-0.1.0-darwin64-1813.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>bb7420a8236b8cbc6a6d2e7b204bd070fb3d9938bb35df11fc335add788d204b6567919790b44f0c3abbbf43fdc676af8ae6cc68650c2ccfec113cc6cfffc5b0</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1318/libjpeg_turbo-2.1.2-linux64-1318.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>94e52e575dd7bd83f93178b0414ca16f6d13f5b7fa91181f426ccd41616fd150ff25fa33137a7c4462e7d7aec626d49ac03b23b1b39c506b8055f942bcfc57ff</string>
+              <string>98b655fda88d5108205853b6b9e805751cf2f64cb0940e9bef45fcaac4c6610cc74418cad83b84b65485823bae40129d50c60d45265dfe60e3228faa41de35a5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/115/packages/generic/libjpeg-turbo/2.1.2.1318/libjpeg_turbo-2.1.2-windows64-1318.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1813/libndofdev-0.1.0-windows64-1813.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>2.1.2</string>
-      </map>
-      <key>libndofdev</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2007, 3Dconnexion, Inc. - All rights reserved.</string>
-        <key>description</key>
-        <string>3DConnexion SDK</string>
         <key>license</key>
         <string>BSD</string>
         <key>license_file</key>
         <string>LICENSES/libndofdev.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2007, 3Dconnexion, Inc. - All rights reserved.</string>
+        <key>version</key>
+        <string>0.1.0</string>
         <key>name</key>
         <string>libndofdev</string>
+        <key>description</key>
+        <string>3DConnexion SDK</string>
+      </map>
+      <key>libpng</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1004,45 +1124,59 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a06121c19aca38f6ff5200af7d60c4ad69ad936b42dbc5e1091bf41a7fdc7d09c7d076a557fd42bad4f2a52ca94b1a3216d18b1161fbb3f4e28ed798520807d3</string>
+              <string>a784d8b6e54e15cd8bb0615d8d3cd6a30c17f52899cb8a7ad234d140bcd005a1bb5d3b4fad3d8bbbe8a58ebf20155dbc32916bfa05cf6ad1e2f4c4fb0e815388</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1314/libndofdev-0.1.0-darwin64-1314.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/93/packages/generic/libpng/1.6.40.2294/libpng-1.6.40-darwin64-2294.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>020fe789d92dcaa59e86e7a6a45cee69eb72ca76f16acf64eb4f734f04923a6fcbb79c16c15f4687e63ce3f9ba9e41921e591738d09f0c5166dc52109358ed6f</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/93/packages/generic/libpng/1.6.40.2294/libpng-1.6.40-linux64-2294.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>18f4395deb21541e40039be4a2f056c833a2e2b2d2b42fe7baee007d40f33a983f33a03f02e841226e6c2e4fe235c39c74e307745860dd68234fe13294865b1f</string>
+              <string>1874920e6577f9c1d2de48b2702c71c25beaedb4d20bc2face6da67cfd343c2b517d7ac02098d7cbf1c5c921e74519181649a3ed7e7ea5f1a923b9292481b070</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/117/packages/generic/libndofdev/0.1.0.1314/libndofdev-0.1.0-windows64-1314.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/93/packages/generic/libpng/1.6.40.2294/libpng-1.6.40-windows64-2294.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>0.1.0</string>
-      </map>
-      <key>libpng</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 1995-2019 The PNG Reference Library Authors</string>
-        <key>description</key>
-        <string>PNG Reference library</string>
         <key>license</key>
         <string>libpng</string>
         <key>license_file</key>
         <string>LICENSES/libpng.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 1995-2019 The PNG Reference Library Authors</string>
+        <key>version</key>
+        <string>1.6.40</string>
         <key>name</key>
         <string>libpng</string>
+        <key>description</key>
+        <string>PNG Reference library</string>
+      </map>
+      <key>libwebp</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1050,11 +1184,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6c816e699b1a443841cf4f5dd1d7eec3c6407bccdf85685e82b347393d9cbd93d7fd683337aae1d83c03c81bfe7ad4c706e6d0cd334fe2ee0ff2048d1a28cd9a</string>
+              <string>48cbe61d7e7b2be292284e4f2629d56c7bd50c8fc52a0f343ac46f5c1efdfc91ff9b85b5807af870569b5590d31c3694006fad392bfb4c503959351250d7ed49</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/93/packages/generic/libpng/1.6.37.1295/libpng-1.6.37-darwin64-1295.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp/1.3.1.2152/libwebp-1.3.1-darwin64-2152.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1064,11 +1198,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2412766ceefeca88fdc2da409a188789c526ffbcafea67c26f61cdaabeb96df42f777c7302636dfc4416817ef120c2121349f6ccd46b528c6ebb1642f84b3ddb</string>
+              <string>f2e8e6c5e8ef80a29aeb5c2d590fe8f1ef7a36daf5ed37f3e27fc92ad288f27909fa4debdd8cda1ec617cf096af47aea6cb0ab76dc2e52cfa1ed163e74de3e29</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/93/packages/generic/libpng/1.6.37.1295/libpng-1.6.37-linux64-1295.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp/1.3.1.2152/libwebp-1.3.1-linux64-2152.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1078,33 +1212,33 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>24c9ba662b4093b05accb147c20770fd6af1a58bcd2d0f8d3319e1a27d75cdd6da3c91134caca8218d12e07afd132355b60e17fb017ac42b2e540b2332520597</string>
+              <string>960b37c24a104453639c6aee74cb5e2b797cba4c0c8d0947e3ce0d75f9eb4dee0409d76edcf8bce77a3ca6eb2041544a2134e857a7e26b85f36244fd3ea0ebe1</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/93/packages/generic/libpng/1.6.37.1295/libpng-1.6.37-windows64-1295.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp/1.3.1.2152/libwebp-1.3.1-windows64-2152.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.6.37</string>
-      </map>
-      <key>libwebp</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libwebp</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2010, Google Inc. All rights reserved.</string>
-        <key>description</key>
-        <string>WebP is a modern image format that provides superior lossless and lossy compression for images on the web.</string>
         <key>license</key>
         <string>BSD</string>
         <key>license_file</key>
         <string>LICENSES/libwebp.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Google Inc. All rights reserved.</string>
+        <key>version</key>
+        <string>1.3.1</string>
         <key>name</key>
         <string>libwebp</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libwebp</string>
+        <key>description</key>
+        <string>WebP is a modern image format that provides superior lossless and lossy compression for images on the web.</string>
+      </map>
+      <key>libxml2</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1112,11 +1246,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>170392941383f35b89042ab7ecdc8f41b39a9ec13b350cc31b3ce11a898e17e2a0bb256177508aaabfe0827c328f4096983dfc68917d120646f6c00be23bd41e</string>
+              <string>6406e223e4505221e9ac42b914fb6eb489e1b551874f97b6522c68e3efd6a65eeb63d7b2498cd3de78a065f71e6c3d4a801fdcefb8d1f3e71759e45834d4bb53</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp/1.2.1.1319/libwebp-1.2.1-darwin64-1319.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/97/packages/generic/libxml2/2.12.3.2297/libxml2-2.12.3-darwin64-2297.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1126,11 +1260,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>cebdbe51a521fcb9a06569cc7d4d208c44b080e6b3a96889d02f6f382c9ca3c45715c8e0719e32bdd697fbc8b16c5f772caf162887216ff6e1a4e7d8d3ab0f58</string>
+              <string>e2f921c79b7c5f65102616f56a9b628754461dc1705eae6137e639f0c5552d6025aba77bc10f88f9408d987456602d0ce7da30c6b419c5bd2847bbc3d562ac61</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp/1.2.1.1319/libwebp-1.2.1-linux64-1319.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/97/packages/generic/libxml2/2.12.3.2297/libxml2-2.12.3-linux64-2297.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1140,90 +1274,31 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>20a40e313710e354264e447b5fb30984cf8ff0cce7de70aae2087cc68df103ccad49f932993df50d3ffc58abaaf86a459cbe75f6369661181877c13bc7191404</string>
+              <string>0fca61aa8b4264c4f869e15e49485098375e8574329786cae6ad70f6b023a26d7373d9eb0cc350f9ea6c3e9dc5251feaded5f022ed5b08639a1d67ca7e71ab13</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/82/packages/generic/libwebp/1.2.1.1319/libwebp-1.2.1-windows64-1319.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/97/packages/generic/libxml2/2.12.3.2297/libxml2-2.12.3-windows64-2297.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.2.1</string>
-      </map>
-      <key>libxml2</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (C) 1998-2012 Daniel Veillard.  All Rights Reserved.</string>
-        <key>description</key>
-        <string>Libxml2 is the XML C parser and toolkit developed for the Gnome project.</string>
         <key>license</key>
         <string>mit</string>
         <key>license_file</key>
         <string>LICENSES/libxml2.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1998-2012 Daniel Veillard.  All Rights Reserved.</string>
+        <key>version</key>
+        <string>2.12.3</string>
         <key>name</key>
         <string>libxml2</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>b686413ab5259e7a5489bc6120fa6484c31545f9f707f0aad538972e119e0b56f71b662b649696366c649584909c795aa0d45024990e75dd0dcf67bd699c973c</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/97/packages/generic/libxml2/2.9.12.1293/libxml2-2.9.12-darwin64-1293.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>94330f69896d7d0b892946a96156574d974a47188134116f1fa8c3b004bf92f558e7871b4c629f73e5c4bfcbe7fe88856ce1057ca88a7392dbb6e5ef899fa538</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/97/packages/generic/libxml2/2.9.12.1293/libxml2-2.9.12-linux64-1293.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>91a732f77af55b0c1a2afd974f75c679cfabba8e4a221e879458e3b8be429c687fb1218df65d0130dc5a653d5b3cf3f34389cd4fb1adbd313606e86d13e43f2b</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/97/packages/generic/libxml2/2.9.12.1293/libxml2-2.9.12-windows64-1293.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>2.9.12</string>
+        <key>description</key>
+        <string>Libxml2 is the XML C parser and toolkit developed for the Gnome project.</string>
       </map>
       <key>llca</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2020, Alchemy Development Group; data provided by the Mozilla NSS Project.
-      </string>
-        <key>license</key>
-        <string>mit</string>
-        <key>license_file</key>
-        <string>LICENSES/ca-license.txt</string>
-        <key>name</key>
-        <string>llca</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -1231,29 +1306,30 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e6e6b97c73ea91ebe2125b67422de71854582f793915d8bbd7cb23fc502b2ca6f7008498edb10ce69b1cfb315c881be3db511cb7338b0882cc044b064eafbab3</string>
+              <string>0957fc9ceb2c4d843e2d913c7814e49a3bd5eaeea2cbacd00bd15edae168307c7639bc12c0d1dbed5c138a199939db50ec64915d9e00656db41132bff2d13499</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/125/packages/generic/llca/2021.1216.2157.1317/llca-2021.1216.2157-common-1317.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/125/packages/generic/llca/2023.1225.0655.2302/llca-2023.1225.0655-common-2302.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>mit</string>
+        <key>license_file</key>
+        <string>LICENSES/ca-license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2020, Alchemy Development Group; data provided by the Mozilla NSS Project.
+      </string>
         <key>version</key>
-        <string>2021.1216.2157</string>
+        <string>2023.1225.0655</string>
+        <key>name</key>
+        <string>llca</string>
       </map>
       <key>llphysicsextensions_stub</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2010, Linden Research, Inc.</string>
-        <key>license</key>
-        <string>internal</string>
-        <key>license_file</key>
-        <string>LICENSES/llphysicsextensions.txt</string>
-        <key>name</key>
-        <string>llphysicsextensions_stub</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -1271,23 +1347,163 @@
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>internal</string>
+        <key>license_file</key>
+        <string>LICENSES/llphysicsextensions.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Linden Research, Inc.</string>
         <key>version</key>
         <string>1.0</string>
+        <key>name</key>
+        <string>llphysicsextensions_stub</string>
+      </map>
+      <key>llphysicsextensions_tpv</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>1fe4cbb09fc2e7e85f304880351ebf923a6e13473193ecbe8fdbd23a7215362e41b7be69bfd02125f349cdd90b0748a2db51fe5bbccac109c62dc9ddd7aafc39</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.7493682926/llphysicsextensions_tpv-1.0.7493682926-darwin64-7493682926.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>gitlab</string>
+              <key>hash</key>
+              <string>a6f38ee871f498741a1274dbc3dcc6205b9f9aebb10cc00bf86cec49426358627afb47632a39c2abcfae6468975554b1530a6bb1a1c5ff74283440f838bc4259</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/192/packages/generic/llphysicsextensions_tpv/1.0.7493682926/llphysicsextensions_tpv-1.0.7493682926-windows64-7493682926.tar.bz2</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>commercial</string>
+        <key>license_file</key>
+        <string>LICENSES/llphysicsextensions.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Linden Research, Inc.</string>
+        <key>version</key>
+        <string>1.0.7493682926</string>
+        <key>name</key>
+        <string>llphysicsextensions_tpv</string>
+      </map>
+      <key>mikktspace</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>0bdb34f2c021c76abb87f4641fbfcf84c05c1cabccbd89e51c85c7ec374fee5225e1f4c4684ad0b06ee0ca946ac587c5ba2117d84ddf0258b96dd1ac10743819</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/204/packages/generic/mikktspace/2.2330/mikktspace-2-common-2330.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>Copyright (C) 2011 by Morten S. Mikkelsen</string>
+        <key>license_file</key>
+        <string>mikktspace.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 2011 by Morten S. Mikkelsen</string>
+        <key>version</key>
+        <string>2</string>
+        <key>name</key>
+        <string>mikktspace</string>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-mikktspace</string>
+        <key>description</key>
+        <string>Mikktspace Tangent Generator</string>
       </map>
       <key>minizip-ng</key>
       <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-minizip-ng</string>
-        <key>copyright</key>
-        <string>Copyright (C) 2010-2021 Nathan Moinvaziri</string>
-        <key>description</key>
-        <string>Fork of the popular zip manipulation library found in the zlib distribution.</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>83e33a370aa3ecb6893ae23f669ea5eb6a73c06480deb8de1dc919dc982f965f712208e458c1087071159e7c06fbf78ce9b142fd4508afc839d95401e55f30dd</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/149/packages/generic/minizip-ng/4.0.3.2295/minizip_ng-4.0.3-darwin64-2295.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>5eb6a453d1c2036d60f4fa9816788a05e6602c40cb8aef26ea497b48a220c5e663edaf9b3397827771d429c7c977b513192f488fdb95fc5c66429a9f18e92a83</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/149/packages/generic/minizip-ng/4.0.3.2295/minizip_ng-4.0.3-linux64-2295.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>68e976037a2703f264db2c0beb1c7e08b08cd1b412b5a05f92d062a3f27d42ac8e04ad62898fe09d8d1c6c9eb82b9574db3fa62e33201d66d0b3f8786eb0da7d</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/149/packages/generic/minizip-ng/4.0.3.2295/minizip_ng-4.0.3-windows64-2295.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
         <key>license</key>
         <string>zlib</string>
         <key>license_file</key>
         <string>LICENSES/minizip-ng.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 2010-2021 Nathan Moinvaziri</string>
+        <key>version</key>
+        <string>4.0.3</string>
         <key>name</key>
         <string>minizip-ng</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-minizip-ng</string>
+        <key>description</key>
+        <string>Fork of the popular zip manipulation library found in the zlib distribution.</string>
+      </map>
+      <key>ndPhysicsStub</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1295,11 +1511,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>aaeeed051cba6b38f7e078b42c3d08b3690177fcf97ec94596c5b5447f091f9157e6647613eab8796edf560abcde20b4d59ce15604f669f9b981e0eaf52f67ff</string>
+              <string>c9412240058438e2556779d9032af1fda0bc3d08bc1e863c7a7213c683a9c08aed5d8277d9d20352c9bcd2a9e2cb07e69f847a4e46fcfb9cf7c49a9e59dadd66</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/149/packages/generic/minizip-ng/3.0.4.1290/minizip_ng-3.0.4-darwin64-1290.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1943/ndPhysicsStub-0.1.2-darwin64-1943.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1309,11 +1525,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>365aa27ca55dbcd42bbecc4ecd761b8112db74259a328ed6a76bf1242fbcad37d30ade612499f79af2e8da5ef6eb253542baeaf44a9ae42f18c5fe37fbbb3d8a</string>
+              <string>87d0b9377a7c4af5643cc24f9b315a1bd3c8286a0214199dfd84f99a32ec353e267f9ff91dc9682b1ba4d31dc24f41b0e95e2b64669c4800af5cd8b8cd5dc349</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/149/packages/generic/minizip-ng/3.0.4.1290/minizip_ng-3.0.4-linux64-1290.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1943/ndPhysicsStub-0.1.2-linux64-1943.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1323,31 +1539,31 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0b5e86e871506a51609630df0913b9ead9d6325a355ef9c07786300f6acdb407c0915bbd1b7393007ddbdedc18076dccafbf076859c4a3860c2b9cc4a72cf963</string>
+              <string>c46d51e612ab2ab83e03ee614e3ad7b8b65cebbf861e71e46f66c3299cfc2ef2fde1af726bd07552e787ebca733b2c346acdc2693ad95e5f95866bd3a06e385a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/149/packages/generic/minizip-ng/3.0.4.1290/minizip_ng-3.0.4-windows64-1290.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1943/ndPhysicsStub-0.1.2-windows64-1943.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>3.0.4</string>
-      </map>
-      <key>ndPhysicsStub</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c)2011-2013 Nicky Dasmijn</string>
-        <key>description</key>
-        <string>ndPhysicsStub</string>
         <key>license</key>
         <string>LGPL</string>
         <key>license_file</key>
         <string>LICENSES/ndphysicsstub.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c)2011-2013 Nicky Dasmijn</string>
+        <key>version</key>
+        <string>0.1.2</string>
         <key>name</key>
         <string>ndPhysicsStub</string>
+        <key>description</key>
+        <string>ndPhysicsStub</string>
+      </map>
+      <key>nghttp2</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1355,11 +1571,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ff1c3781fba09d1227775c125e2ca2827053a49f6869913d81f6a5bde5427a7409f615d51244c5eb671c74b3a294053fd2257ab50f3c20373d043bd720d05ff6</string>
+              <string>386293448cd6074513d8d05d7412c5a7979457da094f7fb6004a5872d2867115a9b25f33bdcb734ef94ea7e417d01cddfc2a8a52c46f599d18d3b53b38b97ebf</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1316/ndPhysicsStub-0.1.2-darwin64-1316.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/91/packages/generic/nghttp2/1.58.0.2278/nghttp2-1.58.0-darwin64-2278.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1369,11 +1585,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>67df53eaee29c4b92be494b46cfb5ccc9097bbe4850f33a5c0309c2ee227a41b0193765f34a85c0cb60059dd52d2097b8658dba8fecbdcf7a71be4af6e66e0d3</string>
+              <string>89bf178b1f0829e7be3beb1cbaf0058398a3fe88c45927d60780d17770fe25679d0f8d20a4856d1aaab797221e61cdc18c5da18e009c35169ed9d823d78843c8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1316/ndPhysicsStub-0.1.2-linux64-1316.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/91/packages/generic/nghttp2/1.58.0.2278/nghttp2-1.58.0-linux64-2278.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1383,218 +1599,220 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>881beb6507ac9d574e9727321f4463d6838f34edb50b964a465d3961e74a1d1886b8c500b62b2186cabc8e7a3f5ac54a951d6eaf076cd175b381472ffe43f86f</string>
+              <string>7e3436188eccbdeabb1b2f688f176a40ba084bc8553e3e4d8063ab841ebe0d1323bb71b4b6dcd2086c5a20aec67beb20b2854280f8a65049f80176110b403a0c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/127/packages/generic/ndPhysicsStub/0.1.2.1316/ndPhysicsStub-0.1.2-windows64-1316.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/91/packages/generic/nghttp2/1.58.0.2278/nghttp2-1.58.0-windows64-2278.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>0.1.2</string>
-      </map>
-      <key>nghttp2</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2012, 2014, 2015, 2016 Tatsuhiro Tsujikawa
-Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
-        <key>description</key>
-        <string>Library providing HTTP 2 support for libcurl</string>
         <key>license</key>
         <string>MIT</string>
         <key>license_file</key>
         <string>LICENSES/nghttp2.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2012, 2014, 2015, 2016 Tatsuhiro Tsujikawa
+Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
+        <key>version</key>
+        <string>1.58.0</string>
         <key>name</key>
         <string>nghttp2</string>
+        <key>description</key>
+        <string>Library providing HTTP 2 support for libcurl</string>
+        <key>source_type</key>
+        <string>hg</string>
+      </map>
+      <key>nvapi</key>
+      <map>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>fcf5e48b79919c72b6ac837bfb01e8efba78bbb5373d4afc1d39bf8ab0818cd6ca429505ada4dd5dff1f784d0b68e0bfd11352bf18d5fd0b2f2ffd3836f6631d</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/91/packages/generic/nghttp2/1.46.0.1307/nghttp2-1.46.0-darwin64-1307.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>ef1d5a84f66fe8ce08a9e405612b01ec574263bffcf571141a74341e692fff49969852d301f1ac4acb45c02ba58200e3c529b56f21446df550ac45d26e59fcae</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/91/packages/generic/nghttp2/1.46.0.1307/nghttp2-1.46.0-linux64-1307.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
+              <key>creds</key>
+              <string>gitlab</string>
               <key>hash</key>
-              <string>4df8ba51c4abdc2ee6f4f1e79ccd15f5f2e2a525e5e136f719de522b488fe5955ac87a871bb0918125ea610512e2d6151d3a50f9bb85d6fd2cc7dfa754185056</string>
+              <string>7f691b455861444e2125503c471ac0d8f4463937eeeec1d95652760f59409bd7ab368b57bd3fd63e70c3ff9349df11e0d9be55bdfb0f68b5b53b153181e9e93e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/91/packages/generic/nghttp2/1.46.0.1307/nghttp2-1.46.0-windows64-1307.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/114/packages/generic/nvapi/535.0.0.2134/nvapi-535.0.0-windows64-2134.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>source_type</key>
-        <string>hg</string>
-        <key>version</key>
-        <string>1.46.0</string>
-      </map>
-      <key>nvapi</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2007- 2020 NVIDIA Corporation. All rights reserved. </string>
-        <key>description</key>
-        <string>NVAPI provides an interface to NVIDIA devices.</string>
         <key>license</key>
         <string>nvapi</string>
         <key>license_file</key>
         <string>LICENSES/nvapi.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2007- 2020 NVIDIA Corporation. All rights reserved. </string>
+        <key>version</key>
+        <string>535.0.0</string>
         <key>name</key>
         <string>nvapi</string>
+        <key>description</key>
+        <string>NVAPI provides an interface to NVIDIA devices.</string>
+      </map>
+      <key>ogg_vorbis</key>
+      <map>
         <key>platforms</key>
         <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>d639d05f7e14b952ea5440b02d9f487c6e2d7b11fc7838aab20f2764b533d8c234e1538c4d259e00d3dfa7fa7b0df08070adb1851b2793342c70f0999db1c891</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5-1.3.7.1942/ogg_vorbis-1.3.5-1.3.7-darwin64-1942.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>d226ac8854b3b9b2de8b4dbd5af86175b43d968481f49626784581f489807ee58e0598bd77236bc3526cf0541a5ed991843bdf7e040ccd3e7e7c0454fc48489d</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5-1.3.7.1942/ogg_vorbis-1.3.5-1.3.7-linux64-1942.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b098bab37d4f4967bec96b5eb2867262965a1ccaa48f595600fea9f98a7f5d8a01ae85272db51cc368528973793c2f006c822d130d78e65592072ff598afc9d7</string>
+              <string>731e1b5f925dfd5cb0c189e92e2c7ccb45b448040b7a9d4082604455adbdc77a96572417cf7d33dce36ce330611ab4a257624c8b573e443bcc6e15c6046a8299</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/114/packages/generic/nvapi/470.0.0.1182/nvapi-470.0.0-windows64-1182.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5-1.3.7.1942/ogg_vorbis-1.3.5-1.3.7-windows64-1942.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>470.0.0</string>
-      </map>
-      <key>ogg_vorbis</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2002, Xiph.org Foundation</string>
-        <key>description</key>
-        <string>Audio encoding library</string>
         <key>license</key>
         <string>ogg-vorbis</string>
         <key>license_file</key>
         <string>LICENSES/ogg-vorbis.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2002, Xiph.org Foundation</string>
+        <key>version</key>
+        <string>1.3.5-1.3.7</string>
         <key>name</key>
         <string>ogg_vorbis</string>
+        <key>description</key>
+        <string>Audio encoding library</string>
+      </map>
+      <key>open-libndofdev</key>
+      <map>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>d5c36e32b1aa0f98cd18285d652519d25a4ad6fe8ccaf43eca831dd1899e5cc82126f116fd5c149ef38d8c29750649252bf817cd3b6fc34e2e6ea65eca89f6d4</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1315/ogg_vorbis-1.3.5-darwin64-1315.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b7807ae153416f7a56add30d0723492388aae3c9c1655677e5031ada377dc1382ed15ba4f1dee6cc49d2de97bf60ccd0b1d6b2fd8499edbbfceb5a39885966f0</string>
+              <string>24322f9e86f4176b7fb596cc170dfaa8a2cb17b05c8ea37379fa0f5ac8b36907ee76c314f8d892ccd1c378b2a822f76e472daf53b3ced59185746f1a975351c1</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1315/ogg_vorbis-1.3.5-linux64-1315.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev/0.14.0.2282/open_libndofdev-0.14.0-linux64-2282.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
           </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>b74af0f241a24ee1baeda0c16a71138c58a93bbc488102ea29f8d3569d91884a70607ff1f11ee2ef60f03cdeb16ed62677f592d42fa8ef239e9cf292981b8dde</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/112/packages/generic/ogg_vorbis/1.3.5.1315/ogg_vorbis-1.3.5-windows64-1315.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
         </map>
-        <key>version</key>
-        <string>1.3.5</string>
-      </map>
-      <key>open-libndofdev</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2008, Jan Ciger (jan.ciger (at) gmail.com)</string>
-        <key>description</key>
-        <string>Open Source replacement for 3DConnection SDK</string>
         <key>license</key>
         <string>BSD</string>
         <key>license_file</key>
         <string>LICENSES/libndofdev.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2008, Jan Ciger (jan.ciger (at) gmail.com)</string>
+        <key>version</key>
+        <string>0.14.0</string>
         <key>name</key>
         <string>open-libndofdev</string>
+        <key>description</key>
+        <string>Open Source replacement for 3DConnection SDK</string>
+      </map>
+      <key>openal</key>
+      <map>
         <key>platforms</key>
         <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>0319579db761c4aca610622dc02ec354f259ec9d43c5783b8177f26eadeccfd013a3dd4af3e53e0fba9a2a58c93326cdeaeb35fbd00a6c2838ab81c4e0534d94</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.23.1.2088/openal-1.23.1-darwin64-2088.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>343405bd013c5492c9d1a89d2b27c8289f713a3789ab260d85049f7cd56d755cdc3a0f8438a62fce32d68acd72b9200bdbb581e8ed9d2fa09df1e8a2864c851a</string>
+              <string>58aaa760a31396573ffe5226de69313d77bb4edabef8a2b4f08684ebd9b39f479ae42ae57a60fda7360636b4c1cf8137e9eeb963fbec5b70651fb6f963d3e37a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/99/packages/generic/open-libndofdev/0.12.0.1325/open_libndofdev-0.12.0-linux64-1325.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.23.1.2088/openal-1.23.1-linux64-2088.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
           </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>a7c8239f8a1483625ababa6ca624c6d6989cf424bcb40916bad747dbfbc826244ef1ce1c754fe75201dfe2f224ff8cd1e2cafe6396a67195006a4a2c429b05f7</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.23.1.2088/openal-1.23.1-windows64-2088.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
         </map>
-        <key>version</key>
-        <string>0.12.0</string>
-      </map>
-      <key>openal</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (C) 1999-2007 by authors.</string>
-        <key>description</key>
-        <string>OpenAL Soft is a software implementation of the OpenAL 3D audio API.</string>
         <key>license</key>
         <string>LGPL2</string>
         <key>license_file</key>
         <string>LICENSES/openal-soft.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1999-2007 by authors.</string>
+        <key>version</key>
+        <string>1.23.1</string>
         <key>name</key>
         <string>openal</string>
+        <key>description</key>
+        <string>OpenAL Soft is a software implementation of the OpenAL 3D audio API.</string>
+      </map>
+      <key>openjpeg</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1602,11 +1820,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0f3237cdfa760f16a690c1eb35f67d90b1f8305fa6108ddfdab4daf58999dd7568ff713a77e1b0f3fc0a495956b97fef45d6f8642e44e6a802a6941fabfdbfe9</string>
+              <string>9e341a6c94a7fa141910e719d5b65c362ea6b39af556a2236a08637fb7c4896820146a99d7e26650ad0ff21fbc47d1081c4fe86f43fcd8243959475c17c36803</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1310/openal-1.21.1-darwin64-1310.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/218/packages/generic/openjpeg/2.5.0.2259/openjpeg-2.5.0-darwin64-2259.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1616,11 +1834,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e57559027bf5c36e531b57e7e28a139f714497932359adff1b9a0589bb2e8abace5fb52994002d421059b43532f48b27b2519c460891cc815c31a255269ff916</string>
+              <string>2e67d30e8539d8061680be99740bb0cda882e4b8bd16951d4d0276c2fe423a9a7cc908b1ab6d3e284a0443ce3b792e09ac9fcef3b86f790d96b01406f715fb2d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1310/openal-1.21.1-linux64-1310.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/218/packages/generic/openjpeg/2.5.0.2259/openjpeg-2.5.0-linux64-2259.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1630,31 +1848,31 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1a6b651db66bcdb010883d93017bfe76f6dc91412776c7f7c347ea40fe455e7d26a92073c1e770e232bb720e2ca23bd8d4c6d4e772742ec8f043add294fcc11e</string>
+              <string>187eb9320d75d15a8ff1ad951eef0f000b32ad81b3d39831ace0fbbe5510f932dbd509811930adf3056f950e89030d6ec5d4e716ff2365ee31a494fdb682eace</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/141/packages/generic/openal/1.21.1.1310/openal-1.21.1-windows64-1310.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/218/packages/generic/openjpeg/2.5.0.2259/openjpeg-2.5.0-windows64-2259.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.21.1</string>
-      </map>
-      <key>openjpeg</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2002-2014, Universite catholique de Louvain, Belgium, Copyright (c) 2002-2012, Professor Benoit Macq, Copyright (c) 2003-2012, Antonin Descampe, Copyright (c) 2003-2009, Francois-Olivier Devaux, Copyright (c) 2005, Herve Drolon, FreeImage Team, Copyright (c) 2002-2003, Yannick Verschueren, Copyright (c) 2001-2003, David Janssens</string>
-        <key>description</key>
-        <string>The OpenJPEG library is an open-source JPEG 2000 codec written in C language.</string>
         <key>license</key>
         <string>BSD</string>
         <key>license_file</key>
         <string>LICENSES/openjpeg.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2002-2014, Universite catholique de Louvain, Belgium, Copyright (c) 2002-2012, Professor Benoit Macq, Copyright (c) 2003-2012, Antonin Descampe, Copyright (c) 2003-2009, Francois-Olivier Devaux, Copyright (c) 2005, Herve Drolon, FreeImage Team, Copyright (c) 2002-2003, Yannick Verschueren, Copyright (c) 2001-2003, David Janssens</string>
+        <key>version</key>
+        <string>2.5.0</string>
         <key>name</key>
         <string>openjpeg</string>
+        <key>description</key>
+        <string>The OpenJPEG library is an open-source JPEG 2000 codec written in C language.</string>
+      </map>
+      <key>openssl</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1662,11 +1880,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8dfcc3034005ddd3bdbbc22dba8e221220489c1901de89859ddef6c4a8e69ea4ef32f97f66bedb5abb7f6c7f1fa2d31ffff4c7cea49172091af02433d6b7cd51</string>
+              <string>d6e287879f8e01df8a6e5d0c7143e83bc5b3d8e92f8c057be3c03f7a22d2a5ac01f3aa8dda4d4666df8ec3329a3beadf48fb576cde91bd048831b1130183602d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1309/openjpeg-2.4.0-darwin64-1309.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/1.1.1w.2296/openssl-1.1.1w-darwin64-2296.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1676,11 +1894,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>55f0657ca8448c7403876a7f57970831f77e23d761001bdb5b6d9f8871c364ea3cccd4ae1b10a0818fd4e38315e6b4b145b957fd5e23f8f85b2207523727968f</string>
+              <string>1aa9bcc21aea285b3454e3afebae6a1e5a6e8e07e1d9d61e3997b0c75c37c7cd30603a55ce0f1012659d1aa9d8b31a56fd2a8dc2599518243970687190195dee</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1309/openjpeg-2.4.0-linux64-1309.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/1.1.1w.2296/openssl-1.1.1w-linux64-2296.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1690,31 +1908,65 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bb71b60514ece0e390548a19fce3d64cd5270705b6686cba6f5dadbb352102dc20c3ad90570159c071afa19773a0f3791f3b535266dc5a5382db89579c0829b3</string>
+              <string>2eab35bdbcbdf8d1dbbd5e4e82b15b12c4aaa19a00ba12737072f319506e6342fb2e1db004c0f944c6db2518f2b56a82a4a3690640f44a9f9e1005e9a74e8db8</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.1309/openjpeg-2.4.0-windows64-1309.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/1.1.1w.2296/openssl-1.1.1w-windows64-2296.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>2.4.0</string>
-      </map>
-      <key>openssl</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 1998-2021 The OpenSSL Project.  All rights reserved; Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)</string>
-        <key>description</key>
-        <string>Secure Sockets Layer (SSL v2/v3) and Transport Layer Security (TLS v1) Library</string>
         <key>license</key>
         <string>openssl</string>
         <key>license_file</key>
         <string>LICENSES/openssl.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 1998-2023 The OpenSSL Project.  All rights reserved; Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)</string>
+        <key>version</key>
+        <string>1.1.1w</string>
         <key>name</key>
         <string>openssl</string>
+        <key>description</key>
+        <string>Secure Sockets Layer (SSL v2/v3) and Transport Layer Security (TLS v1) Library</string>
+      </map>
+      <key>sdbus-cpp</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>5c9f4bd8664d0647ee1fb17d4558c2cf341fe7626dce0356e176c85e5160099271c9e8a1c203e24e2241e2004817441b108d2aab213c391858403dbc77619d70</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/205/packages/generic/sdbus-cpp/1.2.0.2019/sdbus_cpp-1.2.0-linux64-2019.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>LGPL</string>
+        <key>license_file</key>
+        <string>LICENSES/sdbus-cpp.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 22016 - 2021 KISTLER INSTRUMENTE AG, Winterthur, Switzerland, (C) 2016 - 2022 Stanislav Angelovic stanislav.angelovic@protonmail.com</string>
+        <key>version</key>
+        <string>1.2.0</string>
+        <key>name</key>
+        <string>sdbus-cpp</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-sdbus-cpp</string>
+        <key>description</key>
+        <string>High-level C++ D-Bus library for Linux designed to provide easy-to-use yet powerful API in modern C++</string>
+      </map>
+      <key>sentry</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1722,11 +1974,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>55fe9d25b2b2bf8c9fb7c2d5dde391f69161a3bb8191eb5692b58ec6c1d1f426d5f23db6c2ae90787a775c2a0f4980b02f8234cbe55b4329a4d6bbe1b853e8a2</string>
+              <string>94ec049336bc666d1ce27f8b82b3c6995d7d0f5e46431598bd885b9dbd256b35931ae617e267c30f43704e2e0df52f54f553b79377ff23b41cd4f1385ce4406a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/1.1.1l.1296/openssl-1.1.1l-darwin64-1296.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.20.0-0.7.0.2337/sentry-8.20.0-0.7.0-darwin64-2337.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1736,11 +1988,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>193b82332e5cade6206152532ea8d2a5d893cc0b6ed0769fa605c79440faa8c583bb61d09be2f3e224009005ddd61a3dd943059e130ba66ba3de5228d1748173</string>
+              <string>4c3454b6f3e54a1b0a48d2580fdf84223bdfa144749ff168698898a57a0f1077ea4ee0ea84d5696d764d42b5abf2e4dee58c72de6dd785240914c6ba6d6774dd</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/1.1.1l.1296/openssl-1.1.1l-linux64-1296.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.20.0-0.7.0.2337/sentry-8.20.0-0.7.0-linux64-2337.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1750,33 +2002,33 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7e899def25760c2aaf764412c3bf3a91386216cebfdebefca5e18a8c68943344b68f20b7697fe9fcb0122e7b2c5813076f95ecde54ff3da8d240ea053b181e30</string>
+              <string>a4048f5a5d50e4e3933ba7b196145127d209d8245a251ec6b78e2c24a5954e2a8f6c8923779f27774199152cc695e65e9a4fc986717be01c22cd77a7fdc3edf9</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/90/packages/generic/openssl/1.1.1l.1296/openssl-1.1.1l-windows64-1296.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/8.20.0-0.7.0.2337/sentry-8.20.0-0.7.0-windows64-2337.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.1.1l</string>
-      </map>
-      <key>sentry</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-sentry</string>
-        <key>copyright</key>
-        <string>Copyright (c) Sentry</string>
-        <key>description</key>
-        <string>The official Sentry SDK for Apple and Native</string>
         <key>license</key>
         <string>MIT</string>
         <key>license_file</key>
         <string>LICENSES/sentry.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) Sentry</string>
+        <key>version</key>
+        <string>8.20.0-0.7.0</string>
         <key>name</key>
         <string>sentry</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-sentry</string>
+        <key>description</key>
+        <string>The official Sentry SDK for Apple and Native</string>
+      </map>
+      <key>slvoice</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1784,11 +2036,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>decfb309c89a99640c0933b03a049df7b6a6d53db4c0a047f8b5633e9d46e78ccc6704e79f087612e0acc2976eb2381ad25f9ae9091da380422864f494e47542</string>
+              <string>f56e4ab8fb80e23806b3bd255f82dcaad8f0483181b9f63e3342f841a8bd8473bc72a6c0268ebef6d59a31e6609e6c9716b36d401d6a4d179102521565ac6cb0</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1320/sentry-1.0.0-darwin64-1320.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1811/slvoice-4.10.0000.32327.5fc3fe7c.558436-darwin64-1811.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1798,11 +2050,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>55b9060fdfcf58398939213d21ae480c763ef03a23d76572dd7de4c924d2a96d998400847a52b2d3341869999bd7e3c2d50211a168d07170670a78d613edc073</string>
+              <string>e3369cda080cf1a582339ce5a69262f363e68f571e9303184fe7837b54ea59b76a19a3963721e9a3e138d72c3d68cc5645c19682a9759bd3719abc26430e9687</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1320/sentry-1.0.0-linux64-1320.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1811/slvoice-4.10.0000.32327.5fc3fe7c.558436-linux64-1811.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1812,31 +2064,99 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a40d8701ad5ec37c1cf0b0ef5946964d42d6d44d677481cf918e0f1901b4c8758d55b86dc0475ecc2de2b220665ab34eb62d87dc2358ebb4bac7504eb9f88345</string>
+              <string>bdd00d734fe7665290414bb20437b0bf17adaf18bd0e43d729d19b2480dc2216d6ae4aa0ab3ce4290e3bf0bd5941b4a89cd46f8bd2b871c65873ccb660e08f68</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/164/packages/generic/sentry/1.0.0.1320/sentry-1.0.0-windows64-1320.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1811/slvoice-4.10.0000.32327.5fc3fe7c.558436-windows64-1811.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>1.0.0</string>
-      </map>
-      <key>slvoice</key>
-      <map>
-        <key>copyright</key>
-        <string>2010 Vivox, including audio coding using Polycom¨ Siren14TM (ITU-T Rec. G.722.1 Annex C)</string>
-        <key>description</key>
-        <string>Vivox SDK components</string>
         <key>license</key>
         <string>Mixed</string>
         <key>license_file</key>
         <string>LICENSES/vivox_licenses.txt</string>
+        <key>copyright</key>
+        <string>2010 Vivox, including audio coding using Polycom¨ Siren14TM (ITU-T Rec. G.722.1 Annex C)</string>
+        <key>version</key>
+        <string>4.10.0000.32327.5fc3fe7c.558436</string>
         <key>name</key>
         <string>slvoice</string>
+        <key>description</key>
+        <string>Vivox SDK components</string>
+      </map>
+      <key>threejs</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3fbe0e0a9752b4d2247a9f5cfc895677b5877c4804bfc6d0b65dba2853f8f4451fcc6f741bc097bcfceda2c8a9ee99080b3c438e27fe659d679444364235e8e1</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/174/packages/generic/threejs/0.135.0.1339/threejs-0.135.0-common-1339.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/THREEJS_LICENSE.txt</string>
+        <key>copyright</key>
+        <string>Copyright © 2010-2021 three.js authors</string>
+        <key>version</key>
+        <string>0.135.0</string>
+        <key>name</key>
+        <string>threejs</string>
+      </map>
+      <key>tinygltf</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>796ca43cbb2c59c46f6dbf57177b231740b79364920d9d1ea6487e4e312dee7d731f1c66e88d37dc8141c4429d048af4b7f0f46254b6709724a975d52ca66ce3</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/185/packages/generic/tinygltf/v2.8.19.2280/tinygltf-v2.8.19-common-2280.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/tinygltf_license.txt</string>
+        <key>copyright</key>
+        <string>// Copyright (c) 2015 - Present Syoyo Fujita, Aurélien Chatelain and many contributors.</string>
+        <key>version</key>
+        <string>v2.8.19</string>
+        <key>name</key>
+        <string>tinygltf</string>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-tinygltf</string>
+        <key>description</key>
+        <string>tinygltf import library</string>
+        <key>source</key>
+        <string>https://bitbucket.org/lindenlab/3p-tinygltf</string>
+        <key>source_type</key>
+        <string>git</string>
+      </map>
+      <key>tracy</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1844,59 +2164,49 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ee960277ce5a3982aa04abbae482ce0b949a4a6d22a719f4d78fda77599cdca001b9cbaf28f00d013b4cd16eff76310cf1c7829b4e6bd5a16b4906daccdbbc88</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>9b6e1a1f4b0969d38a1ca8ee00aeb548</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1202/slvoice-4.10.0000.32327.5fc3fe7c.558436-darwin64-1202.tar.zst</string>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/110584/960613/tracy-v0.8.1.578241-darwin64-578241.tar.bz2</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>2e2f8a3793cfd4ab441d4cfb6ec2af1c6a0e929076a56f18d6c741b15c2850aaf5ab790291b931a315a6289753de767c802df34c6f8e7ba21e6f549cf8347691</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1202/slvoice-4.10.0000.32327.5fc3fe7c.558436-linux64-1202.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b756951b908b487fb616c6e420d3bfb8d8729613572263ef57fcc17c6d865c1177750b5a3e11f12757004dbb3fd76a4b2082e93bc05b740af394250d5cd050ac</string>
+              <string>773e2803356980515b066dd668fad9cee0d7dfe29bc1b29ed690503aed1dde4970300ab21985c6ac70c91318844d0ae088045034627b0cf1dd7efb5b5c1cd6aa</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/168/packages/generic/slvoice/4.10.0000.32327.5fc3fe7c.558436.1202/slvoice-4.10.0000.32327.5fc3fe7c.558436-windows64-1202.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/201/packages/generic/tracy/v0.9.0.1868/tracy-v0.9.0-windows64-1868.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>4.10.0000.32327.5fc3fe7c.558436</string>
-      </map>
-      <key>tut</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright 2002-2006 Vladimir Dyuzhev, Copyright 2007 Denis Kononenko, Copyright 2008-2009 Michał Rzechonek</string>
-        <key>description</key>
-        <string>TUT is a small and portable unit test framework for C++.</string>
         <key>license</key>
         <string>bsd</string>
         <key>license_file</key>
-        <string>LICENSES/tut.txt</string>
+        <string>LICENSES/tracy_license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2017-2022, Bartosz Taudul (wolf@nereid.pl)</string>
+        <key>version</key>
+        <string>v0.9.0</string>
         <key>name</key>
-        <string>tut</string>
+        <string>tracy</string>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-tracy</string>
+        <key>description</key>
+        <string>Tracy Profiler Library</string>
+        <key>source</key>
+        <string>https://bitbucket.org/lindenlab/3p-tracy</string>
+        <key>source_type</key>
+        <string>git</string>
+      </map>
+      <key>tut</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -1914,21 +2224,81 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <string>common</string>
           </map>
         </map>
+        <key>license</key>
+        <string>bsd</string>
+        <key>license_file</key>
+        <string>LICENSES/tut.txt</string>
+        <key>copyright</key>
+        <string>Copyright 2002-2006 Vladimir Dyuzhev, Copyright 2007 Denis Kononenko, Copyright 2008-2009 Michał Rzechonek</string>
         <key>version</key>
         <string>2008.11.30</string>
+        <key>name</key>
+        <string>tut</string>
+        <key>description</key>
+        <string>TUT is a small and portable unit test framework for C++.</string>
       </map>
       <key>uriparser</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright (C) 2007, Weijia Song &lt;songweijia@gmail.com&gt;, Sebastian Pipping &lt;webmaster@hartwork.org&gt;</string>
-        <key>description</key>
-        <string>uriparser is a strictly RFC 3986 compliant URI parsing and handling library written in C. uriparser is cross-platform, fast, supports Unicode and is licensed under the New BSD license.</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>6636310cac61ae2e7351918ac8cfebbe5f484b1c8208a0bece5a75635e9aefd51bdcd64803ea2e58406bf55c54bb808f3af515889c0924cc71c2f25770ebe160</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser/0.9.7.2131/uriparser-0.9.7-darwin64-2131.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>66fa5b8e563e2253d8aa92cf87792eab48f97c55197c38033851392f2ded757ecc9fb0413ebbe36e406ecbb7c67985df8ebd44f6afb3e432b8c632778cf7364a</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser/0.9.7.2131/uriparser-0.9.7-linux64-2131.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>0d13242a505c52816cbed011dbedddf62162ea6c214d17fc92a240691e0b8d2324b4069ca0904bbd45dea204fe119d9ae56f989e25480ba985da3b8152bd5954</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser/0.9.7.2131/uriparser-0.9.7-windows64-2131.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
         <key>license</key>
         <string>New BSD license</string>
         <key>license_file</key>
         <string>LICENSES/uriparser.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 2007, Weijia Song &lt;songweijia@gmail.com&gt;, Sebastian Pipping &lt;webmaster@hartwork.org&gt;</string>
+        <key>version</key>
+        <string>0.9.7</string>
         <key>name</key>
         <string>uriparser</string>
+        <key>description</key>
+        <string>uriparser is a strictly RFC 3986 compliant URI parsing and handling library written in C. uriparser is cross-platform, fast, supports Unicode and is licensed under the New BSD license.</string>
+      </map>
+      <key>vlc-bin</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -1936,103 +2306,43 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e64c79e4fe79bffe2c6cb73d89a5a46fd8815ce45a77369b00a25a3ada3de5172dc2e9a670520015e5fae370da122aefcb9639cd4d17626980aa89490f8b2f79</string>
+              <string>4eeda8fc5d9c72c5561cfc38f72e7aad2c5b89f74f47f8bb5b1151e4532c1b7a6bda71414241275f881d3baf19b87930bcb0eae4c31373557a6fd1c8c899502e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser/0.9.5.1294/uriparser-0.9.5-darwin64-1294.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.20.2227/vlc_bin-3.0.20-darwin64-2227.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>eee4d4ef0f8fa278969a13dfed1714808a1b32bd46b1ca4dc89ec7421ce4b0700eb988c747e223f6316113abb17c9a77cff44b94cf94ea9c0fd841a5f0755719</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser/0.9.5.1294/uriparser-0.9.5-linux64-1294.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
           </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>60ae9de24caba89ed3bc61cac8ab87882d27fa1442824351ef896b758a1c23b9d07eb05d407bb0a7889211b8c7c5e768e5e0dd70c0b699048f5e323c1fb021cb</string>
+              <string>9d51b045a69076f7f48f76d1c9ef6e910d5ebf2085c6f89932f171b888432000e6c6f76eba1e959daf8839b2b402958f57233d6827ef2cf38bcf8c5a3c489911</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/96/packages/generic/uriparser/0.9.5.1294/uriparser-0.9.5-windows64-1294.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.20.2227/vlc_bin-3.0.20-windows64-2227.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>0.9.5</string>
-      </map>
-      <key>viewer-manager</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (c) 2000-2012, Linden Research, Inc.</string>
-        <key>description</key>
-        <string>Linden Lab Viewer Management Process suite.</string>
-        <key>license</key>
-        <string>viewerlgpl</string>
-        <key>license_file</key>
-        <string>LICENSE</string>
-        <key>name</key>
-        <string>viewer-manager</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>97fac6d88480445c856083ed20d78093</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/85206/790666/viewer_manager-2.0.562101-darwin64-562101.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>3f6271ec0e2e2f0cc1067d4c4102bb4c</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/85208/790681/viewer_manager-2.0.562101-windows-562101.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows</string>
-          </map>
-        </map>
-        <key>source</key>
-        <string>https://bitbucket.org/lindenlab/vmp-standalone</string>
-        <key>source_type</key>
-        <string>hg</string>
-        <key>version</key>
-        <string>2.0.562101</string>
-      </map>
-      <key>vlc-bin</key>
-      <map>
-        <key>copyright</key>
-        <string>Copyright (C) 1998-2020 VLC authors and VideoLAN</string>
         <key>license</key>
         <string>GPL2</string>
         <key>license_file</key>
         <string>LICENSES/vlc.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1998-2020 VLC authors and VideoLAN</string>
+        <key>version</key>
+        <string>3.0.20</string>
         <key>name</key>
         <string>vlc-bin</string>
+      </map>
+      <key>vulkan_gltf</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2040,11 +2350,9 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>82f633c8633ec5a721084f8a43cea5526e9ddde2fc6b81d2f39131d2d8e06e22ca2064e5b172cbbb34014cb42a7eab88b3bc08e86ad9242f0e3b06fed5980cde</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>8cff2060843db3db788511ee34a8e8cc</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.16.1212/vlc_bin-3.0.16-darwin64-1212.tar.zst</string>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/101316/891509/vulkan_gltf-1-darwin64-572743.tar.bz2</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2054,31 +2362,123 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>db3b3bf6f37b66291d862e16bf4b84acb6dcdc82e219cb928a0b40dc2245b001c2ce6c5c0f204b1fef3566b0cfd74532a575d4af392dbfdbe770631b699d4755</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>79b6a11622c2f83cfc2b7cd1fafb867b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.16.1212/vlc_bin-3.0.16-windows64-1212.tar.zst</string>
+              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/101319/891521/vulkan_gltf-1-windows64-572743.tar.bz2</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
+        <key>license</key>
+        <string>Copyright (c) 2018 Sascha Willems</string>
+        <key>license_file</key>
+        <string>LICENSES/vulkan_gltf.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2018 Sascha Willems</string>
         <key>version</key>
-        <string>3.0.16</string>
+        <string>1</string>
+        <key>name</key>
+        <string>vulkan_gltf</string>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-vulkan-gltf-pbr</string>
+        <key>description</key>
+        <string>Vulkan GLTF Sample Implementation</string>
       </map>
       <key>xmlrpc-epi</key>
       <map>
-        <key>copyright</key>
-        <string>Copyright: (C) 2000 Epinions, Inc.</string>
-        <key>description</key>
-        <string>XMLRPC Library</string>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>71caa1eede137c0a942f4ac9bb21af400e4d4b6e80dbeecd5ed07b0f67d151684d0e83cfd74be49d00cec0bb047849109fd4625f8700573f64bb041f5e1d6e26</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1818/xmlrpc_epi-0.54.1-darwin64-1818.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>52b330b451aafa27a4a2b0fad72ffac904df518bab182ab0c9171957f1319cbaece0849c37114d23b41808073417fcb53a26e36eb7f7d6210117530f24dc2167</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1818/xmlrpc_epi-0.54.1-linux64-1818.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>1960bdd5aef6877ad7f33482743c8e747534bb87419ed23a2c5b470d7b5d89138d1d175fb2f785adad8daeefa6480bd13128fb3165656ecc9685c36525c36966</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1818/xmlrpc_epi-0.54.1-windows64-1818.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
         <key>license</key>
         <string>xmlrpc-epi</string>
         <key>license_file</key>
         <string>LICENSES/xmlrpc-epi.txt</string>
+        <key>copyright</key>
+        <string>Copyright: (C) 2000 Epinions, Inc.</string>
+        <key>version</key>
+        <string>0.54.1</string>
         <key>name</key>
         <string>xmlrpc-epi</string>
+        <key>description</key>
+        <string>XMLRPC Library</string>
+      </map>
+      <key>xxhash</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>900198578dac08a7a2f160a7fd5c4410c9609a3579a7c75dec71a16b332daedf2c0c399578f3e66bba14d01e6435aa019bed665372eef6e3c41b15db9ae44421</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.2.2136/xxhash-0.8.2-common-2136.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>BSD 2-Clause</string>
+        <key>license_file</key>
+        <string>LICENSES/xxhash.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2012-2021 Yann Collet</string>
+        <key>version</key>
+        <string>0.8.2</string>
+        <key>name</key>
+        <string>xxhash</string>
+        <key>description</key>
+        <string>Extremely fast non-cryptographic hash algorithm</string>
+      </map>
+      <key>zlib-ng</key>
+      <map>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2086,11 +2486,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2b1ee20a97e85da3812cf05fa4f8d8c140b6d1976ddc88dade5224b27c7e3608086524b393acd0a9618d904db548dbb935b221568d510318e2daf3eeb690949a</string>
+              <string>d777936e09499f1a8654adc911c31f9353e31831eaa6d8941b7ebc19f93c9651263bbe9f86efa51f1a23168853679f43cd4eb2af6dc512b95ed913fa6af7e6c6</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1302/xmlrpc_epi-0.54.1-darwin64-1302.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/148/packages/generic/zlib-ng/2.1.5.2291/zlib_ng-2.1.5-darwin64-2291.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2100,11 +2500,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>dbb1ad76de71a3417934170d8691c5e30ce07074f4d937efc149390f43c372579576ce36c642ca34fbe4167b8d416edb4312502049ed5d1b4108a765ee4ae1b0</string>
+              <string>5dbbb477291b30aaf547525f4e1ad0a9da9537f2baa697579db505e07d5f25fc6be44ff4c8cb6ebb26a22d52c4e7c177ac264e40a989e10f75a5e647d802d8b1</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1302/xmlrpc_epi-0.54.1-linux64-1302.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/148/packages/generic/zlib-ng/2.1.5.2291/zlib_ng-2.1.5-linux64-2291.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2114,96 +2514,34 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0347b4aaca3945c33e615b48666dcd909777f851d58358a74d6d8bf9995dd15c235bd319df68d67b789a8a22ee1fdee1c2f3275c6c005062e46443a364e0563e</string>
+              <string>5e824dd5d32acfea9477e324f114ecffbabac79d522f363f461347e1461f8a17ef4b2031358cba675f95a29c18ec8370801c5bfd18d02bb93cf2f624da33a26c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/110/packages/generic/xmlrpc-epi/0.54.1.1302/xmlrpc_epi-0.54.1-windows64-1302.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/148/packages/generic/zlib-ng/2.1.5.2291/zlib_ng-2.1.5-windows64-2291.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>version</key>
-        <string>0.54.1</string>
-      </map>
-      <key>zlib-ng</key>
-      <map>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-zlib-ng</string>
-        <key>copyright</key>
-        <string>Copyright (C) 1995-2017 Jean-loup Gailly and Mark Adler</string>
-        <key>description</key>
-        <string>zlib replacement with optimizations for next generation systems.</string>
         <key>license</key>
         <string>zlib</string>
         <key>license_file</key>
         <string>LICENSES/zlib-ng.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C) 1995-2017 Jean-loup Gailly and Mark Adler</string>
+        <key>version</key>
+        <string>2.1.5</string>
         <key>name</key>
         <string>zlib-ng</string>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>090435a0951c0548f4cac4d932ba802b1222cb97a0e08cac1e2cf399f638beb0d53ffc86d9d8074d25c130a2e390be271d84371da0ed70c1d52e71b42b36f853</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/148/packages/generic/zlib-ng/2.0.5.1289/zlib_ng-2.0.5-darwin64-1289.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>88685a966a85f92abbc26971728f0eb40de42cfc62325aa881a28cdd832c12b9ac4256fb40d26a50b8184886a80bd3af75cb5156f6fac06940d8d523559d3d4b</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/148/packages/generic/zlib-ng/2.0.5.1289/zlib_ng-2.0.5-linux64-1289.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>43383261ca4a2c296a5d955c424ae6056339efac6681798da0cdbbd39d3275e8783b120c3a7dddbddb39281fa5ba9626ca20a9aed8e3caeaa7283659cdf4b41d</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/148/packages/generic/zlib-ng/2.0.5.1289/zlib_ng-2.0.5-windows64-1289.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>version</key>
-        <string>2.0.5</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-zlib-ng</string>
+        <key>description</key>
+        <string>zlib replacement with optimizations for next generation systems.</string>
       </map>
     </map>
     <key>package_description</key>
     <map>
-      <key>canonical_repo</key>
-      <string>https://git.alchemyviewer.org/alchemy</string>
-      <key>copyright</key>
-      <string>Copyright (c) 2021, Alchemy Development Group</string>
-      <key>description</key>
-      <string>Alchemy Viewer</string>
-      <key>license</key>
-      <string>LGPL</string>
-      <key>license_file</key>
-      <string>docs/LICENSE-source.txt</string>
-      <key>name</key>
-      <string>Alchemy Viewer</string>
       <key>platforms</key>
       <map>
         <key>common</key>
@@ -2214,10 +2552,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <map>
               <key>configure</key>
               <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
                 <key>command</key>
                 <string>cmake</string>
                 <key>options</key>
@@ -2226,16 +2560,17 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                </array>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
               </map>
               <key>name</key>
               <string>Coverity</string>
             </map>
             <key>RelWithDebInfo</key>
             <map>
-              <key>build</key>
-              <map>
-              </map>
               <key>configure</key>
               <map>
                 <key>command</key>
@@ -2246,7 +2581,10 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=TRUE</string>
-                </array>
+</array>
+              </map>
+              <key>build</key>
+              <map>
               </map>
               <key>name</key>
               <string>RelWithDebInfo</string>
@@ -2255,10 +2593,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <map>
               <key>configure</key>
               <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
                 <key>command</key>
                 <string>cmake</string>
                 <key>options</key>
@@ -2267,16 +2601,17 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                </array>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
               </map>
               <key>name</key>
               <string>RelWithDebInfoOS</string>
             </map>
             <key>Release</key>
             <map>
-              <key>build</key>
-              <map>
-              </map>
               <key>configure</key>
               <map>
                 <key>command</key>
@@ -2287,7 +2622,10 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=TRUE</string>
-                </array>
+</array>
+              </map>
+              <key>build</key>
+              <map>
               </map>
               <key>name</key>
               <string>Release</string>
@@ -2296,10 +2634,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <map>
               <key>configure</key>
               <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
                 <key>command</key>
                 <string>cmake</string>
                 <key>options</key>
@@ -2308,7 +2642,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-DADDRESS_SIZE:STRING=$AUTOBUILD_ADDRSIZE</string>
                   <string>-DROOT_PROJECT_NAME:STRING=Alchemy</string>
                   <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                </array>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
               </map>
               <key>name</key>
               <string>ReleaseOS</string>
@@ -2319,12 +2657,24 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         </map>
         <key>darwin64</key>
         <map>
-          <key>build_directory</key>
-          <string>build-darwin-64</string>
           <key>configurations</key>
           <map>
             <key>Coverity</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>command</key>
+                <string>cmake</string>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Unix Makefiles</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2336,27 +2686,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>make</string>
                   <string>-j</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>command</key>
-                <string>cmake</string>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Unix Makefiles</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>Coverity</string>
             </map>
             <key>RelWithDebInfo</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Xcode</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2367,19 +2715,8 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>RelWithDebInfo</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Xcode</string>
-                </array>
+                  <string>-parallelizeTargets</string>
+</array>
               </map>
               <key>default</key>
               <string>True</string>
@@ -2388,6 +2725,14 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             </map>
             <key>RelWithDebInfoOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Xcode</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2398,21 +2743,26 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>RelWithDebInfo</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Xcode</string>
-                </array>
+                  <string>-parallelizeTargets</string>
+</array>
               </map>
               <key>name</key>
               <string>RelWithDebInfoOS</string>
             </map>
             <key>Release</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Xcode</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2423,25 +2773,22 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Xcode</string>
-                </array>
+                  <string>-parallelizeTargets</string>
+</array>
               </map>
               <key>name</key>
               <string>Release</string>
             </map>
             <key>ReleaseOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Xcode</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2452,31 +2799,32 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Xcode</string>
-                </array>
+                  <string>-parallelizeTargets</string>
+</array>
               </map>
               <key>name</key>
               <string>ReleaseOS</string>
             </map>
           </map>
+          <key>build_directory</key>
+          <string>build-darwin-64</string>
           <key>name</key>
           <string>darwin64</string>
         </map>
         <key>linux</key>
         <map>
-          <key>build_directory</key>
-          <string>build-linux-$AUTOBUILD_ADDRSIZE</string>
           <key>configurations</key>
           <map>
             <key>Coverity</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Unix Makefiles</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2488,21 +2836,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>make</string>
                   <string>-j</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Unix Makefiles</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>Coverity</string>
             </map>
             <key>RelWithDebInfo</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Ninja</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2515,19 +2867,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--parallel</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Ninja</string>
-                </array>
+</array>
               </map>
               <key>default</key>
               <string>True</string>
@@ -2536,6 +2876,14 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             </map>
             <key>RelWithDebInfoOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Ninja</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2548,21 +2896,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--parallel</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Ninja</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>RelWithDebInfoOS</string>
             </map>
             <key>Release</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Ninja</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>../indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2575,25 +2927,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--parallel</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>../indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Ninja</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>Release</string>
             </map>
             <key>ReleaseOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>Ninja</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2606,15 +2954,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--parallel</string>
                   <string>$AUTOBUILD_CPU_COUNT</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>Ninja</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>ReleaseOS</string>
@@ -2628,17 +2968,33 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
               <string>default</string>
             </map>
           </map>
+          <key>build_directory</key>
+          <string>build-linux-$AUTOBUILD_ADDRSIZE</string>
           <key>name</key>
           <string>linux</string>
         </map>
         <key>windows</key>
         <map>
-          <key>build_directory</key>
-          <string>build-vc-$AUTOBUILD_ADDRSIZE</string>
           <key>configurations</key>
           <map>
             <key>RelWithDebInfo</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
+                  <string>-A</string>
+                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
+                  <string>-T</string>
+                  <string>host=x64</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>..\indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2651,23 +3007,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--</string>
                   <string>/m</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>..\indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
-                  <string>-A</string>
-                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
-                  <string>-T</string>
-                  <string>host=x64</string>
-                </array>
+</array>
               </map>
               <key>default</key>
               <string>True</string>
@@ -2676,6 +3016,21 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             </map>
             <key>RelWithDebInfoOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
+                  <string>-A</string>
+                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
+                  <string>-DUNATTENDED:BOOL=ON</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>..\indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2688,30 +3043,29 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>RelWithDebInfo</string>
                   <string>--</string>
                   <string>/m</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>..\indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
-                  <string>-A</string>
-                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
-                  <string>-DUNATTENDED:BOOL=ON</string>
-                  <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                  <string>-DUSE_KDU=FALSE</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>RelWithDebInfoOS</string>
             </map>
             <key>Release</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
+                  <string>-A</string>
+                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
+                  <string>-T</string>
+                  <string>host=x64</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>..\indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2724,29 +3078,29 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--</string>
                   <string>/m</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>..\indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
-                  <string>-A</string>
-                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
-                  <string>-T</string>
-                  <string>host=x64</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>Release</string>
             </map>
             <key>ReleaseOS</key>
             <map>
+              <key>configure</key>
+              <map>
+                <key>options</key>
+                <array>
+                  <string>-G</string>
+                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
+                  <string>-A</string>
+                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
+                  <string>-T</string>
+                  <string>host=x64</string>
+</array>
+                <key>arguments</key>
+                <array>
+                  <string>..\indra</string>
+</array>
+              </map>
               <key>build</key>
               <map>
                 <key>command</key>
@@ -2759,40 +3113,32 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>Release</string>
                   <string>--</string>
                   <string>/m</string>
-                </array>
-              </map>
-              <key>configure</key>
-              <map>
-                <key>arguments</key>
-                <array>
-                  <string>..\indra</string>
-                </array>
-                <key>options</key>
-                <array>
-                  <string>-G</string>
-                  <string>${AUTOBUILD_WIN_CMAKE_GEN|NOTWIN}</string>
-                  <string>-A</string>
-                  <string>${AUTOBUILD_WIN_VSPLATFORM|NOTWIN}</string>
-                  <string>-T</string>
-                  <string>host=x64</string>
-                  <string>-DINSTALL_PROPRIETARY=FALSE</string>
-                  <string>-DUSE_KDU=FALSE</string>
-                </array>
+</array>
               </map>
               <key>name</key>
               <string>ReleaseOS</string>
             </map>
           </map>
+          <key>build_directory</key>
+          <string>build-vc-$AUTOBUILD_ADDRSIZE</string>
           <key>name</key>
           <string>windows</string>
         </map>
       </map>
+      <key>license</key>
+      <string>LGPL</string>
+      <key>license_file</key>
+      <string>docs/LICENSE-source.txt</string>
+      <key>copyright</key>
+      <string>Copyright (c) 2013-2023, Alchemy Development Group</string>
       <key>version_file</key>
       <string>newview/viewer_version.txt</string>
+      <key>name</key>
+      <string>Alchemy Viewer</string>
+      <key>canonical_repo</key>
+      <string>https://git.alchemyviewer.org/alchemy</string>
+      <key>description</key>
+      <string>Alchemy Viewer</string>
     </map>
-    <key>type</key>
-    <string>autobuild</string>
-    <key>version</key>
-    <string>1.3</string>
   </map>
 </llsd>

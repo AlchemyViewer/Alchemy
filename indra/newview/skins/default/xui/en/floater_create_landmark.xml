@@ -3,7 +3,7 @@
  can_resize="false"
  show_title="false"
  can_minimize="false"
- can_close="true"
+ can_close="false"
  header_height="10"
  bg_opaque_image="Window_NoTitle_Foreground"
  bg_alpha_image="Window_NoTitle_Background"
@@ -88,6 +88,7 @@
      spellcheck="true"
      text_readonly_color="white"
      text_type="ascii_with_newline"
+     commit_on_focus_lost="true"
      top_pad="5"
      width="290"
      wrap="true" />

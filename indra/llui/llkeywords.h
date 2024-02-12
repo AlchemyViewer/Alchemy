@@ -37,6 +37,8 @@
 #include <deque>
 #include "llpointer.h"
 
+class LLStyle;
+typedef LLPointer<LLStyle> LLStyleSP;
 class LLTextSegment;
 typedef LLPointer<LLTextSegment> LLTextSegmentPtr;
 
@@ -68,7 +70,8 @@ public:
 		TT_FUNCTION,						// WORD
 		TT_LABEL,							// LINE
 		TT_SECTION,							// WORD
-		TT_TYPE								// WORD
+		TT_TYPE,							// WORD
+		TT_PREPROC							// WORD
 	} ETokenType;
 
 	LLKeywordToken( ETokenType type, const LLColor4& color, const LLWString& token, const LLWString& tool_tip, const LLWString& delimiter  )
@@ -197,6 +200,8 @@ protected:
     std::string                                              getAttribute(std::string_view key);
 
 	std::string	getArguments(LLSD& arguments);
+
+	LLStyleSP getDefaultStyle(const LLTextEditor& editor);
 };
 
 #endif  // LL_LLKEYWORDS_H

@@ -2,9 +2,9 @@
  * @file llfloaterprofile.h
  * @brief Avatar profile floater.
  *
- * $LicenseInfo:firstyear=2009&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2022&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2022, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,6 +28,7 @@
 #define LL_LLFLOATERPROFILE_H
 
 #include "llavatarnamecache.h"
+#include "llavatarpropertiesprocessor.h"
 #include "llfloater.h"
 
 class LLPanelProfile;
@@ -39,17 +40,19 @@ public:
     LLFloaterProfile(const LLSD& key);
     virtual ~LLFloaterProfile();
 
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ BOOL postBuild();
+    BOOL postBuild() override;
 
+    void onOpen(const LLSD& key) override;
+    void onClickCloseBtn(bool app_quitting = false) override;
+    void onUnsavedChangesCallback(const LLSD& notification, const LLSD& response, bool can_save);
+
+    void createPick(const LLPickData &data);
     void showPick(const LLUUID& pick_id = LLUUID::null);
     bool isPickTabSelected();
+    void refreshName();
 
     void showClassified(const LLUUID& classified_id = LLUUID::null, bool edit = false);
-
-protected:
-    void onOKBtn();
-    void onCancelBtn();
+    void createClassified();
 
 private:
     LLAvatarNameCache::callback_connection_t mNameCallbackConnection;

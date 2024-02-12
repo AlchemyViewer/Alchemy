@@ -231,33 +231,18 @@
      m
   </text>
 
-  <check_box
-    control_name="WindLightUseAtmosShaders"
-    height="16"
-    initial_value="true"
-    label="Atmospheric shaders"
-    layout="topleft"
-    left="30"
-    name="WindLightUseAtmosShaders"
-    top_delta="24"
-    width="280">
-    <check_box.commit_callback
-      function="Pref.RenderOptionUpdate" />
-  </check_box>
-
-  <check_box
-    control_name="RenderDeferred"
-    height="16"
-    initial_value="true"
-    label="Advanced Lighting Model"
-    layout="topleft"
-    left="30"
-    name="UseLightShaders"
-    top_delta="24"
-    width="256">
-    <check_box.commit_callback
-      function="Pref.RenderOptionUpdate" />
-  </check_box>
+  <button
+  height="23"
+  label="Automatic adjustments settings"
+  layout="topleft"
+  left="30"
+  name="AutoAdjustmentsButton"
+  top_delta="30"
+  width="225">
+    <button.commit_callback
+      function="Pref.AutoAdjustments"/>
+  </button>
+  
   <slider
     control_name="IndirectMaxComplexity"
     tool_tip="Controls at what point a visually complex avatar is drawn as a JellyDoll"
@@ -266,15 +251,15 @@
     initial_value="101"
     increment="1"
     label="Avatar Maximum Complexity:"
-    label_width="165"
+    label_width="190"
     layout="topleft"
     left="30"
     min_val="1"
     max_val="101"
     name="IndirectMaxComplexity"
     show_text="false"
-    top_delta="60"
-    width="300">
+    top_delta="40"
+    width="320">
     <slider.commit_callback
       function="Pref.UpdateIndirectMaxComplexity"
       parameter="IndirectMaxComlexityText" />
@@ -286,7 +271,7 @@
     height="16"
     layout="topleft"
     top_delta="0"
-    left_delta="304"
+    left_pad="3"
     text_readonly_color="LabelDisabledColor"
     name="IndirectMaxComplexityText"
     width="65">
@@ -302,7 +287,7 @@ left_delta="68"
 name="IndirectMaxComplexityLink"
 mouse_opaque="false"
 top_delta="0"
-width="120">
+width="100">
 [https://community.secondlife.com/t5/Featured-News/Why-are-all-these-people-made-of-colored-jelly/ba-p/3031255 What's this?]
 </text>
 
@@ -329,6 +314,25 @@ width="120">
     <button.commit_callback
       function="Pref.RenderExceptions"/>
   </button>
+
+  <slider
+    control_name="RenderExposure"
+    decimal_digits="1"
+    follows="left|top"
+    height="16"
+    increment="0.1"
+    initial_value="160"
+    label="Brightness (exposure)"
+    label_width="145"
+    layout="topleft"
+    left="30"
+    min_val="0.5"
+    max_val="1.5"
+    name="RenderExposure"
+    show_text="true"
+    top_pad="14"
+    width="260">
+  </slider>
 
 <!-- End of Basic Settings block -->
 

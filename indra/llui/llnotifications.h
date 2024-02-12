@@ -327,6 +327,7 @@ public:
 		Optional<void*>							responder;
 		Optional<bool>							offer_from_agent;
         Optional<bool>							is_dnd;
+		Optional<bool>							force_to_chat;
 
 		struct Functor : public LLInitParam::ChoiceBlock<Functor>
 		{
@@ -354,7 +355,8 @@ public:
 			substitutions("substitutions"),
 			expiry("expiry"),
 			offer_from_agent("offer_from_agent", false),
-            is_dnd("is_dnd", false)
+            is_dnd("is_dnd", false),
+			force_to_chat("force_to_chat", false)
 		{
 			time_stamp = LLDate::now();
 			responder = nullptr;
@@ -369,7 +371,8 @@ public:
 			substitutions("substitutions"),
 			expiry("expiry"),
 			offer_from_agent("offer_from_agent", false),
-            is_dnd("is_dnd", false)
+            is_dnd("is_dnd", false),
+			force_to_chat("force_to_chat", false)
 		{
 			functor.name = _name;
 			name = _name;
@@ -397,6 +400,7 @@ private:
 	LLNotificationResponderPtr mResponder;
 	bool mOfferFromAgent;
     bool mIsDND;
+	bool mForceChat;
 
 	// a reference to the template
 	LLNotificationTemplatePtr mTemplatep;
@@ -552,6 +556,16 @@ public:
     void setDND(const bool flag)
     {
         mIsDND = flag;
+    }
+
+    bool isSendToChatForced() const
+    {
+        return mForceChat;
+    }
+
+    void setSendToChatForced(const bool flag)
+    {
+        mForceChat = flag;
     }
 
 	std::string getType() const;
@@ -923,6 +937,7 @@ public:
 	LLNotificationPtr add(const LLNotification::Params& p);
 
 	void add(const LLNotificationPtr pNotif);
+	void load(const LLNotificationPtr pNotif);
 	void cancel(LLNotificationPtr pNotif);
     void cancelByName(std::string_view name);
 	void cancelByOwner(const LLUUID ownerId);
@@ -1119,6 +1134,11 @@ private:
 	}
 
 	void onAdd(LLNotificationPtr p) 
+	{
+		mHistory.push_back(p);
+	}
+
+	void onLoad(LLNotificationPtr p) 
 	{
 		mHistory.push_back(p);
 	}

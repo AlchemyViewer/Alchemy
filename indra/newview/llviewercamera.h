@@ -35,42 +35,26 @@
 #include "lltrace.h"
 
 class LLViewerObject;
-
 const BOOL FOR_SELECTION = TRUE;
 const BOOL NOT_FOR_SELECTION = FALSE;
 
-// Build time optimization, generate this once in .cpp file
-#ifndef LLVIEWERCAMERA_CPP
-extern template class LLViewerCamera* LLSingleton<class LLViewerCamera>::getInstance();
-#endif
-
-LL_ALIGN_PREFIX(16)
-class LLViewerCamera final : public LLCamera, public LLSingleton<LLViewerCamera>
+class alignas(16) LLViewerCamera final : public LLCamera, public LLSimpleton<LLViewerCamera>
 {
-	LLSINGLETON(LLViewerCamera);
+    LL_ALIGN_NEW
 public:
-	void* operator new(size_t size)
-	{
-		return ll_aligned_malloc_16(size);
-	}
-
-	void operator delete(void* ptr)
-	{
-		ll_aligned_free_16(ptr);
-	}
+    LLViewerCamera();
 
 	typedef enum
 	{
 		CAMERA_WORLD = 0,
-		CAMERA_SHADOW0,
-		CAMERA_SHADOW1,
-		CAMERA_SHADOW2,
-		CAMERA_SHADOW3,
-		CAMERA_SHADOW4,
-		CAMERA_SHADOW5,
+		CAMERA_SUN_SHADOW0,
+		CAMERA_SUN_SHADOW1,
+		CAMERA_SUN_SHADOW2,
+		CAMERA_SUN_SHADOW3,
+		CAMERA_SPOT_SHADOW0,
+		CAMERA_SPOT_SHADOW1,
 		CAMERA_WATER0,
 		CAMERA_WATER1,
-		CAMERA_GI_SOURCE,
 		NUM_CAMERAS
 	} eCameraID;
 
@@ -104,7 +88,7 @@ public:
 
 	// Sets the current matrix
 	/* virtual */ void setView(F32 vertical_fov_rads) override;
-
+    void setViewNoBroadcast(F32 vertical_fov_rads);  // set FOV without broadcasting to simulator (for temporary local cameras)
 	void setDefaultFOV(F32 fov) ;
 	F32 getDefaultFOV() { return mCameraFOVDefault; }
 
@@ -149,7 +133,7 @@ protected:
 	S16					mZoomSubregion;
 
 public:
-} LL_ALIGN_POSTFIX(16);
+};
 
 
 #endif // LL_LLVIEWERCAMERA_H

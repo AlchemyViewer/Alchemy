@@ -1,45 +1,20 @@
 #! /usr/bin/env bash
 
-## Here are some configuration options for Linux Client Testers.
+## Here are some configuration options for Linux Client Users.
 
 ## - Avoids using any FMOD STUDIO audio driver.
 #export LL_BAD_FMODSTUDIO_DRIVER=x
 ## - Avoids using any OpenAL audio driver.
 #export LL_BAD_OPENAL_DRIVER=x
 
-## - Avoids using the FMOD Studio or FMOD Ex PulseAudio audio driver.
+## - Avoids using the FMOD Studio PulseAudio audio driver.
 #export LL_BAD_FMOD_PULSEAUDIO=x
-## - Avoids using the FMOD Studio or FMOD Ex ALSA audio driver.
+## - Avoids using the FMOD Studio ALSA audio driver.
 #export LL_BAD_FMOD_ALSA=x
 
 # Completely prevent gamemode from enabling even if set to true in the settings
 # This can be useful if you run Alchemy on a battery-operated device (i.e. laptop)
 # export DISABLE_GAMEMODE=1
-
-## - Avoids the optional OpenGL extensions which have proven most problematic
-##   on some hardware.  Disabling this option may cause BETTER PERFORMANCE but
-##   may also cause CRASHES and hangs on some unstable combinations of drivers
-##   and hardware.
-## NOTE: This is now disabled by default.
-#export LL_GL_BASICEXT=x
-
-## - Avoids *all* optional OpenGL extensions.  This is the safest and least-
-##   exciting option.  Enable this if you experience stability issues, and
-##   report whether it helps in the Linux Client Testers forum.
-#export LL_GL_NOEXT=x
-
-## - For advanced troubleshooters, this lets you disable specific GL
-##   extensions, each of which is represented by a letter a-o.  If you can
-##   narrow down a stability problem on your system to just one or two
-##   extensions then please post details of your hardware (and drivers) to
-##   the Linux Client Testers forum along with the minimal
-##   LL_GL_BLACKLIST which solves your problems.
-#export LL_GL_BLACKLIST=abcdefghijklmno
-
-if [ "`uname -m`" = "x86_64" ]; then
-    echo '64-bit Linux detected.'
-fi
-
 
 ## Everything below this line is just for advanced troubleshooters.
 ##-------------------------------------------------------------------
@@ -58,8 +33,7 @@ if [[ -v AL_VALGRIND ]]; then
 fi
 
 if [[ -v AL_MANGO ]]; then
-    export MANGOHUD_DLSYM=1
-	export LL_WRAPPER='mangohud'
+	export LL_WRAPPER='mangohud --dlsym'
 fi
 
 ## For controlling various sanitizer options
@@ -67,19 +41,22 @@ fi
 #export UBSAN_OPTIONS="print_stacktrace=1 print_summary=1 halt_on_error=0"
 
 ## Allow Gnome 3 to properly display window title in app bar
+export SDL_VIDEO_WAYLAND_WMCLASS=Alchemy
 export SDL_VIDEO_X11_WMCLASS=Alchemy
 
 ## - Enable threaded mesa GL impl
 export mesa_glthread=true
 
+## - Enable nvidia threaded GL
+export __GL_THREADED_OPTIMIZATIONS=1
 
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
 
-SCRIPTSRC=`readlink -f "$0" || echo "$0"`
-RUN_PATH=`dirname "${SCRIPTSRC}" || echo .`
+SCRIPTSRC=$(readlink -f "$0" || echo "$0")
+RUN_PATH=$(dirname "${SCRIPTSRC}" || echo .)
 echo "Running from ${RUN_PATH}"
-cd "${RUN_PATH}"
+cd "${RUN_PATH}" || return
 
 # Re-register the secondlife:// protocol handler every launch, for now.
 ./etc/register_secondlifeprotocol.sh
@@ -107,10 +84,25 @@ done
 # Check chrome-sandbox permissions, and try to set them if they are not already
 SANDBOX_BIN=bin/llplugin/chrome-sandbox
 # if set-user-id = false || is writable || executable = false || read is false || is owned by effective uid || is owned by effective gid
-if [[ !(-u $SANDBOX_BIN) || (-w $SANDBOX_BIN) || !(-x $SANDBOX_BIN) || !(-r $SANDBOX_BIN) || ( -O $SANDBOX_BIN) || (-G $SANDBOX_BIN) ]]; then
-    echo "$SANDBOX_BIN permissions are incorrect and will be reset"
-    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-    pkexec "$SCRIPT_DIR/etc/chrome_sandboxing_permissions_setup.sh"
+OPTOUT_FILE="bin/llplugin/.user_does_not_want_chrome_sandboxing_and_accepts_the_risks"
+if [[ ! (-u $SANDBOX_BIN) || (-w $SANDBOX_BIN) || ! (-x $SANDBOX_BIN) || ! (-r $SANDBOX_BIN) || ( -O $SANDBOX_BIN) || (-G $SANDBOX_BIN) ]]; then
+    echo "$SANDBOX_BIN permissions are not set properly to run under sandboxing."
+    if [ ! -f "$OPTOUT_FILE" ]; then
+        SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+        pkexec "$SCRIPT_DIR/etc/chrome_sandboxing_permissions_setup.sh"
+    fi
+fi
+
+#setup wine voice
+if [ -x "$(command -v wine)" ]; then
+    export WINEDEBUG=-all # disable all debug output for wine
+    export WINEPREFIX="$HOME/.alchemynext/wine"
+    if [ ! -d "$WINEPREFIX" ]; then
+        DISPLAY="" wine hostname
+    fi
+else
+    export VIEWER_DISABLE_WINE=1
+    echo "Please install wine to enable full voice functionality."
 fi
 
 # Run the program.
@@ -122,7 +114,8 @@ LL_RUN_ERR=$?
 
 # Handle any resulting errors
 if [ $LL_RUN_ERR -ne 0 ]; then
-	# generic error running the binaryecho '*** Bad shutdown ($LL_RUN_ERR). ***'
+	# generic error running the binary
+	echo "*** Bad shutdown ($LL_RUN_ERR). ***"
 	if [ "$(uname -m)" = "x86_64" ]; then
 		echo
 		cat << EOFMARKER
@@ -131,9 +124,3 @@ EOFMARKER
 	fi
 fi
 
-echo
-echo '*******************************************************'
-echo 'This is a BETA release of the Alchemy Viewer Linux client.'
-echo 'Thank you for testing!'
-echo 'Please see README-linux.txt before reporting problems.'
-echo

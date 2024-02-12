@@ -286,7 +286,15 @@ public:
 	void			setBgImage(LLPointer<LLUIImage> image) { mBgImage = image; }
 	void			setBgImageFocused(LLPointer<LLUIImage> image) { mBgImageFocused = image; }
 
-private:
+    void setShowContextMenu(bool show) { mShowContextMenu = show; }
+    bool getShowContextMenu() const { return mShowContextMenu; }
+
+	// Autoreplace
+	typedef boost::function<void(S32&, S32&, LLWString&, S32&, const LLWString&)> autoreplace_callback_t;
+	autoreplace_callback_t mAutoreplaceCallback;
+	void			setAutoreplaceCallback(autoreplace_callback_t cb) { mAutoreplaceCallback = cb; }
+
+  private:
 	// private helper methods
 
 	void                    pasteHelper(bool is_primary);
@@ -321,7 +329,10 @@ private:
 	virtual S32		getPreeditFontSize() const;
 	virtual LLWString getPreeditString() const { return getWText(); }
 
+    void			setText(const LLStringExplicit &new_text, bool use_size_limit);
+
 	void			setContextMenu(LLContextMenu* new_context_menu);
+
 
 protected:
 	LLUIString		mText;					// The string being edited.
@@ -403,6 +414,8 @@ protected:
 	LLPreeditor::standouts_t mPreeditStandouts;
 
 	LLHandle<LLContextMenu> mContextMenuHandle;
+
+    bool mShowContextMenu;
 
 private:
 	// Instances that by default point to the statics but can be overidden in XML.

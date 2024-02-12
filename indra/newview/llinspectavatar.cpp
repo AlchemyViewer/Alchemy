@@ -119,7 +119,7 @@ public:
 		mInspector(inspector)
 	{
 		LLAvatarPropertiesProcessor* processor = 
-			LLAvatarPropertiesProcessor::getInstanceFast();
+			LLAvatarPropertiesProcessor::getInstance();
 		// register ourselves as an observer
 		processor->addObserver(mAvatarID, this);
 		// send a request (duplicates will be suppressed inside the avatar
@@ -130,7 +130,7 @@ public:
 	~LLFetchAvatarData()
 	{
 		// remove ourselves as an observer
-		LLAvatarPropertiesProcessor::getInstanceFast()->
+		LLAvatarPropertiesProcessor::getInstance()->
 		removeObserver(mAvatarID, this);
 	}
 	
@@ -337,7 +337,7 @@ void LLInspectAvatar::onClickMuteVolume()
 	LLMuteList* mute_list = LLMuteList::getInstance();
 	bool is_muted = mute_list->isMuted(mAvatarID, LLMute::flagVoiceChat);
 
-	LLMute mute(mAvatarID, mAvatarName.getDisplayName(), LLMute::AGENT);
+	LLMute mute(mAvatarID, mAvatarName.getUserName(), LLMute::AGENT);
 	if (!is_muted)
 	{
 		mute_list->add(mute, LLMute::flagVoiceChat);

@@ -213,9 +213,14 @@ public:
 
 	void	renderRect(	const LLVector3d &west_south_bottom, 
 						const LLVector3d &east_north_top );
-	void	renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 height, U8 direction, LLViewerRegion* regionp);
+	void	renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 height, U8 direction, LLViewerRegion* regionp, bool absolute_height = false);
 	void	renderHighlightSegments(const U8* segments, LLViewerRegion* regionp);
 	void	renderCollisionSegments(U8* segments, BOOL use_pass, LLViewerRegion* regionp);
+
+    static S32 PARCEL_BAN_LINES_HIDE;
+    static S32 PARCEL_BAN_LINES_ON_COLLISION;
+    static S32 PARCEL_BAN_LINES_ON_PROXIMITY;
+    void	resetCollisionTimer(); // Ban lines visibility timer
 
 	void	sendParcelGodForceOwner(const LLUUID& owner_id);
 
@@ -385,7 +390,7 @@ private:
 	U64							mCollisionRegionHandle;
 	collision_update_signal_t*	mCollisionUpdateSignal;
 	U8*							mCollisionSegments;
-	BOOL						mRenderCollision; 
+	bool						mRenderCollision; 
 	BOOL						mRenderSelection;
 	S32							mCollisionBanned;     
 	LLFrameTimer				mCollisionTimer;

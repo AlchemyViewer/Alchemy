@@ -35,13 +35,20 @@
 #include "llui.h"
 #include "lluictrlfactory.h"
 #include "lluiimage.h"
+#include "llwindow.h"
+
+#include "llgltexture.h"
 
 static LLDefaultChildRegistry::Register<LLIconCtrl> r("icon");
 
 LLIconCtrl::Params::Params()
 :	image("image_name"),
 	color("color"),
+// [SL:KB] - Patch: Control-IconCtrl | Checked: Catznip-3.6
+	commit_on_click("commit_on_click", false),
+// [/SL:KB]
 	use_draw_context_alpha("use_draw_context_alpha", true),
+    interactable("interactable", false),
 	scale_image("scale_image"),
 	min_width("min_width", 0),
 	min_height("min_height", 0)
@@ -52,6 +59,7 @@ LLIconCtrl::LLIconCtrl(const LLIconCtrl::Params& p)
 	mColor(p.color()),
 	mImagep(p.image),
 	mUseDrawContextAlpha(p.use_draw_context_alpha),
+    mInteractable(p.interactable),
 	mPriority(0),
 	mMinWidth(p.min_width),
 	mMinHeight(p.min_height),
@@ -62,6 +70,14 @@ LLIconCtrl::LLIconCtrl(const LLIconCtrl::Params& p)
 	{
 		LLUICtrl::setValue(mImagep->getName());
 	}
+
+// [SL:KB] - Patch: Control-IconCtrl | Checked: Catznip-3.6
+	if (p.commit_on_click)
+	{
+		// There's several ways we can do this but this just seems like the easiest
+		setMouseDownCallback(boost::bind(&LLIconCtrl::onCommit, this));
+	}
+// [/SL:KB]
 }
 
 LLIconCtrl::~LLIconCtrl()
@@ -81,6 +97,32 @@ void LLIconCtrl::draw()
 	LLUICtrl::draw();
 }
 
+BOOL LLIconCtrl::handleHover(S32 x, S32 y, MASK mask)
+{
+    if (mInteractable && getEnabled())
+    {
+        getWindow()->setCursor(UI_CURSOR_HAND);
+        return TRUE;
+    }
+    return LLUICtrl::handleHover(x, y, mask);
+}
+
+void LLIconCtrl::onVisibilityChange(BOOL new_visibility)
+{
+	LLUICtrl::onVisibilityChange(new_visibility);
+	if (mPriority == LLGLTexture::BOOST_ICON)
+	{
+		if (new_visibility)
+		{
+			loadImage(getValue(), mPriority);
+		}
+		else
+		{
+			mImagep = nullptr;
+		}
+	}
+}
+
 // virtual
 // value might be a string or a UUID
 void LLIconCtrl::setValue(const LLSD& value)
@@ -97,6 +139,14 @@ void LLIconCtrl::setValue(const LLSD& value, S32 priority)
 		tvalue = LLSD(LLUUID(value.asString()));
 	}
 	LLUICtrl::setValue(tvalue);
+
+	loadImage(tvalue, priority);
+}
+
+void LLIconCtrl::loadImage(const LLSD& tvalue, S32 priority)
+{
+	if(mPriority == LLGLTexture::BOOST_ICON && !getVisible()) return;
+
 	if (tvalue.isUUID())
 	{
         mImagep = LLUI::getUIImageByID(tvalue.asUUID(), priority);

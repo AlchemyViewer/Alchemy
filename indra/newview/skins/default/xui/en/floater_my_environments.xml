@@ -17,6 +17,7 @@
         min_width="265"
         width="313">
     <layout_stack 
+            name="main_layout"
             follows="all"
             layout="topleft"
             left="5"
@@ -108,7 +109,7 @@
                     right="-2"
                     bottom="-2"
                     background_visible="true"
-                    bg_alpha_color="DkGray2"
+                    bg_alpha_color="PanelDefaultBackgroundColor"
                     border="true">
                 <asset_filtered_inv_panel
                        left="0"
@@ -119,13 +120,14 @@
                        follows="all"
                        layout="topleft"
                        name="pnl_settings"
-                       filter_asset_type="settings"/>
+                       filter_asset_types="settings"/>
             </panel>
         </layout_panel>
         <layout_panel
                 auto_resize="false"
                 user_resize="false"
                 tab_group="1"
+                name="lp_showfolders"
                 height="15">
             <check_box
                     follows="left|bottom"

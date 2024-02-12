@@ -33,6 +33,8 @@
 #include "llfloaterwebcontent.h"
 #include "llvoiceclient.h"
 
+class LLAccordionCtrl;
+class LLAccordionCtrlTab;
 class LLAvatarList;
 class LLAvatarName;
 class LLFilterEditor;
@@ -78,6 +80,13 @@ private:
 		E_SORT_BY_RECENT_ARRIVAL = 5
 	} ESortOrder;
 
+	typedef enum e_click_actions {
+		E_CLICK_TO_IM = 0,
+		E_CLICK_TO_PROFILE = 1,
+		E_CLICK_TO_ZOOM = 2,
+		E_CLICK_TO_TELEPORT = 3
+	} EClickActions;
+
     void				    removePicker();
 
 	// methods indirectly called by the updaters
@@ -89,7 +98,7 @@ private:
 	bool					isItemsFreeOfFriends(const uuid_vec_t& uuids);
 
 	void					updateButtons();
-	std::string				getActiveTabName() const;
+	const std::string&		getActiveTabName() const;
 	LLUUID					getCurrentItemID() const;
 	void					getCurrentItemIDs(uuid_vec_t& selected_uuids) const;
 	void					showGroupMenu(LLMenuGL* menu);
@@ -108,6 +117,7 @@ private:
 	void					onMoreButtonClicked();
 	void					onAvatarListDoubleClicked(LLUICtrl* ctrl);
 	void					onAvatarListCommitted(LLAvatarList* list);
+	void					onNearbyListDoubleClicked(LLUICtrl* ctrl);
 	bool					onGroupPlusButtonValidate();
 	void					onGroupMinusButtonClicked();
 	void					onGroupPlusMenuItemClicked(const LLSD& userdata);
@@ -116,6 +126,7 @@ private:
 	void					onNearbyViewSortMenuItemClicked(const LLSD& userdata);
 	void					onGroupsViewSortMenuItemClicked(const LLSD& userdata);
 	void					onRecentViewSortMenuItemClicked(const LLSD& userdata);
+	void					onRecentViewClearHistoryMenuItemClicked();
 
 	bool					onFriendsViewSortMenuItemCheck(const LLSD& userdata);
 	bool					onRecentViewSortMenuItemCheck(const LLSD& userdata);
@@ -126,7 +137,7 @@ private:
 
 	void					onFriendsAccordionExpandedCollapsed(LLUICtrl* ctrl, const LLSD& param, LLAvatarList* avatar_list);
 
-	void					showAccordion(const std::string name, bool show);
+	void					showAccordion(LLAccordionCtrlTab* tab, bool show);
 
 	void					showFriendsAccordionsIfNeeded();
 
@@ -138,12 +149,26 @@ private:
 	bool					isAccordionCollapsedByUser(const std::string& name);
 
 	LLTabContainer*			mTabContainer;
+	LLAccordionCtrl*		mFriendsAccordion = nullptr;
+	LLAccordionCtrlTab*		mAccordionAllTab = nullptr;
+	LLAccordionCtrlTab*		mAccordionOnlineTab = nullptr;
 	LLAvatarList*			mOnlineFriendList;
 	LLAvatarList*			mAllFriendList;
 	LLAvatarList*			mNearbyList;
 	LLAvatarList*			mRecentList;
 	LLGroupList*			mGroupList;
 	LLNetMap*				mMiniMap;
+
+	LLButton*				mNearbyGearBtn = nullptr;
+	LLButton*				mFriendsGearBtn = nullptr;
+	LLButton*				mRecentGearBtn = nullptr;
+	LLButton*				mGroupDelBtn = nullptr;
+
+	LLButton*				mNearbyAddFriendBtn = nullptr;
+	LLButton*				mRecentAddFriendBtn = nullptr;
+	LLUICtrl*				mFriendsDelFriendBtn = nullptr;
+
+	LLTextBox*				mGroupCountText = nullptr;
 
 	std::vector<std::string> mSavedOriginalFilters;
 	std::vector<std::string> mSavedFilters;

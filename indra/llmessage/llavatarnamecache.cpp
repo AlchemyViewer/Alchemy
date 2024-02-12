@@ -63,7 +63,6 @@ LLCore::HttpRequest::ptr_t		sHttpRequest;
 LLCore::HttpHeaders::ptr_t		sHttpHeaders;
 LLCore::HttpOptions::ptr_t		sHttpOptions;
 LLCore::HttpRequest::policy_t	sHttpPolicy;
-LLCore::HttpRequest::priority_t	sHttpPriority;
 
 /* Sample response:
 <?xml version="1.0"?>
@@ -116,11 +115,10 @@ LLAvatarNameCache::LLAvatarNameCache()
 
     mUsePeopleAPI = true;
 
-    sHttpRequest = LLCore::HttpRequest::ptr_t(new LLCore::HttpRequest());
-    sHttpHeaders = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
-    sHttpOptions = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions());
+    sHttpRequest  = std::make_shared<LLCore::HttpRequest>();
+    sHttpHeaders  = std::make_shared<LLCore::HttpHeaders>();
+    sHttpOptions  = std::make_shared<LLCore::HttpOptions>();
     sHttpPolicy = LLCore::HttpRequest::DEFAULT_POLICY_ID;
-    sHttpPriority = 0;
 }
 
 LLAvatarNameCache::~LLAvatarNameCache()
@@ -133,8 +131,10 @@ LLAvatarNameCache::~LLAvatarNameCache()
 
 void LLAvatarNameCache::requestAvatarNameCache_(std::string url, std::vector<LLUUID> agentIds)
 {
+#if SHOW_DEBUG
     LL_DEBUGS("AvNameCache") << "Entering coroutine " << LLCoros::getName()
         << " with url '" << url << "', requesting " << agentIds.size() << " Agent Ids" << LL_ENDL;
+#endif
 
     // Check pointer that can be cleaned up by cleanupClass()
     if (!sHttpRequest || !sHttpOptions || !sHttpHeaders)
@@ -152,7 +152,9 @@ void LLAvatarNameCache::requestAvatarNameCache_(std::string url, std::vector<LLU
         LLCoreHttpUtil::HttpCoroutineAdapter httpAdapter("NameCache", sHttpPolicy);
         LLSD results = httpAdapter.getAndSuspend(sHttpRequest, url);
 
+#if SHOW_DEBUG
         LL_DEBUGS() << results << LL_ENDL;
+#endif
 
         if (!results.isMap())
         {
@@ -195,6 +197,10 @@ void LLAvatarNameCache::requestAvatarNameCache_(std::string url, std::vector<LLU
             LLAvatarNameCache::getInstance()->handleAvNameCacheSuccess(results, httpResults);
         }
     }
+    catch (const LLCoros::Stop&)
+    {
+        LL_DEBUGS("AvNameCache") << "Received a shutdown exception" << LL_ENDL;
+    }
     catch (...)
     {
         LOG_UNHANDLED_EXCEPTION(STRINGIZE("coroutine " << LLCoros::getName()
@@ -216,7 +222,7 @@ void LLAvatarNameCache::handleAvNameCacheSuccess(const LLSD &data, const LLSD &h
     F64 now = LLFrameTimer::getTotalSeconds();
 
     const LLSD& agents = data["agents"];
-    for (const LLSD& row : agents.array())
+    for (const LLSD& row : agents.asArray())
     {
         LLUUID agent_id = row["id"].asUUID();
 
@@ -243,11 +249,13 @@ void LLAvatarNameCache::handleAvNameCacheSuccess(const LLSD &data, const LLSD &h
         LL_WARNS("AvNameCache") << "LLAvatarNameResponder::result " << num_unresolved << " unresolved ids; "
             << "expires in " << expires - now << " seconds"
             << LL_ENDL;
-        for (const LLSD& llsd_val : unresolved_agents.array())
+        for (const LLSD& llsd_val : unresolved_agents.asArray())
         {
             const LLUUID& agent_id = llsd_val.asUUID();
 
-            LL_WARNS("AvNameCache") << "LLAvatarNameResponder::result "
+            // If cap fails, response can contain a lot of names,
+            // don't spam too much
+            LL_DEBUGS("AvNameCache") << "LLAvatarNameResponder::result "
                 << "failed id " << agent_id
                 << LL_ENDL;
 
@@ -268,7 +276,7 @@ void LLAvatarNameCache::handleAgentError(const LLUUID& agent_id)
 	if (existing == mCache.end())
     {
         // there is no existing cache entry, so make a temporary name from legacy
-        LL_WARNS("AvNameCache") << "LLAvatarNameCache get legacy for agent "
+        LL_DEBUGS("AvNameCache") << "LLAvatarNameCache get legacy for agent "
 								<< agent_id << LL_ENDL;
         gCacheName->get(agent_id, false,  // legacy compatibility
                         boost::bind(&LLAvatarNameCache::legacyNameFetch, _1, _2, _3));
@@ -282,7 +290,9 @@ void LLAvatarNameCache::handleAgentError(const LLUUID& agent_id)
         LLAvatarNameCache::mPendingQueue.erase(agent_id);
 
         LLAvatarName& av_name = existing->second;
+#if SHOW_DEBUG
         LL_DEBUGS("AvNameCache") << "LLAvatarNameCache use cache for agent " << agent_id << LL_ENDL;
+#endif
 		av_name.dump();
 
 		 // Reset expiry time so we don't constantly rerequest.
@@ -351,26 +361,32 @@ void LLAvatarNameCache::requestNamesViaCapability()
 	std::vector<LLUUID> agent_ids;
 	agent_ids.reserve(128);
 	
+#ifdef SHOW_DEBUG
 	U32 ids = 0;
-	ask_queue_t::const_iterator it;
-	while(!mAskQueue.empty())
+#endif
+	for(auto it = mAskQueue.begin(); it != mAskQueue.end();)
 	{
-		it = mAskQueue.begin();
 		LLUUID agent_id = *it;
-		mAskQueue.erase(it);
+		it = mAskQueue.erase(it);
 
 		if (url.empty())
 		{
 			// ...starting new request
-			absl::StrAppend(&url, mNameLookupURL, "?ids=", agent_id.asString());
+			url += mNameLookupURL;
+			url += "?ids=";
+#ifdef SHOW_DEBUG
 			ids = 1;
+#endif
 		}
 		else
 		{
 			// ...continuing existing request
-			absl::StrAppend(&url, "&ids=", agent_id.asString());
+			url += "&ids=";
+#ifdef SHOW_DEBUG
 			ids++;
+#endif
 		}
+		url += agent_id.asString();
 		agent_ids.push_back(agent_id);
 
 		// mark request as pending
@@ -384,12 +400,15 @@ void LLAvatarNameCache::requestNamesViaCapability()
 
     if (!url.empty())
     {
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AvNameCache") << "requested " << ids << " ids" << LL_ENDL;
-
-        std::string coroname = 
+        std::string coroname =
+#endif
             LLCoros::instance().launch("LLAvatarNameCache::requestAvatarNameCache_",
             boost::bind(&LLAvatarNameCache::requestAvatarNameCache_, url, agent_ids));
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AvNameCache") << coroname << " with  url '" << url << "', agent_ids.size()=" << agent_ids.size() << LL_ENDL;
+#endif
 
 	}
 }
@@ -416,10 +435,12 @@ void LLAvatarNameCache::legacyNameFetch(const LLUUID& agent_id,
 										const std::string& full_name,
 										bool is_group)
 {
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("AvNameCache") << "LLAvatarNameCache agent " << agent_id << " "
 							 << "full name '" << full_name << "'"
 	                         << ( is_group ? " [group]" : "" )
 	                         << LL_ENDL;
+#endif
 	
 	// Construct an av_name record from this name.
 	LLAvatarName av_name;
@@ -444,7 +465,9 @@ void LLAvatarNameCache::requestNamesViaLegacy()
 		// invoked below.  This should never happen in practice.
 		mPendingQueue[agent_id] = now;
 
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("AvNameCache") << "agent " << agent_id << LL_ENDL;
+#endif
 
 		gCacheName->get(agent_id, false,  // legacy compatibility
 			boost::bind(&LLAvatarNameCache::legacyNameCallback, _1, _2, _3));
@@ -454,7 +477,7 @@ void LLAvatarNameCache::requestNamesViaLegacy()
 bool LLAvatarNameCache::importFile(std::istream& istr)
 {
 	LLSD data;
-	if (LLSDParser::PARSE_FAILURE == LLSDSerialize::fromXMLDocument(data, istr))
+	if (LLSDParser::PARSE_FAILURE == LLSDSerialize::fromNotation(data, istr, LLSDSerialize::SIZE_UNLIMITED))
 	{
         LL_WARNS("AvNameCache") << "avatar name cache data xml parse failed" << LL_ENDL;
 		return false;
@@ -466,7 +489,7 @@ bool LLAvatarNameCache::importFile(std::istream& istr)
 
 	LLUUID agent_id;
 	LLAvatarName av_name;
-	for (const auto& llsd_pair : agents.map())
+	for (const auto& llsd_pair : agents.asMap())
 	{
 		agent_id.set(llsd_pair.first);
 		av_name.fromLLSD(llsd_pair.second );
@@ -500,7 +523,7 @@ void LLAvatarNameCache::exportFile(std::ostream& ostr)
     LL_INFOS("AvNameCache") << "LLAvatarNameCache returning " << agents.size() << LL_ENDL;
 	LLSD data;
 	data["agents"] = agents;
-	LLSDSerialize::toPrettyXML(data, ostr);
+	LLSDSerialize::toNotation(data, ostr);
 }
 
 void LLAvatarNameCache::setNameLookupURL(const std::string& name_lookup_url)
@@ -589,10 +612,12 @@ void LLAvatarNameCache::eraseUnrefreshed()
             const LLAvatarName& av_name = it->second;
             if (av_name.mExpires < max_unrefreshed)
             {
+#ifdef SHOW_DEBUG
                 LL_DEBUGS("AvNameCacheExpired") << "LLAvatarNameCache " << it->first 
                                          << " user '" << av_name.getAccountName() << "' "
                                          << "expired " << now - av_name.mExpires << " secs ago"
                                          << LL_ENDL;
+#endif
                 mCache.erase(it++);
                 expired++;
             }
@@ -818,10 +843,12 @@ bool LLAvatarNameCache::expirationFromCacheControl(LLCore::HttpHeaders *headers,
             fromCacheControl = true;
         }
     }
+#ifdef SHOW_DEBUG
     LL_DEBUGS("AvNameCache")
         << ( fromCacheControl ? "expires based on cache control " : "default expiration " )
         << "in " << *expires - now << " seconds"
         << LL_ENDL;
+#endif
 
     return fromCacheControl;
 }
@@ -863,10 +890,12 @@ bool LLAvatarNameCache::expirationFromCacheControl(const LLSD& headers, F64 *exp
 			fromCacheControl = true;
 		}
 	}
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("AvNameCache") << "LLAvatarNameCache "
 		<< ( fromCacheControl ? "expires based on cache control " : "default expiration " )
 		<< "in " << *expires - now << " seconds"
 		<< LL_ENDL;
+#endif
 	
 	return fromCacheControl;
 }

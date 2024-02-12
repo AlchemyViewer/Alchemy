@@ -36,6 +36,7 @@
 #include "lldate.h"
 #include "lluri.h"
 #include "lluuid.h"
+#include "llstring.h"
 
 /**
 	LLSD provides a flexible data system similar to the data facilities of
@@ -183,6 +184,8 @@ public:
 		typedef LLDate			Date;
 		typedef LLURI			URI;
 		typedef std::vector<U8>	Binary;
+		typedef std::map<String, LLSD, std::less<>>					map_t;
+		typedef std::vector<LLSD> array_t;
 	//@}
 	
 	/** @name Scalar Constructors */
@@ -205,7 +208,17 @@ public:
 
 	/** @name Convenience Constructors */
 	//@{
-		LLSD(F32); // F32 -> Real
+		// support construction from size_t et al.
+		template <typename VALUE,
+				  typename std::enable_if<std::is_integral<VALUE>::value &&
+										  ! std::is_same<VALUE, Boolean>::value,
+										  bool>::type = true>
+		LLSD(VALUE v): LLSD(Integer(narrow(v))) {}
+		// support construction from F32 et al.
+		template <typename VALUE,
+				  typename std::enable_if<std::is_floating_point<VALUE>::value,
+										  bool>::type = true>
+		LLSD(VALUE v): LLSD(Real(narrow(v))) {}
 	//@}
 	
 	/** @name Scalar Assignment */
@@ -275,6 +288,14 @@ public:
 		URI		asURI() const;
 		const Binary&	asBinary() const;
 
+		// Direct access to underlying map. Will return empty map on any non-map type.
+		map_t& asMap();
+		const map_t& asMap() const; 
+
+		// Direct access to underlying std::vector. Will return empty vector on any non-map type.
+		array_t& asArray();
+		const array_t& asArray() const;
+
 		// asStringRef on any non-string type will return a ref to an empty string.
 		const String&	asStringRef() const;
 
@@ -299,7 +320,7 @@ public:
 	//@{
 		LLSD(const char*);
 		void assign(const char*);
-		LLSD& operator=(const char* v)	{ assign(v); return *this; }
+		LLSD& operator=(const char* v) { assign(v); return *this; }
 	//@}
 	
 	/** @name Map Values */
@@ -309,14 +330,14 @@ public:
 		bool has(const std::string_view) const;
 		LLSD get(const std::string_view) const;
 		LLSD getKeys() const;				// Return an LLSD array with keys as strings
-		void insert(const String&, const LLSD&);
+		void insert(const std::string_view, const LLSD&);
 		void erase(const String&);
-		LLSD& with(const String&, const LLSD&);
+		LLSD& with(const std::string_view, const LLSD&);
 		
 		LLSD& operator[](const std::string_view);
-		LLSD& operator[](const char* c) { return (*this)[std::string_view(c)]; }
+		LLSD& operator[](const char* c) { return (*this)[al::safe_string_view(c)]; }
 		const LLSD& operator[](const std::string_view) const;
-		const LLSD& operator[](const char* c) const { return (*this)[std::string_view(c)]; }
+		const LLSD& operator[](const char* c) const { return (*this)[al::safe_string_view(c)]; }
 	//@}
 	
 	/** @name Array Values */
@@ -329,34 +350,37 @@ public:
 		LLSD& append(const LLSD&);
 		void erase(Integer);
 		LLSD& with(Integer, const LLSD&);
-		
-		const LLSD& operator[](Integer) const;
-		LLSD& operator[](Integer);
+
+		// accept size_t so we can index relative to size()
+		const LLSD& operator[](size_t) const;
+		LLSD& operator[](size_t);
+		// template overloads to support int literals, U32 et al.
+		template <typename IDX,
+				  typename std::enable_if<std::is_convertible<IDX, size_t>::value,
+										  bool>::type = true>
+		const LLSD& operator[](IDX i) const { return (*this)[size_t(i)]; }
+		template <typename IDX,
+				  typename std::enable_if<std::is_convertible<IDX, size_t>::value,
+										  bool>::type = true>
+		LLSD& operator[](IDX i) { return (*this)[size_t(i)]; }
 	//@}
 
 	/** @name Iterators */
 	//@{
-		int size() const;
+		size_t size() const;
 
-		typedef std::map<String, LLSD, std::less<>>					map_t;
 		typedef map_t::iterator		map_iterator;
 		typedef map_t::const_iterator	map_const_iterator;
 		
-		map_t& map();
-		const map_t& map() const;
-
 		map_iterator		beginMap();
 		map_iterator		endMap();
 		map_const_iterator	beginMap() const;
 		map_const_iterator	endMap() const;
 		
-		typedef std::vector<LLSD>::iterator			array_iterator;
-		typedef std::vector<LLSD>::const_iterator	array_const_iterator;
-		typedef std::vector<LLSD>::reverse_iterator reverse_array_iterator;
+		typedef array_t::iterator			array_iterator;
+		typedef array_t::const_iterator	array_const_iterator;
+		typedef array_t::reverse_iterator reverse_array_iterator;
 		
-		std::vector<LLSD>& array();
-		const std::vector<LLSD>& array() const;
-
 		array_iterator			beginArray();
 		array_iterator			endArray();
 		array_const_iterator	beginArray() const;
@@ -442,6 +466,49 @@ private:
 public:
 
 	static std::string		typeString(Type type);		// Return human-readable type as a string
+};
+
+struct llsd_select_bool
+{
+	LLSD::Boolean operator()(const LLSD& sd) const
+	{
+		return sd.asBoolean();
+	}
+};
+struct llsd_select_integer
+{
+	LLSD::Integer operator()(const LLSD& sd) const
+	{
+		return sd.asInteger();
+	}
+};
+struct llsd_select_real
+{
+	LLSD::Real operator()(const LLSD& sd) const
+	{
+		return sd.asReal();
+	}
+};
+struct llsd_select_float
+{
+	F32 operator()(const LLSD& sd) const
+	{
+		return (F32)sd.asReal();
+	}
+};
+struct llsd_select_uuid
+{
+	LLSD::UUID operator()(const LLSD& sd) const
+	{
+		return sd.asUUID();
+	}
+};
+struct llsd_select_string
+{
+	LLSD::String operator()(const LLSD& sd) const
+	{
+		return sd.asString();
+	}
 };
 
 LL_COMMON_API std::ostream& operator<<(std::ostream& s, const LLSD& llsd);

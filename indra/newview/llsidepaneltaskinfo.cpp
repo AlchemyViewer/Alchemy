@@ -42,6 +42,7 @@
 #include "llresmgr.h"
 #include "lltextbox.h"
 #include "llbutton.h"
+#include "llcallbacklist.h"
 #include "llcheckboxctrl.h"
 #include "llviewerobject.h"
 #include "llselectmgr.h"
@@ -64,6 +65,7 @@
 #include "lltextbase.h"
 #include "llstring.h"
 #include "lltrans.h"
+#include "llviewerregion.h"
 // [RLVa:KB] - Checked: 2010-08-25 (RLVa-1.2.2a)
 #include "llslurl.h"
 #include "rlvhandler.h"
@@ -79,9 +81,11 @@ static LLPanelInjector<LLSidepanelTaskInfo> t_task_info("sidepanel_task_info");
 
 // Default constructor
 LLSidepanelTaskInfo::LLSidepanelTaskInfo()
+    : mVisibleDebugPermissions(true) // space was allocated by default
 {
 	setMouseOpaque(FALSE);
-	LLSelectMgr::instanceFast().mUpdateSignal.connect(boost::bind(&LLSidepanelTaskInfo::refreshAll, this));
+    mSelectionUpdateSlot = LLSelectMgr::instance().mUpdateSignal.connect(boost::bind(&LLSidepanelTaskInfo::refreshAll, this));
+    gIdleCallbacks.addFunction(&LLSidepanelTaskInfo::onIdle, (void*)this);
 }
 
 
@@ -89,13 +93,17 @@ LLSidepanelTaskInfo::~LLSidepanelTaskInfo()
 {
 	if (sActivePanel == this)
 		sActivePanel = NULL;
+    gIdleCallbacks.deleteFunction(&LLSidepanelTaskInfo::onIdle, (void*)this);
+
+    if (mSelectionUpdateSlot.connected())
+    {
+        mSelectionUpdateSlot.disconnect();
+    }
 }
 
 // virtual
 BOOL LLSidepanelTaskInfo::postBuild()
 {
-	LLSidepanelInventorySubpanel::postBuild();
-
 	mOpenBtn = getChild<LLButton>("open_btn");
 	mOpenBtn->setClickedCallback(boost::bind(&LLSidepanelTaskInfo::onOpenButtonClicked, this));
 	mPayBtn = getChild<LLButton>("pay_btn");
@@ -107,7 +115,7 @@ BOOL LLSidepanelTaskInfo::postBuild()
 
 	mDeedBtn = getChild<LLButton>("button deed");
 
-	mLabelGroupName = getChild<LLNameBox>("Group Name Proxy");
+	mLabelGroupName = getChild<LLTextBox>("Group Name");
 
 	childSetCommitCallback("Object Name",						LLSidepanelTaskInfo::onCommitName,this);
 	getChild<LLLineEditor>("Object Name")->setPrevalidate(LLTextValidate::validateASCIIPrintableNoPipe);
@@ -150,12 +158,12 @@ BOOL LLSidepanelTaskInfo::postBuild()
 	mDALabelClickAction = getChildView("label click action");
 	mDAComboClickAction = getChild<LLComboBox>("clickaction");
 	mDAPathfindingAttributes = getChild<LLTextBase>("pathfinding_attributes_value");
-	mDAB = getChildView("B:");
-	mDAO = getChildView("O:");
-	mDAG = getChildView("G:");
-	mDAE = getChildView("E:");
-	mDAN = getChildView("N:");
-	mDAF = getChildView("F:");
+	mDAB = getChild<LLUICtrl>("B:");
+	mDAO = getChild<LLUICtrl>("O:");
+	mDAG = getChild<LLUICtrl>("G:");
+	mDAE = getChild<LLUICtrl>("E:");
+	mDAN = getChild<LLUICtrl>("N:");
+	mDAF = getChild<LLUICtrl>("F:");
 	
 	return TRUE;
 }
@@ -205,12 +213,22 @@ void LLSidepanelTaskInfo::disableAll()
 
 	disablePermissions();
 
-	mDAB->setVisible(FALSE);
-	mDAO->setVisible(FALSE);
-	mDAG->setVisible(FALSE);
-	mDAE->setVisible(FALSE);
-	mDAN->setVisible(FALSE);
-	mDAF->setVisible(FALSE);
+    if (mVisibleDebugPermissions)
+    {
+        mDAB->setVisible(FALSE);
+        mDAO->setVisible(FALSE);
+        mDAG->setVisible(FALSE);
+        mDAE->setVisible(FALSE);
+        mDAN->setVisible(FALSE);
+        mDAF->setVisible(FALSE);
+
+        LLFloater* parent_floater = gFloaterView->getParentFloater(this);
+        LLRect parent_rect = parent_floater->getRect();
+        LLRect debug_rect = mDAB->getRect();
+        // use double the debug rect for padding (since it isn't trivial to extract top_pad)
+        parent_floater->reshape(parent_rect.getWidth(), parent_rect.getHeight() - (debug_rect.getHeight() * 2));
+        mVisibleDebugPermissions = false;
+    }
 
 	mOpenBtn->setEnabled(FALSE);
 	mPayBtn->setEnabled(FALSE);
@@ -257,6 +275,8 @@ void LLSidepanelTaskInfo::disablePermissions()
 
 void LLSidepanelTaskInfo::refresh()
 {
+    mIsDirty = false;
+    
 	LLButton* btn_deed_to_group = mDeedBtn; 
 	if (btn_deed_to_group)
 	{	
@@ -301,10 +321,10 @@ void LLSidepanelTaskInfo::refresh()
 	const BOOL is_one_object = (object_count == 1);
 	
 	// BUG: fails if a root and non-root are both single-selected.
-	const BOOL is_perm_modify = (mObjectSelection->getFirstRootNode() && LLSelectMgr::getInstanceFast()->selectGetRootsModify()) ||
-		LLSelectMgr::getInstanceFast()->selectGetModify();
-	const BOOL is_nonpermanent_enforced = (mObjectSelection->getFirstRootNode() && LLSelectMgr::getInstanceFast()->selectGetRootsNonPermanentEnforced()) ||
-		LLSelectMgr::getInstanceFast()->selectGetNonPermanentEnforced();
+	const BOOL is_perm_modify = (mObjectSelection->getFirstRootNode() && LLSelectMgr::getInstance()->selectGetRootsModify()) ||
+		LLSelectMgr::getInstance()->selectGetModify();
+	const BOOL is_nonpermanent_enforced = (mObjectSelection->getFirstRootNode() && LLSelectMgr::getInstance()->selectGetRootsNonPermanentEnforced()) ||
+		LLSelectMgr::getInstance()->selectGetNonPermanentEnforced();
 
 	S32 string_index = 0;
 	std::string MODIFY_INFO_STRINGS[] =
@@ -334,20 +354,20 @@ void LLSidepanelTaskInfo::refresh()
 	std::string pfAttrName;
 
 	if ((mObjectSelection->getFirstRootNode() 
-		&& LLSelectMgr::getInstanceFast()->selectGetRootsNonPathfinding())
-		|| LLSelectMgr::getInstanceFast()->selectGetNonPathfinding())
+		&& LLSelectMgr::getInstance()->selectGetRootsNonPathfinding())
+		|| LLSelectMgr::getInstance()->selectGetNonPathfinding())
 	{
 		pfAttrName = "Pathfinding_Object_Attr_None";
 	}
 	else if ((mObjectSelection->getFirstRootNode() 
-		&& LLSelectMgr::getInstanceFast()->selectGetRootsPermanent())
-		|| LLSelectMgr::getInstanceFast()->selectGetPermanent())
+		&& LLSelectMgr::getInstance()->selectGetRootsPermanent())
+		|| LLSelectMgr::getInstance()->selectGetPermanent())
 	{
 		pfAttrName = "Pathfinding_Object_Attr_Permanent";
 	}
 	else if ((mObjectSelection->getFirstRootNode() 
-		&& LLSelectMgr::getInstanceFast()->selectGetRootsCharacter())
-		|| LLSelectMgr::getInstanceFast()->selectGetCharacter())
+		&& LLSelectMgr::getInstance()->selectGetRootsCharacter())
+		|| LLSelectMgr::getInstance()->selectGetCharacter())
 	{
 		pfAttrName = "Pathfinding_Object_Attr_Character";
 	}
@@ -361,16 +381,11 @@ void LLSidepanelTaskInfo::refresh()
 	
 	// Update creator text field
 	getChildView("Creator:")->setEnabled(TRUE);
-// [RLVa:KB] - Checked: 2010-11-01 (RLVa-1.2.2a) | Modified: RLVa-1.2.2a
-	BOOL creators_identical = FALSE;
-// [/RLVa:KB]
-
 	std::string creator_name;
-	LLUUID creator_id;
 // [RLVa:KB] - Checked: 2010-11-01 (RLVa-1.2.2a) | Modified: RLVa-1.2.2a
-	creators_identical = LLSelectMgr::getInstanceFast()->selectGetCreator(creator_id, creator_name);
+	BOOL creators_identical = LLSelectMgr::getInstance()->selectGetCreator(mCreatorID, creator_name);
 // [/RLVa:KB]
-//	LLSelectMgr::getInstanceFast()->selectGetCreator(creator_id, creator_name);
+//	LLSelectMgr::getInstance()->selectGetCreator(creator_id, creator_name);
 
 //	if(creator_id != mCreatorID )
 //	{
@@ -388,11 +403,10 @@ void LLSidepanelTaskInfo::refresh()
 	getChildView("Owner:")->setEnabled(TRUE);
 
 	std::string owner_name;
-	LLUUID owner_id;
-	const BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, owner_name);
-	if (owner_id.isNull())
+	const BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(mOwnerID, owner_name);
+	if (mOwnerID.isNull())
 	{
-		if (LLSelectMgr::getInstanceFast()->selectIsGroupOwned())
+		if (LLSelectMgr::getInstance()->selectIsGroupOwned())
 		{
 			// Group owned already displayed by selectGetOwner
 		}
@@ -400,7 +414,7 @@ void LLSidepanelTaskInfo::refresh()
 		{
 			// Display last owner if public
 			std::string last_owner_name;
-			LLSelectMgr::getInstanceFast()->selectGetLastOwner(mLastOwnerID, last_owner_name);
+			LLSelectMgr::getInstance()->selectGetLastOwner(mLastOwnerID, last_owner_name);
 
 			// It should never happen that the last owner is null and the owner
 			// is null, but it seems to be a bug in the simulator right now. JC
@@ -431,44 +445,30 @@ void LLSidepanelTaskInfo::refresh()
 			creator_name = LLSLURL("agent", mCreatorID, "rlvanonym").getSLURLString();
 
 		// Only anonymize the owner name if all of the selection is owned by the same avie and isn't group owned
-		if ( (owners_identical) && (!LLSelectMgr::getInstanceFast()->selectIsGroupOwned()) && (mOwnerID != gAgent.getID()) )
+		if ( (owners_identical) && (!LLSelectMgr::getInstance()->selectIsGroupOwned()) && (mOwnerID != gAgent.getID()) )
 			owner_name = LLSLURL("agent", mOwnerID, "rlvanonym").getSLURLString();
 	}
 
-	if(mDACreatorName->getValue().asString() == LLStringUtil::null)
-	{
-		mDACreatorName->setValue(creator_name);
-	}
+	mDACreatorName->setValue(creator_name);
 	mDACreatorName->setEnabled(TRUE);
 
-	if(mDAOwnerName->getValue().asString() == LLStringUtil::null)
-	{
-		mDAOwnerName->setValue(owner_name);
-	}
+	mDAOwnerName->setValue(owner_name);
 	mDAOwnerName->setEnabled(TRUE);
 // [/RLVa:KB]
 
 	// update group text field
 	getChildView("Group:")->setEnabled(TRUE);
-	getChild<LLUICtrl>("Group Name")->setValue(LLStringUtil::null);
 	LLUUID group_id;
-	BOOL groups_identical = LLSelectMgr::getInstanceFast()->selectGetGroup(group_id);
+	BOOL groups_identical = LLSelectMgr::getInstance()->selectGetGroup(group_id);
 	if (groups_identical)
 	{
-		if (mLabelGroupName)
-		{
-			mLabelGroupName->setNameID(group_id,TRUE);
-			mLabelGroupName->setEnabled(TRUE);
-		}
+		mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+		mLabelGroupName->setEnabled(TRUE);
 	}
 	else
 	{
-		if (mLabelGroupName)
-		{
-			mLabelGroupName->setNameID(LLUUID::null, TRUE);
-			mLabelGroupName->refresh(LLUUID::null, std::string(), true);
-			mLabelGroupName->setEnabled(FALSE);
-		}
+		mLabelGroupName->setValue(LLStringUtil::null);
+		mLabelGroupName->setEnabled(TRUE);
 	}
 	
 	getChildView("button set group")->setEnabled(owners_identical && (mOwnerID == gAgent.getID()) && is_nonpermanent_enforced);
@@ -521,17 +521,17 @@ void LLSidepanelTaskInfo::refresh()
 	BOOL is_for_sale_mixed = FALSE;
 	BOOL is_sale_price_mixed = FALSE;
 	U32 num_for_sale = FALSE;
-    LLSelectMgr::getInstanceFast()->selectGetAggregateSaleInfo(num_for_sale,
+    LLSelectMgr::getInstance()->selectGetAggregateSaleInfo(num_for_sale,
 														   is_for_sale_mixed,
 														   is_sale_price_mixed,
 														   total_sale_price,
 														   individual_sale_price);
 
 	const BOOL self_owned = (gAgent.getID() == mOwnerID);
-	const BOOL group_owned = LLSelectMgr::getInstanceFast()->selectIsGroupOwned() ;
-	const BOOL public_owned = (mOwnerID.isNull() && !LLSelectMgr::getInstanceFast()->selectIsGroupOwned());
-	const BOOL can_transfer = LLSelectMgr::getInstanceFast()->selectGetRootsTransfer();
-	const BOOL can_copy = LLSelectMgr::getInstanceFast()->selectGetRootsCopy();
+	const BOOL group_owned = LLSelectMgr::getInstance()->selectIsGroupOwned() ;
+	const BOOL public_owned = (mOwnerID.isNull() && !LLSelectMgr::getInstance()->selectIsGroupOwned());
+	const BOOL can_transfer = LLSelectMgr::getInstance()->selectGetRootsTransfer();
+	const BOOL can_copy = LLSelectMgr::getInstance()->selectGetRootsCopy();
 
 	if (!owners_identical)
 	{
@@ -620,45 +620,45 @@ void LLSidepanelTaskInfo::refresh()
 	U32 next_owner_mask_on 		= 0;
 	U32 next_owner_mask_off		= 0;
 
-	BOOL valid_base_perms 		= LLSelectMgr::getInstanceFast()->selectGetPerm(PERM_BASE,
+	BOOL valid_base_perms 		= LLSelectMgr::getInstance()->selectGetPerm(PERM_BASE,
 																			&base_mask_on,
 																			&base_mask_off);
 	//BOOL valid_owner_perms =//
-	LLSelectMgr::getInstanceFast()->selectGetPerm(PERM_OWNER,
+	LLSelectMgr::getInstance()->selectGetPerm(PERM_OWNER,
 											  &owner_mask_on,
 											  &owner_mask_off);
-	BOOL valid_group_perms 		= LLSelectMgr::getInstanceFast()->selectGetPerm(PERM_GROUP,
+	BOOL valid_group_perms 		= LLSelectMgr::getInstance()->selectGetPerm(PERM_GROUP,
 																			&group_mask_on,
 																			&group_mask_off);
 	
-	BOOL valid_everyone_perms 	= LLSelectMgr::getInstanceFast()->selectGetPerm(PERM_EVERYONE,
+	BOOL valid_everyone_perms 	= LLSelectMgr::getInstance()->selectGetPerm(PERM_EVERYONE,
 																			&everyone_mask_on,
 																			&everyone_mask_off);
 	
-	BOOL valid_next_perms 		= LLSelectMgr::getInstanceFast()->selectGetPerm(PERM_NEXT_OWNER,
+	BOOL valid_next_perms 		= LLSelectMgr::getInstance()->selectGetPerm(PERM_NEXT_OWNER,
 																			&next_owner_mask_on,
 																			&next_owner_mask_off);
 
 	
 	if (gSavedSettings.getBOOL("DebugPermissions") )
 	{
-		if (valid_base_perms)
-		{
-			getChild<LLUICtrl>("B:")->setValue("B: " + mask_to_string(base_mask_on));
-			getChildView("B:")->setVisible(							TRUE);
-			
-			getChild<LLUICtrl>("O:")->setValue("O: " + mask_to_string(owner_mask_on));
-			getChildView("O:")->setVisible(							TRUE);
-			
-			getChild<LLUICtrl>("G:")->setValue("G: " + mask_to_string(group_mask_on));
-			getChildView("G:")->setVisible(							TRUE);
-			
-			getChild<LLUICtrl>("E:")->setValue("E: " + mask_to_string(everyone_mask_on));
-			getChildView("E:")->setVisible(							TRUE);
-			
-			getChild<LLUICtrl>("N:")->setValue("N: " + mask_to_string(next_owner_mask_on));
-			getChildView("N:")->setVisible(							TRUE);
-		}
+        if (valid_base_perms)
+        {
+            mDAB->setValue("B: " + mask_to_string(base_mask_on));
+            mDAB->setVisible(							TRUE);
+
+            mDAO->setValue("O: " + mask_to_string(owner_mask_on));
+            mDAO->setVisible(							TRUE);
+
+            mDAG->setValue("G: " + mask_to_string(group_mask_on));
+            mDAG->setVisible(							TRUE);
+
+            mDAE->setValue("E: " + mask_to_string(everyone_mask_on));
+            mDAE->setVisible(							TRUE);
+
+            mDAN->setValue("N: " + mask_to_string(next_owner_mask_on));
+            mDAN->setVisible(							TRUE);
+        }
 
 		U32 flag_mask = 0x0;
 		if (objectp->permMove()) 		flag_mask |= PERM_MOVE;
@@ -666,18 +666,35 @@ void LLSidepanelTaskInfo::refresh()
 		if (objectp->permCopy()) 		flag_mask |= PERM_COPY;
 		if (objectp->permTransfer()) 	flag_mask |= PERM_TRANSFER;
 
-		getChild<LLUICtrl>("F:")->setValue("F:" + mask_to_string(flag_mask));
-		getChildView("F:")->setVisible(								TRUE);
-	}
-	else
-	{
-		getChildView("B:")->setVisible(								FALSE);
-		getChildView("O:")->setVisible(								FALSE);
-		getChildView("G:")->setVisible(								FALSE);
-		getChildView("E:")->setVisible(								FALSE);
-		getChildView("N:")->setVisible(								FALSE);
-		getChildView("F:")->setVisible(								FALSE);
-	}
+        mDAF->setValue("F:" + mask_to_string(flag_mask));
+        mDAF->setVisible(TRUE);
+
+        if (!mVisibleDebugPermissions)
+        {
+            LLFloater* parent_floater = gFloaterView->getParentFloater(this);
+            LLRect parent_rect = parent_floater->getRect();
+            LLRect debug_rect = mDAB->getRect();
+            // use double the debug rect for padding (since it isn't trivial to extract top_pad)
+            parent_floater->reshape(parent_rect.getWidth(), parent_rect.getHeight() + (debug_rect.getHeight() * 2));
+            mVisibleDebugPermissions = true;
+        }
+    }
+    else if (mVisibleDebugPermissions)
+    {
+        mDAB->setVisible(FALSE);
+        mDAO->setVisible(FALSE);
+        mDAG->setVisible(FALSE);
+        mDAE->setVisible(FALSE);
+        mDAN->setVisible(FALSE);
+        mDAF->setVisible(FALSE);
+
+        LLFloater* parent_floater = gFloaterView->getParentFloater(this);
+        LLRect parent_rect = parent_floater->getRect();
+        LLRect debug_rect = mDAB->getRect();
+        // use double the debug rect for padding (since it isn't trivial to extract top_pad)
+        parent_floater->reshape(parent_rect.getWidth(), parent_rect.getHeight() - (debug_rect.getHeight() * 2));
+        mVisibleDebugPermissions = false;
+    }
 
 	BOOL has_change_perm_ability = FALSE;
 	BOOL has_change_sale_ability = FALSE;
@@ -849,7 +866,7 @@ void LLSidepanelTaskInfo::refresh()
 
 	// reflect sale information
 	LLSaleInfo sale_info;
-	BOOL valid_sale_info = LLSelectMgr::getInstanceFast()->selectGetSaleInfo(sale_info);
+	BOOL valid_sale_info = LLSelectMgr::getInstance()->selectGetSaleInfo(sale_info);
 	LLSaleInfo::EForSale sale_type = sale_info.getSaleType();
 
 	LLComboBox* combo_sale_type = getChild<LLComboBox>("sale type");
@@ -880,16 +897,16 @@ void LLSidepanelTaskInfo::refresh()
 	}
 	
 	// Check search status of objects
-	const BOOL all_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME );
+	const BOOL all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
 	bool include_in_search;
-	const BOOL all_include_in_search = LLSelectMgr::getInstanceFast()->selectionGetIncludeInSearch(&include_in_search);
+	const BOOL all_include_in_search = LLSelectMgr::getInstance()->selectionGetIncludeInSearch(&include_in_search);
 	getChildView("search_check")->setEnabled(has_change_sale_ability && all_volume);
 	getChild<LLUICtrl>("search_check")->setValue(include_in_search);
-	getChild<LLUICtrl>("search_check")->setTentative( 				!all_include_in_search);
+	getChild<LLUICtrl>("search_check")->setTentative(!all_include_in_search);
 
 	// Click action (touch, sit, buy)
 	U8 click_action = 0;
-	if (LLSelectMgr::getInstanceFast()->selectionGetClickAction(&click_action))
+	if (LLSelectMgr::getInstance()->selectionGetClickAction(&click_action))
 	{
 		LLComboBox*	ComboClickAction = getChild<LLComboBox>("clickaction");
 		if (ComboClickAction)
@@ -900,33 +917,6 @@ void LLSidepanelTaskInfo::refresh()
 	getChildView("label click action")->setEnabled(is_perm_modify && is_nonpermanent_enforced && all_volume);
 	getChildView("clickaction")->setEnabled(is_perm_modify && is_nonpermanent_enforced && all_volume);
 
-	if (!getIsEditing())
-	{
-		const std::string no_item_names[] = 
-			{
-				"Object Name",
-				"Object Description",
-				"button set group",
-				"checkbox share with group",
-				"button deed",
-				"checkbox allow everyone move",
-				"checkbox allow everyone copy",
-				"checkbox for sale",
-				"sale type",
-				"Edit Cost",
-				"checkbox next owner can modify",
-				"checkbox next owner can copy",
-				"checkbox next owner can transfer",
-				"clickaction",
-				"search_check",
-				"perm_modify",
-				"Group Name",
-			};
-		for (size_t t=0; t<LL_ARRAY_SIZE(no_item_names); ++t)
-		{
-			getChildView(no_item_names[t])->setEnabled(	FALSE);
-		}
-	}
 	updateVerbs();
 }
 
@@ -935,21 +925,21 @@ void LLSidepanelTaskInfo::refresh()
 void LLSidepanelTaskInfo::onClickClaim(void*)
 {
 	// try to claim ownership
-	LLSelectMgr::getInstanceFast()->sendOwner(gAgent.getID(), gAgent.getGroupID());
+	LLSelectMgr::getInstance()->sendOwner(gAgent.getID(), gAgent.getGroupID());
 }
 
 // static
 void LLSidepanelTaskInfo::onClickRelease(void*)
 {
 	// try to release ownership
-	LLSelectMgr::getInstanceFast()->sendOwner(LLUUID::null, LLUUID::null);
+	LLSelectMgr::getInstance()->sendOwner(LLUUID::null, LLUUID::null);
 }
 
 void LLSidepanelTaskInfo::onClickGroup()
 {
 	LLUUID owner_id;
 	std::string name;
-	BOOL owners_identical = LLSelectMgr::getInstanceFast()->selectGetOwner(owner_id, name);
+	BOOL owners_identical = LLSelectMgr::getInstance()->selectGetOwner(owner_id, name);
 	LLFloater* parent_floater = gFloaterView->getParentFloater(this);
 
 	if (owners_identical && (owner_id == gAgent.getID()))
@@ -970,11 +960,9 @@ void LLSidepanelTaskInfo::onClickGroup()
 
 void LLSidepanelTaskInfo::cbGroupID(LLUUID group_id)
 {
-	if (mLabelGroupName)
-	{
-		mLabelGroupName->setNameID(group_id, TRUE);
-	}
-	LLSelectMgr::getInstanceFast()->sendGroup(group_id);
+	mLabelGroupName->setValue(LLSLURL("group", group_id, "inspect").getSLURLString());
+	mLabelGroupName->setEnabled(TRUE);
+	LLSelectMgr::getInstance()->sendGroup(group_id);
 }
 
 static bool callback_deed_to_group(const LLSD& notification, const LLSD& response)
@@ -983,10 +971,10 @@ static bool callback_deed_to_group(const LLSD& notification, const LLSD& respons
 	if (option == 0)
 	{
 		LLUUID group_id;
-		const BOOL groups_identical = LLSelectMgr::getInstanceFast()->selectGetGroup(group_id);
+		const BOOL groups_identical = LLSelectMgr::getInstance()->selectGetGroup(group_id);
 		if (group_id.notNull() && groups_identical && (gAgent.hasPowerInGroup(group_id, GP_OBJECT_DEED)))
 		{
-			LLSelectMgr::getInstanceFast()->sendOwner(LLUUID::null, group_id, FALSE);
+			LLSelectMgr::getInstance()->sendOwner(LLUUID::null, group_id, FALSE);
 		}
 	}
 	return FALSE;
@@ -1004,7 +992,7 @@ void LLSidepanelTaskInfo::onClickDeedToGroup(void *data)
 // static
 void LLSidepanelTaskInfo::onCommitPerm(LLUICtrl *ctrl, void *data, U8 field, U32 perm)
 {
-	LLViewerObject* object = LLSelectMgr::getInstanceFast()->getSelection()->getFirstRootObject();
+	LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
 	if(!object) return;
 
 	// Checkbox will have toggled itself
@@ -1012,7 +1000,7 @@ void LLSidepanelTaskInfo::onCommitPerm(LLUICtrl *ctrl, void *data, U8 field, U32
 	LLCheckBoxCtrl *check = (LLCheckBoxCtrl *)ctrl;
 	BOOL new_state = check->get();
 	
-	LLSelectMgr::getInstanceFast()->selectionSetObjectPermissions(field, new_state, perm);
+	LLSelectMgr::getInstance()->selectionSetObjectPermissions(field, new_state, perm);
 
     LLSidepanelTaskInfo* self = (LLSidepanelTaskInfo*)data;
     if (self)
@@ -1069,8 +1057,8 @@ void LLSidepanelTaskInfo::onCommitName(LLUICtrl*, void* data)
 	LLLineEditor*	tb = self->getChild<LLLineEditor>("Object Name");
 	if(tb)
 	{
-		LLSelectMgr::getInstanceFast()->selectionSetObjectName(tb->getText());
-//		LLSelectMgr::getInstanceFast()->selectionSetObjectName(self->mLabelObjectName->getText());
+		LLSelectMgr::getInstance()->selectionSetObjectName(tb->getText());
+//		LLSelectMgr::getInstance()->selectionSetObjectName(self->mLabelObjectName->getText());
 	}
 }
 
@@ -1083,7 +1071,7 @@ void LLSidepanelTaskInfo::onCommitDesc(LLUICtrl*, void* data)
 	LLLineEditor*	le = self->getChild<LLLineEditor>("Object Description");
 	if(le)
 	{
-		LLSelectMgr::getInstanceFast()->selectionSetObjectDescription(le->getText());
+		LLSelectMgr::getInstance()->selectionSetObjectDescription(le->getText());
 	}
 }
 
@@ -1124,13 +1112,13 @@ void LLSidepanelTaskInfo::setAllSaleInfo()
 		sale_type = LLSaleInfo::FS_NOT;
 
 	LLSaleInfo old_sale_info;
-	LLSelectMgr::getInstanceFast()->selectGetSaleInfo(old_sale_info);
+	LLSelectMgr::getInstance()->selectGetSaleInfo(old_sale_info);
 
 	LLSaleInfo new_sale_info(sale_type, price);
-	LLSelectMgr::getInstanceFast()->selectionSetObjectSaleInfo(new_sale_info);
+	LLSelectMgr::getInstance()->selectionSetObjectSaleInfo(new_sale_info);
 	
 	U8 old_click_action = 0;
-	LLSelectMgr::getInstanceFast()->selectionGetClickAction(&old_click_action);
+	LLSelectMgr::getInstance()->selectionGetClickAction(&old_click_action);
 
 	if (old_sale_info.isForSale()
 		&& !new_sale_info.isForSale()
@@ -1138,7 +1126,7 @@ void LLSidepanelTaskInfo::setAllSaleInfo()
 	{
 		// If turned off for-sale, make sure click-action buy is turned
 		// off as well
-		LLSelectMgr::getInstanceFast()->
+		LLSelectMgr::getInstance()->
 			selectionSetClickAction(CLICK_ACTION_TOUCH);
 	}
 	else if (new_sale_info.isForSale()
@@ -1147,7 +1135,7 @@ void LLSidepanelTaskInfo::setAllSaleInfo()
 	{
 		// If just turning on for-sale, preemptively turn on one-click buy
 		// unless user have a different click action set
-		LLSelectMgr::getInstanceFast()->
+		LLSelectMgr::getInstance()->
 			selectionSetClickAction(CLICK_ACTION_BUY);
 	}
 }
@@ -1186,7 +1174,8 @@ static U8 string_value_to_click_action(std::string p_value)
 void LLSidepanelTaskInfo::onCommitClickAction(LLUICtrl* ctrl, void*)
 {
 	LLComboBox* box = (LLComboBox*)ctrl;
-	if (!box) return;
+	if (!box)
+		return;
 	std::string value = box->getValue().asString();
 	U8 click_action = string_value_to_click_action(value);
 	doClickAction(click_action);
@@ -1198,14 +1187,14 @@ void LLSidepanelTaskInfo::doClickAction(U8 click_action)
 	if (click_action == CLICK_ACTION_BUY)
 	{
 		LLSaleInfo sale_info;
-		LLSelectMgr::getInstanceFast()->selectGetSaleInfo(sale_info);
+		LLSelectMgr::getInstance()->selectGetSaleInfo(sale_info);
 		if (!sale_info.isForSale())
 		{
 			LLNotificationsUtil::add("CantSetBuyObject");
 
 			// Set click action back to its old value
 			U8 click_action = 0;
-			LLSelectMgr::getInstanceFast()->selectionGetClickAction(&click_action);
+			LLSelectMgr::getInstance()->selectionGetClickAction(&click_action);
 			return;
 		}
 	}
@@ -1213,7 +1202,7 @@ void LLSidepanelTaskInfo::doClickAction(U8 click_action)
 	{
 		// Verify object has script with money() handler
 		LLSelectionPayable payable;
-		bool can_pay = LLSelectMgr::getInstanceFast()->getSelection()->applyToObjects(&payable);
+		bool can_pay = LLSelectMgr::getInstance()->getSelection()->applyToObjects(&payable);
 		if (!can_pay)
 		{
 			// Warn, but do it anyway.
@@ -1224,7 +1213,7 @@ void LLSidepanelTaskInfo::doClickAction(U8 click_action)
 			handle_give_money_dialog();
 		}
 	}
-	LLSelectMgr::getInstanceFast()->selectionSetClickAction(click_action);
+	LLSelectMgr::getInstance()->selectionSetClickAction(click_action);
 }
 
 // static
@@ -1232,23 +1221,13 @@ void LLSidepanelTaskInfo::onCommitIncludeInSearch(LLUICtrl* ctrl, void* data)
 {
 	LLCheckBoxCtrl* box = (LLCheckBoxCtrl*)ctrl;
 	llassert(box);
-	LLSelectMgr::getInstanceFast()->selectionSetIncludeInSearch(box->get());
+	LLSelectMgr::getInstance()->selectionSetIncludeInSearch(box->get());
 }
 
 // virtual
 void LLSidepanelTaskInfo::updateVerbs()
 {
-	LLSidepanelInventorySubpanel::updateVerbs();
-
-	/*
-	mOpenBtn->setVisible(!getIsEditing());
-	mPayBtn->setVisible(!getIsEditing());
-	mBuyBtn->setVisible(!getIsEditing());
-	//const LLViewerObject *obj = getFirstSelectedObject();
-	//mEditBtn->setEnabled(obj && obj->permModify());
-	*/
-
-	LLSafeHandle<LLObjectSelection> object_selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLSafeHandle<LLObjectSelection> object_selection = LLSelectMgr::getInstance()->getSelection();
 	const BOOL any_selected = (object_selection->getNumNodes() > 0);
 
 	mOpenBtn->setVisible(true);
@@ -1330,6 +1309,23 @@ void LLSidepanelTaskInfo::setObjectSelection(LLObjectSelectionHandle selection)
 LLSidepanelTaskInfo* LLSidepanelTaskInfo::getActivePanel()
 {
 	return sActivePanel;
+}
+
+void LLSidepanelTaskInfo::dirty()
+{
+    mIsDirty = true;
+}
+
+// static
+void LLSidepanelTaskInfo::onIdle( void* user_data )
+{
+    LLSidepanelTaskInfo* self = reinterpret_cast<LLSidepanelTaskInfo*>(user_data);
+
+    if( self->mIsDirty )
+    {
+        self->refresh();
+        self->mIsDirty = false;
+    }
 }
 
 LLViewerObject* LLSidepanelTaskInfo::getObject()

@@ -88,6 +88,9 @@ private:
 	void				buildParamList(LLScrollingPanelList *panel_list, value_map_t &sorted_params, LLAccordionCtrlTab *tab, LLJoint* jointp);
 	// update bottom bar buttons ("Save", "Revert", etc)
 	void				updateVerbs();
+	
+	void				onClickedImportBtn();
+	void				onClickedImportBtnCallback(const std::vector<std::string>& filenames);
 
 	void				onColorSwatchCommit(const LLUICtrl*);
 	void				onTexturePickerCommit(const LLUICtrl*);

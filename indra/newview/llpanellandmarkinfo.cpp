@@ -111,9 +111,9 @@ void LLPanelLandmarkInfo::setInfoType(EInfoType type)
 }
 
 // Sets CREATE_LANDMARK infotype and creates landmark at desired folder
-void LLPanelLandmarkInfo::setInfoAndCreateLandmark(const LLUUID& fodler_id)
+void LLPanelLandmarkInfo::setInfoAndCreateLandmark(const LLUUID& folder_id)
 {
-    setInfoType(CREATE_LANDMARK, fodler_id);
+    setInfoType(CREATE_LANDMARK, folder_id);
 }
 
 void LLPanelLandmarkInfo::setInfoType(EInfoType type, const LLUUID &folder_id)
@@ -369,6 +369,11 @@ void LLPanelLandmarkInfo::toggleLandmarkEditMode(BOOL enabled)
 
 	// Prevent the floater from losing focus (if the sidepanel is undocked).
 	setFocus(TRUE);
+}
+
+void LLPanelLandmarkInfo::setCanEdit(BOOL enabled)
+{
+    getChild<LLButton>("edit_btn")->setEnabled(enabled);
 }
 
 const std::string& LLPanelLandmarkInfo::getLandmarkTitle() const

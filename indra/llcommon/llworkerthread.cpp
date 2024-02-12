@@ -35,8 +35,7 @@
 // Run on MAIN thread
 
 LLWorkerThread::LLWorkerThread(const std::string& name, bool threaded, bool should_pause) :
-	LLQueuedThread(name, threaded, should_pause),
-	mDeleteListSize(0)
+	LLQueuedThread(name, threaded, should_pause)
 {
 	mDeleteMutex = new LLMutex();
 
@@ -70,27 +69,25 @@ void LLWorkerThread::clearDeleteList()
 				<< " entries in delete list." << LL_ENDL;
 
 		mDeleteMutex->lock();
-		for (delete_list_t::iterator iter = mDeleteList.begin(); iter != mDeleteList.end(); ++iter)
+		for (LLWorkerClass* worker : mDeleteList)
 		{
-			(*iter)->mRequestHandle = LLWorkerThread::nullHandle();
-			(*iter)->clearFlags(LLWorkerClass::WCF_HAVE_WORK);
-			delete *iter ;
+			worker->mRequestHandle = LLWorkerThread::nullHandle();
+			worker->clearFlags(LLWorkerClass::WCF_HAVE_WORK);
+			worker->clearFlags(LLWorkerClass::WCF_WORKING);
+			delete worker;
 		}
 		mDeleteList.clear() ;
-		mDeleteListSize = mDeleteList.size();
 		mDeleteMutex->unlock() ;
 	}
 }
 
 // virtual
-S32 LLWorkerThread::update(F32 max_time_ms)
+size_t LLWorkerThread::update(F32 max_time_ms)
 {
-	S32 res = LLQueuedThread::update(max_time_ms);
+	auto res = LLQueuedThread::update(max_time_ms);
 	// Delete scheduled workers
 	std::vector<LLWorkerClass*> delete_list;
 	std::vector<LLWorkerClass*> abort_list;
-	if (mDeleteListSize)
-	{
 		mDeleteMutex->lock();
 		for (delete_list_t::iterator iter = mDeleteList.begin();
 			 iter != mDeleteList.end(); )
@@ -101,6 +98,7 @@ S32 LLWorkerThread::update(F32 max_time_ms)
 			{
 				if (worker->getFlags(LLWorkerClass::WCF_WORK_FINISHED))
 				{
+                	worker->setFlags(LLWorkerClass::WCF_DELETE_REQUESTED);
 					delete_list.push_back(worker);
 					mDeleteList.erase(curiter);
 				}
@@ -110,19 +108,14 @@ S32 LLWorkerThread::update(F32 max_time_ms)
 				}
 			}
 		}
-		mDeleteListSize = mDeleteList.size();
 		mDeleteMutex->unlock();
-	}
 	// abort and delete after releasing mutex
-	for (std::vector<LLWorkerClass*>::iterator iter = abort_list.begin();
-		 iter != abort_list.end(); ++iter)
+	for (LLWorkerClass* worker : abort_list)
 	{
-		(*iter)->abortWork(false);
+		worker->abortWork(false);
 	}
-	for (std::vector<LLWorkerClass*>::iterator iter = delete_list.begin();
-		 iter != delete_list.end(); ++iter)
+	for (LLWorkerClass* worker : delete_list)
 	{
-		LLWorkerClass* worker = *iter;
 		if (worker->mRequestHandle)
 		{
 			// Finished but not completed
@@ -130,7 +123,7 @@ S32 LLWorkerThread::update(F32 max_time_ms)
 			worker->mRequestHandle = LLWorkerThread::nullHandle();
 			worker->clearFlags(LLWorkerClass::WCF_HAVE_WORK);
 		}
-		delete *iter;
+		delete worker;
 	}
 	// delete and aborted entries mean there's still work to do
 	res += delete_list.size() + abort_list.size();
@@ -139,11 +132,11 @@ S32 LLWorkerThread::update(F32 max_time_ms)
 
 //----------------------------------------------------------------------------
 
-LLWorkerThread::handle_t LLWorkerThread::addWorkRequest(LLWorkerClass* workerclass, S32 param, U32 priority)
+LLWorkerThread::handle_t LLWorkerThread::addWorkRequest(LLWorkerClass* workerclass, S32 param)
 {
 	handle_t handle = generateHandle();
 	
-	WorkRequest* req = new WorkRequest(handle, priority, workerclass, param);
+	WorkRequest* req = new WorkRequest(handle, workerclass, param);
 
 	bool res = addRequest(req);
 	if (!res)
@@ -160,15 +153,14 @@ void LLWorkerThread::deleteWorker(LLWorkerClass* workerclass)
 {
 	mDeleteMutex->lock();
 	mDeleteList.push_back(workerclass);
-	mDeleteListSize = mDeleteList.size();
 	mDeleteMutex->unlock();
 }
 
 //============================================================================
 // Runs on its OWN thread
 
-LLWorkerThread::WorkRequest::WorkRequest(handle_t handle, U32 priority, LLWorkerClass* workerclass, S32 param) :
-	LLQueuedThread::QueuedRequest(handle, priority),
+LLWorkerThread::WorkRequest::WorkRequest(handle_t handle, LLWorkerClass* workerclass, S32 param) :
+	LLQueuedThread::QueuedRequest(handle),
 	mWorkerClass(workerclass),
 	mParam(param)
 {
@@ -183,6 +175,7 @@ void LLWorkerThread::WorkRequest::deleteRequest()
 // virtual
 bool LLWorkerThread::WorkRequest::processRequest()
 {
+    LL_PROFILE_ZONE_SCOPED;
 	LLWorkerClass* workerclass = getWorkerClass();
 	workerclass->setWorking(true);
 	bool complete = workerclass->doWork(getParam());
@@ -193,6 +186,7 @@ bool LLWorkerThread::WorkRequest::processRequest()
 // virtual
 void LLWorkerThread::WorkRequest::finishRequest(bool completed)
 {
+    LL_PROFILE_ZONE_SCOPED;
 	LLWorkerClass* workerclass = getWorkerClass();
 	workerclass->finishWork(getParam(), completed);
 	U32 flags = LLWorkerClass::WCF_WORK_FINISHED | (completed ? 0 : LLWorkerClass::WCF_WORK_ABORTED);
@@ -206,7 +200,6 @@ LLWorkerClass::LLWorkerClass(LLWorkerThread* workerthread, const std::string& na
 	: mWorkerThread(workerthread),
 	  mWorkerClassName(name),
 	  mRequestHandle(LLWorkerThread::nullHandle()),
-	  mRequestPriority(LLWorkerThread::PRIORITY_NORMAL),
 	  mMutex(),
 	  mWorkFlags(0)
 {
@@ -295,7 +288,7 @@ bool LLWorkerClass::yield()
 //----------------------------------------------------------------------------
 
 // calls startWork, adds doWork() to queue
-void LLWorkerClass::addWork(S32 param, U32 priority)
+void LLWorkerClass::addWork(S32 param)
 {
 	mMutex.lock();
 	llassert_always(!(mWorkFlags & (WCF_WORKING|WCF_HAVE_WORK)));
@@ -309,7 +302,7 @@ void LLWorkerClass::addWork(S32 param, U32 priority)
 	startWork(param);
 	clearFlags(WCF_WORK_FINISHED|WCF_WORK_ABORTED);
 	setFlags(WCF_HAVE_WORK);
-	mRequestHandle = mWorkerThread->addWorkRequest(this, param, priority);
+	mRequestHandle = mWorkerThread->addWorkRequest(this, param);
 	mMutex.unlock();
 }
 
@@ -324,7 +317,6 @@ void LLWorkerClass::abortWork(bool autocomplete)
 	if (mRequestHandle != LLWorkerThread::nullHandle())
 	{
 		mWorkerThread->abortRequest(mRequestHandle, autocomplete);
-		mWorkerThread->setPriority(mRequestHandle, LLQueuedThread::PRIORITY_IMMEDIATE);
 		setFlags(WCF_ABORT_REQUESTED);
 	}
 	mMutex.unlock();
@@ -396,17 +388,6 @@ void LLWorkerClass::scheduleDelete()
 	{
 		mWorkerThread->deleteWorker(this);
 	}
-}
-
-void LLWorkerClass::setPriority(U32 priority)
-{
-	mMutex.lock();
-	if (mRequestHandle != LLWorkerThread::nullHandle() && mRequestPriority != priority)
-	{
-		mRequestPriority = priority;
-		mWorkerThread->setPriority(mRequestHandle, priority);
-	}
-	mMutex.unlock();
 }
 
 //============================================================================

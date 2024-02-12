@@ -251,7 +251,6 @@ void LLFloaterImagePreview::draw()
 		if (selected <= 0)
 		{
 			gl_rect_2d_checkerboard(mPreviewRect);
-			LLGLDisable gls_alpha(GL_ALPHA_TEST);
 
 			if(mImagep.notNull())
 			{
@@ -379,7 +378,7 @@ bool LLFloaterImagePreview::loadImage(const std::string& src_filename)
 		return false;
 	}
 	
-	raw_image->biasedScaleToPowerOfTwo(1024);
+	raw_image->biasedScaleToPowerOfTwo(LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT);
 	mRawImagep = raw_image;
 	
 	return true;
@@ -664,10 +663,7 @@ BOOL LLImagePreviewAvatar::render()
 	LLGLSUIDefault def;
 	gGL.color4f(0.15f, 0.2f, 0.3f, 1.f);
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	gl_rect_2d_simple( mFullWidth, mFullHeight );
 
@@ -684,16 +680,16 @@ BOOL LLImagePreviewAvatar::render()
 		LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
 	LLQuaternion av_rot = avatarp->mPelvisp->getWorldRotation() * camera_rot;
-	LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
+	LLViewerCamera::getInstance()->setOriginAndLookAt(
 		target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),		// camera
 		LLVector3::z_axis,																	// up
 		target_pos + (mCameraOffset  * av_rot) );											// point of interest
 
 	stop_glerror();
 
-	LLViewerCamera::getInstanceFast()->setAspect((F32)mFullWidth / mFullHeight);
-	LLViewerCamera::getInstanceFast()->setView(LLViewerCamera::getInstanceFast()->getDefaultFOV() / mCameraZoom);
-	LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
+	LLViewerCamera::getInstance()->setAspect((F32)mFullWidth / mFullHeight);
+	LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
+	LLViewerCamera::getInstance()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
 
 	LLVertexBuffer::unbind();
 	avatarp->updateLOD();
@@ -800,8 +796,8 @@ void LLImagePreviewSculpted::setPreviewTarget(LLImageRaw* imagep, F32 distance)
 	U32 num_indices = vf.mNumIndices;
 	U32 num_vertices = vf.mNumVertices;
 
-	mVertexBuffer = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_NORMAL | LLVertexBuffer::MAP_TEXCOORD0, 0);
-	if (!mVertexBuffer->allocateBuffer(num_vertices, num_indices, TRUE))
+	mVertexBuffer = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_NORMAL | LLVertexBuffer::MAP_TEXCOORD0);
+	if (!mVertexBuffer->allocateBuffer(num_vertices, num_indices))
 	{
 		LL_WARNS() << "Failed to allocate Vertex Buffer for image preview to"
 			<< num_vertices << " vertices and "
@@ -841,6 +837,8 @@ void LLImagePreviewSculpted::setPreviewTarget(LLImageRaw* imagep, F32 distance)
 	{
 		*(index_strider++) = vf.mIndices[i];
 	}
+
+    mVertexBuffer->unmapBuffer();
 }
 
 
@@ -866,10 +864,7 @@ BOOL LLImagePreviewSculpted::render()
 		
 	gGL.color4f(0.15f, 0.2f, 0.3f, 1.f);
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	gl_rect_2d_simple( mFullWidth, mFullHeight );
 	
@@ -887,26 +882,23 @@ BOOL LLImagePreviewSculpted::render()
 		LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
 	LLQuaternion av_rot = camera_rot;
-	LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
+	LLViewerCamera::getInstance()->setOriginAndLookAt(
 		target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),		// camera
 		LLVector3::z_axis,																	// up
 		target_pos + (mCameraOffset  * av_rot) );											// point of interest
 
 	stop_glerror();
 
-	LLViewerCamera::getInstanceFast()->setAspect((F32) mFullWidth / mFullHeight);
-	LLViewerCamera::getInstanceFast()->setView(LLViewerCamera::getInstanceFast()->getDefaultFOV() / mCameraZoom);
-	LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
+	LLViewerCamera::getInstance()->setAspect((F32) mFullWidth / mFullHeight);
+	LLViewerCamera::getInstance()->setView(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
+	LLViewerCamera::getInstance()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
 
 	const LLVolumeFace &vf = mVolume->getVolumeFace(0);
 	U32 num_indices = vf.mNumIndices;
 	
 	gPipeline.enableLightsAvatar();
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gObjectPreviewProgram.bind();
-	}
+	gObjectPreviewProgram.bind();
 	gPipeline.enableLightsPreview();
 
 	gGL.pushMatrix();
@@ -915,15 +907,12 @@ BOOL LLImagePreviewSculpted::render()
 	const F32 BRIGHTNESS = 0.9f;
 	gGL.diffuseColor3f(BRIGHTNESS, BRIGHTNESS, BRIGHTNESS);
 
-	mVertexBuffer->setBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_NORMAL | LLVertexBuffer::MAP_TEXCOORD0);
+	mVertexBuffer->setBuffer();
 	mVertexBuffer->draw(LLRender::TRIANGLES, num_indices, 0);
 
 	gGL.popMatrix();
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gObjectPreviewProgram.unbind();
-	}
+	gObjectPreviewProgram.unbind();
 
 	return TRUE;
 }

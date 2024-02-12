@@ -56,7 +56,7 @@ public:
 		virtual ~WorkRequest() = default; // use deleteRequest()
 		
 	public:
-		WorkRequest(handle_t handle, U32 priority, LLWorkerClass* workerclass, S32 param);
+		WorkRequest(handle_t handle, LLWorkerClass* workerclass, S32 param);
 
 		S32 getParam()
 		{
@@ -82,18 +82,17 @@ protected:
 private:
 	typedef std::list<LLWorkerClass*> delete_list_t;
 	delete_list_t mDeleteList;
-	std::atomic<S32> mDeleteListSize;
 	LLMutex* mDeleteMutex;
 	
 public:
 	LLWorkerThread(const std::string& name, bool threaded = true, bool should_pause = false);
 	~LLWorkerThread();
 
-	/*virtual*/ S32 update(F32 max_time_ms);
+	/*virtual*/ size_t update(F32 max_time_ms);
 	
-	handle_t addWorkRequest(LLWorkerClass* workerclass, S32 param, U32 priority = PRIORITY_NORMAL);
+	handle_t addWorkRequest(LLWorkerClass* workerclass, S32 param);
 	
-	S32 getNumDeletes() const { return mDeleteListSize; } // debug
+	S32 getNumDeletes() { return (S32)mDeleteList.size(); } // debug
 
 private:
 	void deleteWorker(LLWorkerClass* workerclass); // schedule for deletion
@@ -152,10 +151,6 @@ public:
 	bool isWorking() { return getFlags(WCF_WORKING); }
 	bool wasAborted() { return getFlags(WCF_ABORT_REQUESTED); }
 
-	// setPriority(): changes the priority of a request
-	void setPriority(U32 priority);
-	U32  getPriority() { return mRequestPriority; }
-		
 	const std::string& getName() const { return mWorkerClassName; }
 
 protected:
@@ -170,7 +165,7 @@ protected:
 	void setWorkerThread(LLWorkerThread* workerthread);
 
 	// addWork(): calls startWork, adds doWork() to queue
-	void addWork(S32 param, U32 priority = LLWorkerThread::PRIORITY_NORMAL);
+	void addWork(S32 param);
 
 	// abortWork(): requests that work be aborted
 	void abortWork(bool autocomplete);
@@ -194,7 +189,6 @@ protected:
 	LLWorkerThread* mWorkerThread;
 	std::string mWorkerClassName;
 	handle_t mRequestHandle;
-	U32 mRequestPriority; // last priority set
 
 private:
 	LLMutex mMutex;

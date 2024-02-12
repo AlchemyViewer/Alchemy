@@ -51,19 +51,36 @@ class LLHost;
 class LLViewerObject;
 class LLSurfacePatch;
 
+class LLCharacter;
 class LLCloudPuff;
 class LLCloudGroup;
 class LLVOAvatar;
+
+class CapUrlMatches
+{
+public:
+	CapUrlMatches(std::set<LLViewerRegion*>& regions, std::set<std::string>& cap_names)
+		: mRegions(regions)
+		, mCapNames(cap_names)
+	{
+	}
+
+	std::set<LLViewerRegion*> mRegions;
+	std::set<std::string> mCapNames;
+};
 
 // LLWorld maintains a stack of unused viewer_regions and an array of pointers to viewer regions
 // as simulators are connected to, viewer_regions are popped off the stack and connected as required
 // as simulators are removed, they are pushed back onto the stack
 
-class LLWorld final : public LLSingleton<LLWorld>
+class LLWorld final : public LLSimpleton<LLWorld>
 {
-	LLSINGLETON(LLWorld);
 public:
-	void destroyClass();
+    LLWorld();
+
+    // Clear any objects, regions
+    // Prepares class to be reused or destroyed
+    void resetClass();
 
 	LLViewerRegion*	addRegion(const U64 &region_handle, const LLHost &host);
 		// safe to call if already present, does the "right thing" if
@@ -108,23 +125,27 @@ public:
 	LLSurfacePatch *		resolveLandPatchGlobal(const LLVector3d &position);
 	LLVector3				resolveLandNormalGlobal(const LLVector3d &position);		// absolute frame
 
+	void					setRegionSize(const U32& width = 0, const U32& length = 0);
 	U32						getRegionWidthInPoints() const	{ return mWidth; }
 	F32						getRegionScale() const			{ return mScale; }
 
 	// region X and Y size in meters
 	F32						getRegionWidthInMeters() const	{ return mWidthInMeters; }
 	F32						getRegionMinHeight() const		{ return -mWidthInMeters; }
-	F32						getRegionMaxHeight() const		{ return MAX_OBJECT_Z; }
+	F32						getRegionMaxHeight() const		{ return mRegionMaxHeight; }
+	F32						getRegionMinPrimScale() const	{ return mRegionMinPrimScale; }
+	F32						getRegionMaxPrimScale() const	{ return mRegionMaxPrimScale; }
+	F32						getRegionMaxPrimScaleNoMesh() const	{ return mRegionMaxPrimScaleNoMesh; }
+	F32						getRegionMaxHollowSize() const	{ return mRegionMaxHollowSize; }
+	F32						getRegionMinHoleSize() const	{ return mRegionMinHoleSize; }
+	S32						getRegionMaxLinkObjects() const	{ return mRegionMaxLinkObjects; }
 
 	void					updateRegions(F32 max_update_time);
 	void					updateVisibilities();
 	void					updateParticles();
-	void					updateClouds(const F32 dt);
-	LLCloudGroup *			findCloudGroup(const LLCloudPuff &puff);
 
 	void					renderPropertyLines();
 
-	void resetStats();
 	void updateNetStats(); // Update network statistics for all the regions...
 
 	void printPacketsLost();
@@ -137,9 +158,7 @@ public:
 	void setLandFarClip(const F32 far_clip);
 
 	LLViewerTexture *getDefaultWaterTexture();
-	void updateWaterObjects();
-
-    void precullWaterObjects(LLCamera& camera, LLCullResult* cull, bool include_void_water);
+    void updateWaterObjects();
 
 	void waterHeightRegionInfo(std::string const& sim_name, F32 water_height);
 	void shiftRegions(const LLVector3& offset);
@@ -151,6 +170,11 @@ public:
 	U32  getNumOfActiveCachedObjects() const {return mNumOfActiveCachedObjects;}
 
 	void clearAllVisibleObjects();
+	void refreshLimits();
+
+	virtual CapUrlMatches getCapURLMatches(const std::string& cap_url);
+	virtual bool isCapURLMapped(const std::string& cap_url);
+
 public:
 	typedef std::list<LLViewerRegion*> region_list_t;
 	const region_list_t& getRegionList() const { return mActiveRegionList; }
@@ -187,7 +211,14 @@ public:
 	// or if the circuit to this simulator had been lost.
 	bool isRegionListed(const LLViewerRegion* region) const;
 
+    // profile nearby avatars using gPipeline.profileAvatar and update their render times
+    // return max GPU time
+    F32 getNearbyAvatarsAndMaxGPUTime(std::vector<LLCharacter*> &valid_nearby_avs);
+
 private:
+    void clearHoleWaterObjects();
+    void clearEdgeWaterObjects();
+
 	region_list_t	mActiveRegionList;
 	region_list_t	mRegionList;
 	region_list_t	mVisibleRegionList;
@@ -196,12 +227,21 @@ private:
 	region_remove_signal_t mRegionRemovedSignal;
 
 	// Number of points on edge
-	static const U32 mWidth;
+	U32 mWidth = 256;
+	U32 mLength = 256;
 
 	// meters/point, therefore mWidth * mScale = meters per edge
-	static const F32 mScale;
+	F32 mScale = 1.f;
 
-	static const F32 mWidthInMeters;
+	F32 mWidthInMeters;
+	F32 mRegionMaxHeight;
+	F32 mRegionMinPrimScale;
+	F32 mRegionMaxPrimScale;
+	F32 mRegionMaxPrimScaleNoMesh;
+	F32 mRegionMaxHollowSize;
+	F32 mRegionMinHoleSize;
+	S32 mRegionMaxLinkObjects;
+	bool mRefreshLimits;
 
 	F32 mLandFarClip;					// Far clip distance for land.
 	LLPatchVertexArray		mLandPatch;
@@ -211,15 +251,14 @@ private:
 	U32 mNumOfActiveCachedObjects;
 	U64MicrosecondsImplicit mSpaceTimeUSec;
 
-	BOOL mClassicCloudsEnabled;
-
 	////////////////////////////
 	//
 	// Data for "Fake" objects
 	//
 
 	std::list<LLPointer<LLVOWater> > mHoleWaterObjects;
-	LLPointer<LLVOWater> mEdgeWaterObjects[8];
+    static constexpr S32 EDGE_WATER_OBJECTS_COUNT = 8;
+    LLPointer<LLVOWater> mEdgeWaterObjects[EDGE_WATER_OBJECTS_COUNT];
 
 	LLPointer<LLViewerTexture> mDefaultWaterTexturep;
 };

@@ -19,6 +19,7 @@ Agathos Frascati
 	CT-317
 	CT-352
 Ai Austin
+    SL-19399
 Aiko Ying
 Aimee Trescothick
 	SNOW-227
@@ -227,8 +228,19 @@ Ansariel Hiller
 	SL-13364
 	SL-13858
 	SL-13697
+	SL-14939
+	SL-14940
+	SL-14941
 	SL-13395
 	SL-3136
+	SL-15200
+	SL-15226
+	SL-15227
+	SL-15398
+	SL-18432
+	SL-19140
+	SL-4126
+	SL-20224
 Aralara Rajal
 Arare Chantilly
 	CHUIBUG-191
@@ -272,6 +284,14 @@ Beq Janus
 	SL-14766
 	SL-14927
 	SL-11300
+	SL-15709
+	SL-16021
+	SL-18202
+	SL-18586
+	SL-18592
+	SL-18637
+	SL-19317
+	SL-19660
 Beth Walcher
 Bezilon Kasei
 Biancaluce Robbiani
@@ -362,6 +382,7 @@ Charlie Sazaland
 Chaser Zaks
     BUG-225599
     BUG-227485
+    SL-16874
 Cherry Cheevers
 ChickyBabes Zuzu
 Chorazin Allen
@@ -392,6 +413,7 @@ Cinder Roxley
     STORM-2127
     STORM-2144
     SL-3404
+    SL-17634
 Clara Young
 Coaldust Numbers
     VWR-1095
@@ -478,6 +500,8 @@ Evangelista Emerald
 Faelon Swordthain
 Farallon Greyskin
 	VWR-2036
+Fawrsk
+	SL-18893
 Feep Larsson
 	VWR-447
 	VWR-1314
@@ -570,6 +594,10 @@ Henri Beauchamp
 	VWR-1320
 	VWR-1406
 	VWR-4157
+	SL-15175
+	SL-19110
+	SL-19159
+	[NO JIRA] (fullbright HUD alpha fix)
 herina Bode
 Hikkoshi Sakai
 	VWR-429
@@ -870,6 +898,7 @@ Kitty Barnett
 	STORM-2149
 	MAINT-7581
 	MAINT-7081
+    SL-18988
 Kolor Fall
 Komiko Okamoto
 Korvel Noh
@@ -901,6 +930,8 @@ LSL Scientist
 Lamorna Proctor
 Lares Carter
 Larry Pixel
+Lars Næsbye Christensen
+	SL-20054
 Laurent Bechir
 Leal Choche
 Lenae Munz
@@ -908,6 +939,8 @@ Lexi Frua
 Lillie Cordeaux
 Lilly Zenovka
 Lizzy Macarthur
+Logue Takacs
+	INTL-490
 Luban Yiyuan
 Luc Starsider
 Luminous Luminos
@@ -1100,15 +1133,21 @@ Nicky Dasmijn
 	OPEN-187
 	STORM-1937
 	OPEN-187
-    STORM-2010
+	SL-15234
+	STORM-2010
 	STORM-2082
 	MAINT-6665
 	SL-10291
 	SL-10293
 	SL-11061
-    SL-11072
+	SL-11072
 	SL-13141
 	SL-13642
+	SL-14541
+	SL-16438
+	SL-17218
+	SL-17238
+	SL-17585
 Nicky Perian
 	OPEN-1
 	STORM-1087
@@ -1154,6 +1193,12 @@ Ollie Kubrick
 Orenj Marat
 Orion Delphis
 Oryx Tempel
+PanteraPolnocy
+	SL-18891
+	SL-18904
+	SL-18937
+	SL-19207
+	SL-19681
 Parvati Silverweb
 Patric Mills
 	VWR-2645
@@ -1362,14 +1407,24 @@ Sovereign Engineer
     MAINT-7343
     SL-11079
     OPEN-343
-    SL-11625
+	SL-11625
     BUG-229030
+	SL-14696
 	SL-14705
 	SL-14706
 	SL-14707
 	SL-14731
 	SL-14732
 	SL-15096
+	SL-16127
+	SL-18249
+    SL-18394
+    SL-18412
+    SL-18497
+    SL-18525
+    SL-18534
+    SL-19690
+    SL-19336
 SpacedOut Frye
 	VWR-34
 	VWR-45
@@ -1632,6 +1687,8 @@ Zi Ree
 	VWR-25588
 	STORM-1790
 	STORM-1842
+	SL-18348
+	SL-18593
 Zipherius Turas
 	VWR-76
 	VWR-77

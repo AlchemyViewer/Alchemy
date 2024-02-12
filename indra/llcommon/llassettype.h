@@ -28,6 +28,7 @@
 #define LL_LLASSETTYPE_H
 
 #include <string>
+#include <vector>
 
 class LL_COMMON_API LLAssetType
 {
@@ -127,8 +128,9 @@ public:
         AT_RESERVED_6 = 55,
 
         AT_SETTINGS = 56,   // Collection of settings
-            
-		AT_COUNT = 57,
+        AT_MATERIAL = 57,   // Render Material
+
+		AT_COUNT = 58,
 
 			// +*********************************************************+
 			// |  TO ADD AN ELEMENT TO THIS ENUM:                        |
@@ -161,6 +163,8 @@ public:
 
 	static bool 				lookupIsAssetFetchByIDAllowed(EType asset_type); // the asset allows direct download
 	static bool 				lookupIsAssetIDKnowable(EType asset_type); // asset data can be known by the viewer
+
+	static std::vector<std::string> getAssetTypeNames();
 
     static const std::string    BADLOOKUP;
 

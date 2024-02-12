@@ -15,10 +15,11 @@
                 name="menu_stack"
                 orientation="vertical"
                 top="0">
+    <!-- Menu, nav bar and status bar need common focus_root-->
     <layout_panel mouse_opaque="true"
               follows="left|right|top"
               name="status_bar_container"
-              tab_stop="false"
+              focus_root="true"
               height="19"
               left="0"
               top="0"
@@ -26,20 +27,23 @@
               auto_resize="false"
               visible="true">
       <view mouse_opaque="false"
-            follows="all"
+            follows="top|left|right"
             name="menu_bar_holder"
+            tab_group="1"
             left="0"
             top="0"
             width="1024"
             height="19"/>
+      <view mouse_opaque="false"
+            follows="top|left|right"
+            name="nav_bar_container"
+            tab_group="3"
+            left="0"
+            top="19"
+            width="1024"
+            height="34"
+            visible="false"/>
     </layout_panel>
-    <layout_panel auto_resize="false"
-                  height="34"
-                  mouse_opaque="false"
-                  name="nav_bar_container"
-                  tab_stop="false"
-                  width="1024"
-                  visible="false"/>
     <layout_panel auto_resize="true"  
                   follows="all"
                   height="500"

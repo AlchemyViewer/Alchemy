@@ -58,10 +58,60 @@
 #include "llfeaturemanager.h"
 #include "llviewernetwork.h"
 #include "llmeshrepository.h" //for LLMeshRepository::sBytesReceived
+#include "llperfstats.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
 #include "llcorehttputil.h"
 #include "llvoicevivox.h"
+#include "llinventorymodel.h"
+#include "lltranslate.h"
+
+// "Minimal Vulkan" to get max API Version
+
+// Calls
+    #if defined(_WIN32)
+        #define VKAPI_ATTR
+        #define VKAPI_CALL __stdcall
+        #define VKAPI_PTR  VKAPI_CALL
+    #else
+        #define VKAPI_ATTR
+        #define VKAPI_CALL
+        #define VKAPI_PTR
+    #endif // _WIN32
+
+// Macros
+    // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    // |31|30|29|28|27|26|25|24|23|22|21|20|19|18|17|16|15|14|13|12|11|10| 9| 8| 7| 6| 5| 4| 3| 2| 1| 0|
+    // +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    // <variant> <-------major-------><-----------minor-----------> <--------------patch-------------->
+    //      0x7          0x7F                     0x3FF                           0xFFF
+    #define VK_API_VERSION_MAJOR(  version) (((uint32_t)(version) >> 22) & 0x07FU)  //  7 bits
+    #define VK_API_VERSION_MINOR(  version) (((uint32_t)(version) >> 12) & 0x3FFU)  // 10 bits
+    #define VK_API_VERSION_PATCH(  version) (((uint32_t)(version)      ) & 0xFFFU)  // 12 bits
+    #define VK_API_VERSION_VARIANT(version) (((uint32_t)(version) >> 29) & 0x007U)  //  3 bits
+
+    // NOTE: variant is first parameter!  This is to match vulkan/vulkan_core.h
+    #define VK_MAKE_API_VERSION(variant, major, minor, patch) (0\
+        | (((uint32_t)(major   & 0x07FU)) << 22) \
+        | (((uint32_t)(minor   & 0x3FFU)) << 12) \
+        | (((uint32_t)(patch   & 0xFFFU))      ) \
+        | (((uint32_t)(variant & 0x007U)) << 29) )
+
+    #define VK_DEFINE_HANDLE(object) typedef struct object##_T* object;
+
+// Types
+    VK_DEFINE_HANDLE(VkInstance);
+
+    typedef enum VkResult
+    {
+        VK_SUCCESS = 0,
+        VK_RESULT_MAX_ENUM = 0x7FFFFFFF
+    } VkResult;
+
+// Prototypes
+    typedef void               (VKAPI_PTR *PFN_vkVoidFunction            )(void);
+    typedef PFN_vkVoidFunction (VKAPI_PTR *PFN_vkGetInstanceProcAddr     )(VkInstance instance, const char* pName);
+    typedef VkResult           (VKAPI_PTR *PFN_vkEnumerateInstanceVersion)(uint32_t* pApiVersion);
 
 namespace LLStatViewer
 {
@@ -120,7 +170,7 @@ SimMeasurement<>			SIM_TIME_DILATION("simtimedilation", "Simulator time scale", 
 							SIM_MAIN_AGENTS("simmainagents", "Number of avatars in current region", LL_SIM_STAT_NUMAGENTMAIN),
 							SIM_CHILD_AGENTS("simchildagents", "Number of avatars in neighboring regions", LL_SIM_STAT_NUMAGENTCHILD),
 							SIM_OBJECTS("simobjects", "", LL_SIM_STAT_NUMTASKS),
-							SIM_ACTIVE_OBJECTS("simactiveobjects", "Number of scripted and/or mocing objects", LL_SIM_STAT_NUMTASKSACTIVE),
+							SIM_ACTIVE_OBJECTS("simactiveobjects", "Number of scripted and/or moving objects", LL_SIM_STAT_NUMTASKSACTIVE),
 							SIM_ACTIVE_SCRIPTS("simactivescripts", "Number of scripted objects", LL_SIM_STAT_NUMSCRIPTSACTIVE),
 							SIM_IN_PACKETS_PER_SEC("siminpps", "", LL_SIM_STAT_INPPS),
 							SIM_OUT_PACKETS_PER_SEC("simoutpps", "", LL_SIM_STAT_OUTPPS),
@@ -137,10 +187,10 @@ SimMeasurement<LLUnit<F64, LLUnits::Percent> >
 LLTrace::SampleStatHandle<>	FPS_SAMPLE("fpssample"),
 							NUM_IMAGES("numimagesstat"),
 							NUM_RAW_IMAGES("numrawimagesstat"),
+							NUM_MATERIALS("nummaterials"),
 							NUM_OBJECTS("numobjectsstat"),
 							NUM_ACTIVE_OBJECTS("numactiveobjectsstat"),
 							ENABLE_VBO("enablevbo", "Vertex Buffers Enabled"),
-							LIGHTING_DETAIL("lightingdetail", "Lighting Detail"),
 							VISIBLE_AVATARS("visibleavatars", "Visible Avatars"),
 							SHADER_OBJECTS("shaderobjects", "Object Shaders"),
 							DRAW_DISTANCE("drawdistance", "Draw Distance"),
@@ -153,10 +203,7 @@ LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >
 static LLTrace::SampleStatHandle<bool> 
 							CHAT_BUBBLES("chatbubbles", "Chat Bubbles Enabled");
 
-LLTrace::SampleStatHandle<F64Megabytes >	GL_TEX_MEM("gltexmemstat"),
-															GL_BOUND_MEM("glboundmemstat"),
-															RAW_MEM("rawmemstat"),
-															FORMATTED_MEM("formattedmemstat");
+LLTrace::SampleStatHandle<F64Megabytes > FORMATTED_MEM("formattedmemstat");
 LLTrace::SampleStatHandle<F64Kilobytes >	DELTA_BANDWIDTH("deltabandwidth", "Increase/Decrease in bandwidth based on packet loss"),
 															MAX_BANDWIDTH("maxbandwidth", "Max bandwidth setting");
 
@@ -180,8 +227,9 @@ SimMeasurement<F64Kilobytes >	SIM_UNACKED_BYTES("simtotalunackedbytes", "", LL_S
 SimMeasurement<F64Megabytes >	SIM_PHYSICS_MEM("physicsmemoryallocated", "", LL_SIM_STAT_SIMPHYSICSMEMORY);
 
 LLTrace::SampleStatHandle<F64Milliseconds >	FRAMETIME_JITTER("frametimejitter", "Average delta between successive frame times"),
-																FRAMETIME_SLEW("frametimeslew", "Average delta between frame time and mean"),
-																SIM_PING("simpingstat");
+											FRAMETIME_SLEW("frametimeslew", "Average delta between frame time and mean"),
+											FRAMETIME("frametime", "Measured frame time"),
+											SIM_PING("simpingstat");
 
 LLTrace::EventStatHandle<LLUnit<F64, LLUnits::Meters> > AGENT_POSITION_SNAP("agentpositionsnap", "agent position corrections");
 
@@ -204,6 +252,14 @@ LLTrace::EventStatHandle<F64Seconds >	AVATAR_EDIT_TIME("avataredittime", "Second
 
 LLTrace::EventStatHandle<LLUnit<F32, LLUnits::Percent> > OBJECT_CACHE_HIT_RATE("object_cache_hits");
 
+LLTrace::EventStatHandle<F64Seconds >	TEXTURE_FETCH_TIME("texture_fetch_time");
+
+LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  SCENERY_FRAME_PCT("scenery_frame_pct");
+LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  AVATAR_FRAME_PCT("avatar_frame_pct");
+LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  HUDS_FRAME_PCT("huds_frame_pct");
+LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  UI_FRAME_PCT("ui_frame_pct");
+LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  SWAP_FRAME_PCT("swap_frame_pct");
+LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> >  IDLE_FRAME_PCT("idle_frame_pct");
 }
 
 LLViewerStats::LLViewerStats() 
@@ -258,8 +314,11 @@ void LLViewerStats::updateFrameStats(const F64Seconds time_diff)
 		// new "stutter" meter
 		add(LLStatViewer::FRAMETIME_DOUBLED, time_diff >= 2.0 * mLastTimeDiff ? 1 : 0);
 
+		sample(LLStatViewer::FRAMETIME, time_diff);
+
 		// old stats that were never really used
-		sample(LLStatViewer::FRAMETIME_JITTER, F64Milliseconds (mLastTimeDiff - time_diff));
+		F64Seconds jit = (F64Seconds) std::fabs((mLastTimeDiff - time_diff));
+		sample(LLStatViewer::FRAMETIME_JITTER, jit);
 			
 		F32Seconds average_frametime = gRenderStartTime.getElapsedTimeF32() / (F32)gFrameCount;
 		sample(LLStatViewer::FRAMETIME_SLEW, F64Milliseconds (average_frametime - time_diff));
@@ -312,10 +371,10 @@ U64Bytes			gTotalTextureBytesPerBoostLevel[LLViewerTexture::MAX_GL_IMAGE_CATEGOR
 extern U32  gVisCompared;
 extern U32  gVisTested;
 
-LLFrameTimer gTextureTimer;
-
 void update_statistics()
 {
+    LL_PROFILE_ZONE_SCOPED;
+
 	gTotalWorldData += gVLManager.getTotalBytes();
 	gTotalObjectData += gObjectData;
 
@@ -340,8 +399,7 @@ void update_statistics()
 
 	record(LLStatViewer::TRIANGLES_DRAWN_PER_FRAME, last_frame_recording.getSum(LLStatViewer::TRIANGLES_DRAWN));
 
-	sample(LLStatViewer::ENABLE_VBO,      (F64)LLVertexBuffer::sEnableVBOs);
-	sample(LLStatViewer::LIGHTING_DETAIL, (F64)gPipeline.getLightingDetail());
+	sample(LLStatViewer::ENABLE_VBO,      (F64)TRUE);
 	sample(LLStatViewer::DRAW_DISTANCE,   (F64)LLPipeline::RenderFarClip);
 
 	static const LLCachedControl<bool> use_chat_bubbles(gSavedSettings, "UseChatBubbles");
@@ -349,16 +407,8 @@ void update_statistics()
 
 	typedef LLTrace::StatType<LLTrace::TimeBlockAccumulator>::instance_tracker_t stat_type_t;
 
-	F64Seconds idle_secs = last_frame_recording.getSum(*stat_type_t::getInstance("Idle"));
-	F64Seconds network_secs = last_frame_recording.getSum(*stat_type_t::getInstance("Network"));
-
 	record(LLStatViewer::FRAME_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Frame")));
-	record(LLStatViewer::UPDATE_STACKTIME, idle_secs - network_secs);
-	record(LLStatViewer::NETWORK_STACKTIME, network_secs);
-	record(LLStatViewer::IMAGE_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Update Images")));
-	record(LLStatViewer::REBUILD_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Sort Draw State")));
-	record(LLStatViewer::RENDER_STACKTIME, last_frame_recording.getSum(*stat_type_t::getInstance("Render Geometry")));
-		
+
 	if (gAgent.getRegion() && isAgentAvatarValid())
 	{
 		LLCircuitData *cdp = gMessageSystem->mCircuitInfo.findCircuit(gAgent.getRegion()->getHost());
@@ -380,24 +430,19 @@ void update_statistics()
 	}
 	add(LLStatViewer::FPS, 1);
 
-	F64Bits layer_bits = gVLManager.getLandBits() + gVLManager.getWindBits() + gVLManager.getCloudBits();
+	F64Bits layer_bits = gVLManager.getLandBits() + gVLManager.getWindBits() + gVLManager.getCloudBits() + gVLManager.getWaterBits();
 	add(LLStatViewer::LAYERS_NETWORK_DATA_RECEIVED, layer_bits);
 	add(LLStatViewer::OBJECT_NETWORK_DATA_RECEIVED, gObjectData);
 	add(LLStatViewer::ASSET_UDP_DATA_RECEIVED, F64Bits(gTransferManager.getTransferBitsIn(LLTCT_ASSET)));
 	gTransferManager.resetTransferBitsIn(LLTCT_ASSET);
 
-	if (LLAppViewer::getTextureFetch()->getNumRequests() == 0)
-	{
-		gTextureTimer.pause();
-	}
-	else
-	{
-		gTextureTimer.unpause();
-	}
-	
 	sample(LLStatViewer::VISIBLE_AVATARS, LLVOAvatar::sNumVisibleAvatars);
-	LLWorld::getInstanceFast()->updateNetStats();
-	LLWorld::getInstanceFast()->requestCacheMisses();
+    LLWorld *world = LLWorld::getInstance(); // not LLSingleton
+    if (world)
+    {
+        world->updateNetStats();
+        world->requestCacheMisses();
+    }
 	
 	// Reset all of these values.
 	gVLManager.resetBitCounts();
@@ -414,6 +459,89 @@ void update_statistics()
 			texture_stats_timer.reset();
 		}
 	}
+
+    if (LLFloaterReg::instanceVisible("scene_load_stats"))
+    {
+        static const F32 perf_stats_freq = 1;
+        static LLFrameTimer perf_stats_timer;
+        if (perf_stats_timer.getElapsedTimeF32() >= perf_stats_freq)
+        {
+            LLStringUtil::format_map_t args;
+            LLPerfStats::bufferToggleLock.lock(); // prevent toggle for a moment
+
+            auto tot_frame_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_FRAME);
+            // cumulative avatar time (includes idle processing, attachments and base av)
+            auto tot_avatar_time_raw = LLPerfStats::us_to_raw(LLVOAvatar::getTotalGPURenderTime());
+            // cumulative avatar render specific time (a bit arbitrary as the processing is too.)
+            // auto tot_av_idle_time_raw = LLPerfStats::StatsRecorder::getSum(AvType, LLPerfStats::StatType_t::RENDER_IDLE);
+            // auto tot_avatar_render_time_raw = tot_avatar_time_raw - tot_av_idle_time_raw;
+            // the time spent this frame on the "display()" call. Treated as "tot time rendering"
+            auto tot_render_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_DISPLAY);
+            // sleep time is basically forced sleep when window out of focus 
+            auto tot_sleep_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_SLEEP);
+            // time spent on UI
+            auto tot_ui_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_UI);
+            // cumulative time spent rendering HUDS
+            auto tot_huds_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_HUDS);
+            // "idle" time. This is the time spent in the idle poll section of the main loop
+            auto tot_idle_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_IDLE);
+            // similar to sleep time, induced by FPS limit
+            //auto tot_limit_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_FPSLIMIT);
+            // swap time is time spent in swap buffer
+            auto tot_swap_time_raw = LLPerfStats::StatsRecorder::getSceneStat(LLPerfStats::StatType_t::RENDER_SWAP);
+
+            LLPerfStats::bufferToggleLock.unlock();
+
+             auto tot_frame_time_ns = LLPerfStats::raw_to_ns(tot_frame_time_raw);
+            auto tot_avatar_time_ns = LLPerfStats::raw_to_ns(tot_avatar_time_raw);
+            auto tot_huds_time_ns = LLPerfStats::raw_to_ns(tot_huds_time_raw);
+            // UI time includes HUD time so dedut that before we calc percentages
+            auto tot_ui_time_ns = LLPerfStats::raw_to_ns(tot_ui_time_raw - tot_huds_time_raw);
+
+            // auto tot_sleep_time_ns          = LLPerfStats::raw_to_ns( tot_sleep_time_raw );
+            // auto tot_limit_time_ns          = LLPerfStats::raw_to_ns( tot_limit_time_raw );
+
+            // auto tot_render_time_ns         = LLPerfStats::raw_to_ns( tot_render_time_raw );
+            auto tot_idle_time_ns = LLPerfStats::raw_to_ns(tot_idle_time_raw);
+            auto tot_swap_time_ns = LLPerfStats::raw_to_ns(tot_swap_time_raw);
+            auto tot_scene_time_ns = LLPerfStats::raw_to_ns(tot_render_time_raw - tot_avatar_time_raw - tot_swap_time_raw - tot_ui_time_raw);
+            // auto tot_overhead_time_ns  = LLPerfStats::raw_to_ns( tot_frame_time_raw - tot_render_time_raw - tot_idle_time_raw );
+
+            // // remove time spent sleeping for fps limit or out of focus.
+            // tot_frame_time_ns -= tot_limit_time_ns;
+            // tot_frame_time_ns -= tot_sleep_time_ns;
+
+            if (tot_frame_time_ns != 0)
+            {
+                auto pct_avatar_time = (tot_avatar_time_ns * 100) / tot_frame_time_ns;
+                auto pct_huds_time = (tot_huds_time_ns * 100) / tot_frame_time_ns;
+                auto pct_ui_time = (tot_ui_time_ns * 100) / tot_frame_time_ns;
+                auto pct_idle_time = (tot_idle_time_ns * 100) / tot_frame_time_ns;
+                auto pct_swap_time = (tot_swap_time_ns * 100) / tot_frame_time_ns;
+                auto pct_scene_render_time = (tot_scene_time_ns * 100) / tot_frame_time_ns;
+                pct_avatar_time = llclamp(pct_avatar_time, 0., 100.);
+                pct_huds_time = llclamp(pct_huds_time, 0., 100.);
+                pct_ui_time = llclamp(pct_ui_time, 0., 100.);
+                pct_idle_time = llclamp(pct_idle_time, 0., 100.);
+                pct_swap_time = llclamp(pct_swap_time, 0., 100.);
+                pct_scene_render_time = llclamp(pct_scene_render_time, 0., 100.);
+                if (tot_sleep_time_raw == 0)
+                {
+                    sample(LLStatViewer::SCENERY_FRAME_PCT, (U32)ll_round(pct_scene_render_time));
+                    sample(LLStatViewer::AVATAR_FRAME_PCT, (U32)ll_round(pct_avatar_time));
+                    sample(LLStatViewer::HUDS_FRAME_PCT, (U32)ll_round(pct_huds_time));
+                    sample(LLStatViewer::UI_FRAME_PCT, (U32)ll_round(pct_ui_time));
+                    sample(LLStatViewer::SWAP_FRAME_PCT, (U32)ll_round(pct_swap_time));
+                    sample(LLStatViewer::IDLE_FRAME_PCT, (U32)ll_round(pct_idle_time));
+                }
+            }
+            else
+            {
+                LL_WARNS("performance") << "Scene time 0. Skipping til we have data." << LL_ENDL;
+            }
+            perf_stats_timer.reset();
+        }
+    }
 }
 
 /*
@@ -442,7 +570,7 @@ void send_viewer_stats(bool include_preferences)
 	std::string url = gAgent.getRegion()->getCapability("ViewerStats");
 
 	if (url.empty()) {
-		LL_WARNS() << "Could not get ViewerStats capability" << LL_ENDL;
+		//LL_WARNS() << "Could not get ViewerStats capability" << LL_ENDL;
 		return;
 	}
 	
@@ -487,13 +615,17 @@ void send_viewer_stats(bool include_preferences)
 	agent["meters_traveled"] = gAgent.getDistanceTraveled();
 	agent["regions_visited"] = gAgent.getRegionsVisited();
 	agent["mem_use"] = LLMemory::getCurrentRSS() / 1024.0;
+	agent["translation"] = LLTranslate::instance().asLLSD();
 
 	LLSD &system = body["system"];
 	
 	system["ram"] = (S32) gSysMemory.getPhysicalMemoryKB().value();
 	system["os"] = LLOSInfo::instance().getOSStringSimple();
 	system["cpu"] = gSysCPU.getCPUString();
+    system["cpu_sse"] = gSysCPU.getSSEVersions();
 	system["address_size"] = ADDRESS_SIZE;
+	system["os_bitness"] = LLOSInfo::instance().getOSBitness();
+	system["hardware_concurrency"] = (LLSD::Integer) std::thread::hardware_concurrency();
 	unsigned char MACAddress[MAC_ADDRESS_BYTES];
 	LLUUID::getNodeID(MACAddress);
 	std::string macAddressString = llformat("%02x-%02x-%02x-%02x-%02x-%02x",
@@ -509,11 +641,13 @@ void send_viewer_stats(bool include_preferences)
 
 	system["gpu"] = gpu_desc;
 	system["gpu_class"] = (S32)LLFeatureManager::getInstance()->getGPUClass();
+    system["gpu_memory_bandwidth"] = LLFeatureManager::getInstance()->getGPUMemoryBandwidth();
 	system["gpu_vendor"] = gGLManager.mGLVendorShort;
 	system["gpu_version"] = gGLManager.mDriverVersionVendorString;
 	system["opengl_version"] = gGLManager.mGLVersionString;
 
 	gGLManager.asLLSD(system["gl"]);
+
 
 	S32 shader_level = 0;
 	if (LLPipeline::sRenderDeferred)
@@ -531,14 +665,11 @@ void send_viewer_stats(bool include_preferences)
 			shader_level = 3;
 		}
 	}
-	else if (gPipeline.canUseWindLightShadersOnObjects())
+	else
 	{
 		shader_level = 2;
 	}
-	else if (gPipeline.canUseVertexShaders())
-	{
-		shader_level = 1;
-	}
+	
 
 
 	system["shader_level"] = shader_level;
@@ -576,6 +707,11 @@ void send_viewer_stats(bool include_preferences)
 	fail["invalid"] = (S32) gMessageSystem->mInvalidOnCircuitPackets;
 	fail["missing_updater"] = (S32) LLAppViewer::instance()->isUpdaterMissing();
 
+	LLSD &inventory = body["inventory"];
+	inventory["usable"] = gInventory.isInventoryUsable();
+	LLSD& validation_info = inventory["validation_info"];
+	gInventory.mValidationInfo->asLLSD(validation_info);
+
 	body["ui"] = LLSD();
 		
 	body["stats"]["voice"] = LLVoiceVivoxStats::getInstance()->read();
@@ -595,19 +731,76 @@ void send_viewer_stats(bool include_preferences)
     // detailed information on versions and extensions can come later.
     static bool vulkan_oneshot = false;
     static bool vulkan_detected = false;
+    static std::string vulkan_max_api_version( "0.0" ); // Unknown/None
 
     if (!vulkan_oneshot)
     {
-        HMODULE vulkan_loader = LoadLibraryExA("vulkan-1.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
+        // The 32-bit and 64-bit versions normally exist in:
+        //     C:\Windows\System32
+        //     C:\Windows\SysWOW64
+        HMODULE vulkan_loader = LoadLibrary(TEXT("vulkan-1.dll"));
         if (NULL != vulkan_loader)
         {
             vulkan_detected = true;
+            vulkan_max_api_version = "1.0"; // We have at least 1.0.  See the note about vkEnumerateInstanceVersion() below.
+
+            // We use Run-Time Dynamic Linking (via GetProcAddress()) instead of Load-Time Dynamic Linking (via directly calling vkGetInstanceProcAddr()).
+            // This allows us to:
+            //   a) not need the header: #include <vulkan/vulkan.h>
+            //      (and not need to set the corresponding "Additional Include Directories" as long as we provide the equivalent Vulkan types/prototypes/etc.)
+            //   b) not need to link to: vulkan-1.lib
+            //      (and not need to set the corresponding "Additional Library Directories")
+            // The former will allow Second Life to start and run even if the vulkan.dll is missing.
+            // The latter will require us to:
+            //   a) link with vulkan-1.lib
+            //   b) cause a System Error at startup if the .dll is not found:
+            //      "The code execution cannot proceed because vulkan-1.dll was not found."
+            //
+            // See:
+            //   https://docs.microsoft.com/en-us/windows/win32/dlls/using-run-time-dynamic-linking
+            //   https://docs.microsoft.com/en-us/windows/win32/dlls/run-time-dynamic-linking
+
+            // NOTE: Technically we can use GetProcAddress() as a replacement for vkGetInstanceProcAddr()
+            //       but the canonical recommendation (mandate?) is to use vkGetInstanceProcAddr().
+            PFN_vkGetInstanceProcAddr pGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr) GetProcAddress(vulkan_loader, "vkGetInstanceProcAddr");
+            if(pGetInstanceProcAddr)
+            {
+                // Check for vkEnumerateInstanceVersion.  If it exists then we have at least 1.1 and can query the max API version.
+                // NOTE: Each VkPhysicalDevice that supports Vulkan has its own VkPhysicalDeviceProperties.apiVersion which is separate from the max API version!
+                // See: https://www.lunarg.com/wp-content/uploads/2019/02/Vulkan-1.1-Compatibility-Statement_01_19.pdf
+                PFN_vkEnumerateInstanceVersion pEnumerateInstanceVersion = (PFN_vkEnumerateInstanceVersion) pGetInstanceProcAddr(NULL, "vkEnumerateInstanceVersion");
+                if(pEnumerateInstanceVersion)
+                {
+                    uint32_t version = VK_MAKE_API_VERSION(0,1,1,0);   // e.g. 4202631 = 1.2.135.0
+                    VkResult status  = pEnumerateInstanceVersion( &version );
+                    if (status != VK_SUCCESS)
+                    {
+                        LL_INFOS("Vulkan") << "Failed to get Vulkan version.  Assuming 1.0" << LL_ENDL;
+                    }
+                    else
+                    {
+                        // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#extendingvulkan-coreversions-versionnumbers
+                        int major   = VK_API_VERSION_MAJOR  ( version );
+                        int minor   = VK_API_VERSION_MINOR  ( version );
+                        int patch   = VK_API_VERSION_PATCH  ( version );
+                        int variant = VK_API_VERSION_VARIANT( version );
+
+                        vulkan_max_api_version = llformat( "%d.%d.%d.%d", major, minor, patch, variant );
+                        LL_INFOS("Vulkan") << "Vulkan API version: " << vulkan_max_api_version << ", Raw version: " << version << LL_ENDL;
+                    }
+                }
+            }
+            else
+            {
+                LL_WARNS("Vulkan") << "FAILED to get Vulkan vkGetInstanceProcAddr()!" << LL_ENDL;
+            }
             FreeLibrary(vulkan_loader);
         }
         vulkan_oneshot = true;
     }
 
     misc["string_1"] = vulkan_detected ? llformat("Vulkan driver is detected") : llformat("No Vulkan driver detected");
+    misc["VulkanMaxApiVersion"] = vulkan_max_api_version;
 
 #else
     misc["string_1"] = llformat("Unused");
@@ -635,13 +828,11 @@ void send_viewer_stats(bool include_preferences)
 
 
 	LL_INFOS("LogViewerStatsPacket") << "Sending viewer statistics: " << body << LL_ENDL;
-	static bool enable_debug_log = debugLoggingEnabled("LogViewerStatsPacket");
-	if (enable_debug_log)
-	{
-		std::string filename("viewer_stats_packet.xml");
-		llofstream of(filename.c_str());
-		LLSDSerialize::toPrettyXML(body,of);
-	}
+	LL_DEBUGS("LogViewerStatsPacket");
+	std::string filename("viewer_stats_packet.xml");
+	llofstream of(filename.c_str());
+	LLSDSerialize::toPrettyXML(body,of);
+	LL_ENDL;
 
 	// The session ID token must never appear in logs
 	body["session_id"] = gAgentSessionID;

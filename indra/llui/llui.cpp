@@ -96,7 +96,7 @@ LLFrameTimer LLUI::sMouseIdleTimer(LLFrameTimer::kConstInit);
 LLUUID find_ui_sound(std::string_view name)
 {
 	LLUUID uuid = LLUUID(NULL);
-	LLUI& ui_inst = LLUI::instanceFast();
+	LLUI& ui_inst = LLUI::instance();
 	if (!ui_inst.mSettingGroups["config"]->controlExists(name))
 	{
 		LL_WARNS() << "tried to make UI sound for unknown sound name: " << name << LL_ENDL;	
@@ -132,24 +132,24 @@ LLUUID find_ui_sound(std::string_view name)
 
 LLUUID find_ui_sound(const char* namep)
 {
-	return find_ui_sound(absl::NullSafeStringView(namep));
+	return find_ui_sound(al::safe_string_view(namep));
 }
 
 void make_ui_sound(const char* namep)
 {
-	LLUUID soundUUID = find_ui_sound(absl::NullSafeStringView(namep));
+	LLUUID soundUUID = find_ui_sound(namep);
 	if(soundUUID.notNull())
 	{
-		LLUI::getInstanceFast()->mAudioCallback(soundUUID);
+		LLUI::getInstance()->mAudioCallback(soundUUID);
 	}
 }
 
 void make_ui_sound_deferred(const char* namep)
 {
-	LLUUID soundUUID = find_ui_sound(absl::NullSafeStringView(namep));
+	LLUUID soundUUID = find_ui_sound(namep);
 	if(soundUUID.notNull())
 	{
-		LLUI::getInstanceFast()->mDeferredAudioCallback(soundUUID);
+		LLUI::getInstance()->mDeferredAudioCallback(soundUUID);
 	}
 }
 
@@ -181,6 +181,7 @@ mHelpImpl(NULL)
 	reg.add("Floater.Toggle", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::toggleInstance(param.asStringRef()); });
 	reg.add("Floater.ToggleOrBringToFront", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::toggleInstanceOrBringToFront(param.asStringRef()); });
 	reg.add("Floater.Show", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::showInstance(param.asStringRef(), LLSD(), FALSE); });
+	reg.add("Floater.ShowOrBringToFront", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::showInstanceOrBringToFront(param.asStringRef(), LLSD()); });
 	reg.add("Floater.Hide", [](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::hideInstance(param.asStringRef()); });
 	
 	// Button initialization callback for toggle buttons
@@ -287,7 +288,7 @@ std::string LLUI::getUILanguage()
 std::string LLUI::getLanguage()
 {
     // Note: lldateutil_test redefines this function
-    return LLUI::getInstanceFast()->getUILanguage();
+    return LLUI::getInstance()->getUILanguage();
 }
 
 struct SubDir : public LLInitParam::Block<SubDir>
@@ -553,7 +554,7 @@ namespace LLInitParam
 	{
 		if (control.isProvided() && !control().empty())
 		{
-			updateValue(LLUIColorTable::instanceFast().getColor(control.getValue()));
+			updateValue(LLUIColorTable::instance().getColor(control.getValue()));
 		}
 		else
 		{
@@ -603,6 +604,7 @@ namespace LLInitParam
 		U8 fontstyle = 0;
 		fontstyle = LLFontGL::getStyleFromString(style());
 		LLFontDescriptor desc(name(), size(), fontstyle);
+		desc = desc.normalize();
 		const LLFontGL* fontp = LLFontGL::getFont(desc);
 		if (fontp)
 		{

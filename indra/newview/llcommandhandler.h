@@ -42,7 +42,7 @@ public:
 	LLFooHandler() : LLCommandHandler("foo", UNTRUSTED_BLOCK) { }
 
     // Your code here
-	bool handle(const LLSD& tokens, const LLSD& query_map,
+	bool handle(const LLSD& tokens, const LLSD& query_map, const std::string& grid,
 				LLMediaCtrl* web)
 	{
 		if (tokens.size() < 1) return false;
@@ -65,8 +65,13 @@ public:
 	{
 		UNTRUSTED_ALLOW,       // allow commands from untrusted browsers
 		UNTRUSTED_BLOCK,       // ignore commands from untrusted browsers
+        UNTRUSTED_CLICK_ONLY,  // allow untrusted, but only if clicked
 		UNTRUSTED_THROTTLE     // allow untrusted, but only a few per min.
 	};
+
+    static const std::string NAV_TYPE_CLICKED;
+    static const std::string NAV_TYPE_EXTERNAL;
+    static const std::string NAV_TYPE_NAVIGATED;
 
 	LLCommandHandler(const char* command, EUntrustedAccess untrusted_access);
 		// Automatically registers object to get called when 
@@ -76,8 +81,16 @@ public:
 		
 	virtual ~LLCommandHandler();
 
+    virtual bool canHandleUntrusted(
+        const LLSD& params,
+        const LLSD& query_map,
+        LLMediaCtrl* web,
+        const std::string& nav_type)
+    { return true; }
+
 	virtual bool handle(const LLSD& params,
 						const LLSD& query_map,
+						const std::string& grid,
 						LLMediaCtrl* web) = 0;
 		// For URL secondlife:///app/foo/bar/baz?cat=1&dog=2
 		// @params - array of "bar", "baz", possibly empty
@@ -94,6 +107,7 @@ public:
 	static bool dispatch(const std::string& cmd,
 						 const LLSD& params,
 						 const LLSD& query_map,
+						 const std::string& grid,
 						 LLMediaCtrl* web,
 						 const std::string& nav_type,
 						 bool trusted_browser);

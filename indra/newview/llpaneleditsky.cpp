@@ -35,6 +35,7 @@
 #include "llvirtualtrackball.h"
 #include "llsettingssky.h"
 #include "llenvironment.h"
+#include "llviewercontrol.h"
 
 namespace
 {   
@@ -107,6 +108,8 @@ namespace
     const std::string   FIELD_SKY_DENSITY_DROPLET_RADIUS("droplet_radius");
     const std::string   FIELD_SKY_DENSITY_ICE_LEVEL("ice_level");
 
+    const std::string   FIELD_REFLECTION_PROBE_AMBIANCE("probe_ambiance");
+
     const F32 SLIDER_SCALE_SUN_AMBIENT(3.0f);
     const F32 SLIDER_SCALE_BLUE_HORIZON_DENSITY(2.0f);
     const F32 SLIDER_SCALE_GLOW_R(20.0f);
@@ -149,6 +152,7 @@ BOOL LLPanelSettingsSkyAtmosTab::postBuild()
     getChild<LLUICtrl>(FIELD_SKY_DENSITY_MOISTURE_LEVEL)->setCommitCallback([this](LLUICtrl *, const LLSD &) { onMoistureLevelChanged(); });
     getChild<LLUICtrl>(FIELD_SKY_DENSITY_DROPLET_RADIUS)->setCommitCallback([this](LLUICtrl *, const LLSD &) { onDropletRadiusChanged(); });
     getChild<LLUICtrl>(FIELD_SKY_DENSITY_ICE_LEVEL)->setCommitCallback([this](LLUICtrl *, const LLSD &) { onIceLevelChanged(); });
+    getChild<LLUICtrl>(FIELD_REFLECTION_PROBE_AMBIANCE)->setCommitCallback([this](LLUICtrl*, const LLSD&) { onReflectionProbeAmbianceChanged(); });
     refresh();
 
     return TRUE;
@@ -171,6 +175,7 @@ void LLPanelSettingsSkyAtmosTab::setEnabled(BOOL enabled)
         getChild<LLUICtrl>(FIELD_SKY_DENSITY_MOISTURE_LEVEL)->setEnabled(enabled);
         getChild<LLUICtrl>(FIELD_SKY_DENSITY_DROPLET_RADIUS)->setEnabled(enabled);
         getChild<LLUICtrl>(FIELD_SKY_DENSITY_ICE_LEVEL)->setEnabled(enabled);
+        getChild<LLUICtrl>(FIELD_REFLECTION_PROBE_AMBIANCE)->setEnabled(enabled);
     }
 }
 
@@ -203,9 +208,15 @@ void LLPanelSettingsSkyAtmosTab::refresh()
     F32 droplet_radius  = mSkySettings->getSkyDropletRadius();
     F32 ice_level       = mSkySettings->getSkyIceLevel();
 
+    static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", true);
+    F32 rp_ambiance     = mSkySettings->getReflectionProbeAmbiance(should_auto_adjust);
+
     getChild<LLUICtrl>(FIELD_SKY_DENSITY_MOISTURE_LEVEL)->setValue(moisture_level);
     getChild<LLUICtrl>(FIELD_SKY_DENSITY_DROPLET_RADIUS)->setValue(droplet_radius);
     getChild<LLUICtrl>(FIELD_SKY_DENSITY_ICE_LEVEL)->setValue(ice_level);
+    getChild<LLUICtrl>(FIELD_REFLECTION_PROBE_AMBIANCE)->setValue(rp_ambiance);
+
+    updateGammaLabel(should_auto_adjust);
 }
 
 //-------------------------------------------------------------------------
@@ -310,6 +321,35 @@ void LLPanelSettingsSkyAtmosTab::onIceLevelChanged()
     setIsDirty();
 }
 
+void LLPanelSettingsSkyAtmosTab::onReflectionProbeAmbianceChanged()
+{
+    if (!mSkySettings) return;
+    F32 ambiance = getChild<LLUICtrl>(FIELD_REFLECTION_PROBE_AMBIANCE)->getValue().asReal();
+
+    mSkySettings->setReflectionProbeAmbiance(ambiance);
+    mSkySettings->update();
+    setIsDirty();
+
+    updateGammaLabel();
+}
+
+
+void LLPanelSettingsSkyAtmosTab::updateGammaLabel(bool auto_adjust)
+{
+    if (!mSkySettings) return;
+    F32 ambiance = mSkySettings->getReflectionProbeAmbiance(auto_adjust);
+    if (ambiance != 0.f)
+    {
+        childSetValue("scene_gamma_label", getString("hdr_string"));
+        getChild<LLUICtrl>(FIELD_SKY_SCENE_GAMMA)->setToolTip(getString("hdr_tooltip"));
+    }
+    else
+    {
+        childSetValue("scene_gamma_label", getString("brightness_string"));
+        getChild<LLUICtrl>(FIELD_SKY_SCENE_GAMMA)->setToolTip(std::string());
+    }
+
+}
 //==========================================================================
 LLPanelSettingsSkyCloudTab::LLPanelSettingsSkyCloudTab() :
     LLPanelSettingsSky()

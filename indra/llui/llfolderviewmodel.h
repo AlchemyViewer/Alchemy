@@ -4,6 +4,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2017, Kitty Barnett
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -69,7 +70,7 @@ public:
 	virtual bool				checkFolder(const LLFolderViewModelItem* folder) const = 0;
 
 	virtual void 				setEmptyLookupMessage(const std::string& message) = 0;
-	virtual std::string			getEmptyLookupMessage() const = 0;
+    virtual std::string			getEmptyLookupMessage(bool is_empty_folder = false) const = 0;
 
 	virtual bool				showAllResults() const = 0;
 
@@ -108,11 +109,10 @@ public:
 	virtual S32 				getFirstRequiredGeneration() const = 0;
 };
 
-class LLFolderViewModelInterface : public LLTrace::MemTrackable<LLFolderViewModelInterface>
+class LLFolderViewModelInterface
 {
 public:
 	LLFolderViewModelInterface() 
-	:	LLTrace::MemTrackable<LLFolderViewModelInterface>("LLFolderViewModelInterface") 
 	{}
 
 	virtual ~LLFolderViewModelInterface() = default;
@@ -126,18 +126,17 @@ public:
 	virtual void setFolderView(LLFolderView* folder_view) = 0;
 	virtual LLFolderViewFilter& getFilter() = 0;
 	virtual const LLFolderViewFilter& getFilter() const = 0;
-	virtual std::string getStatusText() = 0;
+	virtual std::string getStatusText(bool is_empty_folder = false) = 0;
 
 	virtual bool startDrag(std::vector<LLFolderViewModelItem*>& items) = 0;
 };
 
 // This is an abstract base class that users of the folderview classes
 // would use to bridge the folder view with the underlying data
-class LLFolderViewModelItem : public LLRefCount, public LLTrace::MemTrackable<LLFolderViewModelItem>
+class LLFolderViewModelItem : public LLRefCount
 {
 public:
 	LLFolderViewModelItem() 
-	:	LLTrace::MemTrackable<LLFolderViewModelItem>("LLFolderViewModelItem") 
 	{}
 
 	virtual ~LLFolderViewModelItem() = default;
@@ -161,6 +160,8 @@ public:
 	virtual void openItem( void ) = 0;
 	virtual void closeItem( void ) = 0;
 	virtual void selectItem(void) = 0;
+
+    virtual void navigateToFolder(bool new_window = false, bool change_mode = false) = 0;
     
     virtual BOOL isItemWearable() const { return FALSE; }
 
@@ -174,7 +175,10 @@ public:
 	virtual BOOL removeItem() = 0;
 	virtual void removeBatch(std::vector<LLFolderViewModelItem*>& batch) = 0;
 
-	virtual BOOL isItemCopyable() const = 0;
+	virtual bool isItemCopyable(bool can_copy_as_link = true) const = 0;
+	// [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
+	virtual bool isItemLinkable() const = 0;
+	// [/SL:KB]
 	virtual BOOL copyToClipboard() const = 0;
 	virtual BOOL cutToClipboard() = 0;
 	virtual bool isCutToClipboard() { return false; };
@@ -396,7 +400,7 @@ public:
 		// sort everything
 		mTargetSortVersion++;
 	}
-	virtual std::string getStatusText();
+	virtual std::string getStatusText(bool is_empty_folder = false);
 	virtual void filter();
 
 	void setFolderView(LLFolderView* folder_view) { mFolderView = folder_view;}

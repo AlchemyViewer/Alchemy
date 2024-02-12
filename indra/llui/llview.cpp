@@ -140,8 +140,7 @@ LLView::Params::Params()
 }
 
 LLView::LLView(const LLView::Params& p)
-:	LLTrace::MemTrackable<LLView>("LLView"),
-	mVisible(p.visible),
+:	mVisible(p.visible),
 	mInDraw(false),
 	mName(p.name),
 	mParentView(NULL),
@@ -312,7 +311,13 @@ bool LLView::addChild(LLView* child, S32 tab_group)
 	}
 
 	child->mParentView = this;
-	updateBoundingRect();
+    if (getVisible() && child->getVisible())
+    {
+        // if child isn't visible it won't affect bounding rect
+        // if current view is not visible it will be recalculated
+        // on visibility change
+        updateBoundingRect();
+    }
 	mLastTabGroup = tab_group;
 	return true;
 }
@@ -577,9 +582,12 @@ void LLView::deleteAllChildren()
 
 	while (!mChildList.empty())
 	{
-		LLView* viewp = mChildList.front();
-		delete viewp; // will remove the child from mChildList
+        LLView* viewp = mChildList.front();
+        viewp->mParentView = NULL;
+        delete viewp;
+        mChildList.pop_front();
 	}
+    updateBoundingRect();
 }
 
 void LLView::setAllChildrenEnabled(BOOL b)
@@ -891,6 +899,17 @@ LLView*	LLView::childFromPoint(S32 x, S32 y, bool recur)
 	return 0;
 }
 
+F32 LLView::getTooltipTimeout()
+{
+    static LLCachedControl<F32> tooltip_fast_delay(*LLUI::getInstance()->mSettingGroups["config"], "ToolTipFastDelay", 0.1f);
+    static LLCachedControl<F32> tooltip_delay(*LLUI::getInstance()->mSettingGroups["config"], "ToolTipDelay", 0.7f);
+    // allow "scrubbing" over ui by showing next tooltip immediately
+    // if previous one was still visible
+    return (F32)(LLToolTipMgr::instance().toolTipVisible()
+    ? tooltip_fast_delay
+    : tooltip_delay);
+}
+
 BOOL LLView::handleToolTip(S32 x, S32 y, MASK mask)
 {
 	BOOL handled = FALSE;
@@ -900,22 +919,15 @@ BOOL LLView::handleToolTip(S32 x, S32 y, MASK mask)
 	std::string tooltip = getToolTip();
 	if (!tooltip.empty())
 	{
-        static LLUICachedControl<F32> tooltip_fast_delay("ToolTipFastDelay", 0.1f);
-        static LLUICachedControl<F32> tooltip_delay("ToolTipDelay", 0.7f);
-        static LLUICachedControl<bool> allow_ui_tooltips("BasicUITooltips", true);
-		// allow "scrubbing" over ui by showing next tooltip immediately
-		// if previous one was still visible
-		F32 timeout = LLToolTipMgr::instanceFast().toolTipVisible() 
-		              ? tooltip_fast_delay
-		              : tooltip_delay;
+        static LLCachedControl<bool> allow_ui_tooltips(*LLUI::getInstance()->mSettingGroups["config"], "BasicUITooltips", true);
 
 		// Even if we don't show tooltips, consume the event, nothing below should show tooltip
 		if (allow_ui_tooltips)
 		{
-			LLToolTipMgr::instanceFast().show(LLToolTip::Params()
+			LLToolTipMgr::instance().show(LLToolTip::Params()
 			                              .message(tooltip)
 			                              .sticky_rect(calcScreenRect())
-			                              .delay_time(timeout));
+			                              .delay_time(getTooltipTimeout()));
 		}
 		handled = TRUE;
 	}
@@ -1613,15 +1625,11 @@ LLView* LLView::getChildView(std::string_view name, BOOL recurse) const
 	return getChild<LLView>(name, recurse);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_FIND_VIEWS("Find Widgets");
-
 LLView* LLView::findChildView(std::string_view name, BOOL recurse) const
 {
-	LL_RECORD_BLOCK_TIME(FTM_FIND_VIEWS);
-	//richard: should we allow empty names?
-	//if(name.empty())
-	//	return NULL;
-	// Look for direct children *first*
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+	
+    // Look for direct children *first*
 	for (LLView* childp : mChildList)
 	{
 		llassert(childp);
@@ -1985,11 +1993,11 @@ const LLViewQuery & LLView::getTabOrderQuery()
 {
 	static LLViewQuery query;
 	if(query.getPreFilters().size() == 0) {
-		query.addPreFilter(LLVisibleFilter::getInstanceFast());
-		query.addPreFilter(LLEnabledFilter::getInstanceFast());
-		query.addPreFilter(LLTabStopFilter::getInstanceFast());
-		query.addPostFilter(LLLeavesFilter::getInstanceFast());
-		query.setSorter(SortByTabOrder::getInstanceFast());
+		query.addPreFilter(LLVisibleFilter::getInstance());
+		query.addPreFilter(LLEnabledFilter::getInstance());
+		query.addPreFilter(LLTabStopFilter::getInstance());
+		query.addPostFilter(LLLeavesFilter::getInstance());
+		query.setSorter(SortByTabOrder::getInstance());
 	}
 	return query;
 }
@@ -2009,10 +2017,10 @@ const LLViewQuery & LLView::getFocusRootsQuery()
 {
 	static LLViewQuery query;
 	if(query.getPreFilters().size() == 0) {
-		query.addPreFilter(LLVisibleFilter::getInstanceFast());
-		query.addPreFilter(LLEnabledFilter::getInstanceFast());
-		query.addPreFilter(LLFocusRootsFilter::getInstanceFast());
-		query.addPostFilter(LLRootsFilter::getInstanceFast());
+		query.addPreFilter(LLVisibleFilter::getInstance());
+		query.addPreFilter(LLEnabledFilter::getInstance());
+		query.addPreFilter(LLFocusRootsFilter::getInstance());
+		query.addPostFilter(LLRootsFilter::getInstance());
 	}
 	return query;
 }
@@ -2281,9 +2289,9 @@ LLControlVariable *LLView::findControl(std::string_view name)
 		std::string control_group_key(name.substr(0, key_pos));
 		LLControlVariable* control;
 		// check if it's in the control group that name indicated
-		if(LLUI::getInstanceFast()->mSettingGroups[control_group_key])
+		if(LLUI::getInstance()->mSettingGroups[control_group_key])
 		{
-			control = LLUI::getInstanceFast()->mSettingGroups[control_group_key]->getControl(name);
+			control = LLUI::getInstance()->mSettingGroups[control_group_key]->getControl(name);
 			if (control)
 			{
 				return control;
@@ -2291,7 +2299,7 @@ LLControlVariable *LLView::findControl(std::string_view name)
 		}
 	}
 	
-	LLControlGroup& control_group = LLUI::getInstanceFast()->getControlControlGroup(name);
+	LLControlGroup& control_group = LLUI::getInstance()->getControlControlGroup(name);
 	return control_group.getControl(name);	
 }
 

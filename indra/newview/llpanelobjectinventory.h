@@ -48,8 +48,14 @@ class LLViewerObject;
 class LLPanelObjectInventory : public LLPanel, public LLVOInventoryListener
 {
 public:
-	// dummy param block for template registration purposes
-	struct Params : public LLPanel::Params {};
+    struct Params : public LLInitParam::Block<Params, LLPanel::Params>
+    {
+        Optional<bool> show_root_folder;
+
+        Params()
+            : show_root_folder("show_root_folder", true)
+        {}
+    };
 
 	LLPanelObjectInventory(const Params&);
 	virtual ~LLPanelObjectInventory();
@@ -99,7 +105,7 @@ protected:
 	BOOL			isSelectionRemovable();
 
 private:
-	absl::flat_hash_map<LLUUID, LLFolderViewItem*> mItemMap;
+	boost::unordered_flat_map<LLUUID, LLFolderViewItem*> mItemMap;
 
 	LLScrollContainer* mScroller;
 	LLFolderView* mFolders;
@@ -110,6 +116,7 @@ private:
 	BOOL mIsInventoryEmpty; // 'Empty' label
 	BOOL mInventoryNeedsUpdate; // for idle, set on changed callback
 	LLFolderViewModelInventory	mInventoryViewModel;	
+    bool mShowRootFolder;
 };
 
 #endif // LL_LLPANELOBJECTINVENTORY_H

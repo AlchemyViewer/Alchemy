@@ -31,12 +31,14 @@
 #include "llpanel.h"
 #include "llpointer.h"
 #include "llvolume.h"
+#include "lltextureentry.h"
 
 class LLSpinCtrl;
 class LLCheckBoxCtrl;
 class LLTextBox;
 class LLUICtrl;
 class LLButton;
+class LLMenuButton;
 class LLViewerObject;
 class LLComboBox;
 class LLColorSwatchCtrl;
@@ -44,17 +46,17 @@ class LLTextureCtrl;
 class LLInventoryItem;
 class LLUUID;
 
-class LLPanelObject : public LLPanel
+class LLPanelObject final : public LLPanel
 {
 public:
 	LLPanelObject();
 	virtual ~LLPanelObject();
 
-	virtual BOOL	postBuild();
-	virtual void	draw();
-	virtual void 	clearCtrls();
+	BOOL	postBuild() override;
+	void	draw() override;
+	void 	clearCtrls() override;
 
-	void			refresh();
+	void			refresh() override;
 
 	static bool		precommitValidate(const LLSD& data);
 	
@@ -66,14 +68,36 @@ public:
 	static void 	onCommitPhantom(		LLUICtrl* ctrl, void* userdata);
 	static void 	onCommitPhysics(		LLUICtrl* ctrl, void* userdata);
 
+    void            onCopyPos();
+    void            onPastePos();
+    void            onCopySize();
+    void            onPasteSize();
+    void            onCopyRot();
+    void            onPasteRot();
+    void            onCopyParams();
+    void            onPasteParams();
 	static void 	onCommitParametric(LLUICtrl* ctrl, void* userdata);
 
+	void			onClickPipettePos();
+	void			onClickPipetteSize();
+	void			onClickPipetteRot();
+	void			onClickPipetteParams();
+
+protected:
+	void onPosSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+	void onSizeSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+	void onRotSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+	void onParamsSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+public:
 
 	void     		onCommitSculpt(const LLSD& data);
 	void     		onCancelSculpt(const LLSD& data);
 	void     		onSelectSculpt(const LLSD& data);
 	BOOL     		onDropSculpt(LLInventoryItem* item);
 	static void     onCommitSculptType(    LLUICtrl *ctrl, void* userdata);
+
+    void            menuDoToSelected(const LLSD& userdata);
+    bool            menuEnableItem(const LLSD& userdata);
 
 protected:
 	void			getState();
@@ -157,7 +181,20 @@ protected:
 	LLComboBox      *mCtrlSculptType;
 	LLCheckBoxCtrl  *mCtrlSculptMirror;
 	LLCheckBoxCtrl  *mCtrlSculptInvert;
-	
+
+	LLButton		*mBtnCopyPosition = nullptr;
+	LLButton		*mBtnPastePosition = nullptr;
+	LLButton		*mBtnPipettePosition = nullptr;
+	LLButton		*mBtnCopySize = nullptr;
+	LLButton		*mBtnPasteSize = nullptr;
+	LLButton		*mBtnPipetteSize = nullptr;
+	LLButton		*mBtnCopyRotation = nullptr;
+	LLButton		*mBtnPasteRotation = nullptr;
+	LLButton		*mBtnPipetteRotation = nullptr;
+	LLButton		*mBtnCopyPrimParams = nullptr;
+	LLButton		*mBtnPastePrimParams = nullptr;
+	LLButton		*mBtnPipettePrimParams = nullptr;
+
 	LLVector3		mCurEulerDegrees;		// to avoid sending rotation when not changed
 	BOOL			mIsPhysical;			// to avoid sending "physical" when not changed
 	BOOL			mIsTemporary;			// to avoid sending "temporary" when not changed
@@ -166,6 +203,22 @@ protected:
 
 	LLUUID          mSculptTextureRevert;   // so we can revert the sculpt texture on cancel
 	U8              mSculptTypeRevert;      // so we can revert the sculpt type on cancel
+	
+	F32				mRegionMaxHeight;
+	F32				mRegionMaxDepth;
+	F32				mMinScale;
+	F32				mMaxScale;
+	F32				mMaxHollowSize;
+	F32				mMinHoleSize;
+
+    LLVector3       mClipboardPos;
+    LLVector3       mClipboardSize;
+    LLVector3       mClipboardRot;
+    LLSD            mClipboardParams;
+
+    bool            mHasClipboardPos;
+    bool            mHasClipboardSize;
+    bool            mHasClipboardRot;
 
 	LLPointer<LLViewerObject> mObject;
 	LLPointer<LLViewerObject> mRootObject;

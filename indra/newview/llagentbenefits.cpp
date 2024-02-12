@@ -26,6 +26,14 @@
 #include "llviewerprecompiledheaders.h"
 #include "llagentbenefits.h"
 
+#include "llagent.h"
+#include "llagentpicksinfo.h"
+#include "lleconomy.h"
+#include "llstartup.h"
+#include "llviewercontrol.h"
+#include "llviewernetwork.h"
+#include "llviewerregion.h"
+
 LLAgentBenefits::LLAgentBenefits():
 	m_initalized(false),
 	m_animated_object_limit(-1),
@@ -34,7 +42,8 @@ LLAgentBenefits::LLAgentBenefits():
 	m_group_membership_limit(-1),
 	m_picks_limit(-1),
 	m_sound_upload_cost(-1),
-	m_texture_upload_cost(-1)
+	m_texture_upload_cost(-1),
+	m_create_group_cost(-1)
 {
 }
 
@@ -102,42 +111,86 @@ bool LLAgentBenefits::init(const LLSD& benefits_sd)
 
 S32 LLAgentBenefits::getAnimatedObjectLimit() const
 {
-	return m_animated_object_limit;
+	if (LLGridManager::instance().isInSecondlife())
+	{
+		return m_animated_object_limit;
+	}
+	else
+	{
+		S32 max_attach = 0;
+		if (gSavedSettings.getBOOL("AnimatedObjectsIgnoreLimits"))
+		{
+			max_attach = getAttachmentLimit();
+		}
+		else
+		{
+			if (gAgent.getRegion())
+			{
+				LLSD features;
+				gAgent.getRegion()->getSimulatorFeatures(features);
+				if (features.has("AnimatedObjects"))
+				{
+					max_attach = features["AnimatedObjects"]["MaxAgentAnimatedObjectAttachments"].asInteger();
+				}
+			}
+		}
+		return max_attach;
+	}
 }
 
 S32 LLAgentBenefits::getAnimationUploadCost() const
 {
-	return m_animation_upload_cost;
+	return LLGridManager::instance().isInSecondlife() ? m_animation_upload_cost : LLGlobalEconomy::instance().getPriceUpload();
 }
 
 S32 LLAgentBenefits::getAttachmentLimit() const
 {
-	return m_attachment_limit;
+	if (LLGridManager::instance().isInSecondlife())
+	{
+		return m_attachment_limit;
+	}
+	else
+	{
+		const S32 MAX_AGENT_ATTACHMENTS = 38;
+
+		S32 max_attach = MAX_AGENT_ATTACHMENTS;
+
+		if (gAgent.getRegion())
+		{
+			LLSD features;
+			gAgent.getRegion()->getSimulatorFeatures(features);
+			if (features.has("MaxAgentAttachments"))
+			{
+				max_attach = features["MaxAgentAttachments"].asInteger();
+			}
+		}
+		return max_attach;
+	}
 }
 
 S32 LLAgentBenefits::getCreateGroupCost() const
 {
-	return m_create_group_cost;
+	return LLGridManager::instance().isInSecondlife() ? m_create_group_cost : 0;
 }
 
 S32 LLAgentBenefits::getGroupMembershipLimit() const
 {
-	return m_group_membership_limit;
+	return LLGridManager::instance().isInSecondlife() ? m_group_membership_limit : gMaxAgentGroups;
 }
 
 S32 LLAgentBenefits::getPicksLimit() const
 {
-	return m_picks_limit;
+	return LLGridManager::instance().isInSecondlife() ? m_picks_limit : LLAgentPicksInfo::instance().getMaxNumberOfPicks();
 }
 
 S32 LLAgentBenefits::getSoundUploadCost() const
 {
-	return m_sound_upload_cost;
+	return LLGridManager::instance().isInSecondlife() ? m_sound_upload_cost : LLGlobalEconomy::instance().getPriceUpload();
 }
 
 S32 LLAgentBenefits::getTextureUploadCost() const
 {
-	return m_texture_upload_cost;
+	return LLGridManager::instance().isInSecondlife() ? m_texture_upload_cost : LLGlobalEconomy::instance().getPriceUpload();
 }
 
 bool LLAgentBenefits::findUploadCost(LLAssetType::EType& asset_type, S32& cost) const

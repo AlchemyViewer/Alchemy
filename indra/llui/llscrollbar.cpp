@@ -84,7 +84,7 @@ LLScrollbar::LLScrollbar(const Params & p)
 		mThumbImageH(p.thumb_image_horizontal),
 		mTrackImageV(p.track_image_vertical),
 		mTrackImageH(p.track_image_horizontal),
-		mThickness(p.thickness.isProvided() ? p.thickness : LLUI::getInstanceFast()->mSettingGroups["config"]->getS32("UIScrollbarSize")),
+		mThickness(p.thickness.isProvided() ? p.thickness : LLUI::getInstance()->mSettingGroups["config"]->getS32("UIScrollbarSize")),
 		mBGVisible(p.bg_visible),
 		mBGColor(p.bg_color)
 {
@@ -190,12 +190,12 @@ void LLScrollbar::setPageSize( S32 page_size )
 	}
 }
 
-BOOL LLScrollbar::isAtBeginning()
+bool LLScrollbar::isAtBeginning() const
 {
 	return mDocPos == 0;
 }
 
-BOOL LLScrollbar::isAtEnd()
+bool LLScrollbar::isAtEnd() const
 {
 	return mDocPos == getDocPosMax();
 }
@@ -595,7 +595,12 @@ void LLScrollbar::setValue(const LLSD& value)
 
 BOOL LLScrollbar::handleKeyHere(KEY key, MASK mask)
 {
-	BOOL handled = FALSE;
+    if (getDocPosMax() == 0 && !getVisible())
+    {
+        return FALSE;
+    }
+
+    BOOL handled = FALSE;
 
 	switch( key )
 	{
@@ -659,5 +664,5 @@ void LLScrollbar::onLineDownBtnPressed( const LLSD& data )
 
 void LLScrollbar::setThickness(S32 thickness)
 {
-	mThickness = thickness < 0 ? LLUI::getInstanceFast()->mSettingGroups["config"]->getS32("UIScrollbarSize") : thickness;
+	mThickness = thickness < 0 ? LLUI::getInstance()->mSettingGroups["config"]->getS32("UIScrollbarSize") : thickness;
 }

@@ -198,7 +198,7 @@ BOOL LLVisualParam::setInfo(LLVisualParamInfo *info)
 		return FALSE;
 	mInfo = info;
 	mID = info->mID;
-	setWeight(getDefaultWeight(), FALSE );
+	setWeight(getDefaultWeight(), false);
 	return TRUE;
 }
 
@@ -220,7 +220,7 @@ BOOL LLVisualParam::parseData(LLXmlTreeNode *node)
 //-----------------------------------------------------------------------------
 // setWeight()
 //-----------------------------------------------------------------------------
-void LLVisualParam::setWeight(F32 weight)
+void LLVisualParam::setWeight(F32 weight, bool upload_bake)
 {
 	if (mIsAnimating)
 	{
@@ -238,19 +238,19 @@ void LLVisualParam::setWeight(F32 weight)
 	
 	if (mNext)
 	{
-		mNext->setWeight(weight);
+		mNext->setWeight(weight, upload_bake);
 	}
 }
 
 //-----------------------------------------------------------------------------
 // setAnimationTarget()
 //-----------------------------------------------------------------------------
-void LLVisualParam::setAnimationTarget(F32 target_value)
+void LLVisualParam::setAnimationTarget(F32 target_value, bool upload_bake)
 {
 	// don't animate dummy parameters
 	if (mIsDummy)
 	{
-		setWeight(target_value);
+		setWeight(target_value, upload_bake);
 		mTargetWeight = mCurWeight;
 		return;
 	}
@@ -270,7 +270,7 @@ void LLVisualParam::setAnimationTarget(F32 target_value)
 
 	if (mNext)
 	{
-		mNext->setAnimationTarget(target_value);
+		mNext->setAnimationTarget(target_value, upload_bake);
 	}
 }
 
@@ -295,24 +295,24 @@ void LLVisualParam::clearNextParam()
 //-----------------------------------------------------------------------------
 // animate()
 //-----------------------------------------------------------------------------
-void LLVisualParam::animate( F32 delta)
+void LLVisualParam::animate( F32 delta, bool upload_bake)
 {
 	if (mIsAnimating)
 	{
 		F32 new_weight = ((mTargetWeight - mCurWeight) * delta) + mCurWeight;
-		setWeight(new_weight);
+		setWeight(new_weight, upload_bake);
 	}
 }
 
 //-----------------------------------------------------------------------------
 // stopAnimating()
 //-----------------------------------------------------------------------------
-void LLVisualParam::stopAnimating()
+void LLVisualParam::stopAnimating(bool upload_bake)
 { 
 	if (mIsAnimating && isTweakable())
 	{
 		mIsAnimating = FALSE; 
-		setWeight(mTargetWeight);
+		setWeight(mTargetWeight, upload_bake);
 	}
 }
 
@@ -352,9 +352,11 @@ void LLVisualParam::setParamLocation(EParamLocation loc)
 	{
 		// no action
 	}
+#ifdef SHOW_DEBUG
 	else
 	{
 		LL_DEBUGS() << "param location is already " << mParamLocation << ", not slamming to " << loc << LL_ENDL;
 	}
+#endif
 }
 

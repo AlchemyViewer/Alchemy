@@ -50,7 +50,8 @@ class LLDate;
  */
 class LLRecentPeople final : public LLSingleton<LLRecentPeople>, public LLOldEvents::LLSimpleListener
 {
-	LLSINGLETON_EMPTY_CTOR(LLRecentPeople);
+	LLSINGLETON(LLRecentPeople);
+	~LLRecentPeople();
 	LOG_CLASS(LLRecentPeople);
 public:
 	typedef std::map <LLUUID, F64> id_to_time_map_t;
@@ -62,11 +63,11 @@ public:
 	 * @param id avatar to add.
 	 *
 	 * @param userdata additional information about last interaction party.
-	 *				   For example a session id can be added.
+	 *				   For example session id can be added.
 	 *
 	 * @return false if the avatar is in the list already, true otherwise
 	 */
-	bool add(const LLUUID& id, const LLSD& userdata = LLSD().with("date", LLDate::now()));
+	bool add(const LLUUID& id, LLSD& userdata = LLSD().with("date", LLDate::now()));
 
 	/**
 	 * @param id avatar to search.
@@ -107,6 +108,21 @@ public:
 	 * LLSimpleListener interface.
 	 */
 	/*virtual*/ bool handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata) override;
+	
+	/**
+	 * Saves recent people to file
+	 */
+	bool save() const;
+	
+	/**
+	 * Loads recent people from file
+	 */
+	bool load();
+	
+	/**
+	 * Clears recent people history
+	 */
+	void clearHistory();
 
 	void updateAvatarsArrivalTime(uuid_vec_t& uuids);
 	F32 getArrivalTimeByID(const LLUUID& id);
@@ -116,6 +132,7 @@ private:
 	recent_people_t		mPeople;
 	signal_t			mChangedSignal;
 	id_to_time_map_t	mAvatarsArrivalTime;
+	std::string			mFilename;
 };
 
 #endif // LL_LLRECENTPEOPLE_H

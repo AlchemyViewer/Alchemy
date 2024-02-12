@@ -68,6 +68,7 @@ protected:
 	bool mPendingGroupPropertiesUpdate;
 	bool mPendingRoleDataUpdate;
 	bool mPendingMemberDataUpdate;
+	boost::signals2::connection mAvatarNameCacheConnection;
 };
 
 #endif // LL_LLPANELGROUPBULK_H

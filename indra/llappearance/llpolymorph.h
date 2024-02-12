@@ -41,23 +41,13 @@ class LLWearable;
 //-----------------------------------------------------------------------------
 // LLPolyMorphData()
 //-----------------------------------------------------------------------------
-LL_ALIGN_PREFIX(16)
-class LLPolyMorphData
+class alignas(16) LLPolyMorphData
 {
+    LL_ALIGN_NEW
 public:
 	LLPolyMorphData(const std::string& morph_name);
 	~LLPolyMorphData();
 	LLPolyMorphData(const LLPolyMorphData &rhs);
-
-	void* operator new(size_t size)
-	{
-		return ll_aligned_malloc_16(size);
-	}
-
-	void operator delete(void* ptr)
-	{
-		ll_aligned_free_16(ptr);
-	}
 
 	BOOL			loadBinary(LLFILE* fp, LLPolyMeshSharedData *mesh);
 	const std::string& getName() { return mName; }
@@ -76,7 +66,7 @@ public:
 
 	F32					mTotalDistortion;	// vertex distortion summed over entire morph
 	F32					mMaxDistortion;		// maximum single vertex distortion in a given morph
-	LL_ALIGN_16(LLVector4a			mAvgDistortion);		// average vertex distortion, to infer directionality of the morph
+	LLVector4a			mAvgDistortion;		// average vertex distortion, to infer directionality of the morph
 	LLPolyMeshSharedData*	mMesh;
 
 private:
@@ -154,8 +144,9 @@ protected:
 // These morph targets must be topologically consistent with a given Polymesh
 // (share face sets)
 //-----------------------------------------------------------------------------
-class LLPolyMorphTarget : public LLViewerVisualParam
+class alignas(16) LLPolyMorphTarget : public LLViewerVisualParam
 {
+    LL_ALIGN_NEW
 public:
 	LLPolyMorphTarget(LLPolyMesh *poly_mesh);
 	~LLPolyMorphTarget();
@@ -165,34 +156,24 @@ public:
 	//   This sets mInfo and calls initialization functions
 	BOOL					setInfo(LLPolyMorphTargetInfo *info);
 
-	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const;
+	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const override;
 
 	// LLVisualParam Virtual functions
 	///*virtual*/ BOOL				parseData(LLXmlTreeNode* node);
-	/*virtual*/ void				apply( ESex sex );
+	/*virtual*/ void				apply( ESex sex ) override;
 	
 	// LLViewerVisualParam Virtual functions
-	/*virtual*/ F32					getTotalDistortion();
-	/*virtual*/ const LLVector4a&	getAvgDistortion();
-	/*virtual*/ F32					getMaxDistortion();
-	/*virtual*/ LLVector4a			getVertexDistortion(S32 index, LLPolyMesh *poly_mesh);
-	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh);
-	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh);
+	/*virtual*/ F32					getTotalDistortion() override;
+	/*virtual*/ const LLVector4a&	getAvgDistortion() override;
+	/*virtual*/ F32					getMaxDistortion() override;
+	/*virtual*/ LLVector4a			getVertexDistortion(S32 index, LLPolyMesh *poly_mesh) override;
+	/*virtual*/ const LLVector4a*	getFirstDistortion(U32 *index, LLPolyMesh **poly_mesh) override;
+	/*virtual*/ const LLVector4a*	getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override;
 
 	void	applyMask(U8 *maskData, S32 width, S32 height, S32 num_components, BOOL invert);
 	void	addPendingMorphMask() { mNumMorphMasksPending++; }
 
     void    applyVolumeChanges(F32 delta_weight); // SL-315 - for resetSkeleton()
-
-	void* operator new(size_t size)
-	{
-		return ll_aligned_malloc_16(size);
-	}
-
-	void operator delete(void* ptr)
-	{
-		ll_aligned_free_16(ptr);
-	}
 
 protected:
 	LLPolyMorphTarget(const LLPolyMorphTarget& pOther);

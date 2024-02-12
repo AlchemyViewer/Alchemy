@@ -39,7 +39,6 @@
 #include "llpermissionsflags.h"
 #include "llviewerinventory.h"
 #include "llstring.h"
-#include "llmd5.h"
 #include "httpcommon.h"
 #include "httprequest.h"
 #include "httpoptions.h"
@@ -48,8 +47,8 @@
 #include "lleventcoro.h"
 #include "llcoros.h"
 
-#include "absl/container/node_hash_map.h"
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_map.hpp"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLInventoryObserver;
 class LLInventoryObject;
@@ -58,7 +57,35 @@ class LLInventoryCategory;
 class LLMessageSystem;
 class LLInventoryCollectFunctor;
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///----------------------------------------------------------------------------
+/// LLInventoryValidationInfo 
+///----------------------------------------------------------------------------
+class LLInventoryValidationInfo: public LLRefCount
+{
+public:
+	LLInventoryValidationInfo();
+	void toOstream(std::ostream& os) const;
+	void asLLSD(LLSD& sd) const;
+	
+	bool mInitialized{false};
+	S32 mWarningCount{0};
+	std::map<std::string,U32> mWarnings;
+
+    S32 mLoopCount{0}; // Presence of folders whose ancestors loop onto themselves
+    S32 mOrphanedCount{0}; // Missing or orphaned items, links and folders
+
+	S32 mFatalErrorCount{0};
+	bool mFatalNoRootFolder{false};
+	S32 mFatalSystemDuplicate{0};
+	bool mFatalNoLibraryRootFolder{false};
+	bool mFatalQADebugMode{false};
+
+	std::set<LLFolderType::EType> mMissingRequiredSystemFolders;
+	std::set<LLFolderType::EType> mDuplicateRequiredSystemFolders;
+};
+std::ostream& operator<<(std::ostream& s, const LLInventoryValidationInfo& v);
+
+///----------------------------------------------------------------------------
 // LLInventoryModel
 //
 // Represents a collection of inventory, and provides efficient ways to access 
@@ -66,7 +93,7 @@ class LLInventoryCollectFunctor;
 //   NOTE: This class could in theory be used for any place where you need 
 //   inventory, though it optimizes for time efficiency - not space efficiency, 
 //   probably making it inappropriate for use on tasks.
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+///----------------------------------------------------------------------------
 class LLInventoryModel
 {
 	LOG_CLASS(LLInventoryModel);
@@ -178,13 +205,13 @@ private:
 	// the inventory using several different identifiers.
 	// mInventory member data is the 'master' list of inventory, and
 	// mCategoryMap and mItemMap store uuid->object mappings. 
-	typedef absl::flat_hash_map<LLUUID, LLPointer<LLViewerInventoryCategory> > cat_map_t;
-	typedef absl::flat_hash_map<LLUUID, LLPointer<LLViewerInventoryItem> > item_map_t;
+	typedef boost::unordered_flat_map<LLUUID, LLPointer<LLViewerInventoryCategory> > cat_map_t;
+	typedef boost::unordered_flat_map<LLUUID, LLPointer<LLViewerInventoryItem> > item_map_t;
 	cat_map_t mCategoryMap;
 	item_map_t mItemMap;
 	// This last set of indices is used to map parents to children.
-	typedef absl::flat_hash_map<LLUUID, cat_array_t*> parent_cat_map_t;
-	typedef absl::flat_hash_map<LLUUID, item_array_t*> parent_item_map_t;
+	typedef boost::unordered_flat_map<LLUUID, cat_array_t*> parent_cat_map_t;
+	typedef boost::unordered_flat_map<LLUUID, item_array_t*> parent_item_map_t;
 	parent_cat_map_t mParentChildCategoryTree;
 	parent_item_map_t mParentChildItemTree;
 
@@ -202,9 +229,13 @@ private:
 	//--------------------------------------------------------------------
 public:
 	static BOOL getIsFirstTimeInViewer2();
+    static bool  isSysFoldersReady() { return (sPendingSystemFolders == 0); }
+
 private:
 	static BOOL sFirstTimeInViewer2;
 	const static S32 sCurrentInvCacheVersion; // expected inventory cache version
+
+    static S32 sPendingSystemFolders;
 
 /**                    Initialization/Setup
  **                                                                            **
@@ -231,9 +262,11 @@ public:
 	void getDirectDescendentsOf(const LLUUID& cat_id,
 								cat_array_t*& categories,
 								item_array_t*& items) const;
+    void getDirectDescendentsOf(const LLUUID& cat_id, cat_array_t& categories, item_array_t& items, LLInventoryCollectFunctor& f) const;
 
+	typedef LLUUID digest_t; // To clarify the actual usage of this "UUID"
 	// Compute a hash of direct descendant names (for detecting child name changes)
-	LLMD5 hashDirectDescendentNames(const LLUUID& cat_id) const;
+	digest_t hashDirectDescendentNames(const LLUUID& cat_id) const;
 	
 	// Starting with the object specified, add its descendants to the
 	// array provided, but do not add the inventory object specified
@@ -271,37 +304,44 @@ public:
 	item_array_t collectLinksTo(const LLUUID& item_id);
 
 	// Check if one object has a parent chain up to the category specified by UUID.
-	BOOL isObjectDescendentOf(const LLUUID& obj_id, const LLUUID& cat_id) const;
-
+	BOOL isObjectDescendentOf(const LLUUID& obj_id, const LLUUID& cat_id, const bool break_on_recursion = false) const;
+    
+    enum EAncestorResult{
+        ANCESTOR_OK = 0,
+        ANCESTOR_MISSING = 1,
+        ANCESTOR_LOOP = 2,
+    };
 	// Follow parent chain to the top.
-	bool getObjectTopmostAncestor(const LLUUID& object_id, LLUUID& result) const;
+    EAncestorResult getObjectTopmostAncestor(const LLUUID& object_id, LLUUID& result) const;
 
 	//--------------------------------------------------------------------
 	// Find
 	//--------------------------------------------------------------------
 public:
+
+    // Checks if category exists ("My Inventory" only), if it does not, creates it
+    void ensureCategoryForTypeExists(LLFolderType::EType preferred_type);
+
 	const LLUUID findCategoryUUIDForTypeInRoot(
 		LLFolderType::EType preferred_type,
-		bool create_folder,
-		const LLUUID& root_id);
+		const LLUUID& root_id) const;
 
 	const LLUUID findCategoryUUIDForNameInRoot(std::string const& folder_name,
-											   bool create_folder,
-											   LLUUID const& root_id);
+											   LLUUID const& root_id,
+											   bool create_folder = false,
+											   inventory_func_type func = {});
 
 	// Returns the uuid of the category that specifies 'type' as what it 
 	// defaults to containing. The category is not necessarily only for that type. 
 	//    NOTE: If create_folder is true, this will create a new inventory category 
 	//    on the fly if one does not exist. *NOTE: if find_in_library is true it 
 	//    will search in the user's library folder instead of "My Inventory"
-	const LLUUID findCategoryUUIDForType(LLFolderType::EType preferred_type, 
-										 bool create_folder = true);
+	const LLUUID findCategoryUUIDForType(LLFolderType::EType preferred_type) const;
 	//    will search in the user's library folder instead of "My Inventory"
-	const LLUUID findLibraryCategoryUUIDForType(LLFolderType::EType preferred_type, 
-												bool create_folder = true);
+	const LLUUID findLibraryCategoryUUIDForType(LLFolderType::EType preferred_type) const;
 	// Returns user specified category for uploads, returns default id if there are no
 	// user specified one or it does not exist, creates default category if it is missing.
-	const LLUUID findUserDefinedCategoryUUIDForType(LLFolderType::EType preferred_type);
+	const LLUUID findUserDefinedCategoryUUIDForType(LLFolderType::EType preferred_type) const;
 
 	// Returns the uuid of the category if found, LLUUID::null is not
 	const LLUUID findDescendentCategoryIDByName(const LLUUID& parent_id,
@@ -391,13 +431,15 @@ public:
 							  const LLUUID& new_parent_id,
 							  BOOL restamp);
 
+    // Marks links from a "possibly" broken list for a rebuild
+    // clears the list
+    void rebuildBrockenLinks();
+    bool hasPosiblyBrockenLinks() const { return mPossiblyBrockenLinks.size() > 0; }
+
 	//--------------------------------------------------------------------
 	// Delete
 	//--------------------------------------------------------------------
 public:
-
-	// Update model after an AISv3 update received for any operation.
-	void onAISUpdateReceived(const std::string& context, const LLSD& update);
 		
 	// Update model after an item is confirmed as removed from
 	// server. Works for categories or items.
@@ -431,7 +473,7 @@ public:
 	void checkTrashOverflow();
 
 protected:
-	void updateLinkedObjectsFromPurge(const LLUUID& baseobj_id);
+    void rebuildLinkItems(LLInventoryModel::item_array_t& items);
 	
 	//--------------------------------------------------------------------
 	// Reorder
@@ -461,10 +503,11 @@ public:
 public:
 	// Returns the UUID of the new category. If you want to use the default 
 	// name based on type, pass in a NULL to the 'name' parameter.
-	LLUUID createNewCategory(const LLUUID& parent_id,
+	void createNewCategory(const LLUUID& parent_id,
 							 LLFolderType::EType preferred_type,
 							 const std::string& name,
-							 inventory_func_type callback = NULL);
+							 inventory_func_type callback = NULL,
+							 const LLUUID& thumbnail_id = LLUUID::null);
 protected:
 	// Internal methods that add inventory and make sure that all of
 	// the internal data structures are consistent. These methods
@@ -488,12 +531,14 @@ public:
 	// Represents the number of items added or removed from a category.
 	struct LLCategoryUpdate
 	{
-		LLCategoryUpdate() : mDescendentDelta(0) {}
-		LLCategoryUpdate(const LLUUID& category_id, S32 delta) :
+		LLCategoryUpdate() : mDescendentDelta(0), mChangeVersion(true) {}
+		LLCategoryUpdate(const LLUUID& category_id, S32 delta, bool change_version = true) :
 			mCategoryID(category_id),
-			mDescendentDelta(delta) {}
+			mDescendentDelta(delta),
+			mChangeVersion(change_version) {}
 		LLUUID mCategoryID;
 		S32 mDescendentDelta;
+		bool mChangeVersion;
 	};
 	typedef std::vector<LLCategoryUpdate> update_list_t;
 
@@ -506,13 +551,13 @@ public:
 		LLInitializedS32& operator++() { ++mValue; return *this; }
 		LLInitializedS32& operator--() { --mValue; return *this; }
 	};
-	typedef std::map<LLUUID, LLInitializedS32> update_map_t;
+	typedef boost::unordered_map<LLUUID, LLInitializedS32> update_map_t;
 
 	// Call when there are category updates.  Call them *before* the 
 	// actual update so the method can do descendent accounting correctly.
 	void accountForUpdate(const LLCategoryUpdate& update) const;
-	void accountForUpdate(const update_list_t& updates);
-	void accountForUpdate(const update_map_t& updates);
+	void accountForUpdate(const update_list_t& updates) const;
+	void accountForUpdate(const update_map_t& updates) const;
 
 	// Return (yes/no/maybe) child status of category children.
 	EHasChildren categoryHasChildren(const LLUUID& cat_id) const;
@@ -567,6 +612,10 @@ private:
     U32 mModifyMaskBacklog;
     changed_items_t mChangedItemIDsBacklog;
     changed_items_t mAddedItemIDsBacklog;
+    typedef boost::unordered_map<LLUUID , changed_items_t> broken_links_t;
+    broken_links_t mPossiblyBrockenLinks; // there can be multiple links per item
+    changed_items_t mLinksRebuildList;
+    boost::signals2::connection mBulkFecthCallbackSlot;
 // [SL:KB] - Patch: UI-Notifications | Checked: Catznip-6.5
     LLUUID mTransactionId;
 // [/SL:KB]
@@ -616,8 +665,6 @@ private:
 	LLCore::HttpOptions::ptr_t			mHttpOptions;
 	LLCore::HttpHeaders::ptr_t			mHttpHeaders;
 	LLCore::HttpRequest::policy_t		mHttpPolicyClass;
-	LLCore::HttpRequest::priority_t		mHttpPriorityFG;
-	LLCore::HttpRequest::priority_t		mHttpPriorityBG;
 	
 /**                    HTTP Transport
  **                                                                            **
@@ -658,7 +705,6 @@ public:
 	static void processUpdateCreateInventoryItem(LLMessageSystem* msg, void**);
 	static void removeInventoryItem(LLUUID agent_id, LLMessageSystem* msg, const char* msg_label);
 	static void processRemoveInventoryItem(LLMessageSystem* msg, void**);
-	static void processUpdateInventoryFolder(LLMessageSystem* msg, void**);
 	static void removeInventoryFolder(LLUUID agent_id, LLMessageSystem* msg);
 	static void processRemoveInventoryFolder(LLMessageSystem* msg, void**);
 	static void processRemoveInventoryObjects(LLMessageSystem* msg, void**);
@@ -680,15 +726,17 @@ protected:
 	cat_array_t* getUnlockedCatArray(const LLUUID& id);
 	item_array_t* getUnlockedItemArray(const LLUUID& id);
 private:
-	std::map<LLUUID, bool> mCategoryLock;
-	std::map<LLUUID, bool> mItemLock;
+	boost::unordered_map<LLUUID, bool> mCategoryLock;
+	boost::unordered_map<LLUUID, bool> mItemLock;
 	
 	//--------------------------------------------------------------------
 	// Debugging
 	//--------------------------------------------------------------------
 public:
 	void dumpInventory() const;
-	bool validate() const;
+	LLPointer<LLInventoryValidationInfo> validate() const;
+	LLPointer<LLInventoryValidationInfo> mValidationInfo;
+	std::string getFullPath(const LLInventoryObject *obj) const;
 
 /**                    Miscellaneous
  **                                                                            **

@@ -99,12 +99,14 @@ public:
 	BOOL isMuted(const LLUUID& id, const std::string& name = LLStringUtil::null, U32 flags = 0) const;
 
 	// Workaround for username-based mute search, a lot of string conversions so use cautiously
+    // Expects lower case username
 	BOOL isMuted(const std::string& username, U32 flags = 0) const;
 
 	// Alternate (convenience) form for places we don't need to pass the name, but do need flags
 	BOOL isMuted(const LLUUID& id, U32 flags) const { return isMuted(id, LLStringUtil::null, flags); };
 	
-	static BOOL isLinden(const std::string& name);
+	static bool isLinden(const LLUUID& id);
+	static bool isLinden(const std::string& name);
 	
 	BOOL isLoaded() const { return mIsLoaded; }
 
@@ -115,6 +117,11 @@ public:
 
 	// call this method on logout to save everything.
 	void cache(const LLUUID& agent_id);
+
+	// group functions
+	BOOL addGroup(const LLUUID& group_id);
+	BOOL removeGroup(const LLUUID& group_id);
+	BOOL isGroupMuted(const LLUUID& group_id);
 
 private:
 	BOOL loadFromFile(const std::string& filename);

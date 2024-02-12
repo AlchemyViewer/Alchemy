@@ -44,11 +44,10 @@
 class LLTeleportHistoryItem
 {
 public:
-	LLTeleportHistoryItem()
-	{}
+	LLTeleportHistoryItem() = default;
 
-	LLTeleportHistoryItem(std::string title, LLVector3d global_pos)
-		: mTitle(title), mGlobalPos(global_pos)
+	LLTeleportHistoryItem(std::string grid, std::string region, std::string title, LLVector3d global_pos, LLVector3 local_pos)
+		: mGrid(std::move(grid)), mRegion(std::move(region)), mTitle(std::move(title)), mGlobalPos(global_pos), mLocalPos(local_pos)
 	{}
 
 	/**
@@ -57,8 +56,11 @@ public:
 	 */
 	const std::string& getTitle() const;
 	
+	std::string mGrid;		// grid slurl uri
+	std::string mRegion;	// region name
 	std::string	mTitle;		// human-readable location title
 	std::string mFullTitle; // human-readable location title including coordinates
+	LLVector3	mLocalPos;
 	LLVector3d	mGlobalPos; // global position
 	LLUUID		mRegionID;	// region ID for getting the region info 
 };
@@ -100,6 +102,11 @@ public:
 	 */ 
 	void					goToItem(int idx);
 	
+	void onRegionNameResponse(
+		std::string region_name,
+		LLVector3 local_coords,
+		U64 region_handle, const std::string& url, const LLUUID& snapshot_id, bool teleport);
+
 	/**
 	 * @return history items.
 	 */

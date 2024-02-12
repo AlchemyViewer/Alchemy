@@ -43,7 +43,7 @@ typedef USHORT NTAPI RtlCaptureStackBackTrace_Function(
 
 static RtlCaptureStackBackTrace_Function* const RtlCaptureStackBackTrace_fn =
    (RtlCaptureStackBackTrace_Function*)
-   GetProcAddress(GetModuleHandleA("ntdll.dll"), "RtlCaptureStackBackTrace");
+   GetProcAddress(GetModuleHandle(TEXT("ntdll.dll")), "RtlCaptureStackBackTrace");
 
 bool ll_get_stack_trace(std::vector<std::string>& lines)
 {

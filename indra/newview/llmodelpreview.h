@@ -115,7 +115,7 @@ class LLModelPreview final : public LLViewerDynamicTexture, public LLMutex
 {
     LOG_CLASS(LLModelPreview);
 
-    typedef boost::signals2::signal<void(F32 x, F32 y, F32 z, F32 streaming_cost, F32 physics_cost)> details_signal_t;
+    typedef boost::signals2::signal<void(F32 x, F32 y, F32 z)> details_signal_t;
     typedef boost::signals2::signal<void(void)> model_loaded_signal_t;
     typedef boost::signals2::signal<void(bool)> model_updated_signal_t;
 
@@ -124,9 +124,17 @@ public:
     typedef enum
     {
         LOD_FROM_FILE = 0,
-        GENERATE,
+        MESH_OPTIMIZER_AUTO, // automatically selects method based on model or face
+        MESH_OPTIMIZER_PRECISE, // combines faces into a single model, simplifies, then splits back into faces
+        MESH_OPTIMIZER_SLOPPY, // uses sloppy method, works per face
         USE_LOD_ABOVE,
     } eLoDMode;
+
+    typedef enum
+    {
+        LIMIT_TRIANGLES = 0,
+        LIMIT_ERROR_TRESHOLD,
+    } eLoDLimit;
 
 public:
     // Todo: model preview shouldn't need floater dependency, it
@@ -155,18 +163,17 @@ public:
     void loadModelCallback(S32 lod);
     bool lodsReady() { return !mGenLOD && mLodsQuery.empty(); }
     void queryLODs() { mGenLOD = true; };
-    void genLODs(S32 which_lod = -1, U32 decimation = 3, bool enforce_tri_limit = false);
+    void genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 decimation = 3, bool enforce_tri_limit = false);
     void generateNormals();
     void restoreNormals();
-    U32 calcResourceCost();
+    void updateDimentionsAndOffsets();
     void rebuildUploadData();
     void saveUploadData(bool save_skinweights, bool save_joint_positions, bool lock_scale_if_joint_position);
     void saveUploadData(const std::string& filename, bool save_skinweights, bool save_joint_positions, bool lock_scale_if_joint_position);
     void clearIncompatible(S32 lod);
     void updateStatusMessages();
     void updateLodControls(S32 lod);
-    void clearGLODGroup();
-    void onLODParamCommit(S32 lod, bool enforce_tri_limit);
+    void onLODMeshOptimizerParamCommit(S32 lod, bool enforce_tri_limit, S32 mode);
     void addEmptyFace(LLModel* pTarget);
 
     const bool getModelPivot(void) const { return mHasPivot; }
@@ -217,6 +224,39 @@ private:
     LLVOAvatar* getPreviewAvatar(void) { return mPreviewAvatar; }
     // Count amount of original models, excluding sub-models
     static U32 countRootModels(LLModelLoader::model_list models);
+    LLVector3   mGroundPlane[4];
+	void		renderGroundPlane(float z_offset = 0.0f);
+    /// Indicates whether we should warn of high-lod meshes that do not have a corresponding physics mesh.
+    /// Reset when resetting the modelpreview (i.e., when the uploader dialog is created or reset), and when
+    /// about to process a physics file. Set to true immediately after the file is loaded (before rebuildUploadData()).
+    ///
+    /// (The rules for mapping the correspondence of high-lod meshes to physics meshes are complex. When
+    /// lod rendering meshes are used, there is never an unmatched mesh. Nor is there a mismatch when
+    /// the high-lod file and physics file have ony one mesh each. In these cases, this value is moot.
+    /// When there are multiple meshes in each file, they are matched by name or order, and some meshes
+    /// are broken up by limitations into multiple objects, and thus there can be mismatches.)
+    bool mWarnOfUnmatchedPhyicsMeshes{false};
+    /// A mesh to use as the default physics shape in only those cases where the physics shape is not otherwise specified.
+    /// It is set only when the user chooses a physics shape file that contains a mesh with a name that matches DEFAULT_PHYSICS_MESH_NAME.
+    /// It is reset when such a name is not found, and when resetting the modelpreview.
+    /// Not read unless mWarnOfUnmatchedPhyicsMeshes is true.
+    LLModel* mDefaultPhysicsShapeP{};
+
+    typedef enum
+    {
+        MESH_OPTIMIZER_FULL,
+        MESH_OPTIMIZER_NO_NORMALS,
+        MESH_OPTIMIZER_NO_UVS,
+        MESH_OPTIMIZER_NO_TOPOLOGY,
+    } eSimplificationMode;
+
+    // Merges faces into single mesh, simplifies using mesh optimizer,
+    // then splits back into faces.
+    // Returns reached simplification ratio. -1 in case of a failure.
+    F32 genMeshOptimizerPerModel(LLModel *base_model, LLModel *target_model, F32 indices_ratio, F32 error_threshold, eSimplificationMode simplification_mode);
+    // Simplifies specified face using mesh optimizer.
+    // Returns reached simplification ratio. -1 in case of a failure.
+    F32 genMeshOptimizerPerFace(LLModel *base_model, LLModel *target_model, U32 face_idx, F32 indices_ratio, F32 error_threshold, eSimplificationMode simplification_mode);
 
 protected:
     friend class LLModelLoader;
@@ -239,7 +279,6 @@ protected:
     LLVector3	mPreviewScale;
     S32			mPreviewLOD;
     S32			mPhysicsSearchLOD;
-    U32			mResourceCost;
     std::string mLODFile[LLModel::NUM_LODS];
     bool		mLoading;
     U32			mLoadState;
@@ -249,19 +288,11 @@ protected:
 
     std::map<std::string, bool> mViewOption;
 
-    //GLOD object parameters (must rebuild object if these change)
+    // Model generation parameters (must rebuild object if these change)
     bool mLODFrozen;
-    F32 mBuildShareTolerance;
-    U32 mBuildQueueMode;
-    U32 mBuildOperator;
-    U32 mBuildBorderMode;
     U32 mRequestedLoDMode[LLModel::NUM_LODS];
     S32 mRequestedTriangleCount[LLModel::NUM_LODS];
     F32 mRequestedErrorThreshold[LLModel::NUM_LODS];
-    U32 mRequestedBuildOperator[LLModel::NUM_LODS];
-    U32 mRequestedQueueMode[LLModel::NUM_LODS];
-    U32 mRequestedBorderMode[LLModel::NUM_LODS];
-    F32 mRequestedShareTolerance[LLModel::NUM_LODS];
     F32 mRequestedCreaseAngle[LLModel::NUM_LODS];
 
     LLModelLoader* mModelLoader;
@@ -280,6 +311,8 @@ protected:
 
     U32 mGroup;
     std::map<LLPointer<LLModel>, U32> mObject;
+
+    // Amount of triangles in original(base) model
     U32 mMaxTriangleLimit;
 
     LLMeshUploadThread::instance_list mUploadData;

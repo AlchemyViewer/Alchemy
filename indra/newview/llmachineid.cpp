@@ -315,7 +315,7 @@ bool LLWMIMethods::getGenericSerialNumber(const BSTR &select, const LPCWSTR &var
                 continue;
             }
         }
-        LL_INFOS("AppInit") << " Serial Number : " << ll_convert_wide_to_string(vtProp.bstrVal) << LL_ENDL;
+        LL_DEBUGS("AppInit") << " Serial Number : " << ll_convert_wide_to_string(vtProp.bstrVal) << LL_ENDL;
 
         unsigned int j = 0;
 
@@ -479,7 +479,7 @@ S32 LLMachineID::init()
     has_static_legacy_id = false;
 #endif
 
-        LL_INFOS("AppInit") << "UniqueID: 0x";
+        LL_DEBUGS("AppInit") << "UniqueID: 0x";
         // Code between here and LL_ENDL is not executed unless the LL_DEBUGS
         // actually produces output
         for (size_t i = 0; i < len; ++i)

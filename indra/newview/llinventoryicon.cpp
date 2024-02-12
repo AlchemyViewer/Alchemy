@@ -99,6 +99,8 @@ LLIconDictionary::LLIconDictionary()
     addEntry(LLInventoryType::ICONNAME_SETTINGS_DAY,            new IconEntry("Inv_SettingsDay"));
     addEntry(LLInventoryType::ICONNAME_SETTINGS,                new IconEntry("Inv_Settings"));
 
+    addEntry(LLInventoryType::ICONNAME_MATERIAL,                new IconEntry("Inv_Material"));
+
 	addEntry(LLInventoryType::ICONNAME_INVALID, 				new IconEntry("Inv_Invalid"));
 	addEntry(LLInventoryType::ICONNAME_UNKNOWN, 				new IconEntry("Inv_Unknown"));
 
@@ -174,8 +176,12 @@ const std::string& LLInventoryIcon::getIconName(LLAssetType::EType asset_type,
 			break;
 		case LLAssetType::AT_MESH:
 			idx = LLInventoryType::ICONNAME_MESH;
+			break;
 		case LLAssetType::AT_SETTINGS:
 			idx = assignSettingsIcon(misc_flag);
+			break;
+		case LLAssetType::AT_MATERIAL:
+			idx = LLInventoryType::ICONNAME_MATERIAL;
 			break;
 		case LLAssetType::AT_UNKNOWN:
 			idx = LLInventoryType::ICONNAME_UNKNOWN;
@@ -189,14 +195,14 @@ const std::string& LLInventoryIcon::getIconName(LLAssetType::EType asset_type,
 
 const std::string& LLInventoryIcon::getIconName(LLInventoryType::EIconName idx)
 {
-	const IconEntry *entry = LLIconDictionary::instanceFast().lookup(idx);
+	const IconEntry *entry = LLIconDictionary::instance().lookup(idx);
 	return entry->mName;
 }
 
 LLInventoryType::EIconName LLInventoryIcon::assignWearableIcon(U32 misc_flag)
 {
 	const LLWearableType::EType wearable_type = LLWearableType::inventoryFlagsToWearableType(misc_flag);
-	return LLWearableType::getInstanceFast()->getIconName(wearable_type);
+	return LLWearableType::getInstance()->getIconName(wearable_type);
 }
 
 LLInventoryType::EIconName LLInventoryIcon::assignSettingsIcon(U32 misc_flag)

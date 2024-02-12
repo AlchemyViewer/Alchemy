@@ -386,7 +386,7 @@ void LLImageFilter::convolve(const LLMatrix3 &kernel, bool normalize, bool abs_v
 	U8* dst_data = mImage->getData();
 
 	S32 buffer_size = width * components;
-	llassert_always(buffer_size > 0);
+	llassert(buffer_size > 0);
 	std::vector<U8> even_buffer(buffer_size);
 	std::vector<U8> odd_buffer(buffer_size);
 	

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+ label="Notes"
+ height="360"
+ width="304"
+ name="avatar_notes_tab">
+  <text
+   font="SansSerifSmall"
+   text_color="White_50"
+   width="190"
+   follows="top|left|right"
+   layout="topleft"
+   mouse_opaque="false"
+   type="string"
+   height="16"
+   length="1"
+   left="3"
+   name="notes_label"
+   top="2">
+   Private notes:
+  </text>
+  <text_editor
+   type="string"
+   follows="all"
+   left="3"
+   height="320"
+   layout="topleft"
+   max_length="1022"
+   name="notes"
+   top_pad="4"
+   right="-4"
+   bg_readonly_color="DkGray2"
+   text_readonly_color="White"
+   commit_on_focus_lost="true"
+   word_wrap="true" />
+</panel>

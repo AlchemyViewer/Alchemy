@@ -109,6 +109,7 @@ LLFloaterAvatarPicker::LLFloaterAvatarPicker(const LLSD& key)
 	mNumResultsReturned(0),
 	mNearMeListComplete(FALSE),
 	mCloseOnSelect(FALSE),
+    mExcludeAgentFromSearchResults(FALSE),
     mContextConeOpacity	(0.f),
     mContextConeInAlpha(0.f),
     mContextConeOutAlpha(0.f),
@@ -133,15 +134,18 @@ BOOL LLFloaterAvatarPicker::postBuild()
 	LLScrollListCtrl* searchresults = getChild<LLScrollListCtrl>("SearchResults");
 	searchresults->setDoubleClickCallback( boost::bind(&LLFloaterAvatarPicker::onBtnSelect, this));
 	searchresults->setCommitCallback(boost::bind(&LLFloaterAvatarPicker::onList, this));
+	searchresults->setContextMenu(LLScrollListCtrl::MENU_AVATAR);
 	getChildView("SearchResults")->setEnabled(FALSE);
 	
 	LLScrollListCtrl* nearme = getChild<LLScrollListCtrl>("NearMe");
 	nearme->setDoubleClickCallback(boost::bind(&LLFloaterAvatarPicker::onBtnSelect, this));
 	nearme->setCommitCallback(boost::bind(&LLFloaterAvatarPicker::onList, this));
+	nearme->setContextMenu(LLScrollListCtrl::MENU_AVATAR);
 
 	LLScrollListCtrl* friends = getChild<LLScrollListCtrl>("Friends");
 	friends->setDoubleClickCallback(boost::bind(&LLFloaterAvatarPicker::onBtnSelect, this));
-	getChild<LLUICtrl>("Friends")->setCommitCallback(boost::bind(&LLFloaterAvatarPicker::onList, this));
+	friends->setCommitCallback(boost::bind(&LLFloaterAvatarPicker::onList, this));
+	friends->setContextMenu(LLScrollListCtrl::MENU_AVATAR);
 
 	childSetAction("ok_btn", boost::bind(&LLFloaterAvatarPicker::onBtnSelect, this));
 	getChildView("ok_btn")->setEnabled(FALSE);
@@ -184,6 +188,10 @@ void LLFloaterAvatarPicker::onTabChanged()
 LLFloaterAvatarPicker::~LLFloaterAvatarPicker()
 {
 	gFocusMgr.releaseFocusIfNeeded( this );
+	if (mAvatarNameCacheConnection.connected())
+	{
+		mAvatarNameCacheConnection.disconnect();
+	}
 }
 
 void LLFloaterAvatarPicker::onBtnFind()
@@ -311,12 +319,13 @@ void LLFloaterAvatarPicker::populateNearMe()
 	LLScrollListCtrl* near_me_scroller = getChild<LLScrollListCtrl>("NearMe");
 	near_me_scroller->deleteAllItems();
 
+	static LLCachedControl<F32> av_near_me_range(gSavedSettings, "AVPickerNearMeRange", 512.f);
 	uuid_vec_t avatar_ids;
-	LLWorld::getInstanceFast()->getAvatars(&avatar_ids, NULL, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
+	LLWorld::getInstance()->getAvatars(&avatar_ids, NULL, gAgent.getPositionGlobal(), av_near_me_range);
 	for(U32 i=0; i<avatar_ids.size(); i++)
 	{
 		LLUUID& av = avatar_ids[i];
-		if(av == gAgent.getID()) continue;
+		if(mExcludeAgentFromSearchResults && (av == gAgent.getID())) continue;
 		LLSD element;
 		element["id"] = av; // value
 		LLAvatarName av_name;
@@ -324,7 +333,7 @@ void LLFloaterAvatarPicker::populateNearMe()
 		if (!LLAvatarNameCache::get(av, &av_name))
 		{
 			element["columns"][0]["column"] = "name";
-			element["columns"][0]["value"] = LLCacheName::getDefaultName();
+			element["columns"][0]["value"] = gCacheName->getDefaultName();
 			all_loaded = FALSE;
 		}			
 		else
@@ -433,9 +442,9 @@ void LLFloaterAvatarPicker::findCoro(std::string url, LLUUID queryID, std::strin
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("genericPostCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("genericPostCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+    LLCore::HttpOptions::ptr_t httpOpts(std::make_shared<LLCore::HttpOptions>());
 
     LL_INFOS("HttpCoroutineAdapter", "genericPostCoro") << "Generic POST for " << url << LL_ENDL;
 
@@ -448,14 +457,47 @@ void LLFloaterAvatarPicker::findCoro(std::string url, LLUUID queryID, std::strin
 
     if (status || (status == LLCore::HttpStatus(HTTP_BAD_REQUEST)))
     {
-        LLFloaterAvatarPicker* floater =
-            LLFloaterReg::findTypedInstance<LLFloaterAvatarPicker>("avatar_picker", name);
-        if (floater)
-        {
-            result.erase(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
-            floater->processResponse(queryID, result);
-        }
+        result.erase(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
     }
+    else
+    {
+        result["failure_reason"] = status.toString();
+    }
+
+    LLFloaterAvatarPicker* floater =
+        LLFloaterReg::findTypedInstance<LLFloaterAvatarPicker>("avatar_picker", name);
+    if (floater)
+    {
+        floater->processResponse(queryID, result);
+    }
+}
+
+void LLFloaterAvatarPicker::onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name)
+{
+	mAvatarNameCacheConnection.disconnect();
+	sAvatarNameMap[agent_id] = av_name;
+
+	LLScrollListCtrl* search_results = getChild<LLScrollListCtrl>("SearchResults");
+
+	// clear "Searching" label on first results
+	search_results->deleteAllItems();
+
+	LLSD item;
+	item["id"] = agent_id;
+	LLSD& columns = item["columns"];
+	columns[0]["column"] = "name";
+	columns[0]["value"] = av_name.getDisplayName();
+	columns[1]["column"] = "username";
+	columns[1]["value"] = av_name.getAccountName();
+	search_results->addElement(item);
+
+	getChildView("ok_btn")->setEnabled(true);
+	search_results->setEnabled(true);
+	search_results->sortByColumnIndex(1, TRUE);
+	search_results->selectFirstItem();
+
+	onList();
+	search_results->setFocus(TRUE);
 }
 
 
@@ -464,7 +506,21 @@ void LLFloaterAvatarPicker::find()
 	//clear our stored LLAvatarNames
 	sAvatarNameMap.clear();
 
+	getChild<LLScrollListCtrl>("SearchResults")->deleteAllItems();
+	getChild<LLScrollListCtrl>("SearchResults")->setCommentText(getString("searching"));
+	
+	getChildView("ok_btn")->setEnabled(FALSE);
+	mNumResultsReturned = 0;
+
 	std::string text = getChild<LLUICtrl>("Edit")->getValue().asString();
+
+	bool is_uuid = LLUUID::validate(text) != FALSE;
+	if(is_uuid)
+	{
+		LLUUID search_id(text); 
+		mAvatarNameCacheConnection = LLAvatarNameCache::get(search_id, boost::bind(&LLFloaterAvatarPicker::onAvatarNameCache, this, _1, _2));
+		return;
+	}
 
 	size_t separator_index = text.find_first_of(" ._");
 	if (separator_index != text.npos)
@@ -517,11 +573,6 @@ void LLFloaterAvatarPicker::find()
 			gAgent.sendReliableMessage();
 		}
 	}
-	getChild<LLScrollListCtrl>("SearchResults")->deleteAllItems();
-	getChild<LLScrollListCtrl>("SearchResults")->setCommentText(getString("searching"));
-	
-	getChildView("ok_btn")->setEnabled(FALSE);
-	mNumResultsReturned = 0;
 }
 
 void LLFloaterAvatarPicker::setAllowMultiple(BOOL allow_multiple)
@@ -695,59 +746,67 @@ void LLFloaterAvatarPicker::processResponse(const LLUUID& query_id, const LLSD& 
 	{
 		LLScrollListCtrl* search_results = getChild<LLScrollListCtrl>("SearchResults");
 
-		LLSD agents = content["agents"];
+        // clear "Searching" label on first results
+        search_results->deleteAllItems();
 
-		// clear "Searching" label on first results
-		search_results->deleteAllItems();
+        if (content.has("failure_reason"))
+        {
+            getChild<LLScrollListCtrl>("SearchResults")->setCommentText(content["failure_reason"].asString());
+            getChildView("ok_btn")->setEnabled(false);
+        }
+        else
+        {
+            LLSD agents = content["agents"];
 
-		LLSD item;
-		LLSD::array_const_iterator it = agents.beginArray();
-		for ( ; it != agents.endArray(); ++it)
-		{
-			const LLSD& row = *it;
-			if (row["id"].asUUID() != gAgent.getID() || !mExcludeAgentFromSearchResults)
-			{
-				item["id"] = row["id"];
-				LLSD& columns = item["columns"];
-				columns[0]["column"] = "name";
-				columns[0]["value"] = row["display_name"];
-				columns[1]["column"] = "username";
-				columns[1]["value"] = row["username"];
-				search_results->addElement(item);
+            LLSD item;
+            LLSD::array_const_iterator it = agents.beginArray();
+            for (; it != agents.endArray(); ++it)
+            {
+                const LLSD& row = *it;
+                if (row["id"].asUUID() != gAgent.getID() || !mExcludeAgentFromSearchResults)
+                {
+                    item["id"] = row["id"];
+                    LLSD& columns = item["columns"];
+                    columns[0]["column"] = "name";
+                    columns[0]["value"] = row["display_name"];
+                    columns[1]["column"] = "username";
+                    columns[1]["value"] = row["username"];
+                    search_results->addElement(item);
 
-				// add the avatar name to our list
-				LLAvatarName avatar_name;
-				avatar_name.fromLLSD(row);
-				sAvatarNameMap[row["id"].asUUID()] = avatar_name;
-			}
-		}
+                    // add the avatar name to our list
+                    LLAvatarName avatar_name;
+                    avatar_name.fromLLSD(row);
+                    sAvatarNameMap[row["id"].asUUID()] = avatar_name;
+                }
+            }
 
-		if (search_results->isEmpty())
-		{
-			std::string name = "'" + getChild<LLUICtrl>("Edit")->getValue().asString() + "'";
-			LLSD item;
-			item["id"] = LLUUID::null;
-			item["columns"][0]["column"] = "name";
-			item["columns"][0]["value"] = name;
-			item["columns"][1]["column"] = "username";
-			item["columns"][1]["value"] = getString("not_found_text");
-			search_results->addElement(item);
-			search_results->setEnabled(false);
-			getChildView("ok_btn")->setEnabled(false);
-		}
-		else
-		{
-			getChildView("ok_btn")->setEnabled(true);
-			search_results->setEnabled(true);
-			search_results->sortByColumnIndex(1, TRUE);
-			std::string text = getChild<LLUICtrl>("Edit")->getValue().asString();
-			if (!search_results->selectItemByLabel(text, TRUE, 1))
-			{
-				search_results->selectFirstItem();
-			}			
-			onList();
-			search_results->setFocus(TRUE);
-		}
+            if (search_results->isEmpty())
+            {
+                std::string name = "'" + getChild<LLUICtrl>("Edit")->getValue().asString() + "'";
+                LLSD item;
+                item["id"] = LLUUID::null;
+                item["columns"][0]["column"] = "name";
+                item["columns"][0]["value"] = name;
+                item["columns"][1]["column"] = "username";
+                item["columns"][1]["value"] = getString("not_found_text");
+                search_results->addElement(item);
+                search_results->setEnabled(false);
+                getChildView("ok_btn")->setEnabled(false);
+            }
+            else
+            {
+                getChildView("ok_btn")->setEnabled(true);
+                search_results->setEnabled(true);
+                search_results->sortByColumnIndex(1, TRUE);
+                std::string text = getChild<LLUICtrl>("Edit")->getValue().asString();
+                if (!search_results->selectItemByLabel(text, TRUE, 1))
+                {
+                    search_results->selectFirstItem();
+                }
+                onList();
+                search_results->setFocus(TRUE);
+            }
+        }
 	}
 }
 

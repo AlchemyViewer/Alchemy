@@ -36,12 +36,14 @@
 #include "llfloatersidepanelcontainer.h"
 #include "llfloaterworldmap.h"
 #include "llfocusmgr.h"
+#include "llinspecttexture.h"
 #include "llinventorybridge.h"
 #include "llinventorydefines.h"
 #include "llinventorymodel.h"
 #include "lllandmark.h"
 #include "lllandmarkactions.h"
 #include "lllandmarklist.h"
+#include "llmaterialeditor.h"
 #include "llmemorystream.h"
 #include "llmenugl.h"
 #include "llnotecard.h"
@@ -148,10 +150,8 @@ public:
 		}
 		else
 		{
-			if(!gSavedSettings.getBOOL("ShowNewInventory"))
-			{
-				LLFloaterReg::showInstance("preview_notecard", LLSD(item->getUUID()), TAKE_FOCUS_YES);
-			}
+			// Removed for inventory show
+			LLFloaterReg::showInstance("preview_notecard", LLSD(item->getUUID()), TAKE_FOCUS_YES);
 		}
 	}
 };
@@ -245,6 +245,21 @@ public:
 	}
 	virtual BOOL				handleToolTip(S32 x, S32 y, MASK mask )
 	{ 
+		if (mItem->getThumbnailUUID().notNull())
+		{
+            LLSD params;
+            params["inv_type"] = mItem->getInventoryType();
+            params["thumbnail_id"] = mItem->getThumbnailUUID();
+            params["asset_id"] = mItem->getAssetUUID();
+            
+			LLToolTipMgr::instance().show(LLToolTip::Params()
+					.message(mToolTip)
+					.create_callback(boost::bind(&LLInspectTextureUtil::createInventoryToolTip, _1))
+					.create_params(params));
+
+			return TRUE;
+		}
+
 		if (!mToolTip.empty())
 		{
 			LLToolTipMgr::instance().show(mToolTip);
@@ -542,6 +557,7 @@ LLUIImagePtr LLEmbeddedItems::getItemImage(llwchar ext_char) const
 			case LLAssetType::AT_GESTURE:		img_name = "Inv_Gesture";	break;
 			case LLAssetType::AT_MESH:      	img_name = "Inv_Mesh";	    break;
             case LLAssetType::AT_SETTINGS:      img_name = "Inv_Settings"; break;
+            case LLAssetType::AT_MATERIAL:      img_name = "Inv_Material"; break;
 			default:                        	img_name = "Inv_Invalid";  break; // use the Inv_Invalid icon for undefined object types (see MAINT-3981)
 
 		}
@@ -879,6 +895,7 @@ BOOL LLViewerTextEditor::handleDragAndDrop(S32 x, S32 y, MASK mask,
 			case DAD_ANIMATION:
 			case DAD_GESTURE:
 			case DAD_MESH:
+            case DAD_MATERIAL:
 			{
 				supported = true;
 				break;
@@ -1127,6 +1144,9 @@ BOOL LLViewerTextEditor::openEmbeddedItem(LLPointer<LLInventoryItem> item, llwch
 		case LLAssetType::AT_SETTINGS:
 			openEmbeddedSetting(item, wc);
 			return TRUE;
+        case LLAssetType::AT_MATERIAL:
+            openEmbeddedGLTFMaterial(item, wc);
+            return TRUE;
 		case LLAssetType::AT_NOTECARD:
 		case LLAssetType::AT_LSL_TEXT:
 		case LLAssetType::AT_CLOTHING:
@@ -1195,7 +1215,11 @@ void LLViewerTextEditor::openEmbeddedLandmark( LLPointer<LLInventoryItem> item_p
 
 void LLViewerTextEditor::openEmbeddedCallingcard( LLInventoryItem* item, llwchar wc )
 {
-	if(item && !item->getCreatorUUID().isNull())
+	if (item && !item->getDescription().empty())
+	{
+		LLAvatarActions::showProfile(LLUUID(item->getDescription()));
+	}
+	else if (item && !item->getCreatorUUID().isNull())
 	{
 		LLAvatarActions::showProfile(item->getCreatorUUID());
 	}
@@ -1211,6 +1235,26 @@ void LLViewerTextEditor::openEmbeddedSetting(LLInventoryItem* item, llwchar wc)
 	{
 		LLNotificationsUtil::add("NoEnvironmentSettings");
 	}
+}
+
+void LLViewerTextEditor::openEmbeddedGLTFMaterial(LLInventoryItem* item, llwchar wc)
+{
+    if (!item)
+    {
+        return;
+    }
+
+    LLSD floater_key;
+    floater_key["objectid"] = mObjectID;
+    floater_key["notecardid"] = mNotecardInventoryID;
+    LLMaterialEditor* preview = LLFloaterReg::getTypedInstance<LLMaterialEditor>("material_editor", floater_key);
+    if (preview)
+    {
+        preview->setAuxItem(item);
+        preview->setNotecardInfo(mNotecardInventoryID, mObjectID);
+        preview->openFloater(floater_key);
+        preview->setFocus(TRUE);
+    }
 }
 
 void LLViewerTextEditor::showUnsavedAlertDialog( LLInventoryItem* item )

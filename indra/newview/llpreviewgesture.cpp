@@ -347,9 +347,6 @@ BOOL LLPreviewGesture::postBuild()
 	LLTextBox* text;
 	LLCheckBoxCtrl* check;
 
-	edit = getChild<LLLineEditor>("name");
-	edit->setKeystrokeCallback(onKeystrokeCommit, this);
-
 	edit = getChild<LLLineEditor>("desc");
 	edit->setKeystrokeCallback(onKeystrokeCommit, this);
 
@@ -482,9 +479,6 @@ BOOL LLPreviewGesture::postBuild()
 	{
 		getChild<LLUICtrl>("desc")->setValue(item->getDescription());
 		getChild<LLLineEditor>("desc")->setPrevalidate(&LLTextValidate::validateASCIIPrintableNoPipe);
-		
-		getChild<LLUICtrl>("name")->setValue(item->getName());
-		getChild<LLLineEditor>("name")->setPrevalidate(&LLTextValidate::validateASCIIPrintableNoPipe);
 	}
 
 	return LLPreview::postBuild();
@@ -861,58 +855,37 @@ void LLPreviewGesture::onLoadComplete(const LLUUID& asset_uuid,
 		if (0 == status)
 		{
 			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-			if (file.open())
+			S32 size = file.getSize();
+
+			std::vector<char> buffer(size+1);
+			file.read((U8*)&buffer[0], size);
+			buffer[size] = '\0';
+
+			LLMultiGesture* gesture = new LLMultiGesture();
+
+			LLDataPackerAsciiBuffer dp(&buffer[0], size+1);
+			BOOL ok = gesture->deserialize(dp);
+
+			if (ok)
 			{
-				S32 size = file.getSize();
+				// Everything has been successful.  Load up the UI.
+				self->loadUIFromGesture(gesture);
 
-				std::vector<char> buffer(size + 1);
-				if (file.read((U8*)&buffer[0], size))
-				{
-					file.close();
+				self->mStepList->selectFirstItem();
 
-					buffer[size] = '\0';
-
-						LLMultiGesture* gesture = new LLMultiGesture();
-
-						LLDataPackerAsciiBuffer dp(&buffer[0], size + 1);
-						BOOL ok = gesture->deserialize(dp);
-
-						if (ok)
-						{
-							// Everything has been successful.  Load up the UI.
-							self->loadUIFromGesture(gesture);
-
-							self->mStepList->selectFirstItem();
-
-							self->mDirty = FALSE;
-							self->refresh();
-							self->refreshFromItem(); // to update description and title
-						}
-						else
-						{
-							LL_WARNS() << "Unable to load gesture" << LL_ENDL;
-						}
-
-					delete gesture;
-					gesture = NULL;
-
-					self->mAssetStatus = PREVIEW_ASSET_LOADED;
-				}
-				else
-				{
-					LLDelayedGestureError::gestureFailedToLoad(*item_idp);
-
-					LL_WARNS() << "Problem loading gesture: " << status << LL_ENDL;
-					self->mAssetStatus = PREVIEW_ASSET_ERROR;
-				}
+				self->mDirty = FALSE;
+				self->refresh();
+				self->refreshFromItem(); // to update description and title
 			}
 			else
 			{
-				LLDelayedGestureError::gestureFailedToLoad(*item_idp);
-
-				LL_WARNS() << "Problem loading gesture: " << status << LL_ENDL;
-				self->mAssetStatus = PREVIEW_ASSET_ERROR;
+				LL_WARNS() << "Unable to load gesture" << LL_ENDL;
 			}
+
+			delete gesture;
+			gesture = NULL;
+
+			self->mAssetStatus = PREVIEW_ASSET_LOADED;
 		}
 		else
 		{
@@ -1058,7 +1031,6 @@ void LLPreviewGesture::finishInventoryUpload(LLUUID itemId, LLUUID newAssetId)
     // active map with the new pointer.				
     if (LLGestureMgr::instance().isGestureActive(itemId))
     {
-        //*TODO: This is crashing for some reason.  Fix it.
         // Active gesture edited from menu.
         LLGestureMgr::instance().replaceGesture(itemId, newAssetId);
         gInventory.notifyObservers();
@@ -1146,14 +1118,16 @@ void LLPreviewGesture::saveIfNeeded()
                 item->setComplete(true);
 
                 uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mItemUUID, LLAssetType::AT_GESTURE, buffer,
-                    [](LLUUID itemId, LLUUID newAssetId, LLUUID, LLSD) {
+                    [](LLUUID itemId, LLUUID newAssetId, LLUUID, LLSD)
+                    {
                         LLPreviewGesture::finishInventoryUpload(itemId, newAssetId);
-                    });
+                    },
+                    nullptr);
                 url = agent_url;
             }
             else if (!mObjectUUID.isNull() && !task_url.empty())
             {
-                uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mObjectUUID, mItemUUID, LLAssetType::AT_GESTURE, buffer, nullptr);
+                uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mObjectUUID, mItemUUID, LLAssetType::AT_GESTURE, buffer, nullptr, nullptr);
                 url = task_url;
             }
 
@@ -1172,18 +1146,14 @@ void LLPreviewGesture::saveIfNeeded()
             tid.generate();
             assetId = tid.makeAssetID(gAgent.getSecureSessionID());
 
-            LLFileSystem file(assetId, LLAssetType::AT_GESTURE, LLFileSystem::WRITE);
-			if (file.open())
-			{
-				S32 size = dp.getCurrentSize();
-				if (file.write((U8*)buffer, size))
-				{
-					file.close();
-					LLLineEditor* descEditor = getChild<LLLineEditor>("desc");
-					LLSaveInfo* info = new LLSaveInfo(mItemUUID, mObjectUUID, descEditor->getText(), tid);
-					gAssetStorage->storeAssetData(tid, LLAssetType::AT_GESTURE, onSaveComplete, info, FALSE);
-				}
-			}
+            LLFileSystem file(assetId, LLAssetType::AT_GESTURE, LLFileSystem::APPEND);
+
+            S32 size = dp.getCurrentSize();
+            file.write((U8*)buffer, size);
+
+            LLLineEditor* descEditor = getChild<LLLineEditor>("desc");
+            LLSaveInfo* info = new LLSaveInfo(mItemUUID, mObjectUUID, descEditor->getText(), tid);
+            gAssetStorage->storeAssetData(tid, LLAssetType::AT_GESTURE, onSaveComplete, info, FALSE);
         }
 
     }

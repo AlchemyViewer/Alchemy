@@ -33,52 +33,12 @@
 #include "llwindow.h"
 #include "llwindowcallbacks.h"
 #include "lldragdropwin32.h"
+#include "llthread.h"
+#include "llthreadsafequeue.h"
+#include "llmutex.h"
+#include "workqueue.h"
 
-#ifndef DPI_ENUMS_DECLARED
-
-typedef enum PROCESS_DPI_AWARENESS {
-	PROCESS_DPI_UNAWARE = 0,
-	PROCESS_SYSTEM_DPI_AWARE = 1,
-	PROCESS_PER_MONITOR_DPI_AWARE = 2
-} PROCESS_DPI_AWARENESS;
-
-typedef enum MONITOR_DPI_TYPE {
-	MDT_EFFECTIVE_DPI = 0,
-	MDT_ANGULAR_DPI = 1,
-	MDT_RAW_DPI = 2,
-	MDT_DEFAULT = MDT_EFFECTIVE_DPI
-} MONITOR_DPI_TYPE;
-
-#endif
-
-typedef HRESULT(WINAPI* SetProcessDpiAwareness_t)(_In_ PROCESS_DPI_AWARENESS value);
-
-typedef HRESULT(WINAPI* GetProcessDpiAwareness_t)(
-	_In_ HANDLE hprocess,
-	_Out_ PROCESS_DPI_AWARENESS *value);
-
-typedef HRESULT(WINAPI* GetDpiForMonitor_t)(
-	_In_ HMONITOR hmonitor,
-	_In_ MONITOR_DPI_TYPE dpiType,
-	_Out_ UINT *dpiX,
-	_Out_ UINT *dpiY);
-
-typedef UINT(WINAPI* GetDpiForWindow_t)(_In_ HWND hwnd);
-
-typedef UINT(WINAPI* GetDpiForSystem_t)(VOID);
-
-typedef BOOL(WINAPI* AdjustWindowRectExForDpi_t)(
-	_Inout_ LPRECT lpRect,
-	_In_ DWORD dwStyle,
-	_In_ BOOL bMenu,
-	_In_ DWORD dwExStyle,
-	_In_ UINT dpi);
-
-typedef int(WINAPI* GetSystemMetricsForDpi_t)(
-	_In_ int nIndex,
-	_In_ UINT dpi);
-
-class LLWindowWin32 : public LLWindow
+class LLWindowWin32 final : public LLWindow
 {
 public:
 	/*virtual*/ void show();
@@ -97,9 +57,15 @@ public:
 	/*virtual*/ BOOL setPosition(LLCoordScreen position);
 	/*virtual*/ BOOL setSizeImpl(LLCoordScreen size);
 	/*virtual*/ BOOL setSizeImpl(LLCoordWindow size);
-	/*virtual*/ BOOL switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL disable_vsync, const LLCoordScreen * const posp = NULL);
+	/*virtual*/ BOOL switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL enable_vsync, const LLCoordScreen * const posp = NULL);
+    /*virtual*/ void setTitle(const std::string title);
+    void* createSharedContext() override;
+    void makeContextCurrent(void* context) override;
+    void destroySharedContext(void* context) override;
+    /*virtual*/ void toggleVSync(bool enable_vsync);
 	/*virtual*/ BOOL setCursorPosition(LLCoordWindow position);
 	/*virtual*/ BOOL getCursorPosition(LLCoordWindow *position);
+    /*virtual*/ BOOL getCursorDelta(LLCoordCommon* delta);
 	/*virtual*/ void showCursor();
 	/*virtual*/ void hideCursor();
 	/*virtual*/ void showCursorFromMouseMove();
@@ -113,7 +79,6 @@ public:
 	/*virtual*/ BOOL isClipboardTextAvailable();
 	/*virtual*/ BOOL pasteTextFromClipboard(LLWString &dst);
 	/*virtual*/ BOOL copyTextToClipboard(const LLWString &src);
-	/*virtual*/ void setWindowTitle(const std::string& title) override;
 	/*virtual*/ void flashIcon(F32 seconds);
 	/*virtual*/ F32 getGamma();
 	/*virtual*/ BOOL setGamma(const F32 gamma); // Set the gamma
@@ -139,7 +104,9 @@ public:
 	/*virtual*/ F32 getPixelAspectRatio();
 	/*virtual*/ void setNativeAspectRatio(F32 ratio) { mOverrideAspectRatio = ratio; }
 
-	/*virtual*/	BOOL dialogColorPicker(F32 *r, F32 *g, F32 *b );
+    U32 getAvailableVRAMMegabytes() override;
+	
+    /*virtual*/	BOOL dialogColorPicker(F32 *r, F32 *g, F32 *b );
 
 	/*virtual*/ void *getPlatformWindow();
 	/*virtual*/ void bringToFront();
@@ -153,18 +120,25 @@ public:
 
 	/*virtual*/ F32 getSystemUISize();
 
-	LLWindowCallbacks::DragNDropResult completeDragNDropRequest( const LLCoordGL gl_coord, const MASK mask, LLWindowCallbacks::DragNDropAction action, const std::string url );
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+	LLWindowCallbacks::DragNDropResult completeDragNDropRequest(const LLCoordGL gl_coord, const MASK mask, LLWindowCallbacks::DragNDropAction action, 
+		LLWindowCallbacks::DragNDropType type, const std::vector<std::string>& data);
+// [/SL:KB]
+//	LLWindowCallbacks::DragNDropResult completeDragNDropRequest( const LLCoordGL gl_coord, const MASK mask, LLWindowCallbacks::DragNDropAction action, const std::string url );
 
 	static std::vector<std::string> getDisplaysResolutionList();
 	static std::vector<std::string> getDynamicFallbackFontList();
 
     /*virtual*/ void* getDirectInput8();
     /*virtual*/ bool getInputDevices(U32 device_type_filter, void * di8_devices_callback, void* userdata);
+
+    U32 getRawWParam() { return mRawWParam; }
+
 protected:
 	LLWindowWin32(LLWindowCallbacks* callbacks,
 		const std::string& title, const std::string& name, int x, int y, int width, int height, U32 flags, 
-		BOOL fullscreen, BOOL clearBg, BOOL disable_vsync, BOOL use_gl,
-		BOOL ignore_pixel_depth, U32 fsaa_samples);
+		BOOL fullscreen, BOOL clearBg, BOOL enable_vsync, BOOL use_gl,
+		BOOL ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, U32 max_vram, F32 max_gl_version);
 	~LLWindowWin32();
 
 	void	initCursors();
@@ -212,28 +186,36 @@ protected:
 	WCHAR		*mWindowTitle;
 	WCHAR		*mWindowClassName;
 
-	HWND		mWindowHandle;	// window handle
-	HGLRC		mhRC;			// OpenGL rendering context
-	HDC			mhDC;			// Windows Device context handle
+	HWND	    mWindowHandle = 0;	// window handle
+	HGLRC		mhRC = 0;			// OpenGL rendering context
+	HDC			mhDC = 0;			// Windows Device context handle
 	HINSTANCE	mhInstance;		// handle to application instance
-	WNDPROC		mWndProc;		// user-installable window proc
 	RECT		mOldMouseClip;  // Screen rect to which the mouse cursor was globally constrained before we changed it in clipMouse()
 	WPARAM		mLastSizeWParam;
 	F32			mOverrideAspectRatio;
 	F32			mNativeAspectRatio;
 
 	HCURSOR		mCursor[ UI_CURSOR_COUNT ];  // Array of all mouse cursors
+    LLCoordWindow mCursorPosition;  // mouse cursor position, should only be mutated on main thread
+    LLMutex mRawMouseMutex;
+    RAWINPUTDEVICE mRawMouse;
+    LLCoordWindow mLastCursorPosition; // mouse cursor position from previous frame
+    LLCoordCommon mRawMouseDelta; // raw mouse delta according to window thread
+    LLCoordCommon mMouseFrameDelta; // how much the mouse moved between the last two calls to gatherInput
+
+    MASK        mMouseMask;
 
 	static BOOL sIsClassRegistered; // has the window class been registered?
 
 	F32			mCurrentGamma;
 	U32			mFSAASamples;
+    U32         mMaxCores; // for debugging only -- maximum number of CPU cores to use, or 0 for no limit
+    F32         mMaxGLVersion; // maximum OpenGL version to attempt to use (clamps to 3.2 - 4.6)
 	WORD		mPrevGammaRamp[3][256];
 	WORD		mCurrentGammaRamp[3][256];
 	BOOL		mCustomGammaSet;
 
 	LPWSTR		mIconResource;
-	BOOL		mMousePositionModified;
 	BOOL		mInputProcessingPaused;
 
 	// The following variables are for Language Text Input control.
@@ -262,16 +244,19 @@ protected:
 	BOOL			mMouseVanish;
 private:
 	HMODULE mOpenGL32DLL;
-	HMODULE mUser32DLL;
-	HMODULE mShellcoDLL;
+    // Cached values of GetWindowRect and GetClientRect to be used by app thread
+    void updateWindowRect();
+    RECT mRect; 
+    RECT mClientRect;
 
-	SetProcessDpiAwareness_t pSetProcessDpiAwareness;
-	GetProcessDpiAwareness_t pGetProcessDpiAwareness;
-	GetDpiForMonitor_t pGetDpiForMonitor;
-	GetDpiForWindow_t pGetDpiForWindow;
-	GetDpiForSystem_t pGetDpiForSystem;
-	AdjustWindowRectExForDpi_t pAdjustWindowRectExForDpi;
-	GetSystemMetricsForDpi_t pGetSystemMetricsForDpi;
+	struct LLWindowWin32Thread;
+	LLWindowWin32Thread* mWindowThread = nullptr;
+	LLThreadSafeQueue<std::function<void()>> mFunctionQueue;
+	LLThreadSafeQueue<std::function<void()>> mMouseQueue;
+	void post(const std::function<void()>& func);
+	void postMouseButtonEvent(const std::function<void()>& func);
+	void recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw_style);
+	void kickWindowThread(HWND windowHandle=0);
 
 	friend class LLWindowManager;
 };

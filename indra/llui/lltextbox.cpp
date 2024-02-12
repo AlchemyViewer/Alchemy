@@ -137,6 +137,11 @@ void LLTextBox::setClickedCallback( boost::function<void (void*)> cb, void* user
 	mClickedCallback = boost::bind(cb, userdata);
 }
 
+void LLTextBox::clearClickedCallback()
+{
+	mClickedCallback.clear();
+}
+
 S32 LLTextBox::getTextPixelWidth()
 {
 	return getTextBoundingRect().getWidth();
@@ -161,6 +166,12 @@ BOOL LLTextBox::setTextArg( const std::string& key, const LLStringExplicit& text
 	return TRUE;
 }
 
+void LLTextBox::updateCurrencySymbols()
+{
+    mLabel.dirty();
+    mText.dirty();
+    LLTextBase::setText(mText.getString());
+}
 
 void LLTextBox::reshapeToFitText(BOOL called_from_parent)
 {
@@ -168,7 +179,8 @@ void LLTextBox::reshapeToFitText(BOOL called_from_parent)
 
 	S32 width = getTextPixelWidth();
 	S32 height = getTextPixelHeight();
-	reshape( width + 2 * mHPad, height + 2 * mVPad, called_from_parent );
+    //consider investigating reflow() to find missing width pixel (see SL-17045 changes)
+	reshape( width + 2 * mHPad + 1, height + 2 * mVPad, called_from_parent );
 }
 
 

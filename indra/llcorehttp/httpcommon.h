@@ -187,12 +187,8 @@
 
 #include "linden_common.h"		// Modifies curl/curl.h interfaces
 #include "llsd.h"
-#include "boost/intrusive_ptr.hpp"
 #include "boost/shared_ptr.hpp"
 #include "boost/make_shared.hpp"
-#include "boost/weak_ptr.hpp"
-#include "boost/function.hpp"
-#include "boost/noncopyable.hpp"
 #include <string>
 #include <curl/curl.h>
 
@@ -307,24 +303,24 @@ struct HttpStatus
 
 	HttpStatus()
 	{
-		mDetails = boost::make_shared<Details>(LLCORE, HE_SUCCESS);
+		mDetails = std::make_shared<Details>(LLCORE, HE_SUCCESS);
     }
 
 	HttpStatus(type_enum_t type, short status)
 	{
-        mDetails = boost::make_shared<Details>(type, status);
+        mDetails = std::make_shared<Details>(type, status);
 	}
 	
 	HttpStatus(int http_status)
 	{
-        mDetails = boost::make_shared<Details>(http_status,
+        mDetails = std::make_shared<Details>(http_status,
 			(http_status >= 200 && http_status <= 299) ? HE_SUCCESS : HE_REPLY_ERROR);
 		llassert(http_status >= 100 && http_status <= 999);
 	}
 
 	HttpStatus(int http_status, const std::string &message)
 	{
-        mDetails = boost::make_shared<Details>(http_status,
+        mDetails = std::make_shared<Details>(http_status,
 			(http_status >= 200 && http_status <= 299) ? HE_SUCCESS : HE_REPLY_ERROR);
 		llassert(http_status >= 100 && http_status <= 999);
 		mDetails->mMessage = message;
@@ -341,7 +337,7 @@ struct HttpStatus
 
     HttpStatus & clone(const HttpStatus &rhs)
     {
-        mDetails = boost::make_shared<Details>(*rhs.mDetails);
+        mDetails = std::make_shared<Details>(*rhs.mDetails);
         return *this;
     }
 	
@@ -479,14 +475,14 @@ private:
 		LLSD		mErrorData;
 	};
 
-    boost::shared_ptr<Details> mDetails;
+    std::shared_ptr<Details> mDetails;
 
 }; // end struct HttpStatus
 
 ///  A namespace for several free methods and low level utilities. 
 namespace LLHttp
 {
-    typedef boost::shared_ptr<CURL> CURL_ptr;
+    typedef std::shared_ptr<CURL> CURL_ptr;
 
     void initialize();
     void cleanup();

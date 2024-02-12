@@ -131,7 +131,7 @@ bool handleIgnoredNotification(const LLSD& payload)
 			response = pNotif->getResponseTemplate(LLNotification::WITH_DEFAULT_BUTTON);
 			break;
 		case LLNotificationForm::IGNORE_WITH_LAST_RESPONSE:
-			response = LLUI::getInstanceFast()->mSettingGroups["ignores"]->getLLSD("Default" + pNotif->getName());
+			response = LLUI::getInstance()->mSettingGroups["ignores"]->getLLSD("Default" + pNotif->getName());
 			break;
 		case LLNotificationForm::IGNORE_SHOW_AGAIN:
 			break;
@@ -199,7 +199,7 @@ LLNotificationForm::LLNotificationForm(const std::string& name, const LLNotifica
 		// For all cases but IGNORE_CHECKBOX_ONLY this is name for use in preferences
 		mIgnoreMsg = p.ignore.text;
 
-		LLUI *ui_inst = LLUI::getInstanceFast();
+		LLUI *ui_inst = LLUI::getInstance();
 		if (p.ignore.checkbox_only)
 		{
 			mIgnore = IGNORE_CHECKBOX_ONLY;
@@ -241,9 +241,10 @@ LLNotificationForm::LLNotificationForm(const std::string& name, const LLNotifica
 			*it = it->beginMap()->second;
 		}
 	}
-
+#if SHOW_DEBUG
 	LL_DEBUGS("Notifications") << name << LL_ENDL;
 	LL_DEBUGS("Notifications") << ll_pretty_print_sd(mFormData) << LL_ENDL;
+#endif
 }
 
 LLNotificationForm::LLNotificationForm(const LLSD& sd)
@@ -267,7 +268,7 @@ LLSD LLNotificationForm::asLLSD() const
 
 LLSD LLNotificationForm::getElement(std::string_view element_name)
 {
-	for (const LLSD& llsd_val : mFormData.array())
+	for (const LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["name"].asString() == element_name) return llsd_val;
 	}
@@ -277,7 +278,7 @@ LLSD LLNotificationForm::getElement(std::string_view element_name)
 
 bool LLNotificationForm::hasElement(std::string_view element_name) const
 {
-	for (const LLSD& llsd_val : mFormData.array())
+	for (const LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["name"].asString() == element_name) return true;
 	}
@@ -299,7 +300,7 @@ void LLNotificationForm::getElements(LLSD& elements, S32 offset)
 
 bool LLNotificationForm::getElementEnabled(std::string_view element_name) const
 {
-	for (const LLSD& llsd_val : mFormData.array())
+	for (const LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["name"].asString() == element_name)
 		{
@@ -312,7 +313,7 @@ bool LLNotificationForm::getElementEnabled(std::string_view element_name) const
 
 void LLNotificationForm::setElementEnabled(std::string_view element_name, bool enabled)
 {
-	for (LLSD& llsd_val : mFormData.array())
+	for (LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["name"].asString() == element_name)
 		{
@@ -329,7 +330,7 @@ void LLNotificationForm::addElement(const std::string& type, const std::string& 
 	element["name"] = name;
 	element["text"] = name;
 	element["value"] = value;
-	element["index"] = mFormData.size();
+	element["index"] = LLSD::Integer(mFormData.size());
 	element["enabled"] = enabled;
 	mFormData.append(element);
 }
@@ -338,7 +339,7 @@ void LLNotificationForm::append(const LLSD& sub_form)
 {
 	if (sub_form.isArray())
 	{
-		for (const auto& llsd_val : sub_form.array())
+		for (const auto& llsd_val : sub_form.asArray())
 		{
 			mFormData.append(llsd_val);
 		}
@@ -347,7 +348,7 @@ void LLNotificationForm::append(const LLSD& sub_form)
 
 void LLNotificationForm::formatElements(const LLSD& substitutions)
 {
-	for (LLSD& llsd_val : mFormData.array())
+	for (LLSD& llsd_val : mFormData.asArray())
 	{
 		// format "text" component of each form element
 		if (llsd_val.has("text"))
@@ -367,7 +368,7 @@ void LLNotificationForm::formatElements(const LLSD& substitutions)
 
 std::string LLNotificationForm::getDefaultOption()
 {
-	for (const LLSD& llsd_val : mFormData.array())
+	for (const LLSD& llsd_val : mFormData.asArray())
 	{
 		if (llsd_val["default"]) return llsd_val["name"].asString();
 	}
@@ -425,7 +426,7 @@ LLNotificationTemplate::LLNotificationTemplate(const LLNotificationTemplate::Par
     mSoundName("")
 {
 	if (p.sound.isProvided()
-		&& LLUI::getInstanceFast()->mSettingGroups["config"]->controlExists(p.sound.getValue()))
+		&& LLUI::getInstance()->mSettingGroups["config"]->controlExists(p.sound.getValue()))
 	{
 		mSoundName = p.sound;
 	}
@@ -434,9 +435,11 @@ LLNotificationTemplate::LLNotificationTemplate(const LLNotificationTemplate::Par
 	{
 		mUniqueContext.push_back(context.value);
 	}
-	
+
+#if SHOW_DEBUG
 	LL_DEBUGS("Notifications") << "notification \"" << mName << "\": tag count is " << p.tags.size() << LL_ENDL;
-	
+#endif
+
 	for (const LLNotificationTemplate::Tag& tag : p.tags)
 	{
 		LL_DEBUGS("Notifications") << "    tag \"" << std::string(tag.value) << "\"" << LL_ENDL;
@@ -485,7 +488,8 @@ LLNotification::LLNotification(const LLSDParamAdapter<Params>& p) :
 	mResponderObj(NULL),
 	mId(p.id.isProvided() ? p.id : LLUUID::generateNewID()),
 	mOfferFromAgent(p.offer_from_agent),
-    mIsDND(p.is_dnd)
+    mIsDND(p.is_dnd),
+	mForceChat(p.force_to_chat)
 {
 	if (p.functor.name.isChosen())
 	{
@@ -644,7 +648,7 @@ S32 LLNotification::getSelectedOption(const LLSD& notification, const LLSD& resp
 //static
 std::string LLNotification::getSelectedOptionName(const LLSD& response)
 {
-	for (const auto& llsd_pair : response.map())
+	for (const auto& llsd_pair : response.asMap())
 	{
 		if (llsd_pair.second.isBoolean() && llsd_pair.second.asBoolean())
 		{
@@ -691,7 +695,7 @@ void LLNotification::respond(const LLSD& response)
 		mForm->setIgnored(mIgnored);
 		if (mIgnored && mForm->getIgnoreType() == LLNotificationForm::IGNORE_WITH_LAST_RESPONSE)
 		{
-			LLUI::getInstanceFast()->mSettingGroups["ignores"]->setLLSD(absl::StrCat("Default", getName()), response);
+			LLUI::getInstance()->mSettingGroups["ignores"]->setLLSD("Default" + getName(), response);
 		}
 	}
 
@@ -874,7 +878,10 @@ void LLNotification::init(const std::string& template_name, const LLSD& form_ele
 
 std::string LLNotification::summarize() const
 {
-	std::string s = absl::StrCat("Notification(", getName(), ") : ", mTemplatep ? mTemplatep->mMessage : "");
+	std::string s = "Notification(";
+	s += getName();
+	s += ") : ";
+	s += mTemplatep ? mTemplatep->mMessage : "";
 	// should also include timestamp and expiration time (but probably not payload)
 	return s;
 }
@@ -1191,10 +1198,13 @@ size_t LLNotificationChannel::size()
 
 std::string LLNotificationChannel::summarize()
 {
-	std::string s = absl::StrCat("Channel '", mName, "'\n  ");
+	std::string s("Channel '");
+	s += mName;
+	s += "'\n  ";
 	for (LLNotificationChannel::Iterator it = begin(); it != end(); ++it)
 	{
-		absl::StrAppend(&s, (*it)->summarize(), "\n  ");
+		s += (*it)->summarize();
+		s += "\n  ";
 	}
 	return s;
 }
@@ -1377,7 +1387,7 @@ bool LLNotifications::failedUniquenessTest(const LLSD& payload)
 
 LLNotificationChannelPtr LLNotifications::getChannel(const std::string& channelName)
 {
-	return LLNotificationChannelPtr(LLNotificationChannel::getInstance(channelName));
+	return LLNotificationChannelPtr(LLNotificationChannel::getInstance(channelName).get());
 }
 
 
@@ -1487,7 +1497,9 @@ void replaceSubstitutionStrings(LLXMLNodePtr node, StringMap& replacements)
 			if (found != replacements.end())
 			{
 				replacement = found->second;
+#if SHOW_DEBUG
 				LL_DEBUGS("Notifications") << "replaceSubstitutionStrings: value: \"" << value << "\" repl: \"" << replacement << "\"." << LL_ENDL;
+#endif
 				it->second->setValue(replacement);
 			}
 			else
@@ -1689,6 +1701,20 @@ void LLNotifications::add(const LLNotificationPtr pNotif)
 	}
 
 	updateItem(LLSD().with("sigtype", "add").with("id", pNotif->id()), pNotif);
+}
+
+void LLNotifications::load(const LLNotificationPtr pNotif)
+{
+	if (pNotif == NULL) return;
+
+	// first see if we already have it -- if so, that's a problem
+	LLNotificationSet::iterator it=mItems.find(pNotif);
+	if (it != mItems.end())
+	{
+		LL_ERRS() << "Notification loaded a second time to the master notification channel." << LL_ENDL;
+	}
+
+	updateItem(LLSD().with("sigtype", "load").with("id", pNotif->id()), pNotif);
 }
 
 void LLNotifications::cancel(LLNotificationPtr pNotif)

@@ -83,23 +83,26 @@ void LLViewerAudio::registerIdleListener()
 
 void LLViewerAudio::startInternetStreamWithAutoFade(const std::string &streamURI)
 {
+    LL_DEBUGS("AudioEngine") << "Start with outo fade: " << streamURI << LL_ENDL;
+
 	// Old and new stream are identical
 	if (mNextStreamURI == streamURI)
 	{
 		return;
 	}
 
-	// Record the URI we are going to be switching to	
+	if (!gAudiop)
+	{
+		LL_WARNS("AudioEngine") << "LLAudioEngine instance doesn't exist!" << LL_ENDL;
+		return;
+	}
+
+	// Record the URI we are going to be switching to
 	mNextStreamURI = streamURI;
 
 	switch (mFadeState)
 	{
 	case FADE_IDLE:
-		if (!gAudiop)
-		{
-			LL_WARNS("AudioEngine") << "LLAudioEngine instance doesn't exist!" << LL_ENDL;
-			break;
-		}
 		// If a stream is playing fade it out first
 		if (!gAudiop->getInternetStreamURL().empty())
 		{
@@ -112,28 +115,28 @@ void LLViewerAudio::startInternetStreamWithAutoFade(const std::string &streamURI
 			mFadeState = FADE_IN;
 
 			LLStreamingAudioInterface *stream = gAudiop->getStreamingAudioImpl();
-			if(stream && stream->supportsAdjustableBufferSizes())
+			if (stream && stream->supportsAdjustableBufferSizes())
 				stream->setBufferSizes(gSavedSettings.getU32("FMODStreamBufferSize"),gSavedSettings.getU32("FMODDecodeBufferSize"));
 
 			gAudiop->startInternetStream(mNextStreamURI);
-			startFading();
-			registerIdleListener();
-			break;
 		}
+
+		startFading();
+		break;
 
 	case FADE_OUT:
 		startFading();
-		registerIdleListener();
 		break;
 
 	case FADE_IN:
-		registerIdleListener();
 		break;
 
 	default:
 		LL_WARNS() << "Unknown fading state: " << mFadeState << LL_ENDL;
-		break;
+		return;
 	}
+
+	registerIdleListener();
 }
 
 // A return of false from onIdleUpdate means it will be called again next idle update.
@@ -166,6 +169,7 @@ bool LLViewerAudio::onIdleUpdate()
 			if (gAudiop)
 			{
 				// Clear URI
+                LL_DEBUGS("AudioEngine") << "Done with audio fade" << LL_ENDL;
 				gAudiop->startInternetStream(LLStringUtil::null);
 				gAudiop->stopInternetStream();
 			}
@@ -176,6 +180,7 @@ bool LLViewerAudio::onIdleUpdate()
 
 				if (gAudiop)
 				{
+                    LL_DEBUGS("AudioEngine") << "Audio fade in: " << mNextStreamURI << LL_ENDL;
 					LLStreamingAudioInterface *stream = gAudiop->getStreamingAudioImpl();
 					if(stream && stream->supportsAdjustableBufferSizes())
 						stream->setBufferSizes(gSavedSettings.getU32("FMODStreamBufferSize"),gSavedSettings.getU32("FMODDecodeBufferSize"));
@@ -219,6 +224,7 @@ void LLViewerAudio::stopInternetStreamWithAutoFade()
 	
 	if (gAudiop)
 	{
+        LL_DEBUGS("AudioEngine") << "Stop audio fade" << LL_ENDL;
 		gAudiop->startInternetStream(LLStringUtil::null);
 		gAudiop->stopInternetStream();
 	}
@@ -231,15 +237,12 @@ void LLViewerAudio::startFading()
 	// This minimum fade time prevents divide by zero and negative times
 	const F32 AUDIO_MUSIC_MINIMUM_FADE_TIME = 0.01f;
 
-	if(mDone)
+	if (mDone)
 	{
 		// The fade state here should only be one of FADE_IN or FADE_OUT, but, in case it is not,
 		// rather than check for both states assume a fade in and check for the fade out case.
-		mFadeTime = AUDIO_MUSIC_FADE_IN_TIME;
-		if (getFadeState() == LLViewerAudio::FADE_OUT)
-		{
-			mFadeTime = AUDIO_MUSIC_FADE_OUT_TIME;
-		}
+		mFadeTime = getFadeState() == LLViewerAudio::FADE_OUT ?
+			AUDIO_MUSIC_FADE_OUT_TIME : AUDIO_MUSIC_FADE_IN_TIME;
 
 		// Prevent invalid fade time
 		mFadeTime = llmax(mFadeTime, AUDIO_MUSIC_MINIMUM_FADE_TIME);
@@ -345,8 +348,8 @@ void init_audio()
 					
 	gAudiop->setListener(lpos_global_f,
 						  LLVector3::zero,	// LLViewerCamera::getInstance()->getVelocity(),    // !!! BUG need to replace this with smoothed velocity!
-						  LLViewerCamera::getInstanceFast()->getUpAxis(),
-						  LLViewerCamera::getInstanceFast()->getAtAxis());
+						  LLViewerCamera::getInstance()->getUpAxis(),
+						  LLViewerCamera::getInstance()->getAtAxis());
 
 // load up our initial set of sounds we'll want so they're in memory and ready to be played
 
@@ -422,7 +425,7 @@ void audio_update_volume(bool force_update)
 
 		static const LLCachedControl<F32> rolloff_volume(gSavedSettings, "AudioLevelRolloff");
 		static const LLCachedControl<F32> underwater_rolloff_volume(gSavedSettings, "AudioLevelUnderwaterRolloff");
-		if(!LLViewerCamera::getInstanceFast()->cameraUnderWater())
+		if(!LLViewerCamera::getInstance()->cameraUnderWater())
 			gAudiop->setRolloffFactor(rolloff_volume);
 		else
 			gAudiop->setRolloffFactor(underwater_rolloff_volume);
@@ -432,7 +435,7 @@ void audio_update_volume(bool force_update)
 		//Play any deferred sounds when unmuted
 		if(!gAudiop->getMuted())
 		{
-			LLDeferredSounds::instanceFast().playdeferredSounds();
+			LLDeferredSounds::instance().playdeferredSounds();
 		}
 
 		if (force_update)
@@ -453,15 +456,15 @@ void audio_update_volume(bool force_update)
 
 		// Streaming Music
 
-		if (!progress_view_visible && LLViewerAudio::getInstanceFast()->getForcedTeleportFade())
+		if (!progress_view_visible && LLViewerAudio::getInstance()->getForcedTeleportFade())
 		{
-			LLViewerAudio::getInstanceFast()->setWasPlaying(!gAudiop->getInternetStreamURL().empty());
-			LLViewerAudio::getInstanceFast()->setForcedTeleportFade(false);
+			LLViewerAudio::getInstance()->setWasPlaying(!gAudiop->getInternetStreamURL().empty());
+			LLViewerAudio::getInstance()->setForcedTeleportFade(false);
 		}
 
 		static const LLCachedControl<F32> music_volume_setting(gSavedSettings, "AudioLevelMusic");
 		static const LLCachedControl<bool> music_muted(gSavedSettings, "MuteMusic");
-		const F32 fade_volume = LLViewerAudio::getInstanceFast()->getFadeVolume();
+		const F32 fade_volume = LLViewerAudio::getInstance()->getFadeVolume();
 
 		const F32 music_volume = mute_volume * master_volume * music_volume_setting * fade_volume;
 		gAudiop->setInternetStreamGain (music_muted ? 0.f : music_volume);
@@ -471,7 +474,7 @@ void audio_update_volume(bool force_update)
 	static const LLCachedControl<F32> media_volume_setting(gSavedSettings, "AudioLevelMedia");
 	static const LLCachedControl<bool> media_muted(gSavedSettings, "MuteMedia");
 	const F32 media_volume = mute_volume * master_volume * media_volume_setting;
-	LLViewerMedia::getInstanceFast()->setVolume( media_muted ? 0.0f : media_volume );
+	LLViewerMedia::getInstance()->setVolume( media_muted ? 0.0f : media_volume );
 
 	// Voice, this is parametric singleton, it gets initialized when ready
 	if (LLVoiceClient::instanceExists())
@@ -480,7 +483,7 @@ void audio_update_volume(bool force_update)
 		static const LLCachedControl<bool> voice_mute(gSavedSettings, "MuteVoice");
 		static const LLCachedControl<F32> mic_volume(gSavedSettings, "AudioLevelMic");
 		const F32 voice_volume = mute_volume * master_volume * voice_volume_setting;
-		LLVoiceClient *voice_inst = LLVoiceClient::getInstanceFast();
+		LLVoiceClient *voice_inst = LLVoiceClient::getInstance();
 		voice_inst->setVoiceVolume(voice_mute ? 0.f : voice_volume);
 		voice_inst->setMicGain(voice_mute ? 0.f : mic_volume);
 
@@ -500,7 +503,20 @@ void audio_update_listener()
 	if (gAudiop)
 	{
 		// update listener position because agent has moved	
-		LLVector3d lpos_global = gAgentCamera.getCameraPositionGlobal();		
+        static LLUICachedControl<S32> mEarLocation("MediaSoundsEarLocation", 0);
+        LLVector3d ear_position;
+        switch(mEarLocation)
+        {
+        case 0:
+        default:
+            ear_position = gAgentCamera.getCameraPositionGlobal();
+            break;
+
+        case 1:
+            ear_position = gAgent.getPositionGlobal();
+            break;
+        }
+		LLVector3d lpos_global = ear_position;		
 		LLVector3 lpos_global_f;
 		lpos_global_f.setVec(lpos_global);
 	
@@ -508,8 +524,8 @@ void audio_update_listener()
 							 // LLViewerCamera::getInstance()VelocitySmoothed, 
 							 // LLVector3::zero,	
 							 gAgent.getVelocity(),    // !!! *TODO: need to replace this with smoothed velocity!
-							 LLViewerCamera::getInstanceFast()->getUpAxis(),
-							 LLViewerCamera::getInstanceFast()->getAtAxis());
+							 LLViewerCamera::getInstance()->getUpAxis(),
+							 LLViewerCamera::getInstance()->getAtAxis());
 	}
 }
 

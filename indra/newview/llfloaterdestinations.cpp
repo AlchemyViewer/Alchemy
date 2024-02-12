@@ -33,8 +33,13 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llfloaterdestinations.h"
-#include "lluictrlfactory.h"
-
+#include "llagent.h"
+#include "llmediactrl.h"
+#include "llviewercontrol.h"
+#include "llviewermedia.h"
+#include "llviewernetwork.h"
+#include "llviewerregion.h"
+#include "llweb.h"
 
 LLFloaterDestinations::LLFloaterDestinations(const LLSD& key)
 	:	LLFloater(key)
@@ -43,11 +48,31 @@ LLFloaterDestinations::LLFloaterDestinations(const LLSD& key)
 
 LLFloaterDestinations::~LLFloaterDestinations()
 {
+	LLMediaCtrl* destinations = findChild<LLMediaCtrl>("destination_guide_contents");
+	if (destinations)
+	{
+		LL_INFOS() << "Unloading destinations media" << LL_ENDL;
+		destinations->navigateStop();
+		destinations->clearCache();          //images are reloading each time already
+		destinations->unloadMediaSource();
+	}
 }
 
 BOOL LLFloaterDestinations::postBuild()
 {
 	enableResizeCtrls(true, true, false);
+	LLMediaCtrl* destinations = findChild<LLMediaCtrl>("destination_guide_contents");
+	if (destinations)
+	{
+		destinations->setErrorPageURL(gSavedSettings.getString("GenericErrorPageURL"));
+
+		LLViewerRegion* regionp = gAgent.getRegion();
+		std::string dest_url = regionp != nullptr ? regionp->getDestinationGuideURL()
+			: LLGridManager::getInstance()->isInOpenSim() ? "" : gSavedSettings.getString("DestinationGuideURL");
+
+		dest_url = LLWeb::expandURLSubstitutions(dest_url, LLSD());
+		destinations->navigateTo(dest_url, HTTP_CONTENT_TEXT_HTML);
+	}
 	return TRUE;
 }
 

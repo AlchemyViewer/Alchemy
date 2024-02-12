@@ -52,7 +52,6 @@
 #include "llviewerwindow.h"
 #include "llvoavatarself.h"
 #include "llvoiceclient.h"
-#include "llvosky.h"
 #include "llvotree.h"
 #include "llvovolume.h"
 #include "llworld.h"
@@ -76,6 +75,7 @@
 #include "llspellcheck.h"
 #include "llslurl.h"
 #include "llstartup.h"
+#include "llperfstats.h"
 // [RLVa:KB] - Checked: 2015-12-27 (RLVa-1.5.0)
 #include "llvisualeffect.h"
 #include "rlvactions.h"
@@ -98,6 +98,7 @@ LLControlGroup gSavedSettings("Global");	// saved at end of session
 LLControlGroup gSavedPerAccountSettings("PerAccount"); // saved at end of session
 LLControlGroup gCrashSettings("CrashSettings");	// saved at end of session
 LLControlGroup gWarningSettings("Warnings"); // persists ignored dialogs/warnings
+LLControlGroup gSkinSettings("SkinUI"); // [AL:CR] read only settings tied to skin selection
 
 std::string gLastRunVersion;
 
@@ -115,10 +116,14 @@ static bool handleRenderAvatarMouselookChanged(const LLSD& newvalue)
 
 static bool handleRenderFarClipChanged(const LLSD& newvalue)
 {
-	F32 draw_distance = (F32) newvalue.asReal();
+    if (LLStartUp::getStartupState() >= STATE_STARTED)
+    {
+        F32 draw_distance = (F32)newvalue.asReal();
 	gAgentCamera.mDrawDistance = draw_distance;
-	LLWorld::getInstanceFast()->setLandFarClip(draw_distance);
+	LLWorld::getInstance()->setLandFarClip(draw_distance);
 	return true;
+    }
+    return false;
 }
 
 static bool handleTerrainDetailChanged(const LLSD& newvalue)
@@ -147,15 +152,6 @@ static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
 
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
-// [RLVa:KB] - @setenv and @setsphere
-	if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canChangeEnvironment() || (LLVfxManager::instanceFast().hasEffect(EVisualEffect::RlvSphere))) &&
-		 (LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))&& (!gSavedSettings.getBOOL("WindLightUseAtmosShaders")) )
-	{
-		gSavedSettings.setBOOL("WindLightUseAtmosShaders", TRUE);
-		return true;
-	}
-// [/RLVa:KB]
-
 	// changing shader level may invalidate existing cached bump maps, as the shader type determines the format of the bump map it expects - clear and repopulate the bump cache
 	gBumpImageList.destroyGL();
 	gBumpImageList.restoreGL();
@@ -163,15 +159,7 @@ static bool handleSetShaderChanged(const LLSD& newvalue)
     if (gPipeline.isInit())
     {
         // ALM depends onto atmospheric shaders, state might have changed
-        bool old_state = LLPipeline::sRenderDeferred;
         LLPipeline::refreshCachedSettings();
-        gPipeline.updateRenderDeferred();
-        if (old_state != LLPipeline::sRenderDeferred)
-        {
-            gPipeline.releaseGLBuffers();
-            gPipeline.createGLBuffers();
-            gPipeline.resetVertexBuffers();
-        }
     }
 
 	// else, leave terrain detail as is
@@ -185,8 +173,7 @@ static bool handleRenderPerfTestChanged(const LLSD& newvalue)
        if (!status)
        {
                gPipeline.clearRenderTypeMask(LLPipeline::RENDER_TYPE_WL_SKY,
-                                                                         LLPipeline::RENDER_TYPE_GROUND,
-                                                                        LLPipeline::RENDER_TYPE_TERRAIN,
+                                                                         LLPipeline::RENDER_TYPE_TERRAIN,
                                                                          LLPipeline::RENDER_TYPE_GRASS,
                                                                          LLPipeline::RENDER_TYPE_TREE,
                                                                          LLPipeline::RENDER_TYPE_WATER,
@@ -200,7 +187,6 @@ static bool handleRenderPerfTestChanged(const LLSD& newvalue)
        else 
        {
                gPipeline.setRenderTypeMask(LLPipeline::RENDER_TYPE_WL_SKY,
-                                                                         LLPipeline::RENDER_TYPE_GROUND,
                                                                          LLPipeline::RENDER_TYPE_TERRAIN,
                                                                          LLPipeline::RENDER_TYPE_GRASS,
                                                                          LLPipeline::RENDER_TYPE_TREE,
@@ -218,17 +204,14 @@ static bool handleRenderPerfTestChanged(const LLSD& newvalue)
 
 bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
 {
-	LLRenderTarget::sUseFBO = newvalue.asBoolean();
 	if (gPipeline.isInit())
 	{
 		gPipeline.updateRenderTransparentWater();
-		gPipeline.updateRenderDeferred();
 		gPipeline.releaseGLBuffers();
 		gPipeline.createGLBuffers();
-		gPipeline.resetVertexBuffers();
 		LLViewerShaderMgr::instance()->setShaders();
 	}
-	LLWorld::getInstanceFast()->updateWaterObjects();
+	LLWorld::getInstance()->updateWaterObjects();
 	return true;
 }
 
@@ -265,14 +248,9 @@ static bool handleLUTBufferChanged(const LLSD& newvalue)
 	return true;
 }
 
-static bool handleAnisotropicFilteringChanged(LLControlVariable* ctrl, const LLSD& newval)
+static bool handleAnisotropicFilteringChanged(const LLSD& newval)
 {
 	F32 val = newval.asReal();
-	if (val > gGLManager.mGLMaxAnisotropy)
-	{
-		val = llclamp(val, 0.f, gGLManager.mGLMaxAnisotropy);
-		ctrl->setValue(val);
-	}
 	LLRender::sAnisotropicFilteringLevel = val;
 	LLImageGL::dirtyTexOptions();
 	return true;
@@ -282,6 +260,23 @@ static bool validateAnisotropicFiltering(const LLSD& val)
 {
 	F32 filter_level = val.asInteger();
 	return filter_level == 0 || filter_level == 2 || filter_level == 4 || filter_level == 8 || filter_level == 16;
+}
+
+static bool handleVSyncChanged(const LLSD& newvalue)
+{
+    LLPerfStats::tunables.vsyncEnabled = newvalue.asBoolean();
+    if (gViewerWindow && gViewerWindow->getWindow())
+    {
+        gViewerWindow->getWindow()->toggleVSync(newvalue.asBoolean());
+    }
+
+    if(newvalue.asBoolean() == true)
+    {
+        U32 current_target = gSavedSettings.getU32("TargetFPS");
+        gSavedSettings.setU32("TargetFPS", std::min((U32)gViewerWindow->getWindow()->getRefreshRate(), current_target));
+    }
+
+    return true;
 }
 
 static bool handleVolumeLODChanged(const LLSD& newvalue)
@@ -360,12 +355,6 @@ static bool handleMaxPartCountChanged(const LLSD& newvalue)
 	return true;
 }
 
-static bool handleVideoMemoryChanged(const LLSD& newvalue)
-{
-	gTextureList.updateMaxResidentTexMem(S32Megabytes(newvalue.asInteger()));
-	return true;
-}
-
 static bool handleChatFontSizeChanged(const LLSD& newvalue)
 {
 	if(gConsole)
@@ -410,7 +399,7 @@ static bool handleJoystickChanged(const LLSD& newvalue)
 
 static bool handleUseOcclusionChanged(const LLSD& newvalue)
 {
-	LLPipeline::sUseOcclusion = (newvalue.asBoolean() && gGLManager.mHasOcclusionQuery && LLGLSLShader::sNoFixedFunction
+	LLPipeline::sUseOcclusion = (newvalue.asBoolean()
 		&& LLFeatureManager::getInstance()->isFeatureAvailable("UseOcclusion") && !gUseWireframe) ? 2 : 0;
 	return true;
 }
@@ -427,15 +416,6 @@ static bool handleWLSkyDetailChanged(const LLSD&)
 	if (gSky.mVOWLSkyp.notNull())
 	{
 		gSky.mVOWLSkyp->updateGeometry(gSky.mVOWLSkyp->mDrawable);
-	}
-	return true;
-}
-
-static bool handleResetVertexBuffersChanged(const LLSD&)
-{
-	if (gPipeline.isInit())
-	{
-		gPipeline.resetVertexBuffers();
 	}
 	return true;
 }
@@ -457,54 +437,17 @@ static bool handleRenderDynamicLODChanged(const LLSD& newvalue)
 	return true;
 }
 
-static bool handleRenderLocalLightsChanged(const LLSD& newvalue)
+static bool handleReflectionProbeDetailChanged(const LLSD& newvalue)
 {
-	gPipeline.setLightingDetail(-1);
-	return true;
-}
-
-static bool handleRenderDeferredChanged(const LLSD& newvalue)
-{
-	LLRenderTarget::sUseFBO = newvalue.asBoolean();
-	if (gPipeline.isInit())
-	{
-		LLPipeline::refreshCachedSettings();
-		gPipeline.updateRenderDeferred();
-		gPipeline.releaseGLBuffers();
-		gPipeline.createGLBuffers();
-		gPipeline.resetVertexBuffers();
-		if (LLPipeline::sRenderDeferred == (BOOL)LLRenderTarget::sUseFBO)
-		{
-			LLViewerShaderMgr::instance()->setShaders();
-		}
-	}
-	return true;
-}
-
-// This looks a great deal like handleRenderDeferredChanged because
-// Advanced Lighting (Materials) implies bumps and shiny so disabling
-// bumps should further disable that feature.
-//
-static bool handleRenderBumpChanged(const LLSD& newval)
-{
-	LLRenderTarget::sUseFBO = newval.asBoolean();
-	if (gPipeline.isInit())
-	{
-		gPipeline.updateRenderBump();
-		gPipeline.updateRenderDeferred();
-		gPipeline.releaseGLBuffers();
-		gPipeline.createGLBuffers();
-		gPipeline.resetVertexBuffers();
-		LLViewerShaderMgr::instance()->setShaders();
-	}
-	return true;
-}
-
-static bool handleRenderDebugGLChanged(const LLSD& newvalue)
-{
-	gDebugGL = newvalue.asBoolean() || gDebugSession;
-	gGL.clearErrors();
-	return true;
+    if (gPipeline.isInit())
+    {
+        LLPipeline::refreshCachedSettings();
+        gPipeline.releaseGLBuffers();
+        gPipeline.createGLBuffers();
+        LLViewerShaderMgr::instance()->setShaders();
+        gPipeline.mReflectionMapManager.reset();
+    }
+    return true;
 }
 
 static bool handleRenderDebugPipelineChanged(const LLSD& newvalue)
@@ -513,14 +456,8 @@ static bool handleRenderDebugPipelineChanged(const LLSD& newvalue)
 	return true;
 }
 
-static bool validateRenderResolutionDivisor(const LLSD& newvalue)
+static bool handleRenderResolutionDivisorChanged(const LLSD&)
 {
-	return (newvalue.asReal() > 0.01f);
-}
-
-static bool handleRenderResolutionDivisorChanged(const LLSD& newvalue)
-{
-	LLPipeline::RenderResolutionMultiplier = llmin((F32)newvalue.asReal(), 0.01f);
 	gResizeScreenTexture = TRUE;
 	return true;
 }
@@ -652,7 +589,7 @@ bool toggle_show_navigation_panel(const LLSD& newvalue)
 
 	LLNavigationBar::getInstance()->setVisible(value);
 	gSavedSettings.setBOOL("ShowMiniLocationPanel", !value);
-
+    gViewerWindow->reshapeStatusBarContainer();
 	return true;
 }
 
@@ -672,175 +609,298 @@ bool toggle_show_object_render_cost(const LLSD& newvalue)
 	return true;
 }
 
-void handleRenderAutoMuteByteLimitChanged(const LLSD& new_value);
+void handleTargetFPSChanged(const LLSD& newValue)
+{
+    const auto targetFPS = gSavedSettings.getU32("TargetFPS");
+
+    U32 frame_rate_limit = gViewerWindow->getWindow()->getRefreshRate();
+    if(LLPerfStats::tunables.vsyncEnabled && (targetFPS > frame_rate_limit))
+    {
+        gSavedSettings.setU32("TargetFPS", std::min(frame_rate_limit, targetFPS));
+    }
+    else
+    {
+        LLPerfStats::tunables.userTargetFPS = targetFPS;
+    }
+}
+
+void handleAutoTuneLockChanged(const LLSD& newValue)
+{
+    const auto newval = gSavedSettings.getBOOL("AutoTuneLock");
+    LLPerfStats::tunables.userAutoTuneLock = newval;
+
+    gSavedSettings.setBOOL("AutoTuneFPS", newval);
+}
+
+void handleAutoTuneFPSChanged(const LLSD& newValue)
+{
+    const auto newval = gSavedSettings.getBOOL("AutoTuneFPS");
+    LLPerfStats::tunables.userAutoTuneEnabled = newval;
+    if(newval && LLPerfStats::renderAvatarMaxART_ns == 0) // If we've enabled autotune we override "unlimited" to max
+    {
+        gSavedSettings.setF32("RenderAvatarMaxART",log10(LLPerfStats::ART_UNLIMITED_NANOS-1000));//triggers callback to update static var
+    }
+}
+
+void handleRenderAvatarMaxARTChanged(const LLSD& newValue)
+{
+    LLPerfStats::tunables.updateRenderCostLimitFromSettings();
+}
+
+void handleUserTargetDrawDistanceChanged(const LLSD& newValue)
+{
+    const auto newval = gSavedSettings.getF32("AutoTuneRenderFarClipTarget");
+    LLPerfStats::tunables.userTargetDrawDistance = newval;
+}
+
+void handlePerformanceStatsEnabledChanged(const LLSD& newValue)
+{
+    const auto newval = gSavedSettings.getBOOL("PerfStatsCaptureEnabled");
+    LLPerfStats::StatsRecorder::setEnabled(newval);
+}
+void handleUserImpostorByDistEnabledChanged(const LLSD& newValue)
+{
+    const auto newval = gSavedSettings.getBOOL("AutoTuneImpostorByDistEnabled");
+    LLPerfStats::tunables.userImpostorDistanceTuningEnabled = newval;
+}
+void handleUserImpostorDistanceChanged(const LLSD& newValue)
+{
+    const auto newval = gSavedSettings.getF32("AutoTuneImpostorFarAwayDistance");
+    LLPerfStats::tunables.userImpostorDistance = newval;
+}
+void handleFPSTuningStrategyChanged(const LLSD& newValue)
+{
+    const auto newval = gSavedSettings.getU32("TuningFPSStrategy");
+    LLPerfStats::tunables.userFPSTuningStrategy = newval;
+}
+
+void handleNameTagOptionChanged(const LLSD& newvalue)
+{
+    LLAvatarNameCache::getInstance()->setUseUsernames(gSavedSettings.getBOOL("NameTagShowUsernames"));
+    LLVOAvatar::invalidateNameTags();
+}
+
+void handleDisplayNamesOptionChanged(const LLSD& newvalue)
+{
+    LLAvatarNameCache::getInstance()->setUseDisplayNames(newvalue.asBoolean());
+    LLVOAvatar::invalidateNameTags();
+}
+
+void handleAppearanceCameraMovementChanged(const LLSD& newvalue)
+{
+    if (!newvalue.asBoolean() && gAgentCamera.getCameraMode() == CAMERA_MODE_CUSTOMIZE_AVATAR)
+    {
+        gAgentCamera.changeCameraToDefault();
+        gAgentCamera.resetView();
+    }
+}
+
+void handleRenderHiddenSelection(const LLSD& newvalue)
+{
+    LLSelectMgr::sRenderHiddenSelections = newvalue.asBoolean();
+}
 ////////////////////////////////////////////////////////////////////////////
+
+LLPointer<LLControlVariable> setting_get_control(LLControlGroup& group, const std::string& setting)
+{
+    LLPointer<LLControlVariable> cntrl_ptr = group.getControl(setting);
+    if (cntrl_ptr.isNull())
+    {
+        LL_ERRS() << "Unable to set up setting listener for " << setting
+            << ". Please reinstall viewer from  https ://secondlife.com/support/downloads/ and contact https://support.secondlife.com if issue persists after reinstall."
+            << LL_ENDL;
+    }
+    return cntrl_ptr;
+}
+
+void setting_setup_signal_listener(LLControlGroup& group, const std::string& setting, std::function<void(const LLSD& newvalue)> callback)
+{
+    setting_get_control(group, setting)->getSignal()->connect([callback](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+    {
+        callback(new_val);
+    });
+}
+
+void setting_setup_signal_listener(LLControlGroup& group, const std::string& setting, std::function<void()> callback)
+{
+    setting_get_control(group, setting)->getSignal()->connect([callback](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val)
+    {
+        callback();
+    });
+}
 
 void settings_setup_listeners()
 {
-	gSavedSettings.getControl("FirstPersonAvatarVisible")->getSignal()->connect(boost::bind(&handleRenderAvatarMouselookChanged, _2));
-	gSavedSettings.getControl("RenderFarClip")->getSignal()->connect(boost::bind(&handleRenderFarClipChanged, _2));
-	gSavedSettings.getControl("RenderTerrainDetail")->getSignal()->connect(boost::bind(&handleTerrainDetailChanged, _2));
-	gSavedSettings.getControl("OctreeStaticObjectSizeFactor")->getSignal()->connect(boost::bind(&handleRepartition, _2));
-	gSavedSettings.getControl("OctreeDistanceFactor")->getSignal()->connect(boost::bind(&handleRepartition, _2));
-	gSavedSettings.getControl("OctreeMaxNodeCapacity")->getSignal()->connect(boost::bind(&handleRepartition, _2));
-	gSavedSettings.getControl("OctreeAlphaDistanceFactor")->getSignal()->connect(boost::bind(&handleRepartition, _2));
-	gSavedSettings.getControl("OctreeAttachmentSizeFactor")->getSignal()->connect(boost::bind(&handleRepartition, _2));
-	gSavedSettings.getControl("RenderMaxTextureIndex")->getSignal()->connect(boost::bind(&handleSetShaderChanged, _2));
-	gSavedSettings.getControl("RenderUseTriStrips")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderAvatarVP")->getSignal()->connect(boost::bind(&handleSetShaderChanged, _2));
-	gSavedSettings.getControl("RenderUIBuffer")->getSignal()->connect(boost::bind(&handleWindowResized, _2));
-	gSavedSettings.getControl("RenderDepthOfField")->getSignal()->connect(boost::bind(&handleReleaseGLBufferChanged, _2));
-	gSavedSettings.getControl("RenderFSAASamples")->getSignal()->connect(boost::bind(&handleReleaseGLBufferChanged, _2));
-	gSavedSettings.getControl("RenderSpecularResX")->getSignal()->connect(boost::bind(&handleLUTBufferChanged, _2));
-	gSavedSettings.getControl("RenderSpecularResY")->getSignal()->connect(boost::bind(&handleLUTBufferChanged, _2));
-	gSavedSettings.getControl("RenderSpecularExponent")->getSignal()->connect(boost::bind(&handleLUTBufferChanged, _2));
-	gSavedSettings.getControl("RenderShadowResolutionScale")->getSignal()->connect(boost::bind(&handleShadowsResized, _2));
-	gSavedSettings.getControl("RenderGlow")->getSignal()->connect(boost::bind(&handleReleaseGLBufferChanged, _2));
-	gSavedSettings.getControl("RenderGlow")->getSignal()->connect(boost::bind(&handleSetShaderChanged, _2));
-	gSavedSettings.getControl("RenderGlowResolutionPow")->getSignal()->connect(boost::bind(&handleReleaseGLBufferChanged, _2));
-	gSavedSettings.getControl("RenderAvatarCloth")->getSignal()->connect(boost::bind(&handleSetShaderChanged, _2));
-	gSavedSettings.getControl("WindLightUseAtmosShaders")->getSignal()->connect(boost::bind(&handleSetShaderChanged, _2));
-	gSavedSettings.getControl("RenderGammaFull")->getSignal()->connect(boost::bind(&handleSetShaderChanged, _2));
-	gSavedSettings.getControl("RenderVolumeLODFactor")->getSignal()->connect(boost::bind(&handleVolumeLODChanged, _2));
-	gSavedSettings.getControl("RenderAvatarLODFactor")->getSignal()->connect(boost::bind(&handleAvatarLODChanged, _2));
-	gSavedSettings.getControl("RenderAvatarPhysicsLODFactor")->getSignal()->connect(boost::bind(&handleAvatarPhysicsLODChanged, _2));
-	gSavedSettings.getControl("RenderTerrainLODFactor")->getSignal()->connect(boost::bind(&handleTerrainLODChanged, _2));
-	gSavedSettings.getControl("RenderTreeLODFactor")->getSignal()->connect(boost::bind(&handleTreeLODChanged, _2));
-	gSavedSettings.getControl("RenderFlexTimeFactor")->getSignal()->connect(boost::bind(&handleFlexLODChanged, _2));
-	gSavedSettings.getControl("RenderGamma")->getSignal()->connect(boost::bind(&handleGammaChanged, _2));
-	gSavedSettings.getControl("RenderFogRatio")->getSignal()->connect(boost::bind(&handleFogRatioChanged, _2));
-	gSavedSettings.getControl("RenderMaxPartCount")->getSignal()->connect(boost::bind(&handleMaxPartCountChanged, _2));
-	gSavedSettings.getControl("RenderDynamicLOD")->getSignal()->connect(boost::bind(&handleRenderDynamicLODChanged, _2));
-	gSavedSettings.getControl("RenderLocalLights")->getSignal()->connect(boost::bind(&handleRenderLocalLightsChanged, _2));
-	gSavedSettings.getControl("RenderDebugTextureBind")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderAutoMaskAlphaDeferred")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderAutoMaskAlphaNonDeferred")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderAutoMaskAlphaUseRMSE")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderAutoMaskAlphaMaxRMSE")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderAutoMaskAlphaMaxMid")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderObjectBump")->getSignal()->connect(boost::bind(&handleRenderBumpChanged, _2));
-	gSavedSettings.getControl("RenderMaxVBOSize")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderDeferredNoise")->getSignal()->connect(boost::bind(&handleReleaseGLBufferChanged, _2));
-	gSavedSettings.getControl("RenderDebugGL")->getSignal()->connect(boost::bind(&handleRenderDebugGLChanged, _2));
-	gSavedSettings.getControl("RenderDebugPipeline")->getSignal()->connect(boost::bind(&handleRenderDebugPipelineChanged, _2));
-	gSavedSettings.getControl("RenderResolutionDivisor")->getValidateSignal()->connect(boost::bind(&validateRenderResolutionDivisor, _2));
-	gSavedSettings.getControl("RenderResolutionDivisor")->getSignal()->connect(boost::bind(&handleRenderResolutionDivisorChanged, _2));
+    setting_setup_signal_listener(gSavedSettings, "FirstPersonAvatarVisible", handleRenderAvatarMouselookChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderFarClip", handleRenderFarClipChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderTerrainDetail", handleTerrainDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);
+    setting_setup_signal_listener(gSavedSettings, "OctreeDistanceFactor", handleRepartition);
+    setting_setup_signal_listener(gSavedSettings, "OctreeMaxNodeCapacity", handleRepartition);
+    setting_setup_signal_listener(gSavedSettings, "OctreeAlphaDistanceFactor", handleRepartition);
+    setting_setup_signal_listener(gSavedSettings, "OctreeAttachmentSizeFactor", handleRepartition);
+    setting_setup_signal_listener(gSavedSettings, "RenderMaxTextureIndex", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderUIBuffer", handleWindowResized);
+    setting_setup_signal_listener(gSavedSettings, "RenderDepthOfField", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderFSAASamples", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderPostProcessingHDR", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSpecularResX", handleLUTBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSpecularResY", handleLUTBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleLUTBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleShadowsResized);
+    setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGlowResolutionPow", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGlowHDR", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGlowNoise", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGammaFull", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderVolumeLODFactor", handleVolumeLODChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderAvatarLODFactor", handleAvatarLODChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderAvatarPhysicsLODFactor", handleAvatarPhysicsLODChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderTerrainLODFactor", handleTerrainLODChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderTreeLODFactor", handleTreeLODChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderFlexTimeFactor", handleFlexLODChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderGamma", handleGammaChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderFogRatio", handleFogRatioChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderMaxPartCount", handleMaxPartCountChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderDynamicLOD", handleRenderDynamicLODChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaUseRMSE", handleSetShaderChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxRMSE", handleSetShaderChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAutoMaskAlphaMaxMid", handleSetShaderChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderVSyncEnable", handleVSyncChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleReleaseGLBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-	gSavedSettings.getControl("RenderResolutionMultiplier")->getSignal()->connect(boost::bind(&handleRenderResolutionDivisorChanged, _2));
+	setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);
 // [/SL:KB]
-	gSavedSettings.getControl("RenderWaterRefResolution")->getSignal()->connect(boost::bind(&handleReleaseGLBufferChanged, _2));
-	gSavedSettings.getControl("RenderDeferred")->getSignal()->connect(boost::bind(&handleRenderDeferredChanged, _2));
-	gSavedSettings.getControl("RenderShadowDetail")->getSignal()->connect(boost::bind(&handleSetShaderChanged, _2));
-	gSavedSettings.getControl("RenderDeferredSSAO")->getSignal()->connect(boost::bind(&handleSetShaderChanged, _2));
-	gSavedSettings.getControl("RenderPerformanceTest")->getSignal()->connect(boost::bind(&handleRenderPerfTestChanged, _2));
-	gSavedSettings.getControl("TextureMemory")->getSignal()->connect(boost::bind(&handleVideoMemoryChanged, _2));
-	gSavedSettings.getControl("ChatFontSize")->getSignal()->connect(boost::bind(&handleChatFontSizeChanged, _2));
-	gSavedSettings.getControl("ChatPersistTime")->getSignal()->connect(boost::bind(&handleChatPersistTimeChanged, _2));
-	gSavedSettings.getControl("ConsoleMaxLines")->getSignal()->connect(boost::bind(&handleConsoleMaxLinesChanged, _2));
-	gSavedSettings.getControl("UploadBakedTexOld")->getSignal()->connect(boost::bind(&handleUploadBakedTexOldChanged, _2));
-	gSavedSettings.getControl("UseOcclusion")->getSignal()->connect(boost::bind(&handleUseOcclusionChanged, _2));
-	gSavedSettings.getControl("AudioLevelMaster")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("AudioLevelSFX")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("AudioLevelUI")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("AudioLevelAmbient")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("AudioLevelMusic")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("AudioLevelMedia")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("AudioLevelVoice")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("AudioLevelDoppler")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("AudioLevelRolloff")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("AudioLevelUnderwaterRolloff")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("MuteAudio")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("MuteMusic")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("MuteMedia")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("MuteVoice")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("MuteAmbient")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("MuteUI")->getSignal()->connect(boost::bind(&handleAudioVolumeChanged, _2));
-	gSavedSettings.getControl("RenderVBOEnable")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderUseVAO")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderVBOMappingDisable")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderUseStreamVBO")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("RenderPreferStreamDraw")->getSignal()->connect(boost::bind(&handleResetVertexBuffersChanged, _2));
-	gSavedSettings.getControl("WLSkyDetail")->getSignal()->connect(boost::bind(&handleWLSkyDetailChanged, _2));
-	gSavedSettings.getControl("JoystickAxis0")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("JoystickAxis1")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("JoystickAxis2")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("JoystickAxis3")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("JoystickAxis4")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("JoystickAxis5")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("JoystickAxis6")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisScale0")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisScale1")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisScale2")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisScale3")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisScale4")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisScale5")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisScale6")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisDeadZone0")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisDeadZone1")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisDeadZone2")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisDeadZone3")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisDeadZone4")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisDeadZone5")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("FlycamAxisDeadZone6")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisScale0")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisScale1")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisScale2")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisScale3")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisScale4")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisScale5")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisDeadZone0")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisDeadZone1")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisDeadZone2")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisDeadZone3")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisDeadZone4")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("AvatarAxisDeadZone5")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisScale0")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisScale1")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisScale2")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisScale3")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisScale4")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisScale5")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisDeadZone0")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisDeadZone1")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisDeadZone2")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisDeadZone3")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisDeadZone4")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("BuildAxisDeadZone5")->getSignal()->connect(boost::bind(&handleJoystickChanged, _2));
-	gSavedSettings.getControl("DebugViews")->getSignal()->connect(boost::bind(&handleDebugViewsChanged, _2));
-	gSavedSettings.getControl("UserLogFile")->getSignal()->connect(boost::bind(&handleLogFileChanged, _2));
-	gSavedSettings.getControl("RenderHideGroupTitle")->getSignal()->connect(boost::bind(handleHideGroupTitleChanged, _2));
-	gSavedSettings.getControl("HighResSnapshot")->getSignal()->connect(boost::bind(handleHighResSnapshotChanged, _2));
-	gSavedSettings.getControl("EnableVoiceChat")->getSignal()->connect(boost::bind(&handleVoiceClientPrefsChanged, _2));
-	gSavedSettings.getControl("PTTCurrentlyEnabled")->getSignal()->connect(boost::bind(&handleVoiceClientPrefsChanged, _2));
-	gSavedSettings.getControl("PushToTalkButton")->getSignal()->connect(boost::bind(&handleVoiceClientPrefsChanged, _2));
-	gSavedSettings.getControl("PushToTalkToggle")->getSignal()->connect(boost::bind(&handleVoiceClientPrefsChanged, _2));
-	gSavedSettings.getControl("VoiceEarLocation")->getSignal()->connect(boost::bind(&handleVoiceClientPrefsChanged, _2));
-	gSavedSettings.getControl("VoiceInputAudioDevice")->getSignal()->connect(boost::bind(&handleVoiceClientPrefsChanged, _2));
-	gSavedSettings.getControl("VoiceOutputAudioDevice")->getSignal()->connect(boost::bind(&handleVoiceClientPrefsChanged, _2));
-	gSavedSettings.getControl("AudioLevelMic")->getSignal()->connect(boost::bind(&handleVoiceClientPrefsChanged, _2));
-	gSavedSettings.getControl("LipSyncEnabled")->getSignal()->connect(boost::bind(&handleVoiceClientPrefsChanged, _2));	
-	gSavedSettings.getControl("VelocityInterpolate")->getSignal()->connect(boost::bind(&handleVelocityInterpolate, _2));
-	gSavedSettings.getControl("QAMode")->getSignal()->connect(boost::bind(&show_debug_menus));
-	gSavedSettings.getControl("UseDebugMenus")->getSignal()->connect(boost::bind(&show_debug_menus));
-	gSavedSettings.getControl("AgentPause")->getSignal()->connect(boost::bind(&toggle_agent_pause, _2));
-	gSavedSettings.getControl("ShowNavbarNavigationPanel")->getSignal()->connect(boost::bind(&toggle_show_navigation_panel, _2));
-	gSavedSettings.getControl("ShowMiniLocationPanel")->getSignal()->connect(boost::bind(&toggle_show_mini_location_panel, _2));
-	gSavedSettings.getControl("ShowObjectRenderingCost")->getSignal()->connect(boost::bind(&toggle_show_object_render_cost, _2));
-	gSavedSettings.getControl("ForceShowGrid")->getSignal()->connect(boost::bind(&handleForceShowGrid, _2));
-	gSavedSettings.getControl("RenderTransparentWater")->getSignal()->connect(boost::bind(&handleRenderTransparentWaterChanged, _2));
-	gSavedSettings.getControl("SpellCheck")->getSignal()->connect(boost::bind(&handleSpellCheckChanged));
-	gSavedSettings.getControl("SpellCheckDictionary")->getSignal()->connect(boost::bind(&handleSpellCheckChanged));
-	gSavedSettings.getControl("LoginLocation")->getSignal()->connect(boost::bind(&handleLoginLocationChanged));
-	gSavedSettings.getControl("DebugAvatarJoints")->getCommitSignal()->connect(boost::bind(&handleDebugAvatarJointsChanged, _2));
-	gSavedSettings.getControl("RenderAutoMuteByteLimit")->getSignal()->connect(boost::bind(&handleRenderAutoMuteByteLimitChanged, _2));
-	gSavedPerAccountSettings.getControl("AvatarHoverOffsetZ")->getCommitSignal()->connect(boost::bind(&handleAvatarHoverOffsetChanged, _2));
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderShaderCacheEnabled", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
+    setting_setup_signal_listener(gSavedSettings, "ChatFontName", handleChatFontSizeChanged);
+    setting_setup_signal_listener(gSavedSettings, "ChatFontSize", handleChatFontSizeChanged);
+    setting_setup_signal_listener(gSavedSettings, "ChatPersistTime", handleChatPersistTimeChanged);
+    setting_setup_signal_listener(gSavedSettings, "ConsoleMaxLines", handleConsoleMaxLinesChanged);
+    setting_setup_signal_listener(gSavedSettings, "UploadBakedTexOld", handleUploadBakedTexOldChanged);
+    setting_setup_signal_listener(gSavedSettings, "UseOcclusion", handleUseOcclusionChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelMaster", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelSFX", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelUI", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelAmbient", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelMusic", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelMedia", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelVoice", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelDoppler", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelRolloff", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelUnderwaterRolloff", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "MuteAudio", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "MuteMusic", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "MuteMedia", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "MuteVoice", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "MuteAmbient", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "MuteUI", handleAudioVolumeChanged);
+    setting_setup_signal_listener(gSavedSettings, "WLSkyDetail", handleWLSkyDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "JoystickAxis0", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "JoystickAxis1", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "JoystickAxis2", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "JoystickAxis3", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "JoystickAxis4", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "JoystickAxis5", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "JoystickAxis6", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisScale0", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisScale1", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisScale2", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisScale3", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisScale4", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisScale5", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisScale6", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisDeadZone0", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisDeadZone1", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisDeadZone2", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisDeadZone3", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisDeadZone4", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisDeadZone5", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "FlycamAxisDeadZone6", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisScale0", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisScale1", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisScale2", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisScale3", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisScale4", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisScale5", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisDeadZone0", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisDeadZone1", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisDeadZone2", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisDeadZone3", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisDeadZone4", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "AvatarAxisDeadZone5", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisScale0", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisScale1", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisScale2", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisScale3", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisScale4", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisScale5", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisDeadZone0", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisDeadZone1", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisDeadZone2", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisDeadZone3", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisDeadZone4", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "BuildAxisDeadZone5", handleJoystickChanged);
+    setting_setup_signal_listener(gSavedSettings, "DebugViews", handleDebugViewsChanged);
+    setting_setup_signal_listener(gSavedSettings, "UserLogFile", handleLogFileChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderHideGroupTitle", handleHideGroupTitleChanged);
+    setting_setup_signal_listener(gSavedSettings, "HighResSnapshot", handleHighResSnapshotChanged);
+    setting_setup_signal_listener(gSavedSettings, "EnableVoiceChat", handleVoiceClientPrefsChanged);
+    setting_setup_signal_listener(gSavedSettings, "PTTCurrentlyEnabled", handleVoiceClientPrefsChanged);
+    setting_setup_signal_listener(gSavedSettings, "PushToTalkButton", handleVoiceClientPrefsChanged);
+    setting_setup_signal_listener(gSavedSettings, "PushToTalkToggle", handleVoiceClientPrefsChanged);
+    setting_setup_signal_listener(gSavedSettings, "VoiceEarLocation", handleVoiceClientPrefsChanged);
+    setting_setup_signal_listener(gSavedSettings, "VoiceInputAudioDevice", handleVoiceClientPrefsChanged);
+    setting_setup_signal_listener(gSavedSettings, "VoiceOutputAudioDevice", handleVoiceClientPrefsChanged);
+    setting_setup_signal_listener(gSavedSettings, "AudioLevelMic", handleVoiceClientPrefsChanged);
+    setting_setup_signal_listener(gSavedSettings, "LipSyncEnabled", handleVoiceClientPrefsChanged);	
+    setting_setup_signal_listener(gSavedSettings, "VelocityInterpolate", handleVelocityInterpolate);
+    setting_setup_signal_listener(gSavedSettings, "QAMode", show_debug_menus);
+    setting_setup_signal_listener(gSavedSettings, "UseDebugMenus", show_debug_menus);
+    setting_setup_signal_listener(gSavedSettings, "AgentPause", toggle_agent_pause);
+    setting_setup_signal_listener(gSavedSettings, "ShowNavbarNavigationPanel", toggle_show_navigation_panel);
+    setting_setup_signal_listener(gSavedSettings, "ShowMiniLocationPanel", toggle_show_mini_location_panel);
+    setting_setup_signal_listener(gSavedSettings, "ShowObjectRenderingCost", toggle_show_object_render_cost);
+    setting_setup_signal_listener(gSavedSettings, "ForceShowGrid", handleForceShowGrid);
+    setting_setup_signal_listener(gSavedSettings, "RenderTransparentWater", handleRenderTransparentWaterChanged);
+    setting_setup_signal_listener(gSavedSettings, "SpellCheck", handleSpellCheckChanged);
+    setting_setup_signal_listener(gSavedSettings, "SpellCheckDictionary", handleSpellCheckChanged);
+    setting_setup_signal_listener(gSavedSettings, "LoginLocation", handleLoginLocationChanged);
+    setting_setup_signal_listener(gSavedSettings, "DebugAvatarJoints", handleDebugAvatarJointsChanged);
+
+    setting_setup_signal_listener(gSavedSettings, "TargetFPS", handleTargetFPSChanged);
+    setting_setup_signal_listener(gSavedSettings, "AutoTuneFPS", handleAutoTuneFPSChanged);
+    setting_setup_signal_listener(gSavedSettings, "AutoTuneLock", handleAutoTuneLockChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderAvatarMaxART", handleRenderAvatarMaxARTChanged);
+    setting_setup_signal_listener(gSavedSettings, "PerfStatsCaptureEnabled", handlePerformanceStatsEnabledChanged);
+    setting_setup_signal_listener(gSavedSettings, "AutoTuneRenderFarClipTarget", handleUserTargetDrawDistanceChanged);
+    setting_setup_signal_listener(gSavedSettings, "AutoTuneImpostorFarAwayDistance", handleUserImpostorDistanceChanged);
+    setting_setup_signal_listener(gSavedSettings, "AutoTuneImpostorByDistEnabled", handleUserImpostorByDistEnabledChanged);
+    setting_setup_signal_listener(gSavedSettings, "TuningFPSStrategy", handleFPSTuningStrategyChanged);
+
+    setting_setup_signal_listener(gSavedPerAccountSettings, "AvatarHoverOffsetZ", handleAvatarHoverOffsetChanged);
 // [RLVa:KB] - Checked: 2015-12-27 (RLVa-1.5.0)
-	gSavedSettings.getControl(RlvSettingNames::Main)->getSignal()->connect(boost::bind(&RlvSettings::onChangedSettingMain, _2));
+	setting_setup_signal_listener(gSavedSettings, std::string(RlvSettingNames::Main), RlvSettings::onChangedSettingMain);
 // [/RLVa:KB]
-	gSavedSettings.getControl("AlchemyHudTextFadeDistance")->getSignal()->connect(boost::bind(&LLHUDText::onFadeSettingsChanged));
-	gSavedSettings.getControl("AlchemyHudTextFadeRange")->getSignal()->connect(boost::bind(&LLHUDText::onFadeSettingsChanged));
-	gSavedSettings.getControl("RenderAnisotropicLevel")->getSignal()->connect(boost::bind(&handleAnisotropicFilteringChanged, _1, _2));
-	gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
+	setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeDistance", LLHUDText::onFadeSettingsChanged);
+	setting_setup_signal_listener(gSavedSettings, "AlchemyHudTextFadeRange", LLHUDText::onFadeSettingsChanged);
+	setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
+    gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
+
+    setting_setup_signal_listener(gSavedSettings, "NameTagShowUsernames", handleNameTagOptionChanged);
+    setting_setup_signal_listener(gSavedSettings, "NameTagShowFriends", handleNameTagOptionChanged);
+    setting_setup_signal_listener(gSavedSettings, "UseDisplayNames", handleDisplayNamesOptionChanged);
+    setting_setup_signal_listener(gSavedSettings, "AppearanceCameraMovement", handleAppearanceCameraMovementChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderHiddenSelections", handleRenderHiddenSelection);
 }
 
 #if TEST_CACHED_CONTROL

@@ -96,10 +96,8 @@ void LLTexLayerParamAlpha::getCacheByteCount(S32* gl_bytes)
 {
 	*gl_bytes = 0;
 
-	for (param_alpha_ptr_list_t::iterator iter = sInstances.begin();
-		 iter != sInstances.end(); iter++)
+	for (LLTexLayerParamAlpha* instance : sInstances)
 	{
-		LLTexLayerParamAlpha* instance = *iter;
 		LLGLTexture* tex = instance->mCachedProcessedTexture;
 		if (tex)
 		{
@@ -144,7 +142,7 @@ LLTexLayerParamAlpha::LLTexLayerParamAlpha(const LLTexLayerParamAlpha& pOther)
 	mCachedProcessedTexture(pOther.mCachedProcessedTexture),
 	mStaticImageTGA(pOther.mStaticImageTGA),
 	mStaticImageRaw(pOther.mStaticImageRaw),
-	mNeedsCreateTexture(pOther.mNeedsCreateTexture),
+	mNeedsCreateTexture(pOther.mNeedsCreateTexture.load()),
 	mStaticImageInvalid(pOther.mStaticImageInvalid),
 	mAvgDistortionVec(pOther.mAvgDistortionVec),
 	mCachedEffectiveWeight(pOther.mCachedEffectiveWeight)
@@ -176,7 +174,7 @@ BOOL LLTexLayerParamAlpha::getMultiplyBlend() const
 	return ((LLTexLayerParamAlphaInfo *)getInfo())->mMultiplyBlend; 	
 }
 
-void LLTexLayerParamAlpha::setWeight(F32 weight)
+void LLTexLayerParamAlpha::setWeight(F32 weight, bool upload_bake)
 {
 	if (mIsAnimating || mTexLayer == NULL)
 	{
@@ -194,35 +192,35 @@ void LLTexLayerParamAlpha::setWeight(F32 weight)
 		if ((mAvatarAppearance->getSex() & getSex()) &&
 			(mAvatarAppearance->isSelf() && !mIsDummy)) // only trigger a baked texture update if we're changing a wearable's visual param.
 		{
-			mAvatarAppearance->invalidateComposite(mTexLayer->getTexLayerSet());
+			mAvatarAppearance->invalidateComposite(mTexLayer->getTexLayerSet(), upload_bake);
 			mTexLayer->invalidateMorphMasks();
 		}
 	}
 }
 
-void LLTexLayerParamAlpha::setAnimationTarget(F32 target_value)
+void LLTexLayerParamAlpha::setAnimationTarget(F32 target_value, bool upload_bake)
 { 
 	// do not animate dummy parameters
 	if (mIsDummy)
 	{
-		setWeight(target_value);
+		setWeight(target_value, upload_bake);
 		return;
 	}
 
 	mTargetWeight = target_value; 
-	setWeight(target_value); 
+	setWeight(target_value, upload_bake); 
 	mIsAnimating = TRUE;
 	if (mNext)
 	{
-		mNext->setAnimationTarget(target_value);
+		mNext->setAnimationTarget(target_value, upload_bake);
 	}
 }
 
-void LLTexLayerParamAlpha::animate(F32 delta)
+void LLTexLayerParamAlpha::animate(F32 delta, bool upload_bake)
 {
 	if (mNext)
 	{
-		mNext->animate(delta);
+		mNext->animate(delta, upload_bake);
 	}
 }
 
@@ -254,10 +252,9 @@ BOOL LLTexLayerParamAlpha::getSkip() const
 }
 
 
-static LLTrace::BlockTimerStatHandle FTM_TEX_LAYER_PARAM_ALPHA("alpha render");
 BOOL LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
 {
-	LL_RECORD_BLOCK_TIME(FTM_TEX_LAYER_PARAM_ALPHA);
+    LL_PROFILE_ZONE_SCOPED;
 	BOOL success = TRUE;
 
 	if (!mTexLayer)
@@ -288,7 +285,7 @@ BOOL LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
 		if (mStaticImageTGA.isNull())
 		{
 			// Don't load the image file until we actually need it the first time.  Like now.
-			mStaticImageTGA = LLTexLayerStaticImageList::getInstanceFast()->getImageTGA(info->mStaticImageFileName);
+			mStaticImageTGA = LLTexLayerStaticImageList::getInstance()->getImageTGA(info->mStaticImageFileName);
 			// We now have something in one of our caches
 			LLTexLayerSet::sHasCaches |= mStaticImageTGA.notNull() ? TRUE : FALSE;
 
@@ -324,8 +321,10 @@ BOOL LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
 			mStaticImageRaw = NULL;
 			mStaticImageRaw = new LLImageRaw;
 			mStaticImageTGA->decodeAndProcess(mStaticImageRaw, info->mDomain, effective_weight);
-			mNeedsCreateTexture = TRUE;			
+			mNeedsCreateTexture = TRUE;
+#ifdef SHOW_DEBUG
 			LL_DEBUGS() << "Built Cached Alpha: " << info->mStaticImageFileName << ": (" << mStaticImageRaw->getWidth() << ", " << mStaticImageRaw->getHeight() << ") " << "Domain: " << info->mDomain << " Weight: " << effective_weight << LL_ENDL;
+#endif
 		}
 
 		if (mCachedProcessedTexture)
@@ -340,7 +339,6 @@ BOOL LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
 					mCachedProcessedTexture->setAddressMode(LLTexUnit::TAM_CLAMP);
 				}
 
-				LLGLSNoAlphaTest gls_no_alpha_test;
 				gGL.getTexUnit(0)->bind(mCachedProcessedTexture);
 				gl_rect_2d_simple_tex(width, height);
 				gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
@@ -357,7 +355,6 @@ BOOL LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
 	}
 	else
 	{
-		LLGLDisable no_alpha(GL_ALPHA_TEST);
 		gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 		gGL.color4f(0.f, 0.f, 0.f, effective_weight);
 		gl_rect_2d_simple(width, height);
@@ -460,7 +457,7 @@ LLColor4 LLTexLayerParamColor::getNetColor() const
 }
 
 
-void LLTexLayerParamColor::setWeight(F32 weight)
+void LLTexLayerParamColor::setWeight(F32 weight, bool upload_bake)
 {
 	if (mIsAnimating)
 	{
@@ -486,10 +483,10 @@ void LLTexLayerParamColor::setWeight(F32 weight)
 
 		if ((mAvatarAppearance->getSex() & getSex()) && (mAvatarAppearance->isSelf() && !mIsDummy)) // only trigger a baked texture update if we're changing a wearable's visual param.
 		{
-			onGlobalColorChanged();
+			onGlobalColorChanged(upload_bake);
 			if (mTexLayer)
 			{
-				mAvatarAppearance->invalidateComposite(mTexLayer->getTexLayerSet());
+				mAvatarAppearance->invalidateComposite(mTexLayer->getTexLayerSet(), upload_bake);
 			}
 		}
 
@@ -497,23 +494,23 @@ void LLTexLayerParamColor::setWeight(F32 weight)
 	}
 }
 
-void LLTexLayerParamColor::setAnimationTarget(F32 target_value)
+void LLTexLayerParamColor::setAnimationTarget(F32 target_value, bool upload_bake)
 { 
 	// set value first then set interpolating flag to ignore further updates
 	mTargetWeight = target_value; 
-	setWeight(target_value);
+	setWeight(target_value, upload_bake);
 	mIsAnimating = TRUE;
 	if (mNext)
 	{
-		mNext->setAnimationTarget(target_value);
+		mNext->setAnimationTarget(target_value, upload_bake);
 	}
 }
 
-void LLTexLayerParamColor::animate(F32 delta)
+void LLTexLayerParamColor::animate(F32 delta, bool upload_bake)
 {
 	if (mNext)
 	{
-		mNext->animate(delta);
+		mNext->animate(delta, upload_bake);
 	}
 }
 

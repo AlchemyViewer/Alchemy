@@ -90,6 +90,8 @@ LLLayoutPanel::~LLLayoutPanel()
 	// probably not necessary, but...
 	delete mResizeBar;
 	mResizeBar = NULL;
+
+    gFocusMgr.removeKeyboardFocusWithoutCallback(this);
 }
 
 F32 LLLayoutPanel::getAutoResizeFactor() const
@@ -210,12 +212,13 @@ LLLayoutStack::Params::Params()
 	open_time_constant("open_time_constant", 0.02f),
 	close_time_constant("close_time_constant", 0.03f),
 	resize_bar_overlap("resize_bar_overlap", 1),
-	border_size("border_size", LLUI::getInstanceFast()->mSettingGroups["config"]->getS32("UIResizeBarHeight")),
+	border_size("border_size", LLUI::getInstance()->mSettingGroups["config"]->getS32("UIResizeBarHeight")),
 	show_drag_handle("show_drag_handle", false),
 	drag_handle_first_indent("drag_handle_first_indent", 0),
 	drag_handle_second_indent("drag_handle_second_indent", 0),
 	drag_handle_thickness("drag_handle_thickness", 5),
-	drag_handle_shift("drag_handle_shift", 2)
+	drag_handle_shift("drag_handle_shift", 2),
+    drag_handle_color("drag_handle_color", LLUIColorTable::instance().getColor("ResizebarBody"))
 {
 	addSynonym(border_size, "drag_handle_gap");
 }
@@ -235,7 +238,8 @@ LLLayoutStack::LLLayoutStack(const LLLayoutStack::Params& p)
 	mDragHandleFirstIndent(p.drag_handle_first_indent),
 	mDragHandleSecondIndent(p.drag_handle_second_indent),
 	mDragHandleThickness(p.drag_handle_thickness),
-	mDragHandleShift(p.drag_handle_shift)
+	mDragHandleShift(p.drag_handle_shift),
+    mDragHandleColor(p.drag_handle_color())
 {
 }
 
@@ -283,6 +287,17 @@ void LLLayoutStack::draw()
 	}
 }
 
+void LLLayoutStack::deleteAllChildren()
+{
+    mPanels.clear();
+    LLView::deleteAllChildren();
+
+    // Not really needed since nothing is left to
+    // display, but for the sake of consistency
+    updateFractionalSizes();
+    mNeedsLayout = true;
+}
+
 void LLLayoutStack::removeChild(LLView* view)
 {
 	LLLayoutPanel* embedded_panelp = findEmbeddedPanel(dynamic_cast<LLPanel*>(view));
@@ -290,12 +305,14 @@ void LLLayoutStack::removeChild(LLView* view)
 	if (embedded_panelp)
 	{
 		mPanels.erase(std::find(mPanels.begin(), mPanels.end(), embedded_panelp));
-		delete embedded_panelp;
+        LLView::removeChild(view);
 		updateFractionalSizes();
 		mNeedsLayout = true;
 	}
-
-	LLView::removeChild(view);
+    else
+    {
+        LLView::removeChild(view);
+    }
 }
 
 BOOL LLLayoutStack::postBuild()
@@ -341,8 +358,6 @@ void LLLayoutStack::collapsePanel(LLPanel* panel, BOOL collapsed)
 	mNeedsLayout = true;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_LAYOUT("Update LayoutStacks");
-
 class LLImagePanel : public LLPanel
 {
 public:
@@ -370,7 +385,7 @@ private:
 
 void LLLayoutStack::updateLayout()
 {	
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_LAYOUT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
 	if (!mNeedsLayout) return;
 
@@ -399,7 +414,6 @@ void LLLayoutStack::updateLayout()
 	space_to_distribute += panelp ? ll_round((F32)mPanelSpacing * panelp->getVisibleAmount()) : 0;
 
 	S32 remaining_space = space_to_distribute;
-//	F32 fraction_distributed = 0.f;
 	if (space_to_distribute > 0 && total_visible_fraction > 0.f)
 	{	// give space proportionally to visible auto resize panels
 		for (LLLayoutPanel* panelp : mPanels)
@@ -408,7 +422,6 @@ void LLLayoutStack::updateLayout()
 			{
 				F32 fraction_to_distribute = (panelp->mFractionalSize * panelp->getAutoResizeFactor()) / (total_visible_fraction);
 				S32 delta = ll_round((F32)space_to_distribute * fraction_to_distribute);
-//				fraction_distributed += fraction_to_distribute;
 				panelp->mTargetDim += delta;
 				remaining_space -= delta;
 			}
@@ -514,6 +527,15 @@ void LLLayoutStack::updateLayout()
 	mNeedsLayout = continue_animating;
 } // end LLLayoutStack::updateLayout
 
+void LLLayoutStack::setPanelSpacing(S32 val)
+{
+    if (mPanelSpacing != val)
+    {
+        mPanelSpacing = val;
+        mNeedsLayout = true;
+    }
+}
+
 LLLayoutPanel* LLLayoutStack::findEmbeddedPanel(LLPanel* panelp) const
 {
 	if (!panelp) return NULL;
@@ -567,11 +589,11 @@ void LLLayoutStack::createResizeBar(LLLayoutPanel* panelp)
 				resize_bar_bg_panel_p.follows.flags = FOLLOWS_ALL;
 				resize_bar_bg_panel_p.tab_stop = false;
 				resize_bar_bg_panel_p.background_visible = true;
-				resize_bar_bg_panel_p.bg_alpha_color = LLUIColorTable::instanceFast().getColor("ResizebarBody");
+				resize_bar_bg_panel_p.bg_alpha_color = mDragHandleColor;
 				resize_bar_bg_panel_p.has_border = true;
 				resize_bar_bg_panel_p.border.border_thickness = 1;
-				resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instanceFast().getColor("ResizebarBorderLight");
-				resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instanceFast().getColor("ResizebarBorderDark");
+				resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instance().getColor("ResizebarBorderLight");
+				resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instance().getColor("ResizebarBorderDark");
 
 				LLPanel* resize_bar_bg_panel = LLUICtrlFactory::create<LLPanel>(resize_bar_bg_panel_p);
 

@@ -104,10 +104,10 @@ void LLFloaterAssetRecovery::onBtnRecover()
 		if (pCheckColumn->getCheckBox()->getValue().asBoolean())
 			sdFiles.append(sdFile);
 		else
-			LLFile::remove(sdFile["path"]);
+			LLFile::remove(sdFile["path"].asString());
 	}
 
-	if (!sdFiles.emptyArray())
+	if (sdFiles.isArray() && sdFiles.size() != 0)
 		new LLAssetRecoverQueue(sdFiles);
 
 	closeFloater();
@@ -141,7 +141,7 @@ protected:
 // static
 static bool removeEmbeddedMarkers(const std::string& strFilename)
 {
-	std::ifstream inNotecardFile(strFilename.c_str(), std::ios::in | std::ios::binary);
+	llifstream inNotecardFile(strFilename.c_str(), std::ios::in | std::ios::binary);
 	if (!inNotecardFile.is_open())
 		return false;
 
@@ -166,7 +166,7 @@ static bool removeEmbeddedMarkers(const std::string& strFilename)
 		idxText = strText.find('\xF4', idxText + 1);
 	}
 
-	std::ofstream outNotecardFile(strFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+	llofstream outNotecardFile(strFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!outNotecardFile.is_open())
 		return false;
 
@@ -328,7 +328,7 @@ void LLAssetRecoverQueue::onCreateItem(const LLUUID& idItem)
 
 		std::string strCapsUrl, strBuffer;
 
-		std::ifstream inNotecardFile(itItem->strPath.c_str(), std::ios::in | std::ios::binary);
+		llifstream inNotecardFile(itItem->strPath.c_str(), std::ios::in | std::ios::binary);
 		if (inNotecardFile.is_open())
 		{
 			strBuffer.assign((std::istreambuf_iterator<char>(inNotecardFile)), std::istreambuf_iterator<char>());
@@ -340,11 +340,13 @@ void LLAssetRecoverQueue::onCreateItem(const LLUUID& idItem)
 		{
 			case LLAssetType::AT_LSL_TEXT:
 				strCapsUrl = gAgent.getRegion()->getCapability("UpdateScriptAgent");
-				uploadInfo = LLResourceUploadInfo::ptr_t(new LLScriptAssetUpload(idItem, strBuffer, boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4)));
+				uploadInfo = std::make_shared<LLScriptAssetUpload>(idItem, strBuffer,
+                                                                   boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4), nullptr);
 				break;
 			case LLAssetType::AT_NOTECARD:
 				strCapsUrl = gAgent.getRegion()->getCapability("UpdateNotecardAgentInventory");
-				uploadInfo = LLResourceUploadInfo::ptr_t(new LLBufferedAssetUploadInfo(itItem->idItem, LLAssetType::AT_NOTECARD, strBuffer, boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4)));
+				uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(itItem->idItem, LLAssetType::AT_NOTECARD, strBuffer,
+                                                                         boost::bind(&LLAssetRecoverQueue::onSavedAsset, this, _1, _4), nullptr);
 				break;
 			default:
 				LL_WARNS() << "Unsupported iventory type '" << pItem->getType() << "' for asset recovery" << LL_ENDL;

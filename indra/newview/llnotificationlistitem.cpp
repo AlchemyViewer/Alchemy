@@ -378,11 +378,6 @@ LLGroupNotificationListItem::~LLGroupNotificationListItem()
 
 LLGroupNoticeNotificationListItem::~LLGroupNoticeNotificationListItem()
 {
-	if (mInventoryOffer != nullptr)
-	{
-		mInventoryOffer->forceResponse(IOR_DECLINE);
-		mInventoryOffer = nullptr;
-	}
 }
 
 BOOL LLGroupNoticeNotificationListItem::postBuild()
@@ -552,9 +547,8 @@ void LLGroupNoticeNotificationListItem::onClickAttachment()
         if (!isAttachmentOpenable(mInventoryOffer->mType)) {
             LLNotifications::instance().add("AttachmentSaved", LLSD(), LLSD());
         }
-
         mInventoryOffer->forceResponse(IOR_ACCEPT);
-        mInventoryOffer = nullptr;
+        mInventoryOffer = NULL;
     }
 }
 

@@ -38,6 +38,7 @@ class LLPanelWearing;
 class LLMenuGL;
 class LLSidepanelAppearance;
 class LLTabContainer;
+class LLInventoryCategoriesObserver;
 
 class LLPanelOutfitsInventory : public LLPanel
 {
@@ -67,12 +68,17 @@ public:
 
 	void openApearanceTab(const std::string& tab_name);
 
+	void updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity);
+
 protected:
 	void updateVerbs();
 
 private:
 	LLTabContainer*			mAppearanceTabs;
 	std::string 			mFilterSubString;
+
+	LLInventoryCategoriesObserver* mCategoriesObserver;
+	void onCOFChanged();
 
 	//////////////////////////////////////////////////////////////////////////////////
 	// tab panels                                                                   //

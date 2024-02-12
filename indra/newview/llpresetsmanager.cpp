@@ -292,45 +292,37 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 {
 	const std::vector<std::string> camera_controls = {
 		// From panel_preferences_graphics.xml
-		"AlchemyRenderCAS",
-		"AlchemyRenderCASSharpness",
 		"AlwaysRenderFriends",
 		"RenderAnisotropicLevel",
-		"RenderAvatarCloth",
 		"RenderAvatarLODFactor",
 		"RenderAvatarMaxComplexity",
 		"RenderAvatarMaxNonImpostors",
 		"RenderAvatarPhysicsLODFactor",
-		"RenderAvatarVP",
 		"RenderColorGradeLUT",
-		"RenderCompressTextures",
-		"RenderDeferred",
 		"RenderDeferredSSAO",
 		"RenderDepthOfField",
 		"RenderFSAASamples",
 		"RenderFarClip",
 		"RenderFlexTimeFactor",
-		"RenderFogRatio",
-		"RenderGamma",
 		"RenderGlowResolutionPow",
 		"RenderLocalLights",
 		"RenderMaxPartCount",
-		"RenderObjectBump",
 		"RenderQualityPerformance",
-		"RenderReflectionDetail",
 		"RenderShadowDetail",
-		"RenderTerrainDetail",
 		"RenderTerrainLODFactor",
-		"RenderToneMapExposure",
+		"RenderExposure",
 		"RenderToneMapType",
 		"RenderTransparentWater",
 		"RenderTreeLODFactor",
-		"RenderVBOEnable",
 		"RenderVolumeLODFactor",
-		"RenderWaterRefResolution",
-		"TextureMemory",
 		"WLSkyDetail",
-		"WindLightUseAtmosShaders"
+		"RenderScreenSpaceReflections",
+		"RenderReflectionProbeDetail",
+		"RenderReflectionProbeLevel"
+		"RenderSharpenMethod",
+		"RenderSharpenDLSSharpness",
+		"RenderSharpenDLSDenoise",
+		"RenderSharpenCASSharpness",
 	};
 	names = camera_controls;
 }
@@ -347,6 +339,8 @@ void LLPresetsManager::getCameraControlNames(std::vector<std::string>& names)
 		"CameraOffsetRearView",
 		"FocusOffsetRearView",
 		"AvatarSitRotation",
+		"ZoomTime",
+		"CameraPositionSmoothing"
 	};
     names = camera_controls;
 }

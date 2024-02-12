@@ -30,7 +30,7 @@
 #include "llinitparam.h"
 #include "llsingleton.h"
 
-#include <absl/container/flat_hash_map.h>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 class LLCommand;
 class LLCommandManager;
@@ -199,7 +199,7 @@ protected:
 	void addCommand(LLCommand * command);
 
 private:
-	typedef absl::flat_hash_map<LLUUID, U32>		CommandIndexMap;
+	typedef boost::unordered_flat_map<LLUUID, U32>		CommandIndexMap;
 	typedef std::vector<LLCommand *>	CommandVector;
 	
 	CommandVector	mCommands;

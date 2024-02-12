@@ -36,6 +36,10 @@
 #include "lluictrlfactory.h"
 #include "llmediactrl.h"
 
+#include "llagent.h"
+#include "llviewercontrol.h"
+#include "llviewerregion.h"
+#include "llweb.h"
 
 LLFloaterAvatar::LLFloaterAvatar(const LLSD& key)
 	:	LLFloater(key)
@@ -44,18 +48,34 @@ LLFloaterAvatar::LLFloaterAvatar(const LLSD& key)
 
 LLFloaterAvatar::~LLFloaterAvatar()
 {
-	LLMediaCtrl* avatar_picker = findChild<LLMediaCtrl>("avatar_picker_contents");
-	if (avatar_picker)
+	if (mAvatarPicker)
 	{
-		avatar_picker->navigateStop();
-		avatar_picker->clearCache();          //images are reloading each time already
-		avatar_picker->unloadMediaSource();
+		mAvatarPicker->navigateStop();
+        mAvatarPicker->clearCache();          //images are reloading each time already
+        mAvatarPicker->unloadMediaSource();
 	}
 }
 
 BOOL LLFloaterAvatar::postBuild()
 {
+    mAvatarPicker = findChild<LLMediaCtrl>("avatar_picker_contents");
+    if (mAvatarPicker)
+    {
+        mAvatarPicker->clearCache();
+    }
 	enableResizeCtrls(true, true, false);
+
+	LLMediaCtrl* avatar_picker = findChild<LLMediaCtrl>("avatar_picker_contents");
+	if (avatar_picker)
+	{
+		avatar_picker->setErrorPageURL(gSavedSettings.getString("GenericErrorPageURL"));
+		if (auto* regionp = gAgent.getRegion())
+		{
+			std::string ava_url = regionp->getAvatarPickerURL();
+			ava_url = LLWeb::expandURLSubstitutions(ava_url, LLSD());
+			avatar_picker->navigateTo(ava_url, HTTP_CONTENT_TEXT_HTML);
+		}
+	}
 	return TRUE;
 }
 

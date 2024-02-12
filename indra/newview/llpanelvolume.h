@@ -31,12 +31,14 @@
 #include "llpanel.h"
 #include "llpointer.h"
 #include "llvolume.h"
+#include "lltextureentry.h"
 
 class LLSpinCtrl;
 class LLCheckBoxCtrl;
 class LLTextBox;
 class LLUICtrl;
 class LLButton;
+class LLMenuButton;
 class LLViewerObject;
 class LLComboBox;
 class LLColorSwatchCtrl;
@@ -57,12 +59,22 @@ public:
 	void			refresh();
 
 	void			sendIsLight();
+    
+    // when an object is becoming a refleciton probe, present a dialog asking for confirmation
+    // otherwise, send the reflection probe update immediately
+    void            sendIsReflectionProbe();
+
+    // callback for handling response of the ok/cancel/ignore dialog for making an object a reflection probe
+    void            doSendIsReflectionProbe(const LLSD& notification, const LLSD& response);
+
 	void			sendIsFlexible();
 
 	static bool		precommitValidate(const LLSD& data);
 	
 	static void 	onCommitIsLight(		LLUICtrl* ctrl, void* userdata);
 	static void 	onCommitLight(			LLUICtrl* ctrl, void* userdata);
+    static void 	onCommitIsReflectionProbe(LLUICtrl* ctrl, void* userdata);
+    static void     onCommitProbe(LLUICtrl* ctrl, void* userdata);
 	void 			onCommitIsFlexible(		LLUICtrl* ctrl, void* userdata);
 	static void 	onCommitFlexible(		LLUICtrl* ctrl, void* userdata);
     void            onCommitAnimatedMeshCheckbox(LLUICtrl* ctrl, void* userdata);
@@ -77,6 +89,18 @@ public:
 
     static void    setLightTextureID(const LLUUID &asset_id, const LLUUID &item_id, LLVOVolume* volobjp);
 
+    void            onCopyFeatures();
+    void            onPasteFeatures();
+    void            onCopyLight();
+    void            onPasteLight();
+    void			onClickPipetteFeatures();
+    void			onClickPipetteLight();
+
+    void onFeaturesSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+    void onLightSelect(bool success, LLViewerObject* obj, const LLTextureEntry& te);
+
+    void        menuDoToSelected(const LLSD& userdata);
+    bool        menuEnableItem(const LLSD& userdata);
 
 protected:
 	void			getState();
@@ -135,6 +159,15 @@ protected:
     LLSpinCtrl*     mSpinPhysicsFriction   = nullptr;
     LLSpinCtrl*     mSpinPhysicsDensity    = nullptr;
     LLSpinCtrl*     mSpinPhysicsRestitution = nullptr;
+
+    LLButton* mBtnCopyFeatures = nullptr;
+    LLButton* mBtnPasteFeatures = nullptr;
+    LLButton* mBtnPipetteFeatures = nullptr;
+    LLButton* mBtnCopyLight = nullptr;
+    LLButton* mBtnPasteLight = nullptr;
+    LLButton* mBtnPipetteLight = nullptr;
+
+    LLSD            mClipboardParams;
 };
 
 #endif

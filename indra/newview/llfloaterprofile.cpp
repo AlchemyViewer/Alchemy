@@ -2,9 +2,9 @@
  * @file llfloaterprofile.cpp
  * @brief Avatar profile floater.
  *
- * $LicenseInfo:firstyear=2009&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2022&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2022, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,9 +28,10 @@
 
 #include "llfloaterprofile.h"
 
+#include "llagent.h" //gAgent
+#include "llnotificationsutil.h"
 #include "llpanelavatar.h"
 #include "llpanelprofile.h"
-#include "llagent.h" //gAgent
 
 static const std::string PANEL_PROFILE_VIEW = "panel_profile_view";
 
@@ -62,10 +63,68 @@ BOOL LLFloaterProfile::postBuild()
 {
     mPanelProfile = findChild<LLPanelProfile>(PANEL_PROFILE_VIEW);
 
-    childSetAction("ok_btn", boost::bind(&LLFloaterProfile::onOKBtn, this));
-    childSetAction("cancel_btn", boost::bind(&LLFloaterProfile::onCancelBtn, this));
-
     return TRUE;
+}
+
+void LLFloaterProfile::onClickCloseBtn(bool app_quitting)
+{
+    if (!app_quitting)
+    {
+        if (mPanelProfile->hasUnpublishedClassifieds())
+        {
+            LLNotificationsUtil::add("ProfileUnpublishedClassified", LLSD(), LLSD(),
+                boost::bind(&LLFloaterProfile::onUnsavedChangesCallback, this, _1, _2, false));
+        }
+        else if (mPanelProfile->hasUnsavedChanges())
+        {
+            LLNotificationsUtil::add("ProfileUnsavedChanges", LLSD(), LLSD(),
+                boost::bind(&LLFloaterProfile::onUnsavedChangesCallback, this, _1, _2, true));
+        }
+        else
+        {
+            closeFloater();
+        }
+    }
+    else
+    {
+        closeFloater();
+    }
+}
+
+void LLFloaterProfile::onUnsavedChangesCallback(const LLSD& notification, const LLSD& response, bool can_save)
+{
+    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    if (can_save)
+    {
+        // savable content
+
+        if (option == 0) // Save
+        {
+            mPanelProfile->commitUnsavedChanges();
+            closeFloater();
+        }
+        if (option == 1) // Discard
+        {
+            closeFloater();
+        }
+        // else cancel
+    }
+    else
+    {
+        // classifieds
+
+        if (option == 0) // Ok
+        {
+            closeFloater();
+        }
+        // else cancel
+    }
+
+}
+
+void LLFloaterProfile::createPick(const LLPickData &data)
+{
+    mPanelProfile->createPick(data);
 }
 
 void LLFloaterProfile::showPick(const LLUUID& pick_id)
@@ -78,20 +137,28 @@ bool LLFloaterProfile::isPickTabSelected()
     return mPanelProfile->isPickTabSelected();
 }
 
+void LLFloaterProfile::refreshName()
+{
+    if (!mNameCallbackConnection.connected())
+    {
+        mNameCallbackConnection = LLAvatarNameCache::get(mAvatarId, boost::bind(&LLFloaterProfile::onAvatarNameCache, this, _1, _2));
+    }
+
+    LLPanelProfileSecondLife *panel = findChild<LLPanelProfileSecondLife>("panel_profile_secondlife");
+    if (panel)
+    {
+        panel->refreshName();
+    }
+}
+
 void LLFloaterProfile::showClassified(const LLUUID& classified_id, bool edit)
 {
     mPanelProfile->showClassified(classified_id, edit);
 }
 
-void LLFloaterProfile::onOKBtn()
+void LLFloaterProfile::createClassified()
 {
-    mPanelProfile->apply();
-    closeFloater();
-}
-
-void LLFloaterProfile::onCancelBtn()
-{
-    closeFloater();
+    mPanelProfile->createClassified();
 }
 
 void LLFloaterProfile::onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name)

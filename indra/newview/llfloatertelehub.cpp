@@ -74,12 +74,12 @@ BOOL LLFloaterTelehub::postBuild()
 void LLFloaterTelehub::onOpen(const LLSD& key)
 {
 	// Show tools floater by selecting translate (select) tool
-	LLToolMgr::getInstanceFast()->setCurrentToolset(gBasicToolset);
-	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolCompTranslate::getInstance() );
+	LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
+	LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolCompTranslate::getInstance() );
 
 	sendTelehubInfoRequest();
 	
-	mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
+	mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
 }
 
 LLFloaterTelehub::~LLFloaterTelehub()
@@ -104,7 +104,7 @@ void LLFloaterTelehub::refresh()
 	LLViewerObject* object = mObjectSelection->getFirstRootObject(children_ok);
 	
 	BOOL have_selection = (object != NULL);
-	BOOL all_volume = LLSelectMgr::getInstanceFast()->selectionAllPCode( LL_PCODE_VOLUME );
+	BOOL all_volume = LLSelectMgr::getInstance()->selectionAllPCode( LL_PCODE_VOLUME );
 	getChildView("connect_btn")->setEnabled(have_selection && all_volume);
 
 	BOOL have_telehub = mTelehubObjectID.notNull();
@@ -163,23 +163,23 @@ void LLFloaterTelehub::addBeacons()
 
 void LLFloaterTelehub::sendTelehubInfoRequest()
 {
-	LLSelectMgr::getInstanceFast()->sendGodlikeRequest("telehub", "info ui");
+	LLSelectMgr::getInstance()->sendGodlikeRequest("telehub", "info ui");
 }
 
 void LLFloaterTelehub::onClickConnect()
 {
-	LLSelectMgr::getInstanceFast()->sendGodlikeRequest("telehub", "connect");
+	LLSelectMgr::getInstance()->sendGodlikeRequest("telehub", "connect");
 }
 
 void LLFloaterTelehub::onClickDisconnect()
 {
-	LLSelectMgr::getInstanceFast()->sendGodlikeRequest("telehub", "delete");
+	LLSelectMgr::getInstance()->sendGodlikeRequest("telehub", "delete");
 }
 
 void LLFloaterTelehub::onClickAddSpawnPoint()
 {
-	LLSelectMgr::getInstanceFast()->sendGodlikeRequest("telehub", "spawnpoint add");
-	LLSelectMgr::getInstanceFast()->deselectAll();
+	LLSelectMgr::getInstance()->sendGodlikeRequest("telehub", "spawnpoint add");
+	LLSelectMgr::getInstance()->deselectAll();
 }
 
 void LLFloaterTelehub::onClickRemoveSpawnPoint()

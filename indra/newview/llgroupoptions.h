@@ -17,7 +17,7 @@
 #ifndef LL_LLGROUPOPTIONS_H
 #define LL_LLGROUPOPTIONS_H
 
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #include "llsd.h"
 #include "llsingleton.h"
@@ -49,7 +49,7 @@ class LLGroupOptionsMgr final : public LLSingleton<LLGroupOptionsMgr>
 	 */
 	LLSINGLETON(LLGroupOptionsMgr);
 protected:
-	~LLGroupOptionsMgr() override;
+	~LLGroupOptionsMgr() override = default;
 
 	/*
 	 * Member functions
@@ -60,16 +60,14 @@ public:
 	void            setOptionReceiveChat(const LLUUID& idGroup, bool fReceiveChat);
 	void            setOptionSnoozeOnClose(const LLUUID& idGroup, bool fSnoozeOnClose);
 	void            setOptionSnoozeDuration(const LLUUID& idGroup, int nSnoozeDuration);
-protected:
+private:
 	bool            load();
-//	bool            loadLegacy();
 	bool            save();
 
 	/*
 	 * Member variables
 	 */
-protected:
-	typedef absl::flat_hash_map<LLUUID, std::unique_ptr<LLGroupOptions>> options_map_t;
+	typedef boost::unordered_flat_map<LLUUID, std::unique_ptr<LLGroupOptions>> options_map_t;
 	options_map_t mGroupOptions;
 };
 

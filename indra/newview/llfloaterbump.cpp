@@ -36,7 +36,8 @@
 #include "llfloaterreg.h"
 #include "llfloaterreporter.h"
 #include "llmutelist.h"
-#include "llpanelblockedlist.h"
+#include "llfloaterblocked.h"
+//#include "llpanelblockedlist.h"
 #include "llscrolllistctrl.h"
 #include "lltrans.h"
 #include "lluictrlfactory.h"
@@ -84,7 +85,7 @@ BOOL LLFloaterBump::postBuild()
 	mList->setAllowMultipleSelection(false);
 	mList->setRightMouseDownCallback(boost::bind(&LLFloaterBump::onScrollListRightClicked, this, _1, _2, _3));
 
-	auto menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_avatar_other.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
+	LLContextMenu* menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_avatar_other.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
 	if (menu)
 	{
 		mPopupMenuHandle = menu->getHandle();
@@ -245,7 +246,8 @@ void LLFloaterBump::muteAvatar()
 	else
 	{
 		LLMuteList::getInstance()->add(mute);
-		LLPanelBlockedList::showPanelAndSelect(mute.mID);
+		LLFloaterBlocked::showMuteAndSelect(mute.mID);
+		//LLPanelBlockedList::showPanelAndSelect(mute.mID);
 	}
 }
 

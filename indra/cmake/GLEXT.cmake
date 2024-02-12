@@ -1,6 +1,11 @@
 # -*- cmake -*-
 include(Prebuilt)
+include(GLH)
+include(SDL2)
 
-if (NOT USESYSTEMLIBS)
-  set(GLEXT_INCLUDE_DIR ${LIBS_PREBUILT_DIR}/include)
-endif (NOT USESYSTEMLIBS)
+add_library( ll::glext INTERFACE IMPORTED )
+if(NOT SDL_FOUND)
+  use_system_binary(glext)
+  use_prebuilt_binary(glext)
+endif()
+

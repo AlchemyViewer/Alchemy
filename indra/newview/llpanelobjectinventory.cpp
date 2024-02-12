@@ -50,6 +50,7 @@
 #include "llinventoryicon.h"
 #include "llinventoryfilter.h"
 #include "llinventoryfunctions.h"
+#include "llmaterialeditor.h"
 #include "llpreviewanim.h"
 #include "llpreviewgesture.h"
 #include "llpreviewnotecard.h"
@@ -121,6 +122,7 @@ public:
 	virtual PermissionMask getPermissionMask() const { return PERM_NONE; }
 	/*virtual*/ LLFolderType::EType getPreferredType() const { return LLFolderType::FT_NONE; }
 	virtual const LLUUID& getUUID() const { return mUUID; }
+    virtual const LLUUID& getThumbnailUUID() const { return LLUUID::null;}
 	virtual time_t getCreationDate() const;
 	virtual void setCreationDate(time_t creation_date_utc);
 
@@ -129,6 +131,7 @@ public:
 	virtual BOOL canOpenItem() const { return FALSE; }
 	virtual void closeItem() {}
 	virtual void selectItem() {}
+    virtual void navigateToFolder(bool new_window = false, bool change_mode = false) {}
 	virtual BOOL isItemRenameable() const;
 	virtual BOOL renameItem(const std::string& new_name);
 	virtual BOOL isItemMovable() const;
@@ -136,7 +139,11 @@ public:
 	virtual BOOL removeItem();
 	virtual void removeBatch(std::vector<LLFolderViewModelItem*>& batch);
 	virtual void move(LLFolderViewModelItem* parent_listener);	
-	virtual BOOL isItemCopyable() const;
+    virtual bool isItemCopyable(bool can_copy_as_link = true) const;
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
+	/*virtual*/ bool isItemLinkable() const;
+	/*virtual*/ BOOL isLink() const;
+// [/SL:KB]
 	virtual BOOL copyToClipboard() const;
 	virtual BOOL cutToClipboard();
 	virtual BOOL isClipboardPasteable() const;
@@ -493,13 +500,25 @@ void LLTaskInvFVBridge::move(LLFolderViewModelItem* parent_listener)
 {
 }
 
-BOOL LLTaskInvFVBridge::isItemCopyable() const
+bool LLTaskInvFVBridge::isItemCopyable(bool can_link) const
 {
 	LLInventoryItem* item = findItem();
-	if(!item) return FALSE;
+	if(!item) return false;
 	return gAgent.allowOperation(PERM_COPY, item->getPermissions(),
 								GP_OBJECT_MANIPULATE);
 }
+
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
+bool LLTaskInvFVBridge::isItemLinkable() const
+{
+	return false;
+}
+
+BOOL LLTaskInvFVBridge::isLink() const
+{
+	return FALSE;
+}
+// [/SL:KB]
 
 BOOL LLTaskInvFVBridge::copyToClipboard() const
 {
@@ -621,10 +640,7 @@ void LLTaskInvFVBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 // [/RLVa:KB]
 	}
 	items.push_back(std::string("Task Properties"));
-	if ((flags & FIRST_SELECTED_ITEM) == 0)
-	{
-		disabled_items.push_back(std::string("Task Properties"));
-	}
+
 	if(isItemRenameable())
 	{
 		items.push_back(std::string("Task Rename"));
@@ -701,7 +717,18 @@ const std::string& LLTaskCategoryBridge::getDisplayName() const
 
 	if (cat)
 	{
-		mDisplayName.assign(cat->getName());
+        std::string name = cat->getName();
+        if (mChildren.size() > 0)
+        {
+            // Add item count
+            // Normally we would be using getLabelSuffix for this
+            // but object's inventory just uses displaynames
+            LLStringUtil::format_map_t args;
+            args["[ITEMS_COUNT]"] = llformat("%d", mChildren.size());
+
+            name.append(" " + LLTrans::getString("InventoryItemsCount", args));
+        }
+		mDisplayName.assign(name);
 	}
 
 	return mDisplayName;
@@ -787,6 +814,7 @@ BOOL LLTaskCategoryBridge::dragOrDrop(MASK mask, BOOL drop,
 		case DAD_CALLINGCARD:
 		case DAD_MESH:
         case DAD_SETTINGS:
+        case DAD_MATERIAL:
 			accept = LLToolDragAndDrop::isInventoryDropAcceptable(object, (LLViewerInventoryItem*)cargo_data);
 			if(accept && drop)
 			{
@@ -929,10 +957,6 @@ void LLTaskSoundBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 		}
 	}
 	items.push_back(std::string("Task Properties"));
-	if ((flags & FIRST_SELECTED_ITEM) == 0)
-	{
-		disabled_items.push_back(std::string("Task Properties"));
-	}
 	if(isItemRenameable())
 	{
 		items.push_back(std::string("Task Rename"));
@@ -1249,6 +1273,58 @@ LLSettingsType::type_e LLTaskSettingsBridge::getSettingsType() const
 }
 
 ///----------------------------------------------------------------------------
+/// Class LLTaskMaterialBridge
+///----------------------------------------------------------------------------
+
+class LLTaskMaterialBridge : public LLTaskInvFVBridge
+{
+public:
+    LLTaskMaterialBridge(LLPanelObjectInventory* panel,
+                         const LLUUID& uuid,
+                         const std::string& name) :
+        LLTaskInvFVBridge(panel, uuid, name) {}
+
+    BOOL canOpenItem() const override { return TRUE; }
+    void openItem() override;
+    BOOL removeItem() override;
+};
+
+void LLTaskMaterialBridge::openItem()
+{
+    LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID());
+    if(!object || object->isInventoryPending())
+    {
+        return;
+    }
+
+    // Note: even if we are not allowed to modify copyable notecard, we should be able to view it
+    LLInventoryItem *item = dynamic_cast<LLInventoryItem*>(object->getInventoryObject(mUUID));
+    BOOL item_copy = item && gAgent.allowOperation(PERM_COPY, item->getPermissions(), GP_OBJECT_MANIPULATE);
+    if( item_copy
+        || object->permModify()
+        || gAgent.isGodlike())
+    {
+        LLSD floater_key;
+        floater_key["taskid"] = mPanel->getTaskUUID();
+        floater_key["itemid"] = mUUID;
+        LLMaterialEditor* mat = LLFloaterReg::getTypedInstance<LLMaterialEditor>("material_editor", floater_key);
+        if (mat)
+        {
+            mat->setObjectID(mPanel->getTaskUUID());
+            mat->openFloater(floater_key);
+            mat->setFocus(TRUE);
+        }
+    }
+}
+
+BOOL LLTaskMaterialBridge::removeItem()
+{
+    LLFloaterReg::hideInstance("material_editor", LLSD(mUUID));
+    return LLTaskInvFVBridge::removeItem();
+}
+
+
+///----------------------------------------------------------------------------
 /// LLTaskInvFVBridge impl
 //----------------------------------------------------------------------------
 
@@ -1335,6 +1411,11 @@ LLTaskInvFVBridge* LLTaskInvFVBridge::createObjectBridge(LLPanelObjectInventory*
 										  object_name,
                                           itemflags);
 		break;
+    case LLAssetType::AT_MATERIAL:
+        new_bridge = new LLTaskMaterialBridge(panel,
+                              object_id,
+                              object_name);
+        break;
 	default:
 		LL_INFOS() << "Unhandled inventory type (llassetstorage.h): "
 				<< (S32)type << LL_ENDL;
@@ -1362,7 +1443,8 @@ LLPanelObjectInventory::LLPanelObjectInventory(const LLPanelObjectInventory::Par
 	mHaveInventory(FALSE),
 	mIsInventoryEmpty(TRUE),
 	mInventoryNeedsUpdate(FALSE),
-	mInventoryViewModel(p.name)
+	mInventoryViewModel(p.name),
+    mShowRootFolder(p.show_root_folder)
 {
 	// Setup context menu callbacks
 	mCommitCallbackRegistrar.add("Inventory.DoToSelected", boost::bind(&LLPanelObjectInventory::doToSelected, this, _2));
@@ -1454,7 +1536,8 @@ void LLPanelObjectInventory::reset()
 		LLEditMenuHandler::gEditMenuHandler = mFolders;
 	}
 
-	LLRect scroller_rect(0, getRect().getHeight(), getRect().getWidth(), 0);
+	int offset = hasBorder() ? getBorder()->getBorderWidth() << 1 : 0;
+	LLRect scroller_rect(0, getRect().getHeight() - offset, getRect().getWidth() - offset, 0);
 	LLScrollContainer::Params scroll_p;
 	scroll_p.name("task inventory scroller");
 	scroll_p.rect(scroller_rect);
@@ -1482,21 +1565,6 @@ void LLPanelObjectInventory::inventoryChanged(LLViewerObject* object,
 	if(mTaskUUID == object->mID)
 	{
 		mInventoryNeedsUpdate = TRUE;
-	}
-
-	// refresh any properties floaters that are hanging around.
-	if(inventory)
-	{
-		for (LLInventoryObject::object_list_t::const_iterator iter = inventory->begin();
-			 iter != inventory->end(); )
-		{
-			LLInventoryObject* item = *iter++;
-			LLFloaterProperties* floater = LLFloaterReg::findTypedInstance<LLFloaterProperties>("properties", item->getUUID());
-			if(floater)
-			{
-				floater->refresh();
-			}
-		}
 	}
 }
 
@@ -1614,13 +1682,23 @@ void LLPanelObjectInventory::createFolderViews(LLInventoryObject* inventory_root
 		p.font_highlight_color = item_color;
 
 		LLFolderViewFolder* new_folder = LLUICtrlFactory::create<LLFolderViewFolder>(p);
-		new_folder->addToFolder(mFolders);
-		new_folder->toggleOpen();
+
+        if (mShowRootFolder)
+        {
+            new_folder->addToFolder(mFolders);
+            new_folder->toggleOpen();
+        }
 
 		if (!contents.empty())
 		{
-			createViewsForCategory(&contents, inventory_root, new_folder);
+			createViewsForCategory(&contents, inventory_root, mShowRootFolder ? new_folder : mFolders);
 		}
+
+        if (mShowRootFolder)
+        {
+            // Refresh for label to add item count
+            new_folder->refresh();
+        }
 	}
 }
 
@@ -1688,6 +1766,7 @@ void LLPanelObjectInventory::createViewsForCategory(LLInventoryObject::object_li
 							   child_categories[i]->second );
 		delete child_categories[i];
 	}
+    folder->setChildrenInited(true);
 }
 
 void LLPanelObjectInventory::refresh()
@@ -1695,7 +1774,7 @@ void LLPanelObjectInventory::refresh()
 	//LL_INFOS() << "LLPanelObjectInventory::refresh()" << LL_ENDL;
 	BOOL has_inventory = FALSE;
 	const BOOL non_root_ok = TRUE;
-	LLObjectSelectionHandle selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
 	LLSelectNode* node = selection->getFirstRootNode(NULL, non_root_ok);
 	if(node && node->mValid)
 	{
@@ -1729,7 +1808,7 @@ void LLPanelObjectInventory::refresh()
 				{
 					// Server unsubsribes viewer (deselects object) from property
 					// updates after "ObjectAttach" so we need to resubscribe
-					LLSelectMgr::getInstanceFast()->sendSelect();
+					LLSelectMgr::getInstance()->sendSelect();
 				}
 			}
 
@@ -1914,6 +1993,13 @@ BOOL LLPanelObjectInventory::handleKeyHere( KEY key, MASK mask )
 	BOOL handled = FALSE;
 	switch (key)
 	{
+	case KEY_RETURN:
+		if (mask == MASK_NONE)
+		{
+			LLPanelObjectInventory::doToSelected(LLSD("task_open"));
+			handled = TRUE;
+		}
+		break;
 	case KEY_DELETE:
 #if LL_DARWIN
 	case KEY_BACKSPACE:

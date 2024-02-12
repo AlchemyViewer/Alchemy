@@ -198,7 +198,9 @@ public:
 	typedef boost::signals2::signal<void ()> status_updated_signal_t;
     void initializeSLM(const status_updated_signal_t::slot_type& cb);
 	U32  getSLMStatus() const { return mMarketPlaceStatus; }
+    std::string getSLMConnectionfailureReason() { return mMarketPlaceFailureReason; }
 	void setSLMStatus(U32 status);
+    void setSLMConnectionFailure(const std::string& reason);
     void getSLMListings();
     bool isEmpty() { return (mMarketplaceItems.size() == 0); }
     void setDataFetchedSignal(const status_updated_signal_t::slot_type& cb);
@@ -240,6 +242,7 @@ public:
     void setUpdating(const LLUUID& folder_id, bool isUpdating);
     
     // Used to decide when to run a validation on listing folders
+    bool hasValidationWaiting() { return mValidationWaitingList.size() > 0; }
     void setValidationWaiting(const LLUUID& folder_id, S32 count);
     void decrementValidationWaiting(const LLUUID& folder_id, S32 count = 1);
 
@@ -272,6 +275,7 @@ private:
 
     // Handling Marketplace connection and inventory connection
 	U32  mMarketPlaceStatus;
+    std::string mMarketPlaceFailureReason;
 	status_updated_signal_t* mStatusUpdatedSignal;
 	LLInventoryObserver* mInventoryObserver;
     bool mDirtyCount;   // If true, stock count value need to be updated at the next check

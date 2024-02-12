@@ -26,12 +26,13 @@
  */
 
 #include "llviewerprecompiledheaders.h"
-#include "llviewerbuildconfig.h"
 #include "llevents.h"
 #include "lleventfilter.h"
 #include "llregex.h"
 #include "llversioninfo.h"
 #include "stringize.h"
+
+#include "compile_time.h"
 
 #if ! defined(LL_VIEWER_CHANNEL)       \
  || ! defined(LL_VIEWER_VERSION_MAJOR) \
@@ -71,7 +72,7 @@ void LLVersionInfo::initSingleton()
 	// fully constructed; such calls don't really belong in the constructor.
 
 	// cache the version string
-	version = STRINGIZE(getShortVersion() << "." << getBuild());
+	version = stringize(getShortVersion(), ".", getBuild());
 }
 
 LLVersionInfo::~LLVersionInfo()
@@ -93,7 +94,7 @@ S32 LLVersionInfo::getPatch()
 	return LL_VIEWER_VERSION_PATCH;
 }
 
-S32 LLVersionInfo::getBuild()
+U64 LLVersionInfo::getBuild()
 {
 	return LL_VIEWER_VERSION_BUILD;
 }
@@ -180,4 +181,37 @@ const std::string& LLVersionInfo::getBuildConfig()
 std::string LLVersionInfo::getReleaseNotes()
 {
     return mReleaseNotes;
+}
+
+bool LLVersionInfo::isViewerExpired()
+{
+#ifdef BUILD_EXPIREY
+	static const U64 BUILD_TIME(UNIX_TIMESTAMP);
+	static const U64Seconds TEST_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 14)); // 14 days
+	static const U64Seconds PROJECT_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 30)); // 30 days
+	static const U64Seconds BETA_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 60)); // 60 days
+
+	switch (getViewerMaturity())
+	{
+	case RELEASE_VIEWER:
+		break;
+	case TEST_VIEWER:
+	{
+		if (LLTimer::getTotalSeconds() > TEST_EXPIREY) return true;
+		break;
+	}
+	case PROJECT_VIEWER:
+	{
+		if (LLTimer::getTotalSeconds() > PROJECT_EXPIREY) return true;
+		break;
+	}
+	case BETA_VIEWER:
+	{
+		if (LLTimer::getTotalSeconds() > BETA_EXPIREY) return true;
+		break;
+	}
+	}
+#endif
+	return false;
+
 }

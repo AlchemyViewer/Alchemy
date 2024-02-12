@@ -65,29 +65,58 @@
              parameter="" />
         </menu_item_call>
 		<menu_item_separator/>
+		<menu_item_call
+             label="Alchemy Website"
+             name="Alchemy Website">
+			<menu_item_call.on_click
+				function="Advanced.ShowURL"
+				parameter="https://www.alchemyviewer.org"/>
+		</menu_item_call>
+		<menu_item_call
+             label="Alchemy Downloads"
+             name="Alchemy Downloads">
+			<menu_item_call.on_click
+				function="Advanced.ShowURL"
+				parameter="https://www.alchemyviewer.org/downloads"/>
+		</menu_item_call>
+		<menu_item_call
+             label="Report Alchemy Bug"
+             name="Report Alchemy Bug">
+			<menu_item_call.on_click
+				function="Advanced.ShowURL"
+				parameter="https://git.alchemyviewer.org/alchemy/viewer/issues/new?issuable_template=Bug"/>
+		</menu_item_call>
+		<menu_item_call
+             label="Request Alchemy Improvement"
+             name="Request Alchemy Improvement">
+			<menu_item_call.on_click
+				function="Advanced.ShowURL"
+				parameter="https://git.alchemyviewer.org/alchemy/viewer/issues/new?issuable_template=Improvement"/>
+		</menu_item_call>
+		<menu_item_separator/>
         <menu_item_call
-             label="Knowledge Base"
+             label="Second Life Knowledge Base"
              name="Knowledge Base">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
             parameter="http://community.secondlife.com/t5/English-Knowledge-Base/Second-Life-User-s-Guide/ta-p/1244857"/>
         </menu_item_call>
         <menu_item_call
-             label="Wiki"
+             label="Second Life Wiki"
              name="Wiki">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
                  parameter="http://wiki.secondlife.com"/>
         </menu_item_call>
         <menu_item_call
-             label="Community Forums"
+             label="Second Life Community Forums"
              name="Community Forums">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
                  parameter="http://community.secondlife.com/t5/Forums/ct-p/Forums"/>
         </menu_item_call>         
         <menu_item_call
-             label="Support portal"
+             label="Second Life Support portal"
              name="Support portal">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
@@ -95,14 +124,14 @@
         </menu_item_call>
         <menu_item_separator/>
         <menu_item_call
-             label="[SECOND_LIFE] News"
+             label="Second Life News"
              name="Second Life News">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
                  parameter="http://community.secondlife.com/t5/Featured-News/bg-p/blog_feature_news"/>  
         </menu_item_call>
         <menu_item_call
-             label="[SECOND_LIFE] Blogs"
+             label="Second Life Blogs"
              name="Second Life Blogs">
              <menu_item_call.on_click
                  function="Advanced.ShowURL"
@@ -110,7 +139,7 @@
         </menu_item_call>
         <menu_item_separator/>       
         <menu_item_call
-             label="Report Bug"
+             label="Report Second Life Bug"
              name="Report Bug">
                 <menu_item_call.on_click
                  function="Advanced.ReportBug"/>

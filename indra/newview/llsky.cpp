@@ -85,7 +85,6 @@ void LLSky::cleanup()
 {
 	mVOSkyp = NULL;
 	mVOWLSkyp = NULL;
-	mVOGroundp = NULL;
 }
 
 void LLSky::destroyGL()
@@ -114,18 +113,16 @@ void LLSky::restoreGL()
 
 void LLSky::resetVertexBuffers()
 {
-	if (gSky.mVOSkyp.notNull() && gSky.mVOGroundp.notNull())
+	if (gSky.mVOSkyp.notNull())
 	{
 		gPipeline.resetVertexBuffers(gSky.mVOSkyp->mDrawable);
-		gPipeline.resetVertexBuffers(gSky.mVOGroundp->mDrawable);
-		gPipeline.markRebuild(gSky.mVOSkyp->mDrawable, LLDrawable::REBUILD_ALL, TRUE);
-		gPipeline.markRebuild(gSky.mVOGroundp->mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+		gPipeline.markRebuild(gSky.mVOSkyp->mDrawable, LLDrawable::REBUILD_ALL);
 	}
 	if (gSky.mVOWLSkyp.notNull())
 	{
 		gSky.mVOWLSkyp->resetVertexBuffers();
 		gPipeline.resetVertexBuffers(gSky.mVOWLSkyp->mDrawable);
-		gPipeline.markRebuild(gSky.mVOWLSkyp->mDrawable, LLDrawable::REBUILD_ALL, TRUE);
+		gPipeline.markRebuild(gSky.mVOWLSkyp->mDrawable, LLDrawable::REBUILD_ALL);
 	}
 }
 
@@ -208,9 +205,6 @@ void LLSky::init()
     mVOSkyp->init();
 	gPipeline.createObject(mVOSkyp.get());
 
-	mVOGroundp = (LLVOGround*)gObjectList.createObjectViewer(LLViewerObject::LL_VO_GROUND, NULL);
-	gPipeline.createObject(mVOGroundp.get());
-
 	gSky.setFogRatio(gSavedSettings.getF32("RenderFogRatio"));
 
 	mUpdatedThisFrame = TRUE;
@@ -270,7 +264,7 @@ void LLSky::updateFog(const F32 distance)
 {
 	if (mVOSkyp)
 	{
-		LLEnvironment* environment = LLEnvironment::getInstanceFast();
+		LLEnvironment* environment = LLEnvironment::getInstance();
 		mVOSkyp->updateFog(environment, environment->getCurrentSky(), distance);
 	}
 }

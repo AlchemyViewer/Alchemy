@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_music_ticker" title="" width="500">
+	<panel name="music_ticker" width="410"/>
+</floater>

@@ -100,8 +100,6 @@ void LLSceneView::draw()
 	F32 total_physics[] = { 0.f, 0.f };
 	
 
-	U32 object_count = 0;
-
 	LLViewerRegion* region = gAgent.getRegion();
 	if (region)
 	{
@@ -116,8 +114,7 @@ void LLSceneView::draw()
 				U32 idx = object->isAttachment() ? 1 : 0;
 
 				LLVolume* volume = object->getVolume();
-				object_count++;
-				
+
 				F32 radius = object->getScale().magVec();
 				size[idx].push_back(radius);
 
@@ -207,7 +204,7 @@ void LLSceneView::draw()
 			for (U32 i = 0; i < count; ++i)
 			{
 				F32 rad = size[idx][i];
-				total += rad;	
+				total += rad;
 				F32 y = (rad-size_domain[0])/size_range*size_rect.getHeight()+size_rect.mBottom;
 				F32 x = (F32) i / count * size_rect.getWidth() + size_rect.mLeft;
 
@@ -266,14 +263,11 @@ void LLSceneView::draw()
 
 			U32 count = triangles[idx].size();
 
-			U32 total = 0;
-
 			gGL.begin(LLRender::LINE_STRIP);
 			//plot triangles
 			for (U32 i = 0; i < count; ++i)
 			{
 				U32 tri_count = triangles[idx][i];
-				total += tri_count;	
 				F32 y = (F32) (tri_count-tri_domain[0])/triangle_range*tri_rect.getHeight()+tri_rect.mBottom;
 				F32 x = (F32) i / count * tri_rect.getWidth() + tri_rect.mLeft;
 
@@ -290,14 +284,7 @@ void LLSceneView::draw()
 			gGL.end();
 			gGL.flush();
 
-			U32 total_visible = 0;
 			count = visible_triangles[idx].size();
-
-			for (U32 i = 0; i < count; ++i)
-			{
-				U32 tri_count = visible_triangles[idx][i];
-				total_visible += tri_count;	
-			}
 
 			std::string label = llformat("%s Object Triangle Counts (Ktris) -- Visible: %.2f/%.2f (%.2f KB Visible)",
 				category[idx], total_visible_triangles[idx]/1024.f, total_triangles[idx]/1024.f, total_visible_bytes[idx]/1024.f);

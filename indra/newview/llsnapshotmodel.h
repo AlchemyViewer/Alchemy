@@ -49,7 +49,8 @@ public:
 	typedef enum
 	{
 		SNAPSHOT_TYPE_COLOR,
-		SNAPSHOT_TYPE_DEPTH
+		SNAPSHOT_TYPE_DEPTH,
+		SNAPSHOT_TYPE_DEPTH24
 	} ESnapshotLayerType;
 };
 

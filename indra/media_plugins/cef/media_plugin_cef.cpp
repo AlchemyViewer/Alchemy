@@ -34,6 +34,7 @@
 #include "llplugininstance.h"
 #include "llpluginmessage.h"
 #include "llpluginmessageclasses.h"
+#include "llstring.h"
 #include "volume_catcher.h"
 #include "media_plugin_base.h"
 
@@ -55,14 +56,14 @@ private:
 	bool init();
 
 	void onPageChangedCallback(const unsigned char* pixels, int x, int y, const int width, const int height);
-	void onCustomSchemeURLCallback(std::string url);
+	void onCustomSchemeURLCallback(std::string url, bool user_gesture, bool is_redirect);
 	void onConsoleMessageCallback(std::string message, std::string source, int line);
 	void onStatusMessageCallback(std::string value);
 	void onTitleChangeCallback(std::string title);
 	void onTooltipCallback(std::string text);
 	void onLoadStartCallback();
 	void onRequestExitCallback();
-	void onLoadEndCallback(int httpStatusCode);
+	void onLoadEndCallback(int httpStatusCode, std::string url);
 	void onLoadError(int status, const std::string error_text);
 	void onAddressChangeCallback(std::string url);
 	void onOpenPopupCallback(std::string url, std::string target);
@@ -92,6 +93,8 @@ private:
 	bool mDisableGPU;
 	bool mDisableNetworkService;
 	bool mUseMockKeyChain;
+	bool mDisableWebSecurity;
+	bool mFileAccessFromFileUrls;
 	std::string mUserAgentSubtring;
 	std::string mAuthUsername;
 	std::string mAuthPassword;
@@ -135,9 +138,14 @@ MediaPluginBase(host_send_func, host_user_data)
 	mCookiesEnabled = true;
 	mPluginsEnabled = false;
 	mJavascriptEnabled = true;
+    mProxyEnabled = false;
+    mProxyHost = "";
+    mProxyPort = 0;
 	mDisableGPU = false;
 	mDisableNetworkService = true;
 	mUseMockKeyChain = true;
+	mDisableWebSecurity = false;
+	mFileAccessFromFileUrls = false;
 	mUserAgentSubtring = "";
 	mAuthUsername = "";
 	mAuthPassword = "";
@@ -279,13 +287,14 @@ void MediaPluginCEF::onRequestExitCallback()
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void MediaPluginCEF::onLoadEndCallback(int httpStatusCode)
+void MediaPluginCEF::onLoadEndCallback(int httpStatusCode, std::string url)
 {
 	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA_BROWSER, "navigate_complete");
 	//message.setValue("uri", event.getEventUri());  // not easily available here in CEF - needed?
 	message.setValueS32("result_code", httpStatusCode);
 	message.setValueBoolean("history_back_available", mCEFLib->canGoBack());
 	message.setValueBoolean("history_forward_available", mCEFLib->canGoForward());
+	message.setValue("uri", url);
 	sendMessage(message);
 }
 
@@ -310,11 +319,18 @@ void MediaPluginCEF::onOpenPopupCallback(std::string url, std::string target)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void MediaPluginCEF::onCustomSchemeURLCallback(std::string url)
+void MediaPluginCEF::onCustomSchemeURLCallback(std::string url, bool user_gesture, bool is_redirect)
 {
 	LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA_BROWSER, "click_nofollow");
-	message.setValue("uri", url);
-	message.setValue("nav_type", "clicked");	// TODO: differentiate between click and navigate to
+    message.setValue("uri", url);
+
+    // indicate if this interaction was from a user click (okay on a SLAPP) or 
+    // via a navigation (e.g. a data URL - see SL-18151) (not okay on a SLAPP)
+    const std::string nav_type = user_gesture ? "clicked" : "navigated";
+
+	message.setValue("nav_type", nav_type);
+    message.setValueBoolean("is_redirect", is_redirect);
+
 	sendMessage(message);
 }
 
@@ -382,14 +398,16 @@ const std::vector<std::string> MediaPluginCEF::onFileDialog(dullahan::EFileDialo
 	}
 	else if (dialog_type == dullahan::FD_SAVE_FILE)
 	{
+		mPickedFiles.clear();
 		mAuthOK = false;
 
 		LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "file_download");
+		message.setValueBoolean("blocking_request", true);
 		message.setValue("filename", default_file);
 
 		sendMessage(message);
 
-		return std::vector<std::string>();
+		return mPickedFiles;
 	}
 
 	return std::vector<std::string>();
@@ -419,21 +437,86 @@ void MediaPluginCEF::onCursorChangedCallback(dullahan::ECursorType type)
 
 	switch (type)
 	{
-		case dullahan::CT_POINTER:
-			name = "arrow";
-			break;
+        case dullahan::CT_POINTER:
+            name = "UI_CURSOR_ARROW";
+            break;
+        case dullahan::CT_CROSS:
+            name = "UI_CURSOR_CROSS";
+            break;
+        case dullahan::CT_HAND:
+            name = "UI_CURSOR_HAND";
+            break;
 		case dullahan::CT_IBEAM:
-			name = "ibeam";
+			name = "UI_CURSOR_IBEAM";
 			break;
-		case dullahan::CT_NORTHSOUTHRESIZE:
-			name = "splitv";
-			break;
-		case dullahan::CT_EASTWESTRESIZE:
-			name = "splith";
-			break;
-		case dullahan::CT_HAND:
-			name = "hand";
-			break;
+        case dullahan::CT_WAIT:
+            name = "UI_CURSOR_WAIT";
+            break;
+        //case dullahan::CT_HELP:
+        case dullahan::CT_ROWRESIZE:
+        case dullahan::CT_NORTHRESIZE:
+        case dullahan::CT_SOUTHRESIZE:
+        case dullahan::CT_NORTHSOUTHRESIZE:
+            name = "UI_CURSOR_SIZENS";
+            break;
+        case dullahan::CT_COLUMNRESIZE:
+        case dullahan::CT_EASTRESIZE:
+        case dullahan::CT_WESTRESIZE:
+        case dullahan::CT_EASTWESTRESIZE:
+            name = "UI_CURSOR_SIZEWE";
+            break;
+        case dullahan::CT_NORTHEASTRESIZE:
+        case dullahan::CT_SOUTHWESTRESIZE:
+        case dullahan::CT_NORTHEASTSOUTHWESTRESIZE:
+            name = "UI_CURSOR_SIZENESW";
+            break;
+        case dullahan::CT_SOUTHEASTRESIZE:
+        case dullahan::CT_NORTHWESTRESIZE:
+        case dullahan::CT_NORTHWESTSOUTHEASTRESIZE:
+            name = "UI_CURSOR_SIZENWSE";
+            break;
+        case dullahan::CT_MOVE:
+            name = "UI_CURSOR_SIZEALL";
+            break;
+        //case dullahan::CT_MIDDLEPANNING:
+        //case dullahan::CT_EASTPANNING:
+        //case dullahan::CT_NORTHPANNING:
+        //case dullahan::CT_NORTHEASTPANNING:
+        //case dullahan::CT_NORTHWESTPANNING:
+        //case dullahan::CT_SOUTHPANNING:
+        //case dullahan::CT_SOUTHEASTPANNING:
+        //case dullahan::CT_SOUTHWESTPANNING:
+        //case dullahan::CT_WESTPANNING:
+        //case dullahan::CT_VERTICALTEXT:
+        //case dullahan::CT_CELL:
+        //case dullahan::CT_CONTEXTMENU:
+        case dullahan::CT_ALIAS:
+            name = "UI_CURSOR_TOOLMEDIAOPEN";
+            break;
+        case dullahan::CT_PROGRESS:
+            name = "UI_CURSOR_WORKING";
+            break;
+        case dullahan::CT_COPY:
+            name = "UI_CURSOR_ARROWCOPY";
+            break;
+        case dullahan::CT_NONE:
+            name = "UI_CURSOR_NO";
+            break;
+        case dullahan::CT_NODROP:
+        case dullahan::CT_NOTALLOWED:
+            name = "UI_CURSOR_NOLOCKED";
+            break;
+        case dullahan::CT_ZOOMIN:
+            name = "UI_CURSOR_TOOLZOOMIN";
+            break;
+        case dullahan::CT_ZOOMOUT:
+            name = "UI_CURSOR_TOOLZOOMOUT";
+            break;
+        case dullahan::CT_GRAB:
+            name = "UI_CURSOR_TOOLGRAB";
+            break;
+        //case dullahan::CT_GRABING:
+        //case dullahan::CT_CUSTOM:
 
 		default:
 			LL_WARNS() << "Unknown cursor ID: " << (int)type << LL_ENDL;
@@ -540,65 +623,74 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 		}
 		else if (message_class == LLPLUGIN_MESSAGE_CLASS_MEDIA)
 		{
-			if (message_name == "init")
-			{
-				// event callbacks from Dullahan
-				mCEFLib->setOnPageChangedCallback(std::bind(&MediaPluginCEF::onPageChangedCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
-				mCEFLib->setOnCustomSchemeURLCallback(std::bind(&MediaPluginCEF::onCustomSchemeURLCallback, this, std::placeholders::_1));
-				mCEFLib->setOnConsoleMessageCallback(std::bind(&MediaPluginCEF::onConsoleMessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-				mCEFLib->setOnStatusMessageCallback(std::bind(&MediaPluginCEF::onStatusMessageCallback, this, std::placeholders::_1));
-				mCEFLib->setOnTitleChangeCallback(std::bind(&MediaPluginCEF::onTitleChangeCallback, this, std::placeholders::_1));
-				mCEFLib->setOnTooltipCallback(std::bind(&MediaPluginCEF::onTooltipCallback, this, std::placeholders::_1));
-				mCEFLib->setOnLoadStartCallback(std::bind(&MediaPluginCEF::onLoadStartCallback, this));
-				mCEFLib->setOnLoadEndCallback(std::bind(&MediaPluginCEF::onLoadEndCallback, this, std::placeholders::_1));
-				mCEFLib->setOnLoadErrorCallback(std::bind(&MediaPluginCEF::onLoadError, this, std::placeholders::_1, std::placeholders::_2));
-				mCEFLib->setOnAddressChangeCallback(std::bind(&MediaPluginCEF::onAddressChangeCallback, this, std::placeholders::_1));
-				mCEFLib->setOnOpenPopupCallback(std::bind(&MediaPluginCEF::onOpenPopupCallback, this, std::placeholders::_1, std::placeholders::_2));
+            if (message_name == "init")
+            {
+                // event callbacks from Dullahan
+                mCEFLib->setOnPageChangedCallback(std::bind(&MediaPluginCEF::onPageChangedCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
+                mCEFLib->setOnCustomSchemeURLCallback(std::bind(&MediaPluginCEF::onCustomSchemeURLCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+                mCEFLib->setOnConsoleMessageCallback(std::bind(&MediaPluginCEF::onConsoleMessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+                mCEFLib->setOnStatusMessageCallback(std::bind(&MediaPluginCEF::onStatusMessageCallback, this, std::placeholders::_1));
+                mCEFLib->setOnTitleChangeCallback(std::bind(&MediaPluginCEF::onTitleChangeCallback, this, std::placeholders::_1));
+                mCEFLib->setOnTooltipCallback(std::bind(&MediaPluginCEF::onTooltipCallback, this, std::placeholders::_1));
+                mCEFLib->setOnLoadStartCallback(std::bind(&MediaPluginCEF::onLoadStartCallback, this));
+                mCEFLib->setOnLoadEndCallback(std::bind(&MediaPluginCEF::onLoadEndCallback, this, std::placeholders::_1, std::placeholders::_2));
+                mCEFLib->setOnLoadErrorCallback(std::bind(&MediaPluginCEF::onLoadError, this, std::placeholders::_1, std::placeholders::_2));
+                mCEFLib->setOnAddressChangeCallback(std::bind(&MediaPluginCEF::onAddressChangeCallback, this, std::placeholders::_1));
+                mCEFLib->setOnOpenPopupCallback(std::bind(&MediaPluginCEF::onOpenPopupCallback, this, std::placeholders::_1, std::placeholders::_2));
 				mCEFLib->setOnHTTPAuthCallback(std::bind(&MediaPluginCEF::onHTTPAuthCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
-				mCEFLib->setOnFileDialogCallback(std::bind(&MediaPluginCEF::onFileDialog, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
-				mCEFLib->setOnCursorChangedCallback(std::bind(&MediaPluginCEF::onCursorChangedCallback, this, std::placeholders::_1));
-				mCEFLib->setOnRequestExitCallback(std::bind(&MediaPluginCEF::onRequestExitCallback, this));
-				mCEFLib->setOnJSDialogCallback(std::bind(&MediaPluginCEF::onJSDialogCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-				mCEFLib->setOnJSBeforeUnloadCallback(std::bind(&MediaPluginCEF::onJSBeforeUnloadCallback, this));
-				
-				dullahan::dullahan_settings settings;
+                mCEFLib->setOnFileDialogCallback(std::bind(&MediaPluginCEF::onFileDialog, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
+                mCEFLib->setOnCursorChangedCallback(std::bind(&MediaPluginCEF::onCursorChangedCallback, this, std::placeholders::_1));
+                mCEFLib->setOnRequestExitCallback(std::bind(&MediaPluginCEF::onRequestExitCallback, this));
+                mCEFLib->setOnJSDialogCallback(std::bind(&MediaPluginCEF::onJSDialogCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+                mCEFLib->setOnJSBeforeUnloadCallback(std::bind(&MediaPluginCEF::onJSBeforeUnloadCallback, this));
+
+                dullahan::dullahan_settings settings;
 #if LL_WINDOWS
-				// As of CEF version 83+, for Windows versions, we need to tell CEF 
-				// where the host helper process is since this DLL is not in the same
-				// dir as the executable that loaded it (SLPlugin.exe). The code in 
-				// Dullahan that tried to figure out the location automatically uses 
-				// the location of the exe which isn't helpful so we tell it explicitly.
+                // As of CEF version 83+, for Windows versions, we need to tell CEF 
+                // where the host helper process is since this DLL is not in the same
+                // dir as the executable that loaded it (SLPlugin.exe). The code in 
+                // Dullahan that tried to figure out the location automatically uses 
+                // the location of the exe which isn't helpful so we tell it explicitly.
 				settings.host_process_path = mHelperPath;
 
 #endif
-				settings.accept_language_list = mHostLanguage;
+                settings.accept_language_list = mHostLanguage;
 
-				// SL-15560: Product team overruled my change to set the default
-				// embedded background color to match the floater background
-				// and set it to white
-				settings.background_color = 0xffffffff;	// white 
+                // SL-15560: Product team overruled my change to set the default
+                // embedded background color to match the floater background
+                // and set it to white
+                settings.background_color = 0xffffffff;	// white 
 
 				settings.user_data_path = mUserDataPath;
 
-				settings.cache_enabled = true;
-				settings.root_cache_path = mRootCachePath;
-				settings.cache_path = mCachePath;
-				settings.context_cache_path = mContextCachePath;
-				settings.cookies_enabled = mCookiesEnabled;
+                settings.cache_enabled = true;
+                settings.root_cache_path = mRootCachePath;
+                settings.cache_path = mCachePath;
+                settings.context_cache_path = mContextCachePath;
+                settings.cookies_enabled = mCookiesEnabled;
+
+                //// configure proxy argument if enabled and valid
+                //if (mProxyEnabled && mProxyHost.length())
+                //{
+                //    std::ostringstream proxy_url;
+                //    proxy_url << mProxyHost << ":" << mProxyPort;
+                //    settings.proxy_host_port = proxy_url.str();
+                //}
 				settings.disable_gpu = mDisableGPU;
 #if LL_DARWIN
 				settings.disable_network_service = mDisableNetworkService;
 				settings.use_mock_keychain = mUseMockKeyChain;
 #endif
-				// This setting applies to all plugins, not just Flash
-				// Regarding, SL-15559 PDF files do not load in CEF v91,
-				// it turns out that on Windows, PDF support is treated
-				// as a plugin on Windows only so turning all plugins
-				// off, disabled built in PDF support.  (Works okay in
-				// macOS surprisingly). To mitigrate this, we set the global
-				// media enabled flag to whatever the consumer wants and 
-				// explicitly disable Flash with a different setting (below)
-				settings.plugins_enabled = mPluginsEnabled;
+                // these were added to facilitate loading images directly into a local
+                // web page for the prototype 360 project in 2017 - something that is 
+                // disallowed normally by the browser security model. Now the the source
+                // (cubemap) images are stores as JavaScript, we can avoid opening up
+                // this security hole (it was only set for the 360 floater but still 
+                // a concern). Leaving them here, explicitly turn off vs removing 
+                // entirely from this source file so that others are aware of them 
+                // in the future.
+                settings.disable_web_security = false;
+                settings.file_access_from_file_urls = false;
 
 				settings.flip_mouse_y = false;
 				settings.flip_pixels_y = true;
@@ -744,6 +836,11 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 				std::string uri = message_in.getValue("uri");
 				mCEFLib->navigate(uri);
 			}
+			else if (message_name == "execute_javascript")
+			{
+				std::string code = message_in.getValue("code");
+				mCEFLib->executeJavaScript(code);
+			}
 			else if (message_name == "set_cookie")
 			{
 				std::string uri = message_in.getValue("uri");
@@ -773,17 +870,23 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 					mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_DOWN, x, y);
 					mCEFLib->setFocus();
 
-					std::stringstream str;
-					str << "Mouse down at = " << x << ", " << y;
-					postDebugMessage(str.str());
+					if(mEnableMediaPluginDebugging)
+					{
+						std::stringstream str;
+						str << "Mouse down at = " << x << ", " << y;
+						postDebugMessage(str.str());
+					}
 				}
 				else if (event == "up" && button == 0)
 				{
 					mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_UP, x, y);
 
-					std::stringstream str;
-					str << "Mouse up at = " << x << ", " << y;
-					postDebugMessage(str.str());
+					if (mEnableMediaPluginDebugging)
+					{
+						std::stringstream str;
+						str << "Mouse up at = " << x << ", " << y;
+						postDebugMessage(str.str());
+					}
 				}
 				else if (event == "double_click")
 				{
@@ -976,6 +1079,20 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 			else if (message_name == "gpu_disabled")
 			{
 				mDisableGPU = message_in.getValueBoolean("disable");
+			}
+            else if (message_name == "proxy_setup")
+            {
+                mProxyEnabled = message_in.getValueBoolean("enable");
+                mProxyHost = message_in.getValue("host");
+                mProxyPort = message_in.getValueS32("port");
+            }
+			else if (message_name == "web_security_disabled")
+			{
+				mDisableWebSecurity = message_in.getValueBoolean("disabled");
+			}
+			else if (message_name == "file_access_from_file_urls")
+			{
+				mFileAccessFromFileUrls = message_in.getValueBoolean("enabled");
 			}
 			else if (message_name == "proxy_setup")
 			{

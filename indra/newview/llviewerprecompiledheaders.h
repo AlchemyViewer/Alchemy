@@ -45,8 +45,8 @@
 #include <string>
 #include <string_view>
 
-#include "absl/container/flat_hash_set.h"
-#include "absl/container/flat_hash_map.h"
+#include "boost/unordered/unordered_flat_set.hpp"
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #include <fmt/format.h>
 #include <fmt/compile.h>
@@ -54,7 +54,6 @@
 // Library headers from llcommon project:
 #include "indra_constants.h"
 #include "llinitparam.h"
-#include "llallocator.h"
 #include "llapp.h"
 #include "llcriticaldamp.h"
 #include "lldefs.h"

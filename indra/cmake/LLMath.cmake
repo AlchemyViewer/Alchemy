@@ -1,7 +1,5 @@
 # -*- cmake -*-
 
-set(LLMATH_INCLUDE_DIRS
-    ${LIBS_OPEN_DIR}/llmath
-    )
+include(Variables)
+include(Mikktspace)
 
-set(LLMATH_LIBRARIES llmath)

@@ -2,18 +2,14 @@
 include(Linking)
 include(Prebuilt)
 
-if (USESYSTEMLIBS)
-    set(CEFPLUGIN OFF CACHE BOOL
-        "CEFPLUGIN support for the llplugin/llmedia test apps.")
-else (USESYSTEMLIBS)
-    use_prebuilt_binary(dullahan)
-    set(CEFPLUGIN ON CACHE BOOL
-        "CEFPLUGIN support for the llplugin/llmedia test apps.")
-        set(CEF_INCLUDE_DIR ${LIBS_PREBUILT_DIR}/include/cef)
-endif (USESYSTEMLIBS)
+include_guard()
+add_library( ll::cef INTERFACE IMPORTED )
+
+use_prebuilt_binary(dullahan)
+target_include_directories( ll::cef SYSTEM INTERFACE  ${LIBS_PREBUILT_DIR}/include/cef)
 
 if (WINDOWS)
-    set(CEF_PLUGIN_LIBRARIES
+    target_link_libraries( ll::cef INTERFACE
         ${ARCH_PREBUILT_DIRS_RELEASE}/libcef.lib
         ${ARCH_PREBUILT_DIRS_RELEASE}/libcef_dll_wrapper.lib
         ${ARCH_PREBUILT_DIRS_RELEASE}/dullahan.lib
@@ -24,14 +20,14 @@ elseif (DARWIN)
         message(FATAL_ERROR "AppKit not found")
     endif()
 
-    set(CEF_PLUGIN_LIBRARIES
+    target_link_libraries( ll::cef INTERFACE
         ${ARCH_PREBUILT_DIRS_RELEASE}/libcef_dll_wrapper.a
         ${ARCH_PREBUILT_DIRS_RELEASE}/libdullahan.a
         ${APPKIT_LIBRARY}
        )
 
 elseif (LINUX)
-    set(CEF_PLUGIN_LIBRARIES
+    target_link_libraries( ll::cef INTERFACE
         dullahan
         cef
         cef_dll_wrapper.a

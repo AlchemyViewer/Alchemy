@@ -85,7 +85,7 @@ F32 LLHUDObject::getDistance() const
 
 void LLHUDObject::setSourceObject(LLViewerObject* objectp)
 {
-	if (objectp == mSourceObject)
+	if (objectp == mSourceObject.get())
 	{
 		return;
 	}
@@ -95,7 +95,7 @@ void LLHUDObject::setSourceObject(LLViewerObject* objectp)
 
 void LLHUDObject::setTargetObject(LLViewerObject* objectp)
 {
-	if (objectp == mTargetObject)
+	if (objectp == mTargetObject.get())
 	{
 		return;
 	}
@@ -267,6 +267,13 @@ void LLHUDObject::updateAll()
 // static
 void LLHUDObject::renderAll()
 {
+    LLGLSUIDefault gls_ui;
+
+    gUIProgram.bind();
+    gGL.color4f(1, 1, 1, 1);
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+
 	LLHUDObject *hud_objp;
 	
 	hud_object_list_t::iterator object_it;
@@ -285,6 +292,7 @@ void LLHUDObject::renderAll()
 	}
 
 	LLVertexBuffer::unbind();
+    gUIProgram.unbind();
 }
 
 // static

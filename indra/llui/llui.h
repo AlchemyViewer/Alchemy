@@ -74,7 +74,8 @@ enum EDragAndDropType
 	DAD_WIDGET          = 16,
 	DAD_PERSON          = 17,
     DAD_SETTINGS        = 18,
-	DAD_COUNT           = 19,   // number of types in this enum
+    DAD_MATERIAL        = 19,
+    DAD_COUNT           = 20,   // number of types in this enum
 };
 
 // Reasons for drags to be denied.
@@ -318,9 +319,9 @@ public:
     static void setScaleFactor(const LLVector2& scale_factor);
 	static void setLineWidth(F32 width) { LLRender2D::setLineWidth(width); }
 	static LLPointer<LLUIImage> getUIImageByID(const LLUUID& image_id, S32 priority = 0)
-		{ return LLRender2D::getInstanceFast()->getUIImageByID(image_id, priority); }
+		{ return LLRender2D::getInstance()->getUIImageByID(image_id, priority); }
 	static LLPointer<LLUIImage> getUIImage(const std::string& name, S32 priority = 0)
-		{ return LLRender2D::getInstanceFast()->getUIImage(name, priority); }
+		{ return LLRender2D::getInstance()->getUIImage(name, priority); }
 
 	//
 	// Data
@@ -361,7 +362,7 @@ public:
 	LLUICachedControl(const std::string& name,
 					  const T& default_value,
 					  const std::string& comment = "Declared In Code")
-	:	LLCachedControl<T>(LLUI::getInstanceFast()->getControlControlGroup(name), name, default_value, comment)
+	:	LLCachedControl<T>(LLUI::getInstance()->getControlControlGroup(name), name, default_value, comment)
 	{}
 };
 

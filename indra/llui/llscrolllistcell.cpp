@@ -54,6 +54,14 @@ LLScrollListCell* LLScrollListCell::create(const LLScrollListCell::Params& cell_
 	{
 		cell = new LLScrollListIconText(cell_p);
 	}
+    else if (cell_p.type() == "bar")
+    {
+        cell = new LLScrollListBar(cell_p);
+    }
+	else if(cell_p.type() == "line_editor")
+	{
+		cell = new LLScrollListLineEditor(cell_p);
+	}
 	else	// default is "text"
 	{
 		cell = new LLScrollListText(cell_p);
@@ -70,6 +78,9 @@ LLScrollListCell* LLScrollListCell::create(const LLScrollListCell::Params& cell_
 
 LLScrollListCell::LLScrollListCell(const LLScrollListCell::Params& p)
 :	mWidth(p.width), 
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+	mColumnName(p.column),
+// [/SL:KB]
 	mToolTip(p.tool_tip)
 {}
 
@@ -79,6 +90,14 @@ const LLSD LLScrollListCell::getValue() const
 	return LLStringUtil::null;
 }
 
+
+// virtual
+const LLSD LLScrollListCell::getAltValue() const
+{
+	return LLStringUtil::null;
+}
+
+
 //
 // LLScrollListIcon
 //
@@ -86,7 +105,9 @@ LLScrollListIcon::LLScrollListIcon(const LLScrollListCell::Params& p)
 :	LLScrollListCell(p),
 	mIcon(LLUI::getUIImage(p.value().asString())),
 	mColor(p.color),
-	mAlignment(p.font_halign)
+	mAlignment(p.font_halign),
+	mCallback(NULL),
+	mUserData(NULL)
 {}
 
 /*virtual*/
@@ -162,6 +183,74 @@ void LLScrollListIcon::draw(const LLColor4& color, const LLColor4& highlight_col
 }
 
 //
+// LLScrollListBar
+//
+LLScrollListBar::LLScrollListBar(const LLScrollListCell::Params& p)
+    :	LLScrollListCell(p),
+    mRatio(0),
+    mColor(p.color),
+    mBottom(1),
+    mLeftPad(1),
+    mRightPad(1)
+{}
+
+LLScrollListBar::~LLScrollListBar()
+{
+}
+
+/*virtual*/
+S32 LLScrollListBar::getHeight() const
+{ 
+    return LLScrollListCell::getHeight();
+}
+
+/*virtual*/
+const LLSD LLScrollListBar::getValue() const
+{ 
+    return LLStringUtil::null; 
+}
+
+void LLScrollListBar::setValue(const LLSD& value)
+{
+    if (value.has("ratio"))
+    {
+        mRatio = value["ratio"].asReal();
+    }
+    if (value.has("bottom"))
+    {
+        mBottom = value["bottom"].asInteger();
+    }
+    if (value.has("left_pad"))
+    {
+        mLeftPad = value["left_pad"].asInteger();
+    }
+    if (value.has("right_pad"))
+    {
+        mRightPad = value["right_pad"].asInteger();
+    }
+}
+
+void LLScrollListBar::setColor(const LLColor4& color)
+{
+    mColor = color;
+}
+
+S32	LLScrollListBar::getWidth() const 
+{
+    return LLScrollListCell::getWidth();
+}
+
+
+void LLScrollListBar::draw(const LLColor4& color, const LLColor4& highlight_color)	 const
+{
+    S32 bar_width = getWidth() - mLeftPad - mRightPad;
+    S32 left = bar_width - bar_width * mRatio;
+    left = llclamp(left, mLeftPad, getWidth() - mRightPad - 1);
+
+    gl_rect_2d(left, mBottom, getWidth() - mRightPad, mBottom - 1, mColor);
+}
+
+//
 // LLScrollListText
 //
 U32 LLScrollListText::sCount = 0;
@@ -169,6 +258,7 @@ U32 LLScrollListText::sCount = 0;
 LLScrollListText::LLScrollListText(const LLScrollListCell::Params& p)
 :	LLScrollListCell(p),
 	mText(p.label.isProvided() ? p.label() : p.value().asString()),
+	mAltText(p.alt_value().asString()),
 	mFont(p.font),
 	mColor(p.color),
 	mUseColor(p.color.isProvided()),
@@ -271,10 +361,22 @@ void LLScrollListText::setValue(const LLSD& text)
 	setText(text.asString());
 }
 
+//virtual
+void LLScrollListText::setAltValue(const LLSD& text)
+{
+	mAltText = text.asString();
+}
+
 //virtual 
 const LLSD LLScrollListText::getValue() const		
 { 
-	return LLSD(mText.getString()); 
+	return LLSD(mText.getString());  
+}
+
+//virtual 
+const LLSD LLScrollListText::getAltValue() const		
+{ 
+	return LLSD(mAltText.getString());
 }
 
 
@@ -350,6 +452,14 @@ LLScrollListCheck::LLScrollListCheck(const LLScrollListCell::Params& p)
 {
 	LLCheckBoxCtrl::Params checkbox_p;
 	checkbox_p.name("checkbox");
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+	if (p.commit_callback.isProvided())
+	{
+		if (!mCommitSignal)
+			mCommitSignal = new commit_signal_t();
+		mCommitSignal->connect(p.commit_callback());
+	}
+// [/SL:KB]
 	checkbox_p.rect = LLRect(0, p.width, p.width, 0);
 	checkbox_p.enabled(p.enabled);
 	checkbox_p.initial_value(p.value());
@@ -374,6 +484,9 @@ LLScrollListCheck::LLScrollListCheck(const LLScrollListCell::Params& p)
 
 LLScrollListCheck::~LLScrollListCheck()
 {
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+	delete mCommitSignal;
+// [/SL:KB]
 	delete mCheckBox;
 	mCheckBox = NULL;
 }
@@ -409,6 +522,10 @@ void LLScrollListCheck::setValue(const LLSD& value)
 void LLScrollListCheck::onCommit()
 {
 	mCheckBox->onCommit();
+// [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
+	if (mCommitSignal)
+		(*mCommitSignal)(this);
+// [/SL:KB]
 }
 
 /*virtual*/
@@ -567,4 +684,61 @@ void LLScrollListIconText::draw(const LLColor4& color, const LLColor4& highlight
     }
 }
 
+//
+// LLScrollListLineEditor
+//
+LLScrollListLineEditor::LLScrollListLineEditor( const LLScrollListCell::Params& p)
+: LLScrollListCell(p)
+{
+	LLLineEditor::Params line_editor_p;
+	line_editor_p.name("line_editor");
+	line_editor_p.rect = LLRect(0, p.width, p.width, 0);
+	line_editor_p.enabled(p.enabled);
+	line_editor_p.initial_value(p.value());
 
+	mLineEditor = LLUICtrlFactory::create<LLLineEditor>(line_editor_p);
+
+	LLRect rect(mLineEditor->getRect());
+	if (p.width())
+	{
+		rect.mRight = rect.mLeft + p.width();
+		mLineEditor->setRect(rect);
+		setWidth(p.width());
+	}
+	else
+	{
+		setWidth(rect.getWidth()); //line_editor->getWidth();
+	}
+}
+
+LLScrollListLineEditor::~LLScrollListLineEditor()
+{
+	delete mLineEditor;
+	mLineEditor = NULL;
+}
+
+void LLScrollListLineEditor::draw(const LLColor4& color, const LLColor4& highlight_color) const
+{
+	mLineEditor->draw();
+}
+
+BOOL LLScrollListLineEditor::handleClick()
+{
+	if (mLineEditor->getEnabled())
+	{
+		mLineEditor->setFocus(TRUE);
+		mLineEditor->selectAll();
+	}
+	// return value changes selection?
+	return FALSE; //TRUE;
+}
+
+BOOL LLScrollListLineEditor::handleUnicodeChar(llwchar uni_char, BOOL called_from_parent)
+{
+	return TRUE;
+}
+
+BOOL LLScrollListLineEditor::handleUnicodeCharHere(llwchar uni_char )
+{
+	return TRUE;
+}

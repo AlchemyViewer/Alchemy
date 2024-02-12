@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>${WIN_BINARY_NAME}</id>
+    <version>${VIEWER_VERSION_MAJOR}.${VIEWER_VERSION_MINOR}.${VIEWER_VERSION_PATCH}</version>
+    <authors>Alchemy Development Group</authors>
+    <owners>Alchemy Development Group</owners>
+  	<title>${WIN_PRODUCT_NAME}</title>
+    <description>${WIN_PRODUCT_NAME}</description>
+    <copyright>Copyright (C) 2013-2023 Alchemy Development Group</copyright>
+	<projectUrl>https://www.alchemyviewer.org</projectUrl>
+  </metadata>
+  <files>
+    <file src="Release\**\*.*" target="lib\net45\" exclude="Release\**\*.pdb;Release\**\*.vshost.*;Release\**\*.nsi;Release\**\*.bat;Release\**\*_Setup.exe;Release\**\*-bin.exe;Release\**\*.exp;Release\**\*.lib"/>
+  </files>
+</package>

@@ -36,8 +36,11 @@
 #include "roles_constants.h"
 
 #include "llagent.h"
+#include "llavataractions.h"
+#include "llfloaterreg.h"
 #include "llfloaterregioninfo.h"
 #include "llfloaterreporter.h"
+#include "llfloaterwebcontent.h"
 #include "llslurl.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
@@ -100,6 +103,13 @@ void ALAvatarActions::copyData(const uuid_vec_t& ids, ECopyDataType type)
 				data_string.append(av_name.getDisplayName(true));
 				break;
 			}
+			case E_DATA_COMPLETE_NAME:
+			{
+				LLAvatarName av_name;
+				LLAvatarNameCache::get(id, &av_name);
+				data_string.append(av_name.getCompleteName(true, true));
+				break;
+			}
 			case E_DATA_SLURL:
 				data_string.append(LLSLURL("agent", id, "about").getSLURLString());
 				break;
@@ -134,6 +144,10 @@ void ALAvatarActions::copyData(const LLUUID& id, const LLSD& userdata)
 	else if (item_name == "display_name")
 	{
 		copyData(id, E_DATA_DISPLAY_NAME);
+	}
+	else if (item_name == "full_name")
+	{
+		copyData(id, E_DATA_COMPLETE_NAME);
 	}
 	else if (item_name == "id")
 	{
@@ -190,7 +204,7 @@ bool ALAvatarActions::canTeleportTo(const LLUUID& avatar_id)
 		return false;
 
 	LLWorld::pos_map_t positions;
-	LLWorld::getInstanceFast()->getAvatars(&positions);
+	LLWorld::getInstance()->getAvatars(&positions);
 	auto iter = positions.find(avatar_id);
 	if (iter != positions.cend())
 	{
@@ -211,7 +225,7 @@ void ALAvatarActions::teleportTo(const LLUUID& avatar_id)
 		return;
 
 	LLWorld::pos_map_t positions;
-	LLWorld::getInstanceFast()->getAvatars(&positions);
+	LLWorld::getInstance()->getAvatars(&positions);
 	auto iter = positions.find(avatar_id);
 	if (iter != positions.cend())
 	{
@@ -256,7 +270,7 @@ bool ALAvatarActions::canFreezeEject(const uuid_vec_t& ids)
 		return true;
 
 	LLWorld::region_gpos_map_t idRegions;
-	LLWorld::getInstanceFast()->getAvatars(&idRegions);
+	LLWorld::getInstance()->getAvatars(&idRegions);
 
 	auto ret = false;
 
@@ -273,12 +287,12 @@ bool ALAvatarActions::canFreezeEject(const uuid_vec_t& ids)
 			{
 				// Estate owners / managers can freeze
 				// Parcel owners can also freeze
-				LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstanceFast()->selectParcelAt(pos_global);
+				LLParcelSelectionHandle selection = LLViewerParcelMgr::getInstance()->selectParcelAt(pos_global);
 				const LLParcel* parcel = selection->getParcel();
 				auto local_pos = region->getPosRegionFromGlobal(pos_global);
 
 				if ((region->getOwner() == gAgent.getID() || region->isEstateManager() || region->isOwnedSelf(local_pos))
-					|| (region->isOwnedGroup(local_pos) && parcel && LLViewerParcelMgr::getInstanceFast()->isParcelOwnedByAgent(parcel, GP_LAND_ADMIN)))
+					|| (region->isOwnedGroup(local_pos) && parcel && LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel, GP_LAND_ADMIN)))
 				{
 					ret = true;
 				}
@@ -313,7 +327,7 @@ void ALAvatarActions::parcelFreeze(const uuid_vec_t& ids)
 		return;
 
 	LLSD payload;
-	payload["avatar_ids"] = LLSDArray();
+	payload["avatar_ids"] = LLSD::emptyArray();
 	std::string avatars;
 	for (auto id : ids)
 	{
@@ -331,7 +345,7 @@ void ALAvatarActions::parcelFreeze(const uuid_vec_t& ids)
 	LLSD args;
 	args["AVATAR_NAMES"] = avatars;
 
-	LLNotificationsUtil::add((payload["avatar_ids"].size() == 1) ? "FreezeAvatarFullname" : "FreezeAvatarMultiple", args, payload, handleParcelFreeze);
+	LLNotificationsUtil::add((payload["avatar_ids"].size() == 1) ? "FreezeAvatar" : "FreezeAvatarMultiple", args, payload, handleParcelFreeze);
 }
 
 // static
@@ -351,7 +365,7 @@ void ALAvatarActions::parcelEject(const uuid_vec_t& ids)
 		return;
 
 	LLWorld::pos_map_t avatar_positions;
-	LLWorld::getInstanceFast()->getAvatars(&avatar_positions);
+	LLWorld::getInstance()->getAvatars(&avatar_positions);
 
 	LLSD payload;
 	payload["avatar_ids"] = LLSD::emptyArray();
@@ -370,10 +384,10 @@ void ALAvatarActions::parcelEject(const uuid_vec_t& ids)
 				if (pos_it != avatar_positions.cend())
 				{
 					const auto& pos = pos_it->second;
-					LLParcel* parcel = LLViewerParcelMgr::getInstanceFast()->selectParcelAt(pos)->getParcel();
+					LLParcel* parcel = LLViewerParcelMgr::getInstance()->selectParcelAt(pos)->getParcel();
 					if (parcel)
 					{
-						ban_enabled = LLViewerParcelMgr::getInstanceFast()->isParcelOwnedByAgent(parcel, GP_LAND_MANAGE_BANNED);
+						ban_enabled = LLViewerParcelMgr::getInstance()->isParcelOwnedByAgent(parcel, GP_LAND_MANAGE_BANNED);
 						if (!ban_enabled)
 						{
 							ban_killed = true;
@@ -429,7 +443,7 @@ bool ALAvatarActions::canManageAvatarsEstate(const uuid_vec_t& ids)
 		return true;
 
 	LLWorld::region_gpos_map_t idRegions;
-	LLWorld::getInstanceFast()->getAvatars(&idRegions);
+	LLWorld::getInstance()->getAvatars(&idRegions);
 
 	auto ret = false;
 
@@ -495,7 +509,7 @@ void ALAvatarActions::estateTeleportHome(const uuid_vec_t& ids)
 	LLSD args;
 	args["AVATAR_NAMES"] = avatars;
 
-	LLNotificationsUtil::add((payload["avatar_ids"].size() == 1) ? "EstateTeleportHomeSingle" : "EstateTeleportHomeMulti", args, payload, handleEstateTeleportHome);
+	LLNotificationsUtil::add((payload["avatar_ids"].size() == 1) ? "EstateTeleportHomeSingle" : "EstateTeleportHomeMultiple", args, payload, handleEstateTeleportHome);
 }
 
 // static
@@ -593,7 +607,7 @@ void ALAvatarActions::estateBan(const uuid_vec_t& ids)
 	}
 
 	bool single_user = (payload["avatar_ids"].size() == 1);
-	LLNotificationsUtil::add(single_user ? "EstateBanSingle" : "EstateBanMultiple", args, payload, handleEstateKick);
+	LLNotificationsUtil::add(single_user ? "EstateBanSingle" : "EstateBanMultiple", args, payload, handleEstateBan);
 }
 
 // static
@@ -699,7 +713,7 @@ bool ALAvatarActions::handleEstateTeleportHome(const LLSD& notification, const L
 	if (option == 0)
 	{
 		LLWorld::region_gpos_map_t idRegions;
-		LLWorld::getInstanceFast()->getAvatars(&idRegions);
+		LLWorld::getInstance()->getAvatars(&idRegions);
 		const auto& avatar_ids = notification["payload"]["avatar_ids"];
 		for (LLSD::array_const_iterator it = avatar_ids.beginArray(), it_end = avatar_ids.endArray(); it != it_end; ++it)
 		{
@@ -741,7 +755,7 @@ bool ALAvatarActions::handleEstateKick(const LLSD& notification, const LLSD& res
 	if (option == 0)
 	{
 		LLWorld::region_gpos_map_t idRegions;
-		LLWorld::getInstanceFast()->getAvatars(&idRegions);
+		LLWorld::getInstance()->getAvatars(&idRegions);
 		const auto& avatar_ids = notification["payload"]["avatar_ids"];
 		for (LLSD::array_const_iterator it = avatar_ids.beginArray(), it_end = avatar_ids.endArray(); it != it_end; ++it)
 		{
@@ -841,4 +855,22 @@ bool ALAvatarActions::handleGodKick(const LLSD& notification, const LLSD& respon
 		gAgent.sendReliableMessage();
 	}
 	return false;
+}
+
+// Webprofile junk... for posterity!
+
+static void on_avatar_name_show_profile(const LLUUID& agent_id, const LLAvatarName& av_name)
+{
+    LLFloaterWebContent::Params p;
+    p.url(getProfileURL(av_name.getAccountName())).id(agent_id.asString());
+    LLFloaterReg::showInstance("webprofile", p);
+}
+
+// static
+void ALAvatarActions::showWebProfile(const LLUUID& id)
+{
+    if (id.notNull())
+    {
+        LLAvatarNameCache::get(id, boost::bind(&on_avatar_name_show_profile, _1, _2));
+    }
 }

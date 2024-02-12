@@ -54,6 +54,7 @@
 #include "llquaternion.h"
 #include "llwindow.h"			// getPixelAspectRatio()
 #include "lltracerecording.h"
+#include "llenvironment.h"
 
 // System includes
 #include <iomanip> // for setprecision
@@ -62,9 +63,6 @@ LLTrace::CountStatHandle<> LLViewerCamera::sVelocityStat("camera_velocity");
 LLTrace::CountStatHandle<> LLViewerCamera::sAngularVelocityStat("camera_angular_velocity");
 
 LLViewerCamera::eCameraID LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
-
-// Build time optimization, generate this once in .cpp file
-template class LLViewerCamera* LLSingleton<class LLViewerCamera>::getInstance();
 
 LLViewerCamera::LLViewerCamera() : LLCamera()
 {
@@ -82,24 +80,41 @@ LLViewerCamera::LLViewerCamera() : LLCamera()
 	gSavedSettings.getControl("CameraAngle")->getCommitSignal()->connect(boost::bind(&LLViewerCamera::updateCameraAngle, this, _2));
 }
 
-void LLViewerCamera::updateCameraLocation(const LLVector3 &center,
-											const LLVector3 &up_direction,
-											const LLVector3 &point_of_interest)
+void LLViewerCamera::updateCameraLocation(const LLVector3 &center, const LLVector3 &up_direction, const LLVector3 &point_of_interest)
 {
-	// do not update if avatar didn't move
-	if (!LLViewerJoystick::getInstanceFast()->getCameraNeedsUpdate())
-	{
-		return;
-	}
+    // do not update if avatar didn't move
+    if (!LLViewerJoystick::getInstance()->getCameraNeedsUpdate())
+    {
+        return;
+    }
 
-	LLVector3 last_position;
-	LLVector3 last_axis;
-	last_position = getOrigin();
-	last_axis = getAtAxis();
+    LLVector3 last_position;
+    LLVector3 last_axis;
+    last_position = getOrigin();
+    last_axis     = getAtAxis();
 
-	mLastPointOfInterest = point_of_interest;
+    mLastPointOfInterest = point_of_interest;
 
-	LLVector3 origin = center;
+    LLViewerRegion* regp = LLWorld::instance().getRegionFromPosAgent(getOrigin());
+    if (!regp)
+    {
+        regp = gAgent.getRegion();
+    }
+
+    F32 water_height = (NULL != regp) ? regp->getWaterHeight() : 0.f;
+
+    LLVector3 origin = center;
+
+    {
+        if (origin.mV[2] > water_height)
+        {
+            origin.mV[2] = llmax(origin.mV[2], water_height + 0.20f);
+        }
+        else
+        {
+            origin.mV[2] = llmin(origin.mV[2], water_height - 0.20f);
+        }
+    }
 
 	setOriginAndLookAt(origin, up_direction, point_of_interest);
 
@@ -653,11 +668,19 @@ LLVector3 LLViewerCamera::roundToPixel(const LLVector3 &pos_agent)
 
 BOOL LLViewerCamera::cameraUnderWater() const
 {
-	if(!gAgent.getRegion())
+    LLViewerRegion* regionp = LLWorld::instance().getRegionFromPosAgent(getOrigin());
+
+    if (!regionp)
+    {
+        regionp = gAgent.getRegion();
+    }
+
+	if(!regionp)
 	{
 		return FALSE ;
 	}
-	return getOrigin().mV[VZ] < gAgent.getRegion()->getWaterHeight();
+
+	return getOrigin().mV[VZ] < regionp->getWaterHeight();
 }
 
 BOOL LLViewerCamera::areVertsVisible(LLViewerObject* volumep, BOOL all_verts)
@@ -715,9 +738,13 @@ BOOL LLViewerCamera::areVertsVisible(LLViewerObject* volumep, BOOL all_verts)
 	return all_verts;
 }
 
+extern BOOL gCubeSnapshot;
+
 // changes local camera and broadcasts change
 /* virtual */ void LLViewerCamera::setView(F32 vertical_fov_rads)
 {
+    llassert(!gCubeSnapshot);
+
 	F32 old_fov = getView();
 
 	// cap the FoV
@@ -741,6 +768,11 @@ BOOL LLViewerCamera::areVertsVisible(LLViewerObject* volumep, BOOL all_verts)
 
 	// sync the camera with the new value
 	LLCamera::setView(vertical_fov_rads); // call base implementation
+}
+
+void LLViewerCamera::setViewNoBroadcast(F32 vertical_fov_rads)
+{
+    LLCamera::setView(vertical_fov_rads);
 }
 
 void LLViewerCamera::setDefaultFOV(F32 vertical_fov_rads) 

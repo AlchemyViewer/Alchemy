@@ -43,8 +43,6 @@ public:
 	bool init() override; // Override to do application initialization
     bool cleanup() override;
 
-    void reportCrashToBugsplat(void* pExcepInfo) override;
-
 	void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) override;
 
 protected:

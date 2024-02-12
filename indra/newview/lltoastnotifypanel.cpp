@@ -89,6 +89,7 @@ LLButton* LLToastNotifyPanel::createButton(const LLSD& form_element, BOOL is_opt
 	const LLFontGL* font = make_small_btn ? sFontSmall: sFont; // for block and ignore buttons in script dialog
 	p.name = form_element["name"].asString();
 	p.label = form_element["text"].asString();
+	p.tool_tip = form_element["text"].asString();
 	p.font = font;
 	p.rect.height = BTN_HEIGHT;
 	p.click_callback.function(boost::bind(&LLToastNotifyPanel::onClickButton, userdata));
@@ -329,7 +330,7 @@ void LLToastNotifyPanel::init( LLRect rect, bool show_images )
     mTextBox->setContentTrusted(is_content_trusted);
     mTextBox->setValue(mNotification->getMessage());
 	mTextBox->setIsFriendCallback(LLAvatarActions::isFriend);
-    mTextBox->setIsObjectBlockedCallback(boost::bind(&LLMuteList::isMuted, LLMuteList::getInstanceFast(), _1, _2, 0));
+    mTextBox->setIsObjectBlockedCallback(boost::bind(&LLMuteList::isMuted, LLMuteList::getInstance(), _1, _2, 0));
 
     // add buttons for a script notification
     if (mIsTip)

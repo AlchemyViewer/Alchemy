@@ -50,8 +50,6 @@ public:
 	// Destructor
 	virtual ~LLViewerJointMesh();
 
-	LLViewerJoint* asViewerJoint() override { return static_cast<LLViewerJoint*>(this); }
-
 	// Render time method to upload batches of joint matrices
 	void uploadJointMatrices();
 

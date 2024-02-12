@@ -34,6 +34,9 @@
 #include "llsd.h"
 #include "llsdserialize.h"
 
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
 LLLocationHistory::LLLocationHistory() :
 	mFilename("typed_locations.txt")
 {
@@ -163,7 +166,7 @@ void LLLocationHistory::load()
 	LLPointer<LLSDParser> parser = new LLSDNotationParser();
 	while (std::getline(file, line)) {
 		LLSD s_item;
-		std::istringstream iss(line);
+		boost::iostreams::stream<boost::iostreams::array_source> iss(line.data(), line.size());
 		if (parser->parse(iss, s_item, line.length()) == LLSDParser::PARSE_FAILURE)
 		{
 			LL_INFOS()<< "Parsing saved teleport history failed" << LL_ENDL;

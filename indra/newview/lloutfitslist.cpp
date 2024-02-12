@@ -35,7 +35,7 @@
 #include "llaccordionctrltab.h"
 #include "llagentwearables.h"
 #include "llappearancemgr.h"
-#include "llagentbenefits.h"
+#include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodel.h"
@@ -48,6 +48,7 @@
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
 #include "llwearableitemslist.h"
+#include "llresmgr.h"
 
 static bool is_tab_header_clicked(LLAccordionCtrlTab* tab, S32 y);
 
@@ -122,9 +123,8 @@ void LLOutfitsList::onOpen(const LLSD& info)
 {
     if (!mIsInitialized)
     {
-        const LLUUID cof = gInventory.findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT);
         // Start observing changes in Current Outfit category.
-        mCategoriesObserver->addCategory(cof, boost::bind(&LLOutfitsList::onCOFChanged, this));
+        LLOutfitObserver::instance().addCOFChangedCallback(boost::bind(&LLOutfitsList::onCOFChanged, this));
     }
 
     LLOutfitListBase::onOpen(info);
@@ -765,6 +765,7 @@ bool is_tab_header_clicked(LLAccordionCtrlTab* tab, S32 y)
 LLOutfitListBase::LLOutfitListBase()
     :   LLPanelAppearanceTab()
     ,   mIsInitialized(false)
+	,	mAvatarComplexityLabel(nullptr)
 {
     mCategoriesObserver = new LLInventoryCategoriesObserver();
     mOutfitMenu = new LLOutfitContextMenu(this);
@@ -842,6 +843,13 @@ void LLOutfitListBase::refreshList(const LLUUID& category_id)
 
     // Create added and removed items vectors.
     computeDifference(cat_array, vadded, vremoved);
+
+	{
+		std::string count_string;
+		LLLocale locale("");
+		LLResMgr::getInstance()->getIntegerString(count_string, (S32)cat_array.size());
+		getChild<LLTextBox>("OutfitcountText")->setTextArg("COUNT", count_string);
+	}
 
     // Handle added tabs.
     for (uuid_vec_t::const_iterator iter = vadded.begin();
@@ -968,6 +976,8 @@ BOOL LLOutfitListBase::postBuild()
 {
     mGearMenu = createGearMenu();
 
+	mAvatarComplexityLabel = getChild<LLTextBox>("avatar_complexity_label");
+
     LLMenuButton* menu_gear_btn = getChild<LLMenuButton>("options_gear_btn");
 
     menu_gear_btn->setMouseDownCallback(boost::bind(&LLOutfitListGearMenuBase::updateItemsVisibility, mGearMenu));
@@ -993,6 +1003,15 @@ void LLOutfitListBase::deselectOutfit(const LLUUID& category_id)
         mSelectedOutfitUUID = LLUUID::null;
         signalSelectionOutfitUUID(mSelectedOutfitUUID);
     }
+}
+
+void LLOutfitListBase::updateAvatarComplexity(U32 complexity)
+{
+	std::string complexity_string;
+	LLLocale locale("");
+	LLResMgr::getInstance()->getIntegerString(complexity_string, complexity);
+
+	mAvatarComplexityLabel->setTextArg("[WEIGHT]", complexity_string);
 }
 
 LLContextMenu* LLOutfitContextMenu::createMenu()
@@ -1093,10 +1112,7 @@ LLOutfitListGearMenuBase::LLOutfitListGearMenuBase(LLOutfitListBase* olist)
 
     registrar.add("Gear.WearAdd", boost::bind(&LLOutfitListGearMenuBase::onAdd, this));
 
-    registrar.add("Gear.UploadPhoto", boost::bind(&LLOutfitListGearMenuBase::onUploadFoto, this));
-    registrar.add("Gear.SelectPhoto", boost::bind(&LLOutfitListGearMenuBase::onSelectPhoto, this));
-    registrar.add("Gear.TakeSnapshot", boost::bind(&LLOutfitListGearMenuBase::onTakeSnapshot, this));
-    registrar.add("Gear.RemovePhoto", boost::bind(&LLOutfitListGearMenuBase::onRemovePhoto, this));
+    registrar.add("Gear.Thumbnail", boost::bind(&LLOutfitListGearMenuBase::onThumbnail, this));
     registrar.add("Gear.SortByName", boost::bind(&LLOutfitListGearMenuBase::onChangeSortOrder, this));
 
     enable_registrar.add("Gear.OnEnable", boost::bind(&LLOutfitListGearMenuBase::onEnable, this, _2));
@@ -1187,7 +1203,7 @@ void LLOutfitListGearMenuBase::onRename()
 
 void LLOutfitListGearMenuBase::onCreate(const LLSD& data)
 {
-    LLWearableType::EType type = LLWearableType::getInstanceFast()->typeNameToType(data.asString());
+    LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(data.asString());
     if (type == LLWearableType::WT_NONE)
     {
         LL_WARNS() << "Invalid wearable type" << LL_ENDL;
@@ -1213,7 +1229,6 @@ bool LLOutfitListGearMenuBase::onEnable(LLSD::String param)
 
 bool LLOutfitListGearMenuBase::onVisible(LLSD::String param)
 {
-	getMenu()->getChild<LLUICtrl>("upload_photo")->setLabelArg("[UPLOAD_COST]", fmt::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost()));
     const LLUUID& selected_outfit_id = getSelectedOutfitID();
     if (selected_outfit_id.isNull()) // no selection or invalid outfit selected
     {
@@ -1232,24 +1247,11 @@ bool LLOutfitListGearMenuBase::onVisible(LLSD::String param)
     return true;
 }
 
-void LLOutfitListGearMenuBase::onUploadFoto()
+void LLOutfitListGearMenuBase::onThumbnail()
 {
-
-}
-
-void LLOutfitListGearMenuBase::onSelectPhoto()
-{
-
-}
-
-void LLOutfitListGearMenuBase::onTakeSnapshot()
-{
-
-}
-
-void LLOutfitListGearMenuBase::onRemovePhoto()
-{
-
+    const LLUUID& selected_outfit_id = getSelectedOutfitID();
+    LLSD data(selected_outfit_id);
+    LLFloaterReg::showInstance("change_item_thumbnail", data);
 }
 
 void LLOutfitListGearMenuBase::onChangeSortOrder()
@@ -1269,10 +1271,7 @@ void LLOutfitListGearMenu::onUpdateItemsVisibility()
     if (!mMenu) return;
     mMenu->setItemVisible("expand", TRUE);
     mMenu->setItemVisible("collapse", TRUE);
-    mMenu->setItemVisible("upload_photo", FALSE);
-    mMenu->setItemVisible("select_photo", FALSE);
-    mMenu->setItemVisible("take_snapshot", FALSE);
-    mMenu->setItemVisible("remove_photo", FALSE);
+    mMenu->setItemVisible("thumbnail", FALSE); // Never visible?
     mMenu->setItemVisible("sepatator3", FALSE);
     mMenu->setItemVisible("sort_folders_by_name", FALSE);
     LLOutfitListGearMenuBase::onUpdateItemsVisibility();

@@ -41,10 +41,11 @@ public:
 		Params();
 	};
 	
-	virtual ~LLScriptEditor() {};
+	virtual ~LLScriptEditor();
 	
 	// LLView override
-	virtual void	draw();
+	virtual void	draw() override;
+	BOOL	postBuild() override;
 	
 	void	initKeywords();
 	void	loadKeywords();
@@ -58,13 +59,16 @@ protected:
 	
 private:
 	void	drawLineNumbers();
-	/* virtual */ void	updateSegments();
-	/* virtual */ void	drawSelectionBackground();
+	/* virtual */ void	updateSegments() override;
+	/* virtual */ void	drawSelectionBackground() override;
 	void	loadKeywords(const std::string& filename_keywords,
 						 const std::string& filename_colors);
 	
 	LLKeywords	mKeywords;
 	bool		mShowLineNumbers;
+
+	boost::signals2::connection mFontNameConnection;
+	boost::signals2::connection mFontSizeConnection;
 };
 
 #endif // LL_SCRIPTEDITOR_H

@@ -33,8 +33,6 @@
 #include <immintrin.h>
 #include "llsd.h"
 
-#include "absl/hash/hash.h"
-
 class LLMaterialID
 {
 public:
@@ -54,11 +52,7 @@ public:
  */
 	LL_FORCE_INLINE __m128i load_unaligned_si128(const U8* p) const
 	{
-#if defined(__SSE3__)
-		return _mm_lddqu_si128(reinterpret_cast<const __m128i*>(p));
-#else
 		return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p));
-#endif
 	}
 
 	bool operator==(const LLMaterialID& rhs) const
@@ -66,11 +60,12 @@ public:
 		__m128i mm_left = load_unaligned_si128(mID);
 		__m128i mm_right = load_unaligned_si128(rhs.mID);
 
-		__m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
 #if defined(__SSE4_1__)
-		return _mm_test_all_ones(mm_cmp);
+		__m128i mm = _mm_xor_si128(mm_left, mm_right);
+		return _mm_test_all_zeros(mm, mm) != 0;
 #else
-		return _mm_movemask_epi8(mm_cmp) == 0xFFFF;
+		__m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
+	    return _mm_movemask_epi8(mm_cmp) == 0xFFFF;
 #endif
 	}
 
@@ -110,7 +105,7 @@ public:
 		cmp = (cmp - 1u) ^ cmp;
 		rcmp = (rcmp - 1u) ^ rcmp;
 
-		return static_cast<uint16_t>(cmp) < static_cast<uint16_t>(rcmp);
+		return cmp < rcmp;
 	}
 
 	bool operator>(const LLMaterialID& rhs) const
@@ -134,21 +129,16 @@ public:
 #if defined(__SSE4_1__)
 		return _mm_test_all_zeros(mm, mm) != 0;
 #else
-		mm = _mm_cmpeq_epi8(mm, _mm_setzero_si128());
+		mm = _mm_cmpeq_epi32(mm, _mm_setzero_si128());
 		return _mm_movemask_epi8(mm) == 0xFFFF;
 #endif
 	}
 
-	inline size_t hash() const
+	friend std::size_t hash_value(LLMaterialID const& id)
 	{
-		return absl::Hash<LLMaterialID>{}(*this);
+		return boost::hash_value(id.mID);
 	}
 // END BOOST
-
-	template <typename H>
-	friend H AbslHashValue(H h, const LLMaterialID& id) {
-		return H::combine_contiguous(std::move(h), id.mID, MATERIAL_ID_SIZE);
-	}
 
 	const U8*     get() const;
 	void          set(const void* pMemory);
@@ -156,6 +146,7 @@ public:
 
 	LLSD          asLLSD() const;
 	std::string   asString() const;
+    LLUUID        asUUID() const;
 
 	friend std::ostream& operator<<(std::ostream& s, const LLMaterialID &material_id);
 
@@ -172,17 +163,7 @@ namespace std {
 	{
 		size_t operator()(const LLMaterialID& id) const
 		{
-			return id.hash();
-		}
-	};
-}
-
-namespace boost {
-	template<> struct hash<LLMaterialID>
-	{
-		size_t operator()(const LLMaterialID& id) const
-		{
-			return id.hash();
+			return hash_value(id);
 		}
 	};
 }

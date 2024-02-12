@@ -37,6 +37,7 @@
 #include "llviewerassetupload.h"
 
 class LLTransactionID;
+class LLPluginClassMedia;
 
 
 void init_menu_file();
@@ -71,12 +72,13 @@ void assign_defaults_and_show_upload_message(
 	const std::string& display_name,
 	std::string& description);
 
+//consider moving all file pickers below to more suitable place
 class LLFilePickerThread : public LLThread
 { //multi-threaded file picker (runs system specific file picker in background and calls "notify" from main thread)
 public:
 
 	static std::queue<LLFilePickerThread*> sDeadQ;
-	static LLMutex sMutex;
+	static LLMutex* sMutex;
 
 	static void initClass();
 	static void cleanupClass();
@@ -103,6 +105,9 @@ public:
 	void getFile();
 
 	void run() override final;
+    void runModeless();
+    static void modelessStringCallback(bool success, std::string &response, void *user_data);
+    static void modelessVectorCallback(bool success, std::vector<std::string> &responses, void *user_data);
 
 	virtual void notify(const std::vector<std::string>& filenames) = 0;
 };
@@ -113,18 +118,34 @@ class LLFilePickerReplyThread final : public LLFilePickerThread
 public:
 
 	typedef boost::signals2::signal<void(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter load_filter, LLFilePicker::ESaveFilter save_filter)> file_picked_signal_t;
-	
-	LLFilePickerReplyThread(const file_picked_signal_t::slot_type& cb, LLFilePicker::ELoadFilter filter, bool get_multiple, const file_picked_signal_t::slot_type& failure_cb = file_picked_signal_t());
-	LLFilePickerReplyThread(const file_picked_signal_t::slot_type& cb, LLFilePicker::ESaveFilter filter, const std::string &proposed_name, const file_picked_signal_t::slot_type& failure_cb = file_picked_signal_t());
-	~LLFilePickerReplyThread();
+
+    static void startPicker(const file_picked_signal_t::slot_type& cb, LLFilePicker::ELoadFilter filter, bool get_multiple, const file_picked_signal_t::slot_type& failure_cb = file_picked_signal_t());
+    static void startPicker(const file_picked_signal_t::slot_type& cb, LLFilePicker::ESaveFilter filter, const std::string &proposed_name, const file_picked_signal_t::slot_type& failure_cb = file_picked_signal_t());
 
 	virtual void notify(const std::vector<std::string>& filenames);
+
+private:
+    LLFilePickerReplyThread(const file_picked_signal_t::slot_type& cb, LLFilePicker::ELoadFilter filter, bool get_multiple, const file_picked_signal_t::slot_type& failure_cb = file_picked_signal_t());
+    LLFilePickerReplyThread(const file_picked_signal_t::slot_type& cb, LLFilePicker::ESaveFilter filter, const std::string &proposed_name, const file_picked_signal_t::slot_type& failure_cb = file_picked_signal_t());
+    ~LLFilePickerReplyThread();
 
 private:
 	LLFilePicker::ELoadFilter	mLoadFilter;
 	LLFilePicker::ESaveFilter	mSaveFilter;
 	file_picked_signal_t*		mFilePickedSignal;
 	file_picked_signal_t*		mFailureSignal;
+};
+
+class LLMediaFilePicker : public LLFilePickerThread
+{
+public:
+    LLMediaFilePicker(LLPluginClassMedia* plugin, LLFilePicker::ELoadFilter filter, bool get_multiple);
+    LLMediaFilePicker(LLPluginClassMedia* plugin, LLFilePicker::ESaveFilter filter, const std::string &proposed_name);
+
+    virtual void notify(const std::vector<std::string>& filenames);
+
+private:
+    std::shared_ptr<LLPluginClassMedia> mPlugin;
 };
 
 

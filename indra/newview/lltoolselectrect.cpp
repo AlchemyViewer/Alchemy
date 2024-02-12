@@ -108,11 +108,11 @@ BOOL LLToolSelectRect::handleMouseUp(S32 x, S32 y, MASK mask)
 		
 		if (mask == MASK_CONTROL)
 		{
-			LLSelectMgr::getInstanceFast()->deselectHighlightedObjects();
+			LLSelectMgr::getInstance()->deselectHighlightedObjects();
 		}
 		else
 		{
-			LLSelectMgr::getInstanceFast()->selectHighlightedObjects();
+			LLSelectMgr::getInstance()->selectHighlightedObjects();
 		}
 		return TRUE;
 	}
@@ -132,7 +132,7 @@ BOOL LLToolSelectRect::handleHover(S32 x, S32 y, MASK mask)
 			if (!mMouseOutsideSlop && !(mask & MASK_SHIFT) && !(mask & MASK_CONTROL))
 			{
 				// just started rect select, and not adding to current selection
-				LLSelectMgr::getInstanceFast()->deselectAll();
+				LLSelectMgr::getInstance()->deselectAll();
 			}
 			mMouseOutsideSlop = TRUE;
 			mDragEndX = x;

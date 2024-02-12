@@ -63,7 +63,7 @@ public:
     HttpLibcurl(const HttpLibcurl&) = delete;               // Not defined
 	void operator=(const HttpLibcurl&) = delete;  // Not defined
 
-    typedef boost::shared_ptr<HttpOpRequest> opReqPtr_t;
+    typedef std::shared_ptr<HttpOpRequest> opReqPtr_t;
 
 	/// Give cycles to libcurl to run active requests.  Completed
 	/// operations (successful or failed) will be retried or handed

@@ -58,8 +58,6 @@ LLFloaterOpenObject::LLFloaterOpenObject(const LLSD& key)
 	mDirty(TRUE)
 {
 	mCommitCallbackRegistrar.add("OpenObject.MoveToInventory",	boost::bind(&LLFloaterOpenObject::onClickMoveToInventory, this));
-	mCommitCallbackRegistrar.add("OpenObject.MoveAndWear",		boost::bind(&LLFloaterOpenObject::onClickMoveAndWear, this));
-	mCommitCallbackRegistrar.add("OpenObject.ReplaceOutfit",	boost::bind(&LLFloaterOpenObject::onClickReplace, this));
 	mCommitCallbackRegistrar.add("OpenObject.Cancel",			boost::bind(&LLFloaterOpenObject::onClickCancel, this));
 }
 
@@ -80,7 +78,7 @@ BOOL LLFloaterOpenObject::postBuild()
 
 void LLFloaterOpenObject::onOpen(const LLSD& key)
 {
-	LLObjectSelectionHandle object_selection = LLSelectMgr::getInstanceFast()->getSelection();
+	LLObjectSelectionHandle object_selection = LLSelectMgr::getInstance()->getSelection();
 	if (object_selection->getRootObjectCount() != 1)
 	{
 		LLNotificationsUtil::add("UnableToViewContentsMoreThanOne");
@@ -92,7 +90,7 @@ void LLFloaterOpenObject::onOpen(const LLSD& key)
 		closeFloater();
 		return;
 	}
-	mObjectSelection = LLSelectMgr::getInstanceFast()->getEditSelection();
+	mObjectSelection = LLSelectMgr::getInstance()->getEditSelection();
 	refresh();
 }
 
@@ -178,34 +176,12 @@ void LLFloaterOpenObject::moveToInventory(bool wear, bool replace)
 	}
 
 	inventory_func_type func = boost::bind(LLFloaterOpenObject::callbackCreateInventoryCategory,_1,object_id,wear,replace);
-	LLUUID category_id = gInventory.createNewCategory(parent_category_id, 
-													  LLFolderType::FT_NONE, 
-													  name,
-													  func);
-
-	//If we get a null category ID, we are using a capability in createNewCategory and we will
-	//handle the following in the callbackCreateInventoryCategory routine.
-	if ( category_id.notNull() )
-	{
-		LLCatAndWear* data = new LLCatAndWear;
-		data->mCatID = category_id;
-		data->mWear = wear;
-		data->mFolderResponded = false;
-		data->mReplace = replace;
-
-		// Copy and/or move the items into the newly created folder.
-		// Ignore any "you're going to break this item" messages.
-		BOOL success = move_inv_category_world_to_agent(object_id, category_id, TRUE,
-														callbackMoveInventory, 
-														(void*)data);
-		if (!success)
-		{
-			delete data;
-			data = NULL;
-
-			LLNotificationsUtil::add("OpenObjectCannotCopy");
-		}
-	}
+	// D567 copy thumbnail info
+	gInventory.createNewCategory(
+        parent_category_id,
+        LLFolderType::FT_NONE,
+        name,
+        func);
 }
 
 // static
@@ -220,9 +196,14 @@ void LLFloaterOpenObject::callbackCreateInventoryCategory(const LLUUID& category
 	
 	// Copy and/or move the items into the newly created folder.
 	// Ignore any "you're going to break this item" messages.
-	BOOL success = move_inv_category_world_to_agent(object_id, category_id, TRUE,
-													callbackMoveInventory, 
-													(void*)wear_data);
+	BOOL success = move_inv_category_world_to_agent(object_id,
+                                                    category_id,
+                                                    TRUE,
+                                                    [](S32 result, void* data, const LLMoveInv*)
+                                                    {
+                                                        callbackMoveInventory(result, data);
+                                                    },
+                                                    (void*)wear_data);
 	if (!success)
 	{
 		delete wear_data;
@@ -252,18 +233,6 @@ void LLFloaterOpenObject::callbackMoveInventory(S32 result, void* data)
 void LLFloaterOpenObject::onClickMoveToInventory()
 {
 	moveToInventory(false);
-	closeFloater();
-}
-
-void LLFloaterOpenObject::onClickMoveAndWear()
-{
-	moveToInventory(true, false);
-	closeFloater();
-}
-
-void LLFloaterOpenObject::onClickReplace()
-{
-	moveToInventory(true, true);
 	closeFloater();
 }
 

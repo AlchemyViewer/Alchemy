@@ -1,49 +1,40 @@
 include(Linking)
 include(Prebuilt)
 
-set(APR_FIND_QUIETLY ON)
-set(APR_FIND_REQUIRED ON)
+include_guard()
 
-set(APRUTIL_FIND_QUIETLY ON)
-set(APRUTIL_FIND_REQUIRED ON)
+add_library( ll::apr INTERFACE IMPORTED )
 
-if (USESYSTEMLIBS)
-  include(FindAPR)
-else (USESYSTEMLIBS)
-  use_prebuilt_binary(apr_suite)
-  if (WINDOWS)
-    set(APR_selector "lib")
-    set(APR_LIBRARIES 
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}apr-1.lib
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}apr-1.lib
-      )
-    set(APRICONV_LIBRARIES 
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}apriconv-1.lib
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}apriconv-1.lib
-      )
-    set(APRUTIL_LIBRARIES 
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}aprutil-1.lib ${APRICONV_LIBRARIES}
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}aprutil-1.lib ${APRICONV_LIBRARIES}
-      )
-  elseif (DARWIN)
-    if (LLCOMMON_LINK_SHARED)
-      set(APR_selector     "0.dylib")
-      set(APRUTIL_selector "0.dylib")
-    else (LLCOMMON_LINK_SHARED)
-      set(APR_selector     "a")
-      set(APRUTIL_selector "a")
-    endif (LLCOMMON_LINK_SHARED)
-    set(APR_LIBRARIES libapr-1.${APR_selector})
-    set(APRUTIL_LIBRARIES libaprutil-1.${APRUTIL_selector})
-    set(APRICONV_LIBRARIES iconv)
-  else (WINDOWS)
-    set(APR_LIBRARIES apr-1)
-    set(APRUTIL_LIBRARIES aprutil-1)
-    set(APRICONV_LIBRARIES iconv)
-  endif (WINDOWS)
-  set(APR_INCLUDE_DIR ${LIBS_PREBUILT_DIR}/include/apr-1)
+use_system_binary( apr apr-util )
+use_prebuilt_binary(apr_suite)
 
-  if (LINUX)
-    list(APPEND APRUTIL_LIBRARIES rt)
-  endif (LINUX)
-endif (USESYSTEMLIBS)
+if (WINDOWS)
+    set(APR_selector "")
+    target_link_libraries( ll::apr INTERFACE
+          debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}apr-1.lib
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}apr-1.lib
+          debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}apriconv-1.lib
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}apriconv-1.lib
+          debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}aprutil-1.lib
+	      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}aprutil-1.lib
+          )
+    target_compile_definitions( ll::apr INTERFACE APR_DECLARE_STATIC=1 APU_DECLARE_STATIC=1 API_DECLARE_STATIC=1)
+elseif (DARWIN)
+  target_link_libraries( ll::apr INTERFACE
+          debug ${ARCH_PREBUILT_DIRS_DEBUG}/libapr-1.a
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libapr-1.a
+          debug ${ARCH_PREBUILT_DIRS_DEBUG}/libaprutil-1.a
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libaprutil-1.a
+          iconv
+          )
+
+else()
+  target_link_libraries( ll::apr INTERFACE
+          debug ${ARCH_PREBUILT_DIRS_DEBUG}/libapr-1.a
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libapr-1.a
+          debug ${ARCH_PREBUILT_DIRS_DEBUG}/libaprutil-1.a
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libaprutil-1.a
+          rt
+          )
+endif ()
+target_include_directories( ll::apr SYSTEM INTERFACE  ${LIBS_PREBUILT_DIR}/include/apr-1 )

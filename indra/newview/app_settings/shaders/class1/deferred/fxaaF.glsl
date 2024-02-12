@@ -22,18 +22,10 @@
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
- 
-#extension GL_ARB_texture_rectangle : enable
-#extension GL_ARB_shader_texture_lod : enable
-#extension GL_EXT_gpu_shader4 : enable
 
 /*[EXTRA_CODE_HERE]*/
 
-#ifdef DEFINE_GL_FRAGCOLOR
 out vec4 frag_color;
-#else
-#define frag_color gl_FragColor
-#endif
 
 #define FXAA_PC 1
 //#define FXAA_GLSL_130 1
@@ -2107,12 +2099,13 @@ half4 FxaaPixelShader(
 #endif
 
 uniform sampler2D diffuseMap;
+uniform sampler2D depthMap;
 
 uniform vec2 rcp_screen_res;
 uniform vec4 rcp_frame_opt;
 uniform vec4 rcp_frame_opt2;
-VARYING vec2 vary_fragcoord;
-VARYING vec2 vary_tc;
+in vec2 vary_fragcoord;
+in vec2 vary_tc;
 
 void main() 
 {
@@ -2135,8 +2128,7 @@ void main()
 
 
 
-	//diff = texture2D(diffuseMap, vary_tc);
-	
-	frag_color = diff;
-	
+    frag_color = diff;
+    
+    gl_FragDepth = texture(depthMap, vary_fragcoord.xy).r;
 }

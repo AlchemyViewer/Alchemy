@@ -226,14 +226,14 @@ LLTool* LLToolMgr::getCurrentTool()
 		}
 		if (cur_tool)
 		{
-			if (	LLToolCompInspect::getInstanceFast()->isToolCameraActive()
-				&&	prev_tool == LLToolCamera::getInstanceFast()
-				&&	cur_tool == LLToolPie::getInstanceFast() )
+			if (	LLToolCompInspect::getInstance()->isToolCameraActive()
+				&&	prev_tool == LLToolCamera::getInstance()
+				&&	cur_tool == LLToolPie::getInstance() )
 			{
 				LLFloaterInspect * inspect_instance = LLFloaterReg::findTypedInstance<LLFloaterInspect>("inspect");
 				if(inspect_instance && inspect_instance->getVisible())
 				{
-					setTransientTool(LLToolCompInspect::getInstanceFast());
+					setTransientTool(LLToolCompInspect::getInstance());
 				}
 			}
 			else
@@ -260,13 +260,13 @@ void LLToolMgr::updateToolStatus()
 
 bool LLToolMgr::inEdit()
 {
-	return mBaseTool != LLToolPie::getInstanceFast() && mBaseTool != gToolNull;
+	return mBaseTool != LLToolPie::getInstance() && mBaseTool != gToolNull;
 }
 
 bool LLToolMgr::canEdit()
 {
 // [RLVa:KB] - Patch: RLVa-2.1.0
-	return LLViewerParcelMgr::getInstanceFast()->allowAgentBuild() && RlvActions::canBuild();
+	return LLViewerParcelMgr::getInstance()->allowAgentBuild() && RlvActions::canBuild();
 // [/RLVa:KB]
 //	return LLViewerParcelMgr::getInstance()->allowAgentBuild();
 }
@@ -325,7 +325,7 @@ void LLToolMgr::enterBuildMode(bool verify_canedit /*=false*/)
 		if (gSavedSettings.getBOOL("EditCameraMovement"))
 		{
 			// camera should be set
-			if (LLViewerJoystick::getInstanceFast()->getOverrideCamera())
+			if (LLViewerJoystick::getInstance()->getOverrideCamera())
 			{
 				handle_toggle_flycam();
 			}
@@ -342,7 +342,7 @@ void LLToolMgr::enterBuildMode(bool verify_canedit /*=false*/)
 
 
 		setCurrentToolset(gBasicToolset);
-		getCurrentToolset()->selectTool( LLToolCompCreate::getInstanceFast() );
+		getCurrentToolset()->selectTool( LLToolCompCreate::getInstance() );
 
 		// Could be first use
 		//LLFirstUse::useBuild();
@@ -350,7 +350,7 @@ void LLToolMgr::enterBuildMode(bool verify_canedit /*=false*/)
 		gAgentCamera.resetView(false);
 
 		// avoid spurious avatar movements
-		LLViewerJoystick::getInstanceFast()->setNeedsReset();
+		LLViewerJoystick::getInstance()->setNeedsReset();
 
 	}
 // [RLVa:KB] - Checked: RLVa-2.1.0
@@ -381,7 +381,7 @@ void LLToolMgr::leaveBuildMode()
 			gViewerWindow->showCursor();			
 		}
 		// avoid spurious avatar movements pulling out of edit mode
-		LLViewerJoystick::getInstanceFast()->setNeedsReset();
+		LLViewerJoystick::getInstance()->setNeedsReset();
 	}
 
 }
@@ -490,7 +490,7 @@ void LLToolset::addTool(LLTool* tool)
 void LLToolset::selectTool(LLTool* tool)
 {
 	mSelectedTool = tool;
-	LLToolMgr::getInstanceFast()->setCurrentTool( mSelectedTool );
+	LLToolMgr::getInstance()->setCurrentTool( mSelectedTool );
 }
 
 
@@ -500,7 +500,7 @@ void LLToolset::selectToolByIndex( S32 index )
 	if (tool)
 	{
 		mSelectedTool = tool;
-		LLToolMgr::getInstanceFast()->setCurrentTool( tool );
+		LLToolMgr::getInstance()->setCurrentTool( tool );
 	}
 }
 
@@ -514,7 +514,7 @@ BOOL LLToolset::isToolSelected( S32 index )
 void LLToolset::selectFirstTool()
 {
 	mSelectedTool = (0 < mToolList.size()) ? mToolList[0] : NULL;
-	LLToolMgr::getInstanceFast()->setCurrentTool( mSelectedTool );
+	LLToolMgr::getInstance()->setCurrentTool( mSelectedTool );
 }
 
 
@@ -535,7 +535,7 @@ void LLToolset::selectNextTool()
 	if( next )
 	{
 		mSelectedTool = next;
-		LLToolMgr::getInstanceFast()->setCurrentTool( mSelectedTool );
+		LLToolMgr::getInstance()->setCurrentTool( mSelectedTool );
 	}
 	else
 	{
@@ -560,7 +560,7 @@ void LLToolset::selectPrevTool()
 	if( prev )
 	{
 		mSelectedTool = prev;
-		LLToolMgr::getInstanceFast()->setCurrentTool( mSelectedTool );
+		LLToolMgr::getInstance()->setCurrentTool( mSelectedTool );
 	}
 	else if (mToolList.size() > 0)
 	{

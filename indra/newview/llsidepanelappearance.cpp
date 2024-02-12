@@ -76,7 +76,8 @@ LLSidepanelAppearance::LLSidepanelAppearance() :
 	mFilterEditor(NULL),
 	mOutfitEdit(NULL),
 	mCurrOutfitPanel(NULL),
-	mOpened(false)
+	mOpened(false),
+	mLastAvatarComplexity(0)
 {
 	LLOutfitObserver& outfit_observer =  LLOutfitObserver::instance();
 	outfit_observer.addBOFReplacedCallback(boost::bind(&LLSidepanelAppearance::refreshCurrentOutfitName, this, ""));
@@ -102,7 +103,7 @@ BOOL LLSidepanelAppearance::postBuild()
 
 	childSetAction("edit_outfit_btn", boost::bind(&LLSidepanelAppearance::showOutfitEditPanel, this));
 
-	mFilterEditor = getChild<LLFilterEditor>("Filter");
+	mFilterEditor = findChild<LLSearchEditor>("Filter");
 	if (mFilterEditor)
 	{
 		mFilterEditor->setCommitCallback(boost::bind(&LLSidepanelAppearance::onFilterEdit, this, _2));
@@ -210,7 +211,7 @@ void LLSidepanelAppearance::updateToVisibility(const LLSD &new_visibility)
 			// when editing its physics.
 			if (!gAgentCamera.cameraCustomizeAvatar())
 			{
-				LLVOAvatarSelf::onCustomizeStart(LLWearableType::getInstanceFast()->getDisableCameraSwitch(wearable_ptr->getType()));
+				LLVOAvatarSelf::onCustomizeStart(LLWearableType::getInstance()->getDisableCameraSwitch(wearable_ptr->getType()));
 			}
 			if (is_wearable_edit_visible)
 			{
@@ -565,3 +566,18 @@ bool LLSidepanelAppearance::isWearableEditPanelVisible() const
 	return (mEditWearable) && (mEditWearable->getVisible());
 }
 // [/RLVa:KB]
+
+// static
+void LLSidepanelAppearance::updateAvatarComplexity(U32 complexity, const std::map<LLUUID, U32>& item_complexity, const std::map<LLUUID, U32>& temp_item_complexity, U32 body_parts_complexity)
+{
+	LLSidepanelAppearance* instance = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
+	if(instance)
+	{
+		if (instance->mLastAvatarComplexity != complexity)
+		{
+			instance->mPanelOutfitsInventory->updateAvatarComplexity(complexity, item_complexity, temp_item_complexity, body_parts_complexity);
+			instance->mOutfitEdit->updateAvatarComplexity(complexity);
+		}
+		instance->mLastAvatarComplexity = complexity;
+	}
+}

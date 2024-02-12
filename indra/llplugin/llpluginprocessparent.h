@@ -30,7 +30,6 @@
 #define LL_LLPLUGINPROCESSPARENT_H
 
 #include <queue>
-#include <boost/enable_shared_from_this.hpp>
 
 #include "llapr.h"
 #include "llprocess.h"
@@ -43,7 +42,7 @@
 #include "llsd.h"
 #include "llevents.h"
 
-class LLPluginProcessParentOwner : public boost::enable_shared_from_this < LLPluginProcessParentOwner > 
+class LLPluginProcessParentOwner : public std::enable_shared_from_this < LLPluginProcessParentOwner > 
 {
 public:
 	virtual ~LLPluginProcessParentOwner() = default;
@@ -60,7 +59,7 @@ class LLPluginProcessParent final : public LLPluginMessagePipeOwner
 
     LLPluginProcessParent(LLPluginProcessParentOwner *owner);
 public:
-    typedef boost::shared_ptr<LLPluginProcessParent> ptr_t;
+    typedef std::shared_ptr<LLPluginProcessParent> ptr_t;
 
 	~LLPluginProcessParent();
 		
@@ -169,6 +168,7 @@ private:
 
 	LLProcess::Params mProcessParams;
 	LLProcessPtr mProcess;
+	bool mProcessCreationRequested = false;
 
 	std::string mPluginFile;
 	std::string mPluginDir;
@@ -199,7 +199,7 @@ private:
 	apr_pollfd_t mPollFD;
 	static apr_pollset_t *sPollSet;
 	static bool sPollsetNeedsRebuild;
-	static LLMutex sInstancesMutex;
+	static LLMutex *sInstancesMutex;
     static mapInstances_t sInstances;
 	static void dirtyPollSet();
 	static void updatePollset();

@@ -58,6 +58,25 @@ using namespace llsd;
 #	include "llwin32headerslean.h"
 #   include <psapi.h>               // GetPerformanceInfo() et al.
 #	include <VersionHelpers.h>
+
+VERSIONHELPERAPI
+IsWindows11OrGreater()
+{
+	OSVERSIONINFOEXW osvi = { sizeof(osvi), 0, 0, 0, 0, {0}, 0, 0 };
+	DWORDLONG const dwlConditionMask = VerSetConditionMask(
+		VerSetConditionMask(
+			VerSetConditionMask(
+				0, VER_MAJORVERSION, VER_GREATER_EQUAL),
+			VER_MINORVERSION, VER_GREATER_EQUAL),
+		VER_BUILDNUMBER, VER_GREATER_EQUAL);
+
+	osvi.dwMajorVersion = HIBYTE(_WIN32_WINNT_WIN10);
+	osvi.dwMinorVersion = LOBYTE(_WIN32_WINNT_WIN10);
+	osvi.dwBuildNumber = 22000;
+
+	return VerifyVersionInfoW(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, dwlConditionMask) != FALSE;
+}
+
 #elif LL_DARWIN
 #   include "llsys_objc.h"
 #	include <errno.h>
@@ -97,7 +116,20 @@ LLOSInfo::LLOSInfo() :
 
 #if LL_WINDOWS
 
-	if (IsWindows10OrGreater())
+	if (IsWindows11OrGreater())
+	{
+		mMajorVer = 10;
+		mMinorVer = 0;
+		if (IsWindowsServer())
+		{
+			mOSStringSimple = "Windows Server ";
+		}
+		else
+		{
+			mOSStringSimple = "Microsoft Windows 11 ";
+		}
+	}
+	else if (IsWindows10OrGreater())
 	{
 		mMajorVer = 10;
 		mMinorVer = 0;
@@ -192,18 +224,6 @@ LLOSInfo::LLOSInfo() :
 		GetSystemInfo(&si); //if it fails get regular system info 
 	//(Warning: If GetSystemInfo it may result in incorrect information in a WOW64 machine, if the kernel fails to load)
 
-	//msdn microsoft finds 32 bit and 64 bit flavors this way..
-	//http://msdn.microsoft.com/en-us/library/ms724429(VS.85).aspx (example code that contains quite a few more flavors
-	//of windows than this code does (in case it is needed for the future)
-	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) //check for 64 bit
-	{
-		mOSStringSimple += "64-bit ";
-	}
-	else if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)
-	{
-		mOSStringSimple += "32-bit ";
-	}
-
 	// Try calling GetVersionEx using the OSVERSIONINFOEX structure.
 	OSVERSIONINFOEX osvi;
 	ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
@@ -237,7 +257,19 @@ LLOSInfo::LLOSInfo() :
 				ubr = data;
 			}
 		}
-	}
+    }
+
+    //msdn microsoft finds 32 bit and 64 bit flavors this way..
+    //http://msdn.microsoft.com/en-us/library/ms724429(VS.85).aspx (example code that contains quite a few more flavors
+    //of windows than this code does (in case it is needed for the future)
+    if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) //check for 64 bit
+    {
+        mOSStringSimple += "64-bit ";
+    }
+    else if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)
+    {
+        mOSStringSimple += "32-bit ";
+    }
 
 	mOSString = mOSStringSimple;
 	if (mBuild > 0)
@@ -258,9 +290,9 @@ LLOSInfo::LLOSInfo() :
 	// Initialize mOSStringSimple to something like:
 	// "macOS 10.6.7"
 	{
-		S32 major_version, minor_version, bugfix_version = 0;
+		int64_t major_version, minor_version, bugfix_version = 0;
 
-		if (LLSysDarwin::getOperatingSystemInfo(major_version, minor_version, bugfix_version))
+		if (LLGetDarwinOSInfo(major_version, minor_version, bugfix_version))
 		{
 			mMajorVer = major_version;
 			mMinorVer = minor_version;
@@ -435,18 +467,20 @@ LLOSInfo::LLOSInfo() :
 	dotted_version_string << mMajorVer << "." << mMinorVer << "." << mBuild;
 	mOSVersionString.append(dotted_version_string.str());
 
+	mOSBitness = is64Bit() ? 64 : 32;
+	LL_INFOS("LLOSInfo") << "OS bitness: " << mOSBitness << LL_ENDL;
 }
 
 #ifndef LL_WINDOWS
 // static
-S32 LLOSInfo::getMaxOpenFiles()
+long LLOSInfo::getMaxOpenFiles()
 {
-	const S32 OPEN_MAX_GUESS = 256;
+	const long OPEN_MAX_GUESS = 256;
 
 #ifdef	OPEN_MAX
-	static S32 open_max = OPEN_MAX;
+	static long open_max = OPEN_MAX;
 #else
-	static S32 open_max = 0;
+	static long open_max = 0;
 #endif
 
 	if (0 == open_max)
@@ -488,6 +522,11 @@ const std::string& LLOSInfo::getOSStringSimple() const
 const std::string& LLOSInfo::getOSVersionString() const
 {
 	return mOSVersionString;
+}
+
+const S32 LLOSInfo::getOSBitness() const
+{
+	return mOSBitness;
 }
 
 //static
@@ -543,6 +582,25 @@ U32 LLOSInfo::getProcessResidentSizeKB()
 	return resident_size;
 }
 
+//static
+bool LLOSInfo::is64Bit()
+{
+#if LL_WINDOWS
+#if defined(_WIN64)
+    return true;
+#elif defined(_WIN32)
+    // 32-bit viewer may be run on both 32-bit and 64-bit Windows, need to elaborate
+    BOOL f64 = FALSE;
+    return IsWow64Process(GetCurrentProcess(), &f64) && f64;
+#else
+    return false;
+#endif
+#else // ! LL_WINDOWS
+    // we only build a 64-bit mac viewer and currently we don't build for linux at all
+    return true; 
+#endif
+}
+
 LLCPUInfo::LLCPUInfo()
 {
 	std::ostringstream out;
@@ -550,6 +608,11 @@ LLCPUInfo::LLCPUInfo()
 	// proc.WriteInfoTextFile("procInfo.txt");
 	mHasSSE = proc.hasSSE();
 	mHasSSE2 = proc.hasSSE2();
+    mHasSSE3 = proc.hasSSE3();
+    mHasSSE3S = proc.hasSSE3S();
+    mHasSSE41 = proc.hasSSE41();
+    mHasSSE42 = proc.hasSSE42();
+    mHasSSE4a = proc.hasSSE4a();
 	mHasAltivec = proc.hasAltivec();
 	mCPUMHz = (F64)proc.getCPUFrequency();
 	mFamily = proc.getCPUFamilyName();
@@ -562,6 +625,35 @@ LLCPUInfo::LLCPUInfo()
 	}
 	mCPUString = out.str();
 	LLStringUtil::trim(mCPUString);
+
+    if (mHasSSE)
+    {
+        mSSEVersions.append("1");
+    }
+    if (mHasSSE2)
+    {
+        mSSEVersions.append("2");
+    }
+    if (mHasSSE3)
+    {
+        mSSEVersions.append("3");
+    }
+    if (mHasSSE3S)
+    {
+        mSSEVersions.append("3S");
+    }
+    if (mHasSSE41)
+    {
+        mSSEVersions.append("4.1");
+    }
+    if (mHasSSE42)
+    {
+        mSSEVersions.append("4.2");
+    }
+    if (mHasSSE4a)
+    {
+        mSSEVersions.append("4a");
+    }
 }
 
 bool LLCPUInfo::hasAltivec() const
@@ -579,6 +671,31 @@ bool LLCPUInfo::hasSSE2() const
 	return mHasSSE2;
 }
 
+bool LLCPUInfo::hasSSE3() const
+{
+    return mHasSSE3;
+}
+
+bool LLCPUInfo::hasSSE3S() const
+{
+    return mHasSSE3S;
+}
+
+bool LLCPUInfo::hasSSE41() const
+{
+    return mHasSSE41;
+}
+
+bool LLCPUInfo::hasSSE42() const
+{
+    return mHasSSE42;
+}
+
+bool LLCPUInfo::hasSSE4a() const
+{
+    return mHasSSE4a;
+}
+
 F64 LLCPUInfo::getMHz() const
 {
 	return mCPUMHz;
@@ -587,6 +704,11 @@ F64 LLCPUInfo::getMHz() const
 std::string LLCPUInfo::getCPUString() const
 {
 	return mCPUString;
+}
+
+const LLSD& LLCPUInfo::getSSEVersions() const
+{
+    return mSSEVersions;
 }
 
 void LLCPUInfo::stream(std::ostream& s) const
@@ -598,6 +720,11 @@ void LLCPUInfo::stream(std::ostream& s) const
 	// CPU's attributes regardless of platform
 	s << "->mHasSSE:     " << (U32)mHasSSE << std::endl;
 	s << "->mHasSSE2:    " << (U32)mHasSSE2 << std::endl;
+    s << "->mHasSSE3:    " << (U32)mHasSSE3 << std::endl;
+    s << "->mHasSSE3S:    " << (U32)mHasSSE3S << std::endl;
+    s << "->mHasSSE41:    " << (U32)mHasSSE41 << std::endl;
+    s << "->mHasSSE42:    " << (U32)mHasSSE42 << std::endl;
+    s << "->mHasSSE4a:    " << (U32)mHasSSE4a << std::endl;
 	s << "->mHasAltivec: " << (U32)mHasAltivec << std::endl;
 	s << "->mCPUMHz:     " << mCPUMHz << std::endl;
 	s << "->mCPUString:  " << mCPUString << std::endl;
@@ -663,6 +790,21 @@ static U32Kilobytes LLMemoryAdjustKBResult(U32Kilobytes inKB)
 }
 #endif
 
+#if LL_DARWIN
+// static
+U32Kilobytes LLMemoryInfo::getHardwareMemSize()
+{
+    // This might work on Linux as well.  Someone check...
+    uint64_t phys = 0;
+    int mib[2] = { CTL_HW, HW_MEMSIZE };
+
+    size_t len = sizeof(phys);
+    sysctl(mib, 2, &phys, &len, NULL, 0);
+
+    return U64Bytes(phys);
+}
+#endif
+
 U32Kilobytes LLMemoryInfo::getPhysicalMemoryKB() const
 {
 #if LL_WINDOWS
@@ -671,14 +813,7 @@ U32Kilobytes LLMemoryInfo::getPhysicalMemoryKB() const
 	GlobalMemoryStatusEx(&state);
 	return LLMemoryAdjustKBResult(U64Bytes(state.ullTotalPhys));
 #elif LL_DARWIN
-	// This might work on Linux as well.  Someone check...
-	uint64_t phys = 0;
-	int mib[2] = { CTL_HW, HW_MEMSIZE };
-
-	size_t len = sizeof(phys);	
-	sysctl(mib, 2, &phys, &len, NULL, 0);
-	
-	return U64Bytes(phys);
+    return getHardwareMemSize();
 
 #elif LL_LINUX
 	U64 phys = 0;
@@ -803,7 +938,7 @@ void LLMemoryInfo::stream(std::ostream& s) const
 	// Now stream stats
 	for (const MapEntry& pair : inMap(mStatsMap))
 	{
-		s << pfx << std::setw(key_width+1) << (pair.first + ':') << ' ';
+		s << pfx << std::setw(narrow(key_width+1)) << (pair.first + ':') << ' ';
 		LLSD value(pair.second);
 		if (value.isInteger())
 			s << std::setw(12) << value.asInteger();
@@ -824,20 +959,21 @@ LLSD LLMemoryInfo::getStatsMap() const
 
 LLMemoryInfo& LLMemoryInfo::refresh()
 {
+	LL_PROFILE_ZONE_SCOPED
 	mStatsMap = loadStatsMap();
 
+#if SHOW_DEBUG
 	LL_DEBUGS("LLMemoryInfo") << "Populated mStatsMap:\n";
 	LLSDSerialize::toPrettyXML(mStatsMap, LL_CONT);
 	LL_ENDL;
+#endif
 
 	return *this;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_MEMINFO_LOAD_STATS("MemInfo Load Stats");
-
 LLSD LLMemoryInfo::loadStatsMap()
 {
-	LL_RECORD_BLOCK_TIME(FTM_MEMINFO_LOAD_STATS);
+    LL_PROFILE_ZONE_SCOPED;
 
 	// This implementation is derived from stream() code (as of 2011-06-29).
 	Stats stats;
@@ -1019,9 +1155,10 @@ LLSD LLMemoryInfo::loadStatsMap()
 				LLSD::String key(matched[1].first, matched[1].second);
 				LLSD::String value_str(matched[2].first, matched[2].second);
 				LLSD::Integer value(0);
+				S64 intval = 0;
 				try
 				{
-					value = boost::lexical_cast<LLSD::Integer>(value_str);
+					intval = llclamp(boost::lexical_cast<S64>(value_str), 0, S32_MAX);
 				}
 				catch (const boost::bad_lexical_cast&)
 				{
@@ -1030,6 +1167,7 @@ LLSD LLMemoryInfo::loadStatsMap()
 											 << line << LL_ENDL;
 					continue;
 				}
+				value = LLSD::Integer(intval);
 				// Store this statistic.
 				stats.add(key, value);
 			}
@@ -1180,7 +1318,7 @@ public:
                     << " seconds ";
         }
 
-	S32 precision = LL_CONT.precision();
+	auto precision = LL_CONT.precision();
 
         LL_CONT << std::fixed << std::setprecision(1) << framerate << '\n'
                 << LLMemoryInfo();
@@ -1228,7 +1366,7 @@ BOOL gunzip_file(const std::string& srcfile, const std::string& dstfile)
 	std::wstring utf16filename = ll_convert_string_to_wide(srcfile);
 	src = gzopen_w(utf16filename.c_str(), "rb");
 #else
-	src = gzopen(srcfile.c_str(), "rb");/* Flawfinder: ignore */
+	src = gzopen(srcfile.c_str(), "rb");
 #endif
 	
 	if (! src) goto err;
@@ -1269,7 +1407,7 @@ BOOL gzip_file(const std::string& srcfile, const std::string& dstfile)
 	std::wstring utf16filename = ll_convert_string_to_wide(tmpfile);
 	dst = gzopen_w(utf16filename.c_str(), "wb");
 #else
-	dst = gzopen(tmpfile.c_str(), "wb");/* Flawfinder: ignore */
+	dst = gzopen(tmpfile.c_str(), "wb");
 #endif
 	
 	if (! dst) goto err;

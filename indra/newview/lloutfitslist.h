@@ -42,6 +42,7 @@ class LLInventoryCategoriesObserver;
 class LLOutfitListGearMenuBase;
 class LLWearableItemsList;
 class LLListContextMenu;
+class LLTextBox;
 
 
 /**
@@ -108,6 +109,8 @@ public:
 
     virtual bool getHasExpandableFolders() = 0;
 
+	void updateAvatarComplexity(U32 complexity);
+
 protected:
     virtual LLOutfitListGearMenuBase* createGearMenu() = 0;
     virtual void onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id) = 0;
@@ -124,6 +127,7 @@ protected:
     selection_change_signal_t		mSelectionChangeSignal;
     LLListContextMenu*				mOutfitMenu;
     LLOutfitListGearMenuBase*		mGearMenu;
+	LLTextBox*						mAvatarComplexityLabel;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -163,10 +167,7 @@ public:
 
 protected:
     virtual void onUpdateItemsVisibility();
-    virtual void onUploadFoto();
-    virtual void onSelectPhoto();
-    virtual void onTakeSnapshot();
-    virtual void onRemovePhoto();
+    virtual void onThumbnail();
     virtual void onChangeSortOrder();
 
     const LLUUID& getSelectedOutfitID();
@@ -335,7 +336,7 @@ private:
 	typedef wearables_lists_map_t::value_type			wearables_lists_map_value_t;
 	wearables_lists_map_t			mSelectedListsMap;
 
-	typedef	absl::flat_hash_map<LLUUID, LLAccordionCtrlTab*>		outfits_map_t;
+	typedef	boost::unordered_flat_map<LLUUID, LLAccordionCtrlTab*>		outfits_map_t;
 	typedef outfits_map_t::value_type					outfits_map_value_t;
 	outfits_map_t					mOutfitsMap;
 

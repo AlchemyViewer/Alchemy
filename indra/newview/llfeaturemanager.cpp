@@ -380,7 +380,10 @@ F32 gpu_benchmark();
 
 F32 logExceptionBenchmark()
 {
-    // Todo: make a wrapper/class for SEH exceptions
+    // FIXME: gpu_benchmark uses many C++ classes on the stack to control state.
+    //  SEH exceptions with our current exception handling options do not call 
+    //  destructors for these classes, resulting in an undefined state should
+    //  this handler be invoked.  
     F32 gbps = -1;
     __try
     {
@@ -388,6 +391,9 @@ F32 logExceptionBenchmark()
     }
     __except (msc_exception_filter(GetExceptionCode(), GetExceptionInformation()))
     {
+        // HACK - ensure that profiling is disabled
+        LLGLSLShader::finishProfile(false);
+
         // convert to C++ styled exception
         char integer_string[32];
         snprintf(integer_string, 32, "SEH, code: %lu\n", GetExceptionCode());
@@ -401,6 +407,7 @@ bool LLFeatureManager::loadGPUClass()
 {
 	if (!gSavedSettings.getBOOL("SkipBenchmark"))
 	{
+		F32 class1_gbps = gSavedSettings.getF32("RenderClass1MemoryBandwidth");
 		//get memory bandwidth from benchmark
 		F32 gbps;
 		try
@@ -417,65 +424,37 @@ bool LLFeatureManager::loadGPUClass()
 			LL_WARNS("RenderInit") << "GPU benchmark failed: " << e.what() << LL_ENDL;
 		}
 	
+        mGPUMemoryBandwidth = gbps;
+
+        // bias by CPU speed
+        F32 cpu_basis_mhz = gSavedSettings.getF32("RenderCPUBasis");
+        F32 cpu_mhz = (F32) gSysCPU.getMHz();
+        F32 cpu_bias = llclamp(cpu_mhz / cpu_basis_mhz, 0.5f, 1.f);
+        gbps *= cpu_bias;
+
 		if (gbps < 0.f)
-		{ //couldn't bench, use GLVersion
+		{ //couldn't bench, default to Low
 	#if LL_DARWIN
 		//GLVersion is misleading on OSX, just default to class 3 if we can't bench
 		LL_WARNS("RenderInit") << "Unable to get an accurate benchmark; defaulting to class 3" << LL_ENDL;
 		mGPUClass = GPU_CLASS_3;
 	#else
-			if (gGLManager.mGLVersion <= 2.f)
-			{
-				mGPUClass = GPU_CLASS_0;
-			}
-			else if (gGLManager.mGLVersion <= 3.f)
-			{
-				mGPUClass = GPU_CLASS_1;
-			}
-			else if (gGLManager.mGLVersion < 3.3f)
-			{
-				mGPUClass = GPU_CLASS_2;
-			}
-			else if (gGLManager.mGLVersion < 4.f)
-			{
-				mGPUClass = GPU_CLASS_3;
-			}
-			else 
-			{
-				mGPUClass = GPU_CLASS_4;
-			}
-			if (gGLManager.mIsIntel && mGPUClass > GPU_CLASS_1)
-			{
-				// Intels are generally weaker then other GPUs despite having advanced features
-				mGPUClass = (EGPUClass)(mGPUClass - 1);
-			}
+			mGPUClass = GPU_CLASS_0;
 	#endif
 		}
-		else if (gGLManager.mGLVersion <= 2.f)
-		{
-			mGPUClass = GPU_CLASS_0;
-		}
-		else if (gGLManager.mGLVersion <= 3.f)
+		else if (gbps <= class1_gbps)
 		{
 			mGPUClass = GPU_CLASS_1;
 		}
-		else if (gbps <= 5.f)
-		{
-			mGPUClass = GPU_CLASS_0;
-		}
-		else if (gbps <= 8.f)
-		{
-			mGPUClass = GPU_CLASS_1;
-		}
-		else if (gbps <= 16.f)
+		else if (gbps <= class1_gbps *2.f)
 		{
 			mGPUClass = GPU_CLASS_2;
 		}
-		else if (gbps <= 40.f)
+		else if (gbps <= class1_gbps*4.f)
 		{
 			mGPUClass = GPU_CLASS_3;
 		}
-		else if (gbps <= 80.f)
+		else if (gbps <= class1_gbps*8.f)
 		{
 			mGPUClass = GPU_CLASS_4;
 		}
@@ -483,6 +462,18 @@ bool LLFeatureManager::loadGPUClass()
 		{
 			mGPUClass = GPU_CLASS_5;
 		}
+
+    #if LL_WINDOWS
+        const F32Gigabytes MIN_PHYSICAL_MEMORY(2);
+
+        LLMemory::updateMemoryInfo();
+        F32Gigabytes physical_mem = LLMemory::getMaxMemKB();
+        if (MIN_PHYSICAL_MEMORY > physical_mem && mGPUClass > GPU_CLASS_1)
+        {
+            // reduce quality on systems that don't have enough memory
+            mGPUClass = (EGPUClass)(mGPUClass - 1);
+        }
+    #endif //LL_WINDOWS
 	} //end if benchmark
 	else
 	{
@@ -519,7 +510,6 @@ void LLFeatureManager::initSingleton()
 
 void LLFeatureManager::applyRecommendedSettings()
 {
-	loadGPUClass();
 	// apply saved settings
 	// cap the level at 2 (high)
 	U32 level = llmax(GPU_CLASS_0, llmin(mGPUClass, GPU_CLASS_5));
@@ -601,27 +591,11 @@ void LLFeatureManager::applyFeatures(bool skipFeatures)
 void LLFeatureManager::setGraphicsLevel(U32 level, bool skipFeatures)
 {
     LLViewerShaderMgr::sSkipReload = true;
-
+    flush_glerror(); // Whatever may have already happened (e.g., to cause us to change), don't let confuse it with new initializations.
     applyBaseMasks();
 
     // if we're passed an invalid level, default to "Low"
     std::string features(isValidGraphicsLevel(level)? getNameForGraphicsLevel(level) : "Low");
-    if (features == "Low")
-    {
-#if LL_DARWIN
-        // This Mac-specific change is to insure that we force 'Basic Shaders' for all Mac
-        // systems which support them instead of falling back to fixed-function unnecessarily
-        // MAINT-2157
-        if (gGLManager.mGLVersion < 2.1f)
-#else
-        // only use fixed function by default if GL version < 3.0 or this is an intel graphics chip
-        if (gGLManager.mGLVersion < 3.f || gGLManager.mIsIntel)
-#endif
-        {
-            // same as Low, but with "Basic Shaders" disabled
-            features = "LowFixedFunction";
-        }
-    }
 
     maskFeatures(features);
 
@@ -669,45 +643,17 @@ void LLFeatureManager::applyBaseMasks()
 	}
 
 	// now all those wacky ones
-	if (!gGLManager.mHasFragmentShader)
-	{
-		maskFeatures("NoPixelShaders");
-	}
-	if (!gGLManager.mHasVertexShader || !mGPUSupported)
-	{
-		maskFeatures("NoVertexShaders");
-	}
 	if (gGLManager.mIsNVIDIA)
 	{
 		maskFeatures("NVIDIA");
 	}
-	if (gGLManager.mIsGF2or4MX)
+	if (gGLManager.mIsAMD)
 	{
-		maskFeatures("GeForce2");
-	}
-	if (gGLManager.mIsATI)
-	{
-		maskFeatures("ATI");
-	}
-	if (gGLManager.mHasATIMemInfo && gGLManager.mVRAM < 256)
-	{
-		maskFeatures("ATIVramLT256");
-	}
-	if (gGLManager.mATIOldDriver)
-	{
-		maskFeatures("ATIOldDriver");
-	}
-	if (gGLManager.mIsGFFX)
-	{
-		maskFeatures("GeForceFX");
+		maskFeatures("AMD");
 	}
 	if (gGLManager.mIsIntel)
 	{
 		maskFeatures("Intel");
-	}
-	if (gGLManager.mGLVersion < 1.5f)
-	{
-		maskFeatures("OpenGLPre15");
 	}
 	if (gGLManager.mGLVersion < 3.f)
 	{
@@ -717,15 +663,19 @@ void LLFeatureManager::applyBaseMasks()
 	{
 		maskFeatures("TexUnit8orLess");
 	}
-	if (gGLManager.mHasMapBufferRange)
-	{
-		maskFeatures("MapBufferRange");
-	}
 	if (gGLManager.mVRAM > 512)
 	{
 		maskFeatures("VRAMGT512");
 	}
-	if (!gGLManager.mHasAnisotropic || 2.f > gGLManager.mGLMaxAnisotropy)
+    if (gGLManager.mVRAM < 2048)
+    {
+        maskFeatures("VRAMLT2GB");
+    }
+    if (gGLManager.mGLVersion < 3.99f)
+    {
+        maskFeatures("GL3");
+    }
+	if (2.f > gGLManager.mMaxAnisotropy)
 	{
 		maskFeatures("AnisotropicMissing");
 	}
@@ -744,17 +694,6 @@ void LLFeatureManager::applyBaseMasks()
 	//LL_INFOS() << "Masking features from gpu table match: " << gpustr << LL_ENDL;
 	maskFeatures(gpustr);
 
-	// now mask cpu type ones
-	if (gSysMemory.getPhysicalMemoryKB() <= U32Megabytes(256))
-	{
-		maskFeatures("RAM256MB");
-	}
-	
-	if (gSysCPU.getMHz() < 1100)
-	{
-		maskFeatures("CPUSlow");
-	}
-
 	if (isSafe())
 	{
 		maskFeatures("safe");
@@ -769,11 +708,9 @@ LLSD LLFeatureManager::getRecommendedSettingsMap()
 
 	LLSD map(LLSD::emptyMap());
 
-	loadGPUClass();
 	U32 level = llmax(GPU_CLASS_0, llmin(mGPUClass, GPU_CLASS_5));
 	LL_INFOS("RenderInit") << "Getting the map of recommended settings for level " << level << LL_ENDL;
 
-	applyBaseMasks();
 	std::string features(isValidGraphicsLevel(level) ? getNameForGraphicsLevel(level) : "Low");
 
 	maskFeatures(features);

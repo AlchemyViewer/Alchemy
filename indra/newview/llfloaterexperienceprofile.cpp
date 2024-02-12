@@ -92,8 +92,10 @@ class LLExperienceHandler : public LLCommandHandler
 public:
     LLExperienceHandler() : LLCommandHandler("experience", UNTRUSTED_THROTTLE) { }
 
-    bool handle(const LLSD& params, const LLSD& query_map,
-        LLMediaCtrl* web)
+    bool handle(const LLSD& params,
+                const LLSD& query_map,
+                const std::string& grid,
+                LLMediaCtrl* web)
     {
         if(params.size() != 2 || params[1].asString() != "profile")
             return false;
@@ -690,7 +692,7 @@ void LLFloaterExperienceProfile::onClickLocation()
     if(region)
     {
         LLTextBox* child = getChild<LLTextBox>(EDIT TF_SLURL);
-		mLocationSLURL = LLSLURL(region->getName(), gAgent.getPositionGlobal()).getSLURLString();
+		mLocationSLURL = LLSLURL(region->getName(), gAgent.getPositionAgent()).getSLURLString();
         child->setText(mLocationSLURL);
         onFieldChanged();
     }

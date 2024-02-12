@@ -40,7 +40,7 @@ class LLConversationItem;
 class LLConversationItemSession;
 class LLConversationItemParticipant;
 
-typedef std::map<LLUUID, LLConversationItem*> conversations_items_map;
+typedef std::map<LLUUID, LLPointer<LLConversationItem> > conversations_items_map;
 typedef std::map<LLUUID, LLFolderViewItem*> conversations_widgets_map;
 
 typedef std::vector<std::string> menuentry_vec_t;
@@ -87,7 +87,10 @@ public:
 	virtual BOOL removeItem() { return FALSE; }
 	virtual void removeBatch(std::vector<LLFolderViewModelItem*>& batch) { }
 	virtual void move( LLFolderViewModelItem* parent_listener ) { }
-	virtual BOOL isItemCopyable() const { return FALSE; }
+    virtual bool isItemCopyable(bool can_copy_as_link = true) const { return false; }
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2013-09-19 (Catznip-3.6)
+	/*virtual*/ bool isItemLinkable() const { return false; }
+// [/SL:KB]
 	virtual BOOL copyToClipboard() const { return FALSE; }
 	virtual BOOL cutToClipboard() { return FALSE; }
 	virtual BOOL isClipboardPasteable() const { return FALSE; }
@@ -111,6 +114,7 @@ public:
 	virtual void previewItem( void );
 	virtual void selectItem(void) { } 
 	virtual void showProperties(void);
+    virtual void navigateToFolder(bool new_window = false, bool change_mode = false) {}
 
 	// Methods used in sorting (see LLConversationSort::operator())
 	EConversationType const getType() const { return mConvType; }
@@ -249,7 +253,7 @@ public:
 	bool 				check(const LLFolderViewModelItem* item) { return true; }
 	bool				checkFolder(const LLFolderViewModelItem* folder) const { return true; }
 	void 				setEmptyLookupMessage(const std::string& message) { }
-	std::string			getEmptyLookupMessage() const { return mEmpty; }
+	std::string			getEmptyLookupMessage(bool is_empty_folder = false) const { return mEmpty; }
 	bool				showAllResults() const { return true; }
 	std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const { return std::string::npos; }
 	std::string::size_type getFilterStringSize() const { return 0; }

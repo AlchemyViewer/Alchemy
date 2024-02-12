@@ -52,6 +52,7 @@
 #include "llviewercontrol.h"
 #include "llviewermenufile.h"	// upload_new_resource()
 #include "llviewerstats.h"
+#include "llviewertexturelist.h"
 #include "llwindow.h"
 #include "llworld.h"
 #include <boost/filesystem.hpp>
@@ -234,7 +235,7 @@ bool LLSnapshotLivePreview::setSnapshotQuality(S32 quality, bool set_by_user)
     return false;
 }
 
-void LLSnapshotLivePreview::drawPreviewRect(S32 offset_x, S32 offset_y)
+void LLSnapshotLivePreview::drawPreviewRect(S32 offset_x, S32 offset_y, LLColor4 alpha_color)
 {
 	F32 line_width ; 
 	glGetFloatv(GL_LINE_WIDTH, &line_width) ;
@@ -247,7 +248,6 @@ void LLSnapshotLivePreview::drawPreviewRect(S32 offset_x, S32 offset_y)
 	//draw four alpha rectangles to cover areas outside of the snapshot image
 	if(!mKeepAspectRatio)
 	{
-		LLColor4 alpha_color(0.5f, 0.5f, 0.5f, 0.8f) ;
 		S32 dwl = 0, dwr = 0 ;
 		if(mThumbnailWidth > mPreviewRect.getWidth())
 		{
@@ -567,6 +567,7 @@ void LLSnapshotLivePreview::generateThumbnailImage(BOOL force_update)
                                          mAllowRenderUI && gSavedSettings.getBOOL("RenderUIInSnapshot"),
                                          gSavedSettings.getBOOL("RenderHUDInSnapshot"),
                                          FALSE,
+                                         gSavedSettings.getBOOL("RenderSnapshotNoPost"),
                                          mSnapshotBufferType) )
         {
             raw = NULL ;
@@ -676,8 +677,8 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 	}
 
 	// If we're in freeze-frame and/or auto update mode and camera has moved, update snapshot.
-	LLVector3 new_camera_pos = LLViewerCamera::getInstanceFast()->getOrigin();
-	LLQuaternion new_camera_rot = LLViewerCamera::getInstanceFast()->getQuaternion();
+	LLVector3 new_camera_pos = LLViewerCamera::getInstance()->getOrigin();
+	LLQuaternion new_camera_rot = LLViewerCamera::getInstance()->getQuaternion();
 	if (previewp->mForceUpdateSnapshot ||
 		(((ALControlCache::AutoSnapshot && LLView::isAvailable(previewp->mViewContainer)) ||
 		(LLPipeline::FreezeTime && previewp->mAllowFullScreenPreview)) &&
@@ -730,6 +731,7 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
                 previewp->mAllowRenderUI && gSavedSettings.getBOOL("RenderUIInSnapshot"),
                 gSavedSettings.getBOOL("RenderHUDInSnapshot"),
                 FALSE,
+                gSavedSettings.getBOOL("RenderSnapshotNoPost"),
                 previewp->mSnapshotBufferType,
                 previewp->getMaxImageSize());
         if (success)
@@ -775,7 +777,6 @@ BOOL LLSnapshotLivePreview::onIdle( void* snapshot_preview )
 			previewp->mPreviewImageEncoded = last_preview_encoded;
 			previewp->generateThumbnailImage(FALSE);
             previewp->getWindow()->decBusyCount();
-			gPipeline.doResetVertexBuffers(true);
 		}
     }
     // Tell the floater container that the snapshot is updated now
@@ -898,6 +899,11 @@ LLPointer<LLImageRaw> LLSnapshotLivePreview::getEncodedImage()
 		}
 	}
     return mPreviewImageEncoded;
+}
+
+bool LLSnapshotLivePreview::createUploadFile(const std::string &out_filename, const S32 max_image_dimentions, const S32 min_image_dimentions)
+{
+    return LLViewerTextureList::createUploadFile(mPreviewImage, out_filename, max_image_dimentions, min_image_dimentions);
 }
 
 // We actually estimate the data size so that we do not require actual compression when showing the preview
@@ -1038,43 +1044,26 @@ void LLSnapshotLivePreview::saveTexture(BOOL outfit_snapshot, std::string name)
 	if (formatted->encode(scaled, 0.0f))
 	{
         LLFileSystem fmt_file(new_asset_id, LLAssetType::AT_TEXTURE, LLFileSystem::WRITE);
-		if (fmt_file.open())
-		{
-			if (fmt_file.write(formatted->getData(), formatted->getDataSize()))
-			{
-				fmt_file.close();
+        fmt_file.write(formatted->getData(), formatted->getDataSize());
+		std::string pos_string;
+		LLAgentUI::buildLocationString(pos_string, LLAgentUI::LOCATION_FORMAT_FULL);
+		std::string who_took_it;
+		LLAgentUI::buildFullname(who_took_it);
+		S32 expected_upload_cost = LLAgentBenefitsMgr::current().getTextureUploadCost();
+        std::string res_name = outfit_snapshot ? name : "Snapshot : " + pos_string;
+        std::string res_desc = outfit_snapshot ? "" : "Taken by " + who_took_it + " at " + pos_string;
+        LLFolderType::EType folder_type = outfit_snapshot ? LLFolderType::FT_NONE : LLFolderType::FT_SNAPSHOT_CATEGORY;
+        LLInventoryType::EType inv_type = outfit_snapshot ? LLInventoryType::IT_NONE : LLInventoryType::IT_SNAPSHOT;
 
-				std::string pos_string;
-				LLAgentUI::buildLocationString(pos_string, LLAgentUI::LOCATION_FORMAT_FULL);
-				std::string who_took_it;
-				LLAgentUI::buildFullname(who_took_it);
-				S32 expected_upload_cost = LLAgentBenefitsMgr::current().getTextureUploadCost();
-				std::string res_name = outfit_snapshot ? name : "Snapshot : " + pos_string;
-				std::string res_desc = outfit_snapshot ? "" : "Taken by " + who_took_it + " at " + pos_string;
-				LLFolderType::EType folder_type = outfit_snapshot ? LLFolderType::FT_NONE : LLFolderType::FT_SNAPSHOT_CATEGORY;
-				LLInventoryType::EType inv_type = outfit_snapshot ? LLInventoryType::IT_NONE : LLInventoryType::IT_SNAPSHOT;
+        LLResourceUploadInfo::ptr_t assetUploadInfo(new LLResourceUploadInfo(
+            tid, LLAssetType::AT_TEXTURE, res_name, res_desc, 0,
+            folder_type, inv_type,
+            PERM_ALL, LLFloaterPerms::getGroupPerms("Uploads"), LLFloaterPerms::getEveryonePerms("Uploads"),
+            expected_upload_cost, !outfit_snapshot));
 
-				LLResourceUploadInfo::ptr_t assetUploadInfo(new LLResourceUploadInfo(
-					tid, LLAssetType::AT_TEXTURE, res_name, res_desc, 0,
-					folder_type, inv_type,
-					PERM_ALL, LLFloaterPerms::getGroupPerms("Uploads"), LLFloaterPerms::getEveryonePerms("Uploads"),
-					expected_upload_cost, !outfit_snapshot));
+        upload_new_resource(assetUploadInfo);
 
-				upload_new_resource(assetUploadInfo);
-
-				gViewerWindow->playSnapshotAnimAndSound();
-			}
-			else
-			{
-				LLNotificationsUtil::add("ErrorEncodingSnapshot");
-				LL_WARNS("Snapshot") << "Error writing snapshot to cache" << LL_ENDL;
-			}
-		}
-		else
-		{
-			LLNotificationsUtil::add("ErrorEncodingSnapshot");
-			LL_WARNS("Snapshot") << "Error opening snapshot cache file for write" << LL_ENDL;
-		}
+		gViewerWindow->playSnapshotAnimAndSound();
 	}
 	else
 	{

@@ -29,6 +29,7 @@
 #include "llfloaterbvhpreview.h"
 
 #include "llbvhloader.h"
+#include "llbvhconsts.h"
 #include "lldatapacker.h"
 #include "lldir.h"
 #include "llnotificationsutil.h"
@@ -78,42 +79,6 @@ const F32 MIN_CAMERA_ZOOM = 0.5f;
 const F32 MAX_CAMERA_ZOOM = 10.f;
 
 const F32 BASE_ANIM_TIME_OFFSET = 5.f;
-
-std::string STATUS[] =
-{
-	"E_ST_OK",
-	"E_ST_EOF",
-	"E_ST_NO_CONSTRAINT",
-	"E_ST_NO_FILE",
-	"E_ST_NO_HIER",
-	"E_ST_NO_JOINT",
-	"E_ST_NO_NAME",
-	"E_ST_NO_OFFSET",
-	"E_ST_NO_CHANNELS",
-	"E_ST_NO_ROTATION",
-	"E_ST_NO_AXIS",
-	"E_ST_NO_MOTION",
-	"E_ST_NO_FRAMES",
-	"E_ST_NO_FRAME_TIME",
-	"E_ST_NO_POS",
-	"E_ST_NO_ROT",
-	"E_ST_NO_XLT_FILE",
-	"E_ST_NO_XLT_HEADER",
-	"E_ST_NO_XLT_NAME",
-	"E_ST_NO_XLT_IGNORE",
-	"E_ST_NO_XLT_RELATIVE",
-	"E_ST_NO_XLT_OUTNAME",
-	"E_ST_NO_XLT_MATRIX",
-	"E_ST_NO_XLT_MERGECHILD",
-	"E_ST_NO_XLT_MERGEPARENT",
-	"E_ST_NO_XLT_PRIORITY",
-	"E_ST_NO_XLT_LOOP",
-	"E_ST_NO_XLT_EASEIN",
-	"E_ST_NO_XLT_EASEOUT",
-	"E_ST_NO_XLT_HAND",
-	"E_ST_NO_XLT_EMOTE",
-"E_ST_BAD_ROOT"
-};
 
 //-----------------------------------------------------------------------------
 // LLFloaterBvhPreview()
@@ -230,7 +195,7 @@ BOOL LLFloaterBvhPreview::postBuild()
 		// loading a bvh file
 
 		// now load bvh file
-		apr_off_t file_size;
+		S32 file_size;
 		
 		LLAPRFile infile ;
 		infile.open(mFilenameAndPath, LL_APR_RB, NULL, &file_size);
@@ -255,7 +220,7 @@ BOOL LLFloaterBvhPreview::postBuild()
                 std::map<std::string, std::string> joint_alias_map = getJointAliases();
     
 				loaderp = new LLBVHLoader(file_buffer, load_status, line_number, joint_alias_map);
-				std::string status = getString(STATUS[load_status]);
+                std::string status = getString(BVHSTATUS[load_status]);
 				
 				if(load_status == E_ST_NO_XLT_FILE)
 				{
@@ -294,7 +259,7 @@ BOOL LLFloaterBvhPreview::postBuild()
 		loaderp->serialize(dp);
 		dp.reset();
 		LL_INFOS("BVH") << "Deserializing motionp" << LL_ENDL;
-		BOOL success = motionp && motionp->deserialize(dp, mMotionID);
+		BOOL success = motionp && motionp->deserialize(dp, mMotionID, false);
 		LL_INFOS("BVH") << "Done" << LL_ENDL;
 
 		delete []buffer;
@@ -314,7 +279,7 @@ BOOL LLFloaterBvhPreview::postBuild()
 			//temp.mV[VZ] = 0.f;
 			F32 pelvis_max_displacement = pelvis_offset + (temp.magVec() * 0.5f) + 1.f;
 			
-			F32 camera_zoom = LLViewerCamera::getInstanceFast()->getDefaultFOV() / (2.f * atan(pelvis_max_displacement / PREVIEW_CAMERA_DISTANCE));
+			F32 camera_zoom = LLViewerCamera::getInstance()->getDefaultFOV() / (2.f * atan(pelvis_max_displacement / PREVIEW_CAMERA_DISTANCE));
 		
 			mAnimPreview->setZoom(camera_zoom);
 
@@ -358,7 +323,7 @@ BOOL LLFloaterBvhPreview::postBuild()
 			else
 			{
 				LLUIString out_str = getString("failed_file_read");
-				out_str.setArg("[STATUS]", getString(STATUS[loaderp->getStatus()])); 
+                out_str.setArg("[STATUS]", getString(BVHSTATUS[loaderp->getStatus()])); 
 				getChild<LLUICtrl>("bad_animation_text")->setValue(out_str.getString());
 			}
 		}
@@ -1000,10 +965,8 @@ void LLFloaterBvhPreview::onBtnOK(void* userdata)
 			LLFileSystem file(motionp->getID(), LLAssetType::AT_ANIMATION, LLFileSystem::APPEND);
 
 			S32 size = dp.getCurrentSize();
-			if (file.open() && file.write((U8*)buffer, size))
+			if (file.write((U8*)buffer, size))
 			{
-				file.close();
-
 				std::string name = floaterp->getChild<LLUICtrl>("name_form")->getValue().asString();
 				std::string desc = floaterp->getChild<LLUICtrl>("description_form")->getValue().asString();
 				S32 expected_upload_cost = LLAgentBenefitsMgr::current().getAnimationUploadCost();
@@ -1049,7 +1012,12 @@ LLPreviewAnimation::LLPreviewAnimation(S32 width, S32 height) : LLViewerDynamicT
 	mDummyAvatar = (LLVOAvatar*)gObjectList.createObjectViewer(LL_PCODE_LEGACY_AVATAR, gAgent.getRegion(), LLViewerObject::CO_FLAG_UI_AVATAR);
 	mDummyAvatar->mSpecialRenderMode = 1;
 	mDummyAvatar->startMotion(ANIM_AGENT_STAND, BASE_ANIM_TIME_OFFSET);
-	mDummyAvatar->hideSkirt();
+
+    // on idle overall apperance update will set skirt to visible, so either
+    // call early or account for mSpecialRenderMode in updateMeshVisibility
+    mDummyAvatar->updateOverallAppearance();
+    mDummyAvatar->hideHair();
+    mDummyAvatar->hideSkirt();
 
 	// stop extraneous animations
 	mDummyAvatar->stopMotion( ANIM_AGENT_HEAD_ROT, TRUE );
@@ -1089,10 +1057,7 @@ BOOL	LLPreviewAnimation::render()
 	gGL.pushMatrix();
 	gGL.loadIdentity();
 
-	if (LLGLSLShader::sNoFixedFunction)
-	{
-		gUIProgram.bind();
-	}
+	gUIProgram.bind();
 
 	LLGLSUIDefault def;
 	gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
@@ -1113,18 +1078,17 @@ BOOL	LLPreviewAnimation::render()
 	LLQuaternion camera_rot = LLQuaternion(mCameraPitch, LLVector3::y_axis) * 
 		LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
+    LLViewerCamera* camera = LLViewerCamera::getInstance();
+
 	LLQuaternion av_rot = avatarp->mRoot->getWorldRotation() * camera_rot;
-	LLViewerCamera::getInstanceFast()->setOriginAndLookAt(
+	camera->setOriginAndLookAt(
 		target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),		// camera
 		LLVector3::z_axis,																	// up
 		target_pos + (mCameraOffset  * av_rot) );											// point of interest
 
-	LLViewerCamera::getInstanceFast()->setView(LLViewerCamera::getInstanceFast()->getDefaultFOV() / mCameraZoom);
-	LLViewerCamera::getInstanceFast()->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
-
-	mCameraRelPos = LLViewerCamera::getInstanceFast()->getOrigin() - avatarp->mHeadp->getWorldPosition();
-
-	//avatarp->setAnimationData("LookAtPoint", (void *)&mCameraRelPos);
+	camera->setViewNoBroadcast(LLViewerCamera::getInstance()->getDefaultFOV() / mCameraZoom);
+    camera->setAspect((F32) mFullWidth / (F32) mFullHeight);
+	camera->setPerspective(FALSE, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, FALSE);
 
 	//SJB: Animation is updated in LLVOAvatar::updateCharacter
 	
@@ -1140,6 +1104,7 @@ BOOL	LLPreviewAnimation::render()
 		{
 			LLDrawPoolAvatar *avatarPoolp = (LLDrawPoolAvatar *)face->getPool();
 			avatarp->dirtyMesh();
+            gPipeline.enableLightsPreview();
 			avatarPoolp->renderAvatars(avatarp);  // renders only one avatar
 		}
 	}

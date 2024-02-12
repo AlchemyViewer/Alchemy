@@ -6,31 +6,23 @@ include(00-Common)
 include(LLCommon)
 include(LLMath)
 include(Linking)
-include(Abseil)
 include(Boost)
 include(Sentry)
 include(LLSharedLibs)
 include(Copy3rdPartyLibs)
-include(ZLIB)
+include(ZLIBNG)
 include(URIPARSER)
+include(Sentry)
+include(Tracy)
+include(OpenSSL)
+include(XXHash)
 
-include_directories(
-    ${EXPAT_INCLUDE_DIRS}
-    ${LLCOMMON_INCLUDE_DIRS}
-    ${LLMATH_INCLUDE_DIRS}
-    ${ZLIB_INCLUDE_DIRS}
-    ${URIPARSER_INCLUDE_DIRS}
-    )
-
-# add_executable(lltreeiterators lltreeiterators.cpp)
-# 
-# target_link_libraries(lltreeiterators
-#     ${LLCOMMON_LIBRARIES})
 
 set(llcommon_SOURCE_FILES
+    apply.cpp
+    commoncontrol.cpp
     indra_constants.cpp
-    llallocator.cpp
-    llallocator_heap_profile.cpp
+    lazyeventapi.cpp
     llapp.cpp
     llapr.cpp
     llassettype.cpp
@@ -46,12 +38,12 @@ set(llcommon_SOURCE_FILES
     llcoros.cpp
     llcrc.cpp
     llcriticaldamp.cpp
+    llcurrencywrapper.cpp
     lldate.cpp
     lldeadmantimer.cpp
     lldependencies.cpp
     lldictionary.cpp
     llerror.cpp
-    llerrorthread.cpp
     llevent.cpp
     lleventapi.cpp
     lleventcoro.cpp
@@ -107,7 +99,6 @@ set(llcommon_SOURCE_FILES
     llsys.cpp
     lltempredirect.cpp
     llthread.cpp
-    llthreadlocalstorage.cpp
     llthreadsafequeue.cpp
     lltimer.cpp
     lltrace.cpp
@@ -118,21 +109,29 @@ set(llcommon_SOURCE_FILES
     lluriparser.cpp
     lluuid.cpp
     llworkerthread.cpp
-    timing.cpp
+    hbxxh.cpp
     u64.cpp
+    threadpool.cpp
+    workqueue.cpp
     StackWalker.cpp
     )
     
 set(llcommon_HEADER_FILES
     CMakeLists.txt
 
+    always_return.h
+    apply.h
+    chrono.h
+    classic_callback.h
+    commoncontrol.h
+    compile_time.h
     ctype_workaround.h
     fix_macros.h
+    function_types.h
     indra_constants.h
+    lazyeventapi.h
     linden_common.h
     llalignedarray.h
-    llallocator.h
-    llallocator_heap_profile.h
     llapp.h
     llapr.h
     llassettype.h
@@ -150,6 +149,7 @@ set(llcommon_HEADER_FILES
     llcoros.h
     llcrc.h
     llcriticaldamp.h
+    llcurrencywrapper.h
     lldate.h
     lldeadmantimer.h
     lldefs.h
@@ -160,7 +160,6 @@ set(llcommon_HEADER_FILES
     llendianswizzle.h
     llerror.h
     llerrorcontrol.h
-    llerrorthread.h
     llevent.h
     lleventapi.h
     lleventcoro.h
@@ -183,6 +182,7 @@ set(llcommon_HEADER_FILES
     llinitdestroyclass.h
     llinitparam.h
     llinstancetracker.h
+    llinstancetrackersubclass.h
     llkeybind.h
     llkeythrottle.h
     llleap.h
@@ -199,6 +199,8 @@ set(llcommon_HEADER_FILES
     llmutex.h
     llnametable.h
     llpointer.h
+    llprofiler.h
+    llprofilercategories.h
     llpounceable.h
     llpredicate.h
     llpreprocessor.h
@@ -251,14 +253,20 @@ set(llcommon_HEADER_FILES
     llwin32headers.h
     llwin32headerslean.h
     llworkerthread.h
+    hbxxh.h
     lockstatic.h
     stdtypes.h
     stringize.h
+    threadpool.h
+    threadpool_fwd.h
+    threadsafeschedule.h
     timer.h
+    tuple.h
     u64.h
+    workqueue.h
     StackWalker.h
     )
-
+    
 if (DARWIN)
   list(APPEND llcommon_HEADER_FILES llsys_objc.h)
   list(APPEND llcommon_SOURCE_FILES llsys_objc.mm)
@@ -267,51 +275,36 @@ if (DARWIN)
                               PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 endif (DARWIN)
 
-set_source_files_properties(${llcommon_HEADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-
-if (USE_SENTRY)
-  set_source_files_properties(${llcommon_SOURCE_FILES}
-    PROPERTIES COMPILE_DEFINITIONS "${SENTRY_DEFINE}")
-endif (USE_SENTRY)
-
 list(APPEND llcommon_SOURCE_FILES ${llcommon_HEADER_FILES})
 
 add_library (llcommon ${llcommon_SOURCE_FILES})
 
-set_target_properties(llcommon PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-
 target_link_libraries(
-    llcommon
-    PUBLIC
-    ${APRUTIL_LIBRARIES}
-    ${APR_LIBRARIES}
-    ${EXPAT_LIBRARIES}
-    ${ZLIB_LIBRARIES}
-    ${WINDOWS_LIBRARIES}
-    ${BOOST_FIBER_LIBRARY}
-    ${BOOST_CONTEXT_LIBRARY}
-    ${BOOST_PROGRAM_OPTIONS_LIBRARY}
-    ${BOOST_REGEX_LIBRARY}
-    ${BOOST_STACKTRACE_LIBRARY}
-    ${BOOST_SYSTEM_LIBRARY}
-    ${GOOGLE_PERFTOOLS_LIBRARIES}
-    ${URIPARSER_LIBRARIES}
-    absl::synchronization
-    absl::flat_hash_map
-    absl::node_hash_map
-    absl::random_random
-    absl::random_bit_gen_ref
-    absl::strings
-    nlohmann_json::nlohmann_json
-    fmt::fmt
-    ${DL_LIBRARY}
-    ${RT_LIBRARY}
+        llcommon
+        PUBLIC
+        ll::apr
+        ll::expat
+        ll::openssl
+        ll::zlib-ng
+        ll::boost
+        ll::uriparser
+        ll::oslibraries
+        ll::tracy
+        ll::xxhash
+        nlohmann_json::nlohmann_json
+        fmt::fmt
     )
+
+target_include_directories(llcommon INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(llcommon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(TARGET al::sentry)
+    target_compile_definitions(llcommon PRIVATE AL_SENTRY=1)
+endif()
 
 add_dependencies(llcommon stage_third_party_libs)
 
-if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0") 
+if(USE_PRECOMPILED_HEADERS) 
   target_precompile_headers(llcommon
     PRIVATE
     linden_common.h
@@ -321,11 +314,14 @@ if(USE_PRECOMPILED_HEADERS AND ${CMAKE_VERSION} VERSION_GREATER "3.15.0")
     <functional>
     <map>
     <mutex>
+    <shared_mutex>
     <string>
     <string_view>
     <thread>
-    <absl/container/node_hash_map.h>
-    <absl/container/flat_hash_map.h>
+    <boost/unordered/unordered_flat_map.hpp>
+    <boost/unordered/unordered_flat_set.hpp>
+    <boost/unordered/unordered_map.hpp>
+    <boost/unordered/unordered_set.hpp>
     <fmt/format.h>
     <fmt/compile.h>
     )
@@ -339,29 +335,26 @@ if (LL_TESTS)
   LL_ADD_PROJECT_UNIT_TESTS(llcommon "${llcommon_TEST_SOURCE_FILES}")
 
   #set(TEST_DEBUG on)
-  set(test_libs llcommon 
-      ${LLCOMMON_LIBRARIES} 
-      ${WINDOWS_LIBRARIES} 
-      ${BOOST_FIBER_LIBRARY} 
-      ${BOOST_CONTEXT_LIBRARY} 
-      ${BOOST_THREAD_LIBRARY} 
-      ${BOOST_SYSTEM_LIBRARY})
-  LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}")
+  set(test_libs llcommon)
+  LL_ADD_INTEGRATION_TEST(apply "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(bitpack "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(classic_callback "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(lazyeventapi "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llbase64 "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llcond "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lldate "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lldeadmantimer "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lldependencies "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llerror "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lleventdispatcher "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lleventcoro "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(lleventdispatcher "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lleventfilter "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llframetimer "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llheteromap "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llinstancetracker "" "${test_libs}")
   #LL_ADD_INTEGRATION_TEST(llleap "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(llmainthreadtask "" "${test_libs}")
+  #LL_ADD_INTEGRATION_TEST(llmainthreadtask "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llpounceable "" "${test_libs}")
   #LL_ADD_INTEGRATION_TEST(llprocess "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llprocessor "" "${test_libs}")
@@ -373,9 +366,12 @@ if (LL_TESTS)
   LL_ADD_INTEGRATION_TEST(llstring "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lltrace "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(lltreeiterators "" "${test_libs}")
-  LL_ADD_INTEGRATION_TEST(lluri "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(llunits "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(lluri "" "${test_libs}")
   LL_ADD_INTEGRATION_TEST(stringize "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(threadsafeschedule "" "${test_libs}")
+  LL_ADD_INTEGRATION_TEST(tuple "" "${test_libs}")
+  #LL_ADD_INTEGRATION_TEST(workqueue "" "${test_libs}")
 
 ## llexception_test.cpp isn't a regression test, and doesn't need to be run
 ## every build. It's to help a developer make implementation choices about

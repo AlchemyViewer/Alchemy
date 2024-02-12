@@ -271,7 +271,6 @@ void LLCircuitData::ackReliablePacket(TPACKETID packet_num)
 
 S32 LLCircuitData::resendUnackedPackets(const F64Seconds now)
 {
-	S32 resent_packets = 0;
 	LLReliablePacket *packetp;
 
 
@@ -375,7 +374,6 @@ S32 LLCircuitData::resendUnackedPackets(const F64Seconds now)
 				// Don't remove it yet, it still gets to try to resend at least once.
 				++iter;
 			}
-			resent_packets++;
 		}
 		else
 		{
@@ -1415,3 +1413,12 @@ F32 LLCircuitData::getAgeInSeconds() const
 {
 	return mExistenceTimer.getElapsedTimeF32();
 }
+
+std::vector<LLCircuitData*> LLCircuit::getCircuitDataList() const
+{
+	std::vector<LLCircuitData*> list;
+	for (const auto& [host, circuit_data] : mCircuitData)
+        list.push_back(circuit_data);
+	return list;
+}
+

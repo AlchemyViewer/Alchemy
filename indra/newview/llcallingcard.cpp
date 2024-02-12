@@ -234,20 +234,20 @@ const LLUUID& LLAvatarTracker::getAvatarID()
 	}
 }
 
-S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
+S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t buds)
 {
 	using namespace std;
 
 	U32 new_buddy_count = 0;
 	LLUUID agent_id;
-	for(buddy_map_t::const_iterator itr = buds.begin(); itr != buds.end(); ++itr)
+	for(const auto& itr : buds)
 	{
-		agent_id = (*itr).first;
+		agent_id = (itr).first;
 		buddy_map_t::const_iterator existing_buddy = mBuddyInfo.find(agent_id);
 		if(existing_buddy == mBuddyInfo.end())
 		{
 			++new_buddy_count;
-			mBuddyInfo[agent_id] = (*itr).second;
+			mBuddyInfo[agent_id] = (itr).second;
 
 			// pre-request name for notifications?
 			LLAvatarName av_name;
@@ -265,7 +265,7 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
 		else
 		{
 			LLRelationship* e_r = (*existing_buddy).second;
-			LLRelationship* n_r = (*itr).second;
+			LLRelationship* n_r = (itr).second;
 			LL_WARNS() << "!! Add buddy for existing buddy: " << agent_id
 					<< " [" << (e_r->isOnline() ? "Online" : "Offline") << "->" << (n_r->isOnline() ? "Online" : "Offline")
 					<< ", " <<  e_r->getRightsGrantedTo() << "->" << n_r->getRightsGrantedTo()
@@ -292,6 +292,7 @@ void LLAvatarTracker::copyBuddyList(buddy_map_t& buddies) const
 void LLAvatarTracker::terminateBuddy(const LLUUID& id)
 {
 	LL_DEBUGS() << "LLAvatarTracker::terminateBuddy()" << LL_ENDL;
+
 	LLRelationship* buddy = get_ptr_in_map(mBuddyInfo, id);
 	if(!buddy) return;
 	mBuddyInfo.erase(id);
@@ -451,7 +452,7 @@ void LLAvatarTracker::findAgent()
 	msg->nextBlockFast(_PREHASH_AgentBlock);
 	msg->addUUIDFast(_PREHASH_Hunter, gAgentID);
 	msg->addUUIDFast(_PREHASH_Prey, mTrackingData->mAvatarID);
-	msg->addU32Fast(_PREHASH_SpaceIP, 0); // will get filled in by simulator
+	msg->addIPAddrFast(_PREHASH_SpaceIP, 0); // will get filled in by simulator
 	msg->nextBlockFast(_PREHASH_LocationBlock);
 	const F64 NO_LOCATION = 0.0;
 	msg->addF64Fast(_PREHASH_GlobalX, NO_LOCATION);
@@ -491,6 +492,7 @@ void LLAvatarTracker::notifyObservers()
 		// new masks and ids will be processed later from idle.
 		return;
 	}
+	LL_PROFILE_ZONE_SCOPED
 	mIsNotifyObservers = TRUE;
 
 	observer_list_t observers(mObservers);
@@ -647,7 +649,7 @@ void LLAvatarTracker::processChange(LLMessageSystem* msg)
 			if(mBuddyInfo.find(agent_id) != mBuddyInfo.end())
 			{
 				S32 change = buddy_it->second->getRightsGrantedFrom() ^ new_rights;
-				if (change)
+				if (change && !gAgent.isDoNotDisturb())
 				{
 					LLSD args = LLSD().with("NAME", LLSLURL("agent", agent_id, "displayname").getSLURLString());
 					LLSD payload = LLSD().with("from_id", agent_id);
@@ -679,6 +681,7 @@ void LLAvatarTracker::processChangeUserRights(LLMessageSystem* msg, void**)
 
 void LLAvatarTracker::processNotify(LLMessageSystem* msg, bool online)
 {
+	LL_PROFILE_ZONE_SCOPED
 	S32 count = msg->getNumberOfBlocksFast(_PREHASH_AgentBlock);
 	BOOL chat_notify = gSavedSettings.getBOOL("ChatOnlineNotification");
 
@@ -713,13 +716,12 @@ void LLAvatarTracker::processNotify(LLMessageSystem* msg, bool online)
 				// we were tracking someone who went offline
 				deleteTrackingData();
 			}
-			// *TODO: get actual inventory id
-			gInventory.addChangedMask(LLInventoryObserver::CALLING_CARD, LLUUID::null);
-		}
-		if(chat_notify)
-		{
-			// Look up the name of this agent for the notification
-			LLAvatarNameCache::get(agent_id,boost::bind(&on_avatar_name_cache_notify,_1, _2, online, payload));
+
+            if(chat_notify)
+            {
+                // Look up the name of this agent for the notification
+                LLAvatarNameCache::get(agent_id,boost::bind(&on_avatar_name_cache_notify,_1, _2, online, payload));
+            }
 		}
 
 		mModifyMask |= LLFriendObserver::ONLINE;
@@ -742,20 +744,24 @@ static void on_avatar_name_cache_notify(const LLUUID& agent_id,
 	args["NAME"] = av_name.getDisplayName();
 	args["STATUS"] = online ? online_status : offline_status;
 
-	LLNotificationPtr notification;
+	LLNotification::Params notify_params;
+	notify_params.name = "FriendOnlineOffline";
+	notify_params.substitutions = args;
 	if (online)
 	{
-		notification =
-			LLNotifications::instance().add("FriendOnlineOffline",
-									 args,
-									 payload.with("respond_on_mousedown", TRUE),
-									 boost::bind(&LLAvatarActions::startIM, agent_id));
+		notify_params.payload = payload.with("respond_on_mousedown", TRUE);
+
+		LLNotification::Params::Functor functor_p;
+		functor_p.function = boost::bind(&LLAvatarActions::startIM, agent_id);
+		notify_params.functor = functor_p;
 	}
 	else
 	{
-		notification =
-			LLNotifications::instance().add("FriendOnlineOffline", args, payload);
+		notify_params.payload = payload;
 	}
+
+	notify_params.force_to_chat = gSavedSettings.getBOOL("AlchemyOnlineOfflineToChat");
+	LLNotificationPtr notification = LLNotifications::instance().add(notify_params);
 
 	// If there's an open IM session with this agent, send a notification there too.
 	LLUUID session_id = LLIMMgr::computeSessionID(IM_NOTHING_SPECIAL, agent_id);

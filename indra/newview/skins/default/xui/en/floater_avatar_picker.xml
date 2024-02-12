@@ -65,7 +65,7 @@
              name="InstructSearchResidentName"
              top="8"
              width="220">
-                Type part of a person&apos;s name:
+                Type part of a person&apos;s name or a complete key:
             </text>
             <line_editor
 	     bevel_style="none"
@@ -98,12 +98,10 @@
            width="132">
             <columns
               label="Name"
-              name="name"
-              width="150" />
+              name="name" />
             <columns
               label="Username"
-              name="username"
-              width="150" />
+              name="username" />
           </scroll_list>
         </panel>
         <panel
@@ -172,7 +170,7 @@
                 Select a person nearby:
             </text>
             <slider
-             control_name="NearMeRange"
+             control_name="AVPickerNearMeRange"
              decimal_digits="0"
              follows="left|top"
              height="18"
@@ -181,7 +179,7 @@
              label="Range"
              layout="topleft"
              left="10"
-             max_val="130"
+             max_val="4096"
              min_val="5"
              name="near_me_range"
              top_pad="0"
@@ -217,12 +215,10 @@
              width="132">
             <columns
               label="Name"
-              name="name"
-              width="150" />
+              name="name" />
             <columns
               label="Username"
-              name="username"
-              width="150" />
+              name="username"  />
           </scroll_list>
         </panel>
     </tab_container>

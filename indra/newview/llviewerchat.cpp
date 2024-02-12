@@ -28,7 +28,8 @@
 #include "llviewerchat.h" 
 
 // newview includes
-#include "llagent.h" 	// gAgent		
+#include "llagent.h" 	// gAgent	
+#include "llcallingcard.h"
 #include "llslurl.h"
 #include "lluicolor.h"
 #include "lluicolortable.h"
@@ -36,6 +37,7 @@
 #include "llviewerregion.h"
 #include "llworld.h"
 #include "llinstantmessage.h" //SYSTEM_FROM
+#include "alavatargroups.h"
 
 // LLViewerChat
 LLViewerChat::font_change_signal_t LLViewerChat::sChatFontChangedSignal;
@@ -43,11 +45,6 @@ LLViewerChat::font_change_signal_t LLViewerChat::sChatFontChangedSignal;
 //static 
 void LLViewerChat::getChatColor(const LLChat& chat, LLColor4& r_color)
 {
-	if(chat.mMuted)
-	{
-		r_color= LLUIColorTable::instance().getColor("LtGray");
-	}
-	else
 	{
 		switch(chat.mSourceType)
 		{
@@ -68,6 +65,8 @@ void LLViewerChat::getChatColor(const LLChat& chat, LLColor4& r_color)
 					else
 					{
 						r_color = LLUIColorTable::instance().getColor("AgentChatColor");
+
+						r_color = ALAvatarGroups::instance().getAvatarColor(chat.mFromID, r_color, ALAvatarGroups::COLOR_CHAT);
 					}
 				}
 				break;
@@ -136,7 +135,7 @@ void LLViewerChat::getChatColor(const LLChat& chat, std::string& r_color_name, F
 					}
 					else
 					{
-						r_color_name = "AgentChatColor";
+						r_color_name = ALAvatarGroups::instance().getAvatarColorName(chat.mFromID, "AgentChatColor", ALAvatarGroups::COLOR_CHAT);
 					}
 				}
 				break;
@@ -187,9 +186,11 @@ void LLViewerChat::getChatColor(const LLChat& chat, std::string& r_color_name, F
 LLFontGL* LLViewerChat::getChatFont()
 {
 	S32 font_size = gSavedSettings.getS32("ChatFontSize");
-	LLFontGL* fontp = NULL;
-	switch(font_size)
+	LLFontGL* fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("ChatFontName"), getChatFontSizeStr(font_size), 0).normalize());
+	if (!fontp)
 	{
+		switch (font_size)
+		{
 		case -1:
 			fontp = LLFontGL::getFontMonospace();
 			break;
@@ -206,10 +207,9 @@ LLFontGL* LLViewerChat::getChatFont()
 		case 3:
 			fontp = LLFontGL::getFontSansSerifHuge();
 			break;
+		}
 	}
-	
 	return fontp;
-	
 }
 
 //static
@@ -218,6 +218,31 @@ S32 LLViewerChat::getChatFontSize()
 	return gSavedSettings.getS32("ChatFontSize");
 }
 
+//static
+std::string LLViewerChat::getChatFontSizeStr(S32 size)
+{
+	std::string ret;
+	switch (size)
+	{
+	case -1:
+		ret = "Monospace";
+		break;
+	case 0:
+		ret = "Small";
+		break;
+	default:
+	case 1:
+		ret = "Medium";
+		break;
+	case 2:
+		ret = "Large";
+		break;
+	case 3:
+		ret = "Huge";
+		break;
+	}
+	return ret;
+}
 
 //static
 void LLViewerChat::formatChatMsg(const LLChat& chat, std::string& formated_msg)
@@ -257,12 +282,13 @@ std::string LLViewerChat::getSenderSLURL(const LLChat& chat, const LLSD& args)
 std::string LLViewerChat::getObjectImSLURL(const LLChat& chat, const LLSD& args)
 {
 	std::string url = LLSLURL("objectim", chat.mFromID, "").getSLURLString();
-	absl::StrAppend(&url, "?name=", chat.mFromName, "&owner=", chat.mOwnerID.asString());
+	url += "?name=" + chat.mFromName;
+	url += "&owner=" + chat.mOwnerID.asString();
 
 	std::string slurl = args["slurl"].asString();
 	if (slurl.empty())
 	{
-		LLViewerRegion *region = LLWorld::getInstanceFast()->getRegionFromPosAgent(chat.mPosAgent);
+		LLViewerRegion *region = LLWorld::getInstance()->getRegionFromPosAgent(chat.mPosAgent);
 		if(region)
 		{
 			LLSLURL region_slurl(region->getName(), chat.mPosAgent);
@@ -270,7 +296,7 @@ std::string LLViewerChat::getObjectImSLURL(const LLChat& chat, const LLSD& args)
 		}
 	}
 
-	absl::StrAppend(&url, "&slurl=", LLURI::escape(slurl));
+	url += "&slurl=" + LLURI::escape(slurl);
 
 	return url;
 }

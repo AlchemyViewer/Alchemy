@@ -47,6 +47,7 @@ LLControlAvatar::LLControlAvatar(const LLUUID& id, const LLPCode pcode, LLViewer
     mGlobalScale(1.0f),
     mMarkedForDeath(false),
     mRootVolp(NULL),
+    mControlAVBridge(NULL),
     mScaleConstraintFixup(1.0),
 	mRegionChanged(false)
 {
@@ -241,9 +242,7 @@ void LLControlAvatar::matchVolumeTransform()
 #ifdef SHOW_DEBUG
                 LL_DEBUGS("BindShape") << getFullname() << " bind shape " << skin_info->mBindShapeMatrix << LL_ENDL;
 #endif
-                alignas(16) LLMatrix4 mat(LLMatrix4::kUninitialized);
-                skin_info->mBindShapeMatrix.store4a((F32*)mat.mMatrix);
-                bind_rot = LLSkinningUtil::getUnscaledQuaternion(mat);
+                bind_rot = LLSkinningUtil::getUnscaledQuaternion(LLMatrix4(skin_info->mBindShapeMatrix));
 			}
 #endif
 			setRotation(bind_rot*obj_rot);
@@ -254,7 +253,7 @@ void LLControlAvatar::matchVolumeTransform()
             }
 			mRoot->setPosition(vol_pos + mPositionConstraintFixup);
 
-             setGlobalScale(global_scale * mScaleConstraintFixup);
+            setGlobalScale(global_scale * mScaleConstraintFixup);
         }
     }
 }
@@ -280,10 +279,8 @@ void LLControlAvatar::recursiveScaleJoint(LLJoint* joint, F32 factor)
 {
     joint->setScale(factor * joint->getScale());
     
-	for (LLJoint::joints_t::iterator iter = joint->mChildren.begin();
-		 iter != joint->mChildren.end(); ++iter)
+	for (LLJoint* child : joint->mChildren)
 	{
-		LLJoint* child = *iter;
 		recursiveScaleJoint(child, factor);
 	}
 }
@@ -300,21 +297,19 @@ void LLControlAvatar::updateVolumeGeom()
 	mRootVolp->mDrawable->makeActive();
 	gPipeline.markMoved(mRootVolp->mDrawable);
 	gPipeline.markTextured(mRootVolp->mDrawable); // face may need to change draw pool to/from POOL_HUD
-	mRootVolp->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
 
 	const LLViewerObject::const_child_list_t& child_list = mRootVolp->getChildren();
 	for (LLViewerObject* childp : child_list)
 	{
 		if (childp && childp->mDrawable.notNull())
 		{
-			childp->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
 			gPipeline.markTextured(childp->mDrawable); // face may need to change draw pool to/from POOL_HUD
 			gPipeline.markMoved(childp->mDrawable);
         }
     }
 
-    gPipeline.markRebuild(mRootVolp->mDrawable, LLDrawable::REBUILD_ALL, TRUE);
-    mRootVolp->markForUpdate(TRUE);
+    gPipeline.markRebuild(mRootVolp->mDrawable, LLDrawable::REBUILD_ALL);
+    mRootVolp->markForUpdate();
 
     // Note that attachment overrides aren't needed here, have already
     // been applied at the time the mControlAvatar was created, in
@@ -375,6 +370,12 @@ void LLControlAvatar::idleUpdate(LLAgent &agent, const F64 &time)
     {
         LLVOAvatar::idleUpdate(agent,time);
     }
+}
+
+void LLControlAvatar::markDead()
+{
+    super::markDead();
+    mControlAVBridge = NULL;
 }
 
 bool LLControlAvatar::computeNeedsUpdate()
@@ -567,7 +568,7 @@ void LLControlAvatar::updateAnimations()
     getAnimatedVolumes(volumes);
     
     // Rebuild mSignaledAnimations from the associated volumes.
-    auto& signaled_anim_map = LLObjectSignaledAnimationMap::instanceFast().getMap();
+    auto& signaled_anim_map = LLObjectSignaledAnimationMap::instance().getMap();
 
 	std::map<LLUUID, S32> anims;
     for (LLVOVolume* volp : volumes)
@@ -598,7 +599,7 @@ void LLControlAvatar::updateAnimations()
         //if (!mRootVolp->isAnySelected())
         {
             updateVolumeGeom();
-            mRootVolp->recursiveMarkForUpdate(TRUE);
+            mRootVolp->recursiveMarkForUpdate();
         }
     }
 
@@ -611,6 +612,7 @@ LLViewerObject* LLControlAvatar::lineSegmentIntersectRiggedAttachments(const LLV
 									  S32 face,
 									  BOOL pick_transparent,
 									  BOOL pick_rigged,
+                                      BOOL pick_unselectable,
 									  S32* face_hit,
 									  LLVector4a* intersection,
 									  LLVector2* tex_coord,
@@ -630,7 +632,7 @@ LLViewerObject* LLControlAvatar::lineSegmentIntersectRiggedAttachments(const LLV
 		LLVector4a local_intersection;
         local_intersection.clear();
 
-        if (mRootVolp->lineSegmentIntersect(start, local_end, face, pick_transparent, pick_rigged, face_hit, &local_intersection, tex_coord, normal, tangent))
+        if (mRootVolp->lineSegmentIntersect(start, local_end, face, pick_transparent, pick_rigged, pick_unselectable, face_hit, &local_intersection, tex_coord, normal, tangent))
         {
             local_end = local_intersection;
             if (intersection)
@@ -647,7 +649,7 @@ LLViewerObject* LLControlAvatar::lineSegmentIntersectRiggedAttachments(const LLV
             for (std::vector<LLVOVolume*>::iterator vol_it = volumes.begin(); vol_it != volumes.end(); ++vol_it)
             {
                 LLVOVolume *volp = *vol_it;
-                if (mRootVolp != volp && volp->lineSegmentIntersect(start, local_end, face, pick_transparent, pick_rigged, face_hit, &local_intersection, tex_coord, normal, tangent))
+                if (mRootVolp != volp && volp->lineSegmentIntersect(start, local_end, face, pick_transparent, pick_rigged, pick_unselectable, face_hit, &local_intersection, tex_coord, normal, tangent))
         {
             local_end = local_intersection;
             if (intersection)
@@ -713,4 +715,13 @@ void LLControlAvatar::onRegionChanged()
 			cav->mRegionChanged = true;
 		}
 	}
+}
+
+bool LLControlAvatar::isTooComplex() const
+{
+	if (mRootVolp && !mRootVolp->isAttachment())
+	{
+		return false;
+	}
+	return LLVOAvatar::isTooComplex();
 }

@@ -29,7 +29,7 @@
 #include "object_flags.h"
 
 // viewer includes
-#include "alaoengine.h"
+#include "aoengine.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llagentui.h"
@@ -201,8 +201,8 @@ bool ALChatCommand::parseCommand(std::string data)
 				params.append(data.substr(length));
 				params.append(fmodf(static_cast<F32>(pos.mdV[VX]), REGION_WIDTH_METERS));
 				params.append(fmodf(static_cast<F32>(pos.mdV[VY]), REGION_WIDTH_METERS));
-				params.append(fmodf(static_cast<F32>(pos.mdV[VZ]), REGION_HEIGHT_METERS));
-				LLCommandDispatcher::dispatch("teleport", params, LLSD(), nullptr, "clicked", true);
+				params.append(static_cast<F32>(pos.mdV[VZ]));
+				LLCommandDispatcher::dispatch("teleport", params, LLSD(), std::string(), nullptr, "clicked", true);
 				return true;
 			}
 		}
@@ -304,27 +304,48 @@ bool ALChatCommand::parseCommand(std::string data)
 				}
 				else if (subcmd == "sit")
 				{
-					auto ao_set = ALAOEngine::instance().getSetByName(ALAOEngine::instance().getCurrentSetName());
+					auto ao_set = AOEngine::instance().getSetByName(AOEngine::instance().getCurrentSetName());
 					if (input >> subcmd)
 					{
 						if (subcmd == "on")
 						{
-							ALAOEngine::instance().setOverrideSits(ao_set, true);
+							AOEngine::instance().setOverrideSits(ao_set, true);
 
 						}
 						else if (subcmd == "off")
 						{
-							ALAOEngine::instance().setOverrideSits(ao_set, false);
+							AOEngine::instance().setOverrideSits(ao_set, false);
 						}
 					}
 					else
 					{
-						ALAOEngine::instance().setOverrideSits(ao_set, !ao_set->getSitOverride());
+						AOEngine::instance().setOverrideSits(ao_set, !ao_set->getSitOverride());
 					}
 					return true;
 				}
 			}
 		}
+        else if (cmd == "/sendmenu")
+        {
+            S32 channel;
+            if (!(input >> channel))
+                return false;
+            std::string button;
+            if (!(input >> button))
+                return false;
+            LLMessageSystem* msg = gMessageSystem;
+            msg->newMessageFast(_PREHASH_ScriptDialogReply);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->nextBlockFast(_PREHASH_Data);
+            msg->addUUIDFast(_PREHASH_ObjectID, gAgent.getID());
+            msg->addS32(_PREHASH_ChatChannel, channel);
+            msg->addS32Fast(_PREHASH_ButtonIndex, 0);
+            msg->addStringFast(_PREHASH_ButtonLabel, button);
+            gAgent.sendReliableMessage();
+            return true;
+        }
 	}
 	return false;
 }

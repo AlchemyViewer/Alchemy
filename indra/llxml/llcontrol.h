@@ -34,7 +34,7 @@
 #include "llrefcount.h"
 #include "llinstancetracker.h"
 
-#include "absl/container/flat_hash_map.h"
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <vector>
 #include <string_view>
@@ -171,7 +171,7 @@ class LLControlGroup final : public LLInstanceTracker<LLControlGroup, std::strin
 	LOG_CLASS(LLControlGroup);
 
 protected:
-	typedef absl::flat_hash_map<std::string, LLControlVariablePtr> ctrl_name_table_t;
+	typedef boost::unordered_flat_map<std::string, LLControlVariablePtr, al::string_hash, std::equal_to<>> ctrl_name_table_t;
 	ctrl_name_table_t mNameTable;
 	static const std::string mTypeString[TYPE_COUNT];
 
@@ -237,6 +237,7 @@ public:
 	// generic getter
 	template<typename T> T get(std::string_view  name)
 	{
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
 		LLControlVariable* control = getControl(name);
 		LLSD value;
 		eControlType type = TYPE_COUNT;
@@ -395,8 +396,8 @@ public:
 					const T& default_value, 
 					const std::string& comment = "Declared In Code")
 	{
-		mCachedControlPtr = LLControlCache<T>::getInstance(name);
-		if (mCachedControlPtr.isNull())
+		mCachedControlPtr = LLControlCache<T>::getInstance(name).get();
+		if (! mCachedControlPtr)
 		{
 			mCachedControlPtr = new LLControlCache<T>(group, name, default_value, comment);
 		}
@@ -405,8 +406,8 @@ public:
 	LLCachedControl(LLControlGroup& group,
 					const std::string& name)
 	{
-		mCachedControlPtr = LLControlCache<T>::getInstance(name);
-		if (mCachedControlPtr.isNull())
+		mCachedControlPtr = LLControlCache<T>::getInstance(name).get();
+		if (! mCachedControlPtr)
 		{
 			mCachedControlPtr = new LLControlCache<T>(group, name);
 		}

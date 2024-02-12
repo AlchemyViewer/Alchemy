@@ -92,6 +92,8 @@ LLFloaterIMSessionTab::LLFloaterIMSessionTab(const LLSD& session_id)
     mEnableCallbackRegistrar.add("Avatar.EnableItem", boost::bind(&LLFloaterIMSessionTab::enableContextMenuItem, this, _2));
     mCommitCallbackRegistrar.add("Avatar.DoToSelected", boost::bind(&LLFloaterIMSessionTab::doToSelected, this, _2));
     mCommitCallbackRegistrar.add("Group.DoToSelected", boost::bind(&cb_group_do_nothing));
+
+    mMinFloaterHeight = getMinHeight();
 }
 
 LLFloaterIMSessionTab::~LLFloaterIMSessionTab()
@@ -254,7 +256,6 @@ BOOL LLFloaterIMSessionTab::postBuild()
 	mGearBtn = getChild<LLButton>("gear_btn");
     mAddBtn = getChild<LLButton>("add_btn");
 	mVoiceButton = getChild<LLButton>("voice_call_btn");
-    mTranslationCheckBox = getChild<LLUICtrl>("translate_chat_checkbox_lp");
     
 	mParticipantListPanel = getChild<LLLayoutPanel>("speakers_list_panel");
 	mRightPartPanel = getChild<LLLayoutPanel>("right_part_holder");
@@ -387,13 +388,16 @@ void LLFloaterIMSessionTab::draw()
 
 void LLFloaterIMSessionTab::enableDisableCallBtn()
 {
-    mVoiceButton->setEnabled(
-    		mSessionID.notNull()
-    		&& mSession
-    		&& mSession->mSessionInitialized
-    		&& LLVoiceClient::getInstance()->voiceEnabled()
-    		&& LLVoiceClient::getInstance()->isVoiceWorking()
-    		&& mSession->mCallBackEnabled);
+    if (LLVoiceClient::instanceExists() && mVoiceButton)
+    {
+        mVoiceButton->setEnabled(
+            mSessionID.notNull()
+            && mSession
+            && mSession->mSessionInitialized
+            && LLVoiceClient::getInstance()->voiceEnabled()
+            && LLVoiceClient::getInstance()->isVoiceWorking()
+            && mSession->mCallBackEnabled);
+    }
 }
 
 void LLFloaterIMSessionTab::onFocusReceived()
@@ -429,7 +433,10 @@ std::string LLFloaterIMSessionTab::appendTime()
 	time_t utc_time = time_corrected();
 
 	static const std::string time_str = fmt::format(FMT_STRING("[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
-	std::string timeStr = time_str;
+	static const std::string time_str_seconds = fmt::format(FMT_STRING("[{}]:[{}]:[{}]"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"), LLTrans::getString("TimeSec"));
+	static const LLCachedControl<bool> show_timestamp_seconds(gSavedSettings, "ChatTimestampSeconds", false);
+
+	std::string timeStr = show_timestamp_seconds ? time_str_seconds : time_str;
 
 	LLSD substitution;
 	substitution["datetime"] = (S32) utc_time;
@@ -459,8 +466,7 @@ void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD &args)
 		tmp_chat.mFromName = chat.mFromName;
 		LLSD chat_args;
 		if (args) chat_args = args;
-		chat_args["use_plain_text_chat_history"] =
-				gSavedSettings.getBOOL("PlainTextChatHistory");
+		chat_args["chat_history_style"] = gSavedSettings.getS32("AlchemyChatHistoryStyle");
 		chat_args["show_time"] = gSavedSettings.getBOOL("IMShowTime");
 		chat_args["show_names_for_p2p_conv"] =
 				!mIsP2PChat || gSavedSettings.getBOOL("IMShowNamesForP2PConv");
@@ -550,7 +556,7 @@ void LLFloaterIMSessionTab::removeConversationViewParticipant(const LLUUID& part
 void LLFloaterIMSessionTab::updateConversationViewParticipant(const LLUUID& participant_id)
 {
 	LLFolderViewItem* widget = get_ptr_in_map(mConversationsWidgets,participant_id);
-	if (widget)
+	if (widget && widget->getViewModelItem())
 	{
 		widget->refresh();
 	}
@@ -575,8 +581,11 @@ void LLFloaterIMSessionTab::refreshConversation()
 		{
 			participants_uuids.push_back(widget_it->first);
 		}
-		widget_it->second->refresh();
-		widget_it->second->setVisible(TRUE);
+        if (widget_it->second->getViewModelItem())
+        {
+            widget_it->second->refresh();
+            widget_it->second->setVisible(TRUE);
+        }
 		++widget_it;
 	}
 	if (is_ad_hoc || mIsP2PChat)
@@ -656,9 +665,14 @@ void LLFloaterIMSessionTab::onIMSessionMenuItemClicked(const LLSD& userdata)
 {
 	std::string item = userdata.asString();
 
-	if (item == "compact_view" || item == "expanded_view")
+	if (item == "fancy_compact_view" || item == "compact_view" || item == "expanded_view")
 	{
-		gSavedSettings.setBOOL("PlainTextChatHistory", item == "compact_view");
+		S32 newset = 0;
+		if (item == "fancy_compact_view")
+			newset = 2;
+		else if (item == "compact_view")
+			newset = 1;
+		gSavedSettings.setS32("AlchemyChatHistoryStyle", newset);
 	}
 	else
 	{
@@ -672,9 +686,17 @@ void LLFloaterIMSessionTab::onIMSessionMenuItemClicked(const LLSD& userdata)
 bool LLFloaterIMSessionTab::onIMCompactExpandedMenuItemCheck(const LLSD& userdata)
 {
 	std::string item = userdata.asString();
-	bool is_plain_text_mode = gSavedSettings.getBOOL("PlainTextChatHistory");
-
-	return is_plain_text_mode? item == "compact_view" : item == "expanded_view";
+	S32 chat_history_mode = gSavedSettings.getS32("AlchemyChatHistoryStyle");
+	switch (chat_history_mode)
+	{
+	default:
+	case 0:
+		return item == "expanded_view";
+	case 1:
+		return item == "compact_view";
+	case 2:
+		return item == "fancy_compact_view";
+	}
 }
 
 
@@ -687,7 +709,7 @@ bool LLFloaterIMSessionTab::onIMShowModesMenuItemCheck(const LLSD& userdata)
 bool LLFloaterIMSessionTab::onIMShowModesMenuItemEnable(const LLSD& userdata)
 {
 	std::string item = userdata.asString();
-	bool plain_text = gSavedSettings.getBOOL("PlainTextChatHistory");
+	bool plain_text = gSavedSettings.getS32("AlchemyChatHistoryStyle") >= 1;
 	bool is_not_names = (item != "IMShowNamesForP2PConv");
 	return (plain_text && (is_not_names || mIsP2PChat));
 }
@@ -807,8 +829,6 @@ void LLFloaterIMSessionTab::updateHeaderAndToolbar()
 	mCloseBtn->setVisible(is_not_torn_off && !mIsNearbyChat);
 
 	enableDisableCallBtn();
-
-	showTranslationCheckbox();
 }
  
 void LLFloaterIMSessionTab::forceReshape()
@@ -823,11 +843,6 @@ void LLFloaterIMSessionTab::forceReshape()
 void LLFloaterIMSessionTab::reshapeChatLayoutPanel()
 {
 	mChatLayoutPanel->reshape(mChatLayoutPanel->getRect().getWidth(), mInputEditor->getRect().getHeight() + mInputEditorPad, FALSE);
-}
-
-void LLFloaterIMSessionTab::showTranslationCheckbox(BOOL show)
-{
-	mTranslationCheckBox->setVisible(mIsNearbyChat && show);
 }
 
 // static
@@ -937,10 +952,13 @@ void LLFloaterIMSessionTab::reshapeFloater(bool collapse)
 		S32 height = mContentPanel->getRect().getHeight() + mToolbarPanel->getRect().getHeight()
 			+ mChatLayoutPanel->getRect().getHeight() - mChatLayoutPanelHeight + 2;
 		floater_rect.mTop -= height;
+
+        setResizeLimits(getMinWidth(), floater_rect.getHeight());
 	}
 	else
 	{
 		floater_rect.mTop = floater_rect.mBottom + mFloaterHeight;
+        setResizeLimits(getMinWidth(), mMinFloaterHeight);
 	}
 
 	enableResizeCtrls(true, true, !collapse);
@@ -965,6 +983,7 @@ void LLFloaterIMSessionTab::restoreFloater()
 		setShape(floater_rect, true);
 		mBodyStack->updateLayout();
 		mExpandCollapseLineBtn->setImageOverlay(getString("expandline_icon"));
+        setResizeLimits(getMinWidth(), mMinFloaterHeight);
 		setMessagePaneExpanded(true);
 		saveCollapsedState();
 		mInputEditor->enableSingleLineMode(false);
@@ -979,10 +998,13 @@ void LLFloaterIMSessionTab::onOpen(const LLSD& key)
 	{
 		LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(getHost());
 		// Show the messages pane when opening a floater hosted in the Conversations
-		host_floater->collapseMessagesPane(false);
+		if (host_floater)
+            host_floater->collapseMessagesPane(false);
 	}
 
 	mInputButtonPanel->setVisible(isTornOff());
+
+	setFocus(TRUE);
 }
 
 
@@ -1146,7 +1168,10 @@ void LLFloaterIMSessionTab::getSelectedUUIDs(uuid_vec_t& selected_uuids)
     for (; it != it_end; ++it)
     {
         LLConversationItem* conversation_item = static_cast<LLConversationItem *>((*it)->getViewModelItem());
-        selected_uuids.push_back(conversation_item->getUUID());
+        if (conversation_item)
+        {
+            selected_uuids.push_back(conversation_item->getUUID());
+        }
     }
 }
 
@@ -1176,6 +1201,71 @@ void LLFloaterIMSessionTab::saveCollapsedState()
 LLView* LLFloaterIMSessionTab::getChatHistory()
 {
 	return mChatHistory;
+}
+
+void LLFloaterIMSessionTab::applyMUPose(std::string& text)
+{
+	if (!gSavedSettings.getBOOL("EnableMUPoseChat"))
+	{
+		return;
+	}
+	if (text.at(0) == ':'
+		&& text.length() > 3)
+	{
+		if (text.find(":'") == 0)
+		{
+			text.replace(0, 1, "/me");
+ 		}
+		// Account for emotes and smilies
+		else if (!isdigit(text.at(1))
+				 && !ispunct(text.at(1))
+				 && !isspace(text.at(1)))
+		{
+			text.replace(0, 1, "/me ");
+		}
+	}
+}
+
+void LLFloaterIMSessionTab::applyOOCClose(std::string& message)
+{
+	if (!gSavedSettings.getBOOL("EnableAutoCloseOOC"))
+	{
+		return;
+	}
+
+	// Try to find any unclosed OOC chat (i.e. an opening
+	// double parenthesis without a matching closing double
+	// parenthesis.
+	if (message.find("(( ") != std::string::npos && message.find("))") == std::string::npos)
+	{
+		// add the missing closing double parenthesis.
+		message.append(" ))");
+	}
+	else if (message.find("((") != std::string::npos && message.find("))") == std::string::npos)
+	{
+		if (message.at(message.length() - 1) == ')')
+		{
+			// cosmetic: add a space first to avoid a closing triple parenthesis
+			message.append(" ");
+		}
+		// add the missing closing double parenthesis.
+		message.append("))");
+	}
+	else if (message.find("[[ ") != std::string::npos && message.find("]]") == std::string::npos)
+	{
+		// add the missing closing double parenthesis.
+		message.append(" ]]");
+	}
+	else if (message.find("[[") != std::string::npos && message.find("]]") == std::string::npos)
+	{
+		if (message.at(message.length() - 1) == ']')
+		{
+			// cosmetic: add a space first to avoid a closing triple parenthesis
+			message.append(" ");
+		}
+			// add the missing closing double parenthesis.
+		message.append("]]");
+	}
 }
 
 BOOL LLFloaterIMSessionTab::handleKeyHere(KEY key, MASK mask )

@@ -223,6 +223,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                left="3"
                keep_one_selected="false"
                multi_select="true"
+			   use_colorizer="true"
                name="avatar_list"
                right="-1"
                top="2" />
@@ -330,8 +331,8 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
             </panel>
             <accordion
        		 background_visible="true"
-       		 bg_alpha_color="DkGray2"
-       		 bg_opaque_color="DkGray2"
+       		 bg_alpha_color="PanelDefaultBackgroundColor"
+       		 bg_opaque_color="PanelDefaultBackgroundColor"
              follows="all"
              height="408"
              layout="topleft"
@@ -631,7 +632,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
 
 <!-- ================================= BLOCKED tab ========================== -->
 
-        <panel
+        <!--<panel
          background_opaque="true"
          background_visible="true"
          bg_alpha_color="DkGray"
@@ -657,6 +658,6 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
            font="SansSerifBold"
            top="0"
            right="-1" />
-        </panel>
+        </panel>-->
     </tab_container>
 </panel>

@@ -193,7 +193,7 @@ void LLViewerParcelMedia::play(LLParcel* parcel)
 			LL_DEBUGS("Media") << "new media impl with mime type " << mime_type << ", url " << media_url << LL_ENDL;
 
 			// There is no media impl, make a new one
-			mMediaImpl = LLViewerMedia::getInstanceFast()->newMediaImpl(
+			mMediaImpl = LLViewerMedia::getInstance()->newMediaImpl(
 				placeholder_texture_id,
 				media_width, 
 				media_height, 
@@ -290,13 +290,13 @@ std::string LLViewerParcelMedia::getURL()
 	if(mMediaImpl.notNull())
 		url = mMediaImpl->getMediaURL();
 	
-	if(stricmp(LLViewerParcelMgr::getInstanceFast()->getAgentParcel()->getMediaType().c_str(), LLMIMETypes::getDefaultMimeType().c_str()) != 0)
+	if(stricmp(LLViewerParcelMgr::getInstance()->getAgentParcel()->getMediaType().c_str(), LLMIMETypes::getDefaultMimeType().c_str()) != 0)
 	{
 		if (url.empty())
-			url = LLViewerParcelMgr::getInstanceFast()->getAgentParcel()->getMediaCurrentURL();
+			url = LLViewerParcelMgr::getInstance()->getAgentParcel()->getMediaCurrentURL();
 		
 		if (url.empty())
-			url = LLViewerParcelMgr::getInstanceFast()->getAgentParcel()->getMediaURL();
+			url = LLViewerParcelMgr::getInstance()->getAgentParcel()->getMediaURL();
 	}
 	
 	return url;
@@ -363,7 +363,7 @@ void LLViewerParcelMedia::processParcelMediaCommandMessage( LLMessageSystem *msg
 			}
 			else
 			{
-				LLParcel *parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+				LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 				play(parcel);
 			}
 		}
@@ -379,7 +379,7 @@ void LLViewerParcelMedia::processParcelMediaCommandMessage( LLMessageSystem *msg
 	{
 		if(mMediaImpl.isNull())
 		{
-			LLParcel *parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+			LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 			play(parcel);
 		}
 		seek(time);
@@ -419,7 +419,7 @@ void LLViewerParcelMedia::processParcelMediaUpdate( LLMessageSystem *msg)
 		msg->getS32("DataBlockExtended", "MediaHeight", media_height);
 	}
 
-	LLParcel *parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	BOOL same = FALSE;
 	if (parcel)
 	{
@@ -457,7 +457,7 @@ void LLViewerParcelMedia::sendMediaNavigateMessage(const std::string& url)
 		// send navigate event to sim for link sharing
 		LLSD body;
 		body["agent-id"] = gAgent.getID();
-		body["local-id"] = LLViewerParcelMgr::getInstanceFast()->getAgentParcel()->getLocalID();
+		body["local-id"] = LLViewerParcelMgr::getInstance()->getAgentParcel()->getLocalID();
 		body["url"] = url;
 
         LLCoreHttpUtil::HttpCoroutineAdapter::messageHttpPost(region_url, body,

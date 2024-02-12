@@ -20,6 +20,7 @@
     <command name="minimap"/>
     <command name="myenvironments"/>
     <command name="stats"/>
+    <command name="performance"/>
   </left_toolbar>
   <right_toolbar
     button_display_mode="icons_only">

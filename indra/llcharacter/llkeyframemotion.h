@@ -43,7 +43,7 @@
 #include "v3math.h"
 #include "llbvhconsts.h"
 
-#include <absl/container/flat_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
 
 class LLKeyframeDataCache;
 class LLDataPacker;
@@ -133,6 +133,15 @@ public:
 		else return LLJoint::LOW_PRIORITY;
 	}
 
+    virtual S32 getNumJointMotions()
+    {
+        if (mJointMotionList)
+        {
+            return mJointMotionList->getNumJointMotions();
+        }
+        return 0;
+    }
+
 	virtual LLMotionBlendType getBlendType() { return NORMAL_BLEND; }
 
 	// called to determine when a motion should be activated/deactivated based on avatar pixel coverage
@@ -165,9 +174,9 @@ public:
 public:
 	U32		getFileSize();
 	BOOL	serialize(LLDataPacker& dp) const;
-	BOOL	deserialize(LLDataPacker& dp, const LLUUID& asset_id);
+	BOOL	deserialize(LLDataPacker& dp, const LLUUID& asset_id, bool allow_invalid_joints = true);
 	BOOL	isLoaded() { return mJointMotionList != NULL; }
-    void	dumpToFile(const std::string& name);
+    bool	dumpToFile(const std::string& name);
 
 
 	// setters for modifying a keyframe animation
@@ -424,6 +433,9 @@ protected:
 	F32								mLastUpdateTime;
 	F32								mLastLoopedTime;
 	AssetStatus						mAssetStatus;
+
+public:
+	void setCharacter(LLCharacter* character) { mCharacter = character; }
 };
 
 class LLKeyframeDataCache
@@ -433,7 +445,7 @@ public:
 	LLKeyframeDataCache() = default;
 	~LLKeyframeDataCache();
 
-	typedef absl::flat_hash_map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t; 
+	typedef boost::unordered_flat_map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t; 
 	static keyframe_data_map_t sKeyframeDataMap;
 
 	static void addKeyframeData(const LLUUID& id, LLKeyframeMotion::JointMotionList*);

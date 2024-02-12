@@ -12,7 +12,8 @@
    top_pad="2"
    width="120"
    layout="topleft"
-   value="Draw Distance:"/>
+   value="Draw Distance:"
+   name="draw_distance_label"/>
   <slider_bar
    top_pad="-16"
    height="20"
@@ -48,7 +49,8 @@
    top_pad="3"
    width="120"
    layout="topleft"
-   value="Level of Detail:"/>
+   value="Level of Detail:"
+   name="lod_label"/>
   <slider_bar
    top_pad="-16"
    height="20"
@@ -83,7 +85,8 @@
    top_pad="3"
    width="120"
    layout="topleft"
-   value="Max Particles:"/>
+   value="Max Particles:"
+   name="max_particles_label"/>
   <slider_bar
    top_pad="-16"
    height="20"
@@ -118,7 +121,8 @@
    top_pad="3"
    width="120"
    layout="topleft"
-   value="Max Avatars:"/>
+   value="Max Avatars:"
+   name="max_avatars_label"/>
   <slider_bar
    top_pad="-16"
    height="20"
@@ -153,7 +157,8 @@
    top_pad="3"
    width="120"
    layout="topleft"
-   value="Max Bandwidth:" />
+   value="Max Bandwidth:"
+   name="max_bandwith_label" />
   <slider_bar
    top_pad="-16"
    height="20"
@@ -188,7 +193,8 @@
    top_pad="3"
    width="120"
    layout="topleft"
-   value="Hover Height:" />
+   value="Hover Height:"
+   name="hover_height_label" />
   <slider_bar
    enabled="false"
    top_pad="-16"

@@ -137,7 +137,9 @@ void LLPluginInstance::sendMessage(const std::string &message)
 {
 	if(mPluginSendMessageFunction)
 	{
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Plugin") << "sending message to plugin: \"" << message << "\"" << LL_ENDL;
+#endif
 		mPluginSendMessageFunction(message.c_str(), &mPluginUserData);
 	}
 	else
@@ -172,7 +174,9 @@ void LLPluginInstance::receiveMessage(const char *message_string)
 {
 	if(mOwner)
 	{
-		LL_DEBUGS("Plugin") << "processing incoming message: \"" << message_string << "\"" << LL_ENDL;		
+#if SHOW_DEBUG
+		LL_DEBUGS("Plugin") << "processing incoming message: \"" << message_string << "\"" << LL_ENDL;
+#endif
 		mOwner->receivePluginMessage(message_string);
 	}
 	else

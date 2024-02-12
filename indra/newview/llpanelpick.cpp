@@ -49,22 +49,19 @@
 #include "llavatarpropertiesprocessor.h"
 #include "llfloaterworldmap.h"
 #include "lltexturectrl.h"
-#include "lluiconstants.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
-#include "llworldmap.h"
 
+static const std::string XML_PANEL_EDIT_PICK("panel_edit_pick.xml");
+static const std::string XML_PANEL_PICK_INFO("panel_pick_info.xml");
 
-#define XML_PANEL_EDIT_PICK "panel_edit_pick.xml"
-#define XML_PANEL_PICK_INFO "panel_pick_info.xml"
+static const std::string XML_NAME("pick_name");
+static const std::string XML_DESC("pick_desc");
+static const std::string XML_SNAPSHOT("pick_snapshot");
+static const std::string XML_LOCATION("pick_location");
 
-#define XML_NAME		"pick_name"
-#define XML_DESC		"pick_desc"
-#define XML_SNAPSHOT	"pick_snapshot"
-#define XML_LOCATION	"pick_location"
-
-#define XML_BTN_ON_TXTR "edit_icon"
-#define XML_BTN_SAVE "save_changes_btn"
+static const std::string XML_BTN_ON_TXTR("edit_icon");
+static const std::string XML_BTN_SAVE("save_changes_btn");
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
@@ -82,25 +79,25 @@ LLPanelPickInfo::LLPanelPickInfo()
  : LLPanel()
  , LLAvatarPropertiesObserver()
  , LLRemoteParcelInfoObserver()
- , mAvatarId(LLUUID::null)
- , mSnapshotCtrl(NULL)
- , mPickId(LLUUID::null)
- , mParcelId(LLUUID::null)
- , mRequestedId(LLUUID::null)
  , mScrollingPanelMinHeight(0)
  , mScrollingPanelWidth(0)
- , mScrollingPanel(NULL)
- , mScrollContainer(NULL)
+ , mScrollContainer(nullptr)
+ , mScrollingPanel(nullptr)
+ , mSnapshotCtrl(nullptr)
+ , mAvatarId(LLUUID::null)
+ , mParcelId(LLUUID::null)
+ , mPickId(LLUUID::null)
+ , mRequestedId(LLUUID::null)
 {
 }
 
 LLPanelPickInfo::~LLPanelPickInfo()
 {
-	LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(getAvatarId(), this);
+	LLAvatarPropertiesProcessor::getInstance()->removeObserver(LLPanelPickInfo::getAvatarId(), this);
 
 	if (mParcelId.notNull())
 	{
-		LLRemoteParcelInfoProcessor::getInstanceFast()->removeObserver(mParcelId, this);
+		LLRemoteParcelInfoProcessor::getInstance()->removeObserver(mParcelId, this);
 	}
 }
 
@@ -114,7 +111,7 @@ void LLPanelPickInfo::onOpen(const LLSD& key)
 
 	if(getAvatarId().notNull())
 	{
-		LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(
+		LLAvatarPropertiesProcessor::getInstance()->removeObserver(
 			getAvatarId(), this);
 	}
 
@@ -128,9 +125,9 @@ void LLPanelPickInfo::onOpen(const LLSD& key)
 	setPickDesc(key["pick_desc"]);
 	setSnapshotId(key["snapshot_id"]);
 
-	LLAvatarPropertiesProcessor::getInstanceFast()->addObserver(
+	LLAvatarPropertiesProcessor::getInstance()->addObserver(
 		getAvatarId(), this);
-	LLAvatarPropertiesProcessor::getInstanceFast()->sendPickInfoRequest(
+	LLAvatarPropertiesProcessor::getInstance()->sendPickInfoRequest(
 		getAvatarId(), getPickId());
 }
 
@@ -333,7 +330,7 @@ void LLPanelPickInfo::onClickTeleport()
 
 void LLPanelPickInfo::onClickBack()
 {
-	LLAvatarPropertiesProcessor::getInstanceFast()->removeObserver(getAvatarId(), this);
+	LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -353,10 +350,7 @@ LLPanelPickEdit::LLPanelPickEdit()
  , mLocationChanged(false)
  , mNeedData(true)
  , mNewPick(false)
-{
-}
-
-LLPanelPickEdit::~LLPanelPickEdit()
+ , text_icon(nullptr)
 {
 }
 
@@ -440,7 +434,7 @@ BOOL LLPanelPickEdit::postBuild()
 	mSnapshotCtrl->setCommitCallback(boost::bind(&LLPanelPickEdit::onSnapshotChanged, this));
 
 	LLLineEditor* line_edit = getChild<LLLineEditor>("pick_name");
-	line_edit->setKeystrokeCallback(boost::bind(&LLPanelPickEdit::onPickChanged, this, _1), NULL);
+	line_edit->setKeystrokeCallback(boost::bind(&LLPanelPickEdit::onPickChanged, this, _1), nullptr);
 
 	LLTextEditor* text_edit = getChild<LLTextEditor>("pick_desc");
 	text_edit->setKeystrokeCallback(boost::bind(&LLPanelPickEdit::onPickChanged, this, _1));
@@ -486,8 +480,6 @@ BOOL LLPanelPickEdit::isDirty() const
 	}
 	return FALSE;
 }
-
-// PROTECTED AREA
 
 void LLPanelPickEdit::sendUpdate()
 {

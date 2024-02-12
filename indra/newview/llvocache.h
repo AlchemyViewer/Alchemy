@@ -32,15 +32,31 @@
 #include "lldir.h"
 #include "llvieweroctree.h"
 #include "llapr.h"
+#include "llgltfmaterial.h"
+
+#include <unordered_map>
 
 //---------------------------------------------------------------------------
 // Cache entries
 class LLCamera;
 
-class LLVOCacheEntry final
-:	public LLViewerOctreeEntryData,
-	public LLTrace::MemTrackable<LLVOCacheEntry, 16>
+class LLGLTFOverrideCacheEntry
 {
+public:
+    bool fromLLSD(const LLSD& data);
+    LLSD toLLSD() const;
+
+    LLUUID mObjectId;
+    U32    mLocalId = 0;
+    std::unordered_map<S32, LLSD> mSides; //override LLSD per side
+    std::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side
+    U64 mRegionHandle = 0;
+};
+
+class LLVOCacheEntry final
+:	public LLViewerOctreeEntryData
+{
+    LL_ALIGN_NEW
 public:
 	enum 
 	{
@@ -79,6 +95,13 @@ public:
 			}			
 		}
 	};
+
+    struct ExtrasEntry
+    {
+        LLSD extras;
+        std::string extras_raw;
+    };
+
 protected:
 	~LLVOCacheEntry();
 public:
@@ -107,7 +130,7 @@ public:
 
 	void dump() const;
 	S32 writeToBuffer(U8 *data_buffer) const;
-	LLDataPackerBinaryBuffer *getDP();
+	LLDataPackerBinaryBuffer *getDP() const;
 	void recordHit();
 	void recordDupe() { mDupeCount++; }
 	
@@ -142,7 +165,14 @@ private:
 public:
 	typedef std::map<U32, LLPointer<LLVOCacheEntry> >	   vocache_entry_map_t;
 	typedef std::set<LLVOCacheEntry*>                      vocache_entry_set_t;
-	typedef std::set<LLVOCacheEntry*, CompareVOCacheEntry> vocache_entry_priority_list_t;	
+	typedef std::set<LLVOCacheEntry*, CompareVOCacheEntry> vocache_entry_priority_list_t;
+
+    typedef std::unordered_map<U32, LLGLTFOverrideCacheEntry>  vocache_gltf_overrides_map_t;
+
+// [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
+	vocache_entry_set_t::const_iterator getChildrenBegin() const { return mChildrenList.begin(); }
+	vocache_entry_set_t::const_iterator getChildrenEnd() const { return mChildrenList.end(); }
+// [/SL:KB]
 
 	S32                         mLastCameraUpdated;
 protected:
@@ -153,7 +183,7 @@ protected:
 	S32							mHitCount;
 	S32							mDupeCount;
 	S32							mCRCChangeCount;
-	LLDataPackerBinaryBuffer	mDP;
+	mutable LLDataPackerBinaryBuffer	mDP;
 	U8							*mBuffer;
 
 	F32                         mSceneContrib; //projected scene contributuion of this object.
@@ -185,10 +215,11 @@ protected:
 	virtual ~LLVOCacheGroup();
 };
 
-class LLVOCachePartition final : public LLViewerOctreePartition, public LLTrace::MemTrackable<LLVOCachePartition>
+class LLVOCachePartition final : public LLViewerOctreePartition
 {
 public:
 	LLVOCachePartition(LLViewerRegion* regionp);
+    virtual ~LLVOCachePartition();
 
 	bool addEntry(LLViewerOctreeEntry* entry);
 	void removeEntry(LLViewerOctreeEntry* entry);
@@ -264,7 +295,10 @@ public:
 	void removeCache(ELLPath location, bool started = false) ;
 
 	void readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_entry_map_t& cache_entry_map) ;
+    void readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map);
+
 	void writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, BOOL dirty_cache, bool removal_enabled);
+    void writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, BOOL dirty_cache, bool removal_enabled);
 	void removeEntry(U64 handle) ;
 
 	U32 getCacheEntries() { return mNumEntries; }
@@ -274,6 +308,7 @@ private:
 	void setDirNames(ELLPath location);	
 	// determine the cache filename for the region from the region handle	
 	void getObjectCacheFilename(U64 handle, std::string& filename);
+    std::string getObjectCacheExtrasFilename(U64 handle);
 	void removeFromCache(HeaderEntryInfo* entry);
 	void readCacheHeader();
 	void writeCacheHeader();

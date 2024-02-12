@@ -31,6 +31,7 @@
 
 #include "llavatarname.h"
 #include "llfloater.h"
+#include "llviewerobject.h" // PoundLife - Improved Object Inspect
 
 //class LLTool;
 class LLObjectSelection;
@@ -39,6 +40,7 @@ class LLUICtrl;
 // [RLVa:KB] - Checked: RLVa-2.0.1
 class LLSelectNode;
 // [/RLVa:KB]
+class LLMenuButton; // <FS:Ansariel> FIRE-22292: Configurable columns
 
 class LLFloaterInspect final : public LLFloater
 {
@@ -58,6 +60,7 @@ public:
 	void onClickOwnerProfile();
 	void onSelectObject();
 
+	U64 mStatsMemoryTotal;
 	LLScrollListCtrl* mObjectList;
 protected:
 	// protected members
@@ -69,6 +72,11 @@ protected:
 // [/RLVa:KB]
 
 private:
+	void getObjectTextureMemory(LLViewerObject* object, U32& object_texture_memory, U32& object_vram_memory);
+	void calculateTextureMemory(LLViewerTexture* texture, uuid_vec_t& object_texture_list, U32& object_texture_memory, U32& object_vram_memory);
+	uuid_vec_t mTextureList;
+	U32 mTextureMemory;
+	U32 mTextureVRAMMemory;
 	void onGetOwnerNameCallback();
 	void onGetCreatorNameCallback();
 	
@@ -78,6 +86,16 @@ private:
 	LLSafeHandle<LLObjectSelection> mObjectSelection;
 	boost::signals2::connection mOwnerNameCacheConnection;
 	boost::signals2::connection mCreatorNameCacheConnection;
+	boost::signals2::connection	mInspectColumnConfigConnection;
+
+	void						onColumnDisplayModeChanged();
+	void						onColumnVisibilityChecked(const LLSD& userdata);
+	bool						onEnableColumnVisibilityChecked(const LLSD& userdata);
+
+	LLMenuButton*				mOptionsButton;
+
+	std::map<std::string, U32>	mColumnBits;
+	S32							mLastResizeDelta;
 };
 
 #endif //LL_LLFLOATERINSPECT_H

@@ -40,8 +40,8 @@
 #include "llcoros.h"
 
 // system includes
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/node_hash_map.h>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_map.hpp>
 
 class LLCamera;
 class LLNetMap;
@@ -81,7 +81,6 @@ public:
 	BOOL killObject(LLViewerObject *objectp);
 	void killObjects(LLViewerRegion *regionp); // Kill all objects owned by a particular region.
 	void killAllObjects();
-	void removeDrawable(LLDrawable* drawablep);
 
 	void cleanDeadObjects(const BOOL use_timer = TRUE);	// Clean up the dead object list.
 
@@ -136,11 +135,6 @@ public:
 	
 	void updateAvatarVisibility();
 
-	// Selection related stuff
-	void generatePickList(LLCamera &camera);
-
-	LLViewerObject *getSelectedObject(const U32 object_id);
-
 	inline S32 getNumObjects() { return (S32) mObjects.size(); }
 	inline S32 getNumActiveObjects() { return (S32) mActiveObjects.size(); }
 
@@ -158,6 +152,7 @@ public:
 
 	S32 getOrphanParentCount() const { return (S32) mOrphanParents.size(); }
 	S32 getOrphanCount() const { return mNumOrphans; }
+	S32 getAvatarCount() const { return mNumAvatars; }
 	void orphanize(LLViewerObject *childp, U32 parent_id, U32 ip, U32 port);
 	void findOrphans(LLViewerObject* objectp, U32 ip, U32 port);
 
@@ -184,18 +179,18 @@ public:
 	// used to discount stats from this frame
 	BOOL mWasPaused;
 
-	static void getUUIDFromLocal(LLUUID &id,
+	void getUUIDFromLocal(LLUUID &id,
 								const U32 local_id,
 								const U32 ip,
 								const U32 port);
-	static void setUUIDAndLocal(const LLUUID &id,
+	void setUUIDAndLocal(const LLUUID &id,
 								const U32 local_id,
 								const U32 ip,
 								const U32 port); // Requires knowledge of message system info!
 
-	static BOOL removeFromLocalIDTable(const LLViewerObject* objectp);
+	BOOL removeFromLocalIDTable(const LLViewerObject* objectp);
 	// Used ONLY by the orphaned object code.
-	static U64 getIndex(const U32 local_id, const U32 ip, const U32 port);
+	U64 getIndex(const U32 local_id, const U32 ip, const U32 port);
 
 	S32 mNumUnknownUpdates;
 	S32 mNumDeadObjectUpdates;
@@ -204,6 +199,7 @@ protected:
 	std::vector<U64>	mOrphanParents;	// LocalID/ip,port of orphaned objects
 	std::vector<OrphanInfo> mOrphanChildren;	// UUID's of orphaned objects
 	S32 mNumOrphans;
+	S32 mNumAvatars;
 
 	typedef std::vector<LLPointer<LLViewerObject> > vobj_list_t;
 
@@ -212,34 +208,34 @@ protected:
 
 	vobj_list_t mMapObjects;
 
-    uuid_set_t   mDeadObjects;
 
-	absl::flat_hash_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
+	using uuid_hash_set_t = boost::unordered_set<LLUUID>;
+    uuid_hash_set_t   mDeadObjects;
+
+	boost::unordered_flat_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
 
 	//set of objects that need to update their cost
-    uuid_set_t   mStaleObjectCost;
-    uuid_set_t   mPendingObjectCost;
+    uuid_hash_set_t   mStaleObjectCost;
+    uuid_hash_set_t   mPendingObjectCost;
 
 	//set of objects that need to update their physics flags
-    uuid_set_t   mStalePhysicsFlags;
-    uuid_set_t   mPendingPhysicsFlags;
+    uuid_hash_set_t   mStalePhysicsFlags;
+    uuid_hash_set_t   mPendingPhysicsFlags;
 
 	std::vector<LLDebugBeacon> mDebugBeacons;
 
 	S32 mCurLazyUpdateIndex;
 
 	static U32 sSimulatorMachineIndex;
-	static absl::flat_hash_map<U64, U32> sIPAndPortToIndex;
+	boost::unordered_flat_map<U64, U32> mIPAndPortToIndex;
 
-	static absl::node_hash_map<U64, LLUUID> sIndexAndLocalIDToUUID;
-
-	std::set<LLViewerObject *> mSelectPickList;
+	boost::unordered_flat_map<U64, LLUUID> mIndexAndLocalIDToUUID;
 
 	friend class LLViewerObject;
 
 private:
     static void reportObjectCostFailure(LLSD &objectList);
-    void fetchObjectCostsCoro(std::string url);
+    void fetchObjectCostsCoro(std::string url, uuid_hash_set_t staleObjects);
 
     static void reportPhysicsFlagFailure(LLSD &obejectList);
     void fetchPhisicsFlagsCoro(std::string url);

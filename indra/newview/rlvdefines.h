@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <absl/strings/string_view.h>
-
 // ============================================================================
 // Defines
 //
@@ -454,6 +452,7 @@ namespace RlvStringKeys
 		inline constexpr std::string_view Generic = "hidden_generic"sv;
 		inline constexpr std::string_view Parcel = "hidden_parcel"sv;
 		inline constexpr std::string_view Region = "hidden_region"sv;
+		inline constexpr std::string_view Grid = "hidden_grid"sv;
 	}
 
 	namespace StopIm

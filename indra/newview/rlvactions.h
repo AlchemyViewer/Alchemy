@@ -20,8 +20,6 @@
 #include "llchat.h"
 #include "rlvdefines.h"
 
-#include <absl/strings/string_view.h>
-
 // ============================================================================
 // Forward declarations
 //

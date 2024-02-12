@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<llsd>
+   <map>
+      <key>preprocessor</key>
+      <map>
+         <key>#assert</key>
+         <map>
+            <key>tooltip</key>
+            <string>Allows definition of preprocessor variables that do not conflict with names in the program name space</string>
+         </map>
+         <key>#define</key>
+         <map>
+            <key>tooltip</key>
+            <string>When the preprocessor encounters this directive, it replaces any occurrence of identifier in the rest of the code by replacement</string>
+         </map>
+         <key>#elif</key>
+         <map>
+            <key>tooltip</key>
+            <string>Specify some condition to be met in order for the portion of code they surround to be compiled</string>
+         </map>
+         <key>#else</key>
+         <map>
+            <key>tooltip</key>
+            <string>Specify some condition to be met in order for the portion of code they surround to be compiled</string>
+         </map>
+         <key>#endif</key>
+         <map>
+            <key>tooltip</key>
+            <string>Closes an #if directive</string>
+         </map>
+         <key>#error</key>
+         <map>
+            <key>tooltip</key>
+            <string>Aborts the compilation process when it is found, generating a compilation the error that can be specified as its parameter</string>
+         </map>
+         <key>#ident</key>
+         <map>
+            <key>tooltip</key>
+            <string>Inserts a comment into the generated script</string>
+         </map>
+         <key>#sccs</key>
+         <map>
+            <key>tooltip</key>
+            <string>Inserts a comment into the generated script</string>
+         </map>
+         <key>#if</key>
+         <map>
+            <key>tooltip</key>
+            <string>Specifies some condition to be met in order for the portion of code they surround to be compiled</string>
+         </map>
+         <key>#ifdef</key>
+         <map>
+            <key>tooltip</key>
+            <string>Allows a section of a program to be compiled only if the macro that is specified as the parameter has been defined, no matter which its value is</string>
+         </map>
+         <key>#ifndef</key>
+         <map>
+            <key>tooltip</key>
+            <string>The code between #ifndef and #endif directives is only compiled if the specified identifier has not been previously defined</string>
+         </map>
+         <key>#import</key>
+         <map>
+            <key>tooltip</key>
+            <string>Instructs the preprocessor to look for type library files first in the directory of the file that contains the #import statement, and then in the directories of whatever files that include (#include) that file</string>
+         </map>
+         <key>#include</key>
+         <map>
+            <key>tooltip</key>
+            <string>When the preprocessor finds an #include directive it replaces it by the entire content of the specified file</string>
+         </map>
+         <key>#include_next</key>
+         <map>
+            <key>tooltip</key>
+            <string>Instructs the preprocessor to continue searching for the specified file name, and to include the subsequent instance encountered after the current directory</string>
+         </map>
+         <key>#line</key>
+         <map>
+            <key>tooltip</key>
+            <string>Controls the line number and file name</string>
+         </map>
+         <key>#pragma</key>
+         <map>
+            <key>tooltip</key>
+            <string>This directive is used to specify diverse options to the compiler. These options are specific for the platform and the compiler you use</string>
+         </map>
+         <key>#unassert</key>
+         <map>
+            <key>tooltip</key>
+            <string>Closes an #assert directive</string>
+         </map>
+         <key>#undef</key>
+         <map>
+            <key>tooltip</key>
+            <string>Undefines #define macro</string>
+         </map>
+         <key>#warning</key>
+         <map>
+            <key>tooltip</key>
+            <string>Generate a level one warning from a specific location in your code</string>
+         </map>
+         <key>#switch</key>
+         <map>
+            <key>tooltip</key>
+            <string>Allows selection among multiple sections of code, depending on the value of an integral expression</string>
+         </map>
+         <key>#case</key>
+         <map>
+            <key>tooltip</key>
+            <string>Used with #switch in a union</string>
+         </map>
+         <key>#break</key>
+         <map>
+            <key>tooltip</key>
+            <string>Stops processing further lines in a #switch directive</string>
+         </map>
+      </map>
+      <key>llsd-lsl-syntax-version</key>
+      <integer>2</integer><!-- increment only when the file format changes, not just the content -->
+    </map>
+</llsd>

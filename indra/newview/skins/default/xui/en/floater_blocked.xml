@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater
+ can_close="true"
+ can_minimize="true"
+ can_resize="true"
+ height="300"
+ help_topic="blocked_list"
+ layout="topleft"
+ min_height="300"
+ min_width="330"
+ name="blocked"
+ positioning="cascading"
+ save_rect="true"
+ save_visibility="false"
+ single_instance="true"
+ title="BLOCKED / DERENDER LIST"
+ width="350">
+    <filter_editor
+     follows="left|top|right"
+     height="23"
+     layout="topleft"
+     left="15"
+     label="Filter"
+     max_length_chars="300"
+     name="blocked_filter"
+     right="-15"
+     text_pad_left="10"
+     top="4"
+     />
+    <tab_container
+     follows="all"
+     layout="topleft"
+     left="8"  
+     name="blocked_tabs"
+     height="267"
+     right="-8"   
+     tab_height="25"
+     tab_min_width="100"
+     tab_position="top"
+     top_pad="4" >
+        <panel
+         class="panel_block_list"
+         filename="panel_block_list.xml"
+         label="BLOCKED"
+         layout="topleft"
+         name="mute_tab" />
+        <panel
+         class="panel_derender_list"
+         filename="panel_block_derender.xml"
+         label="DERENDERED"
+         layout="topleft"
+         name="derender_tab" />
+        <panel
+         class="panel_block_avatar_rendering"
+         filename="panel_block_avatar_rendering.xml"
+         label="AVATAR RENDERING"
+         layout="topleft"
+         name="avatar_rendering_tab" />
+    </tab_container>
+</floater>

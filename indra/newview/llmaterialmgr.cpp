@@ -71,7 +71,7 @@ class LLMaterialHttpHandler : public LLHttpSDHandler
 {
 public: 
 	typedef boost::function<void(bool, const LLSD&)> CallbackFunction;
-	typedef boost::shared_ptr<LLMaterialHttpHandler> ptr_t;
+	typedef std::shared_ptr<LLMaterialHttpHandler> ptr_t;
 
 	LLMaterialHttpHandler(const std::string& method, CallbackFunction cback);
 
@@ -136,14 +136,13 @@ LLMaterialMgr::LLMaterialMgr():
 	mHttpRequest(),
 	mHttpHeaders(),
 	mHttpOptions(),
-	mHttpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID),
-	mHttpPriority(0)
+	mHttpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID)
 {
 	LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
 
-	mHttpRequest = LLCore::HttpRequest::ptr_t(new LLCore::HttpRequest());
-	mHttpHeaders = LLCore::HttpHeaders::ptr_t(new LLCore::HttpHeaders());
-	mHttpOptions = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions());
+	mHttpRequest = std::make_shared<LLCore::HttpRequest>();
+	mHttpHeaders = std::make_shared<LLCore::HttpHeaders>();
+	mHttpOptions = std::make_shared<LLCore::HttpOptions>();
 	mHttpPolicy = app_core_http.getPolicy(LLAppCoreHttp::AP_MATERIALS);
 
 	mMaterials.emplace(std::pair<LLMaterialID, LLMaterialPtr>(LLMaterialID::null, LLMaterialPtr(NULL)));
@@ -455,9 +454,8 @@ void LLMaterialMgr::onGetResponse(bool success, const LLSD& content, const LLUUI
 
 	llassert(response_data.isArray());
 	LL_DEBUGS("Materials") << "response has "<< response_data.size() << " materials" << LL_ENDL;
-	for (LLSD::array_const_iterator itMaterial = response_data.beginArray(); itMaterial != response_data.endArray(); ++itMaterial)
+	for (const LLSD& material_data : response_data.asArray())
 	{
-		const LLSD& material_data = *itMaterial;
 		llassert(material_data.isMap());
 
 		llassert(material_data.has(MATERIALS_CAP_OBJECT_ID_FIELD));
@@ -499,9 +497,8 @@ void LLMaterialMgr::onGetAllResponse(bool success, const LLSD& content, const LL
 
 	llassert(response_data.isArray());
 	LL_DEBUGS("Materials") << "response has "<< response_data.size() << " materials" << LL_ENDL;
-	for (LLSD::array_const_iterator itMaterial = response_data.beginArray(); itMaterial != response_data.endArray(); ++itMaterial)
+	for (const LLSD& material_data : response_data.asArray())
 	{
-		const LLSD& material_data = *itMaterial;
 		llassert(material_data.isMap());
 
 		llassert(material_data.has(MATERIALS_CAP_OBJECT_ID_FIELD));
@@ -563,11 +560,12 @@ void LLMaterialMgr::onPutResponse(bool success, const LLSD& content)
 	{
 		llassert(response_data.isArray());
 		LL_DEBUGS("Materials") << "response has "<< response_data.size() << " materials" << LL_ENDL;
+		#           ifdef SHOW_ASSERT   
 		for (LLSD::array_const_iterator faceIter = response_data.beginArray(); faceIter != response_data.endArray(); ++faceIter)
 		{
-#           ifdef SHOW_ASSERT                  // same condition that controls llassert()
+               // same condition that controls llassert()
 			const LLSD& face_data = *faceIter; // conditional to avoid unused variable warning
-#           endif
+
 			llassert(face_data.isMap());
 
 			llassert(face_data.has(MATERIALS_CAP_OBJECT_ID_FIELD));
@@ -584,16 +582,15 @@ void LLMaterialMgr::onPutResponse(bool success, const LLSD& content)
 
 			// *TODO: do we really still need to process this?
 		}
+#           endif
 	}
 }
 
-static LLTrace::BlockTimerStatHandle FTM_MATERIALS_IDLE("Idle Materials");
-
 void LLMaterialMgr::onIdle(void*)
 {
-	LL_RECORD_BLOCK_TIME(FTM_MATERIALS_IDLE);
+    LL_PROFILE_ZONE_SCOPED;
 
-	LLMaterialMgr* instancep = LLMaterialMgr::getInstanceFast();
+	LLMaterialMgr* instancep = LLMaterialMgr::getInstance();
 
 	if (!instancep->mGetQueue.empty())
 	{
@@ -624,7 +621,7 @@ void LLMaterialMgr::CapsRecvForRegion(const LLUUID& regionId, LLUUID regionTest,
 
 void LLMaterialMgr::processGetQueue()
 {
-	auto& worldInst = LLWorld::instanceFast();
+	auto& worldInst = LLWorld::instance();
     get_queue_t::iterator loopRegionQueue = mGetQueue.begin();
     while (mGetQueue.end() != loopRegionQueue)
     {
@@ -694,22 +691,18 @@ void LLMaterialMgr::processGetQueue()
 			return;
 		}
 
-		LLSD::Binary materialBinary;
-		materialBinary.resize(materialSize);
-		memcpy(materialBinary.data(), materialString.data(), materialSize);
-
 		LLSD postData = LLSD::emptyMap();
-		postData[MATERIALS_CAP_ZIP_FIELD] = materialBinary;
+		postData[MATERIALS_CAP_ZIP_FIELD] = LLSD::Binary(materialString.begin(), materialString.end());
 
-        LLCore::HttpHandler::ptr_t handler(new LLMaterialHttpHandler("POST",
+        LLCore::HttpHandler::ptr_t handler = std::make_shared<LLMaterialHttpHandler>("POST",
 				boost::bind(&LLMaterialMgr::onGetResponse, this, _1, _2, region_id)
-				));
+				);
 
 		LL_DEBUGS("Materials") << "POSTing to region '" << regionp->getName() << "' at '" << capURL << " for " << materialsData.size() << " materials."
 			<< "\ndata: " << ll_pretty_print_sd(materialsData) << LL_ENDL;
 
 		LLCore::HttpHandle handle = LLCoreHttpUtil::requestPostWithLLSD(mHttpRequest, 
-				mHttpPolicy, mHttpPriority, capURL, 
+				mHttpPolicy, capURL, 
 				postData, mHttpOptions, mHttpHeaders, handler);
 
 		if (handle == LLCORE_HTTP_HANDLE_INVALID)
@@ -839,7 +832,7 @@ void LLMaterialMgr::processGetAllQueue()
 
 void LLMaterialMgr::processGetAllQueueCoro(LLUUID regionId)
 {
-	auto& worldInst = LLWorld::instanceFast();
+	auto& worldInst = LLWorld::instance();
     LLViewerRegion* regionp = worldInst.getRegionFromID(regionId);
     if (regionp == NULL)
     {
@@ -882,9 +875,9 @@ void LLMaterialMgr::processGetAllQueueCoro(LLUUID regionId)
 
     LL_DEBUGS("Materials") << "GET all for region " << regionId << "url " << capURL << LL_ENDL;
 
-    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(
-            new LLCoreHttpUtil::HttpCoroutineAdapter("processGetAllQueue", LLCore::HttpRequest::DEFAULT_POLICY_ID));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest());
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter =
+            std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("processGetAllQueue", LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, capURL);
 
@@ -982,21 +975,17 @@ void LLMaterialMgr::processPutQueue()
 
 		if (materialSize > 0)
 		{
-			LLSD::Binary materialBinary;
-			materialBinary.resize(materialSize);
-			memcpy(materialBinary.data(), materialString.data(), materialSize);
-
 			LLSD putData = LLSD::emptyMap();
-			putData[MATERIALS_CAP_ZIP_FIELD] = materialBinary;
+			putData[MATERIALS_CAP_ZIP_FIELD] = LLSD::Binary(materialString.begin(), materialString.end());
 
 			LL_DEBUGS("Materials") << "put for " << itRequest->second.size() << " faces to region " << itRequest->first->getName() << LL_ENDL;
 
-			LLCore::HttpHandler::ptr_t handler (new LLMaterialHttpHandler("PUT",
+			LLCore::HttpHandler::ptr_t handler = std::make_shared<LLMaterialHttpHandler>("PUT",
 										boost::bind(&LLMaterialMgr::onPutResponse, this, _1, _2)
-										));
+										);
 
 			LLCore::HttpHandle handle = LLCoreHttpUtil::requestPutWithLLSD(
-				mHttpRequest, mHttpPolicy, mHttpPriority, capURL,
+				mHttpRequest, mHttpPolicy, capURL,
 				putData, mHttpOptions, mHttpHeaders, handler);
 
 			if (handle == LLCORE_HTTP_HANDLE_INVALID)

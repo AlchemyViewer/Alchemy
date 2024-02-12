@@ -30,6 +30,8 @@
 #include "llbufferstream.h"
 #include <boost/function.hpp>
 
+#include "llsingleton.h"
+
 namespace Json
 {
     class Value;
@@ -48,18 +50,21 @@ class LLTranslationAPIHandler;
  *
  * API keys for translation are taken from saved settings.
  */
-class LLTranslate
+class LLTranslate: public LLSingleton<LLTranslate>
 {
+	LLSINGLETON(LLTranslate);
+	~LLTranslate();
 	LOG_CLASS(LLTranslate);
 
 public :
 
 	typedef enum e_service {
-		SERVICE_BING,
+		SERVICE_AZURE,
 		SERVICE_GOOGLE,
+		SERVICE_DEEPL,
 	} EService;
 
-    typedef boost::function<void(EService, bool)> KeyVerificationResult_fn;
+    typedef boost::function<void(EService, bool, S32)> KeyVerificationResult_fn;
     typedef boost::function<void(std::string , std::string )> TranslationSuccess_fn;
     typedef boost::function<void(int, std::string)> TranslationFailure_fn;
 
@@ -74,12 +79,12 @@ public :
     static void translateMessage(const std::string &from_lang, const std::string &to_lang, const std::string &mesg, TranslationSuccess_fn success, TranslationFailure_fn failure);
 
     /**
-	 * Verify given API key of a translation service.
-	 *
-	 * @param receiver  Object to pass verification result to.
-	 * @param key       Key to verify.
-	 */
-    static void verifyKey(EService service, const std::string &key, KeyVerificationResult_fn fnc);
+     * Verify given API key of a translation service.
+     *
+     * @param receiver  Object to pass verification result to.
+     * @param key       Key to verify.
+     */
+    static void verifyKey(EService service, const LLSD &key, KeyVerificationResult_fn fnc);
 
 	/**
 	 * @return translation target language
@@ -94,9 +99,19 @@ public :
     static std::string addNoTranslateTags(std::string mesg);
     static std::string removeNoTranslateTags(std::string mesg);
 
+	void logCharsSeen(size_t count);
+	void logCharsSent(size_t count);
+	void logSuccess(S32 count);
+	void logFailure(S32 count);
+	LLSD asLLSD() const;
 private:
 	static LLTranslationAPIHandler& getPreferredHandler();
 	static LLTranslationAPIHandler& getHandler(EService service);
+
+	size_t mCharsSeen;
+	size_t mCharsSent;
+	S32 mFailureCount;
+	S32 mSuccessCount;
 };
 
 #endif

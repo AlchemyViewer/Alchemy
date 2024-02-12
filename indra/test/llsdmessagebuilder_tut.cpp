@@ -649,7 +649,7 @@ namespace tut
 	template<> template<>
 	void LLSDMessageBuilderTestObject::test<37>()
 	{
-#if LL_CLANG
+#if LL_CLANG || LL_GNUC
         skip("This test fails under fast-math");
 #endif
 	  LLQuaternion data(0.3713907f, 0.5570861f, 0.7427813f,0.0f);

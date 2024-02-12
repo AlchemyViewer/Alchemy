@@ -48,26 +48,17 @@
 #endif
 
 // Need commdlg.h for OPENFILENAMEA
-#ifdef LL_WINDOWS
+#if LL_WINDOWS && !LL_NFD
 #include "llwin32headerslean.h"
 #include <commdlg.h>
 #endif
 
-#if LL_GTK
-extern "C" {
-// mostly for Linux, possible on others
-#include <gtk/gtk.h>
-#include <gdk/gdk.h>
-#include <gdk/gdkx.h>
-}
-#endif // LL_GTK
+#if LL_NFD
+#include "nfd.hpp"
+#endif
 
 class LLFilePicker
 {
-#ifdef LL_GTK
-	friend class LLDirPicker;
-	friend void chooser_responder(GtkWidget *, gint, gpointer);
-#endif // LL_GTK
 public:
 	// calling this before main() is undefined
 	static LLFilePicker& instance( void ) { return sInstance; }
@@ -78,9 +69,7 @@ public:
 		FFLOAD_WAV = 2,
 		FFLOAD_IMAGE = 3,
 		FFLOAD_ANIM = 4,
-#ifdef _CORY_TESTING
-		FFLOAD_GEOMETRY = 5,
-#endif
+		FFLOAD_GLTF = 5,
 		FFLOAD_XML = 6,
 		FFLOAD_SLOBJECT = 7,
 		FFLOAD_RAW = 8,
@@ -90,7 +79,9 @@ public:
 		FFLOAD_DICTIONARY = 12,
         FFLOAD_DIRECTORY = 13,   // To call from lldirpicker.
         FFLOAD_EXE = 14,          // Note: EXE will be treated as ALL on Windows and Linux but not on Darwin
-		FFLOAD_ZIP = 15
+        FFLOAD_MATERIAL = 15,
+        FFLOAD_MATERIAL_TEXTURE = 16,
+		FFLOAD_ZIP = 17
 	};
 
 	enum ESaveFilter
@@ -101,9 +92,7 @@ public:
 		FFSAVE_BMP = 5,
 		FFSAVE_AVI = 6,
 		FFSAVE_ANIM = 7,
-#ifdef _CORY_TESTING
-		FFSAVE_GEOMETRY = 8,
-#endif
+		FFSAVE_GLTF = 8,
 		FFSAVE_XML = 9,
 		FFSAVE_COLLADA = 10,
 		FFSAVE_RAW = 11,
@@ -112,13 +101,22 @@ public:
 		FFSAVE_JPEG = 14,
 		FFSAVE_SCRIPT = 15,
 		FFSAVE_TGAPNGWEBP = 16,
-		FFSAVE_WEBP = 17
+		FFSAVE_WEBP = 17,
+		FFSAVE_CSV
 	};
 
 	// open the dialog. This is a modal operation
 	BOOL getSaveFile( ESaveFilter filter = FFSAVE_ALL, const std::string& filename = LLStringUtil::null, bool blocking = true);
+    BOOL getSaveFileModeless(ESaveFilter filter,
+                             const std::string& filename,
+                             void (*callback)(bool, std::string&, void*),
+                             void *userdata);
 	BOOL getOpenFile( ELoadFilter filter = FFLOAD_ALL, bool blocking = true  );
+    // Todo: implement getOpenFileModeless and getMultipleOpenFilesModeless
+    // for windows and use directly instead of ugly LLFilePickerThread
+    BOOL getOpenFileModeless( ELoadFilter filter, void (*callback)(bool, std::vector<std::string> &, void*), void *userdata); // MAC only.
 	BOOL getMultipleOpenFiles( ELoadFilter filter = FFLOAD_ALL, bool blocking = true );
+    BOOL getMultipleOpenFilesModeless( ELoadFilter filter, void (*callback)(bool, std::vector<std::string> &, void*), void *userdata ); // MAC only
 
 	// Get the filename(s) found. getFirstFile() sets the pointer to
 	// the start of the structure and allows the start of iteration.
@@ -157,30 +155,31 @@ private:
 	// is enabled and if not, tidy up and indicate we're not allowed to do this.
 	bool check_local_file_access_enabled();
 	
-#if LL_WINDOWS
+#if LL_NFD
+	std::vector<nfdfilteritem_t> setupFilter(ELoadFilter filter);
+#endif
+
+#if LL_WINDOWS && !LL_NFD
 	OPENFILENAMEW mOFN;				// for open and save dialogs
 	WCHAR mFilesW[FILENAME_BUFFER_SIZE];
 
 	BOOL setupFilter(ELoadFilter filter);
 #endif
 
-#if LL_DARWIN
+#if LL_DARWIN && !LL_NFD
     S32 mPickOptions;
 	std::vector<std::string> mFileVector;
 	
 	bool doNavChooseDialog(ELoadFilter filter);
+	bool doNavChooseDialogModeless(ELoadFilter filter,
+                                   void (*callback)(bool, std::vector<std::string>&, void*),
+                                   void *userdata);
 	bool doNavSaveDialog(ESaveFilter filter, const std::string& filename);
-    std::vector<std::string>* navOpenFilterProc(ELoadFilter filter);
-#endif
-
-#if LL_GTK
-	static void add_to_selectedfiles(gpointer data, gpointer user_data);
-	static void chooser_responder(GtkWidget *widget, gint response, gpointer user_data);
-	// we remember the last path that was accessed for a particular usage
-	std::map <std::string, std::string> mContextToPathMap;
-	std::string mCurContextName;
-	// we also remember the extension of the last added file.
-	std::string mCurrentExtension;
+    std::unique_ptr<std::vector<std::string>> navOpenFilterProc(ELoadFilter filter);
+    bool doNavSaveDialogModeless(ESaveFilter filter,
+                                 const std::string& filename,
+                                 void (*callback)(bool, std::string&, void*),
+                                 void *userdata);
 #endif
 
 	std::vector<std::string> mFiles;
@@ -189,12 +188,6 @@ private:
 
 	static LLFilePicker sInstance;
 	
-protected:
-#if LL_GTK
-        GtkWindow* buildFilePicker(bool is_save, bool is_folder,
-				   std::string context = "generic");
-#endif
-
 public:
 	// don't call these directly please.
 	LLFilePicker();

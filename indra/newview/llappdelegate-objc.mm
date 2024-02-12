@@ -25,12 +25,11 @@
  */
 
 #import "llappdelegate-objc.h"
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 #import "Sentry.h"
 #endif
 #include "llwindowmacosx-objc.h"
 #include "llappviewermacosx-for-objc.h"
-#include "llviewerbuildconfig.h"
 #include <Carbon/Carbon.h> // Used for Text Input Services ("Safe" API - it's supported)
 
 @implementation LLAppDelegate
@@ -56,12 +55,12 @@
 	// initialized, "played back" into whatever handlers have been set up.
 	constructViewer();
 
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
     [SentrySDK startWithConfigureOptions:^(SentryOptions *options) {
         options.dsn = @SENTRY_DSN;
         options.debug = NO;
         options.releaseName = @LL_VIEWER_CHANNEL_AND_VERSION;
-        options.enableOutOfMemoryTracking = NO;
+        options.enableAppHangTracking = NO;
     }];
 #endif
     
@@ -73,8 +72,9 @@
 	{
 		// Set up recurring calls to oneFrame (repeating timer with timeout 0)
 		// until applicationShouldTerminate.
-		frameTimer = [NSTimer scheduledTimerWithTimeInterval:0.0 target:self
+		frameTimer = [NSTimer timerWithTimeInterval:0.0001 target:self
 							  selector:@selector(oneFrame) userInfo:nil repeats:YES];
+        [[NSRunLoop currentRunLoop] addTimer:frameTimer forMode:NSRunLoopCommonModes];
 	} else {
 		exit(0);
 	}
@@ -187,18 +187,17 @@
 
 - (bool) romanScript
 {
-    @autoreleasepool
-    {
+    @autoreleasepool {
         // How to add support for new languages with the input window:
         // Simply append this array with the language code (ja for japanese, ko for korean, zh for chinese, etc.)
-        NSArray *nonRomanScript = [[NSArray alloc] initWithObjects:@"ja", @"ko", @"zh-Hant", @"zh-Hans", nil];
+        NSArray* nonRomanScript = @[@"ja", @"ko", @"zh-Hant", @"zh-Hans"];
         if ([nonRomanScript containsObject:currentInputLanguage])
         {
             return false;
         }
-        
-        return true;
     }
+    
+    return true;
 }
 
 #if defined(LL_BUGSPLAT)

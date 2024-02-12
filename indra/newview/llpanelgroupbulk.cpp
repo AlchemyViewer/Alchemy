@@ -262,6 +262,10 @@ LLPanelGroupBulk::LLPanelGroupBulk(const LLUUID& group_id) :
 
 LLPanelGroupBulk::~LLPanelGroupBulk()
 {
+	if (mAvatarNameCacheConnection.connected())
+	{
+		mAvatarNameCacheConnection.disconnect();
+	}
 	delete mImplementation;
 }
 
@@ -350,6 +354,11 @@ void LLPanelGroupBulk::updateGroupData()
 
 void LLPanelGroupBulk::addUserCallback(const LLUUID& id, const LLAvatarName& av_name)
 {
+	if (mAvatarNameCacheConnection.connected())
+	{
+		mAvatarNameCacheConnection.disconnect();
+	}
+
 	std::vector<std::string> names;
 	uuid_vec_t agent_ids;
 	agent_ids.push_back(id);
@@ -403,7 +412,7 @@ void LLPanelGroupBulk::addUsers(uuid_vec_t& agent_ids)
 				if (!LLAvatarNameCache::get(agent_id, &av_name))
 				{
 					// actually it should happen, just in case
-					LLAvatarNameCache::get(LLUUID(agent_id), boost::bind(&LLPanelGroupBulk::addUserCallback, this, _1, _2));
+					mAvatarNameCacheConnection = LLAvatarNameCache::get(LLUUID(agent_id), boost::bind(&LLPanelGroupBulk::addUserCallback, this, _1, _2));
 					// for this special case!
 					//when there is no cached name we should remove resident from agent_ids list to avoid breaking of sequence
 					// removed id will be added in callback

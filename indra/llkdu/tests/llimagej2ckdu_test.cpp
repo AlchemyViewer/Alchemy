@@ -63,8 +63,7 @@ U8* LLImageRaw::reallocateData(S32 ) { return NULL; }
 bool LLImageRaw::resize(U16, U16, S8) { return true; } // this method always returns true...
 
 LLImageBase::LLImageBase()
-: LLTrace::MemTrackable<LLImageBase>("LLImageBase"),
-mData(NULL),
+: mData(NULL),
 mDataSize(0),
 mWidth(0),
 mHeight(0),
@@ -190,10 +189,12 @@ bool kdu_codestream::ready_for_flush(kdu_thread_env*) { return false; }
 siz_params* kdu_codestream::access_siz() { return NULL; }
 kdu_tile kdu_codestream::open_tile(kdu_coords , kdu_thread_env* ) { kdu_tile a; return a; }
 kdu_codestream_comment kdu_codestream::add_comment(kdu_thread_env*) { kdu_codestream_comment a; return a; }
+kdu_codestream_comment  kdu_codestream::get_comment(kdu_codestream_comment) { kdu_codestream_comment a; return a; };
 void kdu_subband::close_block(kdu_block*, kdu_thread_env*) { }
 void kdu_subband::get_valid_blocks(kdu_dims &indices) const { }
 kdu_block * kdu_subband::open_block(kdu_coords, int *, kdu_thread_env *, int, bool) { return NULL; }
 bool kdu_codestream_comment::put_text(const char*) { return false; }
+const char *kdu_codestream_comment::get_text() { return nullptr; };
 void kdu_customize_warnings(kdu_message*) { }
 void kdu_customize_errors(kdu_message*) { }
 kdu_long kdu_multi_analysis::create(

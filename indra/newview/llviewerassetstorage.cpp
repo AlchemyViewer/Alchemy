@@ -33,6 +33,7 @@
 
 #include "llagent.h"
 #include "llappcorehttp.h"
+#include "llviewernetwork.h"
 #include "llviewerregion.h"
 
 #include "lltransfersourceasset.h"
@@ -102,10 +103,11 @@ public:
 /// LLViewerAssetStorage
 ///----------------------------------------------------------------------------
 
+S32 LLViewerAssetStorage::sAssetCoroCount = 0;
+
 // Unused?
 LLViewerAssetStorage::LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *xfer, const LLHost &upstream_host)
     : LLAssetStorage(msg, xfer, upstream_host),
-      mAssetCoroCount(0),
       mCountRequests(0),
       mCountStarted(0),
       mCountCompleted(0),
@@ -117,7 +119,6 @@ LLViewerAssetStorage::LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *
 
 LLViewerAssetStorage::LLViewerAssetStorage(LLMessageSystem *msg, LLXferManager *xfer)
     : LLAssetStorage(msg, xfer),
-      mAssetCoroCount(0),
       mCountRequests(0),
       mCountStarted(0),
       mCountCompleted(0),
@@ -133,14 +134,6 @@ LLViewerAssetStorage::~LLViewerAssetStorage()
     {
         // This class has dedicated coroutine pool, clean it up, otherwise coroutines will crash later. 
         LLCoprocedureManager::instance().close(VIEWER_ASSET_STORAGE_CORO_POOL);
-    }
-
-    while (mCoroWaitList.size() > 0)
-    {
-        CoroWaitList &request = mCoroWaitList.front();
-        // Clean up pending downloads, delete request and trigger callbacks
-        removeAndCallbackPendingDownloads(request.mId, request.mType, request.mId, request.mType, LL_ERR_NOERR, LLExtStat::NONE);
-        mCoroWaitList.pop_front();
     }
 }
 
@@ -164,25 +157,13 @@ void LLViewerAssetStorage::storeAssetData(
     
     if (mUpstreamHost.isOk())
     {
-        LLFileSystem vfile(asset_id, asset_type, LLFileSystem::READ);
-        if (vfile.exists())
+        if (LLFileSystem::getExists(asset_id, asset_type))
         {
             // Pack data into this packet if we can fit it.
             U8 buffer[MTUBYTES];
             buffer[0] = 0;
 
-            if (!vfile.open())
-            {
-                // This can happen if there's a bug in our code or if the cache has been corrupted.
-                LL_WARNS("AssetStorage") << "Failed to open cached asset. Data _should_ already be in the cache, but it's not! " << asset_id << LL_ENDL;
-
-                if (callback)
-                {
-                    callback(asset_id, user_data, LL_ERR_ASSET_REQUEST_FAILED, LLExtStat::CACHE_CORRUPT);
-                }
-                return;
-            }
-
+            LLFileSystem vfile(asset_id, asset_type, LLFileSystem::READ);
             S32 asset_size = vfile.getSize();
 
             LLAssetRequest *req = new LLAssetRequest(asset_id, asset_type);
@@ -303,7 +284,7 @@ void LLViewerAssetStorage::storeAssetData(
 #endif
 
     S32 size = 0;
-    LLUniqueFile fp = LLFile::fopen(filename, "rb");
+    LLFILE* fp = LLFile::fopen(filename, "rb");
     if (fp)
     {
         fseek(fp, 0, SEEK_END);
@@ -319,18 +300,13 @@ void LLViewerAssetStorage::storeAssetData(
 
         LLFileSystem file(asset_id, asset_type, LLFileSystem::APPEND);
 
-        if (file.open())
+        const S32 buf_size = 65536;
+        U8 copy_buf[buf_size];
+        while ((size = (S32)fread(copy_buf, 1, buf_size, fp)))
         {
-            const S32 buf_size = 65536;
-            U8 copy_buf[buf_size];
-            while ((size = (S32)fread(copy_buf, 1, buf_size, fp)))
-            {
-                file.write(copy_buf, size);
-            }
-            file.close();
+            file.write(copy_buf, size);
         }
-        fp.close();
-
+        fclose(fp);
 
         // if this upload fails, the caller needs to setup a new tempfile for us
         if (temp_file)
@@ -354,7 +330,7 @@ void LLViewerAssetStorage::storeAssetData(
         {
             // LLAssetStorage metric: Zero size
             reportMetric( asset_id, asset_type, filename, LLUUID::null, 0, MR_ZERO_SIZE, __FILE__, __LINE__, "The file was zero length" );
-			fp.close();
+			fclose(fp);
         }
         else
         {
@@ -365,28 +341,6 @@ void LLViewerAssetStorage::storeAssetData(
         {
             callback(asset_id, user_data, LL_ERR_CANNOT_OPEN_FILE, LLExtStat::BLOCKED_FILE);
         }
-    }
-}
-
-void LLViewerAssetStorage::checkForTimeouts()
-{
-    LLAssetStorage::checkForTimeouts();
-
-    // Restore requests
-    LLCoprocedureManager* manager = LLCoprocedureManager::getInstance();
-    while (mCoroWaitList.size() > 0
-           && manager->count(VIEWER_ASSET_STORAGE_CORO_POOL) < LLCoprocedureManager::DEFAULT_QUEUE_SIZE)
-    {
-        CoroWaitList &request = mCoroWaitList.front();
-        
-        bool with_http = true;
-        bool is_temp = false;
-        LLViewerAssetStatsFF::record_enqueue(request.mType, with_http, is_temp);
-
-        manager->enqueueCoprocedure(VIEWER_ASSET_STORAGE_CORO_POOL, "LLViewerAssetStorage::assetRequestCoro",
-            boost::bind(&LLViewerAssetStorage::assetRequestCoro, this, request.mRequest, request.mId, request.mType, request.mCallback, request.mUserData));
-
-        mCoroWaitList.pop_front();
     }
 }
 
@@ -448,26 +402,25 @@ void LLViewerAssetStorage::queueRequestHttp(
     // This is the same as the current UDP logic - don't re-request a duplicate.
     if (!duplicate)
     {
-        // Coroutine buffer has fixed size (synchronization buffer, so we have no alternatives), so buffer any request above limit
-        if (LLCoprocedureManager::instance().count(VIEWER_ASSET_STORAGE_CORO_POOL) < LLCoprocedureManager::DEFAULT_QUEUE_SIZE)
-        {
-            bool with_http = true;
-            bool is_temp = false;
-            LLViewerAssetStatsFF::record_enqueue(atype, with_http, is_temp);
-
-            LLCoprocedureManager::instance().enqueueCoprocedure(VIEWER_ASSET_STORAGE_CORO_POOL, "LLViewerAssetStorage::assetRequestCoro",
-                boost::bind(&LLViewerAssetStorage::assetRequestCoro, this, req, uuid, atype, callback, user_data));
-        }
-        else
-        {
-            mCoroWaitList.emplace_back(req, uuid, atype, callback, user_data);
-        }
+        LLCoprocedureManager* manager = LLCoprocedureManager::getInstance();
+// ALCHEMY
+//        bool with_http = true;
+//        bool is_temp = false;
+//        LLViewerAssetStatsFF::record_enqueue(atype, with_http, is_temp);
+        manager->enqueueCoprocedure(
+            VIEWER_ASSET_STORAGE_CORO_POOL,
+            "LLViewerAssetStorage::assetRequestCoro",
+            [this, req, uuid, atype, callback, user_data]
+            (LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t&, const LLUUID&)
+            {
+                assetRequestCoro(req, uuid, atype, callback, user_data);
+            });
     }
 }
 
 void LLViewerAssetStorage::capsRecvForRegion(const LLUUID& region_id, std::string pumpname)
 {
-    LLViewerRegion *regionp = LLWorld::instanceFast().getRegionFromID(region_id);
+    LLViewerRegion *regionp = LLWorld::instance().getRegionFromID(region_id);
     if (!regionp)
     {
         LL_WARNS("ViewerAsset") << "region not found for region_id " << region_id << LL_ENDL;
@@ -501,8 +454,7 @@ void LLViewerAssetStorage::assetRequestCoro(
     LLGetAssetCallback callback,
     void *user_data)
 {
-    LLScopedIncrement coro_count_boost(mAssetCoroCount);
-    mCountStarted++;
+    LLScopedIncrement coro_count_boost(sAssetCoroCount); // static counter since corotine can outlive LLViewerAssetStorage
     
     S32 result_code = LL_ERR_NOERR;
     LLExtStat ext_status = LLExtStat::NONE;
@@ -512,6 +464,9 @@ void LLViewerAssetStorage::assetRequestCoro(
         LL_WARNS_ONCE("ViewerAsset") << "Asset request fails: asset storage no longer exists" << LL_ENDL;
         return;
     }
+
+    mCountStarted++;
+
     if (!gAgent.getRegion())
     {
         LL_WARNS_ONCE("ViewerAsset") << "Asset request fails: no region set" << LL_ENDL;
@@ -539,18 +494,44 @@ void LLViewerAssetStorage::assetRequestCoro(
         LL_WARNS_ONCE("ViewerAsset") << "capsRecv got event" << LL_ENDL;
         LL_WARNS_ONCE("ViewerAsset") << "region " << gAgent.getRegion() << " mViewerAssetUrl " << mViewerAssetUrl << LL_ENDL;
     }
-    if (mViewerAssetUrl.empty() && gAgent.getRegion())
+    if (gAgent.getRegion())
     {
         mViewerAssetUrl = gAgent.getRegion()->getViewerAssetUrl();
     }
     if (mViewerAssetUrl.empty())
     {
+        if (!LLGridManager::instance().isInSecondlife() && isUpstreamOK())
+        {
+            req->mWithHTTP = false;
+
+            // send request message to our upstream data provider
+            // Create a new asset transfer.
+            LLTransferSourceParamsAsset spa;
+            spa.setAsset(uuid, atype);
+
+            // Set our destination file, and the completion callback.
+            LLTransferTargetParamsVFile tpvf;
+            tpvf.setAsset(uuid, atype);
+            tpvf.setCallback(downloadCompleteCallback, *req);
+
+            LL_DEBUGS("ViewerAsset") << "Starting transfer for " << uuid << LL_ENDL;
+            LLTransferTargetChannel *ttcp = gTransferManager.getTargetChannel(mUpstreamHost, LLTCT_ASSET);
+            ttcp->requestTransfer(spa, tpvf, 100.f + (req->mIsPriority ? 1.f : 0.f));
+
+			LLViewerAssetStatsFF::record_enqueue(atype, req->mWithHTTP, false);
+        }
+        else
+        {
         LL_WARNS_ONCE("ViewerAsset") << "asset request fails: caps received but no viewer asset cap found" << LL_ENDL;
         result_code = LL_ERR_ASSET_REQUEST_FAILED;
         ext_status = LLExtStat::NONE;
         removeAndCallbackPendingDownloads(uuid, atype, uuid, atype, result_code, ext_status);
+        }
 		return;
     }
+
+    LLViewerAssetStatsFF::record_enqueue(atype, req->mWithHTTP, false);
+
     std::string url = getAssetURL(mViewerAssetUrl, uuid,atype);
 #ifdef SHOW_DEBUG
     LL_DEBUGS("ViewerAsset") << "request url: " << url << LL_ENDL;
@@ -558,9 +539,9 @@ void LLViewerAssetStorage::assetRequestCoro(
 
     LLCore::HttpRequest::policy_t httpPolicy(LLAppCoreHttp::AP_ASSET);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("assetRequestCoro", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
-    LLCore::HttpOptions::ptr_t httpOpts = LLCore::HttpOptions::ptr_t(new LLCore::HttpOptions);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("assetRequestCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+    LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
 
     LLSD result = httpAdapter->getRawAndSuspend(httpRequest, url, httpOpts);
 
@@ -579,6 +560,18 @@ void LLViewerAssetStorage::assetRequestCoro(
 #ifdef SHOW_DEBUG
         LL_DEBUGS("ViewerAsset") << "request failed, status " << status.toTerseString() << LL_ENDL;
 #endif
+        result_code = LL_ERR_ASSET_REQUEST_FAILED;
+        ext_status = LLExtStat::NONE;
+    }
+    else if (!result.has(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_RAW))
+    {
+        LL_DEBUGS("ViewerAsset") << "request failed, no data returned!" << LL_ENDL;
+        result_code = LL_ERR_ASSET_REQUEST_FAILED;
+        ext_status = LLExtStat::NONE;
+    }
+    else if (!result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_RAW].isBinary())
+    {
+        LL_DEBUGS("ViewerAsset") << "request failed, invalid data format!" << LL_ENDL;
         result_code = LL_ERR_ASSET_REQUEST_FAILED;
         ext_status = LLExtStat::NONE;
     }
@@ -602,7 +595,7 @@ void LLViewerAssetStorage::assetRequestCoro(
             temp_id.generate();
             LLFileSystem vf(temp_id, atype, LLFileSystem::WRITE);
             req->mBytesFetched = size;
-            if (!vf.open() || !vf.write(raw.data(), size))
+            if (!vf.write(raw.data(),size))
             {
                 // TODO asset-http: handle error
                 LL_WARNS("ViewerAsset") << "Failure in vf.write()" << LL_ENDL;
@@ -642,8 +635,7 @@ std::string LLViewerAssetStorage::getAssetURL(const std::string& cap_url, const 
 
 void LLViewerAssetStorage::logAssetStorageInfo()
 {
-    LLMemory::logMemoryInfo(true);
-    LL_INFOS("AssetStorage") << "Active coros " << mAssetCoroCount << LL_ENDL;
+    LL_INFOS("AssetStorage") << "Active coros " << sAssetCoroCount << LL_ENDL;
     LL_INFOS("AssetStorage") << "mPendingDownloads size " << mPendingDownloads.size() << LL_ENDL;
     LL_INFOS("AssetStorage") << "mCountStarted " << mCountStarted << LL_ENDL;
     LL_INFOS("AssetStorage") << "mCountCompleted " << mCountCompleted << LL_ENDL;

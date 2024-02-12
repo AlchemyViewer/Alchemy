@@ -32,20 +32,23 @@
 
 std::string getSystemTempFolder()
 {
+    std::string result;
     @autoreleasepool {
         NSString * tempDir = NSTemporaryDirectory();
         if (tempDir == nil)
             tempDir = @"/tmp";
-        return std::string([tempDir UTF8String]);
+        result = std::string([tempDir UTF8String]);
     }
+    
+    return result;
 }
 
 //findSystemDirectory scoped exclusively to this file. 
 std::string findSystemDirectory(NSSearchPathDirectory searchPathDirectory,
                                    NSSearchPathDomainMask domainMask)
 {
+    std::string result;
     @autoreleasepool {
-        std::string result;
         NSString *path = nil;
         
         // Search for the path
@@ -57,31 +60,36 @@ std::string findSystemDirectory(NSSearchPathDirectory searchPathDirectory,
             path = [paths objectAtIndex:0];
             //HACK:  Always attempt to create directory, ignore errors.
             NSError *error = nil;
-
+            
             [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:&error];
-
+            
             
             result = std::string([path UTF8String]);
         }
-
-        return result;
     }
+    return result;
 }
 
 std::string getSystemExecutableFolder()
 {
+    std::string result;
     @autoreleasepool {
         NSString *bundlePath = [[NSBundle mainBundle] executablePath];
-        return std::string([bundlePath UTF8String]);
+        result = std::string([bundlePath UTF8String]);
     }
+
+    return result;
 }
 
 std::string getSystemResourceFolder()
 {
+    std::string result;
     @autoreleasepool {
         NSString *bundlePath = [[NSBundle mainBundle] resourcePath];
-        return std::string([bundlePath UTF8String]);
+        result = std::string([bundlePath UTF8String]);
     }
+    
+    return result;
 }
 
 std::string getSystemCacheFolder()

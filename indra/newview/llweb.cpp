@@ -160,7 +160,7 @@ std::string LLWeb::expandURLSubstitutions(const std::string &url,
 	substitution["VERSION_MAJOR"] = LLVersionInfo::instance().getMajor();
 	substitution["VERSION_MINOR"] = LLVersionInfo::instance().getMinor();
 	substitution["VERSION_PATCH"] = LLVersionInfo::instance().getPatch();
-	substitution["VERSION_BUILD"] = LLVersionInfo::instance().getBuild();
+	substitution["VERSION_BUILD"] = std::to_string(LLVersionInfo::instance().getBuild());
 	substitution["CHANNEL"] = LLVersionInfo::instance().getChannel();
 	substitution["GRID"] = LLGridManager::getInstance()->getGridId();
 	substitution["GRID_LOWERCASE"] = utf8str_tolower(LLGridManager::getInstance()->getGridId());
@@ -199,19 +199,16 @@ std::string LLWeb::expandURLSubstitutions(const std::string &url,
 	// find the grid
 	std::string current_grid = LLGridManager::getInstance()->getGridId();
 	std::transform(current_grid.begin(), current_grid.end(), current_grid.begin(), ::tolower);
-	if (current_grid == "agni")
+    if (current_grid == "damballah")
 	{
-		substitution["GRID"] = "secondlife.com";
-	}
-	else if (current_grid == "damballah")
-	{
-		// Staging grid has its own naming scheme.
-		substitution["GRID"] = "secondlife-staging.com";
-	}
-	else
-	{
-		substitution["GRID"] = llformat("%s.lindenlab.com", current_grid.c_str());
-	}
+      // Staging grid has its own naming scheme.
+      substitution["GRID"] = "secondlife-staging.com";
+    }
+    else
+    {
+        substitution["GRID"] = "secondlife.com";
+    }
+
 	// expand all of the substitution strings and escape the url
 	std::string expanded_url = url;
 	LLStringUtil::format(expanded_url, substitution);

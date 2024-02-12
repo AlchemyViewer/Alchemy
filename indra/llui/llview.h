@@ -100,8 +100,7 @@ class LLView
 :	public LLMouseHandler,			// handles mouse events
 	public LLFocusableElement,		// handles keyboard events
 	public LLMortician,				// lazy deletion
-	public LLHandleProvider<LLView>,     // passes out weak references to self
-	public LLTrace::MemTrackable<LLView> // track memory usage
+	public LLHandleProvider<LLView>     // passes out weak references to self
 {
 public:
 
@@ -249,6 +248,7 @@ public:
 
 	ECursorType	getHoverCursor() { return mHoverCursor; }
 
+    static F32 getTooltipTimeout();
 	virtual const std::string getToolTip() const			{ return mToolTipMsg.getString(); }
 
 	void		sendChildToFront(LLView* child);
@@ -293,6 +293,7 @@ public:
 	void 	setAllChildrenEnabled(BOOL b);
 
 	virtual void	setVisible(BOOL visible);
+	void			setVisibleDirect(BOOL visible) { mVisible = visible; }
 	const BOOL&		getVisible() const			{ return mVisible; }
 	virtual void	setEnabled(BOOL enabled);
 	BOOL			getEnabled() const			{ return mEnabled; }

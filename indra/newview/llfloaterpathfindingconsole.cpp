@@ -950,7 +950,7 @@ void LLFloaterPathfindingConsole::switchIntoTestPathMode()
 	if (LLPathingLib::getInstance() != NULL)
 	{
 		llassert(mPathfindingToolset != NULL);
-		LLToolMgr *toolMgrInstance = LLToolMgr::getInstanceFast();
+		LLToolMgr *toolMgrInstance = LLToolMgr::getInstance();
 		if (toolMgrInstance->getCurrentToolset() != mPathfindingToolset)
 		{
 			mSavedToolset = toolMgrInstance->getCurrentToolset();
@@ -964,7 +964,7 @@ void LLFloaterPathfindingConsole::switchOutOfTestPathMode()
 	if (LLPathingLib::getInstance() != NULL)
 	{
 		llassert(mPathfindingToolset != NULL);
-		LLToolMgr *toolMgrInstance = LLToolMgr::getInstanceFast();
+		LLToolMgr *toolMgrInstance = LLToolMgr::getInstance();
 		if (toolMgrInstance->getCurrentToolset() == mPathfindingToolset)
 		{
 			toolMgrInstance->setCurrentToolset(mSavedToolset);

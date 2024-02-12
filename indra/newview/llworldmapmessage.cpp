@@ -150,6 +150,10 @@ void LLWorldMapMessage::sendMapBlockRequest(U16 min_x, U16 min_y, U16 max_x, U16
 // public static
 void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 {
+	if (gNonInteractive)
+	{
+		return;
+	}
 	U32 agent_flags;
 	msg->getU32Fast(_PREHASH_AgentData, _PREHASH_Flags, agent_flags);
 
@@ -165,13 +169,15 @@ void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 
 	bool found_null_sim = false;
 
-	auto& world_map = LLWorldMap::instanceFast();
-	auto& world_map_message = LLWorldMapMessage::instanceFast();
+	auto& world_map = LLWorldMap::instance();
+	auto& world_map_message = LLWorldMapMessage::instance();
 
 	for (S32 block=0; block<num_blocks; ++block)
 	{
 		U16 x_regions;
 		U16 y_regions;
+		U16 x_size = 256;
+		U16 y_size = 256;
 		std::string name;
 		U8 accesscode;
 		U32 region_flags;
@@ -186,15 +192,29 @@ void LLWorldMapMessage::processMapBlockReply(LLMessageSystem* msg, void**)
 //		msg->getU8Fast(_PREHASH_Data, _PREHASH_WaterHeight, water_height, block);
 //		msg->getU8Fast(_PREHASH_Data, _PREHASH_Agents, agents, block);
 		msg->getUUIDFast(_PREHASH_Data, _PREHASH_MapImageID, image_id, block);
+		if(msg->getNumberOfBlocksFast(_PREHASH_Size) > 0)
+		{
+			msg->getU16Fast(_PREHASH_Size, _PREHASH_SizeX, x_size, block);
+			msg->getU16Fast(_PREHASH_Size, _PREHASH_SizeY, y_size, block);
+		}
+		if(x_size == 0 || (x_size % 16) != 0|| (y_size % 16) != 0)
+		{
+			x_size = 256;
+			y_size = 256;
+		}
 
 		U32 x_world = (U32)(x_regions) * REGION_WIDTH_UNITS;
 		U32 y_world = (U32)(y_regions) * REGION_WIDTH_UNITS;
 
 		// name shouldn't be empty, see EXT-4568
-		llassert(!name.empty());
+		if (name.empty() && accesscode != 255)
+		{
+			LL_WARNS("WorldMap") << "MapBlockReply returned an empty region name; not inserting in the world map" << LL_ENDL;
+			continue;
+		}
 
 		// Insert that region in the world map, if failure, flag it as a "null_sim"
-		if (!(world_map.insertRegion(x_world, y_world, name, image_id, (U32)accesscode, region_flags)))
+		if (!(world_map.insertRegion(x_world, y_world, x_size, y_size, name, image_id, (U32)accesscode, region_flags)))
 		{
 			found_null_sim = true;
 		}
@@ -242,7 +262,7 @@ void LLWorldMapMessage::processMapItemReply(LLMessageSystem* msg, void**)
 
 	S32 num_blocks = msg->getNumberOfBlocksFast(_PREHASH_Data);
 
-	auto& world_map = LLWorldMap::instanceFast();
+	auto& world_map = LLWorldMap::instance();
 
 	for (S32 block=0; block<num_blocks; ++block)
 	{

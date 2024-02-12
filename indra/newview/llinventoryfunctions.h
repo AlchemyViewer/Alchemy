@@ -6,6 +6,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2020, Kitty Barnett
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -51,6 +52,12 @@ BOOL get_is_item_worn(const LLUUID& id);
 // Could this item be worn (correct type + not already being worn)
 BOOL get_can_item_be_worn(const LLUUID& id);
 
+// [SL:KB] - Patch: Inventory-Actions | Checked: 2012-08-18 (Catznip-3.3)
+BOOL get_is_item_movable(const LLInventoryModel* model, const LLUUID& id);
+
+BOOL get_is_category_movable(const LLInventoryModel* model, const LLUUID& id);
+// [/SL:KB]
+
 BOOL get_is_item_removable(const LLInventoryModel* model, const LLUUID& id);
 
 // Performs the appropiate edit action (if one exists) for this item
@@ -68,7 +75,7 @@ void show_item_original(const LLUUID& item_uuid);
 void reset_inventory_filter();
 
 // Nudge the listing categories in the inventory to signal that their marketplace status changed
-void update_marketplace_category(const LLUUID& cat_id, bool perform_consistency_enforcement = true);
+void update_marketplace_category(const LLUUID& cat_id, bool perform_consistency_enforcement = true, bool skip_clear_listing = false);
 // Nudge all listing categories to signal that their marketplace status changed
 void update_all_marketplace_count();
 
@@ -78,28 +85,96 @@ void rename_category(LLInventoryModel* model, const LLUUID& cat_id, const std::s
 //void rename_category(LLInventoryModel* model, const LLUUID& cat_id, const std::string& new_name);
 
 void copy_inventory_category(LLInventoryModel* model, LLViewerInventoryCategory* cat, const LLUUID& parent_id, const LLUUID& root_copy_id = LLUUID::null, bool move_no_copy_items = false);
+void copy_inventory_category(LLInventoryModel* model, LLViewerInventoryCategory* cat, const LLUUID& parent_id, const LLUUID& root_copy_id, bool move_no_copy_items, inventory_func_type callback);
 
 void copy_inventory_category_content(const LLUUID& new_cat_uuid, LLInventoryModel* model, LLViewerInventoryCategory* cat, const LLUUID& root_copy_id, bool move_no_copy_items);
 
-// Generates a string containing the path to the item specified by item_id.
+// Generates a string containing the path to the object specified by id (not including the object name).
 void append_path(const LLUUID& id, std::string& path);
 
-typedef boost::function<void(std::string& validation_message, S32 depth, LLError::ELevel log_level)> validation_callback_t;
+// Generates a string containing the path name of the object.
+std::string make_path(const LLInventoryObject* object);
+// Generates a string containing the path name of the object specified by id.
+std::string make_inventory_path(const LLUUID& id);
+
+// Generates a string containing the path name and id of the object.
+std::string make_info(const LLInventoryObject* object);
+// Generates a string containing the path name and id of the object specified by id.
+std::string make_inventory_info(const LLUUID& id);
 
 bool can_move_item_to_marketplace(const LLInventoryCategory* root_folder, LLInventoryCategory* dest_folder, LLInventoryItem* inv_item, std::string& tooltip_msg, S32 bundle_size = 1, bool from_paste = false);
 bool can_move_folder_to_marketplace(const LLInventoryCategory* root_folder, LLInventoryCategory* dest_folder, LLInventoryCategory* inv_cat, std::string& tooltip_msg, S32 bundle_size = 1, bool check_items = true, bool from_paste = false);
 bool move_item_to_marketplacelistings(LLInventoryItem* inv_item, LLUUID dest_folder, bool copy = false);
 bool move_folder_to_marketplacelistings(LLInventoryCategory* inv_cat, const LLUUID& dest_folder, bool copy = false, bool move_no_copy_items = false);
-bool validate_marketplacelistings(LLInventoryCategory* inv_cat, validation_callback_t cb = NULL, bool fix_hierarchy = true, S32 depth = -1);
+
 S32  depth_nesting_in_marketplace(LLUUID cur_uuid);
 LLUUID nested_parent_id(LLUUID cur_uuid, S32 depth);
 S32 compute_stock_count(LLUUID cat_uuid, bool force_count = false);
 
 void change_item_parent(const LLUUID& item_id, const LLUUID& new_parent_id);
+void move_items_to_new_subfolder(const uuid_vec_t& selected_uuids, const std::string& folder_name);
+void move_items_to_folder(const LLUUID& new_cat_uuid, const uuid_vec_t& selected_uuids);
+bool is_only_cats_selected(const uuid_vec_t& selected_uuids);
+bool is_only_items_selected(const uuid_vec_t& selected_uuids);
+
+bool can_move_to_outfit(LLInventoryItem* inv_item, BOOL move_is_into_current_outfit);
+bool can_move_to_landmarks(LLInventoryItem* inv_item);
+bool can_move_to_my_outfits(LLInventoryModel* model, LLInventoryCategory* inv_cat, U32 wear_limit);
+std::string get_localized_folder_name(LLUUID cat_uuid);
+void new_folder_window(const LLUUID& folder_id);
+void ungroup_folder_items(const LLUUID& folder_id);
+std::string get_searchable_description(LLInventoryModel* model, const LLUUID& item_id);
+std::string get_searchable_creator_name(LLInventoryModel* model, const LLUUID& item_id);
+std::string get_searchable_UUID(LLInventoryModel* model, const LLUUID& item_id);
+bool can_share_item(const LLUUID& item_id);
 
 /**                    Miscellaneous global functions
  **                                                                            **
  *******************************************************************************/
+
+class LLMarketplaceValidator: public LLSingleton<LLMarketplaceValidator>
+{
+    LLSINGLETON(LLMarketplaceValidator);
+    ~LLMarketplaceValidator();
+    LOG_CLASS(LLMarketplaceValidator);
+public:
+
+    typedef boost::function<void(std::string& validation_message, S32 depth, LLError::ELevel log_level)> validation_msg_callback_t;
+    typedef boost::function<void(bool result)> validation_done_callback_t;
+
+    void validateMarketplaceListings(
+        const LLUUID &category_id,
+        validation_done_callback_t cb_done = NULL,
+        validation_msg_callback_t cb_msg = NULL,
+        bool fix_hierarchy = true,
+        S32 depth = -1);
+
+private:
+    void start();
+
+    class ValidationRequest
+    {
+    public:
+        ValidationRequest(
+            LLUUID category_id,
+            validation_done_callback_t cb_done,
+            validation_msg_callback_t cb_msg,
+            bool fix_hierarchy,
+            S32 depth);
+        LLUUID mCategoryId;
+        validation_done_callback_t mCbDone;
+        validation_msg_callback_t  mCbMsg;
+        bool mFixHierarchy;
+        S32 mDepth;
+    };
+
+    bool mValidationInProgress;
+    S32 mPendingCallbacks;
+    bool mPendingResult;
+    // todo: might be a good idea to memorize requests by id and
+    // filter out ones that got multiple validation requests
+    std::queue<ValidationRequest> mValidationQueue;
+};
 
 /********************************************************************************
  **                                                                            **
@@ -213,6 +288,28 @@ protected:
 	LLAssetType::EType mType;
 };
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Class LLAssetIDAndTypeMatches
+//
+// Implementation of a LLInventoryCollectFunctor which returns TRUE if
+// the item matches both asset type and asset id.
+// This is needed in case you are looking for a specific type with default id
+// (since null is default for multiple asset types)
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class LLAssetIDAndTypeMatches: public LLInventoryCollectFunctor
+{
+public:
+    LLAssetIDAndTypeMatches(const LLUUID& asset_id, LLAssetType::EType type): mAssetID(asset_id), mType(type) {}
+    virtual ~LLAssetIDAndTypeMatches() {}
+    bool operator()(LLInventoryCategory* cat,
+                    LLInventoryItem* item);
+
+protected:
+    LLUUID mAssetID;
+    LLAssetType::EType mType;
+};
+
 class LLIsValidItemLink : public LLInventoryCollectFunctor
 {
 public:
@@ -317,6 +414,20 @@ public:
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Class LLFindBrokenLinks
+//
+// Collects broken links
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+class LLFindBrokenLinks : public LLInventoryCollectFunctor
+{
+public:
+    LLFindBrokenLinks() {}
+    virtual ~LLFindBrokenLinks() {}
+    virtual bool operator()(LLInventoryCategory* cat,
+        LLInventoryItem* item);
+};
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLFindByMask
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class LLFindByMask : public LLInventoryCollectFunctor
@@ -414,6 +525,15 @@ private:
 	LLWearableType::EType mWearableType;
 };
 
+class LLIsTextureType : public LLInventoryCollectFunctor
+{
+public:
+    LLIsTextureType() {}
+    virtual ~LLIsTextureType() {}
+    virtual bool operator()(LLInventoryCategory* cat,
+        LLInventoryItem* item);
+};
+
 /** Filter out wearables-links */
 class LLFindActualWearablesOfType : public LLFindWearablesOfType
 {
@@ -473,7 +593,7 @@ struct LLInventoryAction
 
     static void saveMultipleTextures(const std::vector<std::string>& filenames, std::set<LLFolderViewItem*> selected_items, LLInventoryModel* model);
 
-	static const int sConfirmOnDeleteItemsNumber;
+    static bool sDeleteConfirmationDisplayed;
 
 private:
 	static void buildMarketplaceFolders(LLFolderView* root);

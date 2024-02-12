@@ -76,13 +76,25 @@ public:
 		DNDA_DROPPED			// User dropped an incoming drag on the window (this is the "commit" event)
 	};
 	
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+	enum DragNDropType
+	{
+		DNDT_FILE,		// User is dragging one or more files over the window
+		DNDT_DEFAULT,	// Default LL behaviour, whatever that is
+		DNDT_NONE
+	};
+// [/SL:KB]
+
 	enum DragNDropResult {
 		DND_NONE = 0,	// No drop allowed
 		DND_MOVE,		// Drop accepted would result in a "move" operation
 		DND_COPY,		// Drop accepted would result in a "copy" operation
 		DND_LINK		// Drop accepted would result in a "link" operation
 	};
-	virtual DragNDropResult handleDragNDrop(LLWindow *window, LLCoordGL pos, MASK mask, DragNDropAction action, std::string data);
+// [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
+	virtual DragNDropResult handleDragNDrop(LLWindow *window, LLCoordGL pos, MASK mask, DragNDropAction action, DragNDropType type, const std::vector<std::string>& data);
+// [/SL:KB]
+//	virtual DragNDropResult handleDragNDrop(LLWindow *window, LLCoordGL pos, MASK mask, DragNDropAction action, std::string data);
 	
 	virtual void handlePingWatchdog(LLWindow *window, const char * msg);
 	virtual void handlePauseWatchdog(LLWindow *window);

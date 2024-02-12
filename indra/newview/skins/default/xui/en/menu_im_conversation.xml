@@ -79,6 +79,13 @@
     </menu_item_call>
     <menu_item_separator
      layout="topleft"/>
+    <menu_item_call
+     label="Report Abuse"
+     layout="topleft"
+     name="Report Abuse">
+       <on_click function="Avatar.GearDoToSelected" parameter="report_abuse" />
+       <on_enable function="Avatar.EnableGearItem" parameter="report_abuse" />
+    </menu_item_call>
     <menu_item_check
      label="Block Voice"
      layout="topleft"
@@ -103,14 +110,14 @@
     </menu_item_call>
   <menu_item_separator name="separator_utils"/>
   <context_menu
-   label="Utilities"
+   label="Actions"
    name="utils_menu">
     <menu_item_call
-     label="Copy Username"
-     name="copy_username">
+     label="Copy Full Name"
+     name="copy_full_name">
       <menu_item_call.on_click
        function="Avatar.GearDoToSelected"
-       parameter="copy_username"/>
+       parameter="copy_full_name"/>
     </menu_item_call>
     <menu_item_call
      label="Copy Display Name"
@@ -120,11 +127,11 @@
        parameter="copy_display_name"/>
     </menu_item_call>
     <menu_item_call
-     label="Copy Account Name"
-     name="copy_account_name">
+     label="Copy Agent Name"
+     name="copy_username">
       <menu_item_call.on_click
        function="Avatar.GearDoToSelected"
-       parameter="copy_account_name"/>
+       parameter="copy_username"/>
     </menu_item_call>
     <menu_item_call
      label="Copy SLurl"
@@ -134,7 +141,7 @@
        parameter="copy_slurl"/>
     </menu_item_call>
     <menu_item_call
-     label="Copy ID"
+     label="Copy UUID"
      name="copy_uuid">
       <menu_item_call.on_click
        function="Avatar.GearDoToSelected"

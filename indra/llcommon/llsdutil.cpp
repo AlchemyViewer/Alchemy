@@ -29,6 +29,7 @@
 #include "linden_common.h"
 
 #include "llsdutil.h"
+#include <sstream>
 
 #if LL_WINDOWS
 #include "llwin32headerslean.h"
@@ -150,10 +151,9 @@ LLSD ll_binary_from_string(const LLSD& sd)
 	std::vector<U8> binary_value;
 
 	std::string string_value = sd.asString();
-	for (std::string::iterator iter = string_value.begin();
-		 iter != string_value.end(); ++iter)
+	for (const U8 c : string_value)
 	{
-		binary_value.push_back(*iter);
+		binary_value.push_back(c);
 	}
 
 	binary_value.push_back('\0');
@@ -217,6 +217,8 @@ BOOL compare_llsd_with_template(
 	const LLSD& template_llsd,
 	LLSD& resultant_llsd)
 {
+    LL_PROFILE_ZONE_SCOPED
+
 	if (
 		llsd_to_test.isUndefined() &&
 		template_llsd.isDefined() )
@@ -284,7 +286,7 @@ BOOL compare_llsd_with_template(
 		LLSD value;
 
 		resultant_llsd = LLSD::emptyMap();
-		for (const auto& template_pair : template_llsd.map())
+		for (const auto& template_pair : template_llsd.asMap())
 		{
 			if ( llsd_to_test.has(template_pair.first) )
 			{
@@ -334,6 +336,8 @@ bool filter_llsd_with_template(
 	const LLSD & template_llsd,
 	LLSD & resultant_llsd)
 {
+    LL_PROFILE_ZONE_SCOPED
+
 	if (llsd_to_test.isUndefined() && template_llsd.isDefined())
 	{
 		resultant_llsd = template_llsd;
@@ -528,6 +532,8 @@ class TypeLookup
 public:
     TypeLookup()
     {
+        LL_PROFILE_ZONE_SCOPED
+
         for (const LLSDTypeData *di(boost::begin(typedata)), *dend(boost::end(typedata)); di != dend; ++di)
         {
             mMap[di->type] = di->name;
@@ -536,6 +542,8 @@ public:
 
     std::string lookup(LLSD::Type type) const
     {
+        LL_PROFILE_ZONE_SCOPED
+
         MapType::const_iterator found = mMap.find(type);
         if (found != mMap.end())
         {
@@ -586,6 +594,8 @@ static std::string match_types(LLSD::Type expect, // prototype.type()
                                LLSD::Type actual,        // type we're checking
                                const std::string& pfx)   // as for llsd_matches
 {
+    LL_PROFILE_ZONE_SCOPED
+
     // Trivial case: if the actual type is exactly what we expect, we're good.
     if (actual == expect)
         return "";
@@ -623,6 +633,8 @@ static std::string match_types(LLSD::Type expect, // prototype.type()
 // see docstring in .h file
 std::string llsd_matches(const LLSD& prototype, const LLSD& data, const std::string& pfx)
 {
+    LL_PROFILE_ZONE_SCOPED
+
     // An undefined prototype means that any data is valid.
     // An undefined slot in an array or map prototype means that any data
     // may fill that slot.
@@ -668,7 +680,7 @@ std::string llsd_matches(const LLSD& prototype, const LLSD& data, const std::str
         out << colon(pfx);
         const char* init = "Map missing keys: ";
         const char* sep = init;
-        for (const auto& prototype_pair : prototype.map())
+        for (const auto& prototype_pair : prototype.asMap())
         {
             if (! data.has(prototype_pair.first))
             {
@@ -683,7 +695,7 @@ std::string llsd_matches(const LLSD& prototype, const LLSD& data, const std::str
         }
         // Good, the data block contains all the keys required by the
         // prototype. Now match the prototype entries.
-        for (const auto& prototype_pair : prototype.map())
+        for (const auto& prototype_pair : prototype.asMap())
         {
             std::string match(llsd_matches(prototype_pair.second, data[prototype_pair.first],
                                            STRINGIZE("['" << prototype_pair.first << "']")));
@@ -755,6 +767,8 @@ std::string llsd_matches(const LLSD& prototype, const LLSD& data, const std::str
 
 bool llsd_equals(const LLSD& lhs, const LLSD& rhs, int bits)
 {
+    LL_PROFILE_ZONE_SCOPED
+
     // We're comparing strict equality of LLSD representation rather than
     // performing any conversions. So if the types aren't equal, the LLSD
     // values aren't equal.
@@ -820,7 +834,7 @@ bool llsd_equals(const LLSD& lhs, const LLSD& rhs, int bits)
     case LLSD::TypeMap:
     {
         // Build a set of all rhs keys.
-        std::set<LLSD::String> rhskeys;
+        boost::unordered_set<LLSD::String> rhskeys;
         for (LLSD::map_const_iterator rmi(rhs.beginMap()), rmend(rhs.endMap());
              rmi != rmend; ++rmi)
         {
@@ -861,8 +875,10 @@ bool llsd_equals(const LLSD& lhs, const LLSD& rhs, int bits)
 namespace llsd
 {
 
-LLSD& drill(LLSD& blob, const LLSD& rawPath)
+LLSD& drill_ref(LLSD& blob, const LLSD& rawPath)
 {
+    LL_PROFILE_ZONE_SCOPED
+
     // Treat rawPath uniformly as an array. If it's not already an array,
     // store it as the only entry in one. (But let's say Undefined means an
     // empty array.)
@@ -888,6 +904,8 @@ LLSD& drill(LLSD& blob, const LLSD& rawPath)
     // path entry that's bad.
     for (LLSD::Integer i = 0; i < path.size(); ++i)
     {
+        LL_PROFILE_ZONE_NUM( i )
+
         const LLSD& key{path[i]};
         if (key.isString())
         {
@@ -916,9 +934,11 @@ LLSD& drill(LLSD& blob, const LLSD& rawPath)
 
 LLSD drill(const LLSD& blob, const LLSD& path)
 {
-    // non-const drill() does exactly what we want. Temporarily cast away
+    LL_PROFILE_ZONE_SCOPED
+
+    // drill_ref() does exactly what we want. Temporarily cast away
     // const-ness and use that.
-    return drill(const_cast<LLSD&>(blob), path);
+    return drill_ref(const_cast<LLSD&>(blob), path);
 }
 
 } // namespace llsd
@@ -928,6 +948,8 @@ LLSD drill(const LLSD& blob, const LLSD& path)
 // filter may be include to exclude/include keys in a map. 
 LLSD llsd_clone(LLSD value, LLSD filter)
 {
+    LL_PROFILE_ZONE_SCOPED
+
     LLSD clone;
     bool has_filter(filter.isMap());
 
@@ -935,7 +957,7 @@ LLSD llsd_clone(LLSD value, LLSD filter)
     {
     case LLSD::TypeMap:
         clone = LLSD::emptyMap();
-        for (const auto& value_pair : value.map())
+        for (const auto& value_pair : value.asMap())
         {
             if (has_filter)
             {
@@ -959,7 +981,7 @@ LLSD llsd_clone(LLSD value, LLSD filter)
         break;
     case LLSD::TypeArray:
         clone = LLSD::emptyArray();
-        for (const auto& llsd_val : value.array())
+        for (const auto& llsd_val : value.asArray())
         {
             clone.append(llsd_clone(llsd_val, filter));
         }
@@ -967,8 +989,8 @@ LLSD llsd_clone(LLSD value, LLSD filter)
 
     case LLSD::TypeBinary:
     {
-        LLSD::Binary bin(value.asBinary().begin(), value.asBinary().end());
-        clone = LLSD::Binary(std::move(bin));
+        const auto& bin = value.asBinary();
+        clone = LLSD::Binary(bin.begin(), bin.end());
         break;
     }
     default:
@@ -986,7 +1008,7 @@ LLSD llsd_shallow(LLSD value, LLSD filter)
     if (value.isMap())
     {
         shallow = LLSD::emptyMap();
-        for (const auto& value_pair : value.map())
+        for (const auto& value_pair : value.asMap())
         {
             if (has_filter)
             {
@@ -1011,7 +1033,7 @@ LLSD llsd_shallow(LLSD value, LLSD filter)
     else if (value.isArray())
     {
         shallow = LLSD::emptyArray();
-        for (const auto& llsd_val : value.array())
+        for (const auto& llsd_val : value.asArray())
         {
             shallow.append(llsd_val);
         }
@@ -1022,4 +1044,39 @@ LLSD llsd_shallow(LLSD value, LLSD filter)
     }
 
     return shallow;
+}
+
+LLSD LL::apply_llsd_fix(size_t arity, const LLSD& args)
+{
+    // LLSD supports a number of types, two of which are aggregates: Map and
+    // Array. We don't try to support Map: supporting Map would seem to
+    // promise that we could somehow match the string key to 'func's parameter
+    // names. Uh sorry, maybe in some future version of C++ with reflection.
+    if (args.isMap())
+    {
+        LLTHROW(LL::apply_error("LL::apply(function, Map LLSD) unsupported"));
+    }
+    // We expect an LLSD array, but what the heck, treat isUndefined() as a
+    // zero-length array for calling a nullary 'func'.
+    if (args.isUndefined() || args.isArray())
+    {
+        // this works because LLSD().size() == 0
+        if (args.size() != arity)
+        {
+            LLTHROW(LL::apply_error(stringize("LL::apply(function(", arity, " args), ",
+                                              args.size(), "-entry LLSD array)")));
+        }
+        return args;
+    }
+
+    // args is one of the scalar types
+    // scalar_LLSD.size() == 0, so don't test that here.
+    // You can pass a scalar LLSD only to a unary 'func'.
+    if (arity != 1)
+    {
+        LLTHROW(LL::apply_error(stringize("LL::apply(function(", arity, " args), "
+                                          "LLSD ", LLSD::typeString(args.type()), ")")));
+    }
+    // make an array of it
+    return llsd::array(args);
 }

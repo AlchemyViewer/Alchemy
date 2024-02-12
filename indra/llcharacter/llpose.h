@@ -35,7 +35,7 @@
 #include "lljoint.h"
 #include "llpointer.h"
 
-#include <absl/container/flat_hash_map.h>
+#include "boost/unordered/unordered_flat_map.hpp"
 
 #include <map>
 #include <string>
@@ -82,8 +82,10 @@ public:
 
 const S32 JSB_NUM_JOINT_STATES = 6;
 
+LL_ALIGN_PREFIX(16)
 class LLJointStateBlender
 {
+    LL_ALIGN_NEW
 protected:
 	LLPointer<LLJointState>	mJointStates[JSB_NUM_JOINT_STATES];
 	S32				mPriorities[JSB_NUM_JOINT_STATES];
@@ -98,8 +100,8 @@ public:
 	void resetCachedJoint();
 
 public:
-	LLJoint mJointCache;
-};
+	LL_ALIGN_16(LLJoint mJointCache);
+} LL_ALIGN_POSTFIX(16);
 
 class LLMotion;
 
@@ -107,7 +109,7 @@ class LLPoseBlender
 {
 protected:
 	typedef std::list<LLJointStateBlender*> blender_list_t;
-	typedef absl::flat_hash_map<LLJoint*,LLJointStateBlender*> blender_map_t;
+	typedef boost::unordered_flat_map<LLJoint*,LLJointStateBlender*> blender_map_t;
 	blender_map_t mJointStateBlenderPool;
 	blender_list_t mActiveBlenders;
 

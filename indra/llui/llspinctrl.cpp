@@ -101,16 +101,21 @@ LLSpinCtrl::LLSpinCtrl(const LLSpinCtrl::Params& p)
 	// Spin buttons
 	LLButton::Params up_button_params(p.up_button);
 	up_button_params.rect = LLRect(btn_left, getRect().getHeight(), btn_right, getRect().getHeight() - spinctrl_btn_height);
-	up_button_params.click_callback.function(boost::bind(&LLSpinCtrl::onUpBtn, this, _2));
+    // Click callback starts within the button and ends within the button,
+    // but LLSpinCtrl handles the action continuosly so subsribers needs to
+    // be informed about click ending even if outside view, use 'up' instead
+	up_button_params.mouse_up_callback.function(boost::bind(&LLSpinCtrl::onUpBtn, this, _2));
 	up_button_params.mouse_held_callback.function(boost::bind(&LLSpinCtrl::onUpBtn, this, _2));
+    up_button_params.commit_on_capture_lost = true;
 
 	mUpBtn = LLUICtrlFactory::create<LLButton>(up_button_params);
 	addChild(mUpBtn);
 
 	LLButton::Params down_button_params(p.down_button);
 	down_button_params.rect = LLRect(btn_left, getRect().getHeight() - spinctrl_btn_height, btn_right, getRect().getHeight() - 2 * spinctrl_btn_height);
-	down_button_params.click_callback.function(boost::bind(&LLSpinCtrl::onDownBtn, this, _2));
+	down_button_params.mouse_up_callback.function(boost::bind(&LLSpinCtrl::onDownBtn, this, _2));
 	down_button_params.mouse_held_callback.function(boost::bind(&LLSpinCtrl::onDownBtn, this, _2));
+    down_button_params.commit_on_capture_lost = true;
 	mDownBtn = LLUICtrlFactory::create<LLButton>(down_button_params);
 	addChild(mDownBtn);
 
@@ -154,7 +159,7 @@ F32 clamp_precision(F32 value, S32 decimal_precision)
 	for (S32 i = 0; i < decimal_precision; i++)
 		clamped_value *= 10.0;
 
-	clamped_value = std::round(clamped_value);
+	clamped_value = ll_round(clamped_value);
 
 	for (S32 i = 0; i < decimal_precision; i++)
 		clamped_value /= 10.0;

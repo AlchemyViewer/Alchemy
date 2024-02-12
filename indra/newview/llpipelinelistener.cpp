@@ -41,7 +41,7 @@ namespace {
 	// Render Types
 	void toggle_render_types_wrapper(LLSD const& request)
 	{
-		for (const LLSD& llsd_val : request["types"].array())
+		for (const LLSD& llsd_val : request["types"].asArray())
 		{
 			U32 render_type = render_type_from_string( llsd_val.asString() );
 			if ( render_type != 0 )
@@ -78,7 +78,7 @@ namespace {
 	// Render Features
 	void toggle_render_features_wrapper(LLSD const& request)
 	{
-		for (const LLSD& llsd_val : request["features"].array())
+		for (const LLSD& llsd_val : request["features"].asArray())
 		{
 			U32 render_feature = feature_from_string( llsd_val.asString() );
 			if ( render_feature != 0 )
@@ -115,7 +115,7 @@ namespace {
 	// Render Info Displays
 	void toggle_info_displays_wrapper(LLSD const& request)
 	{
-		for (const LLSD& llsd_val : request["displays"].array())
+		for (const LLSD& llsd_val : request["displays"].asArray())
 		{
 			U64 info_display = info_display_from_string( llsd_val.asString() );
 			if ( info_display != 0 )

@@ -40,6 +40,7 @@
 #include "llviewertexturelist.h"
 #include "llvoiceclient.h"
 #include "llrender.h"
+#include "alcinematicmode.h"
 
 //brent's wave image
 //29de489d-0491-fb00-7dab-f9e686d31e83
@@ -336,7 +337,7 @@ void LLVoiceVisualizer::lipSyncOohAah( F32& ooh, F32& aah )
 //---------------------------------------------------
 void LLVoiceVisualizer::render()
 {
-	if ( ! mVoiceEnabled )
+	if ( ! mVoiceEnabled  || ALCinematicMode::isEnabled())
 	{
 		return;
 	}
@@ -356,12 +357,12 @@ void LLVoiceVisualizer::render()
 		//---------------------------------------------------------------
 		LLGLSPipelineAlpha alpha_blend;
 		LLGLDepthTest depth(GL_TRUE, GL_FALSE);
-		LLGLDisable gls_stencil(GL_STENCIL_TEST);
+		//LLGLDisable gls_stencil(GL_STENCIL_TEST);
 		
 		//-------------------------------------------------------------
 		// create coordinates of the geometry for the dot
 		//-------------------------------------------------------------
-		LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+		LLViewerCamera* camera = LLViewerCamera::getInstance();
 		LLVector3 l	= camera->getLeftAxis() * DOT_SIZE;
 		LLVector3 u	= camera->getUpAxis()   * DOT_SIZE;
 

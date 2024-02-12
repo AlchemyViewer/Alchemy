@@ -106,13 +106,14 @@ public:
 
 	LLPointer<LLImageFormatted>	getFormattedImage();
 	LLPointer<LLImageRaw>		getEncodedImage();
+    bool createUploadFile(const std::string &out_file, const S32 max_image_dimentions, const S32 min_image_dimentions);
 
 	/// Sets size of preview thumbnail image and the surrounding rect.
 	void setThumbnailPlaceholderRect(const LLRect& rect) {mThumbnailPlaceholderRect = rect; }
 	BOOL setThumbnailImageSize() ;
 	void generateThumbnailImage(BOOL force_update = FALSE) ;
 	void resetThumbnailImage() { mThumbnailImage = NULL ; }
-	void drawPreviewRect(S32 offset_x, S32 offset_y) ;
+	void drawPreviewRect(S32 offset_x, S32 offset_y, LLColor4 alpha_color = LLColor4(0.5f, 0.5f, 0.5f, 0.8f));
 	void prepareFreezeFrame();
     
 	LLViewerTexture* getBigThumbnailImage();

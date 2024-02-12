@@ -63,11 +63,12 @@ LLViewerMediaFocus::~LLViewerMediaFocus()
 {
 	// The destructor for LLSingletons happens at atexit() time, which is too late to do much.
 	// Clean up in cleanupClass() instead.
+    gFocusMgr.removeKeyboardFocusWithoutCallback(this);
 }
 
 void LLViewerMediaFocus::setFocusFace(LLPointer<LLViewerObject> objectp, S32 face, viewer_media_t media_impl, LLVector3 pick_normal)
 {	
-	LLParcel *parcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+	LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 	
 	LLViewerMediaImpl *old_media_impl = getFocusedMediaImpl();
 	if(old_media_impl)
@@ -76,7 +77,7 @@ void LLViewerMediaFocus::setFocusFace(LLPointer<LLViewerObject> objectp, S32 fac
 	}
 	
 	// Always clear the current selection.  If we're setting focus on a face, we'll reselect the correct object below.
-	LLSelectMgr::getInstanceFast()->deselectAll();
+	LLSelectMgr::getInstance()->deselectAll();
 	mSelection = NULL;
 
 	if (media_impl.notNull() && objectp.notNull())
@@ -89,7 +90,7 @@ void LLViewerMediaFocus::setFocusFace(LLPointer<LLViewerObject> objectp, S32 fac
 		mFocusedObjectNormal = pick_normal;
 		
 		// Set the selection in the selection manager so we can draw the focus ring.
-		mSelection = LLSelectMgr::getInstanceFast()->selectObjectOnly(objectp, face);
+		mSelection = LLSelectMgr::getInstance()->selectObjectOnly(objectp, face);
 
 		// Focusing on a media face clears its disable flag.
 		media_impl->setDisabled(false);
@@ -222,7 +223,7 @@ LLVector3d LLViewerMediaFocus::setCameraZoom(LLViewerObject* object, LLVector3 n
 
 		// We need the aspect ratio, and the 3 components of the bbox as height, width, and depth.
 		F32 aspect_ratio = getBBoxAspectRatio(bbox, normal, &height, &width, &depth);
-		F32 camera_aspect = LLViewerCamera::getInstanceFast()->getAspect();
+		F32 camera_aspect = LLViewerCamera::getInstance()->getAspect();
 		
 		LL_DEBUGS() << "normal = " << normal << ", aspect_ratio = " << aspect_ratio << ", camera_aspect = " << camera_aspect << LL_ENDL;
 
@@ -239,14 +240,14 @@ LLVector3d LLViewerMediaFocus::setCameraZoom(LLViewerObject* object, LLVector3 n
 		// We will add half the depth of the bounding box, as the distance projection uses the center point of the bbox.
 		if(camera_aspect < 1.0f || invert)
 		{
-			angle_of_view = llmax(0.1f, LLViewerCamera::getInstanceFast()->getView() * LLViewerCamera::getInstanceFast()->getAspect());
+			angle_of_view = llmax(0.1f, LLViewerCamera::getInstance()->getView() * LLViewerCamera::getInstance()->getAspect());
 			distance = width * 0.5 * padding_factor / tan(angle_of_view * 0.5f );
 
 			LL_DEBUGS() << "using width (" << width << "), angle_of_view = " << angle_of_view << ", distance = " << distance << LL_ENDL;
 		}
 		else
 		{
-			angle_of_view = llmax(0.1f, LLViewerCamera::getInstanceFast()->getView());
+			angle_of_view = llmax(0.1f, LLViewerCamera::getInstance()->getView());
 			distance = height * 0.5 * padding_factor / tan(angle_of_view * 0.5f );
 
 			LL_DEBUGS() << "using height (" << height << "), angle_of_view = " << angle_of_view << ", distance = " << distance << LL_ENDL;
@@ -408,7 +409,7 @@ void LLViewerMediaFocus::update()
 				clearFocus();
 			}
 		}
-		else if(LLToolMgr::getInstanceFast()->inBuildMode())
+		else if(LLToolMgr::getInstance()->inBuildMode())
 		{
 			// Build tools are selected -- clear focus.
 			clearFocus();
@@ -538,7 +539,7 @@ bool LLViewerMediaFocus::isHoveringOverFace(LLPointer<LLViewerObject> objectp, S
 
 LLViewerMediaImpl* LLViewerMediaFocus::getFocusedMediaImpl()
 {
-	return LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mFocusedImplID);
+	return LLViewerMedia::getInstance()->getMediaImplFromTextureID(mFocusedImplID);
 }
 
 LLViewerObject* LLViewerMediaFocus::getFocusedObject()
@@ -548,7 +549,7 @@ LLViewerObject* LLViewerMediaFocus::getFocusedObject()
 
 LLViewerMediaImpl* LLViewerMediaFocus::getHoverMediaImpl()
 {
-	return LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(mHoverImplID);
+	return LLViewerMedia::getInstance()->getMediaImplFromTextureID(mHoverImplID);
 }
 
 LLViewerObject* LLViewerMediaFocus::getHoverObject()
@@ -558,7 +559,7 @@ LLViewerObject* LLViewerMediaFocus::getHoverObject()
 
 void LLViewerMediaFocus::focusZoomOnMedia(LLUUID media_id)
 {
-	LLViewerMediaImpl* impl = LLViewerMedia::getInstanceFast()->getMediaImplFromTextureID(media_id);
+	LLViewerMediaImpl* impl = LLViewerMedia::getInstance()->getMediaImplFromTextureID(media_id);
 	
 	if(impl)
 	{	
@@ -575,7 +576,7 @@ void LLViewerMediaFocus::focusZoomOnMedia(LLUUID media_id)
 			{
 				// If that didn't work, use the inverse of the camera "look at" axis, which should keep the camera pointed in the same direction.
 //				LL_INFOS() << "approximate face normal invalid, using camera direction." << LL_ENDL;
-				normal = LLViewerCamera::getInstanceFast()->getAtAxis();
+				normal = LLViewerCamera::getInstance()->getAtAxis();
 				normal *= (F32)-1.0f;
 			}
 			

@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="ポップアップ" name="popups" title="ポップアップ">
+<panel label="ポップアップ" name="popups">
 	<text name="tell_me_label">
-		知らせる：
+		通知：
 	</text>
-	<check_box label="L$ を使用する場合" name="notify_money_spend_checkbox"/>
-	<check_box label="フレンドがログイン・ログアウトするとき" name="friends_online_notify_checkbox"/>
-	<check_box label="L$ を手に入れる場合" name="notify_money_received_checkbox"/>
-	<text name="show_label" width="300">
+	<check_box label="L$使用時" name="notify_money_spend_checkbox"/>
+	<check_box label="フレンドのログイン状態変化時" name="friends_online_notify_checkbox"/>
+	<check_box label="近くのチャットで" name="friends_online_notify_checkbox_chat"/>
+	<check_box label="L$入手時" name="notify_money_received_checkbox"/>
+	<check_box label="ストリーム音楽が変わったとき" name="music_stream_title"/>
+	<check_box label="近くのチャットで" name="music_stream_title_checkbox_chat"/>
+	<text name="show_label">
 		常に表示するメッセージ：
 	</text>
 	<text name="dont_show_label">

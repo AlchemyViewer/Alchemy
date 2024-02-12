@@ -48,7 +48,7 @@
 #include "llglheaders.h"
 
 extern LLPipeline gPipeline;
-const F32 MAX_ATTACHMENT_DIST = 3.5f; // meters?
+const F32 MAX_ATTACHMENT_DIST = 3.5f; // meters
 
 //-----------------------------------------------------------------------------
 // LLViewerJointAttachment()
@@ -124,8 +124,7 @@ void LLViewerJointAttachment::setupDrawable(LLViewerObject *object)
 	object->mDrawable->mXform.setRotation(current_rot);
 	gPipeline.markMoved(object->mDrawable);
 	gPipeline.markTextured(object->mDrawable); // face may need to change draw pool to/from POOL_HUD
-	object->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
-	
+
 	if(mIsHUDAttachment)
 	{
 		for (S32 face_num = 0; face_num < object->mDrawable->getNumFaces(); face_num++)
@@ -143,7 +142,6 @@ void LLViewerJointAttachment::setupDrawable(LLViewerObject *object)
 	{
 		if (childp && childp->mDrawable.notNull())
 		{
-			childp->mDrawable->setState(LLDrawable::USE_BACKLIGHT);
 			gPipeline.markTextured(childp->mDrawable); // face may need to change draw pool to/from POOL_HUD
 			gPipeline.markMoved(childp->mDrawable);
 
@@ -173,12 +171,6 @@ BOOL LLViewerJointAttachment::addObject(LLViewerObject* object)
 	if (isObjectAttached(object))
 	{
 		LL_INFOS() << "(same object re-attached)" << LL_ENDL;
-//// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
-//		if ( (object->permYouOwner()) && (gAgentAvatarp) )
-//		{
-//			gAgentAvatarp->removePendingDetach(object->getID());
-//		}
-//// [/SL:KB]
 		removeObject(object);
 		// Pass through anyway to let setupDrawable()
 		// re-connect object to the joint correctly
@@ -284,7 +276,6 @@ void LLViewerJointAttachment::removeObject(LLViewerObject *object)
 		object->mDrawable->mXform.setRotation(cur_rotation);
 		gPipeline.markMoved(object->mDrawable, TRUE);
 		gPipeline.markTextured(object->mDrawable); // face may need to change draw pool to/from POOL_HUD
-		object->mDrawable->clearState(LLDrawable::USE_BACKLIGHT);
 
 		if (mIsHUDAttachment)
 		{
@@ -306,7 +297,6 @@ void LLViewerJointAttachment::removeObject(LLViewerObject *object)
 		LLViewerObject* childp = *iter;
 		if (childp && childp->mDrawable.notNull())
 		{
-			childp->mDrawable->clearState(LLDrawable::USE_BACKLIGHT);
 			gPipeline.markTextured(childp->mDrawable); // face may need to change draw pool to/from POOL_HUD
 			if (mIsHUDAttachment)
 			{

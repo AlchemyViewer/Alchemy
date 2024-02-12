@@ -95,7 +95,7 @@
    type="string"
    length="1"
    follows="left|top"
-   height="10"
+   height="16"
    layout="topleft"
    left_pad="6"
    mouse_opaque="false"
@@ -112,9 +112,245 @@
     layout="topleft"
     left="45"
     name="HideHoverTextInCinematicMode"
-    top_delta="20"
+    top_pad="7"
     width="256">
     <check_box.commit_callback
       function="Pref.RenderOptionUpdate" />
   </check_box>
+  <text
+     type="string"
+     length="1"
+     follows="left|top"
+     height="18"
+     layout="topleft"
+     left="30"
+     name="InventoryText"
+     mouse_opaque="false"
+     top_pad="3"
+     width="300"
+     valign="center">
+    Inventory:
+  </text>
+  <check_box
+    control_name="DoubleClickAttachmentAdd"
+    height="16"
+    initial_value="true"
+    label="Double-click to add Attachments"
+    layout="topleft"
+    left="45"
+    name="DoubleClickAttachmentAddCheck"
+    top_pad="7"
+    width="256"/>
+  <check_box
+    control_name="DoubleClickWearableAdd"
+    height="16"
+    initial_value="true"
+    label="Double-click to add Wearables"
+    layout="topleft"
+    left="45"
+    name="DoubleClickWearableAddCheck"
+    top_pad="4"
+    width="256"/>
+  <text
+     type="string"
+     length="1"
+     follows="left|top"
+     height="18"
+     layout="topleft"
+     left="30"
+     name="SecurityText"
+     mouse_opaque="false"
+     top_pad="3"
+     width="300"
+     >
+    Security:
+  </text>
+      <check_box
+       follows="left|top"
+       height="16"
+       label="Block left-click sitting on Objects"
+       left="45"
+       top_pad="7"
+       name="AlchemyDisableClickToSit"
+       width="275"
+       control_name="AlchemyDisableClickToSit"/>
+      <check_box
+       follows="left|top"
+       height="16"
+       label="Allow scripts to show map UI (llMapDestination)"
+       left="45"
+       top_pad="4"
+       name="ScriptsCanShowUI"
+       width="275"
+       control_name="ScriptsCanShowUI"/>
+      <text
+       type="string"
+       length="1"
+       follows="left|top"
+       height="19"
+       layout="topleft"
+       left="49"
+       name="inworld_typing_rg_label"
+       top_pad="5"
+       width="300"
+       value="Revoke object permissions when:" />
+      <radio_group
+       control_name="AlchemyRevokeObjectPerms"
+       height="20"
+       layout="topleft"
+       name="revoke_perms_radio"
+       width="340">
+        <radio_item
+         top_pad="0"
+         left_delta="15"
+         height="16"
+         label="Never"
+         layout="topleft"
+         name="None"
+         value="0"
+         width="90" />
+        <radio_item
+         left_pad="1"
+         height="16"
+         label="Sitting"
+         layout="topleft"
+         name="Sitting"
+         value="1"
+         width="90" />
+        <radio_item
+         left_pad="1"
+         height="16"
+         label="Standing"
+         layout="topleft"
+         name="Standing"
+         value="2"
+         width="90" />
+        <radio_item
+         left_pad="1"
+         height="16"
+         label="Both"
+         layout="topleft"
+         name="Both"
+         value="3"
+         width="90" />
+    </radio_group>
+    <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="16"
+    layout="topleft"
+    left="30"
+    name="World Effects"
+    mouse_opaque="false"
+    top_pad="5"
+    width="300"
+    font="SansSerifSmall">
+    World Effects:
+ </text>
+     <check_box
+      follows="left|top"
+      height="16"
+		  label="Create particle effects when scripts communicate"
+	  	layout="topleft"
+  		tool_tip="If enabled scripted objects display swirling particle lights when the scripts communicate"
+      left="45"
+      top_pad="7"
+      name="EffectScriptChatParticles"
+      width="275"
+      control_name="EffectScriptChatParticles"/>
+      <text
+      type="string"
+      length="1"
+      follows="left|top"
+      height="10"
+      layout="topleft"
+      left="30"
+      name="UI Fonts"
+      mouse_opaque="false"
+      top_pad="5"
+      width="300">
+      UI Fonts:
+   </text>
+
+      <text
+      layout="topleft"
+      follows="left|top"
+      top_pad="10"
+      left="45"
+      height="12"
+      name="font_name"
+      width="270">
+    Global Font(restart required):
+  </text>
+  <combo_box
+      control_name="FontOverrideMain"
+      height="23"
+      layout="topleft"
+      follows="left|top"
+      name="ui_font_name"
+      left_pad="5"
+      top_delta="-5"
+      width="175">
+    <item
+        label="Deja Vu Sans"
+        name="dejavu"
+        value=""/>
+    <item
+        label="IBM Plex Sans"
+        name="ibmplex"
+        value="font_main_ibmplex.xml"/>
+    <item
+        label="IBM Plex Mono"
+        name="ibmplexmono"
+        value="font_main_ibmplexmono.xml"/>
+    <item
+        label="Open Dyslexic"
+        name="opendyslexic"
+        value="font_main_opendyslexic.xml"/>
+    <item
+        label="Source Sans 3"
+        name="sourcesans"
+        value="font_main_sourcesans.xml"/>
+    <item
+        label="Ubuntu"
+        name="ubuntu"
+        value="font_main_ubuntu.xml"/>
+  </combo_box>
+  <text
+  layout="topleft"
+  follows="left|top"
+  top_pad="10"
+  left="45"
+  height="12"
+  name="font_name"
+  width="270">
+Monospace Font(restart required):
+</text>
+  <combo_box
+      control_name="FontOverrideMonospace"
+      height="23"
+      layout="topleft"
+      follows="left|top"
+      name="ui_font_name"
+      left_pad="5"
+      top_delta="-5"
+      width="175">
+    <item
+        label="Deja Vu Sans Mono"
+        name="dejavumono"
+        value=""/>
+    <item
+        label="IBM Plex Mono"
+        name="ibmplexmono"
+        value="font_mono_ibmplex.xml"/>
+    <item
+        label="Source Code Pro"
+        name="sourcecodepro"
+        value="font_main_sourcecodepro.xml"/>
+    <item
+        label="Ubuntu Mono"
+        name="ubuntumono"
+        value="font_main_ubuntu.xml"/>
+  </combo_box>
 </panel>

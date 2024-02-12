@@ -31,6 +31,7 @@
 #include <algorithm>
 
 #include "llsdserialize.h"
+#include <boost/bind.hpp>
 
 //=========================================================================
 namespace
@@ -92,7 +93,7 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
 {
     LLSD newSettings;
 
-    for (const auto& llsd_pair : settings.map())
+    for (const auto& llsd_pair : settings.asMap())
     {
         const std::string& key_name = llsd_pair.first;
         const LLSD& value = llsd_pair.second;
@@ -105,7 +106,7 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
             break;
         case LLSD::TypeArray:
             newSettings[key_name] = LLSD::emptyArray();
-            for (const auto& llsd_val : value.array())
+            for (const auto& llsd_val : value.asArray())
             {
                 newSettings[key_name].append(llsd_val);
             }
@@ -126,7 +127,7 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
 
     if (!other.isUndefined())
     {
-        for (const auto& llsd_pair : other.map())
+        for (const auto& llsd_pair : other.asMap())
         {
             const std::string& key_name = llsd_pair.first;
             const LLSD& value = llsd_pair.second;
@@ -139,7 +140,7 @@ LLSD LLSettingsBase::combineSDMaps(const LLSD &settings, const LLSD &other) cons
                 break;
             case LLSD::TypeArray:
                 newSettings[key_name] = LLSD::emptyArray();
-                for (const auto& llsd_val : value.array())
+                for (const auto& llsd_val : value.asArray())
                 {
                     newSettings[key_name].append(llsd_val);
                 }
@@ -169,20 +170,26 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     const stringset_t& skip = getSkipInterpolateKeys();
     const stringset_t& slerps = getSlerpKeys();
 
-    llassert(mix >= 0.0f && mix <= 1.0f);
+    //llassert(mix >= 0.0f && mix <= 1.0f);
 
-    for (const auto& llsd_pair : settings.map())
+    const auto& other_map = other.asMap();
+    const auto& settings_map = settings.asMap();
+    const auto skipEnd = skip.end();
+    const auto settingsEnd = settings_map.end();
+
+    for (const auto& llsd_pair : settings_map)
     {
         const std::string& key_name = llsd_pair.first;
         const LLSD& value = llsd_pair.second;
 
-        if (skip.find(key_name) != skip.end())
+        if (skip.find(key_name) != skipEnd)
             continue;
 
         LLSD other_value;
-        if (other.has(key_name))
+        auto it = other_map.find(key_name);
+        if (it != other_map.end())
         {
-            other_value = other[key_name];
+            other_value = it->second;
         }
         else
         {
@@ -210,24 +217,28 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
 
     // Special handling cases
     // Flags
-    if (settings.has(SETTING_FLAGS))
     {
-        U32 flags = (U32)settings[SETTING_FLAGS].asInteger();
-        if (other.has(SETTING_FLAGS))
-            flags |= (U32)other[SETTING_FLAGS].asInteger();
+        auto it = settings_map.find(SETTING_FLAGS);
+        if (it != settings_map.end())
+        {
+            U32 flags = (U32)it->second.asInteger();
+            it = other_map.find(SETTING_FLAGS);
+            if (it != other_map.end())
+                flags |= (U32)it->second.asInteger();
 
-        newSettings[SETTING_FLAGS] = LLSD::Integer(flags);
+            newSettings[SETTING_FLAGS] = LLSD::Integer(flags);
+        }
     }
 
     // Now add anything that is in other but not in the settings
-    for (const auto& llsd_pair : other.map())
+    for (const auto& llsd_pair : other.asMap())
     {
         const std::string& key_name = llsd_pair.first;
 
-        if (skip.find(key_name) != skip.end())
+        if (skip.find(key_name) != skipEnd)
             continue;
 
-        if (settings.has(key_name))
+        if (settings_map.find(key_name) != settingsEnd)
             continue;
 
         parammapping_t::const_iterator def_iter = defaults.find(key_name);
@@ -246,13 +257,13 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
     }
 
     // Note: writes variables from skip list, bug?
-    for (const auto& llsd_pair : other.map())
+    for (const auto& llsd_pair : other.asMap())
     {
         // TODO: Should I blend this in instead?
-        if (skip.find(llsd_pair.first) == skip.end())
+        if (skip.find(llsd_pair.first) == skipEnd)
             continue;
 
-        if (!settings.has(llsd_pair.first))
+        if (settings_map.find(llsd_pair.first) == settingsEnd)
             continue;
     
         newSettings[llsd_pair.first] = llsd_pair.second;
@@ -279,7 +290,7 @@ LLSD LLSettingsBase::interpolateSDValue(const std::string& key_name, const LLSD 
     {
         case LLSD::TypeInteger:
             // lerp between the two values rounding the result to the nearest integer. 
-            new_value = LLSD::Integer(llroundf(ll_lerp(value.asReal(), other_value.asReal(), mix)));
+            new_value = LLSD::Integer(ll_round(ll_lerp(value.asReal(), other_value.asReal(), mix)));
             break;
         case LLSD::TypeReal:
             // lerp between the two values.
@@ -501,7 +512,7 @@ LLSD LLSettingsBase::settingValidation(LLSD &settings, const validation_list_t &
     }
 
     // strip extra entries
-    for (const auto& setting_pair : settings.map())
+    for (const auto& setting_pair : settings.asMap())
     {
         if (validated.find(setting_pair.first) == validated.end())
         {
@@ -697,6 +708,7 @@ bool LLSettingsBase::Validator::verifyStringLength(LLSD &value, U32, S32 length)
 //=========================================================================
 void LLSettingsBlender::update(const LLSettingsBase::BlendFactor& blendf)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     F64 res = setBlendFactor(blendf);
     llassert(res >= 0.0 && res <= 1.0);
     (void)res;
@@ -706,6 +718,7 @@ void LLSettingsBlender::update(const LLSettingsBase::BlendFactor& blendf)
 F64 LLSettingsBlender::setBlendFactor(const LLSettingsBase::BlendFactor& blendf_in)
 {
     LLSettingsBase::TrackPosition blendf = blendf_in;
+    llassert(!isnan(blendf));
     if (blendf >= 1.0)
     {
         triggerComplete();
@@ -727,6 +740,7 @@ F64 LLSettingsBlender::setBlendFactor(const LLSettingsBase::BlendFactor& blendf_
 
 void LLSettingsBlender::triggerComplete()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     if (mTarget)
         mTarget->replaceSettings(mFinal->getSettings());
     LLSettingsBlender::ptr_t hold = shared_from_this();   // prevents this from deleting too soon
@@ -739,11 +753,13 @@ const LLSettingsBase::BlendFactor LLSettingsBlenderTimeDelta::MIN_BLEND_DELTA(FL
 
 LLSettingsBase::BlendFactor LLSettingsBlenderTimeDelta::calculateBlend(const LLSettingsBase::TrackPosition& spanpos, const LLSettingsBase::TrackPosition& spanlen) const
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     return LLSettingsBase::BlendFactor(fmod((F64)spanpos, (F64)spanlen) / (F64)spanlen);
 }
 
 bool LLSettingsBlenderTimeDelta::applyTimeDelta(const LLSettingsBase::Seconds& timedelta)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     mTimeSpent += timedelta;
 
     if (mTimeSpent > mBlendSpan)

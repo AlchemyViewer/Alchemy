@@ -138,7 +138,7 @@ public:
 	F32 getWidthF32(const std::string& utf8text) const;
 	F32 getWidthF32(const llwchar* wchars) const;
 	F32 getWidthF32(const std::string& text, S32 offset, S32 max_chars ) const;
-	F32 getWidthF32(const llwchar* wchars, S32 offset, S32 max_chars) const;
+	F32 getWidthF32(const llwchar* wchars, S32 offset, S32 max_chars, bool no_padding = false) const;
 
 	// The following are called often, frequently with large buffers, so do not use a string interface
 	
@@ -160,12 +160,15 @@ public:
 
 	const LLFontDescriptor& getFontDesc() const;
 
+	void generateASCIIglyphs();
 
-	static void initClass(F32 screen_dpi, F32 x_scale, F32 y_scale, const std::string& app_dir, bool create_gl_textures = true);
+
+	static void initClass(const std::vector<std::string>& font_files, F32 screen_dpi, F32 x_scale, F32 y_scale, const std::string& app_dir, bool create_gl_textures = true);
 
 	// Load sans-serif, sans-serif-small, etc.
 	// Slow, requires multiple seconds to load fonts.
 	static bool loadDefaultFonts();
+    static void loadCommonFonts();
 	static void	destroyDefaultFonts();
 	static void destroyAllGL();
 
@@ -186,11 +189,12 @@ public:
 		
 	static LLFontGL* getFontMonospace();
 	static LLFontGL* getFontSansSerifSmall();
+    static LLFontGL* getFontSansSerifSmallBold();
+    static LLFontGL* getFontSansSerifSmallItalic();
 	static LLFontGL* getFontSansSerif();
 	static LLFontGL* getFontSansSerifBig();
 	static LLFontGL* getFontSansSerifHuge();
 	static LLFontGL* getFontSansSerifBold();
-	static LLFontGL* getFontExtChar();
 	static LLFontGL* getFont(const LLFontDescriptor& desc);
 	// Use with legacy names like "SANSSERIF_SMALL" or "OCRA"
 	static LLFontGL* getFontByName(const std::string& name);

@@ -150,8 +150,38 @@ struct PythonProcessLauncher
     /// Launch Python script; verify that it launched
     void launch()
     {
-        mPy = LLProcess::create(mParams);
-        tut::ensure(STRINGIZE("Couldn't launch " << mDesc << " script"), bool(mPy));
+        try
+        {
+            mPy = LLProcess::create(mParams);
+            tut::ensure(STRINGIZE("Couldn't launch " << mDesc << " script"), bool(mPy));
+        }
+        catch (const tut::failure&)
+        {
+            // On Windows, if APR_LOG is set, our version of APR's
+            // apr_create_proc() logs to the specified file. If this test
+            // failed, try to report that log.
+            const char* APR_LOG = getenv("APR_LOG");
+            if (APR_LOG && *APR_LOG)
+            {
+                std::ifstream inf(APR_LOG);
+                if (! inf.is_open())
+                {
+                    LL_WARNS() << "Couldn't open '" << APR_LOG << "'" << LL_ENDL;
+                }
+                else
+                {
+                    LL_WARNS() << "==============================" << LL_ENDL;
+                    LL_WARNS() << "From '" << APR_LOG << "':" << LL_ENDL;
+                    std::string line;
+                    while (std::getline(inf, line))
+                    {
+                        LL_WARNS() << line << LL_ENDL;
+                    }
+                    LL_WARNS() << "==============================" << LL_ENDL;
+                }
+            }
+            throw;
+        }
     }
 
     /// Run Python script and wait for it to complete.
@@ -190,7 +220,7 @@ struct PythonProcessLauncher
     LLProcess::Params mParams;
     LLProcessPtr mPy;
     std::string mDesc;
-    NamedTempFile mScript;
+    NamedExtTempFile mScript;
 };
 
 /// convenience function for PythonProcessLauncher::run()
@@ -213,30 +243,26 @@ static std::string python_out(const std::string& desc, const CONTENT& script)
 class NamedTempDir: public boost::noncopyable
 {
 public:
-    // Use python() function to create a temp directory: I've found
-    // nothing in either Boost.Filesystem or APR quite like Python's
-    // tempfile.mkdtemp().
-    // Special extra bonus: on Mac, mkdtemp() reports a pathname
-    // starting with /var/folders/something, whereas that's really a
-    // symlink to /private/var/folders/something. Have to use
-    // realpath() to compare properly.
     NamedTempDir():
-        mPath(python_out("mkdtemp()",
-                         "from __future__ import with_statement\n"
-                         "import os.path, sys, tempfile\n"
-                         "with open(sys.argv[1], 'w') as f:\n"
-                         "    f.write(os.path.normcase(os.path.normpath(os.path.realpath(tempfile.mkdtemp()))))\n"))
-    {}
+        mPath(NamedTempFile::temp_path()),
+        mCreated(boost::filesystem::create_directories(mPath))
+    {
+        mPath = boost::filesystem::canonical(mPath);
+    }
 
     ~NamedTempDir()
     {
-        aprchk(apr_dir_remove(mPath.c_str(), gAPRPoolp));
+        if (mCreated)
+        {
+            boost::filesystem::remove_all(mPath);
+        }
     }
 
-    std::string getName() const { return mPath; }
+    std::string getName() const { return mPath.string(); }
 
 private:
-    std::string mPath;
+    boost::filesystem::path mPath;
+    bool mCreated;
 };
 
 /*****************************************************************************
@@ -354,17 +380,18 @@ namespace tut
         set_test_name("raw APR nonblocking I/O");
 
         // Create a script file in a temporary place.
-        NamedTempFile script("py",
+        NamedExtTempFile script("py",
+            "from __future__ import print_function" EOL
             "import sys" EOL
             "import time" EOL
             EOL
             "time.sleep(2)" EOL
-            "print >>sys.stdout, 'stdout after wait'" EOL
+            "print('stdout after wait',file=sys.stdout)" EOL
             "sys.stdout.flush()" EOL
             "time.sleep(2)" EOL
-            "print >>sys.stderr, 'stderr after wait'" EOL
+            "print('stderr after wait',file=sys.stderr)" EOL
             "sys.stderr.flush()" EOL
-            );
+        );
 
         // Arrange to track the history of our interaction with child: what we
         // fetched, which pipe it came from, how many tries it took before we
@@ -561,7 +588,13 @@ namespace tut
                                  "    f.write(os.path.normcase(os.path.normpath(os.getcwd())))\n");
         // Before running, call setWorkingDirectory()
         py.mParams.cwd = tempdir.getName();
-        ensure_equals("os.getcwd()", py.run_read(), tempdir.getName());
+        std::string expected{ tempdir.getName() };
+#if LL_WINDOWS
+        // SIGH, don't get tripped up by "C:" != "c:" --
+        // but on the Mac, using tolower() fails because "/users" != "/Users"!
+        expected = utf8str_tolower(expected);
+#endif
+        ensure_equals("os.getcwd()", py.run_read(), expected);
     }
 
     template<> template<>
@@ -569,12 +602,12 @@ namespace tut
     {
         set_test_name("arguments");
         PythonProcessLauncher py(get_test_name(),
-                                 "from __future__ import with_statement\n"
+                                 "from __future__ import with_statement, print_function\n"
                                  "import sys\n"
                                  // note nonstandard output-file arg!
                                  "with open(sys.argv[3], 'w') as f:\n"
                                  "    for arg in sys.argv[1:]:\n"
-                                 "        print >>f, arg\n");
+                                 "        print(arg,file=f)\n");
         // We expect that PythonProcessLauncher has already appended
         // its own NamedTempFile to mParams.args (sys.argv[0]).
         py.mParams.args.add("first arg");          // sys.argv[1]
@@ -743,7 +776,7 @@ namespace tut
                                      "with open(sys.argv[1], 'w') as f:\n"
                                      "    f.write('ok')\n"
                                      "# wait for 'go' from test program\n"
-                                     "for i in xrange(60):\n"
+                                     "for i in range(60):\n"
                                      "    time.sleep(1)\n"
                                      "    with open(sys.argv[2]) as f:\n"
                                      "        go = f.read()\n"
@@ -805,7 +838,7 @@ namespace tut
                                      "with open(sys.argv[1], 'w') as f:\n"
                                      "    f.write('ok')\n"
                                      "# wait for 'go' from test program\n"
-                                     "for i in xrange(60):\n"
+                                     "for i in range(60):\n"
                                      "    time.sleep(1)\n"
                                      "    with open(sys.argv[2]) as f:\n"
                                      "        go = f.read()\n"
@@ -858,7 +891,8 @@ namespace tut
         set_test_name("'bogus' test");
         CaptureLog recorder;
         PythonProcessLauncher py(get_test_name(),
-                                 "print 'Hello world'\n");
+            "from __future__ import print_function\n"
+            "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam("bogus"));
         py.mPy = LLProcess::create(py.mParams);
         ensure("should have rejected 'bogus'", ! py.mPy);
@@ -873,7 +907,8 @@ namespace tut
         // Replace this test with one or more real 'file' tests when we
         // implement 'file' support
         PythonProcessLauncher py(get_test_name(),
-                                 "print 'Hello world'\n");
+            "from __future__ import print_function\n"
+            "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("file"));
         py.mPy = LLProcess::create(py.mParams);
@@ -888,7 +923,8 @@ namespace tut
         // implement 'tpipe' support
         CaptureLog recorder;
         PythonProcessLauncher py(get_test_name(),
-                                 "print 'Hello world'\n");
+            "from __future__ import print_function\n"
+            "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("tpipe"));
         py.mPy = LLProcess::create(py.mParams);
@@ -905,7 +941,8 @@ namespace tut
         // implement 'npipe' support
         CaptureLog recorder;
         PythonProcessLauncher py(get_test_name(),
-                                 "print 'Hello world'\n");
+            "from __future__ import print_function\n"
+            "print('Hello world')\n");
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam());
         py.mParams.files.add(LLProcess::FileParam("npipe"));
@@ -981,19 +1018,20 @@ namespace tut
     {
         set_test_name("get*Pipe() validation");
         PythonProcessLauncher py(get_test_name(),
-                                 "print 'this output is expected'\n");
+            "from __future__ import print_function\n"
+            "print('this output is expected')\n");
         py.mParams.files.add(LLProcess::FileParam("pipe")); // pipe for  stdin
         py.mParams.files.add(LLProcess::FileParam());       // inherit stdout
         py.mParams.files.add(LLProcess::FileParam("pipe")); // pipe for stderr
         py.run();
         TEST_getPipe(*py.mPy, getWritePipe, getOptWritePipe,
-                     LLProcess::STDIN,   // VALID
-                     LLProcess::STDOUT,  // NOPIPE
-                     LLProcess::STDERR); // BADPIPE
+            LLProcess::STDIN,   // VALID
+            LLProcess::STDOUT,  // NOPIPE
+            LLProcess::STDERR); // BADPIPE
         TEST_getPipe(*py.mPy, getReadPipe,  getOptReadPipe,
-                     LLProcess::STDERR,  // VALID
-                     LLProcess::STDOUT,  // NOPIPE
-                     LLProcess::STDIN);  // BADPIPE
+            LLProcess::STDERR,  // VALID
+            LLProcess::STDOUT,  // NOPIPE
+            LLProcess::STDIN);  // BADPIPE
     }
 
     template<> template<>
@@ -1001,14 +1039,15 @@ namespace tut
     {
         set_test_name("talk to stdin/stdout");
         PythonProcessLauncher py(get_test_name(),
+                                 "from __future__ import print_function\n"
                                  "import sys, time\n"
-                                 "print 'ok'\n"
+                                 "print('ok')\n"
                                  "sys.stdout.flush()\n"
                                  "# wait for 'go' from test program\n"
                                  "go = sys.stdin.readline()\n"
                                  "if go != 'go\\n':\n"
                                  "    sys.exit('expected \"go\", saw %r' % go)\n"
-                                 "print 'ack'\n");
+                                 "print('ack')\n");
         py.mParams.files.add(LLProcess::FileParam("pipe")); // stdin
         py.mParams.files.add(LLProcess::FileParam("pipe")); // stdout
         py.launch();
@@ -1119,7 +1158,8 @@ namespace tut
     {
         set_test_name("ReadPipe \"eof\" event");
         PythonProcessLauncher py(get_test_name(),
-                                 "print 'Hello from Python!'\n");
+            "from __future__ import print_function\n"
+            "print('Hello from Python!')\n");
         py.mParams.files.add(LLProcess::FileParam()); // stdin
         py.mParams.files.add(LLProcess::FileParam("pipe")); // stdout
         py.launch();

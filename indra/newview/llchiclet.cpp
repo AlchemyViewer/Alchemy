@@ -37,6 +37,7 @@
 #include "llsyswellwindow.h"
 #include "llfloaternotificationstabbed.h"
 #include "llviewermenu.h"
+#include "lllegacynotificationwellwindow.h"
 // [SL:KB] - Patch: UI-Notifications | Checked: 2013-05-09 (Catznip-3.5)
 #include "llchannelmanager.h"
 // [/SL:KB]
@@ -81,10 +82,10 @@ LLSysWellChiclet::LLSysWellChiclet(const Params& p)
 LLSysWellChiclet::~LLSysWellChiclet()
 {
 	mFlashToLitTimer->unset();
-	LLContextMenu* menu_avatar = static_cast<LLContextMenu*>(mContextMenuHandle.get());
-	if (menu_avatar)
+	LLContextMenu* menu = static_cast<LLContextMenu*>(mContextMenuHandle.get());
+	if (menu)
 	{
-		menu_avatar->die();
+		menu->die();
 		mContextMenuHandle.markDead();
 	}
 }
@@ -177,7 +178,14 @@ LLNotificationChiclet::LLNotificationChiclet(const Params& p)
 	mNotificationChannel.reset(new ChicletNotificationChannel(this));
 	// ensure that notification well window exists, to synchronously
 	// handle toast add/delete events.
-	LLFloaterNotificationsTabbed::getInstance()->setSysWellChiclet(this);
+    if (gSkinSettings.getBool("LegacyNotificationWell"))
+    {
+        LLLegacyNotificationWellWindow::getInstance()->setSysWellChiclet(this);
+    }
+    else
+    {
+        LLFloaterNotificationsTabbed::getInstance()->setSysWellChiclet(this);
+    }
 }
 
 void LLNotificationChiclet::onMenuItemClicked(const LLSD& user_data)
@@ -185,7 +193,14 @@ void LLNotificationChiclet::onMenuItemClicked(const LLSD& user_data)
 	std::string action = user_data.asString();
 	if("close all" == action)
 	{
-		LLFloaterNotificationsTabbed::getInstance()->closeAll();
+        if (gSkinSettings.getBool("LegacyNotificationWell"))
+        {
+            LLLegacyNotificationWellWindow::getInstance()->closeAll();
+        }
+        else
+        {
+            LLFloaterNotificationsTabbed::getInstance()->closeAll();
+        }
 		LLIMWellWindow::getInstance()->closeAll();
 	}
 }
@@ -240,8 +255,10 @@ bool LLNotificationChiclet::ChicletNotificationChannel::filterNotification( LLNo
 	bool displayNotification;
 	if (   (notification->getName() == "ScriptDialog") // special case for scripts
 		// if there is no toast window for the notification, filter it
-		//|| (!LLNotificationWellWindow::getInstance()->findItemByID(notification->getID()))
-        || (!LLFloaterNotificationsTabbed::getInstance()->findItemByID(notification->getID(), notification->getName()))
+        || (gSkinSettings.getBool("LegacyNotificationWell")
+            && !LLLegacyNotificationWellWindow::getInstance()->findItemByID(notification->getID()))
+        || (!gSkinSettings.getBool("LegacyNotificationWell") 
+			&& !LLFloaterNotificationsTabbed::getInstance()->findItemByID(notification->getID(), notification->getName()))
 		)
 	{
 		displayNotification = false;
@@ -1223,7 +1240,7 @@ void LLInvOfferChiclet::createPopupMenu()
 	LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar;
 	registrar.add("InvOfferChiclet.Action", boost::bind(&LLInvOfferChiclet::onMenuItemClicked, this, _2));
 
-	auto menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>
+	LLMenuGL* menu = LLUICtrlFactory::getInstance()->createFromFile<LLMenuGL>
 		("menu_inv_offer_chiclet.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
 	if (menu)
 	{

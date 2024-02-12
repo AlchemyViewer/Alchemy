@@ -217,7 +217,7 @@ get_region(const LLSD & sd, U64 region_handle1)
 	U32 grid_x(0), grid_y(0);
 	grid_from_region_handle(region_handle1, &grid_x, &grid_y);
 
-	for (const LLSD& llsd_val : sd["regions"].array())
+	for (const LLSD& llsd_val : sd["regions"].asArray())
 	{
 		if (llsd_val.has("grid_x") &&
 			llsd_val.has("grid_y") &&

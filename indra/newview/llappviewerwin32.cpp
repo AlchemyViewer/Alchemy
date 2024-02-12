@@ -26,8 +26,6 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "llviewerbuildconfig.h"
-
 #ifdef INCLUDE_VLD
 #include "vld.h"
 #endif
@@ -49,7 +47,7 @@
 #include "llviewercontrol.h"
 #include "lldxhardware.h"
 
-#if USE_NVAPI
+#ifdef LL_NVAPI
 #include "nvapi/nvapi.h"
 #include "nvapi/NvApiDriverSettings.h"
 #endif
@@ -77,7 +75,7 @@
 #include <exception>
 
 // Sentry (https://sentry.io) crash reporting tool
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 #include <sentry.h>
 #endif
 
@@ -142,7 +140,7 @@ bool create_app_mutex()
 	return result;
 }
 
-#if USE_NVAPI
+#ifdef LL_NVAPI
 
 #define ALWSTR_SIZE(inwstr) ((inwstr.size() + 1) * sizeof(wchar_t))
 
@@ -316,6 +314,11 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
                      PWSTR     pCmdLine,
                      int       nCmdShow)
 {
+    // Call Tracy first thing to have it allocate memory
+    // https://github.com/wolfpld/tracy/issues/196
+    LL_PROFILER_FRAME_END;
+    LL_PROFILER_SET_THREAD_NAME("App");
+
 	const S32 MAX_HEAPS = 255;
 	DWORD heap_enable_lfh_error[MAX_HEAPS];
 	S32 num_heaps = 0;
@@ -351,8 +354,6 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 
 	gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
 
-	viewer_app_ptr->setErrorHandler(LLAppViewer::handleViewerCrash);
-
 	// Set a debug info flag to indicate if multiple instances are running.
 	bool found_other_instance = !create_app_mutex();
 	gDebugInfo["FoundOtherInstanceAtStartup"] = LLSD::Boolean(found_other_instance);
@@ -364,7 +365,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 		return -1;
 	}
 
-#if USE_NVAPI
+#ifdef LL_NVAPI
 	// Initialize NVAPI
 	NvAPI_Status nvStatus = NvAPI_Initialize();
 	NvDRSSessionHandle nvhSession = 0;
@@ -441,7 +442,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 	delete viewer_app_ptr;
 	viewer_app_ptr = NULL;
 
-#if USE_NVAPI
+#ifdef LL_NVAPI
 	// (NVAPI) (6) We clean up. This is analogous to doing a free()
 	if (nvhSession)
 	{
@@ -460,7 +461,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 
 #endif
 
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	sentry_close();
 #endif
 
@@ -492,13 +493,13 @@ void LLAppViewerWin32::disableWinErrorReporting()
 {
 	std::string executable_name = gDirUtilp->getExecutableFilename();
 
-	if( S_OK == WerAddExcludedApplication( ll_convert_string_to_wide(executable_name).c_str(), FALSE ) )
+	if( S_OK == WerRemoveExcludedApplication( ll_convert_string_to_wide(executable_name).c_str(), FALSE ) )
 	{
-		LL_INFOS() << "WerAddExcludedApplication() succeeded for " << executable_name << LL_ENDL;
+		LL_INFOS() << "WerRemoveExcludedApplication() succeeded for " << executable_name << LL_ENDL;
 	}
 	else
 	{
-		LL_INFOS() << "WerAddExcludedApplication() failed for " << executable_name << LL_ENDL;
+		LL_INFOS() << "WerRemoveExcludedApplication() failed for " << executable_name << LL_ENDL;
 	}
 }
 
@@ -622,21 +623,9 @@ bool LLAppViewerWin32::cleanup()
 	return result;
 }
 
-void LLAppViewerWin32::reportCrashToBugsplat(void* pExcepInfo)
-{
-#if defined(USE_SENTRY)
-	if (mSentryInitialized)
-	{
-		sentry_ucontext_s exc_context = {};
-		exc_context.exception_ptrs = *(EXCEPTION_POINTERS*)pExcepInfo;
-		sentry_handle_exception(&exc_context);
-	}
-#endif
-}
-
 void LLAppViewerWin32::setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name)
 {
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	if (mSentryInitialized)
 	{
 		sentry_value_t user = sentry_value_new_object();
@@ -751,7 +740,7 @@ bool LLAppViewerWin32::restoreErrorTrap()
 
 void LLAppViewerWin32::initCrashReporting(bool reportFreeze)
 {
-#if defined(USE_SENTRY)
+#if defined(AL_SENTRY)
 	sentry_options_t* options = sentry_options_new();
 	sentry_options_set_dsn(options, SENTRY_DSN);
 	sentry_options_set_release(options, LL_VIEWER_CHANNEL_AND_VERSION);
@@ -761,6 +750,9 @@ void LLAppViewerWin32::initCrashReporting(bool reportFreeze)
 
 	std::string database_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
 	sentry_options_set_database_pathw(options, ll_convert_string_to_wide(database_path).c_str());
+
+	std::string logfile_path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "Alchemy.log");
+	sentry_options_add_attachmentw(options, ll_convert_string_to_wide(logfile_path).c_str());
 
 	mSentryInitialized = (sentry_init(options) == 0);
 	if (mSentryInitialized)

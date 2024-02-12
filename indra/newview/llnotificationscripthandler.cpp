@@ -73,7 +73,8 @@ void LLScriptHandler::initChannel()
 //--------------------------------------------------------------------------
 void LLScriptHandler::addToastWithNotification(const LLNotificationPtr& notification)
 {
-	LLToastPanel* notify_box = LLToastPanel::buidPanelFromNotification(notification);
+    LL_PROFILE_ZONE_SCOPED
+    LLToastPanel* notify_box = LLToastPanel::buidPanelFromNotification(notification);
 
 	LLToast::Params p;
 	p.notif_id = notification->getID();
@@ -96,7 +97,7 @@ void LLScriptHandler::addToastWithNotification(const LLNotificationPtr& notifica
 }
 
 //--------------------------------------------------------------------------
-bool LLScriptHandler::processNotification(const LLNotificationPtr& notification)
+bool LLScriptHandler::processNotification(const LLNotificationPtr& notification, bool should_log)
 {
 	if(mChannel.isDead())
 	{
@@ -109,7 +110,7 @@ bool LLScriptHandler::processNotification(const LLNotificationPtr& notification)
 		initChannel();
 	}
 	
-	if (notification->canLogToIM())
+	if (should_log && notification->canLogToIM())
 	{
 		LLHandlerUtil::logToIMP2P(notification);
 	}

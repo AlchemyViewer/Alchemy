@@ -115,7 +115,7 @@
                  name="Unread"
                  tool_tip="Notifications"
                  width="34">
-          <init_callback
+          <button.init_callback
                      function="Button.SetDockableFloaterToggle"
                      parameter="notification_well_window" />
         </button>

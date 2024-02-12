@@ -164,7 +164,9 @@ LLLineEditor::LLLineEditor(const LLLineEditor::Params& p)
 	mHighlightColor(p.highlight_color()),
 	mPreeditBgColor(p.preedit_bg_color()),
 	mGLFont(p.font),
-	mContextMenuHandle()
+	mContextMenuHandle(),
+    mShowContextMenu(true),
+	mAutoreplaceCallback()
 {
 	llassert( mMaxLengthBytes > 0 );
 
@@ -174,6 +176,14 @@ LLLineEditor::LLLineEditor(const LLLineEditor::Params& p)
 	mScrollTimer.reset();
 	mTripleClickTimer.reset();
 	setText(p.default_text());
+
+    if (p.initial_value.isProvided()
+        && !p.control_name.isProvided())
+    {
+        // Initial value often is descriptive, like "Type some ID here"
+        // and can be longer than size limitation, ignore size
+        setText(p.initial_value.getValue().asString(), false);
+    }
 
 	// Initialize current history line iterator
 	mCurrentHistoryLine = mLineHistory.begin();
@@ -383,6 +393,11 @@ void LLLineEditor::updateTextPadding()
 
 void LLLineEditor::setText(const LLStringExplicit &new_text)
 {
+    setText(new_text, true);
+}
+
+void LLLineEditor::setText(const LLStringExplicit &new_text, bool use_size_limit)
+{
 	// If new text is identical, don't copy and don't move insertion point
 	if (mText.getString() == new_text)
 	{
@@ -400,13 +415,13 @@ void LLLineEditor::setText(const LLStringExplicit &new_text)
 	all_selected = all_selected || (len == 0 && hasFocus() && mSelectAllonFocusReceived);
 
 	std::string truncated_utf8 = new_text;
-	if (truncated_utf8.size() > (U32)mMaxLengthBytes)
+	if (use_size_limit && truncated_utf8.size() > (U32)mMaxLengthBytes)
 	{	
 		truncated_utf8 = utf8str_truncate(new_text, mMaxLengthBytes);
 	}
 	mText.assign(truncated_utf8);
 
-	if (mMaxLengthChars)
+	if (use_size_limit && mMaxLengthChars)
 	{
 		mText.assign(utf8str_symbol_truncate(truncated_utf8, mMaxLengthChars));
 	}
@@ -593,7 +608,7 @@ void LLLineEditor::addToDictionary()
 {
 	if (canAddToDictionary())
 	{
-		LLSpellChecker::instanceFast().addToCustomDictionary(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToCustomDictionary(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -606,7 +621,7 @@ void LLLineEditor::addToIgnore()
 {
 	if (canAddToIgnore())
 	{
-		LLSpellChecker::instanceFast().addToIgnoreList(getMisspelledWord(mCursorPos));
+		LLSpellChecker::instance().addToIgnoreList(getMisspelledWord(mCursorPos));
 	}
 }
 
@@ -812,7 +827,7 @@ BOOL LLLineEditor::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 BOOL LLLineEditor::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
 	setFocus(TRUE);
-	if (!LLUICtrl::handleRightMouseDown(x, y, mask))
+    if (!LLUICtrl::handleRightMouseDown(x, y, mask) && getShowContextMenu())
 	{
 		showContextMenu(x, y);
 	}
@@ -1020,6 +1035,23 @@ void LLLineEditor::addChar(const llwchar uni_char)
 	else
 	{
 		LLUI::reportBadKeystroke();
+	}
+
+	if (!mReadOnly && mAutoreplaceCallback != NULL)
+	{
+		// autoreplace the text, if necessary
+		S32 replacement_start;
+		S32 replacement_length;
+		LLWString replacement_string;
+		S32 new_cursor_pos = mCursorPos;
+		mAutoreplaceCallback(replacement_start, replacement_length, replacement_string, new_cursor_pos, getWText());
+
+		if (replacement_length > 0 || !replacement_string.empty())
+		{
+			mText.erase(replacement_start, replacement_length);
+			mText.insert(replacement_start, replacement_string);
+			setCursor(new_cursor_pos);
+		}
 	}
 
 	getWindow()->hideCursorUntilMouseMove();
@@ -1239,7 +1271,7 @@ void LLLineEditor::copy()
 
 BOOL LLLineEditor::canPaste() const
 {
-	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable();
+	return !mReadOnly && LLClipboard::instance().isTextAvailable();
 }
 
 void LLLineEditor::paste()
@@ -1362,7 +1394,7 @@ void LLLineEditor::copyPrimary()
 
 BOOL LLLineEditor::canPastePrimary() const
 {
-	return !mReadOnly && LLClipboard::instanceFast().isTextAvailable(true);
+	return !mReadOnly && LLClipboard::instance().isTextAvailable(true);
 }
 
 void LLLineEditor::updatePrimary()
@@ -1989,7 +2021,7 @@ void LLLineEditor::draw()
 
 				// Don't process words shorter than 3 characters
 				std::string word = wstring_to_utf8str(text.substr(word_start, word_end - word_start));
-				if ( (word.length() >= 3) && (!LLSpellChecker::instanceFast().checkSpelling(word)) )
+				if ( (word.length() >= 3) && (!LLSpellChecker::instance().checkSpelling(word)) )
 				{
 					mMisspellRanges.push_back(std::pair<U32, U32>(start + word_start, start + word_end));
 				}
@@ -2686,7 +2718,7 @@ void LLLineEditor::showContextMenu(S32 x, S32 y)
 			std::string misspelled_word = getMisspelledWord(mCursorPos);
 			if ((is_misspelled = !misspelled_word.empty()) == true)
 			{
-				LLSpellChecker::instanceFast().getSuggestions(misspelled_word, mSuggestionList);
+				LLSpellChecker::instance().getSuggestions(misspelled_word, mSuggestionList);
 			}
 		}
 

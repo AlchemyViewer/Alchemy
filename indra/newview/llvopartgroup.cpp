@@ -46,18 +46,8 @@
 
 extern U64MicrosecondsImplicit gFrameTime;
 
-LLPointer<LLVertexBuffer> LLVOPartGroup::sVB = NULL;
-S32 LLVOPartGroup::sVBSlotFree[];
-S32* LLVOPartGroup::sVBSlotCursor = NULL;
-
 void LLVOPartGroup::initClass()
 {
-	for (S32 i = 0; i < LL_MAX_PARTICLE_COUNT; ++i)
-	{
-		sVBSlotFree[i] = i;
-	}
-	
-	sVBSlotCursor = sVBSlotFree;
 }
 
 //static
@@ -65,9 +55,10 @@ void LLVOPartGroup::restoreGL()
 {
 
 	//TODO: optimize out binormal mask here.  Specular and normal coords as well.
-	sVB = new LLVertexBuffer(VERTEX_DATA_MASK | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2, GL_STREAM_DRAW);
+#if 0
+	sVB = new LLVertexBuffer(VERTEX_DATA_MASK | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2);
 	U32 count = LL_MAX_PARTICLE_COUNT;
-	if (!sVB->allocateBuffer(count*4, count*6, true))
+	if (!sVB->allocateBuffer(count*4, count*6))
 	{
 		LL_WARNS() << "Failed to allocate Vertex Buffer to "
 			<< count*4 << " vertices and "
@@ -117,57 +108,29 @@ void LLVOPartGroup::restoreGL()
 		*texcoordsp++ = LLVector2(1.f, 0.f);
 	}
 
-	sVB->flush();
+	sVB->unmapBuffer();
+#endif
 
 }
 
 //static
 void LLVOPartGroup::destroyGL()
 {
-	sVB = NULL;
-}
-
-//static
-S32 LLVOPartGroup::findAvailableVBSlot()
-{
-	if (sVBSlotCursor >= sVBSlotFree + LL_MAX_PARTICLE_COUNT)
-	{ //no more available slots
-		return -1;
-	}
-
-	S32 ret = *sVBSlotCursor;
-	sVBSlotCursor++;
-
-	return ret;
 }
 
 bool ll_is_part_idx_allocated(S32 idx, S32* start, S32* end)
 {
-	while (start < end)
+	/*while (start < end)
 	{
 		if (*start == idx)
 		{ //not allocated (in free list)
 			return false;
 		}
 		++start;
-	}
+	}*/
 
 	//allocated (not in free list)
-	return true;
-}
-
-//static
-void LLVOPartGroup::freeVBSlot(S32 idx)
-{
-	llassert(idx < LL_MAX_PARTICLE_COUNT && idx >= 0);
-	llassert(sVBSlotCursor > sVBSlotFree);
-	llassert(ll_is_part_idx_allocated(idx, sVBSlotCursor, sVBSlotFree+LL_MAX_PARTICLE_COUNT));
-
-	if (sVBSlotCursor > sVBSlotFree)
-	{
-		sVBSlotCursor--;
-		*sVBSlotCursor = idx;
-	}
+	return false;
 }
 
 LLVOPartGroup::LLVOPartGroup(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
@@ -223,7 +186,7 @@ void LLVOPartGroup::setPixelAreaAndAngle(LLAgent &agent)
 {
 	// mPixelArea is calculated during render
 	F32 mid_scale = getMidScale();
-	F32 range = (getRenderPosition()-LLViewerCamera::getInstanceFast()->getOrigin()).length();
+	F32 range = (getRenderPosition()-LLViewerCamera::getInstance()->getOrigin()).length();
 
 	if (range < 0.001f || isHUDAttachment())		// range == zero
 	{
@@ -292,13 +255,13 @@ F32 LLVOPartGroup::getPartSize(S32 idx)
 	return 0.f;
 }
 
-void LLVOPartGroup::getBlendFunc(S32 idx, U32& src, U32& dst)
+void LLVOPartGroup::getBlendFunc(S32 idx, LLRender::eBlendFactor& src, LLRender::eBlendFactor& dst)
 {
 	if (idx < (S32) mViewerPartGroupp->mParticles.size())
 	{
 		LLViewerPart* part = mViewerPartGroupp->mParticles[idx];
-		src = part->mBlendFuncSource;
-		dst = part->mBlendFuncDest;
+		src = (LLRender::eBlendFactor) part->mBlendFuncSource;
+		dst = (LLRender::eBlendFactor) part->mBlendFuncDest;
 	}
 }
 
@@ -307,10 +270,9 @@ LLVector3 LLVOPartGroup::getCameraPosition() const
 	return gAgentCamera.getCameraPositionAgent();
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_PARTICLES("Update Particles");
 BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
 {
-	LL_RECORD_BLOCK_TIME(FTM_UPDATE_PARTICLES);
+    LL_PROFILE_ZONE_SCOPED;
 
 	dirtySpatialGroup();
 	
@@ -325,7 +287,7 @@ BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
 
 	if (group && group->isVisible())
 	{
-		dirtySpatialGroup(TRUE);
+		dirtySpatialGroup();
 	}
 
 	if (!num_parts)
@@ -351,7 +313,7 @@ BOOL LLVOPartGroup::updateGeometry(LLDrawable *drawable)
 	F32 tot_area = 0;
 
 	F32 max_area = LLViewerPartSim::getMaxPartCount() * MAX_PARTICLE_AREA_SCALE; 
-	F32 pixel_meter_ratio = LLViewerCamera::getInstanceFast()->getPixelMeterRatio();
+	F32 pixel_meter_ratio = LLViewerCamera::getInstance()->getPixelMeterRatio();
 	pixel_meter_ratio *= pixel_meter_ratio;
 
 	LLViewerPartSim::checkParticleCount(mViewerPartGroupp->mParticles.size()) ;
@@ -485,6 +447,7 @@ BOOL LLVOPartGroup::lineSegmentIntersect(const LLVector4a& start, const LLVector
 										  S32 face,
 										  BOOL pick_transparent,
 										  BOOL pick_rigged,
+                                          BOOL pick_unselectable,
 										  S32* face_hit,
 										  LLVector4a* intersection,
 										  LLVector2* tex_coord,
@@ -607,7 +570,7 @@ void LLVOPartGroup::getGeometry(const LLViewerPart& part,
 		up.setCross3(right, at);
 		up.normalize3fast();
 
-		if (part.mFlags & LLPartData::LL_PART_FOLLOW_VELOCITY_MASK)
+		if (part.mFlags & LLPartData::LL_PART_FOLLOW_VELOCITY_MASK && !part.mVelocity.isExactlyZero())
 		{
 			LLVector4a normvel;
 			normvel.load3(part.mVelocity.mV);
@@ -713,7 +676,7 @@ void LLVOPartGroup::getGeometry(S32 idx,
 	*colorsp++ = color;
 
 	//Only add emissive attributes if glowing (doing it for all particles is INCREDIBLY inefficient as it leads to a second, slower, render pass.)
-	if (gPipeline.canUseVertexShaders() && (pglow.mV[3] > 0 || part.mGlow.mV[3] > 0))
+	if (pglow.mV[3] > 0 || part.mGlow.mV[3] > 0)
 	{ //only write glow if it is not zero
 		*emissivep++ = pglow;
 		*emissivep++ = pglow;
@@ -724,7 +687,7 @@ void LLVOPartGroup::getGeometry(S32 idx,
 
 	if (!(part.mFlags & LLPartData::LL_PART_EMISSIVE_MASK))
 	{ //not fullbright, needs normal
-		LLVector3 normal = -LLViewerCamera::getInstanceFast()->getXAxis();
+		LLVector3 normal = -LLViewerCamera::getInstance()->getXAxis();
 		*normalsp++   = normal;
 		*normalsp++   = normal;
 		*normalsp++   = normal;
@@ -738,7 +701,7 @@ U32 LLVOPartGroup::getPartitionType() const
 }
 
 LLParticlePartition::LLParticlePartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, GL_STREAM_DRAW, regionp)
+: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, TRUE, regionp)
 {
 	mRenderPass = LLRenderPass::PASS_ALPHA;
 	mDrawableType = LLPipeline::RENDER_TYPE_PARTICLES;
@@ -754,38 +717,72 @@ LLHUDParticlePartition::LLHUDParticlePartition(LLViewerRegion* regionp) :
 	mPartitionType = LLViewerRegion::PARTITION_HUD_PARTICLE;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_REBUILD_PARTICLE_VBO("Particle VBO");
-
 void LLParticlePartition::rebuildGeom(LLSpatialGroup* group)
 {
-	if (group->isDead() || !group->hasState(LLSpatialGroup::GEOM_DIRTY))
-	{
-		return;
-	}
+    LL_PROFILE_ZONE_SCOPED;
+    LL_PROFILE_GPU_ZONE("particle vbo");
+    if (group->isDead() || !group->hasState(LLSpatialGroup::GEOM_DIRTY))
+    {
+        return;
+    }
 
-	if (group->changeLOD())
-	{
-		group->mLastUpdateDistance = group->mDistance;
-		group->mLastUpdateViewAngle = group->mViewAngle;
-	}
-	
-	LL_RECORD_BLOCK_TIME(FTM_REBUILD_PARTICLE_VBO);	
+    if (group->changeLOD())
+    {
+        group->mLastUpdateDistance = group->mDistance;
+        group->mLastUpdateViewAngle = group->mViewAngle;
+    }
 
-	group->clearDrawMap();
-	
-	//get geometry count
-	U32 index_count = 0;
-	U32 vertex_count = 0;
+    group->clearDrawMap();
 
-	addGeometryCount(group, vertex_count, index_count);
-	
+    //get geometry count
+    U32 index_count = 0;
+    U32 vertex_count = 0;
 
-	if (vertex_count > 0 && index_count > 0 && LLVOPartGroup::sVB)
-	{ 
-		group->mBuilt = 1.f;
-		//use one vertex buffer for all groups
-		group->mVertexBuffer = LLVOPartGroup::sVB;
-		getGeometry(group);
+    addGeometryCount(group, vertex_count, index_count);
+
+
+    if (vertex_count > 0 && index_count > 0)
+    {
+        group->mBuilt = 1.f;
+        if (group->mVertexBuffer.isNull() ||
+            group->mVertexBuffer->getNumVerts() < vertex_count || group->mVertexBuffer->getNumIndices() < index_count)
+        {
+            group->mVertexBuffer = new LLVertexBuffer(LLVOPartGroup::VERTEX_DATA_MASK);
+            group->mVertexBuffer->allocateBuffer(vertex_count, index_count);
+
+            // initialize index and texture coordinates only when buffer is reallocated
+            U16* indicesp = (U16*)group->mVertexBuffer->mapIndexBuffer(0, index_count);
+
+            U16 geom_idx = 0;
+            for (U32 i = 0; i < index_count; i += 6)
+            {
+                *indicesp++ = geom_idx + 0;
+                *indicesp++ = geom_idx + 1;
+                *indicesp++ = geom_idx + 2;
+
+                *indicesp++ = geom_idx + 1;
+                *indicesp++ = geom_idx + 3;
+                *indicesp++ = geom_idx + 2;
+
+                geom_idx += 4;
+            }
+
+            LLStrider<LLVector2> texcoordsp;
+
+            group->mVertexBuffer->getTexCoord0Strider(texcoordsp);
+
+            for (U32 i = 0; i < vertex_count; i += 4)
+            {
+                *texcoordsp++ = LLVector2(0.f, 1.f);
+                *texcoordsp++ = LLVector2(0.f, 0.f);
+                *texcoordsp++ = LLVector2(1.f, 1.f);
+                *texcoordsp++ = LLVector2(1.f, 0.f);
+            }
+
+        }
+
+        
+    	getGeometry(group);
 	}
 	else
 	{
@@ -799,11 +796,9 @@ void LLParticlePartition::rebuildGeom(LLSpatialGroup* group)
 
 void LLParticlePartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_count, U32& index_count)
 {
-	group->mBufferUsage = mBufferUsage;
-
 	mFaceList.clear();
 
-	LLViewerCamera* camera = LLViewerCamera::getInstanceFast();
+	LLViewerCamera* camera = LLViewerCamera::getInstance();
 	for (LLSpatialGroup::element_iter i = group->getDataBegin(), i_end = group->getDataEnd(); i != i_end; ++i)
 	{
 		LLDrawable* drawablep = (LLDrawable*)(*i)->getDrawable();
@@ -843,25 +838,18 @@ void LLParticlePartition::addGeometryCount(LLSpatialGroup* group, U32& vertex_co
 }
 
 
-static LLTrace::BlockTimerStatHandle FTM_REBUILD_PARTICLE_GEOM("Particle Geom");
-
 void LLParticlePartition::getGeometry(LLSpatialGroup* group)
 {
-	LL_RECORD_BLOCK_TIME(FTM_REBUILD_PARTICLE_GEOM);
+    LL_PROFILE_ZONE_SCOPED;
 
 	std::sort(mFaceList.begin(), mFaceList.end(), LLFace::CompareDistanceGreater());
-
-	U32 index_count = 0;
-	U32 vertex_count = 0;
 
 	group->clearDrawMap();
 
 	LLVertexBuffer* buffer = group->mVertexBuffer;
 
-	LLStrider<U16> indicesp;
 	LLStrider<LLVector4a> verticesp;
 	LLStrider<LLVector3> normalsp;
-	LLStrider<LLVector2> texcoordsp;
 	LLStrider<LLColor4U> colorsp;
 	LLStrider<LLColor4U> emissivep;
 
@@ -870,66 +858,52 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
 	buffer->getColorStrider(colorsp);
 	buffer->getEmissiveStrider(emissivep);
 
-	
-	LLSpatialGroup::drawmap_elem_t& draw_vec = group->mDrawMap[mRenderPass];	
+    S32 geom_idx = 0;
+    S32 indices_idx = 0;
 
+	LLSpatialGroup::drawmap_elem_t& draw_vec = group->mDrawMap[mRenderPass];	
 	for (LLFace* facep : mFaceList)
 	{
 		LLAlphaObject* object = (LLAlphaObject*) facep->getViewerObject();
 
-		if (!facep->isState(LLFace::PARTICLE))
-		{ //set the indices of this face
-			S32 idx = LLVOPartGroup::findAvailableVBSlot();
-			if (idx >= 0)
-			{
-				facep->setGeomIndex(idx*4);
-				facep->setIndicesIndex(idx*6);
-				facep->setVertexBuffer(LLVOPartGroup::sVB);
-				facep->setPoolType(LLDrawPool::POOL_ALPHA);
-				facep->setState(LLFace::PARTICLE);
-			}
-			else
-			{
-				continue; //out of space in particle buffer
-			}		
-		}
+        facep->setGeomIndex(geom_idx);
+        facep->setIndicesIndex(indices_idx);
 
-		S32 geom_idx = (S32) facep->getGeomIndex();
-
-		LLStrider<U16> cur_idx = indicesp + facep->getIndicesStart();
 		LLStrider<LLVector4a> cur_vert = verticesp + geom_idx;
 		LLStrider<LLVector3> cur_norm = normalsp + geom_idx;
-		LLStrider<LLVector2> cur_tc = texcoordsp + geom_idx;
 		LLStrider<LLColor4U> cur_col = colorsp + geom_idx;
 		LLStrider<LLColor4U> cur_glow = emissivep + geom_idx;
+
+        // not actually used
+        LLStrider<LLVector2> cur_tc;
+        LLStrider<U16> cur_idx;
+
+
+        geom_idx += 4;
+        indices_idx += 6;
 
 		LLColor4U* start_glow = cur_glow.get();
 
 		object->getGeometry(facep->getTEOffset(), cur_vert, cur_norm, cur_tc, cur_col, cur_glow, cur_idx);
 		
-		BOOL has_glow = FALSE;
+		bool has_glow = FALSE;
 
 		if (cur_glow.get() != start_glow)
 		{
-			has_glow = TRUE;
+			has_glow = true;
 		}
 
 		llassert(facep->getGeomCount() == 4);
 		llassert(facep->getIndicesCount() == 6);
-
-
-		vertex_count += facep->getGeomCount();
-		index_count += facep->getIndicesCount();
-
+        
 		S32 idx = draw_vec.size()-1;
 
-		BOOL fullbright = facep->isState(LLFace::FULLBRIGHT);
-		F32 vsize = facep->getVirtualSize();
-
+		bool fullbright = facep->isState(LLFace::FULLBRIGHT);
+        
 		bool batched = false;
 	
-		U32 bf_src = LLRender::BF_SOURCE_ALPHA;
-		U32 bf_dst = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;
+		LLRender::eBlendFactor bf_src = LLRender::BF_SOURCE_ALPHA;
+        LLRender::eBlendFactor bf_dst = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;
 
 		object->getBlendFunc(facep->getTEOffset(), bf_src, bf_dst);
 
@@ -944,24 +918,21 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
 				info->mBlendFuncDst == bf_dst &&
 				info->mBlendFuncSrc == bf_src)
 			{
-				if (info->mEnd == facep->getGeomIndex()-1)
+				if (draw_vec[idx]->mEnd == facep->getGeomIndex()-1)
 				{
 					batched = true;
 					info->mCount += facep->getIndicesCount();
 					info->mEnd += facep->getGeomCount();
-					info->mVSize = llmax(info->mVSize, vsize);
 				}
-				else if (info->mStart == facep->getGeomIndex()+facep->getGeomCount()+1)
+				else if (draw_vec[idx]->mStart == facep->getGeomIndex()+facep->getGeomCount()+1)
 				{
 					batched = true;
 					info->mCount += facep->getIndicesCount();
 					info->mStart -= facep->getGeomCount();
 					info->mOffset = facep->getIndicesStart();
-					info->mVSize = llmax(info->mVSize, vsize);
 				}
 			}
 		}
-
 
 		if (!batched)
 		{
@@ -970,23 +941,18 @@ void LLParticlePartition::getGeometry(LLSpatialGroup* group)
 			U32 offset = facep->getIndicesStart();
 			U32 count = facep->getIndicesCount();
 			LLDrawInfo* info = new LLDrawInfo(start,end,count,offset,facep->getTexture(), 
-				//facep->getTexture(),
-				buffer, object->isSelected(), fullbright);
+				buffer, fullbright);
 
-			const LLVector4a* exts = group->getObjectExtents();
-			info->mExtents[0] = exts[0];
-			info->mExtents[1] = exts[1];
-			info->mVSize = vsize;
 			info->mBlendFuncDst = bf_dst;
 			info->mBlendFuncSrc = bf_src;
 			info->mHasGlow = has_glow;
-			info->mParticle = TRUE;
 			draw_vec.push_back(info);
 			//for alpha sorting
 			facep->setDrawInfo(info);
 		}
 	}
 
+    buffer->unmapBuffer();
 	mFaceList.clear();
 }
 

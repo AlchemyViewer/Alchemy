@@ -64,6 +64,7 @@
 #include "lllineeditor.h"
 #include "lluictrlfactory.h"
 #include "llviewerassetupload.h"
+#include "llmd5.h"
 
 ///----------------------------------------------------------------------------
 /// Class LLPreviewNotecard
@@ -84,11 +85,36 @@ LLPreviewNotecard::LLPreviewNotecard(const LLSD& key) //const LLUUID& item_id,
 LLPreviewNotecard::~LLPreviewNotecard()
 {
 	delete mLiveFile;
+	mFontNameConnection.disconnect();
+	mFontSizeConnection.disconnect();
 }
 
 BOOL LLPreviewNotecard::postBuild()
 {
 	mEditor = getChild<LLViewerTextEditor>("Notecard Editor");
+	if (auto fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("NotecardFontName"), gSavedSettings.getString("NotecardFontSize"), 0).normalize()))
+	{
+		mEditor->setFont(fontp);
+	}
+	mFontNameConnection = gSavedSettings.getControl("NotecardFontName")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) 
+		{ 
+			std::string text = mEditor->getText();
+			if (auto fontp = LLFontGL::getFont(LLFontDescriptor(newval.asString(), gSavedSettings.getString("NotecardFontSize"), 0).normalize()))
+			{
+				mEditor->setFont(fontp);
+			}
+			mEditor->setText(text);
+		});
+	mFontSizeConnection = gSavedSettings.getControl("NotecardFontSize")->getCommitSignal()->connect([this](LLControlVariable*, const LLSD& newval, const LLSD&) 
+		{
+			std::string text = mEditor->getText();
+			if (auto fontp = LLFontGL::getFont(LLFontDescriptor(gSavedSettings.getString("NotecardFontName"), newval.asString(), 0).normalize()))
+			{
+				mEditor->setFont(fontp);
+			}
+			mEditor->setText(text);
+		});
+
 	mEditor->setNotecardInfo(mItemUUID, mObjectID, getKey());
 	mEditor->makePristine();
 
@@ -394,54 +420,36 @@ void LLPreviewNotecard::onLoadComplete(const LLUUID& asset_uuid,
 		if(0 == status)
 		{
 			LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-			if (file.open())
+
+			S32 file_length = file.getSize();
+
+			std::vector<char> buffer(file_length+1);
+			file.read((U8*)&buffer[0], file_length);
+
+			// put a EOS at the end
+			buffer[file_length] = 0;
+
+			
+			LLViewerTextEditor* previewEditor = preview->getChild<LLViewerTextEditor>("Notecard Editor");
+
+			if( (file_length > 19) && !strncmp( &buffer[0], "Linden text version", 19 ) )
 			{
-				S32 file_length = file.getSize();
-
-				std::vector<char> buffer(file_length + 1);
-				if (file.read((U8*)&buffer[0], file_length))
+				if( !previewEditor->importBuffer( &buffer[0], file_length+1 ) )
 				{
-					file.close();
-
-					// put a EOS at the end
-					buffer[file_length] = 0;
-
-					LLViewerTextEditor* previewEditor = preview->getChild<LLViewerTextEditor>("Notecard Editor");
-
-					if ((file_length > 19) && !strncmp(&buffer[0], "Linden text version", 19))
-					{
-						if (!previewEditor->importBuffer(&buffer[0], file_length + 1))
-						{
-							LL_WARNS() << "Problem importing notecard" << LL_ENDL;
-						}
-					}
-					else
-					{
-						// Version 0 (just text, doesn't include version number)
-						previewEditor->setText(LLStringExplicit(&buffer[0]));
-					}
-
-					previewEditor->makePristine();
-					BOOL modifiable = preview->canModify(preview->mObjectID, preview->getItem());
-					preview->setEnabled(modifiable);
-					preview->syncExternal();
-					preview->mAssetStatus = PREVIEW_ASSET_LOADED;
-				}
-				else
-				{
-					LLNotificationsUtil::add("NotecardMissing");
-
-					LL_WARNS() << "Problem loading notecard: " << status << LL_ENDL;
-					preview->mAssetStatus = PREVIEW_ASSET_ERROR;
+					LL_WARNS() << "Problem importing notecard" << LL_ENDL;
 				}
 			}
 			else
 			{
-				LLNotificationsUtil::add("NotecardMissing");
-
-				LL_WARNS() << "Problem loading notecard: " << status << LL_ENDL;
-				preview->mAssetStatus = PREVIEW_ASSET_ERROR;
+				// Version 0 (just text, doesn't include version number)
+				previewEditor->setText(LLStringExplicit(&buffer[0]));
 			}
+
+			previewEditor->makePristine();
+			BOOL modifiable = preview->canModify(preview->mObjectID, preview->getItem());
+			preview->setEnabled(modifiable);
+			preview->syncExternal();
+			preview->mAssetStatus = PREVIEW_ASSET_LOADED;
 		}
 		else
 		{
@@ -608,7 +616,8 @@ bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
                     uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mItemUUID, LLAssetType::AT_NOTECARD, buffer, 
                         [](LLUUID itemId, LLUUID newAssetId, LLUUID newItemId, LLSD) {
                             LLPreviewNotecard::finishInventoryUpload(itemId, newAssetId, newItemId);
-                        });
+                        },
+                        nullptr);
                     url = agent_url;
                 }
                 else if (!mObjectUUID.isNull() && !task_url.empty())
@@ -617,7 +626,8 @@ bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
                     uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mObjectUUID, mItemUUID, LLAssetType::AT_NOTECARD, buffer, 
                         [object_uuid](LLUUID itemId, LLUUID, LLUUID newAssetId, LLSD) {
                             LLPreviewNotecard::finishTaskUpload(itemId, newAssetId, object_uuid);
-                        });
+                        },
+                        nullptr);
                     url = task_url;
                 }
 
@@ -638,32 +648,20 @@ bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
                 tid.generate();
                 asset_id = tid.makeAssetID(gAgent.getSecureSessionID());
 
-                LLFileSystem file(asset_id, LLAssetType::AT_NOTECARD, LLFileSystem::WRITE);
-				if(file.open())
-				{
-					S32 size = buffer.length() + 1;
-					if(file.write((U8*)buffer.c_str(), size))
-					{
-                        LLSaveNotecardInfo* info = new LLSaveNotecardInfo(this, mItemUUID, mObjectUUID,
-                                                                          tid, copyitem);
-                        
-                        gAssetStorage->storeAssetData(tid, LLAssetType::AT_NOTECARD,
-														&onSaveComplete,
-														(void*)info,
-														FALSE);
-						return true;
-					}
-					else
-					{
-						LL_WARNS() << "Unable to write notecard to cache." << LL_ENDL;
-						return false;
-					}
-				}
-				else
-				{
-					LL_WARNS() << "Unable to open cache file for write." << LL_ENDL;
-					return false;
-				}
+                LLFileSystem file(asset_id, LLAssetType::AT_NOTECARD, LLFileSystem::APPEND);
+
+
+				LLSaveNotecardInfo* info = new LLSaveNotecardInfo(this, mItemUUID, mObjectUUID,
+																tid, copyitem);
+
+                S32 size = buffer.length() + 1;
+                file.write((U8*)buffer.c_str(), size);
+
+				gAssetStorage->storeAssetData(tid, LLAssetType::AT_NOTECARD,
+												&onSaveComplete,
+												(void*)info,
+												FALSE);
+				return true;
 			}
 			else // !gAssetStorage
 			{
@@ -724,7 +722,7 @@ void LLPreviewNotecard::onBackupTimer()
 			std::stringstream strmNotecard;
 			notecard.exportStream(strmNotecard);
 
-			std::ofstream outNotecardFile(mBackupFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+			llofstream outNotecardFile(mBackupFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
 			if (outNotecardFile.is_open())
 			{
 				outNotecardFile << strmNotecard.rdbuf();
@@ -972,7 +970,10 @@ bool LLPreviewNotecard::loadNotecardText(const std::string& filename)
     buffer[nread] = '\0';
     fclose(file);
 
-    mEditor->setText(LLStringExplicit(buffer));
+    std::string text = std::string(buffer);
+    LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
+
+    mEditor->setText(text);
     delete[] buffer;
 
     return true;

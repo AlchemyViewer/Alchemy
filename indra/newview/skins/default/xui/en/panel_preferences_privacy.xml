@@ -2,7 +2,7 @@
 <panel
     border="true"
     follows="left|top|right|bottom"
-    height="408"
+    height="428"
     label="Communication"
     layout="topleft"
     left="102"
@@ -19,14 +19,15 @@
      type="string"
      length="1"
      follows="left|top"
-     height="16"
+     height="18"
      layout="topleft"
      left="20"
      mouse_opaque="false"
      name="privacy_text"
-     top="10"
+     top="4"
      text_color="LtGray_50"
-     width="60">
+     width="60"
+     valign="center">
      Privacy:
     </text>
     <check_box
@@ -34,9 +35,9 @@
      height="16"
      label="Do not send my selection target to others or display beam"
      layout="topleft"
+     follows="left|top"
      name="privatepointat"
      tool_tip="Prevents the selection beam from appearing when you touch or edit objects"
-     top_pad="5"
      left="30"
      width="350" />
     <check_box
@@ -44,18 +45,17 @@
      height="16"
      label="Do not display the editing swirl effects"
      layout="topleft"
+     follows="left|top"
      name="privatepointat"
      tool_tip="Prevents swirly particles from appearing when you edit objects"
-     top_pad="5"
      left="30"
      width="350" />
     <check_box
+     layout="topleft"
      follows="left|top"
      height="16"
      label="Do not play Snapshot animations and sounds"
-     left_delta="0"
      name="quiet_snapshots"
-     top_pad="5"
      width="270"
      control_name="QuietSnapshotsToDisk" />
     <check_box
@@ -63,9 +63,8 @@
      enabled="false"
      label="Only friends and groups know I'm online"
      layout="topleft"
-     left_delta="0"
+     follows="left|top"
      name="online_visibility"
-     top_pad="5"
      width="350" />
     <check_box
      control_name="VoiceCallsFriendsOnly"
@@ -73,20 +72,8 @@
      height="16"
      label="Only friends and groups can call or IM me"
      layout="topleft"
+     follows="left|top"
      name="voice_call_friends_only_check"
-     left_delta="0"
-     top_pad="5"
-     width="350">
-    </check_box>
-    <check_box
-     control_name="ConferencesFriendsOnly"
-     enabled="false"
-     height="16"
-     label="Only friends can add me to conference chats"
-     layout="topleft"
-     name="conferences_friends_only_check"
-     left_delta="0"
-     top_pad="5"
      width="350">
     </check_box>
     <check_box
@@ -94,9 +81,8 @@
      enabled="false"
      label="Show my profile info in Search results"
      layout="topleft"
-     left_delta="0"
+     follows="left|top"
      name="online_searchresults"
-     top_pad="5 "
      width="350" />
     <check_box
      enabled_control="EnableVoiceChat"
@@ -104,128 +90,126 @@
      height="16"
      label="Switch off microphone when ending calls"
      layout="topleft"
+     follows="left|top"
      left="30"
      name="auto_disengage_mic_check"
-     top_pad="5"
      width="350" />
+    <check_box
+     control_name="ALDiscordIntegration"
+     height="16"
+     label="Enable Discord Integration"
+     layout="topleft"
+     follows="left|top"
+     left="30"
+     name="Enable_Discord_Integration"
+     width="350" />
+     <check_box
+     enabled_control="ALDiscordIntegration"
+     control_name="ALDiscordShareName"
+     height="16"
+     label="Show Username on Discord"
+     layout="topleft"
+     follows="left|top"
+     left="50"
+     name="Discord_Integration_Show_Name"
+     width="350" />
+     <check_box
+     enabled_control="ALDiscordIntegration"
+     control_name="ALDiscordShareLocationRegion"
+     height="16"
+     label="Show Region Name on Discord"
+     layout="topleft"
+     follows="left|top"
+     left="50"
+     name="Discord_Integration_Show_Region"
+     width="350" />
+   <text
+      type="string"
+      length="1"
+      follows="left|top"
+      height="20"
+      layout="topleft"
+      left="20"
+      name="mylookat"
+      width="200"
+      top_pad="0"
+      valign="center"
+      text_color="LtGray_50">
+         Inventory:
+      </text>
+      <check_box
+      control_name="AutoAcceptNewInventory"
+      height="16"
+      label="Automatically accept new inventory items"
+      layout="topleft"
+      follows="left|top"
+      name="Auto_Accept_New_Inventory"
+      width="350"
+      left="30" />
+      <check_box
+      control_name="ShowInInventory"
+      height="16"
+      label="Automatically show newly accepted items in inventory"
+      layout="topleft"
+      follows="left|top"
+      name="Show_In_Inventory"
+      width="350"
+      left="30" />
+      <check_box
+      control_name="ShowNewInventory"
+      height="16"
+      label="Automatically view notecards, textures, landmarks after accepting"
+      layout="topleft"
+      name="Show_New_Inventory"
+      left="30"
+      width="350" /> 
         <text
          type="string"
          length="1"
          follows="left|top"
-         height="15"
+         height="20"
          layout="topleft"
          left="20"
+         top_pad="0"
          name="mylookat"
-         top_pad="10"
-         width="200"
-         text_color="LtGray_50">
-            LookAt:
-        </text>
-            <check_box
-         top_pad="10"
-         follows="left|top"
-         height="16"
-         label="Show others Look At targets"
-         left="30"
-         name="showlookat"
-         width="250"
-         control_name="AlchemyLookAtShow"
-         tool_tip="Enable crosshairs marking where people are looking."/>
-        <text
-         type="string"
-         length="1"
-         follows="left|top"
-         height="15"
-         layout="topleft"
-         left="290"
-         name="lookatnames"
-		     tool_tip="Select whether to show avatar names on the LookAt crosshairs"
-         top_pad="-15"
-         width="70">
-            Name Style:
-        </text>
-        <combo_box
-         control_name="AlchemyLookAtNames"
-         follows="left|top"
-         height="23"
-         layout="topleft"
-         top_pad="-20"
-         left_pad="0"
-         max_chars="135"
-         name="lookatshownames_combobox"
-         width="150">
-            <combo_box.item
-             enabled="true"
-             label="None"
-             name="None"
-             value="0" />
-            <combo_box.item
-             enabled="true"
-             label="Complete name"
-             name="Complete_Name"
-             value="1" />
-            <combo_box.item
-             enabled="true"
-             label="Display name"
-             name="Display_Name"
-             value="2" />
-            <combo_box.item
-             enabled="true"
-             label="Legacy name"
-             name="Legacy_Name"
-             value="3" />
-            <combo_box.item
-             enabled="true"
-             label="Username"
-             name="User_Name"
-             value="4" />
-        </combo_box>
-
-        <check_box
-         control_name="AlchemyLookAtLines"
-         height="16"
-         label="Show a line from the Look At beacon to its owner"
-         layout="topleft"
-         left="30"
-         name="lineslookat"
-         tool_tip="See a line connecting the camera focus point to the avatar. Useful to find where they are."
-         top_pad="4"
-         width="350" />
-
-        <text
-         type="string"
-         length="1"
-         follows="left|top"
-         height="15"
-         layout="topleft"
-         left="20"
-         name="mylookat"
-         top_pad="10"
+         valign="center"
          width="200"
          text_color="LtGray_50">
             My LookAt:
         </text>
-	    	<check_box
-         control_name="AlchemyLookAtHideSelf"
-         height="16"
-		     initial_value="true"
-         label="Don't show me my LookAt target"
-         layout="topleft"
-         left="30"
-         name="LookAtHideOwn"
-		     tool_tip="Don't show me my own camera crosshairs"
-         top_pad="10"
-         width="350" />
         <check_box
          control_name="AlchemyLookAtPrivate"
          height="16"
-         label="Don't send my actual camera target to others"
+         label="Don't send my Look At target to others"
          layout="topleft"
          left="30"
          name="privatelookat"
-	    	 tool_tip="Disable your camera focus point from showing to others"
-         top_pad="4"
+         tool_tip="Disable your camera focus point from showing to others"
          width="350" />
+        <check_box
+         control_name="AlchemyLookAtClampEnabled"
+         disabled_control="AlchemyLookAtPrivate"
+         height="16"
+         label="Limit Look At Distance"
+         layout="topleft"
+         left="30"
+         name="privatelookat"
+         tool_tip="Allows cosmetic features like eye and head movement but will point at nothing specific if beyond the set distance."
+         width="200" />
+         <slider
+            height="16"
+            left_pad="10"
+            top_delta="0"
+            min_val="0.5"
+            max_val="128"
+            follows="top|left"
+            control_name="AlchemyLookAtClampDistance"
+            disabled_control="AlchemyLookAtPrivate"
+            initial_value="1.0"
+            increment="0.5"
+            label="Max Distance"
+            width="275"
+            layout="topleft"/>
     <button
      follows="left|top"
      height="23"
@@ -233,7 +217,7 @@
      layout="topleft"
      left="30"
      name="block_list"
-     top_pad="20"
+     top_pad="4"
      width="145">
         <!--<button.commit_callback
          function="SideTray.ShowPanel"-->
@@ -244,26 +228,26 @@
      type="string"
      length="1"
      follows="left|top"
-     height="10"
+     height="14"
      layout="topleft"
      left_pad="10"
      mouse_opaque="false"
      name="block_list_label"
      top_delta="3"
      text_color="LtGray_50"
-     width="300">
+     width="320"
+     font="SansSerifSmall">
        (People and/or Objects you have blocked)
     </text>
 
     <button
       follows="left|top"
-      height="23"
       label="Clear History"
-      tool_tip="Clear login image, last location, teleport history, web and texture cache"
+      tool_tip="Clear search and teleport history, web and texture cache"
       layout="topleft"
       left="30"
       name="clear_cache"
-      top_pad="20"
+      top_pad="10"
       width="145">
     <button.commit_callback
         function="Pref.WebClearCache" />
@@ -273,14 +257,14 @@
       type="string"
       length="1"
       follows="left|top"
-      height="10"
+      height="14"
       layout="topleft"
       left_pad="10"
       mouse_opaque="false"
       name="cache_size_label_l"
       top_delta="3"
       text_color="LtGray_50"
-      width="300">
+      width="320">
     (Locations, images, web, search history)
   </text>
     </panel>

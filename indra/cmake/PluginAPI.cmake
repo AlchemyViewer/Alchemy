@@ -1,15 +1,24 @@
 # -*- cmake -*-
 
+include_guard()
+
+add_library( ll::pluginlibraries INTERFACE IMPORTED )
+
 if (WINDOWS)
-  set(PLUGIN_API_WINDOWS_LIBRARIES
+  target_link_libraries( ll::pluginlibraries INTERFACE
       wsock32
       ws2_32
       psapi
       advapi32
       user32
+      wer
       )
-else (WINDOWS)
-  set(PLUGIN_API_WINDOWS_LIBRARIES "")
+elseif (DARWIN)
+  include(CMakeFindFrameworks)
+  find_library(COCOA_LIBRARY Cocoa)
+  target_link_libraries( ll::pluginlibraries INTERFACE
+      ${COCOA_LIBRARY}
+       )
 endif (WINDOWS)
 
 

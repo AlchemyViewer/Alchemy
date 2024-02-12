@@ -28,7 +28,8 @@
 
 #include "llpointer.h"
 
-#define AL_TONEMAP_COUNT 10
+#include "boost/signals2/connection.hpp"
+
 
 class LLRenderTarget;
 class LLVertexBuffer;
@@ -37,33 +38,26 @@ class ALRenderUtil
 {
 public:
 	ALRenderUtil();
-	~ALRenderUtil() = default;
-
-	void restoreVertexBuffers();
-	void resetVertexBuffers();
+	~ALRenderUtil();
 
 	void releaseGLBuffers();
-
 	void refreshState();
 
 	// Deferred Only Functions
 	enum ALTonemap : uint32_t
 	{
 		TONEMAP_NONE = 0,
-		TONEMAP_LINEAR,
-		TONEMAP_REINHARD,
-		TONEMAP_REINHARD2,
-		TONEMAP_FILMIC,
-		TONEMAP_UNREAL,
-		TONEMAP_ACES,
+		TONEMAP_ACES_HILL,
 		TONEMAP_UCHIMURA,
-		TONEMAP_LOTTES,
+		TONEMAP_AMD,
 		TONEMAP_UNCHARTED,
 		TONEMAP_COUNT
 	};
 	bool setupTonemap();
+	void renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, LLRenderTarget* dst);
+
 	bool setupColorGrade();
-	void renderTonemap(LLRenderTarget* src, LLRenderTarget* dst);
+	void renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst);
 
 	enum ALSharpen : uint32_t
 	{
@@ -80,25 +74,13 @@ public:
 	U32 getSharpenMethod() { return mSharpenMethod; };
 
 private:
-	// Parameters
-	F32 mTonemapExposure = 1.f;
-
 	// State
 	U32 mTonemapType = ALTonemap::TONEMAP_NONE;
-	LLVector3 mToneLottesParamA;
-	LLVector3 mToneLottesParamB;
-	LLVector3 mToneUchimuraParamA;
-	LLVector3 mToneUchimuraParamB;
-	LLVector3 mToneUnchartedParamA;
-	LLVector3 mToneUnchartedParamB;
-	LLVector3 mToneUnchartedParamC;
-
 	U32 mSharpenMethod = ALSharpen::SHARPEN_NONE;
 
 	// Texture Data
 	U32 mCGLut;
 	LLVector4 mCGLutSize;
 
-	// Vertex Buffers
-	LLPointer<LLVertexBuffer> mRenderBuffer;
+	std::vector<boost::signals2::scoped_connection> mSettingConnections;
 };

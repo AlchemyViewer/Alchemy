@@ -89,17 +89,21 @@ LLConversationViewSession::LLConversationViewSession(const LLConversationViewSes
 	mFlashStarted(false)
 {
 	mFlashTimer = new LLFlashTimer();
+	mAreChildrenInited = true; // inventory only
 }
 
 LLConversationViewSession::~LLConversationViewSession()
 {
 	mActiveVoiceChannelConnection.disconnect();
 
-	if(LLVoiceClient::instanceExists() && mVoiceClientObserver)
-	{
-		LLVoiceClient::getInstance()->removeObserver(mVoiceClientObserver);
+    if (mVoiceClientObserver)
+    {
+        if (LLVoiceClient::instanceExists())
+        {
+            LLVoiceClient::getInstance()->removeObserver(mVoiceClientObserver);
+        }
 		delete mVoiceClientObserver;
-	}
+    }
 
 	mFlashTimer->unset();
 }
@@ -255,6 +259,11 @@ BOOL LLConversationViewSession::postBuild()
 			mIsInActiveVoiceChannel = true;
 			if(LLVoiceClient::instanceExists())
 			{
+                if (mVoiceClientObserver)
+                {
+                    LLVoiceClient::getInstance()->removeObserver(mVoiceClientObserver);
+                    delete mVoiceClientObserver;
+                }
 				mVoiceClientObserver = new LLNearbyVoiceClientStatusObserver(this);
 				LLVoiceClient::getInstance()->addObserver(mVoiceClientObserver);
 			}
@@ -263,9 +272,9 @@ BOOL LLConversationViewSession::postBuild()
 		default:
 			break;
 		}
-	}
 
-	refresh();
+        refresh(); // requires vmi
+	}
 
 	return TRUE;
 }
@@ -477,17 +486,20 @@ void LLConversationViewSession::refresh()
 {
 	// Refresh the session view from its model data
 	LLConversationItem* vmi = dynamic_cast<LLConversationItem*>(getViewModelItem());
-	vmi->resetRefresh();
+    if (vmi)
+    {
+        vmi->resetRefresh();
 
-	if (mSessionTitle)
-	{		
-		if (!highlightFriendTitle(vmi))
-		{
-			LLStyle::Params title_style;
-			title_style.color = LLUIColorTable::instance().getColor("LabelTextColor");
-			mSessionTitle->setText(vmi->getDisplayName(), title_style);
-		}
-	}
+        if (mSessionTitle)
+        {
+            if (!highlightFriendTitle(vmi))
+            {
+                LLStyle::Params title_style;
+                title_style.color = LLUIColorTable::instance().getColor("LabelTextColor");
+                mSessionTitle->setText(vmi->getDisplayName(), title_style);
+            }
+        }
+    }
 
 	// Update all speaking indicators
 	LLSpeakingIndicatorManager::updateSpeakingIndicators();
@@ -511,8 +523,11 @@ void LLConversationViewSession::refresh()
 	}
 
 	requestArrange();
-	// Do the regular upstream refresh
-	LLFolderViewFolder::refresh();
+    if (vmi)
+    {
+        // Do the regular upstream refresh
+        LLFolderViewFolder::refresh();
+    }
 }
 
 void LLConversationViewSession::onCurrentVoiceSessionChanged(const LLUUID& session_id)
@@ -614,8 +629,11 @@ BOOL LLConversationViewParticipant::postBuild()
     }
 
     updateChildren();
-	LLFolderViewItem::postBuild();
-    refresh();
+    if (getViewModelItem())
+    {
+        LLFolderViewItem::postBuild();
+        refresh();
+    }
     return TRUE;
 }
 
@@ -699,10 +717,10 @@ void LLConversationViewParticipant::refresh()
 
         // *TODO: We should also do something with vmi->isModerator() to echo that state in the UI somewhat
         mSpeakingIndicator->setIsModeratorMuted(participant_model->isModeratorMuted());
+        
+        // Do the regular upstream refresh
+        LLFolderViewItem::refresh();
     }
-
-	// Do the regular upstream refresh
-	LLFolderViewItem::refresh();
 }
 
 void LLConversationViewParticipant::addToFolder(LLFolderViewFolder* folder)

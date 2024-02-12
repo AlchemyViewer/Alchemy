@@ -125,6 +125,7 @@ public:
 		Optional<bool>			is_toggle,
 								scale_image,
 								commit_on_return,
+								commit_on_capture_lost,
 								display_pressed_state;
 		
 		Optional<F32>				hover_glow_amount;
@@ -284,6 +285,8 @@ public:
 	
 	void 		setAutoResize(bool auto_resize) { mAutoResize = auto_resize; }
 
+    void        updateCurrencySymbols();
+
 protected:
 	LLPointer<LLUIImage> getImageUnselected() const	{ return mImageUnselected; }
 	LLPointer<LLUIImage> getImageSelected() const	{ return mImageSelected; }
@@ -376,6 +379,7 @@ protected:
 	F32							mCurGlowStrength;
 
 	bool						mCommitOnReturn;
+    bool						mCommitOnCaptureLost;
 	bool						mFadeWhenDisabled;
 	bool						mForcePressedState;
 	bool						mDisplayPressedState;

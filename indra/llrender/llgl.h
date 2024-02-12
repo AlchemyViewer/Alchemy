@@ -30,7 +30,7 @@
 // This file contains various stuff for handling gl extensions and other gl related stuff.
 
 #include <string>
-#include <absl/container/flat_hash_map.h>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <list>
 
 #include "llerror.h"
@@ -47,6 +47,7 @@
 
 extern BOOL gDebugGL;
 extern BOOL gDebugSession;
+extern BOOL gDebugGLSession;
 extern llofstream gFailLog;
 
 #define LL_GL_ERRS LL_ERRS("RenderState")
@@ -69,7 +70,7 @@ public:
 	void shutdownGL();
 
 #if LL_WINDOWS
-	void initWGL(HDC dc); // Initializes stupid WGL extensions
+	void initWGL(); // Initializes stupid WGL extensions
 #endif
 
 	std::string getRawGLString(); // For sending to simulator
@@ -77,64 +78,35 @@ public:
 	BOOL mInited;
 	BOOL mIsDisabled;
 
-	// Extensions used by everyone
-	BOOL mHasMultitexture;
-	BOOL mHasATIMemInfo;
-	BOOL mHasAMDAssociations;
-	BOOL mHasNVXMemInfo;
-	S32	 mNumTextureUnits;
-	BOOL mHasMipMapGeneration;
-	BOOL mHasCompressedTextures;
-	BOOL mHasFramebufferObject;
+	// OpenGL limits
 	S32 mMaxSamples;
-	BOOL mHasBlendFuncSeparate;
-		
-	// ARB Extensions
-	BOOL mHasVertexBufferObject;
-	BOOL mHasVertexArrayObject;
-	BOOL mHasSync;
-	BOOL mHasMapBufferRange;
-	BOOL mHasFlushBufferRange;
-	BOOL mHasPBuffer;
-	BOOL mHasShaderObjects;
-	BOOL mHasVertexShader;
-	BOOL mHasFragmentShader;
-	S32  mNumTextureImageUnits;
-	BOOL mHasOcclusionQuery;
-	BOOL mHasTimerQuery;
-	BOOL mHasOcclusionQuery2;
-	BOOL mHasPointParameters;
-	BOOL mHasDrawBuffers;
-	BOOL mHasDepthClamp;
-	BOOL mHasTextureRectangle;
-	BOOL mHasTextureMultisample;
-	BOOL mHasTransformFeedback;
+	S32 mNumTextureImageUnits;
 	S32 mMaxSampleMaskWords;
 	S32 mMaxColorTextureSamples;
 	S32 mMaxDepthTextureSamples;
 	S32 mMaxIntegerSamples;
+    S32 mGLMaxVertexRange;
+    S32 mGLMaxIndexRange;
+    S32 mGLMaxTextureSize;
+    F32 mMaxAnisotropy = 0.f;
 
-	// Other extensions.
-	BOOL mHasAnisotropic;
-	BOOL mHasARBEnvCombine;
-	BOOL mHasCubeMap;
-	BOOL mHasDebugOutput;
-	BOOL mHassRGBTexture;
-	BOOL mHassRGBFramebuffer;
-    BOOL mHasTexturesRGBDecode;
+	// GL 4.x capabilities
+	bool mHasCubeMapArray = false;
+	bool mHasDebugOutput = false;
+    bool mHasTransformFeedback = false;
     bool mHasTextureSwizzle = false;
     bool mHasGPUShader4  = false;
-    bool mHasClipControl = false;
-
+	bool mHasAdaptiveVSync = false;
+	
 	// Vendor-specific extensions
-	BOOL mIsATI;
+    bool mHasAMDAssociations = false;
+	bool mHasNVXMemInfo = false;
+	bool mHasATIMemInfo = false;
+	bool mHasTextureFilterAnisotropic = false;
+
+	BOOL mIsAMD;
 	BOOL mIsNVIDIA;
 	BOOL mIsIntel;
-	BOOL mIsGF2or4MX;
-	BOOL mIsGF3;
-	BOOL mIsGFFX;
-	BOOL mATIOffsetVerticalLines;
-	BOOL mATIOldDriver;
 
 #if LL_DARWIN
 	// Needed to distinguish problem cards on older Macs that break with Materials
@@ -143,9 +115,6 @@ public:
 	
 	// Whether this version of GL is good enough for SL to use
 	BOOL mHasRequirements;
-
-	// Misc extensions
-	BOOL mHasSeparateSpecularColor;
 
 	S32 mDriverVersionMajor;
 	S32 mDriverVersionMinor;
@@ -157,10 +126,6 @@ public:
 	std::string mGLVersionString;
 
 	S32 mVRAM; // VRAM in MB
-	S32 mGLMaxVertexRange;
-	S32 mGLMaxIndexRange;
-	S32 mGLMaxTextureSize;
-	F32 mGLMaxAnisotropy;
 	
 	void getPixelFormat(); // Get the best pixel format
 
@@ -234,13 +199,13 @@ void clear_glerror();
 
 	//disable lighting for rendering hud objects
 	//INCORRECT USAGE
-	LLGLEnable lighting(GL_LIGHTING);
+	LLGLEnable blend(GL_BLEND);
 	renderHUD();
-	LLGLDisable lighting(GL_LIGHTING);
+	LLGLDisable blend(GL_BLEND);
 
 	//CORRECT USAGE
 	{
-		LLGLEnable lighting(GL_LIGHTING);
+		LLGLEnable blend(GL_BLEND);
 		renderHUD();
 	}
 
@@ -248,7 +213,7 @@ void clear_glerror();
 	is useful:
 
 	{
-		LLGLEnable lighting(light_hud ? GL_LIGHTING : 0);
+		LLGLEnable blend(blend_hud ? GL_GL_BLEND: 0);
 		renderHUD();
 	}
 
@@ -273,12 +238,14 @@ public:
 
 	static void resetTextureStates();
 	static void dumpStates();
-	static void checkStates(const std::string& msg = "");
-	static void checkTextureChannels(const std::string& msg = "");
-	static void checkClientArrays(const std::string& msg = "", U32 data_mask = 0);
-	
+
+    // make sure GL blend function, GL states, and GL color mask match
+    // what we expect 
+    //  writeAlpha - whether or not writing to alpha channel is expected
+	static void checkStates(GLboolean writeAlpha = GL_TRUE);
+
 protected:
-	static absl::flat_hash_map<LLGLenum, LLGLboolean> sStateMap;
+	static boost::unordered_flat_map<LLGLenum, LLGLboolean> sStateMap;
 	
 public:
 	enum { CURRENT_STATE = -2 };
@@ -426,9 +393,7 @@ public:
 class LLGLSyncFence : public LLGLFence
 {
 public:
-#ifdef GL_ARB_sync
 	GLsync mSync;
-#endif
 	
 	LLGLSyncFence();
 	virtual ~LLGLSyncFence();
@@ -445,6 +410,7 @@ void init_glstates();
 void parse_gl_version( S32* major, S32* minor, S32* release, std::string* vendor_specific, std::string* version_string );
 
 extern BOOL gHeadlessClient;
+extern BOOL gNonInteractive;
 extern BOOL gGLActive;
 
 #endif // LL_LLGL_H

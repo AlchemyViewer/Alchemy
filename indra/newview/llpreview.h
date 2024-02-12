@@ -36,6 +36,7 @@
 #include <map>
 
 class LLInventoryItem;
+class LLViewerObject;
 class LLLineEditor;
 class LLRadioGroup;
 class LLPreview;
@@ -86,7 +87,7 @@ public:
 	virtual BOOL handleHover(S32 x, S32 y, MASK mask);
 	virtual void onOpen(const LLSD& key);
 	
-	void setAuxItem( const LLInventoryItem* item );
+	virtual void setAuxItem( const LLInventoryItem* item );
 
 	static void			onBtnCopyToInv(void* userdata);
 
@@ -107,11 +108,12 @@ public:
 
 	// llview
 	/*virtual*/ void draw();
-	void refreshFromItem();
+	virtual void refreshFromItem();
 
 	// We can't modify Item or description in preview if either in-world Object
 	// or Item  itself is unmodifiable
 	static BOOL canModify(const LLUUID taskUUID, const LLInventoryItem* item);
+	static BOOL canModify(const LLViewerObject* object, const LLInventoryItem* item);
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2012-02-06 (Catznip-3.2)
 	// Backup functionality

@@ -49,7 +49,7 @@
 // Linden library includes
 #include "llwindow.h"			// setMouseClipping()
 
-//#include "alavatarcolormgr.h"
+#include "alavatargroups.h"
 #include "llavatarnamecache.h"
 #include "llagent.h"
 #include "llnetmap.h"
@@ -91,9 +91,9 @@ void LLToolGun::handleDeselect()
 BOOL LLToolGun::handleMouseDown(S32 x, S32 y, MASK mask)
 {
 	gGrabTransientTool = this;
-	LLToolMgr::getInstanceFast()->getCurrentToolset()->selectTool( LLToolGrab::getInstanceFast() );
+	LLToolMgr::getInstance()->getCurrentToolset()->selectTool( LLToolGrab::getInstance() );
 
-	return LLToolGrab::getInstanceFast()->handleMouseDown(x, y, mask);
+	return LLToolGrab::getInstance()->handleMouseDown(x, y, mask);
 }
 
 BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask) 
@@ -114,7 +114,7 @@ BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 		if (dx != 0 || dy != 0)
 		{
 			// ...actually moved off center
-			const F32 fov = LLViewerCamera::getInstanceFast()->getView() / DEFAULT_FIELD_OF_VIEW;
+			const F32 fov = LLViewerCamera::getInstance()->getView() / DEFAULT_FIELD_OF_VIEW;
 			static LLCachedControl<bool> invert_mouse(gSavedSettings, "InvertMouse");
 			if (invert_mouse)
 			{
@@ -130,7 +130,7 @@ BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 			static LLCachedControl<bool> mouse_sun(gSavedSettings, "MouseSun");
 			if (mouse_sun)
 			{
-                const LLVector3& sunpos = LLViewerCamera::getInstanceFast()->getAtAxis();
+                const LLVector3& sunpos = LLViewerCamera::getInstance()->getAtAxis();
 				gSky.setSunDirectionCFR(sunpos);
 				gSavedSettings.setVector3("SkySunDefaultPosition", sunpos);
 			}
@@ -138,7 +138,7 @@ BOOL LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 			static LLCachedControl<bool> mouse_moon(gSavedSettings, "MouseMoon");
             if (mouse_moon)
 			{
-				const LLVector3& moonpos = LLViewerCamera::getInstanceFast()->getAtAxis();
+				const LLVector3& moonpos = LLViewerCamera::getInstance()->getAtAxis();
 				gSky.setMoonDirectionCFR(moonpos);
 				gSavedSettings.setVector3("SkyMoonDefaultPosition", moonpos);
 			}
@@ -187,11 +187,11 @@ void LLToolGun::draw()
 		bool target_rendered = false;
 
 		LLVector3d myPosition = gAgentCamera.getCameraPositionGlobal();
-		LLQuaternion myRotation = LLViewerCamera::getInstanceFast()->getQuaternion();
+		LLQuaternion myRotation = LLViewerCamera::getInstance()->getQuaternion();
 		myRotation.set(-myRotation.mQ[VX], -myRotation.mQ[VY], -myRotation.mQ[VZ], myRotation.mQ[VW]);
 
 		LLWorld::pos_map_t positions;
-		LLWorld::getInstanceFast()->getAvatars(&positions, gAgent.getPositionGlobal(), iff_range);
+		LLWorld::getInstance()->getAvatars(&positions, gAgent.getPositionGlobal(), iff_range);
 		for (const auto& position : positions)
 		{
 			const auto& id = position.first;
@@ -201,9 +201,14 @@ void LLToolGun::draw()
 				continue;
 			}
 
+			LLColor4 marker_color = LLColor4::white;
+			if(show_iff_markers || !target_rendered)
+				marker_color = ALAvatarGroups::instance().getAvatarColor(id, LLColor4::white, ALAvatarGroups::COLOR_MINIMAP);
+			marker_color.mV[VALPHA] = 0.75f;
+
 			if (show_iff_markers)
 			{
-				LLTracker::instance()->drawMarker(targetPosition, crosshair_color, true);
+				LLTracker::instance()->drawMarker(targetPosition, marker_color, true);
 			}
 
 			if (!target_rendered && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES))
@@ -213,6 +218,8 @@ void LLToolGun::draw()
 
 				if (magicVector.mdV[VX] > -0.75 && magicVector.mdV[VX] < 0.75 && magicVector.mdV[VZ] > 0.0 && magicVector.mdV[VY] > -1.5 && magicVector.mdV[VY] < 1.5) // Do not fuck with these, cheater. :(
 				{
+					crosshair_color = marker_color;
+
 					LLAvatarName avatarName;
 					std::string targetName = unknown_agent;
 					if (LLAvatarNameCache::get(id, &avatarName))
@@ -223,7 +230,7 @@ void LLToolGun::draw()
 					LLFontGL::getFontSansSerifBold()->renderUTF8(
 						llformat("%s : %.2fm", targetName.c_str(), (targetPosition - myPosition).magVec()),
 						0, (windowWidth / 2.f) + userPresetX, (windowHeight / 2.f) + userPresetY, crosshair_color,
-						(LLFontGL::HAlign)((S32)userPresetHAlign), LLFontGL::TOP, LLFontGL::BOLD, LLFontGL::NO_SHADOW
+						(LLFontGL::HAlign)((S32)userPresetHAlign), LLFontGL::TOP, LLFontGL::BOLD, LLFontGL::DROP_SHADOW
 					);
 
 					if (!show_iff_markers)

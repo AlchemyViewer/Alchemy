@@ -75,17 +75,16 @@ BOOL LLLineSegmentBoxIntersect(const LLVector4a& start, const LLVector4a& end, c
 }
 
 
-LLVolumeOctreeListener::LLVolumeOctreeListener(LLOctreeNode<LLVolumeTriangle>* node)
+LLVolumeOctreeListener::LLVolumeOctreeListener(LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* node)
 {
 	node->addListener(this);
 }
 
-void LLVolumeOctreeListener::handleChildAddition(const LLOctreeNode<LLVolumeTriangle>* parent, 
-	LLOctreeNode<LLVolumeTriangle>* child)
+void LLVolumeOctreeListener::handleChildAddition(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* parent, 
+    LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* child)
 {
 	new LLVolumeOctreeListener(child);
 }
-
 
 LLOctreeTriangleRayIntersect::LLOctreeTriangleRayIntersect(const LLVector4a& start, const LLVector4a& dir, 
 							   const LLVolumeFace* face, F32* closest_t,
@@ -103,7 +102,7 @@ LLOctreeTriangleRayIntersect::LLOctreeTriangleRayIntersect(const LLVector4a& sta
 	mEnd.setAdd(mStart, mDir);
 }
 
-void LLOctreeTriangleRayIntersect::traverse(const LLOctreeNode<LLVolumeTriangle>* node)
+void LLOctreeTriangleRayIntersect::traverse(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* node)
 {
 	LLVolumeOctreeListener* vl = (LLVolumeOctreeListener*) node->getListener(0);
 
@@ -117,9 +116,9 @@ void LLOctreeTriangleRayIntersect::traverse(const LLOctreeNode<LLVolumeTriangle>
 	}
 }
 
-void LLOctreeTriangleRayIntersect::visit(const LLOctreeNode<LLVolumeTriangle>* node)
+void LLOctreeTriangleRayIntersect::visit(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* node)
 {
-	for (LLOctreeNode<LLVolumeTriangle>::const_element_iter iter = 
+    for (typename LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>::const_element_iter iter =
 			node->getDataBegin(), iter_end = node->getDataEnd(); iter != iter_end; ++iter)
 	{
 		const LLVolumeTriangle* tri = *iter;
@@ -214,7 +213,7 @@ const F32& LLVolumeTriangle::getBinRadius() const
 
 //TEST CODE
 
-void LLVolumeOctreeValidate::visit(const LLOctreeNode<LLVolumeTriangle>* branch)
+void LLVolumeOctreeValidate::visit(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* branch)
 {
 	LLVolumeOctreeListener* node = (LLVolumeOctreeListener*) branch->getListener(0);
 
@@ -251,7 +250,7 @@ void LLVolumeOctreeValidate::visit(const LLOctreeNode<LLVolumeTriangle>* branch)
 	}
 
 	//children fit, check data
-	for (LLOctreeNode<LLVolumeTriangle>::const_element_iter iter = branch->getDataBegin(), iter_end = branch->getDataEnd();
+    for (typename LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>::const_element_iter iter = branch->getDataBegin(), iter_end = branch->getDataEnd();
 			iter != iter_end; ++iter)
 	{
 		const LLVolumeTriangle* tri = *iter;
@@ -267,5 +266,4 @@ void LLVolumeOctreeValidate::visit(const LLOctreeNode<LLVolumeTriangle>* branch)
 		}
 	}
 }
-
 

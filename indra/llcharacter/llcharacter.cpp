@@ -188,20 +188,15 @@ void LLCharacter::requestStopMotion( LLMotion* motion)
 //-----------------------------------------------------------------------------
 // updateMotions()
 //-----------------------------------------------------------------------------
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_ANIMATION("Update Animation");
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_HIDDEN_ANIMATION("Update Hidden Anim");
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_MOTIONS("Update Motions");
-
 void LLCharacter::updateMotions(e_update_t update_type)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 	if (update_type == HIDDEN_UPDATE)
 	{
-		LL_RECORD_BLOCK_TIME(FTM_UPDATE_HIDDEN_ANIMATION);
 		mMotionController.updateMotionsMinimal();
 	}
 	else
 	{
-		LL_RECORD_BLOCK_TIME(FTM_UPDATE_ANIMATION);
 		// unpause if the number of outstanding pause requests has dropped to the initial one
 		if (mMotionController.isPaused() && mPauseRequest->getNumRefs() == 1)
 		{
@@ -209,7 +204,6 @@ void LLCharacter::updateMotions(e_update_t update_type)
 		}
 		bool force_update = (update_type == FORCE_UPDATE);
 		{
-			LL_RECORD_BLOCK_TIME(FTM_UPDATE_MOTIONS);
 			mMotionController.updateMotions(force_update);
 		}
 	}
@@ -252,10 +246,8 @@ void LLCharacter::dumpCharacter( LLJoint* joint )
 	LL_INFOS() << "DEBUG: " << joint->getName() << " (" << (joint->getParent()?joint->getParent()->getName():std::string("ROOT")) << ")" << LL_ENDL;
 
 	// recurse
-	for (LLJoint::joints_t::iterator iter = joint->mChildren.begin();
-		 iter != joint->mChildren.end(); ++iter)
+	for (LLJoint* child_joint : joint->mChildren)
 	{
-		LLJoint* child_joint = *iter;
 		dumpCharacter(child_joint);
 	}
 }
@@ -295,13 +287,13 @@ void LLCharacter::removeAnimationData(std::string_view name)
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 weight)
+BOOL LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 weight, bool upload_bake)
 {
 	S32 index = which_param->getID();
 	auto index_iter = mVisualParamIndexMap.find(index);
 	if (index_iter != mVisualParamIndexMap.end())
 	{
-		index_iter->second->setWeight(weight);
+		index_iter->second->setWeight(weight, upload_bake);
 		return TRUE;
 	}
 	return FALSE;
@@ -310,7 +302,7 @@ BOOL LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 wei
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::setVisualParamWeight(const char* param_name, F32 weight)
+BOOL LLCharacter::setVisualParamWeight(const char* param_name, F32 weight, bool upload_bake)
 {
 	std::string tname(param_name);
 	LLStringUtil::toLower(tname);
@@ -318,7 +310,7 @@ BOOL LLCharacter::setVisualParamWeight(const char* param_name, F32 weight)
 	visual_param_name_map_t::iterator name_iter = mVisualParamNameMap.find(tableptr);
 	if (name_iter != mVisualParamNameMap.end())
 	{
-		name_iter->second->setWeight(weight);
+		name_iter->second->setWeight(weight, upload_bake);
 		return TRUE;
 	}
 	LL_WARNS() << "LLCharacter::setVisualParamWeight() Invalid visual parameter: " << param_name << LL_ENDL;
@@ -328,12 +320,12 @@ BOOL LLCharacter::setVisualParamWeight(const char* param_name, F32 weight)
 //-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
-BOOL LLCharacter::setVisualParamWeight(S32 index, F32 weight)
+BOOL LLCharacter::setVisualParamWeight(S32 index, F32 weight, bool upload_bake)
 {
 	auto index_iter = mVisualParamIndexMap.find(index);
 	if (index_iter != mVisualParamIndexMap.end())
 	{
-		index_iter->second->setWeight(weight);
+		index_iter->second->setWeight(weight, upload_bake);
 		return TRUE;
 	}
 	LL_WARNS() << "LLCharacter::setVisualParamWeight() Invalid visual parameter index: " << index << LL_ENDL;
@@ -402,7 +394,7 @@ void LLCharacter::clearVisualParamWeights()
 		LLVisualParam* param = param_pair.second;
 		if (param->isTweakable())
 		{
-			param->setWeight( param->getDefaultWeight());
+			param->setWeight( param->getDefaultWeight(), false);
 		}
 	}
 }

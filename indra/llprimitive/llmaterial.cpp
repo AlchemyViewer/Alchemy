@@ -27,6 +27,7 @@
 #include "linden_common.h"
 
 #include "llmaterial.h"
+#include "hbxxh.h"
 
 /**
  * Materials cap parameters
@@ -369,39 +370,112 @@ LLSD LLMaterial::asLLSD() const
 
 void LLMaterial::fromLLSD(const LLSD& material_data)
 {
-    mNormalID = getMaterialField<LLSD::UUID>(material_data, MATERIALS_CAP_NORMAL_MAP_FIELD, LLSD::TypeUUID);
+    if (!material_data.isMap()) return;
 
-    S32 normalOffsetXInt = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_NORMAL_MAP_OFFSET_X_FIELD, LLSD::TypeInteger);
-    S32 normalOffsetYInt = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_NORMAL_MAP_OFFSET_Y_FIELD, LLSD::TypeInteger);
-    S32 normalRotInt     = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_NORMAL_MAP_ROTATION_FIELD, LLSD::TypeInteger);
-    S32 normalRepeatXInt = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_NORMAL_MAP_REPEAT_X_FIELD, LLSD::TypeInteger);
-    S32 normalRepeatYInt = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_NORMAL_MAP_REPEAT_Y_FIELD, LLSD::TypeInteger);
+    const auto& material_map = material_data.asMap();
+    const auto& material_end = material_map.end();
 
-    mNormalOffsetX  = F32(normalOffsetXInt) / MATERIALS_MULTIPLIER;
-    mNormalOffsetY  = F32(normalOffsetYInt) / MATERIALS_MULTIPLIER;
-    mNormalRotation = F32(normalRotInt)     / MATERIALS_MULTIPLIER;
-    mNormalRepeatX  = F32(normalRepeatXInt) / MATERIALS_MULTIPLIER;
-    mNormalRepeatY  = F32(normalRepeatYInt) / MATERIALS_MULTIPLIER;
+    auto it = material_map.find(MATERIALS_CAP_NORMAL_MAP_FIELD);
+    if (it != material_end)
+    {
+        mNormalID = it->second.asUUID();
+    }
 
-    mSpecularID = getMaterialField<LLSD::UUID>(material_data, MATERIALS_CAP_SPECULAR_MAP_FIELD, LLSD::TypeUUID);
+    it = material_map.find(MATERIALS_CAP_NORMAL_MAP_OFFSET_X_FIELD);
+    if (it != material_end)
+    {
+        mNormalOffsetX = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
 
-    S32 specularOffsetXInt = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_SPECULAR_MAP_OFFSET_X_FIELD, LLSD::TypeInteger);
-    S32 specularOffsetYInt = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_SPECULAR_MAP_OFFSET_Y_FIELD, LLSD::TypeInteger);
-    S32 specularRotInt     = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_SPECULAR_MAP_ROTATION_FIELD, LLSD::TypeInteger);
-    S32 specularRepeatXInt = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_SPECULAR_MAP_REPEAT_X_FIELD, LLSD::TypeInteger);
-    S32 specularRepeatYInt = getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_SPECULAR_MAP_REPEAT_Y_FIELD, LLSD::TypeInteger);
+    it = material_map.find(MATERIALS_CAP_NORMAL_MAP_OFFSET_Y_FIELD);
+    if (it != material_end)
+    {
+        mNormalOffsetY = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
 
-    mSpecularOffsetX   = F32(specularOffsetXInt) / MATERIALS_MULTIPLIER;
-    mSpecularOffsetY   = F32(specularOffsetYInt) / MATERIALS_MULTIPLIER;
-    mSpecularRotation  = F32(specularRotInt)     / MATERIALS_MULTIPLIER;
-    mSpecularRepeatX  = F32(specularRepeatXInt) / MATERIALS_MULTIPLIER;
-    mSpecularRepeatY  = F32(specularRepeatYInt) / MATERIALS_MULTIPLIER;
+    it = material_map.find(MATERIALS_CAP_NORMAL_MAP_ROTATION_FIELD);
+    if (it != material_end)
+    {
+        mNormalRotation = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
 
-    mSpecularLightColor.setValue(getMaterialField<LLSD>(material_data, MATERIALS_CAP_SPECULAR_COLOR_FIELD, LLSD::TypeArray));
-    mSpecularLightExponent = (U8)getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_SPECULAR_EXP_FIELD,       LLSD::TypeInteger);
-    mEnvironmentIntensity  = (U8)getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_ENV_INTENSITY_FIELD,      LLSD::TypeInteger);
-    mDiffuseAlphaMode      = (U8)getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_DIFFUSE_ALPHA_MODE_FIELD, LLSD::TypeInteger);
-    mAlphaMaskCutoff       = (U8)getMaterialField<LLSD::Integer>(material_data, MATERIALS_CAP_ALPHA_MASK_CUTOFF_FIELD,  LLSD::TypeInteger);
+    it = material_map.find(MATERIALS_CAP_NORMAL_MAP_REPEAT_X_FIELD);
+    if (it != material_end)
+    {
+        mNormalRepeatX = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
+
+    it = material_map.find(MATERIALS_CAP_NORMAL_MAP_REPEAT_Y_FIELD);
+    if (it != material_end)
+    {
+        mNormalRepeatY = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
+
+    it = material_map.find(MATERIALS_CAP_SPECULAR_MAP_FIELD);
+    if (it != material_end)
+    {
+        mSpecularID = it->second.asUUID();
+    }
+
+    it = material_map.find(MATERIALS_CAP_SPECULAR_MAP_OFFSET_X_FIELD);
+    if (it != material_end)
+    {
+        mSpecularOffsetX = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
+
+    it = material_map.find(MATERIALS_CAP_SPECULAR_MAP_OFFSET_Y_FIELD);
+    if (it != material_end)
+    {
+        mSpecularOffsetY = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
+
+    it = material_map.find(MATERIALS_CAP_SPECULAR_MAP_ROTATION_FIELD);
+    if (it != material_end)
+    {
+        mSpecularRotation = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
+
+    it = material_map.find(MATERIALS_CAP_SPECULAR_MAP_REPEAT_X_FIELD);
+    if (it != material_end)
+    {
+        mSpecularRepeatX = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
+
+    it = material_map.find(MATERIALS_CAP_SPECULAR_MAP_REPEAT_Y_FIELD);
+    if (it != material_end)
+    {
+        mSpecularRepeatY = F32(it->second.asInteger()) / MATERIALS_MULTIPLIER;
+    }
+
+    it = material_map.find(MATERIALS_CAP_SPECULAR_COLOR_FIELD);
+    if (it != material_end)
+    {
+        mSpecularLightColor.setValue(it->second);
+    }
+
+    it = material_map.find(MATERIALS_CAP_SPECULAR_EXP_FIELD);
+    if (it != material_end)
+    {
+        mSpecularLightExponent = (U8)it->second.asInteger();
+    }
+
+    it = material_map.find(MATERIALS_CAP_ENV_INTENSITY_FIELD);
+    if (it != material_end)
+    {
+        mEnvironmentIntensity = (U8)it->second.asInteger();
+    }
+
+    it = material_map.find(MATERIALS_CAP_DIFFUSE_ALPHA_MODE_FIELD);
+    if (it != material_end)
+    {
+        mDiffuseAlphaMode = (U8)it->second.asInteger();
+    }
+
+    it = material_map.find(MATERIALS_CAP_ALPHA_MASK_CUTOFF_FIELD);
+    if (it != material_end)
+    {
+        mAlphaMaskCutoff = (U8)it->second.asInteger();
+    }
 }
 
 bool LLMaterial::isNull() const
@@ -426,18 +500,18 @@ bool LLMaterial::operator != (const LLMaterial& rhs) const
 }
 
 
-U32 LLMaterial::getShaderMask(U32 alpha_mode)
+U32 LLMaterial::getShaderMask(U32 alpha_mode, BOOL is_alpha)
 { //NEVER incorporate this value into the message system -- this function will vary depending on viewer implementation
-    U32 ret = 0;
 
-    //two least significant bits are "diffuse alpha mode"
-    if (alpha_mode != DIFFUSE_ALPHA_MODE_DEFAULT)
+	//two least significant bits are "diffuse alpha mode"
+	U32 ret = alpha_mode;
+    if (ret == DIFFUSE_ALPHA_MODE_DEFAULT)
     {
-        ret = alpha_mode;
-    }
-    else
-    {
-        ret = getDiffuseAlphaMode();
+		ret = getDiffuseAlphaMode();
+		if (ret == DIFFUSE_ALPHA_MODE_BLEND && !is_alpha)
+		{
+			ret = DIFFUSE_ALPHA_MODE_NONE;
+		}
     }
 
     llassert(ret < SHADER_COUNT);
@@ -464,4 +538,12 @@ U32 LLMaterial::getShaderMask(U32 alpha_mode)
     return ret;
 }
 
+LLUUID LLMaterial::getHash() const
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    // HACK - hash the bytes of this LLMaterial, but trim off the S32 in LLRefCount
+    LLUUID id;
+    HBXXH128::digest(id, (unsigned char*)this + sizeof(LLRefCount), sizeof(*this) - sizeof(LLRefCount));
+    return id;
+}
 

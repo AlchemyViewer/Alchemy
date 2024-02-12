@@ -42,6 +42,7 @@
 
 
 #ifdef LL_WINDOWS
+
 const DWORD MS_VC_EXCEPTION=0x406D1388;
 
 #pragma pack(push,8)
@@ -123,24 +124,31 @@ LL_COMMON_API void assert_main_thread()
     }
 }
 
-// this function has become moot
-void LLThread::registerThreadID() {}
-
 //
-// Handed to the APR thread creation function
+// Handed to the thread creation function
 //
 void LLThread::threadRun()
 {
+    // Set thread state to running
+    mStatus = RUNNING;
+
 #ifdef LL_WINDOWS
     set_thread_name(mName.c_str());
+
+#if 0 // probably a bad idea, see usage of SetThreadIdealProcessor in LLWindowWin32)
+    HANDLE hThread = GetCurrentThread();
+    if (hThread)
+    {
+        SetThreadAffinityMask(hThread, (DWORD_PTR) 0xFFFFFFFFFFFFFFFE);
+    }
 #endif
 
-    // this is the first point at which we're actually running in the new thread
-    mID = currentID();
+#endif
+    LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
 
-#ifndef LL_RELEASE_FOR_DOWNLOAD
+#if 0
     // for now, hard code all LLThreads to report to single master thread recorder, which is known to be running on main thread
-    mRecorder = new LLTrace::ThreadRecorder(*LLTrace::get_master_thread_recorder());
+    mRecorder = std::make_unique<LLTrace::ThreadRecorder>(*LLTrace::get_master_thread_recorder());
 #endif
 
     // Run the user supplied function
@@ -148,7 +156,9 @@ void LLThread::threadRun()
     {
         try
         {
+            LL_PROFILER_THREAD_BEGIN(mName.c_str());
             run();
+            LL_PROFILER_THREAD_END(mName.c_str());
         }
         catch (const LLContinueError &e)
         {
@@ -166,9 +176,8 @@ void LLThread::threadRun()
 
     //LL_INFOS() << "LLThread::staticRun() Exiting: " << threadp->mName << LL_ENDL;
 
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-    delete mRecorder;
-    mRecorder = NULL;
+#if 0
+    mRecorder.reset();
 #endif
 
     // We're done with the run function, this thread is done executing now.
@@ -181,14 +190,10 @@ void LLThread::threadRun()
 LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
     mPaused(FALSE),
     mName(name),
-    mThreadp(NULL),
     mStatus(STOPPED)
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-    , mRecorder(NULL)
-#endif
 {
-    mRunCondition = new LLCondition();
-    mDataLock = new LLMutex();
+    mRunCondition = std::make_unique<LLCondition>();
+    mDataLock = std::make_unique<LLMutex>();
     mLocalAPRFilePoolp = NULL ;
 }
 
@@ -248,59 +253,59 @@ void LLThread::shutdown()
         if (!isStopped())
         {
             // This thread just wouldn't stop, even though we gave it time
-            //LL_WARNS() << "LLThread::~LLThread() exiting thread before clean exit!" << LL_ENDL;
+            LL_WARNS() << "LLThread::~LLThread() exiting thread: " << mName << " before clean exit!" << LL_ENDL;
             // Put a stake in its heart. (A very hostile method to force a thread to quit)
 #if		LL_WINDOWS
             TerminateThread(mNativeHandle, 0);
 #else
             pthread_cancel(mNativeHandle);
 #endif
-#ifndef LL_RELEASE_FOR_DOWNLOAD
-            delete mRecorder;
-            mRecorder = NULL;
+#if 0
+            mRecorder.reset();
 #endif
             mStatus = STOPPED;
             return;
         }
-        delete mThreadp;
-        mThreadp = NULL;
     }
 
-    delete mRunCondition;
-    mRunCondition = NULL;
-
-    delete mDataLock;
-    mDataLock = NULL;
-#ifndef LL_RELEASE_FOR_DOWNLOAD
+    mThreadp.reset();
+    mRunCondition.reset();
+    mDataLock.reset();
+#if 0
     if (mRecorder)
     {
         // missed chance to properly shut down recorder (needs to be done in thread context)
         // probably due to abnormal thread termination
         // so just leak it and remove it from parent
-        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder);
+        LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder.release());
     }
 #endif
 }
 
-
 void LLThread::start()
 {
     llassert(isStopped());
-    
-    // Set thread state to running
-    mStatus = RUNNING;
-
     try
     {
-        mThreadp = new std::thread(std::bind(&LLThread::threadRun, this));
+        mThreadp = std::make_unique<std::thread>(std::bind(&LLThread::threadRun, this));
         mNativeHandle = mThreadp->native_handle();
-		mThreadp->detach();
+        mThreadp->detach();
 	}
 	catch (const std::system_error& err)
 	{
-		mStatus = CRASHED;
+		mStatus = STOPPED;
 		LL_WARNS() << "Failed to start thread: \"" << mName << "\" due to error: " << err.what() << LL_ENDL;
 	}
+    catch (const std::bad_alloc& err)
+	{
+		mStatus = CRASHED;
+		LL_WARNS() << "Failed to allocate thread: \"" << mName << "\" due to error: " << err.what() << LL_ENDL;
+	}
+}
+
+LLThread::id_t LLThread::getID() const
+{
+    return mThreadp ? mThreadp->get_id() : std::thread::id();
 }
 
 //============================================================================
@@ -339,6 +344,7 @@ bool LLThread::runCondition(void)
 // Stop thread execution if requested until unpaused.
 void LLThread::checkPause()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
     mDataLock->lock();
 
     // This is in a while loop because the pthread API allows for spurious wakeups.
@@ -370,17 +376,20 @@ void LLThread::setQuitting()
 // static
 LLThread::id_t LLThread::currentID()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
     return std::this_thread::get_id();
 }
 
 // static
 void LLThread::yield()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
     std::this_thread::yield();
 }
 
 void LLThread::wake()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
     mDataLock->lock();
     if(!shouldSleep())
     {
@@ -391,6 +400,7 @@ void LLThread::wake()
 
 void LLThread::wakeLocked()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
     if(!shouldSleep())
     {
         mRunCondition->signal();
@@ -399,11 +409,13 @@ void LLThread::wakeLocked()
 
 void LLThread::lockData()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
     mDataLock->lock();
 }
 
 void LLThread::unlockData()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
     mDataLock->unlock();
 }
 

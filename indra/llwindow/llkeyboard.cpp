@@ -148,6 +148,22 @@ void LLKeyboard::addKeyName(KEY key, const std::string& name)
 	sNamesToKeys[nameuc] = key;
 }
 
+void LLKeyboard::resetKeyDownAndHandle()
+{
+    MASK mask = currentMask(FALSE);
+    for (S32 i = 0; i < KEY_COUNT; i++)
+    {
+        if (mKeyLevel[i])
+        {
+            mKeyDown[i] = FALSE;
+            mKeyLevel[i] = FALSE;
+            mKeyUp[i] = TRUE;
+            mCurTranslatedKey = (KEY)i;
+            mCallbacks->handleTranslatedKeyUp(i, mask);
+        }
+    }
+}
+
 // BUG this has to be called when an OS dialog is shown, otherwise modifier key state
 // is wrong because the keyup event is never received by the main window. JC
 void LLKeyboard::resetKeys()
@@ -350,6 +366,45 @@ std::string LLKeyboard::stringFromKey(KEY key, bool translate)
 }
 
 //static
+std::string LLKeyboard::stringFromMouse(EMouseClickType click, bool translate)
+{
+    std::string res;
+    switch (click)
+    {
+        case CLICK_LEFT:
+            res = "LMB";
+            break;
+        case CLICK_MIDDLE:
+            res = "MMB";
+            break;
+        case CLICK_RIGHT:
+            res = "RMB";
+            break;
+        case CLICK_BUTTON4:
+            res = "MB4";
+            break;
+        case CLICK_BUTTON5:
+            res = "MB5";
+            break;
+        case CLICK_DOUBLELEFT:
+            res = "Double LMB";
+            break;
+        default:
+            break;
+    }
+
+    if (translate && !res.empty())
+    {
+        LLKeyStringTranslatorFunc* trans = gKeyboard->mStringTranslator;
+        if (trans != NULL)
+        {
+            res = trans(res.c_str());
+        }
+    }
+    return res;
+}
+
+//static
 std::string LLKeyboard::stringFromAccelerator(MASK accel_mask)
 {
     std::string res;
@@ -416,6 +471,18 @@ std::string LLKeyboard::stringFromAccelerator( MASK accel_mask, KEY key )
 	return res;
 }
 
+//static
+std::string LLKeyboard::stringFromAccelerator(MASK accel_mask, EMouseClickType click)
+{
+    std::string res;
+    if (CLICK_NONE == click)
+    {
+        return res;
+    }
+    res.append(stringFromAccelerator(accel_mask));
+    res.append(stringFromMouse(click));
+    return res;
+}
 
 //static
 BOOL LLKeyboard::maskFromString(std::string_view instring, MASK* mask)

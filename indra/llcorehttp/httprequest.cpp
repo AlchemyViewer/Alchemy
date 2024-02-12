@@ -32,7 +32,6 @@
 #include "_httppolicy.h"
 #include "_httpoperation.h"
 #include "_httpoprequest.h"
-#include "_httpopsetpriority.h"
 #include "_httpopcancel.h"
 #include "_httpopsetget.h"
 
@@ -130,7 +129,7 @@ HttpHandle HttpRequest::setPolicyOption(EPolicyOption opt, policy_t pclass,
 {
 	HttpStatus status;
 
-    HttpOpSetGet::ptr_t op = boost::make_shared<HttpOpSetGet>();
+    HttpOpSetGet::ptr_t op = std::make_shared<HttpOpSetGet>();
 	if (! (status = op->setupSet(opt, pclass, value)))
 	{
 		mLastReqStatus = status;
@@ -153,7 +152,7 @@ HttpHandle HttpRequest::setPolicyOption(EPolicyOption opt, policy_t pclass,
 {
 	HttpStatus status;
 
-	HttpOpSetGet::ptr_t op = boost::make_shared<HttpOpSetGet>();
+	HttpOpSetGet::ptr_t op = std::make_shared<HttpOpSetGet>();
 	if (! (status = op->setupSet(opt, pclass, value)))
 	{
 		mLastReqStatus = status;
@@ -183,16 +182,16 @@ HttpStatus HttpRequest::getStatus() const
 
 
 HttpHandle HttpRequest::requestGet(policy_t policy_id,
-								   priority_t priority,
 								   const std::string & url,
                                    const HttpOptions::ptr_t & options,
 								   const HttpHeaders::ptr_t & headers,
 								   HttpHandler::ptr_t user_handler)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 	HttpStatus status;
 
-	HttpOpRequest::ptr_t op = boost::make_shared<HttpOpRequest>();
-	if (! (status = op->setupGet(policy_id, priority, url, options, headers)))
+	HttpOpRequest::ptr_t op = std::make_shared<HttpOpRequest>();
+	if (! (status = op->setupGet(policy_id, url, options, headers)))
 	{
 		mLastReqStatus = status;
         return LLCORE_HTTP_HANDLE_INVALID;
@@ -210,7 +209,6 @@ HttpHandle HttpRequest::requestGet(policy_t policy_id,
 
 
 HttpHandle HttpRequest::requestGetByteRange(policy_t policy_id,
-											priority_t priority,
 											const std::string & url,
 											size_t offset,
 											size_t len,
@@ -218,10 +216,11 @@ HttpHandle HttpRequest::requestGetByteRange(policy_t policy_id,
 											const HttpHeaders::ptr_t & headers,
 											HttpHandler::ptr_t user_handler)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 	HttpStatus status;
 
-	HttpOpRequest::ptr_t op = boost::make_shared<HttpOpRequest>();
-	if (! (status = op->setupGetByteRange(policy_id, priority, url, offset, len, options, headers)))
+	HttpOpRequest::ptr_t op = std::make_shared<HttpOpRequest>();
+	if (! (status = op->setupGetByteRange(policy_id, url, offset, len, options, headers)))
 	{
 		mLastReqStatus = status;
         return LLCORE_HTTP_HANDLE_INVALID;
@@ -239,7 +238,6 @@ HttpHandle HttpRequest::requestGetByteRange(policy_t policy_id,
 
 
 HttpHandle HttpRequest::requestPost(policy_t policy_id,
-									priority_t priority,
 									const std::string & url,
 									BufferArray * body,
                                     const HttpOptions::ptr_t & options,
@@ -248,8 +246,8 @@ HttpHandle HttpRequest::requestPost(policy_t policy_id,
 {
 	HttpStatus status;
 
-	HttpOpRequest::ptr_t op = boost::make_shared<HttpOpRequest>();
-	if (! (status = op->setupPost(policy_id, priority, url, body, options, headers)))
+	HttpOpRequest::ptr_t op = std::make_shared<HttpOpRequest>();
+	if (! (status = op->setupPost(policy_id, url, body, options, headers)))
 	{
 		mLastReqStatus = status;
         return LLCORE_HTTP_HANDLE_INVALID;
@@ -267,7 +265,6 @@ HttpHandle HttpRequest::requestPost(policy_t policy_id,
 
 
 HttpHandle HttpRequest::requestPut(policy_t policy_id,
-								   priority_t priority,
 								   const std::string & url,
 								   BufferArray * body,
                                    const HttpOptions::ptr_t & options,
@@ -276,8 +273,8 @@ HttpHandle HttpRequest::requestPut(policy_t policy_id,
 {
 	HttpStatus status;
 
-	HttpOpRequest::ptr_t op = boost::make_shared<HttpOpRequest>();
-	if (! (status = op->setupPut(policy_id, priority, url, body, options, headers)))
+	HttpOpRequest::ptr_t op = std::make_shared<HttpOpRequest>();
+	if (! (status = op->setupPut(policy_id, url, body, options, headers)))
 	{
 		mLastReqStatus = status;
         return LLCORE_HTTP_HANDLE_INVALID;
@@ -294,7 +291,6 @@ HttpHandle HttpRequest::requestPut(policy_t policy_id,
 }
 
 HttpHandle HttpRequest::requestDelete(policy_t policy_id,
-    priority_t priority,
     const std::string & url,
     const HttpOptions::ptr_t & options,
     const HttpHeaders::ptr_t & headers,
@@ -302,8 +298,8 @@ HttpHandle HttpRequest::requestDelete(policy_t policy_id,
 {
     HttpStatus status;
 
-    HttpOpRequest::ptr_t op = boost::make_shared<HttpOpRequest>();
-    if (!(status = op->setupDelete(policy_id, priority, url, options, headers)))
+    HttpOpRequest::ptr_t op = std::make_shared<HttpOpRequest>();
+    if (!(status = op->setupDelete(policy_id, url, options, headers)))
     {
         mLastReqStatus = status;
         return LLCORE_HTTP_HANDLE_INVALID;
@@ -320,7 +316,6 @@ HttpHandle HttpRequest::requestDelete(policy_t policy_id,
 }
 
 HttpHandle HttpRequest::requestPatch(policy_t policy_id,
-    priority_t priority,
     const std::string & url,
     BufferArray * body,
     const HttpOptions::ptr_t & options,
@@ -329,8 +324,8 @@ HttpHandle HttpRequest::requestPatch(policy_t policy_id,
 {
     HttpStatus status;
 
-    HttpOpRequest::ptr_t op = boost::make_shared<HttpOpRequest>();
-    if (!(status = op->setupPatch(policy_id, priority, url, body, options, headers)))
+    HttpOpRequest::ptr_t op = std::make_shared<HttpOpRequest>();
+    if (!(status = op->setupPatch(policy_id, url, body, options, headers)))
     {
         mLastReqStatus = status;
         return LLCORE_HTTP_HANDLE_INVALID;
@@ -347,7 +342,6 @@ HttpHandle HttpRequest::requestPatch(policy_t policy_id,
 }
 
 HttpHandle HttpRequest::requestCopy(policy_t policy_id,
-    priority_t priority,
     const std::string & url,
     const HttpOptions::ptr_t & options,
     const HttpHeaders::ptr_t & headers,
@@ -355,8 +349,8 @@ HttpHandle HttpRequest::requestCopy(policy_t policy_id,
 {
     HttpStatus status;
 
-    HttpOpRequest::ptr_t op = boost::make_shared<HttpOpRequest>();
-    if (!(status = op->setupCopy(policy_id, priority, url, options, headers)))
+    HttpOpRequest::ptr_t op = std::make_shared<HttpOpRequest>();
+    if (!(status = op->setupCopy(policy_id, url, options, headers)))
     {
         mLastReqStatus = status;
         return LLCORE_HTTP_HANDLE_INVALID;
@@ -374,7 +368,6 @@ HttpHandle HttpRequest::requestCopy(policy_t policy_id,
 }
 
 HttpHandle HttpRequest::requestMove(policy_t policy_id,
-    priority_t priority,
     const std::string & url,
     const HttpOptions::ptr_t & options,
     const HttpHeaders::ptr_t & headers,
@@ -382,8 +375,8 @@ HttpHandle HttpRequest::requestMove(policy_t policy_id,
 {
     HttpStatus status;
 
-    HttpOpRequest::ptr_t op = boost::make_shared<HttpOpRequest>();
-    if (!(status = op->setupMove(policy_id, priority, url, options, headers)))
+    HttpOpRequest::ptr_t op = std::make_shared<HttpOpRequest>();
+    if (!(status = op->setupMove(policy_id, url, options, headers)))
     {
         mLastReqStatus = status;
         return LLCORE_HTTP_HANDLE_INVALID;
@@ -404,7 +397,7 @@ HttpHandle HttpRequest::requestNoOp(HttpHandler::ptr_t user_handler)
 {
 	HttpStatus status;
 
-	HttpOperation::ptr_t op = boost::make_shared<HttpOpNull>();
+	HttpOperation::ptr_t op = std::make_shared<HttpOpNull>();
 	op->setReplyPath(mReplyQueue, user_handler);
 	if (! (status = mRequestQueue->addOp(op)))			// transfers refcount
 	{
@@ -470,26 +463,8 @@ HttpHandle HttpRequest::requestCancel(HttpHandle request, HttpHandler::ptr_t use
 {
 	HttpStatus status;
 
-	HttpOperation::ptr_t op = boost::make_shared<HttpOpCancel>(request);
+	HttpOperation::ptr_t op = std::make_shared<HttpOpCancel>(request);
 	op->setReplyPath(mReplyQueue, user_handler);
-	if (! (status = mRequestQueue->addOp(op)))			// transfers refcount
-	{
-		mLastReqStatus = status;
-        return LLCORE_HTTP_HANDLE_INVALID;
-	}
-
-	mLastReqStatus = status;
-	return op->getHandle();
-}
-
-
-HttpHandle HttpRequest::requestSetPriority(HttpHandle request, priority_t priority,
-										   HttpHandler::ptr_t handler)
-{
-	HttpStatus status;
-
-	HttpOperation::ptr_t op = boost::make_shared<HttpOpSetPriority>(request, priority);
-	op->setReplyPath(mReplyQueue, handler);
 	if (! (status = mRequestQueue->addOp(op)))			// transfers refcount
 	{
 		mLastReqStatus = status;
@@ -551,7 +526,7 @@ HttpHandle HttpRequest::requestStopThread(HttpHandler::ptr_t user_handler)
 	HttpStatus status;
 	HttpHandle handle(LLCORE_HTTP_HANDLE_INVALID);
 
-	HttpOperation::ptr_t op = boost::make_shared<HttpOpStop>();
+	HttpOperation::ptr_t op = std::make_shared<HttpOpStop>();
 	op->setReplyPath(mReplyQueue, user_handler);
 	if (! (status = mRequestQueue->addOp(op)))			// transfers refcount
 	{
@@ -571,7 +546,7 @@ HttpHandle HttpRequest::requestSpin(int mode)
 	HttpStatus status;
 	HttpHandle handle(LLCORE_HTTP_HANDLE_INVALID);
 
-	HttpOperation::ptr_t op = boost::make_shared<HttpOpSpin>(mode);
+	HttpOperation::ptr_t op = std::make_shared<HttpOpSpin>(mode);
     op->setReplyPath(mReplyQueue, HttpHandler::ptr_t());
 	if (! (status = mRequestQueue->addOp(op)))			// transfers refcount
 	{

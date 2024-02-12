@@ -41,6 +41,9 @@
 #include "llstring.h"
 #include "llfasttimer.h"
 
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
 static const F64 DATE_EPOCH = 0.0;
 
 static const F64 LL_APR_USEC_PER_SEC = 1000000.0;
@@ -82,11 +85,9 @@ std::string LLDate::asRFC1123() const
 	return toHTTPDateString (std::string ("%A, %d %b %Y %H:%M:%S GMT"));
 }
 
-LLTrace::BlockTimerStatHandle FT_DATE_FORMAT("Date Format");
-
 std::string LLDate::toHTTPDateString (const std::string& fmt) const
 {
-	LL_RECORD_BLOCK_TIME(FT_DATE_FORMAT);
+    LL_PROFILE_ZONE_SCOPED;
 	
 	time_t locSeconds = (time_t) mSecondsSinceEpoch;
 	struct tm * gmt = gmtime (&locSeconds);
@@ -95,7 +96,7 @@ std::string LLDate::toHTTPDateString (const std::string& fmt) const
 
 std::string LLDate::toHTTPDateString (tm * gmt, const std::string& fmt)
 {
-	LL_RECORD_BLOCK_TIME(FT_DATE_FORMAT);
+    LL_PROFILE_ZONE_SCOPED;
 
 	// avoid calling setlocale() unnecessarily - it's expensive.
 	static std::string prev_locale = "";
@@ -182,7 +183,9 @@ bool LLDate::split(S32 *year, S32 *month, S32 *day, S32 *hour, S32 *min, S32 *se
 
 bool LLDate::fromString(const std::string& iso8601_date)
 {
-	std::istringstream stream(iso8601_date);
+	if(iso8601_date.empty()) return false;
+
+	boost::iostreams::stream<boost::iostreams::array_source> stream(iso8601_date.data(), iso8601_date.size());
 	return fromStream(stream);
 }
 

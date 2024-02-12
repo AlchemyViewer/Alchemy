@@ -31,6 +31,9 @@
 
 #include "llstreamingaudio.h"
 #include "lltimer.h"
+#include "llsd.h"
+
+#include "boost/signals2.hpp"
 
 //Stubs
 class LLAudioStreamManagerFMODSTUDIO;
@@ -62,8 +65,7 @@ class LLStreamingAudio_FMODSTUDIO final : public LLStreamingAudioInterface
 	/*virtual*/ void setBufferSizes(U32 streambuffertime, U32 decodebuffertime) override;
 
 	/*virtual*/ bool supportsMetaData() override {return true;}
-	/*virtual*/ const LLSD *getMetaData() override { return mMetaData; }	//return NULL if not playing.
-	/*virtual*/ bool hasNewMetaData() override;
+	/*virtual*/ LLSD getMetadata() const override { return mMetadata; }	//return NULL if not playing.
 	/*virtual*/ bool supportsWaveData() override {return true;}
 	/*virtual*/ bool getWaveData(float* arr, S32 count, S32 stride = 1) override;
 private:
@@ -82,8 +84,9 @@ private:
 	std::string mPendingURL;
 	F32 mGain;
 
-	LLSD *mMetaData;
-	bool mNewMetadata;
+    bool mWasAlreadyPlaying;
+
+	LLSD mMetadata;
 };
 
 

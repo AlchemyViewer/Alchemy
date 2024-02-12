@@ -108,7 +108,6 @@ namespace
 
     //---------------------------------------------------------------------
     LLTrace::BlockTimerStatHandle   FTM_ENVIRONMENT_UPDATE("Update Environment Tick");
-    LLTrace::BlockTimerStatHandle   FTM_SHADER_PARAM_UPDATE("Update Shader Parameters");
 
     LLSettingsBase::Seconds         DEFAULT_UPDATE_THRESHOLD(10.0);
     const LLSettingsBase::Seconds   MINIMUM_SPANLENGTH(0.01f);
@@ -172,6 +171,9 @@ namespace
     // Find normalized track position of given time along full length of cycle
     inline LLSettingsBase::TrackPosition convert_time_to_position(const LLSettingsBase::Seconds& time, const LLSettingsBase::Seconds& len)
     {
+        // early out to avoid divide by zero.  if len is zero then jump to end position
+        if (len == 0.f) return 1.f;
+
         LLSettingsBase::TrackPosition position = LLSettingsBase::TrackPosition(fmod((F64)time, (F64)len) / (F64)len);
         return llclamp(position, 0.0f, 1.0f);
     }
@@ -615,6 +617,7 @@ namespace
             specialSet.insert(SETTING_CLOUD_TEXTUREID);
             specialSet.insert(SETTING_MOON_TEXTUREID);
             specialSet.insert(SETTING_SUN_TEXTUREID);
+            specialSet.insert(SETTING_CLOUD_SHADOW); // due to being part of skips
         }
         return specialSet;
     }
@@ -655,6 +658,7 @@ namespace
     template<>
     void LLSettingsInjected<LLSettingsVOSky>::updateSpecial(const typename LLSettingsInjected<LLSettingsVOSky>::Injection::ptr_t &injection, typename LLSettingsBase::BlendFactor mix)
     {
+        bool is_texture = true;
         if (injection->mKeyName == SETTING_SUN_TEXTUREID)
         {
             mNextSunTextureId = injection->mValue.asUUID();
@@ -679,9 +683,28 @@ namespace
         {
             mNextHaloTextureId = injection->mValue.asUUID();
         }
+        else if (injection->mKeyName == LLSettingsSky::SETTING_CLOUD_SHADOW)
+        {
+            // Special case due to being texture dependent and part of skips
+            is_texture = false;
+            if (!injection->mBlendIn)
+                mix = 1.0 - mix;
+            stringset_t dummy;
+            F64 value = this->mSettings[injection->mKeyName].asReal();
+            if (this->getCloudNoiseTextureId().isNull())
+            {
+                value = 0; // there was no texture so start from zero coverage
+            }
+            // Ideally we need to check for texture in injection, but
+            // in this case user is setting value explicitly, potentially
+            // with different transitions, don't ignore it
+            F64 result = ll_lerp(value, injection->mValue.asReal(), mix);
+            injection->mLastValue = LLSD::Real(result);
+            this->mSettings[injection->mKeyName] = injection->mLastValue;
+        }
 
         // Unfortunately I don't have a per texture blend factor.  We'll just pick the one that is furthest along.
-        if (getBlendFactor() < mix)
+        if (is_texture && getBlendFactor() < mix)
         {
             setBlendFactor(mix);
         }
@@ -795,7 +818,8 @@ const F64Seconds LLEnvironment::TRANSITION_SLOW(10.0f);
 const F64Seconds LLEnvironment::TRANSITION_ALTITUDE(5.0f);
 
 const LLUUID LLEnvironment::KNOWN_SKY_SUNRISE("01e41537-ff51-2f1f-8ef7-17e4df760bfb");
-const LLUUID LLEnvironment::KNOWN_SKY_MIDDAY("6c83e853-e7f8-cad7-8ee6-5f31c453721c");
+const LLUUID LLEnvironment::KNOWN_SKY_MIDDAY("c46226b4-0e43-5a56-9708-d27ca1df3292");
+const LLUUID LLEnvironment::KNOWN_SKY_LEGACY_MIDDAY("cef49723-0292-af49-9b14-9598a616b8a3");
 const LLUUID LLEnvironment::KNOWN_SKY_SUNSET("084e26cd-a900-28e8-08d0-64a9de5c15e2");
 const LLUUID LLEnvironment::KNOWN_SKY_MIDNIGHT("8a01b97a-cb20-c1ea-ac63-f7ea84ad0090");
 
@@ -828,7 +852,6 @@ std::string env_selection_to_string(LLEnvironment::EnvSelection_t sel)
 #undef RTNENUM
 }
 
-
 //-------------------------------------------------------------------------
 LLEnvironment::LLEnvironment():
     mCloudScrollDelta(),
@@ -857,27 +880,51 @@ void LLEnvironment::initSingleton()
 
     requestRegion();
 
-    gAgent.addParcelChangedCallback([this]() { onParcelChange(); });
+    if (!mParcelCallbackConnection.connected())
+    {
+        mParcelCallbackConnection = gAgent.addParcelChangedCallback([this]() { onParcelChange(); });
 
-    //TODO: This frequently results in one more request than we need.  It isn't breaking, but should be nicer.
-    // We need to know new env version to fix this, without it we can only do full re-request
-    // Happens: on updates, on opening LLFloaterRegionInfo, on region crossing if info floater is open
-    LLRegionInfoModel::instance().setUpdateCallback([this]() { requestRegion(); });
-    gAgent.addRegionChangedCallback([this]() { onRegionChange(); });
+        //TODO: This frequently results in one more request than we need.  It isn't breaking, but should be nicer.
+        // We need to know new env version to fix this, without it we can only do full re-request
+        // Happens: on updates, on opening LLFloaterRegionInfo, on region crossing if info floater is open
+        mRegionUpdateCallbackConnection = LLRegionInfoModel::instance().setUpdateCallback([this]() { requestRegion(); });
+        mRegionChangeCallbackConnection = gAgent.addRegionChangedCallback([this]() { onRegionChange(); });
 
-    gAgent.whenPositionChanged([this](const LLVector3 &localpos, const LLVector3d &) { onAgentPositionHasChanged(localpos); });
+        mPositionCallbackConnection = gAgent.whenPositionChanged([this](const LLVector3 &localpos, const LLVector3d &) { onAgentPositionHasChanged(localpos); });
+    }
 
     if (!gGenericDispatcher.isHandlerPresent(MESSAGE_PUSHENVIRONMENT))
     {
         gGenericDispatcher.addHandler(MESSAGE_PUSHENVIRONMENT, &environment_push_dispatch_handler);
     }
 
+    gSavedSettings.getControl("RenderSkyAutoAdjustProbeAmbiance")->getSignal()->connect(
+        [](LLControlVariable*, const LLSD& new_val, const LLSD& old_val)
+        {
+            LLSettingsSky::sAutoAdjustProbeAmbiance = new_val.asReal();
+        }
+    );
+    LLSettingsSky::sAutoAdjustProbeAmbiance = gSavedSettings.getF32("RenderSkyAutoAdjustProbeAmbiance");
+
+    LLEventPumps::instance().obtain(PUMP_EXPERIENCE).stopListening(LISTENER_NAME);
     LLEventPumps::instance().obtain(PUMP_EXPERIENCE).listen(LISTENER_NAME, [this](LLSD message) { listenExperiencePump(message); return false; });
 }
 
 void LLEnvironment::cleanupSingleton()
 {
+    if (mParcelCallbackConnection.connected())
+    {
+        mParcelCallbackConnection.disconnect();
+        mRegionUpdateCallbackConnection.disconnect();
+        mRegionChangeCallbackConnection.disconnect();
+        mPositionCallbackConnection.disconnect();
+    }
     LLEventPumps::instance().obtain(PUMP_EXPERIENCE).stopListening(LISTENER_NAME);
+}
+
+LLEnvironment::~LLEnvironment()
+{
+    cleanupSingleton();
 }
 
 bool LLEnvironment::canEdit() const
@@ -923,7 +970,7 @@ const LLSettingsWater::ptr_t& LLEnvironment::getCurrentWater() const
 
 bool LLEnvironment::canAgentUpdateParcelEnvironment() const
 {
-    LLParcel *parcel(LLViewerParcelMgr::instanceFast().getAgentOrSelectedParcel());
+    LLParcel *parcel(LLViewerParcelMgr::instance().getAgentOrSelectedParcel());
 
     return canAgentUpdateParcelEnvironment(parcel);
 }
@@ -989,7 +1036,7 @@ void LLEnvironment::onRegionChange()
 void LLEnvironment::onParcelChange()
 {
     S32 parcel_id(INVALID_PARCEL_ID);
-    LLParcel* parcel = LLViewerParcelMgr::instanceFast().getAgentParcel();
+    LLParcel* parcel = LLViewerParcelMgr::instance().getAgentParcel();
 
     if (parcel)
     {
@@ -1092,6 +1139,10 @@ void LLEnvironment::setEnvironment(LLEnvironment::EnvSelection_t env, const LLSe
         mSignalEnvChanged(env, env_version);
 }
 
+void LLEnvironment::setCurrentEnvironmentSelection(LLEnvironment::EnvSelection_t env)
+{
+    mCurrentEnvironment->setEnvironmentSelection(env);
+}
 
 void LLEnvironment::setEnvironment(LLEnvironment::EnvSelection_t env, LLEnvironment::fixedEnvironment_t fixed, S32 env_version)
 {
@@ -1101,13 +1152,14 @@ void LLEnvironment::setEnvironment(LLEnvironment::EnvSelection_t env, LLEnvironm
         return;
     }
 
-    DayInstance::ptr_t environment = getEnvironmentInstance(env, true);
+    bool reset_probes = false;
 
+    DayInstance::ptr_t environment = getEnvironmentInstance(env, true);
 
     if (fixed.first)
     {
         logEnvironment(env, fixed.first, env_version);
-        environment->setSky(fixed.first);
+        reset_probes = environment->setSky(fixed.first);
         environment->setFlags(DayInstance::NO_ANIMATE_SKY);
     }
     else if (!environment->getSky())
@@ -1118,7 +1170,7 @@ void LLEnvironment::setEnvironment(LLEnvironment::EnvSelection_t env, LLEnvironm
             // and then add water/sky on top
             // This looks like it will result in sky using single keyframe instead of whole day if day is present
             // when setting static water without static sky
-            environment->setSky(mCurrentEnvironment->getSky());
+            reset_probes = environment->setSky(mCurrentEnvironment->getSky());
             environment->setFlags(DayInstance::NO_ANIMATE_SKY);
         }
         else
@@ -1136,7 +1188,7 @@ void LLEnvironment::setEnvironment(LLEnvironment::EnvSelection_t env, LLEnvironm
 
             if (substitute && substitute->getSky())
             {
-                environment->setSky(substitute->getSky());
+                reset_probes = environment->setSky(substitute->getSky());
                 environment->setFlags(DayInstance::NO_ANIMATE_SKY);
             }
             else
@@ -1186,6 +1238,11 @@ void LLEnvironment::setEnvironment(LLEnvironment::EnvSelection_t env, LLEnvironm
                 LL_WARNS("ENVIRONMENT") << "Failed to assign substitute water/sky, environment is not properly initialized" << LL_ENDL;
             }
         }
+    }
+
+    if (reset_probes)
+    { // the sky changed in a way that merits a reset of reflection probes
+        gPipeline.mReflectionMapManager.reset();
     }
 
     if (!mSignalEnvChanged.empty())
@@ -1429,6 +1486,7 @@ LLEnvironment::DayInstance::ptr_t LLEnvironment::getSharedEnvironmentInstance()
 
 void LLEnvironment::updateEnvironment(LLSettingsBase::Seconds transition, bool forced)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     DayInstance::ptr_t pinstance = getSelectedEnvironmentInstance();
 
     if ((mCurrentEnvironment != pinstance) || forced)
@@ -1446,6 +1504,8 @@ void LLEnvironment::updateEnvironment(LLSettingsBase::Seconds transition, bool f
         {
             mCurrentEnvironment = pinstance;
         }
+
+        updateSettingsUniforms();
     }
 }
 
@@ -1549,28 +1609,33 @@ LLVector4 LLEnvironment::getRotatedLightNorm() const
     return toLightNorm(light_direction);
 }
 
+extern BOOL gCubeSnapshot;
+
 //-------------------------------------------------------------------------
 void LLEnvironment::update(const LLViewerCamera * cam)
 {
-    LL_RECORD_BLOCK_TIME(FTM_ENVIRONMENT_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT; //LL_RECORD_BLOCK_TIME(FTM_ENVIRONMENT_UPDATE);
     //F32Seconds now(LLDate::now().secondsSinceEpoch());
-    static LLFrameTimer timer;
-
-    F32Seconds delta(timer.getElapsedTimeAndResetF32());
-
+    if (!gCubeSnapshot)
     {
-        DayInstance::ptr_t keeper = mCurrentEnvironment;    
-        // make sure the current environment does not go away until applyTimeDelta is done.
-        mCurrentEnvironment->applyTimeDelta(delta);
+        static LLFrameTimer timer;
 
+        F32Seconds delta(timer.getElapsedTimeAndResetF32());
+
+        {
+            DayInstance::ptr_t keeper = mCurrentEnvironment;
+            // make sure the current environment does not go away until applyTimeDelta is done.
+            mCurrentEnvironment->applyTimeDelta(delta);
+
+        }
+        // update clouds, sun, and general
+        updateCloudScroll();
+
+        // cache this for use in rotating the rotated light vec for shader param updates later...
+        mLastCamYaw = cam->getYaw() + SUN_DELTA_YAW;
     }
-    // update clouds, sun, and general
-    updateCloudScroll();
 
-    // cache this for use in rotating the rotated light vec for shader param updates later...
-    mLastCamYaw = cam->getYaw() + SUN_DELTA_YAW;
-
-    stop_glerror();
+    updateSettingsUniforms();
 
     // *TODO: potential optimization - this block may only need to be
     // executed some of the time.  For example for water shaders only.
@@ -1579,16 +1644,10 @@ void LLEnvironment::update(const LLViewerCamera * cam)
         end_shaders = LLViewerShaderMgr::instance()->endShaders();
         for (shaders_iter = LLViewerShaderMgr::instance()->beginShaders(); shaders_iter != end_shaders; ++shaders_iter)
         {
-			if ((shaders_iter->mProgramObject != 0) &&
-				(shaders_iter->mFeatures.atmosphericHelpers
-					|| shaders_iter->mFeatures.calculatesAtmospherics
-					|| shaders_iter->mFeatures.hasAtmospherics
-					|| shaders_iter->mFeatures.hasGamma
-					|| shaders_iter->mFeatures.hasTransport
-					|| shaders_iter->mFeatures.hasWaterFog) &&
-				(gPipeline.canUseWindLightShaders()
-					|| shaders_iter->mShaderGroup == LLGLSLShader::SG_WATER))
-			{
+            if ((shaders_iter->mProgramObject != 0)
+                && (gPipeline.canUseWindLightShaders()
+                || shaders_iter->mShaderGroup == LLGLSLShader::SG_WATER))
+            {
                 shaders_iter->mUniformsDirty = TRUE;
             }
         }
@@ -1605,20 +1664,34 @@ void LLEnvironment::updateCloudScroll()
     
     if (mCurrentEnvironment->getSky() && !mCloudScrollPaused)
     {
-        LLVector2 cloud_delta = static_cast<F32>(delta_t)* (mCurrentEnvironment->getSky()->getCloudScrollRate()) / 100.0;
-        mCloudScrollDelta += cloud_delta;
+        LLVector2 rate = mCurrentEnvironment->getSky()->getCloudScrollRate();
+        if (rate.isExactlyZero())
+        {
+            mCloudScrollDelta.setZero();
+        }
+        else
+        {
+            LLVector2 cloud_delta = static_cast<F32>(delta_t) * (mCurrentEnvironment->getSky()->getCloudScrollRate()) / 100.0;
+            mCloudScrollDelta += cloud_delta;
+        }
     }
 
 }
 
 // static
-void LLEnvironment::updateGLVariablesForSettings(LLGLSLShader *shader, const LLSettingsBase::ptr_t &psetting)
+void LLEnvironment::updateGLVariablesForSettings(LLShaderUniforms* uniforms, const LLSettingsBase::ptr_t &psetting)
 {
-    LL_RECORD_BLOCK_TIME(FTM_SHADER_PARAM_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    for (int i = 0; i < LLGLSLShader::SG_COUNT; ++i)
+    {
+        uniforms[i].clear();
+    }
+
+    LLShaderUniforms* shader = &uniforms[LLGLSLShader::SG_ANY];
     //_WARNS("RIDER") << "----------------------------------------------------------------" << LL_ENDL;
     const LLSettingsBase::parammapping_t& params = psetting->getParameterMap();
-    const auto& settings_map = psetting->mSettings.map();
+    const auto& settings_map = psetting->mSettings.asMap();
     for (const auto &it: params)
     {
         LLSD value;
@@ -1626,7 +1699,7 @@ void LLEnvironment::updateGLVariablesForSettings(LLGLSLShader *shader, const LLS
         auto legacy_haze_it = settings_map.find(LLSettingsSky::SETTING_LEGACY_HAZE);
         if (legacy_haze_it != settings_map.end())
         {
-            const auto& legacy_map = legacy_haze_it->second.map();
+            const auto& legacy_map = legacy_haze_it->second.asMap();
             auto legacy_setting_it = legacy_map.find(it.first);
             if (legacy_setting_it != legacy_map.end())
             {
@@ -1670,8 +1743,30 @@ void LLEnvironment::updateGLVariablesForSettings(LLGLSLShader *shader, const LLS
         case LLSD::TypeArray:
         {
             LLVector4 vect4(value);
+
+            if (gCubeSnapshot && !gPipeline.mReflectionMapManager.isRadiancePass())
+            { // maximize and remove tinting if this is an irradiance map render pass and the parameter feeds into the sky background color
+                auto max_vec = [](LLVector4 col)
+                {
+                    LLColor3 color(col);
+                    F32 h, s, l;
+                    color.calcHSL(&h, &s, &l);
+
+                    col.mV[0] = col.mV[1] = col.mV[2] = l;
+                    return col;
+                };
+
+                switch (it.second.getShaderKey())
+                { 
+                case LLShaderMgr::BLUE_HORIZON:
+                case LLShaderMgr::BLUE_DENSITY:
+                    vect4 = max_vec(vect4);
+                        break;
+                }
+            }
+
             //_WARNS("RIDER") << "pushing '" << (*it).first << "' as " << vect4 << LL_ENDL;
-            shader->uniform4fv(it.second.getShaderKey(), 1, vect4.mV);
+            shader->uniform3fv(it.second.getShaderKey(), LLVector3(vect4.mV) );
             break;
         }
 
@@ -1684,17 +1779,44 @@ void LLEnvironment::updateGLVariablesForSettings(LLGLSLShader *shader, const LLS
         default:
             break;
         }
-        stop_glerror();
     }
     //_WARNS("RIDER") << "----------------------------------------------------------------" << LL_ENDL;
 
-    psetting->applySpecial(shader);
+    psetting->applySpecial(uniforms);
 }
 
-void LLEnvironment::updateShaderUniforms(LLGLSLShader *shader)
+void LLEnvironment::updateShaderUniforms(LLGLSLShader* shader)
 {
-    updateGLVariablesForSettings(shader, mCurrentEnvironment->getWater());
-    updateGLVariablesForSettings(shader, mCurrentEnvironment->getSky());
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    // apply uniforms that should be applied to all shaders
+    mSkyUniforms[LLGLSLShader::SG_ANY].apply(shader);
+    mWaterUniforms[LLGLSLShader::SG_ANY].apply(shader);
+
+    // apply uniforms specific to the given shader's shader group
+    auto group = shader->mShaderGroup;
+    mSkyUniforms[group].apply(shader);
+    mWaterUniforms[group].apply(shader);
+}
+
+void LLEnvironment::updateSettingsUniforms()
+{
+    if (mCurrentEnvironment->getWater())
+    {
+        updateGLVariablesForSettings(mWaterUniforms, mCurrentEnvironment->getWater());
+    }
+    else
+    {
+        LL_WARNS("ENVIRONMENT") << "Failed to update GL variable for water settings, environment is not properly set" << LL_ENDL;
+    }
+    if (mCurrentEnvironment->getSky())
+    {
+        updateGLVariablesForSettings(mSkyUniforms, mCurrentEnvironment->getSky());
+    }
+    else
+    {
+        LL_WARNS("ENVIRONMENT") << "Failed to update GL variable for sky settings, environment is not properly set" << LL_ENDL;
+    }
 }
 
 void LLEnvironment::recordEnvironment(S32 parcel_id, LLEnvironment::EnvironmentInfo::ptr_t envinfo, LLSettingsBase::Seconds transition)
@@ -1836,7 +1958,7 @@ void LLEnvironment::requestParcel(S32 parcel_id, environment_apply_fn cb)
         {
             if (!cb)
             {
-                LLSettingsBase::Seconds transition = LLViewerParcelMgr::getInstanceFast()->getTeleportInProgress() ? TRANSITION_FAST : TRANSITION_DEFAULT;
+                LLSettingsBase::Seconds transition = LLViewerParcelMgr::getInstance()->getTeleportInProgress() ? TRANSITION_FAST : TRANSITION_DEFAULT;
                 cb = [this, transition](S32 pid, EnvironmentInfo::ptr_t envinfo)
                 {
                     clearEnvironment(ENV_PARCEL);
@@ -1853,7 +1975,7 @@ void LLEnvironment::requestParcel(S32 parcel_id, environment_apply_fn cb)
 
     if (!cb)
     {
-        LLSettingsBase::Seconds transition = LLViewerParcelMgr::getInstanceFast()->getTeleportInProgress() ? TRANSITION_FAST : TRANSITION_DEFAULT;
+        LLSettingsBase::Seconds transition = LLViewerParcelMgr::getInstance()->getTeleportInProgress() ? TRANSITION_FAST : TRANSITION_DEFAULT;
         cb = [this, transition](S32 pid, EnvironmentInfo::ptr_t envinfo) { recordEnvironment(pid, envinfo, transition); };
     }
 
@@ -1939,8 +2061,8 @@ void LLEnvironment::coroRequestEnvironment(S32 parcel_id, LLEnvironment::environ
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ResetEnvironment", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ResetEnvironment", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     std::string url = gAgent.getRegionCapability("ExtEnvironment");
     if (url.empty())
@@ -1950,10 +2072,8 @@ void LLEnvironment::coroRequestEnvironment(S32 parcel_id, LLEnvironment::environ
 
     if (parcel_id != INVALID_PARCEL_ID)
     {
-        std::stringstream query;
-
-        query << "?parcelid=" << parcel_id;
-        url += query.str();
+        url.append("?parcelid=");
+        url.append(fmt::to_string(parcel_id));
     }
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
@@ -1985,8 +2105,8 @@ void LLEnvironment::coroUpdateEnvironment(S32 parcel_id, S32 track_no, UpdateInf
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ResetEnvironment", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ResetEnvironment", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     std::string url = gAgent.getRegionCapability("ExtEnvironment");
     if (url.empty())
@@ -2091,8 +2211,8 @@ void LLEnvironment::coroResetEnvironment(S32 parcel_id, S32 track_no, environmen
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ResetEnvironment", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ResetEnvironment", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
 
     std::string url = gAgent.getRegionCapability("ExtEnvironment");
     if (url.empty())
@@ -2556,7 +2676,7 @@ void LLEnvironment::setExperienceEnvironment(LLUUID experience_id, LLSD data, F3
 
     if (!water.isUndefined())
     {
-        environment->injectWaterSettings(sky, experience_id, LLSettingsBase::Seconds(transition_time));
+        environment->injectWaterSettings(water, experience_id, LLSettingsBase::Seconds(transition_time));
     }
 
     if (updateenvironment)
@@ -2612,6 +2732,7 @@ LLEnvironment::DayInstance::ptr_t LLEnvironment::DayInstance::clone() const
 
 bool LLEnvironment::DayInstance::applyTimeDelta(const LLSettingsBase::Seconds& delta)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     ptr_t keeper(shared_from_this());   // makes sure that this does not go away while it is being worked on.
 
     bool changed(false);
@@ -2645,16 +2766,20 @@ void LLEnvironment::DayInstance::setDay(const LLSettingsDay::ptr_t &pday, LLSett
 }
 
 
-void LLEnvironment::DayInstance::setSky(const LLSettingsSky::ptr_t &psky)
+bool LLEnvironment::DayInstance::setSky(const LLSettingsSky::ptr_t &psky)
 {
     mInitialized = false;
 
+    bool changed = psky == nullptr || mSky == nullptr || mSky->getHash() != psky->getHash();
+    
     bool different_sky = mSky != psky;
     
     mSky = psky;
     mSky->mReplaced |= different_sky;
     mSky->update();
     mBlenderSky.reset();
+
+    return changed;
 }
 
 void LLEnvironment::DayInstance::setWater(const LLSettingsWater::ptr_t &pwater)
@@ -2804,11 +2929,19 @@ void LLEnvironment::DayTransition::animate()
                 setWater(mNextInstance->getWater());
     });
 
+
+    // pause probe updates and reset reflection maps on sky change
+    gPipeline.mReflectionMapManager.pause();
+    gPipeline.mReflectionMapManager.reset();
+
     mSky = mStartSky->buildClone();
     mBlenderSky = std::make_shared<LLSettingsBlenderTimeDelta>(mSky, mStartSky, mNextInstance->getSky(), mTransitionTime);
     mBlenderSky->setOnFinished(
         [this](LLSettingsBlender::ptr_t blender) {
         mBlenderSky.reset();
+
+        // resume reflection probe updates
+        gPipeline.mReflectionMapManager.resume();
 
         if (!mBlenderSky && !mBlenderWater)
             LLEnvironment::instance().mCurrentEnvironment = mNextInstance;
@@ -2993,7 +3126,7 @@ bool LLEnvironment::loadFromSettings()
         LL_INFOS("ENVIRONMENT") << "Unable to open previous session environment file " << user_filepath << LL_ENDL;
     }
 
-    if (!env_data.isMap() || env_data.size() == 0)
+    if (!env_data.isMap() || (env_data.size() == 0))
     {
         LL_DEBUGS("ENVIRONMENT") << "Empty map loaded from: " << user_filepath << LL_ENDL;
         return false;
@@ -3314,8 +3447,8 @@ namespace
     {
         LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
         LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-            httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("testExperiencesOnParcelCoro", httpPolicy));
-        LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+            httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("testExperiencesOnParcelCoro", httpPolicy));
+        LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
         std::string url = gAgent.getRegionCapability("ExperienceQuery");
 
         if (url.empty())
@@ -3356,7 +3489,7 @@ namespace
         }
 
         {
-            LLParcel* parcel = LLViewerParcelMgr::instanceFast().getAgentParcel();
+            LLParcel* parcel = LLViewerParcelMgr::instance().getAgentParcel();
             if (!parcel)
                 return;
 
@@ -3400,12 +3533,19 @@ namespace
             LLSettingsSky::ptr_t target_sky(start_sky->buildClone());
             mInjectedSky->setSource(target_sky);
 
+            // clear reflection probes and pause updates during sky change
+            gPipeline.mReflectionMapManager.pause();
+            gPipeline.mReflectionMapManager.reset();
+
             mBlenderSky = std::make_shared<LLSettingsBlenderTimeDelta>(target_sky, start_sky, psky, transition);
             mBlenderSky->setOnFinished(
                 [this, psky](LLSettingsBlender::ptr_t blender) 
                 {
                     mBlenderSky.reset();
                     mInjectedSky->setSource(psky);
+
+                    // resume updating reflection probes when done animating sky
+                    gPipeline.mReflectionMapManager.resume();
                     setSky(mInjectedSky);
                     if (!mBlenderWater && (countExperiencesActive() == 0))
                     {
@@ -3475,7 +3615,7 @@ namespace
     void DayInjection::onParcelChange()
     {
         S32 parcel_id(INVALID_PARCEL_ID);
-        LLParcel* parcel = LLViewerParcelMgr::instanceFast().getAgentParcel();
+        LLParcel* parcel = LLViewerParcelMgr::instance().getAgentParcel();
 
         if (!parcel)
             return;

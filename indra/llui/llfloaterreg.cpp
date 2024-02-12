@@ -41,7 +41,7 @@ LLFloaterReg::instance_map_t LLFloaterReg::sInstanceMap;
 LLFloaterReg::build_map_t LLFloaterReg::sBuildMap;
 LLFloaterReg::group_map_t LLFloaterReg::sGroupMap;
 bool LLFloaterReg::sBlockShowFloaters = false;
-absl::flat_hash_set<std::string> LLFloaterReg::sAlwaysShowableList;
+boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> LLFloaterReg::sAlwaysShowableList;
 
 static LLFloaterRegListener sFloaterRegListener;
 
@@ -481,8 +481,8 @@ void LLFloaterReg::registerControlVariables()
 		}
 	}
 
-	const LLSD& exclude_list = LLUI::getInstanceFast()->mSettingGroups["config"]->getLLSD("always_showable_floaters");
-	for (const auto& llsd_var : exclude_list.array())
+	const LLSD& exclude_list = LLUI::getInstance()->mSettingGroups["config"]->getLLSD("always_showable_floaters");
+	for (const auto& llsd_var : exclude_list.asArray())
 	{
 		sAlwaysShowableList.insert(llsd_var.asString());
 	}
@@ -555,6 +555,58 @@ void LLFloaterReg::toggleInstanceOrBringToFront(const LLSD& sdname, const LLSD& 
 			instance->closeHostedFloater();
 		}
 	}
+}
+
+// static
+// Same as toggleInstanceOrBringToFront but does not close floater.
+// unlike showInstance() does not trigger onOpen() if already open
+void LLFloaterReg::showInstanceOrBringToFront(const LLSD& sdname, const LLSD& key)
+{
+    std::string name = sdname.asString();
+    LLFloater* instance = getInstance(name, key);
+
+
+    if (!instance)
+    {
+        LL_DEBUGS() << "Unable to get instance of floater '" << name << "'" << LL_ENDL;
+        return;
+    }
+
+    // If hosted, we need to take that into account
+    LLFloater* host = instance->getHost();
+
+    if (host)
+    {
+        if (host->isMinimized() || !host->isShown() || !host->isFrontmost())
+        {
+            host->setMinimized(FALSE);
+            instance->openFloater(key);
+            instance->setVisibleAndFrontmost(true, key);
+        }
+        else if (!instance->getVisible())
+        {
+            instance->openFloater(key);
+            instance->setVisibleAndFrontmost(true, key);
+            instance->setFocus(TRUE);
+        }
+    }
+    else
+    {
+        if (instance->isMinimized())
+        {
+            instance->setMinimized(FALSE);
+            instance->setVisibleAndFrontmost(true, key);
+        }
+        else if (!instance->isShown())
+        {
+            instance->openFloater(key);
+            instance->setVisibleAndFrontmost(true, key);
+        }
+        else if (!instance->isFrontmost())
+        {
+            instance->setVisibleAndFrontmost(true, key);
+        }
+    }
 }
 
 // static

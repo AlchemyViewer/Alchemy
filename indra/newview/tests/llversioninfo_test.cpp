@@ -25,8 +25,6 @@
 
 #include "linden_common.h"
 
-#include "llviewerbuildconfig.h"
-
 #include "../test/lltut.h"
 
 #include "../llversioninfo.h"
@@ -87,7 +85,7 @@ namespace tut
 	template<> template<>
 	void versioninfo_object_t::test<1>()
 	{   
-		std::cout << "What we parsed from CMake: " << LL_VIEWER_VERSION_BUILD << std::endl;
+		std::cout << "What we parsed from CMake: " << LL_VIEWER_VERSION_PATCH << std::endl;
 		std::cout << "What we get from llversioninfo: " << LLVersionInfo::instance().getBuild() << std::endl;
 		ensure_equals("Major version", 
 					  LLVersionInfo::instance().getMajor(), 

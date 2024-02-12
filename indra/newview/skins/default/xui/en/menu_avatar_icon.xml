@@ -97,6 +97,13 @@
        <on_click function="AvatarIcon.Action" parameter="pay" />
        <on_enable function="AvatarIcon.Enable" parameter="can_pay" />
     </menu_item_call>
+    <menu_item_call
+     label="Report Abuse"
+     layout="topleft"
+     name="Report Abuse">
+       <on_click function="AvatarIcon.Action" parameter="report_abuse" />
+       <on_enable function="AvatarIcon.Enable" parameter="report_abuse" />
+    </menu_item_call>
     <menu_item_check
      label="Block Voice"
      layout="topleft"
@@ -157,14 +164,14 @@
     </menu_item_call>
   <menu_item_separator />
   <context_menu
-   label="Utilities"
+   label="Actions"
    name="Utilities">
     <menu_item_call
-     label="Copy Username"
-     name="Copy Username">
+     label="Copy Full Name"
+     name="Copy Full Name">
       <menu_item_call.on_click
        function="AvatarIcon.CopyData"
-       parameter="user_name"/>
+       parameter="full_name"/>
     </menu_item_call>
     <menu_item_call
      label="Copy Display Name"
@@ -174,11 +181,11 @@
        parameter="display_name"/>
     </menu_item_call>
     <menu_item_call
-     label="Copy Account Name"
-     name="Copy Account Name">
+     label="Copy Agent Name"
+     name="Copy Username">
       <menu_item_call.on_click
        function="AvatarIcon.CopyData"
-       parameter="account_name"/>
+       parameter="user_name"/>
     </menu_item_call>
     <menu_item_call
      label="Copy SLurl"
@@ -188,7 +195,7 @@
        parameter="slurl"/>
     </menu_item_call>
     <menu_item_call
-     label="Copy ID"
+     label="Copy UUID"
      name="Copy ID">
       <menu_item_call.on_click
        function="AvatarIcon.CopyData"

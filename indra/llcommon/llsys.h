@@ -51,14 +51,17 @@ public:
 	const std::string& getOSStringSimple() const;
 
 	const std::string& getOSVersionString() const;
+
+	const S32 getOSBitness() const;
 	
 	S32 mMajorVer;
 	S32 mMinorVer;
 	S32 mBuild;
 
 #ifndef LL_WINDOWS
-	static S32 getMaxOpenFiles();
+	static long getMaxOpenFiles();
 #endif
+	static bool is64Bit();
 
 	static U32 getProcessVirtualSizeKB();
 	static U32 getProcessResidentSizeKB();
@@ -66,6 +69,7 @@ private:
 	std::string mOSString;
 	std::string mOSStringSimple;
 	std::string mOSVersionString;
+	S32 mOSBitness;
 };
 
 
@@ -76,10 +80,16 @@ public:
 	void stream(std::ostream& s) const;
 
 	std::string getCPUString() const;
+	const LLSD& getSSEVersions() const;
 
 	bool hasAltivec() const;
 	bool hasSSE() const;
 	bool hasSSE2() const;
+    bool hasSSE3() const;
+    bool hasSSE3S() const;
+    bool hasSSE41() const;
+    bool hasSSE42() const;
+    bool hasSSE4a() const;
 	F64 getMHz() const;
 
 	// Family is "AMD Duron" or "Intel Pentium Pro"
@@ -88,10 +98,16 @@ public:
 private:
 	bool mHasSSE;
 	bool mHasSSE2;
+    bool mHasSSE3;
+    bool mHasSSE3S;
+    bool mHasSSE41;
+    bool mHasSSE42;
+    bool mHasSSE4a;
 	bool mHasAltivec;
 	F64 mCPUMHz;
 	std::string mFamily;
 	std::string mCPUString;
+    LLSD mSSEVersions;
 };
 
 //=============================================================================
@@ -113,7 +129,10 @@ public:
 	LLMemoryInfo(); ///< Default constructor
 	void stream(std::ostream& s) const;	///< output text info to s
 
-	U32Kilobytes getPhysicalMemoryKB() const; 
+	U32Kilobytes getPhysicalMemoryKB() const;
+#if LL_DARWIN
+    static U32Kilobytes getHardwareMemSize(); // Because some Mac linkers won't let us reference extern gSysMemory from a different lib.
+#endif
 
 	//get the available memory infomation in KiloBytes.
 	static void getAvailableMemoryKB(U32Kilobytes& avail_physical_mem_kb, U32Kilobytes& avail_virtual_mem_kb);

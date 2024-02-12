@@ -43,6 +43,7 @@ LL_ALIGN_16( const F32 F_OOU8MAX_4A[4] ) = { OOU8MAX, OOU8MAX, OOU8MAX, OOU8MAX 
 const U8 FIRSTVALIDCHAR = 54;
 const U8 MAXSTRINGVAL = U8MAX - FIRSTVALIDCHAR; //we don't allow newline or null 
 
+const U32 U24MAX = 16777215;
 
 inline U16 F32_to_U16_ROUND(F32 val, F32 lower, F32 upper)
 {
@@ -107,6 +108,16 @@ inline U8 F32_to_U8(F32 val, F32 lower, F32 upper)
 	return (U8)(llfloor(val*U8MAX));
 }
 
+inline U32 F32_to_U32(F32 val, F32 lower, F32 upper)
+{
+	val = llclamp(val, lower, upper);
+	// make sure that the value is positive and normalized to <0, 1>
+	val -= lower;
+	val /= (upper - lower);
+
+	return (U32)(ll_round(val*U24MAX));
+}
+
 inline F32 U8_to_F32(U8 ival, F32 lower, F32 upper)
 {
 	F32 val = ival*OOU8MAX;
@@ -130,7 +141,7 @@ inline U8 F32_TO_STRING(F32 val, F32 lower, F32 upper)
 	val -= lower;					//[0, upper-lower]
 	val /= (upper - lower);			//[0,1]
 	val = val * MAXSTRINGVAL;		//[0, MAXSTRINGVAL]
-	val = floor(val + 0.5f);		//[0, MAXSTRINGVAL]
+	val = floorf(val + 0.5f);		//[0, MAXSTRINGVAL]
 
 	U8 stringVal = (U8)(val) + FIRSTVALIDCHAR;			//[FIRSTVALIDCHAR, MAXSTRINGVAL + FIRSTVALIDCHAR]
 	return stringVal;

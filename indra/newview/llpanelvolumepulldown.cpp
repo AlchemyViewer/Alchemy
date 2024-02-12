@@ -66,8 +66,7 @@ void LLPanelVolumePulldown::onAdvancedButtonClick(const LLSD& user_data)
 	setVisible(FALSE);
 
 	// bring up the prefs floater
-	LLFloaterPreference* prefsfloater = dynamic_cast<LLFloaterPreference*>
-		(LLFloaterReg::showInstance("preferences"));
+	LLFloaterPreference* prefsfloater = LLFloaterReg::showTypedInstance<LLFloaterPreference>("preferences");
 	if (prefsfloater)
 	{
 		// grab the 'audio' panel from the preferences floater and

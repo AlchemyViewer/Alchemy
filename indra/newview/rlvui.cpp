@@ -142,7 +142,7 @@ void RlvUIEnabler::onToggleShowLoc()
 		{
 			const LLTeleportHistoryItem& tpItem = pTpHistory->getItems().back();
 			const LLTeleportHistoryPersistentItem& tpItemStg = pTpHistoryStg->getItems().back();
-			if (pTpHistoryStg->compareByTitleAndGlobalPos(tpItemStg, LLTeleportHistoryPersistentItem(tpItem.mTitle, tpItem.mGlobalPos)))
+			if (pTpHistoryStg->compareByTitleAndGlobalPos(tpItemStg, LLTeleportHistoryPersistentItem(tpItem.mGrid, tpItem.mRegion, tpItem.mTitle, tpItem.mLocalPos, tpItem.mGlobalPos)))
 			{
 				// TODO-RLVa: [RLVa-1.2.2] Is there a reason why LLTeleportHistoryStorage::removeItem() doesn't trigger history changed?
 				pTpHistoryStg->removeItem(pTpHistoryStg->getItems().size() - 1);
@@ -341,7 +341,7 @@ bool RlvUIEnabler::filterFloaterShowLoc(std::string_view strName, const LLSD&)
 }
 
 // Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
-bool RlvUIEnabler::filterPanelShowLoc(const std::string& strFloater, const std::string&, const LLSD& sdKey)
+bool RlvUIEnabler::filterPanelShowLoc(std::string_view strFloater, std::string_view, const LLSD& sdKey)
 {
 	if ("places" == strFloater)
 	{
@@ -386,13 +386,13 @@ bool RlvUIEnabler::canViewParcelProperties()
 	{
 		// RELEASE-RLVa: [SL-3.2] Check that opening the "About Land" floater still sets focus to the current parcel is none is selected
 		const LLParcel* pParcel = NULL;
-		if (LLViewerParcelMgr::getInstanceFast()->selectionEmpty())
+		if (LLViewerParcelMgr::getInstance()->selectionEmpty())
 		{
-			pParcel = LLViewerParcelMgr::getInstanceFast()->getAgentParcel();
+			pParcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
 		}
 		else
 		{
-			LLParcelSelection* pParcelSel = LLViewerParcelMgr::getInstanceFast()->getFloatingParcelSelection();
+			LLParcelSelection* pParcelSel = LLViewerParcelMgr::getInstance()->getFloatingParcelSelection();
 			if (pParcelSel->hasOthersSelected())
 				return false;
 			pParcel = pParcelSel->getParcel();

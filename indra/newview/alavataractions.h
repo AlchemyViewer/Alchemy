@@ -51,6 +51,7 @@ public:
 		E_DATA_USER_NAME = 0,
 		E_DATA_ACCOUNT_NAME,
 		E_DATA_DISPLAY_NAME,
+		E_DATA_COMPLETE_NAME,
 		E_DATA_SLURL,
 		E_DATA_UUID
 	};
@@ -92,6 +93,9 @@ public:
 	static void godKick(const LLUUID& id);
 	static void godFreeze(const LLUUID& id);
 	static void godUnfreeze(const LLUUID& id);
+
+	// Webprofile
+    static void showWebProfile(const LLUUID& id);
 
 private:
 	static bool handleParcelFreeze(const LLSD& notification, const LLSD& response);

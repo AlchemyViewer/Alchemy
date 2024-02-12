@@ -60,8 +60,8 @@
 #define RY_I	5
 #define RZ_I	3
 
-F32  LLViewerJoystick::sLastDelta[] = {0,0,0,0,0,0,0};
-F32  LLViewerJoystick::sDelta[] = {0,0,0,0,0,0,0};
+std::array<F32, 7>  LLViewerJoystick::sLastDelta = {0,0,0,0,0,0,0};
+std::array<F32, 7>  LLViewerJoystick::sDelta = {0,0,0,0,0,0,0};
 
 // These constants specify the maximum absolute value coming in from the device.
 // HACK ALERT! the value of MAX_JOYSTICK_INPUT_VALUE is not arbitrary as it 
@@ -253,7 +253,7 @@ void LLViewerJoystick::updateEnabled(bool autoenable)
 
 void LLViewerJoystick::setOverrideCamera(bool val)
 {
-	if (!gSavedSettings.getBOOL("JoystickEnabled"))
+	if (!mJoystickEnabled)
 	{
 		mOverrideCamera = FALSE;
 	}
@@ -323,6 +323,76 @@ LLViewerJoystick::LLViewerJoystick()
 	mPerfScale = 4000.f / gSysCPU.getMHz(); // hmm.  why?
 
     mLastDeviceUUID = LLSD::Integer(1);
+
+	gSavedSettings.getControl("JoystickEnabled")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("JoystickAxis0")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("JoystickAxis1")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("JoystickAxis2")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("JoystickAxis3")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("JoystickAxis4")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("JoystickAxis5")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("JoystickAxis6")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("Cursor3D")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AutoLeveling")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("ZoomDirect")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("JoystickAvatarEnabled")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("JoystickBuildEnabled")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("JoystickFlycamEnabled")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("AvatarAxisScale0")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisScale1")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisScale2")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisScale3")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisScale4")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisScale5")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("BuildAxisScale0")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisScale1")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisScale2")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisScale3")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisScale4")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisScale5")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("FlycamAxisScale0")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisScale1")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisScale2")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisScale3")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisScale4")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisScale5")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisScale6")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("AvatarAxisDeadZone0")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisDeadZone1")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisDeadZone2")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisDeadZone3")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisDeadZone4")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("AvatarAxisDeadZone5")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("BuildAxisDeadZone0")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisDeadZone1")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisDeadZone2")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisDeadZone3")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisDeadZone4")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildAxisDeadZone5")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("FlycamAxisDeadZone0")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisDeadZone1")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisDeadZone2")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisDeadZone3")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisDeadZone4")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisDeadZone5")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamAxisDeadZone6")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("AvatarFeathering")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("BuildFeathering")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+	gSavedSettings.getControl("FlycamFeathering")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	gSavedSettings.getControl("JoystickInvertPitch")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
+	refreshFromSettings();
 }
 
 // -----------------------------------------------------------------------------
@@ -435,6 +505,77 @@ void LLViewerJoystick::init(bool autoenable)
 #endif
 }
 
+void LLViewerJoystick::refreshFromSettings()
+{
+	mJoystickEnabled = gSavedSettings.getBOOL("JoystickEnabled");
+
+	mJoystickAxis[0] = gSavedSettings.getS32("JoystickAxis0");
+	mJoystickAxis[1] = gSavedSettings.getS32("JoystickAxis1");
+	mJoystickAxis[2] = gSavedSettings.getS32("JoystickAxis2");
+	mJoystickAxis[3] = gSavedSettings.getS32("JoystickAxis3");
+	mJoystickAxis[4] = gSavedSettings.getS32("JoystickAxis4");
+	mJoystickAxis[5] = gSavedSettings.getS32("JoystickAxis5");
+	mJoystickAxis[6] = gSavedSettings.getS32("JoystickAxis6");
+
+	m3DCursor = gSavedSettings.getBOOL("Cursor3D");
+	mAutoLeveling = gSavedSettings.getBOOL("AutoLeveling");
+	mZoomDirect = gSavedSettings.getBOOL("ZoomDirect");
+
+	mAvatarEnabled = gSavedSettings.getBOOL("JoystickAvatarEnabled");
+	mBuildEnabled = gSavedSettings.getBOOL("JoystickBuildEnabled");
+	mFlycamEnabled = gSavedSettings.getBOOL("JoystickFlycamEnabled");
+
+	mAvatarAxisScale[0] = gSavedSettings.getF32("AvatarAxisScale0");
+	mAvatarAxisScale[1] = gSavedSettings.getF32("AvatarAxisScale1");
+	mAvatarAxisScale[2] = gSavedSettings.getF32("AvatarAxisScale2");
+	mAvatarAxisScale[3] = gSavedSettings.getF32("AvatarAxisScale3");
+	mAvatarAxisScale[4] = gSavedSettings.getF32("AvatarAxisScale4");
+	mAvatarAxisScale[5] = gSavedSettings.getF32("AvatarAxisScale5");
+
+	mBuildAxisScale[0] = gSavedSettings.getF32("BuildAxisScale0");
+	mBuildAxisScale[1] = gSavedSettings.getF32("BuildAxisScale1");
+	mBuildAxisScale[2] = gSavedSettings.getF32("BuildAxisScale2");
+	mBuildAxisScale[3] = gSavedSettings.getF32("BuildAxisScale3");
+	mBuildAxisScale[4] = gSavedSettings.getF32("BuildAxisScale4");
+	mBuildAxisScale[5] = gSavedSettings.getF32("BuildAxisScale5");
+
+	mFlycamAxisScale[0] = gSavedSettings.getF32("FlycamAxisScale0");
+	mFlycamAxisScale[1] = gSavedSettings.getF32("FlycamAxisScale1");
+	mFlycamAxisScale[2] = gSavedSettings.getF32("FlycamAxisScale2");
+	mFlycamAxisScale[3] = gSavedSettings.getF32("FlycamAxisScale3");
+	mFlycamAxisScale[4] = gSavedSettings.getF32("FlycamAxisScale4");
+	mFlycamAxisScale[5] = gSavedSettings.getF32("FlycamAxisScale5");
+	mFlycamAxisScale[6] = gSavedSettings.getF32("FlycamAxisScale6");
+
+	mAvatarAxisDeadZone[0] = gSavedSettings.getF32("AvatarAxisDeadZone0");
+	mAvatarAxisDeadZone[1] = gSavedSettings.getF32("AvatarAxisDeadZone1");
+	mAvatarAxisDeadZone[2] = gSavedSettings.getF32("AvatarAxisDeadZone2");
+	mAvatarAxisDeadZone[3] = gSavedSettings.getF32("AvatarAxisDeadZone3");
+	mAvatarAxisDeadZone[4] = gSavedSettings.getF32("AvatarAxisDeadZone4");
+	mAvatarAxisDeadZone[5] = gSavedSettings.getF32("AvatarAxisDeadZone5");
+
+	mBuildAxisDeadZone[0] = gSavedSettings.getF32("BuildAxisDeadZone0");
+	mBuildAxisDeadZone[1] = gSavedSettings.getF32("BuildAxisDeadZone1");
+	mBuildAxisDeadZone[2] = gSavedSettings.getF32("BuildAxisDeadZone2");
+	mBuildAxisDeadZone[3] = gSavedSettings.getF32("BuildAxisDeadZone3");
+	mBuildAxisDeadZone[4] = gSavedSettings.getF32("BuildAxisDeadZone4");
+	mBuildAxisDeadZone[5] = gSavedSettings.getF32("BuildAxisDeadZone5");
+
+	mFlycamAxisDeadZone[0] = gSavedSettings.getF32("FlycamAxisDeadZone0");
+	mFlycamAxisDeadZone[1] = gSavedSettings.getF32("FlycamAxisDeadZone1");
+	mFlycamAxisDeadZone[2] = gSavedSettings.getF32("FlycamAxisDeadZone2");
+	mFlycamAxisDeadZone[3] = gSavedSettings.getF32("FlycamAxisDeadZone3");
+	mFlycamAxisDeadZone[4] = gSavedSettings.getF32("FlycamAxisDeadZone4");
+	mFlycamAxisDeadZone[5] = gSavedSettings.getF32("FlycamAxisDeadZone5");
+	mFlycamAxisDeadZone[6] = gSavedSettings.getF32("FlycamAxisDeadZone6");
+
+	mAvatarFeathering = gSavedSettings.getF32("AvatarFeathering"); // note: max feather is 32.0
+	mBuildFeathering = gSavedSettings.getF32("BuildFeathering");
+	mFlycamFeathering = gSavedSettings.getF32("FlycamFeathering");
+
+	mInvertPitch = gSavedSettings.getBOOL("JoystickInvertPitch");
+}
+
 void LLViewerJoystick::initDevice(LLSD &guid)
 {
 #if LIB_NDOF
@@ -476,7 +617,7 @@ void LLViewerJoystick::initDevice(void * preffered_device /*LPDIRECTINPUTDEVICE8
     mLastDeviceUUID = guid;
 
     size_t dest_size = sizeof(mNdofDev->product);
-    strncpy(mNdofDev->product, name.c_str(), dest_size-1);
+    strncpy(mNdofDev->product, name.c_str(), dest_size);
     mNdofDev->product[dest_size-1] = '\0';
     
     mNdofDev->manufacturer[0] = '\0';
@@ -537,6 +678,10 @@ void LLViewerJoystick::terminate()
 void LLViewerJoystick::updateStatus()
 {
 #if LIB_NDOF
+	if (!mNdofDev || !mNdofDev->private_data)
+	{
+		return;
+	}
 
 	ndof_update(mNdofDev);
 
@@ -579,7 +724,8 @@ void LLViewerJoystick::handleRun(F32 inc)
 	// Decide whether to walk or run by applying a threshold, with slight
 	// hysteresis to avoid oscillating between the two with input spikes.
 	// Analog speed control would be better, but not likely any time soon.
-	if (inc > gSavedSettings.getF32("JoystickRunThreshold"))
+	static LLCachedControl<F32> joy_run_threshold(gSavedSettings, "JoystickRunThreshold");
+	if (inc > joy_run_threshold)
 	{
 		if (1 == mJoystickRun)
 		{
@@ -685,7 +831,8 @@ void LLViewerJoystick::agentPitch(F32 pitch_inc)
 void LLViewerJoystick::agentYaw(F32 yaw_inc)
 {	
 	// Cannot steer some vehicles in mouselook if the script grabs the controls
-	if (gAgentCamera.cameraMouselook() && !gSavedSettings.getBOOL("JoystickMouselookYaw"))
+	static LLCachedControl<bool> joy_mouse_yaw(gSavedSettings, "JoystickMouselookYaw");
+	if (gAgentCamera.cameraMouselook() && !joy_mouse_yaw)
 	{
 		gAgent.rotate(-yaw_inc, gAgent.getReferenceUpVector());
 	}
@@ -723,46 +870,16 @@ void LLViewerJoystick::moveObjects(bool reset)
 	static bool toggle_send_to_sim = false;
 
 	if (!gFocusMgr.getAppHasFocus() || mDriverState != JDS_INITIALIZED
-		|| !gSavedSettings.getBOOL("JoystickEnabled") || !gSavedSettings.getBOOL("JoystickBuildEnabled"))
+		|| !mJoystickEnabled || !mBuildEnabled)
 	{
 		return;
 	}
-
-	S32 axis[] = 
-	{
-		gSavedSettings.getS32("JoystickAxis0"),
-		gSavedSettings.getS32("JoystickAxis1"),
-		gSavedSettings.getS32("JoystickAxis2"),
-		gSavedSettings.getS32("JoystickAxis3"),
-		gSavedSettings.getS32("JoystickAxis4"),
-		gSavedSettings.getS32("JoystickAxis5"),
-	};
 
 	if (reset || mResetFlag)
 	{
-		resetDeltas(axis);
+		resetDeltas(mJoystickAxis);
 		return;
 	}
-
-	F32 axis_scale[] =
-	{
-		gSavedSettings.getF32("BuildAxisScale0"),
-		gSavedSettings.getF32("BuildAxisScale1"),
-		gSavedSettings.getF32("BuildAxisScale2"),
-		gSavedSettings.getF32("BuildAxisScale3"),
-		gSavedSettings.getF32("BuildAxisScale4"),
-		gSavedSettings.getF32("BuildAxisScale5"),
-	};
-
-	F32 dead_zone[] =
-	{
-		gSavedSettings.getF32("BuildAxisDeadZone0"),
-		gSavedSettings.getF32("BuildAxisDeadZone1"),
-		gSavedSettings.getF32("BuildAxisDeadZone2"),
-		gSavedSettings.getF32("BuildAxisDeadZone3"),
-		gSavedSettings.getF32("BuildAxisDeadZone4"),
-		gSavedSettings.getF32("BuildAxisDeadZone5"),
-	};
 
 	F32 cur_delta[6];
 	F32 time = gFrameIntervalSeconds.value();
@@ -774,12 +891,16 @@ void LLViewerJoystick::moveObjects(bool reset)
 	}
 
 	// max feather is 32
-	F32 feather = gSavedSettings.getF32("BuildFeathering"); 
-	bool is_zero = true, absolute = gSavedSettings.getBOOL("Cursor3D");
+	F32 feather = mBuildFeathering;
+	bool is_zero = true, absolute = m3DCursor;
 	
 	for (U32 i = 0; i < 6; i++)
 	{
-		cur_delta[i] = -mAxes[axis[i]];
+		cur_delta[i] = -mAxes[mJoystickAxis[i]];
+//		//BD - Invertable Pitch Controls
+		if (!mInvertPitch && i == 4)
+			cur_delta[i] = -cur_delta[i];
+
 		F32 tmp = cur_delta[i];
 		if (absolute)
 		{
@@ -790,13 +911,13 @@ void LLViewerJoystick::moveObjects(bool reset)
 			
 		if (cur_delta[i] > 0)
 		{
-			cur_delta[i] = llmax(cur_delta[i]-dead_zone[i], 0.f);
+			cur_delta[i] = llmax(cur_delta[i]- mBuildAxisDeadZone[i], 0.f);
 		}
 		else
 		{
-			cur_delta[i] = llmin(cur_delta[i]+dead_zone[i], 0.f);
+			cur_delta[i] = llmin(cur_delta[i]+ mBuildAxisDeadZone[i], 0.f);
 		}
-		cur_delta[i] *= axis_scale[i];
+		cur_delta[i] *= mBuildAxisScale[i];
 		
 		if (!absolute)
 		{
@@ -829,14 +950,14 @@ void LLViewerJoystick::moveObjects(bool reset)
 		}
 				
 		// the selection update could fail, so we won't send 
-		if (LLSelectMgr::getInstanceFast()->selectionMove(v, sDelta[3],sDelta[4],sDelta[5], upd_type))
+		if (LLSelectMgr::getInstance()->selectionMove(v, sDelta[3],sDelta[4],sDelta[5], upd_type))
 		{
 			toggle_send_to_sim = true;
 		}
 	}
 	else if (toggle_send_to_sim)
 	{
-		LLSelectMgr::getInstanceFast()->sendSelectionMove();
+		LLSelectMgr::getInstance()->sendSelectionMove();
 		toggle_send_to_sim = false;
 	}
 }
@@ -845,26 +966,14 @@ void LLViewerJoystick::moveObjects(bool reset)
 void LLViewerJoystick::moveAvatar(bool reset)
 {
 	if (!gFocusMgr.getAppHasFocus() || mDriverState != JDS_INITIALIZED
-		|| !gSavedSettings.getBOOL("JoystickEnabled") || !gSavedSettings.getBOOL("JoystickAvatarEnabled"))
+		|| !mJoystickEnabled || !mAvatarEnabled)
 	{
 		return;
 	}
 
-	S32 axis[] = 
-	{
-		// [1 0 2 4  3  5]
-		// [Z X Y RZ RX RY]
-		gSavedSettings.getS32("JoystickAxis0"),
-		gSavedSettings.getS32("JoystickAxis1"),
-		gSavedSettings.getS32("JoystickAxis2"),
-		gSavedSettings.getS32("JoystickAxis3"),
-		gSavedSettings.getS32("JoystickAxis4"),
-		gSavedSettings.getS32("JoystickAxis5")
-	};
-
 	if (reset || mResetFlag)
 	{
-		resetDeltas(axis);
+		resetDeltas(mJoystickAxis);
 		if (reset)
 		{
 			// Note: moving the agent triggers agent camera mode;
@@ -908,26 +1017,6 @@ void LLViewerJoystick::moveAvatar(bool reset)
 		button_held = false;
 	}
 
-	F32 axis_scale[] =
-	{
-		gSavedSettings.getF32("AvatarAxisScale0"),
-		gSavedSettings.getF32("AvatarAxisScale1"),
-		gSavedSettings.getF32("AvatarAxisScale2"),
-		gSavedSettings.getF32("AvatarAxisScale3"),
-		gSavedSettings.getF32("AvatarAxisScale4"),
-		gSavedSettings.getF32("AvatarAxisScale5")
-	};
-
-	F32 dead_zone[] =
-	{
-		gSavedSettings.getF32("AvatarAxisDeadZone0"),
-		gSavedSettings.getF32("AvatarAxisDeadZone1"),
-		gSavedSettings.getF32("AvatarAxisDeadZone2"),
-		gSavedSettings.getF32("AvatarAxisDeadZone3"),
-		gSavedSettings.getF32("AvatarAxisDeadZone4"),
-		gSavedSettings.getF32("AvatarAxisDeadZone5")
-	};
-
 	// time interval in seconds between this frame and the previous
 	F32 time = gFrameIntervalSeconds.value();
 
@@ -938,20 +1027,24 @@ void LLViewerJoystick::moveAvatar(bool reset)
 	}
 
 	// note: max feather is 32.0
-	F32 feather = gSavedSettings.getF32("AvatarFeathering"); 
+	F32 feather = mAvatarFeathering;
 	
 	F32 cur_delta[6];
 	F32 val, dom_mov = 0.f;
 	U32 dom_axis = Z_I;
 #if LIB_NDOF
-    bool absolute = (gSavedSettings.getBOOL("Cursor3D") && mNdofDev->absolute);
+    bool absolute = (m3DCursor && mNdofDev->absolute);
 #else
     bool absolute = false;
 #endif
 	// remove dead zones and determine biggest movement on the joystick 
 	for (U32 i = 0; i < 6; i++)
 	{
-		cur_delta[i] = -mAxes[axis[i]];
+		cur_delta[i] = -mAxes[mJoystickAxis[i]];
+
+		if (!mInvertPitch && i == 4)
+			cur_delta[i] = -cur_delta[i];
+
 		if (absolute)
 		{
 			F32 tmp = cur_delta[i];
@@ -961,11 +1054,11 @@ void LLViewerJoystick::moveAvatar(bool reset)
 
 		if (cur_delta[i] > 0)
 		{
-			cur_delta[i] = llmax(cur_delta[i]-dead_zone[i], 0.f);
+			cur_delta[i] = llmax(cur_delta[i]- mAvatarAxisDeadZone[i], 0.f);
 		}
 		else
 		{
-			cur_delta[i] = llmin(cur_delta[i]+dead_zone[i], 0.f);
+			cur_delta[i] = llmin(cur_delta[i]+ mAvatarAxisDeadZone[i], 0.f);
 		}
 
 		// we don't care about Roll (RZ) and Z is calculated after the loop
@@ -1005,11 +1098,11 @@ void LLViewerJoystick::moveAvatar(bool reset)
 		dom_axis = Z_I;
 	}
 
-	sDelta[X_I] = -cur_delta[X_I] * axis_scale[X_I];
-	sDelta[Y_I] = -cur_delta[Y_I] * axis_scale[Y_I];
-	sDelta[Z_I] = -cur_delta[Z_I] * axis_scale[Z_I];
-	cur_delta[RX_I] *= -axis_scale[RX_I] * mPerfScale;
-	cur_delta[RY_I] *= -axis_scale[RY_I] * mPerfScale;
+	sDelta[X_I] = -cur_delta[X_I] * mAvatarAxisScale[X_I];
+	sDelta[Y_I] = -cur_delta[Y_I] * mAvatarAxisScale[Y_I];
+	sDelta[Z_I] = -cur_delta[Z_I] * mAvatarAxisScale[Z_I];
+	cur_delta[RX_I] *= -mAvatarAxisScale[RX_I] * mPerfScale;
+	cur_delta[RY_I] *= -mAvatarAxisScale[RY_I] * mPerfScale;
 		
 	if (!absolute)
 	{
@@ -1038,8 +1131,8 @@ void LLViewerJoystick::moveAvatar(bool reset)
 	
 		// too many rotations during walking can be confusing, so apply
 		// the deadzones one more time (quick & dirty), at 50%|30% power
-		F32 eff_rx = .3f * dead_zone[RX_I];
-		F32 eff_ry = .3f * dead_zone[RY_I];
+		F32 eff_rx = .3f * mAvatarAxisDeadZone[RX_I];
+		F32 eff_ry = .3f * mAvatarAxisDeadZone[RY_I];
 	
 		if (sDelta[RX_I] > 0)
 		{
@@ -1092,55 +1185,22 @@ void LLViewerJoystick::moveFlycam(bool reset)
 	static F32          		sFlycamZoom;
 	
 	if (!gFocusMgr.getAppHasFocus() || mDriverState != JDS_INITIALIZED
-		|| !gSavedSettings.getBOOL("JoystickEnabled") || !gSavedSettings.getBOOL("JoystickFlycamEnabled"))
+		|| !mJoystickEnabled || !mFlycamEnabled)
 	{
 		return;
 	}
 
-	S32 axis[] = 
-	{
-		gSavedSettings.getS32("JoystickAxis0"),
-		gSavedSettings.getS32("JoystickAxis1"),
-		gSavedSettings.getS32("JoystickAxis2"),
-		gSavedSettings.getS32("JoystickAxis3"),
-		gSavedSettings.getS32("JoystickAxis4"),
-		gSavedSettings.getS32("JoystickAxis5"),
-		gSavedSettings.getS32("JoystickAxis6")
-	};
-
-	bool in_build_mode = LLToolMgr::getInstanceFast()->inBuildMode();
+	bool in_build_mode = LLToolMgr::getInstance()->inBuildMode();
 	if (reset || mResetFlag)
 	{
-		sFlycamPosition = LLViewerCamera::getInstanceFast()->getOrigin();
-		sFlycamRotation = LLViewerCamera::getInstanceFast()->getQuaternion();
-		sFlycamZoom = LLViewerCamera::getInstanceFast()->getView();
+		sFlycamPosition = LLViewerCamera::getInstance()->getOrigin();
+		sFlycamRotation = LLViewerCamera::getInstance()->getQuaternion();
+		sFlycamZoom = LLViewerCamera::getInstance()->getView();
 		
-		resetDeltas(axis);
+		resetDeltas(mJoystickAxis);
 
 		return;
 	}
-
-	F32 axis_scale[] =
-	{
-		gSavedSettings.getF32("FlycamAxisScale0"),
-		gSavedSettings.getF32("FlycamAxisScale1"),
-		gSavedSettings.getF32("FlycamAxisScale2"),
-		gSavedSettings.getF32("FlycamAxisScale3"),
-		gSavedSettings.getF32("FlycamAxisScale4"),
-		gSavedSettings.getF32("FlycamAxisScale5"),
-		gSavedSettings.getF32("FlycamAxisScale6")
-	};
-
-	F32 dead_zone[] =
-	{
-		gSavedSettings.getF32("FlycamAxisDeadZone0"),
-		gSavedSettings.getF32("FlycamAxisDeadZone1"),
-		gSavedSettings.getF32("FlycamAxisDeadZone2"),
-		gSavedSettings.getF32("FlycamAxisDeadZone3"),
-		gSavedSettings.getF32("FlycamAxisDeadZone4"),
-		gSavedSettings.getF32("FlycamAxisDeadZone5"),
-		gSavedSettings.getF32("FlycamAxisDeadZone6")
-	};
 
 	F32 time = gFrameIntervalSeconds.value();
 
@@ -1151,14 +1211,16 @@ void LLViewerJoystick::moveFlycam(bool reset)
 	}
 
 	F32 cur_delta[7];
-	F32 feather = gSavedSettings.getF32("FlycamFeathering");
-	bool absolute = gSavedSettings.getBOOL("Cursor3D");
+	F32 feather = mFlycamFeathering;
+	bool absolute = m3DCursor;
 	bool is_zero = true;
 
 	for (U32 i = 0; i < 7; i++)
 	{
-		cur_delta[i] = -getJoystickAxis(axis[i]);
+		cur_delta[i] = -getJoystickAxis(mJoystickAxis[i]);
 
+		if (!mInvertPitch && i == 4)
+			cur_delta[i] = -cur_delta[i];
 
 		F32 tmp = cur_delta[i];
 		if (absolute)
@@ -1169,11 +1231,11 @@ void LLViewerJoystick::moveFlycam(bool reset)
 
 		if (cur_delta[i] > 0)
 		{
-			cur_delta[i] = llmax(cur_delta[i]-dead_zone[i], 0.f);
+			cur_delta[i] = llmax(cur_delta[i]- mFlycamAxisDeadZone[i], 0.f);
 		}
 		else
 		{
-			cur_delta[i] = llmin(cur_delta[i]+dead_zone[i], 0.f);
+			cur_delta[i] = llmin(cur_delta[i]+ mFlycamAxisDeadZone[i], 0.f);
 		}
 
 		// We may want to scale camera movements up or down in build mode.
@@ -1188,7 +1250,7 @@ void LLViewerJoystick::moveFlycam(bool reset)
 			}
 		}
 
-		cur_delta[i] *= axis_scale[i];
+		cur_delta[i] *= mFlycamAxisScale[i];
 		
 		if (!absolute)
 		{
@@ -1207,12 +1269,12 @@ void LLViewerJoystick::moveFlycam(bool reset)
 		gAgent.clearAFK();
 	}
 	
-	sFlycamPosition += LLVector3(sDelta) * sFlycamRotation;
+	sFlycamPosition += LLVector3(sDelta.data()) * sFlycamRotation;
 
 	LLMatrix3 rot_mat(sDelta[3], sDelta[4], sDelta[5]);
 	sFlycamRotation = LLQuaternion(rot_mat)*sFlycamRotation;
 
-	if (gSavedSettings.getBOOL("AutoLeveling"))
+	if (mAutoLeveling)
 	{
 		LLMatrix3 level(sFlycamRotation);
 
@@ -1230,13 +1292,15 @@ void LLViewerJoystick::moveFlycam(bool reset)
 		sFlycamRotation = nlerp(llmin(feather*time,1.f), sFlycamRotation, quat);
 	}
 
-	if (gSavedSettings.getBOOL("ZoomDirect"))
+	if (mZoomDirect)
 	{
-		sFlycamZoom = sLastDelta[6]*axis_scale[6]+dead_zone[6];
+		sFlycamZoom = sLastDelta[6]* mFlycamAxisScale[6]+ mFlycamAxisDeadZone[6];
 	}
 	else
 	{
-		sFlycamZoom += sDelta[6];
+		//BD - We need to cap zoom otherwise it internally counts higher causing
+		//     the zoom level to not react until that extra has been removed first.
+		sFlycamZoom = llclamp(sFlycamZoom + sDelta[6], LLViewerCamera::getInstance()->getMinView(), LLViewerCamera::getInstance()->getMaxView());
 	}
 
 	LLMatrix3 mat(sFlycamRotation);
@@ -1251,7 +1315,7 @@ void LLViewerJoystick::moveFlycam(bool reset)
 // -----------------------------------------------------------------------------
 bool LLViewerJoystick::toggleFlycam()
 {
-	if (!gSavedSettings.getBOOL("JoystickEnabled") || !gSavedSettings.getBOOL("JoystickFlycamEnabled"))
+	if (!mJoystickEnabled || !mFlycamEnabled)
 	{
 		mOverrideCamera = false;
 		return false;
@@ -1285,7 +1349,7 @@ bool LLViewerJoystick::toggleFlycam()
 
 void LLViewerJoystick::scanJoystick()
 {
-	if (mDriverState != JDS_INITIALIZED || !gSavedSettings.getBOOL("JoystickEnabled"))
+	if (mDriverState != JDS_INITIALIZED || !mJoystickEnabled)
 	{
 		return;
 	}
@@ -1318,7 +1382,7 @@ void LLViewerJoystick::scanJoystick()
 		toggle_flycam = 0;
 	}
 	
-	if (!mOverrideCamera && !(LLToolMgr::getInstanceFast()->inBuildMode() && gSavedSettings.getBOOL("JoystickBuildEnabled")))
+	if (!mOverrideCamera && !(LLToolMgr::getInstance()->inBuildMode() && mBuildEnabled))
 	{
 		moveAvatar();
 	}
@@ -1410,6 +1474,7 @@ bool LLViewerJoystick::isLikeSpaceNavigator() const
 #if LIB_NDOF
 	return (isJoystickInitialized() 
 			&& (strncmp(mNdofDev->product, "SpaceNavigator", 14) == 0
+				|| strncmp(mNdofDev->product, "3Dconnexion SpaceNavigator", 26) == 0
 				|| strncmp(mNdofDev->product, "SpaceExplorer", 13) == 0
 				|| strncmp(mNdofDev->product, "SpaceTraveler", 13) == 0
 				|| strncmp(mNdofDev->product, "SpacePilot", 10) == 0));
@@ -1446,6 +1511,7 @@ void LLViewerJoystick::setSNDefaults()
 	gSavedSettings.setBOOL("Cursor3D", is_3d_cursor);
 	gSavedSettings.setBOOL("AutoLeveling", true);
 	gSavedSettings.setBOOL("ZoomDirect", false);
+	gSavedSettings.setBOOL("JoystickInvertPitch", true);
 
 	gSavedSettings.setF32("AvatarAxisScale0", 1.f * platformScaleAvXZ);
 	gSavedSettings.setF32("AvatarAxisScale1", 1.f * platformScaleAvXZ);
@@ -1490,4 +1556,67 @@ void LLViewerJoystick::setSNDefaults()
 	gSavedSettings.setF32("AvatarFeathering", 6.f);
 	gSavedSettings.setF32("BuildFeathering", 12.f);
 	gSavedSettings.setF32("FlycamFeathering", 5.f);
+}
+
+//BD - Xbox360 Controller Support
+void LLViewerJoystick::setXboxDefaults()
+{
+	LL_INFOS() << "restoring Xbox Controller defaults..." << LL_ENDL;
+	
+	gSavedSettings.setS32("JoystickAxis0", 1);	// Z
+	gSavedSettings.setS32("JoystickAxis1", 0);	// X
+	gSavedSettings.setS32("JoystickAxis2", -1);	// Y
+	gSavedSettings.setS32("JoystickAxis3", 2);	// Roll
+	gSavedSettings.setS32("JoystickAxis4", 4);	// Pitch
+	gSavedSettings.setS32("JoystickAxis5", 3);	// Yaw
+	gSavedSettings.setS32("JoystickAxis6", -1);	// Zoom
+	
+	gSavedSettings.setBOOL("Cursor3D", false); // Xbox Gamepad, not 3D Mouse
+	gSavedSettings.setBOOL("AutoLeveling", false);
+	gSavedSettings.setBOOL("ZoomDirect", false);
+	gSavedSettings.setBOOL("JoystickInvertPitch", false);
+	
+	gSavedSettings.setF32("AvatarAxisScale0", 1.f);
+	gSavedSettings.setF32("AvatarAxisScale2", 1.f);
+	gSavedSettings.setF32("AvatarAxisScale1", 1.f);
+	gSavedSettings.setF32("AvatarAxisScale4", 1.f);
+	gSavedSettings.setF32("AvatarAxisScale5", 1.f);
+	gSavedSettings.setF32("AvatarAxisScale3", 1.f);
+	gSavedSettings.setF32("BuildAxisScale0", 1.25f);
+	gSavedSettings.setF32("BuildAxisScale2", 1.25f);
+	gSavedSettings.setF32("BuildAxisScale1", 1.25f);
+	gSavedSettings.setF32("BuildAxisScale4", 1.f);
+	gSavedSettings.setF32("BuildAxisScale5", 1.f);
+	gSavedSettings.setF32("BuildAxisScale3", 1.f);
+	gSavedSettings.setF32("FlycamAxisScale0", 5.0f);
+	gSavedSettings.setF32("FlycamAxisScale2", 5.0f);
+	gSavedSettings.setF32("FlycamAxisScale1", 5.0f);
+	gSavedSettings.setF32("FlycamAxisScale4", 2.0f);
+	gSavedSettings.setF32("FlycamAxisScale5", 2.5f);
+	gSavedSettings.setF32("FlycamAxisScale3", 2.0f);
+	gSavedSettings.setF32("FlycamAxisScale6", 1.0f);
+	
+	gSavedSettings.setF32("AvatarAxisDeadZone0", .6f);
+	gSavedSettings.setF32("AvatarAxisDeadZone2", .3f);
+	gSavedSettings.setF32("AvatarAxisDeadZone1", .6f);
+	gSavedSettings.setF32("AvatarAxisDeadZone3", .3f);
+	gSavedSettings.setF32("AvatarAxisDeadZone4", .3f);
+	gSavedSettings.setF32("AvatarAxisDeadZone5", .3f);
+	gSavedSettings.setF32("BuildAxisDeadZone0", .25f);
+	gSavedSettings.setF32("BuildAxisDeadZone2", .25f);
+	gSavedSettings.setF32("BuildAxisDeadZone1", .25f);
+	gSavedSettings.setF32("BuildAxisDeadZone3", .3f);
+	gSavedSettings.setF32("BuildAxisDeadZone4", .3f);
+	gSavedSettings.setF32("BuildAxisDeadZone5", .1f);
+	gSavedSettings.setF32("FlycamAxisDeadZone0", .25f);
+	gSavedSettings.setF32("FlycamAxisDeadZone2", .25f);
+	gSavedSettings.setF32("FlycamAxisDeadZone1", .25f);
+	gSavedSettings.setF32("FlycamAxisDeadZone3", .1f);
+	gSavedSettings.setF32("FlycamAxisDeadZone4", .3f);
+	gSavedSettings.setF32("FlycamAxisDeadZone5", .3f);
+	gSavedSettings.setF32("FlycamAxisDeadZone6", .1f);
+	
+	gSavedSettings.setF32("AvatarFeathering", 20.0f);
+	gSavedSettings.setF32("BuildFeathering", 3.f);
+	gSavedSettings.setF32("FlycamFeathering", 1.0f);
 }

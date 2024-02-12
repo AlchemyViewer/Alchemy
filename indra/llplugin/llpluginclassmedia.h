@@ -153,6 +153,8 @@ public:
 
 	void loadURI(const std::string &uri);
 	
+	void executeJavaScript(const std::string &code);
+
 	// "Loading" means uninitialized or any state prior to fully running (processing commands)
 	bool isPluginLoading(void) { return mPlugin?mPlugin->isLoading():false; };
 
@@ -228,6 +230,8 @@ public:
 	void	setLanguageCode(const std::string &language_code);
 	void	setPluginsEnabled(const bool enabled);
 	void	setJavascriptEnabled(const bool enabled);
+	void	setWebSecurityDisabled(const bool disabled);
+	void	setFileAccessFromFileUrlsEnabled(const bool enabled);
 	void	setTarget(const std::string &target);
 	
 	///////////////////////////////////
@@ -346,7 +350,7 @@ public:
 	// "init_history" message 
 	void initializeUrlHistory(const LLSD& url_history);
 
-	boost::shared_ptr<LLPluginClassMedia> getSharedPrt() { return boost::dynamic_pointer_cast<LLPluginClassMedia>(shared_from_this()); } // due to enable_shared_from_this
+	std::shared_ptr<LLPluginClassMedia> getSharedPtr() { return std::dynamic_pointer_cast<LLPluginClassMedia>(shared_from_this()); } // due to enable_shared_from_this
 
 protected:
 

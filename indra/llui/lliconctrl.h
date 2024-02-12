@@ -39,7 +39,9 @@ class LLUICtrlFactory;
 // Classes
 //
 
-// 
+// Class for diplaying named UI textures
+// Do not use for displaying textures from network,
+// UI textures are stored permanently!
 class LLIconCtrl
 : public LLUICtrl
 {
@@ -48,7 +50,11 @@ public:
 	{
 		Optional<LLUIImage*>	image;
 		Optional<LLUIColor>		color;
-		Optional<bool>			use_draw_context_alpha;
+// [SL:KB] - Patch: Control-IconCtrl | Checked: Catznip-3.6
+		Optional<bool>			commit_on_click;
+// [/SL:KB]
+		Optional<bool>			use_draw_context_alpha,
+                                interactable;
 		Optional<S32>			min_width,
 								min_height;
 		Ignored					scale_image;
@@ -67,7 +73,11 @@ public:
 	// llview overrides
 	virtual void	draw();
 
+    // llview overrides
+    virtual BOOL handleHover(S32 x, S32 y, MASK mask);
+
 	// lluictrl overrides
+	void onVisibilityChange(BOOL new_visibility);
 	virtual void	setValue(const LLSD& value );
 
 	std::string	getImageName() const;
@@ -88,8 +98,11 @@ protected:
 	// If set to true (default), use the draw context transparency.
 	// If false, will use transparency returned by getCurrentTransparency(). See STORM-698.
 	bool mUseDrawContextAlpha;
+    bool mInteractable;
 
 private:
+	void loadImage(const LLSD& value, S32 priority);
+
 	LLUIColor mColor;
 	LLPointer<LLUIImage> mImagep;
 };

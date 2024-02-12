@@ -5,6 +5,7 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2010-2017, Kitty Barnett
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -35,8 +36,6 @@
 //
 // class LLFolderViewModelInventory
 //
-static LLTrace::BlockTimerStatHandle FTM_INVENTORY_SORT("Inventory Sort");
-
 bool LLFolderViewModelInventory::startDrag(std::vector<LLFolderViewModelItem*>& items)
 {
 	std::vector<EDragAndDropType> types;
@@ -64,9 +63,9 @@ bool LLFolderViewModelInventory::startDrag(std::vector<LLFolderViewModelItem*>& 
 
 void LLFolderViewModelInventory::sort( LLFolderViewFolder* folder )
 {
-	LL_RECORD_BLOCK_TIME(FTM_INVENTORY_SORT);
+	LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Inventory Sort");
 
-	if (!needsSort(folder->getViewModelItem())) return;
+	if (!folder->areChildrenInited() || !needsSort(folder->getViewModelItem())) return;
 
 	LLFolderViewModelItemInventory* modelp =   static_cast<LLFolderViewModelItemInventory*>(folder->getViewModelItem());
 	if (modelp->getUUID().isNull()) return;
@@ -106,7 +105,7 @@ void LLFolderViewModelInventory::sort( LLFolderViewFolder* folder )
 
 bool LLFolderViewModelInventory::contentsReady()
 {
-	return !LLInventoryModelBackgroundFetch::instanceFast().folderFetchActive();
+	return !LLInventoryModelBackgroundFetch::instance().folderFetchActive();
 }
 
 bool LLFolderViewModelInventory::isFolderComplete(LLFolderViewFolder* folder)
@@ -132,6 +131,16 @@ bool LLFolderViewModelInventory::isFolderComplete(LLFolderViewFolder* folder)
 	return false;
 }
 
+//virtual
+void LLFolderViewModelItemInventory::addChild(LLFolderViewModelItem* child)
+{
+    LLFolderViewModelItemInventory* model_child = static_cast<LLFolderViewModelItemInventory*>(child);
+    mLastAddedChildCreationDate = model_child->getCreationDate();
+
+    // this will requestSort()
+    LLFolderViewModelItemCommon::addChild(child);
+}
+
 void LLFolderViewModelItemInventory::requestSort()
 {
 	LLFolderViewModelItemCommon::requestSort();
@@ -140,15 +149,31 @@ void LLFolderViewModelItemInventory::requestSort()
 	{
 		folderp->requestArrange();
 	}
-	if (static_cast<LLFolderViewModelInventory&>(mRootViewModel).getSorter().isByDate())
-	{
-		// sort by date potentially affects parent folders which use a date
-		// derived from newest item in them
-		if (mParent)
-		{
-			mParent->requestSort();
-		}
-	}
+    LLInventorySort sorter = static_cast<LLFolderViewModelInventory&>(mRootViewModel).getSorter();
+
+    // Sort by date potentially affects parent folders which use a date
+    // derived from newest item in them
+    if (sorter.isByDate() && mParent)
+    {
+        // If this is an item, parent needs to be resorted
+        // This case shouldn't happen, unless someone calls item->requestSort()
+        if (!folderp)
+        {
+            mParent->requestSort();
+        }
+        // if this is a folder, check sort rules for folder first
+        else if (sorter.isFoldersByDate())
+        {
+            if (mLastAddedChildCreationDate == -1  // nothing was added, some other reason for resort
+                || mLastAddedChildCreationDate > getCreationDate()) // newer child
+            {
+                LLFolderViewModelItemInventory* model_parent = static_cast<LLFolderViewModelItemInventory*>(mParent);
+                model_parent->mLastAddedChildCreationDate = mLastAddedChildCreationDate;
+                mParent->requestSort();
+            }
+        }
+    }
+    mLastAddedChildCreationDate = -1;
 }
 
 void LLFolderViewModelItemInventory::setPassedFilter(bool passed, S32 filter_generation, std::string::size_type string_offset, std::string::size_type string_size)
@@ -156,11 +181,15 @@ void LLFolderViewModelItemInventory::setPassedFilter(bool passed, S32 filter_gen
 	bool generation_skip = mMarkedDirtyGeneration >= 0
 		&& mPrevPassedAllFilters
 		&& mMarkedDirtyGeneration < mRootViewModel.getFilter().getFirstSuccessGeneration();
+    S32 last_generation = mLastFilterGeneration;
 	LLFolderViewModelItemCommon::setPassedFilter(passed, filter_generation, string_offset, string_size);
 	bool before = mPrevPassedAllFilters;
 	mPrevPassedAllFilters = passedFilter(filter_generation);
 
-	if (before != mPrevPassedAllFilters || generation_skip)
+	if (before != mPrevPassedAllFilters // Change of state
+        || generation_skip // Was marked dirty
+        // Potential change from being in-progress and invisible to visible)
+        || (mPrevPassedAllFilters && last_generation < mRootViewModel.getFilter().getFirstRequiredGeneration()))
 	{
 		// Need to rearrange the folder if the filtered state of the item changed,
 		// previously passed item skipped filter generation changes while being dirty
@@ -235,7 +264,10 @@ bool LLFolderViewModelItemInventory::filter( LLFolderViewFilter& filter)
 	}
      */
 
-	bool is_folder = (getInventoryType() == LLInventoryType::IT_CATEGORY);
+//	bool is_folder = (getInventoryType() == LLInventoryType::IT_CATEGORY);
+// [SL:KB] - Patch: Inventory-Links | Checked: 2013-09-19 (Catznip-3.6)
+	bool is_folder = (getInventoryType() == LLInventoryType::IT_CATEGORY) && (!isLink());
+// [/SL:KB]
 	const bool passed_filter_folder = is_folder ? filter.checkFolder(this) : true;
 	setPassedFolderFilter(passed_filter_folder, filter_generation);
 
@@ -387,6 +419,7 @@ bool LLInventorySort::operator()(const LLFolderViewModelItemInventory* const& a,
 
 LLFolderViewModelItemInventory::LLFolderViewModelItemInventory( class LLFolderViewModelInventory& root_view_model ) :
     LLFolderViewModelItemCommon(root_view_model),
-    mPrevPassedAllFilters(false)
+    mPrevPassedAllFilters(false),
+    mLastAddedChildCreationDate(-1)
 {
 }
