@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_poser" title="ポーザー">
+	<!-- Expanded Size 745 -->
+	<!-- Expanded Size 906 -->
+	<panel name="max_panel"/>
+	<!-- Collapsed Size 517 -->
+	<!-- Collapsed Size 678 -->
+	<panel name="min_panel"/>
+	<string name="linear_time" translate="false">
+		0.000+
+	</string>
+	<string name="spherical_time" translate="false">
+		0.001 to 1.0
+	</string>
+	<string name="icon_category" translate="false">
+		Inv_Shape
+	</string>
+	<string name="icon_bone" translate="false">
+		Transparent
+	</string>
+	<string name="icon_object" translate="false">
+		Inv_Object
+	</string>
+	<string name="title_mPelvis" translate="false">
+		Main Body
+	</string>
+	<string name="title_mHead" translate="false">
+		Head
+	</string>
+	<string name="title_mCollarLeft" translate="false">
+		Left Arm
+	</string>
+	<string name="title_mCollarRight" translate="false">
+		Right Arm
+	</string>
+	<string name="title_mWingsRoot" translate="false">
+		Back
+	</string>
+	<string name="title_mHipLeft" translate="false">
+		Left Leg
+	</string>
+	<string name="title_mHipRight" translate="false">
+		Right Leg
+	</string>
+	<string name="title_mTail1" translate="false">
+		Tail
+	</string>
+	<string name="title_mGroin" translate="false">
+		Misc
+	</string>
+	<layout_stack name="poser_stack">
+		<layout_panel name="poser_layout">
+			<panel name="title">
+				<scroll_list tool_tip="対象となるアバターまたはアニメッシュを選択します。" name="avatar_scroll">
+					<scroll_list.columns label="" name="icon"/>
+					<scroll_list.columns label="名前" name="name"/>
+					<scroll_list.columns label="ＵＵＩＤ" name="uuid"/>
+				</scroll_list>
+				<button label="アバターをリフレッシュ" name="refresh"/>
+				<check_box label="変更を反転する" tool_tip="このオプションは、すべての回転の変更を反対側のボーンにも反転させるかどうかを切り替えます。例えば、左腕の動きは右腕に反転した動きになります。" name="Mirror"/>
+				<check_box label="簡易回転" tool_tip="このオプションは、ポーザーが簡略化された回転軸を表示して使用するかどうかを切り替えます。これは基本的に、どの軸を動かしても、他の軸はそのままであることを意味し、これにより回転がずれてしまい、どの順番でボーンを動かしたかによって、0 0 0がデフォルトの静止位置でなくなることがあります。このオプションを無効にすると、他の軸が実際の回転を表すように動的に変更されるようになります。これは、触れていないスライダーが、現在動かしているスライダーと一緒に変更されることを意味します。これはユーザーを混乱させる可能性があるため、デフォルトでは無効になっています。これを使用する場合は、Ｚ、Ｙ、Ｘの順に0にすることを強くお勧めします。" name="EasyRotations"/>
+				<button label="ポーズを反転" name="flip_pose"/>
+			</panel>
+		</layout_panel>
+		<layout_panel name="poser_layout">
+			<panel name="title">
+				<tab_container name="joints_tabs">
+					<panel title="スケルトン" name="joints_panel">
+						<scroll_list name="joints_scroll">
+							<scroll_list.columns label="" name="icon"/>
+							<scroll_list.columns label="ボーン名" name="joint"/>
+							<scroll_list.columns label="回転Ｘ" name="x"/>
+							<scroll_list.columns label="回転Ｙ" name="y"/>
+							<scroll_list.columns label="回転Ｚ" name="z"/>
+							<scroll_list.columns label="位置Ｘ" name="pos_x"/>
+							<scroll_list.columns label="位置Ｙ" name="pos_y"/>
+							<scroll_list.columns label="位置Ｚ" name="pos_z"/>
+							<scroll_list.columns label="サイズＸ" name="scale_x"/>
+							<scroll_list.columns label="サイズＹ" name="scale_y"/>
+							<scroll_list.columns label="サイズＺ" name="scale_z"/>
+							<scroll_list.columns label="＃" name="number"/>
+						</scroll_list>
+					</panel>
+					<panel title="Collision Volumes" name="cv_panel">
+						<scroll_list name="cv_scroll">
+							<scroll_list.columns label="" name="icon"/>
+							<scroll_list.columns label="衝突ボリューム名" name="joint"/>
+							<scroll_list.columns label="回転Ｘ" name="x"/>
+							<scroll_list.columns label="回転Ｙ" name="y"/>
+							<scroll_list.columns label="回転Ｚ" name="z"/>
+							<scroll_list.columns label="位置Ｘ" name="pos_x"/>
+							<scroll_list.columns label="位置Ｙ" name="pos_y"/>
+							<scroll_list.columns label="位置Ｚ" name="pos_z"/>
+							<scroll_list.columns label="サイズＸ" name="scale_x"/>
+							<scroll_list.columns label="サイズＹ" name="scale_y"/>
+							<scroll_list.columns label="サイズＺ" name="scale_z"/>
+							<scroll_list.columns label="＃" name="number"/>
+						</scroll_list>
+					</panel>
+					<panel title="Attachment Bones" name="attach_panel">
+						<scroll_list name="attach_scroll">
+							<scroll_list.columns label="" name="icon"/>
+							<scroll_list.columns label="装着ボーン名" name="joint"/>
+							<scroll_list.columns label="回転Ｘ" name="x"/>
+							<scroll_list.columns label="回転Ｙ" name="y"/>
+							<scroll_list.columns label="回転Ｚ" name="z"/>
+							<scroll_list.columns label="位置Ｘ" name="pos_x"/>
+							<scroll_list.columns label="位置Ｙ" name="pos_y"/>
+							<scroll_list.columns label="位置Ｚ" name="pos_z"/>
+							<scroll_list.columns label="サイズＸ" name="scale_x"/>
+							<scroll_list.columns label="サイズＹ" name="scale_y"/>
+							<scroll_list.columns label="サイズＺ" name="scale_z"/>
+							<scroll_list.columns label="＃" name="number"/>
+						</scroll_list>
+					</panel>
+				</tab_container>
+				<button label="ポージング開始" label_selected="ポージング停止" name="activate"/>
+				<line_editor label="ポーズ名を入力" name="pose_name"/>
+				<line_editor label="0.001～1.0" name="interpolation_time"/>
+				<combo_box name="interpolation_type">
+					<combo_box.item label="なし" name="0" value="0"/>
+					<combo_box.item label="リニア" name="1" value="1"/>
+					<combo_box.item label="球面リニア" name="2" value="2"/>
+				</combo_box>
+				<button label="" tool_tip="現在のポーズを保存します。" name="save_poses"/>
+				<button name="extend"/>
+				<tab_container name="modifier_tabs">
+					<panel title="回転" name="rotation_panel">
+						<slider label="回転Ｘ：" name="Rotation_X"/>
+						<slider label="回転Ｙ：" name="Rotation_Y"/>
+						<slider label="回転Ｚ：" name="Rotation_Z"/>
+						<panel name="title">
+							<button label="選択された回転をリセット" label_selected="選択されたボーンを無効化" name="reset_bone_rot"/>
+						</panel>
+					</panel>
+					<panel title="位置" name="position_panel">
+						<slider label="位置Ｘ：" name="Position_X"/>
+						<slider label="位置Ｙ：" name="Position_Y"/>
+						<slider label="位置Ｚ：" name="Position_Z"/>
+						<panel name="title">
+							<button label="選択された位置をリセット" label_selected="選択されたボーンを無効化" name="reset_bone_pos"/>
+						</panel>
+					</panel>
+					<panel title="スケール" name="scale_panel">
+						<slider label="スケールＸ：" name="Scale_X"/>
+						<slider label="スケールＹ：" name="Scale_Y"/>
+						<slider label="スケールＺ：" name="Scale_Z"/>
+						<panel name="title">
+							<button label="選択されたスケールをリセット" label_selected="選択されたボーンを無効化" name="reset_bone_scale"/>
+						</panel>
+					</panel>
+				</tab_container>
+				<button label="選択されたボーンを有効化" label_selected="選択されたボーンを無効化" name="toggle_bone"/>
+			</panel>
+		</layout_panel>
+		<layout_panel name="poses_layout">
+			<panel name="poses_panel">
+				<scroll_list tool_tip="現在選択されているポーズの補間タイプを変更します。" name="poses_scroll">
+					<scroll_list.columns label="ポーズ名" name="name"/>
+					<scroll_list.columns label="時間" name="time"/>
+					<scroll_list.columns label="種類" name="type"/>
+				</scroll_list>
+				<menu_button label="" tool_tip="現在選択されているポーズを読み込んで、その中に保存されているすべてのボーン回転を適用します。" name="load_poses"/>
+				<line_editor label="0.001～1.0" tool_tip="現在選択されているポーズの補間時間を変更します。" name="interp_time"/>
+				<combo_box name="interp_type">
+					<combo_box.item label="なし" name="0" value="0"/>
+					<combo_box.item label="リニア" name="1" value="1"/>
+					<combo_box.item label="球面リニア"/>
+				</combo_box>
+				<button label="" tool_tip="現在選択されているポーズを削除します。" name="delete_poses"/>
+			</panel>
+		</layout_panel>
+		<layout_panel name="animator_layout">
+			<panel name="animator_panel">
+				<button label="" tool_tip="アニメーションキューの現在選択されているエントリの下に、現在選択されているポーズを追加します。" name="add_entry"/>
+				<button label="" tool_tip="アニメーションキューの現在選択されているエントリの下に、設定可能な待機イベントを追加します。" name="add_wait"/>
+				<button label="" tool_tip="アニメーションキューの現在選択されているエントリの下に、繰り返しイベントを追加します。" name="add_repeat"/>
+				<button label="" tool_tip="アニメーションキューから現在選択されているエントリを削除します。" name="delete_entry"/>
+				<button label="" tool_tip="現在選択されているエントリーをキューの１行上に移動します。" name="move_up"/>
+				<button label="" tool_tip="現在選択されているエントリーをキューの１行下に移動します。" name="move_down"/>
+				<panel name="title"/>
+				<text name="first_person_label">
+					アニメーションキュー：
+				</text>
+				<scroll_list name="anim_editor_scroll">
+					<scroll_list.columns label="アクション" name="name"/>
+					<scroll_list.columns label="時間" name="time"/>
+					<scroll_list.columns label="種類" name="type"/>
+				</scroll_list>
+				<button label="再生" tool_tip="アニメーションキューの再生を開始します。" name="play_anim"/>
+				<button label="停止" tool_tip="アニメーションキューの再生を停止します。" name="stop_anim"/>
+				<icon/>
+				<line_editor label="待機時間" tool_tip="Change the time for the wait event." name="anim_time"/>
+			</panel>
+		</layout_panel>
+		<layout_panel name="animator_btn_layout">
+			<panel name="title">
+				<button name="animator"/>
+			</panel>
+		</layout_panel>
+	</layout_stack>
+	<!--
+	<multi_slider name="key_slider"/>
+	<line_editor label="" name="time"/>
+	-->
+
+	<!--
+	<multi_slider name="time_slider"/>
+	<multi_slider name="key_slider"/>
+	<button label="＋" label_selected="キーを追加" name="add_key"/>
+	<button label="ー" label_selected="キーを削除" name="delete_key"/>
+	<line_editor label="待機時間" tool_tip="Change the time for the wait event." name="time"/>
+	-->
+</floater>
