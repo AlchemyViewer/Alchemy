@@ -108,6 +108,9 @@ set(viewer_SOURCE_FILES
     altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
+    bdanimator.cpp
+    bdfloaterposer.cpp
+    bdposingmotion.cpp
     fslslpreproc.cpp
     fslslpreprocviewer.cpp
     groupchatlistener.cpp
@@ -838,6 +841,9 @@ set(viewer_HEADER_FILES
     altoolalign.h
     alunzip.h
     alviewermenu.h
+    bdanimator.h
+    bdfloaterposer.h
+    bdposingmotion.h
     fslslpreproc.h
     fslslpreprocviewer.h
     groupchatlistener.h

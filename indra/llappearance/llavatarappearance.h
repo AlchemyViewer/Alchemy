@@ -214,6 +214,11 @@ public:
 	LLJoint* 		mFootRightp;
 	LLJoint* 		mWristLeftp;
 	LLJoint* 		mWristRightp;
+	//BD
+	LLJoint* 		mShoulderRightp;
+	LLJoint* 		mShoulderLeftp;
+	LLJoint* 		mElbowRightp;
+	LLJoint* 		mElbowLeftp;
 
 	//--------------------------------------------------------------------
 	// XML parse tree

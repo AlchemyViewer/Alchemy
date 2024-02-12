@@ -114,6 +114,31 @@ void LLMotion::addJointState(const LLPointer<LLJointState>& jointState)
 	mJointSignature[2][joint_num] = (usage & LLJointState::SCALE) ? (0xff >> (7 - priority)) : 0;
 }
 
+//BD
+//-----------------------------------------------------------------------------
+// removeJointState()
+//-----------------------------------------------------------------------------
+void LLMotion::removeJointState(const LLPointer<LLJointState>& jointState)
+{
+	mPose.removeJointState(jointState);
+}
+
+//BD
+//-----------------------------------------------------------------------------
+// findJointState()
+//-----------------------------------------------------------------------------
+const LLPointer<LLJointState> LLMotion::findJointState(const std::string jointName)
+{
+	const LLPointer<LLJointState> joint_state = mPose.findJointState(jointName);
+	return joint_state;
+}
+
+const LLPointer<LLJointState> LLMotion::findJointState(LLJoint *joint)
+{
+	const LLPointer<LLJointState> joint_state = mPose.findJointState(joint);
+	return joint_state;
+}
+
 void LLMotion::setDeactivateCallback( void (*cb)(void *), void* userdata )
 {
 	mDeactivateCallback = cb;

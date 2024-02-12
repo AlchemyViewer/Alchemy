@@ -286,17 +286,6 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
 		mBorder->reshape(getRect().getWidth(), getRect().getHeight());
 	}
 
-	LLTextBox::Params text_p;
-	text_p.name("comment_text");
-	text_p.border_visible(false);
-	text_p.rect(mItemListRect);
-	text_p.follows.flags(FOLLOWS_ALL);
-	// word wrap was added accroding to the EXT-6841
-	text_p.wrap(true);
-	addChild(LLUICtrlFactory::create<LLTextBox>(text_p));
-
-
-	
 	for (LLInitParam::ParamIterator<LLScrollListColumn::Params>::const_iterator row_it = p.contents.columns.begin();
 		row_it != p.contents.columns.end();
 		++row_it)
@@ -317,6 +306,14 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
 		addRow(*row_it);
 	}
 
+	LLTextBox::Params text_p;
+	text_p.name("comment_text");
+	text_p.border_visible(false);
+	text_p.rect(mItemListRect);
+	text_p.follows.flags(FOLLOWS_ALL);
+	// word wrap was added accroding to the EXT-6841
+	text_p.wrap(true);
+	addChild(LLUICtrlFactory::create<LLTextBox>(text_p));
 }
 
 S32 LLScrollListCtrl::getSearchColumn()
@@ -1138,6 +1135,30 @@ void LLScrollListCtrl::deleteSelectedItems()
 		onCommit();
 	}
 // [/SL:KB]
+}
+
+//BD
+void LLScrollListCtrl::deleteFlaggedItems()
+{
+	item_list::iterator iter;
+	for (iter = mItemList.begin(); iter < mItemList.end();)
+	{
+		LLScrollListItem* itemp = *iter;
+		if (itemp && itemp->getFlagged())
+		{
+			if (itemp == mLastSelected)
+			{
+				mLastSelected = NULL;
+			}
+			delete itemp;
+			iter = mItemList.erase(iter);
+		}
+		else
+		{
+			iter++;
+		}
+	}
+	dirtyColumns();
 }
 
 void LLScrollListCtrl::clearHighlightedItems()

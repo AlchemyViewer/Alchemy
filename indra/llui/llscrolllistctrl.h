@@ -240,6 +240,9 @@ public:
 // [/SL:KB]
 	void			deleteItems(const LLSD& sd);
 	void 			deleteSelectedItems();
+	//BD
+	void 			deleteFlaggedItems();
+
 	void			deselectAllItems(BOOL no_commit_on_change = FALSE);	// by default, go ahead and commit on selection change
 
 	void			clearHighlightedItems();

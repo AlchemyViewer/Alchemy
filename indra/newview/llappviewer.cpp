@@ -4658,6 +4658,9 @@ void LLAppViewer::idle()
 			// Handle automatic walking towards points
 			gAgentPilot.updateTarget();
 			gAgent.autoPilot(&yaw);
+
+			//BD - Animator
+			gDragonAnimator.update();
 		}
 
 		static LLFrameTimer agent_update_timer;
