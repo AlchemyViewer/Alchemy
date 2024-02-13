@@ -3316,7 +3316,7 @@ BOOL LLViewerWindow::handleKey(KEY key, MASK mask)
 				LLFloaterReg::toggleInstanceOrBringToFront(name);
 			}
 			
-			LLChatEntry* chat_editor = nearby_chat->getChatBox();
+			LLChatEntry* chat_editor = nearby_chat ? nearby_chat->getChatBox() : nullptr; 
 			if (chat_editor)
 			{
 				// passing NULL here, character will be added later when it is handled by character handler.
