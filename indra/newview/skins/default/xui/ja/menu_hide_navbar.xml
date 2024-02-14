@@ -5,4 +5,5 @@
 	<menu_item_separator/>
 	<menu_item_check label="ＦＰＳを表示" name="ShowStatusBarFPS"/>
 	<menu_item_check label="ネットワーク状況を表示" name="ShowNetStats"/>
+	<menu_item_check label="時計に秒を表示" name="ShowStatusBarSeconds"/>
 </menu>

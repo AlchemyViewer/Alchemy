@@ -8,13 +8,21 @@
 	</menu>
 	<menu label="ヘルプ" name="Help">
 		<menu_item_call label="ハウツー…" name="How To"/>
-		<menu_item_call label="ナレッジベース" name="Knowledge Base"/>
-		<menu_item_call label="Wiki" name="Wiki"/>
-		<menu_item_call label="コミュニティ フォーラム" name="Community Forums"/>
-		<menu_item_call label="日本語サポートページ" name="Support portal"/>
-		<menu_item_call label="[SECOND_LIFE]ニュース" name="Second Life News"/>
-		<menu_item_call label="[SECOND_LIFE]ブログ" name="Second Life Blogs"/>
-		<menu_item_call label="バグを報告する" name="Report Bug"/>
+		<menu_item_separator/>
+		<menu_item_call label="Alchemyのウェブサイト" name="Alchemy Website"/>
+		<menu_item_call label="Alchemyのダウンロードページ" name="Alchemy Downloads"/>
+		<menu_item_call label="Alchemyのバグ報告" name="Report Alchemy Bug"/>
+		<menu_item_call label="Alchemyの機能改善をリクエスト" name="Request Alchemy Improvement"/>
+		<menu_item_separator/>
+		<menu_item_call label="Second Lifeナレッジベース" name="Knowledge Base"/>
+		<menu_item_call label="Second Life Wiki" name="Wiki"/>
+		<menu_item_call label="Second Lifeコミュニティフォーラム" name="Community Forums"/>
+		<menu_item_call label="Second Lifeサポートポータル" name="Support portal"/>
+		<menu_item_call label="Second Lifeニュース" name="Second Life News"/>
+		<menu_item_call label="Second Lifeブログ" name="Second Life Blogs"/>
+		<menu_item_separator/>
+		<menu_item_call label="Second Lifeのバグ報告" name="Report Bug"/>
+		<menu_item_separator/>
 		<menu_item_call label="[APP_NAME]について" name="About Second Life"/>
 	</menu>
 	<menu_item_check label="デバッグメニューを表示する" name="Show Debug Menu"/>
