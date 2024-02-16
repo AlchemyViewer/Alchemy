@@ -2126,11 +2126,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>796ca43cbb2c59c46f6dbf57177b231740b79364920d9d1ea6487e4e312dee7d731f1c66e88d37dc8141c4429d048af4b7f0f46254b6709724a975d52ca66ce3</string>
+              <string>3078726680748de58c764324dd07038d00ca63a8d3219265932f5ca7e8d61cad130073f0e320ef0ae60fe6fd1b9a7a75e47005038a8e03a1e8ef8621f09e434b</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/185/packages/generic/tinygltf/v2.8.19.2280/tinygltf-v2.8.19-common-2280.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/185/packages/generic/tinygltf/v2.8.21.2343/tinygltf-v2.8.21-common-2343.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2143,7 +2143,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>copyright</key>
         <string>// Copyright (c) 2015 - Present Syoyo Fujita, Aurélien Chatelain and many contributors.</string>
         <key>version</key>
-        <string>v2.8.19</string>
+        <string>v2.8.21</string>
         <key>name</key>
         <string>tinygltf</string>
         <key>canonical_repo</key>
