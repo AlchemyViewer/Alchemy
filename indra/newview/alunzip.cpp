@@ -168,7 +168,7 @@ S32 ALUnZip::extractCurrentFile(const std::string& path)
 
 bool ALUnZip::extractFile(const std::string& file_to_extract, char *buf, size_t bufsize)
 {
-	if (unzLocateFile(mZipfile, file_to_extract.c_str(), compare_filename_mz) != UNZ_OK)
+	if (unzLocateFile(mZipfile, file_to_extract.c_str(), 0) != UNZ_OK)
 	{
 		LL_WARNS("ALUNZIP") << file_to_extract << " was not found in " << mFilename << LL_ENDL;
 		return false;
@@ -193,7 +193,7 @@ bool ALUnZip::extractFile(const std::string& file_to_extract, char *buf, size_t 
 
 size_t ALUnZip::getSizeFile(const std::string& file_to_size)
 {
-	if (unzLocateFile(mZipfile, file_to_size.c_str(), compare_filename_mz) != UNZ_OK)
+	if (unzLocateFile(mZipfile, file_to_size.c_str(), 0) != UNZ_OK)
 	{
 		LL_WARNS("ALUNZIP") << file_to_size << " was not found in " << mFilename << LL_ENDL;
 		return 0;
