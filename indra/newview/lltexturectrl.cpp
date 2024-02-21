@@ -531,6 +531,8 @@ void LLFloaterTexturePicker::onClose(bool app_quitting)
 	}
 	stopUsingPipette();
     sLastPickerMode = mModeSelector->getValue().asInteger();
+    // *NOTE: Vertex buffer for sphere preview is still cached
+    mGLTFPreview = nullptr;
 }
 
 // virtual
@@ -1793,6 +1795,19 @@ void LLTextureCtrl::setFilterPermissionMasks(PermissionMask mask)
 {
     setImmediateFilterPermMask(mask);
     setDnDFilterPermMask(mask);
+}
+
+void LLTextureCtrl::onVisibilityChange(BOOL new_visibility)
+{
+    if (!new_visibility)
+    {
+        // *NOTE: Vertex buffer for sphere preview is still cached
+        mGLTFPreview = nullptr;
+    }
+    else
+    {
+        llassert(!mGLTFPreview);
+    }
 }
 
 void LLTextureCtrl::setVisible( BOOL visible ) 
