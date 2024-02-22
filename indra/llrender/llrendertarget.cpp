@@ -576,4 +576,5 @@ void LLRenderTarget::swapFBORefs(LLRenderTarget& other)
     llassert(mUsage == other.mUsage);
 
     std::swap(mFBO, other.mFBO);
+    std::swap(mTex, other.mTex);
 }
