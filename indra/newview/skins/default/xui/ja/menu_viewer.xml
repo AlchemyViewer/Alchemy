@@ -102,6 +102,7 @@
 	</menu>
 	<menu label="ワールド" name="World">
 		<menu_item_check label="ポーザー" name="Poser"/>
+		<menu_item_check label="ポーズクリエイター" name="Pose Creator"/>
 		<menu_item_call label="アニメーションを再同期" name="Resync Animations"/>
 		<menu_item_check label="サウンドエクスプローラー" name="Sound Explorer"/>
 		<menu_item_separator/>
