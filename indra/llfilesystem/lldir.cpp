@@ -594,6 +594,11 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
 	case LL_PATH_FONTS:
 		prefix = add(getAppRODataDir(), "fonts");
 		break;
+
+	case LL_PATH_POSES:
+		prefix = add(getOSUserAppDir(), "user_settings", "poses");
+		break;
+
 		
 	default:
 		llassert(0);

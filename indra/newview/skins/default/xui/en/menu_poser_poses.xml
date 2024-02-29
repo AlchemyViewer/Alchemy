@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
-<toggleable_menu
+<context_menu
  layout="topleft"
- name="Settings">
+ name="Poser Settings">
     <menu_item_call
      label="Load Rotations only"
      layout="topleft"
@@ -48,4 +48,4 @@
      name="rotations">
         <on_click function="Pose.Menu" parameter="all"/>
     </menu_item_call>
-</toggleable_menu>
+</context_menu>

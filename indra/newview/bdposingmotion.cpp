@@ -65,16 +65,8 @@ LLMotion::LLMotionInitStatus BDPosingMotion::onInitialize(LLCharacter *character
 	for (S32 i = 0; (mTargetJoint = mCharacter->getCharacterJoint(i)); ++i)
 	{
 		mJointState[i]->setJoint(mTargetJoint);
-		//BD - Bones that can support position
-		//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-		if (mTargetJoint->mHasPosition)
-		{
-			mJointState[i]->setUsage(LLJointState::POS | LLJointState::ROT);
-		}
-		else
-		{
-			mJointState[i]->setUsage(LLJointState::ROT);
-		}
+		//BD - All bones support positions now.
+		mJointState[i]->setUsage(LLJointState::POS | LLJointState::ROT /* | LLJointState::SCALE*/);
 		addJointState(mJointState[i]);
 	}
 
@@ -92,12 +84,8 @@ BOOL BDPosingMotion::onActivate()
 		if (joint)
 		{
 			joint->setTargetRotation(joint->getRotation());
-			//BD - Bones that can support position
-			//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-			if (joint->mHasPosition)
-			{
-				joint->setTargetPosition(joint->getPosition());
-			}
+			//BD - All bones support positions now.
+			joint->setTargetPosition(joint->getPosition());
 		}
 	}
 	return TRUE;
@@ -129,53 +117,49 @@ BOOL BDPosingMotion::onUpdate(F32 time, U8* joint_mask)
 
 			//BD - Merge these two together?
 			perc = llclamp(mInterpolationTimer.getElapsedTimeF32() / mInterpolationTime, 0.0f, 1.0f);
-			//BD - Bones that can support position
-			//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-			if (joint->mHasPosition)
+			//BD - All bones support positions now.
+			joint_pos = joint->getPosition();
+			target_pos = joint->getTargetPosition();
+			last_pos = joint->getLastPosition();
+			if (target_pos != joint_pos)
 			{
-				joint_pos = joint->getPosition();
-				target_pos = joint->getTargetPosition();
-				last_pos = joint->getLastPosition();
-				if (target_pos != joint_pos)
+				if (mInterpolationType == 2)
 				{
-					if (mInterpolationType == 2)
+					//BD - Do spherical linear interpolation.
+					//     We emulate the spherical linear interpolation here because
+					//     slerp() does not support LLVector3. mInterpolationTime is always
+					//     in a range between 0.00 and 1.00 which makes it perfect to use
+					//     as percentage directly.
+					//     We use the current joint position rather than the original like
+					//     in linear interpolation to take a fraction of the fraction, this
+					//     re-creates spherical linear interpolation's behavior.
+					joint_pos = lerp(joint_pos, target_pos, mInterpolationTime);
+				}
+				else if (mInterpolationType == 3)
+				{
+					next_pos = joint->getNextPosition();
+					//BD - Do curve interpolation.
+					//     This is a special kind of interpolation where we interpolate towards
+					//     a "middle" pose to a given degree while on our way to the actual final
+					//     pose.
+					joint_pos = lerp(joint_pos, next_pos, perc);
+					joint_pos = lerp(joint_pos, target_pos, 0.5f - abs(0.5f - perc));
+				}
+				else
+				{
+					if (perc >= 1.0f)
 					{
-						//BD - Do spherical linear interpolation.
-						//     We emulate the spherical linear interpolation here because
-						//     slerp() does not support LLVector3. mInterpolationTime is always
-						//     in a range between 0.00 and 1.00 which makes it perfect to use
-						//     as percentage directly.
-						//     We use the current joint position rather than the original like
-						//     in linear interpolation to take a fraction of the fraction, this
-						//     re-creates spherical linear interpolation's behavior.
-						joint_pos = lerp(joint_pos, target_pos, mInterpolationTime);
-					}
-					else if (mInterpolationType == 3)
-					{
-						next_pos = joint->getNextPosition();
-						//BD - Do curve interpolation.
-						//     This is a special kind of interpolation where we interpolate towards
-						//     a "middle" pose to a given degree while on our way to the actual final
-						//     pose.
-						joint_pos = lerp(joint_pos, next_pos, perc);
-						joint_pos = lerp(joint_pos, target_pos, 0.5f - abs(0.5f - perc));
+						//BD - Can be used to do no interpolation too.
+						joint_pos = target_pos;
+						last_pos = joint_pos;
 					}
 					else
 					{
-						if (perc >= 1.0f)
-						{
-							//BD - Can be used to do no interpolation too.
-							joint_pos = target_pos;
-							last_pos = joint_pos;
-						}
-						else
-						{
-							//BD - Do linear interpolation.
-							joint_pos = lerp(last_pos, target_pos, perc);
-						}
+						//BD - Do linear interpolation.
+						joint_pos = lerp(last_pos, target_pos, perc);
 					}
-					joint_state->setPosition(joint_pos);
 				}
+				joint_state->setPosition(joint_pos);
 			}
 
 			if (target_quat != joint_quat)
@@ -245,16 +229,8 @@ void BDPosingMotion::addJointToState(LLJoint *joint)
 		return;
 
 	mJointState[i]->setJoint(joint);
-	//BD - Bones that can support position
-	//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-	if (joint->mHasPosition)
-	{
-		mJointState[i]->setUsage(LLJointState::POS | LLJointState::ROT);
-	}
-	else
-	{
-		mJointState[i]->setUsage(LLJointState::ROT);
-	}
+	//BD - All bones support positions now.
+	mJointState[i]->setUsage(LLJointState::POS | LLJointState::ROT /* | LLJointState::SCALE*/);
 	addJointState(mJointState[i]);
 }
 // End

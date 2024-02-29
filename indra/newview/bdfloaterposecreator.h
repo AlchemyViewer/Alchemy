@@ -15,8 +15,8 @@
 */
 
 
-#ifndef BD_FLOATER_POSER_H
-#define BD_FLOATER_POSER_H
+#ifndef BD_FLOATER_POSE_CREATOR_H
+#define BD_FLOATER_POSE_CREATOR_H
 
 #include "llfloater.h"
 #include "llscrolllistctrl.h"
@@ -25,38 +25,18 @@
 #include "llkeyframemotion.h"
 #include "lltoggleablemenu.h"
 #include "llmenubutton.h"
+#include "llspinctrl.h"
+#include "bdposingmotion.h"
 
 #include "llviewerobject.h"
 
-typedef enum E_BoneTypes
-{
-	JOINTS = 0,
-	COLLISION_VOLUMES = 1,
-	ATTACHMENT_BONES = 2
-} E_BoneTypes;
-
-typedef enum E_Columns
-{
-	COL_ICON = 0,
-	COL_NAME = 1,
-	COL_ROT_X = 2,
-	COL_ROT_Y = 3,
-	COL_ROT_Z = 4,
-	COL_POS_X = 5,
-	COL_POS_Y = 6,
-	COL_POS_Z = 7,
-	COL_SCALE_X = 8,
-	COL_SCALE_Y = 9,
-	COL_SCALE_Z = 10
-} E_Columns;
-
-class BDFloaterPoser :
+class BDFloaterPoseCreator :
 	public LLFloater
 {
 	friend class LLFloaterReg;
 private:
-	BDFloaterPoser(const LLSD& key);
-	/*virtual*/	~BDFloaterPoser();
+	BDFloaterPoseCreator(const LLSD& key);
+	/*virtual*/	~BDFloaterPoseCreator();
 	/*virtual*/	BOOL postBuild();
 	/*virtual*/ void draw();
 	/*virtual*/ void onOpen(const LLSD& key);
@@ -65,13 +45,13 @@ private:
 	//BD - Posing
 	bool onClickPoseSave(const LLSD& param);
 	void onPoseStart();
-	void onPoseDelete();
-	void onPoseRefresh();
-	void onPoseControlsRefresh();
-	bool onPoseSave();
-	void onPoseLoad();
-	void onPoseLoadSelective(const LLSD& param);
-	void onPoseMenuAction(const LLSD& param);
+	bool onPoseExport();
+	void onPoseImport();
+	void onPoseStartStop();
+	void onPoseReapply();
+	void onEditAnimationInfo(const LLSD& param);
+	void onInterpolationChange(LLUICtrl* ctrl);
+	void onAnimationDurationCheck();
 
 	//BD - Joints
 	void onJointRefresh();
@@ -85,7 +65,6 @@ private:
 	void onJointPositionReset();
 	void onJointScaleReset();
 	void onJointRotationRevert();
-	void onJointRecapture();
 	void onCollectDefaults();
 	void onJointContextMenuAction(const LLSD& param);
 	bool onJointContextMenuEnable(const LLSD& param);
@@ -96,9 +75,18 @@ private:
 	void onJointMirror();
 	void onJointSymmetrize();
 	void onJointCopyTransforms();
+	//BD - Keyframes
+	void onKeyframeSelect();
+	void onKeyframeAdd();
+	void onKeyframeAdd(F32 time, LLJoint* joint);
+	void onKeyframeRemove();
+	void onKeyframeTime();
+	void onKeyframeRefresh();
+	void onKeyframesRebuild();
 
 	//BD - Misc
-	void onUpdateLayout();
+	LLKeyframeMotion* onReadyTempMotion(std::string filename = "_poser_temp.anim", bool eternal = false);
+	void onCreateTempMotion();
 
 	//BD - Mirror Bone
 	void toggleMirrorMode(LLUICtrl* ctrl) { mMirrorMode = ctrl->getValue().asBoolean(); }
@@ -107,20 +95,13 @@ private:
 	//BD - Flip Poses
 	void onFlipPose();
 
-	//BD - Animesh
-	void onAvatarsRefresh();
-	void onAvatarsSelect();
-
-	//BD
-	void loadPoseRotations(std::string name, LLVector3 *rotations);
-	void loadPosePositions(std::string name, LLVector3 *rotations);
-	void loadPoseScales(std::string name, LLVector3 *rotations);
-
 private:
 	//BD - Posing
-	LLScrollListCtrl*							mPoseScroll;
 	LLTabContainer*								mJointTabs;
 	LLTabContainer*								mModifierTabs;
+	LLScrollListCtrl*							mKeyframeScroll;
+	LLScrollListCtrl*							mTimelineScroll;
+	LLHandle<LLToggleableMenu>					mSaveMenuHandle;
 
 	std::array<LLUICtrl*, 3>					mRotationSliders;
 	std::array<LLSliderCtrl*, 3>				mPositionSliders;
@@ -136,16 +117,14 @@ private:
 	//BD - Misc
 	bool										mDelayRefresh;
 	bool										mEasyRotations;
+	bool										mAutoDuration;
+
+	LLUUID										mTempMotionID;
 	
 	//BD - Mirror Bone
 	bool										mMirrorMode;
 
-	//BD - Animesh
-	LLScrollListCtrl*							mAvatarScroll;
-
 	LLButton*									mStartPosingBtn;
-	LLMenuButton*								mLoadPosesBtn;
-	LLButton*									mSavePosesBtn;
 
 	LLSD										mClipboard;
 };

@@ -277,6 +277,7 @@ with the same filename but different name
 
   <texture name="Icon_Dock_Foreground" file_name="windows/Icon_Dock_Foreground.png" preload="true" />
   <texture name="Icon_Dock_Press" file_name="windows/Icon_Dock_Press.png" preload="true" />
+  <texture name="Icon_Undock_Foreground" file_name="windows/Icon_Undock_Foreground.png" preload="true" />
 
   <texture name="Icon_File_Upload" file_name="icons/file_upload.png" preload="true" />
   
