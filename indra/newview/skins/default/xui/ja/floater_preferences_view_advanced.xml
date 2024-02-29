@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="floaterpreferencesviewadvanced" title="カメラ位置">
-	<text name="camera_offset_lbl">
+	<text name="camera_offset_lbl" width="130">
 		カメラのオフセット値：
 	</text>
 	<spinner label="Ｘ" name="camera_x"/>
 	<spinner label="Ｙ" name="camera_y"/>
 	<spinner label="Ｚ" name="camera_z"/>
 	<button name="reset_offset_rear" tool_tip="カメラのオフセット値をデフォルトの値にリセットします。"/>
-	<text name="focus_offset_lbl">
-		フォーカスのオフセット：
+	<text name="focus_offset_lbl" width="158">
+		フォーカスのオフセット値：
 	</text>
 	<button name="reset_offset_rear" tool_tip="カメラのフォーカスをデフォルトの値にリセットします。"/>
 	<spinner label="Ｘ" name="focus_x"/>

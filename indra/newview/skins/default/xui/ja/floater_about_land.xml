@@ -165,7 +165,7 @@
 			<text name="estate_section_lbl">
 				不動産：
 			</text>
-			<text name="estate_name_text">
+			<text name="estate_name_text" width="300">
 				メインランド
 			</text>
 			<text name="estate_owner_lbl">
@@ -213,7 +213,7 @@
 		</panel>
 		<panel label="オブジェクト" name="land_objects_panel">
 			<panel.string name="objects_available_text">
-				全[MAX]個中[COUNT]個（[AVAILABLE]個が利用可能）
+				全[MAX]個中[COUNT]個（残り[AVAILABLE]個利用可能）
 			</panel.string>
 			<panel.string name="objects_deleted_text">
 				全[MAX]個中[COUNT]個（[DELETED]個を削除しました）
@@ -221,13 +221,13 @@
 			<text name="parcel_object_bonus">
 				オブジェクトボーナス：[BONUS]個
 			</text>
-			<text name="Simulator primitive usage:">
+			<text name="Simulator primitive usage:" width="364">
 				リージョン全体の最大プリム数：
 			</text>
 			<text name="objects_available">
-				全[MAX]個中[COUNT]個（[AVAILABLE]個が利用可能）
+				全[MAX]個中[COUNT]個（残り[AVAILABLE]個利用可能）
 			</text>
-			<text name="Primitives parcel supports:">
+			<text name="Primitives parcel supports:" width="364">
 				区画で利用可能な最大プリム数：
 			</text>
 			<text name="object_contrib_text">
@@ -273,7 +273,7 @@
 				他者のオブジェクトの自動返却（分単位、0で自動返却なし）：
 			</text>
 			<line_editor name="clean other time"/>
-			<text name="Object Owners:">
+			<text name="Object Owners:" width="130">
 				オブジェクトの所有者：
 			</text>
 			<button name="Refresh List" tool_tip="オブジェクトのリストを更新します"/>

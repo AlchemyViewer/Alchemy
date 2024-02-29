@@ -96,7 +96,7 @@ default
 		プリプロセッサのインクルードパス：
 		</text>
 		<line_editor name="preprocinclude_location"/>
-		<button label="ブラウズ" label_selected="ブラウズ" name="SetPreprocInclude"/>
+		<button label="参照…" label_selected="参照…" name="SetPreprocInclude"/>
 	</panel>
 	<text name="prefs_label">
 		外部エディタ：
@@ -106,7 +106,7 @@ default
 			エディタのパス：
 		</text>
 		<line_editor name="executable_path_field" tool_tip="lslファイルを編集するエディタ（実行ファイル）へのフルパス（クォーテーションは不要）"/>
-		<button label="ブラウズ" label_selected="ブラウズ" name="browse_for_executable" tool_tip="lslファイルを編集するエディター（実行可能ファイル）をブラウズする。"/>
+		<button label="参照…" label_selected="参照…" name="browse_for_executable" tool_tip="lslファイルを編集するエディター（実行可能ファイル）を参照…する。"/>
 	</panel>
 	<button name="close_btn" label="ＯＫ"/>
 </floater>

@@ -23,7 +23,7 @@
 		</panel>
 	</tab_container>
 	<panel label="ボトムパネル" name="bottom_panel">
-		<button label="クリップボードにコピー" name="copy_btn"/>
+		<button label="コピー" name="copy_btn"/>
 		<icon name="dummy_icon"/>
 	</panel>
 </floater>
