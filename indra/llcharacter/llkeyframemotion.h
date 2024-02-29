@@ -42,6 +42,7 @@
 #include "v3dmath.h"
 #include "v3math.h"
 #include "llbvhconsts.h"
+#include "llsortedvector.h"
 
 #include "boost/unordered/unordered_flat_map.hpp"
 
@@ -362,7 +363,7 @@ public:
 
 		InterpolationType	mInterpolationType = LLKeyframeMotion::IT_LINEAR;
 		S32					mNumKeys = 0;
-		typedef std::vector< std::pair<F32, Key> > key_map_t;
+		typedef LLSortedVector<F32, Key> key_map_t;
 		key_map_t 			mKeys;
 		Key					mLoopInKey;
 		Key					mLoopOutKey;

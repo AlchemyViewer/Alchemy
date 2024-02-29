@@ -51,7 +51,7 @@ public:
     {
         // Allow caller to dump in a bunch of (pairs convertible to)
         // value_type if desired, but make sure we sort afterwards.
-        std::sort(mVector.begin(), mVector.end());
+        std::sort(mVector.begin(), mVector.end(), less<value_type>());
     }
 
     /// insert(key, value)
@@ -148,6 +148,17 @@ private:
                         const std::pair<const std::type_info*, T>& rhs) const
         {
             return lhs.first->before(*rhs.first);
+        }
+    };
+
+    // Same as above, but with const F32.
+    template <typename T>
+    struct less< std::pair<F32, T> >
+    {
+        bool operator()(const std::pair<F32, T>& lhs,
+            const std::pair<F32, T>& rhs) const
+        {
+            return lhs.first < rhs.first;
         }
     };
 

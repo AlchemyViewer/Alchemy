@@ -1377,11 +1377,9 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
 					<< " for animation " << asset_id << LL_ENDL;
 				return FALSE;
 			}
-			
-			rCurve->mKeys.emplace_back(time, rot_key);
-		}
 
-		std::sort(rCurve->mKeys.begin(), rCurve->mKeys.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+			rCurve->mKeys[time] = rot_key;
+		}
 
         if (joint_motion->mRotationCurve.mNumKeys > joint_motion->mRotationCurve.mKeys.size())
         {
@@ -1483,15 +1481,13 @@ BOOL LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
 				return FALSE;
 			}
 			
-			pCurve->mKeys.emplace_back(pos_key.mTime, pos_key);
+			pCurve->mKeys[pos_key.mTime] = pos_key;
 
 			if (is_pelvis)
 			{
 				joint_motion_list->mPelvisBBox.addPoint(pos_key.mValue);
 			}
 		}
-
-		std::sort(pCurve->mKeys.begin(), pCurve->mKeys.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
 
         if (joint_motion->mPositionCurve.mNumKeys > joint_motion->mPositionCurve.mKeys.size())
         {
@@ -1930,11 +1926,11 @@ bool LLKeyframeMotion::dumpToFile(const std::string& name)
 		{
 			outfilename = outfile_base;
 		}
-        if (LLFile::isfile(outfilename))
+        /*if (LLFile::isfile(outfilename))
         {
 			LL_WARNS() << outfilename << " already exists, write failed" << LL_ENDL;
             return false;
-        }
+        }*/
 
         S32 file_size = getFileSize();
         U8* buffer = new U8[file_size];

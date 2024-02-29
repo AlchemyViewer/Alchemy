@@ -48,9 +48,7 @@
 
 //BD - Black Dragon specifics
 #include "bdanimator.h"
-#include "bdfunctions.h"
 #include "bdposingmotion.h"
-#include "bdstatus.h"
 #include "bdfloaterposer.h"
 
 //BD - 1 frame is always 1/60 of a second, we assume animations run at 60 FPS by default.
@@ -173,7 +171,7 @@ BOOL BDFloaterPoseCreator::postBuild()
 	enable_registrar.add("Joints.OnEnable", boost::bind(&BDFloaterPoseCreator::onJointContextMenuEnable, this, _2));
 	LLContextMenu* joint_menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_poser_joints.xml",
 		gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
-	//mJointScrolls[JOINTS]->setContextMenu(joint_menu);
+	mJointScrolls[JOINTS]->setContextMenu(LLScrollListCtrl::MENU_EXTERNAL, joint_menu);
 
 	return TRUE;
 }
@@ -251,7 +249,7 @@ void BDFloaterPoseCreator::onKeyframesRebuild()
 		for (auto& rot_key : rot_curve.mKeys)
 		{
 			F32 roll, pitch, yaw;
-			LLQuaternion rot_quat = rot_key.second.mRotation;
+			LLQuaternion rot_quat = rot_key.second.mValue;
 			rot_quat.getEulerAngles(&roll, &pitch, &yaw);
 
 			S32 time_frames = (S32)ll_round(rot_key.second.mTime / FRAMETIME, 1.f);
@@ -265,7 +263,7 @@ void BDFloaterPoseCreator::onKeyframesRebuild()
 
 		for (auto& pos_key : pos_curve.mKeys)
 		{
-			LLVector3 pos = pos_key.second.mPosition;
+			LLVector3 pos = pos_key.second.mValue;
 			S32 time_frames = (S32)ll_round(pos_key.second.mTime / FRAMETIME, 1.f);
 
 			if (col_slider)
@@ -277,7 +275,7 @@ void BDFloaterPoseCreator::onKeyframesRebuild()
 
 		for (auto& scale_key : scale_curve.mKeys)
 		{
-			LLVector3 scale = scale_key.second.mScale;
+			LLVector3 scale = scale_key.second.mValue;
 			S32 time_frames = (S32)ll_round(scale_key.second.mTime / FRAMETIME, 1.f);
 
 			if (col_slider)
@@ -358,7 +356,7 @@ void BDFloaterPoseCreator::onKeyframeRefresh()
 		for (auto& rot_key : rot_curve.mKeys)
 		{
 			F32 roll, pitch, yaw;
-			LLQuaternion rot_quat = rot_key.second.mRotation;
+			LLQuaternion rot_quat = rot_key.second.mValue;
 			rot_quat.getEulerAngles(&roll, &pitch, &yaw);
 
 			S32 time_frames = (S32)ll_round(rot_key.second.mTime / FRAMETIME, 1.f);
@@ -387,7 +385,7 @@ void BDFloaterPoseCreator::onKeyframeRefresh()
 	{
 		for (auto& pos_key : pos_curve.mKeys)
 		{
-			LLVector3 pos = pos_key.second.mPosition;
+			LLVector3 pos = pos_key.second.mValue;
 			S32 time_frames = (S32)ll_round(pos_key.second.mTime / FRAMETIME, 1.f);
 			LLSD row;
 			row["columns"][0]["column"] = "time";
@@ -413,7 +411,7 @@ void BDFloaterPoseCreator::onKeyframeRefresh()
 	{
 		for (auto& scale_key : scale_curve.mKeys)
 		{
-			LLVector3 scale = scale_key.second.mScale;
+			LLVector3 scale = scale_key.second.mValue;
 			S32 time_frames = (S32)ll_round(scale_key.second.mTime / FRAMETIME, 1.f);
 			LLSD row;
 			row["columns"][0]["column"] = "time";
@@ -473,7 +471,7 @@ void BDFloaterPoseCreator::onKeyframeSelect()
 		{
 			if ((S32)it.first == si)
 			{
-				LLQuaternion rot_quat = it.second.mRotation;
+				LLQuaternion rot_quat = it.second.mValue;
 				LLVector3 rot_vec;
 				rot_quat.getEulerAngles(&rot_vec.mV[VX], &rot_vec.mV[VY], &rot_vec.mV[VZ]);
 				mRotationSliders[VX]->setValue(rot_vec.mV[VX]);
@@ -489,7 +487,7 @@ void BDFloaterPoseCreator::onKeyframeSelect()
 		{
 			if ((S32)it.first == si)
 			{
-				LLVector3 pos = it.second.mPosition;
+				LLVector3 pos = it.second.mValue;
 				mPositionSliders[VX]->setValue(pos.mV[VX]);
 				mPositionSliders[VY]->setValue(pos.mV[VY]);
 				mPositionSliders[VZ]->setValue(pos.mV[VZ]);
@@ -503,7 +501,7 @@ void BDFloaterPoseCreator::onKeyframeSelect()
 		{
 			if ((S32)it.first == si)
 			{
-				LLVector3 scale = it.second.mScale;
+				LLVector3 scale = it.second.mValue;
 				mScaleSliders[VX]->setValue(scale.mV[VX]);
 				mScaleSliders[VY]->setValue(scale.mV[VY]);
 				mScaleSliders[VZ]->setValue(scale.mV[VZ]);
@@ -1174,7 +1172,8 @@ void BDFloaterPoseCreator::onPoseStartStop()
 		//     list when we stop it preventing it from being destroyed at some point.
 		if (!tmotion)
 		{
-			gDragonAnimator.mPoseCreatorMotion->dumpToFile("_poser_temp.anim", false);
+			std::string full_path = gDirUtilp->getExpandedFilename(LL_PATH_ANIMATIONS, "_poser_temp.anim");
+			gDragonAnimator.mPoseCreatorMotion->dumpToFile(full_path);
 
 			LLKeyframeMotion* motion = onReadyTempMotion();
 			if (motion)
@@ -1190,7 +1189,8 @@ void BDFloaterPoseCreator::onPoseStartStop()
 			if (tmotion->isStopped())
 			{
 				//BD - Save the animation temporarily.
-				gDragonAnimator.mPoseCreatorMotion->dumpToFile("_poser_temp.anim", false);
+				std::string full_path = gDirUtilp->getExpandedFilename(LL_PATH_ANIMATIONS, "_poser_temp.anim");
+				gDragonAnimator.mPoseCreatorMotion->dumpToFile(full_path);
 				//BD - Reload the animation data back into our already existing animation.
 				//     To refresh it and make sure its always up to date with all our changes.
 				LLKeyframeMotion* tmotion = onReadyTempMotion();
@@ -1257,19 +1257,19 @@ void BDFloaterPoseCreator::onPoseReapply()
 			//     start.
 			for (auto& rot_key : rot_curve.mKeys)
 			{
-				LLQuaternion rot = rot_key.second.mRotation;
+				LLQuaternion rot = rot_key.second.mValue;
 				joint->setTargetRotation(rot);
 			}
 
 			for (auto& pos_key : pos_curve.mKeys)
 			{
-				LLVector3 pos = pos_key.second.mPosition;
+				LLVector3 pos = pos_key.second.mValue;
 				joint->setTargetPosition(pos);
 			}
 
 			for (auto& scale_key : scale_curve.mKeys)
 			{
-				LLVector3 scale = scale_key.second.mScale;
+				LLVector3 scale = scale_key.second.mValue;
 				joint->setScale(scale);
 			}
 
@@ -1291,7 +1291,6 @@ void BDFloaterPoseCreator::onPoseStart()
 			onCollectDefaults();
 
 		gAgent.stopFidget();
-		gDragonStatus->setPosing(true);
 
 		gAgentAvatarp->startMotion(ANIM_BD_POSING_MOTION);
 		onJointRotPosScaleReset();
@@ -1312,7 +1311,6 @@ void BDFloaterPoseCreator::onPoseStart()
 		//BD - Clear posing when we're done now that we've safely endangered getting spaghetified.
 		gAgentAvatarp->clearPosing();
 		gAgentAvatarp->stopMotion(ANIM_BD_POSING_MOTION);
-		gDragonStatus->setPosing(false);
 	}
 
 	//BD - Wipe the joint list.
@@ -1336,7 +1334,8 @@ bool BDFloaterPoseCreator::onPoseExport()
 	if (motion_name.empty())
 		return false;
 
-	return gDragonAnimator.mPoseCreatorMotion->dumpToFile(motion_name, false);
+	std::string full_path = gDirUtilp->getExpandedFilename(LL_PATH_ANIMATIONS, motion_name + ".anim");
+	return gDragonAnimator.mPoseCreatorMotion->dumpToFile(full_path);
 
 	LLKeyframeMotion* temp_motion = NULL;
 	LLAssetID mMotionID;
@@ -1437,14 +1436,14 @@ bool BDFloaterPoseCreator::onPoseExport()
 				//BD - Get the pelvis's bounding box and add it.
 				if (joint->getJointNum() == 0)
 				{
-					joint_motion_list->mPelvisBBox.addPoint(position_key.mPosition);
+					joint_motion_list->mPelvisBBox.addPoint(position_key.mValue);
 				}
 			}
 		}
 	}
 
 	temp_motion->setJointMotionList(joint_motion_list);
-	return temp_motion->dumpToFile(motion_name, false);
+	return temp_motion->dumpToFile(full_path);
 }
 
 void BDFloaterPoseCreator::onPoseImport()
@@ -1946,10 +1945,10 @@ void BDFloaterPoseCreator::onJointSet(LLUICtrl* ctrl, const LLSD& param)
 			LLScrollListItem* key_item = mKeyframeScroll->getItemByLabel(mirror_joint_name);
 			if (key_item)
 			{
-				for (std::map<F32, LLKeyframeMotion::RotationKey>::iterator it = mirror_joint_motion->mRotationCurve.mKeys.begin();
+				for (auto it = mirror_joint_motion->mRotationCurve.mKeys.begin();
 					it != mirror_joint_motion->mRotationCurve.mKeys.end(); )
 				{
-					std::map<F32, LLKeyframeMotion::RotationKey>::iterator curr_it = it;
+					auto curr_it = it;
 					//BD - Previously we were rounding the keyframe time and comparing it to the time set
 					//     in the keyframe list entry, this was ugly and had a big downside, having two
 					//     or more entries with the same time resulting in all of them getting changed.
@@ -1962,7 +1961,7 @@ void BDFloaterPoseCreator::onJointSet(LLUICtrl* ctrl, const LLSD& param)
 					if ((S32)curr_it->first == si)
 					{
 						found = true;
-						curr_it->second.mRotation = mirror_joint->getTargetRotation();
+						curr_it->second.mValue = mirror_joint->getTargetRotation();
 
 						F32 roll, pitch, yaw;
 						LLQuaternion rot_quat = mirror_joint->getTargetRotation();
@@ -2038,10 +2037,10 @@ void BDFloaterPoseCreator::onJointPosSet(LLUICtrl* ctrl, const LLSD& param)
 
 	bool found = false;
 	S32 si = mKeyframeScroll->getFirstSelectedIndex() + 1;
-	for (std::map<F32, LLKeyframeMotion::PositionKey>::iterator it = joint_motion->mPositionCurve.mKeys.begin();
+	for (auto it = joint_motion->mPositionCurve.mKeys.begin();
 		it != joint_motion->mPositionCurve.mKeys.end(); )
 	{
-		std::map<F32, LLKeyframeMotion::PositionKey>::iterator curr_it = it;
+		auto curr_it = it;
 		//BD - Previously we were rounding the keyframe time and comparing it to the time set
 		//     in the keyframe list entry, this was ugly and had a big downside, having two
 		//     or more entries with the same time resulting in all of them getting changed.
@@ -2053,7 +2052,7 @@ void BDFloaterPoseCreator::onJointPosSet(LLUICtrl* ctrl, const LLSD& param)
 		if ((S32)curr_it->first == si)
 		{
 			found = true;
-			curr_it->second.mPosition = joint->getTargetPosition();
+			curr_it->second.mValue = joint->getTargetPosition();
 
 			LLVector3 pos = joint->getTargetPosition();
 			//BD - Should we really be able to get here? The comparison above should already
@@ -2117,10 +2116,10 @@ void BDFloaterPoseCreator::onJointScaleSet(LLUICtrl* ctrl, const LLSD& param)
 	LLKeyframeMotion::RotationCurve rot_curve = joint_motion->mRotationCurve;
 
 	S32 si = mKeyframeScroll->getFirstSelectedIndex() + 1;
-	for (std::map<F32, LLKeyframeMotion::ScaleKey>::iterator it = joint_motion->mScaleCurve.mKeys.begin();
+	for (auto it = joint_motion->mScaleCurve.mKeys.begin();
 		it != joint_motion->mScaleCurve.mKeys.end(); )
 	{
-		std::map<F32, LLKeyframeMotion::ScaleKey>::iterator curr_it = it;
+		auto curr_it = it;
 		//BD - Previously we were rounding the keyframe time and comparing it to the time set
 		//     in the keyframe list entry, this was ugly and had a big downside, having two
 		//     or more entries with the same time resulting in all of them getting changed.
@@ -2131,7 +2130,7 @@ void BDFloaterPoseCreator::onJointScaleSet(LLUICtrl* ctrl, const LLSD& param)
 		//     This should work for now until we decide to allow reordering keyframes.
 		if ((S32)curr_it->first == si)
 		{
-			curr_it->second.mScale = joint->getScale();
+			curr_it->second.mValue = joint->getScale();
 
 			LLVector3 scale = joint->getScale();
 			key_item->getColumn(2)->setValue(ll_round(scale.mV[VX], 0.001f));
@@ -3051,7 +3050,8 @@ void BDFloaterPoseCreator::onCreateTempMotion()
 	//     this animation locally which will create a fully setup LLKeyframeAnimation
 	//     that doesn't have some weird things going on causing crashes, it is also
 	//     a lot easier to do.
-	temp_motion->dumpToFile("_poser_temp", false);
+	std::string full_path = gDirUtilp->getExpandedFilename(LL_PATH_ANIMATIONS, "_poser_temp.anim");
+	temp_motion->dumpToFile(full_path);
 	//return temp_motion;
 }
 
