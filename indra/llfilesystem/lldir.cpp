@@ -599,6 +599,9 @@ std::string LLDir::getExpandedFilename(ELLPath location, const std::string& subd
 		prefix = add(getOSUserAppDir(), "user_settings", "poses");
 		break;
 
+	case LL_PATH_ANIMATIONS:
+		prefix = add(getOSUserAppDir(), "user_settings", "animations");
+		break;
 		
 	default:
 		llassert(0);

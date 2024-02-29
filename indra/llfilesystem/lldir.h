@@ -50,6 +50,7 @@ typedef enum ELLPath
 	LL_PATH_FONTS = 18,
     LL_PATH_DUMP = 19,
 	LL_PATH_POSES = 20,
+	LL_PATH_ANIMATIONS = 21,
 	LL_PATH_LAST
 } ELLPath;
 

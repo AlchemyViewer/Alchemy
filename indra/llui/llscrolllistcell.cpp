@@ -32,6 +32,8 @@
 #include "llcheckboxctrl.h"
 #include "llui.h"	// LLUIImage
 #include "lluictrlfactory.h"
+//BD
+#include "llmultislider.h"
 
 //static 
 LLScrollListCell* LLScrollListCell::create(const LLScrollListCell::Params& cell_p)
@@ -53,6 +55,10 @@ LLScrollListCell* LLScrollListCell::create(const LLScrollListCell::Params& cell_
 	else if (cell_p.type() == "icontext")
 	{
 		cell = new LLScrollListIconText(cell_p);
+	}
+	else if (cell_p.type() == "multislider")
+	{
+		cell = new LLScrollListMultiSlider(cell_p);
 	}
     else if (cell_p.type() == "bar")
     {
@@ -741,4 +747,73 @@ BOOL LLScrollListLineEditor::handleUnicodeChar(llwchar uni_char, BOOL called_fro
 BOOL LLScrollListLineEditor::handleUnicodeCharHere(llwchar uni_char )
 {
 	return TRUE;
+}
+
+//
+// BD - LLScrollListMultiSlider
+//
+LLScrollListMultiSlider::LLScrollListMultiSlider(const LLScrollListCell::Params& p)
+	: LLScrollListCell(p),
+	mMinValue(p.min_val),
+	mMaxValue(p.max_val)
+{
+	LLMultiSlider::Params multislider_p;
+	multislider_p.name("multislider");
+	multislider_p.rect = LLRect(0, 18, p.width, 0);
+	multislider_p.enabled(p.enabled);
+	multislider_p.initial_value(p.value());
+	multislider_p.max_sliders(p.max_sliders);
+	multislider_p.min_value(p.min_val);
+	multislider_p.max_value(p.max_val);
+	multislider_p.increment(p.increment);
+
+	mMultiSlider = LLUICtrlFactory::create<LLMultiSlider>(multislider_p);
+	LLRect rect(mMultiSlider->getRect());
+	if (p.width)
+	{
+		rect.mRight = rect.mLeft + p.width;
+		mMultiSlider->setRect(rect);
+		setWidth(p.width);
+	}
+	else
+	{
+		setWidth(rect.getWidth()); //check_box->getWidth();
+	}
+
+	mMultiSlider->setColor(p.color);
+}
+
+LLScrollListMultiSlider::~LLScrollListMultiSlider()
+{
+}
+
+const LLSD LLScrollListMultiSlider::getValue() const
+{
+	return true;
+}
+
+void LLScrollListMultiSlider::setValue(const LLSD& value)
+{
+	
+}
+
+void LLScrollListMultiSlider::addKeyframe(F32 time, std::string name)
+{
+	mMultiSlider->addSlider(time, name);
+}
+
+void LLScrollListMultiSlider::deleteKeyframe(std::string name)
+{
+	mMultiSlider->deleteSlider(name);
+}
+
+void LLScrollListMultiSlider::setWidth(S32 width)
+{
+	LLScrollListCell::setWidth(width);
+}
+
+
+void LLScrollListMultiSlider::draw(const LLColor4& color, const LLColor4& highlight_color)	 const
+{
+	mMultiSlider->draw();
 }
