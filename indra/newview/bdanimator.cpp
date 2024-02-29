@@ -16,6 +16,8 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "bdanimator.h"
+
 #include "lluictrlfactory.h"
 #include "llagent.h"
 #include "lldiriterator.h"
@@ -25,12 +27,24 @@
 #include "llviewerjointattachment.h"
 #include "llviewerjoint.h"
 #include "llvoavatarself.h"
+#include "llviewercontrol.h"
 
 #include "bdfloaterposer.h"
-#include "bdanimator.h"
 #include "bdposingmotion.h"
 
+#include "llagentcamera.h"
+
 BDAnimator gDragonAnimator;
+
+
+BDAnimator::BDAnimator() :
+			mPlaying(false)
+{
+}
+
+BDAnimator::~BDAnimator()
+{
+}
 
 void BDAnimator::update()
 {
@@ -238,7 +252,7 @@ BOOL BDAnimator::loadPose(const LLSD& name, S32 load_type)
 	std::string filename;
 	if (!name.asString().empty())
 	{
-		filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "poses", LLDir::escapePathString(name.asString()) + ".xml");
+		filename = gDirUtilp->getExpandedFilename(LL_PATH_POSES, LLDir::escapePathString(name.asString()) + ".xml");
 	}
 
 	LLSD pose;
@@ -259,84 +273,162 @@ BOOL BDAnimator::loadPose(const LLSD& name, S32 load_type)
 			return FALSE;
 		}
 
-		//BD - Not sure how to read the exact line out of a XML file, so we're just going
-		//     by the amount of tags here, since the header has only 3 it's a good indicator
-		//     if it's the correct line we're in.
-		BDPosingMotion* motion = (BDPosingMotion*)mTargetAvatar->findMotion(ANIM_BD_POSING_MOTION);
-		if (count == 3)
+		if (pose.has("version"))
 		{
-			if (motion)
+			for (LLSD::map_const_iterator itr = pose.beginMap(); itr != pose.endMap(); ++itr)
 			{
-				F32 time = pose["time"].asReal();
-				S32 type = pose["type"].asInteger();
-				motion->setInterpolationType(type);
-				motion->setInterpolationTime(time);
-				motion->startInterpolationTimer();
-			}
-		}
+				std::string const & name = itr->first;
+				LLSD const & control_map = itr->second;
 
-		LLJoint* joint = mTargetAvatar->getJoint(pose["bone"].asString());
-		if (joint)
-		{
-			//BD - Don't try to add/remove joint states for anything but our default bones.
-			if (motion && joint->getJointNum() < 134)
-			{
-				LLPose* mpose = motion->getPose();
-				if (mpose)
+				//BD - Not sure how to read the exact line out of a XML file, so we're just going
+				//     by the amount of tags here, since the header has only 3 it's a good indicator
+				//     if it's the correct line we're in.
+				BDPosingMotion* motion = (BDPosingMotion*)mTargetAvatar->findMotion(ANIM_BD_POSING_MOTION);
+				if (motion)
 				{
-					//BD - Fail safe, assume that a bone is always enabled in case we
-					//     load a pose that was created prior to including the enabled
-					//     state or for whatever reason end up not having an enabled state
-					//     written into the file.
-					bool state_enabled = true;
+					F32 time = 0.f;
+					S32 type = 0;
+					if (control_map.has("time"))
+						time = control_map["time"].asReal();
+					if (control_map.has("type"))
+						type = control_map["type"].asInteger();
+					motion->setInterpolationType(type);
+					motion->setInterpolationTime(time);
+					motion->startInterpolationTimer();
+				}
 
-					//BD - Check whether the joint state of the current joint has any enabled
-					//     status saved into the pose file or not.
-					if (pose["enabled"].isDefined())
+				LLJoint* joint = mTargetAvatar->getJoint(name);
+				if (joint)
+				{
+					//BD - Don't try to add/remove joint states for anything but our default bones.
+					if (motion && joint->getJointNum() < 134)
 					{
-						state_enabled = pose["enabled"].asBoolean();
+						LLPose* mpose = motion->getPose();
+						if (mpose)
+						{
+							//BD - Fail safe, assume that a bone is always enabled in case we
+							//     load a pose that was created prior to including the enabled
+							//     state or for whatever reason end up not having an enabled state
+							//     written into the file.
+							bool state_enabled = true;
+
+							//BD - Check whether the joint state of the current joint has any enabled
+							//     status saved into the pose file or not.
+							if (control_map.has("enabled"))
+							{
+								state_enabled = control_map["enabled"].asBoolean();
+							}
+
+							//BD - Add the joint state but only if it's not active yet.
+							//     Same goes for removing it, don't remove it if it doesn't exist.
+							LLPointer<LLJointState> joint_state = mpose->findJointState(joint);
+							if (!joint_state && state_enabled)
+							{
+								motion->addJointToState(joint);
+							}
+							else if (joint_state && !state_enabled)
+							{
+								motion->removeJointState(joint_state);
+							}
+						}
 					}
 
-					//BD - Add the joint state but only if it's not active yet.
-					//     Same goes for removing it, don't remove it if it doesn't exist.
-					LLPointer<LLJointState> joint_state = mpose->findJointState(joint);
-					if (!joint_state && state_enabled)
+					LLVector3 vec3;
+					if (load_type & ROTATIONS && control_map.has("rotation"))
 					{
-						motion->addJointToState(joint);
+						LLQuaternion quat;
+						LLQuaternion new_quat = joint->getRotation();
+
+						joint->setLastRotation(new_quat);
+						vec3.setValue(control_map["rotation"]);
+						quat.setEulerAngles(vec3.mV[VX], vec3.mV[VZ], vec3.mV[VY]);
+						joint->setTargetRotation(quat);
 					}
-					else if (joint_state && !state_enabled)
+
+					//BD - Position information is only ever written when it is actually safe to do.
+					//     It's safe to assume that IF information is available it's safe to apply.
+					if (load_type & POSITIONS && control_map.has("position"))
 					{
-						motion->removeJointState(joint_state);
+						vec3.setValue(control_map["position"]);
+						joint->setLastPosition(joint->getPosition());
+						joint->setTargetPosition(vec3);
+					}
+
+					//BD - Bone Scales
+					if (load_type & SCALES && control_map.has("scale"))
+					{
+						vec3.setValue(control_map["scale"]);
+						joint->setScale(vec3);
 					}
 				}
 			}
-
-			LLVector3 vec3;
-			if (load_type & ROTATIONS && pose["rotation"].isDefined())
+		}
+		else
+		{
+			LLJoint* joint = mTargetAvatar->getJoint(pose["bone"].asString());
+			if (joint)
 			{
-				LLQuaternion quat;
-				LLQuaternion new_quat = joint->getRotation();
+				BDPosingMotion* motion = (BDPosingMotion*)mTargetAvatar->findMotion(ANIM_BD_POSING_MOTION);
+				//BD - Don't try to add/remove joint states for anything but our default bones.
+				if (motion && joint->getJointNum() < 134)
+				{
+					LLPose* mpose = motion->getPose();
+					if (mpose)
+					{
+						//BD - Fail safe, assume that a bone is always enabled in case we
+						//     load a pose that was created prior to including the enabled
+						//     state or for whatever reason end up not having an enabled state
+						//     written into the file.
+						bool state_enabled = true;
 
-				joint->setLastRotation(new_quat);
-				vec3.setValue(pose["rotation"]);
-				quat.setEulerAngles(vec3.mV[VX], vec3.mV[VZ], vec3.mV[VY]);
-				joint->setTargetRotation(quat);
-			}
+						//BD - Check whether the joint state of the current joint has any enabled
+						//     status saved into the pose file or not.
+						if (pose["enabled"].isDefined())
+						{
+							state_enabled = pose["enabled"].asBoolean();
+						}
 
-			//BD - Position information is only ever written when it is actually safe to do.
-			//     It's safe to assume that IF information is available it's safe to apply.
-			if (load_type & POSITIONS && pose["position"].isDefined())
-			{
-				vec3.setValue(pose["position"]);
-				joint->setLastPosition(joint->getPosition());
-				joint->setTargetPosition(vec3);
-			}
+						//BD - Add the joint state but only if it's not active yet.
+						//     Same goes for removing it, don't remove it if it doesn't exist.
+						LLPointer<LLJointState> joint_state = mpose->findJointState(joint);
+						if (!joint_state && state_enabled)
+						{
+							motion->addJointToState(joint);
+						}
+						else if (joint_state && !state_enabled)
+						{
+							motion->removeJointState(joint_state);
+						}
+					}
+				}
 
-			//BD - Bone Scales
-			if (load_type & SCALES && pose["scale"].isDefined())
-			{
-				vec3.setValue(pose["scale"]);
-				joint->setScale(vec3);
+				LLVector3 vec3;
+				if (load_type & ROTATIONS && pose["rotation"].isDefined())
+				{
+					LLQuaternion quat;
+					LLQuaternion new_quat = joint->getRotation();
+
+					joint->setLastRotation(new_quat);
+					vec3.setValue(pose["rotation"]);
+					quat.setEulerAngles(vec3.mV[VX], vec3.mV[VZ], vec3.mV[VY]);
+					joint->setTargetRotation(quat);
+				}
+
+				//BD - Position information is only ever written when it is actually safe to do.
+				//     It's safe to assume that IF information is available it's safe to apply.
+				if (load_type & POSITIONS && pose["position"].isDefined())
+				{
+					vec3.setValue(pose["position"]);
+					joint->setLastPosition(joint->getPosition());
+					joint->setTargetPosition(vec3);
+				}
+
+				//BD - Bone Scales
+				if (load_type & SCALES && pose["scale"].isDefined())
+				{
+					vec3.setValue(pose["scale"]);
+					joint->setScale(vec3);
+				}
 			}
 		}
 	}
@@ -349,7 +441,7 @@ LLSD BDAnimator::returnPose(const LLSD& name)
 	std::string filename;
 	if (!name.asString().empty())
 	{
-		filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "poses", LLDir::escapePathString(name.asString()) + ".xml");
+		filename = gDirUtilp->getExpandedFilename(LL_PATH_POSES, LLDir::escapePathString(name.asString()) + ".xml");
 	}
 
 	LLSD pose;
@@ -358,17 +450,14 @@ LLSD BDAnimator::returnPose(const LLSD& name)
 	if (!infile.is_open())
 	{
 		LL_WARNS("Posing") << "Cannot find file in: " << filename << LL_ENDL;
-		//return;
 	}
 
 	for (S32 i = 0; !infile.eof(); ++i)
-	//while (!infile.eof())
 	{
 		S32 count = LLSDSerialize::fromXML(pose[i], infile);
 		if (count == LLSDParser::PARSE_FAILURE)
 		{
 			LL_WARNS("Posing") << "Failed to parse file: " << filename << LL_ENDL;
-			//return;
 		}
 	}
 	infile.close();

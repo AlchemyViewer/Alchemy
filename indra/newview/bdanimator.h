@@ -18,12 +18,11 @@
 #ifndef BD_ANIMATOR_H
 #define BD_ANIMATOR_H
 
-#include "llfloater.h"
-#include "llscrolllistctrl.h"
-#include "llsliderctrl.h"
-#include "llmultisliderctrl.h"
-#include "lltimectrl.h"
-#include "llkeyframemotion.h"
+#include "llsd.h"
+
+class LLKeyframeMotion;
+class LLScrollListItem;
+class LLVOAvatar;
 
 enum BD_EActionType
 {
@@ -43,37 +42,40 @@ enum BD_ELoadType
 class Action
 {
 public:
-	std::string		mPoseName;
-	BD_EActionType	mType = BD_EActionType::WAIT;
-	F32				mTime = 1.f;
+	std::string			mPoseName;
+	BD_EActionType		mType;
+	F32					mTime;
 };
 
 class BDAnimator
 {
 public:
 
-	BDAnimator() = default;
-	~BDAnimator() = default;
+	BDAnimator();
+	/*virtual*/	~BDAnimator();
 
-	void			onAddAction(LLVOAvatar* avatar, LLScrollListItem* item, S32 location);
-	void			onAddAction(LLVOAvatar* avatar, std::string name, BD_EActionType type, F32 time, S32 location);
-	void			onAddAction(LLVOAvatar* avatar, Action action, S32 location);
-	void			onDeleteAction(LLVOAvatar* avatar, S32 i);
+	void				onAddAction(LLVOAvatar* avatar, LLScrollListItem* item, S32 location);
+	void				onAddAction(LLVOAvatar* avatar, std::string name, BD_EActionType type, F32 time, S32 location);
+	void				onAddAction(LLVOAvatar* avatar, Action action, S32 location);
+	void				onDeleteAction(LLVOAvatar* avatar, S32 i);
 
-	BOOL			loadPose(const LLSD& name, S32 load_type = 3);
-	LLSD			returnPose(const LLSD& name);
+	BOOL				loadPose(const LLSD& name, S32 load_type = 3);
+	LLSD				returnPose(const LLSD& name);
 
-	void			update();
-	void			startPlayback();
-	void			stopPlayback();
+	void				update();
+	void				startPlayback();
+	void				stopPlayback();
 
 	//BD - Animesh Support
-	LLVOAvatar*						mTargetAvatar = nullptr;
+	LLVOAvatar*						mTargetAvatar;
 
 	std::vector<LLVOAvatar*>		mAvatarsList;
 
-	bool			getIsPlaying() { return mPlaying; }
-	bool			mPlaying = false;
+	bool				getIsPlaying() { return mPlaying; }
+	bool				mPlaying;
+
+	//BD - Animator
+	LLKeyframeMotion*	mPoseCreatorMotion;
 };
 
 extern BDAnimator gDragonAnimator;

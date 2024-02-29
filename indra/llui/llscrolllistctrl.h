@@ -353,8 +353,8 @@ public:
 	bool			isFiltered(const LLScrollListItem* item) const;
 
 	// support right-click context menus for avatar/group lists
-	enum ContextMenuType { MENU_NONE, MENU_AVATAR, MENU_GROUP };
-	void setContextMenu(const ContextMenuType &menu) { mContextMenuType = menu; }
+	enum ContextMenuType { MENU_NONE, MENU_AVATAR, MENU_GROUP, MENU_EXTERNAL };
+	void setContextMenu(const ContextMenuType& menu, LLContextMenu* new_menup = nullptr);
     ContextMenuType getContextMenuType() { return mContextMenuType; }
 
 	// Overridden from LLView

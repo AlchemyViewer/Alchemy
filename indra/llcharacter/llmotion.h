@@ -100,6 +100,11 @@ public:
 
 	BOOL isBlending();
 
+	//BD - Eternal animations are never deactivated, never deprecated and never removed,
+	//     released or destroyed, they stay around until we allow them to be deprecated.
+	void setEternal(bool eternal) { mEternal = eternal; }
+	bool getEternal() const { return mEternal; }
+
 	// Activation functions.
 	// It is OK for other classes to activate a motion,
 	// but only the controller can deactivate it.
@@ -212,6 +217,9 @@ protected:
 	S32					mInterpolationType;
 	F32					mInterpolationTime;
 	LLFrameTimer		mInterpolationTimer;
+
+	//BD - Eternal
+	bool				mEternal;
 	
 	F32 mActivationTimestamp;	// time when motion was activated
 	F32 mStopTimestamp;			// time when motion was told to stop

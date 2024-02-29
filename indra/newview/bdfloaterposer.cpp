@@ -21,8 +21,13 @@
 #include "llagent.h"
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
+#include "llclipboard.h"
+#include "lldatapacker.h"
 #include "lldiriterator.h"
+#include "llfilepicker.h"
+#include "llfilesystem.h"
 #include "llkeyframemotion.h"
+#include "llnotificationsutil.h"
 #include "llmenugl.h"
 #include "llmenubutton.h"
 #include "lltoggleablemenu.h"
@@ -32,6 +37,11 @@
 #include "llviewerjointattachment.h"
 #include "llviewerjoint.h"
 #include "llvoavatarself.h"
+#include "llwindowwin32.h"
+#include "pipeline.h"
+
+#include "llviewerobjectlist.h"
+#include "lldrawpoolavatar.h"
 
 //BD - Animesh Support
 #include "llcontrolavatar.h"
@@ -40,24 +50,19 @@
 #include "bdanimator.h"
 #include "bdposingmotion.h"
 
-
 BDFloaterPoser::BDFloaterPoser(const LLSD& key)
 	:	LLFloater(key)
 {
-	//BD - Save our current pose into a XML file to import it later or use it for creating an animation.
-	mCommitCallbackRegistrar.add("Pose.Save", boost::bind(&BDFloaterPoser::onClickPoseSave, this));
+	//BD - Save our current pose as XML or ANIM file to be used or uploaded later.
+	mCommitCallbackRegistrar.add("Pose.Save", boost::bind(&BDFloaterPoser::onClickPoseSave, this, _2));
 	//BD - Start our custom pose.
 	mCommitCallbackRegistrar.add("Pose.Start", boost::bind(&BDFloaterPoser::onPoseStart, this));
 	//BD - Load the current pose and export all its values into the UI so we can alter them.
 	mCommitCallbackRegistrar.add("Pose.Load", boost::bind(&BDFloaterPoser::onPoseLoad, this));
 	//BD - Delete the currently selected Pose.
 	mCommitCallbackRegistrar.add("Pose.Delete", boost::bind(&BDFloaterPoser::onPoseDelete, this));
-	//BD - Change a pose's blend type and time.
-	mCommitCallbackRegistrar.add("Pose.Set", boost::bind(&BDFloaterPoser::onPoseSet, this, _1, _2));
 	//BD - Extend or collapse the floater's pose list.
 	mCommitCallbackRegistrar.add("Pose.Layout", boost::bind(&BDFloaterPoser::onUpdateLayout, this));
-	//BD - Set the desired pose interpolation type.
-	mCommitCallbackRegistrar.add("Pose.Interpolation", boost::bind(&BDFloaterPoser::onJointControlsRefresh, this));
 	//BD - Include some menu interactions. Sadly necessary.
 	mCommitCallbackRegistrar.add("Pose.Menu", boost::bind(&BDFloaterPoser::onPoseMenuAction, this, _2));
 
@@ -77,6 +82,14 @@ BDFloaterPoser::BDFloaterPoser(const LLSD& key)
 	mCommitCallbackRegistrar.add("Joint.ResetJointPosition", boost::bind(&BDFloaterPoser::onJointPositionReset, this));
 	//BD - Reset all selected bones scales back to their default.
 	mCommitCallbackRegistrar.add("Joint.ResetJointScale", boost::bind(&BDFloaterPoser::onJointScaleReset, this));
+	//BD - Reset all selected bone rotations back to the initial rotation.
+	mCommitCallbackRegistrar.add("Joint.RevertJointRotation", boost::bind(&BDFloaterPoser::onJointRotationRevert, this));
+	//BD - Recapture all bones either all or just disabled ones.
+	mCommitCallbackRegistrar.add("Joint.Recapture", boost::bind(&BDFloaterPoser::onJointRecapture, this));
+	//BD - Mirror the current bone's rotation to match what the other body side's rotation should be.
+	mCommitCallbackRegistrar.add("Joint.Mirror", boost::bind(&BDFloaterPoser::onJointMirror, this));
+	//BD - Copy and mirror the other body side's bone rotation.
+	mCommitCallbackRegistrar.add("Joint.Symmetrize", boost::bind(&BDFloaterPoser::onJointSymmetrize, this));
 
 	//BD - Toggle Mirror Mode on/off.
 	mCommitCallbackRegistrar.add("Joint.ToggleMirror", boost::bind(&BDFloaterPoser::toggleMirrorMode, this, _1));
@@ -87,25 +100,6 @@ BDFloaterPoser::BDFloaterPoser(const LLSD& key)
 
 	//BD - Refresh the avatar list.
 	mCommitCallbackRegistrar.add("Poser.RefreshAvatars", boost::bind(&BDFloaterPoser::onAvatarsRefresh, this));
-
-	//BD - Add a new entry to the animation creator.
-	mCommitCallbackRegistrar.add("Anim.Add", boost::bind(&BDFloaterPoser::onAnimAdd, this, _2));
-	//BD - Move the selected entry one row up.
-	mCommitCallbackRegistrar.add("Anim.Move", boost::bind(&BDFloaterPoser::onAnimMove, this, _2));
-	//BD - Remove an entry in the animation creator.
-	mCommitCallbackRegistrar.add("Anim.Delete", boost::bind(&BDFloaterPoser::onAnimDelete, this));
-	//BD - Save the currently build list as animation.
-	mCommitCallbackRegistrar.add("Anim.Save", boost::bind(&BDFloaterPoser::onAnimSave, this));
-	//BD - Play the current animator queue.
-	mCommitCallbackRegistrar.add("Anim.Play", boost::bind(&BDFloaterPoser::onAnimPlay, this));
-	//BD - Stop the current animator queue.
-	mCommitCallbackRegistrar.add("Anim.Stop", boost::bind(&BDFloaterPoser::onAnimStop, this));
-	//BD - Change the value for a wait entry.
-	mCommitCallbackRegistrar.add("Anim.Set", boost::bind(&BDFloaterPoser::onAnimSet, this));
-
-	//BD - Test.
-	//mCommitCallbackRegistrar.add("Anim.Edit", boost::bind(&BDFloaterPoser::onAnimEdit, this, _1, _2));
-	//mCommitCallbackRegistrar.add("Anim.SetValue", boost::bind(&BDFloaterPoser::onAnimSetValue, this, _1, _2));
 }
 
 BDFloaterPoser::~BDFloaterPoser()
@@ -135,7 +129,6 @@ BOOL BDFloaterPoser::postBuild()
 	mPoseScroll->setCommitOnSelectionChange(TRUE);
 	mPoseScroll->setCommitCallback(boost::bind(&BDFloaterPoser::onPoseControlsRefresh, this));
 	mPoseScroll->setDoubleClickCallback(boost::bind(&BDFloaterPoser::onPoseLoad, this));
-	mPoseScroll->setRightMouseDownCallback(boost::bind(&BDFloaterPoser::onPoseScrollRightMouse, this, _1, _2, _3));
 
 	mRotationSliders = { { getChild<LLUICtrl>("Rotation_X"), getChild<LLUICtrl>("Rotation_Y"), getChild<LLUICtrl>("Rotation_Z") } };
 	mPositionSliders = { { getChild<LLSliderCtrl>("Position_X"), getChild<LLSliderCtrl>("Position_Y"), getChild<LLSliderCtrl>("Position_Z") } };
@@ -144,13 +137,11 @@ BOOL BDFloaterPoser::postBuild()
 	mJointTabs = getChild<LLTabContainer>("joints_tabs");
 	mJointTabs->setCommitCallback(boost::bind(&BDFloaterPoser::onJointControlsRefresh, this));
 
+	mModifierTabs = getChild<LLTabContainer>("modifier_tabs");
+
 	//BD - Animesh
 	mAvatarScroll = this->getChild<LLScrollListCtrl>("avatar_scroll", true);
 	mAvatarScroll->setCommitCallback(boost::bind(&BDFloaterPoser::onAvatarsSelect, this));
-
-	//BD - Animations
-	mAnimEditorScroll = this->getChild<LLScrollListCtrl>("anim_editor_scroll", true);
-	mAnimEditorScroll->setCommitCallback(boost::bind(&BDFloaterPoser::onAnimControlsRefresh, this));
 
 	//BD - Misc
 	mDelayRefresh = false;
@@ -160,16 +151,30 @@ BOOL BDFloaterPoser::postBuild()
 
 	mStartPosingBtn = getChild<LLButton>("activate");
 	mLoadPosesBtn = getChild<LLMenuButton>("load_poses");
+	mSavePosesBtn = getChild<LLButton>("save_poses");
 
 	//BD - Poser Menu
-	LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar; registrar.add("Pose.Menu", boost::bind(&BDFloaterPoser::onPoseLoadSelective, this, _2));
-	LLToggleableMenu* context_menu = LLUICtrlFactory::getInstance()->createFromFile<LLToggleableMenu>("menu_poser_poses.xml",
+	LLUICtrl::CommitCallbackRegistry::ScopedRegistrar pose_reg;
+	LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable_registrar;
+	pose_reg.add("Pose.Menu", boost::bind(&BDFloaterPoser::onPoseLoadSelective, this, _2));
+	LLToggleableMenu* btn_menu = LLUICtrlFactory::getInstance()->createFromFile<LLToggleableMenu>("menu_poser_poses_btn.xml",
+		gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
+	if(btn_menu)
+		mLoadPosesBtn->setMenu(btn_menu, LLMenuButton::MP_BOTTOM_LEFT);
+
+	LLContextMenu *context_menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_poser_poses.xml",
 		gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
 	if (context_menu)
 	{
-		mPosesMenuHandle = context_menu->getHandle();
-		mLoadPosesBtn->setMenu(context_menu, LLMenuButton::MP_BOTTOM_LEFT);
+		mPoseScroll->setContextMenu(LLScrollListCtrl::MENU_EXTERNAL, context_menu);
 	}
+
+	//BD - Poser Right Click Menu
+	pose_reg.add("Joints.Menu", boost::bind(&BDFloaterPoser::onJointContextMenuAction, this, _2));
+	enable_registrar.add("Joints.OnEnable", boost::bind(&BDFloaterPoser::onJointContextMenuEnable, this, _2));
+	LLContextMenu* joint_menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_poser_joints.xml",
+		gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
+	mJointScrolls[JOINTS]->setContextMenu(LLScrollListCtrl::MENU_EXTERNAL, joint_menu);
 
 	//BD - Experimental
 	/*mTimeSlider = getChild<LLMultiSliderCtrl>("time_slider");
@@ -187,23 +192,6 @@ BOOL BDFloaterPoser::postBuild()
 
 void BDFloaterPoser::draw()
 {
-	if (gDragonAnimator.getIsPlaying())
-	{
-		LLScrollListItem* item = mAvatarScroll->getFirstSelected();
-		if (item)
-		{
-			LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
-			if (avatar || !avatar->isDead())
-			{
-				S32 current_index = avatar->getCurrentActionIndex();
-				if (mAnimEditorScroll->getItemCount() != 0)
-				{
-					mAnimEditorScroll->selectNthItem(current_index);
-				}
-			}
-		}
-	}
-
 	LLFloater::draw();
 }
 
@@ -216,6 +204,7 @@ void BDFloaterPoser::onOpen(const LLSD& key)
 		onCollectDefaults();
 	}
 
+	//BD - We first fill the avatar list because the creation controls require it.
 	onAvatarsRefresh();
 	onJointRefresh();
 	onPoseRefresh();
@@ -237,7 +226,7 @@ void BDFloaterPoser::onClose(bool app_quitting)
 void BDFloaterPoser::onPoseRefresh()
 {
 	mPoseScroll->clearRows();
-	std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "poses", "");
+	std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_POSES, "");
 	std::string file;
 	LLDirIterator dir_iter(dir, "*.xml");
 	while (dir_iter.next(file))
@@ -263,42 +252,36 @@ void BDFloaterPoser::onPoseRefresh()
 			LL_WARNS("Posing") << "Skipping: Failed to parse pose file: " << path << LL_ENDL;
 			continue;
 		}
-
-		if (!infile.eof())
-		{
-			row["columns"][1]["column"] = "time";
-			row["columns"][1]["value"] = data["time"];
-			row["columns"][2]["column"] = "type";
-			row["columns"][2]["value"] = data["type"];
-		}
 		mPoseScroll->addElement(row);
 	}
 	onJointControlsRefresh();
 }
 
-void BDFloaterPoser::onClickPoseSave()
+bool BDFloaterPoser::onClickPoseSave(const LLSD& param)
 {
 	//BD - Values don't matter when not editing.
-	onPoseSave(2, 0.1f, false);
-
-	//BD - Flash the poses button to give the user a visual cue where it went.
-	getChild<LLButton>("extend")->setFlashing(true, true);
+	if (onPoseSave())
+	{
+		LLNotificationsUtil::add("PoserExportXMLSuccess");
+		return true;
+	}
+	return false;
 }
 
-void BDFloaterPoser::onPoseSave(S32 type, F32 time, bool editing)
+bool BDFloaterPoser::onPoseSave()
 {
 	LLScrollListItem* av_item = mAvatarScroll->getFirstSelected();
 	if (!av_item)
 	{
 		LL_WARNS("Posing") << "No avatar selected." << LL_ENDL;
-		return;
+		return false;
 	}
 
 	LLVOAvatar* avatar = (LLVOAvatar*)av_item->getUserdata();
 	if (!avatar || avatar->isDead())
 	{
 		LL_WARNS("Posing") << "Couldn't find avatar, dead?" << LL_ENDL;
-		return;
+		return false;
 	}
 
 	//BD - First and foremost before we do anything, check if the folder exists.
@@ -309,141 +292,58 @@ void BDFloaterPoser::onPoseSave(S32 type, F32 time, bool editing)
 		LLFile::mkdir(pathname);
 	}
 
-	std::string filename;
-	if (editing)
-	{
-		LLScrollListItem* item = mPoseScroll->getFirstSelected();
-		if (item)
-		{
-			filename = item->getColumn(0)->getValue().asString();
-		}
-	}
-	else
-	{
-		filename = getChild<LLUICtrl>("pose_name")->getValue().asString();
-	}
-
+	std::string filename = getChild<LLUICtrl>("pose_name")->getValue().asString();
 	if (filename.empty())
-	{
-		return;
-	}
+		return false;
 
-	std::string full_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "poses", LLDir::escapePathString(filename) + ".xml");
+	std::string full_path = gDirUtilp->getExpandedFilename(LL_PATH_POSES, LLDir::escapePathString(filename) + ".xml");
 	LLSD record;
-	S32 line = 0;
 
-	if (editing)
+	//BD - Create the header first.
+	S32 version = 3;
+	record["version"]["value"] = version;
+
+	//BD - Now create the rest.
+	for (S32 it = 0; it < 3; ++it)
 	{
-		llifstream infile;
-
-		infile.open(full_path);
-		if (!infile.is_open())
+		for (auto element : mJointScrolls[it]->getAllData())
 		{
-			LL_WARNS("Posing") << "Cannot find file in: " << filename << LL_ENDL;
-			return;
-		}
-
-		LLSD old_record;
-		//BD - Read the pose and save it into an LLSD so we can rewrite it later.
-		while (!infile.eof())
-		{
-			if (LLSDParser::PARSE_FAILURE == LLSDSerialize::fromXML(old_record, infile))
+			LLVector3 vec3;
+			LLJoint* joint = (LLJoint*)element->getUserdata();
+			if (joint)
 			{
-				LL_WARNS("Posing") << "Failed to parse while rewrtiting file: " << filename << LL_ENDL;
-				return;
-			}
+				std::string bone_name = joint->getName();
+				record[bone_name] = joint->getName();
+				joint->getTargetRotation().getEulerAngles(&vec3.mV[VX], &vec3.mV[VZ], &vec3.mV[VY]);
+				record[bone_name]["rotation"] = vec3.getValue();
 
-			if (line != 0)
-			{
-				record[line] = old_record;
-			}
-			++line;
-		}
+				//BD - All bones support positions now.
+				vec3 = it > JOINTS ? joint->getPosition() : joint->getTargetPosition();
+				record[bone_name]["position"] = vec3.getValue();
 
-		//BD - Change the header here.
-		record[0]["type"] = type;
-		//BD - If we are using spherical linear interpolation we need to clamp the values 
-		//     between 0.001f and 1.f otherwise unexpected things might happen.
-		if (type == 2)
-		{
-			time = llclamp(time, 0.001f, 1.0f);
-		}
-		record[0]["time"] = time;
+				vec3 = joint->getScale();
+				record[bone_name]["scale"] = vec3.getValue();
 
-		infile.close();
-
-		LLScrollListItem* item = mPoseScroll->getFirstSelected();
-		if (item)
-		{
-			item->getColumn(1)->setValue(time);
-			item->getColumn(2)->setValue(type);
-		}
-	}
-	else
-	{
-		//BD - Create the header first.
-		S32 type = getChild<LLUICtrl>("interpolation_type")->getValue();
-		F32 time = getChild<LLUICtrl>("interpolation_time")->getValue().asReal();
-		//BD - If we are using spherical linear interpolation we need to clamp the values 
-		//     between 0.001f and 1.f otherwise unexpected things might happen.
-		if (type == 2)
-		{
-			time = llclamp(time, 0.001f, 1.0f);
-		}
-		record[line]["time"] = time;
-		record[line]["type"] = type;
-		++line;
-
-		//BD - Now create the rest.
-		for (S32 it = 0; it < 3; ++it)
-		{
-			for (auto element : mJointScrolls[it]->getAllData())
-			{
-				LLVector3 vec3;
-				LLJoint* joint = (LLJoint*)element->getUserdata();
-				if (joint)
+				if (it == JOINTS)
 				{
-					record[line]["bone"] = joint->getName();
-					joint->getTargetRotation().getEulerAngles(&vec3.mV[VX], &vec3.mV[VZ], &vec3.mV[VY]);
-					record[line]["rotation"] = vec3.getValue();
-
-					//BD - We could just check whether position information is available since only joints
-					//     which can have their position changed will have position information but we
-					//     want this to be a minefield for crashes.
-					//     Bones that can support position
-					//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-					//     as well as all attachment bones and collision volumes.
-					if (joint->mHasPosition || it > JOINTS)
+					//BD - Save the enabled state per preset so we can switch bones on and off
+					//     on demand inbetween poses additionally to globally.
+					BDPosingMotion* motion = (BDPosingMotion*)gAgentAvatarp->findMotion(ANIM_BD_POSING_MOTION);
+					if (motion)
 					{
-						vec3 = it > JOINTS ? joint->getPosition() : joint->getTargetPosition();
-						record[line]["position"] = vec3.getValue();
-					}
-
-					vec3 = joint->getScale();
-					record[line]["scale"] = vec3.getValue();
-
-					if (it == JOINTS)
-					{
-						//BD - Save the enabled state per preset so we can switch bones on and off
-						//     on demand inbetween poses additionally to globally.
-						BDPosingMotion* motion = (BDPosingMotion*)gAgentAvatarp->findMotion(ANIM_BD_POSING_MOTION);
-						if (motion)
+						LLPose* pose = motion->getPose();
+						if (pose)
 						{
-							LLPose* pose = motion->getPose();
-							if (pose)
+							if (pose->findJointState(joint))
 							{
-								if (pose->findJointState(joint))
-								{
-									record[line]["enabled"] = true;
-								}
-								else
-								{
-									record[line]["enabled"] = false;
-								}
+								record[bone_name]["enabled"] = true;
+							}
+							else
+							{
+								record[bone_name]["enabled"] = false;
 							}
 						}
 					}
-					++line;
 				}
 			}
 		}
@@ -453,16 +353,14 @@ void BDFloaterPoser::onPoseSave(S32 type, F32 time, bool editing)
 	file.open(full_path.c_str());
 	//BD - Now lets actually write the file, whether it is writing a new one
 	//     or just rewriting the previous one with a new header.
-	for (LLSD cur_line : llsd::inArray(record))
-	{
-		LLSDSerialize::toXML(cur_line, file);
-	}
+	LLSDSerialize::toPrettyXML(record, file);
 	file.close();
 
-	if (!editing)
-	{
-		onPoseRefresh();
-	}
+	onPoseRefresh();
+
+	//BD - Flash the poses button to give the user a visual cue where it went.
+	getChild<LLButton>("extend")->setFlashing(true, true);
+	return true;
 }
 
 void BDFloaterPoser::onPoseLoad()
@@ -522,8 +420,8 @@ void BDFloaterPoser::onPoseStart()
 				onCollectDefaults();
 
 			gAgent.stopFidget();
-			//gDragonStatus->setPosing(true);
 		}
+		avatar->startDefaultMotions();
 		avatar->startMotion(ANIM_BD_POSING_MOTION);
 	}
 	else
@@ -534,11 +432,6 @@ void BDFloaterPoser::onPoseStart()
 		//BD - Clear posing when we're done now that we've safely endangered getting spaghetified.
 		avatar->clearPosing();
 		avatar->stopMotion(ANIM_BD_POSING_MOTION);
-
-		if (avatar->isSelf())
-		{
-			//gDragonStatus->setPosing(false);
-		}
 	}
 	//BD - Wipe the joint list.
 	onJointRefresh();
@@ -561,68 +454,18 @@ void BDFloaterPoser::onPoseDelete()
 	onPoseRefresh();
 }
 
-//BD - We use this function to edit an already saved pose's interpolation time or type.
-//     Both are combined into one function.
-void BDFloaterPoser::onPoseSet(LLUICtrl* ctrl, const LLSD& param)
-{
-	LLScrollListItem* item = mPoseScroll->getFirstSelected();
-	if (item)
-	{
-		S32 type;
-		F32 time;
-		//BD - We either edit the interpolation time here or if we don't we automatically assume 
-		//     we are trying to edit the interpolation type.
-		if (param.asString() == "time")
-		{
-			//BD - Get the new interpolation time from the time widget and read the type from
-			//     the list as we are not going to change it anyway.
-			time = getChild<LLUICtrl>("interp_time")->getValue().asReal();
-			type = item->getColumn(2)->getValue().asInteger();
-		}
-		else
-		{
-			//BD - Do the opposite here.
-			time = item->getColumn(1)->getValue().asReal();
-			type = getChild<LLUICtrl>("interp_type")->getValue().asInteger();
-		}
-		onPoseSave(type, time, true);
-	}
-}
-
 void BDFloaterPoser::onPoseControlsRefresh()
 {
 	bool is_playing = gDragonAnimator.getIsPlaying();
 	LLScrollListItem* item = mPoseScroll->getFirstSelected();
-	if (item)
-	{
-		getChild<LLUICtrl>("interp_time")->setValue(item->getColumn(1)->getValue());
-		getChild<LLUICtrl>("interp_type")->setValue(item->getColumn(2)->getValue());
-	}
-	getChild<LLUICtrl>("interp_time")->setEnabled(bool(item));
-	getChild<LLUICtrl>("interp_type")->setEnabled(bool(item));
 	getChild<LLUICtrl>("delete_poses")->setEnabled(bool(item));
 	getChild<LLUICtrl>("add_entry")->setEnabled(!is_playing && item);
-	getChild<LLUICtrl>("load_poses")->setEnabled(bool(item));
+	mLoadPosesBtn->setEnabled(bool(item));
 }
 
 void BDFloaterPoser::onPoseMenuAction(const LLSD& param)
 {
 	onPoseLoadSelective(param);
-}
-
-void BDFloaterPoser::onPoseScrollRightMouse(LLUICtrl* ctrl, S32 x, S32 y)
-{
-	mPoseScroll->selectItemAt(x, y, MASK_NONE);
-	if (mPoseScroll->getFirstSelected())
-	{
-		LLToggleableMenu* poses_menu = mPosesMenuHandle.get();
-		if (poses_menu)
-		{
-			poses_menu->buildDrawLabels();
-			poses_menu->updateParent(LLMenuGL::sMenuContainer);
-			LLMenuGL::showPopup(mPoseScroll, poses_menu, x, y);
-		}
-	}
 }
 
 ////////////////////////////////
@@ -698,6 +541,15 @@ void BDFloaterPoser::onJointRefresh()
 			row["columns"][COL_ROT_Z]["column"] = "z";
 			row["columns"][COL_ROT_Z]["value"] = ll_round(rot.mV[VZ], 0.001f);
 
+			//BD - All bones support positions now.
+			pos = joint->getTargetPosition();
+			row["columns"][COL_POS_X]["column"] = "pos_x";
+			row["columns"][COL_POS_X]["value"] = ll_round(pos.mV[VX], 0.001f);
+			row["columns"][COL_POS_Y]["column"] = "pos_y";
+			row["columns"][COL_POS_Y]["value"] = ll_round(pos.mV[VY], 0.001f);
+			row["columns"][COL_POS_Z]["column"] = "pos_z";
+			row["columns"][COL_POS_Z]["value"] = ll_round(pos.mV[VZ], 0.001f);
+
 			//BD - Bone Scales
 			scale = joint->getScale();
 			row["columns"][COL_SCALE_X]["column"] = "scale_x";
@@ -706,25 +558,6 @@ void BDFloaterPoser::onJointRefresh()
 			row["columns"][COL_SCALE_Y]["value"] = ll_round(scale.mV[VY], 0.001f);
 			row["columns"][COL_SCALE_Z]["column"] = "scale_z";
 			row["columns"][COL_SCALE_Z]["value"] = ll_round(scale.mV[VZ], 0.001f);
-		}
-
-		//BD - We could just check whether position information is available since only joints
-		//     which can have their position changed will have position information but we
-		//     want this to be a minefield for crashes.
-		//     Bones that can support position
-		//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-		if (joint->mHasPosition)
-		{
-			if (is_posing)
-			{
-				pos = joint->getTargetPosition();
-				row["columns"][COL_POS_X]["column"] = "pos_x";
-				row["columns"][COL_POS_X]["value"] = ll_round(pos.mV[VX], 0.001f);
-				row["columns"][COL_POS_Y]["column"] = "pos_y";
-				row["columns"][COL_POS_Y]["value"] = ll_round(pos.mV[VY], 0.001f);
-				row["columns"][COL_POS_Z]["column"] = "pos_z";
-				row["columns"][COL_POS_Z]["value"] = ll_round(pos.mV[VZ], 0.001f);
-			}
 		}
 
 		LLScrollListItem* item = mJointScrolls[JOINTS]->addElement(row);
@@ -787,6 +620,17 @@ void BDFloaterPoser::onJointRefresh()
 
 		if (is_posing)
 		{
+			//BD - Bone Rotations
+			//     It's stupid but we have to define the empty columns here and fill them with
+			//     nothing otherwise the addRow() function is assuming that the sometimes missing
+			//     rotation columns have an "empty" name and thus creates faulty extra columns.
+			row["columns"][COL_ROT_X]["column"] = "x";
+			row["columns"][COL_ROT_X]["value"] = "";
+			row["columns"][COL_ROT_Y]["column"] = "y";
+			row["columns"][COL_ROT_Y]["value"] = "";
+			row["columns"][COL_ROT_Z]["column"] = "z";
+			row["columns"][COL_ROT_Z]["value"] = "";
+
 			//BD - Bone Positions
 			pos = joint->getPosition();
 			row["columns"][COL_POS_X]["column"] = "pos_x";
@@ -806,8 +650,8 @@ void BDFloaterPoser::onJointRefresh()
 			row["columns"][COL_SCALE_Z]["value"] = ll_round(scale.mV[VZ], 0.001f);
 		}
 
-		LLScrollListItem* item = mJointScrolls[COLLISION_VOLUMES]->addElement(row);
-		item->setUserdata(joint);
+		LLScrollListItem* new_item = mJointScrolls[COLLISION_VOLUMES]->addElement(row);
+		new_item->setUserdata(joint);
 	}
 
 	//BD - Attachment Bones
@@ -826,6 +670,17 @@ void BDFloaterPoser::onJointRefresh()
 
 		if (is_posing)
 		{
+			//BD - Bone Rotations
+			//     It's stupid but we have to define the empty columns here and fill them with
+			//     nothing otherwise the addRow() function is assuming that the sometimes missing
+			//     rotation columns have an "empty" name and thus creates faulty extra columns.
+			row["columns"][COL_ROT_X]["column"] = "x";
+			row["columns"][COL_ROT_X]["value"] = "";
+			row["columns"][COL_ROT_Y]["column"] = "y";
+			row["columns"][COL_ROT_Y]["value"] = "";
+			row["columns"][COL_ROT_Z]["column"] = "z";
+			row["columns"][COL_ROT_Z]["value"] = "";
+
 			//BD - Bone Positions
 			pos = joint->getPosition();
 			row["columns"][COL_POS_X]["column"] = "pos_x";
@@ -860,7 +715,6 @@ void BDFloaterPoser::onJointControlsRefresh()
 	LLVOAvatar* avatar = (LLVOAvatar*)av_item->getUserdata();
 	if (!avatar || avatar->isDead()) return;
 
-	bool can_position = false;
 	bool is_pelvis = false;
 	bool is_posing = (avatar->isFullyLoaded() && avatar->getPosing());
 	S32 index = mJointTabs->getCurrentPanelIndex();
@@ -878,30 +732,12 @@ void BDFloaterPoser::onJointControlsRefresh()
 				mRotationSliders[VZ]->setValue(item->getColumn(COL_ROT_Z)->getValue());
 			}
 
-			//BD - We could just check whether position information is available since only joints
-			//     which can have their position changed will have position information but we
-			//     want this to be a minefield for crashes.
-			//     Bones that can support position
-			//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-			//     as well as all attachment bones and collision volumes.
-			if (joint->mHasPosition || index > JOINTS)
-			{
-				can_position = true;
-				is_pelvis = (joint->mJointNum == 0);
+			//BD - All bones support positions now.
+			is_pelvis = (joint->mJointNum == 0);
 
-				mPositionSliders[VX]->setValue(item->getColumn(COL_POS_X)->getValue());
-				mPositionSliders[VY]->setValue(item->getColumn(COL_POS_Y)->getValue());
-				mPositionSliders[VZ]->setValue(item->getColumn(COL_POS_Z)->getValue());
-			}
-			else
-			{
-				//BD - If we didn't select a positionable bone kill all values. We might
-				//     end up with numbers that are too big for the min/max values when
-				//     changed below.
-				mPositionSliders[VX]->setValue(0.000f);
-				mPositionSliders[VY]->setValue(0.000f);
-				mPositionSliders[VZ]->setValue(0.000f);
-			}
+			mPositionSliders[VX]->setValue(item->getColumn(COL_POS_X)->getValue());
+			mPositionSliders[VY]->setValue(item->getColumn(COL_POS_Y)->getValue());
+			mPositionSliders[VZ]->setValue(item->getColumn(COL_POS_Z)->getValue());
 
 			//BD - Bone Scales
 			mScaleSliders[VX]->setValue(item->getColumn(COL_SCALE_X)->getValue());
@@ -926,30 +762,30 @@ void BDFloaterPoser::onJointControlsRefresh()
 	}
 
 	getChild<LLButton>("toggle_bone")->setEnabled(item && is_posing && index == JOINTS);
-	getChild<LLButton>("activate")->setValue(is_posing);
+	mStartPosingBtn->setValue(is_posing);
 	getChild<LLUICtrl>("pose_name")->setEnabled(is_posing);
 	getChild<LLUICtrl>("save_poses")->setEnabled(is_posing);
 	getChild<LLUICtrl>("joints_tabs")->setEnabled(is_posing);
 
-	//BD - Depending on which interpolation type the user selects we want the time editor to show
-	//     a different label, since spherical and linear both have different min/max numbers and
-	//     work differently with them.
-	//     Spherical: 0.001 - 1.0.
-	//     Linear: 0.0 - infinite.
-	getChild<LLUICtrl>("interpolation_type")->setEnabled(is_posing);
-	S32 interp_type = getChild<LLUICtrl>("interpolation_type")->getValue();
-	getChild<LLUICtrl>("interpolation_time")->setEnabled(is_posing && interp_type != 0);
-	const std::string label_time = interp_type == 1 ? "linear_time" : "spherical_time";
-	getChild<LLLineEditor>("interpolation_time")->setLabel(getString(label_time));
-
 	//BD - Enable position tabs whenever positions are available, scales are always enabled
 	//     unless we are editing attachment bones, rotations on the other hand are only
 	//     enabled when editing joints.
-	LLTabContainer* modifier_tabs = getChild<LLTabContainer>("modifier_tabs");
-	modifier_tabs->setEnabled(item && is_posing);
-	modifier_tabs->enableTabButton(0, (item && is_posing && index == JOINTS));
-	modifier_tabs->enableTabButton(1, (item && is_posing && can_position));
-	modifier_tabs->enableTabButton(2, (item && is_posing && index != ATTACHMENT_BONES));
+	S32 curr_idx = mModifierTabs->getCurrentPanelIndex();
+	mModifierTabs->setEnabled(item && is_posing);
+	mModifierTabs->enableTabButton(0, (item && is_posing && index == JOINTS));
+	mModifierTabs->enableTabButton(1, (item && is_posing));
+	mModifierTabs->enableTabButton(2, (item && is_posing && index != ATTACHMENT_BONES));
+	//BD - Swap out of "Position" tab when it's not available.
+	if (curr_idx == 1 && !mModifierTabs->getTabButtonEnabled(1))
+	{
+		mModifierTabs->selectTab(0);
+	}
+	//BD - Swap out of "Scale" and "Rotation" tabs when they are not available.
+	if (curr_idx == 2 && !mModifierTabs->getTabButtonEnabled(2)
+		|| curr_idx == 0 && !mModifierTabs->getTabButtonEnabled(0))
+	{
+		mModifierTabs->selectTab(1);
+	}
 
 	F32 max_val = is_pelvis ? 20.f : 1.0f;
 	mPositionSliders[VX]->setMaxValue(max_val);
@@ -1049,7 +885,7 @@ void BDFloaterPoser::onJointSet(LLUICtrl* ctrl, const LLSD& param)
 				S32 i = 0;
 				while (i < 3)
 				{
-					cell2[i]->setValue(ll_round(static_cast<F32>(item->getColumn(i + 2)->getValue().asReal()), 0.001f));
+					cell2[i]->setValue(ll_round(item->getColumn(i + 2)->getValue(), 0.001f));
 					++i;
 				}
 			}
@@ -1067,25 +903,17 @@ void BDFloaterPoser::onJointPosSet(LLUICtrl* ctrl, const LLSD& param)
 		LLJoint* joint = (LLJoint*)item->getUserdata();
 		if (joint)
 		{
-			//BD - We could just check whether position information is available since only joints
-			//     which can have their position changed will have position information but we
-			//     want this to be a minefield for crashes.
-			//     Bones that can support position
-			//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-			//     as well as all attachment bones and collision volumes.
-			if (joint->mHasPosition || index > JOINTS)
-			{
-				F32 val = ctrl->getValue().asReal();
-				LLScrollListCell* cell[3] = { item->getColumn(COL_POS_X), item->getColumn(COL_POS_Y), item->getColumn(COL_POS_Z) };
-				LLVector3 vec3 = { F32(cell[VX]->getValue().asReal()),
-								   F32(cell[VY]->getValue().asReal()),
-								   F32(cell[VZ]->getValue().asReal()) };
+			//BD - All bones support positions now.
+			F32 val = ctrl->getValue().asReal();
+			LLScrollListCell* cell[3] = { item->getColumn(COL_POS_X), item->getColumn(COL_POS_Y), item->getColumn(COL_POS_Z) };
+			LLVector3 vec3 = { F32(cell[VX]->getValue().asReal()),
+								F32(cell[VY]->getValue().asReal()),
+								F32(cell[VZ]->getValue().asReal()) };
 
-				S32 dir = param.asInteger();
-				vec3.mV[dir] = val;
-				cell[dir]->setValue(ll_round(vec3.mV[dir], 0.001f));
-				joint->setTargetPosition(vec3);
-			}
+			S32 dir = param.asInteger();
+			vec3.mV[dir] = val;
+			cell[dir]->setValue(ll_round(vec3.mV[dir], 0.001f));
+			joint->setTargetPosition(vec3);
 		}
 	}
 }
@@ -1148,11 +976,11 @@ void BDFloaterPoser::onJointChangeState()
 //BD - We use this to reset everything at once.
 void BDFloaterPoser::onJointRotPosScaleReset()
 {
-	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
-	if (!item) return;
+	LLScrollListItem* av_item = mAvatarScroll->getFirstSelected();
+	if (!av_item) return;
 
 	//BD - We don't support resetting bones for anyone else yet.
-	LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
+	LLVOAvatar* avatar = (LLVOAvatar*)av_item->getUserdata();
 	if (!avatar || avatar->isDead() || !avatar->isSelf()) return;
 
 	//BD - While editing rotations, make sure we use a bit of spherical linear interpolation 
@@ -1167,8 +995,6 @@ void BDFloaterPoser::onJointRotPosScaleReset()
 
 	for (S32 it = 0; it < 3; ++it)
 	{
-		//BD - We use this bool to determine whether or not we'll be in need for a full skeleton
-		//     reset and to prevent checking for it every single time.
 		for (auto item : mJointScrolls[it]->getAllData())
 		{
 			if (item)
@@ -1181,8 +1007,8 @@ void BDFloaterPoser::onJointRotPosScaleReset()
 					{
 						LLQuaternion quat;
 						LLScrollListCell* col_rot_x = item->getColumn(COL_ROT_X);
-						LLScrollListCell* col_rot_y = item->getColumn(COL_ROT_X);
-						LLScrollListCell* col_rot_z = item->getColumn(COL_ROT_X);
+						LLScrollListCell* col_rot_y = item->getColumn(COL_ROT_Y);
+						LLScrollListCell* col_rot_z = item->getColumn(COL_ROT_Z);
 
 						col_rot_x->setValue(0.000f);
 						col_rot_y->setValue(0.000f);
@@ -1190,69 +1016,19 @@ void BDFloaterPoser::onJointRotPosScaleReset()
 
 						quat.setEulerAngles(0, 0, 0);
 						joint->setTargetRotation(quat);
-
-						//BD - If we are in Mirror mode, try to find the opposite bone of our currently
-						//     selected one, for now this simply means we take the name and replace "Left"
-						//     with "Right" and vise versa since all bones are conveniently that way.
-						//     TODO: Do this when creating the joint list so we don't try to find the joint
-						//     over and over again.
-						if (mMirrorMode)
-						{
-							LLJoint* mirror_joint = nullptr;
-							std::string mirror_joint_name = joint->getName();
-							S32 idx = joint->getName().find("Left");
-							if (idx != -1)
-								mirror_joint_name.replace(idx, mirror_joint_name.length(), "Right");
-
-							idx = joint->getName().find("Right");
-							if (idx != -1)
-								mirror_joint_name.replace(idx, mirror_joint_name.length(), "Left");
-
-							if (mirror_joint_name != joint->getName())
-							{
-								mirror_joint = gDragonAnimator.mTargetAvatar->mRoot->findJoint(mirror_joint_name);
-							}
-
-							if (mirror_joint)
-							{
-								//BD - We also need to find the opposite joint's list entry and change its values to reflect
-								//     the new ones, doing this here is still better than causing a complete refresh.
-								LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
-								if (item2)
-								{
-									col_rot_x = item2->getColumn(COL_ROT_X);
-									col_rot_y = item2->getColumn(COL_ROT_Y);
-									col_rot_z = item2->getColumn(COL_ROT_Z);
-
-									col_rot_x->setValue(0.000f);
-									col_rot_y->setValue(0.000f);
-									col_rot_z->setValue(0.000f);
-
-									mirror_joint->setTargetRotation(quat);
-								}
-							}
-						}
 					}
 
 					//BD - Resetting positions next.
-					//BD - We could just check whether position information is available since only joints
-					//     which can have their position changed will have position information but we
-					//     want this to be a minefield for crashes.
-					//     Bones that can support position
-					//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-					//     as well as all attachment bones and collision volumes.
-					if (joint->mHasPosition || it > JOINTS)
-					{
-						LLScrollListCell* col_pos_x = item->getColumn(COL_POS_X);
-						LLScrollListCell* col_pos_y = item->getColumn(COL_POS_Y);
-						LLScrollListCell* col_pos_z = item->getColumn(COL_POS_Z);
-						LLVector3 pos = mDefaultPositions[joint->getName()];
+					//     All bones support positions now.
+					LLScrollListCell* col_pos_x = item->getColumn(COL_POS_X);
+					LLScrollListCell* col_pos_y = item->getColumn(COL_POS_Y);
+					LLScrollListCell* col_pos_z = item->getColumn(COL_POS_Z);
+					LLVector3 pos = mDefaultPositions[joint->getName()];
 
-						col_pos_x->setValue(ll_round(pos.mV[VX], 0.001f));
-						col_pos_y->setValue(ll_round(pos.mV[VY], 0.001f));
-						col_pos_z->setValue(ll_round(pos.mV[VZ], 0.001f));
-						joint->setTargetPosition(pos);
-					}
+					col_pos_x->setValue(ll_round(pos.mV[VX], 0.001f));
+					col_pos_y->setValue(ll_round(pos.mV[VY], 0.001f));
+					col_pos_z->setValue(ll_round(pos.mV[VZ], 0.001f));
+					joint->setTargetPosition(pos);
 
 					//BD - Resetting scales last.
 					LLScrollListCell* col_scale_x = item->getColumn(COL_SCALE_X);
@@ -1292,17 +1068,17 @@ void BDFloaterPoser::onJointRotationReset()
 		motion->setInterpolationType(2);
 	}
 
-	for (auto item : mJointScrolls[JOINTS]->getAllSelected())
+	for (auto new_item : mJointScrolls[JOINTS]->getAllSelected())
 	{
-		if (item)
+		if (new_item)
 		{
-			LLJoint* joint = (LLJoint*)item->getUserdata();
+			LLJoint* joint = (LLJoint*)new_item->getUserdata();
 			if (joint)
 			{
 				LLQuaternion quat;
-				LLScrollListCell* col_x = item->getColumn(COL_ROT_X);
-				LLScrollListCell* col_y = item->getColumn(COL_ROT_Y);
-				LLScrollListCell* col_z = item->getColumn(COL_ROT_Z);
+				LLScrollListCell* col_x = new_item->getColumn(COL_ROT_X);
+				LLScrollListCell* col_y = new_item->getColumn(COL_ROT_Y);
+				LLScrollListCell* col_z = new_item->getColumn(COL_ROT_Z);
 
 				col_x->setValue(0.000f);
 				col_y->setValue(0.000f);
@@ -1451,6 +1227,95 @@ void BDFloaterPoser::onJointScaleReset()
 	onJointControlsRefresh();
 }
 
+//BD - Used to revert rotations only.
+void BDFloaterPoser::onJointRotationRevert()
+{
+	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
+	if (!item) return;
+
+	//BD - We do support reverting bone rotations for everyone however.
+	LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
+	if (!avatar || avatar->isDead()) return;
+
+	//BD - While editing rotations, make sure we use a bit of spherical linear interpolation 
+	//     to make movements smoother.
+	BDPosingMotion* motion = (BDPosingMotion*)avatar->findMotion(ANIM_BD_POSING_MOTION);
+	if (motion)
+	{
+		//BD - If we don't use our default spherical interpolation, set it once.
+		motion->setInterpolationTime(0.25f);
+		motion->setInterpolationType(2);
+	}
+
+	for (auto item : mJointScrolls[JOINTS]->getAllSelected())
+	{
+		if (item)
+		{
+			LLJoint* joint = (LLJoint*)item->getUserdata();
+			if (joint)
+			{
+				//BD - Reverting rotations first if there are any.
+				LLQuaternion quat = mDefaultRotations[joint->getName()];
+				LLVector3 rot;
+				quat.getEulerAngles(&rot.mV[VX], &rot.mV[VY], &rot.mV[VZ]);
+				LLScrollListCell* col_rot_x = item->getColumn(COL_ROT_X);
+				LLScrollListCell* col_rot_y = item->getColumn(COL_ROT_Y);
+				LLScrollListCell* col_rot_z = item->getColumn(COL_ROT_Z);
+
+				col_rot_x->setValue(rot.mV[VX]);
+				col_rot_y->setValue(rot.mV[VY]);
+				col_rot_z->setValue(rot.mV[VZ]);
+
+				joint->setTargetRotation(quat);
+
+				//BD - If we are in Mirror mode, try to find the opposite bone of our currently
+				//     selected one, for now this simply means we take the name and replace "Left"
+				//     with "Right" and vise versa since all bones are conveniently that way.
+				//     TODO: Do this when creating the joint list so we don't try to find the joint
+				//     over and over again.
+				if (mMirrorMode)
+				{
+					LLJoint* mirror_joint = nullptr;
+					std::string mirror_joint_name = joint->getName();
+					S32 idx = joint->getName().find("Left");
+					if (idx != -1)
+						mirror_joint_name.replace(idx, mirror_joint_name.length(), "Right");
+
+					idx = joint->getName().find("Right");
+					if (idx != -1)
+						mirror_joint_name.replace(idx, mirror_joint_name.length(), "Left");
+
+					if (mirror_joint_name != joint->getName())
+					{
+						mirror_joint = gDragonAnimator.mTargetAvatar->mRoot->findJoint(mirror_joint_name);
+					}
+
+					if (mirror_joint)
+					{
+						//BD - We also need to find the opposite joint's list entry and change its values to reflect
+						//     the new ones, doing this here is still better than causing a complete refresh.
+						LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+						if (item2)
+						{
+							col_rot_x = item2->getColumn(COL_ROT_X);
+							col_rot_y = item2->getColumn(COL_ROT_Y);
+							col_rot_z = item2->getColumn(COL_ROT_Z);
+
+							col_rot_x->setValue(rot.mV[VX]);
+							col_rot_y->setValue(rot.mV[VY]);
+							col_rot_z->setValue(rot.mV[VZ]);
+
+							mirror_joint->setTargetRotation(quat);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	onJointControlsRefresh();
+}
+
 //BD - Flip our pose (mirror it)
 void BDFloaterPoser::onFlipPose()
 {
@@ -1541,10 +1406,359 @@ void BDFloaterPoser::onFlipPose()
 	}
 }
 
+//BD - Flip our pose (mirror it)
+void BDFloaterPoser::onJointRecapture()
+{
+	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
+	if (!item) return;
+
+	LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
+	if (!avatar || avatar->isDead()) return;
+
+	if (!(avatar->getRegion() == gAgent.getRegion())) return;
+
+	LLQuaternion rot;
+	LLVector3 pos;
+
+	BDPosingMotion* motion = (BDPosingMotion*)avatar->findMotion(ANIM_BD_POSING_MOTION);
+	if (motion)
+	{
+		LLPose* pose = motion->getPose();
+		if (pose)
+		{
+			for (auto item : mJointScrolls[JOINTS]->getAllData())
+			{
+				if (item)
+				{
+					LLJoint* joint = (LLJoint*)item->getUserdata();
+					if (joint)
+					{
+						// BD - Check for the joint state (whether a bone is enabled or not)
+						//      If not proceed.
+						LLPointer<LLJointState> joint_state = pose->findJointState(joint);
+						if (!joint_state)
+						{
+							//BD - First gather the current rotation and position.
+							rot = joint->getRotation();
+							pos = joint->getPosition();
+
+							//BD - Now, re-add the joint state and enable changing the pose.
+							motion->addJointToState(joint);
+							((LLScrollListText*)item->getColumn(COL_NAME))->setFontStyle(LLFontGL::BOLD);
+
+							//BD - Apply the newly collected rotation and position to the pose.
+							joint->setTargetRotation(rot);
+							joint->setTargetPosition(pos);
+
+							//BD - Get all columns and fill in the new values.
+							LLScrollListCell* col_rot_x = item->getColumn(COL_ROT_X);
+							LLScrollListCell* col_rot_y = item->getColumn(COL_ROT_Y);
+							LLScrollListCell* col_rot_z = item->getColumn(COL_ROT_Z);
+
+							LLScrollListCell* col_pos_x = item->getColumn(COL_POS_X);
+							LLScrollListCell* col_pos_y = item->getColumn(COL_POS_Y);
+							LLScrollListCell* col_pos_z = item->getColumn(COL_POS_Z);
+
+							LLVector3 euler_rot;
+							rot.getEulerAngles(&euler_rot.mV[VX], &euler_rot.mV[VY], &euler_rot.mV[VZ]);
+							col_rot_x->setValue(ll_round(euler_rot.mV[VX], 0.001f));
+							col_rot_y->setValue(ll_round(euler_rot.mV[VY], 0.001f));
+							col_rot_z->setValue(ll_round(euler_rot.mV[VZ], 0.001f));
+
+							col_pos_x->setValue(ll_round(pos.mV[VX], 0.001f));
+							col_pos_y->setValue(ll_round(pos.mV[VY], 0.001f));
+							col_pos_z->setValue(ll_round(pos.mV[VZ], 0.001f));
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+//BD - Poser Utility Functions
+void BDFloaterPoser::onJointPasteRotation()
+{
+	for (auto item : mJointScrolls[JOINTS]->getAllSelected())
+	{
+		LLJoint* joint = (LLJoint*)item->getUserdata();
+		if (joint)
+		{
+			LLScrollListCell* col_rot_x = item->getColumn(COL_ROT_X);
+			LLScrollListCell* col_rot_y = item->getColumn(COL_ROT_Y);
+			LLScrollListCell* col_rot_z = item->getColumn(COL_ROT_Z);
+
+			LLVector3 euler_rot;
+			LLQuaternion rot = (LLQuaternion)mClipboard["rot"];
+
+			joint->setTargetRotation(rot);
+
+			rot.getEulerAngles(&euler_rot.mV[VX], &euler_rot.mV[VY], &euler_rot.mV[VZ]);
+			col_rot_x->setValue(ll_round(euler_rot.mV[VX], 0.001f));
+			col_rot_y->setValue(ll_round(euler_rot.mV[VY], 0.001f));
+			col_rot_z->setValue(ll_round(euler_rot.mV[VZ], 0.001f));
+		}
+	}
+}
+
+void BDFloaterPoser::onJointPastePosition()
+{
+	for (auto item : mJointScrolls[JOINTS]->getAllSelected())
+	{
+		LLJoint* joint = (LLJoint*)item->getUserdata();
+		if (joint)
+		{
+			LLScrollListCell* col_pos_x = item->getColumn(COL_POS_X);
+			LLScrollListCell* col_pos_y = item->getColumn(COL_POS_Y);
+			LLScrollListCell* col_pos_z = item->getColumn(COL_POS_Z);
+
+			LLVector3 pos = (LLVector3)mClipboard["pos"];
+
+			joint->setTargetPosition(pos);
+
+			col_pos_x->setValue(ll_round(pos.mV[VX], 0.001f));
+			col_pos_y->setValue(ll_round(pos.mV[VY], 0.001f));
+			col_pos_z->setValue(ll_round(pos.mV[VZ], 0.001f));
+		}
+	}
+}
+
+void BDFloaterPoser::onJointPasteScale()
+{
+	for (auto item : mJointScrolls[JOINTS]->getAllSelected())
+	{
+		LLJoint* joint = (LLJoint*)item->getUserdata();
+		if (joint)
+		{
+			LLScrollListCell* col_scale_x = item->getColumn(COL_SCALE_X);
+			LLScrollListCell* col_scale_y = item->getColumn(COL_SCALE_Y);
+			LLScrollListCell* col_scale_z = item->getColumn(COL_SCALE_Z);
+			LLVector3 scale = (LLVector3)mClipboard["scale"];
+
+			joint->setScale(scale);
+
+			col_scale_x->setValue(ll_round(scale.mV[VX], 0.001f));
+			col_scale_y->setValue(ll_round(scale.mV[VY], 0.001f));
+			col_scale_z->setValue(ll_round(scale.mV[VZ], 0.001f));
+		}
+	}
+}
+
+void BDFloaterPoser::onJointMirror()
+{
+	for (auto item : mJointScrolls[JOINTS]->getAllSelected())
+	{
+		LLJoint* joint = (LLJoint*)item->getUserdata();
+		if (joint)
+		{
+			LLVector3 euler_rot;
+			LLQuaternion rot_quat = joint->getTargetRotation();
+
+			//BD - Simply mirror the current bone's rotation like we'd do if we pressed the mirror
+			//     button without a mirror bone available.
+			LLQuaternion inv_rot_quat = LLQuaternion(-rot_quat.mQ[VX], rot_quat.mQ[VY], -rot_quat.mQ[VZ], rot_quat.mQ[VW]);
+			inv_rot_quat.getEulerAngles(&euler_rot[VX], &euler_rot[VY], &euler_rot[VZ]);
+			joint->setTargetRotation(inv_rot_quat);
+
+			LLScrollListCell* col_rot_x = item->getColumn(COL_ROT_X);
+			LLScrollListCell* col_rot_y = item->getColumn(COL_ROT_Y);
+			LLScrollListCell* col_rot_z = item->getColumn(COL_ROT_Z);
+
+			col_rot_x->setValue(ll_round(euler_rot.mV[VX], 0.001f));
+			col_rot_y->setValue(ll_round(euler_rot.mV[VY], 0.001f));
+			col_rot_z->setValue(ll_round(euler_rot.mV[VZ], 0.001f));
+		}
+	}
+}
+
+void BDFloaterPoser::onJointSymmetrize()
+{
+	for (auto item : mJointScrolls[JOINTS]->getAllSelected())
+	{
+		LLJoint* joint = (LLJoint*)item->getUserdata();
+		if (joint)
+		{
+			std::string joint_name = joint->getName();
+			std::string mirror_joint_name = joint->getName();
+			//BD - Attempt to find the "right" version of this bone, if we can't find it try
+			//     the left version.
+			S32 idx = joint->getName().find("Left");
+			if (idx != -1)
+				mirror_joint_name.replace(idx, mirror_joint_name.length(), "Right");
+			idx = joint->getName().find("Right");
+			if (idx != -1)
+				mirror_joint_name.replace(idx, mirror_joint_name.length(), "Left");
+
+			LLJoint* mirror_joint = nullptr;
+			if (mirror_joint_name != joint->getName())
+				mirror_joint = gDragonAnimator.mTargetAvatar->mRoot->findJoint(mirror_joint_name);
+
+			//BD - Get the rotation of the mirror bone (if available).
+			//     Flip the mirror bone's rotation (if available) and apply it to our current bone.
+			if (mirror_joint)
+			{
+				LLVector3 mirror_rot;
+				LLQuaternion mirror_rot_quat;
+				mirror_rot_quat = mirror_joint->getTargetRotation();
+				LLQuaternion inv_mirror_rot_quat = LLQuaternion(-mirror_rot_quat.mQ[VX], mirror_rot_quat.mQ[VY], -mirror_rot_quat.mQ[VZ], mirror_rot_quat.mQ[VW]);
+				inv_mirror_rot_quat.getEulerAngles(&mirror_rot[VX], &mirror_rot[VY], &mirror_rot[VZ]);
+				joint->setTargetRotation(inv_mirror_rot_quat);
+
+				LLScrollListCell* col_rot_x = item->getColumn(COL_ROT_X);
+				LLScrollListCell* col_rot_y = item->getColumn(COL_ROT_Y);
+				LLScrollListCell* col_rot_z = item->getColumn(COL_ROT_Z);
+
+				col_rot_x->setValue(ll_round(mirror_rot.mV[VX], 0.001f));
+				col_rot_y->setValue(ll_round(mirror_rot.mV[VY], 0.001f));
+				col_rot_z->setValue(ll_round(mirror_rot.mV[VZ], 0.001f));
+			}
+		}
+	}
+}
+
+void BDFloaterPoser::onJointCopyTransforms()
+{
+	LLScrollListItem* item = mJointScrolls[JOINTS]->getFirstSelected();
+	LLJoint* joint = (LLJoint*)item->getUserdata();
+	if (joint)
+	{
+		mClipboard["rot"] = joint->getTargetRotation().getValue();
+		mClipboard["pos"] = joint->getTargetPosition().getValue();
+		mClipboard["scale"] = joint->getScale().getValue();
+		LL_INFOS("Posing") << "Copied all transforms " << LL_ENDL;
+	}
+}
+
+bool BDFloaterPoser::onJointContextMenuEnable(const LLSD& param)
+{
+	std::string action = param.asString();
+	if (action == "clipboard")
+	{
+		return mClipboard.has("rot");
+	}
+	if (action == "enable_bone")
+	{
+		LLScrollListItem* item = mAvatarScroll->getFirstSelected();
+		if (!item) return false;
+
+		LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
+		if (!avatar || avatar->isDead()) return false;
+
+		item = mJointScrolls[JOINTS]->getFirstSelected();
+		if (item)
+		{
+			LLJoint* joint = (LLJoint*)item->getUserdata();
+			if (joint)
+			{
+				BDPosingMotion* motion = (BDPosingMotion*)avatar->findMotion(ANIM_BD_POSING_MOTION);
+				LLPose* pose = motion->getPose();
+				if (pose)
+				{
+					LLPointer<LLJointState> joint_state = pose->findJointState(joint);
+					return joint_state;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+void BDFloaterPoser::onJointContextMenuAction(const LLSD& param)
+{
+	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
+	if (!item) return;
+
+	LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
+	if (!avatar || avatar->isDead()) return;
+
+	std::string action = param.asString();
+	if (action == "copy_transforms")
+	{
+		onJointCopyTransforms();
+	}
+	else if (action == "paste_rot")
+	{
+		onJointPasteRotation();
+	}
+	else if (action == "paste_pos")
+	{
+		onJointPastePosition();
+	}
+	else if (action == "paste_scale")
+	{
+		onJointPasteScale();
+	}
+	else if (action == "paste_rot_pos")
+	{
+		onJointPasteRotation();
+		onJointPastePosition();
+	}
+	else if (action == "paste_rot_scale")
+	{
+		onJointPasteRotation();
+		onJointPasteScale();
+	}
+	else if (action == "paste_pos_scale")
+	{
+		onJointPastePosition();
+		onJointPasteScale();
+	}
+	else if (action == "paste_all")
+	{
+		onJointPasteRotation();
+		onJointPastePosition();
+		onJointPasteScale();
+	}
+	else if (action == "symmetrize")
+	{
+		onJointSymmetrize();
+	}
+	else if (action == "mirror")
+	{
+		onJointMirror();
+	}
+	else if (action == "recapture")
+	{
+		onJointRecapture();
+	}
+	else if (action == "enable_bone")
+	{
+		onJointChangeState();
+	}
+	else if (action == "enable_override")
+	{
+
+	}
+	else if (action == "enable_offset")
+	{
+
+	}
+	else if (action == "reset_rot")
+	{
+		onJointRotationReset();
+	}
+	else if (action == "reset_pos")
+	{
+		onJointPositionReset();
+	}
+	else if (action == "reset_scale")
+	{
+		onJointScaleReset();
+	}
+	else if (action == "reset_all")
+	{
+		//BD - We do all 3 here because the combined function resets all bones regardless of
+		//     our selection, these only reset the selected ones.
+		onJointRotationReset();
+		onJointPositionReset();
+		onJointScaleReset();
+	}
+}
+
 //BD - This is used to collect all default values at the beginning to revert to later on.
 void BDFloaterPoser::onCollectDefaults()
 {
-	LLVector3 rot;
+	LLQuaternion rot;
 	LLVector3 pos;
 	LLVector3 scale;
 	LLJoint* joint;
@@ -1555,6 +1769,7 @@ void BDFloaterPoser::onCollectDefaults()
 	gAgentAvatarp->getSortedJointNames(1, cv_names);
 	gAgentAvatarp->getSortedJointNames(2, attach_names);
 
+	mDefaultRotations.clear();
 	mDefaultScales.clear();
 	mDefaultPositions.clear();
 
@@ -1566,23 +1781,19 @@ void BDFloaterPoser::onCollectDefaults()
 
 		LLSD row;
 
+		rot = joint->getTargetRotation();
+		mDefaultRotations.insert(std::pair<std::string, LLQuaternion>(name, rot));
+
 		//BD - We always get the values but we don't write them out as they are not relevant for the
 		//     user yet but we need them to establish default values we revert to later on.
 		scale = joint->getScale();
 		mDefaultScales.insert(std::pair<std::string, LLVector3>(name, scale));
 
-		//BD - We could just check whether position information is available since only joints
-		//     which can have their position changed will have position information but we
-		//     want this to be a minefield for crashes.
-		//     Bones that can support position
-		//     0, 9-37, 39-43, 45-59, 77, 97-107, 110, 112, 115, 117-121, 125, 128-129, 132
-		if (joint->mHasPosition)
-		{
-			//BD - We always get the values but we don't write them out as they are not relevant for the
-			//     user yet but we need them to establish default values we revert to later on.
-			pos = joint->getPosition();
-			mDefaultPositions.insert(std::pair<std::string, LLVector3>(name, pos));
-		}
+		//BD - All bones support positions now.
+		//     We always get the values but we don't write them out as they are not relevant for the
+		//     user yet but we need them to establish default values we revert to later on.
+		pos = joint->getPosition();
+		mDefaultPositions.insert(std::pair<std::string, LLVector3>(name, pos));
 	}
 
 	//BD - Collision Volumes
@@ -1618,168 +1829,8 @@ void BDFloaterPoser::onCollectDefaults()
 }
 
 ////////////////////////////////
-//BD - Animations
+//BD - Misc Functions
 ////////////////////////////////
-void BDFloaterPoser::onAnimAdd(const LLSD& param)
-{
-	//BD - Don't allow changing the list while it's currently playing, this might
-	//     cause a crash when the animator is past the null check and we delete an
-	//     entry between null checking and trying to read its values. 
-	if (gDragonAnimator.getIsPlaying()) return;
-
-	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
-	if (!item) return;
-
-	LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
-	if (!avatar || avatar->isDead()) return;
-
-	LLScrollListItem* pose = mPoseScroll->getFirstSelected();
-	std::string name = param.asString();
-	S32 location = mAnimEditorScroll->getFirstSelectedIndex() + 1;
-	F32 time = 0.f;
-	BD_EActionType type;
-	if (param.asString() == "Repeat")
-	{
-		type = BD_EActionType::REPEAT;
-	}
-	else if (param.asString() == "Wait")
-	{
-		type = BD_EActionType::WAIT;
-		time = 1.f;
-	}
-	else
-	{
-		name = pose->getColumn(0)->getValue().asString();
-		type = BD_EActionType::POSE;
-	}
-	//BD - We'll be adding the avatar into a list in here to keep track of all
-	//     avatars we've added actions for.
-	gDragonAnimator.onAddAction(avatar, name, type, time, location);
-	onAnimListWrite();
-
-	//BD - Select added entry and make it appear as nothing happened.
-	//     In case of nothing being selected yet, select the first entry.
-	mAnimEditorScroll->selectNthItem(location);
-
-	//BD - Update our controls when we add items, the move and delete buttons
-	//     should enable now that we selected something.
-	onAnimControlsRefresh();
-}
-
-void BDFloaterPoser::onAnimListWrite()
-{
-	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
-	if (!item) return;
-
-	LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
-	if (!avatar || avatar->isDead()) return;
-
-	mAnimEditorScroll->clearRows();
-	//BD - Now go through the new list we created, read them out and add them
-	//     to our list in the new desired order.
-	for (auto action : avatar->mAnimatorActions)
-	{
-		LLSD row;
-		row["columns"][0]["column"] = "name";
-		row["columns"][0]["value"] = action.mPoseName;
-		if (action.mType == BD_EActionType::WAIT)
-		{
-			row["columns"][1]["column"] = "time";
-			row["columns"][1]["value"] = action.mTime;
-			row["columns"][2]["column"] = "type";
-			row["columns"][2]["value"] = action.mType;
-		}
-		mAnimEditorScroll->addElement(row);
-	}
-
-	//BD - Make sure we don't have a scrollbar unless we need it.
-	mAnimEditorScroll->updateLayout();
-}
-
-void BDFloaterPoser::onAnimMove(const LLSD& param)
-{
-	//BD - Don't allow changing the list while it's currently playing, this might
-	//     cause a crash when the animator is past the null check and we delete an
-	//     entry between null checking and trying to read its values. 
-	if (gDragonAnimator.getIsPlaying())	return;
-
-	//BD - Don't allow moving if we don't have anything selected either. (Crashfix)
-	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
-	if (!item) return;
-
-	LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
-	if (!avatar || avatar->isDead()) return;
-
-	S32 item_count = mAnimEditorScroll->getItemCount();
-	S32 new_index = mAnimEditorScroll->getFirstSelectedIndex();
-	S32 old_index = new_index;
-
-	//BD - Don't allow moving down when we are already at the bottom, this would
-	//     create another entry.
-	//     Don't allow going up when we are on the first entry already either, this
-	//     would select everything in the list.
-	//     Don't allow moving if there's nothing to move. (Crashfix)
-	if (((new_index + 1) >= item_count && param.asString() == "Down")
-		|| (new_index == 0 && param.asString() == "Up")
-		|| item_count == 0)
-	{
-		return;
-	}
-
-	//BD - Move up, otherwise move the entry down. No other option.
-	if (param.asString() == "Up")
-	{
-		--new_index;
-	}
-	else
-	{
-		++new_index;
-	}
-
-	Action action = avatar->mAnimatorActions[old_index];
-	gDragonAnimator.onDeleteAction(avatar, old_index);
-	gDragonAnimator.onAddAction(avatar, action, new_index);
-	onAnimListWrite();
-
-	//BD - Select added entry and make it appear as nothing happened.
-	//     In case of nothing being selected yet, select the first entry.
-	mAnimEditorScroll->selectNthItem(new_index);
-
-	//BD - Update our controls when we move items, the move and delete buttons
-	//     should enable now that we might have selected something.
-	onAnimControlsRefresh();
-}
-
-void BDFloaterPoser::onAnimDelete()
-{
-	//BD - Don't allow changing the list while it's currently playing, this might
-	//     cause a crash when the animator is past the null check and we delete an
-	//     entry between null checking and trying to read its values. 
-	if (gDragonAnimator.getIsPlaying())	return;
-
-	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
-	if (!item) return;
-
-	LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
-	if (!avatar || avatar->isDead()) return;
-
-	std::vector<LLScrollListItem*> items = mAnimEditorScroll->getAllSelected();
-	while (!items.empty())
-	{
-		//BD - We'll delete the avatar from our list if necessary when no more actions
-		//     are saved in a given avatar.
-		gDragonAnimator.onDeleteAction(avatar, mAnimEditorScroll->getFirstSelectedIndex());
-		items.erase(items.begin());
-	}
-	onAnimListWrite();
-
-	//BD - Make sure we don't have a scrollbar unless we need it.
-	mAnimEditorScroll->updateLayout();
-
-	//BD - Update our controls when we delete items. Most of them should
-	//     disable now that nothing is selected anymore.
-	onAnimControlsRefresh();
-}
 
 void BDFloaterPoser::loadPoseRotations(std::string name, LLVector3 *rotations)
 {
@@ -1792,7 +1843,7 @@ void BDFloaterPoser::loadPoseRotations(std::string name, LLVector3 *rotations)
 	std::string filename;
 	if (!name.empty())
 	{
-		filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "poses", LLDir::escapePathString(name) + ".xml");
+		filename = gDirUtilp->getExpandedFilename(LL_PATH_POSES, LLDir::escapePathString(name) + ".xml");
 	}
 
 	LLSD pose;
@@ -1838,7 +1889,7 @@ void BDFloaterPoser::loadPosePositions(std::string name, LLVector3 *positions)
 	std::string filename;
 	if (!name.empty())
 	{
-		filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "poses", LLDir::escapePathString(name) + ".xml");
+		filename = gDirUtilp->getExpandedFilename(LL_PATH_POSES, LLDir::escapePathString(name) + ".xml");
 	}
 
 	LLSD pose;
@@ -1886,7 +1937,7 @@ void BDFloaterPoser::loadPoseScales(std::string name, LLVector3 *scales)
 	std::string filename;
 	if (!name.empty())
 	{
-		filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "poses", LLDir::escapePathString(name) + ".xml");
+		filename = gDirUtilp->getExpandedFilename(LL_PATH_POSES, LLDir::escapePathString(name) + ".xml");
 	}
 
 	LLSD pose;
@@ -1922,384 +1973,17 @@ void BDFloaterPoser::loadPoseScales(std::string name, LLVector3 *scales)
 	return;
 }
 
-void BDFloaterPoser::onAnimSave()
-{
-	LLKeyframeMotion* temp_motion = NULL;
-	LLAssetID mMotionID;
-	LLTransactionID	mTransactionID;
-
-	//BD - To make this work we'll first need a unique UUID for this animation.
-	mTransactionID.generate();
-	mMotionID = mTransactionID.makeAssetID(gAgent.getSecureSessionID());
-	temp_motion->create(mMotionID);
-
-	std::string motion_name = getChild<LLUICtrl>("set_name")->getValue().asString();
-	//U16 motion_major_version = KEYFRAME_MOTION_VERSION;
-	//U16 motion_sub_version = KEYFRAME_MOTION_SUBVERSION;
-	//S32 base_priority = getChild<LLUICtrl>("set_priority")->getValue().asInteger();
-	//LLJoint::JointPriority base_priority = LLJoint::HIGHEST_PRIORITY;
-	F32 duration = getChild<LLUICtrl>("set_duration")->getValue().asReal();
-	//std::string face_emote_name = getChild<LLUICtrl>("set_face_emote")->getValue();
-	//F32 loop_in_time = getChild<LLUICtrl>("set_loop_in")->getValue().asReal();
-	//F32 loop_out_time = getChild<LLUICtrl>("set_loop_out")->getValue().asReal();
-	//S32 loop = getChild<LLUICtrl>("set_loop")->getValue().asBoolean();
-	//F32 ease_in_time = getChild<LLUICtrl>("set_ease_in")->getValue().asReal();
-	//F32 ease_out_time = getChild<LLUICtrl>("set_ease_out")->getValue().asReal();
-	//U32 hand_pose = getChild<LLUICtrl>("set_hand_pose")->getValue().asInteger();
-	//U32 joint_motion_count = getChild<LLUICtrl>("set_active_motions")->getValue().asInteger();
-	//LLUUID emote_name = getChild<LLUICtrl>("set_emote")->getValue();
-
-	//LLKeyframeMotion* motion = (LLKeyframeMotion*)gAgentAvatarp->findMotion(ANIM_BD_POSING_MOTION);
-	temp_motion = (LLKeyframeMotion*)gAgentAvatarp->createMotion(mMotionID);
-	typedef std::map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t;
-
-	LLKeyframeMotion::JointMotionList* jointmotion_list;
-	jointmotion_list = LLKeyframeDataCache::getKeyframeData(ANIM_BD_POSING_MOTION);
-	F32 time = 0.f;
-	for (auto item : mAnimEditorScroll->getAllData())
-	{
-		std::string pose_name = item->getColumn(0)->getValue();
-		LLVector3 rotations[134];
-		LLVector3 positions[134];
-		LLVector3 scales[134];
-		loadPoseRotations(pose_name, rotations);
-		loadPosePositions(pose_name, positions);
-		loadPoseScales(pose_name, scales);
-
-		if (!item->getColumn(1)->getValue().asString().empty())
-		{
-			time += item->getColumn(1)->getValue().asReal();
-		}
-
-		LLKeyframeMotion::JointMotion* joint_motion = new LLKeyframeMotion::JointMotion;
-		jointmotion_list->mJointMotionArray.push_back(joint_motion);
-
-		for (S32 joint_num = 0; joint_num < 134; joint_num++)
-		{
-			LLJoint *joint = gAgentAvatarp->getCharacterJoint(joint_num);
-			if (joint)
-			{
-				joint_motion->mJointName = joint->getName();
-				LLPointer<LLJointState> joint_state = temp_motion->findJointState(joint);
-				if (!joint_state)
-				{
-					joint_state = new LLJointState;
-					temp_motion->addJointState(joint_state);
-					joint_state->setJoint(joint); // note: can accept NULL
-					joint_state->setUsage(0);
-				}
-
-				//---------------------------------------------------------------------
-				// get joint priority
-				//---------------------------------------------------------------------
-				S32 joint_priority = LLJoint::HIGHEST_PRIORITY;
-				joint_motion->mPriority = (LLJoint::JointPriority)joint_priority;
-				joint_state->setPriority((LLJoint::JointPriority)joint_priority);
-
-				//BD - Get the number of poses (keys) of our entire animation.
-				joint_motion->mRotationCurve.mNumKeys = 1;
-				joint_motion->mRotationCurve.mInterpolationType = LLKeyframeMotion::IT_LINEAR;
-				if (joint_motion->mRotationCurve.mNumKeys != 0)
-				{
-					joint_state->setUsage(joint_state->getUsage() | LLJointState::ROT);
-				}
-
-				//---------------------------------------------------------------------
-				// scan rotation curve keys
-				//---------------------------------------------------------------------
-				LLKeyframeMotion::RotationCurve *rCurve = &joint_motion->mRotationCurve;
-
-				for (S32 k = 0; k < joint_motion->mRotationCurve.mNumKeys; k++)
-				{
-					//BD - Get the duration of our animation until this pose.
-					U16 time_short = duration;
-					time = U16_to_F32(time_short, 0.f, jointmotion_list->mDuration);
-
-					LLKeyframeMotion::RotationKey rot_key;
-					rot_key.mTime = time;
-					LLVector3 rot_vec = rotations[joint_num];
-					//BD - Rotations need to be in range from 1 to -1 to be unpacked.
-					//     FIX or translate them directly from euler to quaternions.
-					rot_key.mValue.unpackFromVector3(rot_vec);
-
-					if (!(rot_key.mValue.isFinite()))
-					{
-						LL_WARNS() << "non-finite angle in rotation key for animation " << LL_ENDL;
-					}
-
-					rCurve->mKeys.emplace_back(time, rot_key);
-				}
-
-				std::sort(rCurve->mKeys.begin(), rCurve->mKeys.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-
-				//---------------------------------------------------------------------
-				// scan position curve header
-				//---------------------------------------------------------------------
-				//BD - Get the number of poses (keys) of our entire animation.
-				joint_motion->mPositionCurve.mNumKeys = 1;
-				joint_motion->mPositionCurve.mInterpolationType = LLKeyframeMotion::IT_LINEAR;
-				if (joint_motion->mPositionCurve.mNumKeys != 0)
-				{
-					joint_state->setUsage(joint_state->getUsage() | LLJointState::POS);
-				}
-
-				//---------------------------------------------------------------------
-				// scan position curve keys
-				//---------------------------------------------------------------------
-				LLKeyframeMotion::PositionCurve *pCurve = &joint_motion->mPositionCurve;
-				BOOL is_pelvis = joint_motion->mJointName == "mPelvis";
-				for (S32 k = 0; k < joint_motion->mPositionCurve.mNumKeys; k++)
-				{
-					U16 time_short = duration;
-					LLKeyframeMotion::PositionKey pos_key;
-					pos_key.mTime = U16_to_F32(time_short, 0.f, jointmotion_list->mDuration);
-
-					pos_key.mValue.mV[VX] = U16_to_F32(positions[joint_num].mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-					pos_key.mValue.mV[VY] = U16_to_F32(positions[joint_num].mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-					pos_key.mValue.mV[VZ] = U16_to_F32(positions[joint_num].mV[VZ], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-
-					if (!(pos_key.mValue.isFinite()))
-					{
-						LL_WARNS() << "non-finite position in key for animation "<< LL_ENDL;
-					}
-
-					pCurve->mKeys.emplace_back(pos_key.mTime, pos_key);
-
-					if (is_pelvis)
-					{
-						jointmotion_list->mPelvisBBox.addPoint(pos_key.mValue);
-					}
-				}
-
-				std::sort(pCurve->mKeys.begin(), pCurve->mKeys.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-
-				joint_motion->mUsage = joint_state->getUsage();
-			}
-		}
-	}
-
-	//BD - Work in Progress exporter.
-	/*for (S32 idx = 0; idx > jointmotion_list->getNumJointMotions(); idx++)
-	{
-		LLKeyframeMotion::JointMotion* joint_motion = jointmotion_list->getJointMotion(idx);
-		LLKeyframeMotion::RotationCurve rCurve = joint_motion->mRotationCurve;
-
-		rCurve.mKeys[time];
-	}*/
-	//LLKeyframeMotion::JointMotion* joint_motion = jointmotion_list->getJointMotion(0);
-	//LLKeyframeMotion::RotationCurve rot_courve = joint_motion->mRotationCurve;
-	//LLKeyframeMotion::RotationKey rot_key = rot_courve.mLoopInKey;
-	//LLQuaternion rotation = rot_key.mRotation;
-	//F32 time = rot_key.mTime;
-	//LLDataPackerBinaryBuffer* dp;
-	//BOOL success = TRUE;
-
-	//BD - Lets collect everything we will need.
-	/*std::string motion_name = getChild<LLUICtrl>("set_name")->getValue().asString();
-	//U16 motion_major_version = KEYFRAME_MOTION_VERSION;
-	//U16 motion_sub_version = KEYFRAME_MOTION_SUBVERSION;
-	//S32 base_priority = getChild<LLUICtrl>("set_priority")->getValue().asInteger();
-	LLJoint::JointPriority base_priority = LLJoint::HIGHEST_PRIORITY;
-	F32 duration = getChild<LLUICtrl>("set_duration")->getValue().asReal();
-	std::string face_emote_name = getChild<LLUICtrl>("set_face_emote")->getValue();
-	F32 loop_in_time = getChild<LLUICtrl>("set_loop_in")->getValue().asReal();
-	F32 loop_out_time = getChild<LLUICtrl>("set_loop_out")->getValue().asReal();
-	S32 loop = getChild<LLUICtrl>("set_loop")->getValue().asBoolean();
-	F32 ease_in_time = getChild<LLUICtrl>("set_ease_in")->getValue().asReal();
-	F32 ease_out_time = getChild<LLUICtrl>("set_ease_out")->getValue().asReal();
-	//U32 hand_pose = getChild<LLUICtrl>("set_hand_pose")->getValue().asInteger();
-	//U32 joint_motion_count = getChild<LLUICtrl>("set_active_motions")->getValue().asInteger();
-	LLUUID emote_name = getChild<LLUICtrl>("set_emote")->getValue();
-
-	LLKeyframeMotion::JointMotionList* jointmotion_list = new LLKeyframeMotion::JointMotionList;
-
-	//BD - Reserve for all 134 joints.
-	jointmotion_list->mJointMotionArray.reserve(134);
-
-	LLJoint* joint;
-	for (S32 i = 0; (joint = gAgentAvatarp->getCharacterJoint(i)); ++i)
-	{
-		if (!joint)
-			continue;
-
-		//BD - Let's build joint motions
-		LLKeyframeMotion::JointMotion* joint_motion = jointmotion_list->mJointMotionArray[i];
-
-		//BD - We start with the joint name;
-		joint_motion->mJointName = joint->getName();
-
-		//BD - Add the priority
-		joint_motion->mPriority = LLJoint::HIGHEST_PRIORITY;
-
-		//BD - Define the bone usage
-		S32 usage = 0;
-		if (joint->mHasPosition)
-		{
-			usage = usage & LLJointState::POS;
-		}
-		usage = usage & LLJointState::ROT;
-		usage = usage & LLJointState::POS;
-		joint_motion->mUsage = usage;
-
-		//BD - And finally the fun part.
-		//LLKeyframeMotion::RotationCurve* rot_courve;
-		//LLKeyframeMotion::PositionCurve* pos_courve;
-		//LLKeyframeMotion::ScaleCurve* scale_courve;
-
-		//LLKeyframeMotion::RotationKey* rot_key;
-		//rot_key->mRotation = joint->getRotation();
-		//rot_key->mTime = 0.0f;		
-		//rot_courve->mKeys[0.0f].mRotation = joint->getRotation();
-		//rot_courve->mKeys[0.0f].mTime = 0.0f;
-		joint_motion->mRotationCurve.mKeys[0.0f].mRotation = joint->getRotation();
-		joint_motion->mRotationCurve.mKeys[0.0f].mTime = 0.0f;
-
-		joint_motion->mPositionCurve.mKeys[0.0f].mPosition = joint->getPosition();
-		joint_motion->mPositionCurve.mKeys[0.0f].mTime = 0.0f;
-
-		joint_motion->mScaleCurve.mKeys[0.0f].mScale = joint->getScale();
-		joint_motion->mScaleCurve.mKeys[0.0f].mTime = 0.0f;
-
-		//BD - Add the joint motion to our array.
-		jointmotion_list->mJointMotionArray[i] = joint_motion;
-	}
-	LLKeyframeDataCache::addKeyframeData(mMotionID, jointmotion_list);
-
-	temp_motion->setPriority(base_priority);
-	temp_motion->setEaseIn(ease_in_time);
-	temp_motion->setEaseOut(ease_out_time);
-	temp_motion->setEmote(emote_name);
-	//jointmotion_list->mHandPose = hand_pose;
-	temp_motion->setLoop(loop);
-	temp_motion->setLoopIn(loop_in_time);
-	temp_motion->setLoopOut(loop_out_time);
-
-	if (!jointmotion_list)
-		return;
-
-	jointmotion_list->mBasePriority = base_priority;
-	jointmotion_list->mDuration = duration;
-	jointmotion_list->mEaseInDuration = ease_in_time;
-	jointmotion_list->mEaseOutDuration = ease_out_time;
-	jointmotion_list->mEmoteName = face_emote_name;
-	//jointmotion_list->mHandPose = hand_pose;
-	jointmotion_list->mLoop = loop;
-	jointmotion_list->mLoopInPoint = loop_in_time;
-	jointmotion_list->mLoopOutPoint = loop_out_time;
-	jointmotion_list->mMaxPriority = base_priority;
-	*/
-	temp_motion->dumpToFile(motion_name);
-}
-
-void BDFloaterPoser::onAnimSet()
-{
-	LLScrollListItem* av_item = mAvatarScroll->getFirstSelected();
-	if (!av_item) return;
-
-	LLVOAvatar* avatar = (LLVOAvatar*)av_item->getUserdata();
-	if (!avatar || avatar->isDead()) return;
-
-	F32 value = getChild<LLUICtrl>("anim_time")->getValue().asReal();
-	S32 selected_index = mAnimEditorScroll->getFirstSelectedIndex();
-	Action action = avatar->mAnimatorActions[selected_index];
-	LLScrollListItem* item = mAnimEditorScroll->getFirstSelected();
-	if (item)
-	{
-		if (action.mType == BD_EActionType::WAIT)
-		{
-			avatar->mAnimatorActions[mAnimEditorScroll->getFirstSelectedIndex()].mTime = value;
-			LLScrollListCell* column = item->getColumn(1);
-			column->setValue(value);
-		}
-	}
-}
-
-void BDFloaterPoser::onAnimPlay()
-{
-	//BD - We start the animator frametimer here and set the expiry time to 0.0
-	//     to force the animator to start immediately when hitting the "Start" button.
-	gDragonAnimator.startPlayback();
-
-	//BD - Update our controls when we start the animator. Most of them should
-	//     disable now.
-	onAnimControlsRefresh();
-	onPoseControlsRefresh();
-}
-
-void BDFloaterPoser::onAnimStop()
-{
-	//BD - We only need to stop it here because the .start function resets the timer 
-	//     automatically.
-	gDragonAnimator.stopPlayback();
-
-	//BD - Update our controls when we stop the animator. Most of them should
-	//     enable again.
-	onAnimControlsRefresh();
-	onPoseControlsRefresh();
-}
-
-void BDFloaterPoser::onAnimControlsRefresh()
-{
-	S32 item_count = mAnimEditorScroll->getItemCount();
-	S32 index = mAnimEditorScroll->getFirstSelectedIndex();
-
-	bool is_playing = gDragonAnimator.getIsPlaying();
-	bool selected = index != -1;
-	bool is_wait = false;
-
-	//BD - Don't.
-	if (!is_playing)
-	{
-		LLScrollListItem* item = mAvatarScroll->getFirstSelected();
-		if (item)
-		{
-			LLVOAvatar* avatar = (LLVOAvatar*)item->getUserdata();
-			if (avatar || !avatar->isDead())
-			{
-				//BD - Crashfix.
-				if (selected)
-				{
-					is_wait = avatar->mAnimatorActions[index].mType == BD_EActionType::WAIT;
-				}
-			}
-		}
-	}
-
-	getChild<LLUICtrl>("anim_time")->setEnabled(!is_playing && selected && is_wait);
-	getChild<LLUICtrl>("delete_entry")->setEnabled(!is_playing && selected);
-	getChild<LLUICtrl>("move_up")->setEnabled(!is_playing && selected && index != 0);
-	getChild<LLUICtrl>("move_down")->setEnabled(!is_playing && selected && !((index + 1) >= item_count));
-	getChild<LLUICtrl>("add_repeat")->setEnabled(!is_playing);
-	getChild<LLUICtrl>("add_wait")->setEnabled(!is_playing);
-	getChild<LLUICtrl>("play_anim")->setEnabled(!is_playing && (item_count > 0));
-	getChild<LLUICtrl>("stop_anim")->setEnabled(is_playing);
-}
-
-
-////////////////////////////////
-//BD - Misc Functions
-////////////////////////////////
-
 void BDFloaterPoser::onUpdateLayout()
 {
 	if (!this->isMinimized())
 	{
-		bool animator_expanded = getChild<LLButton>("animator")->getValue();
-		bool poses_expanded = getChild<LLButton>("extend")->getValue() || animator_expanded;
+		bool poses_expanded = getChild<LLButton>("extend")->getValue();
 		getChild<LLUICtrl>("poses_layout")->setVisible(poses_expanded);
-		getChild<LLUICtrl>("animator_layout")->setVisible(animator_expanded);
-		getChild<LLUICtrl>("poser_layout")->setVisible(!animator_expanded);
 
 		S32 collapsed_width = getChild<LLPanel>("min_panel")->getRect().getWidth();
 		S32 expanded_width = getChild<LLPanel>("max_panel")->getRect().getWidth();
-		S32 floater_width = (poses_expanded && !animator_expanded) ? expanded_width : collapsed_width;
+		S32 floater_width = poses_expanded ? expanded_width : collapsed_width;
 		this->reshape(floater_width, this->getRect().getHeight());
-
-		if (animator_expanded)
-		{
-			//BD - Refresh our animation list
-			onAnimListWrite();
-		}
 	}
 }
 
@@ -2321,7 +2005,6 @@ void BDFloaterPoser::onAvatarsSelect()
 	onUpdateLayout();
 
 	onPoseControlsRefresh();
-	onAnimControlsRefresh();
 
 	//BD - Disable the Start Posing button if we haven't loaded yet.
 	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
@@ -2352,7 +2035,7 @@ void BDFloaterPoser::onAvatarsRefresh()
 		create_new = true;
 		LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(character);
 		if (avatar && !avatar->isControlAvatar()
-			&& (avatar->isSelf() || gAgent.isGodlike()))
+			&& avatar->isSelf())
 		{
 			LLUUID uuid = avatar->getID();
 			for (LLScrollListItem* item : mAvatarScroll->getAllData())
@@ -2449,173 +2132,3 @@ void BDFloaterPoser::onAvatarsRefresh()
 	//BD - Make sure we don't have a scrollbar unless we need it.
 	mAvatarScroll->updateLayout();
 }
-
-
-////////////////////////////////
-//BD - Experimental Functions
-////////////////////////////////
-
-/*void BDFloaterPoser::onAnimEdit(LLUICtrl* ctrl, const LLSD& param)
-{
-	getChild<LLMultiSliderCtrl>("key_slider")->clear();
-	LLUUID id = LLUUID("cd9b0386-b26d-e860-0114-d879ee12a777");
-
-	//LLKeyframeMotion* motion = (LLKeyframeMotion*)gAgentAvatarp->findMotion(id);
-	typedef std::map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t;
-
-	LLKeyframeMotion::JointMotionList* jointmotion_list;
-	jointmotion_list = LLKeyframeDataCache::getKeyframeData(id);
-	S32 i = 0;
-
-	if (!jointmotion_list)
-	{
-		return;
-	}
-
-	LLScrollListItem* item = mJointScrolls[JOINTS]->getLastSelectedItem();
-	if (!item)
-	{
-		return;
-	}
-
-	LLJoint* joint = (LLJoint*)item->getUserdata();
-	i = joint->mJointNum;
-
-	LLKeyframeMotion::JointMotion* joint_motion = jointmotion_list->getJointMotion(i);
-	LLKeyframeMotion::RotationCurve rot_courve = joint_motion->mRotationCurve;
-	LLKeyframeMotion::RotationKey rot_key;
-	LLQuaternion rotation;
-	F32 time;
-	LLKeyframeMotion::RotationCurve::key_map_t keys = rot_courve.mKeys;
-
-	for (LLKeyframeMotion::RotationCurve::key_map_t::const_iterator iter = keys.begin();
-		iter != keys.end(); ++iter)
-	{
-		time = iter->first;
-		rot_key = iter->second;
-
-		//const std::string& sldr_name = getChild<LLMultiSliderCtrl>("key_slider")->addSlider(time);
-		getChild<LLMultiSliderCtrl>("key_slider")->addSlider(time);
-		//getChild<LLMultiSliderCtrl>("key_slider")->getSliderValue();
-	}
-}
-
-void BDFloaterPoser::onAddKey()
-{
-	//S32 max_sliders = 60;
-
-	//if ((S32)mSliderToKey.size() >= max_sliders)
-	//{
-	//	LLSD args;
-	//	args["MAX"] = max_sliders;
-	//	//LLNotificationsUtil::add("DayCycleTooManyKeyframes", args, LLSD(), LLNotificationFunctorRegistry::instance().DONOTHING);
-	//	return;
-	//}
-
-	// add the slider key
-	std::string key_val = mPoseScroll->getFirstSelected()->getColumn(0)->getValue().asString();
-	BDPoseKey pose_params(key_val);
-
-	F32 time = mTimeSlider->getCurSliderValue();
-	addSliderKey(time, pose_params);
-}
-
-void BDFloaterPoser::addSliderKey(F32 time, BDPoseKey keyframe)
-{
-	// make a slider
-	const std::string& sldr_name = mKeySlider->addSlider(time);
-	if (sldr_name.empty())
-	{
-		return;
-	}
-
-	// set the key
-	SliderKey newKey(keyframe, mKeySlider->getCurSliderValue());
-
-	// add to map
-	mSliderToKey.insert(std::pair<std::string, SliderKey>(sldr_name, newKey));
-}
-
-void BDFloaterPoser::onTimeSliderMoved()
-{
-}
-
-void BDFloaterPoser::onKeyTimeMoved()
-{
-	if (mKeySlider->getValue().size() == 0)
-	{
-		return;
-	}
-
-	// make sure we have a slider
-	const std::string& cur_sldr = mKeySlider->getCurSlider();
-	if (cur_sldr == "")
-	{
-		return;
-	}
-
-	F32 time24 = mKeySlider->getCurSliderValue();
-
-	// check to see if a key exists
-	BDPoseKey key = mSliderToKey[cur_sldr].keyframe;
-	//// _LL_DEBUGS() << "Setting key time: " << time24 << LL_ENDL;
-	mSliderToKey[cur_sldr].time = time24;
-
-	// if it exists, turn on check box
-	//mSkyPresetsCombo->selectByValue(key.toStringVal());
-
-	//mTimeCtrl->setTime24(time24);
-}
-
-void BDFloaterPoser::onKeyTimeChanged()
-{
-	// if no keys, skipped
-	if (mSliderToKey.size() == 0)
-	{
-		return;
-	}
-
-	F32 time24 = getChild<LLTimeCtrl>("time_control")->getTime24();
-
-	const std::string& cur_sldr = mKeySlider->getCurSlider();
-	mKeySlider->setCurSliderValue(time24, TRUE);
-	F32 time = mKeySlider->getCurSliderValue() / 60;
-
-	// now set the key's time in the sliderToKey map
-	//// _LL_DEBUGS() << "Setting key time: " << time << LL_ENDL;
-	mSliderToKey[cur_sldr].time = time;
-
-	//applyTrack();
-}
-
-void BDFloaterPoser::onDeleteKey()
-{
-	if (mSliderToKey.size() == 0)
-	{
-		return;
-	}
-
-	// delete from map
-	const std::string& sldr_name = mKeySlider->getCurSlider();
-	std::map<std::string, SliderKey>::iterator mIt = mSliderToKey.find(sldr_name);
-	mSliderToKey.erase(mIt);
-
-	mKeySlider->deleteCurSlider();
-
-	if (mSliderToKey.size() == 0)
-	{
-		return;
-	}
-
-	const std::string& name = mKeySlider->getCurSlider();
-	//mSkyPresetsCombo->selectByValue(mSliderToKey[name].keyframe.toStringVal());
-	F32 time24 = mSliderToKey[name].time;
-
-	getChild<LLTimeCtrl>("time_control")->setTime24(time24);
-}
-
-void BDFloaterPoser::onAnimSetValue(LLUICtrl* ctrl, const LLSD& param)
-{
-	F32 val = ctrl->getValue().asReal();
-	mKeySlider->setValue(val);
-}*/
