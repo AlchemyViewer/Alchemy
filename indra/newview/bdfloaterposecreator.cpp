@@ -119,6 +119,12 @@ BDFloaterPoseCreator::~BDFloaterPoseCreator()
 
 BOOL BDFloaterPoseCreator::postBuild()
 {
+	std::string pathname = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "animations");
+	if (!gDirUtilp->fileExists(pathname))
+	{
+		LLFile::mkdir(pathname);
+	}
+
 	//BD - Posing
 	mJointScrolls = { { this->getChild<LLScrollListCtrl>("joints_scroll", true),
 						this->getChild<LLScrollListCtrl>("cv_scroll", true),
