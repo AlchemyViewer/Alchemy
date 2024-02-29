@@ -40,6 +40,8 @@ public:
     virtual ~LLFetchedGLTFMaterial();
 
     LLFetchedGLTFMaterial& operator=(const LLFetchedGLTFMaterial& rhs);
+    // LLGLTFMaterial::operator== is defined, but LLFetchedGLTFMaterial::operator== is not.
+    bool operator==(const LLGLTFMaterial& rhs) const = delete;
 
     // If this material is loaded, fire the given function
     void onMaterialComplete(std::function<void()> material_complete);
@@ -49,8 +51,6 @@ public:
     void bind(LLViewerTexture* media_tex = nullptr);
 
     bool isFetching() const { return mFetching; }
-
-    LLPointer<LLViewerFetchedTexture> getUITexture();
 
     void addTextureEntry(LLTextureEntry* te) override;
     void removeTextureEntry(LLTextureEntry* te) override;
@@ -64,9 +64,6 @@ public:
     LLPointer<LLViewerFetchedTexture> mEmissiveTexture;
 
     std::set<LLTextureEntry*> mTextureEntires;
-
-    // Texture used for previewing the material in the UI
-    LLPointer<LLViewerFetchedTexture> mPreviewTexture;
 
 protected:
     // Lifetime management
