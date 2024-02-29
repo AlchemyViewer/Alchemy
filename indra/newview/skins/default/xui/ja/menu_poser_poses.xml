@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<toggleable_menu name="Settings">
+<toggleable_menu name="Poser Settings">
 	<menu_item_call label="回転のみを読み込む" name="rotations"/>
 	<menu_item_call label="位置のみを読み込む" name="positions"/>
 	<menu_item_call label="スケールのみを読み込む" name="scale"/>

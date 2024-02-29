@@ -323,7 +323,7 @@
 					<text name="physics_points" width="130">
 						頂点数：[POINTS]，
 					</text>
-					<text name="physics_hulls" width="130">
+					<text name="physics_hulls">
 						凸包数：[HULLS]
 					</text>
 				</panel>

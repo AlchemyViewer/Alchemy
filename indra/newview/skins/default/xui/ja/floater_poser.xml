@@ -143,7 +143,8 @@
 						<slider label="回転Ｙ：" name="Rotation_Y"/>
 						<slider label="回転Ｚ：" name="Rotation_Z"/>
 						<panel name="title">
-							<button label="選択された回転をリセット" label_selected="選択されたボーンを無効化" name="reset_bone_rot"/>
+							<button label="選択の回転をリセット" label_selected="選択のボーンを無効化" name="reset_bone_rot"/>
+							<button label="選択の回転を復元" name="revert_pose"/>
 						</panel>
 					</panel>
 					<panel title="位置" name="position_panel">
@@ -151,7 +152,7 @@
 						<slider label="位置Ｙ：" name="Position_Y"/>
 						<slider label="位置Ｚ：" name="Position_Z"/>
 						<panel name="title">
-							<button label="選択された位置をリセット" label_selected="選択されたボーンを無効化" name="reset_bone_pos"/>
+							<button label="選択の位置をリセット" label_selected="選択のボーンを無効化" name="reset_bone_pos"/>
 						</panel>
 					</panel>
 					<panel title="スケール" name="scale_panel">
@@ -159,11 +160,11 @@
 						<slider label="スケールＹ：" name="Scale_Y"/>
 						<slider label="スケールＺ：" name="Scale_Z"/>
 						<panel name="title">
-							<button label="選択されたスケールをリセット" label_selected="選択されたボーンを無効化" name="reset_bone_scale"/>
+							<button label="選択のスケールをリセット" label_selected="選択のボーンを無効化" name="reset_bone_scale"/>
 						</panel>
 					</panel>
 				</tab_container>
-				<button label="選択されたボーンを有効化" label_selected="選択されたボーンを無効化" name="toggle_bone"/>
+				<button label="選択のボーンを有効化" label_selected="選択のボーンを無効化" name="toggle_bone"/>
 			</panel>
 		</layout_panel>
 		<layout_panel name="poses_layout">
