@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_poser" title="ポーズクリエイター">
+	<string name="icon_category" translate="false">
+		Inv_Shape
+	</string>
+	<string name="icon_bone" translate="false">
+		Transparent
+	</string>
+	<string name="icon_object" translate="false">
+		Inv_Object
+	</string>
+	<string name="title_mPelvis" translate="false">
+		Main Body
+	</string>
+	<string name="title_mHead" translate="false">
+		Head
+	</string>
+	<string name="title_mCollarLeft" translate="false">
+		Left Arm
+	</string>
+	<string name="title_mCollarRight" translate="false">
+		Right Arm
+	</string>
+	<string name="title_mWingsRoot" translate="false">
+		Back
+	</string>
+	<string name="title_mHipLeft" translate="false">
+		Left Leg
+	</string>
+	<string name="title_mHipRight" translate="false">
+		Right Leg
+	</string>
+	<string name="title_mTail1" translate="false">
+		Tail
+	</string>
+	<string name="title_mGroin" translate="false">
+		Misc
+	</string>
+	<tab_container name="animation_tabs">
+		<panel title="一般" name="general_panel">
+			<icon name="vicon"/>
+			<text name="linden_intro">
+				ポーズのファイル名
+・これは、アニメーションのアップロード時に付けられる名前です。
+			</text>
+			<line_editor label="" name="export_name"/>
+			<text name="linden_intro">
+				イーズイン/イーズアウト時間
+・これは、アニメーションの開始または停止時に「フェードイン」および「フェードアウト」するのにかかる時間（秒単位）です。
+			</text>
+			<line_editor label="" name="ease_in"/>
+			<line_editor label="" name="ease_out"/>
+			<text name="linden_intro">
+				アニメーション時間
+・アニメーションが続く秒数です。「自動期間」を有効のままにすることをお勧めします。
+			</text>
+			<check_box label="自動期間" tool_tip="最後のキーフレームに基づいてアニメーションの長さを自動的に計算します。" name="AutoDuration"/>
+			<slider label="" name="keyframe_duration"/>
+			<text name="linden_intro">
+				アニメーションをループするか
+・指定された開始時間と終了時間（秒単位）でアニメーションをループするかどうかを切り替えます。
+			</text>
+			<check_box label="アニメーションのループ" tool_tip="アニメーションの設定された時間フレームでアニメーションをループするかどうかを切り替えます。" name="LoopAnimation"/>
+			<line_editor label="" value="0.0" name="loop_in"/>
+			<text name="linden_intro">
+				～
+			</text>
+			<line_editor label="" value="1.0" name="loop_out"/>
+			<text name="linden_intro">
+				優先度
+・このアニメーションの最低優先度を設定します。
+・これは、このアニメーションが他のアニメーションをオーバーライドするか、他のアニメーションによってオーバーライドされるかに影響します。
+・各々のボーンがこれを増加させる可能性があります。
+			</text>
+			<combo_box name="base_priority">
+				<combo_box.item label="優先度・低（0）" name="0" value="0"/>
+				<combo_box.item label="優先度・中（1）" name="1" value="1"/>
+				<combo_box.item label="優先度・高（2）" name="2" value="2"/>
+				<combo_box.item label="優先度・より高い（3）" name="3" value="3"/>
+				<combo_box.item label="優先度・最高（4）" name="4" value="4"/>
+				<combo_box.item label="他のアニメに加える（7）" name="7" value="7"/>
+			</combo_box>
+			<text name="linden_intro">
+				手のポーズ
+・（オプション）デフォルトのリンデンボディを使用する場合のデフォルトの手のポーズを設定します。
+			</text>
+			<combo_box name="hand_poses">
+				<combo_box.item label="広げる" name="0" value="0"/>
+				<combo_box.item label="リラックスした" name="1" value="1"/>
+				<combo_box.item label="指差し" name="2" value="2"/>
+				<combo_box.item label="拳" name="3" value="3"/>
+			</combo_box>
+			<button label="インポート" tool_tip="ディスクからポーズをインポートします。" name="import_poses"/>
+			<button label="エクスポート" tool_tip="現在のポーズをエクスポートします。" name="export_poses"/>
+		</panel>
+		<panel title="スケルトン" name="joints_panel">
+			<!--
+				<icon name="vicon"/>
+			-->
+			<icon name="vicon"/>
+			<icon name="vicon"/>
+			<tab_container name="joints_tabs">
+				<panel title="ボーン" name="joints_panel">
+					<scroll_list name="joints_scroll">
+						<scroll_list.columns label="" name="icon"/>
+						<scroll_list.columns label="ボーン名" name="joint"/>
+						<scroll_list.columns label="回転Ｘ" name="x"/>
+						<scroll_list.columns label="回転Ｙ" name="y"/>
+						<scroll_list.columns label="回転Ｚ" name="z"/>
+						<scroll_list.columns label="位置Ｘ" name="pos_x"/>
+						<scroll_list.columns label="位置Ｙ" name="pos_y"/>
+						<scroll_list.columns label="位置Ｚ" name="pos_z"/>
+						<scroll_list.columns label="サイズＸ" name="scale_x"/>
+						<scroll_list.columns label="サイズＹ" name="scale_y"/>
+						<scroll_list.columns label="サイズＺ" name="scale_z"/>
+					</scroll_list>
+					<scroll_list name="keyframe_scroll">
+						<scroll_list.columns label="時間" name="time"/>
+						<scroll_list.columns label="値" name="value"/>
+						<scroll_list.columns label="Ｘ" name="x"/>
+						<scroll_list.columns label="Ｙ" name="y"/>
+						<scroll_list.columns label="Ｚ" name="z"/>
+					</scroll_list>
+				</panel>
+				<panel title="衝突" name="cv_panel">
+					<scroll_list name="cv_scroll">
+						<scroll_list.columns label="" name="icon"/>
+						<scroll_list.columns label="衝突ボリューム名" name="joint"/>
+						<scroll_list.columns label="回転Ｘ" name="x"/>
+						<scroll_list.columns label="回転Ｙ" name="y"/>
+						<scroll_list.columns label="回転Ｚ" name="z"/>
+						<scroll_list.columns label="位置Ｘ" name="pos_x"/>
+						<scroll_list.columns label="位置Ｙ" name="pos_y"/>
+						<scroll_list.columns label="位置Ｚ" name="pos_z"/>
+						<scroll_list.columns label="サイズＸ" name="scale_x"/>
+						<scroll_list.columns label="サイズＹ" name="scale_y"/>
+						<scroll_list.columns label="サイズＺ" name="scale_z"/>
+						<scroll_list.columns label="＃" name="number"/>
+					</scroll_list>
+				</panel>
+				<panel title="Attachment" name="attach_panel">
+					<scroll_list name="attach_scroll">
+						<scroll_list.columns label="" name="icon"/>
+						<scroll_list.columns label="装着ボーン名" name="joint"/>
+						<scroll_list.columns label="回転Ｘ" name="x"/>
+						<scroll_list.columns label="回転Ｙ" name="y"/>
+						<scroll_list.columns label="回転Ｚ" name="z"/>
+						<scroll_list.columns label="位置Ｘ" name="pos_x"/>
+						<scroll_list.columns label="位置Ｙ" name="pos_y"/>
+						<scroll_list.columns label="位置Ｚ" name="pos_z"/>
+						<scroll_list.columns label="サイズＸ" name="scale_x"/>
+						<scroll_list.columns label="サイズＹ" name="scale_y"/>
+						<scroll_list.columns label="サイズＺ" name="scale_z"/>
+						<scroll_list.columns label="＃" name="number"/>
+					</scroll_list>
+				</panel>
+			</tab_container>
+			<scroll_list name="timeframe_scroll">
+				<scroll_list.columns label="ボーン名" name="joint"/>
+				<scroll_list.columns label="タイムライン" name="multislider"/>
+			</scroll_list>
+			<panel name="title">
+				<button label="ポージング開始" label_selected="ポージング停止" name="activate"/>
+				<button label="プレビュー" label_selected="停止" name="preview"/>
+				<combo_box name="interpolation">
+					<combo_box.item label="ステップ" name="0" value="0"/>
+					<combo_box.item label="リニア" name="1" value="1"/>
+					<combo_box.item label="スプライン" name="2" value="2"/>
+				</combo_box>
+				<line_editor name="key_time"/>
+				<button label="キーの追加" tool_tip="現在選択されているキーフレームの後にキーフレームを追加します。SHIFTを押したままにして最後に追加します。CTRLを押したままにして先頭に追加します。" name="add_keyframe"/>
+				<button label="キーの削除" tool_tip="現在選択されているキーフレームを削除します。" name="remove_keyframe"/>
+			</panel>
+			<icon name="vicon"/>
+			<check_box label="変更をミラーリング" tool_tip="このオプションは、回転に対するすべての変更を反対側のボーンにもミラーリングするかどうかを切り替えます。左腕は右腕にミラーリングされます。" name="Mirror"/>
+			<check_box label="簡易回転Easy Rotations" tool_tip="このオプションは、ポーザーが簡略化された回転軸を表示および使用するかどうかを切り替えます。これは基本的に、任意の軸を移動するときに、他のすべての軸は触れられないことを意味します。これにより、回転が所定の位置からずれることになり、ボーンが移動された順序によっては、0 0 0がデフォルトの静止位置ではなくなります。このオプションを無効にすると、他の軸が実際の回転を表すように動的に変更されるようになります。つまり、タッチしていないスライダーは、現在移動しているスライダーに合わせて変更されます。これはユーザーにとって混乱を招く可能性があるため、デフォルトでは無効になっています。これを使用する場合は、最初にＺ、次にＹ、最後にＸを0設定することを強くお勧めします。そうしないと、ボーンの回転をリセットしない限り、すべての軸を0設定できなくなります。" name="EasyRotations"/>
+			<button label="ポーズのミラーリング" name="flip_pose"/>
+			<icon name="vicon"/>
+			<tab_container name="modifier_tabs">
+				<panel title="回転" name="rotation_panel">
+					<slider label="回転Ｘ：" name="Rotation_X"/>
+					<slider label="回転Ｙ：" name="Rotation_Y"/>
+					<slider label="回転Ｚ：" name="Rotation_Z"/>
+					<panel name="title">
+						<button label="選択された回転をリセット" label_selected="選択されたボーンを無効化" name="reset_bone_rot"/>
+						<button label="選択された回転を復元" name="revert_pose"/>
+					</panel>
+				</panel>
+				<panel title="位置" name="position_panel">
+					<slider label="位置Ｘ：" name="Position_X"/>
+					<slider label="位置Ｙ：" name="Position_Y"/>
+					<slider label="位置Ｚ：" name="Position_Z"/>
+					<panel name="title">
+						<button label="選択された位置をリセット" label_selected="選択されたボーンを無効化" name="reset_bone_pos"/>
+					</panel>
+				</panel>
+				<panel title="スケール" name="scale_panel">
+					<slider label="スケールＸ：" name="Scale_X"/>
+					<slider label="スケールＹ：" name="Scale_Y"/>
+					<slider label="スケールＺ：" name="Scale_Z"/>
+					<panel name="title">
+						<button label="選択されたスケールをリセット" label_selected="選択されたボーンを無効化" name="reset_bone_scale"/>
+					</panel>
+				</panel>
+			</tab_container>
+			<button label="選択されたボーンを有効化" label_selected="選択されたボーンを無効化" name="toggle_bone"/>
+		</panel>
+	</tab_container>
+	<!-- 
+		<multi_slider name="key_slider"/>
+		<line_editor label="" name="time"/>
+	-->
+	<!--
+		<multi_slider name="time_slider"/>
+		<multi_slider name="key_slider"/>
+		<button label="＋" name="add_key"/>
+		<button label="－" label_selected="キーを削除" name="delete_key"/>
+		<line_editor label="待機時間" tool_tip="待機イベントの時間を変更します。" name="time"/>
+	-->
+</floater>

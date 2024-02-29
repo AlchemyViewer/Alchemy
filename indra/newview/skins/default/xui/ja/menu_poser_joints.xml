@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="Actions">
+	<menu_item_call label="回転をミラーリング" name="rotations"/>
+	<menu_item_call label="ミラーボーンからの回転を対称化" name="rotations"/>
+	<menu_item_call label="ボーンを再キャプチャ" name="rotations"/>
+	<menu_item_check label="このボーンを有効化" name="rotations"/>
+	<menu_item_check label="オーバーライドを有効化" name="rotations"/>
+	<menu_item_check label="オフセットを有効化" name="rotations"/>
+	<menu_item_separator/>
+	<menu_item_call label="変形をコピー" name="copy_all"/>
+	<menu_item_separator/>
+	<menu_item_call label="回転をペースト" name="positions"/>
+	<menu_item_call label="位置をペースト" name="positions"/>
+	<menu_item_call label="スケールをペースト" name="scale"/>
+	<menu_item_separator/>
+	<menu_item_call label="回転と位置をペースト" name="rot_pos"/>
+	<menu_item_call label="回転とスケールをペースト" name="rot_scale"/>
+	<menu_item_call label="位置とスケールをペースト" name="pos_scale"/>
+	<menu_item_separator/>
+	<menu_item_call label="すべての変形をペースト" name="all_transforms"/>
+	<menu_item_separator/>
+	<menu_item_call label="回転をリセット" name="reset_rot"/>
+	<menu_item_call label="位置をリセット" name="reset_pos"/>
+	<menu_item_call label="スケールをリセット" name="reset_scale"/>
+	<menu_item_separator/>
+	<menu_item_call label="すべての変形をリセット" name="reset_all"/>
+</context_menu>
