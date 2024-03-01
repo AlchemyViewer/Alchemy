@@ -172,7 +172,8 @@ public:
 								save_dock_state,
 								can_dock,
 								show_title,
-								show_help;
+								show_help,
+								auto_close;
 		
 		Optional<LLFloaterEnums::EOpenPositioning>	positioning;
 		
@@ -253,6 +254,7 @@ public:
 	virtual void	closeHostedFloater();
 
 	/*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
+	/*virtual*/ void translate(S32 x, S32 y) override;
 	
 	// Release keyboard and mouse focus
 	void			releaseFocus();
@@ -274,11 +276,11 @@ public:
 // [/SL:KB]
 	virtual void	setMinimized(BOOL b);
 	void			moveResizeHandlesToFront();
-	void			addDependentFloater(LLFloater* dependent, BOOL reposition = TRUE);
-	void			addDependentFloater(LLHandle<LLFloater> dependent_handle, BOOL reposition = TRUE);
+	void			addDependentFloater(LLFloater* dependent, BOOL reposition = TRUE, BOOL resize = FALSE);
+	void			addDependentFloater(LLHandle<LLFloater> dependent_handle, BOOL reposition = TRUE, BOOL resize = FALSE);
 	LLFloater*		getDependee() { return (LLFloater*)mDependeeHandle.get(); }
-	void		removeDependentFloater(LLFloater* dependent);
-// [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
+	void			removeDependentFloater(LLFloater* dependent);
+	void			fitWithDependentsOnScreen(const LLRect& left, const LLRect& bottom, const LLRect& right, const LLRect& constraint, S32 min_overlap_pixels);
 	bool			isMinimized() const				{ return mMinimized; }
 // [/SL:KB]
 //	BOOL			isMinimized() const				{ return mMinimized; }
@@ -341,6 +343,9 @@ public:
 	void setVisible(BOOL visible) override; // do not override
 	void onVisibilityChange ( BOOL new_visibility ) override; // do not override
 	
+	bool            canFocusStealFrontmost() const { return mFocusStealsFrontmost; }
+	void            setFocusStealsFrontmost(bool wants_frontmost) { mFocusStealsFrontmost = wants_frontmost; }
+
 	void			setFrontmost(BOOL take_focus = TRUE, BOOL restore = TRUE);
      virtual void	setVisibleAndFrontmost(BOOL take_focus=TRUE, const LLSD& key = LLSD());
 	
@@ -422,6 +427,7 @@ protected:
 	void		 	setInstanceName(const std::string& name);
 	
 	virtual void	bringToFront(S32 x, S32 y);
+	virtual void	goneFromFront();
 	
 	void			setExpandedRect(const LLRect& rect) { mExpandedRect = rect; } // size when not minimized
 	const LLRect&	getExpandedRect() const { return mExpandedRect; }
@@ -520,11 +526,13 @@ private:
 	bool			mCanCollapse;
 // [/SL:KB]
 	BOOL			mCanClose;
+    bool            mFocusStealsFrontmost = true;	// FALSE if we don't want the currently focused floater to cover this floater without user interaction
 	BOOL			mDragOnLeft;
 	BOOL			mResizable;
 	BOOL			mResizableHeight;
 	BOOL			mResizableWidth;
 	BOOL			mShowHelp;
+	BOOL			mAutoClose;
 
 	LLFloaterEnums::EOpenPositioning	mPositioning;
 	LLCoordFloater	mPosition;
@@ -547,6 +555,7 @@ private:
 	typedef std::set<LLHandle<LLFloater> > handle_set_t;
 	typedef std::set<LLHandle<LLFloater> >::iterator handle_set_iter_t;
 	handle_set_t	mDependents;
+	bool			mTranslateWithDependents { false };
 
 	bool			mButtonsEnabled[BUTTON_COUNT];
 	F32				mButtonScale;
@@ -646,6 +655,7 @@ public:
 	LLFloater* getFrontmostClosableFloater(); 
 
 	void setToolbarRect(LLToolBarEnums::EToolBarLocation tb, const LLRect& toolbar_rect);
+	void onDestroyFloater(LLFloater* floater);
 
 private:
 	void hiddenFloaterClosed(LLFloater* floater);

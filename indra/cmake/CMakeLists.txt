@@ -25,6 +25,7 @@ set(cmake_SOURCE_FILES
         FreeType.cmake
         GLEXT.cmake
         Hunspell.cmake
+        ICU4C.cmake
         LibXML2.cmake
         LLAddBuildTest.cmake
         LLAppearance.cmake

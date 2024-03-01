@@ -66,6 +66,13 @@ if(WINDOWS)
         openjp2.dll
         )
 
+    # ICU4C (same filenames for 32 and 64 bit builds)
+    set(release_files ${release_files} icudt74.dll)
+    set(release_files ${release_files} icuin74.dll)
+    set(release_files ${release_files} icuio74.dll)
+    set(release_files ${release_files} icutu74.dll)
+    set(release_files ${release_files} icuuc74.dll)
+
     # Filenames are different for 32/64 bit BugSplat file and we don't
     # have any control over them so need to branch.
     if (TARGET al::sentry)

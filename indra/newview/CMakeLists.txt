@@ -16,8 +16,8 @@ include(DiscordSDK)
 include(DragDrop)
 include(EXPAT)
 include(FMODSTUDIO)
-include(Fonts)
 include(Hunspell)
+include(ICU4C)
 include(JPEGEncoderBasic)
 include(LibXML2)
 include(LLAppearance)
@@ -263,6 +263,7 @@ set(viewer_SOURCE_FILES
     llfloaterdisplayname.cpp
     llfloatereditenvironmentbase.cpp
     llfloatereditextdaycycle.cpp
+    llfloateremojipicker.cpp
     llfloaterenvironmentadjust.cpp
     llfloaterevent.cpp
     llfloaterexperiencepicker.cpp
@@ -489,6 +490,7 @@ set(viewer_SOURCE_FILES
     llpaneleditsky.cpp
     llpaneleditwater.cpp
     llpaneleditwearable.cpp
+    llpanelemojicomplete.cpp
     llpanelenvironment.cpp
     llpaneleventinfo.cpp
     llpanelexperiencelisteditor.cpp
@@ -998,6 +1000,7 @@ set(viewer_HEADER_FILES
     llfloaterdisplayname.h
     llfloatereditenvironmentbase.h
     llfloatereditextdaycycle.h
+    llfloateremojipicker.h
     llfloaterenvironmentadjust.h
     llfloaterevent.h
     llfloaterexperiencepicker.h
@@ -1216,6 +1219,7 @@ set(viewer_HEADER_FILES
     llpaneleditsky.h
     llpaneleditwater.h
     llpaneleditwearable.h
+    llpanelemojicomplete.h
     llpanelenvironment.h
     llpaneleventinfo.h
     llpanelexperiencelisteditor.h
@@ -2134,6 +2138,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         llprimitive
         llappearance
         ${LLPHYSICSEXTENSIONS_LIBRARIES}
+        ll::icu4c
         ll::tracy
         ll::sdbus-cpp
         ll::versioninfo
@@ -2169,6 +2174,28 @@ endif()
 
 set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
     "Path to artwork files.")
+
+message("Copying fonts")
+file(GLOB FONT_FILE_GLOB_LIST
+  "${AUTOBUILD_INSTALL_DIR}/fonts/*"
+)
+file(COPY ${FONT_FILE_GLOB_LIST} DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/fonts")
+
+# Copy over the Emoji/shortcodes mapping XML files (and create dependency
+# if they are changed, CMake will run again and copy over new versions)
+message("Copying Emoji/shortcode mappings")
+set(emoji_mapping_src_folder ${AUTOBUILD_INSTALL_DIR}/xui)
+set(emoji_mapping_dst_folder ${CMAKE_CURRENT_SOURCE_DIR}/skins/default/xui)
+
+# Note Turkey is missing from this set (not available in Emoji package yet)
+set(country_codes "da;de;en;es;fr;it;ja;pl;pt;ru;zh")
+foreach(elem ${country_codes})
+   set(emoji_mapping_src_file
+      "${emoji_mapping_src_folder}/${elem}/emoji_characters.xml")
+   set(emoji_mapping_dst_file
+      "${emoji_mapping_dst_folder}/${elem}/emoji_characters.xml")      
+   configure_file(${emoji_mapping_src_file} ${emoji_mapping_dst_file} COPYONLY)
+endforeach()
 
 if (LINUX)
   set(product Alchemy-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})

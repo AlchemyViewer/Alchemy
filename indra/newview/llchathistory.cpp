@@ -1173,6 +1173,8 @@ LLChatHistory::LLChatHistory(const LLChatHistory::Params& p)
 	editor_params.enabled = false; // read only
 	editor_params.show_context_menu = true;
 	editor_params.trusted_content = false;
+	editor_params.text_valign = LLFontGL::VAlign::VCENTER;
+	editor_params.use_color = true;
 	mEditor = LLUICtrlFactory::create<LLTextEditor>(editor_params, this);
 	mEditor->setIsFriendCallback(LLAvatarActions::isFriend);
 	mEditor->setIsObjectBlockedCallback(boost::bind(&LLMuteList::isMuted, LLMuteList::getInstance(), _1, _2, 0));
@@ -1295,9 +1297,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 
 	llassert(mEditor);
 	if (!mEditor)
-	{
 		return;
-	}
 
 	bool from_me = chat.mFromID == gAgent.getID();
 	mEditor->setPlainText(use_plain_text_chat_history);
@@ -1307,26 +1307,16 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 		mUnreadChatSources.insert(chat.mFromName);
 		mMoreChatPanel->setVisible(TRUE);
 		std::string chatters;
-		for (unread_chat_source_t::iterator it = mUnreadChatSources.begin();
-			it != mUnreadChatSources.end();)
+		for (const std::string& source : mUnreadChatSources)
 		{
-			chatters += *it;
-			if (++it != mUnreadChatSources.end())
-			{
-				chatters += ", ";
-			}
+			chatters += chatters.size() ? ", " + source : source;
 		}
 		LLStringUtil::format_map_t args;
 		args["SOURCES"] = chatters;
 
-		if (mUnreadChatSources.size() == 1)
-		{
-			mMoreChatText->setValue(LLTrans::getString("unread_chat_single", args));
-		}
-		else
-		{
-			mMoreChatText->setValue(LLTrans::getString("unread_chat_multiple", args));
-		}
+		std::string xml_desc = mUnreadChatSources.size() == 1 ?
+			"unread_chat_single" : "unread_chat_multiple";
+		mMoreChatText->setValue(LLTrans::getString(xml_desc, args));
 		S32 height = mMoreChatText->getTextPixelHeight() + 5;
 		mMoreChatPanel->reshape(mMoreChatPanel->getRect().getWidth(), height);
 	}
@@ -1374,11 +1364,11 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 		body_message_params.font.style = "ITALIC";
 	}
 
-	if(chat.mChatType == CHAT_TYPE_WHISPER)
+	if (chat.mChatType == CHAT_TYPE_WHISPER)
 	{
 		body_message_params.font.style = "ITALIC";
 	}
-	else if(chat.mChatType == CHAT_TYPE_SHOUT)
+	else if (chat.mChatType == CHAT_TYPE_SHOUT)
 	{
 		body_message_params.font.style = "BOLD";
 	}
@@ -1431,10 +1421,10 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 		}
 
 		// names showing
-		if (args["show_names_for_p2p_conv"].asBoolean() && utf8str_trim(chat.mFromName).size() != 0)
+		if (args["show_names_for_p2p_conv"].asBoolean() && utf8str_trim(chat.mFromName).size())
 		{
 			// Don't hotlink any messages from the system (e.g. "Second Life:"), so just add those in plain text.
-			if ( chat.mSourceType == CHAT_SOURCE_OBJECT && chat.mFromID.notNull())
+			if (chat.mSourceType == CHAT_SOURCE_OBJECT && chat.mFromID.notNull())
 			{
 // [RLVa:KB] - Checked: 2010-04-22 (RLVa-1.2.0f) | Added: RLVa-1.2.0f
 				// NOTE-RLVa: we don't need to do any @shownames or @showloc filtering here because we'll already have an existing URL
@@ -1589,36 +1579,27 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 			&& mIsLastMessageFromLog == message_from_log)  //distinguish between current and previous chat session's histories
 		{
 			view = getSeparator();
-			p.top_pad = mTopSeparatorPad;
-			p.bottom_pad = mBottomSeparatorPad;
             if (!view)
             {
                 // Might be wiser to make this LL_ERRS, getSeparator() should work in case of correct instalation.
                 LL_WARNS() << "Failed to create separator from " << mMessageSeparatorFilename << ": can't append to history" << LL_ENDL;
                 return;
             }
+
+			p.top_pad = mTopSeparatorPad;
+			p.bottom_pad = mBottomSeparatorPad;
 		}
 		else
 		{
 			view = getHeader(chat, name_params, args);
-			if (mEditor->getLength() == 0)
-				p.top_pad = 0;
-			else
-				p.top_pad = mTopHeaderPad;
-            if (teleport_separator)
-            {
-                p.bottom_pad = mBottomSeparatorPad;
-            }
-            else
-            {
-                p.bottom_pad = mBottomHeaderPad;
-            }
-            if (!view)
-            {
-                LL_WARNS() << "Failed to create header from " << mMessageHeaderFilename << ": can't append to history" << LL_ENDL;
-                return;
-            }
+			if (!view)
+			{
+				LL_WARNS() << "Failed to create header from " << mMessageHeaderFilename << ": can't append to history" << LL_ENDL;
+				return;
+			}
 			
+			p.top_pad = mEditor->getLength() ? mTopHeaderPad : 0;
+			p.bottom_pad = teleport_separator ? mBottomSeparatorPad : mBottomHeaderPad;
 		}
 		p.view = view;
 
@@ -1690,10 +1671,10 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 			}
 		}
 	}
-	else if(!teleport_separator)
+	// usual messages showing
+	else if (!teleport_separator)
 	{
 		std::string message = irc_me ? chat.mText.substr(3) : chat.mText;
-
 
 		//MESSAGE TEXT PROCESSING
 		//*HACK getting rid of redundant sender names in system notifications sent using sender name (see EXT-5010)

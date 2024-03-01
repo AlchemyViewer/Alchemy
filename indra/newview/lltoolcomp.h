@@ -230,17 +230,17 @@ public:
 	void			draw() override;
 
 	// Overridden from LLToolComposite
-    BOOL			handleHover(S32 x, S32 y, MASK mask) override;
-	BOOL			handleMouseDown(S32 x, S32 y, MASK mask) override;
-	BOOL			handleDoubleClick(S32 x, S32 y, MASK mask) override;
-	BOOL			handleRightMouseDown(S32 x, S32 y, MASK mask) override;
-	BOOL			handleRightMouseUp(S32 x, S32 y, MASK mask) override;
-	BOOL			handleMouseUp(S32 x, S32 y, MASK mask) override;
-	BOOL			handleScrollWheel(S32 x, S32 y, S32 clicks) override;
-	void			onMouseCaptureLost() override;
-	void			handleSelect() override;
-	void			handleDeselect() override;
-	LLTool*			getOverrideTool(MASK mask) override { return NULL; }
+    virtual BOOL			handleHover(S32 x, S32 y, MASK mask) override;
+	virtual BOOL			handleMouseDown(S32 x, S32 y, MASK mask) override;
+	virtual BOOL			handleDoubleClick(S32 x, S32 y, MASK mask) override;
+	virtual BOOL			handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+	virtual BOOL			handleRightMouseUp(S32 x, S32 y, MASK mask) override;
+	virtual BOOL			handleMouseUp(S32 x, S32 y, MASK mask) override;
+	virtual BOOL			handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+	virtual void			onMouseCaptureLost() override;
+	virtual void			handleSelect() override;
+	virtual void			handleDeselect() override;
+	virtual LLTool*			getOverrideTool(MASK mask) override { return NULL; }
 
 protected:
 	LLToolGun*			mGun;
@@ -249,9 +249,9 @@ protected:
 
 	bool				mRightMouseDown;
 	LLTimer				mTimerFOV;
-	F32				mOriginalFOV,
-					mStartFOV,
-					mTargetFOV;
+	F32					mOriginalFOV,
+						mStartFOV,
+						mTargetFOV;
 };
 
 

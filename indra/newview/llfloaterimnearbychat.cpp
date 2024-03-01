@@ -658,7 +658,7 @@ EChatType LLFloaterIMNearbyChat::processChatTypeTriggers(EChatType type, std::st
 
 void LLFloaterIMNearbyChat::sendChat( EChatType type )
 {
-	processChat(mInputEditor, type);
+	processChatIntern(mInputEditor, type);
 
 	// If the user wants to stop chatting on hitting return, lose focus
 	// and go out of chat mode.

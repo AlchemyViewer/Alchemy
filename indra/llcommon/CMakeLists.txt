@@ -3,6 +3,7 @@
 project(llcommon)
 
 include(00-Common)
+include(ICU4C)
 include(LLCommon)
 include(LLMath)
 include(Linking)
@@ -290,6 +291,7 @@ target_link_libraries(
         ll::uriparser
         ll::oslibraries
         ll::tracy
+        ll::icu4c
         ll::xxhash
         nlohmann_json::nlohmann_json
         fmt::fmt

@@ -3,9 +3,9 @@
 
 	<font name="default" comment="default font files (global fallbacks)">
 		<file>DejaVuSans.ttf</file>
+		<file functor="is_emoji">TwemojiSVG.ttf</file>
 		<file>NotoSans-Regular.ttf</file>
 		<file load_collection="true">NotoSansCJK-Regular.ttc</file>
-		<file>NotoSansTamil-Regular.ttf</file>
 		<file>NotoSansOriya-Regular.ttf</file>
 		<file>NotoSansKannada-Regular.ttf</file>
 		<file>NotoSansDevanagari-Regular.ttf</file>
@@ -92,6 +92,11 @@
 		<file>DejaVuSans-BoldOblique.ttf</file>
 		<file>NotoSans-BoldItalic.ttf</file>
 	</font>
+
+  <font name="Emoji"
+	comment="Name of emoji font">
+    <file>TwemojiSVG.ttf</file>
+  </font>
 
 	<font name="Monospace"
 	  comment="Name of monospace font">

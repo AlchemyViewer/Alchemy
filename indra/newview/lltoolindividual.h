@@ -46,8 +46,6 @@ public:
 	virtual BOOL handleMouseDown(S32 x, S32 y, MASK mask) override;
 	virtual BOOL handleDoubleClick(S32 x, S32 y, MASK mask) override;
 	virtual void handleSelect() override;
-	//virtual void handleDeselect();
-	//virtual void render();
 
 	static void pickCallback(const LLPickInfo& pick_info);
 

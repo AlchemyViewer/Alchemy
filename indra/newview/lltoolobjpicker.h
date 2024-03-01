@@ -47,7 +47,7 @@ public:
 
 	virtual void		onMouseCaptureLost() override;
 
-	virtual void 		setExitCallback(void (*callback)(void *), void *callback_data);
+	void 		setExitCallback(void (*callback)(void *), void *callback_data);
 
 	LLUUID				getObjectID() const { return mHitObjectID; }
 

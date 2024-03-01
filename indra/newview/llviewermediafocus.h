@@ -54,7 +54,7 @@ public:
 	void setHoverFace(LLPointer<LLViewerObject> objectp, S32 face, viewer_media_t media_impl, LLVector3 pick_normal = LLVector3::zero);
 	void clearHover();
 	
-	/*virtual*/ bool	getFocus();
+	bool	getFocus();
 	/*virtual*/ BOOL	handleKey(KEY key, MASK mask, BOOL called_from_parent) override;
 	/*virtual*/ BOOL	handleKeyUp(KEY key, MASK mask, BOOL called_from_parent) override;
 	/*virtual*/ BOOL	handleUnicodeChar(llwchar uni_char, BOOL called_from_parent) override;

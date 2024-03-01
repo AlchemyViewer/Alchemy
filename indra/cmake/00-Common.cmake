@@ -96,7 +96,8 @@ if (WINDOWS)
     /permissive-
     /W3 
     /c 
-    /Zc:__cplusplus 
+    /Zc:__cplusplus
+    /Zc:char8_t-
     /nologo
     )
 

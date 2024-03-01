@@ -184,15 +184,15 @@ class LLVoiceChannelP2P final : public LLVoiceChannelGroup
 public:
 	LLVoiceChannelP2P(const LLUUID& session_id, const std::string& session_name, const LLUUID& other_user_id);
 
-	/*virtual*/ void handleStatusChange(EStatusType status);
-	/*virtual*/ void handleError(EStatusType status);
-    /*virtual*/ void activate();
-	/*virtual*/ void getChannelInfo();
+	/*virtual*/ void handleStatusChange(EStatusType status) override;
+	/*virtual*/ void handleError(EStatusType status) override;
+    /*virtual*/ void activate() override;
+	/*virtual*/ void getChannelInfo() override;
 
 	void setSessionHandle(const std::string& handle, const std::string &inURI);
 
 protected:
-	virtual void setState(EState state);
+	virtual void setState(EState state) override;
 
 private:
 

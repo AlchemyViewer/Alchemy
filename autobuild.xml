@@ -527,6 +527,40 @@
         <key>description</key>
         <string>A headless browser SDK that uses the Chromium Embedded Framework (CEF). It is designed to make it easier to write applications that render modern web content directly to a memory buffer, inject synthesized mouse and keyboard events as well as interact with web based features like JavaScript or cookies.</string>
       </map>
+      <key>emoji_shortcodes</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>aa45328bccaa9f356998c2722ac373bc1822bfb6db7e363fccfaa6c6e290fe3e342084afb9dfe6b058e13d2783a6f93b86ebf7f72e51edbff9887873c58ca53b</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/224/packages/generic/emoji_shortcodes/15.3.0.2381.2381/emoji_shortcodes-15.3.0.2381-common-2381.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/emojibase-license.txt</string>
+        <key>copyright</key>
+        <string>Copyright 2017-2019 Miles Johnson.</string>
+        <key>version</key>
+        <string>15.3.0.2381</string>
+        <key>name</key>
+        <string>emoji_shortcodes</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-emoji-shortcodes</string>
+        <key>description</key>
+        <string>Emoji shortcodes</string>
+      </map>
       <key>expat</key>
       <map>
         <key>platforms</key>
@@ -662,11 +696,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d9993ba516691bb2f3ee35179f42a332ac6a2a1361750bf7a178ecc612cb39bcfe7e93fb8678d50faae2a9b7b82f8ed63e04c7c445f718cee8fee72331872d8c</string>
+              <string>b3207af5d85117e71d3971ad8b4b4d3fae10e4120d58e84354cfae14270497815e15d99bafa3a9fabb5dbe17b3212244e0401f53bd6b0f50e34e0ec96d74f972</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/e53bac2.2319/fonts-e53bac2-common-2319.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/0576fea.2383/fonts-0576fea-common-2383.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -679,7 +713,7 @@
         <key>copyright</key>
         <string>Various Licenses</string>
         <key>version</key>
-        <string>e53bac2</string>
+        <string>0576fea</string>
         <key>name</key>
         <string>fonts</string>
         <key>canonical_repo</key>
@@ -1501,6 +1535,40 @@
         <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-minizip-ng</string>
         <key>description</key>
         <string>Fork of the popular zip manipulation library found in the zlib distribution.</string>
+      </map>
+      <key>nanosvg</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>448a4f5fd2b85a3343612d250fc13f8412ee8c161f1a181e2c09b85afe0eb234af6f44753db6d019b56620462add24dbca064e39da63d78ff542047c80807994</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/226/packages/generic/nanosvg/2024.03.01.2382/nanosvg-2024.03.01-common-2382.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>Zlib</string>
+        <key>license_file</key>
+        <string>LICENSES/nanosvg.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2013-14 Mikko Mononen</string>
+        <key>version</key>
+        <string>2024.03.01</string>
+        <key>name</key>
+        <string>nanosvg</string>
+        <key>canonical_repo</key>
+        <string>https://bitbucket.org/lindenlab/3p-nanosvg</string>
+        <key>description</key>
+        <string>NanoSVG is a simple single-header-file SVG parser and rasterizer</string>
       </map>
       <key>ndPhysicsStub</key>
       <map>
@@ -2538,6 +2606,68 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-zlib-ng</string>
         <key>description</key>
         <string>zlib replacement with optimizations for next generation systems.</string>
+      </map>
+      <key>icu4c</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>f0e0c3987e812bd9cb390f8459235e32b0b6f87ad92b9ab446920418c4dc2646acab633f908451401c655d894d4fe4fe7e597f2cc9179c8718c3d752a88b9cc3</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/74.2.2385/icu4c-74.2-windows64-2385.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>dcd92e12bf749067c7942e34518ff6b32966fd1793edb140ac0aa2e799e553b582f4da983c546f76f0a0ab7e23bdef9e4ecd44f222cad8adf381800fe2e66cf3</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/74.2.2385/icu4c-74.2-darwin64-2385.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>8332eb886287b7467805568a9418f9373bef57a17dfbd65afd992fba20c202a6d28595cf38bf493695cede9c4850e233f24ad3eb22be3caf9a24b1c5536dc5c9</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/74.2.2385/icu4c-74.2-linux64-2385.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>ICU, permissive non-copyleft free software license</string>
+        <key>license_file</key>
+        <string>LICENSES/icu.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 1995-2011 International Business Machines Corporation and others &lt;http://source.icu-project.org&gt;</string>
+        <key>version</key>
+        <string>74.2</string>
+        <key>name</key>
+        <string>icu4c</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-icu4c</string>
+        <key>description</key>
+        <string>ICU is a mature, widely used set of C/C++ and Java libraries providing Unicode and Globalization support for software applications. ICU is widely portable and gives applications the same results on all platforms and between C/C++ and Java software.</string>
       </map>
     </map>
     <key>package_description</key>

@@ -62,6 +62,7 @@ public:
 	LLUIString(const std::string& instring, const LLStringUtil::format_map_t& args);
     LLUIString(std::string&& instring, const LLStringUtil::format_map_t& args);
 	LLUIString(const std::string& instring) : mArgs(NULL) { assign(instring); }
+	LLUIString(const LLWString& instring) : mArgs(NULL) { insert(0, instring); }
     LLUIString(std::string&& instring) : mArgs(NULL) { assign(std::move(instring)); }
 	~LLUIString() { delete mArgs; }
 

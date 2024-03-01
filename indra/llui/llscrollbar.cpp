@@ -480,12 +480,14 @@ void LLScrollbar::reshape(S32 width, S32 height, BOOL called_from_parent)
 		mLineUpBtn->reshape(mLineUpBtn->getRect().getWidth(), llmin(getRect().getHeight() / 2, mThickness));
 		mLineDownBtn->reshape(mLineDownBtn->getRect().getWidth(), llmin(getRect().getHeight() / 2, mThickness));
 		mLineUpBtn->setOrigin(mLineUpBtn->getRect().mLeft, getRect().getHeight() - mLineUpBtn->getRect().getHeight());
+		mLineDownBtn->setOrigin(0, 0);
 	}
 	else
 	{
 		mLineUpBtn->reshape(llmin(getRect().getWidth() / 2, mThickness), mLineUpBtn->getRect().getHeight());
 		mLineDownBtn->reshape(llmin(getRect().getWidth() / 2, mThickness), mLineDownBtn->getRect().getHeight());
-		mLineDownBtn->setOrigin(getRect().getWidth() - mLineDownBtn->getRect().getWidth(), mLineDownBtn->getRect().mBottom);
+		mLineUpBtn->setOrigin(0, 0);
+		mLineDownBtn->setOrigin(getRect().getWidth() - mLineDownBtn->getRect().getWidth(), 0);
 	}
 	updateThumbRect();
 }
