@@ -10,7 +10,7 @@
 		</radio_group>
 		<check_box label="アバターをすべて隠す" name="360_hide_avatar"/>
 		<button label="３６０度画像を作成" name="capture_button"/>
-		<button label="名前をつけて保存…" name="save_local_button"/>
+		<button label="別名で保存…" name="save_local_button"/>
 	</panel>
 	<panel name="ui_panel_right">
 		<web_browser name="360capture_contents"/>

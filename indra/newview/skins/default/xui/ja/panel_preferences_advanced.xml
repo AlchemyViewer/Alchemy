@@ -18,12 +18,12 @@
 	<text name="Cache location">
 		キャッシュ保存先：
 	</text>
-	<button label="ブラウズ" label_selected="ブラウズ" name="set_cache"/>
-	<button label="デフォルトの場所" label_selected="デフォルト" name="default_cache_location"/>
-	<text name="UI Size:">
+	<button label="参照…" label_selected="参照…" name="set_cache"/>
+	<button label="デフォルト" label_selected="デフォルト" name="default_cache_location"/>
+	<text name="UI Size:" width="120">
 		ＵＩのサイズ：
 	</text>
-	<text name="HUD Size:">
+	<text name="HUD Size:" width="120">
 		ＨＵＤのスケール：
 	</text>
 	<check_box label="スクリプトのエラーを表示：" name="show_script_errors"/>

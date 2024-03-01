@@ -84,8 +84,8 @@
 	<menu_item_call label="有効化" name="Activate"/>
 	<menu_item_call label="無効化" name="Deactivate"/>
 	<menu_item_separator name="Texture Separator"/>
-	<menu_item_call label="名前をつけて保存" name="Save As"/>
-	<menu_item_call label="選択を名前をつけて保存" name="Save Selected As"/>
+	<menu_item_call label="別名で保存" name="Save As"/>
+	<menu_item_call label="選択を別名で保存" name="Save Selected As"/>
 	<menu_item_separator name="Wearable And Object Separator"/>
 	<menu_item_call label="装着" name="Wearable And Object Wear"/>
 	<menu_item_call label="追加" name="Wearable Add"/>

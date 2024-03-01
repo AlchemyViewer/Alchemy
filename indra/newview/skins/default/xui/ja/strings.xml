@@ -4179,7 +4179,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		区画一覧：[PARCELS]個
 	</string>
 	<string name="ScriptLimitsMemoryUsed">
-		使用されたメモリ：全[MAX]㎅中[COUNT]㎅使用　[AVAILABLE]㎅利用可
+		使用されたメモリ：全[MAX]㎅中[COUNT]㎅使用（残り[AVAILABLE]㎅利用可）
 	</string>
 	<string name="ScriptLimitsMemoryUsedSimple">
 		使用されたメモリ：[COUNT]㎅
@@ -4188,7 +4188,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		区画のスクリプトＵＲＬ
 	</string>
 	<string name="ScriptLimitsURLsUsed">
-		使用されたＵＲＬ：全[MAX]件中[COUNT]件使用　[AVAILABLE]件利用可
+		使用されたＵＲＬ：全[MAX]件中[COUNT]件使用（残り[AVAILABLE]件利用可）
 	</string>
 	<string name="ScriptLimitsURLsUsedSimple">
 		使用されたＵＲＬ：[COUNT]件

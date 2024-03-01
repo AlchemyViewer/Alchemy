@@ -154,7 +154,7 @@
 					<item name="MeshOptSloppy" label="簡易生成" value="MeshOptSloppy"/>
 				</combo_box>
 				<line_editor name="lod_file_high" value=""/>
-				<button label="ブラウズ…" name="lod_browse_high"/>
+				<button label="参照…" name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
 					<item label="三角形の限度数" name="Triangle Limit" value="Triangle Limit"/>
 					<item label="エラーのしきい値" name="Error Threshold" value="Error Threshold"/>
@@ -174,7 +174,7 @@
 					<item name="Use LoD above" label="上記のＬｏＤ設定を使用" value="Use LoD above"/>
 				</combo_box>
 				<line_editor name="lod_file_medium" value=""/>
-				<button label="ブラウズ…" name="lod_browse_medium"/>
+				<button label="参照…" name="lod_browse_medium"/>
 				<combo_box name="lod_mode_medium">
 					<item label="三角形の限度数" name="Triangle Limit" value="Triangle Limit"/>
 					<item label="エラーのしきい値" name="Error Threshold" value="Error Threshold"/>
@@ -194,7 +194,7 @@
 					<item name="Use LoD above" label="上記のＬｏＤ設定を使用" value="Use LoD above"/>
 				</combo_box>
 				<line_editor name="lod_file_low" value=""/>
-				<button label="ブラウズ…" name="lod_browse_low"/>
+				<button label="参照…" name="lod_browse_low"/>
 				<combo_box name="lod_mode_low">
 					<item label="三角形の限度数" name="Triangle Limit" value="Triangle Limit"/>
 					<item label="エラーのしきい値" name="Error Threshold" value="Error Threshold"/>
@@ -214,7 +214,7 @@
 					<item name="Use LoD above" label="上記のＬｏＤ設定を使用" value="Use LoD above"/>
 				</combo_box>
 				<line_editor name="lod_file_lowest"/>
-				<button label="ブラウズ…" name="lod_browse_lowest"/>
+				<button label="参照…" name="lod_browse_lowest"/>
 				<combo_box name="lod_mode_lowest">
 					<item name="Triangle Limit" label="三角形の限度数" value="Triangle Limit"/>
 					<item name="Error Threshold" label="エラーのしきい値" value="Error Threshold"/>
@@ -264,7 +264,7 @@
 						</combo_item>
 					</combo_box>
 					<line_editor name="physics_file"/>
-					<button name="physics_browse" label="ブラウズ…"/>
+					<button name="physics_browse" label="参照…"/>
 					<!--
 					<check_box name="physics_optimize" label="最適化"/>
 					<check_box name="physics_use_hull" label="凸包を使用"/>
@@ -317,10 +317,10 @@
 					<text name="results_text">
 						結果：
 					</text>
-					<text name="physics_triangles">
+					<text name="physics_triangles" width="130">
 						三角形：[TRIANGLES]，
 					</text>
-					<text name="physics_points">
+					<text name="physics_points" width="130">
 						頂点数：[POINTS]，
 					</text>
 					<text name="physics_hulls">
@@ -334,8 +334,8 @@
 			</panel>
 			<!-- MODIFIERS PANEL -->
 			<panel label="アップロードオプション" name="modifiers_panel">
-				<text name="scale_label">
-					スケール（１＝拡大縮小なし）：
+				<text name="scale_label" width="160">
+					スケール（1＝拡大縮小なし）：
 				</text>
 				<spinner name="import_scale" value="1.0"/>
 				<text name="dimensions_label">
@@ -345,11 +345,8 @@
 					[X]×[Y]×[Z]
 				</text>
 				<check_box label="テクスチャを含む" name="upload_textures"/>
-				<check_box label="スキンの重さを含む" name="upload_skin"/>
-				<check_box label="ジョイント位置を含む" name="upload_joints"/>
-				<check_box label="ジョイント位置が定義されている場合、スケールをロックします。" name="lock_scale_if_joint_position"/>
 				<text name="pelvis_offset_label">
-					Ｚオフセット（アバターを上下調整）：
+					Ｚオフセット（アバターの上下調整）：
 				</text>
 				<spinner name="pelvis_offset" value="0.0"/>
 			</panel>
@@ -357,7 +354,7 @@
 				<view_border name="avatar_tab_border"/>
 				<check_box label="スキンのウエイトを含める" name="upload_skin"/>
 				<check_box label="ジョイント位置を含める" name="upload_joints"/>
-				<check_box label="ジョイント位置が定義されている場合はスケールをロック" name="lock_scale_if_joint_position"/>
+				<check_box label="スケールをロック" name="lock_scale_if_joint_position"/>
 				<text name="pelvis_offset_label">
 					Ｚオフセット（アバターの上下調整）：
 				</text>
@@ -372,7 +369,7 @@
 					ジョイント数：
 				</text>
 				<scroll_list name="joints_list"/>
-				<text name="conflicts_description">
+				<text name="conflicts_description" width="230">
 					[JOINTS_COUNT]個のジョイントに[CONFLICTS]箇所の競合があります。
 				</text>
 				<text name="pos_overrides_descr">
@@ -398,28 +395,28 @@
 			<button label="アップロード" name="ok_btn" tool_tip="シミュレーターにアップロードします。"/>
 			<button label="設定をクリアしてフォームをリセット" name="reset_btn"/>
 			<!-- ========== WEIGHTS ==========-->
-			<text name="upload_fee">
+			<text name="upload_fee" width="170">
 				アップロード料金：L$ [FEE]
 			</text>
-			<text name="prim_weight">
+			<text name="prim_weight" width="160">
 				ランドインパクト：[EQ]
 			</text>
-			<text name="download_weight">
+			<text name="download_weight" width="130">
 				ダウンロード：[ST]
 			</text>
-			<text name="physics_weight">
-				物理演算：[PH]
+			<text name="physics_weight" width="90">
+				物理：[PH]
 			</text>
 			<text name="server_weight">
-				サーバー負荷：[SIM]
+				負荷：[SIM]
 			</text>
 			<!-- =========== Cost breakdown ======== -->
-			<panel name="price_breakdown_panel">
+			<panel name="price_breakdown_panel" width="150">
 				<text>
 					費用の内訳
 				</text>
 				<view_border name="price_breakdown_border"/>
-				<text name="price_breakdown_labels">
+				<text name="price_breakdown_labels" width="100">
 					ダウンロード：
 物理効果数：
 インスタンス数：

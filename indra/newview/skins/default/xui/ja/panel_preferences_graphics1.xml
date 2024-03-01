@@ -51,7 +51,7 @@
 	<slider label="ブライトネス（露光）:" name="RenderExposure"/>
 	<!-- End of Basic Settings block -->
 	<button label="設定をプリセットとして保存…" name="PrefSaveButton"/>
-	<button label="プリセットを読み込む…" name="PrefLoadButton"/>
+	<button label="プリセットを読み込む…" name="PrefLoadButton" width="140"/>
 	<button label="プリセットを削除…" name="PrefDeleteButton"/>
 	<button label="推奨設定にリセット" name="Defaults"/>
 	<button label="拡張設定…" name="AdvancedSettings"/>

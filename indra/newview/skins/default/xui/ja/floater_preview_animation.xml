@@ -10,7 +10,7 @@
 	<text name="desc inworld">
 		他の人から見えます。
 	</text>
-	<button label="ローカル再生" label_selected="停止" name="Locally" tool_tip="自分だけが見えるように再生します。"/>
+	<button label="ローカルで再生" label_selected="停止" name="Locally" tool_tip="自分だけが見えるように再生します。"/>
 	<text name="desc local">
 		あなただけに見えます。
 	</text>
@@ -18,7 +18,7 @@
 	<text name="adv_trigger">
 		拡張
 	</text>
-	<text name="AdvancedStats">
+	<text name="AdvancedStats" width="240">
 		優先度：[PRIORITY]
 長さ：[DURATION]秒
 イースイン：[EASE_IN]秒

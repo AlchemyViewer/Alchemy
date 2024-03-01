@@ -6194,4 +6194,19 @@ https://www.alchemyviewer.org/downloads から最新バージョンのビュー�
 		<tag>confirm</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
+	<notification name="PoserExportXMLSuccess">
+		ポーズは、ＸＭＬファイルへのエクスポートに成功しました。
+
+展開されたポーズリストからポーズを読み込むことができます。
+
+ファイルは以下の場所にあります：
+&lt;b&gt;C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses&lt;/b&gt;
+  </notification>
+
+<notification name="PoserExportANIMSuccess">
+	ポーズは、ANIMファイルへのエクスポートに成功しました。
+
+ファイルは以下の場所にあります：
+&lt;b&gt;C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations&lt;/b&gt;
+  </notification>
 </notifications>

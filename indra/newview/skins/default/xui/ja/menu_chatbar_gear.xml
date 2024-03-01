@@ -4,7 +4,7 @@
 	<menu_item_check label="文字キーでチャットを開く" name="LetterKeysFocusChatBar"/>
 	<menu_item_separator/>
 	<menu_item_check label="「:」を「/me」として扱う" name="EnableMUPoseChat"/>
-	<menu_item_check label="((ＯＯＣ))で自動的にカッコを閉じる parentheses" name="EnableAutoCloseOOC"/>
+	<menu_item_check label="((ＯＯＣ))で自動的にカッコを閉じる" name="EnableAutoCloseOOC"/>
 	<menu_item_separator/>
 	<menu_item_call label="シャウト（コントロールキー）" name="shout"/>
 	<menu_item_call label="ささやき（コントロール‐シフト）" name="whisper"/>

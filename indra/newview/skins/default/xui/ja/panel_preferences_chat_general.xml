@@ -7,7 +7,7 @@
 		<check_box label="オフライン時にＩＭが送られてきたときにメールを送る（[EMAIL]）" name="send_im_to_email"/>
 		<text name="email_settings"> [https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]
 		</text>
-		<text name="font_name">
+		<text name="font_name" width="70" left="296">
 			フォント名：
 		</text>
 		<combo_box name="chat_font_name">
@@ -28,11 +28,11 @@
 			<item label="Monospace" name="Monospace" value="Monospace"/>
 			<item label="Noto Sans Mono" name="NotoSansMono" value="NotoSansMono"/>
 			<item label="Open Dyslexic Mono" name="OpenDyslexicMono" value="OpenDyslexicMono"/>
-			<item label="Source Code Pro" name="SourceCodePro" value="SourceCodePro"/>
+			<item label="源ノ角ゴシック" name="SourceCodePro" value="SourceCodePro"/>
 			<item label="Ubuntu Mono" name="UbuntuMono" value="UbuntuMono"/>
 		</combo_box>
-		<text name="font_size">
-			フォントサイズ：
+		<text name="font_size" width="70" left="296">
+			サイズ：
 		</text>
 		<combo_box name="chat_font_size">
 			<item label="等幅" name="Monospace" value="-1"/>
@@ -135,7 +135,7 @@
 			場所：
 		</text>
 		<line_editor name="log_path_string"/>
-		<button label="ブラウズ…" label_selected="ブラウズ" name="log_path_button"/>
+		<button label="参照…" label_selected="参照…" name="log_path_button"/>
 	</panel>
 	<button label="翻訳…" name="ok_btn"/>
 	<button name="autoreplace_showgui" label="自動置換…"/>

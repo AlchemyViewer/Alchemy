@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Message Log" title="メッセージログ">
 	<floater.string name="filter_status">
-		全[TOTAL]件のメッセージ中[MESSAGES]件を表示しています…
+		全[TOTAL]件中[MESSAGES]件のメッセージを表示しています…
 	</floater.string>
 	<floater.string name="no_filter_status">
 		[TOTAL]件のメッセージを表示しています…
@@ -44,8 +44,8 @@
 			</layout_stack>
 		</layout_panel>
 	</layout_stack>
-	<check_box name="wrap_net_info" label="情報テキストを折り返す"/>
+	<check_box name="wrap_net_info" label="文章を折り返す"/>
 	<!-- Format the message body to be more readable, but not exactly what was sent? -->
-	<check_box name="beautify_messages" label="メッセージをきれいにする"/>
-	<button name="msg_builder_send_btn" label="メッセージビルダーに送信"/>
+	<check_box name="beautify_messages" label="文章を整形"/>
+	<button name="msg_builder_send_btn" label="文章ビルダーに送信"/>
 </floater>

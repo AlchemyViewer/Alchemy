@@ -19,7 +19,7 @@
 		マイク音量：
 	</text>
 	<slider_bar name="mic_volume_slider" tool_tip="スライダーを使ってマイクレベルを調節します。"/>
-	<text name="wait_text">
+	<text name="wait_text" width="140">
 		しばらくお待ちください。
 	</text>
 </panel>

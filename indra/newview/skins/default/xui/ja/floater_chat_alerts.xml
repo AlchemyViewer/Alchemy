@@ -12,7 +12,7 @@
 		キーワード：
 	</text>
 	<line_editor name="alerts_keyword"/>
-	<check_box label="大文字と小文字を区別" name="alerts_keyword_case"/>
+	<check_box label="大文字小文字を区別" name="alerts_keyword_case"/>
 	<text name="alerts_color_label">
 		ハイライトカラー：
 	</text>
@@ -20,7 +20,7 @@
 	<text name="alerts_sound_label">
 		再生するサウンド：
 	</text>
-	<line_editor label="イベントリ内のアイテムをここにドラッグ＆ドロップ" name="alerts_sound_name"/>
+	<line_editor label="イベントリのアイテムをドラッグ＆ドロップ" name="alerts_sound_name"/>
 	<icon name="alerts_sound_icon"/>
 	<button name="alerts_sound_clear_btn"/>
 	<text name="alerts_trigger_label">
@@ -29,6 +29,6 @@
 	<check_box label="チャット" name="alerts_trigger_chat"/>
 	<check_box label="ＩＭ" name="alerts_trigger_im"/>
 	<check_box label="グループ" name="alerts_trigger_group"/>
-	<button name="alerts_save_btn" label="エントリを保存"/>
-	<button name="alerts_revert_btn" label="エントリを復元"/>
+	<button name="alerts_save_btn" label="エントリ保存"/>
+	<button name="alerts_revert_btn" label="エントリ復元"/>
 </floater>
