@@ -37,7 +37,6 @@
 #include "llviewerjointattachment.h"
 #include "llviewerjoint.h"
 #include "llvoavatarself.h"
-#include "llwindowwin32.h"
 #include "pipeline.h"
 
 #include "llviewerobjectlist.h"
@@ -781,8 +780,8 @@ void BDFloaterPoser::onJointControlsRefresh()
 		mModifierTabs->selectTab(0);
 	}
 	//BD - Swap out of "Scale" and "Rotation" tabs when they are not available.
-	if (curr_idx == 2 && !mModifierTabs->getTabButtonEnabled(2)
-		|| curr_idx == 0 && !mModifierTabs->getTabButtonEnabled(0))
+	if ((curr_idx == 2 && !mModifierTabs->getTabButtonEnabled(2))
+		|| (curr_idx == 0 && !mModifierTabs->getTabButtonEnabled(0)))
 	{
 		mModifierTabs->selectTab(1);
 	}
@@ -885,7 +884,7 @@ void BDFloaterPoser::onJointSet(LLUICtrl* ctrl, const LLSD& param)
 				S32 i = 0;
 				while (i < 3)
 				{
-					cell2[i]->setValue(ll_round(item->getColumn(i + 2)->getValue(), 0.001f));
+					cell2[i]->setValue(ll_round((F32)item->getColumn(i + 2)->getValue().asReal(), 0.001f));
 					++i;
 				}
 			}
