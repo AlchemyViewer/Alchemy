@@ -501,7 +501,6 @@
                          height="20"
                          is_expandable="true"
                          text_tentative_color="TextFgTentativeColor"
-                         bg_writeable_color="ScriptBackground"
                          name="chat_editor"
                          max_length="5000"
                          spellcheck="true"
