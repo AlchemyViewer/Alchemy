@@ -7,17 +7,19 @@ option(USE_SYSTEM_FREETYPE "Enable usage of the AVX2 instruction set" OFF)
 
 add_library( ll::freetype INTERFACE IMPORTED )
 
-use_system_binary(freetype)
-use_prebuilt_binary(freetype)
-target_include_directories( ll::freetype SYSTEM INTERFACE  ${LIBS_PREBUILT_DIR}/include/freetype2/)
-if (WINDOWS)
-    target_link_libraries( ll::freetype INTERFACE
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/freetyped.lib
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/freetype.lib)
-else(NOT USE_SYSTEM_FREETYPE)
-    target_link_libraries( ll::freetype INTERFACE
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libfreetyped.a
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libfreetype.a)
+if(NOT USE_SYSTEM_FREETYPE)
+    use_system_binary(freetype)
+    use_prebuilt_binary(freetype)
+    target_include_directories( ll::freetype SYSTEM INTERFACE  ${LIBS_PREBUILT_DIR}/include/freetype2/)
+    if (WINDOWS)
+        target_link_libraries( ll::freetype INTERFACE
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/freetyped.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/freetype.lib)
+    else()
+        target_link_libraries( ll::freetype INTERFACE
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libfreetyped.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libfreetype.a)
+    endif()
 endif()
 
 if(LINUX)
