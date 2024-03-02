@@ -104,6 +104,7 @@ variables:
     when: 'always'
   variables:
     VIEWER_SIGNING_IDENTITY: $APPLE_SIGNATURE
+    USE_SENTRY: "FALSE"
   before_script:
     - python3 -m venv .venv
     - source .venv/bin/activate
