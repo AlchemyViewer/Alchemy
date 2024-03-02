@@ -55,5 +55,11 @@
       <key>Category</key>
       <string>symbols</string>
     </map>
+    <map>
+      <key>Name</key>
+      <string>other</string>
+      <key>Category</key>
+      <string>other</string>
+    </map>
   </array>
 </llsd>

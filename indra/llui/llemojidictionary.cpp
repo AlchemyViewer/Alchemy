@@ -390,19 +390,17 @@ void LLEmojiDictionary::loadEmojis()
             continue;
         }
 
+        std::string category = "other";
         std::list<std::string> categories = loadCategories(sd);
-        if (categories.empty())
+        if (!categories.empty())
         {
-            LL_WARNS() << "Skipping invalid emoji descriptor (no categories)" << LL_ENDL;
-            continue;
-        }
+            category = categories.front();
 
-        std::string category = categories.front();
-
-        if (std::find(mSkipCategories.begin(), mSkipCategories.end(), category) != mSkipCategories.end())
-        {
-            // This category is listed for skip
-            continue;
+            if (std::find(mSkipCategories.begin(), mSkipCategories.end(), category) != mSkipCategories.end())
+            {
+                // This category is listed for skip
+                continue;
+            }
         }
 
         std::list<std::string> shortCodes = loadShortCodes(sd);
