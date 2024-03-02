@@ -192,8 +192,6 @@ LLFontFreetype::LLFontFreetype()
 	mStyle(0),
 	mPointSize(0)
 {
-	mCharGlyphInfoMap.reserve(500);
-	mKerningCache.reserve(500);
 }
 
 
@@ -267,7 +265,7 @@ BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
 	x_max = mFTFace->bbox.xMax * pixels_per_unit;
 	x_min = mFTFace->bbox.xMin * pixels_per_unit;
 	mAscender = mFTFace->ascender * pixels_per_unit;
-	mDescender = -(mFTFace->descender * pixels_per_unit);
+	mDescender = -mFTFace->descender * pixels_per_unit;
 	mLineHeight = mFTFace->height * pixels_per_unit;
 
 	S32 max_char_width = ll_round(0.5f + (x_max - x_min));
@@ -523,10 +521,8 @@ LLFontGlyphInfo* LLFontFreetype::addGlyphFromFont(const LLFontFreetype *fontp, l
 	gi->mXBearing = fontp->mFTFace->glyph->bitmap_left;
 	gi->mYBearing = fontp->mFTFace->glyph->bitmap_top;
 	// Convert these from 26.6 units to float pixels.
-	gi->mXAdvance = fontp->mFTFace->glyph->advance.x * (1.f/64.f);
-	gi->mYAdvance = fontp->mFTFace->glyph->advance.y * (1.f/64.f);
-	gi->mRightSideBearingDelta = fontp->mFTFace->glyph->rsb_delta;
-	gi->mLeftSideBearingDelta = fontp->mFTFace->glyph->lsb_delta;
+	gi->mXAdvance = fontp->mFTFace->glyph->advance.x / 64.f;
+	gi->mYAdvance = fontp->mFTFace->glyph->advance.y / 64.f;
 
 	insertGlyphInfo(wch, gi);
 
