@@ -134,7 +134,8 @@
          max_length="1023"
          name="pick_desc"
          spellcheck="true"
-         word_wrap="true" />
+         word_wrap="true" 
+		 show_emoji_helper="true" />
         <text
          type="string"
          length="1"

@@ -39,5 +39,6 @@
    bg_readonly_color="DkGray2"
    text_readonly_color="White"
    commit_on_focus_lost="true"
-   word_wrap="true" />
+   word_wrap="true" 
+   show_emoji_helper="true" />
 </panel>

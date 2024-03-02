@@ -25,12 +25,13 @@
    left="3"
    height="320"
    layout="topleft"
-   max_length="1022"
+   max_length="65530"
    name="notes"
    top_pad="4"
    right="-4"
    bg_readonly_color="DkGray2"
    text_readonly_color="White"
    commit_on_focus_lost="true"
-   word_wrap="true" />
+   word_wrap="true"
+   show_emoji_helper="true" />
 </panel>
