@@ -741,8 +741,8 @@ void LLTextEditor::selectByCursorPosition(S32 prev_cursor_pos, S32 next_cursor_p
 void LLTextEditor::insertEmoji(llwchar emoji)
 {
 	LL_INFOS() << "LLTextEditor::insertEmoji(" << wchar_utf8_preview(emoji) << ")" << LL_ENDL;
-	auto styleParams = LLStyle::Params();
-	styleParams.font = LLFontGL::getFontEmoji();
+	auto styleParams = getStyleParams();
+	styleParams.font = LLFontGL::getFont(LLFontDescriptor("Emoji", mFont->getFontDesc().getSize(), 0).normalize());
 	auto segment = new LLEmojiTextSegment(new LLStyle(styleParams), mCursorPos, mCursorPos + 1, *this);
 	insert(mCursorPos, LLWString(1, emoji), false, segment);
 	setCursorPos(mCursorPos + 1);

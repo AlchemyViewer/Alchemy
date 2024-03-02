@@ -625,7 +625,7 @@ protected:
 	void							drawText(const std::pair<S32, S32>& line_range);
 
 	// modify contents
-	S32								insertStringNoUndo(S32 pos, const LLWString &wstr, segment_vec_t* segments = NULL); // returns num of chars actually inserted
+	S32								insertStringNoUndo(S32 pos, const LLWString& wstr, segment_vec_t* segments = nullptr, const LLStyle::Params* style = nullptr); // returns num of chars actually inserted
 	S32 							removeStringNoUndo(S32 pos, S32 length);
 	S32								overwriteCharNoUndo(S32 pos, llwchar wc);
 	void							appendAndHighlightText(const std::string &new_text, S32 highlight_part, const LLStyle::Params& stylep, bool underline_on_hover_only = false);

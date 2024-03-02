@@ -893,7 +893,7 @@ void LLTextBase::drawText(const std::pair<S32, S32>& line_range)
 ///////////////////////////////////////////////////////////////////
 // Returns change in number of characters in mWText
 
-S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::segment_vec_t* segments )
+S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::segment_vec_t* segments, const LLStyle::Params* style)
 {
     beforeValueChange();
 
@@ -970,7 +970,8 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
 				if (!emoji_style)
 				{
 					emoji_style = new LLStyle(getStyleParams());
-					emoji_style->setFont(LLFontGL::getFontEmoji());
+					LLFontGL* fontp = style ? LLFontGL::getFont(LLFontDescriptor("Emoji", style->font()->getFontDesc().getSize(), 0)) : LLFontGL::getFontEmoji();
+					emoji_style->setFont(fontp);
 				}
 
 				S32 new_seg_start = pos + text_kitty;
@@ -2492,7 +2493,7 @@ void LLTextBase::appendLineBreakSegment(const LLStyle::Params& style_params)
 	LLStyleConstSP sp(new LLStyle(style_params));
 	segments.push_back(new LLLineBreakTextSegment(sp, getLength()));
 
-	insertStringNoUndo(getLength(), utf8str_to_wstring("\n"), &segments);
+	insertStringNoUndo(getLength(), utf8str_to_wstring("\n"), &segments, &style_params);
 }
 
 void LLTextBase::appendImageSegment(const LLStyle::Params& style_params)
@@ -2505,7 +2506,7 @@ void LLTextBase::appendImageSegment(const LLStyle::Params& style_params)
 	LLStyleConstSP sp(new LLStyle(style_params));
 	segments.push_back(new LLImageTextSegment(sp, getLength(),*this));
 
-	insertStringNoUndo(getLength(), utf8str_to_wstring(" "), &segments);
+	insertStringNoUndo(getLength(), utf8str_to_wstring(" "), &segments, &style_params);
 }
 
 void LLTextBase::appendWidget(const LLInlineViewSegment::Params& params, const std::string& text, bool allow_undo)
@@ -2583,7 +2584,7 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
 			}
 			segment_vec_t segments;
 			segments.push_back(segmentp);
-			insertStringNoUndo(cur_length, wide_text, &segments);
+			insertStringNoUndo(cur_length, wide_text, &segments, &highlight_params);
 		}
 	}
 	else
@@ -2607,7 +2608,7 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
 			segments.push_back(new LLNormalTextSegment(sp, segment_start, segment_end, *this));
 		}
 
-		insertStringNoUndo(getLength(), wide_text, &segments);
+		insertStringNoUndo(getLength(), wide_text, &segments, &style_params);
 	}
 
 	// Set the cursor and scroll position
