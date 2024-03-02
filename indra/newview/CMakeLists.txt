@@ -110,7 +110,6 @@ set(viewer_SOURCE_FILES
     alviewermenu.cpp
     bdanimator.cpp
     bdfloaterposer.cpp
-    bdfloaterposecreator.cpp
     bdposingmotion.cpp
     fslslpreproc.cpp
     fslslpreprocviewer.cpp
@@ -847,7 +846,6 @@ set(viewer_HEADER_FILES
     alviewermenu.h
     bdanimator.h
     bdfloaterposer.h
-    bdfloaterposecreator.h
     bdposingmotion.h
     fslslpreproc.h
     fslslpreprocviewer.h
