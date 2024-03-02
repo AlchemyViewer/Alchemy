@@ -1129,10 +1129,10 @@ https://secondlife.com/viewer-access-faq
 	<string name="anim_yes_head">
 		頷く
 	</string>
+	<!-- build floater -->
 	<string name="multiple_textures">
 		複数
 	</string>
-	<!-- build floater -->
 	<string name="use_texture">
 		テクスチャを使用
 	</string>

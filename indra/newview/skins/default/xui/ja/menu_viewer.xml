@@ -102,7 +102,9 @@
 	</menu>
 	<menu label="ワールド" name="World">
 		<menu_item_check label="ポーザー" name="Poser"/>
+		<!--
 		<menu_item_check label="ポーズクリエイター" name="Pose Creator"/>
+		-->
 		<menu_item_call label="アニメーションを再同期" name="Resync Animations"/>
 		<menu_item_check label="サウンドエクスプローラー" name="Sound Explorer"/>
 		<menu_item_separator/>
@@ -560,6 +562,8 @@
 		</menu>
 		<menu label="ＵＩ" name="UI">
 			<menu_item_call label="メディアブラウザ" name="Media Browser"/>
+			<menu_item_call label="フォントをダンプ" name="Dump Fonts"/>
+			<menu_item_call label="フォントをテクスチャにダンプ" name="Dump Font Textures"/>
 			<menu_item_call label="SelectMgrをダンプ" name="Dump SelectMgr"/>
 			<menu_item_call label="インベントリの出力" name="Dump Inventory"/>
 			<menu_item_call label="タイマーをダンプ" name="Dump Timers"/>
@@ -570,6 +574,7 @@
 			<menu_item_check label="SelectMgrのデバッグ" name="Debug SelectMgr"/>
 			<menu_item_check label="ダブルクリック" name="Debug Clicks"/>
 			<menu_item_check label="デバッグ表示" name="Debug Views"/>
+			<menu_item_check label="Unicodeのデバッグ" name="Debug Unicode"/>
 			<menu_item_check label="デバッグ名ツールチップ" name="Debug Name Tooltips"/>
 			<menu_item_check label="マウスイベントのデバッグ" name="Debug Mouse Events"/>
 			<menu_item_check label="デバッグキー" name="Debug Keys"/>
