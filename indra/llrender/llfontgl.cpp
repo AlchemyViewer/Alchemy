@@ -338,7 +338,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 			glyph_count = 0;
 		}
 
-		drawGlyph(glyph_count, vertices, uvs, colors, screen_rect, uv_rect, (bitmap_entry.first == EFontGlyphType::Grayscale) ? text_color : LLColor4U::white, style_to_add, shadow, drop_shadow_strength);
+
+		LLColor4U glyph_color = (bitmap_entry.first == EFontGlyphType::Grayscale) ? text_color : LLColor4U(255,255,255, text_color.mV[3]);
+		drawGlyph(glyph_count, vertices, uvs, colors, screen_rect, uv_rect, glyph_color, style_to_add, shadow, drop_shadow_strength);
 
 		chars_drawn++;
 		cur_x += fgi->mXAdvance;
