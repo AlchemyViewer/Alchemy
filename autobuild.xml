@@ -2630,11 +2630,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f0e0c3987e812bd9cb390f8459235e32b0b6f87ad92b9ab446920418c4dc2646acab633f908451401c655d894d4fe4fe7e597f2cc9179c8718c3d752a88b9cc3</string>
+              <string>729428694cb2d5f42976fc2d82ee4eb96f0952c84f309ae41d66a6e0a5a2d8c71bd4b30cd17361c53d05bbae6eb08fe58a1469b18f656bb7bd987bf876c3be19</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/74.2.2385/icu4c-74.2-windows64-2385.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/74.2.2388/icu4c-74.2-windows64-2388.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2644,11 +2644,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>dcd92e12bf749067c7942e34518ff6b32966fd1793edb140ac0aa2e799e553b582f4da983c546f76f0a0ab7e23bdef9e4ecd44f222cad8adf381800fe2e66cf3</string>
+              <string>3722208a5b1e719b46d21b9f862a7dfd8fa3f85654fe8d98449cabb605a50a08a9265c56a877e62d04dabf19c91bc4f705134f0bc180868ab8a4d43ec2430359</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/74.2.2385/icu4c-74.2-darwin64-2385.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/74.2.2388/icu4c-74.2-darwin64-2388.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2658,11 +2658,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>8332eb886287b7467805568a9418f9373bef57a17dfbd65afd992fba20c202a6d28595cf38bf493695cede9c4850e233f24ad3eb22be3caf9a24b1c5536dc5c9</string>
+              <string>61204a62dcd216a8502eb1b7e0b6d000a4d541571ccfcf7d2a7c6dd165e3666fb5b9761ec7b9f85525066276d3c5f3a3ef5c55c233adc3239a06710f60adcae3</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/74.2.2385/icu4c-74.2-linux64-2385.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/74.2.2388/icu4c-74.2-linux64-2388.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
