@@ -417,6 +417,7 @@ void LLFloaterEmojiPicker::fillGroups()
     for (LLButton* button : mGroupButtons)
     {
         mGroups->removeChild(button);
+        delete button;
     }
     mFilteredEmojiGroups.clear();
     mFilteredEmojis.clear();
