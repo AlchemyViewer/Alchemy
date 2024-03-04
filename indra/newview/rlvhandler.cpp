@@ -2785,7 +2785,7 @@ ERlvCmdRet RlvHandler::processForceCommand(const RlvCommand& rlvCmd) const
 				{
 					F32 nValue = (rlvCmdOption.m_nPelvisToFoot - gAgentAvatarp->getPelvisToFoot()) * rlvCmdOption.m_nPelvisToFootDeltaMult;
 					nValue += rlvCmdOption.m_nPelvisToFootOffset;
-					if (gAgentAvatarp->getRegion()->avatarHoverHeightEnabled() || !gAgentAvatarp->isUsingServerBakes())
+					if (gAgentAvatarp->getRegion()->avatarHoverHeightEnabled())
 					{
 						LLVector3 avOffset(0.0f, 0.0f, llclamp<F32>(nValue, MIN_HOVER_Z, MAX_HOVER_Z));
 						gSavedPerAccountSettings.setF32("AvatarHoverOffsetZ", avOffset.mV[VZ]);

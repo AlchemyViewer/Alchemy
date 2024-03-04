@@ -526,10 +526,7 @@ void LLAvatarAppearance::computeBodySize()
 
 	F32 old_offset = mAvatarOffset.mV[VZ];
 
-// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
-	mAvatarOffset.mV[VZ] = getAvatarOffset();
-// [/RLVa:KB]
-//	mAvatarOffset.mV[VZ] = getVisualParamWeight(AVATAR_HOVER);
+	mAvatarOffset.mV[VZ] = getVisualParamWeight(AVATAR_HOVER);
 
 	mPelvisToFoot = hip.mV[VZ] * pelvis_scale.mV[VZ] -
 				 	knee.mV[VZ] * hip_scale.mV[VZ] -
@@ -556,20 +553,12 @@ void LLAvatarAppearance::computeBodySize()
 	if (new_body_size != mBodySize || old_offset != mAvatarOffset.mV[VZ])
 	{
 		mBodySize = new_body_size;
-		bodySizeChanged();
 
 #ifdef SHOW_DEBUG
         compareJointStateMaps(mLastBodySizeState, mCurrBodySizeState);
 #endif
 	}
 }
-
-// [RLVa:KB] - Checked: 2013-03-03 (RLVa-1.4.8)
-F32 LLAvatarAppearance::getAvatarOffset() /*const*/
-{
-	return getVisualParamWeight(AVATAR_HOVER);
-}
-// [/RLVa:KB]
 
 //-----------------------------------------------------------------------------
 // parseSkeletonFile()
@@ -1482,14 +1471,14 @@ BOOL LLAvatarAppearance::teToColorParams( ETextureIndex te, U32 *param_name )
 	return TRUE;
 }
 
-void LLAvatarAppearance::setClothesColor( ETextureIndex te, const LLColor4& new_color, bool upload_bake )
+void LLAvatarAppearance::setClothesColor( ETextureIndex te, const LLColor4& new_color)
 {
 	U32 param_name[3];
 	if( teToColorParams( te, param_name ) )
 	{
-		setVisualParamWeight( param_name[0], new_color.mV[VX], upload_bake );
-		setVisualParamWeight( param_name[1], new_color.mV[VY], upload_bake );
-		setVisualParamWeight( param_name[2], new_color.mV[VZ], upload_bake );
+		setVisualParamWeight( param_name[0], new_color.mV[VX]);
+		setVisualParamWeight( param_name[1], new_color.mV[VY]);
+		setVisualParamWeight( param_name[2], new_color.mV[VZ]);
 	}
 }
 

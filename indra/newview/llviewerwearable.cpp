@@ -49,7 +49,7 @@ class LLOverrideBakedTextureUpdate
 public:
 	LLOverrideBakedTextureUpdate(bool temp_state)
 	{
-		U32 num_bakes = (U32) gAgentAvatarp->getNumBakes();
+		U32 num_bakes = (U32) LLAvatarAppearanceDefines::BAKED_NUM_INDICES;
 		for( U32 index = 0; index < num_bakes; ++index )
 		{
 			composite_enabled[index] = gAgentAvatarp->isCompositeUpdateEnabled(index);
@@ -59,7 +59,7 @@ public:
 
 	~LLOverrideBakedTextureUpdate()
 	{
-		U32 num_bakes = (U32) gAgentAvatarp->getNumBakes();		
+		U32 num_bakes = (U32)LLAvatarAppearanceDefines::BAKED_NUM_INDICES;		
 		for( U32 index = 0; index < num_bakes; ++index )
 		{
 			gAgentAvatarp->setCompositeUpdatesEnabled(index, composite_enabled[index]);
@@ -266,7 +266,7 @@ void LLViewerWearable::setParamsToDefaults()
 	{
 		if( (((LLViewerVisualParam*)param)->getWearableType() == mType ) && (param->isTweakable() ) )
 		{
-			setVisualParamWeight(param->getID(),param->getDefaultWeight(), false);
+			setVisualParamWeight(param->getID(),param->getDefaultWeight());
 		}
 	}
 }
@@ -351,14 +351,14 @@ void LLViewerWearable::writeToAvatar(LLAvatarAppearance *avatarp)
 	ESex new_sex = avatarp->getSex();
 	if( old_sex != new_sex )
 	{
-		viewer_avatar->updateSexDependentLayerSets(FALSE);
+		viewer_avatar->updateSexDependentLayerSets();
 	}	
 }
 
 
 // Updates the user's avatar's appearance, replacing this wearables' parameters and textures with default values.
 // static 
-void LLViewerWearable::removeFromAvatar( LLWearableType::EType type, bool upload_bake)
+void LLViewerWearable::removeFromAvatar( LLWearableType::EType type)
 {
 	if (!isAgentAvatarValid()) return;
 
@@ -377,7 +377,7 @@ void LLViewerWearable::removeFromAvatar( LLWearableType::EType type, bool upload
 		if( (((LLViewerVisualParam*)param)->getWearableType() == type) && (param->isTweakable() ) )
 		{
 			S32 param_id = param->getID();
-			gAgentAvatarp->setVisualParamWeight( param_id, param->getDefaultWeight(), upload_bake );
+			gAgentAvatarp->setVisualParamWeight( param_id, param->getDefaultWeight());
 		}
 	}
 
@@ -387,7 +387,7 @@ void LLViewerWearable::removeFromAvatar( LLWearableType::EType type, bool upload
 	}
 
 	gAgentAvatarp->updateVisualParams();
-	gAgentAvatarp->wearableUpdated(type, false);
+	gAgentAvatarp->wearableUpdated(type);
 }
 
 // Does not copy mAssetID.

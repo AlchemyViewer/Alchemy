@@ -121,7 +121,7 @@ BOOL LLPolySkeletalDistortion::setInfo(LLPolySkeletalDistortionInfo *info)
     }
     mInfo = info;
     mID = info->mID;
-    setWeight(getDefaultWeight(), false);
+    setWeight(getDefaultWeight());
 
     for (LLPolySkeletalBoneInfo& bone_info : getInfo()->mBoneInfoList)
     {

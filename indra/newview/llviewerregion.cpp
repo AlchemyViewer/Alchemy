@@ -633,17 +633,6 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 	mHandle(handle),
 	mTimeDilation(1.0f),
 	mWidthScaleFactor(region_width_meters / REGION_WIDTH_METERS),
-#ifndef LL_HAVOK
-	mMaxBakes(LLGridManager::getInstance()->isInSecondlife()?
-		LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES:
-		LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM),
-	mMaxTEs(LLGridManager::getInstance()->isInSecondlife()?
-		LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES:
-		LLAvatarAppearanceDefines::ETextureIndex::TEX_HEAD_UNIVERSAL_TATTOO),
-#else
-	mMaxBakes(LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES),
-	mMaxTEs(LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES),
-#endif
 	mName(""),
 	mZoning(""),
 	mIsEstateManager(FALSE),
@@ -652,7 +641,7 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
 	mSimAccess( SIM_ACCESS_MIN ),
 	mBillableFactor(1.0),
 	mMaxTasks(DEFAULT_MAX_REGION_WIDE_PRIM_COUNT),
-	mCentralBakeVersion(0),
+	mCentralBakeVersion(1),
 	mClassID(0),
 	mCPURatio(0),
 	mColoName("unknown"),
@@ -2621,19 +2610,6 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 	mAvatarHoverHeightEnabled = (mSimulatorFeatures.has("AvatarHoverHeightEnabled") &&
 		mSimulatorFeatures["AvatarHoverHeightEnabled"].asBoolean());
 
-#ifndef LL_HAVOK
-	if (!mBakesOnMeshEnabled)
-	{
-		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM;
-		mMaxTEs   = LLAvatarAppearanceDefines::ETextureIndex::TEX_HEAD_UNIVERSAL_TATTOO;
-	}
-	else
-#endif
-	{
-		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES;
-		mMaxTEs   = LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES;
-	}
-
 	setSimulatorFeaturesReceived(true);
 }
 
@@ -3198,25 +3174,6 @@ void LLViewerRegion::unpackRegionHandshake()
 	}
 
 	mCentralBakeVersion = region_protocols & 1; // was (S32)gSavedSettings.getBOOL("UseServerTextureBaking");
-#ifndef LL_HAVOK
-	constexpr U64 REGION_SUPPORTS_BOM{ 1ULL << 63ULL };
-	if (LLGridManager::instance().isInSecondlife() || (region_protocols & REGION_SUPPORTS_BOM)) // OS sets bit 63 when BOM supported
-	{
-		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES;
-		mMaxTEs = LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES;
-	}
-	else
-	{
-		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_LEFT_ARM;
-		mMaxTEs = LLAvatarAppearanceDefines::ETextureIndex::TEX_HEAD_UNIVERSAL_TATTOO;
-	}
-#else
-	{
-		mMaxBakes = LLAvatarAppearanceDefines::EBakedTextureIndex::BAKED_NUM_INDICES;
-		mMaxTEs = LLAvatarAppearanceDefines::ETextureIndex::TEX_NUM_INDICES;
-	}
-#endif
-
 	LLVLComposition *compp = getComposition();
 	if (compp)
 	{

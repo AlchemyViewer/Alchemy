@@ -76,9 +76,9 @@ public:
 	// LLVisualParam Virtual functions
 	///*virtual*/ BOOL		parseData(LLXmlTreeNode* node);
 	/*virtual*/ void		apply( ESex avatar_sex ) override {}
-	/*virtual*/ void		setWeight(F32 weight, bool upload_bake) override;
-	/*virtual*/ void		setAnimationTarget(F32 target_value, bool upload_bake) override;
-	/*virtual*/ void		animate(F32 delta, bool upload_bake) override;
+	/*virtual*/ void		setWeight(F32 weight) override;
+	/*virtual*/ void		setAnimationTarget(F32 target_value) override;
+	/*virtual*/ void		animate(F32 delta) override;
 
 	// LLViewerVisualParam Virtual functions
 	/*virtual*/ F32					getTotalDistortion()								  override { return 1.f; }
@@ -159,9 +159,9 @@ public:
 	// LLVisualParam Virtual functions
 	///*virtual*/ BOOL			parseData(LLXmlTreeNode* node);
 	/*virtual*/ void			apply( ESex avatar_sex ) override {}
-	/*virtual*/ void			setWeight(F32 weight, bool upload_bake) override;
-	/*virtual*/ void			setAnimationTarget(F32 target_value, bool upload_bake) override;
-	/*virtual*/ void			animate(F32 delta, bool upload_bake) override;
+	/*virtual*/ void			setWeight(F32 weight) override;
+	/*virtual*/ void			setAnimationTarget(F32 target_value) override;
+	/*virtual*/ void			animate(F32 delta) override;
 
 
 	// LLViewerVisualParam Virtual functions
@@ -177,7 +177,7 @@ public:
 protected:
 	LLTexLayerParamColor(const LLTexLayerParamColor& pOther) = default;
 
-	virtual void onGlobalColorChanged(bool upload_bake) {}
+	virtual void onGlobalColorChanged() {}
 private:
 	LLVector4a				mAvgDistortionVec;
 };

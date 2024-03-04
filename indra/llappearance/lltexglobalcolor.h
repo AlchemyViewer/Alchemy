@@ -79,7 +79,7 @@ public:
 	/*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const override;
 protected:
 	LLTexParamGlobalColor(const LLTexParamGlobalColor& pOther) = default;
-	/*virtual*/ void onGlobalColorChanged(bool upload_bake) override;
+	/*virtual*/ void onGlobalColorChanged() override;
 private:
 	LLTexGlobalColor*		mTexGlobalColor;
 };

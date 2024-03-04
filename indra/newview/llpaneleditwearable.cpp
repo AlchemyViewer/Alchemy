@@ -721,8 +721,7 @@ BOOL LLPanelEditWearable::postBuild()
 
         mBtnBack->setClickedCallback(boost::bind(&LLPanelEditWearable::onBackButtonClicked, this));
 
-	getChild<LLButton>("import_btn")->setClickedCallback(boost::bind(&LLPanelEditWearable::onClickedImportBtn, this));
-
+        getChild<LLButton>("import_btn")->setClickedCallback(boost::bind(&LLPanelEditWearable::onClickedImportBtn, this));
 
         mNameEditor = getChild<LLLineEditor>("description");
 
@@ -948,11 +947,11 @@ void LLPanelEditWearable::onCommitSexChange()
         LLViewerWearable*     wearable = gAgentWearables.getViewerWearable(type, index);
         if (wearable)
         {
-                wearable->setVisualParamWeight(param->getID(), is_new_sex_male, false);
+                wearable->setVisualParamWeight(param->getID(), is_new_sex_male);
         }
-        param->setWeight( is_new_sex_male, FALSE);
+        param->setWeight( is_new_sex_male);
 
-        gAgentAvatarp->updateSexDependentLayerSets(FALSE);
+        gAgentAvatarp->updateSexDependentLayerSets();
 
         gAgentAvatarp->updateVisualParams();
         showWearable(mWearablePtr, TRUE, TRUE);
@@ -989,7 +988,7 @@ void LLPanelEditWearable::onTexturePickerCommit(const LLUICtrl* ctrl)
 							{
 								gAgentAvatarp->setLocalTexture(entry->mTextureIndex, image, FALSE, index);
 								LLVisualParamHint::requestHintUpdates();
-								gAgentAvatarp->wearableUpdated(type, false);
+								gAgentAvatarp->wearableUpdated(type);
 							}
 							else
 							{
@@ -1018,9 +1017,9 @@ void LLPanelEditWearable::onColorSwatchCommit(const LLUICtrl* ctrl)
                         const LLColor4& new_color = LLColor4(ctrl->getValue());
                         if( old_color != new_color )
                         {
-                                getWearable()->setClothesColor(entry->mTextureIndex, new_color, true);
+                                getWearable()->setClothesColor(entry->mTextureIndex, new_color);
                                 LLVisualParamHint::requestHintUpdates();
-                                gAgentAvatarp->wearableUpdated(getWearable()->getType(), false);
+                                gAgentAvatarp->wearableUpdated(getWearable()->getType());
                         }
                 }
                 else
@@ -1121,7 +1120,7 @@ void LLPanelEditWearable::saveChanges(bool force_save_as)
 				// Remove old link
 				remove_inventory_item(link_item->getUUID(), gAgentAvatarp->mEndCustomizeCallback);
 			}
-			gAgentWearables.saveWearable(mWearablePtr->getType(), index, TRUE, new_name);
+			gAgentWearables.saveWearable(mWearablePtr->getType(), index, new_name);
         }
 
 	
@@ -1139,7 +1138,7 @@ void LLPanelEditWearable::revertChanges()
         mNameEditor->setText(mWearableItem->getName());
         updatePanelPickerControls(mWearablePtr->getType());
         updateTypeSpecificControls(mWearablePtr->getType());
-        gAgentAvatarp->wearableUpdated(mWearablePtr->getType(), false);
+        gAgentAvatarp->wearableUpdated(mWearablePtr->getType());
 }
 
 void LLPanelEditWearable::showWearable(LLViewerWearable* wearable, BOOL show, BOOL disable_camera_switch)
@@ -1620,7 +1619,7 @@ void LLPanelEditWearable::onInvisibilityCommit(LLCheckBoxCtrl* checkbox_ctrl, LL
                 
                 LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTexture( IMG_INVISIBLE );
 				gAgentAvatarp->setLocalTexture(te, image, FALSE, index);
-				gAgentAvatarp->wearableUpdated(getWearable()->getType(), false);
+				gAgentAvatarp->wearableUpdated(getWearable()->getType());
         }
         else
         {
@@ -1636,7 +1635,7 @@ void LLPanelEditWearable::onInvisibilityCommit(LLCheckBoxCtrl* checkbox_ctrl, LL
                 if (!image) return;
 
                 gAgentAvatarp->setLocalTexture(te, image, FALSE, index);
-                gAgentAvatarp->wearableUpdated(getWearable()->getType(), false);
+                gAgentAvatarp->wearableUpdated(getWearable()->getType());
         }
 
         updatePanelPickerControls(getWearable()->getType());
@@ -1721,7 +1720,7 @@ void LLPanelEditWearable::onClickedImportBtnCallback(const std::vector<std::stri
 			{
 				LLVisualParam* visual_param = getWearable()->getVisualParam(id);
 				if (visual_param)
-					visual_param->setWeight(value, FALSE);
+					visual_param->setWeight(value);
 			}
 			else
 			{
