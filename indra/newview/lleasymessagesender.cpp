@@ -163,7 +163,7 @@ bool LLEasyMessageSender::sendLLUDPMessage(const LLHost& region_host, const std:
 	//Make sure everything's kosher with the message we built
 
 	//check if the message type is one that we know about
-	std::map<const char *, LLMessageTemplate*>::iterator template_iter=
+	auto template_iter=
 		gMessageSystem->mMessageTemplates.find( LLMessageStringTable::getInstance()->getString(message.c_str()) );
 	if (template_iter == gMessageSystem->mMessageTemplates.end())
 	{

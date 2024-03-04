@@ -57,6 +57,7 @@
 
 #include "llstoredmessage.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/signals2/connection.hpp>
 #include <boost/function.hpp>
 #include "llpounceable.h"
@@ -303,8 +304,8 @@ class LLMessageSystem : public LLMessageSenderInterface
 
 	F32                         mMessageFileVersionNumber;
 
-	typedef std::map<const char *, LLMessageTemplate*> message_template_name_map_t;
-	typedef std::map<U32, LLMessageTemplate*> message_template_number_map_t;
+	typedef boost::unordered_flat_map<const char *, LLMessageTemplate*> message_template_name_map_t;
+	typedef boost::unordered_flat_map<U32, LLMessageTemplate*> message_template_number_map_t;
 
 	message_template_name_map_t		mMessageTemplates;
 	message_template_number_map_t	mMessageNumbers;
@@ -354,8 +355,8 @@ class LLMessageSystem : public LLMessageSenderInterface
 	F64Seconds			mCircuitPrintTime;	    // used to print circuit debug info every couple minutes
 	F32Seconds			mCircuitPrintFreq;	    
 
-	std::map<U64, U32>	mIPPortToCircuitCode;
-	std::map<U32, U64>	mCircuitCodeToIPPort;
+	boost::unordered_flat_map<U64, U32>	mIPPortToCircuitCode;
+	boost::unordered_flat_map<U32, U64>	mCircuitCodeToIPPort;
 	U32					mOurCircuitCode;
 	S32					mSendPacketFailureCount;
 	S32					mUnackedListDepth;
@@ -841,7 +842,7 @@ private:
 	
 	// The mCircuitCodes is a map from circuit codes to session
 	// ids. This allows us to verify sessions on connect.
-	typedef std::map<U32, LLUUID> code_session_map_t;
+	typedef boost::unordered_flat_map<U32, LLUUID> code_session_map_t;
 	code_session_map_t mCircuitCodes;
 
 	// Viewers need to track a process session in order to make sure

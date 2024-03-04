@@ -36,7 +36,7 @@ class LLTemplateMessageReader : public LLMessageReader
 {
 public:
 
-	typedef std::map<U32, LLMessageTemplate*> message_template_number_map_t;
+	typedef boost::unordered_flat_map<U32, LLMessageTemplate*> message_template_number_map_t;
 
 	LLTemplateMessageReader(message_template_number_map_t&);
     ~LLTemplateMessageReader() override;

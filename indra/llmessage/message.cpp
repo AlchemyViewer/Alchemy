@@ -323,7 +323,7 @@ void LLMessageSystem::loadTemplateFile(const std::string& filename, bool failure
 LLMessageSystem::~LLMessageSystem()
 {
 	mMessageTemplates.clear(); // don't delete templates.
-	for_each(mMessageNumbers.begin(), mMessageNumbers.end(), DeletePairedPointer());
+	std::for_each(mMessageNumbers.begin(), mMessageNumbers.end(), DeletePairedPointer());
 	mMessageNumbers.clear();
 	
 	if (!mbError)
@@ -1573,7 +1573,7 @@ void LLMessageSystem::disableCircuit(const LLHost &host)
 		}
 
 		U64 ip_port = 0;
-		std::map<U32, U64>::iterator iter = gMessageSystem->mCircuitCodeToIPPort.find(code);
+		auto iter = gMessageSystem->mCircuitCodeToIPPort.find(code);
 		if (iter != gMessageSystem->mCircuitCodeToIPPort.end())
 		{
 			ip_port = iter->second;
