@@ -10748,6 +10748,10 @@ void LLVOAvatar::updateRiggingInfo()
 
     static std::vector<LLVOVolume*> volumes;
 	volumes.clear();
+	if (volumes.capacity() < mLastAssocVolSize)
+	{
+		volumes.reserve(mLastAssocVolSize);
+	}
 	getAssociatedVolumes(volumes);
     mLastAssocVolSize = volumes.size();
 
@@ -11272,9 +11276,6 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
 		static LLCachedControl<F32> max_complexity_setting(gSavedSettings, "MaxAttachmentComplexity");
 		F32 max_attachment_complexity = max_complexity_setting;
 		max_attachment_complexity = llmax(max_attachment_complexity, DEFAULT_MAX_ATTACHMENT_COMPLEXITY);
-
-		// Diagnostic list of all textures on our avatar
-        static std::unordered_set<const LLViewerTexture*> all_textures;
 
 		std::map<LLUUID, U32> item_complexity;
 		std::map<LLUUID, U32> temp_item_complexity;
