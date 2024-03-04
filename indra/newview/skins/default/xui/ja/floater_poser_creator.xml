@@ -45,8 +45,8 @@
 			</text>
 			<line_editor label="" name="export_name"/>
 			<text name="linden_intro">
-				イーズイン/イーズアウト時間
-・これは、アニメーションの開始または停止時に「フェードイン」および「フェードアウト」するのにかかる時間（秒単位）です。
+				イーズイン／イーズアウト時間
+・アニメーションの開始または停止時に「フェードイン」および「フェードアウト」するのにかかる時間（秒）です。
 			</text>
 			<line_editor label="" name="ease_in"/>
 			<line_editor label="" name="ease_out"/>
@@ -58,7 +58,7 @@
 			<slider label="" name="keyframe_duration"/>
 			<text name="linden_intro">
 				アニメーションをループするか
-・指定された開始時間と終了時間（秒単位）でアニメーションをループするかどうかを切り替えます。
+・指定された開始時間と終了時間（秒）でアニメーションをループするかどうかを切り替えます。
 			</text>
 			<check_box label="アニメーションのループ" tool_tip="アニメーションの設定された時間フレームでアニメーションをループするかどうかを切り替えます。" name="LoopAnimation"/>
 			<line_editor label="" value="0.0" name="loop_in"/>
@@ -90,8 +90,8 @@
 				<combo_box.item label="指差し" name="2" value="2"/>
 				<combo_box.item label="拳" name="3" value="3"/>
 			</combo_box>
-			<button label="インポート" tool_tip="ディスクからポーズをインポートします。" name="import_poses"/>
-			<button label="エクスポート" tool_tip="現在のポーズをエクスポートします。" name="export_poses"/>
+			<button label="インポート" tool_tip="ディスクからポーズをインポートします。" name="import_poses" width="100"/>
+			<button label="エクスポート" tool_tip="現在のポーズをエクスポートします。" name="export_poses" width="100"/>
 		</panel>
 		<panel title="スケルトン" name="joints_panel">
 			<!--
@@ -138,7 +138,7 @@
 						<scroll_list.columns label="＃" name="number"/>
 					</scroll_list>
 				</panel>
-				<panel title="Attachment" name="attach_panel">
+				<panel title="装着物" name="attach_panel">
 					<scroll_list name="attach_scroll">
 						<scroll_list.columns label="" name="icon"/>
 						<scroll_list.columns label="装着ボーン名" name="joint"/>
@@ -175,7 +175,7 @@
 			</panel>
 			<icon name="vicon"/>
 			<check_box label="変更をミラーリング" tool_tip="このオプションは、回転に対するすべての変更を反対側のボーンにもミラーリングするかどうかを切り替えます。左腕は右腕にミラーリングされます。" name="Mirror"/>
-			<check_box label="簡易回転Easy Rotations" tool_tip="このオプションは、ポーザーが簡略化された回転軸を表示および使用するかどうかを切り替えます。これは基本的に、任意の軸を移動するときに、他のすべての軸は触れられないことを意味します。これにより、回転が所定の位置からずれることになり、ボーンが移動された順序によっては、0 0 0がデフォルトの静止位置ではなくなります。このオプションを無効にすると、他の軸が実際の回転を表すように動的に変更されるようになります。つまり、タッチしていないスライダーは、現在移動しているスライダーに合わせて変更されます。これはユーザーにとって混乱を招く可能性があるため、デフォルトでは無効になっています。これを使用する場合は、最初にＺ、次にＹ、最後にＸを0設定することを強くお勧めします。そうしないと、ボーンの回転をリセットしない限り、すべての軸を0設定できなくなります。" name="EasyRotations"/>
+			<check_box label="簡易回転" tool_tip="このオプションは、ポーザーが簡略化された回転軸を表示および使用するかどうかを切り替えます。これは基本的に、任意の軸を移動するときに、他のすべての軸は触れられないことを意味します。これにより、回転が所定の位置からずれることになり、ボーンが移動された順序によっては、0 0 0がデフォルトの静止位置ではなくなります。このオプションを無効にすると、他の軸が実際の回転を表すように動的に変更されるようになります。つまり、タッチしていないスライダーは、現在移動しているスライダーに合わせて変更されます。これはユーザーにとって混乱を招く可能性があるため、デフォルトでは無効になっています。これを使用する場合は、最初にＺ、次にＹ、最後にＸを0設定することを強くお勧めします。そうしないと、ボーンの回転をリセットしない限り、すべての軸を0設定できなくなります。" name="EasyRotations"/>
 			<button label="ポーズのミラーリング" name="flip_pose"/>
 			<icon name="vicon"/>
 			<tab_container name="modifier_tabs">
