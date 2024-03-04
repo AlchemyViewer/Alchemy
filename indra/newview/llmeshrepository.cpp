@@ -3546,6 +3546,7 @@ void LLMeshRepository::unregisterMesh(LLVOVolume* vobj, const LLUUID& mesh_id)
 		auto it = lod.find(mesh_id);
 		if(it != lod.end())
 		{
+			vobj->decMeshCache();
 			it->second.erase(vobj);
 			if (it->second.empty())
 			{
@@ -3560,6 +3561,7 @@ void LLMeshRepository::unregisterSkin(LLVOVolume* vobj, const LLUUID& mesh_id)
 	auto it = mLoadingSkins.find(mesh_id);
 	if (it != mLoadingSkins.end())
 	{
+		vobj->decSkinCache();
 		it->second.erase(vobj);
 		if(it->second.empty())
 		{
@@ -3589,11 +3591,13 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 			auto& obj_set = iter->second;
 			auto it = obj_set.find(vobj);
 			if (it == obj_set.end()) {
+				vobj->incMeshCache();
 				obj_set.insert(vobj);
 			}
 		}
 		else
 		{
+			vobj->incMeshCache();
 			LLMutexLock lock(mMeshMutex);
 			//first request for this mesh
 			mLoadingMeshes[detail][mesh_id].insert(vobj);
@@ -3942,6 +3946,7 @@ void LLMeshRepository::notifySkinInfoReceived(LLMeshSkinInfo* info)
 		{
 			if (vobj)
 			{
+				vobj->decSkinCache();
 				vobj->notifySkinInfoLoaded(info);
 			}
 		}
@@ -3958,6 +3963,7 @@ void LLMeshRepository::notifySkinInfoUnavailable(const LLUUID& mesh_id)
 		{
 			if (vobj)
 			{
+				vobj->decSkinCache();
 				vobj->notifySkinInfoUnavailable();
 			}
 		}
@@ -4040,6 +4046,7 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
 		{
 			if (vobj)
 			{
+				vobj->decMeshCache();
 				vobj->notifyMeshLoaded();
 			}
 		}
@@ -4070,6 +4077,8 @@ void LLMeshRepository::notifyMeshUnavailable(const LLVolumeParams& mesh_params, 
 		{
 			if (vobj)
 			{
+				vobj->decMeshCache();
+
 				LLVolume* obj_volume = vobj->getVolume();
 
 				if (obj_volume && 
@@ -4111,11 +4120,14 @@ LLMeshSkinInfo* LLMeshRepository::getSkinInfo(const LLUUID& mesh_id, LLVOVolume*
 				auto& obj_set = iter->second;
 				auto it = obj_set.find(requesting_obj);
 				if (it == obj_set.end()) {
+					requesting_obj->incSkinCache();
 					obj_set.insert(requesting_obj);
 				}
 			}
 			else
 			{
+				requesting_obj->incSkinCache();
+
 				LLMutexLock lock(mMeshMutex);
 				//first request for this mesh
 				mLoadingSkins[mesh_id].insert(requesting_obj);

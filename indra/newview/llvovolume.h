@@ -450,6 +450,11 @@ public:
     F32 mLODDistance;
     F32 mLODAdjustedDistance;
     F32 mLODRadius;
+
+	void incMeshCache() { mFetchingMesh++; }
+	void incSkinCache() { mFetchingSkinInfo++; }
+	void decMeshCache() { mFetchingMesh--; }
+	void decSkinCache() { mFetchingSkinInfo--; }
 private:
 	friend class LLDrawable;
 	friend class LLFace;
@@ -485,6 +490,8 @@ private:
 
 	LLPointer<LLRiggedVolume> mRiggedVolume;
 
+	S32 mFetchingMesh = 0;
+	S32 mFetchingSkinInfo = 0;
 	bool mSkinInfoUnavaliable;
 	LLConstPointer<LLMeshSkinInfo> mSkinInfo;
 	// statics
