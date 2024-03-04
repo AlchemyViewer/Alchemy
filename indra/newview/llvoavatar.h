@@ -412,7 +412,6 @@ public:
 	BOOL			hasGray() const; 
 	S32				getRezzedStatus() const; // 0 = cloud, 1 = gray, 2 = textured, 3 = textured and fully downloaded.
 	void			updateRezzedStatusTimers(S32 status);
-	S32 			getNumBakes() const;
 
 	S32				mLastRezzedStatus;
 
@@ -623,7 +622,7 @@ public:
 	// Global colors
 	//--------------------------------------------------------------------
 public:
-	/*virtual*/void onGlobalColorChanged(const LLTexGlobalColor* global_color, bool upload_bake) override;
+	/*virtual*/void onGlobalColorChanged(const LLTexGlobalColor* global_color) override;
 
 	//--------------------------------------------------------------------
 	// Visibility
@@ -778,7 +777,7 @@ protected:
 	// Composites
 	//--------------------------------------------------------------------
 public:
-	void	invalidateComposite(LLTexLayerSet* layerset, bool upload_result) override;
+	void	invalidateComposite(LLTexLayerSet* layerset) override;
 	virtual void	invalidateAll();
 	virtual void	setCompositeUpdatesEnabled(bool b) {}
 	virtual void 	setCompositeUpdatesEnabled(U32 index, bool b) {}
@@ -812,7 +811,7 @@ private:
 public:
 	void			debugColorizeSubMeshes(U32 i, const LLColor4& color);
 	void 	updateMeshTextures() final override;
-	void 			updateSexDependentLayerSets(bool upload_bake);
+	void 			updateSexDependentLayerSets();
 	void	dirtyMesh() final override; // Dirty the avatar mesh
 	void 			updateMeshData();
 	void			updateMeshVisibility();
@@ -880,7 +879,6 @@ public:
     void 			hideHair();
 	void 			hideSkirt();
 	void			startAppearanceAnimation();
-	/*virtual*/ void bodySizeChanged() override;
 	
 	//--------------------------------------------------------------------
 	// Appearance morphing
@@ -892,9 +890,6 @@ public:
 	// instead of baked textures, as for example during wearable
 	// editing or when waiting for a subsequent server rebake.
 	/*virtual*/ BOOL	isUsingLocalAppearance() const override { return mUseLocalAppearance; }
-
-	BOOL				isUsingServerBakes() const override;
-	void 				setIsUsingServerBakes(BOOL newval);
 
 	// True if we are currently in appearance editing mode. Often but
 	// not always the same as isUsingLocalAppearance().
@@ -908,7 +903,6 @@ private:
 	F32				mLastAppearanceBlendTime;
 	BOOL			mIsEditingAppearance; // flag for if we're actively in appearance editing mode
 	BOOL			mUseLocalAppearance; // flag for if we're using a local composite
-	BOOL			mUseServerBakes; // flag for if baked textures should be fetched from baking service (false if they're temporary uploads)
 
 	//--------------------------------------------------------------------
 	// Visibility

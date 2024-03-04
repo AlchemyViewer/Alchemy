@@ -62,8 +62,8 @@ public:
 	BOOL				isOldVersion() const;
 
 	/*virtual*/ void	writeToAvatar(LLAvatarAppearance *avatarp);
-	void				removeFromAvatar(bool upload_bake )	{ LLViewerWearable::removeFromAvatar( mType, upload_bake); }
-	static void			removeFromAvatar( LLWearableType::EType type, bool upload_bake );
+	void				removeFromAvatar()	{ LLViewerWearable::removeFromAvatar( mType); }
+	static void			removeFromAvatar( LLWearableType::EType type); 
 
 	/*virtual*/ EImportResult	importStream( std::istream& input_stream, LLAvatarAppearance* avatarp );
 	

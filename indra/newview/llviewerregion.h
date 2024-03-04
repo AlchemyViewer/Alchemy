@@ -245,8 +245,6 @@ public:
 	static void idleCleanup(F32 max_update_time);
 	F32 getWidthScaleFactor() const				{ return mWidthScaleFactor; } // Scaling for OpenSim VarRegions
 
-	S32 getRegionMaxBakes() const						{ return mMaxBakes; }
-	S32 getRegionMaxTEs() const							{ return mMaxTEs; }
 	void idleUpdate(F32 max_update_time);
 	void lightIdleUpdate();
 	bool addVisibleGroup(LLViewerOctreeGroup* group);

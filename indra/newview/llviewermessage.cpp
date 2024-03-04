@@ -3484,10 +3484,6 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
 		LL_INFOS("Teleport") << "Agent movement complete, setting state to TELEPORT_START_ARRIVAL" << LL_ENDL;
 		gAgent.setTeleportState( LLAgent::TELEPORT_START_ARRIVAL );
 
-		// set the appearance on teleport since the new sim does not;
-		// know what you look like.
-		gAgent.sendAgentSetAppearance();
-
 		if (isAgentAvatarValid())
 		{
 			// Set the new position
