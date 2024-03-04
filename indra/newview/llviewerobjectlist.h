@@ -209,7 +209,7 @@ protected:
 	vobj_list_t mMapObjects;
 
 
-	using uuid_hash_set_t = boost::unordered_set<LLUUID>;
+	using uuid_hash_set_t = boost::unordered_multiset<LLUUID>;
     uuid_hash_set_t   mDeadObjects;
 
 	boost::unordered_flat_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;

@@ -258,8 +258,13 @@ LLVOVolume::~LLVOVolume()
 
 	mSkinInfo = nullptr;
 
+	if (mFetchingMesh > 0)
 	{
 		gMeshRepo.unregisterMesh(this, getVolume()->getParams().getSculptID());
+	}
+
+	if(mFetchingSkinInfo > 0)
+	{
 		gMeshRepo.unregisterSkin(this, getVolume()->getParams().getSculptID());
 	}
 

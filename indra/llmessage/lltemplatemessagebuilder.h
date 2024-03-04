@@ -41,7 +41,7 @@ class LLTemplateMessageBuilder final : public LLMessageBuilder
 {
 public:
 	
-	typedef std::map<const char* , LLMessageTemplate*> message_template_name_map_t;
+	typedef boost::unordered_flat_map<const char* , LLMessageTemplate*> message_template_name_map_t;
 
 	LLTemplateMessageBuilder(const message_template_name_map_t&);
 	virtual ~LLTemplateMessageBuilder();
