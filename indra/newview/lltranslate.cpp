@@ -1010,8 +1010,8 @@ bool LLDeepLTranslationHandler::parseResponse(
 
     const nlohmann::json& data= translations[0U];
     if (!data.is_object()
-        || data.find("detected_source_language") == root.end()
-        || data.find("text") == root.end())
+        || data.find("detected_source_language") == data.end()
+        || data.find("text") == data.end())
     {
         return false;
     }
