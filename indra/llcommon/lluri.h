@@ -45,31 +45,31 @@ class LL_COMMON_API LLURI
 {
 public:
   LLURI() = default;
-  LLURI(const std::string& escaped_str);
-  LLURI(const std::string& scheme,
-		const std::string& userName,
-		const std::string& password,
-		const std::string& hostName,
+  LLURI(const std::string_view escaped_str);
+  LLURI(const std::string_view scheme,
+		const std::string_view userName,
+		const std::string_view password,
+		const std::string_view hostName,
 		U16 hostPort,
-		const std::string& escapedPath,
-		const std::string& escapedQuery);
+		const std::string_view escapedPath,
+		const std::string_view escapedQuery);
 	  
   // construct from escaped string, as would be transmitted on the net
 
 	~LLURI() = default;
 
 	static LLURI buildHTTP(
-		const std::string& prefix,
+		const std::string_view prefix,
 		const LLSD& path);
 
 	static LLURI buildHTTP(
-		const std::string& prefix,
+		const std::string_view prefix,
 		const LLSD& path,
 		const LLSD& query);
 
 	static LLURI buildHTTP(
-		const std::string& scheme,
-		const std::string& prefix,
+		const std::string_view scheme,
+		const std::string_view prefix,
 		const LLSD& path,
 		const LLSD& query);
 
@@ -79,11 +79,11 @@ public:
 	/// these cases, the "http://" will be added
 
 	static LLURI buildHTTP(
-		const std::string& host,
+		const std::string_view host,
 		const U32& port,
 		const LLSD& path);
 	static LLURI buildHTTP(
-		const std::string& host,
+		const std::string_view host,
 		const U32& port,
 		const LLSD& path,
 		const LLSD& query);
@@ -148,7 +148,7 @@ public:
 	 * @param str The raw URI to escape.
 	 * @return Returns the rfc 1738 escaped uri or an empty string.
 	 */
-	static std::string escape(const std::string& str);
+	static std::string escape(const std::string_view str);
 
 	/**
 	 * @brief Escape a string with a specified set of allowed characters.
@@ -161,8 +161,8 @@ public:
 	 * @return Returns the escaped uri or an empty string.
 	 */
 	static std::string escape(
-		const std::string& str,
-		const std::string& allowed,
+		const std::string_view str,
+		const std::string_view allowed,
 		bool is_allowed_sorted = false);
 
 	/**
@@ -171,7 +171,7 @@ public:
 	 * Data part is not allowed to have path related symbols
 	 * @param str The raw URI to escape.
 	 */
-	static std::string escapePathAndData(const std::string &str);
+	static std::string escapePathAndData(const std::string_view str);
 
 	/**
 	 * @brief unescape an escaped URI string.
@@ -179,7 +179,7 @@ public:
 	 * @param str The escped URI to unescape.
 	 * @return Returns the unescaped uri or an empty string.
 	 */
-	static std::string unescape(const std::string& str);
+	static std::string unescape(const std::string_view str);
 	//@}
 
 private:
