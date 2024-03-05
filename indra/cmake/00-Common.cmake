@@ -97,6 +97,7 @@ if (WINDOWS)
     /W3 
     /c 
     /Zc:__cplusplus
+    /Zc:preprocessor
     /Zc:char8_t-
     /nologo
     )

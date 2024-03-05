@@ -14,11 +14,15 @@ if(NOT USE_SYSTEM_FREETYPE)
     if (WINDOWS)
         target_link_libraries( ll::freetype INTERFACE
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/freetyped.lib
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/freetype.lib)
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/freetype.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/harfbuzz.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/harfbuzz.lib)
     else()
         target_link_libraries( ll::freetype INTERFACE
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libfreetyped.a
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libfreetype.a)
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libfreetype.a
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libharfbuzz.a
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libharfbuzz.a)
     endif()
 endif()
 

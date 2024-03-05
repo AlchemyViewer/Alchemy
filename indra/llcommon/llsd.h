@@ -31,6 +31,8 @@
 #include <string>
 #include <vector>
 
+#include "boost/unordered_map.hpp"
+
 #include "stdtypes.h"
 
 #include "lldate.h"
@@ -184,7 +186,7 @@ public:
 		typedef LLDate			Date;
 		typedef LLURI			URI;
 		typedef std::vector<U8>	Binary;
-		typedef std::map<String, LLSD, std::less<>>					map_t;
+		typedef boost::unordered_map<String, LLSD, al::string_hash, std::equal_to<>> map_t;
 		typedef std::vector<LLSD> array_t;
 	//@}
 	

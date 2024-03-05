@@ -62,8 +62,8 @@ void LLURI::encodeCharacter(std::ostream& ostr, std::string::value_type val)
 
 // static
 std::string LLURI::escape(
-	const std::string& str,
-	const std::string& allowed,
+	const std::string_view str,
+	const std::string_view allowed,
 	bool is_allowed_sorted)
 {
 	// *NOTE: This size determination feels like a good value to
@@ -80,13 +80,13 @@ std::string LLURI::escape(
 	}
 
 	std::ostringstream ostr;
-	std::string::const_iterator it = str.begin();
-	std::string::const_iterator end = str.end();
+	auto it = str.begin();
+	auto end = str.end();
 	std::string::value_type c;
 	if(is_allowed_sorted)
 	{
-		std::string::const_iterator allowed_begin(allowed.begin());
-		std::string::const_iterator allowed_end(allowed.end());
+		auto allowed_begin(allowed.begin());
+		auto allowed_end(allowed.end());
 		for(; it != end; ++it)
 		{
 			c = *it;
@@ -119,11 +119,11 @@ std::string LLURI::escape(
 }
 
 // static
-std::string LLURI::unescape(const std::string& str)
+std::string LLURI::unescape(const std::string_view str)
 {
 	std::ostringstream ostr;
-	std::string::const_iterator it = str.begin();
-	std::string::const_iterator end = str.end();
+	auto it = str.begin();
+	auto end = str.end();
 	for(; it != end; ++it)
 	{
 		if((*it) == '%')
@@ -192,24 +192,24 @@ namespace
 		return s;
 	}
 
-	std::string escapeHostAndPort(const std::string& s)
+	std::string escapeHostAndPort(const std::string_view s)
 		{ return LLURI::escape(s, unreserved() + sub_delims() +":"); }
-	std::string escapePathComponent(const std::string& s)
+	std::string escapePathComponent(const std::string_view s)
 		{ return LLURI::escape(s, unreserved() + sub_delims() + ":@"); }
-	std::string escapeQueryVariable(const std::string& s)
+	std::string escapeQueryVariable(const std::string_view s)
 		{ return LLURI::escape(s, unreserved() + ":@!$'()*+,"); }	 // sub_delims - "&;=" + ":@"
-	std::string escapeQueryValue(const std::string& s)
+	std::string escapeQueryValue(const std::string_view s)
 		{ return LLURI::escape(s, unreserved() + ":@!$'()*+,="); }	// sub_delims - "&;" + ":@"
-	std::string escapeUriQuery(const std::string& s)
+	std::string escapeUriQuery(const std::string_view s)
 		{ return LLURI::escape(s, unreserved() + ":@?&$;*+=%/"); }
-	std::string escapeUriData(const std::string& s)
+	std::string escapeUriData(const std::string_view s)
 		{ return LLURI::escape(s, unreserved() + "%"); }
-	std::string escapeUriPath(const std::string& s)
+	std::string escapeUriPath(const std::string_view s)
 		{ return LLURI::escape(s, path()); }
 }
 
 //static
-std::string LLURI::escape(const std::string& str)
+std::string LLURI::escape(const std::string_view str)
 {
 	static std::string default_allowed = unreserved();
 	static bool initialized = false;
@@ -222,7 +222,7 @@ std::string LLURI::escape(const std::string& str)
 }
 
 //static
-std::string LLURI::escapePathAndData(const std::string &str)
+std::string LLURI::escapePathAndData(const std::string_view str)
 {
     std::string result;
 
@@ -236,7 +236,7 @@ std::string LLURI::escapePathAndData(const std::string &str)
         if (separator != std::string::npos)
         {
             size_t header_size = separator + 1;
-            std::string header = str.substr(0, header_size);
+            std::string_view header = str.substr(0, header_size);
             // base64 is url-safe
             if (header.find("base64") != std::string::npos)
             {
@@ -245,7 +245,7 @@ std::string LLURI::escapePathAndData(const std::string &str)
             }
             else
             {
-                std::string data = str.substr(header_size, str.length() - header_size);
+                auto data = str.substr(header_size, str.length() - header_size);
 
                 // Notes: File can be partially pre-escaped, that's why escaping ignores '%'
                 // It somewhat limits user from displaying strings like "%20" in text
@@ -253,7 +253,8 @@ std::string LLURI::escapePathAndData(const std::string &str)
 
 
                 // Header doesn't need escaping
-                result = header + escapeUriData(data);
+				result = header;
+				result += escapeUriData(data);
             }
         }
     }
@@ -272,8 +273,8 @@ std::string LLURI::escapePathAndData(const std::string &str)
         if (delim_pos != std::string::npos)
         {
             size_t path_size = delim_pos + 1;
-            std::string query;
-            std::string fragment;
+            std::string_view query;
+            std::string_view fragment;
 
             size_t fragment_pos = str.find('#');
             if ((fragment_pos != std::string::npos) && (fragment_pos > delim_pos))
@@ -286,9 +287,11 @@ std::string LLURI::escapePathAndData(const std::string &str)
                 query = str.substr(path_size);
             }
 
-            std::string path = str.substr(0, path_size);
+            auto path = str.substr(0, path_size);
 
-            result = escapeUriPath(path) + escapeUriQuery(query) + escapeUriPath(fragment);
+			result = escapeUriPath(path);
+			result += escapeUriQuery(query);
+			result += escapeUriPath(fragment);
         }
     }
 
@@ -300,7 +303,7 @@ std::string LLURI::escapePathAndData(const std::string &str)
     return result;
 }
 
-LLURI::LLURI(const std::string& escaped_str)
+LLURI::LLURI(const std::string_view escaped_str)
 {
 	std::string::size_type delim_pos;
 	delim_pos = escaped_str.find(':');
@@ -325,7 +328,7 @@ LLURI::LLURI(const std::string& escaped_str)
 	}
 }
 
-static BOOL isDefault(const std::string& scheme, U16 port)
+static BOOL isDefault(const std::string_view scheme, U16 port)
 {
 	if (scheme == "http")
 		return port == 80;
@@ -387,13 +390,13 @@ void LLURI::parseAuthorityAndPathUsingOpaque()
 	}
 }
 
-LLURI::LLURI(const std::string& scheme,
-			 const std::string& userName,
-			 const std::string& password,
-			 const std::string& hostName,
+LLURI::LLURI(const std::string_view scheme,
+			 const std::string_view userName,
+			 const std::string_view password,
+			 const std::string_view hostName,
 			 U16 port,
-			 const std::string& escapedPath,
-			 const std::string& escapedQuery)
+			 const std::string_view escapedPath,
+			 const std::string_view escapedQuery)
 	: mScheme(scheme),
 	  mEscapedPath(escapedPath),
 	  mEscapedQuery(escapedQuery)
@@ -425,7 +428,7 @@ LLURI::LLURI(const std::string& scheme,
 }
 
 // static
-LLURI LLURI::buildHTTP(const std::string& prefix,
+LLURI LLURI::buildHTTP(const std::string_view prefix,
 					   const LLSD& path)
 {
 	LLURI result;
@@ -498,7 +501,7 @@ LLURI LLURI::buildHTTP(const std::string& prefix,
 }
 
 // static
-LLURI LLURI::buildHTTP(const std::string& prefix,
+LLURI LLURI::buildHTTP(const std::string_view prefix,
 					   const LLSD& path,
 					   const LLSD& query)
 {
@@ -511,8 +514,8 @@ LLURI LLURI::buildHTTP(const std::string& prefix,
 }
 
 // static
-LLURI LLURI::buildHTTP(const std::string& scheme,
-	const std::string& prefix,
+LLURI LLURI::buildHTTP(const std::string_view scheme,
+	const std::string_view prefix,
 	const LLSD& path,
 	const LLSD& query)
 {
@@ -520,7 +523,7 @@ LLURI LLURI::buildHTTP(const std::string& scheme,
 }
 
 // static
-LLURI LLURI::buildHTTP(const std::string& host,
+LLURI LLURI::buildHTTP(const std::string_view host,
 					   const U32& port,
 					   const LLSD& path)
 {
@@ -528,7 +531,7 @@ LLURI LLURI::buildHTTP(const std::string& host,
 }
 
 // static
-LLURI LLURI::buildHTTP(const std::string& host,
+LLURI LLURI::buildHTTP(const std::string_view host,
 					   const U32& port,
 					   const LLSD& path,
 					   const LLSD& query)
@@ -565,7 +568,7 @@ std::string LLURI::authority() const
 
 
 namespace {
-	void findAuthorityParts(const std::string& authority,
+	void findAuthorityParts(const std::string_view authority,
 							std::string& user,
 							std::string& host,
 							std::string& port)
@@ -731,8 +734,9 @@ std::string LLURI::mapToQueryString(const LLSD& queryMap)
 	if (queryMap.isMap())
 	{
 		bool first_element = true;
-		LLSD::map_const_iterator iter = queryMap.beginMap();
-		LLSD::map_const_iterator end = queryMap.endMap();
+		std::map<std::string_view, LLSD> oMap(queryMap.beginMap(), queryMap.endMap());
+		auto iter = oMap.cbegin();
+		auto end = oMap.cend();
 		std::ostringstream ostr;
 		for (; iter != end; ++iter)
 		{

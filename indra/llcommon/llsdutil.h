@@ -597,19 +597,16 @@ struct hash<LLSD>
         }
         case LLSD::TypeMap:
         {
-            for (const auto& llsd_pair : s.asMap())
-            {
-                boost::hash_combine(seed, llsd_pair.first);
-                boost::hash_combine(seed, llsd_pair.second);
-            }
+            const auto& sdmap(s.asMap());
+            boost::hash_unordered_range(seed, sdmap.begin(), sdmap.end());
             break;
         }
         case LLSD::TypeArray:
-            for (const auto& llsd_val : s.asArray())
-            {
-                boost::hash_combine(seed, llsd_val);
-            }
+        {
+            const auto& ar(s.asArray());
+            boost::hash_range(seed, ar.begin(), ar.end());
             break;
+        }
         case LLSD::TypeUndefined:
         default:
             break;
