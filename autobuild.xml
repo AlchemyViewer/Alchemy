@@ -730,11 +730,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3f6a8f3feb04363a647c83c340bbe8e8c9e99fcb03c519dd63209e4743a8bc08ae50a0dadae75d4d8dff58be30bd96b9313053aff65096c583c48917b7d4eaf1</string>
+              <string>1974fe5d92a373263721cdc0c2115cbc8f41d51071429f2833c88d6e5ff96d37ee25e4ae2d20fd172ed07a2a3d9e623eb135fd1055241056c80907fb700277c3</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.13.2.2386/freetype-2.13.2-darwin64-2386.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.13.2.2395/freetype-2.13.2-darwin64-2395.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -744,11 +744,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9aea5b33ffd4819907847b89dd57c9093aa48b38dbc8140bdb59d37cd7d1f25749df196179b308595d755a9d38f7d33ab2f2b32e2ae091c0493e4ad8d6b51e20</string>
+              <string>d08bbe59b7826c29b9fa1278f0e136f1dad41e76f8f61b053cb5c01c51f8ea722a0b8145266739bb1b8bc93f07bcc56fb08d42665a643896e425f49e30c83679</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.13.2.2386/freetype-2.13.2-windows64-2386.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.13.2.2395/freetype-2.13.2-windows64-2395.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -758,11 +758,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f3a7bdc40b853b1e48e274719e618fc45ed6e9a2e4aadaac415fe96207639106c9f5515208d8c8b2c99b4e432d209581d1d4c573f5aaee8ec3b1fa73731730b4</string>
+              <string>96ec7f283a6a0e3de079aa9b1dbea5c4d3ec6b6b93c052d1adf73cee85e4a92c99e7f6eaf62879bdf1a34eb9af5d5042079776c2d6f7bc38b3d603dee727e591</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.13.2.2386/freetype-2.13.2-linux64-2386.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/94/packages/generic/freetype/2.13.2.2395/freetype-2.13.2-linux64-2395.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
