@@ -976,7 +976,7 @@ bool LLChatLogParser::parse(std::string& raw, LLSD& im, const LLSD& parse_params
 	if (!ll_regex_match(stuff, name_and_text, NAME_AND_TEXT)) return false;
 
 	bool has_name = name_and_text[IDX_NAME].matched;
-	std::string name = LLURI::unescape(name_and_text[IDX_NAME]);
+	std::string name = LLURI::unescape(name_and_text[IDX_NAME].str());
 
 	//we don't need a name/text separator
 	if (has_name && name.length() && name[name.length()-1] == ':')

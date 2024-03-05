@@ -141,7 +141,7 @@ void LLPanelSearchWeb::loadUrl(const SearchQuery& p)
 	}
 
 	// add the search query string
-	subs["QUERY"] = LLURI::escape(p.query);
+	subs["QUERY"] = LLURI::escape(p.query());
 
 	// add the user's preferred maturity (can be changed via prefs)
 	std::string maturity;

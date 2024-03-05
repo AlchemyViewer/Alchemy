@@ -170,7 +170,7 @@ void LLFloaterSearch::search(const SearchQuery &p)
 	}
 
 	// add the search query string
-	subs["QUERY"] = LLURI::escape(p.query);
+	subs["QUERY"] = LLURI::escape(p.query());
 
     subs["COLLECTION"] = "";
     if (subs["TYPE"] == "standard")

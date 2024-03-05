@@ -331,7 +331,7 @@ public:
 		}
 
 		// Region names may be %20 escaped.
-		std::string region_name = LLURI::unescape(tokens[0]);
+		std::string region_name = LLURI::unescape(tokens[0].asString());
 
 		LLSD args;
 		args["LOCATION"] = region_name;
