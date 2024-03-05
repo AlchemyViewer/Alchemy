@@ -32,8 +32,8 @@
 		マテリアル
 	</text>
 	<combo_box name="combobox matmedia" width="100">
-		<combo_box.item label="テクスチャ" name="Materials" value="Materials"/>
-		<combo_box.item label="物理基準レンダリング（ＰＢＲ）" name="PBR" value="PBR"/>
+		<combo_box.item label="レガシーマテリアル" name="Materials" value="Materials"/>
+		<combo_box.item label="ＰＢＲメタリック／粗さ" name="PBR" value="PBR"/>
 		<combo_box.item label="メディア" name="Media" value="Media"/>
 	</combo_box>
 	<radio_group name="radio_material_type">

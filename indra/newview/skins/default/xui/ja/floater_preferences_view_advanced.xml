@@ -21,11 +21,11 @@
 	<spinner name="offset_scale_ctrl"/>
 	<button name="reset_offset_scale" tool_tip="カメラのオフセット倍率をデフォルトの値にリセットします。"/>
 	<text name="offset_scale_lbl">
-		カメラアングル：
+		カメラの視野角：
 	</text>
 	<slider name="camera_angle_slider"/>
 	<spinner name="camera_angle_spinner"/>
-	<button name="reset_angle" tool_tip="カメラアングルをデフォルトの値にリセットします。"/>
+	<button name="reset_angle" tool_tip="カメラの視野角をデフォルトの値にリセットします。"/>
 	<text name="offset_scale_lbl">
 		ズーム速度：
 	</text>

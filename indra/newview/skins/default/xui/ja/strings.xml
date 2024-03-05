@@ -7714,7 +7714,7 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 		マイクを使って近くの人と話します。
 	</string>
 	<string name="Command_View_Tooltip">
-		カメラアングルの変更を表示します。
+		カメラアングルを調整します。
 	</string>
 	<string name="Command_Voice_Tooltip">
 		インワールドでのコールや近くにいる人物の音量調整します。

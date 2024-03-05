@@ -3106,12 +3106,12 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 	<notification name="PurgeSelectedItems">
 		[COUNT]個のアイテムが完全に削除されます。ごみ箱内の選択した項目を削除してもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="アイテムをゴミ箱から完全に削除する前に警告する" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmEmptyTrash">
 		[COUNT]個のアイテムとフォルダーが完全に削除されます。ごみ箱の項目をすべて削除してもよろしいですか？
 		<tag>confirm</tag>
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="アイテムやフォルダをゴミ箱から完全に削除する前に警告する" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="TrashIsFull">
 		ゴミ箱があふれています。これはログイン時に問題を引き起こします。
