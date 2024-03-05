@@ -121,11 +121,22 @@ namespace tut
 			{
 				ensure_equals(msg + " map size", actual.size(), expected.size());
 				
+				const auto& expected_map = expected.asMap();
+
 				LLSD::map_const_iterator actual_iter = actual.beginMap();
-				LLSD::map_const_iterator expected_iter = expected.beginMap();
+				LLSD::map_const_iterator expected_iter;
 				
 				while(actual_iter != actual.endMap())
 				{
+					auto it = expected_map.find(actual_iter->first);
+					if (it != expected_map.end())
+					{
+						expected_iter = it;
+					}
+					else
+					{
+						fail("actual missing expected key: " + actual_iter->first);
+					}
 					ensure_equals(msg + " map keys", 
 						actual_iter->first, expected_iter->first);
 					ensure_equals(msg + "[" + actual_iter->first + "]",
