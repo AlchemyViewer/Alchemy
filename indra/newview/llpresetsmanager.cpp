@@ -306,6 +306,7 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
 		"RenderFlexTimeFactor",
 		"RenderGlowResolutionPow",
 		"RenderLocalLights",
+		"RenderLocalLightCount",
 		"RenderMaxPartCount",
 		"RenderQualityPerformance",
 		"RenderShadowDetail",
