@@ -128,7 +128,6 @@ void LLFloaterPreferenceGraphicsAdvanced::refresh()
     updateSliderText(getChild<LLSliderCtrl>("TerrainMeshDetail",	true), getChild<LLTextBox>("TerrainMeshDetailText",		true));
     updateSliderText(getChild<LLSliderCtrl>("RenderPostProcess",	true), getChild<LLTextBox>("PostProcessText",			true));
     updateSliderText(getChild<LLSliderCtrl>("SkyMeshDetail",		true), getChild<LLTextBox>("SkyMeshDetailText",			true));
-    updateSliderText(getChild<LLSliderCtrl>("TerrainDetail",		true), getChild<LLTextBox>("TerrainDetailText",			true));	
     LLAvatarComplexityControls::setIndirectControls();
     setMaxNonImpostorsText(
         gSavedSettings.getU32("RenderAvatarMaxNonImpostors"),
