@@ -332,6 +332,17 @@
 			<key>Value</key>
 			<integer>1</integer>
 		</map>
+		<key>AlchemyGlobalLightScale</key>
+		<map>
+			<key>Comment</key>
+			<string>Curve White Point</string>
+			<key>Persist</key>
+			<integer>0</integer>
+			<key>Type</key>
+			<string>F32</string>
+			<key>Value</key>
+			<real>1.0</real>
+		</map>
 		<key>AlchemyHudTextFadeDistance</key>
 		<map>
 			<key>Comment</key>
