@@ -243,6 +243,8 @@ private:
 	bool				mInitialized;
 	LLMenuButton*		mWearablesGearMenuBtn;
 	LLMenuButton*		mGearMenuBtn;
+	LLLoadingIndicator* mLoadingIndicator = nullptr;
+	LLPanel*			mOutfitNameStatusPanel = nullptr;
 
 };
 

@@ -415,16 +415,6 @@ LLPanelOutfitEdit::LLPanelOutfitEdit()
 	mSavedFolderState = new LLSaveFolderState();
 	mSavedFolderState->setApply(FALSE);
 	
-
-	LLOutfitObserver& observer = LLOutfitObserver::instance();
-	observer.addBOFReplacedCallback(boost::bind(&LLPanelOutfitEdit::updateCurrentOutfitName, this));
-	observer.addBOFChangedCallback(boost::bind(&LLPanelOutfitEdit::updateVerbs, this));
-	observer.addOutfitLockChangedCallback(boost::bind(&LLPanelOutfitEdit::updateVerbs, this));
-	observer.addCOFChangedCallback(boost::bind(&LLPanelOutfitEdit::onCOFChanged, this));
-
-	gAgentWearables.addLoadingStartedCallback(boost::bind(&LLPanelOutfitEdit::onOutfitChanging, this, true));
-	gAgentWearables.addLoadedCallback(boost::bind(&LLPanelOutfitEdit::onOutfitChanging, this, false));
-	
 	mFolderViewItemTypes.reserve(NUM_FOLDER_VIEW_ITEM_TYPES);
 	for (U32 i = 0; i < NUM_FOLDER_VIEW_ITEM_TYPES; i++)
 	{
@@ -578,8 +568,21 @@ BOOL LLPanelOutfitEdit::postBuild()
 	mAvatarComplexityLabel = getChild<LLTextBox>("avatar_complexity_label");
 	mAvatarComplexityAddingLabel = getChild<LLTextBox>("avatar_complexity_adding_label");
 
+	mLoadingIndicator = getChild<LLLoadingIndicator>("edit_outfit_loading_indicator");
+	mOutfitNameStatusPanel = getChild<LLPanel>("outfit_name_and_status");
+
 	onOutfitChanging(gAgentWearables.isCOFChangeInProgress());
-	return TRUE;
+
+	LLOutfitObserver& observer = LLOutfitObserver::instance();
+	observer.addBOFReplacedCallback(boost::bind(&LLPanelOutfitEdit::updateCurrentOutfitName, this));
+	observer.addBOFChangedCallback(boost::bind(&LLPanelOutfitEdit::updateVerbs, this));
+	observer.addOutfitLockChangedCallback(boost::bind(&LLPanelOutfitEdit::updateVerbs, this));
+	observer.addCOFChangedCallback(boost::bind(&LLPanelOutfitEdit::onCOFChanged, this));
+
+	gAgentWearables.addLoadingStartedCallback(boost::bind(&LLPanelOutfitEdit::onOutfitChanging, this, true));
+	gAgentWearables.addLoadedCallback(boost::bind(&LLPanelOutfitEdit::onOutfitChanging, this, false));
+
+	return LLPanel::postBuild();
 }
 
 // virtual
@@ -1325,19 +1328,17 @@ static void update_status_widget_rect(LLView * widget, S32 right_border)
 
 void LLPanelOutfitEdit::onOutfitChanging(bool started)
 {
-	static LLLoadingIndicator* indicator = getChild<LLLoadingIndicator>("edit_outfit_loading_indicator");
-	static LLView* status_panel = getChild<LLView>("outfit_name_and_status");
-	static S32 indicator_delta = status_panel->getRect().getWidth() - indicator->getRect().mLeft;
+	S32 indicator_delta = mOutfitNameStatusPanel->getRect().getWidth() - mLoadingIndicator->getRect().mLeft;
 
 	S32 delta = started ? indicator_delta : 0;
-	S32 right_border = status_panel->getRect().getWidth() - delta;
+	S32 right_border = mOutfitNameStatusPanel->getRect().getWidth() - delta;
 
 	if (mCurrentOutfitName)
 		update_status_widget_rect(mCurrentOutfitName, right_border);
 	if (mStatus)
 		update_status_widget_rect(mStatus, right_border);
 
-	indicator->setVisible(started);
+	mLoadingIndicator->setVisible(started);
 }
 
 void LLPanelOutfitEdit::getCurrentItemUUID(LLUUID& selected_id)
