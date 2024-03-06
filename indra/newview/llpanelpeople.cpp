@@ -673,8 +673,15 @@ BOOL LLPanelPeople::postBuild()
 	mNearbyList->setRlvCheckShowNames(true);
 // [/RLVa:KB]
 	mMiniMap = nearby_tab->getChild<LLNetMap>("Net Map", true);
-	mMiniMap->setToolTipMsg(gSavedSettings.getBOOL("DoubleClickTeleport") ? 
-		getString("AltMiniMapToolTipMsg") :	getString("MiniMapToolTipMsg"));
+	mMiniMap->setToolTipMsg(LLTrans::getString("MinimapToolTipMsg"));
+	mMiniMap->setParcelNameMsg(LLTrans::getString("MinimapParcelNameMsg"));
+	mMiniMap->setParcelSalePriceMsg(LLTrans::getString("MinimapParcelSalePriceMsg"));
+	mMiniMap->setParcelSaleAreaMsg(LLTrans::getString("MinimapParcelSaleAreaMsg"));
+	mMiniMap->setParcelOwnerMsg(LLTrans::getString("MinimapParcelOwnerMsg"));
+	mMiniMap->setRegionNameMsg(LLTrans::getString("MinimapRegionNameMsg"));
+	mMiniMap->setToolTipHintMsg(LLTrans::getString("MinimapToolTipHintMsg"));
+	mMiniMap->setAltToolTipHintMsg(LLTrans::getString("MinimapAltToolTipHintMsg"));
+
 	mNearbyGearBtn = nearby_tab->getChild<LLButton>("gear_btn");
 	mNearbyAddFriendBtn = nearby_tab->getChild<LLButton>("add_friend_btn");
 

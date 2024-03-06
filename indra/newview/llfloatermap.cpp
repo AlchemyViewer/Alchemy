@@ -33,6 +33,7 @@
 #include "llfloaterreg.h"
 #include "llfontgl.h"
 #include "llglheaders.h"
+#include "lltrans.h"
 
 // Viewer includes
 #include "llagentcamera.h"
@@ -82,14 +83,14 @@ LLFloaterMap::~LLFloaterMap()
 BOOL LLFloaterMap::postBuild()
 {
     mMap = getChild<LLNetMap>("Net Map");
-    mMap->setToolTipMsg(getString("ToolTipMsg"));
-    mMap->setParcelNameMsg(getString("ParcelNameMsg"));
-    mMap->setParcelSalePriceMsg(getString("ParcelSalePriceMsg"));
-    mMap->setParcelSaleAreaMsg(getString("ParcelSaleAreaMsg"));
-    mMap->setParcelOwnerMsg(getString("ParcelOwnerMsg"));
-    mMap->setRegionNameMsg(getString("RegionNameMsg"));
-    mMap->setToolTipHintMsg(getString("ToolTipHintMsg"));
-    mMap->setAltToolTipHintMsg(getString("AltToolTipHintMsg"));
+	mMap->setToolTipMsg(LLTrans::getString("MinimapToolTipMsg"));
+	mMap->setParcelNameMsg(LLTrans::getString("MinimapParcelNameMsg"));
+	mMap->setParcelSalePriceMsg(LLTrans::getString("MinimapParcelSalePriceMsg"));
+	mMap->setParcelSaleAreaMsg(LLTrans::getString("MinimapParcelSaleAreaMsg"));
+	mMap->setParcelOwnerMsg(LLTrans::getString("MinimapParcelOwnerMsg"));
+	mMap->setRegionNameMsg(LLTrans::getString("MinimapRegionNameMsg"));
+	mMap->setToolTipHintMsg(LLTrans::getString("MinimapToolTipHintMsg"));
+	mMap->setAltToolTipHintMsg(LLTrans::getString("MinimapAltToolTipHintMsg"));
     sendChildToBack(mMap);
 
     mTextBoxNorth     = getChild<LLTextBox>("floater_map_north");

@@ -56,12 +56,6 @@ You are not a member of any groups.
 Learn about [https://community.secondlife.com/knowledgebase/joining-and-participating-in-groups-r51/ groups in Second Life.]
   </string>
 	<string
-	 name="MiniMapToolTipMsg"
-	 value="[REGION](Double-click to open Map, shift-drag to pan)"/>
-	<string
-	 name="AltMiniMapToolTipMsg"
-	 value="[REGION](Double-click to teleport, shift-drag to pan)"/>
-	<string
 	 name="GroupCountWithInfo"
 	 value="You belong to [COUNT] groups, and can join [REMAINING] more.  [secondlife:/// Raise your limit]"/>
     <tab_container

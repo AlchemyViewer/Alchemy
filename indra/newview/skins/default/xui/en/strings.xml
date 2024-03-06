@@ -4473,6 +4473,37 @@ and report the problem.
   <string name="fs_preprocessor_cache_unsafe">Error: script named '[FILENAME]' isn't safe to copy to the filesystem. This include will fail.</string>
   <string name="fs_preprocessor_caching_err">Error caching included file '[FILENAME]'</string>
   <string name="fs_preprocessor_truncated">Warning: Preprocessor output truncated due to excessive script text size. This script will most likely not work.</string>
-  <string name="online_friends_count">Online ([COUNT])</string>
-  <string name="all_friends_count">All ([COUNT])</string>
+
+	<string
+     name="MinimapToolTipMsg">
+		[PARCEL_NAME_MSG][PARCEL_SALE_PRICE_MSG][PARCEL_SALE_AREA_MSG][PARCEL_OWNER_MSG][REGION_NAME_MSG][TOOL_TIP_HINT_MSG]
+	</string>
+	<string
+     name="MinimapParcelNameMsg">
+		[PARCEL_NAME]
+	</string>
+	<string
+     name="MinimapParcelSalePriceMsg">
+		Price: L$[PRICE] (L$[PRICE_PER_SQM]/m²)
+	</string>
+	<string
+     name="MinimapParcelSaleAreaMsg">
+		Area: [AREA]m²
+	</string>
+	<string
+     name="MinimapParcelOwnerMsg">
+		Owner: [PARCEL_OWNER]
+	</string>
+	<string
+     name="MinimapRegionNameMsg">
+		Region: [REGION_NAME]
+	</string>
+	<string
+     name="MinimapToolTipHintMsg">
+		Double-click to open map
+	</string>
+	<string
+     name="MinimapAltToolTipHintMsg">
+		Double-click to teleport
+	</string>
 </strings>
