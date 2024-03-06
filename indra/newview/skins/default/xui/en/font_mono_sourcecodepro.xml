@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <fonts>
 	<font name="Monospace">
-		<file>SourceCodePro-Regular.ttf</file>
+		<file>SourceCodePro-Regular.otf</file>
 	</font>
 
 	<font name="Monospace" font_style="BOLD">
-		<file>SourceCodePro-Bold.ttf</file>
+		<file>SourceCodePro-Bold.otf</file>
 	</font>
 
 	<font name="Monospace" font_style="ITALIC">
-		<file>SourceCodePro-It.ttf</file>
+		<file>SourceCodePro-It.otf</file>
 	</font>
 
 	<font name="Monospace" font_style="BOLD|ITALIC">
-		<file>SourceCodePro-BoldIt.ttf</file>
+		<file>SourceCodePro-BoldIt.otf</file>
 	</font>
 
 	<font_size name="Monospace" size="8.0" />

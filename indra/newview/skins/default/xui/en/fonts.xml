@@ -221,31 +221,31 @@
 
 	<!--IBM Plex-->
 	<font name="IBMPlex">
-		<file>IBMPlexSans-Regular.ttf</file>
-		<file>IBMPlexSansJP-Regular.ttf</file>
-		<file>IBMPlexSansKR-Regular.ttf</file>
-		<file>IBMPlexSansThai-Regular.ttf</file>
-		<file>IBMPlexSansHebrew-Regular.ttf</file>
-		<file>IBMPlexSansDevanagari-Regular.ttf</file>
-		<file>IBMPlexSansArabic-Regular.ttf</file>
+		<file>IBMPlexSans-Regular.otf</file>
+		<file>IBMPlexSansJP-Regular.otf</file>
+		<file>IBMPlexSansKR-Regular.otf</file>
+		<file>IBMPlexSansThai-Regular.otf</file>
+		<file>IBMPlexSansHebrew-Regular.otf</file>
+		<file>IBMPlexSansDevanagari-Regular.otf</file>
+		<file>IBMPlexSansArabic-Regular.otf</file>
 	</font>
 
 	<font name="IBMPlex" font_style="BOLD">
-		<file>IBMPlexSans-Bold.ttf</file>
-		<file>IBMPlexSansJP-Bold.ttf</file>
-		<file>IBMPlexSansKR-Bold.ttf</file>
-		<file>IBMPlexSansThai-Bold.ttf</file>
-		<file>IBMPlexSansHebrew-Bold.ttf</file>
-		<file>IBMPlexSansDevanagari-Bold.ttf</file>
-		<file>IBMPlexSansArabic-Bold.ttf</file>
+		<file>IBMPlexSans-Bold.otf</file>
+		<file>IBMPlexSansJP-Bold.otf</file>
+		<file>IBMPlexSansKR-Bold.otf</file>
+		<file>IBMPlexSansThai-Bold.otf</file>
+		<file>IBMPlexSansHebrew-Bold.otf</file>
+		<file>IBMPlexSansDevanagari-Bold.otf</file>
+		<file>IBMPlexSansArabic-Bold.otf</file>
 	</font>
 
 	<font name="IBMPlex" font_style="ITALIC">
-		<file>IBMPlexSans-Italic.ttf</file>
+		<file>IBMPlexSans-Italic.otf</file>
 	</font>
 
 	<font name="IBMPlex" font_style="BOLD|ITALIC">
-		<file>IBMPlexSans-BoldItalic.ttf</file>
+		<file>IBMPlexSans-BoldItalic.otf</file>
 	</font>
 
 	<font_size name="Monospace" font="IBMPlex" size="8.0" />
@@ -302,21 +302,21 @@
 
 	<!--Source Sans 3-->
 	<font name="SourceSans">
-		<file>SourceSans3-Regular.ttf</file>
+		<file>SourceSans3-Regular.otf</file>
 		<file load_collection="true">SourceHanSans-Regular.ttc</file>
 	</font>
 
 	<font name="SourceSans" font_style="BOLD">
-		<file>SourceSans3-Bold.ttf</file>
+		<file>SourceSans3-Bold.otf</file>
 		<file load_collection="true">SourceHanSans-Bold.ttc</file>
 	</font>
 
 	<font name="SourceSans" font_style="ITALIC">
-		<file>SourceSans3-It.ttf</file>
+		<file>SourceSans3-It.otf</file>
 	</font>
 
 	<font name="SourceSans" font_style="BOLD|ITALIC">
-		<file>SourceSans3-BoldIt.ttf</file>
+		<file>SourceSans3-BoldIt.otf</file>
 	</font>
 
 	<font_size name="Monospace" font="SourceSans" size="8.0" />
@@ -390,19 +390,19 @@
 
 	<!--IBM Plex Mono-->
 	<font name="IBMPlexMono">
-		<file>IBMPlexMono-Regular.ttf</file>
+		<file>IBMPlexMono-Regular.otf</file>
 	</font>
 
 	<font name="IBMPlexMono" font_style="BOLD">
-		<file>IBMPlexMono-Bold.ttf</file>
+		<file>IBMPlexMono-Bold.otf</file>
 	</font>
 
 	<font name="IBMPlexMono" font_style="ITALIC">
-		<file>IBMPlexMono-Italic.ttf</file>
+		<file>IBMPlexMono-Italic.otf</file>
 	</font>
 
 	<font name="IBMPlexMono" font_style="BOLD|ITALIC">
-		<file>IBMPlexMono-BoldItalic.ttf</file>
+		<file>IBMPlexMono-BoldItalic.otf</file>
 	</font>
 
 	<font_size name="Monospace" font="IBMPlexMono" size="8.0" />
@@ -550,21 +550,21 @@
 
 	<!--Source Code Pro-->
 	<font name="SourceCodePro">
-		<file>SourceCodePro-Regular.ttf</file>
+		<file>SourceCodePro-Regular.otf</file>
 		<file load_collection="true">SourceHanSans-Regular.ttc</file>
 	</font>
 
 	<font name="SourceCodePro" font_style="BOLD">
-		<file>SourceSans3-Bold.ttf</file>
+		<file>SourceCodePro-Bold.otf</file>
 		<file load_collection="true">SourceHanSans-Bold.ttc</file>
 	</font>
 
 	<font name="SourceCodePro" font_style="ITALIC">
-		<file>SourceSans3-It.ttf</file>
+		<file>SourceCodePro-It.otf</file>
 	</font>
 
 	<font name="SourceCodePro" font_style="BOLD|ITALIC">
-		<file>SourceSans3-BoldIt.ttf</file>
+		<file>SourceCodePro-BoldIt.otf</file>
 	</font>
 
 	<font_size name="Monospace" font="SourceCodePro" size="8.0" />
