@@ -1489,6 +1489,17 @@
 			<key>Value</key>
 			<integer>0</integer>
 		</map>
+		<key>StreamList</key>
+		<map>
+			<key>Comment</key>
+			<string>Saved list of parcel audio streams</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>LLSD</string>
+			<key>Value</key>
+			<string />
+		</map>
 		<key>VoiceMultiInstance</key>
 		<map>
 			<key>Comment</key>
