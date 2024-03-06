@@ -59,6 +59,7 @@ class LLMenuGL;
 class LLFindNonLinksByMask;
 class LLFindWearablesOfType;
 class LLWearableItemTypeNameComparator;
+class LLLoadingIndicator;
 
 class LLPanelOutfitEdit : public LLPanel
 {
