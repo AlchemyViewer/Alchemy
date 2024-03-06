@@ -208,6 +208,7 @@ coverity_scan:
   extends: .mac_build
   variables:
     AUTOBUILD_ADDRSIZE: 64
+    USE_SENTRY: "FALSE"
   cache:
     key:
       prefix: darwin64
