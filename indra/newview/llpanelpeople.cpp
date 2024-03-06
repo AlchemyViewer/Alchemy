@@ -788,7 +788,7 @@ void LLPanelPeople::updateAccordionTabTitles()
 			mOnlineFriendList->setDirty(true, !mOnlineFriendList->filterHasMatches());
 			LLStringUtil::format_map_t args_online;
 			args_online["[COUNT]"] = llformat("%d", mOnlineFriendList->size());
-			std::string online_title = LLTrans::getString("online_friends_count", args_online);
+			std::string online_title = getString("online_friends_count", args_online);
 
 			mAccordionOnlineTab->setTitle(online_title);
 		}
@@ -798,7 +798,7 @@ void LLPanelPeople::updateAccordionTabTitles()
 			mAllFriendList->setDirty(true, !mAllFriendList->filterHasMatches());
 			LLStringUtil::format_map_t args_all;
 			args_all["[COUNT]"] = llformat("%d", mAllFriendList->size());
-			std::string all_title = LLTrans::getString("all_friends_count", args_all);
+			std::string all_title = getString("all_friends_count", args_all);
 
 			mAccordionAllTab->setTitle(all_title);
 		}

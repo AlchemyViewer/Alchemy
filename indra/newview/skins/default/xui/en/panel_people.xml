@@ -58,6 +58,8 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
 	<string
 	 name="GroupCountWithInfo"
 	 value="You belong to [COUNT] groups, and can join [REMAINING] more.  [secondlife:/// Raise your limit]"/>
+	<string name="online_friends_count">Online ([COUNT])</string>
+	<string name="all_friends_count">All ([COUNT])</string>
     <tab_container
      bottom="-10"
      follows="all"
@@ -187,7 +189,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
          <layout_stack
            clip="false"
            follows="all"
-           height="410"
+           height="394"
            layout="topleft"
            left="0"
            mouse_opaque="false"
