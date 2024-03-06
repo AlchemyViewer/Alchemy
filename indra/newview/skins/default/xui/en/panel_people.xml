@@ -176,6 +176,20 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                      function="People.DelFriend" />
                  </dnd_button>
             </panel>
+            <text
+               type="string"
+               length="1"
+               follows="left|top|right"
+               height="14"
+               layout="topleft"
+               right="-10"
+               top_pad="4"
+               left="3"
+               use_ellipses="true"
+               skip_link_underline="true"
+               name="nearbycount">
+            There are [COUNT] avatars in [REGION].
+            </text>
          <layout_stack
            clip="false"
            follows="all"

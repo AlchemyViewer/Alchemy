@@ -661,6 +661,8 @@ BOOL LLPanelPeople::postBuild()
 
 	LLPanel* nearby_tab = getChild<LLPanel>(NEARBY_TAB_NAME);
 	nearby_tab->setVisibleCallback(boost::bind(&Updater::setActive, mNearbyListUpdater, _2));
+	mNearbyCountText = nearby_tab->getChild<LLTextBox>("nearbycount");
+
 	mNearbyList = nearby_tab->getChild<LLAvatarList>("avatar_list");
 	mNearbyList->setNoItemsCommentText(getString("no_one_near"));
 	mNearbyList->setNoItemsMsg(getString("no_one_near"));
@@ -768,6 +770,34 @@ void LLPanelPeople::onChange(EStatusType status, const std::string &channelURI, 
 	updateButtons();
 }
 
+void LLPanelPeople::updateAccordionTabTitles()
+{
+	// For now, only using according lists for the friends tab.
+	// who knows if this changes for any other UI imrprovesments. -- FLN
+	if (FRIENDS_TAB_NAME == getActiveTabName())
+	{
+		if (mOnlineFriendList)
+		{
+			mOnlineFriendList->setDirty(true, !mOnlineFriendList->filterHasMatches());
+			LLStringUtil::format_map_t args_online;
+			args_online["[COUNT]"] = llformat("%d", mOnlineFriendList->size());
+			std::string online_title = LLTrans::getString("online_friends_count", args_online);
+
+			mAccordionOnlineTab->setTitle(online_title);
+		}
+		
+		if (mAllFriendList)
+		{
+			mAllFriendList->setDirty(true, !mAllFriendList->filterHasMatches());
+			LLStringUtil::format_map_t args_all;
+			args_all["[COUNT]"] = llformat("%d", mAllFriendList->size());
+			std::string all_title = LLTrans::getString("all_friends_count", args_all);
+
+			mAccordionAllTab->setTitle(all_title);
+		}
+	}
+}
+
 void LLPanelPeople::updateFriendListHelpText()
 {
 	// show special help text for just created account to help finding friends. EXT-4836
@@ -787,6 +817,12 @@ void LLPanelPeople::updateFriendListHelpText()
 		args["[SEARCH_TERM]"] = LLURI::escape(filter);
 		no_friends_text->setText(getString(message_name, args));
 	}
+	else
+	{
+		// No point in updating if you're hiding them due to no friends. -- FLN
+		updateAccordionTabTitles();
+	}
+
 }
 
 void LLPanelPeople::updateFriendList()
@@ -834,6 +870,7 @@ void LLPanelPeople::updateFriendList()
 	mAllFriendList->setDirty(true, !mAllFriendList->filterHasMatches());
 	//update trash and other buttons according to a selected item
 	updateButtons();
+	updateAccordionTabTitles();
 	showFriendsAccordionsIfNeeded();
 }
 
@@ -849,6 +886,14 @@ void LLPanelPeople::updateNearbyList()
 	{
 // [/RLVa:KB]
 		LLWorld::getInstance()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
+
+		LLViewerRegion* cur_region = gAgent.getRegion();
+		mNearbyCountText->setTextArg("[COUNT]", llformat("%d", mNearbyList->size()));
+
+		if (cur_region)
+		{
+			mNearbyCountText->setTextArg("[REGION]", llformat("%s", cur_region->getName()));
+		}
 // [RLVa:KB] - Checked: RLVa-2.0.3
 	}
 	else

@@ -4473,5 +4473,6 @@ and report the problem.
   <string name="fs_preprocessor_cache_unsafe">Error: script named '[FILENAME]' isn't safe to copy to the filesystem. This include will fail.</string>
   <string name="fs_preprocessor_caching_err">Error caching included file '[FILENAME]'</string>
   <string name="fs_preprocessor_truncated">Warning: Preprocessor output truncated due to excessive script text size. This script will most likely not work.</string>
-
+  <string name="online_friends_count">Online ([COUNT])</string>
+  <string name="all_friends_count">All ([COUNT])</string>
 </strings>
