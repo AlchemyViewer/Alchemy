@@ -7550,6 +7550,9 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 	<string name="Command_Performance_Label">
 		グラフィック最適化
 	</string>
+	<string name="Command_PersonalLighting_Label">
+		個人的光源
+	</string>
 	<string name="Command_Picks_Label">
 		ピック
 	</string>
@@ -7673,6 +7676,9 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 	</string>
 	<string name="Command_Performance_Tooltip">
 		グラフィック性能を向上させます。
+	</string>
+	<string name="Command_PersonalLighting_Tooltip">
+		自分の光源設定を変更します。
 	</string>
 	<string name="Command_Picks_Tooltip">
 		プロフィールで紹介しているお気に入りの場所を表示します。
