@@ -114,5 +114,7 @@
 // Library includes from llui project
 #include "llui.h"
 #include "lluictrl.h"
+#include "llpanel.h"
+#include "llfloater.h"
 
 #endif

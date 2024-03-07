@@ -34,6 +34,7 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "lluictrlfactory.h"
+#include "llviewercontrol.h"
 
 // library includes
 #include "llcheckboxctrl.h"
@@ -88,8 +89,8 @@ BOOL LLPanelLandAudio::postBuild()
 	mCheckParcelVoiceLocal = getChild<LLCheckBoxCtrl>("parcel_enable_voice_channel_local");
 	childSetCommitCallback("parcel_enable_voice_channel_local", onCommitAny, this);
 
-	mMusicURLEdit = getChild<LLLineEditor>("music_url");
-	childSetCommitCallback("music_url", onCommitAny, this);
+	mMusicURLEdit = getChild<LLComboBox>("music_url");
+	mMusicURLEdit->setCommitCallback(boost::bind(&LLPanelLandAudio::onCommitMusicUrl, this));
 
 	mCheckAVSoundAny = getChild<LLCheckBoxCtrl>("all av sound check");
 	childSetCommitCallback("all av sound check", onCommitAny, this);
@@ -151,8 +152,18 @@ void LLPanelLandAudio::refresh()
 		mCheckParcelEnableVoice->set(allow_voice);
 		mCheckParcelVoiceLocal->set(!parcel->getParcelFlagUseEstateVoiceChannel());
 
-		mMusicURLEdit->setText(parcel->getMusicURL());
-		mMusicURLEdit->setEnabled( can_change_media );
+		const std::string& current_url = parcel->getMusicURL();
+		mMusicURLEdit->clearRows();
+		LLSD stream_list = gSavedSettings.getLLSD("StreamList");
+		const LLSD streams = stream_list["audio"];
+		for (LLSD::array_const_iterator s_itr = streams.beginArray(), s_end = streams.endArray(); s_itr != s_end; ++s_itr)
+		{
+			mMusicURLEdit->add(LLSD(*s_itr));
+		}
+		mMusicURLEdit->addSeparator(ADD_TOP);
+		mMusicURLEdit->add(LLSD(current_url), ADD_TOP);
+		mMusicURLEdit->selectByValue(current_url);
+		mMusicURLEdit->setEnabled(can_change_media);
 
 		BOOL can_change_av_sounds = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_OPTIONS) && parcel->getHaveNewParcelLimitData();
 		mCheckAVSoundAny->set(parcel->getAllowAnyAVSounds());
@@ -178,7 +189,7 @@ void LLPanelLandAudio::onCommitAny(LLUICtrl*, void *userdata)
 
 	// Extract data from UI
 	BOOL sound_local		= self->mCheckSoundLocal->get();
-	std::string music_url	= self->mMusicURLEdit->getText();
+	std::string music_url	= self->mMusicURLEdit->getSimple();
 
 	BOOL voice_enabled = self->mCheckParcelEnableVoice->get();
 	BOOL voice_estate_chan = !self->mCheckParcelVoiceLocal->get();
@@ -209,4 +220,26 @@ void LLPanelLandAudio::onCommitAny(LLUICtrl*, void *userdata)
 
 	// Might have changed properties, so let's redraw!
 	self->refresh();
+}
+
+void LLPanelLandAudio::onCommitMusicUrl()
+{
+	std::string music_url = mMusicURLEdit->getSimple();
+	LLStringUtil::trim(music_url);
+	if (!music_url.empty())
+	{
+		LLSD stream_list = gSavedSettings.getLLSD("StreamList");
+		const LLSD streams = stream_list["audio"];
+		bool found = false;
+		for (LLSD::array_const_iterator s_itr = streams.beginArray(), s_end = streams.endArray(); s_itr != s_end; ++s_itr)
+		{
+			if (LLStringUtil::compareInsensitive((LLSD(*s_itr)).asString(), music_url) == 0)
+				found = true;
+		}
+		if (!found)
+			stream_list["audio"].append(music_url);
+		gSavedSettings.setLLSD("StreamList", stream_list);
+	}
+
+	onCommitAny(mMusicURLEdit, this);
 }

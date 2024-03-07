@@ -112,7 +112,7 @@
     layout="topleft"
     left="45"
     name="HideHoverTextInCinematicMode"
-    top_pad="7"
+    top_pad="4"
     width="256">
     <check_box.commit_callback
       function="Pref.RenderOptionUpdate" />
@@ -139,7 +139,7 @@
     layout="topleft"
     left="45"
     name="DoubleClickAttachmentAddCheck"
-    top_pad="7"
+    top_pad="4"
     width="256"/>
   <check_box
     control_name="DoubleClickWearableAdd"
@@ -151,6 +151,31 @@
     name="DoubleClickWearableAddCheck"
     top_pad="4"
     width="256"/>
+    <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="16"
+    layout="topleft"
+    left="30"
+    name="Appearance Editor"
+    mouse_opaque="false"
+    top_pad="5"
+    width="300"
+    font="SansSerifSmall">
+    Appearance Editor:
+  </text>
+     <check_box
+      follows="left|top"
+      height="16"
+      label="Show visual hints in wearable editors"
+      layout="topleft"
+      tool_tip="Enable or disable the visual hints showing the avatar parts being modified."
+      left="45"
+      top_pad="4"
+      name="AlchemyAppearanceShowHints"
+      width="275"
+      control_name="AlchemyAppearanceShowHints"/>
   <text
      type="string"
      length="1"
@@ -170,7 +195,7 @@
        height="16"
        label="Block left-click sitting on Objects"
        left="45"
-       top_pad="7"
+       top_pad="4"
        name="AlchemyDisableClickToSit"
        width="275"
        control_name="AlchemyDisableClickToSit"/>
@@ -255,7 +280,7 @@
 	  	layout="topleft"
   		tool_tip="If enabled scripted objects display swirling particle lights when the scripts communicate"
       left="45"
-      top_pad="7"
+      top_pad="4"
       name="EffectScriptChatParticles"
       width="275"
       control_name="EffectScriptChatParticles"/>

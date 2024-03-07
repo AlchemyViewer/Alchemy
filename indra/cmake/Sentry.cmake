@@ -7,7 +7,7 @@ include(OpenSSL)
 include(ZLIBNG)
 
 include_guard()
-if (DEFINED ENV{USE_SENTRY})
+if (DEFINED ENV{USE_SENTRY} AND NOT DARWIN)
   set(USE_SENTRY $ENV{USE_SENTRY} CACHE BOOL "" FORCE)
 endif()
 
@@ -17,7 +17,7 @@ else()
   set(SENTRY_DSN "" CACHE STRING "Sentry DSN")
 endif()
 
-if (INSTALL_PROPRIETARY AND NOT SENTRY_DSN STREQUAL "")
+if (INSTALL_PROPRIETARY AND NOT SENTRY_DSN STREQUAL "" AND NOT DARWIN)
   set(USE_SENTRY ON CACHE BOOL "Use the Sentry crash reporting system")
 endif ()
 

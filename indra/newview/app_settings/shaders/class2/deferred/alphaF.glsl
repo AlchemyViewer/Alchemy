@@ -78,6 +78,8 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
 
 float getAmbientClamp();
 
+float calcLegacyDistanceAttenuation(float distance, float falloff);
+
 void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout vec3 legacyenv,
         vec2 tc, vec3 pos, vec3 norm, float glossiness, float envIntensity, bool transparent, vec3 amblit_linear);
 
@@ -126,7 +128,7 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 diffuse, vec3 v, vec3 n, vec
 		lv = normalize(lv);
 	
 		//distance attenuation
-		float dist_atten = clamp(1.0-(dist-1.0*(1.0-fa))/fa, 0.0, 1.0);
+		float dist_atten = calcLegacyDistanceAttenuation(dist, fa);
 		dist_atten *= dist_atten;
         dist_atten *= 2.0f;
 

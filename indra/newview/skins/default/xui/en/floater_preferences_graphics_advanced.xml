@@ -5,7 +5,6 @@
   name="prefs_graphics_advanced"
   help_topic="Preferences_Graphics_Advanced"
   single_instance="true"
-  reuse_instance="false"
   save_rect="true"
   title="ADVANCED GRAPHICS PREFERENCES"
   width="800">
@@ -83,7 +82,7 @@
     layout="topleft"
     left="30"
     min_val="8"
-    max_val="10"
+    max_val="9"
     name="RenderPostProcess"
     show_text="false"
     top_delta="16"

@@ -59,6 +59,7 @@ class LLMenuGL;
 class LLFindNonLinksByMask;
 class LLFindWearablesOfType;
 class LLWearableItemTypeNameComparator;
+class LLLoadingIndicator;
 
 class LLPanelOutfitEdit : public LLPanel
 {
@@ -243,6 +244,8 @@ private:
 	bool				mInitialized;
 	LLMenuButton*		mWearablesGearMenuBtn;
 	LLMenuButton*		mGearMenuBtn;
+	LLLoadingIndicator* mLoadingIndicator = nullptr;
+	LLPanel*			mOutfitNameStatusPanel = nullptr;
 
 };
 

@@ -1118,6 +1118,41 @@
 				increment="8"
 				name="local_light_spinner"
 				control_name="RenderLocalLightCount" />
+			<!--Global Light Scale-->
+			<text
+				follows="left|top"
+				height="15"
+				left="10"
+				top_pad="12"
+				width="120"
+				layout="topleft"
+				value="Light Intensity Scale:" />
+			<slider_bar
+				top_pad="-18"
+				height="20"
+				increment=".1"
+				follows="left|top|right"
+				layout="topleft"
+				max_val="10"
+				min_val="0"
+				left="130"
+				right="-55"
+				name="global_light_inten_slider_bar"
+				control_name="AlchemyGlobalLightScale" />
+			<spinner
+				top_pad="-20"
+				height="15"
+				label_width="0"
+				right="-2"
+				decimal_digits="2"
+				follows="top|right"
+				layout="topleft"
+				max_val="10"
+				min_val="0"
+				width="55"
+				increment=".1"
+				name="global_light_inten_spinner"
+				control_name="AlchemyGlobalLightScale" />
 		</panel>
 		<!--Shadows/SSAO Panel-->
 		<panel
