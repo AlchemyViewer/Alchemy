@@ -56,6 +56,25 @@
     <menu_item_separator>
         <menu_item_separator.on_visible
          function="Inventory.GearDefault.Visible"
+         parameter="multi_folder_view" />
+    </menu_item_separator>
+	<menu_item_check
+     label="Show Inbox panel"
+     layout="topleft"
+     name="show_inbox_panel">
+		<on_click
+         function="ToggleControl"
+         parameter="InventoryDisplayInbox" />
+		<on_check
+         function="CheckControl"
+         parameter="InventoryDisplayInbox" />
+		<on_visible
+         function="Inventory.GearDefault.Visible"
+         parameter="multi_folder_view" />
+	</menu_item_check>
+    <menu_item_separator>
+        <menu_item_separator.on_visible
+         function="Inventory.GearDefault.Visible"
          parameter="single_folder_view" />
     </menu_item_separator>
     <menu_item_check
