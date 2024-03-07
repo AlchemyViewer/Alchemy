@@ -3090,6 +3090,7 @@ BOOL dragItemIntoFolder(LLUUID folder_id, LLInventoryItem* inv_item, BOOL drop, 
 
     const LLUUID &current_outfit_id = model->findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT);
     const LLUUID &favorites_id = model->findCategoryUUIDForType(LLFolderType::FT_FAVORITE);
+    const LLUUID &inbox_id = model->findCategoryUUIDForType(LLFolderType::FT_INBOX);
     const LLUUID &landmarks_id = model->findCategoryUUIDForType(LLFolderType::FT_LANDMARK);
     const LLUUID &marketplacelistings_id = model->findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
     const LLUUID &my_outifts_id = model->findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS);
@@ -3099,6 +3100,7 @@ BOOL dragItemIntoFolder(LLUUID folder_id, LLInventoryItem* inv_item, BOOL drop, 
     const BOOL move_is_into_my_outfits = (folder_id == my_outifts_id) || model->isObjectDescendentOf(folder_id, my_outifts_id);
     const BOOL move_is_into_outfit = move_is_into_my_outfits || (cat && cat->getPreferredType()==LLFolderType::FT_OUTFIT);
     const BOOL move_is_into_landmarks = (folder_id == landmarks_id) || model->isObjectDescendentOf(folder_id, landmarks_id);
+    const BOOL move_is_into_inbox = (folder_id == inbox_id) || model->isObjectDescendentOf(folder_id, inbox_id);
     const BOOL move_is_into_marketplacelistings = model->isObjectDescendentOf(folder_id, marketplacelistings_id);
     const BOOL move_is_from_marketplacelistings = model->isObjectDescendentOf(inv_item->getUUID(), marketplacelistings_id);
 
@@ -3333,6 +3335,10 @@ BOOL dragItemIntoFolder(LLUUID folder_id, LLInventoryItem* inv_item, BOOL drop, 
             tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
             accept = FALSE;
         }
+        else if (move_is_into_inbox)
+        {
+            accept = FALSE;
+        }
 
         if (accept && drop)
         {
@@ -3362,6 +3368,10 @@ BOOL dragItemIntoFolder(LLUUID folder_id, LLInventoryItem* inv_item, BOOL drop, 
         if (move_is_into_marketplacelistings)
         {
             tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
+            accept = FALSE;
+        }
+        else if (move_is_into_inbox)
+        {
             accept = FALSE;
         }
         else if ((inv_item->getActualType() == LLAssetType::AT_SETTINGS) && !LLEnvironment::instance().isInventoryEnabled())
@@ -3394,6 +3404,10 @@ BOOL dragItemIntoFolder(LLUUID folder_id, LLInventoryItem* inv_item, BOOL drop, 
             if (move_is_into_marketplacelistings)
             {
                 tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
+                accept = FALSE;
+            }
+            else if (move_is_into_inbox)
+            {
                 accept = FALSE;
             }
             else if (move_is_into_current_outfit || move_is_into_outfit)
@@ -3478,10 +3492,12 @@ BOOL dragCategoryIntoFolder(LLUUID dest_id, LLInventoryCategory* inv_cat,
 
     const LLUUID &cat_id = inv_cat->getUUID();
     const LLUUID &current_outfit_id = model->findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT);
+    const LLUUID &inbox_id = model->findCategoryUUIDForType(LLFolderType::FT_INBOX);
     const LLUUID &marketplacelistings_id = model->findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
     //const LLUUID from_folder_uuid = inv_cat->getParentUUID();
     
     const BOOL move_is_into_current_outfit = (dest_id == current_outfit_id);
+    const BOOL move_is_into_inbox = (dest_id == inbox_id) || model->isObjectDescendentOf(dest_id, inbox_id);
     const BOOL move_is_into_marketplacelistings = model->isObjectDescendentOf(dest_id, marketplacelistings_id);
     const BOOL move_is_from_marketplacelistings = model->isObjectDescendentOf(cat_id, marketplacelistings_id);
 
@@ -3768,6 +3784,10 @@ BOOL dragCategoryIntoFolder(LLUUID dest_id, LLInventoryCategory* inv_cat,
             tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
             accept = FALSE;
         }
+        else if (move_is_into_inbox)
+        {
+            accept = FALSE;
+        }
         else
         {
             accept = move_inv_category_world_to_agent(cat_id, dest_id, drop);
@@ -3778,6 +3798,10 @@ BOOL dragCategoryIntoFolder(LLUUID dest_id, LLInventoryCategory* inv_cat,
         if (move_is_into_marketplacelistings)
         {
             tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
+            accept = FALSE;
+        }
+        else if (move_is_into_inbox)
+        {
             accept = FALSE;
         }
         else
