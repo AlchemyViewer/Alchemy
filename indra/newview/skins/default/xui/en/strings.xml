@@ -4224,6 +4224,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_Panic_Label">Panic!</string>
   <string name="Command_People_Label">People</string>
   <string name="Command_Performance_Label">Graphics speed</string>
+  <string name="Command_PersonalLighting_Label">Personal Lighting</string>
   <string name="Command_Picks_Label">Picks</string>
   <string name="Command_Places_Label">Places</string>
   <string name="Command_Preferences_Label">Preferences</string>
@@ -4241,8 +4242,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_Voice_Label">Voice Settings</string>
   <string name="Command_Webbrowser_Label">Web Browser</string>
 
-  <string 
-name="Command_360_Capture_Tooltip">Capture a 360 equirectangular image</string>
+  <string name="Command_360_Capture_Tooltip">Capture a 360 equirectangular image</string>
   <string name="Command_AboutLand_Tooltip">Information about the land you're visiting</string>
   <string name="Command_AnimationOverride_Tooltip">Animation Override</string>
   <string name="Command_Appearance_Tooltip">Change your avatar</string>
@@ -4267,6 +4267,7 @@ name="Command_360_Capture_Tooltip">Capture a 360 equirectangular image</string>
   <string name="Command_Panic_Tooltip">Press this if you're in trouble</string>
   <string name="Command_People_Tooltip">Friends, groups, and nearby people</string>
   <string name="Command_Performance_Tooltip">Improve graphics speed</string>
+  <string name="Command_PersonalLighting_Tooltip">Modify your personal environment lighting</string>
   <string name="Command_Picks_Tooltip">Places to show as favorites in your profile</string>
   <string name="Command_Places_Tooltip">Places you've saved</string>
   <string name="Command_Preferences_Tooltip">Preferences</string>
