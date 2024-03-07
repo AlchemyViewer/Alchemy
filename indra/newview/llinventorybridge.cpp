@@ -2851,11 +2851,9 @@ BOOL LLFolderBridge::dragCategoryIntoFolder(LLInventoryCategory* inv_cat,
 	const LLUUID &cat_id = inv_cat->getUUID();
 	const LLUUID &current_outfit_id = model->findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT);
 	const LLUUID &marketplacelistings_id = model->findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
-	const LLUUID &inbox_id = model->findCategoryUUIDForType(LLFolderType::FT_INBOX);
     const LLUUID from_folder_uuid = inv_cat->getParentUUID();
 	
 	const BOOL move_is_into_current_outfit = (mUUID == current_outfit_id);
-	const BOOL move_is_into_inbox = (mUUID == inbox_id) || model->isObjectDescendentOf(mUUID, inbox_id);
 	const BOOL move_is_into_marketplacelistings = model->isObjectDescendentOf(mUUID, marketplacelistings_id);
     const BOOL move_is_from_marketplacelistings = model->isObjectDescendentOf(cat_id, marketplacelistings_id);
 
@@ -3222,10 +3220,6 @@ BOOL LLFolderBridge::dragCategoryIntoFolder(LLInventoryCategory* inv_cat,
 			tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
 			accept = FALSE;
 		}
-		else if (move_is_into_inbox)
-		{
-			accept = FALSE;
-		}
 		else
 		{
             // Todo: fix me. moving from task inventory doesn't have a completion callback,
@@ -3251,10 +3245,6 @@ BOOL LLFolderBridge::dragCategoryIntoFolder(LLInventoryCategory* inv_cat,
 		if (move_is_into_marketplacelistings)
 		{
 			tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
-			accept = FALSE;
-		}
-		else if (move_is_into_inbox)
-		{
 			accept = FALSE;
 		}
 		else
@@ -5485,7 +5475,6 @@ BOOL LLFolderBridge::dragItemIntoFolder(LLInventoryItem* inv_item,
 	const LLUUID &landmarks_id = model->findCategoryUUIDForType(LLFolderType::FT_LANDMARK);
 	const LLUUID &marketplacelistings_id = model->findCategoryUUIDForType(LLFolderType::FT_MARKETPLACE_LISTINGS);
 	const LLUUID &my_outifts_id = model->findCategoryUUIDForType(LLFolderType::FT_MY_OUTFITS);
-	const LLUUID &inbox_id = model->findCategoryUUIDForType(LLFolderType::FT_INBOX);
     const LLUUID from_folder_uuid = inv_item->getParentUUID();
 
 	const BOOL move_is_into_current_outfit = (mUUID == current_outfit_id);
@@ -5493,7 +5482,6 @@ BOOL LLFolderBridge::dragItemIntoFolder(LLInventoryItem* inv_item,
 	const BOOL move_is_into_my_outfits = (mUUID == my_outifts_id) || model->isObjectDescendentOf(mUUID, my_outifts_id);
 	const BOOL move_is_into_outfit = move_is_into_my_outfits || (getCategory() && getCategory()->getPreferredType()==LLFolderType::FT_OUTFIT);
 	const BOOL move_is_into_landmarks = (mUUID == landmarks_id) || model->isObjectDescendentOf(mUUID, landmarks_id);
-	const BOOL move_is_into_inbox = (mUUID == inbox_id) || model->isObjectDescendentOf(mUUID, inbox_id);
     const BOOL move_is_into_marketplacelistings = model->isObjectDescendentOf(mUUID, marketplacelistings_id);
     const BOOL move_is_from_marketplacelistings = model->isObjectDescendentOf(inv_item->getUUID(), marketplacelistings_id);
 
@@ -5771,10 +5759,6 @@ BOOL LLFolderBridge::dragItemIntoFolder(LLInventoryItem* inv_item,
 			tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
 			accept = FALSE;
 		}
-		else if (move_is_into_inbox)
-		{
-			accept = FALSE;
-		}
 		
 		// Check whether the item being dragged from in world
 		// passes the filter of the destination panel.
@@ -5818,10 +5802,6 @@ BOOL LLFolderBridge::dragItemIntoFolder(LLInventoryItem* inv_item,
 			tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
 			accept = FALSE;
 		}
-		else if (move_is_into_inbox)
-		{
-			accept = FALSE;
-		}
 		else if ((inv_item->getActualType() == LLAssetType::AT_SETTINGS) && !LLEnvironment::instance().isInventoryEnabled())
 		{
 			tooltip_msg = LLTrans::getString("NoEnvironmentSettings");
@@ -5859,10 +5839,6 @@ BOOL LLFolderBridge::dragItemIntoFolder(LLInventoryItem* inv_item,
 			if (move_is_into_marketplacelistings)
 			{
 				tooltip_msg = LLTrans::getString("TooltipOutboxNotInInventory");
-				accept = FALSE;
-			}
-			else if (move_is_into_inbox)
-			{
 				accept = FALSE;
 			}
 			else if (move_is_into_current_outfit || move_is_into_outfit)
