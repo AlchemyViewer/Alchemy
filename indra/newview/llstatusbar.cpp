@@ -213,6 +213,7 @@ BOOL LLStatusBar::postBuild()
 	gSavedPerAccountSettings.getControl("AlchemyAOEnable")->getCommitSignal()->connect(boost::bind(&LLStatusBar::onAOStateChanged, this));
 
 	mTextFPS = getChild<LLTextBox>("FPSText");
+	mTextFPS->setClickedCallback([](void*) { LLFloaterReg::showInstance("stats"); });
 
 	static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
 	mTextFPS->setVisible(show_fps);

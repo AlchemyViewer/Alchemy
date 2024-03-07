@@ -338,10 +338,10 @@ void LLInventoryPanel::initFolderRoot()
     }
 
     // hide inbox
-    if (!gSavedSettings.getBOOL("InventoryOutboxMakeVisible"))
-    {
-        getFilter().setFilterCategoryTypes(getFilter().getFilterCategoryTypes() & ~(1ULL << LLFolderType::FT_INBOX));
-    }
+    //if (!gSavedSettings.getBOOL("InventoryOutboxMakeVisible"))
+    //{
+    //    getFilter().setFilterCategoryTypes(getFilter().getFilterCategoryTypes() & ~(1ULL << LLFolderType::FT_INBOX));
+    //}
     // hide marketplace listing box, unless we are a marketplace panel
     if (!gSavedSettings.getBOOL("InventoryOutboxMakeVisible") && !mParams.use_marketplace_folders)
     {

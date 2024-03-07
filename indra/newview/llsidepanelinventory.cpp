@@ -98,7 +98,7 @@ public:
 			switch (added_category_type)
 			{
 				case LLFolderType::FT_INBOX:
-					mSidepanelInventory->enableInbox(true);
+					mSidepanelInventory->enableInbox(gSavedSettings.getBOOL("InventoryDisplayInbox"));
 					mSidepanelInventory->observeInboxModifications(added_category->getUUID());
 					break;
 				default:
@@ -248,7 +248,7 @@ void LLSidepanelInventory::updateInbox()
         gInventory.consolidateForType(inbox_id, LLFolderType::FT_INBOX);
         
 		// Enable the display of the inbox if it exists
-		enableInbox(true);
+		enableInbox(gSavedSettings.getBOOL("InventoryDisplayInbox"));
 
 		observeInboxModifications(inbox_id);
 	}
