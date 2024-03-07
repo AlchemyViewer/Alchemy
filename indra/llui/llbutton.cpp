@@ -1293,7 +1293,7 @@ void LLButton::setFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 	// Set the button control value (toggle state) to the floater visibility control (Sets the value as well)
 	button->setControlVariable(LLFloater::getControlGroup()->getControl(vis_control_name));
 	// Set the clicked callback to toggle the floater
-	button->setClickedCallback([](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::toggleInstance(param.asStringRef(), LLSD()); });
+	button->setClickedCallback([=](LLUICtrl* ctrl, const LLSD& param) -> void { LLFloaterReg::toggleInstance(sdname.asStringRef(), LLSD()); });
 }
 
 // static

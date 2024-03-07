@@ -119,6 +119,22 @@
 	         tool_tip="Teleport to my home location"
 	         top_delta="0"
 	         width="32" />
+	        <button
+	         follows="left|top"
+	         height="23"
+	         image_bottom_pad="1"
+	         image_overlay="Command_AboutLand_Icon"
+	         image_hover_unselected="PushButton_Over"
+	         layout="topleft"
+	         left_pad="5"
+	         name="about_land"
+	         tool_tip="Opens the About Land floater"
+	         top_delta="0"
+	         width="32" >
+             <button.init_callback
+              function="Button.SetFloaterToggle"
+	          parameter="about_land" />
+		     </button>
 	        <location_input
                        follows="all"
 	         halign="right"

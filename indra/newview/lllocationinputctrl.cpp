@@ -645,7 +645,7 @@ void LLLocationInputCtrl::onInfoButtonClicked()
 		return;
 // [/RLVa:KB]
 
-	LLFloaterReg::showInstance("about_land");
+	LLFloaterSidePanelContainer::showPanel("places", LLSD().with("type", "agent"));
 }
 
 void LLLocationInputCtrl::onForSaleButtonClicked()
