@@ -8097,4 +8097,26 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 	<string name="fs_preprocessor_truncated">
 		警告：スクリプトのテキストサイズが大きすぎるため、プリプロセッサの出力が切り詰められました。このスクリプトはおそらく機能しません。
 	</string>
+	<!--Minimap-->
+	<string name="MinimapToolTipMsg">
+		[PARCEL_NAME_MSG][PARCEL_SALE_PRICE_MSG][PARCEL_SALE_AREA_MSG][PARCEL_OWNER_MSG][REGION_NAME_MSG][TOOL_TIP_HINT_MSG]
+	</string>
+	<string name="MinimapParcelSalePriceMsg">
+		価格：L$ [PRICE]（L$ [PRICE_PER_SQM]／㎡）
+	</string>
+	<string name="MinimapParcelSaleAreaMsg">
+		エリア：[AREA]㎡
+	</string>
+	<string name="MinimapParcelOwnerMsg">
+		所有者：[PARCEL_OWNER]
+	</string>
+	<string name="MinimapRegionNameMsg">
+		リージョン：[REGION_NAME]
+	</string>
+	<string name="MinimapToolTipHintMsg">
+		ダブルクリックでマップを開く
+	</string>
+	<string name="MinimapAltToolTipHintMsg">
+		ダブルクリックでテレポート
+	</string>
 </strings>

@@ -426,6 +426,7 @@
 			<text name="MusicURL:">
 				音楽ＵＲＬ：
 			</text>
+			<combo_box name="music_url"/>
 			<text name="Sound:">
 				サウンド：
 			</text>
@@ -444,7 +445,7 @@
 			<text name="media">
 				メディア：
 			</text>
-			<check_box label="ＭＯＡＰを区画に制限する" name="obscure_moap" tool_tip="プリムに付けられたメディア（ＭＯＡＰ）が区画外にあるときに、区画内にいるエージェントに対して自動再生されないようにします。"/>
+			<check_box label="ＭＯＡＰを区画に制限する" name="obscure_moap" tool_tip="プリムに付けられたメディア（ＭＯＡＰ）を、区画外にいるエージェントに対して自動再生されないようにします。"/>
 		</panel>
 		<panel label="アクセス" name="land_access_panel">
 			<panel.string name="access_estate_defined">

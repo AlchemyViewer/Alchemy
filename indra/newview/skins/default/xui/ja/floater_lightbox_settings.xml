@@ -157,6 +157,10 @@
 			<text value="最大ローカル光源数："/>
 			<slider_bar name="local_light_slider_bar"/>
 			<spinner name="local_light_spinner"/>
+			<!--Global Light Scale-->
+			<text value="光の強さのスケール："/>
+			<slider_bar name="global_light_inten_slider_bar"/>
+			<spinner name="global_light_inten_spinner"/>
 		</panel>
 		<!--Shadows/SSAO Panel-->
 		<panel label="影" name="shadow_settings">

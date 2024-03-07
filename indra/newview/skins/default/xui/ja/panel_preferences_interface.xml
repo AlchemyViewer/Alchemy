@@ -23,6 +23,10 @@
 	</text>
 	<check_box label="ダブルクリックで装着物を追加" name="DoubleClickAttachmentAddCheck"/>
 	<check_box label="ダブルクリックで衣装を追加" name="DoubleClickWearableAddCheck"/>
+	<text name="Appearance Editor">
+		容姿エディタ：
+	</text>
+	<check_box label="衣類エディタに視覚的なヒントを表示する" tool_tip="変更中のアバターのパーツを示す視覚的なヒントを有効または無効にします。" name="AlchemyAppearanceShowHints"/>
 	<text name="SecurityText">
 		セキュリティ：
 	</text>
