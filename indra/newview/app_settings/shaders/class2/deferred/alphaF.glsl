@@ -120,7 +120,7 @@ vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 diffuse, vec3 v, vec3 n, vec
         return col;
     }*/
 
-	if (dist > 0.0 && la > 0.0)
+	if (dist > 0.0 && inverted_la > 0.0)
 	{
         dist /= inverted_la;
 
