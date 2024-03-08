@@ -6,7 +6,8 @@
 				<pull_button name="back_btn" tool_tip="前の場所へ移動します。"/>
 				<pull_button name="forward_btn" tool_tip="次の場所へ移動します。"/>
 				<button name="home_btn" tool_tip="「ホーム」へテレポートします。"/>
-				<button name="about_land" tool_tip="土地情報のフローターを開きます。"/>
+				<button name="about_land" tool_tip="土地情報のウィンドウを開きます。"/>
+				<button name="about_land" tool_tip="個人的光源エディタを開きます。"/>
 				<location_input label="所在地" name="location_combo"/>
 			</panel>
 		</layout_panel>

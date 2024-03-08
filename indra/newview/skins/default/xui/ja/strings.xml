@@ -4873,6 +4873,20 @@ https://www.alchemyviewer.org から最新バージョンをダウンロード�
 
 このメッセージが何度も出る場合は、[SUPPORT_SITE]へご連絡ください。
 	</string>
+	<string name="MBOutOfMemoryTitle">
+		メモリが超過
+	</string>
+	<string name="MBOutOfMemoryErr">
+		[APP_NAME]は、メモリの確保に失敗しました。実行に必要なメモリを確保できないため終了します。
+
+コンピュータのＲＡＭが少ない場合は、Second Lifeを実行する前に重いアプリケーションを終了し、ページファイルを割り当てるか、描画距離などのグラフィック設定を軽くしてください。
+	</string>
+	<string name="MBMissingFile">
+		[APP_NAME]は、実行に必要なファイルの一部にアクセスできないか、ファイルが見つからなかったため閉じられます。
+
+https://alchemyviewer.org/downloads からビューアを再インストールてください。再インストール後も問題が解決しない場合はAlchemy Viewerチームに連絡してください。
+	</string>
+	<!-- Avatar Shape Information -->
 	<string name="5 O'Clock Shadow">
 		不精ひげ
 	</string>
