@@ -128,7 +128,7 @@
 	         layout="topleft"
 	         left_pad="5"
 	         name="about_land"
-	         tool_tip="Opens the About Land floater"
+	         tool_tip="Opens the About Land window"
 	         top_delta="0"
 	         width="32" >
              <button.init_callback
@@ -144,7 +144,7 @@
 			layout="topleft"
 			left_pad="5"
 			name="about_land"
-			tool_tip="Opens the About Land floater"
+			tool_tip="Opens the Personal Lighting editor"
 			top_delta="0"
 			width="32" >
 			<button.init_callback

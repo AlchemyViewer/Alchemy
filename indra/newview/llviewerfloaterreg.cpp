@@ -456,7 +456,14 @@ void LLViewerFloaterReg::registerFloaters()
 
 	LLFloaterReg::add("notifications_console", "floater_notifications_console.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationConsole>);
 	
-	LLFloaterReg::add("notification_well_window", "floater_notifications_tabbed.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationsTabbed>);
+	if(!gSkinSettings.getBool("LegacyNotificationWell"))
+	{
+		LLFloaterReg::add("notification_well_window", "floater_notifications_tabbed.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationsTabbed>);
+	}
+	else
+	{
+		LLFloaterReg::add("notification_well_window", "floater_legacy_sys_well.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLLegacyNotificationWellWindow>);
+	}
 
 	LLFloaterReg::add("object_weights", "floater_object_weights.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterObjectWeights>);
 	LLFloaterReg::add("openobject", "floater_openobject.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterOpenObject>);
@@ -564,7 +571,6 @@ void LLViewerFloaterReg::registerFloaters()
 	LLFloaterReg::add("generic_text", "floater_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGenericText>);
 	LLFloaterReg::add("group_profile", "floater_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterGroupProfile>);
     LLFloaterReg::add("legacy_profile", "floater_profile_legacy.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloaterProfileLegacy>);
-	LLFloaterReg::add("legacy_notification_well_window", "floater_legacy_sys_well.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLLegacyNotificationWellWindow>);
 	LLFloaterReg::add("lightbox", "floater_lightbox_settings.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<ALFloaterLightBox>);
 	LLFloaterReg::add("message_builder", "floater_message_builder.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageBuilder>);
 	LLFloaterReg::add("message_log", "floater_message_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageLog>);

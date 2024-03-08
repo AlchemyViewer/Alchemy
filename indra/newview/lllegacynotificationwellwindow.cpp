@@ -34,7 +34,7 @@
 #include "lltoastpanel.h"
 
 LLLegacyNotificationWellWindow::WellNotificationChannel::WellNotificationChannel(LLLegacyNotificationWellWindow* well_window)
-:	LLNotificationChannel(LLNotificationChannel::Params().name(well_window->getPathname()))
+:	LLNotificationChannel(LLNotificationChannel::Params().name(well_window->getName()))
 ,	mWellWindow(well_window)
 {
 	connectToChannel("Notifications");
@@ -45,7 +45,6 @@ LLLegacyNotificationWellWindow::WellNotificationChannel::WellNotificationChannel
 LLLegacyNotificationWellWindow::LLLegacyNotificationWellWindow(const LLSD& key)
 :	LLSysWellWindow(key)
 {
-	mNotificationUpdates.reset(new WellNotificationChannel(this));
 }
 
 // static
@@ -57,6 +56,8 @@ LLLegacyNotificationWellWindow* LLLegacyNotificationWellWindow::getInstance(cons
 // virtual
 BOOL LLLegacyNotificationWellWindow::postBuild()
 {
+	mNotificationUpdates.reset(new WellNotificationChannel(this));
+
 	BOOL rv = LLSysWellWindow::postBuild();
 	setTitle(getString("title_notification_well_window"));
 	return rv;

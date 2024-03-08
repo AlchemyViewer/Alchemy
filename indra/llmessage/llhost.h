@@ -51,7 +51,7 @@ public:
 
 	LLHost(const LLHost& rhs)
 	{
-		set(rhs.getAddress(), rhs.getPort());
+		*this = rhs;
 	}
 
 	LLHost( U32 ipv4_addr, U32 port )
