@@ -2022,11 +2022,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6b10752aa728c7763cd7b21843706a06d8067e06018c8dddf33487bccec64c0e0080a33546e769067538cdef8e6688623bc94278547f44671182ded91bc0ddaf</string>
+              <string>3a6ec1fce8accdbb7d6ee8d52e16822425449e42a76558a4475e3a5ae0ac404c3c51c7d0cb5b4aeb6892d8f76bee2fae690da0d5ce30dbb7e998f600c1a832bc</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/205/packages/generic/sdbus-cpp/1.4.0.2375/sdbus_cpp-1.4.0-linux64-2375.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/205/packages/generic/sdbus-cpp/1.5.0.2399/sdbus_cpp-1.5.0-linux64-2399.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2039,7 +2039,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>copyright</key>
         <string>Copyright (c) 22016 - 2021 KISTLER INSTRUMENTE AG, Winterthur, Switzerland, (C) 2016 - 2022 Stanislav Angelovic stanislav.angelovic@protonmail.com</string>
         <key>version</key>
-        <string>1.4.0</string>
+        <string>1.5.0</string>
         <key>name</key>
         <string>sdbus-cpp</string>
         <key>canonical_repo</key>

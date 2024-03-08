@@ -87,6 +87,7 @@ void ALDiscordManager::init()
 		return;
 	}
 
+#if 0
 	mDiscord->SetLogHook(
 		discord::LogLevel::Info, [](discord::LogLevel level, const char* message)
 		{
@@ -100,19 +101,20 @@ void ALDiscordManager::init()
 					LL_WARNS() << "Discord: " << message << LL_ENDL;
 					break;
 				}
-				//case discord::LogLevel::Info:
-				//{
-				//	LL_DEBUGS() << "Discord: " << message << LL_ENDL;
-				//	break;
-				//}
-				//case discord::LogLevel::Debug:
-				//{
-				//	LL_DEBUGS() << "Discord: " << message << LL_ENDL;
-				//	break;
-				//}
+				case discord::LogLevel::Info:
+				{
+					LL_DEBUGS() << "Discord: " << message << LL_ENDL;
+					break;
+				}
+				case discord::LogLevel::Debug:
+				{
+					LL_DEBUGS() << "Discord: " << message << LL_ENDL;
+					break;
+				}
 				}
 			}
 		});
+#endif
 
 	discord::Activity activity{};
 	activity.GetAssets().SetLargeImage("alchemy_1024");

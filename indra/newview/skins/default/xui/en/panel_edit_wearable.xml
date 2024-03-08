@@ -449,10 +449,10 @@
      follows="bottom|left|right"
      height="23"
      layout="topleft"
-     left="2"
+     left="10"
      name="button_panel"
      top_pad="6"
-     width="333">
+     width="313">
         <layout_stack
          follows="bottom|left|right"
          height="23"
@@ -462,7 +462,7 @@
          left="0"
          orientation="horizontal"
          top="0"
-         width="333">	
+         width="313">	
             <layout_panel
              follows="bottom|left|right"
              height="23"
