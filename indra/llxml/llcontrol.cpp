@@ -176,7 +176,7 @@ LLControlVariable::LLControlVariable(const std::string name, eControlType type,
 {
 	if ((persist != PERSIST_NO) && mComment.empty())
 	{
-		LL_ERRS() << "Must supply a comment for control " << mName << LL_ENDL;
+		LL_WARNS() << "Must supply a comment for control " << mName << LL_ENDL;
 	}
 	//Push back versus setValue'ing here, since we don't want to call a signal yet
 	mValues.push_back(initial);
