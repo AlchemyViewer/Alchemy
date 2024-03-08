@@ -862,7 +862,7 @@ LLRender::~LLRender()
 	shutdown();
 }
 
-void LLRender::init(bool needs_vertex_buffer)
+bool LLRender::init(bool needs_vertex_buffer)
 {
 #if GL_ARB_debug_output && !LL_DARWIN
     if (gGLManager.mHasDebugOutput && gDebugGL)
@@ -884,10 +884,18 @@ void LLRender::init(bool needs_vertex_buffer)
     // necessary for reflection maps
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
+#if LL_WINDOWS
+    if (glGenVertexArrays == nullptr)
+    {
+        return false;
+    }
+#endif
+
     if (needs_vertex_buffer)
     {
         initVertexBuffer();
     }
+    return true;
 }
 
 void LLRender::initVertexBuffer()

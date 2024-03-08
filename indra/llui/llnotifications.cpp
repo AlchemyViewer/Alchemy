@@ -1556,6 +1556,7 @@ bool LLNotifications::loadTemplates()
 
 	if (!success || root.isNull() || !root->hasName( "notifications" ))
 	{
+        LLError::LLUserWarningMsg::show(LLTrans::getString("MBMissingFile"));
 		LL_ERRS() << "Problem reading XML from UI Notifications file: " << base_filename << LL_ENDL;
 		return false;
 	}
@@ -1566,6 +1567,7 @@ bool LLNotifications::loadTemplates()
 
 	if(!params.validateBlock())
 	{
+        LLError::LLUserWarningMsg::show(LLTrans::getString("MBMissingFile"));
 		LL_ERRS() << "Problem reading XUI from UI Notifications file: " << base_filename << LL_ENDL;
 		return false;
 	}
@@ -1632,6 +1634,7 @@ bool LLNotifications::loadVisibilityRules()
 
 	if(!params.validateBlock())
 	{
+        LLError::LLUserWarningMsg::show(LLTrans::getString("MBMissingFile"));
 		LL_ERRS() << "Problem reading UI Notification Visibility Rules file: " << full_filename << LL_ENDL;
 		return false;
 	}
