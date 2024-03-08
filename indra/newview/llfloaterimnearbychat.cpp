@@ -208,6 +208,35 @@ void LLFloaterIMNearbyChat::closeHostedFloater()
 	}
 }
 
+void LLFloaterIMNearbyChat::closeFloater(bool app_quitting)
+{
+	LLFloaterEmojiPicker::saveState();
+
+	// If detached from conversations window close anyway
+	if (!getHost())
+	{
+		LLFloaterIMSessionTab::closeFloater(app_quitting);
+	}
+
+	// Should check how many conversations are ongoing. Select next to "Nearby Chat" in case there are some other besides.
+	// Close conversations window in case "Nearby Chat" is attached and the only conversation
+	LLFloaterIMContainer* floater_container = LLFloaterIMContainer::getInstance();
+	if (floater_container->getConversationListItemSize() == 1)
+	{
+		if (getHost())
+		{
+			floater_container->closeFloater(app_quitting);
+		}
+	}
+	else
+	{
+		if (!getHost())
+		{
+			floater_container->selectNextConversationByID(LLUUID());
+		}
+	}
+}
+
 // virtual
 void LLFloaterIMNearbyChat::refresh()
 {

@@ -65,6 +65,8 @@ public:
 	/*virtual*/ void setVisibleAndFrontmost(BOOL take_focus=TRUE, const LLSD& key = LLSD()) override;
 	/*virtual*/ void closeHostedFloater() override;
 
+	void	closeFloater(bool app_quitting = false) override;
+
 	void loadHistory();
     void reloadMessages(bool clean_messages = false);
 	void removeScreenChat();
