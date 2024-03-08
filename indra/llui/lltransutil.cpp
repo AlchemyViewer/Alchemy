@@ -45,9 +45,9 @@ bool LLTransUtil::parseStrings(const std::string& xml_filename, const std::set<s
 	if (!success)
 	{
         const std::string error_string =
-            "Second Life viewer couldn't access some of the files it needs and will be closed."
-            "\n\nPlease reinstall viewer from  https://secondlife.com/support/downloads/ and "
-            "contact https://support.secondlife.com if issue persists after reinstall.";
+            "Alchemy Viewer couldn't access some of the files it needs and will be closed."
+            "\n\nPlease reinstall viewer from  https://alchemyviewer.org/downloads and "
+            "contact the Alchemy Viewer team if issue persists after reinstall.";
         LLError::LLUserWarningMsg::show(error_string);
 		gDirUtilp->dumpCurrentDirectories(LLError::LEVEL_WARN);
 		LL_ERRS() << "Couldn't load string table " << xml_filename << " " << errno << LL_ENDL;
