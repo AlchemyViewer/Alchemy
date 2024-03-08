@@ -20,10 +20,15 @@ public:
 
 protected:
     ViewerAppAPI_adaptor(sdbus::IObject& object)
-        : object_(object)
+        : object_(&object)
     {
-        object_.registerMethod("GoSLURL").onInterface(INTERFACE_NAME).withInputParamNames("slurl").withOutputParamNames("success_ret").implementedAs([this](const std::string& slurl){ return this->GoSLURL(slurl); });
+        object_->registerMethod("GoSLURL").onInterface(INTERFACE_NAME).withInputParamNames("slurl").withOutputParamNames("success_ret").implementedAs([this](const std::string& slurl){ return this->GoSLURL(slurl); });
     }
+
+    ViewerAppAPI_adaptor(const ViewerAppAPI_adaptor&) = delete;
+    ViewerAppAPI_adaptor& operator=(const ViewerAppAPI_adaptor&) = delete;
+    ViewerAppAPI_adaptor(ViewerAppAPI_adaptor&&) = default;
+    ViewerAppAPI_adaptor& operator=(ViewerAppAPI_adaptor&&) = default;
 
     ~ViewerAppAPI_adaptor() = default;
 
@@ -31,7 +36,7 @@ private:
     virtual bool GoSLURL(const std::string& slurl) = 0;
 
 private:
-    sdbus::IObject& object_;
+    sdbus::IObject* object_;
 };
 
 }} // namespaces

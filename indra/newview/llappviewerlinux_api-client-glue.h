@@ -20,9 +20,14 @@ public:
 
 protected:
     ViewerAppAPI_proxy(sdbus::IProxy& proxy)
-        : proxy_(proxy)
+        : proxy_(&proxy)
     {
     }
+
+    ViewerAppAPI_proxy(const ViewerAppAPI_proxy&) = delete;
+    ViewerAppAPI_proxy& operator=(const ViewerAppAPI_proxy&) = delete;
+    ViewerAppAPI_proxy(ViewerAppAPI_proxy&&) = default;
+    ViewerAppAPI_proxy& operator=(ViewerAppAPI_proxy&&) = default;
 
     ~ViewerAppAPI_proxy() = default;
 
@@ -30,12 +35,12 @@ public:
     bool GoSLURL(const std::string& slurl)
     {
         bool result;
-        proxy_.callMethod("GoSLURL").onInterface(INTERFACE_NAME).withArguments(slurl).storeResultsTo(result);
+        proxy_->callMethod("GoSLURL").onInterface(INTERFACE_NAME).withArguments(slurl).storeResultsTo(result);
         return result;
     }
 
 private:
-    sdbus::IProxy& proxy_;
+    sdbus::IProxy* proxy_;
 };
 
 }} // namespaces
