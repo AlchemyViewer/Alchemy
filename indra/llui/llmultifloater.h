@@ -76,6 +76,8 @@ public:
 	virtual void updateResizeLimits();
 	virtual void updateFloaterTitle(LLFloater* floaterp);
 
+	void closeDockedFloater();
+
 protected:
 	struct LLFloaterData
 	{

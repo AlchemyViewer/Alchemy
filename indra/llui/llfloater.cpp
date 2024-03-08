@@ -2064,7 +2064,11 @@ void LLFloater::handleShowCollapseButtonChanged(const LLSD& sdValue)
 void LLFloater::closeFrontmostFloater()
 {
 	LLFloater* floater_to_close = gFloaterView->getFrontmostClosableFloater();
-	if(floater_to_close)
+	if (LLMultiFloater* multi_floater = dynamic_cast<LLMultiFloater*>(floater_to_close))
+	{
+		multi_floater->closeDockedFloater();
+	}
+	else if(floater_to_close)
 	{
 		floater_to_close->closeFloater();
 	}

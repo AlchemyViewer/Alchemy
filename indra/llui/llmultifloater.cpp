@@ -315,10 +315,15 @@ void LLMultiFloater::removeFloater(LLFloater* floaterp)
 	floaterp->setCanDrag(TRUE);
 	floaterp->setHost(NULL);
 	floaterp->applyRectControl();
+	floaterp->setFollowsNone();
 
 	updateResizeLimits();
 
-	tabOpen((LLFloater*)mTabContainer->getCurrentPanel(), false);
+	LLFloater* tab_floaterp = dynamic_cast<LLFloater*>(mTabContainer->getCurrentPanel());
+	if (tab_floaterp)
+	{
+		tabOpen(tab_floaterp, false);
+	}
 }
 
 void LLMultiFloater::tabOpen(LLFloater* opened_floater, bool from_click)
@@ -360,23 +365,11 @@ void LLMultiFloater::setVisible(BOOL visible)
 
 BOOL LLMultiFloater::handleKeyHere(KEY key, MASK mask)
 {
-	if (key == 'W' && mask == MASK_CONTROL)
-	{
-		LLFloater* floater = getActiveFloater();
-		// is user closeable and is system closeable
-		if (floater && floater->canClose() && floater->isCloseable())
-		{
-			floater->closeFloater();
-
-			// EXT-5695 (Tabbed IM window loses focus if close any tabs by Ctrl+W)
-			// bring back focus on tab container if there are any tab left
-			if(mTabContainer->getTabCount() > 0)
-			{
-				mTabContainer->setFocus(TRUE);
-			}
-		}
-		return TRUE;
-	}
+	//if (key == 'W' && mask == MASK_CONTROL)
+	//{
+	//	closeDockedFloater();
+	//	return TRUE;
+	//}
 
 	return LLFloater::handleKeyHere(key, mask);
 }
@@ -528,4 +521,31 @@ void LLMultiFloater::computeResizeLimits(S32& new_min_width, S32& new_min_height
 			new_min_height = llmax(new_min_height, floaterp->getMinHeight() + floater_header_size + tabcntr_header_height);
 		}
 	}
+}
+
+void LLMultiFloater::closeDockedFloater()
+{
+	LLFloater* floater = getActiveFloater();
+	// is user closeable and is system closeable
+	if (floater && floater->canClose() && floater->isCloseable())
+	{
+		floater->closeFloater();
+
+		// EXT-5695 (Tabbed IM window loses focus if close any tabs by Ctrl+W)
+		// bring back focus on tab container if there are any tab left
+		if(mTabContainer->getTabCount() > 0)
+		{
+			mTabContainer->setFocus(TRUE);
+		}
+		else
+		{
+			// Call closeFloater() here so that focus gets properly handed over
+			closeFloater();
+		}
+
+		return;
+	}
+
+	// Close multifloater itself if we can't close any hosted floaters
+	closeFloater();
 }
