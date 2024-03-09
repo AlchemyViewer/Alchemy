@@ -283,6 +283,7 @@ void LLHandlerUtil::addNotifPanelToIM(const LLNotificationPtr& notification)
 	// update IM floater and counters
 	LLSD arg;
 	arg["session_id"] = session_id;
+	arg["notification_id"] = notification->getID();
 	arg["num_unread"] = ++(session->mNumUnread);
 	arg["participant_unread"] = ++(session->mParticipantUnreadMessageCount);
 	LLIMModel::getInstance()->mNewMsgSignal(arg);
@@ -321,6 +322,7 @@ void LLHandlerUtil::decIMMesageCounter(const LLNotificationPtr& notification)
 	{
 	LLSD arg;
 	arg["session_id"] = session_id;
+	arg["notification_id"] = notification->getID();
 	session->mNumUnread--;
 	arg["num_unread"] = session->mNumUnread;
 	session->mParticipantUnreadMessageCount--;
