@@ -1618,6 +1618,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropFile(LLWindow 
 									if (idLocalBitmap.notNull())
 									{
 										pObj->setTETexture(pick.mObjectFace, LLLocalBitmapMgr::instance().getWorldID(idLocalBitmap));
+										pObj->sendTEUpdate();
 									}
 								}
 								else if (LLAssetType::AT_MATERIAL == mDragItems.front().first->getType())
