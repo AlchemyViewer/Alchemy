@@ -150,7 +150,7 @@ protected:
 	static void applyMUPose(std::string& text);
 	static void applyOOCClose(std::string& text);
 
-	void updateUsedEmojis(LLWString text);
+	void updateUsedEmojis(const LLWString& text);
 
 	S32  mFloaterExtraWidth;
 
