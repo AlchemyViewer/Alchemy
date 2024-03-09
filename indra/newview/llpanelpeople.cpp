@@ -787,7 +787,7 @@ void LLPanelPeople::updateAccordionTabTitles()
 		{
 			mOnlineFriendList->setDirty(true, !mOnlineFriendList->filterHasMatches());
 			LLStringUtil::format_map_t args_online;
-			args_online["[COUNT]"] = llformat("%d", mOnlineFriendList->size());
+			args_online["[COUNT]"] = std::to_string(mOnlineFriendList->size());
 			std::string online_title = getString("online_friends_count", args_online);
 
 			mAccordionOnlineTab->setTitle(online_title);
@@ -797,7 +797,7 @@ void LLPanelPeople::updateAccordionTabTitles()
 		{
 			mAllFriendList->setDirty(true, !mAllFriendList->filterHasMatches());
 			LLStringUtil::format_map_t args_all;
-			args_all["[COUNT]"] = llformat("%d", mAllFriendList->size());
+			args_all["[COUNT]"] = std::to_string(mAllFriendList->size());
 			std::string all_title = getString("all_friends_count", args_all);
 
 			mAccordionAllTab->setTitle(all_title);
@@ -895,11 +895,11 @@ void LLPanelPeople::updateNearbyList()
 		LLWorld::getInstance()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
 
 		LLViewerRegion* cur_region = gAgent.getRegion();
-		mNearbyCountText->setTextArg("[COUNT]", llformat("%d", mNearbyList->size()));
+		mNearbyCountText->setTextArg("[COUNT]", std::to_string(mNearbyList->size()));
 
 		if (cur_region)
 		{
-			mNearbyCountText->setTextArg("[REGION]", llformat("%s", cur_region->getName()));
+			mNearbyCountText->setTextArg("[REGION]", cur_region->getName());
 		}
 // [RLVa:KB] - Checked: RLVa-2.0.3
 	}
