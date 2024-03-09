@@ -97,7 +97,7 @@ public:
 	/*virtual*/ void updateMessages();
 	void reloadMessages(bool clean_messages = false);
 	static void onSendMsg(LLUICtrl*, void*);
-	void sendMsgFromInputEditor();
+	void sendMsgFromInputEditor(bool ooc_chat = false);
 	void sendMsg(const std::string& msg);
 
 	// callback for LLIMModel on new messages
@@ -143,6 +143,8 @@ public:
 
 	bool needsTitleOverwrite() { return mSessionNameUpdatedForTyping && mOtherTyping; }
 	S32 getLastChatMessageIndex() {return mLastMessageIndex;}
+
+	BOOL handleKeyHere(KEY key, MASK mask) override;
 private:
 
 	/*virtual*/ void refresh();

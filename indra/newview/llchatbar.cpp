@@ -173,6 +173,12 @@ BOOL LLChatBar::handleKeyHere( KEY key, MASK mask )
 			sendChat(CHAT_TYPE_SHOUT);
 			handled = TRUE;
 		}
+		else if (mask == MASK_ALT)
+		{
+			// shout
+			sendChat(CHAT_TYPE_OOC);
+			handled = TRUE;
+		}
 		else if (mask == MASK_NONE)
 		{
 			// say

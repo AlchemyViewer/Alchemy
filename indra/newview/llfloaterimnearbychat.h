@@ -92,10 +92,7 @@ public:
 	static void sendChatFromViewer(const LLWString &wtext, EChatType type, BOOL animate);
 
 	template <class T>
-	void processChatIntern(T* editor, EChatType type);
-
-	template <class T>
-	static void processChat(T* editor, EChatType type);
+	static void processChat(T* editor, EChatType type, std::function<void(const LLWString&)> func = nullptr);
 
 	static bool isWordsName(const std::string& name);
 
@@ -149,7 +146,7 @@ private:
 };
 
 template <class T>
-void LLFloaterIMNearbyChat::processChat(T* editor, EChatType type)
+void LLFloaterIMNearbyChat::processChat(T* editor, EChatType type, std::function<void(const LLWString&)> emoji_func)
 {
 	if (editor)
 	{
@@ -158,10 +155,11 @@ void LLFloaterIMNearbyChat::processChat(T* editor, EChatType type)
 		LLWStringUtil::replaceChar(text, 182, '\n'); // Convert paragraph symbols back into newlines.
 		if (!text.empty())
 		{
-			// Check if this is destined for another channel
-			S32 channel = 0;
-			stripChannelNumber(text, &channel);
-
+			if (emoji_func != nullptr)
+			{
+				emoji_func(text);
+			}
+			else
 			{
 				LLEmojiDictionary* dictionary = LLEmojiDictionary::getInstance();
 				llassert_always(dictionary);
@@ -180,59 +178,17 @@ void LLFloaterIMNearbyChat::processChat(T* editor, EChatType type)
 					LLFloaterEmojiPicker::saveState();
 			}
 
-			std::string utf8text = wstring_to_utf8str(text);
-			// Try to trigger a gesture, if not chat to a script.
-			std::string utf8_revised_text;
-			if (0 == channel)
-			{
-				applyOOCClose(utf8text);
-				applyMUPose(utf8text);
-
-				// discard returned "found" boolean
-				if (!LLGestureMgr::instance().triggerAndReviseString(utf8text, &utf8_revised_text))
-				{
-					utf8_revised_text = utf8text;
-				}
-			}
-			else
-			{
-				utf8_revised_text = utf8text;
-			}
-
-			utf8_revised_text = utf8str_trim(utf8_revised_text);
-
-			type = processChatTypeTriggers(type, utf8_revised_text);
-
-			if (!utf8_revised_text.empty() && !ALChatCommand::parseCommand(utf8_revised_text))
-			{
-				// Chat with animation
-				sendChatFromViewer(utf8_revised_text, type, gSavedSettings.getBOOL("PlayTypingAnim"));
-			}
-		}
-
-		editor->setText(LLStringExplicit(""));
-	}
-
-	gAgent.stopTyping();
-}
-
-template <class T>
-void LLFloaterIMNearbyChat::processChatIntern(T* editor, EChatType type)
-{
-	if (editor)
-	{
-		LLWString text = editor->getWText();
-		LLWStringUtil::trim(text);
-		LLWStringUtil::replaceChar(text, 182, '\n'); // Convert paragraph symbols back into newlines.
-		if (!text.empty())
-		{
 			// Check if this is destined for another channel
 			S32 channel = 0;
 			stripChannelNumber(text, &channel);
 
-			updateUsedEmojis(text);
-
 			std::string utf8text = wstring_to_utf8str(text);
+
+			if (type == CHAT_TYPE_OOC)
+			{
+				utf8text = fmt::format("{} {} {}", gSavedSettings.getString("ChatOOCPrefix"), utf8text, gSavedSettings.getString("ChatOOCPostfix"));
+			}
+
 			// Try to trigger a gesture, if not chat to a script.
 			std::string utf8_revised_text;
 			if (0 == channel)
@@ -253,7 +209,8 @@ void LLFloaterIMNearbyChat::processChatIntern(T* editor, EChatType type)
 
 			utf8_revised_text = utf8str_trim(utf8_revised_text);
 
-			type = processChatTypeTriggers(type, utf8_revised_text);
+			EChatType nType = (type == CHAT_TYPE_OOC ? CHAT_TYPE_NORMAL : type);
+			type = processChatTypeTriggers(nType, utf8_revised_text);
 
 			if (!utf8_revised_text.empty() && !ALChatCommand::parseCommand(utf8_revised_text))
 			{

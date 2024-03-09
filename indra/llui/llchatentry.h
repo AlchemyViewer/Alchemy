@@ -79,11 +79,13 @@ private:
 	 */
 	void	expandText();
 
+public:
 	/**
 	 * Implements line history so previous entries can be recalled by CTRL UP/DOWN
 	 */
 	void	updateHistory();
 
+private:
 	BOOL	handleSpecialKey(const KEY key, const MASK mask);
 
 

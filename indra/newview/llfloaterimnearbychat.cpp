@@ -508,6 +508,12 @@ BOOL LLFloaterIMNearbyChat::handleKeyHere( KEY key, MASK mask )
 		sendChat(CHAT_TYPE_SHOUT);
 		handled = TRUE;
 	}
+	else if (KEY_RETURN == key && mask == MASK_ALT)
+	{
+		// shout
+		sendChat(CHAT_TYPE_OOC);
+		handled = TRUE;
+	}
 
 	if((mask == MASK_ALT) && isTornOff())
 	{
@@ -687,7 +693,7 @@ EChatType LLFloaterIMNearbyChat::processChatTypeTriggers(EChatType type, std::st
 
 void LLFloaterIMNearbyChat::sendChat( EChatType type )
 {
-	processChatIntern(mInputEditor, type);
+	processChat(mInputEditor, type, [&](const auto& emojistr) { updateUsedEmojis(emojistr); });
 
 	// If the user wants to stop chatting on hitting return, lose focus
 	// and go out of chat mode.
