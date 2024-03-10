@@ -1601,7 +1601,7 @@ bool LLWorld::getAvatar(const LLUUID& idAvatar, LLVector3d& posAvatar) const
 		{
 			if (idAvatar == pRegion->mMapAvatarIDs[idxAgent])
 			{
-				posAvatar = unpackLocalToGlobalPosition(pRegion->mMapAvatars[idxAgent], pRegion->getOriginGlobal());
+				posAvatar = unpackLocalToGlobalPosition(pRegion->mMapAvatars[idxAgent], pRegion->getOriginGlobal(), pRegion->getWidthScaleFactor());
 				return true;
 			}
 		}
