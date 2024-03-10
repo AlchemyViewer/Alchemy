@@ -333,10 +333,10 @@
         label="Open Dyslexic"
         name="opendyslexic"
         value="font_main_opendyslexic.xml"/>
-	  <item
-		  label="Noto Sans"
-		  name="notosans"
-		  value="font_main_notosans.xml"/>
+    <item
+		label="Noto Sans"
+		name="notosans"
+		value="font_main_notosans.xml"/>
     <item
         label="Source Sans 3"
         name="sourcesans"
@@ -380,10 +380,10 @@ Monospace Font(restart required):
     <item
         label="Source Code Pro"
         name="sourcecodepro"
-        value="font_main_sourcecodepro.xml"/>
+        value="font_mono_sourcecodepro.xml"/>
     <item
         label="Ubuntu Mono"
         name="ubuntumono"
-        value="font_main_ubuntu.xml"/>
+        value="font_mono_ubuntu.xml"/>
   </combo_box>
 </panel>
