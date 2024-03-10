@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <fonts>
 	<font name="Monospace">
-		<file>IBMPlexMono-Regular.otf</file>
+		<file>NotoSansMono-Regular.otf</file>
 	</font>
 
 	<font name="Monospace" font_style="BOLD">
-		<file>IBMPlexMono-Bold.otf</file>
+		<file>NotoSansMono-Bold.otf</file>
 	</font>
 
 	<font name="Monospace" font_style="ITALIC">
-		<file>IBMPlexMono-Italic.otf</file>
+		<file>NotoSansMono-Italic.otf</file>
 	</font>
 
 	<font name="Monospace" font_style="BOLD|ITALIC">
-		<file>IBMPlexMono-BoldItalic.otf</file>
+		<file>NotoSansMono-BoldItalic.otf</file>
 	</font>
 
 	<font_size name="Monospace" size="8.0" />

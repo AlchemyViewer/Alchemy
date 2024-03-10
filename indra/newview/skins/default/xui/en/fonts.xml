@@ -4,16 +4,17 @@
 	<font name="default" comment="default font files (global fallbacks)">
 		<file>DejaVuSans.ttf</file>
 		<file functor="is_emoji">TwemojiSVG.ttf</file>
-		<file>NotoSans-Regular.ttf</file>
+		<file>NotoSans-Regular.otf</file>
 		<file load_collection="true">NotoSansCJK-Regular.ttc</file>
-		<file>NotoSansOriya-Regular.ttf</file>
-		<file>NotoSansKannada-Regular.ttf</file>
-		<file>NotoSansDevanagari-Regular.ttf</file>
-		<file>NotoNaskhArabicUI-Regular.ttf</file>
-		<file>NotoLoopedThaiUI-Regular.ttf</file>
-		<file>NotoSansSymbols-Regular.ttf</file>
-		<file>NotoSansSymbols2-Regular.ttf</file>
-		<file>NotoSansMath-Regular.ttf</file>
+		<file>NotoSansOriya-Regular.otf</file>
+		<file>NotoSansKannadaUI-Regular.otf</file>
+		<file>NotoSansDevanagariUI-Regular.otf</file>
+		<file>NotoNaskhArabicUI-Regular.otf</file>
+		<file>NotoSansThai-Regular.otf</file>
+		<file>NotoSansEgyptianHieroglyphs-Regular.otf</file>
+		<file>NotoSansSymbols-Regular.otf</file>
+		<file>NotoSansSymbols2-Regular.otf</file>
+		<file>NotoSansMath-Regular.otf</file>
 		<os name="Windows">
 			<file load_collection="true">YuGothR.ttc</file>
 			<file>Seguiemj.ttf</file>
@@ -60,15 +61,15 @@
 	  comment="Name of bold sans-serif font"
 	  font_style="BOLD">
 		<file>DejaVuSans-Bold.ttf</file>
-		<file>NotoSans-Bold.ttf</file>
+		<file>NotoSans-Bold.otf</file>
 		<file load_collection="true">NotoSansCJK-Bold.ttc</file>
-		<file>NotoSansTamil-Bold.ttf</file>
-		<file>NotoSansOriya-Bold.ttf</file>
-		<file>NotoSansKannada-Bold.ttf</file>
-		<file>NotoSansDevanagari-Bold.ttf</file>
-		<file>NotoNaskhArabicUI-Bold.ttf</file>
-		<file>NotoLoopedThaiUI-Bold.ttf</file>
-		<file>NotoSansSymbols-Bold.ttf</file>
+		<file>NotoSansTamilUI-Bold.otf</file>
+		<file>NotoSansOriya-Bold.otf</file>
+		<file>NotoSansKannadaUI-Bold.otf</file>
+		<file>NotoSansDevanagariUI-Bold.otf</file>
+		<file>NotoNaskhArabicUI-Bold.otf</file>
+		<file>NotoSansThai-Bold.otf</file>
+		<file>NotoSansSymbols-Bold.otf</file>
 		<os name="Windows">
 			<file>arialbd.ttf</file>
 			<file load_collection="true">YuGothB.ttc</file>
@@ -83,14 +84,14 @@
 	  comment="Name of italic sans-serif font"
 	  font_style="ITALIC">
 		<file>DejaVuSans-Oblique.ttf</file>
-		<file>NotoSans-Italic.ttf</file>
+		<file>NotoSans-Italic.otf</file>
 	</font>
 
 	<font name="SansSerif"
 	  comment="Name of bold italic sans-serif font"
 	  font_style="BOLD|ITALIC">
 		<file>DejaVuSans-BoldOblique.ttf</file>
-		<file>NotoSans-BoldItalic.ttf</file>
+		<file>NotoSans-BoldItalic.otf</file>
 	</font>
 
 	<font name="Emoji"
@@ -107,11 +108,12 @@
 	<font name="Monospace"
 	  comment="Name of monospace font">
 		<file>DejaVuSansMono.ttf</file>
-		<file>NotoSansMono-Regular.ttf</file>
+		<file>NotoSansMono-Regular.otf</file>
 	</font>
 
 	<font name="Monospace" font_style="BOLD">
 		<file>DejaVuSansMono-Bold.ttf</file>
+		<file>NotoSansMono-Bold.otf</file>
 	</font>
 
 	<font name="Monospace" font_style="ITALIC">
@@ -256,19 +258,38 @@
 
 	<!--NotoSans-->
 	<font name="NotoSans">
-		<file>NotoSans-Regular.ttf</file>
+		<file>NotoSans-Regular.otf</file>
+		<file functor="is_emoji">TwemojiSVG.ttf</file>
+		<file load_collection="true">NotoSansCJK-Regular.ttc</file>
+		<file>NotoSansOriya-Regular.otf</file>
+		<file>NotoSansKannadaUI-Regular.otf</file>
+		<file>NotoSansDevanagariUI-Regular.otf</file>
+		<file>NotoNaskhArabicUI-Regular.otf</file>
+		<file>NotoSansThai-Regular.otf</file>
+		<file>NotoSansEgyptianHieroglyphs-Regular.otf</file>
+		<file>NotoSansSymbols-Regular.otf</file>
+		<file>NotoSansSymbols2-Regular.otf</file>
+		<file>NotoSansMath-Regular.otf</file>
 	</font>
 
 	<font name="NotoSans" font_style="BOLD">
-		<file>NotoSans-Bold.ttf</file>
+		<file>NotoSans-Bold.otf</file>
+		<file load_collection="true">NotoSansCJK-Bold.ttc</file>
+		<file>NotoSansTamilUI-Bold.otf</file>
+		<file>NotoSansOriya-Bold.otf</file>
+		<file>NotoSansKannadaUI-Bold.otf</file>
+		<file>NotoSansDevanagariUI-Bold.otf</file>
+		<file>NotoNaskhArabicUI-Bold.otf</file>
+		<file>NotoSansThai-Bold.otf</file>
+		<file>NotoSansSymbols-Bold.otf</file>
 	</font>
 
 	<font name="NotoSans" font_style="ITALIC">
-		<file>NotoSans-Italic.ttf</file>
+		<file>NotoSans-Italic.otf</file>
 	</font>
 
 	<font name="NotoSans" font_style="BOLD|ITALIC">
-		<file>NotoSans-BoldItalic.ttf</file>
+		<file>NotoSans-BoldItalic.otf</file>
 	</font>
 
 	<font_size name="Monospace" font="NotoSans" size="8.0" />
@@ -303,12 +324,12 @@
 	<!--Source Sans 3-->
 	<font name="SourceSans">
 		<file>SourceSans3-Regular.otf</file>
-		<file load_collection="true">SourceHanSans-Regular.ttc</file>
+		<file load_collection="true">NotoSansCJK-Regular.ttc</file>
 	</font>
 
 	<font name="SourceSans" font_style="BOLD">
 		<file>SourceSans3-Bold.otf</file>
-		<file load_collection="true">SourceHanSans-Bold.ttc</file>
+		<file load_collection="true">NotoSansCJK-Regular.ttc</file>
 	</font>
 
 	<font name="SourceSans" font_style="ITALIC">
@@ -528,7 +549,11 @@
 
 	<!--Noto Sans Mono-->
 	<font name="NotoSansMono">
-		<file>NotoSansMono-Regular.ttf</file>
+		<file>NotoSansMono-Regular.otf</file>
+	</font>
+
+	<font name="NotoSansMono" font_style="BOLD">
+		<file>NotoSansMono-Bold.otf</file>
 	</font>
 
 	<font_size name="Monospace" font="NotoSansMono" size="8.0" />
@@ -551,12 +576,12 @@
 	<!--Source Code Pro-->
 	<font name="SourceCodePro">
 		<file>SourceCodePro-Regular.otf</file>
-		<file load_collection="true">SourceHanSans-Regular.ttc</file>
+		<file load_collection="true">NotoSansCJK-Regular.ttc</file>
 	</font>
 
 	<font name="SourceCodePro" font_style="BOLD">
 		<file>SourceCodePro-Bold.otf</file>
-		<file load_collection="true">SourceHanSans-Bold.ttc</file>
+		<file load_collection="true">NotoSansCJK-Regular.ttc</file>
 	</font>
 
 	<font name="SourceCodePro" font_style="ITALIC">

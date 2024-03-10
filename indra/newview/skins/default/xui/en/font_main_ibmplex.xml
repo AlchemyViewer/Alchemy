@@ -1,46 +1,46 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <fonts>
-  <font name="default">
-    <file>IBMPlexSans-Regular.otf</file>
+	<font name="default">
+		<file>IBMPlexSans-Regular.otf</file>
 		<file>IBMPlexSansJP-Regular.otf</file>
 		<file>IBMPlexSansKR-Regular.otf</file>
 		<file>IBMPlexSansThai-Regular.otf</file>
 		<file>IBMPlexSansHebrew-Regular.otf</file>
 		<file>IBMPlexSansDevanagari-Regular.otf</file>
 		<file>IBMPlexSansArabic-Regular.otf</file>
-  </font>
+	</font>
 
-  <font name="SansSerif">
-    <file>IBMPlexSans-Regular.otf</file>
+	<font name="SansSerif">
+		<file>IBMPlexSans-Regular.otf</file>
 		<file>IBMPlexSansJP-Regular.otf</file>
 		<file>IBMPlexSansKR-Regular.otf</file>
 		<file>IBMPlexSansThai-Regular.otf</file>
 		<file>IBMPlexSansHebrew-Regular.otf</file>
 		<file>IBMPlexSansDevanagari-Regular.otf</file>
 		<file>IBMPlexSansArabic-Regular.otf</file>
-  </font>
+	</font>
 
-  <font name="SansSerif" font_style="BOLD">
-    <file>IBMPlexSans-Bold.otf</file>
+	<font name="SansSerif" font_style="BOLD">
+		<file>IBMPlexSans-Bold.otf</file>
 		<file>IBMPlexSansJP-Bold.otf</file>
 		<file>IBMPlexSansKR-Bold.otf</file>
 		<file>IBMPlexSansThai-Bold.otf</file>
 		<file>IBMPlexSansHebrew-Bold.otf</file>
 		<file>IBMPlexSansDevanagari-Bold.otf</file>
 		<file>IBMPlexSansArabic-Bold.otf</file>
-  </font>
+	</font>
 
-  <font name="SansSerif" font_style="ITALIC">
-    <file>IBMPlexSans-Italic.otf</file>
-  </font>
+	<font name="SansSerif" font_style="ITALIC">
+		<file>IBMPlexSans-Italic.otf</file>
+	</font>
 
-  <font name="SansSerif" font_style="BOLD|ITALIC">
-    <file>IBMPlexSans-BoldItalic.otf</file>
-  </font>
+	<font name="SansSerif" font_style="BOLD|ITALIC">
+		<file>IBMPlexSans-BoldItalic.otf</file>
+	</font>
 
-  <font name="OverrideTest">
-    <file>IBMPlexSans-Regular.otf</file>
-  </font>
+	<font name="OverrideTest">
+		<file>IBMPlexSans-Regular.otf</file>
+	</font>
 
 	<font_size name="Huge" size="16.0" />
 	<font_size name="Large" size="12.0" />

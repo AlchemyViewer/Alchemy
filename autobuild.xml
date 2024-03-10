@@ -696,11 +696,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d8e58016074727c9b4fffb8623035adac7dda2933f61e03998cac1d75e80a2da4ece61f9222bdc589e3be10154e80beda4eb7d4ff8a3b2aab4736350d27098e0</string>
+              <string>0bd93717f0a839f908cfadcb055918ba600107b9e4aac4bb3eadb686a523c612ec659daf7f1f030ed62d7fe360c60749658a9e088efb2cb3b8af9963f82a45ce</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/427d30e.2397/fonts-427d30e-common-2397.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/e04de2e.2401/fonts-e04de2e-common-2401.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -713,7 +713,7 @@
         <key>copyright</key>
         <string>Various Licenses</string>
         <key>version</key>
-        <string>427d30e</string>
+        <string>e04de2e</string>
         <key>name</key>
         <string>fonts</string>
         <key>canonical_repo</key>

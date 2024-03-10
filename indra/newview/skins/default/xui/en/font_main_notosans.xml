@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<fonts>
+  <font name="default">
+    <file>NotoSans-Regular.otf</file>
+    <file functor="is_emoji">TwemojiSVG.ttf</file>
+    <file load_collection="true">NotoSansCJK-Regular.ttc</file>
+    <file>NotoSansOriya-Regular.otf</file>
+    <file>NotoSansKannadaUI-Regular.otf</file>
+    <file>NotoSansDevanagariUI-Regular.otf</file>
+    <file>NotoNaskhArabicUI-Regular.otf</file>
+    <file>NotoSansThai-Regular.otf</file>
+    <file>NotoSansEgyptianHieroglyphs-Regular.otf</file>
+    <file>NotoSansSymbols-Regular.otf</file>
+    <file>NotoSansSymbols2-Regular.otf</file>
+    <file>NotoSansMath-Regular.otf</file>
+  </font>
+
+  <font name="SansSerif">
+    <file>NotoSans-Regular.otf</file>
+    <file functor="is_emoji">TwemojiSVG.ttf</file>
+    <file load_collection="true">NotoSansCJK-Regular.ttc</file>
+    <file>NotoSansOriya-Regular.otf</file>
+    <file>NotoSansKannadaUI-Regular.otf</file>
+    <file>NotoSansDevanagariUI-Regular.otf</file>
+    <file>NotoNaskhArabicUI-Regular.otf</file>
+    <file>NotoSansThai-Regular.otf</file>
+    <file>NotoSansEgyptianHieroglyphs-Regular.otf</file>
+    <file>NotoSansSymbols-Regular.otf</file>
+    <file>NotoSansSymbols2-Regular.otf</file>
+    <file>NotoSansMath-Regular.otf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD">
+    <file>NotoSans-Bold.otf</file>
+    <file load_collection="true">NotoSansCJK-Bold.ttc</file>
+    <file>NotoSansTamilUI-Bold.otf</file>
+    <file>NotoSansOriya-Bold.otf</file>
+    <file>NotoSansKannadaUI-Bold.otf</file>
+    <file>NotoSansDevanagariUI-Bold.otf</file>
+    <file>NotoNaskhArabicUI-Bold.otf</file>
+    <file>NotoSansThai-Bold.otf</file>
+    <file>NotoSansSymbols-Bold.otf</file>
+  </font>
+
+  <font name="SansSerif" font_style="ITALIC">
+    <file>NotoSans-Italic.otf</file>
+  </font>
+
+  <font name="SansSerif" font_style="BOLD|ITALIC">
+    <file>NotoSans-BoldItalic.otf</file>
+  </font>
+
+  <font name="OverrideTest">
+    <file>NotoSans-Regular.otf</file>
+  </font>
+
+	<font_size name="Huge" size="16.0" />
+	<font_size name="Large" size="11.4" />
+	<font_size name="Medium" size="9.4" />
+	<font_size name="Small" size="8.4" />
+</fonts>

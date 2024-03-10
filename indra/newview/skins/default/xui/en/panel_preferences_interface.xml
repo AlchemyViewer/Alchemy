@@ -333,6 +333,10 @@
         label="Open Dyslexic"
         name="opendyslexic"
         value="font_main_opendyslexic.xml"/>
+	  <item
+		  label="Noto Sans"
+		  name="notosans"
+		  value="font_main_notosans.xml"/>
     <item
         label="Source Sans 3"
         name="sourcesans"
@@ -369,6 +373,10 @@ Monospace Font(restart required):
         label="IBM Plex Mono"
         name="ibmplexmono"
         value="font_mono_ibmplex.xml"/>
+    <item
+        label="Noto Sans Mono"
+        name="notosansmono"
+        value="font_mono_notosans.xml"/>
     <item
         label="Source Code Pro"
         name="sourcecodepro"
