@@ -54,6 +54,7 @@
 		<item label="IBM Plex Sans" name="ibmplex"/>
 		<item label="IBM Plex Mono" name="ibmplexmono"/>
 		<item label="Open Dyslexic" name="opendyslexic"/>
+		<item label="Noto Sans" name="notosans"/>
 		<item label="源ノ角ゴシック" name="sourcesans"/>
 		<item label="Ubuntu" name="ubuntu"/>
 	</combo_box>
@@ -63,6 +64,7 @@
 	<combo_box name="ui_font_name">
 		<item label="Deja Vu Sans Mono" name="dejavumono"/>
 		<item label="IBM Plex Mono" name="ibmplexmono"/>
+		<item label="Noto Sans Mono" name="notosansmono"/>
 		<item label="源ノ角ゴシック" name="sourcecodepro"/>
 		<item label="Ubuntu Mono" name="ubuntumono"/>
 	</combo_box>

@@ -74,7 +74,7 @@ default
 			<combo_box.item label="Monospace" name="Monospace" value="Monospace"/>
 			<combo_box.item label="Noto Sans Mono" name="NotoSansMono" value="NotoSansMono"/>
 			<combo_box.item label="Open Dyslexic Mono" name="OpenDyslexicMono" value="OpenDyslexicMono"/>
-			<combo_box.item label="Source Code Pro" name="SourceCodePro" value="SourceCodePro"/>
+			<combo_box.item label="源ノ角ゴシック" name="SourceCodePro" value="SourceCodePro"/>
 			<combo_box.item label="Ubuntu Mono" name="UbuntuMono" value="UbuntuMono"/>
 		</combo_box>
 		<text name="script_font_size_label">

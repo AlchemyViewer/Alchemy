@@ -184,7 +184,7 @@
 			<key>blocked_recvim_remote</key>
 			<map>
 				<key>value</key>
-				<string>あなたがメッセージを送信した住民は、現在あなたのインスタントメッセージを読むことができません。お手数ですが、後でもう一度お試しください。</string>
+				<string>あなたがメッセージを送信した住民は、現在インスタントメッセージを読むことができません。お手数ですが、後でもう一度お試しください。</string>
 				<key>description</key>
 				<string>ＩＭがブロックされたときに相手に送信されるメッセージです。</string>
 				<key>label</key>
@@ -192,14 +192,25 @@
 				<key>customizable</key>
 				<boolean>1</boolean>
 			</map>
-			<key>blocked_tplurerequest_remote</key>
+			<key>blocked_tplure_remote</key>
 			<map>
 				<key>value</key>
-				<string>あなたが誘った住民は、現在あなたの要求を受け入れることができません。お手数ですが、後でもう一度試しください。</string>
+				<string>あなたがテレポートをオファーした住民は、現在要求を受け入れることができません。お手数ですが、後でもう一度試しください。</string>
 				<key>description</key>
 				<string>テレポートのオファーがブロックされたときに、相手に送信されるメッセージです。</string>
 				<key>label</key>
 				<string>ブロックされたテレポートのオファー（リモート）</string>
+				<key>customizable</key>
+				<boolean>1</boolean>
+			</map>
+			<key>blocked_tprequest_remote</key>
+			<map>
+				<key>value</key>
+				<string>あなたがテレポートをリクエストした住民は、現在要求を受け入れることができません。お手数ですが、後でもう一度試してください。</string>
+				<key>description</key>
+				<string>テレポートのリクエストがブロックされたときに、リモートパーティに送信されるメッセージです。</string>
+				<key>label</key>
+				<string>ブロックされたテレポートのリクエスト（リモート）</string>
 				<key>customizable</key>
 				<boolean>1</boolean>
 			</map>

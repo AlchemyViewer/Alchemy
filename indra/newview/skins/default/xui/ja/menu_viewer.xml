@@ -244,7 +244,8 @@
 			<menu_item_check label="選択ビームを表示する" name="Show Selection Beam"/>
 			<menu_item_check label="区画の境界のアウトラインを表示" name="RenderParcelSelection"/>
 			<menu_item_check label="ビルドできる最大高度の境界を表示" name="RenderParcelSelectionToMaxHeight"/>
-			<menu_item_check label="ハイライトを透過" name="Highlight Transparent"/>
+			<menu_item_check label="透過をハイライト" name="Highlight Transparent"/>
+			<menu_item_check label="透過プローブをハイライト" name="Highlight Transparent Probes"/>
 			<menu_item_separator/>
 			<menu_item_check label="Ctrl＋ドラッグでオブジェクトを掴む" name="EnableCtrlDragMovement"/>
 			<menu_item_separator/>
