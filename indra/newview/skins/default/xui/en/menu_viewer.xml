@@ -1109,7 +1109,8 @@
             </menu_item_check>
             <menu_item_check
              label="Use Shared Environment"
-             name="Use Shared Environment">
+             name="Use Shared Environment"
+			 shortcut="control|shift|X">
                 <menu_item_check.on_click
                  function="World.EnvSettings"
                  parameter="region" />
@@ -3674,7 +3675,7 @@ function="World.EnvPreset"
             <menu_item_check
              label="Object-Object Occlusion"
              name="Object-Object Occlusion"
-             shortcut="control|alt|shift|o"
+             shortcut="control|alt|shift|O"
              use_mac_ctrl="true">
                 <menu_item_check.on_check
                  function="CheckControl"
