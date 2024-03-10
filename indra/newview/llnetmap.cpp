@@ -854,7 +854,7 @@ BOOL LLNetMap::handleToolTip(S32 x, S32 y, MASK mask)
 
     // If the cursor is near an avatar on the minimap, a mini-inspector will be
     // shown for the avatar, instead of the normal map tooltip.
-//	if (handleToolTipAgent(mClosestAgentToCursor))
+//    if (handleToolTipAgent(mClosestAgentToCursor))
 // [RLVa:KB] - Checked: RLVa-1.2.2
 	bool fRlvCanShowName = (mClosestAgentToCursor.notNull()) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, mClosestAgentToCursor));
 	if ( (fRlvCanShowName) && (handleToolTipAgent(mClosestAgentToCursor)) )
@@ -862,11 +862,6 @@ BOOL LLNetMap::handleToolTip(S32 x, S32 y, MASK mask)
     {
         return true;
     }
-
-// [RLVa:KB] - Checked: RLVa-1.2.2
-	LLStringUtil::format_map_t args; LLAvatarName avName;
-	args["[AGENT]"] = ( (!fRlvCanShowName) && (mClosestAgentToCursor.notNull()) && (LLAvatarNameCache::get(mClosestAgentToCursor, &avName)) ) ? RlvStrings::getAnonym(avName) + "\n" : "";
-// [/RLVa:KB]
 
     // The popup menu uses the hover parcel when it is open and the mouse is on
     // top of it, with some additional tolerance. Returning early here prevents
@@ -895,7 +890,7 @@ BOOL LLNetMap::handleToolTip(S32 x, S32 y, MASK mask)
     {
 //        std::string region_name = region->getName();
 // [RLVa:KB] - Checked: RLVa-1.2.2
-		std::string region_name = (RlvActions::canShowLocation()) ? region->getName() : RlvStrings::getString(RlvStringKeys::Hidden::Region);
+        std::string region_name = (RlvActions::canShowLocation()) ? region->getName() : RlvStrings::getString(RlvStringKeys::Hidden::Region);
 // [/RLVa:KB]
         if (!region_name.empty())
         {
@@ -967,13 +962,17 @@ BOOL LLNetMap::handleToolTip(S32 x, S32 y, MASK mask)
         tool_tip_hint_msg = mToolTipHintMsg;
     }
 
- //   LLStringUtil::format_map_t args;
+	LLStringUtil::format_map_t args;
     args["[PARCEL_NAME_MSG]"]       = parcel_name_msg.empty() ? "" : parcel_name_msg + '\n';
     args["[PARCEL_SALE_PRICE_MSG]"] = parcel_sale_price_msg.empty() ? "" : parcel_sale_price_msg + '\n';
     args["[PARCEL_SALE_AREA_MSG]"]  = parcel_sale_area_msg.empty() ? "" : parcel_sale_area_msg + '\n';
     args["[PARCEL_OWNER_MSG]"]      = parcel_owner_msg.empty() ? "" : parcel_owner_msg + '\n';
     args["[REGION_NAME_MSG]"]       = region_name_msg.empty() ? "" : region_name_msg + '\n';
     args["[TOOL_TIP_HINT_MSG]"]     = tool_tip_hint_msg.empty() ? "" : tool_tip_hint_msg + '\n';
+// [RLVa:KB] - Checked: RLVa-1.2.2
+	LLAvatarName avName;
+	args["[AGENT]"] = ( (!fRlvCanShowName) && (mClosestAgentToCursor.notNull()) && (LLAvatarNameCache::get(mClosestAgentToCursor, &avName)) ) ? RlvStrings::getAnonym(avName) + "\n" : "";
+// [/RLVa:KB]
 
     std::string msg                 = mToolTipMsg;
     LLStringUtil::format(msg, args);

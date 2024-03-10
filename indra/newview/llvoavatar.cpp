@@ -3258,6 +3258,7 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
 	const F32 time_visible = mTimeVisible.getElapsedTimeF32();
 	static const LLCachedControl<F32> NAME_SHOW_TIME(gSavedSettings, "RenderNameShowTime");	// seconds
 	static const LLCachedControl<F32> FADE_DURATION(gSavedSettings, "RenderNameFadeDuration"); // seconds
+    static LLCachedControl<bool> use_chat_bubbles(gSavedSettings, "UseChatBubbles");
 // [RLVa:KB] - Checked: RLVa-2.0.1
 	bool fRlvShowAvTag = true, fRlvShowAvName = true;
 	if (RlvActions::isRlvEnabled())
@@ -3266,14 +3267,15 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
 		fRlvShowAvName = (fRlvShowAvTag) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, getID()));
 	}
 // [/RLVa:KB]
-	static const LLCachedControl<bool> use_chat_bubble(gSavedSettings, "UseChatBubbles");
-	bool visible_chat = use_chat_bubble && (mChats.size() || mTyping);
+	bool visible_chat = use_chat_bubbles && (mChats.size() || mTyping);
 	bool render_name =	visible_chat ||
 // [RLVa:KB] - Checked: RLVa-2.0.1
-						((fRlvShowAvTag) &&
+		((fRlvShowAvTag) &&
+		 ((sRenderName == RENDER_NAME_ALWAYS) ||
+		  (sRenderName == RENDER_NAME_FADE && time_visible < NAME_SHOW_TIME)));
 // [/RLVa:KB]
-		((sRenderName == RENDER_NAME_ALWAYS) ||
-		                 (sRenderName == RENDER_NAME_FADE && time_visible < NAME_SHOW_TIME)));
+//		(((sRenderName == RENDER_NAME_ALWAYS) ||
+//		  (sRenderName == RENDER_NAME_FADE && time_visible < NAME_SHOW_TIME)));
 	// If it's your own avatar, don't draw in mouselook, and don't
 	// draw if we're specifically hiding our own name.
 	if (isSelf())

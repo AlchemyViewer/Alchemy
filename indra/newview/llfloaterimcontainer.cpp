@@ -1453,6 +1453,23 @@ void LLFloaterIMContainer::doToSelected(const LLSD& userdata)
     const LLConversationItem * conversationItem = getCurSelectedViewModelItem();
     uuid_vec_t selected_uuids;
 
+// [RLVa:KB] - @shownames
+	// Bulldozer block of all actions but both Catznip and Firestorm have no need for CHUI
+	if (!RlvActions::canShowName(RlvActions::SNC_DEFAULT))
+	{
+		if (LLConversationItemParticipant* pParticipantItem = dynamic_cast<LLConversationItemParticipant*>(const_cast<LLConversationItem*>(conversationItem)))
+		{
+			if (LLConversationItemSession* pParentSession = pParticipantItem->getParentSession())
+			{
+				if ( (pParentSession->getUUID().isNull()) && (selected_uuids.size() != 1 || !RlvActions::canShowName(RlvActions::SNC_DEFAULT, selected_uuids.front())) )
+				{
+					return;
+				}
+			}
+		}
+	}
+// [/RLVa:KB]
+
     if(conversationItem != NULL)
     {
     	getParticipantUUIDs(selected_uuids);
@@ -1619,7 +1636,14 @@ bool LLFloaterIMContainer::enableContextMenuItem(const std::string& item, uuid_v
 	}
 
 	// Handle all other options
-	if (("can_invite" == item)
+// [RLVa:KB] - @pay
+    if ("can_pay" == item)
+    {
+		return is_single_select && RlvActions::canPayAvatar(single_id);
+    }
+	else if (("can_invite" == item)
+// [/RLVa:KB]
+//	if (("can_invite" == item)
         || ("can_chat_history" == item)
         || ("can_share" == item)
 // [RLVa:KB] - @pay
@@ -1630,12 +1654,6 @@ bool LLFloaterIMContainer::enableContextMenuItem(const std::string& item, uuid_v
 		// Those menu items are enable only if a single avatar is selected
 		return is_single_select;
 	}
-// [RLVa:KB] - @pay
-    else if ("can_pay" == item)
-    {
-		return is_single_select && RlvActions::canPayAvatar(single_id);
-    }
-// [/RLVa:KB]
     else if ("can_block" == item)
     {
         return (is_single_select ? LLAvatarActions::canBlock(single_id) : false);

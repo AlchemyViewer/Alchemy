@@ -3015,7 +3015,7 @@ LLViewerMediaTexture* LLViewerMediaImpl::updateMediaImage()
     llassert(!gCubeSnapshot);
 //    if (!mMediaSource)
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
-	if ( (!mMediaSource) || ((LLViewerFetchedTexture::sDefaultDiffuseImagep.notNull()) && (LLViewerFetchedTexture::sDefaultDiffuseImagep->getID() == mTextureId)))
+	if ( (!mMediaSource) || ((LLViewerFetchedTexture::sDefaultDiffuseImagep.notNull()) && (LLViewerFetchedTexture::sDefaultDiffuseImagep->getID() == mTextureId)) )
 // [/SL:KB]
     {
         return nullptr; // not ready for updating

@@ -2328,14 +2328,14 @@ void LLInventoryModel::notifyObservers(const LLUUID& transaction_id)
 	mChangedItemIDs.insert(mChangedItemIDsBacklog.begin(), mChangedItemIDsBacklog.end());
 	mAddedItemIDs.clear();
 	mAddedItemIDs.insert(mAddedItemIDsBacklog.begin(), mAddedItemIDsBacklog.end());
+// [SL:KB] - Patch: UI-Notifications | Checked: Catznip-6.5
+    mTransactionId.setNull();
+// [/SL:KB]
 
 	mModifyMaskBacklog = LLInventoryObserver::NONE;
 	mChangedItemIDsBacklog.clear();
 	mAddedItemIDsBacklog.clear();
 
-// [SL:KB] - Patch: UI-Notifications | Checked: Catznip-6.5
-    mTransactionId.setNull();
-// [/SL:KB]
 	mIsNotifyObservers = FALSE;
 }
 

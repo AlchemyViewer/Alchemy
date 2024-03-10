@@ -38,6 +38,7 @@
 #include "llavatarnamecache.h"			// @shownames
 #include "llavatarlist.h"				// @shownames
 #include "llfloatercamera.h"			// @setcam family
+#include "llfloaterimnearbychat.h"		// @shownames
 #include "llfloatersidepanelcontainer.h"// @shownames
 #include "llnotifications.h"			// @list IM query
 #include "llnotificationsutil.h"
@@ -45,6 +46,7 @@
 #include "llpaneloutfitsinventory.h"	// @showinv - "Appearance" floater
 #include "llpanelpeople.h"				// @shownames
 #include "llpanelwearing.h"				// @showinv - "Appearance / Current Outfit" panel
+#include "llparticipantlist.h"			// @shownames
 #include "llregionhandle.h"				// @tpto
 #include "llsidepanelappearance.h"		// @showinv - "Appearance / Edit appearance" panel
 #include "lltabcontainer.h"				// @showinv - Tab container control for inventory tabs
@@ -1555,6 +1557,16 @@ bool RlvHandler::setEnabled(bool fEnable)
 		// Reset to show assertions if the viewer version changed
 		if (gSavedSettings.getString("LastRunVersion") != gLastRunVersion)
 			gSavedSettings.set<bool>(RlvSettingNames::ShowAssertionFail, TRUE);
+
+		// Set up camera debug controls
+		{
+			LLControlVariable* pCameraOffsetRLVaView = gSavedSettings.declareVec3("CameraOffsetRLVaView", LLVector3::zero, "Declared in code", LLControlVariable::PERSIST_NO);
+			pCameraOffsetRLVaView->setHiddenFromSettingsEditor(true);
+			LLControlVariable* pCameraOffsetScaleRLVa = gSavedSettings.declareF32("CameraOffsetScaleRLVa", 0.0f, "Declared in code", LLControlVariable::PERSIST_NO);
+			pCameraOffsetScaleRLVa->setHiddenFromSettingsEditor(true);
+			LLControlVariable* pFocusOffsetRLVaView = gSavedSettings.declareVec3d("FocusOffsetRLVaView", LLVector3d::zero, "Declared in code", LLControlVariable::PERSIST_NO);
+			pFocusOffsetRLVaView->setHiddenFromSettingsEditor(true);
+		}
 	}
 
 	return m_fEnabled;
@@ -2597,6 +2609,15 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SHOWNAMES>::onCommandToggle(ERlvBehaviou
 		pPeoplePanel->getNearbyList()->updateAvatarNames();
 	}
 
+	// Refresh the nearby participant list
+	if (LLFloaterIMNearbyChat* pNearbyChatFloater = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))
+	{
+		if (LLParticipantList* pParticipantList = pNearbyChatFloater->getParticipantList())
+		{
+			pParticipantList->refreshNames();
+		}
+	}
+
 	// Force the use of the "display name" cache so we can filter both display and legacy names (or return back to the user's preference)
 	if (fHasBhvr)
 	{
@@ -2687,6 +2708,17 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SHOWNEARBY>::onCommandToggle(ERlvBehavio
 			pPeoplePanel->onCommit();
 		if (!fHasBhvr)
 			pPeoplePanel->updateNearbyList();
+	}
+
+	// Refresh the nearby participant list
+	if (LLFloaterIMNearbyChat* pNearbyChatFloater = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))
+	{
+#ifdef CATZNIP
+		pNearbyChatFloater->updateShowParticipantList();
+		pNearbyChatFloater->updateExpandCollapseBtn();
+#else
+		// *TODO - Solution for CHUI
+#endif // CATZNIP
 	}
 
 	// Refresh that avatar's name tag and all HUD text
@@ -3839,7 +3871,7 @@ ERlvCmdRet RlvHandler::onGetOutfit(const RlvCommand& rlvCmd, std::string& strRep
 
 	// (Compatibility: RLV-1.16.1 will execute @getoutfit=<channel> if <layer> is invalid while we just return failure)
 	LLWearableType::EType wtType = LLWearableType::WT_INVALID;
-	if ( (rlvCmd.hasOption()) && ((wtType = LLWearableType::getInstance()->typeNameToType(rlvCmd.getOption())) == LLWearableType::WT_INVALID) )
+	if ( (rlvCmd.hasOption()) && ((wtType = LLWearableType::instance().typeNameToType(rlvCmd.getOption())) == LLWearableType::WT_INVALID) )
 		return RLV_RET_FAILED_OPTION;
 
 	const LLWearableType::EType wtRlvTypes[] =
@@ -3859,7 +3891,7 @@ ERlvCmdRet RlvHandler::onGetOutfit(const RlvCommand& rlvCmd, std::string& strRep
 			// (nor do we hide a layer if the issuing object is the only one that has this layer locked)
 			bool fWorn = (gAgentWearables.getWearableCount(wtRlvTypes[idxType]) > 0) && 
 				( (!RlvSettings::getHideLockedLayers()) || 
-				  (LLAssetType::AT_BODYPART == LLWearableType::getInstance()->getAssetType(wtRlvTypes[idxType])) ||
+				  (LLAssetType::AT_BODYPART == LLWearableType::instance().getAssetType(wtRlvTypes[idxType])) ||
 				  (RlvForceWear::isForceRemovable(wtRlvTypes[idxType], true, rlvCmd.getObjectID())) );
 			strReply.push_back( (fWorn) ? '1' : '0' );
 		}
@@ -3900,7 +3932,7 @@ ERlvCmdRet RlvHandler::onGetOutfitNames(const RlvCommand& rlvCmd, std::string& s
 		{
 			if (!strReply.empty())
 				strReply.push_back(',');
-			strReply.append(LLWearableType::getInstance()->getTypeName(wtType));
+			strReply.append(LLWearableType::instance().getTypeName(wtType));
 		}
 	}
 	return RLV_RET_SUCCESS;

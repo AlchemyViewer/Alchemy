@@ -1590,6 +1590,13 @@ void LLFloaterPreference::buildPopupLists()
 
 void LLFloaterPreference::refreshEnabledState()
 {
+// [RLVa:KB] - Checked: 2013-05-11 (RLVa-1.4.9)
+	if (RlvActions::isRlvEnabled())
+	{
+		getChild<LLUICtrl>("do_not_disturb_response")->setEnabled(!RlvActions::hasBehaviour(RLV_BHVR_SENDIM));
+	}
+// [/RLVa:KB]
+
 	// Cannot have floater active until caps have been received
 	getChild<LLButton>("default_creation_permissions")->setEnabled(LLStartUp::getStartupState() < STATE_STARTED ? false : true);
 

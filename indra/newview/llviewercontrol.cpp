@@ -771,9 +771,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-	setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);
-// [/SL:KB]
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbeDetailChanged);
@@ -781,6 +778,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderShaderCacheEnabled", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleSetShaderChanged);
+// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
+	setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);
+// [/SL:KB]
     setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatFontName", handleChatFontSizeChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatFontSize", handleChatFontSizeChanged);

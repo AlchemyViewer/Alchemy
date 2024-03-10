@@ -144,19 +144,6 @@ private:
 	/** Camera preset in Third Person Mode */
 	ECameraPreset mCameraPreset; 
 
-// [RLVa:KB] - @setcam_eyeoffset
-	LLPointer<LLControlVariable> mRlvCameraOffsetInitialControl;
-// [/RLVa:KB]
-
-// [RLVa:KB] - @setcam_eyeoffsetscale
-	LLPointer<LLControlVariable> mRlvCameraOffsetScaleControl;
-// [/RLVa:KB]
-
-//	LLPointer<LLControlVariable> mFocusOffsetInitial;
-// [RLVa:KB] - @setcam_focusoffset
-	LLPointer<LLControlVariable> mRlvFocusOffsetInitialControl;
-// [/RLVa:KB]
-
 	LLQuaternion mInitSitRot;
 
 	//--------------------------------------------------------------------

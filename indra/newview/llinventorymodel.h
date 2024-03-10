@@ -608,6 +608,9 @@ private:
 	U32 mModifyMask;
 	changed_items_t mChangedItemIDs;
 	changed_items_t mAddedItemIDs;
+// [SL:KB] - Patch: UI-Notifications | Checked: Catznip-6.5
+    LLUUID mTransactionId;
+// [/SL:KB]
     // Fallback when notifyObservers is in progress
     U32 mModifyMaskBacklog;
     changed_items_t mChangedItemIDsBacklog;
@@ -616,9 +619,6 @@ private:
     broken_links_t mPossiblyBrockenLinks; // there can be multiple links per item
     changed_items_t mLinksRebuildList;
     boost::signals2::connection mBulkFecthCallbackSlot;
-// [SL:KB] - Patch: UI-Notifications | Checked: Catznip-6.5
-    LLUUID mTransactionId;
-// [/SL:KB]
 	
 	
 	//--------------------------------------------------------------------

@@ -1477,7 +1477,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
 			}
 //			else if ( chat.mFromName != SYSTEM_FROM && chat.mFromID.notNull() && !message_from_log && chat.mSourceType != CHAT_SOURCE_REGION)
 // [RLVa:KB] - Checked: 2010-04-22 (RLVa-1.2.0f) | Added: RLVa-1.2.0f
-			else if (chat.mFromName != SYSTEM_FROM && chat.mFromID.notNull() && !message_from_log && chat.mSourceType != CHAT_SOURCE_REGION && !chat.mRlvNamesFiltered)
+			else if ( chat.mFromName != SYSTEM_FROM && chat.mFromID.notNull() && !message_from_log && chat.mSourceType != CHAT_SOURCE_REGION && !chat.mRlvNamesFiltered)
 // [/RLVa:KB]
 			{
 				LLStyle::Params link_params(body_message_params);

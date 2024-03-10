@@ -1552,35 +1552,6 @@ void LLWorld::getAvatars(region_gpos_map_t* umap, const LLVector3d& relative_to,
 	}
 }
 
-// [RLVa:KB] - Checked: RLVa-2.0.1
-bool LLWorld::getAvatar(const LLUUID& idAvatar, LLVector3d& posAvatar) const
-{
-	for (const LLCharacter* pCharacter : LLCharacter::sInstances)
-	{
-		const LLVOAvatar* pAvatar = static_cast<const LLVOAvatar*>(pCharacter);
-		if ( (!pAvatar->isDead()) && (!pAvatar->mIsDummy) && (!pAvatar->isOrphaned()) && (idAvatar == pAvatar->getID()) )
-		{
-			posAvatar = pAvatar->getPositionGlobal();
-			return true;
-		}
-	}
-
-	for (const LLViewerRegion* pRegion : getRegionList())
-	{
-		for (S32 idxAgent = 0, cntAgent = pRegion->mMapAvatarIDs.size(); idxAgent < cntAgent; ++idxAgent)
-		{
-			if (idAvatar == pRegion->mMapAvatarIDs[idxAgent])
-			{
-				posAvatar = unpackLocalToGlobalPosition(pRegion->mMapAvatars[idxAgent], pRegion->getOriginGlobal(), pRegion->getWidthScaleFactor());
-				return true;
-			}
-		}
-	}
-
-	return false;
-}
-// [/RLVa:KB]
-
 F32 LLWorld::getNearbyAvatarsAndMaxGPUTime(std::vector<LLCharacter*> &valid_nearby_avs)
 {
     static LLCachedControl<F32> render_far_clip(gSavedSettings, "RenderFarClip", 64);
@@ -1610,6 +1581,35 @@ F32 LLWorld::getNearbyAvatarsAndMaxGPUTime(std::vector<LLCharacter*> &valid_near
     }
     return nearby_max_complexity;
 }
+
+// [RLVa:KB] - Checked: RLVa-2.0.1
+bool LLWorld::getAvatar(const LLUUID& idAvatar, LLVector3d& posAvatar) const
+{
+	for (const LLCharacter* pCharacter : LLCharacter::sInstances)
+	{
+		const LLVOAvatar* pAvatar = static_cast<const LLVOAvatar*>(pCharacter);
+		if ( (!pAvatar->isDead()) && (!pAvatar->mIsDummy) && (!pAvatar->isOrphaned()) && (idAvatar == pAvatar->getID()) )
+		{
+			posAvatar = pAvatar->getPositionGlobal();
+			return true;
+		}
+	}
+
+	for (const LLViewerRegion* pRegion : LLWorld::getInstance()->getRegionList())
+	{
+		for (S32 idxAgent = 0, cntAgent = pRegion->mMapAvatarIDs.size(); idxAgent < cntAgent; ++idxAgent)
+		{
+			if (idAvatar == pRegion->mMapAvatarIDs[idxAgent])
+			{
+				posAvatar = unpackLocalToGlobalPosition(pRegion->mMapAvatars[idxAgent], pRegion->getOriginGlobal());
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+// [/RLVa:KB]
 
 bool LLWorld::isRegionListed(const LLViewerRegion* region) const
 {
