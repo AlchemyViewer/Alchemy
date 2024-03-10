@@ -291,10 +291,17 @@
 	 layout="topleft"
 	 left="35"
 	 name="display_names_check"
-	 width="237"
+	 width="120"
 	 tool_tip="Check to use display names in chat, IM, name tags, etc."
 	 top_pad="3"/>
-	 
+   <check_box
+   control_name="NameTagShowDistance"
+   height="16"
+   label="Show Distance"
+   layout="topleft"
+   left_pad="30"
+   name="show_distance"
+   tool_tip="Show the distance of other residents from yourself in the name tags"/>     
 	<text
 	 type="string"
 	 length="1"

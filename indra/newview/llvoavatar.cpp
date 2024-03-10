@@ -3383,6 +3383,10 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 	// Avatars must have a first and last name
 	if (!firstname || !lastname) return;
 
+	static const F32 chat_range_whisper_squared = 10 * 10;
+	static const F32 chat_range_say_squared = 20 * 20;
+	static const F32 chat_range_shout_squared = 100 * 100;
+
 // [RLVa:KB] - Checked: RLVa-2.0.1
 	bool fRlvShowAvName = RlvActions::canShowName(RlvActions::SNC_DEFAULT, getID());
 // [/RLVa:KB]
@@ -3405,8 +3409,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 	bool is_cloud = getIsCloud();
 	static LLCachedControl<bool> sShowTyping(gSavedSettings, "AlchemyNearbyTypingIndicators", true);
 	static LLCachedControl<bool> use_chat_bubble(gSavedSettings, "UseChatBubbles");
-	bool is_typing = sShowTyping && mTyping;
-
+	bool is_typing = !isSelf() && sShowTyping && mTyping;
 	if (is_appearance != mNameAppearance)
 	{
 		if (is_appearance)
@@ -3420,6 +3423,50 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 	}
 
 	LLColor4 name_tag_color = getNameTagColor(is_friend);
+	LLColor4 distance_color = name_tag_color;
+	std::string distance_string;
+
+	static LLCachedControl<bool> show_distance_color_tag(gSavedSettings, "NameTagShowDistanceColors", false);
+	static LLCachedControl<bool> show_distance_in_tag(gSavedSettings, "NameTagShowDistance", true);
+	static LLUIColor tag_whisper_color = LLUIColorTable::instance().getColor("NameTagWhisperDistanceColor", LLColor4::green);
+	static LLUIColor tag_chat_color = LLUIColorTable::instance().getColor("NameTagChatDistanceColor", LLColor4::green);
+	static LLUIColor tag_shout_color = LLUIColorTable::instance().getColor("NameTagShoutDistanceColor", LLColor4::yellow);
+	static LLUIColor tag_beyond_shout_color = LLUIColorTable::instance().getColor("NameTagBeyondShoutDistanceColor", LLColor4::red);
+
+	if (!isSelf() && (show_distance_color_tag || show_distance_in_tag))
+	{
+		F64 distance_squared = dist_vec_squared(getPositionGlobal(), gAgent.getPositionGlobal());
+		if (distance_squared <= chat_range_whisper_squared)
+		{
+			distance_color = tag_whisper_color;
+		}
+		else if (distance_squared <= chat_range_say_squared)
+		{
+			distance_color = tag_chat_color;
+		}
+		else if (distance_squared <= chat_range_shout_squared)
+		{
+			distance_color = tag_shout_color;
+		}
+		else
+		{
+			distance_color = tag_beyond_shout_color;
+		}
+
+		if (show_distance_in_tag)
+		{
+			distance_string = llformat("%.02f m", sqrt(distance_squared));
+		}
+
+		// Override nametag color only if friend color is disabled
+		// or avatar is not a friend nor has a contact set color
+		static LLCachedControl<bool> show_friends(gSavedSettings, "NameTagShowFriends");
+		bool special_color_override = show_friends && is_friend;
+		if (show_distance_color_tag && !special_color_override)
+		{
+			name_tag_color = distance_color;
+		}
+	}
 
 	// Rebuild name tag if state change detected
 	if (!mNameIsSet
@@ -3433,6 +3480,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 		|| is_friend != mNameFriend
 		|| is_cloud != mNameCloud
 		|| is_typing != mTypingLast
+		|| distance_string != mDistanceString
 		|| name_tag_color != mNameTagColor)
 	{
 		clearNameTag();
@@ -3547,6 +3595,11 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 			addNameTagLine(full_name, name_tag_color, LLFontGL::NORMAL, font, true);
 		}
 
+		if (show_distance_in_tag)
+		{
+			addNameTagLine(distance_string, distance_color, LLFontGL::NORMAL, LLFontGL::getFontSansSerifSmall());
+		}
+
 		mNameAway = is_away;
 		mNameDoNotDisturb = is_do_not_disturb;
 		mNameMute = is_muted;
@@ -3554,6 +3607,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 		mNameFriend = is_friend;
 		mNameCloud = is_cloud;
 		mTypingLast = is_typing;
+		mDistanceString = distance_string;
 		mTitle = title ? title->getString() : "";
 		mNameTagColor = name_tag_color;
 		LLStringFn::replace_ascii_controlchars(mTitle,LL_UNKNOWN_CHAR);
@@ -3569,7 +3623,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 		std::deque<LLChat>::iterator chat_iter = mChats.begin(), chat_iter_end = mChats.end();
 		mNameText->clearString();
 
-		static LLUIColor agent_chat_color = LLUIColorTable::instance().getColor("AgentChatColor");
+		static LLUIColor agent_chat_color = LLUIColorTable::instance().getColor(isSelf() ? "UserChatColor" : "AgentChatColor");
 		
 		LLColor4 new_chat = ALAvatarGroups::instance().getAvatarColor(getID(), agent_chat_color, ALAvatarGroups::COLOR_CHAT);
 		LLColor4 normal_chat = lerp(new_chat, LLColor4(0.8f, 0.8f, 0.8f, 1.f), 0.7f);

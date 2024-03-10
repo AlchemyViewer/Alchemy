@@ -1943,5 +1943,27 @@
 			<key>Value</key>
 			<integer>0</integer>
 		</map>
+		<key>NameTagShowDistance</key>
+		<map>
+			<key>Comment</key>
+			<string>Show the distance of other residents from yourself in the name tags</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>Boolean</string>
+			<key>Value</key>
+			<integer>1</integer>
+		</map>
+		<key>NameTagShowDistanceColors</key>
+		<map>
+			<key>Comment</key>
+			<string>Change the color of the name tag based on the distance of other avatars</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>Boolean</string>
+			<key>Value</key>
+			<integer>0</integer>
+		</map>
 	</map>
 </llsd>
