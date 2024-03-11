@@ -16,7 +16,7 @@
      height="10"
      layout="topleft"
      left="30"
-     name="Network:"
+     name="float_text_label"
      mouse_opaque="false"
      top="10"
      width="300">
@@ -29,7 +29,7 @@
    height="10"
    layout="topleft"
    left="50"
-   name="Maximum bandwidth"
+   name="fade_dist_label"
    mouse_opaque="false"
    top_pad="10"
    width="200">
@@ -70,7 +70,7 @@
    height="10"
    layout="topleft"
    left="50"
-   name="Maximum bandwidth"
+   name="fade_range_label"
    mouse_opaque="false"
    top_pad="10"
    width="200">
