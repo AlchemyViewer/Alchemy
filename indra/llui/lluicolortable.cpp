@@ -201,6 +201,40 @@ void LLUIColorTable::setColor(std::string_view name, const LLColor4& color)
 	setColor(name, color, mUserSetColors);
 }
 
+bool LLUIColorTable::isDefault(std::string_view name) const
+{
+	string_color_map_t::const_iterator base_iter = mLoadedColors.find(name);
+	string_color_map_t::const_iterator user_iter = mUserSetColors.find(name);
+	if (base_iter != mLoadedColors.end())
+	{
+		if(user_iter != mUserSetColors.end())
+			return user_iter->second == base_iter->second;
+
+		return true;
+	}
+	else if (user_iter != mUserSetColors.end()) // user only color ???
+	{
+		return true;
+	}
+
+	return false;
+}
+
+void LLUIColorTable::resetToDefault(std::string_view name)
+{
+	string_color_map_t::iterator iter = mUserSetColors.find(name);
+
+	if (iter != mUserSetColors.end())
+	{
+		auto default_iter = mLoadedColors.find(name);
+
+		if (default_iter != mLoadedColors.end())
+		{
+			iter->second = default_iter->second.get();
+		}
+	}
+}
+
 bool LLUIColorTable::loadFromSettings()
 {
 	bool result = false;

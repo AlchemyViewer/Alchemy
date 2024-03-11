@@ -37,6 +37,7 @@
 #include "alfloaterlightbox.h"
 #include "alfloaterparticleeditor.h"
 #include "alfloaterregiontracker.h"
+#include "alfloatersettingscolor.h"
 #include "llchatbar.h"
 #include "llcommandhandler.h"
 #include "llcompilequeue.h"
@@ -583,6 +584,7 @@ void LLViewerFloaterReg::registerFloaters()
 	LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
 	LLFloaterReg::add("region_tracker", "floater_region_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterRegionTracker>);
 	LLFloaterReg::add("search", "floater_directory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDirectory>);
+	LLFloaterReg::add("settings_color", "floater_settings_color.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterSettingsColor>);
 	LLFloaterReg::add("sound_explorer", "floater_explore_sounds.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterExploreSounds>);
     LLFloaterReg::add("webprofile", "floater_web_profile.xml", (LLFloaterBuildFunc)&LLFloaterWebProfile::create);
 

@@ -96,6 +96,7 @@ set(viewer_SOURCE_FILES
     alfloaterlightbox.cpp
     alfloaterparticleeditor.cpp
     alfloaterregiontracker.cpp
+    alfloatersettingscolor.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
     alpanelmusicticker.cpp
@@ -831,6 +832,7 @@ set(viewer_HEADER_FILES
     alfloaterlightbox.h
     alfloaterparticleeditor.h
     alfloaterregiontracker.h
+    alfloatersettingscolor.h
     alpanelaomini.h
     alpanelaopulldown.h
     alpanelmusicticker.h
