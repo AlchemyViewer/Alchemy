@@ -114,7 +114,7 @@ LLViewerRegion::vocache_entry_map_t LLViewerRegion::sRegionCacheCleanup;
 const std::string LLViewerRegion::IL_MODE_DEFAULT = "default";
 const std::string LLViewerRegion::IL_MODE_360     = "360";
 
-typedef std::map<std::string, std::string, std::less<>> CapabilityMap;
+typedef boost::unordered_node_map<std::string, std::string, al::string_hash, std::equal_to<>> CapabilityMap;
 
 static void log_capabilities(const CapabilityMap &capmap);
 
