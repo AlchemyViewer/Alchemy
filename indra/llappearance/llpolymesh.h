@@ -357,7 +357,7 @@ protected:
 	LLPolyMesh				*mReferenceMesh;
 
 	// global mesh list
-	typedef std::map<std::string, LLPolyMeshSharedData*> LLPolyMeshSharedDataTable; 
+	typedef boost::unordered_flat_map<std::string, LLPolyMeshSharedData*, al::string_hash, std::equal_to<>> LLPolyMeshSharedDataTable;
 	static LLPolyMeshSharedDataTable sGlobalSharedMeshList;
 
 	// Backlink only; don't make this an LLPointer.

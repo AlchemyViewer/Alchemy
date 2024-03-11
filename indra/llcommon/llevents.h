@@ -348,7 +348,7 @@ testable:
     // LLEventPump subclass statically, as a class member, on the stack or on
     // the heap. In such cases, the instantiating party is responsible for its
     // lifespan.
-    typedef boost::unordered_map<std::string, LLEventPump*> PumpMap;
+    typedef std::map<std::string, LLEventPump*, std::less<>> PumpMap;
     PumpMap mPumpMap;
     // Set of all LLEventPumps we instantiated. Membership in this set means
     // we claim ownership, and will delete them when this LLEventPumps is
@@ -356,7 +356,7 @@ testable:
     typedef boost::unordered_set<LLEventPump*> PumpSet;
     PumpSet mOurPumps;
     // for make(), map string type name to LLEventPump subclass factory function
-    typedef boost::unordered_map<std::string, TypeFactory> TypeFactories;
+    typedef boost::unordered_map<std::string, TypeFactory, al::string_hash, std::equal_to<>> TypeFactories;
     // Data used by make().
     // One might think mFactories and mTypes could reasonably be static. So
     // they could -- if not for the fact that make() or obtain() might be
@@ -366,7 +366,7 @@ testable:
 
     // for obtain(), map desired string instance name to string type when
     // obtain() must create the instance
-    typedef boost::unordered_map<std::string, std::string> InstanceTypes;
+    typedef boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> InstanceTypes;
     InstanceTypes mTypes;
 };
 
@@ -607,7 +607,7 @@ protected:
     /// Map of named listeners. This tracks the listeners that actually exist
     /// at this moment. When we stopListening(), we discard the entry from
     /// this map.
-    typedef boost::unordered_map<std::string, boost::signals2::connection> ConnectionMap;
+    typedef boost::unordered_map<std::string, boost::signals2::connection, al::string_hash, std::equal_to<>> ConnectionMap;
     ConnectionMap mConnections;
     typedef LLDependencies<std::string, float> DependencyMap;
     /// Dependencies between listeners. For each listener, track the float

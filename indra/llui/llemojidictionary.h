@@ -81,11 +81,11 @@ class LLEmojiDictionary : public LLParamSingleton<LLEmojiDictionary>, public LLI
     ~LLEmojiDictionary() override {};
 
 public:
-    typedef boost::unordered_map<std::string, std::string> cat2cat_map_t;
-    typedef boost::unordered_map<std::string, const LLEmojiGroup*> cat2group_map_t;
+    typedef boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> cat2cat_map_t;
+    typedef boost::unordered_map<std::string, const LLEmojiGroup*, al::string_hash, std::equal_to<>> cat2group_map_t;
     typedef boost::unordered_map<llwchar, const LLEmojiDescriptor*> emoji2descr_map_t;
-    typedef boost::unordered_map<std::string, const LLEmojiDescriptor*> code2descr_map_t;
-    typedef boost::unordered_map<std::string, std::vector<const LLEmojiDescriptor*>> cat2descrs_map_t;
+    typedef boost::unordered_map<std::string, const LLEmojiDescriptor*, al::string_hash, std::equal_to<>> code2descr_map_t;
+    typedef boost::unordered_map<std::string, std::vector<const LLEmojiDescriptor*>, al::string_hash, std::equal_to<>> cat2descrs_map_t;
 
     static void initClass();
     LLWString findMatchingEmojis(const std::string& needle) const;
