@@ -1976,5 +1976,38 @@
 			<key>Value</key>
 			<integer>0</integer>
 		</map>
+		<key>NameTagHPad</key>
+		<map>
+			<key>Comment</key>
+			<string>Name tag horizontal padding</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>F32</string>
+			<key>Value</key>
+			<string>16.0</string>
+		</map>
+		<key>NameTagVPad</key>
+		<map>
+			<key>Comment</key>
+			<string>Name tag vertical padding</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>F32</string>
+			<key>Value</key>
+			<string>8.0</string>
+		</map>
+		<key>NameTagLinePad</key>
+		<map>
+			<key>Comment</key>
+			<string>Name tag line padding</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>F32</string>
+			<key>Value</key>
+			<string>1.0</string>
+		</map>
 	</map>
 </llsd>
