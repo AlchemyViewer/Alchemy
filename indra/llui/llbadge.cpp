@@ -356,7 +356,7 @@ void LLBadge::draw()
 							mLabelColor % alpha,
 							LLFontGL::HCENTER, LLFontGL::VCENTER, // centered around the position
 							LLFontGL::NORMAL, // normal text (not bold, italics, etc.)
-							LLFontGL::DROP_SHADOW,
+							LLFontGL::DROP_SHADOW_SOFT,
 							badge_char_length, badge_pixel_length,
 							right_position_out, do_not_use_ellipses);
 		}

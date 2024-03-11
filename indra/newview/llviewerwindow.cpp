@@ -5901,21 +5901,21 @@ void LLViewerWindow::drawMouselookInstructions()
 				INSTRUCTIONS_TOP_PAD,
 				LLColor4(1.0f, 0.5f, 0.5f, 0.5f),
 				LLFontGL::HCENTER, LLFontGL::TOP,
-				LLFontGL::BOLD, LLFontGL::DROP_SHADOW);
+				LLFontGL::BOLD, LLFontGL::DROP_SHADOW_SOFT);
 			font->renderUTF8(
 				llformat("Y: %.2f", vec.mV[VY]), 0,
 				text_pos_start + 100,
 				INSTRUCTIONS_TOP_PAD,
 				LLColor4(0.5f, 1.0f, 0.5f, 0.5f),
 				LLFontGL::HCENTER, LLFontGL::TOP,
-				LLFontGL::BOLD, LLFontGL::DROP_SHADOW);
+				LLFontGL::BOLD, LLFontGL::DROP_SHADOW_SOFT);
 			font->renderUTF8(
 				llformat("Z: %.2f", vec.mV[VZ]), 0,
 				text_pos_start + 200,
 				INSTRUCTIONS_TOP_PAD,
 				LLColor4(0.5f, 0.5f, 1.0f, 0.5f),
 				LLFontGL::HCENTER, LLFontGL::TOP,
-				LLFontGL::BOLD, LLFontGL::DROP_SHADOW);
+				LLFontGL::BOLD, LLFontGL::DROP_SHADOW_SOFT);
 			LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
 			const bool allow_damage = vpm->allowAgentDamage(gAgent.getRegion(), vpm->getAgentParcel());
 			if (allow_damage)
@@ -5931,7 +5931,7 @@ void LLViewerWindow::drawMouselookInstructions()
 					INSTRUCTIONS_TOP_PAD,
 					LLColor4(1.0f, 1.0f, 1.0f, 0.5f),
 					LLFontGL::HCENTER, LLFontGL::TOP,
-					LLFontGL::BOLD, LLFontGL::DROP_SHADOW);
+					LLFontGL::BOLD, LLFontGL::DROP_SHADOW_SOFT);
 			}
 		}
 
