@@ -78,6 +78,10 @@ Graphics Card: [GRAPHICS_CARD]
 	<string name="AboutSettings">
 Window size: [WINDOW_WIDTH]x[WINDOW_HEIGHT]
 Font Size Adjustment: [FONT_SIZE_ADJUSTMENT]pt
+UI Font: [FONT_MAIN_OVERRIDE]
+Monospace Font: [FONT_MONO_OVERRIDE]
+Chat Font: [FONT_CHAT_OVERRIDE]
+Script Font: [FONT_SCRIPT_OVERRIDE]
 UI Scaling: [UI_SCALE]
 Draw distance: [DRAW_DISTANCE]m
 Bandwidth: [NET_BANDWITH]kbit/s

@@ -3317,6 +3317,12 @@ LLSD LLAppViewer::getViewerInfo() const
     info["WINDOW_WIDTH"] = window_rect.getWidth();
     info["WINDOW_HEIGHT"] = window_rect.getHeight();
     info["FONT_SIZE_ADJUSTMENT"] = gSavedSettings.getF32("FontScreenDPI");
+	std::string mainfont = gSavedSettings.getString("FontOverrideMain");
+	info["FONT_MAIN_OVERRIDE"] = !mainfont.empty() ? mainfont : LLTrans::getString("Default");
+	std::string monofont = gSavedSettings.getString("FontOverrideMonospace");
+	info["FONT_MONO_OVERRIDE"] = !monofont.empty() ? monofont : LLTrans::getString("Default");
+	info["FONT_CHAT_OVERRIDE"] = gSavedSettings.getString("ChatFontName");
+	info["FONT_SCRIPT_OVERRIDE"] = gSavedSettings.getString("ScriptFontName");
     info["UI_SCALE"] = gSavedSettings.getF32("UIScaleFactor");
     info["DRAW_DISTANCE"] = gSavedSettings.getF32("RenderFarClip");
     info["NET_BANDWITH"] = gSavedSettings.getF32("ThrottleBandwidthKBPS");
