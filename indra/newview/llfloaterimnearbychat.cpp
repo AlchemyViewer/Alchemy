@@ -183,28 +183,17 @@ BOOL LLFloaterIMNearbyChat::postBuild()
 // virtual
 void LLFloaterIMNearbyChat::closeHostedFloater()
 {
-	// If detached from conversations window close anyway
-	if (!getHost())
-	{
-		setVisible(FALSE);
-	}
+	LLFloaterEmojiPicker::saveState();
 
-	// Should check how many conversations are ongoing. Select next to "Nearby Chat" in case there are some other besides.
-	// Close conversations window in case "Nearby Chat" is attached and the only conversation
 	LLFloaterIMContainer* floater_container = LLFloaterIMContainer::getInstance();
-	if (floater_container->getConversationListItemSize() == 1)
+	if (getHost())
 	{
-		if (getHost())
-		{
-			floater_container->closeFloater();
-		}
+		floater_container->closeFloater();
 	}
-	else
+	else // If detached from conversations window close anyway
 	{
-		if (!getHost())
-		{
-			floater_container->selectNextConversationByID(LLUUID());
-		}
+		closeFloater();
+		floater_container->selectNextConversationByID(LLUUID());
 	}
 }
 
@@ -212,28 +201,15 @@ void LLFloaterIMNearbyChat::closeFloater(bool app_quitting)
 {
 	LLFloaterEmojiPicker::saveState();
 
-	// If detached from conversations window close anyway
-	if (!getHost())
+	LLFloaterIMContainer* floater_container = LLFloaterIMContainer::getInstance();
+	if (getHost())
+	{
+		LLFloaterIMContainer::getInstance()->closeFloater(app_quitting);
+	}
+	else // If detached from conversations window close anyway
 	{
 		LLFloaterIMSessionTab::closeFloater(app_quitting);
-	}
-
-	// Should check how many conversations are ongoing. Select next to "Nearby Chat" in case there are some other besides.
-	// Close conversations window in case "Nearby Chat" is attached and the only conversation
-	LLFloaterIMContainer* floater_container = LLFloaterIMContainer::getInstance();
-	if (floater_container->getConversationListItemSize() == 1)
-	{
-		if (getHost())
-		{
-			floater_container->closeFloater(app_quitting);
-		}
-	}
-	else
-	{
-		if (!getHost())
-		{
-			floater_container->selectNextConversationByID(LLUUID());
-		}
+		floater_container->selectNextConversationByID(LLUUID());
 	}
 }
 
