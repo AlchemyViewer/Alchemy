@@ -172,8 +172,9 @@ void RlvSettings::onChangedSettingMain(const LLSD& sdValue)
 	args["[STATE]"] = LLTrans::getString( (sdValue.asBoolean()) ? "RLVaToggleEnabled" : "RLVaToggleDisabled");
 
 	// As long as RLVa hasn't been enabled but >can< be enabled all toggles are instant (everything else will require a restart)
-	bool fQuickToggle = (!RlvHandler::isEnabled()) && (RlvHandler::canEnable());
-	LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLTrans::getString((fQuickToggle) ? "RLVaToggleMessageLogin" : "RLVaToggleMessageRestart", args)));
+	LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLTrans::getString("RLVaToggleMessageLogin", args)));
+
+	RlvHandler::setEnabled(sdValue.asBoolean());
 }
 
 void RlvSettings::initCompatibilityMode(std::string strCompatList)

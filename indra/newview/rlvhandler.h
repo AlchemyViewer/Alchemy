@@ -161,7 +161,7 @@ public:
 	typedef boost::signals2::signal<void (const RlvCommand&, ERlvCmdRet, bool)> rlv_command_signal_t;
 	boost::signals2::connection setCommandCallback(const rlv_command_signal_t::slot_type& cb )			 { return m_OnCommand.connect(cb); }
 
-	void addCommandHandler(RlvExtCommandHandler* pHandler);
+	void addCommandHandler(std::unique_ptr<RlvExtCommandHandler> pHandler);
 	void removeCommandHandler(RlvExtCommandHandler* pHandler);
 protected:
 	void clearCommandHandlers();
@@ -258,12 +258,13 @@ protected:
 	rlv_behaviour_signal_t m_OnBehaviour;
 	rlv_behaviour_signal_t m_OnBehaviourToggle;
 	rlv_command_signal_t   m_OnCommand;
-	mutable std::list<RlvExtCommandHandler*> m_CommandHandlers;
+	mutable std::list<std::unique_ptr<RlvExtCommandHandler>> m_CommandHandlers;
 	boost::signals2::scoped_connection       m_ExperienceEventConn;
 	boost::signals2::scoped_connection       m_TeleportFailedConn;
 	boost::signals2::scoped_connection       m_TeleportFinishedConn;
 
 	static bool         m_fEnabled;					// Use setEnabled() to toggle this
+	static bool         m_fInitialized;					// Use setEnabled() to toggle this
 
 	bool                                    m_fCanCancelTp;					// @accepttp=n and @tpto=force
 	mutable LLVector3d                      m_posSitSource;					// @standtp=n (mutable because onForceXXX handles are all declared as const)
