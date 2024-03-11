@@ -133,12 +133,6 @@ F32	LLSelectMgr::sHighlightAlpha = 0.f;
 F32	LLSelectMgr::sHighlightAlphaTest = 0.f;
 F32	LLSelectMgr::sHighlightUAnim = 0.f;
 F32	LLSelectMgr::sHighlightVAnim = 0.f;
-LLColor4 LLSelectMgr::sSilhouetteParentColor;
-LLColor4 LLSelectMgr::sSilhouetteChildColor;
-LLColor4 LLSelectMgr::sHighlightInspectColor;
-LLColor4 LLSelectMgr::sHighlightParentColor;
-LLColor4 LLSelectMgr::sHighlightChildColor;
-LLColor4 LLSelectMgr::sContextSilhouetteColor;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // struct LLDeRezInfo
@@ -236,12 +230,12 @@ LLSelectMgr::LLSelectMgr()
 	sHighlightUAnim		= gSavedSettings.getF32("SelectionHighlightUAnim");
 	sHighlightVAnim		= gSavedSettings.getF32("SelectionHighlightVAnim");
 
-	sSilhouetteParentColor =LLUIColorTable::instance().getColor("SilhouetteParentColor");
+	sSilhouetteParentColor = LLUIColorTable::instance().getColor("SilhouetteParentColor");
 	sSilhouetteChildColor = LLUIColorTable::instance().getColor("SilhouetteChildColor");
 	sHighlightParentColor = LLUIColorTable::instance().getColor("HighlightParentColor");
 	sHighlightChildColor = LLUIColorTable::instance().getColor("HighlightChildColor");
 	sHighlightInspectColor = LLUIColorTable::instance().getColor("HighlightInspectColor");
-	sContextSilhouetteColor = LLUIColorTable::instance().getColor("ContextSilhouetteColor")*0.5f;
+	sContextSilhouetteColor = LLUIColorTable::instance().getColor("ContextSilhouetteColor");
 
 	sRenderLightRadius = gSavedSettings.getBOOL("RenderLightRadius");
 	
@@ -6336,8 +6330,10 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
 	bool wireframe_selection = (gFloaterTools && gFloaterTools->getVisible()) || LLSelectMgr::sRenderHiddenSelections;
 	F32 fogCfx = (F32)llclamp((getSelectionCenterGlobal() - gAgentCamera.getCameraPositionGlobal()).magVec() / (getBBoxOfSelection().getExtentLocal().magVec() * 4), 0.0, 1.0);
 
-	static LLColor4 sParentColor = LLColor4(sSilhouetteParentColor[VRED], sSilhouetteParentColor[VGREEN], sSilhouetteParentColor[VBLUE], LLSelectMgr::sHighlightAlpha);
-	static LLColor4 sChildColor = LLColor4(sSilhouetteChildColor[VRED], sSilhouetteChildColor[VGREEN], sSilhouetteChildColor[VBLUE], LLSelectMgr::sHighlightAlpha);
+	LLColor4 sParentColor = sSilhouetteParentColor;
+	sParentColor.mV[3] = LLSelectMgr::sHighlightAlpha;
+	LLColor4 sChildColor = sSilhouetteChildColor;
+	sChildColor.mV[3] = LLSelectMgr::sHighlightAlpha;
 
 	auto renderMeshSelection_f = [fogCfx, wireframe_selection](LLSelectNode* node, LLViewerObject* objectp, LLColor4 hlColor)
 	{
@@ -6447,7 +6443,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
                     }
                     else if (node->isTransient())
                     {
-                        hlColor = sContextSilhouetteColor;
+                        hlColor = sContextSilhouetteColor.get() * 0.5f;
                     }
                     renderMeshSelection_f(node, objectp, hlColor);
                 }
@@ -6469,7 +6465,7 @@ void LLSelectMgr::renderSilhouettes(BOOL for_hud)
                     {
                         BOOL oldHidden = LLSelectMgr::sRenderHiddenSelections;
                         LLSelectMgr::sRenderHiddenSelections = FALSE;
-                        node->renderOneSilhouette(sContextSilhouetteColor);
+                        node->renderOneSilhouette(sContextSilhouetteColor.get() * 0.5f);
                         LLSelectMgr::sRenderHiddenSelections = oldHidden;
                     }
                     else if (objectp->isRootEdit())

@@ -457,12 +457,12 @@ public:
 	static F32					sHighlightAlphaTest;
 	static F32					sHighlightUAnim;
 	static F32					sHighlightVAnim;
-	static LLColor4				sSilhouetteParentColor;
-	static LLColor4				sSilhouetteChildColor;
-	static LLColor4				sHighlightParentColor;
-	static LLColor4				sHighlightChildColor;
-	static LLColor4				sHighlightInspectColor;
-	static LLColor4				sContextSilhouetteColor;
+	LLUIColor				sSilhouetteParentColor;
+	LLUIColor				sSilhouetteChildColor;
+	LLUIColor				sHighlightParentColor;
+	LLUIColor				sHighlightChildColor;
+	LLUIColor				sHighlightInspectColor;
+	LLUIColor				sContextSilhouetteColor;
 
 	LLCachedControl<bool>					mHideSelectedObjects;
 	LLCachedControl<bool>					mRenderHighlightSelections;
