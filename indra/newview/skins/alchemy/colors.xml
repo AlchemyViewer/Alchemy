@@ -1160,4 +1160,16 @@
   <color
      name="AlchemyFancyChatDividerColor"
      reference="AlchemyText" />
+	<color
+	 name="NameTagWhisperDistanceColor"
+	 reference="AlSuccessGreen"/>
+	<color
+	 name="NameTagChatDistanceColor"
+	 reference="AlSuccessGreen" />
+	<color
+	 name="NameTagShoutDistanceColor"
+	 reference="AlWarningOrange" />
+	<color
+     name="NameTagBeyondShoutDistanceColor"
+     reference="AlDangerRed" />
 </colors>
