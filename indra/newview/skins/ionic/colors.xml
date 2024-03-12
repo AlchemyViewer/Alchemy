@@ -3,7 +3,8 @@
 <!-- Reminder: Defining colors after they are referenced sounds silly, because it is.
      If your custom color is showing up as black, move its definition before the first
      reference.
- -->
+-->
+   <color name="AlPurpleDrank" value="0.239 0.067 0.322 1"/>
    <color
     name="AccordionHeaderTextColor"
     value="0.72 0.72 0.72 1"/>
@@ -507,13 +508,13 @@
     value="1 1 .79 1"/>
    <color
     name="MapAvatarColor"
-    reference="White"/>
+    reference="Gree"/>
    <color
     name="MapAvatarFriendColor"
     value="0.37158 0.81592 0.59722 1"/>
    <color
     name="MapAvatarSelfColor"
-    reference="LtGray"/>
+    reference="AlPurpleDrank"/>
    <color
     name="MapFrustumColor"
     reference="White_10"/>
@@ -609,7 +610,7 @@
     reference="EmphasisColor"/>
    <color
     name="NameTagFriend"
-    reference="MapAvatarFriendColor"/>
+    reference="PolarityGreen"/>
    <color
     name="NameTagGroup"
     value="0.60000 0.60000 0.60000 1.0"/>
