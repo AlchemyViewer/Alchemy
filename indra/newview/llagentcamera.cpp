@@ -2263,8 +2263,8 @@ LLVector3d LLAgentCamera::getFocusOffsetInitial()
 // [RLVa:KB] - @setcam_eyeoffsetscale
 F32 LLAgentCamera::getCameraOffsetScale() const
 {
-    static LLCachedControl<F32> camera_offset_scale(gSavedSettings, "CameraOffsetScale");
-	static LLCachedControl<F32> camera_offset_scale_rlv(gSavedSettings, "CameraOffsetScaleRLVa");
+    static LLCachedControl<F32> camera_offset_scale(gSavedSettings, "CameraOffsetScale", 1.0f);
+	static LLCachedControl<F32> camera_offset_scale_rlv(gSavedSettings, "CameraOffsetScaleRLVa", 0.0f);
 	return (ECameraPreset::CAMERA_RLV_SETCAM_VIEW != mCameraPreset) ? camera_offset_scale : camera_offset_scale_rlv;
 }
 // [/RLVa:KB]
