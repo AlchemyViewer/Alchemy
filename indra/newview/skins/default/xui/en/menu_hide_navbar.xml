@@ -32,6 +32,17 @@
 	</menu_item_check>
 	<menu_item_separator />
 	<menu_item_check
+         label="Show Menu Search"
+         layout="topleft"
+         name="MenuSearch">
+		<on_click
+		  function="ToggleControl"
+		  parameter="MenuSearch" />
+		<on_check
+		function="CheckControl"
+		parameter="MenuSearch" />
+	</menu_item_check>
+	<menu_item_check
          label="Show L$ Balance"
          layout="topleft"
          name="ShowStatusBarBalance">

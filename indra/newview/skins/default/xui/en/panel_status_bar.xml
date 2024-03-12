@@ -38,7 +38,7 @@
 	</panel.string>
 	<panel
 	   height="18"
-	   left="260"
+	   left="375"
 	   top="1"
 	   width="120"
 	   follows="right|top"
@@ -75,14 +75,14 @@
 		</search_editor>
 	</panel>
 	<panel
+	  visibility_control="ShowStatusBarBalance"
 	  height="18"
 	  left_pad="60"
-	  width="260"
+	  width="160"
 	  top="1"
 	  follows="right|top"
 	  name="balance_bg">
 		<text
-		 visibility_control="ShowStatusBarBalance"
 		 halign="center"
 		 font="SansSerif"
 		 follows="all"
@@ -110,24 +110,7 @@
 		 pad_right="0"
 		 tool_tip="Click to buy more L$"
 		 top="0"
-		 width="80" />
-		<button
-		 font="SansSerifSmall"
-		 follows="right|top|bottom"
-		 image_overlay="Command_MiniCart_Icon"
-		 image_overlay_alignment="left"
-		 image_hover_unselected="PushButton_Over"
-		 image_unselected="PushButton_Off"
-		 image_pressed="PushButton_Press"
-		 height="18"
-		 label="Shop"
-		 label_color="White"
-		 left_pad="0"
-		 label_shadow="true"
-		 name="goShop"
-		 tool_tip="Open Second Life Marketplace"
-		 top="0"
-		 width="80" />
+		 width="60" />
 	</panel>
 	<text
      visibility_control="ShowStatusBarTime"
@@ -142,8 +125,8 @@
      left_pad="0"
      name="TimeText"
      tool_tip="Current time (Pacific)"
-     width="135">
-		24:00 AM PST
+     width="120">
+		24:00:00 AM PST
 	</text>
 	<icon
      follows="right|top"

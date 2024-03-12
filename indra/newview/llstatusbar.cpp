@@ -178,8 +178,6 @@ BOOL LLStatusBar::postBuild()
 	mBtnBuyL = getChild<LLButton>("buyL");
 	mBtnBuyL->setCommitCallback(boost::bind(&LLStatusBar::onClickBuyCurrency, this));
 
-    getChild<LLUICtrl>("goShop")->setCommitCallback(boost::bind(&LLWeb::loadURL, gSavedSettings.getString("MarketplaceURL"), LLStringUtil::null, LLStringUtil::null));
-
 	mBoxBalance = getChild<LLTextBox>("balance");
 	mBoxBalance->setClickedCallback( &LLStatusBar::onClickBalance, this );
 	mBoxBalance->setVisible(gSavedSettings.getBool("ShowStatusBarBalance"));
@@ -786,9 +784,8 @@ void LLStatusBar::updateBalancePanelPosition()
     const S32 HPAD = 24;
     LLRect balance_rect = mBoxBalance->getTextBoundingRect();
     LLRect buy_rect = mBtnBuyL->getRect();
-    LLRect shop_rect = getChildView("goShop")->getRect();
     LLRect balance_bg_rect = mBalanceBG->getRect();
-    balance_bg_rect.mLeft = balance_bg_rect.mRight - (buy_rect.getWidth() + shop_rect.getWidth() + balance_rect.getWidth() + HPAD);
+    balance_bg_rect.mLeft = balance_bg_rect.mRight - (buy_rect.getWidth() + balance_rect.getWidth() + HPAD);
     mBalanceBG->setShape(balance_bg_rect);
 }
 
