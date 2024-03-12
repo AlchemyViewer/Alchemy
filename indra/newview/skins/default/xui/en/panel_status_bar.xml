@@ -83,6 +83,7 @@
 	  follows="right|top"
 	  name="balance_bg">
 		<text
+         valign="center"
 		 halign="center"
 		 font="SansSerif"
 		 follows="all"
@@ -119,6 +120,7 @@
      text_readonly_color="TimeTextColor"
      follows="right|top"
      halign="center"
+     valign="center"
      height="18"
      top="1"
      layout="topleft"
@@ -202,6 +204,7 @@
      text_color="FPSTextColor"
      follows="right|top"
      halign="center"
+     valign="center"
      height="18"
      top="1"
      v_pad="0"
