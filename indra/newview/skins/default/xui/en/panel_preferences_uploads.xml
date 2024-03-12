@@ -43,6 +43,7 @@
    height="18"
    layout="topleft"
    left_pad="5"
+   valign="center"
    name="title_textures"
    width="100">
     Images
@@ -83,6 +84,7 @@
    height="18"
    layout="topleft"
    left_pad="5"
+   valign="center"
    name="title_sounds"
    width="100">
     Sounds
@@ -122,6 +124,7 @@
    height="18"
    layout="topleft"
    left_pad="5"
+   valign="center"
    name="title_animation"
    width="100">
     Animations
@@ -160,6 +163,7 @@
    height="18"
    layout="topleft"
    left_pad="5"
+   valign="center"
    name="title_model"
    width="100">
     Models
@@ -198,6 +202,7 @@
    height="18"
    layout="topleft"
    left_pad="5"
+   valign="center"
    name="title_pbr"
    width="100">
     PBR Materials
