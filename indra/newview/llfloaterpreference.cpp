@@ -377,6 +377,16 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 	mCommitCallbackRegistrar.add("Pref.RemoveSkin", boost::bind(&LLFloaterPreference::onRemoveSkin, this));
 	mCommitCallbackRegistrar.add("Pref.ApplySkin", boost::bind(&LLFloaterPreference::onApplySkin, this));
 	mCommitCallbackRegistrar.add("Pref.SelectSkin", boost::bind(&LLFloaterPreference::onSelectSkin, this, _2));
+
+	mCommitCallbackRegistrar.add("Pref.ResetControlDefault", [](LLUICtrl* ctrl, const LLSD& userdata)
+		{
+			const std::string& control_name = userdata.asString();
+			LLControlVariable* controlp = gSavedSettings.getControl(control_name);
+			if (controlp)
+			{
+				controlp->resetToDefault(true);
+			}
+		});
 }
 
 void LLFloaterPreference::processProperties( void* pData, EAvatarProcessorType type )
