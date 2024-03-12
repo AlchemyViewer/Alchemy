@@ -672,6 +672,9 @@
       name="MapTrackDisabledColor"
      reference="BrickBrown" />
     <color
+     name="MapWhisperRingColor"
+     value="1 1 1 0.15" />
+    <color
      name="MapChatRingColor"
      value="1 1 1 0.3" />
     <color

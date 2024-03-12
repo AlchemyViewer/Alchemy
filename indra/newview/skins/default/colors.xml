@@ -625,11 +625,14 @@
      name="MapAvatarMutedColor"
      reference="Grey3" />
 	<color
+     name="MapWhisperRingColor"
+     reference="Green" />
+	<color
      name="MapChatRingColor"
-     reference="White_25" />
+     reference="Green" />
     <color
      name="MapShoutRingColor"
-     reference="White_25" />
+     reference="Yellow" />
     <color
      name="MapFrustumColor"
      reference="White_20" />

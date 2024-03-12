@@ -209,6 +209,7 @@ void LLNetMap::draw()
 	static LLUIColor map_avatar_color = LLUIColorTable::instance().getColor("MapAvatarColor", LLColor4::white);
 	//static LLUIColor map_avatar_friend_color = LLUIColorTable::instance().getColor("MapAvatarFriendColor", LLColor4::white);
 	static LLUIColor map_track_color = LLUIColorTable::instance().getColor("MapTrackColor", LLColor4::white);
+	static LLUIColor map_whisper_ring_color = LLUIColorTable::instance().getColor("MapWhisperRingColor", LLColor4::white);
     static LLUIColor map_chat_ring_color = LLUIColorTable::instance().getColor("MapChatRingColor", LLColor4::white);
     static LLUIColor map_shout_ring_color = LLUIColorTable::instance().getColor("MapShoutRingColor", LLColor4::white);
 	//static LLUIColor map_track_disabled_color = LLUIColorTable::instance().getColor("MapTrackDisabledColor", LLColor4::white);
@@ -638,11 +639,13 @@ void LLNetMap::draw()
 		
         if (map_chat_ring)
         {
+			const F32 whisper_radius = curregionp->getWhisperRange() * mPixelsPerMeter;
             const F32 chat_radius = curregionp->getChatRange() * mPixelsPerMeter;
             const F32 shout_radius = curregionp->getShoutRange() * mPixelsPerMeter;
 
             gGL.pushUIMatrix();
                 gGL.translateUI(pos_map.mV[VX], pos_map.mV[VY], 0.f);
+				gl_ring(whisper_radius, 1.75f, map_whisper_ring_color, map_whisper_ring_color, 100, FALSE);
                 gl_ring(chat_radius, 1.75f, map_chat_ring_color, map_chat_ring_color, 100, FALSE);
                 gl_ring(shout_radius, 1.75f, map_shout_ring_color, map_shout_ring_color, 100, FALSE);
             gGL.popUIMatrix();

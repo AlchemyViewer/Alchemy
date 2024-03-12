@@ -1161,6 +1161,15 @@
      name="AlchemyFancyChatDividerColor"
      reference="AlchemyText" />
 	<color
+     name="MapWhisperRingColor"
+     reference="AlSuccessGreen" />
+	<color
+     name="MapChatRingColor"
+     reference="AlSuccessGreen" />
+	<color
+     name="MapShoutRingColor"
+     reference="AlWarningOrange" />
+	<color
 	 name="NameTagWhisperDistanceColor"
 	 reference="AlSuccessGreen"/>
 	<color
