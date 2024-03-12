@@ -1757,12 +1757,16 @@ endif (WINDOWS)
 
 # Add the xui files. This is handy for searching for xui elements
 # from within the IDE.
-set(viewer_XUI_FILES
-    skins/default/colors.xml
-    skins/default/skin_settings.xml
-    skins/default/default_languages.xml
-    skins/default/textures/textures.xml
-    )
+set(viewer_XUI_FILES)
+file(GLOB DEFAULT_XUI_FILE_GLOB_LIST
+     ${CMAKE_CURRENT_SOURCE_DIR}/skins/*/*.xml)
+list(APPEND viewer_XUI_FILES ${DEFAULT_XUI_FILE_GLOB_LIST})
+
+file(GLOB DEFAULT_XUI_FILE_GLOB_LIST
+     ${CMAKE_CURRENT_SOURCE_DIR}/skins/*/textures/*.xml)
+list(APPEND viewer_XUI_FILES ${DEFAULT_XUI_FILE_GLOB_LIST})
+
+
 file(GLOB DEFAULT_XUI_FILE_GLOB_LIST
      ${CMAKE_CURRENT_SOURCE_DIR}/skins/*/xui/en/*.xml)
 list(APPEND viewer_XUI_FILES ${DEFAULT_XUI_FILE_GLOB_LIST})
