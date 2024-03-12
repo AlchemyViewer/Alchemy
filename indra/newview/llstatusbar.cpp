@@ -109,8 +109,6 @@ LLStatusBar::LLStatusBar(const LLRect& rect)
 :	LLPanel(),
 	mTextTime(NULL),
 	mTextFPS(nullptr),
-	mSGBandwidth(NULL),
-	mSGPacketLoss(NULL),
 	mPanelPopupHolder(nullptr),
 	mBtnQuickSettings(nullptr),
 	mBtnAO(nullptr),
@@ -175,6 +173,7 @@ BOOL LLStatusBar::postBuild()
 	mPanelPopupHolder = gViewerWindow->getRootView()->getChildView("popup_holder");
 
 	mTextTime = getChild<LLTextBox>("TimeText");
+	mTextTime->setVisible(gSavedSettings.getBool("ShowStatusBarTime"));
 	
 	mBtnBuyL = getChild<LLButton>("buyL");
 	mBtnBuyL->setCommitCallback(boost::bind(&LLStatusBar::onClickBuyCurrency, this));
@@ -183,6 +182,7 @@ BOOL LLStatusBar::postBuild()
 
 	mBoxBalance = getChild<LLTextBox>("balance");
 	mBoxBalance->setClickedCallback( &LLStatusBar::onClickBalance, this );
+	mBoxBalance->setVisible(gSavedSettings.getBool("ShowStatusBarBalance"));
 
 	mIconPresetsCamera = getChild<LLIconCtrl>( "presets_icon_camera" );
 	mIconPresetsCamera->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterPresetsCamera, this));
@@ -215,53 +215,7 @@ BOOL LLStatusBar::postBuild()
 	mTextFPS = getChild<LLTextBox>("FPSText");
 	mTextFPS->setClickedCallback([](void*) { LLFloaterReg::showInstance("stats"); });
 
-	static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
-	mTextFPS->setVisible(show_fps);
-
-	// Adding Net Stat Graph
-	S32 x = getRect().getWidth() - 2;
-	S32 y = 0;
-	LLRect r;
-	r.set( x-SIM_STAT_WIDTH, y+MENU_BAR_HEIGHT-1, x, y+1);
-	LLStatGraph::Params sgp;
-	sgp.name("BandwidthGraph");
-	sgp.rect(r);
-	sgp.follows.flags(FOLLOWS_BOTTOM | FOLLOWS_RIGHT);
-	sgp.mouse_opaque(false);
-	sgp.stat.count_stat_float(&LLStatViewer::ACTIVE_MESSAGE_DATA_RECEIVED);
-	sgp.units("Kbps");
-	sgp.precision(0);
-	sgp.per_sec(true);
-	mSGBandwidth = LLUICtrlFactory::create<LLStatGraph>(sgp);
-	addChild(mSGBandwidth);
-	x -= SIM_STAT_WIDTH + 2;
-
-	r.set( x-SIM_STAT_WIDTH, y+MENU_BAR_HEIGHT-1, x, y+1);
-	//these don't seem to like being reused
-	LLStatGraph::Params pgp;
-	pgp.name("PacketLossPercent");
-	pgp.rect(r);
-	pgp.follows.flags(FOLLOWS_BOTTOM | FOLLOWS_RIGHT);
-	pgp.mouse_opaque(false);
-	pgp.stat.sample_stat_float(&LLStatViewer::PACKETS_LOST_PERCENT);
-	pgp.units("%");
-	pgp.min(0.f);
-	pgp.max(5.f);
-	pgp.precision(1);
-	pgp.per_sec(false);
-	LLStatGraph::Thresholds thresholds;
-	thresholds.threshold.add(LLStatGraph::ThresholdParams().value(0.1f).color(LLColor4::green))
-						.add(LLStatGraph::ThresholdParams().value(0.25f).color(LLColor4::yellow))
-						.add(LLStatGraph::ThresholdParams().value(0.6f).color(LLColor4::red));
-
-	pgp.thresholds(thresholds);
-
-	mSGPacketLoss = LLUICtrlFactory::create<LLStatGraph>(pgp);
-	addChild(mSGPacketLoss);
-
-	static LLCachedControl<bool> show_net_stats(gSavedSettings, "ShowNetStats", false);
-	mSGBandwidth->setVisible(show_net_stats);
-	mSGPacketLoss->setVisible(show_net_stats);
+	mTextFPS->setVisible(gSavedSettings.getBool("ShowStatusBarFPS"));
 
 	mPanelPresetsCameraPulldown = new LLPanelPresetsCameraPulldown();
 	addChild(mPanelPresetsCameraPulldown);
@@ -319,24 +273,12 @@ BOOL LLStatusBar::postBuild()
 // Per-frame updates of visibility
 void LLStatusBar::refresh()
 {
-	static LLCachedControl<bool> show_net_stats(gSavedSettings, "ShowNetStats", false);
 	static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
+	static LLCachedControl<bool> show_clock(gSavedSettings, "ShowStatusBarTime", false);
 	static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
-	bool net_stats_visible = show_net_stats;
-
-	if (net_stats_visible)
-	{
-		// Adding Net Stat Meter back in
-		F32 bwtotal = gViewerThrottle.getMaxBandwidth() / 1000.f;
-		mSGBandwidth->setMin(0.f);
-		mSGBandwidth->setMax(bwtotal*1.25f);
-		//mSGBandwidth->setThreshold(0, bwtotal*0.75f);
-		//mSGBandwidth->setThreshold(1, bwtotal);
-		//mSGBandwidth->setThreshold(2, bwtotal);
-	}
 	
 	// update clock every 10 seconds
-	if(mClockUpdateTimer.getElapsedTimeF32() > 10.f || (show_clock_seconds && mClockUpdateTimer.getElapsedTimeF32() > 1.f))
+	if(show_clock && (mClockUpdateTimer.getElapsedTimeF32() > 10.f || (show_clock_seconds && mClockUpdateTimer.getElapsedTimeF32() > 1.f)))
 	{
 		mClockUpdateTimer.reset();
 
@@ -398,18 +340,17 @@ void LLStatusBar::refresh()
 
 void LLStatusBar::setVisibleForMouselook(bool visible)
 {
-	static LLCachedControl<bool> show_net_stats(gSavedSettings, "ShowNetStats", false);
+	static LLCachedControl<bool> show_balance(gSavedSettings, "ShowStatusBarBalance", false);
+	static LLCachedControl<bool> show_clock(gSavedSettings, "ShowStatusBarTime", false);
 	static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
 	static LLCachedControl<bool> show_menu_search(gSavedSettings, "MenuSearch", false);
-	mTextTime->setVisible(visible);
+	mTextTime->setVisible(visible && show_clock);
 	mBalanceBG->setVisible(visible);
-	mBoxBalance->setVisible(visible);
+	mBoxBalance->setVisible(visible && show_balance);
 	mBtnQuickSettings->setVisible(visible);
 	mBtnAO->setVisible(visible);
 	mBtnVolume->setVisible(visible);
 	mMediaToggle->setVisible(visible);
-	mSGBandwidth->setVisible(visible && show_net_stats);
-	mSGPacketLoss->setVisible(visible && show_net_stats);
 	mSearchPanel->setVisible(visible && show_menu_search);
 	setBackgroundVisible(visible);
 	mIconPresetsCamera->setVisible(visible);

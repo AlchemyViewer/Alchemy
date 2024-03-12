@@ -29,32 +29,32 @@
              <on_check
              function="CheckControl"
              parameter="ShowMiniLocationPanel" />
-    </menu_item_check>
+	</menu_item_check>
 	<menu_item_separator />
-    <menu_item_check
-         label="Show FPS"
-         layout="topleft"
-         name="ShowStatusBarFPS">
-           <on_click
-             function="ToggleControl"
-             parameter="ShowStatusBarFPS" /> 
-             <on_check
-             function="CheckControl"
-             parameter="ShowStatusBarFPS" />
-    </menu_item_check>
 	<menu_item_check
-         label="Show Network Stats"
+         label="Show L$ Balance"
          layout="topleft"
-         name="ShowNetStats">
+         name="ShowStatusBarBalance">
 		<on_click
 		  function="ToggleControl"
-		  parameter="ShowNetStats" />
+		  parameter="ShowStatusBarBalance" />
 		<on_check
 		function="CheckControl"
-		parameter="ShowNetStats" />
+		parameter="ShowStatusBarBalance" />
 	</menu_item_check>
 	<menu_item_check
-         label="Show seconds in clock"
+         label="Show Clock"
+         layout="topleft"
+         name="ShowStatusBarTime">
+		<on_click
+		  function="ToggleControl"
+		  parameter="ShowStatusBarTime" />
+		<on_check
+		function="CheckControl"
+		parameter="ShowStatusBarTime" />
+	</menu_item_check>
+	<menu_item_check
+         label="Show seconds in Clock"
          layout="topleft"
          name="ShowStatusBarSeconds">
 		<on_click
@@ -63,5 +63,16 @@
 		<on_check
 		function="CheckControl"
 		parameter="ShowStatusBarSeconds" />
+	</menu_item_check>
+	<menu_item_check
+         label="Show FPS"
+         layout="topleft"
+         name="ShowStatusBarFPS">
+		<on_click
+		  function="ToggleControl"
+		  parameter="ShowStatusBarFPS" />
+		<on_check
+		function="CheckControl"
+		parameter="ShowStatusBarFPS" />
 	</menu_item_check>
 </menu>

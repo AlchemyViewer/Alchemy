@@ -131,9 +131,6 @@ private:
 	LLTextBox	*mTextTime;
 	LLTextBox	*mTextFPS;
 
-	LLStatGraph *mSGBandwidth;
-	LLStatGraph *mSGPacketLoss;
-
 	LLView		*mPanelPopupHolder;
 	LLIconCtrl	*mIconPresetsCamera;
 	LLIconCtrl	*mIconPresetsGraphic;
