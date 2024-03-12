@@ -166,7 +166,7 @@
     reference="DkGray2"/>
    <color
     name="ChatHeaderTimestampColor"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_85"/>
    <color
     name="ChatHeaderUserNameColor"
     reference="EmphasisColorLight"/>
@@ -202,7 +202,7 @@
     value="0.09020 0.09020 0.09020 1"/>
    <color
     name="ContextSilhouetteColor"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_65"/>
    <color
     name="DefaultHighlightDark"
     reference="DkGray2"/>  <!-- Border element color -->
@@ -253,10 +253,13 @@
     value="0.31765 0.51373 0.10980 0.13"/>
    <color
     name="EmphasisColor_35"
-    value="0.20000 0.33659 0.06341 0.35"/>
+    value="0.31765 0.51373 0.10980 0.35"/>
    <color
     name="EmphasisColor_65"
-    value="0.20000 0.33659 0.06341 0.65"/>
+    value="0.31765 0.51373 0.10980 0.65"/>
+   <color
+    name="EmphasisColor_85"
+    value="0.31765 0.51373 0.10980 0.85"/>
    <color
     name="EmphasisColorDark"
     value="0.20000 0.33659 0.06341 1.0"/>
@@ -271,7 +274,7 @@
     value="0.25 0.25 0.25 0.5"/>
    <color
     name="FilterTextColor"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_65"/>
     <color
     name="FirestormOrange"
     value="1.0 0.6 0.0 1.0" />
@@ -331,7 +334,7 @@
     value="0 0 0 0.31"/>
    <color
     name="GroupActive"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_65"/>
    <color
     name="GroupHiddenInProfile"
     value="0.38 0.38 0.38 1"/>
@@ -376,7 +379,7 @@
     reference="SilhouetteChildColor"/>
    <color
     name="HighlightInspectColor"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_65"/>
    <color
     name="HighlightParentColor"
     reference="Yellow"/>
@@ -433,16 +436,16 @@
     reference="PolarityNeonGreen"/>
    <color
     name="InventoryItemWornColor"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_65"/>
    <color
     name="InventoryMouseOverColor"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_65"/>
    <color
     name="InventoryObjectIconColor"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_65"/>
    <color
     name="InventorySearchStatusColor"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_65"/>
    <color
     name="LabelDisabledColor"
     reference="LtGray_35"/>
@@ -1063,7 +1066,7 @@
     value="0.3 0.3 0.3 0"/>
    <color
     name="ToolbarDropZoneColor"
-    reference="EmphasisColor_35"/>
+    reference="EmphasisColor_65"/>
    <color
     name="ToolTipBgColor"
     value="0.937 0.89 0.655 1"/>
