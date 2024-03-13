@@ -6136,7 +6136,7 @@ BOOL LLVOAvatar::processSingleAnimationStateChange( const LLUUID& anim_id, BOOL 
 	//BD - Poser
 	//     Don't refresh our root position while we pose otherwise moving any joint that moves
 	//     mFootLeft will trigger mRoot repositioning.
-	if (!(isSelf() && gAgent.getPosing()))
+	if (!isSelf() || !gAgent.getPosing())
 	{
     computeBodySize();
 	}
@@ -7307,9 +7307,9 @@ void LLVOAvatar::updateVisualParams()
 		//BD - Poser
 		//     Don't refresh our root position while we pose otherwise moving any joint that moves
 		//     mFootLeft will trigger mRoot repositioning.
-		if (!(isSelf() && gAgent.getPosing()))
-	{
-		computeBodySize();
+		if (!isSelf() || !gAgent.getPosing())
+		{
+			computeBodySize();
 		}
 		mLastSkeletonSerialNum = mSkeletonSerialNum;
 		mRoot->updateWorldMatrixChildren();
