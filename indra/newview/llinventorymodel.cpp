@@ -1561,13 +1561,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
 		LLUUID new_parent_id = item->getParentUUID();
 		bool update_parent_on_server = false;
 
-//		if (new_parent_id.isNull() && !LLApp::isExiting())
-// [SL:KB] - Patch: Appearance-Misc | Checked: Catznip-6.4
-		// The problem seems to be the 'LogoutReply' message so don't reparent anything to the LNF folder
-		// as soon as we've sent out the log out request (since the quitting state is only set >after< we
-		// start processing the logout response)
-		if ( (new_parent_id.isNull()) && (!LLAppViewer::instance()->logoutRequestSent()) && (!LLApp::isExiting()) )
-// [/SL:KB]
+		if (new_parent_id.isNull() && !LLApp::isExiting())
 		{
             if (old_parent_id.isNull())
             {
@@ -1898,10 +1892,12 @@ void LLInventoryModel::changeItemParent(LLViewerInventoryItem* item,
 			<< " from " << make_inventory_info(item->getParentUUID())
 			<< " to " << make_inventory_info(new_parent_id) << LL_ENDL;
 
-		LLInventoryModel::LLCategoryUpdate old_folder(item->getParentUUID(), -1);
-		accountForUpdate(old_folder);
-		LLInventoryModel::LLCategoryUpdate new_folder(new_parent_id, 1, false);
-		accountForUpdate(new_folder);
+		LLInventoryModel::update_list_t update;
+		LLInventoryModel::LLCategoryUpdate old_folder(item->getParentUUID(),-1);
+		update.push_back(old_folder);
+		LLInventoryModel::LLCategoryUpdate new_folder(new_parent_id, 1);
+		update.push_back(new_folder);
+		accountForUpdate(update);
 
 		LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
 		new_item->setParent(new_parent_id);
@@ -1934,10 +1930,12 @@ void LLInventoryModel::changeCategoryParent(LLViewerInventoryCategory* cat,
 		<< " from " << make_inventory_info(cat->getParentUUID())
 		<< " to " << make_inventory_info(new_parent_id) << LL_ENDL;
 
+	LLInventoryModel::update_list_t update;
 	LLInventoryModel::LLCategoryUpdate old_folder(cat->getParentUUID(), -1);
-	accountForUpdate(old_folder);
-	LLInventoryModel::LLCategoryUpdate new_folder(new_parent_id, 1, false);
-	accountForUpdate(new_folder);
+	update.push_back(old_folder);
+	LLInventoryModel::LLCategoryUpdate new_folder(new_parent_id, 1);
+	update.push_back(new_folder);
+	accountForUpdate(update);
 
 	LLPointer<LLViewerInventoryCategory> new_cat = new LLViewerInventoryCategory(cat);
 	new_cat->setParent(new_parent_id);
@@ -2709,10 +2707,7 @@ void LLInventoryModel::accountForUpdate(const LLCategoryUpdate& update) const
 			{
 				descendents_actual += update.mDescendentDelta;
 				cat->setDescendentCount(descendents_actual);
-				if (update.mChangeVersion)
-				{
-					cat->setVersion(++version);
-				}
+				cat->setVersion(++version);
 				LL_DEBUGS(LOG_INV) << "accounted: '" << cat->getName() << "' "
 								   << version << " with " << descendents_actual
 								   << " descendents." << LL_ENDL;
@@ -2740,7 +2735,7 @@ void LLInventoryModel::accountForUpdate(const LLCategoryUpdate& update) const
 }
 
 void LLInventoryModel::accountForUpdate(
-	const LLInventoryModel::update_list_t& update) const
+	const LLInventoryModel::update_list_t& update)
 {
 	update_list_t::const_iterator it = update.begin();
 	update_list_t::const_iterator end = update.end();
@@ -2751,7 +2746,7 @@ void LLInventoryModel::accountForUpdate(
 }
 
 void LLInventoryModel::accountForUpdate(
-	const LLInventoryModel::update_map_t& update) const
+	const LLInventoryModel::update_map_t& update)
 {
 	LLCategoryUpdate up;
 	update_map_t::const_iterator it = update.begin();

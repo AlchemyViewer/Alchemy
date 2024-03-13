@@ -661,8 +661,8 @@ BOOL LLPhysicsMotion::onUpdate(F32 time)
 							       0.0f,
 							       1.0f);
 
-		LLDriverParam *driver_param = static_cast<LLDriverParam *>(mParamDriver);
-		llassert_always(mParamDriver->isDriverParam());
+		LLDriverParam *driver_param = dynamic_cast<LLDriverParam *>(mParamDriver);
+		llassert_always(driver_param);
 		if (driver_param)
 		{
 			// If this is one of our "hidden" driver params, then make sure it's

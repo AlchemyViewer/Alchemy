@@ -106,7 +106,6 @@ public:
 	/*virtual*/ void				stopAnimating() override;
 	/*virtual*/ BOOL				linkDrivenParams(visual_param_mapper mapper, BOOL only_cross_params) override;
 	/*virtual*/ void				resetDrivenParams() override;
-	/*virtual*/ bool				isDriverParam() override { return true; }
 
     // LLViewerVisualParam Virtual functions
 	/*virtual*/ F32					getTotalDistortion() override;
