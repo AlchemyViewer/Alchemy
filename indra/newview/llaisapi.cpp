@@ -978,10 +978,16 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                     ids.emplace(result["item_id"]);
                 }
                 break;
+            case COPYINVENTORY:
             case CREATEINVENTORY:
                 {
                 AISUpdate::parseUUIDArray(result, "_created_categories", ids);
                 AISUpdate::parseUUIDArray(result, "_created_items", ids);
+                }
+                break;
+            case UPDATECATEGORY:
+                {
+                    AISUpdate::parseUUIDArray(result, "_updated_categories", ids);
                 }
                 break;
             default:
@@ -1367,6 +1373,11 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
     {
         LL_WARNS() << "Got stale folder, known: " << curr_cat->getVersion()
             << ", received: " << version << LL_ENDL;
+        if( version < curr_cat->getVersion() )
+        {
+            curr_cat->setVersion(LLViewerInventoryCategory::VERSION_UNKNOWN);
+            curr_cat->fetch();
+        }
         return;
     }
 
