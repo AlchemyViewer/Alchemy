@@ -137,6 +137,10 @@ SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 	<string name="AboutSettings">
 		ウィンドウサイズ:[WINDOW_WIDTH]x[WINDOW_HEIGHT]
 フォントサイズ調整：[FONT_SIZE_ADJUSTMENT]pt
+ＵＩフォント：[FONT_MAIN_OVERRIDE]
+等幅フォント：[FONT_MONO_OVERRIDE]
+チャットフォント：[FONT_CHAT_OVERRIDE]
+スクリプトフォント：[FONT_SCRIPT_OVERRIDE]
 ＵＩスケーリング：[UI_SCALE]
 描画距離：[DRAW_DISTANCE]ｍ
 帯域幅：[NET_BANDWITH]kbit／秒

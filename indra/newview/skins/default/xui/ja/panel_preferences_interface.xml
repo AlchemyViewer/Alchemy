@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="インターフェース" name="Interface panel">
-	<text name="Network:">
+	<text name="float_text_label">
 		フローティングテキスト：
 	</text>
-	<text name="Maximum bandwidth">
+	<text name="fade_dist_label">
 		フェード距離
 	</text>
 	<slider name="text_draw_distance"/>
 	<text name="text_box2">
 		ｍ
 	</text>
-	<text name="Maximum bandwidth">
+	<text name="fade_range_label">
 		フェード範囲
 	</text>
 	<slider name="text_draw_distance"/>
@@ -40,7 +40,7 @@
 		<radio_item label="両方" name="Both"/>
 	</radio_group>
 	<text name="World Effects">
-		ワールドの「エフェクト：
+		ワールドのエフェクト：
 	</text>
 	<check_box label="スクリプトの通信時にパーティクルエフェクトを生成" tool_tip="有効にすると、スクリプトが通信するときにスクリプト化されたオブジェクトに渦巻きのパーティクルライトが表示されるようになります。" name="EffectScriptChatParticles"/>
 	<text name="UI Fonts">

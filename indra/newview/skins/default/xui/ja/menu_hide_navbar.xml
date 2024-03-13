@@ -3,7 +3,9 @@
 	<menu_item_check label="ナビゲーションバーとお気に入りバーを表示" name="ShowNavbarNavigationPanel"/>
 	<menu_item_check label="「場所」のミニフィールドを表示" name="ShowMiniLocationPanel"/>
 	<menu_item_separator/>
-	<menu_item_check label="ＦＰＳを表示" name="ShowStatusBarFPS"/>
-	<menu_item_check label="ネットワーク状況を表示" name="ShowNetStats"/>
+	<menu_item_check label="メニュー検索を表示" name="MenuSearch"/>
+	<menu_item_check label="L$収支を表示" name="ShowStatusBarBalance"/>
+	<menu_item_check label="時計を表示" name="ShowStatusBarTime"/>
 	<menu_item_check label="時計に秒を表示" name="ShowStatusBarSeconds"/>
+	<menu_item_check label="ＦＰＳを表示" name="ShowStatusBarFPS"/>
 </menu>

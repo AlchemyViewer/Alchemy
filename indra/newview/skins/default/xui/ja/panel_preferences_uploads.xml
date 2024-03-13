@@ -3,22 +3,27 @@
 	<text name="title">
 		アップロード先のフォルダ
 	</text>
-	<text name="title_models">
+	<button name="reset_textures" tool_tip="画像のアップロード先のフォルダをリセットします。"/>
+	<text name="title_textures">
 		画像
 	</text>
 	<text name="upload_textures"/>
+	<button name="reset_sounds" tool_tip="サウンドのアップロード先のフォルダをリセットします。"/>
 	<text name="title_sounds">
 		サウンド
 	</text>
 	<text name="upload_sounds"/>
+	<button name="reset_animations" tool_tip="アニメーションのアップロード先のフォルダをリセットします。"/>
 	<text name="title_animation">
 		アニメーション
 	</text>
 	<text name="upload_animation"/>
+	<button name="reset_models" tool_tip="モデルのアップロード先のフォルダをリセットします。" />
 	<text name="title_model">
 		モデル
 	</text>
 	<text name="upload_models"/>
+	<button name="reset_pbr" tool_tip="ＰＢＲマテリアルのアップロード先のフォルダをリセットします。"/>
 	<text name="title_pbr">
 		ＰＢＲマテリアル
 	</text>
