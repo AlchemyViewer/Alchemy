@@ -264,7 +264,7 @@ viewer_media_t LLViewerMedia::newMediaImpl(
 	return media_impl;
 }
 
-viewer_media_t LLViewerMedia::updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self)
+viewer_media_t LLViewerMedia::updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self, bool is_hud_attachment)
 {
     llassert(!gCubeSnapshot);
 	// Try to find media with the same media ID
@@ -313,7 +313,7 @@ viewer_media_t LLViewerMedia::updateMediaImpl(LLMediaEntry* media_entry, const s
 			// The current media URL is not empty.
 			// If (the media was already loaded OR the media was set to autoplay) AND this update didn't come from this agent,
 			// do a navigate.
-			bool auto_play = media_impl->isAutoPlayable();
+			bool auto_play = media_impl->isAutoPlayable(is_hud_attachment);
 			if((was_loaded || auto_play) && !update_from_self)
 			{
 				needs_navigate = url_changed;
@@ -336,7 +336,7 @@ viewer_media_t LLViewerMedia::updateMediaImpl(LLMediaEntry* media_entry, const s
 		media_impl->setHomeURL(media_entry->getHomeURL());
 		media_impl->mMediaAutoPlay = media_entry->getAutoPlay();
 		media_impl->mMediaEntryURL = media_entry->getCurrentURL();
-		if(media_impl->isAutoPlayable())
+		if(media_impl->isAutoPlayable(is_hud_attachment))
 		{
 			needs_navigate = true;
 		}
@@ -3964,10 +3964,11 @@ void LLViewerMediaImpl::setTextureID(LLUUID id)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 //
-bool LLViewerMediaImpl::isAutoPlayable() const
+bool LLViewerMediaImpl::isAutoPlayable(bool is_hud_attachment) const
 {
+	static LLCachedControl<bool> hud_auto_play(gSavedSettings, "MediaAutoPlayHuds", true);
 	return (mMediaAutoPlay &&
-			gSavedSettings.getS32("ParcelMediaAutoPlayEnable") != 0 &&
+			((gSavedSettings.getS32("ParcelMediaAutoPlayEnable") != 0) || (hud_auto_play && (is_hud_attachment || isAttachedToHUD()))) &&
 			gSavedSettings.getBOOL("MediaTentativeAutoPlay"));
 }
 

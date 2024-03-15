@@ -97,7 +97,7 @@ public:
 									   U8 media_auto_scale = false,
 									   U8 media_loop = false);
 	
-	viewer_media_t updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self);
+	viewer_media_t updateMediaImpl(LLMediaEntry* media_entry, const std::string& previous_url, bool update_from_self, bool is_hud_attachment);
 	LLViewerMediaImpl* getMediaImplFromTextureID(const LLUUID& texture_id);
 	static std::string getCurrentUserAgent();
 	void updateBrowserUserAgent();
@@ -435,7 +435,7 @@ public:
 	LLNotificationPtr getCurrentNotification() const;
 
 private:
-	bool isAutoPlayable() const;
+	bool isAutoPlayable(bool is_hud_attachment = false) const;
 	bool shouldShowBasedOnClass() const;
 	bool isObscured() const;
 	static bool isObjectAttachedToAnotherAvatar(LLVOVolume *obj);
