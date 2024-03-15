@@ -126,6 +126,8 @@ private:
 	void updateMenuSearchPosition(); // depends onto balance position
 	void updateBalancePanelPosition();
 
+	void updateClock();
+
 	void onAOStateChanged();
 
 	LLTextBox	*mTextTime;

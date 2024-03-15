@@ -257,6 +257,8 @@ BOOL LLStatusBar::postBuild()
 	mFilterEdit->setCommitCallback(boost::bind(&LLStatusBar::onUpdateFilterTerm, this));
 	collectSearchableItems();
 	gSavedSettings.getControl("MenuSearch")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateMenuSearchVisibility, this, _2));
+	gSavedSettings.getControl("ShowStatusBarTime")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
+	gSavedSettings.getControl("ShowStatusBarSeconds")->getCommitSignal()->connect(boost::bind(&LLStatusBar::updateClock, this));
 
 	if (search_panel_visible)
 	{
@@ -280,24 +282,7 @@ void LLStatusBar::refresh()
 	{
 		mClockUpdateTimer.reset();
 
-		// Get current UTC time, adjusted for the user's clock
-		// being off.
-		time_t utc_time;
-		utc_time = time_corrected();
-
-		static const std::string timeStrTemplate = getString("time");
-		static const std::string timeStrSecondsTemplate = getString("timeSeconds");
-		std::string timeStr = show_clock_seconds ? timeStrSecondsTemplate : timeStrTemplate;
-		LLSD substitution;
-		substitution["datetime"] = (S32) utc_time;
-		LLStringUtil::format (timeStr, substitution);
-		mTextTime->setText(timeStr);
-
-		// set the tooltip to have the date
-		static const std::string dtStrTemplate = getString("timeTooltip");
-		std::string dtStr = dtStrTemplate;
-		LLStringUtil::format (dtStr, substitution);
-		mTextTime->setToolTip (dtStr);
+		updateClock();
 	}
 
 	LLRect r;
@@ -789,6 +774,29 @@ void LLStatusBar::updateBalancePanelPosition()
     mBalanceBG->setShape(balance_bg_rect);
 }
 
+void LLStatusBar::updateClock()
+{
+	static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
+
+	// Get current UTC time, adjusted for the user's clock
+	// being off.
+	time_t utc_time;
+	utc_time = time_corrected();
+
+	static const std::string timeStrTemplate = getString("time");
+	static const std::string timeStrSecondsTemplate = getString("timeSeconds");
+	std::string timeStr = show_clock_seconds ? timeStrSecondsTemplate : timeStrTemplate;
+	LLSD substitution;
+	substitution["datetime"] = (S32)utc_time;
+	LLStringUtil::format(timeStr, substitution);
+	mTextTime->setText(timeStr);
+
+	// set the tooltip to have the date
+	static const std::string dtStrTemplate = getString("timeTooltip");
+	std::string dtStr = dtStrTemplate;
+	LLStringUtil::format(dtStr, substitution);
+	mTextTime->setToolTip(dtStr);
+}
 
 // Implements secondlife:///app/balance/request to request a L$ balance
 // update via UDP message system. JC
