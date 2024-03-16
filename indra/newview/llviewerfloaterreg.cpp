@@ -459,7 +459,7 @@ void LLViewerFloaterReg::registerFloaters()
 	
 	if(!gSkinSettings.getBool("LegacyNotificationWell"))
 	{
-		LLFloaterReg::add("notification_well_window", "floater_notifications_tabbed.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationsTabbed>);
+		LLFloaterReg::add("legacy_notification_well_window", "floater_notifications_tabbed.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationsTabbed>);
 	}
 	else
 	{
