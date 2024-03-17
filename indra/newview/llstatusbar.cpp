@@ -180,7 +180,6 @@ BOOL LLStatusBar::postBuild()
 
 	mBoxBalance = getChild<LLTextBox>("balance");
 	mBoxBalance->setClickedCallback( &LLStatusBar::onClickBalance, this );
-	mBoxBalance->setVisible(gSavedSettings.getBool("ShowStatusBarBalance"));
 
 	mIconPresetsCamera = getChild<LLIconCtrl>( "presets_icon_camera" );
 	mIconPresetsCamera->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterPresetsCamera, this));
@@ -206,6 +205,7 @@ BOOL LLStatusBar::postBuild()
 
 	mBalanceBG = getChild<LLView>("balance_bg");
 	LLHints::getInstance()->registerHintTarget("linden_balance", mBalanceBG->getHandle());
+	mBoxBalance->setVisible(gSavedSettings.getBool("ShowStatusBarBalance"));
 
 	gSavedSettings.getControl("MuteAudio")->getSignal()->connect(boost::bind(&LLStatusBar::onVolumeChanged, this, _2));
 	gSavedPerAccountSettings.getControl("AlchemyAOEnable")->getCommitSignal()->connect(boost::bind(&LLStatusBar::onAOStateChanged, this));
@@ -328,8 +328,7 @@ void LLStatusBar::setVisibleForMouselook(bool visible)
 	static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
 	static LLCachedControl<bool> show_menu_search(gSavedSettings, "MenuSearch", false);
 	mTextTime->setVisible(visible && show_clock);
-	mBalanceBG->setVisible(visible);
-	mBoxBalance->setVisible(visible && show_balance);
+	mBalanceBG->setVisible(visible && show_balance);
 	mBtnQuickSettings->setVisible(visible);
 	mBtnAO->setVisible(visible);
 	mBtnVolume->setVisible(visible);
