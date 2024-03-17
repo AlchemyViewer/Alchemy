@@ -201,15 +201,22 @@ void LLFloaterIMNearbyChat::closeFloater(bool app_quitting)
 {
 	LLFloaterEmojiPicker::saveState();
 
-	LLFloaterIMContainer* floater_container = LLFloaterIMContainer::getInstance();
-	if (getHost())
-	{
-		LLFloaterIMContainer::getInstance()->closeFloater(app_quitting);
-	}
-	else // If detached from conversations window close anyway
+	if (!getHost() || app_quitting)
 	{
 		LLFloaterIMSessionTab::closeFloater(app_quitting);
-		floater_container->selectNextConversationByID(LLUUID());
+	}
+
+	LLFloaterIMContainer* floater_container = LLFloaterIMContainer::findInstance();
+	if (floater_container && !app_quitting)
+	{
+		if (getHost())
+		{
+			LLFloaterIMContainer::getInstance()->closeFloater(app_quitting);
+		}
+		else // If detached from conversations window close anyway
+		{
+			floater_container->selectNextConversationByID(LLUUID());
+		}
 	}
 }
 
