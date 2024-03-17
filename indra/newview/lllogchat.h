@@ -106,6 +106,7 @@ public:
 	static void findTranscriptFiles(std::string pattern, std::vector<std::string>& list_of_transcriptions);
 	static void getListOfTranscriptFiles(std::vector<std::string>& list);
 	static void getListOfTranscriptBackupFiles(std::vector<std::string>& list_of_transcriptions);
+	static bool anyTranscriptsExist();
 
 	static void loadChatHistory(const std::string& file_name, std::list<LLSD>& messages, const LLSD& load_params = LLSD(), bool is_group = false);
 

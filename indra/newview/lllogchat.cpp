@@ -672,6 +672,29 @@ void LLLogChat::getListOfTranscriptBackupFiles(std::vector<std::string>& list_of
 	findTranscriptFiles(pattern, list_of_transcriptions);
 }
 
+// static
+bool LLLogChat::anyTranscriptsExist()
+{
+	// get Users log directory
+	std::string dirname = gDirUtilp->getPerAccountChatLogsDir();
+
+	// add final OS dependent delimiter
+	dirname += gDirUtilp->getDirDelimiter();
+
+	std::string pattern = "*." + LL_TRANSCRIPT_FILE_EXTENSION;
+	LLDirIterator iter(dirname, pattern);
+	std::string filename;
+	while (iter.next(filename))
+	{
+		std::string fullname = gDirUtilp->add(dirname, filename);
+		if (isTranscriptFileFound(fullname))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 boost::signals2::connection LLLogChat::setSaveHistorySignal(const save_history_signal_t::slot_type& cb)
 {
 	if (NULL == mSaveHistorySignal)
