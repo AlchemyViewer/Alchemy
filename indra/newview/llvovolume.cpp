@@ -2414,12 +2414,12 @@ S32 LLVOVolume::setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID)
 
 S32 LLVOVolume::setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialParams)
 {
-	/*S32 res = */LLViewerObject::setTEMaterialParams(te, pMaterialParams);
-#ifdef SHOW_DEBUG
+	S32 res = LLViewerObject::setTEMaterialParams(te, pMaterialParams);
+
 	LL_DEBUGS("MaterialTEs") << "te " << (S32)te << " material " << ((pMaterialParams) ? pMaterialParams->asLLSD() : LLSD("null")) << " res " << res
 							 << ( LLSelectMgr::getInstance()->getSelection()->contains(const_cast<LLVOVolume*>(this), te) ? " selected" : " not selected" )
 							 << LL_ENDL;
-#endif
+
 	setChanged(ALL_CHANGED);
 	if (!mDrawable.isNull())
 	{
