@@ -146,10 +146,8 @@ void LLThread::threadRun()
 #endif
     LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
 
-#if 0
     // for now, hard code all LLThreads to report to single master thread recorder, which is known to be running on main thread
     mRecorder = std::make_unique<LLTrace::ThreadRecorder>(*LLTrace::get_master_thread_recorder());
-#endif
 
     // Run the user supplied function
     do 
@@ -176,9 +174,7 @@ void LLThread::threadRun()
 
     //LL_INFOS() << "LLThread::staticRun() Exiting: " << threadp->mName << LL_ENDL;
 
-#if 0
     mRecorder.reset();
-#endif
 
     // We're done with the run function, this thread is done executing now.
     //NB: we are using this flag to sync across threads...we really need memory barriers here
@@ -260,9 +256,9 @@ void LLThread::shutdown()
 #else
             pthread_cancel(mNativeHandle);
 #endif
-#if 0
+
             mRecorder.reset();
-#endif
+
             mStatus = STOPPED;
             return;
         }
@@ -271,7 +267,7 @@ void LLThread::shutdown()
     mThreadp.reset();
     mRunCondition.reset();
     mDataLock.reset();
-#if 0
+
     if (mRecorder)
     {
         // missed chance to properly shut down recorder (needs to be done in thread context)
@@ -279,7 +275,6 @@ void LLThread::shutdown()
         // so just leak it and remove it from parent
         LLTrace::get_master_thread_recorder()->removeChildRecorder(mRecorder.release());
     }
-#endif
 }
 
 void LLThread::start()

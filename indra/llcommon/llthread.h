@@ -99,9 +99,9 @@ protected:
     std::unique_ptr<std::thread>        mThreadp;
     std::atomic_int                     mStatus;
     std::thread::native_handle_type     mNativeHandle;
-#if 0
+
     std::unique_ptr<LLTrace::ThreadRecorder> mRecorder;
-#endif
+
     //a local apr_pool for APRFile operations in this thread. If it exists, LLAPRFile::sAPRFilePoolp should not be used.
     //Note: this pool is used by APRFile ONLY, do NOT use it for any other purposes.
     //      otherwise it will cause severe memory leaking!!! --bao
