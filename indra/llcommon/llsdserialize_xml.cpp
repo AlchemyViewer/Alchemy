@@ -47,9 +47,9 @@ extern "C"
 /**
  * LLSDXMLFormatter
  */
-LLSDXMLFormatter::LLSDXMLFormatter(bool boolAlpha, const std::string& realFormat,
+LLSDXMLFormatter::LLSDXMLFormatter(bool boolAlpha, bool orderedMap, const std::string& realFormat,
                                    EFormatterOptions options):
-    LLSDFormatter(boolAlpha, realFormat, options)
+    LLSDFormatter(boolAlpha, orderedMap, realFormat, options)
 {
 }
 
@@ -98,12 +98,22 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 		else
 		{
 			ostr << pre << "<map>" << post;
-			LLSD::map_const_iterator iter = data.beginMap();
-			LLSD::map_const_iterator end = data.endMap();
-			for(; iter != end; ++iter)
+			if (mOrderedMap)
 			{
-				ostr << pre << "<key>" << escapeString((*iter).first) << "</key>" << post;
-				format_count += format_impl((*iter).second, ostr, options, level + 1);
+				std::map<std::string, LLSD> oMap(data.beginMap(), data.endMap());
+				for (auto iter = oMap.cbegin(), end = oMap.cend(); iter != end; ++iter)
+				{
+					ostr << pre << "<key>" << escapeString((*iter).first) << "</key>" << post;
+					format_count += format_impl((*iter).second, ostr, options, level + 1);
+				}
+			}
+			else
+			{
+				for (auto iter = data.beginMap(), end = data.endMap(); iter != end; ++iter)
+				{
+					ostr << pre << "<key>" << escapeString((*iter).first) << "</key>" << post;
+					format_count += format_impl((*iter).second, ostr, options, level + 1);
+				}
 			}
 			ostr << pre <<  "</map>" << post;
 		}

@@ -483,7 +483,7 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
 		llofstream presetsXML(pathName.c_str());
 		if (presetsXML.is_open())
 		{
-			LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter();
+			LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter(false, true);
 			formatter->format(paramsData, presetsXML, LLSDFormatter::OPTIONS_PRETTY);
 			presetsXML.close();
 			saved = true;

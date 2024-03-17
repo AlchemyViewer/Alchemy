@@ -1067,7 +1067,8 @@ U32 LLControlGroup::saveToFile(const std::string& filename, BOOL nondefault_only
 	file.open(filename);
 	if (file.is_open())
 	{
-		LLSDSerialize::toPrettyXML(settings, file);
+		LLPointer<LLSDXMLFormatter> f = new LLSDXMLFormatter(false, true);
+		f->format(settings, file, LLSDFormatter::OPTIONS_PRETTY);
 		file.close();
 		LL_INFOS("Settings") << "Saved to " << filename << LL_ENDL;
 	}

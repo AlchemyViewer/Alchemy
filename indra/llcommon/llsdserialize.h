@@ -435,7 +435,7 @@ public:
 	/** 
 	 * @brief Constructor
 	 */
-	LLSDFormatter(bool boolAlpha=false, const std::string& realFormat="",
+	LLSDFormatter(bool boolAlpha=false, bool orderedMap=false, const std::string& realFormat="",
 				  EFormatterOptions options=OPTIONS_PRETTY_BINARY);
 
 	/** 
@@ -500,6 +500,7 @@ protected:
 	void formatReal(LLSD::Real real, std::ostream& ostr) const;
 
 	bool mBoolAlpha;
+	bool mOrderedMap;
 	std::string mRealFormat;
 	EFormatterOptions mOptions;
 };
@@ -521,7 +522,7 @@ public:
 	/** 
 	 * @brief Constructor
 	 */
-	LLSDNotationFormatter(bool boolAlpha=false, const std::string& realFormat="",
+	LLSDNotationFormatter(bool boolAlpha=false, bool orderedMap = false, const std::string& realFormat="",
 						  EFormatterOptions options=OPTIONS_PRETTY_BINARY);
 
 	/** 
@@ -565,7 +566,7 @@ public:
 	/** 
 	 * @brief Constructor
 	 */
-	LLSDXMLFormatter(bool boolAlpha=false, const std::string& realFormat="",
+	LLSDXMLFormatter(bool boolAlpha=false, bool orderedMap=false, const std::string& realFormat="",
 					 EFormatterOptions options=OPTIONS_PRETTY_BINARY);
 
 	/** 
@@ -637,7 +638,7 @@ public:
 	/** 
 	 * @brief Constructor
 	 */
-	LLSDBinaryFormatter(bool boolAlpha=false, const std::string& realFormat="",
+	LLSDBinaryFormatter(bool boolAlpha=false, bool orderedMap = false, const std::string& realFormat="",
 						EFormatterOptions options=OPTIONS_PRETTY_BINARY);
 
 protected:

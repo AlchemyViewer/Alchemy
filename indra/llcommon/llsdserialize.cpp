@@ -1281,7 +1281,8 @@ bool LLSDBinaryParser::parseString(
 /**
  * LLSDFormatter
  */
-LLSDFormatter::LLSDFormatter(bool boolAlpha, const std::string& realFmt, EFormatterOptions options):
+LLSDFormatter::LLSDFormatter(bool boolAlpha, bool orderedMap, const std::string& realFmt, EFormatterOptions options):
+	mOrderedMap(orderedMap),
     mOptions(options)
 {
     boolalpha(boolAlpha);
@@ -1318,9 +1319,9 @@ void LLSDFormatter::formatReal(LLSD::Real real, std::ostream& ostr) const
 /**
  * LLSDNotationFormatter
  */
-LLSDNotationFormatter::LLSDNotationFormatter(bool boolAlpha, const std::string& realFormat,
+LLSDNotationFormatter::LLSDNotationFormatter(bool boolAlpha, bool orderedMap, const std::string& realFormat,
                                              EFormatterOptions options):
-    LLSDFormatter(boolAlpha, realFormat, options)
+    LLSDFormatter(boolAlpha, orderedMap, realFormat, options)
 {
 }
 
@@ -1361,16 +1362,31 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 		}
 
 		bool need_comma = false;
-		LLSD::map_const_iterator iter = data.beginMap();
-		LLSD::map_const_iterator end = data.endMap();
-		for(; iter != end; ++iter)
+
+		if (mOrderedMap)
 		{
-			if(need_comma) ostr << ",";
-			need_comma = true;
-			ostr << post << inner_pre << '\'';
-			serialize_string((*iter).first, ostr);
-			ostr << "':";
-			format_count += format_impl((*iter).second, ostr, options, level + 2);
+			std::map<std::string, LLSD> oMap(data.beginMap(), data.endMap());
+			for (auto iter = oMap.cbegin(), end = oMap.cend(); iter != end; ++iter)
+			{
+				if (need_comma) ostr << ",";
+				need_comma = true;
+				ostr << post << inner_pre << '\'';
+				serialize_string((*iter).first, ostr);
+				ostr << "':";
+				format_count += format_impl((*iter).second, ostr, options, level + 2);
+			}
+		}
+		else
+		{
+			for (auto iter = data.beginMap(), end = data.endMap(); iter != end; ++iter)
+			{
+				if (need_comma) ostr << ",";
+				need_comma = true;
+				ostr << post << inner_pre << '\'';
+				serialize_string((*iter).first, ostr);
+				ostr << "':";
+				format_count += format_impl((*iter).second, ostr, options, level + 2);
+			}
 		}
 		ostr << post << pre << "}";
 		break;
@@ -1500,9 +1516,9 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 /**
  * LLSDBinaryFormatter
  */
-LLSDBinaryFormatter::LLSDBinaryFormatter(bool boolAlpha, const std::string& realFormat,
+LLSDBinaryFormatter::LLSDBinaryFormatter(bool boolAlpha, bool orderedMap, const std::string& realFormat,
                                          EFormatterOptions options):
-    LLSDFormatter(boolAlpha, realFormat, options)
+    LLSDFormatter(boolAlpha, orderedMap, realFormat, options)
 {
 }
 
@@ -1518,13 +1534,24 @@ S32 LLSDBinaryFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 		ostr.put('{');
 		U32 size_nbo = htonl(data.size());
 		ostr.write((const char*)(&size_nbo), sizeof(U32));
-		LLSD::map_const_iterator iter = data.beginMap();
-		LLSD::map_const_iterator end = data.endMap();
-		for(; iter != end; ++iter)
+		if (mOrderedMap)
 		{
-			ostr.put('k');
-			formatString((*iter).first, ostr);
-			format_count += format_impl((*iter).second, ostr, options, level+1);
+			std::map<std::string, LLSD> oMap(data.beginMap(), data.endMap());
+			for (auto iter = oMap.cbegin(), end = oMap.cend(); iter != end; ++iter)
+			{
+				ostr.put('k');
+				formatString((*iter).first, ostr);
+				format_count += format_impl((*iter).second, ostr, options, level + 1);
+			}
+		}
+		else
+		{
+			for (auto iter = data.beginMap(), end = data.endMap(); iter != end; ++iter)
+			{
+				ostr.put('k');
+				formatString((*iter).first, ostr);
+				format_count += format_impl((*iter).second, ostr, options, level + 1);
+			}
 		}
 		ostr.put('}');
 		break;
