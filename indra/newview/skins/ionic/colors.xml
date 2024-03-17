@@ -1117,5 +1117,17 @@
     reference="EmphasisColor"/>
    <color
     name="MusicTickerEmphasisColor" 
-    reference="EmphasisColor"/>
+     reference="EmphasisColor"/>
+	<color
+	 name="NameTagWhisperDistanceColor"
+	 value="0.075 0.686 0.698 1.0"/>
+	<color
+	 name="NameTagChatDistanceColor"
+	 value="0.075 0.698 0.294 1.0" />
+	<color
+	 name="NameTagShoutDistanceColor"
+	 value="0.698 0.604 0.075 1.0" />
+	<color
+     name="NameTagBeyondShoutDistanceColor"
+     value="0.698 0.076 0.076 1.0" />
 </colors>
