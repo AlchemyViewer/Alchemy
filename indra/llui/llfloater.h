@@ -403,8 +403,6 @@ public:
 
 	void			updateTransparency(ETypeTransparency transparency_type);
 		
-    void            updateCurrencySymbol();
-
 	void			enableResizeCtrls(bool enable, bool width = true, bool height = true);
 
 	bool			isPositioning(LLFloaterEnums::EOpenPositioning p) const { return (p == mPositioning); }

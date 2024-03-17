@@ -135,11 +135,6 @@ LLStatusBar::LLStatusBar(const LLRect& rect)
 
 LLStatusBar::~LLStatusBar()
 {
-    if (mCurrencyChangedSlot.connected())
-	{
-        mCurrencyChangedSlot.disconnect();
-	}
-
 	delete mBalanceTimer;
 	mBalanceTimer = NULL;
 
@@ -265,8 +260,6 @@ BOOL LLStatusBar::postBuild()
 		updateMenuSearchPosition();
 	}
 
-    mCurrencyChangedSlot = LLCurrencyWrapper::getInstance()->addCurrencyChangedCb(
-        [&] { mBtnBuyL->updateCurrencySymbols(); sendMoneyBalanceRequest(); });
 	return TRUE;
 }
 
@@ -483,7 +476,7 @@ S32 LLStatusBar::getSquareMetersLeft() const
 	return mSquareMetersCredit - mSquareMetersCommitted;
 }
 
-void LLStatusBar::onClickBuyCurrency() const
+void LLStatusBar::onClickBuyCurrency()
 {
 	// open a currency floater - actual one open depends on 
 	// value specified in settings.xml

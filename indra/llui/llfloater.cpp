@@ -2239,13 +2239,6 @@ void LLFloater::updateTransparency(ETypeTransparency transparency_type)
 	updateTransparency(this, transparency_type);
 }
 
-void LLFloater::updateCurrencySymbol()
-{
-    mTitle.dirty();
-    mShortTitle.dirty();
-    applyTitle();
-}
-
 void	LLFloater::setCanMinimize(BOOL can_minimize)
 {
 	// if removing minimize/restore button programmatically,

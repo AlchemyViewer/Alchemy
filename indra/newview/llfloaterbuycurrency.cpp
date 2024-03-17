@@ -28,8 +28,6 @@
 
 #include "llfloaterbuycurrency.h"
 
-#include "llcurrencywrapper.h"
-
 // viewer includes
 #include "llcurrencyuimanager.h"
 #include "llfloater.h"
@@ -40,7 +38,6 @@
 #include "llstatusbar.h"
 #include "lltextbox.h"
 #include "llviewchildren.h"
-#include "llviewernetwork.h"
 #include "llviewerwindow.h"
 #include "lluictrlfactory.h"
 #include "llweb.h"
@@ -56,6 +53,8 @@ public:
 	LLFloaterBuyCurrencyUI(const LLSD& key);
 	virtual ~LLFloaterBuyCurrencyUI();
 
+
+public:
 	LLViewChildren		mChildren;
 	LLCurrencyUIManager	mManager;
 	
@@ -63,13 +62,13 @@ public:
 	S32			mTargetPrice;
 	S32			mRequiredAmount;
 	
+public:
 	void noTarget();
 	void target(const std::string& name, S32 price);
 	
 	virtual BOOL postBuild();
 	
 	void updateUI();
-    void updateCurrencySymbols();
 	void collapsePanels(bool collapse);
 
 	virtual void draw();
@@ -77,8 +76,6 @@ public:
 
 	void onClickBuy();
 	void onClickCancel();
-
-    boost::signals2::connection mCurrencyChangedSlot;
 };
 
 LLFloater* LLFloaterBuyCurrency::buildFloater(const LLSD& key)
@@ -98,8 +95,6 @@ LLFloaterBuyCurrencyUI::LLFloaterBuyCurrencyUI(const LLSD& key)
 
 LLFloaterBuyCurrencyUI::~LLFloaterBuyCurrencyUI()
 {
-    if (mCurrencyChangedSlot.connected())
-        mCurrencyChangedSlot.disconnect();
 }
 
 
@@ -139,17 +134,10 @@ BOOL LLFloaterBuyCurrencyUI::postBuild()
 	
 	getChild<LLUICtrl>("buy_btn")->setCommitCallback( boost::bind(&LLFloaterBuyCurrencyUI::onClickBuy, this));
 	getChild<LLUICtrl>("cancel_btn")->setCommitCallback( boost::bind(&LLFloaterBuyCurrencyUI::onClickCancel, this));
-	if (LLGridManager::instance().isInOpenSim())
-	{
-		getChild<LLTextBox>("currency_links")->setText(LLStringExplicit(""));
-	}
 	
 	center();
 	
 	updateUI();
-
-    mCurrencyChangedSlot = LLCurrencyWrapper::instance().addCurrencyChangedCb(
-        std::bind(&LLFloaterBuyCurrencyUI::updateCurrencySymbols, this));
 	
 	return TRUE;
 }
@@ -197,15 +185,7 @@ void LLFloaterBuyCurrencyUI::updateUI()
 		LLSD args;
 		args["TITLE"] = getString("info_cannot_buy");
 		args["MESSAGE"] = mManager.errorMessage();
-		if( !LLGridManager::getInstance()->isInSecondlife() )
-		{
-			args["LINK"] = mManager.errorURI();
-			LLNotificationsUtil::add("CouldNotBuyCurrencyOS", args);
-		}
-		else
-		{
-			LLNotificationsUtil::add("CouldNotBuyCurrency", args);
-		}
+		LLNotificationsUtil::add("CouldNotBuyCurrency", args);
 		mManager.clearError();
 		closeFloater();
 	}
@@ -260,16 +240,6 @@ void LLFloaterBuyCurrencyUI::updateUI()
 	getChildView("getting_data")->setVisible( !mManager.canBuy() && !hasError && !getChildView("currency_est")->getVisible());
 }
 
-void LLFloaterBuyCurrencyUI::updateCurrencySymbols()
-{
-    updateCurrencySymbol();
-    getChild<LLTextBox>("info_need_more")->updateCurrencySymbols();
-    getChild<LLTextBox>("info_buying")->updateCurrencySymbols();
-    getChild<LLTextBox>("currency_label")->updateCurrencySymbols();
-    getChild<LLTextBox>("purchase_warning_repurchase")->updateCurrencySymbols();
-    getChild<LLTextBox>("purchase_warning_notenough")->updateCurrencySymbols();
-}
-
 void LLFloaterBuyCurrencyUI::collapsePanels(bool collapse)
 {
 	LLLayoutPanel* price_panel = getChild<LLLayoutPanel>("layout_panel_price");
@@ -319,33 +289,15 @@ LLFetchAvatarPaymentInfo* LLFloaterBuyCurrency::sPropertiesRequest = NULL;
 // static
 void LLFloaterBuyCurrency::buyCurrency()
 {
-	if (LLGridManager::instance().isInOpenSim())
-	{
-		LLFloaterBuyCurrencyUI* ui = LLFloaterReg::showTypedInstance<LLFloaterBuyCurrencyUI>("buy_currency");
-		ui->noTarget();
-		ui->updateUI();
-	}
-	else
-	{
-		delete sPropertiesRequest;
-		sPropertiesRequest = new LLFetchAvatarPaymentInfo(false);
-	}
+	delete sPropertiesRequest;
+	sPropertiesRequest = new LLFetchAvatarPaymentInfo(false);
 }
 
 // static
 void LLFloaterBuyCurrency::buyCurrency(const std::string& name, S32 price)
 {
-	if (LLGridManager::instance().isInOpenSim())
-	{
-		LLFloaterBuyCurrencyUI* ui = LLFloaterReg::showTypedInstance<LLFloaterBuyCurrencyUI>("buy_currency");
-		ui->target(name, price);
-		ui->updateUI();
-	}
-	else
-	{
-		delete sPropertiesRequest;
-		sPropertiesRequest = new LLFetchAvatarPaymentInfo(true, name, price);
-	}
+	delete sPropertiesRequest;
+	sPropertiesRequest = new LLFetchAvatarPaymentInfo(true, name, price);
 }
 
 // static

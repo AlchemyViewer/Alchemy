@@ -28,7 +28,6 @@
 #define LL_LLSTATUSBAR_H
 
 #include "llpanel.h"
-#include "llcurrencywrapper.h"
 
 // "Constants" loaded from settings.xml at start time
 extern S32 STATUS_BAR_HEIGHT;
@@ -100,7 +99,7 @@ public:
 
 private:
 	
-	void onClickBuyCurrency() const;
+	void onClickBuyCurrency();
 	void onVolumeChanged(const LLSD& newvalue);
 
 	void onMouseEnterPresetsCamera();
@@ -158,8 +157,6 @@ private:
 	ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown;
 	LLPanelVolumePulldown* mPanelVolumePulldown;
 	LLPanelNearByMedia*	mPanelNearByMedia;
-
-    boost::signals2::connection mCurrencyChangedSlot;
 };
 
 // *HACK: Status bar owns your cached money balance. JC

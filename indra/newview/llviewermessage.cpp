@@ -32,7 +32,6 @@
 #include "llaudioengine.h" 
 #include "llavataractions.h"
 #include "llavatarnamecache.h"		// IDEVO HACK
-#include "llcurrencywrapper.h"
 #include "lleconomy.h"
 #include "lleventtimer.h"
 #include "llfloatercreatelandmark.h"
@@ -400,7 +399,7 @@ void give_money(const LLUUID& uuid, LLViewerRegion* region, S32 amount, BOOL is_
 	{
 		if (uuid.isNull())
 		{
-			LL_WARNS() << LLCurrencyWrapper::instance().wrapCurrency("Failed to send L$ gift to to Null UUID.") << LL_ENDL;
+			LL_WARNS() << "Failed to send L$ gift to to Null UUID." << LL_ENDL;
 			return;
 		}
 //		gStatusBar->debitBalance(amount);
@@ -4963,7 +4962,7 @@ void process_money_balance_reply( LLMessageSystem* msg, void** )
 	msg->getS32Fast(_PREHASH_MoneyData, _PREHASH_SquareMetersCredit, credit);
 	msg->getS32Fast(_PREHASH_MoneyData, _PREHASH_SquareMetersCommitted, committed);
 	msg->getStringFast(_PREHASH_MoneyData, _PREHASH_Description, desc);
-	LL_INFOS("Messaging") << LLCurrencyWrapper::instance().wrapCurrency("L$, credit, committed: ") << balance << " " << credit << " "
+	LL_INFOS("Messaging") << "L$, credit, committed: " << balance << " " << credit << " "
 			<< committed << LL_ENDL;
     
 	if (gStatusBar)

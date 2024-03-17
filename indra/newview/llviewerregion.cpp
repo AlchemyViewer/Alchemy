@@ -92,8 +92,6 @@
 
 #include <boost/regex.hpp>
 
-#include "llcurrencywrapper.h"
-
 
 // When we receive a base grant of capabilities that has a different number of 
 // capabilities than the original base grant received for the region, print 
@@ -2502,7 +2500,6 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 	if (LLGridManager::getInstance()->isInOpenSim())
 	{
 		setGodnames();
-        std::string cur_symbol = LLCurrencyWrapper::instance().getHomeCurrency();
 		if (mSimulatorFeatures.has("OpenSimExtras"))
 		{
 			const LLSD& extras(mSimulatorFeatures["OpenSimExtras"]);
@@ -2522,11 +2519,6 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 			if (extras.has("GridNick"))
 			{
 				mHGGridNick = extras["GridNick"].asString();
-			}
-
-			if (extras.has("currency"))
-			{
-				cur_symbol = extras["currency"].asString();
 			}
 
 			if (extras.has("map-server-url"))
@@ -2568,11 +2560,6 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 			mMinPhysPrimScale = OS_MIN_PRIM_SCALE;
 			mMaxPhysPrimScale = OS_DEFAULT_MAX_PRIM_SCALE;
 		}
-		
-        if (LLCurrencyWrapper::instance().getCurrency() != cur_symbol)
-        {
-            LLCurrencyWrapper::instance().setCurrency(cur_symbol);
-        }
 	}
 	else
 #endif
