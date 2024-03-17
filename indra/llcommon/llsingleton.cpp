@@ -270,7 +270,7 @@ void LLSingletonBase::reset_initializing(list_t::size_type size)
 
 void LLSingletonBase::MasterList::LockedInitializing::log(const char* verb, const char* name)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("LLSingleton") << verb << ' ' << demangle(name) << ';';
         if (mList)
         {
@@ -473,7 +473,7 @@ void LLSingletonBase::loginfos(const string_params& args)
 //static
 void LLSingletonBase::logdebugs(const string_params& args)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("LLSingleton") << args << LL_ENDL;
 #endif
 }

@@ -394,7 +394,7 @@ public:
 					// Handle EOF specially: it's part of normal-case processing.
 					if (err == APR_EOF)
 					{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 						LL_DEBUGS("LLProcess") << "EOF on " << mDesc << LL_ENDL;
 #endif
 					}
@@ -416,7 +416,7 @@ public:
 				// received. Make sure we commit those later. (Don't commit them
 				// now, that would invalidate the buffer iterator sequence!)
 				tocommit += gotten;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 				LL_DEBUGS("LLProcess") << "filled " << gotten << " of " << toread
 									   << " bytes from " << mDesc << LL_ENDL;
 #endif

@@ -55,13 +55,13 @@ const int LL_ERR_NOERR = 0;
 #else // _DEBUG
 
 #ifdef LL_RELEASE_WITH_DEBUG_INFO
-#define SHOW_ASSERT 1
-#define SHOW_DEBUG 1
-#define ENABLE_DEBUG_MACRO 1
+#define SHOW_ASSERT
+#define SHOW_DEBUG
+#define ENABLE_DEBUG_MACRO
 #endif // LL_RELEASE_WITH_DEBUG_INFO
 
 #ifdef RELEASE_SHOW_DEBUG
-#define SHOW_DEBUG 1
+#define SHOW_DEBUG
 #endif
 
 #ifdef RELEASE_SHOW_WARN
@@ -402,7 +402,7 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 			std::ostringstream _out;            \
 			_out
 
-#if ENABLE_DEBUG_MACRO
+#ifdef ENABLE_DEBUG_MACRO
 
 #define lllog_debug(level, once, ...)                                         \
 	do {                                                                \

@@ -296,7 +296,7 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
         const LLSD& row = *it;
         LLUUID public_key = row[EXPERIENCE_ID].asUUID();
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("ExperienceCache") << "Received result for " << public_key
             << " display '" << row[LLExperienceCache::NAME].asString() << "'" << LL_ENDL;
 #endif
@@ -478,7 +478,7 @@ bool LLExperienceCache::fetch(const LLUUID& key, bool refresh/* = true*/)
 {
 	if(!key.isNull() && !isRequestPending(key) && (refresh || mCache.find(key)==mCache.end()))
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("ExperienceCache") << " queue request for " << EXPERIENCE_ID << " " << key << LL_ENDL;
 #endif
 

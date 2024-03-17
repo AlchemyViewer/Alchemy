@@ -339,7 +339,7 @@ void LLPluginProcessChild::sendMessageToParent(const LLPluginMessage &message)
 {
 	std::string buffer = message.generate();
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "Sending to parent: " << buffer << LL_ENDL;
 #endif
 
@@ -349,7 +349,7 @@ void LLPluginProcessChild::sendMessageToParent(const LLPluginMessage &message)
 void LLPluginProcessChild::receiveMessageRaw(const std::string &message)
 {
 	// Incoming message from the TCP Socket
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "Received from parent: " << message << LL_ENDL;
 #endif
 
@@ -490,7 +490,7 @@ void LLPluginProcessChild::receiveMessageRaw(const std::string &message)
 /* virtual */
 void LLPluginProcessChild::receivePluginMessage(const std::string &message)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "Received from plugin: " << message << LL_ENDL;
 #endif
 
@@ -575,7 +575,7 @@ void LLPluginProcessChild::receivePluginMessage(const std::string &message)
 
 	if (passMessage)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Plugin") << "Passing through to parent: " << message << LL_ENDL;
 #endif
 		writeMessageRaw(message);
@@ -598,7 +598,7 @@ void LLPluginProcessChild::receivePluginMessage(const std::string &message)
 
 void LLPluginProcessChild::setState(EState state)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("Plugin") << "setting state to " << state << LL_ENDL;
 #endif
 	mState = state;

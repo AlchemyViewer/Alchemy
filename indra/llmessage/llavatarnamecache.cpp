@@ -131,7 +131,7 @@ LLAvatarNameCache::~LLAvatarNameCache()
 
 void LLAvatarNameCache::requestAvatarNameCache_(std::string url, std::vector<LLUUID> agentIds)
 {
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("AvNameCache") << "Entering coroutine " << LLCoros::getName()
         << " with url '" << url << "', requesting " << agentIds.size() << " Agent Ids" << LL_ENDL;
 #endif
@@ -152,7 +152,7 @@ void LLAvatarNameCache::requestAvatarNameCache_(std::string url, std::vector<LLU
         LLCoreHttpUtil::HttpCoroutineAdapter httpAdapter("NameCache", sHttpPolicy);
         LLSD results = httpAdapter.getAndSuspend(sHttpRequest, url);
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS() << results << LL_ENDL;
 #endif
 
@@ -290,7 +290,7 @@ void LLAvatarNameCache::handleAgentError(const LLUUID& agent_id)
         LLAvatarNameCache::mPendingQueue.erase(agent_id);
 
         LLAvatarName& av_name = existing->second;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
         LL_DEBUGS("AvNameCache") << "LLAvatarNameCache use cache for agent " << agent_id << LL_ENDL;
 #endif
 		av_name.dump();

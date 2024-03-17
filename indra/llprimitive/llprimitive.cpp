@@ -1414,7 +1414,7 @@ S32 LLPrimitive::parseTEMessage(LLMessageSystem* mesgsys, char const* block_name
 	tec.face_count = llmin((U32)getNumTEs(),(U32)LLTEContents::MAX_TES);
 
 	U8 *cur_ptr = tec.packed_buffer;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("TEXTUREENTRY") << "Texture Entry with buffere sized: " << tec.size << LL_ENDL;
 #endif
     U8 *buffer_end = tec.packed_buffer + tec.size;
@@ -1550,7 +1550,7 @@ S32 LLPrimitive::unpackTEMessage(LLDataPacker &dp)
 	U32 i;
 
     U8 *cur_ptr = packed_buffer;
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
     LL_DEBUGS("TEXTUREENTRY") << "Texture Entry with buffer sized: " << size << LL_ENDL;
 #endif
     U8 *buffer_end = packed_buffer + size;

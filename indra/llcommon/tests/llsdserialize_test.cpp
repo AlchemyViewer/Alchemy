@@ -501,7 +501,7 @@ namespace tut
 	template<> template<> 
 	void TestLLSDSerializeObject::test<1>()
 	{
-		setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_PRETTY_BINARY),
+		setFormatterParser(new LLSDNotationFormatter(false, false, "", LLSDFormatter::OPTIONS_PRETTY_BINARY),
 						   new LLSDNotationParser());
 		doRoundTripTests("pretty binary notation serialization");
 	}
@@ -509,7 +509,7 @@ namespace tut
 	template<> template<> 
 	void TestLLSDSerializeObject::test<2>()
 	{
-		setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
+		setFormatterParser(new LLSDNotationFormatter(false, false, "", LLSDFormatter::OPTIONS_NONE),
 						   new LLSDNotationParser());
 		doRoundTripTests("raw binary notation serialization");
 	}
@@ -566,7 +566,7 @@ namespace tut
 	template<> template<>
 	void TestLLSDSerializeObject::test<8>()
 	{
-		setFormatterParser(new LLSDNotationFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
+		setFormatterParser(new LLSDNotationFormatter(false, false, "", LLSDFormatter::OPTIONS_NONE),
 						   new LLSDNotationParser());
 		setParser(LLSDSerialize::deserialize);
 		// This is an interesting test because LLSDNotationFormatter does not
@@ -577,7 +577,7 @@ namespace tut
 	template<> template<>
 	void TestLLSDSerializeObject::test<9>()
 	{
-		setFormatterParser(new LLSDXMLFormatter(false, "", LLSDFormatter::OPTIONS_NONE),
+		setFormatterParser(new LLSDXMLFormatter(false, false, "", LLSDFormatter::OPTIONS_NONE),
 						   new LLSDXMLParser());
 		setParser(LLSDSerialize::deserialize);
 		// This is an interesting test because LLSDXMLFormatter does not

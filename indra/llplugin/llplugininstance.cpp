@@ -174,7 +174,7 @@ void LLPluginInstance::receiveMessage(const char *message_string)
 {
 	if(mOwner)
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS("Plugin") << "processing incoming message: \"" << message_string << "\"" << LL_ENDL;
 #endif
 		mOwner->receivePluginMessage(message_string);

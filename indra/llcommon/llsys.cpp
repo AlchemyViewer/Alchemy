@@ -962,7 +962,7 @@ LLMemoryInfo& LLMemoryInfo::refresh()
 	LL_PROFILE_ZONE_SCOPED
 	mStatsMap = loadStatsMap();
 
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 	LL_DEBUGS("LLMemoryInfo") << "Populated mStatsMap:\n";
 	LLSDSerialize::toPrettyXML(mStatsMap, LL_CONT);
 	LL_ENDL;
