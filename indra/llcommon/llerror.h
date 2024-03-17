@@ -57,11 +57,12 @@ const int LL_ERR_NOERR = 0;
 #else // _DEBUG
 
 #ifdef LL_RELEASE_WITH_DEBUG_INFO
-#define SHOW_ASSERT
+#define SHOW_ASSERT 1
+#define SHOW_DEBUG 1
 #endif // LL_RELEASE_WITH_DEBUG_INFO
 
 #ifdef RELEASE_SHOW_DEBUG
-#define SHOW_DEBUG
+#define SHOW_DEBUG 1
 #endif
 
 #ifdef RELEASE_SHOW_WARN
