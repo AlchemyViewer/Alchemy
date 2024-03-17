@@ -511,7 +511,7 @@
     value="1 1 .79 1"/>
    <color
     name="MapAvatarColor"
-    reference="Gree"/>
+    reference="Green"/>
    <color
     name="MapAvatarFriendColor"
     value="0.37158 0.81592 0.59722 1"/>
