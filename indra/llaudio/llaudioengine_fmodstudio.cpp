@@ -490,7 +490,7 @@ bool LLAudioChannelFMODSTUDIO::updateBuffer()
 	}
 	else
 	{
-#if SHOW_DEBUG
+#ifdef SHOW_DEBUG
 		LL_DEBUGS() << "No source buffer!" << LL_ENDL;
 #endif
 		return false;

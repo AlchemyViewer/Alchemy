@@ -1697,12 +1697,9 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
 			
 		if (!http_url.empty())
 		{
-#if SHOW_DEBUG			
-			std::string mid;
-			mesh_id.toString(mid);
-			LL_DEBUGS(LOG_MESH) << "Mesh/Cache: Mesh body for ID " << mid << " - was retrieved from the simulator." << LL_ENDL;
-#endif
-            auto handler = std::make_shared<LLMeshLODHandler>(mesh_params, lod, info.mOffset, info.mSize);
+			LL_DEBUGS(LOG_MESH) << "Mesh/Cache: Mesh body for ID " << mesh_id << " - was retrieved from the simulator." << LL_ENDL;
+
+			auto handler = std::make_shared<LLMeshLODHandler>(mesh_params, lod, info.mOffset, info.mSize);
 			LLCore::HttpHandle handle = getByteRange(http_url, legacy_cap_version, info.mOffset, info.mSize, handler);
 			if (LLCORE_HTTP_HANDLE_INVALID == handle)
 			{

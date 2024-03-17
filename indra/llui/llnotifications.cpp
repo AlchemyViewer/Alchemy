@@ -241,10 +241,8 @@ LLNotificationForm::LLNotificationForm(const std::string& name, const LLNotifica
 			*it = it->beginMap()->second;
 		}
 	}
-#if SHOW_DEBUG
-	LL_DEBUGS("Notifications") << name << LL_ENDL;
-	LL_DEBUGS("Notifications") << ll_pretty_print_sd(mFormData) << LL_ENDL;
-#endif
+
+	LL_DEBUGS("Notifications") << name << LL_NEWLINE << ll_pretty_print_sd(mFormData) << LL_ENDL;
 }
 
 LLNotificationForm::LLNotificationForm(const LLSD& sd)
@@ -436,9 +434,7 @@ LLNotificationTemplate::LLNotificationTemplate(const LLNotificationTemplate::Par
 		mUniqueContext.push_back(context.value);
 	}
 
-#if SHOW_DEBUG
 	LL_DEBUGS("Notifications") << "notification \"" << mName << "\": tag count is " << p.tags.size() << LL_ENDL;
-#endif
 
 	for (const LLNotificationTemplate::Tag& tag : p.tags)
 	{
@@ -1497,9 +1493,7 @@ void replaceSubstitutionStrings(LLXMLNodePtr node, StringMap& replacements)
 			if (found != replacements.end())
 			{
 				replacement = found->second;
-#if SHOW_DEBUG
 				LL_DEBUGS("Notifications") << "replaceSubstitutionStrings: value: \"" << value << "\" repl: \"" << replacement << "\"." << LL_ENDL;
-#endif
 				it->second->setValue(replacement);
 			}
 			else

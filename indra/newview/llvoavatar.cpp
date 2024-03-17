@@ -10798,7 +10798,7 @@ void LLVOAvatar::updateRiggingInfo()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
-#ifdef SHOW_DEBUG
+#if DEBUG_SKINNING
     LL_DEBUGS("RigSpammish") << getFullname() << " updating rig tab" << LL_ENDL;
 #endif
 
@@ -10847,12 +10847,13 @@ void LLVOAvatar::updateRiggingInfo()
     }
 
     //LL_INFOS() << "done update rig count is " << countRigInfoTab(mJointRiggingInfoTab) << LL_ENDL;
-#ifdef SHOW_DEBUG
+#if DEBUG_SKINNING
     LL_DEBUGS("RigSpammish") << getFullname() << " after update rig tab:" << LL_ENDL;
 
+	LL_DEBUGS("RigSpammish") << "uses ";
     S32 joint_count, box_count;
     showRigInfoTabExtents(this, mJointRiggingInfoTab, joint_count, box_count);
-    LL_DEBUGS("RigSpammish") << "uses " << joint_count << " joints " << " nonzero boxes: " << box_count << LL_ENDL;
+    LL_CONT << joint_count << " joints " << " nonzero boxes: " << box_count << LL_ENDL;
 #endif
 }
 

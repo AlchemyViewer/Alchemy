@@ -46,8 +46,6 @@ const int LL_ERR_NOERR = 0;
 // #define RELEASE_SHOW_DEBUG // Define this if you want your release builds to show lldebug output.
 #define RELEASE_SHOW_INFO // Define this if you want your release builds to show llinfo output
 #define RELEASE_SHOW_WARN // Define this if you want your release builds to show llwarn output.
-#define ENABLE_DEBUG_MACRO 1
-
 
 #ifdef _DEBUG
 #define SHOW_DEBUG
@@ -59,6 +57,7 @@ const int LL_ERR_NOERR = 0;
 #ifdef LL_RELEASE_WITH_DEBUG_INFO
 #define SHOW_ASSERT 1
 #define SHOW_DEBUG 1
+#define ENABLE_DEBUG_MACRO 1
 #endif // LL_RELEASE_WITH_DEBUG_INFO
 
 #ifdef RELEASE_SHOW_DEBUG

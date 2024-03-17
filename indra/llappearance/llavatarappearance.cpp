@@ -448,7 +448,8 @@ using namespace LLAvatarAppearanceDefines;
 void LLAvatarAppearance::compareJointStateMaps(joint_state_map_t& last_state,
                                                joint_state_map_t& curr_state)
 {
-    if (!last_state.empty() && (last_state != curr_state))
+	LL_DEBUGS("AvatarBodySize") << "Comparing Joint State";
+	if (!last_state.empty() && (last_state != curr_state))
     {
         S32 diff_count = 0;
         for (joint_state_map_t::value_type& pair : last_state)
@@ -456,16 +457,16 @@ void LLAvatarAppearance::compareJointStateMaps(joint_state_map_t& last_state,
             const std::string& key = pair.first;
             if (last_state[key] != curr_state[key])
             {
-                LL_DEBUGS("AvatarBodySize") << "BodySize change " << key << " " << last_state[key] << "->" << curr_state[key] << LL_ENDL;
+                LL_CONT << LL_NEWLINE << "BodySize change " << key << " " << last_state[key] << "->" << curr_state[key];
                 diff_count++;
             }
         }
         if (diff_count > 0)
         {
-            LL_DEBUGS("AvatarBodySize") << "Total of BodySize changes " << diff_count << LL_ENDL;
+			LL_CONT << LL_NEWLINE << "Total of BodySize changes " << diff_count;
         }
-        
     }
+	LL_CONT << LL_ENDL;
 }
 
 //------------------------------------------------------------------------
@@ -554,9 +555,7 @@ void LLAvatarAppearance::computeBodySize()
 	{
 		mBodySize = new_body_size;
 
-#ifdef SHOW_DEBUG
         compareJointStateMaps(mLastBodySizeState, mCurrBodySizeState);
-#endif
 	}
 }
 
@@ -608,13 +607,11 @@ BOOL LLAvatarAppearance::setupBone(const LLAvatarBoneInfo* info, LLJoint* parent
 {
 	LLJoint* joint = NULL;
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("BVH") << "bone info: name " << info->mName
                      << " isJoint " << info->mIsJoint
                      << " volume_num " << volume_num
                      << " joint_num " << joint_num
                      << LL_ENDL;
-#endif
 
 	if (info->mIsJoint)
 	{

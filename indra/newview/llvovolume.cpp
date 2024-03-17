@@ -3812,7 +3812,7 @@ void LLVOVolume::updateRiggingInfo()
         LLVolume *volume = getVolume();
         if (skin && avatar && volume)
         {
-#ifdef SHOW_DEBUG
+#if DEBUG_SKINNING
             LL_DEBUGS("RigSpammish") << "starting, vovol " << this << " lod " << getLOD() << " last " << mLastRiggingInfoLOD << LL_ENDL;
 #endif
             if (getLOD()>mLastRiggingInfoLOD || getLOD()==3)
@@ -3830,7 +3830,7 @@ void LLVOVolume::updateRiggingInfo()
                 }
                 // Keep the highest LOD info available.
                 mLastRiggingInfoLOD = getLOD();
-#ifdef SHOW_DEBUG
+#if DEBUG_SKINNING
                 LL_DEBUGS("RigSpammish") << "updated rigging info for LLVOVolume " 
                                          << this << " lod " << mLastRiggingInfoLOD 
                                          << LL_ENDL;
