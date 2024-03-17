@@ -350,9 +350,7 @@ LLMotion::LLMotionInitStatus LLKeyframeMotion::onInitialize(LLCharacter *charact
 		return STATUS_FAILURE;
 	}
 
-#ifdef SHOW_DEBUG
 	LL_DEBUGS() << "Loading keyframe data for: " << getName() << ":" << getID() << " (" << anim_file_size << " bytes)" << LL_ENDL;
-#endif
 
 	LLDataPackerBinaryBuffer dp(anim_data, anim_file_size);
 

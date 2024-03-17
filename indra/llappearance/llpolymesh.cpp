@@ -302,9 +302,7 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
         BOOL status = FALSE;
         if ( strncmp(header, HEADER_BINARY, strlen(HEADER_BINARY)) == 0 )       /*Flawfinder: ignore*/
         {
-#ifdef SHOW_DEBUG
                 LL_DEBUGS() << "Loading " << fileName << LL_ENDL;
-#endif
 
                 //----------------------------------------------------------------
                 // File Header (seek past it)
@@ -513,9 +511,7 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
                 // Faces
                 //----------------------------------------------------------------
                 U32 i;
-#ifdef SHOW_DEBUG
                 U32 numTris = 0;
-#endif
                 for (i = 0; i < numFaces; i++)
                 {
                         S16 face[3];
@@ -564,12 +560,10 @@ BOOL LLPolyMeshSharedData::loadMesh( const std::string& fileName )
 #endif
                 }
 
-#ifdef SHOW_DEBUG
                 LL_DEBUGS() << "verts: " << numVertices 
                          << ", faces: "   << numFaces
                          << ", tris: "    << numTris
                          << LL_ENDL;
-#endif
 
                 //----------------------------------------------------------------
                 // NumSkinJoints

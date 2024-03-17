@@ -1289,9 +1289,7 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
 {
 	if (!force_render && !hasMorph())
 	{
-#ifdef SHOW_DEBUG
 		LL_DEBUGS() << "skipping renderMorphMasks for " << getUUID() << LL_ENDL;
-#endif
 		return;
 	}
     LL_PROFILE_ZONE_SCOPED;
@@ -1323,9 +1321,7 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
 		success &= param->render( x, y, width, height );
 		if (!success && !force_render)
 		{
-#ifdef SHOW_DEBUG
 			LL_DEBUGS() << "Failed to render param " << param->getID() << " ; skipping morph mask." << LL_ENDL;
-#endif
 			return;
 		}
 	}
