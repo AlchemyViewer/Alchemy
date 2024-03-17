@@ -3156,8 +3156,8 @@ void LLVOAvatar::idleUpdateLoadingEffect()
 			particle_parameters.mPartData.mEndScale			 = LLVector2(1.000250f, 1.000250f);
 		    particle_parameters.mPartData.mStartGlow		 = 0;
 		    particle_parameters.mPartData.mEndGlow			 = 0;
-			particle_parameters.mPartData.mStartColor        = LLColor4(0.501773, 0.743102, 1.000000, 1.f);
-			particle_parameters.mPartData.mEndColor          = LLColor4(0.000000, 0.000000, 0.000000, 1.f);
+			particle_parameters.mPartData.mStartColor        = LLColor4(0.501773f, 0.743102f, 1.000000f, 1.f);
+			particle_parameters.mPartData.mEndColor          = LLColor4(0.000000f, 0.000000f, 0.000000f, 1.f);
 			particle_parameters.mPartData.mBlendFuncSource	 = LLPartData::LL_PART_BF_SOURCE_COLOR;
 			particle_parameters.mPartData.mBlendFuncDest	 = LLPartData::LL_PART_BF_SOURCE_ALPHA;
 

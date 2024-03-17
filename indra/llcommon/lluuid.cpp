@@ -425,8 +425,6 @@ BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
 #else
     return parseInternalScalar(in_string.data(), broken_format, emit);
 #endif
-
-	return TRUE;
 }
 
 BOOL validate_internal_scalar(const char* str_ptr, bool broken_format)

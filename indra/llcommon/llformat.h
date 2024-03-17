@@ -28,8 +28,15 @@
 #ifndef LL_LLFORMAT_H
 #define LL_LLFORMAT_H
 
+#if LL_WINDOWS
+#pragma warning (push)
+#pragma warning (disable : 4702) // compiler thinks unreachable code, but no
+#endif
 #include <fmt/format.h>
 #include <fmt/compile.h>
+#if LL_WINDOWS
+#pragma warning (pop)
+#endif
 
 // Use as follows:
 // LL_INFOS() << llformat("Test:%d (%.2f %.2f)", idx, x, y) << LL_ENDL;

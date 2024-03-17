@@ -6388,7 +6388,7 @@ LLViewerObject::ExtraParameter* LLViewerObject::createNewParameterEntry(U16 para
 	{
 		entry.in_use = in_use;
 		*entry.in_use = false; // not in use yet
-        llassert(mExtraParameterList[param_type] == nullptr); // leak -- redundantly allocated parameter entry
+        llassert(mExtraParameterList[param_type].data == nullptr); // leak -- redundantly allocated parameter entry
 		entry.data = new_block;
 		return &entry;
 	}

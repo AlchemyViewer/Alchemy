@@ -324,8 +324,6 @@ if(USE_PRECOMPILED_HEADERS)
     <boost/unordered/unordered_flat_set.hpp>
     <boost/unordered/unordered_map.hpp>
     <boost/unordered/unordered_set.hpp>
-    <fmt/format.h>
-    <fmt/compile.h>
     )
 endif()
 
