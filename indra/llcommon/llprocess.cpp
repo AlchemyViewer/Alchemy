@@ -217,15 +217,13 @@ public:
 					remainptr += written;
 					remainlen -= written;
 
-#if SHOW_DEBUG
-					char msgbuf[512];
 					LL_DEBUGS("LLProcess") << "wrote " << written << " of " << towrite
-										   << " bytes to " << mDesc
-										   << " (original " << total << "),"
-										   << " code " << err << ": "
-										   << apr_strerror(err, msgbuf, sizeof(msgbuf))
-										   << LL_ENDL;
-#endif
+						<< " bytes to " << mDesc
+						<< " (original " << total << "),"
+						<< " code " << err << ": ";
+						char msgbuf[512];
+						LL_CONT << apr_strerror(err, msgbuf, sizeof(msgbuf))
+						<< LL_ENDL;
 
 					// The parent end of this pipe is nonblocking. If we weren't able
 					// to write everything we wanted, don't keep banging on it -- that
