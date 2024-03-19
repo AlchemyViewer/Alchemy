@@ -93,7 +93,7 @@
 		 tool_tip="Click to refresh your L$ balance"
 		 top="0"
 		 wrap="false"
-		 value="L$999999"
+		 value="L$???"
 		 width="100" />
 		<button
 		 halign="center"
