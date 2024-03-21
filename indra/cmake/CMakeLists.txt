@@ -59,6 +59,7 @@ set(cmake_SOURCE_FILES
         UnixInstall.cmake
         URIPARSER.cmake
         WebP.cmake
+        WebRTC.cmake
         XXHash.cmake
         ZLIBNG.cmake
         )

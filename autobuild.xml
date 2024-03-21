@@ -2683,6 +2683,66 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>description</key>
         <string>ICU is a mature, widely used set of C/C++ and Java libraries providing Unicode and Globalization support for software applications. ICU is widely portable and gives applications the same results on all platforms and between C/C++ and Java software.</string>
       </map>
+      <key>webrtc</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>b71e7708fd7814a34b59c294a5d83d68be9459c3781d7fbdc6f17b14d4a55509168a4975c2d72e3f6eaa76e1caea948296a920d40e72003c8370b50071d67012</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2433.2433/webrtc-114.5735.08.2433-windows64-2433.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>0d7a5a205726c21f39ebae887fafa662f244e9ab16de4aa0cc850436e09eaff5426d50773c2b868f6bbe668e051dc63badbc96e0ee1fc91fd35e0e2880ee2a06</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2433.2433/webrtc-114.5735.08.2433-darwin64-2433.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>636bb5167c1c6d91f260ce2d98d8a409433848c1bca163b33b263918b74e94b5ed9de99688bb9eb58c742d406edcbf86c429ce3f5bf9959212d92b7170147397</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2433.2433/webrtc-114.5735.08.2433-linux64-2433.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/webrtc-license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2011, The WebRTC project authors. All rights reserved.</string>
+        <key>version</key>
+        <string>114.5735.08.2433</string>
+        <key>name</key>
+        <string>webrtc</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/secondlife/3p-webrtc-build</string>
+      </map>
     </map>
     <key>package_description</key>
     <map>
