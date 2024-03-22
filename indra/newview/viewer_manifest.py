@@ -1200,6 +1200,9 @@ class LinuxManifest(ViewerManifest):
         with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'llplugin', 'locales')):
             self.path("*.pak")
 
+        with self.prefix(src=os.path.join(self.args['build'], os.pardir, "llwebrtc"), dst="lib"):
+            self.path("libllwebrtc.so")
+
         self.path("featuretable_linux.txt")
 
         with self.prefix(src=pkgdir, dst="app_settings"):
