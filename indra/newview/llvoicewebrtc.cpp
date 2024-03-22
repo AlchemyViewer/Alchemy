@@ -2740,7 +2740,7 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
 
             if (participant)
             {
-                if (voice_data[participant_id].value("l", nlohmann::json(false)))
+                if (voice_data[participant_id].value("l", false))
                 {
                     // an existing participant is leaving.
                     if (agent_id != gAgentID)
@@ -2751,13 +2751,13 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
                 else
                 {
                     // we got a 'power' update.
-                    F32 level = (F32) (voice_data[participant_id].value("p", nlohmann::json(participant->mLevel))) / 128;
+                    F32 level = (F32) (voice_data[participant_id].value("p", participant->mLevel)) / 128.f;
                     // convert to decibles
                     participant->mLevel = level;
 
                     if (voice_data[participant_id].contains("v"))
                     {
-                        participant->mIsSpeaking = voice_data[participant_id].value("v", nlohmann::json(false));
+                        participant->mIsSpeaking = voice_data[participant_id].value("v", false);
                     }
                 }
             }
