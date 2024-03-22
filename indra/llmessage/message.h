@@ -67,7 +67,7 @@
 const U32 MESSAGE_MAX_STRINGS_LENGTH = 64;
 const U32 MESSAGE_NUMBER_OF_HASH_BUCKETS = 8192;
 
-const S32 MESSAGE_MAX_PER_FRAME = 400;
+const S32 MESSAGE_MAX_PER_FRAME = 500;
 
 class LLMessageStringTable final : public LLSingleton<LLMessageStringTable>
 {
