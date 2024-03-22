@@ -2694,9 +2694,10 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
         bool new_participant = false;
         nlohmann::json      mute = nlohmann::json::object();
         nlohmann::json      user_gain = nlohmann::json::object();
-        for (auto &participant_id : voice_data)
+        for (const auto& data_pair : voice_data.items())
         {
-            LLUUID agent_id(to_string(participant_id));
+            const auto& participant_id = data_pair.key();
+            LLUUID agent_id(participant_id);
             if (agent_id.isNull())
             {
                 LL_WARNS("Voice") << "Bad participant ID from data channel (" << participant_id << "):" << data << LL_ENDL;
