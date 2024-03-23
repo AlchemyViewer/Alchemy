@@ -22,10 +22,10 @@
 		<search_editor label="メニュー検索" name="search_menu_edit" tool_tip="検索したい内容をここに入力してください。メニューに部分的に一致する結果が表示されます。"/>
 	</panel>
 	<panel name="balance_bg">
-		<text name="balance" tool_tip="クリックしてL$残高を更新します。" value="L$ ??"/>
+		<text name="balance" tool_tip="クリックしてL$残高を更新します。" value="L$ ???"/>
 		<button label="L$を購入" name="buyL" tool_tip="クリックしてL$を購入します。"/>
 	</panel>
-	<text name="TimeText" tool_tip="現在時刻（太平洋時間）">
+	<text name="TimeText" tool_tip="現在時刻（太平洋時間）" width="160">
 		午前　24：00　PST
 	</text>
 	<icon image_name="Cam_FreeCam_Off" name="presets_icon_camera" tool_tip="カメラプリセットを表示する。"/>

@@ -624,15 +624,6 @@ L$が不足しているので、このグループに参加することができ
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
-	<notification name="CouldNotBuyCurrencyOS">
-[TITLE]
-[MESSAGE]
-		<tag>confirm</tag>
-		<url option="0" name="url" target = "_external">
-			[LINK]
-		</url>
-		<usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい"/>
-	</notification>
 	<notification name="CouldNotPutOnOutfit">
 		アウトフィットを装着できません。
 アウトフィットフォルダに服装、身体部位、装着物がありません。
