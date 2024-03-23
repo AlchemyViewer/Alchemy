@@ -29,22 +29,10 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
   )
-# FetchContent_Declare(
-#   Catch2
-#   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-#   GIT_TAG        v2.13.7
-#   )
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
   GIT_TAG        10.2.1
-  GIT_SHALLOW TRUE
-  GIT_PROGRESS TRUE
-  )
-FetchContent_Declare(
-  nlohmann_json
-  GIT_REPOSITORY https://git.alchemyviewer.org/alchemy/mirrors/modernjson.git
-  GIT_TAG        v3.11.3
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
   )
@@ -54,12 +42,6 @@ FetchContent_MakeAvailable(fmt)
 
 set(MESHOPT_BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(meshoptimizer)
-
-# If you only include this third party in PRIVATE source files, you do not
-# need to install it when your main project gets installed.
-set(JSON_Install OFF CACHE INTERNAL "")
-set(JSON_BuildTests OFF CACHE INTERNAL "")
-FetchContent_MakeAvailable(nlohmann_json)
 
 if(USE_TRACY)
   FetchContent_Declare (
