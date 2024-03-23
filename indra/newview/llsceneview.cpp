@@ -49,6 +49,7 @@ LLSceneView::LLSceneView(const LLRect& rect)
 	setVisible(FALSE);
 	
 	setCanMinimize(false);
+	setCanCollapse(false);
 	setCanClose(true);
 }
 

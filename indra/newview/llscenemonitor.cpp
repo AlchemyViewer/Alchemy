@@ -689,6 +689,7 @@ LLSceneMonitorView::LLSceneMonitorView(const LLRect& rect)
 	setVisible(FALSE);
 	
 	setCanMinimize(false);
+	setCanCollapse(false);
 	setCanClose(true);
 
 	sTeleportFinishConnection = LLViewerParcelMgr::getInstance()->setTeleportFinishedCallback(boost::bind(&LLSceneMonitorView::onTeleportFinished, this));
