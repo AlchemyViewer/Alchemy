@@ -561,7 +561,6 @@ void LLFloater::enableResizeCtrls(bool enable, bool width, bool height)
 
 void LLFloater::destroy()
 {
-	gFloaterView->onDestroyFloater(this);
 	// LLFloaterReg should be synchronized with "dead" floater to avoid returning dead instance before
 	// it was deleted via LLMortician::updateClass(). See EXT-8458.
 	LLFloaterReg::removeInstance(mInstanceName, mKey);
@@ -2747,7 +2746,8 @@ void LLFloaterView::bringToFront(LLFloater* child, BOOL give_focus, BOOL restore
 	if (!child)
 		return;
 
-	if (!mFrontChild.isDead() && mFrontChild.get() == child)
+	LLFloater* front_child = mFrontChildHandle.get();
+	if (front_child == child)
 	{
 		if (give_focus && child->canFocusStealFrontmost() && !gFocusMgr.childHasKeyboardFocus(child))
 		{
@@ -2756,12 +2756,12 @@ void LLFloaterView::bringToFront(LLFloater* child, BOOL give_focus, BOOL restore
 		return;
 	}
 
-	if (!mFrontChild.isDead())
+	if (front_child && front_child->getVisible())
 	{
-		mFrontChild.get()->goneFromFront();
+		front_child->goneFromFront();
 	}
 
-	mFrontChild = child->getHandle();
+	mFrontChildHandle = child->getHandle();
 
 	// *TODO: make this respect floater's mAutoFocus value, instead of
 	// using parameter
@@ -3265,7 +3265,8 @@ LLFloater *LLFloaterView::getBackmost() const
 
 void LLFloaterView::syncFloaterTabOrder()
 {
-	if (!mFrontChild.isDead() && mFrontChild.get() && mFrontChild.get()->getIsChrome())
+	LLFloater* front_child = mFrontChildHandle.get();
+	if (front_child && front_child->getIsChrome())
 		return;
 
 	// look for a visible modal dialog, starting from first
@@ -3307,11 +3308,12 @@ void LLFloaterView::syncFloaterTabOrder()
 			LLFloater* floaterp = static_cast<LLFloater*>(*child_it);
 			if (gFocusMgr.childHasKeyboardFocus(floaterp))
 			{
-                if (!mFrontChild.isDead() && mFrontChild.get() != floaterp)
+				LLFloater* front_child = mFrontChildHandle.get();
+                if (front_child != floaterp)
                 {
                     // Grab a list of the top floaters that want to stay on top of the focused floater
 					std::list<LLFloater*> listTop;
-					if (mFrontChild.get() && !mFrontChild.get()->canFocusStealFrontmost())
+					if (front_child && !front_child->canFocusStealFrontmost())
                     {
                         for (LLView* childp : *getChildList())
                         {
@@ -3331,7 +3333,7 @@ void LLFloaterView::syncFloaterTabOrder()
 						{
 							sendChildToFront(childp);
 						}
-						mFrontChild = listTop.back()->getHandle();
+						mFrontChildHandle = listTop.back()->getHandle();
 					}
                 }
 
@@ -3425,14 +3427,6 @@ void LLFloaterView::setToolbarRect(LLToolBarEnums::EToolBarLocation tb, const LL
 		LL_WARNS() << "setToolbarRect() passed odd toolbar number " << (S32) tb << LL_ENDL;
 		break;
 	}
-}
-
-void LLFloaterView::onDestroyFloater(LLFloater* floater)
-{
-    if (mFrontChild.get() == floater)
-    {
-		mFrontChild = {};
-    }
 }
 
 void LLFloater::setInstanceName(const std::string& name)
