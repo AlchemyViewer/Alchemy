@@ -64,13 +64,7 @@
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
 
-#include <boost/json.hpp>
-
 #include <nlohmann/json.hpp>
-
-#ifndef TINYGLTF_USE_BOOSTJSON
-#define TINYGLTF_USE_BOOSTJSON 1
-#endif
 
 #ifndef TINYGLTF_NO_INCLUDE_JSON
 #define TINYGLTF_NO_INCLUDE_JSON 1
@@ -1955,10 +1949,6 @@ void LLMaterialEditor::loadMaterialFromFile(const std::string& filename, S32 ind
 
     if (!loaded)
     {
-        if (!warn_msg.empty())
-            LL_WARNS("MaterialEditor") << "gltf load warning: " << warn_msg.c_str() << LL_ENDL;
-        if (!error_msg.empty())
-            LL_WARNS("MaterialEditor") << "gltf load error: " << error_msg.c_str() << LL_ENDL;
         LLNotificationsUtil::add("CannotUploadMaterial");
         return;
     }

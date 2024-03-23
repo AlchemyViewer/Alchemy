@@ -40,7 +40,7 @@
 #include "llurlregistry.h"
 #include "stringize.h"
 
-#include <boost/json.hpp>
+#include <nlohmann/json.hpp>
 
 static const std::string AZURE_NOTRANSLATE_OPENING_TAG("<div translate=\"no\">");
 static const std::string AZURE_NOTRANSLATE_CLOSING_TAG("</div>");
@@ -346,11 +346,11 @@ public:
 
 private:
     static void parseErrorResponse(
-        const boost::json::value &root,
+        const nlohmann::json &root,
         int &status,
         std::string &err_msg);
     static bool parseTranslation(
-        const boost::json::value&root,
+        const nlohmann::json &root,
         std::string &translation,
         std::string &detected_lang);
     static std::string getAPIKey();
@@ -399,13 +399,17 @@ bool LLGoogleTranslationHandler::parseResponse(
 	std::string& detected_lang,
 	std::string& err_msg) const
 {
-    boost::json::error_code ec;
-    boost::json::value root = boost::json::parse(body, ec);
-    if (ec.failed())
+	std::stringstream stream(body);
+	nlohmann::json root;
+    try
     {
-        err_msg = ec.what();
-        return false;
+		stream >> root;
     }
+    catch(nlohmann::json::exception &e)
+	{
+		err_msg = e.what();
+		return false;
+	}
 
 	if (!root.is_object()) // empty response? should not happen
 	{
@@ -431,49 +435,48 @@ bool LLGoogleTranslationHandler::isConfigured() const
 
 // static
 void LLGoogleTranslationHandler::parseErrorResponse(
-	const boost::json::value &root,
+	const nlohmann::json &root,
 	int &status,
 	std::string &err_msg)
 {
-    boost::json::error_code ec;
-    const boost::json::value &error = root.at("error");
-	if (!error.is_object() || !error.as_object().contains("message") || !error.as_object().contains("code"))
+    const nlohmann::json &error = root.at("error");
+	if (!error.is_object() || error.find("message") == error.end() || error.find("code") == error.end())
 	{
 		return;
 	}
 
-    err_msg = boost::json::value_to<std::string>(error.at("message"));
-	status = boost::json::value_to<int>(error.at("code"));
+	err_msg = error["message"].get<std::string>();
+	status = error.at("code");
 }
 
 // static
 bool LLGoogleTranslationHandler::parseTranslation(
-	const boost::json::value &root,
+	const nlohmann::json &root,
 	std::string &translation,
 	std::string &detected_lang)
 {
 	// Json is prone to aborting the program on failed assertions,
 	// so be super-careful and verify the response format.
-	const boost::json::value &data = root.at("data");
-	if (!data.is_object() || !data.as_object().contains("translations"))
+	const nlohmann::json &data = root.at("data");
+	if (!data.is_object() || data.find("translations") == data.end())
 	{
 		return false;
 	}
 
-	const boost::json::value&translations = data.at("translations");
-	if (!translations.is_array() || translations.as_array().empty())
+	const nlohmann::json &translations = data["translations"];
+	if (!translations.is_array() || translations.empty())
 	{
 		return false;
 	}
 
-	const boost::json::value &first = translations.at(0);
-	if (!first.is_object() || !first.as_object().contains("translatedText"))
+	const nlohmann::json &first = translations[0];
+	if (!first.is_object() || first.find("translatedText") == first.end())
 	{
 		return false;
 	}
 
-	translation = boost::json::value_to<std::string>(first.at("translatedText"));
-    detected_lang = first.as_object().contains("detectedSourceLanguage") ? boost::json::value_to<std::string>(first.at("detectedSourceLanguage")) : "";
+	translation = first["translatedText"].get<std::string>();
+    detected_lang = first.value("detectedSourceLanguage", "");
 	return true;
 }
 
@@ -655,13 +658,17 @@ bool LLAzureTranslationHandler::checkVerificationResponse(
     // Expected: "{\"error\":{\"code\":400000,\"message\":\"One of the request inputs is not valid.\"}}"
     // But for now just verify response is a valid json
 
-    boost::json::error_code ec;
-    boost::json::value root = boost::json::parse(response["error_body"].asString(), ec);
-    if (ec.failed())
+	std::stringstream stream(response["error_body"].asString());
+	nlohmann::json root;
+    try
     {
-        LL_DEBUGS("Translate") << "Failed to parse error_body:" << ec.what() << LL_ENDL;
-        return false;
+		stream >> root;
     }
+    catch(nlohmann::json::exception &e)
+	{
+        LL_DEBUGS("Translate") << "Failed to parse error_body:" << e.what() << LL_ENDL;
+		return false;
+	}
 
     return true;
 }
@@ -685,13 +692,16 @@ bool LLAzureTranslationHandler::parseResponse(
     //Example:
     // "[{\"detectedLanguage\":{\"language\":\"en\",\"score\":1.0},\"translations\":[{\"text\":\"Hello, what is your name?\",\"to\":\"en\"}]}]"
 
-    boost::json::error_code ec;
-    boost::json::value root = boost::json::parse(body, ec);
-    if (ec.failed())
+	nlohmann::json root;
+    try
     {
-        err_msg = ec.what();
-        return false;
+		root = nlohmann::json::parse(body);
     }
+    catch(nlohmann::json::exception &e)
+	{
+        err_msg = e.what();
+        return false;
+	}
 
     if (!root.is_array()) // empty response? should not happen
     {
@@ -700,34 +710,34 @@ bool LLAzureTranslationHandler::parseResponse(
 
     // Request succeeded, extract translation from the response.
 
-    const boost::json::value& data = root.at(0U);
+    const nlohmann::json& data = root[0U];
     if (!data.is_object()
-        || !data.as_object().contains("detectedLanguage")
-        || !data.as_object().contains("translations"))
+        || data.find("detectedLanguage") == data.end()
+        || data.find("translations") == data.end())
     {
         return false;
     }
 
-    const boost::json::value& detectedLanguage = data.at("detectedLanguage");
-    if (!detectedLanguage.is_object() || !detectedLanguage.as_object().contains("language"))
+    const nlohmann::json& detectedLanguage = data["detectedLanguage"];
+    if (!detectedLanguage.is_object() || detectedLanguage.find("language") == detectedLanguage.end())
     {
         return false;
     }
-    detected_lang = boost::json::value_to<std::string>(detectedLanguage.at("language"));
+    detected_lang = detectedLanguage["language"].get<std::string>();
 
-    const boost::json::value& translations = data.at("translations");
-    if (!translations.is_array() || translations.as_array().size() == 0)
-    {
-        return false;
-    }
-
-    const boost::json::value& first = translations.at(0U);
-    if (!first.is_object() || !first.as_object().contains("text"))
+    const nlohmann::json& translations = data["translations"];
+    if (!translations.is_array() || translations.size() == 0)
     {
         return false;
     }
 
-    translation = boost::json::value_to<std::string>(first.at("text"));
+    const nlohmann::json& first = translations[0U];
+    if (!first.is_object() || first.find("text") == first.end())
+    {
+        return false;
+    }
+
+    translation = first["text"].get<std::string>();
 
     return true;
 }
@@ -745,26 +755,29 @@ std::string LLAzureTranslationHandler::parseErrorResponse(
     // Expected: "{\"error\":{\"code\":400000,\"message\":\"One of the request inputs is not valid.\"}}"
     // But for now just verify response is a valid json with an error
 
-    boost::json::error_code ec;
-    boost::json::value root = boost::json::parse(body, ec);
-    if (ec.failed())
+	nlohmann::json root;
+    try
+    {
+		root = nlohmann::json::parse(body);
+    }
+    catch(const nlohmann::json::exception&)
+	{
+        return std::string();
+	}
+
+    if (!root.is_object() || root.find("error") == root.end())
     {
         return std::string();
     }
 
-    if (!root.is_object() || !root.as_object().contains("error"))
+    const nlohmann::json& error_map = root["error"];
+
+    if (!error_map.is_object() || error_map.find("message") == error_map.end())
     {
         return std::string();
     }
 
-    const boost::json::value& error_map = root.at("error");
-
-    if (!error_map.is_object() || !error_map.as_object().contains("message"))
-    {
-        return std::string();
-    }
-
-    return boost::json::value_to<std::string>(error_map.at("message"));
+    return error_map["message"].get<std::string>();
 }
 
 // static
@@ -971,38 +984,41 @@ bool LLDeepLTranslationHandler::parseResponse(
     //Example:
     // "{\"translations\":[{\"detected_source_language\":\"EN\",\"text\":\"test\"}]}"
 
-    boost::json::error_code ec;
-    boost::json::value root = boost::json::parse(body, ec);
-    if (ec.failed())
+	nlohmann::json root;
+    try
     {
-        err_msg = ec.message();
-        return false;
+		root = nlohmann::json::parse(body);
     }
+    catch(nlohmann::json::exception &e)
+	{
+        err_msg = e.what();
+        return false;
+	}
 
     if (!root.is_object()
-        || !root.as_object().contains("translations")) // empty response? should not happen
+        || root.find("translations") == root.end()) // empty response? should not happen
     {
         return false;
     }
 
     // Request succeeded, extract translation from the response.
-    const boost::json::value& translations = root.at("translations");
-    if (!translations.is_array() || translations.as_array().size() == 0)
+    const nlohmann::json& translations = root["translations"];
+    if (!translations.is_array() || translations.size() == 0)
     {
         return false;
     }
 
-    const boost::json::value& data= translations.at(0U);
+    const nlohmann::json& data= translations[0U];
     if (!data.is_object()
-        || !data.as_object().contains("detected_source_language")
-        || !data.as_object().contains("text"))
+        || data.find("detected_source_language") == data.end()
+        || data.find("text") == data.end())
     {
         return false;
     }
 
-    detected_lang = boost::json::value_to<std::string>(root.at("detected_source_language"));
+    detected_lang = data["detected_source_language"].get<std::string>();
     LLStringUtil::toLower(detected_lang);
-    translation = boost::json::value_to<std::string>(root.at("text"));
+    translation = data["text"].get<std::string>();
 
     return true;
 }
@@ -1018,19 +1034,22 @@ std::string LLDeepLTranslationHandler::parseErrorResponse(
     const std::string& body)
 {
     // Example: "{\"message\":\"One of the request inputs is not valid.\"}"
-    boost::json::error_code ec;
-    boost::json::value root = boost::json::parse(body, ec);
-    if (ec.failed())
-    {   
-        return {};
+	nlohmann::json root;
+    try
+    {
+		root = nlohmann::json::parse(body);
     }
+    catch(const nlohmann::json::exception &)
+	{
+        return {};
+	}
 
-    if (!root.is_object() || !root.as_object().contains("message"))
+    if (!root.is_object() || root.find("message") == root.end())
     {
         return std::string();
     }
 
-    return boost::json::value_to<std::string>(root.at("message"));
+    return root["message"].get<std::string>();
 }
 
 // static

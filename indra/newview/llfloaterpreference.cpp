@@ -123,7 +123,7 @@
 #include "llviewercontrol.h"
 #include "llpresetsmanager.h"
 
-#include <boost/json.hpp>
+#include <nlohmann/json.hpp>
 #include <utility>
 
 #include "llsearchableui.h"
@@ -668,30 +668,29 @@ bool LLFloaterPreference::handleRemoveGridCB(const LLSD& notification, const LLS
 skin_t manifestFromJson(const std::string& filename, const ESkinType type)
 {
 	skin_t skin;
+	nlohmann::json root;
 	llifstream in;
 	in.open(filename);
 	if (in.is_open())
 	{
-		boost::json::error_code ec;
-		auto root = boost::json::parse(in, ec);
-		if (!ec.failed() && root.is_object())
+        try
         {
-			auto jobj = root.as_object();
-            skin.mName = jobj.contains("name") ? boost::json::value_to<std::string>(jobj.at("name")) : "Unknown";
-            skin.mAuthor = jobj.contains("author") ? boost::json::value_to<std::string>(jobj.at("author")) : LLTrans::getString("Unknown");
-            skin.mUrl = jobj.contains("url") ? boost::json::value_to<std::string>(jobj.at("url")) : LLTrans::getString("Unknown");
-			skin.mCompatVer = jobj.contains("compatibility") ? boost::json::value_to<std::string>(jobj.at("compatibility")) : LLTrans::getString("Unknown");
-			skin.mDate = jobj.contains("date") ? LLDate(boost::json::value_to<std::string>(jobj.at("date"))) : LLDate::now();
-			skin.mNotes = jobj.contains("notes") ? boost::json::value_to<std::string>(jobj.at("notes")) : "";
+            in >> root;
+            skin.mName = root.value("name", "Unknown");
+            skin.mAuthor = root.value("author", "Unknown");
+            skin.mUrl = root.value("url", "Unknown");
+			skin.mCompatVer = root.value("compatibility", "Unknown");
+			skin.mDate = LLDate(root.value("date", LLDate::now().asString()));
+			skin.mNotes = root.value("notes", "");
 			// If it's a system skin, the compatability version is always the current build
 			if (type == SYSTEM_SKIN)
 			{
 				skin.mCompatVer = LLVersionInfo::instance().getShortVersion();
 			}
         } 
-		else
+		catch(const nlohmann::json::exception& e)
 		{
-			LL_WARNS() << "Failed to parse " << filename << ": " << ec.message() << LL_ENDL;
+			LL_WARNS() << "Failed to parse " << filename << ": " << e.what() << LL_ENDL;
 		}
 		in.close();
 	}
@@ -785,12 +784,11 @@ void LLFloaterPreference::onAddSkinCallback(const std::vector<std::string>& file
 			ss << std::string(const_cast<const char*>(buf.get()), buf_size);
 			buf.reset();
 				
-			boost::json::error_code ec;
-			auto root = boost::json::parse(ss, ec);
-			if (!ec.failed() && root.is_object())
+			nlohmann::json root;
+			try
 			{
-				const auto& jobj = root.as_object();
-				const std::string& name = jobj.contains("name") ? boost::json::value_to<std::string>(jobj.at("name")) : "Unknown";
+                ss >> root;
+				const std::string& name = root.value("name", "Unknown");
 				std::string pathname = gDirUtilp->add(gDirUtilp->getOSUserAppDir(), "skins");
 				if (!gDirUtilp->fileExists(pathname))
 				{
@@ -811,7 +809,7 @@ void LLFloaterPreference::onAddSkinCallback(const std::vector<std::string>& file
 					LLNotificationsUtil::add("AddSkinSuccess", LLSD().with("PACKAGE", name));
 				}
 			}
-			else
+            catch(const nlohmann::json::exception&)
 			{
 				LLNotificationsUtil::add("AddSkinCantParseManifest", LLSD().with("PACKAGE", package));
 			}

@@ -30,6 +30,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iterator>
+#include <nlohmann/json.hpp> // JSON
 #include <utility>
 #include "llcorehttputil.h"
 #include "llhttpconstants.h"
@@ -584,12 +585,20 @@ LLSD HttpCoroJSONHandler::handleSuccess(LLCore::HttpResponse * response, LLCore:
     }
 
     LLCore::BufferArrayStream bas(body);
+    nlohmann::json jsonRoot;
 
-    boost::json::error_code ec;
-    boost::json::value jsonRoot = boost::json::parse(bas, ec);
-    if(ec.failed())
+    try
+    {
+        bas >> jsonRoot;
+    }
+    catch (const nlohmann::json::exception& e)
     {   // deserialization failed.  Record the reason and pass back an empty map for markup.
-        status = LLCore::HttpStatus(499, std::string(ec.what()));
+        status = LLCore::HttpStatus(499, std::string(e.what()));
+        return result;
+    }
+    catch (const std::runtime_error& e)
+    {   // deserialization failed.  Record the reason and pass back an empty map for markup.
+        status = LLCore::HttpStatus(499, std::string(e.what()));
         return result;
     }
 
@@ -609,11 +618,19 @@ LLSD HttpCoroJSONHandler::parseBody(LLCore::HttpResponse *response, bool &succes
     }
 
     LLCore::BufferArrayStream bas(body);
+    nlohmann::json jsonRoot;
 
-    boost::json::error_code ec;
-    boost::json::value jsonRoot = boost::json::parse(bas, ec);
-    if (ec.failed())
+    try
     {
+        bas >> jsonRoot;
+    }
+    catch (const nlohmann::json::exception&)
+    {
+        success = false;
+        return LLSD();
+    }
+    catch (const std::runtime_error&)
+    {   
         success = false;
         return LLSD();
     }
@@ -795,8 +812,8 @@ LLSD HttpCoroutineAdapter::postJsonAndSuspend(LLCore::HttpRequest::ptr_t request
 
     {
         LLCore::BufferArrayStream outs(rawbody.get());
-        auto root = LlsdToJson(body);
-        std::string value = boost::json::serialize(root);
+        nlohmann::json root = LlsdToJson(body);
+        std::string value = root.dump();
 
         LL_WARNS("Http::post") << "JSON Generates: \"" << value << "\"" << LL_ENDL;
 
@@ -854,8 +871,8 @@ LLSD HttpCoroutineAdapter::putJsonAndSuspend(LLCore::HttpRequest::ptr_t request,
 
     {
         LLCore::BufferArrayStream outs(rawbody.get());
-        auto root = LlsdToJson(body);
-        std::string value = boost::json::serialize(root);
+        nlohmann::json root = LlsdToJson(body);
+        std::string value = root.dump();
 
         LL_WARNS("Http::put") << "JSON Generates: \"" << value << "\"" << LL_ENDL;
         outs << value;
