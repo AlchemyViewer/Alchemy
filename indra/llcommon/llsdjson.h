@@ -30,7 +30,7 @@
 
 
 #include "llsd.h"
-#include <nlohmann/json.hpp>
+#include <boost/json.hpp>
 
 /// Convert a parsed JSON structure into LLSD maintaining member names and 
 /// array indexes.
@@ -49,7 +49,7 @@
 ///  
 /// For maps and arrays child entries will be converted and added to the structure.
 /// Order is preserved for an array but not for objects.
-LLSD LlsdFromJson(const nlohmann::json &val);
+LLSD LlsdFromJson(const boost::json::value &val);
 
 /// Convert an LLSD object into Parsed JSON object maintaining member names and 
 /// array indexs.
@@ -68,6 +68,6 @@ LLSD LlsdFromJson(const nlohmann::json &val);
 /// TypeMap       | object
 /// TypeArray     | array
 /// TypeBinary    | unsupported 
-nlohmann::json LlsdToJson(const LLSD &val);
+boost::json::value LlsdToJson(const LLSD &val);
 
 #endif // LL_LLSDJSON_H
