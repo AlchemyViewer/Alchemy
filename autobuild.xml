@@ -2692,11 +2692,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c10c534009bd739532a3398668fe385bd2001caeea8019070e318c68a370a00e722063afb62dd16a6e9b508646bbfa81ef31da671b2da058240077a8d9647ecb</string>
+              <string>b1fee9cf30ecc2d3e3892f60636d33a229c1377bc60c219c43a817e611731b144bd3afeb5b5d21d293acf783a3f98c9c281de0287f820c80ee33fe4e7f82fee0</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2434.2434/webrtc-114.5735.08.2434-windows64-2434.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2439.2439/webrtc-114.5735.08.2439-windows64-2439.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2706,11 +2706,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>520f741cfe30e4581b849782bd4546a8f4567a5213859512e19bb026ad36b645884aa5ff409b7891dd740a63cbb55587fea39ba30edd2391d8243304ba2fdba0</string>
+              <string>86c0d77b531e876b97811b7fe874c76c35fc371edaa4d09db614967e3e4d3ac6c45ee07db9c5317e0de5204ef25660a6a2ce97a2facad1e6d478e51a7989cf35</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2434.2434/webrtc-114.5735.08.2434-darwin64-2434.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2439.2439/webrtc-114.5735.08.2439-darwin64-2439.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2720,11 +2720,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>02f20ff92eb437f74f7066828a6409d5fa059caeb00871cbba03871f5bc82f01e88a7bfa3bdeb0b4cd8d41b9c8caa774035e88e590508e04d8f48326ff6ffec6</string>
+              <string>3fd1c266e59e26675ff6cca4104c9af56edfba138d130b845615cc6f502deb98f92ef64a33c595d775435684a9880f9263f0763bcb55990e9b9bb24e7afd7358</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2434.2434/webrtc-114.5735.08.2434-linux64-2434.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2439.2439/webrtc-114.5735.08.2439-linux64-2439.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2737,7 +2737,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>copyright</key>
         <string>Copyright (c) 2011, The WebRTC project authors. All rights reserved.</string>
         <key>version</key>
-        <string>114.5735.08.2434</string>
+        <string>114.5735.08.2439</string>
         <key>name</key>
         <string>webrtc</string>
         <key>canonical_repo</key>
