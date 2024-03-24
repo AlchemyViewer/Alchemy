@@ -75,7 +75,7 @@
 // for base64 decoding
 #include "apr_base64.h"
 
-#include <nlohmann/json.hpp>
+#include <boost/json.hpp>
 
 const std::string WEBRTC_VOICE_SERVER_TYPE = "webrtc";
 
@@ -995,30 +995,30 @@ void LLWebRTCVoiceClient::sendPositionUpdate(bool force)
 
     if (mSpatialCoordsDirty || force)
     {
-        nlohmann::json   spatial = nlohmann::json::object();
+        boost::json::object spatial = {};
 
-        spatial["sp"]   = nlohmann::json::object();
-        spatial["sp"]["x"] = (int) (mAvatarPosition[0] * 100);
-        spatial["sp"]["y"] = (int) (mAvatarPosition[1] * 100);
-        spatial["sp"]["z"] = (int) (mAvatarPosition[2] * 100);
-        spatial["sh"]      = nlohmann::json::object();
-        spatial["sh"]["x"] = (int) (mAvatarRot[0] * 100);
-        spatial["sh"]["y"] = (int) (mAvatarRot[1] * 100);
-        spatial["sh"]["z"] = (int) (mAvatarRot[2] * 100);
-        spatial["sh"]["w"] = (int) (mAvatarRot[3] * 100);
+        auto& sp = spatial["sp"].emplace_object();
+        sp["x"] = (int) (mAvatarPosition[0] * 100);
+        sp["y"] = (int) (mAvatarPosition[1] * 100);
+        sp["z"] = (int) (mAvatarPosition[2] * 100);
+        auto& sh = spatial["sh"].emplace_object();
+        sh["x"] = (int) (mAvatarRot[0] * 100);
+        sh["y"] = (int) (mAvatarRot[1] * 100);
+        sh["z"] = (int) (mAvatarRot[2] * 100);
+        sh["w"] = (int) (mAvatarRot[3] * 100);
 
-        spatial["lp"]   = nlohmann::json::object();
-        spatial["lp"]["x"] = (int) (mListenerPosition[0] * 100);
-        spatial["lp"]["y"] = (int) (mListenerPosition[1] * 100);
-        spatial["lp"]["z"] = (int) (mListenerPosition[2] * 100);
-        spatial["lh"]      = nlohmann::json::object();
-        spatial["lh"]["x"] = (int) (mListenerRot[0] * 100);
-        spatial["lh"]["y"] = (int) (mListenerRot[1] * 100);
-        spatial["lh"]["z"] = (int) (mListenerRot[2] * 100);
-        spatial["lh"]["w"] = (int) (mListenerRot[3] * 100);
+        auto& lp = spatial["lp"].emplace_object();
+        lp["x"] = (int) (mListenerPosition[0] * 100);
+        lp["y"] = (int) (mListenerPosition[1] * 100);
+        lp["z"] = (int) (mListenerPosition[2] * 100);
+        auto& lh = spatial["lh"].emplace_object();
+        lh["x"] = (int) (mListenerRot[0] * 100);
+        lh["y"] = (int) (mListenerRot[1] * 100);
+        lh["z"] = (int) (mListenerRot[2] * 100);
+        lh["w"] = (int) (mListenerRot[3] * 100);
 
         mSpatialCoordsDirty = false;
-        spatial_data = spatial.dump();
+        spatial_data = boost::json::serialize(spatial);
 
         sessionState::for_each(boost::bind(predSendData, _1, spatial_data));
     }
@@ -2303,11 +2303,11 @@ void LLVoiceWebRTCConnection::setSpeakerVolume(F32 volume)
 
 void LLVoiceWebRTCConnection::setUserVolume(const LLUUID& id, F32 volume)
 {
-    nlohmann::json root = nlohmann::json::object();
-    nlohmann::json user_gain = nlohmann::json::object();
+    boost::json::object root;
+    boost::json::object user_gain;
     user_gain[id.asString()] = (uint32_t)(volume*200);  // give it two decimal places with a range from 0-200, where 100 is normal
     root["ug"] = user_gain;
-    std::string json_data = root.dump();
+    std::string json_data = boost::json::serialize(root);
     if (mWebRTCDataInterface)
     {
         mWebRTCDataInterface->sendData(json_data, false);
@@ -2316,11 +2316,11 @@ void LLVoiceWebRTCConnection::setUserVolume(const LLUUID& id, F32 volume)
 
 void LLVoiceWebRTCConnection::setUserMute(const LLUUID& id, bool mute)
 {
-    nlohmann::json root = nlohmann::json::object();
-    nlohmann::json muted = nlohmann::json::object();
+    boost::json::object root;
+    boost::json::object muted;
     muted[id.asString()] = mute;
     root["m"] = muted;
-    std::string json_data = root.dump();
+    std::string json_data = boost::json::serialize(root);
     if (mWebRTCDataInterface)
     {
         mWebRTCDataInterface->sendData(json_data, false);
@@ -2699,14 +2699,11 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
         return;
     }
 
-    nlohmann::json voice_data;
-    try
+    boost::json::error_code ec;
+    boost::json::value voice_data = boost::json::parse(data, ec);
+    if (ec.failed())
     {
-        voice_data = nlohmann::json::parse(data, nullptr, true, true);
-    }
-    catch (nlohmann::json::exception& e)
-    {
-        LL_WARNS("Voice") << "Error parsing data from data channel:" << e.what() << LL_NEWLINE << data << LL_ENDL;
+        LL_WARNS("Voice") << "Error parsing data from data channel:" << ec.what() << LL_NEWLINE << data << LL_ENDL;
         return;
     }
 
@@ -2717,9 +2714,9 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
             return;
         }
         bool new_participant = false;
-        nlohmann::json      mute = nlohmann::json::object();
-        nlohmann::json      user_gain = nlohmann::json::object();
-        for (const auto& data_pair : voice_data.items())
+        boost::json::object     mute;
+        boost::json::object      user_gain;
+        for (const auto& data_pair : voice_data.as_object())
         {
             const auto& participant_id = data_pair.key();
             LLUUID agent_id(participant_id);
@@ -2728,6 +2725,7 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
                 LL_WARNS("Voice") << "Bad participant ID from data channel (" << participant_id << "):" << data << LL_ENDL;
                 continue;
             }
+            const auto& participant_obj = data_pair.value().as_object();
 
             LLWebRTCVoiceClient::participantStatePtr_t participant =
                 LLWebRTCVoiceClient::getInstance()->findParticipantByID(mChannelID, agent_id);
@@ -2738,11 +2736,12 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
                                    // where a participant on a neighboring region may be
                                    // connected to multiple servers.  We don't want to
                                    // add new identical participants from all of those servers.
-            if (voice_data[participant_id].contains("j"))
+            auto j_val = participant_obj.if_contains("j");
+            if (j_val)
             {
                 // a new participant has announced that they're joining.
                 joined  = true;
-                primary = voice_data[participant_id]["j"].value("p", false);
+                primary = j_val->as_bool();
 
                 // track incoming participants that are muted so we can mute their connections (or set their volume)
                 bool isMuted = LLMuteList::getInstance()->isMuted(agent_id, LLMute::flagVoiceChat);
@@ -2765,7 +2764,8 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
 
             if (participant)
             {
-                if (voice_data[participant_id].value("l", false))
+                auto l_val = participant_obj.if_contains("l");
+                if (l_val && l_val->as_bool())
                 {
                     // an existing participant is leaving.
                     if (agent_id != gAgentID)
@@ -2776,13 +2776,14 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
                 else
                 {
                     // we got a 'power' update.
-                    F32 level = (F32) (voice_data[participant_id].value("p", participant->mLevel)) / 128.f;
+                    F32 level = (F32) (participant_obj.at("p").to_number<double>() / 128.0);
                     // convert to decibles
                     participant->mLevel = level;
 
-                    if (voice_data[participant_id].contains("v"))
+                    auto v_val = participant_obj.if_contains("v");
+                    if (v_val)
                     {
-                        participant->mIsSpeaking = voice_data[participant_id].value("v", false);
+                        participant->mIsSpeaking = v_val->as_bool();
                     }
                 }
             }
@@ -2790,7 +2791,7 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
 
         // tell the simulator to set the mute and volume data for this
         // participant, if there are any updates.
-        nlohmann::json      root     = nlohmann::json::object();
+        boost::json::object root;
         if (mute.size() > 0)
         {
             root["m"] = mute;
@@ -2801,7 +2802,7 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
         }
         if (root.size() > 0)
         {
-            std::string json_data = root.dump();
+            std::string json_data = boost::json::serialize(root);
             mWebRTCDataInterface->sendData(json_data, false);
         }
     }
@@ -2843,15 +2844,15 @@ void LLVoiceWebRTCConnection::sendJoin()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOICE
 
-    nlohmann::json      root     = nlohmann::json::object();
-    nlohmann::json      join_obj = nlohmann::json::object();
+    boost::json::object root;
+    boost::json::object join_obj;
     LLUUID           regionID = gAgent.getRegion()->getRegionID();
     if ((regionID == mRegionID) || !isSpatial())
     {
         join_obj["p"] = true;
     }
     root["j"]             = join_obj;
-    std::string json_data = root.dump();
+    std::string json_data = boost::json::serialize(root);
     mWebRTCDataInterface->sendData(json_data, false);
 }
 
