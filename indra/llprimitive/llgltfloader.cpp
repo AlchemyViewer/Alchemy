@@ -44,10 +44,14 @@
 // TINYGLTF_NO_INCLUDE_STB_IMAGE
 // TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
 
-#include <nlohmann/json.hpp>
+#include <boost/json.hpp>
 
-#ifndef TINYGLTF_NO_INCLUDE_JSON
-#define TINYGLTF_NO_INCLUDE_JSON 1
+#ifndef TINYGLTF_USE_BOOSTJSON
+#define TINYGLTF_USE_BOOSTJSON 1
+#endif
+
+#ifndef TINYGLTF_NO_INCLUDE_BOOSTJSON
+#define TINYGLTF_NO_INCLUDE_BOOSTJSON 1
 #endif
 #undef STRICT
 #include "tinygltf/tiny_gltf.h"

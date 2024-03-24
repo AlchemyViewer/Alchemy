@@ -3931,6 +3931,7 @@ LLTearOffMenu::LLTearOffMenu(LLMenuGL* menup) :
 	setName(menup->getName());
 	setTitle(menup->getLabel());
 	setCanMinimize(FALSE);
+	setCanCollapse(FALSE);
 	// flag menu as being torn off
 	menup->setTornOff(TRUE);
 	// update menu layout as torn off menu (no spillover menus)

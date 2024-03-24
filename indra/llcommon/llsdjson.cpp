@@ -33,44 +33,43 @@
 
 #include "llerror.h"
 
+#include <boost/json/src.hpp>
 
 //=========================================================================
-LLSD LlsdFromJson(const nlohmann::json &val)
+LLSD LlsdFromJson(const boost::json::value& val)
 {
     LLSD result;
 
-    switch (val.type())
+    switch (val.kind())
     {
     default:
-    case nlohmann::json::value_t::null:
+    case boost::json::kind::null:
         break;
-    case nlohmann::json::value_t::number_integer:
-        result = LLSD(val.get<LLSD::Integer>());
+    case boost::json::kind::int64:
+    case boost::json::kind::uint64:
+        result = LLSD(val.to_number<int64_t>());
         break;
-    case nlohmann::json::value_t::number_unsigned:
-        result = LLSD(val.get<LLSD::Integer>());
+    case boost::json::kind::double_:
+        result = LLSD(val.to_number<double>());
         break;
-    case nlohmann::json::value_t::number_float:
-        result = LLSD(val.get<LLSD::Real>());
+    case boost::json::kind::string:
+        result = LLSD(boost::json::value_to<std::string>(val));
         break;
-    case nlohmann::json::value_t::string:
-        result = LLSD(val.get<LLSD::String>());
+    case boost::json::kind::bool_:
+        result = LLSD(val.as_bool());
         break;
-    case nlohmann::json::value_t::boolean:
-        result = LLSD(val.get<LLSD::Boolean>());
-        break;
-    case nlohmann::json::value_t::array:
+    case boost::json::kind::array:
         result = LLSD::emptyArray();
-        for (const auto &element : val)
+        for (const auto &element : val.as_array())
         {
             result.append(LlsdFromJson(element));
         }
         break;
-    case nlohmann::json::value_t::object:
+    case boost::json::kind::object:
         result = LLSD::emptyMap();
-        for (auto it = val.cbegin(), end = val.cend(); it != end; ++it)
+        for (const auto& element : val.as_object())
         {
-            result[it.key()] = LlsdFromJson(it.value());
+            result[element.key()] = LlsdFromJson(element.value());
         }
         break;
     }
@@ -78,9 +77,9 @@ LLSD LlsdFromJson(const nlohmann::json &val)
 }
 
 //=========================================================================
-nlohmann::json LlsdToJson(const LLSD &val)
+boost::json::value LlsdToJson(const LLSD &val)
 {
-    nlohmann::json result;
+    boost::json::value result;
 
     switch (val.type())
     {
@@ -103,17 +102,23 @@ nlohmann::json LlsdToJson(const LLSD &val)
         result = val.asString();
         break;
     case LLSD::TypeMap:
-        for (auto it = val.beginMap(), it_end = val.endMap(); it != it_end; ++it)
+    {
+        boost::json::object& obj = result.emplace_object();
+        for (const auto& llsd_dat : val.asMap())
         {
-            result[it->first] = LlsdToJson(it->second);
+            obj[llsd_dat.first] = LlsdToJson(llsd_dat.second);
         }
         break;
+    }
     case LLSD::TypeArray:
-        for (auto it = val.beginArray(), end = val.endArray(); it != end; ++it)
+    {
+        boost::json::array& json_array = result.emplace_array();
+        for (const auto& llsd_dat : val.asArray())
         {
-            result.push_back(LlsdToJson(*it));
+            json_array.push_back(LlsdToJson(llsd_dat));
         }
         break;
+    }
     case LLSD::TypeBinary:
     default:
         LL_ERRS("LlsdToJson") << "Unsupported conversion to JSON from LLSD type (" << val.type() << ")." << LL_ENDL;

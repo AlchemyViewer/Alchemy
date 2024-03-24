@@ -291,7 +291,6 @@ target_link_libraries(
         ll::tracy
         ll::icu4c
         ll::xxhash
-        nlohmann_json::nlohmann_json
         fmt::fmt
     )
 
