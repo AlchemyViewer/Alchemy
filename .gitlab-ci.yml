@@ -104,7 +104,6 @@ variables:
     when: 'always'
   variables:
     VIEWER_SIGNING_IDENTITY: $APPLE_SIGNATURE
-    USE_SENTRY: "FALSE"
   before_script:
     - python3 -m venv .venv
     - source .venv/bin/activate
@@ -208,7 +207,6 @@ coverity_scan:
   extends: .mac_build
   variables:
     AUTOBUILD_ADDRSIZE: 64
-    USE_SENTRY: "FALSE"
   cache:
     key:
       prefix: darwin64
