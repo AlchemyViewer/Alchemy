@@ -346,11 +346,11 @@ public:
 
 private:
     static void parseErrorResponse(
-        const boost::json::value &root,
+        const boost::json::object &root,
         int &status,
         std::string &err_msg);
     static bool parseTranslation(
-        const boost::json::value&root,
+        const boost::json::object &root,
         std::string &translation,
         std::string &detected_lang);
     static std::string getAPIKey();
@@ -407,7 +407,8 @@ bool LLGoogleTranslationHandler::parseResponse(
         return false;
     }
 
-	if (!root.is_object()) // empty response? should not happen
+    auto root_obj = root.if_object();
+	if (!root_obj) // empty response? should not happen
 	{
 		return false;
 	}
@@ -415,12 +416,12 @@ bool LLGoogleTranslationHandler::parseResponse(
 	if (status != HTTP_OK)
 	{
 		// Request failed. Extract error message from the response.
-		parseErrorResponse(root, status, err_msg);
+		parseErrorResponse(*root_obj, status, err_msg);
 		return false;
 	}
 
 	// Request succeeded, extract translation from the response.
-	return parseTranslation(root, translation, detected_lang);
+	return parseTranslation(*root_obj, translation, detected_lang);
 }
 
 // virtual
@@ -431,49 +432,63 @@ bool LLGoogleTranslationHandler::isConfigured() const
 
 // static
 void LLGoogleTranslationHandler::parseErrorResponse(
-	const boost::json::value &root,
+	const boost::json::object &root,
 	int &status,
 	std::string &err_msg)
 {
     boost::json::error_code ec;
-    const boost::json::value &error = root.at("error");
-	if (!error.is_object() || !error.as_object().contains("message") || !error.as_object().contains("code"))
+    const boost::json::value* error = root.if_contains("error");
+	if (!error || !error->is_object())
 	{
 		return;
 	}
 
-    err_msg = boost::json::value_to<std::string>(error.at("message"));
-	status = boost::json::value_to<int>(error.at("code"));
+    const boost::json::value* message = error->as_object().if_contains("message");
+    const boost::json::value* code = error->as_object().if_contains("code");
+    if (!message || !code)
+    {
+        return;
+    }
+
+    err_msg = boost::json::value_to<std::string>(*message);
+    status = code->to_number<int>();
 }
 
 // static
 bool LLGoogleTranslationHandler::parseTranslation(
-	const boost::json::value &root,
+	const boost::json::object &root,
 	std::string &translation,
 	std::string &detected_lang)
 {
 	// Json is prone to aborting the program on failed assertions,
 	// so be super-careful and verify the response format.
-	const boost::json::value &data = root.at("data");
-	if (!data.is_object() || !data.as_object().contains("translations"))
+    const boost::json::value* data = root.if_contains("data");
+	if (!data || !data->is_object())
 	{
 		return false;
 	}
 
-	const boost::json::value&translations = data.at("translations");
-	if (!translations.is_array() || translations.as_array().empty())
+    const boost::json::value* translations = data->as_object().if_contains("translations");
+    if (!translations || !translations->is_array() || translations->as_array().empty())
+    {
+        return false;
+    }
+
+	const boost::json::object* first = translations->at(0).if_object();
+	if (!first)
 	{
 		return false;
 	}
 
-	const boost::json::value &first = translations.at(0);
-	if (!first.is_object() || !first.as_object().contains("translatedText"))
-	{
-		return false;
-	}
+    auto* translated_text = first->if_contains("translatedText");
+    if (!translated_text)
+    {
+        return false;
+    }
+	translation = boost::json::value_to<std::string>(*translated_text);
 
-	translation = boost::json::value_to<std::string>(first.at("translatedText"));
-    detected_lang = first.as_object().contains("detectedSourceLanguage") ? boost::json::value_to<std::string>(first.at("detectedSourceLanguage")) : "";
+    auto detected_source_lang = first->if_contains("detectedSourceLanguage");
+    detected_lang = detected_source_lang ? boost::json::value_to<std::string>(*detected_source_lang) : "";
 	return true;
 }
 
@@ -678,7 +693,7 @@ bool LLAzureTranslationHandler::parseResponse(
 	if (status != HTTP_OK)
 	{
         if (http_response.has("error_body"))
-        err_msg = parseErrorResponse(http_response["error_body"].asString());
+            err_msg = parseErrorResponse(http_response["error_body"].asString());
 		return false;
 	}
 
@@ -693,41 +708,39 @@ bool LLAzureTranslationHandler::parseResponse(
         return false;
     }
 
-    if (!root.is_array()) // empty response? should not happen
+    const auto* root_array = root.if_array();
+    if (!root_array || root_array->empty()) // empty response? should not happen
     {
         return false;
     }
 
     // Request succeeded, extract translation from the response.
 
-    const boost::json::value& data = root.at(0U);
-    if (!data.is_object()
-        || !data.as_object().contains("detectedLanguage")
-        || !data.as_object().contains("translations"))
+    const boost::json::object* data = root_array->at(0).if_object();
+    if (!data)
     {
         return false;
     }
 
-    const boost::json::value& detectedLanguage = data.at("detectedLanguage");
-    if (!detectedLanguage.is_object() || !detectedLanguage.as_object().contains("language"))
+    const boost::json::value* detectedLanguage = data->if_contains("detectedLanguage");
+    if (!detectedLanguage || !detectedLanguage->is_object() || !detectedLanguage->as_object().contains("language"))
     {
         return false;
     }
-    detected_lang = boost::json::value_to<std::string>(detectedLanguage.at("language"));
-
-    const boost::json::value& translations = data.at("translations");
-    if (!translations.is_array() || translations.as_array().size() == 0)
-    {
-        return false;
-    }
-
-    const boost::json::value& first = translations.at(0U);
-    if (!first.is_object() || !first.as_object().contains("text"))
+    const boost::json::value* translations = data->if_contains("translations");
+    if (!translations->is_array() || translations->as_array().empty())
     {
         return false;
     }
 
-    translation = boost::json::value_to<std::string>(first.at("text"));
+    const boost::json::object* first = translations->at(0).if_object();
+    if (!first || !first->contains("text"))
+    {
+        return false;
+    }
+
+    detected_lang = boost::json::value_to<std::string>(detectedLanguage->at("language"));
+    translation = boost::json::value_to<std::string>(first->at("text"));
 
     return true;
 }
@@ -752,19 +765,25 @@ std::string LLAzureTranslationHandler::parseErrorResponse(
         return std::string();
     }
 
-    if (!root.is_object() || !root.as_object().contains("error"))
+    const boost::json::object* root_obj = root.if_object();
+    if (!root_obj)
     {
         return std::string();
     }
 
-    const boost::json::value& error_map = root.at("error");
-
-    if (!error_map.is_object() || !error_map.as_object().contains("message"))
+    const boost::json::value* error_map = root_obj->if_contains("error");
+    if (!error_map || !error_map->is_object())
     {
         return std::string();
     }
 
-    return boost::json::value_to<std::string>(error_map.at("message"));
+    const boost::json::value* message = error_map->as_object().if_contains("message");
+    if (!message)
+    {
+        return std::string();
+    }
+
+    return boost::json::value_to<std::string>(*message);
 }
 
 // static
@@ -979,30 +998,30 @@ bool LLDeepLTranslationHandler::parseResponse(
         return false;
     }
 
-    if (!root.is_object()
-        || !root.as_object().contains("translations")) // empty response? should not happen
+    auto root_obj = root.if_object();
+    if (!root_obj) // empty response? should not happen
     {
         return false;
     }
 
     // Request succeeded, extract translation from the response.
-    const boost::json::value& translations = root.at("translations");
-    if (!translations.is_array() || translations.as_array().size() == 0)
+    const boost::json::value* translations = root_obj->if_contains("translations");
+    if (!translations || !translations->is_array() || translations->as_array().empty())
     {
         return false;
     }
 
-    const boost::json::value& data= translations.at(0U);
-    if (!data.is_object()
-        || !data.as_object().contains("detected_source_language")
-        || !data.as_object().contains("text"))
+    const boost::json::object* data = translations->at(0U).if_object();
+    if (!data
+        || !data->contains("detected_source_language")
+        || !data->contains("text"))
     {
         return false;
     }
 
-    detected_lang = boost::json::value_to<std::string>(root.at("detected_source_language"));
+    detected_lang = boost::json::value_to<std::string>(data->at("detected_source_language"));
     LLStringUtil::toLower(detected_lang);
-    translation = boost::json::value_to<std::string>(root.at("text"));
+    translation = boost::json::value_to<std::string>(data->at("text"));
 
     return true;
 }
@@ -1025,12 +1044,13 @@ std::string LLDeepLTranslationHandler::parseErrorResponse(
         return {};
     }
 
-    if (!root.is_object() || !root.as_object().contains("message"))
+    auto root_obj = root.if_object();
+    if (!root_obj || !root_obj->contains("message"))
     {
         return std::string();
     }
 
-    return boost::json::value_to<std::string>(root.at("message"));
+    return boost::json::value_to<std::string>(root_obj->at("message"));
 }
 
 // static
