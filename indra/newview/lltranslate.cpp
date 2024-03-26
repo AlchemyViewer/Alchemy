@@ -346,13 +346,13 @@ public:
 
 private:
     static void parseErrorResponse(
-        const boost::json::object &root,
-        int &status,
-        std::string &err_msg);
+        const boost::json::object& root,
+        int& status,
+        std::string& err_msg);
     static bool parseTranslation(
-        const boost::json::object &root,
-        std::string &translation,
-        std::string &detected_lang);
+        const boost::json::object& root,
+        std::string& translation,
+        std::string& detected_lang);
     static std::string getAPIKey();
 
 };
@@ -432,9 +432,9 @@ bool LLGoogleTranslationHandler::isConfigured() const
 
 // static
 void LLGoogleTranslationHandler::parseErrorResponse(
-	const boost::json::object &root,
-	int &status,
-	std::string &err_msg)
+	const boost::json::object& root,
+	int& status,
+	std::string& err_msg)
 {
     boost::json::error_code ec;
     const boost::json::value* error = root.if_contains("error");
@@ -456,11 +456,11 @@ void LLGoogleTranslationHandler::parseErrorResponse(
 
 // static
 bool LLGoogleTranslationHandler::parseTranslation(
-	const boost::json::object &root,
-	std::string &translation,
-	std::string &detected_lang)
+	const boost::json::object& root,
+	std::string& translation,
+	std::string& detected_lang)
 {
-	// Json is prone to aborting the program on failed assertions,
+	// Boost.Json will throw on failed assertions,
 	// so be super-careful and verify the response format.
     const boost::json::value* data = root.if_contains("data");
 	if (!data || !data->is_object())
@@ -470,9 +470,9 @@ bool LLGoogleTranslationHandler::parseTranslation(
 
     const boost::json::value* translations = data->as_object().if_contains("translations");
     if (!translations || !translations->is_array() || translations->as_array().empty())
-    {
-        return false;
-    }
+	{
+		return false;
+	}
 
 	const boost::json::object* first = translations->at(0).if_object();
 	if (!first)
@@ -715,7 +715,6 @@ bool LLAzureTranslationHandler::parseResponse(
     }
 
     // Request succeeded, extract translation from the response.
-
     const boost::json::object* data = root_array->at(0).if_object();
     if (!data)
     {
@@ -727,6 +726,7 @@ bool LLAzureTranslationHandler::parseResponse(
     {
         return false;
     }
+
     const boost::json::value* translations = data->if_contains("translations");
     if (!translations->is_array() || translations->as_array().empty())
     {
