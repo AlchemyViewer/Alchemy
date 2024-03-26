@@ -836,18 +836,20 @@ void LLWebRTCVoiceClient::OnConnectionShutDown(const std::string &channelID, con
         }
     }
 }
-void LLWebRTCVoiceClient::OnConnectionFailure(const std::string &channelID, const LLUUID &regionID)
+void LLWebRTCVoiceClient::OnConnectionFailure(const std::string                       &channelID,
+                                              const LLUUID                            &regionID,
+                                              LLVoiceClientStatusObserver::EStatusType status_type)
 {
     LL_DEBUGS("Voice") << "A connection failed.  channel:" << channelID << LL_ENDL;
     if (gAgent.getRegion()->getRegionID() == regionID)
     {
         if (mNextSession && mNextSession->mChannelID == channelID)
         {
-            LLWebRTCVoiceClient::getInstance()->notifyStatusObservers(LLVoiceClientStatusObserver::ERROR_UNKNOWN);
+            LLWebRTCVoiceClient::getInstance()->notifyStatusObservers(status_type);
         }
         else if (mSession && mSession->mChannelID == channelID)
         {
-            LLWebRTCVoiceClient::getInstance()->notifyStatusObservers(LLVoiceClientStatusObserver::ERROR_UNKNOWN);
+            LLWebRTCVoiceClient::getInstance()->notifyStatusObservers(status_type);
         }
     }
 }
@@ -2028,6 +2030,7 @@ LLVoiceWebRTCConnection::LLVoiceWebRTCConnection(const LLUUID &regionID, const s
     mWebRTCAudioInterface(nullptr),
     mWebRTCDataInterface(nullptr),
     mVoiceConnectionState(VOICE_STATE_START_SESSION),
+    mCurrentStatus(LLVoiceClientStatusObserver::STATUS_VOICE_ENABLED),
     mMuted(true),
     mShutDown(false),
     mIceCompleted(false),
@@ -2370,7 +2373,7 @@ void LLVoiceWebRTCConnection::breakVoiceConnectionCoro()
     LLSD body;
     body["logout"]         = TRUE;
     body["viewer_session"] = mViewerSession;
-    body["voice_server_type"] = REPORTED_VOICE_SERVER_TYPE;
+    body["voice_server_type"] = WEBRTC_VOICE_SERVER_TYPE;
 
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter(
         new LLCoreHttpUtil::HttpCoroutineAdapter("LLVoiceWebRTCAdHocConnection::breakVoiceConnection",
@@ -2433,9 +2436,7 @@ void LLVoiceWebRTCSpatialConnection::requestVoiceConnection()
     LLSD body;
     LLSD jsep;
     jsep["type"] = "offer";
-    {
-        jsep["sdp"] = mChannelSDP;
-    }
+    jsep["sdp"] = mChannelSDP;
     body["jsep"] = jsep;
     if (mParcelLocalID != INVALID_PARCEL_ID)
     {
@@ -2456,13 +2457,25 @@ void LLVoiceWebRTCSpatialConnection::requestVoiceConnection()
     LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-    if (!status)
+    if (status)
     {
-        setVoiceConnectionState(VOICE_STATE_SESSION_RETRY);
+        OnVoiceConnectionRequestSuccess(result);
     }
     else
     {
-        OnVoiceConnectionRequestSuccess(result);
+        switch (status.getType())
+        {
+            case HTTP_CONFLICT:
+                mCurrentStatus = LLVoiceClientStatusObserver::ERROR_CHANNEL_FULL;
+                break;
+            case HTTP_UNAUTHORIZED:
+                mCurrentStatus = LLVoiceClientStatusObserver::ERROR_CHANNEL_LOCKED;
+                break;
+            default:
+                mCurrentStatus = LLVoiceClientStatusObserver::ERROR_UNKNOWN;
+                break;
+        }
+        setVoiceConnectionState(VOICE_STATE_SESSION_RETRY);
     }
     mOutstandingRequests--;
 }
@@ -2609,7 +2622,7 @@ bool LLVoiceWebRTCConnection::connectionStateMachine()
             if (mRetryWaitPeriod++ * UPDATE_THROTTLE_SECONDS > mRetryWaitSecs)
             {
                 // something went wrong, so notify that the connection has failed.
-                LLWebRTCVoiceClient::getInstance()->OnConnectionFailure(mChannelID, mRegionID);
+                LLWebRTCVoiceClient::getInstance()->OnConnectionFailure(mChannelID, mRegionID, mCurrentStatus);
                 setVoiceConnectionState(VOICE_STATE_DISCONNECT);
                 mRetryWaitPeriod = 0;
                 if (mRetryWaitSecs < MAX_RETRY_WAIT_SECONDS)
