@@ -3546,10 +3546,10 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
 
 	send_agent_update(TRUE, TRUE);
 
-	if (gAgent.getRegion()->getBlockFly())
-	{
-		gAgent.setFlying(gAgent.canFly());
-	}
+	//if (gAgent.getRegion()->getBlockFly())
+	//{
+	//	gAgent.setFlying(gAgent.canFly());
+	//}
 
 	// force simulator to recognize do not disturb state
 	if (gAgent.isDoNotDisturb())
