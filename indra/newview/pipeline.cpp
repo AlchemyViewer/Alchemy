@@ -934,7 +934,7 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     S32 shadow_detail = RenderShadowDetail;
 
-    F32 scale = llmax(0.f, RenderShadowResolutionScale);
+    F32 scale = gCubeSnapshot ? 1.0 : llmax(0.f, RenderShadowResolutionScale); // hack to not scale probe shadowmaps
     U32 sun_shadow_map_width = BlurHappySize(resX, scale);
     U32 sun_shadow_map_height = BlurHappySize(resY, scale);
 
