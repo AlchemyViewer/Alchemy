@@ -51,8 +51,9 @@ void main()
     
     vec4  norm         = texture(normalMap, tc);
 
-    if (!GET_GBUFFER_FLAG(GBUFFER_FLAG_HAS_HDRI) &&
-        !GET_GBUFFER_FLAG(GBUFFER_FLAG_SKIP_ATMOS))
+
+    //!GET_GBUFFER_FLAG(GBUFFER_FLAG_HAS_HDRI) &&
+    if (!GET_GBUFFER_FLAG(GBUFFER_FLAG_SKIP_ATMOS))
     {
         // Apply the diffuse luminance scale to objects but not the sky
         // Prevents underexposing when looking at bright environments
