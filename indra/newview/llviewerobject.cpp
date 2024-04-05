@@ -134,7 +134,7 @@ F64Seconds	LLViewerObject::sMaxUpdateInterpolationTime(3.0);		// For motion inte
 F64Seconds	LLViewerObject::sPhaseOutUpdateInterpolationTime(2.0);	// For motion interpolation: after Y seconds with no updates, taper off motion prediction
 F64Seconds	LLViewerObject::sMaxRegionCrossingInterpolationTime(1.0);// For motion interpolation: don't interpolate over this time on region crossing
 
-std::map<std::string, U32> LLViewerObject::sObjectDataMap;
+boost::unordered_flat_map<std::string, U32> LLViewerObject::sObjectDataMap;
 
 // The maximum size of an object extra parameters binary (packed) block
 #define MAX_OBJECT_PARAMS_SIZE 1024
