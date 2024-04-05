@@ -64,10 +64,10 @@
 #include "llcoros.h"
 #include LLCOROS_MUTEX_HEADER
 
-const U32 MESSAGE_MAX_STRINGS_LENGTH = 64;
-const U32 MESSAGE_NUMBER_OF_HASH_BUCKETS = 8192;
+constexpr U32 MESSAGE_MAX_STRINGS_LENGTH = 64;
+constexpr U32 MESSAGE_NUMBER_OF_HASH_BUCKETS = 8192;
 
-const S32 MESSAGE_MAX_PER_FRAME = 500;
+constexpr S32 MESSAGE_MAX_PER_FRAME = 400;
 
 class LLMessageStringTable final : public LLSingleton<LLMessageStringTable>
 {
