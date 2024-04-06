@@ -553,7 +553,7 @@ void LLViewerTexture::updateClass()
     // NOTE: our metrics miss about half the vram we use, so this biases high but turns out to typically be within 5% of the real number
 	F32 used = (F32)ll_round(texture_bytes_alloc + vertex_bytes_alloc);
     
-    F32 budget = max_vram_budget == 0 ? gGLManager.mVRAM : max_vram_budget;
+    F32 budget = max_vram_budget == 0 ? gGLManager.mVRAM : llmin(max_vram_budget, gGLManager.mVRAM);
 
     // try to leave half a GB for everyone else, but keep at least 768MB for ourselves
     F32 target = llmax(budget - 512.f, 768.f);
