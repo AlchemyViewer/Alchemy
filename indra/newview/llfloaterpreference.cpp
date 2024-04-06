@@ -1868,7 +1868,6 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im
 	getChild<LLUICtrl>("online_visibility")->setLabelArg("[DIR_VIS]", mDirectoryVisibility);
 	getChildView("favorites_on_login_check")->setEnabled(TRUE);
 	getChildView("log_path_button")->setEnabled(TRUE);
-	getChildView("chat_font_size")->setEnabled(TRUE);
 	getChildView("conversation_log_combo")->setEnabled(TRUE);
 	LLCheckBoxCtrl* send_im_to_email = getChild<LLCheckBoxCtrl>("send_im_to_email");
 	if (LLGridManager::instance().isInSecondlife())
@@ -1904,6 +1903,10 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility, bool im
 
 	getChild<LLUICtrl>("voice_call_friends_only_check")->setEnabled(TRUE);
 	getChild<LLUICtrl>("voice_call_friends_only_check")->setValue(gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly"));
+
+	getChildView("Enable_Discord_Integration")->setEnabled(TRUE);
+	getChildView("Discord_Integration_Show_Name")->setEnabled(TRUE);
+	getChildView("Discord_Integration_Show_Region")->setEnabled(TRUE);
 }
 
 
