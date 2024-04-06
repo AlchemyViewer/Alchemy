@@ -224,7 +224,7 @@ void LLFloaterTexturePicker::setImageID(const LLUUID& image_id, bool set_selecti
                 LLInventoryItem* itemp = gInventory.getItem(inv_view->getUUID());
 
                 if (mInventoryPickType == PICK_MATERIAL
-                    && mImageAssetID == LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID
+                    && mImageAssetID == BLANK_MATERIAL_ASSET_ID
                     && itemp && itemp->getAssetUUID().isNull())
                 {
                     item_id = inv_view->getUUID();
@@ -267,7 +267,7 @@ void LLFloaterTexturePicker::setImageIDFromItem(const LLInventoryItem* itemp, bo
     if (mInventoryPickType == PICK_MATERIAL && asset_id.isNull())
     {
         // If an inventory item has a null asset, consider it a valid blank material(gltf)
-        asset_id = LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID;
+        asset_id = BLANK_MATERIAL_ASSET_ID;
     }
     setImageID(asset_id, set_selection);
 }
@@ -687,6 +687,10 @@ void LLFloaterTexturePicker::draw()
                         mGLTFPreview = gGLTFMaterialPreviewMgr.getPreview(mGLTFMaterial);
                     }
                 }
+                if (mGLTFPreview)
+                {
+                    mGLTFPreview->setBoostLevel(LLGLTexture::BOOST_PREVIEW);
+                }
             }
             else
             {
@@ -743,7 +747,7 @@ void LLFloaterTexturePicker::draw()
 
 		// If the floater is focused, don't apply its alpha to the texture (STORM-677).
 		const F32 alpha = getTransparencyType() == TT_ACTIVE ? 1.0f : getCurrentTransparency();
-        LLViewerTexture* preview = nullptr;
+        LLViewerTexture* preview;
         if (mGLTFMaterial)
         {
             preview = mGLTFPreview.get();
@@ -751,15 +755,11 @@ void LLFloaterTexturePicker::draw()
         else
         {
             preview = mTexturep.get();
-            if (mTexturep)
-            {
-                // Pump the priority
-				mTexturep->addTextureStats( (F32)(interior.getWidth() * interior.getHeight()) );
-            }
         }
 
 		if( preview )
 		{
+            preview->addTextureStats( (F32)(interior.getWidth() * interior.getHeight()) );
 			if( preview->getComponents() == 4 )
 			{
 				gl_rect_2d_checkerboard( interior, alpha );
@@ -819,7 +819,7 @@ const LLUUID& LLFloaterTexturePicker::findItemID(const LLUUID& asset_id, BOOL co
 	}
 
     LLUUID loockup_id = asset_id;
-    if (mInventoryPickType == PICK_MATERIAL && loockup_id == LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID)
+    if (mInventoryPickType == PICK_MATERIAL && loockup_id == BLANK_MATERIAL_ASSET_ID)
     {
         // default asset id means we are looking for an inventory item with a default asset UUID (null)
         loockup_id = LLUUID::null;
@@ -914,7 +914,7 @@ void LLFloaterTexturePicker::commitCallback(LLTextureCtrl::ETexturePickOp op)
                     LLInventoryItem* itemp = gInventory.getItem(inv_view->getUUID());
 
                     if (mInventoryPickType == PICK_MATERIAL
-                        && mImageAssetID == LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID
+                        && mImageAssetID == BLANK_MATERIAL_ASSET_ID
                         && itemp && itemp->getAssetUUID().isNull())
                     {
                         inventory_id = inv_view->getUUID();
@@ -1693,7 +1693,7 @@ LLTextureCtrl::LLTextureCtrl(const LLTextureCtrl::Params& p)
 	mShowLoadingPlaceholder( TRUE ),
 	mOpenTexPreview(false),
     mBakeTextureEnabled(true),
-    mInventoryPickType(PICK_TEXTURE),
+    mInventoryPickType(p.pick_type),
 	mImageAssetID(p.image_id),
 	mDefaultImageAssetID(p.default_image_id),
 	mDefaultImageName(p.default_image_name),
@@ -2271,6 +2271,10 @@ void LLTextureCtrl::draw()
                         mGLTFPreview = gGLTFMaterialPreviewMgr.getPreview(mGLTFMaterial);
                     }
                 }
+                if (mGLTFPreview)
+                {
+                    mGLTFPreview->setBoostLevel(LLGLTexture::BOOST_PREVIEW);
+                }
 
                 preview = mGLTFPreview;
             }
@@ -2309,10 +2313,7 @@ void LLTextureCtrl::draw()
 		}
 		
 		gl_draw_scaled_image( interior.mLeft, interior.mBottom, interior.getWidth(), interior.getHeight(), preview, UI_VERTEX_COLOR % alpha);
-        if (mTexturep)
-        {
-            mTexturep->addTextureStats( (F32)(interior.getWidth() * interior.getHeight()) );
-        }
+        preview->addTextureStats( (F32)(interior.getWidth() * interior.getHeight()) );
 	}
 	else if (!mFallbackImage.isNull())
 	{
@@ -2431,7 +2432,7 @@ BOOL LLTextureCtrl::doDrop(LLInventoryItem* item)
     if (mInventoryPickType == PICK_MATERIAL && asset_id.isNull())
     {
         // If an inventory material has a null asset, consider it a valid blank material(gltf)
-        asset_id = LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID;
+        asset_id = BLANK_MATERIAL_ASSET_ID;
     }
 
 	setImageAssetID(asset_id);
@@ -2457,6 +2458,16 @@ void LLTextureCtrl::setValue( const LLSD& value )
 LLSD LLTextureCtrl::getValue() const
 {
 	return LLSD(getImageAssetID());
+}
+
+namespace LLInitParam
+{
+    void TypeValues<EPickInventoryType>::declareValues()
+    {
+        declare("texture_material", PICK_TEXTURE_MATERIAL);
+        declare("texture", PICK_TEXTURE);
+        declare("material", PICK_MATERIAL);
+    }
 }
 
 

@@ -317,6 +317,11 @@ void LLVOVolume::markDead()
 		{
 			mLightTexture->removeVolume(LLRender::LIGHT_TEX, this);
 		}
+        
+        if (mIsHeroProbe)
+        {
+            gPipeline.mHeroProbeManager.unregisterViewerObject(this);
+        }
 	}
 	
 	LLViewerObject::markDead();
@@ -1022,7 +1027,7 @@ LLDrawable *LLVOVolume::createDrawable(LLPipeline *pipeline)
     {
         updateReflectionProbePtr();
     }
-
+    
 	updateRadius();
 	bool force_update = true; // avoid non-alpha mDistance update being optimized away
 	mDrawable->updateDistance(LLViewerCamera::instance(), force_update);
@@ -3427,6 +3432,22 @@ bool LLVOVolume::setReflectionProbeIsDynamic(bool is_dynamic)
     return false;
 }
 
+bool LLVOVolume::setReflectionProbeIsMirror(bool is_mirror)
+{
+	LLReflectionProbeParams* param_block = getReflectionProbeParams();
+    if (param_block)
+    {
+        if (param_block->getIsMirror() != is_mirror)
+        {
+            param_block->setIsMirror(is_mirror);
+            parameterChanged(LLNetworkData::PARAMS_REFLECTION_PROBE, true);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 F32 LLVOVolume::getReflectionProbeAmbiance() const
 {
     const LLReflectionProbeParams* param_block = getReflectionProbeParams();
@@ -3470,6 +3491,17 @@ bool LLVOVolume::getReflectionProbeIsDynamic() const
     if (param_block)
     {
         return param_block->getIsDynamic();
+    }
+
+    return false;
+}
+
+bool LLVOVolume::getReflectionProbeIsMirror() const
+{
+	const LLReflectionProbeParams* param_block = getReflectionProbeParams();
+    if (param_block)
+    {
+        return param_block->getIsMirror();
     }
 
     return false;
@@ -4420,14 +4452,30 @@ void LLVOVolume::updateReflectionProbePtr()
 {
     if (isReflectionProbe())
     {
-        if (mReflectionProbe.isNull())
+        if (mReflectionProbe.isNull() && !getReflectionProbeIsMirror())
         {
             mReflectionProbe = gPipeline.mReflectionMapManager.registerViewerObject(this);
         }
+        else if (mReflectionProbe.isNull() && getReflectionProbeIsMirror())
+		{
+			// Geenz: This is a special case - what we want here is a hero probe.
+			// What we want to do here is instantiate a hero probe from the hero probe manager.
+            
+            if (!mIsHeroProbe)
+                mIsHeroProbe = gPipeline.mHeroProbeManager.registerViewerObject(this);
+		}
     }
-    else if (mReflectionProbe.notNull())
+    else if (mReflectionProbe.notNull() || getReflectionProbeIsMirror())
     {
-        mReflectionProbe = nullptr;
+        if (mReflectionProbe.notNull())
+        {
+            mReflectionProbe = nullptr;
+        }
+
+		if (getReflectionProbeIsMirror())
+        {
+            gPipeline.mHeroProbeManager.unregisterViewerObject(this);
+        }
     }
 }
 

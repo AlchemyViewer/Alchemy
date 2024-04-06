@@ -44,6 +44,7 @@
 #include "pipeline.h"
 
 extern BOOL gSnapshotNoPost;
+extern LLPointer<LLImageGL> gEXRImage;
 
 #ifndef LL_WINDOWS
 #define A_GCC 1
@@ -445,6 +446,9 @@ void ALRenderUtil::renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, 
 	tone_shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, exposure, false, LLTexUnit::TFO_BILINEAR);
 
 	tone_shader->uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, src->getWidth(), src->getHeight());
+
+	static LLStaticHashedString aces_mix("aces_mix");
+	tone_shader->uniform1f(aces_mix, gEXRImage.notNull() ? 0.f : 0.3f);
 
 	gPipeline.mScreenTriangleVB->setBuffer();
 	gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);

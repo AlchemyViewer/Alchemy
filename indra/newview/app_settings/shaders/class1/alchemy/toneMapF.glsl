@@ -31,6 +31,7 @@ uniform sampler2D diffuseRect;
 uniform sampler2D exposureMap;
 
 uniform float exposure;
+uniform float aces_mix;
 
 vec3 srgb_to_linear(vec3 cl);
 vec3 linear_to_srgb(vec3 cl);
@@ -147,7 +148,7 @@ void main()
 #endif
 
 #if TONEMAP_METHOD == 1 // Aces Hill method
-    diff.rgb = mix(ACES_Hill(diff.rgb), diff.rgb, 0.3);
+    diff.rgb = mix(ACES_Hill(diff.rgb), diff.rgb, aces_mix);
 #elif TONEMAP_METHOD == 2 // Uchimura's Gran Turismo method
     diff.rgb = uchimura(diff.rgb);
 #elif TONEMAP_METHOD == 3 // AMD Tonemapper

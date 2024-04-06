@@ -71,6 +71,7 @@ const S32 HTTP_PACKET_SIZE = 1496;
 class LLImageFormatted;
 class LLImageRaw;
 class LLColor4U;
+class LLColor3;
 
 typedef enum e_image_codec
 {
@@ -208,9 +209,13 @@ public:
 
 	void verticalFlip();
     
+    // Returns true if the image is not fully opaque
+    bool checkHasTransparentPixels();
     // if the alpha channel is all 100% opaque, delete it
     // returns true if alpha channel was deleted
     bool optimizeAwayAlpha();
+    // Create an alpha channel if this image doesn't have one
+    bool makeAlpha();
 
     static S32 biasedDimToPowerOfTwo(S32 curr_dim, S32 max_dim = MAX_IMAGE_SIZE);
     static S32 expandDimToPowerOfTwo(S32 curr_dim, S32 max_dim = MAX_IMAGE_SIZE);
@@ -223,6 +228,9 @@ public:
 	
 	// Fill the buffer with a constant color
 	void fill( const LLColor4U& color );
+
+    // Multiply this raw image by the given color
+    void tint( const LLColor3& color );
 
 	// Copy operations
 	

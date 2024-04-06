@@ -60,11 +60,11 @@ public:
 	/*virtual*/ BOOL        updateGeometry(LLDrawable *drawable) override;
 	/*virtual*/ BOOL		updateLOD() override;
 	/*virtual*/ void		updateFaceSize(S32 idx) override;
-	void getGeometry(LLStrider<LLVector3> &verticesp,
-								LLStrider<LLVector3> &normalsp,
-								LLStrider<LLVector2> &texCoords0p,
-								LLStrider<LLVector2> &texCoords1p,
-								LLStrider<U16> &indicesp);
+    void getTerrainGeometry(LLStrider<LLVector3> &verticesp,
+                                LLStrider<LLVector3> &normalsp,
+                                LLStrider<LLVector2> &texCoords0p,
+                                LLStrider<LLVector2> &texCoords1p,
+                                LLStrider<U16> &indicesp);
 
 	/*virtual*/ void updateTextures() override;
 	/*virtual*/ void setPixelAreaAndAngle(LLAgent &agent) override; // generate accurate apparent angle and area

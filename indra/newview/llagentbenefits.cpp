@@ -43,6 +43,7 @@ LLAgentBenefits::LLAgentBenefits():
 	m_picks_limit(-1),
 	m_sound_upload_cost(-1),
 	m_texture_upload_cost(-1),
+    m_2k_texture_upload_cost(-1),
 	m_create_group_cost(-1)
 {
 }
@@ -103,6 +104,7 @@ bool LLAgentBenefits::init(const LLSD& benefits_sd)
 	{
 		return false;
 	}
+    get_required_S32(benefits_sd, "large_texture_upload_cost", m_2k_texture_upload_cost);
 
 	// FIXME PREMIUM - either use this field or get rid of it
 	m_initalized = true;
@@ -193,12 +195,17 @@ S32 LLAgentBenefits::getTextureUploadCost() const
 	return LLGridManager::instance().isInSecondlife() ? m_texture_upload_cost : LLGlobalEconomy::instance().getPriceUpload();
 }
 
+S32 LLAgentBenefits::get2KTextureUploadCost() const
+{
+    return m_2k_texture_upload_cost;
+}
+
 bool LLAgentBenefits::findUploadCost(LLAssetType::EType& asset_type, S32& cost) const
 {
 	bool succ = false;
 	if (asset_type == LLAssetType::AT_TEXTURE)
 	{
-		cost = getTextureUploadCost();
+        cost = getTextureUploadCost();
 		succ = true;
 	}
 	else if (asset_type == LLAssetType::AT_SOUND)

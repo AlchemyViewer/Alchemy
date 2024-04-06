@@ -33,6 +33,7 @@ include(LLWindow)
 include(NDOF)
 include(NVAPI)
 include(OPENAL)
+include(OpenEXR)
 include(OpenGL)
 include(OpenSSL)
 include(PNG)
@@ -604,6 +605,7 @@ set(viewer_SOURCE_FILES
     llrecentpeople.cpp
     llreflectionmap.cpp
     llreflectionmapmanager.cpp
+    llheroprobemanager.cpp
     llregioninfomodel.cpp
     llregionposition.cpp
     llremoteparcelrequest.cpp
@@ -1328,6 +1330,7 @@ set(viewer_HEADER_FILES
     llrecentpeople.h
     llreflectionmap.h
     llreflectionmapmanager.h
+    llheroprobemanager.h
     llregioninfomodel.h
     llregionposition.h
     llremoteparcelrequest.h
@@ -1946,6 +1949,12 @@ if (WINDOWS)
       ${viewer_APPSETTINGS_FILES}
       SLPlugin
       media_plugin_example
+      ${SHARED_LIB_STAGING_DIR}/Iex-3_2.dll
+      ${SHARED_LIB_STAGING_DIR}/IlmThread-3_2.dll
+      ${SHARED_LIB_STAGING_DIR}/Imath-3_1.dll
+      ${SHARED_LIB_STAGING_DIR}/OpenEXR-3_2.dll
+      ${SHARED_LIB_STAGING_DIR}/OpenEXRCore-3_2.dll
+      ${SHARED_LIB_STAGING_DIR}/OpenEXRUtil-3_2.dll
       )
 
     if (ADDRESS_SIZE EQUAL 64)
@@ -2142,6 +2151,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         llappearance
         ${LLPHYSICSEXTENSIONS_LIBRARIES}
         ll::icu4c
+        ll::openexr
         ll::tracy
         ll::sdbus-cpp
         ll::versioninfo

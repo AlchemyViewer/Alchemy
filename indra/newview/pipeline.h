@@ -39,6 +39,7 @@
 #include "lldrawable.h"
 #include "llrendertarget.h"
 #include "llreflectionmapmanager.h"
+#include "llheroprobemanager.h"
 
 #include "alrenderutils.h"
 
@@ -112,6 +113,8 @@ public:
 
     // rebuild all LLVOVolume render batches
     void rebuildDrawInfo();
+    // Rebuild all terrain
+    void rebuildTerrain();
 
     // Clear LLFace mVertexBuffer pointers
 	void resetVertexBuffers(LLDrawable* drawable);
@@ -437,6 +440,7 @@ public:
     void handleShadowDetailChanged();
 
     LLReflectionMapManager mReflectionMapManager;
+    LLHeroProbeManager mHeroProbeManager;
 
 private:
 	void unloadShaders();
@@ -677,6 +681,9 @@ public:
     // auxillary 512x512 render target pack
     // used by reflection probes and dynamic texture bakes
     RenderTargetPack mAuxillaryRT;
+
+	// Auxillary render target pack scaled to the hero probe's per-face size.
+    RenderTargetPack mHeroProbeRT;
 
     // currently used render target pack
     RenderTargetPack* mRT;
@@ -1042,6 +1049,9 @@ public:
 	static F32 RenderScreenSpaceReflectionAdaptiveStepMultiplier;
 	static S32 RenderScreenSpaceReflectionGlossySamples;
 	static S32 RenderBufferVisualization;
+	static bool RenderMirrors;
+	static S32 RenderHeroProbeUpdateRate;
+    static S32 RenderHeroProbeConservativeUpdateMultiplier;
 	static F32 RenderNormalMapScale;
 };
 
