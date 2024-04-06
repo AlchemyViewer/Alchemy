@@ -95,6 +95,7 @@
      name="auto_disengage_mic_check"
      width="350" />
     <check_box
+	 enabled="false"
      control_name="ALDiscordIntegration"
      height="16"
      label="Enable Discord Integration"
@@ -104,7 +105,7 @@
      name="Enable_Discord_Integration"
      width="350" />
      <check_box
-     enabled_control="ALDiscordIntegration"
+	 enabled="false"
      control_name="ALDiscordShareName"
      height="16"
      label="Show Username on Discord"
@@ -114,7 +115,7 @@
      name="Discord_Integration_Show_Name"
      width="350" />
      <check_box
-     enabled_control="ALDiscordIntegration"
+	 enabled="false"
      control_name="ALDiscordShareLocationRegion"
      height="16"
      label="Show Region Name on Discord"
