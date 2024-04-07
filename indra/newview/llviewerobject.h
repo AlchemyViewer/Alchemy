@@ -768,7 +768,7 @@ private:
 	// Grabbed from UPDATE_FLAGS
 	U32				mFlags;
 
-	static std::map<std::string, U32> sObjectDataMap;
+	static boost::unordered_flat_map<std::string, U32> sObjectDataMap;
 public:
 	// Sent to sim in UPDATE_FLAGS, received in ObjectPhysicsProperties
 	U8              mPhysicsShapeType;

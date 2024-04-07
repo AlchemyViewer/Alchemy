@@ -58,12 +58,12 @@ class LLFunctorRegistry final : public LLSingleton<LLFunctorRegistry<FUNCTOR_TYP
 
 public:
 	typedef FUNCTOR_TYPE ResponseFunctor;
-	typedef typename std::map<std::string, FUNCTOR_TYPE> FunctorMap;
+	typedef typename boost::unordered_map<std::string, FUNCTOR_TYPE> FunctorMap;
 	
 	bool registerFunctor(const std::string& name, ResponseFunctor f)
 	{
 		bool retval = true;
-		if (mMap.count(name) == 0)
+		if (!mMap.contains(name))
 		{
 			mMap[name] = f;
 		}
@@ -78,7 +78,7 @@ public:
 
 	bool unregisterFunctor(const std::string& name)
 	{
-		if (mMap.count(name) == 0)
+		if (mMap.contains(name))
 		{
 			LL_WARNS() << "trying to remove '" << name << "' from LLFunctorRegistry but it's not there." << LL_ENDL;
 			return false;
@@ -89,7 +89,7 @@ public:
 
 	FUNCTOR_TYPE getFunctor(const std::string& name)
 	{
-		if (mMap.count(name) != 0)
+		if (mMap.contains(name))
 		{
 			return mMap[name];
 		}

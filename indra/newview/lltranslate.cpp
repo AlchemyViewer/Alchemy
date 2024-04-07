@@ -434,12 +434,16 @@ void LLGoogleTranslationHandler::parseErrorResponse(
     auto message = root.find_pointer("/data/message", ec);
     auto code = root.find_pointer("/data/code", ec);
     if (!message || !code) 
+    {
         return;
+    }
 
     auto message_val = boost::json::try_value_to<std::string>(*message);
     auto code_val = boost::json::try_value_to<int>(*code);
     if (!message_val || !code_val)
+    {
         return;
+    }
 
     err_msg = message_val.value();
     status = code_val.value();
@@ -956,24 +960,25 @@ bool LLDeepLTranslationHandler::parseResponse(
     }
 
     auto detected_langp = root.find_pointer("/translations/0/detected_source_language", ec);
-    if (!detected_langp || ec.failed())
+    if (!detected_langp || ec.failed()) // empty response? should not happen
     {
         err_msg = ec.message();
-        return {};
+        return false;
     }
 
+    // Request succeeded, extract translation from the response.
     auto text_valp = root.find_pointer("/translations/0/text", ec);
     if (!text_valp || ec.failed())
     {
         err_msg = ec.message();
-        return {};
+        return false;
     }
 
     auto lang_result = boost::json::try_value_to<std::string>(*detected_langp);
     auto text_result = boost::json::try_value_to<std::string>(*text_valp);
     if (!lang_result || !text_result)
     {
-        return {};
+        return false;
     }
 
     detected_lang = lang_result.value();
@@ -1001,13 +1006,13 @@ std::string LLDeepLTranslationHandler::parseErrorResponse(
         return {};
     }
 
-    auto root_obj = root.if_object();
-    if (!root_obj || !root_obj->contains("message"))
+    auto message_ptr = root.find_pointer("/message", ec);
+    if (!message_ptr || ec.failed())
     {
-        return std::string();
+        return {};
     }
 
-    auto message_val = boost::json::try_value_to<std::string>(root_obj->at("message"));
+    auto message_val = boost::json::try_value_to<std::string>(*message_ptr);
     if (!message_val)
         return {};
 

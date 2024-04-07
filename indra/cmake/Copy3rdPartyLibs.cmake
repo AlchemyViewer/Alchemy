@@ -58,12 +58,12 @@ if(WINDOWS)
 
     set(debug_src_dir "${ARCH_PREBUILT_DIRS_DEBUG}")
     set(debug_files
-        openjp2.dll
+        openjpeg.dll
         )
 
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(release_files
-        openjp2.dll
+        openjpeg.dll
         )
 
     # ICU4C (same filenames for 32 and 64 bit builds)

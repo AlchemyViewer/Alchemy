@@ -463,7 +463,7 @@ class WindowsManifest(ViewerManifest):
                 self.path(libfile)
 
             # For image support
-            self.path("openjp2.dll")
+            self.path("openjpeg.dll")
 
             # Get openal dll for audio engine, continue if missing
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
@@ -1264,7 +1264,7 @@ class Linux_i686_Manifest(LinuxManifest):
 
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libSDL2*.so*")
-            self.path("libopenjp2.*so*")
+            self.path("libopenjpeg.*so*")
             self.path("libjpeg.so*")
 
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
@@ -1302,7 +1302,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
 
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libSDL2*.so*")
-            self.path("libopenjp2.*so*")
+            self.path("libopenjpeg.*so*")
             self.path("libjpeg.so*")
             self.path("libsdbus-c++.so*")
 

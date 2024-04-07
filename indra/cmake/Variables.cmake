@@ -164,8 +164,16 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_64_TO_32_BIT_CONVERSION NO)
 
   set(ADDRESS_SIZE 64)
-  set(ARCH x86_64)
-  set(CMAKE_OSX_ARCHITECTURES x86_64)
+  if(BUILD_ARM64)
+    set(ARCH arm64)
+    set(CMAKE_OSX_ARCHITECTURES arm64)
+  elseif(BUILD_UNIVERSAL)
+    set(ARCH universal)
+    set(CMAKE_OSX_ARCHITECTURES arm64 x86_64)
+  else()
+    set(ARCH x86_64)
+    set(CMAKE_OSX_ARCHITECTURES x86_64)
+  endif()
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 # Default deploy grid
