@@ -13086,7 +13086,7 @@ Please download the latest version from https://www.alchemyviewer.org/downloads
    icon="notify.tga"
    name="PoserExportXMLSuccess"
    type="notify">
-The pose has been exported successfully as XML file.
+The pose has been exported successfully as an XML file.
 
 The pose can be loaded from the expanded pose list.
 
