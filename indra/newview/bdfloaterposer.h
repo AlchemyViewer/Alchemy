@@ -107,6 +107,8 @@ private:
 	//BD - Flip Poses
 	void onFlipPose();
 
+	void onPoseSymmetrize(const LLSD& param);
+
 	//BD - Animesh
 	void onAvatarsRefresh();
 	void onAvatarsSelect();

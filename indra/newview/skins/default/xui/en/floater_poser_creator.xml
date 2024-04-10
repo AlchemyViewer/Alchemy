@@ -77,19 +77,6 @@ width="654">
 		name="general_panel"
 		top="0"
 		width="644">
-				<icon
-				follows="all"
-				height="426"
-				color="1 1 1 1"
-				image_name="Panel_Background"
-				layout="topleft"
-				name="vicon"
-				mouse_opaque="false"
-				visible="true"
-				width="644"
-				top_pad="-2"
-				left="0"/>
-				
 				<text
 				follows="top|left|right"
 				height="25"
@@ -228,7 +215,6 @@ width="654">
 				height="20"
 				label=""
 				value="0.0"
-				increment="0.0166666666666667"
 				left_pad="55"
 				top_delta="0"
 				name="loop_in"
@@ -254,7 +240,6 @@ width="654">
 				height="20"
 				label=""
 				value="1.0"
-				increment="0.0166666666666667"
 				left_pad="1"
 				top_delta="-5"
 				name="loop_out"
@@ -286,16 +271,6 @@ width="654">
 				max_chars="135"
 				name="base_priority"
 				width="151">
-				<combo_box.combo_button
-				image_unselected="ToolbarDropDown_Off"
-				image_selected="ToolbarDropDown_Press"
-				image_disabled="ToolbarDropDown_Off" />
-				<combo_box.drop_down_button
-				image_unselected="ToolbarDropDown_Off"
-				image_selected="ToolbarDropDown_Press"
-				image_pressed="ToolbarDropDown_Press" 
-				image_pressed_selected="ToolbarDropDown_Press"
-				image_disabled="ToolbarDropDown_Off" />
 				<combo_box.item
 				label="Low Priority (0)"
 				name="0"
@@ -345,16 +320,6 @@ width="654">
 				max_chars="135"
 				name="hand_poses"
 				width="151">
-				<combo_box.combo_button
-				image_unselected="ToolbarDropDown_Off"
-				image_selected="ToolbarDropDown_Press"
-				image_disabled="ToolbarDropDown_Off" />
-				<combo_box.drop_down_button
-				image_unselected="ToolbarDropDown_Off"
-				image_selected="ToolbarDropDown_Press"
-				image_pressed="ToolbarDropDown_Press" 
-				image_pressed_selected="ToolbarDropDown_Press"
-				image_disabled="ToolbarDropDown_Off" />
 				<combo_box.item
 				label="Spread"
 				name="0"
@@ -424,47 +389,6 @@ width="654">
 		name="joints_panel"
 		top="0"
 		width="481">
-				
-				
-				<!--<icon
-				follows="top|left"
-				height="320"
-				color="1 1 1 1"
-				image_name="Panel_Background"
-				layout="topleft"
-				name="vicon"
-				mouse_opaque="false"
-				visible="true"
-				width="480"
-				top="0"
-				left="160"/>-->
-				
-				<icon
-				follows="top|left"
-				height="304"
-				color="1 1 1 1"
-				image_name="Panel_Background"
-				layout="topleft"
-				name="vicon"
-				mouse_opaque="false"
-				visible="true"
-				width="220"
-				top_pad="-2"
-				left="0"/>
-				
-				<icon
-				follows="top|left"
-				height="304"
-				color="1 1 1 1"
-				image_name="Panel_Background"
-				layout="topleft"
-				name="vicon"
-				mouse_opaque="false"
-				visible="true"
-				width="420"
-				top_delta="0"
-				left_pad="2"/>
-				
 							<tab_container
 							follows="top|left"
 							halign="center"
@@ -816,16 +740,6 @@ width="654">
 							max_chars="135"
 							name="interpolation"
 							width="139">
-							<combo_box.combo_button
-							image_unselected="ToolbarDropDown_Off"
-							image_selected="ToolbarDropDown_Press"
-							image_disabled="ToolbarDropDown_Off" />
-							<combo_box.drop_down_button
-							image_unselected="ToolbarDropDown_Off"
-							image_selected="ToolbarDropDown_Press"
-							image_pressed="ToolbarDropDown_Press" 
-							image_pressed_selected="ToolbarDropDown_Press"
-							image_disabled="ToolbarDropDown_Off" />
 							<combo_box.item
 							label="Step"
 							name="0"
@@ -891,18 +805,6 @@ width="654">
 							</button>
 						</panel>
 				
-				<icon
-				follows="top|left"
-				height="100"
-				color="1 1 1 1"
-				image_name="Panel_Background"
-				layout="topleft"
-				name="vicon"
-				mouse_opaque="false"
-				visible="true"
-				width="156"
-				top_pad="4"
-				left="0"/>
 				<check_box
 				height="16"
 				initial_value="false"
@@ -911,7 +813,7 @@ width="654">
 				layout="topleft"
 				left="5"
 				name="Mirror"
-				top_delta="5"
+				top_pad="4"
 				width="115">
 				<check_box.commit_callback
                     function="Joint.ToggleMirror"/>
@@ -945,31 +847,19 @@ width="654">
 				<button.commit_callback
 				function="Joint.FlipPose"/>
 				</button>
-				
-				<icon
-				follows="top|left"
-				height="100"
-				color="1 1 1 1"
-				image_name="Panel_Background"
-				layout="topleft"
-				name="vicon"
-				mouse_opaque="false"
-				visible="true"
-				width="480"
-				top_delta="-78"
-				left="161"/>
+
 				<tab_container
 				follows="top|left|bottom"
 				halign="center"
 				height="95"
 				layout="topleft"
-				left_delta="-1"
+				left="161"
 				name="modifier_tabs"
 				enabled="false"
 				tab_height="20"
 				tab_group="1"
 				tab_position="top"
-				top_delta="2"
+				top_delta="-76"
 				width="481">
 					<panel
 					follows="all"
