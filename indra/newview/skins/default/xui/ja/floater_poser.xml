@@ -2,10 +2,10 @@
 <floater name="floater_poser" title="ポーザー">
 	<!-- Expanded Size 745 -->
 	<!-- Expanded Size 906 -->
-	<panel name="max_panel" width="910"/>
+	<panel name="max_panel" width="886"/>
 	<!-- Collapsed Size 517 -->
 	<!-- Collapsed Size 678 -->
-	<panel name="min_panel" width="680"/>
+	<panel name="min_panel" width="654"/>
 	<string name="linear_time" translate="false">
 		0.000+
 	</string>
@@ -55,29 +55,30 @@
 		Misc
 	</string>
 	<layout_stack name="poser_stack">
-		<layout_panel name="poser_list_layout" width="190">
-			<panel name="title" width="180">
-				<panel name="live_panel" width="180">
-					<scroll_list tool_tip="対象となるアバターまたはアニメッシュを選択します。" name="avatar_scroll" width="182">
+		<layout_panel name="poser_list_layout">
+			<panel name="title">
+				<panel name="live_panel">
+					<scroll_list tool_tip="対象となるアバターまたはアニメッシュを選択します。" name="avatar_scroll">
 						<scroll_list.columns label="" name="icon"/>
 						<scroll_list.columns label="名前" name="name"/>
 						<scroll_list.columns label="ＵＵＩＤ" name="uuid"/>
 					</scroll_list>
-					<button label="アバターをリフレッシュ" name="refresh" width="180"/>
+					<button label="アバターをリフレッシュ" name="refresh"/>
 				</panel>
 				<check_box label="変更を反転する" tool_tip="このオプションは、すべての回転の変更を反対側のボーンにも反転させるかどうかを切り替えます。例えば、左腕の動きは右腕に反転した動きになります。" name="Mirror"/>
 				<check_box label="簡易回転" tool_tip="このオプションは、ポーザーが簡略化された回転軸を表示して使用するかどうかを切り替えます。これは基本的に、どの軸を動かしても、他の軸はそのままであることを意味し、これにより回転がずれてしまい、どの順番でボーンを動かしたかによって、0 0 0がデフォルトの静止位置でなくなることがあります。このオプションを無効にすると、他の軸が実際の回転を表すように動的に変更されるようになります。これは、触れていないスライダーが、現在動かしているスライダーと一緒に変更されることを意味します。これはユーザーを混乱させる可能性があるため、デフォルトでは無効になっています。これを使用する場合は、Ｚ、Ｙ、Ｘの順に0にすることを強くお勧めします。" name="EasyRotations"/>
-				<button label="ポーズを反転" name="flip_pose" width="90"/>
+				<button label="ポーズを対称に" name="symmetrize_pose" width="100"/>
+				<button label="ポーズ反転" name="flip_pose"/>
 				<button label="再キャプチャ" tool_tip="無効化されたすべてのジョイントを再キャプチャします。これは、ボーンを無効にしてＨＵＤなどの外部手段でボーンを編集し、これらの変更をポーザーに再キャプチャして微調整を行う場合に便利です。" name="recapture_bones" width="90"/>
 			</panel>
 		</layout_panel>
-		<layout_panel name="poser_layout" width="500">
+		<layout_panel name="poser_layout">
 			<panel name="title">
 				<layout_stack name="poser_layout_stack">
 					<layout_panel name="poser_layout">
 						<panel name="title">
 							<tab_container name="joints_tabs">
-								<panel title="スケルトン" name="joints_panel" width="500">
+								<panel title="スケルトン" name="joints_panel">
 									<panel name="title">
 										<scroll_list name="joints_scroll">
 											<scroll_list.columns label="" name="icon"/>
@@ -95,8 +96,8 @@
 										</scroll_list>
 									</panel>
 								</panel>
-								<panel title="衝突量" name="cv_panel"  width="500">
-									<scroll_list name="cv_scroll" width="500">
+								<panel title="衝突量" name="cv_panel">
+									<scroll_list name="cv_scroll">
 										<scroll_list.columns label="" name="icon"/>
 										<scroll_list.columns label="衝突量名" name="joint" relative_width="0.25"/>
 										<scroll_list.columns label="回転Ｘ　" name="x"/>
@@ -111,8 +112,8 @@
 										<scroll_list.columns label="＃" name="number"/>
 									</scroll_list>
 								</panel>
-								<panel title="装着ボーン" name="attach_panel"  width="500">
-									<scroll_list name="attach_scroll" width="500">
+								<panel title="装着ボーン" name="attach_panel">
+									<scroll_list name="attach_scroll">
 										<scroll_list.columns label="" name="icon"/>
 										<scroll_list.columns label="装着ボーン名" name="joint" relative_width="0.25"/>
 										<scroll_list.columns label="回転Ｘ" name="x"/>
@@ -133,9 +134,9 @@
 					<layout_panel name="poser_options_layout">
 						<panel name="title">
 							<button label="ポージング開始" label_selected="ポージング停止" name="activate"/>
-							<line_editor label="ポーズ名を入力" name="pose_name" width="140"/>
-							<button label="ポーズを保存" tool_tip="現在のポーズを保存します。" name="save_poses"/>
-							<button label="ポーズライブラリ" name="extend" width="122"/>
+							<line_editor label="ポーズ名を入力" name="pose_name"/>
+							<button label="ポーズ保存" tool_tip="現在のポーズを保存します。" name="save_poses"/>
+							<button label="ライブラリ" name="extend"/>
 						</panel>
 					</layout_panel>
 				</layout_stack>
@@ -145,7 +146,7 @@
 						<slider label="回転Ｙ：" name="Rotation_Y"/>
 						<slider label="回転Ｚ：" name="Rotation_Z"/>
 						<panel name="title">
-							<button label="選択の回転をリセット" label_selected="選択のボーンを無効化" name="reset_bone_rot"/>
+							<button label="選択の回転をリセット" label_selected="選択ボーンを無効化" name="reset_bone_rot"/>
 							<button label="選択の回転を復元" name="revert_pose"/>
 						</panel>
 					</panel>
@@ -154,7 +155,7 @@
 						<slider label="位置Ｙ：" name="Position_Y"/>
 						<slider label="位置Ｚ：" name="Position_Z"/>
 						<panel name="title">
-							<button label="選択の位置をリセット" label_selected="選択のボーンを無効化" name="reset_bone_pos"/>
+							<button label="選択位置をリセット" label_selected="選択ボーンを無効化" name="reset_bone_pos"/>
 						</panel>
 					</panel>
 					<panel title="スケール" name="scale_panel">
@@ -162,16 +163,16 @@
 						<slider label="スケールＹ：" name="Scale_Y"/>
 						<slider label="スケールＺ：" name="Scale_Z"/>
 						<panel name="title">
-							<button label="選択のスケールをリセット" label_selected="選択のボーンを無効化" name="reset_bone_scale"/>
+							<button label="選択スケールをリセット" label_selected="選択ボーンを無効化" name="reset_bone_scale"/>
 						</panel>
 					</panel>
 				</tab_container>
-				<button label="選択のボーンを有効化" label_selected="選択のボーンを無効化" name="toggle_bone"/>
+				<button label="選択ボーンを有効化" label_selected="選択ボーンを無効化" name="toggle_bone"/>
 			</panel>
 		</layout_panel>
-		<layout_panel name="poses_layout" width="238">
-			<panel name="poses_panel"  width="230">
-				<scroll_list tool_tip="現在選択されているポーズの補間タイプを変更します。" name="poses_scroll"  width="230">
+		<layout_panel name="poses_layout">
+			<panel name="poses_panel">
+				<scroll_list tool_tip="現在選択されているポーズの補間タイプを変更します。" name="poses_scroll">
 					<scroll_list.columns label="ポーズ名" name="name"/>
 				</scroll_list>
 				<menu_button label="ポーズ読み込み" tool_tip="現在選択されているポーズを読み込んで、その中に保存されているすべてのボーン回転を適用します。" name="load_poses"/>
