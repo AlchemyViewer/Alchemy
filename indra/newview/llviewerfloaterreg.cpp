@@ -203,6 +203,7 @@
 #include "llscriptfloater.h"
 #include "llsyswellwindow.h"
 #include "bdfloaterposer.h"
+#include "bdfloaterposecreator.h"
 
 // *NOTE: Please add files in alphabetical order to keep merges easy.
 // [RLVa:KB] - Checked: 2010-03-11
@@ -580,6 +581,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("new_local_inventory", "floater_new_local_inventory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNewLocalInventory>);
 	LLFloaterReg::add("particle_editor", "floater_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
 	LLFloaterReg::add("poser", "floater_poser.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<BDFloaterPoser>);
+	LLFloaterReg::add("poser_creator", "floater_poser_creator.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<BDFloaterPoseCreator>);
 	LLFloaterReg::add("progress_view", "floater_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProgressView>);
 	LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
 	LLFloaterReg::add("region_tracker", "floater_region_tracker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterRegionTracker>);

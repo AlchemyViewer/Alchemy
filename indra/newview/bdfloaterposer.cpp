@@ -96,6 +96,8 @@ BDFloaterPoser::BDFloaterPoser(const LLSD& key)
 	mCommitCallbackRegistrar.add("Joint.EasyRotations", boost::bind(&BDFloaterPoser::toggleEasyRotations, this, _1));
 	//BD - Flip pose (mirror).
 	mCommitCallbackRegistrar.add("Joint.FlipPose", boost::bind(&BDFloaterPoser::onFlipPose, this));
+	//BD - Symmetrize both sides of the opposite body.
+	mCommitCallbackRegistrar.add("Joint.SymmetrizePose", boost::bind(&BDFloaterPoser::onPoseSymmetrize, this, _2));
 
 	//BD - Refresh the avatar list.
 	mCommitCallbackRegistrar.add("Poser.RefreshAvatars", boost::bind(&BDFloaterPoser::onAvatarsRefresh, this));
@@ -1405,7 +1407,112 @@ void BDFloaterPoser::onFlipPose()
 	}
 }
 
-//BD - Flip our pose (mirror it)
+//BD - Copy and mirror one side's joints to the other (symmetrize the pose).
+void BDFloaterPoser::onPoseSymmetrize(const LLSD& param)
+{
+	LLVOAvatar* avatar = gDragonAnimator.mTargetAvatar;
+	if (!avatar || avatar->isDead()) return;
+
+	if (!(avatar->getRegion() == gAgent.getRegion())) return;
+
+	LLJoint* joint = nullptr;
+	bool flipped[134] = { false };
+	bool flipLeft = false;
+	if (param.asInteger() == 0)
+	{
+		flipLeft = true;
+	}
+
+	for (S32 i = 0; (joint = avatar->getCharacterJoint(i)); ++i)
+	{
+		//BD - Skip if we already flipped this bone.
+		if (flipped[i]) continue;
+
+		//BD - Nothing? Invalid? Skip, when we hit the end we'll break out anyway.
+		if (!joint)	continue;
+
+		LLVector3 rot, mirror_rot;
+		LLQuaternion rot_quat, mirror_rot_quat;
+		std::string joint_name = joint->getName();
+		std::string mirror_joint_name = joint->getName();
+		if (!flipLeft)
+		{
+			//BD - Attempt to find the "right" version of this bone first, we assume we always
+			//     end up with the "left" version of a bone first.
+			S32 idx = joint->getName().find("Left");
+			if (idx != -1)
+				mirror_joint_name.replace(idx, mirror_joint_name.length(), "Right");
+			else
+				continue;
+		}
+		else
+		{
+			//BD - Attempt to find the "right" version of this bone first, this is necessary
+			//     because there are a couple bones starting with the "right" bone.
+			S32 idx = joint->getName().find("Right");
+			if (idx != -1)
+				mirror_joint_name.replace(idx, mirror_joint_name.length(), "Left");
+			else
+				continue;
+		}
+
+		LLJoint* mirror_joint = nullptr;
+		if (mirror_joint_name != joint->getName())
+			mirror_joint = gDragonAnimator.mTargetAvatar->mRoot->findJoint(mirror_joint_name);
+
+		//BD - Collect the joint and mirror joint entries and their cells, we need them later.
+		//LLScrollListItem* item1 = mJointScrolls[JOINTS]->getItemByLabel(joint_name, FALSE, COL_NAME);
+		LLScrollListItem* item2 = nullptr;
+
+		//BD - Get the rotation of our current bone and that of the mirror bone (if available).
+		//     Flip our current bone's rotation and apply it to the mirror bone (if available).
+		//     Flip the mirror bone's rotation (if available) and apply it to our current bone.
+		//     If the mirror bone does not exist, flip the current bone rotation and use that.
+		rot_quat = joint->getTargetRotation();
+		LLQuaternion inv_rot_quat = LLQuaternion(-rot_quat.mQ[VX], rot_quat.mQ[VY], -rot_quat.mQ[VZ], rot_quat.mQ[VW]);
+		inv_rot_quat.getEulerAngles(&rot[VX], &rot[VY], &rot[VZ]);
+
+		if (mirror_joint)
+		{
+			//mirror_rot_quat = mirror_joint->getTargetRotation();
+			//LLQuaternion inv_mirror_rot_quat = LLQuaternion(-mirror_rot_quat.mQ[VX], mirror_rot_quat.mQ[VY], -mirror_rot_quat.mQ[VZ], mirror_rot_quat.mQ[VW]);
+			//inv_mirror_rot_quat.getEulerAngles(&mirror_rot[VX], &mirror_rot[VY], &mirror_rot[VZ]);
+			mirror_joint->setTargetRotation(inv_rot_quat);
+			//joint->setTargetRotation(inv_mirror_rot_quat);
+
+			item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+
+			//BD - Make sure we flag this bone as flipped so we skip it next time we iterate over it.
+			flipped[mirror_joint->getJointNum()] = true;
+		}
+		/*else
+		{
+			joint->setTargetRotation(inv_rot_quat);
+		}*/
+
+		S32 axis = 0;
+		while (axis <= 2)
+		{
+			//BD - Now flip the list entry values.
+			/*if (item1)
+			{
+				if (mirror_joint)
+					item1->getColumn(axis + 2)->setValue(ll_round(mirror_rot[axis], 0.001f));
+				else
+					item1->getColumn(axis + 2)->setValue(ll_round(rot[axis], 0.001f));
+			}*/
+
+			//BD - Now flip the mirror joint list entry values.
+			if (item2)
+				item2->getColumn(axis + 2)->setValue(ll_round(rot[axis], 0.001f));
+
+			++axis;
+		}
+		flipped[i] = true;
+	}
+}
+
+//BD - Recapture the current joint's values.
 void BDFloaterPoser::onJointRecapture()
 {
 	LLScrollListItem* item = mAvatarScroll->getFirstSelected();
