@@ -200,13 +200,29 @@ width="654">
 				follows="top|left"
 				layout="topleft"
 				enabled="true"
+				label="Symmetrize Pose"
+				image_hover_unselected="Toolbar_Middle_Over"
+				image_selected="Toolbar_Middle_Selected"
+				image_unselected="Toolbar_Middle_Off"
+				name="symmetrize_pose"
+				width="75"
+				top_pad="18"
+				left="2">
+				<button.commit_callback
+				function="Joint.SymmetrizePose"/>
+				</button>
+				<button
+				height="21"
+				follows="top|left"
+				layout="topleft"
+				enabled="true"
 				label="Mirror Pose"
 				image_hover_unselected="Toolbar_Middle_Over"
 				image_selected="Toolbar_Middle_Selected"
 				image_unselected="Toolbar_Middle_Off"
 				name="flip_pose"
 				width="75"
-				top_pad="40"
+				top_pad="1"
 				left="2">
 				<button.commit_callback
 				function="Joint.FlipPose"/>
@@ -718,7 +734,7 @@ width="654">
 							name="reset_bone_rot"
 							width="159"
 							top="0"
-							left_delta="2">
+							left_delta="0">
 							<button.commit_callback
 							function="Joint.ResetJointRotation"/>
 							</button>

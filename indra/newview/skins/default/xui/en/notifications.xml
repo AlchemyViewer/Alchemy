@@ -13169,22 +13169,22 @@ Please download the latest version from https://www.alchemyviewer.org/downloads
    icon="notify.tga"
    name="PoserExportXMLSuccess"
    type="notify">
-The pose has been exported successfully as XML file.
+The pose has been exported successfully as an XML file.
 
 The pose can be loaded from the expanded pose list.
 
 The file can be found in:
-&lt;b&gt;C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses&lt;/b&gt;
+C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses
   </notification>
 
 <notification
    icon="notify.tga"
    name="PoserExportANIMSuccess"
    type="notify">
-The pose has been exported successfully as ANIM file.
+The pose has been exported successfully as an ANIM file.
 
 The file can be found in:
-&lt;b&gt;C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations&lt;/b&gt;
+C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
   </notification>
 	
 </notifications>

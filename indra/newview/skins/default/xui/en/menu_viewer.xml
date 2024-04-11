@@ -710,7 +710,7 @@
              function="Floater.Toggle"
              parameter="poser" />
 		</menu_item_check>
-		<!--<menu_item_check
+		<menu_item_check
 			 label="Pose Creator"
 			 name="Pose Creator">
 			<menu_item_check.on_check
@@ -719,7 +719,7 @@
 			<menu_item_check.on_click
              function="Floater.Toggle"
              parameter="poser_creator" />
-		</menu_item_check>-->
+		</menu_item_check>
         <menu_item_call
          label="Resync Animations"
          name="Resync Animations"
