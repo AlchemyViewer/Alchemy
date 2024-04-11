@@ -1358,7 +1358,7 @@ bool LLWebRTCVoiceClient::isCurrentChannel(const LLSD &channelInfo)
 
     if (mSession)
     {
-        if (!channelInfo["sessionHandle"].asString().empty())
+        if (!channelInfo["session_handle"].asString().empty())
         {
             return mSession->mHandle == channelInfo["session_handle"].asString();
         }
@@ -2364,12 +2364,14 @@ void LLVoiceWebRTCConnection::breakVoiceConnectionCoro()
     if (!regionp || !regionp->capabilitiesReceived())
     {
         LL_DEBUGS("Voice") << "no capabilities for voice provisioning; waiting " << LL_ENDL;
+        setVoiceConnectionState(VOICE_STATE_SESSION_RETRY);
         return;
     }
 
     std::string url = regionp->getCapability("ProvisionVoiceAccountRequest");
     if (url.empty())
     {
+        setVoiceConnectionState(VOICE_STATE_SESSION_RETRY);
         return;
     }
 
@@ -2826,6 +2828,11 @@ void LLVoiceWebRTCConnection::OnDataReceivedImpl(const std::string &data, bool b
                     if (v_val)
                     {
                         participant->mIsSpeaking = v_val->as_bool();
+                    }
+
+                    if (voice_data[participant_id].isMember("m"))
+                    {
+                        participant->mIsModeratorMuted = voice_data[participant_id].get("m", Json::Value(false)).asBool();
                     }
                 }
             }
