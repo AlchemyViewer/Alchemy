@@ -78,7 +78,7 @@ public:
 
 	bool unregisterFunctor(const std::string& name)
 	{
-		if (mMap.contains(name))
+		if (!mMap.contains(name))
 		{
 			LL_WARNS() << "trying to remove '" << name << "' from LLFunctorRegistry but it's not there." << LL_ENDL;
 			return false;
