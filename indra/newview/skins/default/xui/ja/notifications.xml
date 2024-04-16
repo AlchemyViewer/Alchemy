@@ -6191,13 +6191,13 @@ https://www.alchemyviewer.org/downloads から最新バージョンのビュー�
 展開されたポーズリストからポーズを読み込むことができます。
 
 ファイルは以下の場所にあります：
-&lt;b&gt;C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses&lt;/b&gt;
+C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses
   </notification>
 
 <notification name="PoserExportANIMSuccess">
 	ポーズは、ANIMファイルへのエクスポートに成功しました。
 
 ファイルは以下の場所にあります：
-&lt;b&gt;C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations&lt;/b&gt;
+C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
   </notification>
 </notifications>

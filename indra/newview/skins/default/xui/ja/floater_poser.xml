@@ -67,7 +67,8 @@
 				</panel>
 				<check_box label="変更を反転する" tool_tip="このオプションは、すべての回転の変更を反対側のボーンにも反転させるかどうかを切り替えます。例えば、左腕の動きは右腕に反転した動きになります。" name="Mirror"/>
 				<check_box label="簡易回転" tool_tip="このオプションは、ポーザーが簡略化された回転軸を表示して使用するかどうかを切り替えます。これは基本的に、どの軸を動かしても、他の軸はそのままであることを意味し、これにより回転がずれてしまい、どの順番でボーンを動かしたかによって、0 0 0がデフォルトの静止位置でなくなることがあります。このオプションを無効にすると、他の軸が実際の回転を表すように動的に変更されるようになります。これは、触れていないスライダーが、現在動かしているスライダーと一緒に変更されることを意味します。これはユーザーを混乱させる可能性があるため、デフォルトでは無効になっています。これを使用する場合は、Ｚ、Ｙ、Ｘの順に0にすることを強くお勧めします。" name="EasyRotations"/>
-				<button label="ポーズを反転" name="flip_pose" width="90"/>
+				<button label="ポーズを対称に" name="symmetrize_pose" width="100"/>
+				<button label="ポーズ反転" name="flip_pose" width="90"/>
 				<button label="再キャプチャ" tool_tip="無効化されたすべてのジョイントを再キャプチャします。これは、ボーンを無効にしてＨＵＤなどの外部手段でボーンを編集し、これらの変更をポーザーに再キャプチャして微調整を行う場合に便利です。" name="recapture_bones" width="90"/>
 			</panel>
 		</layout_panel>
@@ -134,7 +135,7 @@
 						<panel name="title">
 							<button label="ポージング開始" label_selected="ポージング停止" name="activate"/>
 							<line_editor label="ポーズ名を入力" name="pose_name" width="140"/>
-							<button label="ポーズを保存" tool_tip="現在のポーズを保存します。" name="save_poses"/>
+							<button label="ポーズ保存" tool_tip="現在のポーズを保存します。" name="save_poses"/>
 							<button label="ポーズライブラリ" name="extend" width="122"/>
 						</panel>
 					</layout_panel>
@@ -145,7 +146,7 @@
 						<slider label="回転Ｙ：" name="Rotation_Y"/>
 						<slider label="回転Ｚ：" name="Rotation_Z"/>
 						<panel name="title">
-							<button label="選択の回転をリセット" label_selected="選択のボーンを無効化" name="reset_bone_rot"/>
+							<button label="選択の回転をリセット" label_selected="選択ボーンを無効化" name="reset_bone_rot"/>
 							<button label="選択の回転を復元" name="revert_pose"/>
 						</panel>
 					</panel>
@@ -154,7 +155,7 @@
 						<slider label="位置Ｙ：" name="Position_Y"/>
 						<slider label="位置Ｚ：" name="Position_Z"/>
 						<panel name="title">
-							<button label="選択の位置をリセット" label_selected="選択のボーンを無効化" name="reset_bone_pos"/>
+							<button label="選択位置をリセット" label_selected="選択ボーンを無効化" name="reset_bone_pos"/>
 						</panel>
 					</panel>
 					<panel title="スケール" name="scale_panel">
@@ -162,11 +163,11 @@
 						<slider label="スケールＹ：" name="Scale_Y"/>
 						<slider label="スケールＺ：" name="Scale_Z"/>
 						<panel name="title">
-							<button label="選択のスケールをリセット" label_selected="選択のボーンを無効化" name="reset_bone_scale"/>
+							<button label="選択スケールをリセット" label_selected="選択ボーンを無効化" name="reset_bone_scale"/>
 						</panel>
 					</panel>
 				</tab_container>
-				<button label="選択のボーンを有効化" label_selected="選択のボーンを無効化" name="toggle_bone"/>
+				<button label="選択ボーンを有効化" label_selected="選択ボーンを無効化" name="toggle_bone"/>
 			</panel>
 		</layout_panel>
 		<layout_panel name="poses_layout" width="238">
