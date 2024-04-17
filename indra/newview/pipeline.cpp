@@ -1251,7 +1251,6 @@ void LLPipeline::releaseScreenBuffers()
     mRT->deferredLight.release();
 	mHeroProbeRT.uiScreen.release();
 	mHeroProbeRT.screen.release();
-	mHeroProbeRT.fxaaBuffer.release();
 	mHeroProbeRT.deferredScreen.release();
 	mHeroProbeRT.deferredLight.release();
 	mPostMap.release();

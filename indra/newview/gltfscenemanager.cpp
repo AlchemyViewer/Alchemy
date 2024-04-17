@@ -160,8 +160,7 @@ void GLTFSceneManager::renderOpaque()
 
         LLMatrix4a mat = getAssetToAgentTransform(mObjects[i]);
 
-        LLMatrix4a modelview;
-        modelview.loadu(gGLModelView);
+        LLMatrix4a modelview = gGLModelView;
 
         matMul(mat, modelview, modelview);
 
@@ -424,8 +423,7 @@ void GLTFSceneManager::renderDebug()
 
         LLMatrix4a mat = getAssetToAgentTransform(obj);
 
-        LLMatrix4a modelview;
-        modelview.loadu(gGLModelView);
+        LLMatrix4a modelview = gGLModelView;
 
         matMul(mat, modelview, modelview);
 

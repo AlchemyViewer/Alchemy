@@ -43,8 +43,37 @@ public:
 		mBinIndex = -1;	
 	}
 
-	LLVolumeTriangle(const LLVolumeTriangle& rhs) = delete;
-	LLVolumeTriangle& operator=(const LLVolumeTriangle& rhs) = delete;
+	LLVolumeTriangle(const LLVolumeTriangle& rhs)
+    {
+        *this = rhs;
+    }
+	LLVolumeTriangle& operator=(const LLVolumeTriangle& rhs)
+    {
+        LL_ERRS() << "Illegal operation!" << LL_ENDL;
+        return *this;
+    }
+
+    LLVolumeTriangle(LLVolumeTriangle&& rhs) noexcept
+    {
+        *this = std::move(rhs);
+    }
+    LLVolumeTriangle& operator=(LLVolumeTriangle&& rhs) noexcept
+    {
+        mPositionGroup = rhs.mPositionGroup;
+        mV[0] = rhs.mV[0];
+        mV[0] = rhs.mV[0];
+        mV[0] = rhs.mV[0];
+
+        mIndex[0] = rhs.mIndex[2];
+        mIndex[1] = rhs.mIndex[2];
+        mIndex[2] = rhs.mIndex[2];
+
+        mRadius = rhs.mRadius;
+        mBinIndex = rhs.mBinIndex;
+
+        LLRefCount::operator=(std::move(rhs));
+        return *this;
+    }
 
 	~LLVolumeTriangle() = default;
 
