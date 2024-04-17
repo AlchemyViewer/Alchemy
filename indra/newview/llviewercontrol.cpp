@@ -460,6 +460,19 @@ static bool handleReflectionProbeDetailChanged(const LLSD& newvalue)
         gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
         gPipeline.mReflectionMapManager.reset();
+        gPipeline.mHeroProbeManager.reset();
+    }
+    return true;
+}
+
+static bool handleHeroProbeResolutionChanged(const LLSD &newvalue)
+{
+    if (gPipeline.isInit())
+    {
+        LLPipeline::refreshCachedSettings();
+        gPipeline.mHeroProbeManager.reset();
+        gPipeline.releaseGLBuffers();
+        gPipeline.createGLBuffers();
     }
     return true;
 }
@@ -803,6 +816,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleHeroProbeResolutionChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShaderCacheEnabled", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleSetShaderChanged);

@@ -2883,10 +2883,8 @@ void renderLights(LLDrawable* drawablep)
 class LLRenderOctreeRaycast : public LLOctreeTriangleRayIntersect
 {
 public:
-	
-	
 	LLRenderOctreeRaycast(const LLVector4a& start, const LLVector4a& dir, F32* closest_t)
-		: LLOctreeTriangleRayIntersect(start, dir, NULL, closest_t, NULL, NULL, NULL, NULL)
+		: LLOctreeTriangleRayIntersect(start, dir, nullptr, closest_t, NULL, NULL, NULL, NULL)
 	{
 
 	}
@@ -2910,7 +2908,7 @@ public:
 			size.set(vl->mBounds[1].getF32ptr());
 		}
 
-		drawBoxOutline(center, size);	
+		drawBoxOutline(center, size);
 		
 		for (U32 i = 0; i < 2; i++)
 		{
@@ -2953,6 +2951,13 @@ public:
 		}
 	}
 };
+
+void renderOctreeRaycast(const LLVector4a& start, const LLVector4a& end, const LLVolumeOctree* octree)
+{
+    F32 t = 1.f;
+    LLRenderOctreeRaycast render(start, end, &t);
+    render.traverse(octree);
+}
 
 void renderRaycast(LLDrawable* drawablep)
 {
@@ -3011,26 +3016,22 @@ void renderRaycast(LLDrawable* drawablep)
 					dir.setSub(end, start);
 
 					gGL.flush();
-					glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);				
+					glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 					{
 						//render face positions
-						gGL.diffuseColor4f(0.f, 1.f, 1.f, 0.5f);
-						LLVertexBuffer::drawElements(LLRender::TRIANGLES, face.mPositions, NULL, face.mNumIndices, face.mIndices);
+						//gGL.diffuseColor4f(0.f, 1.f, 1.f, 0.5f);
+						//LLVertexBuffer::drawElements(LLRender::TRIANGLES, face.mPositions, NULL, face.mNumIndices, face.mIndices);
 					}
 					
 					if (!volume->isUnique())
 					{
-						F32 t = 1.f;
-
                         if (!face.getOctree())
 						{
 							((LLVolumeFace*) &face)->createOctree(); 
 						}
 
-						LLRenderOctreeRaycast render(start, dir, &t);
-					
-                        render.traverse(face.getOctree());
+                        renderOctreeRaycast(start, end, face.getOctree());
 					}
 
 					gGL.popMatrix();		

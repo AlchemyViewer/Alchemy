@@ -45,6 +45,7 @@
 #include "llbbox.h"
 #include "llrigginginfo.h"
 #include "llreflectionmap.h"
+#include "gltf/asset.h"
 
 class LLAgent;			// TODO: Get rid of this.
 class LLAudioSource;
@@ -777,6 +778,8 @@ public:
 	F32             mPhysicsDensity;
 	F32             mPhysicsRestitution;
 	
+    // Associated GLTF Asset
+    LLPointer<LL::GLTF::Asset> mGLTFAsset;
 
 	// Pipeline classes
 	LLPointer<LLDrawable> mDrawable;

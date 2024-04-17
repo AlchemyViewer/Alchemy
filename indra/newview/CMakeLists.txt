@@ -116,6 +116,9 @@ set(viewer_SOURCE_FILES
     bdposingmotion.cpp
     fslslpreproc.cpp
     fslslpreprocviewer.cpp
+    gltfscenemanager.cpp
+    gltf/asset.cpp
+    gltf/primitive.cpp
     groupchatlistener.cpp
     llaccountingcostmanager.cpp
     lladdgridhandler.cpp
@@ -854,6 +857,9 @@ set(viewer_HEADER_FILES
     bdposingmotion.h
     fslslpreproc.h
     fslslpreprocviewer.h
+    gltfscenemanager.h
+    gltf/asset.h
+    gltf/primitive.h
     groupchatlistener.h
     llaccountingcost.h
     llaccountingcostmanager.h
