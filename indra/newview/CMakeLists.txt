@@ -2036,7 +2036,7 @@ if (WINDOWS)
 
     if (PACKAGE)
       add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/event_host.tar.bz2
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/event_host.tar.xz
         COMMAND ${Python3_EXECUTABLE}
         ARGS
           ${CMAKE_CURRENT_SOURCE_DIR}/event_host_manifest.py
@@ -2082,7 +2082,7 @@ if (WINDOWS)
         )
         # temporarily disable packaging of event_host until hg subrepos get
         # sorted out on the parabuild cluster...
-        #${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/event_host.tar.bz2)
+        #${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/event_host.tar.xz)
 
     endif (PACKAGE)
 elseif (DARWIN)
@@ -2426,12 +2426,12 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING) AND VIE
         OUTPUT_VARIABLE PARENT_DIRECTORY_CYGWIN
         OUTPUT_STRIP_TRAILING_WHITESPACE)
       add_custom_command(OUTPUT "${VIEWER_SYMBOL_FILE}"
-        # Use of 'tar ...j' here assumes VIEWER_SYMBOL_FILE endswith .tar.bz2;
+        # Use of 'tar ...j' here assumes VIEWER_SYMBOL_FILE endswith .tar.xz;
         # testing a string suffix is painful enough in CMake language that
         # we'll continue assuming it until forced to generalize.
         COMMAND "tar"
         ARGS
-          "cjf"
+          "cJf"
           "${VIEWER_SYMBOL_FILE_CYGWIN}"
           "-C"
           "${PARENT_DIRECTORY_CYGWIN}"

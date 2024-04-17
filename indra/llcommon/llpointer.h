@@ -48,7 +48,6 @@ template <class Type> class LLPointer
 public:
 	template<typename Subclass>
 	friend class LLPointer;
-
 	LLPointer()  noexcept :
 		mPointer(nullptr)
 	{
@@ -72,7 +71,7 @@ public:
 		ptr.mPointer = nullptr;
 	}
 
-	// support conversion up the type hierarchy.  See Item 45 in Effective C++, 3rd Ed.
+	// Support conversion up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
 	template<typename Subclass>
 	LLPointer(const LLPointer<Subclass>& ptr) noexcept :
 		mPointer(ptr.get())
@@ -87,7 +86,7 @@ public:
 		ptr.mPointer = nullptr;
 	}
 
-	~LLPointer()								
+	~LLPointer()
 	{
 		unref();
 	}
@@ -112,15 +111,15 @@ public:
 	bool operator > (const LLPointer<Type>& ptr) const noexcept          { return (mPointer > ptr.mPointer); 	}
 
 	LLPointer<Type>& operator =(Type* ptr) noexcept
-	{ 
+	{
 		assign(ptr);
-		return *this; 
+		return *this;
 	}
 
 	LLPointer<Type>& operator =(const LLPointer<Type>& ptr) noexcept
-	{ 
+	{
 		assign(ptr);
-		return *this; 
+		return *this;
 	}
 
 	LLPointer<Type>& operator =(LLPointer<Type>&& ptr) noexcept
@@ -135,9 +134,9 @@ public:
 	// support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
 	template<typename Subclass>
 	LLPointer<Type>& operator =(const LLPointer<Subclass>& ptr) noexcept
-	{ 
+	{
 		assign(ptr.get());
-		return *this; 
+		return *this;
 	}
 
 	template<typename Subclass>
@@ -149,7 +148,7 @@ public:
 		}
 		return *this;
 	}
-	
+
 	inline void swap(LLPointer<Type>& ptr) noexcept
     {
 		Type* temp = mPointer;
@@ -179,16 +178,6 @@ protected:
 	void unref();
 #else
 
-	inline void assign(const LLPointer<Type>& ptr) noexcept
-	{
-		if( mPointer != ptr.mPointer )
-		{
-			unref(); 
-			mPointer = ptr.mPointer;
-			ref();
-		}
-	}
-
 	inline void ref() noexcept
 	{ 
 		if (mPointer)
@@ -211,7 +200,18 @@ protected:
 			}
 		}
 	}
-#endif
+#endif // LL_LIBRARY_INCLUDE
+
+	void assign(const LLPointer<Type>& ptr) noexcept
+	{
+		if (mPointer != ptr.mPointer)
+		{
+			unref();
+			mPointer = ptr.mPointer;
+			ref();
+		}
+	}
+
 protected:
 	Type*	mPointer;
 };
@@ -286,23 +286,23 @@ public:
 	{
 		if( mPointer != ptr )
 		{
-			unref(); 
-			mPointer = ptr; 
+			unref();
+			mPointer = ptr;
 			ref();
 		}
 
-		return *this; 
+		return *this;
 	}
 
 	LLConstPointer<Type>& operator =(const LLConstPointer<Type>& ptr) noexcept
-	{ 
+	{
 		if( mPointer != ptr.mPointer )
 		{
-			unref(); 
+			unref();
 			mPointer = ptr.mPointer;
 			ref();
 		}
-		return *this; 
+		return *this;
 	}
 
 	LLConstPointer<Type>& operator =(LLConstPointer<Type>&& ptr) noexcept
@@ -317,16 +317,16 @@ public:
 	// support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
 	template<typename Subclass>
 	LLConstPointer<Type>& operator =(const LLConstPointer<Subclass>& ptr) noexcept
-	{ 
+	{
 		if( mPointer != ptr.get() )
 		{
-			unref(); 
+			unref();
 			mPointer = ptr.get();
 			ref();
 		}
-		return *this; 
+		return *this;
 	}
-	
+
 	template<typename Subclass>
 	LLConstPointer<Type>& operator =(LLConstPointer<Subclass>&& ptr) noexcept
 	{
@@ -362,11 +362,11 @@ public:
 
 protected:
 #ifdef LL_LIBRARY_INCLUDE
-	void ref();                             
+	void ref();
 	void unref();
-#else
+#else // LL_LIBRARY_INCLUDE
 	inline void ref() noexcept
-	{ 
+	{
 		if (mPointer)
 		{
 			mPointer->ref();
@@ -377,9 +377,9 @@ protected:
 	{
 		if (mPointer)
 		{
-			const Type *tempp = mPointer;
+			const Type *temp = mPointer;
 			mPointer = nullptr;
-			tempp->unref();
+			temp->unref();
 			if (mPointer != nullptr)
 			{
 				LL_WARNS() << "Unreference did assignment to non-NULL because of destructor" << LL_ENDL;
@@ -387,7 +387,8 @@ protected:
 			}
 		}
 	}
-#endif
+#endif // LL_LIBRARY_INCLUDE
+
 protected:
 	const Type*	mPointer;
 };
@@ -397,8 +398,8 @@ class LLCopyOnWritePointer : public LLPointer<Type>
 {
 public:
 	typedef LLCopyOnWritePointer<Type> self_t;
-    typedef LLPointer<Type> pointer_t;
-    
+	typedef LLPointer<Type> pointer_t;
+
 	LLCopyOnWritePointer() noexcept
 	:	mStayUnique(false)
 	{}

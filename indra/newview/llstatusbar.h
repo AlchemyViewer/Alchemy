@@ -101,6 +101,7 @@ private:
 	
 	void onClickBuyCurrency();
 	void onVolumeChanged(const LLSD& newvalue);
+    void onVoiceChanged(const LLSD& newvalue);
 
 	void onMouseEnterPresetsCamera();
 	void onMouseEnterPresets();
@@ -108,7 +109,6 @@ private:
 	void onMouseEnterAO();
 	void onMouseEnterVolume();
 	void onMouseEnterNearbyMedia();
-	void onClickScreen(S32 x, S32 y);
 
 	static void onClickAOBtn(void* data);
 	static void onClickVolume(void* data);

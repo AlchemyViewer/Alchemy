@@ -4271,10 +4271,10 @@ BOOL LLSelectMgr::isMovableAvatarSelected()
 {
 	if (mAllowSelectAvatar && getSelection()->getObjectCount() == 1)
 	{
-		if (auto ret = getSelection()->getFirstRootObject())
-		{
-			return  (ret->isAvatar()) && getSelection()->getFirstMoveableNode(TRUE);
-		}
+        // nothing but avatar should be selected, so check that
+        // there is only one selected object and it is a root
+        LLViewerObject* obj = getSelection()->getFirstRootObject();
+		return obj && obj->isAvatar() && getSelection()->getFirstMoveableNode(TRUE);
 	}
 	return FALSE;
 }

@@ -60,12 +60,17 @@
  * to restore uniform distribution.
  */
 
+// gRandomGenerator is a stateful static object, which is therefore not
+// inherently thread-safe.
 static thread_local std::unique_ptr<std::ranlux48> __generator;
 inline std::ranlux48* _generator()
 {
 	if (!__generator.get())
 	{
 		std::random_device seeder;
+	// Per Monty, it's important to clamp using the correct fmodf() rather
+	// than expanding to F64 for fmod() and then truncating back to F32. Prior
+	// to this change, we were getting sporadic ll_frand() == 1.0 results.
 		__generator = std::make_unique<std::ranlux48>(seeder());
 	}
 	return __generator.get();
