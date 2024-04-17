@@ -203,11 +203,6 @@ protected:
     void resetDirty() override;
 
     /**
-     * Callback for "Set Location" button click
-     */
-    void onClickSetLocation();
-
-    /**
      * Callback for "Save" and "Create" button click
      */
     void onClickSave();

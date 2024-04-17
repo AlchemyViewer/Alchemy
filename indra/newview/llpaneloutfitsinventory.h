@@ -75,7 +75,6 @@ protected:
 
 private:
 	LLTabContainer*			mAppearanceTabs;
-	std::string 			mFilterSubString;
 
 	LLInventoryCategoriesObserver* mCategoriesObserver;
 	void onCOFChanged();

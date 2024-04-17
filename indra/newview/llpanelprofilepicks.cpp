@@ -757,32 +757,6 @@ BOOL LLPanelProfilePick::isDirty() const
     return FALSE;
 }
 
-void LLPanelProfilePick::onClickSetLocation()
-{
-    // Save location for later use.
-    setPosGlobal(gAgent.getPositionGlobal());
-
-    std::string parcel_name, region_name;
-
-    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
-    if (parcel)
-    {
-        mParcelId = parcel->getID();
-        parcel_name = parcel->getName();
-    }
-
-    LLViewerRegion* region = gAgent.getRegion();
-    if (region)
-    {
-        region_name = region->getName();
-    }
-
-    setPickLocation(createLocationText(getLocationNotice(), parcel_name, region_name, getPosGlobal()));
-
-    mLocationChanged = true;
-    enableSaveButton(TRUE);
-}
-
 void LLPanelProfilePick::onClickSave()
 {
     sendUpdate();

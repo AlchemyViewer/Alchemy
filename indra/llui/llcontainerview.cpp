@@ -282,7 +282,7 @@ void LLContainerView::setLabel(const std::string& label)
 	mLabel = label;
 }
 
-void LLContainerView::setDisplayChildren(const BOOL displayChildren)
+void LLContainerView::setDisplayChildren(BOOL displayChildren)
 {
 	mDisplayChildren = displayChildren;
     for (LLView* childp : *getChildList())

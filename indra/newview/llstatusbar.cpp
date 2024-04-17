@@ -203,6 +203,14 @@ BOOL LLStatusBar::postBuild()
 	mBoxBalance->setVisible(gSavedSettings.getBool("ShowStatusBarBalance"));
 
 	gSavedSettings.getControl("MuteAudio")->getSignal()->connect(boost::bind(&LLStatusBar::onVolumeChanged, this, _2));
+// [ALCHEMY]
+//    gSavedSettings.getControl("EnableVoiceChat")->getSignal()->connect(boost::bind(&LLStatusBar::onVoiceChanged, this, _2));
+//
+//    if (!gSavedSettings.getBOOL("EnableVoiceChat") && LLAppViewer::instance()->isSecondInstance())
+//    {
+//        // Indicate that second instance started without sound
+//        mBtnVolume->setImageUnselected(LLUI::getUIImage("VoiceMute_Off"));
+//    }
 	gSavedPerAccountSettings.getControl("AlchemyAOEnable")->getCommitSignal()->connect(boost::bind(&LLStatusBar::onAOStateChanged, this));
 
 	mTextFPS = getChild<LLTextBox>("FPSText");
@@ -686,6 +694,17 @@ void LLStatusBar::onVolumeChanged(const LLSD& newvalue)
 {
 	refresh();
 }
+
+// [ALCHEMY]
+//void LLStatusBar::onVoiceChanged(const LLSD& newvalue)
+//{
+//    if (newvalue.asBoolean())
+//    {
+//        // Second instance starts with "VoiceMute_Off" icon, fix it
+//        mBtnVolume->setImageUnselected(LLUI::getUIImage("Audio_Off"));
+//    }
+//    refresh();
+//}
 
 void LLStatusBar::onUpdateFilterTerm()
 {

@@ -42,8 +42,9 @@ public:
 	//
     bool init() override;			// Override to do application initialization
 
+    void forceErrorOSSpecificException() override;
+
     void setCrashUserMetadata(const LLUUID& user_id, const std::string& avatar_name) override;
-    
 protected:
     bool restoreErrorTrap() override;
     void initCrashReporting(bool reportFreeze) override;

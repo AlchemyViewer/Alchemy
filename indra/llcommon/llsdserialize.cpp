@@ -2183,7 +2183,7 @@ std::string zip_llsd(LLSD& data)
 		}
 	}
 
-	strm.avail_in = narrow(source.size());
+	strm.avail_in = narrow<size_t>(source.size());
 	strm.next_in = (U8*) source.data();
 	U8* output = NULL;
 

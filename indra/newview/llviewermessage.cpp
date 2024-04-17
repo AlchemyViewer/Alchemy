@@ -1579,8 +1579,22 @@ void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_nam
         else
         {
             // Highlight item
-            // Only show if either ShowInInventory is true OR it is an inventory
-            // offer from an agent and the asset is not previewable
+// [ALCHEMY]
+//            bool show_in_inventory = gSavedSettings.get<bool>("ShowInInventory");
+//            bool auto_open =
+//                show_in_inventory && // don't open if ShowInInventory is FALSE
+//                !from_name.empty();  // don't open if it's not from anyone
+//
+//            // SL-20419 : Don't change active tab if floater is visible
+//           LLFloater* instance = LLFloaterReg::findInstance("inventory");
+//            bool use_main_panel = instance && instance->getVisible();
+//
+//            if (auto_open)
+//            {
+//                LLFloaterReg::showInstance("inventory");
+//            }
+//
+//            LLInventoryPanel::openInventoryPanelAndSetSelection(auto_open, obj_id, use_main_panel);
             const BOOL auto_open = gSavedSettings.getBOOL("ShowInInventory") || (manual_offer && !check_asset_previewable(asset_type));
             if(auto_open)
             {
@@ -4564,7 +4578,7 @@ void process_object_animation(LLMessageSystem *mesgsys, void **user_data)
     LLObjectSignaledAnimationMap::instance().getMap()[uuid] = signaled_anims;
     
     LLViewerObject *objp = gObjectList.findObject(uuid);
-    if (!objp)
+    if (!objp || objp->isDead())
     {
 #ifdef SHOW_DEBUG
 		LL_DEBUGS("AnimatedObjectsNotify") << "Received animation state for unknown object " << uuid << LL_ENDL;
