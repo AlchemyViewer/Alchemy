@@ -1058,6 +1058,10 @@ U64 info_display_from_string(std::string info_display)
 	{
 		return LLPipeline::RENDER_DEBUG_OCTREE;
 	}
+    else if ("nodes" == info_display)
+    {
+        return LLPipeline::RENDER_DEBUG_NODES;
+    }
 	else if ("shadow frusta" == info_display)
 	{
 		return LLPipeline::RENDER_DEBUG_SHADOW_FRUSTA;
