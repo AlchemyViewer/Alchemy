@@ -111,6 +111,7 @@ void LLHeroProbeManager::update()
     llassert(mProbes[0] == mDefaultProbe);
 
     LLVector4a probe_pos;
+    probe_pos.clear();
     LLVector3 camera_pos = LLViewerCamera::instance().mOrigin;
     F32        near_clip  = 0.1f;
     if (mHeroVOList.size() > 0)
