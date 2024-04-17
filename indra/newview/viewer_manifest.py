@@ -489,14 +489,6 @@ class WindowsManifest(ViewerManifest):
             self.path("vcruntime140_1.dll")
             self.path("vcruntime140_threads.dll")
 
-            # OpenEXR
-            self.path("Iex-3_2.dll")
-            self.path("IlmThread-3_2.dll")
-            self.path("Imath-3_1.dll")
-            self.path("OpenEXR-3_2.dll")
-            self.path("OpenEXRCore-3_2.dll")
-            self.path("OpenEXRUtil-3_2.dll")
-
             with self.prefix(dst="llplugin"):
                 self.path("concrt140.dll")
                 self.path("msvcp140.dll")
