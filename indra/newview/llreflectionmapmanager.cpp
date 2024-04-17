@@ -72,9 +72,9 @@ void load_exr(const std::string& filename)
             FreeEXRErrorMessage(err); // release memory of error message.
         }
         LLNotificationsUtil::add("CannotLoad", notif_args);
-        return;
     }
-    else {
+    else 
+    {
         U32 texName = 0;
         LLImageGL::generateTextures(1, &texName);
 
@@ -85,104 +85,13 @@ void load_exr(const std::string& filename)
 
         gGL.getTexUnit(0)->bind(gEXRImage);
 
-        //std::vector<F32> data(width * height * 3);
-        //for (int i = 0; i < width * height; ++i)
-        //{
-        //    data[i * 3 + 0] = out[i * 4 + 0];
-        //    data[i * 3 + 1] = out[i * 4 + 1];
-        //    data[i * 3 + 2] = out[i * 4 + 2];
-        //}
-
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, out);
         free(out); // release memory of image data
-
 
         glGenerateMipmap(GL_TEXTURE_2D);
 
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     }
-
-    //try {
-    //    Imf::InputFile file(filename.c_str());
-    //    Imath::Box2i       dw = file.header().dataWindow();
-    //    int                width = dw.max.x - dw.min.x + 1;
-    //    int                height = dw.max.y - dw.min.y + 1;
-
-    //    Imf::Array2D<Imath::half> rPixels;
-    //    Imf::Array2D<Imath::half> gPixels;
-    //    Imf::Array2D<Imath::half> bPixels;
-
-    //    rPixels.resizeErase(height, width);
-    //    gPixels.resizeErase(height, width);
-    //    bPixels.resizeErase(height, width);
-
-    //    Imf::FrameBuffer frameBuffer;
-
-    //    frameBuffer.insert("R",                                    // name
-    //        Imf::Slice(Imf::HALF,                            // type
-    //            (char*)(&rPixels[0][0] -      // base
-    //                dw.min.x -
-    //                dw.min.y * width),
-    //            sizeof(rPixels[0][0]) * 1,     // xStride
-    //            sizeof(rPixels[0][0]) * width, // yStride
-    //            1, 1,                            // x/y sampling
-    //            0.0));                           // fillValue
-
-    //    frameBuffer.insert("G",                                    // name
-    //        Imf::Slice(Imf::HALF,                            // type
-    //            (char*)(&gPixels[0][0] -      // base
-    //                dw.min.x -
-    //                dw.min.y * width),
-    //            sizeof(gPixels[0][0]) * 1,     // xStride
-    //            sizeof(gPixels[0][0]) * width, // yStride
-    //            1, 1,                            // x/y sampling
-    //            0.0));                           // fillValue
-
-    //    frameBuffer.insert("B",                                    // name
-    //        Imf::Slice(Imf::HALF,                           // type
-    //            (char*)(&bPixels[0][0] -      // base
-    //                dw.min.x -
-    //                dw.min.y * width),
-    //            sizeof(bPixels[0][0]) * 1,     // xStride
-    //            sizeof(bPixels[0][0]) * width, // yStride
-    //            1, 1,                            // x/y sampling
-    //            FLT_MAX));                       // fillValue
-
-    //    file.setFrameBuffer(frameBuffer);
-    //    file.readPixels(dw.min.y, dw.max.y);
-
-    //    U32 texName = 0;
-    //    LLImageGL::generateTextures(1, &texName);
-
-    //    gEXRImage = new LLImageGL(texName, 4, GL_TEXTURE_2D, GL_RGB16F, GL_RGB16F, GL_FLOAT, LLTexUnit::TAM_CLAMP);
-    //    gEXRImage->setHasMipMaps(TRUE);
-    //    gEXRImage->setUseMipMaps(TRUE);
-    //    gEXRImage->setFilteringOption(LLTexUnit::TFO_TRILINEAR);
-
-    //    gGL.getTexUnit(0)->bind(gEXRImage);
-
-    //    std::vector<F32> data(width * height * 3);
-    //    for (int i = 0; i < width * height; ++i)
-    //    {
-    //        data[i * 3 + 0] = rPixels[i / width][i % width];
-    //        data[i * 3 + 1] = gPixels[i / width][i % width];
-    //        data[i * 3 + 2] = bPixels[i / width][i % width];
-    //    }
-
-    //    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data.data());
-    //    
-    //    glGenerateMipmap(GL_TEXTURE_2D);
-
-    //    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-
-    //}
-    //catch (const std::exception& e) {
-    //    LLSD notif_args;
-    //    notif_args["WHAT"] = filename;
-    //    notif_args["REASON"] = e.what();
-    //    LLNotificationsUtil::add("CannotLoad", notif_args);
-    //    return;
-    //}
 }
 
 void hdri_preview()
