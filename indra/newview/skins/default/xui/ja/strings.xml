@@ -6982,6 +6982,12 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="texture_load_dimensions_error">
 		[WIDTH]×[HEIGHT]以上の画像は読み込めません。
 	</string>
+	<string name="texture_load_format_error">
+		無効な画像ファイル形式です。
+	</string>
+	<string name="texture_load_empty_file">
+		ファイルが空です。
+	</string>
 	<string name="outfit_photo_load_dimensions_error">
 		アウトフィット画像の最大サイズは、[WIDTH]×[HEIGHT]です。画像のサイズを調整するか、別の画像を使用してください。
 	</string>
@@ -7576,6 +7582,9 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Command_Places_Label">
 		場所
 	</string>
+	<string name="Command_Poser_Label">
+		ポーザー
+	</string>
 	<string name="Command_Preferences_Label">
 		初期設定
 	</string>
@@ -7702,6 +7711,9 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	</string>
 	<string name="Command_Places_Tooltip">
 		保存済みの場所を表示します。
+	</string>
+	<string name="Command_Poser_Tooltip">
+		あなたのアバターとアニメーションするオブジェクトのポーズを取ることができます。
 	</string>
 	<string name="Command_Preferences_Tooltip">
 		初期設定を表示します。

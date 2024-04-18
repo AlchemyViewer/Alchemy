@@ -451,6 +451,7 @@
 		<menu label="エラー実行" name="Force Errors">
 			<menu_item_call label="ブレークポイント" name="Force Breakpoint"/>
 			<menu_item_call label="LLErrorとクラッシュを実行する" name="Force LLError And Crash"/>
+			<menu_item_call label="LLErrorとメッセージとクラッシュを実行する" name="Force LLError And Crash"/>
 			<menu_item_call label="不正なメモリアクセスを実行する" name="Force Bad Memory Access"/>
 			<menu_item_call label="コルーチン内で不正なメモリアクセスを発生させる" name="Force Bad Memory Access in Coroutine"/>
 			<menu_item_call label="無限ループを発生させる" name="Force Infinite Loop"/>

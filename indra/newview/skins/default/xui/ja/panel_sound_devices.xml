@@ -22,4 +22,8 @@
 	<text name="wait_text" width="140">
 		しばらくお待ちください。
 	</text>
+	<text name="disabled_text">
+		無効
+	</text>
+	<button name="unmute_btn" label="ミュート解除"/>
 </panel>
