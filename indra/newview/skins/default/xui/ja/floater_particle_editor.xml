@@ -34,11 +34,15 @@
 				</accordion_tab>
 				<accordion_tab name="omega_tab" title="加速度／オメガ">
 					<panel name="omega_panel">
-						<text name="Acceleration_Label">加速度：</text>
+						<text name="Acceleration_Label">
+							加速度：
+						</text>
 						<slider name="acceleration_x" label="Ｘ："/>
 						<slider name="acceleration_y" label="Ｙ："/>
 						<slider name="acceleration_z" label="Ｚ："/>
-						<text name="Omega_Label">オメガ：</text>
+						<text name="Omega_Label">
+							オメガ：
+						</text>
 						<slider name="omega_x" label="Ｘ："/>
 						<slider name="omega_y" label="Ｙ："/>
 						<slider name="omega_z" label="Ｚ："/>
@@ -76,7 +80,9 @@
 			</accordion>
 		</layout_panel>
 		<layout_panel name="checkbox_panel">
-			<text name="Pattern_Label">パターン：</text>
+			<text name="Pattern_Label">
+				パターン：
+			</text>
 			<combo_box name="pattern_type_combo">
 				<combo_box.commit_callback function="Particle.Edit"/>
 				<combo_box.item label="爆散" name="explode" value="explode"/>

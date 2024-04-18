@@ -58,7 +58,7 @@
 	<text name="RenderShadowDetailText">
 		影の詳細：
 	</text>
-	<combo_box name="ShadowDetail"  width="170">
+	<combo_box name="ShadowDetail" width="170">
 		<combo_box.item label="なし" name="0" value="0"/>
 		<combo_box.item label="太陽／月" name="1" value="1"/>
 		<combo_box.item label="太陽／月＋プロジェクター" name="2" value="2"/>
@@ -71,6 +71,18 @@
 		水面の透明効果を減らしたり切ると、フレームレートが向上するかもしれません。
 	</text>
 	<check_box label="透明な水" name="TransparentWater"/>
+	<text name="ReflectionsText">
+    水面の反射：
+	</text>
+	<combo_box name="反射">
+		<combo_box.item label="なし；不透明" name="0" value="-2"/>
+		<combo_box.item label="なし；透明" name="02"/>
+		<combo_box.item label="最小限" name="03"/>
+		<combo_box.item label="地形と樹木" name="1"/>
+		<combo_box.item label="全ての静的なオブジェクト" name="2"/>
+		<combo_box.item label="全てのアバターとオブジェクト" name="3"/>
+		<combo_box.item label="全て" name="4"/>
+	</combo_box>
 	<view_border name="border4"/>
 	<text name="photo_lbl">
 		写真
