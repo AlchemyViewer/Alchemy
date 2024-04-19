@@ -61,19 +61,7 @@ void load_exr(const std::string& filename)
 
     int ret = LoadEXR(&out, &width, &height, filename.c_str(), &err);
 
-    if (ret != TINYEXR_SUCCESS) 
-    {
-        LLSD notif_args;
-        notif_args["WHAT"] = filename;
-        notif_args["REASON"] = "Unknown";
-        if (err) 
-        {
-			notif_args["REASON"] = std::string(err);
-            FreeEXRErrorMessage(err); // release memory of error message.
-        }
-        LLNotificationsUtil::add("CannotLoad", notif_args);
-    }
-    else 
+    if (ret == TINYEXR_SUCCESS) 
     {
         U32 texName = 0;
         LLImageGL::generateTextures(1, &texName);
@@ -85,12 +73,25 @@ void load_exr(const std::string& filename)
 
         gGL.getTexUnit(0)->bind(gEXRImage);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, out);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_FLOAT, out);
         free(out); // release memory of image data
 
         glGenerateMipmap(GL_TEXTURE_2D);
 
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+
+    }
+    else 
+    {
+        LLSD notif_args;
+        notif_args["WHAT"] = filename;
+        notif_args["REASON"] = "Unknown";
+        if (err) 
+        {
+			notif_args["REASON"] = std::string(err);
+            FreeEXRErrorMessage(err); // release memory of error message.
+        }
+        LLNotificationsUtil::add("CannotLoad", notif_args);
     }
 }
 
