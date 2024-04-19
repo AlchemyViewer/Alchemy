@@ -5457,25 +5457,25 @@ public:
 struct MikktData
 {
     LLVolumeFace* face;
-    std::vector<LLVector3> p_data;
-    std::vector<LLVector3> n_data;
-    std::vector<LLVector2> tc_data;
-    std::vector<LLVector4> w_data;
-    std::vector<LLVector4> t_data;
+    std::vector<LLVector3> p;
+    std::vector<LLVector3> n;
+    std::vector<LLVector2> tc;
+    std::vector<LLVector4> w;
+    std::vector<LLVector4> t;
 
     MikktData(LLVolumeFace* f)
         : face(f)
     {
         U32 count = face->mNumIndices;
 
-        p_data.resize(count);
-        n_data.resize(count);
-        tc_data.resize(count);
-        t_data.resize(count);
+        p.resize(count);
+        n.resize(count);
+        tc.resize(count);
+        t.resize(count);
 
         if (face->mWeights)
         {
-            w_data.resize(count);
+            w.resize(count);
         }
 
 
@@ -5486,12 +5486,12 @@ struct MikktData
         {
             U32 idx = face->mIndices[i];
 
-            p_data[i].set(face->mPositions[idx].getF32ptr());
-            p_data[i].scaleVec(face->mNormalizedScale); //put mesh in original coordinate frame when reconstructing tangents
-            n_data[i].set(face->mNormals[idx].getF32ptr());
-            n_data[i].scaleVec(inv_scale);
-            n_data[i].normalize();
-            tc_data[i].set(face->mTexCoords[idx]);
+            p[i].set(face->mPositions[idx].getF32ptr());
+            p[i].scaleVec(face->mNormalizedScale); //put mesh in original coordinate frame when reconstructing tangents
+            n[i].set(face->mNormals[idx].getF32ptr());
+            n[i].scaleVec(inv_scale);
+            n[i].normalize();
+            tc[i].set(face->mTexCoords[idx]);
 
             if (idx >= face->mNumVertices)
             {
@@ -5506,7 +5506,7 @@ struct MikktData
 
             if (face->mWeights)
             {
-                w_data[i].set(face->mWeights[idx].getF32ptr());
+                w[i].set(face->mWeights[idx].getF32ptr());
             }
         }
     }
@@ -5523,19 +5523,19 @@ struct MikktData
 
 	mikk::float3 GetPosition(const uint32_t face_num, const uint32_t vert_num)
 	{
-		F32* v = p_data[face_num * 3 + vert_num].mV;
+		F32* v = p[face_num * 3 + vert_num].mV;
 		return mikk::float3(v);
 	}
 
 	mikk::float3 GetTexCoord(const uint32_t face_num, const uint32_t vert_num)
 	{
-		F32* uv = tc_data[face_num * 3 + vert_num].mV;
+		F32* uv = tc[face_num * 3 + vert_num].mV;
 		return mikk::float3(uv[0], uv[1], 1.0f);
 	}
 
 	mikk::float3 GetNormal(const uint32_t face_num, const uint32_t vert_num)
 	{
-		F32* normal = n_data[face_num * 3 + vert_num].mV;
+		F32* normal = n[face_num * 3 + vert_num].mV;
 		return mikk::float3(normal);
 	}
 
@@ -5563,26 +5563,26 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         //re-weld
         meshopt_Stream mos[] =
         {
-            { &data.p_data[0], sizeof(LLVector3), sizeof(LLVector3) },
-            { &data.n_data[0], sizeof(LLVector3), sizeof(LLVector3) },
-            { &data.t_data[0], sizeof(LLVector4), sizeof(LLVector4) },
-            { &data.tc_data[0], sizeof(LLVector2), sizeof(LLVector2) },
-            { data.w_data.empty() ? nullptr : &data.w_data[0], sizeof(LLVector4), sizeof(LLVector4) }
+            { &data.p[0], sizeof(LLVector3), sizeof(LLVector3) },
+            { &data.n[0], sizeof(LLVector3), sizeof(LLVector3) },
+            { &data.t[0], sizeof(LLVector4), sizeof(LLVector4) },
+            { &data.tc[0], sizeof(LLVector2), sizeof(LLVector2) },
+            { data.w.empty() ? nullptr : &data.w[0], sizeof(LLVector4), sizeof(LLVector4) }
         };
 
         std::vector<U32> remap;
-        remap.resize(data.p_data.size());
+        remap.resize(data.p.size());
 
-        U32 stream_count = data.w_data.empty() ? 4 : 5;
+        U32 stream_count = data.w.empty() ? 4 : 5;
 
-        size_t vert_count = meshopt_generateVertexRemapMulti(&remap[0], nullptr, data.p_data.size(), data.p_data.size(), mos, stream_count);
+        size_t vert_count = meshopt_generateVertexRemapMulti(&remap[0], nullptr, data.p.size(), data.p.size(), mos, stream_count);
 
         if (vert_count < 65535 && vert_count != 0)
         {
             //copy results back into volume
             resizeVertices(vert_count);
 
-            if (!data.w_data.empty())
+            if (!data.w.empty())
             {
                 allocateWeights(vert_count);
             }
@@ -5602,15 +5602,15 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
                 }
                 mIndices[i] = dst_idx;
 
-                mPositions[dst_idx].load3(data.p_data[src_idx].mV);
-                mNormals[dst_idx].load3(data.n_data[src_idx].mV);
-                mTexCoords[dst_idx] = data.tc_data[src_idx];
+                mPositions[dst_idx].load3(data.p[src_idx].mV);
+                mNormals[dst_idx].load3(data.n[src_idx].mV);
+                mTexCoords[dst_idx] = data.tc[src_idx];
 
-                mTangents[dst_idx].loadua(data.t_data[src_idx].mV);
+                mTangents[dst_idx].loadua(data.t[src_idx].mV);
 
                 if (mWeights)
                 {
-                    mWeights[dst_idx].loadua(data.w_data[src_idx].mV);
+                    mWeights[dst_idx].loadua(data.w[src_idx].mV);
                 }
             }
 
