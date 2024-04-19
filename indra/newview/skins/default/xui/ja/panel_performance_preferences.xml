@@ -25,7 +25,7 @@
 		<radio_item name="5"/>
 		<radio_item name="6"/>
 	</radio_group>
-	<text name="quality_lbl">
+	<text name="best_quality_lbl">
 		最高品位
 	</text>
 	<text name="quality_desc" width="420">
@@ -58,7 +58,7 @@
 	<text name="RenderShadowDetailText">
 		影の詳細：
 	</text>
-	<combo_box name="ShadowDetail"  width="170">
+	<combo_box name="ShadowDetail" width="170">
 		<combo_box.item label="なし" name="0" value="0"/>
 		<combo_box.item label="太陽／月" name="1" value="1"/>
 		<combo_box.item label="太陽／月＋プロジェクター" name="2" value="2"/>
@@ -79,7 +79,7 @@
 		詳細度を最大にすると撮影に適した画像になりますが、フレームレートが下がります。
 	</text>
 	<spinner label="距離の詳細：" name="render_volume_lod"/>
-	<text name="photo_desc">
+	<text name="photo_dist_det_desc">
 		（0.0～4.0の値を入れてください）
 	</text>
 	<text name="1_lbl">

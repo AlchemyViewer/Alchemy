@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Joystick" title="ジョイスティックの設定">
-	<floater.string name="JoystickDisabled">なし</floater.string>
-	<text name="joystick_lbl" width="112">ジョイスティック：</text>
+	<floater.string name="JoystickDisabled">
+		なし
+	</floater.string>
+	<text name="joystick_lbl" width="112">
+		ジョイスティック：
+	</text>
 	<spinner label="Ｘ軸マッピング" name="JoystickAxis1"/>
 	<spinner label="Ｙ軸マッピング" name="JoystickAxis2"/>
 	<spinner label="Ｚ軸マッピング" name="JoystickAxis0"/>
