@@ -412,9 +412,9 @@
 		<menu_item_separator/>
 		<menu_item_check label="RestrainedLove API（ＲＬＶａ）を有効化" name="RLV API"/>
 		<menu_item_call label="デバッグ設定を表示" name="Debug Settings"/>
-		<menu_item_check label="開発者メニューを表示" name="Debug Mode"/>
+		<menu_item_check label="開発メニューを表示" name="Debug Mode"/>
 	</menu>
-	<menu label="開発者" name="Develop">
+	<menu label="開発" name="Develop">
 		<menu label="コンソール" name="Consoles">
 			<menu_item_check label="テクスチャのコンソール" name="Texture Console"/>
 			<menu_item_check label="デバッグコンソール" name="Debug Console"/>
