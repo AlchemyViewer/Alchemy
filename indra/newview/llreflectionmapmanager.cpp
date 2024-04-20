@@ -66,8 +66,7 @@ void load_exr(const std::string& filename)
     int height;
     const char* err = NULL; // or nullptr in C++11
 
-    int ret = LoadEXR(&out, &width, &height, filename.c_str(), &err);
-
+    int ret =  LoadEXRWithLayer(&out, &width, &height, filename.c_str(), /* layername */ nullptr, &err);
     if (ret == TINYEXR_SUCCESS) 
     {
         U32 texName = 0;
@@ -95,7 +94,7 @@ void load_exr(const std::string& filename)
         notif_args["REASON"] = "Unknown";
         if (err) 
         {
-			notif_args["REASON"] = std::string(err);
+            notif_args["REASON"] = std::string(err);
             FreeEXRErrorMessage(err); // release memory of error message.
         }
         LLNotificationsUtil::add("CannotLoad", notif_args);

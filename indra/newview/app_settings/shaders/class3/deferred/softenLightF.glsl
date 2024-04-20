@@ -61,7 +61,7 @@ in vec2 vary_fragcoord;
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
 
-vec3 getNormalFromPacked(vec4 packedNormalEnvIntensityFlags);
+vec3 getNorm(vec2 pos_screen);
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
@@ -129,8 +129,9 @@ void main()
     float depth        = getDepth(tc.xy);
     vec4  pos          = getPositionWithDepth(tc, depth);
     vec4  norm         = texture(normalMap, tc);
-    float envIntensity = norm.z;
-    norm.xyz           = getNormalFromPacked(norm);
+    vec3 colorEmissive = texture(emissiveRect, tc).rgb;
+    float envIntensity = colorEmissive.r;
+    norm.xyz           = getNorm(tc);
     vec3  light_dir   = (sun_up_factor == 1) ? sun_dir : moon_dir;
 
     vec4 baseColor     = texture(diffuseRect, tc);
@@ -174,7 +175,7 @@ void main()
         float metallic = orm.b;
         float ao = orm.r;
 
-        vec3 colorEmissive = texture(emissiveRect, tc).rgb;
+        
         // PBR IBL
         float gloss      = 1.0 - perceptualRoughness;
         
