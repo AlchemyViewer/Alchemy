@@ -51,7 +51,6 @@ void main()
     
     vec4  norm         = texture(normalMap, tc);
 
-
     if (!GET_GBUFFER_FLAG(GBUFFER_FLAG_HAS_HDRI) &&
         !GET_GBUFFER_FLAG(GBUFFER_FLAG_SKIP_ATMOS))
     {
