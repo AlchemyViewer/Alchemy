@@ -5542,7 +5542,7 @@ struct MikktData
 	void SetTangentSpace(const uint32_t face_num, const uint32_t vert_num, mikk::float3 T, bool orientation)
 	{
 		S32 i = face_num * 3 + vert_num;
-		t_data[i].set(T.x, T.y, T.z, orientation ? 1.0f : -1.0f);
+		t[i].set(T.x, T.y, T.z, orientation ? 1.0f : -1.0f);
 	}
 };
 
