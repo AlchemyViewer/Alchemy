@@ -271,8 +271,19 @@
     top_pad="5"
     width="300"
     font="SansSerifSmall">
-    World Effects:
+    World:
  </text>
+    <check_box
+      top_pad="4"
+      control_name="EnvironmentPersistAcrossLogin"
+      follows="left|top"
+      height="16"
+      initial_value="true"
+      name="EnvironmentPersistAcrossLogin"
+      label="Persist Environment settings throughout sessions"
+      left="45"
+      width="500"
+      tool_tip="Restores the current environment settings after next login."/>
      <check_box
       follows="left|top"
       height="16"
