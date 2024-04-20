@@ -31,11 +31,11 @@
 				<text name="land_sale_label">
 					販売中
 				</text>
-				<icon name="square2"/>
+				<icon name="square2_auction"/>
 				<text name="auction_label">
 					オークション中
 				</text>
-				<icon name="square2"/>
+				<icon name="square2_owner"/>
 				<text name="by_owner_label">
 					所有者で
 				</text>

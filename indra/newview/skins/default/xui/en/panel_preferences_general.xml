@@ -274,6 +274,14 @@
      name="show_all_title_checkbox1"
 	 tool_tip="Show group titles, like Officer or Member"
      top_pad="3" />
+     <check_box
+     control_name="RenderHideGroupTitle"
+     height="16"
+     label="Hide own group title"
+     layout="topleft"
+     left_pad="50"
+     name="RenderHideGroupTitle"
+     tool_tip="Shows or hides your own group title for yourself and everyone else."/>
     <check_box
      control_name="NameTagShowFriends"
 	 enabled_control="AvatarNameTagMode"

@@ -271,7 +271,7 @@
 					-->
 				</panel>
 				<!-- ==== STEP 2: Analyze ==== -->
-				<view_border name="physics_tab_border"/>
+				<view_border name="physics_tab_border1"/>
 				<panel name="physics analysis">
 					<text name="method_label">
 						ステップ２：分析
@@ -290,7 +290,7 @@
 					<button label="キャンセル" name="decompose_cancel"/>
 				</panel>
 				<!-- ==== STEP 3: Simplify ==== -->
-				<view_border name="physics_tab_border"/>
+				<view_border name="physics_tab_border2"/>
 				<panel name="physics simplification">
 					<text name="second_step_label">
 						手順３：簡素化
@@ -312,7 +312,7 @@
 					<button label="キャンセル" name="simplify_cancel"/>
 				</panel>
 				<!-- ==== Results ==== -->
-				<view_border name="physics_tab_border"/>
+				<view_border name="physics_tab_border3"/>
 				<panel name="physics info">
 					<text name="results_text">
 						結果：
@@ -496,7 +496,7 @@
 		<check_box label="ジョイント位置のオーバーライド" name="show_joint_overrides"/>
 		<check_box label="ジョイント数" name="show_joint_positions"/>
 		<text name="physics_explode_label">
-			スプレッドのプレビュー：
+			展開プレビュー：
 		</text>
 		<slider name="physics_explode"/>
 	</panel>
