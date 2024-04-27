@@ -118,7 +118,9 @@ set(viewer_SOURCE_FILES
     fslslpreprocviewer.cpp
     gltfscenemanager.cpp
     gltf/asset.cpp
+    gltf/accessor.cpp
     gltf/primitive.cpp
+    gltf/animation.cpp
     groupchatlistener.cpp
     llaccountingcostmanager.cpp
     lladdgridhandler.cpp
@@ -860,7 +862,10 @@ set(viewer_HEADER_FILES
     fslslpreprocviewer.h
     gltfscenemanager.h
     gltf/asset.h
+    gltf/accessor.h
+    gltf/buffer_util.h
     gltf/primitive.h
+    gltf/animation.h
     groupchatlistener.h
     llaccountingcost.h
     llaccountingcostmanager.h

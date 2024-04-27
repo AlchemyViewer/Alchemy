@@ -278,6 +278,12 @@ public:
 	std::string getComment() const { return mComment; }
 	std::string mComment;
 
+    // Emissive operations used by minimap
+    // Roughly emulates GLTF emissive texture, but is not GLTF-compliant
+    // *TODO: Remove in favor of shader
+    void addEmissive(LLImageRaw* src);
+    void addEmissiveScaled(LLImageRaw* src);
+    void addEmissiveUnscaled(LLImageRaw* src);
 protected:
 	// Create an image from a local file (generally used in tools)
 	//bool createFromFile(const std::string& filename, bool j2c_lowest_mip_only = false);

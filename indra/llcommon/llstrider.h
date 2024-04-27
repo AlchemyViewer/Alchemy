@@ -49,8 +49,8 @@ template <class Object> class LLStrider
 	};
 	U32     mSkip;
 public:
-
 	LLStrider()  { mObjectp = NULL; mSkip = sizeof(Object); } 
+    LLStrider(Object* first) { mObjectp = first; mSkip = sizeof(Object); }
 	~LLStrider() = default;
 
 	const LLStrider<Object>& operator =  (Object *first)    { mObjectp = first; return *this;}
