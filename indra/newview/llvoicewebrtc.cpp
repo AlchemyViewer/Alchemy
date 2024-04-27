@@ -1267,6 +1267,35 @@ BOOL LLWebRTCVoiceClient::isSessionCallBackPossible(const LLUUID &session_id)
 }
 
 // Channel Management
+
+bool LLWebRTCVoiceClient::setSpatialChannel(const LLSD &channelInfo)
+{
+    LL_INFOS("Voice") << "SetSpatialChannel " << channelInfo << LL_ENDL;
+    LLViewerRegion *regionp = gAgent.getRegion();
+    if (!regionp)
+    {
+        return false;
+    }
+    LLParcel *parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+
+    // we don't really have credentials for a spatial channel in webrtc,
+    // it's all handled by the sim.
+    if (channelInfo.isMap() && channelInfo.has("channel_uri"))
+    {
+        bool allow_voice = !channelInfo["channel_uri"].asString().empty();
+        if (parcel)
+        {
+            parcel->setParcelFlag(PF_ALLOW_VOICE_CHAT, allow_voice);
+            parcel->setParcelFlag(PF_USE_ESTATE_VOICE_CHAN, channelInfo["channel_uri"].asUUID() == regionp->getRegionID());
+        }
+        else
+        {
+            regionp->setRegionFlag(REGION_FLAGS_ALLOW_VOICE, allow_voice);
+        }
+    }
+    return true;
+}
+
 void LLWebRTCVoiceClient::leaveNonSpatialChannel()
 {
     LL_DEBUGS("Voice") << "Request to leave non-spatial channel." << LL_ENDL;
@@ -2114,7 +2143,7 @@ void LLVoiceWebRTCConnection::OnIceCandidate(const llwebrtc::LLWebRTCIceCandidat
 void LLVoiceWebRTCConnection::processIceUpdates()
 {
     mOutstandingRequests++;
-    LLCoros::getInstance()->launch("LLVoiceWebRTCConnection::requestVoiceConnectionCoro",
+    LLCoros::getInstance()->launch("LLVoiceWebRTCConnection::processIceUpdatesCoro",
                                    boost::bind(&LLVoiceWebRTCConnection::processIceUpdatesCoro, this));
 }
 
@@ -2190,6 +2219,7 @@ void LLVoiceWebRTCConnection::processIceUpdatesCoro()
 
         if (LLWebRTCVoiceClient::isShuttingDown())
         {
+            mOutstandingRequests--;
             return;
         }
 
@@ -2279,6 +2309,7 @@ void LLVoiceWebRTCConnection::OnRenegotiationNeeded()
             {
                 setVoiceConnectionState(VOICE_STATE_SESSION_RETRY);
             }
+            mCurrentStatus = LLVoiceClientStatusObserver::ERROR_UNKNOWN;
         });
 }
 
@@ -2365,6 +2396,7 @@ void LLVoiceWebRTCConnection::breakVoiceConnectionCoro()
     {
         LL_DEBUGS("Voice") << "no capabilities for voice provisioning; waiting " << LL_ENDL;
         setVoiceConnectionState(VOICE_STATE_SESSION_RETRY);
+        mOutstandingRequests--;
         return;
     }
 
@@ -2372,6 +2404,7 @@ void LLVoiceWebRTCConnection::breakVoiceConnectionCoro()
     if (url.empty())
     {
         setVoiceConnectionState(VOICE_STATE_SESSION_RETRY);
+        mOutstandingRequests--;
         return;
     }
 
@@ -2401,6 +2434,7 @@ void LLVoiceWebRTCConnection::breakVoiceConnectionCoro()
 
     if (LLWebRTCVoiceClient::isShuttingDown())
     {
+        mOutstandingRequests--;
         return;
     }
 
@@ -2427,7 +2461,9 @@ void LLVoiceWebRTCSpatialConnection::requestVoiceConnection()
     if (!regionp || !regionp->capabilitiesReceived())
     {
         LL_DEBUGS("Voice") << "no capabilities for voice provisioning; waiting " << LL_ENDL;
-        setVoiceConnectionState(VOICE_STATE_SESSION_RETRY);
+
+        // try again.
+        setVoiceConnectionState(VOICE_STATE_REQUEST_CONNECTION);
         return;
     }
 
@@ -2987,8 +3023,9 @@ void LLVoiceWebRTCAdHocConnection::requestVoiceConnection()
     LL_DEBUGS("Voice") << "Requesting voice connection." << LL_ENDL;
     if (!regionp || !regionp->capabilitiesReceived())
     {
-        LL_DEBUGS("Voice") << "no capabilities for voice provisioning; waiting " << LL_ENDL;
-        setVoiceConnectionState(VOICE_STATE_SESSION_RETRY);
+        LL_DEBUGS("Voice") << "no capabilities for voice provisioning; retrying " << LL_ENDL;
+        // try again.
+        setVoiceConnectionState(VOICE_STATE_REQUEST_CONNECTION);
         return;
     }
 
