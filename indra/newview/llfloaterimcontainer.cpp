@@ -810,12 +810,11 @@ void LLFloaterIMContainer::setVisible(BOOL visible)
 
 void LLFloaterIMContainer::getDetachedConversationFloaters(floater_list_t& floaters)
 {
-	typedef conversations_widgets_map::value_type conv_pair;
 	LLFloaterIMNearbyChat *nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
 
-	for(const conv_pair& item : mConversationsWidgets)
+	for (const auto& [key, fvi] : mConversationsWidgets)
 	{
-		LLConversationViewSession* widget = dynamic_cast<LLConversationViewSession*>(item.second);
+		LLConversationViewSession* widget = dynamic_cast<LLConversationViewSession*>(fvi);
 		if (widget)
 		{
 			LLFloater* session_floater = widget->getSessionFloater();

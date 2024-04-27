@@ -6056,7 +6056,7 @@ void LLVivoxVoiceClient::filePlaybackSetMode(bool vox, float speed)
 }
 
 //------------------------------------------------------------------------
-LLVivoxVoiceClient::sessionState::session_wptr_set LLVivoxVoiceClient::sessionState::mSession;
+std::set<LLVivoxVoiceClient::sessionState::wptr_t, std::owner_less<LLVivoxVoiceClient::sessionState::wptr_t>> LLVivoxVoiceClient::sessionState::mSession;
 
 
 LLVivoxVoiceClient::sessionState::sessionState() :

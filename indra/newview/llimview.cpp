@@ -3205,8 +3205,10 @@ void LLIMMgr::addMessage(
             if (gSavedPerAccountSettings.getBOOL("FetchGroupChatHistory"))
             {
                 std::string chat_url = gAgent.getRegionCapability("ChatSessionRequest");
-                LLCoros::instance().launch("chatterBoxHistoryCoro",
-                    boost::bind(&chatterBoxHistoryCoro, chat_url, session_id, from, msg, timestamp));
+                if (!chat_url.empty())
+                {
+                    LLCoros::instance().launch("chatterBoxHistoryCoro", boost::bind(&chatterBoxHistoryCoro, chat_url, session_id, from, msg, timestamp));
+                }
             }
 
 			//Play sound for new conversations

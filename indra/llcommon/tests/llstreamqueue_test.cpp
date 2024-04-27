@@ -15,8 +15,6 @@
 #include "llstreamqueue.h"
 // STL headers
 #include <vector>
-// std headers
-// external library headers
 // other Linden headers
 #include "../test/lltut.h"
 #include "stringize.h"
