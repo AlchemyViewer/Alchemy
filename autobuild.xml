@@ -1902,11 +1902,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4261f3c8510252c4767c422f309d6f5c462f3069dbe5d943bc72444d6ba56b796ed1c4e3b65c2c6ff12e37379445a6b172226bc56e3557e2bd698bf8d86ec322</string>
+              <string>666ad5a7dd4bede7745cbe2846e2516b47510720824c57fa976bf8424b4f7745b8adbc209e65410ad0e03d3f78f8146d841fb81bbf23fc05358be11ffef60900</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg/1.5.1.2451/openjpeg-1.5.1-darwin64-2451.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.2371/openjpeg-2.4.0-darwin64-2371.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1916,11 +1916,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bfadf99f079161d6f2cef1ce1c4d2623a1aa8f02ba87ff71697af048261d4ea3ca2cbe3e95d627abe985c10bd80edd16b18ef124c7af57246a4ad7887de985d9</string>
+              <string>331d224c638d9ee50c519d8714ad48b8e1c7802ee18ff7b64c77c1905d48cee1a4f0d0c1f23c546dc298464817e4fd39a61b066537ea0a1cbcc90f059ae1747f</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg/1.5.1.2451/openjpeg-1.5.1-linux64-2451.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.2371/openjpeg-2.4.0-linux64-2371.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1930,11 +1930,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d10bc74430b0ee657cb9c6bafec81860974547c1890c038e4223b6e50665cf352a0b8c7dd2db81b21c086a15c6a55ba545d087f88dedddf599fd743e515564c9</string>
+              <string>4bc3980bf4bf9b5d933fcca1949bd2890a5fb2e3a22675e524ea6989150a77211e30f3bc81999272f23387f3aefcd2d894dca7f5bea6f79fcb6b8aea6a02ebcb</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/105/packages/generic/openjpeg/1.5.1.2451/openjpeg-1.5.1-windows64-2451.tar.zst</string>
+              <string>https://git.alchemyviewer.org/api/v4/projects/147/packages/generic/openjpeg/2.4.0.2371/openjpeg-2.4.0-windows64-2371.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1945,9 +1945,9 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>license_file</key>
         <string>LICENSES/openjpeg.txt</string>
         <key>copyright</key>
-        <string>Copyright (c) 2002-2012, Communications and Remote Sensing Laboratory, Universite catholique de Louvain (UCL), Belgium, Copyright (c) 2002-2012, Professor Benoit Macq, Copyright (c) 2003-2012, Antonin Descampe, Copyright (c) 2003-2009, Francois-Olivier Devaux, Copyright (c) 2005, Herve Drolon, FreeImage Team, Copyright (c) 2002-2003, Yannick Verschueren, Copyright (c) 2001-2003, David Janssens</string>
+        <string>Copyright (c) 2002-2014, Universite catholique de Louvain, Belgium, Copyright (c) 2002-2012, Professor Benoit Macq, Copyright (c) 2003-2012, Antonin Descampe, Copyright (c) 2003-2009, Francois-Olivier Devaux, Copyright (c) 2005, Herve Drolon, FreeImage Team, Copyright (c) 2002-2003, Yannick Verschueren, Copyright (c) 2001-2003, David Janssens</string>
         <key>version</key>
-        <string>1.5.1</string>
+        <string>2.4.0</string>
         <key>name</key>
         <string>openjpeg</string>
         <key>description</key>
