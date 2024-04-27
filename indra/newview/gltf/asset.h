@@ -33,6 +33,8 @@
 #include "primitive.h"
 #include "animation.h"
 
+#include "glh/glh_linear.h"
+
 extern F32SecondsImplicit		gFrameTimeSeconds;
 
 // LL GLTF Implementation

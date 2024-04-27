@@ -28,6 +28,8 @@
 
 #include "accessor.h"
 
+#include "glh/glh_linear.h"
+
 // LL GLTF Implementation
 namespace LL
 {
