@@ -361,7 +361,7 @@ LLVector3 LLManip::getSavedPivotPoint() const
 LLVector3 LLManip::getPivotPoint()
 {
 	static LLCachedControl<bool> editRootAxis(gSavedSettings, "AlchemyEditRootAxis", false);
-    LLViewerObject* object = mObjectSelection->getFirstObject();
+    LLViewerObject* object = mObjectSelection->getFirstRootObject(TRUE);
 	if (object && (mObjectSelection->getObjectCount() == 1 || editRootAxis) && mObjectSelection->getSelectType() != SELECT_TYPE_HUD)
 	{
         LLSelectNode* select_node = mObjectSelection->getFirstNode();
