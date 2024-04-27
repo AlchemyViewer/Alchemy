@@ -472,8 +472,8 @@ class WindowsManifest(ViewerManifest):
                 self.path("alut.dll")
 
             # For ICU4C
-            self.path("icudt74.dll")
-            self.path("icuuc74.dll")
+            self.path("icudt75.dll")
+            self.path("icuuc75.dll")
 
             # Get fmodstudio dll for audio engine, continue if missing
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
