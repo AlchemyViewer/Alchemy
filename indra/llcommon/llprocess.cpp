@@ -591,7 +591,7 @@ LLProcess::LLProcess(const LLSDOrParams& params):
 	// apr_procattr_child_err_set()), or accepting a filename, opening it and
 	// passing that apr_file_t (simple <, >, 2> redirect emulation).
 	std::vector<apr_int32_t> select;
-	for(const FileParam& fparam : params.files)
+	for (const FileParam& fparam : params.files)
 	{
 		// Every iteration, we're going to append an item to 'select'. At the
 		// top of the loop, its size() is, in effect, an index. Use that to

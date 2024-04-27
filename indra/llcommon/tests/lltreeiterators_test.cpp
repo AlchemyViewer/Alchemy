@@ -1102,7 +1102,7 @@ namespace tut
         // This test function illustrates the looping techniques described in the
         // comments for the getRootRange() free function, the
         // EnhancedTreeNode::root_range template and the
-        // EnhancedTreeNode::getRootRange() method. Obviously the range-for()
+        // EnhancedTreeNode::getRootRange() method. Obviously the for()
         // forms are more succinct.
         TreeNodePtr tnroot(example_tree<TreeNode>());
         TreeNodePtr tnB2b(get_B2b<TreeNode, TreeNode::child_iterator>

@@ -708,7 +708,7 @@ void LLViewerInventoryCategory::setVersion(S32 version)
 	mVersion = version;
 }
 
-bool LLViewerInventoryCategory::fetch()
+bool LLViewerInventoryCategory::fetch(S32 expiry_seconds)
 {
 	if((mUUID == gLocalInventory) || (gInventory.isObjectDescendentOf(mUUID, gLocalInventory))) return false;
 
@@ -716,9 +716,8 @@ bool LLViewerInventoryCategory::fetch()
 	   && mDescendentsRequested.hasExpired())	//Expired check prevents multiple downloads.
 	{
 		LL_DEBUGS(LOG_INV) << "Fetching category children: " << mName << ", UUID: " << mUUID << LL_ENDL;
-		const F32 FETCH_TIMER_EXPIRY = 10.0f;
 		mDescendentsRequested.reset();
-		mDescendentsRequested.setTimerExpirySec(FETCH_TIMER_EXPIRY);
+		mDescendentsRequested.setTimerExpirySec(expiry_seconds);
 
 		std::string url;
 		if (gAgent.getRegion())
@@ -727,7 +726,7 @@ bool LLViewerInventoryCategory::fetch()
 		}
 		else
 		{
-			LL_WARNS(LOG_INV) << "agent region is null" << LL_ENDL;
+			LL_WARNS_ONCE(LOG_INV) << "agent region is null" << LL_ENDL;
 		}
 		if (!url.empty() || AISAPI::isAvailable())
 		{
@@ -751,7 +750,13 @@ LLViewerInventoryCategory::EFetchType LLViewerInventoryCategory::getFetching()
 
 void LLViewerInventoryCategory::setFetching(LLViewerInventoryCategory::EFetchType fetching)
 {
-    if (fetching > mFetching) // allow a switch from normal to recursive
+    if (fetching == FETCH_FAILED)
+    {
+        const F32 FETCH_FAILURE_EXPIRY = 60.0f;
+        mDescendentsRequested.setTimerExpirySec(FETCH_FAILURE_EXPIRY);
+        mFetching = fetching;
+    }
+    else if (fetching > mFetching) // allow a switch from normal to recursive
     {
         if (mDescendentsRequested.hasExpired() || (mFetching == FETCH_NONE))
         {

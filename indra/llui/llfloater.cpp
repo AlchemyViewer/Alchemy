@@ -1997,6 +1997,8 @@ void LLFloater::onClickTearOff(LLFloater* self)
 		{
 			if (self->mSaveRect)
 			{
+                LLRect screen_rect = self->calcScreenRect();
+                self->mPosition = LLCoordGL(screen_rect.getCenterX(), screen_rect.getCenterY()).convert();
 				self->storeRectControl();
 			}
 			self->setMinimized(FALSE); // to reenable minimize button if it was minimized
@@ -2658,12 +2660,9 @@ void LLFloaterView::restoreAll()
 {
 	// make sure all subwindows aren't minimized
     child_list_t child_list = *(getChildList()); // Copy as list order can change during visibility
-    for (LLView* viewp : child_list)
+    for (auto child : child_list)
 	{
-		if (!viewp->isFloater())
-			continue;
-
-        LLFloater* floaterp = static_cast<LLFloater*>(viewp);
+		LLFloater* floaterp = dynamic_cast<LLFloater*>(child);
 		if (floaterp)
 		{
 			floaterp->setMinimized(FALSE);

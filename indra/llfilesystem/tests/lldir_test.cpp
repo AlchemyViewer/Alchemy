@@ -108,7 +108,7 @@ struct LLDir_Dummy: public LLDir
 
             "install/skins/default/future/somefile.txt"
         };
-        for(const char* path : preload)
+        for (const char* path : preload)
         {
             buildFilesystem(path);
         }
