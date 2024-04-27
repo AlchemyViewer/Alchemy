@@ -64,6 +64,9 @@ public:
 	/** Called when Avatar is entered/exited editing appearance mode */
 	static void onAvatarEditingAppearance(bool editing);
 
+	/** Called when opening and when "Advanced | Debug Camera" menu item is toggled */
+	static void onDebugCameraToggled();
+
 	/* determines actual mode and updates ui */
 	void update();
 
@@ -78,9 +81,9 @@ public:
 
 	void populatePresetCombo();
 
-	LLJoystickCameraRotate* mRotate;
-	LLPanelCameraZoom*	mZoom;
-	LLJoystickCameraTrack*	mTrack;
+	LLJoystickCameraRotate* mRotate { nullptr };
+	LLPanelCameraZoom* mZoom { nullptr };
+	LLJoystickCameraTrack* mTrack { nullptr };
 
 private:
 
@@ -118,6 +121,8 @@ private:
 
 	void handleAvatarEditingAppearance(bool editing);
 
+	void showDebugInfo(bool show);
+
 	void toggleCollapse();
 	void collapse();
 
@@ -130,8 +135,12 @@ private:
 	ECameraControlMode mCurrMode;
 	std::map<ECameraControlMode, LLButton*> mMode2Button;
 
-	LLComboBox* mPresetCombo;
-	LLButton* mBtnCollapse;
+	LLPanel* mControls { nullptr };
+	LLPanel* mViewerCameraInfo { nullptr };
+	LLPanel* mAgentCameraInfo { nullptr };
+	LLComboBox* mPresetCombo { nullptr };
+//	LLTextBox* mPreciseCtrls { nullptr };
+	LLButton* mBtnCollapse { nullptr };
 };
 
 /**

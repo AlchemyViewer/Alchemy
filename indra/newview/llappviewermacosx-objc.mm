@@ -46,3 +46,9 @@ void setCrashUserMetadataWrapper(const std::string& userid, const std::string& u
     [SentrySDK setUser:user];
 #endif
 }
+
+void force_ns_sxeption()
+{
+    NSException *exception = [NSException exceptionWithName:@"Forced NSException" reason:nullptr userInfo:nullptr];
+    @throw exception;
+}

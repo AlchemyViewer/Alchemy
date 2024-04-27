@@ -11,6 +11,7 @@
 		<menu_item_check label="ミュージック・ティッカー…" name="music_ticker_check"/>
 		<menu_item_separator/>
 		<menu_item_call label="カメラコントロール…" name="Camera Controls"/>
+		<menu_item_call label="通知…" name="Notifications"/>
 		<menu_item_separator/>
 		<menu_item_check name="Away" label="離席中"/>
 		<menu_item_check name="Do Not Disturb" label="取り込み中"/>
@@ -103,9 +104,7 @@
 	</menu>
 	<menu label="ワールド" name="World">
 		<menu_item_check label="ポーザー" name="Poser"/>
-		<!--
 		<menu_item_check label="ポーズクリエイター" name="Pose Creator"/>
-		-->
 		<menu_item_call label="アニメーションを再同期" name="Resync Animations"/>
 		<menu_item_check label="サウンドエクスプローラー" name="Sound Explorer"/>
 		<menu_item_separator/>
@@ -132,16 +131,16 @@
 		<menu_item_separator/>
 		<menu label="表示" name="LandShow">
 			<menu_item_check label="バンラインを隠す" name="Hide Ban Lines"/>
-			<menu_item_check label="バンラインをぶつかったときに表示" name="Show Ban Lines On Collision"/>
-			<menu_item_check label="バンラインを近づいたときに表示" name="Show Ban Lines On Proximity"/>
+			<menu_item_check label="バンラインにぶつかったときに表示" name="Show Ban Lines On Collision"/>
+			<menu_item_check label="バンラインに近づいたときに表示" name="Show Ban Lines On Proximity"/>
 			<menu_item_separator/>
-			<menu_item_check label="ビーコン（標識）" name="beacons"/>
+			<menu_item_check label="ビーコン" name="beacons"/>
 			<menu_item_check label="敷地境界線" name="Property Lines"/>
 			<menu_item_check label="土地所有者" name="Land Owners"/>
 			<menu_item_check label="座標" name="Coordinates"/>
 			<menu_item_check label="区画のプロパティ" name="Parcel Properties"/>
 			<menu_item_separator/>
-			<menu_item_check label="被写界深度のフォーカスを固定する" name="lock_focus_point"/>
+			<menu_item_check label="被写界深度（ＤｏＦ）のフォーカスを固定する" name="lock_focus_point"/>
 			<menu_item_check label="拡張メニュー" name="Show Advanced Menu"/>
 		</menu>
 		<menu_item_check label="グラフィック性能の最適化…" name="Performance"/>
@@ -238,22 +237,22 @@
 			<menu_item_check label="プローブの更新" name="Probe Updates"/>
 			<menu_item_check label="範囲内を選択する" name="Select By Surrounding"/>
 			<menu_item_separator/>
-			<menu_item_check label="選択のアウトラインを表示" name="Show Selection Outlines"/>
+			<menu_item_check label="選択のアウトラインを表示する" name="Show Selection Outlines"/>
 			<menu_item_check label="隠れた位置の選択も表示する" name="Show Hidden Selection"/>
 			<menu_item_check label="選択した光の効果範囲を表示する" name="Show Light Radius for Selection"/>
-			<menu_item_check label="反射プローブのボリュームを表示" name="Show Reflection Probe Volumes"/>
+			<menu_item_check label="反射プローブの影響範囲を表示する" name="Show Reflection Probe Volumes"/>
 			<menu_item_check label="選択ビームを表示する" name="Show Selection Beam"/>
-			<menu_item_check label="区画の境界のアウトラインを表示" name="RenderParcelSelection"/>
-			<menu_item_check label="ビルドできる最大高度の境界を表示" name="RenderParcelSelectionToMaxHeight"/>
-			<menu_item_check label="透過をハイライト" name="Highlight Transparent"/>
-			<menu_item_check label="透過プローブをハイライト" name="Highlight Transparent Probes"/>
+			<menu_item_check label="区画の境界のアウトラインを表示する" name="RenderParcelSelection"/>
+			<menu_item_check label="ビルドできる最大高度の境界を表示する" name="RenderParcelSelectionToMaxHeight"/>
+			<menu_item_check label="透過をハイライトする" name="Highlight Transparent"/>
+			<menu_item_check label="透過プローブをハイライトする" name="Highlight Transparent Probes"/>
 			<menu_item_separator/>
 			<menu_item_check label="Ctrl＋ドラッグでオブジェクトを掴む" name="EnableCtrlDragMovement"/>
 			<menu_item_separator/>
 			<menu_item_check label="ポストプロセッシングを無効化" name="No Post"/>
 			<menu_item_separator/>
 			<menu_item_check label="グリッド吸着" name="Snap to Grid"/>
-			<menu_item_call label="オブジェクトのＸＹ軸をグリッドに吸着" name="Snap Object XY to Grid"/>
+			<menu_item_call label="オブジェクトのＸＹ軸をグリッドに吸着させる" name="Snap Object XY to Grid"/>
 			<menu_item_call label="選択をグリッドに使用する" name="Use Selection for Grid"/>
 			<menu_item_separator/>
 			<menu_item_call label="グリッドオプション…" name="Grid Options"/>
@@ -335,9 +334,10 @@
 		<menu_item_separator/>
 		<menu_item_check label="オブジェクトの選択距離の制限" name="Limit Select Distance"/>
 		<menu_item_check label="ドラッグ距離の制限" name="Limit Drag Distance"/>
-		<menu_item_check label="カメラの距離移動を制限しない" name="Disable Camera Distance"/>
+		<menu_item_check label="カメラの距離制限を解除" name="Disable Camera Distance"/>
 		<menu_item_check label="最小ズーム距離を無効化" name="Disable Minimum Zoom Distance"/>
 		<menu_item_check label="ＳＩＭのカメラの衝突面を無効化" name="Disable Sim Camera Collision Plane"/>
+		<menu_item_separator/>
 		<menu_item_check label="アバターを身軽に" name="Avatar Ignore Prejump"/>
 		<menu_item_separator/>
 		<menu_item_check label="高解像度スナップショット" name="HighResSnapshot"/>
@@ -410,7 +410,7 @@
 		</menu>
 		<!--Shortcuts-->
 		<menu_item_separator/>
-		<menu_item_check label="RestrainedLove APIを有効化" name="RLV API"/>
+		<menu_item_check label="RestrainedLove API（ＲＬＶａ）を有効化" name="RLV API"/>
 		<menu_item_call label="デバッグ設定を表示" name="Debug Settings"/>
 		<menu_item_check label="開発メニューを表示" name="Debug Mode"/>
 	</menu>
@@ -419,12 +419,12 @@
 			<menu_item_check label="テクスチャのコンソール" name="Texture Console"/>
 			<menu_item_check label="デバッグコンソール" name="Debug Console"/>
 			<menu_item_call label="通知コンソール" name="Notifications"/>
-			<menu_item_check label="リージョンのデバッグコンソール" name="Region Debug Console"/>
 			<menu_item_check label="ファーストタイマー" name="Fast Timers"/>
 			<menu_item_check label="メモリ" name="Memory"/>
 			<menu_item_check label="シーンの統計" name="Scene Statistics"/>
 			<menu_item_check label="シーンの読み込みモニター" name="Scene Loading Monitor"/>
 			<menu_item_separator/>
+			<menu_item_check label="リージョンのデバッグコンソール" name="Region Debug Console"/>
 			<menu_item_call label="リージョン情報をデバッグコンソールへ" name="Region Info to Debug Console"/>
 			<menu_item_call label="グループ情報をデバッグコンソールへ" name="Group Info to Debug Console"/>
 			<menu_item_call label="性能情報をデバッグコンソールへ" name="Capabilities Info to Debug Console"/>
@@ -451,11 +451,13 @@
 		<menu label="エラー実行" name="Force Errors">
 			<menu_item_call label="ブレークポイント" name="Force Breakpoint"/>
 			<menu_item_call label="LLErrorとクラッシュを実行する" name="Force LLError And Crash"/>
+			<menu_item_call label="LLErrorとメッセージとクラッシュを実行する" name="Force LLError And Crash"/>
 			<menu_item_call label="不正なメモリアクセスを実行する" name="Force Bad Memory Access"/>
 			<menu_item_call label="コルーチン内で不正なメモリアクセスを発生させる" name="Force Bad Memory Access in Coroutine"/>
-			<menu_item_call label="無限ループ" name="Force Infinite Loop"/>
+			<menu_item_call label="無限ループを発生させる" name="Force Infinite Loop"/>
 			<menu_item_call label="ドライバのクラッシュを発生させる" name="Force Driver Carsh"/>
 			<menu_item_call label="ソフトウェア例外エラーの発生させる" name="Force Software Exception"/>
+			<menu_item_call label="ＯＳの例外を発生させる" name="Force OS Exception"/>
 			<menu_item_call label="コルーチン内でクラッシュを発生させる" name="Force a Crash in a Coroutine"/>
 			<menu_item_call label="スレッド内でクラッシュを発生させる" name="Force a Crash in a Thread"/>
 			<menu_item_call label="ビューアの接続遮断を実行する" name="Force Disconnect Viewer"/>
@@ -485,6 +487,7 @@
 			<menu_item_check label="三角形の数" name="Triangle Count"/>
 			<menu_item_check label="光源" name="Lights"/>
 			<menu_item_check label="反射プローブ" name="Reflection Probes"/>
+			<menu_item_check label="プローブの更新" name="Probe Updates"/>
 			<menu_item_check label="パーティクル" name="Particles"/>
 			<menu_item_check label="スケルトンの衝突判定" name="Collision Skeleton"/>
 			<menu_item_check label="ジョイント" name="Joints"/>

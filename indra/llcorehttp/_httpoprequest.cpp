@@ -293,7 +293,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
 // HttpOpRequest::ptr_t HttpOpRequest::fromHandle(HttpHandle handle)
 // {
 // 
-//     return boost::dynamic_pointer_cast<HttpOpRequest>((static_cast<HttpOpRequest *>(handle))->shared_from_this());
+//     return std::dynamic_pointer_cast<HttpOpRequest>((static_cast<HttpOpRequest *>(handle))->shared_from_this());
 // }
 
 

@@ -1149,7 +1149,7 @@ namespace LLError
 
 		if (!file_name.empty())
 		{
-			auto recordToFile = std::make_shared<RecordToFile>(file_name);
+			std::shared_ptr<RecordToFile> recordToFile(new RecordToFile(file_name));
 			if (recordToFile->okay())
 			{
 				addRecorder(std::move(recordToFile));

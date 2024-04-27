@@ -74,7 +74,7 @@ protected:
 	friend class LLUICtrlFactory;
 
 public:
-	virtual ~LLSearchEditor() = default;
+	virtual ~LLSearchEditor();
 
 	/*virtual*/ void	draw();
 

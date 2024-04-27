@@ -321,9 +321,7 @@ protected:
         typedef std::shared_ptr<sessionState> ptr_t;
         typedef std::weak_ptr<sessionState> wptr_t;
 
-		using session_wptr_set = std::set<wptr_t, std::owner_less<wptr_t>>;
-
-        typedef boost::function<void(const ptr_t &)> sessionFunc_t;
+        typedef std::function<void(const ptr_t &)> sessionFunc_t;
 
         static ptr_t createSession();
 		~sessionState();
@@ -390,8 +388,8 @@ protected:
     private:
         sessionState();
 
-        static session_wptr_set mSession;   // canonical list of outstanding sessions.
-		session_wptr_set::iterator  mMyIterator;    // used for delete
+        static std::set<wptr_t, std::owner_less<wptr_t>> mSession;   // canonical list of outstanding sessions.
+        std::set<wptr_t>::iterator  mMyIterator;    // used for delete
 
         static void for_eachPredicate(const wptr_t &a, sessionFunc_t func);
 

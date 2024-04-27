@@ -357,6 +357,9 @@ LLControlAvatar *LLControlAvatar::createControlAvatar(LLVOVolume *obj)
 void LLControlAvatar::markForDeath()
 {
     mMarkedForDeath = true;
+    // object unlinked cav and might be dead already
+    // might need to clean mControlAVBridge here as well
+    mRootVolp = NULL;
 }
 
 void LLControlAvatar::idleUpdate(LLAgent &agent, const F64 &time)
@@ -374,6 +377,7 @@ void LLControlAvatar::idleUpdate(LLAgent &agent, const F64 &time)
 
 void LLControlAvatar::markDead()
 {
+    mRootVolp = NULL;
     super::markDead();
     mControlAVBridge = NULL;
 }
@@ -435,7 +439,7 @@ void LLControlAvatar::updateDebugText()
         F32 streaming_cost = 0.f;
         std::string cam_dist_string = "";
         S32 cam_dist_count = 0;
-        F32 lod_radius = mRootVolp->mLODRadius;
+        F32 lod_radius = mRootVolp ? mRootVolp->mLODRadius : 0.f;
 
         for (std::vector<LLVOVolume*>::iterator it = volumes.begin();
              it != volumes.end(); ++it)

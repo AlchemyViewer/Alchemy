@@ -38,7 +38,6 @@
 	</string>
 	<tab_container name="animation_tabs">
 		<panel title="一般" name="general_panel">
-			<icon name="vicon"/>
 			<text name="linden_intro">
 				ポーズのファイル名
 ・これは、アニメーションのアップロード時に付けられる名前です。
@@ -69,16 +68,16 @@
 			<text name="linden_intro">
 				優先度
 ・このアニメーションの最低優先度を設定します。
-・これは、このアニメーションが他のアニメーションをオーバーライドするか、他のアニメーションによってオーバーライドされるかに影響します。
+・これは、このアニメーションが他のアニメーションを上書きするか、他のアニメーションによって上書きされるかに影響します。
 ・各々のボーンがこれを増加させる可能性があります。
 			</text>
 			<combo_box name="base_priority">
-				<combo_box.item label="優先度・低（0）" name="0" value="0"/>
-				<combo_box.item label="優先度・中（1）" name="1" value="1"/>
-				<combo_box.item label="優先度・高（2）" name="2" value="2"/>
-				<combo_box.item label="優先度・より高い（3）" name="3" value="3"/>
+				<combo_box.item label="優先度・最低（0）" name="0" value="0"/>
+				<combo_box.item label="優先度・低（1）" name="1" value="1"/>
+				<combo_box.item label="優先度・中（2）" name="2" value="2"/>
+				<combo_box.item label="優先度・高（3）" name="3" value="3"/>
 				<combo_box.item label="優先度・最高（4）" name="4" value="4"/>
-				<combo_box.item label="他のアニメに加える（7）" name="7" value="7"/>
+				<combo_box.item label="他のアニメに加算（7）" name="7" value="7"/>
 			</combo_box>
 			<text name="linden_intro">
 				手のポーズ
@@ -94,11 +93,6 @@
 			<button label="エクスポート" tool_tip="現在のポーズをエクスポートします。" name="export_poses" width="100"/>
 		</panel>
 		<panel title="スケルトン" name="joints_panel">
-			<!--
-				<icon name="vicon"/>
-			-->
-			<icon name="vicon"/>
-			<icon name="vicon"/>
 			<tab_container name="joints_tabs">
 				<panel title="ボーン" name="joints_panel">
 					<scroll_list name="joints_scroll">
@@ -125,7 +119,7 @@
 				<panel title="衝突" name="cv_panel">
 					<scroll_list name="cv_scroll">
 						<scroll_list.columns label="" name="icon"/>
-						<scroll_list.columns label="衝突ボリューム名" name="joint"/>
+						<scroll_list.columns label="衝突量名" name="joint"/>
 						<scroll_list.columns label="回転Ｘ" name="x"/>
 						<scroll_list.columns label="回転Ｙ" name="y"/>
 						<scroll_list.columns label="回転Ｚ" name="z"/>
@@ -158,7 +152,7 @@
 			<scroll_list name="timeframe_scroll">
 				<scroll_list.columns label="ボーン名" name="joint"/>
 				<scroll_list.columns label="タイムライン" name="multislider">
-					<column name="multislider" type="multislider"/>
+					<column name="multislider" />
 				</scroll_list.columns>
 			</scroll_list>
 			<panel name="title">
@@ -170,14 +164,12 @@
 					<combo_box.item label="スプライン" name="2" value="2"/>
 				</combo_box>
 				<line_editor name="key_time"/>
-				<button label="キーの追加" tool_tip="現在選択されているキーフレームの後にキーフレームを追加します。SHIFTを押したままにして最後に追加します。CTRLを押したままにして先頭に追加します。" name="add_keyframe"/>
+				<button label="キーの追加" tool_tip="現在選択されているキーフレームの後にキーフレームを追加します。Shiftキーを同時に押すと最後に追加され、Ctrlキーを同時に押すと先頭に追加されます。" name="add_keyframe"/>
 				<button label="キーの削除" tool_tip="現在選択されているキーフレームを削除します。" name="remove_keyframe"/>
 			</panel>
-			<icon name="vicon"/>
 			<check_box label="変更をミラーリング" tool_tip="このオプションは、回転に対するすべての変更を反対側のボーンにもミラーリングするかどうかを切り替えます。左腕は右腕にミラーリングされます。" name="Mirror"/>
 			<check_box label="簡易回転" tool_tip="このオプションは、ポーザーが簡略化された回転軸を表示および使用するかどうかを切り替えます。これは基本的に、任意の軸を移動するときに、他のすべての軸は触れられないことを意味します。これにより、回転が所定の位置からずれることになり、ボーンが移動された順序によっては、0 0 0がデフォルトの静止位置ではなくなります。このオプションを無効にすると、他の軸が実際の回転を表すように動的に変更されるようになります。つまり、タッチしていないスライダーは、現在移動しているスライダーに合わせて変更されます。これはユーザーにとって混乱を招く可能性があるため、デフォルトでは無効になっています。これを使用する場合は、最初にＺ、次にＹ、最後にＸを0設定することを強くお勧めします。そうしないと、ボーンの回転をリセットしない限り、すべての軸を0設定できなくなります。" name="EasyRotations"/>
 			<button label="ポーズのミラーリング" name="flip_pose"/>
-			<icon name="vicon"/>
 			<tab_container name="modifier_tabs">
 				<panel title="回転" name="rotation_panel">
 					<slider label="回転Ｘ：" name="Rotation_X"/>

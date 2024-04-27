@@ -1013,15 +1013,19 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
                 params.args.add( exe_path );
             }
 
-            std::string loglevel = gSavedSettings.getString("VivoxDebugLevel");
+            static LLCachedControl<std::string> host(gSavedSettings, "VivoxVoiceHost");
+            static LLCachedControl<std::string> loglevel_cc(gSavedSettings, "VivoxDebugLevel");
+            static LLCachedControl<std::string> log_folder_cc(gSavedSettings, "VivoxLogDirectory");
+            static LLCachedControl<std::string> shutdown_timeout(gSavedSettings, "VivoxShutdownTimeout");
+			std::string loglevel = loglevel_cc;
+			std::string log_folder = log_folder_cc;
+
             if (loglevel.empty())
             {
                 loglevel = "0";
             }
             params.args.add("-ll");
             params.args.add(loglevel);
-
-            std::string log_folder = gSavedSettings.getString("VivoxLogDirectory");
 
             if (log_folder.empty())
             {
@@ -1055,8 +1059,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
                 LLFile::rename(new_log, old_log);
             }
 
-            std::string shutdown_timeout = gSavedSettings.getString("VivoxShutdownTimeout");
-            if (!shutdown_timeout.empty())
+            if (!shutdown_timeout().empty())
             {
                 params.args.add("-st");
                 params.args.add(shutdown_timeout);
@@ -1069,7 +1072,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
                 {
                     voice_port->setValue(LLSD(port_nr), false);
                     params.args.add("-i");
-                    params.args.add(llformat("%s:%u", gSavedSettings.getString("VivoxVoiceHost").c_str(), gSavedSettings.getU32("VivoxVoicePort")));
+                    params.args.add(llformat("%s:%u", host().c_str(), gSavedSettings.getU32("VivoxVoicePort")));
                 }
             }
 
@@ -1095,7 +1098,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
 
             sGatewayPtr = LLProcess::create(params);
 
-            mDaemonHost = LLHost(gSavedSettings.getString("VivoxVoiceHost"), gSavedSettings.getU32("VivoxVoicePort"));
+            mDaemonHost = LLHost(host().c_str(), gSavedSettings.getU32("VivoxVoicePort"));
         }
         else
         {
@@ -5853,7 +5856,7 @@ void LLVivoxVoiceClient::filePlaybackSetMode(bool vox, float speed)
 }
 
 //------------------------------------------------------------------------
-LLVivoxVoiceClient::sessionState::session_wptr_set LLVivoxVoiceClient::sessionState::mSession;
+std::set<LLVivoxVoiceClient::sessionState::wptr_t, std::owner_less<LLVivoxVoiceClient::sessionState::wptr_t>> LLVivoxVoiceClient::sessionState::mSession;
 
 
 LLVivoxVoiceClient::sessionState::sessionState() :

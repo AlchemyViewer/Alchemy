@@ -367,28 +367,28 @@
 		[AVATAR_NAME]をグループから追放しようとしています。
 		<tag>group</tag>
 		<tag>confirm</tag>
-		<usetemplate ignoretext="グループからの参加者の追放を確認します" name="okcancelignore" notext="キャンセル" yestext="追放する"/>
+		<usetemplate ignoretext="グループからメンバーを追放するときの確認" name="okcancelignore" notext="キャンセル" yestext="追放する"/>
 	</notification>
 	<notification name="EjectGroupMembersWarning">
 		[COUNT]名のメンバーをグループから追放しようとしています。
 		<tag>group</tag>
 		<tag>confirm</tag>
-		<usetemplate ignoretext="グループからの複数のメンバーの追放を確認します" name="okcancelignore" notext="キャンセル" yestext="追放する"/>
+		<usetemplate ignoretext="グループから複数のメンバーを追放するときの確認" name="okcancelignore" notext="キャンセル" yestext="追放する"/>
 	</notification>
 	<notification name="BanGroupMemberWarning">
-		[AVATAR_NAME]をグループから追放しようとしています。
+		[AVATAR_NAME]をグループからバンしようとしています。
 		<tag>group</tag>
 		<tag>confirm</tag>
-		<usetemplate ignoretext="グループからの参加者の追放を確認します" name="okcancelignore" notext="キャンセル" yestext="バンする"/>
+		<usetemplate ignoretext="グループからメンバーをバンするときの確認" name="okcancelignore" notext="キャンセル" yestext="バンする"/>
 	</notification>
 	<notification name="BanGroupMembersWarning">
-		[COUNT]名のメンバーをグループから追放しようとしています。
+		[COUNT]名のメンバーをグループからバンしようとしています。
 		<tag>group</tag>
 		<tag>confirm</tag>
-		<usetemplate ignoretext="グループからの複数のメンバーの追放を確認します" name="okcancelignore" notext="キャンセル" yestext="バンする"/>
+		<usetemplate ignoretext="グループから複数のメンバーをバンするときの確認" name="okcancelignore" notext="キャンセル" yestext="バンする"/>
 	</notification>
 	<notification name="GroupBanUserOnBanlist">
-		一部の住人がグループから追放されたため、招待状が送られませんでした。
+		一部の住人がグループからバンされたため、招待状が送られませんでした。
 	</notification>
 	<notification name="AttachmentDrop">
 		装着物を下に置こうとしています。
@@ -1213,19 +1213,19 @@ L$が不足しているので、このグループに参加することができ
 		<tag>fail</tag>
 	</notification>
 	<notification name="CannotResetSelectObjectsNoScripts">
-		「再設定」ができません。
+		「再設定」できません。
 
 スクリプトが入ったオブジェクトを選択してください。
 		<tag>fail</tag>
 	</notification>
 	<notification name="CannotDeleteSelectObjectsNoScripts">
-		「削除」ができません。
+		「削除」できません。
 
 スクリプトが入ったオブジェクトを選択してください。
 		<tag>fail</tag>
 	</notification>
 	<notification name="CannotResetSelectObjectsNoPermission">
-		「再設定」ができません。
+		「再設定」できません。
 修正権限のある、スクリプトが入ったオブジェクトを選択してください。
 		<tag>fail</tag>
 	</notification>
@@ -2259,11 +2259,11 @@ OKをクリックして、ダウンロードとインストールを開始しま
 		<usetemplate name="okbutton" yestext="閉じる"/>
 	</notification>
 	<notification name="KickUser">
-		どのようなメッセージを添えて、この[AVATAR_NAME]を追い出しますか？
+		どのようなメッセージを添えて、[AVATAR_NAME]をログアウトますか？
 		<tag>win</tag>
 		<tag>confirm</tag>
 		<form name="form">
-			<input name="message">あなたは管理者によりログオフされました。</input>
+			<input name="message">あなたは管理者によりログアウトされました。</input>
 			<button name="OK" text="ＯＫ"/>
 			<button name="Cancel" text="キャンセル"/>
 		</form>
@@ -2273,13 +2273,13 @@ OKをクリックして、ダウンロードとインストールを開始しま
 		<tag>win</tag>
 		<tag>confirm</tag>
 		<form name="form">
-			<input name="message">あなたは管理者によりログオフされました。</input>
+			<input name="message">あなたは管理者によりログアウトされました。</input>
 			<button name="OK" text="ＯＫ"/>
 			<button name="Cancel" text="キャンセル"/>
 		</form>
 	</notification>
 	<notification name="FreezeUser">
-		どのようなメッセージを添えて、この[AVATAR_NAME]をフリーズしますか？
+		どのようなメッセージを添えて、[AVATAR_NAME]をフリーズしますか？
 		<tag>win</tag>
 		<tag>confirm</tag>
 		<form name="form">
@@ -2289,7 +2289,7 @@ OKをクリックして、ダウンロードとインストールを開始しま
 		</form>
 	</notification>
 	<notification name="UnFreezeUser">
-		どのようなメッセージを添えて、この[AVATAR_NAME]のフリーズを解除しますか？
+		どのようなメッセージを添えて、[AVATAR_NAME]のフリーズを解除しますか？
 		<tag>win</tag>
 		<tag>confirm</tag>
 		<form name="form">
@@ -2346,7 +2346,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<tag>fail</tag>
 	</notification>
 	<notification name="OfferTeleport">
-		次のメッセージを使用して、あなたのいる場所へのテレポートのオファーしますか？
+		あなたのいる場所へのテレポートのオファーをするのに、どのようなメッセージを添えますか？
 		<tag>confirm</tag>
 		<form name="form">
 			<input name="message">[REGION]に来てみませんか？</input>
@@ -2355,7 +2355,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		</form>
 	</notification>
 	<notification name="TeleportRequestPrompt">
-		次のメッセージを使用して、[NAME]にあなたのいる場所へのテレポートのリクエストをしますか？
+		あなたのいる場所へ[NAME]にテレポートのリクエストするのに、どのようなメッセージを添えますか？
 		<tag>confirm</tag>
 		<form name="form">
 			<input name="message" type="text">こちらに入りませんか？</input>
@@ -2757,7 +2757,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="いいえ" yestext="はい"/>
 	</notification>
 	<notification label="再起動を確認" name="ConfirmRestart">
-		このリージョンは[SECONDS]秒後に再起動しようとしています。このまま続けてもよろしいですか？
+		このリージョンを[SECONDS]秒後に再起動しようとしています。このまま続けてもよろしいですか？
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
@@ -2772,7 +2772,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 	</notification>
 	<notification label="リージョンのレーティング区分指定変更しました" name="RegionMaturityChange">
 		このリージョンのレーティング区分が変更されました。
-マップにこの変更が反映するには数分かかることがあります。
+マップにこの変更が反映されるまで数分かかることがあります。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification label="ボイスバージョンの不一致" name="VoiceVersionMismatch">
@@ -3138,7 +3138,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="はい"/>
 	</notification>
 	<notification name="ConfirmEmptyLostAndFound">
-		紛失物の中身をすべて削除しますか？
+		遺失物の中身をすべて削除しますか？
 		<tag>confirm</tag>
 		<usetemplate ignoretext="紛失物フォルダを空にする前の確認" name="okcancelignore" notext="いいえ" yestext="はい"/>
 	</notification>
@@ -3774,7 +3774,8 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 			<button name="GoNow..." text="今すぐ行く…"/>
 		</form>
 	</notification>
-	<notification name="OfferFriendship" label="[NAME_LABEL]からのフレンド登録のオファー">[NAME_SLURL] は、あなたにフレンド登録を申し込んでいます。
+	<notification name="OfferFriendship" label="[NAME_LABEL]からのフレンド登録のオファー">
+		[NAME_SLURL] は、あなたにフレンド登録を申し込んでいます。
 
 [MESSAGE]
 
@@ -3790,8 +3791,8 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 		[TO_NAME]にフレンド登録依頼を送りました。
 		<tag>friendship</tag>
 	</notification>
-	<notification name="OfferFriendshipNoMessage" label="[NAME_LABEL]からのフレンドシップの申し込み">
-		[NAME_SLURL] は、フレンド登録を申し込んでいます。（デフォルト設定では、お互いのオンライン状態を見ることができます。）
+	<notification name="OfferFriendshipNoMessage" label="[NAME_LABEL]からのフレンドシップのオファー">
+		[NAME_SLURL] は、フレンド登録をオファーしています。（デフォルト設定では、お互いのオンライン状態を見ることができます。）
 		<tag>friendship</tag>
 		<form name="form">
 			<button name="Accept" text="受け入れる"/>
@@ -4271,12 +4272,12 @@ Your L$ balance is shown in the upper-right.
 	<notification name="MeshUploadErrorDetails">
 		[LABEL]をアップロードできませんでした：[MESSAGE]
 [DETAILS]
-詳しくは、SecondLife.logをご覧ください。
+詳しくは、Alchemy.logをご覧ください。
 	</notification>
 	<notification name="MeshUploadError">
 		[LABEL]をアップロードできませんでした：[MESSAGE]
 
-詳しくは、SecondLife.logをご覧ください。
+詳しくは、Alchemy.logをご覧ください。
 	</notification>
 	<notification name="MeshUploadPermError">
 		メッシュのアップロード許可をリクエスト時にエラーが発生しました。
@@ -6191,13 +6192,13 @@ https://www.alchemyviewer.org/downloads から最新バージョンのビュー�
 展開されたポーズリストからポーズを読み込むことができます。
 
 ファイルは以下の場所にあります：
-&lt;b&gt;C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses&lt;/b&gt;
+C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses
   </notification>
 
 <notification name="PoserExportANIMSuccess">
 	ポーズは、ANIMファイルへのエクスポートに成功しました。
 
 ファイルは以下の場所にあります：
-&lt;b&gt;C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations&lt;/b&gt;
+C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
   </notification>
 </notifications>

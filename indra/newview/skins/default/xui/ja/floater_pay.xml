@@ -12,7 +12,8 @@
 	<text name="payee_name">
 		非常に長い名前が途中で切れていないかをテストして確認
 	</text>
-	<text name="payment_message_label">説明（任意項目）：
+	<text name="payment_message_label">
+		説明（任意項目）：
 	</text>
 	<panel label="検索" name="PatternsPanel">
 		<button label="L$ 1支払う" label_selected="L$ 1支払う" name="fastpay 1"/>

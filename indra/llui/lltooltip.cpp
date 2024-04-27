@@ -150,7 +150,8 @@ LLToolTip::Params::Params()
 	text_color("text_color"),
 	time_based_media("time_based_media", false),
 	web_based_media("web_based_media", false),
-	media_playing("media_playing", false)
+	media_playing("media_playing", false),
+    allow_paste_tooltip("allow_paste_tooltip", false)
 {
 	static LLUICachedControl<F32> tool_tip_delay("ToolTipDelay", 0.69999f);
 	static LLUICachedControl<F32> visible_time_over_setting("ToolTipVisibleTimeOver", 1000.f);
@@ -172,7 +173,8 @@ LLToolTip::LLToolTip(const LLToolTip::Params& p)
 	mTextBox(NULL),
 	mInfoButton(NULL),
 	mPlayMediaButton(NULL),
-	mHomePageButton(NULL)
+	mHomePageButton(NULL),
+    mIsTooltipPastable(p.allow_paste_tooltip)
 {
 	LLTextBox::Params params;
 	params.name = params.initial_value().asString();
@@ -293,6 +295,8 @@ void LLToolTip::initFromParams(const LLToolTip::Params& p)
 	{
 		mTextBox->setText(p.message());
 	}
+
+	mIsTooltipPastable = p.allow_paste_tooltip;
 
 	updateTextBox();
 	snapToChildren();
@@ -445,7 +449,13 @@ void LLToolTipMgr::createToolTip(const LLToolTip::Params& params)
 	tooltip_params.rect = LLRect (0, 1, 1, 0);
 
 	if (tooltip_params.create_callback.isProvided())
-		mToolTip = tooltip_params.create_callback()(tooltip_params);
+    {
+        mToolTip = tooltip_params.create_callback()(tooltip_params);
+        if (mToolTip == NULL) 
+        {
+            return;
+        }
+    }
 	else
 		mToolTip = LLUICtrlFactory::create<LLToolTip> (tooltip_params);
 
@@ -488,16 +498,16 @@ void LLToolTipMgr::createToolTip(const LLToolTip::Params& params)
 }
 
 
-void LLToolTipMgr::show(const std::string& msg)
+void LLToolTipMgr::show(const std::string& msg, bool allow_paste_tooltip)
 {
-	show(LLToolTip::Params().message(msg));
+    show(LLToolTip::Params().message(msg).allow_paste_tooltip(allow_paste_tooltip));
 }
 
 void LLToolTipMgr::show(const LLToolTip::Params& params)
 {
 	if (!params.styled_message.isProvided() 
 		&& (!params.message.isProvided() || params.message().empty())
-		&& !params.image.isProvided()) return;
+		&& !params.image.isProvided() && !params.create_callback.isProvided()) return;
 
 	// fill in default tooltip params from tool_tip.xml
 	LLToolTip::Params params_with_defaults(params);
@@ -631,5 +641,13 @@ void LLToolTipMgr::getToolTipMessage(std::string & message)
 	}
 }
 
+bool LLToolTipMgr::isTooltipPastable()
+{
+    if (toolTipVisible())
+    {
+        return mToolTip->isTooltipPastable();
+    }
+    return false;
+ }
 
 // EOF

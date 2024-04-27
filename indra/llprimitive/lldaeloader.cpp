@@ -2398,7 +2398,7 @@ std::string LLDAELoader::getElementLabel(daeElement *element)
 
 		if (ind > 0)
 		{
-			index_string = fmt::format(FMT_STRING("_{:d}"), ind);
+			index_string = "_" + std::to_string(ind);
 		}
 
 		// if parent has a name or ID, use it

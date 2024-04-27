@@ -324,7 +324,7 @@ public:
      * Reset all known LLEventPump instances
      * workaround for DEV-35406 crash on shutdown
      */
-    void reset();
+    void reset(bool log_pumps = false);
 
 private:
     friend class LLEventPump;
@@ -550,7 +550,7 @@ public:
 
     /// Get the LLBoundListener associated with the passed name (dummy
     /// LLBoundListener if not found)
-    virtual LLBoundListener getListener(const std::string& name) const;
+    virtual LLBoundListener getListener(const std::string& name);
     /**
      * Instantiate one of these to block an existing connection:
      * @code
@@ -593,6 +593,7 @@ private:
     LLHandle<LLEventPumps> mRegistry;
 
     std::string mName;
+    LLMutex mConnectionListMutex;
 
 protected:
     virtual LLBoundListener listen_impl(const std::string& name, const LLEventListener&,

@@ -232,8 +232,6 @@ protected:
 
 //////////////////////////////////////////////////////////////////////////
 
-std::string LLPanelAppearanceTab::sFilterSubString = LLStringUtil::null;
-
 static LLPanelInjector<LLPanelWearing> t_panel_wearing("panel_wearing");
 
 LLPanelWearing::LLPanelWearing()
@@ -354,10 +352,11 @@ void LLPanelWearing::startUpdateTimer()
 }
 
 // virtual
-void LLPanelWearing::setFilterSubString(const std::string& string)
+void LLPanelWearing::onFilterSubStringChanged(const std::string& new_string, const std::string& old_string)
 {
-	sFilterSubString = string;
-	mCOFItemsList->setFilterSubString(sFilterSubString);
+	mCOFItemsList->setFilterSubString(new_string, true);
+
+	mAccordionCtrl->arrange();
 }
 
 // virtual

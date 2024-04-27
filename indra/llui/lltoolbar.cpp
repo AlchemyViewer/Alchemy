@@ -244,7 +244,7 @@ void LLToolBar::initFromParams(const LLToolBar::Params& p)
 	mRightBottomPanel = LLUICtrlFactory::create<LLLayoutPanel>(border_panel_p);
     mCenteringStack->addChild(mRightBottomPanel);
 
-	for (LLCommandId id : p.commands)
+	for (const auto& id : p.commands)
 	{
 		addCommand(id);
 	}
@@ -1047,7 +1047,7 @@ void LLToolBar::createButtons()
 	mButtonMap.clear();
 	mRightMouseTargetButton = NULL;
 	
-	for (LLCommandId& command_id : mButtonCommands)
+	for (const LLCommandId& command_id : mButtonCommands)
 	{
 		LLToolBarButton* button = createButton(command_id);
 		mButtons.push_back(button);
