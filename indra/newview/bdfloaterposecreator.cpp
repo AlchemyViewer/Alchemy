@@ -465,6 +465,9 @@ void BDFloaterPoseCreator::onKeyframeSelect()
 		return;
 
 	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	LLKeyframeMotion::JointMotion* joint_motion = joint_list->getJointMotion(joint->getJointNum());
 	S32 si = item->getColumn(1)->getValue().asInteger();
 	S32 idx = mModifierTabs->getCurrentPanelIndex();
@@ -518,7 +521,13 @@ void BDFloaterPoseCreator::onKeyframeSelect()
 
 void BDFloaterPoseCreator::onKeyframeAdd(F32 time, LLJoint* joint)
 {
+	if (!gDragonAnimator.mPoseCreatorMotion)
+		return;
+
 	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	S32 modifier_idx = mModifierTabs->getCurrentPanelIndex();
 
 	if (joint)
@@ -581,8 +590,14 @@ void BDFloaterPoseCreator::onKeyframeAdd(F32 time, LLJoint* joint)
 
 void BDFloaterPoseCreator::onKeyframeAdd()
 {
-	std::vector<LLScrollListItem*> items = mJointScrolls[JOINTS]->getAllSelected();
+	if (!gDragonAnimator.mPoseCreatorMotion)
+		return;
+
 	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
+	std::vector<LLScrollListItem*> items = mJointScrolls[JOINTS]->getAllSelected();
 	LLScrollListItem* item = mKeyframeScroll->getFirstSelected();
 	MASK mask = gKeyboard->currentMask(TRUE);
 	bool multiple = (items.size() > 1);
@@ -878,6 +893,9 @@ void BDFloaterPoseCreator::onKeyframeRemove()
 		return;
 
 	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	LLKeyframeMotion::JointMotion* joint_motion = joint_list->getJointMotion(joint->getJointNum());
 	LLJointState* joint_state = gDragonAnimator.mPoseCreatorMotion->findJointState(joint);
 	S32 idx = mModifierTabs->getCurrentPanelIndex();
@@ -991,6 +1009,9 @@ void BDFloaterPoseCreator::onKeyframeTime()
 		return;
 
 	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	LLKeyframeMotion::JointMotion* joint_motion = joint_list->getJointMotion(joint->getJointNum());
 	S32 si = mKeyframeScroll->getFirstSelectedIndex() + 1;
 	S32 idx = mModifierTabs->getCurrentPanelIndex();
@@ -1043,6 +1064,9 @@ void BDFloaterPoseCreator::onEditAnimationInfo(const LLSD& param)
 		return;
 
 	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	std::string msg = param.asString();
 	if (msg == "ease_in")
 	{
@@ -1097,6 +1121,9 @@ void BDFloaterPoseCreator::onInterpolationChange(LLUICtrl* ctrl)
 		return;
 
 	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	LLKeyframeMotion::JointMotion* joint_motion = joint_list->getJointMotion(joint->getJointNum());
 	S32 interp_idx = ctrl->getValue().asInteger();
 	S32 idx = mModifierTabs->getCurrentPanelIndex();
@@ -1123,6 +1150,10 @@ void BDFloaterPoseCreator::onAnimationDurationCheck()
 	if (!gDragonAnimator.mPoseCreatorMotion)
 		return;
 
+	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	LLScrollListItem* joint_item = mJointScrolls[JOINTS]->getFirstSelected();
 	if (!joint_item)
 		return;
@@ -1131,7 +1162,6 @@ void BDFloaterPoseCreator::onAnimationDurationCheck()
 	if (!joint)
 		return;
 
-	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
 	F32 new_time = 0.0f;
 
 	//BD - Go through all motions and all keys and determine the largest keyframe time.
@@ -1711,6 +1741,10 @@ void BDFloaterPoseCreator::onJointSet(LLUICtrl* ctrl, const LLSD& param)
 	if (!gDragonAnimator.mPoseCreatorMotion)
 		return;
 
+	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	LLScrollListItem* key_item = mKeyframeScroll->getFirstSelected();
 
 	//BD - Neat yet quick and direct way of rotating our bones.
@@ -1746,7 +1780,6 @@ void BDFloaterPoseCreator::onJointSet(LLUICtrl* ctrl, const LLSD& param)
 	}
 
 	//BD - After a lot of different approaches this seemed to be the most feasible and functional.
-	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
 	LLKeyframeMotion::JointMotion* joint_motion = joint_list->getJointMotion(joint->getJointNum());
 	LLKeyframeMotion::RotationCurve rot_curve = joint_motion->mRotationCurve;
 
@@ -1908,6 +1941,10 @@ void BDFloaterPoseCreator::onJointPosSet(LLUICtrl* ctrl, const LLSD& param)
 	if (!gDragonAnimator.mPoseCreatorMotion)
 		return;
 
+	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	LLScrollListItem* key_item = mKeyframeScroll->getFirstSelected();
 
 	//BD - We could just check whether position information is available since only joints
@@ -1928,7 +1965,6 @@ void BDFloaterPoseCreator::onJointPosSet(LLUICtrl* ctrl, const LLSD& param)
 	cell[dir]->setValue(ll_round(vec3.mV[dir], 0.001f));
 	joint->setTargetPosition(vec3);
 
-	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
 	LLKeyframeMotion::JointMotion* joint_motion = joint_list->getJointMotion(joint->getJointNum());
 	LLKeyframeMotion::RotationCurve rot_curve = joint_motion->mRotationCurve;
 
@@ -1993,6 +2029,10 @@ void BDFloaterPoseCreator::onJointScaleSet(LLUICtrl* ctrl, const LLSD& param)
 	if (!gDragonAnimator.mPoseCreatorMotion)
 		return;
 
+	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
+	if (!joint_list)
+		return;
+
 	LLScrollListItem* key_item = mKeyframeScroll->getFirstSelected();
 	if (!key_item)
 		return;
@@ -2008,7 +2048,6 @@ void BDFloaterPoseCreator::onJointScaleSet(LLUICtrl* ctrl, const LLSD& param)
 	cell[dir]->setValue(ll_round(vec3.mV[dir], 0.001f));
 	joint->setScale(vec3);
 
-	LLKeyframeMotion::JointMotionList* joint_list = gDragonAnimator.mPoseCreatorMotion->getJointMotionList();
 	LLKeyframeMotion::JointMotion* joint_motion = joint_list->getJointMotion(joint->getJointNum());
 	LLKeyframeMotion::RotationCurve rot_curve = joint_motion->mRotationCurve;
 
