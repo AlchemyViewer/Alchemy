@@ -18,7 +18,7 @@
 			<check_box label="サンドボックス" name="is sandbox" tool_tip="これがサンドボックスリージョンでも切り替え"/>
 			<button label="地形を構築する" label_selected="地形を構築する" name="Bake Terrain" tool_tip="現在の地形をデフォルトとして保存します。"/>
 			<button label="地形を元に戻す" label_selected="地形を元に戻す" name="Revert Terrain" tool_tip="現在の地形をデフォルトに置換します。"/>
-			<button label="地形を交換" label_selected="地形を交換" name="Swap Terrain" tool_tip="現在の地形をデフォルトと入れ替えます。"/>
+			<button label="地形を交換" label_selected="地形を交換" name="Swap Terrain" tool_tip="現在の地形をデフォルトと置き換えます。"/>
 			<text name="estate id">
 				不動産ＩＤ：
 			</text>
