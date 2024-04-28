@@ -40,8 +40,9 @@
 		<radio_item label="両方" name="Both"/>
 	</radio_group>
 	<text name="World Effects">
-		ワールドのエフェクト：
+		ワールド：
 	</text>
+	<check_box name="EnvironmentPersistAcrossLogin" label="セッション全体にわたって自然環境の設定を保持する" tool_tip="次回ログイン後に現在の自然環境の設定を復元します。"/>
 	<check_box label="スクリプトの通信時にパーティクルエフェクトを生成" tool_tip="有効にすると、スクリプトが通信するときにスクリプト化されたオブジェクトに渦巻きのパーティクルライトが表示されるようになります。" name="EffectScriptChatParticles"/>
 	<text name="UI Fonts">
 		ＵＩフォント：

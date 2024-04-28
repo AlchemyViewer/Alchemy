@@ -745,7 +745,7 @@ L$が不足しているので、このグループに参加することができ
 	</notification>
 	<notification name="WebCacheWillClear">
 		Webブラウザのキャッシュは、[APP_NAME]再起動後にクリアされます。
-  </notification>
+	</notification>
 	<notification name="CacheWillBeMoved">
 		キャッシュは、[APP_NAME]再起動後が移動されます。
 注意：キャッシュがクリアされます。
@@ -1580,7 +1580,7 @@ L$が不足しているので、このグループに参加することができ
 一意の名前を入力してください：
 		<tag>confirm</tag>
 		<form name="form">
-			<button name="ReplaceList" text="着用中のリストを入れ替える"/>
+			<button name="ReplaceList" text="着用中のリストを置き換える"/>
 			<button name="SetName" text="新しい名前を使用"/>
 		</form>
 	</notification>
@@ -3058,7 +3058,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 選択されたオブジェクトと置き換えますか？
 		<tag>confirm</tag>
 		<form name="form">
-			<ignore name="ignore" save_option="true" text="装着しているアイテムと選択したアイテムの入れ替え"/>
+			<ignore name="ignore" save_option="true" text="装着しているアイテムと選択したアイテムの置き換え"/>
 			<button ignore="自動的に差し替える" name="Yes" text="ＯＫ"/>
 			<button ignore="差し替えない" name="No" text="キャンセル"/>
 		</form>
@@ -4423,8 +4423,8 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<tag>confirm</tag>
 		<form name="form">
 			<input name="message" type="text">
-			[DESC]
-		</input>
+				[DESC]
+			</input>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="キャンセル"/>
 		</form>
@@ -4803,7 +4803,7 @@ Intelドライバーのウェブサイトを確認しますか？
 	<notification name="LocalGLTFVerifyFail">
 		開いたりデコードすることができない、無効または読み取り不可能なＧＬＴＦマテリアル[FNAME]を追加しようとしました。
 読み込みはキャンセルされました。
-  </notification>
+	</notification>
 	<notification name="PathfindingReturnMultipleItems">
 		[NUM_ITEMS]個のアイテムを返却しようとしています。
 このまま続けてもよろしいですか？
@@ -5897,6 +5897,28 @@ Intelドライバーのウェブサイトを確認しますか？
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい"/>
 	</notification>
+	<notification name="ConfirmOverwriteOutfit">
+		<unique/>
+		これにより、選択したアウトフィットの
+アイテムが現在着ているアイテムに
+置き換えられます。
+		<tag>confirm</tag>
+		<usetemplate ignoretext="Confirm before overwriting outfit" name="okcancelignore" notext="キャンセル" yestext="保存"/>
+	</notification>
+	<notification name="ClearInventoryThumbnailsWarning">
+		リスト内のインベントリのアイテムからサムネイル画像を削除しようとしています。この変更は元に戻すことはできません。
+
+このまま続けてもよろしいですか？
+		<tag>confirm</tag>
+		<usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい"/>
+	</notification>
+	<notification name="WriteInventoryThumbnailsWarning">
+		リスト内の一部またはすべてのインベントリのアイテムのサムネイル画像を上書きしようとしています。 この変更は元に戻すことはできません。
+
+このまま続けてもよろしいですか？
+		<tag>confirm</tag>
+		<usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい"/>
+	</notification>
 	<notification name="ReflectionProbeApplied">
 		警告：オブジェクトを反射プローブとしました。これにより、オブジェクトが暗黙的に反射量を模倣するように不可逆的な変更が加えられます。
 
@@ -6054,7 +6076,7 @@ Intelドライバーのウェブサイトを確認しますか？
 	</notification>
 	<notification name="AOImportComplete">
 		アニメーションオーバーライダーのノートカードのインポートが完了しました！
-  </notification>
+	</notification>
 	<notification name="AOImportCreateSetFailed">
 		インポートセット作成時にエラーが発生しました。
 	</notification>
@@ -6193,12 +6215,11 @@ https://www.alchemyviewer.org/downloads から最新バージョンのビュー�
 
 ファイルは以下の場所にあります：
 C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses
-  </notification>
-
-<notification name="PoserExportANIMSuccess">
-	ポーズは、ANIMファイルへのエクスポートに成功しました。
+	</notification>
+	<notification name="PoserExportANIMSuccess">
+		ポーズは、ANIMファイルへのエクスポートに成功しました。
 
 ファイルは以下の場所にあります：
 C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
-  </notification>
+	</notification>
 </notifications>
