@@ -567,6 +567,8 @@
 		</menu>
 		<menu label="ＵＩ" name="UI">
 			<menu_item_call label="メディアブラウザ" name="Media Browser"/>
+			<menu_item_call label="インベントリのサムネイルヘルパ" name="Inventory Thumbnails Helper"/>
+			<menu_item_call label="ＦＢ接続テスト" name="FB Connect Test"/>
 			<menu_item_call label="フォントをダンプ" name="Dump Fonts"/>
 			<menu_item_call label="フォントをテクスチャにダンプ" name="Dump Font Textures"/>
 			<menu_item_call label="SelectMgrをダンプ" name="Dump SelectMgr"/>
@@ -580,6 +582,7 @@
 			<menu_item_check label="ダブルクリック" name="Debug Clicks"/>
 			<menu_item_check label="デバッグ表示" name="Debug Views"/>
 			<menu_item_check label="Unicodeのデバッグ" name="Debug Unicode"/>
+			<menu_item_check label="カメラ操作のデバッグ" name="Debug Camera Controls"/>
 			<menu_item_check label="デバッグ名ツールチップ" name="Debug Name Tooltips"/>
 			<menu_item_check label="マウスイベントのデバッグ" name="Debug Mouse Events"/>
 			<menu_item_check label="デバッグキー" name="Debug Keys"/>
