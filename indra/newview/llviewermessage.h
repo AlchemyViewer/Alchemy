@@ -158,6 +158,7 @@ void send_group_notice(const LLUUID& group_id,
 					   const LLInventoryItem* item);
 
 void send_do_not_disturb_message (LLMessageSystem* msg, const LLUUID& from_id, const LLUUID& session_id = LLUUID::null);
+void send_rejecting_friendship_requests_message (LLMessageSystem* msg, const LLUUID& from_id, const LLUUID& session_id = LLUUID::null); 
 
 void handle_lure(const LLUUID& invitee);
 void handle_lure(const uuid_vec_t& ids);
