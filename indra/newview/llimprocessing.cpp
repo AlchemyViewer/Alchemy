@@ -520,6 +520,9 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     BOOL is_muted = LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat)
         // object IMs contain sender object id in session_id (STORM-1209)
         || (dialog == IM_FROM_TASK && LLMuteList::getInstance()->isMuted(session_id));
+
+    BOOL is_rejecting_friendship_requests = gAgent.getRejectFriendshipRequests();
+
     BOOL is_owned_by_me = FALSE;
     BOOL is_friend = (LLAvatarTracker::instance().getBuddyInfo(from_id) == NULL) ? false : true;
     BOOL accept_im_from_only_friend = gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly");
@@ -1623,6 +1626,12 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
         case IM_FRIENDSHIP_OFFERED:
         {
+            if (is_rejecting_friendship_requests)
+            {
+                send_rejecting_friendship_requests_message(gMessageSystem, from_id);
+                return;
+            }
+
             LLSD payload;
             payload["from_id"] = from_id;
             payload["session_id"] = session_id;
