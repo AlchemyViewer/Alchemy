@@ -531,6 +531,9 @@ void LLAgent::init()
 	controlp->getSignal()->connect([&](LLControlVariable* control, const LLSD& new_val, const LLSD&) { mMovementResetCamera = new_val.asBoolean(); });
 	mMovementResetCamera = controlp->getValue().asBoolean();
 
+	selectRejectFriendshipRequests(gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsMode"));
+
+
 	if (!mTeleportFinishedSlot.connected())
 	{
 		mTeleportFinishedSlot = LLViewerParcelMgr::getInstance()->setTeleportFinishedCallback(boost::bind(&LLAgent::handleTeleportFinished, this));
@@ -1734,6 +1737,39 @@ bool LLAgent::isDoNotDisturb() const
 	return mIsDoNotDisturb;
 }
 
+//-----------------------------------------------------------------------------
+// setRejectFriendshipRequests()
+//-----------------------------------------------------------------------------
+void LLAgent::setRejectFriendshipRequests()
+{
+    selectRejectFriendshipRequests(TRUE);
+}
+
+//-----------------------------------------------------------------------------
+// clearRejectFriendshipRequests()
+//-----------------------------------------------------------------------------
+void LLAgent::clearRejectFriendshipRequests()
+{
+    selectRejectFriendshipRequests(FALSE);
+}
+
+//-----------------------------------------------------------------------------
+// selectRejectFriendshipRequests()
+//-----------------------------------------------------------------------------
+void LLAgent::selectRejectFriendshipRequests(BOOL selected)
+{
+    LL_INFOS() << "Setting rejecting friendship requests mode to " << selected << LL_ENDL;
+    mIsRejectFriendshipRequests = selected;
+    gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsMode", selected);
+}
+
+//-----------------------------------------------------------------------------
+// getRejectFriendshipRequests()
+//-----------------------------------------------------------------------------
+BOOL LLAgent::getRejectFriendshipRequests() const
+{
+    return mIsRejectFriendshipRequests;
+}
 
 //-----------------------------------------------------------------------------
 // startAutoPilotGlobal()
