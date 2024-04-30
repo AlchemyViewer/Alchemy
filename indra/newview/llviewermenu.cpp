@@ -6473,6 +6473,32 @@ class LLWorldSetDoNotDisturb : public view_listener_t
 	}
 };
 
+class LLWorldSetRejectFriendshipRequests : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        if (gAgent.getRejectFriendshipRequests())
+        {
+            gAgent.clearRejectFriendshipRequests();
+        }
+        else
+        {
+            gAgent.setRejectFriendshipRequests();
+            LLNotificationsUtil::add("RejectFriendshipRequestsModeSet");
+        }
+        return true;
+    }
+};
+
+class LLWorldGetRejectFriendshipRequests : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        bool new_value = gAgent.getRejectFriendshipRequests();
+        return new_value;
+    }
+};
+
 class LLWorldCreateLandmark : public view_listener_t
 {
 	bool handleEvent(const LLSD& userdata)
@@ -9867,6 +9893,8 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLViewCheckRenderType(), "View.CheckRenderType");
 	view_listener_t::addMenu(new LLViewStatusAway(), "View.Status.CheckAway");
 	view_listener_t::addMenu(new LLViewStatusDoNotDisturb(), "View.Status.CheckDoNotDisturb");
+	view_listener_t::addMenu(new LLWorldSetRejectFriendshipRequests(), "World.SetRejectFriendshipRequests");
+	view_listener_t::addMenu(new LLWorldGetRejectFriendshipRequests(), "World.GetRejectFriendshipRequests");
 	view_listener_t::addMenu(new LLViewCheckHUDAttachments(), "View.CheckHUDAttachments");
 // [SL:KB] - Patch: World-RenderExceptions | Checked: Catznip-5.2
 	commit.add("View.Blocked", boost::bind(&handle_view_blocked, _2));
