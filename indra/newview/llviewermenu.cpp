@@ -9893,7 +9893,6 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLViewCheckRenderType(), "View.CheckRenderType");
 	view_listener_t::addMenu(new LLViewStatusAway(), "View.Status.CheckAway");
 	view_listener_t::addMenu(new LLViewStatusDoNotDisturb(), "View.Status.CheckDoNotDisturb");
-	view_listener_t::addMenu(new LLWorldSetRejectFriendshipRequests(), "World.SetRejectFriendshipRequests");
 	view_listener_t::addMenu(new LLWorldGetRejectFriendshipRequests(), "World.GetRejectFriendshipRequests");
 	view_listener_t::addMenu(new LLViewCheckHUDAttachments(), "View.CheckHUDAttachments");
 // [SL:KB] - Patch: World-RenderExceptions | Checked: Catznip-5.2
@@ -9921,6 +9920,8 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLWorldTeleportHome(), "World.TeleportHome");
 	view_listener_t::addMenu(new LLWorldSetAway(), "World.SetAway");
 	view_listener_t::addMenu(new LLWorldSetDoNotDisturb(), "World.SetDoNotDisturb");
+	view_listener_t::addMenu(new LLWorldSetRejectFriendshipRequests(), "World.SetRejectFriendshipRequests");
+
 	view_listener_t::addMenu(new LLWorldLindenHome(), "World.LindenHome");
 
 	view_listener_t::addMenu(new LLWorldEnableCreateLandmark(), "World.EnableCreateLandmark");
