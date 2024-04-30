@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+    height="408"
+    layout="topleft"
+    name="autoresponse_settings"
+    top="0"
+    left="13"
+    width="517">
+      <text
+        top_pad="20"
+        follow="left|top"
+        height="18"
+        type="string"
+        length="1"
+        layout="topleft"
+        left="15"
+        name="autorespond_reject_friends_response_label"
+        width="500">
+        Automatic response to all avatars when in REJECT FRIENDSHIP REQUESTS mode
+        </text>
+        <text_editor
+          control_name="ALRejectFriendshipRequestsResponse"
+          use_ellipses="false"
+          commit_on_focus_lost="true"
+          follows="left|top"
+          height="55"
+          layout="topleft"
+          left="15"
+          top_pad="5"
+          name="autorespond_reject_friends_response"
+          width="475"
+          word_wrap="true">
+          log_in_to_change
+        </text_editor>
+    </panel>
+  </tab_container>

@@ -488,6 +488,14 @@ public:
 private:
 	bool			mIsDoNotDisturb;
 
+public:
+    void            setRejectFriendshipRequests();
+    void            clearRejectFriendshipRequests();
+    void            selectRejectFriendshipRequests(BOOL);
+    BOOL            getRejectFriendshipRequests() const;
+private:
+    BOOL            mIsRejectFriendshipRequests;
+
 	//--------------------------------------------------------------------
 	// Grab
 	//--------------------------------------------------------------------

@@ -487,6 +487,7 @@ BOOL LLFloaterPreference::postBuild()
 	if (LLStartUp::getStartupState() < STATE_STARTED)
 	{
 		gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
+		gSavedPerAccountSettings.setString("ALRejectFriendshipRequestsResponse", LLTrans::getString("RejectFriendshipRequestsResponseDefault"));
 	}
 
 	// set 'enable' property for 'Clear log...' button
@@ -555,6 +556,12 @@ void LLFloaterPreference::onDoNotDisturbResponseChanged()
 					!= getChild<LLUICtrl>("do_not_disturb_response")->getValue().asString();
 
 	gSavedPerAccountSettings.setBOOL("DoNotDisturbResponseChanged", response_changed_flag );
+
+	bool reject_friendship_requests_response_changed_flag = 
+			LLTrans::getString("RejectFriendshipRequestsResponseDefault")
+				!= getChild<LLUICtrl>("autorespond_reject_friends_response")->getValue().asString();
+
+	gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsChanged", reject_friendship_requests_response_changed_flag);
 }
 
 #if !LL_HAVOK
@@ -1201,6 +1208,11 @@ void LLFloaterPreference::initDoNotDisturbResponse()
 		{
 			//LLTrans::getString("DoNotDisturbModeResponseDefault") is used here for localization (EXT-5885)
 			gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
+		}
+
+		if (!gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsChanged"))
+		{
+			gSavedPerAccountSettings.setString("ALRejectFriendshipRequestsResponse", LLTrans::getString("RejectFriendshipRequestsResponseDefault"));
 		}
 	}
 

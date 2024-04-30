@@ -31,6 +31,12 @@
 				filename="panel_preferences_chat_cmd.xml"
 				layout="topleft"
 				follows="top|left" />
+            <panel
+				label="Autoresponse"
+				name="chat_pref_autoresponse"
+				filename="panel_preferences_chat_autoresponse.xml"
+				layout="topleft"
+				follows="top|left" />
     </tab_container>
 
 </panel>
