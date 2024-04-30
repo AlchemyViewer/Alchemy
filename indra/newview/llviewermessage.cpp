@@ -2464,6 +2464,25 @@ void send_do_not_disturb_message (LLMessageSystem* msg, const LLUUID& from_id, c
 	}
 }
 
+void send_rejecting_friendship_requests_message (LLMessageSystem* msg, const LLUUID& from_id, const LLUUID& session_id)
+{
+	std::string my_name;
+	LLAgentUI::buildFullname(my_name);
+	std::string response = gSavedPerAccountSettings.getString("ALRejectFriendshipRequestsResponse");
+	pack_instant_message(
+		msg,
+		gAgent.getID(),
+		FALSE,
+		gAgent.getSessionID(),
+		from_id,
+		my_name,
+		response,
+		IM_ONLINE,
+		IM_DO_NOT_DISTURB_AUTO_RESPONSE,
+		session_id);
+	gAgent.sendReliableMessage();
+}
+
 bool callingcard_offer_callback(const LLSD& notification, const LLSD& response)
 {
 	S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
