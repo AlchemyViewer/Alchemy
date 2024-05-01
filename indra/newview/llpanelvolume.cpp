@@ -1399,6 +1399,7 @@ void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTex
                 volobjp->setReflectionProbeAmbiance(hit_volobjp->getReflectionProbeAmbiance());
                 volobjp->setReflectionProbeNearClip(hit_volobjp->getReflectionProbeNearClip());
                 volobjp->setReflectionProbeIsDynamic(hit_volobjp->getReflectionProbeIsDynamic());
+                volobjp->setReflectionProbeIsMirror(hit_volobjp->getReflectionProbeIsMirror());
             }
             else
             {
