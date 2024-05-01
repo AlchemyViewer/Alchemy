@@ -1623,7 +1623,7 @@ void LLPanelVolume::onCommitProbe(LLUICtrl* ctrl, void* userdata)
     volobjp->setReflectionProbeNearClip((F32)self->getChild<LLUICtrl>("Probe Near Clip")->getValue().asReal());
     volobjp->setReflectionProbeIsDynamic(self->getChild<LLUICtrl>("Probe Dynamic")->getValue().asBoolean());
 
-    bool is_mirror = self->getChild<LLUICtrl>("Probe Dynamic")->getValue().asBoolean();
+    bool is_mirror = self->getChild<LLUICtrl>("Probe Mirror")->getValue().asBoolean();
     volobjp->setReflectionProbeIsMirror(is_mirror);
 
     self->getChildView("Probe Ambiance")->setEnabled(!is_mirror);
