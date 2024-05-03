@@ -1052,6 +1052,7 @@ public:
 	static S32 RenderScreenSpaceReflectionGlossySamples;
 	static S32 RenderBufferVisualization;
 	static bool RenderMirrors;
+	static bool RenderMirrorsAvailable;
 	static S32 RenderHeroProbeUpdateRate;
     static S32 RenderHeroProbeConservativeUpdateMultiplier;
 	static F32 RenderNormalMapScale;

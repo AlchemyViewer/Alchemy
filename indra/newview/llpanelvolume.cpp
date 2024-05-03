@@ -422,7 +422,7 @@ void LLPanelVolume::getState( )
 
     bool probe_enabled = is_probe && editable && single_volume;
 
-    bool mirrors_enabled = LLPipeline::RenderMirrors;
+    bool mirrors_enabled = LLPipeline::RenderMirrorsAvailable;
 
 	getChildView("Probe Mirror")->setVisible(mirrors_enabled);
 

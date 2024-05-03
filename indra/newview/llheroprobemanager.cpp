@@ -75,7 +75,7 @@ LLHeroProbeManager::~LLHeroProbeManager()
 // helper class to seed octree with probes
 void LLHeroProbeManager::update()
 {
-    if (!LLPipeline::RenderMirrors || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
+    if (!LLPipeline::RenderMirrorsAvailable || !LLPipeline::RenderMirrors || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
     {
         return;
     }
@@ -510,7 +510,7 @@ void LLHeroProbeManager::initReflectionMaps()
 {
     U32 count = LL_MAX_HERO_PROBE_COUNT;
 
-    if ((mTexture.isNull() || mReflectionProbeCount != count || mReset) && LLPipeline::RenderMirrors)
+    if ((mTexture.isNull() || mReflectionProbeCount != count || mReset) && LLPipeline::RenderMirrorsAvailable && LLPipeline::RenderMirrors)
     {
 
         if (mReset)

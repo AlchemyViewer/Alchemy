@@ -2666,7 +2666,10 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
                 mirrors_enabled = features["MirrorsEnabled"].asBoolean();
             }
 
-            gSavedSettings.setBOOL("RenderMirrors", mirrors_enabled);
+			if (LLPipeline::RenderMirrorsAvailable != mirrors_enabled)
+			{
+				gSavedSettings.setBOOL("RenderMirrorsAvailable", mirrors_enabled);
+			}
 
             if (features.has("PBRTerrainEnabled"))
             {
