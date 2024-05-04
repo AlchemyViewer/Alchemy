@@ -1,6 +1,7 @@
 # -*- cmake -*-
 include(Prebuilt)
 include(GLH)
+include(GLM)
 include(SDL2)
 
 add_library( ll::glext INTERFACE IMPORTED )
