@@ -66,9 +66,8 @@ typedef BOOL ( WINAPI* PfnCoSetProxyBlanket )( IUnknown* pProxy, DWORD dwAuthnSv
 std::string LLDXHardware::getDriverVersionWMI(EGPUVendor vendor)
 {
 	std::string mDriverVersion;
-	HRESULT hrCoInitialize = S_OK;
 	HRESULT hres;
-	hrCoInitialize = CoInitialize(0);
+	CoInitializeEx(0, COINIT_APARTMENTTHREADED);
 	IWbemLocator *pLoc = NULL;
 
 	hres = CoCreateInstance(
@@ -271,10 +270,10 @@ std::string LLDXHardware::getDriverVersionWMI(EGPUVendor vendor)
 	{
 		pEnumerator->Release();
 	}
-	if (SUCCEEDED(hrCoInitialize))
-	{
-		CoUninitialize();
-	}
+
+    // supposed to always call CoUninitialize even if init returned false
+	CoUninitialize();
+
 	return mDriverVersion;
 }
 
@@ -523,14 +522,7 @@ LLSD LLDXHardware::getDisplayInfo()
 	LLTimer hw_timer;
     HRESULT       hr;
 	LLSD ret;
-    hr = CoInitialize(nullptr);
-	if (FAILED(hr))
-	{
-		LL_WARNS() << "COM initialization failure!" << LL_ENDL;
-		gWriteDebug("COM initialization failure!\n");
-		return ret;
-	}
-
+	hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     IDxDiagProvider *dx_diag_providerp = NULL;
     IDxDiagContainer *dx_diag_rootp = NULL;
 	IDxDiagContainer *devices_containerp = NULL;
@@ -538,6 +530,13 @@ LLSD LLDXHardware::getDisplayInfo()
 	IDxDiagContainer *file_containerp = NULL;
 	IDxDiagContainer *driver_containerp = NULL;
 	DWORD dw_device_count;
+
+	if (FAILED(hr))
+	{
+		LL_WARNS() << "COM initialization failure!" << LL_ENDL;
+		gWriteDebug("COM initialization failure!\n");
+		goto LCleanup;
+	}
 
     // CoCreate a IDxDiagProvider*
 	LL_INFOS() << "CoCreateInstance IID_IDxDiagProvider" << LL_ENDL;

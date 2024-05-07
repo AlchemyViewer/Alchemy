@@ -17,7 +17,7 @@
 	</string>
 	<icon name="drag"/>
 	<panel name="buttons">
-		<button label="" name="collapse_btn" tool_tip="縮小／展開"/>
+		<button label="" name="collapse_btn" tool_tip="折り畳む／展開する"/>
 		<button label="" name="save_cam_pos_btn" tool_tip="現在のカメラの位置とフォーカスを保存します。"/>
 		<button label="" name="restore_cam_pos_btn" tool_tip="保存されたカメラの位置とフォーカスを復元します。"/>
 	</panel>
@@ -43,6 +43,8 @@
 		</combo_box>
 		<button name="gear_btn" tool_tip="カメラのプリセット"/>
 		<button label="プリセットを保存…" name="save_preset_btn"/>
-		<button name="precise_controls_btn" tool_tip="小数点単位の操作を使用"/>
+		<button name="precise_controls_btn" tool_tip="小数点単位の操作を使用します。"/>
 	</panel>
+	<panel name="viewer_camera_info"/>
+	<panel name="agent_camera_info"/>
 </floater>

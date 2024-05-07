@@ -457,7 +457,7 @@ class WindowsManifest(ViewerManifest):
         with self.prefix(src=os.path.join(self.args['build'], os.pardir,
                                           'sharedlibs', self.args['buildtype'])):
             # For image support
-            self.path("openjpeg.dll")
+            self.path("openjp2.dll")
 
             # Get openal dll for audio engine, continue if missing
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
@@ -466,8 +466,8 @@ class WindowsManifest(ViewerManifest):
                 self.path("alut.dll")
 
             # For ICU4C
-            self.path("icudt74.dll")
-            self.path("icuuc74.dll")
+            self.path("icudt75.dll")
+            self.path("icuuc75.dll")
 
             # Get fmodstudio dll for audio engine, continue if missing
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
@@ -1241,7 +1241,7 @@ class Linux_i686_Manifest(LinuxManifest):
 
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libSDL2*.so*")
-            self.path("libopenjpeg.*so*")
+            self.path("libopenjp2.*so*")
             self.path("libjpeg.so*")
 
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
@@ -1279,7 +1279,7 @@ class Linux_x86_64_Manifest(LinuxManifest):
 
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libSDL2*.so*")
-            self.path("libopenjpeg.*so*")
+            self.path("libopenjp2.*so*")
             self.path("libjpeg.so*")
             self.path("libsdbus-c++.so*")
 

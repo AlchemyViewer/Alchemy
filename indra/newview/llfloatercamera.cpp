@@ -44,6 +44,7 @@
 #include "llfirstuse.h"
 #include "llhints.h"
 #include "lltabcontainer.h"
+#include "llviewercamera.h"
 #include "llvoavatarself.h"
 // [RLVa:KB] - @setcam
 #include "rlvactions.h"
@@ -68,13 +69,19 @@ class LLPanelCameraZoom
 :	public LLPanel
 {
 	LOG_CLASS(LLPanelCameraZoom);
+
 public:
-	LLPanelCameraZoom();
+	struct Params : public LLInitParam::Block<Params, LLPanel::Params> {};
+
+	LLPanelCameraZoom() { onCreate(); }
 
 	/* virtual */ BOOL	postBuild();
 	/* virtual */ void	draw();
 
 protected:
+	LLPanelCameraZoom(const Params& p) { onCreate(); }
+
+	void	onCreate();
 	void	onZoomPlusHeldDown();
 	void	onZoomMinusHeldDown();
 	void	onSliderValueChanged();
@@ -85,11 +92,13 @@ protected:
 	void	onRollRightHeldDown();
 
 private:
-	LLButton*	mPlusBtn;
-	LLButton*	mMinusBtn;
-	LLSlider*	mSlider;
-	LLButton*	mRollLeft;
-	LLButton*	mRollRight;
+	LLButton*	mPlusBtn { nullptr };
+	LLButton*	mMinusBtn{ nullptr };
+	LLSlider*	mSlider{ nullptr };
+	LLButton*	mRollLeft{ nullptr };
+	LLButton*	mRollRight{ nullptr };
+
+	friend class LLUICtrlFactory;
 };
 
 LLPanelCameraItem::Params::Params()
@@ -165,12 +174,7 @@ static LLPanelInjector<LLPanelCameraZoom> t_camera_zoom_panel("camera_zoom_panel
 // LLPanelCameraZoom
 //-------------------------------------------------------------------------------
 
-LLPanelCameraZoom::LLPanelCameraZoom()
-:	mPlusBtn( NULL ),
-	mMinusBtn( NULL ),
-	mSlider( NULL ),
-	mRollLeft( NULL ),
-	mRollRight( NULL )
+void LLPanelCameraZoom::onCreate()
 {
 	mCommitCallbackRegistrar.add("Zoom.minus", boost::bind(&LLPanelCameraZoom::onZoomMinusHeldDown, this));
 	mCommitCallbackRegistrar.add("Zoom.plus", boost::bind(&LLPanelCameraZoom::onZoomPlusHeldDown, this));
@@ -183,11 +187,11 @@ LLPanelCameraZoom::LLPanelCameraZoom()
 
 BOOL LLPanelCameraZoom::postBuild()
 {
-	mPlusBtn  = getChild <LLButton> ("zoom_plus_btn");
-	mMinusBtn = getChild <LLButton> ("zoom_minus_btn");
-	mSlider   = getChild <LLSlider> ("zoom_slider");
-	mRollLeft	= getChild <LLButton> ("roll_left");
-	mRollRight	= getChild <LLButton> ("roll_right");
+	mPlusBtn  = getChild<LLButton>("zoom_plus_btn");
+	mMinusBtn = getChild<LLButton>("zoom_minus_btn");
+	mSlider   = getChild<LLSlider>("zoom_slider");
+	mRollLeft	= getChild<LLButton>("roll_left");
+	mRollRight	= getChild<LLButton>("roll_right");
 	return LLPanel::postBuild();
 }
 
@@ -267,11 +271,80 @@ void activate_camera_tool()
 	LLToolMgr::getInstance()->setTransientTool(LLToolCamera::getInstance());
 };
 
+class LLCameraInfoPanel : public LLPanel
+{
+public:
+    typedef std::function<LLVector3()> get_vector_t;
+
+    LLCameraInfoPanel(
+        const LLView* parent,
+        const char* title,
+        const LLCoordFrame& camera,
+        const get_vector_t get_focus
+    )
+    : LLPanel([&]() -> LLPanel::Params
+        {
+            LLPanel::Params params;
+            params.rect = LLRect(parent->getLocalRect());
+            return params;
+        }())
+    , mTitle(title)
+    , mCamera(camera)
+    , mGetFocus(get_focus)
+    , mFont(LLFontGL::getFontSansSerifBig())
+    {
+    }
+
+    virtual void draw() override
+    {
+        LLPanel::draw();
+
+        static const U32 HPADDING = 10;
+        static const U32 VPADDING = 5;
+        LLVector3 focus = mGetFocus();
+        LLVector3 sight = focus - mCamera.mOrigin;
+        std::pair<const char*, const LLVector3&> const data[] =
+        {
+            { "Origin:", mCamera.mOrigin },
+            { "X Axis:", mCamera.mXAxis },
+            { "Y Axis:", mCamera.mYAxis },
+            { "Z Axis:", mCamera.mZAxis },
+            { "Focus:", focus },
+            { "Sight:", sight }
+        };
+        S32 width = getRect().getWidth();
+        S32 height = getRect().getHeight();
+        S32 row_count = 1 + sizeof(data) / sizeof(*data);
+        S32 row_height = (height - VPADDING * 2) / row_count;
+        S32 top = height - VPADDING - row_height / 2;
+        mFont->renderUTF8(mTitle, 0, HPADDING, top, LLColor4::white, LLFontGL::LEFT, LLFontGL::VCENTER);
+        for (const auto& row : data)
+        {
+            top -= row_height;
+            mFont->renderUTF8(row.first, 0, HPADDING, top, LLColor4::white, LLFontGL::LEFT, LLFontGL::VCENTER);
+            const LLVector3& vector = row.second;
+            for (S32 i = 0; i < 3; ++i)
+            {
+                std::string text = llformat("%.6f", vector[i]);
+                S32 right = width / 4 * (i + 2) - HPADDING;
+                mFont->renderUTF8(text, 0, right, top, LLColor4::white, LLFontGL::RIGHT, LLFontGL::VCENTER);
+            }
+        }
+    }
+
+private:
+    const char* mTitle;
+    const LLCoordFrame& mCamera;
+    const get_vector_t mGetFocus;
+    const LLFontGL* mFont;
+};
+
 //
 // Member functions
 //
 
-/*static*/ bool LLFloaterCamera::inFreeCameraMode()
+// static
+bool LLFloaterCamera::inFreeCameraMode()
 {
 	LLFloaterCamera* floater_camera = LLFloaterCamera::findInstance();
 	if (floater_camera && floater_camera->mCurrMode == CAMERA_CTRL_MODE_FREE_CAMERA && gAgentCamera.getCameraMode() != CAMERA_MODE_MOUSELOOK)
@@ -281,6 +354,7 @@ void activate_camera_tool()
 	return false;
 }
 
+// static
 void LLFloaterCamera::resetCameraMode()
 {
 	LLFloaterCamera* floater_camera = LLFloaterCamera::findInstance();
@@ -288,6 +362,7 @@ void LLFloaterCamera::resetCameraMode()
 	floater_camera->switchMode(CAMERA_CTRL_MODE_PAN);
 }
 
+// static
 void LLFloaterCamera::onAvatarEditingAppearance(bool editing)
 {
 	sAppearanceEditing = editing;
@@ -296,15 +371,46 @@ void LLFloaterCamera::onAvatarEditingAppearance(bool editing)
 	floater_camera->handleAvatarEditingAppearance(editing);
 }
 
+// static
+void LLFloaterCamera::onDebugCameraToggled()
+{
+    if (LLFloaterCamera* instance = LLFloaterCamera::findInstance())
+    {
+        instance->showDebugInfo(LLView::sDebugCamera);
+    }
+
+    if (LLView::sDebugCamera)
+    {
+        LLFloaterReg::showInstanceOrBringToFront("camera");
+    }
+}
+
+void LLFloaterCamera::showDebugInfo(bool show)
+{
+    // Initially LLPanel contains 1 child "view_border"
+    if (show && mViewerCameraInfo->getChildCount() < 2)
+    {
+        mViewerCameraInfo->addChild(new LLCameraInfoPanel(mViewerCameraInfo, "Viewer Camera", *LLViewerCamera::getInstance(),
+            []() { return LLViewerCamera::getInstance()->getPointOfInterest(); }));
+        mAgentCameraInfo->addChild(new LLCameraInfoPanel(mAgentCameraInfo, "Agent Camera", gAgent.getFrameAgent(),
+            []() { return gAgent.getPosAgentFromGlobal(gAgentCamera.calcFocusPositionTargetGlobal()); }));
+    }
+
+    mAgentCameraInfo->setVisible(show);
+    mViewerCameraInfo->setVisible(show);
+}
+
 void LLFloaterCamera::handleAvatarEditingAppearance(bool editing)
 {
-
 }
 
 void LLFloaterCamera::update()
 {
 	ECameraControlMode mode = determineMode();
-	if (mode != mCurrMode) setMode(mode);
+	if (mode != mCurrMode)
+	{
+		setMode(mode);
+	}
 }
 
 
@@ -313,7 +419,8 @@ void LLFloaterCamera::toPrevMode()
 	switchMode(mPrevMode);
 }
 
-/*static*/ void LLFloaterCamera::onLeavingMouseLook()
+// static
+void LLFloaterCamera::onLeavingMouseLook()
 {
 	LLFloaterCamera* floater_camera = LLFloaterCamera::findInstance();
 	if (floater_camera)
@@ -347,12 +454,14 @@ void LLFloaterCamera::onOpen(const LLSD& key)
 	mClosed = FALSE;
 
 	populatePresetCombo();
+
+	showDebugInfo(LLView::sDebugCamera);
 }
 
 void LLFloaterCamera::onClose(bool app_quitting)
 {
 	//We don't care of camera mode if app is quitting
-	if(app_quitting)
+	if (app_quitting)
 		return;
 	// It is necessary to reset mCurrMode to CAMERA_CTRL_MODE_PAN so 
 	// to avoid seeing an empty floater when reopening the control.
@@ -390,14 +499,18 @@ BOOL LLFloaterCamera::postBuild()
 {
 	updateTransparency(TT_ACTIVE); // force using active floater transparency (STORM-730)
 
+	mControls = getChild<LLPanel>("controls");
+	mAgentCameraInfo = getChild<LLPanel>("agent_camera_info");
+	mViewerCameraInfo = getChild<LLPanel>("viewer_camera_info");
 	mRotate = getChild<LLJoystickCameraRotate>(ORBIT);
-	mZoom = findChild<LLPanelCameraZoom>(ZOOM);
+	mZoom = getChild<LLPanelCameraZoom>(ZOOM);
 	mTrack = getChild<LLJoystickCameraTrack>(PAN);
 	mPresetCombo = getChild<LLComboBox>("preset_combo");
+//	mPreciseCtrls = getChild<LLTextBox>("precise_ctrs_label");
 
-	//getChild<LLTextBox>("precise_ctrs_label")->setShowCursorHand(false);
-	//getChild<LLTextBox>("precise_ctrs_label")->setSoundFlags(LLView::MOUSE_UP);
-	//getChild<LLTextBox>("precise_ctrs_label")->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), FALSE));
+//	mPreciseCtrls->setShowCursorHand(false);
+//	mPreciseCtrls->setSoundFlags(LLView::MOUSE_UP);
+//	mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), FALSE));
 
 	mPresetCombo->setCommitCallback(boost::bind(&LLFloaterCamera::onCustomPresetSelected, this));
 	LLPresetsManager::getInstance()->setPresetListChangeCameraCallback(boost::bind(&LLFloaterCamera::populatePresetCombo, this));
@@ -541,6 +654,7 @@ void LLFloaterCamera::updateItemsSelection()
 	getChild<LLPanelCameraItem>("object_view")->setValue(argument);
 }
 
+// static
 void LLFloaterCamera::onClickCameraItem(const LLSD& param)
 {
 	std::string name = param.asString();
@@ -567,7 +681,7 @@ void LLFloaterCamera::onClickCameraItem(const LLSD& param)
 	}
 }
 
-/*static*/
+// static
 void LLFloaterCamera::switchToPreset(const std::string& name)
 {
 // [RLVa:KB] - @setcam family

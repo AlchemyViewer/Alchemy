@@ -6,26 +6,32 @@
 	<panel.string name="bandwidth_tooltip">
 		Bande passante
 	</panel.string>
-	<panel.string name="time">
-		[hour12, datetime, slt]:[min, datetime, slt] [ampm, datetime, slt] [timezone,datetime, slt]
+	<panel.string name="time" >
+		[hour24, datetime, slt]:[min, datetime, slt] [timezone,datetime, slt]
+	</panel.string>
+	<panel.string name="timeSeconds" >
+		[hour24, datetime, slt]:[min, datetime, slt]:[second, datetime, slt] [timezone,datetime, slt]
 	</panel.string>
 	<panel.string name="timeTooltip">
 		[weekday, datetime, slt] [sday, datetime, slt] [month, datetime, slt] [year, datetime, slt]
 	</panel.string>
 	<panel.string name="buycurrencylabel">
-		[AMT] L$
+		L$ [AMT]
 	</panel.string>
 	<panel name="menu_search_panel">
-		<search_editor label="Menus de recherche" name="search_menu_edit" tool_tip="Tapez le terme de recherche qui vous intéresse ici. Les résultats seront affichés pour les correspondances partielles en texte intégral dans le menu."/>
+		<search_editor label="Recherche" name="search_menu_edit" tool_tip="Cherchez dans les menus"/>
 	</panel>
-	<panel left="-426" name="balance_bg" width="195">
-		<text name="balance" tool_tip="Cliquer sur ce bouton pour actualiser votre solde en L$." value="L$ ??"/>
-		<button label="Acheter L$" name="buyL" tool_tip="Cliquer pour acheter plus de L$."/>
-		<button label="Achats" name="goShop" tool_tip="Ouvrir la Place du marché Second Life." width="75"/>
+	<panel name="balance_bg">
+		<text name="balance" tool_tip="Cliquer sur ce bouton pour actualiser votre solde en L$." value="L$ 999999"/>
+		<button label="Acheter L$" name="buyL" width="70" tool_tip="Cliquer pour acheter plus de L$."/>
 	</panel>
 	<text name="TimeText" tool_tip="Heure actuelle (Pacifique)">
-		00h00 PST
+		24:00:00 AM PST
 	</text>
-	<button name="media_toggle_btn" tool_tip="Arrêter tous les médias (musique, vidéo, pages web)."/>
-	<button name="volume_btn" tool_tip="Régler le volume global."/>
+	<icon image_name="Cam_FreeCam_Off" name="presets_icon_camera" tool_tip="Préréglages de caméra"/>
+	<icon image_name="Presets_Icon" name="presets_icon_graphic" tool_tip="Preréglages graphique"/>
+	<button name="media_toggle_btn" tool_tip="Médias"/>
+	<text name="FPSText" tool_tip="Images par seconde">
+		240
+	</text>
 </panel>

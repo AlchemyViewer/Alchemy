@@ -51,7 +51,7 @@ LLLoadingIndicator::LLLoadingIndicator(const Params& p)
 
 void LLLoadingIndicator::initFromParams(const Params& p)
 {
-    for (LLUIImage* image : p.images().image)
+	for (LLUIImage* image : p.images().image)
 	{
 		mImages.push_back(image);
 	}

@@ -1548,18 +1548,29 @@ void LLAgent::pitch(F32 angle)
 	static LLCachedControl<bool> useRealisticMouselook(gSavedSettings, "AlchemyRealisticMouselook", false);
 	const bool in_mouselook = gAgentCamera.cameraMouselook();
 	const F32 look_down_limit = (in_mouselook && useRealisticMouselook ? 160.f : (isAgentAvatarValid() && gAgentAvatarp->isSitting() ? 170.f : 179.f)) * DEG_TO_RAD;
-	const F32 look_up_limit = (in_mouselook && useRealisticMouselook ? 20.f : 10.f) * DEG_TO_RAD;
 
-	F32 angle_from_skyward = acos( mFrameAgent.getAtAxis() * skyward );
 
 	// clamp pitch to limits
-	if ((angle >= 0.f) && (angle_from_skyward + angle > look_down_limit))
+	if (angle >= 0.f)
 	{
-		angle = look_down_limit - angle_from_skyward;
+		const F32 look_down_limit = (in_mouselook && useRealisticMouselook ? 160.f : 179.f) * DEG_TO_RAD;
+		F32 angle_from_skyward = acos(mFrameAgent.getAtAxis() * skyward);
+		if (angle_from_skyward + angle > look_down_limit)
+		{
+			angle = look_down_limit - angle_from_skyward;
+		}
 	}
-	else if ((angle < 0.f) && (angle_from_skyward + angle < look_up_limit))
+	else if (angle < 0.f)
 	{
-		angle = look_up_limit - angle_from_skyward;
+		const F32 look_up_limit = (in_mouselook && useRealisticMouselook ? 20.f : 5.f) * DEG_TO_RAD;
+		const LLVector3& viewer_camera_pos = LLViewerCamera::getInstance()->getOrigin();
+		LLVector3 agent_focus_pos = getPosAgentFromGlobal(gAgentCamera.calcFocusPositionTargetGlobal());
+		LLVector3 look_dir = agent_focus_pos - viewer_camera_pos;
+		F32 angle_from_skyward = angle_between(look_dir, skyward);
+		if (angle_from_skyward + angle < look_up_limit)
+		{
+			angle = look_up_limit - angle_from_skyward;
+		}
 	}
 
 	if (fabs(angle) > 1e-4)
@@ -4597,6 +4608,11 @@ void LLAgent::teleportViaLandmark(const LLUUID& landmark_asset_id)
 		return;
 	}
 // [/RLVa:KB]
+
+    if (landmark_asset_id.isNull())
+    {
+        gAgentCamera.resetView();
+    }
 
 	mTeleportRequest = std::make_shared<LLTeleportRequestViaLandmark>(landmark_asset_id);
 	startTeleportRequest();

@@ -990,6 +990,7 @@ LLBoundListener LLNotificationChannelBase::connectChangedImpl(const LLEventListe
 	// all of the notifications that are already in the channel
 	// we use a special signal called "load" in case the channel wants to care
 	// only about new notifications
+    LLMutexLock lock(&mItemsMutex);
 	for (LLNotificationSet::iterator it = mItems.begin(); it != mItems.end(); ++it)
 	{
 		slot(LLSD().with("sigtype", "load").with("id", (*it)->id()));
@@ -1167,6 +1168,14 @@ LLNotificationChannel::LLNotificationChannel(const std::string& name,
 	connectToChannel(parent);
 }
 
+LLNotificationChannel::~LLNotificationChannel()
+{
+    for (LLBoundListener &listener : mListeners)
+    {
+        listener.disconnect();
+    }
+}
+
 bool LLNotificationChannel::isEmpty() const
 {
 	return mItems.empty();
@@ -1174,17 +1183,7 @@ bool LLNotificationChannel::isEmpty() const
 
 S32 LLNotificationChannel::size() const
 {
-	return mItems.size();
-}
-
-LLNotificationChannel::Iterator LLNotificationChannel::begin()
-{
-	return mItems.begin();
-}
-
-LLNotificationChannel::Iterator LLNotificationChannel::end()
-{
-	return mItems.end();
+    return mItems.size();
 }
 
 size_t LLNotificationChannel::size()
@@ -1192,12 +1191,19 @@ size_t LLNotificationChannel::size()
 	return mItems.size();
 }
 
+void LLNotificationChannel::forEachNotification(NotificationProcess process)
+{
+    LLMutexLock lock(&mItemsMutex);
+    std::for_each(mItems.begin(), mItems.end(), process);
+}
+
 std::string LLNotificationChannel::summarize()
 {
 	std::string s("Channel '");
 	s += mName;
 	s += "'\n  ";
-	for (LLNotificationChannel::Iterator it = begin(); it != end(); ++it)
+    LLMutexLock lock(&mItemsMutex);
+	for (LLNotificationChannel::Iterator it = mItems.begin(); it != mItems.end(); ++it)
 	{
 		s += (*it)->summarize();
 		s += "\n  ";
@@ -1209,14 +1215,14 @@ void LLNotificationChannel::connectToChannel( const std::string& channel_name )
 {
 	if (channel_name.empty())
 	{
-		LLNotifications::instance().connectChanged(
-			boost::bind(&LLNotificationChannelBase::updateItem, this, _1));
+        mListeners.push_back(LLNotifications::instance().connectChanged(
+			boost::bind(&LLNotificationChannelBase::updateItem, this, _1)));
 	}
 	else
 	{
 		mParents.push_back(channel_name);
 		LLNotificationChannelPtr p = LLNotifications::instance().getChannel(channel_name);
-		p->connectChanged(boost::bind(&LLNotificationChannelBase::updateItem, this, _1));
+        mListeners.push_back(p->connectChanged(boost::bind(&LLNotificationChannelBase::updateItem, this, _1)));
 	}
 }
 
@@ -1568,19 +1574,19 @@ bool LLNotifications::loadTemplates()
 
 	mTemplates.clear();
 
-	for (LLNotificationTemplate::GlobalString& string : params.strings)
+	for (const LLNotificationTemplate::GlobalString& string : params.strings)
 	{
 		mGlobalStrings[string.name] = string.value;
 	}
 
 	std::map<std::string, LLNotificationForm::Params> form_templates;
 
-	for (LLNotificationTemplate::Template& notification_template : params.templates)
+	for (const LLNotificationTemplate::Template& notification_template : params.templates)
 	{
 		form_templates[notification_template.name] = notification_template.form;
 	}
 
-	for (LLNotificationTemplate::Params &notification : params.notifications)
+	for (LLNotificationTemplate::Params& notification : params.notifications)
 	{
 		if (notification.form_ref.form_template.isChosen())
 		{
@@ -1635,7 +1641,7 @@ bool LLNotifications::loadVisibilityRules()
 
 	mVisibilityRules.clear();
 
-	for (LLNotificationVisibilityRule::Rule& rule : params.rules)
+	for (const LLNotificationVisibilityRule::Rule& rule : params.rules)
 	{
 		mVisibilityRules.push_back(LLNotificationVisibilityRulePtr(new LLNotificationVisibilityRule(rule)));
 	}
@@ -1728,6 +1734,7 @@ void LLNotifications::cancel(LLNotificationPtr pNotif)
 
 void LLNotifications::cancelByName(std::string_view name)
 {
+    LLMutexLock lock(&mItemsMutex);
 	std::vector<LLNotificationPtr> notifs_to_cancel;
 	for (LLNotificationSet::iterator it=mItems.begin(), end_it = mItems.end();
 		it != end_it;
@@ -1752,6 +1759,7 @@ void LLNotifications::cancelByName(std::string_view name)
 
 void LLNotifications::cancelByOwner(const LLUUID ownerId)
 {
+    LLMutexLock lock(&mItemsMutex);
 	std::vector<LLNotificationPtr> notifs_to_cancel;
 	for (LLNotificationSet::iterator it = mItems.begin(), end_it = mItems.end();
 		 it != end_it;
@@ -1799,11 +1807,6 @@ LLNotificationPtr LLNotifications::find(LLUUID uuid)
 	{
 		return *it;
 	}
-}
-
-void LLNotifications::forEachNotification(NotificationProcess process)
-{
-	std::for_each(mItems.begin(), mItems.end(), process);
 }
 
 std::string LLNotifications::getGlobalString(std::string_view key) const

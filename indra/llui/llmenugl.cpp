@@ -2163,7 +2163,7 @@ void LLMenuGL::arrange( void )
 		}
 		else
 		{
-            for (LLMenuItemGL* itemp : mItems)
+			for (LLMenuItemGL* itemp : mItems)
 			{
 				// do first so LLMenuGLItemCall can call on_visible to determine if visible
 				itemp->buildDrawLabel();

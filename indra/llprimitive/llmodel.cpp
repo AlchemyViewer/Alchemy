@@ -70,6 +70,7 @@ LLModel::~LLModel()
 	{
 		LLConvexDecomposition::getInstance()->deleteDecomposition(mDecompID);
 	}
+    mPhysics.mMesh.clear();
 }
 
 //static
