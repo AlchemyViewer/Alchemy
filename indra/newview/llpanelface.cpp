@@ -325,7 +325,7 @@ BOOL	LLPanelFace::postBuild()
     if (pbr_ctrl)
     {
         pbr_ctrl->setDefaultImageAssetID(LLUUID::null);
-        pbr_ctrl->setBlankImageAssetID(LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID);
+        pbr_ctrl->setBlankImageAssetID(BLANK_MATERIAL_ASSET_ID);
         pbr_ctrl->setCommitCallback(boost::bind(&LLPanelFace::onCommitPbr, this, _2));
         pbr_ctrl->setOnCancelCallback(boost::bind(&LLPanelFace::onCancelPbr, this, _2));
         pbr_ctrl->setOnSelectCallback(boost::bind(&LLPanelFace::onSelectPbr, this, _2));
@@ -1752,6 +1752,7 @@ void LLPanelFace::updateUI(bool force_set_values /*false*/)
 					getChild<LLUICtrl>("shinyOffsetV")->setValue(offset_y);
                     mSpinGlossiness->setValue(material->getSpecularLightExponent());
                     mSpinEnvironment->setValue(material->getEnvironmentIntensity());
+                    getChild<LLUICtrl>("mirror")->setValue(material->getEnvironmentIntensity());
 
 					updateShinyControls(!material->getSpecularID().isNull(), true);
 				}
@@ -1988,7 +1989,7 @@ void LLPanelFace::updateUIGLTF(LLViewerObject* objectp, bool& has_pbr_material, 
     {
         mVOInventoryListener = nullptr;
     }
-    if (!identical_pbr || pbr_id.isNull() || pbr_id == LLGLTFMaterialList::BLANK_MATERIAL_ASSET_ID)
+    if (!identical_pbr || pbr_id.isNull() || pbr_id == BLANK_MATERIAL_ASSET_ID)
     {
         mAgentInventoryListener = nullptr;
     }

@@ -34,11 +34,12 @@
 #include "llshadermgr.h"
 #include "pipeline.h"
 
+//static
+LLFetchedGLTFMaterial LLFetchedGLTFMaterial::sDefault;
+
 LLFetchedGLTFMaterial::LLFetchedGLTFMaterial()
     : LLGLTFMaterial()
     , mExpectedFlusTime(0.f)
-    , mActive(true)
-    , mFetching(false)
 {
 
 }
@@ -249,10 +250,11 @@ void LLFetchedGLTFMaterial::onMaterialComplete(std::function<void()> material_co
     materialCompleteCallbacks.push_back(material_complete);
 }
 
-void LLFetchedGLTFMaterial::materialComplete()
+void LLFetchedGLTFMaterial::materialComplete(bool success)
 {
     llassert(mFetching);
     mFetching = false;
+    mFetchSuccess = success;
 
     for (std::function<void()> material_complete : materialCompleteCallbacks)
     {

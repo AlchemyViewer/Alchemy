@@ -54,14 +54,20 @@ in vec2 emissive_texcoord;
 
 uniform float minimum_alpha; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
 
-vec2 encode_normal(vec3 n);
 vec3 linear_to_srgb(vec3 c);
 vec3 srgb_to_linear(vec3 c);
+
+uniform vec4 clipPlane;
+uniform float clipSign;
+
+void mirrorClip(vec3 pos);
 
 uniform mat3 normal_matrix;
 
 void main()
 {
+    mirrorClip(vary_position);
+
     vec4 basecolor = texture(diffuseMap, base_color_texcoord.xy).rgba;
     if (basecolor.a < minimum_alpha)
     {
@@ -103,7 +109,7 @@ void main()
     // See: C++: addDeferredAttachments(), GLSL: softenLightF
     frag_data[0] = max(vec4(col, 0.0), vec4(0));                                                   // Diffuse
     frag_data[1] = max(vec4(spec.rgb,vertex_color.a), vec4(0));                                    // PBR linear packed Occlusion, Roughness, Metal.
-    frag_data[2] = max(vec4(encode_normal(tnorm), vertex_color.a, GBUFFER_FLAG_HAS_PBR), vec4(0)); // normal, environment intensity, flags
+    frag_data[2] = vec4(tnorm, GBUFFER_FLAG_HAS_PBR); // normal, environment intensity, flags
     frag_data[3] = max(vec4(emissive,0), vec4(0));                                                // PBR sRGB Emissive
 }
 

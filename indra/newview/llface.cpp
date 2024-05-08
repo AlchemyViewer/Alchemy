@@ -1868,7 +1868,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 			S32* vp = (S32*) &val;
 			*vp = index;
 			
-			llassert(index <= LLGLSLShader::sIndexedTextureChannels-1);
+			llassert(index < LLGLSLShader::sIndexedTextureChannels);
 
 			LLVector4Logical mask;
 			mask.clear();
@@ -1902,7 +1902,7 @@ BOOL LLFace::getGeometryVolume(const LLVolume& volume,
 			F32* normals = (F32*) norm.get();
 			LLVector4a* src = vf.mNormals;
 			LLVector4a* end = src+num_vertices;
-			
+
 			while (src < end)
 			{	
 				LLVector4a normal;

@@ -39,6 +39,7 @@
 #include "lldrawable.h"
 #include "llrendertarget.h"
 #include "llreflectionmapmanager.h"
+#include "llheroprobemanager.h"
 
 #include "alrenderutils.h"
 
@@ -112,6 +113,8 @@ public:
 
     // rebuild all LLVOVolume render batches
     void rebuildDrawInfo();
+    // Rebuild all terrain
+    void rebuildTerrain();
 
     // Clear LLFace mVertexBuffer pointers
 	void resetVertexBuffers(LLDrawable* drawable);
@@ -186,6 +189,8 @@ public:
                                                 bool pick_unselectable,
                                                 bool pick_reflection_probe,
 												S32* face_hit,                          // return the face hit
+                                                S32* gltf_node_hit = nullptr,           // return the gltf node hit
+                                                S32* gltf_primitive_hit = nullptr,      // return the gltf primitive hit
 												LLVector4a* intersection = NULL,         // return the intersection point
 												LLVector2* tex_coord = NULL,            // return the texture coordinates of the intersection point
 												LLVector4a* normal = NULL,               // return the surface normal at the intersection point
@@ -437,6 +442,7 @@ public:
     void handleShadowDetailChanged();
 
     LLReflectionMapManager mReflectionMapManager;
+    LLHeroProbeManager mHeroProbeManager;
 
 private:
 	void unloadShaders();
@@ -590,12 +596,12 @@ public:
 		RENDER_DEBUG_PHYSICS_SHAPES     =  0x02000000,
 		RENDER_DEBUG_NORMALS	        =  0x04000000,
 		RENDER_DEBUG_LOD_INFO	        =  0x08000000,
-		RENDER_DEBUG_ATTACHMENT_BYTES	=  0x20000000, // not used
+        RENDER_DEBUG_NODES              =  0x20000000,
 		RENDER_DEBUG_TEXEL_DENSITY		=  0x40000000,
 		RENDER_DEBUG_TRIANGLE_COUNT		=  0x80000000,
 		RENDER_DEBUG_IMPOSTORS			= 0x100000000,
         RENDER_DEBUG_REFLECTION_PROBES  = 0x200000000,
-        RENDER_DEBUG_PROBE_UPDATES      = 0x400000000
+        RENDER_DEBUG_PROBE_UPDATES      = 0x400000000,
 	};
 
 public:
@@ -677,6 +683,9 @@ public:
     // auxillary 512x512 render target pack
     // used by reflection probes and dynamic texture bakes
     RenderTargetPack mAuxillaryRT;
+
+	// Auxillary render target pack scaled to the hero probe's per-face size.
+    RenderTargetPack mHeroProbeRT;
 
     // currently used render target pack
     RenderTargetPack* mRT;
@@ -1042,6 +1051,9 @@ public:
 	static F32 RenderScreenSpaceReflectionAdaptiveStepMultiplier;
 	static S32 RenderScreenSpaceReflectionGlossySamples;
 	static S32 RenderBufferVisualization;
+	static bool RenderMirrors;
+	static S32 RenderHeroProbeUpdateRate;
+    static S32 RenderHeroProbeConservativeUpdateMultiplier;
 	static F32 RenderNormalMapScale;
 };
 

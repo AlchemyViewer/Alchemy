@@ -139,6 +139,8 @@ namespace
 
     LLGLTFPreviewTexture::MaterialLoadLevels get_material_load_levels(LLFetchedGLTFMaterial& material)
     {
+        llassert(!material.isFetching());
+
         using MaterialTextures = LLPointer<LLViewerFetchedTexture>*[LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT];
 
         MaterialTextures textures;
@@ -563,12 +565,18 @@ void LLGLTFPreviewTexture::postRender(BOOL success)
     LLViewerDynamicTexture::postRender(success);
 }
 
-// static
 LLPointer<LLViewerTexture> LLGLTFMaterialPreviewMgr::getPreview(LLPointer<LLFetchedGLTFMaterial> &material)
 {
     if (!material)
     {
         return nullptr;
+    }
+
+    static LLCachedControl<bool> sUIPreviewMaterial(gSavedSettings, "UIPreviewMaterial", false);
+    if (!sUIPreviewMaterial)
+    {
+        fetch_texture_for_ui(material->mBaseColorTexture, material->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]);
+        return material->mBaseColorTexture;
     }
 
     if (!is_material_loaded_enough_for_ui(*material))

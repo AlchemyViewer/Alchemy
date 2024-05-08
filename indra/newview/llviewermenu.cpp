@@ -153,6 +153,7 @@
 #include <boost/algorithm/string.hpp>
 #include "llcleanup.h"
 #include "llviewershadermgr.h"
+#include "gltfscenemanager.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -588,10 +589,8 @@ void init_menus()
         LLGridManager::getInstance()->isInSLBeta());
 
 	// *TODO:Also fix cost in llfolderview.cpp for Inventory menus
-	const std::string texture_upload_cost_str = fmt::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost());
 	const std::string sound_upload_cost_str = fmt::to_string(LLAgentBenefitsMgr::current().getSoundUploadCost());
 	const std::string animation_upload_cost_str = fmt::to_string(LLAgentBenefitsMgr::current().getAnimationUploadCost());
-	gMenuHolder->childSetLabelArg("Upload Image", "[COST]", texture_upload_cost_str);
 	gMenuHolder->childSetLabelArg("Upload Sound", "[COST]", sound_upload_cost_str);
 	gMenuHolder->childSetLabelArg("Upload Animation", "[COST]", animation_upload_cost_str);
 	
@@ -804,10 +803,30 @@ U32 render_type_from_string(std::string render_type)
 	{
 		return LLPipeline::RENDER_TYPE_SIMPLE;
 	}
+    if ("materials" == render_type)
+    {
+        return LLPipeline::RENDER_TYPE_MATERIALS;
+    }
 	else if ("alpha" == render_type)
 	{
 		return LLPipeline::RENDER_TYPE_ALPHA;
 	}
+    else if ("alpha_mask" == render_type)
+    {
+        return LLPipeline::RENDER_TYPE_ALPHA_MASK;
+    }
+    else if ("fullbright_alpha_mask" == render_type)
+    {
+        return LLPipeline::RENDER_TYPE_FULLBRIGHT_ALPHA_MASK;
+    }
+    else if ("fullbright" == render_type)
+    {
+        return LLPipeline::RENDER_TYPE_FULLBRIGHT;
+    }
+    else if ("glow" == render_type)
+    {
+        return LLPipeline::RENDER_TYPE_GLOW;
+    }
 	else if ("tree" == render_type)
 	{
 		return LLPipeline::RENDER_TYPE_TREE;
@@ -1060,6 +1079,10 @@ U64 info_display_from_string(std::string info_display)
 	{
 		return LLPipeline::RENDER_DEBUG_OCTREE;
 	}
+    else if ("nodes" == info_display)
+    {
+        return LLPipeline::RENDER_DEBUG_NODES;
+    }
 	else if ("shadow frusta" == info_display)
 	{
 		return LLPipeline::RENDER_DEBUG_SHADOW_FRUSTA;
@@ -2258,6 +2281,20 @@ class LLAdvancedPurgeShaderCache : public view_listener_t
 	{
 		LLViewerShaderMgr::instance()->clearShaderCache();
 		LLViewerShaderMgr::instance()->setShaders();
+		return true;
+	}
+};
+
+/////////////////////
+// REBUILD TERRAIN //
+/////////////////////
+
+
+class LLAdvancedRebuildTerrain : public view_listener_t
+{
+	bool handleEvent(const LLSD& userdata)
+	{
+        gPipeline.rebuildTerrain();
 		return true;
 	}
 };
@@ -8326,6 +8363,30 @@ class LLAdvancedClickRenderBenchmark: public view_listener_t
 	}
 };
 
+void hdri_preview();
+
+class LLAdvancedClickHDRIPreview: public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        // open personal lighting floater when previewing an HDRI (keeps HDRI from implicitly unloading when opening build tools)
+        LLFloaterReg::showInstance("env_adjust_snapshot");
+        hdri_preview();
+        return true;
+    }
+};
+
+
+class LLAdvancedClickGLTFScenePreview : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        // open personal lighting floater when previewing an HDRI (keeps HDRI from implicitly unloading when opening build tools)
+        LL::GLTFSceneManager::instance().load();
+        return true;
+    }
+};
+
 // these are used in the gl menus to set control values that require shader recompilation
 class LLToggleShaderControl : public view_listener_t
 {
@@ -9736,6 +9797,8 @@ void LLUploadCostCalculator::calculateCost(const std::string& asset_type_str)
 
 	if (asset_type_str == "texture")
 	{
+        // This use minimal texture cost to allow bulk and
+        // texture upload menu options to be visible
 		upload_cost = LLAgentBenefitsMgr::current().getTextureUploadCost();
 	}
 	else if (asset_type_str == "animation")
@@ -10057,7 +10120,10 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLAdvancedClickRenderShadowOption(), "Advanced.ClickRenderShadowOption");
 	view_listener_t::addMenu(new LLAdvancedClickRenderProfile(), "Advanced.ClickRenderProfile");
 	view_listener_t::addMenu(new LLAdvancedClickRenderBenchmark(), "Advanced.ClickRenderBenchmark");
+    view_listener_t::addMenu(new LLAdvancedClickHDRIPreview(), "Advanced.ClickHDRIPreview");
+    view_listener_t::addMenu(new LLAdvancedClickGLTFScenePreview(), "Advanced.ClickGLTFScenePreview");
 	view_listener_t::addMenu(new LLAdvancedPurgeShaderCache(), "Advanced.ClearShaderCache");
+    view_listener_t::addMenu(new LLAdvancedRebuildTerrain(), "Advanced.RebuildTerrain");
 
 	#ifdef TOGGLE_HACKED_GODLIKE_VIEWER
 	view_listener_t::addMenu(new LLAdvancedHandleToggleHackedGodmode(), "Advanced.HandleToggleHackedGodmode");

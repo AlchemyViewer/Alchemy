@@ -50,6 +50,7 @@ uniform float ssao_irradiance_max;
 #endif
 
 // Inputs
+uniform vec4 clipPlane;
 uniform mat3 env_mat;
 uniform mat3  ssao_effect_mat;
 uniform vec3 sun_dir;
@@ -60,7 +61,7 @@ in vec2 vary_fragcoord;
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
 
-vec3 getNormalFromPacked(vec4 packedNormalEnvIntensityFlags);
+vec4 getNorm(vec2 pos_screen);
 vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
@@ -127,9 +128,9 @@ void main()
     vec2  tc           = vary_fragcoord.xy;
     float depth        = getDepth(tc.xy);
     vec4  pos          = getPositionWithDepth(tc, depth);
-    vec4  norm         = texture(normalMap, tc);
-    float envIntensity = norm.z;
-    norm.xyz           = getNormalFromPacked(norm);
+    vec4  norm         = getNorm(tc);
+    vec3 colorEmissive = texture(emissiveRect, tc).rgb;
+    float envIntensity = colorEmissive.r;
     vec3  light_dir   = (sun_up_factor == 1) ? sun_dir : moon_dir;
 
     vec4 baseColor     = texture(diffuseRect, tc);
@@ -173,12 +174,12 @@ void main()
         float metallic = orm.b;
         float ao = orm.r;
 
-        vec3 colorEmissive = texture(emissiveRect, tc).rgb;
+        
         // PBR IBL
         float gloss      = 1.0 - perceptualRoughness;
         
         sampleReflectionProbes(irradiance, radiance, tc, pos.xyz, norm.xyz, gloss, false, amblit_linear);
-        
+
         adjustIrradiance(irradiance, ambocc);
 
         vec3 diffuseColor = vec3(0);
@@ -188,10 +189,15 @@ void main()
         vec3 v = -normalize(pos.xyz);
         color = pbrBaseLight(diffuseColor, specularColor, metallic, v, norm.xyz, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, ao, additive, atten);
     }
-    else if (!GET_GBUFFER_FLAG(GBUFFER_FLAG_HAS_ATMOS))
+    else if (GET_GBUFFER_FLAG(GBUFFER_FLAG_HAS_HDRI))
     {
-        //should only be true of WL sky, just port over base color value
-        color = texture(emissiveRect, tc).rgb;
+        // actual HDRI sky, just copy color value
+        color = colorEmissive.rgb;
+    }
+    else if (GET_GBUFFER_FLAG(GBUFFER_FLAG_SKIP_ATMOS))
+    {
+        //should only be true of WL sky, port over base color value and scale for fake HDR
+        color = colorEmissive.rgb;
         color = srgb_to_linear(color);
         color *= sky_hdr_scale;
     }
@@ -209,7 +215,7 @@ void main()
         vec3 legacyenv = vec3(0);
 
         sampleReflectionProbesLegacy(irradiance, glossenv, legacyenv, tc, pos.xyz, norm.xyz, spec.a, envIntensity, false, amblit_linear);
-        
+
         adjustIrradiance(irradiance, ambocc);
 
         // apply lambertian IBL only (see pbrIbl)
@@ -244,6 +250,7 @@ void main()
 
             // add radiance map
             applyGlossEnv(color, glossenv, spec, pos.xyz, norm.xyz);
+
         }
 
         color.rgb = mix(color.rgb, baseColor.rgb, baseColor.a);

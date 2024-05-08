@@ -46,6 +46,16 @@ class LL_COMMON_API LLRefCount
 protected:
 	LLRefCount(const LLRefCount& other);
 	LLRefCount& operator=(const LLRefCount&);
+	LLRefCount(LLRefCount&& other) noexcept
+	{
+		*this = std::move(other);
+	}
+	LLRefCount& operator=(LLRefCount&& other) noexcept
+	{
+		mRef = other.mRef;
+		return *this;
+	}
+
 	virtual ~LLRefCount(); // use unref()
 	
 public:

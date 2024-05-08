@@ -1547,8 +1547,6 @@ void LLAgent::pitch(F32 angle)
 
 	static LLCachedControl<bool> useRealisticMouselook(gSavedSettings, "AlchemyRealisticMouselook", false);
 	const bool in_mouselook = gAgentCamera.cameraMouselook();
-	const F32 look_down_limit = (in_mouselook && useRealisticMouselook ? 160.f : (isAgentAvatarValid() && gAgentAvatarp->isSitting() ? 170.f : 179.f)) * DEG_TO_RAD;
-
 
 	// clamp pitch to limits
 	if (angle >= 0.f)

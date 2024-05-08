@@ -1,9 +1,9 @@
-/**
- * @file encodeNormF.glsl
+/** 
+ * @file normaldebugF.glsl
  *
- * $LicenseInfo:firstyear=2018&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2023&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2018, Linden Research, Inc.
+ * Copyright (C) 2023, Linden Research, Inc.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,15 +23,11 @@
  * $/LicenseInfo$
  */
 
- // Octahedron normal vector encoding
- // https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
- //
+out vec4 frag_color;
 
-vec2 encode_normal(vec3 n)
+in vec4 vertex_color;
+
+void main() 
 {
-    n *= 1.0 / max(dot(abs(n), vec3(1.0)), 1e-6);
-    float t = clamp(-n.z, 0.0, 1.0);
-	n.x += n.x >= 0.0 ? t : -t;
-	n.y += n.y >= 0.0 ? t : -t;
-    return n.xy * 0.5 + 0.5;
+	frag_color = max(vertex_color, vec4(0));
 }

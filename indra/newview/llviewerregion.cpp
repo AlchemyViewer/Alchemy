@@ -1147,6 +1147,11 @@ void LLViewerRegion::dirtyHeights()
 	}
 }
 
+void LLViewerRegion::dirtyAllPatches()
+{
+    getLand().dirtyAllPatches();
+}
+
 //physically delete the cache entry
 void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
 {	
@@ -1647,7 +1652,19 @@ void LLViewerRegion::idleUpdate(F32 max_update_time)
 
 	mLastUpdate = LLViewerOctreeEntryData::getCurrentFrame();
 
-	mImpl->mLandp->idleUpdate(max_update_time);
+    static LLCachedControl<bool> pbr_terrain_enabled(gSavedSettings, "RenderTerrainPBREnabled", false);
+    static LLCachedControl<bool> pbr_terrain_experimental_normals(gSavedSettings, "RenderTerrainPBRNormalsEnabled", false);
+    bool pbr_material = mImpl->mCompositionp && (mImpl->mCompositionp->getMaterialType() == LLTerrainMaterials::Type::PBR);
+    bool pbr_land = pbr_material && pbr_terrain_enabled && pbr_terrain_experimental_normals;
+
+    if (!pbr_land)
+    {
+        mImpl->mLandp->idleUpdate</*PBR=*/false>(max_update_time);
+    }
+    else
+    {
+        mImpl->mLandp->idleUpdate</*PBR=*/true>(max_update_time);
+    }
 	
 	if (mParcelOverlay)
 	{
@@ -1948,7 +1965,21 @@ LLViewerObject* LLViewerRegion::updateCacheEntry(U32 local_id, LLViewerObject* o
 // As above, but forcibly do the update.
 void LLViewerRegion::forceUpdate()
 {
-	mImpl->mLandp->idleUpdate(0.f);
+	constexpr F32 max_update_time = 0.f;
+
+    static LLCachedControl<bool> pbr_terrain_enabled(gSavedSettings, "RenderTerrainPBREnabled", false);
+    static LLCachedControl<bool> pbr_terrain_experimental_normals(gSavedSettings, "RenderTerrainPBRNormalsEnabled", false);
+	bool pbr_material = mImpl->mCompositionp && (mImpl->mCompositionp->getMaterialType() == LLTerrainMaterials::Type::PBR);
+	bool pbr_land = pbr_material && pbr_terrain_enabled && pbr_terrain_experimental_normals;
+
+	if (!pbr_land)
+	{
+		mImpl->mLandp->idleUpdate</*PBR=*/false>(max_update_time);
+	}
+	else
+	{
+		mImpl->mLandp->idleUpdate</*PBR=*/true>(max_update_time);
+	}
 
 	if (mParcelOverlay)
 	{
@@ -2606,6 +2637,55 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
 		mSimulatorFeatures["AvatarHoverHeightEnabled"].asBoolean());
 
 	setSimulatorFeaturesReceived(true);
+
+    // WARNING: this is called from a coroutine, and flipping saved settings has a LOT of side effects, shuttle 
+    // the work below back to the main loop
+    // 
+    
+    // copy features to lambda in case the region is deleted before the lambda is executed
+    LLSD features = mSimulatorFeatures;
+
+    auto work = [=]()
+        {
+            // if region has MaxTextureResolution, set max_texture_dimension settings, otherwise use default
+            if (features.has("MaxTextureResolution"))
+            {
+                S32 max_texture_resolution = features["MaxTextureResolution"].asInteger();
+                gSavedSettings.setS32("max_texture_dimension_X", max_texture_resolution);
+                gSavedSettings.setS32("max_texture_dimension_Y", max_texture_resolution);
+            }
+            else
+            {
+                gSavedSettings.setS32("max_texture_dimension_X", 1024);
+                gSavedSettings.setS32("max_texture_dimension_Y", 1024);
+            }
+
+            if (features.has("PBRTerrainEnabled"))
+            {
+                bool enabled = features["PBRTerrainEnabled"];
+                gSavedSettings.setBOOL("RenderTerrainPBREnabled", enabled);
+            }
+            else
+            {
+                gSavedSettings.setBOOL("RenderTerrainPBREnabled", false);
+            }
+
+            if (features.has("PBRMaterialSwatchEnabled"))
+            {
+                bool enabled = features["PBRMaterialSwatchEnabled"];
+                gSavedSettings.setBOOL("UIPreviewMaterial", enabled);
+            }
+            else
+            {
+                gSavedSettings.setBOOL("UIPreviewMaterial", false);
+            }
+        };
+
+    auto workqueue = LL::WorkQueue::getInstance("mainloop");
+    if (workqueue)
+    {
+        LL::WorkQueue::postMaybe(workqueue, work);
+    }
 }
 
 //this is called when the parent is not cacheable.
@@ -3193,20 +3273,20 @@ void LLViewerRegion::unpackRegionHandshake()
 
 		// Get the 4 textures for land
 		msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail0, tmp_id);
-		changed |= (tmp_id != compp->getDetailTextureID(0));		
-		compp->setDetailTextureID(0, tmp_id);
+		changed |= (tmp_id != compp->getDetailAssetID(0));		
+		compp->setDetailAssetID(0, tmp_id);
 
 		msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail1, tmp_id);
-		changed |= (tmp_id != compp->getDetailTextureID(1));		
-		compp->setDetailTextureID(1, tmp_id);
+		changed |= (tmp_id != compp->getDetailAssetID(1));		
+		compp->setDetailAssetID(1, tmp_id);
 
 		msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail2, tmp_id);
-		changed |= (tmp_id != compp->getDetailTextureID(2));		
-		compp->setDetailTextureID(2, tmp_id);
+		changed |= (tmp_id != compp->getDetailAssetID(2));		
+		compp->setDetailAssetID(2, tmp_id);
 
 		msg->getUUIDFast(_PREHASH_RegionInfo, _PREHASH_TerrainDetail3, tmp_id);
-		changed |= (tmp_id != compp->getDetailTextureID(3));		
-		compp->setDetailTextureID(3, tmp_id);
+		changed |= (tmp_id != compp->getDetailAssetID(3));		
+		compp->setDetailAssetID(3, tmp_id);
 
 		// Get the start altitude and range values for land textures
 		F32 tmp_f32;

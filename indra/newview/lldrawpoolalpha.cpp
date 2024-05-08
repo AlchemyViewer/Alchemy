@@ -49,6 +49,7 @@
 #include "llspatialpartition.h"
 #include "llglcommonfunc.h"
 #include "llvoavatar.h"
+#include "gltfscenemanager.h"
 
 #include "llenvironment.h"
 
@@ -260,6 +261,15 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
     mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;       // }
     gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
 
+    if (rigged)
+    { // draw GLTF scene to depth buffer before rigged alpha
+        gPipeline.bindDeferredShader(gDeferredPBRAlphaProgram);
+        LL::GLTFSceneManager::instance().render(false, false);
+
+        gPipeline.bindDeferredShader(*gDeferredPBRAlphaProgram.mRiggedVariant);
+        LL::GLTFSceneManager::instance().render(false, true);
+    }
+
     // If the face is more than 90% transparent, then don't update the Depth buffer for Dof
     // We don't want the nearly invisible objects to cause of DoF effects
     renderAlpha(getVertexDataMask() | LLVertexBuffer::MAP_TEXTURE_INDEX | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2, false, rigged);
@@ -468,7 +478,7 @@ bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material)
             }
         }
     }
-    
+
     return tex_setup;
 }
 
@@ -658,7 +668,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
 			LLSpatialGroup::drawmap_elem_t& draw_info = rigged ? group->mDrawMap[LLRenderPass::PASS_ALPHA_RIGGED] : group->mDrawMap[LLRenderPass::PASS_ALPHA];
 
-            for (LLSpatialGroup::drawmap_elem_t::iterator k = draw_info.begin(); k != draw_info.end(); ++k)	
+            for (LLSpatialGroup::drawmap_elem_t::iterator k = draw_info.begin(); k != draw_info.end(); ++k)
 			{
 				LLDrawInfo& params = **k;
                 if ((bool)params.mAvatar != rigged)
@@ -804,9 +814,10 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                         current_shader->setMinimumAlpha(0.f);
                         reset_minimum_alpha = true;
                     }
-                    
+
                     params.mVertexBuffer->setBuffer();
                     params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
+                    stop_glerror();
 
                     if (reset_minimum_alpha)
                     {

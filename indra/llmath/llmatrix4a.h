@@ -45,7 +45,7 @@ public:
 		ROW_UP,
 		ROW_TRANS
 	};
-
+    
 	LLMatrix4a() = default;
     explicit LLMatrix4a(const LLMatrix4& val)
     {
@@ -97,6 +97,16 @@ public:
 	{
 		return mMatrix[0].getF32ptr();
 	}
+
+    inline LLMatrix4& asMatrix4()
+    {
+        return *(LLMatrix4*)this;
+    }
+
+    inline const LLMatrix4& asMatrix4() const
+    {
+        return *(LLMatrix4*)this;
+    }
 
 	inline void clear()
 	{

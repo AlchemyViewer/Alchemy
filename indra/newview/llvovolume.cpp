@@ -317,6 +317,11 @@ void LLVOVolume::markDead()
 		{
 			mLightTexture->removeVolume(LLRender::LIGHT_TEX, this);
 		}
+        
+        if (mIsHeroProbe)
+        {
+            gPipeline.mHeroProbeManager.unregisterViewerObject(this);
+        }
 	}
 	
 	LLViewerObject::markDead();
@@ -1022,7 +1027,7 @@ LLDrawable *LLVOVolume::createDrawable(LLPipeline *pipeline)
     {
         updateReflectionProbePtr();
     }
-
+    
 	updateRadius();
 	bool force_update = true; // avoid non-alpha mDistance update being optimized away
 	mDrawable->updateDistance(LLViewerCamera::instance(), force_update);
@@ -3427,6 +3432,29 @@ bool LLVOVolume::setReflectionProbeIsDynamic(bool is_dynamic)
     return false;
 }
 
+bool LLVOVolume::setReflectionProbeIsMirror(bool is_mirror)
+{
+	LLReflectionProbeParams* param_block = getReflectionProbeParams();
+    if (param_block)
+    {
+        if (param_block->getIsMirror() != is_mirror)
+        {
+            LL_INFOS() << "Setting reflection probe mirror to " << is_mirror << LL_ENDL;
+            param_block->setIsMirror(is_mirror);
+            parameterChanged(LLNetworkData::PARAMS_REFLECTION_PROBE, true);
+
+			if (!is_mirror)
+				gPipeline.mHeroProbeManager.unregisterViewerObject(this);
+			else
+				gPipeline.mHeroProbeManager.registerViewerObject(this);
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
 F32 LLVOVolume::getReflectionProbeAmbiance() const
 {
     const LLReflectionProbeParams* param_block = getReflectionProbeParams();
@@ -3470,6 +3498,17 @@ bool LLVOVolume::getReflectionProbeIsDynamic() const
     if (param_block)
     {
         return param_block->getIsDynamic();
+    }
+
+    return false;
+}
+
+bool LLVOVolume::getReflectionProbeIsMirror() const
+{
+	const LLReflectionProbeParams* param_block = getReflectionProbeParams();
+    if (param_block)
+    {
+        return param_block->getIsMirror();
     }
 
     return false;
@@ -4420,14 +4459,30 @@ void LLVOVolume::updateReflectionProbePtr()
 {
     if (isReflectionProbe())
     {
-        if (mReflectionProbe.isNull())
+        if (mReflectionProbe.isNull() && !getReflectionProbeIsMirror())
         {
             mReflectionProbe = gPipeline.mReflectionMapManager.registerViewerObject(this);
         }
+        else if (mReflectionProbe.isNull() && getReflectionProbeIsMirror())
+		{
+			// Geenz: This is a special case - what we want here is a hero probe.
+			// What we want to do here is instantiate a hero probe from the hero probe manager.
+            
+            if (!mIsHeroProbe)
+                mIsHeroProbe = gPipeline.mHeroProbeManager.registerViewerObject(this);
+		}
     }
-    else if (mReflectionProbe.notNull())
+    else if (mReflectionProbe.notNull() || getReflectionProbeIsMirror())
     {
-        mReflectionProbe = nullptr;
+        if (mReflectionProbe.notNull())
+        {
+            mReflectionProbe = nullptr;
+        }
+
+		if (getReflectionProbeIsMirror())
+        {
+            gPipeline.mHeroProbeManager.unregisterViewerObject(this);
+        }
     }
 }
 
@@ -4602,7 +4657,8 @@ LLVector3 LLVOVolume::volumeDirectionToAgent(const LLVector3& dir) const
 
 
 BOOL LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, BOOL pick_transparent, BOOL pick_rigged, BOOL pick_unselectable, S32 *face_hitp,
-									  LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
+									      LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
+	
 {
 	if (!mbCanSelect 
 		|| mDrawable->isDead() 
@@ -4814,7 +4870,7 @@ BOOL LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
 			}
 		}
 	}
-		
+
 	return ret;
 }
 
@@ -6219,19 +6275,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 
 	LLViewerTexture* last_tex = NULL;
 
-	S32 texture_index_channels = 1;
-	
-	if (gGLManager.mGLSLVersionMajor > 1 || gGLManager.mGLSLVersionMinor >= 30)
-	{
-		texture_index_channels = LLGLSLShader::sIndexedTextureChannels-1; //always reserve one for shiny for now just for simplicity;
-	}
-
-	if (distance_sort)
-	{
-		texture_index_channels = gDeferredAlphaProgram.mFeatures.mIndexedTextureChannels;
-	}
-
-	texture_index_channels = LLGLSLShader::sIndexedTextureChannels;
+	S32 texture_index_channels = LLGLSLShader::sIndexedTextureChannels;
 
 	bool flexi = false;
 

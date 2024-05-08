@@ -2683,6 +2683,80 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>description</key>
         <string>ICU is a mature, widely used set of C/C++ and Java libraries providing Unicode and Globalization support for software applications. ICU is widely portable and gives applications the same results on all platforms and between C/C++ and Java software.</string>
       </map>
+      <key>tinyexr</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>506cfdf3e8599aefd643a4b973a6a98ce605dbb2c81368a765841822df253da52e7f3040865235cebcde2b9375aa535f64ac6afe4a2eac8105ebde10f10dc771</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/231/packages/generic/tinyexr/v1.0.8.2461/tinyexr-v1.0.8-common-2461.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>3-clause BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/tinyexr_license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2014 - 2021, Syoyo Fujita and many contributors.</string>
+        <key>version</key>
+        <string>v1.0.8</string>
+        <key>name</key>
+        <string>tinyexr</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-tinyexr</string>
+        <key>description</key>
+        <string>tinyexr import library</string>
+        <key>source</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-tinyexr</string>
+        <key>source_type</key>
+        <string>git</string>
+      </map>
+      <key>glm</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>52c11f37bb2ae297b4a934eb59af9d9179fb6950a3a6f3d5fc929041a6932d08ac762e5d1664a129a4da32ea28b724bb347855d5d02acbbe9d2bc21affe82f67</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/232/packages/generic/glm/v1.0.1.2462/glm-v1.0.1-common-2462.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/glm_license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2005 - G-Truc Creation</string>
+        <key>version</key>
+        <string>v1.0.1</string>
+        <key>name</key>
+        <string>glm</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/secondlife/3p-glm</string>
+        <key>description</key>
+        <string>OpenGL Mathematics</string>
+        <key>source_type</key>
+        <string>git</string>
+      </map>
     </map>
     <key>package_description</key>
     <map>
