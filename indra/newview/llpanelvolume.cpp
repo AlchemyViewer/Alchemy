@@ -422,10 +422,6 @@ void LLPanelVolume::getState( )
 
     bool probe_enabled = is_probe && editable && single_volume;
 
-    bool mirrors_enabled = LLPipeline::RenderMirrorsAvailable;
-
-	getChildView("Probe Mirror")->setVisible(mirrors_enabled);
-
     getChildView("Probe Dynamic")->setEnabled(probe_enabled);
     getChildView("Probe Mirror")->setEnabled(probe_enabled);
     getChildView("Probe Volume Type")->setEnabled(probe_enabled);
@@ -452,6 +448,22 @@ void LLPanelVolume::getState( )
             volume_type = "Sphere";
         }
 
+//		std::string update_type = "Static";
+//
+//        if (volobjp->getReflectionProbeIsDynamic() && !volobjp->getReflectionProbeIsMirror())
+//        {
+//            update_type = "Dynamic";
+//        }
+//        else if (volobjp->getReflectionProbeIsMirror() && !volobjp->getReflectionProbeIsDynamic())
+//        {
+//            update_type = "Mirror";
+//
+//        }
+//        else if (volobjp->getReflectionProbeIsDynamic() && volobjp->getReflectionProbeIsMirror())
+//		{
+//			update_type = "Dynamic Mirror";
+//		}
+//		
         bool is_mirror = volobjp->getReflectionProbeIsMirror();
 
         getChildView("Probe Ambiance")->setEnabled(!is_mirror);
@@ -1202,6 +1214,7 @@ void LLPanelVolume::onCopyLight()
         clipboard["reflection_probe"]["ambiance"] = volobjp->getReflectionProbeAmbiance();
         clipboard["reflection_probe"]["near_clip"] = volobjp->getReflectionProbeNearClip();
         clipboard["reflection_probe"]["dynamic"] = volobjp->getReflectionProbeIsDynamic();
+        clipboard["reflection_probe"]["mirror"]    = volobjp->getReflectionProbeIsMirror();
     }
 
     mClipboardParams["light"] = clipboard;
@@ -1261,6 +1274,7 @@ void LLPanelVolume::onPasteLight()
             volobjp->setReflectionProbeAmbiance((F32)clipboard["reflection_probe"]["ambiance"].asReal());
             volobjp->setReflectionProbeNearClip((F32)clipboard["reflection_probe"]["near_clip"].asReal());
             volobjp->setReflectionProbeIsDynamic(clipboard["reflection_probe"]["dynamic"].asBoolean());
+            volobjp->setReflectionProbeIsMirror(clipboard["reflection_probe"]["mirror"].asBoolean());
         }
         else
         {
@@ -1382,7 +1396,7 @@ void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTex
 
             if (hit_volobjp->isReflectionProbe())
             {
-                volobjp->setIsReflectionProbe(TRUE);
+                volobjp->setIsReflectionProbe(true);
                 volobjp->setReflectionProbeIsBox(hit_volobjp->getReflectionProbeIsBox());
                 volobjp->setReflectionProbeAmbiance(hit_volobjp->getReflectionProbeAmbiance());
                 volobjp->setReflectionProbeNearClip(hit_volobjp->getReflectionProbeNearClip());

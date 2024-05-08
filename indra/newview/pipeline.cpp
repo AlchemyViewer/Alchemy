@@ -216,7 +216,6 @@ F32 LLPipeline::RenderScreenSpaceReflectionAdaptiveStepMultiplier;
 S32 LLPipeline::RenderScreenSpaceReflectionGlossySamples;
 S32 LLPipeline::RenderBufferVisualization;
 bool LLPipeline::RenderMirrors;
-bool LLPipeline::RenderMirrorsAvailable;
 S32 LLPipeline::RenderHeroProbeUpdateRate;
 S32 LLPipeline::RenderHeroProbeConservativeUpdateMultiplier;
 F32 LLPipeline::RenderNormalMapScale;
@@ -590,7 +589,6 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderScreenSpaceReflectionGlossySamples");
 	connectRefreshCachedSettingsSafe("RenderBufferVisualization");
     connectRefreshCachedSettingsSafe("RenderMirrors");
-	connectRefreshCachedSettingsSafe("RenderMirrorsAvailable");
     connectRefreshCachedSettingsSafe("RenderHeroProbeUpdateRate");
     connectRefreshCachedSettingsSafe("RenderHeroProbeConservativeUpdateMultiplier");
 	connectRefreshCachedSettingsSafe("RenderNormalMapScale");
@@ -1148,7 +1146,6 @@ void LLPipeline::refreshCachedSettings()
     RenderScreenSpaceReflectionAdaptiveStepMultiplier = gSavedSettings.getF32("RenderScreenSpaceReflectionAdaptiveStepMultiplier");
     RenderScreenSpaceReflectionGlossySamples = gSavedSettings.getS32("RenderScreenSpaceReflectionGlossySamples");
 	RenderBufferVisualization = gSavedSettings.getS32("RenderBufferVisualization");
-	RenderMirrorsAvailable = gSavedSettings.getBOOL("RenderMirrorsAvailable");
     if (gSavedSettings.getBOOL("RenderMirrors") != (BOOL)RenderMirrors)
     {
         RenderMirrors = gSavedSettings.getBOOL("RenderMirrors");

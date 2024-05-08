@@ -75,7 +75,7 @@ LLHeroProbeManager::~LLHeroProbeManager()
 // helper class to seed octree with probes
 void LLHeroProbeManager::update()
 {
-    if (!LLPipeline::RenderMirrorsAvailable || !LLPipeline::RenderMirrors || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
+    if (!LLPipeline::RenderMirrors || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
     {
         return;
     }
@@ -175,7 +175,6 @@ void LLHeroProbeManager::update()
             mCurrentClipPlane.setVec(hero_pos, face_normal);
             mMirrorPosition = hero_pos;
             mMirrorNormal   = face_normal;
-        
 
             probe_pos.load3(point.mV);
 
