@@ -1820,7 +1820,8 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	<notification name="DisplaySetToRecommendedGPUChange">
 		グラフィックの変更により、画面設定は推奨レベルに設定されました。
 「[LAST_GPU]」から
-「[THIS_GPU]」まで</notification>
+「[THIS_GPU]」まで
+	</notification>
 	<notification name="DisplaySetToRecommendedFeatureChange">
 		レンダリングサブシステムの変更により、画面設定は推奨レベルに設定されました。
 	</notification>
@@ -3709,7 +3710,8 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	<notification name="GodMessage">
 		[NAME]
 
-[MESSAGE]</notification>
+[MESSAGE]
+	</notification>
 	<notification name="JoinGroup">
 		[MESSAGE]
 		<tag>group</tag>
