@@ -1887,7 +1887,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 		<usetemplate name="okcancelbuttons" notext="続行" yestext="アカウントを作成…"/>
 	</notification>
 	<notification name="LoginCantRemoveUsername">
-		すでに記憶されているユーザーは「私」メニューの「初期設定」＞「拡張設定」＞「記憶されたユーザー名」から削除することができます。
+		すでに記憶されているユーザーは「私」メニューの「初期設定」＞「高度な設定」＞「記憶されたユーザー名」から削除することができます。
 		<tag>fail</tag>
 	</notification>
 	<notification name="LoginCantRemoveCurUsername">
@@ -4616,77 +4616,77 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		</form>
 	</notification>
 	<notification label="" name="NoClassifieds">
-		クラシファイド広告の作成と編集は、拡張モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
+		クラシファイド広告の作成と編集は、高度な操作モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoGroupInfo">
-		グループの作成と編集は拡張モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
+		グループの作成と編集は高度な操作モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoPlaceInfo">
-		場所のプロフィールの表示は拡張モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
+		場所のプロフィールの表示は高度な操作モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoPicks">
-		ピックの作成と編集は拡張モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
+		ピックの作成と編集は高度な操作モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoWorldMap">
-		ワールドマップの表示は拡張モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
+		ワールドマップの表示は高度な操作モードでのみ利用できます。終了してモードを変更しますか？モードはログイン画面で選択できます。
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoVoiceCall">
-		ボイスコールは拡張モードでのみ利用できます。ログアウトしてモードを変更しますか？
+		ボイスコールは高度な操作モードでのみ利用できます。ログアウトしてモードを変更しますか？
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoAvatarShare">
-		共有は拡張モードでのみ利用できます。ログアウトしてモードを変更しますか？
+		共有は高度な操作モードでのみ利用できます。ログアウトしてモードを変更しますか？
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoAvatarPay">他
-		の住人への支払いは拡張モードでのみ利用できます。ログアウトしてモードを変更しますか？
+		の住人への支払いは高度な操作モードでのみ利用できます。ログアウトしてモードを変更しますか？
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoInventory">
-		インベントリの表示は拡張モードでのみ利用できます。ログアウトしてモードを変更しますか？
+		インベントリの表示は高度な操作モードでのみ利用できます。ログアウトしてモードを変更しますか？
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoAppearance">
-		容姿エディタは拡張モードでのみ利用できます。ログアウトしてモードを変更しますか？
+		容姿エディタは高度な操作モードでのみ利用できます。ログアウトしてモードを変更しますか？
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="終了しない" yestext="終了"/>
 	</notification>
 	<notification label="" name="NoSearch">
-		検索は拡張モードでのみ利用できます。ログアウトしてモードを変更しますか？
+		検索は高度な操作モードでのみ利用できます。ログアウトしてモードを変更しますか？
 		<unique/>
 		<tag>fail</tag>
 		<tag>confirm</tag>

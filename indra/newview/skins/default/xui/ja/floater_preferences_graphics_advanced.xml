@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater name="prefs_graphics_advanced" title="拡張グラフィック設定">
+<floater name="prefs_graphics_advanced" title="高度なグラフィック設定">
 	<!-- This block shows Advanced Settings -->
 	<text name="GeneralText">
 		全般
