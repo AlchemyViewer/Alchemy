@@ -517,6 +517,9 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     name = clean_name_from_im(name, dialog);
 
     BOOL is_do_not_disturb = gAgent.isDoNotDisturb();
+    BOOL is_rejecting_tp_offers = gAgent.isRejectTeleportOffers();
+    static LLCachedControl<bool> ALDontRejectTeleportOffersFromFriends(gSavedPerAccountSettings, "ALDontRejectTeleportOffersFromFriends");
+   
     BOOL is_muted = LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat)
         // object IMs contain sender object id in session_id (STORM-1209)
         || (dialog == IM_FROM_TASK && LLMuteList::getInstance()->isMuted(session_id));
@@ -1353,6 +1356,10 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             else if (gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly") && (LLAvatarTracker::instance().getBuddyInfo(from_id) == NULL))
             {
                 return;
+            }
+            else if ((is_rejecting_tp_offers && (!ALDontRejectTeleportOffersFromFriends || (ALDontRejectTeleportOffersFromFriends && !is_friend))) && (!fRlvAutoAccept))
+            {
+                send_rejecting_tp_offers_message(gMessageSystem, from_id);
             }
             else
             {

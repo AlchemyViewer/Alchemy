@@ -6535,7 +6535,31 @@ class LLWorldSetDoNotDisturb : public view_listener_t
 		return true;
 	}
 };
+class LLWorldSetRejectTeleportOffers : public view_listener_t
+{
+	bool handleEvent(const LLSD& userdata)
+	{
+		if (gAgent.isRejectTeleportOffers())
+		{
+			gAgent.setRejectTeleportOffers(false);
+		}
+		else
+		{
+			gAgent.setRejectTeleportOffers(true);
+			LLNotificationsUtil::add("RejectTeleportOffersModeSet");
+		}
+		return true;
+	}
+};
 
+class LLWorldGetRejectTeleportOffers : public view_listener_t
+{
+	bool handleEvent(const LLSD& userdata)
+	{
+		bool new_value = gAgent.isRejectTeleportOffers();
+		return new_value;
+	}
+};
 class LLWorldSetRejectFriendshipRequests : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -9989,6 +10013,7 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLViewCheckRenderType(), "View.CheckRenderType");
 	view_listener_t::addMenu(new LLViewStatusAway(), "View.Status.CheckAway");
 	view_listener_t::addMenu(new LLViewStatusDoNotDisturb(), "View.Status.CheckDoNotDisturb");
+	view_listener_t::addMenu(new LLWorldGetRejectTeleportOffers(), "World.GetRejectTeleportOffers");
 	view_listener_t::addMenu(new LLWorldGetRejectFriendshipRequests(), "World.GetRejectFriendshipRequests");
 	view_listener_t::addMenu(new LLViewCheckHUDAttachments(), "View.CheckHUDAttachments");
 // [SL:KB] - Patch: World-RenderExceptions | Checked: Catznip-5.2
@@ -10016,6 +10041,7 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLWorldTeleportHome(), "World.TeleportHome");
 	view_listener_t::addMenu(new LLWorldSetAway(), "World.SetAway");
 	view_listener_t::addMenu(new LLWorldSetDoNotDisturb(), "World.SetDoNotDisturb");
+	view_listener_t::addMenu(new LLWorldSetRejectTeleportOffers(), "World.SetRejectTeleportOffers");
 	view_listener_t::addMenu(new LLWorldSetRejectFriendshipRequests(), "World.SetRejectFriendshipRequests");
 
 	view_listener_t::addMenu(new LLWorldLindenHome(), "World.LindenHome");

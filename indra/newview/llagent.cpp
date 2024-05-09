@@ -445,6 +445,7 @@ LLAgent::LLAgent() :
 	mFrameAgent(),
 
 	mIsDoNotDisturb(false),
+	mIsRejectTeleportOffers(false), 
 	mIgnorePrejump(FALSE),
 
 	mControlFlags(0x00000000),
@@ -532,6 +533,7 @@ void LLAgent::init()
 	mMovementResetCamera = controlp->getValue().asBoolean();
 
 	selectRejectFriendshipRequests(gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsMode"));
+	setRejectTeleportOffers(gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersMode")); 
 
 
 	if (!mTeleportFinishedSlot.connected())
@@ -1744,6 +1746,24 @@ void LLAgent::setDoNotDisturb(bool pIsDoNotDisturb)
 bool LLAgent::isDoNotDisturb() const
 {
 	return mIsDoNotDisturb;
+}
+
+//-----------------------------------------------------------------------------
+// setRejectTeleportOffers()
+//-----------------------------------------------------------------------------
+void LLAgent::setRejectTeleportOffers(bool pIsRejectTeleportOffers)
+{
+	LL_INFOS() << "Setting rejecting teleport offers mode to " << pIsRejectTeleportOffers << LL_ENDL;
+	mIsRejectTeleportOffers = pIsRejectTeleportOffers;
+	gSavedPerAccountSettings.setBOOL("ALRejectTeleportOffersMode", pIsRejectTeleportOffers);
+}
+
+//-----------------------------------------------------------------------------
+// isRejectTeleportOffers()
+//-----------------------------------------------------------------------------
+bool LLAgent::isRejectTeleportOffers() const
+{
+	return mIsRejectTeleportOffers;
 }
 
 //-----------------------------------------------------------------------------

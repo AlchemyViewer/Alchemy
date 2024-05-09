@@ -487,6 +487,7 @@ BOOL LLFloaterPreference::postBuild()
 	if (LLStartUp::getStartupState() < STATE_STARTED)
 	{
 		gSavedPerAccountSettings.setString("DoNotDisturbModeResponse", LLTrans::getString("DoNotDisturbModeResponseDefault"));
+		gSavedPerAccountSettings.setString("ALRejectTeleportOffersResponse", LLTrans::getString("RejectTeleportOffersResponseDefault"));
 		gSavedPerAccountSettings.setString("ALRejectFriendshipRequestsResponse", LLTrans::getString("RejectFriendshipRequestsResponseDefault"));
 	}
 
@@ -562,6 +563,15 @@ void LLFloaterPreference::onDoNotDisturbResponseChanged()
 				!= getChild<LLUICtrl>("autorespond_reject_friends_response")->getValue().asString();
 
 	gSavedPerAccountSettings.setBOOL("ALRejectFriendshipRequestsChanged", reject_friendship_requests_response_changed_flag);
+}
+
+void LLFloaterPreference::onRejectTeleportOffersResponseChanged()
+{
+	bool reject_teleport_offers_response_changed_flag =
+			LLTrans::getString("RejectTeleportOffersResponseDefault")
+					!= getChild<LLUICtrl>("autorespond_rto_response")->getValue().asString();
+
+	gSavedPerAccountSettings.setBOOL("ALRejectTeleportOffersResponseChanged", reject_teleport_offers_response_changed_flag);
 }
 
 #if !LL_HAVOK
@@ -940,6 +950,7 @@ LLFloaterPreference::~LLFloaterPreference()
 	LLConversationLog::instance().removeObserver(this);
     mComplexityChangedSignal.disconnect();
 	mDnDModeConnection.disconnect();
+	mRejectTeleportConnection.disconnect();
 }
 
 void LLFloaterPreference::draw()
@@ -1100,6 +1111,9 @@ void LLFloaterPreference::onOpen(const LLSD& key)
 		// this connection is needed to properly set "DoNotDisturbResponseChanged" setting when user makes changes in
 		// do not disturb response message.
 		mDnDModeConnection = gSavedPerAccountSettings.getControl("DoNotDisturbModeResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onDoNotDisturbResponseChanged, this));
+
+		mRejectTeleportConnection =  gSavedPerAccountSettings.getControl("ALRejectTeleportOffersResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onRejectTeleportOffersResponseChanged, this));
+
 	}
 	gAgent.sendAgentUserInfoRequest();
 
