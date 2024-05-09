@@ -4400,6 +4400,9 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="DoNotDisturbModeResponseDefault">
 		この住民が「取り込み中」をオンにすると、あなたのメッセージが後で表示されるようになります。
 	</string>
+	<string name="RejectFriendshipRequestsResponseDefault">
+		あなたがメッセージを送った居住者は、[APP_NAME]ビューアの「フレンドシップのリクエストをすべて拒否する」モードを有効にしています。これは、彼らが友人関係のリクエストに邪魔されないようリクエストしたことを意味します。ＩＭは手動で送信することもできます。
+	</string>
 	<!-- Mute -->
 	<string name="MuteByName">
 		（名前で）

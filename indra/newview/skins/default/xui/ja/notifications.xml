@@ -1173,6 +1173,11 @@ L$が不足しているので、このグループに参加することができ
 		現在[APP_NAME]では、BVH形式のアニメーションファイルの一括アップロードはサポートされていません。
 		<tag>fail</tag>
 	</notification>
+	<notification name="RejectFriendshipRequestsModeSet">
+		受信したフレンドシップリクエストをすべて拒否するモードがオンになっています。
+誰からのフレンドシップのリクエストも、設定された自動応答で拒否されるようになります。このため、通知されることはありません。
+		<usetemplate ignoretext="フレンドシップリクエストをすべて拒否するモードにステータスを変更したとき" name="okignore" yestext="ＯＫ"/>
+	</notification>
 	<notification name="CannotUploadReason">
 		以下の理由で「[FILE]」をアップロードできませんでした：
 [REASON]

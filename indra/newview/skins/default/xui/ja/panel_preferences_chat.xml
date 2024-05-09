@@ -3,5 +3,6 @@
 	<tab_container name="chat_tab_container">
 		<panel label="一般" name="chat_pref_general"/>
 		<panel label="コマンド" name="chat_pref_cmd"/>
+		<panel label="自動返答" name="chat_pref_autoresponse"/>
 	</tab_container>
 </panel>

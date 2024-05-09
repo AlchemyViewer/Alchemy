@@ -101,6 +101,7 @@
 		<menu_item_check label="ブロックリスト" name="Block List"/>
 		<menu_item_separator/>
 		<menu_item_check label="取り込み中" name="Do Not Disturb"/>
+		<menu_item_check label="フレンドシップのリクエストを拒否する" name="Reject all friendship requests"/>
 	</menu>
 	<menu label="ワールド" name="World">
 		<menu_item_check label="ポーザー" name="Poser"/>
