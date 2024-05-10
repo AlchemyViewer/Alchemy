@@ -366,6 +366,11 @@
 		</menu>
 		<menu label="レンダリング種別" name="Rendering Types">
 			<menu_item_check label="シンプル" name="Rendering Type Simple"/>
+			<menu_item_check label="マテリアル" name="Rendering Type Materials"/>
+			<menu_item_check label="アルファマスク" name="Rendering Type Alpha Mask"/>
+			<menu_item_check label="明るさ全開のアルファマスク" name="Rendering Type Fullbright Alpha Mask"/>
+			<menu_item_check label="グロー" name="Rendering Type Glow"/>
+			<menu_item_check label="明るさ全開" name="Rendering Type Fullbright"/>
 			<menu_item_check label="アルファ" name="Rendering Type Alpha"/>
 			<menu_item_check label="樹木" name="Rendering Type Tree"/>
 			<menu_item_check label="アバター" name="Rendering Type Character"/>
@@ -471,11 +476,14 @@
 			<menu_item_check label="周期的な遅いフレーム" name="Periodic Slow Frame"/>
 			<menu_item_call label="フレームのプロフィール" name="Frame Profile"/>
 			<menu_item_call label="ベンチマーク" name="Benchmark"/>
+			<menu_item_call label="ＨＤＲＩプレビュー" name="HDRI Preview"/>
+			<menu_item_call label="ＧＬＴＦシーンプレビュー" name="GLTF Scene Preview"/>
 		</menu>
 		<menu label="メタデータの描画" name="Render Metadata">
 			<menu_item_check label="バウンディングボックス" name="Bounding Boxes"/>
 			<menu_item_check label="普通" name="Normals"/>
 			<menu_item_check label="八分木" name="Octree"/>
+			<menu_item_check label="ＧＬＴＦノード" name="GLTF Nodes"/>
 			<menu_item_check label="シャドウ円錐" name="Shadow Frusta"/>
 			<menu_item_check label="物理的形状" name="Physics Shapes"/>
 			<menu_item_check label="オクルージョン" name="Occlusion"/>
@@ -527,6 +535,7 @@
 			<menu_item_separator/>
 			<menu_item_check label="シェーダーキャッシュを有効化" name="Enable Shader Cache"/>
 			<menu_item_call label="シェーダーキャッシュをクリア" name="Shader Cache Clear"/>
+			<menu_item_call label="地形を再構築" name="Rebuild Terrain"/>
 			<menu_item_separator/>
 			<menu_item_call label="キャッシュを直ちにクリア" name="Cache Clear"/>
 		</menu>

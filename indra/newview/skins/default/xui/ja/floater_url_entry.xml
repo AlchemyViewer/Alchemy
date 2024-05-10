@@ -3,7 +3,7 @@
 	<text name="media_label" >
 		メディアＵＲＬ：
 	</text>
-	<combo_box name="media_entry" left_delta="100" />
+	<combo_box name="media_entry" left_delta="100"/>
 	<button label="ＯＫ" name="ok_btn"/>
 	<button label="キャンセル" name="cancel_btn" width="80"/>
 	<button label="クリア" name="clear_btn"/>

@@ -18,7 +18,7 @@
 		アニメーション
 	</text>
 	<text name="upload_animation"/>
-	<button name="reset_models" tool_tip="モデルのアップロード先のフォルダをリセットします。" />
+	<button name="reset_models" tool_tip="モデルのアップロード先のフォルダをリセットします。"/>
 	<text name="title_model">
 		モデル
 	</text>

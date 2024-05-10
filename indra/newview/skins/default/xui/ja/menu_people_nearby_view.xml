@@ -16,6 +16,6 @@
 	<menu_item_separator/>
 	<menu_item_check name="radar_alerts" label="レーダーアラートを表示"/>
 	<menu_item_check name="radar_alerts_chat" label="ログアラートをチャットに記載"/>
-	<menu_item_separator />
+	<menu_item_separator/>
 	<menu_item_check label="近くの色をミニマップに同期" name="color_nearby"/>
 </toggleable_menu>

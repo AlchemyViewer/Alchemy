@@ -4,7 +4,7 @@
 		スクリプト：[NAME]
 	</floater.string>
 	<panel name="script panel"/>
-	<icon name="lock" />
+	<icon name="lock"/>
 	<text name="path_txt">
 		ファイルパス
 	</text>
