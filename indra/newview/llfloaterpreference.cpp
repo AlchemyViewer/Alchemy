@@ -690,7 +690,7 @@ skin_t manifestFromJson(const std::string& filename, const ESkinType type)
 	in.open(filename);
 	if (in.is_open())
 	{
-		boost::json::error_code ec;
+		boost::system::error_code ec;
 		auto root = boost::json::parse(in, ec);
 		if (!ec.failed() && root.is_object())
         {
@@ -803,7 +803,7 @@ void LLFloaterPreference::onAddSkinCallback(const std::vector<std::string>& file
 			ss << std::string(const_cast<const char*>(buf.get()), buf_size);
 			buf.reset();
 				
-			boost::json::error_code ec;
+			boost::system::error_code ec;
 			auto root = boost::json::parse(ss, ec);
 			if (!ec.failed() && root.is_object())
 			{
