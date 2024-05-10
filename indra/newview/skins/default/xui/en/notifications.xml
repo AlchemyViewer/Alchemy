@@ -13255,5 +13255,25 @@ The pose has been exported successfully as an ANIM file.
 The file can be found in:
 C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
   </notification>
-	
+   <notification
+      icon="alert.tga"
+      name="RejectTeleportOffersModeSet"
+      type="alert">
+   Reject all incoming teleport offers and requests mode is on.
+   Incoming teleport offers and requests from anyone will now be rejected with your configured autoresponse. You will not be notified because of that fact.
+      <usetemplate
+      ignoretext="I change my status to reject all teleport offers and requests mode"
+      name="okignore"
+      yestext="OK"/>
+  </notification>
+   <notification
+      icon="alert.tga"
+      name="RejectTeleportOffersModeWarning"
+      type="alert">
+   You cannot send a teleport request at the moment, because 'reject all incoming teleport offers and requests' mode is on.
+   Go to the 'Comm' &gt; 'Online Status' menu if you wish to disable it.
+      <usetemplate
+      name="okbutton"
+      yestext="OK"/>
+  </notification>
 </notifications>
