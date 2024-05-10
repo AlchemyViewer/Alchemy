@@ -104,7 +104,7 @@
 				<combo_box.item label="低（４サンプル）" name="SSR_Low"/>
 				<combo_box.item label="中（８サンプル）" name="SSR_Medium"/>
 				<combo_box.item label="高 （１６サンプル）" name="SSR_High"/>
-				<combo_box.item label="最高（３２サンプル）" name="SSR_Ultra" />
+				<combo_box.item label="最高（３２サンプル）" name="SSR_Ultra"/>
 			</combo_box>
 			<!--Probe Draw Distance-->
 			<!--

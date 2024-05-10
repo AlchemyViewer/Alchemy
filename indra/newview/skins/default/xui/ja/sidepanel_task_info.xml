@@ -63,7 +63,7 @@
 			グループ：
 		</text>
 		<text name="Group Name"/>
-		<button name="button set group" tool_tip="このオブジェクトの権限を共有するグループを選択してください。" />
+		<button name="button set group" tool_tip="このオブジェクトの権限を共有するグループを選択してください。"/>
 		<button label="寄贈" label_selected="寄贈" name="button deed" tool_tip="このアイテムを寄贈すると「次の所有者」の権限が適用されます。グループ共有オブジェクトは、グループのオフィサーが寄贈できます。"/>
 		<text name="label click action">
 			クリックで：

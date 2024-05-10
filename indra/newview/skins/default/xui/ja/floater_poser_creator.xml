@@ -152,7 +152,7 @@
 			<scroll_list name="timeframe_scroll">
 				<scroll_list.columns label="ボーン名" name="joint"/>
 				<scroll_list.columns label="タイムライン" name="multislider">
-					<column name="multislider" />
+					<column name="multislider"/>
 				</scroll_list.columns>
 			</scroll_list>
 			<panel name="title">

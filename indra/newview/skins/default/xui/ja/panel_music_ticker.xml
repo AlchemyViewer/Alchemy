@@ -7,19 +7,19 @@
 	<string name="loading">
 		（読み込んでいます…）
 	</string>
-	<locate left="310" name="visualizer_box" />
-	<icon left="310" name="visualizer_grid" />
+	<locate left="310" name="visualizer_box"/>
+	<icon left="310" name="visualizer_grid"/>
 	<text name="station_text" width="302">
 		バーク
 	</text>
-	<icon name="ticker_sep1" width="308" />
+	<icon name="ticker_sep1" width="308"/>
 	<text name="title_label" width="100">
 		曲名：
 	</text>
 	<text left="106" name="title_text" width="200">
 		ウーフ
 	</text>
-	<icon name="ticker_sep2" width="308" />
+	<icon name="ticker_sep2" width="308"/>
 	<text name="artist_label" width="100">
 		アーティスト：
 	</text>

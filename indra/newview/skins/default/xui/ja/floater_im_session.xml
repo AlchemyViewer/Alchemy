@@ -72,7 +72,7 @@
 						<group_icon name="group_chat_icon"/>
 						<icon name="nearby_chat_icon"/>
 						<chat_editor name="chat_editor"/>
-						<button name="emoji_recent_panel_toggle_btn" tool_tip="最近利用した絵文字を表示／非表示します。" />
+						<button name="emoji_recent_panel_toggle_btn" tool_tip="最近利用した絵文字を表示／非表示します。"/>
 					</layout_panel>
 					<layout_panel name="input_button_layout_panel">
 						<button name="minz_btn" tool_tip="メッセージパネルの表示／非表示の切り替えを行います。"/>

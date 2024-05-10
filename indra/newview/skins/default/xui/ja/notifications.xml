@@ -4420,6 +4420,11 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 [REASON]
 		<tag>fail</tag>
 	</notification>
+	<notification name="CannotLoad">
+		[WHAT]を読み込むことができませんでした。
+[REASON]
+		<tag>fail</tag>
+	</notification>
 	<notification name="CannotUploadMaterial">
 		ファイルアップロード時に問題が発生しました。
 		<tag>fail</tag>
@@ -5936,6 +5941,11 @@ Intelドライバーのウェブサイトを確認しますか？
 		編集中の非ＨＤＲの空の設定は自動的にＨＤＲの設定に変換されます。ＨＤＲとトーンマッピングを削除する場合は、反射プローブ環境の値を０にしてください。
 		<usetemplate ignoretext="ＨＤＲの空の調整時の警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
+	<notification name="GLTFPreviewSelection">
+		プレビューしているＧＬＴＦアセットへのハンドルとして機能するオブジェクトを選択する必要があります。
+		<tag>fail</tag>
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
 	<!-- ALCHEMY BELOW THIS LINE -->
 	<notification name="ChatCommandCalc">
 		計算結果：[EXPRESSION]＝[RESULT]
@@ -6228,5 +6238,15 @@ C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses
 
 ファイルは以下の場所にあります：
 C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
+	</notification>
+	<notification name="RejectTeleportOffersModeSet">
+		すべての受け取ったテレポートオファーとリクエストを拒否するモードがオンになっています。
+受信したテレポートのオファーやリクエストは、設定された自動応答で拒否されるようになります。このため、通知されることはありません。
+		<usetemplate ignoretext="すべてのテレポートのオファーとリクエストを拒否するモードにステータスを変更したとき" name="okignore" yestext="ＯＫ"/>
+	</notification>
+	<notification name="RejectTeleportOffersModeWarning">
+		「受け取ったテレポートのオファーとリクエストをすべて拒否する」モードがオンになっているため、現時点ではテレポートのリクエストを送信できません。
+無効にしたい場合は「コミュニケーション」＞「オンライン状況」メニューから行います。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 </notifications>

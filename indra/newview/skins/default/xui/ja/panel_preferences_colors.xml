@@ -46,7 +46,7 @@
 			<text name="text_minimap_box2">
 				他人
 			</text>
-			<color_swatch name="friends_minimap_color" />
+			<color_swatch name="friends_minimap_color"/>
 			<text name="text_minimap_box3">
 				フレンド
 			</text>
@@ -62,7 +62,7 @@
 				フローターの透過度
 			</text>
 			<slider label="アクティブ：" name="active"/>
-			<slider label="非アクティブ：" name="inactive" />
+			<slider label="非アクティブ：" name="inactive"/>
 		</panel>
 		<panel label="チャット" name="chat_colors">
 			<text name="font_colors">
@@ -84,7 +84,7 @@
 			<text name="text_box4">
 				システム
 			</text>
-			<color_swatch name="script_error" />
+			<color_swatch name="script_error"/>
 			<text name="text_box5">
 				エラー
 			</text>

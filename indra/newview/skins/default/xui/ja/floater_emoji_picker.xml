@@ -6,7 +6,7 @@
     <scrolling_panel_list name="EmojiGrid"/>
   </scroll_container>
   <panel name="Groups">
-    <panel name="Badge" />
+    <panel name="Badge"/>
   </panel>
   <text name="Dummy">絵文字が選択されていません。</text>
 </floater>
