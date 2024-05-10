@@ -6229,4 +6229,14 @@ C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses
 ファイルは以下の場所にあります：
 C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
 	</notification>
+	<notification name="RejectTeleportOffersModeSet">
+		すべての受け取ったテレポートオファーとリクエストを拒否するモードがオンになっています。
+受信したテレポートのオファーやリクエストは、設定された自動応答で拒否されるようになります。このため、通知されることはありません。
+	<usetemplate ignoretext="すべてのテレポートのオファーとリクエストを拒否するモードにステータスを変更したとき" name="okignore" yestext="ＯＫ"/>
+</notification>
+<notification name="RejectTeleportOffersModeWarning">
+		「受け取ったテレポートのオファーとリクエストをすべて拒否する」モードがオンになっているため、現時点ではテレポートのリクエストを送信できません。
+無効にしたい場合は「コミュニケーション」＞「オンライン状況」メニューから行います。
+	<usetemplate name="okbutton" yestext="ＯＫ"/>
+</notification>
 </notifications>
