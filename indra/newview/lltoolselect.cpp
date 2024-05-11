@@ -128,12 +128,14 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 	}
 // [/RLVa:KB]
 
+	bool select_owned = gSavedSettings.getBOOL("SelectCopyOnly");
 	BOOL select_owned = gSavedSettings.getBOOL("SelectOwnedOnly");
 	BOOL select_movable = gSavedSettings.getBOOL("SelectMovableOnly");
 
     // *NOTE: These settings must be cleaned up at bottom of function.
 	if (temp_select || LLSelectMgr::getInstance()->mAllowSelectAvatar)
 	{
+		gSavedSettings.setBOOL("SelectCopyOnly", FALSE);
 		gSavedSettings.setBOOL("SelectOwnedOnly", FALSE);
 		gSavedSettings.setBOOL("SelectMovableOnly", FALSE);
     	LLSelectMgr::getInstance()->setForceSelection(TRUE);
@@ -286,6 +288,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 	// Cleanup temp select settings above.
 	if (temp_select ||LLSelectMgr::getInstance()->mAllowSelectAvatar)
 	{
+		gSavedSettings.setBOOL("SelectCopyOnly", select_copy);
 		gSavedSettings.setBOOL("SelectOwnedOnly", select_owned);
 		gSavedSettings.setBOOL("SelectMovableOnly", select_movable);
 		LLSelectMgr::getInstance()->setForceSelection(FALSE);

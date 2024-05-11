@@ -1186,7 +1186,8 @@ void LLSelectMgr::highlightObjectOnly(LLViewerObject* objectp)
 		return;
 	}
 	
-    if ((gSavedSettings.getBOOL("SelectOwnedOnly") && !objectp->permYouOwner())
+    if ((gSavedSettings.getBOOL("SelectCopyOnly") && !objectp->permCopy())
+		|| (gSavedSettings.getBOOL("SelectOwnedOnly") && !objectp->permYouOwner())
         || (gSavedSettings.getBOOL("SelectMovableOnly") && (!objectp->permMove() || objectp->isPermanentEnforced())))
 	{
 		// only select my own objects
@@ -7515,7 +7516,8 @@ BOOL LLSelectMgr::canSelectObject(LLViewerObject* object, BOOL ignore_select_own
 
 	if(!ignore_select_owned)
 	{
-		if ((gSavedSettings.getBOOL("SelectOwnedOnly") && !object->permYouOwner()) ||
+		if ((gSavedSettings.getBOOL("SelectCopyOnly") && !object->permCopy()) ||
+			(gSavedSettings.getBOOL("SelectOwnedOnly") && !object->permYouOwner()) ||
 				(gSavedSettings.getBOOL("SelectMovableOnly") && (!object->permMove() ||  object->isPermanentEnforced())))
 		{
 			// only select my own objects
