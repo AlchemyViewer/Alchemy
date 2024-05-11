@@ -19,7 +19,6 @@
 		mouse_opaque="false"
 		name="lightbox_tab_container"
 		tab_position="top"
-		tab_stop="false"
 		tab_min_width="70"
 		width="400">
 		<!--Image Panel-->

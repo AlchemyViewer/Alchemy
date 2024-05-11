@@ -147,12 +147,12 @@
      length="1"
      follows="top|left"
      font="SansSerifSmall"
-     height="10"
+     height="18"
      layout="topleft"
      left="10"
      font.style="BOLD"
      name="library_label"
-     top_delta="25"
+     top_pad="5"
      width="100">
         Library:
     </text>
@@ -162,7 +162,7 @@
      layout="topleft"
      left="10"
      name="library_list"
-     top_delta="15"
+     top_pad="2"
      width="180">
         <scroll_list.rows
          name="action_animation"
@@ -191,7 +191,7 @@
      length="1"
      follows="top|left"
      font="SansSerifSmall"
-     height="10"
+     height="18"
      layout="topleft"
      left="10"
      font.style="BOLD"
@@ -206,7 +206,7 @@
      layout="topleft"
      left="10"
      name="step_list"
-     top_pad="5"
+     top_pad="2"
      width="180" />
     <button
      follows="top|left"

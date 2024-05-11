@@ -62,6 +62,8 @@ if(USE_NFD)
     nfd
     GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
     GIT_TAG        v1.1.1
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
     )
 
   set(NFD_PORTAL ON)
