@@ -34,6 +34,17 @@
          parameter="expanded_view"/>
     </menu_item_check>
     <menu_item_separator layout="topleft" />
+	<menu_item_check
+	 label="Show previous conversation history"
+	 name="LogShowHistory">
+		<menu_item_check.on_check
+		 function="CheckControl"
+		 parameter="LogShowHistory" />
+		<menu_item_check.on_click
+		 function="ToggleControl"
+		 parameter="LogShowHistory" />
+	</menu_item_check>
+	<menu_item_separator layout="topleft" />
     <menu_item_check name="IMShowTime" label="Show time">
         <menu_item_check.on_click
          function="IMSession.Menu.Action"

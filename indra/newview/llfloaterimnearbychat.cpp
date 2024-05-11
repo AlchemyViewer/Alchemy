@@ -240,7 +240,10 @@ void LLFloaterIMNearbyChat::reloadMessages(bool clean_messages/* = false*/)
 	if (clean_messages)
 	{
 		mMessageArchive.clear();
-		loadHistory();
+		if (gSavedPerAccountSettings.getBOOL("LogShowHistory"))
+		{
+			loadHistory();
+		}
 	}
 
 	mChatHistory->clear();
