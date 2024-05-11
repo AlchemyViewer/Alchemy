@@ -233,6 +233,7 @@
 			<menu_item_check label="権限の詳細を表示する" name="DebugPermissions"/>
 			<menu_item_separator/>
 			<menu_item_check label="自分のオブジェクトだけを選択する" name="Select Only My Objects"/>
+			<menu_item_check label="コピー可能なオブジェクトだけを選択する" name="Select Only Copyable Objects"/>
 			<menu_item_check label="動的オブジェクトだけを選択する" name="Select Only Movable Objects"/>
 			<menu_item_check label="非表示のオブジェクトを選択する" name="Select Invisible Objects"/>
 			<menu_item_check label="反射プローブを選択する" name="Select Reflection Probes"/>
