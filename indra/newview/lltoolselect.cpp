@@ -128,7 +128,7 @@ LLObjectSelectionHandle LLToolSelect::handleObjectSelection(const LLPickInfo& pi
 	}
 // [/RLVa:KB]
 
-	bool select_owned = gSavedSettings.getBOOL("SelectCopyOnly");
+	bool select_copy = gSavedSettings.getBOOL("SelectCopyOnly");
 	BOOL select_owned = gSavedSettings.getBOOL("SelectOwnedOnly");
 	BOOL select_movable = gSavedSettings.getBOOL("SelectMovableOnly");
 
