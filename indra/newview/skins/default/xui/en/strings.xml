@@ -4528,4 +4528,13 @@ and report the problem.
      name="MinimapAltToolTipHintMsg">
 		Double-click to teleport
 	</string>
+
+	<string
+     name="Temporary">
+		Temporary
+	</string>
+	<string
+     name="Permanent">
+		Permanent
+	</string>
 </strings>

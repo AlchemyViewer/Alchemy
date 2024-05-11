@@ -16,6 +16,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "alassetblocklist.h"
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
 #include "llcallbacklist.h"
@@ -45,9 +46,11 @@
 
 const std::string BLOCKED_PARAM_NAME  = "blocked_to_select";
 const std::string DERENDER_PARAM_NAME = "derender_to_select";
+const std::string ASSET_PARAM_NAME = "asset_to_select";
 const std::string EXCEPTION_PARAM_NAME = "exception_to_select";
 const std::string BLOCKED_TAB_NAME = "mute_tab";
 const std::string DERENDER_TAB_NAME = "derender_tab";
+const std::string ASSET_TAB_NAME = "asset_tab";
 const std::string EXCEPTION_TAB_NAME = "avatar_rendering_tab";
 
 // ============================================================================
@@ -428,9 +431,126 @@ void LLPanelDerenderList::refresh()
 				auto pObjEntry = static_cast<LLDerenderObject*>(pEntry.get());
 				sdColumns[1]["value"] = fmt::format(FMT_STRING("{} <{}, {}, {}>"), pObjEntry->strRegionName, ll_round(pObjEntry->posRegion.mV[VX]), ll_round(pObjEntry->posRegion.mV[VY]), ll_round(pObjEntry->posRegion.mV[VZ]));
 			}
-			sdColumns[2]["value"] = (pEntry->isPersistent()) ? "Permanent" : "Temporary";
+			sdColumns[2]["value"] = (pEntry->isPersistent()) ? LLTrans::getString("Permanent") : LLTrans::getString("Temporary");
 
 			m_pDerenderList->addElement(sdRow, ADD_BOTTOM);
+		}
+	}
+}
+
+// ============================================================================
+// LLPanelAssetBlocklist
+//
+
+static LLPanelInjector<LLPanelAssetBlocklist> t_panel_asset_list("panel_asset_block_list");
+
+LLPanelAssetBlocklist::LLPanelAssetBlocklist()
+	: LLPanel()
+{
+}
+
+LLPanelAssetBlocklist::~LLPanelAssetBlocklist()
+{
+	mAssetBlocklistChangeConn.disconnect();
+}
+
+BOOL LLPanelAssetBlocklist::postBuild()
+{
+	mAssetBlocklist = findChild<LLScrollListCtrl>("asset_list");
+	mAssetBlocklist->setCommitCallback(boost::bind(&LLPanelAssetBlocklist::onSelectionChange, this));
+	mAssetBlocklist->setCommitOnDelete(true);
+	mAssetBlocklist->setCommitOnSelectionChange(true);
+
+	// Restore last sort order
+	U32 nSortValue = gSavedSettings.getU32("BlockAssetSortOrder");
+	if (nSortValue)
+	{
+		mAssetBlocklist->sortByColumnIndex(nSortValue >> 4, nSortValue & 0xF);
+	}
+	mAssetBlocklist->setSortChangedCallback(boost::bind(&LLPanelAssetBlocklist::onColumnSortChange, this));
+
+	mAssetBlocklistChangeConn = ALAssetBlocklist::instance().setChangeCallback(boost::bind(&LLPanelAssetBlocklist::refresh, this));
+	findChild<LLUICtrl>("asset_trash_btn")->setCommitCallback(boost::bind(&LLPanelAssetBlocklist::onSelectionRemove, this));
+
+	return TRUE;
+}
+
+void LLPanelAssetBlocklist::onOpen(const LLSD& sdParam)
+{
+	refresh();
+
+	if ((sdParam.has(ASSET_PARAM_NAME)) && (sdParam[ASSET_PARAM_NAME].asUUID().notNull()))
+	{
+		mAssetBlocklist->selectByID(sdParam[ASSET_PARAM_NAME].asUUID());
+	}
+}
+
+void LLPanelAssetBlocklist::onColumnSortChange()
+{
+	U32 nSortValue = 0;
+
+	S32 idxColumn = mAssetBlocklist->getSortColumnIndex();
+	if (-1 != idxColumn)
+	{
+		nSortValue = idxColumn << 4 | ((mAssetBlocklist->getSortAscending()) ? 1 : 0);
+	}
+
+	gSavedSettings.setU32("BlockAssetSortOrder", nSortValue);
+}
+
+void LLPanelAssetBlocklist::onSelectionChange()
+{
+	bool hasSelected = (NULL != mAssetBlocklist->getFirstSelected());
+	getChildView("asset_trash_btn")->setEnabled(hasSelected);
+}
+
+void LLPanelAssetBlocklist::onSelectionRemove()
+{
+	uuid_vec_t ids;
+	std::vector<LLScrollListItem*> selItems = mAssetBlocklist->getAllSelected(); 
+	for (LLScrollListItem* itemp : selItems)
+	{
+		ids.push_back(itemp->getValue().asUUID());
+	}
+
+	ALAssetBlocklist::instance().removeEntries(ids);
+}
+
+void LLPanelAssetBlocklist::refresh()
+{
+	mAssetBlocklist->clearRows();
+	if (ALAssetBlocklist::instanceExists())
+	{
+		LLSD sdRow;	LLSD& sdColumns = sdRow["columns"];
+		sdColumns[0]["column"] = "name";  sdColumns[0]["type"] = "text";
+		sdColumns[1]["column"] = "location"; sdColumns[1]["type"] = "text";
+		sdColumns[2]["column"] = "asset_type";    sdColumns[2]["type"] = "text";
+		sdColumns[3]["column"] = "date";  sdColumns[3]["type"] = "text";
+		sdColumns[4]["column"] = "persist";  sdColumns[4]["type"] = "text";
+
+		for (const auto& [key, data] : ALAssetBlocklist::instance().getEntries())
+		{
+			sdRow["value"] = key;
+
+			std::string owner_name = "Unknown";
+			LLAvatarName avName;
+			if (LLAvatarNameCache::get(data.mOwnerID, &avName))
+			{
+				owner_name = avName.getUserName();
+			}
+			sdColumns[0]["value"] = owner_name;
+			sdColumns[1]["value"] = data.mLocation;
+			sdColumns[2]["value"] = LLTrans::getString(LLAssetType::lookupHumanReadable(data.mAssetType));
+
+			std::string timeStr = getString("blockedDate");
+			LLSD substitution;
+			substitution["datetime"] = (S32)data.mDate.secondsSinceEpoch();
+			LLStringUtil::format(timeStr, substitution);
+
+			sdColumns[3]["value"] = timeStr;
+			sdColumns[4]["value"] = data.mPersist ? LLTrans::getString("Permanent") : LLTrans::getString("Temporary");
+			
+			mAssetBlocklist->addElement(sdRow, ADD_BOTTOM);
 		}
 	}
 }
@@ -745,6 +865,8 @@ void LLFloaterBlocked::onOpen(const LLSD& sdParam)
 		m_pBlockedTabs->selectTabByName(BLOCKED_TAB_NAME);
 	else if (sdParam.has(DERENDER_PARAM_NAME))
 		m_pBlockedTabs->selectTabByName(DERENDER_TAB_NAME);
+	else if (sdParam.has(ASSET_PARAM_NAME))
+		m_pBlockedTabs->selectTabByName(ASSET_TAB_NAME);
 	if (sdParam.has(EXCEPTION_PARAM_NAME))
 		m_pBlockedTabs->selectTabByName(EXCEPTION_TAB_NAME);
 	else if ( (sdParam.isString()) && (m_pBlockedTabs->hasChild(sdParam.asString())) )
@@ -781,6 +903,11 @@ void LLFloaterBlocked::showMuteAndSelect(const LLUUID& idMute)
 void LLFloaterBlocked::showDerenderAndSelect(const LLUUID& idEntry)
 {
 	LLFloaterReg::showInstance("blocked", LLSD().with(DERENDER_PARAM_NAME, idEntry));
+}
+
+void LLFloaterBlocked::showAssetAndSelect(const LLUUID& idEntry)
+{
+	LLFloaterReg::showInstance("blocked", LLSD().with(ASSET_PARAM_NAME, idEntry));
 }
 
 void LLFloaterBlocked::showRenderExceptionAndSelect(const LLUUID& idEntry)

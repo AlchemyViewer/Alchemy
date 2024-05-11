@@ -14,7 +14,7 @@
  save_visibility="false"
  single_instance="true"
  title="BLOCKED / DERENDER LIST"
- width="350">
+ width="500">
     <filter_editor
      follows="left|top|right"
      height="23"
@@ -41,19 +41,25 @@
         <panel
          class="panel_block_list"
          filename="panel_block_list.xml"
-         label="BLOCKED"
+         label="Blocked"
          layout="topleft"
          name="mute_tab" />
         <panel
          class="panel_derender_list"
          filename="panel_block_derender.xml"
-         label="DERENDERED"
+         label="Derendered"
          layout="topleft"
          name="derender_tab" />
+		<panel
+         class="panel_asset_block_list"
+         filename="panel_block_asset.xml"
+         label="Assets"
+         layout="topleft"
+         name="asset_tab" />
         <panel
          class="panel_block_avatar_rendering"
          filename="panel_block_avatar_rendering.xml"
-         label="AVATAR RENDERING"
+         label="Avatars"
          layout="topleft"
          name="avatar_rendering_tab" />
     </tab_container>

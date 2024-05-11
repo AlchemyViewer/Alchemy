@@ -51,5 +51,5 @@
 	<button bottom_delta="0" follows="left|bottom" height="20" label="Look At" name="look_at_btn" left_delta="100" width="95" enabled="false"/>
 
 	<button bottom_delta="0" follows="left|bottom" height="20" label="Stop" name="stop_btn" right="-10" width="95" enabled="false"/>
-	<button bottom_delta="0" follows="left|bottom" height="20" label="Blacklist" name="bl_btn" right="-110" width="95" enabled="false" visible="false"/>
+	<button bottom_delta="0" follows="left|bottom" height="20" label="Block" name="block_btn" right="-110" width="95" enabled="false" />
 </floater>

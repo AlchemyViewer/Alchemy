@@ -5,6 +5,9 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alfloaterexploresounds.h"
+
+#include "alassetblocklist.h"
+#include "llfloaterblocked.h"
 #include "llcheckboxctrl.h"
 #include "llscrolllistctrl.h"
 #include "llagent.h"
@@ -73,7 +76,7 @@ BOOL ALFloaterExploreSounds::postBuild()
 	getChild<LLButton>("play_locally_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handlePlayLocally, this));
 	getChild<LLButton>("look_at_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleLookAt, this));
 	getChild<LLButton>("stop_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleStop, this));
-	getChild<LLButton>("bl_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::blacklistSound, this));
+	getChild<LLButton>("block_btn")->setClickedCallback(boost::bind(&ALFloaterExploreSounds::blacklistSound, this));
 	
 	mStopLocalButton = getChild<LLButton>("stop_locally_btn");
 	mStopLocalButton->setClickedCallback(boost::bind(&ALFloaterExploreSounds::handleStopLocally, this));
@@ -99,7 +102,7 @@ void ALFloaterExploreSounds::handleSelection()
 	childSetEnabled("look_at_btn", (num_selected && !multiple));
 	childSetEnabled("play_locally_btn", num_selected);
 	childSetEnabled("stop_btn", num_selected);
-	childSetEnabled("bl_btn", num_selected);
+	childSetEnabled("block_btn", num_selected);
 }
 
 LLSoundHistoryItem ALFloaterExploreSounds::getItem(const LLUUID& itemID)
@@ -497,36 +500,24 @@ void ALFloaterExploreSounds::blacklistSound()
 			continue;
 		}
 
-		std::string region_name;
+		std::string location = "Unknown";
 		LLViewerRegion* cur_region = gAgent.getRegion();
 		if (cur_region)
 		{
-			region_name = cur_region->getName();
+			location = cur_region->getName();
+			//if(!item.mPosition.isNull())
+			//{
+			//	LLVector3 cur_pos(item.mPosition - cur_region->getOriginGlobal());
+			//	location = fmt::format(FMT_STRING("{:s} ({:d}, {:d}, {:d})"), cur_region->getName(), ll_round(cur_pos.mV[VX]), ll_round(cur_pos.mV[VY]), ll_round(cur_pos.mV[VZ]));
+			//}
+			//else
+			//{
+			//	location = cur_region->getName();
+			//}
 		}
 
-		blacklist_avatar_name_cache_connection_map_t::iterator it = mBlacklistAvatarNameCacheConnections.find(item.mOwnerID);
-		if (it != mBlacklistAvatarNameCacheConnections.end())
-		{
-			if (it->second.connected())
-			{
-				it->second.disconnect();
-			}
-			mBlacklistAvatarNameCacheConnections.erase(it);
-		}
-		LLAvatarNameCache::callback_connection_t cb = LLAvatarNameCache::get(item.mOwnerID, boost::bind(&ALFloaterExploreSounds::onBlacklistAvatarNameCacheCallback, this, _1, _2, item.mAssetID, region_name));
-		mBlacklistAvatarNameCacheConnections.insert(std::make_pair(item.mOwnerID, cb));
+		ALAssetBlocklist::instance().addEntry(item.mAssetID, item.mOwnerID, location, LLAssetType::AT_SOUND);
 	}
-}
 
-void ALFloaterExploreSounds::onBlacklistAvatarNameCacheCallback(const LLUUID& av_id, const LLAvatarName& av_name, const LLUUID& asset_id, const std::string& region_name)
-{
-	blacklist_avatar_name_cache_connection_map_t::iterator it = mBlacklistAvatarNameCacheConnections.find(av_id);
-	if (it != mBlacklistAvatarNameCacheConnections.end())
-	{
-		if (it->second.connected())
-		{
-			it->second.disconnect();
-		}
-		mBlacklistAvatarNameCacheConnections.erase(it);
-	}
+	handleStop();
 }

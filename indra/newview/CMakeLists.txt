@@ -88,6 +88,7 @@ set(viewer_SOURCE_FILES
     ao.cpp
     aoengine.cpp
     aoset.cpp
+    alassetblocklist.cpp
     alavataractions.cpp
     alavatargroups.cpp
     alchatcommand.cpp
@@ -832,6 +833,7 @@ set(viewer_HEADER_FILES
     ao.h
     aoengine.h
     aoset.h
+    alassetblocklist.h
     alavataractions.h
     alavatargroups.h
     alchatcommand.h

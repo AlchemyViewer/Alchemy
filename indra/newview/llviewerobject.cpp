@@ -53,6 +53,7 @@
 #include "message.h"
 #include "object_flags.h"
 
+#include "alassetblocklist.h"
 #include "llaudiosourcevo.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -6396,6 +6397,10 @@ void LLViewerObject::setAttachedSound(const LLUUID &audio_uuid, const LLUUID& ow
 		}
 		return;
 	}
+
+	if (gAudiop->isCorruptSound(audio_uuid) || ALAssetBlocklist::instance().isBlocked(audio_uuid))
+		return;
+
 	if (flags & LL_SOUND_FLAG_LOOP
 		&& mAudioSourcep && mAudioSourcep->isLoop() && mAudioSourcep->getCurrentData()
 		&& mAudioSourcep->getCurrentData()->getID() == audio_uuid)

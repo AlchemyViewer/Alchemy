@@ -146,6 +146,45 @@ protected:
 };
 
 // ============================================================================
+// LLPanelAssetBlocklist
+//
+
+class LLPanelAssetBlocklist final : public LLPanel
+{
+public:
+	LLPanelAssetBlocklist();
+	~LLPanelAssetBlocklist();
+
+	/*
+	 * LLPanel overrides
+	 */
+public:
+	BOOL postBuild() override;
+	void onOpen(const LLSD& sdParam) override;
+
+	/*
+	 * Member functions
+	 */
+protected:
+	void refresh() override;
+
+	/*
+	 * Event handlers
+	 */
+protected:
+	void onColumnSortChange();
+	void onSelectionChange();
+	void onSelectionRemove();
+
+	/*
+	 * Member variables
+	 */
+protected:
+	LLScrollListCtrl* mAssetBlocklist = nullptr;
+	boost::signals2::connection mAssetBlocklistChangeConn;
+};
+
+// ============================================================================
 // LLPanelAvatarRendering - Configure avatar complexity excpetions
 //
 
@@ -232,6 +271,7 @@ protected:
 public:
 	static void showMuteAndSelect(const LLUUID& idMute);
 	static void showDerenderAndSelect(const LLUUID& idEntry);
+	static void showAssetAndSelect(const LLUUID& idEntry);
 	static void showRenderExceptionAndSelect(const LLUUID& idEntry);
 
 	/*

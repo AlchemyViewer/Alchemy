@@ -51,6 +51,7 @@
 #include "llxfermanager.h"
 #include "mean_collision_data.h"
 
+#include "alassetblocklist.h"
 #include "llagent.h"
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -4253,6 +4254,9 @@ void process_sound_trigger(LLMessageSystem *msg, void **)
 	if (gAudiop && gAudiop->isCorruptSound(sound_id))
 		return;
 
+	if (ALAssetBlocklist::instance().isBlocked(sound_id))
+		return;
+
 	msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_OwnerID, owner_id);
 	msg->getUUIDFast(_PREHASH_SoundData, _PREHASH_ObjectID, object_id);
 
@@ -4327,6 +4331,9 @@ void process_preload_sound(LLMessageSystem *msg, void **user_data)
 	if (gAudiop->isCorruptSound(sound_id))
 		return;
 
+	if (ALAssetBlocklist::instance().isBlocked(sound_id))
+		return;
+
 	msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_ObjectID, object_id);
 	msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_OwnerID, owner_id);
 
@@ -4364,6 +4371,9 @@ void process_attached_sound(LLMessageSystem *msg, void **user_data)
 
 	msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_SoundID, sound_id);
 	if (gAudiop && gAudiop->isCorruptSound(sound_id))
+		return;
+
+	if (ALAssetBlocklist::instance().isBlocked(sound_id))
 		return;
 
 	msg->getUUIDFast(_PREHASH_DataBlock, _PREHASH_ObjectID, object_id);
