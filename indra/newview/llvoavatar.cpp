@@ -8649,11 +8649,7 @@ BOOL LLVOAvatar::processFullyLoadedChange(bool loading)
 BOOL LLVOAvatar::isFullyLoaded() const
 {
 	static LLCachedControl<bool> render_unloaded_avatar(gSavedSettings, "RenderUnloadedAvatar", false);
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-2.2
-	// Changes to LLAppearanceMgr::updateAppearanceFromCOF() expect this function to actually return mFullyLoaded for gAgentAvatarp
-	return (render_unloaded_avatar && !isSelf()) ||(mFullyLoaded);
-// [/SL:KB]
-//	return (render_unloaded_avatar || mFullyLoaded);
+	return (render_unloaded_avatar || mFullyLoaded);
 }
 
 bool LLVOAvatar::isTooComplex() const

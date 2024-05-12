@@ -57,9 +57,11 @@ public:
 								 nullary_func_t post_update_func = no_op);
 	void updateCOF(const LLUUID& category, bool append = false);
 // [RLVa:KB] - Checked: 2010-03-05 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
-	void updateCOF(LLInventoryModel::item_array_t& body_items_new, LLInventoryModel::item_array_t& wear_items_new,
-				   LLInventoryModel::item_array_t& obj_items_new, LLInventoryModel::item_array_t& gest_items_new,
-				   bool append = false, const LLUUID& idOutfit = LLUUID::null, LLPointer<LLInventoryCallback> link_waiter = NULL);
+	void updateCOF(LLInventoryModel::item_array_t& body_items_new, 
+								LLInventoryModel::item_array_t& wear_items_new, 
+								LLInventoryModel::item_array_t& obj_items_new,
+								LLInventoryModel::item_array_t& gest_items_new,
+								bool append=false, const LLUUID& idOutfit=LLUUID::null, LLPointer<LLInventoryCallback> link_waiter = NULL);
 // [/RLVa:KB]
 	void wearInventoryCategory(LLInventoryCategory* category, bool copy, bool append);
 	void wearInventoryCategoryOnAvatar(LLInventoryCategory* category, bool append);
@@ -153,9 +155,6 @@ public:
 	// Attachment link management
 	void unregisterAttachment(const LLUUID& item_id);
 	void registerAttachment(const LLUUID& item_id);
-// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
-	bool getAttachmentInvLinkEnable() { return mAttachmentInvLinkEnabled; }
-// [/SL:KB]
 	void setAttachmentInvLinkEnable(bool val);
 
 	// Add COF link to individual item.
