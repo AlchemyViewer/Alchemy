@@ -8160,4 +8160,10 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 	<string name="MinimapAltToolTipHintMsg">
 		ダブルクリックでテレポート
 	</string>
+	<string name="Temporary">
+		一時的
+	</string>
+	<string name="Permanent">
+		永続的
+	</string>
 </strings>
