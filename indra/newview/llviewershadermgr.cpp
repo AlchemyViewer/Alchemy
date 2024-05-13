@@ -3252,7 +3252,6 @@ BOOL LLViewerShaderMgr::loadShadersInterface()
         gHeroRadianceGenProgram.mShaderFiles.push_back(make_pair("interface/radianceGenV.glsl", GL_VERTEX_SHADER));
         gHeroRadianceGenProgram.mShaderFiles.push_back(make_pair("interface/radianceGenF.glsl", GL_FRAGMENT_SHADER));
         gHeroRadianceGenProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        gHeroRadianceGenProgram.addPermutation("HERO_PROBES", "1");
         gHeroRadianceGenProgram.addPermutation("PROBE_FILTER_SAMPLES", "4");
         success                              = gHeroRadianceGenProgram.createShader(NULL, NULL);
     }

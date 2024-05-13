@@ -91,7 +91,7 @@ void LLHeroProbeManager::update()
 
     if (!mRenderTarget.isComplete())
     {
-        U32 color_fmt = GL_RGBA16F;
+        U32 color_fmt = GL_RGB16F;
         mRenderTarget.allocate(mProbeResolution, mProbeResolution, color_fmt, true);
     }
 
@@ -103,7 +103,7 @@ void LLHeroProbeManager::update()
         mMipChain.resize(count);
         for (int i = 0; i < count; ++i)
         {
-            mMipChain[i].allocate(res, res, GL_RGBA16F);
+            mMipChain[i].allocate(res, res, GL_RGB16F);
             res /= 2;
         }
     }
