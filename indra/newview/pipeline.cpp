@@ -839,12 +839,6 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
         mReflectionMapManager.initReflectionMaps();
         mHeroProbeManager.initReflectionMaps();
 
-        if (sReflectionProbesEnabled)
-        {
-            gCubeSnapshot = TRUE;
-            mReflectionMapManager.initReflectionMaps();
-        }
-
         mRT = &mAuxillaryRT;
         U32 res = mReflectionMapManager.mProbeResolution * 4;  //multiply by 4 because probes will be 16x super sampled
         allocateScreenBuffer(res, res, samples);
@@ -861,34 +855,35 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
         gCubeSnapshot = FALSE;
     }
 
-	bool is_aux_alloc = mRT == &mAuxillaryRT;
-
-	U32 res_mod = RenderResolutionDivisor;
-
-	if (res_mod > 1 && res_mod < resX && res_mod < resY)
+	if(!gCubeSnapshot)
 	{
-		resX /= res_mod;
-		resY /= res_mod;
-	}
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-	else if (RenderResolutionMultiplier != 1.f)
-	{
-		resX *= RenderResolutionMultiplier;
-		resY *= RenderResolutionMultiplier;
-	}
-// [/SL:KB]
+		U32 res_mod = RenderResolutionDivisor;
 
-	// remember these dimensions
-	mRT->width = resX;
-	mRT->height = resY;
-
-	if (!is_aux_alloc && RenderUIBuffer)
-	{
-		if (!mRT->uiScreen.allocate(resX,resY, GL_RGBA))
+		if (res_mod > 1 && res_mod < resX && res_mod < resY)
 		{
-			return false;
+			resX /= res_mod;
+			resY /= res_mod;
 		}
-	}	
+		// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
+		else if (RenderResolutionMultiplier != 1.f)
+		{
+			resX *= RenderResolutionMultiplier;
+			resY *= RenderResolutionMultiplier;
+		}
+		// [/SL:KB]
+
+			// remember these dimensions
+		mRT->width = resX;
+		mRT->height = resY;
+
+		if (RenderUIBuffer)
+		{
+			if (!mRT->uiScreen.allocate(resX, resY, GL_RGBA))
+			{
+				return false;
+			}
+		}
+	}
 
 	//S32 shadow_detail = RenderShadowDetail;
 	//bool ssao = RenderDeferredSSAO;
@@ -903,23 +898,15 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 
     mRT->deferredScreen.shareDepthBuffer(mRT->screen);
 
-    //water reflection texture (always needed as scratch space whether or not transparent water is enabled)
-    mWaterDis.allocate(resX, resY, GL_RGBA16F, true);
-
-
-	//if (shadow_detail > 0 || ssao || gSavedSettings.getU32("RenderSharpenMethod") != ALRenderUtil::SHARPEN_NONE)
-	{ //only need mRT->deferredLight for shadows OR ssao OR sharpening
-		if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
-	}
-	//else
-	//{
-	//	mRT->deferredLight.release();
-	//}
+	if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
 
     allocateShadowBuffer(resX, resY);
 
-	if (!is_aux_alloc)
+	if (!gCubeSnapshot)
 	{
+		//water reflection texture (always needed as scratch space whether or not transparent water is enabled)
+		if (!mWaterDis.allocate(resX, resY, GL_RGBA16F, true)) return false;
+
 		if (!mSceneMap.allocate(resX, resY, GL_RGB16F, true)) return false;
 
 		if (!mPostMap.allocate(resX, resY, GL_RGBA)) return false;
@@ -1204,7 +1191,6 @@ void LLPipeline::releaseGLBuffers()
 
 	releaseLUTBuffers();
 
-	mWaterDis.release();
     mBake.release();
 	
     mSceneMap.release();
@@ -1249,6 +1235,10 @@ void LLPipeline::releaseScreenBuffers()
     mRT->screen.release();
     mRT->deferredScreen.release();
     mRT->deferredLight.release();
+	mAuxillaryRT.uiScreen.release();
+	mAuxillaryRT.screen.release();
+	mAuxillaryRT.deferredScreen.release();
+	mAuxillaryRT.deferredLight.release();
 	mHeroProbeRT.uiScreen.release();
 	mHeroProbeRT.screen.release();
 	mHeroProbeRT.deferredScreen.release();
@@ -1256,6 +1246,8 @@ void LLPipeline::releaseScreenBuffers()
 	mPostMap.release();
 	mPostFXMap.release();
 	mPostHelperMap.release();
+	mSceneMap.release();
+	mWaterDis.release();
 }
 
 void LLPipeline::releaseSunShadowTarget(U32 index)
