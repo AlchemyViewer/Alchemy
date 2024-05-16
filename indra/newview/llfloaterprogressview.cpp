@@ -39,13 +39,13 @@
 #include "llagent.h"
 
 LLFloaterProgressView::LLFloaterProgressView(const LLSD& key)
-:	LLFloater(key)
-,	mProgressBar(nullptr)
-,	mProgressText(nullptr)
-,	mLocationText(nullptr)
-,	mCancelBtn(nullptr)
+:   LLFloater(key)
+,   mProgressBar(nullptr)
+,   mProgressText(nullptr)
+,   mLocationText(nullptr)
+,   mCancelBtn(nullptr)
 {
-	mCommitCallbackRegistrar.add("cancel", boost::bind(&LLFloaterProgressView::onCommitCancel, this, _1));
+    mCommitCallbackRegistrar.add("cancel", boost::bind(&LLFloaterProgressView::onCommitCancel, this, _1));
 }
 
 LLFloaterProgressView::~LLFloaterProgressView()
@@ -54,57 +54,57 @@ LLFloaterProgressView::~LLFloaterProgressView()
 
 BOOL LLFloaterProgressView::postBuild()
 {
-	mProgressBar = getChild<LLProgressBar>("progress_bar");
-	mProgressText = getChild<LLTextBase>("progress_text");
-	mLocationText = getChild<LLTextBase>("location");
-	mCancelBtn = getChild<LLButton>("cancel_btn");
-	return TRUE;
+    mProgressBar = getChild<LLProgressBar>("progress_bar");
+    mProgressText = getChild<LLTextBase>("progress_text");
+    mLocationText = getChild<LLTextBase>("location");
+    mCancelBtn = getChild<LLButton>("cancel_btn");
+    return TRUE;
 }
 
 void LLFloaterProgressView::setRegion(const std::string& region)
 {
-	if (region.empty())
-		mLocationText->setText(getString("teleporting"));
-	else
-	{
-		LLStringUtil::format_map_t arg;
-		arg["REGION"] = region;
-		mLocationText->setText(getString("loc_fmt", arg));
-	}
+    if (region.empty())
+        mLocationText->setText(getString("teleporting"));
+    else
+    {
+        LLStringUtil::format_map_t arg;
+        arg["REGION"] = region;
+        mLocationText->setText(getString("loc_fmt", arg));
+    }
 }
 
 void LLFloaterProgressView::setProgressText(const std::string& text)
 {
-	mProgressText->setValue(text);
+    mProgressText->setValue(text);
 }
 
 void LLFloaterProgressView::setProgressPercent(const F32 percent)
 {
-	mProgressBar->setValue(percent);
+    mProgressBar->setValue(percent);
 }
 
 void LLFloaterProgressView::setShowProgress(BOOL visible)
 {
-	if(visible)
-	{
-		setVisibleAndFrontmost(TRUE);
-	}
-	else
-	{
-		setVisible(FALSE);
-	}
+    if(visible)
+    {
+        setVisibleAndFrontmost(TRUE);
+    }
+    else
+    {
+        setVisible(FALSE);
+    }
 }
 
 void LLFloaterProgressView::setProgressCancelButtonVisible(BOOL visible, const std::string& label)
 {
-	mCancelBtn->setVisible(visible);
-	mCancelBtn->setEnabled(visible);
-	mCancelBtn->setLabelSelected(label);
-	mCancelBtn->setLabelUnselected(label);
+    mCancelBtn->setVisible(visible);
+    mCancelBtn->setEnabled(visible);
+    mCancelBtn->setLabelSelected(label);
+    mCancelBtn->setLabelUnselected(label);
 }
 
 void LLFloaterProgressView::onCommitCancel(LLUICtrl* ctrl)
 {
-	gAgent.teleportCancel();
-	ctrl->setEnabled(FALSE);
+    gAgent.teleportCancel();
+    ctrl->setEnabled(FALSE);
 }

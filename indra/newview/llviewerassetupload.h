@@ -90,14 +90,14 @@ public:
     LLUUID              getItemId() const { return mItemId; }
     LLAssetID           getAssetId() const { return mAssetId; }
 
-	static bool			findAssetTypeOfExtension(const std::string& exten, LLAssetType::EType& asset_type);
-	static bool			findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec);
+    static bool         findAssetTypeOfExtension(const std::string& exten, LLAssetType::EType& asset_type);
+    static bool         findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec);
 
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: Catznip-4.0
     typedef boost::function<void(LLUUID itemId)> upload_error_f;
-	// Should add this as a parameter to the constructor but this requires less code changes
-	void callUploadErrorCb() { if (mUploadErrorFn) { mUploadErrorFn(mItemId); } }
-	void setUploadErrorCb(upload_error_f fnUploadError) { mUploadErrorFn = fnUploadError; }
+    // Should add this as a parameter to the constructor but this requires less code changes
+    void callUploadErrorCb() { if (mUploadErrorFn) { mUploadErrorFn(mItemId); } }
+    void setUploadErrorCb(upload_error_f fnUploadError) { mUploadErrorFn = fnUploadError; }
 // [/SL:KLB]
 protected:
     LLResourceUploadInfo(
@@ -129,7 +129,7 @@ protected:
 
 private:
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: Catznip-4.0
-	upload_error_f      mUploadErrorFn;
+    upload_error_f      mUploadErrorFn;
 // [/SL:KLB]
     LLTransactionID     mTransactionId;
     LLAssetType::EType  mAssetType;
@@ -265,7 +265,7 @@ public:
     };
 
     LLScriptAssetUpload(LLUUID itemId, std::string buffer, invnUploadFinish_f finish, uploadFailed_f failed, TargetType_t targetType = MONO);
-    LLScriptAssetUpload(LLUUID taskId, LLUUID itemId, TargetType_t targetType, 
+    LLScriptAssetUpload(LLUUID taskId, LLUUID itemId, TargetType_t targetType,
             bool isRunning, LLUUID exerienceId, std::string buffer, taskUploadFinish_f finish, uploadFailed_f failed);
 
     virtual LLSD        generatePostBody();

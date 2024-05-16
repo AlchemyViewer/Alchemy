@@ -29,14 +29,14 @@
 class LLLineEditor;
 
 class LLFloaterNewLocalInventory
-:	public LLFloater
+:   public LLFloater
 {
 public:
-	LLFloaterNewLocalInventory(const LLSD& key);
-	BOOL postBuild() override;
+    LLFloaterNewLocalInventory(const LLSD& key);
+    BOOL postBuild() override;
 
-	void onClickOK();
-	static LLUUID sLastCreatorId;
+    void onClickOK();
+    static LLUUID sLastCreatorId;
 
 private:
     ~LLFloaterNewLocalInventory() override = default;

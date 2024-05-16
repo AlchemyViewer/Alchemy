@@ -23,47 +23,47 @@
 class LLEasyMessageSender
 {
 public:
-	bool sendMessage(const LLHost& region_host, const std::string& str_message );
-	bool sendLLUDPMessage(const LLHost& region_host, const std::string& str_message );
-	bool sendHTTPMessage(const LLHost& region_host, const std::string& str_message ) const;
+    bool sendMessage(const LLHost& region_host, const std::string& str_message );
+    bool sendLLUDPMessage(const LLHost& region_host, const std::string& str_message );
+    bool sendHTTPMessage(const LLHost& region_host, const std::string& str_message ) const;
 
 #ifdef ALCH_ADDON_API
-	bool addonSendRawMessage(const std::string& region_host, const std::string& str_message);
-	bool addonSendRawMessage(const std::string& str_message);
-	bool addonSendMessage(const std::string& region_host);
-	bool addonSendMessage();
-	void addonNewMessage(const std::string& message_name, const std::string& direction, bool include_agent_boilerplate=false);
-	void addonClearMessage();
-	void addonAddBlock(const std::string& blockname);
-	void addonAddField(const std::string& name, const std::string& value);
-	void addonAddHexField(const std::string& name, const std::string& value);
+    bool addonSendRawMessage(const std::string& region_host, const std::string& str_message);
+    bool addonSendRawMessage(const std::string& str_message);
+    bool addonSendMessage(const std::string& region_host);
+    bool addonSendMessage();
+    void addonNewMessage(const std::string& message_name, const std::string& direction, bool include_agent_boilerplate=false);
+    void addonClearMessage();
+    void addonAddBlock(const std::string& blockname);
+    void addonAddField(const std::string& name, const std::string& value);
+    void addonAddHexField(const std::string& name, const std::string& value);
 #endif // ALCH_ADDON_API
-	
+
 private:
 
-	BOOL addField(e_message_variable_type var_type, const char* var_name, std::string input, BOOL hex) const;
+    BOOL addField(e_message_variable_type var_type, const char* var_name, std::string input, BOOL hex) const;
 
-	//a key->value pair in a message
-	struct parts_var
-	{
-		std::string name;
-		std::string value;
-		BOOL hex;
-		e_message_variable_type var_type;
-	};
+    //a key->value pair in a message
+    struct parts_var
+    {
+        std::string name;
+        std::string value;
+        BOOL hex;
+        e_message_variable_type var_type;
+    };
 
-	//a block containing key->value pairs
-	struct parts_block
-	{
-		std::string name;
-		std::vector<parts_var> vars;
-	};
+    //a block containing key->value pairs
+    struct parts_block
+    {
+        std::string name;
+        std::vector<parts_var> vars;
+    };
 
-	std::string mMessageBuffer;
+    std::string mMessageBuffer;
 
-	static void printError(const std::string& error);
-	static std::string mvtstr(e_message_variable_type var_type);
+    static void printError(const std::string& error);
+    static std::string mvtstr(e_message_variable_type var_type);
 
-	std::vector<std::string> split(const std::string& input, const std::string& separator) const;
+    std::vector<std::string> split(const std::string& input, const std::string& separator) const;
 };
 #endif

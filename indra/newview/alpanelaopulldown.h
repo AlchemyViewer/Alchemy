@@ -39,7 +39,7 @@ class LLFrameTimer;
 class ALPanelAOPulldown final : public LLPanelPulldown
 {
 public:
-	ALPanelAOPulldown();
+    ALPanelAOPulldown();
 };
 
 #endif // LL_PANELAOFLYOUT_H

@@ -45,91 +45,91 @@
 static LLPanelInjector<LLPanelSearchEvents> t_panel_search_events("panel_search_events");
 
 LLPanelSearchEvents::LLPanelSearchEvents()
-:	LLPanelSearch()
-,	mDate(0)
+:   LLPanelSearch()
+,   mDate(0)
 {
-	mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchEvents::onCommitSearch, this, _1));
-	mCommitCallbackRegistrar.add("Search.AddDay", boost::bind(&LLPanelSearchEvents::addDay, this));
-	mCommitCallbackRegistrar.add("Search.MinusDay", boost::bind(&LLPanelSearchEvents::minusDay, this));
+    mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchEvents::onCommitSearch, this, _1));
+    mCommitCallbackRegistrar.add("Search.AddDay", boost::bind(&LLPanelSearchEvents::addDay, this));
+    mCommitCallbackRegistrar.add("Search.MinusDay", boost::bind(&LLPanelSearchEvents::minusDay, this));
 }
 
 BOOL LLPanelSearchEvents::postBuild()
 {
-	mSearchEditor = getChild<LLSearchEditor>("search_bar");
-	//mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchEvents::onCommitSearch, this, _1));
-	setDate(0);
-	
-	return TRUE;
+    mSearchEditor = getChild<LLSearchEditor>("search_bar");
+    //mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchEvents::onCommitSearch, this, _1));
+    setDate(0);
+
+    return TRUE;
 }
 
 void LLPanelSearchEvents::onCommitSearch(LLUICtrl* ctrl)
 {
-	LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
-	if (pSearchEditor)
-	{
-		std::string text = pSearchEditor->getText();
-		LLStringUtil::trim(text);
-		if (text.length() <= MIN_SEARCH_STRING_SIZE)
-			LLSearchHistory::getInstance()->addEntry(text);
-	}
-	search();
+    LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
+    if (pSearchEditor)
+    {
+        std::string text = pSearchEditor->getText();
+        LLStringUtil::trim(text);
+        if (text.length() <= MIN_SEARCH_STRING_SIZE)
+            LLSearchHistory::getInstance()->addEntry(text);
+    }
+    search();
 }
 
 void LLPanelSearchEvents::search()
 {
-	LLDirQuery query;
-	query.type = SE_EVENTS;
-	query.results_per_page = 200;
-	std::string text = mSearchEditor->getText();
-	LLStringUtil::trim(text);
-	
-	static LLUICachedControl<bool> inc_pg("ShowPGEvents", true);
-	static LLUICachedControl<bool> inc_mature("ShowMatureEvents", false);
-	static LLUICachedControl<bool> inc_adult("ShowAdultEvents", false);
-	if (!(inc_pg || inc_mature || inc_adult))
-	{
-		LLNotificationsUtil::add("NoContentToSearch");
-		return;
-	}
+    LLDirQuery query;
+    query.type = SE_EVENTS;
+    query.results_per_page = 200;
+    std::string text = mSearchEditor->getText();
+    LLStringUtil::trim(text);
 
-	query.scope = DFQ_DATE_EVENTS;
-	if (inc_pg)
-		query.scope |= DFQ_INC_PG;
-	if (inc_mature && gAgent.canAccessMature())
-		query.scope |= DFQ_INC_MATURE;
-	if (inc_adult && gAgent.canAccessAdult())
-		query.scope |= DFQ_INC_ADULT;
-	
-	std::ostringstream string;
-	string << (childGetValue("events_search_mode").asString() == "current" ? "u" : llformat("%d",mDate)) << "|"
-	       << getChild<LLComboBox>("events_category")->getSelectedValue().asInteger() << "|"
-		   << text;
-	query.text = string.str();
-	
-	mFloater->queryDirectory(query, true);
+    static LLUICachedControl<bool> inc_pg("ShowPGEvents", true);
+    static LLUICachedControl<bool> inc_mature("ShowMatureEvents", false);
+    static LLUICachedControl<bool> inc_adult("ShowAdultEvents", false);
+    if (!(inc_pg || inc_mature || inc_adult))
+    {
+        LLNotificationsUtil::add("NoContentToSearch");
+        return;
+    }
+
+    query.scope = DFQ_DATE_EVENTS;
+    if (inc_pg)
+        query.scope |= DFQ_INC_PG;
+    if (inc_mature && gAgent.canAccessMature())
+        query.scope |= DFQ_INC_MATURE;
+    if (inc_adult && gAgent.canAccessAdult())
+        query.scope |= DFQ_INC_ADULT;
+
+    std::ostringstream string;
+    string << (childGetValue("events_search_mode").asString() == "current" ? "u" : llformat("%d",mDate)) << "|"
+           << getChild<LLComboBox>("events_category")->getSelectedValue().asInteger() << "|"
+           << text;
+    query.text = string.str();
+
+    mFloater->queryDirectory(query, true);
 }
 
 void LLPanelSearchEvents::setDate(S32 day)
 {
-	mDate = day;
+    mDate = day;
 
-	time_t utc = time_corrected();
-	utc += day * 24 * 60 * 60;
-	struct tm * internal_time = utc_to_pacific_time(utc, is_daylight_savings());
-	const std::string date = llformat("%d/%d", 1 + internal_time->tm_mon, internal_time->tm_mday);
-	childSetValue("events_date", date);
+    time_t utc = time_corrected();
+    utc += day * 24 * 60 * 60;
+    struct tm * internal_time = utc_to_pacific_time(utc, is_daylight_savings());
+    const std::string date = llformat("%d/%d", 1 + internal_time->tm_mon, internal_time->tm_mday);
+    childSetValue("events_date", date);
 }
 
 void LLPanelSearchEvents::addDay()
 {
-	setDate(++mDate);
-	if (childGetValue("events_search_mode").asString() == "date")
-		search();
+    setDate(++mDate);
+    if (childGetValue("events_search_mode").asString() == "date")
+        search();
 }
 
 void LLPanelSearchEvents::minusDay()
 {
-	setDate(--mDate);
-	if (childGetValue("events_search_mode").asString() == "date")
-		search();
+    setDate(--mDate);
+    if (childGetValue("events_search_mode").asString() == "date")
+        search();
 }

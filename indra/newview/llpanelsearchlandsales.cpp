@@ -44,75 +44,75 @@
 static LLPanelInjector<LLPanelSearchLandSales> t_panel_search_land_sales("panel_search_landsales");
 
 LLPanelSearchLandSales::LLPanelSearchLandSales()
-:	LLPanelSearch()
+:   LLPanelSearch()
 {
-	mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchLandSales::onCommitSearch, this, _1));
+    mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchLandSales::onCommitSearch, this, _1));
 }
 
 BOOL LLPanelSearchLandSales::postBuild()
 {
-	return TRUE;
+    return TRUE;
 }
 
 void LLPanelSearchLandSales::onCommitSearch(LLUICtrl* ctrl)
 {
-	search();
+    search();
 }
 
 void LLPanelSearchLandSales::search()
 {
-	LLDirQuery query;
-	query.type = SE_LANDSALES;
-	query.results_per_page = 100;
-	
-	static LLUICachedControl<bool> inc_pg("ShowPGLand", true);
-	static LLUICachedControl<bool> inc_mature("ShowMatureLand", false);
-	static LLUICachedControl<bool> inc_adult("ShowAdultLand", false);
-	static LLUICachedControl<bool> limit_price("FindLandPrice", true);
-	static LLUICachedControl<bool> limit_area("FindLandArea", true);
-	if (!(inc_pg || inc_mature || inc_adult))
-	{
-		LLNotificationsUtil::add("NoContentToSearch");
-		return;
-	}
+    LLDirQuery query;
+    query.type = SE_LANDSALES;
+    query.results_per_page = 100;
 
-	const std::string& type = gSavedSettings.getString("FindLandType");
-	if (type == "All")
-		query.category_int = ST_ALL;
-	else if (type == "Auction")
-		query.category_int = ST_AUCTION;
-	else if (type == "Mainland")
-		query.category_int = ST_MAINLAND;
-	else if (type == "Estate")
-		query.category_int = ST_ESTATE;
-	
-	if (gAgent.wantsPGOnly())
-		query.scope |= DFQ_PG_SIMS_ONLY;
-	if (inc_pg)
-		query.scope |= DFQ_INC_PG;
-	if (inc_mature && gAgent.canAccessMature())
-		query.scope |= DFQ_INC_MATURE;
-	if (inc_adult && gAgent.canAccessAdult())
-		query.scope |= DFQ_INC_ADULT;
-	
-	const std::string& sort = gSavedSettings.getString("FindLandSort");
-	if (sort == "Name")
-		query.scope |= DFQ_NAME_SORT;
-	else if (sort == "Price")
-		query.scope |= DFQ_PRICE_SORT;
-	else if (sort == "PPM")
-		query.scope |= DFQ_PER_METER_SORT;
-	else if (sort == "Area")
-		query.scope |= DFQ_AREA_SORT;
+    static LLUICachedControl<bool> inc_pg("ShowPGLand", true);
+    static LLUICachedControl<bool> inc_mature("ShowMatureLand", false);
+    static LLUICachedControl<bool> inc_adult("ShowAdultLand", false);
+    static LLUICachedControl<bool> limit_price("FindLandPrice", true);
+    static LLUICachedControl<bool> limit_area("FindLandArea", true);
+    if (!(inc_pg || inc_mature || inc_adult))
+    {
+        LLNotificationsUtil::add("NoContentToSearch");
+        return;
+    }
 
-	if (gSavedSettings.getBOOL("FindLandSortAscending"))
-		query.scope |= DFQ_SORT_ASC;
-	if (limit_price)
-		query.scope |= DFQ_LIMIT_BY_PRICE;
-	if (limit_area)
-		query.scope |= DFQ_LIMIT_BY_AREA;
-	query.price = childGetValue("edit_price").asInteger();
-	query.area = childGetValue("edit_area").asInteger();
-	
-	mFloater->queryDirectory(query, true);
+    const std::string& type = gSavedSettings.getString("FindLandType");
+    if (type == "All")
+        query.category_int = ST_ALL;
+    else if (type == "Auction")
+        query.category_int = ST_AUCTION;
+    else if (type == "Mainland")
+        query.category_int = ST_MAINLAND;
+    else if (type == "Estate")
+        query.category_int = ST_ESTATE;
+
+    if (gAgent.wantsPGOnly())
+        query.scope |= DFQ_PG_SIMS_ONLY;
+    if (inc_pg)
+        query.scope |= DFQ_INC_PG;
+    if (inc_mature && gAgent.canAccessMature())
+        query.scope |= DFQ_INC_MATURE;
+    if (inc_adult && gAgent.canAccessAdult())
+        query.scope |= DFQ_INC_ADULT;
+
+    const std::string& sort = gSavedSettings.getString("FindLandSort");
+    if (sort == "Name")
+        query.scope |= DFQ_NAME_SORT;
+    else if (sort == "Price")
+        query.scope |= DFQ_PRICE_SORT;
+    else if (sort == "PPM")
+        query.scope |= DFQ_PER_METER_SORT;
+    else if (sort == "Area")
+        query.scope |= DFQ_AREA_SORT;
+
+    if (gSavedSettings.getBOOL("FindLandSortAscending"))
+        query.scope |= DFQ_SORT_ASC;
+    if (limit_price)
+        query.scope |= DFQ_LIMIT_BY_PRICE;
+    if (limit_area)
+        query.scope |= DFQ_LIMIT_BY_AREA;
+    query.price = childGetValue("edit_price").asInteger();
+    query.area = childGetValue("edit_area").asInteger();
+
+    mFloater->queryDirectory(query, true);
 }

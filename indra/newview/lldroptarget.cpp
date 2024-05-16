@@ -33,28 +33,28 @@
 static LLDefaultChildRegistry::Register<LLDropTarget> r("drop_target");
 
 LLDropTarget::LLDropTarget(const LLDropTarget::Params& p)
-:	LLView(p),
+:   LLView(p),
 mAgentID(p.agent_id)
 {}
 
 void LLDropTarget::doDrop(EDragAndDropType cargo_type, void* cargo_data)
 {
-	LL_INFOS("") << "LLDropTarget::doDrop()" << LL_ENDL;
+    LL_INFOS("") << "LLDropTarget::doDrop()" << LL_ENDL;
 }
 
 BOOL LLDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
-									 EDragAndDropType cargo_type,
-									 void* cargo_data,
-									 EAcceptance* accept,
-									 std::string& tooltip_msg)
+                                     EDragAndDropType cargo_type,
+                                     void* cargo_data,
+                                     EAcceptance* accept,
+                                     std::string& tooltip_msg)
 {
-	if(getParent())
-	{
-		LLToolDragAndDrop::handleGiveDragAndDrop(mAgentID, LLUUID::null, drop,
-												 cargo_type, cargo_data, accept);
-		
-		return TRUE;
-	}
-	
-	return FALSE;
+    if(getParent())
+    {
+        LLToolDragAndDrop::handleGiveDragAndDrop(mAgentID, LLUUID::null, drop,
+                                                 cargo_type, cargo_data, accept);
+
+        return TRUE;
+    }
+
+    return FALSE;
 }

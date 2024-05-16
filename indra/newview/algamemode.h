@@ -28,16 +28,16 @@ class ALGameMode final
 {
 
 public:
-	static ALGameMode &instance();
+    static ALGameMode &instance();
 
-	void enable(bool enable);
-	void init();
-	static void shutdown();
+    void enable(bool enable);
+    void init();
+    static void shutdown();
 
 protected:
-	void onToggleGameModeControl();
-	bool mEnabled = false;
-	short mStatus = 0;
+    void onToggleGameModeControl();
+    bool mEnabled = false;
+    short mStatus = 0;
 };
 
 #endif // AL_GAMEMODE_H

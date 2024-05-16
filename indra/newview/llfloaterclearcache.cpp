@@ -41,91 +41,91 @@
 #include "llvoavatarself.h"
 
 LLFloaterClearCache::LLFloaterClearCache(const LLSD& key)
-	: LLModalDialog(key)
+    : LLModalDialog(key)
 {
 }
 
 // virtual
 BOOL LLFloaterClearCache::postBuild()
 {
-	mOkButton = getChild<LLButton>("clear_selected");
-	mOkButton->setCommitCallback(boost::bind(&LLFloaterClearCache::onBtnClearSelected, this));
+    mOkButton = getChild<LLButton>("clear_selected");
+    mOkButton->setCommitCallback(boost::bind(&LLFloaterClearCache::onBtnClearSelected, this));
 
-	getChild<LLCheckBoxCtrl>("clear_textures")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
-	getChild<LLCheckBoxCtrl>("clear_assets")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
-	getChild<LLCheckBoxCtrl>("clear_inventory")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
-	getChild<LLCheckBoxCtrl>("clear_regions")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
-	getChild<LLCheckBoxCtrl>("clear_web")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
-	getChild<LLCheckBoxCtrl>("clear_userdata")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
+    getChild<LLCheckBoxCtrl>("clear_textures")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
+    getChild<LLCheckBoxCtrl>("clear_assets")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
+    getChild<LLCheckBoxCtrl>("clear_inventory")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
+    getChild<LLCheckBoxCtrl>("clear_regions")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
+    getChild<LLCheckBoxCtrl>("clear_web")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
+    getChild<LLCheckBoxCtrl>("clear_userdata")->setCommitCallback(boost::bind(&LLFloaterClearCache::refreshButtons, this));
 
-	getChild<LLButton>("clear_all")->setCommitCallback(boost::bind(&LLFloaterClearCache::onBtnClearAll, this));
-	getChild<LLButton>("cancel")->setCommitCallback(boost::bind(&LLFloaterClearCache::onBtnCancel, this));
+    getChild<LLButton>("clear_all")->setCommitCallback(boost::bind(&LLFloaterClearCache::onBtnClearAll, this));
+    getChild<LLButton>("cancel")->setCommitCallback(boost::bind(&LLFloaterClearCache::onBtnCancel, this));
 
-	refreshButtons();
+    refreshButtons();
 
-	return LLModalDialog::postBuild();
+    return LLModalDialog::postBuild();
 }
 
 
 void LLFloaterClearCache::onOpen(const LLSD& key)
 {
-	LLModalDialog::onOpen(key);
+    LLModalDialog::onOpen(key);
 }
 
 void LLFloaterClearCache::onBtnClearSelected()
 {
-	LLSD caches;
-	if (getChild<LLCheckBoxCtrl>("clear_textures")->get())
-	{
-		caches.insert("textures", "true");
-	}
-	if (getChild<LLCheckBoxCtrl>("clear_assets")->get())
-	{
-		caches.insert("assets", "true");
-	}
-	if (getChild<LLCheckBoxCtrl>("clear_inventory")->get())
-	{
-		caches.insert("inventory", "true");
-	}
-	if (getChild<LLCheckBoxCtrl>("clear_regions")->get())
-	{
-		caches.insert("regions", "true");
-	}
-	if (getChild<LLCheckBoxCtrl>("clear_web")->get())
-	{
-		caches.insert("web", "true");
-	}
-	if (getChild<LLCheckBoxCtrl>("clear_userdata")->get())
-	{
-		caches.insert("userdata", "true");
-	}
+    LLSD caches;
+    if (getChild<LLCheckBoxCtrl>("clear_textures")->get())
+    {
+        caches.insert("textures", "true");
+    }
+    if (getChild<LLCheckBoxCtrl>("clear_assets")->get())
+    {
+        caches.insert("assets", "true");
+    }
+    if (getChild<LLCheckBoxCtrl>("clear_inventory")->get())
+    {
+        caches.insert("inventory", "true");
+    }
+    if (getChild<LLCheckBoxCtrl>("clear_regions")->get())
+    {
+        caches.insert("regions", "true");
+    }
+    if (getChild<LLCheckBoxCtrl>("clear_web")->get())
+    {
+        caches.insert("web", "true");
+    }
+    if (getChild<LLCheckBoxCtrl>("clear_userdata")->get())
+    {
+        caches.insert("userdata", "true");
+    }
 
-	gSavedSettings.setLLSD("PurgeCacheSelectiveData", caches);
-	gSavedSettings.setBOOL("PurgeCacheSelective", true);
+    gSavedSettings.setLLSD("PurgeCacheSelectiveData", caches);
+    gSavedSettings.setBOOL("PurgeCacheSelective", true);
 
-	LLNotificationsUtil::add("CacheWillClear");
-	closeFloater();
+    LLNotificationsUtil::add("CacheWillClear");
+    closeFloater();
 }
 
 void LLFloaterClearCache::onBtnClearAll()
 {
-	gSavedSettings.setBOOL("PurgeCacheOnNextStartup", TRUE);
-	LLNotificationsUtil::add("CacheWillClear");
-	closeFloater();
+    gSavedSettings.setBOOL("PurgeCacheOnNextStartup", TRUE);
+    LLNotificationsUtil::add("CacheWillClear");
+    closeFloater();
 }
 
 void LLFloaterClearCache::onBtnCancel()
 {
-	closeFloater();
+    closeFloater();
 }
 
 void LLFloaterClearCache::refreshButtons()
 {
-	mOkButton->setEnabled(getChild<LLCheckBoxCtrl>("clear_textures")->get() ||
-		getChild<LLCheckBoxCtrl>("clear_assets")->get() ||
-		getChild<LLCheckBoxCtrl>("clear_inventory")->get() ||
-		getChild<LLCheckBoxCtrl>("clear_regions")->get() ||
-		getChild<LLCheckBoxCtrl>("clear_web")->get() ||
-		getChild<LLCheckBoxCtrl>("clear_userdata")->get()
-	);
+    mOkButton->setEnabled(getChild<LLCheckBoxCtrl>("clear_textures")->get() ||
+        getChild<LLCheckBoxCtrl>("clear_assets")->get() ||
+        getChild<LLCheckBoxCtrl>("clear_inventory")->get() ||
+        getChild<LLCheckBoxCtrl>("clear_regions")->get() ||
+        getChild<LLCheckBoxCtrl>("clear_web")->get() ||
+        getChild<LLCheckBoxCtrl>("clear_userdata")->get()
+    );
 }

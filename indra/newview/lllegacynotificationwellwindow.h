@@ -36,46 +36,46 @@ class LLPanel;
 class LLLegacyNotificationWellWindow : public LLSysWellWindow
 {
 public:
-	LLLegacyNotificationWellWindow(const LLSD& key);
-	static LLLegacyNotificationWellWindow* getInstance(const LLSD& key = LLSD());
-	
-	BOOL postBuild() override;
-	void setVisible(BOOL visible) override;
-	void onAdd(LLNotificationPtr notify);
-	// Operating with items
-	void addItem(const LLSysWellItem::Params& p);
-	
-	// Closes all notifications and removes them from the Notification Well
-	void closeAll();
-	
+    LLLegacyNotificationWellWindow(const LLSD& key);
+    static LLLegacyNotificationWellWindow* getInstance(const LLSD& key = LLSD());
+
+    BOOL postBuild() override;
+    void setVisible(BOOL visible) override;
+    void onAdd(LLNotificationPtr notify);
+    // Operating with items
+    void addItem(const LLSysWellItem::Params& p);
+
+    // Closes all notifications and removes them from the Notification Well
+    void closeAll();
+
 protected:
-	struct WellNotificationChannel : public LLNotificationChannel
-	{
-		WellNotificationChannel(LLLegacyNotificationWellWindow*);
-		void onDelete(LLNotificationPtr notify)
-		{
-			mWellWindow->removeItemByID(notify->getID());
-		}
-		
-		LLLegacyNotificationWellWindow* mWellWindow;
-	};
-	
-	LLNotificationChannelPtr mNotificationUpdates;
-	const std::string& getAnchorViewName() override { return NOTIFICATION_WELL_ANCHOR_NAME; }
-	
+    struct WellNotificationChannel : public LLNotificationChannel
+    {
+        WellNotificationChannel(LLLegacyNotificationWellWindow*);
+        void onDelete(LLNotificationPtr notify)
+        {
+            mWellWindow->removeItemByID(notify->getID());
+        }
+
+        LLLegacyNotificationWellWindow* mWellWindow;
+    };
+
+    LLNotificationChannelPtr mNotificationUpdates;
+    const std::string& getAnchorViewName() override { return NOTIFICATION_WELL_ANCHOR_NAME; }
+
 private:
-	// init Window's channel
-	void initChannel() override;
-	void clearScreenChannels();
-	
-	void onStoreToast(LLPanel* info_panel, LLUUID id);
-	
-	// Handlers
-	void onItemClick(LLSysWellItem* item);
-	void onItemClose(LLSysWellItem* item);
-	
-	// ID of a toast loaded by user (by clicking notification well item)
-	LLUUID mLoadedToastId;
+    // init Window's channel
+    void initChannel() override;
+    void clearScreenChannels();
+
+    void onStoreToast(LLPanel* info_panel, LLUUID id);
+
+    // Handlers
+    void onItemClick(LLSysWellItem* item);
+    void onItemClose(LLSysWellItem* item);
+
+    // ID of a toast loaded by user (by clicking notification well item)
+    LLUUID mLoadedToastId;
 };
 
 #endif // LL_NOTIFICATIONWELLWINDOW_H

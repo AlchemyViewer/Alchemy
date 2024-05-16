@@ -1,4 +1,4 @@
-/** 
+/**
 * @file llmaterialid.cpp
 * @brief Implementation of llmaterialid
 * @author Stinson@lindenlab.com
@@ -37,67 +37,67 @@ const LLMaterialID LLMaterialID::null;
 
 LLMaterialID::LLMaterialID(const LLSD& pMaterialID)
 {
-	llassert(pMaterialID.isBinary());
-	parseFromBinary(pMaterialID.asBinary());
+    llassert(pMaterialID.isBinary());
+    parseFromBinary(pMaterialID.asBinary());
 }
 
 LLMaterialID::LLMaterialID(const LLSD::Binary& pMaterialID)
 {
-	parseFromBinary(pMaterialID);
+    parseFromBinary(pMaterialID);
 }
 
 LLMaterialID::LLMaterialID(const void* pMemory)
 {
-	set(pMemory);
+    set(pMemory);
 }
 
 LLMaterialID::LLMaterialID(const LLUUID& lluid)
 {
-	set(lluid.mData);
+    set(lluid.mData);
 }
 
 const U8* LLMaterialID::get() const
 {
-	return mID;
+    return mID;
 }
 
 void LLMaterialID::set(const void* pMemory)
 {
-	llassert(pMemory != NULL);
+    llassert(pMemory != NULL);
 
-	// assumes that the required size of memory is available
-	memcpy(mID, pMemory, MATERIAL_ID_SIZE * sizeof(U8));
+    // assumes that the required size of memory is available
+    memcpy(mID, pMemory, MATERIAL_ID_SIZE * sizeof(U8));
 }
 
 void LLMaterialID::clear()
 {
-	memset(mID, 0, MATERIAL_ID_SIZE * sizeof(U8));
+    memset(mID, 0, MATERIAL_ID_SIZE * sizeof(U8));
 }
 
 LLSD LLMaterialID::asLLSD() const
 {
-	LLSD::Binary materialIDBinary;
+    LLSD::Binary materialIDBinary;
 
-	materialIDBinary.resize(MATERIAL_ID_SIZE * sizeof(U8));
-	memcpy(materialIDBinary.data(), mID, MATERIAL_ID_SIZE * sizeof(U8));
+    materialIDBinary.resize(MATERIAL_ID_SIZE * sizeof(U8));
+    memcpy(materialIDBinary.data(), mID, MATERIAL_ID_SIZE * sizeof(U8));
 
-	LLSD materialID = materialIDBinary;
-	return materialID;
+    LLSD materialID = materialIDBinary;
+    return materialID;
 }
 
 std::string LLMaterialID::asString() const
 {
-	std::string materialIDString;
-	for (unsigned int i = 0U; i < static_cast<unsigned int>(MATERIAL_ID_SIZE / sizeof(U32)); ++i)
-	{
-		if (i != 0U)
-		{
-			materialIDString += "-";
-		}
-		const U32* value = reinterpret_cast<const U32*>(&get()[i * sizeof(U32)]);
-		materialIDString += llformat("%08x", *value);
-	}
-	return materialIDString;
+    std::string materialIDString;
+    for (unsigned int i = 0U; i < static_cast<unsigned int>(MATERIAL_ID_SIZE / sizeof(U32)); ++i)
+    {
+        if (i != 0U)
+        {
+            materialIDString += "-";
+        }
+        const U32* value = reinterpret_cast<const U32*>(&get()[i * sizeof(U32)]);
+        materialIDString += llformat("%08x", *value);
+    }
+    return materialIDString;
 }
 
 LLUUID LLMaterialID::asUUID() const
@@ -109,12 +109,12 @@ LLUUID LLMaterialID::asUUID() const
 
 std::ostream& operator<<(std::ostream& s, const LLMaterialID &material_id)
 {
-	s << material_id.asString();
-	return s;
+    s << material_id.asString();
+    return s;
 }
 
 void LLMaterialID::parseFromBinary (const LLSD::Binary& pMaterialID)
 {
-	llassert(pMaterialID.size() == (MATERIAL_ID_SIZE * sizeof(U8)));
-	memcpy(mID, &pMaterialID[0], MATERIAL_ID_SIZE * sizeof(U8));
+    llassert(pMaterialID.size() == (MATERIAL_ID_SIZE * sizeof(U8)));
+    memcpy(mID, &pMaterialID[0], MATERIAL_ID_SIZE * sizeof(U8));
 }

@@ -15,7 +15,7 @@ if (WINDOWS)
         Crypt32.lib
   )
 elseif (LINUX)
-  target_link_libraries(ll::openssl INTERFACE 
+  target_link_libraries(ll::openssl INTERFACE
     debug ${ARCH_PREBUILT_DIRS_DEBUG}/libssl.a
     optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libssl.a
     debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcrypto.a

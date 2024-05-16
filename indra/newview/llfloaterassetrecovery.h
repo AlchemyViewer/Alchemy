@@ -25,23 +25,23 @@
 
 class LLFloaterAssetRecovery : public LLFloater
 {
-	friend class LLFloaterReg;
+    friend class LLFloaterReg;
 private:
-	LLFloaterAssetRecovery(const LLSD& sdKey);
+    LLFloaterAssetRecovery(const LLSD& sdKey);
 
-	/*
-	 * LLFloater overrides
-	 */
+    /*
+     * LLFloater overrides
+     */
 public:
-	/*virtual*/ void onOpen(const LLSD& sdKey);
-	/*virtual*/ BOOL postBuild();
+    /*virtual*/ void onOpen(const LLSD& sdKey);
+    /*virtual*/ BOOL postBuild();
 
-	/*
-	 * Member functions
-	 */
+    /*
+     * Member functions
+     */
 protected:
-	void onBtnCancel();
-	void onBtnRecover();
+    void onBtnCancel();
+    void onBtnRecover();
 };
 
 // ============================================================================
@@ -50,42 +50,42 @@ protected:
 
 class LLAssetRecoverQueue
 {
-	friend class LLCreateRecoverAssetCallback;
-	friend class LLFloaterAssetRecovery;
+    friend class LLCreateRecoverAssetCallback;
+    friend class LLFloaterAssetRecovery;
 
-	struct LLAssetRecoverItem
-	{
-		std::string strPath;
-		std::string strName;
-		std::string strDescription;
-		LLAssetType::EType eAssetType;
-		LLInventoryType::EType eInvType;
-		U32 nNextOwnerPerm;
-		LLUUID idItem;
+    struct LLAssetRecoverItem
+    {
+        std::string strPath;
+        std::string strName;
+        std::string strDescription;
+        LLAssetType::EType eAssetType;
+        LLInventoryType::EType eInvType;
+        U32 nNextOwnerPerm;
+        LLUUID idItem;
 
-		LLAssetRecoverItem() : eAssetType(LLAssetType::AT_NONE), eInvType(LLInventoryType::IT_NONE) {}
-	};
+        LLAssetRecoverItem() : eAssetType(LLAssetType::AT_NONE), eInvType(LLInventoryType::IT_NONE) {}
+    };
 protected:
-	LLAssetRecoverQueue(const LLSD& sdFiles);
+    LLAssetRecoverQueue(const LLSD& sdFiles);
 
-	/*
-	 * Member functions
-	 */
+    /*
+     * Member functions
+     */
 public:
-	static void recoverIfNeeded();
+    static void recoverIfNeeded();
 protected:
-	bool recoverNext();
+    bool recoverNext();
 
-	void onCreateItem(const LLUUID& idItem);
-	void onSavedAsset(const LLUUID& idItem, const LLSD& sdResponse);
-	void onUploadError(const LLUUID& idItem);
+    void onCreateItem(const LLUUID& idItem);
+    void onSavedAsset(const LLUUID& idItem, const LLSD& sdResponse);
+    void onUploadError(const LLUUID& idItem);
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	typedef std::list<LLAssetRecoverItem> recovery_list_t;
-	recovery_list_t m_RecoveryQueue;
+    typedef std::list<LLAssetRecoverItem> recovery_list_t;
+    recovery_list_t m_RecoveryQueue;
 };
 
 // ============================================================================

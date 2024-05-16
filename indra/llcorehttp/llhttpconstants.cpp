@@ -1,25 +1,25 @@
-/** 
+/**
  * @file llhttpconstants.cpp
  * @brief Implementation of the HTTP request / response constant lookups
  *
  * $LicenseInfo:firstyear=2013&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2013-2014, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -141,75 +141,75 @@ const std::string HTTP_VERB_COPY("COPY");
 
 const std::string& httpMethodAsVerb(EHTTPMethod method)
 {
-	static const std::string VERBS [10] =
-	{
-		HTTP_VERB_INVALID,
-		HTTP_VERB_HEAD,
-		HTTP_VERB_GET,
-		HTTP_VERB_PUT,
-		HTTP_VERB_POST,
-		HTTP_VERB_DELETE,
-		HTTP_VERB_MOVE,
-		HTTP_VERB_OPTIONS,
-		HTTP_VERB_PATCH,
-		HTTP_VERB_COPY
-	};
-	if (((S32) method <= 0) || ((S32) method >= HTTP_METHOD_COUNT))
-	{
-		return VERBS[0];
-	}
-	return VERBS[method];
+    static const std::string VERBS [10] =
+    {
+        HTTP_VERB_INVALID,
+        HTTP_VERB_HEAD,
+        HTTP_VERB_GET,
+        HTTP_VERB_PUT,
+        HTTP_VERB_POST,
+        HTTP_VERB_DELETE,
+        HTTP_VERB_MOVE,
+        HTTP_VERB_OPTIONS,
+        HTTP_VERB_PATCH,
+        HTTP_VERB_COPY
+    };
+    if (((S32) method <= 0) || ((S32) method >= HTTP_METHOD_COUNT))
+    {
+        return VERBS[0];
+    }
+    return VERBS[method];
 }
 
 EHTTPMethod httpVerbAsMethod(const std::string& verb)
 {
-	static const std::string VERBS [10] = {
-		HTTP_VERB_INVALID,
-		HTTP_VERB_HEAD,
-		HTTP_VERB_GET,
-		HTTP_VERB_PUT,
-		HTTP_VERB_POST,
-		HTTP_VERB_DELETE,
-		HTTP_VERB_MOVE,
-		HTTP_VERB_OPTIONS,
-		HTTP_VERB_PATCH,
-		HTTP_VERB_COPY
-	};
+    static const std::string VERBS [10] = {
+        HTTP_VERB_INVALID,
+        HTTP_VERB_HEAD,
+        HTTP_VERB_GET,
+        HTTP_VERB_PUT,
+        HTTP_VERB_POST,
+        HTTP_VERB_DELETE,
+        HTTP_VERB_MOVE,
+        HTTP_VERB_OPTIONS,
+        HTTP_VERB_PATCH,
+        HTTP_VERB_COPY
+    };
 
-	for (int i = 0; i<HTTP_METHOD_COUNT; ++i)
-	{
+    for (int i = 0; i<HTTP_METHOD_COUNT; ++i)
+    {
         if (VERBS[i] == verb)
         {
             return static_cast<EHTTPMethod>(i);
         }
-	}
-	return HTTP_INVALID;
+    }
+    return HTTP_INVALID;
 }
 
 std::string get_base_cap_url(std::string url)
 {
-	std::vector<std::string> url_parts;
-	boost::algorithm::split(url_parts, url, boost::is_any_of("/"));
+    std::vector<std::string> url_parts;
+    boost::algorithm::split(url_parts, url, boost::is_any_of("/"));
 
-	// This is a normal linden-style CAP url.
-	if(url_parts.size() >= 4 && url_parts[3] == "cap")
-	{
-		url_parts.resize(5);
-		return boost::algorithm::join(url_parts, "/");
-	}
-	// Maybe OpenSim? Just cut off the query string and last /.
-	else
-	{
-		size_t query_pos = url.find_first_of('\?');
+    // This is a normal linden-style CAP url.
+    if(url_parts.size() >= 4 && url_parts[3] == "cap")
+    {
+        url_parts.resize(5);
+        return boost::algorithm::join(url_parts, "/");
+    }
+    // Maybe OpenSim? Just cut off the query string and last /.
+    else
+    {
+        size_t query_pos = url.find_first_of('\?');
 
-		if(query_pos != std::string::npos)
-		{
-			LLStringUtil::truncate(url, query_pos);
-		}
+        if(query_pos != std::string::npos)
+        {
+            LLStringUtil::truncate(url, query_pos);
+        }
 
-		static const std::string tokens(" /\?");
-		LLStringUtil::trimTail(url, tokens);
+        static const std::string tokens(" /\?");
+        LLStringUtil::trimTail(url, tokens);
 
-		return url;
-	}
+        return url;
+    }
 }

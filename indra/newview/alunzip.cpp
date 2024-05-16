@@ -36,201 +36,201 @@ size_t WRITE_BUFFER_SIZE = 8192;
 
 int compare_filename_mz(unzFile file, const char* filename1, const char* filename2)
 {
-	return strcmp(filename1, filename2);
+    return strcmp(filename1, filename2);
 }
 
 ALUnZip::ALUnZip(const std::string& filename)
-:	mFilename(filename)
-,	mValid(false)
+:   mFilename(filename)
+,   mValid(false)
 {
-	mZipfile = open(filename);
-	mValid = (mZipfile != nullptr);
+    mZipfile = open(filename);
+    mValid = (mZipfile != nullptr);
 }
 
 ALUnZip::~ALUnZip()
 {
-	close();
+    close();
 }
 
 bool ALUnZip::extract(const std::string& path)
 {
-	S32 error = UNZ_OK;
-	unz_global_info64 gi;
-	
-	unzGoToFirstFile(mZipfile);
-	
-	error = unzGetGlobalInfo64(mZipfile, &gi);
-	if (error != UNZ_OK)
-	{
-		LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
-		return false;
-	}
-	
-	for (uint64_t i = 0; i < gi.number_entry ; i++)
-	{
-		if (extractCurrentFile(path) != UNZ_OK)
-			break;
-		if ((i + 1) < gi.number_entry)
-		{
-			error = unzGoToNextFile(mZipfile);
-			if (error != UNZ_OK)
-			{
-				LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
-				break;
-			}
-		}
-	}
-	
-	return true;
+    S32 error = UNZ_OK;
+    unz_global_info64 gi;
+
+    unzGoToFirstFile(mZipfile);
+
+    error = unzGetGlobalInfo64(mZipfile, &gi);
+    if (error != UNZ_OK)
+    {
+        LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
+        return false;
+    }
+
+    for (uint64_t i = 0; i < gi.number_entry ; i++)
+    {
+        if (extractCurrentFile(path) != UNZ_OK)
+            break;
+        if ((i + 1) < gi.number_entry)
+        {
+            error = unzGoToNextFile(mZipfile);
+            if (error != UNZ_OK)
+            {
+                LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
+                break;
+            }
+        }
+    }
+
+    return true;
 }
 
 S32 ALUnZip::extractCurrentFile(const std::string& path)
 {
-	S32 error = UNZ_OK;
-	char filename_inzip[256];
-	unz_file_info64 file_info;
-	
-	error = unzGetCurrentFileInfo64(mZipfile, &file_info, filename_inzip, sizeof(filename_inzip), nullptr, 0, nullptr, 0);
-	if (error != UNZ_OK)
-	{
-		LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
-		return error;
-	}
-	
-	const std::string& inzip(filename_inzip);
-	const std::string& write_filename = gDirUtilp->add(path, inzip);
-	
-	LL_INFOS("ALUNZIP") << "Unpacking " << inzip << LL_ENDL;
-	if (LLStringUtil::endsWith(inzip, "/") || LLStringUtil::endsWith(inzip, "\\"))
-	{
-		if (!LLFile::isdir(write_filename))
-		{
-			if (LLFile::mkdir(write_filename) != 0)
-				LL_WARNS("ALUNZIP") << "Couldn't create directory at " << write_filename << LL_ENDL;
-		}
-		return error;
-	}
-	
-	size_t size_buf = WRITE_BUFFER_SIZE;
-	auto buf = std::make_unique<char[]>(size_buf);
-	if (buf == nullptr)
-	{
-		LL_WARNS("ALUNZIP") << "Error allocating memory!" << LL_ENDL;
-		return UNZ_INTERNALERROR;
-	}
+    S32 error = UNZ_OK;
+    char filename_inzip[256];
+    unz_file_info64 file_info;
 
-	error = unzOpenCurrentFile(mZipfile);
-	if (error != UNZ_OK)
-	{
-		LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
-	}
-	
-	LLFILE* outfile = LLFile::fopen(write_filename, "wb");
-	if (outfile == nullptr)
-	{
-		LL_WARNS("ALUNZIP") << "Error opening " << write_filename << " for writing" << LL_ENDL;
-	}
-	else
-	{
-		do
-		{
-			error = unzReadCurrentFile(mZipfile, buf.get(), size_buf);
-			if (error < UNZ_OK)
-			{
-				LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
-				break;
-			}
-			else if (error > UNZ_OK)
-			{
-				if (fwrite(buf.get(), error, 1, outfile) != 1)
-				{
-					LL_WARNS("ALUNZIP") << "Error writing out " << mFilename << LL_ENDL;
-					error = UNZ_ERRNO;
-					break;
-				}
-			}
-		} while (error > 0);
-		fclose(outfile);
-	}
+    error = unzGetCurrentFileInfo64(mZipfile, &file_info, filename_inzip, sizeof(filename_inzip), nullptr, 0, nullptr, 0);
+    if (error != UNZ_OK)
+    {
+        LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
+        return error;
+    }
 
-	
-	if (error == UNZ_OK)
-	{
-		error = unzCloseCurrentFile(mZipfile);
-		if (error != UNZ_OK)
-			LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
-	}
-	else
-		unzCloseCurrentFile(mZipfile);
-	
-	return error;
+    const std::string& inzip(filename_inzip);
+    const std::string& write_filename = gDirUtilp->add(path, inzip);
+
+    LL_INFOS("ALUNZIP") << "Unpacking " << inzip << LL_ENDL;
+    if (LLStringUtil::endsWith(inzip, "/") || LLStringUtil::endsWith(inzip, "\\"))
+    {
+        if (!LLFile::isdir(write_filename))
+        {
+            if (LLFile::mkdir(write_filename) != 0)
+                LL_WARNS("ALUNZIP") << "Couldn't create directory at " << write_filename << LL_ENDL;
+        }
+        return error;
+    }
+
+    size_t size_buf = WRITE_BUFFER_SIZE;
+    auto buf = std::make_unique<char[]>(size_buf);
+    if (buf == nullptr)
+    {
+        LL_WARNS("ALUNZIP") << "Error allocating memory!" << LL_ENDL;
+        return UNZ_INTERNALERROR;
+    }
+
+    error = unzOpenCurrentFile(mZipfile);
+    if (error != UNZ_OK)
+    {
+        LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
+    }
+
+    LLFILE* outfile = LLFile::fopen(write_filename, "wb");
+    if (outfile == nullptr)
+    {
+        LL_WARNS("ALUNZIP") << "Error opening " << write_filename << " for writing" << LL_ENDL;
+    }
+    else
+    {
+        do
+        {
+            error = unzReadCurrentFile(mZipfile, buf.get(), size_buf);
+            if (error < UNZ_OK)
+            {
+                LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
+                break;
+            }
+            else if (error > UNZ_OK)
+            {
+                if (fwrite(buf.get(), error, 1, outfile) != 1)
+                {
+                    LL_WARNS("ALUNZIP") << "Error writing out " << mFilename << LL_ENDL;
+                    error = UNZ_ERRNO;
+                    break;
+                }
+            }
+        } while (error > 0);
+        fclose(outfile);
+    }
+
+
+    if (error == UNZ_OK)
+    {
+        error = unzCloseCurrentFile(mZipfile);
+        if (error != UNZ_OK)
+            LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
+    }
+    else
+        unzCloseCurrentFile(mZipfile);
+
+    return error;
 }
 
 bool ALUnZip::extractFile(const std::string& file_to_extract, char *buf, size_t bufsize)
 {
-	if (unzLocateFile(mZipfile, file_to_extract.c_str(), 0) != UNZ_OK)
-	{
-		LL_WARNS("ALUNZIP") << file_to_extract << " was not found in " << mFilename << LL_ENDL;
-		return false;
-	}
-	
-	S32 error = UNZ_OK;
-	
-	char filename_inzip[256];
-	unz_file_info64 file_info;
-	error = unzGetCurrentFileInfo64(mZipfile, &file_info, filename_inzip, sizeof(filename_inzip), nullptr, 0, nullptr, 0);
-	error = unzOpenCurrentFile(mZipfile);
-	error = unzReadCurrentFile(mZipfile, buf, bufsize);
-	unzCloseCurrentFile(mZipfile);
-	if (error != UNZ_OK)
-	{
-		LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
-		return false;
-	}
-	
-	return true;
+    if (unzLocateFile(mZipfile, file_to_extract.c_str(), 0) != UNZ_OK)
+    {
+        LL_WARNS("ALUNZIP") << file_to_extract << " was not found in " << mFilename << LL_ENDL;
+        return false;
+    }
+
+    S32 error = UNZ_OK;
+
+    char filename_inzip[256];
+    unz_file_info64 file_info;
+    error = unzGetCurrentFileInfo64(mZipfile, &file_info, filename_inzip, sizeof(filename_inzip), nullptr, 0, nullptr, 0);
+    error = unzOpenCurrentFile(mZipfile);
+    error = unzReadCurrentFile(mZipfile, buf, bufsize);
+    unzCloseCurrentFile(mZipfile);
+    if (error != UNZ_OK)
+    {
+        LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
+        return false;
+    }
+
+    return true;
 }
 
 size_t ALUnZip::getSizeFile(const std::string& file_to_size)
 {
-	if (unzLocateFile(mZipfile, file_to_size.c_str(), 0) != UNZ_OK)
-	{
-		LL_WARNS("ALUNZIP") << file_to_size << " was not found in " << mFilename << LL_ENDL;
-		return 0;
-	}
-	
-	S32 error = UNZ_OK;
-	char filename_inzip[256];
-	unz_file_info64 file_info;
-	error = unzGetCurrentFileInfo64(mZipfile, &file_info, filename_inzip, sizeof(filename_inzip), nullptr, 0, nullptr, 0);
-	if (error != UNZ_OK)
-	{
-		LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
-		return 0;
-	}
-	return file_info.uncompressed_size;
+    if (unzLocateFile(mZipfile, file_to_size.c_str(), 0) != UNZ_OK)
+    {
+        LL_WARNS("ALUNZIP") << file_to_size << " was not found in " << mFilename << LL_ENDL;
+        return 0;
+    }
+
+    S32 error = UNZ_OK;
+    char filename_inzip[256];
+    unz_file_info64 file_info;
+    error = unzGetCurrentFileInfo64(mZipfile, &file_info, filename_inzip, sizeof(filename_inzip), nullptr, 0, nullptr, 0);
+    if (error != UNZ_OK)
+    {
+        LL_WARNS("ALUNZIP") << "Error unzipping " << mFilename << " - code: " << error << LL_ENDL;
+        return 0;
+    }
+    return file_info.uncompressed_size;
 }
 
 unzFile ALUnZip::open(const std::string& filename)
 {
 #ifdef USEWIN32IOAPI
-	zlib_filefunc64_def ffunc;
+    zlib_filefunc64_def ffunc;
 
-	fill_win32_filefunc64A(&ffunc);
-	mZipfile = unzOpen2_64(filename.c_str(), &ffunc);
+    fill_win32_filefunc64A(&ffunc);
+    mZipfile = unzOpen2_64(filename.c_str(), &ffunc);
 #else // !USEWIN32IOAPI
-	mZipfile = unzOpen64(filename.c_str());
+    mZipfile = unzOpen64(filename.c_str());
 #endif // !USEWIN32IOAPI
-	
-	if (mZipfile == nullptr)
-		LL_WARNS("ALUNZIP") << "Failed to open " << mFilename << LL_ENDL;
-	
-	return mZipfile;
+
+    if (mZipfile == nullptr)
+        LL_WARNS("ALUNZIP") << "Failed to open " << mFilename << LL_ENDL;
+
+    return mZipfile;
 }
 
 void ALUnZip::close()
 {
-	unzClose(mZipfile);
-	mZipfile = nullptr;
-	mValid = false;
+    unzClose(mZipfile);
+    mZipfile = nullptr;
+    mValid = false;
 }

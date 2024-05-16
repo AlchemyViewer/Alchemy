@@ -1,25 +1,25 @@
-/** 
+/**
  * @file llfloatersettingsdebug.cpp
  * @brief floater for debugging internal viewer settings
  *
  * $LicenseInfo:firstyear=2022&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2022, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -39,12 +39,12 @@
 #include "lltexteditor.h"
 
 
-LLFloaterSettingsDebug::LLFloaterSettingsDebug(const LLSD& key) 
-:	LLFloater(key),
+LLFloaterSettingsDebug::LLFloaterSettingsDebug(const LLSD& key)
+:   LLFloater(key),
     mSettingList(NULL)
 {
-	mCommitCallbackRegistrar.add("CommitSettings",	boost::bind(&LLFloaterSettingsDebug::onCommitSettings, this));
-	mCommitCallbackRegistrar.add("ClickDefault",	boost::bind(&LLFloaterSettingsDebug::onClickDefault, this));
+    mCommitCallbackRegistrar.add("CommitSettings",  boost::bind(&LLFloaterSettingsDebug::onCommitSettings, this));
+    mCommitCallbackRegistrar.add("ClickDefault",    boost::bind(&LLFloaterSettingsDebug::onClickDefault, this));
 }
 
 LLFloaterSettingsDebug::~LLFloaterSettingsDebug()
@@ -54,17 +54,17 @@ BOOL LLFloaterSettingsDebug::postBuild()
 {
     enableResizeCtrls(true, false, true);
 
-	mValSpinner1 = getChild<LLSpinCtrl>("val_spinner_1");
-	mValSpinner2 = getChild<LLSpinCtrl>("val_spinner_2");
-	mValSpinner3 = getChild<LLSpinCtrl>("val_spinner_3");
-	mValSpinner4 = getChild<LLSpinCtrl>("val_spinner_4");
-	mBooleanCombo = getChild<LLUICtrl>("boolean_combo");
-	mValText = getChild<LLUICtrl>("val_text");
+    mValSpinner1 = getChild<LLSpinCtrl>("val_spinner_1");
+    mValSpinner2 = getChild<LLSpinCtrl>("val_spinner_2");
+    mValSpinner3 = getChild<LLSpinCtrl>("val_spinner_3");
+    mValSpinner4 = getChild<LLSpinCtrl>("val_spinner_4");
+    mBooleanCombo = getChild<LLUICtrl>("boolean_combo");
+    mValText = getChild<LLUICtrl>("val_text");
 
-	mColorSwatch = getChild<LLColorSwatchCtrl>("val_color_swatch");
+    mColorSwatch = getChild<LLColorSwatchCtrl>("val_color_swatch");
 
-	mDefaultButton = getChild<LLUICtrl>("default_btn");
-	mSettingNameText = getChild<LLTextBox>("setting_name_txt");
+    mDefaultButton = getChild<LLUICtrl>("default_btn");
+    mSettingNameText = getChild<LLTextBox>("setting_name_txt");
 
     mComment = getChild<LLTextEditor>("comment_text");
 
@@ -78,7 +78,7 @@ BOOL LLFloaterSettingsDebug::postBuild()
 
     gSavedSettings.getControl("DebugSettingsHideDefault")->getCommitSignal()->connect(boost::bind(&LLFloaterSettingsDebug::updateList, this, false));
 
-	return TRUE;
+    return TRUE;
 }
 
 void LLFloaterSettingsDebug::draw()
@@ -90,7 +90,7 @@ void LLFloaterSettingsDebug::draw()
         updateControl(controlp);
     }
 
-	LLFloater::draw();
+    LLFloater::draw();
 }
 
 void LLFloaterSettingsDebug::onCommitSettings()
@@ -102,91 +102,91 @@ void LLFloaterSettingsDebug::onCommitSettings()
     }
     LLControlVariable* controlp = (LLControlVariable*)first_selected->getUserdata();
 
-	if (!controlp)
-	{
-		return;
-	}
+    if (!controlp)
+    {
+        return;
+    }
 
-	LLVector3 vector;
-	LLVector3d vectord;
-	LLVector4 vector4;
-	LLQuaternion quat;
-	LLRect rect;
-	LLColor4 col4;
-	LLColor3 col3;
-	LLColor4U col4U;
-	LLColor4 color_with_alpha;
-	LLUUID uuid;
+    LLVector3 vector;
+    LLVector3d vectord;
+    LLVector4 vector4;
+    LLQuaternion quat;
+    LLRect rect;
+    LLColor4 col4;
+    LLColor3 col3;
+    LLColor4U col4U;
+    LLColor4 color_with_alpha;
+    LLUUID uuid;
 
-	switch(controlp->type())
-	{		
-	  case TYPE_U32:
-		controlp->set(mValSpinner1->getValue());
-		break;
-	  case TYPE_S32:
-		controlp->set(mValSpinner1->getValue());
-		break;
-	  case TYPE_F32:
-		controlp->set(LLSD(mValSpinner1->getValue().asReal()));
-		break;
-	  case TYPE_BOOLEAN:
-		controlp->set(mBooleanCombo->getValue());
-		break;
-	  case TYPE_STRING:
-		controlp->set(LLSD(mValText->getValue().asString()));
-		break;
-	  case TYPE_VEC3:
-		vector.mV[VX] = (F32)mValSpinner1->getValue().asReal();
-		vector.mV[VY] = (F32)mValSpinner2->getValue().asReal();
-		vector.mV[VZ] = (F32)mValSpinner3->getValue().asReal();
-		controlp->set(vector.getValue());
-		break;
-	  case TYPE_VEC3D:
-		vectord.mdV[VX] = mValSpinner1->getValue().asReal();
-		vectord.mdV[VY] = mValSpinner2->getValue().asReal();
-		vectord.mdV[VZ] = mValSpinner3->getValue().asReal();
-		controlp->set(vectord.getValue());
-		break;
-	  case TYPE_VEC4:
-		vector4.mV[VX] = (F32)mValSpinner1->getValue().asReal();
-		vector4.mV[VY] = (F32)mValSpinner2->getValue().asReal();
-		vector4.mV[VZ] = (F32)mValSpinner3->getValue().asReal();
-		vector4.mV[VW] = (F32)mValSpinner4->getValue().asReal();
-		controlp->set(vector4.getValue());
-		break;
-	  case TYPE_QUAT:
-		quat.mQ[VX] = mValSpinner1->getValue().asReal();
-		quat.mQ[VY] = mValSpinner2->getValue().asReal();
-		quat.mQ[VZ] = mValSpinner3->getValue().asReal();
-		quat.mQ[VS] = mValSpinner4->getValue().asReal();;
-		controlp->set(quat.getValue());
-		break;
-	  case TYPE_RECT:
-		rect.mLeft = mValSpinner1->getValue().asInteger();
-		rect.mRight = mValSpinner2->getValue().asInteger();
-		rect.mBottom = mValSpinner3->getValue().asInteger();
-		rect.mTop = mValSpinner4->getValue().asInteger();
-		controlp->set(rect.getValue());
-		break;
-	  case TYPE_COL4:
-		col3.setValue(mColorSwatch->getValue());
-		col4 = LLColor4(col3, (F32)mValSpinner4->getValue().asReal());
-		controlp->set(col4.getValue());
-		break;
-	  case TYPE_COL3:
-		controlp->set(mColorSwatch->getValue());
-		//col3.mV[VRED] = (F32)floaterp->mValSpinner1->getValue().asC();
-		//col3.mV[VGREEN] = (F32)floaterp->mValSpinner2->getValue().asReal();
-		//col3.mV[VBLUE] = (F32)floaterp->mValSpinner3->getValue().asReal();
-		//controlp->set(col3.getValue());
-		break;
-	  case TYPE_UUID:
-		LLUUID::parseUUID(mValText->getValue().asString(), &uuid);
-		controlp->set(LLSD(uuid));
-		break;
-	  default:
-		break;
-	}
+    switch(controlp->type())
+    {
+      case TYPE_U32:
+        controlp->set(mValSpinner1->getValue());
+        break;
+      case TYPE_S32:
+        controlp->set(mValSpinner1->getValue());
+        break;
+      case TYPE_F32:
+        controlp->set(LLSD(mValSpinner1->getValue().asReal()));
+        break;
+      case TYPE_BOOLEAN:
+        controlp->set(mBooleanCombo->getValue());
+        break;
+      case TYPE_STRING:
+        controlp->set(LLSD(mValText->getValue().asString()));
+        break;
+      case TYPE_VEC3:
+        vector.mV[VX] = (F32)mValSpinner1->getValue().asReal();
+        vector.mV[VY] = (F32)mValSpinner2->getValue().asReal();
+        vector.mV[VZ] = (F32)mValSpinner3->getValue().asReal();
+        controlp->set(vector.getValue());
+        break;
+      case TYPE_VEC3D:
+        vectord.mdV[VX] = mValSpinner1->getValue().asReal();
+        vectord.mdV[VY] = mValSpinner2->getValue().asReal();
+        vectord.mdV[VZ] = mValSpinner3->getValue().asReal();
+        controlp->set(vectord.getValue());
+        break;
+      case TYPE_VEC4:
+        vector4.mV[VX] = (F32)mValSpinner1->getValue().asReal();
+        vector4.mV[VY] = (F32)mValSpinner2->getValue().asReal();
+        vector4.mV[VZ] = (F32)mValSpinner3->getValue().asReal();
+        vector4.mV[VW] = (F32)mValSpinner4->getValue().asReal();
+        controlp->set(vector4.getValue());
+        break;
+      case TYPE_QUAT:
+        quat.mQ[VX] = mValSpinner1->getValue().asReal();
+        quat.mQ[VY] = mValSpinner2->getValue().asReal();
+        quat.mQ[VZ] = mValSpinner3->getValue().asReal();
+        quat.mQ[VS] = mValSpinner4->getValue().asReal();;
+        controlp->set(quat.getValue());
+        break;
+      case TYPE_RECT:
+        rect.mLeft = mValSpinner1->getValue().asInteger();
+        rect.mRight = mValSpinner2->getValue().asInteger();
+        rect.mBottom = mValSpinner3->getValue().asInteger();
+        rect.mTop = mValSpinner4->getValue().asInteger();
+        controlp->set(rect.getValue());
+        break;
+      case TYPE_COL4:
+        col3.setValue(mColorSwatch->getValue());
+        col4 = LLColor4(col3, (F32)mValSpinner4->getValue().asReal());
+        controlp->set(col4.getValue());
+        break;
+      case TYPE_COL3:
+        controlp->set(mColorSwatch->getValue());
+        //col3.mV[VRED] = (F32)floaterp->mValSpinner1->getValue().asC();
+        //col3.mV[VGREEN] = (F32)floaterp->mValSpinner2->getValue().asReal();
+        //col3.mV[VBLUE] = (F32)floaterp->mValSpinner3->getValue().asReal();
+        //controlp->set(col3.getValue());
+        break;
+      case TYPE_UUID:
+        LLUUID::parseUUID(mValText->getValue().asString(), &uuid);
+        controlp->set(LLSD(uuid));
+        break;
+      default:
+        break;
+    }
     updateDefaultColumn(controlp);
 }
 
@@ -211,26 +211,26 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
 {
     hideUIControls();
 
-	if (controlp && !isSettingHidden(controlp))
-	{
+    if (controlp && !isSettingHidden(controlp))
+    {
 // [RLVa:KB] - Checked: 2011-05-28 (RLVa-1.4.0a) | Modified: RLVa-1.4.0a
-		// If "HideFromEditor" was toggled while the floater is open then we need to manually disable access to the control
-		// NOTE: this runs per-frame so there's no need to explictly handle onCommitSettings() or onClickDefault()
-		bool fEnable = !controlp->isHiddenFromSettingsEditor();
-		mValSpinner1->setEnabled(fEnable);
-		mValSpinner2->setEnabled(fEnable);
-		mValSpinner3->setEnabled(fEnable);
-		mValSpinner4->setEnabled(fEnable);
-		mColorSwatch->setEnabled(fEnable);
-		mValText->setEnabled(fEnable);
-		mBooleanCombo->setEnabled(fEnable);
-		mDefaultButton->setEnabled(fEnable);
+        // If "HideFromEditor" was toggled while the floater is open then we need to manually disable access to the control
+        // NOTE: this runs per-frame so there's no need to explictly handle onCommitSettings() or onClickDefault()
+        bool fEnable = !controlp->isHiddenFromSettingsEditor();
+        mValSpinner1->setEnabled(fEnable);
+        mValSpinner2->setEnabled(fEnable);
+        mValSpinner3->setEnabled(fEnable);
+        mValSpinner4->setEnabled(fEnable);
+        mColorSwatch->setEnabled(fEnable);
+        mValText->setEnabled(fEnable);
+        mBooleanCombo->setEnabled(fEnable);
+        mDefaultButton->setEnabled(fEnable);
 // [/RLVa:KB]
 
-		eControlType type = controlp->type();
+        eControlType type = controlp->type();
 
-		//hide combo box only for non booleans, otherwise this will result in the combo box closing every frame
-		mBooleanCombo->setVisible( type == TYPE_BOOLEAN);
+        //hide combo box only for non booleans, otherwise this will result in the combo box closing every frame
+        mBooleanCombo->setVisible( type == TYPE_BOOLEAN);
         mDefaultButton->setVisible(true);
         mSettingNameText->setVisible(true);
         mSettingNameText->setText(controlp->getName());
@@ -247,309 +247,309 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
             mComment->setText(controlp->getComment());
         }
 
-		mValSpinner1->setMaxValue(F32_MAX);
-		mValSpinner2->setMaxValue(F32_MAX);
-		mValSpinner3->setMaxValue(F32_MAX);
-		mValSpinner4->setMaxValue(F32_MAX);
-		mValSpinner1->setMinValue(-F32_MAX);
-		mValSpinner2->setMinValue(-F32_MAX);
-		mValSpinner3->setMinValue(-F32_MAX);
-		mValSpinner4->setMinValue(-F32_MAX);
-		if (!mValSpinner1->hasFocus())
-		{
-			mValSpinner1->setIncrement(0.1f);
-		}
-		if (!mValSpinner2->hasFocus())
-		{
-			mValSpinner2->setIncrement(0.1f);
-		}
-		if (!mValSpinner3->hasFocus())
-		{
-			mValSpinner3->setIncrement(0.1f);
-		}
-		if (!mValSpinner4->hasFocus())
-		{
-			mValSpinner4->setIncrement(0.1f);
-		}
+        mValSpinner1->setMaxValue(F32_MAX);
+        mValSpinner2->setMaxValue(F32_MAX);
+        mValSpinner3->setMaxValue(F32_MAX);
+        mValSpinner4->setMaxValue(F32_MAX);
+        mValSpinner1->setMinValue(-F32_MAX);
+        mValSpinner2->setMinValue(-F32_MAX);
+        mValSpinner3->setMinValue(-F32_MAX);
+        mValSpinner4->setMinValue(-F32_MAX);
+        if (!mValSpinner1->hasFocus())
+        {
+            mValSpinner1->setIncrement(0.1f);
+        }
+        if (!mValSpinner2->hasFocus())
+        {
+            mValSpinner2->setIncrement(0.1f);
+        }
+        if (!mValSpinner3->hasFocus())
+        {
+            mValSpinner3->setIncrement(0.1f);
+        }
+        if (!mValSpinner4->hasFocus())
+        {
+            mValSpinner4->setIncrement(0.1f);
+        }
 
-		LLSD sd = controlp->get();
-		switch(type)
-		{
-		  case TYPE_U32:
-			mValSpinner1->setVisible(TRUE);
-			mValSpinner1->setLabel(std::string("value")); // Debug, don't translate
-			if (!mValSpinner1->hasFocus())
-			{
-				mValSpinner1->setValue(sd);
-				mValSpinner1->setMinValue((F32)U32_MIN);
-				mValSpinner1->setMaxValue((F32)U32_MAX);
-				mValSpinner1->setIncrement(1.f);
-				mValSpinner1->setPrecision(0);
-			}
-			break;
-		  case TYPE_S32:
-			mValSpinner1->setVisible(TRUE);
-			mValSpinner1->setLabel(std::string("value")); // Debug, don't translate
-			if (!mValSpinner1->hasFocus())
-			{
-				mValSpinner1->setValue(sd);
-				mValSpinner1->setMinValue((F32)S32_MIN);
-				mValSpinner1->setMaxValue((F32)S32_MAX);
-				mValSpinner1->setIncrement(1.f);
-				mValSpinner1->setPrecision(0);
-			}
-			break;
-		  case TYPE_F32:
-			mValSpinner1->setVisible(TRUE);
-			mValSpinner1->setLabel(std::string("value")); // Debug, don't translate
-			if (!mValSpinner1->hasFocus())
-			{
-				mValSpinner1->setPrecision(5);
-				mValSpinner1->setValue(sd);
-			}
-			break;
-		  case TYPE_BOOLEAN:
-			if (!mBooleanCombo->hasFocus())
-			{
-				if (sd.asBoolean())
-				{
-					mBooleanCombo->setValue(LLSD("true"));
-				}
-				else
-				{
-					mBooleanCombo->setValue(LLSD(""));
-				}
-			}
-			break;
-		  case TYPE_STRING:
-			mValText->setVisible( TRUE);
-			if (!mValText->hasFocus())
-			{
-				mValText->setValue(sd);
-			}
-			break;
-		  case TYPE_VEC3:
-		  {
-			LLVector3 v;
-			v.setValue(sd);
-			mValSpinner1->setVisible(TRUE);
-			mValSpinner1->setLabel(std::string("X"));
-			mValSpinner2->setVisible(TRUE);
-			mValSpinner2->setLabel(std::string("Y"));
-			mValSpinner3->setVisible(TRUE);
-			mValSpinner3->setLabel(std::string("Z"));
-			if (!mValSpinner1->hasFocus())
-			{
-				mValSpinner1->setPrecision(4);
-				mValSpinner1->setValue(v[VX]);
-			}
-			if (!mValSpinner2->hasFocus())
-			{
-				mValSpinner2->setPrecision(4);
-				mValSpinner2->setValue(v[VY]);
-			}
-			if (!mValSpinner3->hasFocus())
-			{
-				mValSpinner3->setPrecision(4);
-				mValSpinner3->setValue(v[VZ]);
-			}
-			break;
-		  }
-		  case TYPE_VEC3D:
-		  {
-			LLVector3d v;
-			v.setValue(sd);
-			mValSpinner1->setVisible(TRUE);
-			mValSpinner1->setLabel(std::string("X"));
-			mValSpinner2->setVisible(TRUE);
-			mValSpinner2->setLabel(std::string("Y"));
-			mValSpinner3->setVisible(TRUE);
-			mValSpinner3->setLabel(std::string("Z"));
-			if (!mValSpinner1->hasFocus())
-			{
-				mValSpinner1->setPrecision(4);
-				mValSpinner1->setValue(v[VX]);
-			}
-			if (!mValSpinner2->hasFocus())
-			{
-				mValSpinner2->setPrecision(4);
-				mValSpinner2->setValue(v[VY]);
-			}
-			if (!mValSpinner3->hasFocus())
-			{
-				mValSpinner3->setPrecision(4);
-				mValSpinner3->setValue(v[VZ]);
-			}
-			break;
-		  }
-		  case TYPE_VEC4:
-		  {
-			LLVector4 v;
-			v.setValue(sd);
-			mValSpinner1->setVisible(TRUE);
-			mValSpinner1->setLabel(std::string("X"));
-			mValSpinner2->setVisible(TRUE);
-			mValSpinner2->setLabel(std::string("Y"));
-			mValSpinner3->setVisible(TRUE);
-			mValSpinner3->setLabel(std::string("Z"));
-			mValSpinner4->setVisible(TRUE);
-			mValSpinner4->setLabel(std::string("W"));
-			if (!mValSpinner1->hasFocus())
-			{
-				mValSpinner1->setPrecision(4);
-				mValSpinner1->setValue(v[VX]);
-			}
-			if (!mValSpinner2->hasFocus())
-			{
-				mValSpinner2->setPrecision(4);
-				mValSpinner2->setValue(v[VY]);
-			}
-			if (!mValSpinner3->hasFocus())
-			{
-				mValSpinner3->setPrecision(4);
-				mValSpinner3->setValue(v[VZ]);
-			}
-			if (!mValSpinner4->hasFocus())
-			{
-				mValSpinner4->setPrecision(4);
-				mValSpinner4->setValue(v[VW]);
-			}
-			break;
-		  }
-		  case TYPE_QUAT:
-		  {
-			  LLQuaternion q;
-			  q.setValue(sd);
-			  mValSpinner1->setVisible(TRUE);
-			  mValSpinner1->setLabel(std::string("X"));
-			  mValSpinner2->setVisible(TRUE);
-			  mValSpinner2->setLabel(std::string("Y"));
-			  mValSpinner3->setVisible(TRUE);
-			  mValSpinner3->setLabel(std::string("Z"));
-			  mValSpinner4->setVisible(TRUE);
-			  mValSpinner4->setLabel(std::string("S"));
-			  if (!mValSpinner1->hasFocus())
-			  {
-				  mValSpinner1->setPrecision(4);
-				  mValSpinner1->setValue(q.mQ[VX]);
-			  }
-			  if (!mValSpinner2->hasFocus())
-			  {
-				  mValSpinner2->setPrecision(4);
-				  mValSpinner2->setValue(q.mQ[VY]);
-			  }
-			  if (!mValSpinner3->hasFocus())
-			  {
-				  mValSpinner3->setPrecision(4);
-				  mValSpinner3->setValue(q.mQ[VZ]);
-			  }
-			  if (!mValSpinner4->hasFocus())
-			  {
-				  mValSpinner4->setPrecision(4);
-				  mValSpinner4->setValue(q.mQ[VS]);
-			  }
-			  break;
-		  }
-		  case TYPE_RECT:
-		  {
-			LLRect r;
-			r.setValue(sd);
-			mValSpinner1->setVisible(TRUE);
-			mValSpinner1->setLabel(std::string("Left"));
-			mValSpinner2->setVisible(TRUE);
-			mValSpinner2->setLabel(std::string("Right"));
-			mValSpinner3->setVisible(TRUE);
-			mValSpinner3->setLabel(std::string("Bottom"));
-			mValSpinner4->setVisible(TRUE);
-			mValSpinner4->setLabel(std::string("Top"));
-			if (!mValSpinner1->hasFocus())
-			{
-				mValSpinner1->setPrecision(0);
-				mValSpinner1->setValue(r.mLeft);
-			}
-			if (!mValSpinner2->hasFocus())
-			{
-				mValSpinner2->setPrecision(0);
-				mValSpinner2->setValue(r.mRight);
-			}
-			if (!mValSpinner3->hasFocus())
-			{
-				mValSpinner3->setPrecision(0);
-				mValSpinner3->setValue(r.mBottom);
-			}
-			if (!mValSpinner4->hasFocus())
-			{
-				mValSpinner4->setPrecision(0);
-				mValSpinner4->setValue(r.mTop);
-			}
+        LLSD sd = controlp->get();
+        switch(type)
+        {
+          case TYPE_U32:
+            mValSpinner1->setVisible(TRUE);
+            mValSpinner1->setLabel(std::string("value")); // Debug, don't translate
+            if (!mValSpinner1->hasFocus())
+            {
+                mValSpinner1->setValue(sd);
+                mValSpinner1->setMinValue((F32)U32_MIN);
+                mValSpinner1->setMaxValue((F32)U32_MAX);
+                mValSpinner1->setIncrement(1.f);
+                mValSpinner1->setPrecision(0);
+            }
+            break;
+          case TYPE_S32:
+            mValSpinner1->setVisible(TRUE);
+            mValSpinner1->setLabel(std::string("value")); // Debug, don't translate
+            if (!mValSpinner1->hasFocus())
+            {
+                mValSpinner1->setValue(sd);
+                mValSpinner1->setMinValue((F32)S32_MIN);
+                mValSpinner1->setMaxValue((F32)S32_MAX);
+                mValSpinner1->setIncrement(1.f);
+                mValSpinner1->setPrecision(0);
+            }
+            break;
+          case TYPE_F32:
+            mValSpinner1->setVisible(TRUE);
+            mValSpinner1->setLabel(std::string("value")); // Debug, don't translate
+            if (!mValSpinner1->hasFocus())
+            {
+                mValSpinner1->setPrecision(5);
+                mValSpinner1->setValue(sd);
+            }
+            break;
+          case TYPE_BOOLEAN:
+            if (!mBooleanCombo->hasFocus())
+            {
+                if (sd.asBoolean())
+                {
+                    mBooleanCombo->setValue(LLSD("true"));
+                }
+                else
+                {
+                    mBooleanCombo->setValue(LLSD(""));
+                }
+            }
+            break;
+          case TYPE_STRING:
+            mValText->setVisible( TRUE);
+            if (!mValText->hasFocus())
+            {
+                mValText->setValue(sd);
+            }
+            break;
+          case TYPE_VEC3:
+          {
+            LLVector3 v;
+            v.setValue(sd);
+            mValSpinner1->setVisible(TRUE);
+            mValSpinner1->setLabel(std::string("X"));
+            mValSpinner2->setVisible(TRUE);
+            mValSpinner2->setLabel(std::string("Y"));
+            mValSpinner3->setVisible(TRUE);
+            mValSpinner3->setLabel(std::string("Z"));
+            if (!mValSpinner1->hasFocus())
+            {
+                mValSpinner1->setPrecision(4);
+                mValSpinner1->setValue(v[VX]);
+            }
+            if (!mValSpinner2->hasFocus())
+            {
+                mValSpinner2->setPrecision(4);
+                mValSpinner2->setValue(v[VY]);
+            }
+            if (!mValSpinner3->hasFocus())
+            {
+                mValSpinner3->setPrecision(4);
+                mValSpinner3->setValue(v[VZ]);
+            }
+            break;
+          }
+          case TYPE_VEC3D:
+          {
+            LLVector3d v;
+            v.setValue(sd);
+            mValSpinner1->setVisible(TRUE);
+            mValSpinner1->setLabel(std::string("X"));
+            mValSpinner2->setVisible(TRUE);
+            mValSpinner2->setLabel(std::string("Y"));
+            mValSpinner3->setVisible(TRUE);
+            mValSpinner3->setLabel(std::string("Z"));
+            if (!mValSpinner1->hasFocus())
+            {
+                mValSpinner1->setPrecision(4);
+                mValSpinner1->setValue(v[VX]);
+            }
+            if (!mValSpinner2->hasFocus())
+            {
+                mValSpinner2->setPrecision(4);
+                mValSpinner2->setValue(v[VY]);
+            }
+            if (!mValSpinner3->hasFocus())
+            {
+                mValSpinner3->setPrecision(4);
+                mValSpinner3->setValue(v[VZ]);
+            }
+            break;
+          }
+          case TYPE_VEC4:
+          {
+            LLVector4 v;
+            v.setValue(sd);
+            mValSpinner1->setVisible(TRUE);
+            mValSpinner1->setLabel(std::string("X"));
+            mValSpinner2->setVisible(TRUE);
+            mValSpinner2->setLabel(std::string("Y"));
+            mValSpinner3->setVisible(TRUE);
+            mValSpinner3->setLabel(std::string("Z"));
+            mValSpinner4->setVisible(TRUE);
+            mValSpinner4->setLabel(std::string("W"));
+            if (!mValSpinner1->hasFocus())
+            {
+                mValSpinner1->setPrecision(4);
+                mValSpinner1->setValue(v[VX]);
+            }
+            if (!mValSpinner2->hasFocus())
+            {
+                mValSpinner2->setPrecision(4);
+                mValSpinner2->setValue(v[VY]);
+            }
+            if (!mValSpinner3->hasFocus())
+            {
+                mValSpinner3->setPrecision(4);
+                mValSpinner3->setValue(v[VZ]);
+            }
+            if (!mValSpinner4->hasFocus())
+            {
+                mValSpinner4->setPrecision(4);
+                mValSpinner4->setValue(v[VW]);
+            }
+            break;
+          }
+          case TYPE_QUAT:
+          {
+              LLQuaternion q;
+              q.setValue(sd);
+              mValSpinner1->setVisible(TRUE);
+              mValSpinner1->setLabel(std::string("X"));
+              mValSpinner2->setVisible(TRUE);
+              mValSpinner2->setLabel(std::string("Y"));
+              mValSpinner3->setVisible(TRUE);
+              mValSpinner3->setLabel(std::string("Z"));
+              mValSpinner4->setVisible(TRUE);
+              mValSpinner4->setLabel(std::string("S"));
+              if (!mValSpinner1->hasFocus())
+              {
+                  mValSpinner1->setPrecision(4);
+                  mValSpinner1->setValue(q.mQ[VX]);
+              }
+              if (!mValSpinner2->hasFocus())
+              {
+                  mValSpinner2->setPrecision(4);
+                  mValSpinner2->setValue(q.mQ[VY]);
+              }
+              if (!mValSpinner3->hasFocus())
+              {
+                  mValSpinner3->setPrecision(4);
+                  mValSpinner3->setValue(q.mQ[VZ]);
+              }
+              if (!mValSpinner4->hasFocus())
+              {
+                  mValSpinner4->setPrecision(4);
+                  mValSpinner4->setValue(q.mQ[VS]);
+              }
+              break;
+          }
+          case TYPE_RECT:
+          {
+            LLRect r;
+            r.setValue(sd);
+            mValSpinner1->setVisible(TRUE);
+            mValSpinner1->setLabel(std::string("Left"));
+            mValSpinner2->setVisible(TRUE);
+            mValSpinner2->setLabel(std::string("Right"));
+            mValSpinner3->setVisible(TRUE);
+            mValSpinner3->setLabel(std::string("Bottom"));
+            mValSpinner4->setVisible(TRUE);
+            mValSpinner4->setLabel(std::string("Top"));
+            if (!mValSpinner1->hasFocus())
+            {
+                mValSpinner1->setPrecision(0);
+                mValSpinner1->setValue(r.mLeft);
+            }
+            if (!mValSpinner2->hasFocus())
+            {
+                mValSpinner2->setPrecision(0);
+                mValSpinner2->setValue(r.mRight);
+            }
+            if (!mValSpinner3->hasFocus())
+            {
+                mValSpinner3->setPrecision(0);
+                mValSpinner3->setValue(r.mBottom);
+            }
+            if (!mValSpinner4->hasFocus())
+            {
+                mValSpinner4->setPrecision(0);
+                mValSpinner4->setValue(r.mTop);
+            }
 
-			mValSpinner1->setMinValue((F32)S32_MIN);
-			mValSpinner1->setMaxValue((F32)S32_MAX);
-			mValSpinner1->setIncrement(1.f);
+            mValSpinner1->setMinValue((F32)S32_MIN);
+            mValSpinner1->setMaxValue((F32)S32_MAX);
+            mValSpinner1->setIncrement(1.f);
 
-			mValSpinner2->setMinValue((F32)S32_MIN);
-			mValSpinner2->setMaxValue((F32)S32_MAX);
-			mValSpinner2->setIncrement(1.f);
+            mValSpinner2->setMinValue((F32)S32_MIN);
+            mValSpinner2->setMaxValue((F32)S32_MAX);
+            mValSpinner2->setIncrement(1.f);
 
-			mValSpinner3->setMinValue((F32)S32_MIN);
-			mValSpinner3->setMaxValue((F32)S32_MAX);
-			mValSpinner3->setIncrement(1.f);
+            mValSpinner3->setMinValue((F32)S32_MIN);
+            mValSpinner3->setMaxValue((F32)S32_MAX);
+            mValSpinner3->setIncrement(1.f);
 
-			mValSpinner4->setMinValue((F32)S32_MIN);
-			mValSpinner4->setMaxValue((F32)S32_MAX);
-			mValSpinner4->setIncrement(1.f);
-			break;
-		  }
-		  case TYPE_COL4:
-		  {
-			LLColor4 clr;
-			clr.setValue(sd);
-			mColorSwatch->setVisible(TRUE);
-			// only set if changed so color picker doesn't update
-			if(clr != LLColor4(mColorSwatch->getValue()))
-			{
-				mColorSwatch->set(LLColor4(sd), TRUE, FALSE);
-			}
-			mValSpinner4->setVisible(TRUE);
-			mValSpinner4->setLabel(std::string("Alpha"));
-			if (!mValSpinner4->hasFocus())
-			{
-				mValSpinner4->setPrecision(3);
-				mValSpinner4->setMinValue(0.0);
-				mValSpinner4->setMaxValue(1.f);
-				mValSpinner4->setValue(clr.mV[VALPHA]);
-			}
-			break;
-		  }
-		  case TYPE_COL3:
-		  {
-			LLColor3 clr;
-			clr.setValue(sd);
-			mColorSwatch->setVisible(TRUE);
-			mColorSwatch->setValue(sd);
-			break;
-		  }
-		  case TYPE_UUID:
-			mValText->setVisible( TRUE);
-			if (!mValText->hasFocus())
-			{
-				mValText->setValue(sd);
-			}
-			break;
+            mValSpinner4->setMinValue((F32)S32_MIN);
+            mValSpinner4->setMaxValue((F32)S32_MAX);
+            mValSpinner4->setIncrement(1.f);
+            break;
+          }
+          case TYPE_COL4:
+          {
+            LLColor4 clr;
+            clr.setValue(sd);
+            mColorSwatch->setVisible(TRUE);
+            // only set if changed so color picker doesn't update
+            if(clr != LLColor4(mColorSwatch->getValue()))
+            {
+                mColorSwatch->set(LLColor4(sd), TRUE, FALSE);
+            }
+            mValSpinner4->setVisible(TRUE);
+            mValSpinner4->setLabel(std::string("Alpha"));
+            if (!mValSpinner4->hasFocus())
+            {
+                mValSpinner4->setPrecision(3);
+                mValSpinner4->setMinValue(0.0);
+                mValSpinner4->setMaxValue(1.f);
+                mValSpinner4->setValue(clr.mV[VALPHA]);
+            }
+            break;
+          }
+          case TYPE_COL3:
+          {
+            LLColor3 clr;
+            clr.setValue(sd);
+            mColorSwatch->setVisible(TRUE);
+            mColorSwatch->setValue(sd);
+            break;
+          }
+          case TYPE_UUID:
+            mValText->setVisible( TRUE);
+            if (!mValText->hasFocus())
+            {
+                mValText->setValue(sd);
+            }
+            break;
 // [RLVa:KB] - Patch: RLVa-2.1.0
-		  case TYPE_LLSD:
-			  {
-				  std::ostringstream strLLSD;
-				  LLSDSerialize::toPrettyNotation(sd, strLLSD);
-				  mComment->setText(strLLSD.str());
-			  }
-			  break;
+          case TYPE_LLSD:
+              {
+                  std::ostringstream strLLSD;
+                  LLSDSerialize::toPrettyNotation(sd, strLLSD);
+                  mComment->setText(strLLSD.str());
+              }
+              break;
 // [/RLVa:KB]
-		  default:
-			mComment->setText(std::string("unknown"));
-			break;
-		}
-	}
+          default:
+            mComment->setText(std::string("unknown"));
+            break;
+        }
+    }
 
 }
 
@@ -573,7 +573,7 @@ void LLFloaterSettingsDebug::updateList(bool skip_selection)
         LLFloaterSettingsDebug* floater;
         std::string selected_setting;
         bool skip_selection;
-        f(LLScrollListCtrl* list, LLFloaterSettingsDebug* floater, std::string setting, bool skip_selection) 
+        f(LLScrollListCtrl* list, LLFloaterSettingsDebug* floater, std::string setting, bool skip_selection)
             : setting_list(list), floater(floater), selected_setting(setting), skip_selection(skip_selection) {}
         virtual void apply(const std::string& name, LLControlVariable* control)
         {

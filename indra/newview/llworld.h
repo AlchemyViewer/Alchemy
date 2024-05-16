@@ -1,4 +1,4 @@
-/** 
+/**
  * @file llworld.h
  * @brief Collection of viewer regions in the vacinity of the user.
  *
@@ -10,21 +10,21 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -59,14 +59,14 @@ class LLVOAvatar;
 class CapUrlMatches
 {
 public:
-	CapUrlMatches(std::set<LLViewerRegion*>& regions, std::set<std::string>& cap_names)
-		: mRegions(regions)
-		, mCapNames(cap_names)
-	{
-	}
+    CapUrlMatches(std::set<LLViewerRegion*>& regions, std::set<std::string>& cap_names)
+        : mRegions(regions)
+        , mCapNames(cap_names)
+    {
+    }
 
-	std::set<LLViewerRegion*> mRegions;
-	std::set<std::string> mCapNames;
+    std::set<LLViewerRegion*> mRegions;
+    std::set<std::string> mCapNames;
 };
 
 // LLWorld maintains a stack of unused viewer_regions and an array of pointers to viewer regions
@@ -82,134 +82,134 @@ public:
     // Prepares class to be reused or destroyed
     void resetClass();
 
-	LLViewerRegion*	addRegion(const U64 &region_handle, const LLHost &host);
-		// safe to call if already present, does the "right thing" if
-		// hosts are same, or if hosts are different, etc...
-	void			removeRegion(const LLHost &host);
+    LLViewerRegion* addRegion(const U64 &region_handle, const LLHost &host);
+        // safe to call if already present, does the "right thing" if
+        // hosts are same, or if hosts are different, etc...
+    void            removeRegion(const LLHost &host);
 
-	void	disconnectRegions(); // Send quit messages to all child regions
+    void    disconnectRegions(); // Send quit messages to all child regions
 
-	LLViewerRegion*			getRegion(const LLHost &host);
-	LLViewerRegion*			getRegionFromPosGlobal(const LLVector3d &pos);
-	LLViewerRegion*			getRegionFromPosAgent(const LLVector3 &pos);
-	LLViewerRegion*			getRegionFromHandle(const U64 &handle);
-	LLViewerRegion*			getRegionFromID(const LLUUID& region_id);
-	BOOL					positionRegionValidGlobal(const LLVector3d& pos);			// true if position is in valid region
-	LLVector3d				clipToVisibleRegions(const LLVector3d &start_pos, const LLVector3d &end_pos);
+    LLViewerRegion*         getRegion(const LLHost &host);
+    LLViewerRegion*         getRegionFromPosGlobal(const LLVector3d &pos);
+    LLViewerRegion*         getRegionFromPosAgent(const LLVector3 &pos);
+    LLViewerRegion*         getRegionFromHandle(const U64 &handle);
+    LLViewerRegion*         getRegionFromID(const LLUUID& region_id);
+    BOOL                    positionRegionValidGlobal(const LLVector3d& pos);           // true if position is in valid region
+    LLVector3d              clipToVisibleRegions(const LLVector3d &start_pos, const LLVector3d &end_pos);
 
-	void					updateAgentOffset(const LLVector3d &offset);
+    void                    updateAgentOffset(const LLVector3d &offset);
 
-	// All of these should be in the agent coordinate frame
-	LLViewerRegion*			resolveRegionGlobal(LLVector3 &localpos, const LLVector3d &position);
-	LLViewerRegion*			resolveRegionAgent(LLVector3 &localpos, const LLVector3 &position);
-	F32						resolveLandHeightGlobal(const LLVector3d &position);
-	F32						resolveLandHeightAgent(const LLVector3 &position);
+    // All of these should be in the agent coordinate frame
+    LLViewerRegion*         resolveRegionGlobal(LLVector3 &localpos, const LLVector3d &position);
+    LLViewerRegion*         resolveRegionAgent(LLVector3 &localpos, const LLVector3 &position);
+    F32                     resolveLandHeightGlobal(const LLVector3d &position);
+    F32                     resolveLandHeightAgent(const LLVector3 &position);
 
-	// Return the lowest allowed Z point to prevent objects from being moved
-	// underground.
-	F32 getMinAllowedZ(LLViewerObject* object, const LLVector3d &global_pos);
+    // Return the lowest allowed Z point to prevent objects from being moved
+    // underground.
+    F32 getMinAllowedZ(LLViewerObject* object, const LLVector3d &global_pos);
 
-	// takes a line segment defined by point_a and point_b, then
-	// determines the closest (to point_a) point of intersection that is
-	// on the land surface or on an object of the world.
-	// Stores results in "intersection" and "intersection_normal" and
-	// returns a scalar value that is the normalized (by length of line segment) 
-	// distance along the line from "point_a" to "intersection".
-	//
-	// Currently assumes point_a and point_b only differ in z-direction,
-	// but it may eventually become more general.
-	F32 resolveStepHeightGlobal(const LLVOAvatar* avatarp, const LLVector3d &point_a, const LLVector3d &point_b,
-							LLVector3d &intersection, LLVector3 &intersection_normal,
-							LLViewerObject** viewerObjectPtr=NULL);
+    // takes a line segment defined by point_a and point_b, then
+    // determines the closest (to point_a) point of intersection that is
+    // on the land surface or on an object of the world.
+    // Stores results in "intersection" and "intersection_normal" and
+    // returns a scalar value that is the normalized (by length of line segment)
+    // distance along the line from "point_a" to "intersection".
+    //
+    // Currently assumes point_a and point_b only differ in z-direction,
+    // but it may eventually become more general.
+    F32 resolveStepHeightGlobal(const LLVOAvatar* avatarp, const LLVector3d &point_a, const LLVector3d &point_b,
+                            LLVector3d &intersection, LLVector3 &intersection_normal,
+                            LLViewerObject** viewerObjectPtr=NULL);
 
-	LLSurfacePatch *		resolveLandPatchGlobal(const LLVector3d &position);
-	LLVector3				resolveLandNormalGlobal(const LLVector3d &position);		// absolute frame
+    LLSurfacePatch *        resolveLandPatchGlobal(const LLVector3d &position);
+    LLVector3               resolveLandNormalGlobal(const LLVector3d &position);        // absolute frame
 
-	void					setRegionSize(const U32& width = 0, const U32& length = 0);
-	U32						getRegionWidthInPoints() const	{ return mWidth; }
-	F32						getRegionScale() const			{ return mScale; }
+    void                    setRegionSize(const U32& width = 0, const U32& length = 0);
+    U32                     getRegionWidthInPoints() const  { return mWidth; }
+    F32                     getRegionScale() const          { return mScale; }
 
-	// region X and Y size in meters
-	F32						getRegionWidthInMeters() const	{ return mWidthInMeters; }
-	F32						getRegionMinHeight() const		{ return -mWidthInMeters; }
-	F32						getRegionMaxHeight() const		{ return mRegionMaxHeight; }
-	F32						getRegionMinPrimScale() const	{ return mRegionMinPrimScale; }
-	F32						getRegionMaxPrimScale() const	{ return mRegionMaxPrimScale; }
-	F32						getRegionMaxPrimScaleNoMesh() const	{ return mRegionMaxPrimScaleNoMesh; }
-	F32						getRegionMaxHollowSize() const	{ return mRegionMaxHollowSize; }
-	F32						getRegionMinHoleSize() const	{ return mRegionMinHoleSize; }
-	S32						getRegionMaxLinkObjects() const	{ return mRegionMaxLinkObjects; }
+    // region X and Y size in meters
+    F32                     getRegionWidthInMeters() const  { return mWidthInMeters; }
+    F32                     getRegionMinHeight() const      { return -mWidthInMeters; }
+    F32                     getRegionMaxHeight() const      { return mRegionMaxHeight; }
+    F32                     getRegionMinPrimScale() const   { return mRegionMinPrimScale; }
+    F32                     getRegionMaxPrimScale() const   { return mRegionMaxPrimScale; }
+    F32                     getRegionMaxPrimScaleNoMesh() const { return mRegionMaxPrimScaleNoMesh; }
+    F32                     getRegionMaxHollowSize() const  { return mRegionMaxHollowSize; }
+    F32                     getRegionMinHoleSize() const    { return mRegionMinHoleSize; }
+    S32                     getRegionMaxLinkObjects() const { return mRegionMaxLinkObjects; }
 
-	void					updateRegions(F32 max_update_time);
-	void					updateVisibilities();
-	void					updateParticles();
+    void                    updateRegions(F32 max_update_time);
+    void                    updateVisibilities();
+    void                    updateParticles();
 
-	void					renderPropertyLines();
+    void                    renderPropertyLines();
 
-	void updateNetStats(); // Update network statistics for all the regions...
+    void updateNetStats(); // Update network statistics for all the regions...
 
-	void printPacketsLost();
-	void requestCacheMisses();
+    void printPacketsLost();
+    void requestCacheMisses();
 
-	// deal with map object updates in the world.
-	static void processCoarseUpdate(LLMessageSystem* msg, void** user_data);
+    // deal with map object updates in the world.
+    static void processCoarseUpdate(LLMessageSystem* msg, void** user_data);
 
-	F32 getLandFarClip() const;
-	void setLandFarClip(const F32 far_clip);
+    F32 getLandFarClip() const;
+    void setLandFarClip(const F32 far_clip);
 
-	LLViewerTexture *getDefaultWaterTexture();
+    LLViewerTexture *getDefaultWaterTexture();
     void updateWaterObjects();
 
-	void waterHeightRegionInfo(std::string const& sim_name, F32 water_height);
-	void shiftRegions(const LLVector3& offset);
+    void waterHeightRegionInfo(std::string const& sim_name, F32 water_height);
+    void shiftRegions(const LLVector3& offset);
 
-	void setSpaceTimeUSec(const U64MicrosecondsImplicit space_time_usec);
-	U64MicrosecondsImplicit getSpaceTimeUSec() const;
+    void setSpaceTimeUSec(const U64MicrosecondsImplicit space_time_usec);
+    U64MicrosecondsImplicit getSpaceTimeUSec() const;
 
-	void getInfo(LLSD& info);
-	U32  getNumOfActiveCachedObjects() const {return mNumOfActiveCachedObjects;}
+    void getInfo(LLSD& info);
+    U32  getNumOfActiveCachedObjects() const {return mNumOfActiveCachedObjects;}
 
-	void clearAllVisibleObjects();
-	void refreshLimits();
+    void clearAllVisibleObjects();
+    void refreshLimits();
 
-	virtual CapUrlMatches getCapURLMatches(const std::string& cap_url);
-	virtual bool isCapURLMapped(const std::string& cap_url);
+    virtual CapUrlMatches getCapURLMatches(const std::string& cap_url);
+    virtual bool isCapURLMapped(const std::string& cap_url);
 
 public:
-	typedef std::list<LLViewerRegion*> region_list_t;
-	const region_list_t& getRegionList() const { return mActiveRegionList; }
+    typedef std::list<LLViewerRegion*> region_list_t;
+    const region_list_t& getRegionList() const { return mActiveRegionList; }
 
-	typedef boost::signals2::signal<void(LLViewerRegion*)> region_remove_signal_t;
-	boost::signals2::connection setRegionRemovedCallback(const region_remove_signal_t::slot_type& cb);
+    typedef boost::signals2::signal<void(LLViewerRegion*)> region_remove_signal_t;
+    boost::signals2::connection setRegionRemovedCallback(const region_remove_signal_t::slot_type& cb);
 
-	// Returns lists of avatar IDs and their world-space positions within a given distance of a point.
-	// All arguments are optional. Given containers will be emptied and then filled.
-	// Not supplying origin or radius input returns data on all avatars in the known regions.
-	void getAvatars(
-		uuid_vec_t* avatar_ids = nullptr,
-		std::vector<LLVector3d>* positions = nullptr, 
-		const LLVector3d& relative_to = LLVector3d(), F32 radius = FLT_MAX) const;
-	
-	typedef std::map<LLUUID, LLVector3d> pos_map_t;
-	void getAvatars(pos_map_t* map = nullptr,
-					const LLVector3d& relative_to = LLVector3d(),
-					F32 radius = FLT_MAX) const;
+    // Returns lists of avatar IDs and their world-space positions within a given distance of a point.
+    // All arguments are optional. Given containers will be emptied and then filled.
+    // Not supplying origin or radius input returns data on all avatars in the known regions.
+    void getAvatars(
+        uuid_vec_t* avatar_ids = nullptr,
+        std::vector<LLVector3d>* positions = nullptr,
+        const LLVector3d& relative_to = LLVector3d(), F32 radius = FLT_MAX) const;
 
-	// Returns list of avatar ids with region pointer and global position
-	typedef std::pair<LLViewerRegion*, LLVector3d > regionp_gpos_pair_t;
-	typedef std::map<LLUUID, regionp_gpos_pair_t > region_gpos_map_t;
-	void getAvatars(region_gpos_map_t* map = nullptr,
-		const LLVector3d& relative_to = LLVector3d(),
-		F32 radius = FLT_MAX) const;
+    typedef std::map<LLUUID, LLVector3d> pos_map_t;
+    void getAvatars(pos_map_t* map = nullptr,
+                    const LLVector3d& relative_to = LLVector3d(),
+                    F32 radius = FLT_MAX) const;
+
+    // Returns list of avatar ids with region pointer and global position
+    typedef std::pair<LLViewerRegion*, LLVector3d > regionp_gpos_pair_t;
+    typedef std::map<LLUUID, regionp_gpos_pair_t > region_gpos_map_t;
+    void getAvatars(region_gpos_map_t* map = nullptr,
+        const LLVector3d& relative_to = LLVector3d(),
+        F32 radius = FLT_MAX) const;
 
 // [RLVa:KB] - Checked: RLVa-2.0.1
-	bool getAvatar(const LLUUID& idAvatar, LLVector3d& posAvatar) const;
+    bool getAvatar(const LLUUID& idAvatar, LLVector3d& posAvatar) const;
 // [/RLVa:KB]
 
-	// Returns 'true' if the region is in mRegionList,
-	// 'false' if the region has been removed due to region change
-	// or if the circuit to this simulator had been lost.
-	bool isRegionListed(const LLViewerRegion* region) const;
+    // Returns 'true' if the region is in mRegionList,
+    // 'false' if the region has been removed due to region change
+    // or if the circuit to this simulator had been lost.
+    bool isRegionListed(const LLViewerRegion* region) const;
 
     // profile nearby avatars using gPipeline.profileAvatar and update their render times
     // return max GPU time
@@ -219,48 +219,48 @@ private:
     void clearHoleWaterObjects();
     void clearEdgeWaterObjects();
 
-	region_list_t	mActiveRegionList;
-	region_list_t	mRegionList;
-	region_list_t	mVisibleRegionList;
-	region_list_t	mCulledRegionList;
+    region_list_t   mActiveRegionList;
+    region_list_t   mRegionList;
+    region_list_t   mVisibleRegionList;
+    region_list_t   mCulledRegionList;
 
-	region_remove_signal_t mRegionRemovedSignal;
+    region_remove_signal_t mRegionRemovedSignal;
 
-	// Number of points on edge
-	U32 mWidth = 256;
-	U32 mLength = 256;
+    // Number of points on edge
+    U32 mWidth = 256;
+    U32 mLength = 256;
 
-	// meters/point, therefore mWidth * mScale = meters per edge
-	F32 mScale = 1.f;
+    // meters/point, therefore mWidth * mScale = meters per edge
+    F32 mScale = 1.f;
 
-	F32 mWidthInMeters;
-	F32 mRegionMaxHeight;
-	F32 mRegionMinPrimScale;
-	F32 mRegionMaxPrimScale;
-	F32 mRegionMaxPrimScaleNoMesh;
-	F32 mRegionMaxHollowSize;
-	F32 mRegionMinHoleSize;
-	S32 mRegionMaxLinkObjects;
-	bool mRefreshLimits;
+    F32 mWidthInMeters;
+    F32 mRegionMaxHeight;
+    F32 mRegionMinPrimScale;
+    F32 mRegionMaxPrimScale;
+    F32 mRegionMaxPrimScaleNoMesh;
+    F32 mRegionMaxHollowSize;
+    F32 mRegionMinHoleSize;
+    S32 mRegionMaxLinkObjects;
+    bool mRefreshLimits;
 
-	F32 mLandFarClip;					// Far clip distance for land.
-	LLPatchVertexArray		mLandPatch;
-	S32 mLastPacketsIn;
-	S32 mLastPacketsOut;
-	S32 mLastPacketsLost;
-	U32 mNumOfActiveCachedObjects;
-	U64MicrosecondsImplicit mSpaceTimeUSec;
+    F32 mLandFarClip;                   // Far clip distance for land.
+    LLPatchVertexArray      mLandPatch;
+    S32 mLastPacketsIn;
+    S32 mLastPacketsOut;
+    S32 mLastPacketsLost;
+    U32 mNumOfActiveCachedObjects;
+    U64MicrosecondsImplicit mSpaceTimeUSec;
 
-	////////////////////////////
-	//
-	// Data for "Fake" objects
-	//
+    ////////////////////////////
+    //
+    // Data for "Fake" objects
+    //
 
-	std::list<LLPointer<LLVOWater> > mHoleWaterObjects;
+    std::list<LLPointer<LLVOWater> > mHoleWaterObjects;
     static constexpr S32 EDGE_WATER_OBJECTS_COUNT = 8;
     LLPointer<LLVOWater> mEdgeWaterObjects[EDGE_WATER_OBJECTS_COUNT];
 
-	LLPointer<LLViewerTexture> mDefaultWaterTexturep;
+    LLPointer<LLViewerTexture> mDefaultWaterTexturep;
 };
 
 

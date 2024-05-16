@@ -49,156 +49,156 @@ class LLToggleableMenu;
 class LLPanelProfileLegacy final : public LLPanelProfileLegacyTab
 {
 public:
-	LLPanelProfileLegacy();
-	BOOL postBuild() override;
-	void onOpen(const LLSD& key) override;
-	void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
+    LLPanelProfileLegacy();
+    BOOL postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
     void showTab(std::string_view name, bool show) const;
     LLPanel* expandTab(const std::string& name) const;
     LLPanel* getExpandedTab() const;
 
 protected:
-	void openPanel(LLPanel* panel, const LLSD& params);
-	void closePanel(LLPanel* panel);
-	
+    void openPanel(LLPanel* panel, const LLSD& params);
+    void closePanel(LLPanel* panel);
+
 private:
-	~LLPanelProfileLegacy() override;
-	void updateData() override;
-	void processProperties(void* data, EAvatarProcessorType type) override;
-	void resetControls() override;
+    ~LLPanelProfileLegacy() override;
+    void updateData() override;
+    void processProperties(void* data, EAvatarProcessorType type) override;
+    void resetControls() override;
     void resetInterestsControlValues();
-	void setProgress(bool started);
+    void setProgress(bool started);
     void sendAvatarProfileCoro(std::string url, LLSD payload);
-	void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
-	void onCommitAvatarProperties();
-	void onCommitInterest();
-	void onCommitNotes(LLUICtrl* ctrl);
-	void onDoubleClickName();
-	void onCommitRights();
-	void onBackBtnClick();
-	void onCommitModifyObjectsRights(LLUICtrl* ctrl);
-	void onCommitAction(const LLSD& userdata);
-	void onNameChanged();
-	bool isActionEnabled(const LLSD& userdata);
-	bool handleConfirmModifyRightsCallback(const LLSD& notification, const LLSD& response);
-	void closeParentFloater();
-	
-	boost::signals2::connection mAvatarNameCacheConnection;
-	boost::signals2::connection mNameChangedConnection;
-	
-	class ChildStack
-	{
-	public:
-		ChildStack();
-		~ChildStack();
-		void setParent(LLPanel* parent);
-		
-		bool push();
-		bool pop();
-		void preParentReshape();
-		void postParentReshape();
-		
-	private:
-		void dump();
-		
-		typedef LLView::child_list_t view_list_t;
-		typedef std::list<view_list_t> stack_t;
-		
-		stack_t		mStack;
-		stack_t		mSavedStack;
-		LLPanel*	mParent;
-	};
-	ChildStack		mChildStack;
-	
+    void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
+    void onCommitAvatarProperties();
+    void onCommitInterest();
+    void onCommitNotes(LLUICtrl* ctrl);
+    void onDoubleClickName();
+    void onCommitRights();
+    void onBackBtnClick();
+    void onCommitModifyObjectsRights(LLUICtrl* ctrl);
+    void onCommitAction(const LLSD& userdata);
+    void onNameChanged();
+    bool isActionEnabled(const LLSD& userdata);
+    bool handleConfirmModifyRightsCallback(const LLSD& notification, const LLSD& response);
+    void closeParentFloater();
+
+    boost::signals2::connection mAvatarNameCacheConnection;
+    boost::signals2::connection mNameChangedConnection;
+
+    class ChildStack
+    {
+    public:
+        ChildStack();
+        ~ChildStack();
+        void setParent(LLPanel* parent);
+
+        bool push();
+        bool pop();
+        void preParentReshape();
+        void postParentReshape();
+
+    private:
+        void dump();
+
+        typedef LLView::child_list_t view_list_t;
+        typedef std::list<view_list_t> stack_t;
+
+        stack_t     mStack;
+        stack_t     mSavedStack;
+        LLPanel*    mParent;
+    };
+    ChildStack      mChildStack;
+
 public:
-	class LLPanelProfilePicks final : public LLPanelProfileLegacyTab
-	{
-		friend class LLPanelProfileLegacy;
-	public:
-		LLPanelProfilePicks();
-		~LLPanelProfilePicks() override;
-		BOOL postBuild() override;
+    class LLPanelProfilePicks final : public LLPanelProfileLegacyTab
+    {
+        friend class LLPanelProfileLegacy;
+    public:
+        LLPanelProfilePicks();
+        ~LLPanelProfilePicks() override;
+        BOOL postBuild() override;
 
         void createNewPick();
         void createNewClassified();
 
-	protected:
-		void onOpen(const LLSD& key) override;
+    protected:
+        void onOpen(const LLSD& key) override;
 
-	private:
-		void updateData() override;
-		void processProperties(void* data, EAvatarProcessorType type) override;
-		void resetControls() override {};
-		void showAccordion(const std::string& name, bool show);
-		void setProfilePanel(LLPanelProfileLegacy* profile_panel);
-		LLPanelProfileLegacy* getProfilePanel() const;
-		void onPanelPickClose(LLPanel* panel);
-		void onPanelPickSave(LLPanel* panel);
-		void onPanelPickEditSave(LLPanelPickEdit* panel);
-		void onPanelEdit();
-		void onPanelClassifiedEdit();
-		void onPanelPickEdit();
-		void onPlusMenuItemClicked(const LLSD& param);
-		void editClassified(const LLUUID& classified_id);
-		void updateButtons() override;
-		void onClickPlusBtn();
-		void onClickInfo();
-		void onClickTeleport();
-		void onClickShowOnMap();
-		void onClickDelete();
-		void openPickInfo();
-		void openClassifiedInfo();
-		void onPanelClassifiedSave(LLPanelClassifiedEdit* panel);
-		void onPanelClassifiedClose(LLPanelClassifiedInfo* panel);
-		void onDoubleClickClassifiedItem(LLUICtrl* item);
-		LLClassifiedItem* findClassifiedById(const LLUUID& classified_id) const;
-		LLClassifiedItem* getSelectedClassifiedItem() const;
-		LLPickItem* getSelectedPickItem() const;
+    private:
+        void updateData() override;
+        void processProperties(void* data, EAvatarProcessorType type) override;
+        void resetControls() override {};
+        void showAccordion(const std::string& name, bool show);
+        void setProfilePanel(LLPanelProfileLegacy* profile_panel);
+        LLPanelProfileLegacy* getProfilePanel() const;
+        void onPanelPickClose(LLPanel* panel);
+        void onPanelPickSave(LLPanel* panel);
+        void onPanelPickEditSave(LLPanelPickEdit* panel);
+        void onPanelEdit();
+        void onPanelClassifiedEdit();
+        void onPanelPickEdit();
+        void onPlusMenuItemClicked(const LLSD& param);
+        void editClassified(const LLUUID& classified_id);
+        void updateButtons() override;
+        void onClickPlusBtn();
+        void onClickInfo();
+        void onClickTeleport();
+        void onClickShowOnMap();
+        void onClickDelete();
+        void openPickInfo();
+        void openClassifiedInfo();
+        void onPanelClassifiedSave(LLPanelClassifiedEdit* panel);
+        void onPanelClassifiedClose(LLPanelClassifiedInfo* panel);
+        void onDoubleClickClassifiedItem(LLUICtrl* item);
+        LLClassifiedItem* findClassifiedById(const LLUUID& classified_id) const;
+        LLClassifiedItem* getSelectedClassifiedItem() const;
+        LLPickItem* getSelectedPickItem() const;
 
-		void createPickEditPanel();
-		void createClassifiedEditPanel(LLPanelClassifiedEdit** panel);
+        void createPickEditPanel();
+        void createClassifiedEditPanel(LLPanelClassifiedEdit** panel);
 
-		bool isActionEnabled(const LLSD& userdata) const;
-		bool callbackDeletePick(const LLSD& notification, const LLSD& response);
-		bool callbackDeleteClassified(const LLSD& notification, const LLSD& response);
-		bool callbackTeleport(const LLSD& notification, const LLSD& response);
-		virtual void onRightMouseUpItem(LLUICtrl* item, S32 x, S32 y, MASK mask);
-		
-		LLPanelProfileLegacy* mProfilePanel;
-		LLFlatListView* mClassifiedsList;
-		LLFlatListView* mPicksList;
-		LLPanelPickEdit* mPanelPickEdit;
-		LLPanelPickInfo* mPanelPickInfo;
-		LLPanelClassifiedInfo* mPanelClassifiedInfo;
-		LLHandle<LLView> mPopupMenuHandle;
-		LLHandle<LLToggleableMenu> mPlusMenuHandle;
+        bool isActionEnabled(const LLSD& userdata) const;
+        bool callbackDeletePick(const LLSD& notification, const LLSD& response);
+        bool callbackDeleteClassified(const LLSD& notification, const LLSD& response);
+        bool callbackTeleport(const LLSD& notification, const LLSD& response);
+        virtual void onRightMouseUpItem(LLUICtrl* item, S32 x, S32 y, MASK mask);
 
-		// This map is needed for newly created classifieds. The purpose of panel is to
-		// sit in this map and listen to LLPanelClassifiedEdit::processProperties callback.
+        LLPanelProfileLegacy* mProfilePanel;
+        LLFlatListView* mClassifiedsList;
+        LLFlatListView* mPicksList;
+        LLPanelPickEdit* mPanelPickEdit;
+        LLPanelPickInfo* mPanelPickInfo;
+        LLPanelClassifiedInfo* mPanelClassifiedInfo;
+        LLHandle<LLView> mPopupMenuHandle;
+        LLHandle<LLToggleableMenu> mPlusMenuHandle;
+
+        // This map is needed for newly created classifieds. The purpose of panel is to
+        // sit in this map and listen to LLPanelClassifiedEdit::processProperties callback.
         std::map<LLUUID, LLPanelClassifiedEdit*> mEditClassifiedPanels;
-	};
-	
-	class LLPanelProfileGroups final : public LLPanelProfileLegacyTab
-	{
-		friend class LLPanelProfileLegacy;
-	public:
-		LLPanelProfileGroups();
-		BOOL postBuild() override;
+    };
 
-	protected:
-		void onOpen(const LLSD& key) override;
+    class LLPanelProfileGroups final : public LLPanelProfileLegacyTab
+    {
+        friend class LLPanelProfileLegacy;
+    public:
+        LLPanelProfileGroups();
+        BOOL postBuild() override;
 
-	private:
-		void updateData() override;
-		void processProperties(void* data, EAvatarProcessorType type) override;
-		void resetControls() override {};
-		void showGroup(const LLUUID& id);
-		
-		LLTextBase* mGroupsText;
-		LLFlatListView* mGroupsList;
-	};
+    protected:
+        void onOpen(const LLSD& key) override;
 
-	class LLProfileGroupItem final : public LLPanel, public LLGroupMgrObserver
+    private:
+        void updateData() override;
+        void processProperties(void* data, EAvatarProcessorType type) override;
+        void resetControls() override {};
+        void showGroup(const LLUUID& id);
+
+        LLTextBase* mGroupsText;
+        LLFlatListView* mGroupsList;
+    };
+
+    class LLProfileGroupItem final : public LLPanel, public LLGroupMgrObserver
     {
       public:
         LLProfileGroupItem();
@@ -221,10 +221,10 @@ public:
         std::string mGroupName;
         std::string mCharter;
     };
-	
+
 private:
-	LLPanelProfilePicks* mPanelPicks;
-	LLPanelProfileGroups* mPanelGroups;
+    LLPanelProfilePicks* mPanelPicks;
+    LLPanelProfileGroups* mPanelGroups;
 };
 
 #endif //LL_PANELPROFILELEGACY_H

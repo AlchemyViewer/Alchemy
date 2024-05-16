@@ -40,26 +40,26 @@ class LLComboBox;
 class ALPanelAOMini final : public LLPanel
 {
 public:
-	ALPanelAOMini();
-	
-	BOOL postBuild() override;
-	
+    ALPanelAOMini();
+
+    BOOL postBuild() override;
+
 protected:
-	~ALPanelAOMini();
-	
+    ~ALPanelAOMini();
+
 private:
-	void onSelectSet(const LLSD& userdata);
-	void onClickSit(const LLSD& userdata);
-	void onClickNext();
-	void onClickPrevious();
-	void openAOFloater();
-	void updateSetList();
-	void onSetChanged(const std::string& set_name);
-	
-	LLComboBox* mSetList;
-	
-	boost::signals2::connection mReloadCallback;
-	boost::signals2::connection mSetChangedCallback;
+    void onSelectSet(const LLSD& userdata);
+    void onClickSit(const LLSD& userdata);
+    void onClickNext();
+    void onClickPrevious();
+    void openAOFloater();
+    void updateSetList();
+    void onSetChanged(const std::string& set_name);
+
+    LLComboBox* mSetList;
+
+    boost::signals2::connection mReloadCallback;
+    boost::signals2::connection mSetChangedCallback;
 };
 
 #endif // LL_PANELAOMINI_H

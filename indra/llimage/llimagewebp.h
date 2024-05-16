@@ -31,15 +31,15 @@
 class LLImageWebP final : public LLImageFormatted
 {
 protected:
-	~LLImageWebP() = default;
+    ~LLImageWebP() = default;
 
 public:
     LLImageWebP();
 
-	/*virtual*/ std::string getExtension() { return std::string("webp"); }
-	/*virtual*/ bool updateData();
-	/*virtual*/ bool decode(LLImageRaw* raw_image, F32 decode_time);
-	/*virtual*/ bool encode(const LLImageRaw* raw_image, F32 encode_time);
+    /*virtual*/ std::string getExtension() { return std::string("webp"); }
+    /*virtual*/ bool updateData();
+    /*virtual*/ bool decode(LLImageRaw* raw_image, F32 decode_time);
+    /*virtual*/ bool encode(const LLImageRaw* raw_image, F32 encode_time);
 };
 
 #endif

@@ -39,47 +39,47 @@ static const std::string PICK_NAME("pick_name");
 class LLPickItem final : public LLPanel, public LLAvatarPropertiesObserver
 {
 public:
-	LLPickItem();
-	~LLPickItem();
-	BOOL postBuild() override;
+    LLPickItem();
+    ~LLPickItem();
+    BOOL postBuild() override;
 
-	static LLPickItem* create();
-	void init(LLPickData* pick_data);
-	void setPickName(const std::string& name);
-	void setPickDesc(const std::string& descr);
-	void setPickId(const LLUUID& id);
-	void setCreatorId(const LLUUID& id) { mCreatorID = id; };
-	void setSnapshotId(const LLUUID& id) { mSnapshotID = id; };
-	void setNeedData(bool need) { mNeedData = need; };
-	const LLUUID& getPickId() const;
-	const std::string& getPickName() const;
-	const LLUUID& getCreatorId() const;
-	const LLUUID& getSnapshotId() const;
-	const LLVector3d& getPosGlobal() const;
-	const std::string getDescription() const;
-	const std::string& getSimName() const { return mSimName; }
-	const std::string& getUserName() const { return mUserName; }
-	const std::string& getOriginalName() const { return mOriginalName; }
-	const std::string& getPickDesc() const { return mPickDescription; }
-	void processProperties(void* data, EAvatarProcessorType type) override;
-	void update();
+    static LLPickItem* create();
+    void init(LLPickData* pick_data);
+    void setPickName(const std::string& name);
+    void setPickDesc(const std::string& descr);
+    void setPickId(const LLUUID& id);
+    void setCreatorId(const LLUUID& id) { mCreatorID = id; };
+    void setSnapshotId(const LLUUID& id) { mSnapshotID = id; };
+    void setNeedData(bool need) { mNeedData = need; };
+    const LLUUID& getPickId() const;
+    const std::string& getPickName() const;
+    const LLUUID& getCreatorId() const;
+    const LLUUID& getSnapshotId() const;
+    const LLVector3d& getPosGlobal() const;
+    const std::string getDescription() const;
+    const std::string& getSimName() const { return mSimName; }
+    const std::string& getUserName() const { return mUserName; }
+    const std::string& getOriginalName() const { return mOriginalName; }
+    const std::string& getPickDesc() const { return mPickDescription; }
+    void processProperties(void* data, EAvatarProcessorType type) override;
+    void update();
 
-	/** setting on/off background icon to indicate selected state */
-	void setValue(const LLSD& value) override;
+    /** setting on/off background icon to indicate selected state */
+    void setValue(const LLSD& value) override;
 
 protected:
-	LLUUID mPickID;
-	LLUUID mCreatorID;
-	LLUUID mParcelID;
-	LLUUID mSnapshotID;
-	LLVector3d mPosGlobal;
-	bool mNeedData;
+    LLUUID mPickID;
+    LLUUID mCreatorID;
+    LLUUID mParcelID;
+    LLUUID mSnapshotID;
+    LLVector3d mPosGlobal;
+    bool mNeedData;
 
-	std::string mPickName;
-	std::string mUserName;
-	std::string mOriginalName;
-	std::string mPickDescription;
-	std::string mSimName;
+    std::string mPickName;
+    std::string mUserName;
+    std::string mOriginalName;
+    std::string mPickDescription;
+    std::string mSimName;
 };
 
 #endif // LL_PICKITEM_H

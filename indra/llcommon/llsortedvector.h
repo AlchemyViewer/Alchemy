@@ -4,7 +4,7 @@
  * @date   2012-04-08
  * @brief  LLSortedVector class wraps a vector that we maintain in sorted
  *         order so we can perform binary-search lookups.
- * 
+ *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
  * Copyright (c) 2012, Linden Research, Inc.
  * $/LicenseInfo$
@@ -110,15 +110,15 @@ public:
         return const_cast<self*>(this)->find(key);
     }
 
-	//For easy insertion shorthand. Eases std::map => LLSortedVector drop-in replacement.
-	mapped_type& operator[] (const key_type& key)
-	{
-		 return insert(std::make_pair(key,mapped_type())).first->second;
-	}
-	const mapped_type& operator[] (const key_type& key) const
-	{
-		 return insert(std::make_pair(key,mapped_type())).first->second;
-	}
+    //For easy insertion shorthand. Eases std::map => LLSortedVector drop-in replacement.
+    mapped_type& operator[] (const key_type& key)
+    {
+         return insert(std::make_pair(key,mapped_type())).first->second;
+    }
+    const mapped_type& operator[] (const key_type& key) const
+    {
+         return insert(std::make_pair(key,mapped_type())).first->second;
+    }
 
 private:
     // Define our own 'less' comparator so we can specialize without messing

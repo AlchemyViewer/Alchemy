@@ -24,9 +24,9 @@
 // Hides various UI Elements to provide a more cinematic experience
 class ALCinematicMode
 {
-	static bool _enabled;
+    static bool _enabled;
 public:
-	static void toggle();
-	static bool isEnabled() { return _enabled; };
+    static void toggle();
+    static bool isEnabled() { return _enabled; };
 };
 #endif

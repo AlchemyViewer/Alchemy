@@ -42,52 +42,52 @@
 static LLPanelInjector<ALPanelQuickSettings> t_quick_settings("quick_settings");
 
 ALPanelQuickSettings::ALPanelQuickSettings()
-	: LLPanel(),
-	mHoverSlider(nullptr),
-	mHoverSpinner(nullptr)
+    : LLPanel(),
+    mHoverSlider(nullptr),
+    mHoverSpinner(nullptr)
 {
 }
 
 ALPanelQuickSettings::~ALPanelQuickSettings()
 {
-	if (mRegionChangedSlot.connected())
-	{
-		mRegionChangedSlot.disconnect();
-	}
+    if (mRegionChangedSlot.connected())
+    {
+        mRegionChangedSlot.disconnect();
+    }
 }
 
 // virtual
 BOOL ALPanelQuickSettings::postBuild()
 {
-	refresh();
+    refresh();
 
-	// Hover height
-	mHoverSlider = getChild<LLSlider>("hover_slider_bar");
-	mHoverSlider->setMinValue(MIN_HOVER_Z);
-	mHoverSlider->setMaxValue(MAX_HOVER_Z);
-	mHoverSlider->setMouseUpCallback(boost::bind(&ALPanelQuickSettings::onHoverSliderFinalCommit, this));
-	mHoverSlider->setCommitCallback(boost::bind(&ALPanelQuickSettings::onHoverSliderMoved, this, _2));
+    // Hover height
+    mHoverSlider = getChild<LLSlider>("hover_slider_bar");
+    mHoverSlider->setMinValue(MIN_HOVER_Z);
+    mHoverSlider->setMaxValue(MAX_HOVER_Z);
+    mHoverSlider->setMouseUpCallback(boost::bind(&ALPanelQuickSettings::onHoverSliderFinalCommit, this));
+    mHoverSlider->setCommitCallback(boost::bind(&ALPanelQuickSettings::onHoverSliderMoved, this, _2));
 
-	mHoverSpinner = getChild<LLSpinCtrl>("hover_spinner");
-	mHoverSpinner->setMinValue(MIN_HOVER_Z);
-	mHoverSpinner->setMaxValue(MAX_HOVER_Z);
+    mHoverSpinner = getChild<LLSpinCtrl>("hover_spinner");
+    mHoverSpinner->setMinValue(MIN_HOVER_Z);
+    mHoverSpinner->setMaxValue(MAX_HOVER_Z);
 
-	// Initialize slider from pref setting.
-	syncFromPreferenceSetting();
+    // Initialize slider from pref setting.
+    syncFromPreferenceSetting();
 
-	// Update slider on future pref changes.
-	gSavedPerAccountSettings.getControl("AvatarHoverOffsetZ")->getCommitSignal()->connect(boost::bind(&ALPanelQuickSettings::syncFromPreferenceSetting, this));
+    // Update slider on future pref changes.
+    gSavedPerAccountSettings.getControl("AvatarHoverOffsetZ")->getCommitSignal()->connect(boost::bind(&ALPanelQuickSettings::syncFromPreferenceSetting, this));
 
-	updateEditHoverEnabled();
+    updateEditHoverEnabled();
 
-	if (!mRegionChangedSlot.connected())
-	{
-		mRegionChangedSlot = gAgent.addRegionChangedCallback(boost::bind(&ALPanelQuickSettings::onRegionChanged, this));
-	}
-	// Set up based on initial region.
-	onRegionChanged();
+    if (!mRegionChangedSlot.connected())
+    {
+        mRegionChangedSlot = gAgent.addRegionChangedCallback(boost::bind(&ALPanelQuickSettings::onRegionChanged, this));
+    }
+    // Set up based on initial region.
+    onRegionChanged();
 
-	return LLPanel::postBuild();
+    return LLPanel::postBuild();
 }
 
 // virtual
@@ -98,72 +98,72 @@ void ALPanelQuickSettings::refresh()
 
 void ALPanelQuickSettings::syncFromPreferenceSetting()
 {
-	F32 value = gSavedPerAccountSettings.getF32("AvatarHoverOffsetZ");
-	mHoverSlider->setValue(value, FALSE);
-	mHoverSpinner->setValue(value);
+    F32 value = gSavedPerAccountSettings.getF32("AvatarHoverOffsetZ");
+    mHoverSlider->setValue(value, FALSE);
+    mHoverSpinner->setValue(value);
 
-	if (isAgentAvatarValid())
-	{
-		LLVector3 offset(0.0, 0.0, llclamp(value, MIN_HOVER_Z, MAX_HOVER_Z));
-		LL_INFOS("Avatar") << "setting hover from preference setting " << offset[2] << LL_ENDL;
-		gAgentAvatarp->setHoverOffset(offset);
-	}
+    if (isAgentAvatarValid())
+    {
+        LLVector3 offset(0.0, 0.0, llclamp(value, MIN_HOVER_Z, MAX_HOVER_Z));
+        LL_INFOS("Avatar") << "setting hover from preference setting " << offset[2] << LL_ENDL;
+        gAgentAvatarp->setHoverOffset(offset);
+    }
 }
 
 void ALPanelQuickSettings::onHoverSliderMoved(const LLSD& val)
 {
-	if (isAgentAvatarValid())
-	{
-		auto value = static_cast<F32>(val.asReal());
-		LLVector3 offset(0.0, 0.0, llclamp(value, MIN_HOVER_Z, MAX_HOVER_Z));
-		LL_INFOS("Avatar") << "setting hover from slider moved" << offset[2] << LL_ENDL;
-		gAgentAvatarp->setHoverOffset(offset, false);
-	}
+    if (isAgentAvatarValid())
+    {
+        auto value = static_cast<F32>(val.asReal());
+        LLVector3 offset(0.0, 0.0, llclamp(value, MIN_HOVER_Z, MAX_HOVER_Z));
+        LL_INFOS("Avatar") << "setting hover from slider moved" << offset[2] << LL_ENDL;
+        gAgentAvatarp->setHoverOffset(offset, false);
+    }
 }
 
 // Do send-to-the-server work when slider drag completes, or new
 // value entered as text.
 void ALPanelQuickSettings::onHoverSliderFinalCommit()
 {
-	F32 value = mHoverSlider->getValueF32();
-	gSavedPerAccountSettings.setF32("AvatarHoverOffsetZ", value);
-	if (isAgentAvatarValid())
-	{
-		LLVector3 offset(0.0, 0.0, llclamp(value, MIN_HOVER_Z, MAX_HOVER_Z));
-		LL_INFOS("Avatar") << "setting hover from slider final commit " << offset[2] << LL_ENDL;
-		gAgentAvatarp->setHoverOffset(offset, true); // will send update this time.
-	}
+    F32 value = mHoverSlider->getValueF32();
+    gSavedPerAccountSettings.setF32("AvatarHoverOffsetZ", value);
+    if (isAgentAvatarValid())
+    {
+        LLVector3 offset(0.0, 0.0, llclamp(value, MIN_HOVER_Z, MAX_HOVER_Z));
+        LL_INFOS("Avatar") << "setting hover from slider final commit " << offset[2] << LL_ENDL;
+        gAgentAvatarp->setHoverOffset(offset, true); // will send update this time.
+    }
 }
 
 void ALPanelQuickSettings::onRegionChanged()
 {
-	LLViewerRegion *region = gAgent.getRegion();
-	if (region && region->simulatorFeaturesReceived())
-	{
-		updateEditHoverEnabled();
-	}
-	else if (region)
-	{
-		region->setSimulatorFeaturesReceivedCallback(boost::bind(&ALPanelQuickSettings::onSimulatorFeaturesReceived, this, _1));
-	}
+    LLViewerRegion *region = gAgent.getRegion();
+    if (region && region->simulatorFeaturesReceived())
+    {
+        updateEditHoverEnabled();
+    }
+    else if (region)
+    {
+        region->setSimulatorFeaturesReceivedCallback(boost::bind(&ALPanelQuickSettings::onSimulatorFeaturesReceived, this, _1));
+    }
 }
 
 void ALPanelQuickSettings::onSimulatorFeaturesReceived(const LLUUID &region_id)
 {
-	LLViewerRegion *region = gAgent.getRegion();
-	if (region && (region->getRegionID() == region_id))
-	{
-		updateEditHoverEnabled();
-	}
+    LLViewerRegion *region = gAgent.getRegion();
+    if (region && (region->getRegionID() == region_id))
+    {
+        updateEditHoverEnabled();
+    }
 }
 
 void ALPanelQuickSettings::updateEditHoverEnabled()
 {
-	bool enabled = gAgent.getRegion() && gAgent.getRegion()->avatarHoverHeightEnabled();
-	mHoverSlider->setEnabled(enabled);
-	mHoverSpinner->setEnabled(enabled);
-	if (enabled)
-	{
-		syncFromPreferenceSetting();
-	}
+    bool enabled = gAgent.getRegion() && gAgent.getRegion()->avatarHoverHeightEnabled();
+    mHoverSlider->setEnabled(enabled);
+    mHoverSpinner->setEnabled(enabled);
+    if (enabled)
+    {
+        syncFromPreferenceSetting();
+    }
 }

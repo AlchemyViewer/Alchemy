@@ -12,12 +12,12 @@ if (WINDOWS)
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/nghttp2.lib
   )
 elseif (LINUX)
-  target_link_libraries( ll::nghttp2 INTERFACE 
+  target_link_libraries( ll::nghttp2 INTERFACE
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libnghttp2.a
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libnghttp2.a
   )
 else ()
-  target_link_libraries( ll::nghttp2 INTERFACE 
+  target_link_libraries( ll::nghttp2 INTERFACE
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libnghttp2.a
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libnghttp2.a
   )

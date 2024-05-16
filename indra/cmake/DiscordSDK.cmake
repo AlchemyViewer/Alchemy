@@ -21,7 +21,7 @@ endif ()
 if (USE_DISCORD)
     add_library( al::discord-gamesdk INTERFACE IMPORTED )
 
-    use_prebuilt_binary(discord-gamesdk)    
+    use_prebuilt_binary(discord-gamesdk)
     if (WINDOWS)
       target_link_libraries( al::discord-gamesdk INTERFACE
           ${ARCH_PREBUILT_DIRS_RELEASE}/discordgamesdk.lib

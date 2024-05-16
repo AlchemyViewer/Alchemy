@@ -31,102 +31,102 @@
 #include "llviewerobject.h"
 
 class BDFloaterPoseCreator :
-	public LLFloater
+    public LLFloater
 {
-	friend class LLFloaterReg;
+    friend class LLFloaterReg;
 private:
-	BDFloaterPoseCreator(const LLSD& key);
-	/*virtual*/	~BDFloaterPoseCreator();
-	/*virtual*/	BOOL postBuild();
-	/*virtual*/ void draw();
-	/*virtual*/ void onOpen(const LLSD& key);
-	/*virtual*/	void onClose(bool app_quitting);
+    BDFloaterPoseCreator(const LLSD& key);
+    /*virtual*/ ~BDFloaterPoseCreator();
+    /*virtual*/ BOOL postBuild();
+    /*virtual*/ void draw();
+    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ void onClose(bool app_quitting);
 
-	//BD - Posing
-	bool onClickPoseSave(const LLSD& param);
-	void onPoseStart();
-	bool onPoseExport();
-	void onPoseImport();
-	void onPoseStartStop();
-	void onPoseReapply();
-	void onEditAnimationInfo(const LLSD& param);
-	void onInterpolationChange(LLUICtrl* ctrl);
-	void onAnimationDurationCheck();
+    //BD - Posing
+    bool onClickPoseSave(const LLSD& param);
+    void onPoseStart();
+    bool onPoseExport();
+    void onPoseImport();
+    void onPoseStartStop();
+    void onPoseReapply();
+    void onEditAnimationInfo(const LLSD& param);
+    void onInterpolationChange(LLUICtrl* ctrl);
+    void onAnimationDurationCheck();
 
-	//BD - Joints
-	void onJointRefresh();
-	void onJointSet(LLUICtrl* ctrl, const LLSD& param);
-	void onJointPosSet(LLUICtrl* ctrl, const LLSD& param);
-	void onJointScaleSet(LLUICtrl* ctrl, const LLSD& param);
-	void onJointChangeState();
-	void onJointControlsRefresh();
-	void onJointRotPosScaleReset();
-	void onJointRotationReset();
-	void onJointPositionReset();
-	void onJointScaleReset();
-	void onJointRotationRevert();
-	void onCollectDefaults();
-	void onJointContextMenuAction(const LLSD& param);
-	bool onJointContextMenuEnable(const LLSD& param);
-	//BD - Joints - Utilities
-	void onJointPasteRotation();
-	void onJointPastePosition();
-	void onJointPasteScale();
-	void onJointMirror();
-	void onJointSymmetrize();
-	void onJointCopyTransforms();
-	//BD - Keyframes
-	void onKeyframeSelect();
-	void onKeyframeAdd();
-	void onKeyframeAdd(F32 time, LLJoint* joint);
-	void onKeyframeRemove();
-	void onKeyframeTime();
-	void onKeyframeRefresh();
-	void onKeyframesRebuild();
+    //BD - Joints
+    void onJointRefresh();
+    void onJointSet(LLUICtrl* ctrl, const LLSD& param);
+    void onJointPosSet(LLUICtrl* ctrl, const LLSD& param);
+    void onJointScaleSet(LLUICtrl* ctrl, const LLSD& param);
+    void onJointChangeState();
+    void onJointControlsRefresh();
+    void onJointRotPosScaleReset();
+    void onJointRotationReset();
+    void onJointPositionReset();
+    void onJointScaleReset();
+    void onJointRotationRevert();
+    void onCollectDefaults();
+    void onJointContextMenuAction(const LLSD& param);
+    bool onJointContextMenuEnable(const LLSD& param);
+    //BD - Joints - Utilities
+    void onJointPasteRotation();
+    void onJointPastePosition();
+    void onJointPasteScale();
+    void onJointMirror();
+    void onJointSymmetrize();
+    void onJointCopyTransforms();
+    //BD - Keyframes
+    void onKeyframeSelect();
+    void onKeyframeAdd();
+    void onKeyframeAdd(F32 time, LLJoint* joint);
+    void onKeyframeRemove();
+    void onKeyframeTime();
+    void onKeyframeRefresh();
+    void onKeyframesRebuild();
 
-	//BD - Misc
-	LLKeyframeMotion* onReadyTempMotion(std::string filename = "_poser_temp.anim", bool eternal = false);
-	void onCreateTempMotion();
+    //BD - Misc
+    LLKeyframeMotion* onReadyTempMotion(std::string filename = "_poser_temp.anim", bool eternal = false);
+    void onCreateTempMotion();
 
-	//BD - Mirror Bone
-	void toggleMirrorMode(LLUICtrl* ctrl) { mMirrorMode = ctrl->getValue().asBoolean(); }
-	void toggleEasyRotations(LLUICtrl* ctrl) { mEasyRotations = ctrl->getValue().asBoolean(); }
+    //BD - Mirror Bone
+    void toggleMirrorMode(LLUICtrl* ctrl) { mMirrorMode = ctrl->getValue().asBoolean(); }
+    void toggleEasyRotations(LLUICtrl* ctrl) { mEasyRotations = ctrl->getValue().asBoolean(); }
 
-	//BD - Flip Poses
-	void onFlipPose();
+    //BD - Flip Poses
+    void onFlipPose();
 
 private:
-	//BD - Posing
-	LLTabContainer*								mJointTabs;
-	LLTabContainer*								mModifierTabs;
-	LLScrollListCtrl*							mKeyframeScroll;
-	LLScrollListCtrl*							mTimelineScroll;
-	LLHandle<LLToggleableMenu>					mSaveMenuHandle;
+    //BD - Posing
+    LLTabContainer*                             mJointTabs;
+    LLTabContainer*                             mModifierTabs;
+    LLScrollListCtrl*                           mKeyframeScroll;
+    LLScrollListCtrl*                           mTimelineScroll;
+    LLHandle<LLToggleableMenu>                  mSaveMenuHandle;
 
-	std::array<LLUICtrl*, 3>					mRotationSliders;
-	std::array<LLSliderCtrl*, 3>				mPositionSliders;
-	std::array<LLSliderCtrl*, 3>				mScaleSliders;
-	std::array<LLScrollListCtrl*, 3>			mJointScrolls;
+    std::array<LLUICtrl*, 3>                    mRotationSliders;
+    std::array<LLSliderCtrl*, 3>                mPositionSliders;
+    std::array<LLSliderCtrl*, 3>                mScaleSliders;
+    std::array<LLScrollListCtrl*, 3>            mJointScrolls;
 
-	//BD - I really didn't want to do this this way but we have to.
-	//     It's the easiest way doing this.
-	std::map<const std::string, LLQuaternion>	mDefaultRotations;
-	std::map<const std::string, LLVector3>		mDefaultScales;
-	std::map<const std::string, LLVector3>		mDefaultPositions;
+    //BD - I really didn't want to do this this way but we have to.
+    //     It's the easiest way doing this.
+    std::map<const std::string, LLQuaternion>   mDefaultRotations;
+    std::map<const std::string, LLVector3>      mDefaultScales;
+    std::map<const std::string, LLVector3>      mDefaultPositions;
 
-	//BD - Misc
-	bool										mDelayRefresh;
-	bool										mEasyRotations;
-	bool										mAutoDuration;
+    //BD - Misc
+    bool                                        mDelayRefresh;
+    bool                                        mEasyRotations;
+    bool                                        mAutoDuration;
 
-	LLUUID										mTempMotionID;
-	
-	//BD - Mirror Bone
-	bool										mMirrorMode;
+    LLUUID                                      mTempMotionID;
 
-	LLButton*									mStartPosingBtn;
+    //BD - Mirror Bone
+    bool                                        mMirrorMode;
 
-	LLSD										mClipboard;
+    LLButton*                                   mStartPosingBtn;
+
+    LLSD                                        mClipboard;
 };
 
 #endif

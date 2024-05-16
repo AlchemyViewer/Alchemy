@@ -1,4 +1,4 @@
-/** 
+/**
  * @file _thread.h
  * @brief thread type abstraction
  *
@@ -40,57 +40,57 @@ namespace LLCoreInt
 class HttpThread
 {
 private:
-	HttpThread() = delete;					// Not defined
-	void operator=(const HttpThread &) = delete;		// Not defined
+    HttpThread() = delete;                  // Not defined
+    void operator=(const HttpThread &) = delete;        // Not defined
 
-	void run()
-		{ // THREAD CONTEXT
-			LL_PROFILER_SET_THREAD_NAME("HTTP Service");
-			// run the thread function
-			mThreadFunc(this);
-		} // THREAD CONTEXT
+    void run()
+        { // THREAD CONTEXT
+            LL_PROFILER_SET_THREAD_NAME("HTTP Service");
+            // run the thread function
+            mThreadFunc(this);
+        } // THREAD CONTEXT
 
 public:
-	/// Constructs a thread object for concurrent execution but does
-	/// not start running.  Caller receives on refcount on the thread
-	/// instance.  If the thread is started, another will be taken
-	/// out for the exit handler.
-	explicit HttpThread(std::function<void (HttpThread *)> threadFunc)
-		  : mThreadFunc(threadFunc)
-		{
-			// this creates a std thread that will call HttpThread::run on this instance
-			// and pass it the threadfunc callable...
-			std::function<void()> f = std::bind(&HttpThread::run, this);
+    /// Constructs a thread object for concurrent execution but does
+    /// not start running.  Caller receives on refcount on the thread
+    /// instance.  If the thread is started, another will be taken
+    /// out for the exit handler.
+    explicit HttpThread(std::function<void (HttpThread *)> threadFunc)
+          : mThreadFunc(threadFunc)
+        {
+            // this creates a std thread that will call HttpThread::run on this instance
+            // and pass it the threadfunc callable...
+            std::function<void()> f = std::bind(&HttpThread::run, this);
 
-			mThread = std::make_unique<std::thread>(f);
-		}
+            mThread = std::make_unique<std::thread>(f);
+        }
 
-	~HttpThread() = default;
+    ~HttpThread() = default;
 
-	inline void join()
-		{
-			mThread->join();
-		}
+    inline void join()
+        {
+            mThread->join();
+        }
 
-	inline bool joinable() const
-		{
-			return mThread->joinable();
-		}
+    inline bool joinable() const
+        {
+            return mThread->joinable();
+        }
 
-	// A very hostile method to force a thread to quit
-	inline void cancel()
-		{
-			std::thread::native_handle_type thread(mThread->native_handle());
-#if		LL_WINDOWS
-			TerminateThread(thread, 0);
+    // A very hostile method to force a thread to quit
+    inline void cancel()
+        {
+            std::thread::native_handle_type thread(mThread->native_handle());
+#if     LL_WINDOWS
+            TerminateThread(thread, 0);
 #else
-			pthread_cancel(thread);
+            pthread_cancel(thread);
 #endif
-		}
-	
+        }
+
 private:
-	std::function<void(HttpThread *)> mThreadFunc;
-	std::unique_ptr<std::thread> mThread;
+    std::function<void(HttpThread *)> mThreadFunc;
+    std::unique_ptr<std::thread> mThread;
 }; // end class HttpThread
 
 } // end namespace LLCoreInt

@@ -39,20 +39,20 @@
 class ALFloaterLightBox final : public LLFloater
 {
 public:
-	ALFloaterLightBox(const LLSD& key);
+    ALFloaterLightBox(const LLSD& key);
     ~ALFloaterLightBox() override;
-	BOOL postBuild() override;
+    BOOL postBuild() override;
     virtual void draw() override;
 
   private:
-	void onClickResetControlDefault(const LLSD& userdata);
-	void onClickResetGroupDefault(const LLSD& userdata);
+    void onClickResetControlDefault(const LLSD& userdata);
+    void onClickResetGroupDefault(const LLSD& userdata);
     void updateTonemapper();
     void updateCAS();
     void populateLUTCombo();
 
     boost::signals2::scoped_connection mTonemapConnection;
-	boost::signals2::scoped_connection mCASConnection;
+    boost::signals2::scoped_connection mCASConnection;
 };
 
 #endif // AL_FLOATERLIGHTBOX_H

@@ -28,15 +28,15 @@
 //
 struct LLGroupOptions
 {
-	LLGroupOptions(const LLUUID& idGroup);
-	LLGroupOptions(const LLSD& sdData);
-	bool isValid() const;
-	LLSD toLLSD() const;
+    LLGroupOptions(const LLUUID& idGroup);
+    LLGroupOptions(const LLSD& sdData);
+    bool isValid() const;
+    LLSD toLLSD() const;
 
-	LLUUID mGroupId;
-	bool   mReceiveGroupChat = true;
-	bool   mSnoozeOnClose = false;
-	int    mSnoozeDuration = -1;
+    LLUUID mGroupId;
+    bool   mReceiveGroupChat = true;
+    bool   mSnoozeOnClose = false;
+    int    mSnoozeDuration = -1;
 };
 
 // ============================================================================
@@ -44,31 +44,31 @@ struct LLGroupOptions
 //
 class LLGroupOptionsMgr final : public LLSingleton<LLGroupOptionsMgr>
 {
-	/*
-	 * Constructor
-	 */
-	LLSINGLETON(LLGroupOptionsMgr);
+    /*
+     * Constructor
+     */
+    LLSINGLETON(LLGroupOptionsMgr);
 protected:
-	~LLGroupOptionsMgr() override = default;
+    ~LLGroupOptionsMgr() override = default;
 
-	/*
-	 * Member functions
-	 */
+    /*
+     * Member functions
+     */
 public:
-	void            clearOptions(const LLUUID& idGroup);
-	LLGroupOptions* getOptions(const LLUUID& idGroup);
-	void            setOptionReceiveChat(const LLUUID& idGroup, bool fReceiveChat);
-	void            setOptionSnoozeOnClose(const LLUUID& idGroup, bool fSnoozeOnClose);
-	void            setOptionSnoozeDuration(const LLUUID& idGroup, int nSnoozeDuration);
+    void            clearOptions(const LLUUID& idGroup);
+    LLGroupOptions* getOptions(const LLUUID& idGroup);
+    void            setOptionReceiveChat(const LLUUID& idGroup, bool fReceiveChat);
+    void            setOptionSnoozeOnClose(const LLUUID& idGroup, bool fSnoozeOnClose);
+    void            setOptionSnoozeDuration(const LLUUID& idGroup, int nSnoozeDuration);
 private:
-	bool            load();
-	bool            save();
+    bool            load();
+    bool            save();
 
-	/*
-	 * Member variables
-	 */
-	typedef boost::unordered_flat_map<LLUUID, std::unique_ptr<LLGroupOptions>> options_map_t;
-	options_map_t mGroupOptions;
+    /*
+     * Member variables
+     */
+    typedef boost::unordered_flat_map<LLUUID, std::unique_ptr<LLGroupOptions>> options_map_t;
+    options_map_t mGroupOptions;
 };
 
 // ============================================================================

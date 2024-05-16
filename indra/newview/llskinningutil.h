@@ -1,4 +1,4 @@
-/** 
+/**
 * @file   llskinningutil.h
 * @brief  Functions for mesh object skinning
 * @author vir@lindenlab.com
@@ -156,7 +156,7 @@ namespace LLSkinningUtil
 
     // This is used for extracting rotation from a bind shape matrix that
     // already has scales baked in
-	inline LLQuaternion getUnscaledQuaternion(const LLMatrix4& mat4)
+    inline LLQuaternion getUnscaledQuaternion(const LLMatrix4& mat4)
     {
         LLMatrix3 bind_mat = mat4.getMat3();
         for (auto i = 0; i < 3; i++)

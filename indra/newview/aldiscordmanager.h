@@ -33,11 +33,11 @@
 #include "discord.h"
 
 class ALDiscordManager final
-:	public LLSingleton<ALDiscordManager>
+:   public LLSingleton<ALDiscordManager>
 {
     LLSINGLETON(ALDiscordManager);
     ~ALDiscordManager();
-    
+
 public:
     bool initialized() { return mDiscord != nullptr; }
     void init();

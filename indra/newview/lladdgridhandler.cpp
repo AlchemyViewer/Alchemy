@@ -38,10 +38,10 @@ LLAddGridHandler gAddGridHandler;
 
 bool LLAddGridHandler::handle(const LLSD& tokens, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web)
 {
-	if (query_map.has("grid"))
-	{
-		LLGridManager::getInstance()->setGridChoice(query_map["grid"].asString(), false);
-	}
+    if (query_map.has("grid"))
+    {
+        LLGridManager::getInstance()->setGridChoice(query_map["grid"].asString(), false);
+    }
 
-	return true;
+    return true;
 }

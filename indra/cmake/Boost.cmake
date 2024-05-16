@@ -36,7 +36,7 @@ if (WINDOWS)
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_thread-mt-gd${addrsfx}.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_wave-mt${addrsfx}.lib
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_wave-mt-gd${addrsfx}.lib
-	)
+    )
 elseif (LINUX)
   target_link_libraries( ll::boost INTERFACE
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_fiber-mt${addrsfx}.a
@@ -56,7 +56,7 @@ elseif (LINUX)
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_system-mt${addrsfx}.a
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_system-mt-d${addrsfx}.a
         rt
-	)
+    )
 elseif (DARWIN)
   target_link_libraries( ll::boost INTERFACE
         optimized boost_context-mt
@@ -75,7 +75,7 @@ elseif (DARWIN)
         debug boost_thread-mt-d
         optimized boost_wave-mt
         debug boost_wave-mt-d
-	)
+    )
 endif (WINDOWS)
 
 target_compile_definitions( ll::boost INTERFACE BOOST_ALLOW_DEPRECATED_HEADERS=1 BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE=1 BOOST_BIND_GLOBAL_PLACEHOLDERS=1)

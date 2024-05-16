@@ -32,52 +32,52 @@
 
 #include <boost/signals2.hpp>
 
-// static 
+// static
 ALGameMode& ALGameMode::instance()
-{ 
-	static ALGameMode inst; 
-	return inst;
+{
+    static ALGameMode inst;
+    return inst;
 }
 
 void ALGameMode::init()
 {
-		enable(gSavedSettings.getBool("AlchemyGameModeEnable"));
-		gSavedSettings.getControl("AlchemyGameModeEnable")->getCommitSignal()->connect(boost::bind(&ALGameMode::onToggleGameModeControl, this));
+        enable(gSavedSettings.getBool("AlchemyGameModeEnable"));
+        gSavedSettings.getControl("AlchemyGameModeEnable")->getCommitSignal()->connect(boost::bind(&ALGameMode::onToggleGameModeControl, this));
 }
 
 // static
 void ALGameMode::shutdown()
 {
-	gamemode_request_end();
+    gamemode_request_end();
 }
 
 void ALGameMode::onToggleGameModeControl()
 {
-	enable(gSavedSettings.getBool("AlchemyGameModeEnable"));
+    enable(gSavedSettings.getBool("AlchemyGameModeEnable"));
 }
 
 void ALGameMode::enable(const bool enable)
 {
-	if (enable && getenv("DISABLE_GAMEMODE") != NULL)
-	{
-		LL_WARNS() << "The DISABLE_GAMEMODE environment variable has been set and therefore GameMode will not run." << LL_ENDL;
-	}
-	else if (mEnabled != enable)
-	{
-		mEnabled = enable;
-		enable ? gamemode_request_start() : gamemode_request_end();
-		if (gamemode_query_status() > 0)
-		{
-			LL_INFOS() << "GameMode enabled successfully" << LL_ENDL;
-		}
-		else
-		{
-			LL_INFOS() << "GameMode disabled." << LL_ENDL;
-			std::string errstr = gamemode_error_string();
-			if (errstr.length() > 0)
-			{
-				LL_WARNS() << "Gamemode returned the following error: '" << gamemode_error_string() << "'" << LL_ENDL;
-			}
-		}
-	}
+    if (enable && getenv("DISABLE_GAMEMODE") != NULL)
+    {
+        LL_WARNS() << "The DISABLE_GAMEMODE environment variable has been set and therefore GameMode will not run." << LL_ENDL;
+    }
+    else if (mEnabled != enable)
+    {
+        mEnabled = enable;
+        enable ? gamemode_request_start() : gamemode_request_end();
+        if (gamemode_query_status() > 0)
+        {
+            LL_INFOS() << "GameMode enabled successfully" << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS() << "GameMode disabled." << LL_ENDL;
+            std::string errstr = gamemode_error_string();
+            if (errstr.length() > 0)
+            {
+                LL_WARNS() << "Gamemode returned the following error: '" << gamemode_error_string() << "'" << LL_ENDL;
+            }
+        }
+    }
 }

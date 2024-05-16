@@ -45,69 +45,69 @@
 static LLPanelInjector<LLPanelSearchPlaces> t_panel_search_places("panel_search_places");
 
 LLPanelSearchPlaces::LLPanelSearchPlaces()
-:	LLPanelSearch()
+:   LLPanelSearch()
 {
-	mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchPlaces::onCommitSearch, this, _1));
+    mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchPlaces::onCommitSearch, this, _1));
 }
 
 BOOL LLPanelSearchPlaces::postBuild()
 {
-	mPlacesCategory = getChild<LLComboBox>("places_category");
-	mPlacesCategory->add("All categories", LLSD("any"));
-	mPlacesCategory->addSeparator();
-	for (size_t category = LLParcel::C_LINDEN; category < LLParcel::C_COUNT; ++category)
-	{
-		LLParcel::ECategory eCategory = static_cast<LLParcel::ECategory>(category);
-		mPlacesCategory->add(LLParcel::getCategoryUIString(eCategory), LLParcel::getCategoryString(eCategory));
-	}
-	
-	mSearchEditor = getChild<LLSearchEditor>("search_bar");
-	//mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchPlaces::onCommitSearch, this, _1));
-	
-	return TRUE;
+    mPlacesCategory = getChild<LLComboBox>("places_category");
+    mPlacesCategory->add("All categories", LLSD("any"));
+    mPlacesCategory->addSeparator();
+    for (size_t category = LLParcel::C_LINDEN; category < LLParcel::C_COUNT; ++category)
+    {
+        LLParcel::ECategory eCategory = static_cast<LLParcel::ECategory>(category);
+        mPlacesCategory->add(LLParcel::getCategoryUIString(eCategory), LLParcel::getCategoryString(eCategory));
+    }
+
+    mSearchEditor = getChild<LLSearchEditor>("search_bar");
+    //mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchPlaces::onCommitSearch, this, _1));
+
+    return TRUE;
 }
 
 void LLPanelSearchPlaces::onCommitSearch(LLUICtrl* ctrl)
 {
-	LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
-	if (pSearchEditor)
-	{
-		std::string text = pSearchEditor->getText();
-		LLStringUtil::trim(text);
-		if (text.length() <= MIN_SEARCH_STRING_SIZE)
-			LLSearchHistory::getInstance()->addEntry(text);
-	}
-	search();
+    LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
+    if (pSearchEditor)
+    {
+        std::string text = pSearchEditor->getText();
+        LLStringUtil::trim(text);
+        if (text.length() <= MIN_SEARCH_STRING_SIZE)
+            LLSearchHistory::getInstance()->addEntry(text);
+    }
+    search();
 }
 
 void LLPanelSearchPlaces::search()
 {
-	LLDirQuery query;
-	query.type = SE_PLACES;
-	query.results_per_page = 100;
-	query.text = mSearchEditor->getText();
-	LLStringUtil::trim(query.text);
-	
-	const std::string& category_string = mPlacesCategory->getSelectedValue();
-	query.category_char = category_string == "any" ? LLParcel::C_ANY : LLParcel::getCategoryFromString(category_string);
-	
-	static LLUICachedControl<bool> inc_pg("ShowPGSims", true);
-	static LLUICachedControl<bool> inc_mature("ShowMatureSims", false);
-	static LLUICachedControl<bool> inc_adult("ShowAdultSims", false);
-	if (!(inc_pg || inc_mature || inc_adult))
-	{
-		LLNotificationsUtil::add("NoContentToSearch");
-		return;
-	}
-	if (gAgent.wantsPGOnly())
-		query.scope |= DFQ_PG_SIMS_ONLY;
-	if (inc_pg)
-		query.scope |= DFQ_INC_PG;
-	if (inc_mature && gAgent.canAccessMature())
-		query.scope |= DFQ_INC_MATURE;
-	if (inc_adult && gAgent.canAccessAdult())
-		query.scope |= DFQ_INC_ADULT;
-	query.scope |= DFQ_DWELL_SORT;
-	
-	mFloater->queryDirectory(query, true);
+    LLDirQuery query;
+    query.type = SE_PLACES;
+    query.results_per_page = 100;
+    query.text = mSearchEditor->getText();
+    LLStringUtil::trim(query.text);
+
+    const std::string& category_string = mPlacesCategory->getSelectedValue();
+    query.category_char = category_string == "any" ? LLParcel::C_ANY : LLParcel::getCategoryFromString(category_string);
+
+    static LLUICachedControl<bool> inc_pg("ShowPGSims", true);
+    static LLUICachedControl<bool> inc_mature("ShowMatureSims", false);
+    static LLUICachedControl<bool> inc_adult("ShowAdultSims", false);
+    if (!(inc_pg || inc_mature || inc_adult))
+    {
+        LLNotificationsUtil::add("NoContentToSearch");
+        return;
+    }
+    if (gAgent.wantsPGOnly())
+        query.scope |= DFQ_PG_SIMS_ONLY;
+    if (inc_pg)
+        query.scope |= DFQ_INC_PG;
+    if (inc_mature && gAgent.canAccessMature())
+        query.scope |= DFQ_INC_MATURE;
+    if (inc_adult && gAgent.canAccessAdult())
+        query.scope |= DFQ_INC_ADULT;
+    query.scope |= DFQ_DWELL_SORT;
+
+    mFloater->queryDirectory(query, true);
 }

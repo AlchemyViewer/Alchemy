@@ -35,13 +35,13 @@
  */
 class ALPanelRadarAlert final : public LLPanelTipToast
 {
-	// disallow instantiation of this class
+    // disallow instantiation of this class
 private:
-	// grant privileges to instantiate this class to LLToastPanel
-	friend class LLToastPanel;
-	
-	ALPanelRadarAlert(const LLNotificationPtr& notification);
-	virtual ~ALPanelRadarAlert() = default;
+    // grant privileges to instantiate this class to LLToastPanel
+    friend class LLToastPanel;
+
+    ALPanelRadarAlert(const LLNotificationPtr& notification);
+    virtual ~ALPanelRadarAlert() = default;
 };
 
 #endif // LL_PANELRADARALERT_H

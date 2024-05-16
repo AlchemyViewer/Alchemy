@@ -33,27 +33,27 @@ bool ALCinematicMode::_enabled = false;
 // static
 void ALCinematicMode::toggle()
 {
-	if (gAgentCamera.getCameraMode() != CAMERA_MODE_MOUSELOOK)
-	{
-		LL_INFOS() << "Toggling Cinematic Mode" << LL_ENDL;
-		// Ordered to have a nice effect
-		if (_enabled)
-		{
-			// Showing elements again
-			LLChicletBar::getInstance()->setVisible(TRUE);
-			LLPanelStandStopFlying::getInstance()->setVisible(TRUE); // FIXME: that doesn't always work
-			LLNavigationBar::getInstance()->setVisible(TRUE);
-			gViewerWindow->setUIVisibility(TRUE);
-		}
-		else
-		{
-			// Hiding Elements
-			gViewerWindow->setUIVisibility(FALSE);
-			LLNavigationBar::getInstance()->setVisible(FALSE);
-			LLPanelStandStopFlying::getInstance()->setVisible(FALSE); // FIXME: that doesn't always work
-			LLChicletBar::getInstance()->setVisible(FALSE);
-		}
-		_enabled = !_enabled;
-		LLHUDText::refreshAllObjectText();
-	}
+    if (gAgentCamera.getCameraMode() != CAMERA_MODE_MOUSELOOK)
+    {
+        LL_INFOS() << "Toggling Cinematic Mode" << LL_ENDL;
+        // Ordered to have a nice effect
+        if (_enabled)
+        {
+            // Showing elements again
+            LLChicletBar::getInstance()->setVisible(TRUE);
+            LLPanelStandStopFlying::getInstance()->setVisible(TRUE); // FIXME: that doesn't always work
+            LLNavigationBar::getInstance()->setVisible(TRUE);
+            gViewerWindow->setUIVisibility(TRUE);
+        }
+        else
+        {
+            // Hiding Elements
+            gViewerWindow->setUIVisibility(FALSE);
+            LLNavigationBar::getInstance()->setVisible(FALSE);
+            LLPanelStandStopFlying::getInstance()->setVisible(FALSE); // FIXME: that doesn't always work
+            LLChicletBar::getInstance()->setVisible(FALSE);
+        }
+        _enabled = !_enabled;
+        LLHUDText::refreshAllObjectText();
+    }
 }

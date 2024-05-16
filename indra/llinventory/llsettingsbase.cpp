@@ -205,7 +205,7 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
             }
             else
             {
-                // The other or defaults does not contain this setting, keep the original value 
+                // The other or defaults does not contain this setting, keep the original value
                 // TODO: Should I blend this out instead?
                 newSettings[key_name] = value;
                 continue;
@@ -265,7 +265,7 @@ LLSD LLSettingsBase::interpolateSDMap(const LLSD &settings, const LLSD &other, c
 
         if (settings_map.find(llsd_pair.first) == settingsEnd)
             continue;
-    
+
         newSettings[llsd_pair.first] = llsd_pair.second;
     }
 
@@ -289,7 +289,7 @@ LLSD LLSettingsBase::interpolateSDValue(const std::string& key_name, const LLSD 
     switch (setting_type)
     {
         case LLSD::TypeInteger:
-            // lerp between the two values rounding the result to the nearest integer. 
+            // lerp between the two values rounding the result to the nearest integer.
             new_value = LLSD::Integer(ll_round(ll_lerp(value.asReal(), other_value.asReal(), mix)));
             break;
         case LLSD::TypeReal:
@@ -313,8 +313,8 @@ LLSD LLSettingsBase::interpolateSDValue(const std::string& key_name, const LLSD 
                 new_array = q.getValue();
             }
             else
-            {   // TODO: We could expand this to inspect the type and do a deep lerp based on type. 
-                // for now assume a heterogeneous array of reals. 
+            {   // TODO: We could expand this to inspect the type and do a deep lerp based on type.
+                // for now assume a heterogeneous array of reals.
                 size_t len = std::max(value.size(), other_value.size());
 
                 for (size_t i = 0; i < len; ++i)
@@ -361,7 +361,7 @@ const LLSettingsBase::stringset_t& LLSettingsBase::getSkipInterpolateKeys() cons
 }
 
 const LLSettingsBase::stringset_t& LLSettingsBase::getSlerpKeys() const
-{ 
+{
     static stringset_t slerpKeys;
     return slerpKeys;
 }
@@ -388,7 +388,7 @@ LLSD LLSettingsBase::cloneSettings() const
 
 size_t LLSettingsBase::getHash() const
 {   // get a shallow copy of the LLSD filtering out values to not include in the hash
-    LLSD hash_settings = llsd_shallow(getSettings(), 
+    LLSD hash_settings = llsd_shallow(getSettings(),
         LLSDMap(SETTING_NAME, false)(SETTING_ID, false)(SETTING_HASH, false)("*", true));
 
     boost::hash<LLSD> hasher;
@@ -432,7 +432,7 @@ LLSD LLSettingsBase::settingValidation(LLSD &settings, const validation_list_t &
     LLSD              errors(LLSD::emptyArray());
     LLSD              warnings(LLSD::emptyArray());
     U32               flags(0);
-    
+
     if (partial)
         flags |= Validator::VALIDATION_PARTIAL;
 
@@ -541,8 +541,8 @@ bool LLSettingsBase::Validator::verify(LLSD &data, U32 flags) const
     if (!data.has(mName) || (data.has(mName) && data[mName].isUndefined()))
     {
         if ((flags & VALIDATION_PARTIAL) != 0) // we are doing a partial validation.  Do no attempt to set a default if missing (or fail even if required)
-            return true;    
-        
+            return true;
+
         if (!mDefault.isUndefined())
         {
             data[mName] = mDefault;
@@ -632,7 +632,7 @@ bool LLSettingsBase::Validator::verifyVectorMinMax(LLSD &value, U32, LLSD minval
                 value[index] = minvals[index].asReal();
             }
         }
-        if (maxvals[index].asString() != "*") 
+        if (maxvals[index].asString() != "*")
         {
             if (maxvals[index].asReal() < value[index].asReal())
             {

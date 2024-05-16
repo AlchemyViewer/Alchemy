@@ -39,35 +39,35 @@
 
 static LLPanelInjector<ALPanelAOMini> t_ao_mini("ao_mini");
 
-ALPanelAOMini::ALPanelAOMini() 
-	: LLPanel()
-	, mSetList(nullptr)
+ALPanelAOMini::ALPanelAOMini()
+    : LLPanel()
+    , mSetList(nullptr)
 {
-	mCommitCallbackRegistrar.add("AO.SitOverride", boost::bind(&ALPanelAOMini::onClickSit, this, _2));
-	mCommitCallbackRegistrar.add("AO.NextAnim", boost::bind(&ALPanelAOMini::onClickNext, this));
-	mCommitCallbackRegistrar.add("AO.PrevAnim", boost::bind(&ALPanelAOMini::onClickPrevious, this));
-	mCommitCallbackRegistrar.add("AO.OpenFloater", boost::bind(&ALPanelAOMini::openAOFloater, this));
-	
-	//mEnableCallbackRegistrar.add("AO.EnableSet", boost::bind());
-	//mEnableCallbackRegistrar.add("AO.EnableState", boost::bind());
+    mCommitCallbackRegistrar.add("AO.SitOverride", boost::bind(&ALPanelAOMini::onClickSit, this, _2));
+    mCommitCallbackRegistrar.add("AO.NextAnim", boost::bind(&ALPanelAOMini::onClickNext, this));
+    mCommitCallbackRegistrar.add("AO.PrevAnim", boost::bind(&ALPanelAOMini::onClickPrevious, this));
+    mCommitCallbackRegistrar.add("AO.OpenFloater", boost::bind(&ALPanelAOMini::openAOFloater, this));
+
+    //mEnableCallbackRegistrar.add("AO.EnableSet", boost::bind());
+    //mEnableCallbackRegistrar.add("AO.EnableState", boost::bind());
 }
 
 ALPanelAOMini::~ALPanelAOMini()
 {
-	if (mReloadCallback.connected())
-		mReloadCallback.disconnect();
-	if (mSetChangedCallback.connected())
-		mSetChangedCallback.disconnect();
+    if (mReloadCallback.connected())
+        mReloadCallback.disconnect();
+    if (mSetChangedCallback.connected())
+        mSetChangedCallback.disconnect();
 }
 
 BOOL ALPanelAOMini::postBuild()
 {
-	mSetList = getChild<LLComboBox>("set_list");
-	mSetList->setCommitCallback(boost::bind(&ALPanelAOMini::onSelectSet, this, _2));
-	mReloadCallback = AOEngine::instance().setReloadCallback(boost::bind(&ALPanelAOMini::updateSetList, this));
-	mSetChangedCallback = AOEngine::instance().setSetChangedCallback(boost::bind(&ALPanelAOMini::onSetChanged, this, _1));
-	
-	return LLPanel::postBuild();
+    mSetList = getChild<LLComboBox>("set_list");
+    mSetList->setCommitCallback(boost::bind(&ALPanelAOMini::onSelectSet, this, _2));
+    mReloadCallback = AOEngine::instance().setReloadCallback(boost::bind(&ALPanelAOMini::updateSetList, this));
+    mSetChangedCallback = AOEngine::instance().setSetChangedCallback(boost::bind(&ALPanelAOMini::onSetChanged, this, _1));
+
+    return LLPanel::postBuild();
 }
 
 /////////////////////////////////////
@@ -75,28 +75,28 @@ BOOL ALPanelAOMini::postBuild()
 
 void ALPanelAOMini::updateSetList()
 {
-	const std::vector<AOSet*>& list = AOEngine::getInstance()->getSetList();
-	if (list.empty())
-	{
-		return;
-	}
-	mSetList->removeall();
-	for (AOSet* set : list)
-	{
-		mSetList->add(set->getName(), &set, ADD_BOTTOM, true);
-	}
-	const std::string& current_set = AOEngine::instance().getCurrentSetName();
-	mSetList->selectByValue(LLSD(current_set));
+    const std::vector<AOSet*>& list = AOEngine::getInstance()->getSetList();
+    if (list.empty())
+    {
+        return;
+    }
+    mSetList->removeall();
+    for (AOSet* set : list)
+    {
+        mSetList->add(set->getName(), &set, ADD_BOTTOM, true);
+    }
+    const std::string& current_set = AOEngine::instance().getCurrentSetName();
+    mSetList->selectByValue(LLSD(current_set));
 }
 
 void ALPanelAOMini::onSetChanged(const std::string& set_name)
 {
-	LLSD curr_selected_set = mSetList->getSelectedValue();
+    LLSD curr_selected_set = mSetList->getSelectedValue();
 
-	if (!set_name.empty() && set_name != curr_selected_set.asString())
-	{
-		mSetList->selectByValue(LLSD(set_name));
-	}
+    if (!set_name.empty() && set_name != curr_selected_set.asString())
+    {
+        mSetList->selectByValue(LLSD(set_name));
+    }
 }
 
 ////////////////////////////////////
@@ -104,34 +104,34 @@ void ALPanelAOMini::onSetChanged(const std::string& set_name)
 
 void ALPanelAOMini::onSelectSet(const LLSD& userdata)
 {
-	AOSet* selected_set = AOEngine::instance().getSetByName(userdata.asString());
-	if (selected_set)
-	{
-		AOEngine::instance().selectSet(selected_set);
-	}
+    AOSet* selected_set = AOEngine::instance().getSetByName(userdata.asString());
+    if (selected_set)
+    {
+        AOEngine::instance().selectSet(selected_set);
+    }
 }
 
 void ALPanelAOMini::onClickSit(const LLSD& userdata)
 {
-	const std::string& current_set = AOEngine::instance().getCurrentSetName();
-	AOSet* selected_set = AOEngine::instance().getSetByName(current_set);
-	if (selected_set)
-	{
-		AOEngine::instance().setOverrideSits(selected_set, userdata.asBoolean());
-	}
+    const std::string& current_set = AOEngine::instance().getCurrentSetName();
+    AOSet* selected_set = AOEngine::instance().getSetByName(current_set);
+    if (selected_set)
+    {
+        AOEngine::instance().setOverrideSits(selected_set, userdata.asBoolean());
+    }
 }
 
 void ALPanelAOMini::onClickNext()
 {
-	AOEngine::instance().cycle(AOEngine::CycleNext);
+    AOEngine::instance().cycle(AOEngine::CycleNext);
 }
 
 void ALPanelAOMini::onClickPrevious()
 {
-	AOEngine::instance().cycle(AOEngine::CyclePrevious);
+    AOEngine::instance().cycle(AOEngine::CyclePrevious);
 }
 
 void ALPanelAOMini::openAOFloater()
 {
-	LLFloaterReg::showInstance("ao");
+    LLFloaterReg::showInstance("ao");
 }

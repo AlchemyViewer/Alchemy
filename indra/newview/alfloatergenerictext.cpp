@@ -34,28 +34,28 @@
 #include "lltexteditor.h"
 
 LLFloaterGenericText::LLFloaterGenericText(const LLSD& key)
-:	LLFloater(key)
+:   LLFloater(key)
 {
-	mTitle = key["title"].asString();
-	mContents = key["data"].asString();
-	
-	mCommitCallbackRegistrar.add("GenericText.Close", boost::bind(&LLFloaterGenericText::onClickClose, this));
-	mCommitCallbackRegistrar.add("GenericText.Copy", boost::bind(&LLFloaterGenericText::onClickCopy, this));
+    mTitle = key["title"].asString();
+    mContents = key["data"].asString();
+
+    mCommitCallbackRegistrar.add("GenericText.Close", boost::bind(&LLFloaterGenericText::onClickClose, this));
+    mCommitCallbackRegistrar.add("GenericText.Copy", boost::bind(&LLFloaterGenericText::onClickCopy, this));
 }
 
 BOOL LLFloaterGenericText::postBuild()
 {
-	setTitle(mTitle);
-	getChild<LLTextEditor>("payload")->setText(mContents);
-	return LLFloater::postBuild();
+    setTitle(mTitle);
+    getChild<LLTextEditor>("payload")->setText(mContents);
+    return LLFloater::postBuild();
 }
 
 void LLFloaterGenericText::onClickClose()
 {
-	closeFloater();
+    closeFloater();
 }
 
 void LLFloaterGenericText::onClickCopy()
 {
-	LLClipboard::instance().copyToClipboard(utf8str_to_wstring(mContents, mContents.length()), 0, mContents.length());
+    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(mContents, mContents.length()), 0, mContents.length());
 }

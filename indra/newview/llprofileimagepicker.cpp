@@ -36,7 +36,7 @@
 
 static constexpr std::string_view PROFILE_IMAGE_UPLOAD_CAP("UploadAgentProfileImage");
 
-static void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::string path_to_image, 
+static void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::string path_to_image,
     LLProfileImagePicker::ugly_picker_cb_t cb);
 static LLUUID post_profile_image(std::string cap_url, const LLSD& first_data, std::string path_to_image);
 static void setImageUploading(LLPanel* panel, bool loading);

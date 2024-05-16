@@ -82,7 +82,7 @@ class LLDiskCache final :
         LLDiskCache();
         virtual ~LLDiskCache() = default;
 public:
-        void init(                    
+        void init(
             /**
              * The meta path of the cache e.g LL_PATH_CACHE
              */

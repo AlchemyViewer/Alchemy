@@ -19,7 +19,7 @@ if (WINDOWS)
 elseif(DARWIN)
     target_link_libraries( ll::libxml2 INTERFACE xml2 iconv)
 else()
-    target_link_libraries( ll::libxml2 INTERFACE 
+    target_link_libraries( ll::libxml2 INTERFACE
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libxml2.a
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libxml2.a
     )

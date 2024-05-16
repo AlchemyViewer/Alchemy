@@ -36,7 +36,7 @@ if(WINDOWS)
     # Does this maybe matter on some LL buildserver? Otherwise this and the snippet using slvoice_src_dir
     # can all go
     if( ARCH_PREBUILT_BIN_DIRS_RELEASE )
-        set(slvoice_src_dir "${ARCH_PREBUILT_BIN_DIRS_RELEASE}")    
+        set(slvoice_src_dir "${ARCH_PREBUILT_BIN_DIRS_RELEASE}")
     endif()
     set(slvoice_files SLVoice.exe )
     if (ADDRESS_SIZE EQUAL 64)
@@ -52,7 +52,7 @@ if(WINDOWS)
     endif (ADDRESS_SIZE EQUAL 64)
 
     #*******************************
-    # Misc shared libs 
+    # Misc shared libs
 
     set(addrsfx "-x${ADDRESS_SIZE}")
 

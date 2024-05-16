@@ -41,37 +41,37 @@
 class LLXyzzyHandler : public LLCommandHandler
 {
 public:
-	LLXyzzyHandler() : LLCommandHandler("xyzzy", UNTRUSTED_THROTTLE) {}
-	
-	bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web) override
-	{
-		LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
-		if (nearby_chat)
-		{
-			LLChat chat(LLTrans::getString("NothingHappens"));
-			chat.mSourceType = CHAT_SOURCE_SYSTEM;
-			nearby_chat->addMessage(chat);
-		}
-		return true;
-	}
+    LLXyzzyHandler() : LLCommandHandler("xyzzy", UNTRUSTED_THROTTLE) {}
+
+    bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web) override
+    {
+        LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
+        if (nearby_chat)
+        {
+            LLChat chat(LLTrans::getString("NothingHappens"));
+            chat.mSourceType = CHAT_SOURCE_SYSTEM;
+            nearby_chat->addMessage(chat);
+        }
+        return true;
+    }
 };
 
 class LLDyeMenuHandler : public LLCommandHandler
 {
 public:
-	LLDyeMenuHandler() : LLCommandHandler("dyemenu", UNTRUSTED_THROTTLE) {}
-	
-	bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web) override
-	{
-		if (params.size() != 1)
-			return false;
-		
-		LLColor4 color = LLUIColorTable::instance().getColor(params[0].asString(),
-															 gMenuBarView->getBackgroundColor().get());
-		gMenuBarView->setBackgroundColor(color);
-		gStatusBar->setBackgroundColor(color);
-		return true;
-	}
+    LLDyeMenuHandler() : LLCommandHandler("dyemenu", UNTRUSTED_THROTTLE) {}
+
+    bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web) override
+    {
+        if (params.size() != 1)
+            return false;
+
+        LLColor4 color = LLUIColorTable::instance().getColor(params[0].asString(),
+                                                             gMenuBarView->getBackgroundColor().get());
+        gMenuBarView->setBackgroundColor(color);
+        gStatusBar->setBackgroundColor(color);
+        return true;
+    }
 };
 
 LLXyzzyHandler gXyzzyHandler;

@@ -1,25 +1,25 @@
-/** 
+/**
  * @file llmutex.h
  * @brief Base classes for mutex and condition handling.
  *
  * $LicenseInfo:firstyear=2004&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2012, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -48,111 +48,111 @@
 class LL_COMMON_API LLMutex
 {
 public:
-	LLMutex() = default;
+    LLMutex() = default;
 
-	void lock()		// blocks
-	{
-		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-		mMutex.lock();
-	}
+    void lock()     // blocks
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+        mMutex.lock();
+    }
 
-	bool try_lock()		// non-blocking, returns true if lock held.
-	{
-		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-		return mMutex.try_lock();
-	}
+    bool try_lock()     // non-blocking, returns true if lock held.
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+        return mMutex.try_lock();
+    }
 
-	void unlock()		// undefined behavior when called on mutex not being held
-	{
-		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-		mMutex.unlock();
-	}
+    void unlock()       // undefined behavior when called on mutex not being held
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+        mMutex.unlock();
+    }
 
-	bool isLocked() 	// non-blocking, but does do a lock/unlock so not free
-	{
-		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-		if (!mMutex.try_lock())
-		{
-			return true;
-		}
-		else
-		{
-			mMutex.unlock();
-			return false;
-		}
-	}
+    bool isLocked()     // non-blocking, but does do a lock/unlock so not free
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+        if (!mMutex.try_lock())
+        {
+            return true;
+        }
+        else
+        {
+            mMutex.unlock();
+            return false;
+        }
+    }
 
 protected:
-	std::recursive_mutex	mMutex;
+    std::recursive_mutex    mMutex;
 };
 
 // Actually a condition/mutex pair (since each condition needs to be associated with a mutex).
 class LL_COMMON_API LLCondition final : public LLMutex
 {
 public:
-	LLCondition() :
-		LLMutex()
-	{
-	}
-	
-	void wait()		// blocks
-	{
-		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-		std::unique_lock<std::recursive_mutex> lock(mMutex);
-		mCond.wait(lock);
-	}
+    LLCondition() :
+        LLMutex()
+    {
+    }
 
-	void signal()
-	{
-		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-		mCond.notify_one();
-	}
+    void wait()     // blocks
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+        std::unique_lock<std::recursive_mutex> lock(mMutex);
+        mCond.wait(lock);
+    }
 
-	void broadcast()
-	{
-		LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
-		mCond.notify_all();
-	}
-	
+    void signal()
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+        mCond.notify_one();
+    }
+
+    void broadcast()
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+        mCond.notify_all();
+    }
+
 protected:
-	std::condition_variable_any mCond;
+    std::condition_variable_any mCond;
 };
 
 class LLMutexLock
 {
 public:
-	LLMutexLock(LLMutex* mutex)
-		: mMutex(mutex)
-		, mLocked(false)
-	{
-		lock();
-	}
+    LLMutexLock(LLMutex* mutex)
+        : mMutex(mutex)
+        , mLocked(false)
+    {
+        lock();
+    }
 
-	~LLMutexLock()
-	{
-		unlock();
-	}
+    ~LLMutexLock()
+    {
+        unlock();
+    }
 
-	void lock()
-	{
-		if (mMutex && !mLocked)
-		{
-			mMutex->lock();
-			mLocked = true;
-		}
-	}
+    void lock()
+    {
+        if (mMutex && !mLocked)
+        {
+            mMutex->lock();
+            mLocked = true;
+        }
+    }
 
-	void unlock()
-	{
-		if (mMutex && mLocked)
-		{
-			mLocked = false;
-			mMutex->unlock();
-		}
-	}
+    void unlock()
+    {
+        if (mMutex && mLocked)
+        {
+            mLocked = false;
+            mMutex->unlock();
+        }
+    }
 private:
-	LLMutex* mMutex;
-	bool		mLocked;
+    LLMutex* mMutex;
+    bool        mLocked;
 };
 
 //============================================================================
@@ -168,66 +168,66 @@ private:
 class LLMutexTrylock
 {
 public:
-	LLMutexTrylock(LLMutex* mutex)
-		: mMutex(mutex),
-		mLocked(false)
-	{
-		if (mMutex)
-			mLocked = mMutex->try_lock();
-	}
+    LLMutexTrylock(LLMutex* mutex)
+        : mMutex(mutex),
+        mLocked(false)
+    {
+        if (mMutex)
+            mLocked = mMutex->try_lock();
+    }
 
-	LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms = 10)
-		: mMutex(mutex),
-		mLocked(false)
-	{
-		lock(aTries, delay_ms);
-	}
+    LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms = 10)
+        : mMutex(mutex),
+        mLocked(false)
+    {
+        lock(aTries, delay_ms);
+    }
 
-	~LLMutexTrylock()
-	{
-		unlock();
-	}
+    ~LLMutexTrylock()
+    {
+        unlock();
+    }
 
-	bool isLocked() const
-	{
-		return mLocked;
-	}
+    bool isLocked() const
+    {
+        return mLocked;
+    }
 
-	void lock()
-	{
-		if (mMutex && !mLocked)
-		{
-			mLocked = mMutex->try_lock();
-		}
-	}
+    void lock()
+    {
+        if (mMutex && !mLocked)
+        {
+            mLocked = mMutex->try_lock();
+        }
+    }
 
-	void lock(U32 aTries, U32 delay_ms)
-	{
-		if (mMutex && !mLocked)
-		{
-			for (U32 i = 0; i < aTries; ++i)
-			{
-				mLocked = mMutex->try_lock();
-				if (mLocked)
-					break;
-				ms_sleep(delay_ms);
-				//std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-			}
-		}
-	}
+    void lock(U32 aTries, U32 delay_ms)
+    {
+        if (mMutex && !mLocked)
+        {
+            for (U32 i = 0; i < aTries; ++i)
+            {
+                mLocked = mMutex->try_lock();
+                if (mLocked)
+                    break;
+                ms_sleep(delay_ms);
+                //std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+            }
+        }
+    }
 
-	void unlock()
-	{
-		if (mMutex && mLocked)
-		{
-			mMutex->unlock();
-			mLocked = false;
-		}
-	}
-	
+    void unlock()
+    {
+        if (mMutex && mLocked)
+        {
+            mMutex->unlock();
+            mLocked = false;
+        }
+    }
+
 private:
-	LLMutex*	mMutex;
-	bool		mLocked;
+    LLMutex*    mMutex;
+    bool        mLocked;
 };
 
 /**

@@ -199,7 +199,7 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
                 {
                     // Use libxml2 instead of expat for safety.
                     const int parse_opts = XML_PARSE_NONET | XML_PARSE_NOCDATA | XML_PARSE_NOXINCNODE | XML_PARSE_NOBLANKS;
-                    xmlDocPtr doc = xmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize, 
+                    xmlDocPtr doc = xmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize,
                         "noname.xml", nullptr, parse_opts);
                     if (doc)
                     {
@@ -220,7 +220,7 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
                 else if (beautify && parsed_content_type == HTTP_CONTENT_TEXT_HTML)
                 {
                     const int parse_opts = HTML_PARSE_NONET | HTML_PARSE_NOERROR | HTML_PARSE_NOIMPLIED | HTML_PARSE_NOBLANKS;
-                    htmlDocPtr doc = htmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize, 
+                    htmlDocPtr doc = htmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize,
                         "noname.html", nullptr, parse_opts);
                     if (doc)
                     {

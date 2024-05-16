@@ -36,13 +36,13 @@
  */
 class ALPanelStreamInfo final : public LLPanelTipToast
 {
-	// disallow instantiation of this class
+    // disallow instantiation of this class
 private:
-	// grant privileges to instantiate this class to LLToastPanel
-	friend class LLToastPanel;
-	
-	ALPanelStreamInfo(const LLNotificationPtr& notification);
-	virtual ~ALPanelStreamInfo() = default;
+    // grant privileges to instantiate this class to LLToastPanel
+    friend class LLToastPanel;
+
+    ALPanelStreamInfo(const LLNotificationPtr& notification);
+    virtual ~ALPanelStreamInfo() = default;
 };
 
 #endif // AL_PANELSTREAMINFO_H

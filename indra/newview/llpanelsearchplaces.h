@@ -39,15 +39,15 @@ class LLSearchEditor;
 class LLPanelSearchPlaces : public LLPanelSearch
 {
 public:
-	LLPanelSearchPlaces();
-	/*virtual*/ BOOL postBuild() override;
-	
+    LLPanelSearchPlaces();
+    /*virtual*/ BOOL postBuild() override;
+
 private:
-	/*virtual*/ void onCommitSearch(LLUICtrl* ctrl) override;
-	/*virtual*/ void search() override;
-	
-	LLSearchEditor* mSearchEditor;
-	LLComboBox* mPlacesCategory;
+    /*virtual*/ void onCommitSearch(LLUICtrl* ctrl) override;
+    /*virtual*/ void search() override;
+
+    LLSearchEditor* mSearchEditor;
+    LLComboBox* mPlacesCategory;
 };
 
 #endif // LL_PANELSEARCHPLACES_H

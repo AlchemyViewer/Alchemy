@@ -1,25 +1,25 @@
-/** 
+/**
  * @file llflyoutbutton.cpp
  * @brief LLFlyoutButton base class
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -34,66 +34,66 @@
 //const S32 FLYOUT_BUTTON_ARROW_WIDTH = 24;
 
 LLFlyoutButton::LLFlyoutButton(const Params& p)
-:	LLComboBox(p),
-	mToggleState(FALSE),
-	mActionButton(NULL)
+:   LLComboBox(p),
+    mToggleState(FALSE),
+    mActionButton(NULL)
 {
 // [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
-	mButton->setLabel(LLStringUtil::null);
+    mButton->setLabel(LLStringUtil::null);
 // [/SL:KB]
 
-	// Always use text box 
-	// Text label button
-	LLButton::Params bp(p.action_button);
-	bp.name(p.label);
-	bp.label(p.label);
-//	bp.rect.left(0).bottom(0).width(getRect().getWidth() - FLYOUT_BUTTON_ARROW_WIDTH).height(getRect().getHeight());
+    // Always use text box
+    // Text label button
+    LLButton::Params bp(p.action_button);
+    bp.name(p.label);
+    bp.label(p.label);
+//  bp.rect.left(0).bottom(0).width(getRect().getWidth() - FLYOUT_BUTTON_ARROW_WIDTH).height(getRect().getHeight());
 // [SL:KB] - Patch: Control-FlyoutButton | Checked: 2012-08-09 (Catznip-3.3)
-	bp.rect.left(0).bottom(0).width(getRect().getWidth() - p.arrow_button_width).height(getRect().getHeight());
+    bp.rect.left(0).bottom(0).width(getRect().getWidth() - p.arrow_button_width).height(getRect().getHeight());
 // [/SL:KB]
-	bp.click_callback.function(boost::bind(&LLFlyoutButton::onActionButtonClick, this, _2));
-	bp.follows.flags(FOLLOWS_ALL);
+    bp.click_callback.function(boost::bind(&LLFlyoutButton::onActionButtonClick, this, _2));
+    bp.follows.flags(FOLLOWS_ALL);
 
-	mActionButton = LLUICtrlFactory::create<LLButton>(bp);
-	addChild(mActionButton);
+    mActionButton = LLUICtrlFactory::create<LLButton>(bp);
+    addChild(mActionButton);
 }
 
 void LLFlyoutButton::onActionButtonClick(const LLSD& data)
 {
-	// remember last list selection?
-	mList->deselect();
-	onCommit();
+    // remember last list selection?
+    mList->deselect();
+    onCommit();
 }
 
 void LLFlyoutButton::draw()
 {
-	mActionButton->setToggleState(mToggleState);
-	mButton->setToggleState(mToggleState);
+    mActionButton->setToggleState(mToggleState);
+    mButton->setToggleState(mToggleState);
 
-	//FIXME: this should be an attribute of comboboxes, whether they have a distinct label or
-	// the label reflects the last selected item, for now we have to manually remove the label
-//	setLabel(LLStringUtil::null);
-	LLComboBox::draw();	
+    //FIXME: this should be an attribute of comboboxes, whether they have a distinct label or
+    // the label reflects the last selected item, for now we have to manually remove the label
+//  setLabel(LLStringUtil::null);
+    LLComboBox::draw();
 }
 
 // [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
 // override
 void LLFlyoutButton::setLabel(const LLStringExplicit& name)
 {
-	mActionButton->setLabel(name);
-	mButton->setLabel(LLStringUtil::null);
+    mActionButton->setLabel(name);
+    mButton->setLabel(LLStringUtil::null);
 }
 
 // override
 void LLFlyoutButton::updateLabel()
 {
-	mButton->setLabel(LLStringUtil::null);
+    mButton->setLabel(LLStringUtil::null);
 }
 // [/SL:KB]
 
 void LLFlyoutButton::setToggleState(BOOL state)
 {
-	mToggleState = state;
+    mToggleState = state;
 }
 
 

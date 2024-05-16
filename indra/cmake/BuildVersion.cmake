@@ -142,7 +142,7 @@ if (NOT DEFINED VIEWER_COMMIT_SHORT_SHA)
 endif (NOT DEFINED VIEWER_COMMIT_SHORT_SHA)
 
 add_library( ll::versioninfo INTERFACE IMPORTED )
-target_compile_definitions( ll::versioninfo INTERFACE 
+target_compile_definitions( ll::versioninfo INTERFACE
     $<$<CONFIG:Debug>:LLBUILD_CONFIG="Debug">
     $<$<CONFIG:RelWithDebInfo>:LLBUILD_CONFIG="RelWithDebInfo">
     $<$<CONFIG:Release>:LLBUILD_CONFIG="Release">
