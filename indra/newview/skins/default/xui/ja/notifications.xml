@@ -180,6 +180,11 @@
 '[ERROR_CODE]'
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
+	<notification name="InvalidKeystroke">
+		無効なキーストロークが入力されました：
+[REASON]
+有効なテキストを入力してください。
+  </notification>
 	<notification name="MerchantForceValidateListing">
 		出品リストを作成するために、出品リストするコンテンツの階層を固定しました。
 		<tag>confirm</tag>
@@ -2188,6 +2193,13 @@ OKをクリックして、ダウンロードとインストールを開始しま
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
+	<notification name="GroupLeaveConfirmMemberNoFee">
+		グループ「&lt;nolink&gt;[GROUP]&lt;/nolink&gt;」から脱退しますか？
+現在、このグループに参加するのに料金はかかりません。
+    <tag>group</tag>
+    <tag>confirm</tag>
+    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="脱退する"/>
+  </notification>
 	<notification name="OwnerCannotLeaveGroup">
 		グループを抜けることができません。グループの最後のオーナーであるため、グループを抜けることができません。最初に、別のメンバーをオーナーの役割に割り当ててください。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>

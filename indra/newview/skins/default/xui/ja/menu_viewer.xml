@@ -58,6 +58,7 @@
 			<menu label="取り外す" name="Avatar Detach"/>
 			<menu_item_call label="全てを取り外す" name="Detach All"/>
 		</menu>
+		<menu_item_call label="選択された装着物を取り外す" name="Remove Selected Attachments" />
 		<menu_item_separator/>
 		<menu_item_call label="アバターを選択…" name="Avatar Picker"/>
 		<menu_item_separator/>
@@ -123,6 +124,11 @@
 		<menu_item_separator/>
 		<menu_item_call label="スナップショット" name="Take Snapshot"/>
 		<menu_item_call label="３６０度スナップショット" name="Capture 360"/>
+		<menu label="ズームレベル" name="Zoom menu">
+			<menu_item_call label="ズームアウト" name="Zoom Out" />
+			<menu_item_call label="デフォルト" name="Zoom Default"/>
+			<menu_item_call label="ズームイン" name="Zoom In"/>
+		</menu>
 		<menu_item_separator/>
 		<menu_item_call label="場所のプロフィール" name="Place Profile"/>
 		<menu_item_call label="土地情報" name="About Land"/>
