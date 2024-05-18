@@ -3115,10 +3115,6 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<tag>confirm</tag>
 		<usetemplate name="okcancelbuttons" notext="後でゴミ箱を空にする" yestext="ごみ箱フォルダを確認する"/>
 	</notification>
-	<notification name="InventoryLimitReachedAIS">
-		インベントリに問題が発生しています。お手数ですが、サポートにお問い合わせください。
-		<tag>fail</tag>
-	</notification>
 	<notification name="InventoryLimitReachedAISAlert">
 		インベントリに問題が発生しています。お手数ですが、サポートにお問い合わせください。
 		<tag>fail</tag>

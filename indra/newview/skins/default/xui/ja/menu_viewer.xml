@@ -371,7 +371,6 @@
 			<menu_item_check label="アルファマスク" name="Rendering Type Alpha Mask"/>
 			<menu_item_check label="明るさ全開のアルファマスク" name="Rendering Type Fullbright Alpha Mask"/>
 			<menu_item_check label="グロー" name="Rendering Type Glow"/>
-			<menu_item_check label="明るさ全開" name="Rendering Type Fullbright"/>
 			<menu_item_check label="アルファ" name="Rendering Type Alpha"/>
 			<menu_item_check label="樹木" name="Rendering Type Tree"/>
 			<menu_item_check label="アバター" name="Rendering Type Character"/>

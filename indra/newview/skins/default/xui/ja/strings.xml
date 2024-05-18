@@ -1382,6 +1382,43 @@ https://secondlife.com/viewer-access-faq
 	<string name="recompile_script_verb">
 		再コンパイル
 	</string>
+	<!-- Text validator error messages -->
+	<string name="Validator_InvalidNumericString">
+		無効な数字の文字列です：『[STR]』
+	</string>
+	<string name="Validator_ShouldNotBeMinus">
+		無効な先頭文字です：「[CH]」（マイナスでは使用できません）
+	</string>
+	<string name="Validator_ShouldNotBeMinusOrZero">
+		無効な先頭文字です：「[CH]」（マイナスまたはゼロは使用できません）
+	</string>
+	<string name="Validator_ShouldBeDigit">
+		無効な文字[NR]です：「[CH]」（数字のみにする必要があります）
+	</string>
+	<string name="Validator_ShouldBeDigitOrDot">
+		無効な文字[NR]です：「[CH]」（数字または小数点のみを指定してください）
+	</string>
+	<string name="Validator_ShouldBeDigitOrAlpha">
+		無効な文字[NR]です：「[CH]」（数字または英数字のアスキー文字のみを使用してください）
+	</string>
+	<string name="Validator_ShouldBeDigitOrAlphaOrSpace">
+		無効な文字[NR]です：「[CH]」（数字、英数字のアスキー文字、またはスペースのみを使用してください）
+	</string>
+	<string name="Validator_ShouldBeDigitOrAlphaOrPunct">
+		無効な文字[NR]です：「[CH]」（数字、英数字のアスキー文字、または句読点のみを使用してください）
+	</string>
+	<string name="Validator_ShouldBeDigitOrAlphaOrPunctNotSpace">
+		無効な文字[NR]です：「[CH]」（数字、英数字のアスキー文字、またはスペースを含まない句読点のみを使用してください）
+	</string>
+	<string name="Validator_ShouldBeDigitNotSpace">
+		無効な文字[NR]です：「[CH]」（スペースを含まない数字のみにする必要があります）
+	</string>
+	<string name="Validator_ShouldBeASCII">
+		無効な文字[NR]です：「[CH]」（アスキー文字のみを使用してください）
+	</string>
+	<string name="Validator_ShouldBeNewLineOrASCII">
+		無効な文字[NR]です：「[CH]」（アスキー文字または改行のみを使用してください）
+	</string>
 	<!-- LSL Usage Hover Tips -->
 	<!-- NOTE: For now these are set as translate="false", until DEV-40761 is implemented (to internationalize the rest of tooltips in the same window).
 This has no effect on viewer code, but prevents Linden Lab internal localization tool from scraping these strings.  -->
@@ -6977,10 +7014,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	</string>
 	<string name="dance8">
 		ダンス８
-	</string>
-	<!-- birth date format shared by avatar inspector and profile panels -->
-	<string name="AvatarBirthDateFormat">
-		[year,datetime,slt]年[mthnum,datetime,slt]月[day,datetime,slt]日
 	</string>
 	<string name="DefaultMimeType">
 		none/none
