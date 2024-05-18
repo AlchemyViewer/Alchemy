@@ -46,14 +46,14 @@ uniform vec4 SMAA_RT_METRICS;
  *                 \   \    |  |\/|  |   /  /_\  \     /  /_\  \
  *              ----)   |   |  |  |  |  /  _____  \   /  _____  \
  *             |_______/    |__|  |__| /__/     \__\ /__/     \__\
- * 
+ *
  *                               E N H A N C E D
  *       S U B P I X E L   M O R P H O L O G I C A L   A N T I A L I A S I N G
  *
  *                         http://www.iryoku.com/smaa/
  *
  * Hi, welcome aboard!
- * 
+ *
  * Here you'll find instructions to get the shader up and running as fast as
  * possible.
  *
@@ -142,14 +142,14 @@ uniform vec4 SMAA_RT_METRICS;
  *     this last pass are not possible, the technique will work anyway, but
  *     will perform antialiasing in gamma space.
  *
- *     IMPORTANT: for best results the input read for the color/luma edge 
+ *     IMPORTANT: for best results the input read for the color/luma edge
  *     detection should *NOT* be sRGB.
  *
  *  6. Before including SMAA.h you'll have to setup the render target metrics,
  *     the target and any optional configuration defines. Optionally you can
  *     use a preset.
  *
- *     You have the following targets available: 
+ *     You have the following targets available:
  *         SMAA_HLSL_3
  *         SMAA_HLSL_4
  *         SMAA_HLSL_4_1
@@ -342,7 +342,7 @@ uniform vec4 SMAA_RT_METRICS;
 /**
  * SMAA_THRESHOLD specifies the threshold or sensitivity to edges.
  * Lowering this value you will be able to detect more edges at the expense of
- * performance. 
+ * performance.
  *
  * Range: [0, 0.5]
  *   0.1 is a reasonable value, and allows to catch most visible edges.
@@ -357,7 +357,7 @@ uniform vec4 SMAA_RT_METRICS;
 
 /**
  * SMAA_DEPTH_THRESHOLD specifies the threshold for depth edge detection.
- * 
+ *
  * Range: depends on the depth range of the scene.
  */
 #ifndef SMAA_DEPTH_THRESHOLD
@@ -385,7 +385,7 @@ uniform vec4 SMAA_RT_METRICS;
  *
  * Range: [0, 20]
  *
- * On high-end machines it is cheap (between a 0.8x and 0.9x slower for 16 
+ * On high-end machines it is cheap (between a 0.8x and 0.9x slower for 16
  * steps), but it can have a significant impact on older machines.
  *
  * Define SMAA_DISABLE_DIAG_DETECTION to disable diagonal processing.
@@ -427,16 +427,16 @@ uniform vec4 SMAA_RT_METRICS;
  * It locally decreases the luma or color threshold if an edge is found in an
  * additional buffer (so the global threshold can be higher).
  *
- * This method was developed by Playstation EDGE MLAA team, and used in 
+ * This method was developed by Playstation EDGE MLAA team, and used in
  * Killzone 3, by using the light accumulation buffer. More information here:
- *     http://iryoku.com/aacourse/downloads/06-MLAA-on-PS3.pptx 
+ *     http://iryoku.com/aacourse/downloads/06-MLAA-on-PS3.pptx
  */
 #ifndef SMAA_PREDICATION
 #define SMAA_PREDICATION 0
 #endif
 
 /**
- * Threshold to be used in the additional predication buffer. 
+ * Threshold to be used in the additional predication buffer.
  *
  * Range: depends on the input, so you'll have to find the magic number that
  * works for you.
@@ -632,15 +632,15 @@ SamplerState PointSampler { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; Addres
 
 #define API_V_DIR(v) -(v)
 #define API_V_COORD(v) (1.0 - v)
-#define API_V_BELOW(v1, v2)	v1 < v2
-#define API_V_ABOVE(v1, v2)	v1 > v2
+#define API_V_BELOW(v1, v2) v1 < v2
+#define API_V_ABOVE(v1, v2) v1 > v2
 
 #else  // VULKAN_FLIP
 
 #define API_V_DIR(v) v
 #define API_V_COORD(v) v
-#define API_V_BELOW(v1, v2)	v1 > v2
-#define API_V_ABOVE(v1, v2)	v1 < v2
+#define API_V_BELOW(v1, v2) v1 > v2
+#define API_V_ABOVE(v1, v2) v1 < v2
 
 #endif  // VULKAN_FLIP
 
@@ -924,7 +924,7 @@ float4 SMAADecodeDiagBilinearAccess(float4 e) {
  * These functions allows to perform diagonal pattern searches.
  */
 float2 SMAASearchDiag1(SMAATexture2D(edgesTex), float2 texcoord, float2 dir, out float2 e) {
-	dir.y = API_V_DIR(dir.y);
+    dir.y = API_V_DIR(dir.y);
     float4 coord = float4(texcoord, -1.0, 1.0);
     float3 t = float3(SMAA_RT_METRICS.xy, 1.0);
     while (coord.z < float(SMAA_MAX_SEARCH_STEPS_DIAG - 1) &&
@@ -937,7 +937,7 @@ float2 SMAASearchDiag1(SMAATexture2D(edgesTex), float2 texcoord, float2 dir, out
 }
 
 float2 SMAASearchDiag2(SMAATexture2D(edgesTex), float2 texcoord, float2 dir, out float2 e) {
-	dir.y = API_V_DIR(dir.y);
+    dir.y = API_V_DIR(dir.y);
     float4 coord = float4(texcoord, -1.0, 1.0);
     coord.x += 0.25 * SMAA_RT_METRICS.x; // See @SearchDiag2Optimization
     float3 t = float3(SMAA_RT_METRICS.xy, 1.0);
@@ -959,7 +959,7 @@ float2 SMAASearchDiag2(SMAATexture2D(edgesTex), float2 texcoord, float2 dir, out
     return coord.zw;
 }
 
-/** 
+/**
  * Similar to SMAAArea, this calculates the area corresponding to a certain
  * diagonal distance and crossing edges 'e'.
  */
@@ -975,7 +975,7 @@ float2 SMAAAreaDiag(SMAATexture2D(areaTex), float2 dist, float2 e, float offset)
     // Move to proper place, according to the subpixel offset:
     texcoord.y += SMAA_AREATEX_SUBTEX_SIZE * offset;
 
-	texcoord.y = API_V_COORD(texcoord.y);
+    texcoord.y = API_V_COORD(texcoord.y);
 
     // Do it!
     return SMAA_AREATEX_SELECT(SMAASampleLevelZero(areaTex, texcoord));
@@ -1058,7 +1058,7 @@ float2 SMAACalculateDiagWeights(SMAATexture2D(edgesTex), SMAATexture2D(areaTex),
 
 /**
  * This allows to determine how much length should we add in the last step
- * of the searches. It takes the bilinearly interpolated edge (see 
+ * of the searches. It takes the bilinearly interpolated edge (see
  * @PSEUDO_GATHER4), and adds 0, 1 or 2, depending on which edges and
  * crossing edges are active.
  */
@@ -1077,8 +1077,8 @@ float SMAASearchLength(SMAATexture2D(searchTex), float2 e, float offset) {
     scale *= 1.0 / SMAA_SEARCHTEX_PACKED_SIZE;
     bias *= 1.0 / SMAA_SEARCHTEX_PACKED_SIZE;
 
-	float2 coord = mad(scale, e, bias);
-	coord.y = API_V_COORD(coord.y);
+    float2 coord = mad(scale, e, bias);
+    coord.y = API_V_COORD(coord.y);
 
     // Lookup the search texture:
     return SMAA_SEARCHTEX_SELECT(SMAASampleLevelZero(searchTex, coord));
@@ -1096,7 +1096,7 @@ float SMAASearchXLeft(SMAATexture2D(edgesTex), SMAATexture2D(searchTex), float2 
      * which edges are active from the four fetched ones.
      */
     float2 e = float2(0.0, 1.0);
-    while (texcoord.x > end && 
+    while (texcoord.x > end &&
            e.g > 0.8281 && // Is there some edge not activated?
            e.r == 0.0) { // Or is there a crossing edge that breaks the line?
         e = SMAASampleLevelZero(edgesTex, texcoord).rg;
@@ -1121,7 +1121,7 @@ float SMAASearchXLeft(SMAATexture2D(edgesTex), SMAATexture2D(searchTex), float2 
 
 float SMAASearchXRight(SMAATexture2D(edgesTex), SMAATexture2D(searchTex), float2 texcoord, float end) {
     float2 e = float2(0.0, 1.0);
-    while (texcoord.x < end && 
+    while (texcoord.x < end &&
            e.g > 0.8281 && // Is there some edge not activated?
            e.r == 0.0) { // Or is there a crossing edge that breaks the line?
         e = SMAASampleLevelZero(edgesTex, texcoord).rg;
@@ -1133,7 +1133,7 @@ float SMAASearchXRight(SMAATexture2D(edgesTex), SMAATexture2D(searchTex), float2
 
 float SMAASearchYUp(SMAATexture2D(edgesTex), SMAATexture2D(searchTex), float2 texcoord, float end) {
     float2 e = float2(1.0, 0.0);
-    while (API_V_BELOW(texcoord.y, end) && 
+    while (API_V_BELOW(texcoord.y, end) &&
            e.r > 0.8281 && // Is there some edge not activated?
            e.g == 0.0) { // Or is there a crossing edge that breaks the line?
         e = SMAASampleLevelZero(edgesTex, texcoord).rg;
@@ -1145,7 +1145,7 @@ float SMAASearchYUp(SMAATexture2D(edgesTex), SMAATexture2D(searchTex), float2 te
 
 float SMAASearchYDown(SMAATexture2D(edgesTex), SMAATexture2D(searchTex), float2 texcoord, float end) {
     float2 e = float2(1.0, 0.0);
-    while (API_V_ABOVE(texcoord.y, end) && 
+    while (API_V_ABOVE(texcoord.y, end) &&
            e.r > 0.8281 && // Is there some edge not activated?
            e.g == 0.0) { // Or is there a crossing edge that breaks the line?
         e = SMAASampleLevelZero(edgesTex, texcoord).rg;
@@ -1155,21 +1155,21 @@ float SMAASearchYDown(SMAATexture2D(edgesTex), SMAATexture2D(searchTex), float2 
     return mad(-SMAA_RT_METRICS.y, API_V_DIR(offset), texcoord.y);
 }
 
-/** 
+/**
  * Ok, we have the distance and both crossing edges. So, what are the areas
  * at each side of current edge?
  */
 float2 SMAAArea(SMAATexture2D(areaTex), float2 dist, float e1, float e2, float offset) {
     // Rounding prevents precision errors of bilinear filtering:
     float2 texcoord = mad(float2(SMAA_AREATEX_MAX_DISTANCE, SMAA_AREATEX_MAX_DISTANCE), round(4.0 * float2(e1, e2)), dist);
-    
+
     // We do a scale and bias for mapping to texel space:
     texcoord = mad(SMAA_AREATEX_PIXEL_SIZE, texcoord, 0.5 * SMAA_AREATEX_PIXEL_SIZE);
 
     // Move to proper place, according to the subpixel offset:
     texcoord.y = mad(SMAA_AREATEX_SUBTEX_SIZE, offset, texcoord.y);
 
-	texcoord.y = API_V_COORD(texcoord.y);
+    texcoord.y = API_V_COORD(texcoord.y);
 
     // Do it!
     return SMAA_AREATEX_SELECT(SMAASampleLevelZero(areaTex, texcoord));
@@ -1233,7 +1233,7 @@ float4 SMAABlendingWeightCalculationPS(float2 texcoord,
         // one of the boundaries is enough.
         weights.rg = SMAACalculateDiagWeights(SMAATexturePass2D(edgesTex), SMAATexturePass2D(areaTex), texcoord, e, subsampleIndices);
 
-        // We give priority to diagonals, so if we find a diagonal we skip 
+        // We give priority to diagonals, so if we find a diagonal we skip
         // horizontal/vertical processing.
         SMAA_BRANCH
         if (weights.r == -weights.g) { // weights.r + weights.g == 0.0
@@ -1301,7 +1301,7 @@ float4 SMAABlendingWeightCalculationPS(float2 texcoord,
         // We want the distances to be in pixel units:
         d = abs(round(mad(SMAA_RT_METRICS.ww, d, -pixcoord.yy)));
 
-        // SMAAArea below needs a sqrt, as the areas texture is compressed 
+        // SMAAArea below needs a sqrt, as the areas texture is compressed
         // quadratically:
         float2 sqrt_d = sqrt(d);
 

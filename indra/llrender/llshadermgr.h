@@ -1,25 +1,25 @@
-/** 
+/**
  * @file llshadermgr.h
  * @brief Shader Manager
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -33,8 +33,8 @@
 class LLShaderMgr
 {
 public:
-	LLShaderMgr() = default;
-	virtual ~LLShaderMgr() = default;
+    LLShaderMgr() = default;
+    virtual ~LLShaderMgr() = default;
 
     // clang-format off
     typedef enum
@@ -247,12 +247,12 @@ public:
 
         WL_CAMPOSLOCAL,                     //  "camPosLocal"
 // [RLVa:KB] - @setsphere
-		RLV_EFFECT_MODE,
-		RLV_EFFECT_PARAM1,
-		RLV_EFFECT_PARAM2,
-		RLV_EFFECT_PARAM3,
-		RLV_EFFECT_PARAM4,
-		RLV_EFFECT_PARAM5,
+        RLV_EFFECT_MODE,
+        RLV_EFFECT_PARAM1,
+        RLV_EFFECT_PARAM2,
+        RLV_EFFECT_PARAM3,
+        RLV_EFFECT_PARAM4,
+        RLV_EFFECT_PARAM5,
 // [/RLVa:KB]
 
         AVATAR_WIND,                        //  "gWindDir"
@@ -333,23 +333,23 @@ public:
     } eGLSLReservedUniforms;
     // clang-format on
 
-	// singleton pattern implementation
-	static LLShaderMgr * instance();
+    // singleton pattern implementation
+    static LLShaderMgr * instance();
 
-	virtual void initAttribsAndUniforms(void);
+    virtual void initAttribsAndUniforms(void);
 
-	BOOL attachShaderFeatures(LLGLSLShader * shader);
-	void dumpObjectLog(GLuint ret, BOOL warns = TRUE, const std::string& filename = "");
+    BOOL attachShaderFeatures(LLGLSLShader * shader);
+    void dumpObjectLog(GLuint ret, BOOL warns = TRUE, const std::string& filename = "");
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
-	BOOL	linkProgramObject(GLuint obj, BOOL suppress_errors = FALSE);
-	BOOL	validateProgramObject(GLuint obj);
-	GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1);
+    BOOL    linkProgramObject(GLuint obj, BOOL suppress_errors = FALSE);
+    BOOL    validateProgramObject(GLuint obj);
+    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1);
 
-	// Implemented in the application to actually point to the shader directory.
-	virtual std::string getShaderDirPrefix(void) = 0; // Pure Virtual
+    // Implemented in the application to actually point to the shader directory.
+    virtual std::string getShaderDirPrefix(void) = 0; // Pure Virtual
 
-	// Implemented in the application to actually update out of date uniforms for a particular shader
-	virtual void updateShaderUniforms(LLGLSLShader * shader) = 0; // Pure Virtual
+    // Implemented in the application to actually update out of date uniforms for a particular shader
+    virtual void updateShaderUniforms(LLGLSLShader * shader) = 0; // Pure Virtual
 
     void initShaderCache(bool enabled, const LLUUID& old_cache_version, const LLUUID& current_cache_version);
     void clearShaderCache();
@@ -362,10 +362,10 @@ public:
     boost::unordered_map<std::string, GLuint, al::string_hash, std::equal_to<>> mVertexShaderObjects;
     boost::unordered_map<std::string, GLuint, al::string_hash, std::equal_to<>> mFragmentShaderObjects;
 
-	//global (reserved slot) shader parameters
-	std::vector<std::string> mReservedAttribs;
+    //global (reserved slot) shader parameters
+    std::vector<std::string> mReservedAttribs;
 
-	std::vector<std::string> mReservedUniforms;
+    std::vector<std::string> mReservedUniforms;
 
     struct ProgramBinaryData
     {
@@ -381,8 +381,8 @@ public:
 
 protected:
 
-	// our parameter manager singleton instance
-	static LLShaderMgr * sInstance;
+    // our parameter manager singleton instance
+    static LLShaderMgr * sInstance;
 
 }; //LLShaderMgr
 

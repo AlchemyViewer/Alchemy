@@ -36,18 +36,18 @@
 ALPanelRadarAlert::ALPanelRadarAlert(const LLNotificationPtr& notification) :
     LLPanelTipToast(notification)
 {
-	buildFromFile("panel_radar_alert_toast.xml");
-	
-	getChild<LLUICtrl>("message")->setValue(notification->getMessage());
-	
-	if (notification->getPayload().has("respond_on_mousedown")
-		&& notification->getPayload()["respond_on_mousedown"])
-	{
-		setMouseDownCallback(boost::bind(&LLNotification::respond,
-										 notification, notification->getResponseTemplate()));
-	}
-	
-	S32 max_line_count =  gSavedSettings.getS32("TipToastMessageLineCount");
-	snapToMessageHeight(getChild<LLTextBox> ("message"), max_line_count);
-	
+    buildFromFile("panel_radar_alert_toast.xml");
+
+    getChild<LLUICtrl>("message")->setValue(notification->getMessage());
+
+    if (notification->getPayload().has("respond_on_mousedown")
+        && notification->getPayload()["respond_on_mousedown"])
+    {
+        setMouseDownCallback(boost::bind(&LLNotification::respond,
+                                         notification, notification->getResponseTemplate()));
+    }
+
+    S32 max_line_count =  gSavedSettings.getS32("TipToastMessageLineCount");
+    snapToMessageHeight(getChild<LLTextBox> ("message"), max_line_count);
+
 }

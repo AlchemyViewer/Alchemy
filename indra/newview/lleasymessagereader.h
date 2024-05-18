@@ -28,19 +28,19 @@ class LLViewerRegion;
 class LLEasyMessageReader
 {
 public:
-	LLEasyMessageReader();
-	~LLEasyMessageReader();
+    LLEasyMessageReader();
+    ~LLEasyMessageReader();
 
-	LLMessageTemplate* decodeTemplateMessage(U8* data, S32 data_len, const LLHost& from_host);
-	LLMessageTemplate* decodeTemplateMessage(U8* data, S32 data_len, const LLHost& from_host, U32& sequence_id);
+    LLMessageTemplate* decodeTemplateMessage(U8* data, S32 data_len, const LLHost& from_host);
+    LLMessageTemplate* decodeTemplateMessage(U8* data, S32 data_len, const LLHost& from_host, U32& sequence_id);
 
-	S32 getNumberOfBlocks(const char *blockname);
+    S32 getNumberOfBlocks(const char *blockname);
 
-	std::string var2Str(const char* block_name, S32 block_num, LLMessageVariable* variable, BOOL &returned_hex, BOOL summary_mode=FALSE);
+    std::string var2Str(const char* block_name, S32 block_num, LLMessageVariable* variable, BOOL &returned_hex, BOOL summary_mode=FALSE);
 
 private:
-	LLTemplateMessageReader mTemplateMessageReader;
-	U8	mRecvBuffer[MAX_BUFFER_SIZE];
+    LLTemplateMessageReader mTemplateMessageReader;
+    U8  mRecvBuffer[MAX_BUFFER_SIZE];
 };
 
 #endif

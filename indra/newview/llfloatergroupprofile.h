@@ -39,24 +39,24 @@ class LLPanelGroup;
 class LLFloaterGroupProfile final : public LLFloater
 {
 public:
-	LLFloaterGroupProfile(LLSD const& key);
-	BOOL postBuild() override;
-	void onOpen(const LLSD& key) override;
+    LLFloaterGroupProfile(LLSD const& key);
+    BOOL postBuild() override;
+    void onOpen(const LLSD& key) override;
 
-	void setGroupName(const std::string& group_name);
-	void createGroup() const;
+    void setGroupName(const std::string& group_name);
+    void createGroup() const;
 
-	static LLFloater* showInstance(const LLSD& key, BOOL focus);
+    static LLFloater* showInstance(const LLSD& key, BOOL focus);
 
-	LLPanelGroup* getGroupPanel() const { return (LLPanelGroup*)mGroupPanel; };
+    LLPanelGroup* getGroupPanel() const { return (LLPanelGroup*)mGroupPanel; };
 
 private:
-	~LLFloaterGroupProfile();
+    ~LLFloaterGroupProfile();
 
-	LLPanel* mGroupPanel = nullptr;
-	LLPanel* mCreateGroupPanel = nullptr;
+    LLPanel* mGroupPanel = nullptr;
+    LLPanel* mCreateGroupPanel = nullptr;
 
-	bool mCreatingGroup = false;
+    bool mCreatingGroup = false;
 };
 
 #endif // LL_FLOATERGROUPPROFILE_H

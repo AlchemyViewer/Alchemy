@@ -40,19 +40,19 @@ class LLPanelProfileLegacyTab;
 class LLFloaterProfileLegacy final : public LLFloater
 {
 public:
-	LLFloaterProfileLegacy(LLSD const& key);
-	BOOL postBuild() override;
-	void onOpen(const LLSD& key) override;
+    LLFloaterProfileLegacy(LLSD const& key);
+    BOOL postBuild() override;
+    void onOpen(const LLSD& key) override;
 
-	LLPanel* expandTab(const std::string& name) const;
+    LLPanel* expandTab(const std::string& name) const;
     LLPanel* getExpandedTab() const;
 
 private:
-	~LLFloaterProfileLegacy() override;
-	void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
+    ~LLFloaterProfileLegacy() override;
+    void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name);
 
-	LLPanelProfileLegacy* mPanel;
-	boost::signals2::connection mAvatarNameCacheConnection;
+    LLPanelProfileLegacy* mPanel;
+    boost::signals2::connection mAvatarNameCacheConnection;
 };
 
 #endif // LL_FLOATERLEGACYPROFILE_H

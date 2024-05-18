@@ -29,46 +29,46 @@ class LLUICtrl;
 
 struct LLNetListItem
 {
-	LLNetListItem(LLUUID id);
-	LLUUID mID;
-	BOOL mAutoName;
-	std::string mName;
-	std::string mPreviousRegionName;
-	U64 mHandle;
-	LLCircuitData* mCircuitData;
+    LLNetListItem(LLUUID id);
+    LLUUID mID;
+    BOOL mAutoName;
+    std::string mName;
+    std::string mPreviousRegionName;
+    U64 mHandle;
+    LLCircuitData* mCircuitData;
 };
 
 class LLFloaterMessageBuilder final : public LLFloater, public LLEventTimer
 {
 public:
-	LLFloaterMessageBuilder(const LLSD &);
-	~LLFloaterMessageBuilder() = default;
-	BOOL postBuild() override;
-	void onOpen(const LLSD& key) override;
-	static void show(const std::string& initial_text);
-	
+    LLFloaterMessageBuilder(const LLSD &);
+    ~LLFloaterMessageBuilder() = default;
+    BOOL postBuild() override;
+    void onOpen(const LLSD& key) override;
+    static void show(const std::string& initial_text);
+
 private:
-	static std::list<LLNetListItem*> sNetListItems;
-	
-	BOOL tick() override;
-	void onClickSend();
-	void onCommitPacketCombo(LLUICtrl* ctrl);
+    static std::list<LLNetListItem*> sNetListItems;
 
-	static LLFloaterMessageBuilder* sInstance;
-	BOOL handleKeyHere(KEY key, MASK mask) override;
-	std::string mInitialText;
+    BOOL tick() override;
+    void onClickSend();
+    void onCommitPacketCombo(LLUICtrl* ctrl);
 
-	static LLNetListItem* findNetListItem(LLHost host);
-	static LLNetListItem* findNetListItem(LLUUID id);
-	void refreshNetList();
-	/*typedef enum e_net_info_mode
-	{
-		NI_NET,
-		NI_LOG
-	} ENetInfoMode;
-	ENetInfoMode mNetInfoMode;*/
+    static LLFloaterMessageBuilder* sInstance;
+    BOOL handleKeyHere(KEY key, MASK mask) override;
+    std::string mInitialText;
 
-	LLEasyMessageSender mMessageSender;
+    static LLNetListItem* findNetListItem(LLHost host);
+    static LLNetListItem* findNetListItem(LLUUID id);
+    void refreshNetList();
+    /*typedef enum e_net_info_mode
+    {
+        NI_NET,
+        NI_LOG
+    } ENetInfoMode;
+    ENetInfoMode mNetInfoMode;*/
+
+    LLEasyMessageSender mMessageSender;
 };
 
 #endif

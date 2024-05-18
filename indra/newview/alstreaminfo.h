@@ -36,13 +36,13 @@
 class ALStreamInfo : public LLSimpleton<ALStreamInfo>
 {
 public:
-	ALStreamInfo();
-	~ALStreamInfo();
+    ALStreamInfo();
+    ~ALStreamInfo();
 
 private:
-	void handleMetadataUpdate(const LLSD& metadata);
+    void handleMetadataUpdate(const LLSD& metadata);
 
-	boost::signals2::connection mMetadataConnection;
+    boost::signals2::connection mMetadataConnection;
 };
 
 #endif // LL_STREAMINFO_H

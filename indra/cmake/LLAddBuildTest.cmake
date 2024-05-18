@@ -96,7 +96,7 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
 
     set_target_properties(PROJECT_${project}_TEST_${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}")
     if (DARWIN)
-      set_target_properties(PROJECT_${project}_TEST_${name} 
+      set_target_properties(PROJECT_${project}_TEST_${name}
           PROPERTIES
           BUILD_WITH_INSTALL_RPATH 1
           INSTALL_RPATH "@executable_path/Resources"

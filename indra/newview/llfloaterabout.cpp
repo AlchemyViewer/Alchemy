@@ -1,4 +1,4 @@
-/** 
+/**
  * @file llfloaterabout.cpp
  * @author James Cook
  * @brief The about box from Help->About
@@ -6,25 +6,25 @@
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
- 
+
 #include "llviewerprecompiledheaders.h"
 #include <iostream>
 #include <fstream>
@@ -76,28 +76,28 @@ extern U32 gPacketsIn;
 /// Class LLFloaterAbout
 ///----------------------------------------------------------------------------
 class LLFloaterAbout final
-	: public LLFloater
+    : public LLFloater
 {
-	friend class LLFloaterReg;
+    friend class LLFloaterReg;
 private:
-	LLFloaterAbout(const LLSD& key);
-	virtual ~LLFloaterAbout();
+    LLFloaterAbout(const LLSD& key);
+    virtual ~LLFloaterAbout();
 
 public:
-	/*virtual*/ BOOL postBuild();
+    /*virtual*/ BOOL postBuild();
 
-	/// Obtain the data used to fill out the contents string. This is
-	/// separated so that we can programmatically access the same info.
-	static LLSD getInfo();
-	void onClickCopyToClipboard();
-	void onClickUpdateCheck();
+    /// Obtain the data used to fill out the contents string. This is
+    /// separated so that we can programmatically access the same info.
+    static LLSD getInfo();
+    void onClickCopyToClipboard();
+    void onClickUpdateCheck();
 
 private:
-	void setSupportText(const std::string& server_release_notes_url);
+    void setSupportText(const std::string& server_release_notes_url);
 
     // listener name for update checks
     static const std::string sCheckUpdateListenerName;
-	
+
     static void startFetchServerReleaseNotes();
     static void fetchServerReleaseNotesCoro(const std::string cap_url);
     static void handleServerReleaseNotes(LLSD results);
@@ -105,10 +105,10 @@ private:
 
 
 // Default constructor
-LLFloaterAbout::LLFloaterAbout(const LLSD& key) 
-:	LLFloater(key)
+LLFloaterAbout::LLFloaterAbout(const LLSD& key)
+:   LLFloater(key)
 {
-	
+
 }
 
 // Destroys the object
@@ -118,134 +118,134 @@ LLFloaterAbout::~LLFloaterAbout()
 
 BOOL LLFloaterAbout::postBuild()
 {
-	center();
-	LLViewerTextEditor *support_widget = 
-		getChild<LLViewerTextEditor>("support_editor", true);
+    center();
+    LLViewerTextEditor *support_widget =
+        getChild<LLViewerTextEditor>("support_editor", true);
 
-	LLViewerTextEditor *contrib_names_widget = 
-		getChild<LLViewerTextEditor>("contrib_names", true);  
+    LLViewerTextEditor *contrib_names_widget =
+        getChild<LLViewerTextEditor>("contrib_names", true);
 
-	LLViewerTextEditor *suppoter_names_widget = 
-		getChild<LLViewerTextEditor>("alchemy_supporter_names", true);
+    LLViewerTextEditor *suppoter_names_widget =
+        getChild<LLViewerTextEditor>("alchemy_supporter_names", true);
 
-	LLViewerTextEditor *licenses_widget = 
-		getChild<LLViewerTextEditor>("licenses_editor", true);
+    LLViewerTextEditor *licenses_widget =
+        getChild<LLViewerTextEditor>("licenses_editor", true);
 
-	getChild<LLUICtrl>("copy_btn")->setCommitCallback(
-		boost::bind(&LLFloaterAbout::onClickCopyToClipboard, this));
-    
+    getChild<LLUICtrl>("copy_btn")->setCommitCallback(
+        boost::bind(&LLFloaterAbout::onClickCopyToClipboard, this));
+
     getChild<LLUICtrl>("update_btn")->setCommitCallback(
         boost::bind(&LLFloaterAbout::onClickUpdateCheck, this));
 
-	auto viewer_logo = getChild<LLIconCtrl>("viewer_logo");
+    auto viewer_logo = getChild<LLIconCtrl>("viewer_logo");
 
-	auto viewer_maturity = LLVersionInfo::instance().getViewerMaturity();
-	switch(viewer_maturity)
-	{
-	case LLVersionInfo::TEST_VIEWER:
-		viewer_logo->setImage(LLUI::getUIImage("AlchemyTest128"));
-		break;
-	case LLVersionInfo::PROJECT_VIEWER:
-		viewer_logo->setImage(LLUI::getUIImage("AlchemyProject128"));
-		break;
-	case LLVersionInfo::BETA_VIEWER:
-		viewer_logo->setImage(LLUI::getUIImage("AlchemyBeta128"));
-		break;
-	default:
-	case LLVersionInfo::RELEASE_VIEWER:
-		viewer_logo->setImage(LLUI::getUIImage("AlchemyRelease128"));
-		break;
-	}
+    auto viewer_maturity = LLVersionInfo::instance().getViewerMaturity();
+    switch(viewer_maturity)
+    {
+    case LLVersionInfo::TEST_VIEWER:
+        viewer_logo->setImage(LLUI::getUIImage("AlchemyTest128"));
+        break;
+    case LLVersionInfo::PROJECT_VIEWER:
+        viewer_logo->setImage(LLUI::getUIImage("AlchemyProject128"));
+        break;
+    case LLVersionInfo::BETA_VIEWER:
+        viewer_logo->setImage(LLUI::getUIImage("AlchemyBeta128"));
+        break;
+    default:
+    case LLVersionInfo::RELEASE_VIEWER:
+        viewer_logo->setImage(LLUI::getUIImage("AlchemyRelease128"));
+        break;
+    }
 
-	static const LLUIColor about_color = LLUIColorTable::instance().getColor("TextFgReadOnlyColor");
+    static const LLUIColor about_color = LLUIColorTable::instance().getColor("TextFgReadOnlyColor");
 
-	if (gAgent.getRegion())
-	{
-		// start fetching server release notes URL
-		setSupportText(LLTrans::getString("RetrievingData"));
+    if (gAgent.getRegion())
+    {
+        // start fetching server release notes URL
+        setSupportText(LLTrans::getString("RetrievingData"));
         startFetchServerReleaseNotes();
-	}
-	else // not logged in
-	{
-		LL_DEBUGS("ViewerInfo") << "cannot display region info when not connected" << LL_ENDL;
-		setSupportText(LLTrans::getString("NotConnected"));
-	}
+    }
+    else // not logged in
+    {
+        LL_DEBUGS("ViewerInfo") << "cannot display region info when not connected" << LL_ENDL;
+        setSupportText(LLTrans::getString("NotConnected"));
+    }
 
-	support_widget->blockUndo();
+    support_widget->blockUndo();
 
-	// Fix views
-	support_widget->setEnabled(FALSE);
-	support_widget->startOfDoc();
+    // Fix views
+    support_widget->setEnabled(FALSE);
+    support_widget->startOfDoc();
 
-	{
-		// Get the names of contributors, extracted from .../doc/contributions.txt by viewer_manifest.py at build time
-		std::string contributors_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"contributors.txt");
-		llifstream contrib_file;
-		std::string contributors;
-		contrib_file.open(contributors_path.c_str());		/* Flawfinder: ignore */
-		if (contrib_file.is_open())
-		{
-			std::getline(contrib_file, contributors); // all names are on a single line
-			contrib_file.close();
-		}
-		else
-		{
-			LL_WARNS("AboutInit") << "Could not read contributors file at " << contributors_path << LL_ENDL;
-		}
-		contrib_names_widget->setText(contributors);
-		contrib_names_widget->setEnabled(FALSE);
-		contrib_names_widget->startOfDoc();
-	}
+    {
+        // Get the names of contributors, extracted from .../doc/contributions.txt by viewer_manifest.py at build time
+        std::string contributors_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"contributors.txt");
+        llifstream contrib_file;
+        std::string contributors;
+        contrib_file.open(contributors_path.c_str());       /* Flawfinder: ignore */
+        if (contrib_file.is_open())
+        {
+            std::getline(contrib_file, contributors); // all names are on a single line
+            contrib_file.close();
+        }
+        else
+        {
+            LL_WARNS("AboutInit") << "Could not read contributors file at " << contributors_path << LL_ENDL;
+        }
+        contrib_names_widget->setText(contributors);
+        contrib_names_widget->setEnabled(FALSE);
+        contrib_names_widget->startOfDoc();
+    }
 
-	{
-		// Get the names of supporters, extracted from .../doc/supporters.txt by viewer_manifest.py at build time
-		std::string supporters_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"supporters.txt");
-		llifstream supporters_file;
-		std::string supporters;
-		supporters_file.open(supporters_path.c_str());		/* Flawfinder: ignore */
-		if (supporters_file.is_open())
-		{
-			std::getline(supporters_file, supporters); // all names are on a single line
-			supporters_file.close();
-		}
-		else
-		{
-			LL_WARNS("AboutInit") << "Could not read supporters file at " << supporters_path << LL_ENDL;
-		}
-		suppoter_names_widget->setText(supporters);
-		suppoter_names_widget->setEnabled(FALSE);
-		suppoter_names_widget->startOfDoc();
-	}
+    {
+        // Get the names of supporters, extracted from .../doc/supporters.txt by viewer_manifest.py at build time
+        std::string supporters_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"supporters.txt");
+        llifstream supporters_file;
+        std::string supporters;
+        supporters_file.open(supporters_path.c_str());      /* Flawfinder: ignore */
+        if (supporters_file.is_open())
+        {
+            std::getline(supporters_file, supporters); // all names are on a single line
+            supporters_file.close();
+        }
+        else
+        {
+            LL_WARNS("AboutInit") << "Could not read supporters file at " << supporters_path << LL_ENDL;
+        }
+        suppoter_names_widget->setText(supporters);
+        suppoter_names_widget->setEnabled(FALSE);
+        suppoter_names_widget->startOfDoc();
+    }
 
     // Get the Versions and Copyrights, created at build time
-	std::string licenses_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"packages-info.txt");
-	llifstream licenses_file;
-	licenses_file.open(licenses_path.c_str());		/* Flawfinder: ignore */
-	if (licenses_file.is_open())
-	{
-		std::string license_line;
-		licenses_widget->clear();
-		while ( std::getline(licenses_file, license_line) )
-		{
-			licenses_widget->appendText(license_line+"\n", FALSE,
-										LLStyle::Params() .color(about_color));
-		}
-		licenses_file.close();
-	}
-	else
-	{
-		// this case will use the (out of date) hard coded value from the XUI
-		LL_INFOS("AboutInit") << "Could not read licenses file at " << licenses_path << LL_ENDL;
-	}
-	licenses_widget->setEnabled(FALSE);
-	licenses_widget->startOfDoc();
+    std::string licenses_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,"packages-info.txt");
+    llifstream licenses_file;
+    licenses_file.open(licenses_path.c_str());      /* Flawfinder: ignore */
+    if (licenses_file.is_open())
+    {
+        std::string license_line;
+        licenses_widget->clear();
+        while ( std::getline(licenses_file, license_line) )
+        {
+            licenses_widget->appendText(license_line+"\n", FALSE,
+                                        LLStyle::Params() .color(about_color));
+        }
+        licenses_file.close();
+    }
+    else
+    {
+        // this case will use the (out of date) hard coded value from the XUI
+        LL_INFOS("AboutInit") << "Could not read licenses file at " << licenses_path << LL_ENDL;
+    }
+    licenses_widget->setEnabled(FALSE);
+    licenses_widget->startOfDoc();
 
-	return TRUE;
+    return TRUE;
 }
 
 LLSD LLFloaterAbout::getInfo()
 {
-	return LLAppViewer::instance()->getViewerInfo();
+    return LLAppViewer::instance()->getViewerInfo();
 }
 
 /*static*/
@@ -323,35 +323,35 @@ void LLFloaterAbout::handleServerReleaseNotes(LLSD results)
 class LLFloaterAboutListener: public LLEventAPI
 {
 public:
-	LLFloaterAboutListener():
-		LLEventAPI("LLFloaterAbout",
+    LLFloaterAboutListener():
+        LLEventAPI("LLFloaterAbout",
                    "LLFloaterAbout listener to retrieve About box info")
-	{
-		add("getInfo",
+    {
+        add("getInfo",
             "Request an LLSD::Map containing information used to populate About box",
             &LLFloaterAboutListener::getInfo,
             LLSD().with("reply", LLSD()));
-	}
+    }
 
 private:
-	void getInfo(const LLSD& request) const
-	{
-		LLReqID reqid(request);
-		LLSD reply(LLFloaterAbout::getInfo());
-		reqid.stamp(reply);
-		LLEventPumps::instance().obtain(request["reply"]).post(reply);
-	}
+    void getInfo(const LLSD& request) const
+    {
+        LLReqID reqid(request);
+        LLSD reply(LLFloaterAbout::getInfo());
+        reqid.stamp(reply);
+        LLEventPumps::instance().obtain(request["reply"]).post(reply);
+    }
 };
 
 static LLFloaterAboutListener floaterAboutListener;
 
 void LLFloaterAbout::onClickCopyToClipboard()
 {
-	LLViewerTextEditor *support_widget = 
-		getChild<LLViewerTextEditor>("support_editor", true);
-	support_widget->selectAll();
-	support_widget->copy();
-	support_widget->deselect();
+    LLViewerTextEditor *support_widget =
+        getChild<LLViewerTextEditor>("support_editor", true);
+    support_widget->selectAll();
+    support_widget->copy();
+    support_widget->deselect();
 }
 
 void LLFloaterAbout::onClickUpdateCheck()
@@ -362,21 +362,21 @@ void LLFloaterAbout::onClickUpdateCheck()
 void LLFloaterAbout::setSupportText(const std::string& server_release_notes_url)
 {
 #if LL_WINDOWS
-	getWindow()->incBusyCount();
-	getWindow()->setCursor(UI_CURSOR_ARROW);
+    getWindow()->incBusyCount();
+    getWindow()->setCursor(UI_CURSOR_ARROW);
 #endif
 #if LL_WINDOWS
-	getWindow()->decBusyCount();
-	getWindow()->setCursor(UI_CURSOR_ARROW);
+    getWindow()->decBusyCount();
+    getWindow()->setCursor(UI_CURSOR_ARROW);
 #endif
 
-	LLViewerTextEditor *support_widget =
-		getChild<LLViewerTextEditor>("support_editor", true);
+    LLViewerTextEditor *support_widget =
+        getChild<LLViewerTextEditor>("support_editor", true);
 
-	LLUIColor about_color = LLUIColorTable::instance().getColor("TextFgReadOnlyColor");
-	support_widget->clear();
-	support_widget->appendText(LLAppViewer::instance()->getViewerInfoString(),
-							   FALSE, LLStyle::Params() .color(about_color));
+    LLUIColor about_color = LLUIColorTable::instance().getColor("TextFgReadOnlyColor");
+    support_widget->clear();
+    support_widget->appendText(LLAppViewer::instance()->getViewerInfoString(),
+                               FALSE, LLStyle::Params() .color(about_color));
 }
 
 ///----------------------------------------------------------------------------
@@ -384,6 +384,6 @@ void LLFloaterAbout::setSupportText(const std::string& server_release_notes_url)
 ///----------------------------------------------------------------------------
 void LLFloaterAboutUtil::registerFloater()
 {
-	LLFloaterReg::add("sl_about", "floater_about.xml",
-		&LLFloaterReg::build<LLFloaterAbout>);
+    LLFloaterReg::add("sl_about", "floater_about.xml",
+        &LLFloaterReg::build<LLFloaterAbout>);
 }

@@ -33,46 +33,46 @@
 class LLScriptEditor : public LLTextEditor
 {
 public:
-	
-	struct Params : public LLInitParam::Block<Params, LLTextEditor::Params>
-	{
-		Optional<bool>		show_line_numbers;
+
+    struct Params : public LLInitParam::Block<Params, LLTextEditor::Params>
+    {
+        Optional<bool>      show_line_numbers;
 //        Optional<bool> default_font_size;
-		Params();
-	};
-	
-	virtual ~LLScriptEditor();
-	
-	// LLView override
-	virtual void	draw() override;
-	BOOL	postBuild() override;
-	
-	void	initKeywords();
-	void	loadKeywords();
-	/* virtual */ void	clearSegments();
-	LLKeywords::keyword_iterator_t keywordsBegin()	{ return mKeywords.begin(); }
-	LLKeywords::keyword_iterator_t keywordsEnd()	{ return mKeywords.end(); }
-	
+        Params();
+    };
+
+    virtual ~LLScriptEditor();
+
+    // LLView override
+    virtual void    draw() override;
+    BOOL    postBuild() override;
+
+    void    initKeywords();
+    void    loadKeywords();
+    /* virtual */ void  clearSegments();
+    LLKeywords::keyword_iterator_t keywordsBegin()  { return mKeywords.begin(); }
+    LLKeywords::keyword_iterator_t keywordsEnd()    { return mKeywords.end(); }
+
 //    static std::string getScriptFontSize();
 //    LLFontGL* getScriptFont();
 //    void onFontSizeChange();
 
   protected:
-	friend class LLUICtrlFactory;
-	LLScriptEditor(const Params& p);
-	
+    friend class LLUICtrlFactory;
+    LLScriptEditor(const Params& p);
+
 private:
-	void	drawLineNumbers();
-	/* virtual */ void	updateSegments() override;
-	/* virtual */ void	drawSelectionBackground() override;
-	void	loadKeywords(const std::string& filename_keywords,
-						 const std::string& filename_colors);
-	
-	LLKeywords	mKeywords;
-	bool		mShowLineNumbers;
+    void    drawLineNumbers();
+    /* virtual */ void  updateSegments() override;
+    /* virtual */ void  drawSelectionBackground() override;
+    void    loadKeywords(const std::string& filename_keywords,
+                         const std::string& filename_colors);
+
+    LLKeywords  mKeywords;
+    bool        mShowLineNumbers;
 //    bool mUseDefaultFontSize;
-	boost::signals2::connection mFontNameConnection;
-	boost::signals2::connection mFontSizeConnection;
+    boost::signals2::connection mFontNameConnection;
+    boost::signals2::connection mFontSizeConnection;
 };
 
 #endif // LL_SCRIPTEDITOR_H

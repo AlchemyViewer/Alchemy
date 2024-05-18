@@ -142,8 +142,8 @@ void LLFloaterNewLocalInventory::onClickOK()
     perms->init(creator_id, owner_id, LLUUID::null, LLUUID::null);
 
     auto* item =
-        new LLViewerInventoryItem(item_id, gLocalInventory, 
-            *perms, asset_id, type, inv_type, name, desc, LLSaleInfo::DEFAULT, 
+        new LLViewerInventoryItem(item_id, gLocalInventory,
+            *perms, asset_id, type, inv_type, name, desc, LLSaleInfo::DEFAULT,
             0, 0);
 
     add_item(item);

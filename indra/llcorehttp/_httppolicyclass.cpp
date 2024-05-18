@@ -34,66 +34,66 @@ namespace LLCore
 
 
 HttpPolicyClass::HttpPolicyClass()
-	: mConnectionLimit(HTTP_CONNECTION_LIMIT_DEFAULT),
-	  mPerHostConnectionLimit(HTTP_CONNECTION_LIMIT_DEFAULT),
-	  mPipelining(HTTP_PIPELINING_DEFAULT),
-	  mThrottleRate(HTTP_THROTTLE_RATE_DEFAULT)
+    : mConnectionLimit(HTTP_CONNECTION_LIMIT_DEFAULT),
+      mPerHostConnectionLimit(HTTP_CONNECTION_LIMIT_DEFAULT),
+      mPipelining(HTTP_PIPELINING_DEFAULT),
+      mThrottleRate(HTTP_THROTTLE_RATE_DEFAULT)
 {}
 
 
 HttpStatus HttpPolicyClass::set(HttpRequest::EPolicyOption opt, long value)
 {
-	switch (opt)
-	{
-	case HttpRequest::PO_CONNECTION_LIMIT:
-		mConnectionLimit = llclamp(value, long(HTTP_CONNECTION_LIMIT_MIN), long(HTTP_CONNECTION_LIMIT_MAX));
-		break;
+    switch (opt)
+    {
+    case HttpRequest::PO_CONNECTION_LIMIT:
+        mConnectionLimit = llclamp(value, long(HTTP_CONNECTION_LIMIT_MIN), long(HTTP_CONNECTION_LIMIT_MAX));
+        break;
 
-	case HttpRequest::PO_PER_HOST_CONNECTION_LIMIT:
-		mPerHostConnectionLimit = llclamp(value, long(HTTP_CONNECTION_LIMIT_MIN), mConnectionLimit);
-		break;
+    case HttpRequest::PO_PER_HOST_CONNECTION_LIMIT:
+        mPerHostConnectionLimit = llclamp(value, long(HTTP_CONNECTION_LIMIT_MIN), mConnectionLimit);
+        break;
 
-	case HttpRequest::PO_PIPELINING_DEPTH:
-		mPipelining = llclamp(value, 0L, HTTP_PIPELINING_MAX);
-		break;
+    case HttpRequest::PO_PIPELINING_DEPTH:
+        mPipelining = llclamp(value, 0L, HTTP_PIPELINING_MAX);
+        break;
 
-	case HttpRequest::PO_THROTTLE_RATE:
-		mThrottleRate = llclamp(value, 0L, 1000000L);
-		break;
+    case HttpRequest::PO_THROTTLE_RATE:
+        mThrottleRate = llclamp(value, 0L, 1000000L);
+        break;
 
-	default:
-		return HttpStatus(HttpStatus::LLCORE, HE_INVALID_ARG);
-	}
+    default:
+        return HttpStatus(HttpStatus::LLCORE, HE_INVALID_ARG);
+    }
 
-	return HttpStatus();
+    return HttpStatus();
 }
 
 
 HttpStatus HttpPolicyClass::get(HttpRequest::EPolicyOption opt, long * value) const
 {
-	switch (opt)
-	{
-	case HttpRequest::PO_CONNECTION_LIMIT:
-		*value = mConnectionLimit;
-		break;
+    switch (opt)
+    {
+    case HttpRequest::PO_CONNECTION_LIMIT:
+        *value = mConnectionLimit;
+        break;
 
-	case HttpRequest::PO_PER_HOST_CONNECTION_LIMIT:
-		*value = mPerHostConnectionLimit;
-		break;
+    case HttpRequest::PO_PER_HOST_CONNECTION_LIMIT:
+        *value = mPerHostConnectionLimit;
+        break;
 
-	case HttpRequest::PO_PIPELINING_DEPTH:
-		*value = mPipelining;
-		break;
+    case HttpRequest::PO_PIPELINING_DEPTH:
+        *value = mPipelining;
+        break;
 
-	case HttpRequest::PO_THROTTLE_RATE:
-		*value = mThrottleRate;
-		break;
+    case HttpRequest::PO_THROTTLE_RATE:
+        *value = mThrottleRate;
+        break;
 
-	default:
-		return HttpStatus(HttpStatus::LLCORE, HE_INVALID_ARG);
-	}
+    default:
+        return HttpStatus(HttpStatus::LLCORE, HE_INVALID_ARG);
+    }
 
-	return HttpStatus();
+    return HttpStatus();
 }
 
 

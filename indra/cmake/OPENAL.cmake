@@ -28,14 +28,14 @@ if (USE_OPENAL)
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/OpenAL32.lib
             debug ${ARCH_PREBUILT_DIRS_DEBUG}/alut.lib
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/alut.lib
-	    )
+        )
   elseif (DARWIN)
     target_link_libraries( ll::openal INTERFACE
             debug ${ARCH_PREBUILT_DIRS_DEBUG}/libopenal.dylib
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libopenal.dylib
             debug ${ARCH_PREBUILT_DIRS_DEBUG}/libalut.dylib
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libalut.dylib
-	    )
+        )
   elseif (LINUX)
     target_link_libraries( ll::openal INTERFACE
             debug ${ARCH_PREBUILT_DIRS_DEBUG}/libopenal.so

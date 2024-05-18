@@ -22,7 +22,7 @@
 
 namespace ALViewerMenu
 {
-	void initialize_menus();
+    void initialize_menus();
 }
 
 #endif // AL_VIEWERMENU_H

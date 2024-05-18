@@ -89,7 +89,7 @@ LLSD LLSettingsWater::defaults(const LLSettingsBase::TrackPosition& position)
         // give the normal scale offset some variability over track time...
         F32 normal_scale_offset = (position * 0.5f) - 0.25f;
 
-        // Magic constants copied form defaults.xml 
+        // Magic constants copied form defaults.xml
         dfltsetting[SETTING_BLUR_MULTIPLIER] = LLSD::Real(0.04000f);
         dfltsetting[SETTING_FOG_COLOR] = LLColor3(0.0156f, 0.1490f, 0.2509f).getValue();
         dfltsetting[SETTING_FOG_DENSITY] = LLSD::Real(2.0f);
@@ -181,7 +181,7 @@ LLSD LLSettingsWater::translateLegacySettings(LLSD legacy)
     return newsettings;
 }
 
-void LLSettingsWater::blend(const LLSettingsBase::ptr_t &end, F64 blendf) 
+void LLSettingsWater::blend(const LLSettingsBase::ptr_t &end, F64 blendf)
 {
     LLSettingsWater::ptr_t other = PTR_NAMESPACE::static_pointer_cast<LLSettingsWater>(end);
     if (other)
@@ -300,7 +300,7 @@ F32 LLSettingsWater::getModifiedWaterFogDensityFast(F32 fog_density, F32 underwa
         // this seems to be unlikely to be a desirable use case for the majority.
         // 2) Force density to be an arbitrary non-negative (i.e. 1) when underwater and modifier is not an integer (1 was aribtrarily chosen as it gives at least some notion of fog in the transition)
         // This is more restrictive, effectively forcing a density under certain conditions, but allowing the range of #1 and avoiding blackness in other cases
-        // at the cost of overriding the fog density. 
+        // at the cost of overriding the fog density.
         if(fog_density < 0.0f && underwater_fog_mod != (F32)ll_round(underwater_fog_mod) )
         {
             fog_density = 1.0f;

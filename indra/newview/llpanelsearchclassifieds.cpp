@@ -48,63 +48,63 @@
 static LLPanelInjector<LLPanelSearchClassifieds> t_panel_search_classifieds("panel_search_classifieds");
 
 LLPanelSearchClassifieds::LLPanelSearchClassifieds()
-	: LLPanelSearch()
-	, mSearchEditor(nullptr)
-	, mClassifiedsCategory(nullptr)
+    : LLPanelSearch()
+    , mSearchEditor(nullptr)
+    , mClassifiedsCategory(nullptr)
 {
-	mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchClassifieds::onCommitSearch, this, _1));
+    mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchClassifieds::onCommitSearch, this, _1));
 }
 
 BOOL LLPanelSearchClassifieds::postBuild()
 {
-	mClassifiedsCategory = getChild<LLComboBox>("classifieds_category");
-	mClassifiedsCategory->add("All categories", LLSD("any"));
-	mClassifiedsCategory->addSeparator();
-	for (auto iter = LLClassifiedInfo::sCategories.cbegin();
-		 iter != LLClassifiedInfo::sCategories.cend();
-		 ++iter)
-	{
-		mClassifiedsCategory->add(LLTrans::getString(iter->second));
-	}
-	
-	mSearchEditor = getChild<LLSearchEditor>("search_bar");
-	//mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchClassifieds::onCommitSearch, this, _1));
-	
-	return TRUE;
+    mClassifiedsCategory = getChild<LLComboBox>("classifieds_category");
+    mClassifiedsCategory->add("All categories", LLSD("any"));
+    mClassifiedsCategory->addSeparator();
+    for (auto iter = LLClassifiedInfo::sCategories.cbegin();
+         iter != LLClassifiedInfo::sCategories.cend();
+         ++iter)
+    {
+        mClassifiedsCategory->add(LLTrans::getString(iter->second));
+    }
+
+    mSearchEditor = getChild<LLSearchEditor>("search_bar");
+    //mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchClassifieds::onCommitSearch, this, _1));
+
+    return TRUE;
 }
 
 void LLPanelSearchClassifieds::onCommitSearch(LLUICtrl* ctrl)
 {
-	LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
-	if (pSearchEditor)
-	{
-		std::string text = pSearchEditor->getText();
-		LLStringUtil::trim(text);
-		if (text.length() <= MIN_SEARCH_STRING_SIZE)
-			LLSearchHistory::getInstance()->addEntry(text);
-	}
-	search();
+    LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
+    if (pSearchEditor)
+    {
+        std::string text = pSearchEditor->getText();
+        LLStringUtil::trim(text);
+        if (text.length() <= MIN_SEARCH_STRING_SIZE)
+            LLSearchHistory::getInstance()->addEntry(text);
+    }
+    search();
 }
 
 void LLPanelSearchClassifieds::search()
 {
-	LLDirQuery query;
-	query.type = SE_CLASSIFIEDS;
-	query.results_per_page = 100;
-	query.text = mSearchEditor->getText();
-	LLStringUtil::trim(query.text);
-	
-	query.category_int = mClassifiedsCategory->getValue().asInteger();
-	
-	static LLUICachedControl<bool> inc_pg("ShowPGClassifieds", true);
-	static LLUICachedControl<bool> inc_mature("ShowMatureClassifieds", false);
-	static LLUICachedControl<bool> inc_adult("ShowAdultClassifieds", false);
-	if (!(inc_pg || inc_mature || inc_adult))
-	{
-		LLNotificationsUtil::add("NoContentToSearch");
-		return;
-	}
-	query.scope = pack_classified_flags_request(/*auto_renew*/ FALSE, inc_pg, inc_mature, inc_adult);
-	
-	mFloater->queryDirectory(query, true);
+    LLDirQuery query;
+    query.type = SE_CLASSIFIEDS;
+    query.results_per_page = 100;
+    query.text = mSearchEditor->getText();
+    LLStringUtil::trim(query.text);
+
+    query.category_int = mClassifiedsCategory->getValue().asInteger();
+
+    static LLUICachedControl<bool> inc_pg("ShowPGClassifieds", true);
+    static LLUICachedControl<bool> inc_mature("ShowMatureClassifieds", false);
+    static LLUICachedControl<bool> inc_adult("ShowAdultClassifieds", false);
+    if (!(inc_pg || inc_mature || inc_adult))
+    {
+        LLNotificationsUtil::add("NoContentToSearch");
+        return;
+    }
+    query.scope = pack_classified_flags_request(/*auto_renew*/ FALSE, inc_pg, inc_mature, inc_adult);
+
+    mFloater->queryDirectory(query, true);
 }

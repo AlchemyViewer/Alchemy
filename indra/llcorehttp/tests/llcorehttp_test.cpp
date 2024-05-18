@@ -1,4 +1,4 @@
-/** 
+/**
  * @file llcorehttp_test
  * @brief Main test runner
  *
@@ -51,74 +51,74 @@
 #include "llproxy.h"
 #include "llcleanup.h"
 
-#if 0	// lltut provides main and runner
+#if 0   // lltut provides main and runner
 
 namespace tut
 {
-	test_runner_singleton runner;
+    test_runner_singleton runner;
 }
 
 int main()
 {
-	curl_global_init(CURL_GLOBAL_ALL);
+    curl_global_init(CURL_GLOBAL_ALL);
 
-	// *FIXME:  Need threaded/SSL curl setup here.
-	
-	tut::reporter reporter;
+    // *FIXME:  Need threaded/SSL curl setup here.
 
-	tut::runner.get().set_callback(&reporter);
-	tut::runner.get().run_tests();
-	return !reporter.all_ok();
+    tut::reporter reporter;
 
-	curl_global_cleanup();
+    tut::runner.get().set_callback(&reporter);
+    tut::runner.get().run_tests();
+    return !reporter.all_ok();
+
+    curl_global_cleanup();
 }
 
 #endif // 0
 
 void init_curl()
 {
-	curl_global_init(CURL_GLOBAL_ALL);
+    curl_global_init(CURL_GLOBAL_ALL);
 
-	LLProxy::getInstance();
+    LLProxy::getInstance();
 }
 
 
 void term_curl()
 {
-	SUBSYSTEM_CLEANUP(LLProxy);
+    SUBSYSTEM_CLEANUP(LLProxy);
 }
 
 
 std::string get_base_url()
 {
-	const char * env(getenv("LL_TEST_PORT"));
+    const char * env(getenv("LL_TEST_PORT"));
 
-	if (! env)
-	{
-		std::cerr << "LL_TEST_PORT environment variable missing." << std::endl;
-		std::cerr << "Test expects to run in test_llcorehttp_peer.py script." << std::endl;
-		tut::ensure("LL_TEST_PORT set in environment", NULL != env);
-	}
+    if (! env)
+    {
+        std::cerr << "LL_TEST_PORT environment variable missing." << std::endl;
+        std::cerr << "Test expects to run in test_llcorehttp_peer.py script." << std::endl;
+        tut::ensure("LL_TEST_PORT set in environment", NULL != env);
+    }
 
-	int port(atoi(env));
-	std::ostringstream out;
-	out << "http://localhost:" << port << "/";
-	return out.str();
+    int port(atoi(env));
+    std::ostringstream out;
+    out << "http://localhost:" << port << "/";
+    return out.str();
 }
 
 
 void stop_thread(LLCore::HttpRequest * req)
 {
-	if (req)
-	{
-		req->requestStopThread(LLCore::HttpHandler::ptr_t());
-	
-		int count = 0;
-		int limit = 10;
-		while (count++ < limit && ! HttpService::isStopped())
-		{
-			req->update(1000);
-			usleep(100000);
-		}
-	}
+    if (req)
+    {
+        req->requestStopThread(LLCore::HttpHandler::ptr_t());
+
+        int count = 0;
+        int limit = 10;
+        while (count++ < limit && ! HttpService::isStopped())
+        {
+            req->update(1000);
+            usleep(100000);
+        }
+    }
 }

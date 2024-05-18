@@ -49,7 +49,7 @@ public:
 private:
     LogPayload mEntry;
 
-	std::unique_ptr<LLEasyMessageLogEntry> mResponseMsg{};
+    std::unique_ptr<LLEasyMessageLogEntry> mResponseMsg{};
     LLEasyMessageReader*                   mEasyMessageReader;
 };
 

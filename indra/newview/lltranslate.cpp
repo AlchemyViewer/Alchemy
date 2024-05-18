@@ -5,21 +5,21 @@
  * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -357,22 +357,22 @@ private:
 //-------------------------------------------------------------------------
 // virtual
 std::string LLGoogleTranslationHandler::getTranslateURL(
-	const std::string &from_lang,
-	const std::string &to_lang,
-	const std::string &text) const
+    const std::string &from_lang,
+    const std::string &to_lang,
+    const std::string &text) const
 {
-	std::string url = std::string("https://www.googleapis.com/language/translate/v2?key=")
-		+ getAPIKey() + "&q=" + LLURI::escape(text) + "&target=" + to_lang;
-	if (!from_lang.empty())
-	{
-		url += "&source=" + from_lang;
-	}
+    std::string url = std::string("https://www.googleapis.com/language/translate/v2?key=")
+        + getAPIKey() + "&q=" + LLURI::escape(text) + "&target=" + to_lang;
+    if (!from_lang.empty())
+    {
+        url += "&source=" + from_lang;
+    }
     return url;
 }
 
 // virtual
 std::string LLGoogleTranslationHandler::getKeyVerificationURL(
-	const LLSD& key) const
+    const LLSD& key) const
 {
     std::string url = std::string("https://www.googleapis.com/language/translate/v2/languages?key=")
         + key.asString() +"&target=en";
@@ -389,14 +389,14 @@ bool LLGoogleTranslationHandler::checkVerificationResponse(
 
 // virtual
 bool LLGoogleTranslationHandler::parseResponse(
-	const LLSD& http_response,
-	int& status,
-	const std::string& body,
-	std::string& translation,
-	std::string& detected_lang,
-	std::string& err_msg) const
+    const LLSD& http_response,
+    int& status,
+    const std::string& body,
+    std::string& translation,
+    std::string& detected_lang,
+    std::string& err_msg) const
 {
-	const std::string& text = !body.empty() ? body : http_response["error_body"].asStringRef();
+    const std::string& text = !body.empty() ? body : http_response["error_body"].asStringRef();
     boost::system::error_code ec;
     boost::json::value root = boost::json::parse(text, ec);
     if (ec.failed())
@@ -405,33 +405,33 @@ bool LLGoogleTranslationHandler::parseResponse(
         return false;
     }
 
-	if (status != HTTP_OK)
-	{
-		// Request failed. Extract error message from the response.
-		parseErrorResponse(root, status, err_msg);
-		return false;
-	}
+    if (status != HTTP_OK)
+    {
+        // Request failed. Extract error message from the response.
+        parseErrorResponse(root, status, err_msg);
+        return false;
+    }
 
-	// Request succeeded, extract translation from the response.
-	return parseTranslation(root, translation, detected_lang);
+    // Request succeeded, extract translation from the response.
+    return parseTranslation(root, translation, detected_lang);
 }
 
 // virtual
 bool LLGoogleTranslationHandler::isConfigured() const
 {
-	return !getAPIKey().empty();
+    return !getAPIKey().empty();
 }
 
 // static
 void LLGoogleTranslationHandler::parseErrorResponse(
-	const boost::json::value& root,
-	int& status,
-	std::string& err_msg)
+    const boost::json::value& root,
+    int& status,
+    std::string& err_msg)
 {
     boost::system::error_code ec;
     auto message = root.find_pointer("/data/message", ec);
     auto code = root.find_pointer("/data/code", ec);
-    if (!message || !code) 
+    if (!message || !code)
     {
         return;
     }
@@ -449,9 +449,9 @@ void LLGoogleTranslationHandler::parseErrorResponse(
 
 // static
 bool LLGoogleTranslationHandler::parseTranslation(
-	const boost::json::value& root,
-	std::string& translation,
-	std::string& detected_lang)
+    const boost::json::value& root,
+    std::string& translation,
+    std::string& detected_lang)
 {
     boost::system::error_code ec;
     auto translated_text = root.find_pointer("/data/translations/0/translatedText", ec);
@@ -473,17 +473,17 @@ bool LLGoogleTranslationHandler::parseTranslation(
         detected_lang = lang_val ? lang_val.value() : "";
     }
 
-	return true;
+    return true;
 }
 
 // static
 std::string LLGoogleTranslationHandler::getAPIKey()
 {
     static LLCachedControl<std::string> google_key(gSavedSettings, "GoogleTranslateAPIKey");
-	return google_key;
+    return google_key;
 }
 
-/*virtual*/ 
+/*virtual*/
 void LLGoogleTranslationHandler::verifyKey(const LLSD &key, LLTranslate::KeyVerificationResult_fn fnc)
 {
     LLCoros::instance().launch("Google /Verify Key", boost::bind(&LLTranslationAPIHandler::verifyKeyCoro,
@@ -583,9 +583,9 @@ private:
 //-------------------------------------------------------------------------
 // virtual
 std::string LLAzureTranslationHandler::getTranslateURL(
-	const std::string &from_lang,
-	const std::string &to_lang,
-	const std::string &text) const
+    const std::string &from_lang,
+    const std::string &to_lang,
+    const std::string &text) const
 {
     std::string url;
     LLSD key = getAPIKey();
@@ -606,7 +606,7 @@ std::string LLAzureTranslationHandler::getTranslateURL(
 
 // virtual
 std::string LLAzureTranslationHandler::getKeyVerificationURL(
-	const LLSD& key) const
+    const LLSD& key) const
 {
     std::string url;
     if (key.isMap())
@@ -667,18 +667,18 @@ bool LLAzureTranslationHandler::checkVerificationResponse(
 // virtual
 bool LLAzureTranslationHandler::parseResponse(
     const LLSD& http_response,
-	int& status,
-	const std::string& body,
-	std::string& translation,
-	std::string& detected_lang,
-	std::string& err_msg) const
+    int& status,
+    const std::string& body,
+    std::string& translation,
+    std::string& detected_lang,
+    std::string& err_msg) const
 {
-	if (status != HTTP_OK)
-	{
+    if (status != HTTP_OK)
+    {
         if (http_response.has("error_body"))
             err_msg = parseErrorResponse(http_response["error_body"].asString());
-		return false;
-	}
+        return false;
+    }
 
     //Example:
     // "[{\"detectedLanguage\":{\"language\":\"en\",\"score\":1.0},\"translations\":[{\"text\":\"Hello, what is your name?\",\"to\":\"en\"}]}]"
@@ -713,7 +713,7 @@ bool LLAzureTranslationHandler::parseResponse(
 // virtual
 bool LLAzureTranslationHandler::isConfigured() const
 {
-	return getAPIKey().isMap();
+    return getAPIKey().isMap();
 }
 
 //static
@@ -731,7 +731,7 @@ std::string LLAzureTranslationHandler::parseErrorResponse(
     }
 
     auto err_msg = root.find_pointer("/error/message", ec);
-    if (!err_msg) 
+    if (!err_msg)
     {
         return {};
     }
@@ -748,19 +748,19 @@ std::string LLAzureTranslationHandler::parseErrorResponse(
 LLSD LLAzureTranslationHandler::getAPIKey()
 {
     static LLCachedControl<LLSD> azure_key(gSavedSettings, "AzureTranslateAPIKey");
-	return azure_key;
+    return azure_key;
 }
 
 // static
 std::string LLAzureTranslationHandler::getAPILanguageCode(const std::string& lang)
 {
-	return lang == "zh" ? "zh-CHT" : lang; // treat Chinese as Traditional Chinese
+    return lang == "zh" ? "zh-CHT" : lang; // treat Chinese as Traditional Chinese
 }
 
 /*virtual*/
 void LLAzureTranslationHandler::verifyKey(const LLSD &key, LLTranslate::KeyVerificationResult_fn fnc)
 {
-    LLCoros::instance().launch("Azure /Verify Key", boost::bind(&LLTranslationAPIHandler::verifyKeyCoro, 
+    LLCoros::instance().launch("Azure /Verify Key", boost::bind(&LLTranslationAPIHandler::verifyKeyCoro,
         this, LLTranslate::SERVICE_AZURE, key, fnc));
 }
 /*virtual*/
@@ -1004,7 +1004,7 @@ std::string LLDeepLTranslationHandler::parseErrorResponse(
     boost::system::error_code ec;
     boost::json::value root = boost::json::parse(body, ec);
     if (ec.failed())
-    {   
+    {
         return {};
     }
 
@@ -1101,10 +1101,10 @@ LLSD LLDeepLTranslationHandler::verifyAndSuspend(LLCoreHttpUtil::HttpCoroutineAd
 
 //=========================================================================
 LLTranslate::LLTranslate():
-	mCharsSeen(0),
-	mCharsSent(0),
-	mFailureCount(0),
-	mSuccessCount(0)
+    mCharsSeen(0),
+    mCharsSent(0),
+    mFailureCount(0),
+    mSuccessCount(0)
 {
 }
 
@@ -1205,68 +1205,68 @@ void LLTranslate::verifyKey(EService service, const LLSD &key, KeyVerificationRe
 //static
 std::string LLTranslate::getTranslateLanguage()
 {
-	std::string language = gSavedSettings.getString("TranslateLanguage");
-	if (language.empty() || language == "default")
-	{
-		language = LLUI::getLanguage();
-	}
-	language = language.substr(0,2);
-	return language;
+    std::string language = gSavedSettings.getString("TranslateLanguage");
+    if (language.empty() || language == "default")
+    {
+        language = LLUI::getLanguage();
+    }
+    language = language.substr(0,2);
+    return language;
 }
 
 // static
 bool LLTranslate::isTranslationConfigured()
 {
-	return getPreferredHandler().isConfigured();
+    return getPreferredHandler().isConfigured();
 }
 
 void LLTranslate::logCharsSeen(size_t count)
 {
-	mCharsSeen += count;
+    mCharsSeen += count;
 }
 
 void LLTranslate::logCharsSent(size_t count)
 {
-	mCharsSent += count;
+    mCharsSent += count;
 }
 
 void LLTranslate::logSuccess(S32 count)
 {
-	mSuccessCount += count;
+    mSuccessCount += count;
 }
 
 void LLTranslate::logFailure(S32 count)
 {
-	mFailureCount += count;
+    mFailureCount += count;
 }
 
 LLSD LLTranslate::asLLSD() const
 {
-	LLSD res;
-	bool on = gSavedSettings.getBOOL("TranslateChat");
-	res["on"] = on;
-	res["chars_seen"] = (S32) mCharsSeen;
-	if (on)
-	{
-		res["chars_sent"] = (S32) mCharsSent;
-		res["success_count"] = mSuccessCount;
-		res["failure_count"] = mFailureCount;
-		res["language"] = getTranslateLanguage();  
-		res["service"] = gSavedSettings.getString("TranslationService");
-	}
-	return res;
+    LLSD res;
+    bool on = gSavedSettings.getBOOL("TranslateChat");
+    res["on"] = on;
+    res["chars_seen"] = (S32) mCharsSeen;
+    if (on)
+    {
+        res["chars_sent"] = (S32) mCharsSent;
+        res["success_count"] = mSuccessCount;
+        res["failure_count"] = mFailureCount;
+        res["language"] = getTranslateLanguage();
+        res["service"] = gSavedSettings.getString("TranslationService");
+    }
+    return res;
 }
 
 // static
 LLTranslationAPIHandler& LLTranslate::getPreferredHandler()
 {
-	EService service = SERVICE_AZURE;
+    EService service = SERVICE_AZURE;
 
-	std::string service_str = gSavedSettings.getString("TranslationService");
-	if (service_str == "google")
-	{
-		service = SERVICE_GOOGLE;
-	}
+    std::string service_str = gSavedSettings.getString("TranslationService");
+    if (service_str == "google")
+    {
+        service = SERVICE_GOOGLE;
+    }
     if (service_str == "azure")
     {
         service = SERVICE_AZURE;
@@ -1276,14 +1276,14 @@ LLTranslationAPIHandler& LLTranslate::getPreferredHandler()
         service = SERVICE_DEEPL;
     }
 
-	return getHandler(service);
+    return getHandler(service);
 }
 
 // static
 LLTranslationAPIHandler& LLTranslate::getHandler(EService service)
 {
-	static LLGoogleTranslationHandler google;
-	static LLAzureTranslationHandler azure;
+    static LLGoogleTranslationHandler google;
+    static LLAzureTranslationHandler azure;
     static LLDeepLTranslationHandler deepl;
 
     switch (service)

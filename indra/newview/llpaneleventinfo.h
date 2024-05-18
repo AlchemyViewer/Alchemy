@@ -37,23 +37,23 @@
 class LLPanelEventInfo : public LLPanel
 {
 public:
-	LLPanelEventInfo();
-	/*virtual*/ BOOL postBuild() override;
-	/*virtual*/ void onOpen(const LLSD& key) override;
-	
+    LLPanelEventInfo();
+    /*virtual*/ BOOL postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
+
 private:
-	~LLPanelEventInfo();
-	bool processEventReply(const LLEventStruct& event);
-	std::string formatFromMinutes(U32 time);
-	void setEventID(U32 id) { mEventID = id; }
-	U32 getEventID() const { return mEventID; }
-	void onBtnTeleport();
-	void onBtnMap();
-	void onBtnRemind();
-	
-	LLEventStruct mEvent;
-	U32 mEventID;
-	boost::signals2::connection mEventNotifierConnection;
+    ~LLPanelEventInfo();
+    bool processEventReply(const LLEventStruct& event);
+    std::string formatFromMinutes(U32 time);
+    void setEventID(U32 id) { mEventID = id; }
+    U32 getEventID() const { return mEventID; }
+    void onBtnTeleport();
+    void onBtnMap();
+    void onBtnRemind();
+
+    LLEventStruct mEvent;
+    U32 mEventID;
+    boost::signals2::connection mEventNotifierConnection;
 };
 
 #endif // LL_PANELEVENTINFO_H

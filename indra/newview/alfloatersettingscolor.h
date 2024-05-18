@@ -35,28 +35,28 @@ class LLSpinCtrl;
 class LLTextBox;
 
 class ALFloaterSettingsColor final
-:	public LLFloater
+:   public LLFloater
 {
-	friend class LLFloaterReg;
+    friend class LLFloaterReg;
 
 public:
 
-	virtual BOOL postBuild();
-	virtual void draw();
+    virtual BOOL postBuild();
+    virtual void draw();
 
-	void updateControl(const std::string& color_name);
+    void updateControl(const std::string& color_name);
 
-	void onCommitSettings();
-	void onClickDefault();
+    void onCommitSettings();
+    void onClickDefault();
 
     bool matchesSearchFilter(std::string setting_name);
     bool isSettingHidden(const std::string& color_name);
 
 private:
-	// key - selects which settings to show, one of:
-	// "all", "base", "account", "skin"
-	ALFloaterSettingsColor(const LLSD& key);
-	virtual ~ALFloaterSettingsColor();
+    // key - selects which settings to show, one of:
+    // "all", "base", "account", "skin"
+    ALFloaterSettingsColor(const LLSD& key);
+    virtual ~ALFloaterSettingsColor();
 
     void updateList(bool skip_selection = false);
     void onSettingSelect();
@@ -66,13 +66,13 @@ private:
     void hideUIControls();
 
     LLScrollListCtrl* mSettingList;
-	
-protected:
-	LLUICtrl*			mDefaultButton = nullptr;
-	LLTextBox*			mSettingNameText = nullptr;
 
-	LLSpinCtrl* mAlphaSpinner = nullptr;
-	LLColorSwatchCtrl* mColorSwatch = nullptr;
+protected:
+    LLUICtrl*           mDefaultButton = nullptr;
+    LLTextBox*          mSettingNameText = nullptr;
+
+    LLSpinCtrl* mAlphaSpinner = nullptr;
+    LLColorSwatchCtrl* mColorSwatch = nullptr;
 
     std::string mSearchFilter;
 };

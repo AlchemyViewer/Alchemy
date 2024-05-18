@@ -38,14 +38,14 @@ class LLSearchEditor;
 class LLPanelSearchPeople : public LLPanelSearch
 {
 public:
-	LLPanelSearchPeople();
-	/*virtual*/ BOOL postBuild() override;
-	
+    LLPanelSearchPeople();
+    /*virtual*/ BOOL postBuild() override;
+
 private:
-	/*virtual*/ void onCommitSearch(LLUICtrl* ctrl) override;
-	/*virtual*/ void search() override;
-	
-	LLSearchEditor* mSearchEditor;
+    /*virtual*/ void onCommitSearch(LLUICtrl* ctrl) override;
+    /*virtual*/ void search() override;
+
+    LLSearchEditor* mSearchEditor;
 };
 
 #endif // LL_PANELSEARCHPEOPLE_H

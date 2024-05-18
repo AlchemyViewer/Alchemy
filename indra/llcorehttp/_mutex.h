@@ -1,4 +1,4 @@
-/** 
+/**
  * @file _mutex.hpp
  * @brief mutex type abstraction
  *
@@ -52,5 +52,5 @@ typedef std::unique_lock<HttpMutex> HttpScopedLock;
 
 }
 
-#endif	// LLCOREINT_MUTEX_H
+#endif  // LLCOREINT_MUTEX_H
 

@@ -36,16 +36,16 @@
 class LLFloaterGenericText final : public LLFloater
 {
 public:
-	LLFloaterGenericText(const LLSD& key);
-	BOOL postBuild() override;
+    LLFloaterGenericText(const LLSD& key);
+    BOOL postBuild() override;
 private:
-	~LLFloaterGenericText() = default;
-	void onClickClose();
-	void onClickCopy();
-	
-	std::string mTitle;
-	std::string mContents;
-	
+    ~LLFloaterGenericText() = default;
+    void onClickClose();
+    void onClickCopy();
+
+    std::string mTitle;
+    std::string mContents;
+
 };
 
 #endif // LL_FLOATERGENERICTEXT_H

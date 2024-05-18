@@ -41,45 +41,45 @@
 class ALBlockedAsset
 {
 public:
-	ALBlockedAsset() = default;
-	ALBlockedAsset(const LLSD& sd) { fromLLSD(sd); }
+    ALBlockedAsset() = default;
+    ALBlockedAsset(const LLSD& sd) { fromLLSD(sd); }
 
-	LLSD toLLSD() const;
-	void fromLLSD(const LLSD& sd);
+    LLSD toLLSD() const;
+    void fromLLSD(const LLSD& sd);
 
-	std::string			mLocation;
-	LLUUID				mOwnerID;
-	LLDate				mDate;
-	LLAssetType::EType  mAssetType = LLAssetType::AT_NONE;
-	bool				mPersist = true;
+    std::string         mLocation;
+    LLUUID              mOwnerID;
+    LLDate              mDate;
+    LLAssetType::EType  mAssetType = LLAssetType::AT_NONE;
+    bool                mPersist = true;
 };
 
 class ALAssetBlocklist : public LLSingleton<ALAssetBlocklist>
 {
-	LLSINGLETON(ALAssetBlocklist);
+    LLSINGLETON(ALAssetBlocklist);
 protected:
-	/*virtual*/ ~ALAssetBlocklist();
+    /*virtual*/ ~ALAssetBlocklist();
 
-	void load();
-	void save() const;
+    void load();
+    void save() const;
 
 public:
-	using entry_list_t = boost::unordered_map<LLUUID, ALBlockedAsset>;
-	using change_signal_t = boost::signals2::signal<void()>;
+    using entry_list_t = boost::unordered_map<LLUUID, ALBlockedAsset>;
+    using change_signal_t = boost::signals2::signal<void()>;
 
-	const entry_list_t& getEntries() const { return mEntries; }
-	
-	void addEntry(const LLUUID& asset_id, const LLUUID& avatar_id, const std::string& region, LLAssetType::EType type, bool persist = true);
-	void removeEntry(const LLUUID& asset_id);
-	void removeEntries(const uuid_vec_t& asset_ids);
+    const entry_list_t& getEntries() const { return mEntries; }
 
-	bool isBlocked(const LLUUID& asset_id);
+    void addEntry(const LLUUID& asset_id, const LLUUID& avatar_id, const std::string& region, LLAssetType::EType type, bool persist = true);
+    void removeEntry(const LLUUID& asset_id);
+    void removeEntries(const uuid_vec_t& asset_ids);
 
-	boost::signals2::connection setChangeCallback(const change_signal_t::slot_type& cb) { return mChangedSignal.connect(cb); }
+    bool isBlocked(const LLUUID& asset_id);
+
+    boost::signals2::connection setChangeCallback(const change_signal_t::slot_type& cb) { return mChangedSignal.connect(cb); }
 
 protected:
-	entry_list_t mEntries;
-	change_signal_t	mChangedSignal;
+    entry_list_t mEntries;
+    change_signal_t mChangedSignal;
 };
 
 // ============================================================================

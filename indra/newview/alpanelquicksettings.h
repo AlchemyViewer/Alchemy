@@ -37,25 +37,25 @@ class LLSpinCtrl;
 class ALPanelQuickSettings final : public LLPanel
 {
 public:
-	ALPanelQuickSettings();
-	~ALPanelQuickSettings();
+    ALPanelQuickSettings();
+    ~ALPanelQuickSettings();
 
-	BOOL postBuild() override;
-	void refresh() override;
+    BOOL postBuild() override;
+    void refresh() override;
 
 private:
-	void onHoverSliderMoved(const LLSD& val);
-	void onHoverSliderFinalCommit();
-	void syncFromPreferenceSetting();
-	
-	void onRegionChanged();
-	void onSimulatorFeaturesReceived(const LLUUID &region_id);
-	void updateEditHoverEnabled();
+    void onHoverSliderMoved(const LLSD& val);
+    void onHoverSliderFinalCommit();
+    void syncFromPreferenceSetting();
 
-	LLSlider* mHoverSlider;
-	LLSpinCtrl* mHoverSpinner;
-	
-	boost::signals2::connection mRegionChangedSlot;
+    void onRegionChanged();
+    void onSimulatorFeaturesReceived(const LLUUID &region_id);
+    void updateEditHoverEnabled();
+
+    LLSlider* mHoverSlider;
+    LLSpinCtrl* mHoverSpinner;
+
+    boost::signals2::connection mRegionChangedSlot;
 };
 
 #endif // AL_ALPANELQUICKSETTINGS_H

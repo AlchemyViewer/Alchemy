@@ -1,4 +1,4 @@
-/** 
+/**
  * @file SMAANeighborhoodBlendF.glsl
  */
 
@@ -30,13 +30,13 @@ float4 SMAANeighborhoodBlendingPS(float2 texcoord,
 
 void main()
 {
-	frag_color = SMAANeighborhoodBlendingPS(vary_texcoord0,
-											vary_offset,
-											tex0,
-											tex1
-											#if SMAA_REPROJECTION
-											, tex2
-											#endif
-											);
+    frag_color = SMAANeighborhoodBlendingPS(vary_texcoord0,
+                                            vary_offset,
+                                            tex0,
+                                            tex1
+                                            #if SMAA_REPROJECTION
+                                            , tex2
+                                            #endif
+                                            );
 }
 

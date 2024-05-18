@@ -87,7 +87,7 @@ extern thread_local bool gProfilerEnabled;
         #include "tracy/Tracy.hpp"
 
         // Enable OpenGL profiling
-    	#define LL_PROFILER_ENABLE_TRACY_MEMORY 0
+        #define LL_PROFILER_ENABLE_TRACY_MEMORY 0
         #define LL_PROFILER_ENABLE_TRACY_OPENGL 1
 
         // Enable RenderDoc labeling

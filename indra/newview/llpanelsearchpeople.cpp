@@ -41,47 +41,47 @@
 static LLPanelInjector<LLPanelSearchPeople> t_panel_search_people("panel_search_people");
 
 LLPanelSearchPeople::LLPanelSearchPeople()
-:	LLPanelSearch()
+:   LLPanelSearch()
 {
-	mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchPeople::onCommitSearch, this, _1));
+    mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchPeople::onCommitSearch, this, _1));
 }
 
 BOOL LLPanelSearchPeople::postBuild()
 {
-	mSearchEditor = getChild<LLSearchEditor>("search_bar");
-	//mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchPeople::onCommitSearch, this, _1));
-	
-	return TRUE;
+    mSearchEditor = getChild<LLSearchEditor>("search_bar");
+    //mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchPeople::onCommitSearch, this, _1));
+
+    return TRUE;
 }
 
 void LLPanelSearchPeople::onCommitSearch(LLUICtrl* ctrl)
 {
-	LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
-	if (pSearchEditor)
-	{
-		std::string text = pSearchEditor->getText();
-		LLStringUtil::trim(text);
-		if (text.length() <= MIN_SEARCH_STRING_SIZE)
-			LLSearchHistory::getInstance()->addEntry(text);
-	}
-	search();
+    LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
+    if (pSearchEditor)
+    {
+        std::string text = pSearchEditor->getText();
+        LLStringUtil::trim(text);
+        if (text.length() <= MIN_SEARCH_STRING_SIZE)
+            LLSearchHistory::getInstance()->addEntry(text);
+    }
+    search();
 }
 
 bool isNotAlphaNum(char c)
 {
-	return !std::isalnum(c);
+    return !std::isalnum(c);
 }
 
 void LLPanelSearchPeople::search()
 {
-	LLDirQuery query;
-	query.type = SE_PEOPLE;
-	query.results_per_page = 100;
-	query.text = mSearchEditor->getText();
-	std::replace_if(query.text.begin(), query.text.end(), isNotAlphaNum, ' ');
-	LLStringUtil::trim(query.text);
+    LLDirQuery query;
+    query.type = SE_PEOPLE;
+    query.results_per_page = 100;
+    query.text = mSearchEditor->getText();
+    std::replace_if(query.text.begin(), query.text.end(), isNotAlphaNum, ' ');
+    LLStringUtil::trim(query.text);
 
-	mFloater->queryDirectory(query, true);
-	if (query.text.length() < MIN_SEARCH_STRING_SIZE)
-		mFloater->setResultsComment(getString("SeachFilteredOnShortWordsEmpty"));
+    mFloater->queryDirectory(query, true);
+    if (query.text.length() < MIN_SEARCH_STRING_SIZE)
+        mFloater->setResultsComment(getString("SeachFilteredOnShortWordsEmpty"));
 }

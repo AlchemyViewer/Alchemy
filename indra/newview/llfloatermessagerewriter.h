@@ -24,14 +24,14 @@
 class LLFloaterMessageRewriter final : public LLFloater
 {
 public:
-	LLFloaterMessageRewriter(const LLSD& key);
-	~LLFloaterMessageRewriter() = default;
-	BOOL postBuild() override;
-	
+    LLFloaterMessageRewriter(const LLSD& key);
+    ~LLFloaterMessageRewriter() = default;
+    BOOL postBuild() override;
+
 private:
-	void onClickSaveRules();
-	void onClickNewRule();
-	void refreshRuleList();
+    void onClickSaveRules();
+    void onClickNewRule();
+    void refreshRuleList();
 };
 
 #endif // LL_LLFLOATERMESSAGEREWRITER_H

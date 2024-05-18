@@ -56,7 +56,7 @@ void LLReflectionMap::update(U32 resolution, U32 face, bool force_dynamic, F32 n
     llassert(mCubeArray.notNull());
     llassert(mCubeIndex != -1);
     //llassert(LLPipeline::sRenderDeferred);
-    
+
     // make sure we don't walk off the edge of the render target
     while (resolution > gPipeline.mRT->deferredScreen.getWidth() ||
         resolution > gPipeline.mRT->deferredScreen.getHeight())
@@ -65,7 +65,7 @@ void LLReflectionMap::update(U32 resolution, U32 face, bool force_dynamic, F32 n
     }
 
     F32 clip = (near_clip > 0) ? near_clip : getNearClip();
-    
+
     gViewerWindow->cubeSnapshot(LLVector3(mOrigin), mCubeArray, mCubeIndex, face, clip, getIsDynamic() || force_dynamic, useClipPlane, clipPlane);
 }
 
@@ -73,11 +73,12 @@ void LLReflectionMap::autoAdjustOrigin()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
 
-    if (mGroup && !mComplete)
+
+    if (mGroup && !mComplete && !mGroup->hasState(LLViewerOctreeGroup::DEAD))
     {
         const LLVector4a* bounds = mGroup->getBounds();
         auto* node = mGroup->getOctreeNode();
-        auto* part = mGroup->getSpatialPartition();
+        LLSpatialPartition* part = mGroup->getSpatialPartition();
 
         if (part && part->mPartitionType == LLViewerRegion::PARTITION_VOLUME)
         {
@@ -144,7 +145,7 @@ void LLReflectionMap::autoAdjustOrigin()
             LLVector3 origin(fp);
             F32 height = LLWorld::instance().resolveLandHeightAgent(origin) + 2.f;
             fp[2] = llmax(fp[2], height);
-            
+
             // make sure radius encompasses all objects
             LLSimdScalar r2 = 0.0;
             for (int i = 0; i < 8; ++i)
@@ -164,7 +165,7 @@ void LLReflectionMap::autoAdjustOrigin()
 
             // make sure near clip doesn't poke through ground
             fp[2] = llmax(fp[2], height+mRadius*0.5f);
-            
+
         }
     }
     else if (mViewerObject && !mViewerObject->isDead())
@@ -237,7 +238,7 @@ bool LLReflectionMap::getIsDynamic()
 {
     static LLCachedControl<S32> sProbeDetail(gSavedSettings, "RenderReflectionProbeDetail", -1);
     if (sProbeDetail > (S32) LLReflectionMapManager::DetailLevel::STATIC_ONLY &&
-        mViewerObject && 
+        mViewerObject &&
         mViewerObject->getVolume())
     {
         return ((LLVOVolume*)mViewerObject)->getReflectionProbeIsDynamic();
@@ -247,7 +248,7 @@ bool LLReflectionMap::getIsDynamic()
 }
 
 bool LLReflectionMap::getBox(LLMatrix4& box)
-{ 
+{
     if (mViewerObject)
     {
         LLVolume* volume = mViewerObject->getVolume();
@@ -257,10 +258,10 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
 
             if (vobjp->getReflectionProbeIsBox())
             {
-				LLVector3 s = vobjp->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
-				mRadius = s.magVec();
-				if (vobjp->mDrawable != nullptr)
-				{
+                LLVector3 s = vobjp->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
+                mRadius = s.magVec();
+                if (vobjp->mDrawable != nullptr)
+                {
                     // object to agent space (no scale)
                     LLMatrix4a scale;
                     scale.setIdentity();
@@ -269,14 +270,14 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
 
                     // construct object to camera space (with scale)
                     LLMatrix4a mv = gGLModelView;
-					mv.mul(vobjp->mDrawable->getWorldMatrix());
-					mv.mul(scale);
+                    mv.mul(vobjp->mDrawable->getWorldMatrix());
+                    mv.mul(scale);
 
-                    // inverse is camera space to object unit cube 
-					mv.invert();
-					box = LLMatrix4(mv);
+                    // inverse is camera space to object unit cube
+                    mv.invert();
+                    box = LLMatrix4(mv);
                     return true;
-				}
+                }
             }
         }
     }
@@ -337,7 +338,7 @@ void LLReflectionMap::doOcclusion(const LLVector4a& eye)
         mOccluded = false;
         return;
     }
-    
+
     if (mOcclusionQuery == 0)
     { // no query was previously issued, allocate one and issue
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - glGenQueries");

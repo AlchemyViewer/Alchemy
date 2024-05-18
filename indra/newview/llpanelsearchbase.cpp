@@ -33,12 +33,12 @@
 #include "llfloaterdirectory.h"
 
 LLPanelSearch::LLPanelSearch()
-:	LLPanel()
-,	mFloater(nullptr)
+:   LLPanel()
+,   mFloater(nullptr)
 {
 }
 
 void LLPanelSearch::setSearchFloater(LLFloaterDirectory* floater)
 {
-	mFloater = floater;
+    mFloater = floater;
 }

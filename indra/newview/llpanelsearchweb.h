@@ -42,29 +42,29 @@ struct SearchQuery;
 class LLPanelSearchWeb : public LLPanel, public LLViewerMediaObserver
 {
 public:
-	LLPanelSearchWeb();
-	BOOL postBuild() override;
-	void loadUrl(const SearchQuery& query);
-	
+    LLPanelSearchWeb();
+    BOOL postBuild() override;
+    void loadUrl(const SearchQuery& query);
+
 private:
-	void             onClickBack() const;
-	void             onClickForward() const;
-	void             onClickReload() const;
-	void             onClickStop();
-	/*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
-	
-	LLTextBox* mStatusBarText;
-	LLProgressBar* mStatusBarProgress;
-	LLButton* mBtnBack;
-	LLButton* mBtnForward;
-	LLButton* mBtnReload;
-	LLButton* mBtnStop;
-	
-	std::set<std::string> mSearchType;
-	std::set<std::string> mCollectionType;
-	LLSD mCategoryPaths;
-	//U8 mSearchGodLevel;
-	LLMediaCtrl* mWebBrowser;
+    void             onClickBack() const;
+    void             onClickForward() const;
+    void             onClickReload() const;
+    void             onClickStop();
+    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
+
+    LLTextBox* mStatusBarText;
+    LLProgressBar* mStatusBarProgress;
+    LLButton* mBtnBack;
+    LLButton* mBtnForward;
+    LLButton* mBtnReload;
+    LLButton* mBtnStop;
+
+    std::set<std::string> mSearchType;
+    std::set<std::string> mCollectionType;
+    LLSD mCategoryPaths;
+    //U8 mSearchGodLevel;
+    LLMediaCtrl* mWebBrowser;
 };
 
 #endif // LL_PANELSEARCHWEB_H

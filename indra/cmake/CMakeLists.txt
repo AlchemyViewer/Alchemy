@@ -27,7 +27,6 @@ set(cmake_SOURCE_FILES
         GLH.cmake
         GLM.cmake
         Hunspell.cmake
-        ICU4C.cmake
         LibXML2.cmake
         LLAddBuildTest.cmake
         LLAppearance.cmake

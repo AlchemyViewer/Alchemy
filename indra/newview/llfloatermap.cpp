@@ -1,25 +1,25 @@
-/** 
+/**
  * @file llfloatermap.cpp
  * @brief The "mini-map" or radar in the upper right part of the screen.
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -62,17 +62,17 @@ const S32 MAP_PADDING_BOTTOM = 0;
 // Member functions
 //
 
-LLFloaterMap::LLFloaterMap(const LLSD& key) 
-	: LLFloater(key),
-	  mTextBoxEast(nullptr),
-	  mTextBoxNorth(nullptr),
-	  mTextBoxWest(nullptr),
-	  mTextBoxSouth(nullptr),
-	  mTextBoxSouthEast(nullptr),
-	  mTextBoxNorthEast(nullptr),
-	  mTextBoxNorthWest(nullptr),
-	  mTextBoxSouthWest(nullptr),
-	  mMap(nullptr)
+LLFloaterMap::LLFloaterMap(const LLSD& key)
+    : LLFloater(key),
+      mTextBoxEast(nullptr),
+      mTextBoxNorth(nullptr),
+      mTextBoxWest(nullptr),
+      mTextBoxSouth(nullptr),
+      mTextBoxSouthEast(nullptr),
+      mTextBoxNorthEast(nullptr),
+      mTextBoxNorthWest(nullptr),
+      mTextBoxSouthWest(nullptr),
+      mMap(nullptr)
 {
 }
 
@@ -83,14 +83,14 @@ LLFloaterMap::~LLFloaterMap()
 BOOL LLFloaterMap::postBuild()
 {
     mMap = getChild<LLNetMap>("Net Map");
-	mMap->setToolTipMsg(LLTrans::getString("MinimapToolTipMsg"));
-	mMap->setParcelNameMsg(LLTrans::getString("MinimapParcelNameMsg"));
-	mMap->setParcelSalePriceMsg(LLTrans::getString("MinimapParcelSalePriceMsg"));
-	mMap->setParcelSaleAreaMsg(LLTrans::getString("MinimapParcelSaleAreaMsg"));
-	mMap->setParcelOwnerMsg(LLTrans::getString("MinimapParcelOwnerMsg"));
-	mMap->setRegionNameMsg(LLTrans::getString("MinimapRegionNameMsg"));
-	mMap->setToolTipHintMsg(LLTrans::getString("MinimapToolTipHintMsg"));
-	mMap->setAltToolTipHintMsg(LLTrans::getString("MinimapAltToolTipHintMsg"));
+    mMap->setToolTipMsg(LLTrans::getString("MinimapToolTipMsg"));
+    mMap->setParcelNameMsg(LLTrans::getString("MinimapParcelNameMsg"));
+    mMap->setParcelSalePriceMsg(LLTrans::getString("MinimapParcelSalePriceMsg"));
+    mMap->setParcelSaleAreaMsg(LLTrans::getString("MinimapParcelSaleAreaMsg"));
+    mMap->setParcelOwnerMsg(LLTrans::getString("MinimapParcelOwnerMsg"));
+    mMap->setRegionNameMsg(LLTrans::getString("MinimapRegionNameMsg"));
+    mMap->setToolTipHintMsg(LLTrans::getString("MinimapToolTipHintMsg"));
+    mMap->setAltToolTipHintMsg(LLTrans::getString("MinimapAltToolTipHintMsg"));
     sendChildToBack(mMap);
 
     mTextBoxNorth     = getChild<LLTextBox>("floater_map_north");
@@ -102,8 +102,8 @@ BOOL LLFloaterMap::postBuild()
     mTextBoxSouthWest = getChild<LLTextBox>("floater_map_southwest");
     mTextBoxNorthWest = getChild<LLTextBox>("floater_map_northwest");
 
-	stretchMiniMap(getRect().getWidth() - MAP_PADDING_LEFT - MAP_PADDING_RIGHT
-		,getRect().getHeight() - MAP_PADDING_TOP - MAP_PADDING_BOTTOM);
+    stretchMiniMap(getRect().getWidth() - MAP_PADDING_LEFT - MAP_PADDING_RIGHT
+        ,getRect().getHeight() - MAP_PADDING_TOP - MAP_PADDING_BOTTOM);
 
     mTextBoxNorth->reshapeToFitText();
     mTextBoxEast->reshapeToFitText();
@@ -127,32 +127,32 @@ BOOL LLFloaterMap::postBuild()
 
 BOOL LLFloaterMap::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
-	// If floater is minimized, minimap should be shown on doubleclick (STORM-299)
-	if (isMinimized())
-	{
-		setMinimized(FALSE);
-		return TRUE;
-	}
+    // If floater is minimized, minimap should be shown on doubleclick (STORM-299)
+    if (isMinimized())
+    {
+        setMinimized(FALSE);
+        return TRUE;
+    }
 
-	LLVector3d pos_global = mMap->viewPosToGlobal(x, y);
-	
-	LLTracker::stopTracking(false);
-	LLFloaterWorldMap* world_map = LLFloaterWorldMap::getInstance();
-	if (world_map)
-	{
-		world_map->trackLocation(pos_global);
-	}
+    LLVector3d pos_global = mMap->viewPosToGlobal(x, y);
 
-	if (gSavedSettings.getBOOL("DoubleClickTeleport"))
-	{
-		// If DoubleClickTeleport is on, double clicking the minimap will teleport there
-		gAgent.teleportViaLocationLookAt(pos_global);
-	}
-	else if (gSavedSettings.getBOOL("DoubleClickShowWorldMap"))
-	{
-		LLFloaterReg::showInstance("world_map");
-	}
-	return TRUE;
+    LLTracker::stopTracking(false);
+    LLFloaterWorldMap* world_map = LLFloaterWorldMap::getInstance();
+    if (world_map)
+    {
+        world_map->trackLocation(pos_global);
+    }
+
+    if (gSavedSettings.getBOOL("DoubleClickTeleport"))
+    {
+        // If DoubleClickTeleport is on, double clicking the minimap will teleport there
+        gAgent.teleportViaLocationLookAt(pos_global);
+    }
+    else if (gSavedSettings.getBOOL("DoubleClickShowWorldMap"))
+    {
+        LLFloaterReg::showInstance("world_map");
+    }
+    return TRUE;
 }
 
 void LLFloaterMap::setDirectionPos(LLTextBox *text_box, F32 rotation)
@@ -197,89 +197,89 @@ void LLFloaterMap::setDirectionPos(LLTextBox *text_box, F32 rotation)
 
 void LLFloaterMap::updateMinorDirections()
 {
-	if (mTextBoxNorthEast == NULL)
-	{
-		return;
-	}
+    if (mTextBoxNorthEast == NULL)
+    {
+        return;
+    }
 
-	// Hide minor directions if they cover too much of the map
-	bool show_minors = mTextBoxNorthEast->getRect().getHeight() < MAP_MINOR_DIR_THRESHOLD *
-		llmin(getRect().getWidth(), getRect().getHeight());
+    // Hide minor directions if they cover too much of the map
+    bool show_minors = mTextBoxNorthEast->getRect().getHeight() < MAP_MINOR_DIR_THRESHOLD *
+        llmin(getRect().getWidth(), getRect().getHeight());
 
-	mTextBoxNorthEast->setVisible(show_minors);
-	mTextBoxNorthWest->setVisible(show_minors);
-	mTextBoxSouthWest->setVisible(show_minors);
-	mTextBoxSouthEast->setVisible(show_minors);
+    mTextBoxNorthEast->setVisible(show_minors);
+    mTextBoxNorthWest->setVisible(show_minors);
+    mTextBoxSouthWest->setVisible(show_minors);
+    mTextBoxSouthEast->setVisible(show_minors);
 }
 
 // virtual
 void LLFloaterMap::draw()
 {
-	F32 rotation = 0;
+    F32 rotation = 0;
 
-	static LLUICachedControl<bool> rotate_map("MiniMapRotate", true);
-	if( rotate_map )
-	{
-		// rotate subsequent draws to agent rotation
-		rotation = atan2( LLViewerCamera::getInstance()->getAtAxis().mV[VX], LLViewerCamera::getInstance()->getAtAxis().mV[VY] );
-	}
+    static LLUICachedControl<bool> rotate_map("MiniMapRotate", true);
+    if( rotate_map )
+    {
+        // rotate subsequent draws to agent rotation
+        rotation = atan2( LLViewerCamera::getInstance()->getAtAxis().mV[VX], LLViewerCamera::getInstance()->getAtAxis().mV[VY] );
+    }
 
-	setDirectionPos( mTextBoxEast,  rotation );
-	setDirectionPos( mTextBoxNorth, rotation + F_PI_BY_TWO );
-	setDirectionPos( mTextBoxWest,  rotation + F_PI );
-	setDirectionPos( mTextBoxSouth, rotation + F_PI + F_PI_BY_TWO );
+    setDirectionPos( mTextBoxEast,  rotation );
+    setDirectionPos( mTextBoxNorth, rotation + F_PI_BY_TWO );
+    setDirectionPos( mTextBoxWest,  rotation + F_PI );
+    setDirectionPos( mTextBoxSouth, rotation + F_PI + F_PI_BY_TWO );
 
-	setDirectionPos( mTextBoxNorthEast, rotation +						F_PI_BY_TWO / 2);
-	setDirectionPos( mTextBoxNorthWest, rotation + F_PI_BY_TWO +		F_PI_BY_TWO / 2);
-	setDirectionPos( mTextBoxSouthWest, rotation + F_PI +				F_PI_BY_TWO / 2);
-	setDirectionPos( mTextBoxSouthEast, rotation + F_PI + F_PI_BY_TWO + F_PI_BY_TWO / 2);
+    setDirectionPos( mTextBoxNorthEast, rotation +                      F_PI_BY_TWO / 2);
+    setDirectionPos( mTextBoxNorthWest, rotation + F_PI_BY_TWO +        F_PI_BY_TWO / 2);
+    setDirectionPos( mTextBoxSouthWest, rotation + F_PI +               F_PI_BY_TWO / 2);
+    setDirectionPos( mTextBoxSouthEast, rotation + F_PI + F_PI_BY_TWO + F_PI_BY_TWO / 2);
 
-	// Note: we can't just gAgent.check cameraMouselook() because the transition states are wrong.
-	if(gAgentCamera.cameraMouselook())
-	{
-		setMouseOpaque(FALSE);
-		getDragHandle()->setMouseOpaque(FALSE);
-	}
-	else
-	{
-		setMouseOpaque(TRUE);
-		getDragHandle()->setMouseOpaque(TRUE);
-	}
-	
-	LLFloater::draw();
+    // Note: we can't just gAgent.check cameraMouselook() because the transition states are wrong.
+    if(gAgentCamera.cameraMouselook())
+    {
+        setMouseOpaque(FALSE);
+        getDragHandle()->setMouseOpaque(FALSE);
+    }
+    else
+    {
+        setMouseOpaque(TRUE);
+        getDragHandle()->setMouseOpaque(TRUE);
+    }
+
+    LLFloater::draw();
 }
 
 void LLFloaterMap::stretchMiniMap(S32 width,S32 height)
 {
-	//fix for ext-7112
-	//by default ctrl can't overlap caption area
-	if(mMap)
-	{
-		LLRect map_rect;
-		map_rect.setLeftTopAndSize( MAP_PADDING_LEFT, getRect().getHeight() - MAP_PADDING_TOP, width, height);
-		mMap->reshape( width, height, 1);
-		mMap->setRect(map_rect);
-	}
+    //fix for ext-7112
+    //by default ctrl can't overlap caption area
+    if(mMap)
+    {
+        LLRect map_rect;
+        map_rect.setLeftTopAndSize( MAP_PADDING_LEFT, getRect().getHeight() - MAP_PADDING_TOP, width, height);
+        mMap->reshape( width, height, 1);
+        mMap->setRect(map_rect);
+    }
 }
 
 void LLFloaterMap::reshape(S32 width, S32 height, BOOL called_from_parent)
 {
-	LLFloater::reshape(width, height, called_from_parent);
-	
-	stretchMiniMap(width - MAP_PADDING_LEFT - MAP_PADDING_RIGHT
-		,height - MAP_PADDING_TOP - MAP_PADDING_BOTTOM);
+    LLFloater::reshape(width, height, called_from_parent);
 
-	updateMinorDirections();
+    stretchMiniMap(width - MAP_PADDING_LEFT - MAP_PADDING_RIGHT
+        ,height - MAP_PADDING_TOP - MAP_PADDING_BOTTOM);
+
+    updateMinorDirections();
 }
 
 void LLFloaterMap::setMinimized(BOOL b)
 {
-	LLFloater::setMinimized(b);
-	setTitle(b ? getString("mini_map_caption") : "");
+    LLFloater::setMinimized(b);
+    setTitle(b ? getString("mini_map_caption") : "");
 
 }
 
 LLFloaterMap* LLFloaterMap::getInstance()
 {
-	return LLFloaterReg::getTypedInstance<LLFloaterMap>("mini_map");
+    return LLFloaterReg::getTypedInstance<LLFloaterMap>("mini_map");
 }

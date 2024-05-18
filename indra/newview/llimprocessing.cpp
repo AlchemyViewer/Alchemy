@@ -194,7 +194,7 @@ void inventory_offer_handler(LLOfferInfo* info)
 
     // Strip any SLURL from the message display. (DEV-2754)
     std::string msg = info->mDesc;
-	size_t indx = msg.find(" ( http://slurl.com/secondlife/");
+    size_t indx = msg.find(" ( http://slurl.com/secondlife/");
     if (indx == std::string::npos)
     {
         // try to find new slurl host
@@ -210,23 +210,23 @@ void inventory_offer_handler(LLOfferInfo* info)
     if ((gSavedSettings.getBOOL("AutoAcceptNewInventory"))
         && ((!rlv_handler_t::isEnabled()) || (!RlvInventory::instance().isGiveToRLVOffer(*info))))
     {
-		bAutoAccept = true;
-		if (info->mType != LLAssetType::AT_NOTECARD
-			|| info->mType != LLAssetType::AT_LANDMARK
-			|| info->mType != LLAssetType::AT_TEXTURE)
-		{
-			LLSD args;
-			args["NAME"] = LLSLURL(info->mFromGroup ? "group" : "agent", info->mFromID, "about").getSLURLString();
-			if (info->mFromObject)
-				args["ITEM"] = msg;
-			else
-			{
-				const std::string& verb = "select?name=" + LLURI::escape(msg);
-				args["ITEM"] = LLSLURL("inventory", info->mObjectID, verb.c_str()).getSLURLString();
-			}
-			LLNotificationsUtil::add("AutoAcceptedInventory", args);
-		}
-	}
+        bAutoAccept = true;
+        if (info->mType != LLAssetType::AT_NOTECARD
+            || info->mType != LLAssetType::AT_LANDMARK
+            || info->mType != LLAssetType::AT_TEXTURE)
+        {
+            LLSD args;
+            args["NAME"] = LLSLURL(info->mFromGroup ? "group" : "agent", info->mFromID, "about").getSLURLString();
+            if (info->mFromObject)
+                args["ITEM"] = msg;
+            else
+            {
+                const std::string& verb = "select?name=" + LLURI::escape(msg);
+                args["ITEM"] = LLSLURL("inventory", info->mObjectID, verb.c_str()).getSLURLString();
+            }
+            LLNotificationsUtil::add("AutoAcceptedInventory", args);
+        }
+    }
 
     // Strip any SLURL from the message display. (DEV-2754)
         // try to find new slurl host
@@ -262,7 +262,7 @@ void inventory_offer_handler(LLOfferInfo* info)
         object_id.generate(msg);
 
     payload["from_id"] = info->mFromID;
-    // Needed by LLScriptFloaterManager to bind original notification with 
+    // Needed by LLScriptFloaterManager to bind original notification with
     // faked for toast one.
     payload["object_id"] = object_id;
     // Flag indicating that this notification is faked for toast.
@@ -276,7 +276,7 @@ void inventory_offer_handler(LLOfferInfo* info)
     else
     {
 // [SL:KB] - Patch: UI-Notifications | Checked: 2011-04-11 (Catznip-2.5.0a) | Added: Catznip-2.5.0a
-		args["NAME_LABEL"] = LLSLURL("agent", info->mFromID, "completename").getSLURLString();
+        args["NAME_LABEL"] = LLSLURL("agent", info->mFromID, "completename").getSLURLString();
 // [/SL:KB]
         args["NAME_SLURL"] = LLSLURL("agent", info->mFromID, "about").getSLURLString();
     }
@@ -289,12 +289,12 @@ void inventory_offer_handler(LLOfferInfo* info)
     if (info->mFromObject && !bAutoAccept)
     {
 // [RLVa:KB] - Checked: RLVa-1.2.2
-		// Only filter if the object owner is a nearby agent
-		if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, info->mFromID)) && (RlvUtil::isNearbyAgent(info->mFromID)) )
-		{
-			payload["rlv_shownames"] = TRUE;
-			args["NAME_SLURL"] = LLSLURL("agent", info->mFromID, "rlvanonym").getSLURLString();
-		}
+        // Only filter if the object owner is a nearby agent
+        if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, info->mFromID)) && (RlvUtil::isNearbyAgent(info->mFromID)) )
+        {
+            payload["rlv_shownames"] = TRUE;
+            args["NAME_SLURL"] = LLSLURL("agent", info->mFromID, "rlvanonym").getSLURLString();
+        }
 // [/RLVa:KB]
 
         // Inventory Slurls don't currently work for non agent transfers, so only display the object name.
@@ -312,12 +312,12 @@ void inventory_offer_handler(LLOfferInfo* info)
     else // Agent -> Agent Inventory Offer
     {
 // [RLVa:KB] - Checked: RLVa-2.0.1
-		// Only filter if the offer is from a nearby agent and if there's no open IM session (doesn't necessarily have to be focused)
-		bool fRlvCanShowName = (!RlvActions::isRlvEnabled()) ||
-			(RlvActions::canShowName(RlvActions::SNC_DEFAULT, info->mFromID)) || (!RlvUtil::isNearbyAgent(info->mFromID)) || (RlvUIEnabler::hasOpenIM(info->mFromID)) || (RlvUIEnabler::hasOpenProfile(info->mFromID));
-		if (!fRlvCanShowName)
-		{
-			payload["rlv_shownames"] = TRUE;
+        // Only filter if the offer is from a nearby agent and if there's no open IM session (doesn't necessarily have to be focused)
+        bool fRlvCanShowName = (!RlvActions::isRlvEnabled()) ||
+            (RlvActions::canShowName(RlvActions::SNC_DEFAULT, info->mFromID)) || (!RlvUtil::isNearbyAgent(info->mFromID)) || (RlvUIEnabler::hasOpenIM(info->mFromID)) || (RlvUIEnabler::hasOpenProfile(info->mFromID));
+        if (!fRlvCanShowName)
+        {
+            payload["rlv_shownames"] = TRUE;
             LLAvatarName av_name;
             if (LLAvatarNameCache::get(info->mFromID, &av_name))
             {
@@ -325,16 +325,16 @@ void inventory_offer_handler(LLOfferInfo* info)
             }
             else
             {
-				args["NAME"] = RlvStrings::getAnonym(info->mFromName);
+                args["NAME"] = RlvStrings::getAnonym(info->mFromName);
             }
-			args["NAME_SLURL"] = LLSLURL("agent", info->mFromID, "rlvanonym").getSLURLString();
-		}
+            args["NAME_SLURL"] = LLSLURL("agent", info->mFromID, "rlvanonym").getSLURLString();
+        }
 // [/RLVa:KB]
 
         p.responder = info;
         // Note: sets inventory_offer_callback as the callback
         // *TODO fix memory leak
-        // inventory_offer_callback() is not invoked if user received notification and 
+        // inventory_offer_callback() is not invoked if user received notification and
         // closes viewer(without responding the notification)
         p.substitutions(args).payload(payload).functor.responder(LLNotificationResponderPtr(info));
         info->mPersist = true;
@@ -519,7 +519,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     BOOL is_do_not_disturb = gAgent.isDoNotDisturb();
     BOOL is_rejecting_tp_offers = gAgent.isRejectTeleportOffers();
     static LLCachedControl<bool> ALDontRejectTeleportOffersFromFriends(gSavedPerAccountSettings, "ALDontRejectTeleportOffersFromFriends");
-   
+
     BOOL is_muted = LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat)
         // object IMs contain sender object id in session_id (STORM-1209)
         || (dialog == IM_FROM_TASK && LLMuteList::getInstance()->isMuted(session_id));
@@ -566,7 +566,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             LLPostponedNotification::add<LLPostponedIMSystemTipNotification>(params, from_id, false);
             break;
 
-        case IM_NOTHING_SPECIAL:	// p2p IM
+        case IM_NOTHING_SPECIAL:    // p2p IM
             // Don't show dialog, just do IM
             if (!gAgent.isGodlike()
                 && gAgent.getRegion()->isPrelude()
@@ -576,22 +576,22 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 // Prelude with global IMs
             }
 // [RLVa:KB] - Checked: RLVa-2.1.0
-			else if ( (RlvActions::isRlvEnabled()) && (offline == IM_ONLINE) && (!is_muted) && ((!accept_im_from_only_friend) || (is_friend)) &&
-					  (message.length() > 3) && (RLV_CMD_PREFIX == message[0]) && (RlvHandler::instance().processIMQuery(from_id, message)) )
-			{
-				// Eat the message and do nothing
-			}
+            else if ( (RlvActions::isRlvEnabled()) && (offline == IM_ONLINE) && (!is_muted) && ((!accept_im_from_only_friend) || (is_friend)) &&
+                      (message.length() > 3) && (RLV_CMD_PREFIX == message[0]) && (RlvHandler::instance().processIMQuery(from_id, message)) )
+            {
+                // Eat the message and do nothing
+            }
 // [/RLVa:KB]
 //            else if (offline == IM_ONLINE
 //                && is_do_not_disturb
 //                && from_id.notNull() //not a system message
 //                && to_id.notNull()) //not global message
 // [RLVa:KB] - Checked: 2010-11-30 (RLVa-1.3.0)
-			else if (offline == IM_ONLINE
-				&& is_do_not_disturb
-				&& from_id.notNull() //not a system message
-				&& to_id.notNull() //not global message
-				&& RlvActions::canReceiveIM(from_id))
+            else if (offline == IM_ONLINE
+                && is_do_not_disturb
+                && from_id.notNull() //not a system message
+                && to_id.notNull() //not global message
+                && RlvActions::canReceiveIM(from_id))
 // [/RLVa:KB]
             {
 
@@ -665,13 +665,13 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 }
 
 // [RLVa:KB] - Checked: 2010-11-30 (RLVa-1.3.0)
-				// Don't block offline IMs, or IMs from Lindens
-				if ( (rlv_handler_t::isEnabled()) && (offline != IM_OFFLINE) && (!RlvActions::canReceiveIM(from_id)) && (!LLMuteList::isLinden(original_name) ))
-				{
-					if (!mute_im)
-						RlvUtil::sendBusyMessage(from_id, RlvStrings::getString(RlvStringKeys::Blocked::RecvImRemote), session_id);
-					buffer = RlvStrings::getString(RlvStringKeys::Blocked::RecvIm);
-				}
+                // Don't block offline IMs, or IMs from Lindens
+                if ( (rlv_handler_t::isEnabled()) && (offline != IM_OFFLINE) && (!RlvActions::canReceiveIM(from_id)) && (!LLMuteList::isLinden(original_name) ))
+                {
+                    if (!mute_im)
+                        RlvUtil::sendBusyMessage(from_id, RlvStrings::getString(RlvStringKeys::Blocked::RecvImRemote), session_id);
+                    buffer = RlvStrings::getString(RlvStringKeys::Blocked::RecvIm);
+                }
 // [/RLVa:KB]
 
                 if (!mute_im)
@@ -709,34 +709,34 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             break;
 
         case IM_TYPING_START:
-		{
-			static LLCachedControl<bool> sNotifyIncomingMessage(gSavedSettings, "AlchemyNotifyIncomingMessage");
-			if (sNotifyIncomingMessage &&
-				!gIMMgr->hasSession(session_id) &&
-				((accept_im_from_only_friend && (is_friend || is_linden)) ||
-				(!(is_muted || is_do_not_disturb)))
-				)
-			{
-				LLStringUtil::format_map_t args;
-				args["[NAME]"] = name;
-				const std::string notify_str = LLTrans::getString("NotifyIncomingMessage", args);
-				gIMMgr->addMessage(session_id,
-					from_id,
-					LLStringUtil::null,
-					notify_str,
-					IM_ONLINE,
-					LLStringUtil::null,
-					IM_NOTHING_SPECIAL,
-					parent_estate_id,
-					region_id,
-					position,
-					false,
+        {
+            static LLCachedControl<bool> sNotifyIncomingMessage(gSavedSettings, "AlchemyNotifyIncomingMessage");
+            if (sNotifyIncomingMessage &&
+                !gIMMgr->hasSession(session_id) &&
+                ((accept_im_from_only_friend && (is_friend || is_linden)) ||
+                (!(is_muted || is_do_not_disturb)))
+                )
+            {
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = name;
+                const std::string notify_str = LLTrans::getString("NotifyIncomingMessage", args);
+                gIMMgr->addMessage(session_id,
+                    from_id,
+                    LLStringUtil::null,
+                    notify_str,
+                    IM_ONLINE,
+                    LLStringUtil::null,
+                    IM_NOTHING_SPECIAL,
+                    parent_estate_id,
+                    region_id,
+                    position,
+                    false,
                     0
-				);
-			}
+                );
+            }
 
             gIMMgr->processIMTypingStart(from_id, dialog);
-		}
+        }
         break;
 
         case IM_TYPING_STOP:
@@ -806,7 +806,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     U8 item_name[DB_INV_ITEM_NAME_BUF_SIZE];
                 }*notice_bin_bucket;
 
-                // Make sure the binary bucket is big enough to hold the header 
+                // Make sure the binary bucket is big enough to hold the header
                 // and a null terminated item name.
                 if ((binary_bucket_size < (S32)((sizeof(notice_bucket_header_t) + sizeof(U8))))
                     || (binary_bucket[binary_bucket_size - 1] != '\0'))
@@ -979,8 +979,8 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             {
                 struct offer_agent_bucket_t
                 {
-                    S8		asset_type;
-                    LLUUID	object_id;
+                    S8      asset_type;
+                    LLUUID  object_id;
                 }*bucketp;
 
                 if (sizeof(offer_agent_bucket_t) != binary_bucket_size)
@@ -1002,8 +1002,8 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 }
                 else
                 {
-                    /*RIDER*/ // The previous version of the protocol returned the wrong binary bucket... we 
-                    // still might be able to figure out the type... even though the offer is not retrievable. 
+                    /*RIDER*/ // The previous version of the protocol returned the wrong binary bucket... we
+                    // still might be able to figure out the type... even though the offer is not retrievable.
 
                     // Should be safe to remove once DRTSIM-451 fully deploys
                     std::string str_bucket(reinterpret_cast<char *>(binary_bucket));
@@ -1016,7 +1016,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
                     // We could try AT_UNKNOWN which would be more accurate, but that causes an auto decline
                     info->mType = static_cast<LLAssetType::EType>(type);
-                    // Don't break in the case of a bad binary bucket.  Go ahead and show the 
+                    // Don't break in the case of a bad binary bucket.  Go ahead and show the
                     // accept/decline popup even though it will not do anything.
                     LL_WARNS("Messaging") << "Malformed inventory offer from object, type might be " << info->mType << LL_ENDL;
                 }
@@ -1071,14 +1071,14 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 //            args["NAME"] = LLSLURL("agent", from_id, "completename").getSLURLString();;
 //            args["ORIGINAL_NAME"] = original_name;
 // [RLVa:KB] - Checked: RLVa-1.2.2
-			// Only anonymize the name if the agent is nearby, there isn't an open IM session to them and their profile isn't open
-			bool fRlvCanShowName = (!RlvActions::isRlvEnabled()) ||
-				(RlvActions::canShowName(RlvActions::SNC_DEFAULT, from_id)) || (!RlvUtil::isNearbyAgent(from_id)) || (RlvUIEnabler::hasOpenProfile(from_id)) || (RlvUIEnabler::hasOpenIM(from_id));
-			args["NAME"] = LLSLURL("agent", from_id, (fRlvCanShowName) ? "completename" : "rlvanonym").getSLURLString();
-			if (RlvActions::canShowName(RlvActions::SNC_DEFAULT, from_id))
-				args["ORIGINAL_NAME"] = original_name;
-			else
-				args["ORIGINAL_NAME"] = RlvStrings::getAnonym(original_name);
+            // Only anonymize the name if the agent is nearby, there isn't an open IM session to them and their profile isn't open
+            bool fRlvCanShowName = (!RlvActions::isRlvEnabled()) ||
+                (RlvActions::canShowName(RlvActions::SNC_DEFAULT, from_id)) || (!RlvUtil::isNearbyAgent(from_id)) || (RlvUIEnabler::hasOpenProfile(from_id)) || (RlvUIEnabler::hasOpenIM(from_id));
+            args["NAME"] = LLSLURL("agent", from_id, (fRlvCanShowName) ? "completename" : "rlvanonym").getSLURLString();
+            if (RlvActions::canShowName(RlvActions::SNC_DEFAULT, from_id))
+                args["ORIGINAL_NAME"] = original_name;
+            else
+                args["ORIGINAL_NAME"] = RlvStrings::getAnonym(original_name);
 // [/RLVa:KB]
             LLSD payload;
             payload["from_id"] = from_id;
@@ -1092,10 +1092,10 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
         {
 //            args["NAME"] = LLSLURL("agent", from_id, "completename").getSLURLString();;
 // [RLVa:KB] - Checked: RLVa-1.2.2
-			// Only anonymize the name if the agent is nearby, there isn't an open IM session to them and their profile isn't open
-			bool fRlvCanShowName = (!RlvActions::isRlvEnabled()) ||
-				(RlvActions::canShowName(RlvActions::SNC_DEFAULT, from_id)) || (!RlvUtil::isNearbyAgent(from_id)) || (RlvUIEnabler::hasOpenProfile(from_id)) || (RlvUIEnabler::hasOpenIM(from_id));
-			args["NAME"] = LLSLURL("agent", from_id, (fRlvCanShowName) ? "completename" : "rlvanonym").getSLURLString();;
+            // Only anonymize the name if the agent is nearby, there isn't an open IM session to them and their profile isn't open
+            bool fRlvCanShowName = (!RlvActions::isRlvEnabled()) ||
+                (RlvActions::canShowName(RlvActions::SNC_DEFAULT, from_id)) || (!RlvUtil::isNearbyAgent(from_id)) || (RlvUIEnabler::hasOpenProfile(from_id)) || (RlvUIEnabler::hasOpenIM(from_id));
+            args["NAME"] = LLSLURL("agent", from_id, (fRlvCanShowName) ? "completename" : "rlvanonym").getSLURLString();;
 // [/RLVa:KB]
             LLSD payload;
             payload["from_id"] = from_id;
@@ -1159,23 +1159,23 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             LLSD query_string;
             query_string["owner"] = from_id;
 // [RLVa:KB] - Checked: RLVa-1.2.0
-			if (RlvActions::isRlvEnabled())
-			{
-				// NOTE: the chat message itself will be filtered in LLNearbyChatHandler::processChat()
-				if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT)) && (!from_group) && (RlvUtil::isNearbyAgent(from_id)) )
-				{
-					query_string["rlv_shownames"] = TRUE;
+            if (RlvActions::isRlvEnabled())
+            {
+                // NOTE: the chat message itself will be filtered in LLNearbyChatHandler::processChat()
+                if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT)) && (!from_group) && (RlvUtil::isNearbyAgent(from_id)) )
+                {
+                    query_string["rlv_shownames"] = TRUE;
 
-					RlvUtil::filterNames(name);
-					chat.mFromName = name;
-				}
-				if (!RlvActions::canShowLocation())
-				{
-					std::string::size_type idxPos = location.find('/');
-					if ( (std::string::npos != idxPos) && (RlvUtil::isNearbyRegion(location.substr(0, idxPos))) )
-						location = RlvStrings::getString(RlvStringKeys::Hidden::Region);
-				}
-			}
+                    RlvUtil::filterNames(name);
+                    chat.mFromName = name;
+                }
+                if (!RlvActions::canShowLocation())
+                {
+                    std::string::size_type idxPos = location.find('/');
+                    if ( (std::string::npos != idxPos) && (RlvUtil::isNearbyRegion(location.substr(0, idxPos))) )
+                        location = RlvStrings::getString(RlvStringKeys::Hidden::Region);
+                }
+            }
 // [/RLVa:KB]
             query_string["slurl"] = location;
             query_string["name"] = name;
@@ -1186,7 +1186,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
 
 //           chat.mURL = LLSLURL("objectim", session_id, "").getSLURLString();
 // [SL:KB] - Checked: 2010-11-02 (RLVa-1.2.2a) | Added: RLVa-1.2.2a
-			chat.mURL = LLSLURL("objectim", session_id, LLURI::mapToQueryString(query_string)).getSLURLString();
+            chat.mURL = LLSLURL("objectim", session_id, LLURI::mapToQueryString(query_string)).getSLURLString();
 // [/SL:KB]
            chat.mText = message;
 
@@ -1241,7 +1241,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
         }
         break;
 
-        case IM_SESSION_SEND:		// ad-hoc or group IMs
+        case IM_SESSION_SEND:       // ad-hoc or group IMs
 
             // Only show messages if we have a session open (which
             // should happen after you get an "invitation"
@@ -1256,7 +1256,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             else if (offline == IM_ONLINE && is_do_not_disturb)
             {
 
-                // return a standard "do not disturb" message, but only do it to online IM 
+                // return a standard "do not disturb" message, but only do it to online IM
                 // (i.e. not other auto responses and not store-and-forward IM)
                 if (!gIMMgr->hasSession(session_id))
                 {
@@ -1343,10 +1343,10 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
         case IM_TELEPORT_REQUEST:
         {
  // [RLVa:KB] - Checked: RLVa-1.4.9
-			// If we auto-accept the offer/request then this will override DnD status (but we'll still let the other party know later)
-			bool fRlvAutoAccept = (rlv_handler_t::isEnabled()) &&
-				( ((IM_LURE_USER == dialog) && (RlvActions::autoAcceptTeleportOffer(from_id))) ||
-				  ((IM_TELEPORT_REQUEST == dialog) && (RlvActions::autoAcceptTeleportRequest(from_id))) );
+            // If we auto-accept the offer/request then this will override DnD status (but we'll still let the other party know later)
+            bool fRlvAutoAccept = (rlv_handler_t::isEnabled()) &&
+                ( ((IM_LURE_USER == dialog) && (RlvActions::autoAcceptTeleportOffer(from_id))) ||
+                  ((IM_TELEPORT_REQUEST == dialog) && (RlvActions::autoAcceptTeleportRequest(from_id))) );
 // [/RLVa:KB]
 
            if (is_muted)
@@ -1363,9 +1363,9 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             }
             else
             {
-//				if (is_do_not_disturb) 
+//              if (is_do_not_disturb)
 // [RLVa:KB] - Checked: RLVa-1.4.9
-				if ( (is_do_not_disturb) && (!fRlvAutoAccept) )
+                if ( (is_do_not_disturb) && (!fRlvAutoAccept) )
 // [/RLVa:KB]
                 {
                     send_do_not_disturb_message(gMessageSystem, from_id);
@@ -1425,31 +1425,31 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 }
 
 // [RLVa:KB] - Checked: RLVa-1.4.9
-				if (rlv_handler_t::isEnabled())
-				{
+                if (rlv_handler_t::isEnabled())
+                {
                     bool fBlockTpLure = (IM_LURE_USER == dialog) && (!RlvActions::canAcceptTpOffer(from_id));
                     bool fBlockTpRequest = (IM_TELEPORT_REQUEST == dialog) && (!RlvActions::canAcceptTpRequest(from_id));
-					if ( fBlockTpLure || fBlockTpRequest )
-					{
-						RlvUtil::sendBusyMessage(from_id, RlvStrings::getString(fBlockTpLure ? RlvStringKeys::Blocked::TpLureRemote : RlvStringKeys::Blocked::TpRequestRemote));
-						if (is_do_not_disturb)
-							send_do_not_disturb_message(gMessageSystem, from_id);
-						return;
-					}
+                    if ( fBlockTpLure || fBlockTpRequest )
+                    {
+                        RlvUtil::sendBusyMessage(from_id, RlvStrings::getString(fBlockTpLure ? RlvStringKeys::Blocked::TpLureRemote : RlvStringKeys::Blocked::TpRequestRemote));
+                        if (is_do_not_disturb)
+                            send_do_not_disturb_message(gMessageSystem, from_id);
+                        return;
+                    }
 
-					// Censor message if: 1) restricted from receiving IMs from the sender, or 2) teleport offer/request and @showloc=n restricted
-					if ( (!RlvActions::canReceiveIM(from_id)) || 
-						 ((gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC)) && (IM_LURE_USER == dialog || IM_TELEPORT_REQUEST == dialog)) )
-					{
-						message = RlvStrings::getString(RlvStringKeys::Hidden::Generic);
-					}
-				}
+                    // Censor message if: 1) restricted from receiving IMs from the sender, or 2) teleport offer/request and @showloc=n restricted
+                    if ( (!RlvActions::canReceiveIM(from_id)) ||
+                         ((gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC)) && (IM_LURE_USER == dialog || IM_TELEPORT_REQUEST == dialog)) )
+                    {
+                        message = RlvStrings::getString(RlvStringKeys::Hidden::Generic);
+                    }
+                }
 // [/RLVa:KB]
 
-				LLSD args;
+                LLSD args;
                 // *TODO: Translate -> [FIRST] [LAST] (maybe)
 // [SL:KB] - Patch: UI-Notifications | Checked: 2011-04-11 (Catznip-2.5.0a) | Added: Catznip-2.5.0a
-				args["NAME_LABEL"] = LLSLURL("agent", from_id, "completename").getSLURLString();
+                args["NAME_LABEL"] = LLSLURL("agent", from_id, "completename").getSLURLString();
 // [/SL:KB]
                 args["NAME_SLURL"] = LLSLURL("agent", from_id, "about").getSLURLString();
                 args["MESSAGE"] = message;
@@ -1496,18 +1496,18 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     params.payload = payload;
 
 // [RLVa:KB] - Checked: RLVa-1.4.9
-					if (fRlvAutoAccept)
-					{
-						if (IM_LURE_USER == dialog)
-							gRlvHandler.setCanCancelTp(false);
-						if (is_do_not_disturb)
-							send_do_not_disturb_message(gMessageSystem, from_id);
-						LLNotifications::instance().forceResponse(LLNotification::Params(params.name).payload(payload), 0);
-					}
-					else
-					{
-						LLPostponedNotification::add<LLPostponedOfferNotification>(params, from_id, false);
-					}
+                    if (fRlvAutoAccept)
+                    {
+                        if (IM_LURE_USER == dialog)
+                            gRlvHandler.setCanCancelTp(false);
+                        if (is_do_not_disturb)
+                            send_do_not_disturb_message(gMessageSystem, from_id);
+                        LLNotifications::instance().forceResponse(LLNotification::Params(params.name).payload(payload), 0);
+                    }
+                    else
+                    {
+                        LLPostponedNotification::add<LLPostponedOfferNotification>(params, from_id, false);
+                    }
 // [/RLVa:KB]
 //                    LLPostponedNotification::add<LLPostponedOfferNotification>(params, from_id, false);
                 }
@@ -1667,7 +1667,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     send_do_not_disturb_message(gMessageSystem, from_id);
                 }
 // [SL:KB] - Patch: UI-Notifications | Checked: 2011-04-11 (Catznip-2.5.0a) | Added: Catznip-2.5.0a
-				args["NAME_LABEL"] = LLSLURL("agent", from_id, "completename").getSLURLString();
+                args["NAME_LABEL"] = LLSLURL("agent", from_id, "completename").getSLURLString();
 // [/SL:KB]
                 args["NAME_SLURL"] = LLSLURL("agent", from_id, "about").getSLURLString();
 
@@ -1828,8 +1828,8 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
     {
         const LLSD &message_data(*i);
 
-        /* RIDER: Many fields in this message are using a '_' rather than the standard '-'.  This 
-         * should be changed but would require tight coordination with the simulator. 
+        /* RIDER: Many fields in this message are using a '_' rather than the standard '-'.  This
+         * should be changed but would require tight coordination with the simulator.
          */
         LLVector3 position;
         if (message_data.has("position"))

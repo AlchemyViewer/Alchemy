@@ -46,7 +46,7 @@ void LLJointRiggingInfo::setIsRiggedTo(bool val)
 {
     mIsRiggedTo = val;
 }
-    
+
 LLVector4a *LLJointRiggingInfo::getRiggedExtents()
 {
     return mRiggedExtents;
@@ -121,8 +121,8 @@ void LLJointRiggingInfoTab::clear()
 void showDetails(const LLJointRiggingInfoTab& src, const std::string& str)
 {
     LL_DEBUGS("RigSpammish") << "details: ";
-	S32 count_rigged = 0;
-	S32 count_box = 0;
+    S32 count_rigged = 0;
+    S32 count_box = 0;
     LLVector4a zero_vec;
     zero_vec.clear();
     for (S32 i=0; i<src.size(); i++)

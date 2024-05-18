@@ -1,4 +1,4 @@
-/** 
+/**
  * @file SMAANeighborhoodBlendV.glsl
  */
 
@@ -18,9 +18,9 @@ void SMAANeighborhoodBlendingVS(float2 texcoord,
 
 void main()
 {
-	gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);	
-	vary_texcoord0 = (gl_Position.xy*0.5+0.5);
+    gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
+    vary_texcoord0 = (gl_Position.xy*0.5+0.5);
 
-	SMAANeighborhoodBlendingVS(vary_texcoord0, vary_offset);
+    SMAANeighborhoodBlendingVS(vary_texcoord0, vary_offset);
 }
 

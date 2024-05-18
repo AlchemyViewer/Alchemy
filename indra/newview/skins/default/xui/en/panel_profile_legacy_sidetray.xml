@@ -150,21 +150,6 @@ Remove Friend
         <accordion_tab
          expanded="false"
          layout="topleft"
-         name="avatar_interest_tab"
-         title="Interests"
-         fit_panel="false">
-          <panel
-           border="false"
-           filename="panel_profile_legacy_interests.xml"
-           follows="left|top|right"
-           layout="topleft"
-           left="0"
-           name="avatar_interest_tab_panel"
-           top="0" />
-        </accordion_tab>
-        <accordion_tab
-         expanded="false"
-         layout="topleft"
          name="avatar_picks_tab"
          title="Picks"
          fit_panel="true">

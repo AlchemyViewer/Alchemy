@@ -36,38 +36,38 @@
 #include "llpanelprofilelegacy.h"
 
 LLFloaterProfileLegacy::LLFloaterProfileLegacy(LLSD const& key)
-:	LLFloater(key)
+:   LLFloater(key)
 {
 
 }
 
 LLFloaterProfileLegacy::~LLFloaterProfileLegacy()
 {
-	if (mAvatarNameCacheConnection.connected())
-		mAvatarNameCacheConnection.disconnect();
+    if (mAvatarNameCacheConnection.connected())
+        mAvatarNameCacheConnection.disconnect();
 }
 
 BOOL LLFloaterProfileLegacy::postBuild()
 {
     mPanel = dynamic_cast<LLPanelProfileLegacy*>(getChild<LLPanel>("panel_profile_legacy_sidetray"));
-	return TRUE;
+    return TRUE;
 }
 
 void LLFloaterProfileLegacy::onOpen(const LLSD& key)
 {
-	if (!key.has("avatar_id")) return;
-	const LLUUID av_id = key["avatar_id"].asUUID();
+    if (!key.has("avatar_id")) return;
+    const LLUUID av_id = key["avatar_id"].asUUID();
 
-	mAvatarNameCacheConnection = LLAvatarNameCache::get(av_id,
-		boost::bind(&LLFloaterProfileLegacy::onAvatarNameCache, this, _1, _2));
+    mAvatarNameCacheConnection = LLAvatarNameCache::get(av_id,
+        boost::bind(&LLFloaterProfileLegacy::onAvatarNameCache, this, _1, _2));
 
-	if (mPanel) { mPanel->onOpen(key); }
+    if (mPanel) { mPanel->onOpen(key); }
 }
 
 void LLFloaterProfileLegacy::onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name)
 {
-	setTitle(av_name.getCompleteName());
-	mAvatarNameCacheConnection.disconnect();
+    setTitle(av_name.getCompleteName());
+    mAvatarNameCacheConnection.disconnect();
 }
 
 LLPanel* LLFloaterProfileLegacy::expandTab(const std::string& name) const

@@ -36,7 +36,7 @@
 
 static constexpr std::string_view PROFILE_IMAGE_UPLOAD_CAP("UploadAgentProfileImage");
 
-static void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::string path_to_image, 
+static void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::string path_to_image,
     LLProfileImagePicker::ugly_picker_cb_t cb);
 static LLUUID post_profile_image(std::string cap_url, const LLSD& first_data, std::string path_to_image);
 static void setImageUploading(LLPanel* panel, bool loading);
@@ -77,7 +77,7 @@ void LLProfileImagePicker::notify(const std::vector<std::string>& filenames)
     if (!LLViewerTextureList::createUploadFile(file_path, temp_file, codec, MAX_DIM))
     {
         LLSD notif_args;
-        notif_args["REASON"] = LLImage::getLastError().c_str();
+        notif_args["REASON"] = LLImage::getLastThreadError().c_str();
         LLNotificationsUtil::add("CannotUploadTexture", notif_args);
         LL_WARNS("AvatarProperties") << "Failed to upload profile image of type " << (S32)PROFILE_IMAGE_SL << ", failed to open image" << LL_ENDL;
         return;

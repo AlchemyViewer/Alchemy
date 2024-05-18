@@ -45,75 +45,75 @@
 
 ALStreamInfo::ALStreamInfo()
 {
-	if (gAudiop && gAudiop->getStreamingAudioImpl() && gAudiop->getStreamingAudioImpl()->supportsMetaData())
-	{
-		mMetadataConnection = gAudiop->getStreamingAudioImpl()->setMetadataUpdatedCallback([this](const LLSD& metadata) { handleMetadataUpdate(metadata); });
-	}
+    if (gAudiop && gAudiop->getStreamingAudioImpl() && gAudiop->getStreamingAudioImpl()->supportsMetaData())
+    {
+        mMetadataConnection = gAudiop->getStreamingAudioImpl()->setMetadataUpdatedCallback([this](const LLSD& metadata) { handleMetadataUpdate(metadata); });
+    }
 }
 
 ALStreamInfo::~ALStreamInfo()
 {
-	if (mMetadataConnection.connected())
-	{
-		mMetadataConnection.disconnect();
-	}
+    if (mMetadataConnection.connected())
+    {
+        mMetadataConnection.disconnect();
+    }
 }
 
 void ALStreamInfo::handleMetadataUpdate(const LLSD& metadata)
 {
-	static LLCachedControl<bool> show_stream_info(gSavedSettings, "ShowStreamInfo", false);
-	if (!show_stream_info) return;
+    static LLCachedControl<bool> show_stream_info(gSavedSettings, "ShowStreamInfo", false);
+    if (!show_stream_info) return;
 
-	bool stream_info_to_chat = gSavedSettings.getBOOL("ShowStreamInfoToChat");
+    bool stream_info_to_chat = gSavedSettings.getBOOL("ShowStreamInfoToChat");
 
-	LLFloater* music_ticker = LLFloaterReg::findInstance("music_ticker");
-	if (!stream_info_to_chat && music_ticker)
-		return;
+    LLFloater* music_ticker = LLFloaterReg::findInstance("music_ticker");
+    if (!stream_info_to_chat && music_ticker)
+        return;
 
-	if (metadata.size() > 0)
-	{
-		std::string station = metadata.has("TRSN") ? metadata["TRSN"].asString() : metadata.has("icy-name") ? metadata["icy-name"].asString() : LLTrans::getString("NowPlaying");
-		// Some stations get a little ridiculous with the length.
-		if (station.length() > 64)
-		{
-			LLStringUtil::truncate(station, 64);
-			station.append("...");
-		}
-		LLSD args;
-		LLSD payload;
-		args["STATION"] = station;
-		std::stringstream info;
-		if (metadata.has("TITLE"))
-			info << metadata["TITLE"].asString();
-		if (metadata.has("TITLE") && metadata.has("ARTIST"))
-			info << "\n";
-		if (metadata.has("ARTIST"))
-			info << metadata["ARTIST"].asString();
-		args["INFO"] = info.str();
+    if (metadata.size() > 0)
+    {
+        std::string station = metadata.has("TRSN") ? metadata["TRSN"].asString() : metadata.has("icy-name") ? metadata["icy-name"].asString() : LLTrans::getString("NowPlaying");
+        // Some stations get a little ridiculous with the length.
+        if (station.length() > 64)
+        {
+            LLStringUtil::truncate(station, 64);
+            station.append("...");
+        }
+        LLSD args;
+        LLSD payload;
+        args["STATION"] = station;
+        std::stringstream info;
+        if (metadata.has("TITLE"))
+            info << metadata["TITLE"].asString();
+        if (metadata.has("TITLE") && metadata.has("ARTIST"))
+            info << "\n";
+        if (metadata.has("ARTIST"))
+            info << metadata["ARTIST"].asString();
+        args["INFO"] = info.str();
 
-		std::string station_url;
-		if (metadata.has("URL"))
-			station_url = metadata["URL"].asString();
-		else if (metadata.has("icy-url"))
-			station_url = metadata["icy-url"].asString();
+        std::string station_url;
+        if (metadata.has("URL"))
+            station_url = metadata["URL"].asString();
+        else if (metadata.has("icy-url"))
+            station_url = metadata["icy-url"].asString();
 
-		LLNotification::Params notify_params;
-		notify_params.name = "StreamInfo";
-		notify_params.substitutions = args;
-		if (!station_url.empty())
-		{
-			notify_params.payload = payload.with("respond_on_mousedown", TRUE);
+        LLNotification::Params notify_params;
+        notify_params.name = "StreamInfo";
+        notify_params.substitutions = args;
+        if (!station_url.empty())
+        {
+            notify_params.payload = payload.with("respond_on_mousedown", TRUE);
 
-			LLNotification::Params::Functor functor_p;
-			functor_p.function = [=](const LLSD&, const LLSD&) {LLUrlAction::openURL(station_url); };
-			notify_params.functor = functor_p;
-		}
-		else
-		{
-			notify_params.payload = payload;
-		}
+            LLNotification::Params::Functor functor_p;
+            functor_p.function = [=](const LLSD&, const LLSD&) {LLUrlAction::openURL(station_url); };
+            notify_params.functor = functor_p;
+        }
+        else
+        {
+            notify_params.payload = payload;
+        }
 
-		notify_params.force_to_chat = stream_info_to_chat;
-		LLNotificationPtr notification = LLNotifications::instance().add(notify_params);
-	}
+        notify_params.force_to_chat = stream_info_to_chat;
+        LLNotificationPtr notification = LLNotifications::instance().add(notify_params);
+    }
 }

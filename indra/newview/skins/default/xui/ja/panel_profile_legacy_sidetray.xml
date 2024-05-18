@@ -31,9 +31,6 @@
 				<accordion_tab name="avatar_groups_tab" title="グループ">
 					<panel name="avatar_groups_tab_panel"/>
 				</accordion_tab>
-				<accordion_tab name="avatar_interest_tab" title="関心">
-					<panel name="avatar_interest_tab_panel"/>
-				</accordion_tab>
 				<accordion_tab name="avatar_picks_tab" title="ピック">
 					<panel name="avatar_picks_tab_panel"/>
 				</accordion_tab>
