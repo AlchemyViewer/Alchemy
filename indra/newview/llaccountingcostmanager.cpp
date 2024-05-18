@@ -50,7 +50,7 @@ LLAccountingCostManager::LLAccountingCostManager()
 // Do not call directly.  See documentation in lleventcoro.h and llcoro.h for
 // further explanation.
 void LLAccountingCostManager::accountingCostCoro(std::string url,
-    eSelectionType selectionType, const LLHandle<LLAccountingCostObserver> observerHandle, uuid_set_t object_list)
+    eSelectionType selectionType, const LLHandle<LLAccountingCostObserver> observerHandle)
 {
     LL_DEBUGS("LLAccountingCostManager") << "Entering coroutine " << LLCoros::getName()
         << " with url '" << url << LL_ENDL;
@@ -62,14 +62,19 @@ void LLAccountingCostManager::accountingCostCoro(std::string url,
 
     try
     {
+        LLAccountingCostManager* self = LLAccountingCostManager::getInstance();
         uuid_set_t diffSet;
 
-        std::set_difference(object_list.begin(), object_list.end(),
-            mPendingObjectQuota.begin(), mPendingObjectQuota.end(),
-            std::inserter(diffSet, diffSet.begin()));
+        std::set_difference(self->mObjectList.begin(),
+                            self->mObjectList.end(),
+                            self->mPendingObjectQuota.begin(),
+                            self->mPendingObjectQuota.end(),
+                            std::inserter(diffSet, diffSet.begin()));
 
         if (diffSet.empty())
             return;
+
+        self->mObjectList.clear();
 
         std::string keystr;
         if (selectionType == Roots)
@@ -93,19 +98,25 @@ void LLAccountingCostManager::accountingCostCoro(std::string url,
             objectList.append(*it);
         }
 
-        mPendingObjectQuota.insert(diffSet.begin(), diffSet.end());
+        self->mPendingObjectQuota.insert(diffSet.begin(), diffSet.end());
 
         LLSD dataToPost = LLSD::emptyMap();
         dataToPost[keystr.c_str()] = objectList;
-
-        LLAccountingCostObserver* observer = NULL;
 
         LLSD results = httpAdapter->postAndSuspend(httpRequest, url, dataToPost);
 
         LLSD httpResults = results["http_result"];
         LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-        LL_INFOS() << results << LL_ENDL;
+        if (LLApp::isQuitting()
+            || observerHandle.isDead()
+            || !LLAccountingCostManager::instanceExists())
+        {
+            return;
+        }
+
+        LLAccountingCostObserver* observer = NULL;
+
         // do/while(false) allows error conditions to break out of following
         // block while normal flow goes forward once.
         do
@@ -154,10 +165,6 @@ void LLAccountingCostManager::accountingCostCoro(std::string url,
 
         } while (false);
 
-        for (const auto& id : diffSet)
-        {
-            mPendingObjectQuota.erase(id);
-        }
     }
     catch (...)
     {
@@ -165,72 +172,32 @@ void LLAccountingCostManager::accountingCostCoro(std::string url,
                                           << "('" << url << "')"));
         throw;
     }
+
+    // self can be obsolete by this point
+    LLAccountingCostManager::getInstance()->mPendingObjectQuota.clear();
 }
 
 //===============================================================================
 void LLAccountingCostManager::fetchCosts( eSelectionType selectionType,
+                                          const std::string& url,
                                           const LLHandle<LLAccountingCostObserver>& observer_handle )
 {
-    if (mObjectList.empty()) return;
-
-    boost::unordered_map<LLViewerRegion*, uuid_set_t> regionObjectMap{};
-
-    // Swap it for thread safety since we're going to iterate over it
-    uuid_set_t staleObjectCostIds{};
-    staleObjectCostIds.swap(mObjectList);
-
-    for (const auto& staleObjectId : staleObjectCostIds)
+    // Invoking system must have already determined capability availability
+    if ( !url.empty() )
     {
-        LLViewerObject* staleObject = gObjectList.findObject(staleObjectId);
-        if (staleObject && staleObject->getRegion() && staleObject->getRegion()->capabilitiesReceived())
-        {
-            if (regionObjectMap.find(staleObject->getRegion()) == regionObjectMap.end())
-            {
-                regionObjectMap.insert(std::make_pair(staleObject->getRegion(), uuid_set_t()));
-            }
+        std::string coroname =
+            LLCoros::instance().launch("LLAccountingCostManager::accountingCostCoro",
+            boost::bind(accountingCostCoro, url, selectionType, observer_handle));
+        LL_DEBUGS() << coroname << " with  url '" << url << LL_ENDL;
 
-            regionObjectMap[staleObject->getRegion()].insert(staleObjectId);
-        }
     }
-
-    for (const auto& region : regionObjectMap)
+    else
     {
-        std::string url;
-        if(region.first->capabilitiesReceived())
-            url = region.first->getCapability("ResourceCostSelected");
-
-        if (!url.empty())
-        {
-            std::string coroname =
-                LLCoros::instance().launch("LLAccountingCostManager::accountingCostCoro",
-                    boost::bind(&LLAccountingCostManager::accountingCostCoro, this, url, selectionType, observer_handle, region.second));
-            LL_DEBUGS() << coroname << " with  url '" << url << LL_ENDL;
-        }
-        else
-        {
-            for (const auto& objectId : region.second)
-            {
-                mPendingObjectQuota.erase(objectId);
-            }
-        }
+        //url was empty - warn & continue
+        LL_WARNS()<<"Supplied url is empty "<<LL_ENDL;
+        mObjectList.clear();
+        mPendingObjectQuota.clear();
     }
-
-    //// Invoking system must have already determined capability availability
-    //if ( !url.empty() )
-    //{
- //       std::string coroname =
- //           LLCoros::instance().launch("LLAccountingCostManager::accountingCostCoro",
- //           boost::bind(&LLAccountingCostManager::accountingCostCoro, this, url, selectionType, observer_handle));
- //       LL_DEBUGS() << coroname << " with  url '" << url << LL_ENDL;
-
-    //}
-    //else
-    //{
-    //  //url was empty - warn & continue
-    //  LL_WARNS()<<"Supplied url is empty "<<LL_ENDL;
-    //  mObjectList.clear();
-    //  mPendingObjectQuota.clear();
-    //}
 }
 //===============================================================================
 void LLAccountingCostManager::addObject( const LLUUID& objectID )

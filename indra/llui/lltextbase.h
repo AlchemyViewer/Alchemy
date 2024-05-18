@@ -334,6 +334,7 @@ public:
                                 plain_text,
                                 wrap,
                                 use_ellipses,
+                                use_emoji,
                                 use_color,
                                 parse_urls,
                                 force_urls_external,
@@ -372,7 +373,6 @@ public:
     /*virtual*/ BOOL        handleToolTip(S32 x, S32 y, MASK mask) override;
 
     // LLView interface
-    /*virtual*/ const std::string getToolTip() const override;
     /*virtual*/ void        reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
     /*virtual*/ void        draw() override;
 
@@ -414,12 +414,15 @@ public:
     virtual void            onSpellCheckPerformed(){}
 
     // used by LLTextSegment layout code
-    bool                    getWordWrap() { return mWordWrap; }
-    bool                    getUseEllipses() { return mUseEllipses; }
-    bool                    getUseColor() { return mUseColor; }
+    bool                    getWordWrap() const { return mWordWrap; }
+    bool                    getUseEllipses() const { return mUseEllipses; }
+    bool                    getUseEmoji() const { return mUseEmoji; }
+    void                    setUseEmoji(bool value) { mUseEmoji = value; }
+    bool                    getUseColor() const { return mUseColor; }
+    void                    setUseColor(bool value) { mUseColor = value; }
     bool                    truncate(); // returns true of truncation occurred
 
-    bool                    isContentTrusted() {return mTrustedContent;}
+    bool                    isContentTrusted() const { return mTrustedContent; }
     void                    setContentTrusted(bool trusted_content) { mTrustedContent = trusted_content; }
 
     // TODO: move into LLTextSegment?
@@ -428,7 +431,7 @@ public:
     // Text accessors
     // TODO: add optional style parameter
     virtual void            setText(const LLStringExplicit &utf8str , const LLStyle::Params& input_params = LLStyle::Params()); // uses default style
-    virtual std::string     getText() const;
+    /*virtual*/ const std::string& getText() const override;
     void                    setMaxTextLength(S32 length) { mMaxTextByteLength = length; }
     S32                     getMaxTextLength() { return mMaxTextByteLength; }
 
@@ -511,7 +514,7 @@ public:
     void                    setHighlightWord(const std::string& strHighlight, bool fCaseInsensitive);
 // [/SL:KB]
 
-    const LLFontGL*         getFont() const                 { return mFont; }
+    const LLFontGL*         getFont() const override { return mFont; }
 
     virtual void            appendLineBreakSegment(const LLStyle::Params& style_params);
     virtual void            appendImageSegment(const LLStyle::Params& style_params);
@@ -773,6 +776,7 @@ protected:
 // [/SL:KB]
     bool                        mWordWrap;
     bool                        mUseEllipses;
+    bool                        mUseEmoji;
     bool                        mUseColor;
     bool                        mTrackEnd;          // if true, keeps scroll position at end of document during resize
     bool                        mReadOnly;

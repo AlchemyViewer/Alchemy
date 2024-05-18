@@ -6,16 +6,16 @@
  name="regioninfo"
  save_rect="true"
  title="REGION/ESTATE"
- width="633">
+ width="637">
     <tab_container
-     follows="all"
-     halign="left"
      bottom="555"
+     follows="left|right|top|bottom"
      layout="topleft"
      left="0"
      name="region_panels"
+     tab_padding_right="3"
      tab_position="left"
-     tab_width="100"
-     tab_padding_right="0"
-     top="0" />
+     halign="left"
+     tab_width="110"
+     top="20"/>
 </floater>

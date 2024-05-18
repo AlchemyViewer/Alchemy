@@ -392,9 +392,9 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
 
 void LLFloaterPreference::processProperties( void* pData, EAvatarProcessorType type )
 {
-    if ( APT_PROPERTIES == type )
+    if ( APT_PROPERTIES_LEGACY == type )
     {
-        const LLAvatarData* pAvatarData = static_cast<const LLAvatarData*>( pData );
+        const LLAvatarLegacyData* pAvatarData = static_cast<const LLAvatarLegacyData*>( pData );
         if (pAvatarData && (gAgent.getID() == pAvatarData->avatar_id) && (pAvatarData->avatar_id.notNull()))
         {
             mAllowPublish = (bool)(pAvatarData->flags & AVATAR_ALLOW_PUBLISH);
@@ -544,7 +544,7 @@ BOOL LLFloaterPreference::postBuild()
 
 void LLFloaterPreference::updateDeleteTranscriptsButton()
 {
-    getChild<LLButton>("delete_transcripts")->setEnabled(LLLogChat::anyTranscriptsExist());
+    getChild<LLButton>("delete_transcripts")->setEnabled(LLLogChat::transcriptFilesExist());
 }
 
 void LLFloaterPreference::onDoNotDisturbResponseChanged()
@@ -1078,7 +1078,6 @@ void LLFloaterPreference::cancel()
 
 void LLFloaterPreference::onOpen(const LLSD& key)
 {
-
     // this variable and if that follows it are used to properly handle do not disturb mode response message
     // if user is logged in and we haven't initialized do not disturb mode response yet, do it
     if (!mDnDInit && LLStartUp::getStartupState() == STATE_STARTED)
@@ -1104,7 +1103,7 @@ void LLFloaterPreference::onOpen(const LLSD& key)
         (gAgent.isMature() || gAgent.isGodlike());
 
     LLComboBox* maturity_combo = getChild<LLComboBox>("maturity_desired_combobox");
-    LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest( gAgent.getID() );
+    LLAvatarPropertiesProcessor::getInstance()->sendAvatarLegacyPropertiesRequest( gAgent.getID() );
     if (can_choose_maturity)
     {
         // if they're not adult or a god, they shouldn't see the adult selection, so delete it

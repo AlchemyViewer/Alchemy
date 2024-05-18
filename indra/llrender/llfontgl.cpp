@@ -270,6 +270,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     static LLColor4U colors[GLYPH_BATCH_SIZE * GLYPH_VERTICES];
 
     LLColor4U text_color(color);
+    // Preserve the transparency to render fading emojis in fading text (e.g.
+    // for the chat console)... HB
+    LLColor4U emoji_color(255, 255, 255, text_color.mV[VW]);
 
     std::pair<EFontGlyphType, S32> bitmap_entry = std::make_pair(EFontGlyphType::Grayscale, -1);
     S32 glyph_count = 0;
@@ -338,9 +341,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             glyph_count = 0;
         }
 
-
-        LLColor4U glyph_color = (bitmap_entry.first == EFontGlyphType::Grayscale) ? text_color : LLColor4U(255,255,255, text_color.mV[3]);
-        drawGlyph(glyph_count, vertices, uvs, colors, screen_rect, uv_rect, glyph_color, style_to_add, shadow, drop_shadow_strength);
+        const LLColor4U& col =
+            bitmap_entry.first == EFontGlyphType::Grayscale ? text_color
+                                                            : emoji_color;
+        drawGlyph(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                  col, style_to_add, shadow, drop_shadow_strength);
 
         chars_drawn++;
         cur_x += fgi->mXAdvance;
@@ -1036,9 +1041,23 @@ LLFontGL::VAlign LLFontGL::vAlignFromName(const std::string& name)
 }
 
 //static
-LLFontGL* LLFontGL::getFontEmoji()
+LLFontGL* LLFontGL::getFontEmojiSmall()
+{
+    static LLFontGL* fontp = getFont(LLFontDescriptor("Emoji", "Small", 0));
+    return fontp;;
+}
+
+//static
+LLFontGL* LLFontGL::getFontEmojiMedium()
 {
     static LLFontGL* fontp = getFont(LLFontDescriptor("Emoji", "Medium", 0));
+    return fontp;;
+}
+
+//static
+LLFontGL* LLFontGL::getFontEmojiLarge()
+{
+    static LLFontGL* fontp = getFont(LLFontDescriptor("Emoji", "Large", 0));
     return fontp;;
 }
 

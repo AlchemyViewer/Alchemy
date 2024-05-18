@@ -50,15 +50,37 @@ class LLMessageSystem;
 
 enum EAvatarProcessorType
 {
-    APT_PROPERTIES,
+    APT_PROPERTIES_LEGACY, // APT_PROPERTIES via udp request (Truncates data!!!)
+    APT_PROPERTIES,        // APT_PROPERTIES via http request
     APT_NOTES,
     APT_GROUPS,
     APT_PICKS,
     APT_PICK_INFO,
     APT_TEXTURES,
-    APT_INTERESTS,
     APT_CLASSIFIEDS,
     APT_CLASSIFIED_INFO
+};
+
+// legacy data is supposed to match AvatarPropertiesReply,
+// but it is obsolete, fields like about_text will truncate
+// data, if you need them, use AgenProfile cap.
+// Todo: remove it once once icon ids get moved elsewhere,
+// since AgentProfile is too large for bulk icon requests
+struct LLAvatarLegacyData
+{
+    LLUUID      agent_id;
+    LLUUID      avatar_id; //target id
+    LLUUID      image_id;
+    LLUUID      fl_image_id;
+    LLUUID      partner_id;
+    std::string about_text;
+    std::string fl_about_text;
+    LLDate      born_on;
+    std::string profile_url;
+    U8          caption_index;
+    std::string caption_text;
+    std::string customer_type;
+    U32         flags;
 };
 
 struct LLAvatarData
@@ -76,17 +98,44 @@ struct LLAvatarData
     std::string caption_text;
     std::string customer_type;
     U32         flags;
-    BOOL        allow_publish;
-};
+    bool        hide_age;
+    std::string notes;
 
-struct LLAvatarPicks
-{
-    LLUUID agent_id;
-    LLUUID target_id; //target id
+    struct LLGroupData;
+    typedef std::list<LLGroupData> group_list_t;
+    group_list_t group_list;
 
-    typedef std::pair<LLUUID,std::string> pick_data_t;
+    typedef std::pair<LLUUID, std::string> pick_data_t;
     typedef std::list< pick_data_t> picks_list_t;
     picks_list_t picks_list;
+    BOOL        allow_publish;
+    LLAvatarData() = default;
+    LLAvatarData(const LLAvatarLegacyData& legacy_data)
+    {
+        agent_id = legacy_data.agent_id;
+        avatar_id = legacy_data.avatar_id;
+        image_id = legacy_data.image_id;
+        fl_image_id = legacy_data.fl_image_id;
+        partner_id = legacy_data.partner_id;
+        about_text = legacy_data.about_text;
+        fl_about_text = legacy_data.fl_about_text;
+        born_on = legacy_data.born_on;
+        profile_url = legacy_data.profile_url;
+        caption_index = legacy_data.caption_index;
+        caption_text = legacy_data.caption_text;
+        customer_type = legacy_data.customer_type;
+        flags = legacy_data.flags;
+    }
+};
+
+struct LLAvatarData::LLGroupData
+{
+    U64 group_powers;
+    BOOL accept_notices;
+    std::string group_title;
+    LLUUID group_id;
+    std::string group_name;
+    LLUUID group_insignia_id;
 };
 
 struct LLPickData
@@ -110,7 +159,16 @@ struct LLPickData
 
     //used only in write (update) requests
     LLUUID session_id;
+};
 
+struct LLAvatarPicks
+{
+    LLUUID agent_id;
+    LLUUID target_id; //target id
+
+    typedef std::pair<LLUUID,std::string> pick_data_t;
+    typedef std::list< pick_data_t> picks_list_t;
+    picks_list_t picks_list;
 };
 
 struct LLAvatarNotes
@@ -179,25 +237,14 @@ struct LLAvatarClassifiedInfo
     S32 price_for_listing;
 };
 
-struct LLAvatarInterests
-{
-    LLUUID      agent_id;
-    LLUUID      avatar_id; //target id
-    U32         want_to_mask;
-    std::string want_to_text;
-    U32         skills_mask;
-    std::string skills_text;
-    std::string languages_text;
-};
-
 class LLAvatarPropertiesObserver
 {
 public:
-    virtual ~LLAvatarPropertiesObserver() = default;
+    virtual ~LLAvatarPropertiesObserver() {}
     virtual void processProperties(void* data, EAvatarProcessorType type) = 0;
 };
 
-class LLAvatarPropertiesProcessor final
+class LLAvatarPropertiesProcessor
     : public LLSingleton<LLAvatarPropertiesProcessor>
 {
     LLSINGLETON(LLAvatarPropertiesProcessor);
@@ -211,9 +258,7 @@ public:
     // Request various types of avatar data.  Duplicate requests will be
     // suppressed while waiting for a response from the network.
     void sendAvatarPropertiesRequest(const LLUUID& avatar_id);
-    void sendAvatarPicksRequest(const LLUUID& avatar_id);
-    void sendAvatarNotesRequest(const LLUUID& avatar_id);
-    void sendAvatarGroupsRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyPropertiesRequest(const LLUUID& avatar_id);
     void sendAvatarTexturesRequest(const LLUUID& avatar_id);
     void sendAvatarClassifiedsRequest(const LLUUID& avatar_id);
 
@@ -222,21 +267,17 @@ public:
 
     void sendClassifiedInfoRequest(const LLUUID& classified_id);
 
-    void sendAvatarPropertiesUpdate(const LLAvatarData* avatar_props);
-
     void sendPickInfoUpdate(const LLPickData* new_pick);
 
     void sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data);
 
-    void sendInterestsUpdate(const LLAvatarInterests* i_data);
-
     void sendFriendRights(const LLUUID& avatar_id, S32 rights);
-
-    void sendNotes(const LLUUID& avatar_id, const std::string& notes);
 
     void sendPickDelete(const LLUUID& pick_id);
 
     void sendClassifiedDelete(const LLUUID& classified_id);
+
+    bool isHideAgeSupportedByServer() { return mIsHideAgeSupportedByServer; }
 
     // Returns translated, human readable string for account type, such
     // as "Resident" or "Linden Employee".  Used for profiles, inspectors.
@@ -249,9 +290,10 @@ public:
 
     static bool hasPaymentInfoOnFile(const LLAvatarData* avatar_data);
 
-    static void requestAvatarPropertiesCoro(std::string cap_url, LLUUID agent_id);
+    static void requestAvatarPropertiesCoro(std::string cap_url, LLUUID avatar_id, EAvatarProcessorType type);
 
-    static void processAvatarPropertiesReply(LLMessageSystem* msg, void**);
+    // Processing of UDP variant of properties, truncates certain fields!
+    static void processAvatarLegacyPropertiesReply(LLMessageSystem* msg, void**);
 
     static void processAvatarInterestsReply(LLMessageSystem* msg, void**);
 
@@ -272,7 +314,7 @@ protected:
     void sendRequest(const LLUUID& avatar_id, EAvatarProcessorType type, const std::string &method);
     void sendGenericRequest(const LLUUID& avatar_id, EAvatarProcessorType type, const std::string &method);
     void sendAvatarPropertiesRequestMessage(const LLUUID& avatar_id);
-    void initAgentProfileCapRequest(const LLUUID& avatar_id, const std::string& cap_url);
+    void initAgentProfileCapRequest(const LLUUID& avatar_id, const std::string& cap_url, EAvatarProcessorType type);
 
     void notifyObservers(const LLUUID& id,void* data, EAvatarProcessorType type);
 
@@ -302,6 +344,9 @@ protected:
     // Map avatar_id+request_type -> U32 timestamp in seconds
     typedef std::map< std::pair<LLUUID, EAvatarProcessorType>, U32> timestamp_map_t;
     timestamp_map_t mRequestTimestamps;
+
+    // Is returned by isHideAgeSupportedByServer()
+    bool mIsHideAgeSupportedByServer { false };
 };
 
 #endif  // LL_LLAVATARPROPERTIESPROCESSOR_H

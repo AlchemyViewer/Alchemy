@@ -4026,21 +4026,13 @@ F32 LLViewerObject::recursiveGetEstTrianglesMax() const
 S32 LLViewerObject::getAnimatedObjectMaxTris() const
 {
     S32 max_tris = 0;
-    static LLCachedControl<bool> anim_obj_ignore_limits(gSavedSettings, "AnimatedObjectsIgnoreLimits");
-    if (anim_obj_ignore_limits)
+    if (gAgent.getRegion())
     {
-        max_tris = S32_MAX;
-    }
-    else
-    {
-        if (gAgent.getRegion())
+        LLSD features;
+        gAgent.getRegion()->getSimulatorFeatures(features);
+        if (features.has("AnimatedObjects"))
         {
-            LLSD features;
-            gAgent.getRegion()->getSimulatorFeatures(features);
-            if (features.has("AnimatedObjects"))
-            {
-                max_tris = features["AnimatedObjects"]["AnimatedObjectMaxTris"].asInteger();
-            }
+            max_tris = features["AnimatedObjects"]["AnimatedObjectMaxTris"].asInteger();
         }
     }
     return max_tris;

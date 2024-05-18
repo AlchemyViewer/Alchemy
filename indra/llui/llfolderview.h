@@ -346,6 +346,8 @@ protected:
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar* mCallbackRegistrar;
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar* mEnableRegistrar;
 
+    boost::signals2::connection mRenamerTopLostSignalConnection;
+
     bool mForceArrange;
 
 public:

@@ -222,7 +222,7 @@ LLFolderView::LLFolderView(const Params& p)
     params.font(getLabelFontForStyle(LLFontGL::NORMAL));
     params.max_length.bytes(DB_INV_ITEM_NAME_STR_LEN);
     params.commit_callback.function(boost::bind(&LLFolderView::commitRename, this, _2));
-    params.prevalidate_callback(&LLTextValidate::validateASCIIPrintableNoPipe);
+    params.prevalidator(&LLTextValidate::validateASCIIPrintableNoPipe);
     params.commit_on_focus_lost(true);
     params.visible(false);
     mRenamer = LLUICtrlFactory::create<LLLineEditor> (params);
@@ -258,7 +258,13 @@ LLFolderView::LLFolderView(const Params& p)
 // Destroys the object
 LLFolderView::~LLFolderView( void )
 {
-    closeRenamer();
+    mRenamerTopLostSignalConnection.disconnect();
+    if (mRenamer)
+    {
+        // instead of using closeRenamer remove it directly,
+        // since it might already be hidden
+        LLUI::getInstance()->removePopup(mRenamer);
+    }
 
     // The release focus call can potentially call the
     // scrollcontainer, which can potentially be called with a partly
@@ -344,9 +350,9 @@ S32 LLFolderView::arrange( S32* unused_width, S32* unused_height )
 void LLFolderView::filter( LLFolderViewFilter& filter )
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    static LLUICachedControl<S32> time_visible("FilterItemsMaxTimePerFrameVisible", 10);
-    static LLUICachedControl<S32> time_invisible("FilterItemsMaxTimePerFrameUnvisible", 1);
-    filter.resetTime(llclamp(mParentPanel.get()->getVisible() ? time_visible() : time_invisible(), 1, 100));
+    const S32 TIME_VISIBLE = 10; // in milliseconds
+    const S32 TIME_INVISIBLE = 1;
+    filter.resetTime(llclamp((mParentPanel.get()->getVisible() ? TIME_VISIBLE : TIME_INVISIBLE), 1, 100));
 
     // Note: we filter the model, not the view
     getViewModelItem()->filter(filter);
@@ -774,7 +780,7 @@ void LLFolderView::removeSelectedItems()
             }
             else
             {
-                LL_INFOS() << "Cannot delete " << item->getName() << LL_ENDL;
+                LL_DEBUGS() << "Cannot delete " << item->getName() << LL_ENDL;
                 return;
             }
         }
@@ -1087,7 +1093,10 @@ void LLFolderView::startRenamingSelectedItem( void )
         mRenamer->setVisible( TRUE );
         // set focus will fail unless item is visible
         mRenamer->setFocus( TRUE );
-        mRenamer->setTopLostCallback(boost::bind(&LLFolderView::onRenamerLost, this));
+        if (!mRenamerTopLostSignalConnection.connected())
+        {
+            mRenamerTopLostSignalConnection = mRenamer->setTopLostCallback(boost::bind(&LLFolderView::onRenamerLost, this));
+        }
         LLUI::getInstance()->addPopup(mRenamer);
     }
 }
@@ -1615,7 +1624,11 @@ BOOL LLFolderView::handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
 
 void LLFolderView::deleteAllChildren()
 {
-    closeRenamer();
+    mRenamerTopLostSignalConnection.disconnect();
+    if (mRenamer)
+    {
+        LLUI::getInstance()->removePopup(mRenamer);
+    }
     if (mPopupMenuHandle.get()) mPopupMenuHandle.get()->die();
     mPopupMenuHandle.markDead();
     mScrollContainer = NULL;

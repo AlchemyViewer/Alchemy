@@ -1432,7 +1432,7 @@ const std::string LLAppearanceMgr::sExpectedTextureName = "OutfitPreview";
 
 const LLUUID LLAppearanceMgr::getCOF() const
 {
-    return gInventory.findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT);
+    return mCOFID;
 }
 
 S32 LLAppearanceMgr::getCOFVersion() const
@@ -1446,6 +1446,11 @@ S32 LLAppearanceMgr::getCOFVersion() const
     {
         return LLViewerInventoryCategory::VERSION_UNKNOWN;
     }
+}
+
+void LLAppearanceMgr::initCOFID()
+{
+    mCOFID = gInventory.findCategoryUUIDForType(LLFolderType::FT_CURRENT_OUTFIT);
 }
 
 const LLViewerInventoryItem* LLAppearanceMgr::getBaseOutfitLink()
@@ -4074,6 +4079,14 @@ LLSD LLAppearanceMgr::dumpCOF() const
     return result;
 }
 
+void LLAppearanceMgr::cleanup()
+{
+    mIsInUpdateAppearanceFromCOF = false;
+    mOutstandingAppearanceBakeRequest = false;
+    mRerequestAppearanceBake = false;
+    mCOFID.setNull();
+}
+
 // static
 void LLAppearanceMgr::onIdle(void *)
 {
@@ -4539,9 +4552,9 @@ void LLAppearanceMgr::wearBaseOutfit()
     updateCOF(base_outfit_id);
 }
 
-//void LLAppearanceMgr::removeItemsFromAvatar(const uuid_vec_t& ids_to_remove)
+//void LLAppearanceMgr::removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, nullary_func_t post_update_func)
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2015-05-05 (Catznip-3.7)
-void LLAppearanceMgr::removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, LLPointer<LLInventoryCallback> cb /*= NULL*/, bool immediate_delete /*= false*/)
+void LLAppearanceMgr::removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, nullary_func_t post_update_func, LLPointer<LLInventoryCallback> cb /*= NULL*/, bool immediate_delete /*= false*/)
 // [/SL:KB]
 {
     if (ids_to_remove.empty())
@@ -4550,7 +4563,7 @@ void LLAppearanceMgr::removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, LLP
         return;
     }
 // [RLVa:KB] - Checked: 2013-02-12 (RLVa-1.4.8)
-//  LLPointer<LLInventoryCallback> cb = NULL;
+//    LLPointer<LLInventoryCallback> cb = new LLUpdateAppearanceOnDestroy(true, true, post_update_func);
     for (uuid_vec_t::const_iterator it = ids_to_remove.begin(); it != ids_to_remove.end(); ++it)
     {
         const LLUUID& id_to_remove = *it;
@@ -4572,7 +4585,7 @@ void LLAppearanceMgr::removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, LLP
         }
 
         if (!cb)
-            cb = new LLUpdateAppearanceOnDestroy();
+            cb = new LLUpdateAppearanceOnDestroy(true, true, post_update_func);
         removeCOFItemLinks(linked_item_id, cb, immediate_delete);
 // [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-3.7
         LLAttachmentsMgr::instance().clearPendingAttachmentLink(linked_item_id);
@@ -4599,17 +4612,17 @@ void LLAppearanceMgr::removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, LLP
 //  }
 }
 
-//void LLAppearanceMgr::removeItemFromAvatar(const LLUUID& id_to_remove)
+//void LLAppearanceMgr::removeItemFromAvatar(const LLUUID& id_to_remove, nullary_func_t post_update_func)
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2015-05-05 (Catznip-3.7)
-void LLAppearanceMgr::removeItemFromAvatar(const LLUUID& id_to_remove, LLPointer<LLInventoryCallback> cb /*= NULL*/, bool immediate_delete /*= false*/)
+void LLAppearanceMgr::removeItemFromAvatar(const LLUUID& id_to_remove, nullary_func_t post_update_func, LLPointer<LLInventoryCallback> cb /*= NULL*/, bool immediate_delete /*= false*/)
 // [/SL:KB]
 {
     uuid_vec_t ids_to_remove;
     ids_to_remove.push_back(id_to_remove);
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2015-05-05 (Catznip-3.7)
-    removeItemsFromAvatar(ids_to_remove, cb, immediate_delete);
+    removeItemsFromAvatar(ids_to_remove, post_update_func, cb, immediate_delete);
 // [/SL:KB]
-//  removeItemsFromAvatar(ids_to_remove);
+//    removeItemsFromAvatar(ids_to_remove, post_update_func);
 }
 
 
@@ -4846,20 +4859,45 @@ BOOL LLAppearanceMgr::getIsInCOF(const LLUUID& obj_id) const
     return FALSE;
 }
 
-BOOL LLAppearanceMgr::getIsProtectedCOFItem(const LLUUID& obj_id) const
+bool LLAppearanceMgr::getIsInCOF(const LLInventoryObject* obj) const
 {
-    if (!getIsInCOF(obj_id)) return FALSE;
+    const LLUUID& cof = getCOF();
+    if (obj->getUUID() == cof)
+        return true;
+    if (obj && obj->getParentUUID() == cof)
+        return true;
+    return false;
+}
+
+bool LLAppearanceMgr::getIsProtectedCOFItem(const LLUUID& obj_id) const
+{
+    if (!getIsInCOF(obj_id)) return false;
 
     // If a non-link somehow ended up in COF, allow deletion.
     const LLInventoryObject *obj = gInventory.getObject(obj_id);
     if (obj && !obj->getIsLinkType())
     {
-        return FALSE;
+        return false;
     }
 
     // For now, don't allow direct deletion from the COF.  Instead, force users
     // to choose "Detach" or "Take Off".
-    return TRUE;
+    return true;
+}
+
+bool LLAppearanceMgr::getIsProtectedCOFItem(const LLInventoryObject* obj) const
+{
+    if (!getIsInCOF(obj)) return false;
+
+    // If a non-link somehow ended up in COF, allow deletion.
+    if (obj && !obj->getIsLinkType())
+    {
+        return false;
+    }
+
+    // For now, don't allow direct deletion from the COF.  Instead, force users
+    // to choose "Detach" or "Take Off".
+    return true;
 }
 
 class CallAfterCategoryFetchStage2: public LLInventoryFetchItemsObserver

@@ -287,7 +287,7 @@ BOOL    LLPanelObject::postBuild()
     mCtrlSculptTexture = getChild<LLTextureCtrl>("sculpt texture control");
     if (mCtrlSculptTexture)
     {
-        mCtrlSculptTexture->setDefaultImageAssetID(LLUUID(SCULPT_DEFAULT_TEXTURE));
+        mCtrlSculptTexture->setDefaultImageAssetID(SCULPT_DEFAULT_TEXTURE);
         mCtrlSculptTexture->setCommitCallback( boost::bind(&LLPanelObject::onCommitSculpt, this, _2 ));
         mCtrlSculptTexture->setOnCancelCallback( boost::bind(&LLPanelObject::onCancelSculpt, this, _2 ));
         mCtrlSculptTexture->setOnSelectCallback( boost::bind(&LLPanelObject::onSelectSculpt, this, _2 ));
@@ -2297,7 +2297,7 @@ void LLPanelObject::onCancelSculpt(const LLSD& data)
 {
     if(mSculptTextureRevert.isNull())
     {
-        mSculptTextureRevert = LLUUID(SCULPT_DEFAULT_TEXTURE);
+        mSculptTextureRevert = SCULPT_DEFAULT_TEXTURE;
     }
     mCtrlSculptTexture->setImageAssetID(mSculptTextureRevert);
 
@@ -2562,7 +2562,7 @@ void LLPanelObject::onCopyParams()
         }
         else
         {
-            mClipboardParams["sculpt"]["id"] = LLUUID(SCULPT_DEFAULT_TEXTURE);
+            mClipboardParams["sculpt"]["id"] = SCULPT_DEFAULT_TEXTURE;
         }
 
         mClipboardParams["sculpt"]["type"] = sculpt_params->getSculptType();

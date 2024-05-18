@@ -57,7 +57,7 @@ public:
     /**
      * Show group information panel.
      */
-    static void show(const LLUUID& group_id);
+    static void show(const LLUUID& group_id, bool expand_notices_tab = false);
 
 // [SL:KB] - Patch: Notification-GroupCreateNotice | Checked: 2012-02-16 (Catznip-3.2)
     /**

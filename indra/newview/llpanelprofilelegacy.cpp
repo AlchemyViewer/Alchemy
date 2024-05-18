@@ -85,7 +85,7 @@ LLPanelProfileLegacy::LLPanelProfileLegacy()
 ,   mPanelGroups(nullptr)
 {
     mChildStack.setParent(this);
-    mCommitCallbackRegistrar.add("Profile.CommitInterest", boost::bind(&LLPanelProfileLegacy::onCommitInterest, this));
+    //mCommitCallbackRegistrar.add("Profile.CommitInterest", boost::bind(&LLPanelProfileLegacy::onCommitInterest, this));
     mCommitCallbackRegistrar.add("Profile.CommitProperties", boost::bind(&LLPanelProfileLegacy::onCommitAvatarProperties, this));
     mCommitCallbackRegistrar.add("Profile.CommitRights", boost::bind(&LLPanelProfileLegacy::onCommitRights, this));
     mCommitCallbackRegistrar.add("Profile.CommitModifyObjectRights", boost::bind(&LLPanelProfileLegacy::onCommitModifyObjectsRights, this, _1));
@@ -164,9 +164,9 @@ void LLPanelProfileLegacy::onOpen(const LLSD& key)
     getChild<LLView>("www")->setVisible(!is_self);
     getChild<LLView>("www_edit")->setVisible(is_self);
     getChild<LLView>("allow_publish")->setVisible(is_self);
-    childSetEnabled("wanna_something", is_self);
-    childSetEnabled("can_something", is_self);
-    childSetEnabled("languages", is_self);
+    //childSetEnabled("wanna_something", is_self);
+    //childSetEnabled("can_something", is_self);
+    //childSetEnabled("languages", is_self);
     for (const std::string& checkbox: sWantCheckboxes)
         childSetEnabled(checkbox, is_self);
     for (const std::string& checkbox: sSkillsCheckboxes)
@@ -174,7 +174,7 @@ void LLPanelProfileLegacy::onOpen(const LLSD& key)
     childSetEnabled("drop_target", !is_self);
     getChild<LLLayoutPanel>("avatar_in_search", is_self);
     getChild<LLDropTarget>("drop_target")->setAgentID(av_id);
-    resetInterestsControlValues();
+    //resetInterestsControlValues();
 
     updateData();
     resetControls();
@@ -197,21 +197,21 @@ void LLPanelProfileLegacy::resetControls()
                                         : "MuteAvatar"));
 }
 
-void LLPanelProfileLegacy::resetInterestsControlValues()
-{
-    for (U32 i = 0; i < sWantCheckboxes.size(); ++i)
-    {
-        getChild<LLCheckBoxCtrl>(sWantCheckboxes.at(i))->setValue(FALSE);
-    }
-
-    for (U32 i = 0; i < sSkillsCheckboxes.size(); ++i)
-    {
-        getChild<LLCheckBoxCtrl>(sSkillsCheckboxes.at(i))->setValue(FALSE);
-    }
-    getChild<LLLineEditor>("wanna_something")->setText(LLStringUtil::null);
-    getChild<LLLineEditor>("can_something")->setText(LLStringUtil::null);
-    getChild<LLLineEditor>("languages")->setText(LLStringUtil::null);
-}
+//void LLPanelProfileLegacy::resetInterestsControlValues()
+//{
+//    for (U32 i = 0; i < sWantCheckboxes.size(); ++i)
+//    {
+//        getChild<LLCheckBoxCtrl>(sWantCheckboxes.at(i))->setValue(FALSE);
+//    }
+//
+//    for (U32 i = 0; i < sSkillsCheckboxes.size(); ++i)
+//    {
+//        getChild<LLCheckBoxCtrl>(sSkillsCheckboxes.at(i))->setValue(FALSE);
+//    }
+//    getChild<LLLineEditor>("wanna_something")->setText(LLStringUtil::null);
+//    getChild<LLLineEditor>("can_something")->setText(LLStringUtil::null);
+//    getChild<LLLineEditor>("languages")->setText(LLStringUtil::null);
+//}
 
 void LLPanelProfileLegacy::updateData()
 {
@@ -385,11 +385,6 @@ void LLPanelProfileLegacy::updateData()
 
             });
     }
-    else
-    {
-        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(getAvatarId());
-        LLAvatarPropertiesProcessor::getInstance()->sendAvatarNotesRequest(getAvatarId());
-    }
 
     mAvatarNameCacheConnection = LLAvatarNameCache::get(getAvatarId(),
         boost::bind(&LLPanelProfileLegacy::onAvatarNameCache, this, _1, _2));
@@ -491,25 +486,25 @@ void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType ty
             getChild<LLTextEditor>("notes")->setValue(pData->notes);
             break;
         }
-        case APT_INTERESTS:
-        {
-            const LLAvatarInterests* pData = static_cast<const LLAvatarInterests*>(data);
-            if (!pData || pData->avatar_id != getAvatarId()) return;
+        //case APT_INTERESTS:
+        //{
+        //    const LLAvatarInterests* pData = static_cast<const LLAvatarInterests*>(data);
+        //    if (!pData || pData->avatar_id != getAvatarId()) return;
 
-            for (U32 i = 0; i < sWantCheckboxes.size(); ++i)
-            {
-                getChild<LLCheckBoxCtrl>(sWantCheckboxes.at(i))->setValue(pData->want_to_mask & (1<<i) ? TRUE : FALSE);
-            }
+        //    for (U32 i = 0; i < sWantCheckboxes.size(); ++i)
+        //    {
+        //        getChild<LLCheckBoxCtrl>(sWantCheckboxes.at(i))->setValue(pData->want_to_mask & (1<<i) ? TRUE : FALSE);
+        //    }
 
-            for (U32 i = 0; i < sSkillsCheckboxes.size(); ++i)
-            {
-                getChild<LLCheckBoxCtrl>(sSkillsCheckboxes.at(i))->setValue(pData->skills_mask & (1<<i) ? TRUE : FALSE);
-            }
-            getChild<LLLineEditor>("wanna_something")->setText(pData->want_to_text);
-            getChild<LLLineEditor>("can_something")->setText(pData->skills_text);
-            getChild<LLLineEditor>("languages")->setText(pData->languages_text);
-            break;
-        }
+        //    for (U32 i = 0; i < sSkillsCheckboxes.size(); ++i)
+        //    {
+        //        getChild<LLCheckBoxCtrl>(sSkillsCheckboxes.at(i))->setValue(pData->skills_mask & (1<<i) ? TRUE : FALSE);
+        //    }
+        //    getChild<LLLineEditor>("wanna_something")->setText(pData->want_to_text);
+        //    getChild<LLLineEditor>("can_something")->setText(pData->skills_text);
+        //    getChild<LLLineEditor>("languages")->setText(pData->languages_text);
+        //    break;
+        //}
         case APT_GROUPS:
         {
             const LLAvatarGroups* pData = static_cast<LLAvatarGroups*>(data);
@@ -653,43 +648,6 @@ void LLPanelProfileLegacy::onCommitAvatarProperties()
             "sendAvatarProfileCoro",
             boost::bind(&LLPanelProfileLegacy::sendAvatarProfileCoro, this, cap, data));
     }
-    else
-    {
-        LLAvatarData data = LLAvatarData();
-        data.avatar_id     = gAgentID;
-        data.image_id      = getChild<LLTextureCtrl>("sl_profile_pic")->getImageAssetID();
-        data.fl_image_id   = getChild<LLTextureCtrl>("fl_profile_pic")->getImageAssetID();
-        data.about_text    = getChild<LLTextEditor>("sl_about")->getText();
-        data.fl_about_text = getChild<LLTextEditor>("fl_about")->getText();
-        data.profile_url   = getChild<LLLineEditor>("www_edit")->getText();
-        data.allow_publish = getChild<LLCheckBoxCtrl>("allow_publish")->getValue().asBoolean();
-
-        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesUpdate(&data);
-    }
-}
-
-void LLPanelProfileLegacy::onCommitInterest()
-{
-    if (getAvatarId() != gAgentID) return;
-    LLAvatarInterests data = LLAvatarInterests();
-
-    data.want_to_mask = 0x0;
-    data.skills_mask = 0x0;
-    data.want_to_text = getChild<LLLineEditor>("wanna_something")->getText();
-    data.skills_text = getChild<LLLineEditor>("can_something")->getText();
-    data.languages_text = getChild<LLLineEditor>("languages")->getText();
-    for (U32 i = 0; i < sWantCheckboxes.size(); ++i)
-    {
-        if(getChild<LLCheckBoxCtrl>(sWantCheckboxes.at(i))->getValue().asBoolean())
-            data.want_to_mask |= 1<<i;
-    }
-    for (U32 i = 0; i < sSkillsCheckboxes.size(); ++i)
-    {
-        if(getChild<LLCheckBoxCtrl>(sSkillsCheckboxes.at(i))->getValue().asBoolean())
-            data.skills_mask |= 1<<i;
-    }
-
-    LLAvatarPropertiesProcessor::getInstance()->sendInterestsUpdate(&data);
 }
 
 void LLPanelProfileLegacy::onCommitNotes(LLUICtrl* ctrl)
@@ -700,11 +658,6 @@ void LLPanelProfileLegacy::onCommitNotes(LLUICtrl* ctrl)
         LLCoros::instance().launch("sendAvatarProfileCoro",
             boost::bind(&LLPanelProfileLegacy::sendAvatarProfileCoro, this, cap,
             LLSD().with("notes", ctrl->getValue().asString())));
-    }
-    else
-    {
-        const std::string& notes = ctrl->getValue().asString();
-        LLAvatarPropertiesProcessor::getInstance()->sendNotes(getAvatarId(), notes);
     }
 }
 
@@ -916,7 +869,6 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::updateData()
 {
     mPicksList->clear();
     mClassifiedsList->clear();
-    LLAvatarPropertiesProcessor::getInstance()->sendAvatarPicksRequest(getAvatarId());
     LLAvatarPropertiesProcessor::getInstance()->sendAvatarClassifiedsRequest(getAvatarId());
 }
 
@@ -1493,10 +1445,6 @@ void LLPanelProfileLegacy::LLPanelProfileGroups::updateData()
 {
     mGroupsText->setVisible(TRUE);
     mGroupsList->clear();
-    if (gAgent.getRegionCapability(AGENT_PROFILE_CAP).empty())
-    {
-        LLAvatarPropertiesProcessor::getInstance()->sendAvatarGroupsRequest(getAvatarId());
-    }
 }
 
 void LLPanelProfileLegacy::LLPanelProfileGroups::processProperties(void* data, EAvatarProcessorType type)

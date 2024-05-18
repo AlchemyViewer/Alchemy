@@ -394,8 +394,9 @@ void FloaterAO::onRenameSet()
 
     if (!name.empty())
     {
+        LLTextValidate::Validator validator(LLTextValidate::validateASCIIPrintableNoPipe);
         if (
-            LLTextValidate::validateASCIIPrintableNoPipe(new_set_name.getWString()) &&  // only allow ASCII
+            validator.validate(new_set_name.getWString()) &&  // only allow ASCII
             name.find_first_of(":|") == std::string::npos)                              // don't allow : or |
         {
             if (AOEngine::instance().renameSet(mSelectedSet, name))
@@ -513,13 +514,13 @@ bool FloaterAO::newSetCallback(const LLSD& notification, const LLSD& response)
     LLStringUtil::trim(newSetName);
 
     LLUIString new_set_name = newSetName;
-
+    LLTextValidate::Validator validator(LLTextValidate::validateASCIIPrintableNoPipe);
     if (newSetName.empty())
     {
         return false;
     }
     else if (
-        !LLTextValidate::validateASCIIPrintableNoPipe(new_set_name.getWString()) ||     // only allow ASCII
+        !validator.validate(new_set_name.getWString()) ||     // only allow ASCII
         newSetName.find_first_of(":|") != std::string::npos)                            // don't allow : or |
     {
         LLSD args;

@@ -1,4 +1,4 @@
-/** 
+/**
  * @file SMAABlurWeightsF.glsl
  */
 
@@ -28,13 +28,13 @@ float4 SMAABlendingWeightCalculationPS(float2 texcoord,
 
 void main()
 {
-	frag_color = SMAABlendingWeightCalculationPS(vary_texcoord0,
-												 vary_pixcoord,
-												 vary_offset,
-												 tex0,
-												 tex1,
-												 tex2,
-												 float4(0.0)
-												 );
+    frag_color = SMAABlendingWeightCalculationPS(vary_texcoord0,
+                                                 vary_pixcoord,
+                                                 vary_offset,
+                                                 tex0,
+                                                 tex1,
+                                                 tex2,
+                                                 float4(0.0)
+                                                 );
 }
 

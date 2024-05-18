@@ -121,6 +121,11 @@ LLPanelClassifiedInfo::~LLPanelClassifiedInfo()
         LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
     }
     sAllPanels.remove(this);
+
+    if (getAvatarId().notNull())
+    {
+        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+    }
 }
 
 // static

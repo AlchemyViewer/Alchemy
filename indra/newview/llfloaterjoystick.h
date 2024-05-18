@@ -47,6 +47,7 @@ public:
     static  void setSNDefaults();
     static  void setXboxDefaults();
 
+    static bool addDeviceCallback(std::string &name, LLSD& value, void* userdata);
     void addDevice(std::string &name, LLSD& value);
 
 protected:

@@ -49,8 +49,8 @@ std::string LLFolderViewModelCommon::getStatusText(bool is_empty_folder)
 
 void LLFolderViewModelCommon::filter()
 {
-    static LLUICachedControl<S32> max_time("FilterItemsMaxTimePerFrameVisible", 10);
-    getFilter().resetTime(llclamp(max_time(), 1, 100));
+    const S32 MAX_FILTER_TIME = 10;
+    getFilter().resetTime(MAX_FILTER_TIME);
     mFolderView->getViewModelItem()->filter(getFilter());
 }
 

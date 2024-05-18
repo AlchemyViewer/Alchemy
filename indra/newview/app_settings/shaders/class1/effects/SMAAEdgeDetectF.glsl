@@ -1,6 +1,6 @@
-/** 
+/**
  * @file SMAAEdgeDetectF.glsl
- */ 
+ */
 
 /*[EXTRA_CODE_HERE]*/
 
@@ -28,12 +28,12 @@ float2 SMAAColorEdgeDetectionPS(float2 texcoord,
 
 void main()
 {
-	vec2 val = SMAAColorEdgeDetectionPS(vary_texcoord0,
-										  vary_offset,
-										  tex0
-										  #if SMAA_PREDICATION
-										  , tex1
-										  #endif
-										  );
-	frag_color = float4(val,0.0,0.0);
+    vec2 val = SMAAColorEdgeDetectionPS(vary_texcoord0,
+                                          vary_offset,
+                                          tex0
+                                          #if SMAA_PREDICATION
+                                          , tex1
+                                          #endif
+                                          );
+    frag_color = float4(val,0.0,0.0);
 }

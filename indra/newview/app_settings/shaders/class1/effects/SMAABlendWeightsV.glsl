@@ -1,4 +1,4 @@
-/** 
+/**
  * @file SMAABlurWeightsV.glsl
  */
 
@@ -20,11 +20,11 @@ void SMAABlendingWeightCalculationVS(float2 texcoord,
 
 void main()
 {
-	gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);	
-	vary_texcoord0 = (gl_Position.xy*0.5+0.5);
+    gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
+    vary_texcoord0 = (gl_Position.xy*0.5+0.5);
 
-	SMAABlendingWeightCalculationVS(vary_texcoord0,
-									vary_pixcoord,
-									vary_offset);
+    SMAABlendingWeightCalculationVS(vary_texcoord0,
+                                    vary_pixcoord,
+                                    vary_offset);
 }
 

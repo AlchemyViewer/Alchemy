@@ -57,10 +57,11 @@ static LLDefaultChildRegistry::Register<LLButton> r("button");
 template class LLButton* LLView::getChild<class LLButton>(
     std::string_view name, BOOL recurse) const;
 
-// globals loaded from settings.xml
+// globals
 S32 LLBUTTON_H_PAD  = 4;
-S32 BTN_HEIGHT_SMALL= 0;
-S32 BTN_HEIGHT      = 0;
+S32 BTN_HEIGHT_SMALL= 23;
+S32 BTN_HEIGHT      = 23;
+S32 BTN_DROP_SHADOW = 2;
 
 LLButton::Params::Params()
 :   label_selected("label_selected"),               // requires is_toggle true

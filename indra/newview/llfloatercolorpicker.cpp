@@ -105,9 +105,9 @@ LLFloaterColorPicker::LLFloaterColorPicker (LLColorSwatchCtrl* swatch, BOOL show
       mActive               ( TRUE ),
       mCanApplyImmediately  ( show_apply_immediate ),
       mContextConeOpacity   ( 0.f ),
-      mContextConeInAlpha   ( 0.f ),
-      mContextConeOutAlpha   ( 0.f ),
-      mContextConeFadeTime   ( 0.f )
+      mContextConeInAlpha   (CONTEXT_CONE_IN_ALPHA),
+      mContextConeOutAlpha   (CONTEXT_CONE_OUT_ALPHA),
+      mContextConeFadeTime   (CONTEXT_CONE_FADE_TIME)
 {
     mCommitCallbackRegistrar.add("ColorPicker.menuDoToSelected", boost::bind(&LLFloaterColorPicker::menuDoToSelected, this, _2));
 
@@ -115,10 +115,6 @@ LLFloaterColorPicker::LLFloaterColorPicker (LLColorSwatchCtrl* swatch, BOOL show
 
     // create user interface for this picker
     createUI ();
-
-    mContextConeInAlpha = gSavedSettings.getF32("ContextConeInAlpha");
-    mContextConeOutAlpha = gSavedSettings.getF32("ContextConeOutAlpha");
-    mContextConeFadeTime = gSavedSettings.getF32("ContextConeFadeTime");
 }
 
 LLFloaterColorPicker::~LLFloaterColorPicker()

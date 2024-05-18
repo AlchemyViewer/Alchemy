@@ -116,9 +116,11 @@ public:
     // Find the Current Outfit folder.
     const LLUUID getCOF() const;
     S32 getCOFVersion() const;
+    void initCOFID();
 
     // Debugging - get truncated LLSD summary of COF contents.
     LLSD dumpCOF() const;
+    void cleanup();
 
     // Finds the folder link to the currently worn outfit
     const LLViewerInventoryItem *getBaseOutfitLink();
@@ -207,14 +209,14 @@ public:
 
     //Remove clothing or detach an object from the agent (a bodypart cannot be removed)
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2015-05-05 (Catznip-3.7)
-    void removeItemFromAvatar(const LLUUID& id_to_remove) { removeItemFromAvatar(id_to_remove, NULL, false); }
-    void removeItemFromAvatar(const LLUUID& id_to_remove, LLPointer<LLInventoryCallback> cb /*= NULL*/, bool immediate_delete /*= false*/);
+    void removeItemFromAvatar(const LLUUID& id_to_remove, nullary_func_t post_update_func = no_op) { removeItemFromAvatar(id_to_remove, post_update_func, NULL, false); }
+    void removeItemFromAvatar(const LLUUID& id_to_remove, nullary_func_t post_update_func /*= no_op*/, LLPointer<LLInventoryCallback> cb /*= NULL*/, bool immediate_delete /*= false*/);
 
-    void removeItemsFromAvatar(const uuid_vec_t& ids_to_remove) { removeItemsFromAvatar(ids_to_remove, NULL, false); }
-    void removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, LLPointer<LLInventoryCallback> cb /*= NULL*/, bool immediate_delete /*= false*/);
+    void removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, nullary_func_t post_update_func = no_op) { removeItemsFromAvatar(ids_to_remove, post_update_func, NULL, false); }
+    void removeItemsFromAvatar(const uuid_vec_t& ids_to_remove, nullary_func_t post_update_func /*= no_op*/, LLPointer<LLInventoryCallback> cb /*= NULL*/, bool immediate_delete /*= false*/);
 // [/SL:KB]
-//  void removeItemsFromAvatar(const uuid_vec_t& item_ids);
-//  void removeItemFromAvatar(const LLUUID& item_id);
+//  void removeItemsFromAvatar(const uuid_vec_t& item_ids, nullary_func_t post_update_func = no_op);
+//  void removeItemFromAvatar(const LLUUID& item_id, nullary_func_t post_update_func = no_op);
 
 
     void onOutfitFolderCreated(const LLUUID& folder_id, bool show_panel);
@@ -284,7 +286,6 @@ private:
 
     static void onOutfitRename(const LLSD& notification, const LLSD& response);
 
-
     bool mAttachmentInvLinkEnabled;
     bool mOutfitIsDirty;
     bool mIsInUpdateAppearanceFromCOF; // to detect recursive calls.
@@ -302,6 +303,7 @@ private:
     attachments_changed_signal_t        mAttachmentsChangeSignal;
 
     LLUUID mCOFImageID;
+    LLUUID mCOFID;
 
     std::unique_ptr<LLOutfitUnLockTimer> mUnlockOutfitTimer;
 
@@ -316,8 +318,10 @@ private:
 public:
     // Is this in the COF?
     BOOL getIsInCOF(const LLUUID& obj_id) const;
+    bool getIsInCOF(const LLInventoryObject* obj) const;
     // Is this in the COF and can the user delete it from the COF?
-    BOOL getIsProtectedCOFItem(const LLUUID& obj_id) const;
+    bool getIsProtectedCOFItem(const LLUUID& obj_id) const;
+    bool getIsProtectedCOFItem(const LLInventoryObject* obj) const;
 
     // Outfits will prioritize textures with such name to use for preview in gallery
     static const std::string sExpectedTextureName;
