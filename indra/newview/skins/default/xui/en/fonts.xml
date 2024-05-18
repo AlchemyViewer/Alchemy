@@ -99,12 +99,6 @@
 		<file>TwemojiSVG.ttf</file>
 	</font>
 
-	<font_size name="Monospace" font="Emoji" size="9.0" />
-	<font_size name="Huge" font="Emoji" size="16.0" />
-	<font_size name="Large" font="Emoji" size="12.2" />
-	<font_size name="Medium" font="Emoji" size="11.2" />
-	<font_size name="Small" font="Emoji" size="10.2" />
-
 	<font name="Monospace"
 	  comment="Name of monospace font">
 		<file>DejaVuSansMono.ttf</file>
