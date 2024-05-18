@@ -45,8 +45,8 @@ extern const std::string EXCEPTION_TAB_NAME;
 class LLPanelBlockBase
 {
 public:
-	virtual const std::string& getFilterString() const = 0;
-	virtual void               setFilterString(const std::string& strFilter) = 0;
+    virtual const std::string& getFilterString() const = 0;
+    virtual void               setFilterString(const std::string& strFilter) = 0;
 };
 
 // ============================================================================
@@ -56,54 +56,54 @@ public:
 class LLPanelBlockList final : public LLPanel, public LLMuteListObserver, public LLPanelBlockBase
 {
 public:
-	LLPanelBlockList();
-	~LLPanelBlockList();
+    LLPanelBlockList();
+    ~LLPanelBlockList();
 
-	/*
-	 * LLPanel overrides
-	 */
+    /*
+     * LLPanel overrides
+     */
 public:
-	BOOL postBuild() override;
-	void onOpen(const LLSD& sdParam) override;
+    BOOL postBuild() override;
+    void onOpen(const LLSD& sdParam) override;
 
-	/*
-	 * Member functions
-	 */
+    /*
+     * Member functions
+     */
 public:
-	const std::string& getFilterString() const override { return m_strFilter; }
-	void setFilterString(const std::string& strFilter) override;
+    const std::string& getFilterString() const override { return m_strFilter; }
+    void setFilterString(const std::string& strFilter) override;
 protected:
-	void refresh() override;
-	void removePicker();
-	void selectEntry(const LLSD& sdValue) { LLMute muteEntry(sdValue["id"].asUUID(), sdValue["name"].asString()); selectEntry(muteEntry); }
-	void selectEntry(const LLMute& muteEntry);
-	void updateButtons();
+    void refresh() override;
+    void removePicker();
+    void selectEntry(const LLSD& sdValue) { LLMute muteEntry(sdValue["id"].asUUID(), sdValue["name"].asString()); selectEntry(muteEntry); }
+    void selectEntry(const LLMute& muteEntry);
+    void updateButtons();
 
-	/*
-	 * Event handlers
-	 */
+    /*
+     * Event handlers
+     */
 public:
-	void onChange() override;
+    void onChange() override;
 protected:
-	       void onAddAvatar(LLUICtrl* pCtrl);
-	static void onAddAvatarCallback(const uuid_vec_t& idAgents, const std::vector<LLAvatarName>& avAgents);
-	static void onAddByName();
-	static void onAddByNameCallback(const std::string& strBlockName);
-		   void onRemoveSelection();
-		   void onColumnSortChange();
-	static void onIdleRefresh(LLHandle<LLPanel> hPanel);
-		   void onSelectionChange();
-		   void onToggleMuteFlag(const LLSD& sdValue, const LLScrollListCell* pCell);
+           void onAddAvatar(LLUICtrl* pCtrl);
+    static void onAddAvatarCallback(const uuid_vec_t& idAgents, const std::vector<LLAvatarName>& avAgents);
+    static void onAddByName();
+    static void onAddByNameCallback(const std::string& strBlockName);
+           void onRemoveSelection();
+           void onColumnSortChange();
+    static void onIdleRefresh(LLHandle<LLPanel> hPanel);
+           void onSelectionChange();
+           void onToggleMuteFlag(const LLSD& sdValue, const LLScrollListCell* pCell);
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	bool                m_fRefreshOnChange = true;
-	std::string         m_strFilter;
-	LLScrollListCtrl*   m_pBlockList = nullptr;
-	LLButton*           m_pTrashBtn = nullptr;
-	LLHandle<LLFloater> m_hPicker;
+    bool                m_fRefreshOnChange = true;
+    std::string         m_strFilter;
+    LLScrollListCtrl*   m_pBlockList = nullptr;
+    LLButton*           m_pTrashBtn = nullptr;
+    LLHandle<LLFloater> m_hPicker;
 };
 
 // ============================================================================
@@ -113,36 +113,36 @@ protected:
 class LLPanelDerenderList final : public LLPanel
 {
 public:
-	LLPanelDerenderList();
-	~LLPanelDerenderList();
+    LLPanelDerenderList();
+    ~LLPanelDerenderList();
 
-	/*
-	 * LLPanel overrides
-	 */
+    /*
+     * LLPanel overrides
+     */
 public:
-	BOOL postBuild() override;
-	void onOpen(const LLSD& sdParam) override;
+    BOOL postBuild() override;
+    void onOpen(const LLSD& sdParam) override;
 
-	/*
-	 * Member functions
-	 */
+    /*
+     * Member functions
+     */
 protected:
-	void refresh() override;
+    void refresh() override;
 
-	/*
-	 * Event handlers
-	 */
+    /*
+     * Event handlers
+     */
 protected:
-	void onColumnSortChange();
-	void onSelectionChange();
-	void onSelectionRemove();
+    void onColumnSortChange();
+    void onSelectionChange();
+    void onSelectionRemove();
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	LLScrollListCtrl*           m_pDerenderList;
-	boost::signals2::connection m_DerenderChangeConn;
+    LLScrollListCtrl*           m_pDerenderList;
+    boost::signals2::connection m_DerenderChangeConn;
 };
 
 // ============================================================================
@@ -152,36 +152,36 @@ protected:
 class LLPanelAssetBlocklist final : public LLPanel
 {
 public:
-	LLPanelAssetBlocklist();
-	~LLPanelAssetBlocklist();
+    LLPanelAssetBlocklist();
+    ~LLPanelAssetBlocklist();
 
-	/*
-	 * LLPanel overrides
-	 */
+    /*
+     * LLPanel overrides
+     */
 public:
-	BOOL postBuild() override;
-	void onOpen(const LLSD& sdParam) override;
+    BOOL postBuild() override;
+    void onOpen(const LLSD& sdParam) override;
 
-	/*
-	 * Member functions
-	 */
+    /*
+     * Member functions
+     */
 protected:
-	void refresh() override;
+    void refresh() override;
 
-	/*
-	 * Event handlers
-	 */
+    /*
+     * Event handlers
+     */
 protected:
-	void onColumnSortChange();
-	void onSelectionChange();
-	void onSelectionRemove();
+    void onColumnSortChange();
+    void onSelectionChange();
+    void onSelectionRemove();
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	LLScrollListCtrl* mAssetBlocklist = nullptr;
-	boost::signals2::connection mAssetBlocklistChangeConn;
+    LLScrollListCtrl* mAssetBlocklist = nullptr;
+    boost::signals2::connection mAssetBlocklistChangeConn;
 };
 
 // ============================================================================
@@ -190,55 +190,55 @@ protected:
 
 class LLPanelAvatarRendering final : public LLPanel, public LLMuteListObserver, public LLPanelBlockBase
 {
-	friend class LLPanelAvatarRenderingContextMenu;
+    friend class LLPanelAvatarRenderingContextMenu;
 public:
-	LLPanelAvatarRendering();
-	~LLPanelAvatarRendering();
+    LLPanelAvatarRendering();
+    ~LLPanelAvatarRendering();
 
-	/*
-	 * LLPanel overrides
-	 */
+    /*
+     * LLPanel overrides
+     */
 public:
-	BOOL postBuild() override;
-	void onOpen(const LLSD& sdParam) override;
+    BOOL postBuild() override;
+    void onOpen(const LLSD& sdParam) override;
 
-	/*
-	 * Member functions
-	 */
+    /*
+     * Member functions
+     */
 public:
-	const std::string& getFilterString() const override { return m_strFilter; }
-	void setFilterString(const std::string& strFilter) override;
+    const std::string& getFilterString() const override { return m_strFilter; }
+    void setFilterString(const std::string& strFilter) override;
 protected:
-	void refresh() override;
-	void removePicker();
-	void updateButtons();
+    void refresh() override;
+    void removePicker();
+    void updateButtons();
 
-	/*
-	 * Event handlers
-	 */
+    /*
+     * Event handlers
+     */
 public:
-	void onChange() override;
+    void onChange() override;
 protected:
-	void onAddException(LLUICtrl* pCtrl, const LLSD& sdParam);
-	static void onAddExceptionCb(const uuid_vec_t& idAgents, S32 nSetting);
-	bool onHasException(const LLUUID& idAgent, const LLSD& sdParamn);
-	void onExceptionMenu(S32 x, S32 y);
-	void onRemoveException();
-	void onSetException(const LLUUID& idAgent, const LLSD& sdParamn);
+    void onAddException(LLUICtrl* pCtrl, const LLSD& sdParam);
+    static void onAddExceptionCb(const uuid_vec_t& idAgents, S32 nSetting);
+    bool onHasException(const LLUUID& idAgent, const LLSD& sdParamn);
+    void onExceptionMenu(S32 x, S32 y);
+    void onRemoveException();
+    void onSetException(const LLUUID& idAgent, const LLSD& sdParamn);
 
-	void onColumnSortChange();
-	void onSelectionChange();
+    void onColumnSortChange();
+    void onSelectionChange();
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	bool                m_fRefreshOnChange = true;
-	std::string         m_strFilter;
-	LLNameListCtrl*     m_pExceptionList = nullptr;
-	LLButton*           m_pTrashBtn = nullptr;
-	LLListContextMenu*  m_pContextMenu = nullptr;
-	LLHandle<LLFloater> m_hPicker;
+    bool                m_fRefreshOnChange = true;
+    std::string         m_strFilter;
+    LLNameListCtrl*     m_pExceptionList = nullptr;
+    LLButton*           m_pTrashBtn = nullptr;
+    LLListContextMenu*  m_pContextMenu = nullptr;
+    LLHandle<LLFloater> m_hPicker;
 };
 
 // ============================================================================
@@ -248,38 +248,38 @@ protected:
 class LLFloaterBlocked final : public LLFloater
 {
 public:
-	LLFloaterBlocked(const LLSD& sdKey);
-	~LLFloaterBlocked();
+    LLFloaterBlocked(const LLSD& sdKey);
+    ~LLFloaterBlocked();
 
-	/*
-	 * LLFloater overrides
-	 */
+    /*
+     * LLFloater overrides
+     */
 public:
-	BOOL postBuild() override;
-	void onOpen(const LLSD& sdParam) override;
+    BOOL postBuild() override;
+    void onOpen(const LLSD& sdParam) override;
 
-	/*
-	 * Event handlers
-	 */
+    /*
+     * Event handlers
+     */
 protected:
-	void onFilterEdit(const std::string& strFilter);
-	void onTabSelect(const LLSD& sdParam);
+    void onFilterEdit(const std::string& strFilter);
+    void onTabSelect(const LLSD& sdParam);
 
-	/*
-	 * Member functions
-	 */
+    /*
+     * Member functions
+     */
 public:
-	static void showMuteAndSelect(const LLUUID& idMute);
-	static void showDerenderAndSelect(const LLUUID& idEntry);
-	static void showAssetAndSelect(const LLUUID& idEntry);
-	static void showRenderExceptionAndSelect(const LLUUID& idEntry);
+    static void showMuteAndSelect(const LLUUID& idMute);
+    static void showDerenderAndSelect(const LLUUID& idEntry);
+    static void showAssetAndSelect(const LLUUID& idEntry);
+    static void showRenderExceptionAndSelect(const LLUUID& idEntry);
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	LLFilterEditor* m_pFilterEditor = nullptr;
-	LLTabContainer* m_pBlockedTabs = nullptr;
+    LLFilterEditor* m_pFilterEditor = nullptr;
+    LLTabContainer* m_pBlockedTabs = nullptr;
 };
 
 // ============================================================================
