@@ -33,8 +33,8 @@
 #include "alpanelaopulldown.h"
 
 ALPanelAOPulldown::ALPanelAOPulldown()
-	: LLPanelPulldown()
+    : LLPanelPulldown()
 {
-	buildFromFile("panel_ao_pulldown.xml");
+    buildFromFile("panel_ao_pulldown.xml");
 }
 

@@ -44,91 +44,91 @@ class LLTextBase;
 static const size_t MIN_SEARCH_STRING_SIZE = 3;
 
 typedef enum {
-	SE_UNDEFINED = 0,
-	SE_PEOPLE,
-	SE_GROUPS,
-	SE_PLACES,
-	SE_LANDSALES,
-	SE_EVENTS,
-	SE_CLASSIFIEDS
+    SE_UNDEFINED = 0,
+    SE_PEOPLE,
+    SE_GROUPS,
+    SE_PLACES,
+    SE_LANDSALES,
+    SE_EVENTS,
+    SE_CLASSIFIEDS
 } ESearch;
 
 struct SearchQuery : public LLInitParam::Block<SearchQuery>
 {
-	Optional<std::string> category;
-	Optional<std::string> collection;
-	Optional<std::string> query;
-	
-	SearchQuery();
+    Optional<std::string> category;
+    Optional<std::string> collection;
+    Optional<std::string> query;
+
+    SearchQuery();
 };
 
 typedef struct dir_query
 {
-	dir_query()
-		: type(SE_UNDEFINED), text(LLStringUtil::null), scope(0),
-		category_int(0), category_char(0x0), price(0), area(0), results_per_page(100) {}
-	ESearch type;
-	std::string text;
-	U32 scope;
-	U32 category_int;
-	S8 category_char;
-	S32 price;
-	S32 area;
-	U32 results_per_page;
+    dir_query()
+        : type(SE_UNDEFINED), text(LLStringUtil::null), scope(0),
+        category_int(0), category_char(0x0), price(0), area(0), results_per_page(100) {}
+    ESearch type;
+    std::string text;
+    U32 scope;
+    U32 category_int;
+    S8 category_char;
+    S32 price;
+    S32 area;
+    U32 results_per_page;
 } LLDirQuery;
 
 class LLFloaterDirectory : public LLFloater
 {
-	friend class LLPanelSearchClassifieds;
-	friend class LLPanelSearchEvents;
-	friend class LLPanelSearchGroups;
-	friend class LLPanelSearchLandSales;
-	friend class LLPanelSearchPeople;
-	friend class LLPanelSearchPlaces;
-	
-public:
-	struct _Params : LLInitParam::Block<_Params, LLFloater::Params>
-	{
-		Optional<SearchQuery> search;
-	};
-	typedef LLSDParamAdapter<_Params> Params;
-	
-	LLFloaterDirectory(const Params& key);
-	BOOL postBuild() override;
-	void onOpen(const LLSD& key) override;
-	void onClose(bool app_quitting) override;
-	
-	static void processSearchPeopleReply(LLMessageSystem* msg, void**);
-	static void processSearchGroupsReply(LLMessageSystem* msg, void**);
-	static void processSearchPlacesReply(LLMessageSystem* msg, void**);
-	static void processSearchClassifiedsReply(LLMessageSystem* msg, void**);
-	static void processSearchLandReply(LLMessageSystem* msg, void**);
-	static void processSearchEventsReply(LLMessageSystem* msg, void**);
-	
-protected:
-	void setProgress(bool working);
-	void queryDirectory(const LLDirQuery& query, bool new_search = false);
-	void setResultsComment(const std::string& message);
-	
-private:
-	~LLFloaterDirectory();
-	void onCommitSelection();
-	void choosePage(LLUICtrl* ctrl);
-	void onTabChanged();
-	void paginate();
-	void showDetailPanel(const std::string& panel_name);
-	void rebuildResultList();
+    friend class LLPanelSearchClassifieds;
+    friend class LLPanelSearchEvents;
+    friend class LLPanelSearchGroups;
+    friend class LLPanelSearchLandSales;
+    friend class LLPanelSearchPeople;
+    friend class LLPanelSearchPlaces;
 
-	ESearch mCurrentResultType;
-	LLDirQuery mCurrentQuery;
-	S32 mResultStart;
-	S32 mNumResultsReceived;
-	LLUUID mQueryID;
-	
-	LLTabContainer*	mTabContainer;
-	LLPanelSearchWeb* mPanelWeb;
-	LLScrollListCtrl* mResultList;
-	LLTextBase* mResultsStatus;
+public:
+    struct _Params : LLInitParam::Block<_Params, LLFloater::Params>
+    {
+        Optional<SearchQuery> search;
+    };
+    typedef LLSDParamAdapter<_Params> Params;
+
+    LLFloaterDirectory(const Params& key);
+    BOOL postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void onClose(bool app_quitting) override;
+
+    static void processSearchPeopleReply(LLMessageSystem* msg, void**);
+    static void processSearchGroupsReply(LLMessageSystem* msg, void**);
+    static void processSearchPlacesReply(LLMessageSystem* msg, void**);
+    static void processSearchClassifiedsReply(LLMessageSystem* msg, void**);
+    static void processSearchLandReply(LLMessageSystem* msg, void**);
+    static void processSearchEventsReply(LLMessageSystem* msg, void**);
+
+protected:
+    void setProgress(bool working);
+    void queryDirectory(const LLDirQuery& query, bool new_search = false);
+    void setResultsComment(const std::string& message);
+
+private:
+    ~LLFloaterDirectory();
+    void onCommitSelection();
+    void choosePage(LLUICtrl* ctrl);
+    void onTabChanged();
+    void paginate();
+    void showDetailPanel(const std::string& panel_name);
+    void rebuildResultList();
+
+    ESearch mCurrentResultType;
+    LLDirQuery mCurrentQuery;
+    S32 mResultStart;
+    S32 mNumResultsReceived;
+    LLUUID mQueryID;
+
+    LLTabContainer* mTabContainer;
+    LLPanelSearchWeb* mPanelWeb;
+    LLScrollListCtrl* mResultList;
+    LLTextBase* mResultsStatus;
 };
 
 #endif // LL_FLOATERDIRECTORY_H

@@ -36,22 +36,22 @@ class LLUICtrl;
 class LLFloaterScriptEdPrefs final : public LLFloater
 {
 public:
-	LLFloaterScriptEdPrefs(const LLSD& key);
-	BOOL postBuild();
-	
+    LLFloaterScriptEdPrefs(const LLSD& key);
+    BOOL postBuild();
+
 private:
-	~LLFloaterScriptEdPrefs() {};
-	
-	void applyUIColor(LLUICtrl* ctrl, const LLSD& param);
-	void getUIColor(LLUICtrl* ctrl, const LLSD& param);
-	
-	void setPreprocInclude();
-	void changePreprocIncludePath(const std::vector<std::string>& filenames, const std::string& proposed_name);
+    ~LLFloaterScriptEdPrefs() {};
 
-	void setExternalEditor();
-	void changeExternalEditorPath(const std::vector<std::string>& filenames);
+    void applyUIColor(LLUICtrl* ctrl, const LLSD& param);
+    void getUIColor(LLUICtrl* ctrl, const LLSD& param);
 
-	LLScriptEditor* mEditor;
+    void setPreprocInclude();
+    void changePreprocIncludePath(const std::vector<std::string>& filenames, const std::string& proposed_name);
+
+    void setExternalEditor();
+    void changeExternalEditorPath(const std::vector<std::string>& filenames);
+
+    LLScriptEditor* mEditor;
 };
 
 #endif // LL_FLOATERSCRIPTEDPREFS_H

@@ -24,7 +24,7 @@
 
 namespace ALChatCommand
 {
-	bool parseCommand(std::string data);
+    bool parseCommand(std::string data);
 };
 
 #endif // AL_ALCHATCOMMAND_H

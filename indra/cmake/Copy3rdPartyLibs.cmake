@@ -36,7 +36,7 @@ if(WINDOWS)
     # Does this maybe matter on some LL buildserver? Otherwise this and the snippet using slvoice_src_dir
     # can all go
     if( ARCH_PREBUILT_BIN_DIRS_RELEASE )
-        set(slvoice_src_dir "${ARCH_PREBUILT_BIN_DIRS_RELEASE}")    
+        set(slvoice_src_dir "${ARCH_PREBUILT_BIN_DIRS_RELEASE}")
     endif()
     set(slvoice_files SLVoice.exe )
     if (ADDRESS_SIZE EQUAL 64)
@@ -65,13 +65,6 @@ if(WINDOWS)
     set(release_files
         openjp2.dll
         )
-
-    # ICU4C (same filenames for 32 and 64 bit builds)
-    set(release_files ${release_files} icudt75.dll)
-    set(release_files ${release_files} icuin75.dll)
-    set(release_files ${release_files} icuio75.dll)
-    set(release_files ${release_files} icutu75.dll)
-    set(release_files ${release_files} icuuc75.dll)
 
     # Filenames are different for 32/64 bit BugSplat file and we don't
     # have any control over them so need to branch.

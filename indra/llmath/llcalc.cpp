@@ -4,21 +4,21 @@
  * $LicenseInfo:firstyear=2008&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2008, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  *
@@ -71,91 +71,91 @@ LLCalc* LLCalc::sInstance = nullptr;
 
 LLCalc::LLCalc() : mLastErrorPos(0)
 {
-	// Init table of constants
-	/*setVar("PI", F_PI);
-	setVar("TWO_PI", F_TWO_PI);
-	setVar("PI_BY_TWO", F_PI_BY_TWO);
-	setVar("SQRT_TWO_PI", F_SQRT_TWO_PI);
-	setVar("SQRT2", F_SQRT2);
-	setVar("SQRT3", F_SQRT3);
-	setVar("DEG_TO_RAD", DEG_TO_RAD);
-	setVar("RAD_TO_DEG", RAD_TO_DEG);
-	setVar("GRAVITY", GRAVITY);*/
+    // Init table of constants
+    /*setVar("PI", F_PI);
+    setVar("TWO_PI", F_TWO_PI);
+    setVar("PI_BY_TWO", F_PI_BY_TWO);
+    setVar("SQRT_TWO_PI", F_SQRT_TWO_PI);
+    setVar("SQRT2", F_SQRT2);
+    setVar("SQRT3", F_SQRT3);
+    setVar("DEG_TO_RAD", DEG_TO_RAD);
+    setVar("RAD_TO_DEG", RAD_TO_DEG);
+    setVar("GRAVITY", GRAVITY);*/
 }
 
 
 //static
 void LLCalc::cleanUp()
 {
-	delete sInstance;
-	sInstance = nullptr;
+    delete sInstance;
+    sInstance = nullptr;
 }
 
 //static
 LLCalc* LLCalc::getInstance()
 {
-    if (!sInstance)	sInstance = new LLCalc();
-	return sInstance;
+    if (!sInstance) sInstance = new LLCalc();
+    return sInstance;
 }
 
 void LLCalc::setVar(const std::string& name, const F32& value)
 {
-	mVariables[name] = value;
+    mVariables[name] = value;
 }
 
 void LLCalc::clearVar(const std::string& name)
 {
-	mVariables.erase(name);
+    mVariables.erase(name);
 }
 
 void LLCalc::clearAllVariables()
 {
-	mVariables.clear();
+    mVariables.clear();
 }
 
 /*
 void LLCalc::updateVariables(LLSD& vars)
 {
-	LLSD::map_iterator cIt = vars.beginMap();
-	for(; cIt != vars.endMap(); cIt++)
-	{
-		setVar(cIt->first, (F32)(LLSD::Real)cIt->second);
-	}
+    LLSD::map_iterator cIt = vars.beginMap();
+    for(; cIt != vars.endMap(); cIt++)
+    {
+        setVar(cIt->first, (F32)(LLSD::Real)cIt->second);
+    }
 }
 */
 
 bool LLCalc::evalString(const std::string& expression, F32& result)
 {
-	
 
-	mLastErrorPos = 0;
-	std::string::const_iterator itr = expression.begin();
-	expression::grammar<F32,std::string::const_iterator> calc;
-	calc.constant.add
-				("pi", F_PI)
-				("two_pi", F_TWO_PI)
-				("pi_by_two", F_PI_BY_TWO)
-				("sqrt_two_pi", F_SQRT_TWO_PI)
-				("sqrt2", F_SQRT2)
-				("sqrt3", F_SQRT3)
-				("deg_to_rad", DEG_TO_RAD)
-				("rad_to_deg", RAD_TO_DEG)
-				("gravity", GRAVITY)
-			;
-	for(calc_map_t::const_iterator iter = mVariables.begin();
-		iter != mVariables.end();
-		++iter)
-	{
-		calc.constant.add(iter->first, iter->second);
-		
-	}
-	
-	if (!expression::parse<F32,std::string::const_iterator>(itr, expression.end(), calc, result) || itr !=  expression.end())
-	{
-		mLastErrorPos = itr - expression.begin();
-		LL_INFOS() << "Unhandled syntax error at " << mLastErrorPos << " in expression: " << expression << LL_ENDL;
-		return false;
-	}
-	LL_DEBUGS() << "Math expression: " << expression << " = " << result << LL_ENDL;
-	return true;
+
+    mLastErrorPos = 0;
+    std::string::const_iterator itr = expression.begin();
+    expression::grammar<F32,std::string::const_iterator> calc;
+    calc.constant.add
+                ("pi", F_PI)
+                ("two_pi", F_TWO_PI)
+                ("pi_by_two", F_PI_BY_TWO)
+                ("sqrt_two_pi", F_SQRT_TWO_PI)
+                ("sqrt2", F_SQRT2)
+                ("sqrt3", F_SQRT3)
+                ("deg_to_rad", DEG_TO_RAD)
+                ("rad_to_deg", RAD_TO_DEG)
+                ("gravity", GRAVITY)
+            ;
+    for(calc_map_t::const_iterator iter = mVariables.begin();
+        iter != mVariables.end();
+        ++iter)
+    {
+        calc.constant.add(iter->first, iter->second);
+
+    }
+
+    if (!expression::parse<F32,std::string::const_iterator>(itr, expression.end(), calc, result) || itr !=  expression.end())
+    {
+        mLastErrorPos = itr - expression.begin();
+        LL_INFOS() << "Unhandled syntax error at " << mLastErrorPos << " in expression: " << expression << LL_ENDL;
+        return false;
+    }
+    LL_DEBUGS() << "Math expression: " << expression << " = " << result << LL_ENDL;
+    return true;
 }

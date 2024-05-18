@@ -19,7 +19,7 @@ if (WINDOWS)
     )
     target_compile_definitions( ll::libcurl INTERFACE CURL_STATICLIB=1)
 elseif(DARWIN)
-    target_link_libraries(ll::libcurl INTERFACE 
+    target_link_libraries(ll::libcurl INTERFACE
       debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.a
       optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.a
       ll::openssl

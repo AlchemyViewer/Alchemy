@@ -29,54 +29,54 @@ class LLTextBox;
 class ALPanelMusicTicker final : public LLPanel
 {
 public:
-	ALPanelMusicTicker();	//ctor
-	~ALPanelMusicTicker();
+    ALPanelMusicTicker();   //ctor
+    ~ALPanelMusicTicker();
 
-	BOOL postBuild() final override;
-	void draw() final override;
-	void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) final override;
+    BOOL postBuild() final override;
+    void draw() final override;
+    void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) final override;
 private:
-	void updateTickerText(); //called via draw.
-	void drawOscilloscope(); //called via draw.
-	bool setPaused(bool pause); //returns true on state change.
-	void resetTicker(); //Resets tickers to their innitial values (no offset).
-	bool setStation(const std::string& station, const std::string& url);	//returns true on change
-	bool setArtist(const std::string &artist);	//returns true on change
-	bool setTitle(const std::string &title);	//returns true on change
-	S32 countExtraChars(LLTextBox *texbox, const std::string &text);	//calculates how many characters are truncated by bounds.
-	void iterateTickerOffset();	//Logic that actually shuffles the text to the left.
+    void updateTickerText(); //called via draw.
+    void drawOscilloscope(); //called via draw.
+    bool setPaused(bool pause); //returns true on state change.
+    void resetTicker(); //Resets tickers to their innitial values (no offset).
+    bool setStation(const std::string& station, const std::string& url);    //returns true on change
+    bool setArtist(const std::string &artist);  //returns true on change
+    bool setTitle(const std::string &title);    //returns true on change
+    S32 countExtraChars(LLTextBox *texbox, const std::string &text);    //calculates how many characters are truncated by bounds.
+    void iterateTickerOffset(); //Logic that actually shuffles the text to the left.
 
-	void metadataUpdateCallback(const LLSD&);
+    void metadataUpdateCallback(const LLSD&);
 
-	enum ePlayState
-	{
-		STATE_PAUSED,
-		STATE_PLAYING
-	};
+    enum ePlayState
+    {
+        STATE_PAUSED,
+        STATE_PLAYING
+    };
 
-	ePlayState mPlayState;
-	std::string mszLoading;
-	std::string mszPaused;
-	std::string mszArtist;
-	std::string mszTitle;
-	std::string mszStation;
-	std::string mszStationURL;
-	LLTimer mScrollTimer;
-	LLTimer mLoadTimer;
-	S32 mStationScrollChars;
-	S32 mArtistScrollChars;
-	S32 mTitleScrollChars;
-	S32 mCurScrollChar;
+    ePlayState mPlayState;
+    std::string mszLoading;
+    std::string mszPaused;
+    std::string mszArtist;
+    std::string mszTitle;
+    std::string mszStation;
+    std::string mszStationURL;
+    LLTimer mScrollTimer;
+    LLTimer mLoadTimer;
+    S32 mStationScrollChars;
+    S32 mArtistScrollChars;
+    S32 mTitleScrollChars;
+    S32 mCurScrollChar;
 
-	LLColor4 mOscillatorColor;
+    LLColor4 mOscillatorColor;
 
-	//UI elements
-	LLTextBox* mStationText = nullptr;
-	LLTextBox* mArtistText = nullptr;
-	LLTextBox* mTitleText = nullptr;
-	LLUICtrl* mVisualizer = nullptr;
+    //UI elements
+    LLTextBox* mStationText = nullptr;
+    LLTextBox* mArtistText = nullptr;
+    LLTextBox* mTitleText = nullptr;
+    LLUICtrl* mVisualizer = nullptr;
 
-	boost::signals2::connection mMetadataUpdateConnection;
+    boost::signals2::connection mMetadataUpdateConnection;
 };
 
 #endif // AL_PANELMUSICTICKER_H

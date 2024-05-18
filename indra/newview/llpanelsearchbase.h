@@ -39,17 +39,17 @@ class LLFloaterDirectory;
 class LLPanelSearch : public LLPanel
 {
 public:
-	LLPanelSearch();
-	BOOL postBuild() override { return FALSE; }
-	void setSearchFloater(LLFloaterDirectory* floater);
-	
+    LLPanelSearch();
+    BOOL postBuild() override { return FALSE; }
+    void setSearchFloater(LLFloaterDirectory* floater);
+
 protected:
-	virtual ~LLPanelSearch() = default;;
-	LLFloaterDirectory* mFloater;
-	
+    virtual ~LLPanelSearch() = default;;
+    LLFloaterDirectory* mFloater;
+
 private:
-	virtual void onCommitSearch(LLUICtrl* ctrl) {}
-	virtual void search() {}
+    virtual void onCommitSearch(LLUICtrl* ctrl) {}
+    virtual void search() {}
 };
 
 #endif // LL_PANELSEARCHBASE_H

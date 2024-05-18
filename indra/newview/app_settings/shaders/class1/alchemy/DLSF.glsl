@@ -1,24 +1,24 @@
-/** 
+/**
  * @file DLSF.glsl
  *
  * $LicenseInfo:firstyear=2021&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2021, Rye Mutt<rye@alchemyviewer.org>
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -55,7 +55,7 @@ void main()
 {
     /**
     Image sharpening filter from GeForce Experience. Provided by NVIDIA Corporation.
-    
+
     Copyright 2019 Suketu J. Shah. All rights reserved.
     Redistribution and use in source and binary forms, with or without modification, are permitted provided
     that the following conditions are met:
@@ -123,7 +123,7 @@ void main()
     //      float kernelDenoise = 1.0 / (kDenoiseMin + (kDenoiseMax - kDenoiseMin) * min(max(denoise, 0.0), 1.0));
     // where kernelDenoise is the value to be passed in to this shader (the amount of noise suppression is inversely proportional to this value),
     //       denoise is the value chosen by the user, in the range (0, 1)
-	float kernelDenoise = 1.0 / (kDenoiseMin + (kDenoiseMax - kDenoiseMin) * sharpen_params.y);
+    float kernelDenoise = 1.0 / (kDenoiseMin + (kDenoiseMax - kDenoiseMin) * sharpen_params.y);
     float nw = Square((lmax - lmin) * kernelDenoise);
 
     // pick conservative boost
@@ -153,7 +153,7 @@ void main()
     // normalize (divide the accumulator by the sum of convolution weights)
     accum /= 1.0 + 6.0 * k;
 
-    // accumulator is in linear light space            
+    // accumulator is in linear light space
     float delta = accum - lx;
     x.x += delta;
     x.y += delta;

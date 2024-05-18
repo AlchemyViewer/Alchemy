@@ -94,8 +94,8 @@ if (WINDOWS)
     /Zi
     /EHsc
     /permissive-
-    /W3 
-    /c 
+    /W3
+    /c
     /Zc:__cplusplus
     /Zc:preprocessor
     /Zc:char8_t-
@@ -151,8 +151,8 @@ if (WINDOWS)
   if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     # This is a massive hack and makes me sad. clang-cl fails to find its own builtins library :/ x64 only for now.
     set(CLANG_RT_NAMES clang_rt.builtins-x86_64)
-    find_library(CLANG_RT NAMES ${CLANG_RT_NAMES} 
-                PATHS [HKEY_LOCAL_MACHINE\\SOFTWARE\\LLVM\\LLVM]/lib/clang/${CMAKE_CXX_COMPILER_VERSION}/lib/windows 
+    find_library(CLANG_RT NAMES ${CLANG_RT_NAMES}
+                PATHS [HKEY_LOCAL_MACHINE\\SOFTWARE\\LLVM\\LLVM]/lib/clang/${CMAKE_CXX_COMPILER_VERSION}/lib/windows
                 [HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\LLVM\\LLVM]/lib/clang/${CMAKE_CXX_COMPILER_VERSION}/lib/windows)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /defaultlib:\"${CLANG_RT}\"")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /defaultlib:\"${CLANG_RT}\"")
@@ -238,7 +238,7 @@ if (DARWIN)
     -gdwarf-2
     -fno-strict-aliasing
     -msse4.2
-    $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc> 
+    $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>
     $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-weak>
     )
 endif ()

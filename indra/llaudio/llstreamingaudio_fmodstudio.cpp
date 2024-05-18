@@ -1,25 +1,25 @@
-/** 
+/**
  * @file streamingaudio_fmodstudio.cpp
  * @brief LLStreamingAudio_FMODSTUDIO implementation
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -49,7 +49,7 @@ public:
     FMOD::Channel* startStream();
     bool stopStream(); // Returns true if the stream was successfully stopped.
 
-    const std::string& getURL() 	{ return mInternetStreamURL; }
+    const std::string& getURL()     { return mInternetStreamURL; }
 
     FMOD_RESULT getOpenState(FMOD_OPENSTATE& openstate, unsigned int* percentbuffered = nullptr, bool* starving = nullptr, bool* diskbusy = nullptr);
 protected:
@@ -102,7 +102,7 @@ FMOD_RESULT F_CALLBACK waveDataCallback(FMOD_DSP_STATE *dsp_state, float *inbuff
             gWaveDataBuffer[WAVE_BUFFER_SIZE - gWaveDataBufferSize] = local_buf[i - 1];
         }
     }
-    
+
     return FMOD_OK;
 }
 
@@ -121,8 +121,8 @@ LLStreamingAudio_FMODSTUDIO::LLStreamingAudio_FMODSTUDIO(FMOD::System *system) :
 {
     // Number of milliseconds of audio to buffer for the audio card.
     // Must be larger than the usual Second Life frame stutter time.
-    const U32 buffer_seconds = 10;		//sec
-    const U32 estimated_bitrate = 128;	//kbit/sec
+    const U32 buffer_seconds = 10;      //sec
+    const U32 estimated_bitrate = 128;  //kbit/sec
     Check_FMOD_Stream_Error(mSystem->setStreamBufferSize(estimated_bitrate * buffer_seconds * 128/*bytes/kbit*/, FMOD_TIMEUNIT_RAWBYTES), "FMOD::System::setStreamBufferSize");
 
     Check_FMOD_Stream_Error(system->createChannelGroup("stream", &mStreamGroup), "FMOD::System::createChannelGroup");
@@ -153,8 +153,8 @@ void LLStreamingAudio_FMODSTUDIO::start(const std::string& url)
 {
     //if (!mInited)
     //{
-    //	LL_WARNS() << "startInternetStream before audio initialized" << LL_ENDL;
-    //	return;
+    //  LL_WARNS() << "startInternetStream before audio initialized" << LL_ENDL;
+    //  return;
     //}
 
     // "stop" stream but don't clear url, etc. in case url == mInternetStreamURL
@@ -196,7 +196,7 @@ std::string utf16input_to_utf8(unsigned char* input, U32 len, utf_endian_type_t 
         if (len > 2)
         {
             //Parse and strip BOM.
-            if ((input[0] == 0xFE && input[1] == 0xFF) || 
+            if ((input[0] == 0xFE && input[1] == 0xFF) ||
                 (input[0] == 0xFF && input[1] == 0xFE))
             {
                 input += 2;
@@ -313,35 +313,35 @@ void LLStreamingAudio_FMODSTUDIO::update()
                     {
                         case FMOD_TAGTYPE_ID3V2:
                         {
-	                        if (!LLStringUtil::compareInsensitive(name, "TIT2")) name = "TITLE";
-	                        else if(!LLStringUtil::compareInsensitive(name, "TPE1")) name = "ARTIST";
+                            if (!LLStringUtil::compareInsensitive(name, "TIT2")) name = "TITLE";
+                            else if(!LLStringUtil::compareInsensitive(name, "TPE1")) name = "ARTIST";
                             break;
                         }
                         case FMOD_TAGTYPE_ASF:
                         {
-	                        if (!LLStringUtil::compareInsensitive(name, "Title")) name = "TITLE";
-	                        else if (!LLStringUtil::compareInsensitive(name, "WM/AlbumArtist")) name = "ARTIST";
+                            if (!LLStringUtil::compareInsensitive(name, "Title")) name = "TITLE";
+                            else if (!LLStringUtil::compareInsensitive(name, "WM/AlbumArtist")) name = "ARTIST";
                             break;
                         }
                         case FMOD_TAGTYPE_VORBISCOMMENT:
                         {
-	                            if (!LLStringUtil::compareInsensitive(name, "title")) name = "TITLE";
-	                            else if (!LLStringUtil::compareInsensitive(name, "artist")) name = "ARTIST";
+                                if (!LLStringUtil::compareInsensitive(name, "title")) name = "TITLE";
+                                else if (!LLStringUtil::compareInsensitive(name, "artist")) name = "ARTIST";
                             break;
                         }
                         case FMOD_TAGTYPE_FMOD:
                         {
-	                        if (!LLStringUtil::compareInsensitive(name, "Sample Rate Change"))
+                            if (!LLStringUtil::compareInsensitive(name, "Sample Rate Change"))
                             {
                                 LL_INFOS() << "Stream forced changing sample rate to " << *((float *)tag.data) << LL_ENDL;
-	                            Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setFrequency(*((float *)tag.data)), "FMOD::Channel::setFrequency");
+                                Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setFrequency(*((float *)tag.data)), "FMOD::Channel::setFrequency");
                             }
                             continue;
                         }
                         default:
-	                        if (!LLStringUtil::compareInsensitive(name, "TITLE") ||
-	                            !LLStringUtil::compareInsensitive(name, "ARTIST"))
-	                            LLStringUtil::toUpper(name);
+                            if (!LLStringUtil::compareInsensitive(name, "TITLE") ||
+                                !LLStringUtil::compareInsensitive(name, "ARTIST"))
+                                LLStringUtil::toUpper(name);
                             break;
                     }
                     switch (tag.datatype)
@@ -427,7 +427,7 @@ void LLStreamingAudio_FMODSTUDIO::stop()
 
     mMetadata = LLSD::emptyMap();
     mMetadataUpdateSignal(mMetadata);
-    
+
     if (mFMODInternetStreamChannelp)
     {
         Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setPaused(true), "FMOD::Channel::setPaused");
@@ -513,7 +513,7 @@ void LLStreamingAudio_FMODSTUDIO::setGain(F32 vol)
 
     if (mFMODInternetStreamChannelp)
     {
-        vol = llclamp(vol * vol, 0.f, 1.f);	//should vol be squared here?
+        vol = llclamp(vol * vol, 0.f, 1.f); //should vol be squared here?
 
         Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setVolume(vol), "FMOD::Channel::setVolume");
     }
@@ -584,7 +584,7 @@ FMOD::Channel *LLAudioStreamManagerFMODSTUDIO::startStream()
     }
 
     if (mStreamChannel)
-        return mStreamChannel;	//Already have a channel for this stream.
+        return mStreamChannel;  //Already have a channel for this stream.
 
     Check_FMOD_Stream_Error(mSystem->playSound(mInternetStream, mChannelGroup, true, &mStreamChannel), "FMOD::System::playSound");
     return mStreamChannel;
@@ -671,7 +671,7 @@ void LLStreamingAudio_FMODSTUDIO::cleanupWaveData()
         Check_FMOD_Stream_Error(mStreamGroup->release(), "FMOD::ChannelGroup::release");
         mStreamGroup = nullptr;
     }
-    
+
     if(mStreamDSP)
         Check_FMOD_Stream_Error(mStreamDSP->release(), "FMOD::DSP::release");
     mStreamDSP = nullptr;

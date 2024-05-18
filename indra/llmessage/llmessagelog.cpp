@@ -32,23 +32,23 @@ static boost::circular_buffer<LogPayload> sRingBuffer = boost::circular_buffer<L
 LLMessageLogEntry::LLMessageLogEntry(LLHost from_host, LLHost to_host, U8* data, size_t data_size)
 :   mType(TEMPLATE)
 ,   mFromHost(std::move(from_host))
-,	mToHost(std::move(to_host))
-,	mDataSize(data_size)
-,	mData(nullptr)
+,   mToHost(std::move(to_host))
+,   mDataSize(data_size)
+,   mData(nullptr)
 ,   mHeaders(nullptr)
 ,   mMethod(HTTP_INVALID)
 ,   mStatusCode(0)
 ,   mRequestId(0)
 {
-	if (data)
-	{
-		mData = new U8[data_size];
-		memcpy(mData, data, data_size);
-	}
+    if (data)
+    {
+        mData = new U8[data_size];
+        memcpy(mData, data, data_size);
+    }
 }
 
 LLMessageLogEntry::LLMessageLogEntry(EEntryType etype, U8* data, size_t data_size, std::string url,
-                                     std::string content_type, LLCore::HttpHeaders::ptr_t headers, 
+                                     std::string content_type, LLCore::HttpHeaders::ptr_t headers,
     EHTTPMethod method, U8 status_code, U64 request_id)
 :   mType(etype)
 ,   mDataSize(data_size)
@@ -80,15 +80,15 @@ LLMessageLogEntry::LLMessageLogEntry(const LLMessageLogEntry& entry)
 ,   mStatusCode(entry.mStatusCode)
 ,   mRequestId(entry.mRequestId)
 {
-	mData = new U8[mDataSize];
-	memcpy(mData, entry.mData, mDataSize);
+    mData = new U8[mDataSize];
+    memcpy(mData, entry.mData, mDataSize);
 }
 
 /* virtual */
 LLMessageLogEntry::~LLMessageLogEntry()
 {
-	delete[] mData;
-	mData = nullptr;
+    delete[] mData;
+    mData = nullptr;
 }
 
 /* static */
@@ -96,23 +96,23 @@ LogCallback LLMessageLog::sCallback = nullptr;
 
 /* static */
 void LLMessageLog::setCallback(LogCallback callback)
-{	
-	if (callback != nullptr)
-	{
-		for (auto& m : sRingBuffer)
-		{
-			callback(m);
-		}
-		LLCore::HttpRequestQueue::setMessageLogFunc([](const LLCore::HttpRequestQueue::opPtr_t& op) { LLMessageLog::log(op); });
-		LLCore::HttpOpRequest::setMessageLogFunc([](LLCore::HttpResponse* response) { LLMessageLog::log(response); });
-	}
-	else
-	{
-		LLCore::HttpOpRequest::setMessageLogFunc(nullptr);
-		LLCore::HttpRequestQueue::setMessageLogFunc(nullptr);
-	}
+{
+    if (callback != nullptr)
+    {
+        for (auto& m : sRingBuffer)
+        {
+            callback(m);
+        }
+        LLCore::HttpRequestQueue::setMessageLogFunc([](const LLCore::HttpRequestQueue::opPtr_t& op) { LLMessageLog::log(op); });
+        LLCore::HttpOpRequest::setMessageLogFunc([](LLCore::HttpResponse* response) { LLMessageLog::log(response); });
+    }
+    else
+    {
+        LLCore::HttpOpRequest::setMessageLogFunc(nullptr);
+        LLCore::HttpRequestQueue::setMessageLogFunc(nullptr);
+    }
 
-	sCallback = callback;
+    sCallback = callback;
 }
 
 /* static */
@@ -120,13 +120,13 @@ void LLMessageLog::log(LLHost from_host, LLHost to_host, U8* data, S32 data_size
 {
     if (!haveLogger()) return;
 
-	if(!data_size || data == nullptr) return;
+    if(!data_size || data == nullptr) return;
 
-	LogPayload payload = std::make_shared<LLMessageLogEntry>(from_host, to_host, data, data_size);
+    LogPayload payload = std::make_shared<LLMessageLogEntry>(from_host, to_host, data, data_size);
 
-	if(sCallback) sCallback(payload);
+    if(sCallback) sCallback(payload);
 
-	sRingBuffer.push_back(std::move(payload));
+    sRingBuffer.push_back(std::move(payload));
 }
 
 // Why they decided they need two enums for the same thing, idk.
@@ -176,15 +176,15 @@ void LLMessageLog::log(LLCore::HttpResponse* response)
     U8* data = nullptr;
     size_t data_size = 0;
     LLCore::BufferArray * body = response->getBody();
-    if (body) 
+    if (body)
     {
         data = new U8[body->size()];
         size_t len(body->read(0, data, body->size()));
         data_size = (len > body->size()) ? len : body->size();
     }
-    
+
     LogPayload payload = std::make_shared<LLMessageLogEntry>(LLMessageLogEntry::HTTP_RESPONSE, data, data_size,
-        response->getRequestURL(), response->getContentType(), response->getHeaders(), HTTP_INVALID, 
+        response->getRequestURL(), response->getContentType(), response->getHeaders(), HTTP_INVALID,
         response->getStatus().getType(), response->getRequestId());
     if (sCallback) sCallback(payload);
     sRingBuffer.push_back(std::move(payload));

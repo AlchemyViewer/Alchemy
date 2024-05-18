@@ -37,50 +37,50 @@ class LLVertexBuffer;
 class ALRenderUtil
 {
 public:
-	ALRenderUtil();
-	~ALRenderUtil();
+    ALRenderUtil();
+    ~ALRenderUtil();
 
-	void releaseGLBuffers();
-	void refreshState();
+    void releaseGLBuffers();
+    void refreshState();
 
-	// Deferred Only Functions
-	enum ALTonemap : uint32_t
-	{
-		TONEMAP_NONE = 0,
-		TONEMAP_ACES_HILL,
-		TONEMAP_UCHIMURA,
-		TONEMAP_AMD,
-		TONEMAP_UNCHARTED,
-		TONEMAP_COUNT
-	};
-	bool setupTonemap();
-	void renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, LLRenderTarget* dst);
+    // Deferred Only Functions
+    enum ALTonemap : uint32_t
+    {
+        TONEMAP_NONE = 0,
+        TONEMAP_ACES_HILL,
+        TONEMAP_UCHIMURA,
+        TONEMAP_AMD,
+        TONEMAP_UNCHARTED,
+        TONEMAP_COUNT
+    };
+    bool setupTonemap();
+    void renderTonemap(LLRenderTarget* src, LLRenderTarget* exposure, LLRenderTarget* dst);
 
-	bool setupColorGrade();
-	void renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst);
+    bool setupColorGrade();
+    void renderColorGrade(LLRenderTarget* src, LLRenderTarget* dst);
 
-	enum ALSharpen : uint32_t
-	{
-		SHARPEN_NONE = 0,
-		SHARPEN_CAS,
-		SHARPEN_DLS,
-		SHARPEN_COUNT
-	};
+    enum ALSharpen : uint32_t
+    {
+        SHARPEN_NONE = 0,
+        SHARPEN_CAS,
+        SHARPEN_DLS,
+        SHARPEN_COUNT
+    };
 
-	bool setupSharpen();
-	void renderSharpen(LLRenderTarget* src, LLRenderTarget* dst);
-	// End Deferred Only
+    bool setupSharpen();
+    void renderSharpen(LLRenderTarget* src, LLRenderTarget* dst);
+    // End Deferred Only
 
-	U32 getSharpenMethod() { return mSharpenMethod; };
+    U32 getSharpenMethod() { return mSharpenMethod; };
 
 private:
-	// State
-	U32 mTonemapType = ALTonemap::TONEMAP_NONE;
-	U32 mSharpenMethod = ALSharpen::SHARPEN_NONE;
+    // State
+    U32 mTonemapType = ALTonemap::TONEMAP_NONE;
+    U32 mSharpenMethod = ALSharpen::SHARPEN_NONE;
 
-	// Texture Data
-	U32 mCGLut;
-	LLVector4 mCGLutSize;
+    // Texture Data
+    U32 mCGLut;
+    LLVector4 mCGLutSize;
 
-	std::vector<boost::signals2::scoped_connection> mSettingConnections;
+    std::vector<boost::signals2::scoped_connection> mSettingConnections;
 };

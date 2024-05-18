@@ -50,21 +50,21 @@
 const LLUUID LLUUID::null;
 const LLTransactionID LLTransactionID::tnull;
 
-LLUUID::LLUUID() 
+LLUUID::LLUUID()
 {
 }
 
 bool LLUUID::operator==(const LLUUID& rhs) const
 {
-	__m128i mm_left = load_unaligned_si128(mData);
-	__m128i mm_right = load_unaligned_si128(rhs.mData);
+    __m128i mm_left = load_unaligned_si128(mData);
+    __m128i mm_right = load_unaligned_si128(rhs.mData);
 
 #if defined(__SSE4_1__)
-	__m128i mm = _mm_xor_si128(mm_left, mm_right);
-	return _mm_test_all_zeros(mm, mm) != 0;
+    __m128i mm = _mm_xor_si128(mm_left, mm_right);
+    return _mm_test_all_zeros(mm, mm) != 0;
 #else
-	__m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
-	return _mm_movemask_epi8(mm_cmp) == 0xFFFF;
+    __m128i mm_cmp = _mm_cmpeq_epi32(mm_left, mm_right);
+    return _mm_movemask_epi8(mm_cmp) == 0xFFFF;
 #endif
 }
 
@@ -148,34 +148,34 @@ void LLUUID::to_chars(char* out) const
 {
 #if defined(__SSE4_1__)
     alignas(16) char buffer[UUID_STR_SIZE-1]; // Temporary aligned output buffer for simd op
-    
+
     __m128i lower = load_unaligned_si128(mData);
     __m128i upper = _mm_and_si128(_mm_set1_epi8(0xFF >> 4), _mm_srli_epi32(lower, 4));
-    
+
     const __m128i a = _mm_set1_epi8(0x0F);
     lower = _mm_and_si128(lower, a);
     upper = _mm_and_si128(upper, a);
-    
+
     const __m128i pastNine = _mm_set1_epi8(9 + 1);
     const __m128i lowerMask = _mm_cmplt_epi8(lower, pastNine);
     const __m128i upperMask = _mm_cmplt_epi8(upper, pastNine);
-    
+
     __m128i letterMask1 = _mm_and_si128(lower, lowerMask);
     __m128i letterMask2 = _mm_and_si128(upper, upperMask);
     __m128i letterMask3 = _mm_or_si128(lower, lowerMask);
     __m128i letterMask4 = _mm_or_si128(upper, upperMask);
-    
+
     const __m128i first = _mm_set1_epi8('0');
     const __m128i second = _mm_set1_epi8('a' - 10);
-    
+
     letterMask1 = _mm_add_epi8(letterMask1, first);
     letterMask2 = _mm_add_epi8(letterMask2, first);
     letterMask3 = _mm_add_epi8(letterMask3, second);
     letterMask4 = _mm_add_epi8(letterMask4, second);
-    
+
     lower = _mm_blendv_epi8(letterMask3, letterMask1, lowerMask);
     upper = _mm_blendv_epi8(letterMask4, letterMask2, upperMask);
-    
+
     const __m128i mask1 = _mm_shuffle_epi8(lower, _mm_setr_epi8(-1, 0, -1, 1, -1, 2, -1, 3, -1, -1, 4, -1, 5, -1, -1, 6));
     const __m128i mask2 = _mm_shuffle_epi8(upper, _mm_setr_epi8(0, -1, 1, -1, 2, -1, 3, -1, -1, 4, -1, 5, -1, -1, 6, -1));
     const __m128i mask3 = _mm_shuffle_epi8(lower, _mm_setr_epi8(-1, 7, -1, -1, 8, -1, 9, -1, -1, 10, -1, 11, -1, 12, -1, 13));
@@ -184,10 +184,10 @@ void LLUUID::to_chars(char* out) const
     const __m128i hypens2 = _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, '-', 0, 0, 0, 0, '-', 0, 0);
     const __m128i upperSorted = _mm_or_si128(_mm_or_si128(mask1, mask2), hypens);
     const __m128i lowerSorted = _mm_or_si128(_mm_or_si128(mask3, mask4), hypens2);
-    
+
     _mm_store_si128(reinterpret_cast<__m128i *>(buffer), upperSorted);
     _mm_store_si128(reinterpret_cast<__m128i *>(buffer + UUID_BYTES), lowerSorted);
-    
+
     // Did not fit the last four chars. Extract and append them.
     const int v1 = _mm_extract_epi16(upper, 7);
     const int v2 = _mm_extract_epi16(lower, 7);
@@ -195,7 +195,7 @@ void LLUUID::to_chars(char* out) const
     buffer[33] = (v2 & 0xff);
     buffer[34] = ((v1 >> 8) & 0xff);
     buffer[35] = ((v2 >> 8) & 0xff);
-    
+
     memcpy(out, buffer, UUID_STR_SIZE-1);
 #else
     alignas(16) char result[UUID_STR_SIZE - 1] = {};  // Temporary aligned output buffer for simd op
@@ -225,7 +225,7 @@ void LLUUID::to_chars(char* out) const
 void LLUUID::toCompressedString(std::string& out) const
 {
     char bytes[UUID_BYTES + 1];
-    memcpy(bytes, mData, UUID_BYTES);		/* Flawfinder: ignore */
+    memcpy(bytes, mData, UUID_BYTES);       /* Flawfinder: ignore */
     bytes[UUID_BYTES] = '\0';
     out.assign(bytes, UUID_BYTES);
 }
@@ -233,13 +233,13 @@ void LLUUID::toCompressedString(std::string& out) const
 // *TODO: deprecate
 void LLUUID::toCompressedString(char* out) const
 {
-    memcpy(out, mData, UUID_BYTES);		/* Flawfinder: ignore */
+    memcpy(out, mData, UUID_BYTES);     /* Flawfinder: ignore */
     out[UUID_BYTES] = '\0';
 }
 
 BOOL LLUUID::set(const char* in_string, BOOL emit)
 {
-	return set(al::safe_string_view(in_string), emit);
+    return set(al::safe_string_view(in_string), emit);
 }
 
 BOOL LLUUID::parseInternalScalar(const char* in_string, bool broken_format, bool emit)
@@ -257,9 +257,9 @@ BOOL LLUUID::parseInternalScalar(const char* in_string, bool broken_format, bool
                 cur_pos--;
             }
         }
-        
+
         mData[i] = 0;
-        
+
         if ((in_string[cur_pos] >= '0') && (in_string[cur_pos] <= '9'))
         {
             mData[i] += (U8)(in_string[cur_pos] - '0');
@@ -281,10 +281,10 @@ BOOL LLUUID::parseInternalScalar(const char* in_string, bool broken_format, bool
             setNull();
             return FALSE;
         }
-        
+
         mData[i] = mData[i] << 4;
         cur_pos++;
-        
+
         if ((in_string[cur_pos] >= '0') && (in_string[cur_pos] <= '9'))
         {
             mData[i] += (U8)(in_string[cur_pos] - '0');
@@ -317,23 +317,23 @@ BOOL LLUUID::parseInternalSIMD(const char* in_string, bool emit)
     __m128i mm_lower_mask_1, mm_lower_mask_2, mm_upper_mask_1, mm_upper_mask_2;
     const __m128i mm_lower = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in_string));
     const __m128i mm_upper = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in_string + UUID_BYTES + 3));
-    
+
     mm_lower_mask_1 = _mm_shuffle_epi8(mm_lower, _mm_setr_epi8(0, 2, 4, 6, 9, 11, 14, -1, -1, -1, -1, -1, -1, -1, -1, -1));
     mm_lower_mask_2 = _mm_shuffle_epi8(mm_lower, _mm_setr_epi8(1, 3, 5, 7, 10, 12, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1));
     mm_upper_mask_1 = _mm_shuffle_epi8(mm_upper, _mm_setr_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 0, 2, 5, 7, 9, 11, 13, -1));
     mm_upper_mask_2 = _mm_shuffle_epi8(mm_upper, _mm_setr_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 1, 3, 6, 8, 10, 12, 14, -1));
-    
+
     // Since we had hypens between the character we have 36 characters which does not fit in two 16 char loads
     // therefor we must manually insert them here
     mm_lower_mask_1 = _mm_insert_epi8(mm_lower_mask_1, in_string[16], 7);
     mm_lower_mask_2 = _mm_insert_epi8(mm_lower_mask_2, in_string[17], 7);
     mm_upper_mask_1 = _mm_insert_epi8(mm_upper_mask_1, in_string[34], 15);
     mm_upper_mask_2 = _mm_insert_epi8(mm_upper_mask_2, in_string[35], 15);
-    
+
     // Merge [aaaaaaaa|aaaaaaaa|00000000|00000000] | [00000000|00000000|bbbbbbbb|bbbbbbbb] -> [aaaaaaaa|aaaaaaaa|bbbbbbbb|bbbbbbbb]
     __m128i mm_mask_merge_1 = _mm_or_si128(mm_lower_mask_1, mm_upper_mask_1);
     __m128i mm_mask_merge_2 = _mm_or_si128(mm_lower_mask_2, mm_upper_mask_2);
-    
+
     // Check if all characters are between 0-9, A-Z or a-z
     const __m128i mm_allowed_char_range = _mm_setr_epi8('0', '9', 'A', 'Z', 'a', 'z', 0, -1, 0, -1, 0, -1, 0, -1, 0, -1);
     const int cmp_lower = _mm_cmpistri(mm_allowed_char_range, mm_mask_merge_1, _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_NEGATIVE_POLARITY);
@@ -347,31 +347,31 @@ BOOL LLUUID::parseInternalSIMD(const char* in_string, bool emit)
         setNull();
         return FALSE;
     }
-    
+
     const __m128i nine = _mm_set1_epi8('9');
     const __m128i mm_above_nine_mask_1 = _mm_cmpgt_epi8(mm_mask_merge_1, nine);
     const __m128i mm_above_nine_mask_2 = _mm_cmpgt_epi8(mm_mask_merge_2, nine);
-    
+
     __m128i mm_letter_mask_1 = _mm_and_si128(mm_mask_merge_1, mm_above_nine_mask_1);
     __m128i mm_letter_mask_2 = _mm_and_si128(mm_mask_merge_2, mm_above_nine_mask_2);
-    
+
     // Convert all letters to to lower case first
     const __m128i toLowerCase = _mm_set1_epi8(0x20);
     mm_letter_mask_1 = _mm_or_si128(mm_letter_mask_1, toLowerCase);
     mm_letter_mask_2 = _mm_or_si128(mm_letter_mask_2, toLowerCase);
-    
+
     // now convert to hex
     const __m128i toHex = _mm_set1_epi8('a' - 10 - '0');
     const __m128i fixedUppercase1 = _mm_sub_epi8(mm_letter_mask_1, toHex);
     const __m128i fixedUppercase2 = _mm_sub_epi8(mm_letter_mask_2, toHex);
-    
+
     const __m128i mm_blended_high = _mm_blendv_epi8(mm_mask_merge_1, fixedUppercase1, mm_above_nine_mask_1);
     const __m128i mm_blended_low = _mm_blendv_epi8(mm_mask_merge_2, fixedUppercase2, mm_above_nine_mask_2);
     const __m128i zero = _mm_set1_epi8('0');
     __m128i lo = _mm_sub_epi8(mm_blended_low, zero);
     __m128i hi = _mm_sub_epi8(mm_blended_high, zero);
     hi = _mm_slli_epi16(hi, 4);
-    
+
     _mm_storeu_si128(reinterpret_cast<__m128i *>(mData), _mm_xor_si128(hi, lo));
     return TRUE;
 }
@@ -379,39 +379,39 @@ BOOL LLUUID::parseInternalSIMD(const char* in_string, bool emit)
 
 BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
 {
-	// empty strings should make NULL uuid
-	if (in_string.empty())
-	{
-		setNull();
-		return TRUE;
-	}
+    // empty strings should make NULL uuid
+    if (in_string.empty())
+    {
+        setNull();
+        return TRUE;
+    }
 
     BOOL broken_format = FALSE;
-    
-	if (in_string.length() != (UUID_STR_LENGTH - 1))		/* Flawfinder: ignore */
-	{
-		// I'm a moron.  First implementation didn't have the right UUID format.
-		// Shouldn't see any of these any more
-		if (in_string.length() == (UUID_STR_LENGTH - 2))	/* Flawfinder: ignore */
-		{
-			if(emit)
-			{
-				LL_WARNS() << "Warning! Using broken UUID string format" << LL_ENDL;
-			}
-			broken_format = TRUE;
-		}
-		else
-		{
-			// Bad UUID string.  Spam as INFO, as most cases we don't care.
-			if(emit)
-			{
-				//don't spam the logs because a resident can't spell.
-				LL_WARNS() << "Bad UUID string: " << in_string << LL_ENDL;
-			}
-			setNull();
-			return FALSE;
-		}
-	}
+
+    if (in_string.length() != (UUID_STR_LENGTH - 1))        /* Flawfinder: ignore */
+    {
+        // I'm a moron.  First implementation didn't have the right UUID format.
+        // Shouldn't see any of these any more
+        if (in_string.length() == (UUID_STR_LENGTH - 2))    /* Flawfinder: ignore */
+        {
+            if(emit)
+            {
+                LL_WARNS() << "Warning! Using broken UUID string format" << LL_ENDL;
+            }
+            broken_format = TRUE;
+        }
+        else
+        {
+            // Bad UUID string.  Spam as INFO, as most cases we don't care.
+            if(emit)
+            {
+                //don't spam the logs because a resident can't spell.
+                LL_WARNS() << "Bad UUID string: " << in_string << LL_ENDL;
+            }
+            setNull();
+            return FALSE;
+        }
+    }
 
 #if defined(__SSE4_2__)
     if(broken_format)
@@ -441,7 +441,7 @@ BOOL validate_internal_scalar(const char* str_ptr, bool broken_format)
                 cur_pos--;
             }
         }
-        
+
         if (((str_ptr[cur_pos] >= '0') && (str_ptr[cur_pos] <= '9'))
             || ((str_ptr[cur_pos] >= 'a') && (str_ptr[cur_pos] <='f'))
             || ((str_ptr[cur_pos] >= 'A') && (str_ptr[cur_pos] <='F')))
@@ -451,9 +451,9 @@ BOOL validate_internal_scalar(const char* str_ptr, bool broken_format)
         {
             return FALSE;
         }
-        
+
         cur_pos++;
-        
+
         if (((str_ptr[cur_pos] >= '0') && (str_ptr[cur_pos] <= '9'))
             || ((str_ptr[cur_pos] >= 'a') && (str_ptr[cur_pos] <='f'))
             || ((str_ptr[cur_pos] >= 'A') && (str_ptr[cur_pos] <='F')))
@@ -474,23 +474,23 @@ BOOL validate_internal_simd(const char* str_ptr)
     __m128i mm_lower_mask_1, mm_lower_mask_2, mm_upper_mask_1, mm_upper_mask_2;
     const __m128i mm_lower = _mm_loadu_si128(reinterpret_cast<const __m128i *>(str_ptr));
     const __m128i mm_upper = _mm_loadu_si128(reinterpret_cast<const __m128i *>(str_ptr + UUID_BYTES + 3));
-    
+
     mm_lower_mask_1 = _mm_shuffle_epi8(mm_lower, _mm_setr_epi8(0, 2, 4, 6, 9, 11, 14, -1, -1, -1, -1, -1, -1, -1, -1, -1));
     mm_lower_mask_2 = _mm_shuffle_epi8(mm_lower, _mm_setr_epi8(1, 3, 5, 7, 10, 12, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1));
     mm_upper_mask_1 = _mm_shuffle_epi8(mm_upper, _mm_setr_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 0, 2, 5, 7, 9, 11, 13, -1));
     mm_upper_mask_2 = _mm_shuffle_epi8(mm_upper, _mm_setr_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 1, 3, 6, 8, 10, 12, 14, -1));
-    
+
     // Since we had hypens between the character we have 36 characters which does not fit in two 16 char loads
     // therefor we must manually insert them here
     mm_lower_mask_1 = _mm_insert_epi8(mm_lower_mask_1, str_ptr[16], 7);
     mm_lower_mask_2 = _mm_insert_epi8(mm_lower_mask_2, str_ptr[17], 7);
     mm_upper_mask_1 = _mm_insert_epi8(mm_upper_mask_1, str_ptr[34], 15);
     mm_upper_mask_2 = _mm_insert_epi8(mm_upper_mask_2, str_ptr[35], 15);
-    
+
     // Merge [aaaaaaaa|aaaaaaaa|00000000|00000000] | [00000000|00000000|bbbbbbbb|bbbbbbbb] -> [aaaaaaaa|aaaaaaaa|bbbbbbbb|bbbbbbbb]
     __m128i mm_mask_merge_1 = _mm_or_si128(mm_lower_mask_1, mm_upper_mask_1);
     __m128i mm_mask_merge_2 = _mm_or_si128(mm_lower_mask_2, mm_upper_mask_2);
-    
+
     // Check if all characters are between 0-9, A-Z or a-z
     const __m128i mm_allowed_char_range = _mm_setr_epi8('0', '9', 'A', 'Z', 'a', 'z', 0, -1, 0, -1, 0, -1, 0, -1, 0, -1);
     const int cmp_lower = _mm_cmpistri(mm_allowed_char_range, mm_mask_merge_1, _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_NEGATIVE_POLARITY);
@@ -510,10 +510,10 @@ BOOL LLUUID::validate(std::string_view in_string)
     {
         return FALSE;
     }
-    
+
     static constexpr auto HYPEN_UUID = 36;
     static constexpr auto BROKEN_UUID = 35;
-    
+
     size_t in_str_size = in_string.size();
     if(in_str_size == HYPEN_UUID)
     {
@@ -578,7 +578,7 @@ std::ostream& operator<<(std::ostream& s, const LLUUID& uuid)
 std::istream& operator>>(std::istream& s, LLUUID& uuid)
 {
     U32 i;
-    char uuid_str[UUID_STR_LENGTH];		/* Flawfinder: ignore */
+    char uuid_str[UUID_STR_LENGTH];     /* Flawfinder: ignore */
     for (i = 0; i < UUID_STR_LENGTH - 1; i++)
     {
         s >> uuid_str[i];
@@ -603,91 +603,91 @@ static void get_random_bytes(void* buf, int nbytes)
     return;
 }
 
-#if	LL_WINDOWS
+#if LL_WINDOWS
 
 // static
-S32	LLUUID::getNodeID(unsigned char* node_id)
+S32 LLUUID::getNodeID(unsigned char* node_id)
 {
-	static bool got_node_id = false;
-	static unsigned char local_node_id[6];
-	if (got_node_id)
-	{
-		memcpy(node_id, local_node_id, sizeof(local_node_id));
-		return 1;
-	}
-
-	S32 retval = 0;
-	PIP_ADAPTER_ADDRESSES pAddresses = nullptr;
-	ULONG outBufLen = 0U;
-	DWORD dwRetVal = 0U;
-
-	ULONG family = AF_INET;
-	ULONG flags = GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_INCLUDE_GATEWAYS;
-
-	GetAdaptersAddresses(
-		AF_INET,
-		flags,
-		nullptr,
-		nullptr,
-		&outBufLen);
-
-	constexpr U32 MAX_TRIES = 3U;
-	U32 iteration = 0U;
-	do {
-
-		pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(malloc(outBufLen));
-		if (pAddresses == nullptr) {
-			return 0;
-		}
-
-		dwRetVal =
-			GetAdaptersAddresses(family, flags, nullptr, pAddresses, &outBufLen);
-
-		if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
-			free(pAddresses);
-			pAddresses = nullptr;
-		}
-		else {
-			break;
-		}
-
-		++iteration;
-
-	} while ((dwRetVal == ERROR_BUFFER_OVERFLOW) && (iteration < MAX_TRIES));
-
-	if (dwRetVal == NO_ERROR)
+    static bool got_node_id = false;
+    static unsigned char local_node_id[6];
+    if (got_node_id)
     {
-		PIP_ADAPTER_ADDRESSES pCurrAddresses = pAddresses;
-		PIP_ADAPTER_GATEWAY_ADDRESS pFirstGateway = nullptr;
-		do {
-			pFirstGateway = pCurrAddresses->FirstGatewayAddress;
-			if (pFirstGateway)
-			{
-				if ((pCurrAddresses->IfType == IF_TYPE_ETHERNET_CSMACD || pCurrAddresses->IfType == IF_TYPE_IEEE80211) && pCurrAddresses->ConnectionType == NET_IF_CONNECTION_DEDICATED
-					&& pCurrAddresses->OperStatus == IfOperStatusUp)
-				{
-					if (pCurrAddresses->PhysicalAddressLength == 6) 
-					{
-						for (size_t i = 0; i < 5; ++i)
-						{
-							node_id[i] = pCurrAddresses->PhysicalAddress[i];
-							local_node_id[i] = pCurrAddresses->PhysicalAddress[i];
-						}
-						retval = 1;
-						got_node_id = true;
-						break;
-					}
-				}
-			}
-			pCurrAddresses = pCurrAddresses->Next;
-		} while (pCurrAddresses);                    // Terminate if last adapter
-	}
-	
-	if(pAddresses)
-		free(pAddresses);
-	pAddresses = nullptr;
+        memcpy(node_id, local_node_id, sizeof(local_node_id));
+        return 1;
+    }
 
-	return retval;
+    S32 retval = 0;
+    PIP_ADAPTER_ADDRESSES pAddresses = nullptr;
+    ULONG outBufLen = 0U;
+    DWORD dwRetVal = 0U;
+
+    ULONG family = AF_INET;
+    ULONG flags = GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_INCLUDE_GATEWAYS;
+
+    GetAdaptersAddresses(
+        AF_INET,
+        flags,
+        nullptr,
+        nullptr,
+        &outBufLen);
+
+    constexpr U32 MAX_TRIES = 3U;
+    U32 iteration = 0U;
+    do {
+
+        pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(malloc(outBufLen));
+        if (pAddresses == nullptr) {
+            return 0;
+        }
+
+        dwRetVal =
+            GetAdaptersAddresses(family, flags, nullptr, pAddresses, &outBufLen);
+
+        if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
+            free(pAddresses);
+            pAddresses = nullptr;
+        }
+        else {
+            break;
+        }
+
+        ++iteration;
+
+    } while ((dwRetVal == ERROR_BUFFER_OVERFLOW) && (iteration < MAX_TRIES));
+
+    if (dwRetVal == NO_ERROR)
+    {
+        PIP_ADAPTER_ADDRESSES pCurrAddresses = pAddresses;
+        PIP_ADAPTER_GATEWAY_ADDRESS pFirstGateway = nullptr;
+        do {
+            pFirstGateway = pCurrAddresses->FirstGatewayAddress;
+            if (pFirstGateway)
+            {
+                if ((pCurrAddresses->IfType == IF_TYPE_ETHERNET_CSMACD || pCurrAddresses->IfType == IF_TYPE_IEEE80211) && pCurrAddresses->ConnectionType == NET_IF_CONNECTION_DEDICATED
+                    && pCurrAddresses->OperStatus == IfOperStatusUp)
+                {
+                    if (pCurrAddresses->PhysicalAddressLength == 6)
+                    {
+                        for (size_t i = 0; i < 5; ++i)
+                        {
+                            node_id[i] = pCurrAddresses->PhysicalAddress[i];
+                            local_node_id[i] = pCurrAddresses->PhysicalAddress[i];
+                        }
+                        retval = 1;
+                        got_node_id = true;
+                        break;
+                    }
+                }
+            }
+            pCurrAddresses = pCurrAddresses->Next;
+        } while (pCurrAddresses);                    // Terminate if last adapter
+    }
+
+    if(pAddresses)
+        free(pAddresses);
+    pAddresses = nullptr;
+
+    return retval;
 }
 
 #elif LL_DARWIN
@@ -726,19 +726,19 @@ S32 LLUUID::getNodeID(unsigned char* node_id)
 
     for (ifa = ifap; ifa != NULL; ifa = ifa->ifa_next)
     {
-        //		printf("Interface %s, address family %d, ", ifa->ifa_name, ifa->ifa_addr->sa_family);
+        //      printf("Interface %s, address family %d, ", ifa->ifa_name, ifa->ifa_addr->sa_family);
         for (i = 0; i < ifa->ifa_addr->sa_len; i++)
         {
-            //			printf("%02X ", (unsigned char)ifa->ifa_addr->sa_data[i]);
+            //          printf("%02X ", (unsigned char)ifa->ifa_addr->sa_data[i]);
         }
-        //		printf("\n");
+        //      printf("\n");
 
         if (ifa->ifa_addr->sa_family == AF_LINK)
         {
             // This is a link-level address
             struct sockaddr_dl* lla = (struct sockaddr_dl*)ifa->ifa_addr;
 
-            //			printf("\tLink level address, type %02X\n", lla->sdl_type);
+            //          printf("\tLink level address, type %02X\n", lla->sdl_type);
 
             if (lla->sdl_type == IFT_ETHER)
             {
@@ -795,11 +795,11 @@ S32 LLUUID::getNodeID(unsigned char* node_id)
  // static
 S32 LLUUID::getNodeID(unsigned char* node_id)
 {
-    int 		sd;
-    struct ifreq 	ifr, * ifrp;
-    struct ifconf 	ifc;
+    int         sd;
+    struct ifreq    ifr, * ifrp;
+    struct ifconf   ifc;
     char buf[1024];
-    int		n, i;
+    int     n, i;
     unsigned char* a;
 
     /*
@@ -832,7 +832,7 @@ S32 LLUUID::getNodeID(unsigned char* node_id)
     n = ifc.ifc_len;
     for (i = 0; i < n; i += ifreq_size(*ifr)) {
         ifrp = (struct ifreq*)((char*)ifc.ifc_buf + i);
-        strncpy(ifr.ifr_name, ifrp->ifr_name, IFNAMSIZ);		/* Flawfinder: ignore */
+        strncpy(ifr.ifr_name, ifrp->ifr_name, IFNAMSIZ);        /* Flawfinder: ignore */
 #ifdef SIOCGIFHWADDR
         if (ioctl(sd, SIOCGIFHWADDR, &ifr) < 0)
             continue;
@@ -854,7 +854,7 @@ S32 LLUUID::getNodeID(unsigned char* node_id)
         if (!a[0] && !a[1] && !a[2] && !a[3] && !a[4] && !a[5])
             continue;
         if (node_id) {
-            memcpy(node_id, a, 6);		/* Flawfinder: ignore */
+            memcpy(node_id, a, 6);      /* Flawfinder: ignore */
             close(sd);
             return 1;
         }
@@ -964,7 +964,7 @@ void LLUUID::generate()
     // Create a UUID.
     uuid_time_t timestamp;
 
-    static unsigned char node_id[6];	/* Flawfinder: ignore */
+    static unsigned char node_id[6];    /* Flawfinder: ignore */
     static int has_init = 0;
 
     // Create a UUID.
@@ -997,17 +997,17 @@ void LLUUID::generate()
     // if clock hasn't changed or went backward, change clockseq
     if (cmpTime(&timestamp, &time_last) != 1)
     {
-		static LLMutex sMutex;
-		LLMutexLock	lock(&sMutex);
+        static LLMutex sMutex;
+        LLMutexLock lock(&sMutex);
         clock_seq = (clock_seq + 1) & 0x3FFF;
         if (clock_seq == 0)
             clock_seq++;
-        our_clock_seq = clock_seq;	// Ensure we're using a different clock_seq value from previous time
+        our_clock_seq = clock_seq;  // Ensure we're using a different clock_seq value from previous time
     }
 
     time_last = timestamp;
 
-    memcpy(mData + 10, node_id, 6);		/* Flawfinder: ignore */
+    memcpy(mData + 10, node_id, 6);     /* Flawfinder: ignore */
     U32 tmp;
     tmp = timestamp.low;
     mData[3] = (unsigned char)tmp;
@@ -1067,9 +1067,9 @@ BOOL LLUUID::parseUUID(const std::string& buf, LLUUID* value)
 //static
 LLUUID LLUUID::generateNewID()
 {
-	LLUUID new_id;
-	new_id.generate();
-	return new_id;
+    LLUUID new_id;
+    new_id.generate();
+    return new_id;
 }
 
 //static
@@ -1104,7 +1104,7 @@ LLAssetID LLTransactionID::makeAssetID(const LLUUID& session) const
 // Faster than copying from memory
 void LLUUID::setNull()
 {
-	 memset(mData, 0, sizeof(mData));
+     memset(mData, 0, sizeof(mData));
 }
 
 /*
@@ -1112,19 +1112,19 @@ void LLUUID::setNull()
 // to integers, among other things.  Use isNull() or notNull().
  LLUUID::operator bool() const
 {
-	U32 *word = (U32 *)mData;
-	return (word[0] | word[1] | word[2] | word[3]) > 0;
+    U32 *word = (U32 *)mData;
+    return (word[0] | word[1] | word[2] | word[3]) > 0;
 }
 */
 
  LLUUID::LLUUID(const char *in_string)
 {
-	set(in_string);
+    set(in_string);
 }
 
  LLUUID::LLUUID(const std::string_view in_string)
 {
-	set(in_string);
+    set(in_string);
 }
 
 U16 LLUUID::getCRC16() const
@@ -1145,10 +1145,10 @@ U16 LLUUID::getCRC16() const
 
 U32 LLUUID::getCRC32() const
 {
-	U32 ret = 0;
-	for(U32 i = 0;i < 4;++i)
-	{
-		ret += (mData[i*4]) | (mData[i*4+1]) << 8 | (mData[i*4+2]) << 16 | (mData[i*4+3]) << 24;
-	}
-	return ret;
+    U32 ret = 0;
+    for(U32 i = 0;i < 4;++i)
+    {
+        ret += (mData[i*4]) | (mData[i*4+1]) << 8 | (mData[i*4+2]) << 16 | (mData[i*4+3]) << 24;
+    }
+    return ret;
 }

@@ -5,21 +5,21 @@
  * $LicenseInfo:firstyear=2010&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -37,154 +37,154 @@ class LLParcelChangeObserver;
 
 class LLPanelTopInfoBar final : public LLPanel, public LLSingleton<LLPanelTopInfoBar>, private LLDestroyClass<LLPanelTopInfoBar>
 {
-	LLSINGLETON(LLPanelTopInfoBar);
-	~LLPanelTopInfoBar();
-	LOG_CLASS(LLPanelTopInfoBar);
+    LLSINGLETON(LLPanelTopInfoBar);
+    ~LLPanelTopInfoBar();
+    LOG_CLASS(LLPanelTopInfoBar);
 
-	friend class LLDestroyClass<LLPanelTopInfoBar>;
+    friend class LLDestroyClass<LLPanelTopInfoBar>;
 
 public:
-	typedef boost::signals2::signal<void ()> resize_signal_t;
+    typedef boost::signals2::signal<void ()> resize_signal_t;
 
-	/*virtual*/ BOOL postBuild() override;
-	/*virtual*/ void draw() override;
+    /*virtual*/ BOOL postBuild() override;
+    /*virtual*/ void draw() override;
 
-	/**
-	 * Updates location and parcel icons on login complete
-	 */
-	void handleLoginComplete();
+    /**
+     * Updates location and parcel icons on login complete
+     */
+    void handleLoginComplete();
 
-	/**
-	 * Called when the top info bar gets shown or hidden
-	 */
-	void onVisibilityChanged(const LLSD& show);
+    /**
+     * Called when the top info bar gets shown or hidden
+     */
+    void onVisibilityChanged(const LLSD& show);
 
-	boost::signals2::connection setResizeCallback( const resize_signal_t::slot_type& cb );
+    boost::signals2::connection setResizeCallback( const resize_signal_t::slot_type& cb );
 
 // [RLVa:KB] - Checked: 2014-03-23 (RLVa-1.4.10)
-	/**
-	 * Shorthand to call updateParcelInfoText() and updateParcelIcons().
-	 */
-	void update();
+    /**
+     * Shorthand to call updateParcelInfoText() and updateParcelIcons().
+     */
+    void update();
 // [/RLV:KB]
 private:
-	class LLParcelChangeObserver;
+    class LLParcelChangeObserver;
 
-	friend class LLParcelChangeObserver;
+    friend class LLParcelChangeObserver;
 
-	enum EParcelIcon
-	{
-		VOICE_ICON = 0,
-		FLY_ICON,			// 1
-		PUSH_ICON,			// 2
-		BUILD_ICON,			// 3
-		SCRIPTS_ICON,		// 4
-		DAMAGE_ICON,		// 5
-		SEE_AVATARS_ICON,	// 6
-		ICON_COUNT			// 7 total
-	};
+    enum EParcelIcon
+    {
+        VOICE_ICON = 0,
+        FLY_ICON,           // 1
+        PUSH_ICON,          // 2
+        BUILD_ICON,         // 3
+        SCRIPTS_ICON,       // 4
+        DAMAGE_ICON,        // 5
+        SEE_AVATARS_ICON,   // 6
+        ICON_COUNT          // 7 total
+    };
 
-	/**
-	 * Initializes parcel icons controls. Called from the constructor.
-	 */
-	void initParcelIcons();
+    /**
+     * Initializes parcel icons controls. Called from the constructor.
+     */
+    void initParcelIcons();
 
-	BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
-	/**
-	 * Handles clicks on the parcel icons.
-	 */
-	void onParcelIconClick(EParcelIcon icon);
+    /**
+     * Handles clicks on the parcel icons.
+     */
+    void onParcelIconClick(EParcelIcon icon);
 
-	
-	/**
-	 * Handles clicks on the parcel icons.
-	 */
-	void onParcelInfoTextClicked();
 
-	/**
-	 * Handles clicks on the info buttons.
-	 */
-	void onInfoButtonClicked();
+    /**
+     * Handles clicks on the parcel icons.
+     */
+    void onParcelInfoTextClicked();
 
-	/**
-	 * Called when agent changes the parcel.
-	 */
-	void onAgentParcelChange();
+    /**
+     * Handles clicks on the info buttons.
+     */
+    void onInfoButtonClicked();
 
-	/**
-	 * Called when context menu item is clicked.
-	 */
-	void onContextMenuItemClicked(const LLSD::String& userdata);
+    /**
+     * Called when agent changes the parcel.
+     */
+    void onAgentParcelChange();
 
-	/**
-	 * Called when user checks/unchecks Show Coordinates menu item.
-	 */
-	void onNavBarShowParcelPropertiesCtrlChanged();
+    /**
+     * Called when context menu item is clicked.
+     */
+    void onContextMenuItemClicked(const LLSD::String& userdata);
 
-//	/**
-//	 * Shorthand to call updateParcelInfoText() and updateParcelIcons().
-//	 */
-//	void update();
+    /**
+     * Called when user checks/unchecks Show Coordinates menu item.
+     */
+    void onNavBarShowParcelPropertiesCtrlChanged();
 
-	/**
-	 * Updates parcel info text (mParcelInfoText).
-	 */
-	void updateParcelInfoText();
+//  /**
+//   * Shorthand to call updateParcelInfoText() and updateParcelIcons().
+//   */
+//  void update();
 
-	/**
-	 * Updates parcel icons (mParcelIcon[]).
-	 */
-	void updateParcelIcons();
+    /**
+     * Updates parcel info text (mParcelInfoText).
+     */
+    void updateParcelInfoText();
 
-	/**
-	 * Updates health information (mDamageText).
-	 */
-	void updateHealth();
+    /**
+     * Updates parcel icons (mParcelIcon[]).
+     */
+    void updateParcelIcons();
 
-	/**
-	 * Lays out all parcel icons starting from right edge of the mParcelInfoText + 11px
-	 * (see screenshots in EXT-5808 for details).
-	 */
-	void layoutParcelIcons();
+    /**
+     * Updates health information (mDamageText).
+     */
+    void updateHealth();
 
-	/**
-	 * Lays out a widget. Widget's rect mLeft becomes equal to the 'left' argument.
-	 */
-	S32 layoutWidget(LLUICtrl* ctrl, S32 left);
+    /**
+     * Lays out all parcel icons starting from right edge of the mParcelInfoText + 11px
+     * (see screenshots in EXT-5808 for details).
+     */
+    void layoutParcelIcons();
 
-	/**
-	 * Generates location string and returns it in the loc_str parameter.
-	 */
-	void buildLocationString(std::string& loc_str, bool show_coords);
+    /**
+     * Lays out a widget. Widget's rect mLeft becomes equal to the 'left' argument.
+     */
+    S32 layoutWidget(LLUICtrl* ctrl, S32 left);
 
-	/**
-	 * Sets new value to the mParcelInfoText and updates the size of the top bar.
-	 */
-	void setParcelInfoText(const std::string& new_text);
+    /**
+     * Generates location string and returns it in the loc_str parameter.
+     */
+    void buildLocationString(std::string& loc_str, bool show_coords);
 
-	/**
-	 *  Implementation of LLDestroyClass<T>
-	 */
-	static void destroyClass()
-	{
-		if (LLPanelTopInfoBar::instanceExists())
-		{
-			LLPanelTopInfoBar::getInstance()->setEnabled(FALSE);
-		}
-	}
+    /**
+     * Sets new value to the mParcelInfoText and updates the size of the top bar.
+     */
+    void setParcelInfoText(const std::string& new_text);
 
-	LLButton* 				mInfoBtn;
-	LLTextBox* 				mParcelInfoText;
-	LLTextBox* 				mDamageText;
-	LLIconCtrl*				mParcelIcon[ICON_COUNT];
-	LLParcelChangeObserver*	mParcelChangedObserver;
+    /**
+     *  Implementation of LLDestroyClass<T>
+     */
+    static void destroyClass()
+    {
+        if (LLPanelTopInfoBar::instanceExists())
+        {
+            LLPanelTopInfoBar::getInstance()->setEnabled(FALSE);
+        }
+    }
 
-	boost::signals2::connection	mParcelPropsCtrlConnection;
-	boost::signals2::connection	mShowCoordsCtrlConnection;
-	boost::signals2::connection	mParcelMgrConnection;
+    LLButton*               mInfoBtn;
+    LLTextBox*              mParcelInfoText;
+    LLTextBox*              mDamageText;
+    LLIconCtrl*             mParcelIcon[ICON_COUNT];
+    LLParcelChangeObserver* mParcelChangedObserver;
 
-	resize_signal_t mResizeSignal;
+    boost::signals2::connection mParcelPropsCtrlConnection;
+    boost::signals2::connection mShowCoordsCtrlConnection;
+    boost::signals2::connection mParcelMgrConnection;
+
+    resize_signal_t mResizeSignal;
 };
 
 #endif /* LLPANELTOPINFOBAR_H_ */

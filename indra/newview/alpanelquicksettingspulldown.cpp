@@ -34,5 +34,5 @@
 // Default constructor
 ALPanelQuickSettingsPulldown::ALPanelQuickSettingsPulldown() : LLPanelPulldown()
 {
-	buildFromFile("panel_quick_settings_pulldown.xml");
+    buildFromFile("panel_quick_settings_pulldown.xml");
 }

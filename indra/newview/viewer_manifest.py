@@ -100,7 +100,7 @@ class ViewerManifest(LLManifest):
 
                 # ... and the entire image filters directory
                 self.path("filters")
-
+            
                 # ... and the entire color lut texture directory
                 self.path("colorlut")
             
@@ -468,7 +468,6 @@ class WindowsManifest(ViewerManifest):
             # For ICU4C
             self.path("icudt75.dll")
             self.path("icuuc75.dll")
-
             # Get fmodstudio dll for audio engine, continue if missing
             if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
                 if self.args['buildtype'].lower() == 'debug':
@@ -506,12 +505,8 @@ class WindowsManifest(ViewerManifest):
                 self.path("SLVoice.exe")
 
             # Vivox libraries
-            if (self.address_size == 64):
-                self.path("vivoxsdk_x64.dll")
-                self.path("ortp_x64.dll")
-            else:
-                self.path("vivoxsdk.dll")
-                self.path("ortp.dll")
+            self.path("vivoxsdk_x64.dll")
+            self.path("ortp_x64.dll")
 
             # Sentry
             if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':

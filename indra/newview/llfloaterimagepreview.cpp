@@ -342,6 +342,8 @@ void LLFloaterImagePreview::draw()
 //-----------------------------------------------------------------------------
 bool LLFloaterImagePreview::loadImage(const std::string& src_filename)
 {
+    try
+    {
 	std::string exten = gDirUtilp->getExtension(src_filename);
 	U32 codec = LLImageBase::getCodecFromExtension(exten);
 
@@ -390,6 +392,12 @@ bool LLFloaterImagePreview::loadImage(const std::string& src_filename)
 	
 	raw_image->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
 	mRawImagep = raw_image;
+    }
+    catch (...)
+    {
+        LOG_UNHANDLED_EXCEPTION("");
+        return false;
+    }
 	
 	return true;
 }

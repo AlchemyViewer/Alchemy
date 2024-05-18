@@ -29,29 +29,29 @@ class LLUUID;
 
 class ALAvatarGroups final : public LLSingleton < ALAvatarGroups >
 {
-	LLSINGLETON_EMPTY_CTOR(ALAvatarGroups);
-	~ALAvatarGroups() = default;
+    LLSINGLETON_EMPTY_CTOR(ALAvatarGroups);
+    ~ALAvatarGroups() = default;
 
 public:
-	typedef enum e_custom_colors
-	{
-		E_FIRST_COLOR = 0,
-		E_SECOND_COLOR,
-		E_THIRD_COLOR,
-		E_FOURTH_COLOR
-	} EAvatarColors;
+    typedef enum e_custom_colors
+    {
+        E_FIRST_COLOR = 0,
+        E_SECOND_COLOR,
+        E_THIRD_COLOR,
+        E_FOURTH_COLOR
+    } EAvatarColors;
 
-	void addOrUpdateCustomColor(const LLUUID& id, EAvatarColors color);
-	void clearCustomColor(const LLUUID& id);
+    void addOrUpdateCustomColor(const LLUUID& id, EAvatarColors color);
+    void clearCustomColor(const LLUUID& id);
 
-	typedef enum e_color_type
-	{
-		COLOR_CHAT,
-		COLOR_NAMETAG,
-		COLOR_NEARBY,
-		COLOR_MINIMAP
-	} EColorType;
+    typedef enum e_color_type
+    {
+        COLOR_CHAT,
+        COLOR_NAMETAG,
+        COLOR_NEARBY,
+        COLOR_MINIMAP
+    } EColorType;
 
-	LLColor4 getAvatarColor(const LLUUID& id, LLColor4 default_color, EColorType color_type);
-	std::string getAvatarColorName(const LLUUID& id, std::string_view color_name, EColorType color_type);
+    LLColor4 getAvatarColor(const LLUUID& id, LLColor4 default_color, EColorType color_type);
+    std::string getAvatarColorName(const LLUUID& id, std::string_view color_name, EColorType color_type);
 };

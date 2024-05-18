@@ -30,90 +30,90 @@
 #include "llpanelclassified.h"
 
 LLClassifiedItem::LLClassifiedItem(const LLUUID& avatar_id, const LLUUID& classified_id)
-	: LLPanel()
-	, mAvatarId(avatar_id)
-	, mClassifiedId(classified_id)
+    : LLPanel()
+    , mAvatarId(avatar_id)
+    , mClassifiedId(classified_id)
 {
-	buildFromFile("panel_classifieds_list_item.xml");
+    buildFromFile("panel_classifieds_list_item.xml");
 
-	LLAvatarPropertiesProcessor::getInstance()->addObserver(getAvatarId(), this);
-	LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoRequest(getClassifiedId());
+    LLAvatarPropertiesProcessor::getInstance()->addObserver(getAvatarId(), this);
+    LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoRequest(getClassifiedId());
 }
 
 LLClassifiedItem::~LLClassifiedItem()
 {
-	LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+    LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
 }
 
 void LLClassifiedItem::processProperties(void* data, EAvatarProcessorType type)
 {
-	if (APT_CLASSIFIED_INFO != type)
-	{
-		return;
-	}
+    if (APT_CLASSIFIED_INFO != type)
+    {
+        return;
+    }
 
-	LLAvatarClassifiedInfo* c_info = static_cast<LLAvatarClassifiedInfo*>(data);
-	if (!c_info || c_info->classified_id != getClassifiedId())
-	{
-		return;
-	}
+    LLAvatarClassifiedInfo* c_info = static_cast<LLAvatarClassifiedInfo*>(data);
+    if (!c_info || c_info->classified_id != getClassifiedId())
+    {
+        return;
+    }
 
-	setClassifiedName(c_info->name);
-	setDescription(c_info->description);
-	setSnapshotId(c_info->snapshot_id);
-	setPosGlobal(c_info->pos_global);
+    setClassifiedName(c_info->name);
+    setDescription(c_info->description);
+    setSnapshotId(c_info->snapshot_id);
+    setPosGlobal(c_info->pos_global);
 
-	LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+    LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
 }
 
 BOOL LLClassifiedItem::postBuild()
 {
-	setMouseEnterCallback(std::bind(&set_child_visible, this, "hovered_icon", true));
-	setMouseLeaveCallback(std::bind(&set_child_visible, this, "hovered_icon", false));
-	return TRUE;
+    setMouseEnterCallback(std::bind(&set_child_visible, this, "hovered_icon", true));
+    setMouseLeaveCallback(std::bind(&set_child_visible, this, "hovered_icon", false));
+    return TRUE;
 }
 
 void LLClassifiedItem::setValue(const LLSD& value)
 {
-	if (!value.isMap()) return;;
-	if (!value.has("selected")) return;
-	getChildView("selected_icon")->setVisible(value["selected"]);
+    if (!value.isMap()) return;;
+    if (!value.has("selected")) return;
+    getChildView("selected_icon")->setVisible(value["selected"]);
 }
 
 void LLClassifiedItem::fillIn(LLPanelClassifiedEdit* panel)
 {
-	if (!panel)
-	{
-		return;
-	}
+    if (!panel)
+    {
+        return;
+    }
 
-	setClassifiedName(panel->getClassifiedName());
-	setDescription(panel->getDescription());
-	setSnapshotId(panel->getSnapshotId());
-	setCategory(panel->getCategory());
-	setContentType(panel->getContentType());
-	setAutoRenew(panel->getAutoRenew());
-	setPriceForListing(panel->getPriceForListing());
-	setPosGlobal(panel->getPosGlobal());
-	setLocationText(panel->getClassifiedLocation());
+    setClassifiedName(panel->getClassifiedName());
+    setDescription(panel->getDescription());
+    setSnapshotId(panel->getSnapshotId());
+    setCategory(panel->getCategory());
+    setContentType(panel->getContentType());
+    setAutoRenew(panel->getAutoRenew());
+    setPriceForListing(panel->getPriceForListing());
+    setPosGlobal(panel->getPosGlobal());
+    setLocationText(panel->getClassifiedLocation());
 }
 
 void LLClassifiedItem::setClassifiedName(const std::string& name)
 {
-	getChild<LLUICtrl>("name")->setValue(name);
+    getChild<LLUICtrl>("name")->setValue(name);
 }
 
 void LLClassifiedItem::setDescription(const std::string& desc)
 {
-	getChild<LLUICtrl>("description")->setValue(desc);
+    getChild<LLUICtrl>("description")->setValue(desc);
 }
 
 void LLClassifiedItem::setSnapshotId(const LLUUID& snapshot_id)
 {
-	getChild<LLUICtrl>("picture")->setValue(snapshot_id);
+    getChild<LLUICtrl>("picture")->setValue(snapshot_id);
 }
 
 LLUUID LLClassifiedItem::getSnapshotId() const
 {
-	return getChild<LLUICtrl>("picture")->getValue();
+    return getChild<LLUICtrl>("picture")->getValue();
 }

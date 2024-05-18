@@ -1,4 +1,4 @@
-/** 
+/**
  * @file lloutfitgallery.cpp
  * @author Pavlo Kryvych
  * @brief Visual gallery of agent's outfits for My Appearance side panel
@@ -6,21 +6,21 @@
  * $LicenseInfo:firstyear=2015&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2015, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -431,7 +431,7 @@ bool compareGalleryItem(LLOutfitGalleryItem* item1, LLOutfitGalleryItem* item2)
 }
 
 void LLOutfitGallery::reArrangeRows(S32 row_diff)
-{ 
+{
     std::vector<LLOutfitGalleryItem*> buf_items = mItems;
     for (std::vector<LLOutfitGalleryItem*>::const_reverse_iterator it = buf_items.rbegin(); it != buf_items.rend(); ++it)
     {
@@ -442,7 +442,7 @@ void LLOutfitGallery::reArrangeRows(S32 row_diff)
         buf_items.push_back(*it);
     }
     mHiddenItems.clear();
-    
+
     mItemsInRow += row_diff;
     updateGalleryWidth();
     std::sort(buf_items.begin(), buf_items.end(), compareGalleryItem);
@@ -458,7 +458,7 @@ void LLOutfitGallery::reArrangeRows(S32 row_diff)
         bool hidden = (std::string::npos == outfit_name.find(cur_filter));
         (*it)->setHidden(hidden);
 
-    	addToGallery(*it);
+        addToGallery(*it);
     }
 
     updateMessageVisibility();
@@ -955,7 +955,7 @@ BOOL LLOutfitGalleryItem::postBuild()
 void LLOutfitGalleryItem::draw()
 {
     LLPanel::draw();
-    
+
     // Draw border
     static LLUIColor selected_color = LLUIColorTable::instance().getColor("OutfitGalleryItemSelected", LLColor4::white);
     static LLUIColor unselected_color = LLUIColorTable::instance().getColor("OutfitGalleryItemUnselected", LLColor4::white);
@@ -987,7 +987,7 @@ void LLOutfitGalleryItem::draw()
             mTexturep->addTextureStats((F32)(interior.getWidth() * interior.getHeight()));
         }
     }
-    
+
 }
 
 void LLOutfitGalleryItem::setOutfitName(std::string name)
@@ -1145,7 +1145,7 @@ LLContextMenu* LLOutfitGalleryContextMenu::createMenu()
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar registrar;
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable_registrar;
     LLUUID selected_id = mUUIDs.front();
-    
+
     registrar.add("Outfit.WearReplace",
                   boost::bind(&LLAppearanceMgr::replaceCurrentOutfit, &LLAppearanceMgr::instance(), selected_id));
     registrar.add("Outfit.WearAdd",
@@ -1160,7 +1160,7 @@ LLContextMenu* LLOutfitGalleryContextMenu::createMenu()
     registrar.add("Outfit.Save", boost::bind(&LLOutfitGalleryContextMenu::onSave, this, selected_id));
     enable_registrar.add("Outfit.OnEnable", boost::bind(&LLOutfitGalleryContextMenu::onEnable, this, _2));
     enable_registrar.add("Outfit.OnVisible", boost::bind(&LLOutfitGalleryContextMenu::onVisible, this, _2));
-    
+
     return createFromFile("menu_gallery_outfit_tab.xml");
 }
 
@@ -1172,7 +1172,7 @@ void LLOutfitGalleryContextMenu::onCreate(const LLSD& data)
         LL_WARNS() << "Invalid wearable type" << LL_ENDL;
         return;
     }
-    
+
     LLAgentWearables::createWearable(type, true);
 }
 
@@ -1306,7 +1306,7 @@ void LLOutfitGallery::refreshOutfit(const LLUUID& category_id)
             mOutfitMap[category_id]->setImageAssetId(asset_id);
         }
     }
-    
+
     if (mGalleryCreated && !LLApp::isExiting())
     {
         reArrangeRows();

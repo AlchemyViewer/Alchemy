@@ -43,7 +43,7 @@ LLFloaterGotoLine::LLFloaterGotoLine(LLScriptEdCore* editor_core)
         buildFromFile("floater_goto_line.xml");
 
         sInstance = this;
-        
+
         // find floater in which script panel is embedded
         LLView* viewp = (LLView*)editor_core;
         while(viewp)
@@ -60,17 +60,17 @@ LLFloaterGotoLine::LLFloaterGotoLine(LLScriptEdCore* editor_core)
 
 BOOL LLFloaterGotoLine::postBuild()
 {
-	mGotoBox = getChild<LLLineEditor>("goto_line");
-	mGotoBox->setCommitCallback(boost::bind(&LLFloaterGotoLine::onGotoBoxCommit, this));
-	mGotoBox->setCommitOnFocusLost(FALSE);
-	mGotoBox->setPrevalidate(LLTextValidate::validateNonNegativeS32);
-	childSetAction("goto_btn", onBtnGoto, this);
-	setDefaultBtn("goto_btn");
+    mGotoBox = getChild<LLLineEditor>("goto_line");
+    mGotoBox->setCommitCallback(boost::bind(&LLFloaterGotoLine::onGotoBoxCommit, this));
+    mGotoBox->setCommitOnFocusLost(FALSE);
+    mGotoBox->setPrevalidate(LLTextValidate::validateNonNegativeS32);
+    childSetAction("goto_btn", onBtnGoto, this);
+    setDefaultBtn("goto_btn");
 
-	return LLFloater::postBuild();
+    return LLFloater::postBuild();
 }
 
-//static 
+//static
 void LLFloaterGotoLine::show(LLScriptEdCore* editor_core)
 {
         if (sInstance && sInstance->mEditorCore && sInstance->mEditorCore != editor_core)
@@ -93,7 +93,7 @@ LLFloaterGotoLine::~LLFloaterGotoLine()
         sInstance = NULL;
 }
 
-// static 
+// static
 void LLFloaterGotoLine::onBtnGoto(void *userdata)
 {
         LLFloaterGotoLine* self = (LLFloaterGotoLine*)userdata;
@@ -109,12 +109,12 @@ void LLFloaterGotoLine::handleBtnGoto()
         {
                 if (mEditorCore && mEditorCore->mCurrentEditor)
                 {
-			mEditorCore->mCurrentEditor->deselect();
+            mEditorCore->mCurrentEditor->deselect();
 // [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
-			mEditorCore->mCurrentEditor->scrollTo(row, column);
+            mEditorCore->mCurrentEditor->scrollTo(row, column);
 // [/SL:KB]
-//			mEditorCore->mCurrentEditor->setCursor(row, column);
-			mEditorCore->mCurrentEditor->setFocus(TRUE);
+//          mEditorCore->mCurrentEditor->setCursor(row, column);
+            mEditorCore->mCurrentEditor->setFocus(TRUE);
                 }
         }
 }
@@ -148,19 +148,19 @@ void LLFloaterGotoLine::onGotoBoxCommit()
                 if (mEditorCore && mEditorCore->mCurrentEditor)
                 {
 // [SL:KB] - Patch: UI-ScriptGoToLine | Checked: 2013-12-31 (Catznip-3.6)
-			mEditorCore->mCurrentEditor->scrollTo(row, column);
+            mEditorCore->mCurrentEditor->scrollTo(row, column);
 // [/SL:KB]
-//			mEditorCore->mCurrentEditor->setCursor(row, column);
+//          mEditorCore->mCurrentEditor->setCursor(row, column);
 
-			S32 rownew = 0;
-			S32 columnnew = 0;
-			mEditorCore->mCurrentEditor->getCurrentLineAndColumn( &rownew, &columnnew, FALSE );  // don't include wordwrap
-			if (rownew == row && columnnew == column)
-			{
-			        mEditorCore->mCurrentEditor->deselect();
-			        mEditorCore->mCurrentEditor->setFocus(TRUE);
-			        sInstance->closeFloater();
-			} //else do nothing (if the cursor-position didn't change)
+            S32 rownew = 0;
+            S32 columnnew = 0;
+            mEditorCore->mCurrentEditor->getCurrentLineAndColumn( &rownew, &columnnew, FALSE );  // don't include wordwrap
+            if (rownew == row && columnnew == column)
+            {
+                    mEditorCore->mCurrentEditor->deselect();
+                    mEditorCore->mCurrentEditor->setFocus(TRUE);
+                    sInstance->closeFloater();
+            } //else do nothing (if the cursor-position didn't change)
                 }
         }
 }

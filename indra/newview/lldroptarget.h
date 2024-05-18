@@ -33,32 +33,32 @@
 class LLDropTarget : public LLView
 {
 public:
-	struct Params : public LLInitParam::Block<Params, LLView::Params>
-	{
-		Optional<LLUUID> agent_id;
-		Params()
-		:	agent_id("agent_id")
-		{
-			changeDefault(mouse_opaque, false);
-			changeDefault(follows.flags, FOLLOWS_ALL);
-		}
-	};
-	
-	LLDropTarget(const Params&);
-	~LLDropTarget() = default;
-	
-	void doDrop(EDragAndDropType cargo_type, void* cargo_data);
-	
-	//
-	// LLView functionality
-	BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
-								   EDragAndDropType cargo_type,
-								   void* cargo_data,
-								   EAcceptance* accept,
-								   std::string& tooltip_msg) override;
-	void setAgentID(const LLUUID &agent_id)		{ mAgentID = agent_id; }
+    struct Params : public LLInitParam::Block<Params, LLView::Params>
+    {
+        Optional<LLUUID> agent_id;
+        Params()
+        :   agent_id("agent_id")
+        {
+            changeDefault(mouse_opaque, false);
+            changeDefault(follows.flags, FOLLOWS_ALL);
+        }
+    };
+
+    LLDropTarget(const Params&);
+    ~LLDropTarget() = default;
+
+    void doDrop(EDragAndDropType cargo_type, void* cargo_data);
+
+    //
+    // LLView functionality
+    BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop,
+                                   EDragAndDropType cargo_type,
+                                   void* cargo_data,
+                                   EAcceptance* accept,
+                                   std::string& tooltip_msg) override;
+    void setAgentID(const LLUUID &agent_id)     { mAgentID = agent_id; }
 protected:
-	LLUUID mAgentID;
+    LLUUID mAgentID;
 };
 
 #endif // LL_DROPTARGET_H

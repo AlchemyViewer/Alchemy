@@ -2,9 +2,9 @@
  * @file llfloaterhex.h
  * @brief Hex Editor Floater made by Day
  * @author Day Oh, Skills, Cinder
- * 
+ *
  * $LicenseInfo:firstyear=2009&license=WTFPLV2$
- *  
+ *
  */
 
 #ifndef LL_FLOATERHEX_H
@@ -23,30 +23,30 @@ class LLViewerInventoryItem;
 class LLFloaterHexEditor : public LLFloater
 {
 public:
-	LLFloaterHexEditor(const LLSD& key);
+    LLFloaterHexEditor(const LLSD& key);
 
-	void onOpen(const LLSD& key) override;
-	BOOL postBuild() override;
+    void onOpen(const LLSD& key) override;
+    BOOL postBuild() override;
 
-	LLViewerInventoryItem* mItem;
-	LLAssetType::EType mAssetType;
-	LLHexEditor* mEditor;
+    LLViewerInventoryItem* mItem;
+    LLAssetType::EType mAssetType;
+    LLHexEditor* mEditor;
 
-	static void imageCallback(BOOL success, 
-					LLViewerFetchedTexture *src_vi,
-					LLImageRaw* src, 
-					LLImageRaw* aux_src, 
-					S32 discard_level,
-					BOOL final,
-					void* userdata);
-	static void assetCallback(const LLUUID& asset_uuid,
-		            LLAssetType::EType type,
-				    void* user_data, S32 status, LLExtStat ext_status);
+    static void imageCallback(BOOL success,
+                    LLViewerFetchedTexture *src_vi,
+                    LLImageRaw* src,
+                    LLImageRaw* aux_src,
+                    S32 discard_level,
+                    BOOL final,
+                    void* userdata);
+    static void assetCallback(const LLUUID& asset_uuid,
+                    LLAssetType::EType type,
+                    void* user_data, S32 status, LLExtStat ext_status);
 
 
 
-	static void download(LLViewerInventoryItem* item, loaded_callback_func onImage, LLGetAssetCallback onAsset);
-	static void onSaveComplete(const LLUUID& asset_uuid, void* user_data, S32 status, LLExtStat ext_status);
+    static void download(LLViewerInventoryItem* item, loaded_callback_func onImage, LLGetAssetCallback onAsset);
+    static void onSaveComplete(const LLUUID& asset_uuid, void* user_data, S32 status, LLExtStat ext_status);
 
 private:
     ~LLFloaterHexEditor() override = default;
@@ -54,9 +54,9 @@ private:
     void onClickSave();
     void onClickUpload();
 
-	void onSavedAsset(const LLUUID& id, const LLSD& response);
-	void onCommitColumnCount(LLUICtrl *control);
-	void handleSizing();
+    void onSavedAsset(const LLUUID& id, const LLSD& response);
+    void onCommitColumnCount(LLUICtrl *control);
+    void handleSizing();
 };
 
 #endif

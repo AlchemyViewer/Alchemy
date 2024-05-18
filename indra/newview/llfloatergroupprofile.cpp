@@ -37,7 +37,7 @@
 #include "llpanelgroup.h"
 
 LLFloaterGroupProfile::LLFloaterGroupProfile(LLSD const& key)
-	: LLFloater(key)
+    : LLFloater(key)
 {
 }
 
@@ -47,67 +47,67 @@ LLFloaterGroupProfile::~LLFloaterGroupProfile()
 
 BOOL LLFloaterGroupProfile::postBuild()
 {
-	mGroupPanel = getChild<LLPanel>("panel_group_info_sidetray");
-	mCreateGroupPanel = getChild<LLPanel>("panel_group_creation_sidetray");
-	return TRUE;
+    mGroupPanel = getChild<LLPanel>("panel_group_info_sidetray");
+    mCreateGroupPanel = getChild<LLPanel>("panel_group_creation_sidetray");
+    return TRUE;
 }
 
 void LLFloaterGroupProfile::onOpen(const LLSD& key)
 {
-	if (key.isMap())
-	{
-		setKey(key["group_id"].asUUID());
-	}
+    if (key.isMap())
+    {
+        setKey(key["group_id"].asUUID());
+    }
 
-	mCreatingGroup = (key.has("action") && key.get("action").asString() == "create");
-	if (mCreatingGroup)
-	{
-		mCreateGroupPanel->onOpen(key);
-		mCreateGroupPanel->setVisible(true);
-		mGroupPanel->setVisible(false);
-		setTitle(getString("title_create_group"));
-	}
-	else
-	{
-		mGroupPanel->onOpen(key);
-		mGroupPanel->setVisible(true);
-		mCreateGroupPanel->setVisible(false);
-	}
+    mCreatingGroup = (key.has("action") && key.get("action").asString() == "create");
+    if (mCreatingGroup)
+    {
+        mCreateGroupPanel->onOpen(key);
+        mCreateGroupPanel->setVisible(true);
+        mGroupPanel->setVisible(false);
+        setTitle(getString("title_create_group"));
+    }
+    else
+    {
+        mGroupPanel->onOpen(key);
+        mGroupPanel->setVisible(true);
+        mCreateGroupPanel->setVisible(false);
+    }
 }
 
 void LLFloaterGroupProfile::setGroupName(const std::string& group_name)
 {
-	if (mCreatingGroup)
-	{
-		setTitle(getString("title_create_group"));
-	}
-	else
-	{
-		setTitle(group_name.empty() ? LLTrans::getString("LoadingData") : group_name);
-	}
+    if (mCreatingGroup)
+    {
+        setTitle(getString("title_create_group"));
+    }
+    else
+    {
+        setTitle(group_name.empty() ? LLTrans::getString("LoadingData") : group_name);
+    }
 }
 
 void LLFloaterGroupProfile::createGroup() const
 {
-	LLSD params;
-	params["group_id"] = LLUUID::null;
-	params["action"] = "create";
-	getChild<LLPanel>("panel_group_info_sidetray")->onOpen(params);
+    LLSD params;
+    params["group_id"] = LLUUID::null;
+    params["action"] = "create";
+    getChild<LLPanel>("panel_group_info_sidetray")->onOpen(params);
 }
 
 //static
 LLFloater* LLFloaterGroupProfile::showInstance(const LLSD& key, BOOL focus)
 {
-	// [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
-	if (!LLFloaterReg::canShowInstance("group_profile", key["group_id"].asUUID()))
-		// [/RLVa:KB]
-		return nullptr;//
-	LLFloater* instance = LLFloaterReg::getInstance("group_profile", key["group_id"].asUUID());
-	if (instance)
-	{
-		instance->openFloater(key);
-		if (focus)
-			instance->setFocus(TRUE);
-	}
-	return instance;
+    // [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
+    if (!LLFloaterReg::canShowInstance("group_profile", key["group_id"].asUUID()))
+        // [/RLVa:KB]
+        return nullptr;//
+    LLFloater* instance = LLFloaterReg::getInstance("group_profile", key["group_id"].asUUID());
+    if (instance)
+    {
+        instance->openFloater(key);
+        if (focus)
+            instance->setFocus(TRUE);
+    }
+    return instance;
 }

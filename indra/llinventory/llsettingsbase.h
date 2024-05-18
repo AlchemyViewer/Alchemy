@@ -51,7 +51,7 @@
 #define PTR_NAMESPACE     std
 #define SETTINGS_OVERRIDE override
 
-class LLSettingsBase : 
+class LLSettingsBase :
     public PTR_NAMESPACE::enable_shared_from_this<LLSettingsBase>,
     private boost::noncopyable
 {
@@ -107,7 +107,7 @@ public:
     virtual LLSettingsType::type_e getSettingsTypeValue() const = 0;
 
     //---------------------------------------------------------------------
-    // Settings status 
+    // Settings status
     inline bool hasSetting(const std::string &param) const { return mSettings.has(param); }
     virtual bool isDirty() const { return mDirty; }
     virtual bool isVeryDirty() const { return mReplaced; }
@@ -191,7 +191,7 @@ public:
     virtual LLSD getSettings() const;
 
     //---------------------------------------------------------------------
-    // 
+    //
     inline void setLLSD(const std::string &name, const LLSD &value)
     {
         mSettings[name] = value;
@@ -272,7 +272,7 @@ public:
     {
     public:
         static const U32 VALIDATION_PARTIAL;
-        
+
         typedef boost::function<bool(LLSD &, U32)> verify_pr;
 
         Validator(std::string name, bool required, LLSD::Type type, verify_pr verify = verify_pr(), LLSD defval = LLSD())  :
@@ -330,7 +330,7 @@ protected:
     LLSettingsBase(const LLSD setting);
 
     typedef boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>>   stringset_t;
-    
+
     // combining settings objects. Customize for specific setting types
     virtual void lerpSettings(const LLSettingsBase &other, BlendFactor mix);
 
@@ -343,18 +343,18 @@ protected:
     LLSD    interpolateSDMap(const LLSD &settings, const LLSD &other, const parammapping_t& defaults, BlendFactor mix) const;
     LLSD    interpolateSDValue(const std::string& name, const LLSD &value, const LLSD &other, const parammapping_t& defaults, BlendFactor mix, const stringset_t& slerps) const;
 
-    /// when lerping between settings, some may require special handling.  
+    /// when lerping between settings, some may require special handling.
     /// Get a list of these key to be skipped by the default settings lerp.
     /// (handling should be performed in the override of lerpSettings.
-    virtual const stringset_t& getSkipInterpolateKeys() const; 
+    virtual const stringset_t& getSkipInterpolateKeys() const;
 
-    // A list of settings that represent quaternions and should be slerped 
+    // A list of settings that represent quaternions and should be slerped
     // rather than lerped.
     virtual const stringset_t& getSlerpKeys() const;
 
     virtual const validation_list_t& getValidationList() const = 0;
 
-    // Apply any settings that need special handling. 
+    // Apply any settings that need special handling.
     virtual void applySpecial(void *, bool force = false) { };
 
     virtual const parammapping_t& getParameterMap() const;
@@ -363,7 +363,7 @@ protected:
 
     LLSD        cloneSettings() const;
 
-    inline void setBlendFactor(BlendFactor blendfactor) 
+    inline void setBlendFactor(BlendFactor blendfactor)
     {
         mBlendedFactor = blendfactor;
     }

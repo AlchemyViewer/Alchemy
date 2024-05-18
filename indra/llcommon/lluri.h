@@ -1,4 +1,4 @@
-/** 
+/**
  * @file lluri.h
  * @author Phoenix
  * @date 2006-02-05
@@ -7,21 +7,21 @@
  * $LicenseInfo:firstyear=2006&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -35,7 +35,7 @@ class LLSD;
 class LLUUID;
 class LLApp;
 
-/** 
+/**
  *
  * LLURI instances are immutable
  * See: http://www.ietf.org/rfc/rfc3986.txt
@@ -47,152 +47,152 @@ public:
   LLURI() = default;
   LLURI(const std::string_view escaped_str);
   LLURI(const std::string_view scheme,
-		const std::string_view userName,
-		const std::string_view password,
-		const std::string_view hostName,
-		U16 hostPort,
-		const std::string_view escapedPath,
-		const std::string_view escapedQuery);
-	  
+        const std::string_view userName,
+        const std::string_view password,
+        const std::string_view hostName,
+        U16 hostPort,
+        const std::string_view escapedPath,
+        const std::string_view escapedQuery);
+
   // construct from escaped string, as would be transmitted on the net
 
-	~LLURI() = default;
+    ~LLURI() = default;
 
-	static LLURI buildHTTP(
-		const std::string_view prefix,
-		const LLSD& path);
+    static LLURI buildHTTP(
+        const std::string_view prefix,
+        const LLSD& path);
 
-	static LLURI buildHTTP(
-		const std::string_view prefix,
-		const LLSD& path,
-		const LLSD& query);
+    static LLURI buildHTTP(
+        const std::string_view prefix,
+        const LLSD& path,
+        const LLSD& query);
 
-	static LLURI buildHTTP(
-		const std::string_view scheme,
-		const std::string_view prefix,
-		const LLSD& path,
-		const LLSD& query);
+    static LLURI buildHTTP(
+        const std::string_view scheme,
+        const std::string_view prefix,
+        const LLSD& path,
+        const LLSD& query);
 
-	///< prefix is either a full URL prefix of the form
-	/// "http://example.com:8080", or it can be simply a host and
-	/// optional port like "example.com" or "example.com:8080", in
-	/// these cases, the "http://" will be added
+    ///< prefix is either a full URL prefix of the form
+    /// "http://example.com:8080", or it can be simply a host and
+    /// optional port like "example.com" or "example.com:8080", in
+    /// these cases, the "http://" will be added
 
-	static LLURI buildHTTP(
-		const std::string_view host,
-		const U32& port,
-		const LLSD& path);
-	static LLURI buildHTTP(
-		const std::string_view host,
-		const U32& port,
-		const LLSD& path,
-		const LLSD& query);
+    static LLURI buildHTTP(
+        const std::string_view host,
+        const U32& port,
+        const LLSD& path);
+    static LLURI buildHTTP(
+        const std::string_view host,
+        const U32& port,
+        const LLSD& path,
+        const LLSD& query);
 
-	std::string asString() const;
-	///< the whole URI, escaped as needed
-  
-	/** @name Parts of a URI */
-	//@{
-	// These functions return parts of the decoded URI.  The returned
-	// strings are un-escaped as needed
-  
-	// for all schemes
-	std::string scheme() const;		///< ex.: "http", note lack of colon
-	std::string opaque() const;		///< everything after the colon
-  
-	// for schemes that follow path like syntax (http, https, ftp)
-	std::string authority() const;	// ex.: "user:pass@host.com:80"
-	std::string hostName() const;	// ex.: "host.com"
-	std::string hostNameAndPort() const; // ex.: "host.com:80"
-	std::string userName() const;
-	std::string password() const;
-	U16 hostPort() const;			// ex.: 80, will include implicit port
-	BOOL defaultPort() const;		// true if port is default for scheme
-	const std::string& escapedPath() const { return mEscapedPath; }
-	std::string path() const;		// ex.: "/abc/def", includes leading slash
-	LLSD pathArray() const;			// above decoded into an array of strings
-	std::string query() const;		// ex.: "x=34", section after "?"
-	const std::string& escapedQuery() const { return mEscapedQuery; }
-	LLSD queryMap() const;			// above decoded into a map
-	static LLSD queryMap(std::string escaped_query_string);
+    std::string asString() const;
+    ///< the whole URI, escaped as needed
 
-	/**
-	 * @brief given a name value map, return a serialized query string.
-	 *
+    /** @name Parts of a URI */
+    //@{
+    // These functions return parts of the decoded URI.  The returned
+    // strings are un-escaped as needed
 
-	 * @param query_map a map of name value. every value must be
-	 * representable as a string.
-	 * @return Returns an url query string of '?n1=v1&n2=v2&...'
-	 */
-	static std::string mapToQueryString(const LLSD& query_map);
+    // for all schemes
+    std::string scheme() const;     ///< ex.: "http", note lack of colon
+    std::string opaque() const;     ///< everything after the colon
 
-	/** @name Escaping Utilities */
-	//@{
-	/**
-	 * @brief 'Escape' symbol into stream
-	 *
-	 * @param ostr Output stream.
-	 * @param val Symbol to encode.
-	 */
-	static void encodeCharacter(std::ostream& ostr, std::string::value_type val);
+    // for schemes that follow path like syntax (http, https, ftp)
+    std::string authority() const;  // ex.: "user:pass@host.com:80"
+    std::string hostName() const;   // ex.: "host.com"
+    std::string hostNameAndPort() const; // ex.: "host.com:80"
+    std::string userName() const;
+    std::string password() const;
+    U16 hostPort() const;           // ex.: 80, will include implicit port
+    BOOL defaultPort() const;       // true if port is default for scheme
+    const std::string& escapedPath() const { return mEscapedPath; }
+    std::string path() const;       // ex.: "/abc/def", includes leading slash
+    LLSD pathArray() const;         // above decoded into an array of strings
+    std::string query() const;      // ex.: "x=34", section after "?"
+    const std::string& escapedQuery() const { return mEscapedQuery; }
+    LLSD queryMap() const;          // above decoded into a map
+    static LLSD queryMap(std::string escaped_query_string);
 
-	/**
-	 * @brief Escape the string passed except for unreserved
-	 *
-	 *  ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
-	 *  0123456789
-	 *  -._~
-	 *
-	 * @see http://www.ietf.org/rfc/rfc1738.txt
-	 *
-	 * @param str The raw URI to escape.
-	 * @return Returns the rfc 1738 escaped uri or an empty string.
-	 */
-	static std::string escape(const std::string_view str);
+    /**
+     * @brief given a name value map, return a serialized query string.
+     *
 
-	/**
-	 * @brief Escape a string with a specified set of allowed characters.
-	 *
-	 * Escape a string by urlencoding all the characters that aren't
-	 * in the allowed string.
-	 * @param str The raw URI to escape.
-	 * @param allowed Character array of allowed characters
-	 * @param is_allowed_sorted Optimization hint if allowed array is sorted.
-	 * @return Returns the escaped uri or an empty string.
-	 */
-	static std::string escape(
-		const std::string_view str,
-		const std::string_view allowed,
-		bool is_allowed_sorted = false);
+     * @param query_map a map of name value. every value must be
+     * representable as a string.
+     * @return Returns an url query string of '?n1=v1&n2=v2&...'
+     */
+    static std::string mapToQueryString(const LLSD& query_map);
 
-	/**
-	 * @brief Break string into data part and path or sheme
-	 * and escape path (if present) and data.
-	 * Data part is not allowed to have path related symbols
-	 * @param str The raw URI to escape.
-	 */
-	static std::string escapePathAndData(const std::string_view str);
+    /** @name Escaping Utilities */
+    //@{
+    /**
+     * @brief 'Escape' symbol into stream
+     *
+     * @param ostr Output stream.
+     * @param val Symbol to encode.
+     */
+    static void encodeCharacter(std::ostream& ostr, std::string::value_type val);
 
-	/**
-	 * @brief unescape an escaped URI string.
-	 *
-	 * @param str The escped URI to unescape.
-	 * @return Returns the unescaped uri or an empty string.
-	 */
-	static std::string unescape(const std::string_view str);
-	//@}
+    /**
+     * @brief Escape the string passed except for unreserved
+     *
+     *  ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
+     *  0123456789
+     *  -._~
+     *
+     * @see http://www.ietf.org/rfc/rfc1738.txt
+     *
+     * @param str The raw URI to escape.
+     * @return Returns the rfc 1738 escaped uri or an empty string.
+     */
+    static std::string escape(const std::string_view str);
+
+    /**
+     * @brief Escape a string with a specified set of allowed characters.
+     *
+     * Escape a string by urlencoding all the characters that aren't
+     * in the allowed string.
+     * @param str The raw URI to escape.
+     * @param allowed Character array of allowed characters
+     * @param is_allowed_sorted Optimization hint if allowed array is sorted.
+     * @return Returns the escaped uri or an empty string.
+     */
+    static std::string escape(
+        const std::string_view str,
+        const std::string_view allowed,
+        bool is_allowed_sorted = false);
+
+    /**
+     * @brief Break string into data part and path or sheme
+     * and escape path (if present) and data.
+     * Data part is not allowed to have path related symbols
+     * @param str The raw URI to escape.
+     */
+    static std::string escapePathAndData(const std::string_view str);
+
+    /**
+     * @brief unescape an escaped URI string.
+     *
+     * @param str The escped URI to unescape.
+     * @return Returns the unescaped uri or an empty string.
+     */
+    static std::string unescape(const std::string_view str);
+    //@}
 
 private:
-	 // only "http", "https", "ftp", and "secondlife" schemes are parsed
-	 // secondlife scheme parses authority as "" and includes it as part of
-	 // the path.  See lluri_tut.cpp
-	 // i.e. secondlife://app/login has mAuthority = "" and mPath = "/app/login"
-	void parseAuthorityAndPathUsingOpaque();
-	std::string mScheme;
-	std::string mEscapedOpaque;
-	std::string mEscapedAuthority;
-	std::string mEscapedPath;
-	std::string mEscapedQuery;
+     // only "http", "https", "ftp", and "secondlife" schemes are parsed
+     // secondlife scheme parses authority as "" and includes it as part of
+     // the path.  See lluri_tut.cpp
+     // i.e. secondlife://app/login has mAuthority = "" and mPath = "/app/login"
+    void parseAuthorityAndPathUsingOpaque();
+    std::string mScheme;
+    std::string mEscapedOpaque;
+    std::string mEscapedAuthority;
+    std::string mEscapedPath;
+    std::string mEscapedQuery;
 };
 
 // this operator required for tut

@@ -16,7 +16,7 @@ if (WINDOWS)
           debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}apriconv-1.lib
           optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}apriconv-1.lib
           debug ${ARCH_PREBUILT_DIRS_DEBUG}/${APR_selector}aprutil-1.lib
-	      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}aprutil-1.lib
+          optimized ${ARCH_PREBUILT_DIRS_RELEASE}/${APR_selector}aprutil-1.lib
           )
     target_compile_definitions( ll::apr INTERFACE APR_DECLARE_STATIC=1 APU_DECLARE_STATIC=1 API_DECLARE_STATIC=1)
 elseif (DARWIN)

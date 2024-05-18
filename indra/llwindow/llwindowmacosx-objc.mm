@@ -25,6 +25,7 @@
  * $/LicenseInfo$
  */
 
+#include <errno.h>
 #import "llopenglview-objc.h"
 #import "llwindowmacosx-objc.h"
 #import "llappdelegate-objc.h"

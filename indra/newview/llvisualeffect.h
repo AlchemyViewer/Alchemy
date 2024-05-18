@@ -19,7 +19,7 @@
 #include "llsingleton.h"
 
 // ============================================================================
-// 
+//
 //
 
 class LLRenderTarget;
@@ -30,14 +30,14 @@ class LLRenderTarget;
 
 enum class EVisualEffect
 {
-	RlvOverlay,
-	RlvSphere,
+    RlvOverlay,
+    RlvSphere,
 };
 
 enum class EVisualEffectType
 {
-	PostProcessShader,
-	Custom,
+    PostProcessShader,
+    Custom,
 };
 
 // ============================================================================
@@ -46,24 +46,24 @@ enum class EVisualEffectType
 
 struct LLVisualEffectParams
 {
-	virtual ~LLVisualEffectParams() = default;
-	virtual void step(bool isLast) = 0;
+    virtual ~LLVisualEffectParams() = default;
+    virtual void step(bool isLast) = 0;
 };
 
 struct LLShaderEffectParams final : LLVisualEffectParams
 {
-	explicit LLShaderEffectParams(LLRenderTarget* pSrcBuffer, LLRenderTarget* pScratchBuffer, bool fBindLast) : m_pSrcBuffer(pScratchBuffer), m_pDstBuffer(pSrcBuffer), m_fBindLast(fBindLast) {}
+    explicit LLShaderEffectParams(LLRenderTarget* pSrcBuffer, LLRenderTarget* pScratchBuffer, bool fBindLast) : m_pSrcBuffer(pScratchBuffer), m_pDstBuffer(pSrcBuffer), m_fBindLast(fBindLast) {}
 
-	void step(bool isLast) override
-	{
-		LLRenderTarget* pPrevSrc = m_pSrcBuffer, *pPrevDst = m_pDstBuffer;
-		m_pSrcBuffer = pPrevDst;
-		m_pDstBuffer = (!isLast || !m_fBindLast) ? pPrevSrc : nullptr;
-	}
+    void step(bool isLast) override
+    {
+        LLRenderTarget* pPrevSrc = m_pSrcBuffer, *pPrevDst = m_pDstBuffer;
+        m_pSrcBuffer = pPrevDst;
+        m_pDstBuffer = (!isLast || !m_fBindLast) ? pPrevSrc : nullptr;
+    }
 
-	LLRenderTarget* m_pSrcBuffer = nullptr;
-	LLRenderTarget* m_pDstBuffer = nullptr;
-	bool            m_fBindLast = false;
+    LLRenderTarget* m_pSrcBuffer = nullptr;
+    LLRenderTarget* m_pDstBuffer = nullptr;
+    bool            m_fBindLast = false;
 };
 
 // ============================================================================
@@ -72,34 +72,34 @@ struct LLShaderEffectParams final : LLVisualEffectParams
 
 class LLVisualEffect
 {
-	friend class LLVfxManager;
+    friend class LLVfxManager;
 public:
-	LLVisualEffect(LLUUID id, EVisualEffect eCode, EVisualEffectType eType)
-		: m_id(id), m_eCode(eCode), m_eType(eType)
-	{}
-	virtual ~LLVisualEffect() {}
+    LLVisualEffect(LLUUID id, EVisualEffect eCode, EVisualEffectType eType)
+        : m_id(id), m_eCode(eCode), m_eType(eType)
+    {}
+    virtual ~LLVisualEffect() {}
 
-	EVisualEffect     getCode() const     { return m_eCode;}
-	bool              getEnabled() const  { return m_fEnabled; }
-	const LLUUID&     getId() const       { return m_id;}
-	U32               getPriority() const { return m_nPriority; }
-	EVisualEffectType getType() const     { return m_eType;}
-	void              setEnabled(bool enable) { m_fEnabled = enable; }
+    EVisualEffect     getCode() const     { return m_eCode;}
+    bool              getEnabled() const  { return m_fEnabled; }
+    const LLUUID&     getId() const       { return m_id;}
+    U32               getPriority() const { return m_nPriority; }
+    EVisualEffectType getType() const     { return m_eType;}
+    void              setEnabled(bool enable) { m_fEnabled = enable; }
 
-	virtual void      run(const LLVisualEffectParams* pParams) = 0;
+    virtual void      run(const LLVisualEffectParams* pParams) = 0;
 
 protected:
-	void              setPriority(U32 priority) { m_nPriority = priority; }
+    void              setPriority(U32 priority) { m_nPriority = priority; }
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	LLUUID            m_id;
-	EVisualEffect     m_eCode;
-	EVisualEffectType m_eType;
-	bool              m_fEnabled = true;
-	U32               m_nPriority = 0;
+    LLUUID            m_id;
+    EVisualEffect     m_eCode;
+    EVisualEffectType m_eType;
+    bool              m_fEnabled = true;
+    U32               m_nPriority = 0;
 };
 
 // ============================================================================
@@ -110,46 +110,46 @@ template<typename T>
 class LLTweenableValue
 {
 public:
-	LLTweenableValue(const T& defaultValue) : m_CurValue(defaultValue) {}
-	virtual ~LLTweenableValue() = default;
+    LLTweenableValue(const T& defaultValue) : m_CurValue(defaultValue) {}
+    virtual ~LLTweenableValue() = default;
 
-	virtual T    get() = 0;
-	virtual void start(const T& endValue, double duration) = 0;
+    virtual T    get() = 0;
+    virtual void start(const T& endValue, double duration) = 0;
 
-	T& operator =(const T& value) { m_CurValue = value; }
+    T& operator =(const T& value) { m_CurValue = value; }
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	boost::optional<T> m_CurValue;
+    boost::optional<T> m_CurValue;
 };
 
 template<typename T>
 class LLTweenableValueLerp final : public LLTweenableValue<T>
 {
 public:
-	LLTweenableValueLerp(const T& defaultValue) : LLTweenableValue<T>(defaultValue) {}
+    LLTweenableValueLerp(const T& defaultValue) : LLTweenableValue<T>(defaultValue) {}
 
-	T    get() override;
-	void start(const T& endValue, double duration) override
-	{
-		m_StartValue = get();
-		this->m_CurValue = boost::none;
-		m_EndValue = endValue;
+    T    get() override;
+    void start(const T& endValue, double duration) override
+    {
+        m_StartValue = get();
+        this->m_CurValue = boost::none;
+        m_EndValue = endValue;
 
-		m_StartTime = LLTimer::getElapsedSeconds();
-		m_Duration = duration;
-	}
+        m_StartTime = LLTimer::getElapsedSeconds();
+        m_Duration = duration;
+    }
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	double m_StartTime;
-	double m_Duration;
-	T      m_StartValue;
-	T      m_EndValue;
+    double m_StartTime;
+    double m_Duration;
+    T      m_StartValue;
+    T      m_EndValue;
 };
 
 // ============================================================================
@@ -158,34 +158,34 @@ protected:
 
 class LLVfxManager final : public LLSingleton<LLVfxManager>
 {
-	LLSINGLETON(LLVfxManager);
+    LLSINGLETON(LLVfxManager);
 protected:
-	~LLVfxManager() = default;
+    ~LLVfxManager() = default;
 
-	/*
-	 * Member functions
-	 */
+    /*
+     * Member functions
+     */
 public:
-	bool            addEffect(LLVisualEffect* pEffectInst);
-	LLVisualEffect* getEffect(EVisualEffect eCode, const LLUUID& idEffect) const;
-	template<typename T> T* getEffect(const LLUUID& idEffect) const { return dynamic_cast<T*>(getEffect(T::EffectCode, idEffect)); }
-	bool            getEffects(std::list<LLVisualEffect*>& effectList, std::function<bool(const LLVisualEffect*)> fnFilter);
-	template<typename T> bool getEffects(std::list<T*>& effectList);
-	bool            hasEffect(EVisualEffect eCode) const;
-	bool            removeEffect(EVisualEffect eCode, const LLUUID& idEffect);
-	template<typename T> bool removeEffect(const LLUUID& idEffect) { return removeEffect(T::EffectCode, idEffect); }
-	void            runEffect(EVisualEffect eCode, LLVisualEffectParams* pParams = nullptr);
-	void            runEffect(EVisualEffectType eType, LLVisualEffectParams* pParams = nullptr);
-	void            updateEffect(LLVisualEffect* pEffect, bool fEnabled, U32 nPriority);
+    bool            addEffect(LLVisualEffect* pEffectInst);
+    LLVisualEffect* getEffect(EVisualEffect eCode, const LLUUID& idEffect) const;
+    template<typename T> T* getEffect(const LLUUID& idEffect) const { return dynamic_cast<T*>(getEffect(T::EffectCode, idEffect)); }
+    bool            getEffects(std::list<LLVisualEffect*>& effectList, std::function<bool(const LLVisualEffect*)> fnFilter);
+    template<typename T> bool getEffects(std::list<T*>& effectList);
+    bool            hasEffect(EVisualEffect eCode) const;
+    bool            removeEffect(EVisualEffect eCode, const LLUUID& idEffect);
+    template<typename T> bool removeEffect(const LLUUID& idEffect) { return removeEffect(T::EffectCode, idEffect); }
+    void            runEffect(EVisualEffect eCode, LLVisualEffectParams* pParams = nullptr);
+    void            runEffect(EVisualEffectType eType, LLVisualEffectParams* pParams = nullptr);
+    void            updateEffect(LLVisualEffect* pEffect, bool fEnabled, U32 nPriority);
 protected:
-	void            runEffect(std::function<bool(const LLVisualEffect*)> fnFilter, LLVisualEffectParams* pParams);
-	static bool     cmpEffect(const LLVisualEffect* pLHS, const LLVisualEffect* pRHS);
+    void            runEffect(std::function<bool(const LLVisualEffect*)> fnFilter, LLVisualEffectParams* pParams);
+    static bool     cmpEffect(const LLVisualEffect* pLHS, const LLVisualEffect* pRHS);
 
-	/*
-	 * Member variables
-	 */
+    /*
+     * Member variables
+     */
 protected:
-	std::vector<LLVisualEffect*> m_Effects;
+    std::vector<LLVisualEffect*> m_Effects;
 };
 
 // ============================================================================
@@ -194,26 +194,26 @@ protected:
 
 inline bool LLVfxManager::hasEffect(EVisualEffect eCode) const
 {
-	return m_Effects.end() != std::find_if(m_Effects.begin(), m_Effects.end(), [eCode](const LLVisualEffect* pEffect) { return pEffect->getCode() == eCode; });
+    return m_Effects.end() != std::find_if(m_Effects.begin(), m_Effects.end(), [eCode](const LLVisualEffect* pEffect) { return pEffect->getCode() == eCode; });
 }
 
 template<typename T>
 inline bool LLVfxManager::getEffects(std::list<T*>& effectList)
 {
-	effectList.clear();
+    effectList.clear();
 
-	std::function<bool(const LLVisualEffect*)> fnFilter = [](const LLVisualEffect* pEffect) { return pEffect->getCode() == T::EffectCode; };
-	auto itEffect = boost::make_filter_iterator(fnFilter, m_Effects.begin(), m_Effects.end()),
-	     endEffect = boost::make_filter_iterator(fnFilter, m_Effects.end(), m_Effects.end());
-	while (itEffect != endEffect)
-	{
-		if (T* pEffect = dynamic_cast<T*>(*itEffect++))
-		{
-			effectList.push_back(pEffect);
-		}
-	}
+    std::function<bool(const LLVisualEffect*)> fnFilter = [](const LLVisualEffect* pEffect) { return pEffect->getCode() == T::EffectCode; };
+    auto itEffect = boost::make_filter_iterator(fnFilter, m_Effects.begin(), m_Effects.end()),
+         endEffect = boost::make_filter_iterator(fnFilter, m_Effects.end(), m_Effects.end());
+    while (itEffect != endEffect)
+    {
+        if (T* pEffect = dynamic_cast<T*>(*itEffect++))
+        {
+            effectList.push_back(pEffect);
+        }
+    }
 
-	return effectList.size();
+    return effectList.size();
 }
 
 // ============================================================================

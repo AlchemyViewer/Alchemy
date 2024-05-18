@@ -39,18 +39,18 @@ class LLSearchEditor;
 class LLPanelSearchEvents : public LLPanelSearch
 {
 public:
-	LLPanelSearchEvents();
-	/*virtual*/ BOOL postBuild() override;
-	
+    LLPanelSearchEvents();
+    /*virtual*/ BOOL postBuild() override;
+
 private:
-	/*virtual*/ void onCommitSearch(LLUICtrl* ctrl) override;
-	/*virtual*/ void search() override;
-	void setDate(S32 day);
-	void addDay();
-	void minusDay();
-	
-	S32 mDate;
-	LLSearchEditor* mSearchEditor;
+    /*virtual*/ void onCommitSearch(LLUICtrl* ctrl) override;
+    /*virtual*/ void search() override;
+    void setDate(S32 day);
+    void addDay();
+    void minusDay();
+
+    S32 mDate;
+    LLSearchEditor* mSearchEditor;
 };
 
 #endif // LL_PANELSEARCHEVENTS_H

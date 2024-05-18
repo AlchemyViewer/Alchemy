@@ -36,36 +36,36 @@
 class ALUnZip
 {
 public:
-	ALUnZip(const std::string& filename);
-	~ALUnZip();
-	
-	/* ===============================================================
-	 * @name Archive manipulation functions
-	 * @{
-	 */
-	
-	/// Extracts the archive to a filesystem path
-	bool extract(const std::string& path);
-	
-	/// Extracts a single file from the archive into a memory buffer
-	bool extractFile(const std::string& file_to_extract, char *buf, size_t bufsize);
-	
-	/// Returns the uncompressed size of a file within the archive
-	size_t getSizeFile(const std::string& file_to_size);
-	
-	/// Returns true if the archive is valid
-	bool isValid() { return mValid; }
-	
-	//@}
-	
+    ALUnZip(const std::string& filename);
+    ~ALUnZip();
+
+    /* ===============================================================
+     * @name Archive manipulation functions
+     * @{
+     */
+
+    /// Extracts the archive to a filesystem path
+    bool extract(const std::string& path);
+
+    /// Extracts a single file from the archive into a memory buffer
+    bool extractFile(const std::string& file_to_extract, char *buf, size_t bufsize);
+
+    /// Returns the uncompressed size of a file within the archive
+    size_t getSizeFile(const std::string& file_to_size);
+
+    /// Returns true if the archive is valid
+    bool isValid() { return mValid; }
+
+    //@}
+
 private:
-	unzFile open(const std::string& filename);
-	void close();
-	S32 extractCurrentFile(const std::string& path);
-	
-	unzFile mZipfile;
-	std::string mFilename;
-	bool mValid;
+    unzFile open(const std::string& filename);
+    void close();
+    S32 extractCurrentFile(const std::string& path);
+
+    unzFile mZipfile;
+    std::string mFilename;
+    bool mValid;
 };
 
 #endif // LL_UNZIP_H

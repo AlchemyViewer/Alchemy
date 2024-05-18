@@ -43,57 +43,57 @@
 static LLPanelInjector<LLPanelSearchGroups> t_panel_search_groups("panel_search_groups");
 
 LLPanelSearchGroups::LLPanelSearchGroups()
-	: LLPanelSearch()
-	, mSearchEditor(nullptr)
+    : LLPanelSearch()
+    , mSearchEditor(nullptr)
 {
-	mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchGroups::onCommitSearch, this, _1));
+    mCommitCallbackRegistrar.add("Search.query", boost::bind(&LLPanelSearchGroups::onCommitSearch, this, _1));
 }
 
 BOOL LLPanelSearchGroups::postBuild()
 {
-	mSearchEditor = getChild<LLSearchEditor>("search_bar");
-	//mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchGroups::onCommitSearch, this, _1));
-	
-	return TRUE;
+    mSearchEditor = getChild<LLSearchEditor>("search_bar");
+    //mSearchEditor->setKeystrokeCallback(boost::bind(&LLPanelSearchGroups::onCommitSearch, this, _1));
+
+    return TRUE;
 }
 
 void LLPanelSearchGroups::onCommitSearch(LLUICtrl* ctrl)
 {
-	LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
-	if (pSearchEditor)
-	{
-		std::string text = pSearchEditor->getText();
-		LLStringUtil::trim(text);
-		if (text.length() <= MIN_SEARCH_STRING_SIZE)
-			LLSearchHistory::getInstance()->addEntry(text);
-	}
-	search();
+    LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
+    if (pSearchEditor)
+    {
+        std::string text = pSearchEditor->getText();
+        LLStringUtil::trim(text);
+        if (text.length() <= MIN_SEARCH_STRING_SIZE)
+            LLSearchHistory::getInstance()->addEntry(text);
+    }
+    search();
 }
 
 void LLPanelSearchGroups::search()
 {
-	LLDirQuery query;
-	query.type = SE_GROUPS;
-	query.results_per_page = 100;
-	query.text = mSearchEditor->getText();
-	LLStringUtil::trim(query.text);
-	
-	static LLUICachedControl<bool> inc_pg("ShowPGGroups", true);
-	static LLUICachedControl<bool> inc_mature("ShowMatureGroups", false);
-	static LLUICachedControl<bool> inc_adult("ShowAdultGroups", false);
-	if (!(inc_pg || inc_mature || inc_adult))
-	{
-		LLNotificationsUtil::add("NoContentToSearch");
-		return;
-	}
+    LLDirQuery query;
+    query.type = SE_GROUPS;
+    query.results_per_page = 100;
+    query.text = mSearchEditor->getText();
+    LLStringUtil::trim(query.text);
 
-	if (inc_pg)
-		query.scope |= DFQ_INC_PG;
-	if (inc_mature && gAgent.canAccessMature())
-		query.scope |= DFQ_INC_MATURE;
-	if (inc_adult && gAgent.canAccessAdult())
-		query.scope |= DFQ_INC_ADULT;
-	query.scope |= DFQ_GROUPS;
-	
-	mFloater->queryDirectory(query, true);
+    static LLUICachedControl<bool> inc_pg("ShowPGGroups", true);
+    static LLUICachedControl<bool> inc_mature("ShowMatureGroups", false);
+    static LLUICachedControl<bool> inc_adult("ShowAdultGroups", false);
+    if (!(inc_pg || inc_mature || inc_adult))
+    {
+        LLNotificationsUtil::add("NoContentToSearch");
+        return;
+    }
+
+    if (inc_pg)
+        query.scope |= DFQ_INC_PG;
+    if (inc_mature && gAgent.canAccessMature())
+        query.scope |= DFQ_INC_MATURE;
+    if (inc_adult && gAgent.canAccessAdult())
+        query.scope |= DFQ_INC_ADULT;
+    query.scope |= DFQ_GROUPS;
+
+    mFloater->queryDirectory(query, true);
 }

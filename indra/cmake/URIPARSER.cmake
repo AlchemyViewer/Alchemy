@@ -15,7 +15,7 @@ if (WINDOWS)
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/uriparser.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/uriparser.lib)
 elseif (LINUX)
-    target_link_libraries( ll::uriparser INTERFACE 
+    target_link_libraries( ll::uriparser INTERFACE
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/liburiparser.a
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/liburiparser.a)
 elseif (DARWIN)
