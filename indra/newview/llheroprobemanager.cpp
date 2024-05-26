@@ -193,19 +193,11 @@ void LLHeroProbeManager::update()
             // Iterate through each face of the cube
             for (int i = 0; i < 6; i++)
             {
-                float cube_facing = fmax(-1, fmin(1.0f, cameraDirection * cubeFaces[i])) * 0.6 + 0.4;
+                float cube_facing = fmax(-1, fmin(1.0f, cameraDirection * cubeFaces[i]));
 
-                float updateRate;
-                if (cube_facing < 0.1f)
-                {
-                    updateRate = 0;
-                }
-                else
-                {
-                    updateRate = ceilf(cube_facing * gPipeline.RenderHeroProbeConservativeUpdateMultiplier);
-                }
+                cube_facing = 1 - cube_facing;
 
-                mFaceUpdateList[i] = updateRate;
+                mFaceUpdateList[i] = ceilf(cube_facing * gPipeline.RenderHeroProbeConservativeUpdateMultiplier);
             }
         }
         else
@@ -224,7 +216,7 @@ void LLHeroProbeManager::update()
     static LLCachedControl<S32> sDetail(gSavedSettings, "RenderHeroReflectionProbeDetail", -1);
     static LLCachedControl<S32> sLevel(gSavedSettings, "RenderHeroReflectionProbeLevel", 3);
 
-    if (mNearestHero != nullptr)
+    if (mNearestHero != nullptr && (gPipeline.RenderHeroProbeUpdateRate == 0 || (gFrameCount % gPipeline.RenderHeroProbeUpdateRate) == 0))
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("hpmu - realtime");
         // Probe 0 is always our mirror probe.
@@ -585,8 +577,6 @@ void LLHeroProbeManager::cleanup()
 
     mDefaultProbe = nullptr;
     mUpdatingProbe = nullptr;
-    /*
-    */
 }
 
 void LLHeroProbeManager::doOcclusion()
