@@ -553,7 +553,7 @@ Account: [ACCTTYPE]
      image_selected="ClipboardMenu_Press"
      image_unselected="ClipboardMenu_Off"
      layout="topleft"
-     left_delta="278"
+     left_pad="9"
      name="clipboard_avatar_params"
      tool_tip="Paste options"
      width="22"/>
