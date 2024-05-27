@@ -1865,7 +1865,7 @@ void LLVOCache::removeGenericExtrasForHandle(U64 handle)
     {
         //shouldn't happen, but if it does, we should remove the extras file since it's orphaned
         LL_WARNS("GLTF", "VOCache") << "Removing generic extras for handle " << entry->mHandle << "Filename: " << getObjectCacheExtrasFilename(handle) << LL_ENDL;
-        LLFile::remove(getObjectCacheExtrasFilename(entry->mHandle));
+        LLFile::remove(getObjectCacheExtrasFilename(handle));
     }
 }
 
