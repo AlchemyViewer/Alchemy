@@ -36,5 +36,5 @@
 	<button label="ローカルで停止" name="stop_locally_btn"/>
 	<button label="見る" name="look_at_btn"/>
 	<button label="停止" name="stop_btn"/>
-	<button label="ブラックリスト" name="bl_btn"/>
+	<button label="ブロック" name="block_btn"/>
 </floater>

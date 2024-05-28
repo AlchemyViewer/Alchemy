@@ -4,7 +4,7 @@
 		<menu_item_call label="プロフィール…" name="Profile"/>
 		<menu_item_check label="インベントリ…" name="Inventory"/>
 		<menu_item_call label="新しいインベントリウィンドウ" name="NewInventoryWindow"/>
-		<menu_item_call label="場所…" name="Places"/>
+		<menu_item_check label="場所…" name="Places"/>
 		<menu_item_call label="ピック…" name="Picks"/>
 		<menu_item_call label="体験…" name="Experiences"/>
 		<menu_item_separator/>
@@ -58,6 +58,7 @@
 			<menu label="取り外す" name="Avatar Detach"/>
 			<menu_item_call label="全てを取り外す" name="Detach All"/>
 		</menu>
+		<menu_item_call label="選択された装着物を取り外す" name="Remove Selected Attachments" />
 		<menu_item_separator/>
 		<menu_item_call label="アバターを選択…" name="Avatar Picker"/>
 		<menu_item_separator/>
@@ -123,6 +124,11 @@
 		<menu_item_separator/>
 		<menu_item_call label="スナップショット" name="Take Snapshot"/>
 		<menu_item_call label="３６０度スナップショット" name="Capture 360"/>
+		<menu label="ズームレベル" name="Zoom menu">
+			<menu_item_call label="ズームアウト" name="Zoom Out" />
+			<menu_item_call label="デフォルト" name="Zoom Default"/>
+			<menu_item_call label="ズームイン" name="Zoom In"/>
+		</menu>
 		<menu_item_separator/>
 		<menu_item_call label="場所のプロフィール" name="Place Profile"/>
 		<menu_item_call label="土地情報" name="About Land"/>
@@ -371,7 +377,7 @@
 			<menu_item_check label="アルファマスク" name="Rendering Type Alpha Mask"/>
 			<menu_item_check label="明るさ全開のアルファマスク" name="Rendering Type Fullbright Alpha Mask"/>
 			<menu_item_check label="グロー" name="Rendering Type Glow"/>
-			<menu_item_check label="明るさ全開" name="Rendering Type Fullbright"/>
+			<menu_item_check label="明るさ全開" name="Rendering Type Glow" />
 			<menu_item_check label="アルファ" name="Rendering Type Alpha"/>
 			<menu_item_check label="樹木" name="Rendering Type Tree"/>
 			<menu_item_check label="アバター" name="Rendering Type Character"/>
