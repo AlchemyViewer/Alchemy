@@ -871,17 +871,17 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
             resY *= RenderResolutionMultiplier;
         }
         // [/SL:KB]
+    }
 
-            // remember these dimensions
-        mRT->width = resX;
-        mRT->height = resY;
+    // remember these dimensions
+    mRT->width = resX;
+    mRT->height = resY;
 
-        if (RenderUIBuffer)
+    if (RenderUIBuffer && !gCubeSnapshot)
+    {
+        if (!mRT->uiScreen.allocate(resX, resY, GL_RGBA))
         {
-            if (!mRT->uiScreen.allocate(resX, resY, GL_RGBA))
-            {
-                return false;
-            }
+            return false;
         }
     }
 
