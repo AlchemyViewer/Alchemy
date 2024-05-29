@@ -837,7 +837,6 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
 
         gCubeSnapshot = TRUE;
         mReflectionMapManager.initReflectionMaps();
-        mHeroProbeManager.initReflectionMaps();
 
         mRT = &mAuxillaryRT;
         U32 res = mReflectionMapManager.mProbeResolution * 4;  //multiply by 4 because probes will be 16x super sampled
@@ -1248,6 +1247,8 @@ void LLPipeline::releaseScreenBuffers()
     mPostHelperMap.release();
     mSceneMap.release();
     mWaterDis.release();
+
+    mHeroProbeManager.cleanup();
 }
 
 void LLPipeline::releaseSunShadowTarget(U32 index)
