@@ -4,9 +4,9 @@
 		<!--Image Panel-->
 		<panel label="画像" name="colortone_settings">
 			<!--LUT Control-->
-			<text tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。カスタムＬＵＴには完全なファイル名が必要です！" value="有効なＬＵＴ："/>
+			<text tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテーブル）を指定します。カスタムＬＵＴには完全なファイル名が必要です！" value="有効なＬＵＴ："/>
 			<!--TODO: Make more flexible?-->
-			<combo_box tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテクスチャ）を指定します。カスタムＬＵＴには完全なファイル名が必要です！" name="colorlut_combo">
+			<combo_box tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテーブル）を指定します。カスタムＬＵＴには完全なファイル名が必要です！" name="colorlut_combo">
 				<combo_box.item label="なし" name="lut_none" value=""/>
 				<combo_box.item label="ナチュラル" name="lut_neutral" value="NeutralLUT.png"/>
 				<combo_box.item label="クロスプロセス‐暖色" name="lut_xprocess_warm" value="CrossWarm.png"/>
@@ -36,15 +36,15 @@
 			</combo_box>
 			<view_border name="cost_text_border"/>
 			<!--Sharpen Controls-->
-			<text tool_tip="使用する先鋭化方法を指定します。" value="先鋭化："/>
-			<combo_box allow_text_entry="false" tool_tip="使用する先鋭化方法を指定します。" name="sharpenmethod_combo">
+			<text tool_tip="使用する鮮鋭化のアルゴリズムを指定します。" value="鮮鋭化："/>
+			<combo_box allow_text_entry="false" tool_tip="使用する鮮鋭化のアルゴリズムを指定します。" name="sharpenmethod_combo">
 				<combo_box.item label="なし" name="sharp_none" value="0"/>
 				<combo_box.item label="ＣＡＳ" name="sharp_cas" value="1"/>
 				<combo_box.item label="ＤＬＳ" name="sharp_DLS" value="2"/>
 			</combo_box>
 			<slider name="sharp_strength_slider"/>
 			<spinner name="sharp_strength_spinner"/>
-			<text name="sharp_dynamic_text" value="コントラスト："/>
+			<text name="sharp_dynamic_text" value="輝度："/>
 			<slider name="sharp_dynamic_slider"/>
 			<spinner name="sharp_dynamic_spinner"/>
 			<button name="sharpen_default_btn"/>
@@ -57,7 +57,7 @@
 				<combo_box.item label="アンチャーテッド" name="toneUncharted" value="4"/>
 			</combo_box>
 			<button name="exposure_default_btn" label="リセット"/>
-			<text tool_tip="トーンマッパーを介して画像全体の明るさを調整します。" value="露光："/>
+			<text tool_tip="トーンマッパーを介した画像全体の明るさを調整します。" value="露光："/>
 			<slider_bar name="exposure_slider" tool_tip="トーンマッパーを介して画像全体の明るさを調整します。"/>
 			<spinner name="exposure_spinner" tool_tip="トーンマッパーを介して画像全体の明るさを調整します。"/>
 			<text name="tonemapper_dynamic_text1" value="トーンマップＤ１："/>
@@ -108,9 +108,9 @@
 			</combo_box>
 			<!--Probe Draw Distance-->
 			<!--
-			<text tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。" value="プローブの描画距離："/>
-			<slider_bar name="probeDist_slider" tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。"/>
-			<spinner name="probeDist_spinner" tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほどシーンに対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。"/>
+			<text tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほど場面に対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。" value="プローブの描画距離："/>
+			<slider_bar name="probeDist_slider" tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほど場面に対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。"/>
+			<spinner name="probeDist_spinner" tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほど場面に対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。"/>
 			-->
 			<view_border name="cost_text_border"/>
 			<!--Anti-Aliasing-->
@@ -134,9 +134,9 @@
 			</combo_box>
 			<!--Resolution Scale-->
 			<!--TODO: Disable if AA is also disabled. This option causes broken rendering otherwise! Bug maybe?-->
-			<text tool_tip="（デフォルト：1.0）［危険］内部レンダリング解像度スケール。画像の先鋭化はこの設定とあまり相互作用しないため、最良の結果を得るには無効にしてください。" value="解像度スケール："/>
-			<slider_bar name="resMult_slider" tool_tip="（デフォルト：1.0）［危険］内部レンダリング解像度スケール。画像の先鋭化はこの設定とあまり相互作用しないため、最良の結果を得るには無効にしてください。"/>
-			<spinner name="resMult_spinner" tool_tip="（デフォルト：1.0）［危険］内部レンダリング解像度スケール。画像の先鋭化はこの設定とあまり相互作用しないため、最良の結果を得るには無効にしてください。"/>
+			<text tool_tip="（デフォルト：1.0）［危険］内部レンダリング解像度スケールを指定します。画像の鮮鋭化はこの設定とあまり相互作用しないため、最良の結果を得るには無効にしてください。" value="解像度スケール："/>
+			<slider_bar name="resMult_slider" tool_tip="（デフォルト：1.0）［危険］内部レンダリング解像度スケールを指定します。画像の鮮鋭化はこの設定とあまり相互作用しないため、最良の結果を得るには無効にしてください。"/>
+			<spinner name="resMult_spinner" tool_tip="（デフォルト：1.0）［危険］内部レンダリング解像度スケールを指定します。画像の鮮鋭化はこの設定とあまり相互作用しないため、最良の結果を得るには無効にしてください。"/>
 			<!--Draw Distance-->
 			<text value="描画距離："/>
 			<slider_bar name="draw_dist_slider_bar"/>
@@ -177,9 +177,9 @@
 			<!--TODO: While this option is exceptionally powerful, this option as-is is extremely dangerous!
 								Login-crash dangerous on anything lower than a 1080Ti. Either needs to be limited via reported
 								VRAM and/or GPU String, or this value needs to be flagged as temporary!-->
-			<text tool_tip="シャドウマップ解像度の乗数。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！" value="影の解像度： "/>
-			<slider_bar name="shadowres_slider" tool_tip="シャドウマップ解像度の乗数。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！"/>
-			<spinner name="shadowres_spinner" tool_tip="シャドウマップ解像度の乗数。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！"/>
+			<text tool_tip="シャドウマップ解像度の乗数を指定します。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！" value="影の解像度： "/>
+			<slider_bar name="shadowres_slider" tool_tip="シャドウマップ解像度の乗数を指定します。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！"/>
+			<spinner name="shadowres_spinner" tool_tip="シャドウマップ解像度の乗数を指定します。安全制限を無効にするには、数値入力を使用します。特にＶＲＡＭが制限されたシステムでは、高い乗数を使用するとＧＰＵドライバーが過負荷になり、クラッシュする可能性があります！"/>
 			<button name="shadowRes_default_btn"/>
 			<!--Shadow Bias-->
 			<text tool_tip="影の原点に近すぎる面を無視することで、セルフシャドウイングエラーを減らします。 値を小さくすると、より多くのシャドウエラーが発生しますが、より細かく正確な影が可能になります。" value="影のバイアス："/>
@@ -202,9 +202,9 @@
 			<spinner name="shadow_spotoffset_spinner" tool_tip="プロジェクターのシャドウマップ全体をオフセットすることでシャドウエラーを減らすために使用されます。値を小さくすると、より正確な影が得られ、光源から極端な角度でシャドウエラーが発生する可能性がありますが、薄いオブジェクトからの光のにじみが少なくなります。"/>
 			<button name="spotOffset_default_btn"/>
 			<!--Shadow/SSAO Blur-->
-			<text tool_tip="影とＳＳＡＯのブラーの両方を制御します。 値が低いと、ＳＳＡＯノイズが目立つ場合があります。" value="影のブラー："/>
-			<slider_bar name="shadow_blur_slider" tool_tip="影とＳＳＡＯのブラーの両方を制御します。 値が低いと、ＳＳＡＯノイズが目立つ場合があります。"/>
-			<spinner name="shadow_blur_spinner" tool_tip="影とＳＳＡＯのブラーの両方を制御します。 値が低いと、ＳＳＡＯノイズが目立つ場合があります。"/>
+			<text tool_tip="影とＳＳＡＯのブラーの両方を制御します。値が低いと、ＳＳＡＯノイズが目立つ場合があります。" value="影のブラー："/>
+			<slider_bar name="shadow_blur_slider" tool_tip="影とＳＳＡＯのブラーの両方を制御します。値が低いと、ＳＳＡＯノイズが目立つ場合があります。"/>
+			<spinner name="shadow_blur_spinner" tool_tip="影とＳＳＡＯのブラーの両方を制御します。値が低いと、ＳＳＡＯノイズが目立つ場合があります。"/>
 			<button name="blur_default_btn"/>
 			<!--Blur Distance-->
 			<text tool_tip="ブラーを発生させるカメラからの距離を制御します。値を大きくすると、カメラ付近のブラーが軽減されます。影ブラーを下げたときにＳＳＡＯノイズが発生した場合は、これを影の鮮明化に使用してみてください！" value="ブラー距離："/>
@@ -223,9 +223,9 @@
 			<spinner name="ssao_strength_spinner" tool_tip="ＳＳＡＯのＨＳＶ変換の彩度を制御します。"/>
 			<button name="ssaoStrength_default_btn"/>
 			<!--SSAO Factor-->
-			<text tool_tip="オクルージョン感度係数。大きい＝多く" value="ＳＳＡＯファクター："/>
-			<slider_bar name="ssao_factor_slider" tool_tip="オクルージョン感度係数。大きい＝多く"/>
-			<spinner name="ssao_factor_spinner" tool_tip="オクルージョン感度係数。大きい＝多く"/>
+			<text tool_tip="オクルージョン感度係数を指定します。大きい＝多く" value="ＳＳＡＯファクター："/>
+			<slider_bar name="ssao_factor_slider" tool_tip="オクルージョン感度係数を指定します。大きい＝多く"/>
+			<spinner name="ssao_factor_spinner" tool_tip="オクルージョン感度係数を指定します。大きい＝多く"/>
 			<button name="ssaoFactor_default_btn"/>
 			<!--SSAO Scale-->
 			<text tool_tip="オクルージョンをチェックするサーフェスからの距離を決定します。高い＝オクルージョンが広い　注：値を大きくすると、アーティファクトが生じる可能性があります。" value="ＳＳＡＯスケール："/>
@@ -243,9 +243,9 @@
 			<!--Glow Toggle-->
 			<check_box label="グローシェーダーの使用" tool_tip="グロー切り替え（レンダラーがリロードされます！）"/>
 			<!--Glow Iterations-->
-			<text tool_tip="使用するグローシェーダのパスの数。パスが増えると、全体的に強くなり、柔らかくなり、幅が広くなり、レンダリングが遅くなります。" value="反復数："/>
-			<slider_bar name="glow_iteration_slider" tool_tip="使用するグローシェーダのパスの数。パスが増えると、全体的に強くなり、柔らかくなり、幅が広くなり、レンダリングが遅くなります。"/>
-			<spinner name="glow_iteration_spinner" tool_tip="使用するグローシェーダのパスの数。パスが増えると、全体的に強くなり、柔らかくなり、幅が広くなり、レンダリングが遅くなります。"/>
+			<text tool_tip="使用するグローシェーダのパスの数を指定します。パスが増えると、全体的に強くなり、柔らかくなり、幅が広くなり、レンダリングが遅くなります。" value="反復数："/>
+			<slider_bar name="glow_iteration_slider" tool_tip="使用するグローシェーダのパスの数を指定します。パスが増えると、全体的に強くなり、柔らかくなり、幅が広くなり、レンダリングが遅くなります。"/>
+			<spinner name="glow_iteration_spinner" tool_tip="使用するグローシェーダのパスの数を指定します。パスが増えると、全体的に強くなり、柔らかくなり、幅が広くなり、レンダリングが遅くなります。"/>
 			<button name="glowIteration_default_btn"/>
 			<!--Glow Resolution-->
 			<text tool_tip="グローの全体的な解像度。値を高くするとより広範囲のグローが可能になります。最高の効果を得るには、他のグロー設定と組み合わせて使用します。" value="解像度："/>
@@ -253,9 +253,9 @@
 			<spinner name="glow_resPow_spinner" tool_tip="グローの全体的な解像度。値を高くするとより広範囲のグローが可能になります。最高の効果を得るには、他のグロー設定と組み合わせて使用します。"/>
 			<button name="glowRes_default_btn"/>
 			<!--Glow Strength-->
-			<text tool_tip="グローシェーダーの全体的な強さ。" value="強度："/>
-			<slider_bar name="glow_strength_slider" tool_tip="グローシェーダーの全体的な強さ。"/>
-			<spinner name="glow_strength_spinner" tool_tip="グローシェーダーの全体的な強さ。"/>
+			<text tool_tip="グローシェーダーの全体的な強さを指定します。" value="強度："/>
+			<slider_bar name="glow_strength_slider" tool_tip="グローシェーダーの全体的な強さを指定します。"/>
+			<spinner name="glow_strength_spinner" tool_tip="グローシェーダーの全体的な強さを指定します。"/>
 			<button name="glowStrength_default_btn"/>
 			<!--Glow Softness-->
 			<text tool_tip="グローの柔らかさまたは幅。サイズが大きくなると最終的にピクセル化されます。" value="柔らかさ："/>
@@ -268,13 +268,13 @@
 			<!--DOF Toggle-->
 			<!--TODO: Disable sliders if disabled?-->
 			<check_box label="被写体深度" tool_tip="被写体深度の切り替え"/>
-			<check_box label="マウスに追従" tool_tip="ＤｏＦのフォーカス ポイントがマウスカーソルに追従できるようにします。"/>
-			<check_box label="フォーカスをロック（Alt＋Shift＋X）" tool_tip="ＤｏＦの現在のフォーカスポイントをロックします。"/>
+			<check_box label="マウスに追従" tool_tip="ＤｏＦの焦点がマウスカーソルに追従するようにします。"/>
+			<check_box label="焦点をロック（Alt＋Shift＋X）" tool_tip="ＤｏＦの現在の焦点をロックします。"/>
 			<check_box label="前景のブラーを有効化" tool_tip="このオプションは、被写界深度使用時に前景のぼかしを切り替えるもので、必要に応じて背景のみをぼかすことができます。" name="RenderDepthOfFieldFront"/>
 			<!--DOF Resolution-->
 			<!--TODO: Ensure this setting is temporary? Large CoC @ Full Res has caused Login-Crashes on other viewers, even on high end GPUs!-->
-			<text tool_tip="被写界深度（ＤｏＦ）のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" value="ＤｏＦ解像度："/>
-			<combo_box tool_tip="被写界深度（ＤｏＦ）のレンダリングに使用する画面解像度の割合。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" name="dof_res_combo">
+			<text tool_tip="被写界深度（ＤｏＦ）のレンダリングに使用する画面解像度の割合を指定します。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" value="ＤｏＦ解像度："/>
+			<combo_box tool_tip="被写界深度（ＤｏＦ）のレンダリングに使用する画面解像度の割合を指定します。注：フル解像度の使用時にＤｏＦが激しくなると、ビューアが応答しなくなる可能性があります。" name="dof_res_combo">
 				<combo_box.item label="１／４" name="dof_quarterres" value="0.25"/>
 				<combo_box.item label="１／２" name="dof_halfres" value="0.5"/>
 				<combo_box.item label="３／４" name="dof_threefourthres" value="0.7"/>
@@ -291,20 +291,20 @@
 			<spinner name="dof_fstop_spinner" tool_tip="シミュレートされたカメラの絞りｆ値。ｆストップが小さいほど、焦点範囲が狭くなります。大きくすると焦点範囲が広がります。"/>
 			<button name="dofFNumber_default_btn" follows="top|right"/>
 			<!--Focal Length-->
-			<text tool_tip="シミュレートされたカメラの焦点距離。" value="焦点距離（㎜）："/>
-			<slider_bar name="dof_length_slider" tool_tip="シミュレートされたカメラの焦点距離"/>
-			<spinner name="dof_length_spinner" tool_tip="シミュレートされたカメラの焦点距離"/>
+			<text tool_tip="シミュレートされたカメラの焦点距離を指定します。" value="焦点距離（㎜）："/>
+			<slider_bar name="dof_length_slider" tool_tip="シミュレートされたカメラの焦点距離を指定します。"/>
+			<spinner name="dof_length_spinner" tool_tip="シミュレートされたカメラの焦点距離を指定します。"/>
 			<button name="dofFocal_default_btn"/>
 			<!--Circle of Confusion-->
 			<!--TODO: This can get dangerous on low-end machines! See DoF Resolution-->
-			<text tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアまたはシステムが応答しなくなる可能性があります。" value="最大錯乱円："/>
-			<slider_bar name="dof_coc_slider" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアまたはシステムが応答しなくなる可能性があります。"/>
-			<spinner name="dof_coc_spinner" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアまたはシステムが応答しなくなる可能性があります。"/>
+			<text tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度を指定します。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアまたはシステムが応答しなくなる可能性があります。" value="最大錯乱円："/>
+			<slider_bar name="dof_coc_slider" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度を指定します。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアまたはシステムが応答しなくなる可能性があります。"/>
+			<spinner name="dof_coc_spinner" tool_tip="錯乱円。焦点が合っていないオブジェクトのぼかし強度を指定します。これにより、適用されるブラーの量が制限されます。値を高くすると、焦点の合っていないオブジェクトが柔らかくなりますが、ビューアまたはシステムが応答しなくなる可能性があります。"/>
 			<button name="dofCOF_default_btn"/>
 			<!--Focus Transition Time-->
-			<text tool_tip="カメラが新しい焦点に移動するまでにかかる時間。" value="遷移時間（秒）："/>
-			<slider_bar name="dof_focaltime_slider" tool_tip="カメラが新しい焦点に移動するまでにかかる時間。"/>
-			<spinner name="dof_focaltime_spinner" tool_tip="カメラが新しい焦点に移動するまでにかかる時間。"/>
+			<text tool_tip="カメラが新しい焦点に移動するまでにかかる時間を指定します。" value="遷移時間（秒）："/>
+			<slider_bar name="dof_focaltime_slider" tool_tip="カメラが新しい焦点に移動するまでにかかる時間を指定します。"/>
+			<spinner name="dof_focaltime_spinner" tool_tip="カメラが新しい焦点に移動するまでにかかる時間を指定します。"/>
 			<button name="dofTime_default_btn"/>
 		</panel>
 	</tab_container>

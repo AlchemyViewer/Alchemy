@@ -127,7 +127,7 @@
 				取得日時：
 			</text>
 			<text name="DateClaimText">
-				2006年8月15日火曜日　13：47：25
+				2006年8月15日（火曜日）　13：47：25
 			</text>
 			<text name="PriceLabel">
 				面積：
@@ -178,7 +178,7 @@
 				この不動産には約款がありません。
 			</text_editor>
 			<text name="covenant_timestamp_text">
-				最後更新：1969年12月31日水曜日　16：00：00
+				最後更新：1969年12月31日（水曜日）　16：00：00
 			</text>
 			<text name="region_section_lbl">
 				リージョン名：
@@ -208,7 +208,7 @@
 				再分割：
 			</text>
 			<text name="changeable_clause">
-				このリージョンにある土地は統合または分割ができないことがあります。
+				このリージョンにある土地は、結合または分割ができないことがあります。
 			</text>
 		</panel>
 		<panel label="オブジェクト" name="land_objects_panel">
@@ -219,7 +219,7 @@
 				全[MAX]個中[COUNT]個（[DELETED]個を削除しました）
 			</panel.string>
 			<text name="parcel_object_bonus">
-				オブジェクトボーナス：[BONUS]個
+				オブジェクトボーナス：[BONUS]倍
 			</text>
 			<text name="Simulator primitive usage:" width="364">
 				リージョン全体の最大プリム数：
@@ -246,7 +246,7 @@
 				[COUNT]個
 			</text>
 			<button label="表示" label_selected="表示" name="ShowOwner"/>
-			<button label="返却" name="ReturnOwner..." tool_tip="オブジェクトを所有者に返却します"/>
+			<button label="返却" name="ReturnOwner..." tool_tip="オブジェクトを所有者に返却します。"/>
 			<text name="Set to group:">
 				グループに設定：
 			</text>
@@ -254,7 +254,7 @@
 				[COUNT]個
 			</text>
 			<button label="表示" label_selected="表示" name="ShowGroup"/>
-			<button label="返却" name="ReturnGroup..." tool_tip="オブジェクトを所有者に返却します"/>
+			<button label="返却" name="ReturnGroup..." tool_tip="オブジェクトを所有者に返却します。"/>
 			<text name="Owned by others:">
 				他人の所有物：
 			</text>
@@ -262,7 +262,7 @@
 				[COUNT]個
 			</text>
 			<button label="表示" label_selected="表示" name="ShowOther"/>
-			<button label="返却" name="ReturnOther..." tool_tip="オブジェクトを所有者に返却します"/>
+			<button label="返却" name="ReturnOther..." tool_tip="オブジェクトを所有者に返却します。"/>
 			<text name="Selected / sat upon:">
 				選択済み／決定済み：
 			</text>
@@ -276,7 +276,7 @@
 			<text name="Object Owners:" width="130">
 				オブジェクトの所有者：
 			</text>
-			<button name="Refresh List" tool_tip="オブジェクトのリストを更新します"/>
+			<button name="Refresh List" tool_tip="オブジェクトのリストを更新します。"/>
 			<button label="オブジェクトを返却する" name="Return objects..."/>
 			<name_list name="owner list">
 				<name_list.columns label="タイプ" name="type"/>
@@ -295,7 +295,7 @@
 より大きな区画のみ検索に表示させることが可能です。
 			</panel.string>
 			<panel.string name="search_disabled_permissions_tooltip">
-				あなたはこの区画の設定編集ができないため、このオプションは無効です。
+				あなたはこの区画の設定を編集することができないため、このオプションは無効です。
 			</panel.string>
 			<panel.string name="mature_check_mature">
 				「Moderate」コンテンツ
@@ -369,9 +369,9 @@
 			<text name="Snapshot:">
 				スナップショット：
 			</text>
-			<texture_picker name="snapshot_ctrl" tool_tip="画像をクリックして選択"/>
+			<texture_picker name="snapshot_ctrl" tool_tip="クリックで画像を選択します。"/>
 			<text name="allow_see_label">
-				別の区画にいるアバターが、この区画にいるアバターとチャットできるようになります。
+				別の区画にいるアバターが、この区画にいるアバターとチャットできるようにする
 			</text>
 			<check_box name="SeeAvatarsCheck" tool_tip="別の区画のアバターが、この区画にいるアバターとチャットすることを許可し、あなたもそれらアバターに会ってチャットできるようにします。"/>
 			<text name="landing_point">
@@ -402,7 +402,7 @@
 			</text>
 			<line_editor name="url_description" tool_tip="「再生」「読み込み」ボタンの隣に表示されるテキストです。"/>
 			<text name="Media texture:">
-				テクスチャの差し替え：
+				差し替えるテクスチャ：
 			</text>
 			<texture_picker name="media texture" tool_tip="クリックして画像を選択します。"/>
 			<text name="replace_texture_help">
@@ -457,7 +457,7 @@
 			<check_box label="誰でも訪問可（このオプションをオフにすると立入禁止ラインが作成されます）" name="public_access"/>
 			<check_box label="１８歳以上である必要があります。[ESTATE_AGE_LIMIT]" name="limit_age_verified" tool_tip="この区画にアクセスするには、１８歳以上でなければなりません。詳細につきましては、[SUPPORT_SITE]をご覧になってください。"/>
 			<check_box label="支払情報が登録されている必要があります。[ESTATE_PAYMENT_LIMIT]" name="limit_payment" tool_tip="アカウントに支払情報が登録されていない場合、この区画にアクセスすることはできません。詳細につきましては、[SUPPORT_SITE]をご覧になってください。"/>
-			<check_box label="制約なしにグループ[GROUP]を許可する。" name="GroupCheck" tool_tip="「一般」タブで、グループを選択してください。"/>
+			<check_box label="グループ「[GROUP]」のみアクセスを許可する。" name="GroupCheck" tool_tip="対象とするグループは「一般」タブで選択してください。"/>
 			<check_box label="入場許可を販売：" name="PassCheck" tool_tip="この区画への一時的なアクセスを許可します。"/>
 			<combo_box name="pass_combo">
 				<combo_box.item label="誰でも" name="Anyone"/>

@@ -106,7 +106,7 @@ default
 			エディタのパス：
 		</text>
 		<line_editor name="executable_path_field" tool_tip="lslファイルを編集するエディタ（実行ファイル）へのフルパス（クォーテーションは不要）"/>
-		<button label="参照…" label_selected="参照…" name="browse_for_executable" tool_tip="lslファイルを編集するエディター（実行可能ファイル）を参照…する。"/>
+		<button label="参照…" label_selected="参照…" name="browse_for_executable" tool_tip="lslファイルを編集するエディター（実行可能ファイル）を参照する。"/>
 	</panel>
 	<button name="close_btn" label="ＯＫ"/>
 </floater>

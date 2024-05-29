@@ -53,7 +53,7 @@
 				<stat_bar label="物理作用のＦＰＳ" name="simphysicsfps"/>
 				<stat_view label="物理作用の詳細" name="physicsdetail">
 					<stat_bar label="ピン留めオブジェクト" name="physicspinnedtasks"/>
-					<stat_bar label="低ＬＯＤオブジェクト" name="physicslodtasks"/>
+					<stat_bar label="低ＬｏＤオブジェクト" name="physicslodtasks"/>
 					<stat_bar label="メモリ配分" name="physicsmemoryallocated"/>
 				</stat_view>
 				<stat_bar label="エージェントの更新／秒" name="simagentups"/>

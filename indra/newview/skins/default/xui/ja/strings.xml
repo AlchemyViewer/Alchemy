@@ -718,8 +718,8 @@ https://secondlife.com/viewer-access-faq
 		このタイプのアイテムは、このリージョンのノートカードに添付することができません。
 	</string>
 	<string name="TooltipNotecardOwnerRestrictedDrop">
-		制限のない「次の所有者」の
-許可のみノートカードに
+		「次の所有者」に制限のない
+権限のノートカードのみが
 添付できます。
 	</string>
 	<string name="TooltipTextureRestrictedDrop">
@@ -4185,7 +4185,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		常時許可：（全[MAXACCESS]人中[ALLOWEDAGENTS]人）
 	</string>
 	<string name="RegionInfoAllowedGroups">
-		グループを常に許可：（全[MAXACCESS]グループ中[ALLOWEDGROUPS]グループ）
+		常に許可するグループ：（全[MAXACCESS]グループ中[ALLOWEDGROUPS]グループ）
 	</string>
 	<string name="RegionInfoEstateManagers">
 		不動産マネージャー数：（全[MAXMANAGERS]人中[ESTATEMANAGERS]人）
@@ -4493,7 +4493,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		月
 	</string>
 	<string name="EnvironmentBloom">
-		花
+		ブルーム
 	</string>
 	<string name="EnvironmentCloudNoise">
 		雲の音
@@ -7547,7 +7547,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		ＡＯ
 	</string>
 	<string name="Command_Appearance_Label">
-		容姿
+		アウトフィット
 	</string>
 	<string name="Command_Avatar_Label">
 		アバター一式
@@ -7870,7 +7870,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		（再起動待ち）
 	</string>
 	<string name="RLVaToggleMessageLogin">
-		ＲＬＶａは[STATE]状態です。（再起動する必要はありません）
+		ＲＬＶａは[STATE]です。（再起動する必要はありません）
 	</string>
 	<string name="RLVaToggleMessageRestart">
 		ＲＬＶａは再起動後に[STATE]になります。
@@ -8081,7 +8081,8 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 		[APP_NAME]プリプロセッサは、[LINENUMBER]行目の命令で無効化されています。
 	</string>
 	<string name="fs_preprocessor_settings_list_prefix">
-		設定：</string>
+		設定：
+	</string>
 	<string name="fs_preprocessor_cpp_exception">
 		[ERR_NAME]（[LINENUMBER]）：[ERR_DESC]
 	</string>
