@@ -177,6 +177,7 @@ static bool handleSetShaderChanged(const LLSD& newvalue)
     }
 
     // else, leave terrain detail as is
+    gPipeline.releaseGLBuffers();
     LLViewerShaderMgr::instance()->setShaders();
     return true;
 }
@@ -222,7 +223,6 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
     {
         gPipeline.updateRenderTransparentWater();
         gPipeline.releaseGLBuffers();
-        gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
     }
     LLWorld::getInstance()->updateWaterObjects();
@@ -448,7 +448,6 @@ static bool handleReflectionProbeDetailChanged(const LLSD& newvalue)
     {
         LLPipeline::refreshCachedSettings();
         gPipeline.releaseGLBuffers();
-        gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
         gPipeline.mReflectionMapManager.reset();
         gPipeline.mHeroProbeManager.reset();
@@ -819,6 +818,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionsEnabled", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderScreenSpaceReflections", handleReflectionProbeDetailChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleHeroProbeResolutionChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleHeroProbeResolutionChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShaderCacheEnabled", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);

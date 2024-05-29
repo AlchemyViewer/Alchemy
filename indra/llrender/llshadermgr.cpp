@@ -604,11 +604,6 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         extra_code_text[extra_code_count++] = strdup("#define VERTEX_SHADER 1\n");
     }
 
-    if (sMirrorsEnabled)
-    {
-        extra_code_text[extra_code_count++] = strdup("#define HERO_PROBES 1\n");
-    }
-
     // Use alpha float to store bit flags
     // See: C++: addDeferredAttachment(), shader: frag_data[2]
     extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_SKIP_ATMOS   0.0 \n"); // atmo kill
@@ -616,6 +611,12 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_PBR      0.67\n"); // bit 1
     extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_HDRI      1.0\n");  // bit 2
     extra_code_text[extra_code_count++] = strdup("#define GET_GBUFFER_FLAG(flag)    (abs(norm.w-flag)< 0.1)\n");
+
+    for (auto iter = LLGLSLShader::sGlobalDefines.begin(); iter != LLGLSLShader::sGlobalDefines.end(); ++iter)
+    {
+        std::string define = "#define " + iter->first + " " + iter->second + "\n";
+        extra_code_text[extra_code_count++] = (GLchar*)strdup(define.c_str());
+    }
 
     if (defines)
     {
