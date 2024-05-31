@@ -27,6 +27,10 @@
        parameter="groups_panel" />
   </menu_item_call>
   <menu_item_separator/>
+  <context_menu
+  label="Appearance"
+  layout="topleft"
+  name="AppearanceSubmenu">
     <menu_item_call
      label="Now wearing..."
      layout="topleft"
@@ -45,14 +49,6 @@
         <menu_item_call.on_enable
          function="Edit.EnableCustomizeAvatar" />
     </menu_item_call>
-   <menu_item_call label="Hover height..."
-     layout="topleft"
-     name="Hover Height">
-     <menu_item_call.on_click
-      function="HoverHeight" />
-     <menu_item_call.on_enable
-      function="Edit.EnableHoverHeight" />
-   </menu_item_call>
    <menu_item_call label="Shape..." 
     layout="topleft"
     name="Edit Shape">
@@ -70,6 +66,50 @@
        <menu_item_call.on_enable
         function="Edit.EnableCustomizeAvatar" />
    </menu_item_call>
+   <menu_item_call label="Hover height..."
+     layout="topleft"
+     name="Hover Height">
+     <menu_item_call.on_click
+      function="HoverHeight" />
+     <menu_item_call.on_enable
+      function="Edit.EnableHoverHeight" />
+   </menu_item_call>
+   <menu_item_separator/>
+  <menu_item_call
+   label="Refresh Textures"
+   name="Refresh Textures">
+    <menu_item_call.on_click
+     function="Avatar.RefreshTexture" />
+  </menu_item_call>
+  <menu_item_call label="Reset skeleton"
+     layout="topleft"
+     name="Reset Skeleton">
+     <menu_item_call.on_click
+      function="Avatar.ResetSkeleton" />
+  </menu_item_call>
+  <menu_item_call label="Reset skeleton and animations"
+       layout="topleft"
+       name="Reset Skeleton And Animations">
+       <menu_item_call.on_click
+        function="Avatar.ResetSkeletonAndAnimations" />
+  </menu_item_call>
+    <menu_item_call
+		 label="Debug Textures"
+         name="Debug...">
+            <menu_item_call.on_click
+             function="Avatar.Debug" />
+            <menu_item_call.on_visible
+             function="IsGodCustomerService"/>
+    </menu_item_call>
+    <menu_item_call
+		 label="Dump XML"
+         name="Dump XML">
+            <menu_item_call.on_click
+             function="Advanced.AppearanceToXML" />
+            <menu_item_call.on_visible
+             function="Advanced.EnableAppearanceToXML"/>
+    </menu_item_call>
+  </context_menu>
   <context_menu
     label="Take off"
     layout="topleft"
@@ -277,48 +317,52 @@
          function="Tools.StopAllAnimations" />
   </menu_item_call>
   <menu_item_separator/>
-  <menu_item_call
-   label="Refresh Textures"
-   name="Refresh Textures">
+   <context_menu
+   label="Actions"
+   layout="topleft"
+   name="ActionsCtx">
+   <menu_item_call
+   label="Copy Full Name"
+   name="copy_full_name">
     <menu_item_call.on_click
-     function="Avatar.RefreshTexture" />
+     function="Avatar.CopyData"
+     parameter="full_name"/>
+    <menu_item_call.on_enable
+     function="RLV.CanShowName" />
   </menu_item_call>
-  <menu_item_call label="Reset skeleton"
-     layout="topleft"
-     name="Reset Skeleton">
-     <menu_item_call.on_click
-      function="Avatar.ResetSkeleton" />
-  </menu_item_call>
-  <menu_item_call label="Reset skeleton and animations"
-       layout="topleft"
-       name="Reset Skeleton And Animations">
-       <menu_item_call.on_click
-        function="Avatar.ResetSkeletonAndAnimations" />
-  </menu_item_call>
-    <menu_item_call
-		 label="Debug Textures"
-         name="Debug...">
-            <menu_item_call.on_click
-             function="Avatar.Debug" />
-            <menu_item_call.on_visible
-             function="IsGodCustomerService"/>
-    </menu_item_call>
-    <menu_item_call
-		 label="Dump XML"
-         name="Dump XML">
-            <menu_item_call.on_click
-             function="Advanced.AppearanceToXML" />
-            <menu_item_call.on_visible
-             function="Advanced.EnableAppearanceToXML"/>
-    </menu_item_call>
   <menu_item_call
-     enabled="false"
-     label="Block Particle Owner"
-     name="Mute Particle">
+   label="Copy Display Name"
+   name="copy_display_name">
     <menu_item_call.on_click
-     function="Particle.Mute" />
-
-    <menu_item_call.on_visible
-     function="EnableMuteParticle" />
+     function="Avatar.CopyData"
+     parameter="display_name"/>
+    <menu_item_call.on_enable
+     function="RLV.CanShowName" />
   </menu_item_call>
+  <menu_item_call
+   label="Copy Agent Name"
+   name="copy_username">
+    <menu_item_call.on_click
+     function="Avatar.CopyData"
+     parameter="user_name"/>
+    <menu_item_call.on_enable
+     function="RLV.CanShowName" />
+  </menu_item_call>
+  <menu_item_call
+   label="Copy SLurl"
+   name="copy_slurl">
+    <menu_item_call.on_click
+     function="Avatar.CopyData"
+     parameter="slurl"/>
+    <menu_item_call.on_enable
+     function="RLV.CanShowName" />
+  </menu_item_call>
+  <menu_item_call
+   label="Copy Avatar UUID"
+   name="Copy Agent ID">
+    <menu_item_call.on_click
+     function="Avatar.CopyData"
+     parameter="id"/>
+  </menu_item_call>
+   </context_menu>
 </context_menu>

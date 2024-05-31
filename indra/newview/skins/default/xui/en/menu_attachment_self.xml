@@ -3,6 +3,24 @@
  layout="topleft"
  name="Attachment Pie">
     <menu_item_call
+     enabled="false"
+     label="Touch item"
+     layout="topleft"
+     name="Attachment Object Touch">
+        <menu_item_call.on_click
+         function="Object.Touch" />
+        <menu_item_call.on_enable
+         function="Object.EnableTouch"
+         name="EnableTouch"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Show in inventory"
+     layout="topleft"
+     name="Show original">
+      <menu_item_call.on_click
+       function="Object.ShowOriginal" />
+    </menu_item_call>
+    <menu_item_call
      enabled="true"
      label="Edit item"
      layout="topleft"
@@ -30,112 +48,89 @@
         <menu_item_call.on_enable
          function="Attachment.EnableDetach" />
     </menu_item_call>
-    <menu_item_call
-     enabled="false"
-     label="Touch item"
-     layout="topleft"
-     name="Attachment Object Touch">
-        <menu_item_call.on_click
-         function="Object.Touch" />
-        <menu_item_call.on_enable
-         function="Object.EnableTouch"
-         name="EnableTouch"/>
-    </menu_item_call>
-    <menu_item_call
-     label="Show in inventory"
-     layout="topleft"
-     name="Show original">
-      <menu_item_call.on_click
-       function="Object.ShowOriginal" />
-    </menu_item_call>
 	<menu_item_separator
      layout="topleft" />
-	<menu_item_call
-		label="Object Profile"
-		name="Object Profile">
-		<menu_item_call.on_click
-		 function="Object.Inspect" />
-	</menu_item_call>
-	<menu_item_call
-	  label="Inspect"
-	  name="Object Inspect">
-		<menu_item_call.on_click
-		 function="Floater.ShowOrBringToFront"
-		 parameter="inspect" />
-	</menu_item_call>
-	<menu_item_call
-	  label="Copy Object UUID"
-	  name="Copy Object ID">
-		<menu_item_call.on_click
-		function="Object.CopyID" />
-	</menu_item_call>
-    <menu_item_separator
-     layout="topleft" />
-  <menu_item_call
-    label="My Profile"
-    layout="topleft"
-    name="Profile...">
-      <menu_item_call.on_click
-       function="ShowAgentProfile"
-       parameter="agent" />
-  </menu_item_call>
-  <menu_item_call
-    label="My Friends"
-    layout="topleft"
-    name="Friends...">
-      <menu_item_call.on_click
-       function="SideTray.PanelPeopleTab"
-       parameter="friends_panel" />
-  </menu_item_call>
-  <menu_item_call
-    label="My Groups"
-    layout="topleft"
-    name="Groups...">
-      <menu_item_call.on_click
-       function="SideTray.PanelPeopleTab"
-       parameter="groups_panel" />
-  </menu_item_call>
-  <menu_item_separator/>
-  <menu_item_call
-  label="Now wearing..."
-  name="NowWearing">
-    <menu_item_call.on_click
-     function="NowWearing" />
-    <menu_item_call.on_enable
-     function="Edit.EnableCustomizeAvatar" />
-  </menu_item_call>
-  <menu_item_call
-  label="My Outfits..."
-  name="Change Outfit">
-    <menu_item_call.on_click
-     function="CustomizeAvatar" />
-    <menu_item_call.on_enable
-     function="Edit.EnableCustomizeAvatar" />
-  </menu_item_call>
-  <menu_item_call label="Hover height..."
+     <context_menu
+     label="Appearance"
      layout="topleft"
-     name="Hover Height">
-    <menu_item_call.on_click
-     function="HoverHeight" />
-    <menu_item_call.on_enable
-     function="Edit.EnableHoverHeight" />
-  </menu_item_call>
-  <menu_item_call label="Shape..."
-    layout="topleft"
-    name="Edit Shape">
-    <menu_item_call.on_click
-     function="EditShape" />
-    <menu_item_call.on_enable
-     function="Edit.EnableEditShape" />
-  </menu_item_call>
-  <menu_item_call label="Edit outfit parts..."
-    layout="topleft"
-    name="Edit Outfit">
-    <menu_item_call.on_click
-     function="EditOutfit" />
-    <menu_item_call.on_enable
-     function="Edit.EnableCustomizeAvatar" />
-  </menu_item_call>
+     name="AppearanceSubmenu">
+     <menu_item_call
+     label="Now wearing..."
+     name="NowWearing">
+       <menu_item_call.on_click
+        function="NowWearing" />
+       <menu_item_call.on_enable
+        function="Edit.EnableCustomizeAvatar" />
+     </menu_item_call>
+     <menu_item_call
+     label="My Outfits..."
+     name="Change Outfit">
+       <menu_item_call.on_click
+        function="CustomizeAvatar" />
+       <menu_item_call.on_enable
+        function="Edit.EnableCustomizeAvatar" />
+     </menu_item_call>
+     <menu_item_call label="Shape..."
+       layout="topleft"
+       name="Edit Shape">
+       <menu_item_call.on_click
+        function="EditShape" />
+       <menu_item_call.on_enable
+        function="Edit.EnableEditShape" />
+     </menu_item_call>
+     <menu_item_call label="Edit outfit parts..."
+       layout="topleft"
+       name="Edit Outfit">
+       <menu_item_call.on_click
+        function="EditOutfit" />
+       <menu_item_call.on_enable
+        function="Edit.EnableCustomizeAvatar" />
+     </menu_item_call>
+     <menu_item_call label="Hover height..."
+        layout="topleft"
+        name="Hover Height">
+       <menu_item_call.on_click
+        function="HoverHeight" />
+       <menu_item_call.on_enable
+        function="Edit.EnableHoverHeight" />
+     </menu_item_call>
+     <menu_item_separator
+     layout="topleft" />
+     <menu_item_call
+     label="Refresh Textures"
+     name="Refresh Textures">
+      <menu_item_call.on_click
+       function="Avatar.RefreshTexture" />
+    </menu_item_call>
+    <menu_item_call label="Reset skeleton"
+         layout="topleft"
+         name="Reset Skeleton">
+         <menu_item_call.on_click
+          function="Avatar.ResetSkeleton" />
+    </menu_item_call>
+    <menu_item_call label="Reset skeleton and animations"
+         layout="topleft"
+         name="Reset Skeleton And Animations">
+         <menu_item_call.on_click
+          function="Avatar.ResetSkeletonAndAnimations" />
+    </menu_item_call>
+    <menu_item_call
+    label="Debug Textures"
+        name="Debug...">
+       <menu_item_call.on_click
+        function="Avatar.Debug" />
+       <menu_item_call.on_visible
+        function="IsGodCustomerService"/>
+     </menu_item_call>
+       <menu_item_call
+          label="Dump XML"
+            name="Dump XML">
+               <menu_item_call.on_click
+                function="Advanced.AppearanceToXML" />
+               <menu_item_call.on_visible
+                function="Advanced.EnableAppearanceToXML"/>
+       </menu_item_call>
+     </context_menu>
   <context_menu
   label="Take off"
   layout="topleft"
@@ -343,53 +338,110 @@
      function="Tools.StopAllAnimations" />
   </menu_item_call>
   <menu_item_separator/>
+   <context_menu
+   label="Community"
+   layout="topleft"
+   name="CommunityCtx">
   <menu_item_call
-   label="Refresh Textures"
-   name="Refresh Textures">
-    <menu_item_call.on_click
-     function="Avatar.RefreshTexture" />
-  </menu_item_call>
-  <menu_item_call label="Reset skeleton"
-       layout="topleft"
-       name="Reset Skeleton">
-       <menu_item_call.on_click
-        function="Avatar.ResetSkeleton" />
-  </menu_item_call>
-  <menu_item_call label="Reset skeleton and animations"
-       layout="topleft"
-       name="Reset Skeleton And Animations">
-       <menu_item_call.on_click
-        function="Avatar.ResetSkeletonAndAnimations" />
+    label="My Profile"
+    layout="topleft"
+    name="Profile...">
+      <menu_item_call.on_click
+       function="ShowAgentProfile"
+       parameter="agent" />
   </menu_item_call>
   <menu_item_call
- label="Debug Textures"
-     name="Debug...">
-    <menu_item_call.on_click
-     function="Avatar.Debug" />
-    <menu_item_call.on_visible
-     function="IsGodCustomerService"/>
+    label="My Friends"
+    layout="topleft"
+    name="Friends...">
+      <menu_item_call.on_click
+       function="SideTray.PanelPeopleTab"
+       parameter="friends_panel" />
   </menu_item_call>
-    <menu_item_call
-		 label="Dump XML"
-         name="Dump XML">
-            <menu_item_call.on_click
-             function="Advanced.AppearanceToXML" />
-            <menu_item_call.on_visible
-             function="Advanced.EnableAppearanceToXML"/>
-    </menu_item_call>
   <menu_item_call
-     enabled="false"
-     label="Block Particle Owner"
-     name="Mute Particle">
-    <menu_item_call.on_click
-     function="Particle.Mute" />
-    <menu_item_call.on_visible
-     function="EnableMuteParticle" />
+    label="My Groups"
+    layout="topleft"
+    name="Groups...">
+      <menu_item_call.on_click
+       function="SideTray.PanelPeopleTab"
+       parameter="groups_panel" />
   </menu_item_call>
-
+  </context_menu>
   <menu_item_separator
    layout="topleft" />
-  
+   <context_menu
+   label="Actions"
+   layout="topleft"
+   name="ActionsCtx">
+	<menu_item_call
+	  label="Copy Object UUID"
+	  name="Copy Object ID">
+		<menu_item_call.on_click
+		function="Object.CopyID" />
+	</menu_item_call>
+   <menu_item_separator
+   layout="topleft" />
+   <menu_item_call
+   label="Copy Full Name"
+   name="copy_full_name">
+    <menu_item_call.on_click
+     function="Avatar.CopyData"
+     parameter="full_name"/>
+    <menu_item_call.on_enable
+     function="RLV.CanShowName" />
+  </menu_item_call>
+  <menu_item_call
+   label="Copy Display Name"
+   name="copy_display_name">
+    <menu_item_call.on_click
+     function="Avatar.CopyData"
+     parameter="display_name"/>
+    <menu_item_call.on_enable
+     function="RLV.CanShowName" />
+  </menu_item_call>
+  <menu_item_call
+   label="Copy Agent Name"
+   name="copy_username">
+    <menu_item_call.on_click
+     function="Avatar.CopyData"
+     parameter="user_name"/>
+    <menu_item_call.on_enable
+     function="RLV.CanShowName" />
+  </menu_item_call>
+  <menu_item_call
+   label="Copy SLurl"
+   name="copy_slurl">
+    <menu_item_call.on_click
+     function="Avatar.CopyData"
+     parameter="slurl"/>
+    <menu_item_call.on_enable
+     function="RLV.CanShowName" />
+  </menu_item_call>
+  <menu_item_call
+   label="Copy Avatar UUID"
+   name="Copy Agent ID">
+    <menu_item_call.on_click
+     function="Avatar.CopyData"
+     parameter="id"/>
+  </menu_item_call>
+   </context_menu>
+  <menu_item_separator
+   layout="topleft" />
+	<menu_item_call
+		label="Object Profile"
+		name="Object Profile">
+		<menu_item_call.on_click
+		 function="Object.Inspect" />
+	</menu_item_call>
+	<menu_item_call
+	  label="Inspect"
+	  name="Object Inspect">
+		<menu_item_call.on_click
+		 function="Floater.ShowOrBringToFront"
+		 parameter="inspect" />
+	</menu_item_call>
+   <menu_item_separator
+   layout="topleft" />
   <menu_item_call
    enabled="false"
    label="Drop item"
