@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <context_menu name="Attachment Pie">
+	<menu_item_call label="アイテムを触る" name="Attachment Object Touch"/>
+	<menu_item_call label="インベントリに表示" name="Show original"/>
 	<menu_item_call label="編集…" name="Edit..."/>
 	<menu_item_call label="ＰＢＲマテリアルを編集" name="EditGLTFMaterial"/>
 	<menu_item_call label="取り外す" name="Detach"/>
-	<menu_item_call label="触る" name="Attachment Object Touch"/>
-	<menu_item_call label="インベントリに表示" name="Show original"/>
 	<menu_item_separator/>
-	<menu_item_call label="オブジェクトのプロフィール" name="Object Profile"/>
-	<menu_item_call label="調査" name="Object Inspect"/>
-	<menu_item_call label="オブジェクトのＵＵＩＤをコピー" name="Copy Object ID"/>
-	<menu_item_separator/>
-	<menu_item_call label="プロフィール…" name="Profile..."/>
-	<menu_item_call label="フレンド…" name="Friends..."/>
-	<menu_item_call label="グループ…" name="Groups..."/>
-	<menu_item_separator/>
-	<menu_item_call label="着用中…" name="NowWearing"/>
-	<menu_item_call label="アウトフィット…" name="Change Outfit"/>
-	<menu_item_call label="ホバー高さ…" name="Hover Height"/>
-	<menu_item_call label="シェイプ…" name="Edit Shape"/>
-	<menu_item_call label="アウトフィット編集…" name="Edit Outfit"/>
+	<context_menu label="容姿" name="AppearanceSubmenu">
+		<menu_item_call label="着用中…" name="NowWearing"/>
+		<menu_item_call label="アウトフィット…" name="Change Outfit"/>
+		<menu_item_call label="シェイプ…" name="Edit Shape"/>
+		<menu_item_call label="アウトフィットのパーツを編集…" name="Edit Outfit"/>
+		<menu_item_call label="ホバーする高さ…" name="Hover Height"/>
+		<menu_item_separator/>
+		<menu_item_call label="テクスチャをリフレッシュ" name="Refresh Textures"/>
+		<menu_item_call label="スケルトンをリセット" name="Reset Skeleton"/>
+		<menu_item_call label="スケルトンとアニメをリセット" name="Reset Skeleton And Animations"/>
+		<menu_item_call label="テクスチャのデバッグ" name="Debug..."/>
+		<menu_item_call label="ＸＭＬとしてダンプ" name="Dump XML"/>
+	</context_menu>
 	<context_menu label="脱ぐ" name="Take Off &gt;">
-		<context_menu label="衣類" name="Clothes &gt;">
+		<context_menu label="服装" name="Clothes &gt;">
 			<menu_item_call label="シャツ" name="Shirt"/>
 			<menu_item_call label="ズボン" name="Pants"/>
 			<menu_item_call label="スカート" name="Skirt"/>
@@ -43,14 +43,26 @@
 	<menu_item_separator/>
 	<menu_item_call label="座る／立つ" name="Sit stand"/>
 	<menu_item_call label="飛行／着地" name="Fly land"/>
-	<menu_item_call label="アニメーションを停止" name="Stop Animating My Avatar"/>
+	<menu_item_call label="自分のアニメーションを停止" name="Stop Animating My Avatar"/>
 	<menu_item_separator/>
-	<menu_item_call label="テクスチャをリフレッシュ" name="Refresh Textures"/>
-	<menu_item_call label="スケルトンをリセット" name="Reset Skeleton"/>
-	<menu_item_call label="スケルトンとアニメをリセット" name="Reset Skeleton And Animations"/>
-	<menu_item_call label="テクスチャのデバッグ" name="Debug..."/>
-	<menu_item_call label="ＸＭＬダンプ" name="Dump XML"/>
-	<menu_item_call label="パーティクル所有者をブロック" name="Mute Particle"/>
+	<context_menu label="コミュニティ" name="CommunityCtx">
+		<menu_item_call label="プロフィール…" name="Profile..."/>
+		<menu_item_call label="フレンド…" name="Friends..."/>
+		<menu_item_call label="グループ…" name="Groups..."/>
+	</context_menu>
+	<menu_item_separator/>
+	<context_menu label="操作" name="ActionsCtx">
+		<menu_item_call label="オブジェクトのＵＵＩＤをコピー" name="Copy Object ID"/>
+		<menu_item_separator/>
+		<menu_item_call label="フルネームをコピー" name="copy_full_name"/>
+		<menu_item_call label="表示名をコピー" name="copy_display_name"/>
+		<menu_item_call label="エージェント名をコピー" name="copy_username"/>
+		<menu_item_call label="SLurlをコピー" name="copy_slurl"/>
+		<menu_item_call label="アバターのＵＵＩＤをコピー" name="Copy Agent ID"/>
+	</context_menu>
+	<menu_item_separator/>
+	<menu_item_call label="オブジェクトのプロフィール" name="Object Profile"/>
+	<menu_item_call label="オブジェクトの調査" name="Object Inspect"/>
 	<menu_item_separator/>
 	<menu_item_call label="下に置く" name="Drop"/>
 </context_menu>

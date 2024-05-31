@@ -26,7 +26,7 @@
 		自分の視線：
 	</text>
 	<check_box label="自分の視線を他に知らせない" name="privatelookat" tool_tip="カメラのフォーカスポイントが他の人に表示されないようにする。"/>
-	<check_box label="アバターからの視線の距離を制限する" name="privatelookat" tool_tip="目や頭の動きなどの外観上の変化は許可しますが、設定された距離を超えると特定のものを指しません。"/>
+	<check_box label="アバターからの視線の距離を制限する" name="privatelookat" tool_tip="周囲の物体に対して目や頭の動きなどの容姿が変化するようになりますが、設定された距離を超えると視線を向けなくなります。"/>
 	<slider label="最大距離"/>
 	<button label="ブロックリスト" name="block_list"/>
 	<text name="block_list_label">

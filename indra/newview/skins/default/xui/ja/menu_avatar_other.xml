@@ -7,7 +7,7 @@
 	<menu_item_call label="コール" name="Call"/>
 	<menu_item_call label="グループに招待" name="Invite..."/>
 	<menu_item_separator/>
-	<context_menu label="外観" name="Appearance">
+	<context_menu label="容姿" name="Appearance">
 		<menu_item_call label="スケルトンをリセット" name="Reset Skeleton"/>
 		<menu_item_call label="テクスチャをリフレシュ" name="Refresh Textures"/>
 		<menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations"/>
