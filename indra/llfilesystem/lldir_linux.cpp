@@ -88,21 +88,25 @@ LLDir_Linux::LLDir_Linux()
 #ifdef APP_RO_DATA_DIR
     mAppRODataDir = APP_RO_DATA_DIR;
 #else
-    mAppRODataDir = tmp_str;
-#endif
-    std::string::size_type build_dir_pos = mExecutableDir.rfind("/build-linux-");
+    // Determine the location of the App-Read-Only-Data
+    // Try the working directory then the exe's dir.
+#ifndef AL_SENTRY
+    std::string::size_type build_dir_pos = mExecutableDir.rfind(mDirDelimiter + "build-linux-");
     if (build_dir_pos != std::string::npos)
     {
         // ...we're in a dev checkout
-        mSkinBaseDir = mExecutableDir.substr(0, build_dir_pos) + "/indra/newview/skins";
-        LL_INFOS() << "Running in dev checkout with mSkinBaseDir "
-         << mSkinBaseDir << LL_ENDL;
+        mAppRODataDir = add(mExecutableDir.substr(0, build_dir_pos), "indra", "newview");
+        LL_INFOS() << "Running in dev checkout with mAppRODataDir " << mAppRODataDir << LL_ENDL;
     }
     else
+#endif
     {
         // ...normal installation running
-        mSkinBaseDir = mAppRODataDir + mDirDelimiter + "skins";
+        mAppRODataDir = tmp_str;
     }
+#endif
+
+    mSkinBaseDir = add(mAppRODataDir, "skins");
 
     mOSUserDir = getCurrentUserHome(tmp_str);
     mOSUserAppDir = "";

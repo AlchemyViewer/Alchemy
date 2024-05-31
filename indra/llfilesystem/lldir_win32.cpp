@@ -246,7 +246,7 @@ LLDir_Win32::LLDir_Win32()
     }
     else
     {
-        fprintf(stderr, "Couldn't get APP path, assuming current directory!");
+        PRELOG("Couldn't get APP path, assuming current directory!");
         mExecutableDir = mWorkingDir;
         // Assume it's the current directory
     }
@@ -255,8 +255,20 @@ LLDir_Win32::LLDir_Win32()
 
     // Determine the location of the App-Read-Only-Data
     // Try the working directory then the exe's dir.
-    mAppRODataDir = mWorkingDir;
-
+#ifndef AL_SENTRY
+    std::string::size_type build_dir_pos = mExecutableDir.rfind(mDirDelimiter + "build-vc-");
+    if (build_dir_pos != std::string::npos)
+    {
+        // ...we're in a dev checkout
+        mAppRODataDir = add(mExecutableDir.substr(0, build_dir_pos), "indra", "newview");
+        PRELOG("Running in dev checkout with mAppRODataDir " << mAppRODataDir);
+    }
+    else
+#endif
+    {
+        // ...normal installation running
+        mAppRODataDir = mWorkingDir;
+    }
 
 //  if (mExecutableDir.find("indra") == std::string::npos)
 
