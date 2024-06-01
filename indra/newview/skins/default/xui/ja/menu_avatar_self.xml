@@ -4,11 +4,18 @@
 	<menu_item_call label="フレンド…" name="Friends..."/>
 	<menu_item_call label="グループ…" name="Groups..."/>
 	<menu_item_separator/>
-	<menu_item_call label="着用中…" name="NowWearing"/>
-	<menu_item_call label="アウトフィットを変更" name="Chenge Outfit"/>
-	<menu_item_call label="ホバー高さ" name="Hover Height"/>
-	<menu_item_call label="シェイプ…" name="Edit Shape"/>
-	<menu_item_call label="アウトフィットのパーツの編集" name="Edit Outfit"/>
+	<context_menu label="容姿" name="AppearanceSubmenu">
+		<menu_item_call label="着用中…" name="NowWearing"/>
+		<menu_item_call label="アウトフィットを変更" name="Chenge Outfit"/>
+		<menu_item_call label="シェイプ…" name="Edit Shape"/>
+		<menu_item_call label="アウトフィットのパーツを編集…" name="Edit Outfit"/>
+		<menu_item_call label="ホバーする高さ…" name="Hover Height"/>
+		<menu_item_call label="テクスチャをリフレシュ" name="Refresh Textures"/>
+		<menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations"/>
+		<menu_item_call label="スケルトンをリセット" name="Reset Skeleton"/>
+		<menu_item_call label="テクスチャのデバッグ…" name="Debug..."/>
+		<menu_item_call label="ＸＭＬとしてダンプ" name="Dump XML"/>
+	</context_menu>
 	<context_menu label="脱ぐ" name="Take Off &gt;">
 		<context_menu label="服装" name="Clothes &gt;">
 			<menu_item_call label="シャツ" name="Shirt"/>
@@ -34,10 +41,11 @@
 	<menu_item_call label="飛行／着地" name="Fly land"/>
 	<menu_item_call label="自分のアニメーションを停止" name="Stop Animating My Avatar"/>
 	<menu_item_separator/>
-	<menu_item_call label="スケルトンをリセット" name="Reset Skeleton"/>
-	<menu_item_call label="テクスチャをリフレシュ" name="Refresh Textures"/>
-	<menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations"/>
-	<menu_item_call label="テクスチャのデバッグ…" name="Debug..."/>
-	<menu_item_call label="ＸＭＬとしてダンプ" name="Dump XML"/>
-	<menu_item_call label="パーティクル所有者をブロック" name="Mute Particle"/>
+	<context_menu label="操作" name="ActionsCtx">
+		<menu_item_call label="フルネームをコピー" name="copy_full_name"/>
+		<menu_item_call label="表示名をコピー" name="copy_display_name"/>
+		<menu_item_call label="エージェント名をコピー" name="copy_username"/>
+		<menu_item_call label="SLurlをコピー" name="copy_slurl"/>
+		<menu_item_call label="アバターのＵＵＩＤをコピー" name="Copy Agent ID"/>
+	</context_menu>
 </context_menu>

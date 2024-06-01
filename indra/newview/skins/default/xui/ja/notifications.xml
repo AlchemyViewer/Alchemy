@@ -5965,7 +5965,7 @@ Intelドライバーのウェブサイトを確認しますか？
 		サイコロ振り：[RESULT]
 	</notification>
 	<notification name="DumpArchetypeSuccess">
-		外観は、[FILE_PATH]に正常に保存されました。
+		容姿は、[FILE_PATH]に正常に保存されました。
 	</notification>
 	<notification name="InvalidGrid">
 		「[GRID]」は有効なグリッド識別子ではありません。
