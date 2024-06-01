@@ -8,10 +8,10 @@
  border="false"
  chrome="true"
  follows="bottom"
- height="185"
+ height="315"
  layout="topleft"
  name="presets_pulldown"
- width="225">
+ width="285">
   <text
     type="string"
     length="1"
@@ -30,7 +30,7 @@
     layout="topleft"
     column_padding="0"
     height="100"
-    width="215"
+    width="275"
     draw_heading="false"
     draw_stripes="false"
     bg_stripe_color="0.25 0.25 0.25 0.25"
@@ -54,27 +54,355 @@
     left="5"
     name="horiz_separator"
     top_delta="105"
-    width="215" />
+    width="275" />
+
+  <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="12"
+    layout="topleft"
+    left="5"
+    name="QualitySpeed"
+    top_pad="5" 
+    width="100">
+      Quality &amp; speed:
+  </text>
+  <text
+    type="string"
+    length="1"
+    follows="left|top"
+    halign="left"
+    height="12"
+    layout="topleft"
+    left="5"
+    name="ShadersPrefText"
+    top_pad="0"
+    width="40">
+       Low
+  </text>
+  <text
+    type="string"
+    length="1"
+    follows="left|top"
+    halign="center"
+    height="12"
+    layout="topleft"
+    left_delta="62"
+    name="ShadersPrefText2"
+    top_delta="0"
+    width="60">
+       Mid
+  </text>
+  <text
+    type="string"
+    length="1"
+    follows="left|top"
+    halign="center"
+    height="12"
+    layout="topleft"
+    left_delta="88"
+    name="ShadersPrefText3"
+    top_delta="0"
+    width="60">
+       High
+  </text>
+  <text
+    type="string"
+    length="1"
+    follows="left|top"
+    halign="right"
+    height="12"
+    layout="topleft"
+    left_delta="65"
+    name="ShadersPrefText4"
+    top_delta="0"
+    width="60">
+       Ultra
+  </text>
+  <icon
+    color="White_50"
+    height="14"
+    image_name="Rounded_Square"
+    layout="topleft"
+    left="10"
+    name="LowGraphicsDivet"
+    top_pad="4"
+    width="2" />
+  <icon
+    color="White_50"
+    height="14"
+    image_name="Rounded_Square"
+    layout="topleft"
+    left_pad="41"
+    name="LowMidGraphicsDivet"
+    width="2" />
+  <icon
+    color="White_50"
+    height="14"
+    image_name="Rounded_Square"
+    layout="topleft"
+    left_pad="41"
+    name="MidGraphicsDivet"
+    top_delta="0"
+    width="2" />
+  <icon
+    color="White_50"
+    height="14"
+    image_name="Rounded_Square"
+    layout="topleft"
+    left_pad="42"
+    name="MidHighGraphicsDivet"
+    top_delta="0"
+    width="2" />
+  <icon
+    color="White_50"
+    height="14"
+    image_name="Rounded_Square"
+    layout="topleft"
+    left_pad="42"
+    name="HighGraphicsDivet"
+    top_delta="0"
+    width="2" />
+  <icon
+    color="White_50"
+    height="14"
+    image_name="Rounded_Square"
+    layout="topleft"
+    left_pad="42"
+    name="HighUltraGraphicsDivet"
+    top_delta="0"
+    width="2" />
+  <icon
+    color="White_50"
+    height="14"
+    image_name="Rounded_Square"
+    layout="topleft"
+    left_pad="42"
+    name="UltraGraphicsDivet"
+    top_delta="0"
+    width="2" />
+  <slider
+    control_name="RenderQualityPerformance"
+    decimal_digits="0"
+    follows="left|top"
+    height="16"
+    increment="1"
+    initial_value="0"
+    layout="topleft"
+    left="2"
+    max_val="6"
+    name="QualityPerformanceSelection"
+    show_text="false"
+    top_delta="-2"
+    width="279">
+    <slider.commit_callback
+      function="Presets.QualityPerformance"/>
+  </slider>
+  <text
+   follows="left|top"
+   height="15"
+   left="10"
+   top_pad="5"
+   width="120"
+   layout="topleft"
+   value="Draw Distance:"
+   name="draw_distance_label"/>
+  <slider_bar
+   top_pad="-16"
+   height="20"
+   increment="32"
+   initial_value="96"
+   follows="left|top|right"
+   layout="topleft"
+   max_val="512"
+   min_val="64"
+   left="93"
+   right="-68"
+   name="draw_dist_slider_bar"
+   control_name="RenderFarClip"/>
+  <spinner
+   top_pad="-21"
+   height="20"
+   label=""
+   label_width="0"
+   right="-8"
+   decimal_digits="0"
+   follows="top|right"
+   layout="topleft"
+   max_val="512"
+   min_val="64"
+   width="60"
+   increment="32"
+   name="draw_dist_spinner"
+   control_name="RenderFarClip"/>
+  <text
+   follows="left|top"
+   height="15"
+   left="10"
+   top_pad="3"
+   width="120"
+   layout="topleft"
+   value="Object LoD:"
+   name="lod_label"/>
+  <slider_bar
+   top_pad="-16"
+   height="20"
+   increment="0.1"
+   initial_value="96"
+   follows="left|top|right"
+   layout="topleft"
+   max_val="4.0"
+   min_val="1.0"
+   left="93"
+   right="-68"
+   name="lod_slider_bar"
+   control_name="RenderVolumeLODFactor"/>
+  <spinner
+   top_pad="-21"
+   height="20"
+   label_width="0"
+   right="-8"
+   decimal_digits="2"
+   follows="top|right"
+   layout="topleft"
+   max_val="4.0"
+   min_val="1.0"
+   width="60"
+   increment="0.1"
+   name="lod_spinner"
+   control_name="RenderVolumeLODFactor"/>
+  <text
+   follows="left|top"
+   height="15"
+   left="10"
+   top_pad="3"
+   width="120"
+   layout="topleft"
+   value="Particles:"
+   name="max_particles_label"/>
+  <slider_bar
+   top_pad="-16"
+   height="20"
+   increment="6"
+   initial_value="96"
+   follows="left|top|right"
+   layout="topleft"
+   max_val="8192"
+   min_val="0"
+   left="93"
+   right="-68"
+   name="max_particles_slider_bar"
+   control_name="RenderMaxPartCount"/>
+  <spinner
+   top_pad="-21"
+   height="20"
+   label_width="0"
+   right="-8"
+   decimal_digits="0"
+   follows="top|right"
+   layout="topleft"
+   max_val="8192"
+   min_val="0"
+   width="60"
+   increment="12"
+   name="max_particles_spinner"
+   control_name="RenderMaxPartCount"/>
+  <text
+   follows="left|top"
+   height="15"
+   left="10"
+   top_pad="3"
+   width="120"
+   layout="topleft"
+   value="Avatars:"
+   name="max_avatars_label"/>
+  <slider_bar
+   top_pad="-16"
+   height="20"
+   increment="1"
+   initial_value="96"
+   follows="left|top|right"
+   layout="topleft"
+   max_val="65"
+   min_val="1"
+   left="93"
+   right="-68"
+   name="max_avatar_slider_bar"
+   control_name="RenderAvatarMaxNonImpostors"/>
+  <spinner
+   top_pad="-21"
+   height="20"
+   label_width="0"
+   right="-8"
+   decimal_digits="0"
+   follows="top|right"
+   layout="topleft"
+   max_val="65"
+   min_val="1"
+   width="60"
+   increment="1"
+   name="max_avatar_spinner"
+   control_name="RenderAvatarMaxNonImpostors" />
+   <text
+   follows="left|top"
+   height="15"
+   left="10"
+   top_pad="3"
+   width="120"
+   layout="topleft"
+   value="Complexity:"
+   name="complexity_label"/>
+  <slider_bar
+   top_pad="-16"
+   height="20"
+   initial_value="96"
+   follows="left|top|right"
+   layout="topleft"
+   max_val="350000"
+   min_val="0"
+   left="93"
+   right="-68"
+   name="complexity_slider_bar"
+   control_name="RenderAvatarMaxComplexity"/>
+  <spinner
+   top_pad="-21"
+   height="20"
+   label_width="0"
+   right="-8"
+   decimal_digits="0"
+   follows="top|right"
+   layout="topleft"
+   max_val="350000"
+   min_val="0"
+   width="60"
+   increment="1"
+   name="complexity_spinner"
+   control_name="RenderAvatarMaxComplexity" />
   <button
     name="open_prefs_btn"
     label="Graphics Preferences"
     tool_tip = "Bring up graphics prefs"
-    top_delta="5"
-    left="15"
+    follows="top|left"
+    layout="topleft"
+    top_pad="5"
+    left="10"
     height="20"
-    width="200">
+    width="162">
     <button.commit_callback
       function="Presets.GoGraphicsPrefs" />
   </button>
   <button
-    name="open_autofps_btn"
-    label="Auto-FPS settings"
-    tool_tip = "Bring up auto-adjust settings"
-    top_pad="5"
-    left="15"
+    name="open_prefs_btn"
+    label="Lightbox"
+    tool_tip = "Bring up Lightbox"
+    follows="top|left"
+    layout="topleft"
+    top_delta="0"
+    left_pad="5"
     height="20"
-    width="200">
+    width="100">
     <button.commit_callback
-     function="Presets.GoAutofpsPrefs" />
+      function="Presets.GoLightbox" />
   </button>
 </panel>
