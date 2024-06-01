@@ -752,6 +752,87 @@
 					name="SSR_Ultra"
 					value="32" />
 			</combo_box>
+			<check_box
+				follows="left|top"
+				height="15"
+				left="8"
+				top_pad="6"
+				width="80"
+				layout="topleft"
+				label="Mirrors"
+				tool_tip="Enable Mirrors"
+				control_name="RenderMirrors" />
+			<combo_box
+				enabled_control="RenderMirrors"
+				follows="top|left"
+				layout="topleft"
+				height="16"
+				width="150"
+				right="-2"
+				top_pad="-16"
+				max_chars="128"
+				allow_text_entry="false"
+				tool_tip="Quality of Mirrors"
+				control_name="RenderHeroProbeResolution"
+				name="Mirror_Res_Combo">
+				<combo_box.item
+					label="Low (256px)"
+					name="Mirror_Low"
+					value="256" />
+				<combo_box.item
+					label="Medium (512px)"
+					name="Mirror_Medium"
+					value="512" />
+				<combo_box.item
+					label="High (1024px)"
+					name="Mirror_High"
+					value="1024" />
+				<combo_box.item
+					label="Ultra (2048px)"
+					name="Mirror_Ultra"
+					value="2048" />
+			</combo_box>
+			<text
+				enabled_control="RenderMirrors"
+				follows="left|top"
+				height="15"
+				left="29"
+				top_pad="6"
+				width="110"
+				layout="topleft"
+				tool_tip="Sets how many rendered frames mirrors should wait to update. Can improve average FPS at the cost of jittering."
+				value="Update Rate Delay:" />
+			<slider
+				enabled_control="RenderMirrors"
+				control_name="RenderHeroProbeUpdateRate"
+				top_pad="-18"
+				height="20"
+				increment="1"
+				follows="top|left"
+				layout="topleft"
+				max_val="4"
+				min_val="1"
+				left="140"
+				right="-56"
+				name="mirrorUpdateRateSlider"
+				tool_tip="Sets how many rendered frames mirrors should wait to update. Can improve average FPS at the cost of jittering."
+				show_text="false" />
+			<spinner
+				enabled_control="RenderMirrors"
+				top_pad="-20"
+				height="15"
+				label_width="0"
+				right="-2"
+				decimal_digits="0"
+				follows="top|right"
+				layout="topleft"
+				max_val="4"
+				min_val="1"
+				width="55"
+				increment="1"
+				control_name="RenderHeroProbeUpdateRate"
+				tool_tip="Sets how many rendered frames mirrors should wait to update. Can improve average FPS at the cost of jittering."
+				name="mirrorUpdateRateSpinner" />
 			<!--Probe Draw Distance-->
 			<!--
 			<text
