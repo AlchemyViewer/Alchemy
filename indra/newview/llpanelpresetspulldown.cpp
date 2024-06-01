@@ -35,6 +35,7 @@
 #include "lltabcontainer.h"
 #include "llfloater.h"
 #include "llfloaterperformance.h"
+#include "llfloaterpreference.h"
 #include "llfloaterreg.h"
 #include "llpresetsmanager.h"
 #include "llsliderctrl.h"
@@ -52,7 +53,9 @@ LLPanelPresetsPulldown::LLPanelPresetsPulldown()
 
     mCommitCallbackRegistrar.add("Presets.GoGraphicsPrefs", boost::bind(&LLPanelPresetsPulldown::onGraphicsButtonClick, this, _2));
     mCommitCallbackRegistrar.add("Presets.GoAutofpsPrefs", boost::bind(&LLPanelPresetsPulldown::onAutofpsButtonClick, this, _2));
+    mCommitCallbackRegistrar.add("Presets.GoLightbox", boost::bind(&LLPanelPresetsPulldown::onLightboxButtonClick, this, _2));
     mCommitCallbackRegistrar.add("Presets.RowClick", boost::bind(&LLPanelPresetsPulldown::onRowClick, this, _2));
+    mCommitCallbackRegistrar.add("Presets.QualityPerformance", boost::bind(&LLPanelPresetsPulldown::onChangeQuality, this, _2));
 
     buildFromFile( "panel_presets_pulldown.xml");
 }
@@ -163,9 +166,24 @@ void LLPanelPresetsPulldown::onGraphicsButtonClick(const LLSD& user_data)
 void LLPanelPresetsPulldown::onAutofpsButtonClick(const LLSD& user_data)
 {
     setVisible(FALSE);
-    LLFloaterPerformance* performance_floater = LLFloaterReg::showTypedInstance<LLFloaterPerformance>("performance");
+    LLFloaterPerformance* performance_floater = LLFloaterReg::showTypedInstance<LLFloaterPerformance>("lightbox");
     if (performance_floater)
     {
         performance_floater->showAutoadjustmentsPanel();
+    }
+}
+
+void LLPanelPresetsPulldown::onLightboxButtonClick(const LLSD& user_data)
+{
+    setVisible(FALSE);
+    LLFloaterReg::showInstanceOrBringToFront("lightbox");
+}
+
+void LLPanelPresetsPulldown::onChangeQuality(const LLSD& data)
+{
+    LLFloaterPreference* instance = LLFloaterReg::getTypedInstance<LLFloaterPreference>("preferences");
+    if (instance)
+    {
+        instance->onChangeQuality(data);
     }
 }

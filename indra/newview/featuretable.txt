@@ -76,6 +76,10 @@ RenderScreenSpaceReflections 1  1
 RenderMirrors				1	1
 RenderToneMapType 1 1
 RenderVSyncEnable 1 0
+RenderHeroProbeResolution	1	2048
+RenderHeroProbeDistance		1	16
+RenderHeroProbeUpdateRate	1	1
+RenderHeroProbeConservativeUpdateMultiplier 1 4
 
 
 //
