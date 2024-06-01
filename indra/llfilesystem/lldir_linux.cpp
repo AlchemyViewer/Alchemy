@@ -205,7 +205,15 @@ void LLDir_Linux::initAppDirs(const std::string &app_name,
         LL_WARNS() << "Couldn't create LL_PATH_CACHE dir " << getExpandedFilename(LL_PATH_CACHE,"") << LL_ENDL;
     }
 
-    mCAFile = getExpandedFilename(LL_PATH_APP_SETTINGS, "ca-bundle.crt");
+    std::string ca_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "ca-bundle.crt");
+    if (!LLFile::isfile(ca_path))
+    {
+        mCAFile = gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, ".." ,"app_settings", "ca-bundle.crt");
+    }
+    else
+    {
+        mCAFile = ca_path;
+    }
 }
 
 U32 LLDir_Linux::countFilesInDir(const std::string &dirname, const std::string &mask)
