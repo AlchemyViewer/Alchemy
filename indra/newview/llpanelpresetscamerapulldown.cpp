@@ -50,6 +50,7 @@ LLPanelPresetsCameraPulldown::LLPanelPresetsCameraPulldown()
 {
     mCommitCallbackRegistrar.add("Presets.toggleCameraFloater", boost::bind(&LLPanelPresetsCameraPulldown::onViewButtonClick, this, _2));
     mCommitCallbackRegistrar.add("PresetsCamera.RowClick", boost::bind(&LLPanelPresetsCameraPulldown::onRowClick, this, _2));
+    mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset));
 
     buildFromFile( "panel_presets_camera_pulldown.xml");
 }
