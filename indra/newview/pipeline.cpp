@@ -8212,16 +8212,15 @@ void LLPipeline::renderDeferredLighting()
                     center.load3(drawablep->getPositionAgent().mV);
                     const F32 *c = center.getF32ptr();
                     F32        s = volume->getLightRadius() * 1.5f;
+                    if (s <= 0.001f)
+                    {
+                        continue;
+                    }
 
                     // send light color to shader in linear space
                     LLColor3 col = volume->getLightLinearColor() * light_scale;
 
                     if (col.magVecSquared() < 0.001f)
-                    {
-                        continue;
-                    }
-
-                    if (s <= 0.001f)
                     {
                         continue;
                     }
