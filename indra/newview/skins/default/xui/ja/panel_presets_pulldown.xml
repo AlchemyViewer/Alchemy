@@ -5,6 +5,44 @@
 	</text>
 	<scroll_list name="preset_list"/>
 	<view_border name="horiz_separator"/>
+	<text name="QualitySpeed">
+		品質と速度
+	</text>
+	<text name="ShadersPrefText">
+		低
+	</text>
+	<text name="ShadersPrefText2">
+		中
+	</text>
+	<text name="ShadersPrefText3">
+		高
+	</text>
+	<text name="ShadersPrefText4">
+		最高
+	</text>
+	<icon name="LowGraphicsDivet"/>
+	<icon name="LowMidGraphicsDivet"/>
+	<icon name="MidGraphicsDivet"/>
+	<icon name="MidHighGraphicsDivet"/>
+	<icon name="HighGraphicsDivet" />
+	<icon name="HighUltraGraphicsDivet" />
+	<icon name="UltraGraphicsDivet" />
+	<slider name="QualityPerformanceSelection"/>
+	<text value="描画距離：" name="draw_distance_label"/>
+	<slider_bar name="draw_dist_slider_bar"/>
+	<spinner name="draw_dist_spinner"/>
+	<text value="オブジェクトのＬｏＤ：" name="lod_label"/>
+	<slider_bar name="lod_slider_bar"/>
+	<spinner name="lod_spinner"/>
+	<text value="パーティクル数：" name="max_particles_label"/>
+	<slider_bar name="max_particles_slider_bar"/>
+	<spinner name="max_particles_spinner"/>
+	<text value="アバター数：" name="max_avatars_label"/>
+	<slider_bar name="max_avatar_slider_bar"/>
+	<spinner name="max_avatar_spinner"/>
+	<text value="複雑度：" name="complexity_label"/>
+	<slider_bar name="complexity_slider_bar"/>
+	<spinner name="complexity_spinner"/>
 	<button name="open_prefs_btn" label="グラフィック初期設定" tool_tip="グラフィック設定を呼び出します。"/>
-	<button name="open_autofps_btn" label="自動ＦＰＳ設定" tool_tip="自動調整設定を呼び出します。"/>
+	<button name="open_prefs_btn" label="ライトボックス" tool_tip="ライトボックスを呼び出します。"/>
 </panel>
