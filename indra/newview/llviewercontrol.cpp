@@ -174,10 +174,10 @@ static bool handleSetShaderChanged(const LLSD& newvalue)
     {
         // ALM depends onto atmospheric shaders, state might have changed
         LLPipeline::refreshCachedSettings();
+        gPipeline.releaseGLBuffers();
     }
 
     // else, leave terrain detail as is
-    gPipeline.releaseGLBuffers();
     LLViewerShaderMgr::instance()->setShaders();
     return true;
 }
