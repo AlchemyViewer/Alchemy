@@ -2443,7 +2443,7 @@ void LLAgent::endAnimationUpdateUI()
         gViewerWindow->showCursor();
         // show menus
         gMenuBarView->setVisible(TRUE);
-        LLNavigationBar::getInstance()->setVisible(TRUE && gSavedSettings.getBOOL("ShowNavbarNavigationPanel"));
+        LLNavigationBar::getInstance()->setVisible(gSavedSettings.getU32("NavigationBarStyle") == 2);
         gStatusBar->setVisibleForMouselook(true);
 
         static LLCachedControl<bool> show_mini_location_panel(gSavedSettings, "ShowMiniLocationPanel");

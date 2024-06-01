@@ -2483,8 +2483,8 @@ void LLViewerWindow::initWorldUI()
     mNavBarBarContainer->addChild(navbar);
     mNavBarBarContainer->setVisible(TRUE);
 
-
-    if (!gSavedSettings.getBOOL("ShowNavbarNavigationPanel"))
+    const U32 location_bar = gSavedSettings.getU32("NavigationBarStyle");
+    if (location_bar != 2)
     {
         navbar->setVisible(FALSE);
     }
@@ -2492,7 +2492,6 @@ void LLViewerWindow::initWorldUI()
     {
         reshapeStatusBarContainer();
     }
-
 
     // Top Info bar
     LLPanel* topinfo_bar_container = getRootView()->getChild<LLPanel>("topinfo_bar_container");
@@ -2829,7 +2828,7 @@ void LLViewerWindow::setNormalControlsVisible( BOOL visible )
     {
         // when it's time to show navigation bar we need to ensure that the user wants to see it
         // i.e. ShowNavbarNavigationPanel option is true
-        navbarp->setVisible( visible && gSavedSettings.getBOOL("ShowNavbarNavigationPanel") );
+        navbarp->setVisible( visible && (gSavedSettings.getU32("NavigationBarStyle") == 2));
     }
 }
 
@@ -6535,20 +6534,16 @@ LLRect LLViewerWindow::getChatConsoleRect()
 
 void LLViewerWindow::reshapeStatusBarContainer()
 {
-    S32 new_height = mStatusBarContainer->getRect().getHeight();
+    static S32 original_status_bar_height = mStatusBarContainer->getRect().getHeight();
+    S32 new_height = original_status_bar_height;
     S32 new_width = mStatusBarContainer->getRect().getWidth();
 
-    static LLCachedControl<bool> show_navbar_nav_panel(gSavedSettings, "ShowNavbarNavigationPanel");
-    if (show_navbar_nav_panel)
+    if (gSavedSettings.getU32("NavigationBarStyle") == 2)
     {
         // Navigation bar is outside visible area, expand status_bar_container to show it
         new_height += mNavBarBarContainer->getRect().getHeight();
     }
-    else
-    {
-        // collapse status_bar_container
-        new_height -= mNavBarBarContainer->getRect().getHeight();
-    }
+
     mStatusBarContainer
         ->reshape(new_width, new_height, TRUE);
 }
@@ -6574,10 +6569,9 @@ void LLViewerWindow::setUIVisibility(bool visible)
         gToolBarView->setToolBarsVisible(visible);
     }
 
-    static LLCachedControl<bool> show_navbar_nav_panel(gSavedSettings, "ShowNavbarNavigationPanel");
-    static LLCachedControl<bool> show_miniloc_panel(gSavedSettings, "ShowMiniLocationPanel");
-    LLNavigationBar::getInstance()->setVisible(visible ? show_navbar_nav_panel : FALSE);
-    LLPanelTopInfoBar::getInstance()->setVisible(visible? show_miniloc_panel : FALSE);
+    const U32 location_bar = gSavedSettings.getU32("NavigationBarStyle");
+    LLNavigationBar::getInstance()->setVisible(visible ? (location_bar == 2) : FALSE);
+    LLPanelTopInfoBar::getInstance()->setVisible(visible ? (location_bar == 1) : FALSE);
     mStatusBarContainer->setVisible(visible);
 }
 
