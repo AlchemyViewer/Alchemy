@@ -56,6 +56,10 @@ target_link_libraries(llfilesystem
     )
 target_include_directories( llfilesystem  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
+if(TARGET al::sentry)
+    target_compile_definitions(llfilesystem PRIVATE AL_SENTRY=1)
+endif()
+
 # Add tests
 if (LL_TESTS)
     include(LLAddBuildTest)

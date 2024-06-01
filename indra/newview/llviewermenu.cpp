@@ -92,6 +92,7 @@
 #include "lltoolface.h"
 #include "llhints.h"
 #include "llhudeffecttrail.h"
+#include "llhudeffectresetskeleton.h"
 #include "llhudmanager.h"
 #include "llimview.h"
 #include "llinventorybridge.h"
@@ -6797,10 +6798,19 @@ class LLAvatarResetSkeleton: public view_listener_t
         LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
         if(avatar)
         {
-            avatar->resetSkeleton(false);
-// [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
-            avatar->rebuildAttachments();
-// [/SL:KB]
+            bool owned = false;
+            if(avatar->isAnimatedObject())
+            {
+                owned = avatar->mOwnerID == gAgent.getID();
+            }
+            else
+            {
+                owned = avatar->getID() == gAgent.getID();
+            }
+            LLHUDEffectResetSkeleton* effectp = (LLHUDEffectResetSkeleton*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_RESET_SKELETON, owned);
+            effectp->setSourceObject(gAgentAvatarp);
+            effectp->setTargetObject((LLViewerObject*)avatar);
+            effectp->setResetAnimations(false);
         }
         return true;
     }
@@ -6827,10 +6837,19 @@ class LLAvatarResetSkeletonAndAnimations : public view_listener_t
         LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
         if (avatar)
         {
-            avatar->resetSkeleton(true);
-// [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
-            avatar->rebuildAttachments();
-// [/SL:KB]
+            bool owned = false;
+            if(avatar->isAnimatedObject())
+            {
+                owned = avatar->mOwnerID == gAgent.getID();
+            }
+            else
+            {
+                owned = avatar->getID() == gAgent.getID();
+            }
+            LLHUDEffectResetSkeleton* effectp = (LLHUDEffectResetSkeleton*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_RESET_SKELETON, owned);
+            effectp->setSourceObject(gAgentAvatarp);
+            effectp->setTargetObject((LLViewerObject*)avatar);
+            effectp->setResetAnimations(true);
         }
         return true;
     }
@@ -6843,11 +6862,26 @@ class LLAvatarResetSelfSkeletonAndAnimations : public view_listener_t
         LLVOAvatar* avatar = find_avatar_from_object(LLSelectMgr::getInstance()->getSelection()->getPrimaryObject());
         if (avatar)
         {
-            avatar->resetSkeleton(true);
+            bool owned = false;
+            if(avatar->isAnimatedObject())
+            {
+                owned = avatar->mOwnerID == gAgent.getID();
+            }
+            else
+            {
+                owned = avatar->getID() == gAgent.getID();
+            }
+            LLHUDEffectResetSkeleton* effectp = (LLHUDEffectResetSkeleton*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_RESET_SKELETON, owned);
+            effectp->setSourceObject(gAgentAvatarp);
+            effectp->setTargetObject((LLViewerObject*)avatar);
+            effectp->setResetAnimations(true);
         }
         else
         {
-            gAgentAvatarp->resetSkeleton(true);
+            LLHUDEffectResetSkeleton* effectp = (LLHUDEffectResetSkeleton*)LLHUDManager::getInstance()->createViewerEffect(LLHUDObject::LL_HUD_EFFECT_RESET_SKELETON, true);
+            effectp->setSourceObject(gAgentAvatarp);
+            effectp->setTargetObject(gAgentAvatarp);
+            effectp->setResetAnimations(true);
         }
         return true;
     }

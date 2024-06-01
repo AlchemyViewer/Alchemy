@@ -590,6 +590,19 @@ bool idle_startup()
                 {
                     LLMessageConfig::initClass("viewer", gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, ""));
                 }
+            #elif LL_LINUX
+                // On the windows dev builds, unpackaged, the message.xml file will
+                // be located in indra/build-vc**/newview/<config>/app_settings.
+                std::string message_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "message.xml");
+
+                if (!LLFile::isfile(message_path))
+                {
+                    LLMessageConfig::initClass("viewer", gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, ".." ,"app_settings", ""));
+                }
+                else
+                {
+                    LLMessageConfig::initClass("viewer", gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, ""));
+                }
             #else
                 LLMessageConfig::initClass("viewer", gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, ""));
             #endif
