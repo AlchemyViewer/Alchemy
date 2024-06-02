@@ -490,7 +490,7 @@
 				<combo_box.item label="箱状（ボックス）" name="Box" value="Box"/>
 			</combo_box>
 			<check_box label="動的" name="Probe Dynamic" tool_tip="有効にすると、アバターはこのプローブ範囲内の反射に影響されて表示されます。"/>
-			<check_box label="鏡" name="Probe Mirror" tool_tip="有効にすると、鏡はこのプローブをリアルタイムの平面投影ミラープローブに変えますが、アンビエンスは計算しません。"/>
+			<check_box label="ミラー" name="Probe Mirror" tool_tip="有効にすると、ミラーはこのプローブをリアルタイムの平面投影ミラープローブに変えますが、アンビエンスは計算しません。"/>
 			<spinner label="アンビエンス" name="Probe Ambiance"/>
 			<spinner label="ニアクリップ" name="Probe Near Clip"/>
 			<text name="label physicsshapetype">

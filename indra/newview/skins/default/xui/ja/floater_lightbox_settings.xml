@@ -106,6 +106,16 @@
 				<combo_box.item label="高 （１６サンプル）" name="SSR_High"/>
 				<combo_box.item label="最高（３２サンプル）" name="SSR_Ultra"/>
 			</combo_box>
+			<check_box label="ミラー" tool_tip="ミラーを有効化します。"/>
+			<combo_box tool_tip="ミラーの品質を指定します。" name="Mirror_Res_Combo">
+				<combo_box.item label="低（256px）" name="Mirror_Low" value="256"/>
+				<combo_box.item label="中（512px）" name="Mirror_Medium" value="512"/>
+				<combo_box.item label="高（1024px）" name="Mirror_High" value="1024"/>
+				<combo_box.item label="最高（2048px）" name="Mirror_Ultra" value="2048"/>
+			</combo_box>
+			<text tool_tip="ミラーが更新を待機するレンダリングされたフレームの数を設定します。ジッタを犠牲にして平均ＦＰＳを向上させることができます。" value="更新の遅延レート："/>
+			<slider name="mirrorUpdateRateSlider" tool_tip="ミラーが更新を待機するレンダリングされたフレームの数を設定します。ジッタを犠牲にして平均ＦＰＳを向上させることができます。"/>
+			<spinner tool_tip="ミラーが更新を待機するレンダリングされたフレームの数を設定します。ジッタを犠牲にして平均ＦＰＳを向上させることができます。" name="mirrorUpdateRateSpinner"/>
 			<!--Probe Draw Distance-->
 			<!--
 			<text tool_tip="（デフォルト：６４ｍ）反射プローブで参照される最大オブジェクト距離です。距離が長いほど場面に対してより正確なプローブ描画が可能になりますが、その分生成時間やパフォーマンスが犠牲になります。" value="プローブの描画距離："/>
