@@ -385,7 +385,7 @@ void LLPluginProcessChild::receiveMessageRaw(const std::string &message)
             passMessage = false;
 
             std::string message_name = parsed.getName();
-            if (message_name == "load_plugin")
+            if (message_name == "load_plugin_alchemy")
             {
                 mPluginFile = parsed.getValue("file");
                 mPluginDir = parsed.getValue("dir");

@@ -40,7 +40,7 @@
 /**
  * TODO:DOC describe how it's used
  */
-const char *LLPluginInstance::PLUGIN_INIT_FUNCTION_NAME = "LLPluginInitEntryPoint";
+const char *LLPluginInstance::PLUGIN_INIT_FUNCTION_NAME = "ALPluginInitEntryPoint";
 
 /**
  * Constructor.

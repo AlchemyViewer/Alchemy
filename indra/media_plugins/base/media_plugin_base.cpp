@@ -32,7 +32,7 @@
 #include "media_plugin_base.h"
 
 
-// TODO: Make sure that the only symbol exported from this library is LLPluginInitEntryPoint
+// TODO: Make sure that the only symbol exported from this library is ALPluginInitEntryPoint
 ////////////////////////////////////////////////////////////////////////////////
 /// Media plugin constructor.
 ///
@@ -176,7 +176,7 @@ void MediaPluginBase::sendStatus()
 
 extern "C"
 {
-    LLSYMEXPORT int LLPluginInitEntryPoint(LLPluginInstance::sendMessageFunction host_send_func, void *host_user_data, LLPluginInstance::sendMessageFunction *plugin_send_func, void **plugin_user_data);
+    LLSYMEXPORT int ALPluginInitEntryPoint(LLPluginInstance::sendMessageFunction host_send_func, void *host_user_data, LLPluginInstance::sendMessageFunction *plugin_send_func, void **plugin_user_data);
 }
 
 /**
@@ -191,7 +191,7 @@ extern "C"
  *
  */
 LLSYMEXPORT int
-LLPluginInitEntryPoint(LLPluginInstance::sendMessageFunction host_send_func, void *host_user_data, LLPluginInstance::sendMessageFunction *plugin_send_func, void **plugin_user_data)
+ALPluginInitEntryPoint(LLPluginInstance::sendMessageFunction host_send_func, void *host_user_data, LLPluginInstance::sendMessageFunction *plugin_send_func, void **plugin_user_data)
 {
     return init_media_plugin(host_send_func, host_user_data, plugin_send_func, plugin_user_data);
 }

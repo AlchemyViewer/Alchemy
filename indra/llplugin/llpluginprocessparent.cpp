@@ -627,7 +627,7 @@ void LLPluginProcessParent::idle(void)
 
                 // Send the message to load the plugin
                 {
-                    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_INTERNAL, "load_plugin");
+                    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_INTERNAL, "load_plugin_alchemy");
                     message.setValue("file", mPluginFile);
                     message.setValue("dir", mPluginDir);
                     sendMessage(message);
