@@ -1763,7 +1763,7 @@ void LLWindowSDL::gatherInput()
             if (mKeyVirtualKey == SDLK_RETURN || mKeyVirtualKey == SDLK_KP_ENTER)
                 handleUnicodeUTF16(SDLK_RETURN, gKeyboard->currentMask(FALSE));
             if (!mLanguageTextInputAllowed && isascii(mKeyVirtualKey))
-                mCallbacks->handleUnicodeChar(utf8str_to_wchar(std::string((char)mKeyVirtualKey)), mKeyModifiers);
+                mCallbacks->handleUnicodeChar(utf8str_to_wchar(std::string(1, (char)mKeyVirtualKey)), mKeyModifiers);
             // part of the fix for SL-13243
             if (SDLCheckGrabbyKeys(event.key.keysym.sym, TRUE) != 0)
                 SDLReallyCaptureInput(TRUE);
