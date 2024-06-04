@@ -1124,7 +1124,7 @@ class LinuxManifest(ViewerManifest):
 
         with self.prefix(dst="bin"):
             self.path("alchemy-bin","do-not-directly-run-alchemy-bin")
-            self.path2basename("../llplugin/alplugin", "ALPlugin")
+            self.path2basename("../llplugin/slplugin", "ALPlugin")
             #this copies over the python wrapper script, associated utilities and required libraries, see SL-321, SL-322 and SL-323
             #with self.prefix(src="../viewer_components/manager", dst=""):
             #    self.path("*.py")
