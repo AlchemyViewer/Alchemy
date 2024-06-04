@@ -2,6 +2,7 @@
 <menu name="hide_navbar_menu">
 	<menu_item_check label="ナビゲーションバーとお気に入りバーを表示" name="ShowNavbarNavigationPanel"/>
 	<menu_item_check label="「場所」のミニフィールドを表示" name="ShowMiniLocationPanel"/>
+	<menu_item_check label="ロケーションバーを隠す" name="HideLocationPanels"/>
 	<menu_item_separator/>
 	<menu_item_check label="メニュー検索を表示" name="MenuSearch"/>
 	<menu_item_check label="L$収支を表示" name="ShowStatusBarBalance"/>

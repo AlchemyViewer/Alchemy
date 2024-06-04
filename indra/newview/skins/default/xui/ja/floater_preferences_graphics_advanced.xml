@@ -123,9 +123,9 @@
 	</combo_box>
 	<slider label="露光：" name="RenderExposure"/>
 	<!-- Mirror settings. -->
-	<check_box label="鏡" name="Mirrors"/>
+	<check_box label="ミラー" name="Mirrors"/>
 	<text name="MirrorResolutionText">
-		鏡の解像度：
+		ミラーの解像度：
 	</text>
 	<combo_box name="MirrorResolution">
 		<combo_box.item label="256" name="0" value="256"/>
@@ -134,7 +134,7 @@
 		<combo_box.item label="2048" name="3" value="2048"/>
 	</combo_box>
 	<text name="HeroProbeUpdateText">
-		鏡の更新頻度：
+		ミラーの更新頻度：
 	</text>
 
 	<combo_box name="HeroProbeUpdateRate">
