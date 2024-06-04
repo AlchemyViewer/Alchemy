@@ -1082,6 +1082,17 @@
 			<key>Value</key>
 			<real>0.275</real>
 		</map>
+        <key>RenderColorGrade</key>
+        <map>
+            <key>Comment</key>
+            <string>Enable color grading</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
 		<key>RenderColorGradeLUT</key>
 		<map>
 			<key>Comment</key>

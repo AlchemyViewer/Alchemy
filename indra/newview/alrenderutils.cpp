@@ -263,6 +263,7 @@ void LutCube::writeColor(int x, int y, int z, unsigned char r, unsigned char g, 
 ALRenderUtil::ALRenderUtil()
 {
     // Connect settings
+    mSettingConnections.push_back(gSavedSettings.getControl("RenderColorGrade")->getSignal()->connect(boost::bind(&ALRenderUtil::setupColorGrade, this)));
     mSettingConnections.push_back(gSavedSettings.getControl("RenderColorGradeLUT")->getSignal()->connect(boost::bind(&ALRenderUtil::setupColorGrade, this)));
     mSettingConnections.push_back(gSavedSettings.getControl("RenderToneMapType")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
     mSettingConnections.push_back(gSavedSettings.getControl("RenderExposure")->getSignal()->connect(boost::bind(&ALRenderUtil::setupTonemap, this)));
@@ -472,7 +473,7 @@ bool ALRenderUtil::setupColorGrade()
     if (LLPipeline::sRenderDeferred)
     {
         std::string lut_name = gSavedSettings.getString("RenderColorGradeLUT");
-        if (!lut_name.empty())
+        if (gSavedSettings.getBOOL("RenderColorGrade") && !lut_name.empty())
         {
             std::string lut_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut", lut_name);
 
