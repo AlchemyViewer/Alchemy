@@ -145,7 +145,9 @@ vec2 getScreenCoordinate(vec2 screenpos)
 
 vec4 getNorm(vec2 screenpos)
 {
-    return texture(normalMap, screenpos.xy);
+    vec4 norm = texture(normalMap, screenpos.xy);
+    norm.xyz = normalize(norm.xyz);
+    return norm;
 }
 
 // return packedNormalEnvIntensityFlags since GBUFFER_FLAG_HAS_PBR needs .w
