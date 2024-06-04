@@ -60,7 +60,7 @@ set(llwindow_LINK_LIBRARIES
         )
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
-if (LINUX)
+if (USE_SDL OR LINUX)
   list(APPEND viewer_SOURCE_FILES 
        llkeyboardsdl.cpp 
        llwindowsdl.cpp
@@ -70,7 +70,7 @@ if (LINUX)
        llwindowsdl.h
        )
 
-  if (BUILD_HEADLESS)
+  if (BUILD_HEADLESS AND LINUX)
     set(llwindowheadless_LINK_LIBRARIES
         ${LLCOMMON_LIBRARIES}
         ${LLIMAGE_LIBRARIES}
@@ -81,13 +81,13 @@ if (LINUX)
         ${LLXML_LIBRARIES}
         fontconfig          # For FCInit and other FC* functions.
         )
-  endif (BUILD_HEADLESS)
+  endif ()
 
   list(APPEND llwindow_LINK_LIBRARIES
        ll::SDL2
        )
 
-endif (LINUX)
+endif ()
 
 if (DARWIN)
   list(APPEND llwindow_SOURCE_FILES
