@@ -147,7 +147,7 @@ LLDir_Mac::LLDir_Mac()
 
         mWorkingDir = getCurPath();
 
-        mLLPluginDir = mAppRODataDir + mDirDelimiter + "SLPlugin.app" + mDirDelimiter + "Contents" + mDirDelimiter + "Frameworks";
+        mLLPluginDir = mAppRODataDir + mDirDelimiter + "ALPlugin.app" + mDirDelimiter + "Contents" + mDirDelimiter + "Frameworks";
     }
 }
 
@@ -182,7 +182,7 @@ bool LLDir_Mac::fileExists(const std::string &filename) const
 /*virtual*/ std::string LLDir_Mac::getLLPluginLauncher()
 {
     return gDirUtilp->getAppRODataDir() + gDirUtilp->getDirDelimiter() +
-        "SLPlugin.app/Contents/MacOS/SLPlugin";
+        "ALPlugin.app/Contents/MacOS/ALPlugin";
 }
 
 /*virtual*/ std::string LLDir_Mac::getLLPluginFilename(std::string base_name)

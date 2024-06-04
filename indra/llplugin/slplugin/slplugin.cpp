@@ -169,7 +169,7 @@ int main(int argc, char **argv)
 #if LL_WINDOWS
     if( strlen( lpCmdLine ) == 0 )
     {
-        LL_ERRS("slplugin") << "usage: " << "SLPlugin" << " launcher_port" << LL_ENDL;
+        LL_ERRS("slplugin") << "usage: " << "ALPlugin" << " launcher_port" << LL_ENDL;
     };
 
     U32 port = 0;

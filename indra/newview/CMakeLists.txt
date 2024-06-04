@@ -1949,7 +1949,7 @@ if (WINDOWS)
       ${CMAKE_CURRENT_SOURCE_DIR}/licenses-win32.txt
       ${CMAKE_CURRENT_SOURCE_DIR}/featuretable.txt
       ${viewer_APPSETTINGS_FILES}
-      SLPlugin
+      ALPlugin
       media_plugin_example
       )
 
@@ -2026,7 +2026,7 @@ if (WINDOWS)
       add_dependencies(${VIEWER_BINARY_NAME} copy_win_scripts)
     endif (EXISTS ${CMAKE_SOURCE_DIR}/copy_win_scripts)
 
-    add_dependencies(${VIEWER_BINARY_NAME} SLPlugin)
+    add_dependencies(${VIEWER_BINARY_NAME} ALPlugin)
 
     # sets the 'working directory' for debugging from visual studio.
     # Condition for version can be moved to requirements once build agents will be updated (see TOOL-3865)
@@ -2209,7 +2209,7 @@ if (LINUX)
   # These are the generated targets that are copied to package/
   set(COPY_INPUT_DEPENDENCIES
     ${VIEWER_BINARY_NAME}
-    SLPlugin
+    ALPlugin
     media_plugin_example
     media_plugin_libvlc
     )
@@ -2361,7 +2361,7 @@ if (DARWIN)
       ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
     )
 
-  add_dependencies(${VIEWER_BINARY_NAME} SLPlugin)
+  add_dependencies(${VIEWER_BINARY_NAME} ALPlugin)
 
   if (USE_CEF)
       add_dependencies(${VIEWER_BINARY_NAME} media_plugin_cef)

@@ -470,7 +470,7 @@ public:
          * - "len" entire length of pending data, regardless of setLimit()
          * - "slot" this ReadPipe's FILESLOT, e.g. LLProcess::STDOUT
          * - "name" e.g. "stdout"
-         * - "desc" e.g. "SLPlugin (pid) stdout"
+         * - "desc" e.g. "ALPlugin (pid) stdout"
          * - "eof" @c true means there no more data will arrive on this pipe,
          *   therefore no more events on this pump
          *

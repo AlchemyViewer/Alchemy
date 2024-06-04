@@ -648,7 +648,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 #if LL_WINDOWS
                 // As of CEF version 83+, for Windows versions, we need to tell CEF
                 // where the host helper process is since this DLL is not in the same
-                // dir as the executable that loaded it (SLPlugin.exe). The code in
+                // dir as the executable that loaded it (ALPlugin.exe). The code in
                 // Dullahan that tried to figure out the location automatically uses
                 // the location of the exe which isn't helpful so we tell it explicitly.
                 settings.host_process_path = mHelperPath;
