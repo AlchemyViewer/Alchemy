@@ -6,13 +6,13 @@ body:
   attributes:
     value: |
       - Write a descriptive bug title above.
-      - Search [open](https://github.com/secondlife/viewer/issues?q=is%3Aopen+label%3Abug+is%3Aissue) bugs to ensure that the issue has not already been identified.
+      - Search [open](https://github.com/AlchemyViewer/Alchemy/issues?q=is%3Aopen+label%3Abug+is%3Aissue) bugs to ensure that the issue has not already been identified.
 
 - type: textarea
   attributes:
     label: Environment
-    description: About Second Life Text
-    placeholder: ex. Second Life Test 7.1.3.240191747 (64bit) ...
+    description: About Alchemy Text
+    placeholder: ex. Alchemy Test 7.1.3.240191747 (64bit) ...
   validations:
     required: true
 
