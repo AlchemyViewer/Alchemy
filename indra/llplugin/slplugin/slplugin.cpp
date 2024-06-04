@@ -75,8 +75,7 @@ static void crash_handler(int sig)
 #endif
 
 #if LL_WINDOWS
-#include "llwin32headerslean.h"
-#include <Werapi.h>
+#include <windows.h>
 ////////////////////////////////////////////////////////////////////////////////
 //  Our exception handler - will probably just exit and the host application
 //  will miss the heartbeat and log the error in the usual fashion.
@@ -93,57 +92,22 @@ LONG WINAPI myWin32ExceptionHandler( struct _EXCEPTION_POINTERS* exception_infop
 // The MSVC 2005 and above CRT forces the call of the default-debugger (normally Dr.Watson)
 // even with the other exception handling code. This (terrifying) piece of code
 // patches things so that doesn't happen.
-static BOOL PreventSetUnhandledExceptionFilter()
+LPTOP_LEVEL_EXCEPTION_FILTER WINAPI MyDummySetUnhandledExceptionFilter(
+    LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter )
 {
-    HMODULE hKernel32 = LoadLibrary(TEXT("kernel32.dll"));
-    if (hKernel32 == nullptr) return FALSE;
-    LPVOID pOrgEntry = reinterpret_cast<LPVOID>(GetProcAddress(hKernel32, "SetUnhandledExceptionFilter"));
-    if (pOrgEntry == nullptr) return FALSE;
+    return NULL;
+}
 
-#ifdef _M_IX86
-    // Code for x86:
-    // 33 C0                xor         eax,eax
-    // C2 04 00             ret         4
-    unsigned char szExecute[] = { 0x33, 0xC0, 0xC2, 0x04, 0x00 };
-#elif _M_X64
-    // 33 C0                xor         eax,eax
-
-    unsigned char szExecute[] = { 0x33, 0xC0, 0xC3 };
-#else
-#error "The following code only works for x86 and x64!"
-#endif
-
-    DWORD oldProtect;
-    BOOL bRet = VirtualProtect(pOrgEntry, sizeof(szExecute), PAGE_EXECUTE_READWRITE, &oldProtect);
-    memcpy(pOrgEntry, szExecute, sizeof(szExecute));
-    VirtualProtect(pOrgEntry, sizeof(szExecute), oldProtect, &oldProtect);
-    return bRet;
+BOOL PreventSetUnhandledExceptionFilter()
+{
+    // remove the scary stuff that also isn't supported on 64 bit Windows
+    return TRUE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Hook our exception handler and replace the system one
 void initExceptionHandler()
 {
-    TCHAR szExeFileName[MAX_PATH];
-    GetModuleFileName(nullptr, szExeFileName, MAX_PATH);
-    std::wstring exename(szExeFileName);
-    size_t path_end = exename.find_last_of('\\');
-    if (path_end != std::string::npos)
-    {
-        exename = exename.substr(path_end + 1, std::string::npos);
-
-        if (S_OK == WerAddExcludedApplication(exename.c_str(), FALSE))
-        {
-            LL_INFOS() << "WerAddExcludedApplication() succeeded for " << ll_convert_wide_to_string(exename) << LL_ENDL;
-        }
-        else
-        {
-            LL_INFOS() << "WerAddExcludedApplication() failed for " << ll_convert_wide_to_string(exename) << LL_ENDL;
-        }
-    }
-
-    SetErrorMode(GetErrorMode() | SEM_NOGPFAULTERRORBOX);
-
     LPTOP_LEVEL_EXCEPTION_FILTER prev_filter;
 
     // save old exception handler in case we need to restore it at the end
@@ -292,6 +256,15 @@ int main(int argc, char **argv)
 
 //          LL_INFOS("slplugin") << "slept for "<< timer.getElapsedTimeF64() * 1000.0f << " ms" <<  LL_ENDL;
         }
+
+
+#if LL_WINDOWS
+    // More agressive checking of interfering exception handlers.
+    // Doesn't appear to be required so far - even for plugins
+    // that do crash with a single call to the intercept
+    // exception handler such as QuickTime.
+    //checkExceptionHandler();
+#endif
     }
     delete plugin;
 
