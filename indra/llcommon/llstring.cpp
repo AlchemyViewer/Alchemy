@@ -716,7 +716,7 @@ std::string utf8str_removeCRLF(const std::string& utf8str)
     return out;
 }
 
-llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_t length)
+llwchar utf8str_to_wchar(std::string_view utf8str, size_t offset, size_t length)
 {
     switch (length)
     {

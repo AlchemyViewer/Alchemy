@@ -777,7 +777,7 @@ LL_COMMON_API std::string mbcsstring_makeASCII(const std::string& str);
 
 LL_COMMON_API std::string utf8str_removeCRLF(const std::string& utf8str);
 
-LL_COMMON_API llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_t length);
+LL_COMMON_API llwchar utf8str_to_wchar(std::string_view utf8str, size_t offset, size_t length);
 
 LL_COMMON_API std::string utf8str_showBytesUTF8(const std::string& utf8str);
 
