@@ -102,7 +102,7 @@ class ValidatorFloat : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorFloatImpl;
 Validator validateFloat(validatorFloatImpl);
 
@@ -144,7 +144,7 @@ class ValidatorInt : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorIntImpl;
 Validator validateInt(validatorIntImpl);
 
@@ -188,7 +188,7 @@ class ValidatorPositiveS32 : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorPositiveS32Impl;
 Validator validatePositiveS32(validatorPositiveS32Impl);
 
@@ -232,7 +232,7 @@ class ValidatorNonNegativeS32 : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorNonNegativeS32Impl;
 Validator validateNonNegativeS32(validatorNonNegativeS32Impl);
 
@@ -275,7 +275,7 @@ class ValidatorNonNegativeS32NoSpace : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorNonNegativeS32NoSpaceImpl;
 Validator validateNonNegativeS32NoSpace(validatorNonNegativeS32NoSpaceImpl);
 
@@ -302,7 +302,7 @@ class ValidatorAlphaNum : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorAlphaNumImpl;
 Validator validateAlphaNum(validatorAlphaNumImpl);
 
@@ -329,7 +329,7 @@ class ValidatorAlphaNumSpace : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorAlphaNumSpaceImpl;
 Validator validateAlphaNumSpace(validatorAlphaNumSpaceImpl);
 
@@ -358,7 +358,7 @@ class ValidatorASCIIPrintableNoPipe : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorASCIIPrintableNoPipeImpl;
 Validator validateASCIIPrintableNoPipe(validatorASCIIPrintableNoPipeImpl);
 
@@ -385,7 +385,7 @@ class ValidatorASCIIPrintableNoSpace : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorASCIIPrintableNoSpaceImpl;
 Validator validateASCIIPrintableNoSpace(validatorASCIIPrintableNoSpaceImpl);
 
@@ -411,7 +411,7 @@ protected:
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorASCIIImpl;
 Validator validateASCII(validatorASCIIImpl);
 
@@ -430,7 +430,7 @@ class ValidatorASCIINoLeadingSpace : public ValidatorASCII
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorASCIINoLeadingSpaceImpl;
 Validator validateASCIINoLeadingSpace(validatorASCIINoLeadingSpaceImpl);
 
@@ -457,7 +457,7 @@ class ValidatorASCIIWithNewLine : public ValidatorImpl
 
 public:
     /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
+    /*virtual*/ bool validate(const LLWString& str) override { return validate<char>(wstring_to_utf8str(str)); }
 } validatorASCIIWithNewLineImpl;
 Validator validateASCIIWithNewLine(validatorASCIIWithNewLineImpl);
 

@@ -62,7 +62,7 @@ void LLURLLineEditor::cut()
         deleteSelection();
 
         // Validate new string and rollback the if needed.
-        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getWString());
+        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getString());
         if( need_to_rollback )
         {
             rollback.doRollback( this );

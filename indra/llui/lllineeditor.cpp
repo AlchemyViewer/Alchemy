@@ -1262,7 +1262,7 @@ void LLLineEditor::cut()
         deleteSelection();
 
         // Validate new string and rollback the if needed.
-        BOOL need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getWString());
+        BOOL need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getString());
         if (need_to_rollback)
         {
             rollback.doRollback( this );
@@ -1396,7 +1396,7 @@ void LLLineEditor::pasteHelper(bool is_primary)
             deselect();
 
             // Validate new string and rollback the if needed.
-            BOOL need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getWString());
+            BOOL need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getString());
             if (need_to_rollback)
             {
                 rollback.doRollback( this );
@@ -1663,7 +1663,7 @@ BOOL LLLineEditor::handleKeyHere(KEY key, MASK mask )
             // Validate new string and rollback the keystroke if needed.
             if (!need_to_rollback && mPrevalidator)
             {
-                prevalidator_failed = !mPrevalidator.validate(mText.getWString());
+                prevalidator_failed = !mPrevalidator.validate(mText.getString());
                 need_to_rollback |= prevalidator_failed;
             }
 
@@ -1723,7 +1723,7 @@ BOOL LLLineEditor::handleUnicodeCharHere(llwchar uni_char)
         deselect();
 
         // Validate new string and rollback the keystroke if needed.
-        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getWString());
+        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getString());
         if (need_to_rollback)
         {
             rollback.doRollback( this );
@@ -1776,7 +1776,7 @@ void LLLineEditor::doDelete()
         }
 
         // Validate new string and rollback the if needed.
-        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getWString());
+        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(mText.getString());
         if (need_to_rollback)
         {
             rollback.doRollback(this);
@@ -2313,7 +2313,7 @@ void LLLineEditor::setFocus( BOOL new_state )
         // fine on 1.15.0.2, since all prevalidate func reject any
         // non-ASCII characters.  I'm not sure on future versions,
         // however.
-        getWindow()->allowLanguageTextInput(this, !mPrevalidator);
+        getWindow()->allowLanguageTextInput(this, TRUE);
     }
 }
 
@@ -2482,7 +2482,7 @@ void LLLineEditor::updateAllowingLanguageInput()
         // test app, no window available
         return;
     }
-    if (hasFocus() && !mReadOnly && !mDrawAsterixes && !mPrevalidator)
+    if (hasFocus() && !mReadOnly && !mDrawAsterixes)
     {
         window->allowLanguageTextInput(this, TRUE);
     }

@@ -1051,7 +1051,7 @@ S32 LLTextEditor::execute( TextCmd* cmd )
         mUndoStack.push_front(cmd);
         mLastCmd = cmd;
 
-        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(getViewModel()->getDisplay());
+        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(getViewModel()->getStringValue());
         if (need_to_rollback)
         {
             LLUI::getInstance()->reportBadKeystroke();
