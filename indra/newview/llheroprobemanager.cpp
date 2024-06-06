@@ -75,7 +75,7 @@ LLHeroProbeManager::~LLHeroProbeManager()
 // helper class to seed octree with probes
 void LLHeroProbeManager::update()
 {
-    if (!LLPipeline::RenderMirrors || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
+    if (!LLPipeline::RenderMirrors || !LLPipeline::sReflectionProbesEnabled || gTeleportDisplay || LLStartUp::getStartupState() < STATE_PRECACHE)
     {
         return;
     }
@@ -124,7 +124,7 @@ void LLHeroProbeManager::update()
         float camera_center_distance = 99999.f;
         for (auto vo : mHeroVOList)
         {
-            if (vo && !vo->isDead() && vo->mDrawable.notNull())
+            if (vo && !vo->isDead() && vo->mDrawable.notNull() && vo->isReflectionProbe() && vo->getReflectionProbeIsBox())
             {
                 float distance = (LLViewerCamera::instance().getOrigin() - vo->getPositionAgent()).magVec();
                 float center_distance = cameraDirection * (vo->getPositionAgent() - camera_pos);
@@ -213,6 +213,12 @@ void LLHeroProbeManager::update()
 
 void LLHeroProbeManager::renderProbes()
 {
+    if (!LLPipeline::RenderMirrors || !LLPipeline::sReflectionProbesEnabled || gTeleportDisplay ||
+        LLStartUp::getStartupState() < STATE_PRECACHE)
+    {
+        return;
+    }
+
     static LLCachedControl<S32> sDetail(gSavedSettings, "RenderHeroReflectionProbeDetail", -1);
     static LLCachedControl<S32> sLevel(gSavedSettings, "RenderHeroReflectionProbeLevel", 3);
 

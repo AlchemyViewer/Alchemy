@@ -150,17 +150,6 @@ vec4 getNorm(vec2 screenpos)
     return norm;
 }
 
-// return packedNormalEnvIntensityFlags since GBUFFER_FLAG_HAS_PBR needs .w
-// See: C++: addDeferredAttachments(), GLSL: softenLightF
-vec4 getNormalEnvIntensityFlags(vec2 screenpos, out vec3 n, out float envIntensity)
-{
-    vec4 norm = texture(normalMap, screenpos.xy);
-    n = norm.xyz;
-    envIntensity = texture(emissiveRect, screenpos.xy).r;
-
-    return norm;
-}
-
 // get linear depth value given a depth buffer sample d and znear and zfar values
 float linearDepth(float d, float znear, float zfar)
 {
