@@ -743,7 +743,7 @@ https://secondlife.com/viewer-access-faq
 	</string>
 	<!-- Always mark translate="false" for strings that are nothing but URLs, as they don't need translation. -->
 	<string name="RELEASE_NOTES_BASE_URL" translate="false">
-		https://git.alchemyviewer.org/alchemy/alchemy/releases/
+		https://github.com/AlchemyViewer/Alchemy/releases/tag/
 	</string>
 	<!-- Indicates something is being loaded. Maybe should be merged with RetrievingData -->
 	<string name="LoadingData">

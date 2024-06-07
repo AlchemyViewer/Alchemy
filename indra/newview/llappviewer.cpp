@@ -3216,7 +3216,13 @@ LLSD LLAppViewer::getViewerInfo() const
         url = LLTrans::getString("RELEASE_NOTES_BASE_URL");
         if (!LLStringUtil::endsWith(url, "/"))
             url += "/";
-        url += LLURI::escape(versionInfo.getVersion()) + ".html";
+        url += LLURI::escape(versionInfo.getVersion());
+        if (versionInfo.getViewerMaturity() == LLVersionInfo::BETA_VIEWER)
+            url += LLURI::escape("-beta");
+        else if (versionInfo.getViewerMaturity() == LLVersionInfo::PROJECT_VIEWER)
+            url += LLURI::escape("-project");
+        else if (versionInfo.getViewerMaturity() == LLVersionInfo::TEST_VIEWER)
+            url += LLURI::escape("-test");
     }
     info["VIEWER_RELEASE_NOTES_URL"] = url;
 

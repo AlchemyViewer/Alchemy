@@ -1910,7 +1910,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 
 インターネット接続を確認してから数分後に再接続するか、ヘルプをクリックして [SUPPORT_SITE]をご覧になるか、テレポートをクリックしてホームに移動してみてください。
 		<tag>fail</tag>
-		<url name="url">https://git.alchemyviewer.org/alchemy/alchemy-next/issues</url>
+		<url name="url">https://github.com/AlchemyViewer/Alchemy/issues</url>
 		<form name="form">
 			<button name="OK" text="ＯＫ"/>
 			<button name="Help" text="ヘルプ"/>

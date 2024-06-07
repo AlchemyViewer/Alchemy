@@ -2041,14 +2041,14 @@ function="World.EnvPreset"
              name="Report Alchemy Bug">
 			<menu_item_call.on_click
 				function="Advanced.ShowURL"
-				parameter="https://git.alchemyviewer.org/alchemy/viewer/issues/new?issuable_template=Bug"/>
+				parameter="https://github.com/AlchemyViewer/Alchemy/issues/new?assignees=&labels=bug%2Ctriage&projects=&template=10-bug.yaml"/>
 		</menu_item_call>
 		<menu_item_call
              label="Request Alchemy Improvement"
              name="Request Alchemy Improvement">
 			<menu_item_call.on_click
 				function="Advanced.ShowURL"
-				parameter="https://git.alchemyviewer.org/alchemy/viewer/issues/new?issuable_template=Improvement"/>
+				parameter="https://github.com/AlchemyViewer/Alchemy/issues/new?assignees=&labels=enhancement%2C+triage&projects=&template=20-enhancement.md&title=New+Feature"/>
 		</menu_item_call>
 		<menu_item_separator/>
         <menu_item_call

@@ -3922,7 +3922,7 @@ We&apos;re having trouble connecting. There may be a problem with your Internet 
 You can either check your Internet connection and try again in a few minutes, click Help to view the [SUPPORT_SITE], or click Teleport to attempt to teleport home.
     <url option="1" name="url">
 
-			https://git.alchemyviewer.org/alchemy/alchemy-next/issues
+			https://github.com/AlchemyViewer/Alchemy/issues
     </url>
     <form name="form">
       <button
@@ -3950,7 +3950,7 @@ We&apos;re having trouble connecting. There may be a problem with your Internet 
 
 You can either check your Internet connection and try again in a few minutes or click Help to view the [SUPPORT_SITE].
     <url option="1" name="url">
-			https://git.alchemyviewer.org/alchemy/alchemy-next/issues
+			https://github.com/AlchemyViewer/Alchemy/issues
     </url>
     <form name="form">
       <button
