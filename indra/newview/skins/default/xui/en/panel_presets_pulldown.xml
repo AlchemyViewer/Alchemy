@@ -8,10 +8,10 @@
  border="false"
  chrome="true"
  follows="bottom"
- height="315"
+ height="380"
  layout="topleft"
  name="presets_pulldown"
- width="285">
+ width="400">
   <text
     type="string"
     length="1"
@@ -26,11 +26,11 @@
       Graphic Presets
   </text>
   <scroll_list
-    follows="left|top"
+    follows="left|top|right"
     layout="topleft"
     column_padding="0"
     height="100"
-    width="275"
+    width="390"
     draw_heading="false"
     draw_stripes="false"
     bg_stripe_color="0.25 0.25 0.25 0.25"
@@ -48,13 +48,12 @@
   </scroll_list>
   <view_border
     bevel_style="none"
-    follows="top|left"
+    follows="top|left|right"
     height="0"
     layout="topleft"
     left="5"
     name="horiz_separator"
-    top_delta="105"
-    width="275" />
+    top_delta="105"/>
 
   <text
     type="string"
@@ -88,7 +87,7 @@
     halign="center"
     height="12"
     layout="topleft"
-    left_delta="62"
+    left_delta="102"
     name="ShadersPrefText2"
     top_delta="0"
     width="60">
@@ -101,7 +100,7 @@
     halign="center"
     height="12"
     layout="topleft"
-    left_delta="88"
+    left_delta="128"
     name="ShadersPrefText3"
     top_delta="0"
     width="60">
@@ -114,7 +113,7 @@
     halign="right"
     height="12"
     layout="topleft"
-    left_delta="65"
+    left_delta="100"
     name="ShadersPrefText4"
     top_delta="0"
     width="60">
@@ -134,7 +133,7 @@
     height="14"
     image_name="Rounded_Square"
     layout="topleft"
-    left_pad="41"
+    left_pad="59"
     name="LowMidGraphicsDivet"
     width="2" />
   <icon
@@ -142,7 +141,7 @@
     height="14"
     image_name="Rounded_Square"
     layout="topleft"
-    left_pad="41"
+    left_pad="62"
     name="MidGraphicsDivet"
     top_delta="0"
     width="2" />
@@ -151,7 +150,7 @@
     height="14"
     image_name="Rounded_Square"
     layout="topleft"
-    left_pad="42"
+    left_pad="61"
     name="MidHighGraphicsDivet"
     top_delta="0"
     width="2" />
@@ -160,7 +159,7 @@
     height="14"
     image_name="Rounded_Square"
     layout="topleft"
-    left_pad="42"
+    left_pad="62"
     name="HighGraphicsDivet"
     top_delta="0"
     width="2" />
@@ -169,7 +168,7 @@
     height="14"
     image_name="Rounded_Square"
     layout="topleft"
-    left_pad="42"
+    left_pad="61"
     name="HighUltraGraphicsDivet"
     top_delta="0"
     width="2" />
@@ -178,7 +177,7 @@
     height="14"
     image_name="Rounded_Square"
     layout="topleft"
-    left_pad="42"
+    left_pad="62"
     name="UltraGraphicsDivet"
     top_delta="0"
     width="2" />
@@ -195,7 +194,7 @@
     name="QualityPerformanceSelection"
     show_text="false"
     top_delta="-2"
-    width="279">
+    width="395">
     <slider.commit_callback
       function="Presets.QualityPerformance"/>
   </slider>
@@ -217,7 +216,7 @@
    layout="topleft"
    max_val="512"
    min_val="64"
-   left="93"
+   left="113"
    right="-68"
    name="draw_dist_slider_bar"
    control_name="RenderFarClip"/>
@@ -254,7 +253,7 @@
    layout="topleft"
    max_val="4.0"
    min_val="1.0"
-   left="93"
+   left="113"
    right="-68"
    name="lod_slider_bar"
    control_name="RenderVolumeLODFactor"/>
@@ -290,7 +289,7 @@
    layout="topleft"
    max_val="8192"
    min_val="0"
-   left="93"
+   left="113"
    right="-68"
    name="max_particles_slider_bar"
    control_name="RenderMaxPartCount"/>
@@ -326,7 +325,7 @@
    layout="topleft"
    max_val="65"
    min_val="1"
-   left="93"
+   left="113"
    right="-68"
    name="max_avatar_slider_bar"
    control_name="RenderAvatarMaxNonImpostors"/>
@@ -361,7 +360,7 @@
    layout="topleft"
    max_val="350000"
    min_val="0"
-   left="93"
+   left="113"
    right="-68"
    name="complexity_slider_bar"
    control_name="RenderAvatarMaxComplexity"/>
@@ -379,30 +378,129 @@
    increment="1"
    name="complexity_spinner"
    control_name="RenderAvatarMaxComplexity" />
+    <!--Max Local Lights-->
+    <text
+    follows="left|top"
+    height="15"
+    left="10"
+    top_pad="3"
+    width="120"
+    layout="topleft"
+    value="Local Lights:"
+    name="lights_label"/>
+    <slider_bar
+     top_pad="-16"
+     height="20"
+     initial_value="96"
+     follows="left|top|right"
+     layout="topleft"
+     max_val="4096"
+     min_val="8"
+     increment="8"
+     left="113"
+     right="-68"
+     name="local_light_slider_bar"
+     control_name="RenderLocalLightCount"/>
+    <spinner
+     top_pad="-21"
+     height="20"
+     label_width="0"
+     right="-8"
+     decimal_digits="0"
+     follows="top|right"
+     layout="topleft"
+     max_val="4096"
+     min_val="8"
+     width="60"
+     increment="8"
+     name="local_light_spinner"
+     control_name="RenderLocalLightCount" />
+    <!--Global Light Scale-->
+    <text
+    follows="left|top"
+    height="15"
+    left="10"
+    top_pad="3"
+    width="120"
+    layout="topleft"
+    value="Light Intensity:"
+    name="light_intensity_label"/>
+    <slider_bar
+     top_pad="-16"
+     height="20"
+     initial_value="96"
+     follows="left|top|right"
+     layout="topleft"
+     max_val="10"
+     min_val="0"
+     increment=".1"
+     left="113"
+     right="-68"
+     name="light_intensity_slider_bar"
+     control_name="AlchemyGlobalLightScale"/>
+    <spinner
+     top_pad="-21"
+     height="20"
+     label_width="0"
+     right="-8"
+     decimal_digits="2"
+     follows="top|right"
+     layout="topleft"
+     max_val="10"
+     min_val="0"
+     increment=".1"
+     width="60"
+     name="light_intensity_spinner"
+     control_name="AlchemyGlobalLightScale" />
+    <text
+    follows="left|top"
+    height="15"
+    left="10"
+    top_pad="3"
+    width="120"
+    layout="topleft"
+    value="Resolution Scale:"
+    name="res_scale_label"/>
+    <slider_bar
+     top_pad="-16"
+     height="20"
+     initial_value="96"
+     follows="left|top|right"
+     layout="topleft"
+     max_val="2"
+     min_val=".5"
+     increment=".1"
+     left="113"
+     right="-68"
+     name="res_scale_slider_bar"
+     tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale."
+     control_name="RenderResolutionMultiplier"/>
+    <spinner
+     top_pad="-21"
+     height="20"
+     label_width="0"
+     right="-8"
+     decimal_digits="2"
+     follows="top|right"
+     layout="topleft"
+     max_val="2"
+     min_val=".5"
+     increment=".1"
+     width="60"
+     name="res_scale_spinner"
+     tool_tip="(Default: 1.0) [DANGEROUS] Internal render resolution scale."
+     control_name="RenderResolutionMultiplier" />
   <button
     name="open_prefs_btn"
     label="Graphics Preferences"
     tool_tip = "Bring up graphics prefs"
-    follows="top|left"
+    follows="top|right"
     layout="topleft"
     top_pad="5"
-    left="10"
+    right="-9"
     height="20"
     width="162">
     <button.commit_callback
       function="Presets.GoGraphicsPrefs" />
-  </button>
-  <button
-    name="open_prefs_btn"
-    label="Lightbox"
-    tool_tip = "Bring up Lightbox"
-    follows="top|left"
-    layout="topleft"
-    top_delta="0"
-    left_pad="5"
-    height="20"
-    width="100">
-    <button.commit_callback
-      function="Presets.GoLightbox" />
   </button>
 </panel>
