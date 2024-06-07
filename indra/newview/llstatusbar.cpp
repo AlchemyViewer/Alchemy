@@ -176,10 +176,10 @@ BOOL LLStatusBar::postBuild()
     mBoxBalance = getChild<LLTextBox>("balance");
     mBoxBalance->setClickedCallback( &LLStatusBar::onClickBalance, this );
 
-    mIconPresetsCamera = getChild<LLIconCtrl>( "presets_icon_camera" );
+    mIconPresetsCamera = getChild<LLButton>( "presets_icon_camera" );
     mIconPresetsCamera->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterPresetsCamera, this));
 
-    mIconPresetsGraphic = getChild<LLIconCtrl>( "presets_icon_graphic" );
+    mIconPresetsGraphic = getChild<LLButton>( "presets_icon_graphic" );
     mIconPresetsGraphic->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterPresets, this));
 
     mBtnQuickSettings = getChild<LLButton>("quick_settings_btn");

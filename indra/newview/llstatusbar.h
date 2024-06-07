@@ -133,8 +133,8 @@ private:
     LLTextBox   *mTextFPS;
 
     LLView      *mPanelPopupHolder;
-    LLIconCtrl  *mIconPresetsCamera;
-    LLIconCtrl  *mIconPresetsGraphic;
+    LLButton    *mIconPresetsCamera;
+    LLButton    *mIconPresetsGraphic;
     LLButton    *mBtnQuickSettings;
     LLButton    *mBtnAO;
     LLButton    *mBtnVolume;

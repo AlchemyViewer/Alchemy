@@ -130,24 +130,36 @@
      width="120">
 		24:00:00 AM PST
 	</text>
-	<icon
+    <button
      follows="right|top"
      height="16"
-     image_name="Cam_FreeCam_Off"
+     image_selected="Cam_FreeCam_Off"
+     image_pressed="Cam_FreeCam_Off"
+     image_unselected="Cam_FreeCam_Off"
      left_pad="0"
      top="2"
      name="presets_icon_camera"
-	 tool_tip="My Camera Presets"
-     width="18" />
-	<icon
+     tool_tip="My Camera Presets"
+     width="16">
+        <click_callback
+         function="Floater.ToggleOrBringToFront"
+         parameter="camera" />
+    </button>
+    <button
      follows="right|top"
-     height="13"
-     image_name="Presets_Icon"
+     height="16"
+     image_selected="Presets_Icon"
+     image_pressed="Presets_Icon"
+     image_unselected="Presets_Icon"
      left_pad="6"
-     top="4"
+     top="2"
      name="presets_icon_graphic"
-	 tool_tip="Graphics Presets"
-     width="16" />
+     tool_tip="Graphics Presets"
+     width="16">
+        <click_callback
+         function="Floater.ToggleOrBringToFront"
+         parameter="lightbox" />
+    </button>
 	<button
      follows="right|top"
      height="16"
@@ -170,8 +182,7 @@
      top="2"
      name="media_toggle_btn"
      tool_tip="Start/Stop All Media (Music, Video, Web pages)"
-     width="16" >
-	</button>
+     width="16" />
 	<button
      follows="right|top"
      height="16"
