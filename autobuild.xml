@@ -196,11 +196,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3280a6c52b91ba02b630bd2d2ab0e318bf2a800db02c4bab38b2ccbe71a230cb755663348615891b9d388c2fc2bc1eaa38650e2b5421c4133f750267b2b3c538</string>
+              <string>5b2b81f993aa66c0fc5d6b4dd6bf2500153df7c48b9b6fb67461d63e0d7d0bfedd88fc069e3d7a9d84baeed159c4c20dfd06937cb80403236d7a0dc42011f2fc</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/199/packages/generic/branding/1.0.0.1857/branding-1.0.0-common-1857.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/viewer-branding/releases/download/v1.0.0-383e3ba/branding-1.0.0-common-9427245893.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -211,11 +211,19 @@
         <key>license_file</key>
         <string>LICENSES/branding.txt</string>
         <key>copyright</key>
-        <string>Copyright (c) 2023 Alchemy Development Group</string>
+        <string>Copyright (c) 2024 Alchemy Development Group</string>
         <key>version</key>
         <string>1.0.0</string>
         <key>name</key>
         <string>branding</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v1.0.0-383e3ba</string>
+        <key>vcs_revision</key>
+        <string>383e3ba43630843fcd75b037606f4093fa378665</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/viewer-branding.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/viewer-branding</string>
         <key>description</key>
         <string>Alchemy Branding Material</string>
       </map>
@@ -696,11 +704,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0bd93717f0a839f908cfadcb055918ba600107b9e4aac4bb3eadb686a523c612ec659daf7f1f030ed62d7fe360c60749658a9e088efb2cb3b8af9963f82a45ce</string>
+              <string>9788bb1993e1a75eb9a121570bbf05a665e9a1d9324a9693549004e44557ed25383d62248e16a72623279c755f5401e20fcc82c6d05a01bf5d9c0d337664237c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/e04de2e.2401/fonts-e04de2e-common-2401.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-fonts/releases/download/vf66e1b7/fonts-f66e1b7-common-9427253190.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -713,11 +721,17 @@
         <key>copyright</key>
         <string>Various Licenses</string>
         <key>version</key>
-        <string>e04de2e</string>
+        <string>f66e1b7</string>
         <key>name</key>
         <string>fonts</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/vf66e1b7</string>
+        <key>vcs_revision</key>
+        <string>f66e1b7f09dc67231742d10f60a0499b302572ed</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-fonts.git</string>
         <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-fonts</string>
+        <string>https://github.com/AlchemyViewer/3p-fonts</string>
         <key>description</key>
         <string>A collection of fonts used by the viewer</string>
       </map>
@@ -1354,11 +1368,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>98c884baba8a56dc883372977cb1baea100f0704dc8e3fb757f74da6e06721959023830726fc7f71329a983dc87126a30fd4e663c6af434ed214a3a9f09ce5f9</string>
+              <string>d47e09c5c1db0e3d643e4cd5101e49bfc95148c4751a40f4548ac81b35acfdb1db6e29611845fd12c5f31c7fbc9b9fe28619a8104df47046eb1abf8aca48a2df</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/125/packages/generic/llca/2024.0217.0804.2362/llca-2024.0217.0804-common-2362.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/llca/releases/download/v20240608-7f84421/llca-2024.0608.0713-common-9427055405.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -1372,9 +1386,17 @@
         <string>Copyright (c) 2020, Alchemy Development Group; data provided by the Mozilla NSS Project.
       </string>
         <key>version</key>
-        <string>2024.0217.0804</string>
+        <string>2024.0608.0713</string>
         <key>name</key>
         <string>llca</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v20240608-7f84421</string>
+        <key>vcs_revision</key>
+        <string>7f844210b5c0e4bbaf07c1fa44d15995622f4971</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/llca.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/llca</string>
       </map>
       <key>llphysicsextensions_stub</key>
       <map>
@@ -1463,11 +1485,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0bdb34f2c021c76abb87f4641fbfcf84c05c1cabccbd89e51c85c7ec374fee5225e1f4c4684ad0b06ee0ca946ac587c5ba2117d84ddf0258b96dd1ac10743819</string>
+              <string>8895c201ad0a54e1ca1030279b7b08df269abf1cd06a00d7efea7835d51e72a11931bd914c3f7f451999293538af6e8f17f8f1e383de50479565cad6a1c055f5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/204/packages/generic/mikktspace/2.2330/mikktspace-2-common-2330.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-mikktspace/releases/download/v2.0.0-445eec3/mikktspace-2-common-9426976986.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -1483,8 +1505,14 @@
         <string>2</string>
         <key>name</key>
         <string>mikktspace</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v2.0.0-445eec3</string>
+        <key>vcs_revision</key>
+        <string>445eec3183beee40f7da6d11de6294cc997e4210</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-mikktspace.git</string>
         <key>canonical_repo</key>
-        <string>https://bitbucket.org/lindenlab/3p-mikktspace</string>
+        <string>https://github.com/secondlife/3p-mikktspace</string>
         <key>description</key>
         <string>Mikktspace Tangent Generator</string>
       </map>
@@ -1559,11 +1587,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>448a4f5fd2b85a3343612d250fc13f8412ee8c161f1a181e2c09b85afe0eb234af6f44753db6d019b56620462add24dbca064e39da63d78ff542047c80807994</string>
+              <string>e2ef97f3f9165f209eb4fe13a2292ce1814786afc19fde3181ad90fa4d3a593b8a28880b94e17552e40588af928002b56b8343d1f9728c7c5ef1c59171055228</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/226/packages/generic/nanosvg/2024.03.01.2382/nanosvg-2024.03.01-common-2382.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-nanosvg/releases/download/v2024.03.01-e98809b/nanosvg-2024.03.01-common-9427146439.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -1579,8 +1607,14 @@
         <string>2024.03.01</string>
         <key>name</key>
         <string>nanosvg</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v2024.03.01-e98809b</string>
+        <key>vcs_revision</key>
+        <string>e98809b385b8458e71e2721518d663aec463e879</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-nanosvg.git</string>
         <key>canonical_repo</key>
-        <string>https://bitbucket.org/lindenlab/3p-nanosvg</string>
+        <string>https://github.com/AlchemyViewer/3p-nanosvg</string>
         <key>description</key>
         <string>NanoSVG is a simple single-header-file SVG parser and rasterizer</string>
       </map>
@@ -2199,6 +2233,50 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>name</key>
         <string>threejs</string>
       </map>
+      <key>tinyexr</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>bf1ccc0d761f3d901bb856068c029cc381b9b4196287ec83084c06855818f2a220b869dc78987e1a8ace0e5cd8e8e4180b4242493c7da645ed573b333eed1465</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://github.com/AlchemyViewer/3p-tinyexr/releases/download/v1.0.8-df9c8f5/tinyexr-v1.0.8-common-9426885274.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>3-clause BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/tinyexr_license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2014 - 2021, Syoyo Fujita and many contributors.</string>
+        <key>version</key>
+        <string>v1.0.8</string>
+        <key>name</key>
+        <string>tinyexr</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v1.0.8-df9c8f5</string>
+        <key>vcs_revision</key>
+        <string>df9c8f58b9356e7aca5a5eed364eb8ae8c21b846</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-tinyexr.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-tinyexr</string>
+        <key>description</key>
+        <string>tinyexr import library</string>
+        <key>source</key>
+        <string>https://github.com/AlchemyViewer/3p-tinyexr</string>
+        <key>source_type</key>
+        <string>git</string>
+      </map>
       <key>tinygltf</key>
       <map>
         <key>platforms</key>
@@ -2208,11 +2286,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>fd47fda26f517e1d4a31e0c84ac05ed8171a5582b7b141c45d7359e834d3b533fac71630a59764a72bd59510136156546e1502430a0beeaeb5b46844fd63e8b1</string>
+              <string>ea2cea5638000217c80252f4aa94e2511f0676adcc22b1afc2aaa12ef5537096b7476a7171154f34430224cdad91154585308f384698306bdb9f2a570db631d0</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/185/packages/generic/tinygltf/v2.8.21.2435/tinygltf-v2.8.21-common-2435.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-tinygltf/releases/download/v2.8.21-639e303/tinygltf-v2.8.21-common-9426927923.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2228,12 +2306,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>v2.8.21</string>
         <key>name</key>
         <string>tinygltf</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v2.8.21-639e303</string>
+        <key>vcs_revision</key>
+        <string>639e303d6e18cbb3ee50461c4cfe3daea76bcad3</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-tinygltf.git</string>
         <key>canonical_repo</key>
-        <string>https://bitbucket.org/lindenlab/3p-tinygltf</string>
+        <string>https://github.com/AlchemyViewer/3p-tinygltf</string>
         <key>description</key>
         <string>tinygltf import library</string>
         <key>source</key>
-        <string>https://bitbucket.org/lindenlab/3p-tinygltf</string>
+        <string>https://github.com/AlchemyViewer/3p-tinygltf</string>
         <key>source_type</key>
         <string>git</string>
       </map>
@@ -2536,11 +2620,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>900198578dac08a7a2f160a7fd5c4410c9609a3579a7c75dec71a16b332daedf2c0c399578f3e66bba14d01e6435aa019bed665372eef6e3c41b15db9ae44421</string>
+              <string>1a1c905fe8f2360d518d8ace3e14733543e4c95ee7c2ea8a68c9b4181b640c3ccc64a6df68737c59282767d21de1fc678caadd9c217522ff2691136f0ce07b1d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.2.2136/xxhash-0.8.2-common-2136.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-xxhash/releases/download/v0.8.2-58fe44c/xxhash-0.8.2-common-9427203649.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2556,6 +2640,14 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>0.8.2</string>
         <key>name</key>
         <string>xxhash</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v0.8.2-58fe44c</string>
+        <key>vcs_revision</key>
+        <string>40d40b7de3af4526e880b6d4438612582c656ef6</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-xxhash.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-xxhash</string>
         <key>description</key>
         <string>Extremely fast non-cryptographic hash algorithm</string>
       </map>
@@ -2620,106 +2712,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-zlib-ng</string>
         <key>description</key>
         <string>zlib replacement with optimizations for next generation systems.</string>
-      </map>
-      <key>icu4c</key>
-      <map>
-        <key>platforms</key>
-        <map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>6ffea6bcf648b27d738bf4722fc5e52f57ad320349f7d04473a70a1ac7c4c9425b62be24c28a1b26c5df38b7acdd3939084352fe2ad81680f17b17769ccf8d6a</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/75.1.2470/icu4c-75.1-windows64-2470.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>734445f92df195544d3358dbc761ca8d32eeb8f1707b4b116bb29f23236fd8434f5ae5686cef90a4eee0fc910c19b0838101995c1368f6b823340e025e781978</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/75.1.2470/icu4c-75.1-darwin64-2470.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>646c00d3c708db68047f0a3dbbf382e1fce62bd8a62a19976d15fe694e36ac03656c066dbb4aee2262f5cc6c1db07f578c710f25e6addcea05affe924fe26ab6</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/75.1.2470/icu4c-75.1-linux64-2470.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-        </map>
-        <key>license</key>
-        <string>ICU, permissive non-copyleft free software license</string>
-        <key>license_file</key>
-        <string>LICENSES/icu.txt</string>
-        <key>copyright</key>
-        <string>Copyright (c) 1995-2011 International Business Machines Corporation and others &lt;http://source.icu-project.org&gt;</string>
-        <key>version</key>
-        <string>75.1</string>
-        <key>name</key>
-        <string>icu4c</string>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-icu4c</string>
-        <key>description</key>
-        <string>ICU is a mature, widely used set of C/C++ and Java libraries providing Unicode and Globalization support for software applications. ICU is widely portable and gives applications the same results on all platforms and between C/C++ and Java software.</string>
-      </map>
-      <key>tinyexr</key>
-      <map>
-        <key>platforms</key>
-        <map>
-          <key>common</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>506cfdf3e8599aefd643a4b973a6a98ce605dbb2c81368a765841822df253da52e7f3040865235cebcde2b9375aa535f64ac6afe4a2eac8105ebde10f10dc771</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/231/packages/generic/tinyexr/v1.0.8.2461/tinyexr-v1.0.8-common-2461.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>common</string>
-          </map>
-        </map>
-        <key>license</key>
-        <string>3-clause BSD</string>
-        <key>license_file</key>
-        <string>LICENSES/tinyexr_license.txt</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2014 - 2021, Syoyo Fujita and many contributors.</string>
-        <key>version</key>
-        <string>v1.0.8</string>
-        <key>name</key>
-        <string>tinyexr</string>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-tinyexr</string>
-        <key>description</key>
-        <string>tinyexr import library</string>
-        <key>source</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-tinyexr</string>
-        <key>source_type</key>
-        <string>git</string>
       </map>
       <key>glm</key>
       <map>

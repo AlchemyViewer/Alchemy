@@ -1,7 +1,7 @@
 ---
 name: Enhancement
 about: New feature or enhancement
-title: New Feature
+title: "[New Feature]: "
 labels: enhancement, triage
 ---
 
