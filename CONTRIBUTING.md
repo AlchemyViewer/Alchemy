@@ -1,76 +1,85 @@
 # Contributor guidelines
 
-Thanks for your interest in contributing to Second Life! This document
+Thanks for your interest in contributing to Alchemy Viewer! This document
 summarizes some of the most important points for people looking to contribute
-to the platform especially those looking to provide bug reports and code
+to the project especially those looking to provide bug reports and code
 changes.
 
 ## Table of contents
 
-- [Communication](#communication)
-- [Reporting bugs and requesting features](#reporting-bugs-and-requesting-features)
-- [Contributing pull requests](#contributing-pull-requests)
+- [Contributor guidelines](#contributor-guidelines)
+  - [Table of contents](#table-of-contents)
+  - [Communication](#communication)
+  - [Reporting Bugs and Requesting Features](#reporting-bugs-and-requesting-features)
+    - [Importance of Your Feedback](#importance-of-your-feedback)
+    - [Our Relationship with Linden Lab and Code Inheritance](#our-relationship-with-linden-lab-and-code-inheritance)
+    - [Reporting Bugs to Linden Lab](#reporting-bugs-to-linden-lab)
+    - [Submitting Feedback to Alchemy Viewer](#submitting-feedback-to-alchemy-viewer)
+  - [Contributing pull requests](#contributing-pull-requests)
 
 ## Communication
 
-Second Life has multiple channels for communication. Some of these channels are
-more end-user focused, while others are more tailored for
-developer-to-developer or support.
+Alchemy Viewer has multiple channels for communication. Some of these channels are
+more end-user focused while others are more tailored for developer-to-developer or support.
 
-- [feedback.secondlife.com][] is Second Life's primary community engagement
-  forum. Ideas and bug reports should be placed here unless they relate to
-  ongoing development issues and developer-to-developer communication.
-- [Public user groups][slug] are held on a regular basis, including those for
-  discussing open source development, content creation, server topics and more.
-- [Github issues][] provide a means for staff to organize their
-  work and collaborate with other developers. By default most user-facing
-  discussions should happen on [feedback.secondlife.com][] so that they are
-  visible to more people, can build consensus, and be placed onto our public
-  roadmap. Github issues are useful for collaboration between viewer forks
-  and the official upstream and when engineering-specific and technical
-  collaboration is beneficial. 
-- [Official forums][] exist for many topics including content creation,
-   scripting, social topics and more. 
-- The [opensource-dev mailing list][] is useful for announcements and
-  discussion between viewer maintainers. 
+- [Our Discord][discord] is the primary community engagement platform for the project.
+  This is where we announce our releases, answer questions from the community,
+  and provide support to users. This is also a great place for developers to interact
+  with the Alchemy users to determine if their feature is interesting to them.
+- [Github issues][] provide a means for developers and contributors to organize
+  their work and collaborate with other developers. By default most user-facing
+  discussions should happen on [the Discord][discord] so that they are
+  visible to more people, and can build consensus.
 
+## Reporting Bugs and Requesting Features
 
-## Reporting bugs and requesting features
+### Importance of Your Feedback
 
-Report bugs and provide ideas for features using the respective board on Second
-Life's feedback portal:
+We value your feedback and invite you to help us identify bugs and suggest new features for Alchemy Viewer.
+Your input is crucial in shaping the future of our project.
 
-- [Features](https://feedback.secondlife.com/feature-requests)
-- [Scripting bugs](https://feedback.secondlife.com/scripting-bugs)
-- [Scripting features](https://feedback.secondlife.com/scripting-features)
-- [Server bugs](https://feedback.secondlife.com/scripting-bugs)
-- [Viewer bugs](https://feedback.secondlife.com/bug-reports)
-- [Web/Marketplace bugs](https://feedback.secondlife.com/web-bugs)
-- [Web/Marketplace features](https://feedback.secondlife.com/web-features)
+Your cooperation with these guidelines will help us improve Alchemy Viewer,
+and ensures that Linden Lab can address broader issues within their codebase.
 
-Creating posts on feedback.secondlife.com is important as it allows the greatest
-exposure and input from Second Life users. It also allows Linden Lab staff to
-place work on a single public roadmap.
+### Our Relationship with Linden Lab and Code Inheritance
 
-Issues created on feedback.secondlife.com are imported onto Github after they
-have been reviewed by staff and accepted. 
+It's important to note that while we are not affiliated with or endorsed by Linden Lab,
+the creators of Second Life, our viewer incorporates a significant amount of code from them.
+
+This shared codebase means some issues may originate from the Linden Lab viewer,
+and addressing these effectively benefits both viewers.
+
+### Reporting Bugs to Linden Lab
+
+If you encounter defects or unwanted behavior that are inherited from the official Second Life viewer,
+please report these issues directly to Linden Lab.
+
+Before submitting a bug report to Alchemy Viewer, kindly check the [official Second Life viewer][lindenviewer]
+to determine if the defect exists there as well.
+
+Reporting it to Linden Lab, if it hasn't already been reported, will ensure they are aware of the issue.
+If you are unsure, you are encouraged to share your findings with an Alchemy team member to receive guidance.
+Linden Lab's page for submitting bug reports can be found on [feedback.secondlife.com/bug-reports][lindenbugs].
+
+### Submitting Feedback to Alchemy Viewer
+
+If the defect is unique to Alchemy Viewer or pertains to features exclusive to our viewer, please proceed to submit your bug report to us on Github. Provide as much detail as possible, including steps to reproduce the issue, logs, and screenshots if available. This information will help us diagnose and address the problem more efficiently.
 
 ## Contributing pull requests
 
 If you wish to contribute a new pull request, please ensure that:
 
 - You talk to other developers about how best to implement the work.
-- The functionality is desired. Be sure to talk to users and Second Life staff to ensure
-  the work is a good idea and will be accepted.
+- The functionality is desired. Be sure to talk to users and members of the Alchemy
+  team to ensure the work is a good idea and will be accepted.
 - The work is high quality and the PR follows [PR etiquette][]
 - You have tested the work locally
 
 The [Git Style Guide](https://github.com/agis/git-style-guide) is also a good
 reference for best git practices.
 
-[feedback.secondlife.com]: https://feedback.secondlife.com
-[slug]: https://community.secondlife.com/blogs/entry/6509-introducing-the-second-life-public-calendar/
 [PR etiquette]: https://gist.github.com/mikepea/863f63d6e37281e329f8
-[Github issues]: https://github.com/secondlife/viewer/issues
-[Official forums]: https://community.secondlife.com/forums/
-[opensource-dev mailing list]: https://wiki.secondlife.com/wiki/OpenSource-Dev
+[Github issues]: https://github.com/AlchemyViewer/Alchemy/issues
+[discord]: https://discordapp.com/invite/KugCgs6
+[lindenviewer]: https://releasenotes.secondlife.com/viewer.html
+[lindenbugs]: https://feedback.secondlife.com/bug-reports
