@@ -154,16 +154,19 @@ void LLPanelLandAudio::refresh()
 
         const std::string& current_url = parcel->getMusicURL();
         mMusicURLEdit->clearRows();
-        LLSD stream_list = gSavedSettings.getLLSD("StreamList");
-        const LLSD streams = stream_list["audio"];
-        for (LLSD::array_const_iterator s_itr = streams.beginArray(), s_end = streams.endArray(); s_itr != s_end; ++s_itr)
+        if(can_change_media)
         {
-            mMusicURLEdit->add(LLSD(*s_itr));
+            LLSD stream_list = gSavedSettings.getLLSD("StreamList");
+            const LLSD streams = stream_list["audio"];
+            for (LLSD::array_const_iterator s_itr = streams.beginArray(), s_end = streams.endArray(); s_itr != s_end; ++s_itr)
+            {
+                mMusicURLEdit->add(LLSD(*s_itr));
+            }
+            mMusicURLEdit->addSeparator(ADD_TOP);
         }
-        mMusicURLEdit->addSeparator(ADD_TOP);
         mMusicURLEdit->add(LLSD(current_url), ADD_TOP);
         mMusicURLEdit->selectByValue(current_url);
-        mMusicURLEdit->setEnabled(can_change_media);
+        mMusicURLEdit->setEnabled(TRUE);
 
         BOOL can_change_av_sounds = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_OPTIONS) && parcel->getHaveNewParcelLimitData();
         mCheckAVSoundAny->set(parcel->getAllowAnyAVSounds());
@@ -224,6 +227,14 @@ void LLPanelLandAudio::onCommitAny(LLUICtrl*, void *userdata)
 
 void LLPanelLandAudio::onCommitMusicUrl()
 {
+    LLParcel* parcel = mParcel->getParcel();
+    if (!parcel)
+        return;
+
+    BOOL can_change_media = LLViewerParcelMgr::isParcelModifiableByAgent(parcel, GP_LAND_CHANGE_MEDIA);
+    if (!can_change_media)
+        return;
+
     std::string music_url = mMusicURLEdit->getSimple();
     LLStringUtil::trim(music_url);
     if (!music_url.empty())
