@@ -196,11 +196,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>77ff4019db1fc2b1bad442d3dd1238394e54908688bd7999baa55e683356ecbc2c0cbf12bcab43c6fe325092cc9409fccab222593157fa23583bc11810d47c4c</string>
+              <string>5b2b81f993aa66c0fc5d6b4dd6bf2500153df7c48b9b6fb67461d63e0d7d0bfedd88fc069e3d7a9d84baeed159c4c20dfd06937cb80403236d7a0dc42011f2fc</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/viewer-branding/releases/download/v1.0.0-383e3ba/branding-1.0.0-common-9427139488.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/viewer-branding/releases/download/v1.0.0-383e3ba/branding-1.0.0-common-9427245893.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -704,11 +704,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0bd93717f0a839f908cfadcb055918ba600107b9e4aac4bb3eadb686a523c612ec659daf7f1f030ed62d7fe360c60749658a9e088efb2cb3b8af9963f82a45ce</string>
+              <string>9788bb1993e1a75eb9a121570bbf05a665e9a1d9324a9693549004e44557ed25383d62248e16a72623279c755f5401e20fcc82c6d05a01bf5d9c0d337664237c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/169/packages/generic/fonts/e04de2e.2401/fonts-e04de2e-common-2401.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-fonts/releases/download/vf66e1b7/fonts-f66e1b7-common-9427253190.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -721,11 +721,17 @@
         <key>copyright</key>
         <string>Various Licenses</string>
         <key>version</key>
-        <string>e04de2e</string>
+        <string>f66e1b7</string>
         <key>name</key>
         <string>fonts</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/vf66e1b7</string>
+        <key>vcs_revision</key>
+        <string>f66e1b7f09dc67231742d10f60a0499b302572ed</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-fonts.git</string>
         <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-fonts</string>
+        <string>https://github.com/AlchemyViewer/3p-fonts</string>
         <key>description</key>
         <string>A collection of fonts used by the viewer</string>
       </map>
@@ -2614,11 +2620,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>900198578dac08a7a2f160a7fd5c4410c9609a3579a7c75dec71a16b332daedf2c0c399578f3e66bba14d01e6435aa019bed665372eef6e3c41b15db9ae44421</string>
+              <string>1a1c905fe8f2360d518d8ace3e14733543e4c95ee7c2ea8a68c9b4181b640c3ccc64a6df68737c59282767d21de1fc678caadd9c217522ff2691136f0ce07b1d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/202/packages/generic/xxhash/0.8.2.2136/xxhash-0.8.2-common-2136.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-xxhash/releases/download/v0.8.2-58fe44c/xxhash-0.8.2-common-9427203649.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2634,6 +2640,14 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>0.8.2</string>
         <key>name</key>
         <string>xxhash</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v0.8.2-58fe44c</string>
+        <key>vcs_revision</key>
+        <string>40d40b7de3af4526e880b6d4438612582c656ef6</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-xxhash.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-xxhash</string>
         <key>description</key>
         <string>Extremely fast non-cryptographic hash algorithm</string>
       </map>
@@ -2698,68 +2712,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-zlib-ng</string>
         <key>description</key>
         <string>zlib replacement with optimizations for next generation systems.</string>
-      </map>
-      <key>icu4c</key>
-      <map>
-        <key>platforms</key>
-        <map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>6ffea6bcf648b27d738bf4722fc5e52f57ad320349f7d04473a70a1ac7c4c9425b62be24c28a1b26c5df38b7acdd3939084352fe2ad81680f17b17769ccf8d6a</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/75.1.2470/icu4c-75.1-windows64-2470.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>734445f92df195544d3358dbc761ca8d32eeb8f1707b4b116bb29f23236fd8434f5ae5686cef90a4eee0fc910c19b0838101995c1368f6b823340e025e781978</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/75.1.2470/icu4c-75.1-darwin64-2470.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>646c00d3c708db68047f0a3dbbf382e1fce62bd8a62a19976d15fe694e36ac03656c066dbb4aee2262f5cc6c1db07f578c710f25e6addcea05affe924fe26ab6</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/223/packages/generic/icu4c/75.1.2470/icu4c-75.1-linux64-2470.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-        </map>
-        <key>license</key>
-        <string>ICU, permissive non-copyleft free software license</string>
-        <key>license_file</key>
-        <string>LICENSES/icu.txt</string>
-        <key>copyright</key>
-        <string>Copyright (c) 1995-2011 International Business Machines Corporation and others &lt;http://source.icu-project.org&gt;</string>
-        <key>version</key>
-        <string>75.1</string>
-        <key>name</key>
-        <string>icu4c</string>
-        <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-icu4c</string>
-        <key>description</key>
-        <string>ICU is a mature, widely used set of C/C++ and Java libraries providing Unicode and Globalization support for software applications. ICU is widely portable and gives applications the same results on all platforms and between C/C++ and Java software.</string>
       </map>
       <key>glm</key>
       <map>
