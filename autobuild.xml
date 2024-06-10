@@ -1463,11 +1463,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4e1597ec20042c578afb5b0807919beb0865df46f044b83d886bf2c05460113eaac2a46c5acef8eac623a2846b2f334172aa7a801e0dde6744209bc719006bee</string>
+              <string>5389c8dc9b40b11e1b346ccd32bda8508272dc0583b94b1e254dc27dbcea6067a2a423c88f1d50c09aa454c5cdd4e3f1419e5c63f1db3de56d1a96f2953e7790</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/170/packages/generic/llphysicsextensions_stub/1.0.1229/llphysicsextensions_stub-1.0-common-1229.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/llphysicsextensions_stub/releases/download/v1.0-4c02558/llphysicsextensions_stub-1.0-common-9442370996.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2750,11 +2750,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>52c11f37bb2ae297b4a934eb59af9d9179fb6950a3a6f3d5fc929041a6932d08ac762e5d1664a129a4da32ea28b724bb347855d5d02acbbe9d2bc21affe82f67</string>
+              <string>c5ebeb4ad7c506a0be2cfa248e23e147fb2c49432c145f4727bfaebecf37005a781ca3f233d9ec0e6e1b6f3d0ce0b07b867b6e5281df30646248de9eec0735cc</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/232/packages/generic/glm/v1.0.1.2462/glm-v1.0.1-common-2462.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-glm/releases/download/v1.0.1-127293b/glm-v1.0.1-common-9442368006.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
