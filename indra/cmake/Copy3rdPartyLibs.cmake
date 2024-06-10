@@ -10,6 +10,7 @@ include(FMODSTUDIO)
 include(OPENAL)
 include(DiscordSDK)
 include(Sentry)
+include(InstallRequiredSystemLibraries)
 
 # When we copy our dependent libraries, we almost always want to copy them to
 # both the Release and the RelWithDebInfo staging directories. This has
@@ -104,19 +105,6 @@ if(WINDOWS)
         MESSAGE(WARNING "New MSVC_VERSION ${MSVC_VERSION} of MSVC: adapt Copy3rdPartyLibs.cmake")
     endif (MSVC80)
 
-    if(ADDRESS_SIZE EQUAL 32)
-        # this folder contains the 32bit DLLs.. (yes really!)
-        set(registry_find_path "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Windows;Directory]/SysWOW64")
-    else(ADDRESS_SIZE EQUAL 32)
-        # this folder contains the 64bit DLLs.. (yes really!)
-        set(registry_find_path "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Windows;Directory]/System32")
-    endif(ADDRESS_SIZE EQUAL 32)
-
-    # Having a string containing the system registry path is a start, but to
-    # get CMake to actually read the registry, we must engage some other
-    # operation.
-    get_filename_component(registry_path "${registry_find_path}" ABSOLUTE)
-
     # These are candidate DLL names. Empirically, VS versions before 2015 have
     # msvcp*.dll and msvcr*.dll. VS 2017 has msvcp*.dll and vcruntime*.dll.
     # Check each of them.
@@ -132,18 +120,18 @@ if(WINDOWS)
             vcruntime${MSVC_VER}_1.dll
             vcruntime${MSVC_VER}_threads.dll
             )
-        if(EXISTS "${registry_path}/${release_msvc_file}")
-            to_staging_dirs(
-                ${registry_path}
-                third_party_targets
-                ${release_msvc_file})
-        else()
-            # This isn't a WARNING because, as noted above, every VS version
-            # we've observed has only a subset of the specified DLL names.
-            MESSAGE(STATUS "Redist lib ${release_msvc_file} not found")
-        endif()
+    if(EXISTS "${MSVC_CRT_DIR}/${release_msvc_file}") # MSVC_CRT_DIR set in InstallRequiredSystemLibraries.cmake
+        to_staging_dirs(
+            ${MSVC_CRT_DIR}
+            third_party_targets
+            ${release_msvc_file})
+    else()
+        # This isn't a WARNING because, as noted above, every VS version
+        # we've observed has only a subset of the specified DLL names.
+        MESSAGE(STATUS "Redist lib ${release_msvc_file} not found")
+    endif()
     endforeach()
-    MESSAGE(STATUS "Will copy redist files for MSVC ${MSVC_VER}:")
+    MESSAGE(STATUS "Will copy redist files for MSVC ${MSVC_VER} from ${MSVC_CRT_DIR}:")
     foreach(target ${third_party_targets})
         MESSAGE(STATUS "${target}")
     endforeach()
