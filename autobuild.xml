@@ -294,11 +294,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7d7a74d6a7a71816310b5147caf4c7f512202738ca40b4073ebac0bdd7774d2e447c7a45e29fcd3596c08c798157dea19bd061bfe64dd2fa68f9a240689ae7f3</string>
+              <string>c8b190ac1bdc401bd155c7a895b57a9823ec8252b48d491154d833742e280317502f6353ca5d928d261c9da7cab15bf93908164ffa73ae3857b8820f300e1135</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/175/packages/generic/cubemaptoequirectangular/1.1.0.1341/cubemaptoequirectangular-1.1.0-common-1341.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-cubemap_to_eqr_js/releases/download/v1.1.0-52404b1/cubemaptoequirectangular-1.1.0-common-9430681282.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -314,6 +314,14 @@
         <string>1.1.0</string>
         <key>name</key>
         <string>cubemaptoequirectangular</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v1.1.0-52404b1</string>
+        <key>vcs_revision</key>
+        <string>52404b1b89f3f631083b3e9fa34aed98b5ec6197</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-cubemap_to_eqr_js.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-cubemap_to_eqr_js</string>
       </map>
       <key>curl</key>
       <map>
@@ -384,11 +392,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1923960e355d3d461e3b34644003c8fd4f0462636ffad63c0b80a670b13c5ff83e187244d83ea90da97dedcef92d3bea1df5d57299a8dad920af30720308ec9b</string>
+              <string>2ae19f70fe73a6201e809b018eab20d3294b6c376a20ff077fce57642bcb312c4330ad0965ff6ac9766aad38150d0b89a486289fa986be09e29f20050183fc7d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/124/packages/generic/dictionaries/1.0.0.1181/dictionaries-1.0.0-common-1181.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-dictionaries/releases/download/v1.0.0-724be51/dictionaries-1.0.0-common-9430157592.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -399,13 +407,21 @@
         <key>license_file</key>
         <string>LICENSES/dictionaries.txt</string>
         <key>copyright</key>
-        <string>Copyright 2014 Apache OpenOffice software</string>
+        <string>various contributors</string>
         <key>version</key>
         <string>1.0.0</string>
         <key>name</key>
         <string>dictionaries</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v1.0.0-724be51</string>
+        <key>vcs_revision</key>
+        <string>724be514bc1e7cc029b216df4472a3237c16c318</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-dictionaries.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-dictionaries</string>
         <key>description</key>
-        <string>Spell checking dictionaries to bundled into the viewer</string>
+        <string>Spell checking dictionaries to bundle into the viewer</string>
       </map>
       <key>discord-gamesdk</key>
       <map>
@@ -544,11 +560,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>aa45328bccaa9f356998c2722ac373bc1822bfb6db7e363fccfaa6c6e290fe3e342084afb9dfe6b058e13d2783a6f93b86ebf7f72e51edbff9887873c58ca53b</string>
+              <string>21e6704cda776d24de00a56bc20ef88d66c9b9a4a3e6cbd06c9cd17040318798a9fbfb25622f14a144f054a9dc47c6b42896ece36d6c1bba0c9f526193e5d29e</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/224/packages/generic/emoji_shortcodes/15.3.0.2381.2381/emoji_shortcodes-15.3.0.2381-common-2381.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-emoji-shortcodes/releases/download/v15.3.0-dfc7c2c/emoji_shortcodes-15.3.0.9430912711-common-9430912711.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -561,11 +577,17 @@
         <key>copyright</key>
         <string>Copyright 2017-2019 Miles Johnson.</string>
         <key>version</key>
-        <string>15.3.0.2381</string>
+        <string>15.3.0.9430912711</string>
         <key>name</key>
         <string>emoji_shortcodes</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v15.3.0-dfc7c2c</string>
+        <key>vcs_revision</key>
+        <string>dfc7c2cf2a91e3ef55875b2590f8de738d715e00</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-emoji-shortcodes.git</string>
         <key>canonical_repo</key>
-        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-emoji-shortcodes</string>
+        <string>https://github.com/secondlife/3p-emoji-shortcodes</string>
         <key>description</key>
         <string>Emoji shortcodes</string>
       </map>
@@ -804,11 +826,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7cc58b3acb230a7e65ea5f0ff800be393eb4aa1b</string>
+              <string>64d6a3ea63788c63ef21535fd24235bd205e1840b40dd3a405535b4b69648d815a3cfd4cf95840c9acba733a419580d0bfa6becbc43f7a88a8c0be869d3fb26f</string>
               <key>hash_algorithm</key>
-              <string>sha1</string>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://github.com/secondlife/3p-glext/releases/download/v69/glext-68-common-685b36e.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-glext/releases/download/v20240327-5691615/glext-20240327-common-9429975081.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -821,9 +843,17 @@
         <key>copyright</key>
         <string>Copyright (c) 2007-2010 The Khronos Group Inc.</string>
         <key>version</key>
-        <string>68</string>
+        <string>20240327</string>
         <key>name</key>
         <string>glext</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v20240327-5691615</string>
+        <key>vcs_revision</key>
+        <string>5691615f55c118e4678247696e846bdaf14ff94d</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-glext.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-glext</string>
         <key>description</key>
         <string>glext headers define function prototypes and constants for OpenGL extensions</string>
       </map>
@@ -836,9 +866,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>dce3f3c01fddb400cb143c3283fe9259</string>
+              <string>027c4811ae7374deab834ecb2cc38245af1fcb089d62fc3468b111b61502d4312e1826715a974dcdd74cdf9d146bd04769ae6bd16e58fb1a025209cdd799615a</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
               <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/82754/775367/glh_linear-0.0.0-common-560278.tar.bz2</string>
+              <string>https://github.com/AlchemyViewer/3p-glh_linear/releases/download/v1.0.1-dev4-5efd005/glh_linear-1.0.1-dev4-common-9430188124.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -851,9 +883,17 @@
         <key>copyright</key>
         <string>Copyright (c) 2000 Cass Everitt</string>
         <key>version</key>
-        <string>0.0.0</string>
+        <string>1.0.1-dev4</string>
         <key>name</key>
         <string>glh_linear</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v1.0.1-dev4-5efd005</string>
+        <key>vcs_revision</key>
+        <string>5efd005f011c78d07775973c616b304b88a9a41e</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-glh_linear.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-glh_linear</string>
         <key>description</key>
         <string>glh - is a platform-indepenedent C++ OpenGL helper library</string>
       </map>
@@ -894,11 +934,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>bcce1475013242472bc4158d7c46692aa62a582cbe9ea4a3d54f392da97b359812c6df2aef7038866f009f7e22a8ff18679c6fbc5179ea4883409b1dd3d56a86</string>
+              <string>c8712c55915fc98f735030f4b49edc14b3a5ac58e503ea5286f7ce3efc99f993d7dba22db695d322fe6bea24ec143a87fb93e06f9d89f41bad0903befc2b9a8c</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/212/packages/generic/innosetup/6.2.2.2179/innosetup-6.2.2-windows64-2179.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-innosetup/releases/download/v6.2.2-5e7476c/innosetup-6.2.2-windows64-9431263855.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -914,6 +954,14 @@
         <string>6.2.2</string>
         <key>name</key>
         <string>innosetup</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v6.2.2-5e7476c</string>
+        <key>vcs_revision</key>
+        <string>5e7476c72483461591cb842f8bbd3c9b720d479a</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-innosetup.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-innosetup</string>
         <key>description</key>
         <string>Innosetup installer framework</string>
       </map>
@@ -926,11 +974,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1af3afbf1ce81013c5107dfb41d3fc10735f727f12260fc38cd345c748f1eafb36100ede324da44105205084b9aac32dd723fd0d1d45b686a4a922bcad9525eb</string>
+              <string>36a4b914b39dce5bbfa85e4378f69536a1560ef31085a89392a57d43bf6a3d36b6a445b24f87755b5ec5af40c5642e465ceba2af2b9e0ddafdab77713a2df4a0</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/176/packages/generic/jpegencoderbasic/1.0.1340/jpegencoderbasic-1.0-common-1340.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-jpeg_encoder_js/releases/download/v1.0-9baa576/jpegencoderbasic-1.0-common-9430709713.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -946,6 +994,14 @@
         <string>1.0</string>
         <key>name</key>
         <string>jpegencoderbasic</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v1.0-9baa576</string>
+        <key>vcs_revision</key>
+        <string>9baa5763ca67e004a3c26e34ee7e1217d6e80c7b</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-jpeg_encoder_js.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-jpeg_encoder_js</string>
       </map>
       <key>kdu</key>
       <map>
@@ -1407,11 +1463,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4e1597ec20042c578afb5b0807919beb0865df46f044b83d886bf2c05460113eaac2a46c5acef8eac623a2846b2f334172aa7a801e0dde6744209bc719006bee</string>
+              <string>5389c8dc9b40b11e1b346ccd32bda8508272dc0583b94b1e254dc27dbcea6067a2a423c88f1d50c09aa454c5cdd4e3f1419e5c63f1db3de56d1a96f2953e7790</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/170/packages/generic/llphysicsextensions_stub/1.0.1229/llphysicsextensions_stub-1.0-common-1229.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/llphysicsextensions_stub/releases/download/v1.0-4c02558/llphysicsextensions_stub-1.0-common-9442370996.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2212,11 +2268,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3fbe0e0a9752b4d2247a9f5cfc895677b5877c4804bfc6d0b65dba2853f8f4451fcc6f741bc097bcfceda2c8a9ee99080b3c438e27fe659d679444364235e8e1</string>
+              <string>e86d943ec57771b6f58ff6bb9afc8634221946ea881b874deed1533b2996db95042617f68ffc8a9a0331b76068e0a4acebf23a2e4f2844e53527625ccc8062d9</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/174/packages/generic/threejs/0.135.0.1339/threejs-0.135.0-common-1339.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-three_js/releases/download/v0.135.0-77c9281/threejs-0.135.0-common-9430571859.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2227,11 +2283,19 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>license_file</key>
         <string>LICENSES/THREEJS_LICENSE.txt</string>
         <key>copyright</key>
-        <string>Copyright © 2010-2021 three.js authors</string>
+        <string>Copyright (c) 2010-2021 three.js authors</string>
         <key>version</key>
         <string>0.135.0</string>
         <key>name</key>
         <string>threejs</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v0.135.0-77c9281</string>
+        <key>vcs_revision</key>
+        <string>77c92813a3c4c6f5e67f1dc7534eb004fe6fec6b</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-three_js.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/AlchemyViewer/3p-three_js</string>
       </map>
       <key>tinyexr</key>
       <map>
@@ -2380,11 +2444,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>780b87d04e600cace6e76f1cc9b1a0f81ad2b5216bbbccb8e1e8aab287efdab0b6556b5f9f15240370c2025e7ca95689727c4741efd8837e9b5f9c2390ffb783</string>
+              <string>d6a58e633ddefb94df1d1b000cc90a76bdfd6ad5596c93a5a68b4e25449312e72ea962ab8b46813761dce7b89ae3953d0b251812b7b735c5e53f94589ac2888d</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/138/packages/generic/tut/2008.11.30.1175/tut-2008.11.30-common-1175.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-tut/releases/download/v2008.11.30-da9df71/tut-2008.11.30-common-9430907772.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2400,6 +2464,14 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>2008.11.30</string>
         <key>name</key>
         <string>tut</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v2008.11.30-da9df71</string>
+        <key>vcs_revision</key>
+        <string>da9df71618a8d7738aef8219d3d499f045e95fca</string>
+        <key>vcs_url</key>
+        <string>git://github.com/AlchemyViewer/3p-tut.git</string>
+        <key>canonical_repo</key>
+        <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-tut</string>
         <key>description</key>
         <string>TUT is a small and portable unit test framework for C++.</string>
       </map>
@@ -2472,11 +2544,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4eeda8fc5d9c72c5561cfc38f72e7aad2c5b89f74f47f8bb5b1151e4532c1b7a6bda71414241275f881d3baf19b87930bcb0eae4c31373557a6fd1c8c899502e</string>
+              <string>ce11c4fa8d0285c4dcf45d875ccc7e340538298426a542a470acbe3d8fdc067bc4c3e6b831ac0679b3a3d97a3a77849126f457d8eec0b5d5139c0eb189a00a75</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.20.2227/vlc_bin-3.0.20-darwin64-2227.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-vlc-bin/releases/download/v3.0.20-75ab205/vlc_bin-3.0.20-darwin64-9441322919.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2486,11 +2558,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9d51b045a69076f7f48f76d1c9ef6e910d5ebf2085c6f89932f171b888432000e6c6f76eba1e959daf8839b2b402958f57233d6827ef2cf38bcf8c5a3c489911</string>
+              <string>72f932dd567c6f95bc73bfb8809dc41a0541e674e477041e6a95b50346fe289b26f0126aeaba337d87cf01c6213e9ace04c40687b8a81a047aa5797eb7bbcb38</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.20.2227/vlc_bin-3.0.20-windows64-2227.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-vlc-bin/releases/download/v3.0.20-75ab205/vlc_bin-3.0.20-windows64-9441322919.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2506,50 +2578,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>3.0.20</string>
         <key>name</key>
         <string>vlc-bin</string>
-      </map>
-      <key>vulkan_gltf</key>
-      <map>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>8cff2060843db3db788511ee34a8e8cc</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/101316/891509/vulkan_gltf-1-darwin64-572743.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>79b6a11622c2f83cfc2b7cd1fafb867b</string>
-              <key>url</key>
-              <string>https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/101319/891521/vulkan_gltf-1-windows64-572743.tar.bz2</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>license</key>
-        <string>Copyright (c) 2018 Sascha Willems</string>
-        <key>license_file</key>
-        <string>LICENSES/vulkan_gltf.txt</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2018 Sascha Willems</string>
-        <key>version</key>
-        <string>1</string>
-        <key>name</key>
-        <string>vulkan_gltf</string>
-        <key>canonical_repo</key>
-        <string>https://bitbucket.org/lindenlab/3p-vulkan-gltf-pbr</string>
-        <key>description</key>
-        <string>Vulkan GLTF Sample Implementation</string>
       </map>
       <key>xmlrpc-epi</key>
       <map>
@@ -2722,11 +2750,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>52c11f37bb2ae297b4a934eb59af9d9179fb6950a3a6f3d5fc929041a6932d08ac762e5d1664a129a4da32ea28b724bb347855d5d02acbbe9d2bc21affe82f67</string>
+              <string>c5ebeb4ad7c506a0be2cfa248e23e147fb2c49432c145f4727bfaebecf37005a781ca3f233d9ec0e6e1b6f3d0ce0b07b867b6e5281df30646248de9eec0735cc</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/232/packages/generic/glm/v1.0.1.2462/glm-v1.0.1-common-2462.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-glm/releases/download/v1.0.1-127293b/glm-v1.0.1-common-9442368006.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
