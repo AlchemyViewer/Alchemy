@@ -1598,11 +1598,13 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
     if(msg_region)
         parcel_mgr.mParcelsPerEdge = S32(msg_region->getWidth() / PARCEL_GRID_STEP_METERS);
     else
+    {
         if (!gAgent.getRegion())
         {
             return;
         }
         parcel_mgr.mParcelsPerEdge = S32(gAgent.getRegion()->getWidth() / PARCEL_GRID_STEP_METERS);
+    }
 
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_RequestResult, request_result);
     msg->getS32Fast(_PREHASH_ParcelData, _PREHASH_SequenceID, sequence_id);
