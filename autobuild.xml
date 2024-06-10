@@ -2544,11 +2544,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>4eeda8fc5d9c72c5561cfc38f72e7aad2c5b89f74f47f8bb5b1151e4532c1b7a6bda71414241275f881d3baf19b87930bcb0eae4c31373557a6fd1c8c899502e</string>
+              <string>ce11c4fa8d0285c4dcf45d875ccc7e340538298426a542a470acbe3d8fdc067bc4c3e6b831ac0679b3a3d97a3a77849126f457d8eec0b5d5139c0eb189a00a75</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.20.2227/vlc_bin-3.0.20-darwin64-2227.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-vlc-bin/releases/download/v3.0.20-75ab205/vlc_bin-3.0.20-darwin64-9441322919.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2558,11 +2558,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9d51b045a69076f7f48f76d1c9ef6e910d5ebf2085c6f89932f171b888432000e6c6f76eba1e959daf8839b2b402958f57233d6827ef2cf38bcf8c5a3c489911</string>
+              <string>72f932dd567c6f95bc73bfb8809dc41a0541e674e477041e6a95b50346fe289b26f0126aeaba337d87cf01c6213e9ace04c40687b8a81a047aa5797eb7bbcb38</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/108/packages/generic/vlc-bin/3.0.20.2227/vlc_bin-3.0.20-windows64-2227.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-vlc-bin/releases/download/v3.0.20-75ab205/vlc_bin-3.0.20-windows64-9441322919.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
