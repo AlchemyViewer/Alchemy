@@ -4,7 +4,7 @@
 		<!--Image Panel-->
 		<panel label="画像" name="colortone_settings">
 			<!--LUT Control-->
-			<text tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテーブル）を指定します。カスタムＬＵＴには完全なファイル名が必要です！" value="有効なＬＵＴ："/>
+			<check_box label="カラーグレーディング：" tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテーブル）を指定します。カスタムＬＵＴには完全なファイル名が必要です！"/>
 			<!--TODO: Make more flexible?-->
 			<combo_box tool_tip="画像に対するカラーグレーディングＬＵＴ（ルックアップテーブル）を指定します。カスタムＬＵＴには完全なファイル名が必要です！" name="colorlut_combo">
 				<combo_box.item label="なし" name="lut_none" value=""/>
