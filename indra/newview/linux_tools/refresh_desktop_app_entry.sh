@@ -16,6 +16,13 @@ else
     exit 1
 fi
 
+# Check for the Release channel. This channel should not have the channel name in its launcher.
+if [ "$channel" = "Alchemy Release" ]; then
+    launcher_name="Alchemy"
+else
+    launcher_name=$channel
+fi
+
 install_desktop_entry()
 {
     installation_prefix="${1}"
@@ -23,7 +30,7 @@ install_desktop_entry()
 
     desktop_entry="\
 [Desktop Entry]\n\
-Name=${channel}\n\
+Name=${launcher_name}\n\
 Comment=Client for the On-line Virtual World, Second Life\n\
 Exec=${installation_prefix}/alchemy\n\
 Icon=${installation_prefix}/alchemy_icon.png\n\
