@@ -165,9 +165,10 @@ if (WINDOWS)
   string(REPLACE "/Ob2" "/Ob3" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
   string(REPLACE "/Ob2" "/Ob3" CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
 
-  # configure win32 API for 10 and above compatibility
-  set(WINVER "0x0A00" CACHE STRING "Win32 API Target version (see http://msdn.microsoft.com/en-us/library/aa383745%28v=VS.85%29.aspx)")
-  add_compile_definitions(WINVER=${WINVER} _WIN32_WINNT=${WINVER})
+  # workaround for github runner image breakage:
+  # https://github.com/actions/runner-images/issues/10004#issuecomment-2153445161
+  # can be removed after the above issue is resolved and deployed across GHA
+  add_compile_definitions(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
 endif (WINDOWS)
 
 if (LINUX)
