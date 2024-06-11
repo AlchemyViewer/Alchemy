@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
 # Send a URL of the form secondlife://... to any running viewer, if not, launch Alchemy viewer.
 #

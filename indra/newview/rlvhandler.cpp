@@ -2725,16 +2725,16 @@ void RlvBehaviourToggleHandler<RLV_BHVR_SHOWNEARBY>::onCommandToggle(ERlvBehavio
             pPeoplePanel->updateNearbyList();
     }
 
+#ifdef CATZNIP
     // Refresh the nearby participant list
     if (LLFloaterIMNearbyChat* pNearbyChatFloater = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))
     {
-#ifdef CATZNIP
+
         pNearbyChatFloater->updateShowParticipantList();
         pNearbyChatFloater->updateExpandCollapseBtn();
-#else
         // *TODO - Solution for CHUI
-#endif // CATZNIP
     }
+#endif // CATZNIP
 
     // Refresh that avatar's name tag and all HUD text
     LLHUDText::refreshAllObjectText();

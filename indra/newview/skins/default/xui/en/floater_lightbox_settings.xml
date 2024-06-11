@@ -28,15 +28,16 @@
 			name="colortone_settings"
 			can_resize="false">
 			<!--LUT Control-->
-			<text
-				follows="left|top"
-				height="15"
-				left="10"
-				top_pad="12"
-				width="110"
-				layout="topleft"
-				tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
-				value="Active LUT:" />
+            <check_box
+                follows="left|top"
+                height="15"
+                left="10"
+                top_pad="6"
+                width="80"
+                layout="topleft"
+                label="Colorgrading:"
+                tool_tip="What Colorgrading LUT (Look Up Texture) to be used to colorgrade the image. Custom LUTs require the full filename!"
+                control_name="RenderColorGrade" />
 			<!--TODO: Make more flexible?-->
 			<combo_box
 				allow_text_entry="true"
