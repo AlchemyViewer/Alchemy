@@ -26,19 +26,19 @@
 	<spinner name="offset_scale_ctrl"/>
 	<button name="reset_offset_scale" tool_tip="オフセットのスケーリングをデフォルト値に戻します。"/>
 	<text name="offset_scale_lbl">
-		アングルのオフ設置
+		アングルのオフセット：
 	</text>
 	<slider name="camera_angle_slider"/>
 	<spinner name="camera_angle_spinner"/>
 	<button name="reset_angle" tool_tip="カメラアングルをデフォルト値に戻します。"/>
 	<text name="offset_scale_lbl">
-		ズーム速度
+		ズーム速度：
 	</text>
 	<slider name="zoom_time_slider"/>
 	<spinner name="zoom_time_spin"/>
 	<button name="reset_zoom_time" tool_tip="カメラのズーム速度をデフォルト値に戻します。"/>
 	<text name="offset_scale_lbl">
-		位置のスムージング
+		位置のスムージング：
 	</text>
 	<slider name="cam_pos_slider"/>
 	<spinner name="cam_pos_spinner"/>
