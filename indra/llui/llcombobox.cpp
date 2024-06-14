@@ -1239,7 +1239,14 @@ LLIconsComboBox::LLIconsComboBox(const LLIconsComboBox::Params& p)
 
 const std::string LLIconsComboBox::getSelectedItemLabel(S32 column) const
 {
-    mButton->setImageOverlay(LLComboBox::getSelectedItemLabel(mIconColumnIndex), mButton->getImageOverlayHAlign());
-
-    return LLComboBox::getSelectedItemLabel(mLabelColumnIndex);
+    LLScrollListItem* item = mList->getFirstSelected();
+    if (item)
+    {
+        if (auto columnp = item->getColumn(0))
+        {
+            mButton->setImageOverlay(columnp->getAltValue().asString(), mButton->getImageOverlayHAlign());
+            return columnp->getValue();
+        }
+    }
+    return {};
 }
