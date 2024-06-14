@@ -909,7 +909,6 @@ void LLPanelPeople::updateNearbyList()
         // Also the TOTAL changes based on your filter results --FLN
         for (size_t i = 0; i < positions.size(); ++i)
         {
-            mNearbyCountText->setTextArg("[REGION]", cur_region->getName());
             if (cur_region->pointInRegionGlobal(positions[i]))
             {
                 count_in_region++;
