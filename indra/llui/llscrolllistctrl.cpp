@@ -933,6 +933,7 @@ BOOL LLScrollListCtrl::selectFirstItem()
 // virtual
 BOOL LLScrollListCtrl::selectNthItem( S32 target_index )
 {
+    target_index = llclamp(target_index, 0, (S32)mItemList.size() - 1);
     return selectItemRange(target_index, target_index);
 }
 
