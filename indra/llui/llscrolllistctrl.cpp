@@ -299,13 +299,6 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
         sortByColumnIndex(p.sort_column, p.sort_ascending);
     }
 
-    for (LLInitParam::ParamIterator<LLScrollListItem::Params>::const_iterator row_it = p.contents.rows.begin();
-        row_it != p.contents.rows.end();
-        ++row_it)
-    {
-        addRow(*row_it);
-    }
-
     LLTextBox::Params text_p;
     text_p.name("comment_text");
     text_p.border_visible(false);
@@ -314,6 +307,13 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
     // word wrap was added accroding to the EXT-6841
     text_p.wrap(true);
     addChild(LLUICtrlFactory::create<LLTextBox>(text_p));
+
+    for (LLInitParam::ParamIterator<LLScrollListItem::Params>::const_iterator row_it = p.contents.rows.begin();
+        row_it != p.contents.rows.end();
+        ++row_it)
+    {
+        addRow(*row_it);
+    }
 }
 
 S32 LLScrollListCtrl::getSearchColumn()
@@ -1599,7 +1599,8 @@ const std::string LLScrollListCtrl::getSelectedItemLabel(S32 column) const
     item = getFirstSelected();
     if (item)
     {
-        return item->getColumn(column)->getValue().asString();
+        if(auto columnp = item->getColumn(column))
+            return columnp->getValue().asString();
     }
 
     return LLStringUtil::null;
