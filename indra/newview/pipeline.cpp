@@ -836,7 +836,10 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY, U32 samples)
     { // hacky -- allocate auxillary buffer
 
         gCubeSnapshot = TRUE;
-        mReflectionMapManager.initReflectionMaps();
+        if (sReflectionProbesEnabled)
+        {
+            mReflectionMapManager.initReflectionMaps();
+        }
 
         mRT = &mAuxillaryRT;
         U32 res = mReflectionMapManager.mProbeResolution * 4;  //multiply by 4 because probes will be 16x super sampled
