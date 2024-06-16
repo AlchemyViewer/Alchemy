@@ -100,6 +100,8 @@ private:
 
     // stats view
     LLStatBar* mAxisStatsBar[6];
+
+	LLButton* mAxisButton[16];
 };
 
 #endif

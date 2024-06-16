@@ -402,6 +402,19 @@ LLViewerJoystick::LLViewerJoystick()
 
     gSavedSettings.getControl("JoystickInvertPitch")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
 
+    gSavedSettings.getControl("JoystickButtonRollLeft")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonRollRight")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonRollDefault")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonZoomOut")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonZoomIn")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonZoomDefault")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonJump")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonCrouch")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonFly")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonMouselook")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonFlycam")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+    gSavedSettings.getControl("JoystickButtonRunToggle")->getCommitSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { refreshFromSettings(); });
+
     refreshFromSettings();
 }
 
@@ -607,6 +620,19 @@ void LLViewerJoystick::refreshFromSettings()
     mFlycamFeathering = gSavedSettings.getF32("FlycamFeathering");
 
     mInvertPitch = gSavedSettings.getBOOL("JoystickInvertPitch");
+	
+	mMappedButtons[ROLL_LEFT] = gSavedSettings.getS32("JoystickButtonRollLeft");
+	mMappedButtons[ROLL_RIGHT] = gSavedSettings.getS32("JoystickButtonRollRight");
+	mMappedButtons[ROLL_DEFAULT] = gSavedSettings.getS32("JoystickButtonRollDefault");
+	mMappedButtons[ZOOM_OUT] = gSavedSettings.getS32("JoystickButtonZoomOut");
+	mMappedButtons[ZOOM_IN] = gSavedSettings.getS32("JoystickButtonZoomIn");
+	mMappedButtons[ZOOM_DEFAULT] = gSavedSettings.getS32("JoystickButtonZoomDefault");
+	mMappedButtons[JUMP] = gSavedSettings.getS32("JoystickButtonJump");
+	mMappedButtons[CROUCH] = gSavedSettings.getS32("JoystickButtonCrouch");
+	mMappedButtons[FLY] = gSavedSettings.getS32("JoystickButtonFly");
+	mMappedButtons[MOUSELOOK] = gSavedSettings.getS32("JoystickButtonMouselook");
+	mMappedButtons[FLYCAM] = gSavedSettings.getS32("JoystickButtonFlycam");
+	mMappedButtons[TOGGLE_RUN] = gSavedSettings.getS32("JoystickButtonRunToggle");
 }
 
 void LLViewerJoystick::initDevice(LLSD &guid)
@@ -958,49 +984,115 @@ void LLViewerJoystick::moveObjects(bool reset)
 
     F32 cur_delta[6];
     F32 time = gFrameIntervalSeconds.value();
+    bool is_zero = true;
 
-    // avoid making ridicously big movements if there's a big drop in fps
-    if (time > .2f)
-    {
-        time = .2f;
-    }
+    static LLCachedControl<bool> blackdragon(gSavedSettings, "BlackDragonControls", false);
+	if(blackdragon)
+	{
+		//BD - Avoid making ridicously big movements if there's a big drop in fps 
+		time = llclamp(time, 0.016f, 0.033f);
 
-    // max feather is 32
-    F32 feather = mBuildFeathering;
-    bool is_zero = true, absolute = m3DCursor;
+	//	//BD - Remappable Joystick Controls
 
-    for (U32 i = 0; i < 6; i++)
-    {
-        cur_delta[i] = -mAxes[mJoystickAxis[i]];
-//      //BD - Invertable Pitch Controls
-        if (!mInvertPitch && i == 4)
-            cur_delta[i] = -cur_delta[i];
+	
+		for (U32 i = 0; i < 6; i++)
+		{
+			cur_delta[i] = -getJoystickAxis(mJoystickAxis[i]);
 
-        F32 tmp = cur_delta[i];
-        if (absolute)
-        {
-            cur_delta[i] = cur_delta[i] - sLastDelta[i];
-        }
-        sLastDelta[i] = tmp;
-        is_zero = is_zero && (cur_delta[i] == 0.f);
+            if (i == CAM_X_AXIS)
+            {
+                cur_delta[i] -= (F32)getJoystickButton(mMappedButtons[ROLL_LEFT]);
+                cur_delta[i] += (F32)getJoystickButton(mMappedButtons[ROLL_RIGHT]);
+            }
+            if (i == Z_AXIS)
+            {
+                cur_delta[i] += (F32)getJoystickButton(mMappedButtons[JUMP]);
+                cur_delta[i] -= (F32)getJoystickButton(mMappedButtons[CROUCH]);
+            }
 
-        if (cur_delta[i] > 0)
-        {
-            cur_delta[i] = llmax(cur_delta[i]- mBuildAxisDeadZone[i], 0.f);
-        }
-        else
-        {
-            cur_delta[i] = llmin(cur_delta[i]+ mBuildAxisDeadZone[i], 0.f);
-        }
-        cur_delta[i] *= mBuildAxisScale[i];
+	//		//BD - Invertable Pitch Controls
+            if (mInvertPitch && i == 4)
+				cur_delta[4] *= -1.f;
 
-        if (!absolute)
-        {
-            cur_delta[i] *= time;
-        }
+			F32 tmp = cur_delta[i];
+			F32 axis_deadzone = mBuildAxisDeadZone[i];
+			if (m3DCursor || llabs(cur_delta[i]) < axis_deadzone)
+			{
+				cur_delta[i] = cur_delta[i] - sLastDelta[i];
+			}
+			sLastDelta[i] = tmp;
+			is_zero = is_zero && (cur_delta[i] == 0.f);
+			
+			//BD - We assume that delta 1.0 is the maximum.
+			if (llabs(cur_delta[i]) > axis_deadzone)
+			{
+				//BD - Clamp the delta between 1 and -1 while taking the deadzone into account.
+				if (cur_delta[i] > 0)
+				{
+					cur_delta[i] = llclamp(cur_delta[i] - axis_deadzone, 0.f, 1.f - axis_deadzone);
+				}
+				else
+				{
+					cur_delta[i] = llclamp(cur_delta[i] + axis_deadzone, -1.f + axis_deadzone, 0.f);
+				}
+				//BD - Rescale the remaining delta to match the maximum to get a new clean 0 to 1 range.
+				cur_delta[i] = cur_delta[i] / (1.f - axis_deadzone);
+			}
+			cur_delta[i] *= mBuildAxisScale[i];
+		
+			if (!m3DCursor)
+			{
+				cur_delta[i] *= time;
+			}
 
-        sDelta[i] = sDelta[i] + (cur_delta[i]-sDelta[i])*time*feather;
-    }
+			sDelta[i] = sDelta[i] + (cur_delta[i] - sDelta[i]) * time * mBuildFeathering;
+		}
+	}
+	else
+	{
+	    // avoid making ridicously big movements if there's a big drop in fps
+	    if (time > .2f)
+	    {
+	        time = .2f;
+	    }
+
+	    // max feather is 32
+	    F32 feather = mBuildFeathering;
+	    bool absolute = m3DCursor;
+
+	    for (U32 i = 0; i < 6; i++)
+	    {
+	        cur_delta[i] = -mAxes[mJoystickAxis[i]];
+	//      //BD - Invertable Pitch Controls
+	        if (!mInvertPitch && i == 4)
+	            cur_delta[i] = -cur_delta[i];
+
+	        F32 tmp = cur_delta[i];
+	        if (absolute)
+	        {
+	            cur_delta[i] = cur_delta[i] - sLastDelta[i];
+	        }
+	        sLastDelta[i] = tmp;
+	        is_zero = is_zero && (cur_delta[i] == 0.f);
+
+	        if (cur_delta[i] > 0)
+	        {
+	            cur_delta[i] = llmax(cur_delta[i]- mBuildAxisDeadZone[i], 0.f);
+	        }
+	        else
+	        {
+	            cur_delta[i] = llmin(cur_delta[i]+ mBuildAxisDeadZone[i], 0.f);
+	        }
+	        cur_delta[i] *= mBuildAxisScale[i];
+
+	        if (!absolute)
+	        {
+	            cur_delta[i] *= time;
+	        }
+
+	        sDelta[i] = sDelta[i] + (cur_delta[i]-sDelta[i])*time*feather;
+	    }
+	}
 
     U32 upd_type = UPD_NONE;
     LLVector3 v;
@@ -1058,198 +1150,373 @@ void LLViewerJoystick::moveAvatar(bool reset)
         return;
     }
 
-    bool is_zero = true;
-    static bool button_held = false;
+    static LLCachedControl<bool> blackdragon(gSavedSettings, "BlackDragonControls", false);
+    if (blackdragon)
+	{
+		bool is_zero = true;
+		static bool button_held = false;
+		//BD
+		static bool w_button_held = false;
+		static bool m_button_held = false;
 
-    if (mBtn[1] == 1)
-    {
-        // If AutomaticFly is enabled, then button1 merely causes a
-        // jump (as the up/down axis already controls flying) if on the
-        // ground, or cease flight if already flying.
-        // If AutomaticFly is disabled, then button1 toggles flying.
-        if (ALControlCache::AutomaticFly)
-        {
-            if (!gAgent.getFlying())
+	//	//BD - Remappable Joystick Controls
+		if (getJoystickButton(mMappedButtons[FLY]) == 1 && !button_held)
+		{
+			button_held = true;
+			if (gAgent.getFlying())
+			{
+				gAgent.setFlying(FALSE);
+			}
+			else
+			{
+				gAgent.setFlying(TRUE);
+			}
+		}
+		else if (getJoystickButton(mMappedButtons[FLY]) == 0 && button_held)
+		{
+			button_held = false;
+		}
+
+		if (getJoystickButton(mMappedButtons[TOGGLE_RUN]) == 1 && !w_button_held)
+		{
+			w_button_held = true;
+			if (gAgent.getAlwaysRun())
+			{
+				gAgent.clearAlwaysRun();
+			}
+			else
+			{
+				gAgent.setAlwaysRun();
+			}
+		}
+		else if (getJoystickButton(mMappedButtons[TOGGLE_RUN]) == 0 && w_button_held)
+		{
+			w_button_held = false;
+		}
+
+		if (getJoystickButton(mMappedButtons[MOUSELOOK]) == 1 && !m_button_held)
+		{
+			m_button_held = true;
+			if (gAgentCamera.cameraMouselook())
+			{
+				gAgentCamera.changeCameraToDefault();
+			}
+			else
+			{
+				gAgentCamera.changeCameraToMouselook();
+			}
+		}
+		else if (getJoystickButton(mMappedButtons[MOUSELOOK]) == 0 && m_button_held)
+		{
+			m_button_held = false;
+		}
+
+		// time interval in seconds between this frame and the previous
+		F32 time = gFrameIntervalSeconds.value();
+
+		//BD - Avoid making ridicously big movements if there's a big drop in fps 
+		time = llclamp(time, 0.016f, 0.033f);
+
+		// note: max feather is 32.0
+	
+        F32 cur_delta[6] = {};
+		F32 val, dom_mov = 0.f;
+		U32 dom_axis = Z_I;
+
+		// remove dead zones and determine biggest movement on the joystick 
+		for (U32 i = 0; i < 6; i++)
+		{
+			cur_delta[i] = -getJoystickAxis(mJoystickAxis[i]);
+
+            if(i == Z_AXIS)
             {
-                gAgent.moveUp(1);
+                cur_delta[i] += (F32)getJoystickButton(mMappedButtons[JUMP]);
+                cur_delta[i] -= (F32)getJoystickButton(mMappedButtons[CROUCH]);
             }
-            else if (!button_held)
-            {
-                button_held = true;
-                gAgent.setFlying(FALSE);
-            }
-        }
-        else if (!button_held)
-        {
-            button_held = true;
-            gAgent.setFlying(!gAgent.getFlying());
-        }
 
-        is_zero = false;
-    }
-    else
-    {
-        button_held = false;
-    }
+			F32 axis_deadzone = mAvatarAxisDeadZone[i];
 
-    // time interval in seconds between this frame and the previous
-    F32 time = gFrameIntervalSeconds.value();
+			//BD - We assume that delta 1.0 is the maximum.
+			if (llabs(cur_delta[i]) > axis_deadzone)
+			{
+				//BD - Clamp the delta between 1 and -1 while taking the deadzone into account.
+				if (cur_delta[i] > 0)
+				{
+					cur_delta[i] = llclamp(cur_delta[i] - axis_deadzone, 0.f, 1.f - axis_deadzone);
+				}
+				else
+				{
+					cur_delta[i] = llclamp(cur_delta[i] + axis_deadzone, -1.f + axis_deadzone, 0.f);
+				}
+				//BD - Rescale the remaining delta to match the maximum to get a new clean 0 to 1 range.
+				cur_delta[i] = cur_delta[i] / (1.f - axis_deadzone);
+			}
+			else
+			{
+				cur_delta[i] = 0.f;
+			}
 
-    // avoid making ridicously big movements if there's a big drop in fps
-    if (time > .2f)
-    {
-        time = .2f;
-    }
+			// we don't care about Roll (RZ) and Z is calculated after the loop
+	        if (i != Z_I && i != RZ_I)
+			{
+				// find out the axis with the biggest joystick motion
+				val = fabs(cur_delta[i]);
+				if (val > dom_mov)
+				{
+					dom_axis = i;
+					dom_mov = val;
+				}
+			}
+		
+			cur_delta[i] *= mAvatarAxisScale[i] * time;
 
-    // note: max feather is 32.0
-    F32 feather = mAvatarFeathering;
+			//sDelta[i] = sDelta[i] + (cur_delta[i] - sDelta[i]) * time;
+			is_zero = is_zero && (cur_delta[i] == 0.f);
+		}
 
-    F32 cur_delta[6];
-    F32 val, dom_mov = 0.f;
-    U32 dom_axis = Z_I;
-#if LIB_NDOF
-    bool absolute = (m3DCursor && mNdofDev->absolute);
-#else
-    bool absolute = false;
-#endif
-    // remove dead zones and determine biggest movement on the joystick
-    for (U32 i = 0; i < 6; i++)
-    {
-        cur_delta[i] = -mAxes[mJoystickAxis[i]];
+		if (!is_zero)
+		{
+			// Clear AFK state if moved beyond the deadzone
+			if (gAwayTimer.getElapsedTimeF32() > LLAgent::MIN_AFK_TIME)
+			{
+				gAgent.clearAFK();
+			}
+		
+			setCameraNeedsUpdate(true);
+		}
 
-        if (!mInvertPitch && i == 4)
-            cur_delta[i] = -cur_delta[i];
+	//	//BD - Invertable Pitch Controls
+		if (!mInvertPitch)
+			cur_delta[RX_I] = -cur_delta[RX_I];
 
-        if (absolute)
-        {
-            F32 tmp = cur_delta[i];
-            cur_delta[i] = cur_delta[i] - sLastDelta[i];
-            sLastDelta[i] = tmp;
-        }
+		// forward|backward movements overrule the real dominant movement if 
+		// they're bigger than its 20%. This is what you want 'cos moving forward
+		// is what you do most. We also added a special (even more lenient) case 
+		// for RX|RY to allow walking while pitching and turning
+		if (fabs(cur_delta[Z_I]) > .2f * dom_mov
+		    || ((dom_axis == RX_I || dom_axis == RY_I) 
+			&& fabs(cur_delta[Z_I]) > .05f * dom_mov))
+		{
+			dom_axis = Z_I;
+		}
 
-        if (cur_delta[i] > 0)
-        {
-            cur_delta[i] = llmax(cur_delta[i]- mAvatarAxisDeadZone[i], 0.f);
-        }
-        else
-        {
-            cur_delta[i] = llmin(cur_delta[i]+ mAvatarAxisDeadZone[i], 0.f);
-        }
+		sDelta[X_I] = -cur_delta[X_I];
+		sDelta[Y_I] = -cur_delta[Y_I];
+		sDelta[Z_I] = -cur_delta[Z_I];
+		cur_delta[RX_I] *= -mAvatarAxisScale[RX_I];
+		cur_delta[RY_I] *= -mAvatarAxisScale[RY_I];
+		
+		sDelta[RX_I] += (cur_delta[RX_I] - sDelta[RX_I]) * time * mAvatarFeathering;
+		sDelta[RY_I] += (cur_delta[RY_I] - sDelta[RY_I]) * time * mAvatarFeathering;
+	
+		handleRun((F32) sqrt(sDelta[Z_I]*sDelta[Z_I] + sDelta[X_I]*sDelta[X_I]));
+	
+	//	//BD - Xbox360 Controller Support
+		//     Use raw deltas, do not add any stupid limitations or extra dead zones
+		//     otherwise alot controllers will cry and camera movement will bug out
+		//     or be completely ignored on some controllers. Especially fixes Xbox 360
+		//     controller avatar movement.
+		agentSlide(sDelta[X_I]);		// move sideways
+		agentFly(sDelta[Y_I]);			// up/down & crouch
+		agentPush(sDelta[Z_I]);			// forward/back
+		agentPitch(sDelta[RX_I]);		// pitch
+		agentYaw(sDelta[RY_I]);			// turn
+	}
+	else
+	{
+	    bool is_zero = true;
+	    static bool button_held = false;
 
-        // we don't care about Roll (RZ) and Z is calculated after the loop
-        if (i != Z_I && i != RZ_I)
-        {
-            // find out the axis with the biggest joystick motion
-            val = fabs(cur_delta[i]);
-            if (val > dom_mov)
-            {
-                dom_axis = i;
-                dom_mov = val;
-            }
-        }
+	    if (mBtn[1] == 1)
+	    {
+	        // If AutomaticFly is enabled, then button1 merely causes a
+	        // jump (as the up/down axis already controls flying) if on the
+	        // ground, or cease flight if already flying.
+	        // If AutomaticFly is disabled, then button1 toggles flying.
+	        if (ALControlCache::AutomaticFly)
+	        {
+	            if (!gAgent.getFlying())
+	            {
+	                gAgent.moveUp(1);
+	            }
+	            else if (!button_held)
+	            {
+	                button_held = true;
+	                gAgent.setFlying(FALSE);
+	            }
+	        }
+	        else if (!button_held)
+	        {
+	            button_held = true;
+	            gAgent.setFlying(!gAgent.getFlying());
+	        }
 
-        is_zero = is_zero && (cur_delta[i] == 0.f);
-    }
+	        is_zero = false;
+	    }
+	    else
+	    {
+	        button_held = false;
+	    }
 
-    if (!is_zero)
-    {
-        // Clear AFK state if moved beyond the deadzone
-        if (gAwayTimer.getElapsedTimeF32() > LLAgent::MIN_AFK_TIME)
-        {
-            gAgent.clearAFK();
-        }
+	    // time interval in seconds between this frame and the previous
+	    F32 time = gFrameIntervalSeconds.value();
 
-        setCameraNeedsUpdate(true);
-    }
+	    // avoid making ridicously big movements if there's a big drop in fps
+	    if (time > .2f)
+	    {
+	        time = .2f;
+	    }
 
-    // forward|backward movements overrule the real dominant movement if
-    // they're bigger than its 20%. This is what you want 'cos moving forward
-    // is what you do most. We also added a special (even more lenient) case
-    // for RX|RY to allow walking while pitching and turning
-    if (fabs(cur_delta[Z_I]) > .2f * dom_mov
-        || ((dom_axis == RX_I || dom_axis == RY_I)
-        && fabs(cur_delta[Z_I]) > .05f * dom_mov))
-    {
-        dom_axis = Z_I;
-    }
+	    // note: max feather is 32.0
+	    F32 feather = mAvatarFeathering;
 
-    sDelta[X_I] = -cur_delta[X_I] * mAvatarAxisScale[X_I];
-    sDelta[Y_I] = -cur_delta[Y_I] * mAvatarAxisScale[Y_I];
-    sDelta[Z_I] = -cur_delta[Z_I] * mAvatarAxisScale[Z_I];
-    cur_delta[RX_I] *= -mAvatarAxisScale[RX_I] * mPerfScale;
-    cur_delta[RY_I] *= -mAvatarAxisScale[RY_I] * mPerfScale;
+	    F32 cur_delta[6];
+	    F32 val, dom_mov = 0.f;
+	    U32 dom_axis = Z_I;
+	#if LIB_NDOF
+	    bool absolute = (m3DCursor && mNdofDev->absolute);
+	#else
+	    bool absolute = false;
+	#endif
+	    // remove dead zones and determine biggest movement on the joystick
+	    for (U32 i = 0; i < 6; i++)
+	    {
+	        cur_delta[i] = -mAxes[mJoystickAxis[i]];
 
-    if (!absolute)
-    {
-        cur_delta[RX_I] *= time;
-        cur_delta[RY_I] *= time;
-    }
-    sDelta[RX_I] += (cur_delta[RX_I] - sDelta[RX_I]) * time * feather;
-    sDelta[RY_I] += (cur_delta[RY_I] - sDelta[RY_I]) * time * feather;
+	        if (!mInvertPitch && i == 4)
+	            cur_delta[i] = -cur_delta[i];
 
-    handleRun((F32) sqrt(sDelta[Z_I]*sDelta[Z_I] + sDelta[X_I]*sDelta[X_I]));
+	        if (absolute)
+	        {
+	            F32 tmp = cur_delta[i];
+	            cur_delta[i] = cur_delta[i] - sLastDelta[i];
+	            sLastDelta[i] = tmp;
+	        }
 
-    // Allow forward/backward movement some priority
-    if (dom_axis == Z_I)
-    {
-        agentPush(sDelta[Z_I]);         // forward/back
+	        if (cur_delta[i] > 0)
+	        {
+	            cur_delta[i] = llmax(cur_delta[i]- mAvatarAxisDeadZone[i], 0.f);
+	        }
+	        else
+	        {
+	            cur_delta[i] = llmin(cur_delta[i]+ mAvatarAxisDeadZone[i], 0.f);
+	        }
 
-        if (fabs(sDelta[X_I])  > .1f)
-        {
-            agentSlide(sDelta[X_I]);    // move sideways
-        }
+	        // we don't care about Roll (RZ) and Z is calculated after the loop
+	        if (i != Z_I && i != RZ_I)
+	        {
+	            // find out the axis with the biggest joystick motion
+	            val = fabs(cur_delta[i]);
+	            if (val > dom_mov)
+	            {
+	                dom_axis = i;
+	                dom_mov = val;
+	            }
+	        }
 
-        if (fabs(sDelta[Y_I])  > .1f)
-        {
-            agentFly(sDelta[Y_I]);      // up/down & crouch
-        }
+	        is_zero = is_zero && (cur_delta[i] == 0.f);
+	    }
 
-        // too many rotations during walking can be confusing, so apply
-        // the deadzones one more time (quick & dirty), at 50%|30% power
-        F32 eff_rx = .3f * mAvatarAxisDeadZone[RX_I];
-        F32 eff_ry = .3f * mAvatarAxisDeadZone[RY_I];
+	    if (!is_zero)
+	    {
+	        // Clear AFK state if moved beyond the deadzone
+	        if (gAwayTimer.getElapsedTimeF32() > LLAgent::MIN_AFK_TIME)
+	        {
+	            gAgent.clearAFK();
+	        }
 
-        if (sDelta[RX_I] > 0)
-        {
-            eff_rx = llmax(sDelta[RX_I] - eff_rx, 0.f);
-        }
-        else
-        {
-            eff_rx = llmin(sDelta[RX_I] + eff_rx, 0.f);
-        }
+	        setCameraNeedsUpdate(true);
+	    }
 
-        if (sDelta[RY_I] > 0)
-        {
-            eff_ry = llmax(sDelta[RY_I] - eff_ry, 0.f);
-        }
-        else
-        {
-            eff_ry = llmin(sDelta[RY_I] + eff_ry, 0.f);
-        }
+	    // forward|backward movements overrule the real dominant movement if
+	    // they're bigger than its 20%. This is what you want 'cos moving forward
+	    // is what you do most. We also added a special (even more lenient) case
+	    // for RX|RY to allow walking while pitching and turning
+	    if (fabs(cur_delta[Z_I]) > .2f * dom_mov
+	        || ((dom_axis == RX_I || dom_axis == RY_I)
+	        && fabs(cur_delta[Z_I]) > .05f * dom_mov))
+	    {
+	        dom_axis = Z_I;
+	    }
+
+	    sDelta[X_I] = -cur_delta[X_I] * mAvatarAxisScale[X_I];
+	    sDelta[Y_I] = -cur_delta[Y_I] * mAvatarAxisScale[Y_I];
+	    sDelta[Z_I] = -cur_delta[Z_I] * mAvatarAxisScale[Z_I];
+	    cur_delta[RX_I] *= -mAvatarAxisScale[RX_I] * mPerfScale;
+	    cur_delta[RY_I] *= -mAvatarAxisScale[RY_I] * mPerfScale;
+
+	    if (!absolute)
+	    {
+	        cur_delta[RX_I] *= time;
+	        cur_delta[RY_I] *= time;
+	    }
+	    sDelta[RX_I] += (cur_delta[RX_I] - sDelta[RX_I]) * time * feather;
+	    sDelta[RY_I] += (cur_delta[RY_I] - sDelta[RY_I]) * time * feather;
+
+	    handleRun((F32) sqrt(sDelta[Z_I]*sDelta[Z_I] + sDelta[X_I]*sDelta[X_I]));
+
+	    // Allow forward/backward movement some priority
+	    if (dom_axis == Z_I)
+	    {
+	        agentPush(sDelta[Z_I]);         // forward/back
+
+	        if (fabs(sDelta[X_I])  > .1f)
+	        {
+	            agentSlide(sDelta[X_I]);    // move sideways
+	        }
+
+	        if (fabs(sDelta[Y_I])  > .1f)
+	        {
+	            agentFly(sDelta[Y_I]);      // up/down & crouch
+	        }
+
+	        // too many rotations during walking can be confusing, so apply
+	        // the deadzones one more time (quick & dirty), at 50%|30% power
+	        F32 eff_rx = .3f * mAvatarAxisDeadZone[RX_I];
+	        F32 eff_ry = .3f * mAvatarAxisDeadZone[RY_I];
+
+	        if (sDelta[RX_I] > 0)
+	        {
+	            eff_rx = llmax(sDelta[RX_I] - eff_rx, 0.f);
+	        }
+	        else
+	        {
+	            eff_rx = llmin(sDelta[RX_I] + eff_rx, 0.f);
+	        }
+
+	        if (sDelta[RY_I] > 0)
+	        {
+	            eff_ry = llmax(sDelta[RY_I] - eff_ry, 0.f);
+	        }
+	        else
+	        {
+	            eff_ry = llmin(sDelta[RY_I] + eff_ry, 0.f);
+	        }
 
 
-        if (fabs(eff_rx) > 0.f || fabs(eff_ry) > 0.f)
-        {
-            if (gAgent.getFlying())
-            {
-                agentPitch(eff_rx);
-                agentYaw(eff_ry);
-            }
-            else
-            {
-                agentPitch(eff_rx);
-                agentYaw(2.f * eff_ry);
-            }
-        }
-    }
-    else
-    {
-        agentSlide(sDelta[X_I]);        // move sideways
-        agentFly(sDelta[Y_I]);          // up/down & crouch
-        agentPush(sDelta[Z_I]);         // forward/back
-        agentPitch(sDelta[RX_I]);       // pitch
-        agentYaw(sDelta[RY_I]);         // turn
-    }
+	        if (fabs(eff_rx) > 0.f || fabs(eff_ry) > 0.f)
+	        {
+	            if (gAgent.getFlying())
+	            {
+	                agentPitch(eff_rx);
+	                agentYaw(eff_ry);
+	            }
+	            else
+	            {
+	                agentPitch(eff_rx);
+	                agentYaw(2.f * eff_ry);
+	            }
+	        }
+	    }
+	    else
+	    {
+	        agentSlide(sDelta[X_I]);        // move sideways
+	        agentFly(sDelta[Y_I]);          // up/down & crouch
+	        agentPush(sDelta[Z_I]);         // forward/back
+	        agentPitch(sDelta[RX_I]);       // pitch
+	        agentYaw(sDelta[RY_I]);         // turn
+	    }
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -1277,106 +1544,250 @@ void LLViewerJoystick::moveFlycam(bool reset)
         return;
     }
 
-    F32 time = gFrameIntervalSeconds.value();
+    static LLCachedControl<F32> build_mode_scale(gSavedSettings, "FlycamBuildModeScale", 1.0);
 
-    // avoid making ridiculously big movements if there's a big drop in fps
-    if (time > .2f)
-    {
-        time = .2f;
-    }
+    static LLCachedControl<bool> blackdragon(gSavedSettings, "BlackDragonControls", false);
+    if (blackdragon)
+	{
+		F32 time = gFrameIntervalSeconds.value();
 
-    F32 cur_delta[7];
-    F32 feather = mFlycamFeathering;
-    bool absolute = m3DCursor;
-    bool is_zero = true;
+		//BD - Avoid making ridiculously big movements if there's a big drop in fps 
+		time = llclamp(time, 0.016f, 0.033f);
 
-    for (U32 i = 0; i < 7; i++)
-    {
-        cur_delta[i] = -getJoystickAxis(mJoystickAxis[i]);
+		F32 flycam_feather = mFlycamFeathering;
+		F32 cur_delta[MAX_AXES];
+		F32 max_angle = LLViewerCamera::getInstance()->getMaxView();
+		F32 min_angle = LLViewerCamera::getInstance()->getMinView();
 
-        if (!mInvertPitch && i == 4)
-            cur_delta[i] = -cur_delta[i];
+		//BD - Slam zoom back to default and kill any delta we might have.
+		if (getJoystickButton(mMappedButtons[ZOOM_DEFAULT]) == 1)
+		{
+			sFlycamZoom = gSavedSettings.getF32("CameraAngle");
+			sDelta[CAM_W_AXIS] = 0.0f;
+		}
 
-        F32 tmp = cur_delta[i];
-        if (absolute)
-        {
-            cur_delta[i] = cur_delta[i] - sLastDelta[i];
-        }
-        sLastDelta[i] = tmp;
+		//BD - Only smooth flycam zoom if we are not capping at the min/max otherwise the feathering
+		//     ends up working against previous input, delaying zoom in movement when we just zoomed
+		//     out beyond capped max for a bit and vise versa.
+		if ((sFlycamZoom <= min_angle
+			|| sFlycamZoom >= max_angle))
+		{
+			flycam_feather = 3.0f;
+		}
 
-        if (cur_delta[i] > 0)
-        {
-            cur_delta[i] = llmax(cur_delta[i]- mFlycamAxisDeadZone[i], 0.f);
-        }
-        else
-        {
-            cur_delta[i] = llmin(cur_delta[i]+ mFlycamAxisDeadZone[i], 0.f);
-        }
+		bool is_zero = true;
+		for (U32 i = 0; i < 7; i++)
+		{
+			cur_delta[i] = -getJoystickAxis(mJoystickAxis[i]);
 
-        // We may want to scale camera movements up or down in build mode.
-        // NOTE: this needs to remain after the deadzone calculation, otherwise
-        // we have issues with flycam "jumping" when the build dialog is opened/closed  -Nyx
-        if (in_build_mode)
-        {
-            if (i == X_I || i == Y_I || i == Z_I)
+            if (i == CAM_W_AXIS)
             {
-                static LLCachedControl<F32> build_mode_scale(gSavedSettings,"FlycamBuildModeScale", 1.0);
-                cur_delta[i] *= build_mode_scale;
+                cur_delta[i] -= (F32)getJoystickButton(mMappedButtons[ZOOM_OUT]);
+                cur_delta[i] += (F32)getJoystickButton(mMappedButtons[ZOOM_IN]);
             }
-        }
+            if (i == Z_AXIS)
+            {
+                cur_delta[i] += (F32)getJoystickButton(mMappedButtons[JUMP]);
+                cur_delta[i] -= (F32)getJoystickButton(mMappedButtons[CROUCH]);
+            }
+            if (i == CAM_X_AXIS)
+            {
+                cur_delta[i] -= (F32)getJoystickButton(mMappedButtons[ROLL_LEFT]);
+                cur_delta[i] += (F32)getJoystickButton(mMappedButtons[ROLL_RIGHT]);
+            }
 
-        cur_delta[i] *= mFlycamAxisScale[i];
+			F32 tmp = cur_delta[i];
+			F32 axis_deadzone = mFlycamAxisDeadZone[i];
+			if (m3DCursor || llabs(cur_delta[i]) < axis_deadzone)
+			{
+				cur_delta[i] = cur_delta[i] - sLastDelta[i];
+			}
+			sLastDelta[i] = tmp;
 
-        if (!absolute)
-        {
-            cur_delta[i] *= time;
-        }
+			//BD - We assume that delta 1.0 is the maximum.
+			if (llabs(cur_delta[i]) > axis_deadzone)
+			{
+				//BD - Clamp the delta between 1 and -1 while taking the deadzone into account.
+				if (cur_delta[i] > 0)
+				{
+					cur_delta[i] = llclamp(cur_delta[i] - axis_deadzone, 0.f, 1.f - axis_deadzone);
+				}
+				else
+				{
+					cur_delta[i] = llclamp(cur_delta[i] + axis_deadzone, -1.f + axis_deadzone, 0.f);
+				}
+				//BD - Rescale the remaining delta to match the maximum to get a new clean 0 to 1 range.
+				cur_delta[i] = cur_delta[i] / (1.f - axis_deadzone);
+			}
 
-        sDelta[i] = sDelta[i] + (cur_delta[i]-sDelta[i])*time*feather;
+			// We may want to scale camera movements up or down in build mode.
+			// NOTE: this needs to remain after the deadzone calculation, otherwise
+			// we have issues with flycam "jumping" when the build dialog is opened/closed  -Nyx
+			if (LLToolMgr::getInstance()->inBuildMode())
+			{
+				if (i == X_I || i == Y_I || i == Z_I)
+				{
+					cur_delta[i] *= build_mode_scale;
+				}
+			}
 
-        is_zero = is_zero && (cur_delta[i] == 0.f);
+			cur_delta[i] *= mFlycamAxisScale[i];
 
-    }
+			if (!m3DCursor)
+			{
+				cur_delta[i] *= time;
+			}
 
-    // Clear AFK state if moved beyond the deadzone
-    if (!is_zero && gAwayTimer.getElapsedTimeF32() > LLAgent::MIN_AFK_TIME)
-    {
-        gAgent.clearAFK();
-    }
+			sDelta[i] = sDelta[i] + (cur_delta[i] - sDelta[i]) * time * flycam_feather;
+			is_zero = is_zero && (cur_delta[i] == 0.f);
+		}
 
-    sFlycamPosition += LLVector3(sDelta.data()) * sFlycamRotation;
+	//	//BD - Invertable Pitch Controls
+		if (mInvertPitch)
+			cur_delta[CAM_Y_AXIS] = -cur_delta[CAM_Y_AXIS];
+	
+		// Clear AFK state if moved beyond the deadzone
+		if (!is_zero && gAwayTimer.getElapsedTimeF32() > LLAgent::MIN_AFK_TIME)
+		{
+			gAgent.clearAFK();
+		}
 
-    LLMatrix3 rot_mat(sDelta[3], sDelta[4], sDelta[5]);
-    sFlycamRotation = LLQuaternion(rot_mat)*sFlycamRotation;
+		sFlycamPosition += LLVector3(sDelta.data()) * sFlycamRotation;
+		LLMatrix3 rot_mat(sDelta[CAM_X_AXIS], sDelta[CAM_Y_AXIS], sDelta[CAM_Z_AXIS]);
+		sFlycamRotation = LLQuaternion(rot_mat)*sFlycamRotation;
 
-    if (mAutoLeveling)
-    {
-        LLMatrix3 level(sFlycamRotation);
+		if (mAutoLeveling || getJoystickButton(mMappedButtons[ROLL_DEFAULT]) == 1)
+		{
+			LLMatrix3 level(sFlycamRotation);
 
-        LLVector3 x = LLVector3(level.mMatrix[0]);
-        LLVector3 y = LLVector3(level.mMatrix[1]);
-        LLVector3 z = LLVector3(level.mMatrix[2]);
+			LLVector3 x = LLVector3(level.mMatrix[0]);
+			LLVector3 y = LLVector3(level.mMatrix[1]);
+			LLVector3 z = LLVector3(level.mMatrix[2]);
 
-        y.mV[2] = 0.f;
-        y.normVec();
+			y.mV[2] = 0.f;
+			y.normVec();
 
-        level.setRows(x,y,z);
-        level.orthogonalize();
+			level.setRows(x,y,z);
+			level.orthogonalize();
+				
+			LLQuaternion quat(level);
+			LLQuaternion lerp = nlerp(llmin(flycam_feather * time, 1.f), sFlycamRotation, quat);
+			sFlycamRotation = getJoystickButton(mMappedButtons[ROLL_DEFAULT]) == 1 ? quat : lerp;
+		}
 
-        LLQuaternion quat(level);
-        sFlycamRotation = nlerp(llmin(feather*time,1.f), sFlycamRotation, quat);
-    }
+		if (mZoomDirect)
+		{
+			sFlycamZoom = sLastDelta[CAM_W_AXIS] * mFlycamAxisScale[FLYCAM_AXIS_6] + mFlycamAxisScale[FLYCAM_AXIS_6];
+		}
+		else
+		{
+			//BD - We need to cap zoom otherwise it internally counts higher causing
+			//     the zoom level to not react until that extra has been removed first.
+			sFlycamZoom = llclamp(sFlycamZoom + sDelta[CAM_W_AXIS], LLViewerCamera::getInstance()->getMinView(), LLViewerCamera::getInstance()->getMaxView());
+		}
+	}
+	else
+	{
+	    F32 time = gFrameIntervalSeconds.value();
 
-    if (mZoomDirect)
-    {
-        sFlycamZoom = sLastDelta[6]* mFlycamAxisScale[6]+ mFlycamAxisDeadZone[6];
-    }
-    else
-    {
-        //BD - We need to cap zoom otherwise it internally counts higher causing
-        //     the zoom level to not react until that extra has been removed first.
-        sFlycamZoom = llclamp(sFlycamZoom + sDelta[6], LLViewerCamera::getInstance()->getMinView(), LLViewerCamera::getInstance()->getMaxView());
-    }
+	    // avoid making ridiculously big movements if there's a big drop in fps
+	    if (time > .2f)
+	    {
+	        time = .2f;
+	    }
+
+	    F32 cur_delta[7];
+	    F32 feather = mFlycamFeathering;
+	    bool absolute = m3DCursor;
+	    bool is_zero = true;
+
+	    for (U32 i = 0; i < 7; i++)
+	    {
+	        cur_delta[i] = -getJoystickAxis(mJoystickAxis[i]);
+
+	        if (!mInvertPitch && i == 4)
+	            cur_delta[i] = -cur_delta[i];
+
+	        F32 tmp = cur_delta[i];
+	        if (absolute)
+	        {
+	            cur_delta[i] = cur_delta[i] - sLastDelta[i];
+	        }
+	        sLastDelta[i] = tmp;
+
+	        if (cur_delta[i] > 0)
+	        {
+	            cur_delta[i] = llmax(cur_delta[i]- mFlycamAxisDeadZone[i], 0.f);
+	        }
+	        else
+	        {
+	            cur_delta[i] = llmin(cur_delta[i]+ mFlycamAxisDeadZone[i], 0.f);
+	        }
+
+	        // We may want to scale camera movements up or down in build mode.
+	        // NOTE: this needs to remain after the deadzone calculation, otherwise
+	        // we have issues with flycam "jumping" when the build dialog is opened/closed  -Nyx
+	        if (in_build_mode)
+	        {
+	            if (i == X_I || i == Y_I || i == Z_I)
+	            {
+	                cur_delta[i] *= build_mode_scale;
+	            }
+	        }
+
+	        cur_delta[i] *= mFlycamAxisScale[i];
+
+	        if (!absolute)
+	        {
+	            cur_delta[i] *= time;
+	        }
+
+	        sDelta[i] = sDelta[i] + (cur_delta[i]-sDelta[i])*time*feather;
+
+	        is_zero = is_zero && (cur_delta[i] == 0.f);
+
+	    }
+
+	    // Clear AFK state if moved beyond the deadzone
+	    if (!is_zero && gAwayTimer.getElapsedTimeF32() > LLAgent::MIN_AFK_TIME)
+	    {
+	        gAgent.clearAFK();
+	    }
+
+	    sFlycamPosition += LLVector3(sDelta.data()) * sFlycamRotation;
+
+	    LLMatrix3 rot_mat(sDelta[3], sDelta[4], sDelta[5]);
+	    sFlycamRotation = LLQuaternion(rot_mat)*sFlycamRotation;
+
+	    if (mAutoLeveling)
+	    {
+	        LLMatrix3 level(sFlycamRotation);
+
+	        LLVector3 x = LLVector3(level.mMatrix[0]);
+	        LLVector3 y = LLVector3(level.mMatrix[1]);
+	        LLVector3 z = LLVector3(level.mMatrix[2]);
+
+	        y.mV[2] = 0.f;
+	        y.normVec();
+
+	        level.setRows(x,y,z);
+	        level.orthogonalize();
+
+	        LLQuaternion quat(level);
+	        sFlycamRotation = nlerp(llmin(feather*time,1.f), sFlycamRotation, quat);
+	    }
+
+	    if (mZoomDirect)
+	    {
+	        sFlycamZoom = sLastDelta[6]* mFlycamAxisScale[6]+ mFlycamAxisDeadZone[6];
+	    }
+	    else
+	    {
+	        //BD - We need to cap zoom otherwise it internally counts higher causing
+	        //     the zoom level to not react until that extra has been removed first.
+	        sFlycamZoom = llclamp(sFlycamZoom + sDelta[6], LLViewerCamera::getInstance()->getMinView(), LLViewerCamera::getInstance()->getMaxView());
+	    }
+	}
 
     LLMatrix3 mat(sFlycamRotation);
 
@@ -1445,17 +1856,35 @@ void LLViewerJoystick::scanJoystick()
 
     static long toggle_flycam = 0;
 
-    if (mBtn[0] == 1)
-    {
-        if (mBtn[0] != toggle_flycam)
-        {
-            toggle_flycam = toggleFlycam() ? 1 : 0;
-        }
-    }
-    else
-    {
-        toggle_flycam = 0;
-    }
+    static LLCachedControl<bool> blackdragon(gSavedSettings, "BlackDragonControls", false);
+    if (blackdragon)
+	{
+		if (getJoystickButton(mMappedButtons[FLYCAM]) == 1)
+		{
+			if (getJoystickButton(mMappedButtons[FLYCAM]) != toggle_flycam)
+			{
+				toggle_flycam = toggleFlycam() ? 1 : 0;
+			}
+		}
+		else
+		{
+			toggle_flycam = 0;
+		}
+	}
+	else
+	{
+	    if (mBtn[0] == 1)
+	    {
+	        if (mBtn[0] != toggle_flycam)
+	        {
+	            toggle_flycam = toggleFlycam() ? 1 : 0;
+	        }
+	    }
+	    else
+	    {
+	        toggle_flycam = 0;
+	    }
+	}
 
     if (!mOverrideCamera && !(LLToolMgr::getInstance()->inBuildMode() && mBuildEnabled))
     {
@@ -1617,6 +2046,7 @@ void LLViewerJoystick::setSNDefaults()
 
     //gViewerWindow->alertXml("CacheWillClear");
     LL_INFOS("Joystick") << "restoring SpaceNavigator defaults..." << LL_ENDL;
+    gSavedSettings.setBOOL("BlackDragonControls", FALSE);
 
     gSavedSettings.setS32("JoystickAxis0", 1); // z (at)
     gSavedSettings.setS32("JoystickAxis1", 0); // x (slide)
@@ -1626,6 +2056,19 @@ void LLViewerJoystick::setSNDefaults()
     gSavedSettings.setS32("JoystickAxis5", 5); // yaw
     gSavedSettings.setS32("JoystickAxis6", -1);
 
+	gSavedSettings.setS32("JoystickButtonJump", -1);
+	gSavedSettings.setS32("JoystickButtonCrouch", -1);
+	gSavedSettings.setS32("JoystickButtonFly", -1);
+	gSavedSettings.setS32("JoystickButtonRunToggle", -1);
+	gSavedSettings.setS32("JoystickButtonMouselook", -1);
+	gSavedSettings.setS32("JoystickButtonZoomDefault", -1);
+	gSavedSettings.setS32("JoystickButtonFlycam", 0);
+	gSavedSettings.setS32("JoystickButtonZoomOut", -1);
+	gSavedSettings.setS32("JoystickButtonZoomIn", -1);
+	gSavedSettings.setS32("JoystickButtonRollLeft", -1);
+	gSavedSettings.setS32("JoystickButtonRollRight", -1);
+	gSavedSettings.setS32("JoystickButtonRollDefault", -1);
+	
     gSavedSettings.setBOOL("Cursor3D", is_3d_cursor);
     gSavedSettings.setBOOL("AutoLeveling", true);
     gSavedSettings.setBOOL("ZoomDirect", false);
@@ -1680,6 +2123,7 @@ void LLViewerJoystick::setSNDefaults()
 void LLViewerJoystick::setXboxDefaults()
 {
     LL_INFOS() << "restoring Xbox Controller defaults..." << LL_ENDL;
+    gSavedSettings.setBOOL("BlackDragonControls", TRUE);
 
     gSavedSettings.setS32("JoystickAxis0", 1);  // Z
     gSavedSettings.setS32("JoystickAxis1", 0);  // X
@@ -1689,6 +2133,19 @@ void LLViewerJoystick::setXboxDefaults()
     gSavedSettings.setS32("JoystickAxis5", 3);  // Yaw
     gSavedSettings.setS32("JoystickAxis6", -1); // Zoom
 
+	gSavedSettings.setS32("JoystickButtonJump", 0);
+	gSavedSettings.setS32("JoystickButtonCrouch", 1);
+	gSavedSettings.setS32("JoystickButtonFly", 2);
+	gSavedSettings.setS32("JoystickButtonRunToggle", 8);
+	gSavedSettings.setS32("JoystickButtonMouselook", 9);
+	gSavedSettings.setS32("JoystickButtonZoomDefault", 6);
+	gSavedSettings.setS32("JoystickButtonFlycam", 7);
+	gSavedSettings.setS32("JoystickButtonZoomOut", 5);
+	gSavedSettings.setS32("JoystickButtonZoomIn", 4);
+	gSavedSettings.setS32("JoystickButtonRollLeft", -1);
+	gSavedSettings.setS32("JoystickButtonRollRight", -1);
+	gSavedSettings.setS32("JoystickButtonRollDefault", -1);
+	
     gSavedSettings.setBOOL("Cursor3D", false); // Xbox Gamepad, not 3D Mouse
     gSavedSettings.setBOOL("AutoLeveling", false);
     gSavedSettings.setBOOL("ZoomDirect", false);
