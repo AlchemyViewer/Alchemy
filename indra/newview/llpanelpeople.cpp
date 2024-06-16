@@ -894,13 +894,30 @@ void LLPanelPeople::updateNearbyList()
 // [/RLVa:KB]
         LLWorld::getInstance()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), ALControlCache::NearMeRange);
 
+        int count_in_region = 0;
         LLViewerRegion* cur_region = gAgent.getRegion();
-        mNearbyCountText->setTextArg("[COUNT]", std::to_string(mNearbyList->size()));
 
-        if (cur_region)
-        {
-            mNearbyCountText->setTextArg("[REGION]", cur_region->getName());
+         if (!cur_region)
+         {
+            LL_WARNS() << "Current region is null" << LL_ENDL;
+            return;
         }
+
+        // Iterate through avatars in the region.
+        // The nearby list reports the avatars in 4096m range (ALControlCache::NearMeRange)
+        // Reported UUIDs may not be in same region.
+        // Also the TOTAL changes based on your filter results --FLN
+        for (size_t i = 0; i < positions.size(); ++i)
+        {
+            if (cur_region->pointInRegionGlobal(positions[i]))
+            {
+                count_in_region++;
+            }
+        }
+
+        mNearbyCountText->setTextArg("[TOTAL]", std::to_string(mNearbyList->size()));
+        mNearbyCountText->setTextArg("[COUNT]", std::to_string(count_in_region));
+        mNearbyCountText->setTextArg("[REGION]", RlvActions::canShowLocation() ? cur_region->getName() : "[REDACTED]");
 // [RLVa:KB] - Checked: RLVa-2.0.3
     }
     else

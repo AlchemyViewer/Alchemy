@@ -184,7 +184,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
                use_ellipses="true"
                skip_link_underline="true"
                name="nearbycount">
-            There are [COUNT] avatars in [REGION].
+            There are [TOTAL] avatars total and [COUNT] in [REGION].
             </text>
          <layout_stack
            clip="false"
