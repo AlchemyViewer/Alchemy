@@ -310,6 +310,7 @@ public:
     /*virtual*/ ~LLScrollListIconText() = default;
     /*virtual*/ void    draw(const LLColor4& color, const LLColor4& highlight_color) const;
     /*virtual*/ const LLSD      getValue() const;
+    /*virtual*/ const LLSD      getAltValue() const;
     /*virtual*/ void    setValue(const LLSD& value);
 
 

@@ -547,32 +547,32 @@
               imgoverlay_label_space="3"
               pad_left="3"/>
             <icons_combo_box.item
-              label="Adult"
               name="Adult"
               value="42">
               <item.columns
-                halign="center"
-                type="icon"
+                halign="left"
+                type="icontext"
+                label="Adult"
                 value="Parcel_R_Light"
                 width="20"/>
             </icons_combo_box.item>
             <icons_combo_box.item
-              label="Moderate"
               name="Mature"
               value="21">
               <item.columns
-                halign="center"
-                type="icon"
+                halign="left"
+                type="icontext"
+                label="Moderate"
                 value="Parcel_M_Light"
                 width="20"/>
             </icons_combo_box.item>
             <icons_combo_box.item
-              label="General"
               name="PG"
               value="13">
               <item.columns
-                halign="center"
-                type="icon"
+                halign="left"
+                type="icontext"
+                label="General"
                 value="Parcel_PG_Light"
                 width="20"/>
             </icons_combo_box.item>

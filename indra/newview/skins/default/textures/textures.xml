@@ -967,4 +967,25 @@ with the same filename but different name
 
   <texture name="Cam_Recall" file_name="icons/Cam_Recall.png"/>
   <texture name="Cam_Save" file_name="icons/Cam_Save.png"/>
+
+  <texture name="Button_A" file_name="xbox/button_a.png" preload="false" />
+  <texture name="Button_B" file_name="xbox/button_b.png" preload="false" />
+  <texture name="Button_Y" file_name="xbox/button_y.png" preload="false" />
+  <texture name="Button_X" file_name="xbox/button_x.png" preload="false" />
+  <texture name="Button_Back" file_name="xbox/button_back.png" preload="false" />
+  <texture name="Button_Start" file_name="xbox/button_start.png" preload="false" />
+  <texture name="Left_Button" file_name="xbox/left_button.png" preload="false" />
+  <texture name="Right_Button" file_name="xbox/right_button.png" preload="false" />
+  <texture name="Left_Thumb" file_name="xbox/left_thumb.png" preload="false" />
+  <texture name="Right_Thumb" file_name="xbox/right_thumb.png" preload="false" />
+  <texture name="Left_Thumb_Press" file_name="xbox/left_thumb_press.png" preload="false" />
+  <texture name="Right_Thumb_Press" file_name="xbox/right_thumb_press.png" preload="false" />
+  <texture name="Left_Thumb_X" file_name="xbox/left_thumb_x.png" preload="false" />
+  <texture name="Right_Thumb_X" file_name="xbox/right_thumb_x.png" preload="false" />
+  <texture name="Left_Thumb_Y" file_name="xbox/left_thumb_y.png" preload="false" />
+  <texture name="Right_Thumb_Y" file_name="xbox/right_thumb_y.png" preload="false" />
+  <texture name="Left_Trigger" file_name="xbox/left_trigger.png" preload="false" />
+  <texture name="Right_Trigger" file_name="xbox/right_trigger.png" preload="false" />
+  <texture name="Triggers" file_name="xbox/triggers.png" preload="false" />
+  <texture name="None" file_name="xbox/none.png" preload="false" />
 </textures>

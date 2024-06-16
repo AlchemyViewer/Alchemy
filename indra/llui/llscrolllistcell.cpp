@@ -573,6 +573,11 @@ LLScrollListIconText::LLScrollListIconText(const LLScrollListCell::Params& p)
 
 const LLSD LLScrollListIconText::getValue() const
 {
+    return LLSD(mText.getString());
+}
+
+const LLSD LLScrollListIconText::getAltValue() const
+{
     if (mIcon.isNull())
     {
         return LLStringUtil::null;
