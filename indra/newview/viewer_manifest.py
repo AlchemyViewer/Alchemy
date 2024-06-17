@@ -924,12 +924,62 @@ class DarwinManifest(ViewerManifest):
                 pass
             else:
                 # variable found so use it to unlock keychain followed by codesign
+                frameworks_path = os.path.join(application, "Contents", "Frameworks")
                 slplugin_path = os.path.join(application, "Contents", "Resources", "ALPlugin.app")
                 home_path = os.environ['HOME']
                 viewer_keychain = os.path.join(home_path, 'Library',
                                                 'Keychains', keychain_name)
                 self.run_command(['security', 'unlock-keychain',
                                     '-p', keychain_pwd, viewer_keychain])
+
+                if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
+                    self.run_command(
+                        ['codesign',
+                            '--verbose',
+                            '--force',
+                            '--timestamp',
+                            '--keychain', viewer_keychain,
+                            '--sign', identity,
+                            os.path.join(frameworks_path, "libopenal.dylib")])
+
+                    self.run_command(
+                        ['codesign',
+                            '--verbose',
+                            '--force',
+                            '--timestamp',
+                            '--keychain', viewer_keychain,
+                            '--sign', identity,
+                            os.path.join(frameworks_path, "libalut.dylib")])
+
+                if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
+                    if self.args['buildtype'].lower() == 'debug':
+                        self.run_command(
+                            ['codesign',
+                                '--verbose',
+                                '--force',
+                                '--timestamp',
+                                '--keychain', viewer_keychain,
+                                '--sign', identity,
+                                os.path.join(frameworks_path, "libfmodL.dylib")])
+                    else:
+                        self.run_command(
+                            ['codesign',
+                                '--verbose',
+                                '--force',
+                                '--timestamp',
+                                '--keychain', viewer_keychain,
+                                '--sign', identity,
+                                os.path.join(frameworks_path, "libfmod.dylib")])
+
+                if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
+                    self.run_command(
+                        ['codesign',
+                            '--verbose',
+                            '--force',
+                            '--timestamp',
+                            '--keychain', viewer_keychain,
+                            '--sign', identity,
+                            os.path.join(frameworks_path, "discord_game_sdk.dylib")])
 
                 self.run_command(
                     ['codesign',
