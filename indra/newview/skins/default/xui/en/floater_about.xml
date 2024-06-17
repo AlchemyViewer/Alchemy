@@ -41,14 +41,46 @@
       <icon
        interactable="true"
        commit_on_click="true"
+       height="42"
+       image_name="social_github"
+       layout="topleft"
+       left="25"
+       mouse_opaque="true"
+       name="github_icon"
+       tool_tip="[APP_NAME] on Discord"
+       top="140"
+       width="41">
+        <icon.commit_callback
+         function="Advanced.ShowURL"
+         parameter="https://github.com/alchemyviewer" />
+      </icon>
+      <icon
+       interactable="true"
+       commit_on_click="true"
+       height="42"
+       image_name="social_bluesky"
+       layout="topleft"
+       left_pad="10"
+       mouse_opaque="true"
+       name="bsky_icon"
+       tool_tip="[APP_NAME] on Mastodon"
+       top="140"
+       width="42">
+        <icon.commit_callback
+         function="Advanced.ShowURL"
+         parameter="https://bsky.app/profile/alchemyviewer.org" />
+      </icon>
+      <icon
+       interactable="true"
+       commit_on_click="true"
        height="32"
        image_name="social_discord"
        layout="topleft"
-       left="20"
+       left="25"
        mouse_opaque="true"
        name="discord_icon"
        tool_tip="[APP_NAME] on Discord"
-       top="140"
+       top_pad="10"
        width="42">
         <icon.commit_callback
          function="Advanced.ShowURL"
@@ -60,11 +92,11 @@
        height="32"
        image_name="social_mastodon"
        layout="topleft"
-       left_pad="20"
+       left_pad="16"
        mouse_opaque="true"
        name="mastodon_icon"
        tool_tip="[APP_NAME] on Mastodon"
-       top="140"
+       top_delta="0"
        width="30">
         <icon.commit_callback
          function="Advanced.ShowURL"
