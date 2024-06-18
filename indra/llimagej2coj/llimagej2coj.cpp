@@ -235,8 +235,6 @@ bool LLImageJ2COJ::initEncode(LLImageJ2C &base, LLImageRaw &raw_image, int block
 
 bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decode_time, S32 first_channel, S32 max_channel_count)
 {
-    LLTimer decode_timer;
-
     /* Extract metadata */
     /* ---------------- */
     U8* c_data = base.getData();
@@ -271,7 +269,7 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
             }
 
             // extract the comment minus the markers, 00 01
-            raw_image.mComment.assign((char*)c_data + position + 6, c_length - 4);
+            raw_image.mComment.assign((char*)(c_data + position + 6), c_length - 4);
             break;
         }
         ++position;
