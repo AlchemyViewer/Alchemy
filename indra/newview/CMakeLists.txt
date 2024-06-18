@@ -1584,11 +1584,6 @@ source_group("CMake Rules" FILES ViewerInstall.cmake)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
            "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n")
 
-# if (WINDOWS)
-#  LIST(APPEND viewer_SOURCE_FILES alsquirrelupdater.cpp)
-#  LIST(APPEND viewer_HEADER_FILES alsquirrelupdater.h)
-# endif (WINDOWS)
-
 if (DARWIN)
   LIST(APPEND viewer_SOURCE_FILES llappviewermacosx.cpp)
   LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.mm)

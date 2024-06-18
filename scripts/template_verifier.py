@@ -283,7 +283,7 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
     if options.force_verification == False:
         # Early exist if the template hasn't changed.
         b2_url = "%s.b2" % current_url
-        current_b2b = fetch(b2_url)
+        current_b2b = fetch(b2_url).decode("utf-8")
         if hexdigest == current_b2b:
             print("Message template BLAKE2 has not changed.")
             sys.exit(0)
