@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="llsd.xsd">
 	<map>
@@ -13,7 +13,7 @@
 			<key>Type</key>
 			<string>Boolean</string>
 			<key>Value</key>
-			<boolean>1</boolean>
+			<boolean>0</boolean>
 		</map>
 		<key>LegacyNotificationWell</key>
 		<map>
