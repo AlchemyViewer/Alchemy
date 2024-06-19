@@ -13235,7 +13235,7 @@ You have: [CHANNEL] [MYVERSION][MESSAGE]
   <notification
    icon="notify.tga"
    name="AlchemyUpdateToast"
-   persist="true"
+   persist="false"
    type="offer">
 A new version of [APP_NAME] is available for download!
 
