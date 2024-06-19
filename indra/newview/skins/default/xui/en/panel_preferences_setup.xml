@@ -166,7 +166,7 @@
      type="string"
      length="1"
      follows="left|top"
-     height="10"
+     height="15"
      layout="topleft"
      left="30"
      name="Software updates:"
@@ -185,13 +185,14 @@
     left_delta="50"
     mouse_opaque="true"
     name="alchemy_updates_auto_check"
-    width="400"
+    width="50"
     top_pad="10"/>
   <text
-    left_delta="205"
+    follows="left|top"
+    layout="topleft"
     top_delta="-2"
-    width="100"
-    follows="left|top">
+    left_pad="155"
+    width="100">
       ([https://alchemyviewer.org/privacy-policy Privacy Policy])
   </text>
 
