@@ -24,7 +24,7 @@ chmod +x "$desired_handler"
 if command -v xdg-mime >/dev/null 2>&1; then
     urlhandler=$(xdg-mime query default x-scheme-handler/secondlife)
     localappdir="${HOME}/.local/share/applications"
-    newhandler="secondlifeprotocol_$(basename "$(dirname "${desired_handler}")").desktop"
+    newhandler="secondlifeprotocol_$(basename "${PWD%}").desktop"
     handlerpath="${localappdir}/${newhandler}"
     cat >"${handlerpath}" <<EOFnew || print "Warning: Did not register secondlife:// handler with xdg-mime: Could not write $newhandler"
 [Desktop Entry]
@@ -49,7 +49,8 @@ EOFnew
         #Clean up handlers from other viewers
         if [ "${urlhandler}" != "${newhandler}" ]; then
             print "Current SLURL Handler: ${urlhandler} - Setting ${newhandler} as the new default..."
-            mv "${localappdir}"/"${urlhandler}" "${localappdir}"/"${urlhandler}".bak
+            #mv "${localappdir}"/"${urlhandler}" "${localappdir}"/"${urlhandler}".bak #Old method, now replaced with XDG.
+            xdg-desktop-menu install --novendor "${localappdir}"/"$urlhandler"
         else
             print "SLURL Handler has not changed, leaving as-is."
         fi
@@ -75,3 +76,4 @@ else
         fi
     fi
 fi
+notify-send -t 5000 -i info "Second Life URL Handler" "SLURL association created"

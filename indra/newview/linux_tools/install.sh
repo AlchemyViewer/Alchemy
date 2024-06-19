@@ -68,8 +68,12 @@ homedir_install()
     exit 0
     fi
 
-    install_to_prefix "$HOME/.local/share/${installdir_name}"
-    "$HOME/.local/share/${installdir_name}/etc/refresh_desktop_app_entry.sh"
+    if [ -d "$XDG_DATA_HOME" ] ; then
+        install_to_prefix "$XDG_DATA_HOME/alchemy-install" #$XDG_DATA_HOME is a synonym for $HOME/.local/share/ unless the user has specified otherwise (unlikely).
+    else
+        install_to_prefix "$HOME/.local/share/alchemy-install" #XDG_DATA_HOME not set, so use default path as defined by XDG spec.
+    fi
+
 }
 
 root_install()
@@ -88,7 +92,6 @@ root_install()
     install_to_prefix "$install_prefix"
 
     mkdir -p /usr/local/share/applications
-    "${install_prefix}"/etc/refresh_desktop_app_entry.sh
 }
 
 install_to_prefix()
@@ -134,6 +137,8 @@ install_to_prefix()
         rm "$1/bin/llplugin/.user_does_not_want_chrome_sandboxing_and_accepts_the_risks" 2> /dev/null
         pkexec "$1/etc/chrome_sandboxing_permissions_setup.sh" || die "Failed to set permissions on chrome-sandbox"
     fi
+    "$1"/etc/refresh_desktop_app_entry.sh || echo "Failed to integrate into DE via XDG."
+    set_slurl_handler "$1"
 }
 
 backup_previous_installation()
@@ -144,6 +149,15 @@ backup_previous_installation()
     mv "$1" "$backup_dir" || die "Failed to create backup of existing installation!"
 }
 
+set_slurl_handler()
+{
+    install_dir=$1
+    prompt "Would you like to set Alchemy as your default SLurl handler? [Y/N]: "
+    if [ $? -eq 0 ]; then
+	exit 0
+    fi
+    "$install_dir"/etc/register_secondlifeprotocol.sh #Successful association comes with a notification to the user.
+}
 
 if [ "$(id -u)" = "0" ]; then
     root_install
