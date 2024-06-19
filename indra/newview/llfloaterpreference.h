@@ -182,6 +182,7 @@ public:
     void onChangeSoundFolder();
     void onChangeAnimationFolder();
     void onClickBlockList();
+    void onClickUpdateCheckNow();
     void onClickProxySettings();
     void onClickTranslationSettings();
     void onClickPermsDefault();

@@ -90,6 +90,7 @@
 #include "llrect.h"
 #include "llstring.h"
 #include "alunzip.h"
+#include "alupdatemanager.h"
 
 // project includes
 
@@ -346,6 +347,7 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     mCommitCallbackRegistrar.add("Pref.getUIColor",             boost::bind(&LLFloaterPreference::getUIColor, this ,_1, _2));
     mCommitCallbackRegistrar.add("Pref.MaturitySettings",       boost::bind(&LLFloaterPreference::onChangeMaturity, this));
     mCommitCallbackRegistrar.add("Pref.BlockList",              boost::bind(&LLFloaterPreference::onClickBlockList, this));
+    mCommitCallbackRegistrar.add("Pref.UpdateCheckNow",         boost::bind(&LLFloaterPreference::onClickUpdateCheckNow, this));
     mCommitCallbackRegistrar.add("Pref.Proxy",                  boost::bind(&LLFloaterPreference::onClickProxySettings, this));
     mCommitCallbackRegistrar.add("Pref.TranslationSettings",    boost::bind(&LLFloaterPreference::onClickTranslationSettings, this));
     mCommitCallbackRegistrar.add("Pref.AutoReplace",            boost::bind(&LLFloaterPreference::onClickAutoReplace, this));
@@ -960,6 +962,16 @@ void LLFloaterPreference::draw()
 
     has_first_selected = (getChildRef<LLScrollListCtrl>("enabled_popups").getFirstSelected()!=NULL);
     gSavedSettings.setBOOL("FirstSelectedEnabledPopups", has_first_selected);
+
+    getChild<LLButton>("AlchemyUpdateCheckNow")->setEnabled(!ALUpdateManager::getInstance()->mChecking);
+    static LLCachedControl<bool> AlchemyUpdateEnableAutoCheck(gSavedSettings, "AlchemyUpdateEnableAutoCheck");
+    getChild<LLTextBase>("AlchemyUpdateLastChecked")->setVisible(AlchemyUpdateEnableAutoCheck);
+    if (AlchemyUpdateEnableAutoCheck)
+    {
+        std::string lastCheck = LLTrans::getString("LastCheckedNSecondsAgo");
+        LLStringUtil::format(lastCheck, LLSD().with("SECONDS", static_cast<S32>(ALUpdateManager::getInstance()->mLastChecked.getElapsedTimeF32())));
+        getChild<LLTextBase>("AlchemyUpdateLastChecked")->setText(lastCheck);
+    }
 
     LLFloater::draw();
 }
@@ -2117,6 +2129,11 @@ void LLFloaterPreference::onClickBlockList()
 // [/SL:KB]
 //  LLFloaterSidePanelContainer::showPanel("people", "panel_people",
 //      LLSD().with("people_panel_tab_name", "blocked_panel"));
+}
+
+void LLFloaterPreference::onClickUpdateCheckNow()
+{
+    ALUpdateManager::getInstance()->checkNow();
 }
 
 void LLFloaterPreference::onClickProxySettings()
