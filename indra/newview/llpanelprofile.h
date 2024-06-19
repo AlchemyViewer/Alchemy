@@ -33,7 +33,6 @@
 #include "llpanel.h"
 #include "llpanelavatar.h"
 #include "llmediactrl.h"
-#include "llprofileimagepicker.h"
 #include "llvoiceclient.h"
 
 // class LLPanelProfileClassifieds;

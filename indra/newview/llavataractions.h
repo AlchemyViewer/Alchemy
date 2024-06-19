@@ -107,9 +107,7 @@ public:
     static void hideProfile(const LLUUID& avatar_id);
     static bool profileVisible(const LLUUID& avatar_id);
     static bool isPickTabSelected(const LLUUID& avatar_id);
-    static LLFloater* findProfileFloater(const LLUUID& avatar_id);
-
-    static void createPick(const LLPickData& data);
+    static LLFloater* getProfileFloater(const LLUUID& avatar_id);
 
     /**
      * Show avatar on world map.

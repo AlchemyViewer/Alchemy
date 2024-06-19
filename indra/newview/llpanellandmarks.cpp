@@ -1104,7 +1104,11 @@ void LLLandmarksPanel::doProcessParcelInfo(LLLandmark* landmark,
     data.snapshot_id = parcel_data.snapshot_id;
     data.parcel_id = parcel_data.parcel_id;
 
-    LLAvatarActions::createPick(data);
+    LLFloaterProfile* profile_floater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgentID)));
+    if (profile_floater)
+    {
+        profile_floater->createPick(data);
+    }
 }
 
 void LLLandmarksPanel::doCreatePick(LLLandmark* landmark, const LLUUID &item_id)
