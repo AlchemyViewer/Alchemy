@@ -41,6 +41,7 @@
 #include "llsearchcombobox.h"
 #include "llscrolllistctrl.h"
 #include "lltabcontainer.h"
+#include "lleventnotifier.h"
 
 class FSSearchRemoteParcelInfoObserver;
 class LLAvatarPropertiesObserver;
@@ -48,6 +49,7 @@ class LLGroupMgrObserver;
 class LLSearchEditor;
 class LLSearchComboBox;
 class FSFloaterSearch;
+class LLPanelProfile;
 class FSScrollListCtrl;
 
 struct SearchQuery : public LLInitParam::Block<SearchQuery>
@@ -109,7 +111,6 @@ private:
     LLSD        mResultsContent;
     LLUUID      mQueryID;
 
-    FSFloaterSearch*        mParent;
     LLSearchComboBox*       mSearchComboBox;
     LLScrollListCtrl*       mSearchResults;
 };
@@ -144,7 +145,6 @@ private:
     LLSD        mResultsContent;
     LLUUID      mQueryID;
 
-    FSFloaterSearch*    mParent;
     LLSearchComboBox*   mSearchComboBox;
     LLScrollListCtrl*   mSearchResults;
 };
@@ -179,7 +179,6 @@ private:
     LLSD        mResultsContent;
     LLUUID      mQueryID;
 
-    FSFloaterSearch*    mParent;
     LLSearchComboBox*   mSearchComboBox;
     LLScrollListCtrl*   mSearchResults;
     LLComboBox*         mPlacesCategory;
@@ -213,7 +212,6 @@ private:
     LLSD        mResultsContent;
     LLUUID      mQueryID;
 
-    FSFloaterSearch*    mParent;
     LLLineEditor*       mPriceEditor;
     LLLineEditor*       mAreaEditor;
     LLScrollListCtrl*   mSearchResults;
@@ -249,7 +247,6 @@ private:
     LLSD        mResultsContent;
     LLUUID      mQueryID;
 
-    FSFloaterSearch*    mParent;
     LLSearchComboBox*   mSearchComboBox;
     LLScrollListCtrl*   mSearchResults;
     LLComboBox*         mClassifiedsCategory;
@@ -291,7 +288,6 @@ private:
     LLSD        mResultsContent;
     LLUUID      mQueryID;
 
-    FSFloaterSearch*    mParent;
     LLSearchComboBox*   mSearchComboBox;
     LLScrollListCtrl*   mSearchResults;
     LLRadioGroup*       mEventsMode;
@@ -347,18 +343,9 @@ public:
     void onSelectedEvent(const S32 selected_event);
     void displayParcelDetails(const LLParcelData& parcel_data);
     void displayClassifiedDetails(LLAvatarClassifiedInfo*& c_info);
-    void displayAvatarDetails(LLAvatarData*& avatar_data);
+    void displayAvatarDetails(LLAvatarData* avatar_data);
     void displayGroupDetails(LLGroupMgrGroupData*& group_data);
-    void displayEventDetails(U32 eventId,
-                             F64 eventEpoch,
-                             const std::string& eventDateStr,
-                             const std::string &eventName,
-                             const std::string &eventDesc,
-                             const std::string &simName,
-                             U32 eventDuration,
-                             U32 eventFlags,
-                             U32 eventCover,
-                             LLVector3d eventGlobalPos);
+    bool displayEventDetails(LLEventStruct event);
     void displayEventParcelImage(const LLParcelData& parcel_data);
     void setLoadingProgress(bool started);
 
@@ -392,6 +379,7 @@ private:
     FSSearchRemoteParcelInfoObserver* mRemoteParcelEventLocationObserver;
     LLAvatarPropertiesObserver* mAvatarPropertiesObserver;
     LLGroupMgrObserver* mGroupPropertiesRequest;
+    boost::signals2::connection mEventNotifierConnection;
 
     FSPanelSearchPeople*    mPanelPeople;
     FSPanelSearchGroups*    mPanelGroups;

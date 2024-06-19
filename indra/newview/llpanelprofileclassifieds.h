@@ -305,7 +305,10 @@ private:
 
     S32 mPriceForListing;
 
+public:
     static void handleSearchStatResponse(LLUUID classifiedId, LLSD result);
+
+private:
 
     typedef std::list<LLPanelProfileClassified*> panel_list_t;
     static panel_list_t sAllPanels;

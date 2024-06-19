@@ -48,7 +48,8 @@
 #include "llloadingindicator.h"
 #include "lllogininstance.h"
 #include "llnotificationsutil.h"
-#include "llpanelclassified.h"
+#include "llpanelprofile.h"
+#include "llpanelprofileclassifieds.h"
 #include "llparcel.h"
 #include "llproductinforequest.h"
 #include "llqueryflags.h"
@@ -156,6 +157,9 @@ public:
 
     void processProperties(void* data, EAvatarProcessorType type)
     {
+        if (!data)
+            return;
+
         if (APT_PROPERTIES == type)
         {
             LLAvatarData* avatar_data = static_cast<LLAvatarData*>(data);
@@ -164,6 +168,12 @@ public:
                 mParent->displayAvatarDetails(avatar_data);
                 LLAvatarPropertiesProcessor::getInstance()->removeObserver(avatar_data->avatar_id, this);
             }
+        }
+        else if (APT_PROPERTIES_LEGACY == type)
+        {
+            LLAvatarData avatar_data(*static_cast<LLAvatarLegacyData*>(data));
+            mParent->displayAvatarDetails(&avatar_data);
+            LLAvatarPropertiesProcessor::getInstance()->removeObserver(avatar_data.avatar_id, this);
         }
         if (APT_CLASSIFIED_INFO == type)
         {
@@ -178,7 +188,7 @@ public:
                     LL_INFOS("Search") << "Classified stat request via capability" << LL_ENDL;
                     LLSD body;
                     body["classified_id"] = c_info->classified_id;
-                    LLCoreHttpUtil::HttpCoroutineAdapter::callbackHttpPost(url, body, boost::bind(&LLPanelClassifiedInfo::handleSearchStatResponse, c_info->classified_id, _1));
+                    LLCoreHttpUtil::HttpCoroutineAdapter::callbackHttpPost(url, body, boost::bind(&LLPanelProfileClassified::handleSearchStatResponse, c_info->classified_id, _1));
                 }
             }
         }
@@ -241,7 +251,7 @@ public:
         S32 map_clicks = atoi(strings[2].c_str());
         S32 profile_clicks = atoi(strings[3].c_str());
 
-        LLPanelClassifiedInfo::setClickThrough(
+        LLPanelProfileClassified::setClickThrough(
             classified_id, teleport_clicks, map_clicks, profile_clicks, false);
 
         return true;
@@ -264,10 +274,12 @@ FSFloaterSearch::FSFloaterSearch(const Params& key)
     mRemoteParcelObserver = new FSSearchRemoteParcelInfoObserver(this, false);
     mRemoteParcelEventLocationObserver = new FSSearchRemoteParcelInfoObserver(this, true);
     mAvatarPropertiesObserver = new FSSearchAvatarPropertiesObserver(this);
+    mEventNotifierConnection = gEventNotifier.setNewEventCallback(boost::bind(&FSFloaterSearch::displayEventDetails, this, boost::placeholders::_1));
 }
 
 FSFloaterSearch::~FSFloaterSearch()
 {
+    mEventNotifierConnection.disconnect();
     delete mRemoteParcelObserver;
     delete mRemoteParcelEventLocationObserver;
     delete mAvatarPropertiesObserver;
@@ -361,7 +373,7 @@ void FSFloaterSearch::onTabChange()
         mDetailsPanel->setVisible(false);
         mPanelWeb->resetFocusOnLoad();
     }
-    else
+    else if (active_panel == mPanelPeople)
     {
         mDetailsPanel->setVisible(mHasSelection);
     }
@@ -404,12 +416,10 @@ void FSFloaterSearch::onSelectedItem(const LLUUID& selected_item, ESearchCategor
         switch (type)
         {
             case SC_AVATAR:
-                {
-                    {
-                        LLAvatarPropertiesProcessor::getInstance()->addObserver(selected_item, mAvatarPropertiesObserver);
-                        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(selected_item);
-                    }
-                }
+            {
+                LLAvatarPropertiesProcessor::getInstance()->addObserver(selected_item, mAvatarPropertiesObserver);
+                LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(selected_item);
+            }
                 break;
             case SC_GROUP:
                 mGroupPropertiesRequest = new FSSearchGroupInfoObserver(selected_item, this);
@@ -484,7 +494,7 @@ void FSFloaterSearch::displayParcelDetails(const LLParcelData& parcel_data)
     setLoadingProgress(false);
 }
 
-void FSFloaterSearch::displayAvatarDetails(LLAvatarData*& avatar_data)
+void FSFloaterSearch::displayAvatarDetails(LLAvatarData* avatar_data)
 {
     if (avatar_data)
     {
@@ -501,7 +511,7 @@ void FSFloaterSearch::displayAvatarDetails(LLAvatarData*& avatar_data)
         mDetailTitle->setValue(LLTrans::getString("LoadingData"));
         mDetailDesc->setValue(avatar_data->about_text);
         mDetailSnapshot->setValue(avatar_data->image_id);
-        mDetailAux1->setValue(getString("string.age", map));
+        mDetailAux1->setValue(avatar_data->hide_age ? "" : getString("string.age", map));
         LLAvatarNameCache::get(avatar_data->avatar_id, boost::bind(&FSFloaterSearch::avatarNameUpdatedCallback,this, _1, _2));
         childSetVisible("people_profile_btn", true);
         childSetVisible("people_message_btn", true);
@@ -569,13 +579,13 @@ void FSFloaterSearch::displayClassifiedDetails(LLAvatarClassifiedInfo*& c_info)
     }
 }
 
-void FSFloaterSearch::displayEventDetails(U32 eventId, F64 eventEpoch, const std::string& eventDateStr, const std::string &eventName, const std::string &eventDesc, const std::string &simName, U32 eventDuration, U32 eventFlags, U32 eventCover, LLVector3d eventGlobalPos)
+bool FSFloaterSearch::displayEventDetails(LLEventStruct event)
 {
-    if (eventFlags == EVENT_FLAG_ADULT)
+    if (event.flags == EVENT_FLAG_ADULT)
     {
         mDetailMaturity->setValue("Parcel_R_Dark");
     }
-    else if (eventFlags == EVENT_FLAG_MATURE)
+    else if (event.flags == EVENT_FLAG_MATURE)
     {
         mDetailMaturity->setValue("Parcel_M_Dark");
     }
@@ -587,25 +597,25 @@ void FSFloaterSearch::displayEventDetails(U32 eventId, F64 eventEpoch, const std
     S32 region_x;
     S32 region_y;
     S32 region_z;
-    region_x = (S64)ll_round(eventGlobalPos.mdV[VX]) % REGION_WIDTH_UNITS;
-    region_y = (S64)ll_round(eventGlobalPos.mdV[VY]) % REGION_WIDTH_UNITS;
-    region_z = (S32)ll_round(eventGlobalPos.mdV[VZ]);
+    region_x = (S64)ll_round(event.globalPos.mdV[VX]) % REGION_WIDTH_UNITS;
+    region_y = (S64)ll_round(event.globalPos.mdV[VY]) % REGION_WIDTH_UNITS;
+    region_z = (S32)ll_round(event.globalPos.mdV[VZ]);
     LLStringUtil::format_map_t map;
-    map["DURATION"] = llformat("%d:%.2d", eventDuration / 60, eventDuration % 60);
-    map["LOCATION"] = llformat("%s (%d, %d, %d)", simName.c_str(), region_x, region_y, region_z);
-    if (eventCover > 0)
+    map["DURATION"] = llformat("%d:%.2d", event.duration / 60, event.duration % 60);
+    map["LOCATION"] = llformat("%s (%d, %d, %d)", event.simName.c_str(), region_x, region_y, region_z);
+    if (event.cover > 0)
     {
-        map["COVERCHARGE"] = llformat("L$%d", eventCover);
+        map["COVERCHARGE"] = llformat("L$%d", event.cover);
         mDetailAux2->setValue(getString("string.covercharge", map));
     }
 
-    mParcelGlobal = eventGlobalPos;
-    mEventID = eventId;
+    mParcelGlobal = event.globalPos;
+    mEventID = event.eventId;
     mDetailsPanel->setVisible(mTabContainer->getCurrentPanel()->getName() == "panel_ls_events");
     mHasSelection = true;
     mDetailMaturity->setVisible(true);
-    mDetailTitle->setValue(eventName);
-    mDetailDesc->setValue(eventDesc);
+    mDetailTitle->setValue(event.eventName);
+    mDetailDesc->setValue(event.desc);
     mDetailAux1->setValue(getString("string.duration", map));
     mDetailLocation->setValue(getString("string.location", map));
     mDetailSnapshotParcel->setValue(LLUUID::null);
@@ -613,7 +623,8 @@ void FSFloaterSearch::displayEventDetails(U32 eventId, F64 eventEpoch, const std
     childSetVisible("map_btn", true);
     childSetVisible("event_reminder_btn", true);
 
-    LLWorldMapMessage::getInstance()->sendNamedRegionRequest(simName, boost::bind(&FSFloaterSearch::regionHandleCallback, this, _1, eventGlobalPos), "", false);
+    LLWorldMapMessage::getInstance()->sendNamedRegionRequest(event.simName, boost::bind(&FSFloaterSearch::regionHandleCallback, this, _1, event.globalPos), "", false);
+    return true;
 }
 
 void FSFloaterSearch::regionHandleCallback(U64 region_handle, LLVector3d pos_global)
@@ -2993,7 +3004,7 @@ void FSPanelSearchWeb::loadURL(const SearchQuery &p)
     }
 
     // add the search query string
-    subs["QUERY"] = LLURI::escape(p.query);
+    subs["QUERY"] = LLURI::escape(p.query.getValue());
 
     // add the permissions token that login.cgi gave us
     // We use "search_token", and fallback to "auth_token" if not present.
