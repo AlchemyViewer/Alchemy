@@ -13207,6 +13207,51 @@ Always Run disabled.
   type="notifytip">
 	 I’m sorry Dave, I’m afraid I can’t do that
  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="AlchemyUpdateAlert"
+   type="alertmodal">
+A new version of [APP_NAME] is available for download!
+
+Latest: [CHANNEL] [VERSION]
+You have: [CHANNEL] [MYVERSION][MESSAGE]
+    <form name="form">
+      <button
+       default="true"
+       index="0"
+       name="DOWNLOAD"
+       text="Download"/>
+      <button
+       index="1"
+       name="CLOSE"
+       text="Remind Me Later"/>
+      <button
+       index="2"
+       name="SUPPRESS"
+       text="Ignore"/>
+    </form>
+  </notification>
+  <notification
+   icon="notify.tga"
+   name="AlchemyUpdateToast"
+   persist="true"
+   type="offer">
+A new version of [APP_NAME] is available for download!
+
+Latest: [CHANNEL] [VERSION]
+You have: [CHANNEL] [MYVERSION][MESSAGE]
+    <form name="form">
+      <button
+       index="0"
+       name="DOWNLOAD"
+       text="Download"/>
+      <button
+       index="2"
+       name="SUPPRESS"
+       text="Ignore"/>
+    </form>
+  </notification>
 	
  <notification
   icon="notifytip.tga"
