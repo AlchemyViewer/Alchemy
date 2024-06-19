@@ -69,9 +69,9 @@ homedir_install()
     fi
 
     if [ -d "$XDG_DATA_HOME" ] ; then
-        install_to_prefix "$XDG_DATA_HOME/alchemy-install" #$XDG_DATA_HOME is a synonym for $HOME/.local/share/ unless the user has specified otherwise (unlikely).
+        install_to_prefix "$XDG_DATA_HOME/$installdir_name" #$XDG_DATA_HOME is a synonym for $HOME/.local/share/ unless the user has specified otherwise (unlikely).
     else
-        install_to_prefix "$HOME/.local/share/alchemy-install" #XDG_DATA_HOME not set, so use default path as defined by XDG spec.
+        install_to_prefix "$HOME/.local/share/$installdir_name" #XDG_DATA_HOME not set, so use default path as defined by XDG spec.
     fi
 
 }
@@ -152,6 +152,7 @@ backup_previous_installation()
 set_slurl_handler()
 {
     install_dir=$1
+    echo
     prompt "Would you like to set Alchemy as your default SLurl handler? [Y/N]: "
     if [ $? -eq 0 ]; then
 	exit 0
