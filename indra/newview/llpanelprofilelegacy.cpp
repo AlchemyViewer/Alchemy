@@ -461,7 +461,7 @@ void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType ty
             getChild<LLLineEditor>("www_edit")->setText(pData->profile_url);
 
             LLStringUtil::format_map_t args;
-            std::string birth_date = LLTrans::getString("AvatarBirthDateFormat");
+            std::string birth_date = LLTrans::getString("AvatarBirthDateFormatFull");
             LLStringUtil::format(birth_date, LLSD().with("datetime", static_cast<S32>(pData->born_on.secondsSinceEpoch())));
             args["[AGE]"] = LLDateUtil::ageFromDate(pData->born_on, LLDate::now());
             args["[REZDAY]"] = birth_date;
