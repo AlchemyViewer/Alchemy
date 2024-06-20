@@ -2022,7 +2022,7 @@ void LLPipeline::updateMovedList(LLDrawable::drawable_vector_t& moved_list)
 {
     LL_PROFILE_ZONE_SCOPED;
     LLDrawable::drawable_vector_t newList; // removing elements in the middle of a vector is a really bad idea. I'll just create a new one and swap it at the end.
-	
+
     for (LLDrawable::drawable_vector_t::iterator iter = moved_list.begin();
          iter != moved_list.end(); )
     {

@@ -48,62 +48,62 @@ typedef enum e_joystick_driver_state
 
 typedef enum E_Buttons
 {
-	ROLL_LEFT = 0,
-	ROLL_RIGHT,
-	ROLL_DEFAULT ,
-	ZOOM_IN,
-	ZOOM_OUT,
-	ZOOM_DEFAULT,
-	JUMP,
-	CROUCH,
-	FLY,
-	MOUSELOOK,
-	FLYCAM,
-	TOGGLE_RUN,
-	MAX_BUTTONS
+    ROLL_LEFT = 0,
+    ROLL_RIGHT,
+    ROLL_DEFAULT ,
+    ZOOM_IN,
+    ZOOM_OUT,
+    ZOOM_DEFAULT,
+    JUMP,
+    CROUCH,
+    FLY,
+    MOUSELOOK,
+    FLYCAM,
+    TOGGLE_RUN,
+    MAX_BUTTONS
 } E_buttons;
 
 typedef enum E_Axes
 {
-	X_AXIS = 0,
-	Y_AXIS = 1,
-	Z_AXIS = 2,
-	CAM_X_AXIS = 3,
-	CAM_Y_AXIS = 4,
-	CAM_Z_AXIS = 5,
-	CAM_W_AXIS = 6,
-	MAX_AXES = 7
+    X_AXIS = 0,
+    Y_AXIS = 1,
+    Z_AXIS = 2,
+    CAM_X_AXIS = 3,
+    CAM_Y_AXIS = 4,
+    CAM_Z_AXIS = 5,
+    CAM_W_AXIS = 6,
+    MAX_AXES = 7
 } E_Axes;
 
 typedef enum E_AVScalings
 {
-	AV_AXIS_0 = 0,
-	AV_AXIS_1,
-	AV_AXIS_2,
-	AV_AXIS_3,
-	AV_AXIS_4,
-	AV_AXIS_5,
+    AV_AXIS_0 = 0,
+    AV_AXIS_1,
+    AV_AXIS_2,
+    AV_AXIS_3,
+    AV_AXIS_4,
+    AV_AXIS_5,
 } E_AVScalings;
 
 typedef enum E_BuildScalings
 {
-	BUILD_AXIS_0 = 0,
-	BUILD_AXIS_1,
-	BUILD_AXIS_2,
-	BUILD_AXIS_3,
-	BUILD_AXIS_4,
-	BUILD_AXIS_5,
+    BUILD_AXIS_0 = 0,
+    BUILD_AXIS_1,
+    BUILD_AXIS_2,
+    BUILD_AXIS_3,
+    BUILD_AXIS_4,
+    BUILD_AXIS_5,
 } E_BuildScalings;
 
 typedef enum E_FlycamScalings
 {
-	FLYCAM_AXIS_0 = 0,
-	FLYCAM_AXIS_1,
-	FLYCAM_AXIS_2,
-	FLYCAM_AXIS_3,
-	FLYCAM_AXIS_4,
-	FLYCAM_AXIS_5,
-	FLYCAM_AXIS_6,
+    FLYCAM_AXIS_0 = 0,
+    FLYCAM_AXIS_1,
+    FLYCAM_AXIS_2,
+    FLYCAM_AXIS_3,
+    FLYCAM_AXIS_4,
+    FLYCAM_AXIS_5,
+    FLYCAM_AXIS_6,
 } E_FlycamScalings;
 
 
