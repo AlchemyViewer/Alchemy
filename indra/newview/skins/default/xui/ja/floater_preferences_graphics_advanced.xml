@@ -103,7 +103,7 @@
 		<combo_box.item label="太陽／月" name="1"/>
 		<combo_box.item label="太陽／月＋プロジェクタ" name="2"/>
 	</combo_box>
-	<check_box label="スクリーンスペースの反射" name="ScreenSpaceReflections"/>
+	<check_box label="スクリーンスペースリフレクション" name="ScreenSpaceReflections"/>
 	<text name="ReflectionDetailText">
 		反射の詳細：
 	</text>
@@ -136,7 +136,6 @@
 	<text name="HeroProbeUpdateText">
 		ミラーの更新頻度：
 	</text>
-
 	<combo_box name="HeroProbeUpdateRate">
 		<combo_box.item label="毎フレーム" name="0" value="1"/>
 		<combo_box.item label="毎２フレーム" name="1" value="2"/>

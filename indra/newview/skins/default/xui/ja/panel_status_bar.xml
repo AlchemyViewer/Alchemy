@@ -28,8 +28,8 @@
 	<text name="TimeText" tool_tip="現在時刻（太平洋時間）" width="160">
 		午前　24：00　PST
 	</text>
-	<icon image_name="Cam_FreeCam_Off" name="presets_icon_camera" tool_tip="カメラプリセットを表示する。"/>
-	<icon image_name="Presets_Icon" name="presets_icon_graphic" tool_tip="グラフィックのプリセットを表示する。"/>
+	<icon name="presets_icon_camera" tool_tip="カメラプリセットを表示する。"/>
+	<icon name="presets_icon_graphic" tool_tip="グラフィックのプリセットを表示する。"/>
 	<button name="media_toggle_btn" tool_tip="すべてのメディア（音楽、ビデオ、Webページ）を開始・停止する。"/>
 	<text name="FPSText" tool_tip="現在のＦＰＳ">
 		240

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="panel_profile_classified">
 	<panel.string name="type_mature">
-		Moderate
+		Moderateコンテンツ
 	</panel.string>
 	<panel.string name="type_pg">
 		Generalコンテンツ
@@ -83,9 +83,9 @@
 						<button label="現在地に設定" name="set_to_curr_location_btn"/>
 						<text name="category_label" value="カテゴリ："/>
 						<text name="content_type_label" value="コンテンツの種類："/>
-						<icons_combo_box label="General コンテンツ" name="content_type_edit">
-							<icons_combo_box.item label="Moderate コンテンツ" name="mature_ci" value="Mature"/>
-							<icons_combo_box.item label="General コンテンツ" name="pg_ci" value="PG"/>
+						<icons_combo_box label="Generalコンテンツ" name="content_type_edit">
+							<icons_combo_box.item name="mature_ci" value="Mature"/>
+							<icons_combo_box.item name="pg_ci" value="PG"/>
 						</icons_combo_box>
 						<check_box label="毎週自動更新" name="auto_renew_edit"/>
 					</panel>
