@@ -136,10 +136,10 @@
 		follows="left|top|right"
 		height="210"
 		layout="topleft"
-		left="43"
+		left="78"
 		name="snapshot"
 		top_pad="4"
-		width="280"/>
+		width="210"/>
 		<texture_picker
 		enabled="false"
 		fallback_image="default_land_picture.j2c"
