@@ -34,7 +34,6 @@
      name="blocked_tabs"
      height="267"
      right="-8"   
-     tab_height="25"
      tab_min_width="100"
      tab_position="top"
      top_pad="4" >
