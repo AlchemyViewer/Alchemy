@@ -270,6 +270,8 @@ using namespace LL;
 
 #include "alstreaminfo.h"
 
+#include "alupdatemanager.h"
+
 // *FIX: These extern globals should be cleaned up.
 // The globals either represent state/config/resource-storage of either
 // this app, or another 'component' of the viewer. App globals should be
@@ -4644,6 +4646,9 @@ void LLAppViewer::idle()
     // Must wait until both have avatar object and mute list, so poll
     // here.
     LLIMProcessing::requestOfflineMessages();
+
+    // Check if it is time to do a update check
+    ALUpdateManager::getInstance()->tryAutoCheck();
 
     ///////////////////////////////////
     //

@@ -1445,6 +1445,39 @@
 			<key>Value</key>
 			<real>8.0</real>
 		</map>
+		<key>AlchemyUpdateCheckFrequency</key>
+		<map>
+			<key>Comment</key>
+			<string>How often to check for updates</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>F32</string>
+			<key>Value</key>
+			<real>3600.0</real>
+		</map>
+		<key>AlchemyUpdateEnableAutoCheck</key>
+		<map>
+			<key>Comment</key>
+			<string>Enable update notifications</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>Boolean</string>
+			<key>Value</key>
+			<real>1</real>
+		</map>
+		<key>AlchemyUpdateURL</key>
+		<map>
+			<key>Comment</key>
+			<string>URL to pull update checks from</string>
+			<key>Persist</key>
+			<integer>1</integer>
+			<key>Type</key>
+			<string>String</string>
+			<key>Value</key>
+			<string>https://crocuta.softhyena.com/alupdate.xml</string>
+		</map>
 		<key>ResetUserColorsOnLogout</key>
 		<map>
 			<key>Comment</key>

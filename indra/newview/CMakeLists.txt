@@ -108,6 +108,7 @@ set(viewer_SOURCE_FILES
     alstreaminfo.cpp
     altoolalign.cpp
     alunzip.cpp
+    alupdatemanager.cpp
     alviewermenu.cpp
     bdanimator.cpp
     bdfloaterposer.cpp
@@ -854,6 +855,7 @@ set(viewer_HEADER_FILES
     alstreaminfo.h
     altoolalign.h
     alunzip.h
+    alupdatemanager.h
     alviewermenu.h
     bdanimator.h
     bdfloaterposer.h
