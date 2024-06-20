@@ -216,7 +216,6 @@
        layout="topleft"
        left="0"
        name="inventory filter tabs"
-       tab_height="30"
        tab_position="top"
        tab_min_width="100"
        use_tab_offset="true"

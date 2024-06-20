@@ -94,9 +94,6 @@ public:
     static void godFreeze(const LLUUID& id);
     static void godUnfreeze(const LLUUID& id);
 
-    // Webprofile
-    static void showWebProfile(const LLUUID& id);
-
 private:
     static bool handleParcelFreeze(const LLSD& notification, const LLSD& response);
     static bool handleParcelEject(const LLSD& notification, const LLSD& response);

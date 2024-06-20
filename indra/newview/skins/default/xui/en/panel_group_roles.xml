@@ -27,7 +27,6 @@
      right="-1"
      name="roles_tab_container"
      tab_position="top"
-     tab_height="22"
      tab_min_width="90"
      top="0"
      width="304">

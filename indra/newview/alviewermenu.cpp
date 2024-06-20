@@ -410,20 +410,20 @@ namespace
 
     class ALToggleLocationBar : public view_listener_t
     {
-	    bool handleEvent(const LLSD& userdata) override
-	    {
-		    const U32 val = userdata.asInteger();
-		    gSavedSettings.setU32("NavigationBarStyle", val);
-		    return true;
-	    }
+        bool handleEvent(const LLSD& userdata) override
+        {
+            const U32 val = userdata.asInteger();
+            gSavedSettings.setU32("NavigationBarStyle", val);
+            return true;
+        }
     };
 
     class ALCheckLocationBar : public view_listener_t
     {
-	    bool handleEvent(const LLSD& userdata) override
-	    {
-		    return userdata.asInteger() == (S32)gSavedSettings.getU32("NavigationBarStyle");
-	    }
+        bool handleEvent(const LLSD& userdata) override
+        {
+            return userdata.asInteger() == (S32)gSavedSettings.getU32("NavigationBarStyle");
+        }
     };
 }
 
@@ -461,5 +461,5 @@ void ALViewerMenu::initialize_menus()
     commit.add("View.ToggleCinematicMode", [](LLUICtrl* ctrl, const LLSD& param) { toggle_cinematic_mode(); });
 
     view_listener_t::addMenu(new ALToggleLocationBar(), "ToggleLocationBar");
-	view_listener_t::addMenu(new ALCheckLocationBar(), "CheckLocationBar");
+    view_listener_t::addMenu(new ALCheckLocationBar(), "CheckLocationBar");
 }
