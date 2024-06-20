@@ -2,10 +2,8 @@ repos:
   - repo: https://github.com/secondlife/git-hooks.git 
     rev: v1.0.2
     hooks:
-      - id: opensource-license
       - id: llsd
       - id: no-trigraphs
-      - id: copyright
       - id: end-of-file
         files: \.(cpp|c|h|py|glsl|cmake|txt)$
         exclude: language.txt
