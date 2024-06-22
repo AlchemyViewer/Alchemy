@@ -62,7 +62,7 @@
 					</text>
 					<slider name="cloud_scale"/>
 					<text name="probe_ambiance_label" tool_tip="放射照度制御。0以外の場合、ＨＤＲ光源モデルが有効になります。">
-						環境反射プローブ（ＨＤＲ）：
+						周辺環境の反射プローブ（ＨＤＲ）：
 					</text>
 					<slider name="probe_ambiance" tool_tip="環境ベースの間接照明の強度を指定します。 0の場合、ＨＤＲスケールは輝度パラメータになります。"/>
 					<text name="scene_gamma_label">
