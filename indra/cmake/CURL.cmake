@@ -29,8 +29,7 @@ elseif(DARWIN)
     )
 else ()
     target_link_libraries(ll::libcurl INTERFACE
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcurld.a
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcurl.a
+      ${ARCH_PREBUILT_DIRS}/libcurl.a
       ll::openssl
       ll::nghttp2
       ll::zlib-ng

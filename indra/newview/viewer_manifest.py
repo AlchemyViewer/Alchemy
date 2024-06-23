@@ -932,6 +932,16 @@ class DarwinManifest(ViewerManifest):
                 self.run_command(['security', 'unlock-keychain',
                                     '-p', keychain_pwd, viewer_keychain])
 
+                if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                    self.run_command(
+                        ['codesign',
+                            '--verbose',
+                            '--force',
+                            '--timestamp',
+                            '--keychain', viewer_keychain,
+                            '--sign', identity,
+                            os.path.join(frameworks_path, "Sentry.framework")])
+
                 if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
                     self.run_command(
                         ['codesign',

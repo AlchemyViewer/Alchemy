@@ -39,22 +39,14 @@ if (WINDOWS)
     )
 elseif (LINUX)
   target_link_libraries( ll::boost INTERFACE
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_fiber-mt${addrsfx}.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_fiber-mt-d${addrsfx}.a
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_context-mt${addrsfx}.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_context-mt-d${addrsfx}.a
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_filesystem-mt${addrsfx}.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_filesystem-mt-d${addrsfx}.a
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_program_options-mt${addrsfx}.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_program_options-mt-d${addrsfx}.a
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_regex-mt${addrsfx}.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_regex-mt-d${addrsfx}.a
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_thread-mt${addrsfx}.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_thread-mt-d${addrsfx}.a
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_wave-mt${addrsfx}.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_wave-mt-d${addrsfx}.a
-        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libboost_system-mt${addrsfx}.a
-        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libboost_system-mt-d${addrsfx}.a
+        ${ARCH_PREBUILT_DIRS}/libboost_fiber-mt${addrsfx}.a
+        ${ARCH_PREBUILT_DIRS}/libboost_context-mt${addrsfx}.a
+        ${ARCH_PREBUILT_DIRS}/libboost_filesystem-mt${addrsfx}.a
+        ${ARCH_PREBUILT_DIRS}/libboost_program_options-mt${addrsfx}.a
+        ${ARCH_PREBUILT_DIRS}/libboost_regex-mt${addrsfx}.a
+        ${ARCH_PREBUILT_DIRS}/libboost_thread-mt${addrsfx}.a
+        ${ARCH_PREBUILT_DIRS}/libboost_wave-mt${addrsfx}.a
+        ${ARCH_PREBUILT_DIRS}/libboost_system-mt${addrsfx}.a
         rt
     )
 elseif (DARWIN)
