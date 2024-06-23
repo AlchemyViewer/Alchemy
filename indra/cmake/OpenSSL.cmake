@@ -16,10 +16,8 @@ if (WINDOWS)
   )
 elseif (LINUX)
   target_link_libraries(ll::openssl INTERFACE
-    debug ${ARCH_PREBUILT_DIRS_DEBUG}/libssl.a
-    optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libssl.a
-    debug ${ARCH_PREBUILT_DIRS_DEBUG}/libcrypto.a
-    optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libcrypto.a
+    ${ARCH_PREBUILT_DIRS}/libssl.a
+    ${ARCH_PREBUILT_DIRS}/libcrypto.a
     dl
   )
 else()

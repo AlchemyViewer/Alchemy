@@ -13,8 +13,7 @@ if (WINDOWS)
   )
 elseif (LINUX)
   target_link_libraries( ll::nghttp2 INTERFACE
-      debug ${ARCH_PREBUILT_DIRS_DEBUG}/libnghttp2.a
-      optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libnghttp2.a
+      ${ARCH_PREBUILT_DIRS}/libnghttp2.a
   )
 else ()
   target_link_libraries( ll::nghttp2 INTERFACE

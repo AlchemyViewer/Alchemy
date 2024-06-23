@@ -35,7 +35,7 @@
 #include "llvector4a.h"
 #include "hbxxh.h"
 
-#ifdef LL_USESYSTEMLIBS
+#if defined(LL_USESYSTEMLIBS) || defined(LL_LINUX)
 # include <zlib.h>
 #else
 # include "zlib/zlib.h"

@@ -38,7 +38,7 @@
 #include <boost/iostreams/stream.hpp>
 #include <boost/align/aligned_allocator.hpp>
 
-#ifdef LL_USESYSTEMLIBS
+#if defined(LL_USESYSTEMLIBS) || defined(LL_LINUX)
 # include <zlib.h>
 #else
 # include "zlib/zlib.h"  // for davep's dirty little zip functions
