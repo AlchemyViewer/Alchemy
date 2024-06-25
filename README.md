@@ -22,7 +22,7 @@ Help improve Alchemy Viewer! You can get involved with improvements by filing bu
 
 * [Alchemy Website](http://www.alchemyviewer.org)
 * [Downloads](https://alchemyviewer.org/downloads)
-* [Issue Tracker](https://git.alchemyviewer.org/alchemy/viewer/issues)
+* [Issue Tracker](https://github.com/AlchemyViewer/Alchemy/issues)
 
 [contributing]: https://github.com/alchemyviewer/alchemy/blob/main/CONTRIBUTING.md
 [releasesgh]: https://github.com/AlchemyViewer/Alchemy/releases
