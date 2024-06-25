@@ -361,6 +361,15 @@ namespace
                 LLViewerTexture* spec_img = node->getObject()->getTESpecularMap(i);
                 faces_per_tex[spec_img->getID()].push_back(i);
                 }
+
+                LLPointer<LLGLTFMaterial> mat = node->getObject()->getTE(i)->getGLTFRenderMaterial();
+                if (mat.notNull())
+                {
+                    for (U32 j = 0; j < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++j)
+                    {
+                        faces_per_tex[mat->mTextureId[j]].push_back(i);
+                    }
+                }
             }
 
             for (auto const& it : faces_per_tex)
