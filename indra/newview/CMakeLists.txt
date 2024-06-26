@@ -2107,6 +2107,10 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         ll::versioninfo
         )
 
+if( TARGET ll::sdbus-cpp )
+  target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC ll::sdbus-cpp )
+endif()
+
 if( TARGET ll::nvapi )
   target_link_libraries(${VIEWER_BINARY_NAME} PUBLIC ll::nvapi )
 endif()

@@ -233,7 +233,7 @@ http://wiki.secondlife.com/wiki/Template_verifier.py
 """)
     parser.add_option(
         '-u', '--master_url', type='string', dest='master_url',
-        default='https://git.alchemyviewer.org/alchemy/master-message-template/-/raw/master/message_template.msg',
+        default='https://github.com/AlchemyViewer/master-message-template/raw/master/message_template.msg',
         help="""The url of the master message template.""")
     parser.add_option(
         '-c', '--cache_master', action='store_true', dest='cache_master',

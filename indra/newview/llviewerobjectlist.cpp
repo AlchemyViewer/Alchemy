@@ -72,7 +72,7 @@
 // [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2.1)
 #include "llderenderlist.h"
 // [/SL:KB]
-#ifdef LL_USESYSTEMLIBS
+#if defined(LL_USESYSTEMLIBS) || defined(LL_LINUX)
 #include <zlib.h>
 #else
 #include "zlib/zlib.h"
