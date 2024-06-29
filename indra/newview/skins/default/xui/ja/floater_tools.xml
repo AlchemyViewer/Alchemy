@@ -90,7 +90,7 @@
 	<check_box label="両側を引き伸ばす" name="checkbox uniform"/>
 	<check_box label="テクスチャを引き延ばす" name="checkbox stretch textures"/>
 	<check_box label="グリッドにスナップ" name="checkbox snap to grid"/>
-	<check_box label="ルートの軸を編集する" name="checkbox actual root"/>
+	<check_box label="軸をルートとして編集" name="checkbox actual root"/>
 	<check_box label="選択のアウトラインを表示" name="checkbox selection"/>
 	<check_box label="反射プローブを選択する" name="checkbox select probes"/>
 	<button name="Options..." tool_tip="グリッドオプションを表示します。"/>
@@ -339,7 +339,7 @@
 			<combo_box name="comboBaseType">
 				<combo_box.item label="箱（ボックス）" name="Box"/>
 				<combo_box.item label="円柱（シリンダー）" name="Cylinder"/>
-				<combo_box.item label="三角錐（プリズム）" name="Prism"/>
+				<combo_box.item label="三角柱（プリズム）" name="Prism"/>
 				<combo_box.item label="球体（スフィア）" name="Sphere"/>
 				<combo_box.item label="円環体（トーラス）" name="Torus"/>
 				<combo_box.item label="円筒（チューブ）" name="Tube"/>
@@ -474,11 +474,11 @@
 			<!-- 作用は射影テクスチャマッピングなので意訳 -->
 			<check_box label="射影元" name="Light Checkbox Ctrl" tool_tip="オブジェクトが投影元になります。"/>
 			<color_swatch name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます"/>
-			<texture_picker label="射影画像" name="light texture control" tool_tip="クリックで射影テクスチャを選択します。（遅延レンダリング有効時のみ）"/>
+			<texture_picker label="画像" name="light texture control" tool_tip="クリックで射影テクスチャを選択します。（遅延レンダリング有効時のみ）"/>
 			<button name="copy_light_btn" tool_tip="光源と反射プローブのパラメータをコピーします。"/>
 			<button name="paste_light_btn" tool_tip="光源と反射プローブのパラメータをペーストします。"/>
 			<button name="pipette_light_btn" tool_tip="ピペットツールで光源と反射プローブのパラメータをペーストします。"/>
-			<spinner label="輝度" name="Light Intensity"/>
+			<spinner label="強度" name="Light Intensity"/>
 			<spinner label="ＦｏＶ" name="Light FOV"/>
 			<spinner label="半径" name="Light Radius"/>
 			<spinner label="焦点" name="Light Focus"/>
