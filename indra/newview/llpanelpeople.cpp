@@ -772,7 +772,7 @@ bool LLPanelPeople::postBuild()
 }
 
 // virtual
-void LLPanelPeople::onChange(EStatusType status, const std::string &channelURI, bool proximal)
+void LLPanelPeople::onChange(EStatusType status, const LLSD& channelInfo, bool proximal)
 {
     if(status == STATUS_JOINING || status == STATUS_LEFT_CHANNEL)
     {

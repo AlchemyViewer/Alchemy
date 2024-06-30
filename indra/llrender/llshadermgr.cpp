@@ -281,7 +281,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasLighting)
     {
-        if (features->disableTextureIndex)
+        if (features->mIndexedTextureChannels <= 1)
         {
             if (features->hasAlphaMask)
             {
@@ -1157,6 +1157,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedAttribs.push_back("weight");
     mReservedAttribs.push_back("weight4");
     mReservedAttribs.push_back("clothing");
+    mReservedAttribs.push_back("joint");
     mReservedAttribs.push_back("texture_index");
 
     //matrix state
@@ -1177,9 +1178,19 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("texture_base_color_transform"); // (GLTF)
     mReservedUniforms.push_back("texture_normal_transform"); // (GLTF)
     mReservedUniforms.push_back("texture_metallic_roughness_transform"); // (GLTF)
+    mReservedUniforms.push_back("texture_occlusion_transform"); // (GLTF)
     mReservedUniforms.push_back("texture_emissive_transform"); // (GLTF)
+    mReservedUniforms.push_back("base_color_texcoord"); // (GLTF)
+    mReservedUniforms.push_back("emissive_texcoord"); // (GLTF)
+    mReservedUniforms.push_back("normal_texcoord"); // (GLTF)
+    mReservedUniforms.push_back("metallic_roughness_texcoord"); // (GLTF)
+    mReservedUniforms.push_back("occlusion_texcoord"); // (GLTF)
+    mReservedUniforms.push_back("gltf_node_id"); // (GLTF)
+    mReservedUniforms.push_back("gltf_material_id"); // (GLTF)
 
-    llassert(mReservedUniforms.size() == LLShaderMgr::TEXTURE_EMISSIVE_TRANSFORM+1);
+    mReservedUniforms.push_back("terrain_texture_transforms"); // (GLTF)
+
+    llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_TEXTURE_TRANSFORMS +1);
 
     mReservedUniforms.push_back("viewport");
 
@@ -1223,6 +1234,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("diffuseMap");
     mReservedUniforms.push_back("altDiffuseMap");
     mReservedUniforms.push_back("specularMap");
+    mReservedUniforms.push_back("metallicRoughnessMap");
+    mReservedUniforms.push_back("normalMap");
+    mReservedUniforms.push_back("occlusionMap");
     mReservedUniforms.push_back("emissiveMap");
     mReservedUniforms.push_back("bumpMap");
     mReservedUniforms.push_back("bumpMap2");
@@ -1234,7 +1248,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("heroProbes");
     mReservedUniforms.push_back("cloud_noise_texture");
     mReservedUniforms.push_back("cloud_noise_texture_next");
-    mReservedUniforms.push_back("fullbright");
     mReservedUniforms.push_back("lightnorm");
     mReservedUniforms.push_back("sunlight_color");
     mReservedUniforms.push_back("ambient_color");
@@ -1346,7 +1359,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SHADOW5+1);
 
-    mReservedUniforms.push_back("normalMap");
     mReservedUniforms.push_back("positionMap");
     mReservedUniforms.push_back("diffuseRect");
     mReservedUniforms.push_back("specularRect");
@@ -1359,7 +1371,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("bloomMap");
     mReservedUniforms.push_back("projectionMap");
     mReservedUniforms.push_back("norm_mat");
-    mReservedUniforms.push_back("texture_gamma");
 
     mReservedUniforms.push_back("specular_color");
     mReservedUniforms.push_back("env_intensity");

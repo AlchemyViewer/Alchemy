@@ -168,6 +168,9 @@ if (WINDOWS)
   # configure win32 API for 10 and above compatibility
   set(WINVER "0x0A00" CACHE STRING "Win32 API Target version (see http://msdn.microsoft.com/en-us/library/aa383745%28v=VS.85%29.aspx)")
   add_compile_definitions(WINVER=${WINVER} _WIN32_WINNT=${WINVER})
+
+  # Allow use of sprintf etc
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 endif (WINDOWS)
 
 if (LINUX)
@@ -259,6 +262,11 @@ if (LINUX OR DARWIN)
   if (NOT DISABLE_FATAL_WARNINGS)
     add_compile_options(-Werror)
   endif (NOT DISABLE_FATAL_WARNINGS)
+
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13)
+    add_compile_options( -Wno-unused-but-set-variable -Wno-unused-variable )
+  endif()
+
 
   add_compile_options(-m${ADDRESS_SIZE})
 endif ()

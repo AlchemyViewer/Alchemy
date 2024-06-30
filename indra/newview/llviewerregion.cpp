@@ -57,6 +57,7 @@
 #include "llfloaterregioninfo.h"
 #include "llgltfmateriallist.h"
 #include "llhttpnode.h"
+#include "llpbrterrainfeatures.h"
 #include "llregioninfomodel.h"
 #include "llsdutil.h"
 #include "llstartup.h"
@@ -2671,13 +2672,30 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
             {
                 gSavedSettings.setBOOL("UIPreviewMaterial", false);
             }
+
+            if (features.has("GLTFEnabled"))
+            {
+                bool enabled = features["GLTFEnabled"];
+                gSavedSettings.setBOOL("GLTFEnabled", enabled);
+            }
+            else
+            {
+                gSavedSettings.setBOOL("GLTFEnabled", false);
+            }
+
+            if (features.has("PBRTerrainTransformsEnabled"))
+            {
+                bool enabled = features["PBRTerrainTransformsEnabled"];
+                gSavedSettings.setBOOL("RenderTerrainPBRTransformsEnabled", enabled);
+            }
+            else
+            {
+                gSavedSettings.setBOOL("RenderTerrainPBRTransformsEnabled", false);
+            }
         };
 
-    auto workqueue = LL::WorkQueue::getInstance("mainloop");
-    if (workqueue)
-    {
-        LL::WorkQueue::postMaybe(workqueue, work);
-    }
+
+    LLAppViewer::instance()->postToMainCoro(work);
 }
 
 //this is called when the parent is not cacheable.
@@ -3332,6 +3350,17 @@ void LLViewerRegion::unpackRegionHandshake()
         {
             compp->setParamsReady();
         }
+
+        LLPBRTerrainFeatures::queueQuery(*this, [](LLUUID region_id, bool success, const LLModifyRegion& composition_changes)
+        {
+            if (!success) { return; }
+            LLViewerRegion* region = LLWorld::getInstance()->getRegionFromID(region_id);
+            if (!region) { return; }
+            LLVLComposition* compp = region->getComposition();
+            if (!compp) { return; }
+            compp->apply(composition_changes);
+            LLFloaterRegionInfo::sRefreshFromRegion(region);
+        });
     }
 
 
@@ -3442,6 +3471,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("MapLayerGod");
     capabilityNames.append("MeshUploadFlag");
     capabilityNames.append("ModifyMaterialParams");
+    capabilityNames.append("ModifyRegion");
     capabilityNames.append("NavMeshGenerationStatus");
     capabilityNames.append("NewFileAgentInventory");
     capabilityNames.append("ObjectAnimation");
@@ -3452,6 +3482,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("ParcelVoiceInfoRequest");
     capabilityNames.append("ProductInfoRequest");
     capabilityNames.append("ProvisionVoiceAccountRequest");
+    capabilityNames.append("VoiceSignalingRequest");
     capabilityNames.append("ReadOfflineMsgs"); // Requires to respond reliably: AcceptFriendship, AcceptGroupInvite, DeclineFriendship, DeclineGroupInvite
     capabilityNames.append("RegionObjects");
     capabilityNames.append("RemoteParcelRequest");

@@ -527,6 +527,8 @@ F32 LLVOCacheEntry::getSquaredPixelThreshold(bool is_front)
     return projection_threshold;
 }
 
+extern bool gCubeSnapshot;
+
 bool LLVOCacheEntry::isAnyVisible(const LLVector4a& camera_origin, const LLVector4a& local_camera_origin, F32 dist_threshold)
 {
 #if 0
@@ -1930,9 +1932,8 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
     LLViewerRegion* pRegion = LLWorld::getInstance()->getRegionFromHandle(handle);
 
     U32 num_entries = 0;
-    U32 inmem_entries = 0;
     U32 skipped = 0;
-    inmem_entries = (U32)cache_extras_entry_map.size();
+    size_t inmem_entries = cache_extras_entry_map.size();
     for (auto [local_id, entry] : cache_extras_entry_map)
     {
         // Only write out GLTFOverrides that we can actually apply again on import.

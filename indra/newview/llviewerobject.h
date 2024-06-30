@@ -1,3 +1,4 @@
+
 /**
  * @file llviewerobject.h
  * @brief Description of LLViewerObject class, which is the base class for most objects in the viewer.
@@ -45,7 +46,14 @@
 #include "llbbox.h"
 #include "llrigginginfo.h"
 #include "llreflectionmap.h"
-#include "gltf/asset.h"
+
+namespace LL
+{
+    namespace GLTF
+    {
+        class Asset;
+    }
+}
 
 class LLAgent;          // TODO: Get rid of this.
 class LLAudioSource;
@@ -792,8 +800,13 @@ public:
     F32             mPhysicsDensity;
     F32             mPhysicsRestitution;
 
+    // set the GLTF asset for this LLViewerObject  to the specified asset id
+    // id MUST be for a GLTF asset (LLAssetType::AT_GLTF)
+    // will relesae any currently held references to a GLTF asset on id change
+    void setGLTFAsset(const LLUUID& id);
+
     // Associated GLTF Asset
-    LLPointer<LL::GLTF::Asset> mGLTFAsset;
+    std::shared_ptr<LL::GLTF::Asset> mGLTFAsset;
 
     // Pipeline classes
     LLPointer<LLDrawable> mDrawable;

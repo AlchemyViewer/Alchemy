@@ -147,7 +147,7 @@ char to_char(size_t i)
 void LLUUID::to_chars(char* out) const
 {
 #if defined(__SSE4_1__)
-    alignas(16) char buffer[UUID_STR_SIZE-1]; // Temporary aligned output buffer for simd op
+    alignas(16) char buffer[UUID_STR_SIZE]; // Temporary aligned output buffer for simd op
 
     __m128i lower = load_unaligned_si128(mData);
     __m128i upper = _mm_and_si128(_mm_set1_epi8(0xFF >> 4), _mm_srli_epi32(lower, 4));
@@ -196,9 +196,9 @@ void LLUUID::to_chars(char* out) const
     buffer[34] = ((v1 >> 8) & 0xff);
     buffer[35] = ((v2 >> 8) & 0xff);
 
-    memcpy(out, buffer, UUID_STR_SIZE-1);
+    memcpy(out, buffer, UUID_STR_SIZE);
 #else
-    alignas(16) char result[UUID_STR_SIZE - 1] = {};  // Temporary aligned output buffer for simd op
+    alignas(16) char result[UUID_STR_SIZE] = {};  // Temporary aligned output buffer for simd op
 
     for (size_t i = 0, cur_pos = 0; i < UUID_BYTES; ++i)
     {
@@ -218,7 +218,7 @@ void LLUUID::to_chars(char* out) const
         }
     }
 
-    memcpy(out, result, UUID_STR_SIZE - 1);
+    memcpy(out, result, UUID_STR_SIZE);
 #endif
 }
 

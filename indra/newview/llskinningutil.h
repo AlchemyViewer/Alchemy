@@ -47,6 +47,7 @@ namespace LLSkinningUtil
     {
         return LL_MAX_JOINTS_PER_MESH_OBJECT;
     }
+	S32 getMaxGLTFJointCount();
     U32 getMeshJointCount(const LLMeshSkinInfo *skin);
     void scrubInvalidJoints(LLVOAvatar *avatar, LLMeshSkinInfo* skin);
 

@@ -90,6 +90,7 @@
 #include "llsculptidsize.h"
 #include "llavatarappearancedefines.h"
 #include "llgltfmateriallist.h"
+#include "gltfscenemanager.h"
 #include "lltoolmgr.h"
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvactions.h"
@@ -1158,6 +1159,11 @@ bool LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
             }
         }
 
+        if ((volume_params.getSculptType() & LL_SCULPT_TYPE_MASK) == LL_SCULPT_TYPE_GLTF)
+        { // notify GLTFSceneManager about new GLTF object
+            LL::GLTFSceneManager::instance().addGLTFObject(this, volume_params.getSculptID());
+        }
+
         return true;
     }
     else if (NO_LOD == lod)
@@ -1442,6 +1448,12 @@ bool LLVOVolume::calcLOD()
 {
     if (mDrawable.isNull())
     {
+        return false;
+    }
+
+    if (mGLTFAsset != nullptr)
+    {
+        // do not calculate LOD for GLTF objects
         return false;
     }
 
@@ -2036,6 +2048,7 @@ bool LLVOVolume::updateGeometry(LLDrawable *drawable)
 
     if (mDrawable->isState(LLDrawable::REBUILD_RIGGED))
     {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("rebuild rigged");
         updateRiggedVolume(false);
         genBBoxes(false);
         mDrawable->clearState(LLDrawable::REBUILD_RIGGED);
@@ -4652,7 +4665,7 @@ LLVector3 LLVOVolume::volumeDirectionToAgent(const LLVector3& dir) const
 
 
 bool LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, bool pick_transparent, bool pick_rigged, bool pick_unselectable, S32 *face_hitp,
-                                          LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
+                                      LLVector4a* intersection,LLVector2* tex_coord, LLVector4a* normal, LLVector4a* tangent)
 
 {
     if (!mbCanSelect
@@ -5634,7 +5647,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 
             LLVOVolume* vobj = drawablep->getVOVolume();
 
-            if (!vobj || vobj->isDead())
+            if (!vobj || vobj->isDead() || vobj->mGLTFAsset)
             {
                 continue;
             }

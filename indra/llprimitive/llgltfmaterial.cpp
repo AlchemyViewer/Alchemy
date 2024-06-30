@@ -91,7 +91,7 @@ LLGLTFMaterial::LLGLTFMaterial()
 #endif
 }
 
-void LLGLTFMaterial::TextureTransform::getPacked(F32 (&packed)[8]) const
+void LLGLTFMaterial::TextureTransform::getPacked(Pack& packed) const
 {
     packed[0] = mScale.mV[VX];
     packed[1] = mScale.mV[VY];
@@ -100,6 +100,15 @@ void LLGLTFMaterial::TextureTransform::getPacked(F32 (&packed)[8]) const
     packed[5] = mOffset.mV[VY];
     // Not used but nonetheless zeroed for proper hashing. HB
     packed[3] = packed[6] = packed[7] = 0.f;
+}
+
+void LLGLTFMaterial::TextureTransform::getPackedTight(PackTight& packed) const
+{
+    packed[0] = mScale.mV[VX];
+    packed[1] = mScale.mV[VY];
+    packed[2] = mRotation;
+    packed[3] = mOffset.mV[VX];
+    packed[4] = mOffset.mV[VY];
 }
 
 bool LLGLTFMaterial::TextureTransform::operator==(const TextureTransform& other) const
@@ -682,7 +691,7 @@ void LLGLTFMaterial::applyOverride(const LLGLTFMaterial& override_mat)
     }
 }
 
-void LLGLTFMaterial::getOverrideLLSD(const LLGLTFMaterial& override_mat, LLSD& data)
+void LLGLTFMaterial::getOverrideLLSD(const LLGLTFMaterial& override_mat, LLSD& data) const
 {
     LL_PROFILE_ZONE_SCOPED;
     llassert(data.isUndefined());
@@ -691,7 +700,7 @@ void LLGLTFMaterial::getOverrideLLSD(const LLGLTFMaterial& override_mat, LLSD& d
 
     for (U32 i = 0; i < GLTF_TEXTURE_INFO_COUNT; ++i)
     {
-        LLUUID& texture_id = mTextureId[i];
+        const LLUUID& texture_id = mTextureId[i];
         const LLUUID& override_texture_id = override_mat.mTextureId[i];
         if (override_texture_id.notNull() && override_texture_id != texture_id)
         {

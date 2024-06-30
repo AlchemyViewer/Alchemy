@@ -292,7 +292,7 @@ public:
     // children, etc.
     virtual void deleteAllChildren();
 
-    void    setAllChildrenEnabled(bool b);
+    void    setAllChildrenEnabled(bool b, bool recursive = false);
 
     virtual void    setVisible(bool visible);
     void            setVisibleDirect(bool visible) { mVisible = visible; }

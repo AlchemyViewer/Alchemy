@@ -89,6 +89,7 @@ public:
     S32 mGLMaxIndexRange;
     S32 mGLMaxTextureSize;
     F32 mMaxAnisotropy = 0.f;
+    S32 mMaxUniformBlockSize = 0;
 
     // GL 4.x capabilities
     bool mHasCubeMapArray = false;
@@ -159,12 +160,17 @@ void assert_glerror();
 
 void clear_glerror();
 
-#ifdef SHOW_DEBUG
+
 # define stop_glerror() assert_glerror()
 # define llglassertok() assert_glerror()
+
+// stop_glerror is still needed on OS X but has performance implications
+// use macro below to conditionally add stop_glerror to non-release builds
+// on OS X
+#if LL_DARWIN && !LL_RELEASE_FOR_DOWNLOAD
+#define STOP_GLERROR stop_glerror()
 #else
-# define stop_glerror()
-# define llglassertok()
+#define STOP_GLERROR
 #endif
 
 #define llglassertok_always() assert_glerror()

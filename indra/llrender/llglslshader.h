@@ -44,6 +44,7 @@ public:
     bool hasTransport = false; // implies no lighting (it's possible to have neither though)
     bool hasSkinning = false;
     bool hasObjectSkinning = false;
+    bool mGLTF = false;
     bool hasAtmospherics = false;
     bool hasGamma = false;
     bool hasShadows = false;
@@ -51,7 +52,6 @@ public:
     bool hasSrgb = false;
     bool isDeferred = false;
     bool hasScreenSpaceReflections = false;
-    bool disableTextureIndex = false;
     bool hasAlphaMask = false;
     bool hasReflectionProbes = false;
     bool attachNothing = false;
@@ -145,6 +145,16 @@ public:
         SG_COUNT
     } eGroup;
 
+    enum UniformBlock : GLuint
+    {
+        UB_REFLECTION_PROBES,   // "ReflectionProbes"
+        UB_GLTF_JOINTS,         // "GLTFJoints"
+        UB_GLTF_NODES,          // "GLTFNodes"
+        UB_GLTF_MATERIALS,      // "GLTFMaterials"
+        NUM_UNIFORM_BLOCKS
+    };
+
+
     static std::set<LLGLSLShader*> sInstances;
     static bool sProfileEnabled;
 
@@ -154,6 +164,9 @@ public:
     static GLuint sCurBoundShader;
     static LLGLSLShader* sCurBoundShaderPtr;
     static S32 sIndexedTextureChannels;
+
+    static U32 sMaxGLTFMaterials;
+    static U32 sMaxGLTFNodes;
 
     static void initProfile();
     static void finishProfile(bool emit_report = true);
@@ -175,17 +188,14 @@ public:
     // If force_read is true, will force an immediate readback (severe performance penalty)
     bool readProfileQuery(bool for_runtime = false, bool force_read = false);
 
-    bool createShader(std::vector<LLStaticHashedString>* attributes,
-        std::vector<LLStaticHashedString>* uniforms,
-        U32 varying_count = 0,
-        const char** varyings = NULL);
+    bool createShader();
     bool attachFragmentObject(std::string_view object);
     bool attachVertexObject(std::string_view object);
     void attachObject(GLuint object);
     void attachObjects(GLuint* objects = NULL, S32 count = 0);
-    bool mapAttributes(const std::vector<LLStaticHashedString>* attributes);
-    bool mapUniforms(const std::vector<LLStaticHashedString>*);
-    void mapUniform(GLint index, const std::vector<LLStaticHashedString>*);
+    bool mapAttributes();
+    bool mapUniforms();
+    void mapUniform(GLint index);
     void uniform1i(U32 index, GLint i);
     void uniform1f(U32 index, GLfloat v);
     void fastUniform1f(U32 index, GLfloat v);
@@ -330,6 +340,26 @@ public:
 
     // this pointer should be set to whichever shader represents this shader's rigged variant
     LLGLSLShader* mRiggedVariant = nullptr;
+
+    // variants for use by GLTF renderer
+    // bit 0 = alpha mode blend (1) or opaque (0)
+    // bit 1 = rigged (1) or static (0)
+    // bit 2 = unlit (1) or lit (0)
+    // bit 3 = single (0) or multi (1) uv coordinates
+    struct GLTFVariant
+    {
+        constexpr static U8 ALPHA_BLEND = 1;
+        constexpr static U8 RIGGED = 2;
+        constexpr static U8 UNLIT = 4;
+        constexpr static U8 MULTI_UV = 8;
+    };
+
+    constexpr static U8 NUM_GLTF_VARIANTS = 16;
+
+    std::vector<LLGLSLShader> mGLTFVariants;
+
+    //helper to bind GLTF variant
+    void bind(U8 variant);
 
     // hacky flag used for optimization in LLDrawPoolAlpha
     bool mCanBindFast = false;

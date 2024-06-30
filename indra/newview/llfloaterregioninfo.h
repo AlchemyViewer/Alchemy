@@ -85,6 +85,7 @@ public:
 
     // get and process region info if necessary.
     static void processRegionInfo(LLMessageSystem* msg);
+    static void sRefreshFromRegion(LLViewerRegion* region);
 
     static const LLUUID& getLastInvoice() { return sRequestInvoice; }
     static void nextInvoice() { sRequestInvoice.generate(); }
@@ -156,6 +157,7 @@ public:
 
 protected:
     void initCtrl(const std::string& name);
+    template<typename CTRL> void initAndSetCtrl(CTRL*& ctrl, const std::string& name);
 
     // Returns true if update sent and apply button should be
     // disabled.
@@ -279,8 +281,15 @@ private:
     LLCheckBoxCtrl* mMaterialTypeCtrl = nullptr;
     LLTextureCtrl* mTextureDetailCtrl[LLTerrainMaterials::ASSET_COUNT];
     LLTextureCtrl* mMaterialDetailCtrl[LLTerrainMaterials::ASSET_COUNT];
+
     LLUUID mLastSetTextures[LLTerrainMaterials::ASSET_COUNT];
     LLUUID mLastSetMaterials[LLTerrainMaterials::ASSET_COUNT];
+
+    LLSpinCtrl* mMaterialScaleUCtrl[LLTerrainMaterials::ASSET_COUNT];
+    LLSpinCtrl* mMaterialScaleVCtrl[LLTerrainMaterials::ASSET_COUNT];
+    LLSpinCtrl* mMaterialRotationCtrl[LLTerrainMaterials::ASSET_COUNT];
+    LLSpinCtrl* mMaterialOffsetUCtrl[LLTerrainMaterials::ASSET_COUNT];
+    LLSpinCtrl* mMaterialOffsetVCtrl[LLTerrainMaterials::ASSET_COUNT];
 };
 
 /////////////////////////////////////////////////////////////////////////////

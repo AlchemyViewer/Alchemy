@@ -2577,6 +2577,7 @@ void LLPipeline::doOcclusion(LLCamera& camera)
         mCubeVB->setBuffer();
 
         mReflectionMapManager.doOcclusion();
+        mHeroProbeManager.doOcclusion();
         gOcclusionCubeProgram.unbind();
 
         gGL.setColorMask(true, true);
@@ -6910,7 +6911,7 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
             mGlow[1].bindTexture(0, channel);
         }
 
-        channel = gLuminanceProgram.enableTexture(LLShaderMgr::DEFERRED_NORMAL);
+        channel = gLuminanceProgram.enableTexture(LLShaderMgr::NORMAL_MAP);
         if (channel > -1)
         {
             // bind the normal map to get the environment mask
@@ -7393,7 +7394,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
                         LLVector4a result;
                         result.clear();
 
-                        gViewerWindow->cursorIntersect(-1, -1, 512.f, NULL, -1, false, false, true, true, nullptr, nullptr, nullptr, &result);
+                        gViewerWindow->cursorIntersect(-1, -1, 512.f, nullptr, -1, false, false, true, true, nullptr, nullptr, nullptr, &result);
 
                         focus_point.set(result.getF32ptr());
                     }
@@ -7757,7 +7758,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
         gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
     }
 
-    channel = shader.enableTexture(LLShaderMgr::DEFERRED_NORMAL, deferred_target->getUsage());
+    channel = shader.enableTexture(LLShaderMgr::NORMAL_MAP, deferred_target->getUsage());
     if (channel > -1)
     {
         deferred_target->bindTexture(2, channel, LLTexUnit::TFO_POINT); // frag_data[2]
@@ -8741,7 +8742,7 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     LLRenderTarget* deferred_light_target = &mRT->deferredLight;
 
     stop_glerror();
-    shader.disableTexture(LLShaderMgr::DEFERRED_NORMAL, deferred_target->getUsage());
+    shader.disableTexture(LLShaderMgr::NORMAL_MAP, deferred_target->getUsage());
     shader.disableTexture(LLShaderMgr::DEFERRED_DIFFUSE, deferred_target->getUsage());
     shader.disableTexture(LLShaderMgr::DEFERRED_SPECULAR, deferred_target->getUsage());
     shader.disableTexture(LLShaderMgr::DEFERRED_EMISSIVE, deferred_target->getUsage());

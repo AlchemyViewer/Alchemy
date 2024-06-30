@@ -47,16 +47,7 @@ public:
     {
         *this = rhs;
     }
-    LLVolumeTriangle& operator=(const LLVolumeTriangle& rhs)
-    {
-        LL_ERRS() << "Illegal operation!" << LL_ENDL;
-        return *this;
-    }
 
-    LLVolumeTriangle(LLVolumeTriangle&& rhs) noexcept
-    {
-        *this = std::move(rhs);
-    }
     LLVolumeTriangle& operator=(LLVolumeTriangle&& rhs) noexcept
     {
         mPositionGroup = rhs.mPositionGroup;

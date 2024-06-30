@@ -467,9 +467,6 @@ void LLPanelVolume::getState( )
 //
         bool is_mirror = volobjp->getReflectionProbeIsMirror();
 
-        getChildView("Probe Ambiance")->setEnabled(!is_mirror);
-        getChildView("Probe Near Clip")->setEnabled(!is_mirror);
-
         getChild<LLComboBox>("Probe Volume Type", true)->setValue(volume_type);
         getChild<LLSpinCtrl>("Probe Ambiance", true)->setValue(volobjp->getReflectionProbeAmbiance());
         getChild<LLSpinCtrl>("Probe Near Clip", true)->setValue(volobjp->getReflectionProbeNearClip());

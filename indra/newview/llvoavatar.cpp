@@ -632,7 +632,8 @@ bool LLVOAvatar::sShowAnimationDebug = false;
 bool LLVOAvatar::sVisibleInFirstPerson = false;
 F32 LLVOAvatar::sLODFactor = 1.f;
 F32 LLVOAvatar::sPhysicsLODFactor = 1.f;
-bool LLVOAvatar::sJointDebug = false;
+bool LLVOAvatar::sJointDebug            = false;
+bool LLVOAvatar::sLipSyncEnabled        = false;
 F32 LLVOAvatar::sUnbakedTime = 0.f;
 F32 LLVOAvatar::sUnbakedUpdateTime = 0.f;
 F32 LLVOAvatar::sGreyTime = 0.f;
@@ -1203,11 +1204,18 @@ void LLVOAvatar::initClass()
     LLControlAvatar::sRegionChangedSlot = gAgent.addRegionChangedCallback(&LLControlAvatar::onRegionChanged);
 
     sCloudTexture = LLViewerTextureManager::getFetchedTextureFromFile("SoftDotNoBack.png");
+    gSavedSettings.getControl("LipSyncEnabled")->getSignal()->connect(boost::bind(&LLVOAvatar::handleVOAvatarPrefsChanged, _2));
 }
 
 
 void LLVOAvatar::cleanupClass()
 {
+}
+
+bool LLVOAvatar::handleVOAvatarPrefsChanged(const LLSD &newvalue)
+{
+    sLipSyncEnabled = gSavedSettings.getBOOL("LipSyncEnabled");
+    return true;
 }
 
 // virtual
@@ -2588,7 +2596,7 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
         return;
     }
 
-    LLCachedControl<bool> friends_only(gSavedSettings, "RenderAvatarFriendsOnly", false);
+    static LLCachedControl<bool> friends_only(gSavedSettings, "RenderAvatarFriendsOnly", false);
     if (friends_only()
         && !isUIAvatar()
         && !isControlAvatar()
@@ -3118,11 +3126,10 @@ F32 LLVOAvatar::calcMorphAmount()
 void LLVOAvatar::idleUpdateLipSync(bool voice_enabled)
 {
     // Use the Lipsync_Ooh and Lipsync_Aah morphs for lip sync
-    auto& voiceClient = LLVoiceClient::instance();
     if ( voice_enabled
         && mLastRezzedStatus > 0 // no point updating lip-sync for clouds
-        && (voiceClient.lipSyncEnabled())
-        && voiceClient.getIsSpeaking( mID ) )
+        && sLipSyncEnabled
+        && LLVoiceClient::getInstance()->getIsSpeaking( mID ) )
     {
         F32 ooh_morph_amount = 0.0f;
         F32 aah_morph_amount = 0.0f;
@@ -8761,17 +8768,28 @@ bool LLVOAvatar::isTooComplex() const
 
 bool LLVOAvatar::isTooSlow() const
 {
+    if (mIsControlAvatar)
+    {
+        return mTooSlow;
+    }
+
     static LLCachedControl<S32> compelxity_render_mode(gSavedSettings, "RenderAvatarComplexityMode");
+    static LLCachedControl<bool> friends_only(gSavedSettings, "RenderAvatarFriendsOnly", false);
     bool render_friend = (isInBuddyList() && compelxity_render_mode > AV_RENDER_LIMIT_BY_COMPLEXITY);
 
     if (render_friend || mVisuallyMuteSetting == AV_ALWAYS_RENDER)
     {
         return false;
     }
-    else if (compelxity_render_mode == AV_RENDER_ONLY_SHOW_FRIENDS && !mIsControlAvatar)
+    else if (compelxity_render_mode == AV_RENDER_ONLY_SHOW_FRIENDS)
     {
         return true;
     }
+    else if (!is_friend && friends_only())
+    {
+        return true;
+    }
+
     return mTooSlow;
 }
 

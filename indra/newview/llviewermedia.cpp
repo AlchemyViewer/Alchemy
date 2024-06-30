@@ -1664,7 +1664,7 @@ void LLViewerMediaImpl::destroyMediaSource()
     cancelMimeTypeProbe();
 
     {
-        LLMutexLock lock(&mLock); // Delay tear-down while bg thread is updating
+        LLCoros::LockType lock(mLock); // Delay tear-down while bg thread is updating
         if(mMediaSource)
         {
             mMediaSource->setDeleteOK(true) ;
@@ -2679,7 +2679,13 @@ void LLViewerMediaImpl::mimeDiscoveryCoro(std::string url)
         {
             if (initializeMedia(mimeType))
             {
-                loadURI();
+                ref();
+                LLAppViewer::instance()->postToMainCoro([this]()
+                    {
+                        loadURI();
+                        unref();
+                    });
+
             }
         }
 
@@ -2972,7 +2978,7 @@ bool LLViewerMediaImpl::preMediaTexUpdate(LLViewerMediaTexture*& media_tex, U8*&
 void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* data, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool sync)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
-    LLMutexLock lock(&mLock); // don't allow media source tear-down during update
+    LLCoros::LockType lock(mLock); // don't allow media source tear-down during update
 
     // wrap "data" in an LLImageRaw but do NOT make a copy
     LLPointer<LLImageRaw> raw = new LLImageRaw(data, media_tex->getWidth(), media_tex->getHeight(), media_tex->getComponents(), true);

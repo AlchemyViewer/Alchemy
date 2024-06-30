@@ -53,6 +53,7 @@
 #include "llstl.h"
 #include "llexception.h"
 #include "llhandle.h"
+#include "llcoros.h"
 
 /*==========================================================================*|
 // override this to allow binding free functions with more parameters
@@ -593,7 +594,7 @@ private:
     LLHandle<LLEventPumps> mRegistry;
 
     std::string mName;
-    LLMutex mConnectionListMutex;
+    LLCoros::Mutex mConnectionListMutex;
 
 protected:
     virtual LLBoundListener listen_impl(const std::string& name, const LLEventListener&,

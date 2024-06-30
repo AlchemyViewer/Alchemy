@@ -1177,6 +1177,20 @@ void LLLocalBitmapMgr::delUnit(LLUUID tracking_id)
     }
 }
 
+LLUUID LLLocalBitmapMgr::getTrackingID(const LLUUID& world_id) const
+{
+    for (local_list_citer iter = mBitmapList.begin(); iter != mBitmapList.end(); iter++)
+    {
+        LLLocalBitmap* unit = *iter;
+        if (unit->getWorldID() == world_id)
+        {
+            return unit->getTrackingID();
+        }
+    }
+
+    return LLUUID::null;
+}
+
 LLUUID LLLocalBitmapMgr::getWorldID(const LLUUID &tracking_id) const
 {
     LLUUID world_id = LLUUID::null;

@@ -118,7 +118,7 @@ vec3 pbrPunctual(vec3 diffuseColor, vec3 specularColor,
                     vec3 v, // surface point to camera
                     vec3 l); //surface point to light
 
-vec3 calcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
+vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
                     float perceptualRoughness,
                     float metallic,
                     vec3 n, // normal
@@ -127,33 +127,7 @@ vec3 calcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
                     vec3 lp, // light position
                     vec3 ld, // light direction (for spotlights)
                     vec3 lightColor,
-                    float lightSize, float falloff, float is_pointlight, float ambiance)
-{
-    vec3 color = vec3(0,0,0);
-
-    vec3 lv = lp.xyz - p;
-
-    float lightDist = length(lv);
-
-    float dist = lightDist / lightSize;
-    if (dist <= 1.0)
-    {
-        lv /= lightDist;
-
-        float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
-
-        // spotlight coefficient.
-        float spot = max(dot(-ld, lv), is_pointlight);
-        // spot*spot => GL_SPOT_EXPONENT=2
-        float spot_atten = spot*spot;
-
-        vec3 intensity = spot_atten * dist_atten * lightColor * 3.0; //magic number to balance with legacy materials
-
-        color = intensity*pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv);
-    }
-
-    return color;
-}
+                    float lightSize, float falloff, float is_pointlight, float ambiance);
 
 void main()
 {
@@ -230,7 +204,7 @@ void main()
     vec3 light = vec3(0);
 
     // Punctual lights
-#define LIGHT_LOOP(i) light += calcPointLightOrSpotLight(diffuseColor, specularColor, perceptualRoughness, metallic, norm.xyz, pos.xyz, v, light_position[i].xyz, light_direction[i].xyz, light_diffuse[i].rgb, light_deferred_attenuation[i].x, light_deferred_attenuation[i].y, light_attenuation[i].z, light_attenuation[i].w);
+#define LIGHT_LOOP(i) light += pbrCalcPointLightOrSpotLight(diffuseColor, specularColor, perceptualRoughness, metallic, norm.xyz, pos.xyz, v, light_position[i].xyz, light_direction[i].xyz, light_diffuse[i].rgb, light_deferred_attenuation[i].x, light_deferred_attenuation[i].y, light_attenuation[i].z, light_attenuation[i].w);
 
     LIGHT_LOOP(1)
     LIGHT_LOOP(2)

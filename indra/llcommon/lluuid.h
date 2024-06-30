@@ -40,7 +40,7 @@ class LLMutex;
 static constexpr S32 UUID_BYTES = 16;
 static constexpr S32 UUID_WORDS = 4;
 static constexpr S32 UUID_STR_LENGTH = 37;  // actually wrong, should be 36 and use size below
-static constexpr S32 UUID_STR_SIZE = 37;
+constexpr S32 UUID_STR_SIZE = 36; // .size() of a UUID in a std::string
 static constexpr S32 UUID_BASE85_LENGTH = 21; // including the trailing NULL.
 
 struct uuid_time_t {
@@ -185,12 +185,12 @@ public:
     void toString(char* outstr) const       // Does not allocate memory, needs 37 characters (including \0)
     {
         to_chars(outstr);
-        outstr[UUID_STR_SIZE-1] = '\0';
+        outstr[UUID_STR_SIZE] = '\0';
     }
 
     void toString(std::string& outstr) const
     {
-        outstr.resize(UUID_STR_SIZE-1);
+        outstr.resize(UUID_STR_SIZE);
         to_chars(&outstr[0]);
     }
 

@@ -914,11 +914,11 @@ const LLUUID LLInventoryModel::findCategoryUUIDForTypeInRoot(
     else if (root_id.notNull())
     {
         cat_array_t* cats = get_ptr_in_map(mParentChildCategoryTree, root_id);
-        if (cats)
+        if(cats)
         {
             for (auto& p_cat : *cats)
             {
-                if (p_cat && p_cat->getPreferredType() == preferred_type)
+                if(p_cat && p_cat->getPreferredType() == preferred_type)
                 {
                     const LLUUID& folder_id = p_cat->getUUID();
                     if (rv.isNull() || folder_id < rv)
@@ -1535,7 +1535,9 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
         return mask;
     }
 
-    if (item->getType() == LLAssetType::AT_MESH)
+    if (item->getType() == LLAssetType::AT_MESH ||
+        item->getType() == LLAssetType::AT_GLTF ||
+        item->getType() == LLAssetType::AT_GLTF_BIN)
     {
         return mask;
     }

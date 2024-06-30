@@ -45,6 +45,7 @@
 #include "m4math.h"                 // LLMatrix4
 #include "llframetimer.h"
 #include "llreflectionmap.h"
+#include "llpointer.h"
 #include "lleasymessagesender.h"
 
 // Surface id's

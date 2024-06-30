@@ -43,6 +43,7 @@
 #ifndef LL_LLAPPVIEWER_H
 #define LL_LLAPPVIEWER_H
 
+#include "llapp.h"
 #include "llapr.h"
 #include "llcontrol.h"
 #include "llsys.h"          // for LLOSInfo
@@ -225,6 +226,9 @@ public:
     LLAppCoreHttp & getAppCoreHttp()            { return mAppCoreHttp; }
 
     void updateNameLookupUrl(const LLViewerRegion* regionp);
+
+    // post given work to the "mainloop" work queue for handling on the main thread
+    void postToMainCoro(const LL::WorkQueue::Work& work);
 
 protected:
     virtual bool initWindow(); // Initialize the viewer's window.

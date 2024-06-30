@@ -68,7 +68,12 @@ public:
         LLVector2 mScale = { 1.f, 1.f };
         F32 mRotation = 0.f;
 
-        void getPacked(F32 (&packed)[8]) const;
+        static const size_t PACK_SIZE = 8;
+        static const size_t PACK_TIGHT_SIZE = 5;
+        using Pack = F32[PACK_SIZE];
+        using PackTight = F32[PACK_TIGHT_SIZE];
+        void getPacked(Pack& packed) const;
+        void getPackedTight(PackTight& packed) const;
 
         bool operator==(const TextureTransform& other) const;
         bool operator!=(const TextureTransform& other) const { return !(*this == other); }
@@ -185,7 +190,7 @@ public:
     // Get the given override on this LLGLTFMaterial as LLSD
     // override_mat -- the override source data
     // data -- output LLSD object (should be passed in empty)
-    void getOverrideLLSD(const LLGLTFMaterial& override_mat, LLSD& data);
+    void getOverrideLLSD(const LLGLTFMaterial& override_mat, LLSD& data) const;
 
     // For base materials only (i.e. assets). Clears transforms to
     // default since they're not supported in assets yet.
@@ -209,7 +214,6 @@ public:
     bool hasLocalTextures() { return !mTrackingIdToLocalTexture.empty(); }
     virtual bool replaceLocalTexture(const LLUUID& tracking_id, const LLUUID &old_id, const LLUUID& new_id);
     virtual void updateTextureTracking();
-
 protected:
     static LLVector2 vec2FromJson(const std::map<std::string, tinygltf::Value>& object, const char* key, const LLVector2& default_value);
     static F32 floatFromJson(const std::map<std::string, tinygltf::Value>& object, const char* key, const F32 default_value);
@@ -267,10 +271,11 @@ public:
     F32 mAlphaCutoff;
 
     AlphaMode mAlphaMode;
-    bool mDoubleSided;
+
+    bool mDoubleSided = false;
 
     // Override specific flags for state that can't use off-by-epsilon or UUID
     // hack
-    bool mOverrideDoubleSided;
-    bool mOverrideAlphaMode;
+    bool mOverrideDoubleSided = false;
+    bool mOverrideAlphaMode = false;
 };

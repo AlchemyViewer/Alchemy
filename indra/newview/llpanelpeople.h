@@ -57,7 +57,7 @@ public:
     bool notifyChildren(const LLSD& info) override;
     // Implements LLVoiceClientStatusObserver::onChange() to enable call buttons
     // when voice is available
-    void onChange(EStatusType status, const std::string &channelURI, bool proximal) override;
+    void onChange(EStatusType status, const LLSD& channelInfo, bool proximal) override;
 
 // [RLVa:KB] - Checked: RLVa-1.2.0
     LLAvatarList* getNearbyList() { return mNearbyList; }

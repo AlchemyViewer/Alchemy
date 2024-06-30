@@ -30,6 +30,7 @@
 #include "stdtypes.h"
 #include "llthread.h"
 #include "lltimer.h"
+#include "llcoros.h"
 
 #include <mutex>
 #include <shared_mutex>
@@ -55,6 +56,15 @@ public:
     void lock()     // blocks
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+
+        // LLMutex is not coroutine aware and should not be used from a coroutine
+        // If your code is running in a coroutine, you should use LLCoros::Mutex instead
+        // NOTE:  If the stack trace you're staring at contains non-thread-safe code,
+        // you should use LLAppViewer::instance().postToMainThread() to shuttle execution
+        // back to the main loop.
+        // NOTE: If you got here from seeing this assert in your log and you're not seeing
+        // a stack trace that points here, put a breakpoint in on_main_coro and try again.
+        llassert(LLCoros::on_main_coro());
         mMutex.lock();
     }
 

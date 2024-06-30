@@ -12666,7 +12666,7 @@ are wearing now.
 
   <notification
    icon="alertmodal.tga"
-   name="GLTFPreviewSelection"
+   name="GLTFOpenSelection"
    type="alert">
     You must select an object to act as a handle to the GLTF asset you are previewing.
     <tag>fail</tag>
@@ -12675,7 +12675,61 @@ are wearing now.
       yestext="OK"/>
   </notification>
 
-  
+  <notification
+   icon="alertmodal.tga"
+   name="GLTFLoadFailed"
+   type="alert">
+    Failed to load GLTF file.  See log for details.
+    <tag>fail</tag>
+    <usetemplate
+      name="okbutton"
+      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="GLTFSaveFailed"
+   type="alert">
+    Failed to save GLTF file.  See log for details.
+    <tag>fail</tag>
+    <usetemplate
+      name="okbutton"
+      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="GLTFSaveSelection"
+   type="alert">
+    You must select an object that has a GLTF asset associated with it.
+    <tag>fail</tag>
+    <usetemplate
+      name="okbutton"
+      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="GLTFUploadSelection"
+   type="alert">
+    You must select an object that has local-only GLTF asset associated with it.
+    <tag>fail</tag>
+    <usetemplate
+      name="okbutton"
+      yestext="OK"/>
+  </notification>
+
+  <notification
+ icon="alertmodal.tga"
+ name="GLTFUploadInProgress"
+ type="alert">
+    Upload is currently in progress.  Please try again later.
+    <tag>fail</tag>
+    <usetemplate
+      name="okbutton"
+      yestext="OK"/>
+  </notification>
+
   <!-- ALCHEMY BELOW THIS LINE -->
     <notification
    icon="notifytip.tga"
@@ -12710,9 +12764,6 @@ are wearing now.
 
   <notification
    icon="alertmodal.tga"
-   name="InvalidGrid"
-   type="alertmodal">
-    <tag>fail</tag>
     <tag>opensim</tag>
     '[GRID]' is not a valid grid identifier.
   </notification>
@@ -12744,16 +12795,13 @@ are wearing now.
     <usetemplate
      ignoretext="Confirm removing grids"
      name="okcancelignore"
-     notext="Cancel"
      yestext="OK"/>
   </notification>
+
   <notification
    icon="alertmodal.tga"
-   name="RemoveGridFailure"
-   type="alertmodal">
     <tag>fail</tag>
     <tag>opensim</tag>
-    Failed to remove [GRID] from the list.
   </notification>
   <notification
    icon="alertmodal.tga"
@@ -12793,7 +12841,6 @@ Error: [STATUS] [REASON]
     <usetemplate
      ignoretext="Confirm removing skins"
      name="okcancelignore"
-     notext="Cancel"
      yestext="OK"/>
   </notification>
   <notification
@@ -12805,8 +12852,6 @@ Error: [STATUS] [REASON]
   </notification>
   <notification
    icon="alertmodal.tga"
-   name="RemoveSkinFailure"
-   type="alertmodal">
     <tag>fail</tag>
     Failed to remove [SKIN].
   </notification>
@@ -12829,7 +12874,6 @@ Error: [STATUS] [REASON]
    name="AddSkinUnpackFailed"
    type="alertmodal">
     <tag>fail</tag>
-    Failed to unpack the skin package. See the log for more details.
   </notification>
   <notification
    icon="alertmodal.tga"
@@ -13092,8 +13136,6 @@ Could not create new script for this particle system.
 
   <notification
    icon="alertmodal.tga"
-   name="ParticleScriptNotFound"
-   type="alertmodal">
 Could not find the newly created script for this particle system.
   </notification>
 
@@ -13115,7 +13157,6 @@ Failed to inject script into object.
    icon="notify.tga"
    name="ParticleScriptCopiedToClipboard"
    type="notify">
-The LSL script to create this particle system has been copied to your clipboard. You can now paste it into a new script to use it.
    <form name="form">
       <ignore name="ignore"
        text="A particle script was copied to my clipboard"/>
@@ -13286,10 +13327,7 @@ Please download the latest version from https://www.alchemyviewer.org/downloads
      name="okbutton"
      yestext="OK"/>
   </notification>
-	
 <notification
-   icon="notify.tga"
-   name="PoserExportXMLSuccess"
    type="notify">
 The pose has been exported successfully as an XML file.
 
@@ -13312,13 +13350,11 @@ C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
       icon="alert.tga"
       name="RejectTeleportOffersModeSet"
       type="alert">
-   Reject all incoming teleport offers and requests mode is on.
    Incoming teleport offers and requests from anyone will now be rejected with your configured autoresponse. You will not be notified because of that fact.
       <usetemplate
       ignoretext="I change my status to reject all teleport offers and requests mode"
       name="okignore"
       yestext="OK"/>
-  </notification>
    <notification
       icon="alert.tga"
       name="RejectTeleportOffersModeWarning"
