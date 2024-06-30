@@ -13,7 +13,6 @@ project(llwebrtc)
 if (LINUX)
     add_compile_options(-Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
 endif (LINUX)
-
 set(llwebrtc_SOURCE_FILES
     llwebrtc.cpp
     )

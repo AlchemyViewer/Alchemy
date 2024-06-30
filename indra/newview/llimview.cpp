@@ -3149,7 +3149,6 @@ void LLIncomingCallDialog::processCallResponse(S32 response, const LLSD &payload
     }
 }
 
-//
 // Member Functions
 //
 
@@ -3753,7 +3752,7 @@ bool LLIMMgr::restoreSnoozedSession(const LLUUID& session_id)
             gIMMgr->addSession(groupData.mName, IM_SESSION_GROUP_START, session_id);
 
             uuid_vec_t ids;
-            LLIMModel::sendStartSession(session_id, session_id, ids, IM_SESSION_GROUP_START);
+			LLIMModel::sendStartSession(session_id, session_id, ids, IM_SESSION_GROUP_START, false);
 
             if(!gAgent.isDoNotDisturb())
             {
