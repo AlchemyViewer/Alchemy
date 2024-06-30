@@ -41,14 +41,14 @@ public:
 
 private:
 
-    BOOL addField(e_message_variable_type var_type, const char* var_name, std::string input, BOOL hex) const;
+    bool addField(e_message_variable_type var_type, const char* var_name, std::string input, bool hex) const;
 
     //a key->value pair in a message
     struct parts_var
     {
         std::string name;
         std::string value;
-        BOOL hex;
+        bool hex;
         e_message_variable_type var_type;
     };
 

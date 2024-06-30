@@ -47,12 +47,12 @@ public:
     virtual ~LLViewerTexLayerSet();
 
     /*virtual*/void             requestUpdate() override;
-    BOOL                        isLocalTextureDataAvailable() const;
-    BOOL                        isLocalTextureDataFinal() const;
+    bool                        isLocalTextureDataAvailable() const;
+    bool                        isLocalTextureDataFinal() const;
     void                        updateComposite();
     /*virtual*/void             createComposite() override;
-    void                        setUpdatesEnabled(BOOL b);
-    BOOL                        getUpdatesEnabled() const   { return mUpdatesEnabled; }
+    void                        setUpdatesEnabled(bool b);
+    bool                        getUpdatesEnabled() const   { return mUpdatesEnabled; }
 
     LLVOAvatarSelf*             getAvatar();
     const LLVOAvatarSelf*       getAvatar() const;
@@ -60,7 +60,7 @@ public:
     const LLViewerTexLayerSetBuffer*    getViewerComposite() const;
 
 private:
-    BOOL                        mUpdatesEnabled;
+    bool                        mUpdatesEnabled;
 
 };
 
@@ -79,7 +79,7 @@ public:
 
 public:
     /*virtual*/ S8          getType() const override;
-    BOOL                    isInitialized(void) const;
+    bool                    isInitialized(void) const;
     static void             dumpTotalByteCount();
     const std::string       dumpTextureInfo() const;
     void            restoreGLTexture() override;
@@ -95,8 +95,8 @@ private:
     // Tex Layer Render
     //--------------------------------------------------------------------
     void            preRenderTexLayerSet() override;
-    void            midRenderTexLayerSet(BOOL success) override;
-    void            postRenderTexLayerSet(BOOL success) override;
+    void            midRenderTexLayerSet(bool success) override;
+    void            postRenderTexLayerSet(bool success) override;
     S32             getCompositeOriginX() const override { return getOriginX(); }
     S32             getCompositeOriginY() const override { return getOriginY(); }
     S32             getCompositeWidth() const override { return getFullWidth(); }
@@ -106,25 +106,25 @@ private:
     // Dynamic Texture Interface
     //--------------------------------------------------------------------
 public:
-    /*virtual*/ BOOL        needsRender() override;
+    /*virtual*/ bool        needsRender() override;
 protected:
     // Pass these along for tex layer rendering.
-    void            preRender(BOOL clear_depth) override { preRenderTexLayerSet(); }
-    void            postRender(BOOL success) override { postRenderTexLayerSet(success); }
-    BOOL            render() override { return renderTexLayerSet(mBoundTarget); }
+    void            preRender(bool clear_depth) override { preRenderTexLayerSet(); }
+    void            postRender(bool success) override { postRenderTexLayerSet(success); }
+    bool            render() override { return renderTexLayerSet(mBoundTarget); }
 
     //--------------------------------------------------------------------
     // Updates
     //--------------------------------------------------------------------
 public:
     void                    requestUpdate();
-    BOOL                    requestUpdateImmediate();
+    bool                    requestUpdateImmediate();
 protected:
-    BOOL                    isReadyToUpdate() const;
+    bool                    isReadyToUpdate() const;
     void                    doUpdate();
     void                    restartUpdateTimer();
 private:
-    BOOL                    mNeedsUpdate;                   // Whether we need to locally update our baked textures
+    bool                    mNeedsUpdate;                   // Whether we need to locally update our baked textures
     U32                     mNumLowresUpdates;              // Number of times we've locally updated with lowres version of our baked textures
     LLFrameTimer            mNeedsUpdateTimer;              // Tracks time since update was requested and performed.
 };

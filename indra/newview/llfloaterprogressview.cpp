@@ -52,13 +52,13 @@ LLFloaterProgressView::~LLFloaterProgressView()
 {
 }
 
-BOOL LLFloaterProgressView::postBuild()
+bool LLFloaterProgressView::postBuild()
 {
     mProgressBar = getChild<LLProgressBar>("progress_bar");
     mProgressText = getChild<LLTextBase>("progress_text");
     mLocationText = getChild<LLTextBase>("location");
     mCancelBtn = getChild<LLButton>("cancel_btn");
-    return TRUE;
+    return true;
 }
 
 void LLFloaterProgressView::setRegion(const std::string& region)
@@ -83,19 +83,19 @@ void LLFloaterProgressView::setProgressPercent(const F32 percent)
     mProgressBar->setValue(percent);
 }
 
-void LLFloaterProgressView::setShowProgress(BOOL visible)
+void LLFloaterProgressView::setShowProgress(bool visible)
 {
     if(visible)
     {
-        setVisibleAndFrontmost(TRUE);
+        setVisibleAndFrontmost(true);
     }
     else
     {
-        setVisible(FALSE);
+        setVisible(false);
     }
 }
 
-void LLFloaterProgressView::setProgressCancelButtonVisible(BOOL visible, const std::string& label)
+void LLFloaterProgressView::setProgressCancelButtonVisible(bool visible, const std::string& label)
 {
     mCancelBtn->setVisible(visible);
     mCancelBtn->setEnabled(visible);
@@ -106,5 +106,5 @@ void LLFloaterProgressView::setProgressCancelButtonVisible(BOOL visible, const s
 void LLFloaterProgressView::onCommitCancel(LLUICtrl* ctrl)
 {
     gAgent.teleportCancel();
-    ctrl->setEnabled(FALSE);
+    ctrl->setEnabled(false);
 }

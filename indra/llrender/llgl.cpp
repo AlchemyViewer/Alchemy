@@ -61,11 +61,11 @@
 #define ExtensionExists(exten, unused) SDL_GL_ExtensionSupported(exten);
 #endif
 
-BOOL gDebugSession = FALSE;
-BOOL gDebugGLSession = FALSE;
-BOOL gHeadlessClient = FALSE;
-BOOL gNonInteractive = FALSE;
-BOOL gGLActive = FALSE;
+bool gDebugSession = false;
+bool gDebugGLSession = false;
+bool gHeadlessClient = false;
+bool gNonInteractive = false;
+bool gGLActive = false;
 
 static const std::string HEADLESS_VENDOR_STRING("Linden Lab");
 static const std::string HEADLESS_RENDERER_STRING("Headless");
@@ -996,21 +996,21 @@ PFNGLPOLYGONOFFSETCLAMPPROC              glPolygonOffsetClamp = nullptr;
 LLGLManager gGLManager;
 
 LLGLManager::LLGLManager() :
-    mInited(FALSE),
-    mIsDisabled(FALSE),
+    mInited(false),
+    mIsDisabled(false),
     mMaxSamples(0),
     mNumTextureImageUnits(1),
     mMaxSampleMaskWords(0),
     mMaxColorTextureSamples(0),
     mMaxDepthTextureSamples(0),
     mMaxIntegerSamples(0),
-    mIsAMD(FALSE),
-    mIsNVIDIA(FALSE),
-    mIsIntel(FALSE),
+    mIsAMD(false),
+    mIsNVIDIA(false),
+    mIsIntel(false),
 #if LL_DARWIN
-    mIsMobileGF(FALSE),
+    mIsMobileGF(false),
 #endif
-    mHasRequirements(TRUE),
+    mHasRequirements(true),
     mDriverVersionMajor(1),
     mDriverVersionMinor(0),
     mDriverVersionRelease(0),
@@ -1153,12 +1153,12 @@ bool LLGLManager::initGL()
     {
         mGLVendorShort = "AMD";
         // *TODO: Fix this?
-        mIsAMD = TRUE;
+        mIsAMD = true;
     }
     else if (mGLVendor.find("NVIDIA ") != std::string::npos)
     {
         mGLVendorShort = "NVIDIA";
-        mIsNVIDIA = TRUE;
+        mIsNVIDIA = true;
     }
     else if (mGLVendor.find("INTEL") != std::string::npos
 #if LL_LINUX
@@ -1169,7 +1169,7 @@ bool LLGLManager::initGL()
          )
     {
         mGLVendorShort = "INTEL";
-        mIsIntel = TRUE;
+        mIsIntel = true;
     }
     else
     {
@@ -1179,7 +1179,7 @@ bool LLGLManager::initGL()
     // This is called here because it depends on the setting of mIsGF2or4MX, and sets up mHasMultitexture.
     initExtensions();
 
-    S32 old_vram = mVRAM;
+    U32 old_vram = mVRAM;
     mVRAM = 0;
 
 #if LL_WINDOWS && !LL_SDL
@@ -1391,7 +1391,7 @@ void LLGLManager::asLLSD(LLSD& info)
     info["gpu_version"] = mDriverVersionVendorString;
     info["opengl_version"] = mGLVersionString;
 
-    info["vram"] = mVRAM;
+    info["vram"] = LLSD::Integer(mVRAM);
 
     // OpenGL limits
     info["max_samples"] = mMaxSamples;
@@ -1418,12 +1418,12 @@ void LLGLManager::shutdownGL()
     {
         glFinish();
         stop_glerror();
-        mInited = FALSE;
+        mInited = false;
     }
 }
 
 // these are used to turn software blending on. They appear in the Debug/Avatar menu
-// presence of vertex skinning/blending or vertex programs will set these to FALSE by default.
+// presence of vertex skinning/blending or vertex programs will set these to false by default.
 
 void LLGLManager::initExtensions()
 {
@@ -1439,7 +1439,7 @@ void LLGLManager::initExtensions()
     if (num_extensions)
     {
         all_extensions += "GL_ARB_multitexture GL_ARB_texture_cube_map GL_ARB_texture_compression "; // These are in 3.2 core, but not listed by OSX
-        gGLHExts.mSysExts = strdup(all_extensions.data());
+        gGLHExts.mSysExts = strdup(all_extensions.c_str());
     }
 #endif
 
@@ -1457,10 +1457,7 @@ void LLGLManager::initExtensions()
     glGetIntegerv(GL_MAX_ELEMENTS_INDICES, (GLint*) &mGLMaxIndexRange);
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, (GLint*) &mGLMaxTextureSize);
 
-    mInited = TRUE;
-
-
-
+    mInited = true;
 #if (LL_WINDOWS || LL_LINUX || LL_SDL) && !LL_MESA_HEADLESS
     mHasATIMemInfo = ExtensionExists("GL_ATI_meminfo", gGLHExts.mSysExts); //Basic AMD method, also see mHasAMDAssociations
     mHasNVXMemInfo = ExtensionExists("GL_NVX_gpu_memory_info", gGLHExts.mSysExts);
@@ -2381,10 +2378,10 @@ void do_assert_glerror()
     //  Create or update texture to be used with this data
     GLenum error;
     error = glGetError();
-    BOOL quit = FALSE;
+    bool quit = false;
     if (LL_UNLIKELY(error))
     {
-        quit = TRUE;
+        quit = true;
 
         std::string gl_error_msg = getGLErrorString(error);
         LL_WARNS("RenderState") << "GL Error: 0x" << std::hex << error << std::dec << LL_ENDL;
@@ -2489,7 +2486,7 @@ void LLGLState::dumpStates()
     LL_INFOS("RenderState") << "GL States:" << LL_ENDL;
     for (const auto& state_pair : sStateMap)
     {
-        LL_INFOS("RenderState") << llformat(" 0x%04x : %s",(S32)state_pair.first, state_pair.second?"TRUE":"FALSE") << LL_ENDL;
+        LL_INFOS("RenderState") << llformat(" 0x%04x : %s",(S32)state_pair.first, state_pair.second?"true":"false") << LL_ENDL;
     }
 }
 
@@ -2532,7 +2529,7 @@ void LLGLState::checkStates(GLboolean writeAlpha)
 ///////////////////////////////////////////////////////////////////////
 
 LLGLState::LLGLState(LLGLenum state, S32 enabled) :
-    mState(state), mWasEnabled(FALSE), mIsEnabled(FALSE)
+    mState(state), mWasEnabled(false), mIsEnabled(false)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
@@ -2551,15 +2548,15 @@ void LLGLState::setEnabled(S32 enabled)
     }
     if (enabled == CURRENT_STATE)
     {
-        enabled = sStateMap[mState] == GL_TRUE ? TRUE : FALSE;
+        enabled = sStateMap[mState] == GL_TRUE ? ENABLED_STATE : DISABLED_STATE;
     }
-    else if (enabled == TRUE && sStateMap[mState] != GL_TRUE)
+    else if (enabled == ENABLED_STATE && sStateMap[mState] != GL_TRUE)
     {
         gGL.flush();
         glEnable(mState);
         sStateMap[mState] = GL_TRUE;
     }
-    else if (enabled == FALSE && sStateMap[mState] != GL_FALSE)
+    else if (enabled == DISABLED_STATE && sStateMap[mState] != GL_FALSE)
     {
         gGL.flush();
         glDisable(mState);
@@ -2827,7 +2824,7 @@ LLGLDepthTest::LLGLDepthTest(GLboolean depth_enabled, GLboolean write_enabled, G
     { // always disable depth writes if depth testing is disabled
       // GL spec defines this as a requirement, but some implementations allow depth writes with testing disabled
       // The proper way to write to depth buffer with testing disabled is to enable testing and use a depth_func of GL_ALWAYS
-        write_enabled = FALSE;
+        write_enabled = GL_FALSE;
     }
 
     if (depth_enabled != sDepthEnabled)
@@ -2880,7 +2877,7 @@ void LLGLDepthTest::checkState()
     if (gDebugGL)
     {
         GLint func = 0;
-        GLboolean mask = FALSE;
+        GLboolean mask = GL_FALSE;
 
         glGetIntegerv(GL_DEPTH_FUNC, &func);
         glGetBooleanv(GL_DEPTH_WRITEMASK, &mask);

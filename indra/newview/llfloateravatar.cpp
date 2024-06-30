@@ -56,7 +56,7 @@ LLFloaterAvatar::~LLFloaterAvatar()
     }
 }
 
-BOOL LLFloaterAvatar::postBuild()
+bool LLFloaterAvatar::postBuild()
 {
     mAvatarPicker = findChild<LLMediaCtrl>("avatar_picker_contents");
     if (mAvatarPicker)
@@ -76,7 +76,7 @@ BOOL LLFloaterAvatar::postBuild()
             avatar_picker->navigateTo(ava_url, HTTP_CONTENT_TEXT_HTML);
         }
     }
-    return TRUE;
+    return true;
 }
 
 

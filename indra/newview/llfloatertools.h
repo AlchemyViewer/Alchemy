@@ -55,7 +55,7 @@ class LLFloaterTools final
 : public LLFloater
 {
 public:
-    virtual BOOL    postBuild();
+    virtual bool    postBuild();
     static  void*   createPanelPermissions(void*    vdata);
     static  void*   createPanelObject(void* vdata);
     static  void*   createPanelVolume(void* vdata);
@@ -67,7 +67,7 @@ public:
     virtual ~LLFloaterTools();
 
     /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ BOOL canClose();
+    /*virtual*/ bool canClose();
     /*virtual*/ void onClose(bool app_quitting);
     /*virtual*/ void draw();
     /*virtual*/ void onFocusReceived();
@@ -190,8 +190,8 @@ public:
     LLObjectSelectionHandle mObjectSelection;
 
 private:
-    BOOL                    mDirty;
-    BOOL                    mHasSelection;
+    bool                    mDirty;
+    bool                    mHasSelection;
 
     std::map<std::string, std::string> mStatusText;
 

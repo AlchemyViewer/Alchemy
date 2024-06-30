@@ -777,7 +777,7 @@ U8* LLImageBase::getData()
 
 bool LLImageBase::isBufferInvalid() const
 {
-    return mBadBufferAllocation || mData == NULL ;
+    return mBadBufferAllocation || mData == NULL;
 }
 
 void LLImageBase::setSize(S32 width, S32 height, S32 ncomponents)
@@ -853,6 +853,8 @@ LLImageRaw::~LLImageRaw()
 // virtual
 U8* LLImageRaw::allocateData(S32 size)
 {
+    LLImageDataLock lock(this);
+
     U8* res = LLImageBase::allocateData(size);
     return res;
 }
@@ -860,12 +862,16 @@ U8* LLImageRaw::allocateData(S32 size)
 // virtual
 U8* LLImageRaw::reallocateData(S32 size)
 {
+    LLImageDataLock lock(this);
+
     U8* res = LLImageBase::reallocateData(size);
     return res;
 }
 
 void LLImageRaw::releaseData()
 {
+    LLImageDataLock lock(this);
+
     LLImageBase::setSize(0, 0, 0);
     LLImageBase::setDataAndSize(nullptr, 0);
 }
@@ -873,11 +879,15 @@ void LLImageRaw::releaseData()
 // virtual
 void LLImageRaw::deleteData()
 {
+    LLImageDataLock lock(this);
+
     LLImageBase::deleteData();
 }
 
 void LLImageRaw::setDataAndSize(U8 *data, S32 width, S32 height, S8 components)
 {
+    LLImageDataLock lock(this);
+
     if(data == getData())
     {
         return ;
@@ -891,6 +901,8 @@ void LLImageRaw::setDataAndSize(U8 *data, S32 width, S32 height, S8 components)
 
 bool LLImageRaw::resize(U16 width, U16 height, S8 components)
 {
+    LLImageDataLock lock(this);
+
     if ((getWidth() == width) && (getHeight() == height) && (getComponents() == components) && !isBufferInvalid())
     {
         return true;
@@ -906,6 +918,8 @@ bool LLImageRaw::resize(U16 width, U16 height, S8 components)
 bool LLImageRaw::setSubImage(U32 x_pos, U32 y_pos, U32 width, U32 height,
                              const U8 *data, U32 stride, bool reverse_y)
 {
+    LLImageDataLock lock(this);
+
     if (!getData())
     {
         return false;
@@ -933,6 +947,9 @@ bool LLImageRaw::setSubImage(U32 x_pos, U32 y_pos, U32 width, U32 height,
 void LLImageRaw::clear(U8 r, U8 g, U8 b, U8 a)
 {
     llassert( getComponents() <= 4 );
+
+    LLImageDataLock lock(this);
+
     // This is fairly bogus, but it'll do for now.
     if (isBufferInvalid())
     {
@@ -973,6 +990,8 @@ void LLImageRaw::clear(U8 r, U8 g, U8 b, U8 a)
 // Reverses the order of the rows in the image
 void LLImageRaw::verticalFlip()
 {
+    LLImageDataLock lock(this);
+
     S32 row_bytes = getWidth() * getComponents();
     llassert(row_bytes > 0);
     std::vector<U8> line_buffer(row_bytes);
@@ -1012,6 +1031,8 @@ bool LLImageRaw::checkHasTransparentPixels()
 
 bool LLImageRaw::optimizeAwayAlpha()
 {
+    LLImageDataLock lock(this);
+
     if (getComponents() == 4)
     {
         U8* data = getData();
@@ -1077,6 +1098,8 @@ bool LLImageRaw::makeAlpha()
 
 void LLImageRaw::expandToPowerOfTwo(S32 max_dim, bool scale_image)
 {
+    LLImageDataLock lock(this);
+
     // Find new sizes
     S32 new_width  = expandDimToPowerOfTwo(getWidth(), max_dim);
     S32 new_height = expandDimToPowerOfTwo(getHeight(), max_dim);
@@ -1086,6 +1109,8 @@ void LLImageRaw::expandToPowerOfTwo(S32 max_dim, bool scale_image)
 
 void LLImageRaw::contractToPowerOfTwo(S32 max_dim, bool scale_image)
 {
+    LLImageDataLock lock(this);
+
     // Find new sizes
     S32 new_width  = contractDimToPowerOfTwo(getWidth(), MIN_IMAGE_SIZE);
     S32 new_height = contractDimToPowerOfTwo(getHeight(), MIN_IMAGE_SIZE);
@@ -1135,6 +1160,8 @@ S32 LLImageRaw::contractDimToPowerOfTwo(S32 curr_dim, S32 min_dim)
 
 void LLImageRaw::biasedScaleToPowerOfTwo(S32 max_dim)
 {
+    LLImageDataLock lock(this);
+
     // Find new sizes
     S32 new_width  = biasedDimToPowerOfTwo(getWidth(),max_dim);
     S32 new_height = biasedDimToPowerOfTwo(getHeight(),max_dim);
@@ -1142,6 +1169,7 @@ void LLImageRaw::biasedScaleToPowerOfTwo(S32 max_dim)
     scale( new_width, new_height );
 }
 
+// static
 // Calculates (U8)(255*(a/255.f)*(b/255.f) + 0.5f).  Thanks, Jim Blinn!
 inline U8 LLImageRaw::fastFractionalMult( U8 a, U8 b )
 {
@@ -1150,9 +1178,12 @@ inline U8 LLImageRaw::fastFractionalMult( U8 a, U8 b )
 }
 
 
-void LLImageRaw::composite( LLImageRaw* src )
+void LLImageRaw::composite( const LLImageRaw* src )
 {
     LLImageRaw* dst = this;  // Just for clarity.
+
+    LLImageDataSharedLock lockIn(src);
+    LLImageDataLock lockOut(this);
 
     if (!validateSrcAndDst("LLImageRaw::composite", src, dst))
     {
@@ -1192,11 +1223,13 @@ void LLImageRaw::composite( LLImageRaw* src )
 
 
 // Src and dst can be any size.  Src has 4 components.  Dst has 3 components.
-void LLImageRaw::compositeScaled4onto3(LLImageRaw* src)
+void LLImageRaw::compositeScaled4onto3(const LLImageRaw* src)
 {
     LL_INFOS() << "compositeScaled4onto3" << LL_ENDL;
 
     LLImageRaw* dst = this;  // Just for clarity.
+
+    LLImageDataLock lock(this);
 
     llassert( (4 == src->getComponents()) && (3 == dst->getComponents()) );
 
@@ -1219,14 +1252,16 @@ void LLImageRaw::compositeScaled4onto3(LLImageRaw* src)
 
 
 // Src and dst are same size.  Src has 4 components.  Dst has 3 components.
-void LLImageRaw::compositeUnscaled4onto3( LLImageRaw* src )
+void LLImageRaw::compositeUnscaled4onto3( const LLImageRaw* src )
 {
     LLImageRaw* dst = this;  // Just for clarity.
+
+    LLImageDataLock lock(this);
 
     llassert( (4 == src->getComponents()) || (3 == dst->getComponents()) );
     llassert( (src->getWidth() == dst->getWidth()) && (src->getHeight() == dst->getHeight()) );
 
-    U8* src_data = src->getData();
+    const U8* src_data = src->getData();
     U8* dst_data = dst->getData();
     S32 pixels = getWidth() * getHeight();
 
@@ -1275,9 +1310,12 @@ void LLImageRaw::compositeUnscaled4onto3( LLImageRaw* src )
 }
 
 
-void LLImageRaw::copyUnscaledAlphaMask( LLImageRaw* src, const LLColor4U& fill)
+void LLImageRaw::copyUnscaledAlphaMask( const LLImageRaw* src, const LLColor4U& fill)
 {
     LLImageRaw* dst = this;  // Just for clarity.
+
+    LLImageDataSharedLock lockIn(src);
+    LLImageDataLock lockOut(this);
 
     if (!validateSrcAndDst("LLImageRaw::copyUnscaledAlphaMask", src, dst))
     {
@@ -1289,7 +1327,7 @@ void LLImageRaw::copyUnscaledAlphaMask( LLImageRaw* src, const LLColor4U& fill)
     llassert( (src->getWidth() == dst->getWidth()) && (src->getHeight() == dst->getHeight()) );
 
     S32 pixels = getWidth() * getHeight();
-    U8* src_data = src->getData();
+    const U8* src_data = src->getData();
     U8* dst_data = dst->getData();
     for ( S32 i = 0; i < pixels; i++ )
     {
@@ -1306,6 +1344,8 @@ void LLImageRaw::copyUnscaledAlphaMask( LLImageRaw* src, const LLColor4U& fill)
 // Fill the buffer with a constant color
 void LLImageRaw::fill( const LLColor4U& color )
 {
+    LLImageDataLock lock(this);
+
     if (isBufferInvalid())
     {
         LL_WARNS() << "Invalid image buffer" << LL_ENDL;
@@ -1367,15 +1407,20 @@ LLPointer<LLImageRaw> LLImageRaw::duplicate()
         return this; //nobody else refences to this image, no need to duplicate.
     }
 
+    LLImageDataSharedLock lock(this);
+
     //make a duplicate
     LLPointer<LLImageRaw> dup = new LLImageRaw(getData(), getWidth(), getHeight(), getComponents());
     return dup;
 }
 
 // Src and dst can be any size.  Src and dst can each have 3 or 4 components.
-void LLImageRaw::copy(LLImageRaw* src)
+void LLImageRaw::copy(const LLImageRaw* src)
 {
     LLImageRaw* dst = this;  // Just for clarity.
+
+    LLImageDataSharedLock lockIn(src);
+    LLImageDataLock lockOut(this);
 
     if (!validateSrcAndDst("LLImageRaw::copy", src, dst))
     {
@@ -1422,9 +1467,11 @@ void LLImageRaw::copy(LLImageRaw* src)
 }
 
 // Src and dst are same size.  Src and dst have same number of components.
-void LLImageRaw::copyUnscaled(LLImageRaw* src)
+void LLImageRaw::copyUnscaled(const LLImageRaw* src)
 {
     LLImageRaw* dst = this;  // Just for clarity.
+
+    LLImageDataLock lock(this);
 
     llassert( (1 == src->getComponents()) || (3 == src->getComponents()) || (4 == src->getComponents()) );
     llassert( src->getComponents() == dst->getComponents() );
@@ -1435,7 +1482,7 @@ void LLImageRaw::copyUnscaled(LLImageRaw* src)
 
 
 // Src and dst can be any size.  Src has 3 components.  Dst has 4 components.
-void LLImageRaw::copyScaled3onto4(LLImageRaw* src)
+void LLImageRaw::copyScaled3onto4(const LLImageRaw* src)
 {
     llassert( (3 == src->getComponents()) && (4 == getComponents()) );
 
@@ -1447,7 +1494,7 @@ void LLImageRaw::copyScaled3onto4(LLImageRaw* src)
 
 
 // Src and dst can be any size.  Src has 4 components.  Dst has 3 components.
-void LLImageRaw::copyScaled4onto3(LLImageRaw* src)
+void LLImageRaw::copyScaled4onto3(const LLImageRaw* src)
 {
     llassert( (4 == src->getComponents()) && (3 == getComponents()) );
 
@@ -1459,15 +1506,17 @@ void LLImageRaw::copyScaled4onto3(LLImageRaw* src)
 
 
 // Src and dst are same size.  Src has 4 components.  Dst has 3 components.
-void LLImageRaw::copyUnscaled4onto3( LLImageRaw* src )
+void LLImageRaw::copyUnscaled4onto3( const LLImageRaw* src )
 {
     LLImageRaw* dst = this;  // Just for clarity.
+
+    LLImageDataLock lock(this);
 
     llassert( (3 == dst->getComponents()) && (4 == src->getComponents()) );
     llassert( (src->getWidth() == dst->getWidth()) && (src->getHeight() == dst->getHeight()) );
 
     S32 pixels = getWidth() * getHeight();
-    U8* src_data = src->getData();
+    const U8* src_data = src->getData();
     U8* dst_data = dst->getData();
     for( S32 i=0; i<pixels; i++ )
     {
@@ -1481,15 +1530,18 @@ void LLImageRaw::copyUnscaled4onto3( LLImageRaw* src )
 
 
 // Src and dst are same size.  Src has 3 components.  Dst has 4 components.
-void LLImageRaw::copyUnscaled3onto4( LLImageRaw* src )
+void LLImageRaw::copyUnscaled3onto4( const LLImageRaw* src )
 {
     LLImageRaw* dst = this;  // Just for clarity.
+
+    LLImageDataLock lock(this);
+
     llassert( 3 == src->getComponents() );
     llassert( 4 == dst->getComponents() );
     llassert( (src->getWidth() == dst->getWidth()) && (src->getHeight() == dst->getHeight()) );
 
     S32 pixels = getWidth() * getHeight();
-    U8* src_data = src->getData();
+    const U8* src_data = src->getData();
     U8* dst_data = dst->getData();
     for( S32 i=0; i<pixels; i++ )
     {
@@ -1504,9 +1556,12 @@ void LLImageRaw::copyUnscaled3onto4( LLImageRaw* src )
 
 
 // Src and dst can be any size.  Src and dst have same number of components.
-void LLImageRaw::copyScaled( LLImageRaw* src )
+void LLImageRaw::copyScaled( const LLImageRaw* src )
 {
     LLImageRaw* dst = this;  // Just for clarity.
+
+    LLImageDataSharedLock lockIn(src);
+    LLImageDataLock lockOut(this);
 
     if (!validateSrcAndDst("LLImageRaw::copyScaled", src, dst))
     {
@@ -1549,6 +1604,8 @@ void LLImageRaw::copyScaled( LLImageRaw* src )
 
 bool LLImageRaw::scale( S32 new_width, S32 new_height, bool scale_image_data )
 {
+    LLImageDataLock lock(this);
+
     S32 components = getComponents();
     if (components != 1 && components != 3 && components != 4)
     {
@@ -1638,6 +1695,8 @@ LLPointer<LLImageRaw> LLImageRaw::scaled(S32 new_width, S32 new_height)
 {
     LLPointer<LLImageRaw> result;
 
+    LLImageDataLock lock(this);
+
     S32 components = getComponents();
     if (components != 1 && components != 3 && components != 4)
     {
@@ -1683,7 +1742,7 @@ LLPointer<LLImageRaw> LLImageRaw::scaled(S32 new_width, S32 new_height)
     return result;
 }
 
-void LLImageRaw::copyLineScaled( U8* in, U8* out, S32 in_pixel_len, S32 out_pixel_len, S32 in_pixel_step, S32 out_pixel_step )
+void LLImageRaw::copyLineScaled( const U8* in, U8* out, S32 in_pixel_len, S32 out_pixel_len, S32 in_pixel_step, S32 out_pixel_step )
 {
     const S32 components = getComponents();
     llassert( components >= 1 && components <= 4 );
@@ -1710,7 +1769,7 @@ void LLImageRaw::copyLineScaled( U8* in, U8* out, S32 in_pixel_len, S32 out_pixe
             S32 t0 = x * out_pixel_step * components;
             S32 t1 = index0 * in_pixel_step * components;
             U8* outp = out + t0;
-            U8* inp = in + t1;
+            const U8* inp = in + t1;
             for (S32 i = 0; i < components; ++i)
             {
                 *outp = *inp;
@@ -1798,7 +1857,7 @@ void LLImageRaw::copyLineScaled( U8* in, U8* out, S32 in_pixel_len, S32 out_pixe
     }
 }
 
-void LLImageRaw::compositeRowScaled4onto3( U8* in, U8* out, S32 in_pixel_len, S32 out_pixel_len )
+void LLImageRaw::compositeRowScaled4onto3( const U8* in, U8* out, S32 in_pixel_len, S32 out_pixel_len )
 {
     llassert( getComponents() == 3 );
 
@@ -1894,7 +1953,6 @@ void LLImageRaw::compositeRowScaled4onto3( U8* in, U8* out, S32 in_pixel_len, S3
     }
 }
 
-
 void LLImageRaw::addEmissive(LLImageRaw* src)
 {
     LLImageRaw* dst = this;  // Just for clarity.
@@ -1960,9 +2018,11 @@ void LLImageRaw::addEmissiveScaled(LLImageRaw* src)
     dst->addEmissiveUnscaled(&temp);
 }
 
-
-bool LLImageRaw::validateSrcAndDst(std::string func, LLImageRaw* src, LLImageRaw* dst)
+bool LLImageRaw::validateSrcAndDst(std::string func, const LLImageRaw* src, const LLImageRaw* dst)
 {
+    LLImageDataSharedLock lockIn(src);
+    LLImageDataLock lockOut(dst);
+
     if (!src || !dst || src->isBufferInvalid() || dst->isBufferInvalid())
     {
         LL_WARNS() << func << ": Source: ";
@@ -2273,6 +2333,8 @@ bool LLImageFormatted::decodeChannels(LLImageRaw* raw_image,F32  decode_time, S3
 // virtual
 U8* LLImageFormatted::allocateData(S32 size)
 {
+    LLImageDataLock lock(this);
+
     U8* res = LLImageBase::allocateData(size); // calls deleteData()
     if(res) sGlobalFormattedMemory += getDataSize();
     return res;
@@ -2281,6 +2343,8 @@ U8* LLImageFormatted::allocateData(S32 size)
 // virtual
 U8* LLImageFormatted::reallocateData(S32 size)
 {
+    LLImageDataLock lock(this);
+
     sGlobalFormattedMemory -= getDataSize();
     U8* res = LLImageBase::reallocateData(size);
     if(res) sGlobalFormattedMemory += getDataSize();
@@ -2290,6 +2354,12 @@ U8* LLImageFormatted::reallocateData(S32 size)
 // virtual
 void LLImageFormatted::deleteData()
 {
+    LLImageDataLock lock(this);
+
+    if (mDecoding)
+    {
+        LL_ERRS() << "LLImageFormatted::deleteData() is called during decoding" << LL_ENDL;
+    }
     sGlobalFormattedMemory -= getDataSize();
     LLImageBase::deleteData();
 }
@@ -2315,6 +2385,8 @@ void LLImageFormatted::sanityCheck()
 
 bool LLImageFormatted::copyData(U8 *data, S32 size)
 {
+    LLImageDataLock lock(this);
+
     if ( data && ((data != getData()) || (size != getDataSize())) )
     {
         deleteData();
@@ -2327,6 +2399,8 @@ bool LLImageFormatted::copyData(U8 *data, S32 size)
 // LLImageFormatted becomes the owner of data
 void LLImageFormatted::setData(U8 *data, S32 size)
 {
+    LLImageDataLock lock(this);
+
     if (data && data != getData())
     {
         deleteData();
@@ -2340,6 +2414,8 @@ void LLImageFormatted::appendData(U8 *data, S32 size)
 {
     if (data)
     {
+        LLImageDataLock lock(this);
+
         if (!getData())
         {
             setData(data, size);
@@ -2381,6 +2457,9 @@ bool LLImageFormatted::load(const std::string &filename, int load_size)
     {
         load_size = file_size;
     }
+
+    LLImageDataLock lock(this);
+
     bool res;
     U8 *data = allocateData(load_size);
     if (data)
@@ -2418,6 +2497,8 @@ bool LLImageFormatted::save(const std::string &filename)
         setLastError("Unable to open file for writing", filename);
         return false;
     }
+
+    LLImageDataSharedLock lock(this);
 
     S32 result = outfile.write(getData(), getDataSize());
     outfile.close() ;

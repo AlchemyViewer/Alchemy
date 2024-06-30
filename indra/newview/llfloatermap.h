@@ -42,11 +42,11 @@ public:
     static LLFloaterMap* getInstance();
     virtual ~LLFloaterMap();
 
-    /*virtual*/ BOOL    postBuild() override;
-    /*virtual*/ BOOL    handleDoubleClick( S32 x, S32 y, MASK mask ) override;
-    /*virtual*/ void    reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
+    /*virtual*/ bool    postBuild() override;
+    /*virtual*/ bool    handleDoubleClick( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ void    reshape(S32 width, S32 height, bool called_from_parent = true) override;
     /*virtual*/ void    draw() override;
-    /*virtual*/ void    setMinimized(BOOL b) override;
+    /*virtual*/ void    setMinimized(bool b) override;
 
 private:
     void setDirectionPos( LLTextBox* text_box, F32 rotation );

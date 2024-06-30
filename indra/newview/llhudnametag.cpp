@@ -62,7 +62,7 @@ const F32 LOD_2_SCREEN_COVERAGE = 0.40f;
 
 std::set<LLPointer<LLHUDNameTag> > LLHUDNameTag::sTextObjects;
 std::vector<LLPointer<LLHUDNameTag> > LLHUDNameTag::sVisibleTextObjects;
-BOOL LLHUDNameTag::sDisplayText = TRUE ;
+bool LLHUDNameTag::sDisplayText = true ;
 const F32 LLHUDNameTag::NAMETAG_MAX_WIDTH = 298.f;
 const F32 LLHUDNameTag::HUD_TEXT_MAX_WIDTH = 190.f;
 
@@ -74,13 +74,13 @@ bool llhudnametag_further_away::operator()(const LLPointer<LLHUDNameTag>& lhs, c
 
 LLHUDNameTag::LLHUDNameTag(const U8 type)
 :   LLHUDObject(type),
-    mDoFade(TRUE),
+    mDoFade(true),
     mFadeDistance(8.f),
     mFadeRange(4.f),
     mLastDistance(0.f),
-    mZCompare(TRUE),
-    mVisibleOffScreen(FALSE),
-    mOffscreen(FALSE),
+    mZCompare(true),
+    mVisibleOffScreen(false),
+    mOffscreen(false),
     mColor(1.f, 1.f, 1.f, 1.f),
 //  mScale(),
     mWidth(0.f),
@@ -99,7 +99,7 @@ LLHUDNameTag::LLHUDNameTag(const U8 type)
     mTextAlignment(ALIGN_TEXT_CENTER),
     mVertAlignment(ALIGN_VERT_CENTER),
     mLOD(0),
-    mHidden(FALSE)
+    mHidden(false)
 {
     LLPointer<LLHUDNameTag> ptr(this);
     sTextObjects.insert(ptr);
@@ -113,17 +113,17 @@ LLHUDNameTag::~LLHUDNameTag()
 }
 
 
-BOOL LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, LLVector4a& intersection, BOOL debug_render)
+bool LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, LLVector4a& intersection, bool debug_render)
 {
     if (!mVisible || mHidden)
     {
-        return FALSE;
+        return false;
     }
 
     // don't pick text that isn't bound to a viewerobject
     if (!mSourceObject || mSourceObject->mDrawable.isNull())
     {
-        return FALSE;
+        return false;
     }
 
     F32 alpha_factor = 1.f;
@@ -138,7 +138,7 @@ BOOL LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4
     }
     if (text_color.mV[3] < 0.01f)
     {
-        return FALSE;
+        return false;
     }
 
     mOffsetY = lltrunc(mHeight * ((mVertAlignment == ALIGN_VERT_CENTER) ? 0.5f : 1.f));
@@ -175,7 +175,7 @@ BOOL LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4
     LLVector3 height_vec = mHeight * y_pixel_vec;
 
     LLCoordGL screen_pos;
-    viewerCamera.projectPosAgentToScreen(position, screen_pos, FALSE);
+    viewerCamera.projectPosAgentToScreen(position, screen_pos, false);
 
     LLVector2 screen_offset;
     screen_offset = updateScreenPos(mPositionOffset);
@@ -215,11 +215,11 @@ BOOL LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4
         {
             dir.mul(t);
             intersection.setAdd(start, dir);
-            return TRUE;
+            return true;
         }
     }
 
-    return FALSE;
+    return false;
 }
 
 void LLHUDNameTag::render()
@@ -229,11 +229,11 @@ void LLHUDNameTag::render()
     {
         LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
         //LLGLDisable gls_stencil(GL_STENCIL_TEST);
-        renderText(FALSE);
+        renderText(false);
     }
 }
 
-void LLHUDNameTag::renderText(BOOL for_select)
+void LLHUDNameTag::renderText(bool for_select)
 {
     if (!mVisible || mHidden)
     {
@@ -256,7 +256,7 @@ void LLHUDNameTag::renderText(BOOL for_select)
         gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
     }
 
-    LLGLState gls_blend(GL_BLEND, for_select ? FALSE : TRUE);
+    LLGLState gls_blend(GL_BLEND, !for_select);
 
     LLColor4 shadow_color(0.f, 0.f, 0.f, 1.f);
     F32 alpha_factor = 1.f;
@@ -301,7 +301,7 @@ void LLHUDNameTag::renderText(BOOL for_select)
     mRadius = (width_vec + height_vec).magVec() * 0.5f;
 
     LLCoordGL screen_pos;
-    LLViewerCamera::getInstance()->projectPosAgentToScreen(mPositionAgent, screen_pos, FALSE);
+    LLViewerCamera::getInstance()->projectPosAgentToScreen(mPositionAgent, screen_pos, false);
 
     LLVector2 screen_offset = updateScreenPos(mPositionOffset);
 
@@ -347,7 +347,7 @@ void LLHUDNameTag::renderText(BOOL for_select)
 
             LLColor4 label_color(0.f, 0.f, 0.f, 1.f);
             label_color.mV[VALPHA] = alpha_factor;
-            hud_render_text(segment_iter->getText(), render_position, *fontp, segment_iter->mStyle, LLFontGL::DROP_SHADOW, x_offset, y_offset, label_color, FALSE);
+            hud_render_text(segment_iter->getText(), render_position, *fontp, segment_iter->mStyle, LLFontGL::NO_SHADOW, x_offset, y_offset, label_color, false);
         }
     }
 
@@ -392,7 +392,7 @@ void LLHUDNameTag::renderText(BOOL for_select)
             text_color = segment_iter->mColor;
             text_color.mV[VALPHA] *= alpha_factor;
 
-            hud_render_text(segment_iter->getText(), render_position, *fontp, style, shadow, x_offset, y_offset, text_color, FALSE);
+            hud_render_text(segment_iter->getText(), render_position, *fontp, style, shadow, x_offset, y_offset, text_color, false);
         }
     }
     /// Reset the default color to white.  The renderer expects this to be the default.
@@ -448,7 +448,7 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                 // "QualityAssurance AssuresQuality1" will end up as "QualityAssurance AssuresQua..." because we are enforcing single line
                 do
                 {
-                    S32 segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, wline.length(), LLFontGL::ANYWHERE);
+                    auto segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
                     if (segment_length + line_length < wline.length()) // since we only draw one string, line_length should be 0
                     {
                         // token does does not fit into signle line, need to draw "...".
@@ -456,7 +456,7 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                         static const LLWString dots_pad(utf8str_to_wstring(std::string("....")));
                         S32 elipses_width = font->getWidthF32(dots_pad.c_str());
                         // truncated string length
-                        segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels - elipses_width, wline.length(), LLFontGL::ANYWHERE);
+                        segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels - elipses_width, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
                         static const LLWString dots(utf8str_to_wstring(std::string("...")));
                         LLHUDTextSegment segment(iter->substr(line_length, segment_length) + dots, style, color, font);
                         mTextSegments.push_back(segment);
@@ -477,7 +477,7 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                 // "QualityAssurance AssuresQuality 1" will be split into two lines "QualityAssurance" and "AssuresQuality"
                 do
                 {
-                    S32 segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, wline.length(), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                    S32 segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, static_cast<S32>(wline.length()), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                     LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
                     mTextSegments.push_back(segment);
                     line_length += segment_length;
@@ -516,7 +516,7 @@ void LLHUDNameTag::addLabel(const std::string& label_utf8, F32 max_pixels)
             do
             {
                 S32 segment_length = mFontp->maxDrawableChars(iter->substr(line_length).c_str(),
-                    max_pixels, wstr.length(), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                    max_pixels, static_cast<S32>(wstr.length()), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                 LLHUDTextSegment segment(iter->substr(line_length, segment_length), LLFontGL::NORMAL, mColor, mFontp);
                 mLabelSegments.push_back(segment);
                 line_length += segment_length;
@@ -527,7 +527,7 @@ void LLHUDNameTag::addLabel(const std::string& label_utf8, F32 max_pixels)
     }
 }
 
-void LLHUDNameTag::setZCompare(const BOOL zcompare)
+void LLHUDNameTag::setZCompare(const bool zcompare)
 {
     mZCompare = zcompare;
 }
@@ -559,7 +559,7 @@ void LLHUDNameTag::setAlpha(F32 alpha)
 }
 
 
-void LLHUDNameTag::setDoFade(const BOOL do_fade)
+void LLHUDNameTag::setDoFade(const bool do_fade)
 {
     mDoFade = do_fade;
 }
@@ -576,7 +576,7 @@ void LLHUDNameTag::updateVisibility()
     if (!mSourceObject)
     {
         //LL_WARNS() << "LLHUDNameTag::updateScreenPos -- mSourceObject is NULL!" << LL_ENDL;
-        mVisible = TRUE;
+        mVisible = true;
         sVisibleTextObjects.push_back(LLPointer<LLHUDNameTag> (this));
         return;
     }
@@ -584,7 +584,7 @@ void LLHUDNameTag::updateVisibility()
     // Not visible if parent object is dead
     if (mSourceObject->isDead())
     {
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
@@ -597,7 +597,7 @@ void LLHUDNameTag::updateVisibility()
 
     if (dir_from_camera * viewerCamera.getAtAxis() <= 0.f)
     { //text is behind camera, don't render
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
@@ -614,7 +614,7 @@ void LLHUDNameTag::updateVisibility()
 
     if (mLOD >= 3 || !mTextSegments.size() || (mDoFade && (mLastDistance > mFadeDistance + mFadeRange)))
     {
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
@@ -627,21 +627,21 @@ void LLHUDNameTag::updateVisibility()
             (x_pixel_vec * mPositionOffset.mV[VX]) +
             (y_pixel_vec * mPositionOffset.mV[VY]);
 
-    mOffscreen = FALSE;
+    mOffscreen = false;
     if (!viewerCamera.sphereInFrustum(render_position, mRadius))
     {
         if (!mVisibleOffScreen)
         {
-            mVisible = FALSE;
+            mVisible = false;
             return;
         }
         else
         {
-            mOffscreen = TRUE;
+            mOffscreen = true;
         }
     }
 
-    mVisible = TRUE;
+    mVisible = true;
     sVisibleTextObjects.push_back(LLPointer<LLHUDNameTag> (this));
 }
 
@@ -655,7 +655,7 @@ LLVector2 LLHUDNameTag::updateScreenPos(LLVector2 &offset)
 
     viewerCamera.getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
     LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);
-    if (!viewerCamera.projectPosAgentToScreen(world_pos, screen_pos, FALSE) && mVisibleOffScreen)
+    if (!viewerCamera.projectPosAgentToScreen(world_pos, screen_pos, false) && mVisibleOffScreen)
     {
         // bubble off-screen, so find a spot for it along screen edge
         viewerCamera.projectPosAgentToScreenEdge(world_pos, screen_pos);

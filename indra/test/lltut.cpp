@@ -122,7 +122,6 @@ namespace tut
                 ensure_equals(msg + " map size", actual.size(), expected.size());
 
                 const auto& expected_map = expected.asMap();
-
                 LLSD::map_const_iterator actual_iter = actual.beginMap();
                 LLSD::map_const_iterator expected_iter;
 

@@ -45,7 +45,7 @@ public:
     void getBinaryData(const char *blockname, const char *varname,
                                void *datap, S32 size, S32 blocknum = 0,
                                S32 max_size = S32_MAX) override;
-    void getBOOL(const char *block, const char *var, BOOL &data,
+    void getBOOL(const char *block, const char *var, bool &data,
                          S32 blocknum = 0) override;
     void getS8(const char *block, const char *var, S8 &data,
                        S32 blocknum = 0) override;
@@ -96,15 +96,15 @@ public:
 
     void copyToBuilder(LLMessageBuilder&) const override;
 
-    BOOL validateMessage(const U8* buffer, S32 buffer_size,
+    bool validateMessage(const U8* buffer, S32 buffer_size,
                          const LLHost& sender, bool trusted = false, bool custom = false);
-    BOOL readMessage(const U8* buffer, const LLHost& sender);
+    bool readMessage(const U8* buffer, const LLHost& sender);
 
     bool isTrusted() const;
     bool isBanned(bool trusted_source) const;
     bool isUdpBanned() const;
 
-    BOOL               decodeData(const U8* buffer, const LLHost& sender, bool custom = false);
+    bool               decodeData(const U8* buffer, const LLHost& sender, bool custom = false);
     LLMessageTemplate* getTemplate();
 
 private:
@@ -112,7 +112,7 @@ private:
     void getData(const char *blockname, const char *varname, void *datap,
                  S32 size = 0, S32 blocknum = 0, S32 max_size = S32_MAX);
 
-    BOOL decodeTemplate(const U8* buffer, S32 buffer_size,  // inputs
+    bool decodeTemplate(const U8* buffer, S32 buffer_size,  // inputs
                         LLMessageTemplate** msg_template, bool custom = false); // outputs
 
     void logRanOffEndOfPacket( const LLHost& host, const S32 where, const S32 wanted );

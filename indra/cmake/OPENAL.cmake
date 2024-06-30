@@ -44,6 +44,9 @@ if (USE_OPENAL)
             optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libalut.so
             )
   else()
-    message(FATAL_ERROR "OpenAL is not available for this platform")
+    target_link_libraries( ll::openal INTERFACE
+            openal
+            alut
+            )
   endif()
 endif ()

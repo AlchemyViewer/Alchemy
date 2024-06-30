@@ -56,7 +56,7 @@ LLFloaterNotificationsTabbed::LLFloaterNotificationsTabbed(const LLSD& key) : LL
 }
 
 //---------------------------------------------------------------------------------
-BOOL LLFloaterNotificationsTabbed::postBuild()
+bool LLFloaterNotificationsTabbed::postBuild()
 {
     mGroupInviteMessageList = getChild<LLNotificationListView>("group_invite_notification_list");
     mGroupNoticeMessageList = getChild<LLNotificationListView>("group_notice_notification_list");
@@ -78,14 +78,14 @@ BOOL LLFloaterNotificationsTabbed::postBuild()
     // get a corresponding channel
     mNotificationUpdates.reset(new NotificationTabbedChannel(this));
     initChannel();
-    BOOL rv = LLTransientDockableFloater::postBuild();
+    bool rv = LLTransientDockableFloater::postBuild();
 
     setTitle(getString("title_notification_tabbed_window"));
     return rv;
 }
 
 //---------------------------------------------------------------------------------
-void LLFloaterNotificationsTabbed::setMinimized(BOOL minimize)
+void LLFloaterNotificationsTabbed::setMinimized(bool minimize)
 {
     LLTransientDockableFloater::setMinimized(minimize);
 }
@@ -101,7 +101,7 @@ void LLFloaterNotificationsTabbed::handleReshape(const LLRect& rect, bool by_use
 void LLFloaterNotificationsTabbed::onStartUpToastClick(S32 x, S32 y, MASK mask)
 {
     // just set floater visible. Screen channels will be cleared.
-    setVisible(TRUE);
+    setVisible(true);
 }
 
 //---------------------------------------------------------------------------------
@@ -141,7 +141,7 @@ void LLFloaterNotificationsTabbed::removeItemByID(const LLUUID& id, const std::s
     // hide chiclet window if there are no items left
     if(isWindowEmpty())
     {
-        setVisible(FALSE);
+        setVisible(false);
     }
 }
 
@@ -169,7 +169,7 @@ void LLFloaterNotificationsTabbed::initChannel()
 }
 
 //---------------------------------------------------------------------------------
-void LLFloaterNotificationsTabbed::setVisible(BOOL visible)
+void LLFloaterNotificationsTabbed::setVisible(bool visible)
 {
     if (visible)
     {
@@ -187,7 +187,7 @@ void LLFloaterNotificationsTabbed::setVisible(BOOL visible)
     }
 
     // do not show empty window
-    if (NULL == mNotificationsSeparator || isWindowEmpty()) visible = FALSE;
+    if (NULL == mNotificationsSeparator || isWindowEmpty()) visible = false;
 
     LLTransientDockableFloater::setVisible(visible);
 
@@ -357,7 +357,7 @@ void LLFloaterNotificationsTabbed::collapseAllOnCurrentTab()
     {
         LLNotificationListItem* notify_item = dynamic_cast<LLNotificationListItem*>(*iter);
         if (notify_item)
-            notify_item->setExpanded(FALSE);
+            notify_item->setExpanded(false);
     }
 }
 
@@ -412,7 +412,7 @@ void LLFloaterNotificationsTabbed::onItemClick(LLNotificationListItem* item)
     }
     else
     {
-        item->setExpanded(TRUE);
+        item->setExpanded(true);
     }
 }
 

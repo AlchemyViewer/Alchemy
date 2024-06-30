@@ -49,7 +49,7 @@ ALFloaterSettingsColor::ALFloaterSettingsColor(const LLSD& key)
 ALFloaterSettingsColor::~ALFloaterSettingsColor()
 {}
 
-BOOL ALFloaterSettingsColor::postBuild()
+bool ALFloaterSettingsColor::postBuild()
 {
     enableResizeCtrls(true, false, true);
 
@@ -62,14 +62,14 @@ BOOL ALFloaterSettingsColor::postBuild()
     getChild<LLFilterEditor>("filter_input")->setCommitCallback(boost::bind(&ALFloaterSettingsColor::setSearchFilter, this, _2));
 
     mSettingList = getChild<LLScrollListCtrl>("setting_list");
-    mSettingList->setCommitOnSelectionChange(TRUE);
+    mSettingList->setCommitOnSelectionChange(true);
     mSettingList->setCommitCallback(boost::bind(&ALFloaterSettingsColor::onSettingSelect, this));
 
     updateList();
 
     gSavedSettings.getControl("ColorSettingsHideDefault")->getCommitSignal()->connect(boost::bind(&ALFloaterSettingsColor::updateList, this, false));
 
-    return TRUE;
+    return LLFloater::postBuild();
 }
 
 void ALFloaterSettingsColor::draw()
@@ -145,13 +145,13 @@ void ALFloaterSettingsColor::updateControl(const std::string& color_name)
         mSettingNameText->setToolTip(color_name);
 
         LLColor4 clr = LLUIColorTable::instance().getColor(color_name);
-        mColorSwatch->setVisible(TRUE);
+        mColorSwatch->setVisible(true);
         // only set if changed so color picker doesn't update
         if (clr != LLColor4(mColorSwatch->getValue()))
         {
             mColorSwatch->setOriginal(clr);
         }
-        mAlphaSpinner->setVisible(TRUE);
+        mAlphaSpinner->setVisible(true);
         mAlphaSpinner->setLabel(std::string("Alpha"));
         if (!mAlphaSpinner->hasFocus())
         {

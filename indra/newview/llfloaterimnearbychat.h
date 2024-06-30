@@ -58,11 +58,11 @@ public:
 
     static LLFloaterIMNearbyChat* buildFloater(const LLSD& key);
 
-    /*virtual*/ BOOL postBuild() override;
+    /*virtual*/ bool postBuild() override;
     /*virtual*/ void onOpen(const LLSD& key) override;
     /*virtual*/ void onClose(bool app_quitting) override;
-    /*virtual*/ void setVisible(BOOL visible) override;
-    /*virtual*/ void setVisibleAndFrontmost(BOOL take_focus=TRUE, const LLSD& key = LLSD()) override;
+    /*virtual*/ void setVisible(bool visible) override;
+    /*virtual*/ void setVisibleAndFrontmost(bool take_focus=true, const LLSD& key = LLSD()) override;
     /*virtual*/ void closeHostedFloater() override;
 
     void    closeFloater(bool app_quitting = false) override;
@@ -81,15 +81,15 @@ public:
     LLChatEntry* getChatBox() { return mInputEditor; }
 
     std::string getCurrentChat();
-    S32 getMessageArchiveLength() {return mMessageArchive.size();}
+    S32 getMessageArchiveLength() { return static_cast<S32>(mMessageArchive.size()); }
 
-    BOOL handleKeyHere( KEY key, MASK mask ) override;
+    virtual bool handleKeyHere( KEY key, MASK mask ) override;
 
     static void startChat(const char* line);
     static void stopChat();
 
-    static void sendChatFromViewer(const std::string &utf8text, EChatType type, BOOL animate);
-    static void sendChatFromViewer(const LLWString &wtext, EChatType type, BOOL animate);
+    static void sendChatFromViewer(const std::string &utf8text, EChatType type, bool animate);
+    static void sendChatFromViewer(const LLWString &wtext, EChatType type, bool animate);
 
     template <class T>
     static void processChat(T* editor, EChatType type, std::function<void(const LLWString&)> func = nullptr);
@@ -97,7 +97,7 @@ public:
     static bool isWordsName(const std::string& name);
 
 // [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
-    /*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     typedef boost::signals2::signal<void (LLUICtrl* ctrl, S32 width, S32 height)> reshape_signal_t;
     boost::signals2::connection setReshapeCallback(const reshape_signal_t::slot_type& cb);
@@ -107,7 +107,7 @@ public:
     void changeChannelLabel(S32 channel);
 
 protected:
-    static BOOL matchChatTypeTrigger(const std::string& in_str, std::string* out_str);
+    static bool matchChatTypeTrigger(const std::string& in_str, std::string* out_str);
     void onChatBoxKeystroke();
     void onChatBoxFocusLost();
     void onChatBoxFocusReceived();

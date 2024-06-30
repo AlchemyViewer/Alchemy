@@ -94,7 +94,7 @@ public:
 
 
     virtual ~LLComboBox();
-    /*virtual*/ BOOL postBuild() override;
+    /*virtual*/ bool postBuild() override;
 
 protected:
     friend class LLUICtrlFactory;
@@ -111,19 +111,19 @@ public:
     // LLView interface
     void    onFocusLost() override;
 
-    BOOL    handleToolTip(S32 x, S32 y, MASK mask) override;
-    BOOL    handleKeyHere(KEY key, MASK mask) override;
-    BOOL    handleUnicodeCharHere(llwchar uni_char) override;
-    BOOL    handleScrollWheel(S32 x, S32 y, S32 clicks) final override;
+    bool    handleToolTip(S32 x, S32 y, MASK mask) override;
+    bool    handleKeyHere(KEY key, MASK mask) override;
+    bool    handleUnicodeCharHere(llwchar uni_char) override;
+    bool    handleScrollWheel(S32 x, S32 y, S32 clicks) final override;
 
     // LLUICtrl interface
     void    clear() override;                   // select nothing
     void    onCommit() override;
-    BOOL    acceptsTextInput() const override { return mAllowTextEntry; }
-    BOOL    isDirty() const override;           // Returns TRUE if the user has modified this control.
+    bool    acceptsTextInput() const override { return mAllowTextEntry; }
+    bool    isDirty() const override;           // Returns true if the user has modified this control.
     void    resetDirty() override;              // Clear dirty state
 
-    void    setFocus(BOOL b) override;
+    void    setFocus(bool b) override;
 
     // Selects item by underlying LLSD value, using LLSD::asString() matching.
     // For simple items, this is just the name of the label.
@@ -134,21 +134,21 @@ public:
     LLSD    getValue() const override;
 
     void            setTextEntry(const LLStringExplicit& text);
-    void            setKeystrokeOnEsc(BOOL enable);
+    void            setKeystrokeOnEsc(bool enable);
 
-    LLScrollListItem*   add(const std::string& name, EAddPosition pos = ADD_BOTTOM, BOOL enabled = TRUE);   // add item "name" to menu
-    LLScrollListItem*   add(const std::string& name, const LLUUID& id, EAddPosition pos = ADD_BOTTOM, BOOL enabled = TRUE);
-    LLScrollListItem*   add(const std::string& name, void* userdata, EAddPosition pos = ADD_BOTTOM, BOOL enabled = TRUE);
-    LLScrollListItem*   add(const std::string& name, LLSD value, EAddPosition pos = ADD_BOTTOM, BOOL enabled = TRUE);
+    LLScrollListItem*   add(const std::string& name, EAddPosition pos = ADD_BOTTOM, bool enabled = true);   // add item "name" to menu
+    LLScrollListItem*   add(const std::string& name, const LLUUID& id, EAddPosition pos = ADD_BOTTOM, bool enabled = true);
+    LLScrollListItem*   add(const std::string& name, void* userdata, EAddPosition pos = ADD_BOTTOM, bool enabled = true);
+    LLScrollListItem*   add(const std::string& name, LLSD value, EAddPosition pos = ADD_BOTTOM, bool enabled = true);
     LLScrollListItem*   addSeparator(EAddPosition pos = ADD_BOTTOM);
-    BOOL            remove( S32 index );    // remove item by index, return TRUE if found and removed
+    bool            remove( S32 index );    // remove item by index, return true if found and removed
     void            removeall() { clearRows(); }
     bool            itemExists(const std::string& name);
 
-    void            sortByName(BOOL ascending = TRUE); // Sort the entries in the combobox by name
+    void            sortByName(bool ascending = true); // Sort the entries in the combobox by name
 
-    // Select current item by name using selectItemByLabel.  Returns FALSE if not found.
-    BOOL            setSimple(const LLStringExplicit& name);
+    // Select current item by name using selectItemByLabel.  Returns false if not found.
+    bool            setSimple(const LLStringExplicit& name);
     // Get name of current item. Returns an empty string if not found.
     const std::string   getSimple() const;
     // Get contents of column x of selected row
@@ -167,12 +167,12 @@ public:
 // [/SL:KB]
 //  void            updateLabel();
 
-    BOOL            remove(const std::string& name);    // remove item "name", return TRUE if found and removed
+    bool            remove(const std::string& name);    // remove item "name", return true if found and removed
 
-    BOOL            setCurrentByIndex( S32 index );
+    bool            setCurrentByIndex( S32 index );
     S32             getCurrentIndex() const;
 
-    void            setEnabledByValue(const LLSD& value, BOOL enabled);
+    void            setEnabledByValue(const LLSD& value, bool enabled);
 
     void            createLineEditor(const Params&);
 
@@ -190,21 +190,21 @@ public:
     LLScrollListItem* addElement(const LLSD& value, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL) override;
     LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos = ADD_BOTTOM, const LLSD& id = LLSD()) override;
     void    clearRows() override;
-    void    sortByColumn(std::string_view name, BOOL ascending) override;
+    void    sortByColumn(std::string_view name, bool ascending) override;
 
     // LLCtrlSelectionInterface functions
-    BOOL    getCanSelect() const override               { return TRUE; }
-    BOOL    selectFirstItem() override                  { return setCurrentByIndex(0); }
-    BOOL    selectNthItem( S32 index ) override         { return setCurrentByIndex(index); }
-    BOOL    selectItemRange(S32 first, S32 last) override;
+    bool    getCanSelect() const override               { return true; }
+    bool    selectFirstItem() override                  { return setCurrentByIndex(0); }
+    bool    selectNthItem( S32 index ) override         { return setCurrentByIndex(index); }
+    bool    selectItemRange(S32 first, S32 last) override;
     S32     getFirstSelectedIndex() const override      { return getCurrentIndex(); }
-    BOOL    setCurrentByID( const LLUUID& id ) override;
+    bool    setCurrentByID( const LLUUID& id ) override;
     LLUUID  getCurrentID() const override;              // LLUUID::null if no items in menu
-    BOOL    setSelectedByValue(const LLSD& value, BOOL selected) override;
+    bool    setSelectedByValue(const LLSD& value, bool selected) override;
     LLSD    getSelectedValue() override;
-    BOOL    isSelected(const LLSD& value) const override;
-    BOOL    operateOnSelection(EOperation op) override;
-    BOOL    operateOnAll(EOperation op) override;
+    bool    isSelected(const LLSD& value) const override;
+    bool    operateOnSelection(EOperation op) override;
+    bool    operateOnAll(EOperation op) override;
 
     //========================================================================
 
@@ -221,7 +221,7 @@ public:
     */
     boost::signals2::connection setReturnCallback( const commit_signal_t::slot_type& cb ) { return mOnReturnSignal.connect(cb); }
 
-    void            setButtonVisible(BOOL visible);
+    void            setButtonVisible(bool visible);
 
     void            onButtonMouseDown();
     void            onListMouseUp();
@@ -241,13 +241,13 @@ protected:
     EPreferredPosition  mListPosition;
     LLPointer<LLUIImage>    mArrowImage;
     LLUIString          mLabel;
-    BOOL                mHasAutocompletedText;
+    bool                mHasAutocompletedText;
 
 private:
-    BOOL                mAllowTextEntry;
-    BOOL                mAllowNewValues;
+    bool                mAllowTextEntry;
+    bool                mAllowNewValues;
     S32                 mMaxChars;
-    BOOL                mTextEntryTentative;
+    bool                mTextEntryTentative;
     commit_callback_t   mPrearrangeCallback;
     commit_callback_t   mTextEntryCallback;
     commit_callback_t   mTextChangedCallback;

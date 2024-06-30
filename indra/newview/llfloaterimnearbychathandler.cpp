@@ -160,7 +160,7 @@ protected:
     {
         if (!toast) return;
         LL_DEBUGS("NearbyChat") << "Pooling toast" << LL_ENDL;
-        toast->setVisible(FALSE);
+        toast->setVisible(false);
         toast->stopTimer();
         toast->setIsHidden(true);
 
@@ -329,7 +329,7 @@ bool    LLFloaterIMNearbyChatScreenChannel::createPoolToast()
 void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
 {
     //look in pool. if there is any message
-    if(mStopProcessing)
+    if (mStopProcessing)
         return;
 
     if (mFloaterSnapRegion == NULL)
@@ -344,7 +344,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
     find last toast and check ID
     */
 
-    if(m_active_toasts.size())
+    if (m_active_toasts.size())
     {
         LLUUID fromID = chat["from_id"].asUUID();       // agent id or object id
         std::string from = chat["from"].asString();
@@ -353,7 +353,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
         {
             LLFloaterIMNearbyChatToastPanel* panel = dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(toast->getPanel());
 
-            if(panel && panel->messageID() == fromID && panel->getFromName() == from && panel->canAddText())
+            if (panel && panel->messageID() == fromID && panel->getFromName() == from && panel->canAddText())
             {
                 panel->addMessage(chat);
                 toast->reshapeToPanel();
@@ -367,7 +367,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
 
 
 
-    if(m_toast_pool.empty())
+    if (m_toast_pool.empty())
     {
         //"pool" is empty - create one more panel
         LL_DEBUGS("NearbyChat") << "Empty pool" << LL_ENDL;
@@ -379,14 +379,13 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
 
     int chat_type = chat["chat_type"].asInteger();
 
-    if( ((EChatType)chat_type == CHAT_TYPE_DEBUG_MSG))
+    if (chat_type == CHAT_TYPE_DEBUG_MSG)
     {
-        if(gSavedSettings.getBOOL("ShowScriptErrors") == FALSE)
+        if (!gSavedSettings.getBOOL("ShowScriptErrors"))
             return;
-        if(gSavedSettings.getS32("ShowScriptErrorsLocation")== 1)
+        if (gSavedSettings.getS32("ShowScriptErrorsLocation") == 1)
             return;
     }
-
 
     //take 1st element from pool, (re)initialize it, put it in active toasts
 
@@ -397,7 +396,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
 
 
     LLFloaterIMNearbyChatToastPanel* panel = dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(toast->getPanel());
-    if(!panel)
+    if (!panel)
         return;
     panel->init(chat);
 
@@ -506,7 +505,7 @@ void LLFloaterIMNearbyChatScreenChannel::arrangeToasts()
         if (toast)
     {
         toast->setIsHidden(false);
-        toast->setVisible(TRUE);
+        toast->setVisible(true);
         }
     }
 
@@ -648,11 +647,11 @@ void LLFloaterIMNearbyChatHandler::initChannel()
 void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
                                       const LLSD &args)
 {
-    if(chat_msg.mMuted == TRUE)
+    if (chat_msg.mMuted)
         return;
 
-    if(chat_msg.mText.empty())
-        return;//don't process empty messages
+    if (chat_msg.mText.empty())
+        return; // don't process empty messages
 
 // [RLVa:KB] - Checked: 2010-04-20 (RLVa-1.2.0f) | Modified: RLVa-1.2.0f
     if (RlvActions::isRlvEnabled())
@@ -662,12 +661,12 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
         if ( (!RlvActions::canShowLocation()) && (!tmp_chat.mRlvLocFiltered) && (CHAT_SOURCE_AGENT != tmp_chat.mSourceType) )
         {
             RlvUtil::filterLocation(tmp_chat.mText);
-            tmp_chat.mRlvLocFiltered = TRUE;
+            tmp_chat.mRlvLocFiltered = true;
         }
         if ( (!RlvActions::canShowName(RlvActions::SNC_DEFAULT)) && (!tmp_chat.mRlvNamesFiltered) && (CHAT_SOURCE_AGENT != tmp_chat.mSourceType) )
         {
             RlvUtil::filterNames(tmp_chat.mText);
-            tmp_chat.mRlvNamesFiltered = TRUE;
+            tmp_chat.mRlvNamesFiltered = true;
         }
     }
 // [/RLVa:KB]
@@ -705,9 +704,10 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
     // errors in separate window.
     if (chat_msg.mChatType == CHAT_TYPE_DEBUG_MSG)
     {
-        if (LLFloater::isQuitRequested()) return;
+        if (LLFloater::isQuitRequested())
+            return;
 
-        if(gSavedSettings.getBOOL("ShowScriptErrors") == FALSE)
+        if (!gSavedSettings.getBOOL("ShowScriptErrors"))
             return;
 
         // don't process debug messages from not owned objects, see EXT-7762
@@ -716,7 +716,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
             return;
         }
 
-        if (gSavedSettings.getS32("ShowScriptErrorsLocation")== 1)// show error in window //("ScriptErrorsAsChat"))
+        if (gSavedSettings.getS32("ShowScriptErrorsLocation") == 1)// show error in window //("ScriptErrorsAsChat"))
         {
 
             LLColor4 txt_color;
@@ -733,7 +733,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 
     nearby_chat->addMessage(chat_msg, true, args);
 
-    if(chat_msg.mSourceType == CHAT_SOURCE_AGENT
+    if (chat_msg.mSourceType == CHAT_SOURCE_AGENT
         && chat_msg.mFromID.notNull()
         && chat_msg.mFromID != gAgentID)
     {

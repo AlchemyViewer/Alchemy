@@ -53,7 +53,7 @@ if(WINDOWS)
     endif (ADDRESS_SIZE EQUAL 64)
 
     #*******************************
-    # Misc shared libs 
+    # Misc shared libs
 
     set(addrsfx "-x${ADDRESS_SIZE}")
 
@@ -97,10 +97,13 @@ if(WINDOWS)
         set(MSVC_VER 120)
     elseif (MSVC_VERSION GREATER_EQUAL 1910 AND MSVC_VERSION LESS 1920) # Visual Studio 2017
         set(MSVC_VER 140)
+        set(MSVC_TOOLSET_VER 141)
     elseif (MSVC_VERSION GREATER_EQUAL 1920 AND MSVC_VERSION LESS 1930) # Visual Studio 2019
         set(MSVC_VER 140)
+        set(MSVC_TOOLSET_VER 142)
     elseif (MSVC_VERSION GREATER_EQUAL 1930 AND MSVC_VERSION LESS 1950) # Visual Studio 2022
         set(MSVC_VER 140)
+        set(MSVC_TOOLSET_VER 143)
     else (MSVC80)
         MESSAGE(WARNING "New MSVC_VERSION ${MSVC_VERSION} of MSVC: adapt Copy3rdPartyLibs.cmake")
     endif (MSVC80)

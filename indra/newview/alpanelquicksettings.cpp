@@ -57,7 +57,7 @@ ALPanelQuickSettings::~ALPanelQuickSettings()
 }
 
 // virtual
-BOOL ALPanelQuickSettings::postBuild()
+bool ALPanelQuickSettings::postBuild()
 {
     refresh();
 

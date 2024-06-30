@@ -40,7 +40,7 @@ public:
 
     static LLPanelExperienceLog* create();
 
-    /*virtual*/ BOOL postBuild(void) override;
+    /*virtual*/ bool postBuild(void) override;
 
     void refresh() override;
 protected:

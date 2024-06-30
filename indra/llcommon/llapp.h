@@ -284,7 +284,7 @@ protected:
 
     static void setStatus(EAppStatus status);       // Use this to change the application status.
     static LLScalarCond<EAppStatus> sStatus; // Reflects current application status
-    static BOOL sDisableCrashlogger; // Let the OS handle crashes for us.
+    static bool sDisableCrashlogger; // Let the OS handle crashes for us.
 
     /**
       * @brief This method is called once a frame to do once a frame tasks.
@@ -323,7 +323,7 @@ private:
 #endif
 
 public:
-    static BOOL sLogInSignal;
+    static bool sLogInSignal;
 };
 
 #endif // LL_LLAPP_H

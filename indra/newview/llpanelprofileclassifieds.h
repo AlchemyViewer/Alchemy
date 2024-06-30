@@ -54,7 +54,7 @@ public:
     LLPublishClassifiedFloater(const LLSD& key);
     virtual ~LLPublishClassifiedFloater();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void setPrice(S32 price);
     S32 getPrice();
@@ -74,7 +74,7 @@ public:
     LLPanelProfileClassifieds();
     /*virtual*/ ~LLPanelProfileClassifieds();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void onOpen(const LLSD& key) override;
 
@@ -126,7 +126,7 @@ public:
 
     /*virtual*/ ~LLPanelProfileClassified();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void onOpen(const LLSD& key) override;
 
@@ -172,7 +172,7 @@ public:
 
     void setInfoLoaded(bool loaded) { mInfoLoaded = loaded; }
 
-    BOOL isDirty() const override;
+    bool isDirty() const override;
 
     void resetDirty() override;
 
@@ -194,7 +194,7 @@ public:
 
     S32 getPriceForListing() { return mPriceForListing; }
 
-    void setEditMode(BOOL edit_mode);
+    void setEditMode(bool edit_mode);
     bool getEditMode() {return mEditMode;}
 
     static void setClickThrough(

@@ -45,12 +45,6 @@
 # include "llfilepicker.h"
 #endif
 
-//
-// Globals
-//
-
-LLDirPicker LLDirPicker::sInstance;
-
 #if LL_WINDOWS
 #include <shlobj.h>
 #endif
@@ -93,20 +87,20 @@ void LLDirPicker::reset()
     mDir.clear();
 }
 
-BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
+bool LLDirPicker::getDir(std::string* filename, bool blocking)
 {
     if( mLocked )
     {
-        return FALSE;
+        return false;
     }
 
     // if local file browsing is turned off, return without opening dialog
     if ( check_local_file_access_enabled() == false )
     {
-        return FALSE;
+        return false;
     }
 
-    BOOL success = FALSE;
+    bool success = false;
 
     if (blocking)
     {
@@ -156,92 +150,93 @@ std::string LLDirPicker::getDirName()
 
 LLDirPicker::LLDirPicker() :
     mFileName(NULL),
-    mLocked(false)
+    mLocked(false),
+    pDialog(NULL)
 {
-    bi.hwndOwner = NULL;
-    bi.pidlRoot = NULL;
-    bi.pszDisplayName = NULL;
-    bi.lpszTitle = NULL;
-    bi.ulFlags = BIF_USENEWUI;
-    bi.lpfn = NULL;
-    bi.lParam = NULL;
-    bi.iImage = 0;
 }
 
 LLDirPicker::~LLDirPicker()
 {
-    // nothing
+    mEventListener.disconnect();
 }
 
-template <typename T>
-struct Release_Guard {
-    T* data;
-    Release_Guard(T* releasable) noexcept : data(releasable) {}
-    ~Release_Guard() { data->Release(); }
-};
-
-BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
+void LLDirPicker::reset()
 {
-    if( mLocked )
+    if (pDialog)
     {
-        return FALSE;
+        IFileDialog* p_file_dialog = (IFileDialog*)pDialog;
+        p_file_dialog->Close(S_FALSE);
+        pDialog = NULL;
+    }
+}
+
+bool LLDirPicker::getDir(std::string* filename, bool blocking)
+{
+    if (mLocked)
+    {
+        return false;
     }
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
-    BOOL success = FALSE;
-
+    bool success = false;
 
     if (blocking)
     {
         // Modal, so pause agent
         send_agent_pause();
     }
-
-    CoInitialize(0);
-
-    ::IFileOpenDialog* fileOpenDialog;
-
-    // Create dialog
-    if (SUCCEEDED(::CoCreateInstance(::CLSID_FileOpenDialog,
-        nullptr,
-        CLSCTX_ALL,
-        ::IID_IFileOpenDialog,
-        reinterpret_cast<void**>(&fileOpenDialog))))
+    else if (!mEventListener.connected())
     {
-        Release_Guard<::IFileOpenDialog> fileOpenDialogGuard(fileOpenDialog);
-
-        FILEOPENDIALOGOPTIONS existingOptions;
-        if (SUCCEEDED(fileOpenDialog->GetOptions(&existingOptions)))
-        {
-            if (SUCCEEDED(fileOpenDialog->SetOptions(existingOptions | (::FOS_FORCEFILESYSTEM | ::FOS_PICKFOLDERS))))
+        mEventListener = LLEventPumps::instance().obtain("LLApp").listen(
+            "DirPicker",
+            [this](const LLSD& stat)
             {
-                // Show the dialog to the user
-                const HRESULT result = fileOpenDialog->Show(nullptr);
-                if (result != HRESULT_FROM_WIN32(ERROR_CANCELLED) && SUCCEEDED(result))
+                std::string status(stat["status"]);
+                if (status != "running")
                 {
-                    // Get the shell item result
-                    ::IShellItem* psiResult;
-                    if (SUCCEEDED(fileOpenDialog->GetResult(&psiResult)))
-                    {
-                        Release_Guard<::IShellItem> psiResultGuard(psiResult);
-                        wchar_t* filePath;
-                        if (SUCCEEDED(psiResult->GetDisplayName(::SIGDN_FILESYSPATH, &filePath)))
-                        {
-                            mDir = ll_convert_wide_to_string(std::wstring(filePath));
-                            success = TRUE;
-                        }
-                    }
+                    reset();
                 }
-            }
-        }
+                return false;
+            });
     }
 
-    CoUninitialize();
+    ::OleInitialize(NULL);
+
+    IFileDialog* p_file_dialog;
+    if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&p_file_dialog))))
+    {
+        DWORD dwOptions;
+        if (SUCCEEDED(p_file_dialog->GetOptions(&dwOptions)))
+        {
+            p_file_dialog->SetOptions(dwOptions | FOS_PICKFOLDERS);
+        }
+        HWND owner = (HWND)gViewerWindow->getPlatformWindow();
+        pDialog = p_file_dialog;
+        if (SUCCEEDED(p_file_dialog->Show(owner)))
+        {
+            IShellItem* psi;
+            if (SUCCEEDED(p_file_dialog->GetResult(&psi)))
+            {
+                wchar_t* pwstr = NULL;
+                if (SUCCEEDED(psi->GetDisplayName(SIGDN_FILESYSPATH, &pwstr)))
+                {
+                    mDir = ll_convert_wide_to_string(pwstr);
+                    CoTaskMemFree(pwstr);
+                    success = true;
+                }
+                psi->Release();
+            }
+        }
+        pDialog = NULL;
+        p_file_dialog->Release();
+    }
+
+    ::OleUninitialize();
 
     if (blocking)
     {
@@ -282,7 +277,7 @@ void LLDirPicker::reset()
 
 
 //static
-BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
+bool LLDirPicker::getDir(std::string* filename, bool blocking)
 {
     LLFilePicker::ELoadFilter filter=LLFilePicker::FFLOAD_DIRECTORY;
 
@@ -316,14 +311,14 @@ void LLDirPicker::reset()
         mFilePicker->reset();
 }
 
-BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
+bool LLDirPicker::getDir(std::string* filename, bool blocking)
 {
     reset();
 
     // if local file browsing is turned off, return without opening dialog
-    if ( check_local_file_access_enabled() == false )
+    if (!check_local_file_access_enabled())
     {
-        return FALSE;
+        return false;
     }
 
 #if !LL_MESA_HEADLESS
@@ -333,7 +328,7 @@ BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
     }
 #endif // !LL_MESA_HEADLESS
 
-    return FALSE;
+    return false;
 }
 
 std::string LLDirPicker::getDirName()
@@ -361,9 +356,9 @@ void LLDirPicker::reset()
 {
 }
 
-BOOL LLDirPicker::getDir(std::string* filename, bool blocking)
+bool LLDirPicker::getDir(std::string* filename, bool blocking)
 {
-    return FALSE;
+    return false;
 }
 
 std::string LLDirPicker::getDirName()

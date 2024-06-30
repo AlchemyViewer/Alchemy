@@ -199,7 +199,7 @@ protected:
     void addCommand(LLCommand * command);
 
 private:
-    typedef boost::unordered_flat_map<LLUUID, U32>      CommandIndexMap;
+    typedef boost::unordered_flat_map<LLUUID, size_t>    CommandIndexMap;
     typedef std::vector<LLCommand *>    CommandVector;
 
     CommandVector   mCommands;

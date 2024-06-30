@@ -116,7 +116,7 @@ BDFloaterPoseCreator::~BDFloaterPoseCreator()
 {
 }
 
-BOOL BDFloaterPoseCreator::postBuild()
+bool BDFloaterPoseCreator::postBuild()
 {
     std::string pathname = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "animations");
     if (!gDirUtilp->fileExists(pathname))
@@ -129,20 +129,20 @@ BOOL BDFloaterPoseCreator::postBuild()
                         this->getChild<LLScrollListCtrl>("cv_scroll", true),
                         this->getChild<LLScrollListCtrl>("attach_scroll", true) } };
 
-    mJointScrolls[JOINTS]->setCommitOnSelectionChange(TRUE);
+    mJointScrolls[JOINTS]->setCommitOnSelectionChange(true);
     mJointScrolls[JOINTS]->setCommitCallback(boost::bind(&BDFloaterPoseCreator::onKeyframeRefresh, this));
     mJointScrolls[JOINTS]->setDoubleClickCallback(boost::bind(&BDFloaterPoseCreator::onJointChangeState, this));
 
     //BD - Collision Volumes
-    mJointScrolls[COLLISION_VOLUMES]->setCommitOnSelectionChange(TRUE);
+    mJointScrolls[COLLISION_VOLUMES]->setCommitOnSelectionChange(true);
     mJointScrolls[COLLISION_VOLUMES]->setCommitCallback(boost::bind(&BDFloaterPoseCreator::onKeyframeRefresh, this));
 
     //BD - Attachment Bones
-    mJointScrolls[ATTACHMENT_BONES]->setCommitOnSelectionChange(TRUE);
+    mJointScrolls[ATTACHMENT_BONES]->setCommitOnSelectionChange(true);
     mJointScrolls[ATTACHMENT_BONES]->setCommitCallback(boost::bind(&BDFloaterPoseCreator::onKeyframeRefresh, this));
 
     mKeyframeScroll = this->getChild<LLScrollListCtrl>("keyframe_scroll", true);
-    mKeyframeScroll->setCommitOnSelectionChange(TRUE);
+    mKeyframeScroll->setCommitOnSelectionChange(true);
     mKeyframeScroll->setCommitCallback(boost::bind(&BDFloaterPoseCreator::onKeyframeSelect, this));
 
     mTimelineScroll = this->getChild<LLScrollListCtrl>("timeframe_scroll", true);
@@ -178,7 +178,7 @@ BOOL BDFloaterPoseCreator::postBuild()
         gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance());
     mJointScrolls[JOINTS]->setContextMenu(LLScrollListCtrl::MENU_EXTERNAL, joint_menu);
 
-    return TRUE;
+    return true;
 }
 
 void BDFloaterPoseCreator::draw()
@@ -599,7 +599,7 @@ void BDFloaterPoseCreator::onKeyframeAdd()
 
     std::vector<LLScrollListItem*> items = mJointScrolls[JOINTS]->getAllSelected();
     LLScrollListItem* item = mKeyframeScroll->getFirstSelected();
-    MASK mask = gKeyboard->currentMask(TRUE);
+    MASK mask = gKeyboard->currentMask(true);
     bool multiple = (items.size() > 1);
     S32 new_selected_idx = (mask == MASK_SHIFT || multiple) ? mKeyframeScroll->getChildCount() - 1 : mKeyframeScroll->getFirstSelectedIndex() + 1;
     S32 modifier_idx = mModifierTabs->getCurrentPanelIndex();
@@ -622,7 +622,7 @@ void BDFloaterPoseCreator::onKeyframeAdd()
         if (modifier_idx == 0)
         {
             //BD - Put the key at the end of the list if SHIFT is held while pressing the add key button.
-            if (multiple || joint_motion->mRotationCurve.mNumKeys == 0 || gKeyboard->currentMask(TRUE) == MASK_SHIFT)
+            if (multiple || joint_motion->mRotationCurve.mNumKeys == 0 || gKeyboard->currentMask(true) == MASK_SHIFT)
             {
                 //BD - Add a bit of time to differentiate the keys.
                 //     This also kinda determines if this is the first keyframe or not. If we can't find a previous
@@ -639,7 +639,7 @@ void BDFloaterPoseCreator::onKeyframeAdd()
                 joint_motion->mRotationCurve.mKeys[joint_motion->mRotationCurve.mNumKeys] = rotation_key;
             }
             //BD - Conversely put the key at the start of the list if CTRL is held while adding a key.
-            else if (gKeyboard->currentMask(TRUE) == MASK_CONTROL)
+            else if (gKeyboard->currentMask(true) == MASK_CONTROL)
             {
                 LLKeyframeMotion::RotationCurve rot_curve;
 
@@ -702,7 +702,7 @@ void BDFloaterPoseCreator::onKeyframeAdd()
         else if (modifier_idx == 1)
         {
             //BD - Put the key at the end of the list if SHIFT is held while pressing the add key button.
-            if (multiple || joint_motion->mPositionCurve.mNumKeys == 0 || gKeyboard->currentMask(TRUE) == MASK_SHIFT)
+            if (multiple || joint_motion->mPositionCurve.mNumKeys == 0 || gKeyboard->currentMask(true) == MASK_SHIFT)
             {
                 //BD - Add a bit of time to differentiate the keys.
                 //     This also kinda determines if this is the first keyframe or not. If we can't find a previous
@@ -719,7 +719,7 @@ void BDFloaterPoseCreator::onKeyframeAdd()
                 joint_motion->mPositionCurve.mKeys[joint_motion->mPositionCurve.mNumKeys] = position_key;
             }
             //BD - Conversely put the key at the start of the list if CTRL is held while adding a key.
-            else if (gKeyboard->currentMask(TRUE) == MASK_CONTROL)
+            else if (gKeyboard->currentMask(true) == MASK_CONTROL)
             {
                 LLKeyframeMotion::PositionCurve pos_curve;
 
@@ -785,7 +785,7 @@ void BDFloaterPoseCreator::onKeyframeAdd()
             //LLKeyframeMotion::ScaleKey scale_key = LLKeyframeMotion::ScaleKey(ll_round(time, 0.001f), joint->getScale());
 
             //BD - Put the key at the end of the list if SHIFT is held while pressing the add key button.
-            if (multiple || joint_motion->mScaleCurve.mNumKeys == 0 || gKeyboard->currentMask(TRUE) == MASK_SHIFT)
+            if (multiple || joint_motion->mScaleCurve.mNumKeys == 0 || gKeyboard->currentMask(true) == MASK_SHIFT)
             {
                 //BD - Add a bit of time to differentiate the keys.
                 //     This also kinda determines if this is the first keyframe or not. If we can't find a previous
@@ -802,7 +802,7 @@ void BDFloaterPoseCreator::onKeyframeAdd()
                 joint_motion->mScaleCurve.mKeys[joint_motion->mScaleCurve.mNumKeys] = scale_key;
             }
             //BD - Conversely put the key at the start of the list if CTRL is held while adding a key.
-            else if (gKeyboard->currentMask(TRUE) == MASK_CONTROL)
+            else if (gKeyboard->currentMask(true) == MASK_CONTROL)
             {
                 LLKeyframeMotion::ScaleCurve scale_curve;
 
@@ -1447,7 +1447,7 @@ void BDFloaterPoseCreator::onJointRefresh()
             row["columns"][COL_NAME]["column"] = "joint";
             row["columns"][COL_NAME]["value"] = getString("title_" + joint_name);
             LLScrollListItem* element = mJointScrolls[JOINTS]->addElement(row);
-            element->setEnabled(FALSE);
+            element->setEnabled(false);
         }
 
         row["columns"][COL_ICON]["column"] = "icon";
@@ -2173,7 +2173,7 @@ void BDFloaterPoseCreator::onJointRotPosScaleReset()
                             {
                                 //BD - We also need to find the opposite joint's list entry and change its values to reflect
                                 //     the new ones, doing this here is still better than causing a complete refresh.
-                                LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+                                LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, false, COL_NAME);
                                 if (item2)
                                 {
                                     col_rot_x = item2->getColumn(COL_ROT_X);
@@ -2277,7 +2277,7 @@ void BDFloaterPoseCreator::onJointRotationReset()
                     {
                         //BD - We also need to find the opposite joint's list entry and change its values to reflect
                         //     the new ones, doing this here is still better than causing a complete refresh.
-                        LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+                        LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, false, COL_NAME);
                         if (item2)
                         {
                             col_x = item2->getColumn(COL_ROT_X);
@@ -2428,7 +2428,7 @@ void BDFloaterPoseCreator::onJointRotationRevert()
                     {
                         //BD - We also need to find the opposite joint's list entry and change its values to reflect
                         //     the new ones, doing this here is still better than causing a complete refresh.
-                        LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+                        LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, false, COL_NAME);
                         if (item2)
                         {
                             col_rot_x = item2->getColumn(COL_ROT_X);
@@ -2489,7 +2489,7 @@ void BDFloaterPoseCreator::onFlipPose()
             mirror_joint = gDragonAnimator.mTargetAvatar->mRoot->findJoint(mirror_joint_name);
 
         //BD - Collect the joint and mirror joint entries and their cells, we need them later.
-        LLScrollListItem* item1 = mJointScrolls[JOINTS]->getItemByLabel(joint_name, FALSE, COL_NAME);
+        LLScrollListItem* item1 = mJointScrolls[JOINTS]->getItemByLabel(joint_name, false, COL_NAME);
         LLScrollListItem* item2 = nullptr;
 
         //BD - Get the rotation of our current bone and that of the mirror bone (if available).
@@ -2508,7 +2508,7 @@ void BDFloaterPoseCreator::onFlipPose()
             mirror_joint->setTargetRotation(inv_rot_quat);
             joint->setTargetRotation(inv_mirror_rot_quat);
 
-            item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+            item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, false, COL_NAME);
 
             //BD - Make sure we flag this bone as flipped so we skip it next time we iterate over it.
             flipped[mirror_joint->getJointNum()] = true;
@@ -2813,7 +2813,7 @@ LLKeyframeMotion* BDFloaterPoseCreator::onReadyTempMotion(std::string filename, 
 {
     std::string outfilename = gDirUtilp->getExpandedFilename(LL_PATH_ANIMATIONS, filename);
     S32 file_size;
-    BOOL success = FALSE;
+    bool success = false;
     LLAPRFile infile;
     LLKeyframeMotion* mTempMotion = NULL;
     LLAssetID mMotionID;

@@ -48,7 +48,7 @@ class LLTexLayerParam : public LLViewerVisualParam
 public:
     LLTexLayerParam(LLTexLayerInterface *layer);
     LLTexLayerParam(LLAvatarAppearance *appearance);
-    /*virtual*/ BOOL setInfo(LLViewerVisualParamInfo *info, BOOL add_to_appearance);
+    /*virtual*/ bool setInfo(LLViewerVisualParamInfo *info, bool add_to_appearance);
     /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable) const = 0;
 
 protected:
@@ -74,7 +74,7 @@ public:
     /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable = nullptr) const override;
 
     // LLVisualParam Virtual functions
-    ///*virtual*/ BOOL      parseData(LLXmlTreeNode* node);
+    ///*virtual*/ bool      parseData(LLXmlTreeNode* node);
     /*virtual*/ void        apply( ESex avatar_sex ) override {}
     /*virtual*/ void        setWeight(F32 weight) override;
     /*virtual*/ void        setAnimationTarget(F32 target_value) override;
@@ -89,10 +89,10 @@ public:
     /*virtual*/ const LLVector4a*   getNextDistortion(U32 *index, LLPolyMesh **poly_mesh) override { if( index ){ *index = 0;} if( poly_mesh ){ *poly_mesh = NULL; } return NULL; };
 
     // New functions
-    BOOL                    render( S32 x, S32 y, S32 width, S32 height );
-    BOOL                    getSkip() const;
+    bool                    render( S32 x, S32 y, S32 width, S32 height );
+    bool                    getSkip() const;
     void                    deleteCaches();
-    BOOL                    getMultiplyBlend() const;
+    bool                    getMultiplyBlend() const;
 
 private:
     LLTexLayerParamAlpha(const LLTexLayerParamAlpha& pOther);
@@ -100,8 +100,8 @@ private:
     LLPointer<LLGLTexture>  mCachedProcessedTexture;
     LLPointer<LLImageTGA>   mStaticImageTGA;
     LLPointer<LLImageRaw>   mStaticImageRaw;
-    std::atomic<BOOL>       mNeedsCreateTexture;
-    BOOL                    mStaticImageInvalid;
+    std::atomic<bool>       mNeedsCreateTexture;
+    bool                    mStaticImageInvalid;
     LL_ALIGN_16(LLVector4a              mAvgDistortionVec);
     F32                     mCachedEffectiveWeight;
 
@@ -120,12 +120,12 @@ public:
     LLTexLayerParamAlphaInfo();
     /*virtual*/ ~LLTexLayerParamAlphaInfo() = default;
 
-    /*virtual*/ BOOL parseXml(LLXmlTreeNode* node) override;
+    /*virtual*/ bool parseXml(LLXmlTreeNode* node) override;
 
 private:
     std::string             mStaticImageFileName;
-    BOOL                    mMultiplyBlend;
-    BOOL                    mSkipIfZeroWeight;
+    bool                    mMultiplyBlend;
+    bool                    mSkipIfZeroWeight;
     F32                     mDomain;
 };
 //
@@ -157,7 +157,7 @@ public:
     /*virtual*/ LLViewerVisualParam* cloneParam(LLWearable* wearable = NULL) const override;
 
     // LLVisualParam Virtual functions
-    ///*virtual*/ BOOL          parseData(LLXmlTreeNode* node);
+    ///*virtual*/ bool          parseData(LLXmlTreeNode* node);
     /*virtual*/ void            apply( ESex avatar_sex ) override {}
     /*virtual*/ void            setWeight(F32 weight) override;
     /*virtual*/ void            setAnimationTarget(F32 target_value) override;
@@ -189,7 +189,7 @@ class LLTexLayerParamColorInfo final : public LLViewerVisualParamInfo
 public:
     LLTexLayerParamColorInfo();
     virtual ~LLTexLayerParamColorInfo() = default;
-    BOOL parseXml( LLXmlTreeNode* node ) override;
+    bool parseXml( LLXmlTreeNode* node ) override;
     LLTexLayerParamColor::EColorOperation getOperation() const { return mOperation; }
 private:
     enum { MAX_COLOR_VALUES = 20 };

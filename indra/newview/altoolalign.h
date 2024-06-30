@@ -23,10 +23,10 @@ class ALToolAlign final
 public:
     void    handleSelect() override;
     void    handleDeselect() override;
-    BOOL    handleMouseDown(S32 x, S32 y, MASK mask) override;
-    BOOL    handleHover(S32 x, S32 y, MASK mask) override;
+    bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool    handleHover(S32 x, S32 y, MASK mask) override;
     void    render() override;
-    BOOL    canAffectSelection();
+    bool    canAffectSelection();
 
     static void pickCallback(const LLPickInfo& pick_info);
 
@@ -34,7 +34,7 @@ private:
     void            align();
     void            computeManipulatorSize();
     void            renderManipulators();
-    BOOL            findSelectedManipulator(S32 x, S32 y);
+    bool            findSelectedManipulator(S32 x, S32 y);
 
     LLBBox          mBBox;
     F32             mManipulatorSize;

@@ -66,11 +66,11 @@ bool LLEasyMessageSender::sendLLUDPMessage(const LLHost& region_host, const std:
     std::string dir_str = tokens[0];
     LLStringUtil::toUpper(dir_str);
 
-    BOOL outgoing;
+    bool outgoing;
     if(dir_str == "OUT") {
-        outgoing = TRUE;
+        outgoing = true;
     } else if(dir_str == "IN") {
-        outgoing = FALSE;
+        outgoing = false;
     } else {
         LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", "Expected direction 'in' or 'out'"));
         return false;
@@ -146,12 +146,12 @@ bool LLEasyMessageSender::sendLLUDPMessage(const LLHost& region_host, const std:
                 //check if this is a hex value
                 if(value.substr(0, 1) == "|")
                 {
-                    pv.hex = TRUE;
+                    pv.hex = true;
                     value = value.substr(1);
                     LLStringUtil::trim(value);
                 }
                 else
-                    pv.hex = FALSE;
+                    pv.hex = false;
 
                 pv.name = std::move(field);
                 pv.value = std::move(value);
@@ -443,11 +443,11 @@ void LLEasyMessageSender::addonAddHexField(const std::string& name, const std::s
 }
 #endif // ALCH_ADDON_API
 
-BOOL LLEasyMessageSender::addField(e_message_variable_type var_type, const char* var_name, std::string input, BOOL hex) const
+bool LLEasyMessageSender::addField(e_message_variable_type var_type, const char* var_name, std::string input, bool hex) const
 {
     LLStringUtil::trim(input);
     if(input.length() < 1 && var_type != MVT_VARIABLE)
-        return FALSE;
+        return false;
     U8 valueU8;
     U16 valueU16;
     U32 valueU32;
@@ -463,7 +463,7 @@ BOOL LLEasyMessageSender::addField(e_message_variable_type var_type, const char*
     LLVector4 valueVector4;
     LLQuaternion valueQuaternion;
     LLUUID valueLLUUID;
-    BOOL valueBOOL;
+    bool valueBOOL;
     std::string input_lower = input;
     LLStringUtil::toLower(input_lower);
 
@@ -501,12 +501,12 @@ BOOL LLEasyMessageSender::addField(e_message_variable_type var_type, const char*
     if(hex)
     {
         if(var_type != MVT_VARIABLE && var_type != MVT_FIXED)
-            return FALSE;
+            return false;
 
         int         len  = input_lower.length();
         const char* cstr = input_lower.c_str();
         std::string new_input;
-        BOOL        nibble = FALSE;
+        bool        nibble = false;
         char        byte   = 0;
 
         for(int i = 0; i < len; i++)
@@ -517,7 +517,7 @@ BOOL LLEasyMessageSender::addField(e_message_variable_type var_type, const char*
             else if(c >= 0x61 && c <= 0x66)
                 c -= 0x57;
             else if(c != 0x20)
-                return FALSE;
+                return false;
             else
                 continue;
             if(!nibble)
@@ -528,7 +528,7 @@ BOOL LLEasyMessageSender::addField(e_message_variable_type var_type, const char*
         }
 
         if(nibble)
-            return FALSE;
+            return false;
 
         input = std::move(new_input);
     }
@@ -540,133 +540,133 @@ BOOL LLEasyMessageSender::addField(e_message_variable_type var_type, const char*
     {
     case MVT_U8:
         if(input.substr(0, 1) == "-")
-            return FALSE;
+            return false;
         if((stream >> valueU32).fail())
-            return FALSE;
+            return false;
         valueU8 = (U8)valueU32;
         gMessageSystem->addU8(var_name, valueU8);
-        return TRUE;
+        return true;
         break;
     case MVT_U16:
         if(input.substr(0, 1) == "-")
-            return FALSE;
+            return false;
         if((stream >> valueU16).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addU16(var_name, valueU16);
-        return TRUE;
+        return true;
         break;
     case MVT_U32:
         if(input.substr(0, 1) == "-")
-            return FALSE;
+            return false;
         if((stream >> valueU32).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addU32(var_name, valueU32);
-        return TRUE;
+        return true;
         break;
     case MVT_U64:
         if(input.substr(0, 1) == "-")
-            return FALSE;
+            return false;
         if((stream >> valueU64).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addU64(var_name, valueU64);
-        return TRUE;
+        return true;
         break;
     case MVT_S8:
         if((stream >> valueS8).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addS8(var_name, valueS8);
-        return TRUE;
+        return true;
         break;
     case MVT_S16:
         if((stream >> valueS16).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addS16(var_name, valueS16);
-        return TRUE;
+        return true;
         break;
     case MVT_S32:
         if((stream >> valueS32).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addS32(var_name, valueS32);
-        return TRUE;
+        return true;
         break;
     /*
     case MVT_S64:
         if((stream >> valueS64).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addS64(var_name, valueS64);
-        return TRUE;
+        return true;
         break;
     */
     case MVT_F32:
         if((stream >> valueF32).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addF32(var_name, valueF32);
-        return TRUE;
+        return true;
         break;
     case MVT_F64:
         if((stream >> valueF64).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addF64(var_name, valueF64);
-        return TRUE;
+        return true;
         break;
     case MVT_LLVector3:
         LLStringUtil::trim(input);
         if(input.substr(0, 1) != "<" || input.substr(input.length() - 1, 1) != ">")
-            return FALSE;
+            return false;
         tokens = split(input.substr(1, input.length() - 2), ",");
         if(tokens.size() != 3)
-            return FALSE;
+            return false;
         for(int i = 0; i < 3; i++)
         {
             stream.clear();
             stream.str(tokens[i]);
             if((stream >> valueF32).fail())
-                return FALSE;
+                return false;
             valueVector3.mV[i] = valueF32;
         }
         gMessageSystem->addVector3(var_name, valueVector3);
-        return TRUE;
+        return true;
         break;
     case MVT_LLVector3d:
         LLStringUtil::trim(input);
         if(input.substr(0, 1) != "<" || input.substr(input.length() - 1, 1) != ">")
-            return FALSE;
+            return false;
         tokens = split(input.substr(1, input.length() - 2), ",");
         if(tokens.size() != 3)
-            return FALSE;
+            return false;
         for(int i = 0; i < 3; i++)
         {
             stream.clear();
             stream.str(tokens[i]);
             if((stream >> valueF64).fail())
-                return FALSE;
+                return false;
             valueVector3d.mdV[i] = valueF64;
         }
         gMessageSystem->addVector3d(var_name, valueVector3d);
-        return TRUE;
+        return true;
         break;
     case MVT_LLVector4:
         LLStringUtil::trim(input);
         if(input.substr(0, 1) != "<" || input.substr(input.length() - 1, 1) != ">")
-            return FALSE;
+            return false;
         tokens = split(input.substr(1, input.length() - 2), ",");
         if(tokens.size() != 4)
-            return FALSE;
+            return false;
         for(int i = 0; i < 4; i++)
         {
             stream.clear();
             stream.str(tokens[i]);
             if((stream >> valueF32).fail())
-                return FALSE;
+                return false;
             valueVector4.mV[i] = valueF32;
         }
         gMessageSystem->addVector4(var_name, valueVector4);
-        return TRUE;
+        return true;
         break;
     case MVT_LLQuaternion:
         LLStringUtil::trim(input);
         if(input.substr(0, 1) != "<" || input.substr(input.length() - 1, 1) != ">")
-            return FALSE;
+            return false;
         tokens = split(input.substr(1, input.length() - 2), ",");
         if(tokens.size() == 3)
         {
@@ -675,7 +675,7 @@ BOOL LLEasyMessageSender::addField(e_message_variable_type var_type, const char*
                 stream.clear();
                 stream.str(tokens[i]);
                 if((stream >> valueF32).fail())
-                    return FALSE;
+                    return false;
                 valueVector3.mV[i] = valueF32;
             }
             valueQuaternion.unpackFromVector3(valueVector3);
@@ -687,44 +687,44 @@ BOOL LLEasyMessageSender::addField(e_message_variable_type var_type, const char*
                 stream.clear();
                 stream.str(tokens[i]);
                 if((stream >> valueF32).fail())
-                    return FALSE;
+                    return false;
                 valueQuaternion.mQ[i] = valueF32;
             }
         }
         else
-            return FALSE;
+            return false;
 
         gMessageSystem->addQuat(var_name, valueQuaternion);
-        return TRUE;
+        return true;
         break;
     case MVT_LLUUID:
         if((stream >> valueLLUUID).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addUUID(var_name, valueLLUUID);
-        return TRUE;
+        return true;
         break;
     case MVT_BOOL:
         if(input_lower == "true")
-            valueBOOL = TRUE;
+            valueBOOL = true;
         else if(input_lower == "false")
-            valueBOOL = FALSE;
+            valueBOOL = false;
         else if((stream >> valueBOOL).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addBOOL(var_name, valueBOOL);
         //gMessageSystem->addU8(var_name, (U8)valueBOOL);
-        return TRUE;
+        return true;
         break;
     case MVT_IP_ADDR:
         if((stream >> valueU32).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addIPAddr(var_name, valueU32);
-        return TRUE;
+        return true;
         break;
     case MVT_IP_PORT:
         if((stream >> valueU16).fail())
-            return FALSE;
+            return false;
         gMessageSystem->addIPPort(var_name, valueU16);
-        return TRUE;
+        return true;
         break;
     case MVT_VARIABLE:
         if(!hex)
@@ -736,16 +736,16 @@ BOOL LLEasyMessageSender::addField(e_message_variable_type var_type, const char*
         {
             gMessageSystem->addBinaryData(var_name, input.c_str(), input.size());
         }
-        return TRUE;
+        return true;
         break;
     case MVT_FIXED:
         gMessageSystem->addBinaryData(var_name, input.c_str(), input.size());
-        return TRUE;
+        return true;
         break;
     default:
         break;
     }
-    return FALSE;
+    return false;
 }
 
 /* static */ void LLEasyMessageSender::printError(const std::string& error)

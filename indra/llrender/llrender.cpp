@@ -1088,7 +1088,7 @@ void LLRender::syncMatrices()
             {
                 LLMatrix4a inv_proj = mat;
                 inv_proj.invert();
-                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, FALSE, inv_proj.getF32ptr());
+                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, false, inv_proj.getF32ptr());
             }
 
             // Used by some full screen effects - such as full screen lights, glow, etc.

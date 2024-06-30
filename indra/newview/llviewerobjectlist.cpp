@@ -89,7 +89,7 @@
 #include <iterator>
 
 extern F32 gMinObjectDistance;
-extern BOOL gAnimateTextures;
+extern bool gAnimateTextures;
 
 #define MAX_CONCURRENT_PHYSICS_REQUESTS 256
 
@@ -110,7 +110,7 @@ LLViewerObjectList::LLViewerObjectList()
     mNumDeadObjects = 0;
     mNumOrphans = 0;
     mNumNewObjects = 0;
-    mWasPaused = FALSE;
+    mWasPaused = false;
     mNumDeadObjectUpdates = 0;
     mNumUnknownUpdates = 0;
 }
@@ -168,7 +168,7 @@ U64 LLViewerObjectList::getIndex(const U32 local_id,
     return (((U64)index) << 32) | (U64)local_id;
 }
 
-BOOL LLViewerObjectList::removeFromLocalIDTable(const LLViewerObject* objectp)
+bool LLViewerObjectList::removeFromLocalIDTable(const LLViewerObject* objectp)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
@@ -187,21 +187,21 @@ BOOL LLViewerObjectList::removeFromLocalIDTable(const LLViewerObject* objectp)
         auto iter = mIndexAndLocalIDToUUID.find(indexid);
         if (iter == mIndexAndLocalIDToUUID.end())
         {
-            return FALSE;
+            return false;
         }
 
         // Found existing entry
         if (iter->second == objectp->getID())
         {   // Full UUIDs match, so remove the entry
             mIndexAndLocalIDToUUID.erase(iter);
-            return TRUE;
+            return true;
         }
         // UUIDs did not match - this would zap a valid entry, so don't erase it
         //LL_INFOS() << "Tried to erase entry where id in table ("
         //      << iter->second << ") did not match object " << object.getID() << LL_ENDL;
     }
 
-    return FALSE ;
+    return false ;
 }
 
 void LLViewerObjectList::setUUIDAndLocal(const LLUUID &id,
@@ -403,7 +403,7 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
     else
     {
         objectp->setLastUpdateType(OUT_FULL_COMPRESSED); //newly cached
-        objectp->setLastUpdateCached(TRUE);
+        objectp->setLastUpdateCached(true);
     }
     LLVOAvatar::cullAvatarsByPixelArea();
 
@@ -483,7 +483,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 
     for (i = 0; i < num_objects; i++)
     {
-        BOOL justCreated = FALSE;
+        bool justCreated = false;
         bool update_cache = false; //update object cache if it is a full-update or terse update
 
         if (compressed)
@@ -691,7 +691,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                 continue;
             }
 
-            justCreated = TRUE;
+            justCreated = true;
             mNumNewObjects++;
         }
 
@@ -1427,7 +1427,7 @@ void LLViewerObjectList::cleanupReferences(LLViewerObject *objectp)
     if (objectp->onActiveList())
     {
         //LL_INFOS() << "Removing " << objectp->mID << " " << objectp->getPCodeString() << " from active list in cleanupReferences." << LL_ENDL;
-        objectp->setOnActiveList(FALSE);
+        objectp->setOnActiveList(false);
         removeFromActiveList(objectp);
     }
 
@@ -1439,7 +1439,7 @@ void LLViewerObjectList::cleanupReferences(LLViewerObject *objectp)
     // Don't clean up mObject references, these will be cleaned up more efficiently later!
 }
 
-BOOL LLViewerObjectList::killObject(LLViewerObject *objectp)
+bool LLViewerObjectList::killObject(LLViewerObject *objectp)
 {
     LL_PROFILE_ZONE_SCOPED;
     // Don't ever kill gAgentAvatarp, just force it to the agent's region
@@ -1447,7 +1447,7 @@ BOOL LLViewerObjectList::killObject(LLViewerObject *objectp)
     if ((objectp == gAgentAvatarp) && gAgent.getRegion())
     {
         objectp->setRegion(gAgent.getRegion());
-        return FALSE;
+        return false;
     }
 
     // When we're killing objects, all we do is mark them as dead.
@@ -1460,10 +1460,10 @@ BOOL LLViewerObjectList::killObject(LLViewerObject *objectp)
         // so create a pointer to make sure object will stay alive untill markDead() finishes
         LLPointer<LLViewerObject> sp(objectp);
         sp->markDead(); // does the right thing if object already dead
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
@@ -1483,7 +1483,7 @@ void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
     }
 
     // Have to clean right away because the region is becoming invalid.
-    cleanDeadObjects(FALSE);
+    cleanDeadObjects(false);
 }
 
 void LLViewerObjectList::killAllObjects()
@@ -1499,7 +1499,7 @@ void LLViewerObjectList::killAllObjects()
         llassert((objectp == gAgentAvatarp) || objectp->isDead());
     }
 
-    cleanDeadObjects(FALSE);
+    cleanDeadObjects(false);
 
     if(!mObjects.empty())
     {
@@ -1520,7 +1520,7 @@ void LLViewerObjectList::killAllObjects()
     }
 }
 
-void LLViewerObjectList::cleanDeadObjects(BOOL use_timer)
+void LLViewerObjectList::cleanDeadObjects(bool use_timer)
 {
     if (!mNumDeadObjects)
     {
@@ -1610,7 +1610,7 @@ void LLViewerObjectList::removeFromActiveList(LLViewerObject* objectp)
 
         objectp->setListIndex(-1);
 
-        S32 last_index = mActiveObjects.size()-1;
+        S32 last_index = static_cast<S32>(mActiveObjects.size()) - 1;
 
         if (idx != last_index)
         {
@@ -1631,7 +1631,7 @@ void LLViewerObjectList::updateActive(LLViewerObject *objectp)
         return; // We don't update dead objects!
     }
 
-    BOOL active = objectp->isActive();
+    bool active = objectp->isActive();
     if (active != objectp->onActiveList())
     {
         if (active)
@@ -1641,8 +1641,8 @@ void LLViewerObjectList::updateActive(LLViewerObject *objectp)
             if (idx <= -1)
             {
                 mActiveObjects.push_back(objectp);
-                objectp->setListIndex(mActiveObjects.size()-1);
-            objectp->setOnActiveList(TRUE);
+                objectp->setListIndex(static_cast<S32>(mActiveObjects.size()) - 1);
+            objectp->setOnActiveList(true);
         }
         else
         {
@@ -1660,7 +1660,7 @@ void LLViewerObjectList::updateActive(LLViewerObject *objectp)
         {
             //LL_INFOS() << "Removing " << objectp->mID << " " << objectp->getPCodeString() << " from active list." << LL_ENDL;
             removeFromActiveList(objectp);
-            objectp->setOnActiveList(FALSE);
+            objectp->setOnActiveList(false);
         }
     }
 
@@ -2000,7 +2000,7 @@ void LLViewerObjectList::renderObjectBounds(const LLVector3 &center)
 {
 }
 
-extern BOOL gCubeSnapshot;
+extern bool gCubeSnapshot;
 
 void LLViewerObjectList::addDebugBeacon(const LLVector3 &pos_agent,
                                         const std::string &string,
@@ -2155,7 +2155,7 @@ void LLViewerObjectList::orphanize(LLViewerObject *childp, U32 parent_id, U32 ip
 #endif
 
     // We're an orphan, flag things appropriately.
-    childp->mOrphaned = TRUE;
+    childp->mOrphaned = true;
     if (childp->mDrawable.notNull())
     {
         bool make_invisible = true;
@@ -2228,7 +2228,7 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
     }
 
     U64 parent_info = getIndex(objectp->mLocalID, ip, port);
-    BOOL orphans_found = FALSE;
+    bool orphans_found = false;
     // Iterate through the orphan list, and set parents of matching children.
 
     for (std::vector<OrphanInfo>::iterator iter = mOrphanChildren.begin(); iter != mOrphanChildren.end(); )
@@ -2262,7 +2262,7 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
             objectp->setChanged(LLXform::MOVED | LLXform::SILHOUETTE);
 
             // Flag the object as no longer orphaned
-            childp->mOrphaned = FALSE;
+            childp->mOrphaned = false;
             if (childp->mDrawable.notNull())
             {
                 // Make the drawable visible again and set the drawable parent
@@ -2272,10 +2272,10 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
             }
 
             // Make certain particles, icon and HUD aren't hidden
-            childp->hideExtraDisplayItems( FALSE );
+            childp->hideExtraDisplayItems( false );
 
             objectp->addChild(childp);
-            orphans_found = TRUE;
+            orphans_found = true;
             ++iter;
         }
         else

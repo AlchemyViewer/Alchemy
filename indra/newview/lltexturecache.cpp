@@ -96,7 +96,7 @@ private:
 
 public:
     LLTextureCacheWorker(LLTextureCache* cache, const LLUUID& id,
-                         U8* data, S32 datasize, S32 offset,
+                         const U8* data, S32 datasize, S32 offset,
                          S32 imagesize, // for writes
                          LLTextureCache::Responder* responder)
         : LLWorkerClass(cache, "LLTextureCacheWorker"),
@@ -108,7 +108,7 @@ public:
           mOffset(offset),
           mImageSize(imagesize),
           mImageFormat(IMG_CODEC_J2C),
-          mImageLocal(FALSE),
+          mImageLocal(false),
           mResponder(responder),
           mFileHandle(LLLFSThread::nullHandle()),
           mBytesToRead(0),
@@ -145,12 +145,12 @@ protected:
     LLUUID  mID;
 
     U8* mReadData;
-    U8* mWriteData;
+    const U8* mWriteData;
     S32 mDataSize;
     S32 mOffset;
     S32 mImageSize;
     EImageCodec mImageFormat;
-    BOOL mImageLocal;
+    bool mImageLocal;
     LLPointer<LLTextureCache::Responder> mResponder;
     LLLFSThread::handle_t mFileHandle;
     S32 mBytesToRead;
@@ -224,7 +224,7 @@ bool LLTextureCacheLocalFileWorker::doRead()
     else
     {
         mImageSize = local_size;
-        mImageLocal = TRUE;
+        mImageLocal = true;
     }
     return true;
 }
@@ -239,7 +239,7 @@ class LLTextureCacheRemoteWorker : public LLTextureCacheWorker
 {
 public:
     LLTextureCacheRemoteWorker(LLTextureCache* cache, const LLUUID& id,
-                         U8* data, S32 datasize, S32 offset,
+                         const U8* data, S32 datasize, S32 offset,
                          S32 imagesize, // for writes
                          LLPointer<LLImageRaw> raw, S32 discardlevel,
                          LLTextureCache::Responder* responder)
@@ -367,7 +367,7 @@ bool LLTextureCacheRemoteWorker::doRead()
             else
             {
                 mImageSize = local_size;
-                mImageLocal = TRUE;
+                mImageLocal = true;
             }
         }
         else
@@ -801,9 +801,9 @@ LLTextureCache::LLTextureCache(bool threaded)
       mHeaderAPRFile(NULL),
       mPrioritizeWriteListEmpty(true),
       mCompletedListEmpty(true),
-      mReadOnly(TRUE), //do not allow to change the texture cache until setReadOnly() is called.
+      mReadOnly(true), //do not allow to change the texture cache until setReadOnly() is called.
       mTexturesSizeTotal(0),
-      mDoPurge(FALSE),
+      mDoPurge(false),
       mFastCachep(NULL),
       mFastCachePoolp(NULL),
       mFastCachePadBuffer(NULL)
@@ -882,7 +882,7 @@ std::string LLTextureCache::getTextureFileName(const LLUUID& id)
 }
 
 //debug
-BOOL LLTextureCache::isInCache(const LLUUID& id)
+bool LLTextureCache::isInCache(const LLUUID& id)
 {
     LLMutexLock lock(&mHeaderMutex);
     id_map_t::const_iterator iter = mHeaderIDMap.find(id);
@@ -891,7 +891,7 @@ BOOL LLTextureCache::isInCache(const LLUUID& id)
 }
 
 //debug
-BOOL LLTextureCache::isInLocal(const LLUUID& id)
+bool LLTextureCache::isInLocal(const LLUUID& id)
 {
     S32 local_size = 0;
     std::string local_filename;
@@ -903,7 +903,7 @@ BOOL LLTextureCache::isInLocal(const LLUUID& id)
         local_size = LLAPRFile::size(local_filename, getLocalAPRFilePool());
         if (local_size > 0)
         {
-            return TRUE ;
+            return true ;
         }
     }
 
@@ -913,7 +913,7 @@ BOOL LLTextureCache::isInLocal(const LLUUID& id)
         local_size = LLAPRFile::size(local_filename, getLocalAPRFilePool());
         if (local_size > 0)
         {
-            return TRUE ;
+            return true ;
         }
     }
 
@@ -923,11 +923,11 @@ BOOL LLTextureCache::isInLocal(const LLUUID& id)
         local_size = LLAPRFile::size(local_filename, getLocalAPRFilePool());
         if (local_size > 0)
         {
-            return TRUE ;
+            return true ;
         }
     }
 
-    return FALSE ;
+    return false ;
 }
 //////////////////////////////////////////////////////////////////////////////
 
@@ -989,14 +989,14 @@ void LLTextureCache::purgeCache(ELLPath location, bool remove_dir)
 }
 
 //is called in the main thread before initCache(...) is called.
-void LLTextureCache::setReadOnly(BOOL read_only)
+void LLTextureCache::setReadOnly(bool read_only)
 {
     mReadOnly = read_only ;
 }
 
 // Called in the main thread.
 // Returns the unused amount of max_size if any
-S64 LLTextureCache::initCache(ELLPath location, S64 max_size, BOOL texture_cache_mismatch)
+S64 LLTextureCache::initCache(ELLPath location, S64 max_size, bool texture_cache_mismatch)
 {
     llassert_always(getPending() == 0) ; //should not start accessing the texture cache before initialized.
 
@@ -1321,7 +1321,7 @@ bool LLTextureCache::updateEntry(S32& idx, Entry& entry, S32 new_image_size, S32
 
         if (purge)
         {
-            mDoPurge = TRUE;
+            mDoPurge = true;
         }
     }
 
@@ -1385,13 +1385,13 @@ U32 LLTextureCache::openAndReadEntries(std::vector<Entry>& entries)
 
 void LLTextureCache::writeEntriesAndClose(const std::vector<Entry>& entries)
 {
-    S32 num_entries = entries.size();
+    auto num_entries = entries.size();
     llassert_always(num_entries == mHeaderEntriesInfo.mEntries);
 
     if (!mReadOnly)
     {
         LLAPRFile* aprfile = openHeaderEntriesFile(false, (S32)sizeof(EntriesInfo));
-        for (S32 idx=0; idx<num_entries; idx++)
+        for (size_t idx=0; idx<num_entries; idx++)
         {
             S32 bytes_written = aprfile->write((void*)(&entries[idx]), (S32)sizeof(Entry));
             if(bytes_written != sizeof(Entry))
@@ -1970,7 +1970,7 @@ bool LLTextureCache::readComplete(handle_t handle, bool abort)
 }
 
 LLTextureCache::handle_t LLTextureCache::writeToCache(const LLUUID& id,
-                                                      U8* data, S32 datasize, S32 imagesize,
+                                                      const U8* data, S32 datasize, S32 imagesize,
                                                       LLPointer<LLImageRaw> rawimage, S32 discardlevel,
                                                       WriteResponder* responder)
 {
@@ -2063,6 +2063,9 @@ LLPointer<LLImageRaw> LLTextureCache::readFromFastCache(const LLUUID& id, S32& d
 bool LLTextureCache::writeToFastCache(LLUUID image_id, S32 id, LLPointer<LLImageRaw> raw, S32 discardlevel)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+
+    LLImageDataSharedLock lock(raw);
+
     //rescale image if needed
     if (raw.isNull() || raw->isBufferInvalid() || !raw->getData())
     {
@@ -2146,7 +2149,7 @@ void LLTextureCache::openFastCache(bool first_time)
             {
                 mFastCachePadBuffer = (U8*)ll_aligned_malloc_16(TEXTURE_FAST_CACHE_ENTRY_SIZE);
             }
-            mFastCachePoolp = new LLVolatileAPRPool("Fast Cache Pool", FALSE); // is_local=false, thread safe mode due to crashes
+            mFastCachePoolp = new LLVolatileAPRPool("Fast Cache Pool", false); // is_local=false, thread safe mode due to crashes
             if (LLAPRFile::isExist(mFastCacheFileName, mFastCachePoolp))
             {
                 mFastCachep = new LLAPRFile(mFastCacheFileName, APR_READ|APR_WRITE|APR_BINARY, mFastCachePoolp) ;
@@ -2300,11 +2303,11 @@ bool LLTextureCache::removeFromCache(const LLUUID& id)
 
 LLTextureCache::ReadResponder::ReadResponder()
     : mImageSize(0),
-      mImageLocal(FALSE)
+      mImageLocal(false)
 {
 }
 
-void LLTextureCache::ReadResponder::setData(U8* data, S32 datasize, S32 imagesize, S32 imageformat, BOOL imagelocal)
+void LLTextureCache::ReadResponder::setData(U8* data, S32 datasize, S32 imagesize, S32 imageformat, bool imagelocal)
 {
     if (mFormattedImage.notNull())
     {

@@ -93,7 +93,7 @@ private:
     /* return instance if it exists - created by LLFloaterReg */
     static LLFloaterCamera* findInstance();
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     F32 getCurrentTransparency();
 
@@ -130,7 +130,7 @@ private:
     // remains true until preset camera mode is chosen, or pan button is clicked, or escape pressed
     static bool sFreeCamera;
     static bool sAppearanceEditing;
-    BOOL mClosed;
+    bool mClosed;
     ECameraControlMode mPrevMode;
     ECameraControlMode mCurrMode;
     std::map<ECameraControlMode, LLButton*> mMode2Button;
@@ -165,7 +165,7 @@ public:
         Optional<CommitCallbackParam> mousedown_callback;
         Params();
     };
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     /** setting on/off background icon to indicate selected state */
     /*virtual*/ void setValue(const LLSD& value);
     // sends commit signal

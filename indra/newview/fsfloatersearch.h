@@ -86,7 +86,7 @@ protected:
     const S32& getNumResultsReceived() const { return mResultsReceived; };
 
 private:
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     virtual ~FSPanelSearchPeople();
 
     void onBtnFind();
@@ -125,7 +125,7 @@ public:
     /*virtual*/ void focusDefaultElement();
 
 private:
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     virtual ~FSPanelSearchGroups();
 
     void onBtnFind();
@@ -159,7 +159,7 @@ public:
     /*virtual*/ void focusDefaultElement();
 
 private:
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     virtual ~FSPanelSearchPlaces();
 
     void onBtnFind();
@@ -192,7 +192,7 @@ public:
     static void processSearchReply(LLMessageSystem* msg, void**);
 
 private:
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     virtual ~FSPanelSearchLand();
 
     void onBtnFind();
@@ -227,7 +227,7 @@ public:
     /*virtual*/ void focusDefaultElement();
 
 private:
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     virtual ~FSPanelSearchClassifieds();
 
     void onBtnFind();
@@ -262,7 +262,7 @@ public:
     /*virtual*/ void focusDefaultElement();
 
 private:
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     virtual ~FSPanelSearchEvents();
 
     void onBtnFind();
@@ -298,7 +298,7 @@ class FSPanelSearchWeb : public FSSearchPanelBase
     LOG_CLASS(FSFloaterSearch);
 public:
     FSPanelSearchWeb();
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
     void loadURL(const SearchQuery &query);
     /*virtual*/ void focusDefaultElement();
     /*virtual*/ void draw();
@@ -335,7 +335,7 @@ public:
     FSFloaterSearch(const Params& key);
     ~FSFloaterSearch();
     void onOpen(const LLSD& key);
-    BOOL postBuild();
+    bool postBuild();
 
     void avatarNameUpdatedCallback(const LLUUID& id, const LLAvatarName& av_name);
     void groupNameUpdatedCallback(const LLUUID& id, const std::string& name, bool is_group);

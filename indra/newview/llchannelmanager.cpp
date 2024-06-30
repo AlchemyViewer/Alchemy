@@ -146,7 +146,7 @@ void LLChannelManager::onLoginCompleted()
             // init channel's position and size
             S32 channel_right_bound = gViewerWindow->getWorldViewRectScaled().mRight - gSavedSettings.getS32("NotificationChannelRightMargin");
             mStartUpChannel->init(channel_right_bound - NOTIFY_BOX_WIDTH, channel_right_bound);
-            if (gSkinSettings.getBool("LegacyNotificationWell"))
+            if (gSkinSettings.getBOOL("LegacyNotificationWell"))
             {
                 mStartUpChannel->setMouseDownCallback(boost::bind(&LLLegacyNotificationWellWindow::onStartUpToastClick,
                     LLLegacyNotificationWellWindow::getInstance(), _2, _3, _4));
@@ -170,7 +170,7 @@ void LLChannelManager::onStartUpToastClose()
 {
     if(mStartUpChannel)
     {
-        mStartUpChannel->setVisible(FALSE);
+        mStartUpChannel->setVisible(false);
         mStartUpChannel->closeStartUpToast();
         removeChannelByID(STARTUP_CHANNEL_UUID);
         mStartUpChannel = NULL;
@@ -270,8 +270,8 @@ LLNotificationsUI::LLScreenChannel* LLChannelManager::getNotificationScreenChann
 
     if (channel == NULL)
     {
-        LL_WARNS() << "Can't find screen channel by Notification Channel UUID" << LL_ENDL;
-        llassert(!"Can't find screen channel by Notification Channel UUID");
+        LL_WARNS() << "Can't find screen channel by NotificationChannelUUID" << LL_ENDL;
+        llassert(!"Can't find screen channel by NotificationChannelUUID");
     }
 
     return channel;

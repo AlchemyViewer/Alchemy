@@ -46,7 +46,7 @@ LLFloaterClearCache::LLFloaterClearCache(const LLSD& key)
 }
 
 // virtual
-BOOL LLFloaterClearCache::postBuild()
+bool LLFloaterClearCache::postBuild()
 {
     mOkButton = getChild<LLButton>("clear_selected");
     mOkButton->setCommitCallback(boost::bind(&LLFloaterClearCache::onBtnClearSelected, this));
@@ -109,7 +109,7 @@ void LLFloaterClearCache::onBtnClearSelected()
 
 void LLFloaterClearCache::onBtnClearAll()
 {
-    gSavedSettings.setBOOL("PurgeCacheOnNextStartup", TRUE);
+    gSavedSettings.setBOOL("PurgeCacheOnNextStartup", true);
     LLNotificationsUtil::add("CacheWillClear");
     closeFloater();
 }

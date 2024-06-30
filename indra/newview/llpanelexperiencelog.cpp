@@ -54,7 +54,7 @@ LLPanelExperienceLog::LLPanelExperienceLog(  )
     buildFromFile("panel_experience_log.xml");
 }
 
-BOOL LLPanelExperienceLog::postBuild( void )
+bool LLPanelExperienceLog::postBuild()
 {
     LLExperienceLog* log = LLExperienceLog::getInstance();
     mEventList = getChild<LLScrollListCtrl>("experience_log_list");
@@ -82,7 +82,7 @@ BOOL LLPanelExperienceLog::postBuild( void )
     mPageSize = log->getPageSize();
     refresh();
     mNewEvent = LLExperienceLog::instance().addUpdateSignal(boost::bind(&LLPanelExperienceLog::refresh, this));
-    return TRUE;
+    return true;
 }
 
 LLPanelExperienceLog* LLPanelExperienceLog::create()
@@ -102,14 +102,14 @@ void LLPanelExperienceLog::refresh()
         return;
     }
 
-    setAllChildrenEnabled(FALSE);
+    setAllChildrenEnabled(false);
 
     LLSD item;
     bool waiting = false;
     LLUUID waiting_id;
 
-    int itemsToSkip = mPageSize*mCurrentPage;
-    U32 items = 0;
+    unsigned int itemsToSkip = mPageSize*mCurrentPage;
+    unsigned int items = 0;
     bool moreItems = false;
 
     for (auto day = events.crbegin(), end_day = events.crend(); day != end_day; ++day)
@@ -120,7 +120,7 @@ void LLPanelExperienceLog::refresh()
                 continue;
         }
         const LLSD& dayArray = day->second;
-            int size = dayArray.size();
+            unsigned int size = static_cast<unsigned int>(dayArray.size());
             if(itemsToSkip > size)
             {
                 itemsToSkip -= size;
@@ -131,7 +131,7 @@ void LLPanelExperienceLog::refresh()
                 moreItems = true;
                 break;
             }
-            for(int i = dayArray.size() - itemsToSkip - 1; i >= 0; i--)
+            for(int i = static_cast<int>(dayArray.size()) - itemsToSkip - 1; i >= 0; i--)
             {
                 if(items >= mPageSize)
                 {
@@ -172,9 +172,9 @@ void LLPanelExperienceLog::refresh()
     }
     else
     {
-        setAllChildrenEnabled(TRUE);
+        setAllChildrenEnabled(true);
 
-        mEventList->setEnabled(TRUE);
+        mEventList->setEnabled(true);
         getChild<LLButton>("btn_next")->setEnabled(moreItems);
         getChild<LLButton>("btn_prev")->setEnabled(mCurrentPage>0);
         getChild<LLButton>("btn_clear")->setEnabled(mEventList->getItemCount()>0);

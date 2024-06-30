@@ -24,6 +24,8 @@
  * $/LicenseInfo$
  */
 
+#include "linden_common.h"
+
 #include <iostream>
 #include <cstdio>
 #include <cstdlib>
@@ -33,8 +35,6 @@
 #include <pthread.h>
 #endif
 #include <thread>
-
-#include "linden_common.h"
 
 #include "httpcommon.h"
 #include "httprequest.h"
@@ -518,7 +518,7 @@ void WorkingSet::onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * r
         {
             // More success
             LLCore::BufferArray * data(response->getBody());
-            mByteCount += data ? data->size() : 0;
+            mByteCount += data ? static_cast<long>(data->size()) : 0L;
             ++mSuccesses;
         }
         else
@@ -601,7 +601,7 @@ void WorkingSet::loadAssetUuids(FILE * in)
             mAssets.push_back(asset);
         }
     }
-    mRemaining = mLimit = mAssets.size();
+    mRemaining = mLimit = static_cast<int>(mAssets.size());
 }
 
 

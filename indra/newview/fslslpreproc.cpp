@@ -71,7 +71,7 @@ LLUUID FSLSLPreprocessor::findInventoryByName(std::string name)
     LLInventoryModel::cat_array_t cats;
     LLInventoryModel::item_array_t items;
     ScriptMatches namematches(name);
-    gInventory.collectDescendentsIf(gInventory.getRootFolderID(), cats, items, FALSE, namematches);
+    gInventory.collectDescendentsIf(gInventory.getRootFolderID(), cats, items, false, namematches);
 
     if (!items.empty())
     {
@@ -551,7 +551,7 @@ public:
                                                         item->getType(),
                                                         &FSLSLPreprocessor::FSProcCacheCallback,
                                                         info,
-                                                        TRUE);
+                                                        true);
                         return true;
                     }
                 }
@@ -725,7 +725,7 @@ void FSLSLPreprocessor::FSProcCacheCallback(const LLUUID& iuuid, LLAssetType::ET
     }
 }
 
-void FSLSLPreprocessor::preprocess_script(BOOL close, bool sync, bool defcache)
+void FSLSLPreprocessor::preprocess_script(bool close, bool sync, bool defcache)
 {
     mClose = close;
     mSync = sync;
@@ -1530,7 +1530,7 @@ void FSLSLPreprocessor::start_process()
                 outfield->setText(LLStringExplicit(output));
             }
             mCore->mPostScript = output;
-            mCore->enableSave(TRUE); // The preprocessor run forces a change. (For FIRE-10173) -Sei
+            mCore->enableSave(true); // The preprocessor run forces a change. (For FIRE-10173) -Sei
             mCore->doSaveComplete((void*)mCore, mClose, mSync);
         }
     }

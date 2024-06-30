@@ -41,8 +41,8 @@ class ALFloaterSettingsColor final
 
 public:
 
-    virtual BOOL postBuild();
-    virtual void draw();
+    bool postBuild() override;
+    void draw() override;
 
     void updateControl(const std::string& color_name);
 

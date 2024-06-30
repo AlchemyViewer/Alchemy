@@ -51,7 +51,7 @@ ALFloaterLightBox::~ALFloaterLightBox()
     mCASConnection.disconnect();
 }
 
-BOOL ALFloaterLightBox::postBuild()
+bool ALFloaterLightBox::postBuild()
 {
     populateLUTCombo();
     updateTonemapper();
@@ -306,284 +306,284 @@ void ALFloaterLightBox::updateTonemapper()
     {
     default:
     {
-        text1->setVisible(FALSE);
-        spinner1->setVisible(FALSE);
-        slider1->setVisible(FALSE);
+        text1->setVisible(false);
+        spinner1->setVisible(false);
+        slider1->setVisible(false);
 
-        text2->setVisible(FALSE);
-        spinner2->setVisible(FALSE);
-        slider2->setVisible(FALSE);
+        text2->setVisible(false);
+        spinner2->setVisible(false);
+        slider2->setVisible(false);
 
-        text3->setVisible(FALSE);
-        spinner3->setVisible(FALSE);
-        slider3->setVisible(FALSE);
+        text3->setVisible(false);
+        spinner3->setVisible(false);
+        slider3->setVisible(false);
 
-        text4->setVisible(FALSE);
-        spinner4->setVisible(FALSE);
-        slider4->setVisible(FALSE);
+        text4->setVisible(false);
+        spinner4->setVisible(false);
+        slider4->setVisible(false);
 
-        text5->setVisible(FALSE);
-        spinner5->setVisible(FALSE);
-        slider5->setVisible(FALSE);
+        text5->setVisible(false);
+        spinner5->setVisible(false);
+        slider5->setVisible(false);
 
-        text6->setVisible(FALSE);
-        spinner6->setVisible(FALSE);
-        slider6->setVisible(FALSE);
+        text6->setVisible(false);
+        spinner6->setVisible(false);
+        slider6->setVisible(false);
 
-        text7->setVisible(FALSE);
-        spinner7->setVisible(FALSE);
-        slider7->setVisible(FALSE);
+        text7->setVisible(false);
+        spinner7->setVisible(false);
+        slider7->setVisible(false);
         break;
     }
     case ALRenderUtil::TONEMAP_UCHIMURA:
     {
-        text1->setVisible(TRUE);
+        text1->setVisible(true);
         text1->setText(std::string("Max Brightness"));
-        spinner1->setVisible(TRUE);
+        spinner1->setVisible(true);
         spinner1->setMinValue(0.01f);
         spinner1->setMaxValue(8.0f);
         spinner1->setIncrement(0.1f);
         spinner1->setControlName("AlchemyToneMapUchimuraMaxBrightness");
-        slider1->setVisible(TRUE);
+        slider1->setVisible(true);
         slider1->setMinValue(0.01f);
         slider1->setMaxValue(8.0f);
         slider1->setIncrement(0.1f);
         slider1->setControlName("AlchemyToneMapUchimuraMaxBrightness", nullptr);
 
-        text2->setVisible(TRUE);
+        text2->setVisible(true);
         text2->setText(std::string("Contrast"));
-        spinner2->setVisible(TRUE);
+        spinner2->setVisible(true);
         spinner2->setMinValue(0.01f);
         spinner2->setMaxValue(2.0f);
         spinner2->setIncrement(0.01f);
         spinner2->setControlName("AlchemyToneMapUchimuraContrast");
-        slider2->setVisible(TRUE);
+        slider2->setVisible(true);
         slider2->setMinValue(0.01f);
         slider2->setMaxValue(2.0f);
         slider2->setIncrement(0.01f);
         slider2->setControlName("AlchemyToneMapUchimuraContrast", nullptr);
 
-        text3->setVisible(TRUE);
+        text3->setVisible(true);
         text3->setText(std::string("Linear Start"));
-        spinner3->setVisible(TRUE);
+        spinner3->setVisible(true);
         spinner3->setMinValue(0.01f);
         spinner3->setMaxValue(1.0f);
         spinner3->setIncrement(0.01f);
         spinner3->setControlName("AlchemyToneMapUchimuraLinearStart");
-        slider3->setVisible(TRUE);
+        slider3->setVisible(true);
         slider3->setMinValue(0.01f);
         slider3->setMaxValue(1.0f);
         slider3->setIncrement(0.01f);
         slider3->setControlName("AlchemyToneMapUchimuraLinearStart", nullptr);
 
-        text4->setVisible(TRUE);
+        text4->setVisible(true);
         text4->setText(std::string("Linear Length"));
-        spinner4->setVisible(TRUE);
+        spinner4->setVisible(true);
         spinner4->setMinValue(0.01f);
         spinner4->setMaxValue(1.0f);
         spinner4->setIncrement(0.01f);
         spinner4->setControlName("AlchemyToneMapUchimuraLinearLength");
-        slider4->setVisible(TRUE);
+        slider4->setVisible(true);
         slider4->setMinValue(0.01f);
         slider4->setMaxValue(1.0f);
         slider4->setIncrement(0.01f);
         slider4->setControlName("AlchemyToneMapUchimuraLinearLength", nullptr);
 
-        text5->setVisible(TRUE);
+        text5->setVisible(true);
         text5->setText(std::string("Black Level"));
-        spinner5->setVisible(TRUE);
+        spinner5->setVisible(true);
         spinner5->setMinValue(0.01f);
         spinner5->setMaxValue(4.0f);
         spinner5->setIncrement(0.01f);
         spinner5->setControlName("AlchemyToneMapUchimuraBlackLevel");
-        slider5->setVisible(TRUE);
+        slider5->setVisible(true);
         slider5->setMinValue(0.01f);
         slider5->setMaxValue(4.0f);
         slider5->setIncrement(0.01f);
         slider5->setControlName("AlchemyToneMapUchimuraBlackLevel", nullptr);
 
-        text6->setVisible(FALSE);
-        spinner6->setVisible(FALSE);
-        slider6->setVisible(FALSE);
+        text6->setVisible(false);
+        spinner6->setVisible(false);
+        slider6->setVisible(false);
 
-        text7->setVisible(FALSE);
-        spinner7->setVisible(FALSE);
-        slider7->setVisible(FALSE);
+        text7->setVisible(false);
+        spinner7->setVisible(false);
+        slider7->setVisible(false);
         break;
     }
     case ALRenderUtil::TONEMAP_AMD:
     {
-        text1->setVisible(TRUE);
+        text1->setVisible(true);
         text1->setText(std::string("HDR Max"));
-        spinner1->setVisible(TRUE);
+        spinner1->setVisible(true);
         spinner1->setMinValue(1.0f);
         spinner1->setMaxValue(512.0f);
         spinner1->setIncrement(1.f);
         spinner1->setControlName("AlchemyToneMapAMDHDRMax");
-        slider1->setVisible(TRUE);
+        slider1->setVisible(true);
         slider1->setMinValue(1.0f);
         slider1->setMaxValue(512.0f);
         slider1->setIncrement(1.f);
         slider1->setControlName("AlchemyToneMapAMDHDRMax", nullptr);
 
-        text2->setVisible(TRUE);
+        text2->setVisible(true);
         text2->setText(std::string("Tone Exposure"));
-        spinner2->setVisible(TRUE);
+        spinner2->setVisible(true);
         spinner2->setMinValue(1.0f);
         spinner2->setMaxValue(16.0f);
         spinner2->setIncrement(0.1f);
         spinner2->setControlName("AlchemyToneMapAMDExposure");
-        slider2->setVisible(TRUE);
+        slider2->setVisible(true);
         slider2->setMinValue(1.0f);
         slider2->setMaxValue(16.0f);
         slider2->setIncrement(0.1f);
         slider2->setControlName("AlchemyToneMapAMDExposure", nullptr);
 
-        text3->setVisible(TRUE);
+        text3->setVisible(true);
         text3->setText(std::string("Contrast"));
-        spinner3->setVisible(TRUE);
+        spinner3->setVisible(true);
         spinner3->setMinValue(0.0f);
         spinner3->setMaxValue(1.0f);
         spinner3->setIncrement(0.01f);
         spinner3->setControlName("AlchemyToneMapAMDContrast");
-        slider3->setVisible(TRUE);
+        slider3->setVisible(true);
         slider3->setMinValue(0.0f);
         slider3->setMaxValue(1.0f);
         slider3->setIncrement(0.01f);
         slider3->setControlName("AlchemyToneMapAMDContrast", nullptr);
 
-        text4->setVisible(TRUE);
+        text4->setVisible(true);
         text4->setText(std::string("R Saturation"));
-        spinner4->setVisible(TRUE);
+        spinner4->setVisible(true);
         spinner4->setMinValue(-2.0f);
         spinner4->setMaxValue(2.0f);
         spinner4->setIncrement(0.1f);
         spinner4->setControlName("AlchemyToneMapAMDSaturationR");
-        slider4->setVisible(TRUE);
+        slider4->setVisible(true);
         slider4->setMinValue(-2.0f);
         slider4->setMaxValue(2.0f);
         slider4->setIncrement(0.1f);
         slider4->setControlName("AlchemyToneMapAMDSaturationR", nullptr);
 
-        text5->setVisible(TRUE);
+        text5->setVisible(true);
         text5->setText(std::string("G Saturation"));
-        spinner5->setVisible(TRUE);
+        spinner5->setVisible(true);
         spinner5->setMinValue(-2.0f);
         spinner5->setMaxValue(2.0f);
         spinner5->setIncrement(0.1f);
         spinner5->setControlName("AlchemyToneMapAMDSaturationG");
-        slider5->setVisible(TRUE);
+        slider5->setVisible(true);
         slider5->setMinValue(-2.0f);
         slider5->setMaxValue(2.0f);
         slider5->setIncrement(0.1f);
         slider5->setControlName("AlchemyToneMapAMDSaturationG", nullptr);
 
-        text6->setVisible(TRUE);
+        text6->setVisible(true);
         text6->setText(std::string("B Saturation"));
-        spinner6->setVisible(TRUE);
+        spinner6->setVisible(true);
         spinner6->setMinValue(-2.0f);
         spinner6->setMaxValue(2.0f);
         spinner6->setIncrement(0.1f);
         spinner6->setControlName("AlchemyToneMapAMDSaturationB");
-        slider6->setVisible(TRUE);
+        slider6->setVisible(true);
         slider6->setMinValue(-2.0f);
         slider6->setMaxValue(2.0f);
         slider6->setIncrement(0.1f);
         slider6->setControlName("AlchemyToneMapAMDSaturationB", nullptr);
 
-        text7->setVisible(FALSE);
-        spinner7->setVisible(FALSE);
-        slider7->setVisible(FALSE);
+        text7->setVisible(false);
+        spinner7->setVisible(false);
+        slider7->setVisible(false);
         break;
     }
     case ALRenderUtil::TONEMAP_UNCHARTED:
     {
-        text1->setVisible(TRUE);
+        text1->setVisible(true);
         text1->setText(std::string("Toe Strength"));
-        spinner1->setVisible(TRUE);
+        spinner1->setVisible(true);
         spinner1->setMinValue(0.0f);
         spinner1->setMaxValue(1.0f);
         spinner1->setIncrement(0.01f);
         spinner1->setControlName("AlchemyToneMapFilmicToeStr");
-        slider1->setVisible(TRUE);
+        slider1->setVisible(true);
         slider1->setMinValue(0.0f);
         slider1->setMaxValue(1.0f);
         slider1->setIncrement(0.01f);
         slider1->setControlName("AlchemyToneMapFilmicToeStr", nullptr);
 
-        text2->setVisible(TRUE);
+        text2->setVisible(true);
         text2->setText(std::string("Toe Length"));
-        spinner2->setVisible(TRUE);
+        spinner2->setVisible(true);
         spinner2->setMinValue(0.01f);
         spinner2->setMaxValue(1.0f);
         spinner2->setIncrement(0.01f);
         spinner2->setControlName("AlchemyToneMapFilmicToeLen");
-        slider2->setVisible(TRUE);
+        slider2->setVisible(true);
         slider2->setMinValue(0.01f);
         slider2->setMaxValue(1.0f);
         slider2->setIncrement(0.01f);
         slider2->setControlName("AlchemyToneMapFilmicToeLen", nullptr);
 
-        text3->setVisible(TRUE);
+        text3->setVisible(true);
         text3->setText(std::string("Shoulder Strength"));
-        spinner3->setVisible(TRUE);
+        spinner3->setVisible(true);
         spinner3->setMinValue(0.0f);
         spinner3->setMaxValue(1.0f);
         spinner3->setIncrement(0.01f);
         spinner3->setControlName("AlchemyToneMapFilmicShoulderStr");
-        slider3->setVisible(TRUE);
+        slider3->setVisible(true);
         slider3->setMinValue(0.0f);
         slider3->setMaxValue(1.0f);
         slider3->setIncrement(0.01f);
         slider3->setControlName("AlchemyToneMapFilmicShoulderStr", nullptr);
 
-        text4->setVisible(TRUE);
+        text4->setVisible(true);
         text4->setText(std::string("Shoulder Length"));
-        spinner4->setVisible(TRUE);
+        spinner4->setVisible(true);
         spinner4->setMinValue(0.01f);
         spinner4->setMaxValue(8.0f);
         spinner4->setIncrement(0.01f);
         spinner4->setControlName("AlchemyToneMapFilmicShoulderLen");
-        slider4->setVisible(TRUE);
+        slider4->setVisible(true);
         slider4->setMinValue(0.01f);
         slider4->setMaxValue(8.0f);
         slider4->setIncrement(0.01f);
         slider4->setControlName("AlchemyToneMapFilmicShoulderLen", nullptr);
 
-        text5->setVisible(TRUE);
+        text5->setVisible(true);
         text5->setText(std::string("Shoulder Angle"));
-        spinner5->setVisible(TRUE);
+        spinner5->setVisible(true);
         spinner5->setMinValue(0.0f);
         spinner5->setMaxValue(1.0f);
         spinner5->setIncrement(0.01f);
         spinner5->setControlName("AlchemyToneMapFilmicShoulderAngle");
-        slider5->setVisible(TRUE);
+        slider5->setVisible(true);
         slider5->setMinValue(0.0f);
         slider5->setMaxValue(1.0f);
         slider5->setIncrement(0.01f);
         slider5->setControlName("AlchemyToneMapFilmicShoulderAngle", nullptr);
 
-        text6->setVisible(TRUE);
+        text6->setVisible(true);
         text6->setText(std::string("Gamma"));
-        spinner6->setVisible(TRUE);
+        spinner6->setVisible(true);
         spinner6->setMinValue(0.01f);
         spinner6->setMaxValue(5.0f);
         spinner6->setIncrement(0.01f);
         spinner6->setControlName("AlchemyToneMapFilmicGamma");
-        slider6->setVisible(TRUE);
+        slider6->setVisible(true);
         slider6->setMinValue(0.01f);
         slider6->setMaxValue(5.0f);
         slider6->setIncrement(0.01f);
         slider6->setControlName("AlchemyToneMapFilmicGamma", nullptr);
 
-        text7->setVisible(TRUE);
+        text7->setVisible(true);
         text7->setText(std::string("White Point"));
-        spinner7->setVisible(TRUE);
+        spinner7->setVisible(true);
         spinner7->setMinValue(1.0f);
         spinner7->setMaxValue(16.0f);
         spinner7->setIncrement(0.1f);
         spinner7->setControlName("AlchemyToneMapFilmicWhitePoint");
-        slider7->setVisible(TRUE);
+        slider7->setVisible(true);
         slider7->setMinValue(1.0f);
         slider7->setMaxValue(16.0f);
         slider7->setIncrement(0.1f);
@@ -607,52 +607,52 @@ void ALFloaterLightBox::updateCAS()
     default:
     case ALRenderUtil::SHARPEN_NONE:
     {
-        spinner1->setVisible(FALSE);
-        slider1->setVisible(FALSE);
-        text2->setVisible(FALSE);
-        spinner2->setVisible(FALSE);
-        slider2->setVisible(FALSE);
+        spinner1->setVisible(false);
+        slider1->setVisible(false);
+        text2->setVisible(false);
+        spinner2->setVisible(false);
+        slider2->setVisible(false);
         break;
     }
     case ALRenderUtil::SHARPEN_CAS:
     {
-        spinner1->setVisible(TRUE);
+        spinner1->setVisible(true);
         spinner1->setMinValue(0.0f);
         spinner1->setMaxValue(1.0f);
         spinner1->setIncrement(0.1f);
         spinner1->setControlName("RenderSharpenCASSharpness");
-        slider1->setVisible(TRUE);
+        slider1->setVisible(true);
         slider1->setMinValue(0.0f);
         slider1->setMaxValue(1.0f);
         slider1->setIncrement(0.1f);
         slider1->setControlName("RenderSharpenCASSharpness", nullptr);
 
-        text2->setVisible(FALSE);
-        spinner2->setVisible(FALSE);
-        slider2->setVisible(FALSE);
+        text2->setVisible(false);
+        spinner2->setVisible(false);
+        slider2->setVisible(false);
         break;
     }
     case ALRenderUtil::SHARPEN_DLS:
     {
-        spinner1->setVisible(TRUE);
+        spinner1->setVisible(true);
         spinner1->setMinValue(0.0f);
         spinner1->setMaxValue(1.0f);
         spinner1->setIncrement(0.1f);
         spinner1->setControlName("RenderSharpenDLSSharpness");
-        slider1->setVisible(TRUE);
+        slider1->setVisible(true);
         slider1->setMinValue(0.0f);
         slider1->setMaxValue(1.0f);
         slider1->setIncrement(0.1f);
         slider1->setControlName("RenderSharpenDLSSharpness", nullptr);
 
-        text2->setVisible(TRUE);
+        text2->setVisible(true);
         text2->setText(std::string("Denoise:"));
-        spinner2->setVisible(TRUE);
+        spinner2->setVisible(true);
         spinner2->setMinValue(0.0f);
         spinner2->setMaxValue(1.0f);
         spinner2->setIncrement(0.1f);
         spinner2->setControlName("RenderSharpenDLSDenoise");
-        slider2->setVisible(TRUE);
+        slider2->setVisible(true);
         slider2->setMinValue(0.0f);
         slider2->setMaxValue(1.0f);
         slider2->setIncrement(0.1f);

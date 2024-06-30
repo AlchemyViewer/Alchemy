@@ -63,7 +63,7 @@ const F32 MAX_DRAW_DISTANCE = 300.f;
 std::set<LLPointer<LLHUDText> > LLHUDText::sTextObjects;
 std::vector<LLPointer<LLHUDText> > LLHUDText::sVisibleTextObjects;
 std::vector<LLPointer<LLHUDText> > LLHUDText::sVisibleHUDTextObjects;
-BOOL LLHUDText::sDisplayText = TRUE ;
+bool LLHUDText::sDisplayText = true ;
 
 bool lltextobject_further_away::operator()(const LLPointer<LLHUDText>& lhs, const LLPointer<LLHUDText>& rhs) const
 {
@@ -73,8 +73,8 @@ bool lltextobject_further_away::operator()(const LLPointer<LLHUDText>& lhs, cons
 
 LLHUDText::LLHUDText(const U8 type) :
             LLHUDObject(type),
-            mOnHUDAttachment(FALSE),
-//          mVisibleOffScreen(FALSE),
+            mOnHUDAttachment(false),
+//          mVisibleOffScreen(false),
             mWidth(0.f),
             mHeight(0.f),
             mFontp(LLFontGL::getFontSansSerifSmall()),
@@ -85,14 +85,14 @@ LLHUDText::LLHUDText(const U8 type) :
             mTextAlignment(ALIGN_TEXT_CENTER),
             mVertAlignment(ALIGN_VERT_CENTER),
 //          mLOD(0),
-            mHidden(FALSE)
+            mHidden(false)
 {
     mColor = LLColor4(1.f, 1.f, 1.f, 1.f);
-    mDoFade = TRUE;
+    mDoFade = true;
     mFadeDistance = gSavedSettings.getF32("AlchemyHudTextFadeDistance");
     mFadeRange = gSavedSettings.getF32("AlchemyHudTextFadeRange");
-    mZCompare = TRUE;
-    mOffscreen = FALSE;
+    mZCompare = true;
+    mOffscreen = false;
     mRadius = 0.1f;
     LLPointer<LLHUDText> ptr(this);
     sTextObjects.insert(ptr);
@@ -122,7 +122,7 @@ void LLHUDText::renderText()
 
     gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
 
-    LLGLState gls_blend(GL_BLEND, TRUE);
+    LLGLState gls_blend(GL_BLEND, true);
 
     LLColor4 shadow_color(0.f, 0.f, 0.f, 1.f);
     F32 alpha_factor = 1.f;
@@ -287,7 +287,7 @@ void LLHUDText::addLine(const std::string &text_utf8,
             do
             {
                 F32 max_pixels = HUD_TEXT_MAX_WIDTH_NO_BUBBLE;
-                S32 segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, wline.length(), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                S32 segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, static_cast<S32>(wline.length()), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                 LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
                 mTextSegments.push_back(segment);
                 line_length += segment_length;
@@ -298,7 +298,7 @@ void LLHUDText::addLine(const std::string &text_utf8,
     }
 }
 
-void LLHUDText::setZCompare(const BOOL zcompare)
+void LLHUDText::setZCompare(const bool zcompare)
 {
     mZCompare = zcompare;
 }
@@ -330,7 +330,7 @@ void LLHUDText::setAlpha(F32 alpha)
 }
 
 
-void LLHUDText::setDoFade(const BOOL do_fade)
+void LLHUDText::setDoFade(const bool do_fade)
 {
     mDoFade = do_fade;
 }
@@ -348,7 +348,7 @@ void LLHUDText::updateVisibility()
     if (!mSourceObject)
     {
         // Beacons
-        mVisible = TRUE;
+        mVisible = true;
         if (mOnHUDAttachment)
         {
             sVisibleHUDTextObjects.push_back(LLPointer<LLHUDText> (this));
@@ -364,14 +364,14 @@ void LLHUDText::updateVisibility()
     // Not visible if parent object is dead
     if (!mSourceObject || mSourceObject->isDead())
     {
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
     // for now, all text on hud objects is visible
     if (mOnHUDAttachment)
     {
-        mVisible = TRUE;
+        mVisible = true;
         sVisibleHUDTextObjects.push_back(LLPointer<LLHUDText> (this));
         mLastDistance = mPositionAgent.mV[VX];
         return;
@@ -385,7 +385,7 @@ void LLHUDText::updateVisibility()
 
     if (dir_from_camera * viewerCamera.getAtAxis() <= 0.f)
     { //text is behind camera, don't render
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
@@ -402,7 +402,7 @@ void LLHUDText::updateVisibility()
 
     if (!mTextSegments.size() || (mDoFade && (mLastDistance > mFadeDistance + mFadeRange)))
     {
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
@@ -424,7 +424,7 @@ void LLHUDText::updateVisibility()
 
     if(last_distance_center > max_draw_distance)
     {
-        mVisible = FALSE;
+        mVisible = false;
         return;
     }
 
@@ -438,21 +438,21 @@ void LLHUDText::updateVisibility()
             (x_pixel_vec * mPositionOffset.mV[VX]) +
             (y_pixel_vec * mPositionOffset.mV[VY]);
 
-    mOffscreen = FALSE;
+    mOffscreen = false;
     if (!viewerCamera.sphereInFrustum(render_position, mRadius))
     {
 //      if (!mVisibleOffScreen)
 //      {
-            mVisible = FALSE;
+            mVisible = false;
             return;
 //      }
 //      else
 //      {
-//          mOffscreen = TRUE;
+//          mOffscreen = true;
 //      }
     }
 
-    mVisible = TRUE;
+    mVisible = true;
     sVisibleTextObjects.emplace_back(this);
 }
 
@@ -464,7 +464,7 @@ LLVector2 LLHUDText::updateScreenPos(const LLVector2 &offset)
 //  LLVector3 y_pixel_vec;
 //  LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
 //  LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);
-//  if (!LLViewerCamera::getInstance()->projectPosAgentToScreen(world_pos, screen_pos, FALSE) && mVisibleOffScreen)
+//  if (!LLViewerCamera::getInstance()->projectPosAgentToScreen(world_pos, screen_pos, false) && mVisibleOffScreen)
 //  {
 //      // bubble off-screen, so find a spot for it along screen edge
 //      LLViewerCamera::getInstance()->projectPosAgentToScreenEdge(world_pos, screen_pos);

@@ -42,7 +42,7 @@ LLTexGlobalColor::LLTexGlobalColor(LLAvatarAppearance* appearance)
 {
 }
 
-BOOL LLTexGlobalColor::setInfo(LLTexGlobalColorInfo *info)
+bool LLTexGlobalColor::setInfo(LLTexGlobalColorInfo *info)
 {
     llassert(mInfo == NULL);
     mInfo = info;
@@ -52,15 +52,15 @@ BOOL LLTexGlobalColor::setInfo(LLTexGlobalColorInfo *info)
     for (LLTexLayerParamColorInfo* color_info : mInfo->mParamColorInfoList)
     {
         LLTexParamGlobalColor* param_color = new LLTexParamGlobalColor(this);
-        if (!param_color->setInfo(color_info, TRUE))
+        if (!param_color->setInfo(color_info, true))
         {
             mInfo = NULL;
-            return FALSE;
+            return false;
         }
         mParamGlobalColorList.push_back(param_color);
     }
 
-    return TRUE;
+    return true;
 }
 
 LLColor4 LLTexGlobalColor::getColor() const
@@ -111,14 +111,14 @@ LLTexGlobalColorInfo::~LLTexGlobalColorInfo()
     mParamColorInfoList.clear();
 }
 
-BOOL LLTexGlobalColorInfo::parseXml(LLXmlTreeNode* node)
+bool LLTexGlobalColorInfo::parseXml(LLXmlTreeNode* node)
 {
     // name attribute
     static LLStdStringHandle name_string = LLXmlTree::addAttributeString("name");
     if (!node->getFastAttributeString(name_string, mName))
     {
         LL_WARNS() << "<global_color> element is missing name attribute." << LL_ENDL;
-        return FALSE;
+        return false;
     }
     // <param> sub-element
     for (LLXmlTreeNode* child = node->getChildByName("param");
@@ -132,10 +132,10 @@ BOOL LLTexGlobalColorInfo::parseXml(LLXmlTreeNode* node)
             if (!info->parseXml(child))
             {
                 delete info;
-                return FALSE;
+                return false;
             }
             mParamColorInfoList.push_back(info);
         }
     }
-    return TRUE;
+    return true;
 }

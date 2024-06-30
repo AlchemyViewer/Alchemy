@@ -42,7 +42,7 @@ class LLFloaterSettingsDebug final
 
 public:
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
     virtual void draw();
 
     void updateControl(LLControlVariable* control);

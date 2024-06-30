@@ -241,12 +241,12 @@ void BDAnimator::stopPlayback()
 //     by giving the load an integer which determines what to load.
 //     1 is default and loads rotations only, 2 = positions only,
 //     4 = scales only, thus 3 = rotations and positions and so on.
-BOOL BDAnimator::loadPose(const LLSD& name, S32 load_type)
+bool BDAnimator::loadPose(const LLSD& name, S32 load_type)
 {
     if (!mTargetAvatar || mTargetAvatar->isDead())
     {
         LL_WARNS("Posing") << "Couldn't find avatar, dead?" << LL_ENDL;
-        return FALSE;
+        return false;
     }
 
     std::string filename;
@@ -261,7 +261,7 @@ BOOL BDAnimator::loadPose(const LLSD& name, S32 load_type)
     if (!infile.is_open())
     {
         LL_WARNS("Posing") << "Cannot find file in: " << filename << LL_ENDL;
-        return FALSE;
+        return false;
     }
 
     while (!infile.eof())
@@ -270,7 +270,7 @@ BOOL BDAnimator::loadPose(const LLSD& name, S32 load_type)
         if (count == LLSDParser::PARSE_FAILURE)
         {
             LL_WARNS("Posing") << "Failed to parse file: " << filename << LL_ENDL;
-            return FALSE;
+            return false;
         }
 
         if (pose.has("version"))
@@ -433,7 +433,7 @@ BOOL BDAnimator::loadPose(const LLSD& name, S32 load_type)
         }
     }
     infile.close();
-    return TRUE;
+    return true;
 }
 
 LLSD BDAnimator::returnPose(const LLSD& name)

@@ -102,7 +102,7 @@ private:
         }
 
         bool operator==(const TEMaterialPair& b) const { return (te == b.te) && (materialID == b.materialID); }
-        bool operator<(const TEMaterialPair& b) const { return (te < b.te) ? TRUE : (materialID < b.materialID);}
+        bool operator<(const TEMaterialPair& b) const { return (te < b.te) ? true : (materialID < b.materialID);}
     };
 
     typedef boost::unordered_flat_set<LLMaterialID> material_queue_t;

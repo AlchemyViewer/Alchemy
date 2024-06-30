@@ -32,9 +32,9 @@ public:
     ALPanelMusicTicker();   //ctor
     ~ALPanelMusicTicker();
 
-    BOOL postBuild() final override;
+    bool postBuild() final override;
     void draw() final override;
-    void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) final override;
+    void reshape(S32 width, S32 height, bool called_from_parent = true) final override;
 private:
     void updateTickerText(); //called via draw.
     void drawOscilloscope(); //called via draw.

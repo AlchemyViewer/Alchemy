@@ -34,7 +34,7 @@ private:
      */
 public:
     /*virtual*/ void onOpen(const LLSD& sdKey);
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     /*
      * Member functions

@@ -75,7 +75,7 @@ public:
 
     LLPanelCameraZoom() { onCreate(); }
 
-    /* virtual */ BOOL  postBuild();
+    /* virtual */ bool  postBuild();
     /* virtual */ void  draw();
 
 protected:
@@ -145,13 +145,13 @@ void set_view_visible(LLView* parent, const std::string& name, bool visible)
     parent->getChildView(name)->setVisible(visible);
 }
 
-BOOL LLPanelCameraItem::postBuild()
+bool LLPanelCameraItem::postBuild()
 {
     setMouseEnterCallback(boost::bind(set_view_visible, this, "hovered_icon", true));
     setMouseLeaveCallback(boost::bind(set_view_visible, this, "hovered_icon", false));
     setMouseDownCallback(boost::bind(&LLPanelCameraItem::onAnyMouseClick, this));
     setRightMouseDownCallback(boost::bind(&LLPanelCameraItem::onAnyMouseClick, this));
-    return TRUE;
+    return true;
 }
 
 void LLPanelCameraItem::onAnyMouseClick()
@@ -185,7 +185,7 @@ void LLPanelCameraZoom::onCreate()
     mCommitCallbackRegistrar.add("Camera.roll_right", boost::bind(&LLPanelCameraZoom::onRollRightHeldDown, this));
 }
 
-BOOL LLPanelCameraZoom::postBuild()
+bool LLPanelCameraZoom::postBuild()
 {
     mPlusBtn  = getChild<LLButton>("zoom_plus_btn");
     mMinusBtn = getChild<LLButton>("zoom_minus_btn");
@@ -451,7 +451,7 @@ void LLFloaterCamera::onOpen(const LLSD& key)
         updateState();
     else
         toPrevMode();
-    mClosed = FALSE;
+    mClosed = false;
 
     populatePresetCombo();
 
@@ -474,25 +474,25 @@ void LLFloaterCamera::onClose(bool app_quitting)
         mPrevMode = CAMERA_CTRL_MODE_PAN;
 
     switchMode(CAMERA_CTRL_MODE_PAN);
-    mClosed = TRUE;
+    mClosed = true;
 
-    gAgent.setMovementLocked(FALSE);
+    gAgent.setMovementLocked(false);
 }
 
 LLFloaterCamera::LLFloaterCamera(const LLSD& val)
 :   LLFloater(val),
-    mClosed(FALSE),
+    mClosed(false),
     mCurrMode(CAMERA_CTRL_MODE_PAN),
     mPrevMode(CAMERA_CTRL_MODE_PAN)
 {
     LLHints::getInstance()->registerHintTarget("view_popup", getHandle());
     mCommitCallbackRegistrar.add("CameraPresets.ChangeView", boost::bind(&LLFloaterCamera::onClickCameraItem, _2));
     mCommitCallbackRegistrar.add("CameraPresets.Save", boost::bind(&LLFloaterCamera::onSavePreset));
-    mCommitCallbackRegistrar.add("CameraPresets.ShowPresetsList", boost::bind(&LLFloaterReg::showInstance, "camera_presets", LLSD(), FALSE));
+    mCommitCallbackRegistrar.add("CameraPresets.ShowPresetsList", boost::bind(&LLFloaterReg::showInstance, "camera_presets", LLSD(), false));
 }
 
 // virtual
-BOOL LLFloaterCamera::postBuild()
+bool LLFloaterCamera::postBuild()
 {
     updateTransparency(TT_ACTIVE); // force using active floater transparency (STORM-730)
 
@@ -507,7 +507,7 @@ BOOL LLFloaterCamera::postBuild()
 
 //  mPreciseCtrls->setShowCursorHand(false);
 //  mPreciseCtrls->setSoundFlags(LLView::MOUSE_UP);
-//  mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), FALSE));
+//    mPreciseCtrls->setClickedCallback(boost::bind(&LLFloaterReg::showInstance, "prefs_view_advanced", LLSD(), false));
 
     mPresetCombo->setCommitCallback(boost::bind(&LLFloaterCamera::onCustomPresetSelected, this));
     LLPresetsManager::getInstance()->setPresetListChangeCameraCallback(boost::bind(&LLFloaterCamera::populatePresetCombo, this));
@@ -614,7 +614,7 @@ void LLFloaterCamera::switchMode(ECameraControlMode mode)
 
     default:
         //normally we won't occur here
-        llassert_always(FALSE);
+        llassert_always(false);
     }
 }
 
@@ -776,15 +776,15 @@ void LLFloaterCamera::onCustomPresetSelected()
 
 void LLFloaterCamera::toggleCollapse()
 {
-    BOOL setting = !gSavedSettings.getBOOL("AlchemyCameraExpanded");
+    bool setting = !gSavedSettings.getBOOL("AlchemyCameraExpanded");
     gSavedSettings.setBOOL("AlchemyCameraExpanded", setting);
     collapse();
 }
 
 void LLFloaterCamera::collapse()
 {
-    BOOL collapse = gSavedSettings.getBOOL("AlchemyCameraExpanded");
+    bool collapse = gSavedSettings.getBOOL("AlchemyCameraExpanded");
     mBtnCollapse->setImageOverlay(collapse ? "Conv_toolbar_collapse" : "Conv_toolbar_expand");
     getChild<LLPanel>("buttons_panel")->setVisible(collapse);
-    reshape(collapse ? 370 : 210, getRect().getHeight(), FALSE);
+    reshape(collapse ? 370 : 210, getRect().getHeight(), false);
 }

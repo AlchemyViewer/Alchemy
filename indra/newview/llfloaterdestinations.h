@@ -36,8 +36,8 @@ class LLFloaterDestinations final :
     friend class LLFloaterReg;
 private:
     LLFloaterDestinations(const LLSD& key);
-    /*virtual*/ ~LLFloaterDestinations();
-    /*virtual*/ BOOL postBuild();
+    ~LLFloaterDestinations();
+    bool postBuild() override;
 };
 
 #endif

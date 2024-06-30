@@ -46,7 +46,7 @@ LLFloaterNewLocalInventory::LLFloaterNewLocalInventory(const LLSD& key)
 :   LLFloater(key)
 { }
 
-BOOL LLFloaterNewLocalInventory::postBuild()
+bool LLFloaterNewLocalInventory::postBuild()
 {
     getChild<LLLineEditor>("creator_id_line")->setText(LLUUID::null.asString());
     getChild<LLLineEditor>("owner_id_line")->setText(gAgent.getID().asString());
@@ -62,7 +62,7 @@ BOOL LLFloaterNewLocalInventory::postBuild()
         combo->add(name);
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterNewLocalInventory::onClickOK()
@@ -197,7 +197,7 @@ void open_asset(LLUUID const& item_id)
         case LLAssetType::AT_GESTURE:
         {
             LLPreviewGesture* preview = LLPreviewGesture::show(assetid, LLUUID::null);
-            preview->setFocus(TRUE);
+            preview->setFocus(true);
             break;
         }
         // *TODO: Handle lsl, notecards, AT_SETTINGS, etc.

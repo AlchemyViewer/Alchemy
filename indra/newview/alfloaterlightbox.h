@@ -41,7 +41,7 @@ class ALFloaterLightBox final : public LLFloater
 public:
     ALFloaterLightBox(const LLSD& key);
     ~ALFloaterLightBox() override;
-    BOOL postBuild() override;
+    bool postBuild() override;
     virtual void draw() override;
 
   private:

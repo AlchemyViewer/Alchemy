@@ -47,13 +47,13 @@ public:
     // constructor for inline chat-bars (e.g. hosted in chat history window)
     LLChatBar(const LLSD& key);
 
-    BOOL        postBuild() override;
+    bool        postBuild() override;
     void        onOpen(const LLSD& key) override;
-    BOOL        handleKeyHere(KEY key, MASK mask) override;
+    bool        handleKeyHere(KEY key, MASK mask) override;
     void        onFocusLost() override;
 
 // [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
-    /*virtual*/ void reshape(S32 width, S32 height, BOOL called_from_parent = TRUE) override;
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     typedef boost::signals2::signal<void (LLUICtrl* ctrl, S32 width, S32 height)> reshape_signal_t;
     boost::signals2::connection setReshapeCallback(const reshape_signal_t::slot_type& cb);
@@ -63,12 +63,12 @@ public:
     void        refreshGestures();
 
     // Move cursor into chat input field.
-    void        setKeyboardFocus(BOOL b);
+    void        setKeyboardFocus(bool b);
 
     // Ignore arrow keys for chat bar
-    void        setIgnoreArrowKeys(BOOL b);
+    void        setIgnoreArrowKeys(bool b);
 
-    BOOL        inputEditorHasFocus() const;
+    bool        inputEditorHasFocus() const;
     std::string getCurrentChat() const;
 
     // since chat bar logic is reused for chat history
@@ -96,7 +96,7 @@ protected:
 
     LLFrameTimer    mGestureLabelTimer;
 
-    BOOL            mIsBuilt;
+    bool            mIsBuilt;
     LLComboBox*     mGestureCombo;
 
     LLChatBarGestureObserver* mObserver;

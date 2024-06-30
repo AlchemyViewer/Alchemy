@@ -39,51 +39,51 @@ public:
     F32  getSuggestedWidth(U8 cols = -1);
     U32  getProperSelectionStart() const;
     U32  getProperSelectionEnd() const;
-    void reshape(S32 width, S32 height, BOOL called_from_parent) override;
-    void setFocus(BOOL b) override;
+    void reshape(S32 width, S32 height, bool called_from_parent) override;
+    void setFocus(bool b) override;
 
-    BOOL handleScrollWheel(S32 x, S32 y, S32 clicks) override;
-    BOOL handleMouseDown(S32 x, S32 y, MASK mask) override;
-    BOOL handleHover(S32 x, S32 y, MASK mask) override;
-    BOOL handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
 
-    BOOL handleKeyHere(KEY key, MASK mask) override;
-    BOOL handleKey(KEY key, MASK mask, BOOL called_from_parent) override;
-    BOOL handleUnicodeChar(llwchar uni_char, BOOL called_from_parent) override;
-    BOOL handleUnicodeCharHere(llwchar uni_char) override;
+    bool handleKeyHere(KEY key, MASK mask) override;
+    bool handleKey(KEY key, MASK mask, bool called_from_parent) override;
+    bool handleUnicodeChar(llwchar uni_char, bool called_from_parent) override;
+    bool handleUnicodeCharHere(llwchar uni_char) override;
 
-    /*virtual*/ BOOL    postBuild() override;
+    /*virtual*/ bool    postBuild() override;
     void draw() override;
 
-    void moveCursor(U32 pos, BOOL second_nibble);
+    void moveCursor(U32 pos, bool second_nibble);
 
-    void insert(U32 pos, std::vector<U8> new_data, BOOL undoable);
-    void overwrite(U32 first_pos, U32 last_pos, std::vector<U8> new_data, BOOL undoable);
-    void del(U32 first_pos, U32 last_pos, BOOL undoable);
+    void insert(U32 pos, std::vector<U8> new_data, bool undoable);
+    void overwrite(U32 first_pos, U32 last_pos, std::vector<U8> new_data, bool undoable);
+    void del(U32 first_pos, U32 last_pos, bool undoable);
 
     virtual void    cut() override;
-    virtual BOOL    canCut() const override;
+    virtual bool    canCut() const override;
 
     virtual void    copy() override;
-    virtual BOOL    canCopy() const override;
+    virtual bool    canCopy() const override;
 
     virtual void    paste() override;
-    virtual BOOL    canPaste() const override;
+    virtual bool    canPaste() const override;
 
     virtual void    doDelete() override;
-    virtual BOOL    canDoDelete() const override;
+    virtual bool    canDoDelete() const override;
 
     virtual void    selectAll() override;
-    virtual BOOL    canSelectAll() const override;
+    virtual bool    canSelectAll() const override;
 
     virtual void    deselect() override;
-    virtual BOOL    canDeselect() const override;
+    virtual bool    canDeselect() const override;
 
     virtual void    undo() override;
-    virtual BOOL    canUndo() const override;
+    virtual bool    canUndo() const override;
 
     virtual void    redo() override;
-    virtual BOOL    canRedo() const override;
+    virtual bool    canRedo() const override;
 
 private:
     std::vector<U8> mValue;
@@ -91,10 +91,10 @@ private:
 
     std::string mName;
     U32 mCursorPos;
-    BOOL mSecondNibble;
-    BOOL mInData;
-    BOOL mSelecting;
-    BOOL mHasSelection;
+    bool mSecondNibble;
+    bool mInData;
+    bool mSelecting;
+    bool mHasSelection;
     U32 mSelectionStart;
     U32 mSelectionEnd;
 
@@ -106,7 +106,7 @@ private:
     LLUndoBuffer* mUndoBuffer;
 
     void changedLength();
-    void getPosAndContext(S32 x, S32 y, BOOL force_context, U32& pos, BOOL& in_data, BOOL& second_nibble) const;
+    void getPosAndContext(S32 x, S32 y, bool force_context, U32& pos, bool& in_data, bool& second_nibble) const;
 protected:
     LLHexEditor(const Params & p);
     friend class LLUICtrlFactory;

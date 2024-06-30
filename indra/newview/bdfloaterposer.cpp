@@ -107,27 +107,27 @@ BDFloaterPoser::~BDFloaterPoser()
 {
 }
 
-BOOL BDFloaterPoser::postBuild()
+bool BDFloaterPoser::postBuild()
 {
     //BD - Posing
     mJointScrolls = { { this->getChild<LLScrollListCtrl>("joints_scroll", true),
                         this->getChild<LLScrollListCtrl>("cv_scroll", true),
                         this->getChild<LLScrollListCtrl>("attach_scroll", true) } };
 
-    mJointScrolls[JOINTS]->setCommitOnSelectionChange(TRUE);
+    mJointScrolls[JOINTS]->setCommitOnSelectionChange(true);
     mJointScrolls[JOINTS]->setCommitCallback(boost::bind(&BDFloaterPoser::onJointControlsRefresh, this));
     mJointScrolls[JOINTS]->setDoubleClickCallback(boost::bind(&BDFloaterPoser::onJointChangeState, this));
 
     //BD - Collision Volumes
-    mJointScrolls[COLLISION_VOLUMES]->setCommitOnSelectionChange(TRUE);
+    mJointScrolls[COLLISION_VOLUMES]->setCommitOnSelectionChange(true);
     mJointScrolls[COLLISION_VOLUMES]->setCommitCallback(boost::bind(&BDFloaterPoser::onJointControlsRefresh, this));
 
     //BD - Attachment Bones
-    mJointScrolls[ATTACHMENT_BONES]->setCommitOnSelectionChange(TRUE);
+    mJointScrolls[ATTACHMENT_BONES]->setCommitOnSelectionChange(true);
     mJointScrolls[ATTACHMENT_BONES]->setCommitCallback(boost::bind(&BDFloaterPoser::onJointControlsRefresh, this));
 
     mPoseScroll = this->getChild<LLScrollListCtrl>("poses_scroll", true);
-    mPoseScroll->setCommitOnSelectionChange(TRUE);
+    mPoseScroll->setCommitOnSelectionChange(true);
     mPoseScroll->setCommitCallback(boost::bind(&BDFloaterPoser::onPoseControlsRefresh, this));
     mPoseScroll->setDoubleClickCallback(boost::bind(&BDFloaterPoser::onPoseLoad, this));
 
@@ -188,7 +188,7 @@ BOOL BDFloaterPoser::postBuild()
     getChild<LLButton>("add_key")->setClickedCallback(boost::bind(&BDFloaterPoser::onAddKey, this));
     getChild<LLButton>("delete_key")->setClickedCallback(boost::bind(&BDFloaterPoser::onDeleteKey, this));*/
 
-    return TRUE;
+    return true;
 }
 
 void BDFloaterPoser::draw()
@@ -522,7 +522,7 @@ void BDFloaterPoser::onJointRefresh()
             row["columns"][COL_NAME]["column"] = "joint";
             row["columns"][COL_NAME]["value"] = getString("title_" + joint_name);
             LLScrollListItem* element = mJointScrolls[JOINTS]->addElement(row);
-            element->setEnabled(FALSE);
+            element->setEnabled(false);
         }
 
         row["columns"][COL_ICON]["column"] = "icon";
@@ -879,7 +879,7 @@ void BDFloaterPoser::onJointSet(LLUICtrl* ctrl, const LLSD& param)
 
             //BD - We also need to find the opposite joint's list entry and change its values to reflect
             //     the new ones, doing this here is still better than causing a complete refresh.
-            LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+            LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, false, COL_NAME);
             if (item2)
             {
                 LLScrollListCell* cell2[3] = { item2->getColumn(COL_ROT_X), item2->getColumn(COL_ROT_Y), item2->getColumn(COL_ROT_Z) };
@@ -1114,7 +1114,7 @@ void BDFloaterPoser::onJointRotationReset()
                     {
                         //BD - We also need to find the opposite joint's list entry and change its values to reflect
                         //     the new ones, doing this here is still better than causing a complete refresh.
-                        LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+                        LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, false, COL_NAME);
                         if (item2)
                         {
                             col_x = item2->getColumn(COL_ROT_X);
@@ -1295,7 +1295,7 @@ void BDFloaterPoser::onJointRotationRevert()
                     {
                         //BD - We also need to find the opposite joint's list entry and change its values to reflect
                         //     the new ones, doing this here is still better than causing a complete refresh.
-                        LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+                        LLScrollListItem* item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, false, COL_NAME);
                         if (item2)
                         {
                             col_rot_x = item2->getColumn(COL_ROT_X);
@@ -1356,7 +1356,7 @@ void BDFloaterPoser::onFlipPose()
             mirror_joint = gDragonAnimator.mTargetAvatar->mRoot->findJoint(mirror_joint_name);
 
         //BD - Collect the joint and mirror joint entries and their cells, we need them later.
-        LLScrollListItem* item1 = mJointScrolls[JOINTS]->getItemByLabel(joint_name, FALSE, COL_NAME);
+        LLScrollListItem* item1 = mJointScrolls[JOINTS]->getItemByLabel(joint_name, false, COL_NAME);
         LLScrollListItem* item2 = nullptr;
 
         //BD - Get the rotation of our current bone and that of the mirror bone (if available).
@@ -1375,7 +1375,7 @@ void BDFloaterPoser::onFlipPose()
             mirror_joint->setTargetRotation(inv_rot_quat);
             joint->setTargetRotation(inv_mirror_rot_quat);
 
-            item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+            item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, false, COL_NAME);
 
             //BD - Make sure we flag this bone as flipped so we skip it next time we iterate over it.
             flipped[mirror_joint->getJointNum()] = true;
@@ -1461,7 +1461,7 @@ void BDFloaterPoser::onPoseSymmetrize(const LLSD& param)
             mirror_joint = gDragonAnimator.mTargetAvatar->mRoot->findJoint(mirror_joint_name);
 
         //BD - Collect the joint and mirror joint entries and their cells, we need them later.
-        //LLScrollListItem* item1 = mJointScrolls[JOINTS]->getItemByLabel(joint_name, FALSE, COL_NAME);
+        //LLScrollListItem* item1 = mJointScrolls[JOINTS]->getItemByLabel(joint_name, false, COL_NAME);
         LLScrollListItem* item2 = nullptr;
 
         //BD - Get the rotation of our current bone and that of the mirror bone (if available).
@@ -1480,7 +1480,7 @@ void BDFloaterPoser::onPoseSymmetrize(const LLSD& param)
             mirror_joint->setTargetRotation(inv_rot_quat);
             //joint->setTargetRotation(inv_mirror_rot_quat);
 
-            item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, FALSE, COL_NAME);
+            item2 = mJointScrolls[JOINTS]->getItemByLabel(mirror_joint_name, false, COL_NAME);
 
             //BD - Make sure we flag this bone as flipped so we skip it next time we iterate over it.
             flipped[mirror_joint->getJointNum()] = true;
@@ -2131,7 +2131,7 @@ void BDFloaterPoser::onAvatarsRefresh()
     {
         if (item)
         {
-            item->setFlagged(TRUE);
+            item->setFlagged(true);
         }
     }
 
@@ -2148,7 +2148,7 @@ void BDFloaterPoser::onAvatarsRefresh()
             {
                 if (avatar == item->getUserdata())
                 {
-                    item->setFlagged(FALSE);
+                    item->setFlagged(false);
                     //BD - When we refresh it might happen that we don't have a name for someone
                     //     yet, when this happens the list entry won't be purged and rebuild as
                     //     it will be updated with this part, so we have to update the name in
@@ -2206,7 +2206,7 @@ void BDFloaterPoser::onAvatarsRefresh()
                     if (avatar == item->getUserdata())
                     {
                         //BD - Avatar is still valid unflag it from removal.
-                        item->setFlagged(FALSE);
+                        item->setFlagged(false);
                         create_new = false;
                         break;
                     }

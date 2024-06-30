@@ -63,7 +63,7 @@ public:
      * LLPanel overrides
      */
 public:
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onOpen(const LLSD& sdParam) override;
 
     /*
@@ -120,7 +120,7 @@ public:
      * LLPanel overrides
      */
 public:
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onOpen(const LLSD& sdParam) override;
 
     /*
@@ -159,7 +159,7 @@ public:
      * LLPanel overrides
      */
 public:
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onOpen(const LLSD& sdParam) override;
 
     /*
@@ -199,7 +199,7 @@ public:
      * LLPanel overrides
      */
 public:
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onOpen(const LLSD& sdParam) override;
 
     /*
@@ -255,7 +255,7 @@ public:
      * LLFloater overrides
      */
 public:
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onOpen(const LLSD& sdParam) override;
 
     /*

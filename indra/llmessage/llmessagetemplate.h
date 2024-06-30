@@ -300,10 +300,10 @@ public:
                 << "has already been used as a block name!" << LL_ENDL;
         }
         *member_blockp = blockp;
-        if ((mTotalSize != -1)
-            && (blockp->mTotalSize != -1)
-            && ((blockp->mType == MBT_SINGLE)
-                || (blockp->mType == MBT_MULTIPLE)))
+        if (  (mTotalSize != -1)
+            &&(blockp->mTotalSize != -1)
+            &&(  (blockp->mType == MBT_SINGLE)
+               ||(blockp->mType == MBT_MULTIPLE)))
         {
             mTotalSize += blockp->mNumber*blockp->mTotalSize;
         }
@@ -361,11 +361,11 @@ public:
         mMessageCallbacks.emplace_back(callback);
     }
 
-    BOOL callHandlerFunc(LLMessageSystem *msgsystem) const
+    bool callHandlerFunc(LLMessageSystem *msgsystem) const
     {
         for (auto& cb : mMessageCallbacks)
             cb(msgsystem);
-        return (BOOL)!mMessageCallbacks.empty();
+        return !mMessageCallbacks.empty();
     }
 
     bool isUdpBanned() const

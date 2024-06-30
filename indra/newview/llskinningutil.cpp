@@ -122,7 +122,7 @@ void LLSkinningUtil::initSkinningMatrixPalette(
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
     initJointNums(const_cast<LLMeshSkinInfo*>(skin), avatar);
-    for (U32 j = 0; j < count; ++j)
+    for (S32 j = 0; j < count; ++j)
     {
         S32 joint_num = skin->mJointNums[j];
         LLJoint *joint = avatar->getJoint(joint_num);
@@ -280,7 +280,7 @@ void LLSkinningUtil::updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *a
     if (vol_face.mJointRiggingInfoTab.needsUpdate())
     {
         S32 num_verts = vol_face.mNumVertices;
-        S32 num_joints = skin->mJointNames.size();
+        S32 num_joints = static_cast<S32>(skin->mJointNames.size());
         if (num_verts > 0 && vol_face.mWeights && num_joints > 0)
         {
             initJointNums(const_cast<LLMeshSkinInfo*>(skin), avatar);

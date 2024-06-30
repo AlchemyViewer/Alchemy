@@ -94,8 +94,8 @@ public:
      * Member variables
      */
 protected:
-    bool                m_fFetchStarted;            // TRUE if we fired off an inventory fetch
-    bool                m_fFetchComplete;           // TRUE if everything was fetched
+    bool                m_fFetchStarted;            // true if we fired off an inventory fetch
+    bool                m_fFetchComplete;           // true if everything was fetched
     mutable LLUUID      m_idRlvRoot;
     callback_signal_t   m_OnSharedRootIDChanged;
 

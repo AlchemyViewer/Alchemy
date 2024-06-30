@@ -161,7 +161,7 @@ namespace LL
             // min/max time values for all samplers combined
             F32 mMinTime = 0.f;
             F32 mMaxTime = 0.f;
-            
+
             // current time of the animation
             F32 mTime = 0.f;
 
@@ -170,7 +170,7 @@ namespace LL
             std::vector<ScaleChannel> mScaleChannels;
 
             const Animation& operator=(const tinygltf::Animation& src);
-            
+
             void allocateGLResources(Asset& asset);
 
             void update(Asset& asset, float dt);

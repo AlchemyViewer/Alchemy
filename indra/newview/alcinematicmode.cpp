@@ -40,18 +40,18 @@ void ALCinematicMode::toggle()
         if (_enabled)
         {
             // Showing elements again
-            LLChicletBar::getInstance()->setVisible(TRUE);
-            LLPanelStandStopFlying::getInstance()->setVisible(TRUE); // FIXME: that doesn't always work
-            LLNavigationBar::getInstance()->setVisible(TRUE);
-            gViewerWindow->setUIVisibility(TRUE);
+            LLChicletBar::getInstance()->setVisible(true);
+            LLPanelStandStopFlying::getInstance()->setVisible(true); // FIXME: that doesn't always work
+            LLNavigationBar::getInstance()->setVisible(true);
+            gViewerWindow->setUIVisibility(true);
         }
         else
         {
             // Hiding Elements
-            gViewerWindow->setUIVisibility(FALSE);
-            LLNavigationBar::getInstance()->setVisible(FALSE);
-            LLPanelStandStopFlying::getInstance()->setVisible(FALSE); // FIXME: that doesn't always work
-            LLChicletBar::getInstance()->setVisible(FALSE);
+            gViewerWindow->setUIVisibility(false);
+            LLNavigationBar::getInstance()->setVisible(false);
+            LLPanelStandStopFlying::getInstance()->setVisible(false); // FIXME: that doesn't always work
+            LLChicletBar::getInstance()->setVisible(false);
         }
         _enabled = !_enabled;
         LLHUDText::refreshAllObjectText();

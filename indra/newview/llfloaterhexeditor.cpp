@@ -33,7 +33,7 @@ LLFloaterHexEditor::LLFloaterHexEditor(const LLSD& key)
 ,   mEditor(nullptr)
 { }
 
-BOOL LLFloaterHexEditor::postBuild()
+bool LLFloaterHexEditor::postBuild()
 {
     mEditor = getChild<LLHexEditor>("hex");
     /*
@@ -56,7 +56,7 @@ BOOL LLFloaterHexEditor::postBuild()
     save_btn->setEnabled(false);
     save_btn->setCommitCallback(boost::bind(&LLFloaterHexEditor::onClickSave, this));
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterHexEditor::onOpen(const LLSD& key)
@@ -82,7 +82,7 @@ void LLFloaterHexEditor::onOpen(const LLSD& key)
     }
 
     // Load the asset
-    mEditor->setVisible(FALSE);
+    mEditor->setVisible(false);
     childSetTextArg("status_text", "[STATUS]", LLStringExplicit("Loading..."));
     download(mItem, imageCallback, assetCallback);
 
@@ -111,7 +111,7 @@ void LLFloaterHexEditor::download(LLViewerInventoryItem* item, loaded_callback_f
                 item->getAssetUUID(), FTT_DEFAULT, MIPMAP_YES, LLViewerTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
             texture->setBoostLevel(LLViewerTexture::BOOST_PREVIEW);
             texture->forceToSaveRawImage(0);
-            texture->setLoadedCallbackNoAux(onImage, 0, TRUE, FALSE, item, nullptr);
+            texture->setLoadedCallbackNoAux(onImage, 0, true, false, item, nullptr);
             break;
         }
         case LLAssetType::AT_NOTECARD:
@@ -129,7 +129,7 @@ void LLFloaterHexEditor::download(LLViewerInventoryItem* item, loaded_callback_f
                                            item->getType(),
                                            onAsset,
                                            item,  // user_data
-                                           TRUE);
+                                           true);
             break;
         }
         case LLAssetType::AT_SOUND:
@@ -139,19 +139,19 @@ void LLFloaterHexEditor::download(LLViewerInventoryItem* item, loaded_callback_f
         case LLAssetType::AT_GESTURE:
         default:
         {
-            gAssetStorage->getAssetData(item->getAssetUUID(), item->getType(), onAsset, item, TRUE);
+            gAssetStorage->getAssetData(item->getAssetUUID(), item->getType(), onAsset, item, true);
             break;
         }
     }
 }
 
 // static
-void LLFloaterHexEditor::imageCallback(BOOL success,
+void LLFloaterHexEditor::imageCallback(bool success,
                     LLViewerFetchedTexture *src_vi,
                     LLImageRaw* src,
                     LLImageRaw* aux_src,
                     S32 discard_level,
-                    BOOL final,
+                    bool final,
                     void* userdata)
 {
     if (final)
@@ -174,7 +174,7 @@ void LLFloaterHexEditor::imageCallback(BOOL success,
             new_data.push_back(src_data[i]);
 
         self->mEditor->setValue(new_data);
-        self->mEditor->setVisible(TRUE);
+        self->mEditor->setVisible(true);
         self->childSetTextArg("status_text", "[STATUS]", LLStringExplicit("Note: Image data shown isn't the actual asset data, yet"));
 
         self->childSetEnabled("save_btn", false);
@@ -223,7 +223,7 @@ void LLFloaterHexEditor::assetCallback(const LLUUID& asset_uuid,
         new_data.push_back(buffer[i]);
 
     self->mEditor->setValue(new_data);
-    self->mEditor->setVisible(TRUE);
+    self->mEditor->setVisible(true);
     self->childSetTextArg("status_text", "[STATUS]", LLStringUtil::null);
 
     self->childSetEnabled("upload_btn", true);
@@ -284,7 +284,7 @@ void LLFloaterHexEditor::onClickUpload()
     value.clear();
 
     LLFileSystem file(fake_asset_id, item->getType(), LLFileSystem::APPEND);
-    if (!file.write(buffer.get(), val_size))
+    if (!file.write(buffer.get(), static_cast<S32>(val_size)))
     {
         LLSD args = LLSD().with("MESSAGE", "Couldn't write data to file");
         LLNotificationsUtil::add("GenericAlert", args);
@@ -351,7 +351,7 @@ void LLFloaterHexEditor::onClickSave()
     LLFileSystem file(fake_asset_id, item->getType(), LLFileSystem::APPEND);
     if (file.getMaxSize() > val_size)
     {
-        if (!file.write(buffer.get(), val_size))
+        if (!file.write(buffer.get(), static_cast<S32>(val_size)))
         {
             LLSD args = LLSD().with("MESSAGE", "Could not write data to file");
             LLNotificationsUtil::add("GenericAlert", args);
@@ -425,7 +425,7 @@ void LLFloaterHexEditor::onSaveComplete(const LLUUID& asset_uuid, void* user_dat
         new_item->setDescription(item->getDescription());
         //new_item->setTransactionID(info->mTransactionID);
         new_item->setAssetUUID(asset_uuid);
-        new_item->updateServer(FALSE);
+        new_item->updateServer(false);
         gInventory.updateItem(new_item);
         gInventory.notifyObservers();
     }
@@ -453,7 +453,7 @@ void LLFloaterHexEditor::handleSizing()
     setResizeLimits(min_width, getMinHeight());
     if(getRect().getWidth() < min_width)
     {
-        reshape(min_width, getRect().getHeight(), FALSE);
-        mEditor->reshape(mEditor->getRect().getWidth(), mEditor->getRect().getHeight(), TRUE);
+        reshape(min_width, getRect().getHeight(), false);
+        mEditor->reshape(mEditor->getRect().getWidth(), mEditor->getRect().getHeight(), true);
     }
 }

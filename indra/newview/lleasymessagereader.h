@@ -36,7 +36,7 @@ public:
 
     S32 getNumberOfBlocks(const char *blockname);
 
-    std::string var2Str(const char* block_name, S32 block_num, LLMessageVariable* variable, BOOL &returned_hex, BOOL summary_mode=FALSE);
+    std::string var2Str(const char* block_name, S32 block_num, LLMessageVariable* variable, bool &returned_hex, bool summary_mode=false);
 
 private:
     LLTemplateMessageReader mTemplateMessageReader;

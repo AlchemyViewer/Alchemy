@@ -103,6 +103,8 @@ bool LLImageJ2C::updateData()
     bool res = true;
     resetLastError();
 
+    LLImageDataLock lock(this);
+
     // Check to make sure that this instance has been initialized with data
     if (!getData() || (getDataSize() < 16))
     {
@@ -153,22 +155,25 @@ bool LLImageJ2C::decodeChannels(LLImageRaw *raw_imagep, F32 decode_time, S32 fir
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     LLTimer elapsed;
 
-    bool res = true;
-
     resetLastError();
 
-    // Check to make sure that this instance has been initialized with data
-    if (!getData() || (getDataSize() < 16))
+    bool res;
     {
-        setLastError("LLImageJ2C uninitialized");
-        res = true; // done
-    }
-    else
-    {
-        // Update the raw discard level
-        updateRawDiscardLevel();
+        LLImageDataLock lock(this);
+
         mDecoding = true;
-        res = mImpl->decodeImpl(*this, *raw_imagep, decode_time, first_channel, max_channel_count);
+        // Check to make sure that this instance has been initialized with data
+        if (!getData() || (getDataSize() < 16))
+        {
+            setLastError("LLImageJ2C uninitialized");
+            res = true; // done
+        }
+        else
+        {
+            // Update the raw discard level
+            updateRawDiscardLevel();
+            res = mImpl->decodeImpl(*this, *raw_imagep, decode_time, first_channel, max_channel_count);
+        }
     }
 
     if (res)
@@ -177,9 +182,18 @@ bool LLImageJ2C::decodeChannels(LLImageRaw *raw_imagep, F32 decode_time, S32 fir
         {
             // Failed
             raw_imagep->deleteData();
+            res = false;
         }
         else
         {
+            mDecoding = false;
+        }
+    }
+    else
+    {
+        if (mDecoding)
+        {
+            LL_WARNS() << "decodeImpl failed but mDecoding is true" << LL_ENDL;
             mDecoding = false;
         }
     }
@@ -402,8 +416,9 @@ bool LLImageJ2C::loadAndValidate(const std::string &filename)
 
 bool LLImageJ2C::validate(U8 *data, U32 file_size)
 {
-
     resetLastError();
+
+    LLImageDataLock lock(this);
 
     setData(data, file_size);
 

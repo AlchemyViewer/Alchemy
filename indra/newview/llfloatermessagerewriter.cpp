@@ -34,12 +34,12 @@ LLFloaterMessageRewriter::LLFloaterMessageRewriter(const LLSD& key)
 {
 }
 
-BOOL LLFloaterMessageRewriter::postBuild()
+bool LLFloaterMessageRewriter::postBuild()
 {
     getChild<LLUICtrl>("save_rules")->setCommitCallback(boost::bind(&LLFloaterMessageRewriter::onClickSaveRules, this));
     getChild<LLUICtrl>("new_rule")->setCommitCallback(boost::bind(&LLFloaterMessageRewriter::onClickNewRule, this));
     refreshRuleList();
-    return TRUE;
+    return true;
 }
 
 void LLFloaterMessageRewriter::refreshRuleList()

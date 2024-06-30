@@ -31,7 +31,6 @@
 #include <algorithm>
 
 #include "indra_constants.h"
-//#include "llcachename.h"
 #include "llstl.h"
 #include "lltimer.h"
 #include "lluuid.h"
@@ -94,7 +93,7 @@ LLAvatarTracker::LLAvatarTracker() :
     mTrackingData(NULL),
     mTrackedAgentValid(false),
     mModifyMask(0x0),
-    mIsNotifyObservers(FALSE)
+    mIsNotifyObservers(false)
 {
 }
 
@@ -493,7 +492,7 @@ void LLAvatarTracker::notifyObservers()
         return;
     }
     LL_PROFILE_ZONE_SCOPED
-    mIsNotifyObservers = TRUE;
+    mIsNotifyObservers = true;
 
     observer_list_t observers(mObservers);
     observer_list_t::iterator it = observers.begin();
@@ -510,7 +509,7 @@ void LLAvatarTracker::notifyObservers()
 
     mModifyMask = LLFriendObserver::NONE;
     mChangedBuddyIDs.clear();
-    mIsNotifyObservers = FALSE;
+    mIsNotifyObservers = false;
 }
 
 void LLAvatarTracker::addParticularFriendObserver(const LLUUID& buddy_id, LLFriendObserver* observer)
@@ -683,7 +682,7 @@ void LLAvatarTracker::processNotify(LLMessageSystem* msg, bool online)
 {
     LL_PROFILE_ZONE_SCOPED
     S32 count = msg->getNumberOfBlocksFast(_PREHASH_AgentBlock);
-    BOOL chat_notify = gSavedSettings.getBOOL("ChatOnlineNotification");
+    bool chat_notify = gSavedSettings.getBOOL("ChatOnlineNotification");
 
     LL_DEBUGS() << "Received " << count << " online notifications **** " << LL_ENDL;
     if(count > 0)
@@ -749,7 +748,7 @@ static void on_avatar_name_cache_notify(const LLUUID& agent_id,
     notify_params.substitutions = args;
     if (online)
     {
-        notify_params.payload = payload.with("respond_on_mousedown", TRUE);
+        notify_params.payload = payload.with("respond_on_mousedown", true);
 
         LLNotification::Params::Functor functor_p;
         functor_p.function = boost::bind(&LLAvatarActions::startIM, agent_id);

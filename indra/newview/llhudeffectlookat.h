@@ -57,7 +57,7 @@ public:
     /*virtual*/ void markDead() override;
     /*virtual*/ void setSourceObject(LLViewerObject* objectp) override;
 
-    BOOL setLookAt(ELookAtType target_type, LLViewerObject *object, LLVector3 position);
+    bool setLookAt(ELookAtType target_type, LLViewerObject *object, LLVector3 position);
     void clearLookAtTarget();
 
     ELookAtType getLookAtType() const { return mTargetType; }
@@ -79,7 +79,7 @@ protected:
     void setTargetPosGlobal(const LLVector3d &target_pos_global);
 
 public:
-    static BOOL sDebugLookAt;
+    static bool sDebugLookAt;
 
 private:
     ELookAtType                 mTargetType;

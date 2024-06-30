@@ -106,7 +106,7 @@ ALFloaterParticleEditor::~ALFloaterParticleEditor()
     clearParticles();
 }
 
-BOOL ALFloaterParticleEditor::postBuild()
+bool ALFloaterParticleEditor::postBuild()
 {
     LLPanel* panel = getChild<LLPanel>("burst_panel");
     mBurstRateCtrl = panel->getChild<LLUICtrl>("burst_rate");
@@ -178,17 +178,17 @@ BOOL ALFloaterParticleEditor::postBuild()
     return LLFloater::postBuild();
 }
 
-BOOL ALFloaterParticleEditor::canClose()
+bool ALFloaterParticleEditor::canClose()
 {
     if (!hasChanged())
     {
-        return TRUE;
+        return true;
     }
     else
     {
         // Bring up view-modal dialog: Save changes? Yes, No, Cancel
         LLNotificationsUtil::add("ParticleSaveChanges", LLSD(), LLSD(), boost::bind(&ALFloaterParticleEditor::handleSaveDialog, this, _1, _2));
-        return FALSE;
+        return false;
     }
 }
 
@@ -323,7 +323,7 @@ void ALFloaterParticleEditor::onParameterChange()
 void ALFloaterParticleEditor::updateUI()
 {
     U8 pattern = sParticlePatterns.at(mPatternTypeCombo->getValue()).flag;
-    BOOL drop_pattern = (pattern == LLPartSysData::LL_PART_SRC_PATTERN_DROP);
+    S32 drop_pattern = (pattern == LLPartSysData::LL_PART_SRC_PATTERN_DROP);
     BOOL explode_pattern = (pattern == LLPartSysData::LL_PART_SRC_PATTERN_EXPLODE);
     BOOL target_linear = mTargetLinearCheckBox->getValue();
     BOOL interpolate_color = mInterpolateColorCheckBox->getValue();
@@ -370,8 +370,8 @@ void ALFloaterParticleEditor::onClickClearTarget()
 
 void ALFloaterParticleEditor::onClickTargetPicker()
 {
-    mPickTargetButton->setToggleState(TRUE);
-    mPickTargetButton->setEnabled(FALSE);
+    mPickTargetButton->setToggleState(true);
+    mPickTargetButton->setEnabled(false);
     LLToolObjPicker::getInstance()->setExitCallback(onTargetPicked, this);
     LLToolMgr::getInstance()->setTransientTool(LLToolObjPicker::getInstance());
 }
@@ -385,8 +385,8 @@ void ALFloaterParticleEditor::onTargetPicked(void* userdata)
 
     LLToolMgr::getInstance()->clearTransientTool();
 
-    self->mPickTargetButton->setEnabled(TRUE);
-    self->mPickTargetButton->setToggleState(FALSE);
+    self->mPickTargetButton->setEnabled(true);
+    self->mPickTargetButton->setToggleState(false);
 
     if (picked.notNull())
     {
@@ -568,12 +568,12 @@ void ALFloaterParticleEditor::injectScript()
         perm.getMaskNextOwner(),
         callback);
 
-    setCanClose(FALSE);
+    setCanClose(false);
 }
 
 void ALFloaterParticleEditor::callbackReturned(const LLUUID& inventoryItemID)
 {
-    setCanClose(TRUE);
+    setCanClose(true);
 
     if (inventoryItemID.isNull())
     {
@@ -639,7 +639,7 @@ void ALFloaterParticleEditor::finishUpload(LLUUID itemId, LLUUID taskId, LLUUID 
         return;
     }
     auto* script = gInventory.getItem(itemId);
-    object->saveScript(script, TRUE, FALSE);
+    object->saveScript(script, true, false);
 
     LLNotificationsUtil::add("ParticleScriptInjected");
 }

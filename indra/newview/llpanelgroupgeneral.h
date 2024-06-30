@@ -54,7 +54,7 @@ public:
 
     virtual void update(LLGroupChange gc);
 
-    virtual BOOL postBuild();
+    virtual bool postBuild();
 
     virtual void draw();
 
@@ -81,8 +81,8 @@ private:
     void updateChanged();
     bool confirmMatureApply(const LLSD& notification, const LLSD& response);
 
-    BOOL            mChanged;
-    BOOL            mFirstUse;
+    bool            mChanged;
+    bool            mFirstUse;
     std::string     mIncompleteMemberDataStr;
 
     // Group information (include any updates in updateChanged)

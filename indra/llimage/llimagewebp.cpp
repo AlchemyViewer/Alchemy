@@ -48,6 +48,8 @@ bool LLImageWebP::updateData()
 {
     resetLastError();
 
+    LLImageDataLock lock(this);
+
     // Check to make sure that this instance has been initialized with data
     if (isBufferInvalid() || (0 == getDataSize()))
     {
@@ -77,6 +79,9 @@ bool LLImageWebP::decode(LLImageRaw* raw_image, F32 decode_time)
     llassert_always(raw_image);
 
     resetLastError();
+
+    LLImageDataSharedLock lockIn(this);
+    LLImageDataLock lockOut(raw_image);
 
     // Check to make sure that this instance has been initialized with data
     if (isBufferInvalid() || (0 == getDataSize()))
@@ -141,6 +146,9 @@ bool LLImageWebP::encode(const LLImageRaw* raw_image, F32 encode_time)
 
     resetLastError();
 
+    LLImageDataSharedLock lockIn(raw_image);
+    LLImageDataLock lockOut(this);
+
     if (raw_image->isBufferInvalid() || (0 == raw_image->getDataSize()))
     {
         setLastError("LLImageWebP trying to decode an image with no data!");
@@ -178,11 +186,11 @@ bool LLImageWebP::encode(const LLImageRaw* raw_image, F32 encode_time)
     size_t encodedSize = 0;
     if (components == 4)
     {
-        encodedSize = WebPEncodeLosslessRGBA(tmp_buff.get(), width, height, stride, &encodedData);
+        encodedSize = WebPEncodeLosslessRGBA(tmp_buff.get(), width, height, static_cast<int>(stride), &encodedData);
     }
     else
     {
-        encodedSize = WebPEncodeLosslessRGB(tmp_buff.get(), width, height, stride, &encodedData);
+        encodedSize = WebPEncodeLosslessRGB(tmp_buff.get(), width, height, static_cast<int>(stride), &encodedData);
     }
 
     if (encodedData == nullptr || encodedSize == 0)
@@ -191,7 +199,7 @@ bool LLImageWebP::encode(const LLImageRaw* raw_image, F32 encode_time)
         return false;
     }
 
-    if (!allocateData(encodedSize))
+    if (!allocateData(static_cast<S32>(encodedSize)))
     {
         setLastError("LLImageWebP::Failed to allocate final buffer for image");
         WebPFree(encodedData);

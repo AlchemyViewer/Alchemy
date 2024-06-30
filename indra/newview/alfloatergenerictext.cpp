@@ -43,7 +43,7 @@ LLFloaterGenericText::LLFloaterGenericText(const LLSD& key)
     mCommitCallbackRegistrar.add("GenericText.Copy", boost::bind(&LLFloaterGenericText::onClickCopy, this));
 }
 
-BOOL LLFloaterGenericText::postBuild()
+bool LLFloaterGenericText::postBuild()
 {
     setTitle(mTitle);
     getChild<LLTextEditor>("payload")->setText(mContents);

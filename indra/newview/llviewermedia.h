@@ -317,57 +317,57 @@ public:
 
     // need these to handle mouseup...
     /*virtual*/ void    onMouseCaptureLost() override;
-    /*virtual*/ BOOL    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
 
     // Grr... the only thing I want as an LLMouseHandler are the onMouseCaptureLost and handleMouseUp calls.
     // Sadly, these are all pure virtual, so I have to supply implementations here:
-    /*virtual*/ BOOL    handleMouseDown(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleHover(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleScrollWheel(S32 x, S32 y, S32 clicks) override { return FALSE; };
-    /*virtual*/ BOOL    handleScrollHWheel(S32 x, S32 y, S32 clicks) override { return FALSE; };
-    /*virtual*/ BOOL    handleDoubleClick(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleRightMouseDown(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleRightMouseUp(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleToolTip(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleMiddleMouseDown(S32 x, S32 y, MASK mask) override { return FALSE; };
-    /*virtual*/ BOOL    handleMiddleMouseUp(S32 x, S32 y, MASK mask) override {return FALSE; };
+    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, S32 clicks) override { return false; };
+    /*virtual*/ bool    handleScrollHWheel(S32 x, S32 y, S32 clicks) override { return false; };
+    /*virtual*/ bool    handleDoubleClick(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleRightMouseDown(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleRightMouseUp(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleMiddleMouseUp(S32 x, S32 y, MASK mask) override {return false; };
     /*virtual*/ const std::string& getName() const override;
 
     /*virtual*/ void    screenPointToLocal(S32 screen_x, S32 screen_y, S32* local_x, S32* local_y) const override {};
     /*virtual*/ void    localPointToScreen(S32 local_x, S32 local_y, S32* screen_x, S32* screen_y) const override {};
-    /*virtual*/ BOOL hasMouseCapture() override { return gFocusMgr.getMouseCapture() == this; };
+    /*virtual*/ bool hasMouseCapture() override { return gFocusMgr.getMouseCapture() == this; };
 
     // Inherited from LLPluginClassMediaOwner
     /*virtual*/ void handleMediaEvent(LLPluginClassMedia* plugin, LLPluginClassMediaOwner::EMediaEvent) override;
 
     // LLEditMenuHandler overrides
     /*virtual*/ void    undo() override;
-    /*virtual*/ BOOL    canUndo() const override;
+    /*virtual*/ bool    canUndo() const override;
 
     /*virtual*/ void    redo() override;
-    /*virtual*/ BOOL    canRedo() const override;
+    /*virtual*/ bool    canRedo() const override;
 
     /*virtual*/ void    cut() override;
-    /*virtual*/ BOOL    canCut() const override;
+    /*virtual*/ bool    canCut() const override;
 
     /*virtual*/ void    copy() override;
-    /*virtual*/ BOOL    canCopy() const override;
+    /*virtual*/ bool    canCopy() const override;
 
     /*virtual*/ void    paste() override;
-    /*virtual*/ BOOL    canPaste() const override;
+    /*virtual*/ bool    canPaste() const override;
 
     /*virtual*/ void    doDelete() override;
-    /*virtual*/ BOOL    canDoDelete() const override;
+    /*virtual*/ bool    canDoDelete() const override;
 
     /*virtual*/ void    selectAll() override;
-    /*virtual*/ BOOL    canSelectAll() const override;
+    /*virtual*/ bool    canSelectAll() const override;
 
     void addObject(LLVOVolume* obj) ;
     void removeObject(LLVOVolume* obj) ;
     const std::list< LLVOVolume* >* getObjectList() const ;
     LLVOVolume *getSomeObject();
-    void setUpdated(BOOL updated) ;
-    BOOL isUpdated() ;
+    void setUpdated(bool updated) ;
+    bool isUpdated() ;
 
     // updates the javascript object in the embedded browser with viewer values
     void updateJavascriptObject();
@@ -500,7 +500,7 @@ private:
     static std::vector<std::string> sMimeTypesFailed;
     LLPointer<LLImageRaw> mRawImage; //backing buffer for texture updates
 private:
-    BOOL mIsUpdated ;
+    bool mIsUpdated ;
     std::list< LLVOVolume* > mObjectList ;
 
     void mimeDiscoveryCoro(std::string url);

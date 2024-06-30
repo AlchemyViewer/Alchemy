@@ -61,7 +61,7 @@ class ViewerManifest(LLManifest):
         # files during the build (see copy_w_viewer_manifest
         # and copy_l_viewer_manifest targets)
         return 'package' in self.args['actions']
-    
+
     def construct(self):
         super(ViewerManifest, self).construct()
         self.path(src="../../scripts/messages/message_template.msg", dst="app_settings/message_template.msg")
@@ -103,7 +103,7 @@ class ViewerManifest(LLManifest):
             
                 # ... and the entire color lut texture directory
                 self.path("colorlut")
-            
+
                 # ... and the included spell checking dictionaries
                 pkgdir = os.path.join(self.args['build'], os.pardir, 'packages')
                 with self.prefix(src=pkgdir):
@@ -273,7 +273,7 @@ class ViewerManifest(LLManifest):
 
     def app_name_oneword(self):
         return ''.join(self.app_name().split())
-    
+
     def icon_path(self):
         return os.path.join(self.args['build'], os.pardir, 'packages', 'branding', 'viewer', 'icons', self.channel_type())
 
@@ -452,7 +452,7 @@ class WindowsManifest(ViewerManifest):
         self.path2basename(os.path.join(os.pardir,
                                         'llplugin', 'slplugin', self.args['configuration']),
                            "ALPlugin.exe")
-        
+
         # Get shared libs from the shared libs staging directory
         with self.prefix(src=os.path.join(self.args['build'], os.pardir,
                                           'sharedlibs', self.args['buildtype'])):
@@ -620,7 +620,7 @@ class WindowsManifest(ViewerManifest):
                     self.path("libvlccore.dll")
                     self.path("plugins/")
         if not self.is_packaging_viewer():
-            self.package_file = "copied_deps"    
+            self.package_file = "copied_deps"
 
     def isc_file_commands(self):
         def wpath(path):
@@ -659,7 +659,7 @@ class WindowsManifest(ViewerManifest):
 
         installer_file = self.installer_base_name() + '_Setup.exe'
         substitution_strings['installer_file'] = self.installer_base_name() + '_Setup'
-        
+
         if self.channel_type() == 'release':
             substitution_strings['caption'] = CHANNEL_VENDOR_BASE
         else:
@@ -798,7 +798,7 @@ class DarwinManifest(ViewerManifest):
                 # yields a slightly smaller binary but makes crash
                 # logs mostly useless. This may be desirable for the
                 # final release. Or not.
-                if ("package" in self.args['actions'] or 
+                if ("package" in self.args['actions'] or
                     "unpacked" in self.args['actions']):
                     self.run_command(
                         ['strip', '-S', executable])

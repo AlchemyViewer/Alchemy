@@ -115,19 +115,19 @@ LLTerrainMaterials::~LLTerrainMaterials()
     unboost();
 }
 
-BOOL LLTerrainMaterials::generateMaterials()
+bool LLTerrainMaterials::generateMaterials()
 {
     if (texturesReady(true, true))
     {
-        return TRUE;
+        return true;
     }
 
     if (materialsReady(true, true))
     {
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 void LLTerrainMaterials::boost()
@@ -195,7 +195,7 @@ LLTerrainMaterials::Type LLTerrainMaterials::getMaterialType()
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    const BOOL use_textures = texturesReady(false, false) || !materialsReady(false, false);
+    const bool use_textures = texturesReady(false, false) || !materialsReady(false, false);
     return use_textures ? Type::TEXTURE : Type::PBR;
 }
 
@@ -403,13 +403,13 @@ void LLVLComposition::setSurface(LLSurface *surfacep)
     mSurfacep = surfacep;
 }
 
-BOOL LLVLComposition::generateHeights(const F32 x, const F32 y,
+bool LLVLComposition::generateHeights(const F32 x, const F32 y,
                                       const F32 width, const F32 height)
 {
     if (!mParamsReady)
     {
         // All the parameters haven't been set yet (we haven't gotten the message from the sim)
-        return FALSE;
+        return false;
     }
 
     llassert(mSurfacep);
@@ -417,7 +417,7 @@ BOOL LLVLComposition::generateHeights(const F32 x, const F32 y,
     if (!mSurfacep || !mSurfacep->getRegion())
     {
         // We don't always have the region yet here....
-        return FALSE;
+        return false;
     }
 
     S32 x_begin, y_begin, x_end, y_end;
@@ -499,17 +499,17 @@ BOOL LLVLComposition::generateHeights(const F32 x, const F32 y,
             *(mDatap + i + j*mWidth) = scaled_noisy_height;
         }
     }
-    return TRUE;
+    return true;
 }
 
 LLTerrainMaterials gLocalTerrainMaterials;
 
-BOOL LLVLComposition::generateComposition()
+bool LLVLComposition::generateComposition()
 {
     if (!mParamsReady)
     {
         // All the parameters haven't been set yet (we haven't gotten the message from the sim)
-        return FALSE;
+        return false;
     }
 
     return LLTerrainMaterials::generateMaterials();
@@ -586,7 +586,7 @@ namespace
         };
         PendingImage* pending_image = new PendingImage(raw_image, ddiscard, tex->getID());
 
-        loaded_callback_func cb = [](BOOL success, LLViewerFetchedTexture * src_vi, LLImageRaw * src, LLImageRaw * src_aux, S32 discard_level, BOOL is_final, void* userdata) {
+        loaded_callback_func cb = [](bool success, LLViewerFetchedTexture * src_vi, LLImageRaw * src, LLImageRaw * src_aux, S32 discard_level, bool is_final, void* userdata) {
             PendingImage* pending = (PendingImage*)userdata;
             // Owning LLVLComposition still exists
 
@@ -617,7 +617,7 @@ namespace
     }
 };
 
-BOOL LLVLComposition::generateMinimapTileLand(const F32 x, const F32 y,
+bool LLVLComposition::generateMinimapTileLand(const F32 x, const F32 y,
                                       const F32 width, const F32 height)
 {
     LL_PROFILE_ZONE_SCOPED
@@ -638,11 +638,11 @@ BOOL LLVLComposition::generateMinimapTileLand(const F32 x, const F32 y,
     const bool use_textures = getMaterialType() != LLTerrainMaterials::Type::PBR;
     if (use_textures)
     {
-        if (!texturesReady(true, true)) { return FALSE; }
+        if (!texturesReady(true, true)) { return false; }
     }
     else
     {
-        if (!materialsReady(true, true)) { return FALSE; }
+        if (!materialsReady(true, true)) { return false; }
     }
 
     for (S32 i = 0; i < ASSET_COUNT; i++)
@@ -687,8 +687,8 @@ BOOL LLVLComposition::generateMinimapTileLand(const F32 x, const F32 y,
 
             bool delete_raw_post = false;
             bool delete_raw_post_emissive = false;
-            if (!prepare_raw_image(mRawImagesBaseColor[i], false, tex, delete_raw_post)) { return FALSE; }
-            if (tex_emissive && !prepare_raw_image(mRawImagesEmissive[i], true, tex_emissive, delete_raw_post_emissive)) { return FALSE; }
+            if (!prepare_raw_image(mRawImagesBaseColor[i], false, tex, delete_raw_post)) { return false; }
+            if (tex_emissive && !prepare_raw_image(mRawImagesEmissive[i], true, tex_emissive, delete_raw_post_emissive)) { return false; }
             // tex_emissive can be null, and then will be ignored
 
             // In the simplest case, the minimap image is just the base color.
@@ -819,7 +819,7 @@ BOOL LLVLComposition::generateMinimapTileLand(const F32 x, const F32 y,
     if (tex_comps != st_comps)
     {
         llassert(false);
-        return FALSE;
+        return false;
     }
 
     tex_x_scalef = (F32)tex_width / (F32)mWidth;
@@ -921,7 +921,7 @@ BOOL LLVLComposition::generateMinimapTileLand(const F32 x, const F32 y,
         unboost_minimap_material(mDetailMaterials[i]);
     }
 
-    return TRUE;
+    return true;
 }
 
 F32 LLVLComposition::getStartHeight(S32 corner)

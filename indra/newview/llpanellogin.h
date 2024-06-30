@@ -48,7 +48,7 @@ public:
                 void *callback_data);
     ~LLPanelLogin();
 
-    void setFocus( BOOL b ) override;
+    void setFocus( bool b ) override;
 
     static void show(const LLRect &rect,
         void (*callback)(S32 option, void* user_data),
@@ -59,9 +59,9 @@ public:
     static void resetFields();
     static void getFields(LLPointer<LLCredential>& credential, bool& remember_user, bool& remember_psswrd);
 
-    static BOOL isCredentialSet() { return sCredentialSet; }
+    static bool isCredentialSet() { return sCredentialSet; }
 
-    static BOOL areCredentialFieldsDirty();
+    static bool areCredentialFieldsDirty();
     static void setLocation(const LLSLURL& slurl);
     static void autologinToLocation(const LLSLURL& slurl);
 
@@ -69,7 +69,6 @@ public:
     static void updateLocationSelectorsVisibility();
 
     static void closePanel();
-
 
     static void loadLoginPage();
     static void giveFocus();
@@ -91,7 +90,6 @@ public:
 private:
     friend class LLPanelLoginListener;
     void addFavoritesToStartLocation();
-    void addUsersWithFavoritesToUsername();
     void onSelectServer();
     void onLocationSLURL();
     void refreshGridList();
@@ -120,14 +118,14 @@ private:
     void            (*mCallback)(S32 option, void *userdata);
     void*           mCallbackData;
 
-    BOOL            mPasswordModified;
+    bool            mPasswordModified;
     bool            mShowFavorites;
 
     static LLPanelLogin* sInstance;
-    static BOOL     sCapslockDidNotification;
+    static bool     sCapslockDidNotification;
     bool            mFirstLoginThisInstall;
 
-    static BOOL sCredentialSet;
+    static bool sCredentialSet;
 
     unsigned int mUsernameLength;
     unsigned int mPasswordLength;

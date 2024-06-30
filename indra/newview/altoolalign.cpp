@@ -38,7 +38,7 @@ ALToolAlign::ALToolAlign()
 {
 }
 
-BOOL ALToolAlign::handleMouseDown(S32 x, S32 y, MASK mask)
+bool ALToolAlign::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     if (mHighlightedAxis != -1)
     {
@@ -49,7 +49,7 @@ BOOL ALToolAlign::handleMouseDown(S32 x, S32 y, MASK mask)
         gViewerWindow->pickAsync(x, y, mask, pickCallback);
     }
 
-    return TRUE;
+    return true;
 }
 
 
@@ -105,7 +105,7 @@ void ALToolAlign::handleDeselect()
 {
 }
 
-BOOL ALToolAlign::findSelectedManipulator(S32 x, S32 y)
+bool ALToolAlign::findSelectedManipulator(S32 x, S32 y)
 {
     mHighlightedAxis = -1;
     mHighlightedDirection = 0;
@@ -167,16 +167,16 @@ BOOL ALToolAlign::findSelectedManipulator(S32 x, S32 y)
             {
                 mHighlightedAxis = axis;
                 mHighlightedDirection = direction;
-                return TRUE;
+                return true;
             }
 
         }
     }
 
-    return FALSE;
+    return false;
 }
 
-BOOL ALToolAlign::handleHover(S32 x, S32 y, MASK mask)
+bool ALToolAlign::handleHover(S32 x, S32 y, MASK mask)
 {
     mForce = (mask & MASK_SHIFT) ? false : true;
 
@@ -342,13 +342,13 @@ void ALToolAlign::renderManipulators()
     }
 }
 
-BOOL ALToolAlign::canAffectSelection()
+bool ALToolAlign::canAffectSelection()
 {
     // An selection is scalable if you are allowed to move the objects
     // and it does not have any sitting agents. In case of editing linked parts,
     // the object itself has to be modifiable.
     static LLCachedControl<bool> edit_linked_parts(gSavedSettings, "EditLinkedParts");
-    BOOL can_scale = LLSelectMgr::getInstance()->getSelection()->getObjectCount() != 0;
+    bool can_scale = LLSelectMgr::getInstance()->getSelection()->getObjectCount() != 0;
     if (can_scale)
     {
         struct f : public LLSelectedObjectFunctor
@@ -385,7 +385,7 @@ void ALToolAlign::render()
 }
 
 // only works for our specialized (AABB, position centered) bboxes
-BOOL bbox_overlap(LLBBox bbox1, LLBBox bbox2)
+bool bbox_overlap(LLBBox bbox1, LLBBox bbox2)
 {
     LLVector3 delta = bbox1.getCenterAgent() - bbox2.getCenterAgent();
 
@@ -403,7 +403,7 @@ public:
     BBoxCompare(S32 axis, F32 direction, std::map<LLPointer<LLViewerObject>, LLBBox >& bboxes) :
         mAxis(axis), mDirection(direction), mBBoxes(bboxes) {}
 
-    BOOL operator() (LLViewerObject* object1, LLViewerObject* object2)
+    bool operator() (LLViewerObject* object1, LLViewerObject* object2)
     {
         LLVector3 corner1 = mBBoxes[object1].getCenterAgent() -
             mDirection * mBBoxes[object1].getExtentLocal() / 2.0f;
@@ -499,7 +499,7 @@ void ALToolAlign::align()
             new_bbox.addPointLocal(-1.0f * this_bbox.getExtentLocal() / 2.0f);
 
             // check to see if it overlaps the previously placed objects
-            BOOL overlap = FALSE;
+            bool overlap = false;
 
             //LL_DEBUGS("ToolAlign") << "i=" << i << " j=" << j << LL_ENDL;
 
@@ -510,7 +510,7 @@ void ALToolAlign::align()
                     LLViewerObject* other_object = objects[k];
                     LLBBox other_bbox = new_bboxes[other_object];
 
-                    BOOL overlaps_this = bbox_overlap(other_bbox, new_bbox);
+                    bool overlaps_this = bbox_overlap(other_bbox, new_bbox);
 
                     //if (overlaps_this)
                     //{

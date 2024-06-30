@@ -156,16 +156,16 @@ LLMotion::LLMotionInitStatus LLHeadRotMotion::onInitialize(LLCharacter *characte
 //-----------------------------------------------------------------------------
 // LLHeadRotMotion::onActivate()
 //-----------------------------------------------------------------------------
-BOOL LLHeadRotMotion::onActivate()
+bool LLHeadRotMotion::onActivate()
 {
-    return TRUE;
+    return true;
 }
 
 
 //-----------------------------------------------------------------------------
 // LLHeadRotMotion::onUpdate()
 //-----------------------------------------------------------------------------
-BOOL LLHeadRotMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLHeadRotMotion::onUpdate(F32 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLQuaternion    targetHeadRotWorld;
@@ -243,7 +243,7 @@ BOOL LLHeadRotMotion::onUpdate(F32 time, U8* joint_mask)
         mHeadState->setRotation( nlerp(1.f - NECK_LAG, LLQuaternion::DEFAULT, head_rot_local));
     }
 
-    return TRUE;
+    return true;
 }
 
 
@@ -271,7 +271,7 @@ LLEyeMotion::LLEyeMotion(const LLUUID &id) : LLMotion(id)
     mEyeLookAwayPitch = 0.f;
 
     mEyeBlinkTime = 0.f;
-    mEyesClosed = FALSE;
+    mEyesClosed = false;
 
     mHeadJoint = NULL;
 
@@ -346,9 +346,9 @@ LLMotion::LLMotionInitStatus LLEyeMotion::onInitialize(LLCharacter *character)
 //-----------------------------------------------------------------------------
 // LLEyeMotion::onActivate()
 //-----------------------------------------------------------------------------
-BOOL LLEyeMotion::onActivate()
+bool LLEyeMotion::onActivate()
 {
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -357,7 +357,7 @@ BOOL LLEyeMotion::onActivate()
 void LLEyeMotion::adjustEyeTarget(LLVector3* targetPos, LLJointState& left_eye_state, LLJointState& right_eye_state)
 {
     // Compute eye rotation.
-    BOOL has_eye_target = FALSE;
+    bool has_eye_target = false;
     LLQuaternion    target_eye_rot;
     LLVector3       eye_look_at;
     F32             vergence;
@@ -369,7 +369,7 @@ void LLEyeMotion::adjustEyeTarget(LLVector3* targetPos, LLJointState& left_eye_s
         LLVector3       up;
 
         eye_look_at = *targetPos;
-        has_eye_target = TRUE;
+        has_eye_target = true;
         F32 lookAtDistance = eye_look_at.normVec();
 
         left.setVec(skyward % eye_look_at);
@@ -441,7 +441,7 @@ void LLEyeMotion::adjustEyeTarget(LLVector3* targetPos, LLJointState& left_eye_s
 //-----------------------------------------------------------------------------
 // LLEyeMotion::onUpdate()
 //-----------------------------------------------------------------------------
-BOOL LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     //calculate jitter
@@ -489,7 +489,7 @@ BOOL LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
 
         if (rightEyeBlinkMorph == 1.f)
         {
-            mEyesClosed = TRUE;
+            mEyesClosed = true;
             mEyeBlinkTime = EYE_BLINK_CLOSE_TIME;
             mEyeBlinkTimer.reset();
         }
@@ -509,7 +509,7 @@ BOOL LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
 
             if (rightEyeBlinkMorph == 0.f)
             {
-                mEyesClosed = FALSE;
+                mEyesClosed = false;
                 mEyeBlinkTime = EYE_BLINK_MIN_TIME + ll_frand(EYE_BLINK_MAX_TIME - EYE_BLINK_MIN_TIME);
                 mEyeBlinkTimer.reset();
             }
@@ -521,7 +521,7 @@ BOOL LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
     adjustEyeTarget(targetPos, *mLeftEyeState, *mRightEyeState);
     adjustEyeTarget(targetPos, *mAltLeftEyeState, *mAltRightEyeState);
 
-    return TRUE;
+    return true;
 }
 
 

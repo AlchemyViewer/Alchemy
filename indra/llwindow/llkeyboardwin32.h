@@ -39,17 +39,17 @@ public:
     LLKeyboardWin32();
     /*virtual*/ ~LLKeyboardWin32() = default;
 
-    /*virtual*/ BOOL    handleKeyUp(const U32 key, MASK mask) override;
-    /*virtual*/ BOOL    handleKeyDown(const U32 key, MASK mask) override;
+    /*virtual*/ bool    handleKeyUp(const U32 key, MASK mask) override;
+    /*virtual*/ bool    handleKeyDown(const U32 key, MASK mask) override;
     /*virtual*/ void    resetMaskKeys() override;
-    /*virtual*/ MASK    currentMask(BOOL for_mouse_event) override;
+    /*virtual*/ MASK    currentMask(bool for_mouse_event) override;
     /*virtual*/ void    scanKeyboard() override;
-    BOOL                translateExtendedKey(const U32 os_key, const MASK mask, KEY *translated_key);
+    bool                translateExtendedKey(const U32 os_key, const MASK mask, KEY *translated_key);
     U32                 inverseTranslateExtendedKey(const KEY translated_key);
 
 protected:
     MASK    updateModifiers();
-    //void  setModifierKeyLevel( KEY key, BOOL new_state );
+    //void  setModifierKeyLevel( KEY key, bool new_state );
 private:
     boost::unordered_flat_map<U32, KEY> mTranslateNumpadMap;
     boost::unordered_flat_map<KEY, U32> mInvTranslateNumpadMap;

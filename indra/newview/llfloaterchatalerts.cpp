@@ -52,9 +52,9 @@ LLSoundDropTarget::~LLSoundDropTarget()
     delete m_pDropSignal;
 }
 
-BOOL LLSoundDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept, std::string& tooltip_msg)
+bool LLSoundDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept, std::string& tooltip_msg)
 {
-    BOOL fHandled = FALSE;
+    bool fHandled = false;
     if (getParent())
     {
         switch (cargo_type)
@@ -86,7 +86,7 @@ BOOL LLSoundDropTarget::handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop, ED
                 break;
         }
 
-        fHandled = TRUE;
+        fHandled = true;
     }
     return fHandled;
 }
@@ -126,15 +126,15 @@ LLFloaterChatAlerts::~LLFloaterChatAlerts()
     mChatAlertsConnection.disconnect();
 }
 
-BOOL LLFloaterChatAlerts::canClose()
+bool LLFloaterChatAlerts::canClose()
 {
     if (isEntryDirty())
     {
         m_fPendingSave = true;
         onEntrySaveChanges(LLUUID::null, true);
-        return FALSE;
+        return false;
     }
-    return TRUE;
+    return true;
 }
 
 void LLFloaterChatAlerts::onOpen(const LLSD& sdKey)
@@ -147,7 +147,7 @@ void LLFloaterChatAlerts::onClose(bool app_quitting)
     LLTextParser::instance().saveToDisk();
 }
 
-BOOL LLFloaterChatAlerts::postBuild(void)
+bool LLFloaterChatAlerts::postBuild(void)
 {
     m_pAlertList = findChild<LLScrollListCtrl>("alerts_list");
     m_pAlertList->setCommitOnKeyboardMovement(true);
@@ -179,7 +179,7 @@ BOOL LLFloaterChatAlerts::postBuild(void)
     mChatAlertsConnection = gSavedSettings.getControl("ChatAlerts")->getSignal()->connect(
             boost::bind(&LLFloaterChatAlerts::onToggleChatAlerts, this, _2));
 
-    return TRUE;
+    return LLFloater::postBuild();
 }
 
 S32 LLFloaterChatAlerts::notifyParent(const LLSD& sdInfo)

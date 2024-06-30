@@ -39,8 +39,8 @@ public:
     LLLegacyNotificationWellWindow(const LLSD& key);
     static LLLegacyNotificationWellWindow* getInstance(const LLSD& key = LLSD());
 
-    BOOL postBuild() override;
-    void setVisible(BOOL visible) override;
+    bool postBuild() override;
+    void setVisible(bool visible) override;
     void onAdd(LLNotificationPtr notify);
     // Operating with items
     void addItem(const LLSysWellItem::Params& p);

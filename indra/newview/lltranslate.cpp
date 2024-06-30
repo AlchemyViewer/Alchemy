@@ -397,7 +397,8 @@ bool LLGoogleTranslationHandler::parseResponse(
     std::string& err_msg) const
 {
     const std::string& text = !body.empty() ? body : http_response["error_body"].asStringRef();
-    boost::system::error_code ec;
+
+    boost::json::error_code ec;
     boost::json::value root = boost::json::parse(text, ec);
     if (ec.failed())
     {
@@ -405,15 +406,17 @@ bool LLGoogleTranslationHandler::parseResponse(
         return false;
     }
 
-    if (status != HTTP_OK)
+    if (root.is_object())
     {
-        // Request failed. Extract error message from the response.
+        // Request succeeded, extract translation from the XML body.
+        if (parseTranslation(root, translation, detected_lang))
+            return true;
+
+        // Request failed. Extract error message from the XML body.
         parseErrorResponse(root, status, err_msg);
-        return false;
     }
 
-    // Request succeeded, extract translation from the response.
-    return parseTranslation(root, translation, detected_lang);
+    return false;
 }
 
 // virtual
@@ -1145,7 +1148,7 @@ std::string LLTranslate::addNoTranslateTags(std::string mesg)
             upd_msg.insert(dif + match.getStart(), AZURE_NOTRANSLATE_OPENING_TAG);
             upd_msg.insert(dif + AZURE_NOTRANSLATE_OPENING_TAG.size() + match.getEnd() + 1, AZURE_NOTRANSLATE_CLOSING_TAG);
             mesg.erase(match.getStart(), match.getEnd() - match.getStart());
-            dif += match.getEnd() - match.getStart() + AZURE_NOTRANSLATE_OPENING_TAG.size() + AZURE_NOTRANSLATE_CLOSING_TAG.size();
+            dif += match.getEnd() - match.getStart() + static_cast<S32>(AZURE_NOTRANSLATE_OPENING_TAG.size() + AZURE_NOTRANSLATE_CLOSING_TAG.size());
         }
         return upd_msg;
     }
@@ -1167,9 +1170,9 @@ std::string LLTranslate::removeNoTranslateTags(std::string mesg)
     {
         std::string upd_msg(mesg);
         LLUrlMatch match;
-        S32 opening_tag_size = AZURE_NOTRANSLATE_OPENING_TAG.size();
-        S32 closing_tag_size = AZURE_NOTRANSLATE_CLOSING_TAG.size();
-        S32 dif = 0;
+        auto opening_tag_size = AZURE_NOTRANSLATE_OPENING_TAG.size();
+        auto closing_tag_size = AZURE_NOTRANSLATE_CLOSING_TAG.size();
+        size_t dif = 0;
         //remove 'no-translate' tags we added to the links before
         while (LLUrlRegistry::instance().findUrl(mesg, match))
         {

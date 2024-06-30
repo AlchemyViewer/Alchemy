@@ -65,8 +65,8 @@ static LLPanelInjector<LLPanelGroup> t_panel_group("panel_group_info_sidetray");
 
 LLPanelGroupTab::LLPanelGroupTab()
     : LLPanel(),
-      mAllowEdit(TRUE),
-      mHasModal(FALSE)
+      mAllowEdit(true),
+      mHasModal(false)
 {
     mGroupID = LLUUID::null;
 }
@@ -75,21 +75,21 @@ LLPanelGroupTab::~LLPanelGroupTab()
 {
 }
 
-BOOL LLPanelGroupTab::isVisibleByAgent(LLAgent* agentp)
+bool LLPanelGroupTab::isVisibleByAgent(LLAgent* agentp)
 {
     //default to being visible
-    return TRUE;
+    return true;
 }
 
-BOOL LLPanelGroupTab::postBuild()
+bool LLPanelGroupTab::postBuild()
 {
-    return TRUE;
+    return true;
 }
 
 LLPanelGroup::LLPanelGroup()
 :   LLPanel(),
     LLGroupMgrObserver( LLUUID() ),
-    mSkipRefresh(FALSE),
+    mSkipRefresh(false),
     mButtonJoin(NULL)
 {
     // Set up the factory callbacks.
@@ -157,7 +157,7 @@ void LLPanelGroup::onOpen(const LLSD& key)
 // [/SL:KB]
 }
 
-BOOL LLPanelGroup::postBuild()
+bool LLPanelGroup::postBuild()
 {
     mGroupsAccordion = getChild<LLAccordionCtrl>("groups_accordion");
 
@@ -211,7 +211,7 @@ BOOL LLPanelGroup::postBuild()
 
     LLVoiceClient::getInstance()->addObserver(this);
 
-    return TRUE;
+    return true;
 }
 
 void LLPanelGroup::reposButton(LLButton* button)
@@ -241,7 +241,7 @@ void LLPanelGroup::reposButtons()
     reposButton(mButtonCall);
 }
 
-void LLPanelGroup::reshape(S32 width, S32 height, BOOL called_from_parent )
+void LLPanelGroup::reshape(S32 width, S32 height, bool called_from_parent )
 {
     LLPanel::reshape(width, height, called_from_parent );
 
@@ -298,9 +298,9 @@ void LLPanelGroup::onBtnJoin()
     }
     else
     {
-        LL_DEBUGS() << "joining group: " << mID << LL_ENDL;
-        LLGroupActions::join(mID);
-    }
+    LL_DEBUGS() << "joining group: " << mID << LL_ENDL;
+    LLGroupActions::join(mID);
+}
 }
 
 void LLPanelGroup::changed(LLGroupChange gc)
@@ -537,7 +537,7 @@ bool LLPanelGroup::apply(LLPanelGroupTab* tab)
             }
         }
 
-        mSkipRefresh = TRUE;
+        mSkipRefresh = true;
         return true;
     }
 
@@ -569,8 +569,8 @@ void LLPanelGroup::draw()
     if (mRefreshTimer.hasExpired())
     {
         mRefreshTimer.stop();
-        if(mButtonRefresh) mButtonRefresh->setEnabled(TRUE);
-        mGroupsAccordion->setEnabled(TRUE);
+        if(mButtonRefresh) mButtonRefresh->setEnabled(true);
+        mGroupsAccordion->setEnabled(true);
     }
 
     if(mButtonApply && mButtonApply->getVisible())
@@ -588,7 +588,7 @@ void LLPanelGroup::refreshData()
 {
     if(mSkipRefresh)
     {
-        mSkipRefresh = FALSE;
+        mSkipRefresh = false;
         return;
     }
     LLGroupMgr::getInstance()->clearGroupData(getID());
@@ -596,8 +596,8 @@ void LLPanelGroup::refreshData()
     setGroupID(getID());
 
     // 5 second timeout
-    if(mButtonRefresh) mButtonRefresh->setEnabled(FALSE);
-    mGroupsAccordion->setEnabled(FALSE);
+    if(mButtonRefresh) mButtonRefresh->setEnabled(false);
+    mGroupsAccordion->setEnabled(false);
 
     mRefreshTimer.start();
     mRefreshTimer.setTimerExpirySec(5);

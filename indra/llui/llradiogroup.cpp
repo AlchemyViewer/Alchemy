@@ -53,8 +53,8 @@ public:
     /*virtual*/ ~LLRadioCtrl() = default;
     /*virtual*/ void setValue(const LLSD& value);
 
-    /*virtual*/ BOOL postBuild();
-    /*virtual*/ BOOL handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool postBuild();
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
 
     LLSD getPayload() { return mPayload; }
 
@@ -114,16 +114,16 @@ void LLRadioGroup::initFromParams(const Params& p)
 }
 
 // virtual
-BOOL LLRadioGroup::postBuild()
+bool LLRadioGroup::postBuild()
 {
     if (!mRadioButtons.empty())
     {
         mRadioButtons[0]->setTabStop(true);
     }
-    return TRUE;
+    return true;
 }
 
-void LLRadioGroup::setIndexEnabled(S32 index, BOOL enabled)
+void LLRadioGroup::setIndexEnabled(S32 index, bool enabled)
 {
     S32 count = 0;
     for (button_list_t::iterator iter = mRadioButtons.begin();
@@ -133,7 +133,7 @@ void LLRadioGroup::setIndexEnabled(S32 index, BOOL enabled)
         if (count == index)
         {
             child->setEnabled(enabled);
-            if (index == mSelectedIndex && enabled == FALSE)
+            if (index == mSelectedIndex && !enabled)
             {
                 setSelectedIndex(-1);
             }
@@ -168,30 +168,30 @@ void LLRadioGroup::setIndexEnabled(S32 index, BOOL enabled)
     }
 }
 
-BOOL LLRadioGroup::setSelectedIndex(S32 index, BOOL from_event)
+bool LLRadioGroup::setSelectedIndex(S32 index, bool from_event)
 {
     if ((S32)mRadioButtons.size() <= index )
     {
-        return FALSE;
+        return false;
     }
 
     if (index < -1)
     {
         // less then minimum value
-        return FALSE;
+        return false;
     }
 
     if (index < 0 && mSelectedIndex >= 0 && !mAllowDeselect)
     {
         // -1 is "nothing selected"
-        return FALSE;
+        return false;
     }
 
     if (mSelectedIndex >= 0)
     {
         LLRadioCtrl* old_radio_item = mRadioButtons[mSelectedIndex];
         old_radio_item->setTabStop(false);
-        old_radio_item->setValue( FALSE );
+        old_radio_item->setValue( false );
     }
     else
     {
@@ -204,11 +204,11 @@ BOOL LLRadioGroup::setSelectedIndex(S32 index, BOOL from_event)
     {
         LLRadioCtrl* radio_item = mRadioButtons[mSelectedIndex];
         radio_item->setTabStop(true);
-        radio_item->setValue( TRUE );
+        radio_item->setValue( true );
 
         if (hasFocus())
         {
-            radio_item->focusFirstItem(FALSE, FALSE);
+            radio_item->focusFirstItem(false, false);
         }
     }
 
@@ -217,7 +217,7 @@ BOOL LLRadioGroup::setSelectedIndex(S32 index, BOOL from_event)
         setControlValue(getValue());
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLRadioGroup::focusSelectedRadioBtn()
@@ -227,18 +227,18 @@ void LLRadioGroup::focusSelectedRadioBtn()
         LLRadioCtrl* radio_item = mRadioButtons[mSelectedIndex];
         if (radio_item->hasTabStop() && radio_item->getEnabled())
         {
-            radio_item->focusFirstItem(FALSE, FALSE);
+            radio_item->focusFirstItem(false, false);
         }
     }
     else if (mRadioButtons[0]->hasTabStop() || hasTabStop())
     {
-        focusFirstItem(FALSE, FALSE);
+        focusFirstItem(false, false);
     }
 }
 
-BOOL LLRadioGroup::handleKeyHere(KEY key, MASK mask)
+bool LLRadioGroup::handleKeyHere(KEY key, MASK mask)
 {
-    BOOL handled = FALSE;
+    bool handled = false;
     // do any of the tab buttons have keyboard focus?
     if (mask == MASK_NONE)
     {
@@ -253,7 +253,7 @@ BOOL LLRadioGroup::handleKeyHere(KEY key, MASK mask)
             {
                 onCommit();
             }
-            handled = TRUE;
+            handled = true;
             break;
         case KEY_UP:
             if (!setSelectedIndex((getSelectedIndex() - 1)))
@@ -264,7 +264,7 @@ BOOL LLRadioGroup::handleKeyHere(KEY key, MASK mask)
             {
                 onCommit();
             }
-            handled = TRUE;
+            handled = true;
             break;
         case KEY_LEFT:
             if (!setSelectedIndex((getSelectedIndex() - 1)))
@@ -275,7 +275,7 @@ BOOL LLRadioGroup::handleKeyHere(KEY key, MASK mask)
             {
                 onCommit();
             }
-            handled = TRUE;
+            handled = true;
             break;
         case KEY_RIGHT:
             if (!setSelectedIndex((getSelectedIndex() + 1)))
@@ -286,7 +286,7 @@ BOOL LLRadioGroup::handleKeyHere(KEY key, MASK mask)
             {
                 onCommit();
             }
-            handled = TRUE;
+            handled = true;
             break;
         default:
             break;
@@ -353,11 +353,11 @@ void LLRadioGroup::setValue( const LLSD& value )
         // string not found, try integer
         if (value.isInteger())
         {
-            setSelectedIndex((S32) value.asInteger(), TRUE);
+            setSelectedIndex((S32) value.asInteger(), true);
         }
         else
         {
-            setSelectedIndex(-1, TRUE);
+            setSelectedIndex(-1, true);
         }
     }
 }
@@ -376,9 +376,9 @@ LLSD LLRadioGroup::getValue() const
 }
 
 // LLCtrlSelectionInterface functions
-BOOL    LLRadioGroup::setCurrentByID( const LLUUID& id )
+bool    LLRadioGroup::setCurrentByID( const LLUUID& id )
 {
-    return FALSE;
+    return false;
 }
 
 LLUUID  LLRadioGroup::getCurrentID() const
@@ -386,7 +386,7 @@ LLUUID  LLRadioGroup::getCurrentID() const
     return LLUUID::null;
 }
 
-BOOL    LLRadioGroup::setSelectedByValue(const LLSD& value, BOOL selected)
+bool    LLRadioGroup::setSelectedByValue(const LLSD& value, bool selected)
 {
     S32 idx = 0;
     for (button_list_t::const_iterator iter = mRadioButtons.begin();
@@ -395,12 +395,12 @@ BOOL    LLRadioGroup::setSelectedByValue(const LLSD& value, BOOL selected)
         if((*iter)->getPayload().asString() == value.asString())
         {
             setSelectedIndex(idx);
-            return TRUE;
+            return true;
         }
         idx++;
     }
 
-    return FALSE;
+    return false;
 }
 
 LLSD    LLRadioGroup::getSelectedValue()
@@ -408,7 +408,7 @@ LLSD    LLRadioGroup::getSelectedValue()
     return getValue();
 }
 
-BOOL    LLRadioGroup::isSelected(const LLSD& value) const
+bool    LLRadioGroup::isSelected(const LLSD& value) const
 {
     S32 idx = 0;
     for (button_list_t::const_iterator iter = mRadioButtons.begin();
@@ -418,22 +418,22 @@ BOOL    LLRadioGroup::isSelected(const LLSD& value) const
         {
             if (idx == mSelectedIndex)
             {
-                return TRUE;
+                return true;
             }
         }
         idx++;
     }
-    return FALSE;
+    return false;
 }
 
-BOOL    LLRadioGroup::operateOnSelection(EOperation op)
+bool    LLRadioGroup::operateOnSelection(EOperation op)
 {
-    return FALSE;
+    return false;
 }
 
-BOOL    LLRadioGroup::operateOnAll(EOperation op)
+bool    LLRadioGroup::operateOnAll(EOperation op)
 {
-    return FALSE;
+    return false;
 }
 
 LLRadioGroup::ItemParams::ItemParams()
@@ -453,7 +453,7 @@ LLRadioCtrl::LLRadioCtrl(const LLRadioGroup::ItemParams& p)
     }
 }
 
-BOOL LLRadioCtrl::postBuild()
+bool LLRadioCtrl::postBuild()
 {
     // Old-style radio_item used the text contents to indicate the label,
     // but new-style radio_item uses label attribute.
@@ -462,15 +462,15 @@ BOOL LLRadioCtrl::postBuild()
     {
         setLabel(value);
     }
-    return TRUE;
+    return true;
 }
 
-BOOL LLRadioCtrl::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLRadioCtrl::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     // Grab focus preemptively, before button takes mousecapture
     if (hasTabStop() && getEnabled())
     {
-        focusFirstItem(FALSE, FALSE);
+        focusFirstItem(false, false);
     }
     else
     {

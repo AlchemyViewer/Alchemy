@@ -185,7 +185,7 @@ LLFontFreetype::LLFontFreetype()
     mAscender(0.f),
     mDescender(0.f),
     mLineHeight(0.f),
-    mIsFallback(FALSE),
+    mIsFallback(false),
     mFTFace(NULL),
     mRenderGlyphCount(0),
     mAddGlyphCount(0),
@@ -210,7 +210,7 @@ LLFontFreetype::~LLFontFreetype()
     // mFallbackFonts cleaned up by LLPointer destructor
 }
 
-BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n)
+bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n)
 {
     // Don't leak face objects.  This is also needed to deal with
     // changed font file names.
@@ -227,7 +227,7 @@ BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     openArgs.memory_base = gFontManagerp->loadFont(filename, openArgs.memory_size);
 
     if( !openArgs.memory_base )
-        return FALSE;
+        return false;
 
     openArgs.flags = FT_OPEN_MEMORY;
 
@@ -235,7 +235,7 @@ BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
 
     if (error)
     {
-        return FALSE;
+        return false;
     }
 
     mIsFallback = is_fallback;
@@ -252,7 +252,7 @@ BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
         // Clean up freetype libs.
         FT_Done_Face(mFTFace);
         mFTFace = NULL;
-        return FALSE;
+        return false;
     }
 
     F32 y_max, y_min, x_max, x_min;
@@ -299,7 +299,7 @@ BOOL LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
         mStyle |= LLFontGL::ITALIC;
     }
 
-    return TRUE;
+    return true;
 }
 
 S32 LLFontFreetype::getNumFaces(const std::string& filename)
@@ -421,7 +421,7 @@ F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LL
     return kerning;
 }
 
-BOOL LLFontFreetype::hasGlyph(llwchar wch) const
+bool LLFontFreetype::hasGlyph(llwchar wch) const
 {
     llassert(!mIsFallback);
     return(mCharGlyphInfoMap.find(wch) != mCharGlyphInfoMap.end());
@@ -843,6 +843,7 @@ bool LLFontFreetype::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num, U16 width, U1
 void LLFontFreetype::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num, U32 width, U32 height, U8 *data, S32 stride) const
 {
     LLImageRaw *image_raw = mFontBitmapCachep->getImageRaw(EFontGlyphType::Grayscale, bitmap_num);
+    LLImageDataLock lock(image_raw);
 
     llassert(!mIsFallback);
     llassert(image_raw && (image_raw->getComponents() == 2));

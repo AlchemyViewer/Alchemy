@@ -125,7 +125,7 @@ public:
         }
 
         LLUUID group_id;
-        if (!group_id.set(tokens[0].asStringRef(), FALSE))
+        if (!group_id.set(tokens[0].asString(), false))
         {
             return false;
         }
@@ -193,7 +193,7 @@ public:
             }
             else if (!gdatap->isMemberDataComplete())
             {
-                LL_WARNS() << "LLGroupMgr::getInstance()->getGroupData()->isMemberDataComplete() was FALSE" << LL_ENDL;
+                LL_WARNS() << "LLGroupMgr::getInstance()->getGroupData()->isMemberDataComplete() was false" << LL_ENDL;
                 processGroupData();
                 mRequestProcessed = true;
             }
@@ -389,8 +389,8 @@ void LLGroupActions::processLeaveGroupDataResponse(const LLUUID group_id)
     if (gdatap->mMembershipFee > 0)
     {
         args["COST"] = gdatap->mMembershipFee;
-        LLNotificationsUtil::add("GroupLeaveConfirmMember", args, payload, onLeaveGroup);
-    }
+    LLNotificationsUtil::add("GroupLeaveConfirmMember", args, payload, onLeaveGroup);
+}
     else
     {
         LLNotificationsUtil::add("GroupLeaveConfirmMemberNoFee", args, payload, onLeaveGroup);
@@ -446,9 +446,9 @@ void LLGroupActions::show(const LLUUID &group_id, bool expand_notices_tab)
         params["action"] = "show_notices";
     }
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        LLFloaterGroupProfile::showInstance(params, TRUE);
+        LLFloaterGroupProfile::showInstance(params, true);
     }
     else
     {
@@ -456,7 +456,7 @@ void LLGroupActions::show(const LLUUID &group_id, bool expand_notices_tab)
         LLFloater *floater = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>("people");
         if (!floater->isFrontmost())
         {
-            floater->setVisibleAndFrontmost(TRUE, params);
+            floater->setVisibleAndFrontmost(true, params);
         }
     }
 }
@@ -473,9 +473,9 @@ void LLGroupActions::showNotices(const LLUUID& group_id)
     sdParams["group_id"] = group_id;
     sdParams["action"] = "view_notices";
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        LLFloaterGroupProfile::showInstance(sdParams, TRUE);
+        LLFloaterGroupProfile::showInstance(sdParams, true);
     }
     else
     {
@@ -496,11 +496,11 @@ void LLGroupActions::refresh_notices(const LLUUID& group_id)
     params["group_id"] = group_id;
     params["action"] = "refresh_notices";
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
         if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
         {
-            LLFloaterGroupProfile::showInstance(params, FALSE);
+            LLFloaterGroupProfile::showInstance(params, false);
         }
     }
     else
@@ -519,11 +519,11 @@ void LLGroupActions::refresh(const LLUUID& group_id)
     params["group_id"] = group_id;
     params["action"] = "refresh";
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
         if (LLFloaterReg::instanceVisible("group_profile", LLSD(group_id)))
         {
-            LLFloaterGroupProfile::showInstance(params, TRUE);
+            LLFloaterGroupProfile::showInstance(params, true);
         }
     }
     else
@@ -542,9 +542,9 @@ void LLGroupActions::createGroup()
     params["group_id"] = LLUUID::null;
     params["action"] = "create";
 
-    if (gSavedSettings.getBool("ShowGroupFloaters"))
+    if (gSavedSettings.getBOOL("ShowGroupFloaters"))
     {
-        LLFloaterGroupProfile::showInstance(params, TRUE);
+        LLFloaterGroupProfile::showInstance(params, true);
     }
     else
     {

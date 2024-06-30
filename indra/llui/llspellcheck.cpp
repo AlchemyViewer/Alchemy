@@ -83,7 +83,7 @@ S32 LLSpellChecker::getSuggestions(const std::string& word, std::vector<std::str
 
     suggestions = mHunspell->suggest(word);
 
-    return suggestions.size();
+    return static_cast<S32>(suggestions.size());
 }
 
 const LLSD LLSpellChecker::getDictionaryData(const std::string& dict_language)

@@ -59,14 +59,14 @@ public:
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
     virtual bool hasAccelerators() const override { return true; }
 // [/SL:KB]
-    BOOL handleKeyHere(KEY key, MASK mask) override;
-    void setEnabled( BOOL enabled ) override;
+    bool handleKeyHere(KEY key, MASK mask) override;
+    void setEnabled(bool enabled) override;
 
     // llfloater
-    BOOL canClose() override;
+    bool canClose() override;
 
     // llpanel
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     // reach into the text editor, and grab the drag item
     const LLInventoryItem* getDragItem();

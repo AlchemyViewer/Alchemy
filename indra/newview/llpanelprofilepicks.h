@@ -50,7 +50,7 @@ public:
     LLPanelProfilePicks();
     /*virtual*/ ~LLPanelProfilePicks();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void onOpen(const LLSD& key) override;
 
@@ -109,7 +109,7 @@ public:
 
     /*virtual*/ ~LLPanelProfilePick();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void setAvatarId(const LLUUID& avatar_id) override;
 
@@ -125,7 +125,7 @@ public:
     /**
      * Returns true if any of Pick properties was changed by user.
      */
-    BOOL isDirty() const override;
+    bool isDirty() const override;
 
     /**
      * Saves changes.
@@ -183,7 +183,7 @@ public:
     /**
      * Enables/disables "Save" button
      */
-    void enableSaveButton(BOOL enable);
+    void enableSaveButton(bool enable);
 
     /**
      * Called when snapshot image changes.

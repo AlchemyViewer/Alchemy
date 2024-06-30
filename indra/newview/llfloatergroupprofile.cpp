@@ -45,11 +45,11 @@ LLFloaterGroupProfile::~LLFloaterGroupProfile()
 {
 }
 
-BOOL LLFloaterGroupProfile::postBuild()
+bool LLFloaterGroupProfile::postBuild()
 {
     mGroupPanel = getChild<LLPanel>("panel_group_info_sidetray");
     mCreateGroupPanel = getChild<LLPanel>("panel_group_creation_sidetray");
-    return TRUE;
+    return LLFloater::postBuild();
 }
 
 void LLFloaterGroupProfile::onOpen(const LLSD& key)
@@ -96,7 +96,7 @@ void LLFloaterGroupProfile::createGroup() const
 }
 
 //static
-LLFloater* LLFloaterGroupProfile::showInstance(const LLSD& key, BOOL focus)
+LLFloater* LLFloaterGroupProfile::showInstance(const LLSD& key, bool focus)
 {
     // [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
     if (!LLFloaterReg::canShowInstance("group_profile", key["group_id"].asUUID()))
@@ -107,7 +107,7 @@ LLFloater* LLFloaterGroupProfile::showInstance(const LLSD& key, BOOL focus)
     {
         instance->openFloater(key);
         if (focus)
-            instance->setFocus(TRUE);
+            instance->setFocus(true);
     }
     return instance;
 }

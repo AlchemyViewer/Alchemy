@@ -48,11 +48,11 @@ class FSLSLPreprocessor
 public:
 
     FSLSLPreprocessor(LLScriptEdCore* corep)
-        : mCore(corep), mWaving(false), mClose(FALSE), mSync(false), mStandalone(false)
+        : mCore(corep), mWaving(false), mClose(false), mSync(false), mStandalone(false)
     {}
 
     FSLSLPreprocessor()
-        : mWaving(false), mClose(FALSE), mSync(false), mStandalone(true)
+        : mWaving(false), mClose(false), mSync(false), mStandalone(true)
     {}
 
     static bool mono_directive(std::string const& text, bool agent_inv = true);
@@ -65,7 +65,7 @@ public:
     static LLUUID findInventoryByName(std::string name);
     static void FSProcCacheCallback(const LLUUID& uuid, LLAssetType::EType type,
                                     void *userdata, S32 result, LLExtStat extstat);
-    void preprocess_script(BOOL close = FALSE, bool sync = false, bool defcache = false);
+    void preprocess_script(bool close = false, bool sync = false, bool defcache = false);
     void preprocess_script(const LLUUID& asset_id, LLScriptQueueData* data, LLAssetType::EType type, const std::string& script_data);
     void start_process();
     void display_message(const std::string& err);
@@ -91,7 +91,7 @@ public:
 
     LLScriptEdCore* mCore;
     bool mWaving;
-    BOOL mClose;
+    bool mClose;
     bool mSync;
     std::string mMainScriptName;
 

@@ -98,7 +98,7 @@ void RlvUIEnabler::onRefreshHoverText()
 void RlvUIEnabler::onToggleMovement()
 {
     if ( (gRlvHandler.hasBehaviour(RLV_BHVR_FLY)) && (gAgent.getFlying()) )
-        gAgent.setFlying(FALSE);
+        gAgent.setFlying(false);
     if ( (gRlvHandler.hasBehaviour(RLV_BHVR_ALWAYSRUN)) && (gAgent.getAlwaysRun()) )
         gAgent.clearAlwaysRun();
     if ( (gRlvHandler.hasBehaviour(RLV_BHVR_TEMPRUN)) && (gAgent.getTempRun()) )
@@ -199,7 +199,7 @@ void RlvUIEnabler::onToggleShowMinimap()
 
     // Break/reestablish the visibility connection for the nearby people panel embedded minimap instance
     LLPanel* pPeoplePanel = LLFloaterSidePanelContainer::getPanel("people", "panel_people");
-    LLPanel* pNetMapPanel = (pPeoplePanel) ? pPeoplePanel->findChild<LLPanel>("Net Map Panel", TRUE) : NULL;
+    LLPanel* pNetMapPanel = (pPeoplePanel) ? pPeoplePanel->findChild<LLPanel>("Net Map Panel", true) : NULL;
     RLV_ASSERT( (pPeoplePanel) && (pNetMapPanel) );
     if (pNetMapPanel)
     {

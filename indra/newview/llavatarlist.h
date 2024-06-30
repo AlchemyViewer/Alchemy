@@ -72,7 +72,7 @@ public:
 
     void clear() override;
 
-    void setVisible(BOOL visible) override;
+    void setVisible(bool visible) override;
 
     void setNameFilter(const std::string& filter);
     void setDirty(bool val = true, bool force_refresh = false);
@@ -91,10 +91,10 @@ public:
     bool getIconsVisible() const { return mShowIcons; }
     const std::string& getIconParamName() const {return mIconParamName;}
     std::string getAvatarName(const LLAvatarName& av_name);
-    BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
-    BOOL handleMouseDown( S32 x, S32 y, MASK mask ) override;
-    BOOL handleMouseUp(S32 x, S32 y, MASK mask) override;
-    BOOL handleHover(S32 x, S32 y, MASK mask) override;
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
 
     // Return true if filter has at least one match.
     bool filterHasMatches();
@@ -118,7 +118,7 @@ public:
 protected:
     void refresh();
 
-    void addNewItem(const LLUUID& id, const std::string& name, BOOL is_online, EAddPosition pos = ADD_BOTTOM);
+    void addNewItem(const LLUUID& id, const std::string& name, bool is_online, EAddPosition pos = ADD_BOTTOM);
     void computeDifference(
         const uuid_vec_t& vnew,
         uuid_vec_t& vadded,

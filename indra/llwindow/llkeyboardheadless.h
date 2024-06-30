@@ -35,10 +35,10 @@ public:
     LLKeyboardHeadless() = default;
     /*virtual*/ ~LLKeyboardHeadless() = default;
 
-    /*virtual*/ BOOL    handleKeyUp(const U32 key, MASK mask) override;
-    /*virtual*/ BOOL    handleKeyDown(const U32 key, MASK mask) override;
+    /*virtual*/ bool    handleKeyUp(const U32 key, MASK mask) override;
+    /*virtual*/ bool    handleKeyDown(const U32 key, MASK mask) override;
     /*virtual*/ void    resetMaskKeys() override;
-    /*virtual*/ MASK    currentMask(BOOL for_mouse_event) override;
+    /*virtual*/ MASK    currentMask(bool for_mouse_event) override;
     /*virtual*/ void    scanKeyboard() override;
 #ifdef LL_DARWIN
     /*virtual*/ void    handleModifier(MASK mask) override;

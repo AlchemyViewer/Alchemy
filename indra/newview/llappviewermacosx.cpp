@@ -27,7 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #if !defined LL_DARWIN
-    #error "Use only with Mac OS X"
+    #error "Use only with macOS"
 #endif
 
 #include "llwindowmacosx.h"

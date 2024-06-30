@@ -43,9 +43,9 @@ class LLFastTimerView final : public LLFloater
 public:
     LLFastTimerView(const LLSD&);
     ~LLFastTimerView();
-    BOOL postBuild() override;
+    bool postBuild() override;
 
-    static BOOL sAnalyzePerformance;
+    static bool sAnalyzePerformance;
 
     static void outputAllMetrics();
     static void doAnalysis(std::string baseline, std::string target, std::string output);
@@ -58,13 +58,13 @@ private:
 
 public:
 
-    BOOL handleMouseDown(S32 x, S32 y, MASK mask) override;
-    BOOL handleDoubleClick(S32 x, S32 y, MASK mask) override;
-    BOOL handleRightMouseDown(S32 x, S32 y, MASK mask) override;
-    BOOL handleMouseUp(S32 x, S32 y, MASK mask) override;
-    BOOL handleHover(S32 x, S32 y, MASK mask) override;
-    BOOL handleToolTip(S32 x, S32 y, MASK mask) override;
-    BOOL handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
+    bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
     void draw() override;
     void onOpen(const LLSD& key) override;
     void onClose(bool app_quitting) override;

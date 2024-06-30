@@ -129,7 +129,7 @@ LLAssetType::EType LLInventoryObject::getActualType() const
     return mType;
 }
 
-BOOL LLInventoryObject::getIsLinkType() const
+bool LLInventoryObject::getIsLinkType() const
 {
     return LLAssetType::lookupIsLinkType(mType);
 }
@@ -178,7 +178,7 @@ void LLInventoryObject::setType(LLAssetType::EType type)
 
 
 // virtual
-BOOL LLInventoryObject::importLegacyStream(std::istream& input_stream)
+bool LLInventoryObject::importLegacyStream(std::istream& input_stream)
 {
     // *NOTE: Changing the buffer size will require changing the scanf
     // calls below.
@@ -261,10 +261,10 @@ BOOL LLInventoryObject::importLegacyStream(std::istream& input_stream)
                     << "' in LLInventoryObject::importLegacyStream() for object " << mUUID << LL_ENDL;
         }
     }
-    return TRUE;
+    return true;
 }
 
-BOOL LLInventoryObject::exportLegacyStream(std::ostream& output_stream, BOOL) const
+bool LLInventoryObject::exportLegacyStream(std::ostream& output_stream, bool) const
 {
     std::string uuid_str;
     output_stream <<  "\tinv_object\t0\n\t{\n";
@@ -275,16 +275,16 @@ BOOL LLInventoryObject::exportLegacyStream(std::ostream& output_stream, BOOL) co
     output_stream << "\t\ttype\t" << LLAssetType::lookup(mType) << "\n";
     output_stream << "\t\tname\t" << mName.c_str() << "|\n";
     output_stream << "\t}\n";
-    return TRUE;
+    return true;
 }
 
-void LLInventoryObject::updateParentOnServer(BOOL) const
+void LLInventoryObject::updateParentOnServer(bool) const
 {
     // don't do nothin'
     LL_WARNS() << "LLInventoryObject::updateParentOnServer() called.  Doesn't do anything." << LL_ENDL;
 }
 
-void LLInventoryObject::updateServer(BOOL) const
+void LLInventoryObject::updateServer(bool) const
 {
     // don't do nothin'
     LL_WARNS() << "LLInventoryObject::updateServer() called.  Doesn't do anything." << LL_ENDL;
@@ -567,7 +567,7 @@ void LLInventoryItem::packMessage(LLMessageSystem* msg) const
 }
 
 // virtual
-BOOL LLInventoryItem::unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num)
+bool LLInventoryItem::unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num)
 {
     msg->getUUIDFast(block, _PREHASH_ItemID, mUUID, block_num);
     msg->getUUIDFast(block, _PREHASH_FolderID, mParentUUID, block_num);
@@ -603,13 +603,13 @@ BOOL LLInventoryItem::unpackMessage(LLMessageSystem* msg, const char* block, S32
     if(local_crc == remote_crc)
     {
         LL_DEBUGS() << "crc matches" << LL_ENDL;
-        return TRUE;
+        return true;
     }
     else
     {
         LL_WARNS() << "inventory crc mismatch: local=" << std::hex << local_crc
                 << " remote=" << remote_crc << std::dec << LL_ENDL;
-        return FALSE;
+        return false;
     }
 #else
     return (local_crc == remote_crc);
@@ -617,7 +617,7 @@ BOOL LLInventoryItem::unpackMessage(LLMessageSystem* msg, const char* block, S32
 }
 
 // virtual
-BOOL LLInventoryItem::importLegacyStream(std::istream& input_stream)
+bool LLInventoryItem::importLegacyStream(std::istream& input_stream)
 {
     // *NOTE: Changing the buffer size will require changing the scanf
     // calls below.
@@ -625,7 +625,7 @@ BOOL LLInventoryItem::importLegacyStream(std::istream& input_stream)
     char keyword[MAX_STRING];   /* Flawfinder: ignore */
     char valuestr[MAX_STRING];  /* Flawfinder: ignore */
     char junk[MAX_STRING];  /* Flawfinder: ignore */
-    BOOL success = TRUE;
+    bool success = true;
 
     keyword[0] = '\0';
     valuestr[0] = '\0';
@@ -665,7 +665,7 @@ BOOL LLInventoryItem::importLegacyStream(std::istream& input_stream)
             // the permissions. Thus, we read that out, and fix legacy
             // objects. It's possible this op would fail, but it
             // should pick up the vast majority of the tasks.
-            BOOL has_perm_mask = FALSE;
+            bool has_perm_mask = false;
             U32 perm_mask = 0;
             success = mSaleInfo.importLegacyStream(input_stream, has_perm_mask, perm_mask);
             if(has_perm_mask)
@@ -807,7 +807,7 @@ BOOL LLInventoryItem::importLegacyStream(std::istream& input_stream)
     return success;
 }
 
-BOOL LLInventoryItem::exportLegacyStream(std::ostream& output_stream, BOOL include_asset_key) const
+bool LLInventoryItem::exportLegacyStream(std::ostream& output_stream, bool include_asset_key) const
 {
     std::string uuid_str;
     output_stream << "\tinv_item\t0\n\t{\n";
@@ -866,7 +866,7 @@ BOOL LLInventoryItem::exportLegacyStream(std::ostream& output_stream, BOOL inclu
     output_stream << "\t\tdesc\t" << mDescription.c_str() << "|\n";
     output_stream << "\t\tcreation_date\t" << mCreationDate << "\n";
     output_stream << "\t}\n";
-    return TRUE;
+    return true;
 }
 
 LLSD LLInventoryItem::asLLSD() const
@@ -930,166 +930,168 @@ bool LLInventoryItem::fromLLSD(const LLSD& sd, bool is_new)
     // TODO - figure out if this should be moved into the noclobber fields above
     mThumbnailUUID.setNull();
 
-    const auto& sdMap = sd.asMap();
-    auto itEnd = sdMap.end();
-
-    auto it = sdMap.find(INV_ITEM_ID_LABEL);
-    if (it != itEnd)
+    // iterate as map to avoid making unnecessary temp copies of everything
+    LLSD::map_const_iterator i, end;
+    end = sd.endMap();
+    for (i = sd.beginMap(); i != end; ++i)
     {
-        mUUID = it->second;
-    }
-
-    it = sdMap.find(INV_PARENT_ID_LABEL);
-    if (it != itEnd)
-    {
-        mParentUUID = it->second;
-    }
-
-    it = sdMap.find(INV_THUMBNAIL_LABEL);
-    if (it != itEnd)
-    {
-        const LLSD& thumbnail_map = it->second;
-        if (thumbnail_map.has(INV_ASSET_ID_LABEL))
+        if (i->first == INV_ITEM_ID_LABEL)
         {
-            mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
+            mUUID = i->second;
+            continue;
         }
-        /* Example:
-            <key> asset_id </key>
-            <uuid> acc0ec86 - 17f2 - 4b92 - ab41 - 6718b1f755f7 </uuid>
-            <key> perms </key>
-            <integer> 8 </integer>
-            <key>service</key>
-            <integer> 3 </integer>
-            <key>version</key>
-            <integer> 1 </key>
-        */
-    }
-    else
-    {
-        it = sdMap.find(INV_THUMBNAIL_ID_LABEL);
-        if (it != itEnd)
-        {
-            mThumbnailUUID = it->second.asUUID();
-        }
-    }
 
-    it = sdMap.find(INV_PERMISSIONS_LABEL);
-    if (it != itEnd)
-    {
-        mPermissions = ll_permissions_from_sd(it->second);
-    }
-
-    it = sdMap.find(INV_SALE_INFO_LABEL);
-    if (it != itEnd)
-    {
-        // Sale info used to contain next owner perm. It is now in
-        // the permissions. Thus, we read that out, and fix legacy
-        // objects. It's possible this op would fail, but it
-        // should pick up the vast majority of the tasks.
-        BOOL has_perm_mask = FALSE;
-        U32  perm_mask = 0;
-        if (!mSaleInfo.fromLLSD(it->second, has_perm_mask, perm_mask))
+        if (i->first == INV_PARENT_ID_LABEL)
         {
-            return false;
+            mParentUUID = i->second;
+            continue;
         }
-        if (has_perm_mask)
+
+        if (i->first == INV_THUMBNAIL_LABEL)
         {
-            if (perm_mask == PERM_NONE)
+            const LLSD &thumbnail_map = i->second;
+            const std::string w = INV_ASSET_ID_LABEL;
+            if (thumbnail_map.has(w))
             {
-                perm_mask = mPermissions.getMaskOwner();
+                mThumbnailUUID = thumbnail_map[w];
             }
-            // fair use fix.
-            if (!(perm_mask & PERM_COPY))
+            /* Example:
+                <key> asset_id </key>
+                <uuid> acc0ec86 - 17f2 - 4b92 - ab41 - 6718b1f755f7 </uuid>
+                <key> perms </key>
+                <integer> 8 </integer>
+                <key>service</key>
+                <integer> 3 </integer>
+                <key>version</key>
+                <integer> 1 </key>
+            */
+          continue;
+      }
+
+        if (i->first == INV_THUMBNAIL_ID_LABEL)
+        {
+            mThumbnailUUID = i->second.asUUID();
+            continue;
+        }
+
+        if (i->first == INV_PERMISSIONS_LABEL)
+        {
+            mPermissions = ll_permissions_from_sd(i->second);
+            continue;
+        }
+
+        if (i->first == INV_SALE_INFO_LABEL)
+        {
+            // Sale info used to contain next owner perm. It is now in
+            // the permissions. Thus, we read that out, and fix legacy
+            // objects. It's possible this op would fail, but it
+            // should pick up the vast majority of the tasks.
+            bool has_perm_mask = false;
+            U32  perm_mask     = 0;
+            if (!mSaleInfo.fromLLSD(i->second, has_perm_mask, perm_mask))
             {
-                perm_mask |= PERM_TRANSFER;
+                return false;
             }
-            mPermissions.setMaskNext(perm_mask);
+            if (has_perm_mask)
+            {
+                if (perm_mask == PERM_NONE)
+                {
+                    perm_mask = mPermissions.getMaskOwner();
+                }
+                // fair use fix.
+                if (!(perm_mask & PERM_COPY))
+                {
+                    perm_mask |= PERM_TRANSFER;
+                }
+                mPermissions.setMaskNext(perm_mask);
+            }
+            continue;
         }
-    }
 
-    it = sdMap.find(INV_SHADOW_ID_LABEL);
-    if (it != itEnd)
-    {
-        mAssetUUID = it->second;
-        LLXORCipher cipher(MAGIC_ID.mData, UUID_BYTES);
-        cipher.decrypt(mAssetUUID.mData, UUID_BYTES);
-    }
-
-    it = sdMap.find(INV_ASSET_ID_LABEL);
-    if (it != itEnd)
-    {
-        mAssetUUID = it->second;
-    }
-
-    it = sdMap.find(INV_LINKED_ID_LABEL);
-    if (it != itEnd)
-    {
-        mAssetUUID = it->second;
-    }
-
-    it = sdMap.find(INV_ASSET_TYPE_LABEL);
-    if (it != itEnd)
-    {
-        LLSD const& label = it->second;
-        if (label.isString())
+        if (i->first == INV_SHADOW_ID_LABEL)
         {
-            mType = LLAssetType::lookup(label.asString().c_str());
+            mAssetUUID = i->second;
+            LLXORCipher cipher(MAGIC_ID.mData, UUID_BYTES);
+            cipher.decrypt(mAssetUUID.mData, UUID_BYTES);
+            continue;
         }
-        else if (label.isInteger())
-        {
-            S8 type = (U8)label.asInteger();
-            mType = static_cast<LLAssetType::EType>(type);
-        }
-    }
 
-    it = sdMap.find(INV_INVENTORY_TYPE_LABEL);
-    if (it != itEnd)
-    {
-        LLSD const& label = it->second;
-        if (label.isString())
+        if (i->first == INV_ASSET_ID_LABEL)
         {
-            mInventoryType = LLInventoryType::lookup(label.asString().c_str());
+            mAssetUUID = i->second;
+            continue;
         }
-        else if (label.isInteger())
+
+        if (i->first == INV_LINKED_ID_LABEL)
         {
-            S8 type = (U8)label.asInteger();
-            mInventoryType = static_cast<LLInventoryType::EType>(type);
+            mAssetUUID = i->second;
+            continue;
         }
-    }
 
-    it = sdMap.find(INV_FLAGS_LABEL);
-    if (it != itEnd)
-    {
-        LLSD const& label = it->second;
-        if (label.isBinary())
+        if (i->first == INV_ASSET_TYPE_LABEL)
         {
-            mFlags = ll_U32_from_sd(label);
+            LLSD const &label = i->second;
+            if (label.isString())
+            {
+                mType = LLAssetType::lookup(label.asString().c_str());
+            }
+            else if (label.isInteger())
+            {
+                S8 type = (U8) label.asInteger();
+                mType   = static_cast<LLAssetType::EType>(type);
+            }
+            continue;
         }
-        else if (label.isInteger())
+
+        if (i->first == INV_INVENTORY_TYPE_LABEL)
         {
-            mFlags = label.asInteger();
+            LLSD const &label = i->second;
+            if (label.isString())
+            {
+                mInventoryType = LLInventoryType::lookup(label.asString().c_str());
+            }
+            else if (label.isInteger())
+            {
+                S8 type        = (U8) label.asInteger();
+                mInventoryType = static_cast<LLInventoryType::EType>(type);
+            }
+            continue;
         }
-    }
 
-    it = sdMap.find(INV_NAME_LABEL);
-    if (it != itEnd)
-    {
-        mName = it->second.asString();
-        LLStringUtil::replaceNonstandardASCII(mName, ' ');
-        LLStringUtil::replaceChar(mName, '|', ' ');
-    }
+        if (i->first == INV_FLAGS_LABEL)
+        {
+            LLSD const &label = i->second;
+            if (label.isBinary())
+            {
+                mFlags = ll_U32_from_sd(label);
+            }
+            else if (label.isInteger())
+            {
+                mFlags = label.asInteger();
+            }
+            continue;
+        }
 
-    it = sdMap.find(INV_DESC_LABEL);
-    if (it != itEnd)
-    {
-        mDescription = it->second.asString();
-        LLStringUtil::replaceNonstandardASCII(mDescription, ' ');
-    }
+        if (i->first == INV_NAME_LABEL)
+        {
+            mName = i->second.asString();
+            LLStringUtil::replaceNonstandardASCII(mName, ' ');
+            LLStringUtil::replaceChar(mName, '|', ' ');
+            continue;
+        }
 
-    it = sdMap.find(INV_CREATION_DATE_LABEL);
-    if (it != itEnd)
-    {
-        mCreationDate = it->second.asInteger();
+        if (i->first == INV_DESC_LABEL)
+        {
+            mDescription = i->second.asString();
+            LLStringUtil::replaceNonstandardASCII(mDescription, ' ');
+            continue;
+        }
+
+        if (i->first == INV_CREATION_DATE_LABEL)
+        {
+            mCreationDate = i->second.asInteger();
+            continue;
+        }
     }
 
     // Need to convert 1.0 simstate files to a useful inventory type
@@ -1274,7 +1276,7 @@ void LLInventoryCategory::unpackMessage(LLMessageSystem* msg,
 }
 
 // virtual
-BOOL LLInventoryCategory::importLegacyStream(std::istream& input_stream)
+bool LLInventoryCategory::importLegacyStream(std::istream& input_stream)
 {
     // *NOTE: Changing the buffer size will require changing the scanf
     // calls below.
@@ -1365,10 +1367,10 @@ BOOL LLInventoryCategory::importLegacyStream(std::istream& input_stream)
                     << "' in inventory import category "  << mUUID << LL_ENDL;
         }
     }
-    return TRUE;
+    return true;
 }
 
-BOOL LLInventoryCategory::exportLegacyStream(std::ostream& output_stream, BOOL) const
+bool LLInventoryCategory::exportLegacyStream(std::ostream& output_stream, bool) const
 {
     std::string uuid_str;
     output_stream << "\tinv_category\t0\n\t{\n";
@@ -1389,7 +1391,7 @@ BOOL LLInventoryCategory::exportLegacyStream(std::ostream& output_stream, BOOL) 
         output_stream << "|\n";
     }
     output_stream << "\t}\n";
-    return TRUE;
+    return true;
 }
 
 LLSD LLInventoryCategory::exportLLSD() const

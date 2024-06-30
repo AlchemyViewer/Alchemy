@@ -42,7 +42,7 @@ class ALPanelAOMini final : public LLPanel
 public:
     ALPanelAOMini();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
 
 protected:
     ~ALPanelAOMini();

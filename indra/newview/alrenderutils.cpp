@@ -43,7 +43,7 @@
 #include "llviewershadermgr.h"
 #include "pipeline.h"
 
-extern BOOL gSnapshotNoPost;
+extern bool gSnapshotNoPost;
 extern LLPointer<LLImageGL> gEXRImage;
 
 #ifndef LL_WINDOWS

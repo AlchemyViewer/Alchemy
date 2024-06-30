@@ -77,7 +77,13 @@ LLViewerCamera::LLViewerCamera() : LLCamera()
     mZoomSubregion = 1;
     mAverageSpeed = 0.f;
     mAverageAngularSpeed = 0.f;
-    gSavedSettings.getControl("CameraAngle")->getCommitSignal()->connect(boost::bind(&LLViewerCamera::updateCameraAngle, this, _2));
+
+    mCameraAngleChangedSignal = gSavedSettings.getControl("CameraAngle")->getCommitSignal()->connect(boost::bind(&LLViewerCamera::updateCameraAngle, this, _2));
+}
+
+LLViewerCamera::~LLViewerCamera()
+{
+    mCameraAngleChangedSignal.disconnect();
 }
 
 void LLViewerCamera::updateCameraLocation(const LLVector3 &center, const LLVector3 &up_direction, const LLVector3 &point_of_interest)
@@ -168,7 +174,7 @@ void LLViewerCamera::calcProjection(const F32 far_distance) const
 // height.
 
 //static
-void LLViewerCamera::updateFrustumPlanes(LLCamera& camera, BOOL ortho, BOOL zflip, BOOL no_hacks)
+void LLViewerCamera::updateFrustumPlanes(LLCamera& camera, bool ortho, bool zflip, bool no_hacks)
 {
     LLVector3 frust[8];
 
@@ -237,17 +243,17 @@ void LLViewerCamera::updateFrustumPlanes(LLCamera& camera, BOOL ortho, BOOL zfli
     camera.calcAgentFrustumPlanes(frust);
 }
 
-void LLViewerCamera::setPerspective(BOOL for_selection,
+void LLViewerCamera::setPerspective(bool for_selection,
                                     S32 x, S32 y_from_bot, S32 width, S32 height,
-                                    BOOL limit_select_distance,
+                                    bool limit_select_distance,
                                     F32 z_near, F32 z_far)
 {
     F32 fov_y, aspect;
     fov_y = RAD_TO_DEG * getView();
-    BOOL z_default_far = FALSE;
+    bool z_default_far = false;
     if (z_far <= 0)
     {
-        z_default_far = TRUE;
+        z_default_far = true;
         z_far = getFar();
     }
     if (z_near <= 0)
@@ -370,11 +376,11 @@ void LLViewerCamera::projectScreenToPosAgent(const S32 screen_x, const S32 scree
 }
 
 // Uses the last GL matrices set in set_perspective to project a point from
-// the agent's region space to screen coordinates.  Returns TRUE if point in within
+// the agent's region space to screen coordinates.  Returns true if point in within
 // the current window.
-BOOL LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoordGL &out_point, const BOOL clamp) const
+bool LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoordGL &out_point, const bool clamp) const
 {
-    BOOL in_front = TRUE;
+    bool in_front = true;
     LLVector3 window_coordinates;
 
     LLVector3 dir_to_point = pos_agent - getOrigin();
@@ -384,11 +390,11 @@ BOOL LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoord
     {
         if (clamp)
         {
-            return FALSE;
+            return false;
         }
         else
         {
-            in_front = FALSE;
+            in_front = false;
         }
     }
 
@@ -412,19 +418,19 @@ BOOL LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoord
         S32 int_x = lltrunc(x);
         S32 int_y = lltrunc(y);
 
-        BOOL valid = TRUE;
+        bool valid = true;
 
         if (clamp)
         {
             if (int_x < world_rect.mLeft)
             {
                 out_point.mX = world_rect.mLeft;
-                valid = FALSE;
+                valid = false;
             }
             else if (int_x > world_rect.mRight)
             {
                 out_point.mX = world_rect.mRight;
-                valid = FALSE;
+                valid = false;
             }
             else
             {
@@ -434,12 +440,12 @@ BOOL LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoord
             if (int_y < world_rect.mBottom)
             {
                 out_point.mY = world_rect.mBottom;
-                valid = FALSE;
+                valid = false;
             }
             else if (int_y > world_rect.mTop)
             {
                 out_point.mY = world_rect.mTop;
-                valid = FALSE;
+                valid = false;
             }
             else
             {
@@ -454,19 +460,19 @@ BOOL LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoord
 
             if (int_x < world_rect.mLeft)
             {
-                valid = FALSE;
+                valid = false;
             }
             else if (int_x > world_rect.mRight)
             {
-                valid = FALSE;
+                valid = false;
             }
             if (int_y < world_rect.mBottom)
             {
-                valid = FALSE;
+                valid = false;
             }
             else if (int_y > world_rect.mTop)
             {
-                valid = FALSE;
+                valid = false;
             }
 
             return in_front && valid;
@@ -474,23 +480,23 @@ BOOL LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoord
     }
     else
     {
-        return FALSE;
+        return false;
     }
 }
 
 // Uses the last GL matrices set in set_perspective to project a point from
 // the agent's region space to the nearest edge in screen coordinates.
-// Returns TRUE if projection succeeds.
-BOOL LLViewerCamera::projectPosAgentToScreenEdge(const LLVector3 &pos_agent,
+// Returns true if projection succeeds.
+bool LLViewerCamera::projectPosAgentToScreenEdge(const LLVector3 &pos_agent,
                                                 LLCoordGL &out_point) const
 {
     LLVector3 dir_to_point = pos_agent - getOrigin();
     dir_to_point /= dir_to_point.magVec();
 
-    BOOL in_front = TRUE;
+    bool in_front = true;
     if (dir_to_point * getAtAxis() < 0.f)
     {
-        in_front = FALSE;
+        in_front = false;
     }
 
     const LLMatrix4a& modelview = get_current_modelview();
@@ -520,7 +526,7 @@ BOOL LLViewerCamera::projectPosAgentToScreenEdge(const LLVector3 &pos_agent,
         if (x == center_x  &&  y == center_y)
         {
             // can't project to edge from exact center
-            return FALSE;
+            return false;
         }
 
         // find the line from center to local
@@ -617,9 +623,9 @@ BOOL LLViewerCamera::projectPosAgentToScreenEdge(const LLVector3 &pos_agent,
 
         out_point.mX = int_x + world_rect.mLeft;
         out_point.mY = int_y + world_rect.mBottom;
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 
@@ -644,7 +650,7 @@ LLVector3 LLViewerCamera::roundToPixel(const LLVector3 &pos_agent)
     F32 dist = (pos_agent - getOrigin()).magVec();
     // Convert to screen space and back, preserving the depth.
     LLCoordGL screen_point;
-    if (!projectPosAgentToScreen(pos_agent, screen_point, FALSE))
+    if (!projectPosAgentToScreen(pos_agent, screen_point, false))
     {
         // Off the screen, just return the original position.
         return pos_agent;
@@ -666,14 +672,14 @@ LLVector3 LLViewerCamera::roundToPixel(const LLVector3 &pos_agent)
     return pos_agent_rounded;
 }
 
-BOOL LLViewerCamera::cameraUnderWater() const
+bool LLViewerCamera::cameraUnderWater() const
 {
     LLViewerRegion* regionp = LLWorld::instance().getRegionFromPosAgent(getOrigin());
 
     if (gPipeline.mHeroProbeManager.isMirrorPass())
     {
         // TODO: figure out how to handle this case
-        return FALSE;
+        return false;
     }
 
     if (!regionp)
@@ -683,26 +689,26 @@ BOOL LLViewerCamera::cameraUnderWater() const
 
     if(!regionp)
     {
-        return FALSE ;
+        return false ;
     }
 
     return getOrigin().mV[VZ] < regionp->getWaterHeight();
 }
 
-BOOL LLViewerCamera::areVertsVisible(LLViewerObject* volumep, BOOL all_verts)
+bool LLViewerCamera::areVertsVisible(LLViewerObject* volumep, bool all_verts)
 {
     S32 i, num_faces;
     LLDrawable* drawablep = volumep->mDrawable;
 
     if (!drawablep)
     {
-        return FALSE;
+        return false;
     }
 
     LLVolume* volume = volumep->getVolume();
     if (!volume)
     {
-        return FALSE;
+        return false;
     }
 
     LLVOVolume* vo_volume = (LLVOVolume*) volumep;
@@ -720,7 +726,7 @@ BOOL LLViewerCamera::areVertsVisible(LLViewerObject* volumep, BOOL all_verts)
     {
         const LLVolumeFace& face = volume->getVolumeFace(i);
 
-        for (U32 v = 0; v < face.mNumVertices; v++)
+        for (S32 v = 0; v < face.mNumVertices; v++)
         {
             const LLVector4a& src_vec = face.mPositions[v];
             LLVector4a vec;
@@ -732,7 +738,7 @@ BOOL LLViewerCamera::areVertsVisible(LLViewerObject* volumep, BOOL all_verts)
                 render_mata.affineTransform(t, vec);
             }
 
-            BOOL in_frustum = pointInFrustum(LLVector3(vec.getF32ptr())) > 0;
+            bool in_frustum = pointInFrustum(LLVector3(vec.getF32ptr())) > 0;
 
             if (( !in_frustum && all_verts) ||
                  (in_frustum && !all_verts))
@@ -744,7 +750,7 @@ BOOL LLViewerCamera::areVertsVisible(LLViewerObject* volumep, BOOL all_verts)
     return all_verts;
 }
 
-extern BOOL gCubeSnapshot;
+extern bool gCubeSnapshot;
 
 // changes local camera and broadcasts change
 /* virtual */ void LLViewerCamera::setView(F32 vertical_fov_rads)
@@ -795,14 +801,14 @@ void LLViewerCamera::setDefaultFOV(F32 vertical_fov_rads)
     mCosHalfCameraFOV = cosf(mCameraFOVDefault * 0.5f);
 }
 
-BOOL LLViewerCamera::isDefaultFOVChanged()
+bool LLViewerCamera::isDefaultFOVChanged()
 {
     if(mPrevCameraFOVDefault != mCameraFOVDefault)
     {
         mPrevCameraFOVDefault = mCameraFOVDefault;
         return !gSavedSettings.getBOOL("IgnoreFOVZoomForLODs");
     }
-    return FALSE;
+    return false;
 }
 
 void LLViewerCamera::loadDefaultFOV()
@@ -813,11 +819,8 @@ void LLViewerCamera::loadDefaultFOV()
     mCosHalfCameraFOV = cosf(mCameraFOVDefault * 0.5f);
 }
 
-
-// static
-void LLViewerCamera::updateCameraAngle( void* user_data, const LLSD& value)
+void LLViewerCamera::updateCameraAngle(const LLSD& value)
 {
-    LLViewerCamera* self=(LLViewerCamera*)user_data;
-    self->setDefaultFOV(value.asReal());
+    setDefaultFOV(value.asReal());
 }
 

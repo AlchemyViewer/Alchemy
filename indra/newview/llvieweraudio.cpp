@@ -76,7 +76,7 @@ LLViewerAudio::~LLViewerAudio()
 
 void LLViewerAudio::registerIdleListener()
 {
-    if(mIdleListnerActive==false)
+    if (!mIdleListnerActive)
     {
         mIdleListnerActive = true;
         doOnIdleRepeating(boost::bind(boost::bind(&LLViewerAudio::onIdleUpdate, this)));
@@ -355,9 +355,9 @@ void init_audio()
 
 // load up our initial set of sounds we'll want so they're in memory and ready to be played
 
-    BOOL mute_audio = gSavedSettings.getBOOL("MuteAudio");
+    bool mute_audio = gSavedSettings.getBOOL("MuteAudio");
 
-    if (!mute_audio && FALSE == gSavedSettings.getBOOL("NoPreload"))
+    if (!mute_audio && false == gSavedSettings.getBOOL("NoPreload"))
     {
         gAudiop->preloadSound(LLUUID(gSavedSettings.getString("UISndAlert")));
         gAudiop->preloadSound(LLUUID(gSavedSettings.getString("UISndBadKeystroke")));
@@ -402,7 +402,7 @@ void audio_update_volume(bool force_update)
     bool mute_audio = mute_audio_cc;
 
     LLProgressView* progress = gViewerWindow->getProgressView();
-    BOOL progress_view_visible = FALSE;
+    bool progress_view_visible = false;
 
     if (progress)
     {
@@ -560,12 +560,13 @@ void audio_update_wind(bool force_update)
         // don't use the setter setMaxWindGain() because we don't
         // want to screw up the fade-in on startup by setting actual source gain
         // outside the fade-in.
-        static const LLCachedControl<bool> mute_audio(gSavedSettings, "MuteAudio");
-        static const LLCachedControl<bool> mute_ambient(gSavedSettings, "MuteAmbient");
-        static const LLCachedControl<F32> audio_level_master(gSavedSettings, "AudioLevelMaster");
-        static const LLCachedControl<F32> audio_level_ambient(gSavedSettings, "AudioLevelAmbient");
-        F32 master_volume = mute_audio ? 0.f : audio_level_master;
-        F32 ambient_volume = mute_ambient ? 0.f : audio_level_ambient;
+        static LLCachedControl<bool> mute_audio(gSavedSettings, "MuteAudio");
+        static LLCachedControl<bool> mute_ambient(gSavedSettings, "MuteAmbient");
+        static LLCachedControl<F32> level_master(gSavedSettings, "AudioLevelMaster");
+        static LLCachedControl<F32> level_ambient(gSavedSettings, "AudioLevelAmbient");
+
+        F32 master_volume  = mute_audio() ? 0.f : level_master();
+        F32 ambient_volume = mute_ambient() ? 0.f : level_ambient();
         F32 max_wind_volume = master_volume * ambient_volume;
 
         const F32 WIND_SOUND_TRANSITION_TIME = 2.f;

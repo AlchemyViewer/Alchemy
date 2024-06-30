@@ -68,7 +68,7 @@ constexpr F32   DEG_TO_RAD  = 0.017453292519943295769236907684886f;
 constexpr F32   RAD_TO_DEG  = 57.295779513082320876798154814105f;
 constexpr F32   F_APPROXIMATELY_ZERO = 0.00001f;
 constexpr F32   F_LN10      = 2.3025850929940456840179914546844f;
-constexpr F32   OO_LN10     = 0.43429448190325182765112891891661f;
+constexpr F32   OO_LN10     = 0.43429448190325182765112891891661;
 constexpr F32   F_LN2       = 0.69314718056f;
 constexpr F32   OO_LN2      = 1.4426950408889634073599246810019f;
 
@@ -252,8 +252,8 @@ constexpr F32 FAST_MAG_BETA = 0.397824734759f;
 // peak error = -32.6 dB
 // RMS  error = -25.7 dB
 //
-//const F32 FAST_MAG_ALPHA = 0.948059448969f;
-//const F32 FAST_MAG_BETA = 0.392699081699f;
+//constexpr F32 FAST_MAG_ALPHA = 0.948059448969f;
+//constexpr F32 FAST_MAG_BETA = 0.392699081699f;
 
 inline F32 fastMagnitude(F32 a, F32 b)
 {
@@ -270,8 +270,8 @@ inline F32 fastMagnitude(F32 a, F32 b)
 //
 // Culled from www.stereopsis.com/FPU.html
 
-const F64 LL_DOUBLE_TO_FIX_MAGIC    = 68719476736.0*1.5;     //2^36 * 1.5,  (52-_shiftamt=36) uses limited precisicion to floor
-const S32 LL_SHIFT_AMOUNT           = 16;                    //16.16 fixed point representation,
+constexpr F64 LL_DOUBLE_TO_FIX_MAGIC    = 68719476736.0*1.5;     //2^36 * 1.5,  (52-_shiftamt=36) uses limited precisicion to floor
+constexpr S32 LL_SHIFT_AMOUNT           = 16;                    //16.16 fixed point representation,
 
 // Endian dependent code
 #ifdef LL_LITTLE_ENDIAN

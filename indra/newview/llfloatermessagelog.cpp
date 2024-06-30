@@ -63,7 +63,7 @@ void LLMessageLogFilter::set(const std::string& filter)
         {
             LLStringUtil::toLower(token);
 
-            BOOL negative = token.find('!') == 0;
+            bool negative = token.find('!') == 0;
             if(negative)
             {
                 token = token.substr(1);
@@ -81,10 +81,10 @@ LLFloaterMessageLog::LLMessageLogNetMan::LLMessageLogNetMan(LLFloaterMessageLog*
 {
 }
 
-BOOL LLFloaterMessageLog::LLMessageLogNetMan::tick()
+bool LLFloaterMessageLog::LLMessageLogNetMan::tick()
 {
     if (mParent) mParent->updateGlobalNetList();
-    return FALSE;
+    return false;
 }
 
 ////////////////////////////////
@@ -139,7 +139,7 @@ LLFloaterMessageLog::~LLFloaterMessageLog()
     sIncompleteHTTPConvoMutex = nullptr;
 }
 
-BOOL LLFloaterMessageLog::postBuild()
+bool LLFloaterMessageLog::postBuild()
 {
     mStatusText = getChild<LLTextBase>("log_status_text");
     mMessagelogScrollListCtrl = getChild<LLScrollListCtrl>("message_log");
@@ -155,7 +155,7 @@ BOOL LLFloaterMessageLog::postBuild()
     getChild<LLUICtrl>("msg_builder_send_btn")->setCommitCallback(boost::bind(&LLFloaterMessageLog::onClickSendToMessageBuilder, this));
     getChild<LLLineEditor>("filter_edit")->setText(mMessageLogFilter.asString());
 
-    startApplyingFilter(mMessageLogFilter.asString(), TRUE);
+    startApplyingFilter(mMessageLogFilter.asString(), true);
 
     updateGlobalNetList(true);
     mNetListTimer.reset(new LLMessageLogNetMan(this));
@@ -163,7 +163,7 @@ BOOL LLFloaterMessageLog::postBuild()
     setInfoPaneMode(IPANE_NET);
     wrapInfoPaneText(true);
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterMessageLog::onOpen(const LLSD& key)
@@ -261,7 +261,7 @@ void LLFloaterMessageLog::updateGlobalNetList(bool starting)
     if(!starting)
     {
         refreshNetList();
-        refreshNetInfo(FALSE);
+        refreshNetInfo(false);
     }
 }
 
@@ -371,7 +371,7 @@ void LLFloaterMessageLog::refreshNetList()
         scrollp->setScrollPos(scroll_pos);
 }
 
-void LLFloaterMessageLog::refreshNetInfo(BOOL force)
+void LLFloaterMessageLog::refreshNetInfo(bool force)
 {
     if(mInfoPaneMode != IPANE_NET) return;
     const LLScrollListCtrl* scrollp = getChild<LLScrollListCtrl>("net_list");
@@ -424,7 +424,7 @@ void LLFloaterMessageLog::setInfoPaneMode(EInfoPaneMode mode)
 {
     mInfoPaneMode = mode;
     if(mode == IPANE_NET)
-        refreshNetInfo(TRUE);
+        refreshNetInfo(true);
 
     //we hide the regular net_info editor and show two panes for http log mode
     getChild<LLView>("net_info")->setVisible(mode != IPANE_HTTP_LOG);
@@ -612,7 +612,7 @@ void LLFloaterMessageLog::pairHTTPResponse(LogPayload entry)
 void LLFloaterMessageLog::onCommitNetList(LLUICtrl* ctrl)
 {
     setInfoPaneMode(IPANE_NET);
-    refreshNetInfo(TRUE);
+    refreshNetInfo(true);
 }
 
 void LLFloaterMessageLog::onCommitMessageLog(LLUICtrl* ctrl)
@@ -655,18 +655,18 @@ void LLFloaterMessageLog::showMessage(FloaterMessageItem item)
 }
 
 // static
-BOOL LLFloaterMessageLog::onClickCloseCircuit(void* user_data)
+bool LLFloaterMessageLog::onClickCloseCircuit(void* user_data)
 {
     LLNetListItem* itemp = static_cast<LLNetListItem*>(user_data);
     LLCircuitData* cdp = static_cast<LLCircuitData*>(itemp->mCircuitData);
-    if(!cdp) return FALSE;
+    if(!cdp) return false;
     LLHost myhost = cdp->getHost();
     LLSD args;
     args["MESSAGE"] = "This will delete local circuit data.\nDo you want to tell the remote host to close the circuit too?";
     LLSD payload;
     payload["circuittoclose"] = myhost.getString();
     LLNotificationsUtil::add("GenericAlertYesCancel", args, payload, onConfirmCloseCircuit);
-    return TRUE;
+    return true;
 }
 
 // static
@@ -709,10 +709,10 @@ void LLFloaterMessageLog::onConfirmRemoveRegion(const LLSD& notification, const 
 
 void LLFloaterMessageLog::onClickFilterApply()
 {
-    startApplyingFilter(childGetValue("filter_edit"), TRUE);
+    startApplyingFilter(childGetValue("filter_edit"), true);
 }
 
-void LLFloaterMessageLog::startApplyingFilter(const std::string& filter, BOOL force)
+void LLFloaterMessageLog::startApplyingFilter(const std::string& filter, bool force)
 {
     LLMessageLogFilter new_filter(filter);
     if (force
@@ -743,7 +743,7 @@ void LLFloaterMessageLog::updateFilterStatus()
 
 void LLFloaterMessageLog::onCommitFilter()
 {
-    startApplyingFilter(childGetValue("filter_edit"), FALSE);
+    startApplyingFilter(childGetValue("filter_edit"), false);
 }
 
 void LLFloaterMessageLog::onClickClearLog()
@@ -758,7 +758,7 @@ void LLFloaterMessageLog::onClickClearLog()
 void LLFloaterMessageLog::onClickFilterMenu(const LLSD& user_data)
 {
     getChild<LLLineEditor>("filter_edit")->setText(user_data.asString());
-    startApplyingFilter(user_data.asString(), FALSE);
+    startApplyingFilter(user_data.asString(), false);
 }
 
 void LLFloaterMessageLog::onClickSendToMessageBuilder()

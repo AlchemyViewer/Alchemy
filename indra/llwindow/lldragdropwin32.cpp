@@ -177,7 +177,7 @@ class LLDragDropWin32Target:
                     ScreenToClient(mAppWindowHandle, &pt2);
 
                     LLCoordWindow cursor_coord_window(pt2.x, pt2.y);
-                    MASK mask = gKeyboard->currentMask(TRUE);
+                    MASK mask = gKeyboard->currentMask(true);
 
                     LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest(cursor_coord_window.convert(), mask, LLWindowCallbacks::DNDA_START_TRACKING, mDropType, mDropData);
                     switch (result)
@@ -228,7 +228,7 @@ class LLDragDropWin32Target:
 //                      ScreenToClient( mAppWindowHandle, &pt2 );
 //
 //                      LLCoordWindow cursor_coord_window( pt2.x, pt2.y );
-//                      MASK mask = gKeyboard->currentMask(TRUE);
+//                      MASK mask = gKeyboard->currentMask(true);
 //
 //                      LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest( cursor_coord_window.convert(), mask,
 //                          LLWindowCallbacks::DNDA_START_TRACKING, mDropUrl );
@@ -287,7 +287,7 @@ class LLDragDropWin32Target:
                     ScreenToClient( mAppWindowHandle, &pt2 );
 
                     LLCoordWindow cursor_coord_window( pt2.x, pt2.y );
-                    MASK mask = gKeyboard->currentMask(TRUE);
+                    MASK mask = gKeyboard->currentMask(true);
 
 // [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
                     LLWindowCallbacks::DragNDropResult result = window_imp->completeDragNDropRequest(cursor_coord_window.convert(), mask, LLWindowCallbacks::DNDA_TRACK, mDropType, mDropData);
@@ -330,7 +330,7 @@ class LLDragDropWin32Target:
             if (NULL != window_imp)
             {
                 LLCoordGL gl_coord( 0, 0 );
-                MASK mask = gKeyboard->currentMask(TRUE);
+                MASK mask = gKeyboard->currentMask(true);
 // [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
                 window_imp->completeDragNDropRequest(gl_coord, mask, LLWindowCallbacks::DNDA_STOP_TRACKING, mDropType, mDropData);
 // [/SL:KB]
@@ -366,7 +366,7 @@ class LLDragDropWin32Target:
                     LL_INFOS() << LL_ENDL;
 
                     // no keyboard modifier option yet but we could one day
-                    MASK mask = gKeyboard->currentMask( TRUE );
+                    MASK mask = gKeyboard->currentMask( true );
 
                     // actually do the drop
 // [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
@@ -436,7 +436,7 @@ LLDragDropWin32::~LLDragDropWin32()
 bool LLDragDropWin32::init( HWND hWnd )
 {
     if ( NOERROR != OleInitialize( NULL ) )
-        return FALSE;
+        return false;
 
     mDropTarget = new LLDragDropWin32Target( hWnd );
     if ( mDropTarget )

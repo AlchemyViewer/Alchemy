@@ -92,7 +92,7 @@ namespace
                 {
                     for (const auto& playpair : avatarp->mPlayingAnimations)
                     {
-                        avatarp->stopMotion(playpair.first, TRUE);
+                        avatarp->stopMotion(playpair.first, true);
                         avatarp->startMotion(playpair.first);
                     }
                 }
@@ -126,16 +126,16 @@ namespace
         msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
         msg->nextBlockFast(_PREHASH_AnimationList);
         msg->addUUIDFast(_PREHASH_AnimID, LLUUID("e5afcabe-1601-934b-7e89-b0c78cac373a"));
-        msg->addBOOLFast(_PREHASH_StartAnim, TRUE);
+        msg->addBOOLFast(_PREHASH_StartAnim, true);
         msg->nextBlockFast(_PREHASH_AnimationList);
         msg->addUUIDFast(_PREHASH_AnimID, LLUUID("d307c056-636e-dda6-4a3c-b3a43c431ca8"));
-        msg->addBOOLFast(_PREHASH_StartAnim, TRUE);
+        msg->addBOOLFast(_PREHASH_StartAnim, true);
         msg->nextBlockFast(_PREHASH_AnimationList);
         msg->addUUIDFast(_PREHASH_AnimID, LLUUID("319b4e7a-18fc-1f9e-6411-dd10326c0c7e"));
-        msg->addBOOLFast(_PREHASH_StartAnim, TRUE);
+        msg->addBOOLFast(_PREHASH_StartAnim, true);
         msg->nextBlockFast(_PREHASH_AnimationList);
         msg->addUUIDFast(_PREHASH_AnimID, LLUUID("f05d765d-0e01-5f9a-bfc2-fdc054757e55"));
-        msg->addBOOLFast(_PREHASH_StartAnim, TRUE);
+        msg->addBOOLFast(_PREHASH_StartAnim, true);
         msg->nextBlockFast(_PREHASH_PhysicalAvatarEventList);
         msg->addBinaryDataFast(_PREHASH_TypeData, nullptr, 0);
         msg->sendReliable(gAgent.getRegion()->getHost());
@@ -263,7 +263,7 @@ namespace
             /*
                 NOTE: oh god how did this get here
             */
-            LLSelectMgr::getInstance()->selectionUpdateTemporary(1);//set temp to TRUE
+            LLSelectMgr::getInstance()->selectionUpdateTemporary(1);//set temp to true
             LLSelectMgr::getInstance()->selectionUpdatePhysics(1);
             LLSelectMgr::getInstance()->sendDelink();
             LLSelectMgr::getInstance()->deselectAll();
@@ -289,7 +289,7 @@ namespace
 
                 So we do selectionUpdateTemporary(1)
             */
-            LLSelectMgr::getInstance()->selectionUpdateTemporary(1);//set temp to TRUE
+            LLSelectMgr::getInstance()->selectionUpdateTemporary(1);//set temp to true
             LLVector3 pos = objpos->getPosition();//get the x and the y
             pos.mV[VZ] = FLT_MAX;//create the z
             objpos->setPositionParent(pos);//set the x y z

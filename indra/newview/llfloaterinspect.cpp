@@ -61,7 +61,7 @@
 
 LLFloaterInspect::LLFloaterInspect(const LLSD& key)
   : LLFloater(key),
-    mDirty(FALSE),
+    mDirty(false),
     mOwnerNameCacheConnection(),
     mCreatorNameCacheConnection(),
     mOptionsButton(NULL),
@@ -87,7 +87,7 @@ LLFloaterInspect::LLFloaterInspect(const LLSD& key)
     mColumnBits["creation_date"] = 512;
 }
 
-BOOL LLFloaterInspect::postBuild()
+bool LLFloaterInspect::postBuild()
 {
     mObjectList = getChild<LLScrollListCtrl>("object_list");
 
@@ -96,7 +96,7 @@ BOOL LLFloaterInspect::postBuild()
 
     refresh();
 
-    return TRUE;
+    return true;
 }
 
 LLFloaterInspect::~LLFloaterInspect(void)
@@ -124,13 +124,13 @@ LLFloaterInspect::~LLFloaterInspect(void)
     }
     else
     {
-        LLFloaterReg::showInstance("build", LLSD(), TRUE);
+        LLFloaterReg::showInstance("build", LLSD(), true);
     }
 }
 
 void LLFloaterInspect::onOpen(const LLSD& key)
 {
-    BOOL forcesel = LLSelectMgr::getInstance()->setForceSelection(TRUE);
+    bool forcesel = LLSelectMgr::getInstance()->setForceSelection(true);
     LLToolMgr::getInstance()->setTransientTool(LLToolCompInspect::getInstance());
     LLSelectMgr::getInstance()->setForceSelection(forcesel);    // restore previouis value
     mObjectSelection = LLSelectMgr::getInstance()->getSelection();
@@ -581,7 +581,7 @@ void LLFloaterInspect::refresh()
     args["NUM_VERTICES"] = format_res_string;
     res_mgr.getIntegerString(format_res_string, tcount);
     args["NUM_TRIANGLES"] = format_res_string;
-    res_mgr.getIntegerString(format_res_string, mTextureList.size());
+    res_mgr.getIntegerString(format_res_string, static_cast<S32>(mTextureList.size()));
     args["NUM_TEXTURES"] = format_res_string;
     res_mgr.getIntegerString(format_res_string, mTextureMemory / 1024);
     args["TEXTURE_MEMORY"] = format_res_string;
@@ -702,7 +702,7 @@ void LLFloaterInspect::draw()
     if (mDirty)
     {
         refresh();
-        mDirty = FALSE;
+        mDirty = false;
     }
 
     LLFloater::draw();
@@ -720,7 +720,7 @@ void LLFloaterInspect::onColumnDisplayModeChanged()
     getResizeLimits(&min_width, &min_height);
 
     std::string current_sort_col = mObjectList->getSortColumnName();
-    BOOL current_sort_asc = mObjectList->getSortAscending();
+    bool current_sort_asc = mObjectList->getSortAscending();
 
     mObjectList->clearRows();
     mObjectList->clearColumns();

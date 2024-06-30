@@ -69,6 +69,7 @@
 #include "rlvactions.h"
 #include "rlvcommon.h"
 // [/RLVa:KB]
+const F32 AGENT_TYPING_TIMEOUT = 5.f;   // seconds
 
 class LLChatBarGestureObserver final : public LLGestureManagerObserver
 {
@@ -94,7 +95,7 @@ LLChatBar::LLChatBar(const LLSD& key)
 :   LLFloater(key),
     mInputEditor(nullptr),
     mGestureLabelTimer(),
-    mIsBuilt(FALSE),
+    mIsBuilt(false),
     mGestureCombo(nullptr),
     mObserver(nullptr)
 {
@@ -121,7 +122,7 @@ LLChatBar::~LLChatBar()
 // Overrides
 //-----------------------------------------------------------------------
 
-BOOL LLChatBar::postBuild()
+bool LLChatBar::postBuild()
 {
     // * NOTE: mantipov: getChild with default parameters returns dummy widget.
     // Seems this class will be completle removed
@@ -133,31 +134,31 @@ BOOL LLChatBar::postBuild()
     mInputEditor->setKeystrokeCallback(&onInputEditorKeystroke, this);
     mInputEditor->setFocusLostCallback(boost::bind(&LLChatBar::onInputEditorFocusLost));
     mInputEditor->setFocusReceivedCallback(boost::bind(&LLChatBar::onInputEditorGainFocus));
-    mInputEditor->setCommitOnFocusLost( FALSE );
-    mInputEditor->setRevertOnEsc( FALSE );
-    mInputEditor->setIgnoreTab(TRUE);
-    mInputEditor->setPassDelete(TRUE);
-    mInputEditor->setReplaceNewlinesWithSpaces(FALSE);
+    mInputEditor->setCommitOnFocusLost( false );
+    mInputEditor->setRevertOnEsc( false );
+    mInputEditor->setIgnoreTab(true);
+    mInputEditor->setPassDelete(true);
+    mInputEditor->setReplaceNewlinesWithSpaces(false);
 
     mInputEditor->setMaxTextLength(DB_CHAT_MSG_STR_LEN);
-    mInputEditor->setEnableLineHistory(TRUE);
+    mInputEditor->setEnableLineHistory(true);
 
     mInputEditor->setFont(LLViewerChat::getChatFont());
 
     mChatFontSizeConnection = gSavedSettings.getControl("ChatFontSize")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD& old_val) { mInputEditor->setFont(LLViewerChat::getChatFont()); });
 
-    return TRUE;
+    return true;
 }
 
 void LLChatBar::onOpen(const LLSD& key)
 {
-    mInputEditor->setFocus(TRUE);
+    mInputEditor->setFocus(true);
 }
 
 // virtual
-BOOL LLChatBar::handleKeyHere( KEY key, MASK mask )
+bool LLChatBar::handleKeyHere( KEY key, MASK mask )
 {
-    BOOL handled = FALSE;
+    bool handled = false;
 
     if( KEY_RETURN == key )
     {
@@ -165,25 +166,25 @@ BOOL LLChatBar::handleKeyHere( KEY key, MASK mask )
         {
             // whisper
             sendChat(CHAT_TYPE_WHISPER);
-            handled = TRUE;
+            handled = true;
         }
         else if (mask == MASK_CONTROL)
         {
             // shout
             sendChat(CHAT_TYPE_SHOUT);
-            handled = TRUE;
+            handled = true;
         }
         else if (mask == MASK_ALT)
         {
             // shout
             sendChat(CHAT_TYPE_OOC);
-            handled = TRUE;
+            handled = true;
         }
         else if (mask == MASK_NONE)
         {
             // say
             sendChat( CHAT_TYPE_NORMAL );
-            handled = TRUE;
+            handled = true;
         }
     }
     // only do this in main chatbar
@@ -191,7 +192,7 @@ BOOL LLChatBar::handleKeyHere( KEY key, MASK mask )
     {
         stopChat();
 
-        handled = TRUE;
+        handled = true;
     }
 
     return handled;
@@ -231,7 +232,7 @@ void LLChatBar::refreshGestures()
         mGestureCombo->clearRows();
 
         // collect list of unique gestures
-        std::map <std::string, BOOL> unique;
+        std::map <std::string, bool> unique;
         LLGestureMgr::item_map_t::const_iterator it;
         const LLGestureMgr::item_map_t& active_gestures = LLGestureMgr::instance().getActiveGestures();
         for (it = active_gestures.begin(); it != active_gestures.end(); ++it)
@@ -241,13 +242,13 @@ void LLChatBar::refreshGestures()
             {
                 if (!gesture->mTrigger.empty())
                 {
-                    unique[gesture->mTrigger] = TRUE;
+                    unique[gesture->mTrigger] = true;
                 }
             }
         }
 
         // add unique gestures
-        std::map <std::string, BOOL>::iterator it2;
+        std::map <std::string, bool>::iterator it2;
         for (it2 = unique.begin(); it2 != unique.end(); ++it2)
         {
             mGestureCombo->addSimpleElement((*it2).first);
@@ -270,13 +271,13 @@ void LLChatBar::refreshGestures()
 }
 
 // Move the cursor to the correct input field.
-void LLChatBar::setKeyboardFocus(BOOL focus)
+void LLChatBar::setKeyboardFocus(bool focus)
 {
     if (focus)
     {
         if (mInputEditor)
         {
-            mInputEditor->setFocus(TRUE);
+            mInputEditor->setFocus(true);
             mInputEditor->selectAll();
         }
     }
@@ -286,13 +287,13 @@ void LLChatBar::setKeyboardFocus(BOOL focus)
         {
             mInputEditor->deselect();
         }
-        setFocus(FALSE);
+        setFocus(false);
     }
 }
 
 
 // Ignore arrow keys in chat bar
-void LLChatBar::setIgnoreArrowKeys(BOOL b)
+void LLChatBar::setIgnoreArrowKeys(bool b)
 {
     if (mInputEditor)
     {
@@ -300,7 +301,7 @@ void LLChatBar::setIgnoreArrowKeys(BOOL b)
     }
 }
 
-BOOL LLChatBar::inputEditorHasFocus() const
+bool LLChatBar::inputEditorHasFocus() const
 {
     return mInputEditor && mInputEditor->hasFocus();
 }
@@ -350,9 +351,9 @@ void LLChatBar::sendChat( EChatType type )
 void LLChatBar::startChat(const char* line)
 {
     LLChatBar* bar = LLFloaterReg::getTypedInstance<LLChatBar>("chatbar");
-    bar->setVisible(TRUE);
-    bar->setFocus(TRUE);
-    bar->mInputEditor->setFocus(TRUE);
+    bar->setVisible(true);
+    bar->setFocus(true);
+    bar->mInputEditor->setFocus(true);
 
     if (line)
     {
@@ -369,8 +370,8 @@ void LLChatBar::startChat(const char* line)
 void LLChatBar::stopChat()
 {
     LLChatBar* bar = LLFloaterReg::getTypedInstance<LLChatBar>("chatbar");
-    bar->mInputEditor->setFocus(FALSE);
-    bar->setVisible(FALSE);
+    bar->mInputEditor->setFocus(false);
+    bar->setVisible(false);
     gAgent.stopTyping();
 }
 
@@ -396,7 +397,7 @@ void LLChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
     // to eat trailing spaces that might be part of a gesture.
     LLWStringUtil::trimHead(raw_text);
 
-    S32 length = raw_text.length();
+    auto length = raw_text.length();
 
     if( (length > 0)
         && (raw_text[0] != '/')     // forward slash is used for escape (eg. emote) sequences
@@ -433,7 +434,7 @@ void LLChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
 
                 // Select to end of line, starting from the character
                 // after the last one the user typed.
-                self->mInputEditor->setSelection(length, outlength);
+                self->mInputEditor->setSelection(static_cast<S32>(length), outlength);
             }
         }
     }
@@ -474,20 +475,20 @@ void LLChatBar::onCommitGesture(LLUICtrl* ctrl)
         if (!revised_text.empty() && !ALChatCommand::parseCommand(revised_text))
         {
             // Don't play nodding animation
-            LLFloaterIMNearbyChat::sendChatFromViewer(revised_text, CHAT_TYPE_NORMAL, FALSE);
+            LLFloaterIMNearbyChat::sendChatFromViewer(revised_text, CHAT_TYPE_NORMAL, false);
         }
     }
     mGestureLabelTimer.start();
-    if (mGestureCombo != nullptr)
+    if (mGestureCombo != NULL)
     {
         // free focus back to chat bar
-        mGestureCombo->setFocus(FALSE);
+        mGestureCombo->setFocus(false);
     }
 }
 
 // [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
 // virtual
-void LLChatBar::reshape(S32 width, S32 height, BOOL called_from_parent)
+void LLChatBar::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLFloater::reshape(width, height, called_from_parent);
 

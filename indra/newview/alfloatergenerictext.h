@@ -37,7 +37,7 @@ class LLFloaterGenericText final : public LLFloater
 {
 public:
     LLFloaterGenericText(const LLSD& key);
-    BOOL postBuild() override;
+    bool postBuild() override;
 private:
     ~LLFloaterGenericText() = default;
     void onClickClose();

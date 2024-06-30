@@ -59,7 +59,7 @@ public:
 
 protected:
     ~LLViewerInventoryItem( void ); // ref counted
-    BOOL extractSortFieldAndDisplayName(S32* sortField, std::string* displayName) const { return extractSortFieldAndDisplayName(mName, sortField, displayName); }
+    bool extractSortFieldAndDisplayName(S32* sortField, std::string* displayName) const { return extractSortFieldAndDisplayName(mName, sortField, displayName); }
     mutable std::string mDisplayName;
 
 public:
@@ -86,7 +86,7 @@ public:
     virtual time_t getCreationDate() const;
     virtual U32 getCRC32() const; // really more of a checksum.
 
-    static BOOL extractSortFieldAndDisplayName(const std::string& name, S32* sortField, std::string* displayName);
+    static bool extractSortFieldAndDisplayName(const std::string& name, S32* sortField, std::string* displayName);
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2013-03-10 (Catznip-3.4)
     static bool lookupLocalizedName(std::string& name);
     static bool lookupSystemName(std::string& name);
@@ -132,14 +132,14 @@ public:
     void cloneViewerItem(LLPointer<LLViewerInventoryItem>& newitem) const;
 
     // virtual methods
-    virtual void updateParentOnServer(BOOL restamp) const;
-    virtual void updateServer(BOOL is_new) const;
+    virtual void updateParentOnServer(bool restamp) const;
+    virtual void updateServer(bool is_new) const;
     void fetchFromServer(void) const;
 
     virtual void packMessage(LLMessageSystem* msg) const;
-    virtual BOOL unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num = 0);
-    virtual BOOL unpackMessage(const LLSD& item);
-    virtual BOOL importLegacyStream(std::istream& input_stream);
+    virtual bool unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num = 0);
+    virtual bool unpackMessage(const LLSD& item);
+    virtual bool importLegacyStream(std::istream& input_stream);
 
     // new methods
     bool isFinished() const { return mIsComplete; }
@@ -168,7 +168,7 @@ public:
     void onCallingCardNameLookup(const LLUUID& id, const LLAvatarName& name);
 
     // If this is a broken link, try to fix it and any other identical link.
-    BOOL regenerateLink();
+    bool regenerateLink();
 
 public:
     bool mIsComplete;
@@ -204,8 +204,8 @@ public:
     LLViewerInventoryCategory(const LLViewerInventoryCategory* other);
     void copyViewerCategory(const LLViewerInventoryCategory* other);
 
-    virtual void updateParentOnServer(BOOL restamp_children) const;
-    virtual void updateServer(BOOL is_new) const;
+    virtual void updateParentOnServer(bool restamp_children) const;
+    virtual void updateServer(bool is_new) const;
 
     virtual void packMessage(LLMessageSystem* msg) const;
 
@@ -245,7 +245,7 @@ public:
     void determineFolderType();
     void changeType(LLFolderType::EType new_folder_type);
     virtual void unpackMessage(LLMessageSystem* msg, const char* block, S32 block_num = 0);
-    virtual BOOL unpackMessage(const LLSD& category);
+    virtual bool unpackMessage(const LLSD& category);
 
     // returns true if the category object will accept the incoming item
     bool acceptItem(LLInventoryItem* inv_item);
@@ -265,7 +265,7 @@ protected:
 class LLInventoryCallback : public LLRefCount
 {
 public:
-    virtual ~LLInventoryCallback() {}
+    virtual ~LLInventoryCallback() = default;
     virtual void fire(const LLUUID& inv_item) = 0;
 };
 

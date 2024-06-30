@@ -143,7 +143,7 @@ public:
     void printQueueStats();
 
     virtual size_t getPending();
-    bool getThreaded() const { return mThreaded ? true : false; }
+    bool getThreaded() const { return mThreaded; }
 
     // Request accessors
     status_t getRequestStatus(handle_t handle);

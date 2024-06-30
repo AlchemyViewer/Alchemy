@@ -26,18 +26,18 @@ public:
     LLFloaterHexEditor(const LLSD& key);
 
     void onOpen(const LLSD& key) override;
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     LLViewerInventoryItem* mItem;
     LLAssetType::EType mAssetType;
     LLHexEditor* mEditor;
 
-    static void imageCallback(BOOL success,
+    static void imageCallback(bool success,
                     LLViewerFetchedTexture *src_vi,
                     LLImageRaw* src,
                     LLImageRaw* aux_src,
                     S32 discard_level,
-                    BOOL final,
+                    bool final,
                     void* userdata);
     static void assetCallback(const LLUUID& asset_uuid,
                     LLAssetType::EType type,

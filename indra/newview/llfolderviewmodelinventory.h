@@ -45,10 +45,10 @@ public:
     virtual PermissionMask getPermissionMask() const = 0;
     virtual LLFolderType::EType getPreferredType() const = 0;
     virtual void showProperties(void) = 0;
-    virtual BOOL isItemInTrash( void) const { return FALSE; } // TODO: make   into pure virtual.
+    virtual bool isItemInTrash( void) const { return false; } // TODO: make   into pure virtual.
     virtual bool isItemInOutfits() const { return false; }
-    virtual BOOL isAgentInventory() const { return FALSE; }
-    virtual BOOL isUpToDate() const = 0;
+    virtual bool isAgentInventory() const { return false; }
+    virtual bool isUpToDate() const = 0;
     virtual void addChild(LLFolderViewModelItem* child);
     virtual bool hasChildren() const = 0;
     virtual LLInventoryType::EType getInventoryType() const = 0;
@@ -56,14 +56,14 @@ public:
     virtual LLWearableType::EType getWearableType() const = 0;
     virtual LLSettingsType::type_e getSettingsType() const = 0;
     virtual EInventorySortGroup getSortGroup() const = 0;
-    virtual BOOL isLink() const = 0;
+    virtual bool isLink() const = 0;
     virtual LLInventoryObject* getInventoryObject() const = 0;
     virtual void requestSort();
     virtual void setPassedFilter(bool filtered, S32 filter_generation, std::string::size_type string_offset = std::string::npos, std::string::size_type string_size = 0);
     virtual bool filter( LLFolderViewFilter& filter);
     virtual bool filterChildItem( LLFolderViewModelItem* item, LLFolderViewFilter& filter);
 
-    virtual BOOL startDrag(EDragAndDropType* type, LLUUID* id) const = 0;
+    virtual bool startDrag(EDragAndDropType* type, LLUUID* id) const = 0;
     virtual LLToolDragAndDrop::ESource getDragSource() const = 0;
 protected:
     bool mPrevPassedAllFilters;

@@ -72,7 +72,7 @@ inline U32 LLVOWLSky::getStarsNumIndices(void)
 }
 
 LLVOWLSky::LLVOWLSky(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
-    : LLStaticViewerObject(id, pcode, regionp, TRUE)
+    : LLStaticViewerObject(id, pcode, regionp, true)
 {
     initStars();
 }
@@ -82,9 +82,9 @@ void LLVOWLSky::idleUpdate(LLAgent &agent, const F64 &time)
 
 }
 
-BOOL LLVOWLSky::isActive(void) const
+bool LLVOWLSky::isActive(void) const
 {
-    return FALSE;
+    return false;
 }
 
 LLDrawable * LLVOWLSky::createDrawable(LLPipeline * pipeline)
@@ -144,7 +144,7 @@ void LLVOWLSky::restoreGL()
     gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 }
 
-BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
+bool LLVOWLSky::updateGeometry(LLDrawable * drawable)
 {
     LL_PROFILE_ZONE_SCOPED;
     LLStrider<LLVector3>    vertices;
@@ -160,7 +160,7 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
             LL_WARNS() << "Failed to allocate Vertex Buffer on full screen sky update" << LL_ENDL;
         }
 
-        BOOL success = mFsSkyVerts->getVertexStrider(vertices)
+        bool success = mFsSkyVerts->getVertexStrider(vertices)
                     && mFsSkyVerts->getTexCoord0Strider(texCoords)
                     && mFsSkyVerts->getIndexStrider(indices);
 
@@ -253,7 +253,7 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
 #endif
 
             // lock the buffer
-            BOOL success = segment->getVertexStrider(vertices)
+            bool success = segment->getVertexStrider(vertices)
                 && segment->getTexCoord0Strider(texCoords)
                 && segment->getIndexStrider(indices);
 
@@ -281,7 +281,7 @@ BOOL LLVOWLSky::updateGeometry(LLDrawable * drawable)
     updateStarColors();
     updateStarGeometry(drawable);
 
-    return TRUE;
+    return true;
 }
 
 void LLVOWLSky::drawStars(void)
@@ -509,7 +509,7 @@ void LLVOWLSky::updateStarColors()
     }
 }
 
-BOOL LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
+bool LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
 {
     LLStrider<LLVector3> verticesp;
     LLStrider<LLColor4U> colorsp;
@@ -524,7 +524,7 @@ BOOL LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
         }
     }
 
-    BOOL success = mStarsVerts->getVertexStrider(verticesp)
+    bool success = mStarsVerts->getVertexStrider(verticesp)
         && mStarsVerts->getColorStrider(colorsp)
         && mStarsVerts->getTexCoord0Strider(texcoordsp);
 
@@ -576,5 +576,5 @@ BOOL LLVOWLSky::updateStarGeometry(LLDrawable *drawable)
     }
 
     mStarsVerts->unmapBuffer();
-    return TRUE;
+    return true;
 }

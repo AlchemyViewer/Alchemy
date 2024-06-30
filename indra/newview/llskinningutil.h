@@ -59,7 +59,7 @@ namespace LLSkinningUtil
 
     inline void scrubSkinWeights(LLVector4a* weights, U32 num_vertices, const LLMeshSkinInfo* skin)
     {
-        const S32 max_joints = skin->mJointNames.size();
+        const S32 max_joints = static_cast<S32>(skin->mJointNames.size());
         LLIVector4a max_joint((S16)max_joints - 1);
         LLIVector4a cur_joint;
         LLVector4a weight;

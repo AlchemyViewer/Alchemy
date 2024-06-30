@@ -102,7 +102,7 @@ std::string LLHost::getHostName() const
     }
 }
 
-BOOL LLHost::setHostByName(const std::string& hostname)
+bool LLHost::setHostByName(const std::string& hostname)
 {
     hostent *he;
     std::string local_name(hostname);
@@ -122,7 +122,7 @@ BOOL LLHost::setHostByName(const std::string& hostname)
     if (he)
     {
         mIP = *(U32 *)he->h_addr_list[0];
-        return TRUE;
+        return true;
     }
     else
     {
@@ -146,7 +146,7 @@ BOOL LLHost::setHostByName(const std::string& hostname)
                 LL_WARNS() << "LLHost::setAddress(): unknown error - " << error_number << LL_ENDL;
                 break;
         }
-        return FALSE;
+        return false;
     }
 }
 

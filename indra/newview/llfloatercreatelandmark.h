@@ -45,7 +45,7 @@ public:
     LLFloaterCreateLandmark(const LLSD& key);
     ~LLFloaterCreateLandmark();
 
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onOpen(const LLSD& key) override;
 
     void setItem(const uuid_set_t& items);

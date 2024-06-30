@@ -237,12 +237,12 @@ void LLUUID::toCompressedString(char* out) const
     out[UUID_BYTES] = '\0';
 }
 
-BOOL LLUUID::set(const char* in_string, BOOL emit)
+bool LLUUID::set(const char* in_string, bool emit)
 {
     return set(al::safe_string_view(in_string), emit);
 }
 
-BOOL LLUUID::parseInternalScalar(const char* in_string, bool broken_format, bool emit)
+bool LLUUID::parseInternalScalar(const char* in_string, bool broken_format, bool emit)
 {
     U8 cur_pos = 0;
     S32 i;
@@ -279,7 +279,7 @@ BOOL LLUUID::parseInternalScalar(const char* in_string, bool broken_format, bool
                 LL_WARNS() << "Invalid UUID string character" << LL_ENDL;
             }
             setNull();
-            return FALSE;
+            return false;
         }
 
         mData[i] = mData[i] << 4;
@@ -304,15 +304,15 @@ BOOL LLUUID::parseInternalScalar(const char* in_string, bool broken_format, bool
                 LL_WARNS() << "Invalid UUID string character" << LL_ENDL;
             }
             setNull();
-            return FALSE;
+            return false;
         }
         cur_pos++;
     }
-    return TRUE;
+    return true;
 }
 
 #if defined(__SSE4_2__)
-BOOL LLUUID::parseInternalSIMD(const char* in_string, bool emit)
+bool LLUUID::parseInternalSIMD(const char* in_string, bool emit)
 {
     __m128i mm_lower_mask_1, mm_lower_mask_2, mm_upper_mask_1, mm_upper_mask_2;
     const __m128i mm_lower = _mm_loadu_si128(reinterpret_cast<const __m128i *>(in_string));
@@ -345,7 +345,7 @@ BOOL LLUUID::parseInternalSIMD(const char* in_string, bool emit)
             LL_WARNS() << "Invalid UUID string: " << in_string << LL_ENDL;
         }
         setNull();
-        return FALSE;
+        return false;
     }
 
     const __m128i nine = _mm_set1_epi8('9');
@@ -373,20 +373,20 @@ BOOL LLUUID::parseInternalSIMD(const char* in_string, bool emit)
     hi = _mm_slli_epi16(hi, 4);
 
     _mm_storeu_si128(reinterpret_cast<__m128i *>(mData), _mm_xor_si128(hi, lo));
-    return TRUE;
+    return true;
 }
 #endif
 
-BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
+bool LLUUID::set(const std::string_view in_string, bool emit)
 {
     // empty strings should make NULL uuid
     if (in_string.empty())
     {
         setNull();
-        return TRUE;
+        return true;
     }
 
-    BOOL broken_format = FALSE;
+    bool broken_format = false;
 
     if (in_string.length() != (UUID_STR_LENGTH - 1))        /* Flawfinder: ignore */
     {
@@ -398,7 +398,7 @@ BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
             {
                 LL_WARNS() << "Warning! Using broken UUID string format" << LL_ENDL;
             }
-            broken_format = TRUE;
+            broken_format = true;
         }
         else
         {
@@ -409,7 +409,7 @@ BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
                 LL_WARNS() << "Bad UUID string: " << in_string << LL_ENDL;
             }
             setNull();
-            return FALSE;
+            return false;
         }
     }
 
@@ -427,7 +427,7 @@ BOOL LLUUID::set(const std::string_view in_string, BOOL emit)
 #endif
 }
 
-BOOL validate_internal_scalar(const char* str_ptr, bool broken_format)
+bool validate_internal_scalar(const char* str_ptr, bool broken_format)
 {
     U8 cur_pos = 0;
     for (U32 i = 0; i < 16; i++)
@@ -449,7 +449,7 @@ BOOL validate_internal_scalar(const char* str_ptr, bool broken_format)
         }
         else
         {
-            return FALSE;
+            return false;
         }
 
         cur_pos++;
@@ -461,15 +461,15 @@ BOOL validate_internal_scalar(const char* str_ptr, bool broken_format)
         }
         else
         {
-            return FALSE;
+            return false;
         }
         cur_pos++;
     }
-    return TRUE;
+    return true;
 }
 
 #if defined(__SSE4_2__)
-BOOL validate_internal_simd(const char* str_ptr)
+bool validate_internal_simd(const char* str_ptr)
 {
     __m128i mm_lower_mask_1, mm_lower_mask_2, mm_upper_mask_1, mm_upper_mask_2;
     const __m128i mm_lower = _mm_loadu_si128(reinterpret_cast<const __m128i *>(str_ptr));
@@ -497,18 +497,18 @@ BOOL validate_internal_simd(const char* str_ptr)
     const int cmp_upper = _mm_cmpistri(mm_allowed_char_range, mm_mask_merge_2, _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_NEGATIVE_POLARITY);
     if (cmp_lower != UUID_BYTES || cmp_upper != UUID_BYTES)
     {
-        return FALSE;
+        return false;
     }
 
-    return TRUE;
+    return true;
 }
 #endif
 
-BOOL LLUUID::validate(std::string_view in_string)
+bool LLUUID::validate(std::string_view in_string)
 {
     if (in_string.empty())
     {
-        return FALSE;
+        return false;
     }
 
     static constexpr auto HYPEN_UUID = 36;
@@ -527,7 +527,7 @@ BOOL LLUUID::validate(std::string_view in_string)
     {
         return validate_internal_scalar(in_string.data(), true);
     }
-    return FALSE;
+    return false;
 }
 
 const LLUUID& LLUUID::operator^=(const LLUUID& rhs)
@@ -691,7 +691,7 @@ S32 LLUUID::getNodeID(unsigned char* node_id)
 }
 
 #elif LL_DARWIN
-// Mac OS X version of the UUID generation code...
+// macOS version of the UUID generation code...
 /*
  * Get an ethernet hardware address, if we can find it...
  */
@@ -917,12 +917,12 @@ void LLUUID::getCurrentTime(uuid_time_t* timestamp)
 
     static uuid_time_t time_last;
     static U32    uuids_this_tick;
-    static BOOL     init = FALSE;
+    static bool     init = false;
 
     if (!init) {
         getSystemTime(&time_last);
         uuids_this_tick = uuids_per_tick;
-        init = TRUE;
+        init = true;
     }
 
     uuid_time_t time_now = { 0,0 };
@@ -1047,11 +1047,11 @@ void LLUUID::generate(const std::string& hash_string)
     md5_uuid.raw_digest(mData);
 }
 
-BOOL LLUUID::parseUUID(const std::string& buf, LLUUID* value)
+bool LLUUID::parseUUID(const std::string& buf, LLUUID* value)
 {
     if (buf.empty() || value == NULL)
     {
-        return FALSE;
+        return false;
     }
 
     std::string temp(buf);
@@ -1059,9 +1059,9 @@ BOOL LLUUID::parseUUID(const std::string& buf, LLUUID* value)
     if (LLUUID::validate(temp))
     {
         value->set(temp);
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 //static
@@ -1117,12 +1117,12 @@ void LLUUID::setNull()
 }
 */
 
- LLUUID::LLUUID(const char *in_string)
+LLUUID::LLUUID(const char *in_string)
 {
     set(in_string);
 }
 
- LLUUID::LLUUID(const std::string_view in_string)
+LLUUID::LLUUID(const std::string_view in_string)
 {
     set(in_string);
 }

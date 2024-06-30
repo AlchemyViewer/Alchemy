@@ -56,18 +56,18 @@ public:
 
     LLVOPartGroup(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
 
-    /*virtual*/ BOOL    isActive() const override; // Whether this object needs to do an idleUpdate.
+    /*virtual*/ bool    isActive() const override; // Whether this object needs to do an idleUpdate.
     void idleUpdate(LLAgent &agent, const F64 &time) override;
 
     F32 getBinRadius() override;
     void updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax) override;
     U32 getPartitionType() const override;
 
-    /*virtual*/ BOOL lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
+    /*virtual*/ bool lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
                                           S32 face,
-                                          BOOL pick_transparent,
-                                          BOOL pick_rigged,
-                                          BOOL pick_unselectable,
+                                          bool pick_transparent,
+                                          bool pick_rigged,
+                                          bool pick_unselectable,
                                           S32* face_hit,
                                           LLVector4a* intersection,
                                           LLVector2* tex_coord,
@@ -78,7 +78,7 @@ public:
     /*virtual*/ void updateTextures() override;
 
     /*virtual*/ LLDrawable* createDrawable(LLPipeline *pipeline) override;
-    /*virtual*/ BOOL        updateGeometry(LLDrawable *drawable) override;
+    /*virtual*/ bool        updateGeometry(LLDrawable *drawable) override;
     void        getGeometry(const LLViewerPart& part,
                                 LLStrider<LLVector4a>& verticesp);
 

@@ -60,7 +60,7 @@ LLSysWellChiclet::Params::Params()
     , max_displayed_count("max_displayed_count", 99)
 {
     button.name = "button";
-    button.tab_stop = FALSE;
+    button.tab_stop = false;
     button.label = LLStringUtil::null;
 }
 
@@ -118,7 +118,7 @@ boost::signals2::connection LLSysWellChiclet::setClickCallback(
     return mButton->setClickedCallback(cb);
 }
 
-void LLSysWellChiclet::setToggleState(BOOL toggled) {
+void LLSysWellChiclet::setToggleState(bool toggled) {
     mButton->setToggleState(toggled);
 }
 
@@ -152,7 +152,7 @@ void LLSysWellChiclet::updateWidget(bool is_window_empty)
     }
 }
 // virtual
-BOOL LLSysWellChiclet::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool LLSysWellChiclet::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     LLContextMenu* menu_avatar = mContextMenuHandle.get();
     if(!menu_avatar)
@@ -165,7 +165,7 @@ BOOL LLSysWellChiclet::handleRightMouseDown(S32 x, S32 y, MASK mask)
         menu_avatar->show(x, y);
         LLMenuGL::showPopup(this, menu_avatar, x, y);
     }
-    return TRUE;
+    return true;
 }
 
 /************************************************************************/
@@ -178,7 +178,7 @@ LLNotificationChiclet::LLNotificationChiclet(const Params& p)
     mNotificationChannel.reset(new ChicletNotificationChannel(this));
     // ensure that notification well window exists, to synchronously
     // handle toast add/delete events.
-    if (gSkinSettings.getBool("LegacyNotificationWell"))
+    if (gSkinSettings.getBOOL("LegacyNotificationWell"))
     {
         LLLegacyNotificationWellWindow::getInstance()->setSysWellChiclet(this);
     }
@@ -198,7 +198,7 @@ void LLNotificationChiclet::onMenuItemClicked(const LLSD& user_data)
     std::string action = user_data.asString();
     if("close all" == action)
     {
-        if (gSkinSettings.getBool("LegacyNotificationWell"))
+        if (gSkinSettings.getBOOL("LegacyNotificationWell"))
         {
             LLLegacyNotificationWellWindow::getInstance()->closeAll();
         }
@@ -260,9 +260,9 @@ bool LLNotificationChiclet::ChicletNotificationChannel::filterNotification( LLNo
     bool displayNotification;
     if (   (notification->getName() == "ScriptDialog") // special case for scripts
         // if there is no toast window for the notification, filter it
-        || (gSkinSettings.getBool("LegacyNotificationWell")
+        || (gSkinSettings.getBOOL("LegacyNotificationWell")
             && !LLLegacyNotificationWellWindow::getInstance()->findItemByID(notification->getID()))
-        || (!gSkinSettings.getBool("LegacyNotificationWell")
+        || (!gSkinSettings.getBOOL("LegacyNotificationWell")
             && !LLFloaterNotificationsTabbed::getInstance()->findItemByID(notification->getID(), notification->getName()))
         )
     {
@@ -313,11 +313,11 @@ boost::signals2::connection LLChiclet::setLeftButtonClickCallback(
     return setCommitCallback(cb);
 }
 
-BOOL LLChiclet::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLChiclet::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     onCommit();
     childrenHandleMouseDown(x,y,mask);
-    return TRUE;
+    return true;
 }
 
 boost::signals2::connection LLChiclet::setChicletSizeChangedCallback(
@@ -368,12 +368,12 @@ LLIMChiclet::~LLIMChiclet()
 }
 
 /* virtual*/
-BOOL LLIMChiclet::postBuild()
+bool LLIMChiclet::postBuild()
 {
     mChicletButton = getChild<LLButton>("chiclet_button");
     mChicletButton->setCommitCallback(boost::bind(&LLIMChiclet::onMouseDown, this));
     mChicletButton->setDoubleClickCallback(boost::bind(&LLIMChiclet::onMouseDown, this));
-    return TRUE;
+    return true;
 }
 
 void LLIMChiclet::enableCounterControl(bool enable)
@@ -416,7 +416,7 @@ void LLIMChiclet::setToggleState(bool toggle)
     mChicletButton->setToggleState(toggle);
 }
 
-BOOL LLIMChiclet::handleRightMouseDown(S32 x, S32 y, MASK mask)
+bool LLIMChiclet::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     auto menu = static_cast<LLMenuGL*>(mPopupMenuHandle.get());
     if(!menu)
@@ -432,7 +432,7 @@ BOOL LLIMChiclet::handleRightMouseDown(S32 x, S32 y, MASK mask)
         LLMenuGL::showPopup(this, menu, x, y);
     }
 
-    return TRUE;
+    return true;
 }
 
 void LLIMChiclet::hidePopupMenu()
@@ -440,7 +440,7 @@ void LLIMChiclet::hidePopupMenu()
     auto menu = mPopupMenuHandle.get();
     if (menu)
     {
-        menu->setVisible(FALSE);
+        menu->setVisible(false);
     }
 }
 
@@ -532,7 +532,7 @@ void LLChicletPanel::objectChicletCallback(const LLSD& data)
     }
 }
 
-BOOL LLChicletPanel::postBuild()
+bool LLChicletPanel::postBuild()
 {
     LLPanel::postBuild();
     LLIMModel::instance().addNewMsgCallback(boost::bind(&LLChicletPanel::onMessageCountChanged, this, _1));
@@ -554,7 +554,7 @@ BOOL LLChicletPanel::postBuild()
     mRightScrollButton->setHeldDownCallback(boost::bind(&LLChicletPanel::onRightScrollHeldDown,this));
     mRightScrollButton->setEnabled(false);
 
-    return TRUE;
+    return true;
 }
 
 void LLChicletPanel::onCurrentVoiceChannelChanged(const LLUUID& session_id)
@@ -740,7 +740,7 @@ void LLChicletPanel::scrollToChiclet(const LLChiclet* chiclet)
     }
 }
 
-void LLChicletPanel::reshape(S32 width, S32 height, BOOL called_from_parent )
+void LLChicletPanel::reshape(S32 width, S32 height, bool called_from_parent )
 {
     LLPanel::reshape(width,height,called_from_parent);
 
@@ -1026,7 +1026,7 @@ boost::signals2::connection LLChicletPanel::setChicletClickedCallback(
     return setCommitCallback(cb);
 }
 
-BOOL LLChicletPanel::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLChicletPanel::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
     if(clicks > 0)
     {
@@ -1036,7 +1036,7 @@ BOOL LLChicletPanel::handleScrollWheel(S32 x, S32 y, S32 clicks)
     {
         scrollLeft();
     }
-    return TRUE;
+    return true;
 }
 
 bool LLChicletPanel::isAnyIMFloaterDoked()

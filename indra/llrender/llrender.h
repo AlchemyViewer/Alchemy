@@ -563,6 +563,5 @@ void set_last_modelview(const LLMatrix4a& mat);
 void set_last_projection(const LLMatrix4a& mat);
 
 #define LL_SHADER_LOADING_WARNS(...) LL_WARNS()
-#define LL_SHADER_UNIFORM_ERRS(...)  LL_ERRS("Shader")
 
 #endif

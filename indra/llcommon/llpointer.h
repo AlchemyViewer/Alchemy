@@ -97,7 +97,6 @@ public:
     const Type& operator*() const noexcept              { return *mPointer; }
     Type&   operator*() noexcept                        { return *mPointer; }
 
-    operator BOOL()  const noexcept                     { return (mPointer != nullptr); }
     operator bool()  const noexcept                     { return (mPointer != nullptr); }
     bool operator!() const noexcept                     { return (mPointer == nullptr); }
     bool isNull() const noexcept                        { return (mPointer == nullptr); }
@@ -269,7 +268,6 @@ public:
     const Type* operator->() const noexcept             { return mPointer; }
     const Type& operator*() const noexcept              { return *mPointer; }
 
-    operator BOOL()  const noexcept                     { return (mPointer != nullptr); }
     operator bool()  const noexcept                     { return (mPointer != nullptr); }
     bool operator!() const noexcept                     { return (mPointer == nullptr); }
     bool isNull() const noexcept                        { return (mPointer == nullptr); }

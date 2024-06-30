@@ -34,10 +34,10 @@ private:
     LLFloaterChatAlerts(const LLSD& sdKey);
 public:
     ~LLFloaterChatAlerts() override;
-    BOOL canClose() override;
+    bool canClose() override;
     void onOpen(const LLSD& sdKey) override;
     void onClose(bool app_quitting) override;
-    BOOL postBuild() override;
+    bool postBuild() override;
     S32  notifyParent(const LLSD& sdInfo) override;
 
 public:
@@ -111,7 +111,7 @@ public:
      * LLView overrides
      */
 public:
-    BOOL handleDragAndDrop(S32 x, S32 y, MASK mask, BOOL drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override;
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override;
 
     /*
      * Member variables

@@ -109,7 +109,7 @@ public:
     F32 getTextureBandwidth() { return mTextureBandwidth; }
 
     // Threads:  T*
-    BOOL isFromLocalCache(const LLUUID& id);
+    bool isFromLocalCache(const LLUUID& id);
 
     // get the current fetch state, if any, from the given UUID
     S32 getFetchState(const LLUUID& id);
@@ -292,7 +292,7 @@ private:
 public:
     LLUUID mDebugID;
     S32 mDebugCount;
-    BOOL mDebugPause;
+    bool mDebugPause;
     S32 mPacketCount;
     S32 mBadPacketCount;
 
@@ -338,7 +338,7 @@ private:
     // same locks.
     typedef std::deque<TFRequest *> command_queue_t;
     command_queue_t mCommands;                                          // Mfq
-    std::atomic<S32> mCommandsSize;
+    std::atomic_size_t mCommandsSize;
 
     // If true, modifies some behaviors that help with QA tasks.
     const bool mQAMode;

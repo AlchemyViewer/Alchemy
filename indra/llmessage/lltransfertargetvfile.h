@@ -83,7 +83,7 @@ protected:
 
     LLTransferTargetParamsVFile mParams;
 
-    BOOL mNeedsCreate;
+    bool mNeedsCreate;
     LLUUID mTempID;
 };
 

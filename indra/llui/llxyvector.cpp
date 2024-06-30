@@ -66,7 +66,7 @@ LLXYVector::Params::Params()
     ghost_color("ghost_color"),
     area_color("area_color", LLColor4::grey4),
     grid_color("grid_color", LLColor4::grey % 0.25f),
-    logarithmic("logarithmic", FALSE)
+    logarithmic("logarithmic", false)
 {
 }
 
@@ -138,12 +138,12 @@ LLXYVector::LLXYVector(const LLXYVector::Params& p)
     addChild(mTouchArea);
 }
 
-BOOL LLXYVector::postBuild()
+bool LLXYVector::postBuild()
 {
     mLogScaleX = (2 * log(mMaxValueX)) / mTouchArea->getRect().getWidth();
     mLogScaleY = (2 * log(mMaxValueY)) / mTouchArea->getRect().getHeight();
 
-    return TRUE;
+    return true;
 }
 
 void drawArrow(S32 tailX, S32 tailY, S32 tipX, S32 tipY, LLColor4 color)
@@ -271,7 +271,7 @@ void LLXYVector::update()
     mYEntry->setValue(mValueY);
 }
 
-BOOL LLXYVector::handleHover(S32 x, S32 y, MASK mask)
+bool LLXYVector::handleHover(S32 x, S32 y, MASK mask)
 {
     if (hasMouseCapture())
     {
@@ -294,10 +294,10 @@ BOOL LLXYVector::handleHover(S32 x, S32 y, MASK mask)
         }
     }
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLXYVector::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLXYVector::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     if (hasMouseCapture())
     {
@@ -307,7 +307,7 @@ BOOL LLXYVector::handleMouseUp(S32 x, S32 y, MASK mask)
 
     if (mTouchArea->getRect().pointInRect(x, y))
     {
-        return TRUE;
+        return true;
     }
     else
     {
@@ -315,7 +315,7 @@ BOOL LLXYVector::handleMouseUp(S32 x, S32 y, MASK mask)
     }
 }
 
-BOOL LLXYVector::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLXYVector::handleMouseDown(S32 x, S32 y, MASK mask)
 {
 
     if (mTouchArea->getRect().pointInRect(x, y))
@@ -323,7 +323,7 @@ BOOL LLXYVector::handleMouseDown(S32 x, S32 y, MASK mask)
         gFocusMgr.setMouseCapture(this);
         make_ui_sound("UISndClick");
 
-        return TRUE;
+        return true;
     }
     else
     {

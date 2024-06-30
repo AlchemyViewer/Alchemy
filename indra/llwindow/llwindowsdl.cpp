@@ -62,7 +62,7 @@ extern "C" {
 # include <sys/wait.h>
 #endif // LL_LINUX
 
-extern BOOL gDebugWindowProc;
+extern bool gDebugWindowProc;
 
 const S32 MAX_NUM_RESOLUTIONS = 200;
 
@@ -173,9 +173,9 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
              const std::string& title, const std::string& name,
              S32 x, S32 y, S32 width,
              S32 height, U32 flags,
-             BOOL fullscreen, BOOL clearBg,
-             BOOL enable_vsync, BOOL use_gl,
-             BOOL ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, U32 max_vram, F32 max_gl_version)
+             bool fullscreen, bool clearBg,
+             bool enable_vsync, bool use_gl,
+             bool ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, U32 max_vram, F32 max_gl_version)
     : LLWindow(callbacks, fullscreen, flags),
       mGamma(1.0f)
 {
@@ -211,7 +211,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     // Ignore use_gl for now, only used for drones on PC
     mWindow = nullptr;
     mGLContext = nullptr;
-    mNeedsResize = FALSE;
+    mNeedsResize = false;
     mOverrideAspectRatio = 0.f;
     mGrabbyKeyFlags = 0;
     mReallyCapturedCount = 0;
@@ -237,7 +237,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
         setCursor( UI_CURSOR_ARROW );
 
 
-        allowLanguageTextInput(NULL, FALSE);
+        allowLanguageTextInput(NULL, false);
     }
 
     stop_glerror();
@@ -245,7 +245,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     // Stash an object pointer for OSMessageBox()
     gWindowImplementation = this;
 
-    mFlashing = FALSE;
+    mFlashing = false;
 
     mKeyScanCode = 0;
     mKeyVirtualKey = 0;
@@ -414,7 +414,7 @@ static int x11_detect_VRAM_kb()
 }
 #endif // LL_X11
 
-BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL enable_vsync)
+bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, bool fullscreen, bool disable_vsync)
 {
     //bool          glneedsinit = false;
 
@@ -443,7 +443,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     {
         LL_INFOS() << "SDL_GetCurrentDisplayMode failed! " << SDL_GetError() << LL_ENDL;
         setupFailure("SDL_GetCurrentDisplayMode failed!", "Error", OSMB_OK);
-        return FALSE;
+        return false;
     }
 
     if (current_mode.h > 0)
@@ -508,7 +508,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
         {
             LL_WARNS() << "Window creation failure. SDL: " << SDL_GetError() << LL_ENDL;
             setupFailure("Window creation error", "Error", OSMB_OK);
-            return FALSE;
+            return false;
         }
     }
 
@@ -581,7 +581,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
             {
                 SDL_DisplayMode mode;
                 SDL_GetWindowDisplayMode(mWindow, &mode);
-                mFullscreen = TRUE;
+                mFullscreen = true;
                 mFullscreenWidth = mode.w;
                 mFullscreenHeight = mode.h;
                 mFullscreenBits = SDL_BITSPERPIXEL(mode.format);
@@ -596,7 +596,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
             {
                 LL_WARNS() << "createContext: fullscreen creation failure. SDL: " << SDL_GetError() << LL_ENDL;
                 // No fullscreen support
-                mFullscreen = FALSE;
+                mFullscreen = false;
                 mFullscreenWidth = -1;
                 mFullscreenHeight = -1;
                 mFullscreenBits = -1;
@@ -662,13 +662,13 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     {
         LL_WARNS() << "OpenGL context creation failure. SDL: " << SDL_GetError() << LL_ENDL;
         setupFailure("Context creation error", "Error", OSMB_OK);
-        return FALSE;
+        return false;
     }
     if (SDL_GL_MakeCurrent(mWindow, mGLContext) != 0)
     {
         LL_WARNS() << "Failed to make context current. SDL: " << SDL_GetError() << LL_ENDL;
         setupFailure("Context current failure", "Error", OSMB_OK);
-        return FALSE;
+        return false;
     }
 
     int major_gl_version = 0;
@@ -707,7 +707,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
                      "Alternately, if you choose to run fullscreen, Alchemy\n"
                      "will automatically adjust the screen each time it runs.",
                      "Error", OSMB_OK);
-        return FALSE;
+        return false;
     }
 
     // if (alphaBits < 8)
@@ -720,7 +720,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
     //                  "Control Panels -> Display -> Settings.\n"
     //                  "If you continue to receive this message, contact customer service.",
     //                  "Error", OSMB_OK);
-    //     return FALSE;
+    //     return false;
     // }
 
     LL_PROFILER_GPU_CONTEXT;
@@ -763,7 +763,7 @@ BOOL LLWindowSDL::createContext(int x, int y, int width, int height, int bits, B
 # endif // LL_X11
 
     // Don't need to get the current gamma, since there's a call that restores it to the system defaults.
-    return TRUE;
+    return true;
 }
 
 void* LLWindowSDL::createSharedContext()
@@ -810,10 +810,10 @@ void LLWindowSDL::toggleVSync(bool enable_vsync)
 }
 
 // changing fullscreen resolution, or switching between windowed and fullscreen mode.
-BOOL LLWindowSDL::switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL enable_vsync, const LLCoordScreen * const posp)
+bool LLWindowSDL::switchContext(bool fullscreen, const LLCoordScreen &size, bool enable_vsync, const LLCoordScreen * const posp)
 {
-    const BOOL needsRebuild = TRUE;  // Just nuke the context and start over.
-    BOOL result = true;
+    const bool needsRebuild = true;  // Just nuke the context and start over.
+    bool result = true;
 
     LL_INFOS() << "switchContext, fullscreen=" << fullscreen << LL_ENDL;
     stop_glerror();
@@ -940,118 +940,118 @@ void LLWindowSDL::close()
     //  }
 
     // Make sure cursor is visible and we haven't mangled the clipping state.
-    setMouseClipping(FALSE);
+    setMouseClipping(false);
     showCursor();
 
     destroyContext();
 }
 
-BOOL LLWindowSDL::isValid()
+bool LLWindowSDL::isValid()
 {
     return (mWindow != NULL);
 }
 
-BOOL LLWindowSDL::getVisible()
+bool LLWindowSDL::getVisible()
 {
-    BOOL result = FALSE;
+    bool result = false;
     if (mWindow)
     {
         Uint32 flags = SDL_GetWindowFlags(mWindow);
         if (flags & SDL_WINDOW_SHOWN)
         {
-            result = TRUE;
+        result = true;
         }
     }
     return result;
 }
 
-BOOL LLWindowSDL::getMinimized()
+bool LLWindowSDL::getMinimized()
 {
-    BOOL result = FALSE;
+    bool result = false;
     if (mWindow)
     {
         Uint32 flags = SDL_GetWindowFlags(mWindow);
         if (flags & SDL_WINDOW_MINIMIZED)
         {
-            result = TRUE;
+        result = true;
         }
     }
     return result;
 }
 
-BOOL LLWindowSDL::getMaximized()
+bool LLWindowSDL::getMaximized()
 {
     if (mWindow)
     {
         Uint32 flags = SDL_GetWindowFlags(mWindow);
         if (flags & SDL_WINDOW_MAXIMIZED)
         {
-            return TRUE;
+            return true;
         }
     }
 
-    return FALSE;
+    return false;
 }
 
-BOOL LLWindowSDL::maximize()
+bool LLWindowSDL::maximize()
 {
     if (mWindow)
     {
         SDL_MaximizeWindow(mWindow);
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
-BOOL LLWindowSDL::getFullscreen()
+bool LLWindowSDL::getFullscreen()
 {
     return mFullscreen;
 }
 
-BOOL LLWindowSDL::getPosition(LLCoordScreen *position)
+bool LLWindowSDL::getPosition(LLCoordScreen *position)
 {
     if (mWindow)
     {
         SDL_GetWindowPosition(mWindow, &position->mX, &position->mY);
-        return TRUE;
+    return true;
     }
-    return FALSE;
+    return false;
 }
 
-BOOL LLWindowSDL::getSize(LLCoordScreen *size)
+bool LLWindowSDL::getSize(LLCoordScreen *size)
 {
     if (mWindow)
     {
         SDL_GetWindowSize(mWindow, &size->mX, &size->mY);
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
-BOOL LLWindowSDL::getSize(LLCoordWindow *size)
+bool LLWindowSDL::getSize(LLCoordWindow *size)
 {
     if (mWindow)
     {
         SDL_GetWindowSize(mWindow, &size->mX, &size->mY);
-        return (TRUE);
+        return true;
     }
 
-    return (FALSE);
+    return false;
 }
 
-BOOL LLWindowSDL::setPosition(LLCoordScreen position)
+bool LLWindowSDL::setPosition(LLCoordScreen position)
 {
     if (mWindow)
     {
         SDL_SetWindowPosition(mWindow, position.mX, position.mY);
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
-BOOL LLWindowSDL::setSizeImpl(LLCoordScreen size)
+bool LLWindowSDL::setSizeImpl(LLCoordScreen size)
 {
     if (mWindow)
     {
@@ -1089,13 +1089,13 @@ BOOL LLWindowSDL::setSizeImpl(LLCoordScreen size)
         {
             SDL_SetWindowSize(mWindow, width, height);
         }
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
-BOOL LLWindowSDL::setSizeImpl(LLCoordWindow size)
+bool LLWindowSDL::setSizeImpl(LLCoordWindow size)
 {
     if(mWindow)
     {
@@ -1133,10 +1133,10 @@ BOOL LLWindowSDL::setSizeImpl(LLCoordWindow size)
         {
             SDL_SetWindowSize(mWindow, width, height);
         }
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 
@@ -1164,7 +1164,7 @@ F32 LLWindowSDL::getGamma()
     return 1.f / mGamma;
 }
 
-BOOL LLWindowSDL::restoreGamma()
+bool LLWindowSDL::restoreGamma()
 {
     if (mWindow)
     {
@@ -1175,7 +1175,7 @@ BOOL LLWindowSDL::restoreGamma()
     return true;
 }
 
-BOOL LLWindowSDL::setGamma(const F32 gamma)
+bool LLWindowSDL::setGamma(const F32 gamma)
 {
     if (mWindow)
     {
@@ -1191,13 +1191,13 @@ BOOL LLWindowSDL::setGamma(const F32 gamma)
     return true;
 }
 
-BOOL LLWindowSDL::isCursorHidden()
+bool LLWindowSDL::isCursorHidden()
 {
     return mCursorHidden;
 }
 
 // Constrains the mouse to the window.
-void LLWindowSDL::setMouseClipping( BOOL b )
+void LLWindowSDL::setMouseClipping( bool b )
 {
     SDL_SetWindowGrab(mWindow, b ? SDL_TRUE : SDL_FALSE);
 }
@@ -1213,14 +1213,14 @@ void LLWindowSDL::setMinSize(U32 min_width, U32 min_height, bool enforce_immedia
     }
 }
 
-BOOL LLWindowSDL::setCursorPosition(LLCoordWindow position)
+bool LLWindowSDL::setCursorPosition(LLCoordWindow position)
 {
-    BOOL result = TRUE;
+    bool result = true;
     LLCoordScreen screen_pos;
 
     if (!convertCoords(position, &screen_pos))
     {
-        return FALSE;
+        return false;
     }
 
     //LL_INFOS() << "setCursorPosition(" << screen_pos.mX << ", " << screen_pos.mY << ")" << LL_ENDL;
@@ -1233,7 +1233,7 @@ BOOL LLWindowSDL::setCursorPosition(LLCoordWindow position)
     return result;
 }
 
-BOOL LLWindowSDL::getCursorPosition(LLCoordWindow *position)
+bool LLWindowSDL::getCursorPosition(LLCoordWindow *position)
 {
     //Point cursor_point;
     LLCoordScreen screen_pos;
@@ -1304,7 +1304,7 @@ void LLWindowSDL::beforeDialog()
 {
     LL_INFOS() << "LLWindowSDL::beforeDialog()" << LL_ENDL;
 
-    if (SDLReallyCaptureInput(FALSE)) // must ungrab input so popup works!
+    if (SDLReallyCaptureInput(false)) // must ungrab input so popup works!
     {
         if (mFullscreen)
         {
@@ -1348,15 +1348,15 @@ void LLWindowSDL::flashIcon(F32 seconds)
     mFlashTimer.setTimerExpirySec(remaining_time);
 
     SDL_FlashWindow(mWindow, SDL_FLASH_UNTIL_FOCUSED);
-    mFlashing = TRUE;
+    mFlashing = true;
 }
 
-BOOL LLWindowSDL::isClipboardTextAvailable()
+bool LLWindowSDL::isClipboardTextAvailable()
 {
     return SDL_HasClipboardText();
 }
 
-BOOL LLWindowSDL::pasteTextFromClipboard(LLWString &dst)
+bool LLWindowSDL::pasteTextFromClipboard(LLWString &dst)
 {
     if (isClipboardTextAvailable())
     {
@@ -1365,24 +1365,24 @@ BOOL LLWindowSDL::pasteTextFromClipboard(LLWString &dst)
         {
             dst = LLWString(utf8str_to_wstring(data));
             SDL_free(data);
-            return TRUE;
+            return true;
         }
     }
-    return FALSE; // failure
+    return false; // failure
 }
 
-BOOL LLWindowSDL::copyTextToClipboard(const LLWString &text)
+bool LLWindowSDL::copyTextToClipboard(const LLWString &text)
 {
     const std::string utf8 = wstring_to_utf8str(text);
     return SDL_SetClipboardText(utf8.c_str()) == 0; // success == 0
 }
 
-BOOL LLWindowSDL::isPrimaryTextAvailable()
+bool LLWindowSDL::isPrimaryTextAvailable()
 {
     return SDL_HasPrimarySelectionText();
 }
 
-BOOL LLWindowSDL::pasteTextFromPrimary(LLWString &dst)
+bool LLWindowSDL::pasteTextFromPrimary(LLWString &dst)
 {
     if (isPrimaryTextAvailable())
     {
@@ -1391,13 +1391,13 @@ BOOL LLWindowSDL::pasteTextFromPrimary(LLWString &dst)
         {
             dst = LLWString(utf8str_to_wstring(data));
             SDL_free(data);
-            return TRUE;
+            return true;
         }
     }
-    return FALSE; // failure
+    return false; // failure
 }
 
-BOOL LLWindowSDL::copyTextToPrimary(const LLWString &text)
+bool LLWindowSDL::copyTextToPrimary(const LLWString &text)
 {
     const std::string utf8 = wstring_to_utf8str(text);
     return SDL_SetPrimarySelectionText(utf8.c_str()) == 0; // success == 0
@@ -1440,68 +1440,68 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
     return mSupportedResolutions;
 }
 
-BOOL LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
+bool LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
 {
     if (!to)
-        return FALSE;
+        return false;
 
     if (!mWindow)
-        return FALSE;
+        return false;
     S32 height;
     SDL_GetWindowSize(mWindow, nullptr, &height);
 
     to->mX = from.mX;
     to->mY = height - from.mY - 1;
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordGL* to)
+bool LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordGL* to)
 {
     if (!to)
-        return FALSE;
+        return false;
 
     if (!mWindow)
-        return FALSE;
+        return false;
     S32 height;
     SDL_GetWindowSize(mWindow, nullptr, &height);
 
     to->mX = from.mX;
     to->mY = height - from.mY - 1;
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLWindowSDL::convertCoords(LLCoordScreen from, LLCoordWindow* to)
+bool LLWindowSDL::convertCoords(LLCoordScreen from, LLCoordWindow* to)
 {
     if (!to)
-        return FALSE;
+        return false;
 
     // In the fullscreen case, window and screen coordinates are the same.
     to->mX = from.mX;
     to->mY = from.mY;
-    return (TRUE);
+    return (true);
 }
 
-BOOL LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordScreen *to)
+bool LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordScreen *to)
 {
     if (!to)
-        return FALSE;
+        return false;
 
     // In the fullscreen case, window and screen coordinates are the same.
     to->mX = from.mX;
     to->mY = from.mY;
-    return (TRUE);
+    return (true);
 }
 
-BOOL LLWindowSDL::convertCoords(LLCoordScreen from, LLCoordGL *to)
+bool LLWindowSDL::convertCoords(LLCoordScreen from, LLCoordGL *to)
 {
     LLCoordWindow window_coord;
 
     return(convertCoords(from, &window_coord) && convertCoords(window_coord, to));
 }
 
-BOOL LLWindowSDL::convertCoords(LLCoordGL from, LLCoordScreen *to)
+bool LLWindowSDL::convertCoords(LLCoordGL from, LLCoordScreen *to)
 {
     LLCoordWindow window_coord;
 
@@ -1515,7 +1515,7 @@ void LLWindowSDL::setupFailure(const std::string& text, const std::string& capti
     OSMessageBox(text, caption, type);
 }
 
-BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
+bool LLWindowSDL::SDLReallyCaptureInput(bool capture)
 {
     // note: this used to be safe to call nestedly, but in the
     // end that's not really a wise usage pattern, so don't.
@@ -1565,7 +1565,7 @@ BOOL LLWindowSDL::SDLReallyCaptureInput(BOOL capture)
     return (bool)capture == newGrab;
 }
 
-U32 LLWindowSDL::SDLCheckGrabbyKeys(SDL_Keycode keysym, BOOL gain)
+U32 LLWindowSDL::SDLCheckGrabbyKeys(SDL_Keycode keysym, bool gain)
 {
     /* part of the fix for SL-13243: Some popular window managers like
        to totally eat alt-drag for the purposes of moving windows.  We
@@ -1727,7 +1727,7 @@ void LLWindowSDL::gatherInput()
             LLCoordWindow winCoord(event.motion.x, event.motion.y);
             LLCoordGL openGlCoord;
             convertCoords(winCoord, &openGlCoord);
-            MASK mask = gKeyboard->currentMask(TRUE);
+            MASK mask = gKeyboard->currentMask(true);
             mCallbacks->handleMouseMove(this, openGlCoord, mask);
             break;
         }
@@ -1749,7 +1749,7 @@ void LLWindowSDL::gatherInput()
             for (auto key : string)
             {
                 //mKeyVirtualKey = key;
-                mCallbacks->handleUnicodeChar(key, gKeyboard->currentMask(FALSE));
+                mCallbacks->handleUnicodeChar(key, gKeyboard->currentMask(false));
             }
             break;
         }
@@ -1761,10 +1761,10 @@ void LLWindowSDL::gatherInput()
 
             gKeyboard->handleKeyDown(mKeyVirtualKey, mKeyModifiers);
             if (mKeyVirtualKey == SDLK_RETURN || mKeyVirtualKey == SDLK_KP_ENTER)
-                handleUnicodeUTF16(SDLK_RETURN, gKeyboard->currentMask(FALSE));
+                handleUnicodeUTF16(SDLK_RETURN, gKeyboard->currentMask(false));
             // part of the fix for SL-13243
-            if (SDLCheckGrabbyKeys(event.key.keysym.sym, TRUE) != 0)
-                SDLReallyCaptureInput(TRUE);
+            if (SDLCheckGrabbyKeys(event.key.keysym.sym, true) != 0)
+                SDLReallyCaptureInput(true);
 
             break;
         }
@@ -1773,8 +1773,8 @@ void LLWindowSDL::gatherInput()
             mKeyVirtualKey = event.key.keysym.sym;
             mKeyModifiers = (SDL_Keymod) event.key.keysym.mod;
 
-            if (SDLCheckGrabbyKeys(mKeyVirtualKey, FALSE) == 0)
-                SDLReallyCaptureInput(FALSE); // part of the fix for SL-13243
+            if (SDLCheckGrabbyKeys(mKeyVirtualKey, false) == 0)
+                SDLReallyCaptureInput(false); // part of the fix for SL-13243
 
             gKeyboard->handleKeyUp(mKeyVirtualKey, mKeyModifiers);
             break;
@@ -1784,7 +1784,7 @@ void LLWindowSDL::gatherInput()
             LLCoordWindow winCoord(event.button.x, event.button.y);
             LLCoordGL openGlCoord;
             convertCoords(winCoord, &openGlCoord);
-            MASK mask = gKeyboard->currentMask(TRUE);
+            MASK mask = gKeyboard->currentMask(true);
 
             if (event.button.button == SDL_BUTTON_LEFT) // SDL doesn't manage double clicking...
             {
@@ -1812,7 +1812,7 @@ void LLWindowSDL::gatherInput()
             LLCoordWindow winCoord(event.button.x, event.button.y);
             LLCoordGL openGlCoord;
             convertCoords(winCoord, &openGlCoord);
-            MASK mask = gKeyboard->currentMask(TRUE);
+            MASK mask = gKeyboard->currentMask(true);
 
             if (event.button.button == SDL_BUTTON_LEFT) // left
                 mCallbacks->handleMouseUp(this, openGlCoord, mask);
@@ -1901,7 +1901,7 @@ void LLWindowSDL::gatherInput()
     if (mFlashing && mFlashTimer.hasExpired())
     {
         SDL_FlashWindow(mWindow, SDL_FLASH_CANCEL);
-        mFlashing = FALSE;
+        mFlashing = false;
     }
 }
 
@@ -1951,10 +1951,10 @@ static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty
                     U8 srcred = pixelp[0];
                     U8 srcgreen = pixelp[1];
                     U8 srcblue = pixelp[2];
-                    BOOL mask_bit = (srcred != 200)
+                    bool mask_bit = (srcred != 200)
                         || (srcgreen != 200)
                         || (srcblue != 200);
-                    BOOL data_bit = mask_bit && (srcgreen <= 80);//not 0x80
+                    bool data_bit = mask_bit && (srcgreen <= 80);//not 0x80
                     unsigned char bit_offset = (cursurface->w/8) * i
                         + j/8;
                     cursor_data[bit_offset] |= (data_bit) << (7 - (j&7));
@@ -2105,8 +2105,8 @@ void LLWindowSDL::hideCursor()
     if(!mCursorHidden)
     {
         // LL_INFOS() << "hideCursor: hiding" << LL_ENDL;
-        mCursorHidden = TRUE;
-        mHideCursorPermanent = TRUE;
+        mCursorHidden = true;
+        mHideCursorPermanent = true;
         SDL_ShowCursor(SDL_DISABLE);
     }
     else
@@ -2120,8 +2120,8 @@ void LLWindowSDL::showCursor()
     if(mCursorHidden)
     {
         // LL_INFOS() << "showCursor: showing" << LL_ENDL;
-        mCursorHidden = FALSE;
-        mHideCursorPermanent = FALSE;
+        mCursorHidden = false;
+        mHideCursorPermanent = false;
         SDL_ShowCursor(SDL_ENABLE);
     }
     else
@@ -2143,7 +2143,7 @@ void LLWindowSDL::hideCursorUntilMouseMove()
     if (!mHideCursorPermanent)
     {
         hideCursor();
-        mHideCursorPermanent = FALSE;
+        mHideCursorPermanent = false;
     }
 }
 
@@ -2272,10 +2272,10 @@ S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 typ
     return rtn;
 }
 
-BOOL LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
+bool LLWindowSDL::dialogColorPicker( F32 *r, F32 *g, F32 *b)
 {
     beforeDialog();
-    BOOL retval = FALSE;
+    bool retval = false;
 #if LL_WINDOWS
     static CHOOSECOLOR cc;
     static COLORREF crCustColors[16];
@@ -2388,12 +2388,12 @@ void LLWindowSDL::bringToFront()
     }
 }
 
-void LLWindowSDL::allowLanguageTextInput(LLPreeditor *preeditor, BOOL b)
+void LLWindowSDL::allowLanguageTextInput(LLPreeditor *preeditor, bool b)
 {
     if (preeditor != mPreeditor && !b)
     {
         // This condition may occur by a call to
-        // setEnabled(BOOL) against LLTextEditor or LLLineEditor
+        // setEnabled(bool) against LLTextEditor or LLLineEditor
         // when the control is not focused.
         // We need to silently ignore the case so that
         // the language input status of the focused control

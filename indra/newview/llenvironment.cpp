@@ -760,7 +760,7 @@ namespace
         LLEnvironment::DayInstance::ptr_t   getBaseDayInstance() const  { return mBaseDayInstance; }
         void                                setBaseDayInstance(const LLEnvironment::DayInstance::ptr_t &baseday);
 
-        S32                                 countExperiencesActive() const { return mActiveExperiences.size(); }
+        S32                                 countExperiencesActive() const { return static_cast<S32>(mActiveExperiences.size()); }
 
         bool                                isOverriddenSky() const { return !mSkyExperience.isNull(); }
         bool                                isOverriddenWater() const { return !mWaterExperience.isNull(); }
@@ -1609,7 +1609,7 @@ LLVector4 LLEnvironment::getRotatedLightNorm() const
     return toLightNorm(light_direction);
 }
 
-extern BOOL gCubeSnapshot;
+extern bool gCubeSnapshot;
 
 //-------------------------------------------------------------------------
 void LLEnvironment::update(const LLViewerCamera * cam)
@@ -1646,10 +1646,10 @@ void LLEnvironment::update(const LLViewerCamera * cam)
                 && (gPipeline.canUseWindLightShaders()
                 || shaders_iter->mShaderGroup == LLGLSLShader::SG_WATER))
             {
-                shaders_iter->mUniformsDirty = TRUE;
+                shaders_iter->mUniformsDirty = true;
                 if (shaders_iter->mRiggedVariant)
                 {
-                    shaders_iter->mRiggedVariant->mUniformsDirty = TRUE;
+                    shaders_iter->mRiggedVariant->mUniformsDirty = true;
                 }
             }
         }
@@ -2486,7 +2486,7 @@ LLSettingsDay::ptr_t LLEnvironment::createDayCycleFromEnvironment(EnvSelection_t
 
     if (type == "sky")
     {
-        for (S32 idx = 1; idx < LLSettingsDay::TRACK_MAX; ++idx)
+        for (U32 idx = 1; idx < LLSettingsDay::TRACK_MAX; ++idx)
             day->clearCycleTrack(idx);
         day->setSettingsAtKeyframe(settings, 0.0f, 1);
     }

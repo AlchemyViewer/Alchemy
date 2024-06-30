@@ -155,9 +155,9 @@ bool ALChatCommand::parseCommand(std::string data)
             msg->addVector3Fast(_PREHASH_RayStart, rez_pos);
             msg->addVector3Fast(_PREHASH_RayEnd, rez_pos);
             msg->addUUIDFast(_PREHASH_RayTargetID, LLUUID::null);
-            msg->addU8Fast(_PREHASH_BypassRaycast, TRUE);
-            msg->addU8Fast(_PREHASH_RayEndIsIntersection, FALSE);
-            msg->addU8Fast(_PREHASH_State, FALSE);
+            msg->addU8Fast(_PREHASH_BypassRaycast, true);
+            msg->addU8Fast(_PREHASH_RayEndIsIntersection, false);
+            msg->addU8Fast(_PREHASH_State, false);
             msg->sendReliable(gAgent.getRegionHost());
 
             return true;
@@ -279,7 +279,7 @@ bool ALChatCommand::parseCommand(std::string data)
                     {
                         for (const std::pair<LLUUID, S32> playpair : avatarp->mPlayingAnimations)
                         {
-                            avatarp->stopMotion(playpair.first, TRUE);
+                            avatarp->stopMotion(playpair.first, true);
                             avatarp->startMotion(playpair.first);
                         }
                     }
@@ -294,12 +294,12 @@ bool ALChatCommand::parseCommand(std::string data)
             {
                 if (subcmd == "on")
                 {
-                    gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", TRUE);
+                    gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", true);
                     return true;
                 }
                 else if (subcmd == "off")
                 {
-                    gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", FALSE);
+                    gSavedPerAccountSettings.setBOOL("AlchemyAOEnable", false);
                     return true;
                 }
                 else if (subcmd == "sit")

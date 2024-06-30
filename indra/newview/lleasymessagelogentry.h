@@ -30,10 +30,10 @@ public:
 
     LogPayload operator()() const { return mEntry; };
 
-    std::string getFull(BOOL beautify = FALSE, BOOL show_header = FALSE) const;
+    std::string getFull(bool beautify = false, bool show_header = false) const;
     std::string getName();
-    std::string getResponseFull(BOOL beautify = FALSE, BOOL show_header = FALSE) const;
-    BOOL isOutgoing() const;
+    std::string getResponseFull(bool beautify = false, bool show_header = false) const;
+    bool isOutgoing() const;
 
     void setResponseMessage(LogPayload entry);
 

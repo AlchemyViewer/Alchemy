@@ -42,7 +42,7 @@
 #include "llvoavatar.h"
 #include "llworld.h"
 
-LLHUDEffectSpiral::LLHUDEffectSpiral(const U8 type) : LLHUDEffect(type), mbInit(FALSE)
+LLHUDEffectSpiral::LLHUDEffectSpiral(const U8 type) : LLHUDEffect(type), mbInit(false)
 {
     mKillTime = 10.f;
     mVMag = 1.f;
@@ -247,7 +247,7 @@ void LLHUDEffectSpiral::triggerLocal()
         }
     }
 
-    mbInit = TRUE;
+    mbInit = true;
 }
 
 void LLHUDEffectSpiral::setTargetObject(LLViewerObject *objp)

@@ -51,28 +51,12 @@ char LLResMgr::getDecimalPoint()
 {
     char decimal = localeconv()->decimal_point[0];
 
-#if LL_DARWIN
-    // On the Mac, locale support is broken before 10.4, which causes things to go all pear-shaped.
-    if(decimal == 0)
-    {
-        decimal = '.';
-    }
-#endif
-
     return decimal;
 }
 
 char LLResMgr::getThousandsSeparator()
 {
     char separator = localeconv()->thousands_sep[0];
-
-#if LL_DARWIN
-    // On the Mac, locale support is broken before 10.4, which causes things to go all pear-shaped.
-    if(separator == 0)
-    {
-        separator = ',';
-    }
-#endif
 
     return separator;
 }
@@ -81,28 +65,12 @@ char LLResMgr::getMonetaryDecimalPoint()
 {
     char decimal = localeconv()->mon_decimal_point[0];
 
-#if LL_DARWIN
-    // On the Mac, locale support is broken before 10.4, which causes things to go all pear-shaped.
-    if(decimal == 0)
-    {
-        decimal = '.';
-    }
-#endif
-
     return decimal;
 }
 
 char LLResMgr::getMonetaryThousandsSeparator()
 {
     char separator = localeconv()->mon_thousands_sep[0];
-
-#if LL_DARWIN
-    // On the Mac, locale support is broken before 10.4, which causes things to go all pear-shaped.
-    if(separator == 0)
-    {
-        separator = ',';
-    }
-#endif
 
     return separator;
 }
@@ -131,9 +99,9 @@ std::string LLResMgr::getMonetaryString( S32 input )
 
 
     // Note: we assume here that the currency symbol goes on the left. (Hey, it's Lindens! We can just decide.)
-    BOOL negative = (input < 0 );
-    BOOL negative_before = negative && (conv->n_sign_posn != 2);
-    BOOL negative_after = negative && (conv->n_sign_posn == 2);
+    bool negative = (input < 0 );
+    bool negative_before = negative && (conv->n_sign_posn != 2);
+    bool negative_after = negative && (conv->n_sign_posn == 2);
 
     std::string digits = llformat("%u", abs(input));
     if( !grouping || !grouping[0] )
@@ -172,7 +140,7 @@ std::string LLResMgr::getMonetaryString( S32 input )
     S32 output_pos = 0;
 
     cur_group = 0;
-    S32 pos = digits.size()-1;
+    S32 pos = static_cast<S32>(digits.size()) - 1;
     S32 count_within_group = 0;
     while( (pos >= 0) && (groupings[cur_group] >= 0) )
     {

@@ -54,7 +54,7 @@ LLAgent gAgent;
 std::string LLViewerRegion::getMapServerURL() const { return {}; }
 
 void LLGLTexture::setBoostLevel(S32 ) { }
-LLViewerFetchedTexture* LLViewerTextureManager::getFetchedTextureFromUrl(const std::string&, FTType, BOOL, LLGLTexture::EBoostLevel, S8,
+LLViewerFetchedTexture* LLViewerTextureManager::getFetchedTextureFromUrl(const std::string&, FTType, bool, LLGLTexture::EBoostLevel, S8,
                                                                          LLGLint, LLGLenum, const LLUUID& ) { return NULL; }
 
 LLControlGroup::LLControlGroup(const std::string& name) : LLInstanceTracker<LLControlGroup, std::string>(name) { }

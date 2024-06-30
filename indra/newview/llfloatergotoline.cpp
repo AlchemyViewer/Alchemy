@@ -58,11 +58,11 @@ LLFloaterGotoLine::LLFloaterGotoLine(LLScriptEdCore* editor_core)
         }
 }
 
-BOOL LLFloaterGotoLine::postBuild()
+bool LLFloaterGotoLine::postBuild()
 {
     mGotoBox = getChild<LLLineEditor>("goto_line");
     mGotoBox->setCommitCallback(boost::bind(&LLFloaterGotoLine::onGotoBoxCommit, this));
-    mGotoBox->setCommitOnFocusLost(FALSE);
+    mGotoBox->setCommitOnFocusLost(false);
     mGotoBox->setPrevalidate(LLTextValidate::validateNonNegativeS32);
     childSetAction("goto_btn", onBtnGoto, this);
     setDefaultBtn("goto_btn");
@@ -114,7 +114,7 @@ void LLFloaterGotoLine::handleBtnGoto()
             mEditorCore->mCurrentEditor->scrollTo(row, column);
 // [/SL:KB]
 //          mEditorCore->mCurrentEditor->setCursor(row, column);
-            mEditorCore->mCurrentEditor->setFocus(TRUE);
+            mEditorCore->mCurrentEditor->setFocus(true);
                 }
         }
 }
@@ -125,17 +125,17 @@ bool LLFloaterGotoLine::hasAccelerators() const
         {
                 return mEditorCore->hasAccelerators();
         }
-        return FALSE;
+        return false;
 }
 
-BOOL LLFloaterGotoLine::handleKeyHere(KEY key, MASK mask)
+bool LLFloaterGotoLine::handleKeyHere(KEY key, MASK mask)
 {
         if (mEditorCore)
         {
                 return mEditorCore->handleKeyHere(key, mask);
         }
 
-        return FALSE;
+        return false;
 }
 
 void LLFloaterGotoLine::onGotoBoxCommit()
@@ -154,11 +154,11 @@ void LLFloaterGotoLine::onGotoBoxCommit()
 
             S32 rownew = 0;
             S32 columnnew = 0;
-            mEditorCore->mCurrentEditor->getCurrentLineAndColumn( &rownew, &columnnew, FALSE );  // don't include wordwrap
+            mEditorCore->mCurrentEditor->getCurrentLineAndColumn( &rownew, &columnnew, false );  // don't include wordwrap
             if (rownew == row && columnnew == column)
             {
                     mEditorCore->mCurrentEditor->deselect();
-                    mEditorCore->mCurrentEditor->setFocus(TRUE);
+                    mEditorCore->mCurrentEditor->setFocus(true);
                     sInstance->closeFloater();
             } //else do nothing (if the cursor-position didn't change)
                 }

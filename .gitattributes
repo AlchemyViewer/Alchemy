@@ -51,6 +51,17 @@ indra/newview/installers/windows/FILES_ARE_UNICODE_UTF-16LE.txt -text
 
 *.exe      binary
 
+# Files with Windows line endings
+VivoxAUP.txt text eol=crlf
+FILES_ARE_UNICODE_UTF-16LE.txt text eol=crlf
+
+# Windows Manifest files
+*.manifest text eol=crlf
+
+# Windows Installer Script files (normalization disabled)
+*.nsi -text
+
 # Exclude files from exporting
 .gitattributes export-ignore
 .gitignore     export-ignore
+

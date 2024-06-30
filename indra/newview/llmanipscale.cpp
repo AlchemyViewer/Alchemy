@@ -86,7 +86,7 @@ const LLManip::EManipPart MANIPULATOR_IDS[LLManipScale::NUM_MANIPULATORS] =
     LLManip::LL_FACE_NEGZ
 };
 
-BOOL LLManipScale::sInvertUniform = FALSE;
+bool LLManipScale::sInvertUniform = false;
 
 F32 get_default_max_prim_scale(bool is_flora)
 {
@@ -104,37 +104,37 @@ F32 get_default_max_prim_scale(bool is_flora)
 }
 
 // static
-void LLManipScale::setUniform(BOOL b)
+void LLManipScale::setUniform(bool b)
 {
     gSavedSettings.setBOOL("ScaleUniform", b);
 }
 
 // static
-void LLManipScale::setShowAxes(BOOL b)
+void LLManipScale::setShowAxes(bool b)
 {
     gSavedSettings.setBOOL("ScaleShowAxes", b);
 }
 
 // static
-void LLManipScale::setStretchTextures(BOOL b)
+void LLManipScale::setStretchTextures(bool b)
 {
     gSavedSettings.setBOOL("ScaleStretchTextures", b);
 }
 
 // static
-BOOL LLManipScale::getUniform()
+bool LLManipScale::getUniform()
 {
     return (gSavedSettings.getBOOL("ScaleUniform") ^ sInvertUniform);
 }
 
 // static
-BOOL LLManipScale::getShowAxes()
+bool LLManipScale::getShowAxes()
 {
     return gSavedSettings.getBOOL("ScaleShowAxes");
 }
 
 // static
-BOOL LLManipScale::getStretchTextures()
+bool LLManipScale::getStretchTextures()
 {
     return gSavedSettings.getBOOL("ScaleStretchTextures");
 }
@@ -186,7 +186,7 @@ LLManipScale::LLManipScale( LLToolComposite* composite )
     mScaledBoxHandleSize( 1.f ),
     mLastMouseX( -1 ),
     mLastMouseY( -1 ),
-    mSendUpdateOnMouseUp( FALSE ),
+    mSendUpdateOnMouseUp( false ),
     mLastUpdateFlags( 0 ),
     mScaleSnapUnit1(1.f),
     mScaleSnapUnit2(1.f),
@@ -322,9 +322,9 @@ void LLManipScale::render()
     }
 }
 
-BOOL LLManipScale::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLManipScale::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-    BOOL    handled = FALSE;
+    bool    handled = false;
 
     if(mHighlightedPart != LL_NO_PART)
     {
@@ -335,18 +335,18 @@ BOOL LLManipScale::handleMouseDown(S32 x, S32 y, MASK mask)
 }
 
 // Assumes that one of the arrows on an object was hit.
-BOOL LLManipScale::handleMouseDownOnPart( S32 x, S32 y, MASK mask )
+bool LLManipScale::handleMouseDownOnPart( S32 x, S32 y, MASK mask )
 {
-    BOOL can_scale = canAffectSelection();
+    bool can_scale = canAffectSelection();
     if (!can_scale)
     {
-        return FALSE;
+        return false;
     }
 
     highlightManipulators(x, y);
     S32 hit_part = mHighlightedPart;
 
-    LLSelectMgr::getInstance()->enableSilhouette(FALSE);
+    LLSelectMgr::getInstance()->enableSilhouette(false);
     mManipPart = (EManipPart)hit_part;
 
     LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
@@ -368,15 +368,15 @@ BOOL LLManipScale::handleMouseDownOnPart( S32 x, S32 y, MASK mask )
     // we just started a drag, so save initial object positions, orientations, and scales
     LLSelectMgr::getInstance()->saveSelectedObjectTransform(SELECT_ACTION_TYPE_SCALE);
     // Route future Mouse messages here preemptively.  (Release on mouse up.)
-    setMouseCapture( TRUE );
+    setMouseCapture( true );
 
     mHelpTextTimer.reset();
     sNumTimesHelpTextShown++;
-    return TRUE;
+    return true;
 }
 
 
-BOOL LLManipScale::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLManipScale::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     // first, perform normal processing in case this was a quick-click
     handleHover(x, y, mask);
@@ -386,20 +386,20 @@ BOOL LLManipScale::handleMouseUp(S32 x, S32 y, MASK mask)
         if( (LL_FACE_MIN <= (S32)mManipPart)
             && ((S32)mManipPart <= LL_FACE_MAX) )
         {
-            sendUpdates(TRUE,TRUE,FALSE);
+            sendUpdates(true,true,false);
         }
         else
         if( (LL_CORNER_MIN <= (S32)mManipPart)
             && ((S32)mManipPart <= LL_CORNER_MAX) )
         {
-            sendUpdates(TRUE,TRUE,TRUE);
+            sendUpdates(true,true,true);
         }
 
         //send texture update
         auto& select_mgr = LLSelectMgr::instance();
-        select_mgr.adjustTexturesByScale(TRUE, getStretchTextures());
+        select_mgr.adjustTexturesByScale(true, getStretchTextures());
 
-        select_mgr.enableSilhouette(TRUE);
+        select_mgr.enableSilhouette(true);
         mManipPart = LL_NO_PART;
 
         // Might have missed last update due to UPDATE_DELAY timing
@@ -412,14 +412,14 @@ BOOL LLManipScale::handleMouseUp(S32 x, S32 y, MASK mask)
 }
 
 
-BOOL LLManipScale::handleHover(S32 x, S32 y, MASK mask)
+bool LLManipScale::handleHover(S32 x, S32 y, MASK mask)
 {
     if( hasMouseCapture() )
     {
         if( mObjectSelection->isEmpty() )
         {
             // Somehow the object got deselected while we were dragging it.
-            setMouseCapture( FALSE );
+            setMouseCapture( false );
         }
         else
         {
@@ -445,10 +445,10 @@ BOOL LLManipScale::handleHover(S32 x, S32 y, MASK mask)
     }
 
     // Patch up textures, if possible.
-    LLSelectMgr::getInstance()->adjustTexturesByScale(FALSE, getStretchTextures());
+    LLSelectMgr::getInstance()->adjustTexturesByScale(false, getStretchTextures());
 
     gViewerWindow->setCursor(UI_CURSOR_TOOLSCALE);
-    return TRUE;
+    return true;
 }
 
 void LLManipScale::highlightManipulators(S32 x, S32 y)
@@ -884,7 +884,7 @@ void LLManipScale::dragCorner( S32 x, S32 y )
     F32 scale_factor = 1.f;
     F32 max_scale    = partToMaxScale(mManipPart, bbox);
     F32 min_scale    = partToMinScale(mManipPart, bbox);
-    BOOL uniform     = LLManipScale::getUniform();
+    bool uniform     = LLManipScale::getUniform();
 
     // check for snapping
     LLVector3 mouse_on_plane1;
@@ -898,7 +898,7 @@ void LLManipScale::dragCorner( S32 x, S32 y )
     LLVector3 projected_drag_pos1 = inverse_projected_vec(mScaleDir, orthogonal_component(mouse_on_plane1, mSnapGuideDir1));
     LLVector3 projected_drag_pos2 = inverse_projected_vec(mScaleDir, orthogonal_component(mouse_on_plane2, mSnapGuideDir2));
 
-    BOOL snap_enabled = ALControlCache::SnapEnabled;
+    bool snap_enabled = ALControlCache::SnapEnabled;
     if (snap_enabled && (mouse_on_plane1 - projected_drag_pos1) * mSnapGuideDir1 > mSnapRegimeOffset)
     {
         F32 drag_dist = mScaleDir * projected_drag_pos1; // Projecting the drag position allows for negative results, vs using the length which will result in a "reverse scaling" bug.
@@ -981,7 +981,7 @@ void LLManipScale::dragCorner( S32 x, S32 y )
 
     LLVector3d drag_global = uniform ? mDragStartCenterGlobal : mDragFarHitGlobal;
 
-    // do the root objects i.e. (TRUE == cur->isRootEdit())
+    // do the root objects i.e. (true == cur->isRootEdit())
     for (LLObjectSelection::iterator iter = mObjectSelection->begin();
          iter != mObjectSelection->end(); iter++)
     {
@@ -1029,7 +1029,7 @@ void LLManipScale::dragCorner( S32 x, S32 y )
             }
         }
     }
-    // do the child objects i.e. (FALSE == cur->isRootEdit())
+    // do the child objects i.e. (false == cur->isRootEdit())
     for (LLObjectSelection::iterator iter = mObjectSelection->begin();
          iter != mObjectSelection->end(); iter++)
     {
@@ -1041,7 +1041,7 @@ void LLManipScale::dragCorner( S32 x, S32 y )
             !cur->isAvatar() && !cur->isRootEdit() )
         {
             const LLVector3& scale = selectNode->mSavedScale;
-            cur->setScale( scale_factor * scale, FALSE );
+            cur->setScale( scale_factor * scale, false );
 
             if (!selectNode->mIndividualSelection)
             {
@@ -1103,7 +1103,7 @@ void LLManipScale::dragFace( S32 x, S32 y )
     F32 max_drag_dist = partToMaxScale(mManipPart, bbox);
     F32 min_drag_dist = partToMinScale(mManipPart, bbox);
 
-    BOOL uniform = LLManipScale::getUniform();
+    bool uniform = LLManipScale::getUniform();
     if( uniform )
     {
         drag_delta *= 2.f;
@@ -1113,7 +1113,7 @@ void LLManipScale::dragFace( S32 x, S32 y )
     F32 dist_from_scale_line = dist_vec(scale_center_to_mouse, (mouse_on_scale_line - mScaleCenter));
     F32 dist_along_scale_line = scale_center_to_mouse * mScaleDir;
 
-    BOOL snap_enabled = ALControlCache::SnapEnabled;
+    bool snap_enabled = ALControlCache::SnapEnabled;
 
     if (snap_enabled && dist_from_scale_line > mSnapRegimeOffset)
     {
@@ -1189,7 +1189,7 @@ void LLManipScale::dragFace( S32 x, S32 y )
     mDragPointGlobal = drag_point_global;
 }
 
-void LLManipScale::sendUpdates( BOOL send_position_update, BOOL send_scale_update, BOOL corner )
+void LLManipScale::sendUpdates( bool send_position_update, bool send_scale_update, bool corner )
 {
     // Throttle updates to 10 per second.
     static LLTimer  update_timer;
@@ -1202,7 +1202,7 @@ void LLManipScale::sendUpdates( BOOL send_position_update, BOOL send_scale_updat
         if (send_position_update)   update_flags |= UPD_POSITION;
         if (send_scale_update)      update_flags |= UPD_SCALE;
 
-//      BOOL send_type = SEND_INDIVIDUALS;
+//      bool send_type = SEND_INDIVIDUALS;
         if (corner)
         {
             update_flags |= UPD_UNIFORM;
@@ -1215,11 +1215,11 @@ void LLManipScale::sendUpdates( BOOL send_position_update, BOOL send_scale_updat
         {
             LLSelectMgr::getInstance()->sendMultipleUpdate( update_flags );
             update_timer.reset();
-            mSendUpdateOnMouseUp = FALSE;
+            mSendUpdateOnMouseUp = false;
         }
         else
         {
-            mSendUpdateOnMouseUp = TRUE;
+            mSendUpdateOnMouseUp = true;
         }
         dialog_refresh_all();
     }
@@ -1268,7 +1268,7 @@ void LLManipScale::stretchFace( const LLVector3& drag_start_agent, const LLVecto
 
             LLVector3 scale         = cur->getScale();
             scale.mV[axis_index]    = desired_scale;
-            cur->setScale(scale, FALSE);
+            cur->setScale(scale, false);
             rebuild(cur);
             LLVector3 delta_pos;
             if( !getUniform() )
@@ -2097,11 +2097,11 @@ LLVector3 LLManipScale::nearestAxis( const LLVector3& v ) const
 }
 
 // virtual
-BOOL LLManipScale::canAffectSelection()
+bool LLManipScale::canAffectSelection()
 {
     // An selection is scalable if you are allowed to both edit and move
     // everything in it, and it does not have any sitting agents
-    BOOL can_scale = mObjectSelection->getObjectCount() != 0;
+    bool can_scale = mObjectSelection->getObjectCount() != 0;
     if (can_scale)
     {
         struct f : public LLSelectedObjectFunctor
@@ -2119,14 +2119,14 @@ BOOL LLManipScale::canAffectSelection()
     return can_scale;
 }
 
-BOOL LLManipScale::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
+bool LLManipScale::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 {
-    sInvertUniform = TRUE;
+    sInvertUniform = true;
     return handleMouseDown(x,y,mask);
 }
 
-BOOL LLManipScale::handleMiddleMouseUp(S32 x, S32 y, MASK mask)
+bool LLManipScale::handleMiddleMouseUp(S32 x, S32 y, MASK mask)
 {
-    sInvertUniform = FALSE;
+    sInvertUniform = false;
     return handleMouseUp(x, y, mask);
 }

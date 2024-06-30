@@ -47,7 +47,7 @@ LLFloaterScriptEdPrefs::LLFloaterScriptEdPrefs(const LLSD& key)
     mCommitCallbackRegistrar.add("ScriptPref.SetExternalEditor", boost::bind(&LLFloaterScriptEdPrefs::setExternalEditor, this));
 }
 
-BOOL LLFloaterScriptEdPrefs::postBuild()
+bool LLFloaterScriptEdPrefs::postBuild()
 {
     mEditor = getChild<LLScriptEditor>("Script Preview");
     if (mEditor)
@@ -57,7 +57,7 @@ BOOL LLFloaterScriptEdPrefs::postBuild()
     }
 
     getChild<LLButton>("close_btn")->setClickedCallback(boost::bind(&LLFloaterScriptEdPrefs::closeFloater, this, false));
-    return TRUE;
+    return true;
 }
 
 void LLFloaterScriptEdPrefs::applyUIColor(LLUICtrl* ctrl, const LLSD& param)

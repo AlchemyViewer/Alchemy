@@ -110,16 +110,16 @@ S32 LLFileSystem::getFileSize(const LLUUID& file_id, const LLAssetType::EType fi
     return file_size;
 }
 
-BOOL LLFileSystem::read(U8* buffer, S32 bytes)
+bool LLFileSystem::read(U8* buffer, S32 bytes)
 {
-    BOOL success = FALSE;
+    bool success = false;
 
     LLFILE* file = LLFile::fopen(mFilePath, TEXT("rb"));
     if (file)
     {
         if (fseek(file, mPosition, SEEK_SET) == 0)
         {
-            mBytesRead = fread(buffer, 1, bytes, file);
+            mBytesRead = (S32)fread(buffer, 1, bytes, file);
             fclose(file);
 
             mPosition += mBytesRead;
@@ -127,7 +127,7 @@ BOOL LLFileSystem::read(U8* buffer, S32 bytes)
             // but that will break avatar rezzing...
             if (mBytesRead)
             {
-                success = TRUE;
+                success = true;
             }
         }
     }
@@ -141,21 +141,21 @@ S32 LLFileSystem::getLastBytesRead()
     return mBytesRead;
 }
 
-BOOL LLFileSystem::eof()
+bool LLFileSystem::eof()
 {
     return mPosition >= getSize();
 }
 
-BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
+bool LLFileSystem::write(const U8* buffer, S32 bytes)
 {
-    BOOL success = FALSE;
+    bool success = false;
 
     if (mMode == APPEND)
     {
         LLFILE* ofs = LLFile::fopen(mFilePath, TEXT("a+b"));
         if (ofs)
         {
-            S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
+            S32 bytes_written = (S32)fwrite(buffer, 1, bytes, ofs);
             mPosition = ftell(ofs);
             fclose(ofs);
             success = (bytes_written == bytes);
@@ -168,7 +168,7 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
         {
             if (fseek(ofs, mPosition, SEEK_SET) == 0)
             {
-                S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
+                S32 bytes_written = (S32)fwrite(buffer, 1, bytes, ofs);
                 mPosition = ftell(ofs);
                 fclose(ofs);
                 success = (bytes_written == bytes);
@@ -179,7 +179,7 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
             ofs = LLFile::fopen(mFilePath, TEXT("wb"));
             if (ofs)
             {
-                S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
+                S32 bytes_written = (S32)fwrite(buffer, 1, bytes, ofs);
                 mPosition = ftell(ofs);
                 fclose(ofs);
                 success = (bytes_written == bytes);
@@ -191,7 +191,7 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
         LLFILE* ofs = LLFile::fopen(mFilePath, TEXT("wb"));
         if (ofs)
         {
-            S32 bytes_written = fwrite(buffer, 1, bytes, ofs);
+            S32 bytes_written = (S32)fwrite(buffer, 1, bytes, ofs);
             mPosition = ftell(ofs);
             fclose(ofs);
             success = (bytes_written == bytes);
@@ -202,7 +202,7 @@ BOOL LLFileSystem::write(const U8* buffer, S32 bytes)
     return success;
 }
 
-BOOL LLFileSystem::seek(S32 offset, S32 origin)
+bool LLFileSystem::seek(S32 offset, S32 origin)
 {
     if (-1 == origin)
     {
@@ -218,18 +218,18 @@ BOOL LLFileSystem::seek(S32 offset, S32 origin)
         LL_WARNS() << "Attempt to seek past end of file" << LL_ENDL;
 
         mPosition = size;
-        return FALSE;
+        return false;
     }
     else if (new_pos < 0)
     {
         LL_WARNS() << "Attempt to seek past beginning of file" << LL_ENDL;
 
         mPosition = 0;
-        return FALSE;
+        return false;
     }
 
     mPosition = new_pos;
-    return TRUE;
+    return true;
 }
 
 S32 LLFileSystem::tell() const
@@ -254,7 +254,7 @@ S32 LLFileSystem::getMaxSize()
     return INT_MAX;
 }
 
-BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_type)
+bool LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_type)
 {
     const boost::filesystem::path new_filename = LLDiskCache::getInstance()->metaDataToFilepath(new_id, new_type);
 
@@ -270,10 +270,10 @@ BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_typ
     boost::filesystem::rename(mFilePath, new_filename, ec);
     if (ec.failed())
     {
-        // We would like to return FALSE here indicating the operation
+        // We would like to return false here indicating the operation
         // failed but the original code does not and doing so seems to
         // break a lot of things so we go with the flow...
-        //return FALSE;
+        //return false;
         LL_WARNS() << "Failed to rename " << mFileID << " to " << new_id << " reason: "  << ec.what() << LL_ENDL;
     }
 
@@ -281,12 +281,12 @@ BOOL LLFileSystem::rename(const LLUUID& new_id, const LLAssetType::EType new_typ
     mFileType = new_type;
     mFilePath = new_filename;
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLFileSystem::remove()
+bool LLFileSystem::remove()
 {
     boost::system::error_code ec;
     boost::filesystem::remove(mFilePath, ec);
-    return TRUE;
+    return true;
 }

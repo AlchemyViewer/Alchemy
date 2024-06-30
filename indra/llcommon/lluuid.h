@@ -70,13 +70,13 @@ public:
     static LLUUID generateNewID(const std::string& stream);
 
 private:
-    BOOL    parseInternalScalar(const char* in_string, bool broken_format, bool emit);
+    bool    parseInternalScalar(const char* in_string, bool broken_format, bool emit);
 #if defined(__SSE4_2__)
-    BOOL    parseInternalSIMD(const char* in_string, bool emit);
+    bool    parseInternalSIMD(const char* in_string, bool emit);
 #endif
 public:
-    BOOL    set(const char *in_string, BOOL emit = TRUE);   // Convert from string, if emit is FALSE, do not emit warnings
-    BOOL    set(const std::string_view in_string, BOOL emit = TRUE);    // Convert from string, if emit is FALSE, do not emit warnings
+    bool    set(const char *in_string, bool emit = true);   // Convert from string, if emit is false, do not emit warnings
+    bool    set(const std::string_view in_string, bool emit = true);    // Convert from string, if emit is false, do not emit warnings
     void    setNull();                  // Faster than setting to LLUUID::null.
 
     S32     cmpTime(uuid_time_t *t1, uuid_time_t *t2);
@@ -100,7 +100,7 @@ public:
         return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p));
     }
 
-    BOOL isNull() const // Faster than comparing to LLUUID::null.
+    bool isNull() const // Faster than comparing to LLUUID::null.
     {
         __m128i mm = load_unaligned_si128(mData);
 #if defined(__SSE4_1__)
@@ -111,7 +111,7 @@ public:
 #endif
     }
 
-    BOOL notNull() const // Faster than comparing to LLUUID::null.
+    bool notNull() const // Faster than comparing to LLUUID::null.
     {
         return !isNull();
     }
@@ -119,8 +119,6 @@ public:
     // to integers, among other things.  Use isNull() or notNull().
     //      operator bool() const;
 
-    // JC: These must return real bool's (not BOOLs) or else use of the STL
-    // will generate bool-to-int performance warnings.
     bool operator==(const LLUUID& rhs) const;
     bool operator!=(const LLUUID& rhs) const
     {
@@ -222,14 +220,14 @@ public:
         return boost::hash_value(id.mData);
     }
 
-    static BOOL validate(const std::string_view in_string); // Validate that the UUID string is legal.
+    static bool validate(const std::string_view in_string); // Validate that the UUID string is legal.
 
     static const LLUUID null;
     static LLMutex sMutex;
 
     static S32 getNodeID(unsigned char * node_id);
 
-    static BOOL parseUUID(const std::string& buf, LLUUID* value);
+    static bool parseUUID(const std::string& buf, LLUUID* value);
 
     U8 mData[UUID_BYTES] = {};
 };
@@ -251,7 +249,7 @@ struct lluuid_less
 {
     bool operator()(const LLUUID& lhs, const LLUUID& rhs) const
     {
-        return (lhs < rhs) ? true : false;
+        return lhs < rhs;
     }
 };
 

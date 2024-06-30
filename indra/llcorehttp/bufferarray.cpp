@@ -149,7 +149,7 @@ size_t BufferArray::append(const void * src, size_t len)
         }
         catch (const std::bad_alloc&)
         {
-            LLMemory::logMemoryInfo(TRUE);
+            LLMemory::logMemoryInfo(true);
 
             //output possible call stacks to log file.
             LLError::LLCallStacks::print();

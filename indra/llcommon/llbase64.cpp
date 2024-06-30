@@ -72,7 +72,7 @@ size_t LLBase64::decode(std::string_view input, U8 * buffer, size_t buffer_size)
     BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
 
     // BIO_new_mem_buf is not const aware, but it doesn't modify the buffer
-    BIO *bio = BIO_new_mem_buf(const_cast<char*>(input.data()), input.length());
+    BIO *bio = BIO_new_mem_buf(const_cast<char*>(input.data()), static_cast<int>(input.length()));
     bio = BIO_push(b64, bio);
     size_t bytes_written = BIO_read(bio, buffer, narrow(buffer_size));
     BIO_free_all(bio);
@@ -82,7 +82,7 @@ size_t LLBase64::decode(std::string_view input, U8 * buffer, size_t buffer_size)
 
 std::string LLBase64::decode(std::string_view input)
 {
-    U32 buffer_len = LLBase64::requiredDecryptionSpace(input);
+    size_t buffer_len = LLBase64::requiredDecryptionSpace(input);
     std::vector<U8> buffer(buffer_len);
     buffer_len = LLBase64::decode(input, &buffer[0], buffer_len);
     buffer.resize(buffer_len);

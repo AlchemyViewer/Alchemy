@@ -53,10 +53,10 @@ LLFloaterSidePanelContainer::~LLFloaterSidePanelContainer()
     LLTransientFloaterMgr::getInstance()->removeControlView(LLTransientFloaterMgr::GLOBAL, this);
 }
 
-BOOL LLFloaterSidePanelContainer::postBuild()
+bool LLFloaterSidePanelContainer::postBuild()
 {
     mMainPanel = getChild<LLPanel>(sMainPanelName);
-    return TRUE;
+    return true;
 }
 
 void LLFloaterSidePanelContainer::onOpen(const LLSD& key)
@@ -135,7 +135,7 @@ LLPanel* LLFloaterSidePanelContainer::openChildPanel(std::string_view panel_name
     }
     else if (!hasFocus())
     {
-        setFocus(TRUE);
+        setFocus(true);
     }
 
     LLPanel* panel = NULL;

@@ -375,7 +375,7 @@ namespace tut
         LLPointer<LLInventoryItem> src1 = create_random_inventory_item();
 
         std::ostringstream ostream;
-        src1->exportLegacyStream(ostream, TRUE);
+        src1->exportLegacyStream(ostream, true);
 
         std::istringstream istream(ostream.str());
         LLPointer<LLInventoryItem> src2 = new LLInventoryItem();
@@ -497,7 +497,7 @@ namespace tut
         LLPointer<LLInventoryCategory> src1 = create_random_inventory_cat();
 
         std::ostringstream ostream;
-        src1->exportLegacyStream(ostream, TRUE);
+        src1->exportLegacyStream(ostream, true);
 
         std::istringstream istream(ostream.str());
         LLPointer<LLInventoryCategory> src2 = new LLInventoryCategory();

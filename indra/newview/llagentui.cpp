@@ -63,20 +63,20 @@ void LLAgentUI::buildSLURL(LLSLURL& slurl, const bool escaped /*= true*/)
 }
 
 //static
-BOOL LLAgentUI::checkAgentDistance(const LLVector3& pole, F32 radius)
+bool LLAgentUI::checkAgentDistance(const LLVector3& pole, F32 radius)
 {
     F32 delta_x = gAgent.getPositionAgent().mV[VX] - pole.mV[VX];
     F32 delta_y = gAgent.getPositionAgent().mV[VY] - pole.mV[VY];
 
     return  sqrt( delta_x* delta_x + delta_y* delta_y ) < radius;
 }
-BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const LLVector3& agent_pos_region)
+bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const LLVector3& agent_pos_region)
 {
     LLViewerRegion* region = gAgent.getRegion();
     LLViewerParcelMgr& parcelMGr = LLViewerParcelMgr::instance();
     LLParcel* parcel = parcelMGr.getAgentParcel();
 
-    if (!region || !parcel) return FALSE;
+    if (!region || !parcel) return false;
 
     std::string remote_grid = LLGridManager::instance().getGridByProbing(region->getHGGrid());
     std::string cur_grid = LLGridManager::instance().getGrid();
@@ -191,9 +191,9 @@ BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
         }
     }
     str = std::move(buffer);
-    return TRUE;
+    return true;
 }
-BOOL LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt)
+bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt)
 {
     return buildLocationString(str,fmt, gAgent.getPositionAgent());
 }

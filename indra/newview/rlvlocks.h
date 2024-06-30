@@ -95,23 +95,23 @@ public:
     bool verifyAttachmentLocks();
 
 protected:
-    // Returns TRUE if the attachment point is eLock type locked by anything other than idRlvObj
+    // Returns true if the attachment point is eLock type locked by anything other than idRlvObj
     bool isLockedAttachmentPointExcept(S32 idxAttachPt, ERlvLockMask eLock, const LLUUID& idRlvObj) const;
 
     /*
      * canAttach/canDetach trivial helper functions (note that a more approriate name might be userCanAttach/userCanDetach)
      */
 public:
-    // Returns TRUE if there is at least one attachment point that can be attached to
+    // Returns true if there is at least one attachment point that can be attached to
     bool         canAttach() const;
-    // Returns TRUE if the inventory item can be attached by the user (and optionally provides the attachment point - which may be NULL)
+    // Returns true if the inventory item can be attached by the user (and optionally provides the attachment point - which may be NULL)
     ERlvWearMask canAttach(const LLInventoryItem* pItem, LLViewerJointAttachment** ppAttachPtOut = NULL) const;
-    // Returns TRUE if the attachment point can be attached to by the user
+    // Returns true if the attachment point can be attached to by the user
     ERlvWearMask canAttach(const LLViewerJointAttachment* pAttachPt) const;
 
-    // Returns TRUE if the inventory item can be detached by the user
+    // Returns true if the inventory item can be detached by the user
     bool canDetach(const LLInventoryItem* pItem) const;
-    // Returns TRUE if the attachment point has at least one attachment that can be detached by the user
+    // Returns true if the attachment point has at least one attachment that can be detached by the user
     bool canDetach(const LLViewerJointAttachment* pAttachPt, bool fDetachAll = false) const;
 
     /*
@@ -162,7 +162,7 @@ public:
     void onAttach(const LLViewerObject* pAttachObj, const LLViewerJointAttachment* pAttachPt);
     void onDetach(const LLViewerObject* pAttachObj, const LLViewerJointAttachment* pAttachPt);
     void onSavedAssetIntoInventory(const LLUUID& idItem);
-    BOOL onTimer();
+    bool onTimer();
     void onWearAttachment(const LLInventoryItem* pItem, ERlvWearMask eWearAction);
     void onWearAttachment(const LLUUID& idItem, ERlvWearMask eWearAction);
 
@@ -211,7 +211,7 @@ protected:
     public:
         RlvAttachmentLockWatchdogTimer(RlvAttachmentLockWatchdog* pWatchdog) : LLEventTimer(10), m_pWatchdog(pWatchdog) {}
         virtual ~RlvAttachmentLockWatchdogTimer() { m_pWatchdog->m_pTimer = NULL; }
-        virtual BOOL tick() { return m_pWatchdog->onTimer(); }
+        virtual bool tick() { return m_pWatchdog->onTimer(); }
         RlvAttachmentLockWatchdog* m_pWatchdog;
     } *m_pTimer = nullptr;
 };
@@ -312,27 +312,27 @@ public:
     // Adds an eLock type lock (held by idRlvObj) for the specified folder source (with ePerm and eScope lock options)
     void addFolderLock(const folderlock_source_t& lockSource, ELockPermission ePerm, ELockScope eScope, const LLUUID& idRlvObj, ERlvLockMask eLockType);
 
-    // Returns TRUE if there is at least 1 non-detachable attachment as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
+    // Returns true if there is at least 1 non-detachable attachment as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
     bool hasLockedAttachment() const;
-    // Returns TRUE if there is at least 1 eLock type PERM_DENY locked folder (RLV_LOCK_ANY = RLV_LOCK_ADD *or* RLV_LOCK_REMOVE)
+    // Returns true if there is at least 1 eLock type PERM_DENY locked folder (RLV_LOCK_ANY = RLV_LOCK_ADD *or* RLV_LOCK_REMOVE)
     bool hasLockedFolder(ERlvLockMask eLockTypeMask) const;
-    // Returns TRUE if the folder has a descendent folder lock with the specified charateristics
+    // Returns true if the folder has a descendent folder lock with the specified charateristics
     bool hasLockedFolderDescendent(const LLUUID& idFolder, int eSourceTypeMask, ELockPermission ePermMask,
                                    ERlvLockMask eLockTypeMask, bool fCheckSelf) const;
-    // Returns TRUE if there is at least 1 non-removable wearable as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
+    // Returns true if there is at least 1 non-removable wearable as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
     bool hasLockedWearable() const;
-    // Returns TRUE if the attachment (specified by item UUID) is non-detachable as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
+    // Returns true if the attachment (specified by item UUID) is non-detachable as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
     bool isLockedAttachment(const LLUUID& idItem) const;
-    // Returns TRUE if the folder is locked as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
+    // Returns true if the folder is locked as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
     bool isLockedFolder(LLUUID idFolder, ERlvLockMask eLock, int eSourceTypeMask = ST_MASK_ANY, std::list<folderlock_source_t>* pLockSourceList = nullptr) const;
-    // Returns TRUE if the wearable (specified by item UUID) is non-removable as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
+    // Returns true if the wearable (specified by item UUID) is non-removable as a result of a RLV_LOCK_REMOVE folder PERM_DENY lock
     bool isLockedWearable(const LLUUID& idItem) const;
 
     // Removes an eLock type lock (held by idRlvObj) for the specified folder source (with ePerm and eScope lock options)
     void removeFolderLock(const folderlock_source_t& lockSource, ELockPermission ePerm, ELockScope eScope, const LLUUID& idRlvObj, ERlvLockMask eLockType);
 
 protected:
-    // Returns TRUE if the folder has an explicit folder lock entry with the specified charateristics
+    // Returns true if the folder has an explicit folder lock entry with the specified charateristics
     bool isLockedFolderEntry(const LLUUID& idFolder, int eSourceTypeMask, ELockPermission ePermMask, ERlvLockMask eLockTypeMask) const;
 
     /*

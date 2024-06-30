@@ -48,7 +48,7 @@ LLFlatListView::Params::Params()
     no_items_text("no_items_text")
 {};
 
-void LLFlatListView::reshape(S32 width, S32 height, BOOL called_from_parent /* = TRUE */)
+void LLFlatListView::reshape(S32 width, S32 height, bool called_from_parent /* = true */)
 {
     S32 delta = height - getRect().getHeight();
     LLScrollContainer::reshape(width, height, called_from_parent);
@@ -397,7 +397,7 @@ U32 LLFlatListView::size(const bool only_visible_items) const
     }
     else
     {
-        return mItemPairs.size();
+        return static_cast<U32>(mItemPairs.size());
     }
 }
 
@@ -535,7 +535,7 @@ void LLFlatListView::draw()
 }
 
 // virtual
-BOOL LLFlatListView::postBuild()
+bool LLFlatListView::postBuild()
 {
     setTabStop(true);
     return LLScrollContainer::postBuild();
@@ -570,7 +570,7 @@ void LLFlatListView::rearrangeItems()
     }
 
     // add paddings between items, excluding invisible ones
-    height += mItemPad * (mItemPairs.size() - invisible_children_count - 1);
+    height += mItemPad * (static_cast<S32>(mItemPairs.size()) - invisible_children_count - 1);
 
     LLRect rc = mItemsPanel->getRect();
     S32 width = mItemsNoScrollWidth;
@@ -617,7 +617,7 @@ void LLFlatListView::onItemMouseClick(item_pair_t* item_pair, MASK mask)
         return;
     }
 
-    setFocus(TRUE);
+    setFocus(true);
 
     bool select_item = !isSelected(item_pair);
 
@@ -721,10 +721,10 @@ void LLFlatListView::onItemRightMouseClick(item_pair_t* item_pair, MASK mask)
     onItemMouseClick(item_pair, mask);
 }
 
-BOOL LLFlatListView::handleKeyHere(KEY key, MASK mask)
+bool LLFlatListView::handleKeyHere(KEY key, MASK mask)
 {
-    BOOL reset_selection = (mask != MASK_SHIFT);
-    BOOL handled = FALSE;
+    bool reset_selection = (mask != MASK_SHIFT);
+    bool handled = false;
     switch (key)
     {
         case KEY_RETURN:
@@ -732,7 +732,7 @@ BOOL LLFlatListView::handleKeyHere(KEY key, MASK mask)
             if (mSelectedItemPairs.size() && mask == MASK_NONE)
             {
                 mOnReturnSignal(this, getValue());
-                handled = TRUE;
+                handled = true;
             }
             break;
         }
@@ -760,7 +760,7 @@ BOOL LLFlatListView::handleKeyHere(KEY key, MASK mask)
         {
             if (mask == MASK_NONE)
             {
-                setFocus(FALSE); // pass focus to the game area (EXT-8357)
+                setFocus(false); // pass focus to the game area (EXT-8357)
             }
             break;
         }
@@ -786,7 +786,7 @@ BOOL LLFlatListView::handleKeyHere(KEY key, MASK mask)
         localRectToScreen(selected_rc, &screen_rc);
         notifyParent(LLSD().with("scrollToShowRect",screen_rc.getValue()));*/
 
-        handled = TRUE;
+        handled = true;
     }
 
     return handled ? handled : LLScrollContainer::handleKeyHere(key, mask);
@@ -1047,7 +1047,7 @@ bool LLFlatListView::selectNextItemPair(bool is_up_direction, bool reset_selecti
     return false;
 }
 
-BOOL LLFlatListView::canSelectAll() const
+bool LLFlatListView::canSelectAll() const
 {
     return 0 != size() && mAllowSelection && mMultipleSelection;
 }
@@ -1205,14 +1205,14 @@ void LLFlatListView::onFocusReceived()
 {
     if (size())
     {
-        mSelectedItemsBorder->setVisible(TRUE);
+        mSelectedItemsBorder->setVisible(true);
     }
     gEditMenuHandler = this;
 }
 // virtual
 void LLFlatListView::onFocusLost()
 {
-    mSelectedItemsBorder->setVisible(FALSE);
+    mSelectedItemsBorder->setVisible(false);
     // Route menu back to the default
     if (gEditMenuHandler == this)
     {
@@ -1383,7 +1383,7 @@ bool LLFlatListViewEx::updateItemVisibility(LLPanel* item, const LLSD &action)
     if (!item)
         return false;
 
-    BOOL visible = TRUE;
+    bool visible = true;
 
     // 0 signifies that filter is matched,
     // i.e. we don't hide items that don't support 'match_filter' action, separators etc.
@@ -1397,7 +1397,7 @@ bool LLFlatListViewEx::updateItemVisibility(LLPanel* item, const LLSD &action)
         if (!mForceShowingUnmatchedItems)
         {
             selectItem(item, false);
-            visible = FALSE;
+            visible = false;
         }
     }
 

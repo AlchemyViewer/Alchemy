@@ -60,7 +60,7 @@ ALFloaterRegionTracker::~ALFloaterRegionTracker()
     saveToFile();
 }
 
-BOOL ALFloaterRegionTracker::postBuild()
+bool ALFloaterRegionTracker::postBuild()
 {
     mRefreshRegionListBtn = getChild<LLButton>("refresh");
     mRefreshRegionListBtn->setClickedCallback(boost::bind(&ALFloaterRegionTracker::refresh, this));
@@ -72,7 +72,7 @@ BOOL ALFloaterRegionTracker::postBuild()
     mOpenMapBtn->setClickedCallback(boost::bind(&ALFloaterRegionTracker::openMap, this));
 
     mRegionScrollList = getChild<LLScrollListCtrl>("region_list");
-    mRegionScrollList->setCommitOnSelectionChange(TRUE);
+    mRegionScrollList->setCommitOnSelectionChange(true);
     mRegionScrollList->setCommitCallback(boost::bind(&ALFloaterRegionTracker::updateHeader, this));
     mRegionScrollList->setDoubleClickCallback(boost::bind(&ALFloaterRegionTracker::openMap, this));
 
@@ -174,10 +174,10 @@ void ALFloaterRegionTracker::refresh()
     mRegionScrollList->setScrollPos(saved_scroll_pos);
 }
 
-BOOL ALFloaterRegionTracker::tick()
+bool ALFloaterRegionTracker::tick()
 {
     refresh();
-    return FALSE;
+    return false;
 }
 
 void ALFloaterRegionTracker::requestRegionData()

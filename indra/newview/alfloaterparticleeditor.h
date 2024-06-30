@@ -43,8 +43,8 @@ public:
     ALFloaterParticleEditor(const LLSD& key);
     ~ALFloaterParticleEditor();
 
-    BOOL postBuild() override;
-    BOOL canClose() override;
+    bool postBuild() override;
+    bool canClose() override;
 
     void setObject(LLViewerObject* objectp);
 

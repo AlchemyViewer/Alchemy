@@ -51,7 +51,7 @@ public:
     LLFloaterSidePanelContainer(const LLSD& key, const Params& params = getDefaultParams());
     ~LLFloaterSidePanelContainer();
 
-    /*virtual*/ BOOL postBuild();
+    /*virtual*/ bool postBuild();
 
     /*virtual*/ void onOpen(const LLSD& key);
 

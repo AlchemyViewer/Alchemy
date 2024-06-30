@@ -49,14 +49,15 @@ DWORD GetDllVersion(LPCTSTR lpszDllName);
 namespace
 { // anonymous
     enum class prst { INIT, OPEN, SKIP };
-    prst state = prst::INIT;
+    prst state{ prst::INIT };
+
     // This is called so early that we can't count on static objects being
     // properly constructed yet, so declare a pointer instead of an instance.
     llofstream* prelogf = nullptr;
 
     void prelog(const std::string& message)
     {
-        boost::optional<std::string> prelog_name;
+        std::optional<std::string> prelog_name;
 
         switch (state)
         {
@@ -77,6 +78,7 @@ namespace
             (*prelogf) << "========================================================================"
                        << std::endl;
             // fall through, don't break
+            [[fallthrough]];
 
         case prst::OPEN:
             (*prelogf) << message << std::endl;
@@ -232,7 +234,7 @@ LLDir_Win32::LLDir_Win32()
     {
         w_str[size] = '\0';
         mExecutablePathAndName = ll_convert_wide_to_string(w_str);
-        std::string::size_type path_end = mExecutablePathAndName.find_last_of('\\');
+        auto path_end = mExecutablePathAndName.find_last_of('\\');
         if (path_end != std::string::npos)
         {
             mExecutableDir = mExecutablePathAndName.substr(0, path_end);

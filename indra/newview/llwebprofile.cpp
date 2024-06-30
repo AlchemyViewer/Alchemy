@@ -73,9 +73,7 @@ void LLWebProfile::uploadImage(LLPointer<LLImageFormatted> image, const std::str
 // static
 void LLWebProfile::setAuthCookie(const std::string& cookie)
 {
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Snapshots") << "Setting auth cookie: " << cookie << LL_ENDL;
-#endif
     sAuthCookie = cookie;
 }
 
@@ -121,9 +119,7 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
     configUrl += "?caption=" + LLURI::escape(caption);
     configUrl += "&add_loc=" + std::string(addLocation ? "1" : "0");
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Snapshots") << "Requesting " << configUrl << LL_ENDL;
-#endif
 
     httpHeaders = buildDefaultHeaders();
     httpHeaders->append(HTTP_OUT_HEADER_COOKIE, getAuthCookie());
@@ -180,9 +176,7 @@ void LLWebProfile::uploadImageCoro(LLPointer<LLImageFormatted> image, std::strin
         LLWebProfile::reportImageUploadStatus(false);
     }
 
-#ifdef SHOW_DEBUG
     LL_DEBUGS("Snapshots") << "Got redirection URL: " << redirUrl << LL_ENDL;
-#endif
 
     result = httpAdapter->getRawAndSuspend(httpRequest, redirUrl, httpOpts, httpHeaders);
 
@@ -244,10 +238,12 @@ LLCore::BufferArray::ptr_t LLWebProfile::buildPostData(const LLSD &data, LLPoint
         << "Content-Disposition: form-data; name=\"file\"; filename=\"snapshot.png\"\r\n"
         << "Content-Type: image/png\r\n\r\n";
 
+    LLImageDataSharedLock lock(image);
+
     // Insert the image data.
     //char *datap = (char *)(image->getData());
     //bas.write(datap, image->getDataSize());
-    U8* image_data = image->getData();
+    const U8* image_data = image->getData();
     for (S32 i = 0; i < image->getDataSize(); ++i)
     {
         bas << image_data[i];

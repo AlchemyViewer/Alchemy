@@ -71,13 +71,13 @@ public:
     void draw() override;
 
 protected:
-    BOOL postBuild() override;
+    bool postBuild() override;
     void updateGlobalNetList(bool starting = false);
     static LLNetListItem* findNetListItem(LLHost host);
     static LLNetListItem* findNetListItem(LLUUID id);
 
     void refreshNetList();
-    void refreshNetInfo(BOOL force);
+    void refreshNetInfo(bool force);
 
     //the textbox(es) in the lower half of the floater can
     //display two types of information, information about
@@ -105,7 +105,7 @@ protected:
     void onClickSendToMessageBuilder();
     void onCheckWrapNetInfo(const LLSD& value);
     void onCheckBeautifyMessages(const LLSD& value);
-    static BOOL onClickCloseCircuit(void* user_data);
+    static bool onClickCloseCircuit(void* user_data);
     static void onConfirmCloseCircuit(const LLSD& notification, const LLSD& response);
     static void onConfirmRemoveRegion(const LLSD& notification, const LLSD& response);
 
@@ -115,7 +115,7 @@ private:
     LLTextBase* mStatusText;
 
 public:
-    void startApplyingFilter(const std::string& filter, BOOL force);
+    void startApplyingFilter(const std::string& filter, bool force);
 
 protected:
     void stopApplyingFilter(bool quitting = false);
@@ -140,7 +140,7 @@ public:
 protected:
     HTTPConvoMap mIncompleteHTTPConvos;
 
-    U32 mMessagesLogged;
+    size_t mMessagesLogged;
 
     LLEasyMessageReader* mEasyMessageReader;
 
@@ -156,7 +156,7 @@ protected:
         ~LLMessageLogNetMan() = default;
 
     private:
-        BOOL tick() override;
+        bool tick() override;
         LLFloaterMessageLog* mParent;
     };
 

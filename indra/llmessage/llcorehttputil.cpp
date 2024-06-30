@@ -36,6 +36,7 @@
 #include "llsd.h"
 #include "llsdjson.h"
 #include "llsdserialize.h"
+#include "boost/json.hpp" // Boost.Json
 #include "llfilesystem.h"
 
 #include "message.h" // for getting the port

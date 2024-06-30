@@ -62,43 +62,43 @@ public:
     /*virtual*/ void show() override;
     /*virtual*/ void hide() override;
     /*virtual*/ void close() override;
-    /*virtual*/ BOOL getVisible() override;
-    /*virtual*/ BOOL getMinimized() override;
-    /*virtual*/ BOOL getMaximized() override;
-    /*virtual*/ BOOL maximize() override;
+    /*virtual*/ bool getVisible() override;
+    /*virtual*/ bool getMinimized() override;
+    /*virtual*/ bool getMaximized() override;
+    /*virtual*/ bool maximize() override;
     /*virtual*/ void minimize() override;
     /*virtual*/ void restore() override;
-    BOOL getFullscreen();
-    /*virtual*/ BOOL getPosition(LLCoordScreen *position) override;
-    /*virtual*/ BOOL getSize(LLCoordScreen *size) override;
-    /*virtual*/ BOOL getSize(LLCoordWindow *size) override;
-    /*virtual*/ BOOL setPosition(LLCoordScreen position) override;
-    /*virtual*/ BOOL setSizeImpl(LLCoordScreen size) override;
-    /*virtual*/ BOOL setSizeImpl(LLCoordWindow size) override;
-    /*virtual*/ BOOL switchContext(BOOL fullscreen, const LLCoordScreen &size, BOOL enable_vsync, const LLCoordScreen * const posp = NULL) override;
-    /*virtual*/ BOOL setCursorPosition(LLCoordWindow position) override;
-    /*virtual*/ BOOL getCursorPosition(LLCoordWindow *position) override;
+    bool getFullscreen();
+    /*virtual*/ bool getPosition(LLCoordScreen *position) override;
+    /*virtual*/ bool getSize(LLCoordScreen *size) override;
+    /*virtual*/ bool getSize(LLCoordWindow *size) override;
+    /*virtual*/ bool setPosition(LLCoordScreen position) override;
+    /*virtual*/ bool setSizeImpl(LLCoordScreen size) override;
+    /*virtual*/ bool setSizeImpl(LLCoordWindow size) override;
+    /*virtual*/ bool switchContext(bool fullscreen, const LLCoordScreen &size, bool enable_vsync, const LLCoordScreen * const posp = NULL) override;
+    /*virtual*/ bool setCursorPosition(LLCoordWindow position) override;
+    /*virtual*/ bool getCursorPosition(LLCoordWindow *position) override;
 #if LL_WINDOWS
-    /*virtual*/ BOOL getCursorDelta(LLCoordCommon* delta) override { return FALSE; }
+    /*virtual*/ bool getCursorDelta(LLCoordCommon* delta) override { return FALSE; }
 #endif
     /*virtual*/ void showCursor() override;
     /*virtual*/ void hideCursor() override;
     /*virtual*/ void showCursorFromMouseMove() override;
     /*virtual*/ void hideCursorUntilMouseMove() override;
-    /*virtual*/ BOOL isCursorHidden() override;
+    /*virtual*/ bool isCursorHidden() override;
     /*virtual*/ void updateCursor() override;
     /*virtual*/ void captureMouse() override;
     /*virtual*/ void releaseMouse() override;
-    /*virtual*/ void setMouseClipping( BOOL b ) override;
+    /*virtual*/ void setMouseClipping( bool b ) override;
     /*virtual*/ void setMinSize(U32 min_width, U32 min_height, bool enforce_immediately = true) override;
 
-    /*virtual*/ BOOL isClipboardTextAvailable() override;
-    /*virtual*/ BOOL pasteTextFromClipboard(LLWString &dst) override;
-    /*virtual*/ BOOL copyTextToClipboard(const LLWString & src) override;
+    /*virtual*/ bool isClipboardTextAvailable() override;
+    /*virtual*/ bool pasteTextFromClipboard(LLWString &dst) override;
+    /*virtual*/ bool copyTextToClipboard(const LLWString & src) override;
 
-    /*virtual*/ BOOL isPrimaryTextAvailable() override;
-    /*virtual*/ BOOL pasteTextFromPrimary(LLWString &dst) override;
-    /*virtual*/ BOOL copyTextToPrimary(const LLWString & src) override;
+    /*virtual*/ bool isPrimaryTextAvailable() override;
+    /*virtual*/ bool pasteTextFromPrimary(LLWString &dst) override;
+    /*virtual*/ bool copyTextToPrimary(const LLWString & src) override;
     /*virtual*/ void setTitle(const std::string title) override;
     void* createSharedContext() override;
     void makeContextCurrent(void* context) override;
@@ -106,10 +106,10 @@ public:
     /*virtual*/ void toggleVSync(bool enable_vsync) override;
     /*virtual*/ void flashIcon(F32 seconds) override;
     /*virtual*/ F32 getGamma() override;
-    /*virtual*/ BOOL setGamma(const F32 gamma) override; // Set the gamma
+    /*virtual*/ bool setGamma(const F32 gamma) override; // Set the gamma
     /*virtual*/ U32 getFSAASamples() override;
     /*virtual*/ void setFSAASamples(const U32 samples) override;
-    /*virtual*/ BOOL restoreGamma() override;           // Restore original gamma table (before updating gamma)
+    /*virtual*/ bool restoreGamma() override;           // Restore original gamma table (before updating gamma)
     /*virtual*/ ESwapMethod getSwapMethod() override { return mSwapMethod; }
     /*virtual*/ void processMiscNativeEvents() override;
     /*virtual*/ void gatherInput() override;
@@ -118,12 +118,12 @@ public:
     /*virtual*/ void delayInputProcessing() override { };
 
     // handy coordinate space conversion routines
-    /*virtual*/ BOOL convertCoords(LLCoordScreen from, LLCoordWindow *to) override;
-    /*virtual*/ BOOL convertCoords(LLCoordWindow from, LLCoordScreen *to) override;
-    /*virtual*/ BOOL convertCoords(LLCoordWindow from, LLCoordGL *to) override;
-    /*virtual*/ BOOL convertCoords(LLCoordGL from, LLCoordWindow *to) override;
-    /*virtual*/ BOOL convertCoords(LLCoordScreen from, LLCoordGL *to) override;
-    /*virtual*/ BOOL convertCoords(LLCoordGL from, LLCoordScreen *to) override;
+    /*virtual*/ bool convertCoords(LLCoordScreen from, LLCoordWindow *to) override;
+    /*virtual*/ bool convertCoords(LLCoordWindow from, LLCoordScreen *to) override;
+    /*virtual*/ bool convertCoords(LLCoordWindow from, LLCoordGL *to) override;
+    /*virtual*/ bool convertCoords(LLCoordGL from, LLCoordWindow *to) override;
+    /*virtual*/ bool convertCoords(LLCoordScreen from, LLCoordGL *to) override;
+    /*virtual*/ bool convertCoords(LLCoordGL from, LLCoordScreen *to) override;
 
     /*virtual*/ LLWindowResolution* getSupportedResolutions(S32 &num_resolutions) override;
     /*virtual*/ F32 getNativeAspectRatio() override;
@@ -133,14 +133,14 @@ public:
     /*virtual*/ void beforeDialog() override;
     /*virtual*/ void afterDialog() override;
 
-    /*virtual*/ BOOL dialogColorPicker(F32 *r, F32 *g, F32 *b) override;
+    /*virtual*/ bool dialogColorPicker(F32 *r, F32 *g, F32 *b) override;
 
     /*virtual*/ void *getPlatformWindow() override;
     /*virtual*/ void bringToFront() override;
 
     U32 getAvailableVRAMMegabytes() override;
 
-    void allowLanguageTextInput(LLPreeditor *preeditor, BOOL b) override;
+    void allowLanguageTextInput(LLPreeditor *preeditor, bool b) override;
     void updateLanguageTextInputArea() override;
     void setLanguageTextInput( const LLCoordGL & pos ) override;
 
@@ -163,23 +163,23 @@ public:
 protected:
     LLWindowSDL(LLWindowCallbacks* callbacks,
         const std::string& title, const std::string& name, int x, int y, int width, int height, U32 flags,
-        BOOL fullscreen, BOOL clearBg, BOOL disable_vsync, BOOL use_gl,
-        BOOL ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, U32 max_vram, F32 max_gl_version);
+        bool fullscreen, bool clearBg, bool disable_vsync, bool use_gl,
+        bool ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, U32 max_vram, F32 max_gl_version);
     ~LLWindowSDL();
 
-    /*virtual*/ BOOL    isValid() override;
+    /*virtual*/ bool    isValid() override;
     /*virtual*/ LLSD    getNativeKeyData() override;
 
     void    initCursors();
     void    quitCursors();
 
     // Changes display resolution. Returns true if successful
-    BOOL    setDisplayResolution(S32 width, S32 height, S32 bits, S32 refresh);
+    bool    setDisplayResolution(S32 width, S32 height, S32 bits, S32 refresh);
 
     // Go back to last fullscreen display resolution.
-    BOOL    setFullscreenResolution();
+    bool    setFullscreenResolution();
 
-    BOOL    shouldPostQuit() { return mPostQuit; }
+    bool    shouldPostQuit() { return mPostQuit; }
 
 protected:
     //
@@ -187,11 +187,11 @@ protected:
     //
 
     // create or re-create the GL context/window.  Called from the constructor and switchContext().
-    BOOL createContext(int x, int y, int width, int height, int bits, BOOL fullscreen, BOOL disable_vsync);
+    bool createContext(int x, int y, int width, int height, int bits, bool fullscreen, bool disable_vsync);
     void destroyContext();
     void setupFailure(const std::string& text, const std::string& caption, U32 type);
-    U32 SDLCheckGrabbyKeys(SDL_Keycode keysym, BOOL gain);
-    BOOL SDLReallyCaptureInput(BOOL capture);
+    U32 SDLCheckGrabbyKeys(SDL_Keycode keysym, bool gain);
+    bool SDLReallyCaptureInput(bool capture);
 
     void setIcon();
 
@@ -205,7 +205,7 @@ protected:
     std::string     mWindowName;
     std::string     mWindowTitle;
     double          mOriginalAspectRatio;
-    BOOL            mNeedsResize;       // Constructor figured out the window is too big, it needs a resize.
+    bool        mNeedsResize;       // Constructor figured out the window is too big, it needs a resize.
     LLCoordScreen   mNeedsResizeSize;
     F32             mOverrideAspectRatio;
     F32             mGamma;
@@ -222,7 +222,7 @@ protected:
 #endif
 
 private:
-    BOOL mFlashing;
+    bool mFlashing;
     LLTimer mFlashTimer;
 
     U32 mKeyScanCode;

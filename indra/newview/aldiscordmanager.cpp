@@ -60,7 +60,7 @@ ALDiscordManager::ALDiscordManager()
             }
         });
 
-    if (gSavedPerAccountSettings.getBool("ALDiscordIntegration"))
+    if (gSavedPerAccountSettings.getBOOL("ALDiscordIntegration"))
     {
         init();
     }

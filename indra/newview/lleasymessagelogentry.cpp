@@ -75,7 +75,7 @@ LLEasyMessageLogEntry::LLEasyMessageLogEntry(LogPayload entry, LLEasyMessageRead
     }
 }
 
-BOOL LLEasyMessageLogEntry::isOutgoing() const
+bool LLEasyMessageLogEntry::isOutgoing() const
 {
     static const U32 LOCALHOST_ADDR = 16777343;
     return mEntry->mFromHost == LLHost(LOCALHOST_ADDR, gMessageSystem->getListenPort());
@@ -105,7 +105,7 @@ void LLEasyMessageLogEntry::setResponseMessage(LogPayload entry)
     mResponseMsg.reset(new LLEasyMessageLogEntry(entry));
 }
 
-std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) const
+std::string LLEasyMessageLogEntry::getFull(bool beautify, bool show_header) const
 {
     std::ostringstream full;
     switch (mEntry->mType)
@@ -140,7 +140,7 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
                     for (auto *variable : block->mMemberVariables)
                     {
                         const char* var_name = variable->getName();
-                        BOOL returned_hex;
+                        bool returned_hex;
                         std::string value = mEasyMessageReader->var2Str(block_name, block_num, variable, returned_hex);
                         if (returned_hex) {
                             full << llformat("    %s =| ", var_name);
@@ -267,7 +267,7 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
     return full.str();
 }
 
-std::string LLEasyMessageLogEntry::getResponseFull(BOOL beautify, BOOL show_header) const
+std::string LLEasyMessageLogEntry::getResponseFull(bool beautify, bool show_header) const
 {
     return mResponseMsg.get() ? mResponseMsg->getFull(beautify, show_header) : LLStringUtil::null;
 }

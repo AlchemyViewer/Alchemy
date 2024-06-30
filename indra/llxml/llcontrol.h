@@ -129,7 +129,7 @@ public:
     LLSD getSaveValue() const;
 
     void set(const LLSD& val)   { setValue(val); }
-    void setValue(const LLSD& value, bool saved_value = TRUE);
+    void setValue(const LLSD& value, bool saved_value = true);
     void setDefaultValue(const LLSD& value);
     void setPersist(ePersist);
     void setHiddenFromSettingsEditor(bool hide);
@@ -194,11 +194,11 @@ public:
     };
     void applyToAll(ApplyFunctor* func);
 
-    LLControlVariable* declareControl(const std::string& name, eControlType type, const LLSD initial_val, const std::string& comment, LLControlVariable::ePersist persist, BOOL hidefromsettingseditor = FALSE);
+    LLControlVariable* declareControl(const std::string& name, eControlType type, const LLSD initial_val, const std::string& comment, LLControlVariable::ePersist persist, bool hidefromsettingseditor = false);
     LLControlVariable* declareU32(const std::string& name, U32 initial_val, const std::string& comment, LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT);
     LLControlVariable* declareS32(const std::string& name, S32 initial_val, const std::string& comment, LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT);
     LLControlVariable* declareF32(const std::string& name, F32 initial_val, const std::string& comment, LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT);
-    LLControlVariable* declareBOOL(const std::string& name, BOOL initial_val, const std::string& comment, LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT);
+    LLControlVariable* declareBOOL(const std::string& name, bool initial_val, const std::string& comment, LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT);
     LLControlVariable* declareString(const std::string& name, const std::string &initial_val, const std::string& comment, LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT);
     LLControlVariable* declareVec3(const std::string& name, const LLVector3 &initial_val,const std::string& comment,  LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT);
     LLControlVariable* declareVec3d(const std::string& name, const LLVector3d &initial_val, const std::string& comment, LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT);
@@ -212,8 +212,7 @@ public:
 
     std::string getString(std::string_view  name);
     std::string getText(std::string_view  name);
-    BOOL        getBOOL(std::string_view  name);
-    bool        getBool(std::string_view  name);
+    bool        getBOOL(std::string_view name);
     S32         getS32(std::string_view  name);
     F32         getF32(std::string_view  name);
     U32         getU32(std::string_view  name);
@@ -255,7 +254,7 @@ public:
         return convert_from_llsd<T>(value, type, name);
     }
 
-    void    setBOOL(std::string_view name, BOOL val);
+    void    setBOOL(std::string_view name, bool val);
     void    setS32(std::string_view name, S32 val);
     void    setF32(std::string_view name, F32 val);
     void    setU32(std::string_view name, U32 val);
@@ -287,13 +286,13 @@ public:
         }
     }
 
-    BOOL    controlExists(std::string_view  name);
+    bool    controlExists(std::string_view  name);
 
     // Returns number of controls loaded, 0 if failed
     // If require_declaration is false, will auto-declare controls it finds
     // as the given type.
-    U32 loadFromFileLegacy(const std::string& filename, BOOL require_declaration = TRUE, eControlType declare_as = TYPE_STRING);
-    U32 saveToFile(const std::string& filename, BOOL nondefault_only);
+    U32 loadFromFileLegacy(const std::string& filename, bool require_declaration = true, eControlType declare_as = TYPE_STRING);
+    U32 saveToFile(const std::string& filename, bool nondefault_only);
     U32 loadFromFile(const std::string& filename, bool default_values = false, bool save_values = true);
     void    resetToDefaults();
     void    incrCount(std::string_view name);
@@ -425,8 +424,6 @@ template <> eControlType get_control_type<U32>();
 template <> eControlType get_control_type<S32>();
 template <> eControlType get_control_type<F32>();
 template <> eControlType get_control_type<bool>();
-// Yay BOOL, its really an S32.
-//template <> eControlType get_control_type<BOOL> ()
 template <> eControlType get_control_type<std::string>();
 template <> eControlType get_control_type<LLVector3>();
 template <> eControlType get_control_type<LLVector3d>();

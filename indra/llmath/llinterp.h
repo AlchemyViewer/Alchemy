@@ -34,7 +34,6 @@ class LLInterpVal
 {
 public:
     virtual ~LLInterpVal() = default;
-    virtual void interp(LLInterpVal &target, const F32 frac); // Linear interpolation for each type
 };
 
 template <typename Type>
@@ -45,7 +44,7 @@ public:
     virtual ~LLInterp() = default;
 
     virtual void start();
-    void update(const F32 time);
+    virtual void update(const F32 time) = 0;
     const Type &getCurVal() const;
 
     void setStartVal(const Type &start_val);
@@ -60,15 +59,15 @@ public:
     void setEndTime(const F32 time);
     F32 getEndTime() const;
 
-    BOOL isActive() const;
-    BOOL isDone() const;
+    bool isActive() const;
+    bool isDone() const;
 
 protected:
     F32 mStartTime;
     F32 mEndTime;
     F32 mDuration;
-    BOOL mActive;
-    BOOL mDone;
+    bool mActive;
+    bool mDone;
 
     Type mStartVal;
     Type mEndVal;
@@ -81,8 +80,8 @@ template <typename Type>
 class LLInterpLinear : public LLInterp<Type>
 {
 public:
-    /*virtual*/ void start();
-    void update(const F32 time);
+    void start() override;
+    void update(const F32 time) override;
     F32 getCurFrac() const;
 protected:
     F32 mCurFrac;
@@ -101,10 +100,10 @@ class LLInterpAttractor : public LLInterp<Type>
 {
 public:
     LLInterpAttractor();
-    /*virtual*/ void start();
+    void start() override;
     void setStartVel(const Type &vel);
     void setForce(const F32 force);
-    void update(const F32 time);
+    void update(const F32 time) override;
 protected:
     F32 mForce;
     Type mStartVel;
@@ -116,7 +115,7 @@ class LLInterpFunc : public LLInterp<Type>
 {
 public:
     LLInterpFunc();
-    void update(const F32 time);
+    void update(const F32 time) override;
 
     void setFunc(Type (*)(const F32, void *data), void *data);
 protected:
@@ -144,8 +143,8 @@ LLInterp<Type>::LLInterp()
     mEndTime = 1.f;
     mDuration = 1.f;
     mCurTime = 0.f;
-    mDone = FALSE;
-    mActive = FALSE;
+    mDone = false;
+    mActive = false;
 }
 
 template <class Type>
@@ -159,8 +158,8 @@ void LLInterp<Type>::start()
 {
     mCurVal = mStartVal;
     mCurTime = mStartTime;
-    mDone = FALSE;
-    mActive = FALSE;
+    mDone = false;
+    mActive = false;
 }
 
 template <class Type>
@@ -218,13 +217,13 @@ F32 LLInterp<Type>::getEndTime() const
 
 
 template <class Type>
-BOOL LLInterp<Type>::isDone() const
+bool LLInterp<Type>::isDone() const
 {
     return mDone;
 }
 
 template <class Type>
-BOOL LLInterp<Type>::isActive() const
+bool LLInterp<Type>::isActive() const
 {
     return mActive;
 }
@@ -247,7 +246,7 @@ void LLInterpLinear<Type>::update(const F32 time)
     F32 dfrac = target_frac - this->mCurFrac;
     if (target_frac >= 0.f)
     {
-        this->mActive = TRUE;
+        this->mActive = true;
     }
 
     if (target_frac > 1.f)
@@ -255,7 +254,7 @@ void LLInterpLinear<Type>::update(const F32 time)
         this->mCurVal = this->mEndVal;
         this->mCurFrac = 1.f;
         this->mCurTime = time;
-        this->mDone = TRUE;
+        this->mDone = true;
         return;
     }
 
@@ -325,7 +324,7 @@ void LLInterpAttractor<Type>::update(const F32 time)
 {
     if (time > this->mStartTime)
     {
-        this->mActive = TRUE;
+        this->mActive = true;
     }
     else
     {
@@ -333,7 +332,7 @@ void LLInterpAttractor<Type>::update(const F32 time)
     }
     if (time > this->mEndTime)
     {
-        this->mDone = TRUE;
+        this->mDone = true;
         return;
     }
 
@@ -355,8 +354,8 @@ void LLInterpAttractor<Type>::update(const F32 time)
 template <class Type>
 LLInterpFunc<Type>::LLInterpFunc() : LLInterp<Type>()
 {
-    mFunc = NULL;
-    mData = NULL;
+    mFunc = nullptr;
+    mData = nullptr;
 }
 
 template <class Type>
@@ -371,7 +370,7 @@ void LLInterpFunc<Type>::update(const F32 time)
 {
     if (time > this->mStartTime)
     {
-        this->mActive = TRUE;
+        this->mActive = true;
     }
     else
     {
@@ -379,7 +378,7 @@ void LLInterpFunc<Type>::update(const F32 time)
     }
     if (time > this->mEndTime)
     {
-        this->mDone = TRUE;
+        this->mDone = true;
         return;
     }
 
@@ -398,7 +397,7 @@ void LLInterpExp<Type>::update(const F32 time)
     F32 target_frac = (time - this->mStartTime) / this->mDuration;
     if (target_frac >= 0.f)
     {
-        this->mActive = TRUE;
+        this->mActive = true;
     }
 
     if (target_frac > 1.f)
@@ -406,7 +405,7 @@ void LLInterpExp<Type>::update(const F32 time)
         this->mCurVal = this->mEndVal;
         this->mCurFrac = 1.f;
         this->mCurTime = time;
-        this->mDone = TRUE;
+        this->mDone = true;
         return;
     }
 

@@ -66,13 +66,13 @@ public:
             void    updateLabel() override;
 // [/SL:KB]
 
-    void setToggleState(BOOL state);
+    void setToggleState(bool state);
 
     void onActionButtonClick(const LLSD& data);
 
 protected:
     LLButton*               mActionButton;
-    BOOL                    mToggleState;
+    bool                    mToggleState;
 };
 
 #endif // LL_LLFLYOUTBUTTON_H

@@ -33,7 +33,7 @@ class LLFloaterNewLocalInventory
 {
 public:
     LLFloaterNewLocalInventory(const LLSD& key);
-    BOOL postBuild() override;
+    bool postBuild() override;
 
     void onClickOK();
     static LLUUID sLastCreatorId;

@@ -38,7 +38,7 @@ class LLFloaterClearCache final : public LLModalDialog
 public:
     LLFloaterClearCache(const LLSD &key);
 
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onOpen(const LLSD& key) override;
 
     void onBtnClearSelected();

@@ -61,7 +61,7 @@ public:
     std::string    mPattern;
     bool           mCaseSensitive;
     LLColor4       mColor;
-    bool           mColorReadOnly;     // If TRUE, the highlight color will also be set as the read-only text color
+    bool           mColorReadOnly;     // If true, the highlight color will also be set as the read-only text color
     EHighlightType mHighlightType;
     // Other actions
     LLUUID         mSoundAsset;        // Asset UUID of the sound
@@ -81,7 +81,7 @@ public:
     void                    addHighlight(const LLHighlightEntry& entry);
     LLHighlightEntry*       getHighlightById(const LLUUID& idEntry);
     const LLHighlightEntry* getHighlightById(const LLUUID& idEntry) const;
-    S32                     getHighlightCount() const { return mHighlightEntries.size(); }
+    size_t                  getHighlightCount() const { return mHighlightEntries.size(); }
     const highlight_list_t& getHighlights() const;
     void                    removeHighlight(const LLUUID& idEntry);
 

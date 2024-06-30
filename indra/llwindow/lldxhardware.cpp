@@ -319,7 +319,7 @@ std::string get_string(IDxDiagContainer *containerp, const WCHAR *wszPropName)
 
 LLVersion::LLVersion()
 {
-    mValid = FALSE;
+    mValid = false;
     S32 i;
     for (i = 0; i < 4; i++)
     {
@@ -327,7 +327,7 @@ LLVersion::LLVersion()
     }
 }
 
-BOOL LLVersion::set(const std::string &version_string)
+bool LLVersion::set(const std::string &version_string)
 {
     S32 i;
     for (i = 0; i < 4; i++)
@@ -353,11 +353,11 @@ BOOL LLVersion::set(const std::string &version_string)
         {
             mFields[i] = 0;
         }
-        mValid = FALSE;
+        mValid = false;
     }
     else
     {
-        mValid = TRUE;
+        mValid = true;
     }
     return mValid;
 }
@@ -460,16 +460,16 @@ void LLDXHardware::cleanup()
 {
 }
 
-BOOL LLDXHardware::updateVRAM()
+bool LLDXHardware::updateVRAM()
 {
     U64 vram = getMBVideoMemoryViaDXGI();
 
     if (vram > 0)
     {
         mVRAM = vram / (1024 * 1024);
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 U64 LLDXHardware::getMBVideoMemoryViaDXGI()

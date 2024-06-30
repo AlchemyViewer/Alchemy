@@ -44,7 +44,7 @@ public:
 
     LLTexGlobalColorInfo*   getInfo() const { return mInfo; }
     //   This sets mInfo and calls initialization functions
-    BOOL                    setInfo(LLTexGlobalColorInfo *info);
+    bool                    setInfo(LLTexGlobalColorInfo *info);
 
     LLAvatarAppearance*     getAvatarAppearance()   const       { return mAvatarAppearance; }
     LLColor4                getColor() const;
@@ -64,7 +64,7 @@ public:
     LLTexGlobalColorInfo() = default;
     ~LLTexGlobalColorInfo();
 
-    BOOL parseXml(LLXmlTreeNode* node);
+    bool parseXml(LLXmlTreeNode* node);
 
 private:
     param_color_info_list_t     mParamColorInfoList;

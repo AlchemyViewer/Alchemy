@@ -37,7 +37,7 @@
 ////////////////////////////////
 LLNetListItem::LLNetListItem(LLUUID id)
 :   mID(id),
-    mAutoName(TRUE),
+    mAutoName(true),
     mName("No name"),
     mPreviousRegionName(""),
     mHandle(0),
@@ -71,10 +71,10 @@ void LLFloaterMessageBuilder::onOpen(const LLSD& key)
         getChild<LLTextBase>("message_edit")->setText(mInitialText);
     }
 }
-BOOL LLFloaterMessageBuilder::tick()
+bool LLFloaterMessageBuilder::tick()
 {
     refreshNetList();
-    return FALSE;
+    return false;
 }
 LLNetListItem* LLFloaterMessageBuilder::findNetListItem(LLHost host)
 {
@@ -194,7 +194,7 @@ void LLFloaterMessageBuilder::refreshNetList()
         scrollp->setScrollPos(scroll_pos);
 }
 
-BOOL LLFloaterMessageBuilder::postBuild()
+bool LLFloaterMessageBuilder::postBuild()
 {
     string_vec_t untrusted_names;
     string_vec_t trusted_names;
@@ -223,7 +223,7 @@ BOOL LLFloaterMessageBuilder::postBuild()
     getChild<LLTextBase>("message_edit")->setText(mInitialText);
     getChild<LLUICtrl>("send_btn")->setCommitCallback(boost::bind(&LLFloaterMessageBuilder::onClickSend, this));
 
-    return TRUE;
+    return LLFloater::postBuild();
 }
 
 void LLFloaterMessageBuilder::onCommitPacketCombo(LLUICtrl* ctrl)
@@ -380,17 +380,17 @@ void LLFloaterMessageBuilder::onClickSend()
     mMessageSender.sendMessage(end_point, getChild<LLTextBase>("message_edit")->getText());
 }
 
-BOOL LLFloaterMessageBuilder::handleKeyHere(KEY key, MASK mask)
+bool LLFloaterMessageBuilder::handleKeyHere(KEY key, MASK mask)
 {
     if(key == KEY_RETURN && (mask & MASK_CONTROL))
     {
         onClickSend();
-        return TRUE;
+        return true;
     }
     if(key == KEY_ESCAPE)
     {
         releaseFocus();
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }

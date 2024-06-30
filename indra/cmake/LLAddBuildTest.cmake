@@ -18,9 +18,6 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
   #
   # More info and examples at: https://wiki.secondlife.com/wiki/How_to_add_unit_tests_to_indra_code
 
-  # This here looks weird, but is needed. It will inject GoogleMock into projects that forgot to include `this` (LLAddBuildTest.cmake)
-  # But through some other means have access to this macro
-
   if(LL_TEST_VERBOSE)
     message("LL_ADD_PROJECT_UNIT_TESTS UNITTEST_PROJECT_${project} sources: ${sources}")
   endif()

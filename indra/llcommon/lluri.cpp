@@ -328,7 +328,7 @@ LLURI::LLURI(const std::string_view escaped_str)
     }
 }
 
-static BOOL isDefault(const std::string_view scheme, U16 port)
+static bool isDefault(const std::string_view scheme, U16 port)
 {
     if (scheme == "http")
         return port == 80;
@@ -337,7 +337,7 @@ static BOOL isDefault(const std::string_view scheme, U16 port)
     if (scheme == "ftp")
         return port == 21;
 
-    return FALSE;
+    return false;
 }
 
 void LLURI::parseAuthorityAndPathUsingOpaque()
@@ -638,7 +638,7 @@ std::string LLURI::password() const
     return unescape(pass);
 }
 
-BOOL LLURI::defaultPort() const
+bool LLURI::defaultPort() const
 {
     return isDefault(mScheme, hostPort());
 }

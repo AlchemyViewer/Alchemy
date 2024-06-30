@@ -59,7 +59,7 @@ struct LLMessageLogEntry
     EEntryType mType;
     LLHost mFromHost;
     LLHost mToHost;
-    S32 mDataSize;
+    size_t mDataSize;
     U8* mData;
 
     // http specific

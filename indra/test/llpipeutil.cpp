@@ -60,7 +60,7 @@ LLIOPipe::EStatus LLPipeStringInjector::process_impl(
         LLSD& context,
         LLPumpIO* pump)
 {
-    buffer->append(channels.out(), (U8*) mString.data(), mString.size());
+    buffer->append(channels.out(), (U8*) mString.data(), static_cast<S32>(mString.size()));
     eos = true;
     return STATUS_DONE;
 }
@@ -119,7 +119,7 @@ struct random_ascii_generator
     random_ascii_generator() {}
     U8 operator()()
     {
-        int rv = ll_rand();
+        int rv = rand();
         rv %= (127 - 32);
         rv += 32;
         return rv;

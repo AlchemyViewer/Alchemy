@@ -40,13 +40,13 @@ class LLFloaterGroupProfile final : public LLFloater
 {
 public:
     LLFloaterGroupProfile(LLSD const& key);
-    BOOL postBuild() override;
+    bool postBuild() override;
     void onOpen(const LLSD& key) override;
 
     void setGroupName(const std::string& group_name);
     void createGroup() const;
 
-    static LLFloater* showInstance(const LLSD& key, BOOL focus);
+    static LLFloater* showInstance(const LLSD& key, bool focus);
 
     LLPanelGroup* getGroupPanel() const { return (LLPanelGroup*)mGroupPanel; };
 

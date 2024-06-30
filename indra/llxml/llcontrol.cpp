@@ -63,8 +63,6 @@ template <> eControlType get_control_type<U32>();
 template <> eControlType get_control_type<S32>();
 template <> eControlType get_control_type<F32>();
 template <> eControlType get_control_type<bool>();
-// Yay BOOL, its really an S32.
-//template <> eControlType get_control_type<BOOL> () ;
 template <> eControlType get_control_type<std::string>();
 
 template <> eControlType get_control_type<LLVector3>();
@@ -191,10 +189,10 @@ LLSD LLControlVariable::getComparableValue(const LLSD& value)
     LLSD storable_value;
     if(TYPE_BOOLEAN == type() && value.isString())
     {
-        BOOL temp;
+        bool temp;
         if(LLStringUtil::convertToBOOL(value.asString(), temp))
         {
-            storable_value = (bool)temp;
+            storable_value = temp;
         }
         else
         {
@@ -226,7 +224,7 @@ LLSD LLControlVariable::getComparableValue(const LLSD& value)
 
 void LLControlVariable::setValue(const LLSD& new_value, bool saved_value)
 {
-    if (mValidateSignal(this, new_value) == false)
+    if (!mValidateSignal(this, new_value))
     {
         // can not set new value, exit
         return;
@@ -234,12 +232,12 @@ void LLControlVariable::setValue(const LLSD& new_value, bool saved_value)
 
     LLSD storable_value = getComparableValue(new_value);
     LLSD original_value = getValue();
-    bool value_changed = llsd_compare(original_value, storable_value) == FALSE;
+    bool value_changed = !llsd_compare(original_value, storable_value);
     if(saved_value)
     {
         // If we're going to save this value, return to default but don't fire
         resetToDefault(false);
-        if (llsd_compare(mValues.back(), storable_value) == FALSE)
+        if (!llsd_compare(mValues.back(), storable_value))
         {
             mValues.push_back(storable_value);
         }
@@ -249,7 +247,7 @@ void LLControlVariable::setValue(const LLSD& new_value, bool saved_value)
         // This is an unsaved value. Its needs to reside at
         // mValues[2] (or greater). It must not affect
         // the result of getSaveValue()
-        if (llsd_compare(mValues.back(), storable_value) == FALSE)
+        if (!llsd_compare(mValues.back(), storable_value))
         {
             while(mValues.size() > 2)
             {
@@ -283,10 +281,10 @@ void LLControlVariable::setDefaultValue(const LLSD& value)
 
     LLSD comparable_value = getComparableValue(value);
     LLSD original_value = getValue();
-    bool value_changed = (llsd_compare(original_value, comparable_value) == FALSE);
+    bool value_changed = !llsd_compare(original_value, comparable_value);
     resetToDefault(false);
     mValues[0] = comparable_value;
-    if(value_changed)
+    if (value_changed)
     {
         firePropertyChanged(original_value);
     }
@@ -320,7 +318,7 @@ void LLControlVariable::resetToDefault(bool fire_signal)
 
     // don't fire if the value didn't actually change
     LLSD previous_value = getComparableValue(getValue());
-    bool value_changed = (llsd_compare(originalValue, previous_value) == FALSE);
+    bool value_changed = (llsd_compare(originalValue, previous_value) == false);
     if(fire_signal && value_changed)
     {
         firePropertyChanged(originalValue);
@@ -379,7 +377,7 @@ LLPointer<LLControlVariable> LLControlGroup::getControl(std::string_view name)
         incrCount(name);
     }
 
-    ctrl_name_table_t::iterator iter = mNameTable.find(name);
+    ctrl_name_table_t::iterator iter = mNameTable.find(name.data());
     return iter == mNameTable.end() ? LLPointer<LLControlVariable>() : iter->second;
 }
 
@@ -493,7 +491,7 @@ std::string LLControlGroup::typeEnumToString(eControlType typeenum)
     return mTypeString[typeenum];
 }
 
-LLControlVariable* LLControlGroup::declareControl(const std::string& name, eControlType type, const LLSD initial_val, const std::string& comment, LLControlVariable::ePersist persist, BOOL hidefromsettingseditor)
+LLControlVariable* LLControlGroup::declareControl(const std::string& name, eControlType type, const LLSD initial_val, const std::string& comment, LLControlVariable::ePersist persist, bool hidefromsettingseditor)
 {
     LLControlVariable* existing_control = getControl(name);
     if (existing_control)
@@ -536,7 +534,7 @@ LLControlVariable* LLControlGroup::declareF32(const std::string& name, const F32
     return declareControl(name, TYPE_F32, initial_val, comment, persist);
 }
 
-LLControlVariable* LLControlGroup::declareBOOL(const std::string& name, const BOOL initial_val, const std::string& comment, LLControlVariable::ePersist persist)
+LLControlVariable* LLControlGroup::declareBOOL(const std::string& name, const bool initial_val, const std::string& comment, LLControlVariable::ePersist persist)
 {
     return declareControl(name, TYPE_BOOLEAN, initial_val, comment, persist);
 }
@@ -608,12 +606,7 @@ void LLControlGroup::incrCount(std::string_view name)
     }
 }
 
-BOOL LLControlGroup::getBOOL(std::string_view name)
-{
-    return (BOOL)get<bool>(name);
-}
-
-bool LLControlGroup::getBool(std::string_view name)
+bool LLControlGroup::getBOOL(std::string_view name)
 {
     return get<bool>(name);
 }
@@ -721,7 +714,7 @@ LLSD LLControlGroup::asLLSD(bool diffs_only)
     return result;
 }
 
-BOOL LLControlGroup::controlExists(std::string_view name)
+bool LLControlGroup::controlExists(std::string_view name)
 {
     ctrl_name_table_t::iterator iter = mNameTable.find(name);
     return iter != mNameTable.end();
@@ -732,7 +725,7 @@ BOOL LLControlGroup::controlExists(std::string_view name)
 // Set functions
 //-------------------------------------------------------------------
 
-void LLControlGroup::setBOOL(std::string_view name, BOOL val)
+void LLControlGroup::setBOOL(std::string_view name, bool val)
 {
     set<bool>(name, val);
 }
@@ -827,7 +820,7 @@ void LLControlGroup::setUntypedValue(std::string_view name, const LLSD& val)
 //---------------------------------------------------------------
 
 // Returns number of controls loaded, so 0 if failure
-U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require_declaration, eControlType declare_as)
+U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, bool require_declaration, eControlType declare_as)
 {
     std::string name;
 
@@ -863,7 +856,7 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
     {
         name = child_nodep->getName();
 
-        BOOL declared = controlExists(name);
+        bool declared = controlExists(name);
 
         if (require_declaration && !declared)
         {
@@ -931,7 +924,7 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
             break;
         case TYPE_BOOLEAN:
             {
-                BOOL initial = FALSE;
+                bool initial = false;
 
                 child_nodep->getAttributeBOOL("value", initial);
                 control->set(initial);
@@ -1043,7 +1036,7 @@ U32 LLControlGroup::loadFromFileLegacy(const std::string& filename, BOOL require
     return validitems;
 }
 
-U32 LLControlGroup::saveToFile(const std::string& filename, BOOL nondefault_only)
+U32 LLControlGroup::saveToFile(const std::string& filename, bool nondefault_only)
 {
     LLSD settings;
     int num_saved = 0;
@@ -1101,7 +1094,7 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
     {
         infile.close();
         LL_WARNS("Settings") << "Unable to parse LLSD control file " << filename << ". Trying Legacy Method." << LL_ENDL;
-        return loadFromFileLegacy(filename, TRUE, TYPE_STRING);
+        return loadFromFileLegacy(filename, true, TYPE_STRING);
     }
 
     U32 validitems = 0;
@@ -1279,7 +1272,7 @@ void main()
     bar = new LLControlVariable<S32>("gBar", 10, 2, 22);
     gGlobals.addEntry("gBar", bar);
 
-    baz = new LLControlVariable<BOOL>("gBaz", FALSE);
+    baz = new LLControlVariable<bool>("gBaz", false);
     gGlobals.addEntry("gBaz", baz);
 
     // test retrieval
@@ -1307,7 +1300,7 @@ void main()
 
     // ...invalid data type
     getfoo = (F32_CONTROL) gGlobals.resolveName("gFoo");
-    getfoo->set(TRUE);
+    getfoo->set(true);
     getfoo->dump();
 
     // ...out of range data
@@ -1341,13 +1334,7 @@ template <> eControlType get_control_type<bool> ()
 {
     return TYPE_BOOLEAN;
 }
-/*
-// Yay BOOL, its really an S32.
-template <> eControlType get_control_type<BOOL> ()
-{
-    return TYPE_BOOLEAN;
-}
-*/
+
 template <> eControlType get_control_type<std::string>()
 {
     return TYPE_STRING;
@@ -1452,8 +1439,8 @@ bool convert_from_llsd<bool>(const LLSD& sd, eControlType type, std::string_view
         return sd.asBoolean();
     else
     {
-        CONTROL_ERRS << "Invalid BOOL value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
-        return FALSE;
+        CONTROL_ERRS << "Invalid bool value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
+        return false;
     }
 }
 
@@ -1642,7 +1629,6 @@ DECL_LLCC(U32, (U32)666);
 DECL_LLCC(S32, (S32)-666);
 DECL_LLCC(F32, (F32)-666.666);
 DECL_LLCC(bool, true);
-DECL_LLCC(BOOL, FALSE);
 static LLCachedControl<std::string> mySetting_string("TestCachedControlstring", "Default String Value");
 DECL_LLCC(LLVector3, LLVector3(1.0f, 2.0f, 3.0f));
 DECL_LLCC(LLVector3d, LLVector3d(6.0f, 5.0f, 4.0f));
@@ -1661,7 +1647,6 @@ void test_cached_control()
     TEST_LLCC(S32, (S32)-666);
     TEST_LLCC(F32, (F32)-666.666);
     TEST_LLCC(bool, true);
-    TEST_LLCC(BOOL, FALSE);
     if((std::string)mySetting_string != "Default String Value") LL_ERRS() << "Fail string" << LL_ENDL;
     TEST_LLCC(LLVector3, LLVector3(1.0f, 2.0f, 3.0f));
     TEST_LLCC(LLVector3d, LLVector3d(6.0f, 5.0f, 4.0f));

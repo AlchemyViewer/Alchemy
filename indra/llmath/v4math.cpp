@@ -42,28 +42,6 @@
 const LLVector4 LLVector4::zero(0.f, 0.f, 0.f, 0.f);
 
 // Axis-Angle rotations
-
-/*
-const LLVector4&    LLVector4::rotVec(F32 angle, const LLVector4 &vec)
-{
-    if ( !vec.isExactlyZero() && angle )
-    {
-        *this = *this * LLMatrix4(angle, vec);
-    }
-    return *this;
-}
-
-const LLVector4&    LLVector4::rotVec(F32 angle, F32 x, F32 y, F32 z)
-{
-    LLVector3 vec(x, y, z);
-    if ( !vec.isExactlyZero() && angle )
-    {
-        *this = *this * LLMatrix4(angle, vec);
-    }
-    return *this;
-}
-*/
-
 const LLVector4&    LLVector4::rotVec(const LLMatrix4 &mat)
 {
     *this = *this * mat;
@@ -87,15 +65,15 @@ const LLVector4&    LLVector4::scaleVec(const LLVector4& vec)
 }
 
 // Sets all values to absolute value of their original values
-// Returns TRUE if data changed
-BOOL LLVector4::abs()
+// Returns true if data changed
+bool LLVector4::abs()
 {
-    BOOL ret = FALSE;
+    bool ret{ false };
 
-    if (mV[0] < 0.f) { mV[0] = -mV[0]; ret = TRUE; }
-    if (mV[1] < 0.f) { mV[1] = -mV[1]; ret = TRUE; }
-    if (mV[2] < 0.f) { mV[2] = -mV[2]; ret = TRUE; }
-    if (mV[3] < 0.f) { mV[3] = -mV[3]; ret = TRUE; }
+    if (mV[0] < 0.f) { mV[0] = -mV[0]; ret = true; }
+    if (mV[1] < 0.f) { mV[1] = -mV[1]; ret = true; }
+    if (mV[2] < 0.f) { mV[2] = -mV[2]; ret = true; }
+    if (mV[3] < 0.f) { mV[3] = -mV[3]; ret = true; }
 
     return ret;
 }
@@ -108,11 +86,11 @@ std::ostream& operator<<(std::ostream& s, const LLVector4 &a)
 }
 
 
-BOOL LLVector4::parseVector4(const std::string& buf, LLVector4* value)
+bool LLVector4::parseVector4(const std::string& buf, LLVector4* value)
 {
     if (buf.empty() || value == NULL)
     {
-        return FALSE;
+        return false;
     }
 
     LLVector4 v;
@@ -120,10 +98,10 @@ BOOL LLVector4::parseVector4(const std::string& buf, LLVector4* value)
     if (4 == count)
     {
         value->setVec(v);
-        return TRUE;
+        return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 // Non-member functions
@@ -141,7 +119,7 @@ F32 angle_between( const LLVector4& a, const LLVector4& b )
     return angle;
 }
 
-BOOL are_parallel(const LLVector4 &a, const LLVector4 &b, F32 epsilon)
+bool are_parallel(const LLVector4 &a, const LLVector4 &b, F32 epsilon)
 {
     LLVector4 an = a;
     LLVector4 bn = b;
@@ -149,8 +127,8 @@ BOOL are_parallel(const LLVector4 &a, const LLVector4 &b, F32 epsilon)
     bn.normalize();
     F32 dot = an * bn;
     if ( (1.0f - fabs(dot)) < epsilon)
-        return TRUE;
-    return FALSE;
+        return true;
+    return false;
 }
 
 

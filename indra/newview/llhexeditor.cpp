@@ -98,9 +98,9 @@ LLHexEditor::~LLHexEditor()
     }
 }
 
-BOOL LLHexEditor::postBuild()
+bool LLHexEditor::postBuild()
 {
-    return TRUE;
+    return true;
 }
 
 void LLHexEditor::setValue(const LLSD& value)
@@ -128,7 +128,7 @@ U32 LLHexEditor::getLineCount() const
     return lines;
 }
 
-void LLHexEditor::getPosAndContext(S32 x, S32 y, BOOL force_context, U32& pos, BOOL& in_data, BOOL& second_nibble) const
+void LLHexEditor::getPosAndContext(S32 x, S32 y, bool force_context, U32& pos, bool& in_data, bool& second_nibble) const
 {
     pos = 0;
 
@@ -168,15 +168,15 @@ void LLHexEditor::getPosAndContext(S32 x, S32 y, BOOL force_context, U32& pos, B
             if(rem > char_width)
             {
                 offset++; // next byte
-                second_nibble = FALSE;
+                second_nibble = false;
             }
-            else second_nibble = TRUE;
+            else second_nibble = true;
         }
-        else second_nibble = FALSE;
+        else second_nibble = false;
     }
     else
     {
-        second_nibble = FALSE;
+        second_nibble = false;
         lx += char_width; // adding char width because idk
         lx -= text_x_ascii;
         offset = lx / char_width;
@@ -186,14 +186,14 @@ void LLHexEditor::getPosAndContext(S32 x, S32 y, BOOL force_context, U32& pos, B
     {
         offset = 0;
         line++;
-        second_nibble = FALSE;
+        second_nibble = false;
     }
 
     pos = (line * mColumns) + offset;
     if(pos > mValue.size()) pos = mValue.size();
     if(pos == mValue.size())
     {
-        second_nibble = FALSE;
+        second_nibble = false;
     }
 }
 
@@ -213,7 +213,7 @@ void LLHexEditor::changedLength()
     moveCursor(mCursorPos, mSecondNibble); // cursor was off end after undo of paste
 }
 
-void LLHexEditor::reshape(S32 width, S32 height, BOOL called_from_parent)
+void LLHexEditor::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLView::reshape( width, height, called_from_parent );
     mTextRect.setOriginAndSize(
@@ -232,7 +232,7 @@ void LLHexEditor::reshape(S32 width, S32 height, BOOL called_from_parent)
     changedLength();
 }
 
-void LLHexEditor::setFocus(BOOL b)
+void LLHexEditor::setFocus(bool b)
 {
     if (b)
     {
@@ -240,7 +240,7 @@ void LLHexEditor::setFocus(BOOL b)
     }
     else
     {
-        mSelecting = FALSE;
+        mSelecting = false;
         gFocusMgr.releaseFocusIfNeeded(this);
         if(LLEditMenuHandler::gEditMenuHandler == this)
         {
@@ -274,47 +274,47 @@ U32 LLHexEditor::getProperSelectionEnd() const
     return (mSelectionStart < mSelectionEnd) ? mSelectionEnd : mSelectionStart;
 }
 
-BOOL LLHexEditor::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLHexEditor::handleScrollWheel(S32 x, S32 y, S32 clicks)
 {
     return mScrollbar->handleScrollWheel( 0, 0, clicks );
 }
 
-BOOL LLHexEditor::handleMouseDown(S32 x, S32 y, MASK mask)
+bool LLHexEditor::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = FALSE;
+    bool handled = false;
     handled = LLView::childrenHandleMouseDown(x, y, mask) != NULL;
     if(!handled)
     {
-        setFocus(TRUE);
+        setFocus(true);
         gFocusMgr.setMouseCapture(this);
-        handled = TRUE;
+        handled = true;
         if(!mSelecting)
         {
             if(mask & MASK_SHIFT)
             {
                 // extend a selection
-                getPosAndContext(x, y, FALSE, mCursorPos, mInData, mSecondNibble);
+                getPosAndContext(x, y, false, mCursorPos, mInData, mSecondNibble);
                 mSelectionEnd = mCursorPos;
                 mHasSelection = (mSelectionStart != mSelectionEnd);
-                mSelecting = TRUE;
+                mSelecting = true;
             }
             else
             {
                 // start selecting
-                getPosAndContext(x, y, FALSE, mCursorPos, mInData, mSecondNibble);
+                getPosAndContext(x, y, false, mCursorPos, mInData, mSecondNibble);
                 mSelectionStart = mCursorPos;
                 mSelectionEnd = mCursorPos;
-                mHasSelection = FALSE;
-                mSelecting = TRUE;
+                mHasSelection = false;
+                mSelecting = true;
             }
         }
     }
     return handled;
 }
 
-BOOL LLHexEditor::handleHover(S32 x, S32 y, MASK mask)
+bool LLHexEditor::handleHover(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = FALSE;
+    bool handled = false;
     if(!hasMouseCapture())
     {
         handled = childrenHandleHover(x, y, mask) != NULL;
@@ -322,36 +322,36 @@ BOOL LLHexEditor::handleHover(S32 x, S32 y, MASK mask)
     if(!handled && mSelecting && hasMouseCapture())
     {
         // continuation of selecting
-        getPosAndContext(x, y, TRUE, mCursorPos, mInData, mSecondNibble);
+        getPosAndContext(x, y, true, mCursorPos, mInData, mSecondNibble);
         mSelectionEnd = mCursorPos;
         mHasSelection = (mSelectionStart != mSelectionEnd);
-        handled = TRUE;
+        handled = true;
     }
     return handled;
 }
 
-BOOL LLHexEditor::handleMouseUp(S32 x, S32 y, MASK mask)
+bool LLHexEditor::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = FALSE;
+    bool handled = false;
     handled = LLView::childrenHandleMouseUp(x, y, mask) != NULL;
     if(!handled && mSelecting && hasMouseCapture())
     {
         gFocusMgr.setMouseCapture(NULL);
-        mSelecting = FALSE;
+        mSelecting = false;
     }
     return handled;
 }
 
-BOOL LLHexEditor::handleKeyHere(KEY key, MASK mask)
+bool LLHexEditor::handleKeyHere(KEY key, MASK mask)
 {
-    return FALSE;
+    return false;
 }
 
-BOOL LLHexEditor::handleKey(KEY key, MASK mask, BOOL called_from_parent)
+bool LLHexEditor::handleKey(KEY key, MASK mask, bool called_from_parent)
 {
-    BOOL handled = FALSE;
+    bool handled = false;
 
-    BOOL moved_cursor = FALSE;
+    bool moved_cursor = false;
     U32 old_cursor = mCursorPos;
     U32 cursor_line = mCursorPos / mColumns;
     U32 doc_first_line = 0;
@@ -361,7 +361,7 @@ BOOL LLHexEditor::handleKey(KEY key, MASK mask, BOOL called_from_parent)
     U32 beginning_of_line = mCursorPos - (mCursorPos % mColumns);
     U32 end_of_line = beginning_of_line + mColumns - 1;
 
-    handled = TRUE;
+    handled = true;
     switch( key )
     {
 
@@ -371,27 +371,27 @@ BOOL LLHexEditor::handleKey(KEY key, MASK mask, BOOL called_from_parent)
         if(cursor_line > doc_first_line)
         {
             moveCursor(mCursorPos - mColumns, mSecondNibble);
-            moved_cursor = TRUE;
+            moved_cursor = true;
         }
         break;
     case KEY_DOWN:
         if(cursor_line < doc_last_line)
         {
             moveCursor(mCursorPos + mColumns, mSecondNibble);
-            moved_cursor = TRUE;
+            moved_cursor = true;
         }
         break;
     case KEY_LEFT:
         if(mCursorPos)
         {
-            if(!mSecondNibble) moveCursor(mCursorPos - 1, FALSE);
-            else moveCursor(mCursorPos, FALSE);
-            moved_cursor = TRUE;
+            if(!mSecondNibble) moveCursor(mCursorPos - 1, false);
+            else moveCursor(mCursorPos, false);
+            moved_cursor = true;
         }
         break;
     case KEY_RIGHT:
-        moveCursor(mCursorPos + 1, FALSE);
-        moved_cursor = TRUE;
+        moveCursor(mCursorPos + 1, false);
+        moved_cursor = true;
         break;
     case KEY_PAGE_UP:
         mScrollbar->pageUp(1);
@@ -401,17 +401,17 @@ BOOL LLHexEditor::handleKey(KEY key, MASK mask, BOOL called_from_parent)
         break;
     case KEY_HOME:
         if(mask & MASK_CONTROL)
-            moveCursor(0, FALSE);
+            moveCursor(0, false);
         else
-            moveCursor(beginning_of_line, FALSE);
-        moved_cursor = TRUE;
+            moveCursor(beginning_of_line, false);
+        moved_cursor = true;
         break;
     case KEY_END:
         if(mask & MASK_CONTROL)
-            moveCursor(mValue.size(), FALSE);
+            moveCursor(mValue.size(), false);
         else
-            moveCursor(end_of_line, FALSE);
-        moved_cursor = TRUE;
+            moveCursor(end_of_line, false);
+        moved_cursor = true;
         break;
 
     // Special
@@ -430,13 +430,13 @@ BOOL LLHexEditor::handleKey(KEY key, MASK mask, BOOL called_from_parent)
         {
             U32 start = getProperSelectionStart();
             U32 end = getProperSelectionEnd();
-            del(start, end - 1, TRUE);
-            moveCursor(start, FALSE);
+            del(start, end - 1, true);
+            moveCursor(start, false);
         }
         else if(mCursorPos && (!mSecondNibble))
         {
-            del(mCursorPos - 1, mCursorPos - 1, TRUE);
-            moveCursor(mCursorPos - 1, FALSE);
+            del(mCursorPos - 1, mCursorPos - 1, true);
+            moveCursor(mCursorPos - 1, false);
         }
         break;
 
@@ -445,17 +445,17 @@ BOOL LLHexEditor::handleKey(KEY key, MASK mask, BOOL called_from_parent)
         {
             U32 start = getProperSelectionStart();
             U32 end = getProperSelectionEnd();
-            del(start, end - 1, TRUE);
-            moveCursor(start, FALSE);
+            del(start, end - 1, true);
+            moveCursor(start, false);
         }
         else if((mCursorPos != mValue.size()) && (!mSecondNibble))
         {
-            del(mCursorPos, mCursorPos, TRUE);
+            del(mCursorPos, mCursorPos, true);
         }
         break;
 
     default:
-        handled = FALSE;
+        handled = false;
         break;
     }
 
@@ -478,7 +478,7 @@ BOOL LLHexEditor::handleKey(KEY key, MASK mask, BOOL called_from_parent)
     return handled;
 }
 
-BOOL LLHexEditor::handleUnicodeChar(llwchar uni_char, BOOL called_from_parent)
+bool LLHexEditor::handleUnicodeChar(llwchar uni_char, bool called_from_parent)
 {
     U8 c = uni_char & 0xff;
     if(mInData)
@@ -487,13 +487,13 @@ BOOL LLHexEditor::handleUnicodeChar(llwchar uni_char, BOOL called_from_parent)
         {
             if(c > 0x46) c -= 0x20;
             if(c >= 0x41 && c <= 0x46) c = (c & 0x0f) + 0x09;
-            else return TRUE;
+            else return true;
         }
-        else if(c < 0x30) return TRUE;
+        else if(c < 0x30) return true;
         else c &= 0x0f;
     }
 
-    if(uni_char < 0x20) return FALSE;
+    if(uni_char < 0x20) return false;
 
     if( (LL_KIM_INSERT == gKeyboard->getInsertMode() && (!mHasSelection))
         || (!mHasSelection && (mCursorPos == mValue.size())) )// last byte? always insert
@@ -503,24 +503,24 @@ BOOL LLHexEditor::handleUnicodeChar(llwchar uni_char, BOOL called_from_parent)
         {
             std::vector<U8> new_data;
             new_data.push_back(c);
-            insert(mCursorPos, new_data, TRUE);
-            moveCursor(mCursorPos + 1, FALSE);
+            insert(mCursorPos, new_data, true);
+            moveCursor(mCursorPos + 1, false);
         }
         else if(!mSecondNibble)
         {
             c <<= 4;
             std::vector<U8> new_data;
             new_data.push_back(c);
-            insert(mCursorPos, new_data, TRUE);
-            moveCursor(mCursorPos, TRUE);
+            insert(mCursorPos, new_data, true);
+            moveCursor(mCursorPos, true);
         }
         else
         {
             c |= (mValue[mCursorPos] & 0xF0);
             std::vector<U8> new_data;
             new_data.push_back(c);
-            overwrite(mCursorPos, mCursorPos, new_data, TRUE);
-            moveCursor(mCursorPos + 1, FALSE);
+            overwrite(mCursorPos, mCursorPos, new_data, true);
+            moveCursor(mCursorPos + 1, false);
         }
     }
     else // overwrite mode
@@ -531,16 +531,16 @@ BOOL LLHexEditor::handleUnicodeChar(llwchar uni_char, BOOL called_from_parent)
             std::vector<U8> new_data;
             new_data.push_back(c);
             U8 start = getProperSelectionStart();
-            overwrite(start, getProperSelectionEnd() - 1, new_data, TRUE);
-            if(mInData) moveCursor(start, TRUE); // we only entered a nibble
-            else moveCursor(start + 1, FALSE); // we only entered a byte
+            overwrite(start, getProperSelectionEnd() - 1, new_data, true);
+            if(mInData) moveCursor(start, true); // we only entered a nibble
+            else moveCursor(start + 1, false); // we only entered a byte
         }
         else if(!mInData)
         {
             std::vector<U8> new_data;
             new_data.push_back(c);
-            overwrite(mCursorPos, mCursorPos, new_data, TRUE);
-            moveCursor(mCursorPos + 1, FALSE);
+            overwrite(mCursorPos, mCursorPos, new_data, true);
+            moveCursor(mCursorPos + 1, false);
         }
         else if(!mSecondNibble)
         {
@@ -548,25 +548,25 @@ BOOL LLHexEditor::handleUnicodeChar(llwchar uni_char, BOOL called_from_parent)
             c |= (mValue[mCursorPos] & 0x0F);
             std::vector<U8> new_data;
             new_data.push_back(c);
-            overwrite(mCursorPos, mCursorPos, new_data, TRUE);
-            moveCursor(mCursorPos, TRUE);
+            overwrite(mCursorPos, mCursorPos, new_data, true);
+            moveCursor(mCursorPos, true);
         }
         else
         {
             c |= (mValue[mCursorPos] & 0xF0);
             std::vector<U8> new_data;
             new_data.push_back(c);
-            overwrite(mCursorPos, mCursorPos, new_data, TRUE);
-            moveCursor(mCursorPos + 1, FALSE);
+            overwrite(mCursorPos, mCursorPos, new_data, true);
+            moveCursor(mCursorPos + 1, false);
         }
     }
 
-    return TRUE;
+    return true;
 }
 
-BOOL LLHexEditor::handleUnicodeCharHere(llwchar uni_char)
+bool LLHexEditor::handleUnicodeCharHere(llwchar uni_char)
 {
-    return FALSE;
+    return false;
 }
 
 void LLHexEditor::draw()
@@ -576,7 +576,7 @@ void LLHexEditor::draw()
     S32 right = getRect().getWidth();
     S32 bottom = 0;
 
-    BOOL has_focus = hasFocus();
+    bool has_focus = hasFocus();
 
     F32 line_height = mGLFont->getLineHeight();
     F32 char_width = mGLFont->getWidthF32(".");
@@ -928,11 +928,11 @@ void LLHexEditor::deselect()
 {
     mSelectionStart = mCursorPos;
     mSelectionEnd = mCursorPos;
-    mHasSelection = FALSE;
-    mSelecting = FALSE;
+    mHasSelection = false;
+    mSelecting = false;
 }
 
-BOOL LLHexEditor::canUndo() const
+bool LLHexEditor::canUndo() const
 {
     return mUndoBuffer->canUndo();
 }
@@ -942,7 +942,7 @@ void LLHexEditor::undo()
     mUndoBuffer->undoAction();
 }
 
-BOOL LLHexEditor::canRedo() const
+bool LLHexEditor::canRedo() const
 {
     return mUndoBuffer->canRedo();
 }
@@ -955,7 +955,7 @@ void LLHexEditor::redo()
 
 
 
-void LLHexEditor::moveCursor(U32 pos, BOOL second_nibble)
+void LLHexEditor::moveCursor(U32 pos, bool second_nibble)
 {
     mCursorPos = pos;
 
@@ -963,11 +963,11 @@ void LLHexEditor::moveCursor(U32 pos, BOOL second_nibble)
     if(mCursorPos >= mValue.size())
     {
         mCursorPos = mValue.size();
-        mSecondNibble = FALSE;
+        mSecondNibble = false;
     }
     else
     {
-        mSecondNibble = mInData ? second_nibble : FALSE;
+        mSecondNibble = mInData ? second_nibble : false;
     }
 
     // Change selection
@@ -982,7 +982,7 @@ void LLHexEditor::moveCursor(U32 pos, BOOL second_nibble)
     if(line > (last_line - 2)) mScrollbar->setDocPos(line - mScrollbar->getPageSize() + 1);
 }
 
-BOOL LLHexEditor::canCut() const
+bool LLHexEditor::canCut() const
 {
     return mHasSelection;
 }
@@ -994,12 +994,12 @@ void LLHexEditor::cut()
     copy();
 
     U32 start = getProperSelectionStart();
-    del(start, getProperSelectionEnd() - 1, TRUE);
+    del(start, getProperSelectionEnd() - 1, true);
 
-    moveCursor(start, FALSE);
+    moveCursor(start, false);
 }
 
-BOOL LLHexEditor::canCopy() const
+bool LLHexEditor::canCopy() const
 {
     return mHasSelection;
 }
@@ -1027,9 +1027,9 @@ void LLHexEditor::copy()
     LLClipboard::instance().copyToClipboard(wtext, 0, wtext.length());
 }
 
-BOOL LLHexEditor::canPaste() const
+bool LLHexEditor::canPaste() const
 {
-    return TRUE;
+    return true;
 }
 
 void LLHexEditor::paste()
@@ -1066,17 +1066,17 @@ void LLHexEditor::paste()
 
     U32 start = mCursorPos;
     if(!mHasSelection)
-        insert(start, new_data, TRUE);
+        insert(start, new_data, true);
     else
     {
         start = getProperSelectionStart();
-        overwrite(start, getProperSelectionEnd() - 1, new_data, TRUE);
+        overwrite(start, getProperSelectionEnd() - 1, new_data, true);
     }
 
-    moveCursor(start + new_data.size(), FALSE);
+    moveCursor(start + new_data.size(), false);
 }
 
-BOOL LLHexEditor::canDoDelete() const
+bool LLHexEditor::canDoDelete() const
 {
     return mValue.size() > 0;
 }
@@ -1086,12 +1086,12 @@ void LLHexEditor::doDelete()
     if(!canDoDelete()) return;
 
     U32 start = getProperSelectionStart();
-    del(start, getProperSelectionEnd(), TRUE);
+    del(start, getProperSelectionEnd(), true);
 
-    moveCursor(start, FALSE);
+    moveCursor(start, false);
 }
 
-BOOL LLHexEditor::canSelectAll() const
+bool LLHexEditor::canSelectAll() const
 {
     return mValue.size() > 0;
 }
@@ -1105,12 +1105,12 @@ void LLHexEditor::selectAll()
     mHasSelection = mSelectionStart != mSelectionEnd;
 }
 
-BOOL LLHexEditor::canDeselect() const
+bool LLHexEditor::canDeselect() const
 {
     return mHasSelection;
 }
 
-void LLHexEditor::insert(U32 pos, std::vector<U8> new_data, BOOL undoable)
+void LLHexEditor::insert(U32 pos, std::vector<U8> new_data, bool undoable)
 {
     if(pos > mValue.size())
     {
@@ -1133,7 +1133,7 @@ void LLHexEditor::insert(U32 pos, std::vector<U8> new_data, BOOL undoable)
     changedLength();
 }
 
-void LLHexEditor::overwrite(U32 first_pos, U32 last_pos, std::vector<U8> new_data, BOOL undoable)
+void LLHexEditor::overwrite(U32 first_pos, U32 last_pos, std::vector<U8> new_data, bool undoable)
 {
     if(first_pos > mValue.size() || last_pos > mValue.size())
     {
@@ -1162,7 +1162,7 @@ void LLHexEditor::overwrite(U32 first_pos, U32 last_pos, std::vector<U8> new_dat
     changedLength();
 }
 
-void LLHexEditor::del(U32 first_pos, U32 last_pos, BOOL undoable)
+void LLHexEditor::del(U32 first_pos, U32 last_pos, bool undoable)
 {
     if(first_pos > mValue.size() || last_pos > mValue.size())
     {
@@ -1218,34 +1218,34 @@ void LLUndoHex::redo()
 
 void LLUndoHex::undoInsert(LLUndoHex* action)
 {
-    //action->mHexEditor->del(action->mFirstPos, action->mLastPos, FALSE);
-    action->mHexEditor->del(action->mFirstPos, action->mFirstPos + action->mNewData.size() - 1, FALSE);
+    //action->mHexEditor->del(action->mFirstPos, action->mLastPos, false);
+    action->mHexEditor->del(action->mFirstPos, action->mFirstPos + action->mNewData.size() - 1, false);
 }
 
 void LLUndoHex::redoInsert(LLUndoHex* action)
 {
-    action->mHexEditor->insert(action->mFirstPos, action->mNewData, FALSE);
+    action->mHexEditor->insert(action->mFirstPos, action->mNewData, false);
 }
 
 void LLUndoHex::undoOverwrite(LLUndoHex* action)
 {
-    //action->mHexEditor->overwrite(action->mFirstPos, action->mLastPos, action->mOldData, FALSE);
-    action->mHexEditor->overwrite(action->mFirstPos, action->mFirstPos + action->mNewData.size() - 1, action->mOldData, FALSE);
+    //action->mHexEditor->overwrite(action->mFirstPos, action->mLastPos, action->mOldData, false);
+    action->mHexEditor->overwrite(action->mFirstPos, action->mFirstPos + action->mNewData.size() - 1, action->mOldData, false);
 }
 
 void LLUndoHex::redoOverwrite(LLUndoHex* action)
 {
-    action->mHexEditor->overwrite(action->mFirstPos, action->mLastPos, action->mNewData, FALSE);
+    action->mHexEditor->overwrite(action->mFirstPos, action->mLastPos, action->mNewData, false);
 }
 
 void LLUndoHex::undoDel(LLUndoHex* action)
 {
-    action->mHexEditor->insert(action->mFirstPos, action->mOldData, FALSE);
+    action->mHexEditor->insert(action->mFirstPos, action->mOldData, false);
 }
 
 void LLUndoHex::redoDel(LLUndoHex* action)
 {
-    action->mHexEditor->del(action->mFirstPos, action->mLastPos, FALSE);
+    action->mHexEditor->del(action->mFirstPos, action->mLastPos, false);
 }
 
 

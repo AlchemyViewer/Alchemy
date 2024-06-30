@@ -78,11 +78,11 @@ public:
 
     LLViewerObject *replaceObject(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp); // TomY: hack to switch VO instances on the fly
 
-    BOOL killObject(LLViewerObject *objectp);
+    bool killObject(LLViewerObject *objectp);
     void killObjects(LLViewerRegion *regionp); // Kill all objects owned by a particular region.
     void killAllObjects();
 
-    void cleanDeadObjects(const BOOL use_timer = TRUE); // Clean up the dead object list.
+    void cleanDeadObjects(const bool use_timer = true); // Clean up the dead object list.
 
     // Simulator and viewer side object updates...
     void processUpdateCore(LLViewerObject* objectp, void** data, U32 block, const EObjectUpdateType update_type,
@@ -177,7 +177,7 @@ public:
 
     // if we paused in the last frame
     // used to discount stats from this frame
-    BOOL mWasPaused;
+    bool mWasPaused;
 
     void getUUIDFromLocal(LLUUID &id,
                                 const U32 local_id,
@@ -188,7 +188,7 @@ public:
                                 const U32 ip,
                                 const U32 port); // Requires knowledge of message system info!
 
-    BOOL removeFromLocalIDTable(const LLViewerObject* objectp);
+    bool removeFromLocalIDTable(const LLViewerObject* objectp);
     // Used ONLY by the orphaned object code.
     U64 getIndex(const U32 local_id, const U32 ip, const U32 port);
 

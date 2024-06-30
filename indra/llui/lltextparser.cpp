@@ -153,7 +153,7 @@ S32 LLHighlightEntry::findPattern(const std::string& text, S32 cat_mask) const
             }
             break;
     }
-    return idxFound;
+    return static_cast<S32>(idxFound);
 }
 // [/SL:KB]
 //S32 LLTextParser::findPattern(const std::string &text, LLSD highlight)
@@ -228,9 +228,9 @@ LLTextParser::partial_results_t LLTextParser::parsePartialLineHighlights(const s
                 S32 start = entry.findPattern(text, cat_mask);
                 if (start >= 0 )
                 {
-                    S32 end = entry.mPattern.length();
+                    auto end = entry.mPattern.length();
 // [/SL:KB]
-                    S32 len = text.length();
+                    auto len = text.length();
                     EHighlightPosition newpart;
                     if (start==0)
                     {
@@ -343,11 +343,11 @@ bool LLTextParser::parseFullLineHighlights(const std::string& text, S32 cat_mask
             {
                 if (ppEntry)
                     *ppEntry = &entry;
-                return TRUE;
+                return true;
             }
         }
     }
-    return FALSE;   //No matches found.
+    return false;   //No matches found.
 }
 // [/SL:KB]
 //bool LLTextParser::parseFullLineHighlights(const std::string &text, LLColor4 *color)
@@ -362,11 +362,11 @@ bool LLTextParser::parseFullLineHighlights(const std::string& text, S32 cat_mask
 //          {
 //              LLSD color_llsd = mHighlights[i]["color"];
 //              color->setValue(color_llsd);
-//              return TRUE;
+//              return true;
 //          }
 //      }
 //  }
-//  return FALSE;   //No matches found.
+//  return false;   //No matches found.
 //}
 
 //std::string LLTextParser::getFileName()
@@ -455,13 +455,13 @@ void LLTextParser::saveToDisk() const
 //  if (filename.empty())
 //  {
 //      LL_WARNS() << "LLTextParser::saveToDisk() no valid user directory." << LL_ENDL;
-//      return FALSE;
+//      return false;
 //  }
 //  llofstream file;
 //  file.open(filename.c_str());
 //  LLSDSerialize::toPrettyXML(mHighlights, file);
 //  file.close();
-//  return TRUE;
+//  return true;
 //}
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-17 (Catznip-3.3)

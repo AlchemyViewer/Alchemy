@@ -46,8 +46,8 @@
 
 ///////////////////////////////////////////////////////////
 LLPacketRing::LLPacketRing () :
-    mUseInThrottle(FALSE),
-    mUseOutThrottle(FALSE),
+    mUseInThrottle(false),
+    mUseOutThrottle(false),
     mInThrottle(256000.f),
     mOutThrottle(64000.f),
     mActualBitsIn(0),
@@ -98,12 +98,12 @@ void LLPacketRing::setDropPercentage (F32 percent_to_drop)
     mDropPercentage = percent_to_drop;
 }
 
-void LLPacketRing::setUseInThrottle(const BOOL use_throttle)
+void LLPacketRing::setUseInThrottle(const bool use_throttle)
 {
     mUseInThrottle = use_throttle;
 }
 
-void LLPacketRing::setUseOutThrottle(const BOOL use_throttle)
+void LLPacketRing::setUseOutThrottle(const bool use_throttle)
 {
     mUseOutThrottle = use_throttle;
 }
@@ -162,7 +162,7 @@ S32 LLPacketRing::receivePacket (S32 socket, char *datap)
     // If using the throttle, simulate a limited size input buffer.
     if (mUseInThrottle)
     {
-        BOOL done = FALSE;
+        bool done = false;
 
         // push any current net packet (if any) onto delay ring
         while (!done)
@@ -271,12 +271,12 @@ S32 LLPacketRing::receivePacket (S32 socket, char *datap)
     return packet_size;
 }
 
-BOOL LLPacketRing::sendPacket(int h_socket, char * send_buffer, S32 buf_size, const LLHost& host)
+bool LLPacketRing::sendPacket(int h_socket, char * send_buffer, S32 buf_size, const LLHost& host)
 {
 #define LOCALHOST_ADDR 16777343
     LLMessageLog::log(LLHost(LOCALHOST_ADDR, gMessageSystem->getListenPort()), host, (U8*)send_buffer, buf_size);
 #undef LOCALHOST_ADDR
-    BOOL status = TRUE;
+    bool status = true;
     if (!mUseOutThrottle)
     {
         return sendPacketImpl(h_socket, send_buffer, buf_size, host );
@@ -348,7 +348,7 @@ BOOL LLPacketRing::sendPacket(int h_socket, char * send_buffer, S32 buf_size, co
     return status;
 }
 
-BOOL LLPacketRing::sendPacketImpl(int h_socket, const char * send_buffer, S32 buf_size, const LLHost& host)
+bool LLPacketRing::sendPacketImpl(int h_socket, const char * send_buffer, S32 buf_size, const LLHost& host)
 {
 
     if (!LLProxy::isSOCKSProxyEnabled())

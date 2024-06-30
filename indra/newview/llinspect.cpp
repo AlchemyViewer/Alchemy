@@ -93,15 +93,15 @@ void LLInspect::onFocusLost()
 }
 
 // virtual
-BOOL LLInspect::handleHover(S32 x, S32 y, MASK mask)
+bool LLInspect::handleHover(S32 x, S32 y, MASK mask)
 {
     mOpenTimer.pause();
     return LLView::handleHover(x, y, mask);
 }
 
-BOOL LLInspect::handleToolTip(S32 x, S32 y, MASK mask)
+bool LLInspect::handleToolTip(S32 x, S32 y, MASK mask)
 {
-    BOOL handled = FALSE;
+    bool handled = false;
 
 
     //delegate handling of tooltip to the hovered child
@@ -116,7 +116,7 @@ BOOL LLInspect::handleToolTip(S32 x, S32 y, MASK mask)
         static LLUICachedControl<F32> tool_tip_delay("ToolTipDelay", 0.69999f);
         params.delay_time =  LLToolTipMgr::instance().toolTipVisible() ? 0.f : tool_tip_delay;
         LLToolTipMgr::instance().show(params);
-        handled = TRUE;
+        handled = true;
     }
     return handled;
 }

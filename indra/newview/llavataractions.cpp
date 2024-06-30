@@ -584,7 +584,7 @@ void LLAvatarActions::teleport_request_callback(const LLSD& notification, const 
         msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
 
         msg->nextBlockFast(_PREHASH_MessageBlock);
-        msg->addBOOLFast(_PREHASH_FromGroup, FALSE);
+        msg->addBOOLFast(_PREHASH_FromGroup, false);
         msg->addUUIDFast(_PREHASH_ToAgentID, notification["substitutions"]["uuid"] );
         msg->addU8Fast(_PREHASH_Offline, IM_ONLINE);
         msg->addU8Fast(_PREHASH_Dialog, IM_TELEPORT_REQUEST);
@@ -717,8 +717,8 @@ void LLAvatarActions::csr(const LLUUID& id, std::string name)
     std::string url = "http://csr.lindenlab.com/agent/";
 
     // slow and stupid, but it's late
-    S32 len = name.length();
-    for (S32 i = 0; i < len; i++)
+    auto len = name.length();
+    for (size_t i = 0; i < len; i++)
     {
         if (name[i] == ' ')
         {
@@ -789,7 +789,7 @@ namespace action_give_inventory
      */
     static LLInventoryPanel* get_active_inventory_panel()
     {
-        LLInventoryPanel* active_panel = LLInventoryPanel::getActiveInventoryPanel(FALSE);
+        LLInventoryPanel* active_panel = LLInventoryPanel::getActiveInventoryPanel(false);
         LLFloater* floater_appearance = LLFloaterReg::findInstance("appearance");
         if (!active_panel || (floater_appearance && floater_appearance->hasFocus()))
         {
@@ -901,11 +901,11 @@ namespace action_give_inventory
             return;
         }
 
-        S32 count = LLShareInfo::instance().mAvatarNames.size();
+        auto count = LLShareInfo::instance().mAvatarNames.size();
         bool shared = count && !inventory_selected_uuids.empty();
 
         // iterate through avatars
-        for(S32 i = 0; i < count; ++i)
+        for(size_t i = 0; i < count; ++i)
         {
             const LLUUID& avatar_uuid = LLShareInfo::instance().mAvatarUuids[i];
 
@@ -989,7 +989,7 @@ namespace action_give_inventory
 // [RLVa:KB] - @share
         if ( (RlvActions::isRlvEnabled()) && (RlvActions::hasBehaviour(RLV_BHVR_SHARE)) )
         {
-            for (int idxAvatar = avatar_uuids.size() - 1; idxAvatar >= 0; idxAvatar--)
+            for (int idxAvatar = static_cast<int>(avatar_uuids.size()) - 1; idxAvatar >= 0; idxAvatar--)
             {
                 if (!RlvActions::canGiveInventory(avatar_uuids[idxAvatar]))
                 {
@@ -1160,7 +1160,7 @@ void LLAvatarActions::shareWithAvatars(LLView * panel)
     LLFloater* root_floater = gFloaterView->getParentFloater(panel);
     LLInventoryPanel* inv_panel = dynamic_cast<LLInventoryPanel*>(panel);
     LLFloaterAvatarPicker* picker =
-        LLFloaterAvatarPicker::show(boost::bind(give_inventory, _1, _2, inv_panel), TRUE, FALSE, FALSE, root_floater->getName());
+        LLFloaterAvatarPicker::show(boost::bind(give_inventory, _1, _2, inv_panel), true, false, false, root_floater->getName());
     if (!picker)
     {
         return;
@@ -1182,7 +1182,7 @@ void LLAvatarActions::shareWithAvatars(const uuid_set_t inventory_selected_uuids
     using namespace action_give_inventory;
 
     LLFloaterAvatarPicker* picker =
-        LLFloaterAvatarPicker::show(boost::bind(give_inventory_ids, _1, _2, inventory_selected_uuids), TRUE, FALSE, FALSE, root_floater->getName());
+        LLFloaterAvatarPicker::show(boost::bind(give_inventory_ids, _1, _2, inventory_selected_uuids), true, false, false, root_floater->getName());
     if (!picker)
     {
         return;
@@ -1393,7 +1393,7 @@ bool LLAvatarActions::handleRemove(const LLSD& notification, const LLSD& respons
             case 0: // YES
                 if( ip->isRightGrantedTo(LLRelationship::GRANT_MODIFY_OBJECTS))
                 {
-                    LLAvatarTracker::instance().empower(id, FALSE);
+                    LLAvatarTracker::instance().empower(id, false);
                     LLAvatarTracker::instance().notifyObservers();
                 }
                 LLAvatarTracker::instance().terminateBuddy(id);

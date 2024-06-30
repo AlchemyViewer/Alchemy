@@ -48,11 +48,11 @@ protected:
 public:
     virtual ~LLTextBox() = default;
 
-    /*virtual*/ BOOL handleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ BOOL handleHover(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
 
-    /*virtual*/ void setEnabled(BOOL enabled);
+    /*virtual*/ void setEnabled(bool enabled);
 
     /*virtual*/ void setText( const LLStringExplicit& text, const LLStyle::Params& input_params = LLStyle::Params() );
 
@@ -61,13 +61,13 @@ public:
     void            setClickedCallback( boost::function<void (void*)> cb, void* userdata = NULL );
     void            clearClickedCallback();
 
-    void            reshapeToFitText(BOOL called_from_parent = FALSE);
+    void            reshapeToFitText(bool called_from_parent = false);
 
     S32             getTextPixelWidth();
     S32             getTextPixelHeight();
 
     /*virtual*/ LLSD    getValue() const;
-    /*virtual*/ BOOL    setTextArg( const std::string& key, const LLStringExplicit& text );
+    /*virtual*/ bool    setTextArg( const std::string& key, const LLStringExplicit& text );
 
     void            setShowCursorHand(bool show_cursor) { mShowCursorHand = show_cursor; }
 
@@ -88,7 +88,7 @@ protected:
 // Build time optimization, generate once in .cpp file
 #ifndef LLTEXTBOX_CPP
 extern template class LLTextBox* LLView::getChild<class LLTextBox>(
-    std::string_view name, BOOL recurse) const;
+    std::string_view name, bool recurse) const;
 #endif
 
 #endif

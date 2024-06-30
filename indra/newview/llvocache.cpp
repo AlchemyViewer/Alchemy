@@ -40,17 +40,17 @@ F32 LLVOCacheEntry::sNearRadius = 1.0f;
 F32 LLVOCacheEntry::sRearFarRadius = 1.0f;
 F32 LLVOCacheEntry::sFrontPixelThreshold = 1.0f;
 F32 LLVOCacheEntry::sRearPixelThreshold = 1.0f;
-BOOL LLVOCachePartition::sNeedsOcclusionCheck = FALSE;
+bool LLVOCachePartition::sNeedsOcclusionCheck = false;
 
 const S32 ENTRY_HEADER_SIZE = 6 * sizeof(S32);
 const S32 MAX_ENTRY_BODY_SIZE = 10000;
 
-BOOL check_read(LLAPRFile* apr_file, void* src, S32 n_bytes)
+bool check_read(LLAPRFile* apr_file, void* src, S32 n_bytes)
 {
     return apr_file->read(src, n_bytes) == n_bytes ;
 }
 
-BOOL check_write(LLAPRFile* apr_file, void* src, S32 n_bytes)
+bool check_write(LLAPRFile* apr_file, void* src, S32 n_bytes)
 {
     return apr_file->write(src, n_bytes) == n_bytes ;
 }
@@ -165,7 +165,7 @@ LLVOCacheEntry::LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &
     mCRCChangeCount(0),
     mState(INACTIVE),
     mSceneContrib(0.f),
-    mValid(TRUE),
+    mValid(true),
     mParentID(0),
     mBSphereRadius(-1.0f)
 {
@@ -185,7 +185,7 @@ LLVOCacheEntry::LLVOCacheEntry()
     mBuffer(NULL),
     mState(INACTIVE),
     mSceneContrib(0.f),
-    mValid(TRUE),
+    mValid(true),
     mParentID(0),
     mBSphereRadius(-1.0f)
 {
@@ -198,12 +198,12 @@ LLVOCacheEntry::LLVOCacheEntry(LLAPRFile* apr_file)
     mUpdateFlags(-1),
     mState(INACTIVE),
     mSceneContrib(0.f),
-    mValid(FALSE),
+    mValid(false),
     mParentID(0),
     mBSphereRadius(-1.0f)
 {
     S32 size = -1;
-    BOOL success;
+    bool success;
     static U8 data_buffer[ENTRY_HEADER_SIZE];
 
     mDP.assignBuffer(mBuffer, 0);
@@ -225,7 +225,7 @@ LLVOCacheEntry::LLVOCacheEntry(LLAPRFile* apr_file)
             // We won't bother seeking, because the rest of this file
             // is likely bogus, and will be tossed anyway.
             LL_WARNS() << "Bogus cache entry, size " << size << ", aborting!" << LL_ENDL;
-            success = FALSE;
+            success = false;
         }
     }
     if(success && size > 0)
@@ -339,7 +339,7 @@ void LLVOCacheEntry::setState(U32 state)
 
     if(getState() == ACTIVE)
     {
-        const S32 MIN_INTERVAL = 64 + sMinFrameRange;
+        const U32 MIN_INTERVAL = 64U + sMinFrameRange;
         U32 last_visible = getVisible();
 
         setVisible();
@@ -552,7 +552,7 @@ bool LLVOCacheEntry::isAnyVisible(const LLVector4a& camera_origin, const LLVecto
     if(!vis)
     {
         S32 cur_vis = llmax(group->getAnyVisible(), (S32)getVisible());
-        vis = (cur_vis + sMinFrameRange > LLViewerOctreeEntryData::getCurrentFrame());
+        vis = (cur_vis + (S32)sMinFrameRange > LLViewerOctreeEntryData::getCurrentFrame());
     }
 
     //within the back sphere
@@ -1024,7 +1024,7 @@ S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
         }
         if(LLViewerOctreeEntryData::getCurrentFrame() % seed != mIdleHash)
         {
-            mFrontCull = FALSE;
+            mFrontCull = false;
 
             //process back objects selection
             selectBackObjects(camera, LLVOCacheEntry::getSquaredPixelThreshold(mFrontCull),
@@ -1041,7 +1041,7 @@ S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
     LLVector3 region_agent = mRegionp->getOriginAgent();
     camera.calcRegionFrustumPlanes(region_agent, gAgentCamera.mDrawDistance);
 
-    mFrontCull = TRUE;
+    mFrontCull = true;
     LLVOCacheOctreeCull culler(&camera, mRegionp, region_agent, do_occlusion && use_object_cache_occlusion,
         LLVOCacheEntry::getSquaredPixelThreshold(mFrontCull), this);
     culler.traverse(mOctree);
@@ -1054,10 +1054,10 @@ S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
 }
 #endif // LL_TEST
 
-void LLVOCachePartition::setCullHistory(BOOL has_new_object)
+void LLVOCachePartition::setCullHistory(bool has_new_object)
 {
     mCullHistory <<= 1;
-    mCullHistory |= has_new_object;
+    mCullHistory |= static_cast<U32>(has_new_object);
 }
 
 void LLVOCachePartition::addOccluders(LLViewerOctreeGroup* gp)
@@ -1096,7 +1096,7 @@ void LLVOCachePartition::processOccluders(LLCamera* camera)
 
     //safe to clear mOccludedGroups here because only the world camera accesses it.
     mOccludedGroups.clear();
-    sNeedsOcclusionCheck = FALSE;
+    sNeedsOcclusionCheck = false;
 }
 
 void LLVOCachePartition::resetOccluders()
@@ -1112,7 +1112,7 @@ void LLVOCachePartition::resetOccluders()
         group->clearOcclusionState(LLOcclusionCullingGroup::ACTIVE_OCCLUSION);
     }
     mOccludedGroups.clear();
-    sNeedsOcclusionCheck = FALSE;
+    sNeedsOcclusionCheck = false;
 }
 
 void LLVOCachePartition::removeOccluder(LLVOCacheGroup* group)
@@ -1296,7 +1296,7 @@ void LLVOCache::removeEntry(HeaderEntryInfo* entry)
         removeFromCache(entry);
         delete entry;
 
-        mNumEntries = mHandleEntryMap.size() ;
+        mNumEntries = static_cast<U32>(mHandleEntryMap.size());
     }
 }
 
@@ -1481,7 +1481,7 @@ void LLVOCache::writeCacheHeader()
             success = check_write(&apr_file, (void*)*iter, sizeof(HeaderEntryInfo));
         }
 
-        mNumEntries = mHeaderEntryQueue.size() ;
+        mNumEntries = static_cast<U32>(mHeaderEntryQueue.size());
         if(success && mNumEntries < MAX_NUM_OBJECT_ENTRIES)
         {
             HeaderEntryInfo* entry = new HeaderEntryInfo() ;
@@ -1499,12 +1499,12 @@ void LLVOCache::writeCacheHeader()
     if(!success)
     {
         clearCacheInMemory() ;
-        mReadOnly = TRUE ; //disable the cache.
+        mReadOnly = true ; //disable the cache.
     }
     return ;
 }
 
-BOOL LLVOCache::updateEntry(const HeaderEntryInfo* entry)
+bool LLVOCache::updateEntry(const HeaderEntryInfo* entry)
 {
     LLAPRFile apr_file(mHeaderFileName, APR_WRITE|APR_BINARY, mLocalAPRFilePoolp);
     apr_file.seek(APR_SET, entry->mIndex * sizeof(HeaderEntryInfo) + sizeof(HeaderMetaInfo)) ;
@@ -1725,10 +1725,10 @@ void LLVOCache::purgeEntries(U32 size)
         removeFromCache(entry) ; // This now handles removing extras cache where appropriate.
         delete entry;
     }
-    mNumEntries = mHandleEntryMap.size() ;
+    mNumEntries = static_cast<U32>(mHandleEntryMap.size());
 }
 
-void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, BOOL dirty_cache, bool removal_enabled)
+void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled)
 {
     std::string filename;
     getObjectCacheFilename(handle, filename);
@@ -1797,7 +1797,7 @@ void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry:
 
         if(success)
         {
-            S32 num_entries = cache_entry_map.size(); // if removal is enabled num_entries might be wrong
+            S32 num_entries = static_cast<S32>(cache_entry_map.size()); // if removal is enabled num_entries might be wrong
             success = check_write(&apr_file, &num_entries, sizeof(S32));
             if (success)
             {
@@ -1872,17 +1872,17 @@ void LLVOCache::removeGenericExtrasForHandle(U64 handle)
     auto* entry = mHandleEntryMap[handle];
     if (entry)
     {
+        LL_WARNS("GLTF", "VOCache") << "Removing generic extras for handle " << entry->mHandle << "Filename: " << getObjectCacheExtrasFilename(handle) << LL_ENDL;
         removeEntry(entry);
     }
     else
     {
         //shouldn't happen, but if it does, we should remove the extras file since it's orphaned
-        LL_WARNS("GLTF", "VOCache") << "Removing generic extras for handle " << handle << "Filename: " << getObjectCacheExtrasFilename(handle) << LL_ENDL;
         LLFile::remove(getObjectCacheExtrasFilename(handle));
     }
 }
 
-void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, BOOL dirty_cache, bool removal_enabled)
+void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, bool dirty_cache, bool removal_enabled)
 {
     if(!mEnabled)
     {
@@ -1897,9 +1897,7 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
         return;
     }
 
-    // <FS:Beq> FIRE-33808 - Material Override Cache causes long delays
     std::string filename = getObjectCacheExtrasFilename(handle);
-    // </FS:Beq>
     llofstream out(filename, std::ios::out | std::ios::binary);
     if(!out.good())
     {
@@ -1934,7 +1932,7 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
     U32 num_entries = 0;
     U32 inmem_entries = 0;
     U32 skipped = 0;
-    inmem_entries = cache_extras_entry_map.size();
+    inmem_entries = (U32)cache_extras_entry_map.size();
     for (auto [local_id, entry] : cache_extras_entry_map)
     {
         // Only write out GLTFOverrides that we can actually apply again on import.

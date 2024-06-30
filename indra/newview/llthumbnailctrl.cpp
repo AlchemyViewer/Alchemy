@@ -97,7 +97,7 @@ void LLThumbnailCtrl::draw()
     {
         mBorder->setKeyboardFocusHighlight(hasFocus());
 
-        gl_rect_2d( draw_rect, mBorderColor.get(), FALSE );
+        gl_rect_2d( draw_rect, mBorderColor.get(), false );
         draw_rect.stretch( -1 );
     }
 
@@ -108,7 +108,7 @@ void LLThumbnailCtrl::draw()
         if( mTexturep->getComponents() == 4 )
         {
             const LLColor4 color(.098f, .098f, .098f);
-            gl_rect_2d( draw_rect, color, TRUE);
+            gl_rect_2d( draw_rect, color, true);
         }
 
         gl_draw_scaled_image( draw_rect.mLeft, draw_rect.mBottom, draw_rect.getWidth(), draw_rect.getHeight(), mTexturep, UI_VERTEX_COLOR % alpha);
@@ -144,7 +144,7 @@ void LLThumbnailCtrl::draw()
     }
     else
     {
-        gl_rect_2d( draw_rect, LLColor4::grey % alpha, TRUE );
+        gl_rect_2d( draw_rect, LLColor4::grey % alpha, true );
 
         // Draw X
         gl_draw_x( draw_rect, LLColor4::black );
@@ -205,12 +205,12 @@ void LLThumbnailCtrl::setValue(const LLSD& value)
     }
 }
 
-BOOL LLThumbnailCtrl::handleHover(S32 x, S32 y, MASK mask)
+bool LLThumbnailCtrl::handleHover(S32 x, S32 y, MASK mask)
 {
     if (mInteractable && getEnabled())
     {
         getWindow()->setCursor(UI_CURSOR_HAND);
-        return TRUE;
+        return true;
     }
     return LLUICtrl::handleHover(x, y, mask);
 }
@@ -261,7 +261,7 @@ void LLThumbnailCtrl::unloadImage()
     mInited = false;
 }
 
-void LLThumbnailCtrl::onVisibilityChange(BOOL new_visibility)
+void LLThumbnailCtrl::onVisibilityChange(bool new_visibility)
 {
     if (!new_visibility && mInited)
     {

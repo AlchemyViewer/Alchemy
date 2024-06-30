@@ -58,7 +58,7 @@ LLFloaterDestinations::~LLFloaterDestinations()
     }
 }
 
-BOOL LLFloaterDestinations::postBuild()
+bool LLFloaterDestinations::postBuild()
 {
     enableResizeCtrls(true, true, false);
     LLMediaCtrl* destinations = findChild<LLMediaCtrl>("destination_guide_contents");
@@ -73,7 +73,7 @@ BOOL LLFloaterDestinations::postBuild()
         dest_url = LLWeb::expandURLSubstitutions(dest_url, LLSD());
         destinations->navigateTo(dest_url, HTTP_CONTENT_TEXT_HTML);
     }
-    return TRUE;
+    return true;
 }
 
 

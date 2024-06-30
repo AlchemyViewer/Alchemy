@@ -84,7 +84,7 @@ private:
     virtual ~LLFloaterAbout();
 
 public:
-    /*virtual*/ BOOL postBuild();
+    bool postBuild() override;
 
     /// Obtain the data used to fill out the contents string. This is
     /// separated so that we can programmatically access the same info.
@@ -116,7 +116,7 @@ LLFloaterAbout::~LLFloaterAbout()
 {
 }
 
-BOOL LLFloaterAbout::postBuild()
+bool LLFloaterAbout::postBuild()
 {
     center();
     LLViewerTextEditor *support_widget =
@@ -174,7 +174,7 @@ BOOL LLFloaterAbout::postBuild()
     support_widget->blockUndo();
 
     // Fix views
-    support_widget->setEnabled(FALSE);
+    support_widget->setEnabled(false);
     support_widget->startOfDoc();
 
     {
@@ -193,7 +193,7 @@ BOOL LLFloaterAbout::postBuild()
             LL_WARNS("AboutInit") << "Could not read contributors file at " << contributors_path << LL_ENDL;
         }
         contrib_names_widget->setText(contributors);
-        contrib_names_widget->setEnabled(FALSE);
+        contrib_names_widget->setEnabled(false);
         contrib_names_widget->startOfDoc();
     }
 
@@ -213,7 +213,7 @@ BOOL LLFloaterAbout::postBuild()
             LL_WARNS("AboutInit") << "Could not read supporters file at " << supporters_path << LL_ENDL;
         }
         suppoter_names_widget->setText(supporters);
-        suppoter_names_widget->setEnabled(FALSE);
+        suppoter_names_widget->setEnabled(false);
         suppoter_names_widget->startOfDoc();
     }
 
@@ -227,7 +227,7 @@ BOOL LLFloaterAbout::postBuild()
         licenses_widget->clear();
         while ( std::getline(licenses_file, license_line) )
         {
-            licenses_widget->appendText(license_line+"\n", FALSE,
+            licenses_widget->appendText(license_line+"\n", false,
                                         LLStyle::Params() .color(about_color));
         }
         licenses_file.close();
@@ -237,10 +237,10 @@ BOOL LLFloaterAbout::postBuild()
         // this case will use the (out of date) hard coded value from the XUI
         LL_INFOS("AboutInit") << "Could not read licenses file at " << licenses_path << LL_ENDL;
     }
-    licenses_widget->setEnabled(FALSE);
+    licenses_widget->setEnabled(false);
     licenses_widget->startOfDoc();
 
-    return TRUE;
+    return true;
 }
 
 LLSD LLFloaterAbout::getInfo()
@@ -376,7 +376,7 @@ void LLFloaterAbout::setSupportText(const std::string& server_release_notes_url)
     LLUIColor about_color = LLUIColorTable::instance().getColor("TextFgReadOnlyColor");
     support_widget->clear();
     support_widget->appendText(LLAppViewer::instance()->getViewerInfoString(),
-                               FALSE, LLStyle::Params() .color(about_color));
+                               false, LLStyle::Params() .color(about_color));
 }
 
 ///----------------------------------------------------------------------------

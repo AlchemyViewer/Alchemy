@@ -75,7 +75,7 @@ LLMotion::LLMotionInitStatus LLKeyframeWalkMotion::onInitialize(LLCharacter *cha
 //-----------------------------------------------------------------------------
 // LLKeyframeWalkMotion::onActivate()
 //-----------------------------------------------------------------------------
-BOOL LLKeyframeWalkMotion::onActivate()
+bool LLKeyframeWalkMotion::onActivate()
 {
     mRealTimeLast = 0.0f;
     mAdjTimeLast = 0.0f;
@@ -95,7 +95,7 @@ void LLKeyframeWalkMotion::onDeactivate()
 //-----------------------------------------------------------------------------
 // LLKeyframeWalkMotion::onUpdate()
 //-----------------------------------------------------------------------------
-BOOL LLKeyframeWalkMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLKeyframeWalkMotion::onUpdate(F32 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED;
     // compute time since last update
@@ -166,7 +166,7 @@ LLMotion::LLMotionInitStatus LLWalkAdjustMotion::onInitialize(LLCharacter *chara
 //-----------------------------------------------------------------------------
 // LLWalkAdjustMotion::onActivate()
 //-----------------------------------------------------------------------------
-BOOL LLWalkAdjustMotion::onActivate()
+bool LLWalkAdjustMotion::onActivate()
 {
     mAnimSpeed = 0.f;
     mAdjustedSpeed = 0.f;
@@ -183,13 +183,13 @@ BOOL LLWalkAdjustMotion::onActivate()
     F32 rightAnkleOffset = (mRightAnkleJoint->getWorldPosition() - mCharacter->getCharacterPosition()).magVec();
     mAnkleOffset = llmax(leftAnkleOffset, rightAnkleOffset);
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
 // LLWalkAdjustMotion::onUpdate()
 //-----------------------------------------------------------------------------
-BOOL LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED;
     // delta_time is guaranteed to be non zero
@@ -308,7 +308,7 @@ BOOL LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
     // need to update *some* joint to keep this animation active
     mPelvisState->setPosition(mPelvisOffset);
 
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -355,18 +355,18 @@ LLMotion::LLMotionInitStatus LLFlyAdjustMotion::onInitialize(LLCharacter *charac
 //-----------------------------------------------------------------------------
 // LLFlyAdjustMotion::onActivate()
 //-----------------------------------------------------------------------------
-BOOL LLFlyAdjustMotion::onActivate()
+bool LLFlyAdjustMotion::onActivate()
 {
     mPelvisState->setPosition(LLVector3::zero);
     mPelvisState->setRotation(LLQuaternion::DEFAULT);
     mRoll = 0.f;
-    return TRUE;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
 // LLFlyAdjustMotion::onUpdate()
 //-----------------------------------------------------------------------------
-BOOL LLFlyAdjustMotion::onUpdate(F32 time, U8* joint_mask)
+bool LLFlyAdjustMotion::onUpdate(F32 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED;
     LLVector3 ang_vel = mCharacter->getCharacterAngularVelocity() * mCharacter->getTimeDilation();
@@ -381,6 +381,6 @@ BOOL LLFlyAdjustMotion::onUpdate(F32 time, U8* joint_mask)
     LLQuaternion roll(mRoll, LLVector3(0.f, 0.f, 1.f));
     mPelvisState->setRotation(roll);
 
-    return TRUE;
+    return true;
 }
 

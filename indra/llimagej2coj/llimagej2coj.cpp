@@ -235,6 +235,9 @@ bool LLImageJ2COJ::initEncode(LLImageJ2C &base, LLImageRaw &raw_image, int block
 
 bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decode_time, S32 first_channel, S32 max_channel_count)
 {
+    LLImageDataLock lockIn(&base);
+    LLImageDataLock lockOut(&raw_image);
+
     /* Extract metadata */
     /* ---------------- */
     U8* c_data = base.getData();
@@ -407,7 +410,7 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
             S32 offset = dest;
             for (S32 y = (height - 1); y >= 0; y--)
             {
-                for (S32 x = 0; x < width; x++)
+                for (U32 x = 0; x < width; x++)
                 {
                     rawp[offset] = image->comps[comp].data[y*comp_width + x];
                     offset += channels;
@@ -434,6 +437,8 @@ bool LLImageJ2COJ::decodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decod
 
 bool LLImageJ2COJ::encodeImpl(LLImageJ2C &base, const LLImageRaw &raw_image, const char* comment_text, F32 encode_time, bool reversible)
 {
+    LLImageDataSharedLock lockIn(&raw_image);
+    LLImageDataLock lockOut(&base);
     const S32 MAX_COMPS = 5;
     opj_cparameters_t parameters;   /* compression parameters */
 
@@ -632,6 +637,8 @@ bool getMetadataFast( LLImageJ2C &aImage, S32 &aW, S32 &aH, S32 &aComps )
 
 bool LLImageJ2COJ::getMetadata(LLImageJ2C &base)
 {
+    LLImageDataLock lock(&base);
+
     //
     // FIXME: We get metadata by decoding the ENTIRE image.
     //

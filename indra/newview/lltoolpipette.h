@@ -47,17 +47,17 @@ class LLToolPipette final
     virtual ~LLToolPipette();
 
 public:
-    virtual BOOL    handleMouseDown(S32 x, S32 y, MASK mask) override;
-    virtual BOOL    handleMouseUp(S32 x, S32 y, MASK mask) override;
-    virtual BOOL    handleHover(S32 x, S32 y, MASK mask) override;
-    virtual BOOL    handleToolTip(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleToolTip(S32 x, S32 y, MASK mask) override;
 
     virtual void    handleDeselect() override;
 
     // Note: Don't return connection; all signals disconnected on tool deselect
     typedef boost::signals2::signal<void (bool success, LLViewerObject* obj, const LLTextureEntry& te)> signal_t;
     void setToolSelectCallback(const signal_t::slot_type& cb) { mSignal.connect(cb); }
-    void setResult(BOOL success, const std::string& msg);
+    void setResult(bool success, const std::string& msg);
 
 protected:
     void signalCallback(LLViewerObject* obj, const LLTextureEntry* entry);
@@ -66,7 +66,7 @@ protected:
     LLTextureEntry  mTextureEntry;
     LLViewerObject* mHitObj;
     signal_t        mSignal;
-    BOOL            mSuccess;
+    bool            mSuccess;
     std::string     mTooltipMsg;
 };
 

@@ -54,7 +54,7 @@ ALPanelMusicTicker::~ALPanelMusicTicker()
     }
 }
 
-BOOL ALPanelMusicTicker::postBuild()
+bool ALPanelMusicTicker::postBuild()
 {
     mStationText = getChild<LLTextBox>("station_text");
     mArtistText =   getChild<LLTextBox>("artist_text");
@@ -85,7 +85,7 @@ void ALPanelMusicTicker::draw()
     LLPanel::draw();
 }
 
-void ALPanelMusicTicker::reshape(S32 width, S32 height, BOOL called_from_parent/*=TRUE*/)
+void ALPanelMusicTicker::reshape(S32 width, S32 height, bool called_from_parent/*=true*/)
 {
     bool width_changed = (getRect().getWidth() != width);
     LLPanel::reshape(width, height, called_from_parent);
