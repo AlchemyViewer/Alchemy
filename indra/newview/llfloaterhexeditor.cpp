@@ -167,6 +167,7 @@ void LLFloaterHexEditor::imageCallback(bool success,
             return;
         }
 
+        LLImageDataSharedLock lockIn(src);
         U8* src_data = src->getData();
         S32 src_size = src->getDataSize();
         std::vector<U8> new_data;
