@@ -8326,6 +8326,28 @@
     <key>Value</key>
     <integer>0</integer>
   </map>
+  <key>RenderMinFreeMainMemoryThreshold</key>
+  <map>
+    <key>Comment</key>
+    <string>Minimum of available physical memory in MB before textures get scaled down</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>U32</string>
+    <key>Value</key>
+    <integer>512</integer>
+  </map>
+  <key>RenderLowMemMinDiscardIncrement</key>
+  <map>
+    <key>Comment</key>
+    <string>Minimum increment of discard level if system memory gets low</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>0.1</real>
+  </map>
   <key>RenderMaxTextureIndex</key>
   <map>
     <key>Comment</key>
@@ -13708,7 +13730,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>1</integer>
+      <integer>0</integer>
     </map>
     <key>AutoDisengageMic</key>
     <map>

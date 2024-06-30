@@ -2102,6 +2102,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         ${LLPHYSICSEXTENSIONS_LIBRARIES}
         ll::tracy
         ll::versioninfo
+        meshoptimizer
         )
 
 if( TARGET ll::sdbus-cpp )

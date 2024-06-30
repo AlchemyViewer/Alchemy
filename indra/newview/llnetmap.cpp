@@ -359,7 +359,6 @@ void LLNetMap::draw()
                     }
                 }
             }
-
             if (render_land_textures)
             {
                 // Draw using texture.
@@ -375,24 +374,6 @@ void LLNetMap::draw()
                     gGL.vertex2f(right, bottom);
                 gGL.end();
 
-                // Draw water
-                gGL.flush();
-                {
-                    if (regionp->getLand().getWaterTexture())
-                    {
-                        gGL.getTexUnit(0)->bind(regionp->getLand().getWaterTexture());
-                        gGL.begin(LLRender::TRIANGLE_STRIP);
-                            gGL.texCoord2f(0.f, 1.f);
-                            gGL.vertex2f(left, top);
-                            gGL.texCoord2f(0.f, 0.f);
-                            gGL.vertex2f(left, bottom);
-                            gGL.texCoord2f(1.f, 1.f);
-                            gGL.vertex2f(right, top);
-                            gGL.texCoord2f(1.f, 0.f);
-                            gGL.vertex2f(right, bottom);
-                        gGL.end();
-                    }
-                }
                 gGL.flush();
             }
         }

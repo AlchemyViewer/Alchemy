@@ -48,25 +48,10 @@ public:
         *this = rhs;
     }
 
-    LLVolumeTriangle& operator=(LLVolumeTriangle&& rhs) noexcept
+    ~LLVolumeTriangle()
     {
-        mPositionGroup = rhs.mPositionGroup;
-        mV[0] = rhs.mV[0];
-        mV[0] = rhs.mV[0];
-        mV[0] = rhs.mV[0];
 
-        mIndex[0] = rhs.mIndex[2];
-        mIndex[1] = rhs.mIndex[2];
-        mIndex[2] = rhs.mIndex[2];
-
-        mRadius = rhs.mRadius;
-        mBinIndex = rhs.mBinIndex;
-
-        LLRefCount::operator=(std::move(rhs));
-        return *this;
     }
-
-    ~LLVolumeTriangle() = default;
 
     LL_ALIGN_16(LLVector4a mPositionGroup);
 
@@ -93,8 +78,16 @@ public:
     LLVolumeOctreeListener(LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* node);
     ~LLVolumeOctreeListener() = default;
 
-    LLVolumeOctreeListener(const LLVolumeOctreeListener& rhs) = delete;
-    LLVolumeOctreeListener& operator=(const LLVolumeOctreeListener& rhs) = delete;
+    LLVolumeOctreeListener(const LLVolumeOctreeListener& rhs)
+    {
+        *this = rhs;
+    }
+
+    const LLVolumeOctreeListener& operator=(const LLVolumeOctreeListener& rhs)
+    {
+        LL_ERRS() << "Illegal operation!" << LL_ENDL;
+        return *this;
+    }
 
      //LISTENER FUNCTIONS
     virtual void handleChildAddition(const LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* parent, LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* child);

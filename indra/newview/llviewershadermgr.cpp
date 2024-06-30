@@ -2412,7 +2412,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 gPostSMAAEdgeDetect[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
                 gPostSMAAEdgeDetect[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
                 gPostSMAAEdgeDetect[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-                success                             = gPostSMAAEdgeDetect[i].createShader(NULL, NULL);
+                success                             = gPostSMAAEdgeDetect[i].createShader();
                 if (success)
                 {
                     gPostSMAAEdgeDetect[i].bind();
@@ -2432,7 +2432,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 gPostSMAABlendWeights[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
                 gPostSMAABlendWeights[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
                 gPostSMAABlendWeights[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-                success                               = gPostSMAABlendWeights[i].createShader(NULL, NULL);
+                success                               = gPostSMAABlendWeights[i].createShader();
                 if (success)
                 {
                     gPostSMAABlendWeights[i].bind();
@@ -2453,7 +2453,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 gPostSMAANeighborhoodBlend[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_FRAGMENT_SHADER_ARB));
                 gPostSMAANeighborhoodBlend[i].mShaderFiles.push_back(make_pair("effects/SMAA.glsl", GL_VERTEX_SHADER_ARB));
                 gPostSMAANeighborhoodBlend[i].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-                success                                    = gPostSMAANeighborhoodBlend[i].createShader(NULL, NULL);
+                success                                    = gPostSMAANeighborhoodBlend[i].createShader();
                 if (success)
                 {
                     gPostSMAANeighborhoodBlend[i].bind();
@@ -2689,7 +2689,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostTonemapProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredPostTonemapProgram.clearPermutations();
         gDeferredPostTonemapProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_NONE));
-        success = gDeferredPostTonemapProgram.createShader(NULL, NULL);
+        success = gDeferredPostTonemapProgram.createShader();
     }
 
     if (success)
@@ -2702,7 +2702,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostTonemapACESProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredPostTonemapACESProgram.clearPermutations();
         gDeferredPostTonemapACESProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_ACES_HILL));
-        success = gDeferredPostTonemapACESProgram.createShader(NULL, NULL);
+        success = gDeferredPostTonemapACESProgram.createShader();
     }
 
     if (success)
@@ -2715,7 +2715,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostTonemapUchiProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredPostTonemapUchiProgram.clearPermutations();
         gDeferredPostTonemapUchiProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_UCHIMURA));
-        success = gDeferredPostTonemapUchiProgram.createShader(NULL, NULL);
+        success = gDeferredPostTonemapUchiProgram.createShader();
     }
 
     if (success)
@@ -2728,7 +2728,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostTonemapHableProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredPostTonemapHableProgram.clearPermutations();
         gDeferredPostTonemapHableProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_UNCHARTED));
-        success = gDeferredPostTonemapHableProgram.createShader(NULL, NULL);
+        success = gDeferredPostTonemapHableProgram.createShader();
     }
 
     if (success)
@@ -2741,7 +2741,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostColorCorrectProgram[0].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredPostColorCorrectProgram[0].clearPermutations();
         gDeferredPostColorCorrectProgram[0].addPermutation("COLOR_GRADE_LUT", std::to_string(0));
-        success = gDeferredPostColorCorrectProgram[0].createShader(NULL, NULL);
+        success = gDeferredPostColorCorrectProgram[0].createShader();
     }
 
     if (success)
@@ -2755,7 +2755,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostColorCorrectProgram[1].clearPermutations();
         gDeferredPostColorCorrectProgram[1].addPermutation("COLOR_GRADE_LUT", std::to_string(0));
         gDeferredPostColorCorrectProgram[1].addPermutation("LEGACY_GAMMA", "1");
-        success = gDeferredPostColorCorrectProgram[1].createShader(NULL, NULL);
+        success = gDeferredPostColorCorrectProgram[1].createShader();
     }
 
     if (success)
@@ -2769,7 +2769,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostColorCorrectProgram[2].clearPermutations();
         gDeferredPostColorCorrectProgram[2].addPermutation("COLOR_GRADE_LUT", std::to_string(0));
         gDeferredPostColorCorrectProgram[2].addPermutation("NO_POST", "1");
-        success = gDeferredPostColorCorrectProgram[2].createShader(NULL, NULL);
+        success = gDeferredPostColorCorrectProgram[2].createShader();
     }
 
     if (success)
@@ -2782,7 +2782,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostColorCorrectLUTProgram[0].mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredPostColorCorrectLUTProgram[0].clearPermutations();
         gDeferredPostColorCorrectLUTProgram[0].addPermutation("COLOR_GRADE_LUT", std::to_string(1));
-        success = gDeferredPostColorCorrectLUTProgram[0].createShader(NULL, NULL);
+        success = gDeferredPostColorCorrectLUTProgram[0].createShader();
     }
 
     if (success)
@@ -2796,7 +2796,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostColorCorrectLUTProgram[1].clearPermutations();
         gDeferredPostColorCorrectLUTProgram[1].addPermutation("COLOR_GRADE_LUT", std::to_string(1));
         gDeferredPostColorCorrectLUTProgram[1].addPermutation("LEGACY_GAMMA", "1");
-        success = gDeferredPostColorCorrectLUTProgram[1].createShader(NULL, NULL);
+        success = gDeferredPostColorCorrectLUTProgram[1].createShader();
     }
 
     if (success)
@@ -2810,7 +2810,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostColorCorrectLUTProgram[2].clearPermutations();
         gDeferredPostColorCorrectLUTProgram[2].addPermutation("COLOR_GRADE_LUT", std::to_string(1));
         gDeferredPostColorCorrectLUTProgram[2].addPermutation("NO_POST", "1");
-        success = gDeferredPostColorCorrectLUTProgram[2].createShader(NULL, NULL);
+        success = gDeferredPostColorCorrectLUTProgram[2].createShader();
     }
 
     // These shaders are non-critical and do not fail shader load
@@ -2823,7 +2823,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredPostDLSProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
             gDeferredPostDLSProgram.mShaderFiles.push_back(make_pair("alchemy/DLSF.glsl", GL_FRAGMENT_SHADER));
             gDeferredPostDLSProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            gDeferredPostDLSProgram.createShader(NULL, NULL);
+            gDeferredPostDLSProgram.createShader();
         }
 
         // [RLVa:KB] - @setsphere
@@ -2837,7 +2837,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             else
                 gRlvSphereProgram.mShaderFiles.push_back(make_pair("deferred/rlvFLegacy.glsl", GL_FRAGMENT_SHADER));
             gRlvSphereProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            gRlvSphereProgram.createShader(NULL, NULL);
+            gRlvSphereProgram.createShader();
         }
         // [/RLV:KB]
 #ifndef LL_DARWIN
@@ -2849,7 +2849,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredPostCASProgram.mShaderFiles.push_back(make_pair("alchemy/postNoTCV.glsl", GL_VERTEX_SHADER));
             gDeferredPostCASProgram.mShaderFiles.push_back(make_pair("alchemy/CASF.glsl", GL_FRAGMENT_SHADER));
             gDeferredPostCASProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            gDeferredPostCASProgram.createShader(NULL, NULL);
+            gDeferredPostCASProgram.createShader();
         }
 
         if (gGLManager.mGLVersion >= 4.59f)
@@ -2863,7 +2863,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredPostTonemapLPMProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
             gDeferredPostTonemapLPMProgram.clearPermutations();
             gDeferredPostTonemapLPMProgram.addPermutation("TONEMAP_METHOD", std::to_string(ALRenderUtil::TONEMAP_AMD));
-            gDeferredPostTonemapLPMProgram.createShader(NULL, NULL); // Ignore return value for this shader
+            gDeferredPostTonemapLPMProgram.createShader(); // Ignore return value for this shader
         }
 #endif
     }
