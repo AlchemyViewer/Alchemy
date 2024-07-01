@@ -48,25 +48,16 @@ public:
         *this = rhs;
     }
 
-    LLVolumeTriangle& operator=(LLVolumeTriangle&& rhs) noexcept
+    const LLVolumeTriangle& operator=(const LLVolumeTriangle& rhs)
     {
-        mPositionGroup = rhs.mPositionGroup;
-        mV[0] = rhs.mV[0];
-        mV[0] = rhs.mV[0];
-        mV[0] = rhs.mV[0];
-
-        mIndex[0] = rhs.mIndex[2];
-        mIndex[1] = rhs.mIndex[2];
-        mIndex[2] = rhs.mIndex[2];
-
-        mRadius = rhs.mRadius;
-        mBinIndex = rhs.mBinIndex;
-
-        LLRefCount::operator=(std::move(rhs));
+        LL_ERRS() << "Illegal operation!" << LL_ENDL;
         return *this;
     }
 
-    ~LLVolumeTriangle() = default;
+    ~LLVolumeTriangle()
+    {
+
+    }
 
     LL_ALIGN_16(LLVector4a mPositionGroup);
 

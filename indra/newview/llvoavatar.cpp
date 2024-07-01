@@ -8785,7 +8785,7 @@ bool LLVOAvatar::isTooSlow() const
     {
         return true;
     }
-    else if (!is_friend && friends_only())
+    else if (!isInBuddyList() && friends_only())
     {
         return true;
     }

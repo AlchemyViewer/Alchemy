@@ -526,7 +526,7 @@ void LLPluginProcessParent::idle(void)
                                 {
                                     // this grabs a copy of the smart pointer to ourselves to ensure that we do not
                                     // get destroyed until after this method returns.
-                                    LLMutexLock lock(sInstancesMutex);
+                                    LLCoros::LockType lock(*sInstancesMutex);
                                     mapInstances_t::iterator it = sInstances.find(this);
                                     if (it != sInstances.end())
                                         that = (*it).second;
@@ -944,7 +944,7 @@ void LLPluginProcessParent::setUseReadThread(bool use_read_thread)
 bool LLPluginProcessParent::poll(F64 timeout)
 {
     {
-        LLMutexLock mtxLock(sInstancesMutex);
+        LLCoros::LockType mtxLock(*sInstancesMutex);
         if (sInstances.empty())
         {
             return false;
@@ -1009,7 +1009,7 @@ bool LLPluginProcessParent::poll(F64 timeout)
 
     // Remove instances in the done state from the sInstances map.
     {
-        LLMutexLock inst_lock(sInstancesMutex);
+        LLCoros::LockType inst_lock(*sInstancesMutex);
         mapInstances_t::iterator itClean = sInstances.begin();
         while (itClean != sInstances.end())
         {
