@@ -46,8 +46,6 @@
 template <class Type> class LLPointer
 {
 public:
-    template<typename Subclass>
-    friend class LLPointer;
     LLPointer()  noexcept :
         mPointer(nullptr)
     {
@@ -77,13 +75,6 @@ public:
         mPointer(ptr.get())
     {
         ref();
-    }
-
-    template<typename Subclass>
-    LLPointer(LLPointer<Subclass>&& ptr) noexcept
-    {
-        mPointer = ptr.get();
-        ptr.mPointer = nullptr;
     }
 
     ~LLPointer()
@@ -125,7 +116,12 @@ public:
     {
         if (mPointer != ptr.mPointer)
         {
-            LLPointer<Type>(std::move(ptr)).swap(*this);
+            if (mPointer)
+            {
+                unref();
+                mPointer = nullptr;
+            }
+            swap(*this, ptr);
         }
         return *this;
     }
@@ -136,31 +132,6 @@ public:
     {
         assign(ptr.get());
         return *this;
-    }
-
-    template<typename Subclass>
-    LLPointer<Type>& operator =(LLPointer<Subclass>&& ptr) noexcept
-    {
-        if (mPointer != ptr.get())
-        {
-            LLPointer<Type>(std::move(ptr)).swap(*this);
-        }
-        return *this;
-    }
-
-    inline void swap(LLPointer<Type>& ptr) noexcept
-    {
-        Type* temp = mPointer;
-        mPointer = ptr.mPointer;
-        ptr.mPointer = temp;
-    }
-
-    template<typename Subclass>
-    inline void swap(LLPointer<Subclass>& ptr) noexcept
-    {
-        Type* temp = mPointer;
-        mPointer = ptr.mPointer;
-        ptr.mPointer = temp;
     }
 
     // Just exchange the pointers, which will not change the reference counts.
@@ -176,7 +147,6 @@ protected:
     void ref();
     void unref();
 #else
-
     inline void ref() noexcept
     {
         if (mPointer)
@@ -218,9 +188,6 @@ protected:
 template <class Type> class LLConstPointer
 {
 public:
-    template<typename Subclass>
-    friend class LLConstPointer;
-
     LLConstPointer() noexcept :
         mPointer(nullptr)
     {
@@ -250,13 +217,6 @@ public:
         mPointer(ptr.get())
     {
         ref();
-    }
-
-    template<typename Subclass>
-    LLConstPointer(LLConstPointer<Subclass>&& ptr) noexcept
-    {
-        mPointer = ptr.get();
-        ptr.mPointer = nullptr;
     }
 
     ~LLConstPointer()
@@ -307,7 +267,12 @@ public:
     {
         if (mPointer != ptr.mPointer)
         {
-            LLConstPointer<Type>(std::move(ptr)).swap(*this);
+            if (mPointer)
+            {
+                unref();
+                mPointer = nullptr;
+            }
+            swap(*this, ptr);
         }
         return *this;
     }
@@ -325,31 +290,6 @@ public:
         return *this;
     }
 
-    template<typename Subclass>
-    LLConstPointer<Type>& operator =(LLConstPointer<Subclass>&& ptr) noexcept
-    {
-        if (mPointer != ptr.get())
-        {
-            LLConstPointer<Type>(std::move(ptr)).swap(*this);
-        }
-        return *this;
-    }
-
-    inline void swap(LLConstPointer<Type>& ptr) noexcept
-    {
-        Type* temp = mPointer;
-        mPointer = ptr.mPointer;
-        ptr.mPointer = temp;
-    }
-
-    template<typename Subclass>
-    inline void swap(LLConstPointer<Subclass>& ptr) noexcept
-    {
-        Type* temp = mPointer;
-        mPointer = ptr.mPointer;
-        ptr.mPointer = temp;
-    }
-
     // Just exchange the pointers, which will not change the reference counts.
     static void swap(LLConstPointer<Type>& a, LLConstPointer<Type>& b) noexcept
     {
@@ -363,7 +303,7 @@ protected:
     void ref();
     void unref();
 #else // LL_LIBRARY_INCLUDE
-    inline void ref() noexcept
+    void ref() noexcept
     {
         if (mPointer)
         {
@@ -371,7 +311,7 @@ protected:
         }
     }
 
-    inline void unref() noexcept
+    void unref() noexcept
     {
         if (mPointer)
         {
