@@ -10,7 +10,7 @@
 		入会費（L$ [AMOUNT]）
 	</panel.string>
 	<panel.string name="group_join_free">
-		無料
+		入会費はかかりません。
 	</panel.string>
 	<panel.string name="group_member">
 		あなたはメンバーです。

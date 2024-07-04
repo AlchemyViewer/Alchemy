@@ -24,9 +24,9 @@
 	<icon name="LowMidGraphicsDivet"/>
 	<icon name="MidGraphicsDivet"/>
 	<icon name="MidHighGraphicsDivet"/>
-	<icon name="HighGraphicsDivet" />
-	<icon name="HighUltraGraphicsDivet" />
-	<icon name="UltraGraphicsDivet" />
+	<icon name="HighGraphicsDivet"/>
+	<icon name="HighUltraGraphicsDivet"/>
+	<icon name="UltraGraphicsDivet"/>
 	<slider name="QualityPerformanceSelection"/>
 	<text value="描画距離：" name="draw_distance_label"/>
 	<slider_bar name="draw_dist_slider_bar"/>
@@ -43,6 +43,16 @@
 	<text value="複雑度：" name="complexity_label"/>
 	<slider_bar name="complexity_slider_bar"/>
 	<spinner name="complexity_spinner"/>
+	<!--Max Local Lights-->
+	<text value="ローカル光源：" name="lights_label"/>
+	<slider_bar name="local_light_slider_bar"/>
+	<spinner name="local_light_spinner"/>
+	<!--Global Light Scale-->
+	<text value="光の強度：" name="light_intensity_label"/>
+	<slider_bar name="light_intensity_slider_bar"/>
+	<spinner name="light_intensity_spinner"/>
+	<text value="解像度スケール：" name="res_scale_label"/>
+	<slider_bar name="res_scale_slider_bar" tool_tip="（デフォルト：1.0）［危険］内部レンダリング解像度スケールです。"/>
+	<spinner name="res_scale_spinner" tool_tip="（デフォルト：1.0）［危険］内部レンダリング解像度スケールです。"/>
 	<button name="open_prefs_btn" label="グラフィック初期設定" tool_tip="グラフィック設定を呼び出します。"/>
-	<button name="open_prefs_btn" label="ライトボックス" tool_tip="ライトボックスを呼び出します。"/>
 </panel>

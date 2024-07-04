@@ -477,6 +477,17 @@
 			<menu_item_call label="ビューアの接続遮断を実行する" name="Force Disconnect Viewer"/>
 			<menu_item_call label="メモリリークをシミュレートする" name="Memory Leaking Simulation"/>
 		</menu>
+		<menu label="ＧＬＴＦ" name="GLTF">
+			<menu_item_call label="開く…" name="Open..."/>
+			<menu_item_call label="名前をつけて保存…" name="Save As..." />
+			<menu_item_call label="アップロード…" name="Upload..."/>
+		</menu>
+		<menu label="ビデオ" name="Video">
+			<menu_item_call label="1080x×1920" name="1080x1920"/>
+			<menu_item_call label="1920×1080" name="1920x1080"/>
+			<menu_item_call label="1280×720" name="1280x720"/>
+			<menu_item_call label="720×1280" name="720x1280"/>
+		</menu>
 		<menu label="描画テスト" name="Render Tests">
 			<menu_item_check label="カメラのオフセット" name="Camera Offset"/>
 			<menu_item_check label="フレームレートをランダム化" name="Randomize Framerate"/>
@@ -484,7 +495,6 @@
 			<menu_item_call label="フレームのプロフィール" name="Frame Profile"/>
 			<menu_item_call label="ベンチマーク" name="Benchmark"/>
 			<menu_item_call label="ＨＤＲＩプレビュー" name="HDRI Preview"/>
-			<menu_item_call label="ＧＬＴＦシーンプレビュー" name="GLTF Scene Preview"/>
 		</menu>
 		<menu label="メタデータの描画" name="Render Metadata">
 			<menu_item_check label="バウンディングボックス" name="Bounding Boxes"/>
@@ -625,10 +635,11 @@
 			</menu>
 			<menu label="キャラクターテスト" name="Character Tests">
 				<menu_item_call label="容姿をＸＭＬとして保存する" name="Appearance To XML"/>
-				<menu_item_call label="キャラクタジオメトリの切り替え" name="Toggle Character Geometry"/>
+				<menu_item_call label="キャラクタージオメトリの切り替え" name="Toggle Character Geometry"/>
 				<menu_item_call label="男性アバターのテスト" name="Test Male"/>
 				<menu_item_call label="女性アバターのテスト" name="Test Female"/>
 				<menu_item_check label="アバター選択を許可" name="Allow Select Avatar"/>
+				<menu_item_check label="フレンドのみ描画" name="Render Only Friends"/>
 			</menu>
 			<menu label="アニメーションの速度" name="Animation Speed">
 				<menu_item_call label="すべてのアニメーションを１０％速く" name="All Animations 10 Faster"/>
@@ -640,12 +651,13 @@
 			<menu_item_check label="アニメーション情報" name="Animation Info"/>
 			<menu_item_check label="見えているものを表示する" name="Show Look At"/>
 			<menu_item_check label="クリックした場所を表示する" name="Show Point At"/>
-			<menu_item_check label="ジョイント部分の更新のデバッグ" name="Debug Joint Updates"/>
+			<menu_item_check label="ジョイント部分の更新をデバッグ" name="Debug Joint Updates"/>
 			<menu_item_check label="ＬｏＤを無効にする" name="Disable LOD"/>
-			<menu_item_check label="キャラクターVisのデバッグ" name="Debug Character Vis"/>
+			<menu_item_check label="キャラクターのVisをデバッグ" name="Debug Character Vis"/>
+			<menu_item_check label="キャラクターのRezステートをデバッグ" name="Debug Character Rez State"/>
 			<menu_item_check label="スケルトンの衝突判定を表示する" name="Show Collision Skeleton"/>
 			<menu_item_check label="ボーンを表示" name="Show Bones"/>
-			<menu_item_check label="エージェントの目標を表示する" name="Display Agent Target"/>
+			<menu_item_check label="エージェントの視線を表示する" name="Display Agent Target"/>
 			<menu_item_check label="インポスターの範囲を表示" name="Show Impostor Extents"/>
 			<!-- Appears not to exist anymore
 			<menu_item_check label="回転をデバッグ" name="Debug Rotation"/>
