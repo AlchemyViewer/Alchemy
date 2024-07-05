@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater
+ can_close="true"
+ can_drag_on_left="false"
+ can_minimize="true"
+ can_resize="true"
+ height="300"
+ width="300"
+ name="floater_transaction_log"
+ title="Transaction Log"
+ single_instance="true"
+ save_rect="true">
+  <floater.string
+   name="total_fmt">
+Total: L$[TOTAL]
+  </floater.string>
+  <scroll_list
+   draw_heading="true"
+   follows="left|top|bottom|right"
+   name="transaction_list"
+   background_visible="true"
+   fg_unselected_color="ScrollSelectedFGColor"
+   fg_selected_color="ScrollSelectedFGColor"
+   column_padding="0"
+   top="0"
+   left="4"
+   right="-4"
+   bottom="-26">
+    <column name="time" width="50" label="Time" />
+    <column name="name" dynamicwidth="true" label="Name" />
+    <column name="amount" width="70" label="Amount" />
+  </scroll_list>
+  <text
+   type="string"
+   length="1"
+   follows="bottom|right"
+   font="SansSerif"
+   height="20"
+   layout="topleft"
+   name="total"
+   top_pad="2"
+   width="89"
+   left="129"
+   halign="right"
+   value="Total: L$0" />
+  <button
+   label="Reset"
+   follows="bottom|right"
+   height="20"
+   left_pad="3"
+   name="btn_reset"
+   width="75">
+    <button.commit_callback
+     function="TL.Reset" />
+  </button>
+</floater>

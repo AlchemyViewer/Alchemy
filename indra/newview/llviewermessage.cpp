@@ -67,6 +67,7 @@
 #include "llfloaterpreference.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llfloatersnapshot.h"
+#include "llfloatertransactionlog.h"
 #include "llhudeffecttrail.h"
 #include "llhudmanager.h"
 #include "llimprocessing.h"
@@ -5302,6 +5303,10 @@ static void process_money_balance_reply_extended(LLMessageSystem* msg)
         // make notification loggable
         payload["from_id"] = source_id;
         notification = "PaymentReceived";
+
+        LLFloaterTransactionLog* floater = LLFloaterReg::findTypedInstance<LLFloaterTransactionLog>("transaction_log");
+        if (floater) floater->addTransaction(LLDate::now(), source_id, amount);
+
     }
 
     // Despite using SLURLs, wait until the name is available before
