@@ -253,6 +253,17 @@
         <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyAutoresponseChanged</key>
+        <map>
+        <key>Comment</key>
+            <string>Does user's autoresponse response message differ from default?</string>
+        <key>Persist</key>
+            <integer>1</integer>
+        <key>Type</key>
+            <string>Boolean</string>
+        <key>Value</key>
+            <integer>0</integer>
+        </map>
     <key>AlchemyAutoresponseEnable</key>
         <map>
         <key>Comment</key>
@@ -285,6 +296,17 @@
             <string>String</string>
         <key>Value</key>
             <string>This resident has turned on &apos;Autorespond mode&apos; like a boss.</string>
+        </map>
+        <key>AlchemyAutoresponseNotFriendChanged</key>
+        <map>
+        <key>Comment</key>
+            <string>Does user's autoresponse not friend response message differ from default?</string>
+        <key>Persist</key>
+            <integer>1</integer>
+        <key>Type</key>
+            <string>Boolean</string>
+        <key>Value</key>
+            <integer>0</integer>
         </map>
     <key>AlchemyAutoresponseNotFriend</key>
         <map>

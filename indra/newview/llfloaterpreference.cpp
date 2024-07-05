@@ -583,16 +583,16 @@ void LLFloaterPreference::onAutoRespondResponseChanged()
             LLTrans::getString("AutoResponseModeDefault")
                     != getChild<LLUICtrl>("autorespond_response")->getValue().asString();
 
-    gSavedPerAccountSettings.setBOOL("ALAutoRespondChanged", auto_response_changed_flag);
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseChanged", auto_response_changed_flag);
 }
 
 void LLFloaterPreference::onAutoRespondNonFriendsResponseChanged()
 {
     bool auto_response_non_friends_changed_flag =
             LLTrans::getString("AutoResponseModeNonFriendsDefault")
-                    != getChild<LLUICtrl>("autorespond_nf_response")->getValue().asString();
+                    != getChild<LLUICtrl>("AlchemyAutoresponseNotFriend")->getValue().asString();
 
-    gSavedPerAccountSettings.setBOOL("ALAutoRespondNonFriendsChanged", auto_response_non_friends_changed_flag);
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendChanged", auto_response_non_friends_changed_flag);
 }
 
 #if !LL_HAVOK
@@ -1262,6 +1262,19 @@ void LLFloaterPreference::initDoNotDisturbResponse()
         if (!gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsChanged"))
         {
             gSavedPerAccountSettings.setString("ALRejectFriendshipRequestsResponse", LLTrans::getString("RejectFriendshipRequestsResponseDefault"));
+        }
+
+        // This is called on viewer init so we setup defaults
+        // not sure this is necessary anymore ???
+        // -- FLN
+        if (!gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseChanged"))
+        {
+            gSavedPerAccountSettings.setString("AlchemyAutoresponse", LLTrans::getString("AlchemyAutoresponseDefault"));
+        }
+        
+        if (!gSavedPerAccountSettings.getBOOL("AlchemyAutoresponseNotFriendChanged"))
+        {
+            gSavedPerAccountSettings.setString("AlchemyAutoresponseNotFriend", LLTrans::getString("AlchemyAutoresponseNotFriendDefault"));
         }
     }
 
