@@ -272,9 +272,6 @@ private:
     boost::signals2::connection mPreferredMaturityConnection;
     boost::signals2::connection mAutoResponseConnection;
     boost::signals2::connection mAutoResponseNonFriendsConnection;
-    // boost::signals2::connection mAutoResponseAwayAvatarConnection;
-    // boost::signals2::connection mAutoResponseEnableConnection;
-    // boost::signals2::connection mAutoResponseNonFriendsEnableConnection;
 
     bool mDnDInit = false;
 
