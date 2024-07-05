@@ -76,7 +76,7 @@
      top_pad="5"
      follows="left|top"
      height="16"
-     label="Autorespond to new instant messages from non-friends (uses the designated message)"
+     label="Autorespond to new instant messages from non-friends"
      left="10"
      name="AlchemyAutoresponseNotFriendEnable"
      width="270"
