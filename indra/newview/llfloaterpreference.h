@@ -125,6 +125,10 @@ protected:
     // string differs from default after user changes.
     void onDoNotDisturbResponseChanged();
     void onRejectTeleportOffersResponseChanged();
+    void onAutoRespondResponseChanged();
+    void onAutoRespondNonFriendsResponseChanged();
+    // void onAutoRespondAwayAvatarResponseChanged();
+
     // if the custom settings box is clicked
     void onChangeCustom();
     void updateMeterText(LLUICtrl* ctrl);
@@ -267,6 +271,11 @@ private:
     boost::signals2::connection mRejectTeleportConnection;
     boost::signals2::connection mChatBubbleOpacityConnection;
     boost::signals2::connection mPreferredMaturityConnection;
+    boost::signals2::connection mAutoResponseConnection;
+    boost::signals2::connection mAutoResponseNonFriendsConnection;
+    // boost::signals2::connection mAutoResponseAwayAvatarConnection;
+    // boost::signals2::connection mAutoResponseEnableConnection;
+    // boost::signals2::connection mAutoResponseNonFriendsEnableConnection;
 
     bool mDnDInit = false;
 
