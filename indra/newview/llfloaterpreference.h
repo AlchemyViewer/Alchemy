@@ -127,7 +127,6 @@ protected:
     void onRejectTeleportOffersResponseChanged();
     void onAutoRespondResponseChanged();
     void onAutoRespondNonFriendsResponseChanged();
-    // void onAutoRespondAwayAvatarResponseChanged();
 
     // if the custom settings box is clicked
     void onChangeCustom();
