@@ -974,7 +974,6 @@ LLFloaterPreference::~LLFloaterPreference()
     mRejectTeleportConnection.disconnect();
     mAutoResponseConnection.disconnect();
     mAutoResponseNonFriendsConnection.disconnect();
-    // mAutoResponseAwayAvatarConnection.disconnect();
 }
 
 void LLFloaterPreference::draw()
@@ -1150,13 +1149,6 @@ void LLFloaterPreference::onOpen(const LLSD& key)
         
         mAutoResponseNonFriendsConnection = gSavedPerAccountSettings.getControl("AlchemyAutoresponseNotFriend")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondNonFriendsResponseChanged, this));
 
-        // mAutoResponseEnableConnection = gSavedPerAccountSettings.getControl("AlchemyAutoresponseEnable")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondResponseChanged, this));
-        
-        // mAutoResponseNonFriendsEnableConnection = gSavedPerAccountSettings.getControl("AlchemyAutoresponseNotFriendEnable")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondNonFriendsResponseChanged, this));
-        
-        // mAutoResponseFriendsEnableConnection = gSavedPerAccountSettings.getControl("AlchemyAutoresponseEnable")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondResponseChanged, this));
-
-        // mAutoResponseAwayAvatarConnection = gSavedPerAccountSettings.getControl("ALSendAwayAvatarResponse")->getSignal()->connect(boost::bind(&LLFloaterPreference::onAutoRespondAwayAvatarResponseChanged, this));
     }
     gAgent.sendAgentUserInfoRequest();
 
