@@ -75,15 +75,15 @@
 // -- FLN
 std::string replace_wildcards(std::string input, const LLUUID& id, const std::string& name)
 {
-	boost::algorithm::replace_all(input, "#n", name);
-// disable boost::lexical_cast warning
-	LLSLURL slurl;
-	LLAgentUI::buildSLURL(slurl);
-	boost::algorithm::replace_all(input, "#r", slurl.getSLURLString());
+    boost::algorithm::replace_all(input, "#n", name);
+    // disable boost::lexical_cast warning
+    LLSLURL slurl;
+    LLAgentUI::buildSLURL(slurl);
+    boost::algorithm::replace_all(input, "#r", slurl.getSLURLString());
 
-	LLAvatarName av_name;
-	boost::algorithm::replace_all(input, "#d", LLAvatarNameCache::get(id, &av_name) ? av_name.getDisplayName() : name);
-	return input;
+    LLAvatarName av_name;
+    boost::algorithm::replace_all(input, "#d", LLAvatarNameCache::get(id, &av_name) ? av_name.getDisplayName() : name);
+    return input;
 }
 
 
@@ -556,7 +556,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     // Resurrect AutoResponse from Alchemy Archive 
     // -- FLN
     static LLCachedControl<bool> sAutorespond(gSavedPerAccountSettings, "AlchemyAutoresponseEnable");
-	static LLCachedControl<bool> sAutorespondNonFriend(gSavedPerAccountSettings, "AlchemyAutoresponseNotFriendEnable");
+    static LLCachedControl<bool> sAutorespondNonFriend(gSavedPerAccountSettings, "AlchemyAutoresponseNotFriendEnable");
 
     chat.mMuted = is_muted;
     chat.mFromID = from_id;
