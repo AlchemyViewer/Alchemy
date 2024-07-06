@@ -41,7 +41,7 @@ class LLFloaterTransactionLog : public LLFloater
   public:
     LLFloaterTransactionLog(const LLSD& key);
     BOOL postBuild();
-    void addTransaction(const LLDate& date, const LLUUID& sender, S32 amount);
+    void addTransaction(const LLDate& date, const LLUUID& sender, S32 amount, bool incoming);
 
   private:
     ~LLFloaterTransactionLog();
@@ -51,7 +51,8 @@ class LLFloaterTransactionLog : public LLFloater
 
     LLScrollListCtrl* mList;
     LLTextBase*       mTotalText;
-    S32               mTotal;
+    S32               mReceivedTotal;
+    S32               mSpentTotal;
 
     boost::signals2::connection mAvatarNameCacheConnection;
 };

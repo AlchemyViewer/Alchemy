@@ -5278,6 +5278,8 @@ static void process_money_balance_reply_extended(LLMessageSystem* msg)
         final_args["MESSAGE"] = message;
         payload["dest_id"] = dest_id;
         notification = success ? "PaymentSent" : "PaymentFailure";
+        LLFloaterTransactionLog* floater = LLFloaterReg::findTypedInstance<LLFloaterTransactionLog>("transaction_log");
+        if (floater) floater->addTransaction(LLDate::now(), source_id, amount, false);
     }
     else
     {
@@ -5305,7 +5307,7 @@ static void process_money_balance_reply_extended(LLMessageSystem* msg)
         notification = "PaymentReceived";
 
         LLFloaterTransactionLog* floater = LLFloaterReg::findTypedInstance<LLFloaterTransactionLog>("transaction_log");
-        if (floater) floater->addTransaction(LLDate::now(), source_id, amount);
+        if (floater) floater->addTransaction(LLDate::now(), source_id, amount, true);
 
     }
 
