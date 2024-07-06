@@ -42,8 +42,7 @@
    name="total"
    left="15" 
    value="Received: L$ 0 | Spent: L$ -0"/>
-   </text>
-    <button
+  <button
     label="Reset"
     top_pad="-20"
     name="btn_reset"
