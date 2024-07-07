@@ -3,6 +3,7 @@
  * @brief Transaction log floater
  *
  * (C) 2014 Cinder Roxley @ Second Life <cinder@sdf.org>
+ * (C) 2024 Improvements by Fallen Kiyori Shadow
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
