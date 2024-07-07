@@ -49,9 +49,11 @@ class LLFloaterTransactionLog : public LLFloater
     void reset();
     void onDoubleClick();
     void onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name, LLSD& row);
+    void updateLabels();
 
     LLScrollListCtrl* mList;
-    LLTextBase*       mTotalText;
+    LLTextBase*       mTotalReceivedText;
+    LLTextBase*       mTotalSpentText;
     S32               mReceivedTotal;
     S32               mSpentTotal;
 

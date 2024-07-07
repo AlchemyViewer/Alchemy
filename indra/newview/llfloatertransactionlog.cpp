@@ -40,7 +40,8 @@
 LLFloaterTransactionLog::LLFloaterTransactionLog(const LLSD& key) :
     LLFloater(key),
     mList(nullptr),
-    mTotalText(nullptr),
+    mTotalReceivedText(nullptr),
+    mTotalSpentText(nullptr),
     mReceivedTotal(0),
     mSpentTotal(0),
     mAvatarNameCacheConnection()
@@ -58,7 +59,8 @@ BOOL LLFloaterTransactionLog::postBuild()
 {
     mList = getChild<LLScrollListCtrl>("transaction_list");
     mList->setDoubleClickCallback(boost::bind(&LLFloaterTransactionLog::onDoubleClick, this));
-    mTotalText = getChild<LLTextBase>("total");
+    mTotalReceivedText = getChild<LLTextBase>("total_received");
+    mTotalSpentText    = getChild<LLTextBase>("total_spent");
     return TRUE;
 }
 
@@ -67,8 +69,6 @@ void LLFloaterTransactionLog::addTransaction(const LLDate& date, const LLUUID& s
     // drop it
     if (!getVisible())
         return;
-
-    LLStringUtil::format_map_t args;
 
     if (incoming)
     {
@@ -79,10 +79,7 @@ void LLFloaterTransactionLog::addTransaction(const LLDate& date, const LLUUID& s
         mSpentTotal += amount;
     }
 
-    args["TOTAL_RECEIVED"] = std::to_string(mReceivedTotal);
-    args["TOTAL_SPENT"]    = std::to_string(mSpentTotal);
-
-    mTotalText->setValue(getString("total_fmt", args));
+    updateLabels();
 
     LLSD row;
     row["value"]               = sender;
@@ -115,9 +112,17 @@ void LLFloaterTransactionLog::reset()
     mReceivedTotal = 0;
     mSpentTotal    = 0;
 
-    LLStringUtil::format_map_t args;
-    args["TOTAL_RECEIVED"] = std::to_string(mReceivedTotal);
-    args["TOTAL_SPENT"]    = std::to_string(mSpentTotal);
+    updateLabels();
+}
 
-    mTotalText->setValue(getString("total_fmt", args));
+void LLFloaterTransactionLog::updateLabels()
+{
+    LLStringUtil::format_map_t receivedArgs;
+    LLStringUtil::format_map_t spentArgs;
+
+    receivedArgs["TOTAL"] = std::to_string(mReceivedTotal);
+    spentArgs["TOTAL"]    = std::to_string(mSpentTotal);
+
+    mTotalReceivedText->setValue(getString("total_received_fmt", receivedArgs));
+    mTotalSpentText->setValue(getString("total_spent_fmt", spentArgs));
 }

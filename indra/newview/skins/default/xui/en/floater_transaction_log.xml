@@ -13,8 +13,12 @@
  single_instance="true"
  save_rect="true">
  <floater.string
-   name="total_fmt">
-    Received: L$ [TOTAL_RECEIVED] | Spent: L$ -[TOTAL_SPENT]
+   name="total_received_fmt">
+    Received: L$ [TOTAL]
+  </floater.string>
+ <floater.string
+   name="total_spent_fmt">
+    Spent: L$ -[TOTAL]
   </floater.string>
   <scroll_list
    draw_heading="true"
@@ -27,7 +31,7 @@
    top="0"
    left="4"
    right="-4"
-   bottom="-26">
+   bottom="-50">
     <column name="time" width="50" label="Time" />
     <column name="name" dynamicwidth="true" label="Name" />
     <column name="amount" width="70" label="Amount" />
@@ -39,18 +43,28 @@
    font="SansSerif"
    height="20"
    layout="topleft"
-   name="total"
+   name="total_received"
    left="15" 
-   value="Received: L$ 0 | Spent: L$ -0"/>
+   value="Received: L$ 0"/>
+    <text
+   type="string"
+   length="1"
+   follows="left|bottom"
+   font="SansSerif"
+   height="20"
+   layout="topleft"
+   name="total_spent"
+   left="15" 
+   value="Spent: L$ -0"/>
   <button
     label="Reset"
-    top_pad="-20"
+    top_pad="-35"
     name="btn_reset"
     font="SansSerif"
     mouse_opaque="true"
     height="20"
     width="75"
-    right="325"
+    left_pad="-80"
     follows="right|bottom">
      <button.commit_callback
      function="TL.Reset" />
