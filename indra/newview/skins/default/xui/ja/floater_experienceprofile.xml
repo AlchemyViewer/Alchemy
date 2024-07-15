@@ -84,9 +84,9 @@
 						レーティング区分：
 					</text>
 					<icons_combo_box label="Moderate" name="edit_ContentRatingText" tool_tip="体験のレーティング区分を上げると、体験を許可したすべての住人の権限がリセットされます。">
-						<icons_combo_box.item label="Adult" name="Adult" value="42"/>
-						<icons_combo_box.item label="Moderate" name="Mature" value="21"/>
-						<icons_combo_box.item label="General" name="PG" value="13"/>
+						<icons_combo_box.item name="Adult" value="42"/>
+						<icons_combo_box.item name="Mature" value="21"/>
+						<icons_combo_box.item name="PG" value="13"/>
 					</icons_combo_box>
 					<text name="edit_Location">
 						場所：

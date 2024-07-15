@@ -10,7 +10,7 @@
 	<string name="partner_text" value="パートナー：[LINK]"/>
 	<string name="CaptionTextAcctInfo">
 		アカウント：[ACCTTYPE]
-		[PAYMENTINFO]
+[PAYMENTINFO]
 	</string>
 	<!--Badges-->
 	<string name="BadgeBeta" value="オリジナルβテスター"/>

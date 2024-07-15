@@ -184,7 +184,7 @@
 		無効なキーストロークが入力されました：
 [REASON]
 有効なテキストを入力してください。
-  </notification>
+	</notification>
 	<notification name="MerchantForceValidateListing">
 		出品リストを作成するために、出品リストするコンテンツの階層を固定しました。
 		<tag>confirm</tag>
@@ -2196,10 +2196,10 @@ OKをクリックして、ダウンロードとインストールを開始しま
 	<notification name="GroupLeaveConfirmMemberNoFee">
 		グループ「&lt;nolink&gt;[GROUP]&lt;/nolink&gt;」から脱退しますか？
 現在、このグループに参加するのに料金はかかりません。
-    <tag>group</tag>
-    <tag>confirm</tag>
-    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="脱退する"/>
-  </notification>
+		<tag>group</tag>
+		<tag>confirm</tag>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="脱退する"/>
+	</notification>
 	<notification name="OwnerCannotLeaveGroup">
 		グループを抜けることができません。グループの最後のオーナーであるため、グループを抜けることができません。最初に、別のメンバーをオーナーの役割に割り当ててください。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
@@ -3008,6 +3008,11 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 	<notification name="ThumbnailOutfitPhoto">
 		アウトフィットに画像を追加するには、アウトフィットギャラリーウィンドウを使うか、アウトフィットフォルダーを右クリックし、「画像…」を選択します。
 		<unique/>
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="ThumbnailSelectionTooLarge">
+		<unique/>
+		一度に変更できるサムネイルは最大５０個までです。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmUnlink">
@@ -5949,10 +5954,35 @@ Intelドライバーのウェブサイトを確認しますか？
 		編集中の非ＨＤＲの空の設定は自動的にＨＤＲの設定に変換されます。ＨＤＲとトーンマッピングを削除する場合は、反射プローブ環境の値を０にしてください。
 		<usetemplate ignoretext="ＨＤＲの空の調整時の警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
-	<notification name="GLTFPreviewSelection">
+	<notification name="GLTFOpenSelection">
 		プレビューしているＧＬＴＦアセットへのハンドルとして機能するオブジェクトを選択する必要があります。
 		<tag>fail</tag>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="GLTFLoadFailed">
+		ＧＬＴＦファイルの読み込みに失敗しました。詳細についてはログ路確認ください。
+		<tag>fail</tag>
+		<usetemplate name="okbutton" yestext="OK"/>
+	</notification>
+	<notification name="GLTFSaveFailed">
+		ＧＬＴＦファイルの保存に失敗しました。詳細についてはログ路確認ください。
+		<tag>fail</tag>
+		<usetemplate name="okbutton" yestext="OK"/>
+	</notification>
+	<notification name="GLTFSaveSelection">
+		ＧＬＴＦアセットが関連付けられているオブジェクトを選択する必要があります。
+		<tag>fail</tag>
+		<usetemplate name="okbutton" yestext="OK"/>
+	</notification>
+	<notification name="GLTFUploadSelection">
+		ローカル専用のＧＬＴＦアセットが関連付けられているオブジェクトを選択する必要があります。
+		<tag>fail</tag>
+		<usetemplate name="okbutton" yestext="OK"/>
+	</notification>
+	<notification name="GLTFUploadInProgress">
+		現在アップロード中です。しばらくしてからもう一度お試しください。
+		<tag>fail</tag>
+		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
 	<!-- ALCHEMY BELOW THIS LINE -->
 	<notification name="ChatCommandCalc">

@@ -4,10 +4,10 @@
 		ＨＤＲスケール：
 	</string>
 	<string name="brightness_string">
-		ブライトネス：
+		輝度：
 	</string>
 	<string name="hdr_tooltip">
-		リアルで明るい空やダイナミックな露出などの光源効果の強さを指定します。1.0がデフォルトで、0はオフとなり、0～1の間の値はアンビエントとＨＤＲの混合となります。
+		リアルで明るい空やダイナミックな露光などの光源効果の強さを指定します。1.0がデフォルトで、0はオフとなり、0～1の間の値は周辺環境とＨＤＲの混合となります。
 	</string>
 	<layout_stack name="main_ls">
 		<layout_panel name="top_lp">
@@ -62,11 +62,11 @@
 					</text>
 					<slider name="max_alt"/>
 					<text name="probe_ambiance_label" tool_tip="放射照度を制御します。０以外の場合、ＨＤＲライティングモデルが有効になります。">
-						環境反射プローブ（ＨＤＲ）：
+						周辺環境の反射プローブ（ＨＤＲ）：
 					</text>
 					<slider name="probe_ambiance" tool_tip="環境ベースの間接照明の強度を制御します。０の場合、ＨＤＲスケールは明るさになります。"/>
 					<text name="scene_gamma_label">
-						ブライトネス：
+						輝度：
 					</text>
 					<slider name="scene_gamma"/>
 				</layout_panel>

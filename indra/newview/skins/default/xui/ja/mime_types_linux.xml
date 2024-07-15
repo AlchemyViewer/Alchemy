@@ -143,6 +143,11 @@
 			Macromedia Director
 		</label>
 	</mimetype>
+	<mimetype name="application/octet-stream">
+		<label name="application/octet-stream_label">
+			ストリーム
+		</label>
+	</mimetype>
 	<mimetype name="audio/mid">
 		<label name="audio/mid_label">
 			オーディオ（MIDI）
@@ -216,6 +221,11 @@
 	<mimetype name="video/mp4">
 		<label name="video/mp4_label">
 			ムービー（MP4）
+		</label>
+	</mimetype>
+	<mimetype name="video/x-flv">
+		<label name="video/x-flv_label">
+			ムービー（flv）
 		</label>
 	</mimetype>
 	<mimetype name="application/octet-stream">

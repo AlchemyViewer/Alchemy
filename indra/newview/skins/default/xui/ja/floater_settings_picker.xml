@@ -16,7 +16,7 @@
 		地表
 	</floater.string>
 	<floater.string name="track_sky">
-		空[NUM]
+		スカイ[NUM]
 	</floater.string>
 	<layout_stack name="test_stack">
 		<layout_panel name="inv_list">
