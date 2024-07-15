@@ -360,6 +360,7 @@ set(viewer_SOURCE_FILES
     llfloatertopobjects.cpp
     llfloatertos.cpp
     llfloatertoybox.cpp
+    llfloatertransactionlog.cpp
     llfloatertranslationsettings.cpp
     llfloateruipreview.cpp
     llfloaterurlentry.cpp
@@ -1092,6 +1093,7 @@ set(viewer_HEADER_FILES
     llfloatertopobjects.h
     llfloatertos.h
     llfloatertoybox.h
+    llfloatertransactionlog.h
     llfloatertranslationsettings.h
     llfloateruipreview.h
     llfloaterurlentry.h
