@@ -5306,7 +5306,11 @@ static void process_money_balance_reply_extended(LLMessageSystem* msg)
     }
 
     LLFloaterTransactionLog* floater = LLFloaterReg::findTypedInstance<LLFloaterTransactionLog>("transaction_log");
-    if (floater) floater->addTransaction(LLDate::now(), source_id, amount, !you_paid_someone);
+    // only log the successful transactions --FLN
+    if (success && floater)
+    {
+        floater->addTransaction(LLDate::now(), source_id, amount, !you_paid_someone);
+    }
 
     // Despite using SLURLs, wait until the name is available before
     // showing the notification, otherwise the UI layout is strange and
