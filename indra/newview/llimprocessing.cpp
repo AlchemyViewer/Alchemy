@@ -29,6 +29,7 @@
 #include "llimprocessing.h"
 
 #include "llagent.h"
+#include "llagentui.h"
 #include "llappviewer.h"
 #include "llavatarnamecache.h"
 #include "llfirstuse.h"
@@ -64,7 +65,27 @@
 #include "rlvui.h"
 // [/RLVa:KB]
 
+#include <boost/algorithm/string/predicate.hpp> // <alchemy/>
+#include <boost/algorithm/string/replace.hpp>
 #include "boost/lexical_cast.hpp"
+
+
+
+// Resurrect the Autorespond from the archive
+// -- FLN
+std::string replace_wildcards(std::string input, const LLUUID& id, const std::string& name)
+{
+    boost::algorithm::replace_all(input, "#n", name);
+    // disable boost::lexical_cast warning
+    LLSLURL slurl;
+    LLAgentUI::buildSLURL(slurl);
+    boost::algorithm::replace_all(input, "#r", slurl.getSLURLString());
+
+    LLAvatarName av_name;
+    boost::algorithm::replace_all(input, "#d", LLAvatarNameCache::get(id, &av_name) ? av_name.getDisplayName() : name);
+    return input;
+}
+
 
 extern void on_new_message(const LLSD& msg);
 
@@ -532,6 +553,11 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
     BOOL is_linden = chat.mSourceType != CHAT_SOURCE_OBJECT &&
         LLMuteList::isLinden(name);
 
+    // Resurrect AutoResponse from Alchemy Archive 
+    // -- FLN
+    static LLCachedControl<bool> sAutorespond(gSavedPerAccountSettings, "AlchemyAutoresponseEnable");
+    static LLCachedControl<bool> sAutorespondNonFriend(gSavedPerAccountSettings, "AlchemyAutoresponseNotFriendEnable");
+
     chat.mMuted = is_muted;
     chat.mFromID = from_id;
     chat.mFromName = name;
@@ -625,6 +651,49 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 }
 
             }
+            else if (offline == IM_ONLINE
+            && (sAutorespond || (sAutorespondNonFriend && !is_friend))
+            && from_id.notNull() //not a system message
+            && to_id.notNull()) //not global message
+            {
+                buffer = message;
+                LL_DEBUGS("Messaging") << "process_improved_im: session_id( " << session_id << " ), from_id( " << from_id << " )" << LL_ENDL;
+                bool send_response = !gIMMgr->hasSession(session_id);
+                gIMMgr->addMessage(session_id,
+                    from_id,
+                    name,
+                    buffer,
+                    IM_OFFLINE == offline,
+                    LLStringUtil::null,
+                    dialog,
+                    parent_estate_id,
+                    region_id,
+                    position,
+                    true);
+                if (send_response)
+                {
+                    std::string my_name;
+                    LLAgentUI::buildFullname(my_name);
+                    std::string response = gSavedPerAccountSettings.getString(sAutorespondNonFriend && !is_friend
+                        ? "AlchemyAutoresponseNotFriend"
+                        : "AlchemyAutoresponse");
+                    response = replace_wildcards(response, from_id, name);
+                    pack_instant_message(
+                        gMessageSystem,
+                        gAgent.getID(),
+                        FALSE,
+                        gAgent.getSessionID(),
+                        from_id,
+                        my_name,
+                        response,
+                        IM_ONLINE,
+                        IM_DO_NOT_DISTURB_AUTO_RESPONSE,
+                        session_id);
+                    gAgent.sendReliableMessage();
+                    gIMMgr->addMessage(session_id, gAgent.getID(), my_name, LLTrans::getString("AutoresponsePrefix").append(response));
+                }
+            }
+
             else if (from_id.isNull())
             {
                 LLSD args;
@@ -733,6 +802,32 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     false,
                     0
                 );
+
+                // Resurrect Autorespond from Alchemy archive
+                // -- FLN
+                if (sAutorespond || (sAutorespondNonFriend && !is_friend))
+                {
+                    std::string my_name;
+                    LLAgentUI::buildFullname(my_name);
+                    std::string response = gSavedPerAccountSettings.getString(sAutorespondNonFriend && !is_friend
+                        ? "AlchemyAutoresponseNotFriend"
+                        : "AlchemyAutoresponse");
+                    response = replace_wildcards(response, from_id, name);
+                    pack_instant_message(gMessageSystem,
+                        gAgent.getID(),
+                        FALSE,
+                        gAgent.getSessionID(),
+                        from_id,
+                        my_name,
+                        response,
+                        IM_ONLINE,
+                        IM_DO_NOT_DISTURB_AUTO_RESPONSE,
+                        session_id);
+                    gAgent.sendReliableMessage();
+
+                    gIMMgr->addMessage(session_id, gAgent.getID(), my_name, LLTrans::getString("AutoresponsePrefix").append(response));
+                }
+
             }
 
             gIMMgr->processIMTypingStart(from_id, dialog);

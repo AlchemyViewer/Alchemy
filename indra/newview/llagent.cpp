@@ -444,6 +444,9 @@ LLAgent::LLAgent() :
     mShowAvatar(TRUE),
     mFrameAgent(),
 
+    mIsAutoRespond(false),
+    mIsAutoRespondNonFriends(false),
+    
     mIsDoNotDisturb(false),
     mIsRejectTeleportOffers(false),
     mIgnorePrejump(FALSE),
@@ -1798,6 +1801,42 @@ void LLAgent::selectRejectFriendshipRequests(BOOL selected)
 BOOL LLAgent::getRejectFriendshipRequests() const
 {
     return mIsRejectFriendshipRequests;
+}
+
+//-----------------------------------------------------------------------------
+// setAutoRespond()
+//-----------------------------------------------------------------------------
+void LLAgent::setAutoRespond(bool pIsAutoRespond)
+{
+    LL_INFOS() << "Setting autorespond mode to " << pIsAutoRespond << LL_ENDL;
+    mIsAutoRespond = pIsAutoRespond;
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseEnable", pIsAutoRespond);
+}
+
+//-----------------------------------------------------------------------------
+// getAutoRespond()
+//-----------------------------------------------------------------------------
+bool LLAgent::getAutoRespond() const
+{
+    return mIsAutoRespond;
+}
+
+//-----------------------------------------------------------------------------
+// setAutoRespondNonFriends()
+//-----------------------------------------------------------------------------
+void LLAgent::setAutoRespondNonFriends(bool pIsAutoRespondNonFriends)
+{
+    LL_INFOS() << "Setting AutoRespondingNonFriends mode to " << pIsAutoRespondNonFriends << LL_ENDL;
+    mIsAutoRespondNonFriends = pIsAutoRespondNonFriends;
+    gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseNotFriendEnable", pIsAutoRespondNonFriends);
+}
+
+//-----------------------------------------------------------------------------
+// getAutoRespondNonFriends()
+//-----------------------------------------------------------------------------
+bool LLAgent::getAutoRespondNonFriends() const
+{
+    return mIsAutoRespondNonFriends;
 }
 
 //-----------------------------------------------------------------------------

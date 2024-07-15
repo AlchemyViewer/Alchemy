@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+    height="408"
+    layout="topleft"
+    name="autoresponse_settings"
+    top="0"
+    left="13"
+    width="517">
+      <text
+        top_pad="20"
+        follow="left|top"
+        height="18"
+        type="string"
+        length="1"
+        layout="topleft"
+        left="15"
+        name="autorespond_reject_friends_response_label"
+        width="500">
+        Automatic response to all avatars when in REJECT FRIENDSHIP REQUESTS mode
+        </text>
+        <text_editor
+          control_name="ALRejectFriendshipRequestsResponse"
+          use_ellipses="false"
+          commit_on_focus_lost="true"
+          follows="left|top"
+          height="55"
+          layout="topleft"
+          left="15"
+          top_pad="5"
+          name="autorespond_reject_friends_response"
+          width="475"
+          word_wrap="true">
+          log_in_to_change
+        </text_editor>
+
+      <text
+        top_pad="15"
+        follows="left|top"
+        height="18"
+        type="string"
+        length="1"
+        layout="topleft"
+        left="15"
+        name="autorespond_rto_response_label"
+        mouse_opaque="false"
+        width="500">
+        Automatic response to all avatars when in REJECT TELEPORT OFFERS mode:
+        </text>
+      <text_editor
+        control_name="ALRejectTeleportOffersResponse"
+        use_ellipses="false"
+        commit_on_focus_lost = "true"
+        follows="left|top"
+        text_readonly_color="LabelDisabledColor"
+        bg_writeable_color="LtGray"
+        height="45"
+        layout="topleft"
+        left="15"
+        name="autorespond_rto_response"
+        width="475"
+        word_wrap="true">
+          log_in_to_change
+        </text_editor>
+        <check_box
+          top_pad="5"
+          left="15"
+          follows="left|top"
+          height="16"
+          label="Don't reject teleport offers (and send response) from people on friends list"
+          name="ALDontRejectTeleportOffersFromFriends"
+          width="500"
+          control_name="ALDontRejectTeleportOffersFromFriends" />
+    </panel>
