@@ -41,7 +41,7 @@
 				<dnd_button name="nearby_del_btn" tool_tip="フレンドとして選択されている人物を削除します。"/>
 			</panel>
 			<text name="nearbycount">
-				[REGION]には[COUNT]人のアバターがいます。
+				[REGION]には[TOTAL]人中[COUNT]人のアバターがいます。
 			</text>
 			<layout_stack>
 				<layout_panel name="Net Map Panel">

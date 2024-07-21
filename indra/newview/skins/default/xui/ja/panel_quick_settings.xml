@@ -15,7 +15,7 @@
 	<text value="最大帯域幅：" name="max_bandwith_label"/>
 	<slider_bar name="bandwith_slider_bar" left="100"/>
 	<spinner name="bandwith_spinner"/>
-	<text value="ホバー高さ：" name="hover_height_label"/>
+	<text value="ホバーする高さ：" name="hover_height_label"/>
 	<slider_bar name="hover_slider_bar" left="100"/>
 	<spinner name="hover_spinner"/>
 </panel>
