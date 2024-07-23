@@ -1369,7 +1369,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 
             if (show_all_object_tips || needs_tip)
             {
-                // [RLVa:KB] - Checked: RLVa-1.2.1
+// [RLVa:KB] - Checked: RLVa-1.2.1
                 if ( (!RlvActions::isRlvEnabled()) || (RlvActions::canInteract(hover_object, mHoverPick.mObjectOffset)) )
                 {
 // [/RLVa:KB]
