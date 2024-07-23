@@ -1313,7 +1313,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
                 }
             }
 
-            if (gSavedSettings.getBool("ShowAdvancedHoverTips") && (!RlvActions::isRlvEnabled() || RlvActions::canShowLocation()))
+            if (gSavedSettings.getBool("ShowAdvancedHoverTips"))
             {
                 LLStringUtil::format_map_t args;
                 // Get Position
@@ -1321,11 +1321,15 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
                 if (region)
                 {
                     LLVector3 objectPosition = region->getPosRegionFromGlobal(hover_object->getPositionGlobal());
-                    if (RlvActions::canShowLocation())
+                    if (!RlvActions::isRlvEnabled() || RlvActions::canShowLocation())
                     {
-                        args["OBJECT_POSITION"] =
-                            llformat("<%.02f, %.02f, %.02f>", objectPosition.mV[VX], objectPosition.mV[VY], objectPosition.mV[VZ]);
-                        tooltip_msg.append("\n" + LLTrans::getString("TooltipPosition", args));
+                        //Check if we are in the same region, otherwise it shows large negitive position numbers.
+                        if (hover_object->getRegion() && gAgent.getRegion() && hover_object->getRegion()->getRegionID() == gAgent.getRegion()->getRegionID())
+                        {
+                            args["OBJECT_POSITION"] =
+                                llformat("<%.02f, %.02f, %.02f>", objectPosition.mV[VX], objectPosition.mV[VY], objectPosition.mV[VZ]);
+                            tooltip_msg.append("\n" + LLTrans::getString("TooltipPosition", args));
+                        }                        
                     }
 
                     // Get Distance
@@ -1341,23 +1345,15 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
                 // Get Prim Land Impact
                 if (gMeshRepo.meshRezEnabled())
                 {
-                    if (hover_object->getRegion() && gAgent.getRegion() &&
-                        hover_object->getRegion()->getRegionID() == gAgent.getRegion()->getRegionID())
+                    S32 cost = LLSelectMgr::getInstance()->getHoverObjects()->getSelectedLinksetCost();
+                    if (cost > 0)
                     {
-                        S32 cost = LLSelectMgr::getInstance()->getHoverObjects()->getSelectedLinksetCost();
-                        if (cost > 0)
-                        {
-                            args["PRIM_COST"] = llformat("%d", cost);
-                            tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCost", args));
-                        }
-                        else
-                        {
-                            tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCostLoading"));
-                        }
+                        args["PRIM_COST"] = llformat("%d", cost);
+                        tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCost", args));
                     }
                     else
                     {
-                        tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCostUnavailable"));
+                        tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCostLoading"));
                     }
                 }
             }

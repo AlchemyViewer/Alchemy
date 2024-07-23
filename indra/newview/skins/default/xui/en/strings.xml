@@ -4569,9 +4569,6 @@ and report the problem.
     <string name="TooltipPrimCostLoading">
         Loading Land Impact...
     </string>
-    <string name="TooltipPrimCostUnavailable">
-        Unable To Load Land Impact.
-    </string>
     <string name="TooltipPosition">
         Position: [OBJECT_POSITION]
     </string>
