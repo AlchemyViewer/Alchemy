@@ -76,6 +76,8 @@
 #include "rlvhandler.h"
 // [/RLVa:KB]
 #include "alcinematicmode.h"
+#include "llviewerregion.h"
+#include "llmeshrepository.h"
 
 extern BOOL gDebugClicks;
 
@@ -1311,7 +1313,54 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
                 }
             }
 
+            if (gSavedSettings.getBool("ShowAdvancedHoverTips") && (!RlvActions::isRlvEnabled() || RlvActions::canShowLocation()))
+            {
+                LLStringUtil::format_map_t args;
+                // Get Position
+                LLViewerRegion* region = gAgent.getRegion();
+                if (region)
+                {
+                    LLVector3 objectPosition = region->getPosRegionFromGlobal(hover_object->getPositionGlobal());
+                    if (RlvActions::canShowLocation())
+                    {
+                        args["OBJECT_POSITION"] =
+                            llformat("<%.02f, %.02f, %.02f>", objectPosition.mV[VX], objectPosition.mV[VY], objectPosition.mV[VZ]);
+                        tooltip_msg.append("\n" + LLTrans::getString("TooltipPosition", args));
+                    }
 
+                    // Get Distance
+                    F32 distance            = (objectPosition - region->getPosRegionFromGlobal(gAgent.getPositionGlobal())).magVec();
+                    args["OBJECT_DISTANCE"] = llformat("%.02f", distance);
+                    tooltip_msg.append("\n" + LLTrans::getString("TooltipDistance", args));
+                }
+
+                // Get Prim Count
+                args["PRIM_COUNT"] = llformat("%d", LLSelectMgr::getInstance()->getHoverObjects()->getObjectCount());
+                tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCount", args));
+
+                // Get Prim Land Impact
+                if (gMeshRepo.meshRezEnabled())
+                {
+                    if (hover_object->getRegion() && gAgent.getRegion() &&
+                        hover_object->getRegion()->getRegionID() == gAgent.getRegion()->getRegionID())
+                    {
+                        S32 cost = LLSelectMgr::getInstance()->getHoverObjects()->getSelectedLinksetCost();
+                        if (cost > 0)
+                        {
+                            args["PRIM_COST"] = llformat("%d", cost);
+                            tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCost", args));
+                        }
+                        else
+                        {
+                            tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCostLoading"));
+                        }
+                    }
+                    else
+                    {
+                        tooltip_msg.append("\n" + LLTrans::getString("TooltipPrimCostUnavailable"));
+                    }
+                }
+            }
             // Avoid showing tip over media that's displaying unless it's for sale
             // also check the primary node since sometimes it can have an action even though
             // the root node doesn't
@@ -1324,7 +1373,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
 
             if (show_all_object_tips || needs_tip)
             {
-// [RLVa:KB] - Checked: RLVa-1.2.1
+                // [RLVa:KB] - Checked: RLVa-1.2.1
                 if ( (!RlvActions::isRlvEnabled()) || (RlvActions::canInteract(hover_object, mHoverPick.mObjectOffset)) )
                 {
 // [/RLVa:KB]
