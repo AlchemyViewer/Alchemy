@@ -18,7 +18,7 @@
 	<panel name="menu_search_panel">
 		<search_editor label="Меню поиска" name="search_menu_edit" tool_tip="Введите интересующий вас термин для поиска здесь. Результаты будут отображены для частичного совпадения полного текста в меню."/>
 	</panel>
-	<panel left="-471" name="balance_bg" width="240">
+	<panel left="-471" name="balance_bg">
 		<text name="balance" tool_tip="Щелкните для обновления вашего баланса L$" value="L$??"/>
 		<button label="Купить L$" name="buyL" tool_tip="Щелкните для покупки L$"/>
 		<button label="Торговый центр" name="goShop" tool_tip="Открыть торговый центр Second Life" width="121"/>
