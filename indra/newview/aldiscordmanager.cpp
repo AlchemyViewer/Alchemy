@@ -185,7 +185,7 @@ void ALDiscordManager::updateActivity()
     activity.SetType(discord::ActivityType::Playing);
 
     static LLCachedControl<bool> discord_shared_region(gSavedPerAccountSettings, "ALDiscordShareLocationRegion", true);
-    static LLCachedControl<U32> discord_shared_region_maturity(gSavedPerAccountSettings, "ALDiscordShareRegionMaxMaturity", true);
+    static LLCachedControl<U32> discord_shared_region_maturity(gSavedPerAccountSettings, "ALDiscordShareRegionMaxMaturity", 13);
     std::string region_name;
     if (RlvActions::canShowLocation() && discord_shared_region && region->getSimAccess() <= discord_shared_region_maturity)
     {
