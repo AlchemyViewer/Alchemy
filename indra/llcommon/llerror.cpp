@@ -58,6 +58,7 @@
 #include "llsingleton.h"
 #include "llstl.h"
 #include "lltimer.h"
+#include <boost/fiber/recursive_mutex.hpp>
 
 #include <boost/make_shared.hpp>
 
@@ -526,7 +527,7 @@ namespace
         LLError::TimeFunction               mTimeFunction;
 
         Recorders                           mRecorders;
-        LLCoros::Mutex                      mRecorderMutex;
+        boost::fibers::recursive_mutex      mRecorderMutex;
 
         int                                 mShouldLogCallCounter;
 
@@ -1059,7 +1060,7 @@ namespace LLError
             return;
         }
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
-        LLCoros::LockType lock(s->mRecorderMutex);
+        std::unique_lock lock(s->mRecorderMutex);
         s->mRecorders.push_back(std::move(recorder));
     }
 
@@ -1070,7 +1071,7 @@ namespace LLError
             return;
         }
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
-        LLCoros::LockType lock(s->mRecorderMutex);
+        std::unique_lock lock(s->mRecorderMutex);
         s->mRecorders.erase(std::remove(s->mRecorders.begin(), s->mRecorders.end(), recorder),
                             s->mRecorders.end());
     }
@@ -1119,7 +1120,7 @@ namespace LLError
     std::shared_ptr<RECORDER> findRecorder()
     {
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
-        LLCoros::LockType lock(s->mRecorderMutex);
+        std::unique_lock lock(s->mRecorderMutex);
         return findRecorderPos<RECORDER>(s).first;
     }
 
@@ -1130,7 +1131,7 @@ namespace LLError
     bool removeRecorder()
     {
         SettingsConfigPtr s = Globals::getInstance()->getSettingsConfig();
-        LLCoros::LockType lock(s->mRecorderMutex);
+        std::unique_lock lock(s->mRecorderMutex);
         auto found = findRecorderPos<RECORDER>(s);
         if (found.first)
         {
@@ -1236,7 +1237,7 @@ namespace
 
         std::string escaped_message;
 
-        LLCoros::LockType lock(s->mRecorderMutex);
+        std::unique_lock lock(s->mRecorderMutex);
         for (LLError::RecorderPtr& r : s->mRecorders)
         {
             if (!r->enabled())
