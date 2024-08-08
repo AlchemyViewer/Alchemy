@@ -38,7 +38,6 @@
 #include "llkeyboard.h"
 #include "llagent.h"
 #include "lltrans.h"
-#include "lluiusage.h"
 
 const F32 LLVoiceClient::OVERDRIVEN_POWER_LEVEL = 0.7f;
 

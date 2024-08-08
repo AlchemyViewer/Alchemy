@@ -110,7 +110,7 @@ private:
 
 public:
     /*virtual*/ bool    isSelf() const override { return true; }
-        virtual bool    isBuddy() const { return false; }
+        bool isBuddy() const override { return false; }
     /*virtual*/ bool    isValid() const override;
 
     //--------------------------------------------------------------------

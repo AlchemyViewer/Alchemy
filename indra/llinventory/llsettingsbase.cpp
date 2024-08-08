@@ -718,7 +718,7 @@ void LLSettingsBlender::update(const LLSettingsBase::BlendFactor& blendf)
 F64 LLSettingsBlender::setBlendFactor(const LLSettingsBase::BlendFactor& blendf_in)
 {
     LLSettingsBase::TrackPosition blendf = blendf_in;
-    llassert(!isnan(blendf));
+    llassert(!llisnan(blendf));
     if (blendf >= 1.0)
     {
         triggerComplete();

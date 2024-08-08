@@ -138,7 +138,7 @@ public:
     /*virtual*/ void *getPlatformWindow() override;
     /*virtual*/ void bringToFront() override;
 
-    U32 getAvailableVRAMMegabytes() override;
+    U32 getAvailableVRAMMegabytes();
 
     void allowLanguageTextInput(LLPreeditor *preeditor, bool b) override;
     void updateLanguageTextInputArea() override;
@@ -163,8 +163,8 @@ public:
 protected:
     LLWindowSDL(LLWindowCallbacks* callbacks,
         const std::string& title, const std::string& name, int x, int y, int width, int height, U32 flags,
-        bool fullscreen, bool clearBg, bool disable_vsync, bool use_gl,
-        bool ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, U32 max_vram, F32 max_gl_version);
+        bool fullscreen, bool clearBg, bool enable_vsync, bool use_gl,
+        bool ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, F32 max_gl_version);
     ~LLWindowSDL();
 
     /*virtual*/ bool    isValid() override;
@@ -187,7 +187,7 @@ protected:
     //
 
     // create or re-create the GL context/window.  Called from the constructor and switchContext().
-    bool createContext(int x, int y, int width, int height, int bits, bool fullscreen, bool disable_vsync);
+    bool createContext(int x, int y, int width, int height, int bits, bool fullscreen, bool enable_vsync);
     void destroyContext();
     void setupFailure(const std::string& text, const std::string& caption, U32 type);
     U32 SDLCheckGrabbyKeys(SDL_Keycode keysym, bool gain);

@@ -41,7 +41,7 @@ ALGameMode& ALGameMode::instance()
 
 void ALGameMode::init()
 {
-        enable(gSavedSettings.getBool("AlchemyGameModeEnable"));
+        enable(gSavedSettings.getBOOL("AlchemyGameModeEnable"));
         gSavedSettings.getControl("AlchemyGameModeEnable")->getCommitSignal()->connect(boost::bind(&ALGameMode::onToggleGameModeControl, this));
 }
 
@@ -53,7 +53,7 @@ void ALGameMode::shutdown()
 
 void ALGameMode::onToggleGameModeControl()
 {
-    enable(gSavedSettings.getBool("AlchemyGameModeEnable"));
+    enable(gSavedSettings.getBOOL("AlchemyGameModeEnable"));
 }
 
 void ALGameMode::enable(const bool enable)
