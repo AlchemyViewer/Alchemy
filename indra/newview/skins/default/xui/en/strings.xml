@@ -4560,4 +4560,19 @@ and report the problem.
      name="Permanent">
 		Permanent
 	</string>
+    <string name="TooltipPrimCount">
+        Prims: [PRIM_COUNT]
+    </string>
+    <string name="TooltipPrimCost">
+        Land Impact: [PRIM_COST]
+    </string>
+    <string name="TooltipPrimCostLoading">
+        Loading Land Impact...
+    </string>
+    <string name="TooltipPosition">
+        Position: [OBJECT_POSITION]
+    </string>
+    <string name="TooltipDistance">
+        Distance: [OBJECT_DISTANCE]
+    </string>
 </strings>
