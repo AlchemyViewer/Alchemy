@@ -16,6 +16,11 @@
 	<check_box label="Discord連携を有効化" name="Enable_Discord_Integration"/>
 	<check_box label="Discord上でユーザ名を表示" name="Discord_Integration_Show_Name"/>
 	<check_box label="Discord上でリージョン名を表示" name="Discord_Integration_Show_Region"/>
+	<combo_box name="maturity_desired_combobox">
+		<combo_box.item label="General，Moderate，Adult" name="Desired_Adult" value="42"/>
+		<combo_box.item label="GeneralとModerate" name="Desired_Mature" value="21"/>
+		<combo_box.item label="General" name="Desired_PG" value="13"/>
+	</combo_box>
 	<text name="mylookat">
 		インベントリ：
 	</text>

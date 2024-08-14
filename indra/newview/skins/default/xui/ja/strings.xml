@@ -8221,4 +8221,19 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 	<string name="Permanent">
 		永続的
 	</string>
+	<string name="TooltipPrimCount">
+		プリム：[PRIM_COUNT]個
+	</string>
+	<string name="TooltipPrimCost">
+		ランドインパクト：[PRIM_COST]
+	</string>
+	<string name="TooltipPrimCostLoading">
+		ランドインパクトを読み込んでいます…
+	</string>
+	<string name="TooltipPosition">
+		位置：[OBJECT_POSITION]
+	</string>
+	<string name="TooltipDistance">
+		距離：[OBJECT_DISTANCE]
+	</string>
 </strings>

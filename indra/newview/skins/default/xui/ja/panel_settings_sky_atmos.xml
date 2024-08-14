@@ -4,10 +4,10 @@
 		ＨＤＲスケール：
 	</string>
 	<string name="brightness_string">
-		ブライトネス：
+		輝度：
 	</string>
 	<string name="hdr_tooltip">
-		リアルで明るい空やダイナミックな露出などの光源効果の強さを指定します。1.0がデフォルトで、0はオフとなり、0～1の間の値はアンビエントとＨＤＲの混合となります。
+		リアルで明るい空やダイナミックな露光などの光源効果の強さを指定します。1.0がデフォルトで、0はオフとなり、0～1の間の値は周辺環境とＨＤＲの混合となります。
 	</string>
 	<layout_stack name="main_ls">
 		<layout_panel name="top_lp">
