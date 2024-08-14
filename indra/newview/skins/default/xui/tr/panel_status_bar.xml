@@ -18,7 +18,7 @@
 	<panel name="menu_search_panel">
 		<search_editor label="Menülerde Ara" name="search_menu_edit" tool_tip="Merak ettiğiniz arama terimini buraya yazın. Sonuçlar, menü içindeki kısmi tam metin eşleşmeleri şeklinde görüntülenir."/>
 	</panel>
-	<panel left="-446" name="balance_bg" width="215">
+	<panel left="-446" name="balance_bg">
 		<text name="balance" tool_tip="L$ bakiyenizi yenilemek için buraya tıklayın" value="L$??"/>
 		<button label="L$ Satın Al" name="buyL" tool_tip="Daha fazla L$ satın almak için tıklayın"/>
 		<button label="Alışveriş yap" name="goShop" tool_tip="Second Life Pazaryeri Aç" width="95"/>
