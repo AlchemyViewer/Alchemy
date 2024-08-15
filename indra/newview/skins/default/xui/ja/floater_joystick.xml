@@ -115,7 +115,7 @@
 	</text>
 	<spinner name="FlycamAxisDeadZone6"/>
 	<text name="general_label">
-		ボタンのマッピングて
+		ボタンのマッピング
 	</text>
 	<text name="JoystickButtonJump">
 		ジャンプ
@@ -232,7 +232,7 @@
 		</icons_combo_box.item>
 	</icons_combo_box>
 	<text name="JoystickButtonRunToggle">
-		走行／歩行
+		走る／歩く
 	</text>
 	<icons_combo_box name="JoystickButtonRunToggle">
 		<icons_combo_box.item name="none" value="-1">
