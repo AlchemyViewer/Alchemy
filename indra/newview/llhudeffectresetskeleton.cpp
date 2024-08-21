@@ -186,7 +186,13 @@ void LLHUDEffectResetSkeleton::update()
     }
 
     bool owned = false;
-    if(mTargetObject->isAnimatedObject())
+    if (getOriginatedHere())
+    {
+        // If we created the request, always reset the skeleton
+        // This fixes issues with resetting other skeletons locally
+        owned = true;
+    }
+    else if (mTargetObject->isAnimatedObject())
     {
         owned = mTargetObject->mOwnerID == mSourceObject->getID();
     }
