@@ -118,8 +118,8 @@ else
 fi
 
 # Check if switcheroo is needed
-if [[ -d /sys/class/drm/card1 ]] && command -v switcherooctl >/dev/null 2>&1 && [[ "$(switcherooctl)" == "" ]]; then
-  notify-send "Automatic GPU selection is not available" "Please enable switcheroo-control.service"
+if [ -d /sys/class/drm/card1 ] && command -v switcherooctl >/dev/null 2>&1 && [ "$(switcherooctl)" = "" ]; then
+    notify-send "Automatic GPU selection is not available" "Please enable switcheroo-control.service"
 fi
 
 # Run the program.
