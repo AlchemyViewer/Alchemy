@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_transaction_log" title="取引ログ">
+	<floater.string name="total_received_fmt">
+		収入：L$ [TOTAL]
+	</floater.string>
+	<floater.string name="total_spent_fmt">
+		支出：L$ -[TOTAL]
+	</floater.string>
+	<scroll_list name="transaction_list">
+		<column name="time" label="時刻"/>
+		<column name="name"  label="名前"/>
+		<column name="amount" label="金額"/>
+	</scroll_list>
+	<text name="total_received" value="収入：L$ 0"/>
+	<text name="total_spent" value="支出：L$ -0"/>
+	<button label="リセット" name="btn_reset"/>
+</floater>

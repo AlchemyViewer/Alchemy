@@ -19,6 +19,7 @@
 		<!-- L$が空白になってしまうため翻訳を変更 -->
 		<menu_item_call label="リンデンドルの購入…" name="Buy and Sell L$"/>
 		<menu_item_call label="マーケットプレイス…" name="Marketplace"/>
+		<menu_item_check label="取引ログ…" name="transaction_log"/>
 		<menu_item_call label="マーケットプレイスに出品…" name="MarketplaceListings"/>
 		<menu_item_call label="アカウントのダッシュボード…" name="Manage My Account"/>
 		<menu_item_call label="[Membership]" name="Membership"/>
@@ -58,7 +59,7 @@
 			<menu label="取り外す" name="Avatar Detach"/>
 			<menu_item_call label="全てを取り外す" name="Detach All"/>
 		</menu>
-		<menu_item_call label="選択された装着物を取り外す" name="Remove Selected Attachments" />
+		<menu_item_call label="選択された装着物を取り外す" name="Remove Selected Attachments"/>
 		<menu_item_separator/>
 		<menu_item_call label="アバターを選択…" name="Avatar Picker"/>
 		<menu_item_separator/>
@@ -125,7 +126,7 @@
 		<menu_item_call label="スナップショット" name="Take Snapshot"/>
 		<menu_item_call label="３６０度スナップショット" name="Capture 360"/>
 		<menu label="ズームレベル" name="Zoom menu">
-			<menu_item_call label="ズームアウト" name="Zoom Out" />
+			<menu_item_call label="ズームアウト" name="Zoom Out"/>
 			<menu_item_call label="デフォルト" name="Zoom Default"/>
 			<menu_item_call label="ズームイン" name="Zoom In"/>
 		</menu>
@@ -365,7 +366,7 @@
 			<menu_item_check label="透明部分をハイライト" name="Highlight Transparent"/>
 			<menu_item_check label="マウスルックのときにクロスヘアーを表示" name="ShowCrosshairs"/>
 		</menu>
-		<menu label="ホバー時のツールチップ" name="Hover Tips">
+		<menu label="マウスホバー時のツールチップ" name="Hover Tips">
 			<menu_item_check label="ツールチップを表示" name="Show Tips"/>
 			<menu_item_separator/>
 			<menu_item_check label="土地のツールチップを表示" name="Land Tips"/>
@@ -377,7 +378,7 @@
 			<menu_item_check label="アルファマスク" name="Rendering Type Alpha Mask"/>
 			<menu_item_check label="明るさ全開のアルファマスク" name="Rendering Type Fullbright Alpha Mask"/>
 			<menu_item_check label="グロー" name="Rendering Type Glow"/>
-			<menu_item_check label="明るさ全開" name="Rendering Type Glow" />
+			<menu_item_check label="明るさ全開" name="Rendering Type Glow"/>
 			<menu_item_check label="アルファ" name="Rendering Type Alpha"/>
 			<menu_item_check label="樹木" name="Rendering Type Tree"/>
 			<menu_item_check label="アバター" name="Rendering Type Character"/>
@@ -625,7 +626,7 @@
 			</menu>
 			<menu label="キャラクターテスト" name="Character Tests">
 				<menu_item_call label="容姿をＸＭＬとして保存する" name="Appearance To XML"/>
-				<menu_item_call label="キャラクタジオメトリの切り替え" name="Toggle Character Geometry"/>
+				<menu_item_call label="キャラクタージオメトリの切り替え" name="Toggle Character Geometry"/>
 				<menu_item_call label="男性アバターのテスト" name="Test Male"/>
 				<menu_item_call label="女性アバターのテスト" name="Test Female"/>
 				<menu_item_check label="アバター選択を許可" name="Allow Select Avatar"/>
@@ -640,12 +641,12 @@
 			<menu_item_check label="アニメーション情報" name="Animation Info"/>
 			<menu_item_check label="見えているものを表示する" name="Show Look At"/>
 			<menu_item_check label="クリックした場所を表示する" name="Show Point At"/>
-			<menu_item_check label="ジョイント部分の更新のデバッグ" name="Debug Joint Updates"/>
+			<menu_item_check label="ジョイント部分の更新をデバッグ" name="Debug Joint Updates"/>
 			<menu_item_check label="ＬｏＤを無効にする" name="Disable LOD"/>
-			<menu_item_check label="キャラクターVisのデバッグ" name="Debug Character Vis"/>
+			<menu_item_check label="キャラクターのVisをデバッグ" name="Debug Character Vis"/>
 			<menu_item_check label="スケルトンの衝突判定を表示する" name="Show Collision Skeleton"/>
 			<menu_item_check label="ボーンを表示" name="Show Bones"/>
-			<menu_item_check label="エージェントの目標を表示する" name="Display Agent Target"/>
+			<menu_item_check label="エージェントの視線を表示する" name="Display Agent Target"/>
 			<menu_item_check label="インポスターの範囲を表示" name="Show Impostor Extents"/>
 			<!-- Appears not to exist anymore
 			<menu_item_check label="回転をデバッグ" name="Debug Rotation"/>
