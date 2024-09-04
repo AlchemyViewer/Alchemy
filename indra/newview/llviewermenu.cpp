@@ -6587,6 +6587,56 @@ class LLWorldGetRejectFriendshipRequests : public view_listener_t
     }
 };
 
+class LLCommunicateSetAutoRespond : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        if (gAgent.getAutoRespond())
+        {
+            gAgent.setAutoRespond(false);
+        }
+        else
+        {
+            gAgent.setAutoRespond(true);
+            LLNotificationsUtil::add("AutoRespondModeSet");
+        }
+        return true;
+    }
+};
+
+class LLCommunicateCheckAutoRespond : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+       return gAgent.getAutoRespond();
+    }
+};
+
+class LLCommunicateSetAutoRespondNonFriends : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        if (gAgent.getAutoRespondNonFriends())
+        {
+            gAgent.setAutoRespondNonFriends(false);
+        }
+        else
+        {
+            gAgent.setAutoRespondNonFriends(true);
+            LLNotificationsUtil::add("AutoRespondNonFriendsModeSet");
+        }
+        return true;
+    }
+};
+
+class LLCommunicateCheckAutoRespondNonFriends : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return gAgent.getAutoRespondNonFriends();
+    }
+};
+
 class LLWorldCreateLandmark : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -10089,6 +10139,13 @@ void initialize_menus()
 
     //Communicate Nearby chat
     view_listener_t::addMenu(new LLCommunicateNearbyChat(), "Communicate.NearbyChat");
+
+     // Communicate > Autorespond
+    view_listener_t::addMenu(new LLCommunicateSetAutoRespond(), "Communicate.SetAutoRespond");
+    view_listener_t::addMenu(new LLCommunicateSetAutoRespondNonFriends(), "Communicate.SetAutoRespondNonFriends");
+    view_listener_t::addMenu(new LLCommunicateCheckAutoRespond(), "Communicate.GetAutoRespond");
+    view_listener_t::addMenu(new LLCommunicateCheckAutoRespondNonFriends(), "Communicate.GetAutoRespondNonFriends");
+
 
     // Communicate > Voice morphing > Subscribe...
     commit.add("Communicate.VoiceMorphing.Subscribe", boost::bind(&handle_voice_morphing_subscribe));

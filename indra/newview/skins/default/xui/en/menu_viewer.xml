@@ -739,8 +739,24 @@
              function="World.GetRejectFriendshipRequests"/>
           <menu_item_check.on_click
               function="World.SetRejectFriendshipRequests"/>
- </menu_item_check>
-
+      </menu_item_check>
+      <menu_item_separator/>
+      <menu_item_check
+         label="Autorespond"
+         name="Set AutoRespond">
+            <menu_item_check.on_check
+            function="Communicate.GetAutoRespond"/>
+            <menu_item_check.on_click
+            function="Communicate.SetAutoRespond"/>
+      </menu_item_check>
+      <menu_item_check
+         label="AutoRespond to non-friends"
+         name="Set AutoRespond to non-friends">
+            <menu_item_check.on_check
+            function="Communicate.GetAutoRespondNonFriends"/>
+            <menu_item_check.on_click
+            function="Communicate.SetAutoRespondNonFriends"/>
+      </menu_item_check>
     </menu>
     <menu
      create_jump_keys="true"
