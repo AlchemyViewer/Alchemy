@@ -932,7 +932,7 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
     else
     {
         // This is normal chat.
-        *channel = 0;
+        *channel = gSavedSettings.getS32("AlchemyNearbyChatChannel");
         return mesg;
     }
 }
