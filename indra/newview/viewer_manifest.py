@@ -456,6 +456,12 @@ class WindowsManifest(ViewerManifest):
         # Get shared libs from the shared libs staging directory
         with self.prefix(src=os.path.join(self.args['build'], os.pardir,
                                           'sharedlibs', self.args['buildtype'])):
+            # WebRTC libraries
+            for libfile in (
+                    'llwebrtc.dll',
+            ):
+                self.path(libfile)
+
             # For image support
             self.path("openjp2.dll")
 
@@ -842,6 +848,20 @@ class DarwinManifest(ViewerManifest):
                 self.path("tr.lproj")
                 self.path("uk.lproj")
                 self.path("zh-Hans.lproj")
+
+                # WebRTC libraries
+                with self.prefix(src=os.path.join(self.args['build'], os.pardir,
+                                          'sharedlibs', self.args['buildtype'], 'Resources')):
+                    for libfile in (
+                            'libllwebrtc.dylib',
+                    ):
+                        self.path(libfile)
+
+                        oldpath = os.path.join("@rpath", libfile)
+                        self.run_command(
+                            ['install_name_tool', '-change', oldpath,
+                             '@executable_path/../Resources/%s' % libfile,
+                             executable])
 
                 # dylibs is a list of all the .dylib files we expect to need
                 # in our bundled sub-apps. For each of these we'll create a
@@ -1231,6 +1251,9 @@ class LinuxManifest(ViewerManifest):
 
         with self.prefix(src=os.path.join(pkgdir, 'resources', 'locales'), dst=os.path.join('bin', 'llplugin', 'locales')):
             self.path("*.pak")
+
+        with self.prefix(src=os.path.join(self.args['build'], os.pardir, "llwebrtc"), dst="lib"):
+            self.path("libllwebrtc.so")
 
         self.path("featuretable_linux.txt")
 

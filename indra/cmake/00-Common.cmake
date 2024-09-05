@@ -260,6 +260,10 @@ if (LINUX OR DARWIN)
     add_compile_options(-Werror)
   endif (NOT DISABLE_FATAL_WARNINGS)
 
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13)
+    add_compile_options(-Wno-unused-but-set-variable -Wno-unused-variable )
+  endif()
+
   add_compile_options(-m${ADDRESS_SIZE})
 endif ()
 

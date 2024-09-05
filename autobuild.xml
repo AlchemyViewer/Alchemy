@@ -2821,6 +2821,66 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>description</key>
         <string>Zstandard - Fast real-time compression algorithm</string>
       </map>
+      <key>webrtc</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>c10c534009bd739532a3398668fe385bd2001caeea8019070e318c68a370a00e722063afb62dd16a6e9b508646bbfa81ef31da671b2da058240077a8d9647ecb</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2434.2434/webrtc-114.5735.08.2434-windows64-2434.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>520f741cfe30e4581b849782bd4546a8f4567a5213859512e19bb026ad36b645884aa5ff409b7891dd740a63cbb55587fea39ba30edd2391d8243304ba2fdba0</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2434.2434/webrtc-114.5735.08.2434-darwin64-2434.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>02f20ff92eb437f74f7066828a6409d5fa059caeb00871cbba03871f5bc82f01e88a7bfa3bdeb0b4cd8d41b9c8caa774035e88e590508e04d8f48326ff6ffec6</string>
+              <key>hash_algorithm</key>
+              <string>blake2b</string>
+              <key>url</key>
+              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2434.2434/webrtc-114.5735.08.2434-linux64-2434.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/webrtc-license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2011, The WebRTC project authors. All rights reserved.</string>
+        <key>version</key>
+        <string>114.5735.08.2434</string>
+        <key>name</key>
+        <string>webrtc</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/secondlife/3p-webrtc-build</string>
+      </map>
     </map>
     <key>package_description</key>
     <map>
