@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="autoresponse_settings">
+	<text name="autorespond_reject_friends_response_label">
+		「フレンドシップのリクエストをすべて拒否する」モード時の他のアバターに対する自動返答：
+	</text>
+	<text_editor name="autorespond_reject_friends_response">
+		ログイン後に変更できます。
+	</text_editor>
+	<text name="autorespond_rto_response_label">
+		「テレポートのオファーをすべて拒否する」モード時の他のアバターに対する自動返答：
+	</text>
+	<text_editor name="autorespond_rto_response">
+		ログイン後に変更できます。
+	</text_editor>
+	<check_box label="フレンドリストに載っている人からのテレポートのオファー（と応答を送信）を拒否しない" name="ALDontRejectTeleportOffersFromFriends"/>
+</panel>

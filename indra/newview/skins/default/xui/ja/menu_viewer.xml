@@ -105,6 +105,9 @@
 		<menu_item_check label="取り込み中" name="Do Not Disturb"/>
 		<menu_item_check label="テレポートのオファーとリクエストを拒否する" name="Automatically reject teleport offers"/>
 		<menu_item_check label="フレンドシップのリクエストを拒否する" name="Reject all friendship requests"/>
+		<menu_item_separator/>
+		<menu_item_check label="自動応答の有効化" name="Set AutoRespond"/>
+		<menu_item_check label="非フレンドへ自動応答の有効化" name="Set AutoRespond to non-friends"/>
 	</menu>
 	<menu label="ワールド" name="World">
 		<menu_item_check label="ポーザー" name="Poser"/>
