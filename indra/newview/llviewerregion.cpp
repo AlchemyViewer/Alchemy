@@ -3393,16 +3393,13 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("EventQueueGet");
     capabilityNames.append("ExtEnvironment");
 
-    if (LLGridManager::instance().isInSecondlife() || gSavedSettings.getBOOL("UseHTTPInventory"))
-    {
-        capabilityNames.append("FetchLib2");
-        capabilityNames.append("FetchLibDescendents2");
-        capabilityNames.append("FetchInventory2");
-        capabilityNames.append("FetchInventoryDescendents2");
-        capabilityNames.append("IncrementCOFVersion");
-        capabilityNames.append("RequestTaskInventory");
-        AISAPI::getCapNames(capabilityNames);
-    }
+    capabilityNames.append("FetchLib2");
+    capabilityNames.append("FetchLibDescendents2");
+    capabilityNames.append("FetchInventory2");
+    capabilityNames.append("FetchInventoryDescendents2");
+    capabilityNames.append("IncrementCOFVersion");
+    capabilityNames.append("RequestTaskInventory");
+    AISAPI::getCapNames(capabilityNames);
 
     capabilityNames.append("InterestList");
 
@@ -3443,6 +3440,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("MapLayerGod");
     capabilityNames.append("MeshUploadFlag");
     capabilityNames.append("ModifyMaterialParams");
+    capabilityNames.append("ModifyRegion");
     capabilityNames.append("NavMeshGenerationStatus");
     capabilityNames.append("NewFileAgentInventory");
     capabilityNames.append("ObjectAnimation");
@@ -3482,6 +3480,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("UpdateNotecardAgentInventory");
     capabilityNames.append("UpdateNotecardTaskInventory");
     capabilityNames.append("UpdateScriptAgent");
+    capabilityNames.append("UpdateScriptTask");
     capabilityNames.append("UpdateSettingsAgentInventory");
     capabilityNames.append("UpdateSettingsTaskInventory");
     capabilityNames.append("UploadAgentProfileImage");
