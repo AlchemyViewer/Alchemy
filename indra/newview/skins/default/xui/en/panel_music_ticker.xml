@@ -123,7 +123,7 @@
      mouse_opaque="false"
      name="artist_label" 
      v_pad="0" 
-     width="50">
+     width="60">
         Artist:
     </text>
     <text
@@ -136,7 +136,7 @@
      h_pad="0"
      halign="left"
      height="16"
-     left="57"
+     left="67"
      mouse_opaque="false"
      name="artist_text"
      v_pad="0"
