@@ -100,9 +100,9 @@ void RlvInventory::fetchSharedInventory()
 
     // Add them to the "to fetch" list
     uuid_vec_t idFolders;
-    idFolders.push_back(pRlvRoot->getUUID());
-    for (S32 idxFolder = 0, cntFolder = folders.size(); idxFolder < cntFolder; idxFolder++)
-        idFolders.push_back(folders.at(idxFolder)->getUUID());
+    idFolders.emplace_back(pRlvRoot->getUUID());
+    for (size_t idxFolder = 0, cntFolder = folders.size(); idxFolder < cntFolder; idxFolder++)
+        idFolders.emplace_back(folders.at(idxFolder)->getUUID());
 
     // Now fetch them all in one go
     RlvSharedInventoryFetcher* pFetcher = new RlvSharedInventoryFetcher(idFolders);
@@ -131,7 +131,7 @@ void RlvInventory::fetchSharedLinks()
 
     // Add them to the "to fetch" list based on link type
     uuid_vec_t idFolders, idItems;
-    for (S32 idxItem = 0, cntItem = items.size(); idxItem < cntItem; idxItem++)
+    for (size_t idxItem = 0, cntItem = items.size(); idxItem < cntItem; idxItem++)
     {
         const LLViewerInventoryItem* pItem = items.at(idxItem);
         switch (pItem->getActualType())
@@ -244,7 +244,7 @@ const LLUUID& RlvInventory::getSharedRootID() const
         {
             // NOTE: we might have multiple #RLV folders (pick the first one with sub-folders; otherwise the last one with no sub-folders)
             const LLViewerInventoryCategory* pFolder;
-            for (S32 idxFolder = 0, cntFolder = pFolders->size(); idxFolder < cntFolder; idxFolder++)
+            for (size_t idxFolder = 0, cntFolder = pFolders->size(); idxFolder < cntFolder; idxFolder++)
             {
                 if ( ((pFolder = pFolders->at(idxFolder)) != NULL) && (cstrSharedRoot == pFolder->getName()) )
                 {
@@ -354,7 +354,7 @@ S32 RlvInventory::getDirectDescendentsItemCount(const LLInventoryCategory* pFold
 
         if (pItems)
         {
-            for (S32 idxItem = 0, cntItem = pItems->size(); idxItem < cntItem; idxItem++)
+            for (size_t idxItem = 0, cntItem = pItems->size(); idxItem < cntItem; idxItem++)
                 if (pItems->at(idxItem)->getType() == filterType)
                     cntType++;
         }
@@ -430,7 +430,7 @@ void RlvRenameOnWearObserver::doneIdle()
             continue;
         }
 
-        for (S32 idxItem = 0, cntItem = items.size(); idxItem < cntItem; idxItem++)
+        for (size_t idxItem = 0, cntItem = items.size(); idxItem < cntItem; idxItem++)
         {
             LLViewerInventoryItem* pItem = items.at(idxItem);
             if (!pItem)
@@ -572,42 +572,24 @@ void RlvGiveToRLVOffer::moveAndRename(const LLUUID& idFolder, const LLUUID& idDe
     const LLViewerInventoryCategory* pFolder = gInventory.getCategory(idFolder);
     if ( (idDestination.notNull()) && (pFolder) )
     {
-        bool needsRename = (pFolder->getName() != strName);
+        gInventory.changeCategoryParent(gInventory.getCategory(idFolder), idDestination, false);
+        gInventory.addChangedMask(LLInventoryObserver::STRUCTURE, idFolder);
+        gInventory.notifyObservers();
+        gInventory.fetchDescendentsOf(idDestination);
 
-        LLPointer<LLInventoryCallback> cbMove;
-        if (idDestination != pFolder->getParentUUID())
+        // rename and restart this function if the folder doesn't have the correct name.
+        // This will also trigger another move above, but that should have no ill effects
+        // and might even help when the folder didn't move correctly the first time. -Zi
+        if (pFolder->getName() != strName)
         {
-            // We have to move *after* the rename operation completes or AIS will drop it
-            if (!needsRename)
-            {
-                LLInventoryModel::update_list_t update;
-                LLInventoryModel::LLCategoryUpdate updOldParent(pFolder->getParentUUID(), -1);
-                update.push_back(updOldParent);
-                LLInventoryModel::LLCategoryUpdate updNewParent(idDestination, 1);
-                update.push_back(updNewParent);
-                gInventory.accountForUpdate(update);
-
-                LLPointer<LLViewerInventoryCategory> pNewFolder = new LLViewerInventoryCategory(pFolder);
-                pNewFolder->setParent(idDestination);
-                pNewFolder->updateParentOnServer(false);
-
-                gInventory.updateCategory(pNewFolder);
-                gInventory.notifyObservers();
-
-                if (cbFinal)
-                {
-                    cbFinal.get()->fire(idFolder);
-                }
-            }
-            else
-            {
-                cbMove = new LLBoostFuncInventoryCallback(boost::bind(RlvGiveToRLVOffer::moveAndRename, _1, idDestination, strName, cbFinal));
-            }
+            LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(RlvGiveToRLVOffer::moveAndRename, _1, idDestination, strName, cbFinal));
+            rename_category(&gInventory, idFolder, strName, cb);
+            return;
         }
 
-        if (needsRename)
+        if (cbFinal)
         {
-            rename_category(&gInventory, idFolder, strName, (cbMove) ? cbMove : cbFinal);
+            cbFinal.get()->fire(idFolder);
         }
     }
     else if (cbFinal)
@@ -650,8 +632,7 @@ void RlvGiveToRLVTaskOffer::doneIdle()
 
 void RlvGiveToRLVTaskOffer::onDestinationCreated(const LLUUID& idDestFolder, const std::string& strName)
 {
-    const LLViewerInventoryCategory* pTarget = (idDestFolder.notNull()) ? gInventory.getCategory(idDestFolder) : nullptr;
-    if (pTarget)
+    if (const LLViewerInventoryCategory* pTarget = (idDestFolder.notNull()) ? gInventory.getCategory(idDestFolder) : nullptr)
     {
         moveAndRename(m_Folders.front(), idDestFolder, strName, new LLBoostFuncInventoryCallback(boost::bind(&RlvGiveToRLVTaskOffer::onOfferCompleted, this, _1)));
     }
