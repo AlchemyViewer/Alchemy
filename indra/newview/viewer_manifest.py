@@ -1316,7 +1316,6 @@ class Linux_i686_Manifest(LinuxManifest):
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libSDL2*.so*")
             self.path("libopenjp2.*so*")
-            self.path("libjpeg.so*")
 
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
                 self.path("libalut.so*")
@@ -1354,7 +1353,6 @@ class Linux_x86_64_Manifest(LinuxManifest):
         with self.prefix(src=relpkgdir, dst="lib"):
             self.path("libSDL2*.so*")
             self.path("libopenjp2.*so*")
-            self.path("libjpeg.so*")
             self.path("libsdbus-c++.so*")
 
             if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
