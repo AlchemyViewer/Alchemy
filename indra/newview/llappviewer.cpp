@@ -2923,19 +2923,20 @@ bool LLAppViewer::initConfiguration()
             OSMB_OK);
         return false;
     }
-
+#if 0
     if (mSecondInstance)
     {
         // This is the second instance of SL. Mute voice,
         // but make sure the setting is *not* persisted.
         // Also see LLVivoxVoiceClient::voiceEnabled()
         LLControlVariable* enable_voice = gSavedSettings.getControl("EnableVoiceChat");
-        if(enable_voice && !gSavedSettings.getBOOL("VoiceMultiInstance"))
+        if (enable_voice)
         {
-            const BOOL DO_NOT_PERSIST = FALSE;
-            enable_voice->setValue(LLSD(FALSE), DO_NOT_PERSIST);
+            const bool DO_NOT_PERSIST = false;
+            enable_voice->setValue(LLSD(false), DO_NOT_PERSIST);
         }
     }
+#endif
 
     gLastRunVersion = gSavedSettings.getString("LastRunVersion");
 

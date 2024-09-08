@@ -211,6 +211,11 @@ protected:
     LLPanel* mExtendedButtonPanel = nullptr;
 // [/SL:KB]
 
+    // Since mVoiceButton can work in one of two modes, "Start call" or "Hang up",
+    // (with different images and tooltips depending on the currently chosen mode)
+    // we should track the mode we're currently using to react on click accordingly
+    bool mVoiceButtonHangUpMode { false };
+
 private:
     // Handling selection and contextual menu
     void doToSelected(const LLSD& userdata);
@@ -228,6 +233,8 @@ private:
      * Implementation: chat history bottom "follows" top+top_pad of input chat field
      */
     void reshapeChatLayoutPanel();
+
+    void onCallButtonClicked();
 
     void onInputEditorClicked();
 

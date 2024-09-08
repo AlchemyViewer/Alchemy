@@ -585,7 +585,6 @@ void LLVivoxVoiceClient::connectorCreate()
         << "<AccountManagementServer>" << mVoiceAccountServerURI << "</AccountManagementServer>"
         << "<Mode>Normal</Mode>"
         << strConnectorHandle
-        << (gSavedSettings.getBOOL("VoiceMultiInstance") ? "<MinimumPort>30000</MinimumPort><MaximumPort>50000</MaximumPort>" : "")
         << "<Logging>"
         << "<Folder>" << logdir << "</Folder>"
         << "<FileNamePrefix>Connector</FileNamePrefix>"
@@ -1013,31 +1012,53 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
                 params.args.add( exe_path );
             }
 
+            static LLCachedControl<U32> portbase(gSavedSettings, "VivoxVoicePort");
             static LLCachedControl<std::string> host(gSavedSettings, "VivoxVoiceHost");
-            static LLCachedControl<std::string> loglevel_cc(gSavedSettings, "VivoxDebugLevel");
+            static LLCachedControl<std::string> loglevel(gSavedSettings, "VivoxDebugLevel");
             static LLCachedControl<std::string> log_folder_cc(gSavedSettings, "VivoxLogDirectory");
             static LLCachedControl<std::string> shutdown_timeout(gSavedSettings, "VivoxShutdownTimeout");
-            std::string loglevel = loglevel_cc;
-            std::string log_folder = log_folder_cc;
+            static const U32 portrange = 100;
+            static U32 portoffset = 0;
+            U32 port = 0;
 
-            if (loglevel.empty())
+            if (LLAppViewer::instance()->isSecondInstance())
             {
-                loglevel = "0";
+                // Ideally need to know amount of instances and
+                // to increment instance_offset on EADDRINUSE.
+                // But for now just use rand
+                static U32 instance_offset = portrange * ll_rand(20);
+                port = portbase + portoffset + instance_offset;
             }
-            params.args.add("-ll");
-            params.args.add(loglevel);
+            else
+            {
+                // leave main thread with exclusive port set
+                port = portbase + portoffset;
+            }
+            portoffset = (portoffset + 1) % portrange;
+            params.args.add("-i");
+            params.args.add(STRINGIZE(host() << ':' << port));
 
+            params.args.add("-ll");
+            if (loglevel().empty())
+            {
+                params.args.add("0");
+            }
+            else
+            {
+                params.args.add(loglevel);
+            }
+
+            params.args.add("-lf");
+
+            std::string log_folder = log_folder_cc;
             if (log_folder.empty())
             {
                 log_folder = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "");
             }
-
             if (LLStringUtil::endsWith(log_folder, gDirUtilp->getDirDelimiter()))
             {
                 log_folder = log_folder.substr(0, log_folder.size() - gDirUtilp->getDirDelimiter().size());
             }
-
-            params.args.add("-lf");
             params.args.add(log_folder);
 
             // set log file basename and .log
@@ -1047,13 +1068,12 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
             params.args.add(".log");
 
             // rotate any existing log
-
+            std::string new_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "SLVoice.log");
             std::string old_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "SLVoice.old");
             if (gDirUtilp->fileExists(old_log))
             {
                 LLFile::remove(old_log);
             }
-            std::string new_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "SLVoice.log");
             if (gDirUtilp->fileExists(new_log))
             {
                 LLFile::rename(new_log, old_log);
@@ -1064,18 +1084,6 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
                 params.args.add("-st");
                 params.args.add(shutdown_timeout);
             }
-            if (gSavedSettings.getBOOL("VoiceMultiInstance"))
-            {
-                S32 port_nr = 30000 + ll_rand(20000);
-                LLControlVariable* voice_port = gSavedSettings.getControl("VivoxVoicePort");
-                if (voice_port)
-                {
-                    voice_port->setValue(LLSD(port_nr), false);
-                    params.args.add("-i");
-                    params.args.add(llformat("%s:%u", host().c_str(), gSavedSettings.getU32("VivoxVoicePort")));
-                }
-            }
-
             params.cwd = gDirUtilp->getAppRODataDir();
 
             // Check if using the old SLVoice for Linux. the SDK in that version is too old to handle the extra args
@@ -1098,7 +1106,7 @@ bool LLVivoxVoiceClient::startAndLaunchDaemon()
 
             sGatewayPtr = LLProcess::create(params);
 
-            mDaemonHost = LLHost(host().c_str(), gSavedSettings.getU32("VivoxVoicePort"));
+            mDaemonHost = LLHost(host().c_str(), port);
         }
         else
         {
@@ -1341,7 +1349,7 @@ bool LLVivoxVoiceClient::establishVoiceConnection()
             {
                 if (result.has("retry") && ++retries <= CONNECT_RETRY_MAX && !sShuttingDown)
                 {
-                    F32 timeout = LLSD::Real(result["retry"]);
+                    F32 timeout = (F32)LLSD::Real(result["retry"]);
                     timeout *= retries;
                     LL_INFOS("Voice") << "Retry connection to voice service in " << timeout << " seconds" << LL_ENDL;
                     llcoro::suspendUntilTimeout(timeout);
@@ -6545,7 +6553,6 @@ LLVivoxVoiceClient::voiceFontEntry::voiceFontEntry(LLUUID& id) :
     mIsNew(false)
 {
     mExpiryTimer.stop();
-    mExpiryWarningTimer.stop();
 }
 
 LLVivoxVoiceClient::voiceFontEntry::~voiceFontEntry()
@@ -6656,20 +6663,6 @@ void LLVivoxVoiceClient::addVoiceFont(const S32 font_index,
             font->mExpiryTimer.start();
             font->mExpiryTimer.setExpiryAt(expiration_date.secondsSinceEpoch() - VOICE_FONT_EXPIRY_INTERVAL);
 
-            // Set the warning timer to some interval before actual expiry.
-            S32 warning_time = gSavedSettings.getS32("VoiceEffectExpiryWarningTime");
-            if (warning_time != 0)
-            {
-                font->mExpiryWarningTimer.start();
-                F64 expiry_time = (expiration_date.secondsSinceEpoch() - (F64)warning_time);
-                font->mExpiryWarningTimer.setExpiryAt(expiry_time - VOICE_FONT_EXPIRY_INTERVAL);
-            }
-            else
-            {
-                // Disable the warning timer.
-                font->mExpiryWarningTimer.stop();
-            }
-
              // Only flag new session fonts after the first time we have fetched the list.
             if (mVoiceFontsReceived)
             {
@@ -6711,7 +6704,6 @@ void LLVivoxVoiceClient::expireVoiceFonts()
     // than checking each font individually.
 
     bool have_expired = false;
-    bool will_expire = false;
     bool expired_in_use = false;
 
     LLUUID current_effect = LLVoiceClient::instance().getVoiceEffectDefault();
@@ -6721,7 +6713,6 @@ void LLVivoxVoiceClient::expireVoiceFonts()
     {
         voiceFontEntry* voice_font = iter->second;
         LLFrameTimer& expiry_timer  = voice_font->mExpiryTimer;
-        LLFrameTimer& warning_timer = voice_font->mExpiryWarningTimer;
 
         // Check for expired voice fonts
         if (expiry_timer.getStarted() && expiry_timer.hasExpired())
@@ -6737,14 +6728,6 @@ void LLVivoxVoiceClient::expireVoiceFonts()
             LL_DEBUGS("Voice") << "Voice Font " << voice_font->mName << " has expired." << LL_ENDL;
             deleteVoiceFont(voice_font->mID);
             have_expired = true;
-        }
-
-        // Check for voice fonts that will expire in less that the warning time
-        if (warning_timer.getStarted() && warning_timer.hasExpired())
-        {
-            LL_DEBUGS("VoiceFont") << "Voice Font " << voice_font->mName << " will expire soon." << LL_ENDL;
-            will_expire = true;
-            warning_timer.stop();
         }
     }
 
@@ -6769,15 +6752,6 @@ void LLVivoxVoiceClient::expireVoiceFonts()
 
         // Refresh voice font lists in the UI.
         notifyVoiceFontObservers();
-    }
-
-    // Give a warning notification if any voice fonts are due to expire.
-    if (will_expire)
-    {
-        S32Seconds seconds(gSavedSettings.getS32("VoiceEffectExpiryWarningTime"));
-        args["INTERVAL"] = llformat("%d", LLUnit<S32, LLUnits::Days>(seconds).value());
-
-        LLNotificationsUtil::add("VoiceEffectsWillExpire", args);
     }
 }
 

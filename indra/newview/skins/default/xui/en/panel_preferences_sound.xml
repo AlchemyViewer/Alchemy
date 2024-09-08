@@ -365,7 +365,8 @@
    name="gesture_audio_play_btn"
    control_name="EnableGestureSounds"
    value="true"
-   follows="left|bottom|right"
+   follows="left|top"
+   layout="topleft" 
    height="15"
    tool_tip="Check this to hear sounds from gestures"
    label="Play sounds from gestures"
@@ -375,12 +376,13 @@
    name="sound_on_collisions"
    control_name="EnableCollisionSounds"
    value="true"
-   follows="left|bottom|right"
+   follows="left|top"
+   layout="topleft" 
    height="15"
    tool_tip="Check this to hear sounds from collisions with objects and avatars"
    label="Play sounds from collisions"
-   top_pad="5"
-   left="20"/>
+   top_delta="0"
+   left_delta="235"/>
  	<check_box
     name="media_auto_play_hud"
     control_name="MediaAutoPlayHuds"
@@ -481,9 +483,9 @@
    tool_tip="Check to enable voice echo cancellation"
    label="Echo Cancellation"
    layout="topleft"
-   left="260"
+   left="270"
    name="enable_echo_cancellation"
-   top_pad="-15"
+   top_pad="5"
    width="200"/>
   <check_box
    follows="top|left"
@@ -496,7 +498,7 @@
    name="push_to_talk_toggle_check"
    width="237"
    tool_tip="When in toggle mode, press and release the trigger key ONCE to switch your microphone on or off. When not in toggle mode, the microphone broadcasts your voice only while the trigger is being held down."
-   top_pad="5"/>
+   top_delta="0"/>
   <check_box
    control_name="VoiceAutomaticGainControl"
    height="15"
@@ -504,8 +506,8 @@
    label="Automatic Gain Control"
    layout="topleft"
    name="voice_automatic_gain_control"
-   left="260"
-   top_pad="-15"
+   left="270"
+   top_pad="5"
    width="200"/>
   <check_box
    control_name="LipSyncEnabled"
@@ -515,14 +517,14 @@
    layout="topleft"
    left="20"
    name="enable_lip_sync"
-   top_pad="5" 
+   top_delta="0" 
    width="237"/>
   <text
    layout="topleft"
    height="15"
-   left="260"
-   top_pad="-12"
-   width="100"
+   left="273"
+   top_pad="5"
+   width="110"
    name="noise_suppression_label">
     Noise Suppression
   </text>
@@ -563,7 +565,7 @@
    label="Voice Input/Output devices"
    layout="topleft"
    left="20"
-   top_pad="0"
+   top_delta="5"
    name="device_settings_btn"
    width="200">
   </button>
