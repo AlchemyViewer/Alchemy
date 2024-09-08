@@ -189,7 +189,7 @@ bool LLVersionInfo::isViewerExpired()
     static const U64 BUILD_TIME(UNIX_TIMESTAMP);
     static const U64Seconds TEST_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 30)); // 30 days
     static const U64Seconds PROJECT_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 60)); // 60 days
-    static const U64Seconds BETA_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 120)); // 90 days
+    static const U64Seconds BETA_EXPIREY(BUILD_TIME + ((60 * 60) * 24 * 120)); // 120 days
 
     switch (getViewerMaturity())
     {
