@@ -5148,7 +5148,7 @@ void LLAppViewer::sendLogoutRequest()
 
         if(LLVoiceClient::instanceExists())
         {
-			LLVoiceClient::getInstance()->setVoiceEnabled(false);
+            LLVoiceClient::getInstance()->setVoiceEnabled(false);
         }
     }
 }
@@ -5192,6 +5192,11 @@ void LLAppViewer::updateNameLookupUrl(const LLViewerRegion * regionp)
         // name tags are persistant on screen, so make sure they refresh
         LLVOAvatar::invalidateNameTags();
     }
+}
+
+void LLAppViewer::postToMainCoro(const LL::WorkQueue::Work& work)
+{
+    gMainloopWork.post(work);
 }
 
 void LLAppViewer::idleNameCache()

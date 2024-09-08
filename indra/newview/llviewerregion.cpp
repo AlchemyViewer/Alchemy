@@ -3453,7 +3453,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("ParcelVoiceInfoRequest");
     capabilityNames.append("ProductInfoRequest");
     capabilityNames.append("ProvisionVoiceAccountRequest");
-	capabilityNames.append("VoiceSignalingRequest");
+    capabilityNames.append("VoiceSignalingRequest");
     capabilityNames.append("ReadOfflineMsgs"); // Requires to respond reliably: AcceptFriendship, AcceptGroupInvite, DeclineFriendship, DeclineGroupInvite
     capabilityNames.append("RegionObjects");
     capabilityNames.append("RemoteParcelRequest");
@@ -3482,7 +3482,6 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("UpdateNotecardAgentInventory");
     capabilityNames.append("UpdateNotecardTaskInventory");
     capabilityNames.append("UpdateScriptAgent");
-    capabilityNames.append("UpdateScriptTask");
     capabilityNames.append("UpdateSettingsAgentInventory");
     capabilityNames.append("UpdateSettingsTaskInventory");
     capabilityNames.append("UploadAgentProfileImage");

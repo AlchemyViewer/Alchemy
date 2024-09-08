@@ -116,7 +116,7 @@ public:
     void        initInstance() override; // Called after construction to initialize the class.
 protected:
     virtual             ~LLVOAvatar();
-	static bool 		handleVOAvatarPrefsChanged(const LLSD &newvalue);
+    static bool         handleVOAvatarPrefsChanged(const LLSD &newvalue);
 
 /**                    Initialization
  **                                                                            **

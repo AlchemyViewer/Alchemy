@@ -156,7 +156,7 @@ void LLAvatarActions::removeFriendDialog(const LLUUID& id)
 // static
 void LLAvatarActions::removeFriendsDialog(const uuid_vec_t& ids)
 {
-    if(ids.empty())
+    if(ids.size() == 0)
         return;
 
     LLSD args;
@@ -203,7 +203,7 @@ void LLAvatarActions::offerTeleport(const LLUUID& invitee)
 // static
 void LLAvatarActions::offerTeleport(const uuid_vec_t& ids)
 {
-    if (ids.empty())
+    if (ids.size() == 0)
         return;
 
     handle_lure(ids);
@@ -214,7 +214,7 @@ static void on_avatar_name_cache_start_im(const LLUUID& agent_id,
 {
     std::string name = av_name.getDisplayName();
     LLUUID session_id = gIMMgr->addSession(name, IM_NOTHING_SPECIAL, agent_id);
-    if (session_id.notNull())
+    if (session_id != LLUUID::null)
     {
         LLFloaterIMContainer::getInstance()->showConversation(session_id);
     }
@@ -246,7 +246,7 @@ void LLAvatarActions::endIM(const LLUUID& id)
         return;
 
     LLUUID session_id = gIMMgr->computeSessionID(IM_NOTHING_SPECIAL, id);
-    if (session_id.notNull())
+    if (session_id != LLUUID::null)
     {
         gIMMgr->leaveSession(session_id);
     }
@@ -256,8 +256,8 @@ static void on_avatar_name_cache_start_call(const LLUUID& agent_id,
                                             const LLAvatarName& av_name)
 {
     std::string name = av_name.getDisplayName();
-	LLUUID session_id = gIMMgr->addSession(name, IM_NOTHING_SPECIAL, agent_id, LLSD());
-    if (session_id.notNull())
+    LLUUID session_id = gIMMgr->addSession(name, IM_NOTHING_SPECIAL, agent_id, LLSD());
+    if (session_id != LLUUID::null)
     {
         gIMMgr->startCall(session_id);
     }
@@ -287,7 +287,7 @@ void LLAvatarActions::startCall(const LLUUID& id)
 // static
 void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floater_id)
 {
-    if (ids.empty())
+    if (ids.size() == 0)
     {
         return;
     }
@@ -298,22 +298,20 @@ void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floate
     for (uuid_vec_t::const_iterator it = ids.begin(); it != ids.end(); ++it)
     {
 // [RLVa:KB] - Checked: 2011-04-11 (RLVa-1.3.0)
-        const LLUUID& idAgent = *it;
-        if (!RlvActions::canStartIM(idAgent))
+        if (!RlvActions::canStartIM(*it))
         {
             make_ui_sound("UISndInvalidOp");
             RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartConference);
             return;
         }
-        id_array.push_back(idAgent);
 // [/RLVa:KB]
-//      id_array.push_back(*it);
+        id_array.push_back(*it);
     }
 
     // create the new ad hoc voice session
     const std::string title = LLTrans::getString("conference-title");
-	LLUUID session_id = gIMMgr->addSession(title, IM_SESSION_CONFERENCE_START, ids[0], id_array, LLSD(), floater_id);
-    if (session_id.isNull())
+    LLUUID session_id = gIMMgr->addSession(title, IM_SESSION_CONFERENCE_START, ids[0], id_array, LLSD(), floater_id);
+    if (session_id == LLUUID::null)
     {
         return;
     }
@@ -368,7 +366,7 @@ void LLAvatarActions::startConference(const uuid_vec_t& ids, const LLUUID& float
     const std::string title = LLTrans::getString("conference-title");
     LLUUID  session_id = gIMMgr->addSession(title, IM_SESSION_CONFERENCE_START, ids[0], id_array, LLSD(), floater_id);
 
-    if (session_id.isNull())
+    if (session_id == LLUUID::null)
     {
         return;
     }

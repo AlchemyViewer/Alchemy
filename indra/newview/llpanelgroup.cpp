@@ -102,10 +102,7 @@ LLPanelGroup::LLPanelGroup()
 LLPanelGroup::~LLPanelGroup()
 {
     LLGroupMgr::getInstance()->removeObserver(this);
-    if(LLVoiceClient::instanceExists())
-    {
-        LLVoiceClient::getInstance()->removeObserver(this);
-    }
+    LLVoiceClient::removeObserver(this);
 }
 
 void LLPanelGroup::onOpen(const LLSD& key)
@@ -209,7 +206,7 @@ BOOL LLPanelGroup::postBuild()
         mJoinText = panel_general->getChild<LLUICtrl>("join_cost_text");
     }
 
-    LLVoiceClient::getInstance()->addObserver(this);
+    LLVoiceClient::addObserver(this);
 
     return TRUE;
 }
@@ -298,9 +295,9 @@ void LLPanelGroup::onBtnJoin()
     }
     else
     {
-        LL_DEBUGS() << "joining group: " << mID << LL_ENDL;
-        LLGroupActions::join(mID);
-    }
+    LL_DEBUGS() << "joining group: " << mID << LL_ENDL;
+    LLGroupActions::join(mID);
+}
 }
 
 void LLPanelGroup::changed(LLGroupChange gc)

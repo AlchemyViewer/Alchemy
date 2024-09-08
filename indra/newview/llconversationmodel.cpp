@@ -210,7 +210,6 @@ void LLConversationItem::buildParticipantMenuOptions(menuentry_vec_t& items, U32
             items.push_back(std::string("BanMember"));
         }
 
-
         items.push_back(std::string("separator_utils"));
         items.push_back(std::string("utils_menu"));
         items.push_back(std::string("copy_username"));
@@ -372,22 +371,20 @@ void LLConversationItemSession::clearParticipants()
 
 void LLConversationItemSession::clearAndDeparentModels()
 {
-    std::for_each(mChildren.begin(), mChildren.end(),
-        [](LLFolderViewModelItem* c)
+    for (LLFolderViewModelItem* child : mChildren)
+    {
+        if (child->getNumRefs() == 0)
         {
-            if (c->getNumRefs() == 0)
-            {
-                // LLConversationItemParticipant can be created but not assigned to any view,
-                // it was waiting for an "add_participant" event to be processed
-                delete c;
-            }
-            else
-            {
-                // Model is still assigned to some view/widget
-                c->setParent(NULL);
-            }
+            // LLConversationItemParticipant can be created but not assigned to any view,
+            // it was waiting for an "add_participant" event to be processed
+            delete child;
         }
-    );
+        else
+        {
+            // Model is still assigned to some view/widget
+            child->setParent(NULL);
+        }
+    }
     mChildren.clear();
 }
 

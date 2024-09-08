@@ -41,6 +41,7 @@ class LLWebRTCProtocolParser;
 #include "llparcel.h"
 #include "llmutelist.h"
 #include <queue>
+#include "boost/json.hpp"
 
 #ifdef LL_USESYSTEMLIBS
 # include "expat.h"
@@ -54,20 +55,22 @@ class LLWebRTCProtocolParser;
 
 class LLAvatarName;
 class LLVoiceWebRTCConnection;
-typedef boost::shared_ptr<LLVoiceWebRTCConnection> connectionPtr_t;
+typedef std::shared_ptr<LLVoiceWebRTCConnection> connectionPtr_t;
 
 extern const std::string WEBRTC_VOICE_SERVER_TYPE;
 
 class LLWebRTCVoiceClient : public LLSingleton<LLWebRTCVoiceClient>,
                             virtual public LLVoiceModuleInterface,
                             public llwebrtc::LLWebRTCDevicesObserver,
-                            public LLMuteListObserver
+                            public LLMuteListObserver,
+                            public llwebrtc::LLWebRTCLogCallback
 {
     LLSINGLETON(LLWebRTCVoiceClient);
     LOG_CLASS(LLWebRTCVoiceClient);
     virtual ~LLWebRTCVoiceClient();
 
 public:
+    void cleanupSingleton() override;
     /// @name LLVoiceModuleInterface virtual implementations
     ///  @see LLVoiceModuleInterface
     //@{
@@ -83,7 +86,16 @@ public:
     // Returns true if WebRTC has successfully logged in and is not in error state
     bool isVoiceWorking() const override;
 
-    std::string sipURIFromID(const LLUUID &id) override;
+    std::string sipURIFromID(const LLUUID &id) const override;
+    LLSD getP2PChannelInfoTemplate(const LLUUID& id) const override;
+
+    void setHidden(bool hidden) override;  // virtual
+
+    ///////////////////
+    /// @name Logging
+    /// @{
+    void LogMessage(llwebrtc::LLWebRTCLogCallback::LogLevel level, const std::string& message) override;
+    //@}
 
     /////////////////////
     /// @name Tuning
@@ -121,15 +133,15 @@ public:
     bool isParticipant(const LLUUID& speaker_id) override;
 
     // Send a text message to the specified user, initiating the session if necessary.
-    // virtual BOOL sendTextMessage(const LLUUID& participant_id, const std::string& message) const {return false;};
+    // virtual bool sendTextMessage(const LLUUID& participant_id, const std::string& message) const {return false;};
 
     // Returns true if calling back the session URI after the session has closed is possible.
     // Currently this will be false only for PSTN P2P calls.
     // NOTE: this will return true if the session can't be found.
-    BOOL isSessionCallBackPossible(const LLUUID &session_id) override;
+    bool isSessionCallBackPossible(const LLUUID &session_id) override;
 
     // WebRTC doesn't preclude text im
-    BOOL isSessionTextIMPossible(const LLUUID &session_id) override { return TRUE; }
+    bool isSessionTextIMPossible(const LLUUID &session_id) override { return true; }
 
     ////////////////////////////
     /// @name Channel stuff
@@ -143,12 +155,7 @@ public:
         startAdHocSession(channelInfo, notify_on_first_join, hangup_on_last_leave);
     }
 
-    bool setSpatialChannel(const LLSD &channelInfo) override
-    {
-        // we don't really have credentials for a spatial channel in webrtc,
-        // it's all handled by the sim.
-        return true;
-    }
+    bool setSpatialChannel(const LLSD &channelInfo) override;
 
     void leaveNonSpatialChannel() override;
 
@@ -181,9 +188,9 @@ public:
     //////////////////////////
     /// @name nearby speaker accessors
     std::string getDisplayName(const LLUUID& id) override;
-    BOOL isParticipantAvatar(const LLUUID &id) override;
-    BOOL getIsSpeaking(const LLUUID& id) override;
-    BOOL getIsModeratorMuted(const LLUUID& id) override;
+    bool isParticipantAvatar(const LLUUID &id) override;
+    bool getIsSpeaking(const LLUUID& id) override;
+    bool getIsModeratorMuted(const LLUUID& id) override;
     F32 getCurrentPower(const LLUUID& id) override;        // "power" is related to "amplitude" in a defined way.  I'm just not sure what the formula is...
     F32 getUserVolume(const LLUUID& id) override;
     void setUserVolume(const LLUUID& id, F32 volume) override; // set's volume for specified agent, from 0-1 (where .5 is nominal)
@@ -202,8 +209,11 @@ public:
 
     void OnConnectionEstablished(const std::string& channelID, const LLUUID& regionID);
     void OnConnectionShutDown(const std::string &channelID, const LLUUID &regionID);
-    void OnConnectionFailure(const std::string &channelID, const LLUUID& regionID);
-    void sendPositionUpdate(bool force);
+    void OnConnectionFailure(const std::string &channelID,
+        const LLUUID &regionID,
+        LLVoiceClientStatusObserver::EStatusType status_type = LLVoiceClientStatusObserver::ERROR_UNKNOWN);
+    void updatePosition(void); // update the internal position state
+    void sendPositionUpdate(bool force); // send the position to the voice server.
     void updateOwnVolume();
 
     //////////////////////////////
@@ -230,7 +240,7 @@ public:
     struct participantState
     {
     public:
-        participantState(const LLUUID& agent_id);
+        participantState(const LLUUID& agent_id, const LLUUID& region);
 
         bool isAvatar();
 
@@ -242,12 +252,13 @@ public:
         F32 mVolume; // the gain applied to the participant
         bool mIsSpeaking;
         bool mIsModeratorMuted;
+        LLUUID mRegion;
     };
-    typedef boost::shared_ptr<participantState> participantStatePtr_t;
+    typedef std::shared_ptr<participantState> participantStatePtr_t;
 
     participantStatePtr_t findParticipantByID(const std::string &channelID, const LLUUID &id);
-    participantStatePtr_t addParticipantByID(const std::string& channelID, const LLUUID &id);
-    void                  removeParticipantByID(const std::string& channelID, const LLUUID &id);
+    participantStatePtr_t addParticipantByID(const std::string& channelID, const LLUUID &id, const LLUUID& region);
+    void removeParticipantByID(const std::string& channelID, const LLUUID &id, const LLUUID& region);
 
   protected:
 
@@ -256,17 +267,17 @@ public:
     class sessionState
     {
     public:
-        typedef boost::shared_ptr<sessionState> ptr_t;
-        typedef boost::weak_ptr<sessionState> wptr_t;
+        typedef std::shared_ptr<sessionState> ptr_t;
+        typedef std::weak_ptr<sessionState> wptr_t;
 
-        typedef boost::function<void(const ptr_t &)> sessionFunc_t;
+        typedef std::function<void(const ptr_t &)> sessionFunc_t;
 
         static void addSession(const std::string &channelID, ptr_t& session);
         virtual ~sessionState();
 
-        participantStatePtr_t addParticipant(const LLUUID& agent_id);
+        participantStatePtr_t addParticipant(const LLUUID& agent_id, const LLUUID& region);
         void removeParticipant(const participantStatePtr_t &participant);
-        void removeAllParticipants();
+        void removeAllParticipants(const LLUUID& region = LLUUID());
 
         participantStatePtr_t findParticipantByID(const LLUUID& id);
 
@@ -282,7 +293,6 @@ public:
         virtual void sendData(const std::string &data);
 
         void setMuteMic(bool muted);
-        void setMicGain(F32 volume);
         void setSpeakerVolume(F32 volume);
         void setUserVolume(const LLUUID& id, F32 volume);
 
@@ -291,6 +301,7 @@ public:
         static void for_each(sessionFunc_t func);
 
         static void reapEmptySessions();
+        static void clearSessions();
 
         bool isEmpty() { return mWebRTCConnections.empty(); }
 
@@ -303,7 +314,6 @@ public:
         std::string mName;
 
         bool    mMuted;          // this session is muted.
-        F32     mMicGain;        // gain for this session.
         F32     mSpeakerVolume;  // volume for this session.
 
         bool        mShuttingDown;
@@ -311,7 +321,7 @@ public:
         participantUUIDMap mParticipantsByUUID;
 
         static bool hasSession(const std::string &sessionID)
-        { return mSessions.find(sessionID) != mSessions.end(); }
+        { return sSessions.find(sessionID) != sSessions.end(); }
 
        bool mHangupOnLastLeave;  // notify observers after the session becomes empty.
        bool mNotifyOnFirstJoin;  // notify observers when the first peer joins.
@@ -322,14 +332,14 @@ public:
 
     private:
 
-        static std::map<std::string, ptr_t> mSessions;  // canonical list of outstanding sessions.
+        static std::map<std::string, ptr_t> sSessions;  // canonical list of outstanding sessions.
 
         static void for_eachPredicate(const std::pair<std::string,
                                       LLWebRTCVoiceClient::sessionState::wptr_t> &a,
                                       sessionFunc_t func);
     };
 
-    typedef boost::shared_ptr<sessionState> sessionStatePtr_t;
+    typedef std::shared_ptr<sessionState> sessionStatePtr_t;
     typedef std::map<std::string, sessionStatePtr_t> sessionMap;
 
     class estateSessionState : public sessionState
@@ -382,7 +392,6 @@ public:
     static void predSendData(const LLWebRTCVoiceClient::sessionStatePtr_t &session, const std::string& spatial_data);
     static void predUpdateOwnVolume(const LLWebRTCVoiceClient::sessionStatePtr_t &session, F32 audio_level);
     static void predSetMuteMic(const LLWebRTCVoiceClient::sessionStatePtr_t &session, bool mute);
-    static void predSetMicGain(const LLWebRTCVoiceClient::sessionStatePtr_t &session, F32 volume);
     static void predSetSpeakerVolume(const LLWebRTCVoiceClient::sessionStatePtr_t &session, F32 volume);
     static void predShutdownSession(const LLWebRTCVoiceClient::sessionStatePtr_t &session);
     static void predSetUserMute(const LLWebRTCVoiceClient::sessionStatePtr_t &session, const LLUUID& id, bool mute);
@@ -399,7 +408,6 @@ public:
 
     /////////////////////////////
     // Sending updates of current state
-    void updatePosition(void);
     void setListenerPosition(const LLVector3d &position, const LLVector3 &velocity, const LLQuaternion &rot);
     void setAvatarPosition(const LLVector3d &position, const LLVector3 &velocity, const LLQuaternion &rot);
 
@@ -445,7 +453,7 @@ private:
     /// Clean up objects created during a voice session.
     void cleanUp();
 
-	LL::WorkQueue::weak_t mMainQueue;
+    LL::WorkQueue::weak_t mMainQueue;
 
     bool mTuningMode;
     F32 mTuningMicGain;
@@ -474,8 +482,6 @@ private:
     bool inEstateChannel();
 
     LLSD getAudioSessionChannelInfo();
-
-    void setHidden(bool hidden) override; //virtual
 
     void enforceTether();
 
@@ -571,7 +577,8 @@ class LLVoiceWebRTCStats : public LLSingleton<LLVoiceWebRTCStats>
 
 class LLVoiceWebRTCConnection :
     public llwebrtc::LLWebRTCSignalingObserver,
-    public llwebrtc::LLWebRTCDataObserver
+    public llwebrtc::LLWebRTCDataObserver,
+    public std::enable_shared_from_this<LLVoiceWebRTCConnection>
 {
   public:
     LLVoiceWebRTCConnection(const LLUUID &regionID, const std::string &channelID);
@@ -586,6 +593,7 @@ class LLVoiceWebRTCConnection :
     void OnIceCandidate(const llwebrtc::LLWebRTCIceCandidate &candidate) override;
     void OnOfferAvailable(const std::string &sdp) override;
     void OnRenegotiationNeeded() override;
+    void OnPeerConnectionClosed() override;
     void OnAudioEstablished(llwebrtc::LLWebRTCAudioInterface *audio_interface) override;
     //@}
 
@@ -602,12 +610,11 @@ class LLVoiceWebRTCConnection :
     void sendJoin();
     void sendData(const std::string &data);
 
-    virtual void processIceUpdates();
-    virtual void onIceUpdateComplete(bool ice_completed, const LLSD &result);
-    virtual void onIceUpdateError(int retries, std::string url, LLSD body, bool ice_completed, const LLSD &result);
+    void processIceUpdates();
+
+    static void processIceUpdatesCoro(connectionPtr_t connection);
 
     virtual void setMuteMic(bool muted);
-    virtual void setMicGain(F32 volume);
     virtual void setSpeakerVolume(F32 volume);
 
     void setUserVolume(const LLUUID& id, F32 volume);
@@ -615,7 +622,7 @@ class LLVoiceWebRTCConnection :
 
     bool connectionStateMachine();
 
-    virtual bool isSpatial() = 0;
+    virtual bool isSpatial() { return false; }
 
     LLUUID getRegionID() { return mRegionID; }
 
@@ -641,13 +648,15 @@ class LLVoiceWebRTCConnection :
         VOICE_STATE_DISCONNECT             = 0x100,
         VOICE_STATE_WAIT_FOR_EXIT          = 0x200,
         VOICE_STATE_SESSION_EXIT           = 0x400,
-        VOICE_STATE_SESSION_STOPPING       = 0x780
+        VOICE_STATE_WAIT_FOR_CLOSE         = 0x800,
+        VOICE_STATE_CLOSED                 = 0x1000,
+        VOICE_STATE_SESSION_STOPPING       = 0x1F80
     } EVoiceConnectionState;
 
     EVoiceConnectionState mVoiceConnectionState;
     LL::WorkQueue::weak_t mMainQueue;
 
-    void                  setVoiceConnectionState(EVoiceConnectionState new_voice_connection_state)
+    void setVoiceConnectionState(EVoiceConnectionState new_voice_connection_state)
     {
         if (new_voice_connection_state & VOICE_STATE_SESSION_STOPPING)
         {
@@ -670,11 +679,14 @@ class LLVoiceWebRTCConnection :
     }
 
     virtual void requestVoiceConnection() = 0;
-    void requestVoiceConnectionCoro() { requestVoiceConnection(); }
+    static void requestVoiceConnectionCoro(connectionPtr_t connection) { connection->requestVoiceConnection(); }
 
-    void breakVoiceConnection();
+    static void breakVoiceConnectionCoro(connectionPtr_t connection);
+
+    LLVoiceClientStatusObserver::EStatusType mCurrentStatus;
 
     LLUUID mRegionID;
+    bool   mPrimary;
     LLUUID mViewerSession;
     std::string mChannelID;
 
@@ -682,7 +694,6 @@ class LLVoiceWebRTCConnection :
     std::string mRemoteChannelSDP;
 
     bool mMuted;
-    F32  mMicGain;
     F32  mSpeakerVolume;
 
     bool mShutDown;
@@ -696,7 +707,6 @@ class LLVoiceWebRTCConnection :
 
     std::vector<llwebrtc::LLWebRTCIceCandidate> mIceCandidates;
     bool                                        mIceCompleted;
-    bool                                        mTrickling;
 
     llwebrtc::LLWebRTCPeerConnectionInterface *mWebRTCPeerConnectionInterface;
     llwebrtc::LLWebRTCAudioInterface *mWebRTCAudioInterface;

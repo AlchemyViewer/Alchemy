@@ -341,7 +341,7 @@ public:
         LLAvatarTracker::instance().addObserver(this);
 
         // For notification when SIP online status changes.
-        LLVoiceClient::getInstance()->addObserver(this);
+        LLVoiceClient::addObserver(this);
         mInvObserver = new LLInventoryFriendCardObserver(this);
     }
 
@@ -349,10 +349,7 @@ public:
     {
         // will be deleted by ~LLInventoryModel
         //delete mInvObserver;
-        if (LLVoiceClient::instanceExists())
-        {
-            LLVoiceClient::getInstance()->removeObserver(this);
-        }
+        LLVoiceClient::removeObserver(this);
         LLAvatarTracker::instance().removeObserver(this);
     }
 
@@ -581,10 +578,7 @@ LLPanelPeople::~LLPanelPeople()
     delete mFriendListUpdater;
     delete mRecentListUpdater;
 
-    if(LLVoiceClient::instanceExists())
-    {
-        LLVoiceClient::getInstance()->removeObserver(this);
-    }
+    LLVoiceClient::removeObserver(this);
 }
 
 void LLPanelPeople::onFriendsAccordionExpandedCollapsed(LLUICtrl* ctrl, const LLSD& param, LLAvatarList* avatar_list)
@@ -755,7 +749,7 @@ BOOL LLPanelPeople::postBuild()
 
     updateRecentList();
 
-    LLVoiceClient::getInstance()->addObserver(this);
+    LLVoiceClient::addObserver(this);
 
     // call this method in case some list is empty and buttons can be in inconsistent state
     updateButtons();

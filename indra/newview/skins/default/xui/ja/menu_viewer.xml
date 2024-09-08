@@ -87,7 +87,6 @@
 		<menu_item_check label="ジェスチャー…" name="Gestures"/>
 		<menu_item_separator/>
 		<menu_item_check label="喋る" name="Speak"/>
-		<menu label="ボイスモーフィング" name="VoiceMorphing">
 			<menu_item_check label="ボイスモーフィングなし" name="NoVoiceMorphing"/>
 			<menu_item_separator/>
 			<menu_item_check label="プレビュー" name="Preview"/>

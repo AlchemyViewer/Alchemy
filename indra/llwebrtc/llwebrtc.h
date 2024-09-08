@@ -56,6 +56,20 @@
 namespace llwebrtc
 {
 
+class LLWebRTCLogCallback
+{
+public:
+    typedef enum {
+        LOG_LEVEL_VERBOSE = 0,
+        LOG_LEVEL_INFO,
+        LOG_LEVEL_WARNING,
+        LOG_LEVEL_ERROR
+    } LogLevel;
+
+    virtual void LogMessage(LogLevel level, const std::string& message) = 0;
+};
+
+
 // LLWebRTCVoiceDevice is a simple representation of the
 // components of a device, used to communicate this
 // information to the viewer.
@@ -78,7 +92,12 @@ class LLWebRTCVoiceDevice
     LLWebRTCVoiceDevice(const std::string &display_name, const std::string &id) :
         mDisplayName(display_name),
         mID(id)
-    {};
+    {
+        if (mID.empty())
+        {
+            mID = display_name;
+        }
+    };
 };
 
 typedef std::vector<LLWebRTCVoiceDevice> LLWebRTCVoiceDeviceList;
@@ -99,9 +118,31 @@ class LLWebRTCDevicesObserver
 // to enumerate, set, and get notifications of changes
 // for both capture (microphone) and render (speaker)
 // devices.
+
 class LLWebRTCDeviceInterface
 {
   public:
+    struct AudioConfig {
+
+        bool mAGC { true };
+
+        bool mEchoCancellation { true };
+
+        // TODO: The various levels of noise suppression are configured
+        // on the APM which would require setting config on the APM.
+        // We should pipe the various values through
+        // later.
+        typedef enum {
+            NOISE_SUPPRESSION_LEVEL_NONE = 0,
+            NOISE_SUPPRESSION_LEVEL_LOW,
+            NOISE_SUPPRESSION_LEVEL_MODERATE,
+            NOISE_SUPPRESSION_LEVEL_HIGH,
+            NOISE_SUPPRESSION_LEVEL_VERY_HIGH
+        } ENoiseSuppressionLevel;
+        ENoiseSuppressionLevel mNoiseSuppressionLevel { NOISE_SUPPRESSION_LEVEL_VERY_HIGH };
+    };
+
+    virtual void setAudioConfig(AudioConfig config) = 0;
 
     // instructs webrtc to refresh the device list.
     virtual void refreshDevices() = 0;
@@ -118,6 +159,7 @@ class LLWebRTCDeviceInterface
     virtual void setTuningMode(bool enable) = 0;
     virtual float getTuningAudioLevel() = 0; // for use during tuning
     virtual float getPeerConnectionAudioLevel() = 0; // for use when not tuning
+    virtual void setPeerConnectionGain(float gain) = 0;
 };
 
 // LLWebRTCAudioInterface provides the viewer with a way
@@ -185,6 +227,9 @@ class LLWebRTCSignalingObserver
     // Called when a connection enters a failure state and renegotiation is needed.
     virtual void OnRenegotiationNeeded() = 0;
 
+    // Called when a peer connection has shut down
+    virtual void OnPeerConnectionClosed() = 0;
+
     // Called when the audio channel has been established and audio
     // can begin.
     virtual void OnAudioEstablished(LLWebRTCAudioInterface *audio_interface) = 0;
@@ -194,7 +239,6 @@ class LLWebRTCSignalingObserver
     virtual void OnDataChannelReady(LLWebRTCDataInterface *data_interface) = 0;
 };
 
-
 // LLWebRTCPeerConnectionInterface representsd a connection to a peer,
 // in most cases a Secondlife WebRTC server.  This interface
 // allows for management of this peer connection.
@@ -202,11 +246,29 @@ class LLWebRTCPeerConnectionInterface
 {
   public:
 
+    struct InitOptions
+    {
+        // equivalent of PeerConnectionInterface::IceServer
+        struct IceServers {
+
+            // Valid formats are described in RFC7064 and RFC7065.
+            // Urls should containe dns hostnames (not IP addresses)
+            // as the TLS certificate policy is 'secure.'
+            // and we do not currentply support TLS extensions.
+            std::vector<std::string> mUrls;
+            std::string mUserName;
+            std::string mPassword;
+        };
+
+        std::vector<IceServers> mServers;
+    };
+
+    virtual bool initializeConnection(const InitOptions& options) = 0;
+    virtual bool shutdownConnection() = 0;
+
     virtual void setSignalingObserver(LLWebRTCSignalingObserver* observer) = 0;
     virtual void unsetSignalingObserver(LLWebRTCSignalingObserver* observer) = 0;
 
-    virtual bool initializeConnection() = 0;
-    virtual bool shutdownConnection() = 0;
     virtual void AnswerAvailable(const std::string &sdp) = 0;
 };
 
@@ -214,7 +276,7 @@ class LLWebRTCPeerConnectionInterface
 // exports.
 
 // This library must be initialized before use.
-LLSYMEXPORT void init();
+LLSYMEXPORT void init(LLWebRTCLogCallback* logSink);
 
 // And should be terminated as part of shutdown.
 LLSYMEXPORT void terminate();

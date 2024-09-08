@@ -54,8 +54,6 @@
 
 #include "llregioninfomodel.h"
 
-#include <boost/make_shared.hpp>
-
 #include "llagent.h"
 #include "roles_constants.h"
 #include "llestateinfomodel.h"

@@ -340,7 +340,7 @@
    follows="left|top"
    top_delta="-6"
    layout="topleft"
-   left_pad="20"
+   left_pad="10"
    width="360"
    height="40"
    name="media_ear_location">
@@ -453,7 +453,7 @@
    control_name="VoiceEarLocation"
    follows="left|top"
    layout="topleft"
-   left_pad="20"
+   left_pad="10"
    top_delta="-6"
    width="360"
    height="40"
@@ -476,17 +476,37 @@
     width="200" />
   </radio_group>
   <check_box
+   control_name="VoiceEchoCancellation"
+   height="15"
+   tool_tip="Check to enable voice echo cancellation"
+   label="Echo Cancellation"
+   layout="topleft"
+   left="260"
+   name="enable_echo_cancellation"
+   top_pad="-15"
+   width="200"/>
+  <check_box
    follows="top|left"
    enabled_control="EnableVoiceChat"
    control_name="PushToTalkToggle"
    height="15"
-   label="Toggle speak on/off when I press button in toolbar"
+   label="Toggle speak on/off with toolbar button"
    layout="topleft"
    left="20"
    name="push_to_talk_toggle_check"
    width="237"
    tool_tip="When in toggle mode, press and release the trigger key ONCE to switch your microphone on or off. When not in toggle mode, the microphone broadcasts your voice only while the trigger is being held down."
    top_pad="5"/>
+  <check_box
+   control_name="VoiceAutomaticGainControl"
+   height="15"
+   tool_tip="Check to enable automatic gain control"
+   label="Automatic Gain Control"
+   layout="topleft"
+   name="voice_automatic_gain_control"
+   left="260"
+   top_pad="-15"
+   width="200"/>
   <check_box
    control_name="LipSyncEnabled"
    follows="left|top"
@@ -497,6 +517,44 @@
    name="enable_lip_sync"
    top_pad="5" 
    width="237"/>
+  <text
+   layout="topleft"
+   height="15"
+   left="260"
+   top_pad="-12"
+   width="100"
+   name="noise_suppression_label">
+    Noise Suppression
+  </text>
+  <combo_box
+      control_name="VoiceNoiseSuppressionLevel"
+      layout="topleft"
+      height="23"
+      left_pad="10"
+      top_pad="-18"
+      name="noise_suppression_combo"
+      width="80">
+  <item
+      label="Off"
+      name="noise_suppression_none"
+      value="0"/>
+  <item
+      label="Low"
+      name="noise_suppression_low"
+      value="1"/>
+  <item
+      label="Moderate"
+      name="noise_suppression_moderate"
+      value="2"/>
+  <item
+      label="High"
+      name="noise_suppression_high"
+      value="3"/>
+  <item
+      label="Max"
+      name="noise_suppression_max"
+      value="4"/>
+  </combo_box>
   <button
    control_name="ShowDeviceSettings"
    follows="left|top"
@@ -504,10 +562,10 @@
    is_toggle="true"
    label="Voice Input/Output devices"
    layout="topleft"
-   left_pad="40"
-   top_delta="-4"
+   left="20"
+   top_pad="0"
    name="device_settings_btn"
-   width="210">
+   width="200">
   </button>
     <panel
     layout="topleft"

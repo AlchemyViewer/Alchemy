@@ -43,7 +43,7 @@ LLVoiceChannel* LLVoiceChannel::sCurrentVoiceChannel = NULL;
 LLVoiceChannel* LLVoiceChannel::sSuspendedVoiceChannel = NULL;
 LLVoiceChannel::channel_changed_signal_t LLVoiceChannel::sCurrentVoiceChannelChangedSignal;
 
-BOOL LLVoiceChannel::sSuspended = FALSE;
+bool LLVoiceChannel::sSuspended = false;
 
 //
 // Constants
@@ -58,7 +58,7 @@ LLVoiceChannel::LLVoiceChannel(const LLUUID& session_id, const std::string& sess
     mState(STATE_NO_CHANNEL_INFO),
     mSessionName(session_name),
     mCallDirection(OUTGOING_CALL),
-    mIgnoreNextSessionLeave(FALSE),
+    mIgnoreNextSessionLeave(false),
     mCallEndedByAgent(false)
 {
     mNotifyArgs["VOICE_CHANNEL_NAME"] = mSessionName;
@@ -81,10 +81,7 @@ LLVoiceChannel::~LLVoiceChannel()
     {
         sCurrentVoiceChannel = NULL;
         // Must check instance exists here, the singleton MAY have already been destroyed.
-        if(LLVoiceClient::instanceExists())
-        {
-            LLVoiceClient::getInstance()->removeObserver(this);
-        }
+        LLVoiceClient::removeObserver(this);
     }
 
     sVoiceChannelMap.erase(mSessionID);
@@ -92,14 +89,14 @@ LLVoiceChannel::~LLVoiceChannel()
 
 void LLVoiceChannel::setChannelInfo(const LLSD &channelInfo)
 {
-	mChannelInfo     = channelInfo;
+    mChannelInfo     = channelInfo;
 
     if (mState == STATE_NO_CHANNEL_INFO)
     {
-		if (mChannelInfo.isUndefined())
+        if (mChannelInfo.isUndefined() || !mChannelInfo.isMap() || mChannelInfo.size() == 0)
         {
             LLNotificationsUtil::add("VoiceChannelJoinFailed", mNotifyArgs);
-			LL_WARNS("Voice") << "Received empty channel info for channel " << mSessionName << LL_ENDL;
+            LL_WARNS("Voice") << "Received empty channel info for channel " << mSessionName << LL_ENDL;
             deactivate();
         }
         else
@@ -118,15 +115,21 @@ void LLVoiceChannel::setChannelInfo(const LLSD &channelInfo)
     }
 }
 
+void LLVoiceChannel::resetChannelInfo()
+{
+    mChannelInfo = LLSD();
+    mState = STATE_NO_CHANNEL_INFO;
+}
+
 void LLVoiceChannel::onChange(EStatusType type, const LLSD& channelInfo, bool proximal)
 {
-	LL_DEBUGS("Voice") << "Incoming channel info: " << channelInfo << LL_ENDL;
-	LL_DEBUGS("Voice") << "Current channel info: " << mChannelInfo << LL_ENDL;
-	if (mChannelInfo.isUndefined())
-	{
-		mChannelInfo = channelInfo;
-	}
-	if (!LLVoiceClient::getInstance()->compareChannels(mChannelInfo, channelInfo))
+    LL_DEBUGS("Voice") << "Incoming channel info: " << channelInfo << LL_ENDL;
+    LL_DEBUGS("Voice") << "Current channel info: " << mChannelInfo << LL_ENDL;
+    if (mChannelInfo.isUndefined() || (mChannelInfo.isMap() && mChannelInfo.size() == 0))
+    {
+        mChannelInfo = channelInfo;
+    }
+    if (!LLVoiceClient::getInstance()->compareChannels(mChannelInfo, channelInfo))
     {
         return;
     }
@@ -147,18 +150,21 @@ void LLVoiceChannel::handleStatusChange(EStatusType type)
     switch(type)
     {
     case STATUS_LOGIN_RETRY:
-		// no user notice
+        // no user notice
         break;
     case STATUS_LOGGED_IN:
         break;
     case STATUS_LEFT_CHANNEL:
-        if (callStarted() && !mIgnoreNextSessionLeave && !sSuspended)
+        if (callStarted() && !sSuspended)
         {
             // if forceably removed from channel
             // update the UI and revert to default channel
+            // deactivate will set the State to STATE_HUNG_UP
+            // so when handleStatusChange is called again during
+            // shutdown callStarted will return false and deactivate
+            // won't be called again.
             deactivate();
         }
-        mIgnoreNextSessionLeave = FALSE;
         break;
     case STATUS_JOINING:
         if (callStarted())
@@ -184,13 +190,13 @@ void LLVoiceChannel::handleError(EStatusType type)
     setState(STATE_ERROR);
 }
 
-BOOL LLVoiceChannel::isActive()
+bool LLVoiceChannel::isActive() const
 {
     // only considered active when currently bound channel matches what our channel
-	return callStarted() && LLVoiceClient::getInstance()->isCurrentChannel(mChannelInfo); 
+    return callStarted() && LLVoiceClient::getInstance()->isCurrentChannel(mChannelInfo);
 }
 
-BOOL LLVoiceChannel::callStarted()
+bool LLVoiceChannel::callStarted() const
 {
     return mState >= STATE_CALL_STARTED;
 }
@@ -200,7 +206,7 @@ void LLVoiceChannel::deactivate()
     if (mState >= STATE_RINGING)
     {
         // ignore session leave event
-        mIgnoreNextSessionLeave = TRUE;
+        mIgnoreNextSessionLeave = true;
     }
 
     if (callStarted())
@@ -216,7 +222,7 @@ void LLVoiceChannel::deactivate()
             LLVoiceClient::getInstance()->setUserPTTState(false);
         }
     }
-    LLVoiceClient::getInstance()->removeObserver(this);
+    LLVoiceClient::removeObserver(this);
 
     if (sCurrentVoiceChannel == this)
     {
@@ -249,14 +255,14 @@ void LLVoiceChannel::activate()
     if (mState == STATE_NO_CHANNEL_INFO)
     {
         // responsible for setting status to active
-		requestChannelInfo();
+        requestChannelInfo();
     }
     else
     {
         setState(STATE_CALL_STARTED);
     }
 
-    LLVoiceClient::getInstance()->addObserver(this);
+    LLVoiceClient::addObserver(this);
 
     //do not send earlier, channel should be initialized, should not be in STATE_NO_CHANNEL_INFO state
     sCurrentVoiceChannelChangedSignal(this->mSessionID);
@@ -285,7 +291,6 @@ LLVoiceChannel* LLVoiceChannel::getChannelByID(const LLUUID& session_id)
     }
 }
 
-//static 
 LLVoiceChannel* LLVoiceChannel::getCurrentVoiceChannel()
 {
     return sCurrentVoiceChannel;
@@ -342,7 +347,7 @@ void LLVoiceChannel::suspend()
     if (!sSuspended)
     {
         sSuspendedVoiceChannel = sCurrentVoiceChannel;
-        sSuspended = TRUE;
+        sSuspended = true;
     }
 }
 
@@ -362,7 +367,7 @@ void LLVoiceChannel::resume()
                 LLVoiceChannelProximal::getInstance()->activate();
             }
         }
-        sSuspended = FALSE;
+        sSuspended = false;
     }
 }
 
@@ -383,13 +388,13 @@ boost::signals2::connection LLVoiceChannel::setCurrentVoiceChannelChangedCallbac
 //
 
 LLVoiceChannelGroup::LLVoiceChannelGroup(const LLUUID      &session_id,
-										 const std::string &session_name,
-										 bool               is_p2p) :
-										 LLVoiceChannel(session_id, session_name),
-										 mIsP2P(is_p2p)
+                                         const std::string &session_name,
+                                         bool               is_p2p) :
+                                         LLVoiceChannel(session_id, session_name),
+                                         mIsP2P(is_p2p)
 {
     mRetries = DEFAULT_RETRIES_COUNT;
-    mIsRetrying = FALSE;
+    mIsRetrying = false;
 }
 
 void LLVoiceChannelGroup::deactivate()
@@ -400,13 +405,13 @@ void LLVoiceChannelGroup::deactivate()
     }
     LLVoiceChannel::deactivate();
 
-	if (mIsP2P)
-	{
-		// void the channel info for p2p adhoc channels
-		// so we request it again, hence throwing up the 
-		// connect dialogue on the other side.
-		setState(STATE_NO_CHANNEL_INFO);
-	}
+    if (mIsP2P)
+    {
+        // void the channel info for p2p adhoc channels
+        // so we request it again, hence throwing up the
+        // connect dialogue on the other side.
+        setState(STATE_NO_CHANNEL_INFO);
+    }
  }
 
 void LLVoiceChannelGroup::activate()
@@ -418,43 +423,42 @@ void LLVoiceChannelGroup::activate()
     if (callStarted())
     {
         // we have the channel info, just need to use it now
-		LLVoiceClient::getInstance()->setNonSpatialChannel(mChannelInfo,
-														   mIsP2P && (mCallDirection == OUTGOING_CALL), 
-														   mIsP2P);
+        LLVoiceClient::getInstance()->setNonSpatialChannel(mChannelInfo,
+                                                           mIsP2P && (mCallDirection == OUTGOING_CALL),
+                                                           mIsP2P);
 
-		if (mIsP2P)
-		{
-			LLIMModel::addSpeakersToRecent(mSessionID);
-		}
-		else
-		{
-		if (!gAgent.isInGroup(mSessionID)) // ad-hoc channel
-		{
-			LLIMModel::LLIMSession* session = LLIMModel::getInstance()->findIMSession(mSessionID);
-			// Adding ad-hoc call participants to Recent People List.
-			// If it's an outgoing ad-hoc, we can use mInitialTargetIDs that holds IDs of people we
-			// called(both online and offline) as source to get people for recent (STORM-210).
-			if (session->isOutgoingAdHoc())
-			{
-					for (uuid_vec_t::iterator it = session->mInitialTargetIDs.begin(); it != session->mInitialTargetIDs.end(); ++it)
-				{
-					const LLUUID id = *it;
-					LLRecentPeople::instance().add(id);
-				}
-			}
-			// If this ad-hoc is incoming then trying to get ids of people from mInitialTargetIDs
-			// would lead to EXT-8246. So in this case we get them from speakers list.
-			else
-			{
-				LLIMModel::addSpeakersToRecent(mSessionID);
-			}
-		}
-		//Mic default state is OFF on initiating/joining Ad-Hoc/Group calls
+        if (mIsP2P)
+        {
+            LLIMModel::addSpeakersToRecent(mSessionID);
+        }
+        else
+        {
+            if (!gAgent.isInGroup(mSessionID))  // ad-hoc channel
+            {
+                LLIMModel::LLIMSession *session = LLIMModel::getInstance()->findIMSession(mSessionID);
+                // Adding ad-hoc call participants to Recent People List.
+                // If it's an outgoing ad-hoc, we can use mInitialTargetIDs that holds IDs of people we
+                // called(both online and offline) as source to get people for recent (STORM-210).
+                if (session && session->isOutgoingAdHoc())
+                {
+                    for (uuid_vec_t::iterator it = session->mInitialTargetIDs.begin(); it != session->mInitialTargetIDs.end(); ++it)
+                    {
+                        const LLUUID id = *it;
+                        LLRecentPeople::instance().add(id);
+                    }
+                }
+                // If this ad-hoc is incoming then trying to get ids of people from mInitialTargetIDs
+                // would lead to EXT-8246. So in this case we get them from speakers list.
+                else
+                {
+                    LLIMModel::addSpeakersToRecent(mSessionID);
+                }
+            }
         }
 
-		// Mic default state is OFF on initiating/joining Ad-Hoc/Group calls.  It's on for P2P using the AdHoc infra.
-		
-		LLVoiceClient::getInstance()->setUserPTTState(mIsP2P);
+        // Mic default state is OFF on initiating/joining Ad-Hoc/Group calls.  It's on for P2P using the AdHoc infra.
+
+        LLVoiceClient::getInstance()->setUserPTTState(mIsP2P);
     }
 }
 
@@ -465,18 +469,18 @@ void LLVoiceChannelGroup::requestChannelInfo()
     {
         std::string url = region->getCapability("ChatSessionRequest");
 
-		LLCoros::instance().launch("LLVoiceChannelGroup::voiceCallCapCoro",
-			boost::bind(&LLVoiceChannelGroup::voiceCallCapCoro, this, url));
+        LLCoros::instance().launch("LLVoiceChannelGroup::voiceCallCapCoro",
+            boost::bind(&LLVoiceChannelGroup::voiceCallCapCoro, this, url));
     }
 }
 
 void LLVoiceChannelGroup::setChannelInfo(const LLSD& channelInfo)
 {
-	mChannelInfo     = channelInfo;
+    mChannelInfo = channelInfo;
 
     if (mState == STATE_NO_CHANNEL_INFO)
     {
-		if(!mChannelInfo.isUndefined())
+        if(mChannelInfo.isDefined() && mChannelInfo.isMap())
         {
             setState(STATE_READY);
 
@@ -499,9 +503,9 @@ void LLVoiceChannelGroup::setChannelInfo(const LLSD& channelInfo)
     else if ( mIsRetrying )
     {
         // we have the channel info, just need to use it now
-		LLVoiceClient::getInstance()->setNonSpatialChannel(channelInfo,
-														   mCallDirection == OUTGOING_CALL,
-														   mIsP2P);
+        LLVoiceClient::getInstance()->setNonSpatialChannel(channelInfo,
+                                                           mCallDirection == OUTGOING_CALL,
+                                                           mIsP2P);
     }
 }
 
@@ -512,7 +516,7 @@ void LLVoiceChannelGroup::handleStatusChange(EStatusType type)
     {
     case STATUS_JOINED:
         mRetries = 3;
-        mIsRetrying = FALSE;
+        mIsRetrying = false;
     default:
         break;
     }
@@ -536,17 +540,17 @@ void LLVoiceChannelGroup::handleError(EStatusType status)
         if ( mRetries > 0 )
         {
             mRetries--;
-            mIsRetrying = TRUE;
-            mIgnoreNextSessionLeave = TRUE;
+            mIsRetrying = true;
+            mIgnoreNextSessionLeave = true;
 
-			requestChannelInfo();
+            requestChannelInfo();
             return;
         }
         else
         {
             notify = "VoiceChannelJoinFailed";
             mRetries = DEFAULT_RETRIES_COUNT;
-            mIsRetrying = FALSE;
+            mIsRetrying = false;
         }
 
         break;
@@ -587,62 +591,69 @@ void LLVoiceChannelGroup::setState(EState state)
 
 void LLVoiceChannelGroup::voiceCallCapCoro(std::string url)
 {
-	LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-	LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-		httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("voiceCallCapCoro", httpPolicy));
-	LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
+        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("voiceCallCapCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
 
-	LLSD postData;
-	postData["method"] = "call";
-	postData["session-id"] = mSessionID;
-	LLSD altParams;
-	altParams["preferred_voice_server_type"] = gSavedSettings.getString("VoiceServerType");
-	postData["alt_params"] = altParams;
+    LLSD postData;
+    postData["method"] = "call";
+    postData["session-id"] = mSessionID;
+    LLSD altParams;
+    std::string  preferred_voice_server_type = gSavedSettings.getString("VoiceServerType");
+    if (preferred_voice_server_type.empty())
+    {
+        // default to the server type associated with the region we're on.
+        LLVoiceVersionInfo versionInfo = LLVoiceClient::getInstance()->getVersion();
+        preferred_voice_server_type = versionInfo.internalVoiceServerType;
+    }
+    altParams["preferred_voice_server_type"] = preferred_voice_server_type;
+    postData["alt_params"] = altParams;
 
-	LL_INFOS("Voice", "voiceCallCapCoro") << "Generic POST for " << url << LL_ENDL;
+    LL_INFOS("Voice", "voiceCallCapCoro") << "Generic POST for " << url << LL_ENDL;
 
-	LLSD result = httpAdapter->postAndSuspend(httpRequest, url, postData);
+    LLSD result = httpAdapter->postAndSuspend(httpRequest, url, postData);
 
-	LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
-	LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-	LLVoiceChannel* channelp = LLVoiceChannel::getChannelByID(mSessionID);
-	if (!channelp)
-	{
-		LL_WARNS("Voice") << "Unable to retrieve channel with Id = " << mSessionID << LL_ENDL;
-		return;
-	}
+    LLVoiceChannel* channelp = LLVoiceChannel::getChannelByID(mSessionID);
+    if (!channelp)
+    {
+        LL_WARNS("Voice") << "Unable to retrieve channel with Id = " << mSessionID << LL_ENDL;
+        return;
+    }
 
-	if (!status)
-	{
-		if (status == LLCore::HttpStatus(HTTP_FORBIDDEN))
-		{
-			//403 == no ability
-			LLNotificationsUtil::add(
-				"VoiceNotAllowed",
-				channelp->getNotifyArgs());
-		}
-		else
-		{
-			LLNotificationsUtil::add(
-				"VoiceCallGenericError",
-				channelp->getNotifyArgs());
-		}
-		channelp->deactivate();
-		return;
-	}
+    if (!status)
+    {
+        if (status == LLCore::HttpStatus(HTTP_FORBIDDEN))
+        {
+            //403 == no ability
+            LLNotificationsUtil::add(
+                "VoiceNotAllowed",
+                channelp->getNotifyArgs());
+        }
+        else
+        {
+            LLNotificationsUtil::add(
+                "VoiceCallGenericError",
+                channelp->getNotifyArgs());
+        }
+        channelp->deactivate();
+        return;
+    }
 
-	result.erase(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
+    result.erase(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
 
-	LLSD::map_const_iterator iter;
-	for (iter = result.beginMap(); iter != result.endMap(); ++iter)
-	{
-		LL_DEBUGS("Voice") << "LLVoiceChannelGroup::voiceCallCapCoro got "
-			<< iter->first << LL_ENDL;
-	}
-	LL_INFOS("Voice") << "LLVoiceChannelGroup::voiceCallCapCoro got " << result << LL_ENDL;
+    LLSD::map_const_iterator iter;
+    for (iter = result.beginMap(); iter != result.endMap(); ++iter)
+    {
+        LL_DEBUGS("Voice") << "LLVoiceChannelGroup::voiceCallCapCoro got "
+            << iter->first << LL_ENDL;
+    }
+    LL_INFOS("Voice") << "LLVoiceChannelGroup::voiceCallCapCoro got " << result << LL_ENDL;
 
-	channelp->setChannelInfo(result["voice_credentials"]);
+    channelp->setChannelInfo(result["voice_credentials"]);
 }
 
 
@@ -654,7 +665,7 @@ LLVoiceChannelProximal::LLVoiceChannelProximal() :
 {
 }
 
-BOOL LLVoiceChannelProximal::isActive()
+bool LLVoiceChannelProximal::isActive() const
 {
     return callStarted() && LLVoiceClient::getInstance()->inProximalChannel();
 }
@@ -666,11 +677,11 @@ void LLVoiceChannelProximal::activate()
     if((LLVoiceChannel::sCurrentVoiceChannel != this) && (LLVoiceChannel::getState() == STATE_CONNECTED))
     {
         // we're connected to a non-spatial channel, so disconnect.
-		LLVoiceClient::getInstance()->leaveNonSpatialChannel();	
+        LLVoiceClient::getInstance()->leaveNonSpatialChannel();
     }
-	LLVoiceClient::getInstance()->activateSpatialChannel(true);
-    LLVoiceChannel::activate();
 
+    LLVoiceClient::getInstance()->activateSpatialChannel(true);
+    LLVoiceChannel::activate();
 }
 
 void LLVoiceChannelProximal::onChange(EStatusType type, const LLSD& channelInfo, bool proximal)
@@ -734,7 +745,7 @@ void LLVoiceChannelProximal::handleError(EStatusType status)
         LLNotificationsUtil::add(notify, mNotifyArgs);
     }
 
-	// proximal voice remains up and the provider will try to reconnect.
+    // proximal voice remains up and the provider will try to reconnect.
 }
 
 void LLVoiceChannelProximal::deactivate()
@@ -743,8 +754,8 @@ void LLVoiceChannelProximal::deactivate()
     {
         setState(STATE_HUNG_UP);
     }
-
-	LLVoiceClient::getInstance()->activateSpatialChannel(false);
+    LLVoiceClient::removeObserver(this);
+    LLVoiceClient::getInstance()->activateSpatialChannel(false);
 }
 
 
@@ -752,15 +763,15 @@ void LLVoiceChannelProximal::deactivate()
 // LLVoiceChannelP2P
 //
 LLVoiceChannelP2P::LLVoiceChannelP2P(const LLUUID      &session_id,
-									 const std::string &session_name,
-									 const LLUUID      &other_user_id,
-									LLVoiceP2POutgoingCallInterface* outgoing_call_interface) : 
-	LLVoiceChannelGroup(session_id, session_name, true), 
-		mOtherUserID(other_user_id),
-	mReceivedCall(FALSE),
-	mOutgoingCallInterface(outgoing_call_interface)
+                                     const std::string &session_name,
+                                     const LLUUID      &other_user_id,
+                                    LLVoiceP2POutgoingCallInterface* outgoing_call_interface) :
+    LLVoiceChannelGroup(session_id, session_name, true),
+    mOtherUserID(other_user_id),
+    mReceivedCall(false),
+    mOutgoingCallInterface(outgoing_call_interface)
 {
-	// make sure URI reflects encoded version of other user's agent id
+    mChannelInfo = LLVoiceClient::getInstance()->getP2PChannelInfoTemplate(other_user_id);
 }
 
 void LLVoiceChannelP2P::handleStatusChange(EStatusType type)
@@ -786,12 +797,12 @@ void LLVoiceChannelP2P::handleStatusChange(EStatusType type)
             }
             deactivate();
         }
-        mIgnoreNextSessionLeave = FALSE;
+        mIgnoreNextSessionLeave = false;
         return;
     case STATUS_JOINING:
         // because we join session we expect to process session leave event in the future. EXT-7371
         // may be this should be done in the LLVoiceChannel::handleStatusChange.
-        mIgnoreNextSessionLeave = FALSE;
+        mIgnoreNextSessionLeave = false;
         break;
 
     default:
@@ -827,23 +838,23 @@ void LLVoiceChannelP2P::activate()
     if (callStarted())
     {
         // no session handle yet, we're starting the call
-		if (mIncomingCallInterface == nullptr)
+        if (mIncomingCallInterface == nullptr)
         {
-            mReceivedCall = FALSE;
-			mOutgoingCallInterface->callUser(mOtherUserID);
+            mReceivedCall = false;
+            mOutgoingCallInterface->callUser(mOtherUserID);
         }
         // otherwise answering the call
         else
         {
-			if (!mIncomingCallInterface->answerInvite())
+            if (!mIncomingCallInterface->answerInvite())
             {
                 mCallEndedByAgent = false;
-				mIncomingCallInterface.reset();
+                mIncomingCallInterface.reset();
                 handleError(ERROR_UNKNOWN);
                 return;
             }
-			// using the session handle invalidates it.  Clear it out here so we can't reuse it by accident.
-			mIncomingCallInterface.reset();
+            // using the incoming call interface invalidates it.  Clear it out here so we can't reuse it by accident.
+            mIncomingCallInterface.reset();
         }
 
         // Add the party to the list of people with which we've recently interacted.
@@ -859,11 +870,11 @@ void LLVoiceChannelP2P::activate()
 
 void LLVoiceChannelP2P::deactivate()
 {
-	if (callStarted())
-	{
-		mOutgoingCallInterface->hangup();
-	}
-	LLVoiceChannel::deactivate();
+    if (callStarted())
+    {
+        mOutgoingCallInterface->hangup();
+    }
+    LLVoiceChannel::deactivate();
 }
 
 
@@ -879,8 +890,8 @@ void LLVoiceChannelP2P::requestChannelInfo()
 // receiving session from other user who initiated call
 void LLVoiceChannelP2P::setChannelInfo(const LLSD& channel_info)
 {
-	mChannelInfo        = channel_info;
-    BOOL needs_activate = FALSE;
+    mChannelInfo        = channel_info;
+    bool needs_activate = false;
     if (callStarted())
     {
         // defer to lower agent id when already active
@@ -888,29 +899,32 @@ void LLVoiceChannelP2P::setChannelInfo(const LLSD& channel_info)
         {
             // pretend we haven't started the call yet, so we can connect to this session instead
             deactivate();
-            needs_activate = TRUE;
+            needs_activate = true;
         }
         else
         {
             // we are active and have priority, invite the other user again
             // under the assumption they will join this new session
-			mOutgoingCallInterface->callUser(mOtherUserID);
+            mOutgoingCallInterface->callUser(mOtherUserID);
             return;
         }
     }
 
-	mReceivedCall = TRUE;
-	if (!channel_info.isUndefined())
-	// The URI of a p2p session should always be the other end's SIP URI.
+    mReceivedCall = true;
+    if (channel_info.isDefined() && channel_info.isMap())
     {
-		mIncomingCallInterface = LLVoiceClient::getInstance()->getIncomingCallInterface(channel_info);
+        mIncomingCallInterface = LLVoiceClient::getInstance()->getIncomingCallInterface(channel_info);
     }
-		// See LLVoiceClient::sessionAddedEvent()
-	
     if (needs_activate)
     {
         activate();
     }
+}
+
+void LLVoiceChannelP2P::resetChannelInfo()
+{
+    mChannelInfo = LLVoiceClient::getInstance()->getP2PChannelInfoTemplate(mOtherUserID);
+    mState = STATE_NO_CHANNEL_INFO; // we have template, not full info
 }
 
 void LLVoiceChannelP2P::setState(EState state)
@@ -924,7 +938,7 @@ void LLVoiceChannelP2P::setState(EState state)
         if (mReceivedCall && state == STATE_RINGING)
         {
             //TODO: remove or redirect this call status notification
-//			LLCallInfoDialog::show("answering", mNotifyArgs);
+    //          LLCallInfoDialog::show("answering", mNotifyArgs);
             doSetState(state);
             return;
         }

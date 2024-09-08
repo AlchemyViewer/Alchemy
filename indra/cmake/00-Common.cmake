@@ -124,7 +124,7 @@ if (WINDOWS)
   elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     add_compile_options(/Qvec /Zc:dllexportInlines- /clang:-mprefer-vector-width=128 -fno-strict-aliasing -Wno-ignored-pragma-intrinsic -Wno-unused-local-typedef)
   endif()
-
+     
   if(FAVOR_AMD AND FAVOR_INTEL)
       message(FATAL_ERROR "Cannot enable FAVOR_AMD and FAVOR_INTEL at the same time")
   elseif(FAVOR_AMD)
