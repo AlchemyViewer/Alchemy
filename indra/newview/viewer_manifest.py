@@ -772,6 +772,11 @@ class DarwinManifest(ViewerManifest):
             # Remember where we parked this car.
             with self.prefix(src=libdir, dst="Frameworks"):
                 for libfile in (
+                        'libllwebrtc.dylib',
+                ):
+                    self.path(libfile)
+
+                for libfile in (
                                 'libndofdev.dylib',
                                 ):
                     self.path(libfile)
@@ -848,20 +853,6 @@ class DarwinManifest(ViewerManifest):
                 self.path("tr.lproj")
                 self.path("uk.lproj")
                 self.path("zh-Hans.lproj")
-
-                # WebRTC libraries
-                with self.prefix(src=os.path.join(self.args['build'], os.pardir,
-                                          'sharedlibs', self.args['buildtype'], 'Resources')):
-                    for libfile in (
-                            'libllwebrtc.dylib',
-                    ):
-                        self.path(libfile)
-
-                        oldpath = os.path.join("@rpath", libfile)
-                        self.run_command(
-                            ['install_name_tool', '-change', oldpath,
-                             '@executable_path/../Resources/%s' % libfile,
-                             executable])
 
                 # dylibs is a list of all the .dylib files we expect to need
                 # in our bundled sub-apps. For each of these we'll create a
@@ -1011,6 +1002,14 @@ class DarwinManifest(ViewerManifest):
                             '--sign', identity,
                             os.path.join(frameworks_path, "discord_game_sdk.dylib")])
 
+                self.run_command(
+                    ['codesign',
+                        '--verbose',
+                        '--force',
+                        '--timestamp',
+                        '--keychain', viewer_keychain,
+                        '--sign', identity,
+                        os.path.join(frameworks_path, "libllwebrtc.dylib")])
                 self.run_command(
                     ['codesign',
                         '--verbose',

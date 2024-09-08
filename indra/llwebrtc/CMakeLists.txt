@@ -61,11 +61,6 @@ endif (WINDOWS)
     
 target_include_directories( llwebrtc INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
-if (WINDOWS)
-    set_property(TARGET llwebrtc PROPERTY
-        MSVC_RUNTIME_LIBRARY "MultiThreadedDebug")
-endif (WINDOWS)
-
 ADD_CUSTOM_COMMAND(TARGET llwebrtc POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $<TARGET_FILE:llwebrtc>

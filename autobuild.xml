@@ -560,11 +560,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>21e6704cda776d24de00a56bc20ef88d66c9b9a4a3e6cbd06c9cd17040318798a9fbfb25622f14a144f054a9dc47c6b42896ece36d6c1bba0c9f526193e5d29e</string>
+              <string>9c58108270fbad15a321f75501cdfb9c6b78a6f2</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-emoji-shortcodes/releases/download/v15.3.0-dfc7c2c/emoji_shortcodes-15.3.0.9430912711-common-9430912711.tar.zst</string>
+              <string>https://github.com/secondlife/3p-emoji-shortcodes/releases/download/v15.3.2-r1/emoji_shortcodes-15.3.2.10207138275-common-10207138275.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -577,15 +577,9 @@
         <key>copyright</key>
         <string>Copyright 2017-2019 Miles Johnson.</string>
         <key>version</key>
-        <string>15.3.0.9430912711</string>
+        <string>15.3.2.10207138275</string>
         <key>name</key>
         <string>emoji_shortcodes</string>
-        <key>vcs_branch</key>
-        <string>refs/tags/v15.3.0-dfc7c2c</string>
-        <key>vcs_revision</key>
-        <string>dfc7c2cf2a91e3ef55875b2590f8de738d715e00</string>
-        <key>vcs_url</key>
-        <string>git://github.com/AlchemyViewer/3p-emoji-shortcodes.git</string>
         <key>canonical_repo</key>
         <string>https://github.com/secondlife/3p-emoji-shortcodes</string>
         <key>description</key>
@@ -866,11 +860,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>027c4811ae7374deab834ecb2cc38245af1fcb089d62fc3468b111b61502d4312e1826715a974dcdd74cdf9d146bd04769ae6bd16e58fb1a025209cdd799615a</string>
+              <string>066625e7aa7f697a4b6cd461aad960c57181011f</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-glh_linear/releases/download/v1.0.1-dev4-5efd005/glh_linear-1.0.1-dev4-common-9430188124.tar.zst</string>
+              <string>https://github.com/secondlife/3p-glh_linear/releases/download/v1.0.1-dev4-984c397/glh_linear-1.0.1-dev4-common-984c397.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -886,16 +880,50 @@
         <string>1.0.1-dev4</string>
         <key>name</key>
         <string>glh_linear</string>
-        <key>vcs_branch</key>
-        <string>refs/tags/v1.0.1-dev4-5efd005</string>
-        <key>vcs_revision</key>
-        <string>5efd005f011c78d07775973c616b304b88a9a41e</string>
-        <key>vcs_url</key>
-        <string>git://github.com/AlchemyViewer/3p-glh_linear.git</string>
-        <key>canonical_repo</key>
-        <string>https://github.com/AlchemyViewer/3p-glh_linear</string>
         <key>description</key>
         <string>glh - is a platform-indepenedent C++ OpenGL helper library</string>
+      </map>
+      <key>glm</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>common</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>353ae3a560143732503a8e14499ae12db1e66056</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-glm/releases/download/v1.0.1-r1/glm-v1.0.1-common-9066386153.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>common</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/glm_license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2005 - G-Truc Creation</string>
+        <key>version</key>
+        <string>v1.0.1</string>
+        <key>name</key>
+        <string>glm</string>
+        <key>vcs_branch</key>
+        <string>refs/tags/v1.0.1-r1</string>
+        <key>vcs_revision</key>
+        <string>399cd5ba57a9267a560ce07e50a0f8c5fe3dc66f</string>
+        <key>vcs_url</key>
+        <string>git://github.com/secondlife/3p-glm.git</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/secondlife/3p-glm</string>
+        <key>description</key>
+        <string>OpenGL Mathematics</string>
+        <key>source_type</key>
+        <string>git</string>
       </map>
       <key>gstreamer</key>
       <map>
@@ -1003,6 +1031,68 @@
         <key>canonical_repo</key>
         <string>https://github.com/AlchemyViewer/3p-jpeg_encoder_js</string>
       </map>
+      <key>libjpeg-turbo</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>34cf4fdbbc999e67b0528f7ca3c7f31f35267ecf</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-libjpeg-turbo/releases/download/v3.0.3-r2/libjpeg_turbo-3.0.3-r2-windows64-10341191820.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>5ff05a0e5ed0aba1514b84d3c2edaf70c18738b5</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-libjpeg-turbo/releases/download/v3.0.3-r2/libjpeg_turbo-3.0.3-r2-linux64-10341191820.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>7c38eabc050b4a6bdb183a1d7a38da885341049c</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-libjpeg-turbo/releases/download/v3.0.3-r2/libjpeg_turbo-3.0.3-r2-darwin64-10341191820.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>libjpeg-turbo</string>
+        <key>license_file</key>
+        <string>LICENSES/libjpeg-turbo.txt</string>
+        <key>copyright</key>
+        <string>Copyright (C)2009-2024 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
+        <key>version</key>
+        <string>3.0.3-r2</string>
+        <key>name</key>
+        <string>libjpeg-turbo</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/secondlife/3p-libjpeg-turbo</string>
+        <key>description</key>
+        <string>JPEG encoding, decoding library</string>
+      </map>
       <key>kdu</key>
       <map>
         <key>platforms</key>
@@ -1062,11 +1152,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>39b86c91c1959dc54226b48756ae135b3c1902dd6dd9e04a38b544c831914204758e41b4bd878920485247c543026436da3e48823a55560fac43c6ab72e1a989</string>
+              <string>e71ae7a645603fe967a69aa5beb5b3009185e177</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-libhunspell/releases/download/v1.7.2-b72e9bd/libhunspell-1.7.2-darwin64-9458411730.tar.zst</string>
+              <string>https://github.com/secondlife/3p-libhunspell/releases/download/v1.7.2-r1/libhunspell-1.7.2.10207243663-darwin64-10207243663.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1076,11 +1166,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d362ac62f710efe00e5b14cf71d7bb2a6d8791738e9d0768bba78da198a0b099431e0ae9403242fb8b2b6365f4ba8dfaf1f1af8e49f8e3d6bd29b085bfe2ae8e</string>
+              <string>275ffb7f60064d8008aed8406f80f34229f651fc</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-libhunspell/releases/download/v1.7.2-b72e9bd/libhunspell-1.7.2-linux64-9458411730.tar.zst</string>
+              <string>https://github.com/secondlife/3p-libhunspell/releases/download/v1.7.2-r1/libhunspell-1.7.2.10207243663-linux64-10207243663.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1090,11 +1180,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>123a0a9c4feabbbe3b19489a7a1df623ffff7f3f33c4d21ce2fee2eccc5c3d366f3a4933ba76e63f403834c1187ed4e5317ca8003db9ec19d96c9fc0c0b34b9d</string>
+              <string>89ff24e93eaeca7949ccdb5cc368f938f5b1f307</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-libhunspell/releases/download/v1.7.2-b72e9bd/libhunspell-1.7.2-windows64-9458411730.tar.zst</string>
+              <string>https://github.com/secondlife/3p-libhunspell/releases/download/v1.7.2-r1/libhunspell-1.7.2.10207243663-windows64-10207243663.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1107,73 +1197,11 @@
         <key>copyright</key>
         <string>LGPL 2.1</string>
         <key>version</key>
-        <string>1.7.2</string>
+        <string>1.7.2.10207243663</string>
         <key>name</key>
         <string>libhunspell</string>
         <key>description</key>
         <string>Spell checking library</string>
-      </map>
-      <key>libjpeg-turbo</key>
-      <map>
-        <key>platforms</key>
-        <map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>2552b1150f1561385f901bbce569ddce176fea9c83a13e97dc0ad47d6200a913f25be817d3634b948450b700bf73a77fe34fe6d7d55dce954e1bcbb2319df792</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-libjpeg-turbo/releases/download/v3.0.3-e150f8f/libjpeg_turbo-3.0.3-darwin64-9630753092.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>e78ef1fbaf7d3917a1ba9ea5a1d263e0364c58e7931e3568e62a765b66de590a1aabe1312d1dc043bce5465892615f2e444b860815d261139b8762a6927e9232</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-libjpeg-turbo/releases/download/v3.0.3-e150f8f/libjpeg_turbo-3.0.3-linux64-9630753092.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>c4b54277b37c203aaa7b5ba4fe24ad9bbf7804ef1e2f4c013619b69a54872f895918052b2b93f23bda2eaa1b44985ead0a6a77edac0fe34c9bbd1ba903155525</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-libjpeg-turbo/releases/download/v3.0.3-e150f8f/libjpeg_turbo-3.0.3-windows64-9630753092.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-        </map>
-        <key>license</key>
-        <string>libjpeg-turbo</string>
-        <key>license_file</key>
-        <string>LICENSES/libjpeg-turbo.txt</string>
-        <key>copyright</key>
-        <string>Copyright (C)2009-2023 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
-        <key>version</key>
-        <string>3.0.3</string>
-        <key>name</key>
-        <string>libjpeg-turbo</string>
-        <key>canonical_repo</key>
-        <string>https://www.github.com/AlchemyViewer/3p-libjpeg-turbo</string>
-        <key>description</key>
-        <string>JPEG encoding, decoding library</string>
       </map>
       <key>libndofdev</key>
       <map>
@@ -1405,6 +1433,15 @@
       </map>
       <key>llca</key>
       <map>
+        <key>copyright</key>
+        <string>Copyright (c) 2016, Linden Research, Inc.; data provided by the Mozilla NSS Project.
+      </string>
+        <key>license</key>
+        <string>mit</string>
+        <key>license_file</key>
+        <string>LICENSES/ca-license.txt</string>
+        <key>name</key>
+        <string>llca</string>
         <key>platforms</key>
         <map>
           <key>common</key>
@@ -1412,35 +1449,82 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d47e09c5c1db0e3d643e4cd5101e49bfc95148c4751a40f4548ac81b35acfdb1db6e29611845fd12c5f31c7fbc9b9fe28619a8104df47046eb1abf8aca48a2df</string>
+              <string>6d6771706a5b70caa24893ff62afc925f8d035f6</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/llca/releases/download/v20240608-7f84421/llca-2024.0608.0713-common-9427055405.tar.zst</string>
+              <string>https://github.com/secondlife/llca/releases/download/v202407221723.0-a0fd5b9/llca-202407221423.0-common-10042698865.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
           </map>
         </map>
-        <key>license</key>
-        <string>mit</string>
-        <key>license_file</key>
-        <string>LICENSES/ca-license.txt</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2020, Alchemy Development Group; data provided by the Mozilla NSS Project.
-      </string>
         <key>version</key>
-        <string>2024.0608.0713</string>
+        <string>202407221423.0</string>
+      </map>
+      <key>llphysicsextensions_source</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>github</string>
+              <key>hash</key>
+              <string>9e59c93c7110e87b4ff3db330f11a23c50e5000f</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://api.github.com/repos/secondlife/llphysicsextensions_source/releases/assets/178910560</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>github</string>
+              <key>hash</key>
+              <string>7ed994db5bafa9a7ad09a1b53da850a84715c65e</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://api.github.com/repos/secondlife/llphysicsextensions_source/releases/assets/178910561</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>creds</key>
+              <string>github</string>
+              <key>hash</key>
+              <string>66824c02e0e5eabbfbe37bfb173360195f89697c</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://api.github.com/repos/secondlife/llphysicsextensions_source/releases/assets/178910562</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>internal</string>
+        <key>license_file</key>
+        <string>LICENSES/llphysicsextensions.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2010, Linden Research, Inc.</string>
+        <key>version</key>
+        <string>1.0.66e6919</string>
         <key>name</key>
-        <string>llca</string>
-        <key>vcs_branch</key>
-        <string>refs/tags/v20240608-7f84421</string>
-        <key>vcs_revision</key>
-        <string>7f844210b5c0e4bbaf07c1fa44d15995622f4971</string>
-        <key>vcs_url</key>
-        <string>git://github.com/AlchemyViewer/llca.git</string>
-        <key>canonical_repo</key>
-        <string>https://github.com/AlchemyViewer/llca</string>
+        <string>llphysicsextensions_source</string>
       </map>
       <key>llphysicsextensions_stub</key>
       <map>
@@ -1793,27 +1877,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
           <map>
             <key>archive</key>
             <map>
-              <key>creds</key>
-              <string>github</string>
               <key>hash</key>
-              <string>a646647c803e473229ca646d9441faa7042061c6d3fd6a8c31466efc29e64da0150752893e6a14f1cb91a36e1b91c280b7d4ee0abaf29d163f3c158022ef62e4</string>
+              <string>bc574ea89164387a6c12bb49e1bac091c1d4da27</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://api.github.com/repos/AlchemyViewer/3p-nvapi-private/releases/assets/174138192</string>
+              <string>https://github.com/secondlife/3p-nvapi/releases/download/v560-r1/nvapi-560.0.0-r1-windows64-10390321492.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>license</key>
-        <string>nvapi</string>
+        <string>MIT</string>
         <key>license_file</key>
         <string>LICENSES/nvapi.txt</string>
         <key>copyright</key>
-        <string>Copyright (c) 2007- 2020 NVIDIA Corporation. All rights reserved. </string>
+        <string>Copyright (c) 2024 NVIDIA CORPORATION and AFFILIATES. All rights reserved.</string>
         <key>version</key>
-        <string>535.0.0</string>
+        <string>560.0.0-r1</string>
         <key>name</key>
         <string>nvapi</string>
         <key>description</key>
@@ -1828,11 +1910,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>55ad6d4a3838c8b3fee7cb9e17b4c759f8cbd1835c16ad55527c4d43effb49744b0b1058bce83d508541a74e086f98cce31e2d54a801792748ba5450c8b7f9cd</string>
+              <string>3abb5d21655aeca9d6a4de37704e8475821c28d9</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-ogg_vorbis/releases/download/v1.3.5-1.3.7-32d79b1/ogg_vorbis-1.3.5-1.3.7-darwin64-9458285844.tar.zst</string>
+              <string>https://github.com/secondlife/3p-ogg_vorbis/releases/download/v1.3.5-1.3.7-r1/ogg_vorbis-1.3.5-1.3.7.10341271136-darwin64-10341271136.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -1842,11 +1924,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>6cba55e42b446ff5f370f4e7828baa38f58fb536c811e480dcc703094e1947f3ec43f061198094deeaecebf6d705e817e602fabf082864d740ad91d2b8f50b5f</string>
+              <string>d89dff615c51b46ebdb3d42ac6bd9e0faae5ddf1</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-ogg_vorbis/releases/download/v1.3.5-1.3.7-32d79b1/ogg_vorbis-1.3.5-1.3.7-linux64-9458285844.tar.zst</string>
+              <string>https://github.com/secondlife/3p-ogg_vorbis/releases/download/v1.3.5-1.3.7-r1/ogg_vorbis-1.3.5-1.3.7.10341271136-linux64-10341271136.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1856,11 +1938,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>7024773d65e8064f3696d1dc51994a8bed8adfe3250b65464bab10aaa98dfb9c57cd1a81032a6327928dac3de230ad92a0659ab489c05f06c673f2e9a81548dc</string>
+              <string>0dc0f5334d1c882d5d7bce6d2cfaecf2f7ab1ae6</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-ogg_vorbis/releases/download/v1.3.5-1.3.7-32d79b1/ogg_vorbis-1.3.5-1.3.7-windows64-9458285844.tar.zst</string>
+              <string>https://github.com/secondlife/3p-ogg_vorbis/releases/download/v1.3.5-1.3.7-r1/ogg_vorbis-1.3.5-1.3.7.10341271136-windows64-10341271136.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -1873,7 +1955,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>copyright</key>
         <string>Copyright (c) 2002, Xiph.org Foundation</string>
         <key>version</key>
-        <string>1.3.5-1.3.7</string>
+        <string>1.3.5-1.3.7.10341271136</string>
         <key>name</key>
         <string>ogg_vorbis</string>
         <key>description</key>
@@ -2285,50 +2367,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>canonical_repo</key>
         <string>https://github.com/AlchemyViewer/3p-three_js</string>
       </map>
-      <key>tinyexr</key>
-      <map>
-        <key>platforms</key>
-        <map>
-          <key>common</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>bf1ccc0d761f3d901bb856068c029cc381b9b4196287ec83084c06855818f2a220b869dc78987e1a8ace0e5cd8e8e4180b4242493c7da645ed573b333eed1465</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-tinyexr/releases/download/v1.0.8-df9c8f5/tinyexr-v1.0.8-common-9426885274.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>common</string>
-          </map>
-        </map>
-        <key>license</key>
-        <string>3-clause BSD</string>
-        <key>license_file</key>
-        <string>LICENSES/tinyexr_license.txt</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2014 - 2021, Syoyo Fujita and many contributors.</string>
-        <key>version</key>
-        <string>v1.0.8</string>
-        <key>name</key>
-        <string>tinyexr</string>
-        <key>vcs_branch</key>
-        <string>refs/tags/v1.0.8-df9c8f5</string>
-        <key>vcs_revision</key>
-        <string>df9c8f58b9356e7aca5a5eed364eb8ae8c21b846</string>
-        <key>vcs_url</key>
-        <string>git://github.com/AlchemyViewer/3p-tinyexr.git</string>
-        <key>canonical_repo</key>
-        <string>https://github.com/AlchemyViewer/3p-tinyexr</string>
-        <key>description</key>
-        <string>tinyexr import library</string>
-        <key>source</key>
-        <string>https://github.com/AlchemyViewer/3p-tinyexr</string>
-        <key>source_type</key>
-        <string>git</string>
-      </map>
       <key>tinygltf</key>
       <map>
         <key>platforms</key>
@@ -2338,11 +2376,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>ea2cea5638000217c80252f4aa94e2511f0676adcc22b1afc2aaa12ef5537096b7476a7171154f34430224cdad91154585308f384698306bdb9f2a570db631d0</string>
+              <string>005d23bb2606ae2cc9e844adc1a0edf112c69812</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-tinygltf/releases/download/v2.8.21-639e303/tinygltf-v2.8.21-common-9426927923.tar.zst</string>
+              <string>https://github.com/secondlife/3p-tinygltf/releases/download/v2.9.3-r1/tinygltf-2.9.3-r1-common-10341018043.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2355,21 +2393,15 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>copyright</key>
         <string>// Copyright (c) 2015 - Present Syoyo Fujita, Aurélien Chatelain and many contributors.</string>
         <key>version</key>
-        <string>v2.8.21</string>
+        <string>2.9.3-r1</string>
         <key>name</key>
         <string>tinygltf</string>
-        <key>vcs_branch</key>
-        <string>refs/tags/v2.8.21-639e303</string>
-        <key>vcs_revision</key>
-        <string>639e303d6e18cbb3ee50461c4cfe3daea76bcad3</string>
-        <key>vcs_url</key>
-        <string>git://github.com/AlchemyViewer/3p-tinygltf.git</string>
         <key>canonical_repo</key>
-        <string>https://github.com/AlchemyViewer/3p-tinygltf</string>
+        <string>https://bitbucket.org/lindenlab/3p-tinygltf</string>
         <key>description</key>
         <string>tinygltf import library</string>
         <key>source</key>
-        <string>https://github.com/AlchemyViewer/3p-tinygltf</string>
+        <string>https://bitbucket.org/lindenlab/3p-tinygltf</string>
         <key>source_type</key>
         <string>git</string>
       </map>
@@ -2377,19 +2409,47 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
       <map>
         <key>platforms</key>
         <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>226225ec049826c35adc5e897e0398ed64d4bedb</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-tracy/releases/download/v0.11.0%2Br1/tracy-v0.11.0.10376230034-darwin64-10376230034.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
           <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>9016967970c081211d93b130a05dff7639c9c9d408092d8e0f2ac37279f4a39873f129a04a1b56efebbebd29719e7e742fe8db423614a62a0ab520c3faf01430</string>
+              <string>8c5429d1a1486f40cf7e5e88a232222d1fa4f78e</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-tracy/releases/download/v0.10.0-0561576/tracy-v0.10.0-windows64-9552419732.tar.zst</string>
+              <string>https://github.com/secondlife/3p-tracy/releases/download/v0.11.0%2Br1/tracy-v0.11.0.10376230034-windows64-10376230034.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>ed0664a009aba1dcf1246d845839f524e857162e</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-tracy/releases/download/v0.11.0%2Br1/tracy-v0.11.0.10376230034-linux64-10376230034.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
           </map>
         </map>
         <key>license</key>
@@ -2397,17 +2457,17 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>license_file</key>
         <string>LICENSES/tracy_license.txt</string>
         <key>copyright</key>
-        <string>Copyright (c) 2017-2021, Bartosz Taudul (wolf@nereid.pl)</string>
+        <string>Copyright (c) 2017-2024, Bartosz Taudul (wolf@nereid.pl)</string>
         <key>version</key>
-        <string>v0.10.0</string>
+        <string>v0.11.0.10376230034</string>
         <key>name</key>
         <string>tracy</string>
         <key>canonical_repo</key>
-        <string>https://github.com/AlchemyViewer/3p-tracy</string>
+        <string>https://bitbucket.org/lindenlab/3p-tracy</string>
         <key>description</key>
         <string>Tracy Profiler Library</string>
         <key>source</key>
-        <string>https://github.com/AlchemyViewer/3p-tracy</string>
+        <string>https://bitbucket.org/lindenlab/3p-tracy</string>
         <key>source_type</key>
         <string>git</string>
       </map>
@@ -2420,11 +2480,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d6a58e633ddefb94df1d1b000cc90a76bdfd6ad5596c93a5a68b4e25449312e72ea962ab8b46813761dce7b89ae3953d0b251812b7b735c5e53f94589ac2888d</string>
+              <string>9f0bf4545f08df5381e0f39ccce3a57c6ec4b0f4</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-tut/releases/download/v2008.11.30-da9df71/tut-2008.11.30-common-9430907772.tar.zst</string>
+              <string>https://github.com/secondlife/3p-tut/releases/download/v2008.11.30-409bce5/tut-2008.11.30-common-409bce5.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -2440,14 +2500,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>2008.11.30</string>
         <key>name</key>
         <string>tut</string>
-        <key>vcs_branch</key>
-        <string>refs/tags/v2008.11.30-da9df71</string>
-        <key>vcs_revision</key>
-        <string>da9df71618a8d7738aef8219d3d499f045e95fca</string>
-        <key>vcs_url</key>
-        <string>git://github.com/AlchemyViewer/3p-tut.git</string>
-        <key>canonical_repo</key>
-        <string>https://www.github.com/AlchemyViewer/3p-tut</string>
         <key>description</key>
         <string>TUT is a small and portable unit test framework for C++.</string>
       </map>
@@ -2513,6 +2565,14 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
       </map>
       <key>vlc-bin</key>
       <map>
+        <key>copyright</key>
+        <string>Copyright (C) 1998-2016 VLC authors and VideoLAN</string>
+        <key>license</key>
+        <string>GPL2</string>
+        <key>license_file</key>
+        <string>LICENSES/vlc.txt</string>
+        <key>name</key>
+        <string>vlc-bin</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -2520,11 +2580,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e1b4816dd46ecece8765d775a291dc8f84d0fa2e6a71ddbe6c5f424b278a0553886f0b75af6b3baf78011f21417a8dc943bd8eb6c254f89fcf59d6906fa0e2c6</string>
+              <string>f13c82042ef8311e57dd75a3b2bda02d70f711b5</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-vlc-bin/releases/download/v3.0.20-a26068b/vlc_bin-3.0.20-darwin64-9458590372.tar.zst</string>
+              <string>https://github.com/secondlife/3p-vlc-bin/releases/download/v3.0.21.e60ee26/vlc_bin-3.0.21.10218721728-darwin64-10218721728.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2534,26 +2594,18 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1178093f309be2e193b2157517f73ba103acb9014188ad6ff6f3ef2fe704c1154366bb0b5eebc67f148ee6eae8b90fa1f35f13382898b6adb2f3d50686707a1f</string>
+              <string>bd995441c1a229ed1432ddd837d7d1663b8c5548</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-vlc-bin/releases/download/v3.0.20-a26068b/vlc_bin-3.0.20-windows64-9458590372.tar.zst</string>
+              <string>https://github.com/secondlife/3p-vlc-bin/releases/download/v3.0.21.e60ee26/vlc_bin-3.0.21.10218721728-windows64-10218721728.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>license</key>
-        <string>GPL2</string>
-        <key>license_file</key>
-        <string>LICENSES/vlc.txt</string>
-        <key>copyright</key>
-        <string>Copyright (C) 1998-2020 VLC authors and VideoLAN</string>
         <key>version</key>
-        <string>3.0.20</string>
-        <key>name</key>
-        <string>vlc-bin</string>
+        <string>3.0.21.10218721728</string>
       </map>
       <key>xmlrpc-epi</key>
       <map>
@@ -2615,6 +2667,72 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>description</key>
         <string>XMLRPC Library</string>
       </map>
+      <key>webrtc</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3570b6442d472cd97bad8622c2ec2571d72218a0</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-webrtc-build/releases/download/m114.5735.08.72-test/webrtc-m114.5735.08.72-test.10444682919-darwin64-10444682919.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>eadf6aa99313940ded11801d42c11375669f1628</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-webrtc-build/releases/download/m114.5735.08.72-test/webrtc-m114.5735.08.72-test.10444682919-linux64-10444682919.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>0081fd35290adbc8e66dd366535fb6cd8a966f1e</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-webrtc-build/releases/download/m114.5735.08.72-test/webrtc-m114.5735.08.72-test.10444682919-windows64-10444682919.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/webrtc-license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2011, The WebRTC project authors. All rights reserved.</string>
+        <key>version</key>
+        <string>m114.5735.08.72-test.10444682919</string>
+        <key>name</key>
+        <string>webrtc</string>
+        <key>vcs_branch</key>
+        <string>secondlife</string>
+        <key>vcs_revision</key>
+        <string>d3f62d32bac8694d3c7423c731ae30c113bf6a11</string>
+        <key>vcs_url</key>
+        <string>https://github.com/secondlife/3p-webrtc-build</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/secondlife/3p-webrtc-build</string>
+      </map>
       <key>xxhash</key>
       <map>
         <key>platforms</key>
@@ -2624,36 +2742,28 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1a1c905fe8f2360d518d8ace3e14733543e4c95ee7c2ea8a68c9b4181b640c3ccc64a6df68737c59282767d21de1fc678caadd9c217522ff2691136f0ce07b1d</string>
+              <string>fc9362865e33391d55c64d6101726da0a25d924e</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-xxhash/releases/download/v0.8.2-58fe44c/xxhash-0.8.2-common-9427203649.tar.zst</string>
+              <string>https://github.com/secondlife/3p-xxhash/releases/download/v0.8.2-r1/xxhash-0.8.2-10285735820-common-10285735820.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
           </map>
         </map>
         <key>license</key>
-        <string>BSD 2-Clause</string>
+        <string>xxhash</string>
         <key>license_file</key>
         <string>LICENSES/xxhash.txt</string>
         <key>copyright</key>
         <string>Copyright (c) 2012-2021 Yann Collet</string>
         <key>version</key>
-        <string>0.8.2</string>
+        <string>0.8.2-10285735820</string>
         <key>name</key>
         <string>xxhash</string>
-        <key>vcs_branch</key>
-        <string>refs/tags/v0.8.2-58fe44c</string>
-        <key>vcs_revision</key>
-        <string>40d40b7de3af4526e880b6d4438612582c656ef6</string>
-        <key>vcs_url</key>
-        <string>git://github.com/AlchemyViewer/3p-xxhash.git</string>
-        <key>canonical_repo</key>
-        <string>https://github.com/AlchemyViewer/3p-xxhash</string>
         <key>description</key>
-        <string>Extremely fast non-cryptographic hash algorithm</string>
+        <string>xxHash Library</string>
       </map>
       <key>zlib-ng</key>
       <map>
@@ -2716,42 +2826,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>https://www.github.com/AlchemyViewer/3p-zlib-ng</string>
         <key>description</key>
         <string>zlib replacement with optimizations for next generation systems.</string>
-      </map>
-      <key>glm</key>
-      <map>
-        <key>platforms</key>
-        <map>
-          <key>common</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>c5ebeb4ad7c506a0be2cfa248e23e147fb2c49432c145f4727bfaebecf37005a781ca3f233d9ec0e6e1b6f3d0ce0b07b867b6e5281df30646248de9eec0735cc</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-glm/releases/download/v1.0.1-127293b/glm-v1.0.1-common-9442368006.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>common</string>
-          </map>
-        </map>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/glm_license.txt</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2005 - G-Truc Creation</string>
-        <key>version</key>
-        <string>v1.0.1</string>
-        <key>name</key>
-        <string>glm</string>
-        <key>canonical_repo</key>
-        <string>https://github.com/secondlife/3p-glm</string>
-        <key>description</key>
-        <string>OpenGL Mathematics</string>
-        <key>source_type</key>
-        <string>git</string>
       </map>
       <key>zstd</key>
       <map>
@@ -2821,71 +2895,45 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>description</key>
         <string>Zstandard - Fast real-time compression algorithm</string>
       </map>
-      <key>webrtc</key>
+      <key>tinyexr</key>
       <map>
+        <key>copyright</key>
+        <string>Copyright (c) 2014 - 2021, Syoyo Fujita and many contributors.</string>
+        <key>description</key>
+        <string>tinyexr import library</string>
+        <key>license</key>
+        <string>3-clause BSD</string>
+        <key>license_file</key>
+        <string>LICENSES/tinyexr_license.txt</string>
+        <key>name</key>
+        <string>tinyexr</string>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
+          <key>common</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>3570b6442d472cd97bad8622c2ec2571d72218a0</string>
+              <string>a9649f85e20c0b83acfd7b02ca19c1dcdd15f01e</string>
               <key>hash_algorithm</key>
               <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/secondlife/3p-webrtc-build/releases/download/m114.5735.08.72-test/webrtc-m114.5735.08.72-test.10444682919-darwin64-10444682919.tar.zst</string>
+              <string>https://github.com/secondlife/3p-tinyexr/releases/download/v1.0.9-5e8947c/tinyexr-1.0.9-5e8947c-common-10475846787.tar.zst</string>
             </map>
             <key>name</key>
-            <string>darwin64</string>
-          </map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>eadf6aa99313940ded11801d42c11375669f1628</string>
-              <key>hash_algorithm</key>
-              <string>sha1</string>
-              <key>url</key>
-              <string>https://github.com/secondlife/3p-webrtc-build/releases/download/m114.5735.08.72-test/webrtc-m114.5735.08.72-test.10444682919-linux64-10444682919.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>0081fd35290adbc8e66dd366535fb6cd8a966f1e</string>
-              <key>hash_algorithm</key>
-              <string>sha1</string>
-              <key>url</key>
-              <string>https://github.com/secondlife/3p-webrtc-build/releases/download/m114.5735.08.72-test/webrtc-m114.5735.08.72-test.10444682919-windows64-10444682919.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
+            <string>common</string>
           </map>
         </map>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/webrtc-license.txt</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2011, The WebRTC project authors. All rights reserved.</string>
-        <key>version</key>
-        <string>m114.5735.08.72-test.10444682919</string>
-        <key>name</key>
-        <string>webrtc</string>
+        <key>source_type</key>
+        <string>git</string>
         <key>vcs_branch</key>
-        <string>secondlife</string>
+        <string>dependabot/github_actions/secondlife/action-autobuild-4</string>
         <key>vcs_revision</key>
-        <string>d3f62d32bac8694d3c7423c731ae30c113bf6a11</string>
+        <string>4dc4d1d90d82a22843e2adf5130f9ecb5ee5769e</string>
         <key>vcs_url</key>
-        <string>https://github.com/secondlife/3p-webrtc-build</string>
-        <key>canonical_repo</key>
-        <string>https://github.com/secondlife/3p-webrtc-build</string>
+        <string>https://github.com/secondlife/3p-tinyexr</string>
+        <key>version</key>
+        <string>1.0.9-5e8947c</string>
       </map>
     </map>
     <key>package_description</key>
@@ -3079,7 +3127,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                 <array>
                   <string>-G</string>
                   <string>Xcode</string>
-</array>
+                </array>
               </map>
               <key>build</key>
               <map>
@@ -3092,7 +3140,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
                   <string>-parallelizeTargets</string>
-</array>
+                </array>
               </map>
               <key>name</key>
               <string>RelWithDebInfoOS</string>
@@ -3105,11 +3153,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                 <array>
                   <string>-G</string>
                   <string>Xcode</string>
-</array>
+                </array>
                 <key>arguments</key>
                 <array>
                   <string>../indra</string>
-</array>
+                </array>
               </map>
               <key>build</key>
               <map>
@@ -3122,7 +3170,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
                   <string>-project</string>
                   <string>Alchemy.xcodeproj</string>
                   <string>-parallelizeTargets</string>
-</array>
+                </array>
               </map>
               <key>name</key>
               <string>Release</string>
