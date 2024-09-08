@@ -40,7 +40,11 @@ if (USE_SENTRY)
             ll::zlib-ng
         )
     endif ()
-    target_include_directories( al::sentry SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/sentry)
+    if (LINUX)
+        target_include_directories( al::sentry SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include)
+    else ()
+        target_include_directories( al::sentry SYSTEM INTERFACE ${LIBS_PREBUILT_DIR}/include/sentry)
+    endif()
 
     if(SENTRY_DSN STREQUAL "")
         message(FATAL_ERROR "You must set a DSN url with -DSENTRY_DSN= to enable sentry")
