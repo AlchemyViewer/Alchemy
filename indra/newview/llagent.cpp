@@ -2485,11 +2485,7 @@ void LLAgent::endAnimationUpdateUI()
         LLNavigationBar::getInstance()->setVisible(gSavedSettings.getU32("NavigationBarStyle") == 2);
         gStatusBar->setVisibleForMouselook(true);
 
-        static LLCachedControl<bool> show_mini_location_panel(gSavedSettings, "ShowMiniLocationPanel");
-        if (show_mini_location_panel)
-        {
-            LLPanelTopInfoBar::getInstance()->setVisible(TRUE);
-        }
+        LLPanelTopInfoBar::getInstance()->setVisible(gSavedSettings.getU32("NavigationBarStyle") == 1);
 
         LLChicletBar::getInstance()->setVisible(!ALCinematicMode::isEnabled());
 
