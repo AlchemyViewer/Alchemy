@@ -770,7 +770,7 @@ class DarwinManifest(ViewerManifest):
         with self.prefix(src="", dst="Contents"):  # everything goes in Contents
             # CEF framework goes inside Contents/Frameworks.
             # Remember where we parked this car.
-            with self.prefix(src=libdir, dst="Frameworks"):
+            with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'llwebrtc', self.args['configuration']), dst="Frameworks"):
                 for libfile in (
                         'libllwebrtc.dylib',
                 ):
