@@ -554,7 +554,7 @@ bool viewerChoosesConnectionHandles()
 void LLVivoxVoiceClient::connectorCreate()
 {
     std::ostringstream stream;
-	// Transition to stateConnectorStarted when the connector handle comes back.
+    // Transition to stateConnectorStarted when the connector handle comes back.
     std::string logdir = gSavedSettings.getString("VivoxLogDirectory");
     if (logdir.empty())
     {
@@ -579,7 +579,7 @@ void LLVivoxVoiceClient::connectorCreate()
         strConnectorHandle = "<ConnectorHandle>" + LLVivoxSecurity::getInstance()->connectorHandle() + "</ConnectorHandle>";
     }
 
-	stream 
+    stream
     << "<Request requestId=\"" << mCommandCookie++ << "\" action=\"Connector.Create.1\">"
         << "<ClientName>V2 SDK</ClientName>"
         << "<AccountManagementServer>" << mVoiceAccountServerURI << "</AccountManagementServer>"
