@@ -43,6 +43,7 @@
 #include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llviewermessage.h"
+#include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
@@ -202,7 +203,7 @@ bool ALChatCommand::parseCommand(std::string data)
                 params.append(fmodf(static_cast<F32>(pos.mdV[VX]), REGION_WIDTH_METERS));
                 params.append(fmodf(static_cast<F32>(pos.mdV[VY]), REGION_WIDTH_METERS));
                 params.append(static_cast<F32>(pos.mdV[VZ]));
-                LLCommandDispatcher::dispatch("teleport", params, LLSD(), std::string(), nullptr, "clicked", true);
+                LLCommandDispatcher::dispatch("teleport", params, LLSD(), LLGridManager::getInstance()->getGrid(), nullptr, "clicked", true);
                 return true;
             }
         }
