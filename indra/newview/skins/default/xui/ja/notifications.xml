@@ -184,7 +184,7 @@
 		無効なキーストロークが入力されました：
 [REASON]
 有効なテキストを入力してください。
-  </notification>
+	</notification>
 	<notification name="MerchantForceValidateListing">
 		出品リストを作成するために、出品リストするコンテンツの階層を固定しました。
 		<tag>confirm</tag>
@@ -1917,6 +1917,24 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 			<button name="Teleport" text="テレポート"/>
 		</form>
 	</notification>
+	<notification name="LoginPacketNeverReceivedNoTP">
+		<tag>fail</tag>
+			接続に問題があります。お使いのインターネット接続か、[SECOND_LIFE_GRID]の問題と考えられます。
+
+インターネット接続を確認してから数分後に再接続するか、ヘルプをクリックして [SUPPORT_SITE]をご覧になるか、テレポートをクリックしてホームに移動してみてください。
+		<url option="1" name="url">
+			https://git.alchemyviewer.org/alchemy/alchemy-next/issues
+		</url>
+		<form name="form">
+			<button name="OK" text="ＯＫ"/>
+			<button name="Help" text="ヘルプ"/>
+		</form>
+	</notification>
+	<notification name="LoginRemoveMultiGridUserData">
+		<tag>confirm</tag>
+		削除しようとしているローカルのデータは複数のグリッド間で共有されています。削除してもよろしいですか?
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="確認"/>
+	</notification>
 	<notification name="WelcomeChooseSex">
 		まもなく、あなたのアバターが表示されます。矢印キーを使用して歩きます。
 ヘルプが必要なときや、[SECOND_LIFE]について知りたいときは、Ｆ１キーを押してください。
@@ -2196,10 +2214,10 @@ OKをクリックして、ダウンロードとインストールを開始しま
 	<notification name="GroupLeaveConfirmMemberNoFee">
 		グループ「&lt;nolink&gt;[GROUP]&lt;/nolink&gt;」から脱退しますか？
 現在、このグループに参加するのに料金はかかりません。
-    <tag>group</tag>
-    <tag>confirm</tag>
-    <usetemplate name="okcancelbuttons" notext="キャンセル" yestext="脱退する"/>
-  </notification>
+		<tag>group</tag>
+		<tag>confirm</tag>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="脱退する"/>
+	</notification>
 	<notification name="OwnerCannotLeaveGroup">
 		グループを抜けることができません。グループの最後のオーナーであるため、グループを抜けることができません。最初に、別のメンバーをオーナーの役割に割り当ててください。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
@@ -6248,13 +6266,23 @@ C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\poses
 C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
 	</notification>
 	<notification name="RejectTeleportOffersModeSet">
-		すべての受け取ったテレポートオファーとリクエストを拒否するモードがオンになっています。
+		「すべての受け取ったテレポートオファーとリクエストを拒否する」モードがオンになっています。
 受信したテレポートのオファーやリクエストは、設定された自動応答で拒否されるようになります。このため、通知されることはありません。
-		<usetemplate ignoretext="すべてのテレポートのオファーとリクエストを拒否するモードにステータスを変更したとき" name="okignore" yestext="ＯＫ"/>
+		<usetemplate ignoretext="ステータスをすべてのテレポートのオファーとリクエストを拒否するモードに変えたとき" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="RejectTeleportOffersModeWarning">
 		「受け取ったテレポートのオファーとリクエストをすべて拒否する」モードがオンになっているため、現時点ではテレポートのリクエストを送信できません。
 無効にしたい場合は「コミュニケーション」＞「オンライン状況」メニューから行います。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="AutoRespondModeSet">
+		自動応答モードがオンになっています。
+受信したインスタントメッセージは、設定された自動応答で応答されるようになります。
+		<usetemplate ignoretext="ステータスを自動応答モードに変えたとき" name="okignore" yestext="ＯＫ"/>
+	</notification>
+	<notification name="AutoRespondNonFriendsModeSet">
+		非フレンドへの自動応答モードがオンになっています。
+フレンド以外の人からインスタントメッセージを受信したときに、設定した自動応答で応答されるようになります。
+		<usetemplate ignoretext="ステータスを非フレンドへの自動応答モードに変えたとき" name="okignore" yestext="ＯＫ"/>
 	</notification>
 </notifications>

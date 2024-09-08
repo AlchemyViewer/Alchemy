@@ -13333,4 +13333,27 @@ C:\Users\USERNAME\AppData\Roaming\AlchemyNext\user_settings\animations
       name="okbutton"
       yestext="OK"/>
   </notification>
+  <notification
+   icon="alert.tga"
+   name="AutoRespondModeSet"
+   type="alert">
+Autorespond mode is on.
+Incoming instant messages will now be answered with your configured autoresponse.
+    <usetemplate
+     ignoretext="I change my status to autorespond mode"
+     name="okignore"
+     yestext="OK"/>
+  </notification>
+
+    <notification
+   icon="alert.tga"
+   name="AutoRespondNonFriendsModeSet"
+   type="alert">
+Autorespond mode for non-friends is on.
+Incoming instant messages from anyone who is not your friend will now be answered with your configured autoresponse.
+    <usetemplate
+     ignoretext="I change my status to autorespond mode for non-friends"
+     name="okignore"
+     yestext="OK"/>
+  </notification>
 </notifications>

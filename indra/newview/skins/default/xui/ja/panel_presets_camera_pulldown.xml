@@ -20,13 +20,13 @@
 	<spinner label="Ｚ" name="focus_z"/>
 	<button name="reset_offset_rear" tool_tip="フォーカスのオフセット値をデフォルト値に戻します。"/>
 	<text name="offset_scale_lbl">
-		スケールのオフセット：
+		カメラのオフセットスケール：
 	</text>
 	<slider name="offset_scale_sld"/>
 	<spinner name="offset_scale_ctrl"/>
 	<button name="reset_offset_scale" tool_tip="オフセットのスケーリングをデフォルト値に戻します。"/>
 	<text name="offset_scale_lbl">
-		アングルのオフセット：
+		カメラアングル：
 	</text>
 	<slider name="camera_angle_slider"/>
 	<spinner name="camera_angle_spinner"/>
@@ -43,7 +43,12 @@
 	<slider name="cam_pos_slider"/>
 	<spinner name="cam_pos_spinner"/>
 	<button name="cam_pos_reset" tool_tip="カメラ位置のスムージングをデフォルト値に戻します。"/>
-	<button name="open_prefs_btn" label="カメラのフローターを表示" tool_tip="カメラのフローターを起動します。"/>
-	<button name="save_cam_pos_btn" tool_tip="現在のカメラの位置とフォーカスを保存します。"/>
-	<button name="restore_cam_pos_btn" tool_tip="カメラの位置とフォーカスを復元します。"/>
+	<button label="" name="save_cam_pos_btn" tool_tip="現在のカメラの位置とフォーカスを保存します。"/>
+	<button label="" name="restore_cam_pos_btn" tool_tip="保存されたカメラの位置とフォーカスを復元します。"/>
+	<panel_camera_item name="front_view" tool_tip="前方ビュー"/>
+	<panel_camera_item name="group_view" tool_tip="側方ビュー"/>
+	<panel_camera_item name="rear_view" tool_tip="後方ビュー"/>
+	<panel_camera_item name="object_view" tool_tip="オブジェクトビュー"/>
+	<panel_camera_item name="mouselook_view" tool_tip="マウスルックビュー"/>
+	<button name="save_preset_btn" label="プリセットとして保存…" tool_tip="カメラの位置とフォーカスを復元します。"/>
 </panel>

@@ -4416,32 +4416,44 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="ATTACH_HIND_RFOOT">
 		右後足
 	</string>
+	<!-- script editor -->
 	<string name="CursorPos">
 		[LINE]行目、[COLUMN]列目
 	</string>
+	<!-- panel dir browser -->
 	<string name="PanelDirCountFound">
 		[COUNT]件見つかりました
 	</string>
 	<string name="PanelDirTimeStr">
 		[ampm,datetime,utc]　[hour12,datetime,utc]：[min,datetime,utc]
 	</string>
+	<!-- panel dir events -->
 	<string name="PanelDirEventsDateText">
 		[mthnum,datetime,slt]／[day,datetime,slt]
 	</string>
+	<!-- panel contents -->
 	<string name="PanelContentsTooltip">
 		オブジェクトの中身
 	</string>
 	<string name="PanelContentsNewScript">
 		新しいスクリプト
 	</string>
+	<!-- panel preferences general -->
 	<string name="DoNotDisturbModeResponseDefault">
 		この住民が「取り込み中」をオンにすると、あなたのメッセージが後で表示されるようになります。
 	</string>
 	<string name="RejectFriendshipRequestsResponseDefault">
-		あなたがメッセージを送った住民は、[APP_NAME]ビューアの「フレンドシップのリクエストをすべて拒否する」モードを有効にしています。これは、彼らがフレンドシップのリクエストに邪魔されないよう要求したことを意味します。ＩＭは手動で送信することもできます。
+		あなたがメッセージを送った住民は、[APP_NAME]ビューアの「フレンドシップのリクエストをすべて拒否する」モードを有効にしています。これは、フレンドシップのリクエストに邪魔されないよう要求したことを意味します。ＩＭは手動で送信することもできます。
 	</string>
+	<!-- panel preferences chat-->
 	<string name="RejectTeleportOffersResponseDefault">
-		あなたがメッセージを送った住民は、[APP_NAME]ビューアの「すべてのテレポートのオファーとリクエストを拒否するモード」を有効にしました。これは、彼らがテレポートのオファーやリクエストに邪魔されないように要求したことを意味します。ＩＭは手動で送信することもできます。
+		あなたがメッセージを送った住民は、[APP_NAME]ビューアの「すべてのテレポートのオファーとリクエストを拒否するモード」を有効にしました。これは、テレポートのオファーやリクエストに邪魔されないように要求したことを意味します。ＩＭは手動で送信することもできます。
+	</string>
+	<string name="AlchemyAutoresponseDefault">
+		あなたがメッセージを送った住人は「自動応答モード」を有効にしており、邪魔されないよう要求しています。あなたの送ったメッセージは、後で閲覧できるように住人のＩＭパネルに表示されます。
+	</string>
+	<string name="AlchemyAutoresponseNotFriendDefault">
+		あなたがメッセージを送った住人は「非フレンドの自動応答モード」を有効にしており、邪魔されないよう要求しています。あなたの送ったメッセージは、後で閲覧できるように住人のＩＭパネルに表示されます。
 	</string>
 	<!-- Mute -->
 	<string name="MuteByName">
@@ -4742,7 +4754,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="Adult">
 		成人向け
 	</string>
-	<string name="Arts&amp;Culture">
+	<string name="Arts and Culture">
 		芸術と文化
 	</string>
 	<string name="Business">
@@ -4760,7 +4772,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="Newcomer Friendly">
 		新規住民歓迎
 	</string>
-	<string name="Parks&amp;Nature">
+	<string name="Parks and Nature">
 		公園と自然
 	</string>
 	<string name="Residential">
@@ -6493,6 +6505,9 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="not_online_inventory">
 		ユーザーがオンラインでありません‐インベントリに保存されました。
 	</string>
+	<string name="AutoresponsePrefix">
+		（自動応答）
+	</string>
 	<!-- voice calls -->
 	<string name="answered_call">
 		相手がコールを受けました。
@@ -8046,6 +8061,27 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 		無効な画像ファイル形式です。他の画像を選択してください。
 	</string>
 	<!-- Alchemy Strings -->
+	<string name="not_found">
+		「[TEXT]」は見つかりませんでした。
+	</string>
+	<string name="no_results">
+		検索結果なし
+	</string>
+	<string name="searching">
+		検索しています…
+	</string>
+	<string name="all_categories">
+		全てのカテゴリ
+	</string>
+	<string name="search_banned">
+		コミュニティスタンダードに明記されているコンテンツ制限により、検索クエリ内の一部の語句は除外されました。
+	</string>
+	<string name="search_short">
+		検索語が短すぎるため、検索は実行されませんでした。
+	</string>
+	<string name="search_disabled">
+		レガシー検索はこのリージョンでは無効化されています。
+		</string>
 	<string name="NotifyIncomingMessage">
 		[NAME]さんからのメッセージが届いています…
 	</string>
@@ -8199,5 +8235,20 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 	</string>
 	<string name="Permanent">
 		永続的
+	</string>
+	<string name="TooltipPrimCount">
+		プリム：[PRIM_COUNT]個
+	</string>
+	<string name="TooltipPrimCost">
+		ランドインパクト：[PRIM_COST]
+	</string>
+	<string name="TooltipPrimCostLoading">
+		ランドインパクトを読み込んでいます…
+	</string>
+	<string name="TooltipPosition">
+		位置：[OBJECT_POSITION]
+	</string>
+	<string name="TooltipDistance">
+		距離：[OBJECT_DISTANCE]
 	</string>
 </strings>

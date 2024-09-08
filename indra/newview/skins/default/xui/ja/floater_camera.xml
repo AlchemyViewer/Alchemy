@@ -33,10 +33,10 @@
 		</panel>
 	</panel>
 	<panel name="buttons_panel">
-		<panel_camera_item name="front_view" tool_tip="前方視界"/>
-		<panel_camera_item name="group_view" tool_tip="斜方視界"/>
-		<panel_camera_item name="rear_view" tool_tip="後方視界"/>
-		<panel_camera_item name="object_view" tool_tip="オブジェクト視点"/>
+		<panel_camera_item name="front_view" tool_tip="前方ビュー"/>
+		<panel_camera_item name="group_view" tool_tip="側方ビュー"/>
+		<panel_camera_item name="rear_view" tool_tip="後方ビュー"/>
+		<panel_camera_item name="object_view" tool_tip="オブジェクトビュー"/>
 		<panel_camera_item name="mouselook_view" tool_tip="マウスルックビュー"/>
 		<combo_box name="preset_combo">
 			<combo_box.item label="プリセットを使用" name="Use preset" value="default"/>

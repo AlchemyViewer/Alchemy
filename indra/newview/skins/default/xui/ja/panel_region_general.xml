@@ -32,9 +32,9 @@
 		区分：
 	</text>
 	<icons_combo_box label="Moderate" name="access_combo">
-		<icons_combo_box.item label="Adult" name="Adult" value="42"/>
-		<icons_combo_box.item label="Moderate" name="Mature" value="21"/>
-		<icons_combo_box.item label="General" name="PG" value="13"/>
+		<icons_combo_box.item name="Adult" value="42"/>
+		<icons_combo_box.item name="Mature" value="21"/>
+		<icons_combo_box.item name="PG" value="13"/>
 	</icons_combo_box>
 	<button label="適用" name="apply_btn"/>
 	<button label="住人１名をホームにテレポート…" name="kick_btn"/>
