@@ -300,19 +300,19 @@ public:
     F32 getLightCutoff() const;
 
     // Reflection Probes
-    bool setIsReflectionProbe(BOOL is_probe);
+    bool setIsReflectionProbe(bool is_probe);
     bool setReflectionProbeAmbiance(F32 ambiance);
     bool setReflectionProbeNearClip(F32 near_clip);
     bool setReflectionProbeIsBox(bool is_box);
     bool setReflectionProbeIsDynamic(bool is_dynamic);
     bool setReflectionProbeIsMirror(bool is_mirror);
 
-    BOOL isReflectionProbe() const override;
-    F32 getReflectionProbeAmbiance() const;
-    F32 getReflectionProbeNearClip() const;
-    bool getReflectionProbeIsBox() const;
-    bool getReflectionProbeIsDynamic() const;
-    bool getReflectionProbeIsMirror() const;
+    bool isReflectionProbe() const override;
+    F32 getReflectionProbeAmbiance() const override;
+    F32 getReflectionProbeNearClip() const override;
+    bool getReflectionProbeIsBox() const override;
+    bool getReflectionProbeIsDynamic() const override;
+    bool getReflectionProbeIsMirror() const override;
 
     // Flexible Objects
     U32 getVolumeInterfaceID() const;

@@ -276,7 +276,12 @@ public:
     virtual BOOL isMesh() const                     { return FALSE; }
     virtual BOOL isRiggedMesh() const               { return FALSE; }
     virtual BOOL hasLightTexture() const            { return FALSE; }
-    virtual BOOL isReflectionProbe() const          { return FALSE; }
+    virtual bool isReflectionProbe() const          { return false; }
+    virtual F32 getReflectionProbeAmbiance() const  { return 0.f; }
+    virtual F32 getReflectionProbeNearClip() const  { return 0.f; }
+    virtual bool getReflectionProbeIsBox() const    { return false; }
+    virtual bool getReflectionProbeIsDynamic() const { return false; };
+    virtual bool getReflectionProbeIsMirror() const { return false; };
 
     // This method returns true if the object is over land owned by
     // the agent, one of its groups, or it encroaches and

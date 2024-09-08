@@ -51,18 +51,18 @@ class alignas(16) LLHeroProbeManager
 {
     LL_ALIGN_NEW
 public:
-    enum class DetailLevel 
+    enum class DetailLevel
     {
         STATIC_ONLY = 0,
         STATIC_AND_DYNAMIC,
         REALTIME = 2
     };
 
-    // allocate an environment map of the given resolution 
+    // allocate an environment map of the given resolution
     LLHeroProbeManager();
     ~LLHeroProbeManager();
 
-    // release any GL state 
+    // release any GL state
     void cleanup();
 
     // maintain reflection probes
@@ -90,11 +90,11 @@ public:
     LLVector3 mMirrorPosition;
     LLVector3     mMirrorNormal;
     HeroProbeData mHeroData;
-    
+
 private:
     friend class LLPipeline;
     friend class LLReflectionMapManager;
-    
+
     // update UBO used for rendering (call only once per render pipe flush)
     void updateUniforms();
 
@@ -118,7 +118,7 @@ private:
     // update the specified face of the specified probe
     void updateProbeFace(LLReflectionMap* probe, U32 face, bool is_dynamic, F32 near_clip);
     void generateRadiance(LLReflectionMap *probe);
-    
+
     // list of active reflection maps
     std::vector<LLPointer<LLReflectionMap>> mProbes;
 
@@ -129,10 +129,10 @@ private:
 
     // resolution of reflection probes
     U32 mProbeResolution = 1024;
-    
+
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
-    
+
     F32 mHeroProbeStrength = 1.f;
     bool mIsInTransition = false;
 
@@ -140,10 +140,7 @@ private:
     bool mReset = false;
 
     bool mRenderingMirror = false;
-    std::map<int, int> mFaceUpdateList;
-    
-    U32 mCurrentProbeUpdateFrame = 0;
-    
+
     std::vector<LLPointer<LLVOVolume>>                       mHeroVOList;
     LLPointer<LLVOVolume>                                 mNearestHero;
 

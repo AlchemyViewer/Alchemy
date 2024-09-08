@@ -1270,7 +1270,7 @@ void LLPanelVolume::onPasteLight()
 
         if (clipboard.has("reflection_probe"))
         {
-            volobjp->setIsReflectionProbe(TRUE);
+            volobjp->setIsReflectionProbe(true);
             volobjp->setReflectionProbeIsBox(clipboard["reflection_probe"]["is_box"].asBoolean());
             volobjp->setReflectionProbeAmbiance((F32)clipboard["reflection_probe"]["ambiance"].asReal());
             volobjp->setReflectionProbeNearClip((F32)clipboard["reflection_probe"]["near_clip"].asReal());

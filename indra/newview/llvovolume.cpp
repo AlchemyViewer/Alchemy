@@ -3343,14 +3343,14 @@ F32 LLVOVolume::getLightCutoff() const
     }
 }
 
-BOOL LLVOVolume::isReflectionProbe() const
+bool LLVOVolume::isReflectionProbe() const
 {
     return getReflectionProbeParams() != nullptr;
 }
 
-bool LLVOVolume::setIsReflectionProbe(BOOL is_probe)
+bool LLVOVolume::setIsReflectionProbe(bool is_probe)
 {
-    BOOL was_probe = isReflectionProbe();
+    bool was_probe = isReflectionProbe();
     if (is_probe != was_probe)
     {
         if (is_probe)
