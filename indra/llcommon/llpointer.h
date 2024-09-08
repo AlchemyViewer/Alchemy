@@ -48,18 +48,19 @@ template <class Type> class LLPointer
 public:
     template<typename Subclass>
     friend class LLPointer;
-    LLPointer()  noexcept :
+
+    LLPointer() :
         mPointer(nullptr)
     {
     }
 
-    LLPointer(Type* ptr) noexcept :
+    LLPointer(Type* ptr) :
         mPointer(ptr)
     {
         ref();
     }
 
-    LLPointer(const LLPointer<Type>& ptr) noexcept :
+    LLPointer(const LLPointer<Type>& ptr) :
         mPointer(ptr.mPointer)
     {
         ref();
@@ -73,16 +74,16 @@ public:
 
     // Support conversion up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
     template<typename Subclass>
-    LLPointer(const LLPointer<Subclass>& ptr) noexcept :
+    LLPointer(const LLPointer<Subclass>& ptr) :
         mPointer(ptr.get())
     {
         ref();
     }
 
     template<typename Subclass>
-    LLPointer(LLPointer<Subclass>&& ptr) noexcept
+    LLPointer(LLPointer<Subclass>&& ptr) noexcept :
+        mPointer(ptr.get())
     {
-        mPointer = ptr.get();
         ptr.mPointer = nullptr;
     }
 
@@ -91,81 +92,70 @@ public:
         unref();
     }
 
-    Type*   get() const noexcept                        { return mPointer; }
-    const Type* operator->() const noexcept             { return mPointer; }
-    Type*   operator->() noexcept                       { return mPointer; }
-    const Type& operator*() const noexcept              { return *mPointer; }
-    Type&   operator*() noexcept                        { return *mPointer; }
+    Type*   get() const                         { return mPointer; }
+    const Type* operator->() const              { return mPointer; }
+    Type*   operator->()                        { return mPointer; }
+    const Type& operator*() const               { return *mPointer; }
+    Type&   operator*()                         { return *mPointer; }
 
-    operator BOOL()  const noexcept                     { return (mPointer != nullptr); }
-    operator bool()  const noexcept                     { return (mPointer != nullptr); }
-    bool operator!() const noexcept                     { return (mPointer == nullptr); }
-    bool isNull() const noexcept                        { return (mPointer == nullptr); }
-    bool notNull() const noexcept                       { return (mPointer != nullptr); }
+    operator BOOL() const                       { return (mPointer != nullptr); }
+    operator bool() const                       { return (mPointer != nullptr); }
+    bool operator!() const                      { return (mPointer == nullptr); }
+    bool isNull() const                         { return (mPointer == nullptr); }
+    bool notNull() const                        { return (mPointer != nullptr); }
 
-    operator Type*()       const noexcept               { return mPointer; }
-    bool operator !=(Type* ptr) const noexcept          { return (mPointer != ptr);     }
-    bool operator ==(Type* ptr) const noexcept          { return (mPointer == ptr);     }
-    bool operator ==(const LLPointer<Type>& ptr) const noexcept          { return (mPointer == ptr.mPointer);   }
-    bool operator < (const LLPointer<Type>& ptr) const noexcept          { return (mPointer < ptr.mPointer);    }
-    bool operator > (const LLPointer<Type>& ptr) const noexcept          { return (mPointer > ptr.mPointer);    }
+    operator Type*() const                      { return mPointer; }
+    bool operator !=(Type* ptr) const           { return (mPointer != ptr); }
+    bool operator ==(Type* ptr) const           { return (mPointer == ptr); }
+    bool operator ==(const LLPointer<Type>& ptr) const { return (mPointer == ptr.mPointer); }
+    bool operator < (const LLPointer<Type>& ptr) const { return (mPointer < ptr.mPointer); }
+    bool operator > (const LLPointer<Type>& ptr) const { return (mPointer > ptr.mPointer); }
 
-    LLPointer<Type>& operator =(Type* ptr) noexcept
+    LLPointer<Type>& operator =(Type* ptr)
     {
         assign(ptr);
         return *this;
     }
 
-    LLPointer<Type>& operator =(const LLPointer<Type>& ptr) noexcept
+    LLPointer<Type>& operator =(const LLPointer<Type>& ptr)
     {
         assign(ptr);
         return *this;
     }
 
-    LLPointer<Type>& operator =(LLPointer<Type>&& ptr) noexcept
+    LLPointer<Type>& operator =(LLPointer<Type>&& ptr)
     {
         if (mPointer != ptr.mPointer)
         {
-            LLPointer<Type>(std::move(ptr)).swap(*this);
+            unref();
+            mPointer = ptr.mPointer;
+            ptr.mPointer = nullptr;
         }
         return *this;
     }
 
     // support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
     template<typename Subclass>
-    LLPointer<Type>& operator =(const LLPointer<Subclass>& ptr) noexcept
+    LLPointer<Type>& operator =(const LLPointer<Subclass>& ptr)
     {
         assign(ptr.get());
         return *this;
     }
 
     template<typename Subclass>
-    LLPointer<Type>& operator =(LLPointer<Subclass>&& ptr) noexcept
+    LLPointer<Type>& operator =(LLPointer<Subclass>&& ptr)
     {
-        if (mPointer != ptr.get())
+        if (mPointer != ptr.mPointer)
         {
-            LLPointer<Type>(std::move(ptr)).swap(*this);
+            unref();
+            mPointer = ptr.mPointer;
+            ptr.mPointer = nullptr;
         }
         return *this;
     }
 
-    inline void swap(LLPointer<Type>& ptr) noexcept
-    {
-        Type* temp = mPointer;
-        mPointer = ptr.mPointer;
-        ptr.mPointer = temp;
-    }
-
-    template<typename Subclass>
-    inline void swap(LLPointer<Subclass>& ptr) noexcept
-    {
-        Type* temp = mPointer;
-        mPointer = ptr.mPointer;
-        ptr.mPointer = temp;
-    }
-
     // Just exchange the pointers, which will not change the reference counts.
-    static void swap(LLPointer<Type>& a, LLPointer<Type>& b) noexcept
+    static void swap(LLPointer<Type>& a, LLPointer<Type>& b)
     {
         Type* temp = a.mPointer;
         a.mPointer = b.mPointer;
@@ -177,8 +167,7 @@ protected:
     void ref();
     void unref();
 #else
-
-    inline void ref() noexcept
+    void ref()
     {
         if (mPointer)
         {
@@ -186,7 +175,7 @@ protected:
         }
     }
 
-    inline void unref() noexcept
+    void unref()
     {
         if (mPointer)
         {
@@ -202,7 +191,7 @@ protected:
     }
 #endif // LL_LIBRARY_INCLUDE
 
-    void assign(const LLPointer<Type>& ptr) noexcept
+    void assign(const LLPointer<Type>& ptr)
     {
         if (mPointer != ptr.mPointer)
         {
@@ -218,22 +207,21 @@ protected:
 
 template <class Type> class LLConstPointer
 {
-public:
     template<typename Subclass>
     friend class LLConstPointer;
-
-    LLConstPointer() noexcept :
+public:
+    LLConstPointer() :
         mPointer(nullptr)
     {
     }
 
-    LLConstPointer(const Type* ptr) noexcept :
+    LLConstPointer(const Type* ptr) :
         mPointer(ptr)
     {
         ref();
     }
 
-    LLConstPointer(const LLConstPointer<Type>& ptr) noexcept :
+    LLConstPointer(const LLConstPointer<Type>& ptr) :
         mPointer(ptr.mPointer)
     {
         ref();
@@ -247,16 +235,16 @@ public:
 
     // support conversion up the type hierarchy.  See Item 45 in Effective C++, 3rd Ed.
     template<typename Subclass>
-    LLConstPointer(const LLConstPointer<Subclass>& ptr) noexcept :
+    LLConstPointer(const LLConstPointer<Subclass>& ptr) :
         mPointer(ptr.get())
     {
         ref();
     }
 
     template<typename Subclass>
-    LLConstPointer(LLConstPointer<Subclass>&& ptr) noexcept
+    LLConstPointer(LLConstPointer<Subclass>&& ptr) noexcept :
+        mPointer(ptr.get())
     {
-        mPointer = ptr.get();
         ptr.mPointer = nullptr;
     }
 
@@ -265,24 +253,24 @@ public:
         unref();
     }
 
-    const Type* get() const noexcept                    { return mPointer; }
-    const Type* operator->() const noexcept             { return mPointer; }
-    const Type& operator*() const noexcept              { return *mPointer; }
+    const Type* get() const                     { return mPointer; }
+    const Type* operator->() const              { return mPointer; }
+    const Type& operator*() const               { return *mPointer; }
 
-    operator BOOL()  const noexcept                     { return (mPointer != nullptr); }
-    operator bool()  const noexcept                     { return (mPointer != nullptr); }
-    bool operator!() const noexcept                     { return (mPointer == nullptr); }
-    bool isNull() const noexcept                        { return (mPointer == nullptr); }
-    bool notNull() const noexcept                       { return (mPointer != nullptr); }
+    operator BOOL() const                       { return (mPointer != nullptr); }
+    operator bool() const                       { return (mPointer != nullptr); }
+    bool operator!() const                      { return (mPointer == nullptr); }
+    bool isNull() const                         { return (mPointer == nullptr); }
+    bool notNull() const                        { return (mPointer != nullptr); }
 
-    operator const Type*()       const noexcept          { return mPointer; }
-    bool operator !=(const Type* ptr) const noexcept     { return (mPointer != ptr);    }
-    bool operator ==(const Type* ptr) const noexcept     { return (mPointer == ptr);    }
-    bool operator ==(const LLConstPointer<Type>& ptr) const noexcept          { return (mPointer == ptr.mPointer);  }
-    bool operator < (const LLConstPointer<Type>& ptr) const noexcept          { return (mPointer < ptr.mPointer);   }
-    bool operator > (const LLConstPointer<Type>& ptr) const noexcept          { return (mPointer > ptr.mPointer);   }
+    operator const Type*() const                { return mPointer; }
+    bool operator !=(const Type* ptr) const     { return (mPointer != ptr); }
+    bool operator ==(const Type* ptr) const     { return (mPointer == ptr); }
+    bool operator ==(const LLConstPointer<Type>& ptr) const { return (mPointer == ptr.mPointer); }
+    bool operator < (const LLConstPointer<Type>& ptr) const { return (mPointer < ptr.mPointer); }
+    bool operator > (const LLConstPointer<Type>& ptr) const { return (mPointer > ptr.mPointer); }
 
-    LLConstPointer<Type>& operator =(const Type* ptr) noexcept
+    LLConstPointer<Type>& operator =(const Type* ptr)
     {
         if( mPointer != ptr )
         {
@@ -294,7 +282,7 @@ public:
         return *this;
     }
 
-    LLConstPointer<Type>& operator =(const LLConstPointer<Type>& ptr) noexcept
+    LLConstPointer<Type>& operator =(const LLConstPointer<Type>& ptr)
     {
         if( mPointer != ptr.mPointer )
         {
@@ -305,18 +293,20 @@ public:
         return *this;
     }
 
-    LLConstPointer<Type>& operator =(LLConstPointer<Type>&& ptr) noexcept
+    LLConstPointer<Type>& operator =(LLConstPointer<Type>&& ptr)
     {
         if (mPointer != ptr.mPointer)
         {
-            LLConstPointer<Type>(std::move(ptr)).swap(*this);
+            unref();
+            mPointer = ptr.mPointer;
+            ptr.mPointer = nullptr;
         }
         return *this;
     }
 
     // support assignment up the type hierarchy. See Item 45 in Effective C++, 3rd Ed.
     template<typename Subclass>
-    LLConstPointer<Type>& operator =(const LLConstPointer<Subclass>& ptr) noexcept
+    LLConstPointer<Type>& operator =(const LLConstPointer<Subclass>& ptr)
     {
         if( mPointer != ptr.get() )
         {
@@ -328,32 +318,19 @@ public:
     }
 
     template<typename Subclass>
-    LLConstPointer<Type>& operator =(LLConstPointer<Subclass>&& ptr) noexcept
+    LLConstPointer<Type>& operator =(LLConstPointer<Subclass>&& ptr)
     {
-        if (mPointer != ptr.get())
+        if (mPointer != ptr.mPointer)
         {
-            LLConstPointer<Type>(std::move(ptr)).swap(*this);
+            unref();
+            mPointer = ptr.mPointer;
+            ptr.mPointer = nullptr;
         }
         return *this;
     }
 
-    inline void swap(LLConstPointer<Type>& ptr) noexcept
-    {
-        Type* temp = mPointer;
-        mPointer = ptr.mPointer;
-        ptr.mPointer = temp;
-    }
-
-    template<typename Subclass>
-    inline void swap(LLConstPointer<Subclass>& ptr) noexcept
-    {
-        Type* temp = mPointer;
-        mPointer = ptr.mPointer;
-        ptr.mPointer = temp;
-    }
-
     // Just exchange the pointers, which will not change the reference counts.
-    static void swap(LLConstPointer<Type>& a, LLConstPointer<Type>& b) noexcept
+    static void swap(LLConstPointer<Type>& a, LLConstPointer<Type>& b)
     {
         const Type* temp = a.mPointer;
         a.mPointer = b.mPointer;
@@ -365,7 +342,7 @@ protected:
     void ref();
     void unref();
 #else // LL_LIBRARY_INCLUDE
-    inline void ref() noexcept
+    void ref()
     {
         if (mPointer)
         {
@@ -373,7 +350,7 @@ protected:
         }
     }
 
-    inline void unref() noexcept
+    void unref()
     {
         if (mPointer)
         {
@@ -400,16 +377,16 @@ public:
     typedef LLCopyOnWritePointer<Type> self_t;
     typedef LLPointer<Type> pointer_t;
 
-    LLCopyOnWritePointer() noexcept
+    LLCopyOnWritePointer()
     :   mStayUnique(false)
     {}
 
-    LLCopyOnWritePointer(Type* ptr) noexcept
+    LLCopyOnWritePointer(Type* ptr)
     :   LLPointer<Type>(ptr),
         mStayUnique(false)
     {}
 
-    LLCopyOnWritePointer(LLPointer<Type>& ptr) noexcept
+    LLCopyOnWritePointer(LLPointer<Type>& ptr)
     :   LLPointer<Type>(ptr),
         mStayUnique(false)
     {
@@ -419,13 +396,13 @@ public:
         }
     }
 
-    Type* write() noexcept
+    Type* write()
     {
         makeUnique();
         return pointer_t::mPointer;
     }
 
-    void makeUnique() noexcept
+    void makeUnique()
     {
         if (pointer_t::notNull() && pointer_t::mPointer->getNumRefs() > 1)
         {
@@ -433,10 +410,10 @@ public:
         }
     }
 
-    const Type* operator->() const noexcept { return pointer_t::mPointer; }
-    const Type& operator*() const noexcept  { return *pointer_t::mPointer; }
+    const Type* operator->() const  { return pointer_t::mPointer; }
+    const Type& operator*() const   { return *pointer_t::mPointer; }
 
-    void setStayUnique(bool stay) noexcept { makeUnique(); mStayUnique = stay; }
+    void setStayUnique(bool stay) { makeUnique(); mStayUnique = stay; }
 private:
     bool mStayUnique;
 };
