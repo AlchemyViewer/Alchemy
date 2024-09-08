@@ -2510,7 +2510,7 @@ void LLViewerWindow::initWorldUI()
     topinfo_bar_container->addChild(topinfo_bar);
     topinfo_bar_container->setVisible(true);
 
-    if (!gSavedSettings.getBOOL("ShowMiniLocationPanel"))
+    if (gSavedSettings.getU32("NavigationBarStyle") != 1)
     {
         topinfo_bar->setVisible(false);
     }
