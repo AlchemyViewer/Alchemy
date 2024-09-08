@@ -4581,4 +4581,6 @@ and report the problem.
     <string name="TooltipDistance">
         Distance: [OBJECT_DISTANCE]
     </string>
+	<string name="AutoResponseModeDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
+	<string name="AutoResponseModeNonFriendsDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
 </strings>
