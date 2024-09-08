@@ -1,24 +1,24 @@
-/** 
+/**
  * @file class1/deferred/textureUtilV.glsl
  *
  * $LicenseInfo:firstyear=2023&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2023, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -48,6 +48,7 @@ vec2 khr_texture_transform(vec2 texcoord, vec2 scale, float rotation, vec2 offse
     return (transform * vec3(texcoord, 1)).xy;
 }
 
+// A texture transform function for PBR materials applied to shape prims/Collada model prims
 // vertex_texcoord - The UV texture coordinates sampled from the vertex at
 //     runtime. Per SL convention, this is in a right-handed UV coordinate
 //     system. Collada models also have right-handed UVs.
@@ -93,6 +94,8 @@ vec2 terrain_texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform)
 // Take the rotation only from both transforms and apply to the tangent. This
 // accounts for the change of the topology of the normal texture when a texture
 // rotation is applied to it.
+// In practice, this applies the inverse of the texture transform to the tangent.
+// It is effectively an inverse of the rotation
 // *HACK: Assume the imported GLTF model did not have both normal texture
 // transforms and tangent vertices. The use of this function is inconsistent
 // with the GLTF sample viewer when that is the case. See getNormalInfo in
