@@ -88,12 +88,6 @@
 		<menu_item_check label="ジェスチャー…" name="Gestures"/>
 		<menu_item_separator/>
 		<menu_item_check label="喋る" name="Speak"/>
-			<menu_item_check label="ボイスモーフィングなし" name="NoVoiceMorphing"/>
-			<menu_item_separator/>
-			<menu_item_check label="プレビュー" name="Preview"/>
-			<menu_item_call label="購読…" name="Subscribe"/>
-			<menu_item_call label="プレミアム特典…" name="PremiumPerk"/>
-		</menu>
 		<menu_item_check label="ジェスチャー…" name="Gestures"/>
 		<menu_item_separator/>
 		<menu_item_check label="フレンド" name="My Friends"/>
