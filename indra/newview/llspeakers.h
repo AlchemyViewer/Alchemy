@@ -77,9 +77,9 @@ public:
     BOOL            mTyping;
     S32             mSortIndex;
     ESpeakerType    mType;
-    BOOL            mIsModerator;
-    BOOL            mModeratorMutedVoice;
-    BOOL            mModeratorMutedText;
+    bool            mIsModerator;
+    bool            mModeratorMutedVoice;
+    bool            mModeratorMutedText;
 };
 
 class LLSpeakerUpdateSpeakerEvent : public LLOldEvents::LLEvent

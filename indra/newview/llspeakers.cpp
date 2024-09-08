@@ -387,7 +387,7 @@ void LLSpeakerMgr::update(BOOL resort_ok)
         if (voice_channel_active && voice_client->getVoiceEnabled(speaker_id))
         {
             speakerp->mSpeechVolume = voice_client->getCurrentPower(speaker_id);
-            BOOL moderator_muted_voice = voice_client->getIsModeratorMuted(speaker_id);
+            bool moderator_muted_voice = voice_client->getIsModeratorMuted(speaker_id);
             if (moderator_muted_voice != speakerp->mModeratorMutedVoice)
             {
                 speakerp->mModeratorMutedVoice = moderator_muted_voice;
