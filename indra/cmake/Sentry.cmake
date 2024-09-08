@@ -32,8 +32,8 @@ if (USE_SENTRY)
         target_link_libraries( al::sentry INTERFACE ${SENTRY_LIBRARIES})
     else ()
         target_link_libraries( al::sentry INTERFACE
-            ${ARCH_PREBUILT_DIRS_RELEASE}/libsentry.a
-            ${ARCH_PREBUILT_DIRS_RELEASE}/libbreakpad_client.a
+            ${ARCH_PREBUILT_DIRS}/libsentry.a
+            ${ARCH_PREBUILT_DIRS}/libbreakpad_client.a
             ll::libcurl
             ll::openssl
             ll::nghttp2
