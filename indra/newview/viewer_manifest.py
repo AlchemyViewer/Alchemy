@@ -768,37 +768,31 @@ class DarwinManifest(ViewerManifest):
         libdir = debpkgdir if self.args['buildtype'].lower() == 'debug' else relpkgdir
 
         with self.prefix(src="", dst="Contents"):  # everything goes in Contents
-            # CEF framework goes inside Contents/Frameworks.
-            # Remember where we parked this car.
-            with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'llwebrtc', self.args['configuration']), dst="Frameworks"):
-                for libfile in (
-                        'libllwebrtc.dylib',
-                ):
-                    self.path(libfile)
+            with self.prefix(dst="Frameworks"):
+                with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'llwebrtc', self.args['configuration'])):
+                    self.path('libllwebrtc.dylib')
 
-                for libfile in (
-                                'libndofdev.dylib',
-                                ):
-                    self.path(libfile)
+                with self.prefix(src=libdir):
+                    self.path('libndofdev.dylib')
 
-                if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
-                    self.path("Sentry.framework")
+                    if self.args['sentry'] == 'ON' or self.args['sentry'] == 'TRUE':
+                        self.path("Sentry.framework")
 
-                if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
-                    for libfile in (
-                                    'libopenal.dylib',
-                                    'libalut.dylib',
-                                    ):
-                        self.path(libfile)
+                    if self.args['openal'] == 'ON' or self.args['openal'] == 'TRUE':
+                        for libfile in (
+                                        'libopenal.dylib',
+                                        'libalut.dylib',
+                                        ):
+                            self.path(libfile)
 
-                if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
-                    if self.args['buildtype'].lower() == 'debug':
-                        self.path("libfmodL.dylib")
-                    else:
-                        self.path("libfmod.dylib")
+                    if self.args['fmodstudio'] == 'ON' or self.args['fmodstudio'] == 'TRUE':
+                        if self.args['buildtype'].lower() == 'debug':
+                            self.path("libfmodL.dylib")
+                        else:
+                            self.path("libfmod.dylib")
 
-                if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
-                    self.path("discord_game_sdk.dylib")
+                    if self.args['discord'] == 'ON' or self.args['discord'] == 'TRUE':
+                        self.path("discord_game_sdk.dylib")
 
             with self.prefix(dst="MacOS"):
                 executable = self.dst_path_of(self.channel())
@@ -899,6 +893,8 @@ class DarwinManifest(ViewerManifest):
                     self.path2basename("../media_plugins/libvlc/" + self.args['configuration'],
                                        "media_plugin_libvlc.dylib")
 
+                    # CEF framework goes inside Contents/Frameworks.
+                    # Remember where we parked this car.
                     with self.prefix(src=os.path.join(pkgdir, 'bin', 'release')):
                         self.path("Chromium Embedded Framework.framework")
                         self.path("DullahanHost.app")
