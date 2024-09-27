@@ -175,7 +175,7 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
              S32 height, U32 flags,
              bool fullscreen, bool clearBg,
              bool enable_vsync, bool use_gl,
-             bool ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, U32 max_vram, F32 max_gl_version)
+             bool ignore_pixel_depth, U32 fsaa_samples, U32 max_cores, F32 max_gl_version)
     : LLWindow(callbacks, fullscreen, flags),
       mGamma(1.0f)
 {
@@ -726,7 +726,7 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     LL_PROFILER_GPU_CONTEXT;
 
     // Enable vertical sync for swap
-    toggleVSync(enable_vsync);
+    toggleVSync(disable_vsync);
 
     setIcon();
 

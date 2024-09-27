@@ -29,6 +29,8 @@
 #ifndef LL_PREEDITOR
 #define LL_PREEDITOR
 
+#include <deque>
+
 class LLPreeditor
 {
 public:
