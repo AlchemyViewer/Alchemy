@@ -123,7 +123,30 @@
      follows="left|top"
      left="50"
      name="Discord_Integration_Show_Region"
-     width="350" />
+        width="350" />
+    <combo_box
+     control_name="ALDiscordShareRegionMaxMaturity"
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left_delta="200"
+     name="maturity_desired_combobox"
+     width="200">
+        <combo_box.item
+         label="General, Moderate, Adult"
+         name="Desired_Adult"
+         value="42" />
+        <combo_box.item
+         label="General and Moderate"
+         name="Desired_Mature"
+         value="21" />
+        <combo_box.item
+         label="General"
+         name="Desired_PG"
+         value="13" />
+        <combo_box.commit_callback
+		 function="Pref.MaturitySettings"/>
+        </combo_box>
    <text
       type="string"
       length="1"
