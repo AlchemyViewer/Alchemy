@@ -44,10 +44,8 @@
 #ifdef LL_MAKEDLL
 #ifdef WEBRTC_WIN
 #define LLSYMEXPORT __declspec(dllexport)
-#elif WEBRTC_LINUX
-#define LLSYMEXPORT __attribute__((visibility("default")))
 #else
-#define LLSYMEXPORT /**/
+#define LLSYMEXPORT __attribute__((visibility("default")))
 #endif
 #else
 #define LLSYMEXPORT /**/
@@ -55,6 +53,20 @@
 
 namespace llwebrtc
 {
+
+class LLWebRTCLogCallback
+{
+public:
+    typedef enum {
+        LOG_LEVEL_VERBOSE = 0,
+        LOG_LEVEL_INFO,
+        LOG_LEVEL_WARNING,
+        LOG_LEVEL_ERROR
+    } LogLevel;
+
+    virtual void LogMessage(LogLevel level, const std::string& message) = 0;
+};
+
 
 // LLWebRTCVoiceDevice is a simple representation of the
 // components of a device, used to communicate this
@@ -145,6 +157,7 @@ class LLWebRTCDeviceInterface
     virtual void setTuningMode(bool enable) = 0;
     virtual float getTuningAudioLevel() = 0; // for use during tuning
     virtual float getPeerConnectionAudioLevel() = 0; // for use when not tuning
+    virtual void setPeerConnectionGain(float gain) = 0;
 };
 
 // LLWebRTCAudioInterface provides the viewer with a way
@@ -261,7 +274,7 @@ class LLWebRTCPeerConnectionInterface
 // exports.
 
 // This library must be initialized before use.
-LLSYMEXPORT void init();
+LLSYMEXPORT void init(LLWebRTCLogCallback* logSink);
 
 // And should be terminated as part of shutdown.
 LLSYMEXPORT void terminate();

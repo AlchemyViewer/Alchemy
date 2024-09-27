@@ -89,6 +89,7 @@ public:
     /*virtual*/ void setVisible(bool visible);
     /*virtual*/ void setFocus(bool focus);
     /*virtual*/ void closeFloater(bool app_quitting = false);
+    /*virtual*/ void deleteAllChildren();
 
     // Handle the left hand participant list widgets
     void addConversationViewParticipant(LLConversationItem* item, bool update_view = true);
@@ -227,6 +228,8 @@ private:
      * Implementation: chat history bottom "follows" top+top_pad of input chat field
      */
     void reshapeChatLayoutPanel();
+
+    void onCallButtonClicked();
 
     void onInputEditorClicked();
 

@@ -1572,17 +1572,6 @@
             <key>Value</key>
             <string />
         </map>
-        <key>VoiceMultiInstance</key>
-        <map>
-            <key>Comment</key>
-            <string>Enables using voice in multiple simultaneous viewer instances</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
         <key>ALInspectColumnConfig</key>
         <map>
             <key>Comment</key>

@@ -2931,7 +2931,7 @@ bool LLAppViewer::initConfiguration()
         // but make sure the setting is *not* persisted.
         // Also see LLVivoxVoiceClient::voiceEnabled()
         LLControlVariable* enable_voice = gSavedSettings.getControl("EnableVoiceChat");
-        if(enable_voice && !gSavedSettings.getBOOL("VoiceMultiInstance"))
+        if (enable_voice)
         {
             const bool DO_NOT_PERSIST = false;
             enable_voice->setValue(LLSD(false), DO_NOT_PERSIST);

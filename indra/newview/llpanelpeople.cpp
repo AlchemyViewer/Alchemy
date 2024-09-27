@@ -341,7 +341,7 @@ public:
         LLAvatarTracker::instance().addObserver(this);
 
         // For notification when SIP online status changes.
-        LLVoiceClient::getInstance()->addObserver(this);
+        LLVoiceClient::addObserver(this);
         mInvObserver = new LLInventoryFriendCardObserver(this);
     }
 
@@ -349,10 +349,7 @@ public:
     {
         // will be deleted by ~LLInventoryModel
         //delete mInvObserver;
-        if (LLVoiceClient::instanceExists())
-        {
-            LLVoiceClient::getInstance()->removeObserver(this);
-        }
+        LLVoiceClient::removeObserver(this);
         LLAvatarTracker::instance().removeObserver(this);
     }
 

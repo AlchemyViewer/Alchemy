@@ -19,6 +19,7 @@
 		<!-- L$が空白になってしまうため翻訳を変更 -->
 		<menu_item_call label="リンデンドルの購入…" name="Buy and Sell L$"/>
 		<menu_item_call label="マーケットプレイス…" name="Marketplace"/>
+		<menu_item_check label="取引ログ…" name="transaction_log"/>
 		<menu_item_call label="マーケットプレイスに出品…" name="MarketplaceListings"/>
 		<menu_item_call label="アカウントのダッシュボード…" name="Manage My Account"/>
 		<menu_item_call label="[Membership]" name="Membership"/>
@@ -58,7 +59,7 @@
 			<menu label="取り外す" name="Avatar Detach"/>
 			<menu_item_call label="全てを取り外す" name="Detach All"/>
 		</menu>
-		<menu_item_call label="選択された装着物を取り外す" name="Remove Selected Attachments" />
+		<menu_item_call label="選択された装着物を取り外す" name="Remove Selected Attachments"/>
 		<menu_item_separator/>
 		<menu_item_call label="アバターを選択…" name="Avatar Picker"/>
 		<menu_item_separator/>
@@ -97,6 +98,9 @@
 		<menu_item_check label="取り込み中" name="Do Not Disturb"/>
 		<menu_item_check label="テレポートのオファーとリクエストを拒否する" name="Automatically reject teleport offers"/>
 		<menu_item_check label="フレンドシップのリクエストを拒否する" name="Reject all friendship requests"/>
+		<menu_item_separator/>
+		<menu_item_check label="自動応答の有効化" name="Set AutoRespond"/>
+		<menu_item_check label="非フレンドへ自動応答の有効化" name="Set AutoRespond to non-friends"/>
 	</menu>
 	<menu label="ワールド" name="World">
 		<menu_item_check label="ポーザー" name="Poser"/>
@@ -118,7 +122,7 @@
 		<menu_item_call label="スナップショット" name="Take Snapshot"/>
 		<menu_item_call label="３６０度スナップショット" name="Capture 360"/>
 		<menu label="ズームレベル" name="Zoom menu">
-			<menu_item_call label="ズームアウト" name="Zoom Out" />
+			<menu_item_call label="ズームアウト" name="Zoom Out"/>
 			<menu_item_call label="デフォルト" name="Zoom Default"/>
 			<menu_item_call label="ズームイン" name="Zoom In"/>
 		</menu>
@@ -358,7 +362,7 @@
 			<menu_item_check label="透明部分をハイライト" name="Highlight Transparent"/>
 			<menu_item_check label="マウスルックのときにクロスヘアーを表示" name="ShowCrosshairs"/>
 		</menu>
-		<menu label="ホバー時のツールチップ" name="Hover Tips">
+		<menu label="マウスホバー時のツールチップ" name="Hover Tips">
 			<menu_item_check label="ツールチップを表示" name="Show Tips"/>
 			<menu_item_separator/>
 			<menu_item_check label="土地のツールチップを表示" name="Land Tips"/>
@@ -370,7 +374,7 @@
 			<menu_item_check label="アルファマスク" name="Rendering Type Alpha Mask"/>
 			<menu_item_check label="明るさ全開のアルファマスク" name="Rendering Type Fullbright Alpha Mask"/>
 			<menu_item_check label="グロー" name="Rendering Type Glow"/>
-			<menu_item_check label="明るさ全開" name="Rendering Type Glow" />
+			<menu_item_check label="明るさ全開" name="Rendering Type Glow"/>
 			<menu_item_check label="アルファ" name="Rendering Type Alpha"/>
 			<menu_item_check label="樹木" name="Rendering Type Tree"/>
 			<menu_item_check label="アバター" name="Rendering Type Character"/>

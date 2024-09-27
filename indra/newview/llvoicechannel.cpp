@@ -81,10 +81,7 @@ LLVoiceChannel::~LLVoiceChannel()
     {
         sCurrentVoiceChannel = NULL;
         // Must check instance exists here, the singleton MAY have already been destroyed.
-        if(LLVoiceClient::instanceExists())
-        {
-            LLVoiceClient::getInstance()->removeObserver(this);
-        }
+        LLVoiceClient::removeObserver(this);
     }
 
     sVoiceChannelMap.erase(mSessionID);
@@ -96,7 +93,7 @@ void LLVoiceChannel::setChannelInfo(const LLSD &channelInfo)
 
     if (mState == STATE_NO_CHANNEL_INFO)
     {
-        if (mChannelInfo.isUndefined())
+        if (mChannelInfo.isUndefined() || !mChannelInfo.isMap() || mChannelInfo.size() == 0)
         {
             LLNotificationsUtil::add("VoiceChannelJoinFailed", mNotifyArgs);
             LL_WARNS("Voice") << "Received empty channel info for channel " << mSessionName << LL_ENDL;
@@ -118,11 +115,17 @@ void LLVoiceChannel::setChannelInfo(const LLSD &channelInfo)
     }
 }
 
+void LLVoiceChannel::resetChannelInfo()
+{
+    mChannelInfo = LLSD();
+    mState = STATE_NO_CHANNEL_INFO;
+}
+
 void LLVoiceChannel::onChange(EStatusType type, const LLSD& channelInfo, bool proximal)
 {
     LL_DEBUGS("Voice") << "Incoming channel info: " << channelInfo << LL_ENDL;
     LL_DEBUGS("Voice") << "Current channel info: " << mChannelInfo << LL_ENDL;
-    if (mChannelInfo.isUndefined())
+    if (mChannelInfo.isUndefined() || (mChannelInfo.isMap() && mChannelInfo.size() == 0))
     {
         mChannelInfo = channelInfo;
     }
@@ -219,7 +222,7 @@ void LLVoiceChannel::deactivate()
             LLVoiceClient::getInstance()->setUserPTTState(false);
         }
     }
-    LLVoiceClient::getInstance()->removeObserver(this);
+    LLVoiceClient::removeObserver(this);
 
     if (sCurrentVoiceChannel == this)
     {
@@ -259,7 +262,7 @@ void LLVoiceChannel::activate()
         setState(STATE_CALL_STARTED);
     }
 
-    LLVoiceClient::getInstance()->addObserver(this);
+    LLVoiceClient::addObserver(this);
 
     //do not send earlier, channel should be initialized, should not be in STATE_NO_CHANNEL_INFO state
     sCurrentVoiceChannelChangedSignal(this->mSessionID);
@@ -325,6 +328,16 @@ void LLVoiceChannel::setState(EState state)
 
 void LLVoiceChannel::doSetState(const EState& new_state)
 {
+    LL_DEBUGS("Voice") << "session '" << mSessionName << "' state " << mState << ", new_state " << new_state << ": "
+        << (new_state == STATE_ERROR ? "ERROR" :
+            new_state == STATE_HUNG_UP ? "HUNG_UP" :
+            new_state == STATE_READY ? "READY" :
+            new_state == STATE_CALL_STARTED ? "CALL_STARTED" :
+            new_state == STATE_RINGING ? "RINGING" :
+            new_state == STATE_CONNECTED ? "CONNECTED" :
+            "NO_INFO")
+        << LL_ENDL;
+
     EState old_state = mState;
     mState = new_state;
 
@@ -477,7 +490,7 @@ void LLVoiceChannelGroup::setChannelInfo(const LLSD& channelInfo)
 
     if (mState == STATE_NO_CHANNEL_INFO)
     {
-        if(!mChannelInfo.isUndefined())
+        if(mChannelInfo.isDefined() && mChannelInfo.isMap())
         {
             setState(STATE_READY);
 
@@ -676,6 +689,7 @@ void LLVoiceChannelProximal::activate()
         // we're connected to a non-spatial channel, so disconnect.
         LLVoiceClient::getInstance()->leaveNonSpatialChannel();
     }
+
     LLVoiceClient::getInstance()->activateSpatialChannel(true);
     LLVoiceChannel::activate();
 

@@ -72,7 +72,8 @@ public:
     virtual void handleError(EStatusType status);
     virtual void deactivate();
     virtual void activate();
-    virtual void setChannelInfo(const LLSD &channelInfo);
+    virtual void setChannelInfo(const LLSD& channelInfo);
+    virtual void resetChannelInfo();
     virtual void requestChannelInfo();
     virtual bool isActive();
     virtual bool callStarted();
@@ -162,7 +163,7 @@ private:
     bool mIsP2P;
 };
 
-class LLVoiceChannelProximal final : public LLVoiceChannel, public LLSingleton<LLVoiceChannelProximal>
+class LLVoiceChannelProximal : public LLVoiceChannel, public LLSingleton<LLVoiceChannelProximal>
 {
     LLSINGLETON(LLVoiceChannelProximal);
   public:
@@ -175,7 +176,7 @@ class LLVoiceChannelProximal final : public LLVoiceChannel, public LLSingleton<L
     void deactivate() override;
 };
 
-class LLVoiceChannelP2P final : public LLVoiceChannelGroup
+class LLVoiceChannelP2P : public LLVoiceChannelGroup
 {
   public:
     LLVoiceChannelP2P(const LLUUID      &session_id,
@@ -189,6 +190,7 @@ class LLVoiceChannelP2P final : public LLVoiceChannelGroup
     void requestChannelInfo() override;
     void deactivate() override;
     void setChannelInfo(const LLSD& channel_info) override;
+    void resetChannelInfo() override;
 
   protected:
     void setState(EState state) override;

@@ -501,6 +501,18 @@ public:
 private:
     bool            mIsRejectFriendshipRequests;
 
+public:
+    void            setAutoRespond(bool pIsAutoRespond);
+    bool            getAutoRespond() const;
+private:
+    BOOL            mIsAutoRespond;
+
+public:
+    void            setAutoRespondNonFriends(bool pIsAutoRespondNonFriends);
+    bool            getAutoRespondNonFriends() const;
+private:
+    BOOL            mIsAutoRespondNonFriends;
+
     //--------------------------------------------------------------------
     // Grab
     //--------------------------------------------------------------------

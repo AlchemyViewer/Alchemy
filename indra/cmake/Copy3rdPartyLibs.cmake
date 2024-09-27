@@ -186,14 +186,6 @@ elseif(LINUX)
             ${EXPAT_COPY}
             )
 
-     if( USE_AUTOBUILD_3P )
-         list( APPEND release_files
-                 libjpeg.so
-                 libjpeg.so.8
-                 libjpeg.so.8.3.2
-                 )
-     endif()
-
     if (TARGET ll::fmodstudio)
       list(APPEND debug_files libfmodL.so)
       list(APPEND release_files libfmod.so)

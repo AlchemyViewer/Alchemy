@@ -37,6 +37,7 @@
 #include "llui.h"
 #include "llkeyboard.h"
 #include "llagent.h"
+#include "lltrans.h"
 
 const F32 LLVoiceClient::OVERDRIVEN_POWER_LEVEL = 0.7f;
 
@@ -46,7 +47,7 @@ const F32 LLVoiceClient::VOLUME_MAX = 1.0f;
 
 
 // Support for secondlife:///app/voice SLapps
-class LLVoiceHandler final : public LLCommandHandler
+class LLVoiceHandler : public LLCommandHandler
 {
 public:
     // requests will be throttled from a non-trusted browser
@@ -138,6 +139,7 @@ LLVoiceClient::LLVoiceClient(LLPumpIO *pump)
     m_servicePump(NULL),
     mVoiceEffectEnabled(LLCachedControl<bool>(gSavedSettings, "VoiceMorphingEnabled", true)),
     mVoiceEffectDefault(LLCachedControl<std::string>(gSavedPerAccountSettings, "VoiceEffectDefault", "00000000-0000-0000-0000-000000000000")),
+    mVoiceEffectSupportNotified(false),
     mPTTDirty(true),
     mPTT(true),
     mUsePTT(true),
@@ -253,8 +255,8 @@ void LLVoiceClient::setSpatialVoiceModule(const std::string &voice_server_type)
         if (inProximalChannel())
         {
             mSpatialVoiceModule->processChannels(false);
+            module->processChannels(true);
         }
-        module->processChannels(true);
         mSpatialVoiceModule = module;
         mSpatialVoiceModule->updateSettings();
     }
@@ -278,10 +280,8 @@ void LLVoiceClient::setNonSpatialVoiceModule(const std::string &voice_server_typ
 
 void LLVoiceClient::setHidden(bool hidden)
 {
-    if (mSpatialVoiceModule)
-    {
-        mSpatialVoiceModule->setHidden(hidden);
-    }
+    LLWebRTCVoiceClient::getInstance()->setHidden(hidden);
+    LLVivoxVoiceClient::getInstance()->setHidden(hidden);
 }
 
 void LLVoiceClient::terminate()
@@ -405,13 +405,13 @@ const LLVoiceDeviceList& LLVoiceClient::getRenderDevices()
 //--------------------------------------------------
 // participants
 
-void LLVoiceClient::getParticipantList(std::set<LLUUID> &participants)
+void LLVoiceClient::getParticipantList(std::set<LLUUID> &participants) const
 {
     LLWebRTCVoiceClient::getInstance()->getParticipantList(participants);
     LLVivoxVoiceClient::getInstance()->getParticipantList(participants);
 }
 
-bool LLVoiceClient::isParticipant(const LLUUID &speaker_id)
+bool LLVoiceClient::isParticipant(const LLUUID &speaker_id) const
 {
     return LLWebRTCVoiceClient::getInstance()->isParticipant(speaker_id) ||
            LLVivoxVoiceClient::getInstance()->isParticipant(speaker_id);
@@ -568,6 +568,26 @@ void LLVoiceClient::setMicGain(F32 gain)
 //------------------------------------------
 // enable/disable voice features
 
+// static
+bool LLVoiceClient::onVoiceEffectsNotSupported(const LLSD &notification, const LLSD &response)
+{
+    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    switch (option)
+    {
+        case 0:  // "Okay"
+            gSavedPerAccountSettings.setString("VoiceEffectDefault", LLUUID::null.asString());
+            break;
+
+        case 1:  // "Cancel"
+            break;
+
+        default:
+            llassert(0);
+            break;
+    }
+    return false;
+}
+
 bool LLVoiceClient::voiceEnabled()
 {
     static LLCachedControl<bool> enable_voice_chat(gSavedSettings, "EnableVoiceChat");
@@ -686,7 +706,7 @@ bool LLVoiceClient::getVoiceEnabled(const LLUUID& id)
     return isParticipant(id);
 }
 
-std::string LLVoiceClient::getDisplayName(const LLUUID& id)
+std::string LLVoiceClient::getDisplayName(const LLUUID& id) const
 {
     std::string result = LLWebRTCVoiceClient::getInstance()->getDisplayName(id);
     if (result.empty())
@@ -761,8 +781,14 @@ void LLVoiceClient::addObserver(LLVoiceClientStatusObserver* observer)
 
 void LLVoiceClient::removeObserver(LLVoiceClientStatusObserver* observer)
 {
-    LLVivoxVoiceClient::getInstance()->removeObserver(observer);
-    LLWebRTCVoiceClient::getInstance()->removeObserver(observer);
+    if (LLVivoxVoiceClient::instanceExists())
+    {
+        LLVivoxVoiceClient::getInstance()->removeObserver(observer);
+    }
+    if (LLWebRTCVoiceClient::instanceExists())
+    {
+        LLWebRTCVoiceClient::getInstance()->removeObserver(observer);
+    }
 }
 
 void LLVoiceClient::addObserver(LLFriendObserver* observer)
@@ -773,8 +799,14 @@ void LLVoiceClient::addObserver(LLFriendObserver* observer)
 
 void LLVoiceClient::removeObserver(LLFriendObserver* observer)
 {
-    LLVivoxVoiceClient::getInstance()->removeObserver(observer);
-    LLWebRTCVoiceClient::getInstance()->removeObserver(observer);
+    if (LLVivoxVoiceClient::instanceExists())
+    {
+        LLVivoxVoiceClient::getInstance()->removeObserver(observer);
+    }
+    if (LLWebRTCVoiceClient::instanceExists())
+    {
+        LLWebRTCVoiceClient::getInstance()->removeObserver(observer);
+    }
 }
 
 void LLVoiceClient::addObserver(LLVoiceClientParticipantObserver* observer)
@@ -785,11 +817,17 @@ void LLVoiceClient::addObserver(LLVoiceClientParticipantObserver* observer)
 
 void LLVoiceClient::removeObserver(LLVoiceClientParticipantObserver* observer)
 {
-    LLVivoxVoiceClient::getInstance()->removeObserver(observer);
-    LLWebRTCVoiceClient::getInstance()->removeObserver(observer);
+    if (LLVivoxVoiceClient::instanceExists())
+    {
+        LLVivoxVoiceClient::getInstance()->removeObserver(observer);
+    }
+    if (LLWebRTCVoiceClient::instanceExists())
+    {
+        LLWebRTCVoiceClient::getInstance()->removeObserver(observer);
+    }
 }
 
-std::string LLVoiceClient::sipURIFromID(const LLUUID &id)
+std::string LLVoiceClient::sipURIFromID(const LLUUID &id) const
 {
     if (mNonSpatialVoiceModule)
     {
@@ -813,7 +851,7 @@ LLVoiceEffectInterface* LLVoiceClient::getVoiceEffectInterface() const
 ///////////////////
 // version checking
 
-class LLViewerRequiredVoiceVersion final : public LLHTTPNode
+class LLViewerRequiredVoiceVersion : public LLHTTPNode
 {
     static bool sAlertedUser;
     virtual void post(
@@ -865,7 +903,7 @@ class LLViewerRequiredVoiceVersion final : public LLHTTPNode
     }
 };
 
-class LLViewerParcelVoiceInfo final : public LLHTTPNode
+class LLViewerParcelVoiceInfo : public LLHTTPNode
 {
     virtual void post(
                       LLHTTPNode::ResponsePtr response,

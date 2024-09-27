@@ -107,7 +107,7 @@
 		<combo_box.item label="太陽／月" name="1"/>
 		<combo_box.item label="太陽／月＋プロジェクタ" name="2"/>
 	</combo_box>
-	<check_box label="スクリーンスペースの反射" name="ScreenSpaceReflections"/>
+	<check_box label="スクリーンスペースリフレクション" name="ScreenSpaceReflections"/>
 	<text name="ReflectionDetailText">
 		反射の詳細：
 	</text>

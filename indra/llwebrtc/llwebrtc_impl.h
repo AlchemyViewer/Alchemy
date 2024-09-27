@@ -41,6 +41,7 @@
 #include "llwebrtc.h"
 // WebRTC Includes
 #ifdef WEBRTC_WIN
+#pragma warning(push)
 #pragma warning(disable : 4996) // ignore 'deprecated.'  We don't use the functions marked
                                 // deprecated in the webrtc headers, but msvc complains anyway.
                                 // Clang doesn't, and that's generally what webrtc uses.
@@ -63,12 +64,59 @@
 #include "api/task_queue/default_task_queue_factory.h"
 #include "modules/audio_device/include/audio_device_defines.h"
 
-
 namespace llwebrtc
 {
 
 class LLWebRTCPeerConnectionImpl;
 
+class LLWebRTCLogSink : public rtc::LogSink {
+public:
+    LLWebRTCLogSink(LLWebRTCLogCallback* callback) :
+    mCallback(callback)
+    {
+    }
+
+    // Destructor: close the log file
+    ~LLWebRTCLogSink() override
+    {
+    }
+
+    void OnLogMessage(const std::string& msg,
+                      rtc::LoggingSeverity severity) override
+    {
+        if (mCallback)
+        {
+            switch(severity)
+            {
+                case rtc::LS_VERBOSE:
+                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                    break;
+                case rtc::LS_INFO:
+                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                    break;
+                case rtc::LS_WARNING:
+                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                    break;
+                case rtc::LS_ERROR:
+                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    void OnLogMessage(const std::string& message) override
+    {
+        if (mCallback)
+        {
+            mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, message);
+        }
+    }
+
+private:
+    LLWebRTCLogCallback* mCallback;
+};
 
 // Implements a class allowing capture of audio data
 // to determine audio level of the microphone.
@@ -121,6 +169,8 @@ class LLCustomProcessor : public webrtc::CustomProcessing
 
     float getMicrophoneEnergy() { return mMicrophoneEnergy; }
 
+    void setGain(float gain) { mGain = gain; }
+
   protected:
     static const int NUM_PACKETS_TO_FILTER = 30;  // 300 ms of smoothing
     int              mSampleRateHz;
@@ -128,6 +178,7 @@ class LLCustomProcessor : public webrtc::CustomProcessing
 
     float mSumVector[NUM_PACKETS_TO_FILTER];
     float mMicrophoneEnergy;
+    float mGain;
 };
 
 
@@ -136,8 +187,11 @@ class LLCustomProcessor : public webrtc::CustomProcessing
 class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceSink
 {
   public:
-    LLWebRTCImpl();
-    ~LLWebRTCImpl() {}
+    LLWebRTCImpl(LLWebRTCLogCallback* logCallback);
+    ~LLWebRTCImpl()
+    {
+        delete mLogSink;
+    }
 
     void init();
     void terminate();
@@ -159,6 +213,8 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceS
     void setTuningMode(bool enable) override;
     float getTuningAudioLevel() override;
     float getPeerConnectionAudioLevel() override;
+
+    void setPeerConnectionGain(float gain) override;
 
     //
     // AudioDeviceSink
@@ -222,7 +278,11 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceS
     // enables/disables capture via the capture device
     void setRecording(bool recording);
 
+    void setPlayout(bool playing);
+
   protected:
+    LLWebRTCLogSink*                                           mLogSink;
+
     // The native webrtc threads
     std::unique_ptr<rtc::Thread>                               mNetworkThread;
     std::unique_ptr<rtc::Thread>                               mWorkerThread;
@@ -373,5 +433,9 @@ class LLWebRTCPeerConnectionImpl : public LLWebRTCPeerConnectionInterface,
 };
 
 }
+
+#if WEBRTC_WIN
+#pragma warning(pop)
+#endif
 
 #endif // LLWEBRTC_IMPL_H

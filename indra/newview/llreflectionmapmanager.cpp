@@ -80,6 +80,8 @@ void load_exr(const std::string& filename)
         gGL.getTexUnit(0)->bind(gEXRImage);
 
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_FLOAT, out);
+
+
         free(out); // release memory of image data
 
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -220,8 +222,28 @@ void LLReflectionMapManager::update()
 
     initReflectionMaps();
 
+    if (!mRenderTarget.isComplete())
+    {
+        U32 color_fmt = GL_RGB16F;
+        U32 targetRes = mProbeResolution * 4; // super sample
+        mRenderTarget.allocate(targetRes, targetRes, color_fmt, true);
+    }
+
+    if (mMipChain.empty())
+    {
+        U32 res = mProbeResolution;
+        U32 count = (U32)(log2((F32)res) + 0.5f);
+
+        mMipChain.resize(count);
+        for (U32 i = 0; i < count; ++i)
+        {
+            mMipChain[i].allocate(res, res, GL_RGB16F);
+            res /= 2;
+        }
+    }
+
     llassert(mProbes[0] == mDefaultProbe);
-    
+
     LLVector4a camera_pos;
     camera_pos.load3(LLViewerCamera::instance().getOrigin().mV);
 
@@ -231,7 +253,7 @@ void LLReflectionMapManager::update()
         auto const & iter = std::find(mProbes.begin(), mProbes.end(), probe);
         if (iter != mProbes.end())
         {
-            deleteProbe(iter - mProbes.begin());
+            deleteProbe((U32)(iter - mProbes.begin()));
         }
     }
 
@@ -740,7 +762,7 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
         }
 
 
-        S32 mips = log2((F32)mProbeResolution) + 0.5f;
+        S32 mips = (S32)(log2((F32)mProbeResolution) + 0.5f);
 
         gReflectionMipProgram.bind();
         S32 diffuseChannel = gReflectionMipProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, LLTexUnit::TT_TEXTURE);
@@ -818,7 +840,7 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
                 static LLStaticHashedString sWidth("u_width");
 
                 gRadianceGenProgram.uniform1f(sRoughness, (F32)i / (F32)(mMipChain.size() - 1));
-                gRadianceGenProgram.uniform1f(sMipLevel, i);
+                gRadianceGenProgram.uniform1f(sMipLevel, (GLfloat)i);
                 gRadianceGenProgram.uniform1i(sWidth, mProbeResolution);
 
                 for (int cf = 0; cf < 6; ++cf)
@@ -1349,18 +1371,22 @@ void LLReflectionMapManager::initReflectionMaps()
 {
     U32 count = LL_MAX_REFLECTION_PROBE_COUNT;
 
-    static LLCachedControl<U32> probe_res_cc(gSavedSettings, "RenderReflectionProbeResolution", 128);
-    U32 probe_resolution = nhpo2(llclamp(probe_res_cc(), (U32)64, (U32)512));
-    bool probe_resolution_changed = mProbeResolution != probe_resolution;
-
-    if (mTexture.isNull() || mReflectionProbeCount != count || probe_resolution_changed || mReset)
+    static LLCachedControl<U32> ref_probe_res(gSavedSettings, "RenderReflectionProbeResolution", 128U);
+    U32 probe_resolution = nhpo2(llclamp(ref_probe_res(), (U32)64, (U32)512));
+    if (mTexture.isNull() || mReflectionProbeCount != count || mProbeResolution != probe_resolution || mReset)
     {
+        if(mProbeResolution != probe_resolution)
+        {
+            mRenderTarget.release();
+            mMipChain.clear();
+        }
+
         gEXRImage = nullptr;
 
         mReset = false;
         mReflectionProbeCount = count;
         mProbeResolution = probe_resolution;
-        mMaxProbeLOD = log2f(mProbeResolution) - 1.f; // number of mips - 1
+        mMaxProbeLOD = log2f((F32)mProbeResolution) - 1.f; // number of mips - 1
 
         if (mTexture.isNull() ||
             mTexture->getWidth() != mProbeResolution ||

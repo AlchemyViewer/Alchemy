@@ -430,8 +430,8 @@ void startConferenceCoro(std::string url,
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ConferenceChatStart", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ConferenceChatStart", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
 
     LLSD postData;
     postData["method"] = "start conference";
@@ -519,8 +519,8 @@ void chatterBoxInvitationCoro(std::string url, LLUUID sessionId, LLIMMgr::EInvit
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter(std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("ConferenceInviteStart", httpPolicy));
-    LLCore::HttpRequest::ptr_t httpRequest(std::make_shared<LLCore::HttpRequest>());
+        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("ConferenceInviteStart", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
 
     LLSD postData;
     postData["method"] = "accept invitation";
@@ -1021,7 +1021,7 @@ void LLIMModel::LLIMSession::addMessage(const std::string& from,
                                         const std::string& time,
                                         const bool is_history,  // comes from a history file or chat server
                                         const bool is_region_msg,
-                                        const U32 timestamp) // may be zero
+                                        const U32 timestamp)   // may be zero
 {
     LLSD message;
     message["from"] = from;
@@ -2668,6 +2668,7 @@ void LLOutgoingCallDialog::show(const LLSD& key)
     if (!mPayload["old_channel_name"].asString().empty())
     {
         std::string old_caller_name = mPayload["old_channel_name"].asString();
+
         getChild<LLUICtrl>("leaving")->setTextArg("[CURRENT_CHAT]", old_caller_name);
         show_oldchannel = true;
     }
@@ -2692,6 +2693,7 @@ void LLOutgoingCallDialog::show(const LLSD& key)
     }
 
     std::string callee_name = mPayload["session_name"].asString();
+
     if (callee_name == "anonymous") // obsolete? Likely was part of avaline support
     {
         callee_name = getString("anonymous");
@@ -3078,13 +3080,16 @@ void LLIncomingCallDialog::processCallResponse(S32 response, const LLSD &payload
 
             gIMMgr->addSession(correct_session_name, type, session_id, payload["voice_channel_info"]);
 
-            std::string url = gAgent.getRegion()->getCapability(
+            std::string url = gAgent.getRegionCapability(
                 "ChatSessionRequest");
 
             if (voice)
             {
-                LLCoros::instance().launch("chatterBoxInvitationCoro",
-                                           boost::bind(&chatterBoxInvitationCoro, url, session_id, inv_type, payload["voice_channel_info"]));
+                if(!url.empty())
+                {
+                    LLCoros::instance().launch("chatterBoxInvitationCoro",
+                        boost::bind(&chatterBoxInvitationCoro, url, session_id, inv_type, payload["voice_channel_info"]));
+                }
 
                 // send notification message to the corresponding chat
                 if (payload["notify_box_type"].asString() == "VoiceInviteGroup" || payload["notify_box_type"].asString() == "VoiceInviteAdHoc")
@@ -3344,9 +3349,9 @@ void LLIMMgr::addSystemMessage(const LLUUID& session_id, const std::string& mess
 S32 LLIMMgr::getNumberOfUnreadIM()
 {
     S32 num = 0;
-    for (const auto& session_pair : LLIMModel::getInstance()->mId2SessionMap)
+    for(auto it = LLIMModel::getInstance()->mId2SessionMap.begin(); it != LLIMModel::getInstance()->mId2SessionMap.end(); ++it)
     {
-        num += session_pair.second->mNumUnread;
+        num += (*it).second->mNumUnread;
     }
 
     return num;
@@ -3355,9 +3360,9 @@ S32 LLIMMgr::getNumberOfUnreadIM()
 S32 LLIMMgr::getNumberOfUnreadParticipantMessages()
 {
     S32 num = 0;
-    for(const auto& session_pair : LLIMModel::getInstance()->mId2SessionMap)
+    for(auto it = LLIMModel::getInstance()->mId2SessionMap.begin(); it != LLIMModel::getInstance()->mId2SessionMap.end(); ++it)
     {
-        num += session_pair.second->mParticipantUnreadMessageCount;
+        num += (*it).second->mParticipantUnreadMessageCount;
     }
 
     return num;
@@ -3447,11 +3452,11 @@ LLUUID LLIMMgr::addSession(
         ((IM_NOTHING_SPECIAL == dialog) || (IM_SESSION_P2P_INVITE == dialog) || (IM_SESSION_CONFERENCE_START == dialog)) &&
         ids.size())
     {
-        LLIMModel::LLIMSession* ad_hoc_found = LLIMModel::getInstance()->findAdHocIMSession(ids);
-        if (ad_hoc_found)
+        session = LLIMModel::getInstance()->findAdHocIMSession(ids);
+        if (session)
         {
             new_session = false;
-            session_id = ad_hoc_found->mSessionID;
+            session_id = session->mSessionID;
         }
     }
 
@@ -3538,7 +3543,6 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
 // [/SL:KB]
 #else
     LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
-#endif
     gIMMgr->removeSession(session_id);
     return true;
 }
@@ -3867,16 +3871,24 @@ void LLIMMgr::addPendingAgentListUpdates(
     {
         //new school update
         LLSD update_types = LLSD::emptyArray();
+        LLSD::array_iterator array_iter;
+
         update_types.append("agent_updates");
         update_types.append("updates");
 
-        for (const auto& update_type : update_types.asArray())
+        for (
+            array_iter = update_types.beginArray();
+            array_iter != update_types.endArray();
+            ++array_iter)
         {
             //we only want to include the last update for a given agent
-            for (const auto& update_pair : updates[update_type.asString()].asMap())
+            for (
+                iter = updates[array_iter->asString()].beginMap();
+                iter != updates[array_iter->asString()].endMap();
+                ++iter)
             {
-                mPendingAgentListUpdates[session_id.asString()][update_type.asString()][update_pair.first] =
-                    update_pair.second;
+                mPendingAgentListUpdates[session_id.asString()][array_iter->asString()][iter->first] =
+                    iter->second;
             }
         }
     }
@@ -3888,10 +3900,13 @@ void LLIMMgr::addPendingAgentListUpdates(
         //of agent_id -> "LEAVE"/"ENTER"
 
         //only want to keep last update for each agent
-        for (const auto& update_pair : updates["updates"].asMap())
+        for (
+            iter = updates["updates"].beginMap();
+            iter != updates["updates"].endMap();
+            ++iter)
         {
-            mPendingAgentListUpdates[session_id.asString()]["updates"][update_pair.first] =
-                update_pair.second;
+            mPendingAgentListUpdates[session_id.asString()]["updates"][iter->first] =
+                iter->second;
         }
     }
 }
@@ -3959,9 +3974,14 @@ bool LLIMMgr::startCall(const LLUUID& session_id, LLVoiceChannel::EDirection dir
 {
     LLVoiceChannel* voice_channel = LLIMModel::getInstance()->getVoiceChannel(session_id);
     if (!voice_channel) return false;
-    if (!voice_channel_info.isUndefined())
+    if (voice_channel_info.isDefined() && voice_channel_info.isMap() && voice_channel_info.size() > 0)
     {
         voice_channel->setChannelInfo(voice_channel_info);
+    }
+    else if (voice_channel->getState() < LLVoiceChannel::STATE_READY)
+    {
+        // restart if there wa an error or it was hang up
+        voice_channel->resetChannelInfo();
     }
     voice_channel->setCallDirection(direction);
     voice_channel->activate();
@@ -4169,8 +4189,11 @@ public:
                     if (gSavedPerAccountSettings.getBOOL("FetchGroupChatHistory"))
                     {
                         std::string url = gAgent.getRegionCapability("ChatSessionRequest");
-                        LLCoros::instance().launch("chatterBoxHistoryCoro",
-                            boost::bind(&chatterBoxHistoryCoro, url, session_id, "", "", 0));
+                        if (!url.empty())
+                        {
+                            LLCoros::instance().launch("chatterBoxHistoryCoro",
+                                boost::bind(&chatterBoxHistoryCoro, url, session_id, "", "", 0));
+                        }
                     }
                 }
             }

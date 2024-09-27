@@ -94,6 +94,8 @@ vec2 terrain_texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform)
 // Take the rotation only from both transforms and apply to the tangent. This
 // accounts for the change of the topology of the normal texture when a texture
 // rotation is applied to it.
+// In practice, this applies the inverse of the texture transform to the tangent.
+// It is effectively an inverse of the rotation
 // *HACK: Assume the imported GLTF model did not have both normal texture
 // transforms and tangent vertices. The use of this function is inconsistent
 // with the GLTF sample viewer when that is the case. See getNormalInfo in

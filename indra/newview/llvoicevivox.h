@@ -89,6 +89,8 @@ public:
     // Returns true if vivox has successfully logged in and is not in error state
     bool isVoiceWorking() const override;
 
+    void setHidden(bool hidden) override;  // virtual
+
     /////////////////////
     /// @name Tuning
     //@{
@@ -221,7 +223,8 @@ public:
     void removeObserver(LLVoiceClientParticipantObserver* observer) override;
     //@}
 
-    std::string sipURIFromID(const LLUUID &id) override;
+    std::string sipURIFromID(const LLUUID &id) const override;
+    LLSD getP2PChannelInfoTemplate(const LLUUID& id) const override;
     //@}
 
     /// @name LLVoiceEffectInterface virtual implementations
@@ -541,8 +544,8 @@ protected:
     sessionStatePtr_t findSession(const LLUUID &participant_id);
 
     sessionStatePtr_t addSession(const std::string &uri, const std::string &handle = std::string());
-    void clearSessionHandle(const sessionStatePtr_t session);
-    void setSessionHandle(const sessionStatePtr_t session, const std::string &handle);
+    void clearSessionHandle(const sessionStatePtr_t &session);
+    void setSessionHandle(const sessionStatePtr_t &session, const std::string &handle);
     void setSessionURI(const sessionStatePtr_t &session, const std::string &uri);
     void deleteSession(const sessionStatePtr_t session);
     void deleteAllSessions(void);
@@ -710,7 +713,6 @@ private:
 
     std::string mChannelName;           // Name of the channel to be looked up
     sessionStatePtr_t mAudioSession;        // Session state for the current audio session
-    bool mAudioSessionChanged;          // set to true when the above pointer gets changed, so observers can be notified.
 
     sessionStatePtr_t mNextAudioSession;    // Session state for the audio session we're trying to join
 
@@ -755,16 +757,15 @@ private:
     std::string nameFromID(const LLUUID &id);
     bool IDFromName(const std::string& name, LLUUID &uuid);
     std::string sipURIFromAvatar(LLVOAvatar *avatar);
-    std::string sipURIFromName(std::string_view name);
+    std::string sipURIFromName(std::string &name);
 
     // Returns the name portion of the SIP URI if the string looks vaguely like a SIP URI, or an empty string if not.
-    std::string nameFromsipURI(std::string_view uri);
+    std::string nameFromsipURI(const std::string &uri);
 
     bool inSpatialChannel(void);
     LLSD getAudioSessionChannelInfo();
     std::string getAudioSessionHandle();
 
-    void setHidden(bool hidden) override; //virtual
     void sendPositionAndVolumeUpdate(void);
 
     void sendCaptureAndRenderDevices();
@@ -883,7 +884,6 @@ private:
         bool        mIsNew;
 
         LLFrameTimer    mExpiryTimer;
-        LLFrameTimer    mExpiryWarningTimer;
     };
 
     bool mVoiceFontsReceived;
