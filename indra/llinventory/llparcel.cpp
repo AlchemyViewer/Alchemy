@@ -135,6 +135,12 @@ LLParcel::LLParcel(const LLUUID &owner_id,
 }
 
 
+// virtual
+LLParcel::~LLParcel()
+{
+    // user list cleaned up by std::vector destructor.
+}
+
 void LLParcel::init(const LLUUID &owner_id,
                     bool modify, bool terraform, bool damage,
                     time_t claim_date, S32 claim_price_per_meter,
@@ -574,7 +580,7 @@ void LLParcel::unpackMessage(LLMessageSystem* msg)
     setHaveNewParcelLimitData(have_new_parcel_limit_data);
 
     // non-optimized version
-    msg->getU8Fast (_PREHASH_ParcelData, _PREHASH_MediaAutoScale, mMediaAutoScale );
+    msg->getU8Fast(_PREHASH_ParcelData, _PREHASH_MediaAutoScale, mMediaAutoScale );
 
     msg->getUUIDFast( _PREHASH_ParcelData,_PREHASH_MediaID, mMediaID );
     msg->getUUIDFast( _PREHASH_ParcelData,_PREHASH_GroupID, mGroupID );

@@ -173,7 +173,7 @@ const std::string &LLInventoryType::lookup(EType type)
 }
 
 // static
-LLInventoryType::EType LLInventoryType::lookup(const std::string_view name)
+LLInventoryType::EType LLInventoryType::lookup(const std::string& name)
 {
     return LLInventoryDictionary::getInstance()->lookup(name);
 }

@@ -45,7 +45,7 @@ public:
     // for calling back interested parties when a region handle comes back.
     typedef boost::function<void(const LLUUID& region_id, const U64& region_handle)> region_handle_callback_t;
 
-    ~LLLandmark() = default;
+    ~LLLandmark() {}
 
     // returns true if the position is known.
     bool getGlobalPos(LLVector3d& pos);

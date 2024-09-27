@@ -93,6 +93,10 @@ LLInventoryObject::LLInventoryObject()
 {
 }
 
+LLInventoryObject::~LLInventoryObject()
+{
+}
+
 void LLInventoryObject::copyObject(const LLInventoryObject* other)
 {
     mUUID = other->mUUID;
@@ -367,6 +371,10 @@ LLInventoryItem::LLInventoryItem(const LLInventoryItem* other) :
     LLInventoryObject()
 {
     copyItem(other);
+}
+
+LLInventoryItem::~LLInventoryItem()
+{
 }
 
 // virtual
@@ -1134,6 +1142,10 @@ LLInventoryCategory::LLInventoryCategory(const LLInventoryCategory* other) :
     copyCategory(other);
 }
 
+LLInventoryCategory::~LLInventoryCategory()
+{
+}
+
 // virtual
 void LLInventoryCategory::copyCategory(const LLInventoryCategory* other)
 {
@@ -1184,10 +1196,6 @@ LLSD LLInventoryCategory::asAISCreateCatLLSD() const
     return sd;
 }
 
-bool LLInventoryCategory::isPreferredTypeRoot() const
-{
-    return (mPreferredType == LLFolderType::FT_ROOT_INVENTORY || mPreferredType == 9);
-}
 
 // virtual
 void LLInventoryCategory::packMessage(LLMessageSystem* msg) const
@@ -1201,63 +1209,57 @@ void LLInventoryCategory::packMessage(LLMessageSystem* msg) const
 
 bool LLInventoryCategory::fromLLSD(const LLSD& sd)
 {
+    std::string w;
+
+    w = INV_FOLDER_ID_LABEL_WS;
+    if (sd.has(w))
+    {
+        mUUID = sd[w];
+    }
+    w = INV_PARENT_ID_LABEL;
+    if (sd.has(w))
+    {
+        mParentUUID = sd[w];
+    }
     mThumbnailUUID.setNull();
-
-    const auto& sdMap = sd.asMap();
-    auto itEnd = sdMap.end();
-
-    auto it = sdMap.find(INV_FOLDER_ID_LABEL_WS);
-    if (it != itEnd)
+    w = INV_THUMBNAIL_LABEL;
+    if (sd.has(w))
     {
-        mUUID = it->second;
-    }
-
-    it = sdMap.find(INV_PARENT_ID_LABEL);
-    if (it != itEnd)
-    {
-        mParentUUID = it->second;
-    }
-
-    it = sdMap.find(INV_THUMBNAIL_LABEL);
-    if (it != itEnd)
-    {
-        const LLSD& thumbnail_map = it->second;
-        if (thumbnail_map.has(INV_ASSET_ID_LABEL))
+        const LLSD &thumbnail_map = sd[w];
+        w = INV_ASSET_ID_LABEL;
+        if (thumbnail_map.has(w))
         {
-            mThumbnailUUID = thumbnail_map[INV_ASSET_ID_LABEL];
+            mThumbnailUUID = thumbnail_map[w];
         }
     }
     else
     {
-        it = sdMap.find(INV_THUMBNAIL_ID_LABEL);
-        if (it != itEnd)
+        w = INV_THUMBNAIL_ID_LABEL;
+        if (sd.has(w))
         {
-            mThumbnailUUID = it->second;
+            mThumbnailUUID = sd[w];
         }
     }
-
-    it = sdMap.find(INV_ASSET_TYPE_LABEL);
-    if (it != itEnd)
+    w = INV_ASSET_TYPE_LABEL;
+    if (sd.has(w))
     {
-        S8 type = (U8)it->second.asInteger();
+        S8 type = (U8)sd[w].asInteger();
+        mPreferredType = static_cast<LLFolderType::EType>(type);
+    }
+    w = INV_ASSET_TYPE_LABEL_WS;
+    if (sd.has(w))
+    {
+        S8 type = (U8)sd[w].asInteger();
         mPreferredType = static_cast<LLFolderType::EType>(type);
     }
 
-    it = sdMap.find(INV_ASSET_TYPE_LABEL_WS);
-    if (it != itEnd)
+    w = INV_NAME_LABEL;
+    if (sd.has(w))
     {
-        S8 type = (U8)it->second.asInteger();
-        mPreferredType = static_cast<LLFolderType::EType>(type);
-    }
-
-    it = sdMap.find(INV_NAME_LABEL);
-    if (it != itEnd)
-    {
-        mName = it->second.asString();
+        mName = sd[w].asString();
         LLStringUtil::replaceNonstandardASCII(mName, ' ');
         LLStringUtil::replaceChar(mName, '|', ' ');
     }
-
     return true;
 }
 
@@ -1413,44 +1415,35 @@ LLSD LLInventoryCategory::exportLLSD() const
 
 bool LLInventoryCategory::importLLSD(const LLSD& cat_data)
 {
-    const auto& sdMap = cat_data.asMap();
-    auto itEnd = sdMap.end();
-
-    auto it = sdMap.find(INV_FOLDER_ID_LABEL);
-    if (it != itEnd)
+    if (cat_data.has(INV_FOLDER_ID_LABEL))
     {
-        setUUID(it->second.asUUID());
+        setUUID(cat_data[INV_FOLDER_ID_LABEL].asUUID());
     }
-    it = sdMap.find(INV_PARENT_ID_LABEL);
-    if (it != itEnd)
+    if (cat_data.has(INV_PARENT_ID_LABEL))
     {
-        setParent(it->second.asUUID());
+        setParent(cat_data[INV_PARENT_ID_LABEL].asUUID());
     }
-    it = sdMap.find(INV_ASSET_TYPE_LABEL);
-    if (it != itEnd)
+    if (cat_data.has(INV_ASSET_TYPE_LABEL))
     {
-        setType(LLAssetType::lookup(it->second.asString()));
+        setType(LLAssetType::lookup(cat_data[INV_ASSET_TYPE_LABEL].asString()));
     }
-    it = sdMap.find(INV_PREFERRED_TYPE_LABEL);
-    if (it != itEnd)
+    if (cat_data.has(INV_PREFERRED_TYPE_LABEL))
     {
-        setPreferredType(LLFolderType::lookup(it->second.asString()));
+        setPreferredType(LLFolderType::lookup(cat_data[INV_PREFERRED_TYPE_LABEL].asString()));
     }
-    it = sdMap.find(INV_THUMBNAIL_LABEL);
-    if (it != itEnd)
+    if (cat_data.has(INV_THUMBNAIL_LABEL))
     {
         LLUUID thumbnail_uuid;
-        const LLSD& thumbnail_data = it->second;
+        const LLSD &thumbnail_data = cat_data[INV_THUMBNAIL_LABEL];
         if (thumbnail_data.has(INV_ASSET_ID_LABEL))
         {
             thumbnail_uuid = thumbnail_data[INV_ASSET_ID_LABEL].asUUID();
         }
         setThumbnailUUID(thumbnail_uuid);
     }
-    it = sdMap.find(INV_NAME_LABEL);
-    if (it != itEnd)
+    if (cat_data.has(INV_NAME_LABEL))
     {
-        mName = it->second.asString();
+        mName = cat_data[INV_NAME_LABEL].asString();
         LLStringUtil::replaceNonstandardASCII(mName, ' ');
         LLStringUtil::replaceChar(mName, '|', ' ');
     }

@@ -124,17 +124,14 @@ LLFolderDictionary::LLFolderDictionary()
     addEntry(LLFolderType::FT_SETTINGS,             new FolderEntry("settings", true, false, true));
     addEntry(LLFolderType::FT_MATERIAL,             new FolderEntry("material", true, false, true));
 
-    addEntry(LLFolderType::FT_SUITCASE,             new FolderEntry("suitcase", true, false, false));
     addEntry(LLFolderType::FT_ANIM_OVERRIDES,       new FolderEntry("animover", true, false, false));
-
     addEntry(LLFolderType::FT_RLV,                  new FolderEntry("rlv",      true, false, false));
-    addEntry(LLFolderType::FT_LOCAL,                new FolderEntry("local",    true, false, false));
 
     addEntry(LLFolderType::FT_NONE,                 new FolderEntry("-1",       false, false, false));
 };
 
 // static
-LLFolderType::EType LLFolderType::lookup(const std::string_view name)
+LLFolderType::EType LLFolderType::lookup(const std::string& name)
 {
     return LLFolderDictionary::getInstance()->lookup(name);
 }

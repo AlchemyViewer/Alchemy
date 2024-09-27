@@ -2127,13 +2127,6 @@ bool idle_startup()
         LLLandmark::registerCallbacks(msg);
         display_startup();
 
-        if (gSavedSettings.getBOOL("LocalInventoryEnabled"))
-        {
-            gInventory.createNewCategory(LLUUID::null,
-                                                           LLFolderType::FT_LOCAL,
-                                                           LOCAL_INVENTORY_FOLDER_NAME,
-                [](const LLUUID& new_local_id) {gLocalInventory = new_local_id; });
-        }
         // Create the inventory views
         LL_INFOS() << "Creating Inventory Views" << LL_ENDL;
         LLFloaterReg::getInstance("inventory");

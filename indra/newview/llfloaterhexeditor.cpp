@@ -261,12 +261,6 @@ void LLFloaterHexEditor::assetCallback(const LLUUID& asset_uuid,
             break;
         }
     }
-
-    // Never enable save if it's a local inventory item
-    if(gInventory.isObjectDescendentOf(item->getUUID(), gLocalInventory))
-    {
-        self->childSetEnabled("save_btn", false);
-    }
 }
 
 void LLFloaterHexEditor::onClickUpload()

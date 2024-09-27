@@ -556,8 +556,6 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
             move_ids.push_back(item->getUUID());
             --update[item->getParentUUID()];
             ++update[trash_id];
-            if(!gInventory.isObjectDescendentOf(item->getUUID(), gLocalInventory))
-            {
             if(start_new_message)
             {
                 start_new_message = false;
@@ -577,7 +575,6 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
                 gAgent.sendReliableMessage();
                 gInventory.accountForUpdate(update);
                 update.clear();
-            }
             }
         }
     }
@@ -600,8 +597,6 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
             move_ids.push_back(cat->getUUID());
             --update[cat->getParentUUID()];
             ++update[trash_id];
-            if(!gInventory.isObjectDescendentOf(cat->getUUID(), gLocalInventory))
-            {
             if(start_new_message)
             {
                 start_new_message = false;
@@ -621,7 +616,6 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
                 gInventory.accountForUpdate(update);
                 update.clear();
             }
-            }
         }
     }
     if(!start_new_message)
@@ -635,42 +629,11 @@ void  LLInvFVBridge::removeBatchNoCheck(std::vector<LLFolderViewModelItem*>&  ba
     uuid_vec_t::iterator end = move_ids.end();
     for(; it != end; ++it)
     {
-        if(gInventory.isObjectDescendentOf(*it, gLocalInventory))
-        {
-            // if it's a category, delete descendents
-            if(gInventory.getCategory(*it))
-            {
-                LLViewerInventoryCategory* cat = gInventory.getCategory(*it);
-                cat->setDescendentCount(0);
-                LLInventoryModel::cat_array_t categories;
-                LLInventoryModel::item_array_t items;
-                gInventory.collectDescendents(cat->getUUID(),
-                                   categories,
-                                   items,
-                                   false); // include trash?
-                size_t count = items.size();
-                size_t i;
-                for(i = 0; i < count; ++i)
-                {
-                    gInventory.deleteObject(items.at(i)->getUUID());
-                }
-                count = categories.size();
-                for(i = 0; i < count; ++i)
-                {
-                    gInventory.deleteObject(categories.at(i)->getUUID());
-                }
-            }
-            // delete it
-            gInventory.deleteObject(*it);
-        }
-        else
-        {
         gInventory.moveObject((*it), trash_id);
         LLViewerInventoryItem* item = gInventory.getItem(*it);
         if (item)
         {
             model->updateItem(item);
-        }
         }
     }
 
@@ -2039,7 +2002,7 @@ void copy_slurl_to_clipboard_callback_inv(const std::string& slurl)
 void LLItemBridge::selectItem()
 {
     LLViewerInventoryItem* item = static_cast<LLViewerInventoryItem*>(getItem());
-    if(item && !item->isFinished() && !(gInventory.isObjectDescendentOf(mUUID, gLocalInventory)))
+    if(item && !item->isFinished())
     {
         //item->fetchFromServer();
         LLInventoryModelBackgroundFetch::instance().start(item->getUUID(), false);
@@ -2327,17 +2290,6 @@ bool LLItemBridge::removeItem()
     }
     // Already in trash
     if (model->isObjectDescendentOf(mUUID, trash_id)) return false;
-    else
-    {
-        if(gInventory.isObjectDescendentOf(mUUID, gLocalInventory))
-        {
-            LLInventoryModel::LLCategoryUpdate up(item->getParentUUID(), -1);
-            gInventory.deleteObject(mUUID);
-            gInventory.accountForUpdate(up);
-            gInventory.notifyObservers();
-            return true;
-        }
-    }
 
     LLNotification::Params params("ConfirmItemDeleteHasLinks");
     params.functor.function(boost::bind(&LLItemBridge::confirmRemoveItem, this, _1, _2));
@@ -2663,7 +2615,7 @@ bool LLFolderBridge::isUpToDate() const
         return false;
     }
 
-    return (category->getVersion() != LLViewerInventoryCategory::VERSION_UNKNOWN) || (mUUID == gLocalInventory) || (gInventory.isObjectDescendentOf(mUUID, gLocalInventory));
+    return category->getVersion() != LLViewerInventoryCategory::VERSION_UNKNOWN;
 }
 
 bool LLFolderBridge::isItemCopyable(bool can_copy_as_link) const
@@ -4736,10 +4688,6 @@ void LLFolderBridge::buildContextMenuOptions(U32 flags, menuentry_vec_t&   items
         {
             // it's all on its way - add an observer, and the inventory will call done for us when everything is here.
             gInventory.addObserver(fetch);
-        }
-        if (mUUID == gLocalInventory)
-        {
-            items.clear();
         }
     }
 }

@@ -61,7 +61,7 @@ public:
                       const std::string& name);
     void copyObject(const LLInventoryObject* other); // LLRefCount requires custom copy
 protected:
-    virtual ~LLInventoryObject() = default;
+    virtual ~LLInventoryObject();
 
     //--------------------------------------------------------------------
     // Accessors
@@ -149,7 +149,7 @@ public:
     virtual void copyItem(const LLInventoryItem* other); // LLRefCount requires custom copy
     void generateUUID() { mUUID.generate(); }
 protected:
-    ~LLInventoryItem() = default; // ref counted
+    ~LLInventoryItem(); // ref counted
 
     //--------------------------------------------------------------------
     // Accessors
@@ -244,7 +244,7 @@ public:
     LLInventoryCategory(const LLInventoryCategory* other);
     void copyCategory(const LLInventoryCategory* other); // LLRefCount requires custom copy
 protected:
-    virtual ~LLInventoryCategory() = default;
+    virtual ~LLInventoryCategory();
 
     //--------------------------------------------------------------------
     // Accessors And Mutators
@@ -255,7 +255,6 @@ public:
     LLSD asLLSD() const;
     LLSD asAISCreateCatLLSD() const;
     bool fromLLSD(const LLSD& sd);
-    bool isPreferredTypeRoot() const;
 
     //--------------------------------------------------------------------
     // Messaging

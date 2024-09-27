@@ -319,19 +319,4 @@
          function="Inventory.GearDefault.Custom.Action"
          parameter="shop" />
     </menu_item_call>
-	<menu_item_separator>
-        <menu_item_separator.on_visible
-			function="SavedSetting"
-			parameter="LocalInventoryEnabled"/>
-	</menu_item_separator>
-	<menu_item_call
-			label="New Local Asset"
-			name="New Local Item">
-		<menu_item_call.on_visible
-			function="SavedSetting"
-			parameter="LocalInventoryEnabled" />
-		<menu_item_call.on_click
-			function="Floater.Show"
-			parameter="new_local_inventory"/>
-	</menu_item_call>
 </menu>

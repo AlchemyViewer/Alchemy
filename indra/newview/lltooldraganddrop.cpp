@@ -1874,8 +1874,7 @@ EAcceptance LLToolDragAndDrop::willObjectAcceptInventory(LLViewerObject* obj, LL
 
     // HACK: downcast
     LLViewerInventoryItem* vitem = (LLViewerInventoryItem*)item;
-    if (!vitem->isFinished() && (type != DAD_CATEGORY)
-    && !(gInventory.isObjectDescendentOf(vitem->getUUID(), gLocalInventory)))
+    if (!vitem->isFinished() && (type != DAD_CATEGORY))
     {
         // Note: for DAD_CATEGORY we assume that folder version check passed and folder
         // is complete, meaning that items inside are up to date.
@@ -2397,7 +2396,7 @@ EAcceptance LLToolDragAndDrop::dad3dRezScript(
     LLViewerInventoryItem* item;
     LLViewerInventoryCategory* cat;
     locateInventory(item, cat);
-    if (!item || (!item->isFinished() && !(gInventory.isObjectDescendentOf(item->getUUID(), gLocalInventory)))) return ACCEPT_NO;
+    if (!item || !item->isFinished()) return ACCEPT_NO;
     EAcceptance rv = willObjectAcceptInventory(obj, item);
     if(drop && (ACCEPT_YES_SINGLE <= rv))
     {
@@ -2435,7 +2434,7 @@ EAcceptance LLToolDragAndDrop::dad3dApplyToObject(
     LLViewerInventoryItem* item;
     LLViewerInventoryCategory* cat;
     locateInventory(item, cat);
-    if( !item || (!item->isFinished() && !(gInventory.isObjectDescendentOf(item->getUUID(), gLocalInventory))) ) return ACCEPT_NO;
+    if (!item || !item->isFinished()) return ACCEPT_NO;
     LLPermissions item_permissions = item->getPermissions();
     EAcceptance rv = willObjectAcceptInventory(obj, item);
     if((mask & MASK_CONTROL))

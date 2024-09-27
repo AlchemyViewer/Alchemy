@@ -985,16 +985,6 @@ void mask_to_string(U32 mask, char* str)
         *str = ' ';
     }
     str++;
-
-    if (mask & PERM_EXPORT)
-    {
-        *str = 'E';
-    }
-    else
-    {
-        *str = ' ';
-    }
-    str++;
     *str = '\0';
 }
 

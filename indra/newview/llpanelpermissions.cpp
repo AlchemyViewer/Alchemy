@@ -79,32 +79,6 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 
-// base and own must have EXPORT, next owner must be UNRESTRICTED
-bool can_set_export(const U32& base, const U32& own, const U32& next)
-{
-    return base & PERM_EXPORT && own & PERM_EXPORT && (next & PERM_ITEM_UNRESTRICTED) == PERM_ITEM_UNRESTRICTED;
-}
-
-bool perms_allow_export(const LLPermissions& perms)
-{
-    return perms.getMaskBase() & PERM_EXPORT && perms.getMaskEveryone() & PERM_EXPORT;
-}
-
-bool is_asset_exportable(const LLUUID& asset_id)
-{
-    if (asset_id.isNull()) return true; // Don't permission-check null textures
-    LLViewerInventoryCategory::cat_array_t cats;
-    LLViewerInventoryItem::item_array_t items;
-    LLAssetIDMatches asset_id_matches(asset_id);
-    gInventory.collectDescendentsIf(LLUUID::null, cats, items, true, asset_id_matches, false);
-
-    for (U32 i = 0; i < items.size(); ++i)
-    {
-        if (perms_allow_export(items[i]->getPermissions())) return true;
-    }
-    return false;
-}
-
 U8 string_value_to_click_action(std::string p_value);
 std::string click_action_to_string_value( U8 action);
 
@@ -206,8 +180,6 @@ bool LLPanelPermissions::postBuild()
 
     childSetCommitCallback("checkbox allow everyone copy",LLPanelPermissions::onCommitEveryoneCopy,this);
 
-    childSetCommitCallback("checkbox allow export", LLPanelPermissions::onCommitExport, this);
-
     childSetCommitCallback("checkbox for sale",LLPanelPermissions::onCommitSaleInfo,this);
 
     childSetCommitCallback("sale type",LLPanelPermissions::onCommitSaleType,this);
@@ -279,9 +251,6 @@ void LLPanelPermissions::disableAll()
     getChildView("checkbox allow everyone move")->setEnabled(false);
     getChild<LLUICtrl>("checkbox allow everyone copy")->setValue(false);
     getChildView("checkbox allow everyone copy")->setEnabled(false);
-
-    getChild<LLCheckBoxCtrl>("checkbox allow export")->setValue(false);
-    getChild<LLCheckBoxCtrl>("checkbox allow export")->setEnabled(false);
 
     //Next owner can:
     getChildView("Next owner can:")->setEnabled(false);
@@ -752,25 +721,15 @@ void LLPanelPermissions::refresh()
         if (valid_base_perms)
         {
             std::string perm_string = mask_to_string(base_mask_on);
-            if (!supports_export && base_mask_on & PERM_EXPORT) // Hide Export when not available
-                perm_string.erase(perm_string.find_last_of("E"));
             getChild<LLUICtrl>("B:")->setValue("B: " + perm_string);
             getChildView("B:")->setVisible(true);
 
             perm_string = mask_to_string(owner_mask_on);
-            if (!supports_export && owner_mask_on & PERM_EXPORT) // Hide Export when not available
-                perm_string.erase(perm_string.find_last_of("E"));
             getChild<LLUICtrl>("O:")->setValue("O: " + perm_string);
             getChildView("O:")->setVisible(true);
 
             getChild<LLUICtrl>("G:")->setValue("G: " + mask_to_string(group_mask_on));
             getChildView("G:")->setVisible(true);
-
-            perm_string = mask_to_string(everyone_mask_on);
-            if (!supports_export && everyone_mask_on & PERM_EXPORT) // Hide Export when not available
-                perm_string.erase(perm_string.find_last_of("E"));
-            getChild<LLUICtrl>("E:")->setValue("E: " + perm_string);
-            getChildView("E:")->setVisible(true);
 
             getChild<LLUICtrl>("N:")->setValue("N: " + mask_to_string(next_owner_mask_on));
             getChildView("N:")->setVisible(true);
@@ -856,45 +815,6 @@ void LLPanelPermissions::refresh()
         getChildView("checkbox allow everyone copy")->setEnabled(false);
     }
 
-    // Is this user allowed to toggle export on this object?
-    if (supports_export && self_owned && mCreatorID == mOwnerID
-        && can_set_export(base_mask_on, owner_mask_on, next_owner_mask_on))
-    {
-        bool can_export = false;
-        LLInventoryObject::object_list_t objects;
-        objectp->getInventoryContents(objects);
-        if (!objects.empty())
-        {
-            for (LLInventoryObject::object_list_t::iterator i = objects.begin(); i != objects.end(); ++i) //The object's inventory must have EXPORT.
-            {
-                LLViewerInventoryItem* item = static_cast<LLViewerInventoryItem*>(i->get()); //getInventoryContents() filters out categories, static_cast.
-                can_export = perms_allow_export(item->getPermissions());
-                if (!can_export) break;
-            }
-        }
-        else
-            can_export = true;
-
-        if(can_export)
-        {
-            for (U8 i = 0; i < objectp->getNumTEs(); ++i) // Can the textures be exported?
-            {
-                if (LLTextureEntry* texture = objectp->getTE(i))
-                {
-                    can_export = is_asset_exportable(texture->getID());
-                    if(!can_export) break;
-                }
-            }
-        }
-        getChildView("checkbox allow export")->setEnabled(can_export);
-        getChildView("checkbox allow export")->setVisible(true);
-    }
-    else
-    {
-        getChildView("checkbox allow export")->setEnabled(false);
-        getChildView("checkbox allow export")->setVisible(supports_export);
-    }
-
     if (has_change_sale_ability && (owner_mask_on & PERM_TRANSFER))
     {
         getChildView("checkbox for sale")->setEnabled(can_transfer || (!can_transfer && num_for_sale));
@@ -903,11 +823,10 @@ void LLPanelPermissions::refresh()
         getChild<LLUICtrl>("checkbox for sale")->setTentative(              is_for_sale_mixed);
         getChildView("sale type")->setEnabled(num_for_sale && can_transfer && !is_sale_price_mixed);
 
-        bool no_export = everyone_mask_off & PERM_EXPORT; // Next owner perms can't be changed if set
-        getChildView("Next owner can:")->setEnabled(no_export);
-        getChildView("checkbox next owner can modify")->setEnabled(no_export && base_mask_on & PERM_MODIFY);
-        getChildView("checkbox next owner can copy")->setEnabled(no_export && base_mask_on & PERM_COPY);
-        getChildView("checkbox next owner can transfer")->setEnabled(no_export && next_owner_mask_on & PERM_COPY);
+        getChildView("Next owner can:")->setEnabled(true);
+        getChildView("checkbox next owner can modify")->setEnabled(base_mask_on & PERM_MODIFY);
+        getChildView("checkbox next owner can copy")->setEnabled(base_mask_on & PERM_COPY);
+        getChildView("checkbox next owner can transfer")->setEnabled(next_owner_mask_on & PERM_COPY);
     }
     else
     {
@@ -976,30 +895,6 @@ void LLPanelPermissions::refresh()
         {
             getChild<LLUICtrl>("checkbox allow everyone copy")->setValue(true);
             getChild<LLUICtrl>("checkbox allow everyone copy")->setTentative(   true);
-        }
-
-        if (supports_export)
-        {
-            if(everyone_mask_on & PERM_EXPORT)
-            {
-                getChild<LLUICtrl>("checkbox allow export")->setValue(true);
-                getChild<LLUICtrl>("checkbox allow export")->setTentative(  false);
-            }
-            else if(everyone_mask_off & PERM_EXPORT)
-            {
-                getChild<LLUICtrl>("checkbox allow export")->setValue(false);
-                getChild<LLUICtrl>("checkbox allow export")->setTentative(  false);
-            }
-            else
-            {
-                getChild<LLUICtrl>("checkbox allow export")->setValue(true);
-                getChild<LLUICtrl>("checkbox allow export")->setTentative(  true);
-            }
-        }
-        else
-        {
-            childSetValue("checkbox allow export", false);
-            getChild<LLUICtrl>("checkbox allow export")->setTentative(false);
         }
     }
 
@@ -1293,13 +1188,6 @@ void LLPanelPermissions::onCommitNextOwnerTransfer(LLUICtrl* ctrl, void* data)
 {
     //LL_INFOS() << "LLPanelPermissions::onCommitNextOwnerTransfer" << LL_ENDL;
     onCommitPerm(ctrl, data, PERM_NEXT_OWNER, PERM_TRANSFER);
-}
-
-// static
-void LLPanelPermissions::onCommitExport(LLUICtrl* ctrl, void* data)
-{
-    //LL_INFOS() << "LLPanelPermissions::onCommitExport" << LL_ENDL;
-    onCommitPerm(ctrl, data, PERM_EVERYONE, PERM_EXPORT);
 }
 
 // static

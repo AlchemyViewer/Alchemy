@@ -151,9 +151,6 @@ LLViewerFolderDictionary::LLViewerFolderDictionary()
     addEntry(LLFolderType::FT_ANIM_OVERRIDES,       new ViewerFolderEntry("Animation Overrides",    "Inv_SysOpen",          "Inv_SysClosed",        false,  false));
     addEntry(LLFolderType::FT_TOXIC,                new ViewerFolderEntry("Firestorm",              "Inv_FolderOpenToxic",  "Inv_FolderClosedToxic",    false,     true));
     addEntry(LLFolderType::FT_RLV,                  new ViewerFolderEntry("RlvRoot",                "Inv_SysOpen",          "Inv_SysClosed",            false,  true));
-    addEntry(LLFolderType::FT_LOCAL,                new ViewerFolderEntry("Local Inventory",        "Inv_SysOpen",          "Inv_SysClosed",            false,  true));
-
-    addEntry(LLFolderType::FT_SUITCASE,             new ViewerFolderEntry("My Suitcase",            "Inv_SysOpen", "Inv_SysClosed",                         false,      true));
 
     for (U32 type = (U32)LLFolderType::FT_ENSEMBLE_START; type <= (U32)LLFolderType::FT_ENSEMBLE_END; ++type)
     {

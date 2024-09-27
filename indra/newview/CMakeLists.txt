@@ -314,7 +314,6 @@ set(viewer_SOURCE_FILES
     llfloatermyenvironment.cpp
     llfloaternamedesc.cpp
     llfloaternewfeaturenotification.cpp
-    llfloaternewlocalinventory.cpp
     llfloaternotificationsconsole.cpp
     llfloaternotificationstabbed.cpp
     llfloaterobjectweights.cpp
@@ -1045,7 +1044,6 @@ set(viewer_HEADER_FILES
     llfloatermyenvironment.h
     llfloaternamedesc.h
     llfloaternewfeaturenotification.h
-    llfloaternewlocalinventory.h
     llfloaternotificationsconsole.h
     llfloaternotificationstabbed.h
     llfloaterobjectweights.h
