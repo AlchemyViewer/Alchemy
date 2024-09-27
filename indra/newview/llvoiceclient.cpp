@@ -843,6 +843,22 @@ std::string LLVoiceClient::sipURIFromID(const LLUUID &id) const
     }
 }
 
+LLSD LLVoiceClient::getP2PChannelInfoTemplate(const LLUUID& id) const
+{
+    if (mNonSpatialVoiceModule)
+    {
+        return mNonSpatialVoiceModule->getP2PChannelInfoTemplate(id);
+    }
+    else if (mSpatialVoiceModule)
+    {
+        return mSpatialVoiceModule->getP2PChannelInfoTemplate(id);
+    }
+    else
+    {
+        return LLSD();
+    }
+}
+
 LLVoiceEffectInterface* LLVoiceClient::getVoiceEffectInterface() const
 {
     return getVoiceEffectEnabled() ? dynamic_cast<LLVoiceEffectInterface*>(mSpatialVoiceModule) : NULL;

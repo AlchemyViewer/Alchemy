@@ -370,7 +370,7 @@ private:
     LLTimer                 mFilterTime;
 
     std::string             mFilterText;
-    mutable LLUIString      mEmptyLookupMessage;
+    std::string             mEmptyLookupMessage;
     std::string             mDefaultEmptyLookupMessage;
 
     ESearchType             mSearchType;

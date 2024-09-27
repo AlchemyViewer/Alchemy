@@ -5061,7 +5061,7 @@ void LLVivoxVoiceClient::hangup() { leaveChannel(); }
 
 LLVoiceP2PIncomingCallInterfacePtr LLVivoxVoiceClient::getIncomingCallInterface(const LLSD &voice_call_info)
 {
-    return boost::make_shared<LLVivoxVoiceP2PIncomingCall>(voice_call_info);
+    return std::make_shared<LLVivoxVoiceP2PIncomingCall>(voice_call_info);
 }
 
 bool LLVivoxVoiceClient::answerInvite(const std::string &sessionHandle)
@@ -5238,6 +5238,14 @@ std::string LLVivoxVoiceClient::sipURIFromID(const LLUUID &id) const
     return result;
 }
 
+LLSD LLVivoxVoiceClient::getP2PChannelInfoTemplate(const LLUUID& id) const
+{
+    LLSD result;
+    result["channel_uri"] = sipURIFromID(id);
+    result["voice_server_type"] = VIVOX_VOICE_SERVER_TYPE;
+    return result;
+}
+
 std::string LLVivoxVoiceClient::sipURIFromAvatar(LLVOAvatar *avatar)
 {
     std::string result;
@@ -5252,7 +5260,7 @@ std::string LLVivoxVoiceClient::sipURIFromAvatar(LLVOAvatar *avatar)
     return result;
 }
 
-std::string LLVivoxVoiceClient::nameFromID(const LLUUID &uuid)
+std::string LLVivoxVoiceClient::nameFromID(const LLUUID &uuid) const
 {
     std::string result;
 
@@ -5326,7 +5334,7 @@ bool LLVivoxVoiceClient::IDFromName(const std::string inName, LLUUID &uuid)
     return result;
 }
 
-std::string LLVivoxVoiceClient::sipURIFromName(std::string_view name)
+std::string LLVivoxVoiceClient::sipURIFromName(std::string &name)
 {
     std::string result;
     result = "sip:";
@@ -7278,6 +7286,7 @@ LLIOPipe::EStatus LLVivoxProtocolParser::process_impl(
         XML_SetCharacterDataHandler(parser, ExpatCharHandler);
         XML_SetUserData(parser, this);
         XML_Parse(parser, mInput.data() + start, static_cast<int>(delim - start), false);
+
 
         LL_DEBUGS("VivoxProtocolParser") << "parsing: " << mInput.substr(start, delim - start) << LL_ENDL;
         start = delim + 3;

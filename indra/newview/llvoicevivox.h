@@ -66,7 +66,7 @@ class LLVivoxVoiceP2PIncomingCall : public LLVoiceP2PIncomingCallInterface
     LLSD mCallInfo;
 };
 
-class LLVivoxVoiceClient final : public LLSingleton<LLVivoxVoiceClient>,
+class LLVivoxVoiceClient :  public LLSingleton<LLVivoxVoiceClient>,
                             virtual public LLVoiceModuleInterface,
                             virtual public LLVoiceEffectInterface,
                             virtual public LLVoiceP2POutgoingCallInterface
@@ -547,7 +547,7 @@ protected:
     void clearSessionHandle(const sessionStatePtr_t &session);
     void setSessionHandle(const sessionStatePtr_t &session, const std::string &handle);
     void setSessionURI(const sessionStatePtr_t &session, const std::string &uri);
-    void deleteSession(const sessionStatePtr_t session);
+    void deleteSession(const sessionStatePtr_t &session);
     void deleteAllSessions(void);
 
     void verifySessionState(void);
@@ -754,8 +754,8 @@ private:
     bool switchChannel(std::string uri = std::string(), bool spatial = true, bool no_reconnect = false, bool is_p2p = false, std::string hash = "");
     void joinSession(const sessionStatePtr_t &session);
 
-    std::string nameFromID(const LLUUID &id);
-    bool IDFromName(const std::string& name, LLUUID &uuid);
+    std::string nameFromID(const LLUUID &id) const;
+    bool IDFromName(const std::string name, LLUUID &uuid);
     std::string sipURIFromAvatar(LLVOAvatar *avatar);
     std::string sipURIFromName(std::string &name);
 
@@ -1047,7 +1047,7 @@ protected:
 
 };
 
-class LLVivoxSecurity final : public LLSingleton<LLVivoxSecurity>
+class LLVivoxSecurity : public LLSingleton<LLVivoxSecurity>
 {
     LLSINGLETON(LLVivoxSecurity);
     virtual ~LLVivoxSecurity();
@@ -1064,7 +1064,7 @@ class LLVivoxSecurity final : public LLSingleton<LLVivoxSecurity>
     std::string     mAccountHandle;
 };
 
-class LLVoiceVivoxStats final : public LLSingleton<LLVoiceVivoxStats>
+class LLVoiceVivoxStats : public LLSingleton<LLVoiceVivoxStats>
 {
     LLSINGLETON(LLVoiceVivoxStats);
     LOG_CLASS(LLVoiceVivoxStats);

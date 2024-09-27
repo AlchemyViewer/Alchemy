@@ -2596,7 +2596,6 @@ void LLInventoryGallery::startDrag()
 {
     std::vector<EDragAndDropType> types;
     uuid_vec_t ids;
-    // ALCHMERGE
     LLToolDragAndDrop::ESource src = LLToolDragAndDrop::SOURCE_AGENT;
     for (LLUUID& selected_id : mSelectedItemIDs)
     {

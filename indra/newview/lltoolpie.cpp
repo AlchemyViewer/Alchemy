@@ -1314,7 +1314,7 @@ bool LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
                 }
             }
 
-            if (gSavedSettings.getBool("ShowAdvancedHoverTips"))
+            if (gSavedSettings.getBOOL("ShowAdvancedHoverTips"))
             {
                 LLStringUtil::format_map_t args;
                 // Get Position

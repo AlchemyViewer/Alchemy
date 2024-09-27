@@ -75,7 +75,7 @@ LLInventoryFilter::FilterOps::FilterOps(const Params& p)
 LLInventoryFilter::LLInventoryFilter(const Params& p)
 :   mName(p.name),
     mFilterModified(FILTER_NONE),
-    mEmptyLookupMessage(LLTrans::getString("InventoryNoMatchingItems")),
+    mEmptyLookupMessage("InventoryNoMatchingItems"),
     mDefaultEmptyLookupMessage(""),
     mFilterOps(p.filter_ops),
     mBackupFilterOps(mFilterOps),
@@ -292,11 +292,7 @@ bool LLInventoryFilter::checkFolder(const LLUUID& folder_id) const
         if (!cat)
             return folder_id.isNull();
         LLFolderType::EType cat_type = cat->getPreferredType();
-        if (cat_type == LLFolderType::FT_SUITCASE)
-        {
-            return true; // suitcase will always be shown
-        }
-        if (cat_type != LLFolderType::FT_NONE && (1ULL << cat_type & mFilterOps.mFilterCategoryTypes) == U64(0))
+        if (cat_type != LLFolderType::FT_NONE && (1LL << cat_type & mFilterOps.mFilterCategoryTypes) == U64(0))
             return false;
     }
 
@@ -1689,24 +1685,26 @@ S32 LLInventoryFilter::getFirstRequiredGeneration() const
 
 void LLInventoryFilter::setEmptyLookupMessage(const std::string& message)
 {
-    mEmptyLookupMessage = LLTrans::getString(message);
+    mEmptyLookupMessage = message;
 }
 
 void LLInventoryFilter::setDefaultEmptyLookupMessage(const std::string& message)
 {
-    mDefaultEmptyLookupMessage = LLTrans::getString(message);
+    mDefaultEmptyLookupMessage = message;
 }
 
 std::string LLInventoryFilter::getEmptyLookupMessage(bool is_empty_folder) const
 {
     if ((isDefault() || is_empty_folder) && !mDefaultEmptyLookupMessage.empty())
     {
-        return mDefaultEmptyLookupMessage;
+        return LLTrans::getString(mDefaultEmptyLookupMessage);
     }
     else
     {
-        mEmptyLookupMessage.setArg("[SEARCH_TERM]", LLURI::escape(getFilterSubStringOrig()));
-        return mEmptyLookupMessage.getString();
+        LLStringUtil::format_map_t args;
+        args["[SEARCH_TERM]"] = LLURI::escape(getFilterSubStringOrig());
+
+        return LLTrans::getString(mEmptyLookupMessage, args);
     }
 
 }

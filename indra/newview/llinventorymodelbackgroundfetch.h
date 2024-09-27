@@ -41,7 +41,7 @@
 // This class handles background fetches, which are fetches of
 // inventory folder.  Fetches can be recursive or not.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLInventoryModelBackgroundFetch final : public LLSingleton<LLInventoryModelBackgroundFetch>
+class LLInventoryModelBackgroundFetch : public LLSingleton<LLInventoryModelBackgroundFetch>
 {
     LLSINGLETON(LLInventoryModelBackgroundFetch);
     ~LLInventoryModelBackgroundFetch();

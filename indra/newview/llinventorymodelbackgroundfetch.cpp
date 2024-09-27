@@ -1189,7 +1189,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
         {
             if (folder_request_body["folders"].size())
             {
-                const std::string& url = region->getCapability("FetchInventoryDescendents2");
+                const std::string url(region->getCapability("FetchInventoryDescendents2"));
 
                 if (! url.empty())
                 {
@@ -1200,7 +1200,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 
             if (folder_request_body_lib["folders"].size())
             {
-                const std::string& url = region->getCapability("FetchLibDescendents2");
+                const std::string url(region->getCapability("FetchLibDescendents2"));
 
                 if (! url.empty())
                 {
@@ -1214,7 +1214,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
         {
             if (item_request_body.size())
             {
-                const std::string& url = region->getCapability("FetchInventory2");
+                const std::string url(region->getCapability("FetchInventory2"));
 
                 if (! url.empty())
                 {
@@ -1227,7 +1227,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
 
             if (item_request_body_lib.size())
             {
-                const std::string& url = region->getCapability("FetchLib2");
+                const std::string url(region->getCapability("FetchLib2"));
 
                 if (! url.empty())
                 {
@@ -1350,8 +1350,12 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
     {
         LLSD folders(content["folders"]);
 
-        for (const auto& folder_sd : folders.asArray())
+        for (LLSD::array_const_iterator folder_it = folders.beginArray();
+            folder_it != folders.endArray();
+            ++folder_it)
         {
+            LLSD folder_sd(*folder_it);
+
             //LLUUID agent_id = folder_sd["agent_id"];
 
             //if(agent_id != gAgent.getID())    //This should never happen.
@@ -1372,12 +1376,15 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
                 LLSD items(folder_sd["items"]);
                 LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
 
-                for (const auto& item : items.asArray())
+                for (LLSD::array_const_iterator item_it = items.beginArray();
+                    item_it != items.endArray();
+                    ++item_it)
                 {
                     const LLUUID lost_uuid(gInventory.findCategoryUUIDForType(LLFolderType::FT_LOST_AND_FOUND));
 
                     if (lost_uuid.notNull())
                     {
+                        LLSD item(*item_it);
 
                         titem->unpackMessage(item);
 
@@ -1400,8 +1407,11 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
             }
 
             LLSD categories(folder_sd["categories"]);
-            for (const auto& category : categories.asArray())
+            for (LLSD::array_const_iterator category_it = categories.beginArray();
+                category_it != categories.endArray();
+                ++category_it)
             {
+                LLSD category(*category_it);
                 tcategory->fromLLSD(category);
 
                 const bool recursive(getIsRecursive(tcategory->getUUID()));
@@ -1417,8 +1427,11 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
 
             LLSD items(folder_sd["items"]);
             LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
-            for (const auto& item : items.asArray())
+            for (LLSD::array_const_iterator item_it = items.beginArray();
+                 item_it != items.endArray();
+                 ++item_it)
             {
+                LLSD item(*item_it);
                 titem->unpackMessage(item);
 
                 gInventory.updateItem(titem);
@@ -1438,8 +1451,13 @@ void BGFolderHttpHandler::processData(LLSD & content, LLCore::HttpResponse * res
     if (content.has("bad_folders"))
     {
         LLSD bad_folders(content["bad_folders"]);
-        for (const auto& folder_sd : bad_folders.asArray())
+        for (LLSD::array_const_iterator folder_it = bad_folders.beginArray();
+             folder_it != bad_folders.endArray();
+             ++folder_it)
         {
+            // *TODO: Stop copying data [ed:  this isn't copying data]
+            LLSD folder_sd(*folder_it);
+
             // These folders failed on the dataserver.  We probably don't want to retry them.
             LL_WARNS(LOG_INV) << "Folder " << folder_sd["folder_id"].asString()
                               << "Error: " << folder_sd["error"].asString() << LL_ENDL;
@@ -1532,8 +1550,11 @@ void BGFolderHttpHandler::processFailure(LLCore::HttpStatus status, LLCore::Http
     if (false)
     {
         // timed out or curl failure
-        for (const auto& folder_sd : mRequestSD["folders"].asArray())
+        for (LLSD::array_const_iterator folder_it = mRequestSD["folders"].beginArray();
+             folder_it != mRequestSD["folders"].endArray();
+             ++folder_it)
         {
+            LLSD folder_sd(*folder_it);
             LLUUID folder_id(folder_sd["folder_id"].asUUID());
             const bool recursive = getIsRecursive(folder_id);
             fetcher->addRequestAtFront(folder_id, recursive, true);
@@ -1566,8 +1587,11 @@ void BGFolderHttpHandler::processFailure(const char * const reason, LLCore::Http
     LLInventoryModelBackgroundFetch *fetcher = LLInventoryModelBackgroundFetch::getInstance();
     if (true)
     {
-        for (const auto& folder_sd : mRequestSD["folders"].asArray())
+        for (LLSD::array_const_iterator folder_it = mRequestSD["folders"].beginArray();
+             folder_it != mRequestSD["folders"].endArray();
+             ++folder_it)
         {
+            LLSD folder_sd(*folder_it);
             LLUUID folder_id(folder_sd["folder_id"].asUUID());
             const bool recursive = getIsRecursive(folder_id);
             fetcher->addRequestAtFront(folder_id, recursive, true);

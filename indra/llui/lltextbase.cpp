@@ -3092,7 +3092,7 @@ void LLTextBase::refreshHighlights()
             for (std::list<boost::iterator_range<LLWString::const_iterator> >::const_iterator itRange = highlightRanges.begin(); itRange != highlightRanges.end(); ++itRange)
             {
                 S32 idxStart = itRange->begin() - wstrText.begin();
-                mHighlights.push_back(range_pair_t(idxStart, idxStart + itRange->size()));
+                mHighlights.push_back(range_pair_t(idxStart, idxStart + (S32)itRange->size()));
             }
         }
         mHighlightsDirty = false;

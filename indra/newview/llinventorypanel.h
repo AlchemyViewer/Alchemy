@@ -39,8 +39,6 @@
 #include "lluictrlfactory.h"
 #include <set>
 
-#include "boost/unordered/unordered_flat_map.hpp"
-
 class LLInvFVBridge;
 class LLInventoryFolderViewModelBuilder;
 class LLInvPanelComplObserver;
@@ -299,7 +297,7 @@ protected:
     LLPointer<LLFolderViewGroupedItemBridge> mGroupedItemBridge;
     Params                      mParams;    // stored copy of parameter block
 
-    boost::unordered_flat_map<LLUUID, LLFolderViewItem*> mItemMap;
+    std::map<LLUUID, LLFolderViewItem*> mItemMap;
     /**
      * Pointer to LLInventoryFolderViewModelBuilder.
      *

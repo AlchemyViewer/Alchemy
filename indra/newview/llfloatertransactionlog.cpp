@@ -55,7 +55,7 @@ LLFloaterTransactionLog::~LLFloaterTransactionLog()
         mAvatarNameCacheConnection.disconnect();
 }
 
-BOOL LLFloaterTransactionLog::postBuild()
+bool LLFloaterTransactionLog::postBuild()
 {
     mList = getChild<LLScrollListCtrl>("transaction_list");
     mList->setDoubleClickCallback(boost::bind(&LLFloaterTransactionLog::onDoubleClick, this));

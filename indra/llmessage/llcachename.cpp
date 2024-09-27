@@ -214,7 +214,7 @@ public:
     Impl(LLMessageSystem* msg);
     ~Impl();
 
-    bool getName(const LLUUID& id, std::string& first, std::string& last, std::map<std::string, std::string>& default_names);
+    bool getName(const LLUUID& id, std::string& first, std::string& last, boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>>& default_names);
 
     boost::signals2::connection addPending(const LLUUID& id, const LLCacheNameCallback& callback);
     void addPending(const LLUUID& id, const LLHost& host);
@@ -401,7 +401,7 @@ void LLCacheName::exportFile(std::ostream& ostr)
 }
 
 
-bool LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last, std::map<std::string, std::string>& default_names)
+bool LLCacheName::Impl::getName(const LLUUID& id, std::string& first, std::string& last, boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>>& default_names)
 {
     if(id.isNull())
     {

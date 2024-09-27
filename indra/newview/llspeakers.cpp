@@ -381,8 +381,8 @@ void LLSpeakerMgr::update(bool resort_ok)
     bool voice_channel_active = (!mVoiceChannel && voice_client->inProximalChannel()) || (mVoiceChannel && mVoiceChannel->isActive());
     for (const auto& speaker_pair : mSpeakers)
     {
-        LLUUID speaker_id = speaker_it->first;
-        LLSpeaker* speakerp = speaker_it->second;
+        LLUUID speaker_id = speaker_pair.first;
+        LLSpeaker* speakerp = speaker_pair.second;
 
         if (voice_channel_active && voice_client->getVoiceEnabled(speaker_id))
         {
@@ -689,17 +689,17 @@ void LLIMSpeakerMgr::setSpeakers(const LLSD& speakers)
             speaker_it != speakers["agent_info"].endMap();
             ++speaker_it)
         {
-            const LLUUID agent_id(llsd_pair.first);
+            const LLUUID agent_id(speaker_it->first);
 
             LLPointer<LLSpeaker> speakerp = setSpeaker(
                 agent_id,
                 LLStringUtil::null,
                 LLSpeaker::STATUS_TEXT_ONLY);
 
-            if (llsd_pair.second.isMap() )
+            if (speaker_it->second.isMap() )
             {
                 bool is_moderator = speakerp->mIsModerator;
-                speakerp->mIsModerator = llsd_pair.second["is_moderator"];
+                speakerp->mIsModerator = speaker_it->second["is_moderator"];
                 speakerp->mModeratorMutedText =
                     speaker_it->second["mutes"]["text"];
                 // Fire event only if moderator changed
@@ -720,7 +720,7 @@ void LLIMSpeakerMgr::setSpeakers(const LLSD& speakers)
             speaker_it != speakers["agents"].endArray();
             ++speaker_it)
         {
-            const LLUUID agent_id = llsd_val.asUUID();
+            const LLUUID agent_id = speaker_it->asUUID();
 
             LLPointer<LLSpeaker> speakerp = setSpeaker(
                 agent_id,
@@ -745,7 +745,7 @@ void LLIMSpeakerMgr::updateSpeakers(const LLSD& update)
             LLUUID agent_id(update_it->first);
             LLPointer<LLSpeaker> speakerp = findSpeaker(agent_id);
 
-            LLSD agent_data = llsd_pair.second;
+            LLSD agent_data = update_it->second;
 
             if (agent_data.isMap() && agent_data.has("transition"))
             {

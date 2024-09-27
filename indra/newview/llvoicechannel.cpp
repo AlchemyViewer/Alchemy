@@ -328,16 +328,6 @@ void LLVoiceChannel::setState(EState state)
 
 void LLVoiceChannel::doSetState(const EState& new_state)
 {
-    LL_DEBUGS("Voice") << "session '" << mSessionName << "' state " << mState << ", new_state " << new_state << ": "
-        << (new_state == STATE_ERROR ? "ERROR" :
-            new_state == STATE_HUNG_UP ? "HUNG_UP" :
-            new_state == STATE_READY ? "READY" :
-            new_state == STATE_CALL_STARTED ? "CALL_STARTED" :
-            new_state == STATE_RINGING ? "RINGING" :
-            new_state == STATE_CONNECTED ? "CONNECTED" :
-            "NO_INFO")
-        << LL_ENDL;
-
     EState old_state = mState;
     mState = new_state;
 
@@ -601,10 +591,10 @@ void LLVoiceChannelGroup::setState(EState state)
 
 void LLVoiceChannelGroup::voiceCallCapCoro(std::string url)
 {
-	LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
-	LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-		httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("voiceCallCapCoro", httpPolicy));
-	LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
+        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("voiceCallCapCoro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
 
     LLSD postData;
     postData["method"] = "call";
@@ -692,7 +682,6 @@ void LLVoiceChannelProximal::activate()
 
     LLVoiceClient::getInstance()->activateSpatialChannel(true);
     LLVoiceChannel::activate();
-
 }
 
 void LLVoiceChannelProximal::onChange(EStatusType type, const LLSD& channelInfo, bool proximal)
@@ -765,7 +754,7 @@ void LLVoiceChannelProximal::deactivate()
     {
         setState(STATE_HUNG_UP);
     }
-
+    LLVoiceClient::removeObserver(this);
     LLVoiceClient::getInstance()->activateSpatialChannel(false);
 }
 
@@ -782,6 +771,7 @@ LLVoiceChannelP2P::LLVoiceChannelP2P(const LLUUID      &session_id,
     mReceivedCall(false),
     mOutgoingCallInterface(outgoing_call_interface)
 {
+    mChannelInfo = LLVoiceClient::getInstance()->getP2PChannelInfoTemplate(other_user_id);
 }
 
 void LLVoiceChannelP2P::handleStatusChange(EStatusType type)
@@ -921,6 +911,7 @@ void LLVoiceChannelP2P::setChannelInfo(const LLSD& channel_info)
     }
 
     mReceivedCall = true;
+    if (channel_info.isDefined() && channel_info.isMap())
     {
         mIncomingCallInterface = LLVoiceClient::getInstance()->getIncomingCallInterface(channel_info);
     }
@@ -928,6 +919,12 @@ void LLVoiceChannelP2P::setChannelInfo(const LLSD& channel_info)
     {
         activate();
     }
+}
+
+void LLVoiceChannelP2P::resetChannelInfo()
+{
+    mChannelInfo = LLVoiceClient::getInstance()->getP2PChannelInfoTemplate(mOtherUserID);
+    mState = STATE_NO_CHANNEL_INFO; // we have template, not full info
 }
 
 void LLVoiceChannelP2P::setState(EState state)

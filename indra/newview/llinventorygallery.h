@@ -271,7 +271,7 @@ private:
     LLInventoryFilter* mFilter;
     U32 mSortOrder;
 
-    typedef boost::unordered_map<LLUUID, LLInventoryGalleryItem*> gallery_item_map_t;
+    typedef std::map<LLUUID, LLInventoryGalleryItem*> gallery_item_map_t;
     gallery_item_map_t mItemMap;
     uuid_vec_t mCOFLinkedItems;
     uuid_vec_t mActiveGestures;
@@ -406,7 +406,7 @@ protected:
         LLUUID mThumbnailID;
     };
 
-    typedef boost::unordered_map<LLUUID, LLItemData> item_map_t;
+    typedef std::map<LLUUID, LLItemData> item_map_t;
     typedef item_map_t::value_type item_map_value_t;
     item_map_t mItemMap;
 };

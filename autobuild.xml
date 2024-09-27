@@ -1793,27 +1793,25 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
           <map>
             <key>archive</key>
             <map>
-              <key>creds</key>
-              <string>github</string>
               <key>hash</key>
-              <string>a646647c803e473229ca646d9441faa7042061c6d3fd6a8c31466efc29e64da0150752893e6a14f1cb91a36e1b91c280b7d4ee0abaf29d163f3c158022ef62e4</string>
+              <string>bc574ea89164387a6c12bb49e1bac091c1d4da27</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://api.github.com/repos/AlchemyViewer/3p-nvapi-private/releases/assets/174138192</string>
+              <string>https://github.com/secondlife/3p-nvapi/releases/download/v560-r1/nvapi-560.0.0-r1-windows64-10390321492.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
         <key>license</key>
-        <string>nvapi</string>
+        <string>MIT</string>
         <key>license_file</key>
         <string>LICENSES/nvapi.txt</string>
         <key>copyright</key>
-        <string>Copyright (c) 2007- 2020 NVIDIA Corporation. All rights reserved. </string>
+        <string>Copyright (c) 2024 NVIDIA CORPORATION and AFFILIATES. All rights reserved.</string>
         <key>version</key>
-        <string>535.0.0</string>
+        <string>560.0.0-r1</string>
         <key>name</key>
         <string>nvapi</string>
         <key>description</key>
@@ -2615,6 +2613,72 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>description</key>
         <string>XMLRPC Library</string>
       </map>
+      <key>webrtc</key>
+      <map>
+        <key>platforms</key>
+        <map>
+          <key>darwin64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>3570b6442d472cd97bad8622c2ec2571d72218a0</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-webrtc-build/releases/download/m114.5735.08.72-test/webrtc-m114.5735.08.72-test.10444682919-darwin64-10444682919.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>darwin64</string>
+          </map>
+          <key>linux64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>eadf6aa99313940ded11801d42c11375669f1628</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-webrtc-build/releases/download/m114.5735.08.72-test/webrtc-m114.5735.08.72-test.10444682919-linux64-10444682919.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>linux64</string>
+          </map>
+          <key>windows64</key>
+          <map>
+            <key>archive</key>
+            <map>
+              <key>hash</key>
+              <string>0081fd35290adbc8e66dd366535fb6cd8a966f1e</string>
+              <key>hash_algorithm</key>
+              <string>sha1</string>
+              <key>url</key>
+              <string>https://github.com/secondlife/3p-webrtc-build/releases/download/m114.5735.08.72-test/webrtc-m114.5735.08.72-test.10444682919-windows64-10444682919.tar.zst</string>
+            </map>
+            <key>name</key>
+            <string>windows64</string>
+          </map>
+        </map>
+        <key>license</key>
+        <string>MIT</string>
+        <key>license_file</key>
+        <string>LICENSES/webrtc-license.txt</string>
+        <key>copyright</key>
+        <string>Copyright (c) 2011, The WebRTC project authors. All rights reserved.</string>
+        <key>version</key>
+        <string>m114.5735.08.72-test.10444682919</string>
+        <key>name</key>
+        <string>webrtc</string>
+        <key>vcs_branch</key>
+        <string>secondlife</string>
+        <key>vcs_revision</key>
+        <string>d3f62d32bac8694d3c7423c731ae30c113bf6a11</string>
+        <key>vcs_url</key>
+        <string>https://github.com/secondlife/3p-webrtc-build</string>
+        <key>canonical_repo</key>
+        <string>https://github.com/secondlife/3p-webrtc-build</string>
+      </map>
       <key>xxhash</key>
       <map>
         <key>platforms</key>
@@ -2624,36 +2688,28 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1a1c905fe8f2360d518d8ace3e14733543e4c95ee7c2ea8a68c9b4181b640c3ccc64a6df68737c59282767d21de1fc678caadd9c217522ff2691136f0ce07b1d</string>
+              <string>fc9362865e33391d55c64d6101726da0a25d924e</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-xxhash/releases/download/v0.8.2-58fe44c/xxhash-0.8.2-common-9427203649.tar.zst</string>
+              <string>https://github.com/secondlife/3p-xxhash/releases/download/v0.8.2-r1/xxhash-0.8.2-10285735820-common-10285735820.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
           </map>
         </map>
         <key>license</key>
-        <string>BSD 2-Clause</string>
+        <string>xxhash</string>
         <key>license_file</key>
         <string>LICENSES/xxhash.txt</string>
         <key>copyright</key>
         <string>Copyright (c) 2012-2021 Yann Collet</string>
         <key>version</key>
-        <string>0.8.2</string>
+        <string>0.8.2-10285735820</string>
         <key>name</key>
         <string>xxhash</string>
-        <key>vcs_branch</key>
-        <string>refs/tags/v0.8.2-58fe44c</string>
-        <key>vcs_revision</key>
-        <string>40d40b7de3af4526e880b6d4438612582c656ef6</string>
-        <key>vcs_url</key>
-        <string>git://github.com/AlchemyViewer/3p-xxhash.git</string>
-        <key>canonical_repo</key>
-        <string>https://github.com/AlchemyViewer/3p-xxhash</string>
         <key>description</key>
-        <string>Extremely fast non-cryptographic hash algorithm</string>
+        <string>xxHash Library</string>
       </map>
       <key>zlib-ng</key>
       <map>
@@ -2820,72 +2876,6 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <string>https://github.com/AlchemyViewer/3p-zstd</string>
         <key>description</key>
         <string>Zstandard - Fast real-time compression algorithm</string>
-      </map>
-      <key>webrtc</key>
-      <map>
-        <key>platforms</key>
-        <map>
-          <key>linux64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>07e7a96ea6dc8656f9712012616dcc309d2c9c50ddedf1d830ae701c576a0d0795c18ebb6af5985276f5d34779e50e45f9130416a1058e240facd8969ccd0934</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2494.2494/webrtc-114.5735.08.2494-linux64-2494.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>linux64</string>
-          </map>
-          <key>windows64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>cec2018acacbf7c965e043e319b239a756c476d5bf2c81854290af14ea970c0823ffe66c78bcf1512f456d4cad4d1c9bb08007e302458c9c7af5c0d9ff4f244e</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2494.2494/webrtc-114.5735.08.2494-windows64-2494.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>windows64</string>
-          </map>
-          <key>darwin64</key>
-          <map>
-            <key>archive</key>
-            <map>
-              <key>hash</key>
-              <string>5cc420b1353ec38bc6d7a2da76e9f62cadf1a74310260f5e0eb77dca5fe4eb83a62b99fba46870e4516fa76fabe4cbf172057d6a38e29a78d5ba01137bdd0f99</string>
-              <key>hash_algorithm</key>
-              <string>blake2b</string>
-              <key>url</key>
-              <string>https://git.alchemyviewer.org/api/v4/projects/230/packages/generic/webrtc/114.5735.08.2494.2494/webrtc-114.5735.08.2494-darwin64-2494.tar.zst</string>
-            </map>
-            <key>name</key>
-            <string>darwin64</string>
-          </map>
-        </map>
-        <key>license</key>
-        <string>MIT</string>
-        <key>license_file</key>
-        <string>LICENSES/webrtc-license.txt</string>
-        <key>copyright</key>
-        <string>Copyright (c) 2011, The WebRTC project authors. All rights reserved.</string>
-        <key>version</key>
-        <string>114.5735.08.2494</string>
-        <key>name</key>
-        <string>webrtc</string>
-        <key>vcs_branch</key>
-        <string>secondlife</string>
-        <key>vcs_revision</key>
-        <string>d5d4352af197445b78c3b13b2d7c5f0f1750563a</string>
-        <key>vcs_url</key>
-        <string>https://github.com/secondlife/3p-webrtc-build</string>
-        <key>canonical_repo</key>
-        <string>https://github.com/secondlife/3p-webrtc-build</string>
       </map>
     </map>
     <key>package_description</key>

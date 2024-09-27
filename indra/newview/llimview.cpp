@@ -3544,6 +3544,7 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
 #else
     LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
     gIMMgr->removeSession(session_id);
+#endif
     return true;
 }
 

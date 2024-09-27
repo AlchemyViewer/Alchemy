@@ -41,7 +41,7 @@ class LLFloaterTransactionLog : public LLFloater
 {
   public:
     LLFloaterTransactionLog(const LLSD& key);
-    BOOL postBuild();
+    bool postBuild();
     void addTransaction(const LLDate& date, const LLUUID& sender, S32 amount, bool incoming);
 
   private:

@@ -443,24 +443,24 @@ void LLFloaterIMSessionTab::enableDisableCallBtn()
 
     if (mSessionID.notNull() && mSession && mSession->mSessionInitialized && mSession->mCallBackEnabled)
     {
-        if (mVoiceButtonHangUpMode)
-        {
-            // We allow to hang up from any state
-            enable = true;
-        }
-        else
-        {
-            // We allow to start call from this state only
-            if (mSession->mVoiceChannel->getState() == LLVoiceChannel::STATE_NO_CHANNEL_INFO &&
-                LLVoiceClient::instanceExists())
-            {
-                LLVoiceClient* client = LLVoiceClient::getInstance();
-                if (client->voiceEnabled() && client->isVoiceWorking())
-                {
-                    enable = true;
-                }
-            }
-        }
+        //if (mVoiceButtonHangUpMode)
+        //{
+        //    // We allow to hang up from any state
+        //    enable = true;
+        //}
+        //else
+        //{
+        //    // We allow to start call from this state only
+        //    if (mSession->mVoiceChannel->getState() == LLVoiceChannel::STATE_NO_CHANNEL_INFO &&
+        //        LLVoiceClient::instanceExists())
+        //    {
+        //        LLVoiceClient* client = LLVoiceClient::getInstance();
+        //        if (client->voiceEnabled() && client->isVoiceWorking())
+        //        {
+        //            enable = true;
+        //        }
+        //    }
+        //}
     }
 
     mVoiceButton->setEnabled(enable);
@@ -488,21 +488,21 @@ void LLFloaterIMSessionTab::onFocusLost()
 
 void LLFloaterIMSessionTab::onCallButtonClicked()
 {
-    if (mVoiceButtonHangUpMode)
-    {
-        // We allow to hang up from any state
-        gIMMgr->endCall(mSessionID);
-    }
-    else
-    {
-        LLVoiceChannel::EState channel_state = mSession && mSession->mVoiceChannel ?
-            mSession->mVoiceChannel->getState() : LLVoiceChannel::STATE_NO_CHANNEL_INFO;
-        // We allow to start call from this state only
-        if (channel_state == LLVoiceChannel::STATE_NO_CHANNEL_INFO)
-        {
-            gIMMgr->startCall(mSessionID);
-        }
-    }
+    //if (mVoiceButtonHangUpMode)
+    //{
+    //    // We allow to hang up from any state
+    //    gIMMgr->endCall(mSessionID);
+    //}
+    //else
+    //{
+    //    LLVoiceChannel::EState channel_state = mSession && mSession->mVoiceChannel ?
+    //        mSession->mVoiceChannel->getState() : LLVoiceChannel::STATE_NO_CHANNEL_INFO;
+    //    // We allow to start call from this state only
+    //    if (channel_state == LLVoiceChannel::STATE_NO_CHANNEL_INFO)
+    //    {
+    //        gIMMgr->startCall(mSessionID);
+    //    }
+    //}
 }
 
 void LLFloaterIMSessionTab::onInputEditorClicked()
@@ -1095,7 +1095,7 @@ void LLFloaterIMSessionTab::updateCallBtnState(bool callIsActive)
 {
     mVoiceButton->setImageOverlay(callIsActive? getString("call_btn_stop") : getString("call_btn_start"));
     mVoiceButton->setToolTip(callIsActive? getString("end_call_button_tooltip") : getString("start_call_button_tooltip"));
-    mVoiceButtonHangUpMode = callIsActive;
+    //mVoiceButtonHangUpMode = callIsActive;
 
     enableDisableCallBtn();
 }

@@ -47,9 +47,6 @@
 #include "lleventcoro.h"
 #include "llcoros.h"
 
-#include "boost/unordered/unordered_map.hpp"
-#include "boost/unordered/unordered_flat_map.hpp"
-
 class LLInventoryObserver;
 class LLInventoryObject;
 class LLInventoryItem;
@@ -205,13 +202,13 @@ private:
     // the inventory using several different identifiers.
     // mInventory member data is the 'master' list of inventory, and
     // mCategoryMap and mItemMap store uuid->object mappings.
-    typedef boost::unordered_flat_map<LLUUID, LLPointer<LLViewerInventoryCategory> > cat_map_t;
-    typedef boost::unordered_flat_map<LLUUID, LLPointer<LLViewerInventoryItem> > item_map_t;
+    typedef std::map<LLUUID, LLPointer<LLViewerInventoryCategory> > cat_map_t;
+    typedef std::map<LLUUID, LLPointer<LLViewerInventoryItem> > item_map_t;
     cat_map_t mCategoryMap;
     item_map_t mItemMap;
     // This last set of indices is used to map parents to children.
-    typedef boost::unordered_flat_map<LLUUID, cat_array_t*> parent_cat_map_t;
-    typedef boost::unordered_flat_map<LLUUID, item_array_t*> parent_item_map_t;
+    typedef std::map<LLUUID, cat_array_t*> parent_cat_map_t;
+    typedef std::map<LLUUID, item_array_t*> parent_item_map_t;
     parent_cat_map_t mParentChildCategoryTree;
     parent_item_map_t mParentChildItemTree;
 
@@ -615,7 +612,7 @@ private:
     U32 mModifyMaskBacklog;
     changed_items_t mChangedItemIDsBacklog;
     changed_items_t mAddedItemIDsBacklog;
-    typedef boost::unordered_map<LLUUID , changed_items_t> broken_links_t;
+    typedef std::map<LLUUID , changed_items_t> broken_links_t;
     broken_links_t mPossiblyBrockenLinks; // there can be multiple links per item
     changed_items_t mLinksRebuildList;
     boost::signals2::connection mBulkFecthCallbackSlot;
@@ -726,8 +723,8 @@ protected:
     cat_array_t* getUnlockedCatArray(const LLUUID& id);
     item_array_t* getUnlockedItemArray(const LLUUID& id);
 private:
-    boost::unordered_map<LLUUID, bool> mCategoryLock;
-    boost::unordered_map<LLUUID, bool> mItemLock;
+    std::map<LLUUID, bool> mCategoryLock;
+    std::map<LLUUID, bool> mItemLock;
 
     //--------------------------------------------------------------------
     // Debugging
