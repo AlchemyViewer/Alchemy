@@ -437,12 +437,18 @@ LLScriptEdCore::~LLScriptEdCore()
     deleteBridges();
 
     // If the search window is up for this editor, close it.
-//  LLFloaterScriptSearch* script_search = LLFloaterScriptSearch::getInstance();
-//  if (script_search && script_search->getEditorCore() == this)
-//  {
-//      script_search->closeFloater();
-//      delete script_search;
-//  }
+//    LLFloaterScriptSearch* script_search = LLFloaterScriptSearch::getInstance();
+//    if (script_search && script_search->getEditorCore() == this)
+//    {
+//        script_search->closeFloater();
+//        // closeFloater can delete instance since it's not reusable nor single instance
+//        // so make sure instance is still there before deleting
+//        script_search = LLFloaterScriptSearch::getInstance();
+//        if (script_search)
+//        {
+//            delete script_search;
+//        }
+//    }
 
     delete mLiveFile;
     if (mSyntaxIDConnection.connected())

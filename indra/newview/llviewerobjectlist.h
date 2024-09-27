@@ -227,9 +227,9 @@ protected:
     S32 mCurLazyUpdateIndex;
 
     static U32 sSimulatorMachineIndex;
-    boost::unordered_flat_map<U64, U32> mIPAndPortToIndex;
+    std::map<U64, U32> mIPAndPortToIndex;
 
-    boost::unordered_flat_map<U64, LLUUID> mIndexAndLocalIDToUUID;
+    std::map<U64, LLUUID> mIndexAndLocalIDToUUID;
 
     friend class LLViewerObject;
 

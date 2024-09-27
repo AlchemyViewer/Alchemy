@@ -451,8 +451,8 @@ public:
 
     /////////////////////////////
     // Accessors for data related to nearby speakers
-    bool getVoiceEnabled(const LLUUID& id);     // true if we've received data for this avatar
-    std::string getDisplayName(const LLUUID& id);
+    bool getVoiceEnabled(const LLUUID& id) const;     // true if we've received data for this avatar
+    std::string getDisplayName(const LLUUID& id) const;
     bool isOnlineSIP(const LLUUID &id);
     bool isParticipantAvatar(const LLUUID &id);
     bool getIsSpeaking(const LLUUID& id);

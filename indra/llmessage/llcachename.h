@@ -137,7 +137,7 @@ public:
     void localizeCacheName(std::string key, std::string value);
 
 private:
-    boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> sCacheName;
+    boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> mCacheName;
 
     class Impl;
     Impl& impl;

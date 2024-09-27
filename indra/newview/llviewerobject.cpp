@@ -2107,7 +2107,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
                 // Debugging for suspected problems with local ids.
                 //LLUUID parent_uuid;
-                //LLViewerObjectList::getUUIDFromLocal(parent_uuid, parent_id, mesgsys->getSenderIP(), mesgsys->getSenderPort() );
+                //gObjectList.getUUIDFromLocal(parent_uuid, parent_id, mesgsys->getSenderIP(), mesgsys->getSenderPort() );
                 //if (parent_uuid != cur_parentp->getID() )
                 //{
                 //  LL_ERRS() << "Local ID match but UUID mismatch of viewer object" << LL_ENDL;

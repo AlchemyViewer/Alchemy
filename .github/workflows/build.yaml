@@ -417,7 +417,7 @@ jobs:
           password: ${{ env.BUGSPLAT_PASS }}
           database: "SecondLife_Viewer_2018"
           application: ${{ needs.build.outputs.viewer_channel }}
-          version: ${{ needs.build.outputs.viewer_version }}
+          version: ${{ needs.build.outputs.viewer_version }} (${{ needs.build.outputs.viewer_version }})
           directory: .
           files: "**/*.xcarchive.zip"
 

@@ -282,12 +282,12 @@ static bool handleVSyncChanged(const LLSD& newvalue)
     if (gViewerWindow && gViewerWindow->getWindow())
     {
         gViewerWindow->getWindow()->toggleVSync(newvalue.asBoolean());
-    }
 
-    if (newvalue.asBoolean())
-    {
-        U32 current_target = gSavedSettings.getU32("TargetFPS");
-        gSavedSettings.setU32("TargetFPS", std::min((U32)gViewerWindow->getWindow()->getRefreshRate(), current_target));
+        if (newvalue.asBoolean())
+        {
+            U32 current_target = gSavedSettings.getU32("TargetFPS");
+            gSavedSettings.setU32("TargetFPS", std::min((U32)gViewerWindow->getWindow()->getRefreshRate(), current_target));
+        }
     }
 
     return true;

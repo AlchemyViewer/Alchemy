@@ -578,15 +578,13 @@ LLPanelPeople::~LLPanelPeople()
     delete mFriendListUpdater;
     delete mRecentListUpdater;
 
+    LLVoiceClient::removeObserver(this);
+
     mNearbyFilterCommitConnection.disconnect();
     mFriedsFilterCommitConnection.disconnect();
     mGroupsFilterCommitConnection.disconnect();
     mRecentFilterCommitConnection.disconnect();
 
-    if(LLVoiceClient::instanceExists())
-    {
-        LLVoiceClient::getInstance()->removeObserver(this);
-    }
 }
 
 void LLPanelPeople::onFriendsAccordionExpandedCollapsed(LLUICtrl* ctrl, const LLSD& param, LLAvatarList* avatar_list)

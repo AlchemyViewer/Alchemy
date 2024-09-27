@@ -389,6 +389,7 @@ public:
 //  }
 
     static void     onClickClose(LLFloater* floater);
+    static void     onClickClose(LLFloater* floater, bool app_quitting);
     static void     onClickMinimize(LLFloater* floater);
 // [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-3.2
     static void     onClickCollapse(LLFloater* floater);
