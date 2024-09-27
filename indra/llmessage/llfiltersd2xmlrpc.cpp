@@ -83,6 +83,8 @@
 #include <xmlrpc.h>
 #else
 #include <xmlrpc-epi/xmlrpc.h>
+#undef queue
+// Doug: If you see a merge conflict here because this file was deleted, feel free to nuke this too.
 #endif
 
 #include "apr_base64.h"
