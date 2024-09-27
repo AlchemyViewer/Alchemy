@@ -560,11 +560,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>21e6704cda776d24de00a56bc20ef88d66c9b9a4a3e6cbd06c9cd17040318798a9fbfb25622f14a144f054a9dc47c6b42896ece36d6c1bba0c9f526193e5d29e</string>
+              <string>9c58108270fbad15a321f75501cdfb9c6b78a6f2</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-emoji-shortcodes/releases/download/v15.3.0-dfc7c2c/emoji_shortcodes-15.3.0.9430912711-common-9430912711.tar.zst</string>
+              <string>https://github.com/secondlife/3p-emoji-shortcodes/releases/download/v15.3.2-r1/emoji_shortcodes-15.3.2.10207138275-common-10207138275.tar.zst</string>
             </map>
             <key>name</key>
             <string>common</string>
@@ -577,15 +577,9 @@
         <key>copyright</key>
         <string>Copyright 2017-2019 Miles Johnson.</string>
         <key>version</key>
-        <string>15.3.0.9430912711</string>
+        <string>15.3.2.10207138275</string>
         <key>name</key>
         <string>emoji_shortcodes</string>
-        <key>vcs_branch</key>
-        <string>refs/tags/v15.3.0-dfc7c2c</string>
-        <key>vcs_revision</key>
-        <string>dfc7c2cf2a91e3ef55875b2590f8de738d715e00</string>
-        <key>vcs_url</key>
-        <string>git://github.com/AlchemyViewer/3p-emoji-shortcodes.git</string>
         <key>canonical_repo</key>
         <string>https://github.com/secondlife/3p-emoji-shortcodes</string>
         <key>description</key>
@@ -1117,47 +1111,47 @@
       <map>
         <key>platforms</key>
         <map>
-          <key>darwin64</key>
+          <key>windows64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2552b1150f1561385f901bbce569ddce176fea9c83a13e97dc0ad47d6200a913f25be817d3634b948450b700bf73a77fe34fe6d7d55dce954e1bcbb2319df792</string>
+              <string>34cf4fdbbc999e67b0528f7ca3c7f31f35267ecf</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-libjpeg-turbo/releases/download/v3.0.3-e150f8f/libjpeg_turbo-3.0.3-darwin64-9630753092.tar.zst</string>
+              <string>https://github.com/secondlife/3p-libjpeg-turbo/releases/download/v3.0.3-r2/libjpeg_turbo-3.0.3-r2-windows64-10341191820.tar.zst</string>
             </map>
             <key>name</key>
-            <string>darwin64</string>
+            <string>windows64</string>
           </map>
           <key>linux64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>e78ef1fbaf7d3917a1ba9ea5a1d263e0364c58e7931e3568e62a765b66de590a1aabe1312d1dc043bce5465892615f2e444b860815d261139b8762a6927e9232</string>
+              <string>5ff05a0e5ed0aba1514b84d3c2edaf70c18738b5</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-libjpeg-turbo/releases/download/v3.0.3-e150f8f/libjpeg_turbo-3.0.3-linux64-9630753092.tar.zst</string>
+              <string>https://github.com/secondlife/3p-libjpeg-turbo/releases/download/v3.0.3-r2/libjpeg_turbo-3.0.3-r2-linux64-10341191820.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
           </map>
-          <key>windows64</key>
+          <key>darwin64</key>
           <map>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c4b54277b37c203aaa7b5ba4fe24ad9bbf7804ef1e2f4c013619b69a54872f895918052b2b93f23bda2eaa1b44985ead0a6a77edac0fe34c9bbd1ba903155525</string>
+              <string>7c38eabc050b4a6bdb183a1d7a38da885341049c</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-libjpeg-turbo/releases/download/v3.0.3-e150f8f/libjpeg_turbo-3.0.3-windows64-9630753092.tar.zst</string>
+              <string>https://github.com/secondlife/3p-libjpeg-turbo/releases/download/v3.0.3-r2/libjpeg_turbo-3.0.3-r2-darwin64-10341191820.tar.zst</string>
             </map>
             <key>name</key>
-            <string>windows64</string>
+            <string>darwin64</string>
           </map>
         </map>
         <key>license</key>
@@ -1165,13 +1159,13 @@
         <key>license_file</key>
         <string>LICENSES/libjpeg-turbo.txt</string>
         <key>copyright</key>
-        <string>Copyright (C)2009-2023 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
+        <string>Copyright (C)2009-2024 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
         <key>version</key>
-        <string>3.0.3</string>
+        <string>3.0.3-r2</string>
         <key>name</key>
         <string>libjpeg-turbo</string>
         <key>canonical_repo</key>
-        <string>https://www.github.com/AlchemyViewer/3p-libjpeg-turbo</string>
+        <string>https://github.com/secondlife/3p-libjpeg-turbo</string>
         <key>description</key>
         <string>JPEG encoding, decoding library</string>
       </map>
