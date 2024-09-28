@@ -43,8 +43,8 @@
 	</radio_group>
 	<check_box name="gesture_audio_play_btn" tool_tip="ジェスチャーからのサウンドを聞くにはこれを選択" label="ジェスチャーのサウンドを再生する"/>
 	<check_box name="sound_on_collisions" tool_tip="ここをチェックすると、オブジェクトやアバターにぶつかったときに衝突音がなります。" label="衝突音を再生する"/>
-	<check_box name="media_auto_play_hud" tool_tip="ここのチェックを外すと、自分のＨＵＤに取り付けられたメディアが自動再生されなくなります。" label="自分のＨＵＤに取り付けられたメディアを自動再生する"/>
-	<check_box name="media_show_on_others_btn" tool_tip="ここのチェックを外すと、近くにいる他のアバターに取り付けられたメディアを非表示にします。" label="近くにいるアバターに取り付けられたメディアを再生する"/>
+	<check_box name="media_auto_play_hud" tool_tip="ここのチェックを外すと、自分のＨＵＤに取り付けられたメディアが自動再生されなくなります。" label="自分のＨＵＤのメディアを自動再生"/>
+	<check_box name="media_show_on_others_btn" tool_tip="ここのチェックを外すと、近くにいる他のアバターに取り付けられたメディアを非表示にします。" label="近くのアバターのメディアを自動再生"/>
 	<text name="media_autoplay_label">
 		メディアの自動再生
 	</text>
@@ -60,11 +60,10 @@
 		<radio_item label="カメラの位置" name="0"/>
 		<radio_item label="アバターの位置" name="1"/>
 	</radio_group>
-	<check_box tool_tip="ここをチェックするとボイスのエコー除去を有効にします。" label="エコー除去" name="enable_echo_cancellation"/>
+	<check_box tool_tip="ここをチェックするとボイスのエコーを除去します。" label="エコー除去" name="enable_echo_cancellation"/>
+	<check_box label="ツールバーのボタンでボイスの切り替え" name="push_to_talk_toggle_check" tool_tip="トグルモードでは、トリガーキーを押すことでマイクのオン／オフを切り替えます。そうでない場合は、トリガーキーを押している間だけマイクがオンになります。"/>
+	<check_box tool_tip="ここをチェックすると、自動ゲインコントロールを有効化します。" label="自動音量調整" name="voice_automatic_gain_control"/>
 	<check_box label="喋ったときにアバターの口を動かす" name="enable_lip_sync"/>
-	<check_box label="ボイスチャットをトグルモードにする" name="push_to_talk_toggle_check" tool_tip="トグルモードでは、トリガーキーを押すことでマイクのオン／オフを切り替えます。そうでない場合は、トリガーキーを押している間だけマイクがオンになります。"/>
-	<check_box tool_tip="ここをチェックすると自動ゲインコントロールを有効にします。" label="自動ゲインコントロール" name="voice_automatic_gain_control"/>
-	<button label="入出力機器の設定" name="device_settings_btn"/>
 	<text name="noise_suppression_label">
 		ノイズ抑制
 	</text>
@@ -73,7 +72,8 @@
 		<item label="低" name="noise_suppression_low" value="1"/>
 		<item label="中" name="noise_suppression_moderate" value="2"/>
 		<item label="高" name="noise_suppression_high" value="3"/>
-		<item label="最大" name="noise_suppression_max" value="4"/>
+		<item label="最高" name="noise_suppression_max" value="4"/>
 	</combo_box>
+	<button label="入出力機器の設定" name="device_settings_btn"/>
 	<panel name="device_settings_panel"/>
 </panel>
