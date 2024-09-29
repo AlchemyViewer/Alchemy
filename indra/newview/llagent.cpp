@@ -1697,6 +1697,10 @@ void LLAgent::setAFK()
     {
         sendAnimationRequest(ANIM_AGENT_AWAY, ANIM_REQUEST_START);
         setControlFlags(AGENT_CONTROL_AWAY | AGENT_CONTROL_STOP);
+        static const LLCachedControl<bool> sit_when_away(gSavedPerAccountSettings, "AlchemySitWhenAway", true);
+        if (sit_when_away) {
+            sitDown();
+        }
         gAwayTimer.start();
     }
 }
