@@ -33,7 +33,9 @@ if [ -n "${AL_VALGRIND}" ]; then
 fi
 
 if [ -n "${AL_MANGO}" ]; then
-    export LL_WRAPPER='mangohud --dlsym'
+    if command -v mangohud >/dev/null 2>&1; then
+        export LL_WRAPPER='mangohud --dlsym'
+    fi
 fi
 
 ## For controlling various sanitizer options
