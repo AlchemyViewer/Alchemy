@@ -28,6 +28,7 @@
 #ifndef LL_LLWINDOWMACOSX_OBJC_H
 #define LL_LLWINDOWMACOSX_OBJC_H
 
+#include <deque>
 #include <map>
 #include <string>
 #include <vector>
