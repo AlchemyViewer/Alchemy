@@ -5506,6 +5506,7 @@ bool attempt_standard_notification(LLMessageSystem* msgsystem)
             }
 
             make_ui_sound("UISndRestart");
+            fs_report_region_restart_to_channel(seconds); // <FS:PP> Announce region restart to a defined chat channel
         }
 
         // Special Marketplace update notification
@@ -7475,3 +7476,22 @@ void LLOfferInfo::forceResponse(InventoryOfferResponse response)
     LLNotifications::instance().forceResponse(params, response);
 }
 
+// <FS:PP> Announce region restart to a defined chat channel
+void fs_report_region_restart_to_channel(S32 seconds)
+{
+	S32 channel = gSavedSettings.getS32("FSRegionRestartAnnounceChannel");
+	if (gSavedSettings.getBOOL("FSReportRegionRestartToChat") && channel != 0)
+	{
+		LLMessageSystem* msg = gMessageSystem;
+		msg->newMessageFast(_PREHASH_ChatFromViewer);
+		msg->nextBlockFast(_PREHASH_AgentData);
+		msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+		msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+		msg->nextBlockFast(_PREHASH_ChatData);
+		msg->addStringFast(_PREHASH_Message, "region_restart_in:" + llformat("%d", seconds));
+		msg->addU8Fast(_PREHASH_Type, CHAT_TYPE_WHISPER);
+		msg->addS32("Channel", channel);
+		gAgent.sendReliableMessage();
+	}
+}
+// </FS:PP>
