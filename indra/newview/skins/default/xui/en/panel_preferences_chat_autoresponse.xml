@@ -20,7 +20,6 @@
            Automatic response to all avatars when in AUTORESPONSE to everyone mode:
         </text>
         <text_editor
-         enabled_control="AlchemyAutoresponseEnable"
          control_name="AlchemyAutoresponse"
          use_ellipses="false"
          commit_on_focus_lost = "true"
@@ -49,7 +48,6 @@
            Automatic response to non-friends when in AUTORESPONSE TO NON-FRIENDS mode:
         </text>
         <text_editor
-        enabled_control="AlchemyAutoresponseNotFriendEnable"
          control_name="AlchemyAutoresponseNotFriend"
          use_ellipses="false"
          commit_on_focus_lost = "true"
