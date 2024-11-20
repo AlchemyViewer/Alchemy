@@ -242,7 +242,7 @@ void LLReflectionMapManager::update()
         }
     }
 
-    llassert(mProbes[0] == mDefaultProbe.get());
+    llassert(mProbes[0] == mDefaultProbe);
 
     LLVector4a camera_pos;
     camera_pos.load3(LLViewerCamera::instance().getOrigin().mV);
