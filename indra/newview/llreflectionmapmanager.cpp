@@ -242,7 +242,7 @@ void LLReflectionMapManager::update()
         }
     }
 
-    llassert(mProbes[0] == mDefaultProbe);
+    llassert(mProbes[0] == mDefaultProbe.get());
 
     LLVector4a camera_pos;
     camera_pos.load3(LLViewerCamera::instance().getOrigin().mV);
@@ -607,7 +607,7 @@ void LLReflectionMapManager::deleteProbe(U32 i)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     LLReflectionMap* probe = mProbes[i];
 
-    llassert(probe != mDefaultProbe);
+    llassert(probe != mDefaultProbe.get());
 
     if (probe->mCubeIndex != -1)
     { // mark the cube index used by this probe as being free
