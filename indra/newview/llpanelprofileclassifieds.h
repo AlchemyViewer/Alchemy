@@ -28,14 +28,11 @@
 #define LL_PANELPROFILECLASSIFIEDS_H
 
 #include "llavatarpropertiesprocessor.h"
-#include "llclassifiedinfo.h"
-#include "llfloater.h"
+#include "llfloaterpublishclassified.h"
 #include "llpanel.h"
 #include "llpanelavatar.h"
-#include "llrect.h"
 #include "lluuid.h"
 #include "v3dmath.h"
-#include "llcoros.h"
 #include "lleventcoro.h"
 
 class LLCheckBoxCtrl;
@@ -46,23 +43,6 @@ class LLTabContainer;
 class LLTextEditor;
 class LLTextureCtrl;
 class LLUICtrl;
-
-
-class LLPublishClassifiedFloater final : public LLFloater
-{
-public:
-    LLPublishClassifiedFloater(const LLSD& key);
-    virtual ~LLPublishClassifiedFloater();
-
-    BOOL postBuild() override;
-
-    void setPrice(S32 price);
-    S32 getPrice();
-
-    void setPublishClickedCallback(const commit_signal_t::slot_type& cb);
-    void setCancelClickedCallback(const commit_signal_t::slot_type& cb);
-};
-
 
 /**
 * Panel for displaying Avatar's picks.
@@ -325,10 +305,7 @@ private:
 
     S32 mPriceForListing;
 
-public:
     static void handleSearchStatResponse(LLUUID classifiedId, LLSD result);
-
-private:
 
     typedef std::list<LLPanelProfileClassified*> panel_list_t;
     static panel_list_t sAllPanels;
@@ -339,7 +316,7 @@ private:
     bool mCanClose;
     bool mEditOnLoad;
 
-    LLPublishClassifiedFloater* mPublishFloater;
+    LLFloaterPublishClassified* mPublishFloater;
 };
 
 #endif // LL_PANELPROFILECLASSIFIEDS_H
