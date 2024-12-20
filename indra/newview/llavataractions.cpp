@@ -50,6 +50,7 @@
 #include "llfloaterreg.h"
 #include "llfloaterpay.h"
 #include "llfloaterprofile.h"
+#include "llfloaterprofilelegacy.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llfloaterwebcontent.h"
 #include "llfloaterworldmap.h"
@@ -64,6 +65,7 @@
 #include "llnotificationsutil.h"    // for LLNotificationsUtil
 #include "llpaneloutfitedit.h"
 #include "llpanelprofile.h"
+#include "llpanelprofilelegacy.h"
 #include "llparcel.h"
 #include "llrecentpeople.h"
 #include "lltrans.h"
@@ -378,7 +380,15 @@ void LLAvatarActions::showProfile(const LLUUID& avatar_id)
 {
     if (avatar_id.notNull())
     {
-        LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id));
+        if (gSkinSettings.getBool("LegacyProfile"))
+        {
+            LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+                "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
+        }
+        else
+        {
+            LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id));
+        }
     }
 }
 
@@ -387,10 +397,21 @@ void LLAvatarActions::showPicks(const LLUUID& avatar_id)
 {
     if (avatar_id.notNull())
     {
-        LLFloaterProfile* profilefloater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id)));
-        if (profilefloater)
+        if (gSkinSettings.getBool("LegacyProfile"))
         {
-            profilefloater->showPick();
+            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+                "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
+            LLPanel* tab = profile->expandTab("avatar_picks_tab");
+            tab->getChild<LLAccordionCtrl>("accordion")->expandTab("tab_picks");
+        }
+        else
+        {
+            LLFloaterProfile* profile = LLFloaterReg::showTypedInstance<LLFloaterProfile>(
+                "profile", LLSD().with("id", avatar_id));
+            if (profile)
+            {
+                profile->showPick();
+            }
         }
     }
 }
@@ -400,10 +421,20 @@ void LLAvatarActions::showPick(const LLUUID& avatar_id, const LLUUID& pick_id)
 {
     if (avatar_id.notNull())
     {
-        LLFloaterProfile* profilefloater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id)));
-        if (profilefloater)
+        if (gSkinSettings.getBool("LegacyProfile"))
         {
-            profilefloater->showPick(pick_id);
+            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+                "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
+            /*auto* tab = */dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+            // *TODO: Finish
+        }
+        else
+        {
+            LLFloaterProfile* profile = LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
+            if (profile)
+            {
+                profile->showPick(pick_id);
+            }
         }
     }
 }
@@ -411,9 +442,9 @@ void LLAvatarActions::showPick(const LLUUID& avatar_id, const LLUUID& pick_id)
 // static
 void LLAvatarActions::createPick()
 {
-    LLFloaterProfile* profilefloater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+
     LLViewerRegion* region = gAgent.getRegion();
-    if (profilefloater && region)
+    if (region)
     {
         LLPickData data;
         data.pos_global = gAgent.getPositionGlobal();
@@ -431,8 +462,7 @@ void LLAvatarActions::createPick()
         {
             data.name = region->getName();
         }
-
-        profilefloater->createPick(data);
+        createPick(data);
     }
 }
 
@@ -441,10 +471,21 @@ bool LLAvatarActions::isPickTabSelected(const LLUUID& avatar_id)
 {
     if (avatar_id.notNull())
     {
-        LLFloaterProfile* profilefloater = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
-        if (profilefloater)
+        static LLCachedControl<bool> legacy_profile(gSkinSettings, "LegacyProfile");
+        if (legacy_profile)
         {
-            return profilefloater->isPickTabSelected();
+            const LLFloaterProfileLegacy* profile = LLFloaterReg::findTypedInstance<LLFloaterProfileLegacy>(
+                "legacy_profile", LLSD().with("avatar_id", avatar_id));
+            if (profile == nullptr) { return false; }
+            return dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->getExpandedTab()) != nullptr;
+        }
+        else
+        {
+            LLFloaterProfile* profilefloater = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
+            if (profilefloater)
+            {
+                return profilefloater->isPickTabSelected();
+            }
         }
     }
     return false;
@@ -455,10 +496,21 @@ void LLAvatarActions::showClassifieds(const LLUUID& avatar_id)
 {
     if (avatar_id.notNull())
     {
-        LLFloaterProfile* profilefloater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id)));
-        if (profilefloater)
+        if (gSkinSettings.getBool("LegacyProfile"))
         {
-            profilefloater->showClassified();
+            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+                "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
+            LLPanel* tab = profile->expandTab("avatar_picks_tab");
+            tab->getChild<LLAccordionCtrl>("accordion")->expandTab("tab_classifieds");
+        }
+        else
+        {
+            LLFloaterProfile* profilefloater = LLFloaterReg::showTypedInstance<LLFloaterProfile>(
+                "profile", LLSD().with("id", avatar_id));
+            if (profilefloater)
+            {
+                profilefloater->showClassified();
+            }
         }
     }
 }
@@ -468,10 +520,22 @@ void LLAvatarActions::showClassified(const LLUUID& avatar_id, const LLUUID& clas
 {
     if (avatar_id.notNull())
     {
-        LLFloaterProfile* profilefloater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id)));
-        if (profilefloater)
+        if (gSkinSettings.getBool("LegacyProfile"))
         {
-            profilefloater->showClassified(classified_id, edit);
+            const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+                "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
+            LLPanel* tab = profile->expandTab("avatar_picks_tab");
+            tab->getChild<LLAccordionCtrl>("accordion")->expandTab("tab_classifieds");
+            // *TODO: Finish
+        }
+        else
+        {
+            LLFloaterProfile* profilefloater =
+                dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id)));
+            if (profilefloater)
+            {
+                profilefloater->showClassified(classified_id, edit);
+            }
         }
     }
 }
@@ -479,35 +543,68 @@ void LLAvatarActions::showClassified(const LLUUID& avatar_id, const LLUUID& clas
 // static
 void LLAvatarActions::createClassified()
 {
-    LLFloaterProfile* profilefloater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
-    if (profilefloater)
+    if (gSkinSettings.getBool("LegacyProfile"))
     {
-        profilefloater->createClassified();
+        const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            "legacy_profile", LLSD().with("avatar_id", gAgent.getID()));
+        auto* tab = dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+        tab->createNewClassified();
+
+    }
+    else
+    {
+        LLFloaterProfile* profilefloater =
+            dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+        if (profilefloater)
+        {
+            profilefloater->createClassified();
+        }
     }
 }
 
 //static
 bool LLAvatarActions::profileVisible(const LLUUID& avatar_id)
 {
-    LLSD sd;
-    sd["id"] = avatar_id;
-    LLFloater* floater = getProfileFloater(avatar_id);
+    LLFloater* floater = findProfileFloater(avatar_id);
     return floater && floater->isShown();
 }
 
 //static
-LLFloater* LLAvatarActions::getProfileFloater(const LLUUID& avatar_id)
+LLFloater* LLAvatarActions::findProfileFloater(const LLUUID& avatar_id)
 {
-    LLFloaterProfile* floater = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
-    return floater;
+    LLFloater* profile = nullptr;
+    static LLCachedControl<bool> legacy_profile(gSkinSettings, "LegacyProfile");
+    if (legacy_profile)
+        profile = LLFloaterReg::findTypedInstance<LLFloaterProfileLegacy>("legacy_profile", LLSD().with("avatar_id", avatar_id));
+    else
+        profile = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
+    return profile;
+}
+
+void LLAvatarActions::createPick(const LLPickData& data)
+{
+    if (gSkinSettings.getBool("LegacyProfile"))
+    {
+        const LLFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<LLFloaterProfileLegacy>(
+            "legacy_profile", LLSD().with("avatar_id", gAgent.getID()));
+        auto* tab = dynamic_cast<LLPanelProfileLegacy::LLPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+        tab->createNewPick();
+    }
+    else
+    {
+        LLFloaterProfile* floater =
+            dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+        if (floater)
+        {
+            floater->createPick(data);
+        }
+    }
 }
 
 //static
 void LLAvatarActions::hideProfile(const LLUUID& avatar_id)
 {
-    LLSD sd;
-    sd["id"] = avatar_id;
-    LLFloater* floater = getProfileFloater(avatar_id);
+    LLFloater* floater = findProfileFloater(avatar_id);
     if (floater)
     {
         floater->closeFloater();
