@@ -2,7 +2,7 @@
  * @file llpanelprofilelegacy.h
  * @brief Legacy protocol avatar profile panel
  *
- * Copyright (c) 2014-2022, Cinder Roxley <cinder@sdf.org>
+ * Copyright (c) 2014-2024, Cinder Roxley <cinder@sdf.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -128,6 +128,7 @@ public:
     private:
         void updateData() override;
         void processProperties(void* data, EAvatarProcessorType type) override;
+        void processPick(LLAvatarData::pick_data_t const& pick);
         void resetControls() override {};
         void showAccordion(const std::string& name, bool show);
         void setProfilePanel(LLPanelProfileLegacy* profile_panel);

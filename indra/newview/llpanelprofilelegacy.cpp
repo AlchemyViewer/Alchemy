@@ -2,7 +2,7 @@
  * @file llpanelprofilelegacy.cpp
  * @brief Legacy protocol avatar profile panel
  *
- * Copyright (c) 2014-2022, Cinder Roxley <cinder@sdf.org>
+ * Copyright (c) 2014-2024, Cinder Roxley <cinder@sdf.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -513,8 +513,12 @@ void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType ty
             showTab("avatar_groups_tab", !pData->group_list.empty());
             break;
         }
-        // These are handled by their respective panels
         case APT_PICKS:
+        {
+            mPanelPicks->processProperties(data, APT_PICKS);
+            break;
+        }
+        // These are handled by their respective panels
         case APT_CLASSIFIEDS:
         case APT_PICK_INFO:
         case APT_CLASSIFIED_INFO:
@@ -874,33 +878,31 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::updateData()
 
 void LLPanelProfileLegacy::LLPanelProfilePicks::processProperties(void* data, EAvatarProcessorType type)
 {
-    if (APT_PICKS == type)
+    if (APT_PROPERTIES == type)
+    {
+        LLAvatarData* avatar_data = static_cast<LLAvatarData*>(data);
+        if (!avatar_data || getAvatarId() != avatar_data->avatar_id) { return; }
+        if (getAvatarId() == gAgentID)
+        {
+            LLAgentPicksInfo::getInstance()->onServerRespond(avatar_data);
+        }
+        mPicksList->clear();
+        for (const LLAvatarPicks::pick_data_t& pick : avatar_data->picks_list)
+        {
+            LL_INFOS() << "Porcessing pick " << pick.second << LL_ENDL;
+            processPick(pick);
+        }
+        showAccordion("tab_picks", mPicksList->size());
+    }
+    // LEGACY CODE, OH SCARY SO HARD TO MAINE TAINE
+    else if (APT_PICKS == type)
     {
         mPicksList->clear();
         LLAvatarPicks* avatar_picks = static_cast<LLAvatarPicks*>(data);
         if (!avatar_picks || getAvatarId() != avatar_picks->target_id) return;
         for (const LLAvatarPicks::pick_data_t& pick: avatar_picks->picks_list)
         {
-            const LLUUID pick_id = pick.first;
-            const std::string pick_name = pick.second;
-
-            LLPickItem* picture = LLPickItem::create();
-            picture->childSetAction("info_chevron", boost::bind(&LLPanelProfilePicks::onClickInfo, this));
-            picture->setPickName(pick_name);
-            picture->setPickId(pick_id);
-            picture->setCreatorId(getAvatarId());
-
-            LLAvatarPropertiesProcessor::instance().addObserver(getAvatarId(), picture);
-            picture->update();
-
-            LLSD pick_value = LLSD();
-            pick_value.insert(PICK_ID, pick_id);
-            pick_value.insert(PICK_NAME, pick_name);
-            pick_value.insert(PICK_CREATOR_ID, getAvatarId());
-
-            mPicksList->addItem(picture, pick_value);
-            picture->setMouseUpCallback(boost::bind(&LLPanelProfilePicks::updateButtons, this));
-            picture->setRightMouseUpCallback(boost::bind(&LLPanelProfilePicks::onRightMouseUpItem, this, _1, _2, _3, _4));
+            processPick(pick);
         }
         showAccordion("tab_picks", mPicksList->size());
     }
@@ -929,6 +931,30 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::processProperties(void* data, EA
         showAccordion("tab_classifieds", mClassifiedsList->size());
     }
     updateButtons();
+}
+
+void LLPanelProfileLegacy::LLPanelProfilePicks::processPick(LLAvatarData::pick_data_t const& pick)
+{
+    const LLUUID      pick_id   = pick.first;
+    const std::string pick_name = pick.second;
+
+    LLPickItem* picture = LLPickItem::create();
+    picture->childSetAction("info_chevron", boost::bind(&LLPanelProfilePicks::onClickInfo, this));
+    picture->setPickName(pick_name);
+    picture->setPickId(pick_id);
+    picture->setCreatorId(getAvatarId());
+
+    LLAvatarPropertiesProcessor::instance().addObserver(getAvatarId(), picture);
+    picture->update();
+
+    LLSD pick_value = LLSD();
+    pick_value.insert(PICK_ID, pick_id);
+    pick_value.insert(PICK_NAME, pick_name);
+    pick_value.insert(PICK_CREATOR_ID, getAvatarId());
+
+    mPicksList->addItem(picture, pick_value);
+    picture->setMouseUpCallback(boost::bind(&LLPanelProfilePicks::updateButtons, this));
+    picture->setRightMouseUpCallback(boost::bind(&LLPanelProfilePicks::onRightMouseUpItem, this, _1, _2, _3, _4));
 }
 
 void LLPanelProfileLegacy::LLPanelProfilePicks::showAccordion(const std::string& name, bool show)
