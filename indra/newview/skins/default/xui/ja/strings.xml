@@ -6650,11 +6650,14 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="premium_voice_morphing_url">
 		https://secondlife.com/destination/voice-morphing-premium
 	</string>
+	<string name="no_voice_morphing_faq_url">
+		https://lindenlab.freshdesk.com/support/solutions/articles/31000173560-webrtc-update-for-voice-chat-faq/
+	</string>
 	<string name="lindenhomes_get_home_url">
 		https://secondlife.com/land/lindenhomes/member.php?lang=ja-JP
 	</string>
 	<string name="lindenhomes_my_home_url">
-		https://land.secondlife.com/ja-JP/lindenhomes/my-home.php
+		https://secondlife.com/ja-JP/land/lindenhomes
 	</string>
 	<string name="membership_url">
 		https://accounts.secondlife.com/change_membership/?lang=ja-JP
@@ -8250,5 +8253,11 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 	</string>
 	<string name="TooltipDistance">
 		距離：[OBJECT_DISTANCE]
+	</string>
+	<string name="AutoResponseModeDefault">
+		あなたがメッセージを送った住人は、[APP_NAME]ビューアの「自動応答モード」を有効にしており、邪魔されないよう要求しています。あなたのメッセージは、後で閲覧できるように住人のＩＭパネルに表示されます。
+	</string>
+	<string name="AutoResponseModeNonFriendsDefault">
+		あなたがメッセージを送った住人は、[APP_NAME]ビューアの「自動応答モード」を有効にしており、邪魔されないよう要求しています。あなたのメッセージは、後で閲覧できるように住人のＩＭパネルに表示されます。
 	</string>
 </strings>
