@@ -75,8 +75,6 @@
 #include "llviewernetwork.h" //LLGridManager
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
-#include "lltrans.h"
-#include "llcallingcard.h"
 #include "llslurl.h"            // IDEVO
 #include "llsidepanelinventory.h"
 #include "llavatarname.h"
@@ -148,7 +146,9 @@ void LLAvatarActions::requestFriendshipDialog(const LLUUID& id)
 void LLAvatarActions::removeFriendDialog(const LLUUID& id)
 {
     if (id.isNull())
+    {
         return;
+    }
 
     uuid_vec_t ids;
     ids.push_back(id);
@@ -158,8 +158,10 @@ void LLAvatarActions::removeFriendDialog(const LLUUID& id)
 // static
 void LLAvatarActions::removeFriendsDialog(const uuid_vec_t& ids)
 {
-    if(ids.size() == 0)
+    if (ids.empty())
+    {
         return;
+    }
 
     LLSD args;
     std::string msgType;
@@ -195,8 +197,9 @@ void LLAvatarActions::removeFriendsDialog(const uuid_vec_t& ids)
 void LLAvatarActions::offerTeleport(const LLUUID& invitee)
 {
     if (invitee.isNull())
+    {
         return;
-
+    }
     std::vector<LLUUID> ids;
     ids.push_back(invitee);
     offerTeleport(ids);
@@ -205,9 +208,10 @@ void LLAvatarActions::offerTeleport(const LLUUID& invitee)
 // static
 void LLAvatarActions::offerTeleport(const uuid_vec_t& ids)
 {
-    if (ids.size() == 0)
+    if (ids.empty())
+    {
         return;
-
+    }
     handle_lure(ids);
 }
 
@@ -227,9 +231,10 @@ static void on_avatar_name_cache_start_im(const LLUUID& agent_id,
 void LLAvatarActions::startIM(const LLUUID& id)
 {
     if (id.isNull() || gAgent.getID() == id)
+    {
         return;
-
-// [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
+    }
+    // [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
     if (!RlvActions::canStartIM(id))
     {
         make_ui_sound("UISndInvalidOp");
@@ -245,8 +250,9 @@ void LLAvatarActions::startIM(const LLUUID& id)
 void LLAvatarActions::endIM(const LLUUID& id)
 {
     if (id.isNull())
+    {
         return;
-
+    }
     LLUUID session_id = gIMMgr->computeSessionID(IM_NOTHING_SPECIAL, id);
     if (session_id != LLUUID::null)
     {
@@ -286,7 +292,7 @@ void LLAvatarActions::startCall(const LLUUID& id)
 // static
 void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floater_id)
 {
-    if (ids.size() == 0)
+    if (ids.empty())
     {
         return;
     }
@@ -574,10 +580,11 @@ LLFloater* LLAvatarActions::findProfileFloater(const LLUUID& avatar_id)
 {
     LLFloater* profile = nullptr;
     static LLCachedControl<bool> legacy_profile(gSkinSettings, "LegacyProfile");
-    if (legacy_profile)
+    if (legacy_profile) {
         profile = LLFloaterReg::findTypedInstance<LLFloaterProfileLegacy>("legacy_profile", LLSD().with("avatar_id", avatar_id));
-    else
+    } else {
         profile = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
+    }
     return profile;
 }
 

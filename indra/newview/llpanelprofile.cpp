@@ -62,16 +62,18 @@
 #include "llcommandhandler.h"
 #include "llfloaterprofiletexture.h"
 #include "llfloaterreg.h"
-#include "lltexturectrl.h"
+#include "llfloaterblocked.h"
+#include "llfloaterreporter.h"
 #include "llfilepicker.h"
 #include "llfirstuse.h"
 #include "llgroupactions.h"
 #include "lllogchat.h"
 #include "llmutelist.h"
 #include "llnotificationsutil.h"
-//#include "llpanelblockedlist.h"
+#include "llpanelblockedlist.h"
 #include "llpanelprofileclassifieds.h"
 #include "llpanelprofilepicks.h"
+#include "llprofileimagepicker.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h" //is_agent_mappable
@@ -103,6 +105,153 @@ static const std::string PROFILE_IMAGE_UPLOAD_CAP = "UploadAgentProfileImage";
 
 //////////////////////////////////////////////////////////////////////////
 
+LLUUID post_profile_image(std::string cap_url, const LLSD &first_data, std::string path_to_image, LLHandle<LLPanel> *handle)
+{
+    LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
+    LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
+        httpAdapter(new LLCoreHttpUtil::HttpCoroutineAdapter("post_profile_image_coro", httpPolicy));
+    LLCore::HttpRequest::ptr_t httpRequest(new LLCore::HttpRequest);
+    LLCore::HttpHeaders::ptr_t httpHeaders;
+
+    LLCore::HttpOptions::ptr_t httpOpts(new LLCore::HttpOptions);
+    httpOpts->setFollowRedirects(true);
+
+    LLSD result = httpAdapter->postAndSuspend(httpRequest, cap_url, first_data, httpOpts, httpHeaders);
+
+    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+    if (!status)
+    {
+        // todo: notification?
+        LL_WARNS("AvatarProperties") << "Failed to get uploader cap " << status.toString() << LL_ENDL;
+        return LLUUID::null;
+    }
+    if (!result.has("uploader"))
+    {
+        // todo: notification?
+        LL_WARNS("AvatarProperties") << "Failed to get uploader cap, response contains no data." << LL_ENDL;
+        return LLUUID::null;
+    }
+    std::string uploader_cap = result["uploader"].asString();
+    if (uploader_cap.empty())
+    {
+        LL_WARNS("AvatarProperties") << "Failed to get uploader cap, cap invalid." << LL_ENDL;
+        return LLUUID::null;
+    }
+
+    // Upload the image
+    LLCore::HttpRequest::ptr_t uploaderhttpRequest(new LLCore::HttpRequest);
+    LLCore::HttpHeaders::ptr_t uploaderhttpHeaders(new LLCore::HttpHeaders);
+    LLCore::HttpOptions::ptr_t uploaderhttpOpts(new LLCore::HttpOptions);
+    S64 length;
+
+    {
+        llifstream instream(path_to_image.c_str(), std::iostream::binary | std::iostream::ate);
+        if (!instream.is_open())
+        {
+            LL_WARNS("AvatarProperties") << "Failed to open file " << path_to_image << LL_ENDL;
+            return LLUUID::null;
+        }
+        length = instream.tellg();
+    }
+
+    uploaderhttpHeaders->append(HTTP_OUT_HEADER_CONTENT_TYPE, "application/jp2"); // optional
+    uploaderhttpHeaders->append(HTTP_OUT_HEADER_CONTENT_LENGTH, llformat("%d", length)); // required!
+    uploaderhttpOpts->setFollowRedirects(true);
+
+    result = httpAdapter->postFileAndSuspend(uploaderhttpRequest, uploader_cap, path_to_image, uploaderhttpOpts, uploaderhttpHeaders);
+
+    httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+    status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+    LL_DEBUGS("AvatarProperties") << result << LL_ENDL;
+
+    if (!status)
+    {
+        LL_WARNS("AvatarProperties") << "Failed to upload image " << status.toString() << LL_ENDL;
+        return LLUUID::null;
+    }
+
+    if (result["state"].asString() != "complete")
+    {
+        if (result.has("message"))
+        {
+            LL_WARNS("AvatarProperties") << "Failed to upload image, state " << result["state"] << " message: " << result["message"] << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS("AvatarProperties") << "Failed to upload image " << result << LL_ENDL;
+        }
+        return LLUUID::null;
+    }
+
+    return result["new_asset"].asUUID();
+}
+
+void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::string path_to_image, LLHandle<LLPanel> *handle)
+{
+    LLSD data;
+    switch (type)
+    {
+    case PROFILE_IMAGE_SL:
+        data["profile-image-asset"] = "sl_image_id";
+        break;
+    case PROFILE_IMAGE_FL:
+        data["profile-image-asset"] = "fl_image_id";
+        break;
+    }
+
+    LLUUID result = post_profile_image(cap_url, data, path_to_image, handle);
+
+    // reset loading indicator
+    if (!handle->isDead())
+    {
+        switch (type)
+        {
+        case PROFILE_IMAGE_SL:
+            {
+                LLPanelProfileSecondLife* panel = static_cast<LLPanelProfileSecondLife*>(handle->get());
+                if (result.notNull())
+                {
+                    panel->setProfileImageUploaded(result);
+                }
+                else
+                {
+                    // failure, just stop progress indicator
+                    panel->setProfileImageUploading(false);
+                }
+                break;
+            }
+        case PROFILE_IMAGE_FL:
+            {
+                LLPanelProfileFirstLife* panel = static_cast<LLPanelProfileFirstLife*>(handle->get());
+                if (result.notNull())
+                {
+                    panel->setProfileImageUploaded(result);
+                }
+                else
+                {
+                    // failure, just stop progress indicator
+                    panel->setProfileImageUploading(false);
+                }
+                break;
+            }
+        }
+    }
+
+    if (type == PROFILE_IMAGE_SL && result.notNull())
+    {
+        LLAvatarIconIDCache::getInstance()->add(gAgentID, result);
+        // Should trigger callbacks in icon controls
+        LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(gAgentID);
+    }
+
+    // Cleanup
+    LLFile::remove(path_to_image);
+    delete handle;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // LLWebProfileHandler
 
@@ -127,166 +276,7 @@ public:
     }
 };
 LLWebProfileHandler gWebProfileHandler;
-#if 0 // ALCHMERGE
-LLProfileHandler gProfileHandler;
 
-
-//////////////////////////////////////////////////////////////////////////
-// LLAgentHandler
-
-class LLAgentHandler : public LLCommandHandler
-{
-public:
-    // requires trusted browser to trigger
-    LLAgentHandler() : LLCommandHandler("agent", UNTRUSTED_THROTTLE) { }
-
-    virtual bool canHandleUntrusted(
-        const LLSD& params,
-        const LLSD& query_map,
-        LLMediaCtrl* web,
-        const std::string& nav_type)
-    {
-        if (params.size() < 2)
-        {
-            return true; // don't block, will fail later
-        }
-
-        if (nav_type == NAV_TYPE_CLICKED
-            || nav_type == NAV_TYPE_EXTERNAL)
-        {
-            return true;
-        }
-
-        const std::string verb = params[1].asString();
-        if (verb == "about" || verb == "inspect" || verb == "reportAbuse")
-        {
-            return true;
-        }
-        return false;
-    }
-
-    bool handle(const LLSD& params,
-                const LLSD& query_map,
-                const std::string& grid,
-                LLMediaCtrl* web)
-    {
-        if (params.size() < 2) return false;
-        LLUUID avatar_id;
-        if (!avatar_id.set(params[0], FALSE))
-        {
-            return false;
-        }
-
-        const std::string verb = params[1].asString();
-        if (verb == "about")
-        {
-            LLAvatarActions::showProfile(avatar_id);
-            return true;
-        }
-
-        if (verb == "inspect")
-        {
-            LLFloaterReg::showInstance("inspect_avatar", LLSD().with("avatar_id", avatar_id));
-            return true;
-        }
-
-        if (verb == "im")
-        {
-            LLAvatarActions::startIM(avatar_id);
-            return true;
-        }
-
-        if (verb == "pay")
-        {
-            if (!LLUI::getInstance()->mSettingGroups["config"]->getBOOL("EnableAvatarPay"))
-            {
-                LLNotificationsUtil::add("NoAvatarPay", LLSD(), LLSD(), std::string("SwitchToStandardSkinAndQuit"));
-                return true;
-            }
-
-            LLAvatarActions::pay(avatar_id);
-            return true;
-        }
-
-        if (verb == "offerteleport")
-        {
-            LLAvatarActions::offerTeleport(avatar_id);
-            return true;
-        }
-
-        if (verb == "requestfriend")
-        {
-            LLAvatarActions::requestFriendshipDialog(avatar_id);
-            return true;
-        }
-
-        if (verb == "removefriend")
-        {
-            LLAvatarActions::removeFriendDialog(avatar_id);
-            return true;
-        }
-
-        if (verb == "mute")
-        {
-            if (! LLAvatarActions::isBlocked(avatar_id))
-            {
-                LLAvatarActions::toggleBlock(avatar_id);
-            }
-            return true;
-        }
-
-        if (verb == "unmute")
-        {
-            if (LLAvatarActions::isBlocked(avatar_id))
-            {
-                LLAvatarActions::toggleBlock(avatar_id);
-            }
-            return true;
-        }
-
-        if (verb == "block")
-        {
-            if (params.size() > 2)
-            {
-                const std::string object_name = LLURI::unescape(params[2].asString());
-                LLMute mute(avatar_id, object_name, LLMute::OBJECT);
-                LLMuteList::getInstance()->add(mute);
-                LLPanelBlockedList::showPanelAndSelect(mute.mID);
-            }
-            return true;
-        }
-
-        if (verb == "unblock")
-        {
-            if (params.size() > 2)
-            {
-                const std::string object_name = params[2].asString();
-                LLMute mute(avatar_id, object_name, LLMute::OBJECT);
-                LLMuteList::getInstance()->remove(mute);
-            }
-            return true;
-        }
-
-        // reportAbuse is here due to convoluted avatar handling
-        // in LLScrollListCtrl and LLTextBase
-        if (verb == "reportAbuse" && web == NULL)
-        {
-            LLAvatarName av_name;
-            if (LLAvatarNameCache::get(avatar_id, &av_name))
-            {
-                LLFloaterReporter::showFromAvatar(avatar_id, av_name.getCompleteName());
-            }
-            else
-            {
-                LLFloaterReporter::showFromAvatar(avatar_id, "not avaliable");
-            }
-            return true;
-        }
-        return false;
-    }
-};
-LLAgentHandler gAgentHandler;
-#endif
 
 ///----------------------------------------------------------------------------
 /// LLFloaterProfilePermissions
