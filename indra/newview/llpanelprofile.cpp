@@ -252,31 +252,6 @@ void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::s
     delete handle;
 }
 
-//////////////////////////////////////////////////////////////////////////
-// LLWebProfileHandler
-
-class LLWebProfileHandler : public LLCommandHandler
-{
-public:
-    // requires trusted browser to trigger
-    LLWebProfileHandler() : LLCommandHandler("profile", UNTRUSTED_THROTTLE) { }
-
-    bool handle(const LLSD& params,
-                const LLSD& query_map,
-                const std::string& grid,
-                LLMediaCtrl* web)
-    {
-        if (params.size() < 1) return false;
-        std::string agent_name = params[0];
-        LL_INFOS() << "Profile, agent_name " << agent_name << LL_ENDL;
-        std::string url = getProfileURL(agent_name);
-        LLWeb::loadURLInternal(url);
-
-        return true;
-    }
-};
-LLWebProfileHandler gWebProfileHandler;
-
 
 ///----------------------------------------------------------------------------
 /// LLFloaterProfilePermissions

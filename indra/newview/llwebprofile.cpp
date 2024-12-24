@@ -31,17 +31,16 @@
 // libs
 #include "llbufferstream.h"
 #include "llimagepng.h"
-
 #include "llsdserialize.h"
 #include "llstring.h"
 
 // newview
 #include "llavataractions.h" // for getProfileURL()
-#include "llviewermedia.h" // FIXME: don't use LLViewerMedia internals
-
+#include "llcommandhandler.h"
 #include "llcorehttputil.h"
-
-#include "bufferstream.h"
+#include "llmediactrl.h"
+#include "llviewermedia.h" // FIXME: don't use LLViewerMedia internals
+#include "llweb.h"
 
 /*
  * Workflow:
@@ -273,3 +272,26 @@ std::string LLWebProfile::getAuthCookie()
     // This is needed to test image uploads on Linux viewer built with OpenSSL 1.0.0 (0.9.8 works fine).
     return LLStringUtil::getenv("LL_SNAPSHOT_COOKIE", sAuthCookie);
 }
+
+//////////////////////////////////////////////////////////////////////////
+// LLWebProfileHandler
+
+class LLWebProfileHandler : public LLCommandHandler
+{
+  public:
+    // requires trusted browser to trigger
+    LLWebProfileHandler() : LLCommandHandler("profile", UNTRUSTED_THROTTLE) {}
+
+    bool handle(const LLSD& params, const LLSD& query_map, const std::string& grid, LLMediaCtrl* web)
+    {
+        if (params.size() < 1)
+            return false;
+        std::string agent_name = params[0];
+        LL_INFOS() << "Profile, agent_name " << agent_name << LL_ENDL;
+        std::string url = getProfileURL(agent_name);
+        LLWeb::loadURLInternal(url);
+
+        return true;
+    }
+};
+LLWebProfileHandler gWebProfileHandler;
