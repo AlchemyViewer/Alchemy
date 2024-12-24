@@ -46,7 +46,7 @@
        left="25"
        mouse_opaque="true"
        name="github_icon"
-       tool_tip="[APP_NAME] on Discord"
+       tool_tip="[APP_NAME] on GitHub"
        top="140"
        width="41">
         <icon.commit_callback
@@ -62,7 +62,7 @@
        left_pad="10"
        mouse_opaque="true"
        name="bsky_icon"
-       tool_tip="[APP_NAME] on Mastodon"
+       tool_tip="[APP_NAME] on Bluesky"
        top="140"
        width="42">
         <icon.commit_callback
