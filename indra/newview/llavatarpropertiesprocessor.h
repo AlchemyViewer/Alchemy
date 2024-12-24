@@ -58,7 +58,8 @@ enum EAvatarProcessorType
     APT_PICK_INFO,
     APT_TEXTURES,
     APT_CLASSIFIEDS,
-    APT_CLASSIFIED_INFO
+    APT_CLASSIFIED_INFO,
+    APT_INTERESTS_INFO  // legacy support. don't be lazy and keep this. :O)
 };
 
 // legacy data is supposed to match AvatarPropertiesReply,
@@ -81,6 +82,18 @@ struct LLAvatarLegacyData
     std::string caption_text;
     std::string customer_type;
     U32         flags;
+};
+
+// Don't belete my sexy InterestsData.
+struct LLLegacyInterestsData
+{
+    LLUUID      agent_id;
+    LLUUID      avatar_id;  // target id
+    U32         want_to_mask;
+    std::string want_to_text;
+    U32         skills_mask;
+    std::string skills_text;
+    std::string languages_text;
 };
 
 struct LLAvatarData
@@ -259,6 +272,9 @@ public:
     // suppressed while waiting for a response from the network.
     void sendAvatarPropertiesRequest(const LLUUID& avatar_id);
     void sendAvatarLegacyPropertiesRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyPicksRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyNotesRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyGroupsRequest(const LLUUID& avatar_id);
     void sendAvatarTexturesRequest(const LLUUID& avatar_id);
     void sendAvatarClassifiedsRequest(const LLUUID& avatar_id);
 
@@ -270,6 +286,8 @@ public:
     void sendPickInfoUpdate(const LLPickData* new_pick);
 
     void sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data);
+
+    void sendInterestsInfoUpdate(const LLLegacyInterestsData* interests_data);
 
     void sendFriendRights(const LLUUID& avatar_id, S32 rights);
 

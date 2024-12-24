@@ -1155,6 +1155,9 @@
   <color
    name="StatBarMeanBarColor"
    reference="Red_80" />
+  <color
+   name="ProfileOnlineIndicatorColor"
+   reference="Green" />
    <color
     name="MusicTickerGridColor" 
     reference="White_50"/>

@@ -449,7 +449,7 @@ bool LLPanelProfilePicks::hasUnsavedChanges()
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
         LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
-        if (pick_panel && (pick_panel->isDirty() || pick_panel->isDirty()))
+        if (pick_panel && pick_panel->isDirty())
         {
             return true;
         }
