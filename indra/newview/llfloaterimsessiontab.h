@@ -48,6 +48,7 @@ class LLPanelEmojiComplete;
 
 class LLFloaterIMSessionTab
     : public LLTransientDockableFloater
+    , public LLIMSessionObserver
 {
 // [RLVa:KB] - @shownames
     friend struct RlvCommandHandler<RLV_TYPE_ADDREM, RLV_BHVR_SHOWNAMES>;
@@ -83,13 +84,13 @@ public:
     bool isNearbyChat() {return mIsNearbyChat;}
 
     // LLFloater overrides
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ BOOL postBuild();
-    /*virtual*/ void draw();
-    /*virtual*/ void setVisible(BOOL visible);
-    /*virtual*/ void setFocus(BOOL focus);
-    /*virtual*/ void closeFloater(bool app_quitting = false);
-    /*virtual*/ void deleteAllChildren();
+    void onOpen(const LLSD& key) override;
+    BOOL postBuild() override;
+    void draw() override;
+    void setVisible(BOOL visible) override;
+    void setFocus(BOOL focus) override;
+    void closeFloater(bool app_quitting = false) override;
+    void deleteAllChildren() override;
 
     // Handle the left hand participant list widgets
     void addConversationViewParticipant(LLConversationItem* item, bool update_view = true);
@@ -114,6 +115,13 @@ public:
     void updateChatIcon(const LLUUID& id);
 
     LLView* getChatHistory();
+
+    // LLIMSessionObserver triggers
+    virtual void sessionAdded(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id, BOOL has_offline_msg) override {}; // Stub
+    virtual void sessionActivated(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id) override {}; // Stub
+    virtual void sessionRemoved(const LLUUID& session_id) override;
+    virtual void sessionVoiceOrIMStarted(const LLUUID& session_id) override {};                              // Stub
+    virtual void sessionIDUpdated(const LLUUID& old_session_id, const LLUUID& new_session_id) override {};   // Stub
 
 protected:
 
@@ -146,8 +154,8 @@ protected:
     virtual void enableDisableCallBtn();
 
     // process focus events to set a currently active session
-    /* virtual */ void onFocusReceived();
-    /* virtual */ void onFocusLost();
+    void onFocusReceived() override;
+    void onFocusLost() override;
 
     // prepare chat's params and out one message to chatHistory
     void appendMessage(const LLChat& chat, const LLSD& args = LLSD());
@@ -225,7 +233,7 @@ private:
     void getSelectedUUIDs(uuid_vec_t& selected_uuids);
 
     /// Refreshes the floater at a constant rate.
-    virtual void refresh() = 0;
+    virtual void refresh() override = 0;
 
     /**
      * Adjusts chat history height to fit vertically with input chat field

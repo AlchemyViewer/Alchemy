@@ -36,6 +36,7 @@
 #include "llnotificationsutil.h"
 #include "llinventorymodel.h"
 #include "lltrans.h"
+#include "llappviewer.h"
 
 // Callback struct
 struct LLWearableArrivedData
@@ -81,9 +82,7 @@ void LLWearableList::getAsset(const LLAssetID& assetID, const std::string& weara
     LLViewerWearable* instance = get_if_there(mList, assetID, (LLViewerWearable*)NULL );
     if( instance )
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("Avatar") << "wearable " << assetID << " found in LLWearableList" << LL_ENDL;
-#endif
         asset_arrived_callback( instance, userdata );
     }
     else
@@ -99,6 +98,22 @@ void LLWearableList::getAsset(const LLAssetID& assetID, const std::string& weara
 // static
 void LLWearableList::processGetAssetReply( const char* filename, const LLAssetID& uuid, void* userdata, S32 status, LLExtStat ext_status )
 {
+    if (!LLCoros::on_main_coro())
+    {
+        // if triggered from a coroutine, dispatch to main thread before accessing app state
+        std::string filename_in = filename;
+        LLUUID uuid_in = uuid;
+
+        LLAppViewer::instance()->postToMainCoro([=]()
+            {
+                processGetAssetReply(filename_in.c_str(), uuid_in, userdata, status, ext_status);
+            });
+
+        return;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
     BOOL isNewWearable = FALSE;
     LLWearableArrivedData* data = (LLWearableArrivedData*) userdata;
 //  LLViewerWearable* wearable = NULL; // NULL indicates failure
@@ -203,10 +218,8 @@ void LLWearableList::processGetAssetReply( const char* filename, const LLAssetID
     if (wearable) // success
     {
         LLWearableList::instance().mList[ uuid ] = wearable;
-#ifdef SHOW_DEBUG
         LL_DEBUGS("Wearable") << "processGetAssetReply()" << LL_ENDL;
         LL_DEBUGS("Wearable") << wearable << LL_ENDL;
-#endif
     }
     else
     {
@@ -239,9 +252,7 @@ void LLWearableList::processGetAssetReply( const char* filename, const LLAssetID
 
 LLViewerWearable* LLWearableList::createCopy(const LLViewerWearable* old_wearable, const std::string& new_name)
 {
-#ifdef SHOW_DEBUG
     LL_DEBUGS() << "LLWearableList::createCopy()" << LL_ENDL;
-#endif
 
     LLViewerWearable *wearable = generateNewWearable();
     wearable->copyDataFrom(old_wearable);
@@ -260,9 +271,7 @@ LLViewerWearable* LLWearableList::createCopy(const LLViewerWearable* old_wearabl
 
 LLViewerWearable* LLWearableList::createNewWearable( LLWearableType::EType type, LLAvatarAppearance *avatarp )
 {
-#ifdef SHOW_DEBUG
     LL_DEBUGS() << "LLWearableList::createNewWearable()" << LL_ENDL;
-#endif
 
     LLViewerWearable *wearable = generateNewWearable();
     wearable->setType( type, avatarp );

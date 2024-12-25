@@ -2360,6 +2360,8 @@ void LLViewerWindow::initBase()
     // Hide the toolbars for the moment: we'll make them visible after logging in world (see LLViewerWindow::initWorldUI())
     gToolBarView->setVisible(FALSE);
 
+    mFloaterSnapRegion = gToolBarView->getChild<LLView>("floater_snap_region");
+    mChicletContainer = gToolBarView->getChild<LLPanel>("chiclet_container");
     // Constrain floaters to inside the menu and status bar regions.
     gFloaterView = main_view->getChild<LLFloaterView>("Floater View");
     for (S32 i = 0; i < LLToolBarEnums::TOOLBAR_COUNT; ++i)
@@ -2370,8 +2372,6 @@ void LLViewerWindow::initBase()
             toolbarp->getCenterLayoutPanel()->setReshapeCallback(boost::bind(&LLFloaterView::setToolbarRect, gFloaterView, _1, _2));
         }
     }
-    mChicletContainer = getRootView()->getChild<LLPanel>("chiclet_container");
-    mFloaterSnapRegion = main_view->getChild<LLView>("floater_snap_region");
     gFloaterView->setFloaterSnapView(mFloaterSnapRegion->getHandle());
     gSnapshotFloaterView = main_view->getChild<LLSnapshotFloaterView>("Snapshot Floater View");
 
@@ -2463,25 +2463,33 @@ void LLViewerWindow::initWorldUI()
     // Force gFloaterTools to initialize
     LLFloaterReg::getInstance("build");
 
-    // Status bar
-    mStatusBarContainer = getRootView()->getChild<LLPanel>("status_bar_container");
-    gStatusBar = new LLStatusBar(mStatusBarContainer->getLocalRect());
-    gStatusBar->setFollows(FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT);
-    gStatusBar->setShape(mStatusBarContainer->getLocalRect());
-    // sync bg color with menu bar
-    gStatusBar->setBackgroundColor( gMenuBarView->getBackgroundColor().get() );
-    // add InBack so that gStatusBar won't be drawn over menu
-    mStatusBarContainer->addChildInBack(gStatusBar, 2/*tab order, after menu*/);
-    mStatusBarContainer->setVisible(TRUE);
-
-    // Navigation bar
-    mNavBarBarContainer = getRootView()->getChild<LLView>("nav_bar_container");
-
     LLNavigationBar* navbar = LLNavigationBar::getInstance();
-    navbar->setShape(mNavBarBarContainer->getLocalRect());
-    navbar->setBackgroundColor(gMenuBarView->getBackgroundColor().get());
-    mNavBarBarContainer->addChild(navbar);
-    mNavBarBarContainer->setVisible(TRUE);
+    if (!gStatusBar)
+    {
+        // Status bar
+	    mStatusBarContainer = getRootView()->getChild<LLPanel>("status_bar_container");
+        gStatusBar = new LLStatusBar(mStatusBarContainer->getLocalRect());
+        gStatusBar->setFollows(FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT);
+        gStatusBar->setShape(mStatusBarContainer->getLocalRect());
+        // sync bg color with menu bar
+	    gStatusBar->setBackgroundColor( gMenuBarView->getBackgroundColor().get() );
+        // add InBack so that gStatusBar won't be drawn over menu
+        mStatusBarContainer->addChildInBack(gStatusBar, 2/*tab order, after menu*/);
+	    mStatusBarContainer->setVisible(TRUE);
+
+        // Navigation bar
+	    mNavBarBarContainer = getRootView()->getChild<LLView>("nav_bar_container");
+
+	    navbar->setShape(mNavBarBarContainer->getLocalRect());
+	    navbar->setBackgroundColor(gMenuBarView->getBackgroundColor().get());
+	    mNavBarBarContainer->addChild(navbar);
+	    mNavBarBarContainer->setVisible(TRUE);
+    }
+    else
+    {
+        mStatusBarContainer->setVisible(true);
+        mNavBarBarContainer->setVisible(true);
+    }
 
     const U32 location_bar = gSavedSettings.getU32("NavigationBarStyle");
     if (location_bar != 2)
@@ -2823,12 +2831,11 @@ void LLViewerWindow::setNormalControlsVisible( BOOL visible )
         gStatusBar->setEnabled( visible );
     }
 
-    LLNavigationBar* navbarp = LLUI::getRootView()->findChild<LLNavigationBar>("navigation_bar");
-    if (navbarp)
+    if (mNavBarBarContainer)
     {
         // when it's time to show navigation bar we need to ensure that the user wants to see it
         // i.e. ShowNavbarNavigationPanel option is true
-        navbarp->setVisible( visible && (gSavedSettings.getU32("NavigationBarStyle") == 2));
+        mNavBarBarContainer->setVisible( visible && (gSavedSettings.getU32("NavigationBarStyle") == 2));
     }
 }
 

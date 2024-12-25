@@ -112,11 +112,16 @@ void LLConversation::onIMFloaterShown(const LLUUID& session_id)
 // static
 const std::string LLConversation::createTimestamp(const U64Seconds& utc_time)
 {
-    static const std::string time_fmt_str = fmt::format(FMT_STRING("[{:s}]/[{:s}]/[{:s}] [{:s}]:[{:s}]"), LLTrans::getString("TimeMonth"), LLTrans::getString("TimeDay"), LLTrans::getString("TimeYear"), LLTrans::getString("TimeHour"), LLTrans::getString("TimeMin"));
-
-    std::string timeStr = time_fmt_str;
+    std::string timeStr;
     LLSD substitution;
     substitution["datetime"] = (S32)utc_time.value();
+
+    timeStr = "["+LLTrans::getString ("TimeMonth")+"]/["
+                 +LLTrans::getString ("TimeDay")+"]/["
+                 +LLTrans::getString ("TimeYear")+"] ["
+                 +LLTrans::getString ("TimeHour")+"]:["
+                 +LLTrans::getString ("TimeMin")+"]";
+
 
     LLStringUtil::format (timeStr, substitution);
     return timeStr;
@@ -181,6 +186,22 @@ LLConversationLog::LLConversationLog() :
     mAvatarNameCacheConnection(),
     mLoggingEnabled(false)
 {
+}
+
+LLConversationLog::~LLConversationLog()
+{
+    if (mLoggingEnabled)
+    {
+        if (LLIMMgr::instanceExists())
+        {
+            LLIMMgr::instance().removeSessionObserver(this);
+        }
+        LLAvatarTracker::instance().removeObserver(mFriendObserver);
+    }
+    if (mAvatarNameCacheConnection.connected())
+    {
+        mAvatarNameCacheConnection.disconnect();
+    }
 }
 
 void LLConversationLog::enableLogging(S32 log_mode)
