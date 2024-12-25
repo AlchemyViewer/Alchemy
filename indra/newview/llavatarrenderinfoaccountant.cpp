@@ -231,9 +231,9 @@ void LLAvatarRenderInfoAccountant::avatarRenderInfoReportCoro(std::string url, U
     {
         LLVOAvatar* avatar = static_cast<LLVOAvatar*>(*iter);
         if (avatar &&
-            avatar->getRezzedStatus() >= 2 &&                   // Mostly rezzed (maybe without baked textures downloaded)
             !avatar->isDead() &&                                // Not dead yet
             !avatar->isControlAvatar() &&                       // Not part of an animated object
+            avatar->getRezzedStatus() >= 2 &&                   // Mostly rezzed (maybe without baked textures downloaded)
             avatar->getObjectHost() == regionp->getHost())      // Ensure it's on the same region
         {
             avatar->calculateUpdateRenderComplexity();          // Make sure the numbers are up-to-date
