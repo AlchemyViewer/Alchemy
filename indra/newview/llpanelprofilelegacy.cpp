@@ -52,16 +52,19 @@
 #include "llagentdata.h"
 #include "llagentpicksinfo.h"
 #include "llavataractions.h"
+#include "llavatariconctrl.h"
 #include "llcallingcard.h" // for LLAvatarTracker
 #include "llclassifieditem.h"
 #include "lldateutil.h"
 #include "lldroptarget.h"
+#include "llfloaterprofiletexture.h"
 #include "llfloaterreporter.h"
 #include "llfloaterworldmap.h"
 #include "llgroupactions.h"
 #include "llpanelclassified.h"
 #include "llpanelpick.h"
 #include "llpickitem.h"
+#include "llprofileimagepicker.h"
 #include "llmutelist.h"
 #include "llsidetraypanelcontainer.h"
 #include "llslurl.h"
@@ -69,7 +72,7 @@
 #include "llviewermenu.h" // gMenuHolder
 
 static constexpr std::string_view AGENT_PROFILE_CAP("AgentProfile");
-//static constexpr std::string_view UPLOAD_AGENT_PROFILE_CAP("UploadAgentProfileImage");
+static constexpr std::string_view UPLOAD_AGENT_PROFILE_CAP("UploadAgentProfileImage");
 
 // These are order-senstitive so don't fk with 'em!
 static const std::array<std::string, 8> sWantCheckboxes{{"wanna_build", "wanna_explore", "wanna_yiff", "wanna_work", "wanna_group", "wanna_buy", "wanna_sell", "wanna_hire"}};
@@ -83,12 +86,15 @@ LLPanelProfileLegacy::LLPanelProfileLegacy()
 :   LLPanelProfileLegacyTab()
 ,   mPanelPicks(nullptr)
 ,   mPanelGroups(nullptr)
+,   mPopupMenuHandle()
+,   mTexturePicker()
 {
     mChildStack.setParent(this);
     //mCommitCallbackRegistrar.add("Profile.CommitInterest", boost::bind(&LLPanelProfileLegacy::onCommitInterest, this));
     mCommitCallbackRegistrar.add("Profile.CommitProperties", boost::bind(&LLPanelProfileLegacy::onCommitAvatarProperties, this));
     mCommitCallbackRegistrar.add("Profile.CommitRights", boost::bind(&LLPanelProfileLegacy::onCommitRights, this));
     mCommitCallbackRegistrar.add("Profile.CommitModifyObjectRights", boost::bind(&LLPanelProfileLegacy::onCommitModifyObjectsRights, this, _1));
+    mCommitCallbackRegistrar.add("Profile.UploadAction", boost::bind(&LLPanelProfileLegacy::onCommitImageAction, this, _1, _2));
     mCommitCallbackRegistrar.add("Profile.Action", boost::bind(&LLPanelProfileLegacy::onCommitAction, this, _2));
     mEnableCallbackRegistrar.add("Profile.Enable", boost::bind(&LLPanelProfileLegacy::isActionEnabled, this, _2));
 }
@@ -101,6 +107,12 @@ LLPanelProfileLegacy::~LLPanelProfileLegacy()
         mAvatarNameCacheConnection.disconnect();
     if (mNameChangedConnection.connected())
         mNameChangedConnection.disconnect();
+    auto popup_menu = static_cast<LLMenuGL*>(mPopupMenuHandle.get());
+    if (popup_menu)
+    {
+        popup_menu->die();
+        mPopupMenuHandle.markDead();
+    }
 }
 
 // virtual
@@ -110,6 +122,9 @@ BOOL LLPanelProfileLegacy::postBuild()
     mPanelPicks = static_cast<LLPanelProfilePicks*>(getChild<LLUICtrl>("avatar_picks_tab_panel"));
     mPanelPicks->setProfilePanel(this);
 
+    auto popup_menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_profile_image.xml", gMenuHolder, child_registry_t::instance());
+    if (popup_menu) { mPopupMenuHandle = popup_menu->getHandle(); }
+
     if (dynamic_cast<LLSideTrayPanelContainer*>(getParent()) != nullptr)
         getChild<LLUICtrl>("back")->setCommitCallback(boost::bind(&LLPanelProfileLegacy::onBackBtnClick, this));
     else if (dynamic_cast<LLFloater*>(getParent()) != nullptr)
@@ -118,10 +133,12 @@ BOOL LLPanelProfileLegacy::postBuild()
         getChild<LLUICtrl>("back")->setEnabled(FALSE);
     getChild<LLTextEditor>("sl_about")->setCommitCallback(boost::bind(&LLPanelProfileLegacy::onCommitAvatarProperties, this));
     getChild<LLTextEditor>("fl_about")->setCommitCallback(boost::bind(&LLPanelProfileLegacy::onCommitAvatarProperties, this));
-    getChild<LLTextureCtrl>("sl_profile_pic")->setCommitCallback(boost::bind(&LLPanelProfileLegacy::onCommitAvatarProperties, this));
-    getChild<LLTextureCtrl>("fl_profile_pic")->setCommitCallback(boost::bind(&LLPanelProfileLegacy::onCommitAvatarProperties, this));
     getChild<LLTextEditor>("notes")->setCommitCallback(boost::bind(&LLPanelProfileLegacy::onCommitNotes, this, _1));
     getChild<LLTextEditor>("avatar_name")->setDoubleClickCallback(boost::bind(&LLPanelProfileLegacy::onDoubleClickName, this));
+    //getChild<LLProfileImageCtrl>("sl_profile_pic")->setMouseUpCallback(boost::bind(&LLPanelProfileLegacy::onCommitZoomProfileImage, this, _1, _2, _3, _4));
+    getChild<LLProfileImageCtrl>("sl_profile_pic")->setRightMouseUpCallback(boost::bind(&LLPanelProfileLegacy::onCommitRightClickProfileImage, this, _1, _2, _3, _4));
+    //getChild<LLProfileImageCtrl>("fl_profile_pic")->setMouseUpCallback(boost::bind(&LLPanelProfileLegacy::onCommitZoomProfileImage, this, _1, _2, _3, _4));
+    getChild<LLProfileImageCtrl>("fl_profile_pic")->setRightMouseUpCallback(boost::bind(&LLPanelProfileLegacy::onCommitRightClickProfileImage, this, _1, _2, _3, _4));
     return TRUE;
 }
 
@@ -442,8 +459,8 @@ void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType ty
         {
             const LLAvatarData* pData = static_cast<const LLAvatarData*>(data);
             if (!pData || pData->avatar_id != getAvatarId()) return;
-            getChild<LLTextureCtrl>("sl_profile_pic")->setValue(pData->image_id);
-            getChild<LLTextureCtrl>("fl_profile_pic")->setValue(pData->fl_image_id);
+            getChild<LLProfileImageCtrl>("sl_profile_pic")->setValue(pData->image_id);
+            getChild<LLProfileImageCtrl>("fl_profile_pic")->setValue(pData->fl_image_id);
             if (pData->partner_id.notNull())
             {
                 getChild<LLTextBase>("partner_info")->setText(LLSLURL("agent", pData->partner_id, "inspect").getSLURLString());
@@ -558,9 +575,40 @@ LLPanel* LLPanelProfileLegacy::getExpandedTab() const
     return tab ? tab->getChild<LLPanel>(tab->getName() + "_panel") : nullptr;
 }
 
+void LLPanelProfileLegacy::onCommitImageAction(LLUICtrl* ctrl, const LLSD& userdata)
+{
+    auto* menu = ctrl->getParentByType<LLContextMenu>();
+    if (menu == NULL) {
+        LL_WARNS("LegacyProfiles") << "Command did not come from context menu: " << ctrl->getName() << LL_ENDL;
+        return;
+    }
+    auto* spawning_view = menu->getSpawningView();
+    if (spawning_view == NULL || !spawning_view->isAvailable())
+    {
+        LL_WARNS("LegacyProfiles") << "Profile image is not available" << LL_ENDL;
+        return;
+    }
+    auto* view = static_cast<LLProfileImageCtrl*>(spawning_view);
+    if (view == NULL)
+    {
+        LL_WARNS("LegacyProfiles") << spawning_view->getName() << " is not a profile image control." << LL_ENDL;
+        return;
+    }
+
+    const std::string& action = userdata.asString();
+    if (action == "upload_profile_pic")
+        LLPanelProfileLegacy::onCommitUploadImage(view);
+    else if (action == "change_profile_pic")
+        LLPanelProfileLegacy::onCommitChangeImage(view);
+    else if (action == "remove_profile_pic")
+        LLPanelProfileLegacy::onCommitRemoveImage(view);
+    else
+        LL_WARNS("LegacyProfiles") << "Unhandled action: " << action << LL_ENDL;
+}
+
 void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
 {
-    const std::string action = userdata.asString();
+    const std::string& action = userdata.asString();
     if (action == "friend")
     {
         if (LLAvatarTracker::instance().getBuddyInfo(getAvatarId()) == nullptr)
@@ -590,14 +638,6 @@ void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
         LLAvatarActions::pay(getAvatarId());
     else if (action == "report_abuse")
         LLFloaterReporter::showFromObject(getAvatarId());
-    else if (action == "upload_sl")
-    {
-        // *TODO:
-    }
-    else if (action == "upload_fl")
-    {
-        // *TODO:
-    }
     else if (action == "webprofile")
         ALAvatarActions::showWebProfile(getAvatarId());
     else
@@ -608,29 +648,27 @@ bool LLPanelProfileLegacy::isActionEnabled(const LLSD& userdata)
 {
     bool action_enabled = false;
     const std::string check = userdata.asString();
-    if (check == "can_has_telefono")
+    if (check == "can_has_telefono") {
         action_enabled = (LLAvatarActions::canCall() && getAvatarId() != gAgentID);
-    else if (check == "can_has_teleport")
+    } else if (check == "can_has_teleport") {
         action_enabled = (LLAvatarActions::canOfferTeleport(getAvatarId()) && getAvatarId() != gAgentID);
-    else if (check == "can_has_map")
+    } else if (check == "can_has_map")
     {
         action_enabled = (LLAvatarTracker::instance().isBuddyOnline(getAvatarId())
                           && LLAvatarActions::isAgentMappable(getAvatarId()))
         || gAgent.isGodlike();
     }
-    else if (check == "can_has_pay")
+    else if (check == "can_has_pay") {
         action_enabled = (getAvatarId() != gAgentID);
-    else if (check == "can_share")
+    } else if (check == "can_share") {
         action_enabled = (getAvatarId() != gAgentID);
-    else if (check == "can_drama")
+    } else if (check == "can_drama") {
         action_enabled = (getAvatarId() != gAgentID);
-    else if (check == "can_upload_pic")
-    {
-        action_enabled = getAvatarId() == gAgentID
-            && !gAgent.getRegionCapability("UploadAgentProfileImage").empty();
-    }
-    else
+    } else if (check == "can_upload_pic") {
+        action_enabled = getAvatarId() == gAgentID && !gAgent.getRegionCapability(UPLOAD_AGENT_PROFILE_CAP).empty();
+    } else {
         LL_INFOS("LegacyProfiles") << "Unhandled check " << check << LL_ENDL;
+    }
     return action_enabled;
 }
 
@@ -638,20 +676,21 @@ void LLPanelProfileLegacy::onCommitAvatarProperties()
 {
     if (getAvatarId() != gAgentID) return;
 
-
     std::string cap = gAgent.getRegionCapability(AGENT_PROFILE_CAP);
-    if (!cap.empty())
+    if (cap.empty())
     {
-        LLSD data;
-        data["sl_about_text"] = getChild<LLTextEditor>("sl_about")->getText();
-        data["fl_about_text"] = getChild<LLTextEditor>("fl_about")->getText();
-        data["profile_url"]   = getChild<LLLineEditor>("www_edit")->getText();
-        data["allow_publish"] = getChild<LLCheckBoxCtrl>("allow_publish")->getValue().asBoolean();
-
-        LLCoros::instance().launch(
-            "sendAvatarProfileCoro",
-            boost::bind(&LLPanelProfileLegacy::sendAvatarProfileCoro, this, cap, data));
+        LL_WARNS("AvatarProperties") << "Failed to update profile data, no cap found" << LL_ENDL;
     }
+
+    LLSD data;
+    data["sl_about_text"] = getChild<LLTextEditor>("sl_about")->getText();
+    data["fl_about_text"] = getChild<LLTextEditor>("fl_about")->getText();
+    data["profile_url"]   = getChild<LLLineEditor>("www_edit")->getText();
+    data["allow_publish"] = getChild<LLCheckBoxCtrl>("allow_publish")->getValue().asBoolean();
+
+    LLCoros::instance().launch(
+        "sendAvatarProfileCoro",
+        boost::bind(&LLPanelProfileLegacy::sendAvatarProfileCoro, this, cap, data));
 }
 
 void LLPanelProfileLegacy::onCommitNotes(LLUICtrl* ctrl)
@@ -678,6 +717,99 @@ void LLPanelProfileLegacy::onNameChanged()
 {
     mAvatarNameCacheConnection = LLAvatarNameCache::get(getAvatarId(),
                                                         boost::bind(&LLPanelProfileLegacy::onAvatarNameCache, this, _1, _2));
+}
+
+void LLPanelProfileLegacy::onCommitUploadImage(LLProfileImageCtrl* ctrl)
+{
+    // I really hate this, but I gotta make work with what's there lest my changes get backed out again. lol. -CR
+    auto const& ctrl_name = ctrl->getName();
+    EProfileImageType type;
+    if (ctrl_name == "sl_profile_pic")
+    {
+        type = PROFILE_IMAGE_SL;
+    }
+    else if (ctrl_name == "fl_profile_pic")
+    {
+        type = PROFILE_IMAGE_FL;
+    }
+    else
+    {
+        LL_INFOS("LegacyProfiles") << "Invalid control name for updating profile pic: " << ctrl_name << LL_ENDL;
+        return;
+    }
+    (new LLProfileImagePicker(type, new LLHandle<LLPanel>(LLPanel::getHandle()),
+        [this, ctrl](LLUUID const& id) { onProfileImageChanged(id, ctrl); }))->getFile();
+
+    LLFloater* picker = mTexturePicker.get();
+    if (picker)
+    {
+        picker->closeFloater();
+    }
+}
+
+void LLPanelProfileLegacy::onCommitChangeImage(LLProfileImageCtrl* ctrl)
+{
+    LLFloater* existing = mTexturePicker.get();
+    if (existing)
+    {
+        existing->setMinimized(FALSE);
+        existing->setFocus(TRUE);
+    }
+    else
+    {
+        LLFloater* parent = gFloaterView->getParentFloater(this);
+        if (!parent) { return; }
+
+        getWindow()->setCursor(UI_CURSOR_WAIT);
+        LLFloaterTexturePicker* picker =
+            new LLFloaterTexturePicker(this, ctrl->getImageAssetId(), LLUUID::null, LLUUID::null, ctrl->getImageAssetId(), FALSE, FALSE,
+                                       "SELECT IMAGE", PERM_NONE, PERM_NONE, FALSE, NULL, PICK_TEXTURE);
+        mTexturePicker = picker->getHandle();
+        picker->setOnFloaterCommitCallback(
+            [this, ctrl, picker](LLTextureCtrl::ETexturePickOp op, LLPickerSource source, const LLUUID& asset_id, const LLUUID&,
+                                 const LLUUID&)
+            {
+                if (op == LLTextureCtrl::TEXTURE_SELECT)
+                {
+                    onProfileImageChanged(asset_id, ctrl);
+                }
+            });
+        picker->setLocalTextureEnabled(FALSE);
+        picker->setCanApply(false, true, false);
+
+        parent->addDependentFloater(picker);
+
+        picker->openFloater();
+        picker->setFocus(TRUE);
+    }
+}
+
+void LLPanelProfileLegacy::onCommitRemoveImage(LLProfileImageCtrl* ctrl)
+{
+    onProfileImageChanged(LLUUID::null, ctrl);
+
+    LLFloater* picker = mTexturePicker.get();
+    if (picker)
+    {
+        picker->closeFloater();
+    }
+}
+
+void LLPanelProfileLegacy::onProfileImageChanged(const LLUUID& id, LLProfileImageCtrl* ctrl)
+{
+    if (getAvatarId() != gAgentID) { return; }
+
+    ctrl->setValue(id);
+
+    std::string cap = gAgent.getRegionCapability(AGENT_PROFILE_CAP);
+    if (cap.empty()) { return; }
+
+    const std::string_view img = ctrl->getName() == "sl_profile_pic" ? "sl_image_id" : "fl_image_id";
+    // *TODO: Do we want to verify that the changes were put?
+    LLCoros::instance().launch("sendAvatarProfileImage",
+                               boost::bind(&LLPanelProfileLegacy::sendAvatarProfileCoro, this, cap, LLSD().with(img, id)));
+    LLAvatarIconIDCache::getInstance()->add(gAgentID, id);
+    LLAvatarPropertiesProcessor::getInstance()->sendAvatarPropertiesRequest(gAgentID);
 }
 
 void LLPanelProfileLegacy::onBackBtnClick()
@@ -715,6 +847,50 @@ bool LLPanelProfileLegacy::handleConfirmModifyRightsCallback(const LLSD& notific
     // Make sure to flip the checkbox back off
     findChild<LLCheckBoxCtrl>("allow_object_perms")->setValue(false);
     return false;
+}
+
+void LLPanelProfileLegacy::onCommitRightClickProfileImage(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
+{
+    auto menu = static_cast<LLContextMenu*>(mPopupMenuHandle.get());
+    if (menu)
+    {
+        menu->buildDrawLabels();
+        menu->show(x, y, ctrl);
+        LLMenuGL::showPopup(ctrl, menu, x, y);
+    }
+}
+
+void LLPanelProfileLegacy::onCommitZoomProfileImage(LLUICtrl* item, S32 x, S32 y, MASK mask)
+{
+    LLFloater* existing = mProfileSnooper.get();
+    if (existing)
+    {
+        LLFloaterProfileTexture* tex_view = static_cast<LLFloaterProfileTexture*>(existing);
+        tex_view->setMinimized(FALSE);
+        tex_view->setVisibleAndFrontmost(TRUE);
+        
+        LLUUID const& id = static_cast<LLProfileImageCtrl*>(item)->getImageAssetId();
+        if (id.notNull())
+        {
+            tex_view->loadAsset(id);
+        }
+        else
+        {
+            tex_view->resetAsset();
+        }
+    }
+    else
+    {
+        LLFloater* parent = gFloaterView->getParentFloater(this);
+        if (!parent) { return; }
+
+        LLFloaterProfileTexture* picker = new LLFloaterProfileTexture(this);
+        mProfileSnooper = picker->getHandle();
+        parent->addDependentFloater(picker);
+        picker->loadAsset(static_cast<LLProfileImageCtrl*>(item)->getImageAssetId());
+        picker->openFloater();
+        picker->setVisibleAndFrontmost(TRUE);
+    }
 }
 
 void LLPanelProfileLegacy::closeParentFloater()
@@ -889,7 +1065,7 @@ void LLPanelProfileLegacy::LLPanelProfilePicks::processProperties(void* data, EA
         mPicksList->clear();
         for (const LLAvatarPicks::pick_data_t& pick : avatar_data->picks_list)
         {
-            LL_INFOS() << "Porcessing pick " << pick.second << LL_ENDL;
+            LL_INFOS("LegacyProfiles") << "Processing pick " << pick.second << LL_ENDL;
             processPick(pick);
         }
         showAccordion("tab_picks", mPicksList->size());

@@ -43,6 +43,7 @@ class LLPanelPickInfo;
 class LLPanelClassifiedInfo;
 class LLPanelClassifiedEdit;
 class LLPickItem;
+class LLProfileImageCtrl;
 class LLTextBase;
 class LLToggleableMenu;
 
@@ -77,14 +78,24 @@ private:
     void onCommitRights();
     void onBackBtnClick();
     void onCommitModifyObjectsRights(LLUICtrl* ctrl);
+    void onCommitImageAction(LLUICtrl* ctrl, const LLSD& userdata);
     void onCommitAction(const LLSD& userdata);
     void onNameChanged();
+    void onCommitUploadImage(LLProfileImageCtrl* ctrl);
+    void onCommitChangeImage(LLProfileImageCtrl* ctrl);
+    void onCommitRemoveImage(LLProfileImageCtrl* ctrl);
+    void onProfileImageChanged(const LLUUID& id, LLProfileImageCtrl* ctrl);
     bool isActionEnabled(const LLSD& userdata);
     bool handleConfirmModifyRightsCallback(const LLSD& notification, const LLSD& response);
+    void onCommitRightClickProfileImage(LLUICtrl* item, S32 x, S32 y, MASK mask);
+    void onCommitZoomProfileImage(LLUICtrl* item, S32 x, S32 y, MASK mask);
     void closeParentFloater();
 
     boost::signals2::connection mAvatarNameCacheConnection;
     boost::signals2::connection mNameChangedConnection;
+    LLHandle<LLView>            mPopupMenuHandle;
+    LLHandle<LLFloater>         mTexturePicker;
+    LLHandle<LLFloater>         mProfileSnooper;
 
     class ChildStack
     {

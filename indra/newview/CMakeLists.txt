@@ -608,8 +608,9 @@ set(viewer_SOURCE_FILES
     llpreviewsound.cpp
     llpreviewtexture.cpp
     llproductinforequest.cpp
-    llprogressview.cpp
+    llprofileimagectrl.cpp
     llprofileimagepicker.cpp
+    llprogressview.cpp
     llrecentpeople.cpp
     llreflectionmap.cpp
     llreflectionmapmanager.cpp
@@ -1345,6 +1346,7 @@ set(viewer_HEADER_FILES
     llpreviewsound.h
     llpreviewtexture.h
     llproductinforequest.h
+    llprofileimagectrl.h
     llprofileimagepicker.h
     llprogressview.h
     llrecentpeople.h

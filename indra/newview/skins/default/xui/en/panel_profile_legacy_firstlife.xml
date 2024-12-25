@@ -12,19 +12,25 @@
    height="129"
    width="304"
    layout="topleft">
-    <texture_picker
-     default_image_name="Generic_Person_Large"
-     fallback_image="Generic_Person_Large"
+    <profile_image
+     image_name="Generic_Person_Large"
      follows="left|top"
-     height="143"
+     height="120"
      label=""
      layout="topleft"
      left="5"
      name="fl_profile_pic"
-     no_commit_on_selection="true"
+     interactable="true"
+	 for_profile="true"
      tool_tip="Click to choose a picture"
      top="6"
-     width="120" />
+     width="120">
+      <!-- It would be cool if this worked someday!
+      <profile_image.commit_callback
+       function="Profile.ModifyProfileImage"
+       parameter="first_life" />
+      -->
+    </profile_image>
   </panel>
   <text_editor
    type="string"

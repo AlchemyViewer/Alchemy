@@ -25,19 +25,25 @@
      right="-1"
      auto_resize="false"
      layout="topleft">
-      <texture_picker
-       default_image_name="Generic_Person_Large"
-       fallback_image="Generic_Person_Large"
+      <profile_image
+       image_name="Generic_Person_Large"
        follows="left|top"
-       height="143"
+       height="120"
        label=""
        layout="topleft"
        left="5"
        name="sl_profile_pic"
-       no_commit_on_selection="true"
+       interactable="true"
+	   for_profile="true"
        tool_tip="Click to choose a picture"
        top="0"
-       width="120" />
+       width="120">
+        <!-- It would be cool if this worked someday!
+        <profile_image.commit_callback
+         function="Profile.Profile.ModifyProfileImage"
+         parameter="second_life" />
+        -->
+      </profile_image>
       <text
        font="SansSerifSmall"
        text_color="White_50"
