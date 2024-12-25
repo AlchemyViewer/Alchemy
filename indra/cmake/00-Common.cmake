@@ -56,8 +56,6 @@ if(USE_LTO)
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${USE_LTO})
 endif()
 
-option(COMPRESS_DEBUG "Compress debug sections on supported compilers" OFF)
-
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
@@ -186,14 +184,12 @@ if (LINUX)
     -fexceptions
     -fno-math-errno
     -fno-strict-aliasing
+    -fno-omit-frame-pointer
     -fsigned-char
     -g
+    -gz
     -pthread
     )
-
-  if(COMPRESS_DEBUG)
-    add_compile_options(-gz)
-  endif()
 
   if (USE_AVX2)
     add_compile_options(-mavx2)
@@ -221,13 +217,13 @@ if (LINUX)
   endif ()
 
   if (USE_ASAN OR USE_LEAKSAN OR USE_UBSAN OR USE_THDSAN)
-    add_compile_options(-Og -fno-omit-frame-pointer)
+    add_compile_options(-Og)
   else ()
     add_compile_options(-O3)
   endif ()
 
   # Enable these flags so we have a read only GOT and some linking opts
-  add_link_options("LINKER:-z,relro" "LINKER:-z,now" "LINKER:--as-needed" "LINKER:--build-id")
+  add_link_options("LINKER:-z,relro" "LINKER:-z,now" "LINKER:--as-needed" "LINKER:--build-id=sha1")
 endif ()
 
 if (DARWIN)

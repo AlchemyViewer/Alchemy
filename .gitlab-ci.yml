@@ -73,7 +73,7 @@ variables:
   before_script:
     - python -m venv .venv
     - .\.venv\Scripts\Activate.ps1
-    - pip install --upgrade llbase autobuild certifi sentry-cli==2.32.1 cmake
+    - pip install --upgrade llbase autobuild certifi sentry-cli cmake
   script:
     - autobuild configure -c Release -- -DUSE_LTO="${ENABLE_LTO}" -DHAVOK_TPV="${USE_HAVOK}" -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
@@ -107,7 +107,7 @@ variables:
   before_script:
     - python3 -m venv .venv
     - source .venv/bin/activate
-    - pip3 install --upgrade llbase autobuild dmgbuild certifi sentry-cli==2.32.1 cmake
+    - pip3 install --upgrade llbase autobuild dmgbuild certifi sentry-cli cmake
   script:
     - autobuild configure -c Release -- -DENABLE_SIGNING=ON -DUSE_LTO=OFF -DHAVOK_TPV=${USE_HAVOK} -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE
     - autobuild build -c Release --no-configure
@@ -139,7 +139,7 @@ variables:
   before_script:
     - python3 -m venv .venv
     - source .venv/bin/activate
-    - pip3 install --upgrade llbase autobuild certifi sentry-cli==2.32.1 cmake ninja
+    - pip3 install --upgrade llbase autobuild certifi sentry-cli cmake ninja
   script:
     - autobuild configure -c Release -- -DUSE_LTO=OFF -DLL_TESTS="${ENABLE_TESTS}" -DDISABLE_FATAL_WARNINGS=ON -DREVISION_FROM_VCS=FALSE -DCOMPRESS_DEBUG=ON
     - autobuild build -c Release --no-configure
