@@ -48,7 +48,7 @@ set(VIEWER_SYMBOL_FILE "" CACHE STRING "Name of tarball into which to place symb
 option(USE_CEF "Enable CEF media plugin" ON)
 option(USE_VLC "Enable VLC media plugin" ON)
 
-option(BUILD_EXPIREY "Use build expirey system" ON)
+option(BUILD_EXPIREY "Use build expirey system" OFF)
 
 if(LIBS_CLOSED_DIR)
   file(TO_CMAKE_PATH "${LIBS_CLOSED_DIR}" LIBS_CLOSED_DIR)
