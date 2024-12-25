@@ -350,12 +350,12 @@ A. Or use FXAA_GREEN_AS_LUMA.
         #define FXAA_GATHER4_ALPHA 1
     #endif
     #ifndef FXAA_GATHER4_ALPHA
-        #ifdef GL_ARB_gpu_shader5
-            #define FXAA_GATHER4_ALPHA 1
-        #endif
-        #ifdef GL_NV_gpu_shader5
-            #define FXAA_GATHER4_ALPHA 1
-        #endif
+//        #ifdef GL_ARB_gpu_shader5
+//            #define FXAA_GATHER4_ALPHA 1
+//        #endif
+//        #ifdef GL_NV_gpu_shader5
+//            #define FXAA_GATHER4_ALPHA 1
+//        #endif
         #ifndef FXAA_GATHER4_ALPHA
             #define FXAA_GATHER4_ALPHA 0
         #endif
