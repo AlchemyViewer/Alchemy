@@ -444,16 +444,19 @@ bool LLImageJ2COJ::encodeImpl(LLImageJ2C &base, const LLImageRaw &raw_image, con
 
     if (reversible)
     {
+        parameters.max_cs_size = 0;
         parameters.tcp_numlayers = 1;
         parameters.tcp_rates[0] = 0.0f;
     }
     else
     {
+        parameters.max_cs_size = (1 << 15);
+
         parameters.tcp_numlayers = 5;
-                parameters.tcp_rates[0] = 1920.0f;
-                parameters.tcp_rates[1] = 480.0f;
-                parameters.tcp_rates[2] = 120.0f;
-                parameters.tcp_rates[3] = 30.0f;
+        parameters.tcp_rates[0] = 1920.0f;
+        parameters.tcp_rates[1] = 480.0f;
+        parameters.tcp_rates[2] = 120.0f;
+        parameters.tcp_rates[3] = 30.0f;
         parameters.tcp_rates[4] = 10.0f;
         parameters.irreversible = 1;
         if (raw_image.getComponents() >= 3)

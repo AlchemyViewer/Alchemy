@@ -14,7 +14,6 @@ if (WINDOWS)
       wer
       )
 elseif (DARWIN)
-  include(CMakeFindFrameworks)
   find_library(COCOA_LIBRARY Cocoa)
   target_link_libraries( ll::pluginlibraries INTERFACE
       ${COCOA_LIBRARY}
