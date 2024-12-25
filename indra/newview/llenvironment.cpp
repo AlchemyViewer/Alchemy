@@ -1971,7 +1971,10 @@ void LLEnvironment::requestParcel(S32 parcel_id, environment_apply_fn cb)
             LLEnvironmentRequest::initiate(cb);
         }
         else if (cb)
+        {
             cb(parcel_id, EnvironmentInfo::ptr_t());
+        }
+
         return;
     }
 
@@ -1981,16 +1984,14 @@ void LLEnvironment::requestParcel(S32 parcel_id, environment_apply_fn cb)
         cb = [this, transition](S32 pid, EnvironmentInfo::ptr_t envinfo) { recordEnvironment(pid, envinfo, transition); };
     }
 
-    std::string coroname =
-        LLCoros::instance().launch("LLEnvironment::coroRequestEnvironment",
+    LLCoros::instance().launch("LLEnvironment::coroRequestEnvironment",
         [this, parcel_id, cb]() { coroRequestEnvironment(parcel_id, cb); });
 }
 
 void LLEnvironment::updateParcel(S32 parcel_id, const LLUUID &asset_id, std::string display_name, S32 track_num, S32 day_length, S32 day_offset, U32 flags, LLEnvironment::altitudes_vect_t altitudes, environment_apply_fn cb)
 {
     UpdateInfo::ptr_t updates(std::make_shared<UpdateInfo>(asset_id, display_name, day_length, day_offset, altitudes, flags));
-    std::string coroname =
-        LLCoros::instance().launch("LLEnvironment::coroUpdateEnvironment",
+    LLCoros::instance().launch("LLEnvironment::coroUpdateEnvironment",
         [this, parcel_id, track_num, updates, cb]() { coroUpdateEnvironment(parcel_id, track_num, updates, cb); });
 }
 
@@ -2040,8 +2041,7 @@ void LLEnvironment::updateParcel(S32 parcel_id, const LLSettingsDay::ptr_t &pday
 {
     UpdateInfo::ptr_t updates(std::make_shared<UpdateInfo>(pday, day_length, day_offset, altitudes));
 
-    std::string coroname =
-        LLCoros::instance().launch("LLEnvironment::coroUpdateEnvironment",
+    LLCoros::instance().launch("LLEnvironment::coroUpdateEnvironment",
         [this, parcel_id, track_num, updates, cb]() { coroUpdateEnvironment(parcel_id, track_num, updates, cb); });
 }
 
@@ -2050,12 +2050,9 @@ void LLEnvironment::updateParcel(S32 parcel_id, const LLSettingsDay::ptr_t &pday
     updateParcel(parcel_id, pday, NO_TRACK, day_length, day_offset, altitudes, cb);
 }
 
-
-
 void LLEnvironment::resetParcel(S32 parcel_id, environment_apply_fn cb)
 {
-    std::string coroname =
-        LLCoros::instance().launch("LLEnvironment::coroResetEnvironment",
+    LLCoros::instance().launch("LLEnvironment::coroResetEnvironment",
         [this, parcel_id, cb]() { coroResetEnvironment(parcel_id, NO_TRACK, cb); });
 }
 
@@ -2074,8 +2071,10 @@ void LLEnvironment::coroRequestEnvironment(S32 parcel_id, LLEnvironment::environ
 
     if (parcel_id != INVALID_PARCEL_ID)
     {
-        url.append("?parcelid=");
-        url.append(fmt::to_string(parcel_id));
+        std::stringstream query;
+
+        query << "?parcelid=" << parcel_id;
+        url += query.str();
     }
 
     LLSD result = httpAdapter->getAndSuspend(httpRequest, url);
@@ -2096,11 +2095,13 @@ void LLEnvironment::coroRequestEnvironment(S32 parcel_id, LLEnvironment::environ
         LLSD environment = result[KEY_ENVIRONMENT];
         if (environment.isDefined() && apply)
         {
-            EnvironmentInfo::ptr_t envinfo = LLEnvironment::EnvironmentInfo::extract(environment);
-            apply(parcel_id, envinfo);
+            LLAppViewer::instance()->postToMainCoro([=]()
+                {
+                    EnvironmentInfo::ptr_t envinfo = LLEnvironment::EnvironmentInfo::extract(environment);
+                    apply(parcel_id, envinfo);
+                });
         }
     }
-
 }
 
 void LLEnvironment::coroUpdateEnvironment(S32 parcel_id, S32 track_no, UpdateInfo::ptr_t updates, environment_apply_fn apply)
@@ -2120,9 +2121,14 @@ void LLEnvironment::coroUpdateEnvironment(S32 parcel_id, S32 track_no, UpdateInf
     if (track_no == NO_TRACK)
     {   // day length and offset are only applicable if we are addressing the entire day cycle.
         if (updates->mDayLength > 0)
+        {
             body[KEY_ENVIRONMENT][KEY_DAYLENGTH] = updates->mDayLength;
+        }
+
         if (updates->mDayOffset > 0)
+        {
             body[KEY_ENVIRONMENT][KEY_DAYOFFSET] = updates->mDayOffset;
+        }
 
         if ((parcel_id == INVALID_PARCEL_ID) && (updates->mAltitudes.size() == 3))
         {   // only test for altitude changes if we are changing the region.
@@ -2135,12 +2141,16 @@ void LLEnvironment::coroUpdateEnvironment(S32 parcel_id, S32 track_no, UpdateInf
     }
 
     if (updates->mDayp)
+    {
         body[KEY_ENVIRONMENT][KEY_DAYCYCLE] = updates->mDayp->getSettings();
+    }
     else if (!updates->mSettingsAsset.isNull())
     {
         body[KEY_ENVIRONMENT][KEY_DAYASSET] = updates->mSettingsAsset;
         if (!updates->mDayName.empty())
+        {
             body[KEY_ENVIRONMENT][KEY_DAYNAME] = updates->mDayName;
+        }
     }
 
     body[KEY_ENVIRONMENT][KEY_FLAGS] = LLSD::Integer(updates->mFlags);
@@ -2158,22 +2168,27 @@ void LLEnvironment::coroUpdateEnvironment(S32 parcel_id, S32 track_no, UpdateInf
             if (track_no != NO_TRACK)
                 query << "&";
         }
+
         if (track_no != NO_TRACK)
         {
             query << "trackno=" << track_no;
         }
+
         url += query.str();
     }
 
     LLSD result = httpAdapter->putAndSuspend(httpRequest, url, body);
     // results that come back may contain the new settings
 
+    if (LLApp::isExiting())
+        return;
+
     LLSD notify;
 
     LLSD httpResults = result["http_result"];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-    if ((!status) || !result["success"].asBoolean())
+    if (!status || !result["success"].asBoolean())
     {
         LL_WARNS("ENVIRONMENT") << "Couldn't update Windlight settings for " << ((parcel_id == INVALID_PARCEL_ID) ? ("region!") : ("parcel!")) << LL_ENDL;
 
@@ -2187,10 +2202,6 @@ void LLEnvironment::coroUpdateEnvironment(S32 parcel_id, S32 track_no, UpdateInf
         {
             notify["FAIL_REASON"] = reason;
         }
-    }
-    else if (LLApp::isExiting())
-    {
-        return;
     }
     else
     {
@@ -2242,34 +2253,26 @@ void LLEnvironment::coroResetEnvironment(S32 parcel_id, S32 track_no, environmen
     LLSD result = httpAdapter->deleteAndSuspend(httpRequest, url);
     // results that come back may contain the new settings
 
+    if (LLApp::isExiting())
+        return;
+
     LLSD notify;
 
     LLSD httpResults = result["http_result"];
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
-    if ((!status) || !result["success"].asBoolean())
+    if (!status || !result["success"].asBoolean())
     {
         LL_WARNS("ENVIRONMENT") << "Couldn't reset Windlight settings in " << ((parcel_id == INVALID_PARCEL_ID) ? ("region!") : ("parcel!")) << LL_ENDL;
 
         notify = LLSD::emptyMap();
         std::string reason = result["message"].asString();
-        if (reason.empty())
-        {
-            notify["FAIL_REASON"] = status.toString();
-        }
-        else
-        {
-            notify["FAIL_REASON"] = reason;
-        }
+        notify["FAIL_REASON"] = reason.empty() ? status.toString() : reason;
     }
-    else if (LLApp::isExiting())
+    else if (apply)
     {
-        return;
-    }
-    else
-    {
-       LLSD environment = result[KEY_ENVIRONMENT];
-        if (environment.isDefined() && apply)
+        LLSD environment = result[KEY_ENVIRONMENT];
+        if (environment.isDefined())
         {
             EnvironmentInfo::ptr_t envinfo = LLEnvironment::EnvironmentInfo::extract(environment);
             apply(parcel_id, envinfo);
@@ -2281,7 +2284,6 @@ void LLEnvironment::coroResetEnvironment(S32 parcel_id, S32 track_no, environmen
         LLNotificationsUtil::add("WLRegionApplyFail", notify);
         //LLEnvManagerNew::instance().onRegionSettingsApplyResponse(false);
     }
-
 }
 
 
@@ -2406,7 +2408,6 @@ LLEnvironment::EnvironmentInfo::ptr_t LLEnvironment::EnvironmentInfo::extractLeg
     pinfo->mAltitudes[1] = 10001;
     pinfo->mAltitudes[2] = 10002;
     pinfo->mAltitudes[3] = 10003;
-
 
     return pinfo;
 }

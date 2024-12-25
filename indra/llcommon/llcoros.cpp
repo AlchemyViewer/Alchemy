@@ -62,6 +62,23 @@
 #endif
 
 // static
+bool LLCoros::on_main_coro()
+{
+    if (!LLCoros::instanceExists() || LLCoros::getName().empty())
+    {
+        return true;
+    }
+
+    return false;
+}
+
+// static
+bool LLCoros::on_main_thread_main_coro()
+{
+    return on_main_coro() && on_main_thread();
+}
+
+// static
 LLCoros::CoroData& LLCoros::get_CoroData(const std::string& caller)
 {
     CoroData* current{ nullptr };
@@ -362,7 +379,8 @@ void LLCoros::toplevel(std::string name, callable_t callable)
     {
         // Stash any OTHER kind of uncaught exception in the rethrow() queue
         // to be rethrown by the main fiber.
-        LOG_UNHANDLED_EXCEPTION(STRINGIZE("coroutine " << name));
+        LL_WARNS("LLCoros") << "Capturing uncaught exception in coroutine "
+                            << name << LL_ENDL;
         LLCoros::instance().saveException(name, std::current_exception());
     }
 }
