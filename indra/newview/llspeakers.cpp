@@ -538,7 +538,7 @@ void LLSpeakerMgr::updateSpeakerList()
                     mSpeakerListUpdated = true;
                 }
             }
-            else if (mSpeakers.empty())
+            else if (mSpeakers.size() == 0)
             {
                 // For all other session type (ad-hoc, P2P), we use the initial participants targets list
                 for (uuid_vec_t::iterator it = session->mInitialTargetIDs.begin();it!=session->mInitialTargetIDs.end();++it)
@@ -598,7 +598,7 @@ bool LLSpeakerMgr::removeSpeaker(const LLUUID& speaker_id)
 LLPointer<LLSpeaker> LLSpeakerMgr::findSpeaker(const LLUUID& speaker_id)
 {
     //In some conditions map causes crash if it is empty(Windows only), adding check (EK)
-    if (mSpeakers.empty())
+    if (mSpeakers.size() == 0)
         return NULL;
     speaker_map_t::iterator found_it = mSpeakers.find(speaker_id);
     if (found_it == mSpeakers.end())

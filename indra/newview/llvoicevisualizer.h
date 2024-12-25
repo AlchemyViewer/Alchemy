@@ -100,6 +100,8 @@ class LLVoiceVisualizer final : public LLHUDEffect
         void setMaxGesticulationAmplitude();
         void setMinGesticulationAmplitude();
 
+        static bool getLipSyncEnabled() { return sLipSyncEnabled; }
+
     //---------------------------------------------------
     // private members
     //---------------------------------------------------
