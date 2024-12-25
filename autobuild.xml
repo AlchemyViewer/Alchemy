@@ -9,6 +9,16 @@
     <map>
       <key>SDL2</key>
       <map>
+        <key>copyright</key>
+        <string>Copyright (C) 1997-2022 Sam Lantinga (slouken@libsdl.org)</string>
+        <key>description</key>
+        <string>Simple DirectMedia Layer is a cross-platform multimedia library designed to provide low level access to audio, keyboard, mouse, joystick, 3D hardware via OpenGL, and 2D video framebuffer.</string>
+        <key>license</key>
+        <string>lgpl</string>
+        <key>license_file</key>
+        <string>LICENSES/SDL2.txt</string>
+        <key>name</key>
+        <string>SDL2</string>
         <key>platforms</key>
         <map>
           <key>darwin64</key>
@@ -16,11 +26,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>b2981cbc72e966b75ef587fb55c5e8fcf829aaa390fcd3365de209b4366bb056cca04f02eb3179193ca941a0214d6bc9362b9a281179976b8c4cb0053caca23e</string>
+              <string>a6aa829c1e7f193b624f05415588e4d727454c8f</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-sdl2/releases/download/v2.30.0-958285a/SDL2-2.30.0-darwin64-9459243145.tar.zst</string>
+              <string>https://github.com/secondlife/3p-sdl2/releases/download/v2.30.9-r1/SDL2-2.30.9-r1-darwin64-11943333704.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -30,11 +40,11 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>fe47b8bff02bba3bff2d07194769bd79d80900509f30fdabbf5f73849a582ced9ccbeaa4a4f0bd724df34b6dc0e354109a8bde81b389a1568c3ce822f36cde48</string>
+              <string>ad1b738a7cef16d5cec63ab99b1c80146626f47b</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-sdl2/releases/download/v2.30.0-958285a/SDL2-2.30.0-linux64-9459243145.tar.zst</string>
+              <string>https://github.com/secondlife/3p-sdl2/releases/download/v2.30.9-r1/SDL2-2.30.9-r1-linux64-11943333704.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -44,28 +54,18 @@
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>d94e4a57dedf71905365c56f9ecffd12aa94d30c9bd9de70874bfd26d6e9805a988fb537db6678d7f807bd7f21d648faf491c93b0da9e43d6a4c4b71a5cb6694</string>
+              <string>97153f9d302f964142df971b57680724824f458f</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-sdl2/releases/download/v2.30.0-958285a/SDL2-2.30.0-windows64-9459243145.tar.zst</string>
+              <string>https://github.com/secondlife/3p-sdl2/releases/download/v2.30.9-r1/SDL2-2.30.9-r1-windows64-11943333704.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
           </map>
         </map>
-        <key>license</key>
-        <string>lgpl</string>
-        <key>license_file</key>
-        <string>LICENSES/SDL2.txt</string>
-        <key>copyright</key>
-        <string>Copyright (C) 1997-2024 Sam Lantinga (slouken@libsdl.org)</string>
         <key>version</key>
-        <string>2.30.0</string>
-        <key>name</key>
-        <string>SDL2</string>
-        <key>description</key>
-        <string>Simple DirectMedia Layer is a cross-platform multimedia library designed to provide low level access to audio, keyboard, mouse, joystick, 3D hardware via OpenGL, and 2D video framebuffer.</string>
+        <string>2.30.9-r1</string>
       </map>
       <key>apr_suite</key>
       <map>
@@ -1970,11 +1970,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>0f97bd114ccbcb67f15caa16c837e7b294d720c05d6a2cd99c939f5618b8a65798772c0a157c2367b1f6b50c1b2f7bb209f03ddddd9ca2c2dc16eb66634e875c</string>
+              <string>a93b63fc4e5aa3e226b819fb02ce9a05b00dfea1</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-open-libndofdev/releases/download/v0.14.0-a377d1a/open_libndofdev-0.14.0-linux64-9459328666.tar.zst</string>
+              <string>https://github.com/secondlife/3p-open-libndofdev/releases/download/v1.14-r5/open_libndofdev-0.14.11968684513-linux64-11968684513.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -1987,7 +1987,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>copyright</key>
         <string>Copyright (c) 2008, Jan Ciger (jan.ciger (at) gmail.com)</string>
         <key>version</key>
-        <string>0.14.0</string>
+        <string>0.14.11968684513</string>
         <key>name</key>
         <string>open-libndofdev</string>
         <key>description</key>
@@ -2002,11 +2002,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>1b876fc7046470ddfda2fb74ef7d653643a40c4668f8ca276f56535afa1d93fafb05cae77ccadbffebf7ee1ce3dab90c4b7d4f4a56b8461688b61f19550751ac</string>
+              <string>9250e12d4d88f0a437e49be2b32d107f6b4270d0</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-openal-soft/releases/download/v1.23.1-13e162a/openal-1.23.1-darwin64-9458147120.tar.zst</string>
+              <string>https://github.com/secondlife/3p-openal-soft/releases/download/v1.24.0-r1/openal-1.24.0-r1-darwin64-11968917548.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2016,11 +2016,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>2552fc42e102e38d506569aa22b88a06712c976b93b8cfb2644c4decbf11bc463d239061d0a1bc5e76337f9dec9f5efe00bbaf9102ea926949b930cb2a92b6ce</string>
+              <string>1e50db24586fba434a2be62f94fdc687569379ca</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-openal-soft/releases/download/v1.23.1-13e162a/openal-1.23.1-linux64-9458147120.tar.zst</string>
+              <string>https://github.com/secondlife/3p-openal-soft/releases/download/v1.24.0-r1/openal-1.24.0-r1-linux64-11968917548.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2030,11 +2030,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>c2f9c3551b1691d0b8cf49560ef10fd48e1fb515c2d9a0f777ffb71709bb9efcf7b12a625391bbc3fc369888061c8a0f989ec58a3887b658e6c1353053aa6ea7</string>
+              <string>2ec7b2b1f4c37e5bd1b473e4a26935ec374ee208</string>
               <key>hash_algorithm</key>
-              <string>blake2b</string>
+              <string>sha1</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-openal-soft/releases/download/v1.23.1-13e162a/openal-1.23.1-windows64-9458147120.tar.zst</string>
+              <string>https://github.com/secondlife/3p-openal-soft/releases/download/v1.24.0-r1/openal-1.24.0-r1-windows64-11968917548.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2047,7 +2047,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>copyright</key>
         <string>Copyright (C) 1999-2007 by authors.</string>
         <key>version</key>
-        <string>1.23.1</string>
+        <string>1.24.0-r1</string>
         <key>name</key>
         <string>openal</string>
         <key>description</key>
