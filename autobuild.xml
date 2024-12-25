@@ -656,11 +656,11 @@
               <key>creds</key>
               <string>github</string>
               <key>hash</key>
-              <string>670f2ec5c64ca45d1206f449e58852607f8891ea3361b574ca612aae8d058671fd6046ee1315173eb30c44f5fa790b03000c48d2a2c4dbf1f4163e60eb81f0e2</string>
+              <string>e5e37b56f81d0604c53c485f04073da398bc18edfad7c45ed3a18555c161ca528c697e1aa7d62c155f18ce8682318aef18b6d451c9536b8566b819ef74b0a2d7</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/172704632</string>
+              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/215807187</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -672,11 +672,11 @@
               <key>creds</key>
               <string>github</string>
               <key>hash</key>
-              <string>7b367764b9ed6c97e03e95d834058d6fee6cfe74498145dcd9f29a865d5599e20cc665aa5d88f3cb433d9825b9bc72ed21fc33fd33574e2f764a071b487f2fd7</string>
+              <string>422512d3f65165ac67326e74c88ea89bd04c40240cb01b21a5b3e4160631446706acae4eb7f508c2347c4d8e7f7097564841a4eb532b478130b8390b9bfd6dc5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/172704631</string>
+              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/215807186</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -688,11 +688,11 @@
               <key>creds</key>
               <string>github</string>
               <key>hash</key>
-              <string>e15dd0312354bd745e88576a7bb638cd4b8396d6310e8b14ec2697585eabe92a0b6d97ebe0a5ce498d492cb92d85ae2604679fb5a20c6be1229b328d3e4ee16e</string>
+              <string>5d86d27111336b5f9641d654e26f0670f5a7f687fffbcbb31877c2e52d8e758a130eafd618ba0c05d67dd3bf1556038c0341e1065098ef062320a5be6fa0de8a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/172704633</string>
+              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/215807189</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -705,7 +705,7 @@
         <key>copyright</key>
         <string>FMOD Studio, Copyright (c) Firelight Technologies Pty Ltd.</string>
         <key>version</key>
-        <string>2.02.22</string>
+        <string>2.02.26</string>
         <key>name</key>
         <string>fmodstudio</string>
         <key>description</key>
