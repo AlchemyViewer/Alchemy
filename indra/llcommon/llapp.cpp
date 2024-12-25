@@ -678,6 +678,10 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
     // We do the somewhat sketchy operation of blocking in here until the error handler
     // has gracefully stopped the app.
 
+    // FIXME(brad) - we are using this handler for asynchronous signals as well, so sLogInSignal is currently
+    // disabled for safety.  we need to find a way to selectively reenable it when it is safe.
+    // see issue secondlife/viewer#2566
+
     if (LLApp::sLogInSignal)
     {
         LL_INFOS() << "Signal handler - Got signal " << signum << " - " << apr_signal_description_get(signum) << LL_ENDL;
@@ -687,9 +691,10 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
     switch (signum)
     {
     case SIGCHLD:
+    case SIGHUP:
         if (LLApp::sLogInSignal)
         {
-            LL_INFOS() << "Signal handler - Got SIGCHLD from " << info->si_pid << LL_ENDL;
+            LL_INFOS() << "Signal handler - Got SIGCHLD or SIGHUP from " << info->si_pid << LL_ENDL;
         }
 
         return;
@@ -704,11 +709,10 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
         raise(signum);
         return;
     case SIGINT:
-    case SIGHUP:
     case SIGTERM:
         if (LLApp::sLogInSignal)
         {
-            LL_WARNS() << "Signal handler - Got SIGINT, HUP, or TERM, exiting gracefully" << LL_ENDL;
+            LL_WARNS() << "Signal handler - Got SIGINT, or TERM, exiting gracefully" << LL_ENDL;
         }
         // Graceful exit
         // Just set our state to quitting, not error
@@ -755,6 +759,7 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
             {
                 LL_WARNS() << "Signal handler - Handling fatal signal!" << LL_ENDL;
             }
+
             if (LLApp::isError())
             {
                 // Received second fatal signal while handling first, just die right now
@@ -792,11 +797,11 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
             clear_signals();
             raise(signum);
             return;
-        } else {
-            if (LLApp::sLogInSignal)
-            {
-                LL_INFOS() << "Signal handler - Unhandled signal " << signum << ", ignoring!" << LL_ENDL;
-            }
+        }
+
+        if (LLApp::sLogInSignal)
+        {
+            LL_INFOS() << "Signal handler - Unhandled signal " << signum << ", ignoring!" << LL_ENDL;
         }
     }
 }
