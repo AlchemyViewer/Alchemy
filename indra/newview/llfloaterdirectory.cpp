@@ -79,27 +79,10 @@ LLFloaterDirectory::LLFloaterDirectory(const Params& key)
     mCommitCallbackRegistrar.add("Search.NavigateResults", boost::bind(&LLFloaterDirectory::navigateResults, this, _2));
     mCommitCallbackRegistrar.add("Search.NavigateResults", boost::bind(&LLFloaterDirectory::navigateResults, this, _2));
     mCommitCallbackRegistrar.add("Search.Popout", boost::bind(&LLFloaterDirectory::onCommitPopoutResult, this));
-    mEnableCallbackRegistrar.add("Search.Enable", boost::bind(&LLFloaterDirectory::isActionEnabled, this, _2));
 }
 
 LLFloaterDirectory::~LLFloaterDirectory()
 {
-}
-
-bool LLFloaterDirectory::isActionEnabled(const LLSD& userdata)
-{
-    bool action_enabled = false;
-    const std::string& check = userdata.asString();
-    if (check == "can_page_up") {
-        action_enabled = mNumResultsReceived > mCurrentQuery.results_per_page;
-    } else if (check == "can_page_down") {
-        action_enabled = mResultStart > 0;
-    } else if (check == "can_popout") {
-        
-    } else {
-        LL_INFOS("Search") << "Unknown check in Directory Search: " << check << LL_ENDL;
-    }
-    return action_enabled;
 }
 
 BOOL LLFloaterDirectory::postBuild()

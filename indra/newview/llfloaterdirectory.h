@@ -112,7 +112,6 @@ protected:
 
 private:
     ~LLFloaterDirectory();
-    bool isActionEnabled(const LLSD& userdata);
     void onCommitSelection();
     void navigateResults(const LLSD& userdata);
     void onTabChanged();
