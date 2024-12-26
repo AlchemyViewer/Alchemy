@@ -36,10 +36,12 @@ class LLFloaterEvent final : public LLFloater
 public:
     LLFloaterEvent(const LLSD& key);
     /*virtual*/ ~LLFloaterEvent() = default;
+    BOOL postBuild() override;
+    void onOpen(const LLSD& key) override;
     void setEventID(const U32 event_id);
 
 private:
-    S32 mEventId;
+    LLPanel* mPanel;
 };
 
 #endif // LL_LLFLOATEREVENT_H

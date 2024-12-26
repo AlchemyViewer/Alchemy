@@ -647,7 +647,7 @@ void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
 bool LLPanelProfileLegacy::isActionEnabled(const LLSD& userdata)
 {
     bool action_enabled = false;
-    const std::string check = userdata.asString();
+    const std::string& check = userdata.asString();
     if (check == "can_has_telefono") {
         action_enabled = (LLAvatarActions::canCall() && getAvatarId() != gAgentID);
     } else if (check == "can_has_teleport") {
