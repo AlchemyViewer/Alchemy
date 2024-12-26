@@ -1198,7 +1198,7 @@ class LinuxManifest(ViewerManifest):
             self.path("install.sh")
 
         with self.prefix(dst="bin"):
-            self.path("alchemy-bin","do-not-directly-run-alchemy-bin")
+            self.path("alchemy-bin","alchemy-bin")
             self.path2basename("../llplugin/slplugin", "ALPlugin")
             #this copies over the python wrapper script, associated utilities and required libraries, see SL-321, SL-322 and SL-323
             #with self.prefix(src="../viewer_components/manager", dst=""):
@@ -1267,7 +1267,7 @@ class LinuxManifest(ViewerManifest):
             self.run_command(['find', self.get_dst_prefix(),
                               '-type', 'f', '-perm', old,
                               '-exec', 'chmod', new, '{}', ';'])
-        self.package_file = installer_name + '.tar.xz'
+        self.package_file = installer_name + '.tar.zstd'
 
         # temporarily move directory tree so that it has the right
         # name in the tarfile
@@ -1279,11 +1279,14 @@ class LinuxManifest(ViewerManifest):
             if self.args['buildtype'].lower() == 'release':
                 # --numeric-owner hides the username of the builder for
                 # security etc.
+                tar_env = os.environ.copy()
+                tar_env["ZSTD_NBTHREADS"] = '0'
+                tar_env["ZSTD_CLEVEL"] = '19'
                 self.run_command(['tar', '-C', self.get_build_prefix(),
-                                  '--numeric-owner', '-cJf',
-                                 tempname + '.tar.xz', installer_name])
+                                  '--numeric-owner', '--zstd', '-cf',
+                                 tempname + '.tar.zstd', installer_name], env=tar_env)
             else:
-                print("Skipping %s.tar.xz for non-Release build (%s)" % \
+                print("Skipping %s.tar.zstd for non-Release build (%s)" % \
                       (installer_name, self.args['buildtype']))
         finally:
             self.run_command(["mv", tempname, realname])
@@ -1297,7 +1300,11 @@ class LinuxManifest(ViewerManifest):
                 [os.path.join(self.get_dst_prefix(), dir) for dir in ('bin', 'lib')] +
                 ['-type', 'f', '!', '-name', '*.py', '!', '-name', '*.pak', '!', '-name', '*.bin', '!', '-name', '*.dat',
                  '!', '-name', 'update_install', '!', '-name', '*.exe', '!', '-name', '*.dll', '!', '-name', '*.lib', '!', '-name', '*.pdb', '!', '-name', '*.json', 
-                 '-exec', 'strip', '-S', '{}', ';'])
+                 '-exec', 'strip', '--strip-debug', '--strip-unneeded', '{}', ';'])
+
+            alchemypath = os.path.join(self.args['build'], 'alchemy-bin')
+            self.run_command(['objcopy', '--only-keep-debug', '--compress-debug-sections=zlib', alchemypath, alchemypath + '.debug'])
+            self.run_command(['objcopy', '--add-gnu-debuglink=' + alchemypath + '.debug', os.path.join(self.get_dst_prefix(), 'bin', 'alchemy-bin')])
 
 class Linux_i686_Manifest(LinuxManifest):
     address_size = 32

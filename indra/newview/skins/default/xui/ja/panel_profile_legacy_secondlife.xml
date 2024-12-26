@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel label="セカンドライフ" name="avatar_secondlife_tab">
+	<layout_stack>
+		<layout_panel name="avatar_info_top">
+			<profile_image label="" name="sl_profile_pic" tool_tip="Click to choose a picture">
+				<!-- It would be cool if this worked someday!
+				<profile_image.commit_callback function="Profile.Profile.ModifyProfileImage" parameter="second_life"/>
+				-->
+			</profile_image>
+			<text name="rezday_label">
+				誕生日：
+			</text>
+			<icon tool_tip="ハッピーRezデイ" name="cake"/>
+			<text name="online">
+				オンライン
+			</text>
+			<icon name="account_type_internal"/>
+			<icon name="account_type_premium"/>
+			<icon name="account_type_plus"/>
+			<text name="rezday">
+				（不明）
+			</text>
+			<text name="account_info"/>
+			<text name="partner_label">
+				パートナー：
+			</text>
+			<text name="partner_info">
+				secondlife:///app/agent/00000000-0000-0000-0000-000000000000/inspect
+			</text>
+		</layout_panel>
+		<layout_panel name="avatar_desc">
+			<text_editor name="sl_about"/>
+			<text name="www"/>
+			<line_editor tool_tip="Website link" name="www_edit"/>
+		</layout_panel>
+		<layout_panel name="avatar_perm">
+			<text name="permissions_label">
+				このアバターができること：
+			</text>
+			<check_box label="自分のオンライン状況を見る" name="allow_show_online"/>
+			<check_box label="ワールドマップ上から自分を探すことができる" name="allow_mapping"/>
+			<check_box label="自分のオブジェクトを編集したり削除したり取ることができる" name="allow_object_perms"/>
+		</layout_panel>
+		<layout_panel name="avatar_in_search">
+			<check_box label="検索に表示する" name="allow_publish"/>
+		</layout_panel>
+	</layout_stack>
+</panel>

@@ -53,6 +53,7 @@
 #include "llstl.h"
 #include "llexception.h"
 #include "llhandle.h"
+#include "llcoros.h"
 
 /*==========================================================================*|
 // override this to allow binding free functions with more parameters
@@ -348,15 +349,15 @@ testable:
     // LLEventPump subclass statically, as a class member, on the stack or on
     // the heap. In such cases, the instantiating party is responsible for its
     // lifespan.
-    typedef std::map<std::string, LLEventPump*, std::less<>> PumpMap;
+    typedef std::map<std::string, LLEventPump*> PumpMap;
     PumpMap mPumpMap;
     // Set of all LLEventPumps we instantiated. Membership in this set means
     // we claim ownership, and will delete them when this LLEventPumps is
     // destroyed.
-    typedef boost::unordered_set<LLEventPump*> PumpSet;
+    typedef std::set<LLEventPump*> PumpSet;
     PumpSet mOurPumps;
     // for make(), map string type name to LLEventPump subclass factory function
-    typedef boost::unordered_map<std::string, TypeFactory, al::string_hash, std::equal_to<>> TypeFactories;
+    typedef std::map<std::string, TypeFactory> TypeFactories;
     // Data used by make().
     // One might think mFactories and mTypes could reasonably be static. So
     // they could -- if not for the fact that make() or obtain() might be
@@ -366,7 +367,7 @@ testable:
 
     // for obtain(), map desired string instance name to string type when
     // obtain() must create the instance
-    typedef boost::unordered_map<std::string, std::string, al::string_hash, std::equal_to<>> InstanceTypes;
+    typedef std::map<std::string, std::string> InstanceTypes;
     InstanceTypes mTypes;
 };
 
@@ -512,7 +513,7 @@ public:
     const static NameList empty;
 
     /// Get this LLEventPump's name
-    const std::string& getName() const { return mName; }
+    std::string getName() const { return mName; }
 
     /**
      * Register a new listener with a unique name. Specify an optional list
@@ -593,7 +594,7 @@ private:
     LLHandle<LLEventPumps> mRegistry;
 
     std::string mName;
-    LLMutex mConnectionListMutex;
+    LLCoros::Mutex mConnectionListMutex;
 
 protected:
     virtual LLBoundListener listen_impl(const std::string& name, const LLEventListener&,
@@ -608,7 +609,7 @@ protected:
     /// Map of named listeners. This tracks the listeners that actually exist
     /// at this moment. When we stopListening(), we discard the entry from
     /// this map.
-    typedef boost::unordered_map<std::string, boost::signals2::connection, al::string_hash, std::equal_to<>> ConnectionMap;
+    typedef std::map<std::string, boost::signals2::connection> ConnectionMap;
     ConnectionMap mConnections;
     typedef LLDependencies<std::string, float> DependencyMap;
     /// Dependencies between listeners. For each listener, track the float
