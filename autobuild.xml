@@ -656,11 +656,11 @@
               <key>creds</key>
               <string>github</string>
               <key>hash</key>
-              <string>670f2ec5c64ca45d1206f449e58852607f8891ea3361b574ca612aae8d058671fd6046ee1315173eb30c44f5fa790b03000c48d2a2c4dbf1f4163e60eb81f0e2</string>
+              <string>e5e37b56f81d0604c53c485f04073da398bc18edfad7c45ed3a18555c161ca528c697e1aa7d62c155f18ce8682318aef18b6d451c9536b8566b819ef74b0a2d7</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/172704632</string>
+              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/215807187</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -672,11 +672,11 @@
               <key>creds</key>
               <string>github</string>
               <key>hash</key>
-              <string>7b367764b9ed6c97e03e95d834058d6fee6cfe74498145dcd9f29a865d5599e20cc665aa5d88f3cb433d9825b9bc72ed21fc33fd33574e2f764a071b487f2fd7</string>
+              <string>422512d3f65165ac67326e74c88ea89bd04c40240cb01b21a5b3e4160631446706acae4eb7f508c2347c4d8e7f7097564841a4eb532b478130b8390b9bfd6dc5</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/172704631</string>
+              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/215807186</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -688,11 +688,11 @@
               <key>creds</key>
               <string>github</string>
               <key>hash</key>
-              <string>e15dd0312354bd745e88576a7bb638cd4b8396d6310e8b14ec2697585eabe92a0b6d97ebe0a5ce498d492cb92d85ae2604679fb5a20c6be1229b328d3e4ee16e</string>
+              <string>5d86d27111336b5f9641d654e26f0670f5a7f687fffbcbb31877c2e52d8e758a130eafd618ba0c05d67dd3bf1556038c0341e1065098ef062320a5be6fa0de8a</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/172704633</string>
+              <string>https://api.github.com/repos/AlchemyViewer/3p-fmodstudio-private/releases/assets/215807189</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -705,7 +705,7 @@
         <key>copyright</key>
         <string>FMOD Studio, Copyright (c) Firelight Technologies Pty Ltd.</string>
         <key>version</key>
-        <string>2.02.22</string>
+        <string>2.02.26</string>
         <key>name</key>
         <string>fmodstudio</string>
         <key>description</key>
@@ -2216,11 +2216,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>a530b77d4c3c4f63150db501a7cf5ab133e97cd0db12e19aed2c5631f972bd3be920697066f97c7731f88bea43ce22825bb422097e2669cf4b35101b15359f53</string>
+              <string>ecfcb4b85a1f28467892d43754dfeb7adde65be71623a7e016d5ea8ea0d7dfa3211ad4aa02d2fa64ab1aaf02d831df524a69412d2bb3651772201756af1b6472</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-sentry/releases/download/v8.29.1-0.7.6-38697f9/sentry-8.29.1-0.7.6-darwin64-9635115166.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-sentry/releases/download/v8.42.1-0.7.17-r1/sentry-8.42.1-0.7.17-darwin64-12495374196.tar.zst</string>
             </map>
             <key>name</key>
             <string>darwin64</string>
@@ -2230,11 +2230,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>f442f7191ded1a00fe4ceba8374e9fa36043d34f26bb397b861bf014274e622ef6f43d1a199f57f91db6ea85d2f3501dadce8b68c213590fac6abac8a2a43410</string>
+              <string>ca3eb2d3da3d7b39ec699119724cebee0842af0c46085597bc243dcbb62a5ef063aecde82893c06812e5375dd3f53953382d1d3e52173d652214078d41bcb64f</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-sentry/releases/download/v8.29.1-0.7.6-38697f9/sentry-8.29.1-0.7.6-linux64-9635115166.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-sentry/releases/download/v8.42.1-0.7.17-r1/sentry-8.42.1-0.7.17-linux64-12495374196.tar.zst</string>
             </map>
             <key>name</key>
             <string>linux64</string>
@@ -2244,11 +2244,11 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
             <key>archive</key>
             <map>
               <key>hash</key>
-              <string>981cf0fa9033cd6cf98c592708ac61cf191b234c3863abd6580b6aace08dc532bf6636f6c5e4dbd5f17a7c0092b244bba1a7704be5736f1c16cd86e5383a6e60</string>
+              <string>399edc177df918a350b1b3d058d33f6ef5344d600ed65db0b5b46683c46a363265b21499891804cafe0cd873cd7717e50ab324f5dfe381146abca1c2f85cacb1</string>
               <key>hash_algorithm</key>
               <string>blake2b</string>
               <key>url</key>
-              <string>https://github.com/AlchemyViewer/3p-sentry/releases/download/v8.29.1-0.7.6-38697f9/sentry-8.29.1-0.7.6-windows64-9635115166.tar.zst</string>
+              <string>https://github.com/AlchemyViewer/3p-sentry/releases/download/v8.42.1-0.7.17-r1/sentry-8.42.1-0.7.17-windows64-12495374196.tar.zst</string>
             </map>
             <key>name</key>
             <string>windows64</string>
@@ -2261,7 +2261,7 @@ Copyright (c) 2012, 2014, 2015, 2016 nghttp2 contributors</string>
         <key>copyright</key>
         <string>Copyright (c) Sentry</string>
         <key>version</key>
-        <string>8.29.1-0.7.6</string>
+        <string>8.42.1-0.7.17</string>
         <key>name</key>
         <string>sentry</string>
         <key>canonical_repo</key>

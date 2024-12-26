@@ -168,7 +168,7 @@ public:
     //@{
         LLSD(LLSD&& other) noexcept;
         void  assign(LLSD&& other);
-        LLSD& operator=(LLSD&& other) noexcept;
+        LLSD& operator=(LLSD&& other);
     //@}
 
     void clear();   ///< resets to Undefined
