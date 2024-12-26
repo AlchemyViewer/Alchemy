@@ -62,6 +62,7 @@
 #include "llfloaterworldmap.h"
 #include "llgroupactions.h"
 #include "llpanelclassified.h"
+#include "llpanelclassifiededit.h"
 #include "llpanelpick.h"
 #include "llpickitem.h"
 #include "llprofileimagepicker.h"
@@ -1009,19 +1010,15 @@ BOOL LLPanelProfileLegacy::LLPanelProfilePicks::postBuild()
     registar.add("Pick.Teleport", boost::bind(&LLPanelProfilePicks::onClickTeleport, this));
     registar.add("Pick.Map", boost::bind(&LLPanelProfilePicks::onClickShowOnMap, this));
     registar.add("Pick.Delete", boost::bind(&LLPanelProfilePicks::onClickDelete, this));
-    //EnableCallbackRegistry::ScopedRegistrar enable_registar;
-    //enable_registar.add("Pick.Enable", boost::bind(&LLPanelProfilePicks::onEnableMenuItem, this, _2));
 
     auto popup_menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_picks.xml", gMenuHolder, child_registry_t::instance());
-    if (popup_menu)
-        mPopupMenuHandle = popup_menu->getHandle();
+    if (popup_menu) { mPopupMenuHandle = popup_menu->getHandle(); }
 
     CommitCallbackRegistry::ScopedRegistrar plus_registar;
     plus_registar.add("Picks.Plus.Action", boost::bind(&LLPanelProfilePicks::onPlusMenuItemClicked, this, _2));
     mEnableCallbackRegistrar.add("Picks.Plus.Enable", boost::bind(&LLPanelProfilePicks::isActionEnabled, this, _2));
     auto plus_menu = LLUICtrlFactory::getInstance()->createFromFile<LLToggleableMenu>("menu_picks_plus.xml", gMenuHolder, child_registry_t::instance());
-    if (plus_menu)
-        mPlusMenuHandle = plus_menu->getHandle();
+    if (plus_menu) { mPlusMenuHandle = plus_menu->getHandle(); }
 
     updateButtons();
     return TRUE;

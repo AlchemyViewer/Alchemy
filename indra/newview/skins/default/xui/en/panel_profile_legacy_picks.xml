@@ -87,7 +87,28 @@
      orientation="horizontal"
      top="0"
      width="304">
-		  <layout_panel
+      <layout_panel
+       follows="bottom|left|right"
+       height="28"
+       layout="topleft"
+       name="add_btn_lp"
+       auto_resize="true"
+       left_pad="2"
+       width="30">
+        <menu_button
+         follows="top|left|right"
+         height="23"
+         layout="topleft"
+         name="add_btn"
+         tab_stop="false"
+         tool_tip="Add entry"
+         width="30"
+         image_hover_unselected="Toolbar_Middle_Over"
+         image_overlay="Conv_toolbar_plus"
+         image_selected="Toolbar_Middle_Selected"
+         image_unselected="Toolbar_Middle_Off" />
+      </layout_panel>
+	  <layout_panel
        follows="bottom|left|right"
        height="28"
        layout="topleft"
@@ -106,8 +127,8 @@
          tab_stop="false"
          tool_tip="Show pick information"
          width="95" />
-		  </layout_panel>
-		  <layout_panel
+	  </layout_panel>
+      <layout_panel
        follows="bottom|left|right"
        height="28"
        layout="bottomleft"
@@ -125,8 +146,8 @@
          tab_stop="false"
          tool_tip="Teleport to the corresponding area"
          width="117" />
-		  </layout_panel>
-		  <layout_panel
+	  </layout_panel>
+	  <layout_panel
        follows="bottom|left|right"
        height="28"
        layout="bottomleft"
@@ -144,7 +165,7 @@
          tab_stop="false"
          tool_tip="Show the corresponding area on the World Map"
          width="88" />
-		  </layout_panel>
-	  </layout_stack>
-	</panel>
+	  </layout_panel>
+	</layout_stack>
+  </panel>
 </panel>

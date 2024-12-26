@@ -28,6 +28,7 @@
 #include "llclassifieditem.h"
 
 #include "llpanelclassified.h"
+#include "llpanelclassifiededit.h"
 
 LLClassifiedItem::LLClassifiedItem(const LLUUID& avatar_id, const LLUUID& classified_id)
     : LLPanel()
