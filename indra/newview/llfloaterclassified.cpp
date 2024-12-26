@@ -39,11 +39,7 @@ LLFloaterClassified::~LLFloaterClassified()
 
 void LLFloaterClassified::onOpen(const LLSD& key)
 {
-    LLPanel* panel = findChild<LLPanel>("main_panel", true);
-    if (panel)
-    {
-        panel->onOpen(key);
-    }
+    getChild<LLPanel>("main_panel", true)->onOpen(key);
     if (key.has("classified_name"))
     {
         setTitle(key["classified_name"].asString());
