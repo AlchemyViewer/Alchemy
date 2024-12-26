@@ -1306,7 +1306,7 @@ class LinuxManifest(ViewerManifest):
             self.run_command(['objcopy', '--only-keep-debug', '--compress-debug-sections=zlib', alchemypath, alchemypath + '.debug'])
             self.run_command(['objcopy', '--add-gnu-debuglink=' + alchemypath + '.debug', os.path.join(self.get_dst_prefix(), 'bin', 'alchemy-bin')])
 
-class Linux_i686_Ma_nifest(LinuxManifest):
+class Linux_i686_Manifest(LinuxManifest):
     address_size = 32
 
     def construct(self):
