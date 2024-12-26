@@ -4163,7 +4163,14 @@ Your L$ balance is shown in the upper-right.
 		<tag>fail</tag>
 		<tag>voice</tag>
 	</notification>
-	<notification name="VoiceEffectsNew">新しいボイスモーフィング効果が登場！
+	<notification name="VoiceEffectsNew">
+		新しいボイスモーフィング効果が登場！
+		<tag>voice</tag>
+	</notification>
+	<notification name="VoiceEffectsNotSupported">
+		このビューアはボイスモーフィングをサポートしていません。
+他のボイスモーフィングツールについての情報は、[[FAQ_URL] この記事]を参照してください。
+		<usetemplate ignoretext="ボイスモーフィングをサポートしていないことについての警告" name="okignore" yestext="ＯＫ"/>
 		<tag>voice</tag>
 	</notification>
 	<notification name="Cannot enter parcel: not a group member">
@@ -5941,7 +5948,7 @@ Intelドライバーのウェブサイトを確認しますか？
 アイテムが現在着ているアイテムに
 置き換えられます。
 		<tag>confirm</tag>
-		<usetemplate ignoretext="Confirm before overwriting outfit" name="okcancelignore" notext="キャンセル" yestext="保存"/>
+		<usetemplate ignoretext="アウトフィットを置き換える前の確認" name="okcancelignore" notext="キャンセル" yestext="保存"/>
 	</notification>
 	<notification name="ClearInventoryThumbnailsWarning">
 		リスト内のインベントリのアイテムからサムネイル画像を削除しようとしています。この変更は元に戻すことはできません。
@@ -5997,7 +6004,8 @@ Intelドライバーのウェブサイトを確認しますか？
 		<tag>fail</tag>
 		<tag>opensim</tag>
 	</notification>
-	<notification name="CannotRemoveConnectedGrid">[GRID]に接続している間は削除できません。
+	<notification name="CannotRemoveConnectedGrid">
+		[GRID]に接続している間は削除できません。
 		<tag>fail</tag>
 		<tag>opensim</tag>
 	</notification>
