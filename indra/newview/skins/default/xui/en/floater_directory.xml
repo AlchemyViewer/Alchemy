@@ -265,7 +265,11 @@ Your search terms were missing a query string.
   layout="topleft"
   left_pad="5"
   name="PageDn"
-  top_delta="0" />
+  top_delta="0">
+   <button.commit_callback
+    function="Search.NavigateResults"
+    parameter="-" />
+ </button>
  <button
   follows="bottom|left"
   height="16"
@@ -279,13 +283,30 @@ Your search terms were missing a query string.
   layout="topleft"
   left_pad="5"
   name="PageUp"
-  top_delta="0" />
+  top_delta="0">
+   <button.commit_callback
+    function="Search.NavigateResults"
+    parameter="+" />
+ </button>
  <loading_indicator
   follows="bottom|right"
   height="16"
   layout="topleft"
-  right="-4"
+  right="-20"
   name="loading"
   top_delta="0"
   width="16" />
+ <button
+  follows="bottom|right"
+  height="16"
+  width="16"
+  layout="topleft"
+  right="-4"
+  image_unselected="Icon_Restore_Foreground"
+  image_pressed="Icon_Restore_Press"
+  name="popout"
+  top_delta="0">
+   <button.commit_callback
+    function="Search.Popout" />
+ </button>
 </floater>

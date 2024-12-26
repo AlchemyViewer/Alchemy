@@ -2,7 +2,7 @@
  * @file llfloaterdirectory.cpp
  * @brief Legacy search facility
  *
- * Copyright (c) 2014-2022, Cinder Roxley <cinder@sdf.org>
+ * Copyright (c) 2014-2024, Cinder Roxley <cinder@sdf.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -52,6 +52,7 @@
 #include "llpanelsearchweb.h"
 #include "llproductinforequest.h"
 #include "llviewercontrol.h"
+#include "llavataractions.h"
 
 SearchQuery::SearchQuery()
 :   category("category", ""),
@@ -69,15 +70,36 @@ LLFloaterDirectory::LLFloaterDirectory(const Params& key)
     , mResultStart(0)
     , mNumResultsReceived(0)
     , mQueryID()
+    , mSelectedResultParams()
     , mTabContainer(nullptr)
     , mPanelWeb(nullptr)
     , mResultList(nullptr)
     , mResultsStatus(nullptr)
 {
+    mCommitCallbackRegistrar.add("Search.NavigateResults", boost::bind(&LLFloaterDirectory::navigateResults, this, _2));
+    mCommitCallbackRegistrar.add("Search.NavigateResults", boost::bind(&LLFloaterDirectory::navigateResults, this, _2));
+    mCommitCallbackRegistrar.add("Search.Popout", boost::bind(&LLFloaterDirectory::onCommitPopoutResult, this));
+    mEnableCallbackRegistrar.add("Search.Enable", boost::bind(&LLFloaterDirectory::isActionEnabled, this, _2));
 }
 
 LLFloaterDirectory::~LLFloaterDirectory()
 {
+}
+
+bool LLFloaterDirectory::isActionEnabled(const LLSD& userdata)
+{
+    bool action_enabled = false;
+    const std::string& check = userdata.asString();
+    if (check == "can_page_up") {
+        action_enabled = mNumResultsReceived > mCurrentQuery.results_per_page;
+    } else if (check == "can_page_down") {
+        action_enabled = mResultStart > 0;
+    } else if (check == "can_popout") {
+        
+    } else {
+        LL_INFOS("Search") << "Unknown check in Directory Search: " << check << LL_ENDL;
+    }
+    return action_enabled;
 }
 
 BOOL LLFloaterDirectory::postBuild()
@@ -95,8 +117,6 @@ BOOL LLFloaterDirectory::postBuild()
     mTabContainer->setCommitCallback(boost::bind(&LLFloaterDirectory::onTabChanged, this));
     setProgress(false);
     mResultsStatus = findChild<LLTextBase>("results_status");
-    getChild<LLButton>("PageUp")->setCommitCallback(boost::bind(&LLFloaterDirectory::choosePage, this, _1));
-    getChild<LLButton>("PageDn")->setCommitCallback(boost::bind(&LLFloaterDirectory::choosePage, this, _1));
     showDetailPanel(LLStringUtil::null); // hide all the panels
     paginate();
 
@@ -144,16 +164,18 @@ void LLFloaterDirectory::onTabChanged()
     findChild<LLLayoutStack>("results_stack")->setVisible(show_detail);
     findChild<LLButton>("PageUp")->setVisible(show_detail);
     findChild<LLButton>("PageDn")->setVisible(show_detail);
+    findChild<LLButton>("popout")->setVisible(show_detail);
     mResultsStatus->setVisible(show_detail);
 }
 
 void LLFloaterDirectory::onCommitSelection()
 {
+    LLSD params;
+    params["ResultCategory"] = mCurrentResultType;
     switch (mCurrentResultType)
     {
         case SE_PEOPLE:
         {
-            LLSD params;
             params["avatar_id"] = mResultList->getSelectedValue().asUUID();
             getChild<LLPanel>("detail_avatar")->onOpen(params);
             showDetailPanel("detail_avatar");
@@ -161,7 +183,6 @@ void LLFloaterDirectory::onCommitSelection()
         }
         case SE_GROUPS:
         {
-            LLSD params;
             params["group_id"] = mResultList->getSelectedValue().asUUID();
             getChild<LLPanel>("detail_group")->onOpen(params);
             showDetailPanel("detail_group");
@@ -170,7 +191,6 @@ void LLFloaterDirectory::onCommitSelection()
         case SE_LANDSALES:
         case SE_PLACES:
         {
-            LLSD params;
             params["type"] = "remote_place";
             params["id"] = mResultList->getSelectedValue().asUUID();
             getChild<LLPanel>("detail_place")->onOpen(params);
@@ -179,7 +199,6 @@ void LLFloaterDirectory::onCommitSelection()
         }
         case SE_CLASSIFIEDS:
         {
-            LLSD params;
             params["classified_id"] = mResultList->getSelectedValue().asUUID();
             getChild<LLPanel>("detail_classified")->onOpen(params);
             showDetailPanel("detail_classified");
@@ -187,15 +206,18 @@ void LLFloaterDirectory::onCommitSelection()
         }
         case SE_EVENTS:
         {
-            getChild<LLPanel>("detail_event")->onOpen(mResultList->getSelectedValue().asInteger());
+            params["event_id"] = mResultList->getSelectedValue().asInteger();
+            getChild<LLPanel>("detail_event")->onOpen(params);
             showDetailPanel("detail_event");
             break;
         }
         case SE_UNDEFINED:
         default:
+            params = LLSD();
             LL_WARNS("Search") << "Unhandled search mode: " << mCurrentResultType << LL_ENDL;
             break;
     }
+    mSelectedResultParams = params;
 }
 
 void LLFloaterDirectory::paginate()
@@ -215,21 +237,28 @@ void LLFloaterDirectory::paginate()
                                           args));
     }
     else
+    {
         mResultsStatus->setText(getString("no_results"));
+    }
     childSetEnabled("PageUp", mNumResultsReceived > mCurrentQuery.results_per_page);
     childSetEnabled("PageDn", mResultStart > 0);
 }
 
-void LLFloaterDirectory::choosePage(LLUICtrl* ctrl)
+void LLFloaterDirectory::navigateResults(const LLSD& userdata)
 {
-    if (ctrl->getName() == "PageUp")
+    const std::string& action = userdata.asString();
+    if (action == "+")
+    {
         mResultStart += mCurrentQuery.results_per_page;
-    else if (ctrl->getName() == "PageDn")
+    }
+    else if (action == "-")
+    {
         mResultStart -= mCurrentQuery.results_per_page;
+    }
     else
     {
-        LL_WARNS("Search") << "Unknown control: " << ctrl->getName() << LL_ENDL;
-        return; // Fuck you, you lose.
+        LL_WARNS("Search") << "Unknown action encountered navigating results: " << action << LL_ENDL;
+        return;
     }
     queryDirectory(mCurrentQuery, false);
 }
@@ -396,6 +425,47 @@ void LLFloaterDirectory::rebuildResultList()
             LL_WARNS("Search") << "Unhandled search mode: " << mCurrentResultType << LL_ENDL;
             break;
 
+    }
+}
+
+void LLFloaterDirectory::onCommitPopoutResult()
+{
+    if (!mSelectedResultParams.has("ResultCategory"))
+    {
+        LL_INFOS("Search") << "No selected result to pop out" << LL_ENDL;
+        return;
+    }
+
+    ESearch resultType(static_cast<ESearch>(mSelectedResultParams["ResultCategory"].asInteger()));
+    switch (resultType)
+    {
+        case SE_PEOPLE:
+        {
+            LLAvatarActions::showProfile(mSelectedResultParams["avatar_id"].asUUID());
+            break;
+        }
+        case SE_GROUPS:
+        {
+            LLFloaterReg::showInstance("group_profile", mSelectedResultParams, TAKE_FOCUS_YES);
+            break;
+        }
+        case SE_PLACES:
+        case SE_LANDSALES:
+        {
+            LLFloaterReg::showInstance("places", mSelectedResultParams, TAKE_FOCUS_YES);
+            break;
+        }
+        case SE_EVENTS:
+            LLFloaterReg::showInstance("event", mSelectedResultParams, TAKE_FOCUS_YES);
+            break;
+        case SE_CLASSIFIEDS:
+            LLFloaterReg::showInstance("classified", mSelectedResultParams, TAKE_FOCUS_YES);
+            break;
+        default:
+        {
+            LL_INFOS("Search") << "Unhandled Result Type: " << resultType << LL_ENDL;
+            break;
+        }
     }
 }
 

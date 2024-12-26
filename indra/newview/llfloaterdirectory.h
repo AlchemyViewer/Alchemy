@@ -112,18 +112,21 @@ protected:
 
 private:
     ~LLFloaterDirectory();
+    bool isActionEnabled(const LLSD& userdata);
     void onCommitSelection();
-    void choosePage(LLUICtrl* ctrl);
+    void navigateResults(const LLSD& userdata);
     void onTabChanged();
     void paginate();
     void showDetailPanel(const std::string& panel_name);
     void rebuildResultList();
+    void onCommitPopoutResult();
 
     ESearch mCurrentResultType;
     LLDirQuery mCurrentQuery;
     S32 mResultStart;
     S32 mNumResultsReceived;
     LLUUID mQueryID;
+    LLSD mSelectedResultParams;
 
     LLTabContainer* mTabContainer;
     LLPanelSearchWeb* mPanelWeb;
