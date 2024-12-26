@@ -4754,9 +4754,9 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="Adult">
 		成人向け
 	</string>
-	<string name="Arts and Culture">
-		芸術と文化
-	</string>
+    <string name="Arts&amp;Culture">
+        芸術と文化
+    </string>
 	<string name="Business">
 		ビジネス
 	</string>
@@ -4772,9 +4772,9 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="Newcomer Friendly">
 		新規住民歓迎
 	</string>
-	<string name="Parks and Nature">
-		公園と自然
-	</string>
+    <string name="Parks&amp;Nature">
+        公園と自然
+    </string>
 	<string name="Residential">
 		住宅用
 	</string>
@@ -6650,11 +6650,14 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="premium_voice_morphing_url">
 		https://secondlife.com/destination/voice-morphing-premium
 	</string>
+	<string name="no_voice_morphing_faq_url">
+		https://lindenlab.freshdesk.com/support/solutions/articles/31000173560-webrtc-update-for-voice-chat-faq/
+	</string>
 	<string name="lindenhomes_get_home_url">
 		https://secondlife.com/land/lindenhomes/member.php?lang=ja-JP
 	</string>
 	<string name="lindenhomes_my_home_url">
-		https://land.secondlife.com/ja-JP/lindenhomes/my-home.php
+		https://secondlife.com/ja-JP/land/lindenhomes
 	</string>
 	<string name="membership_url">
 		https://accounts.secondlife.com/change_membership/?lang=ja-JP
@@ -8061,27 +8064,6 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 		無効な画像ファイル形式です。他の画像を選択してください。
 	</string>
 	<!-- Alchemy Strings -->
-	<string name="not_found">
-		「[TEXT]」は見つかりませんでした。
-	</string>
-	<string name="no_results">
-		検索結果なし
-	</string>
-	<string name="searching">
-		検索しています…
-	</string>
-	<string name="all_categories">
-		全てのカテゴリ
-	</string>
-	<string name="search_banned">
-		コミュニティスタンダードに明記されているコンテンツ制限により、検索クエリ内の一部の語句は除外されました。
-	</string>
-	<string name="search_short">
-		検索語が短すぎるため、検索は実行されませんでした。
-	</string>
-	<string name="search_disabled">
-		レガシー検索はこのリージョンでは無効化されています。
-		</string>
 	<string name="NotifyIncomingMessage">
 		[NAME]さんからのメッセージが届いています…
 	</string>
@@ -8250,5 +8232,11 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 	</string>
 	<string name="TooltipDistance">
 		距離：[OBJECT_DISTANCE]
+	</string>
+	<string name="AutoResponseModeDefault">
+		あなたがメッセージを送った住人は、[APP_NAME]ビューアの「自動応答モード」を有効にしており、邪魔されないよう要求しています。あなたのメッセージは、後で閲覧できるように住人のＩＭパネルに表示されます。
+	</string>
+	<string name="AutoResponseModeNonFriendsDefault">
+		あなたがメッセージを送った住人は、[APP_NAME]ビューアの「自動応答モード」を有効にしており、邪魔されないよう要求しています。あなたのメッセージは、後で閲覧できるように住人のＩＭパネルに表示されます。
 	</string>
 </strings>
