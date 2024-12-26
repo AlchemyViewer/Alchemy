@@ -305,6 +305,7 @@ Your search terms were missing a query string.
   image_unselected="Icon_Restore_Foreground"
   image_pressed="Icon_Restore_Press"
   name="popout"
+  tool_tip="Open result in new window"
   top_delta="0">
    <button.commit_callback
     function="Search.Popout" />
