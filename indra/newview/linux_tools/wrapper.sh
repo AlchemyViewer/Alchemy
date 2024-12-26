@@ -127,7 +127,7 @@ fi
 # command line. But DO quote "$ARGS": preserve separate args as
 # individually quoted.
 # Note: In sh, we don't have arrays like in Bash. So, we use a string instead to store the arguments.
-eval "$LL_WRAPPER bin/do-not-directly-run-alchemy-bin $ARGS"
+eval "$LL_WRAPPER bin/alchemy-bin $ARGS"
 LL_RUN_ERR=$?
 
 # Handle any resulting errors
