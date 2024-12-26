@@ -200,6 +200,7 @@ void LLFloaterDirectory::onCommitSelection()
         case SE_CLASSIFIEDS:
         {
             params["classified_id"] = mResultList->getSelectedValue().asUUID();
+            params["from_search"] = true;
             getChild<LLPanel>("detail_classified")->onOpen(params);
             showDetailPanel("detail_classified");
             break;
