@@ -98,6 +98,7 @@ static LLPanelInjector<LLPanelClassifiedInfo> t_classified_info("panel_classifie
 LLPanelClassifiedInfo::LLPanelClassifiedInfo()
  : LLPanel()
  , mInfoLoaded(false)
+ , mFromSearch(false)
  , mScrollingPanel(NULL)
  , mScrollContainer(NULL)
  , mScrollingPanelMinHeight(0)
@@ -116,16 +117,9 @@ LLPanelClassifiedInfo::LLPanelClassifiedInfo()
 
 LLPanelClassifiedInfo::~LLPanelClassifiedInfo()
 {
-    if (getAvatarId().notNull())
-    {
-        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
-    }
     sAllPanels.remove(this);
 
-    if (getAvatarId().notNull())
-    {
-        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
-    }
+    LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
 }
 
 // static
@@ -189,18 +183,7 @@ void LLPanelClassifiedInfo::reshape(S32 width, S32 height, BOOL called_from_pare
 
 void LLPanelClassifiedInfo::onOpen(const LLSD& key)
 {
-    LLUUID avatar_id = key["classified_creator_id"];
-    if(avatar_id.isNull())
-    {
-        //return;
-    }
-
-    if(getAvatarId().notNull())
-    {
-        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
-    }
-
-    setAvatarId(avatar_id);
+    setAvatarId(key["classified_creator_id"].asUUID());
 
     resetData();
     resetControls();

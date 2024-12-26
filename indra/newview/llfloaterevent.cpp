@@ -5,7 +5,7 @@
  * $LicenseInfo:firstyear=2004&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * Copyright (C) 2014, Cinder Roxley @ Second Life
+ * Copyright (C) 2024, Cinder Roxley @ Second Life
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,20 +28,31 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llfloaterevent.h"
-#include "llpaneleventinfo.h"
 
 
 LLFloaterEvent::LLFloaterEvent(const LLSD& key)
-:   LLFloater(key)
-,   mEventId(0)
-{
+: LLFloater(key)
+, mPanel(nullptr)
+{ }
 
+BOOL LLFloaterEvent::postBuild()
+{
+    mPanel = getChild<LLPanel>("event_panel");
+
+    return TRUE;
+}
+
+void LLFloaterEvent::onOpen(const LLSD& key)
+{
+    mPanel->onOpen(key);
 }
 
 void LLFloaterEvent::setEventID(const U32 event_id)
 {
-    mEventId = event_id;
-    if (event_id == 0) closeFloater();
+    if (event_id == 0)
+    {
+        closeFloater();
+    }
 
-    getChild<LLPanel>("event_panel")->onOpen(mEventId);
+    mPanel->onOpen(LLSD().with("event_id", event_id));
 }

@@ -71,8 +71,7 @@ BOOL LLPanelEventInfo::postBuild()
 
 void LLPanelEventInfo::onOpen(const LLSD& key)
 {
-    U32 id(key.asInteger());
-    setEventID(id);
+    setEventID(key["event_id"].asInteger());
 
     gEventNotifier.add(getEventID());
 }
