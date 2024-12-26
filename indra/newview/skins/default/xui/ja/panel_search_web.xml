@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_search_web">
+	<layout_stack name="stack1">
+		<layout_panel name="external_controls">
+			<web_browser name="webbrowser"/>
+		</layout_panel>
+		<layout_panel name="status_bar">
+			<button tool_tip="戻る" name="back"/>
+			<button tool_tip="進む" name="forward" />
+			<button tool_tip="停止する" name="stop"/>
+			<button tool_tip="リロードする" name="reload"/>
+			<text name="statusbartext"/>
+			<progress_bar name="statusbarprogress"/>
+		</layout_panel>
+	</layout_stack>
+</panel>
