@@ -56,8 +56,8 @@ export SDL_VIDEO_X11_WMCLASS=$channel
 ## - Enable threaded mesa GL impl
 export mesa_glthread=true
 
-## - Enable nvidia threaded GL
-export __GL_THREADED_OPTIMIZATIONS=1
+## - Uncomment to enable nvidia threaded GL optimizations - MAY CAUSE INSTABILITY
+#export __GL_THREADED_OPTIMIZATIONS=1
 
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
