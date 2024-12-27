@@ -25,14 +25,14 @@ add_library(deps
 FetchContent_Declare(
   meshoptimizer
   GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git
-  GIT_TAG        v0.20
+  GIT_TAG        v0.22
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
   )
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG        10.2.1
+  GIT_TAG        11.1.0
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
   )
