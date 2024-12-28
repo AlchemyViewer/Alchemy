@@ -15,9 +15,6 @@
     name="AlertBoxColor"
     value="0.24 0.24 0.24 1"/>
    <color
-    name="AlertCautionBoxColor"
-    value="1 0.82 0.46 1"/>
-   <color
     name="AlertCautionTextColor"
     reference="LtYellow"/>
    <color
@@ -32,9 +29,6 @@
    <color
     name="AvatarCustomColor4"
     reference="Yellow" />
-   <color
-    name="AvatarDefaultColor"
-    reference="MapAvatarColor" />
    <color
     name="AvatarListItemIconDefaultColor"
     reference="White"/>
@@ -356,12 +350,6 @@
    <color
     name="HealthTextColor"
     value="0.72 0.72 0.72 1"/>
-   <color
-    name="HelpBgColor"
-    reference="Unused?" />
-   <color
-    name="HelpFgColor"
-    reference="Unused?" />
    <color
     name="HelpScrollHighlightColor"
     reference="Unused?"/>

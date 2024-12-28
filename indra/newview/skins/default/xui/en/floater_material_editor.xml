@@ -26,7 +26,6 @@
    width="250"
    follows="all"
    layout="topleft"
-   color="DkGray2"
    opaque="true"
    tab_stop="true"
    reserve_scroll_corner="false">
@@ -55,7 +54,7 @@
                type="string"
                name="unsaved_changes"
                font.style="BOLD"
-               text_color="DrYellow"
+               text_color="EmphasisColor"
                length="1"
                follows="left|top"
                height="10"
