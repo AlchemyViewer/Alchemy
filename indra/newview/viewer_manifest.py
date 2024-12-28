@@ -1267,7 +1267,7 @@ class LinuxManifest(ViewerManifest):
             self.run_command(['find', self.get_dst_prefix(),
                               '-type', 'f', '-perm', old,
                               '-exec', 'chmod', new, '{}', ';'])
-        self.package_file = installer_name + '.tar.zstd'
+        self.package_file = installer_name + '.tar.zst'
 
         # temporarily move directory tree so that it has the right
         # name in the tarfile
@@ -1284,9 +1284,9 @@ class LinuxManifest(ViewerManifest):
                 tar_env["ZSTD_CLEVEL"] = '19'
                 self.run_command(['tar', '-C', self.get_build_prefix(),
                                   '--numeric-owner', '--zstd', '-cf',
-                                 tempname + '.tar.zstd', installer_name], env=tar_env)
+                                 tempname + '.tar.zst', installer_name], env=tar_env)
             else:
-                print("Skipping %s.tar.zstd for non-Release build (%s)" % \
+                print("Skipping %s.tar.zst for non-Release build (%s)" % \
                       (installer_name, self.args['buildtype']))
         finally:
             self.run_command(["mv", tempname, realname])

@@ -2255,7 +2255,7 @@ if (LINUX)
 
   if (PACKAGE)
     add_custom_command(
-        OUTPUT ${product}.tar.zstd
+        OUTPUT ${product}.tar.zst
         COMMAND ${Python3_EXECUTABLE}
         ARGS
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
@@ -2280,7 +2280,7 @@ if (LINUX)
           ${COPY_INPUT_DEPENDENCIES}
         )
 
-    add_custom_target(llpackage ALL DEPENDS ${product}.tar.zstd)
+    add_custom_target(llpackage ALL DEPENDS ${product}.tar.zst)
     # Make sure we don't run two instances of viewer_manifest.py at the same time.
     add_dependencies(llpackage copy_l_viewer_manifest)
   endif (PACKAGE)
