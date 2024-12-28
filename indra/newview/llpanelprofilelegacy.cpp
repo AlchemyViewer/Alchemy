@@ -31,6 +31,8 @@
 #include "llviewerprecompiledheaders.h"
 #include "llpanelprofilelegacy.h"
 
+#include <boost/algorithm/string/predicate.hpp> // for boost::iequals
+
 // libraries
 #include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
@@ -82,6 +84,8 @@ static const std::array<std::string, 6> sSkillsCheckboxes{{"can_texture", "can_a
 static LLPanelInjector<LLPanelProfileLegacy> t_panel_lprofile("panel_profile_legacy_sidetray");
 static LLPanelInjector<LLPanelProfileLegacy::LLPanelProfileGroups> t_panel_group("panel_profile_legacy_groups");
 static LLPanelInjector<LLPanelProfileLegacy::LLPanelProfilePicks> t_panel_picks("panel_profile_legacy_picks");
+
+static LLDate sSecondLifeRelease = LLDate("2003-06-23T00:00:00");
 
 LLPanelProfileLegacy::LLPanelProfileLegacy()
 :   LLPanelProfileLegacyTab()
@@ -235,7 +239,7 @@ void LLPanelProfileLegacy::updateData()
 {
     setProgress(true);
 
-    const std::string cap_url = gAgent.getRegionCapability(AGENT_PROFILE_CAP);
+    const std::string& cap_url = gAgent.getRegionCapability(AGENT_PROFILE_CAP);
     if (!cap_url.empty())
     {
         const auto& agent_id = getAvatarId();
@@ -273,7 +277,7 @@ void LLPanelProfileLegacy::updateData()
                 return;
             }
 
-            LLPanelProfileLegacy* legacy_sidetray = (LLPanelProfileLegacy*)handle.get();
+            LLPanelProfileLegacy* legacy_sidetray = static_cast<LLPanelProfileLegacy*>(handle.get());
             if (!legacy_sidetray)
             {
                 return;
@@ -367,38 +371,44 @@ void LLPanelProfileLegacy::updateData()
 
             legacy_sidetray->processProperties(&avatar_picks, APT_PICKS);
 
-            // bonus time...
+            LLIconCtrl* badge = legacy_sidetray->getChild<LLIconCtrl>("badge_icon");
             if (result.has("customer_type"))
             {
-                LLUICtrl* internal_icon = legacy_sidetray->getChild<LLUICtrl>("account_type_internal");
-                LLUICtrl* premium_icon = legacy_sidetray->getChild<LLUICtrl>("account_type_premium");
-                LLUICtrl* plus_icon = legacy_sidetray->getChild<LLUICtrl>("account_type_plus");
+                
                 const std::string& type = result["customer_type"].asStringRef();
 
-                if (type == "Internal")
+                if (boost::iequals(type, "Internal"))
                 {
-                    internal_icon->setVisible(true);
-                    premium_icon->setVisible(false);
-                    plus_icon->setVisible(false);
+                    badge->setValue("Profile_Badge_Linden");
                 }
-                else if (type == "Monthly" || type == "Quarterly" || type == "Annual")
+                else if (avatar_data.born_on < sSecondLifeRelease)
                 {
-                    internal_icon->setVisible(false);
-                    premium_icon->setVisible(true);
-                    plus_icon->setVisible(false);
+                    badge->setValue("Profile_Badge_Beta");
+                }
+                else if (boost::iequals(type, "Beta_Lifetime"))
+                {
+                    badge->setValue("Profile_Badge_Beta_Lifetime");
+                }
+                else if (boost::iequals(type, "Lifetime"))
+                {
+                    badge->setValue("Profile_Badge_Lifetime");
+                }
+                else if (boost::iequals(type, "Monthly") || boost::iequals(type, "Quarterly") || boost::iequals(type, "Annual"))
+                {
+                    badge->setValue("AccountLevel_Premium");
                 }
                 else if (type.substr(0, 12) == "Premium_Plus")
                 {
-                    internal_icon->setVisible(false);
-                    premium_icon->setVisible(false);
-                    plus_icon->setVisible(true);
+                    badge->setValue("AccountLevel_Plus");
                 }
                 else /* if (type == "Base") */
                 {
-                    internal_icon->setVisible(false);
-                    premium_icon->setVisible(false);
-                    plus_icon->setVisible(false);
+                    badge->setValue("");
                 }
+            }
+            else
+            {
+                badge->setValue("");
             }
 
             });
@@ -412,7 +422,7 @@ void LLPanelProfileLegacy::updateData()
     getChild<LLLayoutPanel>("avatar_perm")->setVisible(is_other);
     if (is_other)
     {
-        S32 rights = relation->getRightsGrantedTo();
+        const S32 rights = relation->getRightsGrantedTo();
         getChild<LLCheckBoxCtrl>("allow_show_online")->setValue(rights & LLRelationship::GRANT_ONLINE_STATUS ? TRUE : FALSE);
         getChild<LLCheckBoxCtrl>("allow_mapping")->setValue(rights & LLRelationship::GRANT_MAP_LOCATION ? TRUE : FALSE);
         getChild<LLCheckBoxCtrl>("allow_object_perms")->setValue(rights & LLRelationship::GRANT_MODIFY_OBJECTS ? TRUE : FALSE);
@@ -451,7 +461,7 @@ void LLPanelProfileLegacy::sendAvatarProfileCoro(std::string url, LLSD payload)
     LL_DEBUGS("LegacyProfiles") << "Agent id: " << getAvatarId() << " Payload: " << payload << " Result: " << httpResults << LL_ENDL;
 }
 
-void LLPanelProfileLegacy::processProperties(void* data, EAvatarProcessorType type)
+void LLPanelProfileLegacy::processProperties(void* data, const EAvatarProcessorType type)
 {
     if (!data) return;
     switch(type)
