@@ -55,7 +55,7 @@ Recovered items will be placed in the 'Lost and Found' inventory folder.
   <panel
    background_visible="false"
    follows="left|right|bottom"
-    height="25"
+   height="25"
    label="bottom_panel"
    layout="topleft"
    left="6"
@@ -71,12 +71,10 @@ Recovered items will be placed in the 'Lost and Found' inventory folder.
      width="30" />
     <button
      height="25"
-     image_color="Green"
      image_hover_unselected="Toolbar_Middle_Over"
      image_selected="Toolbar_Middle_Selected"
      image_unselected="Toolbar_Middle_Off"
      label="Recover"
-     label_color="White"
      left_pad="1"
      name="recover_btn"
      top="1"

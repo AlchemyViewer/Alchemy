@@ -161,7 +161,7 @@
      value="0.24 0.24 0.24 1" />
     <color
      name="AlertCautionBoxColor"
-     value="1 0.82 0.46 1" />
+     reference="Unused?" />
     <color
      name="AlertCautionTextColor"
      reference="LtYellow" />
