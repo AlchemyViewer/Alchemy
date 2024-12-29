@@ -1,6 +1,6 @@
 /**
  * @file llavatarpropertiesprocessor.h
- * @brief LLAvatatIconCtrl base class
+ * @brief LLAvatarPropertiesProcessor class description
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -34,12 +34,12 @@
 #include <map>
 
 // For Flags in AvatarPropertiesReply
-const U32 AVATAR_ALLOW_PUBLISH          = 0x1 << 0; // whether profile is externally visible or not
-const U32 AVATAR_MATURE_PUBLISH         = 0x1 << 1; // profile is "mature"
-const U32 AVATAR_IDENTIFIED             = 0x1 << 2; // whether avatar has provided payment info
-const U32 AVATAR_TRANSACTED             = 0x1 << 3; // whether avatar has actively used payment info
-const U32 AVATAR_ONLINE                 = 0x1 << 4; // the online status of this avatar, if known.
-const U32 AVATAR_AGEVERIFIED            = 0x1 << 5; // whether avatar has been age-verified
+constexpr U32 AVATAR_ALLOW_PUBLISH  = 0x1 << 0; // whether profile is externally visible or not
+constexpr U32 AVATAR_MATURE_PUBLISH = 0x1 << 1; // profile is "mature"
+constexpr U32 AVATAR_IDENTIFIED     = 0x1 << 2; // whether avatar has provided payment info
+constexpr U32 AVATAR_TRANSACTED     = 0x1 << 3; // whether avatar has actively used payment info
+constexpr U32 AVATAR_ONLINE         = 0x1 << 4; // the online status of this avatar, if known.
+constexpr U32 AVATAR_AGEVERIFIED    = 0x1 << 5; // whether avatar has been age-verified
 
 /*
 *TODO Vadim: This needs some refactoring:
@@ -253,7 +253,7 @@ struct LLAvatarClassifiedInfo
 class LLAvatarPropertiesObserver
 {
 public:
-    virtual ~LLAvatarPropertiesObserver() {}
+    virtual      ~LLAvatarPropertiesObserver() = default;
     virtual void processProperties(void* data, EAvatarProcessorType type) = 0;
 };
 
@@ -279,29 +279,29 @@ public:
     void sendAvatarClassifiedsRequest(const LLUUID& avatar_id);
 
     // Duplicate pick info requests are not suppressed.
-    void sendPickInfoRequest(const LLUUID& creator_id, const LLUUID& pick_id);
+    static void sendPickInfoRequest(const LLUUID& creator_id, const LLUUID& pick_id);
 
-    void sendClassifiedInfoRequest(const LLUUID& classified_id);
+    static void sendClassifiedInfoRequest(const LLUUID& classified_id);
 
-    void sendPickInfoUpdate(const LLPickData* new_pick);
+    static void sendPickInfoUpdate(const LLPickData* new_pick);
 
-    void sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data);
+    static void sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data);
 
-    void sendInterestsInfoUpdate(const LLLegacyInterestsData* interests_data);
+    static void sendInterestsInfoUpdate(const LLLegacyInterestsData* interests_data);
 
-    void sendFriendRights(const LLUUID& avatar_id, S32 rights);
+    static void sendFriendRights(const LLUUID& avatar_id, S32 rights);
 
-    void sendPickDelete(const LLUUID& pick_id);
+    static void sendPickDelete(const LLUUID& pick_id);
 
-    void sendClassifiedDelete(const LLUUID& classified_id);
+    static void sendClassifiedDelete(const LLUUID& classified_id);
 
-    bool isHideAgeSupportedByServer() { return mIsHideAgeSupportedByServer; }
+    bool isHideAgeSupportedByServer() const { return mIsHideAgeSupportedByServer; }
 
-    // Returns translated, human readable string for account type, such
+    // Returns translated, human-readable string for account type, such
     // as "Resident" or "Linden Employee".  Used for profiles, inspectors.
     static std::string accountType(const LLAvatarData* avatar_data);
 
-    // Returns translated, human readable string for payment info, such
+    // Returns translated, human-readable string for payment info, such
     // as "Payment Info on File" or "Payment Info Used".
     // Used for profiles, inspectors.
     static std::string paymentInfo(const LLAvatarData* avatar_data);
@@ -334,7 +334,7 @@ protected:
     void sendAvatarPropertiesRequestMessage(const LLUUID& avatar_id);
     void initAgentProfileCapRequest(const LLUUID& avatar_id, const std::string& cap_url, EAvatarProcessorType type);
 
-    void notifyObservers(const LLUUID& id,void* data, EAvatarProcessorType type);
+    void notifyObservers(const LLUUID& id,void* data, EAvatarProcessorType type) const;
 
     // Is there a pending, not timed out, request for this avatar's data?
     // Use this to suppress duplicate requests for data when a request is
@@ -348,7 +348,6 @@ protected:
     void removePendingRequest(const LLUUID& avatar_id, EAvatarProcessorType type);
 
     typedef void* (*processor_method_t)(LLMessageSystem*);
-    static processor_method_t getProcessor(EAvatarProcessorType type);
 
 protected:
 
