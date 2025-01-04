@@ -40,9 +40,7 @@
 #include "llavataractions.h" // for getProfileUrl
 #include "lldate.h"
 #include "lltrans.h"
-#include "llui.h"               // LLUI::getLanguage()
 #include "message.h"
-#include "llappviewer.h"
 
 LLAvatarPropertiesProcessor::LLAvatarPropertiesProcessor()
 {
@@ -119,7 +117,7 @@ void LLAvatarPropertiesProcessor::sendRequest(const LLUUID& avatar_id, EAvatarPr
     // Try to send HTTP request if cap_url is available
     if (type == APT_PROPERTIES)
     {
-        std::string cap_url = gAgent.getRegionCapability("AgentProfile");
+        const std::string& cap_url = gAgent.getRegionCapability("AgentProfile");
         if (!cap_url.empty())
         {
             initAgentProfileCapRequest(avatar_id, cap_url, type);
@@ -148,7 +146,7 @@ void LLAvatarPropertiesProcessor::sendGenericRequest(const LLUUID& avatar_id, EA
     // indicate we're going to make a request
     addPendingRequest(avatar_id, type);
 
-    std::vector<std::string> strings{ avatar_id.asString() };
+    const std::vector<std::string> strings{ avatar_id.asString() };
     send_generic_message(method, strings);
 }
 
@@ -328,7 +326,7 @@ void LLAvatarPropertiesProcessor::requestAvatarPropertiesCoro(std::string cap_ur
     // TODO: SL-20163 Remove the "has" check when SRV-684 is done
     // and the field "hide_age" is included to the http response
     inst.mIsHideAgeSupportedByServer = result.has("hide_age");
-    avatar_data.hide_age = !inst.isHideAgeSupportedByServer() || result["hide_age"].asBoolean();
+    avatar_data.hide_age = inst.isHideAgeSupportedByServer() && result["hide_age"].asBoolean();
     avatar_data.profile_url = getProfileURL(avatar_id.asString());
     avatar_data.customer_type = result["customer_type"].asString();
     avatar_data.notes = result["notes"].asString();
@@ -568,7 +566,7 @@ void LLAvatarPropertiesProcessor::processAvatarGroupsReply(LLMessageSystem* msg,
     LL_DEBUGS("AvatarProperties") << "Received AvatarGroupsReply for " << avatar_id << LL_ENDL;
 }
 
-void LLAvatarPropertiesProcessor::notifyObservers(const LLUUID& id, void* data, EAvatarProcessorType type)
+void LLAvatarPropertiesProcessor::notifyObservers(const LLUUID& id, void* data, EAvatarProcessorType type) const
 {
     // Copy the map (because observers may delete themselves when updated?)
     LLAvatarPropertiesProcessor::observer_multimap_t observers = mObservers;

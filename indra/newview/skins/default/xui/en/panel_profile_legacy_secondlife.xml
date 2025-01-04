@@ -86,35 +86,12 @@
       <icon
        follows="right|top"
        height="14"
-       visible="false"
-       image_name="AccountLevel_Internal"
+       image_name=""
        layout="topleft"
        right="-1"
        top_delta="0"
        mouse_opaque="false"
-       name="account_type_internal"
-       width="14" />
-      <icon
-       follows="right|top"
-       height="14"
-       visible="false"
-       image_name="AccountLevel_Premium"
-       layout="topleft"
-       right="-1"
-       top_delta="0"
-       mouse_opaque="false"
-       name="account_type_premium"
-       width="14" />
-      <icon
-       follows="right|top"
-       height="14"
-       visible="false"
-       image_name="AccountLevel_Plus"
-       layout="topleft"
-       right="-1"
-       top_delta="0"
-       mouse_opaque="false"
-       name="account_type_plus"
+       name="badge_icon"
        width="14" />
       <text
        font="SansSerifSmall"

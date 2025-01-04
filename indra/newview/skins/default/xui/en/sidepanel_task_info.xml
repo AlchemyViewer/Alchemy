@@ -301,7 +301,6 @@
          layout="topleft"
          mouse_opaque="false"
          background_visible="true"
-         bg_alpha_color="DkGray"
          name="perms_inv"
          left="0"
          top_pad="15"

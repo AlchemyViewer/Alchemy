@@ -367,8 +367,6 @@ with the same filename but different name
 
   <texture name="Locked_Icon" file_name="icons/Locked_Icon.png" preload="false" />
 
-  <texture name="Map_Placeholder_Icon" file_name="icons/map_placeholder.png" preload="true" />
-
   <texture name="Marketplace_Dropzone_Background" file_name="widgets/Marketplace_Dropzone_Background.png" preload="true" />
   <texture name="MarketplaceBtn_Off" file_name="widgets/MarketplaceBtn_Off.png" preload="true" scale.left="30" scale.top="19" scale.right="35" scale.bottom="4" />
   <texture name="MarketplaceBtn_Selected" file_name="widgets/MarketplaceBtn_Selected.png" preload="true" scale.left="30" scale.top="19" scale.right="35" scale.bottom="4" />
@@ -898,7 +896,6 @@ with the same filename but different name
   <texture name="Clipboard_Cut" file_name="icons/clipboard_cut.png" preload="false" />
   <texture name="Clipboard_Paste" file_name="icons/clipboard_paste.png" preload="false" />
 
-  <texture name="AccountLevel_Internal" file_name="icons/SL_Logo.png" preload="false" />
   <texture name="AccountLevel_Plus" file_name="icons/AccountLevel_Plus.png" preload="false" />
   <texture name="AccountLevel_Premium" file_name="icons/AccountLevel_Premium.png" preload="false" />
 

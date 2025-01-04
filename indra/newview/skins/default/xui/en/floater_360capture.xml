@@ -15,8 +15,6 @@
        follows="left|bottom|top"
        left="0"
        width="200"
-       bg_opaque_color="0.195 0.195 0.195 1"
-       background_opaque="true"
        height="400"
        name="ui_panel_left">
     <text
@@ -111,13 +109,11 @@
      follows="all"
      left="200"
      width="600"
-     bg_opaque_color="0.195 0.195 0.195 1"
      background_opaque="true"
      height="400"
      name="ui_panel_right">
     <web_browser top="10"
                  follows="all"
-                 bg_opaque_color="0.225 0.225 0.225 1"
                  left="0"
                  width="590"
                  height="368"
