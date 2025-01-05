@@ -2,7 +2,7 @@
  * @file llpanelsearchpeople.cpp
  * @brief People search panel
  *
- * Copyright (c) 2014, Cinder Roxley <cinder@sdf.org>
+ * Copyright (c) 2014-2025, Cinder Roxley <cinder@sdf.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -61,6 +61,15 @@ void LLPanelSearchPeople::onCommitSearch(LLUICtrl* ctrl)
     {
         std::string text = pSearchEditor->getText();
         LLStringUtil::trim(text);
+        if (LLUUID::validate(text) == TRUE)
+        {
+            LLDirQuery query;
+            query.type = SE_PEOPLE;
+            query.results_per_page = 100;
+            query.text = text;
+            mFloater->queryAvatarKey(query);
+            return;
+        }
         if (text.length() <= MIN_SEARCH_STRING_SIZE)
             LLSearchHistory::getInstance()->addEntry(text);
     }
