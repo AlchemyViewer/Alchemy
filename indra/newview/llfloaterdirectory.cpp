@@ -152,18 +152,21 @@ void LLFloaterDirectory::onCommitSelection()
 {
     LLSD params;
     params["ResultCategory"] = mCurrentResultType;
+    LLSD const& selection = mResultList->getSelectedValue();
+    if (selection.isUndefined()) { return; }
+
     switch (mCurrentResultType)
     {
         case SE_PEOPLE:
         {
-            params["avatar_id"] = mResultList->getSelectedValue().asUUID();
+            params["avatar_id"] = selection.asUUID();
             getChild<LLPanel>("detail_avatar")->onOpen(params);
             showDetailPanel("detail_avatar");
             break;
         }
         case SE_GROUPS:
         {
-            params["group_id"] = mResultList->getSelectedValue().asUUID();
+            params["group_id"] = selection.asUUID();
             getChild<LLPanel>("detail_group")->onOpen(params);
             showDetailPanel("detail_group");
             break;
@@ -172,14 +175,14 @@ void LLFloaterDirectory::onCommitSelection()
         case SE_PLACES:
         {
             params["type"] = "remote_place";
-            params["id"] = mResultList->getSelectedValue().asUUID();
+            params["id"]   = selection.asUUID();
             getChild<LLPanel>("detail_place")->onOpen(params);
             showDetailPanel("detail_place");
             break;
         }
         case SE_CLASSIFIEDS:
         {
-            params["classified_id"] = mResultList->getSelectedValue().asUUID();
+            params["classified_id"] = selection.asUUID();
             params["from_search"] = true;
             getChild<LLPanel>("detail_classified")->onOpen(params);
             showDetailPanel("detail_classified");
@@ -187,7 +190,7 @@ void LLFloaterDirectory::onCommitSelection()
         }
         case SE_EVENTS:
         {
-            params["event_id"] = mResultList->getSelectedValue().asInteger();
+            params["event_id"] = selection.asInteger();
             getChild<LLPanel>("detail_event")->onOpen(params);
             showDetailPanel("detail_event");
             break;
