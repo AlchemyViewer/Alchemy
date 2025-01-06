@@ -89,10 +89,10 @@ static LLDate sSecondLifeRelease = LLDate("2003-06-23T00:00:00");
 
 LLPanelProfileLegacy::LLPanelProfileLegacy()
 :   LLPanelProfileLegacyTab()
-,   mPanelPicks(nullptr)
-,   mPanelGroups(nullptr)
 ,   mPopupMenuHandle()
 ,   mTexturePicker()
+,   mPanelPicks(nullptr)
+,   mPanelGroups(nullptr)
 {
     mChildStack.setParent(this);
     //mCommitCallbackRegistrar.add("Profile.CommitInterest", boost::bind(&LLPanelProfileLegacy::onCommitInterest, this));
@@ -651,6 +651,12 @@ void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
         LLFloaterReporter::showFromObject(getAvatarId());
     else if (action == "webprofile")
         ALAvatarActions::showWebProfile(getAvatarId());
+    else if (action == "copy_name")
+        ALAvatarActions::copyData(getAvatarId(), ALAvatarActions::E_DATA_USER_NAME);
+    else if (action == "copy_slurl")
+        ALAvatarActions::copyData(getAvatarId(), ALAvatarActions::E_DATA_SLURL);
+    else if (action == "copy_key")
+        ALAvatarActions::copyData(getAvatarId(), ALAvatarActions::E_DATA_UUID);
     else
         LL_WARNS("LegacyProfiles") << "Unhandled action: " << action << LL_ENDL;
 }
