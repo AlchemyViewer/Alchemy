@@ -73,6 +73,7 @@
 #include "llslurl.h"
 #include "llviewerdisplayname.h"
 #include "llviewermenu.h" // gMenuHolder
+#include "rlvactions.h"
 
 static constexpr std::string_view AGENT_PROFILE_CAP("AgentProfile");
 static constexpr std::string_view UPLOAD_AGENT_PROFILE_CAP("UploadAgentProfileImage");
@@ -683,6 +684,8 @@ bool LLPanelProfileLegacy::isActionEnabled(const LLSD& userdata)
         action_enabled = (getAvatarId() != gAgentID);
     } else if (check == "can_upload_pic") {
         action_enabled = getAvatarId() == gAgentID && !gAgent.getRegionCapability(UPLOAD_AGENT_PROFILE_CAP).empty();
+    } else if (check == "can_show_name") {
+        action_enabled = RlvActions::canShowName(RlvActions::SNC_DEFAULT, getAvatarId());
     } else {
         LL_INFOS("LegacyProfiles") << "Unhandled check " << check << LL_ENDL;
     }

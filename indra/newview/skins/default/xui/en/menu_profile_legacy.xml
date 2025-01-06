@@ -89,7 +89,8 @@
 	 function="Profile.Action"
 	 parameter="copy_name"/>
 	<menu_item_call.on_enable
-	 function="RLV.CanShowName" />
+	 function="Profile.Enable"
+     parameter="can_show_name" />
   </menu_item_call>
   <menu_item_call
    label="Copy SLurl"
@@ -98,7 +99,8 @@
 	 function="Profile.Action"
 	 parameter="copy_slurl"/>
 	<menu_item_call.on_enable
-	 function="RLV.CanShowName" />
+	 function="Profile.Enable"
+     parameter="can_show_name" />
   </menu_item_call>
   <menu_item_call
    label="Copy UUID"
