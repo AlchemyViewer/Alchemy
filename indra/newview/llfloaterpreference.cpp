@@ -581,7 +581,7 @@ void LLFloaterPreference::onAutoRespondResponseChanged()
 {
     bool auto_response_changed_flag =
             LLTrans::getString("AutoResponseModeDefault")
-                    != getChild<LLUICtrl>("autorespond_response")->getValue().asString();
+                    != getChild<LLUICtrl>("AlchemyAutoresponse")->getValue().asString();
 
     gSavedPerAccountSettings.setBOOL("AlchemyAutoresponseChanged", auto_response_changed_flag);
 }
