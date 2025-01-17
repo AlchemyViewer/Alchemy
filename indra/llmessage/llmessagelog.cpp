@@ -27,7 +27,9 @@
 #include "_httpoprequest.h"
 #include "_httprequestqueue.h"
 
-static boost::circular_buffer<LogPayload> sRingBuffer = boost::circular_buffer<LogPayload>(2048);
+namespace {
+    boost::circular_buffer<LogPayload> sRingBuffer = boost::circular_buffer<LogPayload>(2048);
+} // namespace
 
 LLMessageLogEntry::LLMessageLogEntry(LLHost from_host, LLHost to_host, U8* data, size_t data_size)
 :   mType(TEMPLATE)
@@ -148,16 +150,18 @@ EHTTPMethod convertEMethodToEHTTPMethod(const LLCore::HttpOpRequest::EMethod e_m
 /* static */
 void LLMessageLog::log(const LLCore::HttpRequestQueue::opPtr_t& op)
 {
-    if (!haveLogger()) return;
+    if (!haveLogger()) { return; }
 
-    auto req = std::static_pointer_cast<LLCore::HttpOpRequest>(op);
+    const auto req = std::dynamic_pointer_cast<LLCore::HttpOpRequest>(op);
+    if (!req) { return; }
+
     U8* data = nullptr;
     size_t data_size = 0;
     LLCore::BufferArray * body = req->mReqBody;
     if (body)
     {
         data = new U8[body->size()];
-        size_t len(body->read(0, data, body->size()));
+        const size_t len(body->read(0, data, body->size()));
         data_size = (len > body->size()) ? len : body->size();
     }
 
