@@ -37,7 +37,7 @@
 
 #include <boost/tokenizer.hpp>
 
-const std::string DEFAULT_FILTER = "!StartPingCheck !CompletePingCheck !PacketAck !SimulatorViewerTimeMessage !SimStats !AgentUpdate !AgentAnimation !AvatarAnimation !ViewerEffect !CoarseLocationUpdate !LayerData !CameraConstraint !ObjectUpdateCached !RequestMultipleObjects !ObjectUpdate !ObjectUpdateCompressed !ImprovedTerseObjectUpdate !KillObject !ImagePacket !SendXferPacket !ConfirmXferPacket !TransferPacket !SoundTrigger !AttachedSound !PreloadSound";
+const std::string DEFAULT_FILTER = "!StartPingCheck !CompletePingCheck !PacketAck !SimulatorViewerTimeMessage !SimStats !AgentUpdate !AgentAnimation !AvatarAnimation !ViewerEffect !CoarseLocationUpdate !LayerData !CameraConstraint !ObjectUpdateCached !RequestMultipleObjects !ObjectUpdate !ObjectUpdateCompressed !ImprovedTerseObjectUpdate !KillObject !ImagePacket !SendXferPacket !ConfirmXferPacket !TransferPacket !SoundTrigger !AttachedSound !PreloadSound !ViewerAsset";
 
 //TODO: replace all filtering code, esp start/stopApplyingFilter
 
@@ -55,7 +55,7 @@ void LLMessageLogFilter::set(const std::string& filter)
     boost::char_separator<char> sep(" ","");
     tokenizer tokens(filter, sep);
     tokenizer::iterator end = tokens.end();
-    for(tokenizer::iterator iter = tokens.begin(); iter != end; ++iter)
+    for (tokenizer::iterator iter = tokens.begin(); iter != end; ++iter)
     {
         std::string token = (*iter);
         LLStringUtil::trim(token);
@@ -63,14 +63,16 @@ void LLMessageLogFilter::set(const std::string& filter)
         {
             LLStringUtil::toLower(token);
 
-            BOOL negative = token.find('!') == 0;
-            if(negative)
+            bool negative = token.find('!') == 0;
+            if (negative)
             {
                 token = token.substr(1);
                 mNegativeNames.insert(token);
             }
             else
+            {
                 mPositiveNames.insert(token);
+            }
         }
     }
 }
@@ -83,7 +85,7 @@ LLFloaterMessageLog::LLMessageLogNetMan::LLMessageLogNetMan(LLFloaterMessageLog*
 
 BOOL LLFloaterMessageLog::LLMessageLogNetMan::tick()
 {
-    if (mParent) mParent->updateGlobalNetList();
+    if (mParent) { mParent->updateGlobalNetList(); }
     return FALSE;
 }
 
@@ -107,13 +109,11 @@ LLFloaterMessageLog::LLFloaterMessageLog(const LLSD& key)
 ,   mMessagesLogged(0)
 ,   mEasyMessageReader(new LLEasyMessageReader())
 {
-    mCommitCallbackRegistrar.add("MessageLog.Filter.Action", boost::bind(&LLFloaterMessageLog::onClickFilterMenu, this, _2));
-    if(!sNetListMutex)
-        sNetListMutex = new LLMutex();
-    if(!sMessageListMutex)
-        sMessageListMutex = new LLMutex();
-    if(!sIncompleteHTTPConvoMutex)
-        sIncompleteHTTPConvoMutex = new LLMutex();
+    mCommitCallbackRegistrar.add("MessageLog.Filter.Action",
+        boost::bind(&LLFloaterMessageLog::onClickFilterMenu, this, _2));
+    if(!sNetListMutex) { sNetListMutex = new LLMutex(); }
+    if(!sMessageListMutex) { sMessageListMutex = new LLMutex(); }
+    if(!sIncompleteHTTPConvoMutex) { sIncompleteHTTPConvoMutex = new LLMutex(); }
 
     mFloaterMessageLogItems.reserve(4096);
 }
@@ -174,7 +174,7 @@ void LLFloaterMessageLog::onOpen(const LLSD& key)
 void LLFloaterMessageLog::onClose(bool app_quiting)
 {
     LLMessageLog::setCallback(nullptr);
-    if (!app_quiting) onClickClearLog();
+    if (!app_quiting) { onClickClearLog(); }
 }
 
 void LLFloaterMessageLog::draw()
@@ -229,8 +229,8 @@ void LLFloaterMessageLog::updateGlobalNetList(bool starting)
 
     // Update circuit data of net list items
     std::vector<LLCircuitData*> circuits = gMessageSystem->getCircuit()->getCircuitDataList();
-    std::vector<LLCircuitData*>::iterator circuits_end = circuits.end();
-    for(std::vector<LLCircuitData*>::iterator iter = circuits.begin(); iter != circuits_end; ++iter)
+    std::vector<LLCircuitData*>::const_iterator circuits_end = circuits.cend();
+    for (std::vector<LLCircuitData*>::const_iterator iter = circuits.cbegin(); iter != circuits_end; ++iter)
     {
         LLNetListItem* itemp = findNetListItem((*iter)->getHost());
         if(!itemp)
@@ -242,13 +242,13 @@ void LLFloaterMessageLog::updateGlobalNetList(bool starting)
         itemp->mCircuitData = (*iter);
     }
     // Clear circuit data of items whose circuits are gone
-    for(std::list<LLNetListItem*>::iterator iter = sNetListItems.begin(); iter != sNetListItems.end(); ++iter)
+    for (const auto& sNetListItem : sNetListItems)
     {
-        if(std::find(circuits.begin(), circuits.end(), (*iter)->mCircuitData) == circuits.end())
-            (*iter)->mCircuitData = nullptr;
+        if(std::ranges::find(circuits, sNetListItem->mCircuitData) == circuits.end())
+            sNetListItem->mCircuitData = nullptr;
     }
     // Remove net list items that are totally useless now
-    for(std::list<LLNetListItem*>::iterator iter = sNetListItems.begin(); iter != sNetListItems.end();)
+    for(std::list<LLNetListItem*>::const_iterator iter = sNetListItems.cbegin(); iter != sNetListItems.cend();)
     {
         if((*iter)->mCircuitData == nullptr)
         {
@@ -267,19 +267,23 @@ void LLFloaterMessageLog::updateGlobalNetList(bool starting)
 
 LLNetListItem* LLFloaterMessageLog::findNetListItem(LLHost host)
 {
-    std::list<LLNetListItem*>::iterator end = sNetListItems.end();
-    for(std::list<LLNetListItem*>::iterator iter = sNetListItems.begin(); iter != end; ++iter)
+    for (std::list<LLNetListItem*>::const_iterator iter = sNetListItems.cbegin(); iter != sNetListItems.cend(); ++iter)
         if((*iter)->mCircuitData && (*iter)->mCircuitData->getHost() == host)
+        {
             return (*iter);
+        }
     return nullptr;
 }
 
 LLNetListItem* LLFloaterMessageLog::findNetListItem(LLUUID id)
 {
-    std::list<LLNetListItem*>::iterator end = sNetListItems.end();
-    for(std::list<LLNetListItem*>::iterator iter = sNetListItems.begin(); iter != end; ++iter)
-        if((*iter)->mID == id)
+    for (std::list<LLNetListItem*>::const_iterator iter = sNetListItems.cbegin(); iter != sNetListItems.cend(); ++iter)
+    {
+        if ((*iter)->mID == id)
+        {
             return (*iter);
+        }
+    }
     return nullptr;
 }
 
@@ -296,8 +300,11 @@ void LLFloaterMessageLog::refreshNetList()
             if(regionp)
             {
                 std::string name = regionp->getName();
-                if(name.empty())
-                    name = fmt::format(FMT_STRING("{:s} (awaiting region name)"), itemp->mCircuitData->getHost().getString());
+                if (name.empty())
+                {
+                    name = fmt::format(FMT_STRING("{:s} (awaiting region name)"),
+                        itemp->mCircuitData->getHost().getString());
+                }
                 itemp->mName = name;
                 itemp->mPreviousRegionName = name;
                 itemp->mHandle = regionp->getHandle();
@@ -305,8 +312,10 @@ void LLFloaterMessageLog::refreshNetList()
             else
             {
                 itemp->mName = itemp->mCircuitData->getHost().getString();
-                if(!itemp->mPreviousRegionName.empty())
+                if (!itemp->mPreviousRegionName.empty())
+                {
                     itemp->mName.append(fmt::format(FMT_STRING(" (was {:s})"), itemp->mPreviousRegionName));
+                }
             }
         }
         else
@@ -365,23 +374,27 @@ void LLFloaterMessageLog::refreshNetList()
         icon->setColor(LLColor4(0.1f,0.1f,0.1f,0.7f));
         icon->setClickCallback(nullptr, nullptr);
     }
-    if(selected_id.notNull())
+    if (selected_id.notNull())
+    {
         scrollp->selectByID(selected_id);
-    if(scroll_pos < scrollp->getItemCount())
+    }
+    if (scroll_pos < scrollp->getItemCount())
+    {
         scrollp->setScrollPos(scroll_pos);
+    }
 }
 
 void LLFloaterMessageLog::refreshNetInfo(BOOL force)
 {
-    if(mInfoPaneMode != IPANE_NET) return;
+    if (mInfoPaneMode != IPANE_NET) { return; }
     const LLScrollListCtrl* scrollp = getChild<LLScrollListCtrl>("net_list");
     const LLScrollListItem* selected_itemp = scrollp->getFirstSelected();
     if(selected_itemp)
     {
         const LLTextEditor* net_info = getChild<LLTextEditor>("net_info");
-        if(!force && (net_info->hasSelection() || net_info->hasFocus())) return;
+        if (!force && (net_info->hasSelection() || net_info->hasFocus())) { return; }
         const LLNetListItem* itemp = findNetListItem(selected_itemp->getUUID());
-        if(itemp)
+        if (itemp)
         {
             std::string info;
             info.reserve(512);
@@ -436,10 +449,8 @@ void LLFloaterMessageLog::setInfoPaneMode(EInfoPaneMode mode)
 void LLFloaterMessageLog::onLog(LogPayload& entry)
 {
     LLFloaterMessageLog* floaterp = LLFloaterReg::findTypedInstance<LLFloaterMessageLog>("message_log");
-    if (!floaterp)
-    {
-        return;
-    }
+    if (!floaterp) { return; }
+
     if (entry->mType != LLMessageLogEntry::HTTP_RESPONSE)
     {
         sMessageListMutex->lock();
@@ -471,14 +482,14 @@ void LLFloaterMessageLog::conditionalLog(LogPayload entry)
         //keep the message if we allowed its name so long as one of its other names hasn't been blacklisted
         if (!have_positive && !mMessageLogFilter.mPositiveNames.empty())
         {
-            if (std::find(mMessageLogFilter.mPositiveNames.begin(), mMessageLogFilter.mPositiveNames.end(), find_name) != mMessageLogFilter.mPositiveNames.end())
+            if (std::ranges::find(mMessageLogFilter.mPositiveNames, find_name) != mMessageLogFilter.mPositiveNames.cend())
             {
                 have_positive = true;
             }
         }
         if (!mMessageLogFilter.mNegativeNames.empty())
         {
-            if (std::find(mMessageLogFilter.mNegativeNames.begin(), mMessageLogFilter.mNegativeNames.end(), find_name) != mMessageLogFilter.mNegativeNames.end())
+            if (std::ranges::find(mMessageLogFilter.mNegativeNames, find_name) != mMessageLogFilter.mNegativeNames.cend())
             {
                 return;
             }
@@ -512,7 +523,7 @@ void LLFloaterMessageLog::conditionalLog(LogPayload entry)
         for (const auto& host : item->mRegionHosts)
         {
             std::string region_name = LLStringUtil::null;
-            for (LLNetListItem* list_item : sNetListItems)
+            for (const LLNetListItem* list_item : sNetListItems)
             {
                 if (host == list_item->mCircuitData->getHost())
                 {
@@ -580,7 +591,7 @@ void LLFloaterMessageLog::conditionalLog(LogPayload entry)
     row.columns.add(net_column);
     row.columns.add(name_column);
 
-    S32 scroll_pos = mMessagelogScrollListCtrl->getScrollPos();
+    const S32 scroll_pos = mMessagelogScrollListCtrl->getScrollPos();
 
     mMessagelogScrollListCtrl->addRow(row, ADD_BOTTOM);
 
@@ -591,9 +602,9 @@ void LLFloaterMessageLog::conditionalLog(LogPayload entry)
 void LLFloaterMessageLog::pairHTTPResponse(LogPayload entry)
 {
     LLMutexLock lock(sIncompleteHTTPConvoMutex);
-    HTTPConvoMap::iterator iter = mIncompleteHTTPConvos.find(entry->mRequestId);
+    HTTPConvoMap::const_iterator iter = mIncompleteHTTPConvos.find(entry->mRequestId);
 
-    if(iter != mIncompleteHTTPConvos.end())
+    if(iter != mIncompleteHTTPConvos.cend())
     {
         iter->second->setResponseMessage(entry);
 
@@ -658,7 +669,7 @@ void LLFloaterMessageLog::showMessage(FloaterMessageItem item)
 BOOL LLFloaterMessageLog::onClickCloseCircuit(void* user_data)
 {
     LLNetListItem* itemp = static_cast<LLNetListItem*>(user_data);
-    LLCircuitData* cdp = static_cast<LLCircuitData*>(itemp->mCircuitData);
+    LLCircuitData* cdp = itemp->mCircuitData;
     if(!cdp) return FALSE;
     LLHost myhost = cdp->getHost();
     LLSD args;
@@ -672,16 +683,17 @@ BOOL LLFloaterMessageLog::onClickCloseCircuit(void* user_data)
 // static
 void LLFloaterMessageLog::onConfirmCloseCircuit(const LLSD& notification, const LLSD& response)
 {
-    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    const S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
     if (option != 0)
     {
         // Not yes
         return;
     }
 
-    LLCircuitData* cdp = gMessageSystem->mCircuitInfo.findCircuit(LLHost(notification["payload"]["circuittoclose"].asString()));
-    if(!cdp) return;
-    LLViewerRegion* regionp = LLWorld::getInstance()->getRegion(cdp->getHost());
+    const LLCircuitData* cdp = gMessageSystem->mCircuitInfo.findCircuit(LLHost(notification["payload"]["circuittoclose"].asString()));
+    if(!cdp) { return; }
+
+    const LLViewerRegion* regionp = LLWorld::getInstance()->getRegion(cdp->getHost());
     gMessageSystem->newMessageFast(_PREHASH_CloseCircuit);
     gMessageSystem->sendReliable(cdp->getHost());
     if(gMessageSystem->findCircuitCode(cdp->getHost()))
@@ -714,7 +726,7 @@ void LLFloaterMessageLog::onClickFilterApply()
 
 void LLFloaterMessageLog::startApplyingFilter(const std::string& filter, BOOL force)
 {
-    LLMessageLogFilter new_filter(filter);
+    const LLMessageLogFilter new_filter(filter);
     if (force
         || (new_filter.mNegativeNames != mMessageLogFilter.mNegativeNames)
         || (new_filter.mPositiveNames != mMessageLogFilter.mPositiveNames))
@@ -726,7 +738,7 @@ void LLFloaterMessageLog::startApplyingFilter(const std::string& filter, BOOL fo
 
         sMessageListMutex->lock();
         mMessagesLogged = sMessageLogEntries.size();
-        for (auto& entry : sMessageLogEntries)
+        for (auto const& entry : sMessageLogEntries)
             conditionalLog(entry);
         sMessageListMutex->unlock();
     }
@@ -736,9 +748,9 @@ void LLFloaterMessageLog::stopApplyingFilter(bool quitting)
 {
 }
 
-void LLFloaterMessageLog::updateFilterStatus()
+void LLFloaterMessageLog::updateFilterStatus() const
 {
-    if (!mMessageLogFilter.empty()) return;
+    if (!mMessageLogFilter.empty()) { return; }
 }
 
 void LLFloaterMessageLog::onCommitFilter()
@@ -761,7 +773,7 @@ void LLFloaterMessageLog::onClickFilterMenu(const LLSD& user_data)
     startApplyingFilter(user_data.asString(), FALSE);
 }
 
-void LLFloaterMessageLog::onClickSendToMessageBuilder()
+void LLFloaterMessageLog::onClickSendToMessageBuilder() const
 {
     const LLScrollListItem* selected_itemp = mMessagelogScrollListCtrl->getFirstSelected();
 

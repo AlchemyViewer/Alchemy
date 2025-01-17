@@ -73,6 +73,7 @@
 #include "llslurl.h"
 #include "llviewerdisplayname.h"
 #include "llviewermenu.h" // gMenuHolder
+#include "rlvactions.h"
 
 static constexpr std::string_view AGENT_PROFILE_CAP("AgentProfile");
 static constexpr std::string_view UPLOAD_AGENT_PROFILE_CAP("UploadAgentProfileImage");
@@ -89,10 +90,10 @@ static LLDate sSecondLifeRelease = LLDate("2003-06-23T00:00:00");
 
 LLPanelProfileLegacy::LLPanelProfileLegacy()
 :   LLPanelProfileLegacyTab()
-,   mPanelPicks(nullptr)
-,   mPanelGroups(nullptr)
 ,   mPopupMenuHandle()
 ,   mTexturePicker()
+,   mPanelPicks(nullptr)
+,   mPanelGroups(nullptr)
 {
     mChildStack.setParent(this);
     //mCommitCallbackRegistrar.add("Profile.CommitInterest", boost::bind(&LLPanelProfileLegacy::onCommitInterest, this));
@@ -651,6 +652,12 @@ void LLPanelProfileLegacy::onCommitAction(const LLSD& userdata)
         LLFloaterReporter::showFromObject(getAvatarId());
     else if (action == "webprofile")
         ALAvatarActions::showWebProfile(getAvatarId());
+    else if (action == "copy_name")
+        ALAvatarActions::copyData(getAvatarId(), ALAvatarActions::E_DATA_USER_NAME);
+    else if (action == "copy_slurl")
+        ALAvatarActions::copyData(getAvatarId(), ALAvatarActions::E_DATA_SLURL);
+    else if (action == "copy_key")
+        ALAvatarActions::copyData(getAvatarId(), ALAvatarActions::E_DATA_UUID);
     else
         LL_WARNS("LegacyProfiles") << "Unhandled action: " << action << LL_ENDL;
 }
@@ -677,6 +684,8 @@ bool LLPanelProfileLegacy::isActionEnabled(const LLSD& userdata)
         action_enabled = (getAvatarId() != gAgentID);
     } else if (check == "can_upload_pic") {
         action_enabled = getAvatarId() == gAgentID && !gAgent.getRegionCapability(UPLOAD_AGENT_PROFILE_CAP).empty();
+    } else if (check == "can_show_name") {
+        action_enabled = RlvActions::canShowName(RlvActions::SNC_DEFAULT, getAvatarId());
     } else {
         LL_INFOS("LegacyProfiles") << "Unhandled check " << check << LL_ENDL;
     }

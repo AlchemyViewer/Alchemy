@@ -31,11 +31,11 @@ public:
     LogPayload operator()() const { return mEntry; };
 
     std::string getFull(BOOL beautify = FALSE, BOOL show_header = FALSE) const;
-    std::string getName();
+    std::string getName() const;
     std::string getResponseFull(BOOL beautify = FALSE, BOOL show_header = FALSE) const;
-    BOOL isOutgoing() const;
+    BOOL        isOutgoing() const;
 
-    void setResponseMessage(LogPayload entry);
+    void setResponseMessage(const LogPayload& entry);
 
     LLUUID mID;
     U32 mSequenceID;

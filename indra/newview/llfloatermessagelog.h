@@ -22,8 +22,6 @@
 #include "llmessagelog.h"
 #include "lleventtimer.h"
 
-#include <boost/container/flat_map.hpp>
-#include <boost/container/flat_set.hpp>
 #include <boost/circular_buffer.hpp>
 
 struct LLNetListItem;
@@ -62,7 +60,7 @@ class LLFloaterMessageLog final : public LLFloater
 {
 public:
     LLFloaterMessageLog(const LLSD& key);
-    ~LLFloaterMessageLog();
+    ~LLFloaterMessageLog() override;
 
     static void onLog(LogPayload& entry);
 
@@ -102,7 +100,7 @@ protected:
     void onCommitFilter();
     void onClickFilterMenu(const LLSD& user_data);
     void onClickFilterApply();
-    void onClickSendToMessageBuilder();
+    void onClickSendToMessageBuilder() const;
     void onCheckWrapNetInfo(const LLSD& value);
     void onCheckBeautifyMessages(const LLSD& value);
     static BOOL onClickCloseCircuit(void* user_data);
@@ -119,7 +117,7 @@ public:
 
 protected:
     void stopApplyingFilter(bool quitting = false);
-    void updateFilterStatus();
+    void updateFilterStatus() const;
 
     LLMessageLogFilter mMessageLogFilter;
 

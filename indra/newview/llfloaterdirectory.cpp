@@ -2,7 +2,7 @@
  * @file llfloaterdirectory.cpp
  * @brief Legacy search facility
  *
- * Copyright (c) 2014-2024, Cinder Roxley <cinder@sdf.org>
+ * Copyright (c) 2014-2025, Cinder Roxley <cinder@sdf.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -66,11 +66,8 @@ static const std::array<std::string, 5> sDetailPanels{ {"detail_avatar", "detail
 LLFloaterDirectory::LLFloaterDirectory(const Params& key)
     : LLFloater(key)
     , mCurrentResultType(SE_UNDEFINED)
-    , mCurrentQuery()
     , mResultStart(0)
     , mNumResultsReceived(0)
-    , mQueryID()
-    , mSelectedResultParams()
     , mTabContainer(nullptr)
     , mPanelWeb(nullptr)
     , mResultList(nullptr)
@@ -83,6 +80,7 @@ LLFloaterDirectory::LLFloaterDirectory(const Params& key)
 
 LLFloaterDirectory::~LLFloaterDirectory()
 {
+    if (mAvatarNameCallbackConnection.connected()) { mAvatarNameCallbackConnection.disconnect(); }
 }
 
 BOOL LLFloaterDirectory::postBuild()
@@ -92,8 +90,7 @@ BOOL LLFloaterDirectory::postBuild()
     for (std::string panel_name: sSearchPanels)
     {
         LLPanelSearch* panel = static_cast<LLPanelSearch*>(findChild<LLUICtrl>(panel_name));
-        if (panel)
-            panel->setSearchFloater(this);
+        if (panel) { panel->setSearchFloater(this); }
     }
     mPanelWeb = findChild<LLPanelSearchWeb>("panel_search_web");
     mTabContainer = findChild<LLTabContainer>("search_tabs");
@@ -135,7 +132,7 @@ void LLFloaterDirectory::setProgress(bool working)
     getChild<LLUICtrl>("loading")->setVisible(working);
 }
 
-void LLFloaterDirectory::setResultsComment(const std::string& message)
+void LLFloaterDirectory::setResultsComment(const std::string& message) const
 {
     mResultList->setCommentText(message);
 }
@@ -155,18 +152,21 @@ void LLFloaterDirectory::onCommitSelection()
 {
     LLSD params;
     params["ResultCategory"] = mCurrentResultType;
+    LLSD const& selection = mResultList->getSelectedValue();
+    if (selection.isUndefined()) { return; }
+
     switch (mCurrentResultType)
     {
         case SE_PEOPLE:
         {
-            params["avatar_id"] = mResultList->getSelectedValue().asUUID();
+            params["avatar_id"] = selection.asUUID();
             getChild<LLPanel>("detail_avatar")->onOpen(params);
             showDetailPanel("detail_avatar");
             break;
         }
         case SE_GROUPS:
         {
-            params["group_id"] = mResultList->getSelectedValue().asUUID();
+            params["group_id"] = selection.asUUID();
             getChild<LLPanel>("detail_group")->onOpen(params);
             showDetailPanel("detail_group");
             break;
@@ -175,14 +175,14 @@ void LLFloaterDirectory::onCommitSelection()
         case SE_PLACES:
         {
             params["type"] = "remote_place";
-            params["id"] = mResultList->getSelectedValue().asUUID();
+            params["id"]   = selection.asUUID();
             getChild<LLPanel>("detail_place")->onOpen(params);
             showDetailPanel("detail_place");
             break;
         }
         case SE_CLASSIFIEDS:
         {
-            params["classified_id"] = mResultList->getSelectedValue().asUUID();
+            params["classified_id"] = selection.asUUID();
             params["from_search"] = true;
             getChild<LLPanel>("detail_classified")->onOpen(params);
             showDetailPanel("detail_classified");
@@ -190,7 +190,7 @@ void LLFloaterDirectory::onCommitSelection()
         }
         case SE_EVENTS:
         {
-            params["event_id"] = mResultList->getSelectedValue().asInteger();
+            params["event_id"] = selection.asInteger();
             getChild<LLPanel>("detail_event")->onOpen(params);
             showDetailPanel("detail_event");
             break;
@@ -210,7 +210,7 @@ void LLFloaterDirectory::paginate()
     {
         LLStringUtil::format_map_t args;
         std::string total_str;
-        LLResMgr::getInstance()->getIntegerString(total_str, mResultStart + mNumResultsReceived - 1);
+        LLResMgr::getInstance()->getIntegerString(total_str, mResultStart + mNumResultsReceived);
         args["TOTAL"] = total_str;
         args["VISIBLE_END"] = total_str;
         total_str = LLStringUtil::null;
@@ -255,7 +255,7 @@ void LLFloaterDirectory::showDetailPanel(const std::string& panel_name)
     }
 }
 
-void LLFloaterDirectory::rebuildResultList()
+void LLFloaterDirectory::rebuildResultList() const
 {
     mResultList->clearColumns();
     switch (mCurrentResultType)
@@ -451,6 +451,130 @@ void LLFloaterDirectory::onCommitPopoutResult()
             break;
         }
     }
+}
+
+void LLFloaterDirectory::queryAvatarKey(const LLDirQuery& query)
+{
+    if (mCurrentResultType != query.type)
+    {
+        mCurrentResultType = query.type;
+        rebuildResultList();
+    }
+    mResultList->clearRows();
+    mResultStart = 0;
+
+    mResultList->setCommentText(this->getString("searching"));
+    mResultList->setEnabled(FALSE);
+    setProgress(true);
+
+    /// This is, obviously, the most direct way of doing it, but we could also grab the name and run
+    /// a directory query for that name which would, in turn, give us the additional data a directory
+    /// query provides. ie. Online state and reputation. (does it even actually provide these anymore???)
+    if (mAvatarNameCallbackConnection.connected())
+    {
+        mAvatarNameCallbackConnection.disconnect();
+    }
+    mAvatarNameCallbackConnection = LLAvatarNameCache::get(LLUUID(query.text),
+            boost::bind(&LLFloaterDirectory::onAvatarNameCallback, this, _1, _2));
+}
+
+void LLFloaterDirectory::onAvatarNameCallback(const LLUUID& id, const LLAvatarName& av_name)
+{
+    if (mAvatarNameCallbackConnection.connected())
+    {
+        mAvatarNameCallbackConnection.disconnect();
+    }
+    setProgress(false);
+
+    if (av_name.getAccountName() == "(?\?\?).(?\?\?)") // rarely if ever encountered anymore.
+    {
+        LLStringUtil::format_map_t map;
+        map["[TEXT]"] = mCurrentQuery.text;
+        mResultList->setCommentText(this->getString("not_found", map));
+        mNumResultsReceived = 0;
+    }
+    else
+    {
+        mNumResultsReceived = 1;
+
+        LL_DEBUGS("Search") << "Got: " << av_name.getLegacyName() << " AgentID: " << id << LL_ENDL;
+        mResultList->setEnabled(TRUE);
+
+        LLSD element;
+        element["id"] = id;
+
+        element["columns"][0]["column"] = "icon";
+        element["columns"][0]["type"]   = "icon";
+        element["columns"][0]["value"]  = "icon_avatar_offline.tga";
+
+        element["columns"][1]["column"] = "name";
+        element["columns"][1]["value"]  = av_name.getUserName();
+
+        mResultList->addElement(element, ADD_BOTTOM);
+    }
+
+    paginate();
+}
+
+void LLFloaterDirectory::queryGroupKey(const LLDirQuery& query)
+{
+    if (mCurrentResultType != query.type)
+    {
+        mCurrentResultType = query.type;
+        rebuildResultList();
+    }
+    mResultList->clearRows();
+    mResultStart = 0;
+
+    mResultList->setCommentText(this->getString("searching"));
+    mResultList->setEnabled(FALSE);
+    setProgress(true);
+
+    gCacheName->getGroup(LLUUID(query.text), // i love you my sexy boost::bind. 
+        boost::bind(&LLFloaterDirectory::onGroupNameCallback, this, _1, _2, _3));
+    // lambda expressions will never take your place in my heart. <3
+}
+
+void LLFloaterDirectory::onGroupNameCallback(const LLUUID& id, const std::string& name, bool is_group)
+{
+    setProgress(false);
+
+    // nothing returns on a bad key, so this never happens, but whatever.
+    if (!is_group || name.empty()) 
+    {
+        LLStringUtil::format_map_t map;
+        map["[TEXT]"] = mCurrentQuery.text;
+        mResultList->setCommentText(this->getString("not_found", map));
+        mNumResultsReceived = 0;
+    }
+    else
+    {
+        mNumResultsReceived = 1;
+
+        LL_DEBUGS("Search") << "Got: " << name << " GroupID: " << id << LL_ENDL;
+        mResultList->setEnabled(TRUE);
+
+        LLSD element;
+
+        element["id"] = id;
+
+        element["columns"][0]["column"] = "icon";
+        element["columns"][0]["type"]   = "icon";
+        element["columns"][0]["value"]  = "Icon_Group";
+
+        element["columns"][1]["column"] = "name";
+        element["columns"][1]["value"]  = name;
+
+        element["columns"][2]["column"] = "members";
+        element["columns"][2]["value"]  = ""; // not worth the trouble
+
+        element["columns"][3]["column"] = "score";
+        element["columns"][3]["value"]  = ""; // not worth the trouble
+
+        mResultList->addElement(element, ADD_BOTTOM);
+    }
+
+    paginate();
 }
 
 void LLFloaterDirectory::queryDirectory(const LLDirQuery& query, bool new_search)

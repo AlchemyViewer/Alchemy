@@ -2,7 +2,7 @@
  * @file llfloaterdirectory.h
  * @brief Legacy search facility definitions
  *
- * Copyright (c) 2014-2022, Cinder Roxley <cinder@sdf.org>
+ * Copyright (c) 2014-2025, Cinder Roxley <cinder@sdf.org>
  *
  * Permission is hereby granted, free of charge, to any person or organization
  * obtaining a copy of the software and accompanying documentation covered by
@@ -41,7 +41,7 @@ class LLScrollListCtrl;
 class LLTabContainer;
 class LLTextBase;
 
-static const size_t MIN_SEARCH_STRING_SIZE = 3;
+static constexpr size_t MIN_SEARCH_STRING_SIZE = 3;
 
 typedef enum {
     SE_UNDEFINED = 0,
@@ -77,7 +77,7 @@ typedef struct dir_query
     U32 results_per_page;
 } LLDirQuery;
 
-class LLFloaterDirectory : public LLFloater
+class LLFloaterDirectory final : public LLFloater
 {
     friend class LLPanelSearchClassifieds;
     friend class LLPanelSearchEvents;
@@ -108,16 +108,21 @@ public:
 protected:
     void setProgress(bool working);
     void queryDirectory(const LLDirQuery& query, bool new_search = false);
-    void setResultsComment(const std::string& message);
+    void setResultsComment(const std::string& message) const;
+
+    void queryAvatarKey(const LLDirQuery& query);
+    void onAvatarNameCallback(const LLUUID& id, const LLAvatarName& av_name);
+    void queryGroupKey(const LLDirQuery& query);
+    void onGroupNameCallback(const LLUUID& id, const std::string& name, bool is_group);
 
 private:
-    ~LLFloaterDirectory();
+    ~LLFloaterDirectory() override;
     void onCommitSelection();
     void navigateResults(const LLSD& userdata);
     void onTabChanged();
     void paginate();
     void showDetailPanel(const std::string& panel_name);
-    void rebuildResultList();
+    void rebuildResultList() const;
     void onCommitPopoutResult();
 
     ESearch mCurrentResultType;
@@ -126,6 +131,9 @@ private:
     S32 mNumResultsReceived;
     LLUUID mQueryID;
     LLSD mSelectedResultParams;
+
+    typedef boost::signals2::connection avatar_name_callback_connection_t;
+    avatar_name_callback_connection_t mAvatarNameCallbackConnection;
 
     LLTabContainer* mTabContainer;
     LLPanelSearchWeb* mPanelWeb;
