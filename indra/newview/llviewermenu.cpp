@@ -6608,7 +6608,8 @@ class LLCommunicateCheckAutoRespond : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-       return gAgent.getAutoRespond();
+        bool new_value = gAgent.getAutoRespond();
+        return new_value;
     }
 };
 
