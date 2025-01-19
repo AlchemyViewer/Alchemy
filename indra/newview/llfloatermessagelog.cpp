@@ -35,6 +35,7 @@
 #include "llviewerwindow.h"
 #include "llworld.h"
 
+#include <boost/range/algorithm/find.hpp>
 #include <boost/tokenizer.hpp>
 
 const std::string DEFAULT_FILTER = "!StartPingCheck !CompletePingCheck !PacketAck !SimulatorViewerTimeMessage !SimStats !AgentUpdate !AgentAnimation !AvatarAnimation !ViewerEffect !CoarseLocationUpdate !LayerData !CameraConstraint !ObjectUpdateCached !RequestMultipleObjects !ObjectUpdate !ObjectUpdateCompressed !ImprovedTerseObjectUpdate !KillObject !ImagePacket !SendXferPacket !ConfirmXferPacket !TransferPacket !SoundTrigger !AttachedSound !PreloadSound !ViewerAsset";
@@ -244,7 +245,7 @@ void LLFloaterMessageLog::updateGlobalNetList(bool starting)
     // Clear circuit data of items whose circuits are gone
     for (const auto& sNetListItem : sNetListItems)
     {
-        if(std::ranges::find(circuits, sNetListItem->mCircuitData) == circuits.end())
+        if(boost::range::find(circuits, sNetListItem->mCircuitData) == circuits.end())
             sNetListItem->mCircuitData = nullptr;
     }
     // Remove net list items that are totally useless now
@@ -482,14 +483,14 @@ void LLFloaterMessageLog::conditionalLog(LogPayload entry)
         //keep the message if we allowed its name so long as one of its other names hasn't been blacklisted
         if (!have_positive && !mMessageLogFilter.mPositiveNames.empty())
         {
-            if (std::ranges::find(mMessageLogFilter.mPositiveNames, find_name) != mMessageLogFilter.mPositiveNames.cend())
+            if (boost::range::find(mMessageLogFilter.mPositiveNames, find_name) != mMessageLogFilter.mPositiveNames.cend())
             {
                 have_positive = true;
             }
         }
         if (!mMessageLogFilter.mNegativeNames.empty())
         {
-            if (std::ranges::find(mMessageLogFilter.mNegativeNames, find_name) != mMessageLogFilter.mNegativeNames.cend())
+            if (boost::range::find(mMessageLogFilter.mNegativeNames, find_name) != mMessageLogFilter.mNegativeNames.cend())
             {
                 return;
             }
