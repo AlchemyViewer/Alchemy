@@ -112,6 +112,7 @@ if (WINDOWS)
   elseif (USE_AVX)
     add_compile_options(/arch:AVX)
   elseif (USE_SSE42)
+    add_compile_options(/arch:SSE4.2)
     add_compile_definitions(__SSE3__=1 __SSSE3__=1 __SSE4__=1 __SSE4_1__=1 __SSE4_2__=1)
   else ()
     add_compile_definitions(__SSE3__=1)
@@ -122,7 +123,7 @@ if (WINDOWS)
   elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     add_compile_options(/Qvec /Zc:dllexportInlines- /clang:-mprefer-vector-width=128 -fno-strict-aliasing -Wno-ignored-pragma-intrinsic -Wno-unused-local-typedef)
   endif()
-     
+
   if(FAVOR_AMD AND FAVOR_INTEL)
       message(FATAL_ERROR "Cannot enable FAVOR_AMD and FAVOR_INTEL at the same time")
   elseif(FAVOR_AMD)
@@ -189,6 +190,7 @@ if (LINUX)
     -g
     -gz
     -pthread
+    -fdiagnostics-color=always
     )
 
   if (USE_AVX2)
