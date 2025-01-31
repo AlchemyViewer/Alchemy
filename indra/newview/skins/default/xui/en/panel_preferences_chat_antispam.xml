@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel
+    height="408"
+    layout="topleft"
+    name="antispam_settings"
+    top="0"
+    left="13"
+    width="517">
+        <panel
+            border="false"
+            height="60"
+            layout="topleft"
+            follows="left|top"
+            name="general_chat_settings"
+            top="10"
+            left="13"
+            width="517">
+                <check_box
+                    layout="topleft"
+                    follows="left|top"
+                    top_pad="-1"
+                    width="30"
+                    height="18"
+                    name="FSIgnoreAdHocSessions"
+                    control_name="FSIgnoreAdHocSessions"
+                    label="Automatically ignore and leave all conference (ad-hoc) chats"/>
+                <check_box
+                    layout="topleft"
+                    follows="left|top"
+                    left_delta="10"
+                    enabled_control="FSIgnoreAdHocSessions"
+                    top_pad="-1"
+                    width="30"
+                    height="18"
+                    name="FSReportIgnoredAdHocSession"
+                    control_name="FSReportIgnoredAdHocSession"
+                    label="Report ignored conference chats in nearby chat"/>
+                <check_box
+                    layout="topleft"
+                    follows="left|top"
+                    enabled_control="FSIgnoreAdHocSessions"
+                    top_pad="-1"
+                    width="30"
+                    height="18"
+                    name="FSDontIgnoreAdHocFromFriends"
+                    control_name="FSDontIgnoreAdHocFromFriends"
+                    label="Don't ignore conference chats invitations from my friends"/>
+            </panel>
+    </panel>
