@@ -72,7 +72,7 @@ Fejl detaljer: Beskeden kaldet &apos;[_NAME]&apos; blev ikke fundet i notificati
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
 	<notification name="LoginFailedNoNetwork">
-		Kunne ikke tilslutte til  [SECOND_LIFE_GRID].
+		Kunne ikke tilslutte til [SECOND_LIFE_GRID].
     &apos;[DIAGNOSTIC]&apos;
 Check at Internet forbindelsen fungerer korrekt.
 		<usetemplate name="okbutton" yestext="OK"/>
