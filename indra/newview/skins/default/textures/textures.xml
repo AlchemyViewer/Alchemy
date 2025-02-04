@@ -400,8 +400,6 @@ with the same filename but different name
   <texture name="Lock2" file_name="navbar/Lock.png" preload="false" />
 
   <texture name="Locked_Icon" file_name="icons/Locked_Icon.png" preload="false" />
-
-  <texture name="Map_Placeholder_Icon" file_name="icons/map_placeholder.png" preload="true" />
     
   <texture name="Marketplace_Dropzone_Background" file_name="widgets/Marketplace_Dropzone_Background.png" preload="true" />
   <texture name="MarketplaceBtn_Off" file_name="widgets/MarketplaceBtn_Off.png" preload="true" scale.left="30" scale.top="19" scale.right="35" scale.bottom="4" />
@@ -938,7 +936,6 @@ with the same filename but different name
   <texture name="Clipboard_Cut" file_name="icons/clipboard_cut.png" preload="false" />
   <texture name="Clipboard_Paste" file_name="icons/clipboard_paste.png" preload="false" />
 
-  <texture name="AccountLevel_Internal" file_name="icons/SL_Logo.png" preload="false" />
   <texture name="AccountLevel_Plus" file_name="icons/AccountLevel_Plus.png" preload="false" />
   <texture name="AccountLevel_Premium" file_name="icons/AccountLevel_Premium.png" preload="false" />
 
@@ -990,21 +987,4 @@ with the same filename but different name
   <texture name="Right_Trigger" file_name="xbox/right_trigger.png" preload="false" />
   <texture name="Triggers" file_name="xbox/triggers.png" preload="false" />
   <texture name="None" file_name="xbox/none.png" preload="false" />
-  
-  <texture name="Icon_Legacy_Event_PG" file_name="icon_legacy_event.tga" preload="false" />
-  <texture name="Icon_Legacy_Event_Mature" file_name="icon_legacy_event_mature.tga" preload="false" />
-  <texture name="Icon_Legacy_Event_Adult" file_name="icon_legacy_event_adult.tga" preload="false" />
-
-  <texture name="ProgressLarge_1" file_name="icons/ProgressLarge_1.png" preload="true" />
-  <texture name="ProgressLarge_2" file_name="icons/ProgressLarge_2.png" preload="true" />
-  <texture name="ProgressLarge_3" file_name="icons/ProgressLarge_3.png" preload="true" />
-  <texture name="ProgressLarge_4" file_name="icons/ProgressLarge_4.png" preload="true" />
-  <texture name="ProgressLarge_5" file_name="icons/ProgressLarge_5.png" preload="true" />
-  <texture name="ProgressLarge_6" file_name="icons/ProgressLarge_6.png" preload="true" />
-  <texture name="ProgressLarge_7" file_name="icons/ProgressLarge_7.png" preload="true" />
-  <texture name="ProgressLarge_8" file_name="icons/ProgressLarge_8.png" preload="true" />
-  <texture name="ProgressLarge_9" file_name="icons/ProgressLarge_9.png" preload="true" />
-  <texture name="ProgressLarge_10" file_name="icons/ProgressLarge_10.png" preload="true" />
-  <texture name="ProgressLarge_11" file_name="icons/ProgressLarge_11.png" preload="true" />
-  <texture name="ProgressLarge_12" file_name="icons/ProgressLarge_12.png" preload="true" />
 </textures>

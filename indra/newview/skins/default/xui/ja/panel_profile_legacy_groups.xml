@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel label="Groups" name="panel_profile_groups">
+	<text name="groups_panel_text">
+		グループ無し
+	</text>
+	<flat_list_view name="groups_detail_list"/>
+</panel>

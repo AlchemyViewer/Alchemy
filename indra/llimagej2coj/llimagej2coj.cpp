@@ -439,30 +439,21 @@ bool LLImageJ2COJ::encodeImpl(LLImageJ2C &base, const LLImageRaw &raw_image, con
 
     /* set encoding parameters to default values */
     opj_set_default_encoder_parameters(&parameters);
-    parameters.cod_format = 0;
+    parameters.tcp_mct = (raw_image.getComponents() >= 3) ? 1 : 0;
+    parameters.cod_format = OPJ_CODEC_J2K;
+    parameters.prog_order = OPJ_RLCP;
     parameters.cp_disto_alloc = 1;
 
     if (reversible)
     {
         parameters.max_cs_size = 0;
+        parameters.irreversible = 0;
         parameters.tcp_numlayers = 1;
         parameters.tcp_rates[0] = 0.0f;
     }
     else
     {
-        parameters.max_cs_size = (1 << 15);
-
-        parameters.tcp_numlayers = 5;
-        parameters.tcp_rates[0] = 1920.0f;
-        parameters.tcp_rates[1] = 480.0f;
-        parameters.tcp_rates[2] = 120.0f;
-        parameters.tcp_rates[3] = 30.0f;
-        parameters.tcp_rates[4] = 10.0f;
         parameters.irreversible = 1;
-        if (raw_image.getComponents() >= 3)
-        {
-            parameters.tcp_mct = 1;
-        }
     }
 
     if (!comment_text)
@@ -530,6 +521,45 @@ bool LLImageJ2COJ::encodeImpl(LLImageJ2C &base, const LLImageRaw &raw_image, con
     opj_set_warning_handler(opj_encoder_p, warning_callback, nullptr);
     opj_set_info_handler(opj_encoder_p, info_callback, nullptr);
 #endif
+
+    // if not lossless compression, computes tcp_numlayers and max_cs_size depending on the image dimensions
+    if( parameters.irreversible ) {
+        // computes a number of layers
+        U32 surface = raw_image.getWidth() * raw_image.getHeight();
+        U32 nb_layers = 1;
+        U32 s = 64*64;
+        while (surface > s)
+        {
+            nb_layers++;
+            s *= 4;
+        }
+        nb_layers = llclamp(nb_layers, 1, 6);
+        parameters.tcp_numlayers = nb_layers;
+        parameters.tcp_rates[nb_layers - 1] = (U32)(1.f / DEFAULT_COMPRESSION_RATE); // 1:8 by default
+        // for each subsequent layer, computes its rate and adds surface * numcomps * 1/rate to the max_cs_size
+        U32 max_cs_size = (U32)(surface * image->numcomps * DEFAULT_COMPRESSION_RATE);
+        U32 multiplier;
+        for (int i = nb_layers - 2; i >= 0; i--)
+        {
+            if( i == nb_layers - 2 )
+            {
+                multiplier = 15;
+            }
+            else if( i == nb_layers - 3 )
+            {
+                multiplier = 4;
+            }
+            else
+            {
+                multiplier = 2;
+            }
+            parameters.tcp_rates[i] = parameters.tcp_rates[i + 1] * multiplier;
+            max_cs_size += (U32)(surface * image->numcomps * (1 / parameters.tcp_rates[i]));
+        }
+        //ensure that we have at least a minimal size
+        max_cs_size = llmax(max_cs_size, (U32)FIRST_PACKET_SIZE);
+        parameters.max_cs_size = max_cs_size;
+    }
 
     /* setup the encoder parameters using the current image and using user parameters */
     if (!opj_setup_encoder(opj_encoder_p, &parameters, image))

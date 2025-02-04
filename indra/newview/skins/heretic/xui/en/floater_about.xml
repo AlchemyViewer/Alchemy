@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ can_close="true"
+ can_minimize="true"
+ can_resize="false"
+ height="380"
+ help_topic="floater_about"
+ name="floater_about"
+ positioning="centered"
+ save_rect="true"
+ save_visibility="false"
+ title="ABOUT [CAPITALIZED_APP_NAME]"
+ width="580">
+
+  <tab_container
+    follows="all" 
+    layout="topleft"
+    left="4"
+    height="378"
+    right="-4"
+    tab_min_width="120"
+    name="about_tab"
+    tab_position="top"
+    top="2">
+    <panel
+      border="true"
+      has_border="true"
+      label="INFO"
+      help_topic="about_support_tab"
+      name="support_panel">
+      <icon
+       height="128"
+       image_name="AlchemyRelease128"
+       layout="topleft"
+       left="0"
+       mouse_opaque="true"
+       name="viewer_logo"
+       top="4"
+       width="128" />
+      <icon
+       interactable="true"
+       commit_on_click="true"
+       height="42"
+       image_name="social_github"
+       layout="topleft"
+       left="25"
+       mouse_opaque="true"
+       name="github_icon"
+       tool_tip="[APP_NAME] on GitHub"
+       top="140"
+       width="41">
+        <icon.commit_callback
+         function="Advanced.ShowURL"
+         parameter="https://github.com/alchemyviewer" />
+      </icon>
+      <icon
+       interactable="true"
+       commit_on_click="true"
+       height="42"
+       image_name="social_bluesky"
+       layout="topleft"
+       left_pad="10"
+       mouse_opaque="true"
+       name="bsky_icon"
+       tool_tip="[APP_NAME] on Bluesky"
+       top="140"
+       width="42">
+        <icon.commit_callback
+         function="Advanced.ShowURL"
+         parameter="https://bsky.app/profile/alchemyviewer.org" />
+      </icon>
+      <icon
+       interactable="true"
+       commit_on_click="true"
+       height="32"
+       image_name="social_discord"
+       layout="topleft"
+       left="25"
+       mouse_opaque="true"
+       name="discord_icon"
+       tool_tip="[APP_NAME] on Discord"
+       top_pad="10"
+       width="42">
+        <icon.commit_callback
+         function="Advanced.ShowURL"
+         parameter="https://discordapp.com/invite/KugCgs6" />
+      </icon>
+      <icon
+       interactable="true"
+       commit_on_click="true"
+       height="32"
+       image_name="social_mastodon"
+       layout="topleft"
+       left_pad="16"
+       mouse_opaque="true"
+       name="mastodon_icon"
+       tool_tip="[APP_NAME] on Mastodon"
+       top_delta="0"
+       width="30">
+        <icon.commit_callback
+         function="Advanced.ShowURL"
+         parameter="https://mastodon.social/@alchemyviewer" />
+      </icon>
+      <icon
+       interactable="true"
+       commit_on_click="true"
+       height="32"
+       image_name="Heretic"
+       layout="topleft"
+       left="25"
+       mouse_opaque="true"
+       name="heretic_icon"
+       tool_tip="Heretic on [APP_NAME]. Oh baby."
+       top_pad="10"
+       width="92">
+        <icon.commit_callback
+         function="Advanced.ShowURL"
+         parameter="https://github.com/cinderblocks" />
+      </icon>
+      <button
+       visible="false"
+       follows="bottom|left" 
+       tool_tip="Check for and download updates."
+       name="update_btn"
+       label="Check for Updates"
+       left="3"
+       bottom="-30"
+       height="22"
+       width="125" />
+      <button
+       follows="bottom|left" 
+       image_overlay="Copy"
+       image_overlay_alignment="left"
+       tool_tip="Copy the About information to the clipboard."
+       name="copy_btn"
+       label="Copy Info"
+       left="3"
+       bottom="4"
+       height="22"
+       width="125" />
+      <text_editor
+       parse_urls="true" 
+       follows="top|left"
+       font="SansSerif"
+       height="341"
+       bg_readonly_color="Transparent"
+       left="133"
+       max_length="65536"
+       name="support_editor"
+       top="5"
+       right="-5"
+       word_wrap="true" />
+    </panel>
+    <panel
+      border="true"
+      has_border="true"
+      label="CREDITS" 
+      help_topic="about_credits_tab"
+      name="credits_panel">
+<accordion
+ fit_parent="false"
+ follows="all"
+ layout="topleft"
+ left="2"
+ name="credits_accordion"
+ single_expansion="true"
+ top="0"
+ right="-1">
+<!-- Credits -->
+  <accordion_tab
+   expanded="true"
+   fit_panel="false"
+   layout="topleft"
+   name="alchemy_credits_tab"
+   title="Alchemy">
+    <panel
+     border="false" 
+     follows="all"
+     left="10"
+     name="alchemy_credits_panel"
+     height="295"
+     top="10">
+      <text
+          follows="top|left|right"
+          font.style="BOLD"
+          height="10"
+          layout="topleft"
+          left="5"
+          name="alchemy_intro"
+          top="0"
+          width="435"
+          wrap="true">
+Alchemy is brought to you by the Alchemy Development Group:
+      </text>
+      <text_editor
+       enabled="false" 
+       follows="top|left"
+       height="100"
+       bg_readonly_color="Transparent"
+       left="5"
+       text_color="LtGray"
+       max_length="65536"
+       name="alchemy_names"
+       top_pad="5"
+       width="545"
+       word_wrap="true">
+Rye Cogtail
+Luminous Luminos
+Unexpectedly Dismantled
+Cinder Roxley
+Inusaito Kanya
+Zanibar Darkstone
+Doug Falta
+      </text_editor>
+      <text
+          follows="top|left"
+          font.style="BOLD"
+          height="10"
+          layout="topleft"
+          left="5"
+          name="alchemy_thanks_intro"
+          top_pad="5"
+          width="435"
+          wrap="true">
+with special thanks to:
+      </text>
+      <text_editor
+       enabled="false" 
+       follows="top|left"
+       height="150"
+       bg_readonly_color="Transparent"
+       left="5"
+       text_color="LtGray"
+       max_length="65536"
+       name="alchemy_supporter_names"
+       top_pad="5"
+       width="545"
+       word_wrap="true">
+Dummy Name replaced at run time
+      </text_editor>
+    </panel>
+  </accordion_tab>
+  <accordion_tab
+   expanded="true"
+   fit_panel="false"
+   layout="topleft"
+   name="sl_credits_tab"
+   title="Second Life">
+    <panel
+     border="false" 
+     follows="all"
+     left="10"
+     name="sl_credits_panel"
+     height="332"
+     top="10">
+      <text
+          follows="top|left|right"
+          font.style="BOLD"
+          height="20"
+          layout="topleft"
+          left="5"
+          name="linden_intro"
+          top="0"
+          width="465"
+          wrap="true">
+Second Life is brought to you by the Lindens, 
+with open source contributions from:
+      </text>
+      <text_editor
+       enabled="false" 
+       follows="top|left"
+       height="270"
+       bg_readonly_color="Transparent"
+       left="5"
+       text_color="LtGray"
+       max_length="65536"
+       name="contrib_names"
+       top_pad="5"
+       width="545"
+       word_wrap="true">
+Dummy Name replaced at run time
+      </text_editor>
+    </panel>
+  </accordion_tab>
+</accordion>
+    </panel>
+<!-- Licences -->
+    <panel
+      border="true"
+      has_border="true"
+      label="LICENCES"
+      help_topic="about_licenses_tab"
+      name="licenses_panel">
+      <text_editor
+       enabled="false"
+       follows="left|top"
+       height="340"
+       bg_readonly_color="Transparent"
+       left="5"
+       text_color="LtGray"
+       max_length="65536"
+       name="licenses_editor"
+       top="5"
+       right="-5"
+       word_wrap="true"
+       parse_urls="true">
+This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; version 2.1 of the License only which can be found in doc/LGPL-licence.txt in this distribution (or online at https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt).
+
+This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+
+3Dconnexion SDK Copyright (C) 1992-2009 3Dconnexion
+APR Copyright (C) 2011 The Apache Software Foundation
+Collada DOM Copyright 2006 Sony Computer Entertainment Inc.
+cURL Copyright (C) 1996-2010, Daniel Stenberg, (daniel@haxx.se)
+DBus/dbus-glib Copyright (C) 2002, 2003  CodeFactory AB / Copyright (C) 2003, 2004 Red Hat, Inc.
+expat Copyright (C) 1998, 1999, 2000 Thai Open Source Software Center Ltd.
+FreeType Copyright (C) 1996-2002, 2006 David Turner, Robert Wilhelm, and Werner Lemberg.
+GL Copyright (C) 1999-2004 Brian Paul.
+google-perftools Copyright (c) 2005, Google Inc.
+Havok.com(TM) Copyright (C) 1999-2001, Telekinesys Research Limited.
+jpeg2000 Copyright (C) 2001, David Taubman, The University of New South Wales (UNSW)
+jpeglib Copyright (C) 1991-1998, Thomas G. Lane.
+meshoptimizer Copyright (c) 2016-2021 Arseny Kapoulkine
+ogg/vorbis Copyright (C) 2002, Xiphophorus
+OpenSSL Copyright (C) 1998-2008 The OpenSSL Project.
+PCRE Copyright (c) 1997-2012 University of Cambridge
+SDL Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002 Sam Lantinga
+SSLeay Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
+xmlrpc-epi Copyright (C) 2000 Epinions, Inc.
+xxHash Copyright (C) 2012-2020 Yann Collet.
+zlib Copyright (C) 1995-2012 Jean-loup Gailly and Mark Adler.
+
+Second Life Viewer uses Havok (TM) Physics. (c)Copyright 1999-2010 Havok.com Inc. (and its Licensors). All Rights Reserved. See www.havok.com for details.
+
+This software contains source code provided by NVIDIA Corporation.
+
+All rights reserved.  See licenses.txt for details.
+
+Voice chat Audio coding: Polycom(R) Siren14(TM) (ITU-T Rec. G.722.1 Annex C)
+
+      </text_editor>
+      </panel>
+    </tab_container>
+</floater>

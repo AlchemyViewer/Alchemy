@@ -81,12 +81,12 @@ BOOL LLEasyMessageLogEntry::isOutgoing() const
     return mEntry->mFromHost == LLHost(LOCALHOST_ADDR, gMessageSystem->getListenPort());
 }
 
-std::string LLEasyMessageLogEntry::getName()
+std::string LLEasyMessageLogEntry::getName() const
 {
     std::string message_names;
-    std::set<std::string>::iterator iter = mNames.begin();
-    std::set<std::string>::const_iterator begin = mNames.begin();
-    std::set<std::string>::const_iterator end = mNames.end();
+    std::set<std::string>::const_iterator iter = mNames.cbegin();
+    std::set<std::string>::const_iterator begin = mNames.cbegin();
+    std::set<std::string>::const_iterator end = mNames.cend();
 
     while (iter != end)
     {
@@ -100,7 +100,7 @@ std::string LLEasyMessageLogEntry::getName()
     return message_names;
 }
 
-void LLEasyMessageLogEntry::setResponseMessage(LogPayload entry)
+void LLEasyMessageLogEntry::setResponseMessage(const LogPayload& entry)
 {
     mResponseMsg.reset(new LLEasyMessageLogEntry(entry));
 }
@@ -180,7 +180,7 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
 
             for (; iter != end; ++iter)
             {
-                const auto header = (*iter);
+                const auto& header = (*iter);
                 full << header.first << ": " << header.second << "\n";
             }
         }
@@ -198,7 +198,7 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
                 if (beautify && (parsed_content_type == HTTP_CONTENT_LLSD_XML || parsed_content_type == HTTP_CONTENT_XML))
                 {
                     // Use libxml2 instead of expat for safety.
-                    const int parse_opts = XML_PARSE_NONET | XML_PARSE_NOCDATA | XML_PARSE_NOXINCNODE | XML_PARSE_NOBLANKS;
+                    constexpr int parse_opts = XML_PARSE_NONET | XML_PARSE_NOCDATA | XML_PARSE_NOXINCNODE | XML_PARSE_NOBLANKS;
                     xmlDocPtr doc = xmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize,
                         "noname.xml", nullptr, parse_opts);
                     if (doc)
@@ -219,7 +219,7 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
                 }
                 else if (beautify && parsed_content_type == HTTP_CONTENT_TEXT_HTML)
                 {
-                    const int parse_opts = HTML_PARSE_NONET | HTML_PARSE_NOERROR | HTML_PARSE_NOIMPLIED | HTML_PARSE_NOBLANKS;
+                    constexpr int parse_opts = HTML_PARSE_NONET | HTML_PARSE_NOERROR | HTML_PARSE_NOIMPLIED | HTML_PARSE_NOBLANKS;
                     htmlDocPtr doc = htmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize,
                         "noname.html", nullptr, parse_opts);
                     if (doc)
@@ -269,5 +269,5 @@ std::string LLEasyMessageLogEntry::getFull(BOOL beautify, BOOL show_header) cons
 
 std::string LLEasyMessageLogEntry::getResponseFull(BOOL beautify, BOOL show_header) const
 {
-    return mResponseMsg.get() ? mResponseMsg->getFull(beautify, show_header) : LLStringUtil::null;
+    return mResponseMsg ? mResponseMsg->getFull(beautify, show_header) : LLStringUtil::null;
 }

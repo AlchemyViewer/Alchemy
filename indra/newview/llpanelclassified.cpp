@@ -34,21 +34,31 @@
 
 #include "lldispatcher.h"
 #include "llfloaterreg.h"
+#include "llnotifications.h"
+#include "llnotificationsutil.h"
 #include "llparcel.h"
 
 #include "llagent.h"
 #include "llclassifiedflags.h"
+#include "llclassifiedinfo.h"
 #include "lliconctrl.h"
+#include "lllineeditor.h"
+#include "llcombobox.h"
 #include "lltexturectrl.h"
+#include "lltexteditor.h"
+#include "llviewerparcelmgr.h"
 #include "llfloaterworldmap.h"
 #include "llviewergenericmessage.h" // send_generic_message
 #include "llviewerregion.h"
+#include "llviewertexture.h"
+#include "lltrans.h"
 #include "llscrollcontainer.h"
+#include "llstatusbar.h"
 #include "llcorehttputil.h"
 
 //static
 LLPanelClassifiedInfo::panel_list_t LLPanelClassifiedInfo::sAllPanels;
-static LLPanelInjector<LLPanelClassifiedInfo> t_panel_panel_classified_info("panel_classified_info");
+static LLPanelInjector<LLPanelClassifiedInfo> t_panel_classified_info("panel_classified_info");
 
 // "classifiedclickthrough"
 // strings[0] = classified_id
@@ -82,9 +92,12 @@ static LLDispatchClassifiedClickThrough sClassifiedClickThrough;
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
+static LLPanelInjector<LLPanelClassifiedInfo> t_classified_info("panel_classified_info");
+
 LLPanelClassifiedInfo::LLPanelClassifiedInfo()
  : LLPanel()
  , mInfoLoaded(false)
+ , mFromSearch(false)
  , mScrollingPanel(NULL)
  , mScrollContainer(NULL)
  , mScrollingPanelMinHeight(0)
@@ -105,14 +118,20 @@ LLPanelClassifiedInfo::~LLPanelClassifiedInfo()
 {
     sAllPanels.remove(this);
 
-    if (getAvatarId().notNull())
-    {
-        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
-    }
+    LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+}
+
+// static
+LLPanelClassifiedInfo* LLPanelClassifiedInfo::create()
+{
+    LLPanelClassifiedInfo* panel = new LLPanelClassifiedInfo();
+    panel->buildFromFile("panel_classified_info.xml");
+    return panel;
 }
 
 BOOL LLPanelClassifiedInfo::postBuild()
 {
+    childSetAction("back_btn", boost::bind(&LLPanelClassifiedInfo::onExit, this));
     childSetAction("show_on_map_btn", boost::bind(&LLPanelClassifiedInfo::onMapClick, this));
     childSetAction("teleport_btn", boost::bind(&LLPanelClassifiedInfo::onTeleportClick, this));
 
@@ -126,6 +145,16 @@ BOOL LLPanelClassifiedInfo::postBuild()
     mSnapshotRect = getDefaultSnapshotRect();
 
     return TRUE;
+}
+
+void LLPanelClassifiedInfo::setExitCallback(const commit_callback_t& cb)
+{
+    getChild<LLButton>("back_btn")->setClickedCallback(cb);
+}
+
+void LLPanelClassifiedInfo::setEditClassifiedCallback(const commit_callback_t& cb)
+{
+    getChild<LLButton>("edit_btn")->setClickedCallback(cb);
 }
 
 void LLPanelClassifiedInfo::reshape(S32 width, S32 height, BOOL called_from_parent /* = TRUE */)
@@ -153,18 +182,7 @@ void LLPanelClassifiedInfo::reshape(S32 width, S32 height, BOOL called_from_pare
 
 void LLPanelClassifiedInfo::onOpen(const LLSD& key)
 {
-    LLUUID avatar_id = key["classified_creator_id"];
-    if(avatar_id.isNull())
-    {
-        return;
-    }
-
-    if(getAvatarId().notNull())
-    {
-        LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
-    }
-
-    setAvatarId(avatar_id);
+    setAvatarId(key["classified_creator_id"].asUUID());
 
     resetData();
     resetControls();
@@ -180,6 +198,7 @@ void LLPanelClassifiedInfo::onOpen(const LLSD& key)
 
     LLAvatarPropertiesProcessor::getInstance()->addObserver(getAvatarId(), this);
     LLAvatarPropertiesProcessor::getInstance()->sendClassifiedInfoRequest(getClassifiedId());
+
     gGenericDispatcher.addHandler("classifiedclickthrough", &sClassifiedClickThrough);
 
     if (gAgent.getRegion())
@@ -259,9 +278,11 @@ void LLPanelClassifiedInfo::processProperties(void* data, EAvatarProcessorType t
             LLStringUtil::format(date_str, LLSD().with("datetime", (S32) c_info->creation_date));
             getChild<LLUICtrl>("creation_date")->setValue(date_str);
 
-            setInfoLoaded(true);
+            date_str = date_fmt;
+            LLStringUtil::format(date_str, LLSD().with("datetime", (S32) c_info->expiration_date));
+            getChild<LLUICtrl>("expiration_date")->setValue(date_str);
 
-            LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+            setInfoLoaded(true);
         }
     }
 }
@@ -372,9 +393,8 @@ void LLPanelClassifiedInfo::setClickThrough(
             << teleport << ", " << map << ", " << profile << "] ("
             << (from_new_table ? "new" : "old") << ")" << LL_ENDL;
 
-    for (panel_list_t::iterator iter = sAllPanels.begin(); iter != sAllPanels.end(); ++iter)
+    for (auto self : sAllPanels)
     {
-        LLPanelClassifiedInfo* self = *iter;
         if (self->getClassifiedId() != classified_id)
         {
             continue;
@@ -566,4 +586,8 @@ void LLPanelClassifiedInfo::onTeleportClick()
     }
 }
 
-//EOF
+void LLPanelClassifiedInfo::onExit()
+{
+    LLAvatarPropertiesProcessor::getInstance()->removeObserver(getAvatarId(), this);
+    gGenericDispatcher.addHandler("classifiedclickthrough", nullptr); // deregister our handler
+}

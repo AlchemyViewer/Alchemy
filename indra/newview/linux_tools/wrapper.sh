@@ -56,8 +56,8 @@ export SDL_VIDEO_X11_WMCLASS=$channel
 ## - Enable threaded mesa GL impl
 export mesa_glthread=true
 
-## - Enable nvidia threaded GL
-export __GL_THREADED_OPTIMIZATIONS=1
+## - Uncomment to enable nvidia threaded GL optimizations - MAY CAUSE INSTABILITY
+#export __GL_THREADED_OPTIMIZATIONS=1
 
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
@@ -127,7 +127,7 @@ fi
 # command line. But DO quote "$ARGS": preserve separate args as
 # individually quoted.
 # Note: In sh, we don't have arrays like in Bash. So, we use a string instead to store the arguments.
-eval "$LL_WRAPPER bin/do-not-directly-run-alchemy-bin $ARGS"
+eval "$LL_WRAPPER bin/alchemy-bin $ARGS"
 LL_RUN_ERR=$?
 
 # Handle any resulting errors

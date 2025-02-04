@@ -176,11 +176,9 @@ postAndSuspendSetup(const std::string& callerName,
                 auto& statsd = status["status"];
                 if (statsd.asString() != "running")
                 {
-#ifdef SHOW_DEBUG
                     LL_DEBUGS("lleventcoro") << listenerName
                                              << " spotted status " << statsd
                                              << ", throwing Stopping" << LL_ENDL;
-#endif
                     try
                     {
                         promise.set_exception(
@@ -212,13 +210,8 @@ postAndSuspendSetup(const std::string& callerName,
                 }
                 catch(const boost::fibers::promise_already_satisfied & ex)
                 {
-                    (void)ex;
-#ifdef SHOW_DEBUG
                     LL_DEBUGS("lleventcoro") << "promise already satisfied in '"
                         << listenerName << "': "  << ex.what() << LL_ENDL;
-#else
-                    (void)ex;
-#endif
                     // We could not propagate the result value to the
                     // listener.
                     return false;
@@ -233,21 +226,17 @@ postAndSuspendSetup(const std::string& callerName,
         // request event.
         LLSD modevent(event);
         storeToLLSDPath(modevent, replyPumpNamePath, replyPump.getName());
-#ifdef SHOW_DEBUG
         LL_DEBUGS("lleventcoro") << callerName << ": coroutine " << listenerName
                                  << " posting to " << requestPump.getName()
                                  << LL_ENDL;
-#endif
 
         // *NOTE:Mani - Removed because modevent could contain user's hashed passwd.
         //                         << ": " << modevent << LL_ENDL;
         requestPump.post(modevent);
     }
-#ifdef SHOW_DEBUG
     LL_DEBUGS("lleventcoro") << callerName << ": coroutine " << listenerName
                              << " about to wait on LLEventPump " << replyPump.getName()
                              << LL_ENDL;
-#endif
     return { connection, stopper };
 }
 
@@ -271,10 +260,8 @@ LLSD llcoro::postAndSuspend(const LLSD& event, const LLEventPumpOrPumpName& requ
     // calling get() on the future makes us wait for it
     LLCoros::TempStatus st(STRINGIZE("waiting for " << replyPump.getPump().getName()));
     LLSD value(future.get());
-#ifdef SHOW_DEBUG
     LL_DEBUGS("lleventcoro") << "postAndSuspend(): coroutine " << listenerName
                              << " resuming with " << value << LL_ENDL;
-#endif
     // returning should disconnect the connection
     return value;
 }
@@ -311,11 +298,9 @@ LLSD llcoro::postAndSuspendWithTimeout(const LLSD& event,
     // if the future is NOT yet ready, return timeoutResult instead
     if (status == boost::fibers::future_status::timeout)
     {
-#ifdef SHOW_DEBUG
         LL_DEBUGS("lleventcoro") << "postAndSuspendWithTimeout(): coroutine " << listenerName
                                  << " timed out after " << timeout << " seconds,"
                                  << " resuming with " << timeoutResult << LL_ENDL;
-#endif
         return timeoutResult;
     }
     else
@@ -324,10 +309,8 @@ LLSD llcoro::postAndSuspendWithTimeout(const LLSD& event,
 
         // future is now ready, no more waiting
         LLSD value(future.get());
-#ifdef SHOW_DEBUG
         LL_DEBUGS("lleventcoro") << "postAndSuspendWithTimeout(): coroutine " << listenerName
                                  << " resuming with " << value << LL_ENDL;
-#endif
         // returning should disconnect the connection
         return value;
     }

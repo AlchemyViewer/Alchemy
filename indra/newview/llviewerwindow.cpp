@@ -2467,23 +2467,23 @@ void LLViewerWindow::initWorldUI()
     if (!gStatusBar)
     {
         // Status bar
-	    mStatusBarContainer = getRootView()->getChild<LLPanel>("status_bar_container");
+        mStatusBarContainer = getRootView()->getChild<LLPanel>("status_bar_container");
         gStatusBar = new LLStatusBar(mStatusBarContainer->getLocalRect());
         gStatusBar->setFollows(FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT);
         gStatusBar->setShape(mStatusBarContainer->getLocalRect());
         // sync bg color with menu bar
-	    gStatusBar->setBackgroundColor( gMenuBarView->getBackgroundColor().get() );
+        gStatusBar->setBackgroundColor( gMenuBarView->getBackgroundColor().get() );
         // add InBack so that gStatusBar won't be drawn over menu
         mStatusBarContainer->addChildInBack(gStatusBar, 2/*tab order, after menu*/);
-	    mStatusBarContainer->setVisible(TRUE);
+        mStatusBarContainer->setVisible(TRUE);
 
         // Navigation bar
-	    mNavBarBarContainer = getRootView()->getChild<LLView>("nav_bar_container");
+        mNavBarBarContainer = getRootView()->getChild<LLView>("nav_bar_container");
 
-	    navbar->setShape(mNavBarBarContainer->getLocalRect());
-	    navbar->setBackgroundColor(gMenuBarView->getBackgroundColor().get());
-	    mNavBarBarContainer->addChild(navbar);
-	    mNavBarBarContainer->setVisible(TRUE);
+        navbar->setShape(mNavBarBarContainer->getLocalRect());
+        navbar->setBackgroundColor(gMenuBarView->getBackgroundColor().get());
+        mNavBarBarContainer->addChild(navbar);
+        mNavBarBarContainer->setVisible(TRUE);
     }
     else
     {

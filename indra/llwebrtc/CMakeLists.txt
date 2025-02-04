@@ -57,6 +57,7 @@ elseif (DARWIN)
     endif (USE_BUGSPLAT)
 elseif (LINUX)
     target_link_libraries(llwebrtc PRIVATE ll::webrtc)
+    set_target_properties(llwebrtc PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
 endif (WINDOWS)
     
 target_include_directories( llwebrtc INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})

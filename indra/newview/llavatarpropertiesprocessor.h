@@ -1,6 +1,6 @@
 /**
  * @file llavatarpropertiesprocessor.h
- * @brief LLAvatatIconCtrl base class
+ * @brief LLAvatarPropertiesProcessor class description
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -34,12 +34,12 @@
 #include <map>
 
 // For Flags in AvatarPropertiesReply
-const U32 AVATAR_ALLOW_PUBLISH          = 0x1 << 0; // whether profile is externally visible or not
-const U32 AVATAR_MATURE_PUBLISH         = 0x1 << 1; // profile is "mature"
-const U32 AVATAR_IDENTIFIED             = 0x1 << 2; // whether avatar has provided payment info
-const U32 AVATAR_TRANSACTED             = 0x1 << 3; // whether avatar has actively used payment info
-const U32 AVATAR_ONLINE                 = 0x1 << 4; // the online status of this avatar, if known.
-const U32 AVATAR_AGEVERIFIED            = 0x1 << 5; // whether avatar has been age-verified
+constexpr U32 AVATAR_ALLOW_PUBLISH  = 0x1 << 0; // whether profile is externally visible or not
+constexpr U32 AVATAR_MATURE_PUBLISH = 0x1 << 1; // profile is "mature"
+constexpr U32 AVATAR_IDENTIFIED     = 0x1 << 2; // whether avatar has provided payment info
+constexpr U32 AVATAR_TRANSACTED     = 0x1 << 3; // whether avatar has actively used payment info
+constexpr U32 AVATAR_ONLINE         = 0x1 << 4; // the online status of this avatar, if known.
+constexpr U32 AVATAR_AGEVERIFIED    = 0x1 << 5; // whether avatar has been age-verified
 
 /*
 *TODO Vadim: This needs some refactoring:
@@ -58,7 +58,8 @@ enum EAvatarProcessorType
     APT_PICK_INFO,
     APT_TEXTURES,
     APT_CLASSIFIEDS,
-    APT_CLASSIFIED_INFO
+    APT_CLASSIFIED_INFO,
+    APT_INTERESTS_INFO  // legacy support. don't be lazy and keep this. :O)
 };
 
 // legacy data is supposed to match AvatarPropertiesReply,
@@ -81,6 +82,18 @@ struct LLAvatarLegacyData
     std::string caption_text;
     std::string customer_type;
     U32         flags;
+};
+
+// Don't belete my sexy InterestsData.
+struct LLLegacyInterestsData
+{
+    LLUUID      agent_id;
+    LLUUID      avatar_id;  // target id
+    U32         want_to_mask;
+    std::string want_to_text;
+    U32         skills_mask;
+    std::string skills_text;
+    std::string languages_text;
 };
 
 struct LLAvatarData
@@ -240,7 +253,7 @@ struct LLAvatarClassifiedInfo
 class LLAvatarPropertiesObserver
 {
 public:
-    virtual ~LLAvatarPropertiesObserver() {}
+    virtual      ~LLAvatarPropertiesObserver() = default;
     virtual void processProperties(void* data, EAvatarProcessorType type) = 0;
 };
 
@@ -259,31 +272,36 @@ public:
     // suppressed while waiting for a response from the network.
     void sendAvatarPropertiesRequest(const LLUUID& avatar_id);
     void sendAvatarLegacyPropertiesRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyPicksRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyNotesRequest(const LLUUID& avatar_id);
+    void sendAvatarLegacyGroupsRequest(const LLUUID& avatar_id);
     void sendAvatarTexturesRequest(const LLUUID& avatar_id);
     void sendAvatarClassifiedsRequest(const LLUUID& avatar_id);
 
     // Duplicate pick info requests are not suppressed.
-    void sendPickInfoRequest(const LLUUID& creator_id, const LLUUID& pick_id);
+    static void sendPickInfoRequest(const LLUUID& creator_id, const LLUUID& pick_id);
 
-    void sendClassifiedInfoRequest(const LLUUID& classified_id);
+    static void sendClassifiedInfoRequest(const LLUUID& classified_id);
 
-    void sendPickInfoUpdate(const LLPickData* new_pick);
+    static void sendPickInfoUpdate(const LLPickData* new_pick);
 
-    void sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data);
+    static void sendClassifiedInfoUpdate(const LLAvatarClassifiedInfo* c_data);
 
-    void sendFriendRights(const LLUUID& avatar_id, S32 rights);
+    static void sendInterestsInfoUpdate(const LLLegacyInterestsData* interests_data);
 
-    void sendPickDelete(const LLUUID& pick_id);
+    static void sendFriendRights(const LLUUID& avatar_id, S32 rights);
 
-    void sendClassifiedDelete(const LLUUID& classified_id);
+    static void sendPickDelete(const LLUUID& pick_id);
 
-    bool isHideAgeSupportedByServer() { return mIsHideAgeSupportedByServer; }
+    static void sendClassifiedDelete(const LLUUID& classified_id);
 
-    // Returns translated, human readable string for account type, such
+    bool isHideAgeSupportedByServer() const { return mIsHideAgeSupportedByServer; }
+
+    // Returns translated, human-readable string for account type, such
     // as "Resident" or "Linden Employee".  Used for profiles, inspectors.
     static std::string accountType(const LLAvatarData* avatar_data);
 
-    // Returns translated, human readable string for payment info, such
+    // Returns translated, human-readable string for payment info, such
     // as "Payment Info on File" or "Payment Info Used".
     // Used for profiles, inspectors.
     static std::string paymentInfo(const LLAvatarData* avatar_data);
@@ -316,7 +334,7 @@ protected:
     void sendAvatarPropertiesRequestMessage(const LLUUID& avatar_id);
     void initAgentProfileCapRequest(const LLUUID& avatar_id, const std::string& cap_url, EAvatarProcessorType type);
 
-    void notifyObservers(const LLUUID& id,void* data, EAvatarProcessorType type);
+    void notifyObservers(const LLUUID& id,void* data, EAvatarProcessorType type) const;
 
     // Is there a pending, not timed out, request for this avatar's data?
     // Use this to suppress duplicate requests for data when a request is
@@ -330,7 +348,6 @@ protected:
     void removePendingRequest(const LLUUID& avatar_id, EAvatarProcessorType type);
 
     typedef void* (*processor_method_t)(LLMessageSystem*);
-    static processor_method_t getProcessor(EAvatarProcessorType type);
 
 protected:
 

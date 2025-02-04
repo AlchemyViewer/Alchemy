@@ -3895,7 +3895,7 @@ void handle_avatar_eject(const LLSD& avatar_id)
 
 bool my_profile_visible()
 {
-    LLFloater* floaterp = LLAvatarActions::getProfileFloater(gAgentID);
+    LLFloater* floaterp = LLAvatarActions::findProfileFloater(gAgentID);
     return floaterp && floaterp->isInVisibleChain();
 }
 
@@ -6608,7 +6608,8 @@ class LLCommunicateCheckAutoRespond : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-       return gAgent.getAutoRespond();
+        bool new_value = gAgent.getAutoRespond();
+        return new_value;
     }
 };
 
@@ -6770,7 +6771,7 @@ class LLAvatarToggleMyProfile : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        LLFloater* instance = LLAvatarActions::getProfileFloater(gAgent.getID());
+        LLFloater* instance = LLAvatarActions::findProfileFloater(gAgent.getID());
         if (LLFloater::isMinimized(instance))
         {
             instance->setMinimized(FALSE);
@@ -6796,7 +6797,7 @@ class LLAvatarTogglePicks : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        LLFloater * instance = LLAvatarActions::getProfileFloater(gAgent.getID());
+        LLFloater * instance = LLAvatarActions::findProfileFloater(gAgent.getID());
         if (LLFloater::isMinimized(instance) || (instance && !instance->hasFocus() && !instance->getIsChrome()))
         {
             instance->setMinimized(FALSE);

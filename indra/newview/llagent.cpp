@@ -537,6 +537,8 @@ void LLAgent::init()
 
     selectRejectFriendshipRequests(gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsMode"));
     setRejectTeleportOffers(gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersMode"));
+    setAutoRespond(gSavedPerAccountSettings.getBOOL("AutoRespondModeSet"));
+    setAutoRespondNonFriends(gSavedPerAccountSettings.getBOOL("AutoRespondNonFriendsModeSet"));
 
 
     if (!mTeleportFinishedSlot.connected())
