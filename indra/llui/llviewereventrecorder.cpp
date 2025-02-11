@@ -99,8 +99,9 @@ void LLViewerEventRecorder::setMouseGlobalCoords(S32 x, S32 y) {
 }
 
 void LLViewerEventRecorder::updateMouseEventInfo(S32 local_x, S32 local_y, S32 global_x, S32 global_y, std::string mName) {
-  if (!sLogEvents) return;
-  LLView * target_view = LLUI::resolvePath(LLUI::getRootView(), xui);
+    if (!logEvents) return;
+
+  LLView * target_view = LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), xui);
   if (! target_view) {
     LL_DEBUGS() << "LLViewerEventRecorder::updateMouseEventInfo - xui path on file at moment is NOT valid - so DO NOT record these local coords" << LL_ENDL;
     return;
@@ -126,6 +127,8 @@ void LLViewerEventRecorder::updateMouseEventInfo(S32 local_x, S32 local_y, S32 g
 }
 
 void LLViewerEventRecorder::logVisibilityChange(std::string xui, std::string name, bool visibility, std::string event_subtype) {
+
+    if (!logEvents) return;
   if (!sLogEvents) return;
   LLSD  event=LLSD::emptyMap();
 
@@ -168,7 +171,6 @@ void LLViewerEventRecorder::update_xui(std::string xui) {
 
 void LLViewerEventRecorder::logKeyEvent(KEY key, MASK mask) {
 
-  if (!sLogEvents) return;
   // NOTE: Event recording only logs keydown events - the viewer itself hides keyup events at a fairly low level in the code and does not appear to care about them anywhere
 
   LLSD event = LLSD::emptyMap();
@@ -259,7 +261,7 @@ void LLViewerEventRecorder::logKeyUnicodeEvent(llwchar uni_char) {
 
   event.insert("event",LLSD("keyDown"));
 
-  LL_DEBUGS()  << "[VITA] unicode key: " << wstring_to_utf8str(LLWString(1, uni_char)) << LL_ENDL;
+  LL_DEBUGS()  << "[VITA] unicode key: " << uni_char   << LL_ENDL;
   LL_DEBUGS()  << "[VITA] dumpxml " << LLSDXMLStreamer(event) << "\n" << LL_ENDL;
 
 

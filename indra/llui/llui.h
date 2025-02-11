@@ -122,8 +122,8 @@ private:
                            LLUIAudioCallback deferred_audio_callback);
     ~LLUI();
 
-    LOG_CLASS(LLUI);
-public:
+    ~LLUI();
+
     //
     // Classes
     //

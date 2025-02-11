@@ -179,7 +179,7 @@ std::string LLDXHardware::getDriverVersionWMI(EGPUVendor vendor)
 
             //convert BSTR to std::string
             std::wstring ws(caption, SysStringLen(caption));
-            std::string caption_str(ws.begin(), ws.end());
+            std::string caption_str = ll_convert_wide_to_string(ws);
             LLStringUtil::toLower(caption_str);
 
             bool found = false;
@@ -231,7 +231,7 @@ std::string LLDXHardware::getDriverVersionWMI(EGPUVendor vendor)
 
         //convert BSTR to std::string
         std::wstring ws(driverVersion, SysStringLen(driverVersion));
-        std::string str(ws.begin(), ws.end());
+        std::string str = ll_convert_wide_to_string(ws);
         LL_INFOS("AppInit") << " DriverVersion : " << str << LL_ENDL;
 
         if (mDriverVersion.empty())
@@ -613,7 +613,7 @@ LLSD LLDXHardware::getDisplayInfo()
 
         // Dump the string as an int into the structure
         char *stopstring;
-        ret["VRAM"] = (LLSD::Integer)strtol(ram_str.c_str(), &stopstring, 10);
+        ret["VRAM"] = LLSD::Integer(strtol(ram_str.c_str(), &stopstring, 10));
         std::string device_name = get_string(device_containerp, L"szDescription");
         ret["DeviceName"] = device_name;
         std::string device_driver=  get_string(device_containerp, L"szDriverVersion");

@@ -826,6 +826,7 @@ void LLWorld::updateParticles()
 
 void LLWorld::renderPropertyLines()
 {
+    LL_PROFILE_ZONE_SCOPED;
     for (region_list_t::iterator iter = mVisibleRegionList.begin();
          iter != mVisibleRegionList.end(); ++iter)
     {
@@ -861,10 +862,10 @@ void LLWorld::updateNetStats()
     add(LLStatViewer::PACKETS_OUT, packets_out);
     add(LLStatViewer::PACKETS_LOST, packets_lost);
 
-    F32 total_packets_in = LLViewerStats::instance().getRecording().getSum(LLStatViewer::PACKETS_IN);
-    if (total_packets_in > 0)
+    F32 total_packets_in = (F32)LLViewerStats::instance().getRecording().getSum(LLStatViewer::PACKETS_IN);
+    if (total_packets_in > 0.f)
     {
-        F32 total_packets_lost = LLViewerStats::instance().getRecording().getSum(LLStatViewer::PACKETS_LOST);
+        F32 total_packets_lost = (F32)LLViewerStats::instance().getRecording().getSum(LLStatViewer::PACKETS_LOST);
         sample(LLStatViewer::PACKETS_LOST_PERCENT, LLUnits::Ratio::fromValue((F32)total_packets_lost/(F32)total_packets_in));
     }
 
@@ -1016,11 +1017,10 @@ void LLWorld::updateWaterObjects()
             if (!getRegionFromHandle(region_handle))
             {   // No region at that area, so make water
                 LLVOWater* waterp = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_WATER, gAgent.getRegion());
-                waterp->setUseTexture(false);
-                waterp->setPositionGlobal(LLVector3d(x + step/2,
-                                                     y + step/2,
-                                                     water_height));
-                waterp->setScale(LLVector3((F32)step, (F32)step, 512.f));
+                waterp->setPositionGlobal(LLVector3d(x + rwidth/2,
+                                                     y + rwidth/2,
+                                                     256.f + water_height));
+                waterp->setScale(LLVector3((F32)rwidth, (F32)rwidth, 512.f));
                 gPipeline.createObject(waterp);
                 mHoleWaterObjects.push_back(waterp);
             }
@@ -1070,7 +1070,6 @@ void LLWorld::updateWaterObjects()
             mEdgeWaterObjects[dir] = (LLVOWater *)gObjectList.createObjectViewer(LLViewerObject::LL_VO_VOID_WATER,
                                                                                  gAgent.getRegion());
             waterp = mEdgeWaterObjects[dir];
-            waterp->setUseTexture(false);
             waterp->setIsEdgePatch(true);
             gPipeline.createObject(waterp);
         }
@@ -1351,7 +1350,7 @@ bool LLWorld::isCapURLMapped(const std::string &cap_url)
 
 void send_agent_resume()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     // Note: used to check for LLWorld initialization before it became a singleton.
     // Rather than just remove this check I'm changing it to assure that the message
     // system has been initialized. -MG
@@ -1411,31 +1410,31 @@ void LLWorld::getAvatars(uuid_vec_t* avatar_ids, std::vector<LLVector3d>* positi
 
     // get the list of avatars from the character list first, so distances are correct
     // when agent is above 1020m and other avatars are nearby
-    for (auto instance : LLCharacter::sInstances)
+    for (LLCharacter* character : LLCharacter::sInstances)
     {
-        LLVOAvatar* pVOAvatar = static_cast<LLVOAvatar*>(instance);
-
-        if (!pVOAvatar->isDead() && !pVOAvatar->mIsDummy && !pVOAvatar->isOrphaned())
+        LLVOAvatar* avatar = (LLVOAvatar*)character;
+        if (!avatar->isDead() && !avatar->mIsDummy && !avatar->isOrphaned())
         {
-            LLVector3d pos_global = pVOAvatar->getPositionGlobal();
-            LLUUID uuid = pVOAvatar->getID();
+            LLVector3d pos_global = avatar->getPositionGlobal();
+            LLUUID uuid = avatar->getID();
 
             if (!uuid.isNull()
                 && dist_vec_squared(pos_global, relative_to) <= radius_squared)
             {
-                if(positions != NULL)
+                if (positions != NULL)
                 {
                     positions->emplace_back(std::move(pos_global));
                 }
-                if(avatar_ids !=NULL)
+                if (avatar_ids != NULL)
                 {
                     avatar_ids->emplace_back(std::move(uuid));
                 }
             }
         }
     }
+
     // region avatars added for situations where radius is greater than RenderFarClip
-    for (LLViewerRegion* regionp : getRegionList())
+    for (const LLViewerRegion* regionp : LLWorld::getInstance()->getRegionList())
     {
         const LLVector3d& origin_global = regionp->getOriginGlobal();
         auto count = regionp->mMapAvatars.size();
@@ -1552,33 +1551,31 @@ void LLWorld::getAvatars(region_gpos_map_t* umap, const LLVector3d& relative_to,
     }
 }
 
-F32 LLWorld::getNearbyAvatarsAndMaxGPUTime(std::vector<LLCharacter*> &valid_nearby_avs)
+F32 LLWorld::getNearbyAvatarsAndMaxGPUTime(std::vector<LLVOAvatar*> &valid_nearby_avs)
 {
     static LLCachedControl<F32> render_far_clip(gSavedSettings, "RenderFarClip", 64);
+
     F32 nearby_max_complexity = 0;
     F32 radius = render_far_clip * render_far_clip;
-    std::vector<LLCharacter*>::iterator char_iter = LLCharacter::sInstances.begin();
-    while (char_iter != LLCharacter::sInstances.end())
-    {
-        LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(*char_iter);
-        if (avatar && !avatar->isDead() && !avatar->isControlAvatar())
-        {
-            if ((dist_vec_squared(avatar->getPositionGlobal(), gAgent.getPositionGlobal()) > radius) &&
-                (dist_vec_squared(avatar->getPositionGlobal(), gAgentCamera.getCameraPositionGlobal()) > radius))
-            {
-                char_iter++;
-                continue;
-            }
 
-            if (!avatar->isTooSlow())
+    for (LLCharacter* character : LLCharacter::sInstances)
+    {
+        LLVOAvatar* avatar = (LLVOAvatar*)character;
+        if (!avatar->isDead() && !avatar->isControlAvatar())
+        {
+            if ((dist_vec_squared(avatar->getPositionGlobal(), gAgent.getPositionGlobal()) <= radius) ||
+                (dist_vec_squared(avatar->getPositionGlobal(), gAgentCamera.getCameraPositionGlobal()) <= radius))
             {
-                gPipeline.profileAvatar(avatar);
+                if (!avatar->isTooSlow())
+                {
+                    gPipeline.profileAvatar(avatar);
+                }
+                nearby_max_complexity = llmax(nearby_max_complexity, avatar->getGPURenderTime());
+                valid_nearby_avs.push_back(avatar);
             }
-            nearby_max_complexity = llmax(nearby_max_complexity, avatar->getGPURenderTime());
-            valid_nearby_avs.push_back(*char_iter);
         }
-        char_iter++;
     }
+
     return nearby_max_complexity;
 }
 

@@ -32,7 +32,7 @@
 #include "llsd.h"
 #include "llsingleton.h"
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
-#include "v4color.h"
+#include "lluicolor.h"
 
 #include <list>
 // [/SL:KB]

@@ -39,6 +39,9 @@
 #include "llui.h"
 #include "alglmath.h"
 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 void hud_render_utf8text(const std::string &str, const LLVector3 &pos_agent,
                      const LLFontGL &font,
                      const U8 style,
@@ -105,9 +108,10 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
     F32& winY = window_coordinates.mV[VY];
     F32& winZ = window_coordinates.mV[VZ];
 
-    const LLRect& world_view_rect = gViewerWindow->getWorldViewRectRaw();
+    LLRect world_view_rect = gViewerWindow->getWorldViewRectRaw();
+    glm::ivec4 viewport(world_view_rect.mLeft, world_view_rect.mBottom, world_view_rect.getWidth(), world_view_rect.getHeight());
 
-    ALGLMath::projectf(render_pos, get_current_modelview(), get_current_projection(), world_view_rect, window_coordinates);
+    glm::vec3 win_coord = glm::project(glm::make_vec3(render_pos.mV), get_current_modelview(), get_current_projection(), viewport);
 
     //fonts all render orthographically, set up projection``
     gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -119,11 +123,11 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
     gl_state_for_2d(world_view_rect.getWidth(), world_view_rect.getHeight());
     gViewerWindow->setup3DViewport();
 
-    winX -= world_view_rect.mLeft;
-    winY -= world_view_rect.mBottom;
+    win_coord.x -= world_view_rect.mLeft;
+    win_coord.y -= world_view_rect.mBottom;
     LLUI::loadIdentity();
     gGL.loadIdentity();
-    LLUI::translate((F32) winX*1.0f/LLFontGL::sScaleX, (F32) winY*1.0f/(LLFontGL::sScaleY), -(((F32) winZ*2.f)-1.f));
+    LLUI::translate((F32) win_coord.x*1.0f/LLFontGL::sScaleX, (F32) win_coord.y*1.0f/(LLFontGL::sScaleY), -(((F32) win_coord.z*2.f)-1.f));
     F32 right_x;
 
     font.render(wstr, 0, 0, 1, color, LLFontGL::LEFT, LLFontGL::BASELINE, style, shadow, static_cast<S32>(wstr.length()), 1000, &right_x, /*use_ellipses*/false, /*use_color*/true);

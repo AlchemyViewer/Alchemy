@@ -55,7 +55,6 @@
 #include "rlvhandler.h"
 #include "rlvlocks.h"
 // [/RLVa:KB]
-
 LLAgentWearables gAgentWearables;
 
 bool LLAgentWearables::mInitialWearablesUpdateReceived = false;

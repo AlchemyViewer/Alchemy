@@ -61,6 +61,7 @@
 #include "llfloatergroups.h"
 #include "llfloaterreg.h"
 #include "llfloaterregiondebugconsole.h"
+#include "llfloaterregionrestartschedule.h"
 #include "llfloatertelehub.h"
 #include "llgltfmateriallist.h"
 #include "llinventorymodel.h"
@@ -260,6 +261,7 @@ bool LLFloaterRegionInfo::postBuild()
     panel = new LLPanelRegionGeneralInfo;
     mInfoPanels.push_back(panel);
     panel->getCommitCallbackRegistrar().add("RegionInfo.ManageTelehub", boost::bind(&LLPanelRegionInfo::onClickManageTelehub, panel));
+    panel->getCommitCallbackRegistrar().add("RegionInfo.ManageRestart", boost::bind(&LLPanelRegionInfo::onClickManageRestartSchedule, panel));
     panel->buildFromFile("panel_region_general.xml");
     mTab->addTabPanel(panel);
 
@@ -267,7 +269,7 @@ bool LLFloaterRegionInfo::postBuild()
     mInfoPanels.push_back(panel);
     static LLCachedControl<bool> feature_pbr_terrain_enabled(gSavedSettings, "RenderTerrainPBREnabled", false);
     static LLCachedControl<bool> feature_pbr_terrain_transforms_enabled(gSavedSettings, "RenderTerrainPBRTransformsEnabled", false);
-    if (!feature_pbr_terrain_transforms_enabled || !feature_pbr_terrain_enabled)
+    if (!feature_pbr_terrain_transforms_enabled() || !feature_pbr_terrain_enabled())
     {
         panel->buildFromFile("panel_region_terrain.xml");
     }
@@ -519,7 +521,7 @@ void LLFloaterRegionInfo::processRegionInfo(LLMessageSystem* msg)
     panel->getChild<LLUICtrl>("object_bonus_spin")->setValue(LLSD(object_bonus_factor));
     panel->getChild<LLUICtrl>("access_combo")->setValue(LLSD(sim_access));
 
-    panel->getChild<LLSpinCtrl>("agent_limit_spin")->setMaxValue(hard_agent_limit);
+    panel->getChild<LLSpinCtrl>("agent_limit_spin")->setMaxValue((F32)hard_agent_limit);
 
     LLPanelRegionGeneralInfo* panel_general = LLFloaterRegionInfo::getPanelGeneral();
     if (panel)
@@ -863,6 +865,25 @@ void LLPanelRegionInfo::onClickManageTelehub()
     LLFloaterReg::showInstance("telehubs");
 }
 
+void LLPanelRegionInfo::onClickManageRestartSchedule()
+{
+    LLFloater* floaterp = mFloaterRestartScheduleHandle.get();
+    // Show the dialog
+    if (!floaterp)
+    {
+        floaterp = new LLFloaterRegionRestartSchedule(this);
+    }
+
+    if (floaterp->getVisible())
+    {
+        floaterp->closeFloater();
+    }
+    else
+    {
+        floaterp->openFloater();
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // LLPanelRegionGeneralInfo
 //
@@ -878,6 +899,8 @@ bool LLPanelRegionGeneralInfo::refreshFromRegion(LLViewerRegion* region)
     getChildView("kick_all_btn")->setEnabled(allow_modify);
     getChildView("im_btn")->setEnabled(allow_modify);
     getChildView("manage_telehub_btn")->setEnabled(allow_modify);
+    getChildView("manage_restart_btn")->setEnabled(allow_modify);
+    getChildView("manage_restart_btn")->setVisible(LLFloaterRegionRestartSchedule::canUse());
 
     // Data gets filled in by processRegionInfo
 
@@ -1565,7 +1588,7 @@ bool LLPanelRegionTerrainInfo::postBuild()
         {
             mTextureDetailCtrl[i]->setBakeTextureEnabled(false);
         }
-        initAndSetCtrl(mMaterialDetailCtrl[i], llformat("material_detail_%d", i));
+        initMaterialCtrl(mMaterialDetailCtrl[i], llformat("material_detail_%d", i), i);
 
         initAndSetCtrl(mMaterialScaleUCtrl[i], llformat("terrain%dScaleU", i));
         initAndSetCtrl(mMaterialScaleVCtrl[i], llformat("terrain%dScaleV", i));
@@ -1674,7 +1697,7 @@ bool LLPanelRegionTerrainInfo::refreshFromRegion(LLViewerRegion* region)
         static LLCachedControl<bool> feature_pbr_terrain_enabled(gSavedSettings, "RenderTerrainPBREnabled", false);
 
         const bool textures_ready = compp->makeTexturesReady(false, false);
-        const bool materials_ready = feature_pbr_terrain_enabled && compp->makeMaterialsReady(false, false);
+        const bool materials_ready = feature_pbr_terrain_enabled() && compp->makeMaterialsReady(false, false);
 
         bool set_texture_swatches;
         bool set_material_swatches;
@@ -1704,7 +1727,7 @@ bool LLPanelRegionTerrainInfo::refreshFromRegion(LLViewerRegion* region)
         {
             material_type_to_ctrl(mMaterialTypeCtrl, material_type);
             updateForMaterialType();
-            mMaterialTypeCtrl->setVisible(feature_pbr_terrain_enabled);
+            mMaterialTypeCtrl->setVisible(feature_pbr_terrain_enabled());
         }
 
         if (set_texture_swatches)
@@ -1918,7 +1941,7 @@ bool LLPanelRegionTerrainInfo::sendUpdate()
     // POST to ModifyRegion endpoint, if enabled
 
     static LLCachedControl<bool> feature_pbr_terrain_transforms_enabled(gSavedSettings, "RenderTerrainPBRTransformsEnabled", false);
-    if (material_type == LLTerrainMaterials::Type::PBR && feature_pbr_terrain_transforms_enabled)
+    if (material_type == LLTerrainMaterials::Type::PBR && feature_pbr_terrain_transforms_enabled())
     {
         LLTerrainMaterials composition;
         for (S32 i = 0; i < LLTerrainMaterials::ASSET_COUNT; ++i)
@@ -1935,11 +1958,11 @@ bool LLPanelRegionTerrainInfo::sendUpdate()
                 for (U32 tt = 0; tt < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++tt)
                 {
                     LLGLTFMaterial::TextureTransform& transform = mat_override->mTextureTransform[tt];
-                    transform.mScale.mV[VX] = mMaterialScaleUCtrl[i]->getValue().asReal();
-                    transform.mScale.mV[VY] = mMaterialScaleVCtrl[i]->getValue().asReal();
-                    transform.mRotation = mMaterialRotationCtrl[i]->getValue().asReal() * DEG_TO_RAD;
-                    transform.mOffset.mV[VX] = mMaterialOffsetUCtrl[i]->getValue().asReal();
-                    transform.mOffset.mV[VY] = mMaterialOffsetVCtrl[i]->getValue().asReal();
+                    transform.mScale.mV[VX] = (F32)mMaterialScaleUCtrl[i]->getValue().asReal();
+                    transform.mScale.mV[VY] = (F32)mMaterialScaleVCtrl[i]->getValue().asReal();
+                    transform.mRotation = (F32)mMaterialRotationCtrl[i]->getValue().asReal() * DEG_TO_RAD;
+                    transform.mOffset.mV[VX] = (F32)mMaterialOffsetUCtrl[i]->getValue().asReal();
+                    transform.mOffset.mV[VY] = (F32)mMaterialOffsetVCtrl[i]->getValue().asReal();
                 }
             }
 
@@ -1960,6 +1983,31 @@ bool LLPanelRegionTerrainInfo::sendUpdate()
     }
 
     return true;
+}
+
+void LLPanelRegionTerrainInfo::initMaterialCtrl(LLTextureCtrl*& ctrl, const std::string& name, S32 index)
+{
+    ctrl = findChild<LLTextureCtrl>(name, true);
+    if (!ctrl) return;
+
+    // consume cancel events, otherwise they will trigger commit callbacks
+    ctrl->setOnCancelCallback([](LLUICtrl* ctrl, const LLSD& param) {});
+    ctrl->setCommitCallback(
+        [this, index](LLUICtrl* ctrl, const LLSD& param)
+    {
+        if (!mMaterialScaleUCtrl[index]
+            || !mMaterialScaleVCtrl[index]
+            || !mMaterialRotationCtrl[index]
+            || !mMaterialOffsetUCtrl[index]
+            || !mMaterialOffsetVCtrl[index]) return;
+
+        mMaterialScaleUCtrl[index]->setValue(1.f);
+        mMaterialScaleVCtrl[index]->setValue(1.f);
+        mMaterialRotationCtrl[index]->setValue(0.f);
+        mMaterialOffsetUCtrl[index]->setValue(0.f);
+        mMaterialOffsetVCtrl[index]->setValue(0.f);
+        onChangeAnything();
+    });
 }
 
 bool LLPanelRegionTerrainInfo::callbackTextureHeights(const LLSD& notification, const LLSD& response)
@@ -2056,8 +2104,14 @@ LLPanelEstateInfo::LLPanelEstateInfo()
     mEstateID(0)    // invalid
 {
     LLEstateInfoModel& estate_info = LLEstateInfoModel::instance();
-    estate_info.setCommitCallback(boost::bind(&LLPanelEstateInfo::refreshFromEstate, this));
-    estate_info.setUpdateCallback(boost::bind(&LLPanelEstateInfo::refreshFromEstate, this));
+    mEstateInfoCommitConnection = estate_info.setCommitCallback(boost::bind(&LLPanelEstateInfo::refreshFromEstate, this));
+    mEstateInfoUpdateConnection = estate_info.setUpdateCallback(boost::bind(&LLPanelEstateInfo::refreshFromEstate, this));
+}
+
+LLPanelEstateInfo::~LLPanelEstateInfo()
+{
+    mEstateInfoCommitConnection.disconnect();
+    mEstateInfoUpdateConnection.disconnect();
 }
 
 // static
@@ -2311,7 +2365,6 @@ void LLPanelEstateInfo::refresh()
     // Disable access restriction controls if they make no sense.
     bool public_access = ("estate_public_access" == getChild<LLUICtrl>("externally_visible_radio")->getValue().asString());
 
-    getChildView("Only Allow")->setEnabled(public_access);
     getChildView("limit_payment")->setEnabled(public_access);
     getChildView("limit_age_verified")->setEnabled(public_access);
     getChildView("limit_bots")->setEnabled(public_access);
@@ -2774,6 +2827,16 @@ std::string LLPanelEstateCovenant::getEstateName() const
 void LLPanelEstateCovenant::setEstateName(const std::string& name)
 {
     mEstateNameText->setText(name);
+}
+
+// static
+void LLPanelEstateCovenant::updateCovenant(const LLTextBase* source, const LLUUID& asset_id)
+{
+    if (LLPanelEstateCovenant* panelp = LLFloaterRegionInfo::getPanelCovenant())
+    {
+        panelp->mEditor->copyContents(source);
+        panelp->setCovenantID(asset_id);
+    }
 }
 
 // static
@@ -4180,11 +4243,11 @@ bool LLPanelRegionEnvironment::postBuild()
     if (!LLPanelEnvironmentInfo::postBuild())
         return false;
 
-    getChild<LLUICtrl>(BTN_USEDEFAULT)->setLabelArg("[USEDEFAULT]", getString(STR_LABEL_USEDEFAULT));
-    getChild<LLUICtrl>(CHK_ALLOWOVERRIDE)->setVisible(true);
-    getChild<LLUICtrl>(PNL_ENVIRONMENT_ALTITUDES)->setVisible(true);
+    mBtnUseDefault->setLabelArg("[USEDEFAULT]", getString(STR_LABEL_USEDEFAULT));
+    mCheckAllowOverride->setVisible(true);
+    mPanelEnvAltitudes->setVisible(true);
 
-    getChild<LLUICtrl>(CHK_ALLOWOVERRIDE)->setCommitCallback([this](LLUICtrl *, const LLSD &value){ onChkAllowOverride(value.asBoolean()); });
+    mCheckAllowOverride->setCommitCallback([this](LLUICtrl *, const LLSD &value){ onChkAllowOverride(value.asBoolean()); });
 
     mCommitConnect = estate_info.setCommitCallback(boost::bind(&LLPanelRegionEnvironment::refreshFromEstate, this));
     return true;
@@ -4206,7 +4269,7 @@ void LLPanelRegionEnvironment::refresh()
 
     LLPanelEnvironmentInfo::refresh();
 
-    getChild<LLUICtrl>(CHK_ALLOWOVERRIDE)->setValue(mAllowOverride);
+    mCheckAllowOverride->setValue(mAllowOverride);
 }
 
 bool LLPanelRegionEnvironment::refreshFromRegion(LLViewerRegion* region)
@@ -4247,7 +4310,7 @@ void LLPanelRegionEnvironment::refreshFromSource()
     }
 
     LLEnvironment::instance().requestRegion(
-        [that_h](S32 parcel_id, LLEnvironment::EnvironmentInfo::ptr_t envifo) { _onEnvironmentReceived(that_h, parcel_id, envifo); });
+        [that_h](S32 parcel_id, LLEnvironment::EnvironmentInfo::ptr_t envifo) { onEnvironmentReceived(that_h, parcel_id, envifo); });
 
     setControlsEnabled(false);
 }
@@ -4272,7 +4335,7 @@ bool LLPanelRegionEnvironment::confirmUpdateEstateEnvironment(const LLSD& notifi
 
     case 1:
         mAllowOverride = mAllowOverrideRestore;
-        getChild<LLUICtrl>(CHK_ALLOWOVERRIDE)->setValue(mAllowOverride);
+        mCheckAllowOverride->setValue(mAllowOverride);
         break;
     default:
         break;

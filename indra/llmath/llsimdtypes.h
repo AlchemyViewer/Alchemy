@@ -33,7 +33,6 @@
 
 typedef __m128  LLQuad;
 typedef __m128i LLIQuad;
-
 class LLBool32
 {
 public:
@@ -47,7 +46,7 @@ public:
     inline operator bool() const { return static_cast<const bool&>(m_bool); }
 
 private:
-    int m_bool;
+    int m_bool{ 0 };
 };
 static_assert(std::is_trivial<LLBool32>::value, "LLBool32 must be a trivial type");
 static_assert(std::is_standard_layout<LLBool32>::value, "LLBool32 must be a standard layout type");

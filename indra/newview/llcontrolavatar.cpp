@@ -99,13 +99,11 @@ LLVOAvatar *LLControlAvatar::getAttachedAvatar()
 
 void LLControlAvatar::getNewConstraintFixups(LLVector3& new_pos_fixup, F32& new_scale_fixup) const
 {
-    static const LLCachedControl<F32> max_legal_offset_cc(gSavedSettings, "AnimatedObjectsMaxLegalOffset", MAX_LEGAL_OFFSET);
-    F32 max_legal_offset = max_legal_offset_cc;
-    max_legal_offset = llmax(max_legal_offset,0.f);
+    static LLCachedControl<F32> anim_max_legal_offset(gSavedSettings, "AnimatedObjectsMaxLegalOffset", MAX_LEGAL_OFFSET);
+    F32 max_legal_offset = llmax(anim_max_legal_offset(), 0.f);
 
-    static const LLCachedControl<F32> max_legal_size_cc(gSavedSettings, "AnimatedObjectsMaxLegalSize", MAX_LEGAL_SIZE);
-    F32 max_legal_size = max_legal_size_cc;
-    max_legal_size = llmax(max_legal_size, 1.f);
+    static LLCachedControl<F32> anim_max_legal_size(gSavedSettings, "AnimatedObjectsMaxLegalSize", MAX_LEGAL_SIZE);
+    F32 max_legal_size = llmax(anim_max_legal_size(), 1.f);
 
     new_pos_fixup = LLVector3();
     new_scale_fixup = 1.0f;
@@ -415,7 +413,7 @@ bool LLControlAvatar::updateCharacter(LLAgent &agent)
 //virtual
 void LLControlAvatar::updateDebugText()
 {
-    static const LLCachedControl<bool> debug_animated_objects(gSavedSettings, "DebugAnimatedObjects");
+    static LLCachedControl<bool> debug_animated_objects(gSavedSettings, "DebugAnimatedObjects");
     if (debug_animated_objects)
     {
         S32 total_linkset_count = 0;
@@ -704,16 +702,13 @@ bool LLControlAvatar::isImpostor()
     return LLVOAvatar::isImpostor();
 }
 
-//static
+// static
 void LLControlAvatar::onRegionChanged()
 {
-    std::vector<LLCharacter*>::iterator it = LLCharacter::sInstances.begin();
-    for ( ; it != LLCharacter::sInstances.end(); ++it)
+    for (LLCharacter* character : LLCharacter::sInstances)
     {
-        auto avatar = static_cast<LLVOAvatar*>(*it);
-        if (!avatar->isDead() && avatar->isControlAvatar())
+        if (LLControlAvatar* cav = dynamic_cast<LLControlAvatar*>(character))
         {
-            LLControlAvatar* cav = static_cast<LLControlAvatar*>(avatar);
             cav->mRegionChanged = true;
         }
     }

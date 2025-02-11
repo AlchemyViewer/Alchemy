@@ -459,9 +459,7 @@ void LLVOTree::updateTextures()
         {
             setDebugText(llformat("%4.0f", (F32) sqrt(mPixelArea)));
         }
-        mTreeImagep->addTextureStats(mPixelArea);
     }
-
 }
 
 
@@ -477,7 +475,7 @@ LLDrawable* LLVOTree::createDrawable(LLPipeline *pipeline)
     // Just a placeholder for an actual object...
     LLFace *facep = mDrawable->addFace(poolp, mTreeImagep);
     facep->setSize(1, 3);
-
+    facep->setTexture(LLRender::DIFFUSE_MAP, mTreeImagep);
     updateRadius();
 
     return mDrawable;
@@ -1044,12 +1042,15 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector4a>& vertices,
                 llassert(sLODIndexCount[trunk_LOD] > 0);
                 width = scale * length * aspect;
 
-                LLMatrix4a scale_mat = matrix;
-                scale_mat.applyScale_affine(width,width,scale*length);
+                LLMatrix4 scale_mat;
+                scale_mat.mMatrix[0][0] = width;
+                scale_mat.mMatrix[1][1] = width;
+                scale_mat.mMatrix[2][2] = scale*length;
+                scale_mat *= matrix;
 
-                LLMatrix4a norm_mat = scale_mat;
-                norm_mat.invert();
-                norm_mat.transpose();
+                glm::mat4 norm(glm::make_mat4((F32*) scale_mat.mMatrix));
+                LLMatrix4 norm_mat = LLMatrix4(glm::value_ptr(glm::transpose(glm::inverse(norm))));
+
 
                 appendMesh(vertices, normals, tex_coords, colors, indices, index_offset, scale_mat, norm_mat,
                             sLODVertexOffset[trunk_LOD], sLODVertexCount[trunk_LOD], sLODIndexCount[trunk_LOD], sLODIndexOffset[trunk_LOD]);
@@ -1090,12 +1091,15 @@ void LLVOTree::genBranchPipeline(LLStrider<LLVector4a>& vertices,
             //  Append leaves as two 90 deg crossed quads with leaf textures
             //
             {
-                LLMatrix4a scale_mat = matrix;
-                scale_mat.applyScale_affine(scale*mLeafScale);
+                LLMatrix4 scale_mat;
+                scale_mat.mMatrix[0][0] =
+                    scale_mat.mMatrix[1][1] =
+                    scale_mat.mMatrix[2][2] = scale*mLeafScale;
 
-                LLMatrix4a norm_mat = scale_mat;
-                norm_mat.invert();
-                norm_mat.transpose();
+                scale_mat *= matrix;
+
+                glm::mat4 norm(glm::make_mat4((F32*)scale_mat.mMatrix));
+                LLMatrix4 norm_mat = LLMatrix4(glm::value_ptr(glm::transpose(glm::inverse(norm))));
 
                 appendMesh(vertices, normals, tex_coords, colors, indices, index_offset, scale_mat, norm_mat, 0, LEAF_VERTICES, LEAF_INDICES, 0);
             }
@@ -1164,6 +1168,16 @@ void LLVOTree::updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
     LLVector4a pos;
     pos.load3(center.mV);
     mDrawable->setPositionGroup(pos);
+
+    if (mDrawable->getNumFaces() > 0)
+    {
+        LLFace* facep = mDrawable->getFace(0);
+        if (facep)
+        {
+            facep->mExtents[0] = newMin;
+            facep->mExtents[1] = newMax;
+        }
+    }
 }
 
 bool LLVOTree::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end, S32 face, bool pick_transparent, bool pick_rigged, bool pick_unselectable, S32 *face_hitp,

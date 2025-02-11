@@ -292,6 +292,15 @@ bool    LLFloaterTools::postBuild()
     // the setting stores the actual force multiplier, but the slider is logarithmic, so we convert here
     getChild<LLUICtrl>("slider force")->setValue(log10(gSavedSettings.getF32("LandBrushForce")));
 
+    mTextBulldozer = getChild<LLTextBox>("Bulldozer:");
+    mTextDozerSize = getChild<LLTextBox>("Dozer Size:");
+    mTextDozerStrength = getChild<LLTextBox>("Strength:");
+    mSliderZoom = getChild<LLSlider>("slider zoom");
+
+    mTextSelectionCount = getChild<LLTextBox>("selection_count");
+    mTextSelectionEmpty = getChild<LLTextBox>("selection_empty");
+    mTextSelectionFaces = getChild<LLTextBox>("selection_faces");
+
     mCostTextBorder = getChild<LLViewBorder>("cost_text_border");
 
     mTab = getChild<LLTabContainer>("Object Info Tabs");
@@ -530,11 +539,11 @@ void LLFloaterTools::refresh()
     if (!gMeshRepo.meshRezEnabled())
     {
         std::string obj_count_string;
-        LLResMgr::getIntegerString(obj_count_string, LLSelectMgr::getInstance()->getSelection()->getRootObjectCount());
-        getChild<LLUICtrl>("selection_count")->setTextArg("[OBJ_COUNT]", obj_count_string);
+        LLResMgr::getInstance()->getIntegerString(obj_count_string, LLSelectMgr::getInstance()->getSelection()->getRootObjectCount());
+        mTextSelectionCount->setTextArg("[OBJ_COUNT]", obj_count_string);
         std::string prim_count_string;
-        LLResMgr::getIntegerString(prim_count_string, LLSelectMgr::getInstance()->getSelection()->getObjectCount());
-        getChild<LLUICtrl>("selection_count")->setTextArg("[PRIM_COUNT]", prim_count_string);
+        LLResMgr::getInstance()->getIntegerString(prim_count_string, LLSelectMgr::getInstance()->getSelection()->getObjectCount());
+        mTextSelectionCount->setTextArg("[PRIM_COUNT]", prim_count_string);
 
         // calculate selection rendering cost
         if (sShowObjectCost)
@@ -586,7 +595,6 @@ void LLFloaterTools::refresh()
             const LLStringExplicit empty_str("");
             childSetTextArg("remaining_capacity", "[CAPACITY_STRING]", empty_str);
         }
-
         //if (object_count == 1)
         //{
         //    // "selection_faces" shouldn't be visible if not LLToolFace::getInstance()
@@ -626,11 +634,7 @@ void LLFloaterTools::refresh()
         selection_args["OBJ_COUNT"] = llformat("%.1d", link_count);
         selection_args["LAND_IMPACT"] = llformat("%.1d", (S32)link_cost);
 
-        std::ostringstream selection_info;
-
-        selection_info << getString("status_selectcount", selection_args);
-
-        getChild<LLTextBox>("selection_count")->setText(selection_info.str());
+        mTextSelectionCount->setText(getString("status_selectcount", selection_args));
     }
 
     // disable the object and prim counts if nothing selected
@@ -714,8 +718,9 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
     mBtnFocus   ->setToggleState( focus_visible );
 
     mRadioGroupFocus->setVisible( focus_visible );
-    getChildView("slider zoom")->setVisible( focus_visible);
-    getChildView("slider zoom")->setEnabled(gCameraBtnZoom);
+
+    mSliderZoom->setVisible( focus_visible);
+    mSliderZoom->setEnabled(gCameraBtnZoom);
 
     if (!gCameraBtnOrbit &&
         !gCameraBtnPan &&
@@ -740,7 +745,7 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
     }
 
     // multiply by correction factor because volume sliders go [0, 0.5]
-    getChild<LLUICtrl>("slider zoom")->setValue(gAgentCamera.getCameraZoomFraction() * 0.5f);
+    mSliderZoom->setValue(gAgentCamera.getCameraZoomFraction() * 0.5f);
 
     // Move buttons
     bool move_visible = (tool == LLToolGrab::getInstance());
@@ -947,14 +952,14 @@ void LLFloaterTools::updatePopup(LLCoordGL center, MASK mask)
     }
     if (mSliderDozerSize)
     {
-        mSliderDozerSize    ->setVisible( land_visible );
-        getChildView("Bulldozer:")->setVisible( land_visible);
-        getChildView("Dozer Size:")->setVisible( land_visible);
+        mSliderDozerSize->setVisible( land_visible );
+        mTextBulldozer->setVisible( land_visible);
+        mTextDozerSize->setVisible( land_visible);
     }
     if (mSliderDozerForce)
     {
-        mSliderDozerForce   ->setVisible( land_visible );
-        getChildView("Strength:")->setVisible( land_visible);
+        mSliderDozerForce->setVisible( land_visible );
+        mTextDozerStrength->setVisible( land_visible);
     }
 
     bool have_selection = !LLSelectMgr::getInstance()->getSelection()->isEmpty();

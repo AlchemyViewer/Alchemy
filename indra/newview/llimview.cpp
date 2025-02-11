@@ -386,8 +386,10 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
     // 4. Toast
     if ((("toast" == user_preferences) &&
         (ON_TOP_AND_ITEM_IS_SELECTED != conversations_floater_status) &&
-        (!session_floater->isTornOff() || !LLFloater::isVisible(session_floater)))
-                || !session_floater->isMessagePaneExpanded())
+        (!session_floater->isTornOff()
+         || session_floater->isMinimized()
+         || !LLFloater::isVisible(session_floater)))
+         || !session_floater->isMessagePaneExpanded())
 
     {
         //Show IM toasts (upper right toasts)
@@ -402,10 +404,10 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
                 }
                 else
                 {
-            LLAvatarNameCache::get(participant_id, boost::bind(&on_avatar_name_cache_toast, _1, _2, msg));
+                    LLAvatarNameCache::get(participant_id, boost::bind(&on_avatar_name_cache_toast, _1, _2, msg));
+                }
+            }
         }
-    }
-}
     }
     if (store_dnd_message)
     {
@@ -808,7 +810,6 @@ LLIMModel::LLIMSession::LLIMSession(const LLUUID& session_id,
 
 void LLIMModel::LLIMSession::initVoiceChannel(const LLSD& voiceChannelInfo)
 {
-
     if (mVoiceChannel)
     {
         if (mVoiceChannel->isThisVoiceChannel(voiceChannelInfo))
@@ -2378,7 +2379,7 @@ LLCallDialogManager::~LLCallDialogManager()
 
 void LLCallDialogManager::initSingleton()
 {
-    LLVoiceChannel::setCurrentVoiceChannelChangedCallback(LLCallDialogManager::onVoiceChannelChanged);
+    mVoiceChannelChanged = LLVoiceChannel::setCurrentVoiceChannelChangedCallback(LLCallDialogManager::onVoiceChannelChanged);
 }
 
 // static
@@ -4296,11 +4297,16 @@ public:
         }
         if (input["body"]["info"].has("voice_channel_info"))
         {
+            // new voice channel info incoming, update and re-activate call
+            // if currently in a call.
             LLIMModel::LLIMSession* session = LLIMModel::getInstance()->findIMSession(session_id);
             if (session)
             {
-                session->initVoiceChannel(input["body"]["info"]["voice_channel_info"]);
-                session->mVoiceChannel->activate();
+                if (session->mVoiceChannel && session->mVoiceChannel->callStarted())
+                {
+                    session->initVoiceChannel(input["body"]["info"]["voice_channel_info"]);
+                    session->mVoiceChannel->activate();
+                }
             }
         }
     }
@@ -4406,7 +4412,7 @@ public:
                 message_params["region_id"].asUUID(),
                 ll_vector3_from_sd(message_params["position"]),
                 false,      // is_region_message
-                timestamp);
+                (U32)timestamp);
 
             if (LLMuteList::getInstance()->isMuted(from_id, name, LLMute::flagTextChat))
             {

@@ -66,6 +66,7 @@ bool LLFloaterSettingsDebug::postBuild()
     mDefaultButton = getChild<LLUICtrl>("default_btn");
     mSettingNameText = getChild<LLTextBox>("setting_name_txt");
 
+
     mComment = getChild<LLTextEditor>("comment_text");
 
     getChild<LLFilterEditor>("filter_input")->setCommitCallback(boost::bind(&LLFloaterSettingsDebug::setSearchFilter, this, _2));
@@ -350,7 +351,7 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
             }
             if (!mValSpinner3->hasFocus())
             {
-                mValSpinner3->setPrecision(4);
+                mValSpinner3->setPrecision(3);
                 mValSpinner3->setValue(v[VZ]);
             }
             break;

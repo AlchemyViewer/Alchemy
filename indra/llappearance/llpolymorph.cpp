@@ -560,7 +560,7 @@ void LLPolyMorphTarget::apply( ESex avatar_sex )
     }
     if (mLastWeight != mLastWeight)
     {
-        mLastWeight = mCurWeight+0.001f;
+        mLastWeight = mCurWeight+.001f;
     }
 
     // perform differential update of morph

@@ -398,7 +398,7 @@ bool LLGoogleTranslationHandler::parseResponse(
 {
     const std::string& text = !body.empty() ? body : http_response["error_body"].asStringRef();
 
-    boost::json::error_code ec;
+    boost::system::error_code ec;
     boost::json::value root = boost::json::parse(text, ec);
     if (ec.failed())
     {

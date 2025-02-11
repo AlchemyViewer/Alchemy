@@ -116,7 +116,6 @@ public:
     void        initInstance() override; // Called after construction to initialize the class.
 protected:
     virtual             ~LLVOAvatar();
-    static bool         handleVOAvatarPrefsChanged(const LLSD &newvalue);
 
 /**                    Initialization
  **                                                                            **
@@ -134,17 +133,18 @@ public:
     /*virtual*/ void            updateGL() override;
     /*virtual*/ LLVOAvatar*     asAvatar() override;
 
-    virtual U32             processUpdateMessage(LLMessageSystem *mesgsys,
+    virtual U32                 processUpdateMessage(LLMessageSystem *mesgsys,
                                                      void **user_data,
                                                      U32 block_num,
                                                      const EObjectUpdateType update_type,
                                                      LLDataPacker *dp) override;
     virtual void            idleUpdate(LLAgent &agent, const F64 &time) override;
     /*virtual*/ bool            updateLOD() override;
-    bool                    updateJointLODs();
-    void                    updateLODRiggedAttachments( void );
-    /*virtual*/ bool            isActive() const override; // Whether this object needs to do an idleUpdate.
-    S32Bytes                totalTextureMemForUUIDS(std::set<LLUUID>& ids);
+    bool                        updateJointLODs();
+    void                        updateLODRiggedAttachments(void);
+    void                        setCorrectedPixelArea(F32 area);
+    /*virtual*/ bool            isActive() const; // Whether this object needs to do an idleUpdate.
+    S32Bytes                    totalTextureMemForUUIDS(std::set<LLUUID>& ids);
     bool                        allTexturesCompletelyDownloaded(std::set<LLUUID>& ids) const;
     bool                        allLocalTexturesCompletelyDownloaded() const;
     bool                        allBakedTexturesCompletelyDownloaded() const;
@@ -231,13 +231,9 @@ public:
     void                    getAssociatedVolumes(std::vector<LLVOVolume*>& volumes);
 
     // virtual
-    void                    updateRiggingInfo() override;
-
-    size_t mLastAssocVolSize = 0;
+    void                    updateRiggingInfo();
     // This encodes mesh id and LOD, so we can see whether display is up-to-date.
-    using rigging_info_hash_vec_t = std::vector<std::pair<LLUUID, S32>>;
-    size_t mLastRiggingInfoKeyHash = 0;
-    size_t mLastRiggingInfoMeshCount = 0;
+    size_t    mLastRiggingInfoKey;
 
     std::set<LLUUID>        mActiveOverrideMeshes;
     void            onActiveOverrideMeshesChanged();
@@ -381,7 +377,6 @@ public:
     static F32      sLODFactor; // user-settable LOD factor
     static F32      sPhysicsLODFactor; // user-settable physics LOD factor
     static bool     sJointDebug; // output total number of joints being touched for each avatar
-    static bool     sLipSyncEnabled;
 
     static LLPointer<LLViewerTexture>  sCloudTexture;
 
@@ -435,7 +430,7 @@ protected:
     bool            updateIsFullyLoaded();
     bool            processFullyLoadedChange(bool loading);
     void            updateRuthTimer(bool loading);
-    F32             calcMorphAmount();
+    F32             calcMorphAmount() const;
 
 private:
     bool            mFirstFullyVisible;
@@ -641,6 +636,7 @@ public:
 protected:
     void        updateVisibility();
 private:
+    F32         mVisibilityPreference;
     U32         mVisibilityRank;
     bool        mVisible;
 

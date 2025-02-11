@@ -17,6 +17,8 @@ if (WINDOWS)
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libvorbis.lib
         optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libvorbisfile.lib
         debug ${ARCH_PREBUILT_DIRS_DEBUG}/libvorbisfile.lib
+        optimized ${ARCH_PREBUILT_DIRS_RELEASE}/libvorbis.lib
+        debug ${ARCH_PREBUILT_DIRS_DEBUG}/libvorbis.lib
     )
 else (WINDOWS)
   target_link_libraries(ll::vorbis INTERFACE

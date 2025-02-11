@@ -59,10 +59,10 @@ LLPointer<LLInventoryItem> create_random_inventory_item()
     perm.initMasks(PERM_ALL, PERM_ALL, PERM_COPY, PERM_COPY, PERM_MODIFY | PERM_COPY);
     LLUUID asset_id;
     asset_id.generate();
-    S32 price = ll_rand();
+    S32 price = rand();
     LLSaleInfo sale_info(LLSaleInfo::FS_COPY, price);
-    U32 flags = ll_rand();
-    S32 creation = time(NULL);
+    U32 flags = rand();
+    S32 creation = (S32)time(NULL);
 
     LLPointer<LLInventoryItem> item = new LLInventoryItem(
         item_id,
@@ -195,8 +195,8 @@ namespace tut
         LLSaleInfo new_sale_info(LLSaleInfo::FS_COPY, new_price);
         src->setSaleInfo(new_sale_info);
 
-        U32 new_flags = ll_rand();
-        S32 new_creation = time(NULL);
+        U32 new_flags = rand();
+        S32 new_creation = (S32)time(NULL);
 
         LLPermissions new_perm;
 
@@ -266,8 +266,8 @@ namespace tut
         LLSaleInfo new_sale_info(LLSaleInfo::FS_COPY, new_price);
         src->setSaleInfo(new_sale_info);
 
-        U32 new_flags = ll_rand();
-        S32 new_creation = time(NULL);
+        U32 new_flags = rand();
+        S32 new_creation = (S32)time(NULL);
 
         LLPermissions new_perm;
 

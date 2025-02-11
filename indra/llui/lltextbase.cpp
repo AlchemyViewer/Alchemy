@@ -437,8 +437,8 @@ std::vector<LLRect> LLTextBase::getSelectionRects(const highlight_list_t& highli
 
                 // Use F32 otherwise a string of multiple segments
                 // will accumulate a large error
-                F32 left_precise = line_iter->mRect.mLeft;
-                F32 right_precise = line_iter->mRect.mLeft;
+            F32 left_precise = (F32)line_iter->mRect.mLeft;
+            F32 right_precise = (F32)line_iter->mRect.mLeft;
 
                 for (; segment_iter != mSegments.end(); ++segment_iter, segment_offset = 0)
                 {
@@ -484,8 +484,8 @@ std::vector<LLRect> LLTextBase::getSelectionRects(const highlight_list_t& highli
                 }
 
                 LLRect selection_rect;
-                selection_rect.mLeft = left_precise;
-                selection_rect.mRight = right_precise;
+            selection_rect.mLeft = (S32)left_precise;
+            selection_rect.mRight = (S32)right_precise;
                 selection_rect.mBottom = line_iter->mRect.mBottom;
                 selection_rect.mTop = line_iter->mRect.mTop;
 
@@ -638,13 +638,12 @@ void LLTextBase::drawCursor()
 
             gl_rect_2d(cursor_rect);
 
-            if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode() && !hasSelection() && wtext[mCursorPos] != '\n')
+            if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode() && !hasSelection() && text[mCursorPos] != '\n')
             {
-                LLColor4 text_color;
                 const LLFontGL* fontp;
-                text_color = segmentp->getColor();
+                const LLColor4& text_color = segmentp->getColor();
                 fontp = segmentp->getStyle()->getFont();
-                fontp->render(wtext, mCursorPos, cursor_rect,
+                fontp->render(text, mCursorPos, cursor_rect,
                     LLColor4(1.f - text_color.mV[VRED], 1.f - text_color.mV[VGREEN], 1.f - text_color.mV[VBLUE], alpha),
                     LLFontGL::LEFT, mTextVAlign,
                     LLFontGL::NORMAL,
@@ -654,7 +653,7 @@ void LLTextBase::drawCursor()
 
             // Make sure the IME is in the right place
             LLRect screen_pos = calcScreenRect();
-            LLCoordGL ime_pos( screen_pos.mLeft + llfloor(cursor_rect.mLeft), screen_pos.mBottom + llfloor(cursor_rect.mTop) );
+            LLCoordGL ime_pos( screen_pos.mLeft + cursor_rect.mLeft, screen_pos.mBottom + cursor_rect.mTop );
 
             ime_pos.mX = (S32) (ime_pos.mX * LLUI::getScaleFactor().mV[VX]);
             ime_pos.mY = (S32) (ime_pos.mY * LLUI::getScaleFactor().mV[VY]);
@@ -810,9 +809,9 @@ void LLTextBase::drawText(const std::pair<S32, S32>& line_range)
             line_end = next_start;
         }
 
-        LLRectf text_rect(line.mRect.mLeft, line.mRect.mTop, line.mRect.mRight, line.mRect.mBottom);
-        text_rect.mRight = mDocumentView->getRect().getWidth(); // clamp right edge to document extents
-        text_rect.translate(mDocumentView->getRect().mLeft, mDocumentView->getRect().mBottom); // adjust by scroll position
+        LLRectf text_rect((F32)line.mRect.mLeft, (F32)line.mRect.mTop, (F32)line.mRect.mRight, (F32)line.mRect.mBottom);
+        text_rect.mRight = (F32)mDocumentView->getRect().getWidth(); // clamp right edge to document extents
+        text_rect.translate((F32)mDocumentView->getRect().mLeft, (F32)mDocumentView->getRect().mBottom); // adjust by scroll position
 
         // draw a single line of text
         S32 seg_start = line_start;
@@ -857,13 +856,13 @@ void LLTextBase::drawText(const std::pair<S32, S32>& line_range)
                 S32 squiggle_start = 0, squiggle_end = 0, pony = 0;
                 cur_segment->getDimensions(seg_start - cur_segment->getStart(), misspell_start - seg_start, squiggle_start, pony);
                 cur_segment->getDimensions(misspell_start - cur_segment->getStart(), misspell_end - misspell_start, squiggle_end, pony);
-                squiggle_start += text_rect.mLeft;
+                squiggle_start += (S32)text_rect.mLeft;
 
                 pony = (squiggle_end + 3) / 6;
                 squiggle_start += squiggle_end / 2 - pony * 3;
                 squiggle_end = squiggle_start + pony * 6;
 
-                S32 squiggle_bottom = text_rect.mBottom + (S32)cur_segment->getStyle()->getFont()->getDescenderHeight();
+                S32 squiggle_bottom = (S32)text_rect.mBottom + (S32)cur_segment->getStyle()->getFont()->getDescenderHeight();
 
                 gGL.color4ub(255, 0, 0, 200);
                 while (squiggle_start + 1 < squiggle_end)
@@ -1006,7 +1005,6 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
 
 S32 LLTextBase::removeStringNoUndo(S32 pos, S32 length)
 {
-
     beforeValueChange();
     segment_set_t::iterator seg_iter = getSegIterContaining(pos);
     while(seg_iter != mSegments.end())
@@ -1383,6 +1381,7 @@ void LLTextBase::reshape(S32 width, S32 height, bool called_from_parent)
 //virtual
 void LLTextBase::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // reflow if needed, on demand
     reflow();
 
@@ -1426,7 +1425,7 @@ void LLTextBase::draw()
         {
             bg_rect.intersectWith(text_rect);
         }
-        LLColor4 bg_color = mReadOnly
+        const LLColor4& bg_color = mReadOnly
                             ? mReadOnlyBgColor.get()
                             : hasFocus()
                                 ? mFocusBgColor.get()
@@ -1437,7 +1436,7 @@ void LLTextBase::draw()
     // Draw highlighted if needed
     if( ll::ui::SearchableControl::getHighlighted() )
     {
-        LLColor4 bg_color = ll::ui::SearchableControl::getHighlightColor();
+        const LLColor4& bg_color = ll::ui::SearchableControl::getHighlightColor();
         LLRect bg_rect = mVisibleTextRect;
         if( mScroller )
             bg_rect.intersectWith( text_rect );
@@ -1476,14 +1475,14 @@ void LLTextBase::draw()
 
 
 //virtual
-void LLTextBase::setColor( const LLColor4& c )
+void LLTextBase::setColor( const LLUIColor& c )
 {
     mFgColor = c;
     mStyleDirty = true;
 }
 
 //virtual
-void LLTextBase::setReadOnlyColor(const LLColor4 &c)
+void LLTextBase::setReadOnlyColor(const LLUIColor &c)
 {
     mReadOnlyFgColor = c;
     mStyleDirty = true;
@@ -1738,7 +1737,7 @@ void LLTextBase::reflow()
         segment_set_t::iterator seg_iter = mSegments.begin();
         S32 seg_offset = 0;
         S32 line_start_index = 0;
-        const F32 text_available_width = mVisibleTextRect.getWidth() - mHPad;  // reserve room for margin
+        const F32 text_available_width = (F32)(mVisibleTextRect.getWidth() - mHPad);  // reserve room for margin
         F32 remaining_pixels = text_available_width;
         S32 line_count = 0;
 
@@ -1963,7 +1962,7 @@ S32 LLTextBase::getLineNumFromDocIndex( S32 doc_index, bool include_wordwrap) co
         line_list_t::const_iterator iter = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), doc_index, line_end_compare());
         if (include_wordwrap)
         {
-            return iter - mLineInfoList.begin();
+            return (S32)(iter - mLineInfoList.begin());
         }
         else
         {
@@ -2000,7 +1999,7 @@ S32 LLTextBase::getFirstVisibleLine() const
     // binary search for line that starts before top of visible buffer
     line_list_t::const_iterator iter = std::lower_bound(mLineInfoList.begin(), mLineInfoList.end(), visible_region.mTop, compare_bottom());
 
-    return iter - mLineInfoList.begin();
+    return (S32)(iter - mLineInfoList.begin());
 }
 
 std::pair<S32, S32> LLTextBase::getVisibleLines(bool require_fully_visible)
@@ -2022,7 +2021,7 @@ std::pair<S32, S32> LLTextBase::getVisibleLines(bool require_fully_visible)
         first_iter = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), visible_region.mTop, compare_bottom());
         last_iter = std::lower_bound(mLineInfoList.begin(), mLineInfoList.end(), visible_region.mBottom, compare_top());
     }
-    return std::pair<S32, S32>(first_iter - mLineInfoList.begin(), last_iter - mLineInfoList.begin());
+    return std::pair<S32, S32>((S32)(first_iter - mLineInfoList.begin()), (S32)(last_iter - mLineInfoList.begin()));
 }
 
 
@@ -2286,8 +2285,8 @@ static LLUIImagePtr image_from_icon_name(const std::string& icon_name)
 void LLTextBase::appendTextImpl(const std::string &new_text, const LLStyle::Params& input_params)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    LLStyle::Params style_params(input_params);
-    style_params.fillFrom(getStyleParams());
+    LLStyle::Params style_params(getStyleParams());
+    style_params.overwriteFrom(input_params);
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
     const LLHighlightEntry* pEntry = NULL;
@@ -2484,6 +2483,34 @@ S32 LLTextBase::removeFirstLine()
     return 0;
 }
 
+// virtual
+void LLTextBase::copyContents(const LLTextBase* source)
+{
+    llassert(source);
+    if (!source)
+        return;
+
+    beforeValueChange();
+    deselect();
+
+    mSegments.clear();
+    for (const LLTextSegmentPtr& segp : source->mSegments)
+    {
+        mSegments.emplace(segp->clone(*this));
+    }
+
+    mLineInfoList.clear();
+    for (const line_info& li : mLineInfoList)
+    {
+        mLineInfoList.push_back(line_info(li));
+    }
+
+    getViewModel()->setDisplay(source->getViewModel()->getDisplay());
+
+    onValueChange(0, getLength());
+    needsReflow();
+}
+
 void LLTextBase::appendLineBreakSegment(const LLStyle::Params& style_params)
 {
     segment_vec_t segments;
@@ -2533,17 +2560,17 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
     {
         LLStyle::Params highlight_params(style_params);
 
-//      LLSD pieces = LLTextParser::instance().parsePartialLineHighlights(new_text, highlight_params.color(), (LLTextParser::EHighlightPosition)highlight_part);
+//      auto pieces = LLTextParser::instance().parsePartialLineHighlights(new_text, highlight_params.color, (LLTextParser::EHighlightPosition)highlight_part);
 //      for (S32 i = 0; i < pieces.size(); i++)
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
         LLTextParser::partial_results_t results = LLTextParser::instance().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
         for (LLTextParser::partial_results_t::const_iterator itResult = results.begin(); itResult != results.end(); ++itResult)
 // [/SL:KB]
         {
-//          LLSD color_llsd = pieces[i]["color"];
+            const auto& piece_pair = pieces[i];
 //          LLColor4 lcolor;
 //          lcolor.setValue(color_llsd);
-//          highlight_params.color = lcolor;
+            highlight_params.color = piece_pair.second;
 //
 //          LLWString wide_text;
 //          wide_text = utf8str_to_wstring(pieces[i]["text"].asString());
@@ -2726,6 +2753,11 @@ const LLWString& LLTextBase::getWText() const
     return getViewModel()->getDisplay();
 }
 
+S32 LLTextBase::getTextGeneration() const
+{
+    return getViewModel()->getDisplayGeneration();
+}
+
 // If round is true, if the position is on the right half of a character, the cursor
 // will be put to its right.  If round is false, the cursor will always be put to the
 // character's left.
@@ -2745,7 +2777,7 @@ S32 LLTextBase::getDocIndexFromLocalCoord( S32 local_x, S32 local_y, bool round,
     }
 
     S32 pos = getLength();
-    F32 start_x = line_iter->mRect.mLeft + doc_rect.mLeft;
+    F32 start_x = (F32)(line_iter->mRect.mLeft + doc_rect.mLeft);
 
     segment_set_t::iterator line_seg_iter;
     S32 line_seg_offset;
@@ -2763,7 +2795,7 @@ S32 LLTextBase::getDocIndexFromLocalCoord( S32 local_x, S32 local_y, bool round,
 
         if(newline)
         {
-            pos = segment_line_start + segmentp->getOffset(local_x - start_x, line_seg_offset, segment_line_length, round);
+            pos = segment_line_start + segmentp->getOffset(local_x - (S32)start_x, line_seg_offset, segment_line_length, round);
             break;
         }
 
@@ -2793,7 +2825,7 @@ S32 LLTextBase::getDocIndexFromLocalCoord( S32 local_x, S32 local_y, bool round,
             }
             else
             {
-                offset = segmentp->getOffset(local_x - start_x, line_seg_offset, segment_line_length, round);
+                offset = segmentp->getOffset(local_x - (S32)start_x, line_seg_offset, segment_line_length, round);
             }
             pos = segment_line_start + offset;
             break;
@@ -2840,7 +2872,7 @@ LLRect LLTextBase::getDocRectFromDocIndex(S32 pos) const
     getSegmentAndOffset(line_iter->mDocIndexStart, &line_seg_iter, &line_seg_offset);
     getSegmentAndOffset(pos, &cursor_seg_iter, &cursor_seg_offset);
 
-    F32 doc_left_precise = line_iter->mRect.mLeft;
+    F32 doc_left_precise = (F32)line_iter->mRect.mLeft;
 
     while(line_seg_iter != mSegments.end())
     {
@@ -2871,7 +2903,7 @@ LLRect LLTextBase::getDocRectFromDocIndex(S32 pos) const
     }
 
     LLRect doc_rect;
-    doc_rect.mLeft = doc_left_precise;
+    doc_rect.mLeft = (S32)doc_left_precise;
     doc_rect.mBottom = line_iter->mRect.mBottom;
     doc_rect.mTop = line_iter->mRect.mTop;
 
@@ -3446,6 +3478,24 @@ boost::signals2::connection LLTextBase::setIsObjectBlockedCallback(const is_bloc
 //
 // LLTextSegment
 //
+// static
+LLStyleSP LLTextSegment::cloneStyle(LLTextBase& target, const LLStyle* source)
+{
+    // Take most params from target
+    LLStyle::Params params = target.getStyleParams();
+    LLStyle* style = new LLStyle(params);
+
+    // Take some params from source
+    style->setLinkHREF(source->getLinkHREF());
+    if (source->isImage())
+    {
+        style->setImage(source->getImage()->getName());
+    }
+
+    return style;
+}
+
+
 bool LLTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const { width = 0; height = 0; return false; }
 bool LLTextSegment::getDimensions(S32 first_char, S32 num_chars, S32& width, S32& height) const
 {
@@ -3462,8 +3512,8 @@ F32 LLTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 selection_e
 bool LLTextSegment::canEdit() const { return false; }
 void LLTextSegment::unlinkFromDocument(LLTextBase*) {}
 void LLTextSegment::linkToDocument(LLTextBase*) {}
-const LLColor4& LLTextSegment::getColor() const { return LLColor4::white; }
-//void LLTextSegment::setColor(const LLColor4 &color) {}
+const LLUIColor& LLTextSegment::getColor() const { static const LLUIColor white = LLUIColorTable::instance().getColor("White", LLColor4::white); return white; }
+//void LLTextSegment::setColor(const LLUIColor &color) {}
 LLStyleConstSP LLTextSegment::getStyle() const {static LLStyleConstSP sp(new LLStyle()); return sp; }
 void LLTextSegment::setStyle(LLStyleConstSP style) {}
 void LLTextSegment::setToken( LLKeywordToken* token ) {}
@@ -3498,7 +3548,8 @@ LLNormalTextSegment::LLNormalTextSegment( LLStyleConstSP style, S32 start, S32 e
 :   LLTextSegment(start, end),
     mStyle( style ),
     mToken(NULL),
-    mEditor(editor)
+    mEditor(editor),
+    mLastGeneration(-1)
 {
     mFontHeight = mStyle->getFont()->getLineHeight();
 
@@ -3509,10 +3560,11 @@ LLNormalTextSegment::LLNormalTextSegment( LLStyleConstSP style, S32 start, S32 e
     }
 }
 
-LLNormalTextSegment::LLNormalTextSegment( const LLColor4& color, S32 start, S32 end, LLTextBase& editor, bool is_visible)
+LLNormalTextSegment::LLNormalTextSegment( const LLUIColor& color, S32 start, S32 end, LLTextBase& editor, bool is_visible)
 :   LLTextSegment(start, end),
     mToken(NULL),
-    mEditor(editor)
+    mEditor(editor),
+    mLastGeneration(-1)
 {
     mStyle = new LLStyle(LLStyle::Params().visible(is_visible).color(color));
 
@@ -3531,25 +3583,41 @@ F32 LLNormalTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 selec
     {
         return drawClippedSegment( getStart() + start, getStart() + end, selection_start, selection_end, draw_rect);
     }
+    else
+    {
+        mFontBufferPreSelection.reset();
+        mFontBufferSelection.reset();
+        mFontBufferPostSelection.reset();
+    }
     return draw_rect.mLeft;
 }
 
 // Draws a single text segment, reversing the color for selection if needed.
 F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 selection_start, S32 selection_end, LLRectf rect)
 {
-    F32 alpha = LLViewDrawContext::getCurrentContext().mAlpha;
-
-    const LLWString &text = getWText();
-
     F32 right_x = rect.mLeft;
     if (!mStyle->isVisible())
     {
         return right_x;
     }
 
-    const LLFontGL* font = mStyle->getFont();
+    F32 alpha = LLViewDrawContext::getCurrentContext().mAlpha;
 
-    LLColor4 color = (mEditor.getReadOnly() ? mStyle->getReadOnlyColor() : mStyle->getColor())  % alpha;
+    const LLWString& text = getWText();
+    S32 text_gen = mEditor.getTextGeneration();
+
+    if (text_gen != mLastGeneration)
+    {
+        mLastGeneration = text_gen;
+
+        mFontBufferPreSelection.reset();
+        mFontBufferSelection.reset();
+        mFontBufferPostSelection.reset();
+    }
+
+    const LLFontGL* font = mStyle->getFont();
+    LLColor4 color = (mEditor.getReadOnly() ? mStyle->getReadOnlyColor() : mStyle->getColor())  % (alpha * mStyle->getAlpha());
+    bool use_font_buffers = useFontBuffers();
 
     if( selection_start > seg_start )
     {
@@ -3557,16 +3625,40 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
         S32 start = seg_start;
         S32 end = llmin( selection_start, seg_end );
         S32 length =  end - start;
-        font->render(text, start,
-                 rect,
-                 color,
-                 LLFontGL::LEFT, mEditor.mTextVAlign,
-                 LLFontGL::NORMAL,
-                 mStyle->getShadowType(),
-                 length,
-                 &right_x,
-                 mEditor.getUseEllipses(),
-                 mEditor.getUseColor());
+        if (use_font_buffers)
+        {
+            mFontBufferPreSelection.render(
+                font,
+                text, start,
+                rect,
+                color,
+                LLFontGL::LEFT, mEditor.mTextVAlign,
+                LLFontGL::NORMAL,
+                mStyle->getShadowType(),
+                length,
+                &right_x,
+                mEditor.getUseEllipses(),
+                mEditor.getUseColor());
+        }
+        else
+        {
+            // Font buffer doesn't do well with changes and huge notecard with a bunch
+            // of segments will see a lot of buffer updates, so instead use derect
+            // rendering to cache.
+            // Todo: instead of mLastGeneration make buffer invalidation more fine grained
+            // like string hash of a given segment.
+            font->render(
+                text, start,
+                rect,
+                color,
+                LLFontGL::LEFT, mEditor.mTextVAlign,
+                LLFontGL::NORMAL,
+                mStyle->getShadowType(),
+                length,
+                &right_x,
+                mEditor.getUseEllipses(),
+                mEditor.getUseColor());
+        }
     }
     rect.mLeft = right_x;
 
@@ -3577,16 +3669,35 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
         S32 end = llmin( selection_end, seg_end );
         S32 length = end - start;
 
-        font->render(text, start,
-                 rect,
-                 mStyle->getSelectedColor().get(),
-                 LLFontGL::LEFT, mEditor.mTextVAlign,
-                 LLFontGL::NORMAL,
-                 LLFontGL::NO_SHADOW,
-                 length,
-                 &right_x,
-                 mEditor.getUseEllipses(),
-                 mEditor.getUseColor());
+        if (use_font_buffers)
+        {
+            mFontBufferSelection.render(
+                font,
+                text, start,
+                rect,
+                mStyle->getSelectedColor().get(),
+                LLFontGL::LEFT, mEditor.mTextVAlign,
+                LLFontGL::NORMAL,
+                LLFontGL::NO_SHADOW,
+                length,
+                &right_x,
+                mEditor.getUseEllipses(),
+                mEditor.getUseColor());
+        }
+        else
+        {
+            font->render(
+                text, start,
+                rect,
+                mStyle->getSelectedColor().get(),
+                LLFontGL::LEFT, mEditor.mTextVAlign,
+                LLFontGL::NORMAL,
+                LLFontGL::NO_SHADOW,
+                length,
+                &right_x,
+                mEditor.getUseEllipses(),
+                mEditor.getUseColor());
+        }
     }
     rect.mLeft = right_x;
     if( selection_end < seg_end )
@@ -3595,16 +3706,36 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
         S32 start = llmax( selection_end, seg_start );
         S32 end = seg_end;
         S32 length = end - start;
-        font->render(text, start,
-                 rect,
-                 color,
-                 LLFontGL::LEFT, mEditor.mTextVAlign,
-                 LLFontGL::NORMAL,
-                 mStyle->getShadowType(),
-                 length,
-                 &right_x,
-                 mEditor.getUseEllipses(),
-                 mEditor.getUseColor());
+        if (use_font_buffers)
+        {
+            mFontBufferPostSelection.render(
+                font,
+                text, start,
+                rect,
+                color,
+                LLFontGL::LEFT, mEditor.mTextVAlign,
+                LLFontGL::NORMAL,
+                mStyle->getShadowType(),
+                length,
+                &right_x,
+                mEditor.getUseEllipses(),
+                mEditor.getUseColor());
+        }
+        else
+        {
+            font->render(
+                text, start,
+                rect,
+                color,
+                LLFontGL::LEFT, mEditor.mTextVAlign,
+                LLFontGL::NORMAL,
+                mStyle->getShadowType(),
+                length,
+                &right_x,
+                mEditor.getUseEllipses(),
+                mEditor.getUseColor());
+
+        }
     }
     return right_x;
 }
@@ -3706,6 +3837,13 @@ void LLNormalTextSegment::setToolTip(const std::string& tooltip)
     mTooltip = tooltip;
 }
 
+// virtual
+LLTextSegmentPtr LLNormalTextSegment::clone(LLTextBase& target) const
+{
+    LLStyleConstSP sp(cloneStyle(target, mStyle));
+    return new LLNormalTextSegment(sp, mStart, mEnd, target);
+}
+
 bool LLNormalTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
 {
     height = 0;
@@ -3791,6 +3929,15 @@ S32 LLNormalTextSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 lin
     return num_chars;
 }
 
+void LLNormalTextSegment::updateLayout(const class LLTextBase& editor)
+{
+    LLTextSegment::updateLayout(editor);
+
+    mFontBufferPreSelection.reset();
+    mFontBufferSelection.reset();
+    mFontBufferPostSelection.reset();
+}
+
 void LLNormalTextSegment::dump() const
 {
     LL_INFOS() << "Segment [" <<
@@ -3819,9 +3966,16 @@ LLLabelTextSegment::LLLabelTextSegment( LLStyleConstSP style, S32 start, S32 end
 {
 }
 
-LLLabelTextSegment::LLLabelTextSegment( const LLColor4& color, S32 start, S32 end, LLTextBase& editor, bool is_visible)
+LLLabelTextSegment::LLLabelTextSegment( const LLUIColor& color, S32 start, S32 end, LLTextBase& editor, bool is_visible)
 :   LLNormalTextSegment(color, start, end, editor, is_visible)
 {
+}
+
+// virtual
+LLTextSegmentPtr LLLabelTextSegment::clone(LLTextBase& target) const
+{
+    LLStyleConstSP sp(cloneStyle(target, mStyle));
+    return new LLLabelTextSegment(sp, mStart, mEnd, target);
 }
 
 /*virtual*/
@@ -3843,9 +3997,16 @@ LLEmojiTextSegment::LLEmojiTextSegment(LLStyleConstSP style, S32 start, S32 end,
 {
 }
 
-LLEmojiTextSegment::LLEmojiTextSegment(const LLColor4& color, S32 start, S32 end, LLTextBase& editor, bool is_visible)
+LLEmojiTextSegment::LLEmojiTextSegment(const LLUIColor& color, S32 start, S32 end, LLTextBase& editor, bool is_visible)
     : LLNormalTextSegment(color, start, end, editor, is_visible)
 {
+}
+
+// virtual
+LLTextSegmentPtr LLEmojiTextSegment::clone(LLTextBase& target) const
+{
+    LLStyleConstSP sp(cloneStyle(target, mStyle));
+    return new LLEmojiTextSegment(sp, mStart, mEnd, target);
 }
 
 bool LLEmojiTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
@@ -3870,6 +4031,14 @@ LLOnHoverChangeableTextSegment::LLOnHoverChangeableTextSegment( LLStyleConstSP s
       LLNormalTextSegment(normal_style, start, end, editor),
       mHoveredStyle(style),
       mNormalStyle(normal_style){}
+
+// virtual
+LLTextSegmentPtr LLOnHoverChangeableTextSegment::clone(LLTextBase& target) const
+{
+    LLStyleConstSP hsp(cloneStyle(target, mHoveredStyle));
+    LLStyleConstSP nsp(cloneStyle(target, mNormalStyle));
+    return new LLOnHoverChangeableTextSegment(hsp, nsp, mStart, mEnd, target);
+}
 
 /*virtual*/
 F32 LLOnHoverChangeableTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect)
@@ -3910,6 +4079,13 @@ LLInlineViewSegment::~LLInlineViewSegment()
     mView->die();
 }
 
+// virtual
+LLTextSegmentPtr LLInlineViewSegment::clone(LLTextBase& target) const
+{
+    llassert_always_msg(false, "NOT SUPPORTED");
+    return nullptr;
+}
+
 bool LLInlineViewSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
 {
     if (first_char == 0 && num_chars == 0)
@@ -3935,7 +4111,7 @@ bool LLInlineViewSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& w
     }
     else
     {
-        width = mLeftPad + mRightPad + mView->getRect().getWidth();
+        width = (F32)(mLeftPad + mRightPad + mView->getRect().getWidth());
         height = mBottomPad + mTopPad + mView->getRect().getHeight();
     }
 
@@ -3994,6 +4170,14 @@ LLLineBreakTextSegment::LLLineBreakTextSegment(LLStyleConstSP style,S32 pos):LLT
 {
     mFontHeight = style->getFont()->getLineHeight();
 }
+
+// virtual
+LLTextSegmentPtr LLLineBreakTextSegment::clone(LLTextBase& target) const
+{
+    LLLineBreakTextSegment* copy = new LLLineBreakTextSegment(mStart);
+    copy->mFontHeight = mFontHeight;
+    return copy;
+}
 bool LLLineBreakTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
 {
     width = 0;
@@ -4017,8 +4201,16 @@ LLImageTextSegment::LLImageTextSegment(LLStyleConstSP style,S32 pos,class LLText
 {
 }
 
+// virtual
+LLTextSegmentPtr LLImageTextSegment::clone(LLTextBase& target) const
+{
+    LLStyleConstSP sp(cloneStyle(target, mStyle));
+    return new LLImageTextSegment(sp, mStart, target);
+}
+
 static const S32 IMAGE_HPAD = 3;
 
+// virtual
 bool LLImageTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
 {
     width = 0;
@@ -4079,10 +4271,10 @@ F32 LLImageTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 select
             S32 style_image_width = image->getWidth();
             // Text is drawn from the top of the draw_rect downward
 
-            S32 text_center = draw_rect.mTop - (draw_rect.getHeight() / 2);
+            S32 text_center = (S32)(draw_rect.mTop - (draw_rect.getHeight() / 2.f));
             // Align image to center of draw rect
             S32 image_bottom = text_center - (style_image_height / 2);
-            image->draw(draw_rect.mLeft, image_bottom,
+            image->draw((S32)draw_rect.mLeft, image_bottom,
                 style_image_width, style_image_height, color);
 
             const S32 IMAGE_HPAD = 3;

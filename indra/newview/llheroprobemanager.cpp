@@ -201,7 +201,12 @@ void LLHeroProbeManager::update()
 
         mHeroProbeStrength = 1;
     }
+    else
+    {
+        mNearestHero = nullptr;
+        mDefaultProbe->mViewerObject = nullptr;
     }
+}
 
 void LLHeroProbeManager::renderProbes()
 {

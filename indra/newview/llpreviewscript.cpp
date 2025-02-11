@@ -466,7 +466,7 @@ void LLLiveLSLEditor::experienceChanged()
     if(mScriptEd->getAssociatedExperience() != mExperiences->getSelectedValue().asUUID())
     {
         mScriptEd->enableSave(getIsModifiable());
-        //getChildView("Save_btn")->setEnabled(true);
+        //mSaveBtn->setEnabled(true);
         mScriptEd->setAssociatedExperience(mExperiences->getSelectedValue().asUUID());
         updateExperiencePanel();
     }

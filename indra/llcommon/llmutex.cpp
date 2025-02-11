@@ -28,6 +28,98 @@
 #include "llmutex.h"
 #include "llthread.h"
 #include "lltimer.h"
+    llassert(LLCoros::on_main_coro());
+
+    if(isSelfLocked())
+    { //redundant lock
+        mCount++;
+        return;
+    }
+
+    mMutex.lock();
+
+#if MUTEX_DEBUG
+    // Have to have the lock before we can access the debug info
+    auto id = LLThread::currentID();
+    if (mIsLocked[id])
+        LL_ERRS() << "Already locked in Thread: " << id << LL_ENDL;
+    mIsLocked[id] = true;
+#endif
+
+    mLockingThread = LLThread::currentID();
+}
+
+void LLMutex::unlock()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+
+    if (mCount > 0)
+    { //not the root unlock
+        mCount--;
+        return;
+    }
+
+#if MUTEX_DEBUG
+    // Access the debug info while we have the lock
+    auto id = LLThread::currentID();
+    if (!mIsLocked[id])
+        LL_ERRS() << "Not locked in Thread: " << id << LL_ENDL;
+    mIsLocked[id] = false;
+#endif
+
+    mLockingThread = LLThread::id_t();
+    mMutex.unlock();
+}
+
+bool LLMutex::isLocked()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    if (!mMutex.try_lock())
+    {
+        return true;
+    }
+    else
+    {
+        mMutex.unlock();
+        return false;
+    }
+}
+
+bool LLMutex::isSelfLocked()
+{
+    return mLockingThread == LLThread::currentID();
+}
+
+LLThread::id_t LLMutex::lockingThread() const
+{
+    return mLockingThread;
+}
+
+bool LLMutex::trylock()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    if (isSelfLocked())
+    { //redundant lock
+        mCount++;
+        return true;
+    }
+
+    if (!mMutex.try_lock())
+    {
+        return false;
+    }
+
+#if MUTEX_DEBUG
+    // Have to have the lock before we can access the debug info
+    auto id = LLThread::currentID();
+    if (mIsLocked[id])
+        LL_ERRS() << "Already locked in Thread: " << id << LL_ENDL;
+    mIsLocked[id] = true;
+#endif
+
+    mLockingThread = LLThread::currentID();
+    return true;
+}
 
 //---------------------------------------------------------------------
 //
@@ -41,7 +133,7 @@ LLSharedMutex::LLSharedMutex()
 
 bool LLSharedMutex::isLocked() const
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     std::lock_guard<std::mutex> lock(mLockMutex);
 
     return !mLockingThreads.empty();
@@ -49,7 +141,7 @@ bool LLSharedMutex::isLocked() const
 
 bool LLSharedMutex::isThreadLocked() const
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     LLThread::id_t current_thread = LLThread::currentID();
     std::lock_guard<std::mutex> lock(mLockMutex);
 
@@ -59,7 +151,7 @@ bool LLSharedMutex::isThreadLocked() const
 
 void LLSharedMutex::lockShared()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     LLThread::id_t current_thread = LLThread::currentID();
 
     mLockMutex.lock();
@@ -84,7 +176,7 @@ void LLSharedMutex::lockShared()
 
 void LLSharedMutex::lockExclusive()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     LLThread::id_t current_thread = LLThread::currentID();
 
     mLockMutex.lock();
@@ -117,7 +209,7 @@ void LLSharedMutex::lockExclusive()
 
 bool LLSharedMutex::trylockShared()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     LLThread::id_t current_thread = LLThread::currentID();
     std::lock_guard<std::mutex> lock(mLockMutex);
 
@@ -140,7 +232,7 @@ bool LLSharedMutex::trylockShared()
 
 bool LLSharedMutex::trylockExclusive()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     LLThread::id_t current_thread = LLThread::currentID();
     std::lock_guard<std::mutex> lock(mLockMutex);
 
@@ -162,7 +254,7 @@ bool LLSharedMutex::trylockExclusive()
 
 void LLSharedMutex::unlockShared()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     LLThread::id_t current_thread = LLThread::currentID();
     std::lock_guard<std::mutex> lock(mLockMutex);
 
@@ -183,7 +275,7 @@ void LLSharedMutex::unlockShared()
 
 void LLSharedMutex::unlockExclusive()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     LLThread::id_t current_thread = LLThread::currentID();
     std::lock_guard<std::mutex> lock(mLockMutex);
 
@@ -202,13 +294,72 @@ void LLSharedMutex::unlockExclusive()
     }
 }
 
+LLCondition::LLCondition() :
+    LLMutex()
+{
+}
+
+LLCondition::~LLCondition()
+{
+}
+
+void LLCondition::wait()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    std::unique_lock< std::mutex > lock(mMutex);
+    mCond.wait(lock);
+}
+
+void LLCondition::signal()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    mCond.notify_one();
+}
+
+void LLCondition::broadcast()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    mCond.notify_all();
+}
+LLMutexTrylock::LLMutexTrylock(LLMutex* mutex)
+    : mMutex(mutex),
+    mLocked(false)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    if (mMutex)
+        mLocked = mMutex->trylock();
+}
+
+LLMutexTrylock::LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms)
+    : mMutex(mutex),
+    mLocked(false)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    if (!mMutex)
+        return;
+
+    for (U32 i = 0; i < aTries; ++i)
+    {
+        mLocked = mMutex->trylock();
+        if (mLocked)
+            break;
+        ms_sleep(delay_ms);
+    }
+}
+
+LLMutexTrylock::~LLMutexTrylock()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    if (mMutex && mLocked)
+        mMutex->unlock();
+}
 //---------------------------------------------------------------------
 //
 // LLScopedLock
 //
 LLScopedLock::LLScopedLock(std::mutex* mutex) : mMutex(mutex)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     if(mutex)
     {
         mutex->lock();
@@ -227,7 +378,7 @@ LLScopedLock::~LLScopedLock()
 
 void LLScopedLock::unlock()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     if(mLocked)
     {
         mLocked = false;

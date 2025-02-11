@@ -112,12 +112,6 @@ public:
          */
         const boost::filesystem::path metaDataToFilepath(const LLUUID& id,
                                              LLAssetType::EType at);
-
-        /**
-         * Update the "last write time" of a file to "now". This must be called whenever a
-         * file in the cache is read (not written) so that the last time the file was
-         * accessed is up to date (This is used in the mechanism for purging the cache)
-         */
         static void updateFileAccessTime(const boost::filesystem::path& file_path);
 
         /**
@@ -155,14 +149,9 @@ public:
          * directory. Primarily used here to determine the directory size
          * before and after the cache purge
          */
-        uintmax_t dirFileSize(const std::string dir);
+        uintmax_t dirFileSize(const std::string& dir);
 
-        /**
-         * Utility function to convert an LLAssetType enum into a
-         * string that we use as part of the cache file filename
-         */
         static const std::string assetTypeToString(LLAssetType::EType at);
-
         /**
          * Utility function to create the cache directory structure
          */
@@ -183,16 +172,8 @@ public:
          * setting could potentially point it at a non-cache directory (for example,
          * the Windows System dir) with disastrous results.
          */
-        std::string mCacheDir;
-
-        /**
-         * The extension inserted at the end of a cache file filename to
-         * help identify it as a cache file. It's probably not required
-         * (just the presence in the cache folder is enough) but I am
-         * paranoid about the cache folder being set to something bad
-         * like the users' OS system dir by mistake or maliciously and
-         * this will help to offset any damage if that happens.
-         */
+        static std::string sCacheDir;
+         * The prefix inserted at the start of a cache file filename to
         const std::string mCacheFilenameExt = ".sl_cache";
 
         /**

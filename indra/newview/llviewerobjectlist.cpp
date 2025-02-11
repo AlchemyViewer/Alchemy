@@ -68,7 +68,6 @@
 #include "u64.h"
 #include "llviewertexturelist.h"
 #include "lldatapacker.h"
-#include "llcallstack.h"
 // [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2.1)
 #include "llderenderlist.h"
 // [/SL:KB]
@@ -419,7 +418,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 
     LLViewerObject *objectp;
     S32         num_objects;
-    U32         local_id;
+    U32         local_id = 0;
     LLPCode     pcode = 0;
     LLUUID      fullid;
     S32         i;
@@ -969,8 +968,8 @@ void LLViewerObjectList::update(LLAgent &agent)
     static std::vector<LLViewerObject*> idle_list;
 
     U32 idle_count = 0;
-
     mNumAvatars = 0;
+
     {
         for (std::vector<LLPointer<LLViewerObject> >::iterator active_iter = mActiveObjects.begin();
             active_iter != mActiveObjects.end(); active_iter++)
@@ -988,7 +987,9 @@ void LLViewerObjectList::update(LLAgent &agent)
                 }
                 ++idle_count;
                 if (objectp->isAvatar())
+                {
                     mNumAvatars++;
+                }
             }
             else
             {   // There shouldn't be any NULL pointers in the list, but they have caused
@@ -1227,10 +1228,10 @@ void LLViewerObjectList::fetchObjectCostsCoro(std::string url, uuid_hash_set_t s
         {
             LLSD objectData = result[it->asString()];
 
-            F32 linkCost = objectData["linked_set_resource_cost"].asReal();
-            F32 objectCost = objectData["resource_cost"].asReal();
-            F32 physicsCost = objectData["physics_cost"].asReal();
-            F32 linkPhysicsCost = objectData["linked_set_physics_cost"].asReal();
+            F32 linkCost = (F32)objectData["linked_set_resource_cost"].asReal();
+            F32 objectCost = (F32)objectData["resource_cost"].asReal();
+            F32 physicsCost = (F32)objectData["physics_cost"].asReal();
+            F32 linkPhysicsCost = (F32)objectData["linked_set_physics_cost"].asReal();
 
             gObjectList.updateObjectCost(objectId, objectCost, linkCost, physicsCost, linkPhysicsCost);
         }
@@ -1355,10 +1356,10 @@ void LLViewerObjectList::fetchPhisicsFlagsCoro(std::string url)
 
             if (data.has("Density"))
             {
-                F32 density = data["Density"].asReal();
-                F32 friction = data["Friction"].asReal();
-                F32 restitution = data["Restitution"].asReal();
-                F32 gravityMult = data["GravityMultiplier"].asReal();
+                F32 density = (F32)data["Density"].asReal();
+                F32 friction = (F32)data["Friction"].asReal();
+                F32 restitution = (F32)data["Restitution"].asReal();
+                F32 gravityMult = (F32)data["GravityMultiplier"].asReal();
 
                 gObjectList.updatePhysicsProperties(objectId, density,
                     friction, restitution, gravityMult);
@@ -1845,10 +1846,8 @@ void LLViewerObjectList::clearAllMapObjectsInRegion(LLViewerRegion* regionp)
 
 void LLViewerObjectList::renderObjectsForMap(LLNetMap &netmap)
 {
-    static const LLUIColor above_water_color =
-        LLUIColorTable::instance().getColor( "NetMapOtherOwnAboveWater" );
-    static const LLUIColor below_water_color =
-        LLUIColorTable::instance().getColor( "NetMapOtherOwnBelowWater" );
+    static const LLUIColor above_water_color = LLUIColorTable::instance().getColor( "NetMapOtherOwnAboveWater" );
+    static const LLUIColor below_water_color = LLUIColorTable::instance().getColor( "NetMapOtherOwnBelowWater" );
     static const LLUIColor you_own_above_water_color =
         LLUIColorTable::instance().getColor( "NetMapYouOwnAboveWater" );
     static const LLUIColor you_own_below_water_color =
@@ -1907,9 +1906,9 @@ void LLViewerObjectList::renderObjectsForMap(LLNetMap &netmap)
         // Limit the size of megaprims so they don't blot out everything on the minimap.
         // Attempting to draw very large megaprims also causes client lag.
         // See DEV-17370 and DEV-29869/SNOW-79 for details.
-        approx_radius = llmin<F32>(approx_radius, max_radius);
+        approx_radius = llmin(approx_radius, max_radius);
 
-        LLColor4 color = above_water_color;
+        LLColor4U color = above_water_color.get();
         if (objectp->permYouOwner())
         {
             const F32 MIN_RADIUS_FOR_OWNED_OBJECTS = 2.f;
@@ -1922,71 +1921,29 @@ void LLViewerObjectList::renderObjectsForMap(LLNetMap &netmap)
             {
                 if (objectp->permGroupOwner())
                 {
-                    color = group_own_above_water_color;
+                    color = group_own_above_water_color.get();
                 }
                 else
                 {
-                    color = you_own_above_water_color;
+                color = you_own_above_water_color.get();
                 }
             }
             else
             {
                 if (objectp->permGroupOwner())
                 {
-                    color = group_own_below_water_color;
+                    color = group_own_below_water_color.get();
                 }
                 else
                 {
-                    color = you_own_below_water_color;
+                color = you_own_below_water_color.get();
                 }
             }
         }
-        else if (pos.mdV[VZ] < water_height)
+        else
+        if( pos.mdV[VZ] < water_height )
         {
-            color = below_water_color;
-        }
-
-        if (netmap_scripted && objectp->flagScripted())
-        {
-            color = scripted_object_color;
-            if( approx_radius < MIN_RADIUS_FOR_ACCENTED_OBJECTS )
-            {
-                approx_radius = MIN_RADIUS_FOR_ACCENTED_OBJECTS;
-            }
-        }
-
-        if (netmap_physical && objectp->flagUsePhysics())
-        {
-            if (objectp->permYouOwner())
-            {
-                color = you_own_physical_color;
-            }
-            else if (objectp->permGroupOwner())
-            {
-                color = group_own_physical_color;
-            }
-            else
-            {
-                color = other_own_physical_color;
-            }
-            if( approx_radius < MIN_RADIUS_FOR_ACCENTED_OBJECTS )
-            {
-                approx_radius = MIN_RADIUS_FOR_ACCENTED_OBJECTS;
-            }
-        }
-
-        if (netmap_temp_on_rez && objectp->flagTemporaryOnRez())
-        {
-            color = temp_on_rez_object_color;
-            if( approx_radius < MIN_RADIUS_FOR_ACCENTED_OBJECTS )
-            {
-                approx_radius = MIN_RADIUS_FOR_ACCENTED_OBJECTS;
-            }
-        }
-
-        if (objectp->flagPhantom())
-        {
-            color.setAlpha(llclampb(netmap_phantom_opacity()));
+            color = below_water_color.get();
         }
 
         netmap.renderScaledPointGlobal(

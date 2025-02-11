@@ -43,13 +43,13 @@
  */
 class LL_COMMON_API LLDate
 {
+    static constexpr F64 DATE_EPOCH = 0.0;
 public:
     /**
      * @brief Construct a date equal to epoch.
      */
-    LLDate();
-
-    /**
+    constexpr LLDate() : mSecondsSinceEpoch(DATE_EPOCH)
+    {}
      * @brief Construct a date from a seconds since epoch value.
      *
      * @param seconds_since_epoch The number of seconds since UTC epoch.

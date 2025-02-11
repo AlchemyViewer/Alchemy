@@ -66,9 +66,23 @@ LLFloaterPreferenceGraphicsAdvanced::~LLFloaterPreferenceGraphicsAdvanced()
 
 bool LLFloaterPreferenceGraphicsAdvanced::postBuild()
 {
-    // Don't do this on Mac as their braindead GL versioning
-    // sets this when 8x and 16x are indeed available
+    // Disable FSAA combo when shaders are not loaded
     //
+    {
+        LLComboBox* combo = getChild<LLComboBox>("fsaa");
+        if (!gFXAAProgram[0].isComplete())
+            combo->remove("FXAA");
+
+        if (!gSMAAEdgeDetectProgram[0].isComplete())
+            combo->remove("SMAA");
+
+        if (!gFXAAProgram[0].isComplete() && !gSMAAEdgeDetectProgram[0].isComplete())
+        {
+            combo->setEnabled(false);
+            getChild<LLComboBox>("fsaa quality")->setEnabled(false);
+        }
+    }
+
 #if !LL_DARWIN
     LLCheckBoxCtrl *use_HiDPI = getChild<LLCheckBoxCtrl>("use HiDPI");
     use_HiDPI->setVisible(false);
@@ -136,8 +150,6 @@ void LLFloaterPreferenceGraphicsAdvanced::onAdvancedAtmosphericsEnable()
 
 void LLFloaterPreferenceGraphicsAdvanced::refresh()
 {
-    getChild<LLUICtrl>("fsaa")->setValue((LLSD::Integer)  gSavedSettings.getU32("RenderFSAASamples"));
-
     // sliders and their text boxes
     //  mPostProcess = gSavedSettings.getS32("RenderGlowResolutionPow");
     // slider text boxes
@@ -266,7 +278,10 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
     LLComboBox* ctrl_shadows = getChild<LLComboBox>("ShadowDetail");
     LLTextBox* shadows_text = getChild<LLTextBox>("RenderShadowDetailText");
     LLCheckBoxCtrl* ctrl_ssao = getChild<LLCheckBoxCtrl>("UseSSAO");
-    LLComboBox* ctrl_anisotropic = getChild<LLComboBox>("anisotropic_filter");
+    LLCheckBoxCtrl* ctrl_dof = getChild<LLCheckBoxCtrl>("UseDoF");
+    LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
+    LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
+    LLSliderCtrl* cas_slider = getChild<LLSliderCtrl>("RenderSharpness");
 
     // disabled deferred SSAO
     if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferredSSAO"))
@@ -283,17 +298,23 @@ void LLFloaterPreferenceGraphicsAdvanced::disableUnavailableSettings()
         shadows_text->setEnabled(false);
     }
 
-    if (!LLFeatureManager::instance().isFeatureAvailable("RenderAnisotropicLevel"))
-    {
-        ctrl_anisotropic->setEnabled(false);
-    }
+    // disabled reflections
+    static LLCachedControl<bool> is_not_vintage(gSavedSettings, "RenderDisableVintageMode");
+    LLSliderCtrl*         tonemapMix    = getChild<LLSliderCtrl>("TonemapMix");
+    LLComboBox*           tonemapSelect = getChild<LLComboBox>("TonemapType");
+    LLTextBox*            tonemapLabel  = getChild<LLTextBox>("TonemapTypeText");
+    LLSliderCtrl*         exposureSlider = getChild<LLSliderCtrl>("RenderExposure");
+
+    tonemapSelect->setEnabled(is_not_vintage);
+    tonemapLabel->setEnabled(is_not_vintage);
+    tonemapMix->setEnabled(is_not_vintage);
+    exposureSlider->setEnabled(is_not_vintage);
+    cas_slider->setEnabled(is_not_vintage);
 }
 
 void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
 {
     // WindLight
-    //LLCheckBoxCtrl* ctrl_wind_light = getChild<LLCheckBoxCtrl>("WindLightUseAtmosShaders");
-    //ctrl_wind_light->setEnabled(true);
     LLSliderCtrl* sky = getChild<LLSliderCtrl>("SkyMeshDetail");
     LLTextBox* sky_text = getChild<LLTextBox>("SkyMeshDetailText");
     sky->setEnabled(true);
@@ -331,20 +352,7 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
         getChildView("texture compression")->setEnabled(false);
     }
 
-    // AF Filtering
-    LLComboBox* af_combo = getChild<LLComboBox>("anisotropic_filter");
-    if (2.f > gGLManager.mMaxAnisotropy) {
-        af_combo->remove("2x");
-    }
-    if (4.f > gGLManager.mMaxAnisotropy) {
-        af_combo->remove("4x");
-    }
-    if (8.f > gGLManager.mMaxAnisotropy) {
-        af_combo->remove("8x");
-    }
-    if (16.f > gGLManager.mMaxAnisotropy) {
-        af_combo->remove("16x");
-    }
+    // if no windlight shaders, turn off nighttime brightness, gamma, and fog distance
 
     getChildView("antialiasing restart")->setVisible(!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"));
 

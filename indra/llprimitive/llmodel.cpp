@@ -93,19 +93,15 @@ std::string LLModel::getStatusString(U32 status)
 }
 
 
-void LLModel::offsetMesh( const LLVector3& pivotPoint )
+void LLModel::offsetMesh(const LLVector3& pivotPoint)
 {
-    LLVector4a pivot( pivotPoint[VX], pivotPoint[VY], pivotPoint[VZ] );
+    LLVector4a pivot(pivotPoint[VX], pivotPoint[VY], pivotPoint[VZ]);
 
-    for (std::vector<LLVolumeFace>::iterator faceIt = mVolumeFaces.begin(); faceIt != mVolumeFaces.end(); )
+    for (LLVolumeFace& face : mVolumeFaces)
     {
-        std::vector<LLVolumeFace>:: iterator currentFaceIt = faceIt++;
-        LLVolumeFace& face = *currentFaceIt;
-        LLVector4a *pos = (LLVector4a*) face.mPositions;
-
-        for (S32 i=0; i<face.mNumVertices; ++i )
+        for (S32 i = 0; i < face.mNumVertices; ++i)
         {
-            pos[i].add( pivot );
+            face.mPositions[i].add(pivot);
         }
     }
 }
@@ -340,7 +336,7 @@ void LLModel::normalizeVolumeFaces()
     }
 }
 
-void LLModel::getNormalizedScaleTranslation(LLVector3& scale_out, LLVector3& translation_out)
+void LLModel::getNormalizedScaleTranslation(LLVector3& scale_out, LLVector3& translation_out) const
 {
     scale_out = mNormalizedScale;
     translation_out = mNormalizedTranslation;
@@ -1507,11 +1503,11 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
         for (size_t i = 0, size = inv_bind_mat.size(); i < size; ++i)
         {
             LLMatrix4 mat;
-            for (auto j = 0; j < 4; j++)
+            for (U32 j = 0; j < 4; j++)
             {
-                for (auto k = 0; k < 4; k++)
+                for (U32 k = 0; k < 4; k++)
                 {
-                    mat.mMatrix[j][k] = inv_bind_mat[i][j*4+k].asReal();
+                    mat.mMatrix[j][k] = (F32)skin["inverse_bind_matrix"][i][j*4+k].asReal();
                 }
             }
 
@@ -1532,18 +1528,29 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
         }
     }
 
-    it = skin_map.find("alt_inverse_bind_matrix");
-    if (it != skin_map.end())
+    if (skin.has("bind_shape_matrix"))
     {
-        const auto& alt_inv_bind_mat = it->second.asArray();
-        for (size_t i = 0, size = alt_inv_bind_mat.size(); i < size; ++i)
+        LLMatrix4 mat;
+        for (U32 j = 0; j < 4; j++)
+        {
+            for (U32 k = 0; k < 4; k++)
+            {
+                mat.mMatrix[j][k] = (F32)skin["bind_shape_matrix"][j*4+k].asReal();
+            }
+        }
+        mBindShapeMatrix.loadu(mat);
+    }
+
+    if (skin.has("alt_inverse_bind_matrix"))
+    {
+        for (U32 i = 0; i < skin["alt_inverse_bind_matrix"].size(); ++i)
         {
             LLMatrix4 mat;
-            for (auto j = 0; j < 4; j++)
+            for (U32 j = 0; j < 4; j++)
             {
-                for (auto k = 0; k < 4; k++)
+                for (U32 k = 0; k < 4; k++)
                 {
-                    mat.mMatrix[j][k] = alt_inv_bind_mat[i][j*4+k].asReal();
+                    mat.mMatrix[j][k] = (F32)skin["alt_inverse_bind_matrix"][i][j*4+k].asReal();
                 }
             }
 
@@ -1551,10 +1558,9 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
         }
     }
 
-    it = skin_map.find("pelvis_offset");
-    if (it != skin_map.end())
+    if (skin.has("pelvis_offset"))
     {
-        mPelvisOffset = it->second.asReal();
+        mPelvisOffset = (F32)skin["pelvis_offset"].asReal();
     }
 
     it = skin_map.find("lock_scale_if_joint_position");
@@ -1565,6 +1571,13 @@ void LLMeshSkinInfo::fromLLSD(const LLSD& skin)
     else
     {
         mLockScaleIfJointPosition = false;
+    }
+
+    // combine mBindShapeMatrix and mInvBindMatrix into mBindPoseMatrix
+    mBindPoseMatrix.resize(mInvBindMatrix.size());
+    for (U32 i = 0; i < mInvBindMatrix.size(); ++i)
+    {
+        matMul(mBindShapeMatrix, mInvBindMatrix[i], mBindPoseMatrix[i]);
     }
 
     updateHash();

@@ -452,6 +452,9 @@ void LLVOGrass::plantBlades()
         face->setVertexBuffer(NULL);
         face->setTEOffset(0);
         face->mCenterLocal = mPosition + mRegionp->getOriginAgent();
+        const LLVector4a* ext = mDrawable->getSpatialExtents();
+        face->mExtents[0] = ext[0];
+        face->mExtents[1] = ext[1];
     }
 
     auto& viewerCamera = LLViewerCamera::instance();
@@ -592,7 +595,7 @@ U32 LLVOGrass::getPartitionType() const
 }
 
 LLGrassPartition::LLGrassPartition(LLViewerRegion* regionp)
-: LLSpatialPartition(LLDrawPoolAlpha::VERTEX_DATA_MASK | LLVertexBuffer::MAP_TEXTURE_INDEX, true, regionp)
+: LLSpatialPartition(static_cast<U32>(LLDrawPoolAlpha::VERTEX_DATA_MASK) | static_cast<U32>(LLVertexBuffer::MAP_TEXTURE_INDEX), true, regionp)
 {
     mDrawableType = LLPipeline::RENDER_TYPE_GRASS;
     mPartitionType = LLViewerRegion::PARTITION_GRASS;
@@ -725,7 +728,6 @@ void LLGrassPartition::getGeometry(LLSpatialGroup* group)
         }
     }
 
-    buffer->unmapBuffer();
     mFaceList.clear();
 }
 

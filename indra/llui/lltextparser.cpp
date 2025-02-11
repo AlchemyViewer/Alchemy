@@ -37,6 +37,7 @@
 #include "llmath.h"
 #include "v4color.h"
 #include "lldir.h"
+#include "lluicolor.h"
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
 #include <boost/bind.hpp>
@@ -246,7 +247,7 @@ LLTextParser::partial_results_t LLTextParser::parsePartialLineHighlights(const s
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
                             resEnd = parsePartialLineHighlights(text.substr(end), cat_mask, newpart, i);
 // [/SL:KB]
-//                          end_llsd=parsePartialLineHighlights(text.substr( end ),color,newpart,i);
+//                          end_vec = parsePartialLineHighlights(text.substr( end ),color,newpart,i);
                         }
                     }
                     else
@@ -256,7 +257,7 @@ LLTextParser::partial_results_t LLTextParser::parsePartialLineHighlights(const s
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
                         resStart = parsePartialLineHighlights(text.substr(0,start), cat_mask, newpart, i+1);
 // [/SL:KB]
-//                      start_llsd=parsePartialLineHighlights(text.substr(0,start),color,newpart,i+1);
+//                      start_vec = parsePartialLineHighlights(text.substr(0,start),color,newpart,i+1);
 
                         if (end < len)
                         {
@@ -267,20 +268,20 @@ LLTextParser::partial_results_t LLTextParser::parsePartialLineHighlights(const s
 //                          middle_llsd[0]["color"]=mHighlights[i]["color"];
 
                             if (part==END   || part==WHOLE) newpart=END; else newpart=MIDDLE;
-
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
                             resEnd = parsePartialLineHighlights(text.substr(start + end), cat_mask, newpart, i);
 // [/SL:KB]
 //                          end_llsd=parsePartialLineHighlights(text.substr( (start+end) ),color,newpart,i);
-                        }
-                        else
-                        {
+                            }
+                            else
+                            {
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
                             resEnd.push_back(partial_result_t(text.substr(start,end), &entry));
 // [/SL:KB]
 //                          end_llsd[0]["text"] =text.substr(start,end);
 //                          end_llsd[0]["color"]=mHighlights[i]["color"];
-                        }
+                            }
+
                     }
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
@@ -306,7 +307,7 @@ LLTextParser::partial_results_t LLTextParser::parsePartialLineHighlights(const s
 //                      LLSD highlight = *iter;
 //                      ret_llsd[retcount++]=highlight;
 //                  }
-//
+
 //                  for (LLSD::array_iterator iter = end_llsd.beginArray();
 //                       iter != end_llsd.endArray();++iter)
 //                  {

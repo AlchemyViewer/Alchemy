@@ -167,18 +167,17 @@ bool LLPanelGroup::postBuild()
         mButtonApply->setClickedCallback(onBtnApply, this);
         mButtonApply->setVisible(true);
         mButtonApply->setEnabled(false);
-    }
 
-    mButtonCall = findChild<LLButton>("btn_call");
-    if(mButtonCall) mButtonCall->setClickedCallback(onBtnGroupCallClicked, this);
+    mButtonCall = getChild<LLButton>("btn_call");
+    mButtonCall->setClickedCallback(onBtnGroupCallClicked, this);
 
-    mButtonChat = findChild<LLButton>("btn_chat");
-    if(mButtonChat) mButtonChat->setClickedCallback(onBtnGroupChatClicked, this);
+    mButtonChat = getChild<LLButton>("btn_chat");
+    mButtonChat->setClickedCallback(onBtnGroupChatClicked, this);
 
-    mButtonRefresh = findChild<LLButton>("btn_refresh");
-    if(mButtonRefresh) mButtonRefresh->setClickedCallback(onBtnRefresh, this);
+    mButtonRefresh = getChild<LLButton>("btn_refresh");
+    mButtonRefresh->setClickedCallback(onBtnRefresh, this);
 
-    mButtonCancel = findChild<LLButton>("btn_cancel");
+    mGroupNameCtrl = getChild<LLUICtrl>("group_name");
 
     childSetCommitCallback("back",boost::bind(&LLPanelGroup::onBackBtnClick,this),NULL);
 
@@ -197,10 +196,11 @@ bool LLPanelGroup::postBuild()
     if(panel_general)
     {
         panel_general->setupCtrls(this);
-        mButtonJoin = panel_general->getChild<LLButton>("btn_join");
-        mButtonJoin->setVisible(false);
-        mButtonJoin->setEnabled(true);
+        LLButton* button = panel_general->getChild<LLButton>("btn_join");
+        button->setVisible(false);
+        button->setEnabled(true);
 
+        mButtonJoin = button;
         mButtonJoin->setCommitCallback(boost::bind(&LLPanelGroup::onBtnJoin,this));
 
         mJoinText = panel_general->getChild<LLUICtrl>("join_cost_text");
@@ -230,7 +230,6 @@ void LLPanelGroup::reposButtons()
             btn_refresh_rect.getHeight() + 2, btn_refresh_rect.getWidth(), btn_refresh_rect.getHeight());
         mButtonRefresh->setRect(btn_refresh_rect);
     }
-
     reposButton(mButtonApply);
     reposButton(mButtonRefresh);
     reposButton(mButtonCancel);
@@ -295,9 +294,9 @@ void LLPanelGroup::onBtnJoin()
     }
     else
     {
-    LL_DEBUGS() << "joining group: " << mID << LL_ENDL;
-    LLGroupActions::join(mID);
-}
+        LL_DEBUGS() << "joining group: " << mID << LL_ENDL;
+        LLGroupActions::join(mID);
+    }
 }
 
 void LLPanelGroup::changed(LLGroupChange gc)
@@ -395,13 +394,11 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
     if(gdatap)
     {
         std::string group_name =  gdatap->mName.empty() ? LLTrans::getString("LoadingData") : gdatap->mName;
-        LLUICtrl* group_name_ctrl = getChild<LLUICtrl>("group_name");
-        group_name_ctrl->setValue(group_name);
-        group_name_ctrl->setToolTip(group_name);
+        mGroupNameCtrl->setValue(group_name);
+        mGroupNameCtrl->setToolTip(group_name);
     }
 
     getChild<LLUICtrl>("group_key")->setValue(str_group_id);
-
     bool is_null_group_id = group_id.isNull();
     if(mButtonApply)
         mButtonApply->setVisible(!is_null_group_id);
@@ -410,7 +407,6 @@ void LLPanelGroup::setGroupID(const LLUUID& group_id)
 
     if(mButtonCancel)
         mButtonCancel->setVisible(!is_null_group_id);
-
     if(mButtonCall)
             mButtonCall->setVisible(!is_null_group_id);
     if(mButtonChat)

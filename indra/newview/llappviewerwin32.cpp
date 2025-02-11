@@ -103,9 +103,6 @@ LONG WINAPI catchallCrashHandler(EXCEPTION_POINTERS * /*ExceptionInfo*/)
     exceptionTerminateHandler();
     return 0;
 }
-
-// *FIX:Mani - This hack is to fix a linker issue with libndofdev.lib
-// The lib was compiled under VS2005 - in VS2003 we need to remap assert
 #ifdef LL_DEBUG
 #ifdef LL_MSVC7
 extern "C" {
@@ -133,7 +130,7 @@ bool create_app_mutex()
     LPCWSTR unique_mutex_name = L"AlchemyAppMutex";
     HANDLE hMutex;
     hMutex = CreateMutex(NULL, TRUE, unique_mutex_name);
-    if(GetLastError() == ERROR_ALREADY_EXISTS)
+    if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
         result = false;
     }
@@ -359,7 +356,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     gDebugInfo["FoundOtherInstanceAtStartup"] = LLSD::Boolean(found_other_instance);
 
     bool ok = viewer_app_ptr->init();
-    if(!ok)
+    if (!ok)
     {
         LL_WARNS() << "Application init failed." << LL_ENDL;
         return -1;

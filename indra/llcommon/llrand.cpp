@@ -67,6 +67,9 @@ inline std::ranlux48* _generator()
     {
         std::random_device seeder;
         __generator = std::make_unique<std::ranlux48>(seeder());
+    F32 rv{ narrow<F64>(gRandomGenerator()) };
+    if(!((rv >= 0.0f) && (rv < 1.0f))) return fmodf(rv, 1.0f);
+    return rv;
     }
     return __generator.get();
 }

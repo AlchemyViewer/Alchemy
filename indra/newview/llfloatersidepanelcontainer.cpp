@@ -28,6 +28,7 @@
 
 #include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
+#include "llnotificationsutil.h"
 #include "llpaneleditwearable.h"
 
 // newview includes
@@ -73,19 +74,20 @@ void LLFloaterSidePanelContainer::closeFloater(bool app_quitting)
         if (panel_outfit_edit)
         {
             LLFloater *parent = gFloaterView->getParentFloater(panel_outfit_edit);
-            if (parent == this )
+        if (parent == this )
             {
                 LLSidepanelAppearance* panel_appearance = dynamic_cast<LLSidepanelAppearance*>(mMainPanel);
-            if ( panel_appearance )
+            if (panel_appearance)
                 {
                     LLPanelEditWearable *edit_wearable_ptr = panel_appearance->getWearable();
                     if (edit_wearable_ptr)
                     {
                         edit_wearable_ptr->onClose();
                     }
-                if(!app_quitting)
+                if (!app_quitting)
                     {
                         panel_appearance->showOutfitsInventoryPanel();
+                    }
                     }
                 }
             }
@@ -97,6 +99,45 @@ void LLFloaterSidePanelContainer::closeFloater(bool app_quitting)
     if (getInstanceName() == "inventory" && !getKey().isUndefined())
     {
         destroy();
+    }
+}
+
+void LLFloaterSidePanelContainer::onClickCloseBtn(bool app_quitting)
+{
+    if (!app_quitting && getInstanceName() == "appearance")
+    {
+        LLPanelOutfitEdit* panel_outfit_edit = findChild<LLPanelOutfitEdit>("panel_outfit_edit");
+        if (panel_outfit_edit)
+        {
+            LLFloater* parent = gFloaterView->getParentFloater(panel_outfit_edit);
+            if (parent == this)
+            {
+                LLSidepanelAppearance* panel_appearance = dynamic_cast<LLSidepanelAppearance*>(getPanel("appearance"));
+                if (panel_appearance)
+                {
+                    LLPanelEditWearable* edit_wearable_ptr = panel_appearance->getWearable();
+                    if (edit_wearable_ptr && edit_wearable_ptr->getVisible() && edit_wearable_ptr->isDirty())
+                    {
+                        LLNotificationsUtil::add("UsavedWearableChanges", LLSD(), LLSD(), [this](const LLSD& notification, const LLSD& response)
+                        {
+                            onCloseMsgCallback(notification, response);
+                        });
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    closeFloater();
+}
+
+void LLFloaterSidePanelContainer::onCloseMsgCallback(const LLSD& notification, const LLSD& response)
+{
+    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    if (0 == option)
+    {
+        closeFloater();
     }
 }
 
@@ -205,7 +246,6 @@ void LLFloaterSidePanelContainer::showPanel(std::string_view floater_name, std::
 LLPanel* LLFloaterSidePanelContainer::getPanel(std::string_view floater_name, std::string_view panel_name)
 {
     LLFloaterSidePanelContainer* floaterp = LLFloaterReg::getTypedInstance<LLFloaterSidePanelContainer>(floater_name);
-
     if (floaterp)
     {
         if (panel_name == sMainPanelName)
@@ -224,7 +264,6 @@ LLPanel* LLFloaterSidePanelContainer::getPanel(std::string_view floater_name, st
 LLPanel* LLFloaterSidePanelContainer::findPanel(std::string_view floater_name, std::string_view panel_name)
 {
     LLFloaterSidePanelContainer* floaterp = LLFloaterReg::findTypedInstance<LLFloaterSidePanelContainer>(floater_name);
-
     if (floaterp)
     {
         if (panel_name == sMainPanelName)

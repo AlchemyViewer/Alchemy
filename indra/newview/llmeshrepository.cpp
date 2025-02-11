@@ -74,11 +74,14 @@
 #include "llinventorypanel.h"
 #include "lluploaddialog.h"
 #include "llfloaterreg.h"
+#include "llvoavatarself.h"
+#include "llskinningutil.h"
 #include "llviewernetwork.h"
 
-#include <boost/smart_ptr/make_shared.hpp>
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
+#include "boost/smart_ptr/make_shared.hpp>
+#include "boost/iostreams/device/array.hpp"
+#include "boost/iostreams/stream.hpp"
+#include "boost/lexical_cast.hpp"
 
 #ifndef LL_WINDOWS
 #include "netdb.h"
@@ -749,7 +752,7 @@ void log_upload_error(LLCore::HttpStatus status, const LLSD& content,
                        << " (" << status.toTerseString() << ")" << LL_ENDL;
 
     std::ostringstream details;
-    typedef std::set<std::string> mav_errors_set_t;
+    typedef std::unordered_set<std::string> mav_errors_set_t;
     mav_errors_set_t mav_errors;
 
     if (content.has("error"))
@@ -820,9 +823,8 @@ LLMeshRepoThread::LLMeshRepoThread()
   mHttpLargeOptions(),
   mHttpHeaders(),
   mHttpPolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
-  mHttpLegacyPolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
   mHttpLargePolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
-  mLegacyGetMeshVersion(0)
+  mWorkQueue("MeshRepoThread", 1024*1024)
 {
     LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
 
@@ -854,10 +856,17 @@ LLMeshRepoThread::~LLMeshRepoThread()
     mHttpRequestSet.clear();
     mHttpHeaders.reset();
 
-    delete_and_clear(mSkinInfoQ);
+    while (!mSkinInfoQ.empty())
+    {
+        llassert(mSkinInfoQ.front()->getNumRefs() == 1);
+        mSkinInfoQ.pop_front();
+    }
 
-    mDecompositionQ.clear();
-    mPhysicsQ.clear();
+    while (!mDecompositionQ.empty())
+    {
+        delete mDecompositionQ.front();
+        mDecompositionQ.pop_front();
+    }
 
     delete mHttpRequest;
     mHttpRequest = NULL;
@@ -898,6 +907,10 @@ void LLMeshRepoThread::run()
         {
             break;
         }
+
+        // run mWorkQueue for up to 8ms
+        static std::chrono::nanoseconds WorkTimeNanoSec{std::chrono::nanoseconds::rep(8 * 1000000) };
+        mWorkQueue.runFor(WorkTimeNanoSec);
 
         if (! mHttpRequestSet.empty())
         {
@@ -1317,8 +1330,39 @@ LLCore::HttpHandle LLMeshRepoThread::getByteRange(const std::string & url, int l
     return handle;
 }
 
-bool LLMeshRepoThread::loadInfoFromFilesystem(const LLUUID& mesh_id, MeshHeaderInfo& info, boost::function<bool(const LLUUID&, U8*, S32)> fn)
+bool LLMeshRepoThread::fetchMeshSkinInfo(const LLUUID& mesh_id, bool can_retry)
 {
+    LL_PROFILE_ZONE_SCOPED;
+    if (!mHeaderMutex)
+    {
+        return false;
+    }
+
+    mHeaderMutex->lock();
+
+    auto header_it = mMeshHeader.find(mesh_id);
+    if (header_it == mMeshHeader.end())
+    { //we have no header info for this mesh, do nothing
+        mHeaderMutex->unlock();
+        return false;
+    }
+
+    ++LLMeshRepository::sMeshRequestCount;
+    bool ret = true;
+    U32 header_size = header_it->second.first;
+
+    if (header_size > 0)
+    {
+        const LLMeshHeader& header = header_it->second.second;
+
+        S32 version = header.mVersion;
+        S32 offset = header_size + header.mSkinOffset;
+        S32 size = header.mSkinSize;
+
+        mHeaderMutex->unlock();
+
+        if (version <= MAX_MESH_VERSION && offset >= 0 && size > 0)
+        {
     //check cache for mesh skin info
     LLFileSystem file(mesh_id, LLAssetType::AT_MESH);
     if (file.getSize() >= info.mOffset + info.mSize)
@@ -1327,12 +1371,22 @@ bool LLMeshRepoThread::loadInfoFromFilesystem(const LLUUID& mesh_id, MeshHeaderI
         if (!buffer)
         {
             LL_WARNS_ONCE(LOG_MESH) << "Failed to allocate memory for mesh data load, size: " << info.mSize << LL_ENDL;
-            return false;
-        }
-        LLMeshRepository::sCacheBytesRead += info.mSize;
-        ++LLMeshRepository::sCacheReads;
-        file.seek(info.mOffset);
-        file.read(buffer.get(), info.mSize);
+
+                    // Not sure what size is reasonable for skin info,
+                    // but if 20MB allocation failed, we definetely have issues
+                    const S32 MAX_SIZE = 30 * 1024 * 1024; //30MB
+                    if (size < MAX_SIZE)
+                    {
+                        LLAppViewer::instance()->outOfMemorySoftQuit();
+                    } // else ignore failures for anomalously large data
+                    LLMutexLock locker(mMutex);
+                    mSkinUnavailableQ.emplace_back(mesh_id);
+                    return true;
+                }
+                LLMeshRepository::sCacheBytesRead += size;
+                ++LLMeshRepository::sCacheReads;
+                file.seek(offset);
+                file.read(buffer, size);
 
         //make sure buffer isn't all 0's by checking the first 1KB (reserved block but not written)
         bool zero = true;
@@ -1432,11 +1486,14 @@ bool LLMeshRepoThread::fetchMeshSkinInfo(const LLUUID& mesh_id, bool can_retry)
 
 bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 {
-    MeshHeaderInfo info;
+    LL_PROFILE_ZONE_SCOPED;
+    if (!mHeaderMutex)
     {
-        LLMutexLock lock(mHeaderMutex);
+        return false;
+    }
 
-        ++LLMeshRepository::sMeshRequestCount;
+    mHeaderMutex->lock();
+
 
         auto header_it = mMeshHeader.find(mesh_id);
         if (header_it == mMeshHeader.end())
@@ -1454,8 +1511,21 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
         }
         else
         {
-            return false;
-        }
+
+                    // Not sure what size is reasonable for decomposition
+                    // but if 20MB allocation failed, we definetely have issues
+                    const S32 MAX_SIZE = 30 * 1024 * 1024; //30MB
+                    if (size < MAX_SIZE)
+                    {
+                        LLAppViewer::instance()->outOfMemorySoftQuit();
+                    } // else ignore failures for anomalously large decompositiions
+                    return true;
+                }
+                LLMeshRepository::sCacheBytesRead += size;
+                ++LLMeshRepository::sCacheReads;
+
+                file.seek(offset);
+                file.read(buffer, size);
     }
 
     if (info.mVersion <= MAX_MESH_VERSION && info.mOffset >= 0 && info.mSize > 0)
@@ -1495,11 +1565,14 @@ bool LLMeshRepoThread::fetchMeshDecomposition(const LLUUID& mesh_id)
 
 bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
 {
-    MeshHeaderInfo info;
+    LL_PROFILE_ZONE_SCOPED;
+    if (!mHeaderMutex)
     {
-        LLMutexLock lock(mHeaderMutex);
+        return false;
+    }
 
-        ++LLMeshRepository::sMeshRequestCount;
+    mHeaderMutex->lock();
+
 
         auto header_it = mMeshHeader.find(mesh_id);
         if (header_it == mMeshHeader.end())
@@ -1517,8 +1590,27 @@ bool LLMeshRepoThread::fetchMeshPhysicsShape(const LLUUID& mesh_id)
         }
         else
         {
-            return false;
-        }
+            LLFileSystem file(mesh_id, LLAssetType::AT_MESH);
+            if (file.getSize() >= offset+size)
+            {
+                LLMeshRepository::sCacheBytesRead += size;
+                ++LLMeshRepository::sCacheReads;
+                file.seek(offset);
+                U8* buffer = new(std::nothrow) U8[size];
+                if (!buffer)
+                {
+                    LL_WARNS(LOG_MESH) << "Failed to allocate memory for mesh decomposition, size: " << size << LL_ENDL;
+
+                    // Not sure what size is reasonable for physcis
+                    // but if 20MB allocation failed, we definetely have issues
+                    const S32 MAX_SIZE = 30 * 1024 * 1024; //30MB
+                    if (size < MAX_SIZE)
+                    {
+                        LLAppViewer::instance()->outOfMemorySoftQuit();
+                    } // else ignore failures for anomalously large data
+                    return true;
+                }
+                file.read(buffer, size);
     }
 
     if (info.mVersion <= MAX_MESH_VERSION && info.mOffset >= 0 && info.mSize > 0)
@@ -1590,6 +1682,8 @@ void LLMeshRepoThread::decActiveHeaderRequests()
 //return false if failed to get header
 bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool can_retry)
 {
+    LL_PROFILE_ZONE_SCOPED;
+    ++LLMeshRepository::sMeshRequestCount;
     {
         //look for mesh in asset in cache
         LLFileSystem file(mesh_params.getSculptID(), LLAssetType::AT_MESH);
@@ -1609,7 +1703,7 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 #ifdef SHOW_DEBUG
                 std::string mid;
                 mesh_params.getSculptID().toString(mid);
-                LL_DEBUGS(LOG_MESH) << "Mesh/Cache: Mesh header for ID " << mid << " - was retrieved from the cache." << LL_ENDL;
+                LL_DEBUGS(LOG_MESH) << "Mesh/Cache: Mesh header for ID " << mesh_params.getSculptID() << " - was retrieved from the cache." << LL_ENDL;
 #endif
                 // Found mesh in cache
                 return true;
@@ -1626,9 +1720,7 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
     if (!http_url.empty())
     {
 #ifdef SHOW_DEBUG
-        std::string mid;
-        mesh_params.getSculptID().toString(mid);
-        LL_DEBUGS(LOG_MESH) << "Mesh/Cache: Mesh header for ID " << mid << " - was retrieved from the simulator." << LL_ENDL;
+        LL_DEBUGS(LOG_MESH) << "Mesh/Cache: Mesh header for ID " << mesh_params.getSculptID() << " - was retrieved from the simulator." << LL_ENDL;
 #endif
 
         //grab first 4KB if we're going to bother with a fetch.  Cache will prevent future fetches if a full mesh fits
@@ -1658,6 +1750,11 @@ bool LLMeshRepoThread::fetchMeshHeader(const LLVolumeParams& mesh_params, bool c
 //return false if failed to get mesh lod.
 bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, bool can_retry)
 {
+    LL_PROFILE_ZONE_SCOPED;
+    if (!mHeaderMutex)
+    {
+        return false;
+    }
     const LLUUID& mesh_id = mesh_params.getSculptID();
     MeshHeaderInfo info;
     {
@@ -1681,13 +1778,28 @@ bool LLMeshRepoThread::fetchMeshLOD(const LLVolumeParams& mesh_params, S32 lod, 
         }
         else
         {
-            return false;
-        }
+
+                    // todo: for now it will result in indefinite constant retries, should result in timeout
+                    // or in retry-count and disabling mesh. (but usually viewer is beyond saving at this point)
+                    const S32 MAX_SIZE = 30 * 1024 * 1024; //30MB
+                    if (size < MAX_SIZE)
+                    {
+                        LLAppViewer::instance()->outOfMemorySoftQuit();
+                    } // else ignore failures for anomalously large data
+                    LLMutexLock lock(mMutex);
+                    mUnavailableQ.push_back(LODRequest(mesh_params, lod));
+                    return true;
+                }
+                LLMeshRepository::sCacheBytesRead += size;
+                ++LLMeshRepository::sCacheReads;
+                file.seek(offset);
+                file.read(buffer, size);
     }
 
     if(info.mVersion <= MAX_MESH_VERSION && info.mOffset >= 0 && info.mSize > 0)
     {
         if (loadInfoFromFilesystem(mesh_id, info, boost::bind(&LLMeshRepoThread::lodReceived, this, mesh_params, lod, _2, _3 )))
+                        LL_DEBUGS(LOG_MESH) << "Mesh/Cache: Mesh body for ID " << mesh_id << " - was retrieved from the cache." << LL_ENDL;
             return true;
 
         //reading from cache failed for whatever reason, fetch from sim
@@ -1749,7 +1861,7 @@ EMeshProcessingResult LLMeshRepoThread::headerReceived(const LLVolumeParams& mes
         llssize dsize = data_size;
         char* result_ptr = strip_deprecated_header((char*)data, dsize, &header_size);
 
-        data_size = dsize;
+        data_size = (S32)dsize;
 
         boost::iostreams::stream<boost::iostreams::array_source> stream(result_ptr, data_size);
 
@@ -1790,9 +1902,21 @@ EMeshProcessingResult LLMeshRepoThread::headerReceived(const LLVolumeParams& mes
 
         {
             LLMutexLock lock(mHeaderMutex);
-            mMeshHeader[mesh_id] = { header_size, header };
-            LLMeshRepository::sCacheBytesHeaders += header_size;
+            mMeshHeader[mesh_id] = { (U32)header_size, header };
+            LLMeshRepository::sCacheBytesHeaders += (U32)header_size;
         }
+
+        // immediately request SkinInfo since we'll need it before we can render any LoD if it is present
+        {
+            LLMutexLock lock(gMeshRepo.mMeshMutex);
+
+            if (gMeshRepo.mLoadingSkins.find(mesh_id) == gMeshRepo.mLoadingSkins.end())
+            {
+                gMeshRepo.mLoadingSkins[mesh_id] = {}; // add an empty vector to indicate to main thread that we are loading skin info
+            }
+        }
+
+        fetchMeshSkinInfo(mesh_id);
 
         LLMutexLock lock(mMutex); // make sure only one thread access mPendingLOD at the same time.
 
@@ -1825,6 +1949,18 @@ EMeshProcessingResult LLMeshRepoThread::lodReceived(const LLVolumeParams& mesh_p
     {
         if (volume->getNumFaces() > 0)
         {
+            // if we have a valid SkinInfo, cache per-joint bounding boxes for this LOD
+            LLMeshSkinInfo* skin_info = mSkinMap[mesh_params.getSculptID()];
+            if (skin_info && isAgentAvatarValid())
+            {
+                for (S32 i = 0; i < volume->getNumFaces(); ++i)
+                {
+                    // NOTE: no need to lock gAgentAvatarp as the state being checked is not changed after initialization
+                    LLVolumeFace& face = volume->getVolumeFace(i);
+                    LLSkinningUtil::updateRiggingInfo(skin_info, gAgentAvatarp, face);
+                }
+            }
+
             LoadedMesh mesh(volume, mesh_params, lod);
             {
                 LLMutexLock lock(mMutex);
@@ -1869,21 +2005,24 @@ EMeshProcessingResult LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, 
     }
 
     {
-        LLMeshSkinInfo* skin_info = nullptr;
-        try
-        {
-            skin_info = new LLMeshSkinInfo(mesh_id, skin);
-        }
-        catch (const std::bad_alloc& ex)
-        {
-            LL_WARNS() << "Failed to allocate skin info with exception: " << ex.what()  << LL_ENDL;
-            return MESH_OUT_OF_MEMORY;
+        LLPointer<LLMeshSkinInfo> info = nullptr;
+        info = new LLMeshSkinInfo(mesh_id, skin);
+
+        if (isAgentAvatarValid())
+        { // joint numbers are consistent inside LLVOAvatar and animations, but inconsistent inside meshes,
+            // generate a map of mesh joint numbers to LLVOAvatar joint numbers
+            LLSkinningUtil::initJointNums(info, gAgentAvatarp);
         }
 
-        // LL_DEBUGS(LOG_MESH) << "info pelvis offset" << info.mPelvisOffset << LL_ENDL;
+        // copy the skin info for the background thread so we can use it
+        // to calculate per-joint bounding boxes when volumes are loaded
+        mSkinMap[mesh_id] = new LLMeshSkinInfo(*info);
+
         {
+            // Move the LLPointer in to the skin info queue to avoid reference
+            // count modification after we leave the lock
             LLMutexLock lock(mMutex);
-            mSkinInfoQ.emplace_back(skin_info);
+            mSkinInfoQ.emplace_back(std::move(info));
         }
     }
 
@@ -2125,10 +2264,10 @@ void LLMeshUploadThread::wholeModelToLLSD(LLSD& dest, bool include_textures)
     S32 mesh_num = 0;
     S32 texture_num = 0;
 
-    std::set<LLViewerTexture* > textures;
-    std::map<LLViewerTexture*,S32> texture_index;
+    std::unordered_set<LLViewerTexture* > textures;
+    std::unordered_map<LLViewerTexture*,S32> texture_index;
 
-    std::map<LLModel*,S32> mesh_index;
+    std::unordered_map<LLModel*,S32> mesh_index;
     std::string model_name;
 
     S32 instance_num = 0;
@@ -2223,10 +2362,11 @@ void LLMeshUploadThread::wholeModelToLLSD(LLSD& dest, bool include_textures)
 
             // We want to be able to allow more than 8 materials...
             //
-            S32 end = llmin((S32)instance.mMaterial.size(), instance.mModel->getNumVolumeFaces()) ;
+            S32 end = llmin((S32)data.mBaseModel->mMaterialList.size(), instance.mModel->getNumVolumeFaces()) ;
 
             for (S32 face_num = 0; face_num < end; face_num++)
             {
+                // multiple faces can reuse the same material
                 LLImportMaterial& material = instance.mMaterial[data.mBaseModel->mMaterialList[face_num]];
                 LLSD face_entry = LLSD::emptyMap();
 
@@ -2780,7 +2920,21 @@ void LLMeshRepoThread::notifyLoadedMeshes()
         if (!mUnavailableQ.empty())
         {
             unavil_queue.swap(mUnavailableQ);
+            update_metrics = true;
+            for (const auto& req : unavil_queue)
+            {
+                gMeshRepo.notifyMeshUnavailable(req.mMeshParams, req.mLOD);
+            }
         }
+    }
+
+    if (!mSkinInfoQ.empty() || !mSkinUnavailableQ.empty() || ! mDecompositionQ.empty())
+    {
+        if (mMutex->trylock())
+        {
+            std::deque<LLPointer<LLMeshSkinInfo>> skin_info_q;
+            std::deque<UUIDBasedRequest> skin_info_unavail_q;
+            std::list<LLModel::Decomposition*> decomp_q;
 
         if (!mSkinInfoQ.empty())
         {
@@ -2956,6 +3110,7 @@ S32 LLMeshRepository::getActualMeshLOD(LLMeshHeader& header, S32 lod)
 // are cases far off the norm.
 void LLMeshHandlerBase::onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response)
 {
+    LL_PROFILE_ZONE_SCOPED;
     mProcessed = true;
 
     unsigned int retries(0U);
@@ -3168,8 +3323,6 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
             // only allocate as much space in the cache as is needed for the local cache
             data_size = llmin(data_size, bytes);
 
-            // <FS:Ansariel> Fix asset caching
-            //LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::WRITE);
             LLFileSystem file(mesh_id, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
             if (file.getMaxSize() >= bytes)
             {
@@ -3178,7 +3331,6 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
 
                 file.write(data, data_size);
 
-                // <FS:Ansariel> Fix asset caching
                 S32 remaining = bytes - file.tell();
                 if (remaining > 0)
                 {
@@ -3190,7 +3342,6 @@ void LLMeshHeaderHandler::processData(LLCore::BufferArray * /* body */, S32 /* b
                         delete[] block;
                     }
                 }
-                // </FS:Ansariel>
             }
         }
         else
@@ -3236,6 +3387,7 @@ void LLMeshLODHandler::processFailure(LLCore::HttpStatus status)
 void LLMeshLODHandler::processData(LLCore::BufferArray * /* body */, S32 /* body_offset */,
                                    U8 * data, S32 data_size)
 {
+    LL_PROFILE_ZONE_SCOPED;
     if ((!MESH_LOD_PROCESS_FAILED)
         && ((data != NULL) == (data_size > 0))) // if we have data but no size or have size but no data, something is wrong
     {
@@ -3243,8 +3395,6 @@ void LLMeshLODHandler::processData(LLCore::BufferArray * /* body */, S32 /* body
         if (result == MESH_OK)
         {
             // good fetch from sim, write to cache
-            // <FS:Ansariel> Fix asset caching
-            //LLFileSystem file(mMeshParams.getSculptID(), LLAssetType::AT_MESH, LLFileSystem::WRITE);
             LLFileSystem file(mMeshParams.getSculptID(), LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
             S32 offset = mOffset;
@@ -3303,13 +3453,12 @@ void LLMeshSkinInfoHandler::processFailure(LLCore::HttpStatus status)
 void LLMeshSkinInfoHandler::processData(LLCore::BufferArray * /* body */, S32 /* body_offset */,
                                         U8 * data, S32 data_size)
 {
+    LL_PROFILE_ZONE_SCOPED;
     if ((!MESH_SKIN_INFO_PROCESS_FAILED)
         && ((data != NULL) == (data_size > 0)) // if we have data but no size or have size but no data, something is wrong
         && gMeshRepo.mThread->skinInfoReceived(mMeshID, data, data_size) == MESH_OK)
     {
         // good fetch from sim, write to cache
-        // <FS:Ansariel> Fix asset caching
-        //LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::WRITE);
         LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
         S32 offset = mOffset;
@@ -3354,13 +3503,12 @@ void LLMeshDecompositionHandler::processFailure(LLCore::HttpStatus status)
 void LLMeshDecompositionHandler::processData(LLCore::BufferArray * /* body */, S32 /* body_offset */,
                                              U8 * data, S32 data_size)
 {
+    LL_PROFILE_ZONE_SCOPED;
     if ((!MESH_DECOMP_PROCESS_FAILED)
         && ((data != NULL) == (data_size > 0)) // if we have data but no size or have size but no data, something is wrong
         && gMeshRepo.mThread->decompositionReceived(mMeshID, data, data_size) == MESH_OK)
     {
         // good fetch from sim, write to cache
-        // <FS:Ansariel> Fix asset caching
-        //LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::WRITE);
         LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
         S32 offset = mOffset;
@@ -3403,13 +3551,12 @@ void LLMeshPhysicsShapeHandler::processFailure(LLCore::HttpStatus status)
 void LLMeshPhysicsShapeHandler::processData(LLCore::BufferArray * /* body */, S32 /* body_offset */,
                                             U8 * data, S32 data_size)
 {
+    LL_PROFILE_ZONE_SCOPED;
     if ((!MESH_PHYS_SHAPE_PROCESS_FAILED)
         && ((data != NULL) == (data_size > 0)) // if we have data but no size or have size but no data, something is wrong
         && gMeshRepo.mThread->physicsShapeReceived(mMeshID, data, data_size) == MESH_OK)
     {
         // good fetch from sim, write to cache for caching
-        // <FS:Ansariel> Fix asset caching
-        //LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::WRITE);
         LLFileSystem file(mMeshID, LLAssetType::AT_MESH, LLFileSystem::READ_WRITE);
 
         S32 offset = mOffset;
@@ -3686,8 +3833,8 @@ void LLMeshRepository::notifyLoadedMeshes()
                   ? (2 * LLAppCoreHttp::PIPELINING_DEPTH)
                   : 5);
 
-        static const LLCachedControl<U32> mesh2_max_con_req(gSavedSettings, "Mesh2MaxConcurrentRequests");
-        LLMeshRepoThread::sMaxConcurrentRequests = mesh2_max_con_req;
+    static LLCachedControl<U32> mesh2_max_req(gSavedSettings, "Mesh2MaxConcurrentRequests");
+    LLMeshRepoThread::sMaxConcurrentRequests = mesh2_max_req;
         LLMeshRepoThread::sRequestHighWater = llclamp(scale * S32(LLMeshRepoThread::sMaxConcurrentRequests),
                                                       REQUEST2_HIGH_WATER_MIN,
                                                       REQUEST2_HIGH_WATER_MAX);
@@ -3780,6 +3927,7 @@ void LLMeshRepository::notifyLoadedMeshes()
         for (auto iter = mSkinMap.begin(), ender = mSkinMap.end(); iter != ender;)
         {
             auto copy_iter = iter++;
+            LLUUID id = copy_iter->first;
 
             //skinbytes += U64Bytes(sizeof(LLMeshSkinInfo));
             //skinbytes += U64Bytes(copy_iter->second->mJointNames.size() * sizeof(std::string));
@@ -3791,6 +3939,12 @@ void LLMeshRepository::notifyLoadedMeshes()
             {
                 mSkinMap.erase(copy_iter);
             }
+
+            // erase from background thread
+            mThread->mWorkQueue.post([=]()
+                {
+                    mThread->mSkinMap.erase(id);
+                });
         }
         //LL_INFOS() << "Skin info cache elements:" << mSkinMap.size() << " Memory: " << U64Kilobytes(skinbytes) << LL_ENDL;
     }
@@ -4157,7 +4311,7 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
         {
             LLMutexLock lock(mMeshMutex);
             //add volume to list of loading meshes
-            std::set<LLUUID>::iterator iter = mLoadingPhysicsShapes.find(mesh_id);
+            std::unordered_set<LLUUID>::iterator iter = mLoadingPhysicsShapes.find(mesh_id);
             if (iter == mLoadingPhysicsShapes.end())
             { //no request pending for this skin info
                 mLoadingPhysicsShapes.insert(mesh_id);
@@ -4186,7 +4340,7 @@ LLModel::Decomposition* LLMeshRepository::getDecomposition(const LLUUID& mesh_id
         {
             LLMutexLock lock(mMeshMutex);
             //add volume to list of loading meshes
-            std::set<LLUUID>::iterator iter = mLoadingDecompositions.find(mesh_id);
+            std::unordered_set<LLUUID>::iterator iter = mLoadingDecompositions.find(mesh_id);
             if (iter == mLoadingDecompositions.end())
             { //no request pending for this skin info
                 mLoadingDecompositions.insert(mesh_id);
@@ -4237,6 +4391,8 @@ bool LLMeshRepository::hasPhysicsShape(const LLUUID& mesh_id)
 
 bool LLMeshRepository::hasSkinInfo(const LLUUID& mesh_id)
 {
+    LL_PROFILE_ZONE_SCOPED;
+
     if (mesh_id.isNull())
     {
         return false;
@@ -4726,12 +4882,13 @@ F32 LLMeshCostData::getEstTrisForStreamingCost()
 
 F32 LLMeshCostData::getRadiusBasedStreamingCost(F32 radius)
 {
-    return getRadiusWeightedTris(radius)/gSavedSettings.getU32("MeshTriangleBudget")*15000.f;
+    static LLCachedControl<U32> mesh_triangle_budget(gSavedSettings, "MeshTriangleBudget");
+    return getRadiusWeightedTris(radius)/mesh_triangle_budget*15000.f;
 }
 
 F32 LLMeshCostData::getTriangleBasedStreamingCost()
 {
-    F32 result = ANIMATED_OBJECT_COST_PER_KTRI * 0.001 * getEstTrisForStreamingCost();
+    F32 result = ANIMATED_OBJECT_COST_PER_KTRI * 0.001f * getEstTrisForStreamingCost();
     return result;
 }
 
@@ -5339,8 +5496,8 @@ bool LLMeshRepository::meshUploadEnabled()
 
 bool LLMeshRepository::meshRezEnabled()
 {
+    static LLCachedControl<bool> mesh_enabled(gSavedSettings, "MeshEnabled");
     LLViewerRegion *region = gAgent.getRegion();
-    static const LLCachedControl<bool> mesh_enabled(gSavedSettings, "MeshEnabled", true);
     if(mesh_enabled &&
        region)
     {
@@ -5479,7 +5636,7 @@ void on_new_single_inventory_upload_complete(
                 LL_INFOS() << "inventory_item_flags " << inventory_item_flags << LL_ENDL;
             }
         }
-        S32 creation_date_now = time_corrected();
+        S32 creation_date_now = (S32)time_corrected();
         LLPointer<LLViewerInventoryItem> item = new LLViewerInventoryItem(
             server_response["new_inventory_item"].asUUID(),
             item_folder_id,

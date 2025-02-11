@@ -34,7 +34,7 @@
 #include <thread>
 
 #if LL_WINDOWS
-#   include "llwin32headerslean.h"
+#   include "llwin32headers.h"
 #elif LL_LINUX || LL_DARWIN
 #   include <errno.h>
 #   include <sys/time.h>
@@ -111,7 +111,7 @@ U32 micro_sleep(U64 us, U32 max_yields)
 
 U32 micro_sleep(U64 us, U32 max_yields)
 {
-    LL_PROFILE_ZONE_SCOPED
+    LL_PROFILE_ZONE_SCOPED;
 #if 0
     LARGE_INTEGER ft;
     ft.QuadPart = -static_cast<S64>(us * 10);  // '-' using relative time
@@ -121,7 +121,7 @@ U32 micro_sleep(U64 us, U32 max_yields)
     WaitForSingleObject(timer, INFINITE);
     CloseHandle(timer);
 #else
-    Sleep(us / 1000);
+    Sleep((DWORD)(us / 1000));
 #endif
 
     return 0;
@@ -129,7 +129,7 @@ U32 micro_sleep(U64 us, U32 max_yields)
 
 void ms_sleep(U32 ms)
 {
-    LL_PROFILE_ZONE_SCOPED
+    LL_PROFILE_ZONE_SCOPED;
     micro_sleep(ms * 1000, 0);
 }
 

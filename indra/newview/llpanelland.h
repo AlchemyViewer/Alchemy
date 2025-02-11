@@ -59,14 +59,14 @@ protected:
     static LLPanelLandSelectObserver* sObserver;
     static LLPanelLandInfo* sInstance;
 private:
-    LLCheckBoxCtrl  *mCheckShowOwners;
-    LLButton* mButtonBuyLand;
-    LLButton* mButtonAbandonLand;
-    LLButton* mButtonSubdivLand;
-    LLButton* mButtonJoinLand;
-    LLButton* mButtonAboutLand;
-    LLTextBox* mTextArea;
-    LLTextBox* mTextAreaPrice;
+    LLCheckBoxCtrl  *mCheckShowOwners = nullptr;
+    LLButton* mButtonBuyLand = nullptr;
+    LLButton* mButtonAbandonLand = nullptr;
+    LLButton* mButtonSubdivLand = nullptr;
+    LLButton* mButtonJoinLand = nullptr;
+    LLButton* mButtonAboutLand = nullptr;
+    LLTextBox* mTextArea = nullptr;
+    LLTextBox* mTextAreaPrice = nullptr;
 };
 
 #endif

@@ -171,6 +171,13 @@ public:
         LLSD& operator=(LLSD&& other) noexcept;
     //@}
 
+    /** @name Movable */
+    //@{
+        LLSD(LLSD&& other) noexcept;
+        void  assign(LLSD&& other);
+        LLSD& operator=(LLSD&& other) noexcept;
+    //@}
+
     void clear();   ///< resets to Undefined
 
 
@@ -288,7 +295,7 @@ public:
         UUID    asUUID() const;
         Date    asDate() const;
         URI     asURI() const;
-        const Binary&   asBinary() const;
+        const Binary& asBinary() const;
 
         // Direct access to underlying map. Will return empty map on any non-map type.
         map_t& asMap();
@@ -299,7 +306,11 @@ public:
         const array_t& asArray() const;
 
         // asStringRef on any non-string type will return a ref to an empty string.
-        const String&   asStringRef() const;
+        const String& asStringRef() const;
+
+        // Return "<value><((type))>((scalar value or recursive calls))</((type))></value>"
+        // See http://xmlrpc.com/spec.md
+        String asXMLRPCValue() const;
 
         operator Boolean() const    { return asBoolean(); }
         operator Integer() const    { return asInteger(); }
@@ -312,7 +323,7 @@ public:
 
         // This is needed because most platforms do not automatically
         // convert the boolean negation as a bool in an if statement.
-        bool operator!() const {return !asBoolean();}
+        bool operator!() const { return !asBoolean(); }
     //@}
 
     /** @name Character Pointer Helpers
@@ -332,14 +343,20 @@ public:
         bool has(const std::string_view) const;
         LLSD get(const std::string_view) const;
         LLSD getKeys() const;               // Return an LLSD array with keys as strings
-        void insert(const std::string_view, const LLSD&);
+        void insert(std::string_view, const LLSD&);
         void erase(const String&);
-        LLSD& with(const std::string_view, const LLSD&);
+        LLSD& with(std::string_view, const LLSD&);
 
         LLSD& operator[](const std::string_view);
-        LLSD& operator[](const char* c) { return (*this)[al::safe_string_view(c)]; }
+        LLSD& operator[](const char* c)
+        {
+            return c ? (*this)[std::string_view(c)] : *this;
+        }
         const LLSD& operator[](const std::string_view) const;
-        const LLSD& operator[](const char* c) const { return (*this)[al::safe_string_view(c)]; }
+        const LLSD& operator[](const char* c) const
+        {
+            return c ? (*this)[std::string_view(c)] : *this;
+        }
     //@}
 
     /** @name Array Values */

@@ -121,6 +121,7 @@ public:
         SKY_HDR_SCALE,                      //  "sky_hdr_scale"
         SKY_SUNLIGHT_SCALE,                 //  "sky_sunlight_scale"
         SKY_AMBIENT_SCALE,                  //  "sky_ambient_scale"
+        CLASSIC_MODE,                       //  "classic_mode"
         BLUE_HORIZON,                       //  "blue_horizon"
         BLUE_DENSITY,                       //  "blue_density"
         HAZE_HORIZON,                       //  "haze_horizon"
@@ -275,6 +276,7 @@ public:
         TERRAIN_DETAIL3,                    //  "detail_3"
 
         TERRAIN_ALPHARAMP,                  //  "alpha_ramp"
+        TERRAIN_PAINTMAP,                   //  "paint_map"
 
         TERRAIN_DETAIL0_BASE_COLOR,                //  "detail_0_base_color" (GLTF)
         TERRAIN_DETAIL1_BASE_COLOR,                //  "detail_1_base_color" (GLTF)
@@ -298,6 +300,8 @@ public:
         TERRAIN_ROUGHNESS_FACTORS,                 //  "roughnessFactors" (GLTF)
         TERRAIN_EMISSIVE_COLORS,                   //  "emissiveColors" (GLTF)
         TERRAIN_MINIMUM_ALPHAS,                    //  "minimum_alphas" (GLTF)
+
+        REGION_SCALE,                              //  "region_scale" (GLTF)
 
         SHINY_ORIGIN,                       //  "origin"
         DISPLAY_GAMMA,                      //  "display_gamma"
@@ -338,6 +342,11 @@ public:
         DEBUG_NORMAL_DRAW_LENGTH,           //  "debug_normal_draw_length"
         COLORGRADE_LUT,                     //  "colorgrade_lut"
         COLORGRADE_LUT_SIZE,                //  "colorgrade_lut_size"
+
+        SMAA_EDGE_TEX,                      //  "edgesTex"
+        SMAA_AREA_TEX,                      //  "areaTex"
+        SMAA_SEARCH_TEX,                    //  "searchTex"
+        SMAA_BLEND_TEX,                     //  "blendTex"
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
@@ -387,7 +396,6 @@ public:
     bool mShaderCacheInitialized = false;
     bool mShaderCacheEnabled = false;
     std::string mShaderCacheDir;
-    static bool sMirrorsEnabled;
 
 protected:
 

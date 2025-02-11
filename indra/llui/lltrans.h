@@ -57,17 +57,17 @@ public:
 class LLTrans
 {
 public:
-    LLTrans();
+    LLTrans() = default;
 
     /**
      * @brief Parses the xml root that holds the strings. Used once on startup
-// *FIXME    * @param xml_filename Filename to parse
+     * @param root xml root node to parse
      * @param default_args Set of strings (expected to be in the file) to use as default replacement args, e.g. "SECOND_LIFE"
      * @returns true if the file was parsed successfully, true if something went wrong
      */
-    static bool parseStrings(LLPointer<LLXMLNode> & root, const std::set<std::string>& default_args);
+    static bool parseStrings(LLXMLNodePtr& root, const std::set<std::string>& default_args);
 
-    static bool parseLanguageStrings(LLPointer<LLXMLNode> & root);
+    static bool parseLanguageStrings(LLXMLNodePtr& root);
 
     /**
      * @brief Returns a translated string
@@ -86,7 +86,7 @@ public:
     // special per-language logic for plural nouns.  For example, some languages
     // may have different plurals for 0, 1, 2 and > 2.
     // See "AgeWeeksA", "AgeWeeksB", etc. in strings.xml for examples.
-    static std::string getCountString(const std::string_view language, const std::string_view xml_desc, S32 count);
+    static std::string getCountString(std::string_view language, std::string_view xml_desc, S32 count);
 
     /**
      * @brief Returns a translated string

@@ -33,9 +33,6 @@
 #include "stringize.h"
 #include "llsdserialize.h"
 
-// llmessage (!)
-#include "llfiltersd2xmlrpc.h" // for xml_escape_string()
-
 // login
 #include "lllogin.h"
 
@@ -619,13 +616,14 @@ std::string construct_start_string()
         {
             // a startup URL was specified
             LLVector3 position = start_slurl.getPosition();
-            std::string unescaped_start =
+            // NOTE - do not xml escape here, will get escaped properly later by LLSD::asXMLRPCValue()
+            // see secondlife/viewer#2395
+            start =
             STRINGIZE(  "uri:"
                       << start_slurl.getRegion() << "&"
                         << position[VX] << "&"
                         << position[VY] << "&"
                         << position[VZ]);
-            start = xml_escape_string(unescaped_start);
             break;
         }
         case LLSLURL::HOME_LOCATION:

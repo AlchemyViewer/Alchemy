@@ -646,9 +646,10 @@ class LLManifest(object, metaclass=LLManifestRegistry):
             'vers':'_'.join(self.args['version'])}
         print("Creating unpacked file:", unpacked_file_name)
         # could add a gz here but that doubles the time it takes to do this step
-        with tarfile.open(self.src_path_of(unpacked_file_name), 'w:') as tf:
-            # add the entire installation package, at the very top level
-            tf.add(self.get_dst_prefix(), "")
+        tf = tarfile.open(self.build_path_of(unpacked_file_name), 'w:')
+        # add the entire installation package, at the very top level
+        tf.add(self.get_dst_prefix(), "")
+        tf.close()
 
     def cleanup_finish(self):
         """ Delete paths that were specified to have been created by this script"""

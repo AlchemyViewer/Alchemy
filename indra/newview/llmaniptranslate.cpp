@@ -1690,12 +1690,9 @@ void LLManipTranslate::highlightIntersection(LLVector3 normal,
             normal = -normal;
         }
         F32 d = -(selection_center * normal);
-        LLVector4a plane(normal.mV[0], normal.mV[1], normal.mV[2], d );
+        glm::vec4 plane(normal.mV[0], normal.mV[1], normal.mV[2], d );
 
-        LLMatrix4a inv_mat = gGL.getModelviewMatrix();
-        inv_mat.invert();
-        inv_mat.transpose();
-        inv_mat.rotate4(plane,plane);
+        plane = glm::inverse(gGL.getModelviewMatrix()) * plane;
 
         static LLStaticHashedString sClipPlane("clip_plane");
         gClipProgram.uniform4fv(sClipPlane, 1, plane.getF32ptr());

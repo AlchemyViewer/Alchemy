@@ -202,6 +202,8 @@ public:
     static bool isExiting(); // Either quitting or error (app is exiting, cleanly or not)
     static int getPid();
 
+    static void notifyOutOfDiskSpace();
+
     //
     // Sleep for specified time while still running
     //
@@ -291,6 +293,8 @@ protected:
       */
     void stepFrame();
 
+    virtual void sendOutOfDiskSpaceNotification();
+
 private:
     std::string mStaticDebugFileName;
     std::string mDynamicDebugFileName;
@@ -322,8 +326,12 @@ private:
     friend void default_unix_signal_handler(int signum, siginfo_t *info, void *);
 #endif
 
-public:
-    static bool sLogInSignal;
+private:
+#ifdef LL_RELEASE_FOR_DOWNLOAD
+    static constexpr bool sLogInSignal = false;
+#else
+    static constexpr bool sLogInSignal = true;
+#endif
 };
 
 #endif // LL_LLAPP_H

@@ -158,7 +158,7 @@ void LLTeleportHistoryStorage::addItem(const std::string grid, const std::string
     S32 removed_index = -1;
     if (item_iter != mItems.end())
     {
-        removed_index = item_iter - mItems.begin();
+        removed_index = (S32)(item_iter - mItems.begin());
         mItems.erase(item_iter);
     }
 

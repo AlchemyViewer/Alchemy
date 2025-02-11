@@ -189,7 +189,6 @@ protected:
     toast_list_t m_toast_pool;
 
     bool    mStopProcessing;
-    bool    mChannelRect;
 
 // [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
     boost::signals2::connection mChatBarReshapeConnection;
@@ -310,8 +309,8 @@ bool    LLFloaterIMNearbyChatScreenChannel::createPoolToast()
 
     LLToast::Params p;
     p.panel = panel;
-    p.lifetime_secs = gSavedSettings.getS32("NearbyToastLifeTime");
-    p.fading_time_secs = gSavedSettings.getS32("NearbyToastFadingTime");
+    p.lifetime_secs = (F32)gSavedSettings.getS32("NearbyToastLifeTime");
+    p.fading_time_secs = (F32)gSavedSettings.getS32("NearbyToastFadingTime");
 
     LLToast* toast = new LLFloaterIMNearbyChatToast(p, this);
 
@@ -718,14 +717,13 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 
         if (gSavedSettings.getS32("ShowScriptErrorsLocation") == 1)// show error in window //("ScriptErrorsAsChat"))
         {
-
-            LLColor4 txt_color;
-
-            LLViewerChat::getChatColor(chat_msg,txt_color);
+            LLUIColor txt_color;
+            F32 alpha = 1.f;
+            LLViewerChat::getChatColor(chat_msg, txt_color, alpha);
 
             LLFloaterScriptDebug::addScriptLine(chat_msg.mText,
                                                 chat_msg.mFromName,
-                                                txt_color,
+                                                txt_color % alpha,
                                                 chat_msg.mFromID);
             return;
         }
@@ -834,6 +832,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
         //      return;
         //  }
         //}
+
 
         //Will show toast when chat preference is set
         if((gSavedSettings.getString("NotificationNearbyChatOptions") == "toast"))

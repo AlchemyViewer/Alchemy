@@ -41,7 +41,7 @@
 
 #include "llagentbenefits.h"
 
-constexpr S32 MAX_TEXTURE_SIZE = 1024 ; //max upload texture size 1024 * 1024
+constexpr S32 MAX_TEXTURE_SIZE = 2048 ; //max upload texture size 2048 * 2048
 
 S32 power_of_two(S32 sz, S32 upper)
 {
@@ -61,6 +61,8 @@ LLPanelSnapshot::LLPanelSnapshot()
 // virtual
 bool LLPanelSnapshot::postBuild()
 {
+    S32 w = getTypedPreviewWidth();
+    S32 h = getTypedPreviewHeight();
     getChild<LLUICtrl>("save_btn")->setLabelArg("[UPLOAD_COST]", fmt::to_string(LLAgentBenefitsMgr::current().getTextureUploadCost()));
     getChild<LLUICtrl>(getImageSizeComboName())->setCommitCallback(boost::bind(&LLPanelSnapshot::onResolutionComboCommit, this, _1));
     if (!getWidthSpinnerName().empty())
@@ -211,12 +213,12 @@ void LLPanelSnapshot::onCustomResolutionCommit()
         S32 width = widthSpinner->getValue().asInteger();
         width = power_of_two(width, MAX_TEXTURE_SIZE);
         info["w"] = width;
-        widthSpinner->setIncrement(width >> 1);
+        widthSpinner->setIncrement((F32)(width >> 1));
         widthSpinner->forceSetValue(width);
         S32 height =  heightSpinner->getValue().asInteger();
         height = power_of_two(height, MAX_TEXTURE_SIZE);
-        heightSpinner->setIncrement(height >> 1);
-        heightSpinner->forceSetValue(height);
+        heightSpinner->setIncrement((F32)(height >> 1));
+        heightSpinner->forceSetValue((F32)height);
         info["h"] = height;
     }
     else

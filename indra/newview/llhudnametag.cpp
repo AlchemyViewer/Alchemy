@@ -228,35 +228,20 @@ void LLHUDNameTag::render()
     if (sDisplayText)
     {
         LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
-        //LLGLDisable gls_stencil(GL_STENCIL_TEST);
-        renderText(false);
+        renderText();
     }
 }
 
-void LLHUDNameTag::renderText(bool for_select)
+void LLHUDNameTag::renderText()
 {
     if (!mVisible || mHidden)
     {
         return;
     }
 
-    // don't pick text that isn't bound to a viewerobject
-    if (for_select &&
-        (!mSourceObject || mSourceObject->mDrawable.isNull()))
-    {
-        return;
-    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    if (for_select)
-    {
-        gGL.getTexUnit(0)->disable();
-    }
-    else
-    {
-        gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
-    }
-
-    LLGLState gls_blend(GL_BLEND, !for_select);
+    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
 
     LLColor4 shadow_color(0.f, 0.f, 0.f, 1.f);
     F32 alpha_factor = 1.f;
@@ -282,10 +267,10 @@ void LLHUDNameTag::renderText(bool for_select)
     static LLCachedControl<F32> name_tag_linepad(gSavedSettings, "NameTagLinePad", 3.f); // aka "leading"
 
     // *TODO: make this a per-text setting
-    static const LLUIColor nametag_bg_color = LLUIColorTable::instance().getColor("NameTagBackground");
+    static LLCachedControl<F32> bubble_opacity(gSavedSettings, "ChatBubbleOpacity");
+    static LLUIColor nametag_bg_color = LLUIColorTable::instance().getColor("NameTagBackground");
     LLColor4 bg_color = nametag_bg_color;
-    static const LLCachedControl<F32> chat_bubble_opacity_cc(gSavedSettings, "ChatBubbleOpacity");
-    bg_color.setAlpha(chat_bubble_opacity_cc * alpha_factor);
+    bg_color.setAlpha(bubble_opacity * alpha_factor);
 
     // scale screen size of borders down
     //RN: for now, text on hud objects is never occluded
@@ -345,8 +330,7 @@ void LLHUDNameTag::renderText(bool for_select)
                 x_offset = -0.5f * mWidth + (name_tag_hpad / 2.f);
             }
 
-            LLColor4 label_color(0.f, 0.f, 0.f, 1.f);
-            label_color.mV[VALPHA] = alpha_factor;
+            LLColor4 label_color(0.f, 0.f, 0.f, alpha_factor);
             hud_render_text(segment_iter->getText(), render_position, *fontp, segment_iter->mStyle, LLFontGL::NO_SHADOW, x_offset, y_offset, label_color, false);
         }
     }
@@ -397,10 +381,6 @@ void LLHUDNameTag::renderText(bool for_select)
     }
     /// Reset the default color to white.  The renderer expects this to be the default.
     gGL.color4f(1.0f, 1.0f, 1.0f, 1.0f);
-    if (for_select)
-    {
-        gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
-    }
 }
 
 void LLHUDNameTag::setString(const std::string &text_utf8)
@@ -453,8 +433,8 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                     {
                         // token does does not fit into signle line, need to draw "...".
                         // Use four dots for ellipsis width to generate padding
-                        static const LLWString dots_pad(utf8str_to_wstring(std::string("....")));
-                        S32 elipses_width = font->getWidthF32(dots_pad.c_str());
+                        const LLWString dots_pad(utf8str_to_wstring(std::string("....")));
+                        S32 elipses_width = (S32)font->getWidthF32(dots_pad.c_str());
                         // truncated string length
                         segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels - elipses_width, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
                         static const LLWString dots(utf8str_to_wstring(std::string("...")));
@@ -793,7 +773,7 @@ void LLHUDNameTag::updateAll()
     }
 
     LLTrace::CountStatHandle<>* camera_vel_stat = LLViewerCamera::getVelocityStat();
-    F32 camera_vel = LLTrace::get_frame_recording().getLastRecording().getPerSec(*camera_vel_stat);
+    F32 camera_vel = (F32)LLTrace::get_frame_recording().getLastRecording().getPerSec(*camera_vel_stat);
     if (camera_vel > MAX_STABLE_CAMERA_VELOCITY)
     {
         return;

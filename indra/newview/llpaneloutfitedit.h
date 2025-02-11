@@ -221,9 +221,14 @@ private:
     LLButton*           mFolderViewBtn;
     LLButton*           mListViewBtn;
     LLButton*           mPlusBtn;
+    LLButton*           mShowAddWearablesBtn = nullptr;
+    LLButton*           mFilterBtn = nullptr;
     LLPanel*            mAddWearablesPanel;
-    LLTextBox*          mAvatarComplexityLabel;
-    LLTextBox*          mAvatarComplexityAddingLabel;
+    LLPanel*            mOutfitNameStatusPanel = nullptr;
+    LLLoadingIndicator* mLoadingIndicator = nullptr;
+    LLView*             mFilterPanel = nullptr;
+    LLUICtrl*           mNoAddWearablesButtonBar = nullptr;
+    LLUICtrl*           mAddWearablesButtonBar = nullptr;
 
     LLComboBox*         mFolderViewFilterCmbBox;
     LLComboBox*         mListViewFilterCmbBox;

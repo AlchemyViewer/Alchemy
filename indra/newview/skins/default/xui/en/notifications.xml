@@ -2516,6 +2516,26 @@ Unable to upload [FILE] due to the following reason: [REASON]
 Please try again later.
   <tag>fail</tag>
   </notification>
+    
+  <notification
+   icon="alertmodal.tga"
+   name="CannotUploadSnapshotEmailTooBig"
+   type="alertmodal">
+Unable to upload snapshot [FILE] due to the following reason: [REASON]
+
+File might be too big, try reducing resolution, quality or try again later.
+  <tag>fail</tag>
+  </notification>
+    
+  <notification
+   icon="alertmodal.tga"
+   name="CannotUploadSnapshotWebTooBig"
+   type="alertmodal">
+Unable to upload snapshot.
+
+File might be too big, try reducing resolution or try again later.
+  <tag>fail</tag>
+  </notification>
 
   <notification
    icon="notifytip.tga"
@@ -3177,6 +3197,15 @@ Unable to save &apos;[NAME]&apos; to wearable file.  You will need to free up so
 Unable to save [NAME] to central asset store.
 This is usually a temporary failure. Please customize and save the wearable again in a few minutes.
   <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="OutOfDiskSpace"
+   type="notifytip">
+The system is out of disk space. You will need to free up some space on your computer or clear the cache.
+<tag>fail</tag>
+    <unique/>
   </notification>
 
   <notification
@@ -4398,6 +4427,20 @@ Unable to add estate manager [AGENT] to banned list.
    name="CanNotChangeAppearanceUntilLoaded"
    type="alertmodal">
 Can&apos;t change appearance until clothing and shape are loaded.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="UsavedWearableChanges"
+   type="alertmodal">
+You have unsaved changes.
+      <tag>group</tag>
+    <tag>confirm</tag>
+    <usetemplate
+     ignoretext="Confirm before I discard unsaved wearable changes"
+     name="okcancelignore"
+     notext="Keep Editing"
+     yestext="Discard"/>
   </notification>
 
   <notification
@@ -8989,7 +9032,11 @@ One or more of your Voice Morphs will expire in less than [INTERVAL] days.
 
 If you are a Premium Member, [[PREMIUM_URL] click here] to receive your voice morphing perk.
   <tag>fail</tag>
-    <tag>voice</tag>
+  <tag>voice</tag>
+  <usetemplate
+      ignoretext="Warn me about voice morph expiring"
+      name="okignore"
+      yestext="OK"/>
   </notification>
 
   <notification
@@ -9223,7 +9270,6 @@ Your voice has been muted by moderator.
           name="okbutton"
           yestext="OK"/>
     </notification>
-
    <notification
     icon="alertmodal.tga"
     name="BulkUploadCostConfirmation"
@@ -10293,12 +10339,6 @@ Do you wish to continue?
      notext="Cancel"
      yestext="OK"/>
   </notification>
-
-  <global name="UnsupportedIntelDriver">
-The installed Intel graphics driver for [GPUNAME], version [VERSION], is significantly out of date and is known to cause excessive rates of program crashes. You are strongly advised to update to a current Intel driver
-
-Do you want to check the Intel driver website?
-  </global>
 
   <global name="UnsupportedCPUAmount">
 796

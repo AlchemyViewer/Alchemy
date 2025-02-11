@@ -44,6 +44,7 @@
 #include "llinstancetracker.h"
 
 #include "llglheaders.h"
+#include "glm/mat4x4.hpp"
 
 extern bool gDebugGL;
 extern bool gDebugSession;
@@ -90,6 +91,7 @@ public:
     S32 mGLMaxTextureSize;
     F32 mMaxAnisotropy = 0.f;
     S32 mMaxUniformBlockSize = 0;
+    S32 mMaxVaryingVectors = 0;
 
     // GL 4.x capabilities
     bool mHasCubeMapArray = false;
@@ -101,13 +103,15 @@ public:
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;
-    bool mHasNVXMemInfo = false;
-    bool mHasATIMemInfo = false;
-    bool mHasTextureFilterAnisotropic = false;
+    bool mHasNVXGpuMemoryInfo = false;
 
     bool mIsAMD;
     bool mIsNVIDIA;
     bool mIsIntel;
+    bool mIsApple = false;
+
+    // hints to the render pipe
+    U32 mDownScaleMethod = 0; // see settings.xml RenderDownScaleMethod
 
 #if LL_DARWIN
     // Needed to distinguish problem cards on older Macs that break with Materials
@@ -320,7 +324,7 @@ class LLGLUserClipPlane
 {
 public:
 
-    LLGLUserClipPlane(const LLPlane& plane, const LLMatrix4a& modelview, const LLMatrix4a& projection, bool apply = true);
+    LLGLUserClipPlane(const LLPlane& plane, const glm::mat4& modelview, const glm::mat4& projection, bool apply = true);
     ~LLGLUserClipPlane();
 
     void setPlane(F32 a, F32 b, F32 c, F32 d);
@@ -332,7 +336,10 @@ private:
     LL_ALIGN_16(LLMatrix4a mModelview);
 
     bool mApply;
-} LL_ALIGN_POSTFIX(16);
+
+    glm::mat4 mProjection;
+    glm::mat4 mModelview;
+};
 
 /*
   Modify and load projection matrix to push depth values to far clip plane.
@@ -345,9 +352,9 @@ class LLGLSquashToFarClip
 {
 public:
     LLGLSquashToFarClip();
-    LLGLSquashToFarClip(const LLMatrix4a& projection, U32 layer = 0);
+    LLGLSquashToFarClip(const glm::mat4& projection, U32 layer = 0);
 
-    void setProjectionMatrix(const LLMatrix4a& P_in, U32 layer);
+    void setProjectionMatrix(glm::mat4 projection, U32 layer);
 
     ~LLGLSquashToFarClip();
 };

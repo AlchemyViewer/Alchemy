@@ -39,9 +39,9 @@
 LLFloaterReg::instance_list_t LLFloaterReg::sNullInstanceList;
 LLFloaterReg::instance_map_t LLFloaterReg::sInstanceMap;
 LLFloaterReg::build_map_t LLFloaterReg::sBuildMap;
-LLFloaterReg::group_map_t LLFloaterReg::sGroupMap;
+std::map<std::string, std::string, std::less<>> LLFloaterReg::sGroupMap;
 bool LLFloaterReg::sBlockShowFloaters = false;
-boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> LLFloaterReg::sAlwaysShowableList;
+std::set<std::string, std::less<>> LLFloaterReg::sAlwaysShowableList;
 
 static LLFloaterRegListener sFloaterRegListener;
 
@@ -61,7 +61,7 @@ void LLFloaterReg::add(const std::string& name, const std::string& filename, con
 }
 
 //static
-bool LLFloaterReg::isRegistered(const std::string& name)
+bool LLFloaterReg::isRegistered(std::string_view name)
 {
     return sBuildMap.find(name) != sBuildMap.end();
 }

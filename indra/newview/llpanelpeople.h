@@ -42,6 +42,8 @@ class LLGroupList;
 class LLMenuButton;
 class LLTabContainer;
 class LLNetMap;
+class LLAccordionCtrl;
+class LLAccordionCtrlTab;
 
 class LLPanelPeople
     : public LLPanel
@@ -159,6 +161,11 @@ private:
     LLGroupList*            mGroupList;
     LLNetMap*               mMiniMap;
 
+
+    LLAccordionCtrl* mFriendsAccordion = nullptr;
+    LLAccordionCtrlTab*     mFriendsAllTab = nullptr;
+    LLAccordionCtrlTab*     mFriendsOnlineTab = nullptr;
+
     LLButton*               mNearbyGearBtn = nullptr;
     LLButton*               mFriendsGearBtn = nullptr;
     LLButton*               mRecentGearBtn = nullptr;
@@ -169,7 +176,6 @@ private:
     LLUICtrl*               mFriendsDelFriendBtn = nullptr;
 
     LLTextBox*              mGroupCountText = nullptr;
-    LLTextBox*              mNearbyCountText = nullptr;
 
     std::vector<std::string> mSavedOriginalFilters;
     std::vector<std::string> mSavedFilters;

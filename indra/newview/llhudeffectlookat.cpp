@@ -38,6 +38,7 @@
 #include "llvoavatarself.h" // for gAgentAvatarp
 #include "lldrawable.h"
 #include "llviewerobjectlist.h"
+#include "llviewercontrol.h"
 #include "llrendersphere.h"
 #include "llselectmgr.h"
 #include "llglheaders.h"
@@ -633,8 +634,16 @@ void LLHUDEffectLookAt::update()
     {
         if (calcTargetPosition())
         {
+            static LLCachedControl<bool> disable_look_at(gSavedSettings, "DisableLookAtAnimation", true);
             LLMotion* head_motion = ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->findMotion(ANIM_AGENT_HEAD_ROT);
-            if (!head_motion || head_motion->isStopped())
+            if (disable_look_at())
+            {
+                if (head_motion)
+                {
+                    ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->stopMotion(ANIM_AGENT_HEAD_ROT);
+                }
+            }
+            else if (!head_motion || head_motion->isStopped())
             {
                 ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->startMotion(ANIM_AGENT_HEAD_ROT);
             }
@@ -737,7 +746,15 @@ bool LLHUDEffectLookAt::calcTargetPosition()
     if (!mTargetPos.isFinite())
         return false;
 
-    source_avatar->setAnimationData("LookAtPoint", (void *)&mTargetPos);
+    static LLCachedControl<bool> disable_look_at(gSavedSettings, "DisableLookAtAnimation", true);
+    if (disable_look_at())
+    {
+        source_avatar->removeAnimationData("LookAtPoint");
+    }
+    else
+    {
+        source_avatar->setAnimationData("LookAtPoint", (void*)&mTargetPos);
+    }
 
     return true;
 }

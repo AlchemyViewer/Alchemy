@@ -2467,18 +2467,16 @@ void ungroup_folder_items(const LLUUID& folder_id)
     LLInventoryModel::cat_array_t cats = *cat_array;
     LLInventoryModel::item_array_t items = *item_array;
 
-    for (LLInventoryModel::cat_array_t::const_iterator cat_iter = cats.begin(); cat_iter != cats.end(); ++cat_iter)
+    for (const LLPointer<LLViewerInventoryCategory>& cat : cats)
     {
-        LLViewerInventoryCategory* cat = *cat_iter;
         if (cat)
         {
             gInventory.changeCategoryParent(cat, new_cat_uuid, false);
         }
     }
-    for (LLInventoryModel::item_array_t::const_iterator item_iter = items.begin(); item_iter != items.end(); ++item_iter)
+    for (const LLPointer<LLViewerInventoryItem>& item : items)
     {
-        LLViewerInventoryItem* item = *item_iter;
-        if(item)
+        if (item)
         {
             gInventory.changeItemParent(item, new_cat_uuid, false);
         }
@@ -2491,8 +2489,7 @@ std::string get_searchable_description(LLInventoryModel* model, const LLUUID& it
 {
     if (model)
     {
-        const LLInventoryItem *item = model->getItem(item_id);
-        if(item)
+        if (const LLInventoryItem* item = model->getItem(item_id))
         {
             std::string desc = item->getDescription();
             LLStringUtil::toUpper(desc);
@@ -2506,8 +2503,7 @@ std::string get_searchable_creator_name(LLInventoryModel* model, const LLUUID& i
 {
     if (model)
     {
-        const LLInventoryItem *item = model->getItem(item_id);
-        if(item)
+        if (const LLInventoryItem* item = model->getItem(item_id))
         {
             LLAvatarName av_name;
             const auto& creatorId {item->getCreatorUUID()};
@@ -3705,11 +3701,11 @@ void LLInventoryAction::onItemsRemovalConfirmation(const LLSD& notification, con
                                                               {
                                                                   for (const LLUUID& id : item_deletion_list)
                                                                   {
-                                                                      remove_inventory_item(id, NULL);
+                                                                      gInventory.removeItem(id);
                                                                   }
                                                                   for (const LLUUID& id : cat_deletion_list)
                                                                   {
-                                                                      remove_inventory_category(id, NULL);
+                                                                      gInventory.removeCategory(id);
                                                                   }
                                                               });
         }

@@ -399,9 +399,9 @@ void LLPanelPlaceProfile::displaySelectedParcelInfo(LLParcel* parcel,
     mPosRegion.setVec((F32)(pos_global.mdV[VX] - global_origin.mdV[VX]),
                       (F32)(pos_global.mdV[VY] - global_origin.mdV[VY]),
                       (F32)pos_global.mdV[VZ]);
-    parcel_data.global_x = pos_global.mdV[VX];
-    parcel_data.global_y = pos_global.mdV[VY];
-    parcel_data.global_z = pos_global.mdV[VZ];
+    parcel_data.global_x = (F32)pos_global.mdV[VX];
+    parcel_data.global_y = (F32)pos_global.mdV[VY];
+    parcel_data.global_z = (F32)pos_global.mdV[VZ];
     parcel_data.owner_id = parcel->getOwnerID();
 
     std::string on = getString("on");
@@ -634,6 +634,11 @@ void LLPanelPlaceProfile::updateEstateOwnerName(const std::string& name)
 void LLPanelPlaceProfile::updateCovenantText(const std::string &text)
 {
     mCovenantText->setText(text);
+}
+
+void LLPanelPlaceProfile::updateCovenant(const LLTextBase* source)
+{
+    mCovenantText->copyContents(source);
 }
 
 void LLPanelPlaceProfile::onForSaleBannerClick()

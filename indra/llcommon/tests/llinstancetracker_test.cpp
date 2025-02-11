@@ -37,7 +37,6 @@
 #include <algorithm>                // std::sort()
 #include <stdexcept>
 // std headers
-// external library headers
 // other Linden headers
 #include "../test/lltut.h"
 

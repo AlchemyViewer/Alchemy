@@ -73,7 +73,7 @@
 #include <vector>
 
 // Height of the yellow selection highlight posts for land
-const F32 PARCEL_POST_HEIGHT = 0.666f;
+constexpr F32 PARCEL_POST_HEIGHT = 0.666f;
 
 // Returns true if you got at least one object
 void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
@@ -222,21 +222,23 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
         {
             for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
             {
-                LLSpatialPartition* part = region->getSpatialPartition(i);
-                if (part)
+                if (LLSpatialPartition* part = region->getSpatialPartition(i))
                 {
-                    part->cull(*viewer_cam, &potentials, true);
+                    part->cull(*LLViewerCamera::getInstance(), &potentials, true);
                 }
             }
         }
 
-        for (std::vector<LLDrawable*>::iterator iter = potentials.begin();
-             iter != potentials.end(); iter++)
+        for (LLDrawable* drawable : potentials)
         {
-            LLDrawable* drawable = *iter;
+            if (!drawable)
+            {
+                continue;
+            }
+
             LLViewerObject* vobjp = drawable->getVObj();
 
-            if (!drawable || !vobjp ||
+            if (!vobjp ||
                 vobjp->getPCode() != LL_PCODE_VOLUME ||
                 vobjp->isAttachment() ||
                 (deselect && !vobjp->isSelected()))
@@ -289,7 +291,7 @@ void LLToolSelectRect::handleRectangleSelection(S32 x, S32 y, MASK mask)
     gViewerWindow->setup3DRender();
 }
 
-const F32 WIND_RELATIVE_ALTITUDE            = 25.f;
+constexpr F32 WIND_RELATIVE_ALTITUDE = 25.f;
 
 void LLWind::renderVectors()
 {
@@ -304,21 +306,21 @@ void LLWind::renderVectors()
     LLVector3 origin_agent;
     origin_agent = gAgent.getPosAgentFromGlobal(mOriginGlobal);
     gGL.translatef(origin_agent.mV[VX], origin_agent.mV[VY], gAgent.getPositionAgent().mV[VZ] + WIND_RELATIVE_ALTITUDE);
-    for (j = 0; j < WIND_SIZE; j++)
+    for (j = 0; j < mSize; j++)
     {
-        for (i = 0; i < WIND_SIZE; i++)
+        for (i = 0; i < mSize; i++)
         {
-            x = mVelX[i + j*WIND_SIZE] * WIND_SCALE_HACK;
-            y = mVelY[i + j*WIND_SIZE] * WIND_SCALE_HACK;
+            x = mVelX[i + j*mSize] * WIND_SCALE_HACK;
+            y = mVelY[i + j*mSize] * WIND_SCALE_HACK;
             gGL.pushMatrix();
-            gGL.translatef((F32)i * region_width_meters/WIND_SIZE, (F32)j * region_width_meters/WIND_SIZE, 0.0);
-            gGL.color3f(0,1,0);
+            gGL.translatef((F32)i * region_width_meters/mSize, (F32)j * region_width_meters/mSize, 0.f);
+            gGL.color3f(0.f, 1.f, 0.f);
             gGL.begin(LLRender::POINTS);
-                gGL.vertex3f(0,0,0);
+                gGL.vertex3f(0.f, 0.f, 0.f);
             gGL.end();
-            gGL.color3f(1,0,0);
+            gGL.color3f(1.f, 0.f, 0.f);
             gGL.begin(LLRender::LINES);
-                gGL.vertex3f(x * 0.1f, y * 0.1f ,0.f);
+                gGL.vertex3f(x * 0.1f, y * 0.1f, 0.f);
                 gGL.vertex3f(x, y, 0.f);
             gGL.end();
             gGL.popMatrix();
@@ -332,7 +334,7 @@ void LLWind::renderVectors()
 
 // Used by lltoolselectland
 void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
-                                   const LLVector3d &east_north_top_global )
+                                   const LLVector3d &east_north_top_global)
 {
     LLGLSUIDefault gls_ui;
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
@@ -386,108 +388,21 @@ void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
 
     gGL.color4f(1.f, 1.f, 0.f, 0.2f);
     gGL.begin(LLRender::TRIANGLE_STRIP);
-
-    gGL.vertex3f(west, north, nw_top);
-    gGL.vertex3f(west, north, nw_bottom);
-    gGL.vertex3f(east, north, ne_top);
-    gGL.vertex3f(east, north, ne_bottom);
-    gGL.vertex3f(east, south, se_top);
-    gGL.vertex3f(east, south, se_bottom);
-    gGL.vertex3f(west, south, sw_top);
-    gGL.vertex3f(west, south, sw_bottom);
-    gGL.vertex3f(west, north, nw_top);
-    gGL.vertex3f(west, north, nw_bottom);
-
+    {
+        gGL.vertex3f(west, north, nw_bottom);
+        gGL.vertex3f(west, north, nw_top);
+        gGL.vertex3f(east, north, ne_bottom);
+        gGL.vertex3f(east, north, ne_top);
+        gGL.vertex3f(east, south, se_bottom);
+        gGL.vertex3f(west, south, sw_top);
+        gGL.vertex3f(west, south, sw_bottom);
+        gGL.vertex3f(west, north, nw_top);
+        gGL.vertex3f(west, north, nw_bottom);
+    }
     gGL.end();
 
     LLUI::setLineWidth(1.f);
 }
-
-/*
-void LLViewerParcelMgr::renderParcel(LLParcel* parcel )
-{
-    S32 i;
-    S32 count = parcel->getBoxCount();
-    for (i = 0; i < count; i++)
-    {
-        const LLParcelBox& box = parcel->getBox(i);
-
-        F32 west = box.mMin.mV[VX];
-        F32 south = box.mMin.mV[VY];
-
-        F32 east = box.mMax.mV[VX];
-        F32 north = box.mMax.mV[VY];
-
-        // HACK: At edge of last region of world, we need to make sure the region
-        // resolves correctly so we can get a height value.
-        const F32 FUDGE = 0.01f;
-
-        F32 sw_bottom = LLWorld::getInstance()->resolveLandHeightAgent( LLVector3( west, south, 0.f ) );
-        F32 se_bottom = LLWorld::getInstance()->resolveLandHeightAgent( LLVector3( east-FUDGE, south, 0.f ) );
-        F32 ne_bottom = LLWorld::getInstance()->resolveLandHeightAgent( LLVector3( east-FUDGE, north-FUDGE, 0.f ) );
-        F32 nw_bottom = LLWorld::getInstance()->resolveLandHeightAgent( LLVector3( west, north-FUDGE, 0.f ) );
-
-        // little hack to make nearby lines not Z-fight
-        east -= 0.1f;
-        north -= 0.1f;
-
-        F32 sw_top = sw_bottom + POST_HEIGHT;
-        F32 se_top = se_bottom + POST_HEIGHT;
-        F32 ne_top = ne_bottom + POST_HEIGHT;
-        F32 nw_top = nw_bottom + POST_HEIGHT;
-
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-        LLGLDepthTest gls_depth(GL_TRUE);
-
-        LLUI::setLineWidth(2.f);
-        gGL.color4f(0.f, 1.f, 1.f, 1.f);
-
-        // Cheat and give this the same pick-name as land
-        gGL.begin(LLRender::LINES);
-
-        gGL.vertex3f(west, north, nw_bottom);
-        gGL.vertex3f(west, north, nw_top);
-
-        gGL.vertex3f(east, north, ne_bottom);
-        gGL.vertex3f(east, north, ne_top);
-
-        gGL.vertex3f(east, south, se_bottom);
-        gGL.vertex3f(east, south, se_top);
-
-        gGL.vertex3f(west, south, sw_bottom);
-        gGL.vertex3f(west, south, sw_top);
-
-        gGL.end();
-
-        gGL.color4f(0.f, 1.f, 1.f, 0.2f);
-        gGL.begin(LLRender::QUADS);
-
-        gGL.vertex3f(west, north, nw_bottom);
-        gGL.vertex3f(west, north, nw_top);
-        gGL.vertex3f(east, north, ne_top);
-        gGL.vertex3f(east, north, ne_bottom);
-
-        gGL.vertex3f(east, north, ne_bottom);
-        gGL.vertex3f(east, north, ne_top);
-        gGL.vertex3f(east, south, se_top);
-        gGL.vertex3f(east, south, se_bottom);
-
-        gGL.vertex3f(east, south, se_bottom);
-        gGL.vertex3f(east, south, se_top);
-        gGL.vertex3f(west, south, sw_top);
-        gGL.vertex3f(west, south, sw_bottom);
-
-        gGL.vertex3f(west, south, sw_bottom);
-        gGL.vertex3f(west, south, sw_top);
-        gGL.vertex3f(west, north, nw_top);
-        gGL.vertex3f(west, north, nw_bottom);
-
-        gGL.end();
-
-        LLUI::setLineWidth(1.f);
-    }
-}
-*/
 
 
 // north = a wall going north/south.  Need that info to set up texture
@@ -532,6 +447,10 @@ void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 hei
         gGL.vertex3f(x2, y2, z2);
 
         gGL.vertex3f(x1, y1, z);
+
+        gGL.vertex3f(x2, y2, z2);
+
+        gGL.vertex3f(x1, y1, z);
         gGL.vertex3f(x2, y2, z2);
 
         z = absolute_height ? height : z2+height;
@@ -565,22 +484,25 @@ void LLViewerParcelMgr::renderOneSegment(F32 x1, F32 y1, F32 x2, F32 y2, F32 hei
         }
 
 
-        gGL.texCoord2f(tex_coord1*0.5f+0.5f, z1*0.5f);
+        gGL.texCoord2f(tex_coord1 * 0.5f + 0.5f, z1 * 0.5f);
         gGL.vertex3f(x1, y1, z1);
 
-        gGL.texCoord2f(tex_coord2*0.5f+0.5f, z2*0.5f);
+        gGL.texCoord2f(tex_coord2 * 0.5f + 0.5f, z2 * 0.5f);
         gGL.vertex3f(x2, y2, z2);
 
         // top edge stairsteps
         z = absolute_height ? height : llmax(z2+height, z1+height);
 
-        gGL.texCoord2f(tex_coord2*0.5f+0.5f, z*0.5f);
+        gGL.texCoord2f(tex_coord2 * 0.5f + 0.5f, z * 0.5f);
         gGL.vertex3f(x2, y2, z);
-        gGL.texCoord2f(tex_coord1*0.5f + 0.5f, z1*0.5f);
+
+        gGL.texCoord2f(tex_coord1 * 0.5f + 0.5f, z1 * 0.5f);
         gGL.vertex3f(x1, y1, z1);
+
         gGL.texCoord2f(tex_coord2*0.5f+0.5f, z*0.5f);
         gGL.vertex3f(x2, y2, z);
-        gGL.texCoord2f(tex_coord1*0.5f + 0.5f, z*0.5f);
+
+        gGL.texCoord2f(tex_coord1*0.5f+0.5f, z*0.5f);
         gGL.vertex3f(x1, y1, z);
     }
 }
@@ -942,7 +864,7 @@ void LLSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& di
     {
         pos_end.mV[i] = pos_agent.mV[i] + (50 * direction.mV[i]);
     }
-    gGL.setLineWidth(LLPipeline::DebugBeaconLineWidth);
+    glLineWidth((GLfloat)LLPipeline::DebugBeaconLineWidth);
     gGL.begin(LLRender::LINES);
     color.mV[3] *= 0.5f;
     gGL.color4fv(color.mV);
@@ -972,7 +894,7 @@ struct ShaderProfileHelper
     }
     ~ShaderProfileHelper()
     {
-        LLGLSLShader::finishProfile(false);
+        LLGLSLShader::finishProfile();
     }
 };
 
@@ -1159,6 +1081,9 @@ F32 gpu_benchmark()
             return -1.f;
         }
         LLImageGL::setManualImage(GL_TEXTURE_2D, 0, GL_RGBA, res,res,GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        // disable mipmaps and use point filtering to cause cache misses
+        gGL.getTexUnit(0)->setHasMipMaps(false);
+        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 
         if (alloc_timer.getElapsedTimeF32() > time_limit)
         {
@@ -1202,57 +1127,6 @@ F32 gpu_benchmark()
 
     LLGLSLShader::unbind();
 
-    F32 time_passed = 0; // seconds
-
-    { //run CPU timer benchmark
-        glFinish();
-        gBenchmarkProgram.bind();
-        for (S32 c = -1; c < samples && time_passed < time_limit; ++c)
-        {
-            LLTimer timer;
-            timer.start();
-
-            for (U32 i = 0; i < count; ++i)
-            {
-                dest[i].bindTarget();
-                texHolder.bind(i);
-                buff->setBuffer();
-                buff->drawArrays(LLRender::TRIANGLES, 0, 3);
-                dest[i].flush();
-            }
-
-            //wait for current batch of copies to finish
-            glFinish();
-
-            F32 time = timer.getElapsedTimeF32();
-            time_passed += time;
-
-            if (c >= 0) // <-- ignore the first sample as it tends to be artificially slow
-            {
-                //store result in gigabytes per second
-                F32 gb = (F32)((F64)(res * res * 8 * count)) / (1000000000);
-                F32 gbps = gb / time;
-                results.push_back(gbps);
-            }
-        }
-        gBenchmarkProgram.unbind();
-    }
-
-    std::sort(results.begin(), results.end());
-
-    F32 gbps = results[results.size()/2];
-
-    LL_INFOS("Benchmark") << "Memory bandwidth is " << llformat("%.3f", gbps) << " GB/sec according to CPU timers, " << (F32)results.size() << " tests took " << time_passed << " seconds" << LL_ENDL;
-
-#if LL_DARWIN
-    if (gbps > 512.f)
-    {
-        LL_WARNS("Benchmark") << "Memory bandwidth is improbably high and likely incorrect; discarding result." << LL_ENDL;
-        //OSX is probably lying, discard result
-        return -1.f;
-    }
-#endif
-
     // run GPU timer benchmark
     {
         ShaderProfileHelper initProfile;
@@ -1274,9 +1148,10 @@ F32 gpu_benchmark()
     F32 ms = gBenchmarkProgram.mTimeElapsed/1000000.f;
     F32 seconds = ms/1000.f;
 
-    F64 samples_drawn = gBenchmarkProgram.mSamplesDrawn;
-    F32 samples_sec = (samples_drawn/1000000000.0)/seconds;
-    gbps = samples_sec*4;  // 4 bytes per sample
+    F64 samples_drawn = (F64)gBenchmarkProgram.mSamplesDrawn;
+    F64 gpixels_drawn = samples_drawn / 1000000000.0;
+    F32 samples_sec = (F32)(gpixels_drawn/seconds);
+    F32 gbps = samples_sec*4;  // 4 bytes per sample
 
     LL_INFOS("Benchmark") << "Memory bandwidth is " << llformat("%.3f", gbps) << " GB/sec according to ARB_timer_query, total time " << seconds << " seconds" << LL_ENDL;
 

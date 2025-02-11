@@ -51,11 +51,13 @@ public:
     LLFloaterSidePanelContainer(const LLSD& key, const Params& params = getDefaultParams());
     ~LLFloaterSidePanelContainer();
 
-    /*virtual*/ bool postBuild();
+    bool postBuild() override;
 
-    /*virtual*/ void onOpen(const LLSD& key);
+    void onOpen(const LLSD& key) override;
 
-    /*virtual*/ void closeFloater(bool app_quitting = false);
+    void closeFloater(bool app_quitting = false) override;
+
+    void onClickCloseBtn(bool app_qutting) override;
 
     void cleanup() { destroy(); }
 

@@ -50,6 +50,10 @@
 #include "llglheaders.h"
 #include "llglslshader.h"
 
+#include "glm/glm.hpp"
+#include <glm/gtc/matrix_access.hpp>
+#include "glm/gtc/type_ptr.hpp"
+
 #if LL_WINDOWS
 #include "lldxhardware.h"
 #endif
@@ -1053,6 +1057,7 @@ void LLGLManager::initWGL()
         GLH_EXT_NAME(wglGetGPUIDsAMD) = (PFNWGLGETGPUIDSAMDPROC)GLH_EXT_GET_PROC_ADDRESS("wglGetGPUIDsAMD");
         GLH_EXT_NAME(wglGetGPUInfoAMD) = (PFNWGLGETGPUINFOAMDPROC)GLH_EXT_GET_PROC_ADDRESS("wglGetGPUInfoAMD");
     }
+    mHasNVXGpuMemoryInfo = ExtensionExists("GL_NVX_gpu_memory_info", gGLHExts.mSysExts);
 
     if (ExtensionExists("WGL_EXT_swap_control", gGLHExts.mSysExts))
     {
@@ -1171,6 +1176,11 @@ bool LLGLManager::initGL()
         mGLVendorShort = "INTEL";
         mIsIntel = true;
     }
+    else if (mGLVendor.find("APPLE") != std::string::npos)
+    {
+        mGLVendorShort = "APPLE";
+        mIsApple = true;
+    }
     else
     {
         mGLVendorShort = "MISC";
@@ -1209,6 +1219,17 @@ bool LLGLManager::initGL()
         if (mVRAM != 0)
         {
             LL_INFOS("RenderInit") << "VRAM Detected (AMDAssociations):" << mVRAM << LL_ENDL;
+        }
+    }
+    else if (mHasNVXGpuMemoryInfo)
+    {
+        GLint mem_kb = 0;
+        glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &mem_kb);
+        mVRAM = mem_kb / 1024;
+
+        if (mVRAM != 0)
+        {
+            LL_WARNS("RenderInit") << "VRAM Detected (NVXGpuMemoryInfo):" << mVRAM << LL_ENDL;
         }
     }
 #endif
@@ -1262,6 +1283,7 @@ bool LLGLManager::initGL()
     glGetIntegerv(GL_MAX_INTEGER_SAMPLES, &mMaxIntegerSamples);
     glGetIntegerv(GL_MAX_SAMPLE_MASK_WORDS, &mMaxSampleMaskWords);
     glGetIntegerv(GL_MAX_SAMPLES, &mMaxSamples);
+    glGetIntegerv(GL_MAX_VARYING_VECTORS, &mMaxVaryingVectors);
     glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &mMaxUniformBlockSize);
 
     // sanity clamp max uniform block size to 64k just in case
@@ -2748,7 +2770,7 @@ void parse_glsl_version(S32& major, S32& minor)
     LLStringUtil::convertToS32(minor_str, minor);
 }
 
-LLGLUserClipPlane::LLGLUserClipPlane(const LLPlane& p, const LLMatrix4a& modelview, const LLMatrix4a& projection, bool apply)
+LLGLUserClipPlane::LLGLUserClipPlane(const LLPlane& p, const glm::mat4& modelview, const glm::mat4& projection, bool apply)
 {
     mApply = apply;
 
@@ -2775,41 +2797,27 @@ void LLGLUserClipPlane::disable()
 
 void LLGLUserClipPlane::setPlane(F32 a, F32 b, F32 c, F32 d)
 {
-    LLMatrix4a& P = mProjection;
-    LLMatrix4a& M = mModelview;
+    const glm::mat4& P = mProjection;
+    const glm::mat4& M = mModelview;
 
-    LLMatrix4a invtrans_MVP;
-    invtrans_MVP.setMul(P,M);
-    invtrans_MVP.invert();
-    invtrans_MVP.transpose();
+    glm::mat4 invtrans_MVP = glm::transpose(glm::inverse(P*M));
+    glm::vec4 oplane(a,b,c,d);
+    glm::vec4 cplane = invtrans_MVP * oplane;
 
-    LLVector4a oplane(a,b,c,d);
-    LLVector4a cplane;
-    LLVector4a cplane_splat;
-    LLVector4a cplane_neg;
+    cplane /= fabs(cplane[2]); // normalize such that depth is not scaled
+    cplane[3] -= 1;
 
-    invtrans_MVP.rotate4(oplane,cplane);
+    if(cplane[2] < 0)
+        cplane *= -1;
 
-    cplane_splat.splat<2>(cplane);
-    cplane_splat.setAbs(cplane_splat);
-    cplane.div(cplane_splat);
-    cplane.sub(LLVector4a(0.f,0.f,0.f,1.f));
-
-    cplane_splat.splat<2>(cplane);
-    cplane_neg = cplane;
-    cplane_neg.negate();
-
-    cplane.setSelectWithMask( cplane_splat.lessThan( _mm_setzero_ps() ), cplane_neg, cplane );
-
-    LLMatrix4a suffix;
-    suffix.setIdentity();
-    suffix.setColumn<2>(cplane);
-    LLMatrix4a newP;
-    newP.setMul(suffix,P);
+    glm::mat4 suffix;
+    suffix = glm::row(suffix, 2, cplane);
+    glm::mat4 newP = suffix * P;
 
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
-    gGL.loadMatrix(newP);
+    gGL.loadMatrix(glm::value_ptr(newP));
+    gGLObliqueProjectionInverse = LLMatrix4(glm::value_ptr(glm::transpose(glm::inverse(newP))));
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 }
 
@@ -2822,7 +2830,7 @@ LLGLDepthTest::LLGLDepthTest(GLboolean depth_enabled, GLboolean write_enabled, G
 : mPrevDepthEnabled(sDepthEnabled), mPrevDepthFunc(sDepthFunc), mPrevWriteEnabled(sWriteEnabled)
 {
     stop_glerror();
-
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     checkState();
 
     if (!depth_enabled)
@@ -2855,6 +2863,7 @@ LLGLDepthTest::LLGLDepthTest(GLboolean depth_enabled, GLboolean write_enabled, G
 
 LLGLDepthTest::~LLGLDepthTest()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     checkState();
     if (sDepthEnabled != mPrevDepthEnabled )
     {
@@ -2905,30 +2914,27 @@ void LLGLDepthTest::checkState()
 
 LLGLSquashToFarClip::LLGLSquashToFarClip()
 {
-    setProjectionMatrix(get_current_projection(), 0);
+    glm::mat4 proj = get_current_projection();
+    setProjectionMatrix(proj, 0);
 }
 
-LLGLSquashToFarClip::LLGLSquashToFarClip(const LLMatrix4a& projection, U32 layer)
+LLGLSquashToFarClip::LLGLSquashToFarClip(const glm::mat4& P, U32 layer)
 {
-    setProjectionMatrix(projection, layer);
+    setProjectionMatrix(P, layer);
 }
 
-
-void LLGLSquashToFarClip::setProjectionMatrix(const LLMatrix4a& P_in, U32 layer)
+void LLGLSquashToFarClip::setProjectionMatrix(glm::mat4 projection, U32 layer)
 {
-    LLMatrix4a P = P_in;
-
     F32 depth = 0.99999f - 0.0001f * layer;
 
-    LLVector4a col = P.getColumn<3>();
-    col.mul(depth);
-    P.setColumn<2>(col);
+    glm::vec4 P_row_3 = glm::row(projection, 3) * depth;
+    projection = glm::row(projection, 2, P_row_3);
 
     LLRender::eMatrixMode last_matrix_mode = gGL.getMatrixMode();
 
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
-    gGL.loadMatrix(P);
+    gGL.loadMatrix(glm::value_ptr(projection));
 
     gGL.matrixMode(last_matrix_mode);
 }

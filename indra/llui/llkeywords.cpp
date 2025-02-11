@@ -86,7 +86,7 @@ LLKeywords::~LLKeywords()
 // Add the token as described
 void LLKeywords::addToken(LLKeywordToken::ETokenType type,
                           const std::string& key_in,
-                          const LLColor4& color,
+                          const LLUIColor& color,
                           const std::string& tool_tip_in,
                           const std::string& delimiter_in)
 {
@@ -314,10 +314,10 @@ void LLKeywords::processTokens()
 
 void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
 {
-    LLColor4 color;
-    LLColor4 color_group;
-    const LLColor4 color_deprecated = getColorGroup("deprecated");
-    const LLColor4 color_god_mode = getColorGroup("god-mode");
+    LLUIColor color;
+    LLUIColor color_group;
+    LLColor4 color_deprecated = getColorGroup("deprecated");
+    LLColor4 color_god_mode = getColorGroup("god-mode");
 
     LLKeywordToken::ETokenType token_type = LLKeywordToken::TT_UNKNOWN;
     // If a new token type is added here, it must also be added to the 'addToken' method
@@ -351,7 +351,7 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
     }
 
     color_group = getColorGroup(group);
-    LL_DEBUGS("SyntaxLSL") << "Group: '" << group << "', using color: '" << color_group << "'" << LL_ENDL;
+    LL_DEBUGS("SyntaxLSL") << "Group: '" << group << "', using color: '" << color_group.get() << "'" << LL_ENDL;
 
     if (tokens.isMap())
     {
@@ -386,7 +386,7 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
                     case LLKeywordToken::TT_CONSTANT:
                         if (getAttribute("type").length() > 0)
                         {
-                            color_group = getColorGroup(fmt::format("{}-{}", group, getAttribute("type")));
+                            color_group = getColorGroup(group + "-" + getAttribute("type"));
                         }
                         else
                         {
@@ -431,7 +431,7 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
     }
     else if (tokens.isArray())  // Currently nothing should need this, but it's here for completeness
     {
-        LL_INFOS("SyntaxLSL") << "Curious, shouldn't be an array here; adding all using color " << color << LL_ENDL;
+        LL_INFOS("SyntaxLSL") << "Curious, shouldn't be an array here; adding all using color " << color.get() << LL_ENDL;
         for (S32 count = 0; count < tokens.size(); ++count)
         {
             addToken(token_type, tokens[count], color, "");
@@ -554,7 +554,7 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
         {
             if( *cur == '\n' )
             {
-                LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(style, cur-base);
+                LLTextSegmentPtr text_segment = new LLLineBreakTextSegment(style, (S32)(cur - base));
                 text_segment->setToken( 0 );
                 insertSegment( *seg_list, text_segment, text_len, style, editor);
                 cur++;
@@ -585,13 +585,13 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
                     LLKeywordToken* cur_token = *iter;
                     if( cur_token->isHead( cur ) )
                     {
-                        S32 seg_start = cur - base;
+                        S32 seg_start = (S32)(cur - base);
                         while( *cur && *cur != '\n' )
                         {
                             // skip the rest of the line
                             cur++;
                         }
-                        S32 seg_end = cur - base;
+                        S32 seg_end = (S32)(cur - base);
 
                         //create segments from seg_start to seg_end
                         insertSegments(wtext, *seg_list,cur_token, text_len, seg_start, seg_end, style, editor);
@@ -635,7 +635,7 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
                     S32 between_delimiters = 0;
                     S32 seg_end = 0;
 
-                    seg_start = cur - base;
+                    seg_start = (S32)(cur - base);
                     cur += cur_delimiter->getLengthHead();
 
                     LLKeywordToken::ETokenType type = cur_delimiter->getType();
@@ -725,7 +725,7 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
                 {
                     p++;
                 }
-                S32 seg_len = p - cur;
+                S32 seg_len = (S32)(p - cur);
                 if( seg_len > 0 )
                 {
                     WStringMapIndex word( cur, seg_len );
@@ -733,7 +733,7 @@ void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLW
                     if( map_iter != mWordTokenMap.end() )
                     {
                         LLKeywordToken* cur_token = map_iter->second;
-                        S32 seg_start = cur - base;
+                        S32 seg_start = (S32)(cur - base);
                         S32 seg_end = seg_start + seg_len;
 
                         // LL_INFOS("SyntaxLSL") << "Seg: [" << word.c_str() << "]" << LL_ENDL;
@@ -781,7 +781,7 @@ void LLKeywords::insertSegments(const LLWString& wtext, std::vector<LLTextSegmen
     insertSegment( seg_list, text_segment, text_len, style, editor);
 }
 
-void LLKeywords::insertSegment(std::vector<LLTextSegmentPtr>& seg_list, LLTextSegmentPtr new_segment, S32 text_len, const LLColor4 &defaultColor, LLTextEditor& editor )
+void LLKeywords::insertSegment(std::vector<LLTextSegmentPtr>& seg_list, LLTextSegmentPtr new_segment, S32 text_len, const LLUIColor& defaultColor, LLTextEditor& editor )
 {
     LLTextSegmentPtr last = seg_list.back();
     S32 new_seg_end = new_segment->getEnd();

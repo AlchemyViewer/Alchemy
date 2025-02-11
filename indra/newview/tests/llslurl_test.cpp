@@ -52,7 +52,7 @@ public:
     static void setDefaultArg(const std::string& name, std::string value);
 };
 
-std::string LLTrans::getString(const std::string_view xml_desc, const LLStringUtil::format_map_t& args, bool def_string)
+std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::format_map_t& args, bool def_string)
 {
     return std::string();
 }

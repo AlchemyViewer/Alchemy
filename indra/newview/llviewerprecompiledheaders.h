@@ -44,6 +44,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "boost/unordered/unordered_flat_set.hpp"
 #include "boost/unordered/unordered_flat_map.hpp"

@@ -136,9 +136,10 @@ namespace LLPredicate
         :   mRule(other)
         {}
 
-        Rule() = default;
+        Rule()
+        {}
 
-        void require(ENUM e, bool match)
+        void mandate(ENUM e, bool match)
         {
             mRule.set(e, match);
         }
@@ -153,7 +154,7 @@ namespace LLPredicate
             return (mRule && value).someSet();
         }
 
-        bool require(const Value<ENUM> value) const
+        bool requires(const Value<ENUM> value) const
         {
             return (mRule && value).someSet() && (!mRule && value).noneSet();
         }

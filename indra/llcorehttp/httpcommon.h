@@ -191,6 +191,7 @@
 #include "boost/make_shared.hpp"
 #include <string>
 #include <curl/curl.h>
+#include "boost/noncopyable.hpp"
 
 namespace LLCore
 {

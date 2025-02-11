@@ -30,7 +30,8 @@
 #include "llgl.h"
 #include "llrender.h"
 #include "llstaticstringtable.h"
-#include <boost/unordered_map.hpp>
+#include <boost/json.hpp>
+#include <boost/unordered_map>
 
 class LLShaderFeatures
 {
@@ -51,6 +52,7 @@ public:
     bool hasAmbientOcclusion = false;
     bool hasSrgb = false;
     bool isDeferred = false;
+    bool hasFullGBuffer = false;
     bool hasScreenSpaceReflections = false;
     bool hasAlphaMask = false;
     bool hasReflectionProbes = false;
@@ -169,14 +171,14 @@ public:
     static U32 sMaxGLTFNodes;
 
     static void initProfile();
-    static void finishProfile(bool emit_report = true);
+    static void finishProfile(boost::json::value& stats=sDefaultStats);
 
     static void startProfile();
     static void stopProfile();
 
     void unload();
     void clearStats();
-    void dumpStats();
+    void dumpStats(boost::json::object& stats);
 
     // place query objects for profiling if profiling is enabled
     // if for_runtime is true, will place timer query only whether or not profiling is enabled
@@ -209,6 +211,7 @@ public:
     void uniform2fv(U32 index, U32 count, const GLfloat* v);
     void uniform3fv(U32 index, U32 count, const GLfloat* v);
     void uniform4fv(U32 index, U32 count, const GLfloat* v);
+    void uniform4uiv(U32 index, U32 count, const GLuint* v);
     void uniform2i(const LLStaticHashedString& uniform, GLint i, GLint j);
     void uniformMatrix2fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
     void uniformMatrix3fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
@@ -221,10 +224,12 @@ public:
     void uniform1f(const LLStaticHashedString& uniform, GLfloat v);
     void uniform2f(const LLStaticHashedString& uniform, GLfloat x, GLfloat y);
     void uniform3f(const LLStaticHashedString& uniform, GLfloat x, GLfloat y, GLfloat z);
+    void uniform4f(const LLStaticHashedString& uniform, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
     void uniform1fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
     void uniform2fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
     void uniform3fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
     void uniform4fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
+    void uniform4uiv(const LLStaticHashedString& uniform, U32 count, const GLuint* v);
     void uniformMatrix4fv(const LLStaticHashedString& uniform, U32 count, GLboolean transpose, const GLfloat* v);
 
     void setMinimumAlpha(F32 minimum);
@@ -240,17 +245,10 @@ public:
     GLint mapUniformTextureChannel(GLint location, GLenum type, GLint size);
 
     void clearPermutations();
-    void addPermutations(std::map<std::string, std::string>& map)
-    {
-        mDefines.insert(map.begin(), map.end());
-    }
     void addPermutation(std::string name, std::string value);
-    void removePermutations(std::map<std::string, std::string>& map)
+    void addPermutations(const std::map<std::string, std::string>& defines)
     {
-        for (const auto& entry : map)
-        {
-            mDefines.erase(entry.first);
-        }
+        mDefines.insert(defines.begin(), defines.end());
     }
     void removePermutation(std::string name);
 
@@ -370,6 +368,11 @@ public:
 
 private:
     void unloadInternal();
+    // This must be static because finishProfile() is called at least once
+    // within a __try block. If we default its stats parameter to a temporary
+    // json::value, that temporary must be destroyed when the stack is
+    // unwound, which __try forbids.
+    static boost::json::value sDefaultStats;
 };
 
 //UI shader (declared here so llui_libtest will link properly)

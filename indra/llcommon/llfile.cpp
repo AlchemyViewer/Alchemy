@@ -34,7 +34,7 @@
 #include "stringize.h"
 
 #if LL_WINDOWS
-#include "llwin32headerslean.h"
+#include "llwin32headers.h"
 #include <stdlib.h>                 // Windows errno
 #include <vector>
 #else
@@ -328,15 +328,23 @@ int LLFile::close(LLFILE * file)
     return ret_value;
 }
 
-int LLFile::remove(const char* filename, int supress_error)
+std::string LLFile::getContents(const std::string& filename)
 {
-#if LL_WINDOWS
-    std::wstring utf16filename = ll_convert_string_to_wide(filename);
-    int rc = _wremove(utf16filename.c_str());
-#else
-    int rc = ::remove(filename);
-#endif
-    return warnif("remove", std::string(filename), rc, supress_error);
+    LLFILE* fp = fopen(filename, "rb"); /* Flawfinder: ignore */
+    if (fp)
+    {
+        fseek(fp, 0, SEEK_END);
+        U32 length = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+
+        std::vector<char> buffer(length);
+        size_t nread = fread(buffer.data(), 1, length, fp);
+        fclose(fp);
+
+        return std::string(buffer.data(), nread);
+    }
+
+    return LLStringUtil::null;
 }
 
 int LLFile::remove(const std::string& filename, int supress_error)
@@ -618,7 +626,7 @@ LLFILE *    LLFile::_Fiopen(const std::string& filename,
 
     if (valid[n] == 0)
         return (0); // no valid mode
-    else if (norepflag && mode & (ios_base::out || ios_base::app)
+    else if (norepflag && mode & (ios_base::out | ios_base::app)
         && (fp = LLFile::fopen(filename, "r")) != 0)    /* Flawfinder: ignore */
         {   // file must not exist, close and fail
         fclose(fp);

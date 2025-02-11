@@ -183,20 +183,20 @@ private:
 
 private:
     LLRect          mInnerRect;
-    LLScrollbar*    mScrollbar;
-    bool            mSingleExpansion;
-    bool            mFitParent;
-    bool            mAutoScrolling;
-    F32             mAutoScrollRate;
-    LLTextBox*      mNoVisibleTabsHelpText;
+    LLScrollbar*    mScrollbar = nullptr;
+    bool            mSingleExpansion = false;
+    bool            mFitParent = false;
+    bool            mAutoScrolling = false;
+    F32             mAutoScrollRate = 0.f;
+    LLTextBox*      mNoVisibleTabsHelpText = nullptr;
 
-    bool            mSkipScrollToChild;
+    bool            mSkipScrollToChild = false;
 
     std::string     mNoMatchedTabsOrigString;
     std::string     mNoVisibleTabsOrigString;
 
-    LLAccordionCtrlTab*     mSelectedTab;
-    const LLTabComparator*  mTabComparator;
+    LLAccordionCtrlTab*     mSelectedTab = nullptr;
+    const LLTabComparator*  mTabComparator = nullptr;
 };
 
 

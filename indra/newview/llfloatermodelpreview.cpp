@@ -784,15 +784,16 @@ void LLFloaterModelPreview::draw3dPreview()
     gGL.begin(LLRender::TRIANGLES);
     {
         gGL.texCoord2f(0.f, 1.f);
-        gGL.vertex2i(mPreviewRect.mLeft+1, mPreviewRect.mTop-1);
+        gGL.vertex2i(mPreviewRect.mLeft + 1, mPreviewRect.mTop - 1);
         gGL.texCoord2f(0.f, 0.f);
-        gGL.vertex2i(mPreviewRect.mLeft+1, mPreviewRect.mBottom+1);
+        gGL.vertex2i(mPreviewRect.mLeft + 1, mPreviewRect.mBottom + 1);
         gGL.texCoord2f(1.f, 0.f);
-        gGL.vertex2i(mPreviewRect.mRight-1, mPreviewRect.mBottom+1);
+        gGL.vertex2i(mPreviewRect.mRight - 1, mPreviewRect.mBottom + 1);
+
         gGL.texCoord2f(1.f, 0.f);
         gGL.vertex2i(mPreviewRect.mRight - 1, mPreviewRect.mBottom + 1);
         gGL.texCoord2f(1.f, 1.f);
-        gGL.vertex2i(mPreviewRect.mRight-1, mPreviewRect.mTop-1);
+        gGL.vertex2i(mPreviewRect.mRight - 1, mPreviewRect.mTop - 1);
         gGL.texCoord2f(0.f, 1.f);
         gGL.vertex2i(mPreviewRect.mLeft + 1, mPreviewRect.mTop - 1);
     }
@@ -1201,7 +1202,7 @@ void LLFloaterModelPreview::initDecompControls()
                 else if (LLSpinCtrl* spinner = dynamic_cast<LLSpinCtrl*>(ctrl))
                 {
                     bool is_retain_ctrl = "Retain%" == name;
-                    double coefficient = is_retain_ctrl ? RETAIN_COEFFICIENT : 1.f;
+                    float coefficient = is_retain_ctrl ? (F32)RETAIN_COEFFICIENT : 1.f;
 
                     spinner->setMinValue(param[i].mDetails.mRange.mLow.mFloat * coefficient);
                     spinner->setMaxValue(param[i].mDetails.mRange.mHigh.mFloat * coefficient);
@@ -1241,10 +1242,10 @@ void LLFloaterModelPreview::initDecompControls()
                 LLUICtrl* ctrl = getChild<LLUICtrl>(name);
                 if (LLSliderCtrl* slider = dynamic_cast<LLSliderCtrl*>(ctrl))
                 {
-                    slider->setMinValue(param[i].mDetails.mRange.mLow.mIntOrEnumValue);
-                    slider->setMaxValue(param[i].mDetails.mRange.mHigh.mIntOrEnumValue);
-                    slider->setIncrement(param[i].mDetails.mRange.mDelta.mIntOrEnumValue);
-                    slider->setValue(param[i].mDefault.mIntOrEnumValue);
+                    slider->setMinValue((F32)param[i].mDetails.mRange.mLow.mIntOrEnumValue);
+                    slider->setMaxValue((F32)param[i].mDetails.mRange.mHigh.mIntOrEnumValue);
+                    slider->setIncrement((F32)param[i].mDetails.mRange.mDelta.mIntOrEnumValue);
+                    slider->setValue((F32)param[i].mDefault.mIntOrEnumValue);
                     slider->setCommitCallback(onPhysicsParamCommit, (void*) &param[i]);
                 }
                 else if (LLComboBox* combo_box = dynamic_cast<LLComboBox*>(ctrl))

@@ -27,6 +27,8 @@
 #define LLBADGE_CPP
 #include "llbadge.h"
 
+#include "llfontgl.h"
+#include "llfontvertexbuffer.h"
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
 
@@ -193,22 +195,20 @@ void renderBadgeBackground(F32 centerX, F32 centerY, F32 width, F32 height, cons
     F32 x = LLFontGL::sCurOrigin.mX + centerX - width * 0.5f;
     F32 y = LLFontGL::sCurOrigin.mY + centerY - height * 0.5f;
 
-    LLRectf screen_rect(ll_round(x),
-                        ll_round(y),
-                        ll_round(x) + width,
-                        ll_round(y) + height);
+    LLRectf screen_rect((F32)ll_round(x),
+                        (F32)ll_round(y),
+                        (F32)ll_round(x) + width,
+                        (F32)ll_round(y) + height);
 
-    LLVector4a vertices[6];
-    vertices[0].set(screen_rect.mLeft, screen_rect.mTop, 1.0f);
-    vertices[1].set(screen_rect.mLeft, screen_rect.mBottom, 1.0f);
-    vertices[2].set(screen_rect.mRight, screen_rect.mTop, 1.0f);
-    vertices[3].set(screen_rect.mRight, screen_rect.mTop, 1.0f);
-    vertices[4].set(screen_rect.mLeft, screen_rect.mBottom, 1.0f);
-    vertices[5].set(screen_rect.mRight, screen_rect.mBottom, 1.0f);
+    LLVector4a vertices[4];
+    vertices[0].set(screen_rect.mLeft,  screen_rect.mTop,    1.0f);
+    vertices[1].set(screen_rect.mRight, screen_rect.mTop,    1.0f);
+    vertices[2].set(screen_rect.mLeft,  screen_rect.mBottom, 1.0f);
+    vertices[3].set(screen_rect.mRight, screen_rect.mBottom, 1.0f);
 
-    gGL.begin(LLRender::TRIANGLES);
+    gGL.begin(LLRender::TRIANGLE_STRIP);
     {
-        gGL.vertexBatchPreTransformed(vertices, 6);
+        gGL.vertexBatchPreTransformed(vertices, 4);
     }
     gGL.end();
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -235,7 +235,7 @@ void LLBadge::draw()
             bool do_not_use_ellipses = false;
 
             F32 badge_width = (2.0f * mPaddingHoriz) +
-                mGLFont->getWidthF32(mLabel.c_str(), badge_label_begin_offset, badge_char_length);
+                mGLFont->getWidthF32(mLabel.getWString().c_str(), badge_label_begin_offset, badge_char_length);
 
             F32 badge_height = (2.0f * mPaddingVert) + mGLFont->getLineHeight();
 
@@ -297,7 +297,7 @@ void LLBadge::draw()
             }
             else
             {
-                badge_center_x = location_offset_horiz;
+                badge_center_x = (F32)location_offset_horiz;
             }
 
             // Compute y position
@@ -314,7 +314,7 @@ void LLBadge::draw()
             }
             else
             {
-                badge_center_y = location_offset_vert;
+                badge_center_y = (F32)location_offset_vert;
             }
 
             //
@@ -348,17 +348,17 @@ void LLBadge::draw()
             //
             // Draw the label
             //
-
-            mGLFont->render(mLabel,
-                            badge_label_begin_offset,
-                            badge_center_x + mLabelOffsetHoriz,
-                            badge_center_y + mLabelOffsetVert,
-                            mLabelColor % alpha,
-                            LLFontGL::HCENTER, LLFontGL::VCENTER, // centered around the position
-                            LLFontGL::NORMAL, // normal text (not bold, italics, etc.)
-                            LLFontGL::DROP_SHADOW_SOFT,
-                            badge_char_length, badge_pixel_length,
-                            right_position_out, do_not_use_ellipses);
+            mGLFont->render(badge_label_wstring,
+                               mLabel.getWString(),
+                               badge_label_begin_offset,
+                               badge_center_x + mLabelOffsetHoriz,
+                               badge_center_y + mLabelOffsetVert,
+                               mLabelColor % alpha,
+                               LLFontGL::HCENTER, LLFontGL::VCENTER, // centered around the position
+                               LLFontGL::NORMAL, // normal text (not bold, italics, etc.)
+                               LLFontGL::DROP_SHADOW_SOFT,
+                               badge_char_length, badge_pixel_length,
+                               right_position_out, do_not_use_ellipses);
         }
     }
 }

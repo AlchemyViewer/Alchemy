@@ -114,7 +114,7 @@ LLXmlTreeNode::~LLXmlTreeNode()
     }
     mAttributes.clear();
 
-    for (LLXmlTreeNode* node : mChildren)
+        for(LLXmlTreeNode* node : mChildren)
     {
         delete node;
     }

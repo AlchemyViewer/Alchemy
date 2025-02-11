@@ -350,13 +350,11 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
 
         impl = regionp->getRegionImplNC();
 
-        ++(impl->mSeedCapAttempts);
-
         if (!result.isMap() || result.has("error"))
         {
             LL_WARNS("AppInit", "Capabilities") << "Malformed response" << LL_ENDL;
+            ++(impl->mSeedCapAttempts);
             // setup for retry.
-            ++(impl->mSeedCapAttempts); // <FS:Ansariel> Fix seed cap retry count
             continue;
         }
 
@@ -365,8 +363,8 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
         if (!status)
         {
             LL_WARNS("AppInit", "Capabilities") << "HttpStatus error " << LL_ENDL;
+            ++(impl->mSeedCapAttempts);
             // setup for retry.
-            ++(impl->mSeedCapAttempts); // <FS:Ansariel> Fix seed cap retry count
             continue;
         }
 
@@ -376,8 +374,8 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
         if (id != impl->mHttpResponderID) // region is no longer referring to this request
         {
             LL_WARNS("AppInit", "Capabilities") << "Received results for a stale capabilities request!" << LL_ENDL;
-            // setup for retry.
             ++(impl->mSeedCapAttempts);
+            // setup for retry.
             continue;
         }
 
@@ -1303,8 +1301,12 @@ U32 LLViewerRegion::getNumOfVisibleGroups() const
     return mImpl ? static_cast<U32>(mImpl->mVisibleGroups.size()) : 0;
 }
 
-void LLViewerRegion::updateReflectionProbes()
+void LLViewerRegion::updateReflectionProbes(bool full_update)
 {
+    if (!full_update && mReflectionMaps.empty())
+    {
+        return;
+    }
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     const F32 probe_spacing = 32.f;
     const F32 probe_radius = sqrtf((probe_spacing * 0.5f) * (probe_spacing * 0.5f) * 3.f);
@@ -1312,7 +1314,7 @@ void LLViewerRegion::updateReflectionProbes()
 
     F32 start = probe_spacing * 0.5f;
 
-    U32 grid_width = REGION_WIDTH_METERS / probe_spacing;
+    U32 grid_width = (U32)(REGION_WIDTH_METERS / probe_spacing);
 
     mReflectionMaps.resize(grid_width * grid_width);
 
@@ -1333,12 +1335,15 @@ void LLViewerRegion::updateReflectionProbes()
                 mReflectionMaps[idx] = gPipeline.mReflectionMapManager.addProbe();
             }
 
-            LLVector3 probe_origin = LLVector3(x, y, llmax(water_height, mImpl->mLandp->resolveHeightRegion(x, y)));
-            probe_origin.mV[2] += hover_height;
-            probe_origin += origin;
+            if (mReflectionMaps[idx])
+            {
+                LLVector3 probe_origin = LLVector3(x, y, llmax(water_height, mImpl->mLandp->resolveHeightRegion(x, y)));
+                probe_origin.mV[2] += hover_height;
+                probe_origin += origin;
 
-            mReflectionMaps[idx]->mOrigin.load3(probe_origin.mV);
-            mReflectionMaps[idx]->mRadius = probe_radius;
+                mReflectionMaps[idx]->mOrigin.load3(probe_origin.mV);
+                mReflectionMaps[idx]->mRadius = probe_radius;
+            }
         }
     }
 }
@@ -2676,7 +2681,16 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
             if (features.has("GLTFEnabled"))
             {
                 bool enabled = features["GLTFEnabled"];
-                gSavedSettings.setBOOL("GLTFEnabled", enabled);
+
+                // call setShaders the first time GLTFEnabled is received as true (causes GLTF specific shaders to be loaded)
+                if (enabled != gSavedSettings.getBOOL("GLTFEnabled"))
+                {
+                    gSavedSettings.setBOOL("GLTFEnabled", enabled);
+                    if (enabled)
+                    {
+                        LLViewerShaderMgr::instance()->setShaders();
+                    }
+                }
             }
             else
             {
@@ -3351,16 +3365,24 @@ void LLViewerRegion::unpackRegionHandshake()
             compp->setParamsReady();
         }
 
-        LLPBRTerrainFeatures::queueQuery(*this, [](LLUUID region_id, bool success, const LLModifyRegion& composition_changes)
+        std::string cap = getCapability("ModifyRegion"); // needed for queueQuery
+        if (cap.empty())
         {
-            if (!success) { return; }
-            LLViewerRegion* region = LLWorld::getInstance()->getRegionFromID(region_id);
-            if (!region) { return; }
-            LLVLComposition* compp = region->getComposition();
-            if (!compp) { return; }
-            compp->apply(composition_changes);
-            LLFloaterRegionInfo::sRefreshFromRegion(region);
-        });
+            LLFloaterRegionInfo::sRefreshFromRegion(this);
+        }
+        else
+        {
+            LLPBRTerrainFeatures::queueQuery(*this, [](LLUUID region_id, bool success, const LLModifyRegion& composition_changes)
+            {
+                if (!success) { return; }
+                LLViewerRegion* region = LLWorld::getInstance()->getRegionFromID(region_id);
+                if (!region) { return; }
+                LLVLComposition* compp = region->getComposition();
+                if (!compp) { return; }
+                compp->apply(composition_changes);
+                LLFloaterRegionInfo::sRefreshFromRegion(region);
+            });
+        }
     }
 
 
@@ -3485,6 +3507,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("VoiceSignalingRequest");
     capabilityNames.append("ReadOfflineMsgs"); // Requires to respond reliably: AcceptFriendship, AcceptGroupInvite, DeclineFriendship, DeclineGroupInvite
     capabilityNames.append("RegionObjects");
+    capabilityNames.append("RegionSchedule");
     capabilityNames.append("RemoteParcelRequest");
     capabilityNames.append("RenderMaterials");
     capabilityNames.append("RequestTextureDownload");
@@ -4020,7 +4043,7 @@ void LLViewerRegion::resetMaterialsCapThrottle()
     if (   mSimulatorFeatures.has("RenderMaterialsCapability")
         && mSimulatorFeatures["RenderMaterialsCapability"].isReal() )
     {
-        requests_per_sec = mSimulatorFeatures["RenderMaterialsCapability"].asReal();
+        requests_per_sec = (F32)mSimulatorFeatures["RenderMaterialsCapability"].asReal();
         if ( requests_per_sec == 0.0f )
         {
             requests_per_sec = 1.0f;

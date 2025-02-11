@@ -152,6 +152,12 @@ LLPluginProcessParent::ptr_t LLPluginProcessParent::create(LLPluginProcessParent
 /*static*/
 void LLPluginProcessParent::shutdown()
 {
+    if (!sInstancesMutex)
+    {
+        // setup was not complete, skip shutdown
+        return;
+    }
+
     LLCoros::LockType lock(*sInstancesMutex);
 
     mapInstances_t::iterator it;
@@ -488,6 +494,9 @@ void LLPluginProcessParent::idle(void)
 
             case STATE_LISTENING:
                 {
+                    // Only argument to the launcher is the port number we're listening on
+                    mProcessParams.args.add(stringize(mBoundPort));
+
                     // Launch the plugin process.
                     // Only argument to the launcher is the port number we're listening on
                     mProcessParams.args.add(stringize(mBoundPort));

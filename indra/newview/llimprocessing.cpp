@@ -595,7 +595,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
         case IM_NOTHING_SPECIAL:    // p2p IM
             // Don't show dialog, just do IM
             if (!gAgent.isGodlike()
-                && gAgent.getRegion()->isPrelude()
+                && gAgent.inPrelude()
                 && to_id.isNull())
             {
                 // do nothing -- don't distract newbies in
@@ -1933,7 +1933,7 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
         }
         else
         {
-            position.set(message_data["local_x"].asReal(), message_data["local_y"].asReal(), message_data["local_z"].asReal());
+            position.set((F32)message_data["local_x"].asReal(), (F32)message_data["local_y"].asReal(), (F32)message_data["local_z"].asReal());
         }
 
         std::vector<U8> bin_bucket;

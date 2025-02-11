@@ -38,7 +38,9 @@
 #include "v3math.h"
 #include "v3dmath.h"
 #include "v4math.h"
+#include "llbase64.h"
 #include "llquaternion.h"
+#include "llsd.h"
 #include "llstring.h"
 #include "lluuid.h"
 #include "lldir.h"
@@ -650,32 +652,24 @@ bool LLXMLNode::updateNode(
 // static
 bool LLXMLNode::parseFile(const std::string& filename, LLXMLNodePtr& node, LLXMLNode* defaults_tree)
 {
-    // Read file
-    LL_DEBUGS("XMLNode") << "parsing XML file: " << filename << LL_ENDL;
-    LLFILE* fp = LLFile::fopen(filename, "rb");     /* Flawfinder: ignore */
-    if (fp == NULL)
+    std::string xml = LLFile::getContents(filename);
+    if (xml.empty())
     {
-        node = NULL ;
-        return false;
+        LL_WARNS("XMLNode") << "no XML file: " << filename << LL_ENDL;
     }
-    fseek(fp, 0, SEEK_END);
-    U32 length = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
+    else if (parseBuffer(xml.data(), xml.size(), node, defaults_tree))
+    {
+        return true;
+    }
 
-    U8* buffer = new U8[length+1];
-    size_t nread = fread(buffer, 1, length, fp);
-    buffer[nread] = 0;
-    fclose(fp);
-
-    bool rv = parseBuffer(buffer, static_cast<U32>(nread), node, defaults_tree);
-    delete [] buffer;
-    return rv;
+    node = nullptr;
+    return false;
 }
 
 // static
 bool LLXMLNode::parseBuffer(
-    U8* buffer,
-    U32 length,
+    const char* buffer,
+    U64 length,
     LLXMLNodePtr& node,
     LLXMLNode* defaults)
 {
@@ -690,19 +684,24 @@ bool LLXMLNode::parseBuffer(
 
     file_node->mParser = &my_parser;
 
-    XML_SetUserData(my_parser, (void *)file_node_ptr);
+    XML_SetUserData(my_parser, file_node_ptr);
 
     // Do the parsing
-    if (XML_Parse(my_parser, (const char *)buffer, length, true) != XML_STATUS_OK)
+    bool success = XML_STATUS_OK == XML_Parse(my_parser, buffer, (int)length, true);
+    if (!success)
     {
         LL_WARNS() << "Error parsing xml error code: "
                 << XML_ErrorString(XML_GetErrorCode(my_parser))
                 << " on line " << XML_GetCurrentLineNumber(my_parser)
+                << ", column " << XML_GetCurrentColumnNumber(my_parser)
                 << LL_ENDL;
     }
 
     // Deinit
     XML_ParserFree(my_parser);
+
+    if (!success)
+        return false;
 
     if (!file_node->mChildren || file_node->mChildren->map.size() != 1)
     {
@@ -3260,6 +3259,27 @@ std::string LLXMLNode::getTextContents() const
     return msg;
 }
 
+std::string LLXMLNode::getXMLRPCTextContents() const
+{
+    std::string msg;
+    std::string::size_type start = mValue.find_first_not_of(" \t\n");
+    if (start != mValue.npos)
+    {
+        std::string::size_type end = mValue.find_last_not_of(" \t\n");
+        if (end != mValue.npos)
+        {
+            msg = mValue.substr(start, end + 1 - start);
+        }
+        else
+        {
+            msg = mValue.substr(start);
+        }
+    }
+    // Convert any internal CR to LF
+    msg = utf8str_removeCRLF(msg);
+    return msg;
+}
+
 void LLXMLNode::setLineNumber(S32 line_number)
 {
     mLineNumber = line_number;
@@ -3268,4 +3288,172 @@ void LLXMLNode::setLineNumber(S32 line_number)
 S32 LLXMLNode::getLineNumber()
 {
     return mLineNumber;
+}
+
+bool LLXMLNode::parseXmlRpcArrayValue(LLSD& target)
+{
+    LLXMLNode* datap = getFirstChild().get();
+    if (!datap)
+    {
+        LL_WARNS() << "No inner XML element." << LL_ENDL;
+        return false;
+    }
+    if (!datap->hasName("data"))
+    {
+        LL_WARNS() << "No inner XML element (<data> expected, got: "
+                   << datap->mName->mString << ")" << LL_ENDL;
+        return false;
+    }
+    if (datap->getNextSibling().get())
+    {
+        LL_WARNS() << "Multiple inner XML elements (single <data> expected)"
+                   << LL_ENDL;
+        return false;
+    }
+    for (LLXMLNode* itemp = datap->getFirstChild().get(); itemp;
+         itemp = itemp->getNextSibling().get())
+    {
+        LLSD value;
+        if (!itemp->fromXMLRPCValue(value))
+        {
+            return false;
+        }
+        target.append(value);
+    }
+    return true;
+}
+
+bool LLXMLNode::parseXmlRpcStructValue(LLSD& target)
+{
+    std::string name;
+    LLSD value;
+    for (LLXMLNode* itemp = getFirstChild().get(); itemp;
+         itemp = itemp->getNextSibling().get())
+    {
+        if (!itemp->hasName("member"))
+        {
+            LL_WARNS() << "Invalid inner XML element (<member> expected, got: <"
+                       << itemp->mName->mString << ">" << LL_ENDL;
+            return false;
+        }
+        name.clear();
+        value.clear();
+        for (LLXMLNode* chilp = itemp->getFirstChild().get(); chilp;
+             chilp = chilp->getNextSibling().get())
+        {
+            if (chilp->hasName("name"))
+            {
+                name = LLStringFn::xml_decode(chilp->getTextContents());
+            }
+            else if (!chilp->fromXMLRPCValue(value))
+            {
+                return false;
+            }
+        }
+        if (name.empty())
+        {
+            LL_WARNS() << "Empty struct member name" << LL_ENDL;
+            return false;
+        }
+        target.insert(name, value);
+    }
+    return true;
+}
+
+bool LLXMLNode::fromXMLRPCValue(LLSD& target)
+{
+    target.clear();
+
+    if (!hasName("value"))
+    {
+        LL_WARNS() << "Invalid XML element (<value> expected), got: <"
+                   << mName->mString << ">" << LL_ENDL;
+        return false;
+    }
+
+    LLXMLNode* childp = getFirstChild().get();
+    if (!childp)
+    {
+        LL_WARNS() << "No inner XML element (value type expected)" << LL_ENDL;
+        // Value with no type qualifier is treated as string
+        target.assign(LLStringFn::xml_decode(getTextContents()));
+        return true;
+    }
+
+    if (childp->getNextSibling())
+    {
+        LL_WARNS() << "Multiple inner XML elements (single expected)"
+                   << LL_ENDL;
+        return false;
+    }
+
+    if (childp->hasName("string"))
+    {
+        target.assign(LLStringFn::xml_decode(childp->getXMLRPCTextContents()));
+        return true;
+    }
+
+    if (childp->hasName("int") || childp->hasName("i4"))
+    {
+        target.assign(std::stoi(childp->getTextContents()));
+        return true;
+    }
+
+    if (childp->hasName("double"))
+    {
+        target.assign(std::stod(childp->getTextContents()));
+        return true;
+    }
+
+    if (childp->hasName("boolean"))
+    {
+        target.assign(std::stoi(childp->getTextContents()) != 0);
+        return true;
+    }
+
+    if (childp->hasName("dateTime.iso8601"))
+    {
+        target.assign(LLSD::Date(childp->getTextContents()));
+        return true;
+    }
+
+    if (childp->hasName("base64"))
+    {
+        std::string decoded =
+            LLBase64::decodeAsString(childp->getTextContents());
+        size_t size = decoded.size();
+        LLSD::Binary binary(size);
+        if (size)
+        {
+            memcpy((void*)binary.data(), (void*)decoded.data(), size);
+        }
+        target.assign(binary);
+        return true;
+    }
+
+    if (childp->hasName("array"))
+    {
+        if (!childp->parseXmlRpcArrayValue(target))
+        {
+            target.clear();
+            return false;
+        }
+        return true;
+    }
+
+    if (childp->hasName("struct"))
+    {
+        if (!childp->parseXmlRpcStructValue(target))
+        {
+            target.clear();
+            return false;
+        }
+        return true;
+    }
+
+    LL_WARNS() << "Unknown inner XML element (known value type expected)"
+               << LL_ENDL;
+    // Value with unknown type qualifier is treated as string
+    target.assign(LLStringFn::xml_decode(childp->getTextContents()));
+    return true;
 }

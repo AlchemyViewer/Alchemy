@@ -659,7 +659,7 @@ void LLMaterialEditor::setBaseColor(const LLColor4& color)
 
 F32 LLMaterialEditor::getTransparency()
 {
-    return childGetValue("transparency").asReal();
+    return (F32)childGetValue("transparency").asReal();
 }
 
 void LLMaterialEditor::setTransparency(F32 transparency)
@@ -679,7 +679,7 @@ void LLMaterialEditor::setAlphaMode(const std::string& alpha_mode)
 
 F32 LLMaterialEditor::getAlphaCutoff()
 {
-    return childGetValue("alpha cutoff").asReal();
+    return (F32)childGetValue("alpha cutoff").asReal();
 }
 
 void LLMaterialEditor::setAlphaCutoff(F32 alpha_cutoff)
@@ -719,7 +719,7 @@ void LLMaterialEditor::setMetallicRoughnessUploadId(const LLUUID& id)
 
 F32 LLMaterialEditor::getMetalnessFactor()
 {
-    return childGetValue("metalness factor").asReal();
+    return (F32)childGetValue("metalness factor").asReal();
 }
 
 void LLMaterialEditor::setMetalnessFactor(F32 factor)
@@ -729,7 +729,7 @@ void LLMaterialEditor::setMetalnessFactor(F32 factor)
 
 F32 LLMaterialEditor::getRoughnessFactor()
 {
-    return childGetValue("roughness factor").asReal();
+    return (F32)childGetValue("roughness factor").asReal();
 }
 
 void LLMaterialEditor::setRoughnessFactor(F32 factor)
@@ -1991,21 +1991,21 @@ void LLMaterialEditor::loadMaterialFromFile(const std::string& filename, S32 ind
         return;
     }
 
-    LLMaterialEditor* me = (LLMaterialEditor*)LLFloaterReg::getInstance("material_editor");
-
     if (index >= 0)
     {
         // Prespecified material
+        LLMaterialEditor* me = (LLMaterialEditor*)LLFloaterReg::getInstance("material_editor");
         me->loadMaterial(model_in, filename, index);
     }
     else if (model_in.materials.size() == 1)
     {
-        // Only one, just load it
+        // Only one material, just load it
+        LLMaterialEditor* me = (LLMaterialEditor*)LLFloaterReg::getInstance("material_editor");
         me->loadMaterial(model_in, filename, 0);
     }
     else
     {
-        // Promt user to select material
+        // Multiple materials, Promt user to select material
         std::list<std::string> material_list;
         std::vector<tinygltf::Material>::const_iterator mat_iter = model_in.materials.begin();
         std::vector<tinygltf::Material>::const_iterator mat_end = model_in.materials.end();
@@ -2023,15 +2023,19 @@ void LLMaterialEditor::loadMaterialFromFile(const std::string& filename, S32 ind
             }
         }
 
-        material_list.push_back(me->getString("material_batch_import_text"));
+        material_list.push_back(LLTrans::getString("material_batch_import_text"));
 
         LLFloaterComboOptions::showUI(
-            [me, model_in, filename](const std::string& option, S32 index)
+            [model_in, filename](const std::string& option, S32 index)
         {
-            me->loadMaterial(model_in, filename, index);
+            if (index >= 0) // -1 on cancel
+            {
+                LLMaterialEditor* me = (LLMaterialEditor*)LLFloaterReg::getInstance("material_editor");
+                me->loadMaterial(model_in, filename, index);
+            }
         },
-            me->getString("material_selection_title"),
-            me->getString("material_selection_text"),
+            LLTrans::getString("material_selection_title"),
+            LLTrans::getString("material_selection_text"),
             material_list
             );
     }
@@ -2445,14 +2449,14 @@ void LLMaterialEditor::onSaveObjectsMaterialAsMsgCallback(const LLSD& notificati
     createInventoryItem(str.str(), new_name, std::string(), permissions);
 }
 
-const void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type);
+const void upload_bulk(const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter type, bool allow_2k);
 
 void LLMaterialEditor::loadMaterial(const tinygltf::Model &model_in, const std::string &filename, S32 index, bool open_floater)
 {
     if (index == model_in.materials.size())
     {
         // bulk upload all the things
-        upload_bulk({ filename }, LLFilePicker::FFLOAD_MATERIAL);
+        upload_bulk({ filename }, LLFilePicker::FFLOAD_MATERIAL, true);
         return;
     }
 
@@ -2633,13 +2637,13 @@ bool LLMaterialEditor::setFromGltfModel(const tinygltf::Model& model, S32 index,
         }
 
         setAlphaMode(material_in.alphaMode);
-        setAlphaCutoff(material_in.alphaCutoff);
+        setAlphaCutoff((F32)material_in.alphaCutoff);
 
         setBaseColor(LLTinyGLTFHelper::getColor(material_in.pbrMetallicRoughness.baseColorFactor));
         setEmissiveColor(LLTinyGLTFHelper::getColor(material_in.emissiveFactor));
 
-        setMetalnessFactor(material_in.pbrMetallicRoughness.metallicFactor);
-        setRoughnessFactor(material_in.pbrMetallicRoughness.roughnessFactor);
+        setMetalnessFactor((F32)material_in.pbrMetallicRoughness.metallicFactor);
+        setRoughnessFactor((F32)material_in.pbrMetallicRoughness.roughnessFactor);
 
         setDoubleSided(material_in.doubleSided);
     }

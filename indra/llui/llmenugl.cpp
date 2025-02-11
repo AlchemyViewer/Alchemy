@@ -547,8 +547,8 @@ void LLMenuItemGL::draw( void )
         std::string::size_type offset = upper_case_label.find(mJumpKey);
         if (offset != std::string::npos)
         {
-            S32 x_begin = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel, 0, static_cast<S32>(offset));
-            S32 x_end = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel, 0, static_cast<S32>(offset) + 1);
+            S32 x_begin = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel.getWString().c_str(), 0, static_cast<S32>(offset));
+            S32 x_end = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel.getWString().c_str(), 0, static_cast<S32>(offset) + 1);
             gl_line_2d(x_begin, (MENU_ITEM_PADDING / 2) + 1, x_end, (MENU_ITEM_PADDING / 2) + 1);
         }
     }
@@ -1651,8 +1651,8 @@ void LLMenuItemBranchDownGL::draw( void )
         if (offset != std::string::npos)
         {
             S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - getFont()->getWidthF32(mLabel.getWString().c_str(), 0, S32_MAX) / 2.f);
-            S32 x_begin = x_offset + getFont()->getWidth(mLabel, 0, static_cast<S32>(offset));
-            S32 x_end = x_offset + getFont()->getWidth(mLabel, 0, static_cast<S32>(offset) + 1);
+            S32 x_begin = x_offset + getFont()->getWidth(mLabel.getWString().c_str(), 0, static_cast<S32>(offset));
+            S32 x_end = x_offset + getFont()->getWidth(mLabel.getWString().c_str(), 0, static_cast<S32>(offset) + 1);
             gl_line_2d(x_begin, LABEL_BOTTOM_PAD_PIXELS, x_end, LABEL_BOTTOM_PAD_PIXELS);
         }
     }

@@ -28,12 +28,8 @@
 
 #include "lltrans.h"
 
-#include "llfasttimer.h"    // for call count statistics
 #include "llxuiparser.h"
 #include "llsd.h"
-#include "llxmlnode.h"
-
-#include <map>
 
 LLTrans::template_map_t LLTrans::sStringTemplates;
 LLTrans::template_map_t LLTrans::sDefaultStringTemplates;
@@ -59,7 +55,7 @@ struct StringTable : public LLInitParam::Block<StringTable>
 };
 
 //static
-bool LLTrans::parseStrings(LLXMLNodePtr &root, const std::set<std::string>& default_args)
+bool LLTrans::parseStrings(LLXMLNodePtr& root, const std::set<std::string>& default_args)
 {
     std::string xml_filename = "(strings file)";
     if (!root->hasName("strings"))
@@ -107,7 +103,7 @@ bool LLTrans::parseStrings(LLXMLNodePtr &root, const std::set<std::string>& defa
 
 
 //static
-bool LLTrans::parseLanguageStrings(LLXMLNodePtr &root)
+bool LLTrans::parseLanguageStrings(LLXMLNodePtr& root)
 {
     std::string xml_filename = "(language strings file)";
     if (!root->hasName("strings"))
@@ -273,7 +269,7 @@ bool LLTrans::findString(std::string &result, std::string_view xml_desc, const L
 }
 
 //static
-std::string LLTrans::getCountString(const std::string_view language, const std::string_view xml_desc, S32 count)
+std::string LLTrans::getCountString(std::string_view language, std::string_view xml_desc, S32 count)
 {
     // Compute which string identifier to use
     const char* form = "";

@@ -74,12 +74,12 @@ private:
     static instance_list_t sNullInstanceList;
     static instance_map_t sInstanceMap;
     static build_map_t sBuildMap;
-    static group_map_t sGroupMap;
+    static std::map<std::string, std::string, std::less<>> sGroupMap;
     static bool sBlockShowFloaters;
     /**
      * Defines list of floater names that can be shown despite state of sBlockShowFloaters.
      */
-    static boost::unordered_flat_set<std::string, al::string_hash, std::equal_to<>> sAlwaysShowableList;
+    static std::set<std::string, std::less<>> sAlwaysShowableList;
 
 // [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
     // Used to determine whether a floater can be shown
@@ -102,8 +102,8 @@ public:
     }
 
     static void add(const std::string& name, const std::string& file, const LLFloaterBuildFunc& func,
-                    const std::string& groupname = std::string());
-    static bool isRegistered(const std::string& name);
+                    const std::string& groupname = LLStringUtil::null);
+    static bool isRegistered(std::string_view name);
 
     // Helpers
     static LLFloater* getLastFloaterInGroup(std::string_view name);

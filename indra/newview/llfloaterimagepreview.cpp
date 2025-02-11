@@ -285,12 +285,19 @@ void LLFloaterImagePreview::draw()
             }
 
             gGL.color3f(1.f, 1.f, 1.f);
-            gGL.begin( LLRender::TRIANGLE_STRIP );
+            gGL.begin(LLRender::TRIANGLES);
             {
                 gGL.texCoord2f(mPreviewImageRect.mLeft, mPreviewImageRect.mTop);
                 gGL.vertex2i(PREVIEW_HPAD, PREVIEW_TEXTURE_HEIGHT + PREVIEW_VPAD);
                 gGL.texCoord2f(mPreviewImageRect.mLeft, mPreviewImageRect.mBottom);
                 gGL.vertex2i(PREVIEW_HPAD, PREVIEW_HPAD + PREF_BUTTON_HEIGHT + PREVIEW_HPAD);
+                gGL.texCoord2f(mPreviewImageRect.mRight, mPreviewImageRect.mBottom);
+                gGL.vertex2i(r.getWidth() - PREVIEW_HPAD, PREVIEW_HPAD + PREF_BUTTON_HEIGHT + PREVIEW_HPAD);
+
+                gGL.texCoord2f(mPreviewImageRect.mRight, mPreviewImageRect.mBottom);
+                gGL.vertex2i(r.getWidth() - PREVIEW_HPAD, PREVIEW_HPAD + PREF_BUTTON_HEIGHT + PREVIEW_HPAD);
+                gGL.texCoord2f(mPreviewImageRect.mLeft, mPreviewImageRect.mTop);
+                gGL.vertex2i(PREVIEW_HPAD, PREVIEW_TEXTURE_HEIGHT + PREVIEW_VPAD);
                 gGL.texCoord2f(mPreviewImageRect.mRight, mPreviewImageRect.mTop);
                 gGL.vertex2i(r.getWidth() - PREVIEW_HPAD, PREVIEW_TEXTURE_HEIGHT + PREVIEW_VPAD);
                 gGL.texCoord2f(mPreviewImageRect.mRight, mPreviewImageRect.mBottom);
@@ -317,12 +324,19 @@ void LLFloaterImagePreview::draw()
                     gGL.getTexUnit(0)->bind(mAvatarPreview);
                 }
 
-                gGL.begin( LLRender::TRIANGLE_STRIP );
+                gGL.begin(LLRender::TRIANGLES);
                 {
                     gGL.texCoord2f(0.f, 1.f);
                     gGL.vertex2i(PREVIEW_HPAD, PREVIEW_TEXTURE_HEIGHT + PREVIEW_VPAD);
                     gGL.texCoord2f(0.f, 0.f);
                     gGL.vertex2i(PREVIEW_HPAD, PREVIEW_HPAD + PREF_BUTTON_HEIGHT + PREVIEW_HPAD);
+                    gGL.texCoord2f(1.f, 0.f);
+                    gGL.vertex2i(r.getWidth() - PREVIEW_HPAD, PREVIEW_HPAD + PREF_BUTTON_HEIGHT + PREVIEW_HPAD);
+
+                    gGL.texCoord2f(1.f, 0.f);
+                    gGL.vertex2i(r.getWidth() - PREVIEW_HPAD, PREVIEW_HPAD + PREF_BUTTON_HEIGHT + PREVIEW_HPAD);
+                    gGL.texCoord2f(0.f, 1.f);
+                    gGL.vertex2i(PREVIEW_HPAD, PREVIEW_TEXTURE_HEIGHT + PREVIEW_VPAD);
                     gGL.texCoord2f(1.f, 1.f);
                     gGL.vertex2i(r.getWidth() - PREVIEW_HPAD, PREVIEW_TEXTURE_HEIGHT + PREVIEW_VPAD);
                     gGL.texCoord2f(1.f, 0.f);
@@ -671,7 +685,7 @@ bool LLImagePreviewAvatar::render()
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
     gGL.loadIdentity();
-    gGL.ortho(0.0f, mFullWidth, 0.0f, mFullHeight, -1.0f, 1.0f);
+    gGL.ortho(0.0f, (F32)mFullWidth, 0.0f, (F32)mFullHeight, -1.0f, 1.0f);
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();
@@ -852,7 +866,7 @@ void LLImagePreviewSculpted::setPreviewTarget(LLImageRaw* imagep, F32 distance)
     }
 
     // build indices
-    for (U16 i = 0; i < num_indices; i++)
+    for (U32 i = 0; i < num_indices; i++)
     {
         *(index_strider++) = vf.mIndices[i];
     }
@@ -875,7 +889,7 @@ bool LLImagePreviewSculpted::render()
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
     gGL.loadIdentity();
-    gGL.ortho(0.0f, mFullWidth, 0.0f, mFullHeight, -1.0f, 1.0f);
+    gGL.ortho(0.0f, (F32)mFullWidth, 0.0f, (F32)mFullHeight, -1.0f, 1.0f);
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();

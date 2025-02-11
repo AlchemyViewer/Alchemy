@@ -56,6 +56,7 @@
 #include "llattachmentsmgr.h"
 #include "llviewerwindow.h"
 #include "lldrawable.h"
+#include "llfloatergltfasseteditor.h"
 #include "llfloaterinspect.h"
 #include "llfloaterreporter.h"
 #include "llfloaterreg.h"
@@ -108,20 +109,12 @@ LLViewerObject* getSelectedParentObject(LLViewerObject *object) ;
 // Consts
 //
 
-const F32 SILHOUETTE_UPDATE_THRESHOLD_SQUARED = 0.02f;
-const S32 MAX_SILS_PER_FRAME = 50;
-const S32 MAX_OBJECTS_PER_PACKET = 254;
+constexpr F32 SILHOUETTE_UPDATE_THRESHOLD_SQUARED = 0.02f;
+constexpr S32 MAX_SILS_PER_FRAME = 50;
+constexpr S32 MAX_OBJECTS_PER_PACKET = 254;
 // For linked sets
-//const S32 MAX_CHILDREN_PER_TASK = 255;
+constexpr S32 MAX_CHILDREN_PER_TASK = 255;
 
-//
-// Globals
-//
-
-//bool gDebugSelectMgr = false;
-
-//bool gHideSelectedObjects = false;
-//bool gAllowSelectAvatar = false;
 
 bool LLSelectMgr::sRectSelectInclusive = true;
 bool LLSelectMgr::sRenderHiddenSelections = true;
@@ -133,6 +126,12 @@ F32 LLSelectMgr::sHighlightAlpha = 0.f;
 F32 LLSelectMgr::sHighlightAlphaTest = 0.f;
 F32 LLSelectMgr::sHighlightUAnim = 0.f;
 F32 LLSelectMgr::sHighlightVAnim = 0.f;
+LLUIColor LLSelectMgr::sSilhouetteParentColor;
+LLUIColor LLSelectMgr::sSilhouetteChildColor;
+LLUIColor LLSelectMgr::sHighlightInspectColor;
+LLUIColor LLSelectMgr::sHighlightParentColor;
+LLUIColor LLSelectMgr::sHighlightChildColor;
+LLUIColor LLSelectMgr::sContextSilhouetteColor;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // struct LLDeRezInfo
@@ -467,6 +466,11 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S3
     if (object->isSelected() ) {
         // make sure point at position is updated
         updatePointAt();
+        LLSelectNode* nodep = mSelectedObjects->findNode(object);
+        if (nodep)
+        {
+            nodep->selectGLTFNode(gltf_node, gltf_primitive, true);
+        }
         gEditMenuHandler = this;
         return NULL;
     }
@@ -2256,13 +2260,18 @@ void LLSelectMgr::selectionRevertGLTFMaterials()
 
                 // Update material locally
                 objectp->setRenderMaterialID(te, asset_id, false /*wait for LLGLTFMaterialList update*/);
-                objectp->setTEGLTFMaterialOverride(te, nodep->mSavedGLTFOverrideMaterials[te]);
+                LLGLTFMaterial* material = nodep->mSavedGLTFOverrideMaterials[te];
+                if (material)
+                {
+                    material = new LLGLTFMaterial(*material);
+                    objectp->setTEGLTFMaterialOverride(te, material);
+                }
 
                 // Enqueue update to server
-                if (asset_id.notNull())
+                if (asset_id.notNull() && material)
                 {
                     // Restore overrides and base material
-                    LLGLTFMaterialList::queueApply(objectp, te, asset_id, nodep->mSavedGLTFOverrideMaterials[te]);
+                    LLGLTFMaterialList::queueApply(objectp, te, asset_id, material);
                 }
                 else
                 {
@@ -3049,7 +3058,7 @@ void LLSelectMgr::adjustTexturesByScale(bool send_to_sim, bool stretch)
 
         for (U8 te_num = 0; te_num < object->getNumTEs(); te_num++)
         {
-            const LLTextureEntry* tep = object->getTE(te_num);
+            LLTextureEntry* tep = object->getTE(te_num);
 
             bool planar = tep->getTexGen() == LLTextureEntry::TEX_GEN_PLANAR;
             if (planar == stretch)
@@ -3082,8 +3091,6 @@ void LLSelectMgr::adjustTexturesByScale(bool send_to_sim, bool stretch)
                     F32 specular_scale_t = specular_scale_ratio.mV[t_axis]/object_scale.mV[t_axis];
 
                     object->setTEScale(te_num, diffuse_scale_s, diffuse_scale_t);
-
-                    LLTextureEntry* tep = object->getTE(te_num);
 
                     if (tep && !tep->getMaterialParams().isNull())
                     {
@@ -3120,6 +3127,52 @@ void LLSelectMgr::adjustTexturesByScale(bool send_to_sim, bool stretch)
                         p->setSpecularRepeat(specular_scale_s, specular_scale_t);
 
                         LLMaterialMgr::getInstance()->put(object->getID(), te_num, *p);
+                    }
+                }
+
+                if (tep->getGLTFMaterial())
+                {
+                    LLPointer<LLGLTFMaterial> material = tep->getGLTFMaterialOverride();
+                    if (!material)
+                    {
+                        material = new LLGLTFMaterial();
+                        tep->setGLTFMaterialOverride(material);
+                    }
+
+                    F32 scale_x = 1;
+                    F32 scale_y = 1;
+
+                    for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+                    {
+                        LLVector3 scale_ratio = selectNode->mGLTFScaleRatios[te_num][i];
+
+                        if (planar)
+                        {
+                            scale_x = scale_ratio.mV[s_axis] / object_scale.mV[s_axis];
+                            scale_y = scale_ratio.mV[t_axis] / object_scale.mV[t_axis];
+                        }
+                        else
+                        {
+                            scale_x = scale_ratio.mV[s_axis] * object_scale.mV[s_axis];
+                            scale_y = scale_ratio.mV[t_axis] * object_scale.mV[t_axis];
+                        }
+                        material->mTextureTransform[i].mScale.set(scale_x, scale_y);
+                    }
+
+                    const LLGLTFMaterial* base_material = tep->getGLTFMaterial();
+                    if (base_material)
+                    {
+                        LLGLTFMaterial* render_material = new LLFetchedGLTFMaterial();
+                        *render_material = *base_material;
+                        render_material->applyOverride(*material);
+                        tep->setGLTFRenderMaterial(render_material);
+                    }
+
+                    if (send_to_sim)
+                    {
+                        LLGLTFMaterial new_override;
+                        new_override = *material;
+                        LLGLTFMaterialList::queueModify(object, te_num, &new_override);
                     }
                 }
                 send = send_to_sim;
@@ -5900,12 +5953,12 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
                         LLGLTFMaterial* old_override = node->getObject()->getTE(i)->getGLTFMaterialOverride();
                         if (old_override)
                         {
-                            LLPointer<LLGLTFMaterial> mat = new LLGLTFMaterial(*old_override);
-                            override_materials.push_back(mat);
+                            // saveGLTFMaterials will make a copy
+                            override_materials.emplace_back(old_override);
                         }
                         else
                         {
-                            override_materials.push_back(nullptr);
+                            override_materials.emplace_back(nullptr);
                         }
                     }
                     // processObjectProperties does not include overrides so this
@@ -6352,9 +6405,9 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
     F32 fogCfx = (F32)llclamp((getSelectionCenterGlobal() - gAgentCamera.getCameraPositionGlobal()).magVec() / (getBBoxOfSelection().getExtentLocal().magVec() * 4), 0.0, 1.0);
 
     LLColor4 sParentColor = sSilhouetteParentColor;
-    sParentColor.mV[3] = LLSelectMgr::sHighlightAlpha;
+    sParentColor.mV[VALPHA] = LLSelectMgr::sHighlightAlpha;
     LLColor4 sChildColor = sSilhouetteChildColor;
-    sChildColor.mV[3] = LLSelectMgr::sHighlightAlpha;
+    sChildColor.mV[VALPHA] = LLSelectMgr::sHighlightAlpha;
 
     auto renderMeshSelection_f = [fogCfx, wireframe_selection](LLSelectNode* node, LLViewerObject* objectp, LLColor4 hlColor)
     {
@@ -6771,16 +6824,22 @@ void LLSelectNode::saveGLTFMaterials(const uuid_vec_t& materials, const gltf_mat
         mSavedGLTFMaterialIds.clear();
         mSavedGLTFOverrideMaterials.clear();
 
-        for (uuid_vec_t::const_iterator materials_it = materials.begin();
-            materials_it != materials.end(); ++materials_it)
+        for (const LLUUID& id : materials)
         {
-            mSavedGLTFMaterialIds.push_back(*materials_it);
+            mSavedGLTFMaterialIds.push_back(id);
         }
 
-        for (gltf_materials_vec_t::const_iterator mat_it = override_materials.begin();
-            mat_it != override_materials.end(); ++mat_it)
+        for (const LLPointer<LLGLTFMaterial> &mat : override_materials)
         {
-            mSavedGLTFOverrideMaterials.push_back(*mat_it);
+            if (mat.notNull())
+            {
+                LLGLTFMaterial* copy = new LLGLTFMaterial(*mat);
+                mSavedGLTFOverrideMaterials.emplace_back(copy);
+            }
+            else
+            {
+                mSavedGLTFOverrideMaterials.emplace_back(nullptr);
+            }
         }
     }
 }
@@ -6788,6 +6847,7 @@ void LLSelectNode::saveGLTFMaterials(const uuid_vec_t& materials, const gltf_mat
 void LLSelectNode::saveTextureScaleRatios(LLRender::eTexIndex index_to_query)
 {
     mTextureScaleRatios.clear();
+    mGLTFScaleRatios.clear();
 
     if (mObject.notNull())
     {
@@ -6822,6 +6882,40 @@ void LLSelectNode::saveTextureScaleRatios(LLRender::eTexIndex index_to_query)
                 v.mV[t_axis] = diffuse_t/scale.mV[t_axis];
                 mTextureScaleRatios.push_back(v);
             }
+
+            LLGLTFMaterial* material = tep->getGLTFMaterialOverride();
+            LLVector3 material_v;
+            F32 scale_x = 1;
+            F32 scale_y = 1;
+            std::vector<LLVector3> material_v_vec;
+            for (U32 i = 0; i < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++i)
+            {
+                if (material)
+                {
+                    LLGLTFMaterial::TextureTransform& transform = material->mTextureTransform[i];
+                    scale_x = transform.mScale[VX];
+                    scale_y = transform.mScale[VY];
+                }
+                else
+                {
+                    // Not having an override doesn't mean that there is no material
+                    scale_x = 1;
+                    scale_y = 1;
+                }
+
+                if (tep->getTexGen() == LLTextureEntry::TEX_GEN_PLANAR)
+                {
+                    material_v.mV[s_axis] = scale_x * scale.mV[s_axis];
+                    material_v.mV[t_axis] = scale_y * scale.mV[t_axis];
+                }
+                else
+                {
+                    material_v.mV[s_axis] = scale_x / scale.mV[s_axis];
+                    material_v.mV[t_axis] = scale_y / scale.mV[t_axis];
+                }
+                material_v_vec.push_back(material_v);
+            }
+            mGLTFScaleRatios.push_back(material_v_vec);
         }
     }
 }
@@ -7128,6 +7222,12 @@ void dialog_refresh_all()
     if (panel_task_info)
     {
         panel_task_info->dirty();
+    }
+
+    LLFloaterGLTFAssetEditor * gltf_editor = LLFloaterReg::findTypedInstance<LLFloaterGLTFAssetEditor>("gltf_asset_editor");
+    if (gltf_editor)
+    {
+        gltf_editor->dirty();
     }
 }
 
@@ -7854,7 +7954,7 @@ S32 LLObjectSelection::getSelectedObjectRenderCost()
                    cost += object->getRenderCost(textures);
                    computed_objects.insert(object->getID());
 
-                   LLViewerObject::const_child_list_t& children = object->getChildren();
+                   const const_child_list_t& children = object->getChildren();
                    for (LLViewerObject* child_obj : children)
                    {
                        LLVOVolume *child = child_obj ? child_obj->asVolume() : nullptr;

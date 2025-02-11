@@ -46,8 +46,7 @@ protected:
     void onSpellCheckSettingsChange();
     void refreshDictionaries(bool from_settings);
 
-private:
-    boost::signals2::connection mSpellcheckCtrlConnection;
+    bool mMainSelectionChanged{ false };
 };
 
 class LLFloaterSpellCheckerImport final : public LLFloater

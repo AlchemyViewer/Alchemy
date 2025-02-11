@@ -377,7 +377,7 @@ LLPointer<LLControlVariable> LLControlGroup::getControl(std::string_view name)
         incrCount(name);
     }
 
-    ctrl_name_table_t::iterator iter = mNameTable.find(name.data());
+    ctrl_name_table_t::iterator iter = mNameTable.find(name);
     return iter == mNameTable.end() ? LLPointer<LLControlVariable>() : iter->second;
 }
 

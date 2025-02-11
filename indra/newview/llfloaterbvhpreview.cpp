@@ -250,7 +250,12 @@ bool LLFloaterBvhPreview::postBuild()
 
         // create data buffer for keyframe initialization
         S32 buffer_size = loaderp->getOutputSize();
-        U8* buffer = new U8[buffer_size];
+        U8* buffer = new(std::nothrow) U8[buffer_size];
+        if (!buffer)
+        {
+            LLError::LLUserWarningMsg::showOutOfMemory();
+            LL_ERRS() << "Bad memory allocation for buffer, size: " << buffer_size << LL_ENDL;
+        }
 
         LLDataPackerBinaryBuffer dp(buffer, buffer_size);
 
@@ -366,12 +371,19 @@ void LLFloaterBvhPreview::draw()
 
         gGL.getTexUnit(0)->bind(mAnimPreview);
 
-        gGL.begin( LLRender::TRIANGLE_STRIP );
+        gGL.begin(LLRender::TRIANGLES);
         {
             gGL.texCoord2f(0.f, 1.f);
             gGL.vertex2i(PREVIEW_HPAD, PREVIEW_TEXTURE_HEIGHT + PREVIEW_VPAD);
             gGL.texCoord2f(0.f, 0.f);
             gGL.vertex2i(PREVIEW_HPAD, PREVIEW_HPAD + PREF_BUTTON_HEIGHT + PREVIEW_HPAD);
+            gGL.texCoord2f(1.f, 0.f);
+            gGL.vertex2i(r.getWidth() - PREVIEW_HPAD, PREVIEW_HPAD + PREF_BUTTON_HEIGHT + PREVIEW_HPAD);
+
+            gGL.texCoord2f(0.f, 1.f);
+            gGL.vertex2i(PREVIEW_HPAD, PREVIEW_TEXTURE_HEIGHT + PREVIEW_VPAD);
+            gGL.texCoord2f(1.f, 0.f);
+            gGL.vertex2i(r.getWidth() - PREVIEW_HPAD, PREVIEW_HPAD + PREF_BUTTON_HEIGHT + PREVIEW_HPAD);
             gGL.texCoord2f(1.f, 1.f);
             gGL.vertex2i(r.getWidth() - PREVIEW_HPAD, PREVIEW_TEXTURE_HEIGHT + PREVIEW_VPAD);
             gGL.texCoord2f(1.f, 0.f);
@@ -957,7 +969,12 @@ void LLFloaterBvhPreview::onBtnOK(void* userdata)
         LLKeyframeMotion* motionp = (LLKeyframeMotion*)floaterp->mAnimPreview->getDummyAvatar()->findMotion(floaterp->mMotionID);
 
         S32 file_size = motionp->getFileSize();
-        U8* buffer = new U8[file_size];
+        U8* buffer = new(std::nothrow) U8[file_size];
+        if (!buffer)
+        {
+            LLError::LLUserWarningMsg::showOutOfMemory();
+            LL_ERRS() << "Bad memory allocation for buffer, size: " << file_size << LL_ENDL;
+        }
 
         LLDataPackerBinaryBuffer dp(buffer, file_size);
         if (motionp->serialize(dp))
@@ -1051,7 +1068,7 @@ bool    LLPreviewAnimation::render()
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
     gGL.loadIdentity();
-    gGL.ortho(0.0f, mFullWidth, 0.0f, mFullHeight, -1.0f, 1.0f);
+    gGL.ortho(0.0f, (F32)mFullWidth, 0.0f, (F32)mFullHeight, -1.0f, 1.0f);
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();

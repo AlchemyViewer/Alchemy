@@ -31,7 +31,6 @@ set(llcommon_SOURCE_FILES
     llbase64.cpp
     llbitpack.cpp
     llcallbacklist.cpp
-    llcallstack.cpp
     llcleanup.cpp
     llcommon.cpp
     llcommonutils.cpp
@@ -126,6 +125,7 @@ set(llcommon_HEADER_FILES
     compile_time.h
     ctype_workaround.h
     fix_macros.h
+    fsyspath.h
     function_types.h
     indra_constants.h
     lazyeventapi.h
@@ -140,7 +140,6 @@ set(llcommon_HEADER_FILES
     llbitpack.h
     llboost.h
     llcallbacklist.h
-    llcallstack.h
     llcleanup.h
     llcommon.h
     llcommonutils.h
@@ -249,7 +248,6 @@ set(llcommon_HEADER_FILES
     lluriparser.h
     lluuid.h
     llwin32headers.h
-    llwin32headerslean.h
     llworkerthread.h
     hbxxh.h
     lockstatic.h
@@ -289,7 +287,6 @@ target_link_libraries(
         ll::openssl
         ll::zlib-ng
         ll::boost
-        ll::uriparser
         ll::oslibraries
         ll::tracy
         ll::xxhash

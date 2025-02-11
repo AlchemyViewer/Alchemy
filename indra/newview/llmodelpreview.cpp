@@ -134,25 +134,17 @@ std::string getLodSuffix(S32 lod)
 
 void FindModel(LLModelLoader::scene& scene, const std::string& name_to_match, LLModel*& baseModelOut, LLMatrix4& matOut)
 {
-    LLModelLoader::scene::iterator base_iter = scene.begin();
-    bool found = false;
-    while (!found && (base_iter != scene.end()))
+    for (auto scene_iter = scene.begin(); scene_iter != scene.end(); scene_iter++)
     {
-        matOut = base_iter->first;
-
-        LLModelLoader::model_instance_list::iterator base_instance_iter = base_iter->second.begin();
-        while (!found && (base_instance_iter != base_iter->second.end()))
+        for (auto model_iter = scene_iter->second.begin(); model_iter != scene_iter->second.end(); model_iter++)
         {
-            LLModelInstance& base_instance = *base_instance_iter++;
-            LLModel* base_model = base_instance.mModel;
-
-            if (base_model && (base_model->mLabel == name_to_match))
+            if (model_iter->mModel && (model_iter->mModel->mLabel == name_to_match))
             {
-                baseModelOut = base_model;
+                baseModelOut = model_iter->mModel;
+                matOut = scene_iter->first;
                 return;
             }
         }
-        base_iter++;
     }
 }
 
@@ -212,9 +204,12 @@ LLModelPreview::LLModelPreview(S32 width, S32 height, LLFloater* fmp)
 
 LLModelPreview::~LLModelPreview()
 {
+    LLMutexLock lock(this);
+
     if (mModelLoader)
     {
         mModelLoader->shutdown();
+        mModelLoader = NULL;
     }
 
     if (mPreviewAvatar)
@@ -232,6 +227,8 @@ LLModelPreview::~LLModelPreview()
     }
     mBaseModel.clear();
     mBaseScene.clear();
+
+    LLLoadedCallbackEntry::cleanUpCallbackList(&mCallbackTextureList);
 }
 
 void LLModelPreview::updateDimentionsAndOffsets()
@@ -242,7 +239,7 @@ void LLModelPreview::updateDimentionsAndOffsets()
 
     std::set<LLModel*> accounted;
 
-    mPelvisZOffset = mFMP ? mFMP->childGetValue("pelvis_offset").asReal() : 3.0f;
+    mPelvisZOffset = mFMP ? (F32)mFMP->childGetValue("pelvis_offset").asReal() : 3.0f;
 
     if (mFMP && mFMP->childGetValue("upload_joints").asBoolean())
     {
@@ -262,7 +259,7 @@ void LLModelPreview::updateDimentionsAndOffsets()
             accounted.insert(instance.mModel);
 
             // update instance skin info for each lods pelvisZoffset
-            for (int j = 0; j<LLModel::NUM_LODS; ++j)
+            for (int j = 0; j < LLModel::NUM_LODS; ++j)
             {
                 if (instance.mLOD[j])
                 {
@@ -272,7 +269,7 @@ void LLModelPreview::updateDimentionsAndOffsets()
         }
     }
 
-    F32 scale = mFMP ? mFMP->childGetValue("import_scale").asReal()*2.f : 2.f;
+    F32 scale = mFMP ? (F32)mFMP->childGetValue("import_scale").asReal()*2.f : 2.f;
 
     mDetailsSignal((F32)(mPreviewScale[0] * scale), (F32)(mPreviewScale[1] * scale), (F32)(mPreviewScale[2] * scale));
 
@@ -293,7 +290,7 @@ void LLModelPreview::rebuildUploadData()
 
     LLSpinCtrl* scale_spinner = mFMP->getChild<LLSpinCtrl>("import_scale");
 
-    F32 scale = scale_spinner->getValue().asReal();
+    F32 scale = (F32)scale_spinner->getValue().asReal();
 
     LLMatrix4 scale_mat;
     scale_mat.initScale(LLVector3(scale, scale, scale));
@@ -303,7 +300,7 @@ void LLModelPreview::rebuildUploadData()
     bool legacyMatching = gSavedSettings.getBOOL("ImporterLegacyMatching");
     U32 load_state = 0;
 
-    for (LLModelLoader::scene::iterator iter = mBaseScene.begin(); iter != mBaseScene.end(); ++iter)
+    for (auto iter = mBaseScene.begin(); iter != mBaseScene.end(); ++iter)
     { //for each transform in scene
         LLMatrix4 mat = iter->first;
 
@@ -322,9 +319,9 @@ void LLModelPreview::rebuildUploadData()
 
         mat *= scale_mat;
 
-        for (LLModelLoader::model_instance_list::iterator model_iter = iter->second.begin(); model_iter != iter->second.end();)
+        for (auto model_iter = iter->second.begin(); model_iter != iter->second.end(); ++model_iter)
         { // for each instance with said transform applied
-            LLModelInstance instance = *model_iter++;
+            LLModelInstance instance = *model_iter;
 
             LLModel* base_model = instance.mModel;
 
@@ -558,7 +555,7 @@ void LLModelPreview::rebuildUploadData()
                         {
                             // in case user provided a missing file later
                             texture->setIsMissingAsset(false);
-                            texture->setLoadedCallback(LLModelPreview::textureLoadedCallback, 0, true, false, this, NULL, false);
+                            texture->setLoadedCallback(LLModelPreview::textureLoadedCallback, 0, true, false, new LLHandle<LLModelPreview>(getHandle()), &mCallbackTextureList, false);
                             texture->forceToSaveRawImage(0, F32_MAX);
                             texture->updateFetch();
                             if (mModelLoader)
@@ -787,6 +784,10 @@ void LLModelPreview::loadModel(std::string filename, S32 lod, bool force_disable
     std::map<std::string, std::string> joint_alias_map;
     getJointAliases(joint_alias_map);
 
+    LLHandle<LLModelPreview> preview_handle = getHandle();
+    auto load_textures_cb =
+            [preview_handle](LLImportMaterial& material, void* opaque) { return LLModelPreview::loadTextures(material, preview_handle); };
+
     // three possible file extensions, .dae .gltf .glb
     // check for .dae and if not then assume one of the .gl??
     std::string filename_lc(filename);
@@ -798,7 +799,7 @@ void LLModelPreview::loadModel(std::string filename, S32 lod, bool force_disable
             lod,
             &LLModelPreview::loadedCallback,
             &LLModelPreview::lookupJointByName,
-            &LLModelPreview::loadTextures,
+            load_textures_cb,
             &LLModelPreview::stateChangedCallback,
             this,
             mJointTransformMap,
@@ -815,7 +816,7 @@ void LLModelPreview::loadModel(std::string filename, S32 lod, bool force_disable
             lod,
             &LLModelPreview::loadedCallback,
             &LLModelPreview::lookupJointByName,
-            &LLModelPreview::loadTextures,
+            load_textures_cb,
             &LLModelPreview::stateChangedCallback,
             this,
             mJointTransformMap,
@@ -910,7 +911,7 @@ void LLModelPreview::clearIncompatible(S32 lod)
                 {
                     mBaseModel = mModel[lod];
                     mBaseScene = mScene[lod];
-                    mVertexBuffer[5].clear();
+                    mVertexBuffer[LLModel::NUM_LODS].clear();
                     replaced_base_model = true;
                 }
             }
@@ -1134,7 +1135,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
             mBaseModel = mModel[loaded_lod];
 
             mBaseScene = mScene[loaded_lod];
-            mVertexBuffer[5].clear();
+            mVertexBuffer[LLModel::NUM_LODS].clear();
         }
         else
         {
@@ -1250,7 +1251,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
     {
         if (!mBaseModel.empty())
         {
-            const std::string& model_name = mBaseModel[0]->getName();
+            std::string model_name = mBaseModel.front()->getName();
             LLLineEditor* description_form = mFMP->getChild<LLLineEditor>("description_form");
             if (description_form->getText().empty())
             {
@@ -1271,6 +1272,8 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
 
 void LLModelPreview::resetPreviewTarget()
 {
+    LLMutexLock lock(this);
+
     if (mModelLoader)
     {
         mPreviewTarget = (mModelLoader->mExtents[0] + mModelLoader->mExtents[1]) * 0.5f;
@@ -1292,7 +1295,7 @@ void LLModelPreview::generateNormals()
         return;
     }
 
-    F32 angle_cutoff = mFMP->childGetValue("crease_angle").asReal();
+    F32 angle_cutoff = (F32)mFMP->childGetValue("crease_angle").asReal();
 
     mRequestedCreaseAngle[which_lod] = angle_cutoff;
 
@@ -1316,7 +1319,7 @@ void LLModelPreview::generateNormals()
             (*it)->generateNormals(angle_cutoff);
         }
 
-        mVertexBuffer[5].clear();
+        mVertexBuffer[LLModel::NUM_LODS].clear();
     }
 
     bool perform_copy = mModelFacesCopy[which_lod].empty();
@@ -1491,7 +1494,7 @@ F32 LLModelPreview::genMeshOptimizerPerModel(LLModel *base_model, LLModel *targe
         target_indices = 3;
     }
 
-    size_new_indices = LLMeshOptimizer::simplifyU32(
+    size_new_indices = (S32)LLMeshOptimizer::simplifyU32(
         output_indices,
         source_indices,
         size_indices,
@@ -1732,7 +1735,7 @@ F32 LLModelPreview::genMeshOptimizerPerFace(LLModel *base_model, LLModel *target
         target_indices = 3;
     }
 
-    size_new_indices = LLMeshOptimizer::simplify(
+    size_new_indices = (S32)LLMeshOptimizer::simplify(
         output_indices,
         source_indices,
         size_indices,
@@ -1853,7 +1856,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         {
             if (!enforce_tri_limit)
             {
-                triangle_limit = base_triangle_count;
+                triangle_limit = (F32)base_triangle_count;
                 // reset to default value for this lod
                 F32 pw = pow((F32)decimation, (F32)(LLModel::LOD_HIGH - which_lod));
 
@@ -1863,7 +1866,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
             {
 
                 // UI spacifies limit for all models of single lod
-                triangle_limit = mFMP->childGetValue("lod_triangle_limit_" + lod_name[which_lod]).asInteger();
+                triangle_limit = (F32)mFMP->childGetValue("lod_triangle_limit_" + lod_name[which_lod]).asReal();
 
             }
             // meshoptimizer doesn't use triangle limit, it uses indices limit, so convert it to aproximate ratio
@@ -1873,14 +1876,14 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         else
         {
             // UI shows 0 to 100%, but meshoptimizer works with 0 to 1
-            lod_error_threshold = mFMP->childGetValue("lod_error_threshold_" + lod_name[which_lod]).asReal() / 100.f;
+            lod_error_threshold = (F32)mFMP->childGetValue("lod_error_threshold_" + lod_name[which_lod]).asReal() / 100.f;
         }
     }
     else
     {
         // we are genrating all lods and each lod will get own indices_decimator
         indices_decimator = 1;
-        triangle_limit = base_triangle_count;
+        triangle_limit = (F32)base_triangle_count;
     }
 
     mMaxTriangleLimit = base_triangle_count;
@@ -1908,7 +1911,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
             }
         }
 
-        mRequestedTriangleCount[lod] = triangle_limit;
+        mRequestedTriangleCount[lod] = (S32)triangle_limit;
         mRequestedErrorThreshold[lod] = lod_error_threshold * 100;
         mRequestedLoDMode[lod] = lod_mode;
 
@@ -2158,7 +2161,7 @@ void LLModelPreview::updateStatusMessages()
     S32 total_verts[LLModel::NUM_LODS];
     S32 total_submeshes[LLModel::NUM_LODS];
 
-    for (U32 i = 0; i < LLModel::NUM_LODS - 1; i++)
+    for (U32 i = 0; i < LLModel::NUM_LODS; i++)
     {
         total_tris[i] = 0;
         total_verts[i] = 0;
@@ -2462,12 +2465,16 @@ void LLModelPreview::updateStatusMessages()
         }
     }
 
-    if (mModelNoErrors && mModelLoader)
+    if (mModelNoErrors)
     {
-        if (!mModelLoader->areTexturesReady() && mFMP->childGetValue("upload_textures").asBoolean())
+        LLMutexLock lock(this);
+        if (mModelLoader)
         {
-            // Some textures are still loading, prevent upload until they are done
-            mModelNoErrors = false;
+            if (!mModelLoader->areTexturesReady() && mFMP->childGetValue("upload_textures").asBoolean())
+            {
+                // Some textures are still loading, prevent upload until they are done
+                mModelNoErrors = false;
+            }
         }
     }
 
@@ -2750,7 +2757,7 @@ void LLModelPreview::updateLodControls(S32 lod)
         LLSpinCtrl* threshold = mFMP->getChild<LLSpinCtrl>("lod_error_threshold_" + lod_name[lod]);
         LLSpinCtrl* limit = mFMP->getChild<LLSpinCtrl>("lod_triangle_limit_" + lod_name[lod]);
 
-        limit->setMaxValue(mMaxTriangleLimit);
+        limit->setMaxValue((F32)mMaxTriangleLimit);
         limit->forceSetValue(mRequestedTriangleCount[lod]);
 
         threshold->forceSetValue(mRequestedErrorThreshold[lod]);
@@ -2762,8 +2769,8 @@ void LLModelPreview::updateLodControls(S32 lod)
             limit->setVisible(true);
             threshold->setVisible(false);
 
-            limit->setMaxValue(mMaxTriangleLimit);
-            limit->setIncrement(llmax((U32)1, mMaxTriangleLimit / 32));
+            limit->setMaxValue((F32)mMaxTriangleLimit);
+            limit->setIncrement((F32)llmax((U32)1, mMaxTriangleLimit / 32));
         }
         else
         {
@@ -2796,10 +2803,10 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
 {
     LLModelLoader::model_list* model = NULL;
 
-    if (lod < 0 || lod > 4)
+    if (lod < 0 || lod >= LLModel::NUM_LODS)
     {
         model = &mBaseModel;
-        lod = 5;
+        lod = LLModel::NUM_LODS;
     }
     else
     {
@@ -2830,9 +2837,9 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
         LLMatrix4a mat_normal;
         if (skinned)
         {
-            glh::matrix4f m((F32*)mdl->mSkinInfo.mBindShapeMatrix.getF32ptr());
-            m = m.inverse().transpose();
-            mat_normal.loadu(m.m);
+            glm::mat4 m = glm::make_mat4((F32*)mdl->mSkinInfo.mBindShapeMatrix.getF32ptr());
+            m = glm::transpose(glm::inverse(m));
+            mat_normal.loadu(glm::value_ptr(m));
         }
         else
         {
@@ -3040,8 +3047,9 @@ void LLModelPreview::loadedCallback(
     S32 lod,
     void* opaque)
 {
-    LLModelPreview* pPreview = static_cast< LLModelPreview* >(opaque);
-    if (pPreview && !LLModelPreview::sIgnoreLoadedCallback)
+    LLModelPreview* pPreview = static_cast<LLModelPreview*>(opaque);
+    LLMutexLock lock(pPreview);
+    if (pPreview && pPreview->mModelLoader && !LLModelPreview::sIgnoreLoadedCallback)
     {
         // Load loader's warnings into floater's log tab
         const LLSD out = pPreview->mModelLoader->logOut();
@@ -3062,7 +3070,9 @@ void LLModelPreview::loadedCallback(
         }
 
         const LLVOAvatar* avatarp = pPreview->getPreviewAvatar();
-        if (avatarp) { // set up ground plane for possible rendering
+        if (avatarp && avatarp->mRoot && avatarp->mDrawable)
+        {
+            // set up ground plane for possible rendering
             const LLVector3 root_pos = avatarp->mRoot->getPosition();
             const LLVector4a* ext = avatarp->mDrawable->getSpatialExtents();
             const LLVector4a min = ext[0], max = ext[1];
@@ -3130,17 +3140,21 @@ LLJoint* LLModelPreview::lookupJointByName(const std::string& str, void* opaque)
     return NULL;
 }
 
-U32 LLModelPreview::loadTextures(LLImportMaterial& material, void* opaque)
+U32 LLModelPreview::loadTextures(LLImportMaterial& material, LLHandle<LLModelPreview> handle)
 {
-    (void)opaque;
-
-    if (material.mDiffuseMapFilename.size())
+    if (material.mDiffuseMapFilename.size() && !handle.isDead())
     {
         material.mOpaqueData = new LLPointer< LLViewerFetchedTexture >;
         LLPointer< LLViewerFetchedTexture >& tex = (*reinterpret_cast< LLPointer< LLViewerFetchedTexture > * >(material.mOpaqueData));
 
         tex = LLViewerTextureManager::getFetchedTextureFromUrl("file://" + LLURI::unescape(material.mDiffuseMapFilename), FTT_LOCAL_FILE, true, LLGLTexture::BOOST_PREVIEW);
-        tex->setLoadedCallback(LLModelPreview::textureLoadedCallback, 0, true, false, opaque, NULL, false);
+        if (tex->getDiscardLevel() < tex->getMaxDiscardLevel())
+        {
+            // file was loaded previosly, reload image to get potential changes
+            tex->clearFetchedResults();
+        }
+        LLModelPreview* preview = (LLModelPreview*)handle.get();
+        tex->setLoadedCallback(LLModelPreview::textureLoadedCallback, 0, true, false, new LLHandle<LLModelPreview>(handle), &preview->mCallbackTextureList, false);
         tex->forceToSaveRawImage(0, F32_MAX);
         material.setDiffuseMap(tex->getID()); // record tex ID
         return 1;
@@ -3199,12 +3213,12 @@ bool LLModelPreview::render()
     LLMutexLock lock(this);
     mNeedsUpdate = false;
 
-    bool edges = mViewOption["show_edges"];
-    bool joint_overrides = mViewOption["show_joint_overrides"];
-    bool joint_positions = mViewOption["show_joint_positions"];
-    bool skin_weight = mViewOption["show_skin_weight"];
-    bool textures = mViewOption["show_textures"];
-    bool physics = mViewOption["show_physics"];
+    bool show_edges = mViewOption["show_edges"];
+    bool show_joint_overrides = mViewOption["show_joint_overrides"];
+    bool show_joint_positions = mViewOption["show_joint_positions"];
+    bool show_skin_weight = mViewOption["show_skin_weight"];
+    bool show_textures = mViewOption["show_textures"];
+    bool show_physics = mViewOption["show_physics"];
 
     S32 width = getWidth();
     S32 height = getHeight();
@@ -3221,7 +3235,7 @@ bool LLModelPreview::render()
         gGL.matrixMode(LLRender::MM_PROJECTION);
         gGL.pushMatrix();
         gGL.loadIdentity();
-        gGL.ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+        gGL.ortho(0.0f, (F32)width, 0.0f, (F32)height, -1.0f, 1.0f);
 
         gGL.matrixMode(LLRender::MM_MODELVIEW);
         gGL.pushMatrix();
@@ -3281,15 +3295,15 @@ bool LLModelPreview::render()
                     fmp->childSetValue("upload_skin", true);
                     mFirstSkinUpdate = false;
                     upload_skin = true;
-                    skin_weight = true;
+                    show_skin_weight = true;
                     mViewOption["show_skin_weight"] = true;
                 }
 
                 fmp->enableViewOption("show_skin_weight");
-                fmp->setViewOptionEnabled("show_joint_overrides", skin_weight);
-                fmp->setViewOptionEnabled("show_joint_positions", skin_weight);
+                fmp->setViewOptionEnabled("show_joint_overrides", show_skin_weight);
+                fmp->setViewOptionEnabled("show_joint_positions", show_skin_weight);
                 mFMP->childEnable("upload_skin");
-                mFMP->childSetValue("show_skin_weight", skin_weight);
+                mFMP->childSetValue("show_skin_weight", show_skin_weight);
 
             }
             else if ((flags & LEGACY_RIG_FLAG_TOO_MANY_JOINTS) > 0)
@@ -3312,11 +3326,12 @@ bool LLModelPreview::render()
             fmp->disableViewOption("show_joint_overrides");
             fmp->disableViewOption("show_joint_positions");
 
-            skin_weight = false;
+            show_skin_weight = false;
             mFMP->childSetValue("show_skin_weight", false);
-            fmp->setViewOptionEnabled("show_skin_weight", skin_weight);
+            fmp->setViewOptionEnabled("show_skin_weight", show_skin_weight);
         }
     }
+    //if (this) return TRUE;
 
     if (upload_skin && !has_skin_weights)
     { //can't upload skin weights if model has no skin weights
@@ -3359,7 +3374,7 @@ bool LLModelPreview::render()
         mFMP->childSetEnabled("upload_joints", upload_skin);
     }
 
-    F32 explode = mFMP->childGetValue("physics_explode").asReal();
+    F32 physics_explode = (F32)mFMP->childGetValue("physics_explode").asReal();
 
     LLGLDepthTest gls_depth(GL_TRUE); // SL-12781 re-enable z-buffer for 3D model preview
 
@@ -3379,7 +3394,7 @@ bool LLModelPreview::render()
     F32 z_near = 0.001f;
     F32 z_far = mCameraDistance*10.0f + mPreviewScale.magVec() + mCameraOffset.magVec();
 
-    if (skin_weight)
+    if (show_skin_weight)
     {
         target_pos = getPreviewAvatar()->getPositionAgent() + offset;
         z_near = 0.01f;
@@ -3389,7 +3404,7 @@ bool LLModelPreview::render()
         refresh();
     }
 
-    gObjectPreviewProgram.bind(skin_weight);
+    gObjectPreviewProgram.bind(show_skin_weight);
 
     gGL.loadIdentity();
     gPipeline.enableLightsPreview();
@@ -3398,7 +3413,7 @@ bool LLModelPreview::render()
         LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
     LLQuaternion av_rot = camera_rot;
-    F32 camera_distance = skin_weight ? SKIN_WEIGHT_CAMERA_DISTANCE : mCameraDistance;
+    F32 camera_distance = show_skin_weight ? SKIN_WEIGHT_CAMERA_DISTANCE : mCameraDistance;
     LLViewerCamera::getInstance()->setOriginAndLookAt(
         target_pos + ((LLVector3(camera_distance, 0.f, 0.f) + offset) * av_rot),        // camera
         LLVector3::z_axis,                                                                  // up
@@ -3414,9 +3429,9 @@ bool LLModelPreview::render()
     gGL.pushMatrix();
     gGL.color4fv(PREVIEW_EDGE_COL.mV);
 
-    if (!mBaseModel.empty() && mVertexBuffer[5].empty())
+    if (!mBaseModel.empty() && mVertexBuffer[LLModel::NUM_LODS].empty())
     {
-        genBuffers(-1, skin_weight);
+        genBuffers(-1, show_skin_weight);
         //genBuffers(3);
     }
 
@@ -3431,7 +3446,7 @@ bool LLModelPreview::render()
             if (!vb_vec.empty())
             {
                 const LLVertexBuffer* buff = vb_vec[0];
-                regen = buff->hasDataType(LLVertexBuffer::TYPE_WEIGHT4) != skin_weight;
+                regen = buff->hasDataType(LLVertexBuffer::TYPE_WEIGHT4) != show_skin_weight;
             }
             else
             {
@@ -3442,15 +3457,15 @@ bool LLModelPreview::render()
 
         if (regen)
         {
-            genBuffers(mPreviewLOD, skin_weight);
+            genBuffers(mPreviewLOD, show_skin_weight);
         }
 
-        if (physics && mVertexBuffer[LLModel::LOD_PHYSICS].empty())
+        if (show_physics && mVertexBuffer[LLModel::LOD_PHYSICS].empty())
         {
             genBuffers(LLModel::LOD_PHYSICS, false);
         }
 
-        if (!skin_weight)
+        if (!show_skin_weight)
         {
             for (LLMeshUploadThread::instance_list::iterator iter = mUploadData.begin(); iter != mUploadData.end(); ++iter)
             {
@@ -3472,11 +3487,7 @@ bool LLModelPreview::render()
                 auto num_models = mVertexBuffer[mPreviewLOD][model].size();
                 for (size_t i = 0; i < num_models; ++i)
                 {
-                    LLVertexBuffer* buffer = mVertexBuffer[mPreviewLOD][model][i];
-
-                    buffer->setBuffer();
-
-                    if (textures)
+                    if (show_textures)
                     {
                         auto materialCnt = instance.mModel->mMaterialList.size();
                         if (i < materialCnt)
@@ -3500,10 +3511,16 @@ bool LLModelPreview::render()
                         gGL.diffuseColor4fv(PREVIEW_BASE_COL.mV);
                     }
 
+                    // Zero this variable for an obligatory buffer initialization
+                    // See https://github.com/secondlife/viewer/issues/912
+                    LLVertexBuffer::sGLRenderBuffer = 0;
+                    LLVertexBuffer* buffer = mVertexBuffer[mPreviewLOD][model][i];
+                    buffer->setBuffer();
                     buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0);
+
                     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
                     gGL.diffuseColor4fv(PREVIEW_EDGE_COL.mV);
-                    if (edges)
+                    if (show_edges)
                     {
                         gGL.setLineWidth(PREVIEW_EDGE_WIDTH);
                         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -3516,7 +3533,7 @@ bool LLModelPreview::render()
                 gGL.popMatrix();
             }
 
-            if (physics)
+            if (show_physics)
             {
                 glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -3582,12 +3599,12 @@ bool LLModelPreview::render()
 
                                     for (U32 i = 0; i < physics.mMesh.size(); ++i)
                                     {
-                                        if (explode > 0.f)
+                                        if (physics_explode > 0.f)
                                         {
                                             gGL.pushMatrix();
 
                                             LLVector3 offset = model->mHullCenter[i] - model->mCenterOfHullCenters;
-                                            offset *= explode;
+                                            offset *= physics_explode;
 
                                             gGL.translatef(offset.mV[0], offset.mV[1], offset.mV[2]);
                                         }
@@ -3602,7 +3619,7 @@ bool LLModelPreview::render()
                                         gGL.diffuseColor4ubv(hull_colors[i].mV);
                                         LLVertexBuffer::drawArrays(LLRender::TRIANGLES, physics.mMesh[i].mPositions);
 
-                                        if (explode > 0.f)
+                                        if (physics_explode > 0.f)
                                         {
                                             gGL.popMatrix();
                                         }
@@ -3617,14 +3634,17 @@ bool LLModelPreview::render()
                         if (render_mesh)
                         {
                             auto num_models = mVertexBuffer[LLModel::LOD_PHYSICS][model].size();
-                            if (pass > 0){
+                            if (pass > 0)
+                            {
                                 for (size_t i = 0; i < num_models; ++i)
                                 {
-                                    LLVertexBuffer* buffer = mVertexBuffer[LLModel::LOD_PHYSICS][model][i];
-
                                     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
                                     gGL.diffuseColor4fv(PREVIEW_PSYH_FILL_COL.mV);
 
+                                    // Zero this variable for an obligatory buffer initialization
+                                    // See https://github.com/secondlife/viewer/issues/912
+                                    LLVertexBuffer::sGLRenderBuffer = 0;
+                                    LLVertexBuffer* buffer = mVertexBuffer[LLModel::LOD_PHYSICS][model][i];
                                     buffer->setBuffer();
                                     buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0);
 
@@ -3684,10 +3704,11 @@ bool LLModelPreview::render()
                                     auto num_models = mVertexBuffer[LLModel::LOD_PHYSICS][model].size();
                                     for (size_t v = 0; v < num_models; ++v)
                                     {
+                                        // Zero this variable for an obligatory buffer initialization
+                                        // See https://github.com/secondlife/viewer/issues/912
+                                        LLVertexBuffer::sGLRenderBuffer = 0;
                                         LLVertexBuffer* buffer = mVertexBuffer[LLModel::LOD_PHYSICS][model][v];
-
                                         buffer->setBuffer();
-
                                         LLStrider<LLVector3> pos_strider;
                                         buffer->getVertexStrider(pos_strider, 0);
                                         LLVector4a* pos = (LLVector4a*)pos_strider.get();
@@ -3751,7 +3772,7 @@ bool LLModelPreview::render()
                         U32 joint_count = LLSkinningUtil::getMeshJointCount(skin);
                         auto bind_count = skin->mAlternateBindMatrix.size();
 
-                        if (joint_overrides
+                        if (show_joint_overrides
                             && bind_count > 0
                             && joint_count == bind_count)
                         {
@@ -3794,16 +3815,15 @@ bool LLModelPreview::render()
                             }
                         }
 
-                        for (U32 i = 0, e = static_cast<U32>(mVertexBuffer[mPreviewLOD][model].size()); i < e; ++i)
+                        std::size_t size = mVertexBuffer[mPreviewLOD][model].size();
+                        for (U32 i = 0; i < size; ++i)
                         {
-                            LLVertexBuffer* buffer = mVertexBuffer[mPreviewLOD][model][i];
-
                             model->mSkinInfo.updateHash();
                             LLRenderPass::uploadMatrixPalette(mPreviewAvatar, &model->mSkinInfo);
 
                             gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
-                            if (textures)
+                            if (show_textures)
                             {
                                 auto materialCnt = instance.mModel->mMaterialList.size();
                                 if (i < materialCnt)
@@ -3827,10 +3847,14 @@ bool LLModelPreview::render()
                                 gGL.diffuseColor4fv(PREVIEW_BASE_COL.mV);
                             }
 
+                            // Zero this variable for an obligatory buffer initialization
+                            // See https://github.com/secondlife/viewer/issues/912
+                            LLVertexBuffer::sGLRenderBuffer = 0;
+                            LLVertexBuffer* buffer = mVertexBuffer[mPreviewLOD][model][i];
                             buffer->setBuffer();
                             buffer->draw(LLRender::TRIANGLES, buffer->getNumIndices(), 0);
 
-                            if (edges)
+                            if (show_edges)
                             {
                                 gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
                                 gGL.diffuseColor4fv(PREVIEW_EDGE_COL.mV);
@@ -3845,7 +3869,7 @@ bool LLModelPreview::render()
                 }
             }
 
-            if (joint_positions)
+            if (show_joint_positions)
             {
                 LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
                 if (shader)
@@ -3987,15 +4011,28 @@ void LLModelPreview::textureLoadedCallback(
     bool final,
     void* userdata)
 {
-    LLModelPreview* preview = (LLModelPreview*)userdata;
-    preview->refresh();
+    if (!userdata)
+        return;
 
-    if (final && preview->mModelLoader)
+    LLHandle<LLModelPreview>* handle = (LLHandle<LLModelPreview>*)userdata;
+
+    if (!handle->isDead())
     {
-        if (preview->mModelLoader->mNumOfFetchingTextures > 0)
+        LLModelPreview* preview = static_cast<LLModelPreview*>(handle->get());
+        preview->refresh();
+
+        if (final && preview->mModelLoader)
         {
-            preview->mModelLoader->mNumOfFetchingTextures--;
+            if (preview->mModelLoader->mNumOfFetchingTextures > 0)
+            {
+                preview->mModelLoader->mNumOfFetchingTextures--;
+            }
         }
+    }
+
+    if (final || !success)
+    {
+        delete handle;
     }
 }
 

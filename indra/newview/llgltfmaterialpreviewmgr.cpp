@@ -193,7 +193,7 @@ LLGLTFPreviewTexture::LLGLTFPreviewTexture(LLPointer<LLFetchedGLTFMaterial> mate
 // static
 LLPointer<LLGLTFPreviewTexture> LLGLTFPreviewTexture::create(LLPointer<LLFetchedGLTFMaterial> material)
 {
-    return new LLGLTFPreviewTexture(material, LLPipeline::MAX_BAKE_WIDTH);
+    return new LLGLTFPreviewTexture(material, LLPipeline::MAX_PREVIEW_WIDTH);
 }
 
 bool LLGLTFPreviewTexture::needsRender()
@@ -434,7 +434,7 @@ bool LLGLTFPreviewTexture::render()
     SetTemporarily<bool> no_dof(&LLPipeline::RenderDepthOfField, false);
     SetTemporarily<bool> no_glow(&LLPipeline::sRenderGlow, false);
     SetTemporarily<bool> no_ssr(&LLPipeline::RenderScreenSpaceReflections, false);
-    SetTemporarily<U32> no_fxaa(&LLPipeline::RenderFSAASamples, U32(0));
+    SetTemporarily<U32> no_aa(&LLPipeline::RenderFSAAType, U32(0));
     SetTemporarily<LLPipeline::RenderTargetPack*> use_auxiliary_render_target(&gPipeline.mRT, &gPipeline.mAuxillaryRT);
 
     const LLVector4a light_dir(1.0f, 1.0f, 1.0f, 0.f);
@@ -460,7 +460,7 @@ bool LLGLTFPreviewTexture::render()
     // Set up camera and viewport
     const LLVector3 origin(0.0, 0.0, 0.0);
     camera.lookAt(origin, object_position);
-    camera.setAspect(mFullHeight / mFullWidth);
+    camera.setAspect((F32)(mFullHeight / mFullWidth));
     const LLRect texture_rect(0, mFullHeight, mFullWidth, 0);
     camera.setPerspective(NOT_FOR_SELECTION, texture_rect.mLeft, texture_rect.mBottom, texture_rect.getWidth(), texture_rect.getHeight(), false, camera.getNear(), MAX_FAR_CLIP*2.f);
 
@@ -469,10 +469,10 @@ bool LLGLTFPreviewTexture::render()
     PreviewSphere& preview_sphere = get_preview_sphere(mGLTFMaterial, object_transform);
 
     gPipeline.setupHWLights();
-    const LLMatrix4a& mat = gGLModelView;
-    LLVector4a transformed_light_dir;
-    mat.rotate4(light_dir, transformed_light_dir);
-    SetTemporarily<LLVector4a> force_sun_direction_high_graphics(&gPipeline.mTransformedSunDir, transformed_light_dir);
+    glm::mat4 mat = get_current_modelview();
+    glm::vec4 transformed_light_dir = glm::make_vec4(light_dir.mV);
+    transformed_light_dir = mat * transformed_light_dir;
+    SetTemporarily<LLVector4> force_sun_direction_high_graphics(&gPipeline.mTransformedSunDir, LLVector4(glm::value_ptr(transformed_light_dir)));
     // Override lights to ensure the sun is always shining from a certain direction (low graphics)
     // See also force_sun_direction_high_graphics and fixup_shader_constants
     {

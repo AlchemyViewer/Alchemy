@@ -54,6 +54,7 @@
 #include "llmenubutton.h"
 #include "llloadingindicator.h"
 #include "llwindow.h"
+#include "llspellcheck.h"
 
 // for registration
 #include "llfiltereditor.h"
@@ -205,6 +206,12 @@ mHelpImpl(NULL)
 
     // Parse the master list of commands
     LLCommandManager::load();
+}
+
+LLUI::~LLUI()
+{
+    LLSpellChecker::deleteSingleton();
+    LLRender2D::deleteSingleton();
 }
 
 LLUI::~LLUI()

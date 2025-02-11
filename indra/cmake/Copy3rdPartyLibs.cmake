@@ -151,8 +151,7 @@ elseif(DARWIN)
        )
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     set(release_files
-        libndofdev.dylib
-       )
+            )
 
     if (TARGET ll::fmodstudio)
       list(APPEND debug_files libfmodL.dylib)
@@ -183,8 +182,7 @@ elseif(LINUX)
     set(release_src_dir "${ARCH_PREBUILT_DIRS_RELEASE}")
     # *FIX - figure out what to do with duplicate libalut.so here -brad
     set(release_files
-            ${EXPAT_COPY}
-            )
+       )
 
     if (TARGET ll::fmodstudio)
       list(APPEND debug_files libfmodL.so)

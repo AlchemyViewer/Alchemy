@@ -475,7 +475,7 @@ void LLScrollbar::reshape(S32 width, S32 height, bool called_from_parent)
     {
         mLineUpBtn->reshape(mLineUpBtn->getRect().getWidth(), llmin(getRect().getHeight() / 2, mThickness));
         mLineDownBtn->reshape(mLineDownBtn->getRect().getWidth(), llmin(getRect().getHeight() / 2, mThickness));
-        mLineUpBtn->setOrigin(mLineUpBtn->getRect().mLeft, getRect().getHeight() - mLineUpBtn->getRect().getHeight());
+        mLineUpBtn->setOrigin(0, getRect().getHeight() - mLineUpBtn->getRect().getHeight());
         mLineDownBtn->setOrigin(0, 0);
     }
     else

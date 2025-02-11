@@ -445,8 +445,8 @@ F32 LLPhysicsMotion::calculateAcceleration_local(const F32 velocity_local, const
         const F32 acceleration_local = (velocity_local - mVelocityJoint_local) / time_delta;
 
         const F32 smoothed_acceleration_local =
-                acceleration_local * 1.0/smoothing +
-                mAccelerationJoint_local * (smoothing-1.0)/smoothing;
+                acceleration_local * 1.0f/smoothing +
+                mAccelerationJoint_local * (smoothing-1.0f)/smoothing;
 
         return smoothed_acceleration_local;
 }
@@ -454,23 +454,23 @@ F32 LLPhysicsMotion::calculateAcceleration_local(const F32 velocity_local, const
 bool LLPhysicsMotionController::onUpdate(F32 time, U8* joint_mask)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
-        // Skip if disabled globally.
-        static const LLCachedControl<bool> av_physics(gSavedSettings, "AvatarPhysics");
+    // Skip if disabled globally.
+    static LLCachedControl<bool> av_physics(gSavedSettings, "AvatarPhysics");
         if (!av_physics)
-        {
-                return true;
-        }
+    {
+            return true;
+    }
 
-        bool update_visuals = false;
+    bool update_visuals = false;
         for (LLPhysicsMotion* motion : mMotions)
-        {
+    {
             update_visuals |= motion->onUpdate(time);
-        }
+    }
 
-        if (update_visuals)
-                mCharacter->updateVisualParams();
+    if (update_visuals)
+            mCharacter->updateVisualParams();
 
-        return true;
+    return true;
 }
 
 // Return true if character has to update visual params.
@@ -601,7 +601,7 @@ bool LLPhysicsMotion::onUpdate(F32 time)
 
         // Drag is a force imparted by velocity (intuitively it is similar to wind resistance)
         // F = .5kv^2
-        const F32 force_drag = .5*behavior_drag*velocity_joint_local*velocity_joint_local*llsgn(velocity_joint_local);
+        const F32 force_drag = (F32)(.5 * behavior_drag * velocity_joint_local * velocity_joint_local * llsgn(velocity_joint_local));
 
         const F32 force_net = (force_accel +
                        force_gravity +
@@ -629,7 +629,7 @@ bool LLPhysicsMotion::onUpdate(F32 time)
         // Temporary debugging setting to cause all avatars to move, for profiling purposes.
         if (physics_test)
         {
-            velocity_new_local = sin(time*4.0);
+            velocity_new_local = sin(time*4.0f);
         }
         // Calculate the new parameters, or remain unchanged if max speed is 0.
         F32 position_new_local = position_current_local + velocity_new_local*time_iteration_step;
@@ -695,7 +695,7 @@ bool LLPhysicsMotion::onUpdate(F32 time)
         // For non-self, if the avatar is small enough visually, then don't update.
         const F32 area_for_max_settings = 0.0;
         const F32 area_for_min_settings = 1400.0;
-        const F32 area_for_this_setting = area_for_max_settings + (area_for_min_settings-area_for_max_settings)*(1.0-lod_factor);
+        const F32 area_for_this_setting = area_for_max_settings + (area_for_min_settings-area_for_max_settings)*(1.0f-lod_factor);
             const F32 pixel_area = sqrtf(mCharacter->getPixelArea());
 
         const bool is_self = static_cast<LLVOAvatar*>(mCharacter)->isSelf();
@@ -761,8 +761,8 @@ void LLPhysicsMotion::setParamValue(const LLViewerVisualParam *param,
 {
         const F32 value_min_local = param->getMinWeight();
         const F32 value_max_local = param->getMaxWeight();
-        const F32 min_val = 0.5f-behavior_maxeffect/2.0;
-        const F32 max_val = 0.5f+behavior_maxeffect/2.0;
+        const F32 min_val = 0.5f-behavior_maxeffect/2.0f;
+        const F32 max_val = 0.5f+behavior_maxeffect/2.0f;
 
     // Scale from [0,1] to [min_val,max_val]
     const F32 new_value_rescaled = min_val + (max_val-min_val) * new_value_normalized;

@@ -1,10 +1,10 @@
 /**
- * @file llwin32headerslean.h
- * @brief sanitized include of windows header files
+ * @file llterrainpaintmap.h
+ * @brief Utilities for managing terrain paint maps
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * Copyright (C) 2024, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,24 +24,19 @@
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLWINDOWS_H
-#define LL_LLWINDOWS_H
+#pragma once
 
-#ifdef LL_WINDOWS
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef PSAPI_VERSION
-#define PSAPI_VERSION   2
-#endif
-#include <winsock2.h>
-#include <windows.h>
-#include <Ws2ipdef.h>
-#include <psapi.h>
-#undef NOMINMAX
-#endif
+class LLViewerRegion;
+class LLViewerTexture;
 
-#endif
+class LLTerrainPaintMap
+{
+public:
+
+    // Convert a region's heightmap and composition into a paint map texture which
+    // approximates how the terrain would be rendered with the heightmap.
+    // In effect, this allows converting terrain of type TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
+    // to type TERRAIN_PAINT_TYPE_PBR_PAINTMAP.
+    // Returns true if successful
+    static bool bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& region, LLViewerTexture& tex);
+};

@@ -106,6 +106,12 @@ extern thread_local bool gProfilerEnabled;
         #define LL_PROFILE_ZONE_ERR(name)               LL_PROFILE_ZONE_NAMED_COLOR( name, 0XFF0000  )  // RGB yellow
         #define LL_PROFILE_ZONE_INFO(name)              LL_PROFILE_ZONE_NAMED_COLOR( name, 0X00FFFF  )  // RGB cyan
         #define LL_PROFILE_ZONE_WARN(name)              LL_PROFILE_ZONE_NAMED_COLOR( name, 0x0FFFF00 )  // RGB red
+
+        #define LL_PROFILE_MUTEX(type, varname)                     TracyLockable(type, varname)
+        #define LL_PROFILE_MUTEX_NAMED(type, varname, desc)         TracyLockableN(type, varname, desc)
+        #define LL_PROFILE_MUTEX_SHARED(type, varname)              TracySharedLockable(type, varname)
+        #define LL_PROFILE_MUTEX_SHARED_NAMED(type, varname, desc)  TracySharedLockableN(type, varname, desc)
+        #define LL_PROFILE_MUTEX_LOCK(varname) { auto& mutex = varname; LockMark(mutex); }
     #endif
     #if LL_PROFILER_CONFIGURATION == LL_PROFILER_CONFIG_FAST_TIMER
         #define LL_PROFILER_FRAME_END

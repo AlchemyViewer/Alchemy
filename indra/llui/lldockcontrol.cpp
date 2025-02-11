@@ -43,6 +43,8 @@ LLDockControl::LLDockControl(LLView* dockWidget, LLFloater* dockableFloater,
         mDockWidgetHandle = dockWidget->getHandle();
     }
 
+    mNonToolbarPanelHandle = mDockableFloater->getRootView()->getChild<LLView>("non_toolbar_panel")->getHandle();
+
     if (dockableFloater->isDocked())
     {
         on();

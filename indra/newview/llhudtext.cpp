@@ -142,6 +142,13 @@ void LLHUDText::renderText()
     shadow_color.mV[3] = text_color.mV[3];
 
     mOffsetY = lltrunc(mHeight * ((mVertAlignment == ALIGN_VERT_CENTER) ? 0.5f : 1.f));
+    static LLCachedControl<F32> bubble_opacity(gSavedSettings, "ChatBubbleOpacity");
+    static LLUIColor nametag_bg_color = LLUIColorTable::instance().getColor("ObjectBubbleColor");
+    LLColor4 bg_color = nametag_bg_color;
+    bg_color.setAlpha(bubble_opacity * alpha_factor);
+
+    const S32 border_height = 16;
+    const S32 border_width = 16;
 
     // scale screen size of borders down
     //RN: for now, text on hud objects is never occluded
@@ -407,9 +414,9 @@ void LLHUDText::updateVisibility()
     }
 
     LLVector3 pos_agent_center = gAgent.getPosAgentFromGlobal(mPositionGlobal) - dir_from_camera;
-    F32 last_distance_center = (pos_agent_center - viewerCamera.getOrigin()).magVec();
-    static const LLCachedControl<F32> prim_text_max_draw(gSavedSettings, "PrimTextMaxDrawDistance");
-    F32 max_draw_distance = prim_text_max_draw;
+    F32 last_distance_center = (pos_agent_center - LLViewerCamera::getInstance()->getOrigin()).magVec();
+    static LLCachedControl<F32> prim_text_max_dist(gSavedSettings, "PrimTextMaxDrawDistance");
+    F32 max_draw_distance = prim_text_max_dist;
 
     if(max_draw_distance < 0)
     {

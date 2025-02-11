@@ -27,16 +27,17 @@
 #ifndef LL_LLVLCOMPOSITION_H
 #define LL_LLVLCOMPOSITION_H
 
-#include "llviewerlayer.h"
-#include "llpointer.h"
-
+#include "llfetchedgltfmaterial.h"
 #include "llimage.h"
+#include "llpointer.h"
+#include "llterrainpaintmap.h"
+#include "llviewerlayer.h"
+#include "llviewershadermgr.h"
+#include "llviewertexture.h"
 
 class LLSurface;
 
 class LLViewerFetchedTexture;
-class LLGLTFMaterial;
-class LLFetchedGLTFMaterial;
 
 class LLModifyRegion
 {
@@ -44,12 +45,13 @@ public:
     virtual const LLGLTFMaterial* getMaterialOverride(S32 asset) const = 0;
 };
 
+// The subset of the composition used by local terrain debug materials (gLocalTerrainMaterials)
 class LLTerrainMaterials : public LLModifyRegion
 {
 public:
     friend class LLDrawPoolTerrain;
 
-    LLTerrainMaterials();
+    LLTerrainMaterials() {}
     virtual ~LLTerrainMaterials();
 
     void apply(const LLModifyRegion& other);
@@ -79,20 +81,29 @@ public:
     // strict = false -> at least one material must be loaded
     bool makeMaterialsReady(bool boost, bool strict);
 
+    // See TerrainPaintType
+    U32 getPaintType() const { return mPaintType; }
+    void setPaintType(U32 paint_type) { mPaintType = paint_type; }
+    LLViewerTexture* getPaintMap();
+    void setPaintMap(LLViewerTexture* paint_map);
+
 protected:
     void unboost();
     static bool makeTextureReady(LLPointer<LLViewerFetchedTexture>& tex, bool boost);
     // strict = true -> all materials must be sufficiently loaded
     // strict = false -> at least one material must be loaded
-    static bool makeMaterialReady(LLPointer<LLFetchedGLTFMaterial>& mat, bool& textures_set, bool boost, bool strict);
-    // *NOTE: Prefer calling makeMaterialReady if mat is known to be LLFetchedGLTFMaterial
     static bool materialTexturesReady(LLPointer<LLFetchedGLTFMaterial>& mat, bool& textures_set, bool boost, bool strict);
 
     LLPointer<LLViewerFetchedTexture> mDetailTextures[ASSET_COUNT];
+    // *NOTE: Unlike mDetailRenderMaterials, the textures in this are not
+    // guaranteed to be set or loaded after a true return from
+    // makeMaterialsReady.
     LLPointer<LLFetchedGLTFMaterial> mDetailMaterials[ASSET_COUNT];
     LLPointer<LLGLTFMaterial> mDetailMaterialOverrides[ASSET_COUNT];
     LLPointer<LLFetchedGLTFMaterial> mDetailRenderMaterials[ASSET_COUNT];
-    bool mMaterialTexturesSet[ASSET_COUNT];
+
+    U32 mPaintType = TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE;
+    LLPointer<LLViewerTexture> mPaintMap;
 };
 
 // Local materials to override all regions
@@ -114,8 +125,6 @@ public:
     // Viewer side hack to generate composition values
     bool generateHeights(const F32 x, const F32 y, const F32 width, const F32 height);
     bool generateComposition();
-    // Generate texture from composition values.
-    bool generateMinimapTileLand(const F32 x, const F32 y, const F32 width, const F32 height);
 
     // Use these as indeces ito the get/setters below that use 'corner'
     enum ECorner

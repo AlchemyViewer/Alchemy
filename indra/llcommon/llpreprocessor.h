@@ -83,7 +83,6 @@
 #elif defined(__MSVC_VER__) || defined(_MSC_VER)
     #ifndef LL_MSVC
         #define LL_MSVC 1
-    #endif
 #endif
 
 // Deal with minor differences on Unixy OSes.
@@ -110,16 +109,7 @@
 
 // Deal with VC++ problems
 #if LL_MSVC
-#ifndef _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS // disable warnings for methods considered unsafe
-#endif
-#ifndef _WINSOCK_DEPRECATED_NO_WARNINGS
-#define _WINSOCK_DEPRECATED_NO_WARNINGS // disable deprecated WinSock API warnings
-#endif
-
 // level 4 warnings that we need to disable:
-#pragma warning (disable : 4244) // possible loss of data on conversions
-#pragma warning (disable : 4396) // the inline specifier cannot be used when a friend declaration refers to a specialization of a function template
 #pragma warning (disable : 4251) // member needs to have dll-interface to be used by clients of class
 #pragma warning (disable : 4275) // non dll-interface class used as base for dll-interface class
 #endif  //  LL_MSVC

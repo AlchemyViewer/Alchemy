@@ -11,16 +11,6 @@ version 57
 // Generates lists of feature mask that can be applied on top of each other.
 //
 //		//		Begin comments
-//		list <name>
-//		Starts a feature list named <name>
-//		<name> <available> <recommended>
-//		<name> is the name of a feature
-//		<available> is 0 or 1, whether the feature is available
-//		<recommended> is an F32 which is the recommended value
-//
-// For now, the first list read sets up all of the default values
-//
-
 
 //
 // All contains everything at their default settings for high end machines

@@ -28,6 +28,26 @@
 
 #include "llphysicsshapebuilderutil.h"
 
+#include "llmeshrepository.h"
+
+bool LLPhysicsVolumeParams::hasDecomposition() const
+ {
+    if (!isMeshSculpt())
+    {
+        return false;
+    }
+
+    LLUUID mesh_id = getSculptID();
+    if (mesh_id.isNull())
+    {
+        return false;
+    }
+
+    LLModel::Decomposition* decomp = gMeshRepo.getDecomposition(mesh_id);
+
+    return decomp != NULL;
+}
+
 /* static */
 // <FS:Beq> FIRE-23053 - analysed mesh physics is not correctly displayed for thin meshes
 //void LLPhysicsShapeBuilderUtil::determinePhysicsShape( const LLPhysicsVolumeParams& volume_params, const LLVector3& scale, PhysicsShapeSpecification& specOut)
@@ -205,7 +225,7 @@ void LLPhysicsShapeBuilderUtil::determinePhysicsShape(const LLPhysicsVolumeParam
     }
     // <FS:Beq> restore proper behaviour.
     // else if (volume_params.isMeshSculpt() &&
-    //          // Check overall dimensions, not individual triangles.
+             // Check overall dimensions, not individual triangles.
     //          (scale.mV[0] < SHAPE_BUILDER_USER_MESH_CONVEXIFICATION_SIZE ||
     //           scale.mV[1] < SHAPE_BUILDER_USER_MESH_CONVEXIFICATION_SIZE ||
     //           scale.mV[2] < SHAPE_BUILDER_USER_MESH_CONVEXIFICATION_SIZE
@@ -227,7 +247,8 @@ void LLPhysicsShapeBuilderUtil::determinePhysicsShape(const LLPhysicsVolumeParam
               scale.mV[2] < SHAPE_BUILDER_USER_MESH_CONVEXIFICATION_SIZE
               ) )
         {
-            specOut.mType = PhysicsShapeSpecification::PRIM_CONVEX;
+        // Server distinguishes between user-specified or default convex mesh, vs server's thin-triangle override, but we don't.
+        specOut.mType = PhysicsShapeSpecification::PRIM_CONVEX;
         }
         if (specOut.mType == PhysicsShapeSpecification::INVALID)
             //</FS:Beq> note: dangling if....(hopefully this will go away with PR sent to LL)

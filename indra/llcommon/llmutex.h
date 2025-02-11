@@ -258,6 +258,18 @@ public:
             mSharedMutex->unlock<SHARED>();
     }
 
+    void lock()
+    {
+        if (mSharedMutex)
+            mSharedMutex->lock<SHARED>();
+    }
+
+    void unlock()
+    {
+        if (mSharedMutex)
+            mSharedMutex->unlock<SHARED>();
+    }
+
 private:
     LLSharedMutex* mSharedMutex;
 };

@@ -34,7 +34,6 @@
 #include "llpolymorph.h"
 #include "llwearable.h"
 #include "llfasttimer.h"
-#include "llcallstack.h"
 
 #include "llpolyskeletaldistortion.h"
 
@@ -190,7 +189,6 @@ void LLPolySkeletalDistortion::apply( ESex avatar_sex )
         ostr << "LLPolySkeletalDistortion::apply, id " << getID() << " " << getName() << " effective wt " << effective_weight << " last wt " << mLastWeight << " scaleDelta " << scaleDelta << " offset " << offset;
         LLScopedContextString str(ostr.str());
 #endif
-
         joint->setScale(newScale, true);
     }
 

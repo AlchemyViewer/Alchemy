@@ -14,31 +14,34 @@
  single_instance="true"
  title="WORLD MAP"
  width="650">
-  <floater.string name="UnnamedParcel">(Unnamed Parcel)</floater.string>
+  <string name="UnnamedParcel">
+    (Unnamed Parcel)
+  </string>
+  <string
+   name="collapse_icon"
+   value="map_ui_collapse_icon.png"/>
+  <string
+   name="expand_icon"
+   value="map_ui_expand_icon.png"/>
+  <string
+   name="collapse_tooltip"
+   value="Hide map controls"/>
+  <string
+   name="expand_tooltip"
+   value="Show map controls"/>
   <layout_stack
-   follows="all"
    animate="false"
-   top="17"
-   height="583"
-   left="1"
-   width="643"
-   layout="topleft"
-   name="control_stack"
-   orientation="horizontal"
-   drag_handle_gap="2"
-   drag_handle_first_indent="1"
-   drag_handle_second_indent="1"
-   show_drag_handle="true">
+   follows="all"
+   name="floater_map_stack"
+   tab_group="1"
+   top="16"
+   left="0"
+   right="-1"
+   bottom="-1">
     <layout_panel
-     border="false"
-     auto_resize="true"
-     user_resize="true"
-     layout="topleft"
-     top="0"
-     left="0"
-     width="383"
-     height="600"
-     name="map_lp">
+     name="map_lp"
+     width="385"
+     height="575">
       <panel
        filename="panel_world_map.xml"
        follows="all"

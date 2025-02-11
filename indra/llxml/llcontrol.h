@@ -38,10 +38,8 @@
 
 #include <vector>
 #include <string_view>
-
 #include <boost/bind.hpp>
 #include <boost/signals2.hpp>
-
 class LLVector3;
 class LLVector3d;
 class LLQuaternion;
@@ -171,7 +169,7 @@ class LLControlGroup final : public LLInstanceTracker<LLControlGroup, std::strin
     LOG_CLASS(LLControlGroup);
 
 protected:
-    typedef boost::unordered_flat_map<std::string, LLControlVariablePtr, al::string_hash, std::equal_to<>> ctrl_name_table_t;
+    typedef std::map<std::string, LLControlVariablePtr, std::less<> > ctrl_name_table_t;
     ctrl_name_table_t mNameTable;
     static const std::string mTypeString[TYPE_COUNT];
 

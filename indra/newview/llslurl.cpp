@@ -35,7 +35,6 @@
 #include "llworldmap.h"
 #include "llfiltersd2xmlrpc.h"
 #include "curl/curl.h"
-// [RLVa:KB] - Checked: 2010-04-05 (RLVa-1.2.0d)
 #include "rlvhandler.h"
 // [/RLVa:KB]
 const char* LLSLURL::SLURL_HTTP_SCHEME       = "http";
@@ -43,6 +42,7 @@ const char* LLSLURL::SLURL_HTTPS_SCHEME      = "https";
 const char* LLSLURL::SLURL_SECONDLIFE_SCHEME = "secondlife";
 const char* LLSLURL::SLURL_SECONDLIFE_PATH   = "secondlife";
 const char* LLSLURL::SLURL_COM               = "slurl.com";
+
 // For DnD - even though www.slurl.com redirects to slurl.com in a browser, you  can copy and drag
 // text with www.slurl.com or a link explicitly pointing at www.slurl.com so testing for this
 // version is required also.
@@ -341,11 +341,11 @@ LLSLURL::LLSLURL(const std::string& grid,
 {
     mGrid = grid;
     mRegion = region;
-    S32 x = ll_round(position[VX]);
-    S32 y = ll_round(position[VY]);
-    S32 z = ll_round(position[VZ]);
+    S32 x = ll_round((F32)fmod(position[VX], (F32)REGION_WIDTH_METERS));
+    S32 y = ll_round((F32)fmod(position[VY], (F32)REGION_WIDTH_METERS));
+    S32 z = ll_round((F32)position[VZ]);
     mType = LOCATION;
-    mPosition = LLVector3(x, y, z);
+    mPosition = LLVector3((F32)x, (F32)y, (F32)z);
 }
 
 // create a simstring
@@ -360,8 +360,8 @@ LLSLURL::LLSLURL(const std::string& grid,
          const std::string& region,
          const LLVector3d& global_position)
 {
-    *this = LLSLURL(grid, region,
-        LLVector3(global_position.mdV[VX], global_position.mdV[VY], global_position.mdV[VZ]));
+    *this = LLSLURL(LLGridManager::getInstance()->getGridId(grid), region,
+        LLVector3((F32)global_position.mdV[VX], (F32)global_position.mdV[VY], (F32)global_position.mdV[VZ]));
 }
 
 // create a slurl from a global position
@@ -445,7 +445,7 @@ std::string LLSLURL::getLoginString() const
             LL_WARNS("AppInit") << "Unexpected SLURL type (" << (int)mType << ")for login string" << LL_ENDL;
             break;
     }
-    return  xml_escape_string(unescaped_start.str());
+    return  LLStringFn::xml_encode(unescaped_start.str(), true);
 }
 
 bool LLSLURL::operator ==(const LLSLURL& rhs)

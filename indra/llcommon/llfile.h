@@ -78,6 +78,8 @@ public:
 
     static  int     close(LLFILE * file);
 
+    static std::string getContents(const std::string& filename);
+
     // perms is a permissions mask like 0777 or 0700.  In most cases it will
     // be overridden by the user's umask.  It is ignored on Windows.
     // mkdir() considers "directory already exists" to be SUCCESS.
@@ -200,7 +202,7 @@ typedef stream_wrapper<std::ofstream, std::ios_base::out | std::ios_base::trunc 
 
 
 /**
- * @breif filesize helpers.
+ * @brief filesize helpers.
  *
  * The file size helpers are not considered particularly efficient,
  * and should only be used for config files and the like -- not in a

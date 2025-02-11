@@ -189,7 +189,7 @@ bool LLVisualParamHint::render()
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
     gGL.loadIdentity();
-    gGL.ortho(0.0f, mFullWidth, 0.0f, mFullHeight, -1.0f, 1.0f);
+    gGL.ortho(0.0f, (F32)mFullWidth, 0.0f, (F32)mFullHeight, -1.0f, 1.0f);
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();
@@ -285,12 +285,19 @@ void LLVisualParamHint::draw(F32 alpha)
     gGL.color4f(1.f, 1.f, 1.f, alpha);
 
     LLGLSUIDefault gls_ui;
-    gGL.begin(LLRender::TRIANGLE_STRIP);
+    gGL.begin(LLRender::TRIANGLES);
     {
         gGL.texCoord2i(0, 1);
         gGL.vertex2i(0, mFullHeight);
         gGL.texCoord2i(0, 0);
         gGL.vertex2i(0, 0);
+        gGL.texCoord2i(1, 0);
+        gGL.vertex2i(mFullWidth, 0);
+
+        gGL.texCoord2i(0, 1);
+        gGL.vertex2i(0, mFullHeight);
+        gGL.texCoord2i(1, 0);
+        gGL.vertex2i(mFullWidth, 0);
         gGL.texCoord2i(1, 1);
         gGL.vertex2i(mFullWidth, mFullHeight);
         gGL.texCoord2i(1, 0);

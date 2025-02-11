@@ -52,41 +52,41 @@ public:
     ~LLVersionInfo();
 
     /// return the major version number as an integer
-    S32 getMajor();
+    S32 getMajor() const;
 
     /// return the minor version number as an integer
-    S32 getMinor();
+    S32 getMinor() const;
 
     /// return the patch version number as an integer
-    S32 getPatch();
+    S32 getPatch() const;
 
     /// return the build number as an integer
-    U64 getBuild();
+    U64 getBuild() const;
 
     /// return the full viewer version as a string like "2.0.0.200030"
-    const std::string& getVersion();
+    std::string getVersion() const;
 
     /// return the viewer version as a string like "2.0.0"
-    const std::string& getShortVersion();
+    std::string getShortVersion() const;
 
     /// return the viewer version and channel as a string
     /// like "Second Life Release 2.0.0.200030"
-    const std::string& getChannelAndVersion();
+    std::string getChannelAndVersion() const;
 
     /// return the channel name, e.g. "Second Life"
-    const std::string& getChannel();
+    std::string getChannel() const;
 
     /// return the release codename e.g. "FeralFox"
     const std::string& getCodename();
 
     /// return the CMake build type
-    const std::string& getBuildConfig();
+    std::string getBuildConfig() const;
 
     /// reset the channel name used by the viewer.
     void resetChannel(const std::string& channel);
 
     /// return the bit width of an address
-    S32 getAddressSize() { return ADDRESS_SIZE; }
+    S32 getAddressSize() const { return ADDRESS_SIZE; }
 
     typedef enum
     {
@@ -95,13 +95,13 @@ public:
         BETA_VIEWER,
         RELEASE_VIEWER
     } ViewerMaturity;
-    ViewerMaturity getViewerMaturity();
+    ViewerMaturity getViewerMaturity() const;
 
     bool isViewerExpired();
 
     /// get the release-notes URL, once it becomes available -- until then,
     /// return empty string
-    std::string getReleaseNotes();
+    std::string getReleaseNotes() const;
 
 private:
     std::string version;
@@ -112,7 +112,7 @@ private:
     std::string mWorkingChannelName;
     // Storage for the "version and channel" string.
     // This will get reset too.
-    std::string mVersionChannel;
+    mutable std::string mVersionChannel;
     std::string build_configuration;
     std::string mReleaseNotes;
     // Storage for the build codename.

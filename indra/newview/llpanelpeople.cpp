@@ -157,7 +157,6 @@ public:
         uuid_vec_t::const_iterator
             id_it = uuids.begin(),
             id_end = uuids.end();
-
         mAvatarsPositions.clear();
 
         for (;pos_it != pos_end && id_it != id_end; ++pos_it, ++id_it )
@@ -617,11 +616,6 @@ bool LLPanelPeople::postBuild()
 {
     S32 max_premium = LLAgentBenefitsMgr::get("Premium").getGroupMembershipLimit();
 
-    mNearbyFilterCommitConnection = getChild<LLFilterEditor>("nearby_filter_input")->setCommitCallback(boost::bind(&LLPanelPeople::onFilterEdit, this, _2));
-    mFriedsFilterCommitConnection = getChild<LLFilterEditor>("friends_filter_input")->setCommitCallback(boost::bind(&LLPanelPeople::onFilterEdit, this, _2));
-    mGroupsFilterCommitConnection = getChild<LLFilterEditor>("groups_filter_input")->setCommitCallback(boost::bind(&LLPanelPeople::onFilterEdit, this, _2));
-    mRecentFilterCommitConnection = getChild<LLFilterEditor>("recent_filter_input")->setCommitCallback(boost::bind(&LLPanelPeople::onFilterEdit, this, _2));
-
     LLPanel* group_tab = getChild<LLPanel>(GROUP_TAB_NAME);
     mGroupDelBtn = group_tab->getChild<LLButton>("minus_btn");
     mGroupCountText = group_tab->getChild<LLTextBox>("groupcount");
@@ -652,11 +646,11 @@ bool LLPanelPeople::postBuild()
     mAllFriendList = friends_tab->getChild<LLAvatarList>("avatars_all");
     mOnlineFriendList->setNoItemsCommentText(getString("no_friends_online"));
     mOnlineFriendList->setShowIcons("FriendsListShowIcons");
-    mOnlineFriendList->showPermissions(spType);
+    mOnlineFriendList->showPermissions(gSavedSettings.getBOOL("FriendsListShowPermissions"));
     mOnlineFriendList->setShowCompleteName(!gSavedSettings.getBOOL("FriendsListHideUsernames"));
     mAllFriendList->setNoItemsCommentText(getString("no_friends"));
     mAllFriendList->setShowIcons("FriendsListShowIcons");
-    mAllFriendList->showPermissions(spType);
+    mAllFriendList->showPermissions(gSavedSettings.getBOOL("FriendsListShowPermissions"));
     mAllFriendList->setShowCompleteName(!gSavedSettings.getBOOL("FriendsListHideUsernames"));
 
     LLPanel* nearby_tab = getChild<LLPanel>(NEARBY_TAB_NAME);
@@ -691,6 +685,7 @@ bool LLPanelPeople::postBuild()
     mRecentList->setNoItemsMsg(getString("no_recent_people"));
     mRecentList->setNoFilteredItemsMsg(getString("no_filtered_recent_people"));
     mRecentList->setShowIcons("RecentListShowIcons");
+
     mRecentGearBtn = recent_tab->getChild<LLButton>("gear_btn");
     mRecentAddFriendBtn = recent_tab->getChild<LLButton>("add_friend_btn");
 
@@ -698,6 +693,11 @@ bool LLPanelPeople::postBuild()
     mGroupList->setNoItemsCommentText(getString("no_groups_msg"));
     mGroupList->setNoItemsMsg(getString("no_groups_msg"));
     mGroupList->setNoFilteredItemsMsg(getString("no_filtered_groups_msg"));
+
+    mNearbyFilterCommitConnection = nearby_tab->getChild<LLFilterEditor>("nearby_filter_input")->setCommitCallback(boost::bind(&LLPanelPeople::onFilterEdit, this, _2));
+    mFriedsFilterCommitConnection = friends_tab->getChild<LLFilterEditor>("friends_filter_input")->setCommitCallback(boost::bind(&LLPanelPeople::onFilterEdit, this, _2));
+    mRecentFilterCommitConnection = recent_tab->getChild<LLFilterEditor>("recent_filter_input")->setCommitCallback(boost::bind(&LLPanelPeople::onFilterEdit, this, _2));
+    mGroupsFilterCommitConnection = group_tab->getChild<LLFilterEditor>("groups_filter_input")->setCommitCallback(boost::bind(&LLPanelPeople::onFilterEdit, this, _2));
 
     mNearbyList->setContextMenu(&LLPanelPeopleMenus::gNearbyPeopleContextMenu);
     mRecentList->setContextMenu(&LLPanelPeopleMenus::gPeopleContextMenu);
@@ -742,12 +742,13 @@ bool LLPanelPeople::postBuild()
     }
 
     mFriendsAccordion = friends_tab->getChild<LLAccordionCtrl>("friends_accordion");
-    mAccordionAllTab = mFriendsAccordion->getChild<LLAccordionCtrlTab>("tab_all");
-    mAccordionAllTab->setDropDownStateChangedCallback(
+
+    mFriendsAllTab = mFriendsAccordion->getChild<LLAccordionCtrlTab>("tab_all");
+    mFriendsAllTab->setDropDownStateChangedCallback(
         boost::bind(&LLPanelPeople::onFriendsAccordionExpandedCollapsed, this, _1, _2, mAllFriendList));
 
-    mAccordionOnlineTab = mFriendsAccordion->getChild<LLAccordionCtrlTab>("tab_online");
-    mAccordionOnlineTab->setDropDownStateChangedCallback(
+    mFriendsOnlineTab = mFriendsAccordion->getChild<LLAccordionCtrlTab>("tab_online");
+    mFriendsOnlineTab->setDropDownStateChangedCallback(
         boost::bind(&LLPanelPeople::onFriendsAccordionExpandedCollapsed, this, _1, _2, mOnlineFriendList));
 
     // Must go after setting commit callback and initializing all pointers to children.
@@ -983,7 +984,7 @@ void LLPanelPeople::updateButtons()
             is_self = gAgent.getID() == selected_id;
         }
 
-        {
+            {
 // [RLVa:KB] - Checked: RLVa-1.2.0
 //          auto add_friend_btn = cur_panel->findChildView("add_friend_btn", true);
 //          if (add_friend_btn)
@@ -1000,8 +1001,8 @@ void LLPanelPeople::updateButtons()
 
             if (friends_tab_active)
             {
-                mFriendsGearBtn->setEnabled(multiple_selected);
                 mFriendsDelFriendBtn->setEnabled(multiple_selected);
+                mFriendsGearBtn->setEnabled(multiple_selected);
             }
 
             if (recent_tab_active)
@@ -1164,8 +1165,8 @@ void LLPanelPeople::onFilterEdit(const std::string& search_string)
         mOnlineFriendList->setNameFilter(filter);
         mAllFriendList->setNameFilter(filter);
 
-        setAccordionCollapsedByUser(mAccordionOnlineTab, false);
-        setAccordionCollapsedByUser(mAccordionAllTab, false);
+        setAccordionCollapsedByUser(mFriendsOnlineTab, false);
+        setAccordionCollapsedByUser(mFriendsAllTab, false);
         showFriendsAccordionsIfNeeded();
 
         // restore accordion tabs state _after_ all manipulations
@@ -1307,7 +1308,7 @@ void LLPanelPeople::onAddFriendButtonClicked()
 bool LLPanelPeople::isItemsFreeOfFriends(const uuid_vec_t& uuids)
 {
     const LLAvatarTracker& av_tracker = LLAvatarTracker::instance();
-    for (auto uuid : uuids)
+    for (const LLUUID& uuid : uuids)
     {
         if (av_tracker.isBuddy (uuid))
         {
@@ -1687,8 +1688,8 @@ void LLPanelPeople::showFriendsAccordionsIfNeeded()
     if(FRIENDS_TAB_NAME == getActiveTabName())
     {
         // Expand and show accordions if needed, else - hide them
-        showAccordion(mAccordionOnlineTab, mOnlineFriendList->filterHasMatches());
-        showAccordion(mAccordionAllTab, mAllFriendList->filterHasMatches());
+        showAccordion(mFriendsOnlineTab, mOnlineFriendList->filterHasMatches());
+        showAccordion(mFriendsAllTab, mAllFriendList->filterHasMatches());
 
         // Rearrange accordions
         mFriendsAccordion->arrange();
@@ -1704,11 +1705,11 @@ void LLPanelPeople::onFriendListRefreshComplete(LLUICtrl*ctrl, const LLSD& param
 {
     if(ctrl == mOnlineFriendList)
     {
-        showAccordion(mAccordionOnlineTab, param.asInteger());
+        showAccordion(mFriendsOnlineTab, param.asInteger());
     }
     else if(ctrl == mAllFriendList)
     {
-        showAccordion(mAccordionAllTab, param.asInteger());
+        showAccordion(mFriendsAllTab, param.asInteger());
     }
 }
 

@@ -166,8 +166,8 @@ void LLThumbnailCtrl::draw()
             font->renderUTF8(
                 mLoadingPlaceholderString,
                 0,
-                llfloor(draw_rect.mLeft+3),
-                llfloor(draw_rect.mTop-v_offset),
+                (draw_rect.mLeft+3),
+                (draw_rect.mTop-v_offset),
                 LLColor4::white,
                 LLFontGL::LEFT,
                 LLFontGL::BASELINE,

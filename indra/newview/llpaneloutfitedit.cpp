@@ -430,6 +430,7 @@ LLPanelOutfitEdit::~LLPanelOutfitEdit()
 
     delete mCOFDragAndDropObserver;
 
+
     delete mWearableListViewItemsComparator;
 
     while (!mListViewItemTypes.empty()) {
@@ -474,8 +475,10 @@ bool LLPanelOutfitEdit::postBuild()
 
     mFolderViewBtn = getChild<LLButton>("folder_view_btn");
     mListViewBtn = getChild<LLButton>("list_view_btn");
+    mFilterPanel = getChild<LLView>("filter_panel");
+    mFilterBtn = getChild<LLButton>("filter_button");
+    mFilterBtn->setCommitCallback(boost::bind(&LLPanelOutfitEdit::showWearablesFilter, this));
 
-    childSetCommitCallback("filter_button", boost::bind(&LLPanelOutfitEdit::showWearablesFilter, this), NULL);
     childSetCommitCallback("folder_view_btn", boost::bind(&LLPanelOutfitEdit::showWearablesFolderView, this), NULL);
     childSetCommitCallback("folder_view_btn", boost::bind(&LLPanelOutfitEdit::saveListSelection, this), NULL);
     childSetCommitCallback("list_view_btn", boost::bind(&LLPanelOutfitEdit::showWearablesListView, this), NULL);
@@ -528,12 +531,16 @@ bool LLPanelOutfitEdit::postBuild()
     mSearchFilter = getChild<LLFilterEditor>("look_item_filter");
     mSearchFilter->setCommitCallback(boost::bind(&LLPanelOutfitEdit::onSearchEdit, this, _2));
 
-    childSetAction("show_add_wearables_btn", boost::bind(&LLPanelOutfitEdit::onAddMoreButtonClicked, this));
+    mShowAddWearablesBtn = getChild<LLButton>("show_add_wearables_btn");
+    mShowAddWearablesBtn->setClickedCallback(boost::bind(&LLPanelOutfitEdit::onAddMoreButtonClicked, this));
 
     mPlusBtn = getChild<LLButton>("plus_btn");
     mPlusBtn->setClickedCallback(boost::bind(&LLPanelOutfitEdit::onPlusBtnClicked, this));
 
     childSetAction(REVERT_BTN, boost::bind(&LLAppearanceMgr::wearBaseOutfit, LLAppearanceMgr::getInstance()));
+
+    mNoAddWearablesButtonBar = getChild<LLUICtrl>("no_add_wearables_button_bar");
+    mAddWearablesButtonBar = getChild<LLUICtrl>("add_wearables_button_bar");
 
     /*
      * By default AT_CLOTHING are sorted by (in in MY OUTFITS):
@@ -621,15 +628,15 @@ void LLPanelOutfitEdit::showAddWearablesPanel(bool show_add_wearables)
 
     mAddWearablesPanel->setVisible(show_add_wearables);
 
-    getChild<LLUICtrl>("show_add_wearables_btn")->setValue(show_add_wearables);
+    mShowAddWearablesBtn->setValue(show_add_wearables);
 
     updateFiltersVisibility();
-    getChildView("filter_button")->setVisible( show_add_wearables);
+    mFilterBtn->setVisible( show_add_wearables);
 
     //search filter should be disabled
     if (!show_add_wearables)
     {
-        getChild<LLUICtrl>("filter_button")->setValue(false);
+        mFilterBtn->setValue(false);
 
         mFolderViewFilterCmbBox->setVisible(false);
         mListViewFilterCmbBox->setVisible(false);
@@ -656,15 +663,15 @@ void LLPanelOutfitEdit::showAddWearablesPanel(bool show_add_wearables)
     }
 
     //switching button bars
-    getChildView("no_add_wearables_button_bar")->setVisible( !show_add_wearables);
-    getChildView("add_wearables_button_bar")->setVisible( show_add_wearables);
+    mNoAddWearablesButtonBar->setVisible( !show_add_wearables);
+    mAddWearablesButtonBar->setVisible( show_add_wearables);
 }
 
 void LLPanelOutfitEdit::showWearablesFilter()
 {
-    bool filter_visible = getChild<LLUICtrl>("filter_button")->getValue();
+    bool filter_visible = mFilterBtn->getValue();
 
-    getChildView("filter_panel")->setVisible( filter_visible);
+    mFilterPanel->setVisible(filter_visible);
 
     if(!filter_visible)
     {

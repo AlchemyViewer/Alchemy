@@ -1,34 +1,3 @@
-/**
- * @file lldiskcache.cpp
- * @brief The disk cache implementation.
- *
- * Note: Rather than keep the top level function comments up
- * to date in both the source and header files, I elected to
- * only have explicit comments about each function and variable
- * in the header - look there for details. The same is true for
- * description of how this code is supposed to work.
- *
- * $LicenseInfo:firstyear=2009&license=viewerlgpl$
- * Second Life Viewer Source Code
- * Copyright (C) 2020, Linden Research, Inc.
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation;
- * version 2.1 of the License only.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
- * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
- * $/LicenseInfo$
- */
 
 #include "linden_common.h"
 #include "llapp.h"
@@ -75,26 +44,6 @@ void LLDiskCache::createCache()
 // NOT touch any LLDiskCache data without introducing and locking a mutex!
 
 // Interaction through the filesystem itself should be safe. Let’s say thread
-// A is accessing the cache file for reading/writing and thread B is trimming
-// the cache. Let’s also assume using llifstream to open a file and
-// boost::filesystem::remove are not atomic (which will be pretty much the
-// case).
-
-// Now, A is trying to open the file using llifstream ctor. It does some
-// checks if the file exists and whatever else it might be doing, but has not
-// issued the call to the OS to actually open the file yet. Now B tries to
-// delete the file: If the file has been already marked as in use by the OS,
-// deleting the file will fail and B will continue with the next file. A can
-// safely continue opening the file. If the file has not yet been marked as in
-// use, B will delete the file. Now A actually wants to open it, operation
-// will fail, subsequent check via llifstream.is_open will fail, asset will
-// have to be re-requested. (Assuming here the viewer will actually handle
-// this situation properly, that can also happen if there is a file containing
-// garbage.)
-
-// Other situation: B is trimming the cache and A wants to read a file that is
-// about to get deleted. boost::filesystem::remove does whatever it is doing
-// before actually deleting the file. If A opens the file before the file is
 // actually gone, the OS call from B to delete the file will fail since the OS
 // will prevent this. B continues with the next file. If the file is already
 // gone before A finally gets to open it, this operation will fail and the
@@ -162,8 +111,6 @@ void LLDiskCache::purge()
 
     LL_INFOS() << "Purging cache to a maximum of " << mMaxSizeBytes << " bytes" << LL_ENDL;
 
-    // Extra accounting to track the retention of static assets
-    std::vector<bool> file_removed;
     if (mEnableCacheDebugInfo)
     {
         file_removed.reserve(file_info.size());
@@ -182,9 +129,6 @@ void LLDiskCache::purge()
         bool should_remove = file_size_total > mMaxSizeBytes;
         if (mEnableCacheDebugInfo)
         {
-            file_removed.push_back(should_remove);
-        }
-
         if (should_remove)
         {
             boost::filesystem::remove(entry.second.second, ec);
@@ -198,7 +142,6 @@ void LLDiskCache::purge()
 
     if (mEnableCacheDebugInfo)
     {
-        auto end_time = std::chrono::high_resolution_clock::now();
         auto execute_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
         // Log afterward so it doesn't affect the time measurement
@@ -215,10 +158,6 @@ void LLDiskCache::purge()
             const std::string action = removed ? "DELETE:" : "KEEP:";
 
             // have to do this because of LL_INFO/LL_END weirdness
-            std::ostringstream line;
-
-            line << action << "  ";
-            line << entry.first << "  ";
             line << entry.second.first << "  ";
             line << entry.second.second;
             line << " (" << file_size_total << "/" << mMaxSizeBytes << ")";
@@ -312,7 +251,6 @@ void LLDiskCache::updateFileAccessTime(const boost::filesystem::path& file_path)
     const std::time_t cur_time = std::time(nullptr);
 
     boost::system::error_code ec;
-
     // file last write time
     const std::time_t last_write_time = boost::filesystem::last_write_time(file_path, ec);
     if (ec.failed())
@@ -391,19 +329,6 @@ void LLDiskCache::removeOldVFSFiles()
     if (boost::filesystem::is_directory(cache_path, ec) && !ec.failed())
     {
         boost::filesystem::directory_iterator iter(cache_path, ec);
-        while (iter != boost::filesystem::directory_iterator() && !ec.failed())
-        {
-            if (boost::filesystem::is_regular_file(*iter, ec) && !ec.failed())
-            {
-                if (((*iter).path().string().find(CACHE_FORMAT) != std::string::npos) ||
-                    ((*iter).path().string().find(DB_FORMAT) != std::string::npos))
-                {
-                    boost::filesystem::remove(*iter, ec);
-                    if (ec.failed())
-                    {
-                        LL_WARNS() << "Failed to delete cache file " << *iter << ": " << ec.message() << LL_ENDL;
-                    }
-                }
             }
             iter.increment(ec);
         }
@@ -417,8 +342,6 @@ uintmax_t LLDiskCache::dirFileSize(const std::string dir)
     /**
      * There may be a better way that works directly on the folder (similar to
      * right clicking on a folder in the OS and asking for size vs right clicking
-     * on all files and adding up manually) but this is very fast - less than 100ms
-     * for 10,000 files in my testing so, so long as it's not called frequently,
      * it should be okay. Note that's it's only currently used for logging/debugging
      * so if performance is ever an issue, optimizing this or removing it altogether,
      * is an easy win.
@@ -457,17 +380,3 @@ uintmax_t LLDiskCache::dirFileSize(const std::string dir)
     return total_file_size;
 }
 
-LLPurgeDiskCacheThread::LLPurgeDiskCacheThread() :
-    LLThread("PurgeDiskCacheThread", nullptr)
-{
-}
-
-void LLPurgeDiskCacheThread::run()
-{
-    constexpr std::chrono::seconds CHECK_INTERVAL{60};
-
-    while (LLApp::instance()->sleep(CHECK_INTERVAL))
-    {
-        LLDiskCache::instance().purge();
-    }
-}

@@ -36,12 +36,12 @@
 
 #include "boost/bind.hpp"
 
-static const S32 BORDER_MARGIN = 2;
-static const S32 PARENT_BORDER_MARGIN = 5;
-static const S32 VERTICAL_MULTIPLE = 16;
-static const F32 MIN_AUTO_SCROLL_RATE = 120.f;
-static const F32 MAX_AUTO_SCROLL_RATE = 500.f;
-static const F32 AUTO_SCROLL_RATE_ACCEL = 120.f;
+static constexpr S32 BORDER_MARGIN = 2;
+static constexpr S32 PARENT_BORDER_MARGIN = 5;
+static constexpr S32 VERTICAL_MULTIPLE = 16;
+static constexpr F32 MIN_AUTO_SCROLL_RATE = 120.f;
+static constexpr F32 MAX_AUTO_SCROLL_RATE = 500.f;
+static constexpr F32 AUTO_SCROLL_RATE_ACCEL = 120.f;
 
 // LLAccordionCtrl =================================================================|
 
@@ -49,13 +49,7 @@ static LLDefaultChildRegistry::Register<LLAccordionCtrl>    t2("accordion");
 
 LLAccordionCtrl::LLAccordionCtrl(const Params& params):LLPanel(params)
  , mFitParent(params.fit_parent)
- , mAutoScrolling( false )
- , mAutoScrollRate( 0.f )
- , mSelectedTab( NULL )
- , mTabComparator( NULL )
- , mNoVisibleTabsHelpText(NULL)
  , mNoVisibleTabsOrigString(params.no_visible_tabs_text.initial_value().asString())
- , mSkipScrollToChild(false)
 {
     initNoTabsWidget(params.no_matched_tabs_text);
 
@@ -67,10 +61,6 @@ LLAccordionCtrl::LLAccordionCtrl(const Params& params):LLPanel(params)
 }
 
 LLAccordionCtrl::LLAccordionCtrl() : LLPanel()
- , mAutoScrolling( false )
- , mAutoScrollRate( 0.f )
- , mSelectedTab( NULL )
- , mNoVisibleTabsHelpText(NULL)
 {
     initNoTabsWidget(LLTextBox::Params());
 
@@ -293,7 +283,6 @@ void LLAccordionCtrl::hideScrollbar(S32 width, S32 height)
 S32 LLAccordionCtrl::calcRecuiredHeight()
 {
     S32 rec_height = 0;
-
     for (LLAccordionCtrlTab* accordion_tab : mAccordionTabs)
     {
         if(accordion_tab && accordion_tab->getVisible())
@@ -374,12 +363,10 @@ void LLAccordionCtrl::initNoTabsWidget(const LLTextBox::Params& tb_params)
 
 void LLAccordionCtrl::updateNoTabsHelpTextVisibility()
 {
-    bool visible_exists = false;
-    std::vector<LLAccordionCtrlTab*>::const_iterator it = mAccordionTabs.begin();
-    const std::vector<LLAccordionCtrlTab*>::const_iterator it_end = mAccordionTabs.end();
-    while (it < it_end)
+    bool visible_exists{ false };
+    for (auto accordion_tab : mAccordionTabs)
     {
-        if ((*(it++))->getVisible())
+        if (accordion_tab->getVisible())
         {
             visible_exists = true;
             break;
@@ -489,7 +476,7 @@ void LLAccordionCtrl::arrangeMultiple()
                 // minimum tab height is equal to header height
                 if (accordion_tab->getHeaderHeight() > panel_height)
                 {
-                    panel_height = mAccordionTabs[i]->getHeaderHeight();
+                    panel_height = accordion_tab->getHeaderHeight();
                 }
             }
 
@@ -630,12 +617,12 @@ void LLAccordionCtrl::updateLayout(S32 width, S32 height)
         panel_width -= scrollbar_size;
 
     // set sizes for first panels and dragbars
-    for (size_t i = 0; i < mAccordionTabs.size(); ++i)
+    for (LLAccordionCtrlTab* accordion_tab : mAccordionTabs)
     {
-        if (!mAccordionTabs[i]->getVisible())
+        if (!accordion_tab->getVisible())
             continue;
-        LLRect panel_rect = mAccordionTabs[i]->getRect();
-        ctrlSetLeftTopAndSize(mAccordionTabs[i], panel_rect.mLeft, panel_top, panel_width, panel_rect.getHeight());
+        LLRect panel_rect = accordion_tab->getRect();
+        ctrlSetLeftTopAndSize(accordion_tab, panel_rect.mLeft, panel_top, panel_width, panel_rect.getHeight());
         panel_top -= panel_rect.getHeight();
     }
 }
@@ -896,15 +883,12 @@ void LLAccordionCtrl::setFilterSubString(const std::string& filter_string)
 
 const LLAccordionCtrlTab* LLAccordionCtrl::getExpandedTab() const
 {
-    typedef std::vector<LLAccordionCtrlTab*>::const_iterator tabs_const_iterator;
-
-    const LLAccordionCtrlTab* result = 0;
-
-    for (tabs_const_iterator i = mAccordionTabs.begin(); i != mAccordionTabs.end(); ++i)
+    const LLAccordionCtrlTab* result = nullptr;
+    for (LLAccordionCtrlTab* accordion_tab : mAccordionTabs)
     {
-        if ((*i)->isExpanded())
+        if (accordion_tab->isExpanded())
         {
-            result = *i;
+            result = accordion_tab;
             break;
         }
     }
@@ -922,11 +906,11 @@ S32 LLAccordionCtrl::calcExpandedTabHeight(S32 tab_index /* = 0 */, S32 availabl
     S32 collapsed_tabs_height = 0;
     S32 num_expanded = 0;
 
-    for (size_t n = tab_index; n < mAccordionTabs.size(); ++n)
+    for (LLAccordionCtrlTab* tab : mAccordionTabs)
     {
-        if (!mAccordionTabs[n]->isExpanded())
+        if (!tab->isExpanded())
         {
-            collapsed_tabs_height += mAccordionTabs[n]->getHeaderHeight();
+            collapsed_tabs_height += tab->getHeaderHeight();
         }
         else
         {
@@ -948,10 +932,8 @@ void LLAccordionCtrl::collapseAllTabs()
 {
     if (mAccordionTabs.size() > 0)
     {
-        for (size_t i = 0; i < mAccordionTabs.size(); ++i)
+        for (LLAccordionCtrlTab* tab : mAccordionTabs)
         {
-            LLAccordionCtrlTab *tab = mAccordionTabs[i];
-
             if (tab->getDisplayChildren())
             {
                 tab->setDisplayChildren(false);

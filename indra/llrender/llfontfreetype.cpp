@@ -209,6 +209,20 @@ LLFontFreetype::~LLFontFreetype()
     delete mFontBitmapCachep;
     // mFallbackFonts cleaned up by LLPointer destructor
 }
+#ifdef LL_WINDOWS
+unsigned long ft_read_cb(FT_Stream stream, unsigned long offset, unsigned char *buffer, unsigned long count) {
+    if (count <= 0) return count;
+    llifstream *file_stream = static_cast<llifstream *>(stream->descriptor.pointer);
+    file_stream->seekg(offset, std::ios::beg);
+    file_stream->read((char*)buffer, count);
+    return (unsigned long)file_stream->gcount();
+}
+
+void ft_close_cb(FT_Stream stream) {
+    llifstream *file_stream = static_cast<llifstream *>(stream->descriptor.pointer);
+    file_stream->close();
+}
+#endif
 
 bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n)
 {

@@ -146,12 +146,21 @@ pre_build()
     && [ -r "$master_message_template_checkout/message_template.msg" ] \
     && template_verifier_master_url="-DTEMPLATE_VERIFIER_MASTER_URL=file://$master_message_template_checkout/message_template.msg"
 
-    RELEASE_CRASH_REPORTING=ON
-    HAVOK=ON
+    RELEASE_CRASH_REPORTING=OFF
+    HAVOK=OFF
     SIGNING=()
-    if [[ "$arch" == "Darwin" && "$variant" == "Release" ]]
-    then SIGNING=("-DENABLE_SIGNING:BOOL=YES" \
-                  "-DSIGNING_IDENTITY:STRING=Developer ID Application: Linden Research, Inc.")
+    if [[ "$variant" != *OS ]]
+    then
+        # Proprietary builds
+
+        RELEASE_CRASH_REPORTING=ON
+        HAVOK=ON
+
+        if [[ "$arch" == "Darwin" ]]
+        then
+            SIGNING=("-DENABLE_SIGNING:BOOL=YES" \
+                          "-DSIGNING_IDENTITY:STRING=Developer ID Application: Linden Research, Inc.")
+        fi
     fi
 
     if [ "${RELEASE_CRASH_REPORTING:-}" != "OFF" ]
@@ -507,15 +516,6 @@ then
     record_event "skipping debian build due to failed build"
   fi
 fi
-
-# Some of the uploads takes a long time to finish in the codeticket backend,
-# causing the next codeticket upload attempt to fail.
-# Inserting this after each potentially large upload may prevent those errors.
-# JJ is making changes to Codeticket that we hope will eliminate this failure, then this can be removed
-wait_for_codeticket()
-{
-    sleep $(( 60 * 6 ))
-}
 
 # check status and upload results to S3
 if $succeeded

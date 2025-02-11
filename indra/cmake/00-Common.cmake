@@ -28,6 +28,7 @@ add_compile_definitions(
     $<$<CONFIG:RelWithDebInfo>:LL_RELEASE_WITH_DEBUG_INFO=1>
     $<$<CONFIG:Release>:LL_RELEASE_FOR_DOWNLOAD=1>
     )
+
 # Configure crash reporting
 set(RELEASE_CRASH_REPORTING OFF CACHE BOOL "Enable use of crash reporting in release builds")
 set(NON_RELEASE_CRASH_REPORTING OFF CACHE BOOL "Enable use of crash reporting in developer builds")
@@ -157,7 +158,6 @@ if (WINDOWS)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /defaultlib:\"${CLANG_RT}\"")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /defaultlib:\"${CLANG_RT}\"")
   endif()
-
   if (NOT DISABLE_FATAL_WARNINGS)
     add_compile_options(/WX)
   endif (NOT DISABLE_FATAL_WARNINGS)
@@ -168,9 +168,6 @@ if (WINDOWS)
   # configure win32 API for 10 and above compatibility
   set(WINVER "0x0A00" CACHE STRING "Win32 API Target version (see http://msdn.microsoft.com/en-us/library/aa383745%28v=VS.85%29.aspx)")
   add_compile_definitions(WINVER=${WINVER} _WIN32_WINNT=${WINVER})
-
-  # Allow use of sprintf etc
-  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 endif (WINDOWS)
 
 if (LINUX)

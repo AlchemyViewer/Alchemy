@@ -2040,7 +2040,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(bool *hit_limit)
                     }
                     else
                     {
-                        LLCachedControl<F32> dynamic_camera_strength(gSavedSettings, "DynamicCameraStrength");
+                        static LLCachedControl<F32> dynamic_camera_strength(gSavedSettings, "DynamicCameraStrength");
                         target_lag = vel * dynamic_camera_strength / 30.f;
                     }
 
@@ -2349,7 +2349,7 @@ void LLAgentCamera::handleScrollWheel(S32 clicks)
         else
         {
             F32 current_zoom_fraction = (F32)mCameraFocusOffsetTarget.magVec();
-            cameraOrbitIn(current_zoom_fraction * (1.f - pow(ROOT_ROOT_TWO, clicks)));
+            cameraOrbitIn(current_zoom_fraction * (1.f - (F32)pow(ROOT_ROOT_TWO, clicks)));
         }
     }
 }
@@ -2437,10 +2437,6 @@ void LLAgentCamera::changeCameraToMouselook(bool animate)
         AOEngine::getInstance()->inMouselook(true);
         const U32 old_flags = gAgent.getControlFlags();
         gAgent.setControlFlags(AGENT_CONTROL_MOUSELOOK);
-        if (old_flags != gAgent.getControlFlags())
-        {
-            gAgent.setFlagsDirty();
-        }
 
         if (animate)
         {

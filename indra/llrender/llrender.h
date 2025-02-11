@@ -43,19 +43,18 @@
 #include "llpointer.h"
 #include "llglheaders.h"
 #include "llmatrix4a.h"
-#include "llvector4a.h"
-#include <boost/align/aligned_allocator.hpp>
+#include "glm/mat4x4.hpp"
 
 #include <array>
+#include <list>
 
-#include <array>
 
 class LLVertexBuffer;
 class LLCubeMap;
 class LLImageGL;
 class LLRenderTarget;
-class LLTexture ;
-class LLMatrix4a;
+class LLTexture;
+class LLVertexBufferData;
 
 #define LL_MATRIX_STACK_DEPTH 32
 
@@ -287,11 +286,18 @@ public:
 
     enum eTexIndex : U8
     {
-        DIFFUSE_MAP           = 0,
-        ALTERNATE_DIFFUSE_MAP = 1,
-        NORMAL_MAP            = 1,
-        SPECULAR_MAP          = 2,
-        NUM_TEXTURE_CHANNELS  = 3,
+        // Channels for material textures
+        DIFFUSE_MAP            = 0,
+        ALTERNATE_DIFFUSE_MAP  = 1,
+        NORMAL_MAP             = 1,
+        SPECULAR_MAP           = 2,
+        // Channels for PBR textures
+        BASECOLOR_MAP          = 3,
+        METALLIC_ROUGHNESS_MAP = 4,
+        GLTF_NORMAL_MAP        = 5,
+        EMISSIVE_MAP           = 6,
+        // Total number of channels
+        NUM_TEXTURE_CHANNELS   = 7,
     };
 
     enum eVolumeTexIndex : U8
@@ -399,8 +405,8 @@ public:
     void matrixMode(eMatrixMode mode);
     eMatrixMode getMatrixMode();
 
-    const LLMatrix4a& getModelviewMatrix();
-    const LLMatrix4a& getProjectionMatrix();
+    const glm::mat4& getModelviewMatrix();
+    const glm::mat4& getProjectionMatrix();
 
     void syncMatrices();
     void syncLightState();
@@ -417,15 +423,20 @@ public:
 
     void flush();
 
+    // if list is set, will store buffers in list for later use, if list isn't set, will use cache
+    void beginList(std::list<LLVertexBufferData> *list);
+    void endList();
+
     void begin(const GLuint& mode);
     void end();
 
-    LL_FORCE_INLINE void vertex2i(const GLint& x, const GLint& y) { vertex4a(LLVector4a((GLfloat)x,(GLfloat)y,0.f)); }
-    LL_FORCE_INLINE void vertex2f(const GLfloat& x, const GLfloat& y) { vertex4a(LLVector4a(x,y,0.f)); }
-    LL_FORCE_INLINE void vertex3f(const GLfloat& x, const GLfloat& y, const GLfloat& z) { vertex4a(LLVector4a(x,y,z)); }
-    LL_FORCE_INLINE void vertex2fv(const GLfloat* v) { vertex4a(LLVector4a(v[0],v[1],0.f)); }
-    LL_FORCE_INLINE void vertex3fv(const GLfloat* v) { vertex4a(LLVector4a(v[0],v[1],v[2])); }
-    void vertex4a(const LLVector4a& v);
+    U8 getMode() const { return mMode; }
+
+    void vertex2i(const GLint& x, const GLint& y);
+    void vertex2f(const GLfloat& x, const GLfloat& y);
+    void vertex3f(const GLfloat& x, const GLfloat& y, const GLfloat& z);
+    void vertex2fv(const GLfloat* v);
+    void vertex3fv(const GLfloat* v);
 
     void texCoord2i(const GLint& x, const GLint& y);
     void texCoord2f(const GLfloat& x, const GLfloat& y);
@@ -488,14 +499,20 @@ public:
     static bool sGLCoreProfile;
     static bool sNsightDebugSupport;
     static LLVector2 sUIGLScaleFactor;
+    static bool sClassicMode; // classic sky mode active
 
 private:
     friend class LLLightState;
 
+    LLVertexBuffer* bufferfromCache(U32 attribute_mask, U32 count);
+    LLVertexBuffer* genBuffer(U32 attribute_mask, S32 count);
+    void drawBuffer(LLVertexBuffer* vb, U32 mode, S32 count);
+    void resetStriders(S32 count);
+
     eMatrixMode mMatrixMode;
     U32 mMatIdx[NUM_MATRIX_MODES];
     U32 mMatHash[NUM_MATRIX_MODES];
-    LL_ALIGN_16(LLMatrix4a mMatrix[NUM_MATRIX_MODES][LL_MATRIX_STACK_DEPTH]);
+    glm::mat4 mMatrix[NUM_MATRIX_MODES][LL_MATRIX_STACK_DEPTH];
     U32 mCurMatHash[NUM_MATRIX_MODES];
     U32 mLightHash;
     LLColor4 mAmbientLightColor;
@@ -523,17 +540,16 @@ private:
     std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIOffset;
     std::vector<LLVector4a, boost::alignment::aligned_allocator<LLVector4a, 64> > mUIScale;
     std::vector<LLQuaternion> mUIRotation;
-
     bool            mPrimitiveReset;
 };
 
-extern LLMatrix4a gGLModelView;
-extern LLMatrix4a gGLLastModelView;
-extern LLMatrix4a gGLLastProjection;
-extern LLMatrix4a gGLProjection;
+extern F32 gGLModelView[16];
+extern F32 gGLLastModelView[16];
+extern F32 gGLLastProjection[16];
+extern F32 gGLProjection[16];
 extern S32 gGLViewport[4];
-extern LLMatrix4a gGLDeltaModelView;
-extern LLMatrix4a gGLInverseDeltaModelView;
+extern glm::mat4 gGLDeltaModelView;
+extern glm::mat4 gGLInverseDeltaModelView;
 
 extern thread_local LLRender gGL;
 
@@ -544,24 +560,19 @@ inline constexpr F32 OGL_TO_CFR_ROTATION[16] = {  0.f,  0.f, -1.f,  0.f,    // -
                                                   0.f,  1.f,  0.f,  0.f,    //  Y becomes Z
                                                   0.f,  0.f,  0.f,  1.f };
 
-// This rotation matrix moves the default OpenGL reference frame
-// (-Z at, Y up) to Cory's favorite reference frame (X at, Z up)
-inline static LL_ALIGN_16(const LLMatrix4a) OGL_TO_CFR_ROTATION_4A(
-    LLVector4a(0.f, 0.f, -1.f, 0.f),    // -Z becomes X
-    LLVector4a(-1.f, 0.f, 0.f, 0.f),    // -X becomes Y
-    LLVector4a(0.f, 1.f, 0.f, 0.f),     //  Y becomes Z
-    LLVector4a(0.f, 0.f, 0.f, 1.f));
+glm::mat4 copy_matrix(F32* src);
+glm::mat4 get_current_modelview();
+glm::mat4 get_current_projection();
+glm::mat4 get_last_modelview();
+glm::mat4 get_last_projection();
 
-const LLMatrix4a& get_current_modelview();
-const LLMatrix4a& get_current_projection();
-const LLMatrix4a& get_last_modelview();
-const LLMatrix4a& get_last_projection();
+void copy_matrix(const glm::mat4& src, F32* dst);
+void set_current_modelview(const glm::mat4& mat);
+void set_current_projection(const glm::mat4& mat);
+void set_last_modelview(const glm::mat4& mat);
+void set_last_projection(const glm::mat4& mat);
 
-void set_current_modelview(const LLMatrix4a& mat);
-void set_current_projection(const LLMatrix4a& mat);
-void set_last_modelview(const LLMatrix4a& mat);
-void set_last_projection(const LLMatrix4a& mat);
-
+glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec);
 #define LL_SHADER_LOADING_WARNS(...) LL_WARNS()
 
 #endif

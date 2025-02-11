@@ -1,5 +1,6 @@
 # -*- cmake -*-
 include(Prebuilt)
+include(Linking)
 
 include_guard()
 add_library( ll::openssl INTERFACE IMPORTED )

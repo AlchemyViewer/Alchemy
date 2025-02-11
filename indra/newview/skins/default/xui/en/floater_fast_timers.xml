@@ -73,8 +73,8 @@
         name="scroll_vert"
         orientation="vertical"
         step_size="16"
-        doc_size="3000"
         doc_pos="0"
+        doc_size="3000"
         page_size="0"
           />
     </layout_panel>

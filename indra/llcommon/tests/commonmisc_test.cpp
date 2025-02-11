@@ -47,12 +47,6 @@
 
 #include "../test/lltut.h"
 
-
-#if LL_WINDOWS
-// disable overflow warnings
-#pragma warning(disable: 4307)
-#endif
-
 namespace tut
 {
     struct sd_data

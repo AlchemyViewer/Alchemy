@@ -232,7 +232,7 @@ std::string LLUrlEntryBase::urlToLabelWithGreyQuery(const std::string &url) cons
         return url;
     }
     LLUriParser up(escapeUrl(url));
-    if (up.normalize() == 0)
+    if (up.normalize())
     {
         std::string label;
         up.extractParts();
@@ -690,7 +690,7 @@ std::string LLUrlEntryAgent::getLabel(const std::string &url, const LLUrlLabelCa
     else
     {
         boost::signals2::connection connection = LLAvatarNameCache::get(agent_id, boost::bind(&LLUrlEntryAgent::onAvatarNameCache, this, _1, _2));
-        mAvatarNameCacheConnections.insert(std::make_pair(agent_id, connection));
+        mAvatarNameCacheConnections.emplace(agent_id, LLAvatarNameCache::get(agent_id, boost::bind(&LLUrlEntryAgent::onAvatarNameCache, this, _1, _2)));
         addObserver(agent_id_string, url, cb);
         return LLTrans::getString("LoadingData");
     }
@@ -753,10 +753,9 @@ std::string LLUrlEntryAgent::getIcon(const std::string &url)
 // x-grid-info://lincoln.lindenlab.com/app/agent/0e346d8b-4433-4d66-a6b0-fd37083abc4c/(completename|displayname|username)
 //
 void LLUrlEntryAgentName::onAvatarNameCache(const LLUUID& id,
-                                        const LLAvatarName& av_name)
+                                            const LLAvatarName& av_name)
 {
-    std::pair<avatar_name_cache_connection_map_t::iterator, avatar_name_cache_connection_map_t::iterator> range;
-    range = mAvatarNameCacheConnections.equal_range(id);
+    auto range = mAvatarNameCacheConnections.equal_range(id);
     for (avatar_name_cache_connection_map_t::iterator it = range.first; it != range.second; ++it)
     {
         if (it->second.connected())

@@ -144,10 +144,19 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(const LLSD& notification, bool 
 
     std::string color_name = notification["text_color"].asString();
 
-    LLColor4 textColor = LLUIColorTable::instance().getColor(color_name);
-    textColor.mV[VALPHA] =notification["color_alpha"].asReal();
+    LLUIColor textColor = LLUIColorTable::instance().getColor(color_name);
+    F32 textAlpha = (F32)notification["color_alpha"].asReal();
 
-    LLFontGL* messageFont = LLViewerChat::getChatFont();
+    S32 font_size = notification["font_size"].asInteger();
+
+    LLFontGL*       messageFont;
+    switch(font_size)
+    {
+        case 0: messageFont = LLFontGL::getFontSansSerifSmall(); break;
+        default:
+        case 1: messageFont = LLFontGL::getFontSansSerif();     break;
+        case 2: messageFont = LLFontGL::getFontSansSerifBig();  break;
+    }
 
 // [SL:KB] - Patch: Chat-Alerts | Checked: Catznip-5.3
     // Copied from LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
@@ -183,6 +192,7 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(const LLSD& notification, bool 
     {
         LLStyle::Params style_params;
         style_params.color(textColor);
+        style_params.alpha(textAlpha);
         std::string font_name = LLFontGL::nameFromFont(messageFont);
         std::string font_style_size = LLFontGL::sizeFromFont(messageFont);
         style_params.font.name(font_name);

@@ -63,8 +63,9 @@
 #include "llfloatertools.h"  // to enable hide if build tools are up
 #include "llvector4a.h"
 
+#include <glm/gtx/transform2.hpp>
 // Functions pulled from llviewerdisplay.cpp
-bool get_hud_matrices(LLMatrix4a& proj, LLMatrix4a& model);
+bool get_hud_matrices(glm::mat4 &proj, glm::mat4 &model);
 
 // Warning: make sure these two match!
 const LLPanelPrimMediaControls::EZoomLevel LLPanelPrimMediaControls::kZoomLevels[] = { ZOOM_NONE, ZOOM_MEDIUM };
@@ -419,7 +420,7 @@ void LLPanelPrimMediaControls::updateShape()
             if(mUpdateSlider && mMovieDuration!= 0)
             {
                 F64 current_time =  media_plugin->getCurrentTime();
-                F32 percent = current_time / mMovieDuration;
+                F32 percent = (F32)(current_time / mMovieDuration);
                 mMediaPlaySliderCtrl->setValue(percent);
                 mMediaPlaySliderCtrl->setEnabled(true);
             }
@@ -644,33 +645,26 @@ void LLPanelPrimMediaControls::updateShape()
         vert_it = vect_face.begin();
         vert_end = vect_face.end();
 
-        LLMatrix4a mat;
+        glm::mat4 mat;
         if (!is_hud)
         {
             mat.setMul(get_current_projection(), get_current_modelview());
         }
         else {
-            LLMatrix4a proj, modelview;
+            glm::mat4 proj, modelview;
             if (get_hud_matrices(proj, modelview))
-            {
-                mat.setMul(proj,modelview);
-            }
+                mat = proj * modelview;
         }
-        LLVector4a min;
-        min.splat(1.f);
-        LLVector4a max;
-        max.splat(-1.f);
+        LLVector3 min = LLVector3(1,1,1);
+        LLVector3 max = LLVector3(-1,-1,-1);
         for(; vert_it != vert_end; ++vert_it)
         {
             // project silhouette vertices into screen space
-            LLVector4a screen_vert;
-            screen_vert.load3(vert_it->mV,1.f);
-
-            mat.perspectiveTransform(screen_vert,screen_vert);
+            glm::vec3 screen_vert(glm::make_vec3(vert_it->mV));
+            screen_vert = mul_mat4_vec3(mat, screen_vert);
 
             // add to screenspace bounding box
-            min.setMin(screen_vert,min);
-            max.setMax(screen_vert,max);
+            update_min_max(min, max, LLVector3(glm::value_ptr(screen_vert)));
         }
 
         // convert screenspace bbox to pixels (in screen coords)
@@ -1318,7 +1312,7 @@ void LLPanelPrimMediaControls::onMediaPlaySliderCtrlMouseUp()
             }
             else
             {
-                media_impl->seek(cur_value * mMovieDuration);
+                media_impl->seek((F32)(cur_value * mMovieDuration));
             }
         }
 

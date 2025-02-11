@@ -114,7 +114,7 @@ LLViewerPartSourceScript::LLViewerPartSourceScript(LLViewerObject *source_objp) 
     llassert(source_objp);
     mSourceObjectp = source_objp;
     mPosAgent = mSourceObjectp->getPositionAgent();
-    mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
+    mImagep = LLViewerFetchedTexture::sDefaultParticleImagep;
 
     mImagep->setAddressMode(LLTexUnit::TAM_CLAMP);
 }
@@ -623,7 +623,7 @@ void LLViewerPartSourceSpiral::update(const F32 dt)
 {
     if (!mImagep)
     {
-        mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
+        mImagep = LLViewerFetchedTexture::sDefaultParticleImagep;
     }
 
     const F32 RATE = 0.025f;
@@ -796,7 +796,7 @@ void LLViewerPartSourceBeam::update(const F32 dt)
 
         if (!mImagep)
         {
-            mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
+            mImagep = LLViewerFetchedTexture::sDefaultParticleImagep;
         }
 
         LLViewerPart* part = new LLViewerPart();
@@ -883,7 +883,7 @@ void LLViewerPartSourceChat::update(const F32 dt)
 {
     if (!mImagep)
     {
-        mImagep = LLViewerFetchedTexture::sPixieSmallImagep;
+        mImagep = LLViewerFetchedTexture::sDefaultParticleImagep;
     }
 
 

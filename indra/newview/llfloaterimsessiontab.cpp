@@ -80,6 +80,7 @@ LLFloaterIMSessionTab::LLFloaterIMSessionTab(const LLSD& session_id)
 {
     setAutoFocus(false);
     mSession = LLIMModel::getInstance()->findIMSession(mSessionID);
+    LLIMMgr::instance().addSessionObserver(this);
 
     mCommitCallbackRegistrar.add("IMSession.Menu.Action",
             boost::bind(&LLFloaterIMSessionTab::onIMSessionMenuItemClicked,  this, _2));
@@ -102,6 +103,7 @@ LLFloaterIMSessionTab::LLFloaterIMSessionTab(const LLSD& session_id)
 LLFloaterIMSessionTab::~LLFloaterIMSessionTab()
 {
     delete mRefreshTimer;
+    LLIMMgr::instance().removeSessionObserver(this);
 
     LLFloaterIMContainer* im_container = LLFloaterIMContainer::findInstance();
     if (im_container)
@@ -488,21 +490,20 @@ void LLFloaterIMSessionTab::onFocusLost()
 
 void LLFloaterIMSessionTab::onCallButtonClicked()
 {
-    //if (mVoiceButtonHangUpMode)
-    //{
-    //    // We allow to hang up from any state
-    //    gIMMgr->endCall(mSessionID);
-    //}
-    //else
-    //{
-    //    LLVoiceChannel::EState channel_state = mSession && mSession->mVoiceChannel ?
+    if (mVoiceButtonHangUpMode)
+    {
+        gIMMgr->endCall(mSessionID);
+    }
+    else
+    {
+        if (mSession->mVoiceChannel && !mSession->mVoiceChannel->callStarted())
     //        mSession->mVoiceChannel->getState() : LLVoiceChannel::STATE_NO_CHANNEL_INFO;
     //    // We allow to start call from this state only
     //    if (channel_state == LLVoiceChannel::STATE_NO_CHANNEL_INFO)
-    //    {
-    //        gIMMgr->startCall(mSessionID);
-    //    }
-    //}
+        {
+            gIMMgr->startCall(mSessionID);
+        }
+    }
 }
 
 void LLFloaterIMSessionTab::onInputEditorClicked()
@@ -1095,7 +1096,7 @@ void LLFloaterIMSessionTab::updateCallBtnState(bool callIsActive)
 {
     mVoiceButton->setImageOverlay(callIsActive? getString("call_btn_stop") : getString("call_btn_start"));
     mVoiceButton->setToolTip(callIsActive? getString("end_call_button_tooltip") : getString("start_call_button_tooltip"));
-    //mVoiceButtonHangUpMode = callIsActive;
+    mVoiceButtonHangUpMode = callIsActive;
 
     enableDisableCallBtn();
 }

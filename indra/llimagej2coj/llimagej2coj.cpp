@@ -215,6 +215,121 @@ int ceildivpow2(int a, int b)
     return (a + (1 << b) - 1) >> b;
 }
 
+        if (reversible)
+        {
+            parameters.max_cs_size = 0; // do not limit size for reversible compression
+            parameters.irreversible = 0; // should be the default, but, just in case
+            parameters.tcp_numlayers = 1;
+            /* documentation seems to be wrong, should be 0.0f for lossless, not 1.0f
+               see https://github.com/uclouvain/openjpeg/blob/39e8c50a2f9bdcf36810ee3d41bcbf1cc78968ae/src/lib/openjp2/j2k.c#L7755
+            */
+            parameters.tcp_rates[0] = 0.0f;
+        }
+        else
+        {
+        // if not lossless compression, computes tcp_numlayers and max_cs_size depending on the image dimensions
+        if( parameters.irreversible ) {
+
+            // computes a number of layers
+            U32 surface = rawImageIn.getWidth() * rawImageIn.getHeight();
+            U32 nb_layers = 1;
+            U32 s = 64*64;
+            while (surface > s)
+            {
+                nb_layers++;
+                s *= 4;
+            }
+            nb_layers = llclamp(nb_layers, 1, 6);
+
+            parameters.tcp_numlayers = nb_layers;
+            parameters.tcp_rates[nb_layers - 1] = (U32)(1.f / DEFAULT_COMPRESSION_RATE); // 1:8 by default
+
+            // for each subsequent layer, computes its rate and adds surface * numcomps * 1/rate to the max_cs_size
+            U32 max_cs_size = (U32)(surface * image->numcomps * DEFAULT_COMPRESSION_RATE);
+            U32 multiplier;
+            for (int i = nb_layers - 2; i >= 0; i--)
+            {
+                if( i == nb_layers - 2 )
+                {
+                    multiplier = 15;
+                }
+                else if( i == nb_layers - 3 )
+                {
+                    multiplier = 4;
+                }
+                else
+                {
+                    multiplier = 2;
+                }
+                parameters.tcp_rates[i] = parameters.tcp_rates[i + 1] * multiplier;
+                max_cs_size += (U32)(surface * image->numcomps * (1 / parameters.tcp_rates[i]));
+            }
+
+            //ensure that we have at least a minimal size
+            max_cs_size = llmax(max_cs_size, (U32)FIRST_PACKET_SIZE);
+
+            parameters.max_cs_size = max_cs_size;
+        }
+
+        if (!opj_setup_encoder(encoder, &parameters, image))
+        {
+            return false;
+        }
+
+        opj_set_info_handler(encoder, opj_info, this);
+        opj_set_warning_handler(encoder, opj_warn, this);
+        opj_set_error_handler(encoder, opj_error, this);
+
+        U32 tile_count = (rawImageIn.getWidth() >> 6) * (rawImageIn.getHeight() >> 6);
+        U32 data_size_guess = tile_count * TILE_SIZE;
+            compressedImageOut.allocateData((S32)offset);
+            memcpy(compressedImageOut.getData(), buffer, offset);
+            compressedImageOut.updateData(); // update width, height etc from header
+        }
+        return encoded;
+    }
+
+    void setImage(const LLImageRaw& raw)
+    {
+        opj_image_cmptparm_t cmptparm[MAX_ENCODED_DISCARD_LEVELS];
+        memset(&cmptparm[0], 0, MAX_ENCODED_DISCARD_LEVELS * sizeof(opj_image_cmptparm_t));
+
+        S32 numcomps = raw.getComponents();
+        S32 width = raw.getWidth();
+        S32 height = raw.getHeight();
+
+        for (S32 c = 0; c < numcomps; c++)
+        {
+            cmptparm[c].prec = 8;
+            cmptparm[c].bpp = 8;
+            cmptparm[c].sgnd = 0;
+            cmptparm[c].dx = parameters.subsampling_dx;
+            cmptparm[c].dy = parameters.subsampling_dy;
+            cmptparm[c].w = width;
+            cmptparm[c].h = height;
+        }
+
+        image = opj_image_create(numcomps, &cmptparm[0], OPJ_CLRSPC_SRGB);
+
+        image->x1 = width;
+        image->y1 = height;
+
+        const U8 *src_datap = raw.getData();
+
+        S32 i = 0;
+        for (S32 y = height - 1; y >= 0; y--)
+        {
+            for (S32 x = 0; x < width; x++)
+            {
+                const U8 *pixel = src_datap + (y*width + x) * numcomps;
+                for (S32 c = 0; c < numcomps; c++)
+                {
+                    image->comps[c].data[i] = *pixel;
+                    pixel++;
+                }
+                i++;
+            }
+        }
 LLImageJ2COJ::LLImageJ2COJ()
     : LLImageJ2CImpl()
 {

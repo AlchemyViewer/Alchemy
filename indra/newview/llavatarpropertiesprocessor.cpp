@@ -41,6 +41,7 @@
 #include "lltrans.h"
 #include "llui.h"               // LLUI::getLanguage()
 #include "message.h"
+#include "llappviewer.h"
 
 LLAvatarPropertiesProcessor::LLAvatarPropertiesProcessor()
 {
@@ -367,7 +368,11 @@ void LLAvatarPropertiesProcessor::requestAvatarPropertiesCoro(std::string cap_ur
         avatar_data.picks_list.emplace_back(pick_data["id"].asUUID(), pick_data["name"].asString());
     }
 
-    inst.notifyObservers(avatar_id, &avatar_data, type);
+    LLAppViewer::instance()->postToMainCoro(
+        [avatar_id, avatar_data, type]()
+        {
+            LLAvatarPropertiesProcessor::instance().notifyObservers(avatar_id, (void*) &avatar_data, type);
+        });
 }
 
 void LLAvatarPropertiesProcessor::processAvatarLegacyPropertiesReply(LLMessageSystem* msg, void**)
@@ -697,7 +702,7 @@ bool LLAvatarPropertiesProcessor::isPendingRequest(const LLUUID& avatar_id, EAva
     if (it == mRequestTimestamps.end()) return false;
 
     // We found a request, check if it has timed out
-    U32 now = time(nullptr);
+    U32 now = (U32)time(nullptr);
     const U32 REQUEST_EXPIRE_SECS = 5;
     U32 expires = it->second + REQUEST_EXPIRE_SECS;
 
@@ -711,7 +716,7 @@ bool LLAvatarPropertiesProcessor::isPendingRequest(const LLUUID& avatar_id, EAva
 void LLAvatarPropertiesProcessor::addPendingRequest(const LLUUID& avatar_id, EAvatarProcessorType type)
 {
     timestamp_map_t::key_type key = std::make_pair(avatar_id, type);
-    U32 now = time(nullptr);
+    U32 now = (U32)time(nullptr);
     // Add or update existing (expired) request
     mRequestTimestamps[ key ] = now;
 }
