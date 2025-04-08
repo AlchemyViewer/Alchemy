@@ -108,7 +108,7 @@ Voice Server Version: [VOICE_VERSION]
   <string name="LocalTime">[month, datetime, local] [day, datetime, local] [year, datetime, local] [hour, datetime, local]:[min, datetime, local]:[second,datetime, local]</string>
 	<string name="ErrorFetchingServerReleaseNotesURL">Error fetching server release notes URL.</string>
 	<string name="BuildConfiguration">Build Configuration</string>
-
+	
 	<!--  progress -->
 	<string name="ProgressRestoring">Restoring...</string>
 	<string name="ProgressChangingResolution">Changing resolution...</string>
@@ -150,10 +150,10 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="LoginFailedNoNetwork">Network error: Could not establish connection, please check your network connection.</string>
 	<string name="LoginFailedHeader">Login failed.</string>
 	<string name="Quit">Quit</string>
-
+	
 	<string name="AgniGridLabel">Second Life Main Grid (Agni)</string>
 	<string name="AditiGridLabel">Second Life Beta Test Grid (Aditi)</string>
-
+	
 	<string name="ViewerDownloadURL">https://www.alchemyviewer.org/downloads</string>
 	<string name="LoginFailedViewerNotPermitted">
     The viewer you are using can no longer access [CURRENT_GRID]. Please visit the following page to download a new viewer: https://www.alchemyviewer.org/downloads</string>
@@ -236,7 +236,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="YouHaveBeenDisconnected">You have been disconnected from the region you were in.</string>
 	<string name="SentToInvalidRegion">You were sent to an invalid region.</string>
 	<string name="TestingDisconnect">Testing viewer disconnect</string>
-
+  
 	<!-- SLShare: User Friendly Filter Names Translation -->
     <string name="BlackAndWhite">Black &amp; White</string>
     <string name="Colors1970">1970&apos;s Colors</string>
@@ -249,7 +249,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
     <string name="LensFlare">Lens Flare</string>
     <string name="Miniature">Miniature</string>
     <string name="Toycamera">Toy Camera</string>
-
+	
     <!-- Tooltip -->
 	<string name="TooltipPerson">Person</string><!-- Object under mouse pointer is an avatar -->
 	<string name="TooltipNoName">(no name)</string> <!-- No name on an object -->
@@ -286,10 +286,10 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="TooltipOutboxMixedStock">All items in a stock folder must have the same type and permission</string>
 	<string name="TooltipOutfitNotInInventory">You can only put items or outfits from your personal inventory into "My outfits"</string>
 	<string name="TooltipCantCreateOutfit">One or more items can't be used inside "My outfits"</string>
-
+	
 	<string name="TooltipDragOntoOwnChild">You can't move a folder into its child</string>
 	<string name="TooltipDragOntoSelf">You can't move a folder into itself</string>
-
+	
 	<!-- tooltips for Urls -->
 	<string name="TooltipHttpUrl">Click to view this web page</string>
 	<string name="TooltipSLURL">Click to view this location's information</string>
@@ -398,7 +398,7 @@ are allowed.
 	<string name="AssetUploadServerDifficulties">The server is experiencing unexpected difficulties.</string>
 	<string name="AssetUploadServerUnavaliable">Service not available or upload timeout was reached.</string>
 	<string name="AssetUploadRequestInvalid">
-Error in upload request.  Please visit
+Error in upload request.  Please visit 
 http://secondlife.com/support for help fixing this problem.
 </string>
 
@@ -563,7 +563,7 @@ http://secondlife.com/support for help fixing this problem.
 	<string name="ChangeYourDefaultAnimations">Change your default animations</string>
 	<string name="ForceSitAvatar">Force your avatar to sit</string>
 	<string name="ChangeEnvSettings">Change your environment settings</string>
-
+	
 	<string name="NotConnected">Not Connected</string>
 	<string name="AgentNameSubst">(You)</string> <!-- Substitution for agent name -->
 	<string name="JoinAnExperience"/><!-- intentionally blank -->
@@ -2354,7 +2354,7 @@ For AI Character: Get the closest navigable point to the point provided.
 
 	<!-- inventory -->
 	<string name="InventoryNoMatchingItems">Didn't find what you're looking for? Try [secondlife:///app/search/all/[SEARCH_TERM] Search].</string>
-	<string name="InventoryNoMatchingRecentItems">Didn't find what you're looking for? Try [secondlife:///app/inventory/filters Show filters].</string>
+	<string name="InventoryNoMatchingRecentItems">Didn't find what you're looking for? Try [secondlife:///app/inventory/filters Show filters].</string>	
 	<string name="PlacesNoMatchingItems">To add a place to your landmarks, click the star to the right of the location name.</string>
 	<string name="FavoritesNoMatchingItems">To add a place to your favorites, click the star to the right of the location name, then save the landmark to "Favorites bar".</string>
 	<string name="MarketplaceNoListing">You have no listings yet.</string>
@@ -2541,9 +2541,9 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="InvFolder Local Inventory">Local Inventory</string>
 	<string name="InvFolder #RLV">#RLV</string>
 	<string name="InvFolder #Firestorm">#Firestorm</string>
-
+  
   <!-- are used for Friends and Friends/All folders in Inventory "Calling cards" folder. See EXT-694-->
-	<string name="InvFolder Friends">Friends</string>
+	<string name="InvFolder Friends">Friends</string>	
 	<string name="InvFolder All">All</string>
 
 	<string name="no_attachments">No attachments worn</string>
@@ -2720,7 +2720,7 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="UploadFailed">File upload failed: </string>
 	<string name="ObjectOutOfRange">Script (object out of range)</string>
 	<string name="ScriptWasDeleted">Script (deleted from inventory)</string>
-
+	
 	<!-- god tools -->
 	<string name="GodToolsObjectOwnedBy">Object [OBJECT] owned by [OWNER]</string>
 
@@ -3907,7 +3907,7 @@ Please reinstall viewer from https://alchemyviewer.org/downloads and contact the
 
   <string name="uploading_costs">Uploading costs L$ [AMOUNT]</string>
   <string name="this_costs">This costs L$ [AMOUNT]</string>
-
+  
   <string name="buying_selected_land">This land costs</string>
   <string name="this_object_costs">This item costs</string>
   <string name="giving">You want to give</string>
@@ -3991,7 +3991,7 @@ Abuse Report</string>
   <string name="New Daycycle">New Daycycle</string>
   <string name="New Water">New Water</string>
   <string name="New Sky">New Sky</string>
-
+  
 
   <string name="/bow">/bow</string>
   <string name="/clap">/clap</string>
@@ -4073,7 +4073,7 @@ Please check http://status.secondlifegrid.net to see if there is a known problem
   <string name="Accounting">Accounting</string>
   <string name="Notices">Notices</string>
   <string name="Chat">Chat</string>
-
+  
   <!-- SL Membership -->
   <string name="BaseMembership">Base</string>
   <string name="PremiumMembership">Premium</string>
@@ -4239,7 +4239,7 @@ Try enclosing path to the editor with double quotes.
 
   <!-- commands -->
 
-  <string
+  <string 
 name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Command_AboutLand_Label">About land</string>
   <string name="Command_AnimationOverride_Label">AO</string>
@@ -4361,14 +4361,14 @@ name="Command_360_Capture_Label">360 snapshot</string>
 
   <!-- Spell check settings floater -->
   <string name="UserDictionary">[User]</string>
-
+  
   <!-- RLVa -->
   <string name="RLVaPendingRestart">(pending restart)</string>
   <string name="RLVaToggleMessageLogin">RLVa has been [STATE] (no restart required)</string>
   <string name="RLVaToggleMessageRestart">RLVa will be [STATE] after you restart</string>
   <string name="RLVaToggleEnabled">enabled</string>
   <string name="RLVaToggleDisabled">disabled</string>
-
+   
   <!-- Experience Tools strings -->
   <string name="experience_tools_experience">Experience</string>
   <string name="ExperienceNameNull">(no experience)</string>
@@ -4404,7 +4404,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
 
   <!-- PBR Materials -->
   <string name="Material Texture Name Header">Textures present this material: </string>
-
+  
   <!-- Conversation log messages -->
   <string name="logging_calls_disabled_log_empty">
     Conversations are not being logged. To begin keeping a log, choose "Save: Log only" or "Save: Log and transcripts" under Preferences > Chat.
@@ -4427,7 +4427,7 @@ name="Command_360_Capture_Label">360 snapshot</string>
   <string name="Default">Default</string>
   <string name="none_paren_cap">(None)</string>
   <string name="no_limit">No limit</string>
-
+  
   <string name="Mav_Details_MAV_FOUND_DEGENERATE_TRIANGLES">
       The physics shape contains triangles which are too small. Try simplifying the physics model.
   </string>
@@ -4576,5 +4576,4 @@ and report the problem.
     </string>
 	<string name="AutoResponseModeDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
 	<string name="AutoResponseModeNonFriendsDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
-    <string name="IgnoredAdHocSession">You've been invited to a conference (ad-hoc) chat by [AVATAR_NAME], but viewer automatically ignored it because of your settings.</string>
 </strings>
