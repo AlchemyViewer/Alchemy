@@ -13356,4 +13356,10 @@ Incoming instant messages from anyone who is not your friend will now be answere
      name="okignore"
      yestext="OK"/>
   </notification>
+  <notification
+     icon="notifytip.tga"
+     name="IgnoredAdHocSession"
+     type="notifytip">
+You've been invited to a conference (ad-hoc) chat by [AVATAR_NAME], but the viewer automatically ignored it because of your settings.
+  </notification>
 </notifications>
