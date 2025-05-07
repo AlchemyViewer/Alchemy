@@ -274,7 +274,9 @@ void LLViewerJoystick::setOverrideCamera(bool val)
 
     if (mOverrideCamera)
     {
-        gAgentCamera.changeCameraToDefault();
+        // Call mouselook if camera overridden by user
+        // This is what makes the trackball work.
+        gAgentCamera.resetView(true);
     }
 }
 
@@ -1138,16 +1140,47 @@ void LLViewerJoystick::moveAvatar(bool reset)
         return;
     }
 
+    // When the application regains focus, we preserve the movement state
+    // to avoid jitter movement that happens after focus is regained
+    static bool focus_reset_state = false;
+    
+    // Detect if this is a reset after regaining focus
+    // If reset flag is true but not coming from a normal agent movement reset
+    // it means we've just returned from outside application state and should prevent this nasty bug.
+    bool is_focus_reset = reset && mResetFlag;
+    
+    // Mark that we're in an alt-tab reset situation for the next non-reset frame
+    if (is_focus_reset)
+    {
+        focus_reset_state = true;
+    }
+
+    // Handle reset condition - but preserve movement state
     if (reset || mResetFlag)
     {
-        resetDeltas(mJoystickAxis);
+        // We always preserve the last delta values
+        // when activity resumes. Only reset the accumulated delta.
         if (reset)
         {
-            // Note: moving the agent triggers agent camera mode;
-            //  don't do this every time we set mResetFlag (e.g. because we gained focus)
+            // Note: moving the agent triggers agent camera mode
+            // Don't do this every time we set mResetFlag
             gAgent.moveAt(0, true);
         }
         return;
+    }
+
+    // If this is the first frame after an focus regain reset, prevent movement jitter
+    // by using the same values for both current and last delta
+    if (focus_reset_state)
+    {
+        // We've handled the post-reset frame, clear the flag
+        focus_reset_state = false;
+        
+        // Additional protection for the first movement after focus regain
+        // Set current delta = last delta for rotation axes to prevent rotation
+        sLastDelta[RX_I] = sDelta[RX_I];
+        sLastDelta[RY_I] = sDelta[RY_I];
+        sLastDelta[RZ_I] = sDelta[RZ_I];
     }
 
     static LLCachedControl<bool> blackdragon(gSavedSettings, "BlackDragonControls", false);
@@ -2194,4 +2227,24 @@ void LLViewerJoystick::setXboxDefaults()
     gSavedSettings.setF32("AvatarFeathering", 20.0f);
     gSavedSettings.setF32("BuildFeathering", 3.f);
     gSavedSettings.setF32("FlycamFeathering", 1.0f);
+}
+
+void LLViewerJoystick::setNeedsReset(bool reset)
+{
+    // When joystick needs to be reset for any reason, we want to preserve the movement state
+    // to prevent camera rotation issues, regardless of whether it's due to focus changes or other reasons
+    if (reset)
+    {
+        // Preserve the current joystick state but stop ongoing movement
+        // This prevents the 360-degree rotation when alt-tabbing
+        for (int i = 0; i < 7; i++)
+        {
+            // Don't update sLastDelta which stores the last joystick position
+            // This is what prevents the difference calculation from causing a sudden rotation
+            // when resuming movement after a reset
+            sDelta[i] = 0.f; // Zero out the accumulated delta to stop ongoing movement
+        }
+    }
+    
+    mResetFlag = reset;
 }

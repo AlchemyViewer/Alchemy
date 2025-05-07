@@ -470,8 +470,6 @@ LLAgent::LLAgent() :
 
     mMovementKeysLocked(FALSE),
 
-    mMovementResetCamera(true),
-
     mEffectColor(new LLUIColor(LLColor4(0.f, 1.f, 1.f, 1.f))),
 
     mHaveHomePosition(FALSE),
@@ -531,10 +529,15 @@ void LLAgent::init()
     mIgnorePrejump = gSavedSettings.getBOOL("AlchemyNimble");
     gSavedSettings.getControl("AlchemyNimble")->getSignal()->connect([this](LLControlVariable* control, const LLSD& new_val, const LLSD&) { mIgnorePrejump = new_val.asBoolean(); });
 
-    auto controlp = gSavedSettings.getControl("AlchemyMotionResetsCamera");
-    controlp->getSignal()->connect([&](LLControlVariable* control, const LLSD& new_val, const LLSD&) { mMovementResetCamera = new_val.asBoolean(); });
-    mMovementResetCamera = controlp->getValue().asBoolean();
-
+    // auto controlp = gSavedSettings.getControl("AlchemyMotionResetsCamera");
+    // controlp->getSignal()->connect([&](LLControlVariable* control, const LLSD& new_val, const LLSD&) { mMovementResetCamera = new_val.asBoolean(); });
+    // mMovementResetCamera = controlp->getValue().asBoolean();
+    // ------------------------------------------------------------------------
+    // Control variable connection for movement reset camera is removed
+    // as we now handle this through the joystick handling system
+    // gh@dzmitryj - 7/05/2025
+    // ------------------------------------------------------------------------
+    
     selectRejectFriendshipRequests(gSavedPerAccountSettings.getBOOL("ALRejectFriendshipRequestsMode"));
     setRejectTeleportOffers(gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersMode"));
     setAutoRespond(gSavedPerAccountSettings.getBOOL("AutoRespondModeSet"));
@@ -602,16 +605,21 @@ LLAgent::~LLAgent()
 //-----------------------------------------------------------------------------
 void LLAgent::onAppFocusGained()
 {
+    //  if (CAMERA_MODE_MOUSELOOK == gAgentCamera.getCameraMode())
+    //  {
+    //      gAgentCamera.changeCameraToDefault();
+    //      LLToolMgr::getInstance()->clearSavedTool();
+    //  }
 
-    // Don't reset camera position on app focus gained
-    // This will prevent the 360 camera reset when alt-tabbing back
-    mMovementResetCamera = false;
-    
-//  if (CAMERA_MODE_MOUSELOOK == gAgentCamera.getCameraMode())
-//  {
-//      gAgentCamera.changeCameraToDefault();
-//      LLToolMgr::getInstance()->clearSavedTool();
-//  }
+    // When returning to app focus, we need to prevent the camera rotation
+    // By initalizing the joystick system, we can preserve the movement
+    // state of the camera.
+    if (isInitialized() && LLViewerJoystick::getInstance()->isJoystickInitialized())
+    {
+        // Tell the joystick system we're returning from alt-tab
+        // which prevents unwanted camera rotation
+        LLViewerJoystick::getInstance()->setNeedsReset(true);
+    }
 }
 
 void LLAgent::setFirstLogin(bool b)
@@ -735,9 +743,11 @@ void LLAgent::moveAt(S32 direction, bool reset)
         setControlFlags(AGENT_CONTROL_AT_NEG | AGENT_CONTROL_FAST_AT);
     }
 
+    // The reset parameter now directly controls whether to reset the camera view
+    // It's no longer related to movement reset camera state which was used for alt-tab handling
     if (reset)
     {
-        gAgentCamera.resetView(mMovementResetCamera);
+        gAgentCamera.resetView(true);
     }
 }
 
@@ -763,7 +773,7 @@ void LLAgent::moveAtNudge(S32 direction)
         setControlFlags(AGENT_CONTROL_NUDGE_AT_NEG);
     }
 
-    gAgentCamera.resetView(mMovementResetCamera);
+    gAgentCamera.resetView(true);
 }
 
 //-----------------------------------------------------------------------------
@@ -788,7 +798,7 @@ void LLAgent::moveLeft(S32 direction)
         setControlFlags(AGENT_CONTROL_LEFT_NEG | AGENT_CONTROL_FAST_LEFT);
     }
 
-    gAgentCamera.resetView(mMovementResetCamera);
+    gAgentCamera.resetView(true);
 }
 
 //-----------------------------------------------------------------------------
@@ -813,7 +823,7 @@ void LLAgent::moveLeftNudge(S32 direction)
         setControlFlags(AGENT_CONTROL_NUDGE_LEFT_NEG);
     }
 
-    gAgentCamera.resetView(mMovementResetCamera);
+    gAgentCamera.resetView(true);
 }
 
 //-----------------------------------------------------------------------------
@@ -846,8 +856,7 @@ void LLAgent::moveUp(S32 direction)
         setControlFlags(AGENT_CONTROL_UP_NEG | AGENT_CONTROL_FAST_UP);
     }
 
-    if (!mCrouch)
-        gAgentCamera.resetView(mMovementResetCamera);
+    gAgentCamera.resetView(true);
 }
 
 //-----------------------------------------------------------------------------
@@ -857,27 +866,21 @@ void LLAgent::moveYaw(F32 mag, bool reset_view)
 {
     gAgentCamera.setYawKey(mag);
 
-    if (mag > 0)
+    if (mag != 0.f)
     {
-        setControlFlags(AGENT_CONTROL_YAW_POS);
-    }
-    else if (mag < 0)
-    {
-        setControlFlags(AGENT_CONTROL_YAW_NEG);
-    }
-
-    U32 mask = AGENT_CONTROL_YAW_POS | AGENT_CONTROL_YAW_NEG;
-    if ((getControlFlags() & mask) == mask)
-    {
-        // Rotation into both directions should cancel out
-        // But keep sending controls to simulator,
-        // it's needed for script based controls
-        gAgentCamera.setYawKey(0);
+        if (mag > 0)
+        {
+            setControlFlags(AGENT_CONTROL_YAW_POS);
+        }
+        else if (mag < 0)
+        {
+            setControlFlags(AGENT_CONTROL_YAW_NEG);
+        }
     }
 
     if (reset_view)
     {
-        gAgentCamera.resetView(mMovementResetCamera);
+        gAgentCamera.resetView(reset_view);
     }
 }
 
@@ -888,14 +891,19 @@ void LLAgent::movePitch(F32 mag)
 {
     gAgentCamera.setPitchKey(mag);
 
-    if (mag > 0)
+    if (mag != 0.f)
     {
-        setControlFlags(AGENT_CONTROL_PITCH_POS);
+        if (mag > 0)
+        {
+            setControlFlags(AGENT_CONTROL_PITCH_POS);
+        }
+        else if (mag < 0)
+        {
+            setControlFlags(AGENT_CONTROL_PITCH_NEG);
+        }
     }
-    else if (mag < 0)
-    {
-        setControlFlags(AGENT_CONTROL_PITCH_NEG);
-    }
+
+    gAgentCamera.resetView(true);
 }
 
 bool LLAgent::isCrouching() const
@@ -1019,7 +1027,7 @@ void LLAgent::toggleFlying()
     LLFirstUse::notMoving(false);
 
     gAgent.setFlying( fly );
-    gAgentCamera.resetView(gAgent.mMovementResetCamera);
+    gAgentCamera.resetView(true);
 }
 
 // static

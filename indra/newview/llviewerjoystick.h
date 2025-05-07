@@ -129,7 +129,7 @@ public:
     U32 getJoystickButton(U32 button) const;
     bool isJoystickInitialized() const {return (mDriverState==JDS_INITIALIZED);}
     bool isLikeSpaceNavigator() const;
-    void setNeedsReset(bool reset = true) { mResetFlag = reset; }
+    void setNeedsReset(bool reset = true);
     void setCameraNeedsUpdate(bool b)     { mCameraUpdated = b; }
     bool getCameraNeedsUpdate() const     { return mCameraUpdated; }
     bool getOverrideCamera() { return mOverrideCamera; }
