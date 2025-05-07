@@ -602,6 +602,11 @@ LLAgent::~LLAgent()
 //-----------------------------------------------------------------------------
 void LLAgent::onAppFocusGained()
 {
+
+    // Don't reset camera position on app focus gained
+    // This will prevent the 360 camera reset when alt-tabbing back
+    mMovementResetCamera = false;
+    
 //  if (CAMERA_MODE_MOUSELOOK == gAgentCamera.getCameraMode())
 //  {
 //      gAgentCamera.changeCameraToDefault();

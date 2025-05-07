@@ -304,7 +304,8 @@ public:
 
 
     // Is window of our application frontmost?
-    BOOL            getActive() const           { return mActive; }
+    bool getActive() const {return mActive;}
+    bool getPreviousActive() const { return mPreviousActive; }
 
     const std::string&  getInitAlert() { return mInitAlert; }
 
@@ -490,6 +491,7 @@ private:
 private:
     LLWindow*       mWindow;                        // graphical window object
     bool            mActive;
+    bool            mPreviousActive;
     bool            mUIVisible;
 
     LLNotificationChannelPtr mSystemChannel;
