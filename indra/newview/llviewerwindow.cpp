@@ -1904,10 +1904,12 @@ BOOL LLViewerWindow::handleActivate(LLWindow *window, BOOL activated)
 
 BOOL LLViewerWindow::handleActivateApp(LLWindow *window, BOOL activating)
 {
-    //if (!activating) gAgentCamera.changeCameraToDefault();
-
-    LLViewerJoystick::getInstance()->setNeedsReset(true);
-    return FALSE;
+    if (gViewerWindow && activating)
+    {
+        // When returning to app, restore things that may have been
+        // hidden while minimized
+    }
+    return LLWindowCallbacks::handleActivateApp(window, activating);
 }
 
 
