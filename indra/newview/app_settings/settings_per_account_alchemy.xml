@@ -319,5 +319,38 @@
             <key>Value</key>
             <string>This resident has turned on &apos;Autorespond mode&apos; like a boss.</string>
         </map>
+        <key>AlchemyIgnoreAdHocSessions</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatically ignore and leave all conference (ad-hoc) chats.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyReportIgnoredAdHocSession</key>
+        <map>
+            <key>Comment</key>
+            <string>Reports to nearby chat if a conference (ad-hoc) has been ignored.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyDontIgnoreAdHocFromFriends</key>
+        <map>
+            <key>Comment</key>
+            <string>Allow my friends to start conference chats with me.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
     </map>
 </llsd>

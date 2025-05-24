@@ -70,4 +70,31 @@
           name="ALDontRejectTeleportOffersFromFriends"
           width="500"
           control_name="ALDontRejectTeleportOffersFromFriends" />
+          <check_box
+             layout="topleft"
+             follows="left|top"
+             top_pad="5"
+             height="18"
+             name="AlchemyIgnoreAdHocSessions"
+             control_name="AlchemyIgnoreAdHocSessions"
+             label="Automatically ignore and leave all conference (ad-hoc) chats"/>
+            <check_box
+             layout="topleft"
+             follows="left|top"
+             left_delta="10"
+             enabled_control="AlchemyIgnoreAdHocSessions"
+             top_pad="5"
+             height="18"
+             name="AlchemyReportIgnoredAdHocSession"
+             control_name="AlchemyReportIgnoredAdHocSession"
+             label="Report ignored conference chats in nearby chat"/>
+            <check_box
+             layout="topleft"
+             follows="left|top"
+             enabled_control="AlchemyIgnoreAdHocSessions"
+             top_pad="5"
+             height="18"
+             name="AlchemyDontIgnoreAdHocFromFriends"
+             control_name="AlchemyDontIgnoreAdHocFromFriends"
+             label="Don't ignore conference chats invitations from my friends"/>
     </panel>

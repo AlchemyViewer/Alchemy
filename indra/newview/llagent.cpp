@@ -447,6 +447,9 @@ LLAgent::LLAgent() :
     mIsAutoRespond(false),
     mIsAutoRespondNonFriends(false),
     
+    mIsRejectingConferences(false),
+    mIsAllowingConferenceFromFriends(false),
+
     mIsDoNotDisturb(false),
     mIsRejectTeleportOffers(false),
     mIgnorePrejump(FALSE),
@@ -539,6 +542,9 @@ void LLAgent::init()
     setRejectTeleportOffers(gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersMode"));
     setAutoRespond(gSavedPerAccountSettings.getBOOL("AutoRespondModeSet"));
     setAutoRespondNonFriends(gSavedPerAccountSettings.getBOOL("AutoRespondNonFriendsModeSet"));
+
+    setRejectingConferences(gSavedPerAccountSettings.getBOOL("AlchemyIgnoreAdHocSessions"));
+    setAllowConferenceFromFriends(gSavedPerAccountSettings.getBOOL("AlchemyDontIgnoreAdHocFromFriends"));
 
 
     if (!mTeleportFinishedSlot.connected())
@@ -1839,6 +1845,42 @@ void LLAgent::setAutoRespondNonFriends(bool pIsAutoRespondNonFriends)
 bool LLAgent::getAutoRespondNonFriends() const
 {
     return mIsAutoRespondNonFriends;
+}
+
+//-----------------------------------------------------------------------------
+// setRejectingConferences()
+//-----------------------------------------------------------------------------
+void LLAgent::setRejectingConferences(bool pIsRejectingConferences)
+{
+    LL_INFOS() << "Setting reject adhoc mode to " << pIsRejectingConferences << LL_ENDL;
+    mIsRejectingConferences = pIsRejectingConferences;
+    gSavedPerAccountSettings.setBOOL("AlchemyIgnoreAdHocSessions", pIsRejectingConferences);
+}
+
+//-----------------------------------------------------------------------------
+// isRejectingConferences()
+//-----------------------------------------------------------------------------
+bool LLAgent::isRejectingConferences()
+{
+    return mIsRejectingConferences;
+}
+
+//-----------------------------------------------------------------------------
+// setAllowConferenceFromFriends()
+//-----------------------------------------------------------------------------
+void LLAgent::setAllowConferenceFromFriends(bool pIsRejectingConferencesFriends)
+{
+    LL_INFOS() << "Setting reject adhoc mode to " << pIsRejectingConferencesFriends << LL_ENDL;
+    mIsAllowingConferenceFromFriends = pIsRejectingConferencesFriends;
+    gSavedPerAccountSettings.setBOOL("AlchemyDontIgnoreAdHocFromFriends", pIsRejectingConferencesFriends);
+}
+
+//-----------------------------------------------------------------------------
+// isRejectingConferences()
+//-----------------------------------------------------------------------------
+bool LLAgent::isAllowingConferencesFromFriends()
+{
+    return mIsAllowingConferenceFromFriends;
 }
 
 //-----------------------------------------------------------------------------

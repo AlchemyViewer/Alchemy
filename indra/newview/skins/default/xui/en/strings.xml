@@ -4576,4 +4576,5 @@ and report the problem.
     </string>
 	<string name="AutoResponseModeDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
 	<string name="AutoResponseModeNonFriendsDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;autorespond mode&apos; which means they have requested not to be disturbed.  Your message will still be shown in their IM panel for later viewing.</string>
+    <string name="IgnoredAdHocSession">You've been invited to a conference (ad-hoc) chat by [AVATAR_NAME], but the viewer automatically ignored it because of your settings.</string>
 </strings>

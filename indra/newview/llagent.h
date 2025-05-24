@@ -513,6 +513,18 @@ public:
 private:
     BOOL            mIsAutoRespondNonFriends;
 
+public:
+    void            setRejectingConferences(bool pIsRejectingConferences);
+    bool            isRejectingConferences();
+private:
+    bool            mIsRejectingConferences;
+
+public:
+    void            setAllowConferenceFromFriends(bool pIsRejectingConferencesFriends);
+    bool            isAllowingConferencesFromFriends();
+private:
+    bool            mIsAllowingConferenceFromFriends;
+
     //--------------------------------------------------------------------
     // Grab
     //--------------------------------------------------------------------
