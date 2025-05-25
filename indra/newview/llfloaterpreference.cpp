@@ -3879,3 +3879,9 @@ void LLFloaterPreference::restoreIgnoredNotifications()
         LLUI::getInstance()->mSettingGroups["ignores"]->setBOOL(it->first, it->second);
     }
 }
+
+void LLFloaterPreference::onAdHocSelectionChange(const LLSD& newvalue)
+{
+    S32 value = gSavedPerAccountSettings.getS32("AlchemyIgnoreAdHocSessions");
+    getChild<LLCheckBoxCtrl>("AlchemyReportIgnoredAdHocSession")->setEnabled(value != 0);
+}

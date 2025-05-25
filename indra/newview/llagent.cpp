@@ -446,7 +446,7 @@ LLAgent::LLAgent() :
 
     mIsAutoRespond(false),
     mIsAutoRespondNonFriends(false),
-    
+
     mIsDoNotDisturb(false),
     mIsRejectTeleportOffers(false),
     mIgnorePrejump(FALSE),
@@ -539,7 +539,6 @@ void LLAgent::init()
     setRejectTeleportOffers(gSavedPerAccountSettings.getBOOL("ALRejectTeleportOffersMode"));
     setAutoRespond(gSavedPerAccountSettings.getBOOL("AutoRespondModeSet"));
     setAutoRespondNonFriends(gSavedPerAccountSettings.getBOOL("AutoRespondNonFriendsModeSet"));
-
 
     if (!mTeleportFinishedSlot.connected())
     {
