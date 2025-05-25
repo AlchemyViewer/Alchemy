@@ -110,5 +110,5 @@
             height="18"
             name="AlchemyReportIgnoredAdHocSession"
             control_name="AlchemyReportIgnoredAdHocSession"
-            label="Report ignored conference chats in nearby chat"/>
+            label="Report ignored conference chats"/>
     </panel>

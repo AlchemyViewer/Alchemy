@@ -3302,7 +3302,7 @@ void LLIMMgr::addMessage(
                     }
                     else if (report_ignored_conferences)
                     {
-                        addSystemMessage(LLUUID::null, "IgnoredAdHocSession",args);
+                        LLNotificationsUtil::add("IgnoredAdHocSession", args);
                     }
 
                     return;
