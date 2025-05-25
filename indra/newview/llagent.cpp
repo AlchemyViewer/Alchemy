@@ -540,10 +540,6 @@ void LLAgent::init()
     setAutoRespond(gSavedPerAccountSettings.getBOOL("AutoRespondModeSet"));
     setAutoRespondNonFriends(gSavedPerAccountSettings.getBOOL("AutoRespondNonFriendsModeSet"));
 
-    setRejectingConferences(gSavedPerAccountSettings.getBOOL("AlchemyIgnoreAdHocSessions"));
-    setAllowConferenceFromFriends(gSavedPerAccountSettings.getBOOL("AlchemyDontIgnoreAdHocFromFriends"));
-
-
     if (!mTeleportFinishedSlot.connected())
     {
         mTeleportFinishedSlot = LLViewerParcelMgr::getInstance()->setTeleportFinishedCallback(boost::bind(&LLAgent::handleTeleportFinished, this));
