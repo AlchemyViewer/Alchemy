@@ -1069,13 +1069,6 @@ void LLFloaterPreference::apply()
     gAgent.setAutoRespond(autoresponse_enabled);
     gAgent.setAutoRespondNonFriends(autoresponse_notfriends_enabled);
 
-    // Block AdHoc conferences.
-    bool is_rejecting_conferences = getChild<LLCheckBoxCtrl>("AlchemyIgnoreAdHocSessions")->get();
-    bool is_allowing_friend_conferences = getChild<LLCheckBoxCtrl>("AlchemyDontIgnoreAdHocFromFriends")->get();
-
-    gAgent.setRejectingConferences(is_rejecting_conferences);
-    gAgent.setAllowConferenceFromFriends(is_allowing_friend_conferences);
-
     saveAvatarProperties();
 }
 
@@ -3885,4 +3878,10 @@ void LLFloaterPreference::restoreIgnoredNotifications()
     {
         LLUI::getInstance()->mSettingGroups["ignores"]->setBOOL(it->first, it->second);
     }
+}
+
+void LLFloaterPreference::onAdHocSelectionChange(const LLSD& newvalue)
+{
+    S32 value = gSavedPerAccountSettings.getS32("AlchemyIgnoreAdHocSessions");
+    getChild<LLCheckBoxCtrl>("AlchemyReportIgnoredAdHocSession")->setEnabled(value != 0);
 }

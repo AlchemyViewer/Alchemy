@@ -326,7 +326,7 @@
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Boolean</string>
+            <string>S32</string>
             <key>Value</key>
             <integer>0</integer>
         </map>
@@ -334,17 +334,6 @@
         <map>
             <key>Comment</key>
             <string>Reports to nearby chat if a conference (ad-hoc) has been ignored.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>AlchemyDontIgnoreAdHocFromFriends</key>
-        <map>
-            <key>Comment</key>
-            <string>Allow my friends to start conference chats with me.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

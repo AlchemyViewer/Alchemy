@@ -70,31 +70,45 @@
           name="ALDontRejectTeleportOffersFromFriends"
           width="500"
           control_name="ALDontRejectTeleportOffersFromFriends" />
+                     <text
+        top_pad="15"
+        follows="left|top"
+        height="18"
+        type="string"
+        length="1"
+        layout="topleft"
+        left="15"
+        name="adhoc_ignore_label"
+        mouse_opaque="false"
+        width="500">
+        Reject Ad-Hoc (conferences):
+        </text>
+        <combo_box
+          control_name="AlchemyIgnoreAdHocSessions"
+          follows="left|top"
+          layout="topleft"
+          height="23"
+          name="adhoc_preference_combo"
+          width="115">
+          <item
+            label="Off"
+            name="adhoc_preference_allow_none"
+            value="0"/>
+          <item
+            label="Friends Only"
+            name="adhoc_preference_allow_friends"
+            value="1"/>
+          <item
+            label="All"
+            name="adhoc_preference_allow_all"
+            value="2"/>
+          </combo_box>
           <check_box
-             layout="topleft"
-             follows="left|top"
-             top_pad="5"
-             height="18"
-             name="AlchemyIgnoreAdHocSessions"
-             control_name="AlchemyIgnoreAdHocSessions"
-             label="Automatically ignore and leave all conference (ad-hoc) chats"/>
-            <check_box
-             layout="topleft"
-             follows="left|top"
-             left_delta="10"
-             enabled_control="AlchemyIgnoreAdHocSessions"
-             top_pad="5"
-             height="18"
-             name="AlchemyReportIgnoredAdHocSession"
-             control_name="AlchemyReportIgnoredAdHocSession"
-             label="Report ignored conference chats in nearby chat"/>
-            <check_box
-             layout="topleft"
-             follows="left|top"
-             enabled_control="AlchemyIgnoreAdHocSessions"
-             top_pad="5"
-             height="18"
-             name="AlchemyDontIgnoreAdHocFromFriends"
-             control_name="AlchemyDontIgnoreAdHocFromFriends"
-             label="Don't ignore conference chats invitations from my friends"/>
+            layout="topleft"
+            follows="left|top"
+            left_delta="125"
+            height="18"
+            name="AlchemyReportIgnoredAdHocSession"
+            control_name="AlchemyReportIgnoredAdHocSession"
+            label="Report ignored conference chats in nearby chat"/>
     </panel>

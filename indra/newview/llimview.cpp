@@ -3283,8 +3283,8 @@ void LLIMMgr::addMessage(
                 }
             }
 
-            bool is_rejecting_conferences = gAgent.isRejectingConferences();
-            bool is_allowing_friend_conferences = gAgent.isAllowingConferencesFromFriends();
+            S32 is_rejecting_conferences = gSavedPerAccountSettings.getS32("AlchemyIgnoreAdHocSessions");
+            bool is_allowing_friend_conferences = (is_rejecting_conferences == 1);
             bool is_friend = LLAvatarTracker::instance().isBuddy(other_participant_id);
             is_group_chat = session->isGroupSessionType();
 

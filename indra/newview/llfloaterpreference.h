@@ -128,6 +128,9 @@ protected:
     void onAutoRespondResponseChanged();
     void onAutoRespondNonFriendsResponseChanged();
 
+    // This is used to control the enabling / disabling of the checkbox as the `enable_control="AlchemyIgnoreAdHocSessions"` is not boolean
+    void onAdHocSelectionChange(const LLSD& newValue);
+
     // if the custom settings box is clicked
     void onChangeCustom();
     void updateMeterText(LLUICtrl* ctrl);
