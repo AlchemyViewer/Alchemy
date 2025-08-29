@@ -28,6 +28,7 @@
 
 #include "llchannelmanager.h"
 
+#include "allegacynotificationwellwindow.h"
 #include "llappviewer.h"
 #include "lldonotdisturbnotificationstorage.h"
 #include "llpersistentnotificationstorage.h"
@@ -145,8 +146,16 @@ void LLChannelManager::onLoginCompleted()
             // init channel's position and size
             S32 channel_right_bound = gViewerWindow->getWorldViewRectScaled().mRight - gSavedSettings.getS32("NotificationChannelRightMargin");
             mStartUpChannel->init(channel_right_bound - NOTIFY_BOX_WIDTH, channel_right_bound);
-            mStartUpChannel->setMouseDownCallback(boost::bind(&LLFloaterNotificationsTabbed::onStartUpToastClick, LLFloaterNotificationsTabbed::getInstance(), _2, _3, _4));
-
+            if (gSkinSettings.getBOOL("LegacyNotificationWell"))
+            {
+                mStartUpChannel->setMouseDownCallback(boost::bind(&ALLegacyNotificationWellWindow::onStartUpToastClick,
+                    ALLegacyNotificationWellWindow::getInstance(), _2, _3, _4));
+            }
+            else
+            {
+                mStartUpChannel->setMouseDownCallback(boost::bind(&LLFloaterNotificationsTabbed::onStartUpToastClick,
+                    LLFloaterNotificationsTabbed::getInstance(), _2, _3, _4));
+            }
             mStartUpChannel->setCommitCallback(boost::bind(&LLChannelManager::onStartUpToastClose, this));
             mStartUpChannel->createStartUpToast(away_notifications, (F32)gSavedSettings.getS32("StartUpToastLifeTime"));
         }

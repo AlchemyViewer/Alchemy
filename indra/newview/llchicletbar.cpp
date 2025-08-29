@@ -32,6 +32,7 @@
 #include "llpaneltopinfobar.h"
 #include "llsyswellwindow.h"
 #include "llfloaternotificationstabbed.h"
+#include "allegacynotificationwellwindow.h"
 
 namespace
 {
@@ -50,8 +51,14 @@ bool LLChicletBar::postBuild()
     mToolbarStack = getChild<LLLayoutStack>("toolbar_stack");
     mChicletPanel = getChild<LLChicletPanel>("chiclet_list");
 
-    showWellButton("notification_well", !LLFloaterNotificationsTabbed::getInstance()->isWindowEmpty());
-
+    if (gSkinSettings.getBOOL("LegacyNotificationWell"))
+    {
+        showWellButton("notification_well", !ALLegacyNotificationWellWindow::getInstance()->isWindowEmpty());
+    }
+    else
+    {
+        showWellButton("notification_well", !LLFloaterNotificationsTabbed::getInstance()->isWindowEmpty());
+    }
     LLPanelTopInfoBar::instance().setResizeCallback(boost::bind(&LLChicletBar::fitWithTopInfoBar, this));
     LLPanelTopInfoBar::instance().setVisibleCallback(boost::bind(&LLChicletBar::fitWithTopInfoBar, this));
 

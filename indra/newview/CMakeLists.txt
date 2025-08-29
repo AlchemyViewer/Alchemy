@@ -86,6 +86,7 @@ set(viewer_SOURCE_FILES
     alfloaterprogressview.cpp
     alfloaterregiontracker.cpp
     alfloatertransactionlog.cpp
+    allegacynotificationwellwindow.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
     alpanelradaralert.cpp
@@ -797,6 +798,7 @@ set(viewer_HEADER_FILES
     alfloaterprogressview.h
     alfloaterregiontracker.h
     alfloatertransactionlog.h
+    allegacynotificationwellwindow.h
     alpanelaomini.h
     alpanelaopulldown.h
     alpanelradaralert.h

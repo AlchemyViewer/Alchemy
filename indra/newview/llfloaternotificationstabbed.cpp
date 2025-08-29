@@ -52,7 +52,6 @@ LLFloaterNotificationsTabbed::LLFloaterNotificationsTabbed(const LLSD& key) : LL
 
 {
     setOverlapsScreenChannel(true);
-    mNotificationUpdates.reset(new NotificationTabbedChannel(this));
     mNotificationsSeparator = std::make_unique<LLNotificationSeparator>();
 }
 
@@ -76,6 +75,7 @@ bool LLFloaterNotificationsTabbed::postBuild()
     mCollapseAllBtn->setClickedCallback(boost::bind(&LLFloaterNotificationsTabbed::onClickCollapseAllBtn,this));
 
     // get a corresponding channel
+    mNotificationUpdates.reset(new NotificationTabbedChannel(this));
     initChannel();
     bool rv = LLTransientDockableFloater::postBuild();
 
@@ -231,7 +231,7 @@ bool LLFloaterNotificationsTabbed::isWindowEmpty()
 
 //---------------------------------------------------------------------------------
 LLFloaterNotificationsTabbed::NotificationTabbedChannel::NotificationTabbedChannel(LLFloaterNotificationsTabbed* notifications_tabbed_window)
-    : LLNotificationChannel(LLNotificationChannel::Params().name(notifications_tabbed_window->getPathname())),
+    : LLNotificationChannel(LLNotificationChannel::Params().name(notifications_tabbed_window->getName())),
     mNotificationsTabbedWindow(notifications_tabbed_window)
 {
     connectToChannel("Notifications");
