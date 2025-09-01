@@ -317,6 +317,7 @@ public:
 
     static void trimHead(string_type& string);
     static void trimTail(string_type& string);
+    static void trimTail(string_type& string, const string_type& tokens);
     static void trim(string_type& string)   { trimHead(string); trimTail(string); }
 
     static void trimHead(string_view_type& string);
@@ -1475,13 +1476,29 @@ void LLStringUtilBase<T>::trimHead(string_type& string)
 template<class T>
 void LLStringUtilBase<T>::trimTail(string_type& string)
 {
-    if( string.size() )
+    if(!string.empty())
     {
         size_type len = string.length();
         size_type i = len;
         while( i > 0 && LLStringOps::isSpace( string[i-1] ) )
         {
-            i--;
+            --i;
+        }
+
+        string.erase( i, len - i );
+    }
+}
+
+template<class T>
+void LLStringUtilBase<T>::trimTail(string_type& string, const string_type& tokens)
+{
+    if(!string.empty())
+    {
+        size_type len = string.length();
+        size_type i = len;
+        while( i > 0 && (tokens.find_first_of(string[i-1]) != string_type::npos) )
+        {
+            --i;
         }
 
         string.erase( i, len - i );

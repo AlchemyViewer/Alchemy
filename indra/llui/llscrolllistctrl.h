@@ -181,6 +181,7 @@ public:
     virtual LLScrollListColumn* getColumn(S32 index);
     virtual LLScrollListColumn* getColumn(const std::string& name);
     virtual S32 getNumColumns() const { return static_cast<S32>(mColumnsIndexed.size()); }
+    virtual S32 getPageLines() const { return mPageLines; }
 
     // Adds a single element, from an array of:
     // "columns" => [ "column" => column name, "value" => value, "type" => type, "font" => font, "font-style" => style ], "id" => uuid
@@ -335,6 +336,7 @@ public:
 
     virtual S32     getScrollPos() const;
     virtual void    setScrollPos( S32 pos );
+    S32 getPageLines() { return mPageLines; }
     S32             getSearchColumn();
     void            setSearchColumn(S32 column) { mSearchColumn = column; }
     S32             getColumnIndexFromOffset(S32 x);
@@ -438,6 +440,7 @@ public:
     // manually call this whenever editing list items in place to flag need for resorting
     void            setNeedsSort(bool val = true) { mSorted = !val; }
     void            dirtyColumns(); // some operation has potentially affected column layout or ordering
+    S32             getLinesPerPage();
 
     bool highlightMatchingItems(const std::string& filter_str);
 
@@ -484,7 +487,6 @@ private:
     void            deselectItem(LLScrollListItem* itemp);
     void            commitIfChanged();
     bool            setSort(S32 column, bool ascending);
-    S32             getLinesPerPage();
 
     static void     showProfile(std::string id, bool is_group);
     static void     sendIM(std::string id);

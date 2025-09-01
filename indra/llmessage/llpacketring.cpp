@@ -42,6 +42,7 @@
 #include "llrand.h"
 #include "message.h"
 #include "u64.h"
+#include "llmessagelog.h"
 
 constexpr S16 MAX_BUFFER_RING_SIZE = 1024;
 constexpr S16 DEFAULT_BUFFER_RING_SIZE = 256;
@@ -103,6 +104,9 @@ bool send_packet_helper(int socket, const char * datap, S32 data_size, LLHost ho
 
 bool LLPacketRing::sendPacket(int socket, const char * datap, S32 data_size, LLHost host)
 {
+#define LOCALHOST_ADDR 16777343
+    LLMessageLog::log(LLHost(LOCALHOST_ADDR, gMessageSystem->getListenPort()), host, (U8*)datap, data_size);
+#undef LOCALHOST_ADDR
     mActualBytesOut += data_size;
     return send_packet_helper(socket, datap, data_size, host);
 }

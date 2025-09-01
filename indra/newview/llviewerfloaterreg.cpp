@@ -120,6 +120,9 @@
 #include "llfloatermarketplacelistings.h"
 #include "llfloatermediasettings.h"
 #include "llfloatermemleak.h"
+#include "llfloatermessagelog.h"
+#include "llfloatermessagebuilder.h"
+#include "llfloatermessagerewriter.h"
 #include "llfloatermodelpreview.h"
 #include "llfloatermyscripts.h"
 #include "llfloatermyenvironment.h"
@@ -568,6 +571,9 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
     LLFloaterReg::add("group_profile", "floater_al_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGroupProfile>);
     LLFloaterReg::add("lightbox", "floater_lightbox_settings.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<ALFloaterLightBox>);
+    LLFloaterReg::add("message_builder", "floater_message_builder.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageBuilder>);
+    LLFloaterReg::add("message_log", "floater_message_log.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageLog>);
+    LLFloaterReg::add("message_rewriter", "floater_message_rewriter.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMessageRewriter>);
     LLFloaterReg::add("music_ticker", "floater_music_ticker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
     LLFloaterReg::add("particle_editor", "floater_al_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
     LLFloaterReg::add("progress_view", "floater_al_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProgressView>);

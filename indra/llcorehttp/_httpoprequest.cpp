@@ -125,6 +125,7 @@ static const char * const LOG_CORE("CoreHttp");
 namespace LLCore
 {
 
+std::function<void(LLCore::HttpResponse* response)> HttpOpRequest::sMessageLogFunc = nullptr;
 
 HttpOpRequest::HttpOpRequest()
     : HttpOperation(),
@@ -153,7 +154,8 @@ HttpOpRequest::HttpOpRequest()
       mPolicyRetryLimit(HTTP_RETRY_COUNT_DEFAULT),
       mPolicyMinRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MIN_DEFAULT)),
       mPolicyMaxRetryBackoff(HttpTime(HTTP_RETRY_BACKOFF_MAX_DEFAULT)),
-      mCallbackSSLVerify(nullptr)
+      mCallbackSSLVerify(nullptr),
+      mRequestId(0)
 {
     // *NOTE:  As members are added, retry initialization/cleanup
     // may need to be extended in @see prepareRequest().
@@ -263,6 +265,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
         response->setRequestURL(mReqURL);
 
         response->setRequestMethod(methodToString(mReqMethod));
+        response->setRequestId(mRequestId);
 
         if (mReplyOffset || mReplyLength)
         {
@@ -281,7 +284,7 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
         response->setTransferStats(stats);
 
         mUserHandler->onCompleted(this->getHandle(), response);
-
+        if (sMessageLogFunc != nullptr) sMessageLogFunc(response);
         response->release();
     }
 }
@@ -419,6 +422,7 @@ HttpStatus HttpOpRequest::setupMove(HttpRequest::policy_t policy_id,
     return HttpStatus();
 }
 
+static U64 sRequestId = 0;
 
 void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
                                 const std::string & url,
@@ -427,6 +431,7 @@ void HttpOpRequest::setupCommon(HttpRequest::policy_t policy_id,
                                 const HttpHeaders::ptr_t & headers)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    mRequestId = sRequestId++;
     mProcFlags = 0U;
     mReqPolicy = policy_id;
     mReqURL = url;

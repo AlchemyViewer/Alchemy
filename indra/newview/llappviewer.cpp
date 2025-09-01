@@ -302,6 +302,9 @@ using namespace LL;
 // define a self-registering event API object
 #include "llappviewerlistener.h"
 
+#undef XMLCALL //HACK: need to find the expat.h include
+#include <libxml/parser.h> // needed for init and cleanup
+
 #ifdef LL_DISCORD
 #define DISCORDPP_IMPLEMENTATION
 #include <discordpp.h>
@@ -809,6 +812,9 @@ bool LLAppViewer::init()
 
     // Initialize ui color table singleton
     LLUIColorTable::createInstance();
+
+    // Initalize libxml2
+    xmlInitParser();
 
     // inits from settings.xml and from strings.xml
     if (!initConfiguration())

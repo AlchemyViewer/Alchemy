@@ -85,7 +85,7 @@ public:
     ///                 an explicit release() call.
     ///
     /// Threading:  callable by any thread.
-    HttpStatus addOp(const opPtr_t &op);
+    HttpStatus addOp(const opPtr_t &op, bool loggable = true);
 
     /// Return the operation on the front of the queue.  If
     /// the queue is empty and @wait is false, call returns
@@ -126,8 +126,11 @@ public:
     /// Threading:  callable by any thread.
     bool stopQueue();
 
+    static void setMessageLogFunc(std::function<void(const HttpRequestQueue::opPtr_t &)> func) { sMessageLogFunc = func;}
+
 protected:
     static HttpRequestQueue *           sInstance;
+    static std::function<void(const HttpRequestQueue::opPtr_t &)> sMessageLogFunc;
 
 protected:
     OpContainer                         mQueue;

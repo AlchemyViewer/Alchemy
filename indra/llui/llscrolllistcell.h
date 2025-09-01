@@ -223,11 +223,16 @@ public:
     /*virtual*/ void    setValue(const LLSD& value);
     void                setIconSize(S32 size);
 
+    void setClickCallback(bool (*callback)(void*), void* user_data);
+    bool handleClick() override;
+
 private:
     LLPointer<LLUIImage>    mIcon;
     LLColor4                mColor;
     LLFontGL::HAlign        mAlignment;
     S32                     mIconSize;
+    bool (*mCallback)(void*);
+    void* mUserData;
 };
 
 
@@ -305,6 +310,28 @@ public:
 private:
     LLPointer<LLUIImage>    mIcon;
     S32                     mPad;
+};
+
+class LLScrollListLineEditor : public LLScrollListCell
+{
+public:
+    LLScrollListLineEditor( const LLScrollListCell::Params&);
+    /*virtual*/ ~LLScrollListLineEditor();
+    void    draw(const LLColor4& color, const LLColor4& highlight_color) override;
+    S32     getHeight() const override { return 0; }
+    const LLSD  getValue() const override { return mLineEditor->getValue(); }
+    void    setValue(const LLSD& value) override { mLineEditor->setValue(value); }
+    void    onCommit() override { mLineEditor->onCommit(); }
+    bool    handleClick() override;
+    virtual bool    handleUnicodeChar(llwchar uni_char, bool called_from_parent);
+    virtual bool    handleUnicodeCharHere(llwchar uni_char );
+    void    setEnabled(bool enable) override { mLineEditor->setEnabled(enable); }
+
+    LLLineEditor*   getLineEditor()             { return mLineEditor; }
+    bool    isText() const override { return FALSE; }
+
+private:
+    LLLineEditor* mLineEditor;
 };
 
 #endif

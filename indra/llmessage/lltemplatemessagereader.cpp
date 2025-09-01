@@ -33,7 +33,6 @@
 #include "llmath.h"
 #include "llquaternion.h"
 #include "message.h"
-#include "u64.h"
 #include "v3dmath.h"
 #include "v3math.h"
 #include "v4math.h"
@@ -41,8 +40,8 @@
 LLTemplateMessageReader::LLTemplateMessageReader(message_template_number_map_t&
                                                  number_template_map) :
     mReceiveSize(0),
-    mCurrentRMessageTemplate(NULL),
-    mCurrentRMessageData(NULL),
+    mCurrentRMessageTemplate(nullptr),
+    mCurrentRMessageData(nullptr),
     mMessageNumbers(number_template_map)
 {
 }
@@ -51,16 +50,16 @@ LLTemplateMessageReader::LLTemplateMessageReader(message_template_number_map_t&
 LLTemplateMessageReader::~LLTemplateMessageReader()
 {
     delete mCurrentRMessageData;
-    mCurrentRMessageData = NULL;
+    mCurrentRMessageData = nullptr;
 }
 
 //virtual
 void LLTemplateMessageReader::clearMessage()
 {
     mReceiveSize = -1;
-    mCurrentRMessageTemplate = NULL;
+    mCurrentRMessageTemplate = nullptr;
     delete mCurrentRMessageData;
-    mCurrentRMessageData = NULL;
+    mCurrentRMessageData = nullptr;
 }
 
 void LLTemplateMessageReader::getData(const char *blockname, const char *varname, void *datap, S32 size, S32 blocknum, S32 max_size)
@@ -448,7 +447,7 @@ S32 LLTemplateMessageReader::getMessageSize() const
 // Returns template for the message contained in buffer
 bool LLTemplateMessageReader::decodeTemplate(
         const U8* buffer, S32 buffer_size,  // inputs
-        LLMessageTemplate** msg_template ) // outputs
+        LLMessageTemplate** msg_template, bool custom ) // outputs
 {
     const U8* header = buffer + LL_PACKET_ID_SIZE;
 
@@ -490,6 +489,7 @@ bool LLTemplateMessageReader::decodeTemplate(
     }
     else // bogus packet received (too short)
     {
+        if (!custom)
         LL_WARNS() << "Packet with unusable length received (too short): "
                 << buffer_size << LL_ENDL;
         return(false);
@@ -502,10 +502,11 @@ bool LLTemplateMessageReader::decodeTemplate(
     }
     else
     {
-        // MAINT-7482 - make viewer more tolerant of unknown messages.
+        if (!custom)
+        {
         LL_WARNS_ONCE() << "Message #" << std::hex << num << std::dec
                         << " received but not registered!" << LL_ENDL;
-        //gMessageSystem->callExceptionFunc(MX_UNREGISTERED_MESSAGE);
+        }
         return(false);
     }
 
@@ -534,7 +535,7 @@ void LLTemplateMessageReader::logRanOffEndOfPacket( const LLHost& host, const S3
 static LLTrace::BlockTimerStatHandle FTM_PROCESS_MESSAGES("Process Messages");
 
 // decode a given message
-bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender )
+bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender, bool custom )
 {
     LL_RECORD_BLOCK_TIME(FTM_PROCESS_MESSAGES);
 
@@ -594,6 +595,7 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
         }
         else
         {
+            if (!custom)
             LL_ERRS() << "Unknown block type" << LL_ENDL;
             return false;
         }
@@ -640,6 +642,7 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
 
                     if ((decode_pos + data_size) > mReceiveSize)
                     {
+                        if (!custom)
                         logRanOffEndOfPacket(sender, decode_pos, data_size);
 
                         // default to 0 length variable blocks
@@ -676,6 +679,7 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
                     // so, copy data pointer and set data size to fixed size
                     if ((decode_pos + mvci.getSize()) > mReceiveSize)
                     {
+                        if (!custom)
                         logRanOffEndOfPacket(sender, decode_pos, mvci.getSize());
 
                         // default to 0s.
@@ -704,6 +708,7 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
         return false;
     }
 
+    if (!custom)
     {
         static LLTimer decode_timer;
 
@@ -756,11 +761,12 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender 
 bool LLTemplateMessageReader::validateMessage(const U8* buffer,
                                               S32 buffer_size,
                                               const LLHost& sender,
-                                              bool trusted)
+                                              bool trusted,
+                                              bool custom)
 {
     mReceiveSize = buffer_size;
-    bool valid = decodeTemplate(buffer, buffer_size, &mCurrentRMessageTemplate );
-    if(valid)
+    bool valid = decodeTemplate(buffer, buffer_size, &mCurrentRMessageTemplate, custom );
+    if(valid && !custom)
     {
         mCurrentRMessageTemplate->mReceiveCount++;
         //LL_DEBUGS() << "MessageRecvd:"
@@ -825,9 +831,15 @@ bool LLTemplateMessageReader::isUdpBanned() const
 //virtual
 void LLTemplateMessageReader::copyToBuilder(LLMessageBuilder& builder) const
 {
-    if(NULL == mCurrentRMessageTemplate)
+    if(nullptr == mCurrentRMessageTemplate)
     {
         return;
     }
     builder.copyFromMessageData(*mCurrentRMessageData);
 }
+
+LLMessageTemplate* LLTemplateMessageReader::getTemplate()
+{
+    return mCurrentRMessageTemplate;
+}
+

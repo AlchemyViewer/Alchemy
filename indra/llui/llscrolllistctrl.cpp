@@ -3620,3 +3620,15 @@ bool LLScrollListCtrl::isFiltered(const LLScrollListItem* item) const
     return false;
 }
 
+void LLScrollListIcon::setClickCallback(bool (*callback)(void*), void* user_data)
+{
+    mCallback = callback;
+    mUserData = user_data;
+}
+
+bool LLScrollListIcon::handleClick()
+{
+    if(mCallback) return mCallback(mUserData);
+    return FALSE;
+}
+

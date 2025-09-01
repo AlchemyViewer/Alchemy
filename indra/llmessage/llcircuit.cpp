@@ -1417,3 +1417,12 @@ F32 LLCircuitData::getAgeInSeconds() const
 {
     return mExistenceTimer.getElapsedTimeF32();
 }
+
+std::vector<LLCircuitData*> LLCircuit::getCircuitDataList() const
+{
+    std::vector<LLCircuitData*> list;
+    for (const auto& [host, circuit_data] : mCircuitData)
+        list.push_back(circuit_data);
+    return list;
+}
+

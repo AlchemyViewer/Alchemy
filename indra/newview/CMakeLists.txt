@@ -195,6 +195,9 @@ set(viewer_SOURCE_FILES
     lldrawpoolwlsky.cpp
     lldrawpoolwaterexclusion.cpp
     lldynamictexture.cpp
+    lleasymessagelogentry.cpp
+    lleasymessagereader.cpp
+    lleasymessagesender.cpp
     llemote.cpp
     llenvironment.cpp
     llestateinfomodel.cpp
@@ -289,6 +292,9 @@ set(viewer_SOURCE_FILES
     llfloatermap.cpp
     llfloatermediasettings.cpp
     llfloatermemleak.cpp
+    llfloatermessagebuilder.cpp
+    llfloatermessagelog.cpp
+    llfloatermessagerewriter.cpp
     llfloatermodelpreview.cpp
     llfloatermodeluploadbase.cpp
     llfloatermyscripts.cpp
@@ -917,6 +923,9 @@ set(viewer_HEADER_FILES
     lldrawpoolwlsky.h
     lldrawpoolwaterexclusion.h
     lldynamictexture.h
+    lleasymessagelogentry.h
+    lleasymessagereader.h
+    lleasymessagesender.h
     llemote.h
     llenvironment.h
     llestateinfomodel.h
@@ -1015,6 +1024,9 @@ set(viewer_HEADER_FILES
     llfloatermarketplacelistings.h
     llfloatermediasettings.h
     llfloatermemleak.h
+    llfloatermessagebuilder.h
+    llfloatermessagelog.h
+    llfloatermessagerewriter.h
     llfloatermodelpreview.h
     llfloatermodeluploadbase.h
     llfloatermyscripts.h
@@ -1881,6 +1893,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         ll::tinygltf
         ll::tinyexr
         ll::minizip
+        ll::libxml2
         )
 
 if (TARGET ll::velopack)

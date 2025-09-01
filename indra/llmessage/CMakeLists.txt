@@ -30,6 +30,7 @@ target_sources(llmessage
     llioutil.cpp
     llmessagebuilder.cpp
     llmessageconfig.cpp
+    llmessagelog.cpp
     llmessagereader.cpp
     llmessagetemplate.cpp
     llmessagetemplateparser.cpp
@@ -115,6 +116,7 @@ target_sources(llmessage
     llloginflags.h
     llmessagebuilder.h
     llmessageconfig.h
+    llmessagelog.h
     llmessagereader.h
     llmessagetemplate.h
     llmessagetemplateparser.h

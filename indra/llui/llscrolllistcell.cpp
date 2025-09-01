@@ -59,6 +59,10 @@ LLScrollListCell* LLScrollListCell::create(const LLScrollListCell::Params& cell_
     {
         cell = new LLScrollListBar(cell_p);
     }
+    else if(cell_p.type() == "line_editor")
+    {
+        cell = new LLScrollListLineEditor(cell_p);
+    }
     else    // default is "text"
     {
         cell = new LLScrollListText(cell_p);
@@ -103,7 +107,9 @@ LLScrollListIcon::LLScrollListIcon(const LLScrollListCell::Params& p)
     mIcon(LLUI::getUIImage(p.value().asString())),
     mIconSize(0),
     mColor(p.color),
-    mAlignment(p.font_halign)
+    mAlignment(p.font_halign),
+    mCallback(NULL),
+    mUserData(NULL)
 {}
 
 LLScrollListIcon::~LLScrollListIcon()
@@ -731,4 +737,62 @@ void LLScrollListIconText::draw(const LLColor4& color, const LLColor4& highlight
     }
 }
 
+//
+// LLScrollListLineEditor
+//
+LLScrollListLineEditor::LLScrollListLineEditor( const LLScrollListCell::Params& p)
+: LLScrollListCell(p)
+{
+    LLLineEditor::Params line_editor_p;
+    line_editor_p.name("line_editor");
+    line_editor_p.rect = LLRect(0, p.width, p.width, 0);
+    line_editor_p.enabled(p.enabled);
+    line_editor_p.initial_value(p.value());
+
+    mLineEditor = LLUICtrlFactory::create<LLLineEditor>(line_editor_p);
+
+    LLRect rect(mLineEditor->getRect());
+    if (p.width())
+    {
+        rect.mRight = rect.mLeft + p.width();
+        mLineEditor->setRect(rect);
+        setWidth(p.width());
+    }
+    else
+    {
+        setWidth(rect.getWidth()); //line_editor->getWidth();
+    }
+}
+
+LLScrollListLineEditor::~LLScrollListLineEditor()
+{
+    delete mLineEditor;
+    mLineEditor = NULL;
+}
+
+void LLScrollListLineEditor::draw(const LLColor4& color, const LLColor4& highlight_color)
+{
+    mLineEditor->draw();
+}
+
+bool LLScrollListLineEditor::handleClick()
+{
+    if (mLineEditor->getEnabled())
+    {
+        mLineEditor->setFocus(true);
+        mLineEditor->selectAll();
+    }
+    // return value changes selection?
+    return false; //true;
+}
+
+bool LLScrollListLineEditor::handleUnicodeChar(llwchar uni_char, bool called_from_parent)
+{
+    return true;
+}
+
+bool LLScrollListLineEditor::handleUnicodeCharHere(llwchar uni_char )
+{
+    return true;
+}
 

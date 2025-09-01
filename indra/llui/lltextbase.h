@@ -726,7 +726,7 @@ protected:
     }
 
 public:
-    bool                            hasSelection() const { return (mSelectionStart !=mSelectionEnd); }
+    bool hasSelection() const { return (mSelectionStart != mSelectionEnd); }
 
     std::vector<LLRect> getSelectionRects(const highlight_list_t& highlights);
     std::vector<std::pair<LLRect, LLUIColor>> getHighlightedBgRects();

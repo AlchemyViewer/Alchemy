@@ -280,6 +280,10 @@ public:
     std::string getCapabilityDebug(std::string_view name) const;
 
 
+    virtual std::set<std::string> getCapURLNames(const std::string& cap_url);
+    virtual bool isCapURLMapped(const std::string& cap_url);
+    virtual std::set<std::string> getAllCaps();
+
     // has region received its final (not seed) capability list?
     bool capabilitiesReceived() const;
     bool capabilitiesError() const;
@@ -624,7 +628,8 @@ public:
 
     // list of reflection maps being managed by this llviewer region
     std::vector<LLPointer<LLReflectionMap> > mReflectionMaps;
-
+    using url_mapping_t = boost::unordered_multimap<std::string, std::string>;
+    url_mapping_t mCapURLMappings;
 };
 
 inline bool LLViewerRegion::getRegionProtocol(U64 protocol) const
