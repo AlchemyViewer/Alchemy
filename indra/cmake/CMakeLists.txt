@@ -16,6 +16,7 @@ set(cmake_SOURCE_FILES
         Discord.cmake
         EXPAT.cmake
         FindPipeWire.cmake
+        FMODSTUDIO.cmake
         FontConfig.cmake
         FreeType.cmake
         GLEXT.cmake

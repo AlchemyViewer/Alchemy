@@ -90,6 +90,17 @@ if(WINDOWS)
         third_party_targets
         ${vivox_libs}
         )
+
+    if(USE_FMODSTUDIO)
+        list(APPEND fmod_libs
+            fmod$<$<CONFIG:Debug>:L>.dll
+            )
+        to_viewer_staging_dirs(
+            ${fmod_lib_paths}
+            third_party_targets
+            ${fmod_libs}
+            )
+    endif()
 elseif(DARWIN)
     set(vivox_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/slvoice/darwin64")
     set(vivox_libs

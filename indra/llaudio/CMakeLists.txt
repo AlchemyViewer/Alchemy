@@ -50,3 +50,24 @@ if (TARGET ll::openal)
 
     target_link_libraries(llaudio PUBLIC ll::openal)
 endif ()
+
+if (TARGET ll::fmodstudio)
+    target_sources(llaudio
+        PRIVATE
+        llaudioengine_fmodstudio.cpp
+        lllistener_fmodstudio.cpp
+        llstreamingaudio_fmodstudio.cpp
+        )
+
+    target_sources(llaudio
+        PUBLIC
+        FILE_SET HEADERS
+        FILES
+        llaudioengine_fmodstudio.h
+        lllistener_fmodstudio.h
+        llstreamingaudio_fmodstudio.h
+        )
+	 
+    target_link_libraries(llaudio PUBLIC ll::fmodstudio)
+endif ()
+
