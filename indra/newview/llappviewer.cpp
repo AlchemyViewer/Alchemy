@@ -6379,7 +6379,7 @@ void LLAppViewer::initDiscordSocial()
     gDiscordPartyMaxSize = 0;
     gDiscordTimestampsStart = time(nullptr);
     gDiscordClient = std::make_shared<discordpp::Client>();
-    gDiscordClient->SetApplicationId(1394782217405862001);
+    gDiscordClient->SetApplicationId(564763931009220608);
     updateDiscordActivity();
 }
 
@@ -6399,6 +6399,15 @@ void LLAppViewer::updateDiscordActivity()
     discordpp::ActivityTimestamps timestamps;
     timestamps.SetStart(gDiscordTimestampsStart);
     activity.SetTimestamps(timestamps);
+
+    discordpp::ActivityAssets activityAssets;
+    activityAssets.SetLargeImage("alchemy_1024");
+    activityAssets.SetLargeText(LLTrans::getString("APP_NAME"));
+    activityAssets.SetLargeUrl("https://www.alchemyviewer.org");
+    activityAssets.SetSmallImage("secondlife_512");
+    activityAssets.SetSmallText(LLTrans::getString("SECOND_LIFE"));
+    activityAssets.SetSmallUrl("https://secondlife.com/");
+    activity.SetAssets(activityAssets);
 
     if (gAgent.getID() == LLUUID::null)
     {
