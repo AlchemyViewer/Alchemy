@@ -35,20 +35,27 @@
 
 class LLPluginClassMedia;
 
-class LLStreamingAudio_MediaPlugins : public LLStreamingAudioInterface
+class LLStreamingAudio_MediaPlugins final : public LLStreamingAudioInterface
 {
  public:
     LLStreamingAudio_MediaPlugins();
     /*virtual*/ ~LLStreamingAudio_MediaPlugins();
 
-    /*virtual*/ void start(const std::string& url);
-    /*virtual*/ void stop();
-    /*virtual*/ void pause(int pause);
-    /*virtual*/ void update();
-    /*virtual*/ int isPlaying();
-    /*virtual*/ void setGain(F32 vol);
-    /*virtual*/ F32 getGain();
-    /*virtual*/ std::string getURL();
+    /*virtual*/ void start(const std::string& url) override;
+    /*virtual*/ void stop() override;
+    /*virtual*/ void pause(int pause) override;
+    /*virtual*/ void update() override;
+    /*virtual*/ int isPlaying() override;
+    /*virtual*/ void setGain(F32 vol) override;
+    /*virtual*/ F32 getGain() override;
+    /*virtual*/ std::string getURL() override;
+
+    bool supportsAdjustableBufferSizes() override {return false;}
+    void setBufferSizes(U32 streambuffertime, U32 decodebuffertime) override {};
+
+    virtual bool supportsMetaData() override { return false; }
+    virtual bool supportsWaveData() override { return false; }
+    virtual bool getWaveData(float* arr, S32 count, S32 stride = 1) override { return false; }
 
 private:
     LLPluginClassMedia* initializeMedia(const std::string& media_type);

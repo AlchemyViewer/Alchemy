@@ -59,6 +59,7 @@ public:
     void setRightAlign() { mHAlign = LLFontGL::RIGHT; }
     void setHAlign(LLFontGL::HAlign align) { mHAlign = align; }
     void setClickedCallback(std::function<void(void*)> cb, void* userdata = nullptr);
+    void clearClickedCallback();
 
     void reshapeToFitText(bool called_from_parent = false);
 

@@ -137,7 +137,12 @@ void LLTextBox::setText(const LLStringExplicit& text , const LLStyle::Params& in
 
 void LLTextBox::setClickedCallback(std::function<void (void*)> cb, void* userdata /*= nullptr */)
 {
-    mClickedCallback = std::bind(cb, userdata);
+    mClickedCallback = boost::bind(cb, userdata);
+}
+
+void LLTextBox::clearClickedCallback()
+{
+    mClickedCallback = nullptr;
 }
 
 S32 LLTextBox::getTextPixelWidth()

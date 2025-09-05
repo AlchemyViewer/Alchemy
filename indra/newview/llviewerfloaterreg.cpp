@@ -563,6 +563,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);
     LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
     LLFloaterReg::add("group_profile", "floater_al_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGroupProfile>);
+    LLFloaterReg::add("music_ticker", "floater_music_ticker.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);
     LLFloaterReg::add("particle_editor", "floater_al_particle_editor.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterParticleEditor>);
     LLFloaterReg::add("progress_view", "floater_al_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProgressView>);
     LLFloaterReg::add("quick_settings", "floater_quick_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloater>);

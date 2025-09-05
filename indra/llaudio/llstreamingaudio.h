@@ -30,11 +30,17 @@
 
 #include "stdtypes.h" // from llcommon
 
+#include "llsd.h"
+
+#include "boost/signals2.hpp"
+
+class LLSD;
+
 // Entirely abstract.  Based exactly on the historic API.
 class LLStreamingAudioInterface
 {
  public:
-    virtual ~LLStreamingAudioInterface() {}
+    virtual ~LLStreamingAudioInterface() = default;
 
     virtual void start(const std::string& url) = 0;
     virtual void stop() = 0;
@@ -47,6 +53,20 @@ class LLStreamingAudioInterface
     virtual std::string getURL() = 0;
     virtual bool supportsAdjustableBufferSizes(){return false;}
     virtual void setBufferSizes(U32 streambuffertime, U32 decodebuffertime){};
+
+    virtual bool supportsMetaData() = 0;
+    using metadata_signal_t = boost::signals2::signal<void(const LLSD& metadata)>;
+    virtual boost::signals2::connection setMetadataUpdatedCallback(const metadata_signal_t::slot_type& cb)
+    {
+        return mMetadataUpdateSignal.connect(cb);
+    }
+    virtual LLSD getMetadata() const { return LLSD(); }
+
+    virtual bool supportsWaveData() = 0;
+    virtual bool getWaveData(float* arr, S32 count, S32 stride = 1) = 0;
+
+protected:
+    metadata_signal_t mMetadataUpdateSignal;
 };
 
 #endif // LL_STREAMINGAUDIO_H

@@ -89,9 +89,12 @@ set(viewer_SOURCE_FILES
     allegacynotificationwellwindow.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
-    alpanelradaralert.cpp
+    alpanelmusicticker.cpp
     alpanelquicksettings.cpp
     alpanelquicksettingspulldown.cpp
+    alpanelradaralert.cpp
+    alpanelstreaminfo.cpp
+    alstreaminfo.cpp
     altoolalign.cpp
     alunzip.cpp
     alviewermenu.cpp
@@ -801,9 +804,12 @@ set(viewer_HEADER_FILES
     allegacynotificationwellwindow.h
     alpanelaomini.h
     alpanelaopulldown.h
-    alpanelradaralert.h
+    alpanelmusicticker.h
     alpanelquicksettings.h
     alpanelquicksettingspulldown.h
+    alpanelradaralert.h
+    alpanelstreaminfo.h
+    alstreaminfo.h
     altoolalign.h
     alunzip.h
     alviewermenu.h

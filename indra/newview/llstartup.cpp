@@ -94,6 +94,7 @@
 #include "message.h"
 #include "v3math.h"
 
+#include "alstreaminfo.h"
 #include "llagent.h"
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -3336,6 +3337,8 @@ void LLStartUp::multimediaInit()
     std::string msg = LLTrans::getString("LoginInitializingMultimedia");
     set_startup_status(0.42f, msg.c_str(), gAgent.mMOTD.c_str());
     do_startup_frame();
+
+    ALStreamInfo::createInstance();
 }
 
 void LLStartUp::fontInit()

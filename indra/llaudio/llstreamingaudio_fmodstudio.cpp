@@ -25,19 +25,27 @@
  */
 
 #include "linden_common.h"
+#include "llstreamingaudio_fmodstudio.h"
 
+#include "llsd.h"
 #include "llmath.h"
+#include "llmutex.h"
 
 #include <fmod.hpp>
 #include <fmod_errors.h>
 
-#include "llstreamingaudio_fmodstudio.h"
-
+inline bool Check_FMOD_Stream_Error(FMOD_RESULT result, const char *string)
+{
+    if (result == FMOD_OK)
+        return false;
+    LL_WARNS("FMOD") << string << " Error: " << FMOD_ErrorString(result) << LL_ENDL;
+    return true;
+}
 
 class LLAudioStreamManagerFMODSTUDIO
 {
 public:
-    LLAudioStreamManagerFMODSTUDIO(FMOD::System *system, const std::string& url);
+    LLAudioStreamManagerFMODSTUDIO(FMOD::System *system, FMOD::ChannelGroup *group, const std::string& url);
     FMOD::Channel* startStream();
     bool stopStream(); // Returns true if the stream was successfully stopped.
 
@@ -46,6 +54,7 @@ public:
     FMOD_OPENSTATE getOpenState(unsigned int* percentbuffered = nullptr, bool* starving = nullptr, bool* diskbusy = nullptr);
 protected:
     FMOD::System* mSystem;
+    FMOD::ChannelGroup* mChannelGroup;
     FMOD::Channel* mStreamChannel;
     FMOD::Sound* mInternetStream;
     bool mReady;
@@ -53,7 +62,49 @@ protected:
     std::string mInternetStreamURL;
 };
 
+LLMutex gWaveDataMutex;    //Just to be extra strict.
+const U32 WAVE_BUFFER_SIZE = 1024;
+U32 gWaveBufferMinSize = 0;
+F32 gWaveDataBuffer[WAVE_BUFFER_SIZE] = { 0.f };
+U32 gWaveDataBufferSize = 0;
 
+FMOD_RESULT F_CALL waveDataCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, float *outbuffer, unsigned int length, int inchannels, int *outchannels)
+{
+    if (!length || !inchannels)
+        return FMOD_OK;
+    memcpy(outbuffer, inbuffer, length * inchannels * sizeof(float));
+
+    static std::vector<F32> local_buf;
+    if (local_buf.size() < length)
+        local_buf.resize(length, 0.f);
+
+    for (U32 i = 0; i < length; ++i)
+    {
+        F32 total = 0.f;
+        for (S32 j = 0; j < inchannels; ++j)
+        {
+            total += inbuffer[i*inchannels + j];
+        }
+        local_buf[i] = total / inchannels;
+    }
+
+    {
+        LLMutexLock lock(&gWaveDataMutex);
+
+        for (U32 i = length; i > 0; --i)
+        {
+            if (++gWaveDataBufferSize > WAVE_BUFFER_SIZE)
+            {
+                if (gWaveBufferMinSize)
+                    memcpy(gWaveDataBuffer + WAVE_BUFFER_SIZE - gWaveBufferMinSize, gWaveDataBuffer, gWaveBufferMinSize * sizeof(float));
+                gWaveDataBufferSize = 1 + gWaveBufferMinSize;
+            }
+            gWaveDataBuffer[WAVE_BUFFER_SIZE - gWaveDataBufferSize] = local_buf[i - 1];
+        }
+    }
+
+    return FMOD_OK;
+}
 
 //---------------------------------------------------------------------------
 // Internet Streaming
@@ -61,27 +112,28 @@ protected:
 LLStreamingAudio_FMODSTUDIO::LLStreamingAudio_FMODSTUDIO(FMOD::System *system) :
 mSystem(system),
 mCurrentInternetStreamp(nullptr),
+mStreamDSP(nullptr),
+mStreamGroup(nullptr),
 mFMODInternetStreamChannelp(nullptr),
 mGain(1.0f),
-mRetryCount(0)
+mRetryCount(0),
+mMetadata(LLSD::emptyMap())
 {
     // Number of milliseconds of audio to buffer for the audio card.
     // Must be larger than the usual Second Life frame stutter time.
     const U32 buffer_seconds = 10;      //sec
     const U32 estimated_bitrate = 128;  //kbit/sec
-    FMOD_RESULT result = mSystem->setStreamBufferSize(estimated_bitrate * buffer_seconds * 128/*bytes/kbit*/, FMOD_TIMEUNIT_RAWBYTES);
-    if (result != FMOD_OK)
-    {
-        LL_WARNS("FMOD") << "setStreamBufferSize error: " << FMOD_ErrorString(result) << LL_ENDL;
-    }
+    Check_FMOD_Stream_Error(mSystem->setStreamBufferSize(estimated_bitrate * buffer_seconds * 128/*bytes/kbit*/, FMOD_TIMEUNIT_RAWBYTES), "FMOD::System::setStreamBufferSize");
 
-    // Here's where we set the size of the network buffer and some buffering
-    // parameters.  In this case we want a network buffer of 16k, we want it
-    // to prebuffer 40% of that when we first connect, and we want it
-    // to rebuffer 80% of that whenever we encounter a buffer underrun.
+    Check_FMOD_Stream_Error(system->createChannelGroup("stream", &mStreamGroup), "FMOD::System::createChannelGroup");
 
-    // Leave the net buffer properties at the default.
-    //FSOUND_Stream_Net_SetBufferProperties(20000, 40, 80);
+    FMOD_DSP_DESCRIPTION dspdesc = { };
+    dspdesc.pluginsdkversion = FMOD_PLUGIN_SDK_VERSION;
+    strncpy(dspdesc.name, "Waveform", sizeof(dspdesc.name));
+    dspdesc.numoutputbuffers = 1;
+    dspdesc.read = &waveDataCallback; //Assign callback.
+
+    Check_FMOD_Stream_Error(system->createDSP(&dspdesc, &mStreamDSP), "FMOD::System::createDSP");
 }
 
 
@@ -125,6 +177,8 @@ LLStreamingAudio_FMODSTUDIO::~LLStreamingAudio_FMODSTUDIO()
     {
         LL_WARNS("FMOD") << "Failed to kill some audio streams" << LL_ENDL;
     }
+
+    cleanupWaveData();
 }
 
 void LLStreamingAudio_FMODSTUDIO::killDeadStreams()
@@ -160,7 +214,7 @@ void LLStreamingAudio_FMODSTUDIO::start(const std::string& url)
     if (!url.empty())
     {
         LL_INFOS("FMOD") << "Starting internet stream: " << url << LL_ENDL;
-        mCurrentInternetStreamp = new LLAudioStreamManagerFMODSTUDIO(mSystem, url);
+        mCurrentInternetStreamp = new LLAudioStreamManagerFMODSTUDIO(mSystem, mStreamGroup, url);
         mURL = url;
     }
     else
@@ -172,6 +226,45 @@ void LLStreamingAudio_FMODSTUDIO::start(const std::string& url)
     mRetryCount = 0;
 }
 
+enum utf_endian_type_t
+{
+    UTF16LE,
+    UTF16BE,
+    UTF16
+};
+
+std::string utf16input_to_utf8(unsigned char* input, U32 len, utf_endian_type_t type)
+{
+    if (type == UTF16)
+    {
+        type = UTF16BE;    //Default
+        if (len > 2)
+        {
+            //Parse and strip BOM.
+            if ((input[0] == 0xFE && input[1] == 0xFF) ||
+                (input[0] == 0xFF && input[1] == 0xFE))
+            {
+                input += 2;
+                len -= 2;
+                type = input[0] == 0xFE ? UTF16BE : UTF16LE;
+            }
+        }
+    }
+    llutf16string out_16((llutf16string::value_type*)input, len / 2);
+    if (len % 2)
+    {
+        out_16.push_back((input)[len - 1] << 8);
+    }
+    if (type == UTF16BE)
+    {
+        for (llutf16string::iterator i = out_16.begin(); i < out_16.end(); ++i)
+        {
+            llutf16string::value_type v = *i;
+            *i = ((v & 0x00FF) << 8) | ((v & 0xFF00) >> 8);
+        }
+    }
+    return utf16str_to_utf8str(out_16);
+}
 
 void LLStreamingAudio_FMODSTUDIO::update()
 {
@@ -199,7 +292,11 @@ void LLStreamingAudio_FMODSTUDIO::update()
         {
             // Reset volume to previously set volume
             setGain(getGain());
-            mFMODInternetStreamChannelp->setPaused(false);
+            if (mStreamDSP)
+            {
+                Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->addDSP(FMOD_CHANNELCONTROL_DSP_TAIL, mStreamDSP), "FMOD::Channel::addDSP");
+            }
+            Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setPaused(false), "FMOD::Channel::setPaused");
         }
         mRetryCount = 0;
     }
@@ -220,7 +317,7 @@ void LLStreamingAudio_FMODSTUDIO::update()
             if (!url.empty())
             {
                 LL_INFOS("FMOD") << "Restarting internet stream: " << url  << ", attempt " << (mRetryCount + 1) << LL_ENDL;
-                mCurrentInternetStreamp = new LLAudioStreamManagerFMODSTUDIO(mSystem, url);
+                mCurrentInternetStreamp = new LLAudioStreamManagerFMODSTUDIO(mSystem, mStreamGroup, url);
                 mURL = url;
             }
         }
@@ -240,40 +337,122 @@ void LLStreamingAudio_FMODSTUDIO::update()
             FMOD_TAG tag;
             S32 tagcount, dirtytagcount;
 
-            if (sound->getNumTags(&tagcount, &dirtytagcount) == FMOD_OK && dirtytagcount)
+            if (sound->getNumTags(&tagcount, &dirtytagcount) == FMOD_OK && dirtytagcount > 0)
             {
+                mMetadata = LLSD::emptyMap();
+
                 for (S32 i = 0; i < tagcount; ++i)
                 {
                     if (sound->getTag(nullptr, i, &tag) != FMOD_OK)
                         continue;
 
-                    if (tag.type == FMOD_TAGTYPE_FMOD)
+                    std::string name = tag.name;
+                    switch (tag.type)
                     {
-                        if (!strcmp(tag.name, "Sample Rate Change"))
+                        case FMOD_TAGTYPE_ID3V2:
                         {
-                            LL_INFOS("FMOD") << "Stream forced changing sample rate to " << *((float *)tag.data) << LL_ENDL;
-                            mFMODInternetStreamChannelp->setFrequency(*((float *)tag.data));
+                            if (!LLStringUtil::compareInsensitive(name, "TIT2")) name = "TITLE";
+                            else if(!LLStringUtil::compareInsensitive(name, "TPE1")) name = "ARTIST";
+                            break;
                         }
-                        continue;
+                        case FMOD_TAGTYPE_ASF:
+                        {
+                            if (!LLStringUtil::compareInsensitive(name, "Title")) name = "TITLE";
+                            else if (!LLStringUtil::compareInsensitive(name, "WM/AlbumArtist")) name = "ARTIST";
+                            break;
+                        }
+                        case FMOD_TAGTYPE_VORBISCOMMENT:
+                        {
+                                if (!LLStringUtil::compareInsensitive(name, "title")) name = "TITLE";
+                                else if (!LLStringUtil::compareInsensitive(name, "artist")) name = "ARTIST";
+                            break;
+                        }
+                        case FMOD_TAGTYPE_FMOD:
+                        {
+                            if (!LLStringUtil::compareInsensitive(name, "Sample Rate Change"))
+                            {
+                                LL_INFOS("FMOD") << "Stream forced changing sample rate to " << *((float *)tag.data) << LL_ENDL;
+                                Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setFrequency(*((float *)tag.data)), "FMOD::Channel::setFrequency");
+                            }
+                            continue;
+                        }
+                        default:
+                            if (!LLStringUtil::compareInsensitive(name, "TITLE") ||
+                                !LLStringUtil::compareInsensitive(name, "ARTIST"))
+                                LLStringUtil::toUpper(name);
+                            break;
+                    }
+                    switch (tag.datatype)
+                    {
+                        case(FMOD_TAGDATATYPE_INT):
+                           mMetadata[name]=*(LLSD::Integer*)(tag.data);
+                            LL_INFOS("FMOD") << tag.name << ": " << *(int*)(tag.data) << LL_ENDL;
+                            break;
+                        case(FMOD_TAGDATATYPE_FLOAT):
+                            mMetadata[name]=*(LLSD::Real*)(tag.data);
+                            LL_INFOS("FMOD") << tag.name << ": " << *(float*)(tag.data) << LL_ENDL;
+                            break;
+                        case(FMOD_TAGDATATYPE_STRING):
+                        {
+                            std::string out = rawstr_to_utf8(std::string((char*)tag.data,tag.datalen));
+                            if (out.length() && out[out.size() - 1] == 0)
+                                out.erase(out.size() - 1);
+                            mMetadata[name]=out;
+                            LL_INFOS("FMOD") << tag.name << "(RAW): " << out << LL_ENDL;
+                            break;
+                        }
+                        case(FMOD_TAGDATATYPE_STRING_UTF8) :
+                        {
+                            U8 offs = 0;
+                            if (tag.datalen > 3 && ((unsigned char*)tag.data)[0] == 0xEF && ((unsigned char*)tag.data)[1] == 0xBB && ((unsigned char*)tag.data)[2] == 0xBF)
+                                offs = 3;
+                            std::string out((char*)tag.data + offs, tag.datalen - offs);
+                            if (out.length() && out[out.size() - 1] == 0)
+                                out.erase(out.size() - 1);
+                            mMetadata[name] = out;
+                            LL_INFOS("FMOD") << tag.name << "(UTF8): " << out << LL_ENDL;
+                            break;
+                        }
+                        case(FMOD_TAGDATATYPE_STRING_UTF16):
+                        {
+                            std::string out = utf16input_to_utf8((unsigned char*)tag.data, tag.datalen, UTF16);
+                            if (out.length() && out[out.size() - 1] == 0)
+                                out.erase(out.size() - 1);
+                            mMetadata[name] = out;
+                            LL_INFOS("FMOD") << tag.name << "(UTF16): " << out << LL_ENDL;
+                            break;
+                        }
+                        case(FMOD_TAGDATATYPE_STRING_UTF16BE):
+                        {
+                            std::string out = utf16input_to_utf8((unsigned char*)tag.data, tag.datalen, UTF16BE);
+                            if (out.length() && out[out.size() - 1] == 0)
+                                out.erase(out.size() - 1);
+                            mMetadata[name] = out;
+                            LL_INFOS("FMOD") << tag.name << "(UTF16BE): " << out << LL_ENDL;
+                            break;
+                        }
+                        default:
+                            break;
                     }
                 }
+
+                mMetadataUpdateSignal(mMetadata);
             }
 
             if (starving)
             {
                 bool paused = false;
-                mFMODInternetStreamChannelp->getPaused(&paused);
-                if (!paused)
+                if (!Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->getPaused(&paused), "FMOD:Channel::getPaused") && !paused)
                 {
                     LL_INFOS("FMOD") << "Stream starvation detected! Pausing stream until buffer nearly full." << LL_ENDL;
                     LL_INFOS("FMOD") << "  (diskbusy=" << diskbusy << ")" << LL_ENDL;
                     LL_INFOS("FMOD") << "  (progress=" << progress << ")" << LL_ENDL;
-                    mFMODInternetStreamChannelp->setPaused(true);
+                    Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setPaused(true), "FMOD::Channel::setPaused");
                 }
             }
             else if (progress > 80)
             {
-                mFMODInternetStreamChannelp->setPaused(false);
+                Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setPaused(false), "FMOD::Channel::setPaused");
             }
         }
     }
@@ -281,10 +460,18 @@ void LLStreamingAudio_FMODSTUDIO::update()
 
 void LLStreamingAudio_FMODSTUDIO::stop()
 {
+
+    mMetadata = LLSD::emptyMap();
+    mMetadataUpdateSignal(mMetadata);
+
     if (mFMODInternetStreamChannelp)
     {
-        mFMODInternetStreamChannelp->setPaused(true);
-        mFMODInternetStreamChannelp->setPriority(0);
+        Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setPaused(true), "FMOD::Channel::setPaused");
+        Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setPriority(0), "FMOD::Channel::setPriority");
+        if (mStreamDSP)
+        {
+            Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->removeDSP(mStreamDSP), "FMOD::Channel::removeDSP");
+        }
         mFMODInternetStreamChannelp = nullptr;
     }
 
@@ -301,7 +488,6 @@ void LLStreamingAudio_FMODSTUDIO::stop()
             mDeadStreams.push_back(mCurrentInternetStreamp);
         }
         mCurrentInternetStreamp = nullptr;
-        //mURL.clear();
     }
 }
 
@@ -366,22 +552,51 @@ void LLStreamingAudio_FMODSTUDIO::setGain(F32 vol)
     {
         vol = llclamp(vol * vol, 0.f, 1.f); //should vol be squared here?
 
-        mFMODInternetStreamChannelp->setVolume(vol);
+        Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setVolume(vol), "FMOD::Channel::setVolume");
     }
+}
+
+/* virtual */
+bool LLStreamingAudio_FMODSTUDIO::getWaveData(float* arr, S32 count, S32 stride/*=1*/)
+{
+    if (count > (WAVE_BUFFER_SIZE / 2))
+        LL_ERRS("AudioImpl") << "Count=" << count << " exceeds WAVE_BUFFER_SIZE/2=" << WAVE_BUFFER_SIZE << LL_ENDL;
+
+    if(!mFMODInternetStreamChannelp || !mCurrentInternetStreamp)
+        return false;
+
+    bool muted = false;
+    FMOD_RESULT res = mFMODInternetStreamChannelp->getMute(&muted);
+    if(res != FMOD_OK || muted)
+        return false;
+    {
+        U32 buff_size;
+        {
+            LLMutexLock lock(&gWaveDataMutex);
+            gWaveBufferMinSize = count;
+            buff_size = gWaveDataBufferSize;
+            if (!buff_size)
+                return false;
+            memcpy(arr, gWaveDataBuffer + WAVE_BUFFER_SIZE - buff_size, llmin(U32(count), buff_size) * sizeof(float));
+        }
+        if (buff_size < U32(count))
+            memset(arr + buff_size, 0, (count - buff_size) * sizeof(float));
+    }
+    return true;
 }
 
 ///////////////////////////////////////////////////////
 // manager of possibly-multiple internet audio streams
 
-LLAudioStreamManagerFMODSTUDIO::LLAudioStreamManagerFMODSTUDIO(FMOD::System *system, const std::string& url) :
+LLAudioStreamManagerFMODSTUDIO::LLAudioStreamManagerFMODSTUDIO(FMOD::System *system, FMOD::ChannelGroup *group, const std::string& url) :
 mSystem(system),
+mChannelGroup(group),
 mStreamChannel(nullptr),
 mInternetStream(nullptr),
-mReady(false)
+mReady(false),
+mInternetStreamURL(url)
 {
-    mInternetStreamURL = url;
-
-    FMOD_RESULT result = mSystem->createStream(url.c_str(), FMOD_2D | FMOD_NONBLOCKING | FMOD_IGNORETAGS, 0, &mInternetStream);
+    FMOD_RESULT result = mSystem->createStream(url.c_str(), FMOD_2D | FMOD_NONBLOCKING | FMOD_IGNORETAGS, nullptr, &mInternetStream);
 
     if (result != FMOD_OK)
     {
@@ -407,11 +622,7 @@ FMOD::Channel *LLAudioStreamManagerFMODSTUDIO::startStream()
     if (mStreamChannel)
         return mStreamChannel;  //Already have a channel for this stream.
 
-    FMOD_RESULT result = mSystem->playSound(mInternetStream, nullptr, true, &mStreamChannel);
-    if (result != FMOD_OK)
-    {
-        LL_WARNS("FMOD") << FMOD_ErrorString(result) << LL_ENDL;
-    }
+    Check_FMOD_Stream_Error(mSystem->playSound(mInternetStream, mChannelGroup, true, &mStreamChannel), "FMOD::System::playSound");
     return mStreamChannel;
 }
 
@@ -462,19 +673,22 @@ FMOD_OPENSTATE LLAudioStreamManagerFMODSTUDIO::getOpenState(unsigned int* percen
 
 void LLStreamingAudio_FMODSTUDIO::setBufferSizes(U32 streambuffertime, U32 decodebuffertime)
 {
-    FMOD_RESULT result = mSystem->setStreamBufferSize(streambuffertime / 1000 * 128 * 128, FMOD_TIMEUNIT_RAWBYTES);
-    if (result != FMOD_OK)
-    {
-        LL_WARNS("FMOD") << "setStreamBufferSize error: " << FMOD_ErrorString(result) << LL_ENDL;
-        return;
-    }
-    FMOD_ADVANCEDSETTINGS settings;
-    memset(&settings, 0, sizeof(settings));
+    Check_FMOD_Stream_Error(mSystem->setStreamBufferSize(streambuffertime / 1000 * 128 * 128, FMOD_TIMEUNIT_RAWBYTES), "FMOD::System::setStreamBufferSize");
+    FMOD_ADVANCEDSETTINGS settings = { };
     settings.cbSize = sizeof(settings);
     settings.defaultDecodeBufferSize = decodebuffertime;//ms
-    result = mSystem->setAdvancedSettings(&settings);
-    if (result != FMOD_OK)
+    Check_FMOD_Stream_Error(mSystem->setAdvancedSettings(&settings), "FMOD::System::setAdvancedSettings");
+}
+
+void LLStreamingAudio_FMODSTUDIO::cleanupWaveData()
+{
+    if (mStreamGroup)
     {
-        LL_WARNS("FMOD") << "setAdvancedSettings error: " << FMOD_ErrorString(result) << LL_ENDL;
+        Check_FMOD_Stream_Error(mStreamGroup->release(), "FMOD::ChannelGroup::release");
+        mStreamGroup = nullptr;
     }
+
+    if(mStreamDSP)
+        Check_FMOD_Stream_Error(mStreamDSP->release(), "FMOD::DSP::release");
+    mStreamDSP = nullptr;
 }
