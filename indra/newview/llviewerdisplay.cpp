@@ -130,6 +130,7 @@ void render_hud_attachments();
 void render_ui_3d();
 void render_ui_2d();
 void render_disconnected_background();
+void app_side_fps_limit();
 
 void display_startup()
 {
@@ -186,6 +187,7 @@ void display_startup()
 
     if (gViewerWindow && gViewerWindow->getWindow())
     gViewerWindow->getWindow()->swapBuffers();
+    app_side_fps_limit();
 
     glClear(GL_DEPTH_BUFFER_BIT);
 }
@@ -437,6 +439,7 @@ void display(BOOL rebuild, F32 zoom_factor, int subfield, BOOL for_snapshot)
         gGL.flush();
         glClear(GL_COLOR_BUFFER_BIT);
         gViewerWindow->getWindow()->swapBuffers();
+        app_side_fps_limit();
         LLPipeline::refreshCachedSettings();
         gPipeline.resizeScreenTexture();
         gResizeScreenTexture = FALSE;
@@ -1471,6 +1474,7 @@ void swap()
     if (gDisplaySwapBuffers)
     {
         gViewerWindow->getWindow()->swapBuffers();
+        app_side_fps_limit();
     }
     gDisplaySwapBuffers = TRUE;
 }
@@ -1780,6 +1784,91 @@ void render_disconnected_background()
     gGL.flush();
 
     gUIProgram.unbind();
+}
+
+// App-side FPS limiter: call once after every buffer swap
+void app_side_fps_limit()
+{
+    // Optional: lightweight telemetry once per second
+    static LLTimer s_log_timer;
+    if (s_log_timer.getElapsedTimeF32() > 1.0f)
+    {
+        const F32 max_f = gSavedSettings.getF32("MaxFPS");
+        const F32 bg_f  = gSavedSettings.getF32("BackgroundMaxFPS");
+        LL_INFOS("FPSLimit") << "LimitFPS=" << (int)gSavedSettings.getBOOL("LimitFPS")
+                             << " VSync="   << (int)gSavedSettings.getBOOL("RenderVSyncEnable")
+                             << " MaxF="    << max_f
+                             << " BgF="     << bg_f
+                             << LL_ENDL;
+        s_log_timer.reset();
+    }
+
+    static LLTimer s_timer; // starts on first call
+
+    // Skip when limiter is disabled
+    if (!gSavedSettings.getBOOL("LimitFPS"))
+    {
+        s_timer.reset();
+        return;
+    }
+
+    // Avoid double-capping when VSync is enabled
+    if (gSavedSettings.getBOOL("RenderVSyncEnable"))
+    {
+        s_timer.reset();
+        return;
+    }
+
+    // Background detection (minimized or unfocused)
+    bool minimized = false;
+    if (gViewerWindow)
+    {
+        if (LLWindow* win = gViewerWindow->getWindow())
+        {
+            minimized = win->getMinimized();
+        }
+    }
+    const bool background = minimized || !gFocusMgr.getAppHasFocus();
+
+    // Read as F32 (UI often provides floats even for integer-like spinners)
+    const F32 limit_f = background
+        ? gSavedSettings.getF32("BackgroundMaxFPS")
+        : gSavedSettings.getF32("MaxFPS");
+
+    // <= 0 means "unlimited"
+    if (limit_f <= 0.0f)
+    {
+        s_timer.reset();
+        return;
+    }
+
+    // Round to nearest integer and clamp to a sane range
+    S32 limit = (S32)std::lround((double)limit_f);
+    limit = llclamp(limit, 1, 1000);
+
+    const double target_dt = 1.0 / static_cast<double>(limit);
+    const double elapsed   = s_timer.getElapsedTimeF64();
+
+    if (elapsed < target_dt)
+    {
+        using namespace std::chrono;
+        double remain = target_dt - elapsed;
+
+        // Sleep most of the remaining time; keep a tiny margin to avoid oversleep on some OSes
+        if (remain > 0.002) // > 2 ms
+        {
+            std::this_thread::sleep_for(duration<double>(remain - 0.001));
+        }
+
+        // Final short wait to reach target more accurately
+        while (s_timer.getElapsedTimeF64() < target_dt)
+        {
+            std::this_thread::yield();
+        }
+    }
+
+    // Reset timer for the next frame
+    s_timer.reset();
 }
 
 void display_cleanup()

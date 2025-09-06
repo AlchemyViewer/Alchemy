@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
-  height="400"
+  height="480"
   layout="topleft"
   name="prefs_graphics_advanced"
   help_topic="Preferences_Graphics_Advanced"
@@ -111,10 +111,52 @@
     label="Enable VSync"
     layout="topleft"
     left="30"
-    top_delta="16"
+    top_delta="20"
     name="vsync"
     tool_tip="Synchronizes the frame rate to the refresh rate of the monitor, which results in smooth performance."
     width="315" />
+
+<!-- FPS limiter -->
+  <check_box
+    control_name="LimitFPS"
+    height="16"
+    label="Limit frame rate"
+    layout="topleft"
+    left="30"
+    top_delta="20"
+    name="LimitFPS"
+    tool_tip="Sleep at the end of each frame to cap FPS and reduce CPU/GPU usage."
+    width="315" />
+
+  <spinner
+    control_name="MaxFPS"
+    height="16"
+    decimal_digits="0"
+    label="Max FPS (Foreground)"
+    layout="topleft"
+    left="30"
+    top_delta="22"
+    name="MaxFPS"
+    min_val="1"
+    max_val="240"
+    increment="1"
+    label_width="185"
+    width="300" />
+
+  <spinner
+    control_name="BackgroundMaxFPS"
+    height="16"
+    decimal_digits="0"
+    label="Max FPS (Background)"
+    layout="topleft"
+    left="30"
+    top_delta="22"
+    name="BackgroundMaxFPS"
+    min_val="1"
+    max_val="240"
+    increment="1"
+    label_width="185"
+    width="300" />
 
   <text
     type="string"
@@ -537,13 +579,13 @@
     width="130">
      (requires restart)
   </text>
-   <view_border
+  <view_border
       bevel_style="in"
-      height="322"
+      height="380"
       layout="topleft"
       left="385"
       name="vert_border"
-      top="16"      
+      top="16"
       width="0"/>
   
   <text
@@ -883,7 +925,7 @@
       layout="topleft"
       left="13"
       name="horiz_border"
-      top="338"
+      top="426"
       top_delta="5"
       width="774"/>
   <button
