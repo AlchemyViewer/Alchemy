@@ -64,6 +64,7 @@
 // System includes
 #include <sstream>
 #include <iomanip>
+#include <cstdint>
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -159,7 +160,7 @@ void LLFloaterColorPicker::createUI ()
     // create palette
     for ( S32 each = 0; each < numPaletteColumns * numPaletteRows; ++each )
     {
-        mPalette.push_back(new LLColor4(LLUIColorTable::instance().getColor(llformat("ColorPaletteEntry%02d", each + 1), LLColor4::white)));
+        mPalette.emplace_back(std::make_unique<LLColor4>(LLUIColorTable::instance().getColor(llformat("ColorPaletteEntry%02d", each + 1), LLColor4::white)));
     }
 }
 
@@ -274,12 +275,7 @@ void LLFloaterColorPicker::destroyUI ()
     stopUsingPipette();
 
     // delete palette we created
-    std::vector < LLColor4* >::iterator iter = mPalette.begin ();
-    while ( iter != mPalette.end () )
-    {
-        delete ( *iter );
-        ++iter;
-    }
+    mPalette.clear();
 
     if ( mSwatchView )
     {
@@ -1051,15 +1047,14 @@ bool LLFloaterColorPicker::handleMouseUp ( S32 x, S32 y, MASK mask )
                     {
                         if ( mPalette [ curEntry ] )
                         {
-                            delete mPalette [ curEntry ];
-
-                            mPalette [ curEntry ] = new LLColor4 ( getCurR (), getCurG (), getCurB (), 1.0f );
+                            LLColor4 new_color(getCurR(), getCurG(), getCurB(), 1.0f);
+                            mPalette[curEntry] = std::make_unique<LLColor4>(new_color);
 
                             // save off color
                             std::ostringstream codec;
                             codec << "ColorPaletteEntry" << std::setfill ( '0' ) << std::setw ( 2 ) << curEntry + 1;
                             const std::string s ( codec.str () );
-                            LLUIColorTable::instance().setColor(s, *mPalette [ curEntry ] );
+                            LLUIColorTable::instance().setColor(s, new_color);
                         }
                     }
 

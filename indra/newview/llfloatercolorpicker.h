@@ -168,7 +168,7 @@ class LLFloaterColorPicker
 
         const S32 numPaletteColumns;
         const S32 numPaletteRows;
-        std::vector < LLColor4* > mPalette;
+        std::vector<std::unique_ptr<LLColor4>> mPalette;
         S32 highlightEntry;
         const S32 mPaletteRegionLeft;
         const S32 mPaletteRegionTop;
