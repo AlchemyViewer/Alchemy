@@ -24,6 +24,7 @@
 	<panel name="balance_bg">
 		<text name="balance" tool_tip="クリックしてL$残高を更新します。" value="L$ ???"/>
 		<button label="L$を購入" name="buyL" tool_tip="クリックしてL$を購入します。"/>
+		<button label="ショップ" name="goShop" tool_tip="SecondLifeマーケットプレイスを開きます。"/>
 	</panel>
 	<text name="TimeText" tool_tip="現在時刻（太平洋時間）" width="160">
 		午前　24：00　PST

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel name="panel_search_landsales">
-	<text name="search_title" value="検索語句を入力：" />
+	<text name="search_title" value="検索語句を入力："/>
 	<check_box label="価格＜" name="price_check"/>
 	<check_box label="面積＞" name="area_check"/>
 	<combo_box name="land_type">

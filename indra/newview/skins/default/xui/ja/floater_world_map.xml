@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="worldmap" title="ワールドマップ">
 	<floater.string name="UnnamedParcel">（名前のない区画）</floater.string>
-	<layout_stack name="control_stack">
-		<layout_panel name="control_lp">
+	<string name="collapse_tooltip" value="マップ操作を隠します。"/>
+	<string name="expand_tooltip" value="マップ操作を表示します。"/>
+	<layout_stack name="floater_map_stack">
+		<layout_panel name="map_lp">
+			<panel name="expand_btn_panel" tool_tip="マップ操作を隠します。">
+				<icon name="expand_collapse_icon" tool_tip="マップ操作を隠します。"/>
+			</panel>
+		</layout_panel>
+		<layout_panel name="controls_lp">
 			<panel name="layout_panel_1">
-				<text name="legends_label">
+				<text name="events_label">
 					凡例
 				</text>
 			</panel>
@@ -61,8 +68,10 @@
 				<search_editor label="リージョン名で" name="location" tool_tip="リージョン名を入力してください。"/>
 				<button label="探す" name="DoSearch" tool_tip="リージョンを検索します。"/>
 				<button name="Clear" tool_tip="追跡ラインをクリアしてマップをリセットします。"/>
-				<text name="locations_label">
-					場所：
+			</panel>
+			<panel name="layout_panel_7">
+				<text name="events_label">
+					場所
 				</text>
 				<button label="テレポート" name="Teleport" tool_tip="選択した場所にテレポートします。"/>
 				<button label="SLurlをコピー" name="copy_slurl" tool_tip="現在の場所をWebで使えるSLurlにしてコピーします。"/>

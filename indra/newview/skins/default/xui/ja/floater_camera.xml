@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater name="camera_floater">
+<floater name="camera_floater" title="カメラ操作">
 	<floater.string name="rotate_tooltip">
 		対象を中心にカメラを回す
 	</floater.string>
@@ -16,17 +16,19 @@
 		プリセットを使用
 	</string>
 	<panel name="buttons">
-		<button  name="collapse_btn" tool_tip="折り畳む／展開する"/>
-		<button  name="save_cam_pos_btn" tool_tip="現在のカメラの位置とフォーカスを保存します。"/>
-		<button  name="restore_cam_pos_btn" tool_tip="保存されたカメラの位置とフォーカスを復元します。"/>
+		<button name="collapse_btn" tool_tip="折り畳む／展開する"/>
+		<button name="save_cam_pos_btn" tool_tip="現在のカメラの位置とフォーカスを保存します。"/>
+		<button name="restore_cam_pos_btn" tool_tip="保存されたカメラの位置とフォーカスを復元します。"/>
 	</panel>
 	<panel name="controls">
-		<!--TODO:
-		replace + - images -->
+		<!--TODO: replace + - images -->
 		<panel name="zoom">
 			<joystick_rotate name="cam_rotate_stick" tool_tip="対象にカメラを追尾させます。"/>
 			<slider_bar name="zoom_slider" tool_tip="対象にカメラをズームします。"/>
 			<joystick_track name="cam_track_stick" tool_tip="カメラを上下左右に動かします。"/>
+			<text name="precise_ctrs_label">
+				正確な操作を使用する
+			</text>
 		</panel>
 	</panel>
 	<panel name="buttons_panel">

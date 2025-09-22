@@ -11,7 +11,7 @@
 	<menu_item_call label="グループに勧誘…" name="Invite Group"/>
 	<menu_item_call label="ズームイン" name="Zoom In"/>
 	<menu_item_call label="マップ" name="Map"/>
-	<menu_item_call label="シェア" name="Share"/>
+	<menu_item_call label="共有" name="Share"/>
 	<menu_item_call label="支払い" name="Pay"/>
 	<menu_item_call label="嫌がらせの報告" name="Report Abuse"/>
 	<menu_item_check label="ボイスをブロック" name="Block Unblock"/>

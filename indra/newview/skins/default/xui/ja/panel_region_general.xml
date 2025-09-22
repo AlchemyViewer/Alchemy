@@ -27,7 +27,7 @@
 	<check_box label="土地の統合・分割を許可" name="allow_parcel_changes_check"/>
 	<check_box label="土地の検索表示をブロック" name="block_parcel_search_check" tool_tip="検索結果で、このリージョンと区画を表示するかどうかの設定です。"/>
 	<spinner label="アバター数上限" name="agent_limit_spin"/>
-	<spinner label="物体ボーナス" name="object_bonus_spin"/>
+	<spinner label="オブジェクトボーナス" name="object_bonus_spin"/>
 	<text label="レーティング" name="access_text">
 		区分：
 	</text>
@@ -41,4 +41,5 @@
 	<button label="住人全員をホームにテレポート…" name="kick_all_btn"/>
 	<button label="メッセージをリージョンに送信…" name="im_btn"/>
 	<button label="テレハブの管理…" name="manage_telehub_btn"/>
+	<button label="再起動のスケジュールを管理…"  name="manage_restart_btn"/>
 </panel>

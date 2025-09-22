@@ -3,7 +3,7 @@
 	<layout_stack name="stack1">
 		<layout_panel name="status_bar">
 			<button tool_tip="戻る" name="back"/>
-			<button tool_tip="進む" name="forward" />
+			<button tool_tip="進む" name="forward"/>
 			<button tool_tip="停止する" name="stop"/>
 			<button tool_tip="リロードする" name="reload"/>
 		</layout_panel>

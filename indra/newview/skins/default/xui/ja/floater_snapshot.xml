@@ -51,6 +51,7 @@
 			<combo_box.item label="色深度（２４ビット）" name="Depth24" value="depth24"/>
 		</combo_box>
 		<check_box label="インターフェース" name="ui_check"/>
+		<check_box label="L$残高" name="balance_check"/>
 		<check_box label="ＨＵＤ" name="hud_check"/>
 		<check_box label="フレームをフリーズ（全画面）" name="freeze_frame_check"/>
 		<check_box label="自動リフレッシュ" name="auto_snapshot_check"/>

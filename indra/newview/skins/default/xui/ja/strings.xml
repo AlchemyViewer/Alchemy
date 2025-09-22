@@ -586,6 +586,9 @@ https://secondlife.com/viewer-access-faq
 	<string name="TooltipCantCreateOutfit">
 		１つ以上のアイテムが 「アウトフィット」内で使用できません。
 	</string>
+	<string name="TooltipCantMoveOutfitIntoOutfit">
+		アウトフィットを別のアウトフィットへ移動することはできません。
+	</string>
 	<string name="TooltipOutfitNotInInventory">
 		「アウトフィット」に入れることができるのは、自分のインベントリにあるアイテムや衣装のみです。
 	</string>
@@ -3285,6 +3288,9 @@ For AI Character: Get the closest navigable point to the point provided.
 	<string name="InventoryNoMatchingRecentItems">
 		お探しのものは見つかりましたか？[secondlife:///app/inventory/filters フィルタを表示]をお試しください。
 	</string>
+	<string name="InventoryNoMatchingFavorites">
+		お気に入りとしてマークしたアイテムはありません。
+	</string>
 	<string name="PlacesNoMatchingItems">
 		お探しのものは見つかりましたか？[secondlife:///app/search/places/[SEARCH_TERM] 検索]をお試しください。
 	</string>
@@ -4429,6 +4435,9 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	</string>
 	<string name="RejectFriendshipRequestsResponseDefault">
 		あなたがメッセージを送った住民は、[APP_NAME]ビューアの「フレンドシップのリクエストをすべて拒否する」モードを有効にしています。これは、フレンドシップのリクエストに邪魔されないよう要求したことを意味します。ＩＭは手動で送信することもできます。
+	</string>
+	<string name="IgnoredAdHocSession">
+		[AVATAR_NAME]から会話（アドホック）チャットに招待されましたが、ビューアの設定により自動的に無視しました。
 	</string>
 	<!-- panel preferences chat-->
 	<string name="RejectTeleportOffersResponseDefault">
@@ -6535,6 +6544,10 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="inventory_item_offered_rlv">
 		[NAME]からのインベントリのオファーです。
 	</string>
+	<string name="bot_warning">
+		ボット「[NAME]」とチャット中です。個人情報は共有しないでください。
+詳しくは https://second.life/scripted-agents をご覧ください。
+	</string>
 	<string name="share_alert">
 		インベントリからここにアイテムをドラッグします。
 	</string>
@@ -7017,6 +7030,9 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	</string>
 	<string name="DefaultMimeType">
 		none/none
+	</string>
+	<string name="texture_load_area_error">
+		[PIXELS]ピクセルよりも大きな画像は、読み込むことができません。
 	</string>
 	<string name="texture_load_dimensions_error">
 		[WIDTH]✕[HEIGHT]以上の画像は読み込めません。
@@ -7980,9 +7996,10 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		自然環境の設定
 	</string>
 	<!-- PBR Materials -->
-	<string name="Material Texture Name Header">
-		テクスチャはこのマテリアルを表しています：
-	</string>
+	<string name="Material Texture Name Header">テクスチャはこのマテリアルを表しています：</string>
+	<string name="material_selection_title">マテリアルの選択</string>
+	<string name="material_selection_text">マテリアル選択：</string>
+	<string name="material_batch_import_text">─全てを一括アップロード─</string>
 	<!-- Conversation log messages -->
 	<string name="logging_calls_disabled_log_empty">
 		会話はログに記録されていません。ログの記録を開始するには、「初期設定」＞「チャット」で「保存：ログのみ」または「保存：ログと会話のテキスト」を選択します。
@@ -8044,27 +8061,13 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 		無効な画像ファイル形式です。他の画像を選択してください。
 	</string>
 	<!-- Alchemy Strings -->
-	<string name="NotifyIncomingMessage">
-		[NAME]さんからのメッセージが届いています…
-	</string>
-	<string name="NearbyChatTitleChannel">
-		近くのチャット（チャンネル[CHANNEL]）
-	</string>
-	<string name="AvatarTyping">
-		入力中
-	</string>
-	<string name="UnknownAvatar">
-		不明なアバター
-	</string>
-	<string name="NotAvailableOnPlatform">
-		このプラットフォームでは使用できません。
-	</string>
-	<string name="NowPlaying">
-		再生中：
-	</string>
-	<string name="GridInfoTitle">
-		グリッド情報
-	</string>
+	<string name="NotifyIncomingMessage">[NAME]さんからのメッセージが届いています…</string>
+	<string name="NearbyChatTitleChannel">近くのチャット（チャンネル[CHANNEL]）</string>
+	<string name="AvatarTyping">入力中</string>
+	<string name="UnknownAvatar">不明なアバター</string>
+	<string name="NotAvailableOnPlatform">このプラットフォームでは使用できません。</string>
+	<string name="NowPlaying">再生中：</string>
+	<string name="SimulatorFeaturesTitle">シミュレーターの機能</string>
 	<!-- <LSL Preprocessor -->
 	<string name="preproc_toggle_warning">
 		プリプロセッサの切り替えは、このエディタを閉じて再度開くまで完全には有効になりません。

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="チャット" name="chat">
 	<tab_container name="chat_tab_container">
-		<panel label="一般" name="chat_pref_general"/>
-		<panel label="コマンド" name="chat_pref_cmd"/>
-		<panel label="拒否するメッセージ" name="chat_pref_moderation"/>
-		<panel label="自動返答" name="chat_pref_autoresponse"/>
+		<panel label="一般" name="chat_prefs_general"/>
+		<panel label="コマンド" name="chat_prefs_cmd"/>
+		<panel label="拒否するメッセージ" name="chat_prefs_moderation"/>
+		<panel label="自動返答" name="chat_pref_autoreponse"/>
 	</tab_container>
 </panel>

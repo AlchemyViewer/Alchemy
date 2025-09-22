@@ -12,6 +12,7 @@
 	<panel.string name="paste_options">
 		ペースト時のオプション
 	</panel.string>
+	<menu_button name="clipboard_color_params_btn" tool_tip="ペースト時のオプションを選択します。"/>
 	<button name="copy_color_btn" tool_tip="色のパラメータをコピーします。"/>
 	<button name="paste_color_btn" tool_tip="色のパラメータをペーストします。"/>
 	<button name="pipette_color_btn" tool_tip="ピペットツールで色のパラメータをペーストします。"/>
@@ -27,6 +28,7 @@
 		グロー
 	</text>
 	<check_box label="明るさ全開" name="checkbox fullbright"/>
+	<check_box label="水面を隠す" name="checkbox_hide_water"/>
 	<text name="label_matmedia">
 		マテリアル
 	</text>
@@ -47,6 +49,7 @@
 		<radio_item label="メタリック／粗さ" name="Metallic/roughness"/>
 		<radio_item label="放射（エミッシブ）" name="Emissive"/>
 	</radio_group>
+	<menu_button name="clipboard_texture_params_btn" tool_tip="ペースト時のオプションを選択します。"/>
 	<button name="copy_texture_btn" tool_tip="テクスチャパラメータをコピーします。"/>
 	<button name="paste_texture_btn" tool_tip="テクスチャパラメータをペーストします。"/>
 	<button name="pipette_texture_btn" tool_tip="ピペットツールでテクスチャパラメータをペーストします。"/>
@@ -142,7 +145,7 @@
 	</combo_box>
 	<spinner label="水平スケール" name="TexScaleU"/>
 	<spinner label="垂直スケール" name="TexScaleV"/>
-	<spinner label="メーターごとに繰り返す" name="rptctrl"/>
+	<spinner label="メートル毎に繰り返す" name="rptctrl"/>
 	<spinner label="回転度" name="TexRot"/>
 	<spinner label="水平オフセット" name="TexOffsetU"/>
 	<spinner label="垂直オフセット" name="TexOffsetV"/>
@@ -156,14 +159,16 @@
 	<spinner label="回転度" name="shinyRot"/>
 	<spinner label="水平オフセット" name="shinyOffsetU"/>
 	<spinner label="垂直オフセット" name="shinyOffsetV"/>
+	<check_box label="平面を揃える" name="checkbox planar align" tool_tip="テクスチャを最後に選択された面を基準に揃えます。平面テクスチャのマッピングが必要です。"/>
+	<button label="揃える" label_selected="現在のテクスチャレイヤーを揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーを揃えます。"/>
 	<!-- BEGIN PBR Material texture transform parameters -->
 	<spinner label="水平スケール" name="gltfTextureScaleU"/>
 	<spinner label="垂直スケール" name="gltfTextureScaleV"/>
 	<spinner label="回転度" name="gltfTextureRotation"/>
 	<spinner label="水平オフセット" name="gltfTextureOffsetU"/>
 	<spinner label="垂直オフセット" name="gltfTextureOffsetV"/>
+	<spinner label="メートル毎に繰り返す" name="gltfRptctrl"/>
 	<!-- END PBR Material texture transform parameters -->
-	<check_box label="平面を揃える" name="checkbox planar align" tool_tip="テクスチャを最後に選択された面を基準に揃えます。平面テクスチャのマッピングが必要です。"/>
 	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同期させます。"/>
 	<button label="揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
 	<button label="全て検索" name="btn_select_same_diff" tool_tip="この面と同じディフューズ（拡散反射）マップを貼り付けた、すべての面を選択します。"/>

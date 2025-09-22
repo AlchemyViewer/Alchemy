@@ -17,7 +17,14 @@
 		インワールド内のアバターを右クリックして表示を制御することもできます。
 	</text>
 	<button label="例外…" name="exceptions_btn"/>
-	<check_box label="フレンドは常に詳細表示する" name="display_friends"/>
+	<text name="AvatarComplexityModeLabel">
+		アバターの表示：
+	</text>
+	<combo_box name="AvatarComplexityMode">
+		<combo_box.item label="複雑度で制限" name="0"/>
+		<combo_box.item label="フレンドは常に表示" name="1"/>
+		<combo_box.item label="フレンドのみ表示" name="2"/>
+	</combo_box>
 	<check_box label="アバターを完全に非表示にする（風景写真に適しています）" name="hide_avatars"/>
 	<text name="name_tags_textbox">
 		名前タグ：

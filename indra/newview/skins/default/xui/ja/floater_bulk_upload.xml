@@ -12,7 +12,7 @@
 			</text>
 		</layout_panel>
 		<layout_panel name="checkbox_panel">
-			<check_box label="最大テクスチャ解像度を1024ピクセルに制限する" name="upload_2k" />
+			<check_box label="最大テクスチャ解像度を1024ピクセルに制限する" name="upload_2k"/>
 		</layout_panel>
 		<layout_panel name="cost_panel">
 			<text name="upload_cost">

@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="テキストチャット" name="chat">
+<panel label="テキストチャット" name="preferences_chat_general">
 	<panel name="general_chat_settings">
 		<check_box label="近くのチャット入力でチャットバーを使用する" name="use_chat_bar"/>
 		<check_box label="ローカルチャットでジェスチャーを自動補完する" name="auto_complete_gestures"/>
 		<check_box label="チャット時にタイピングアニメーションを再生する" name="play_typing_animation"/>
+		<check_box label="コールやＩＭができるのをフレンドとグループに限定する" name="voice_call_friends_only_check"/>
 		<check_box label="オフライン時にＩＭが送られてきたときにメールを送る（[EMAIL]）" name="send_im_to_email"/>
 		<text name="email_settings">[https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]</text>
-		<text name="font_name" width="70" left="296">
+		<text name="font_name">
 			フォント名：
 		</text>
 		<combo_box name="chat_font_name">
@@ -46,7 +47,7 @@
 		<text name="friend_ims">
 			フレンドのＩＭ：
 		</text>
-		<combo_box control_name="NotificationFriendIMOptions" name="FriendIMOptions">
+		<combo_box name="FriendIMOptions">
 			<item label="会話ウィンドウを開く" name="OpenConversationsWindow"/>
 			<item label="メッセージをポップアップ" name="PopUpMessage"/>
 			<item label="ツールバーのボタンをフラッシュ" name="FlashToolbarButton"/>
@@ -117,6 +118,7 @@
 		<check_box label="音声通話の着信" name="incoming_voice_call"/>
 		<check_box label="テレポートのオファー" name="teleport_offer"/>
 		<check_box label="インベントリのオファー" name="inventory_offer"/>
+		<check_box label="チャットのメンション" name="chat_mention"/>
 	</panel>
 	<panel name="log_settings">
 		<text name="logging_label">

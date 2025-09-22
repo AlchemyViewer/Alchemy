@@ -4,6 +4,8 @@
 	<menu_item_call label="アウトフィットにアイテムを追加" name="wear_add"/>
 	<menu_item_call label="アウトフィットのアイテムを脱ぐ" name="take_off"/>
 	<menu_item_call label="画像…" name="thumbnail"/>
+	<menu_item_call label="お気に入りのアウトフィットに追加" name="favorites_add"/>
+	<menu_item_call label="お気に入りのアウトフィットから削除" name="favorites_remove"/>
 	<menu_item_call label="アウトフィットの名前変更" name="rename"/>
 	<menu_item_call label="このアウトフィットを保存" name="save"/>
 	<menu_item_call label="アウトフィットを削除" name="delete_outfit"/>
@@ -34,4 +36,5 @@
 		<menu_item_call label="新しい目" name="New Eyes"/>
 	</menu>
 	<!-- copied from menu_inventory_add.xml -->
+	<menu_item_check label="インベントリ設定…" name="inventory_settings"/>
 </toggleable_menu>

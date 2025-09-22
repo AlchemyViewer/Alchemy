@@ -1,7 +1,41 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="移動" name="move_panel">
-	<tab_container name="moveview_tab_container">
-		<panel label="一般的な移動と視線" name="general_move_panel"/>
-		<panel label="マウスルック" name="mlook_panel"/>
-	</tab_container>
+	<slider label="視野角" name="camera_fov"/>
+	<slider label="距離" name="camera_offset_scale"/>
+	<text name="heading2">
+		カメラ位置の自動調整：
+	</text>
+		<check_box label="ビルド／編集" name="edit_camera_movement" tool_tip="編集モードの開始時と終了時に自動カメラ位置を使用する。"/>
+		<check_box label="容姿" name="appearance_camera_movement" tool_tip="編集モードで自動カメラ位置調整を使用する。"/>
+	<text name="keyboard_lbl">
+		キーボード：
+	</text>
+	<check_box label="移動キー押下時は常に移動するようにする" name="arrow_keys_move_avatar_check"/>
+	<check_box label="移動キー２度押し＋長押しで走る" name="tap_tap_hold_to_run"/>
+	<check_box label="ジャンプキーか、しゃがむキーを押し続けたときに飛行モードを切り替える" name="automatic_fly"/>
+	<text name="mouse_lbl">
+		マウス：
+	</text>
+	<check_box label="Show me in Mouselook" name="first_person_avatar_visible"/>
+	<text name=" Mouse Sensitivity">
+		マウスルック時のマウスの感度：
+	</text>
+	<check_box label="反転" name="invert_mouse"/>
+	<text name="single_click_action_lbl">
+		地面をシングルクリック：
+	</text>
+	<combo_box name="single_click_action_combo">
+		<combo_box.item label="何もしない" name="0"/>
+		<combo_box.item label="その場所に移動" name="1"/>
+	</combo_box>
+	<text name="double_click_action_lbl">
+		地面をダブルクリック：
+	</text>
+	<combo_box name="double_click_action_combo">
+		<combo_box.item label="何もしない" name="0"/>
+		<combo_box.item label="その場所に移動" name="1"/>
+		<combo_box.item label="その場所にテレポート" name="2"/>
+	</combo_box>
+	<check_box label="衝突時にサウンドを鳴らす" name="sound_on_collisions"/>
+	<button label="その他のデバイス" name="joystick_setup_button"/>
 </panel>

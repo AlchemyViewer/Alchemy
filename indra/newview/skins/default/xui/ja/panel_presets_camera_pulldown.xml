@@ -41,4 +41,5 @@
 	<panel_camera_item name="object_view" tool_tip="オブジェクトビュー"/>
 	<panel_camera_item name="mouselook_view" tool_tip="マウスルックビュー"/>
 	<button name="save_preset_btn" label="プリセットとして保存…" tool_tip="カメラの位置とフォーカスを復元します。"/>
+	<button name="open_prefs_btn" label="カメラフローターを開く" tool_tip="カメラのフローターを開きます。"/>
 </panel>

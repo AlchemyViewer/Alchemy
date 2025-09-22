@@ -42,7 +42,7 @@
 		</panel>
 	</scroll_container>
 	<panel label="ボトムパネル" name="bottom_panel">
-		<button label="[LABEL]" name="save_changes_btn" />
-		<button label="キャンセル" name="cancel_btn" />
+		<button label="[LABEL]" name="save_changes_btn"/>
+		<button label="キャンセル" name="cancel_btn"/>
 	</panel>
 </panel>

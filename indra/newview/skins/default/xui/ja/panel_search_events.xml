@@ -18,7 +18,7 @@
 		<combo_box.item label="ゲーム／コンテンスト" name="games"/>
 		<combo_box.item label="野外劇" name="pageants"/>
 		<combo_box.item label="教育" name="education"/>
-		<combo_box.item label="芸術と文化" name="arts" />
+		<combo_box.item label="芸術と文化" name="arts"/>
 		<combo_box.item label="チャリティー／サポートグループ" name="charity"/>
 		<combo_box.item label="その他" name="misc"/>
 	</combo_box>
