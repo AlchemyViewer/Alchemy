@@ -41,7 +41,9 @@
 #include <ios>
 #include <openssl/ossl_typ.h>
 #include <openssl/x509.h>
+#include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
+#include <openssl/bn.h>
 #include <openssl/pem.h>
 #include <openssl/asn1.h>
 #include <openssl/rand.h>
@@ -54,8 +56,11 @@
 
 static const std::string DEFAULT_CREDENTIAL_STORAGE = "credential";
 
-// 128 bits of salt data...
-#define STORE_SALT_SIZE 16
+// compat
+#define COMPAT_STORE_SALT_SIZE 16
+
+// 256 bits of salt data...
+#define STORE_SALT_SIZE 32
 #define BUFFER_READ_SIZE 256
 std::string cert_string_from_asn1_string(ASN1_STRING* value);
 std::string cert_string_from_octet_string(ASN1_OCTET_STRING* value);
@@ -180,8 +185,8 @@ LLSD& LLBasicCertificate::_initLLSD()
         mLLSDInfo[CERT_SERIAL_NUMBER] = cert_string_from_asn1_integer(sn);
     }
 
-    mLLSDInfo[CERT_VALID_TO] = cert_date_from_asn1_time(X509_get_notAfter(mCert));
-    mLLSDInfo[CERT_VALID_FROM] = cert_date_from_asn1_time(X509_get_notBefore(mCert));
+    mLLSDInfo[CERT_VALID_TO] = cert_date_from_asn1_time(X509_getm_notAfter(mCert));
+    mLLSDInfo[CERT_VALID_FROM] = cert_date_from_asn1_time(X509_getm_notBefore(mCert));
     // add the known extensions
     mLLSDInfo[CERT_BASIC_CONSTRAINTS] = _basic_constraints_ext(mCert);
     mLLSDInfo[CERT_KEY_USAGE] = _key_usage_ext(mCert);
@@ -355,8 +360,20 @@ LLSD cert_name_from_X509_NAME(X509_NAME* name)
         char buffer[32];
         X509_NAME_ENTRY *entry = X509_NAME_get_entry(name, entry_index);
 
-        std::string name_value = std::string((const char*)ASN1_STRING_get0_data(X509_NAME_ENTRY_get_data(entry)),
-                                             ASN1_STRING_length(X509_NAME_ENTRY_get_data(entry)));
+        ASN1_STRING *name_data = X509_NAME_ENTRY_get_data(entry);
+
+        std::string name_value;
+        if (ASN1_STRING_type(name_data) != V_ASN1_UTF8STRING)
+        {
+            unsigned char* out_utf8_str;
+            int len = ASN1_STRING_to_UTF8(&out_utf8_str, name_data);
+            name_value = std::string((char*) out_utf8_str, len);
+            OPENSSL_free(out_utf8_str);
+        }
+        else
+        {
+            name_value = std::string((char*) ASN1_STRING_get0_data(name_data), ASN1_STRING_length(name_data));
+        }
 
         ASN1_OBJECT* name_obj = X509_NAME_ENTRY_get_object(entry);
         OBJ_obj2txt(buffer, sizeof(buffer), name_obj, 0);
@@ -605,7 +622,7 @@ void LLBasicCertificateStore::load_from_file(const std::string& filename)
                                 << LL_ENDL;
                         loaded++;
                     }
-                    catch (LLCertException& cert_exception)
+                    catch (const LLCertException& cert_exception)
                     {
                         LLSD cert_info(cert_exception.getCertData());
                         LL_DEBUGS("SECAPI_BADCERT","SECAPI") << "invalid certificate (" << cert_exception.what() << "): " << cert_info << LL_ENDL;
@@ -688,7 +705,7 @@ LLBasicCertificateChain::LLBasicCertificateChain(X509_STORE_CTX* store)
 
     // we're passed in a context, which contains a cert, and a blob of untrusted
     // certificates which compose the chain.
-    if((store == NULL) || X509_STORE_CTX_get0_cert(store) == NULL)
+    if((store == NULL) || (X509_STORE_CTX_get0_cert(store) == NULL))
     {
         LL_WARNS("SECAPI") << "An invalid store context was passed in when trying to create a certificate chain" << LL_ENDL;
         return;
@@ -697,15 +714,17 @@ LLBasicCertificateChain::LLBasicCertificateChain(X509_STORE_CTX* store)
     LLPointer<LLCertificate> current = new LLBasicCertificate(X509_STORE_CTX_get0_cert(store));
 
     add(current);
-    if(X509_STORE_CTX_get0_untrusted(store) != NULL)
+
+    stack_st_X509* untrusted = X509_STORE_CTX_get0_untrusted(store);
+    if(untrusted != NULL)
     {
         // if there are other certs in the chain, we build up a vector
         // of untrusted certs so we can search for the parents of each
         // consecutive cert.
         LLBasicCertificateVector untrusted_certs;
-        for(int i = 0; i < sk_X509_num(X509_STORE_CTX_get0_untrusted(store)); i++)
+        for(int i = 0; i < sk_X509_num(untrusted); i++)
         {
-            LLPointer<LLCertificate> cert = new LLBasicCertificate(sk_X509_value(X509_STORE_CTX_get0_untrusted(store), i));
+            LLPointer<LLCertificate> cert = new LLBasicCertificate(sk_X509_value(untrusted, i));
             untrusted_certs.add(cert);
 
         }
@@ -1277,8 +1296,6 @@ void LLSecAPIBasicHandler::init()
                                                             "bin_conf.dat");
         mLegacyPasswordPath = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "password.dat");
 
-        mProtectedDataFilename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS,
-                                                            "bin_conf.dat");
         std::string store_file = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS,
                                                         "CA.pem");
 
@@ -1309,6 +1326,47 @@ LLSecAPIBasicHandler::~LLSecAPIBasicHandler()
 {
     _writeProtectedData();
 }
+
+#if LEGACY_PASSWORD_STORAGE
+// compat_rc4 reads old rc4 encrypted files
+void compat_rc4(llifstream &protected_data_stream, std::string &decrypted_data)
+{
+    U8 salt[COMPAT_STORE_SALT_SIZE];
+    U8 buffer[BUFFER_READ_SIZE];
+    U8 decrypted_buffer[BUFFER_READ_SIZE];
+    int decrypted_length;
+
+    unsigned char unique_id[MAC_ADDRESS_BYTES];
+    LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
+    LLXORCipher cipher(unique_id, sizeof(unique_id));
+
+    // read in the salt and key
+    protected_data_stream.read((char *)salt, COMPAT_STORE_SALT_SIZE);
+    if (protected_data_stream.gcount() < COMPAT_STORE_SALT_SIZE)
+    {
+        throw LLProtectedDataException("Config file too short.");
+    }
+
+    cipher.decrypt(salt, COMPAT_STORE_SALT_SIZE);
+
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    EVP_DecryptInit_ex(ctx, EVP_rc4(), NULL, salt, NULL);
+
+    while (protected_data_stream.good()) {
+        // read data as a block:
+        protected_data_stream.read((char *)buffer, BUFFER_READ_SIZE);
+
+        EVP_DecryptUpdate(ctx, decrypted_buffer, &decrypted_length,
+            buffer, (int)protected_data_stream.gcount());
+        decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
+    }
+
+    EVP_DecryptFinal_ex(ctx, decrypted_buffer, &decrypted_length);
+    decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
+
+    EVP_CIPHER_CTX_free(ctx);
+}
+#endif
 
 void LLSecAPIBasicHandler::_readProtectedData(unsigned char *unique_id, U32 id_len)
 {
@@ -1346,11 +1404,9 @@ void LLSecAPIBasicHandler::_readProtectedData(unsigned char *unique_id, U32 id_l
 
 
         // read in the rest of the file.
-        EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-        // todo: ctx error handling
+        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+        EVP_DecryptInit_ex(ctx, EVP_chacha20(), nullptr, salt, nullptr); // 0 is decrypt
 
-        EVP_DecryptInit(ctx, EVP_rc4(), salt, NULL);
-        // allocate memory:
         std::string decrypted_data;
 
         while(protected_data_stream.good()) {
@@ -1359,17 +1415,36 @@ void LLSecAPIBasicHandler::_readProtectedData(unsigned char *unique_id, U32 id_l
 
             EVP_DecryptUpdate(ctx, decrypted_buffer, &decrypted_length,
                               buffer, (int)protected_data_stream.gcount());
-            decrypted_data.append((const char *)decrypted_buffer, (int)protected_data_stream.gcount());
+            decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
         }
 
-        // RC4 is a stream cipher, so we don't bother to EVP_DecryptFinal, as there is
-        // no block padding.
+        EVP_DecryptFinal_ex(ctx, decrypted_buffer, &decrypted_length);
+        decrypted_data.append((const char *)decrypted_buffer, decrypted_length);
+
         EVP_CIPHER_CTX_free(ctx);
         std::istringstream parse_stream(decrypted_data);
         if (parser->parse(parse_stream, mProtectedDataMap,
                           LLSDSerialize::SIZE_UNLIMITED) == LLSDParser::PARSE_FAILURE)
         {
+#if LEGACY_PASSWORD_STORAGE
+            // clear and reset to try compat
+            parser->reset();
+            decrypted_data.clear();
+            protected_data_stream.clear();
+            protected_data_stream.seekg(0, std::ios::beg);
+            compat_rc4(protected_data_stream, decrypted_data);
+
+            std::istringstream compat_parse_stream(decrypted_data);
+            if (parser->parse(compat_parse_stream, mProtectedDataMap,
+                LLSDSerialize::SIZE_UNLIMITED) == LLSDParser::PARSE_FAILURE)
+            {
+                // everything failed abort
+                LLTHROW(LLProtectedDataException("Config file cannot be decrypted."));
+            }
+#else
+            // everything failed abort
             LLTHROW(LLProtectedDataException("Config file cannot be decrypted."));
+#endif
         }
     }
 }
@@ -1424,20 +1499,18 @@ void LLSecAPIBasicHandler::_writeProtectedData()
 
     llofstream protected_data_stream(tmp_filename.c_str(),
                                      std::ios_base::binary);
-    EVP_CIPHER_CTX *ctx = NULL;
+    EVP_CIPHER_CTX* ctx = nullptr;
     try
     {
-
         ctx = EVP_CIPHER_CTX_new();
-        // todo: ctx error handling
-
-        EVP_EncryptInit(ctx, EVP_rc4(), salt, NULL);
+        EVP_EncryptInit_ex(ctx, EVP_chacha20(), NULL, salt, NULL); // 1 is encrypt
         unsigned char unique_id[MAC_ADDRESS_BYTES];
         LLMachineID::getUniqueID(unique_id, sizeof(unique_id));
         LLXORCipher cipher(unique_id, sizeof(unique_id));
         cipher.encrypt(salt, STORE_SALT_SIZE);
         protected_data_stream.write((const char *)salt, STORE_SALT_SIZE);
 
+        int encrypted_length;
         while (formatted_data_istream.good())
         {
             formatted_data_istream.read((char *)buffer, BUFFER_READ_SIZE);
@@ -1445,13 +1518,14 @@ void LLSecAPIBasicHandler::_writeProtectedData()
             {
                 break;
             }
-            int encrypted_length;
             EVP_EncryptUpdate(ctx, encrypted_buffer, &encrypted_length,
                           buffer, (int)formatted_data_istream.gcount());
             protected_data_stream.write((const char *)encrypted_buffer, encrypted_length);
         }
 
-        // no EVP_EncrypteFinal, as this is a stream cipher
+        EVP_EncryptFinal_ex(ctx, encrypted_buffer, &encrypted_length);
+        protected_data_stream.write((const char *)encrypted_buffer, encrypted_length);
+
         EVP_CIPHER_CTX_free(ctx);
 
         protected_data_stream.close();

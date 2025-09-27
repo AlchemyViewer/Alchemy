@@ -42,9 +42,6 @@ LLPointer<LLSecAPIHandler> gSecAPIHandler;
 
 void initializeSecHandler()
 {
-    ERR_load_crypto_strings();
-    OpenSSL_add_all_algorithms();
-
     gHandlerMap[BASIC_SECHANDLER] = new LLSecAPIBasicHandler();
 
 
@@ -64,7 +61,7 @@ void initializeSecHandler()
         {
             handler->init();
         }
-        catch (LLProtectedDataException& e)
+        catch (const LLProtectedDataException& e)
         {
             exception_msg = e.what();
         }
@@ -78,9 +75,10 @@ void initializeSecHandler()
 
 void clearSecHandler()
 {
-    gSecAPIHandler = NULL;
+    gSecAPIHandler = nullptr;
     gHandlerMap.clear();
 }
+
 // start using a given security api handler.  If the string is empty
 // the default is used
 LLPointer<LLSecAPIHandler> getSecHandler(const std::string& handler_type)
