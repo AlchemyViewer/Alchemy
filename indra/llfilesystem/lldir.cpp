@@ -387,7 +387,7 @@ std::string LLDir::buildSLOSCacheDir() const
     }
     else
     {
-        res = add(getOSCacheDir(), "Alchemy");
+        res = add(getOSCacheDir(), "AlchemyViewer");
     }
     return res;
 }

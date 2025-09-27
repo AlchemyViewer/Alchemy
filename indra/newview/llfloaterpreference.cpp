@@ -1644,6 +1644,7 @@ void LLFloaterPreference::refreshEnabledState()
     getChild<LLButton>("default_creation_permissions")->setEnabled(LLStartUp::getStartupState() >= STATE_STARTED);
 
     getChildView("block_list")->setEnabled(LLLoginInstance::getInstance()->authSuccess());
+
 }
 
 void LLAvatarComplexityControls::setIndirectControls()

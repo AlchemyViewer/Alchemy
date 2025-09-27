@@ -975,7 +975,8 @@ LLGLManager::LLGLManager() :
     mGLSLVersionMinor(0),
     mVRAM(0),
     mGLMaxVertexRange(0),
-    mGLMaxIndexRange(0)
+    mGLMaxIndexRange(0),
+    mGLMaxTextureSize(0)
 {
 }
 

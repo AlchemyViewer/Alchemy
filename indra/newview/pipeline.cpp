@@ -904,9 +904,10 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
     mRT->deferredScreen.shareDepthBuffer(mRT->screen);
 
-    if (hdr || shadow_detail > 0 || ssao || RenderDepthOfField || RlvActions::hasPostProcess())
-    { //only need mRT->deferredLight for hdr OR shadows OR ssao OR dof
-        if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
+    if (shadow_detail > 0 || ssao || RenderDepthOfField || RlvActions::hasPostProcess())
+    { //only need mRT->deferredLight for shadows OR ssao OR dof
+        bool high_precision_shadows = gSavedSettings.getBOOL("RenderShadowHighPrecision");
+        if (!mRT->deferredLight.allocate(resX, resY, high_precision_shadows ? GL_RGBA16F : GL_RGBA)) return false;
     }
     else
     {
@@ -8075,12 +8076,12 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
         bool apply_cas = cas_sharpness != 0.0f && gCASProgram.isComplete() && gCASLegacyGammaProgram.isComplete();
 
-        tonemap(&mRT->screen, apply_cas ? &mRT->deferredLight : &mPostPingMap, !apply_cas);
+        tonemap(&mRT->screen, apply_cas ? &mWaterDis : &mPostPingMap, !apply_cas);
 
         if (apply_cas)
         {
             // Gamma Corrects
-            applyCAS(&mRT->deferredLight, &mPostPingMap);
+            applyCAS(&mWaterDis, &mPostPingMap);
         }
     }
     else
