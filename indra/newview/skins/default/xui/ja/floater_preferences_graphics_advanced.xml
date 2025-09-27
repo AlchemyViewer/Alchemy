@@ -43,9 +43,18 @@
 	<text name="HardwareText">
 		ハードウェア
 	</text>
-	<check_box label="異方向性フィルタリング（有効にすると遅くなります）" name="ani"/>
-	<check_box control_name="RenderCompressTextures" label="テクスチャ圧縮の有効化 (再起動後に反映)" name="texture compression" tool_tip="ビデオメモリ内のテクスチャを圧縮し、色の品質をある程度犠牲にして、より高解像度のテクスチャを読み込むようにします。"/>
+	<check_box label="テクスチャ圧縮の有効化 (再起動後に反映)" name="texture compression" tool_tip="ビデオメモリ内のテクスチャを圧縮し、色の品質をある程度犠牲にして、より高解像度のテクスチャを読み込むようにします。"/>
 	<check_box label="HiDPIディスプレイのサポートを有効にする（再起動後に反映）" name="use HiDPI" tool_tip="ＯｐｅｎＧＬの高解像描画を有効化します。"/>
+	<text name="af strength label">
+		異方向性フィルタリング
+	</text>
+	<combo_box label="異方向性フィルタリング" name="anisotropic_filter">
+		<combo_box.item label="無効" name="disabled"/>
+		<combo_box.item label="２倍" name="2x"/>
+		<combo_box.item label="４倍" name="4x"/>
+		<combo_box.item label="８倍" name="8x"/>
+		<combo_box.item label="１６倍" name="16x"/>
+	</combo_box>
 	<text name="antialiasing label">
 		アンチエイリアス：
 	</text>
