@@ -1509,10 +1509,13 @@ void LLAgent::pitch(F32 angle)
 
     LLVector3 skyward = getReferenceUpVector();
 
+    static LLCachedControl<bool> useRealisticMouselook(gSavedSettings, "AlchemyRealisticMouselook", false);
+    const bool in_mouselook = gAgentCamera.cameraMouselook();
+
     // clamp pitch to limits
     if (angle >= 0.f)
     {
-        const F32 look_down_limit = 179.f * DEG_TO_RAD;
+        const F32 look_down_limit = (in_mouselook && useRealisticMouselook ? 160.f : 179.f) * DEG_TO_RAD;
         F32 angle_from_skyward = acos(mFrameAgent.getAtAxis() * skyward);
         if (angle_from_skyward + angle > look_down_limit)
         {
@@ -1521,7 +1524,7 @@ void LLAgent::pitch(F32 angle)
     }
     else if (angle < 0.f)
     {
-        const F32 look_up_limit = 5.f * DEG_TO_RAD;
+        const F32 look_up_limit = (in_mouselook && useRealisticMouselook ? 20.f : 5.f) * DEG_TO_RAD;
         const LLVector3& viewer_camera_pos = LLViewerCamera::getInstance()->getOrigin();
         LLVector3 agent_focus_pos = getPosAgentFromGlobal(gAgentCamera.calcFocusPositionTargetGlobal());
         LLVector3 look_dir = agent_focus_pos - viewer_camera_pos;

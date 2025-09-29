@@ -149,6 +149,7 @@ pre_build()
     RELEASE_CRASH_REPORTING=OFF
     HAVOK=OFF
     TESTING=OFF
+    USE_LTO=ON
     SIGNING=()
     if [[ "$variant" != *OS ]]
     then
@@ -170,6 +171,7 @@ pre_build()
       # RELEASE_CRASH_REPORTING is tuned on unconditionaly, this is fine but not for Linux as of now (due to missing breakpad/crashpad support)
       RELEASE_CRASH_REPORTING=OFF
       HAVOK=OFF
+      USE_LTO=OFF
     fi
 
     if $build_tests
@@ -202,6 +204,7 @@ pre_build()
     "$autobuild" configure --quiet -c $variant \
      ${eval_autobuild_configure_parameters:---} \
      -DLL_TESTS:BOOL="$TESTING" \
+     -DUSE_LTO:BOOL="$USE_LTO" \
      -DPACKAGE:BOOL=ON \
      -DHAVOK:BOOL="$HAVOK" \
      -DRELEASE_CRASH_REPORTING:BOOL="$RELEASE_CRASH_REPORTING" \

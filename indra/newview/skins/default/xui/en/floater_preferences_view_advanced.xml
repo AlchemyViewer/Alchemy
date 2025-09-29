@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater
- height="190"
+ height="271"
  layout="topleft"
  name="floaterpreferencesviewadvanced"
  help_topic="floaterviewadvanced"
@@ -8,7 +8,7 @@
  save_rect="true"
  single_instance="true"
  reuse_instance="false"
- width="280">
+ width="292">
 
   <text
     follows="top|left|right"
@@ -42,7 +42,7 @@
    label_width="12"
    follows="top|left"
    name="camera_y"
-   left_pad="20"
+   left_pad="21"
    min_val="-1e+007"
    max_val="1e+007"
    width="70">
@@ -56,7 +56,7 @@
    label_width="12"
    follows="top|left"
    name="camera_z"
-   left_pad="20"
+   left_pad="21"
    min_val="-1e+007"
    max_val="1e+007"
    width="70">
@@ -64,13 +64,27 @@
      function="CommitSettings" />
   </spinner>
 
+  <button
+  follows="top|left|right"
+  left_pad="3"
+  top_delta="0"
+  height="22"
+  width="22"
+  name="reset_offset_rear"
+  image_overlay="Refresh_Off"
+  tool_tip="Reset camera offset to default value">
+     <button.commit_callback
+        function="ResetControl"
+        parameter="CameraOffsetRearView" />
+  </button>
+
   <text
     follows="top|left|right"
     name="focus_offset_lbl"
     height="16"
     layout="topleft"
     left="10"
-    top_pad="20"
+    top_pad="9"
     width="100">
       Focus offset:
   </text>
@@ -96,7 +110,7 @@
    label_width="12"
    follows="top|left"
    name="focus_y"
-   left_pad="20"
+   left_pad="21"
    min_val="-1e+007"
    max_val="1e+007"
    width="70">
@@ -110,13 +124,26 @@
    label_width="12"
    follows="top|left"
    name="focus_z"
-   left_pad="20"
+   left_pad="21"
    min_val="-1e+007"
    max_val="1e+007"
    width="70">
     <spinner.commit_callback
      function="CommitSettings" />
   </spinner>
+   <button
+   follows="top|left|right"
+   left_pad="3"
+   top_delta="0"
+   height="22"
+   width="22"
+   name="reset_offset_rear"
+   image_overlay="Refresh_Off"
+   tool_tip="Reset focus offset to default value">
+      <button.commit_callback
+         function="ResetControl"
+         parameter="FocusOffsetRearView" />
+   </button>
 
    <text
     follows="top|left|right"
@@ -124,7 +151,7 @@
     height="16"
     layout="topleft"
     left="10"
-    top_pad="20"
+    top_pad="8"
     width="140">
       Camera offset scale:
   </text>
@@ -133,7 +160,7 @@
    control_name="CameraOffsetScale"
    follows="top|left|right"
    height="16"
-   top_pad="5"
+   top_pad="2"
    increment="0.1"
    min_val="-3"
    max_val="5"
@@ -154,5 +181,168 @@
     <spinner.commit_callback
      function="CommitSettings" />
   </spinner>
+  <button
+  follows="top|left|right"
+  left_pad="3"
+  top_delta="0"
+  height="22"
+  width="22"  
+  name="reset_offset_scale"
+  image_overlay="Refresh_Off"
+  tool_tip="Reset offset scaling to default value">
+     <button.commit_callback
+        function="ResetControl"
+        parameter="CameraOffsetScale" />
+  </button>
 
+  <text
+  follows="top|left|right"
+  name="offset_scale_lbl"
+  height="16"
+  layout="topleft"
+  left="10"
+  top_pad="3"
+  width="140">
+    Camera angle:
+</text>
+
+<slider
+ control_name="CameraAngle"
+ follows="top|left|right"
+ height="16"
+ top_pad="2"
+ increment="0.025"
+ min_val="0.08"
+ max_val="3.06"
+ show_text="false"
+ layout="topleft"
+ left="3"
+ name="camera_angle_slider"
+ width="196" />
+<spinner
+ control_name="CameraAngle"
+ height="20"
+ follows="top|left|right"
+ left_pad="5"
+ name="camera_angle_spinner"
+ min_val="0.08"
+ max_val="3.06"
+ width="58"
+ increment="0.025">
+  <spinner.commit_callback
+   function="CommitSettings" />
+</spinner>
+   <button
+   follows="top|left|right"
+   left_pad="3"
+   top_delta="0"
+   height="22"
+   width="22"
+   name="reset_angle"
+   image_overlay="Refresh_Off"
+   tool_tip="Reset camera angle to default value">
+      <button.commit_callback
+         function="ResetControl"
+         parameter="CameraAngle" />
+   </button>
+
+   <text
+   follows="top|left|right"
+   name="offset_scale_lbl"
+   height="16"
+   layout="topleft"
+   left="10"
+   top_pad="3"
+   width="140">
+     Zoom Speed:
+ </text>
+ 
+ <slider
+  control_name="ZoomTime"
+  follows="top|left|right"
+  height="16"
+  top_pad="2"
+  increment="0.1"
+  min_val="0.0"
+  max_val="30.0"
+  show_text="false"
+  layout="topleft"
+  left="3"
+  name="zoom_time_slider"
+  width="196" />
+ <spinner
+  control_name="ZoomTime"
+  height="20"
+  follows="top|left|right"
+  left_pad="5"
+  name="zoom_time_spin"
+  min_val="0.0"
+  max_val="30.0"
+  width="58"
+  increment="0.1">
+   <spinner.commit_callback
+    function="CommitSettings" />
+ </spinner>
+    <button
+    follows="top|left|right"
+    left_pad="3"
+    top_delta="0"
+    height="22"
+    width="22"
+    name="reset_zoom_time"
+    image_overlay="Refresh_Off"
+    tool_tip="Reset camera zoom speed to default value">
+       <button.commit_callback
+          function="ResetControl"
+          parameter="ZoomTime" />
+    </button>
+
+    <text
+    follows="top|left|right"
+    name="offset_scale_lbl"
+    height="16"
+    layout="topleft"
+    left="10"
+    top_pad="3"
+    width="140">
+      Position Smoothing:
+  </text>
+  
+  <slider
+   control_name="CameraPositionSmoothing"
+   follows="top|left|right"
+   height="16"
+   top_pad="2"
+   increment="1.000"
+   min_val="0.0"
+   max_val="60.0"
+   show_text="false"
+   layout="topleft"
+   left="3"
+   name="cam_pos_slider"
+   width="196" />
+  <spinner
+   control_name="CameraPositionSmoothing"
+   height="20"
+   follows="top|left|right"
+   left_pad="5"
+   name="cam_pos_spinner"
+   min_val="0.0"
+   max_val="60.0"
+   width="58"
+   increment="1.000">
+  </spinner>
+     <button
+     follows="top|left|right"
+     left_pad="3"
+     top_delta="0"
+     height="22"
+     width="22"
+     name="cam_pos_reset"
+     image_overlay="Refresh_Off"
+     tool_tip="Reset camera position smoothing to default value">
+        <button.commit_callback
+           function="ResetControl"
+           parameter="CameraPositionSmoothing" />
+     </button>
 </floater>

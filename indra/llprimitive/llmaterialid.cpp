@@ -61,8 +61,6 @@ LLMaterialID::LLMaterialID(const LLUUID& lluid)
     set(lluid.mData);
 }
 
-#if !defined(LL_X86) && !defined(LL_ARM64)
-
 bool LLMaterialID::operator == (const LLMaterialID& pOtherMaterialID) const
 {
     return (compareToOtherMaterialID(pOtherMaterialID) == 0);
@@ -97,8 +95,6 @@ bool LLMaterialID::isNull() const
 {
     return (compareToOtherMaterialID(LLMaterialID::null) == 0);
 }
-
-#endif
 
 const U8* LLMaterialID::get() const
 {
@@ -138,7 +134,7 @@ std::string LLMaterialID::asString() const
         {
             materialIDString += "-";
         }
-        const U32* value = reinterpret_cast<const U32*>(&get()[i * sizeof(U32)]);
+        const U32 *value = reinterpret_cast<const U32*>(&get()[i * sizeof(U32)]);
         materialIDString += llformat("%08x", *value);
     }
     return materialIDString;
@@ -163,8 +159,6 @@ void LLMaterialID::parseFromBinary (const LLSD::Binary& pMaterialID)
     memcpy(mID, &pMaterialID[0], MATERIAL_ID_SIZE * sizeof(U8));
 }
 
-#if !defined(LL_X86) && !defined(LL_ARM64)
-
 int LLMaterialID::compareToOtherMaterialID(const LLMaterialID& pOtherMaterialID) const
 {
     int retVal = 0;
@@ -178,5 +172,3 @@ int LLMaterialID::compareToOtherMaterialID(const LLMaterialID& pOtherMaterialID)
 
     return retVal;
 }
-
-#endif

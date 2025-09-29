@@ -8626,6 +8626,22 @@ class LLCheckControl : public view_listener_t
     }
 };
 
+class LLResetControl : public view_listener_t
+{
+protected:
+
+    bool handleEvent(const LLSD& userdata)
+    {
+        std::string control_name = userdata.asString();
+        auto ctrlp = gSavedSettings.getControl(control_name);
+        if (ctrlp)
+        {
+            ctrlp->resetToDefault(true);
+        }
+        return true;
+    }
+};
+
 // not so generic
 
 class LLAdvancedCheckRenderShadowOption: public view_listener_t
@@ -10844,6 +10860,7 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToggleControl(), "ToggleControl");
     view_listener_t::addMenu(new LLToggleShaderControl(), "ToggleShaderControl");
     view_listener_t::addMenu(new LLCheckControl(), "CheckControl");
+    view_listener_t::addMenu(new LLResetControl(), "ResetControl");
     view_listener_t::addMenu(new LLGoToObject(), "GoToObject");
     commit.add("PayObject", boost::bind(&handle_give_money_dialog));
 

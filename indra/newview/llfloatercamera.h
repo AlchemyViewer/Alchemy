@@ -31,6 +31,7 @@
 #include "lliconctrl.h"
 #include "lltextbox.h"
 #include "llflatlistview.h"
+#include "llbutton.h"
 
 class LLJoystickCameraRotate;
 class LLJoystickCameraTrack;
@@ -45,7 +46,7 @@ enum ECameraControlMode
     CAMERA_CTRL_MODE_PRESETS
 };
 
-class LLFloaterCamera : public LLFloater
+class LLFloaterCamera final : public LLFloater
 {
     friend class LLFloaterReg;
 
@@ -122,6 +123,9 @@ private:
 
     void showDebugInfo(bool show);
 
+    void toggleCollapse();
+    void collapse();
+
     // set to true when free camera mode is selected in modes list
     // remains true until preset camera mode is chosen, or pan button is clicked, or escape pressed
     static bool sFreeCamera;
@@ -135,7 +139,8 @@ private:
     LLPanel* mViewerCameraInfo { nullptr };
     LLPanel* mAgentCameraInfo { nullptr };
     LLComboBox* mPresetCombo { nullptr };
-    LLTextBox* mPreciseCtrls { nullptr };
+//  LLTextBox* mPreciseCtrls { nullptr };
+    LLButton* mBtnCollapse { nullptr };
 };
 
 /**

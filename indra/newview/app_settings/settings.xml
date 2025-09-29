@@ -16819,6 +16819,17 @@
     <integer>0</integer>
   </map>
   <!-- ALCHEMY BELOW -->
+  <key>AlchemyCameraFloaterExpanded</key>
+  <map>
+      <key>Comment</key>
+      <string>Expanded camera floater</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+  </map>
   <key>AlchemyChatCommandAnimationOverride</key>
   <map>
       <key>Comment</key>
@@ -17359,6 +17370,17 @@
       <string>Boolean</string>
       <key>Value</key>
       <integer>1</integer>
+  </map>
+  <key>AlchemyRealisticMouselook</key>
+  <map>
+      <key>Comment</key>
+      <string>Make the camera follow avatar body movements and animations while in mouselook</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
   </map>
   <key>AlchemyRezUnderLandGroup</key>
   <map>

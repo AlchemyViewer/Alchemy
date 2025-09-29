@@ -32,6 +32,7 @@
 //#include "alcinematicmode.h"
 #include "alfloaterparticleeditor.h"
 #include "llagent.h"
+#include "llagentcamera.h"
 #include "llappviewer.h"
 #include "llavatarpropertiesprocessor.h"
 #include "llhudobject.h"
@@ -454,6 +455,9 @@ void ALViewerMenu::initialize_menus()
     commit.add("Avatar.RefreshTexture", [](LLUICtrl* ctrl, const LLSD& param) { avatar_texture_refresh(); });
 
     commit.add("Advanced.DebugSimFeatures", [](LLUICtrl* ctrl, const LLSD& param) { spawn_debug_simfeatures(); });
+
+    commit.add("Camera.SavePosition", [](LLUICtrl* ctrl, const LLSD& param) { gAgentCamera.storeCameraPosition(); });
+    commit.add("Camera.RestorePosition", [](LLUICtrl* ctrl, const LLSD& param) { gAgentCamera.loadCameraPosition(); });
 
     commit.add("Object.CopyID", [](LLUICtrl* ctrl, const LLSD& param) { object_copy_key(); });
     commit.add("Object.EditParticles",  [](LLUICtrl* ctrl, const LLSD& param) { edit_particle_source(); });

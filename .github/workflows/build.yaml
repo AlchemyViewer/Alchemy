@@ -451,7 +451,7 @@ jobs:
 
       - uses: actions/download-artifact@v5
         with:
-          pattern: "Linux-app"
+          name: "Linux-app"
 
       - name: Rename metadata
         run: |
@@ -468,14 +468,10 @@ jobs:
         uses: secondlife-3p/action-gh-release@v1
         with:
           # name the release page for the branch
-          name: "${{ needs.build.outputs.viewer_branch }}"
+          name: "${{ needs.build.outputs.viewer_channel }} ${{ needs.build.outputs.viewer_version }}"
           # SL-20546: want the channel and version to be visible on the
           # release page
           body: |
-            Build ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            ${{ needs.build.outputs.viewer_channel }}
-            ${{ needs.build.outputs.viewer_version }}
-            ${{ needs.build.outputs.relnotes }}
           prerelease: true
           generate_release_notes: true
           target_commitish: ${{ github.sha }}
@@ -484,9 +480,7 @@ jobs:
           files: |
             macOS-installer/*.dmg
             Windows-installer/*.exe
-            Linux-app/*.tar.xz
-            *-autobuild-package.xml
-            *-viewer_version.txt
+            *.tar.xz
 
       - name: post release URL
         run: |
