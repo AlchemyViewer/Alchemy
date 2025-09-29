@@ -170,8 +170,8 @@
 	<spinner label="メートル毎に繰り返す" name="gltfRptctrl"/>
 	<!-- END PBR Material texture transform parameters -->
 	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同期させます。"/>
-	<button label="揃える" name="button align textures" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
-	<button label="全て検索" name="btn_select_same_diff" tool_tip="この面と同じディフューズ（拡散反射）マップを貼り付けた、すべての面を選択します。"/>
+	<button label="揃える" name="button align textures" label_selected="現在のテクスチャレイヤーを揃える" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
+	<button label="全て検索" name="btn_select_same_diff" tool_tip="この面と同じ拡散（ディフューズ）マップを貼り付けた、すべての面を選択します。"/>
 	<button label="全て検索" name="btn_select_same_norm" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。"/>
 	<button label="全て検索" name="btn_select_same_spec" tool_tip="この面と同じ鏡面反射（スペキュラ）マップを貼り付けた、すべての面を選択します。"/>
 	<button label="全て検索" name="btn_select_same_pbr" tool_tip="この面と同じＰＢＲマテリアルを貼り付けた、すべての面を選択します。"/>
