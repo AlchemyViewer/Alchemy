@@ -431,6 +431,64 @@ bool checkRDNA35()
     return false;
 }
 
+/**
+ * Removes the Mesa information from the GPU model string.
+ *
+ * The Mesa graphics utilities injects the current kernel name and version,
+ * as well as Mesa's own name and version into the device name, which causes
+ * several usability headaches when doing A/B testing across kernel and Mesa
+ * releases, as the original behavior of the viewer is to reset the graphics
+ * settings every time this string changes.
+ * This function thus strips everything but the physical device information
+ * from the string to greatly aid both the developer and the end user
+ * experience.
+ *
+ * @param[out] device_name Contains the new GPU model string, after being cleaned if applicable.
+ */
+bool extractGLDeviceModel(std::string& device_name)
+{
+    const std::string gl_string = ll_safe_string((const char*)(glGetString(GL_RENDERER)));
+#if LL_LINUX
+    // Get the kernel version; essentially 'uname -r' on Linux
+    // TODO: *BSD
+    std::istringstream iss(LLOSInfo::instance().getOSString());
+    std::string first, second;
+    iss >> first >> second;
+    const std::string kernel_version = (first == "Linux") ? second : "";
+
+    if (!kernel_version.empty())
+    {
+        LL_WARNS("RenderInit") << "Linux detected, performing GPU String cleanup!" << LL_ENDL;
+        std::string new_gpu_string = gl_string;
+        if (new_gpu_string.find(kernel_version) != std::string::npos)
+        {
+            LL_WARNS("RenderInit") << "GPU String contains the kernel version, removing" << LL_ENDL;
+            // Strip the extra information on AMD adapters
+            if (const size_t paren_pos = new_gpu_string.find('('); paren_pos != std::string::npos)
+            {
+                std::string result = new_gpu_string.substr(0, paren_pos);
+                // Trim trailing whitespace
+                result.erase(std::find_if(result.rbegin(), result.rend(),
+                            [](unsigned char c) { return !std::isspace(c); }).base(),
+                        result.end());
+                new_gpu_string = result;
+            }
+        }
+        // Strip leading 'Mesa' keyword on Intel adapters
+        if (const size_t paren_pos = new_gpu_string.find("Mesa "); paren_pos != std::string::npos)
+        {
+            LL_WARNS("RenderInit") << "GPU String contains 'Mesa', removing" << LL_ENDL;
+            std::string result = new_gpu_string.substr(5, std::string::npos);
+            new_gpu_string = result;
+        }
+        device_name = new_gpu_string;
+        return true;
+    }
+#endif // LL_LINUX
+    device_name = gl_string;
+    return false;
+}
+
 bool LLFeatureManager::loadGPUClass()
 {
     // This is a hack for certain AMD GPUs in newer driver versions on certain APUs.
@@ -528,8 +586,10 @@ bool LLFeatureManager::loadGPUClass()
         mGPUClass = GPU_CLASS_1;
     }
 
+    if (extractGLDeviceModel(mGPUString)) {
+        LL_INFOS("RenderInit") << "GPU String has been stripped of driver identification" << LL_ENDL;
+    }
     // defaults
-    mGPUString = gGLManager.getRawGLString();
     mGPUSupported = true;
 
     return true; // indicates that a gpu value was established
