@@ -21,7 +21,6 @@
 		<menu_item_call label="[Membership]" name="Membership"/>
 		<menu_item_call label="初期設定…" name="Preferences"/>
 		<menu_item_call label="ツールバーのボタン…" name="Toolbars"/>
-		<menu_item_call label="シネマティックモード" name="CinematicMode"/>
 		<menu_item_call label="全てのコントロールを隠す" name="Hide UI" shortcut="control|shift|U"/>
 		<menu_item_check label="ＨＵＤを表示" name="Show HUD Attachments" shortcut="alt|shift|H"/>
 		<menu_item_call label="[APP_NAME]の終了" name="Quit"/>
@@ -72,7 +71,6 @@
 		<menu_item_check label="近くのチャット…" name="Nearby Chat"/>
 		<menu_item_check label="ボイスチャット" name="Speak"/>
 		<menu_item_check label="会話ログ…" name="Conversation Log..."/>
-		<menu_item_check label="チャットのアラート…" name="Chat Alerts"/>
 		<menu_item_check label="ジェスチャー…" name="Gestures"/>
 		<menu_item_check label="喋る" name="Speak"/>
 		<menu_item_check label="ジェスチャー…" name="Gestures"/>
@@ -87,10 +85,7 @@
 		<menu_item_check label="非フレンドへ自動応答の有効化" name="Set AutoRespond to non-friends"/>
 	</menu>
 	<menu label="ワールド" name="World">
-		<menu_item_check label="ポーザー" name="Poser"/>
-		<menu_item_check label="ポーズクリエイター" name="Pose Creator"/>
 		<menu_item_call label="アニメーションを再同期" name="Resync Animations"/>
-		<menu_item_check label="サウンドエクスプローラー" name="Sound Explorer"/>
 		<menu_item_call label="現在地のランドマークを作成" name="Create Landmark Here"/>
 		<menu_item_call label="行き先…" name="Destinations"/>
 		<menu_item_check label="ワールドマップ" name="World Map"/>
@@ -122,7 +117,6 @@
 			<menu_item_check label="土地所有者" name="Land Owners"/>
 			<menu_item_check label="座標" name="Coordinates"/>
 			<menu_item_check label="区画のプロパティ" name="Parcel Properties"/>
-			<menu_item_check label="被写界深度（ＤｏＦ）のフォーカスを固定する" name="lock_focus_point"/>
 			<menu_item_check label="高度な操作メニュー" name="Show Advanced Menu"/>
 		</menu>
 		<menu_item_check label="グラフィック性能の最適化…" name="Performance"/>
@@ -215,8 +209,6 @@
 			<menu_item_check label="選択した光の効果範囲を表示する" name="Show Light Radius for Selection"/>
 			<menu_item_check label="反射プローブの影響範囲を表示する" name="Show Reflection Probe Volumes"/>
 			<menu_item_check label="選択ビームを表示する" name="Show Selection Beam"/>
-			<menu_item_check label="区画の境界のアウトラインを表示する" name="RenderParcelSelection"/>
-			<menu_item_check label="ビルドできる最大高度の境界を表示する" name="RenderParcelSelectionToMaxHeight"/>
 			<menu_item_check label="透過をハイライトする" name="Highlight Transparent"/>
 			<menu_item_check label="透過プローブをハイライトする" name="Highlight Transparent Probes"/>
 			<menu_item_check label="Ctrl＋ドラッグでオブジェクトを掴む" name="EnableCtrlDragMovement"/>
@@ -250,15 +242,10 @@
 		<!--
 		<menu_item_call label="チュートリアル" name="Tutorial"/>
 		-->
-		<menu_item_call label="Alchemyのウェブサイト" name="Alchemy Website"/>
-		<menu_item_call label="Alchemyのダウンロードページ" name="Alchemy Downloads"/>
-		<menu_item_call label="Alchemyのバグ報告" name="Report Alchemy Bug"/>
-		<menu_item_call label="Alchemyの機能改善をリクエスト" name="Request Alchemy Improvement"/>
 		<menu_item_call label="Second Lifeナレッジベース" name="Knowledge Base"/>
 		<menu_item_call label="Second Life Wiki" name="Wiki"/>
 		<menu_item_call label="Second Lifeコミュニティフォーラム" name="Community Forums"/>
 		<menu_item_call label="Second Lifeサポートポータル" name="Support portal"/>
-		<menu_item_call label="Second Lifeニュース" name="Second Life News"/>
 		<menu_item_call label="Second Lifeブログ" name="Second Life Blogs"/>
 		<menu_item_call label="嫌がらせの報告" name="Report Abuse"/>
 		<menu_item_call label="バグの報告" name="Report Bug"/>
@@ -297,8 +284,6 @@
 		<menu_item_check label="オブジェクトの選択距離の制限" name="Limit Select Distance"/>
 		<menu_item_check label="ドラッグ距離の制限" name="Limit Drag Distance"/>
 		<menu_item_check label="カメラの距離制限を解除" name="Disable Camera Distance"/>
-		<menu_item_check label="最小ズーム距離を無効化" name="Disable Minimum Zoom Distance"/>
-		<menu_item_check label="ＳＩＭのカメラの衝突面を無効化" name="Disable Sim Camera Collision Plane"/>
 		<menu_item_check label="アバターを身軽に" name="Avatar Ignore Prejump"/>
 		<menu_item_check label="高解像度スナップショット" name="HighResSnapshot"/>
 		<menu_item_check label="スナップショットをディスクに保存" name="QuietSnapshotsToDisk"/>
@@ -406,7 +391,6 @@
 		<menu label="エラー実行" name="Force Errors">
 			<menu_item_call label="ブレークポイント" name="Force Breakpoint"/>
 			<menu_item_call label="LLErrorとクラッシュを実行する" name="Force LLError And Crash"/>
-			<menu_item_call label="LLErrorとメッセージとクラッシュを実行する" name="Force LLError Message And Crash"/>
 			<menu_item_call label="不正なメモリアクセスを実行する" name="Force Bad Memory Access"/>
 			<menu_item_call label="コルーチン内で不正なメモリアクセスを発生させる" name="Force Bad Memory Access in Coroutine"/>
 			<menu_item_call label="無限ループを発生させる" name="Force Infinite Loop"/>
@@ -440,7 +424,6 @@
 			<menu_item_call label="フレームのプロフィール" name="Frame Profile"/>
 			<menu_item_call label="ベンチマーク" name="Benchmark"/>
 			<menu_item_call label="ＨＤＲＩプレビュー" name="HDRI Preview"/>
-			<menu_item_call label="ＧＬＴＦシーンプレビュー" name="GLTF Scene Preview"/>
 		</menu>
 		<menu label="メタデータの描画" name="Render Metadata">
 			<menu_item_check label="バウンディングボックス" name="Bounding Boxes"/>
@@ -487,7 +470,6 @@
 			<menu_item_check label="パイプラインをデバッグ" name="Debug Pipeline"/>
 			<menu_item_check label="自動アルファマスク（遅延）" name="Automatic Alpha Masks (deferred)"/>
 			<menu_item_check label="自動アルファマスク（遅延なし）" name="Automatic Alpha Masks (non-deferred)"/>
-			<menu_item_check label="自動アルファマスク（ＲＭＳＥ）" name="Automatic Alpha Masks (RMSE)"/>
 			<menu_item_check label="アニメーションテクスチャ" name="Animation Textures"/>
 			<menu_item_check label="テクスチャを無効にする" name="Disable Textures"/>
 			<menu_item_check label="フル解像度テクスチャ" name="Rull Res Textures"/>
@@ -501,9 +483,6 @@
 		</menu>
 		<menu label="ネットワーク" name="Network">
 			<menu_item_check label="エージェントを一時停止する" name="AgentPause"/>
-			<menu_item_call label="メッセージログ…" name="Message Log"/>
-			<menu_item_call label="メッセージビルダー…" name="Message Builder"/>
-			<menu_item_call label="メッセージ書き換え…" name="Message Rewriter"/>
 			<menu_item_call label="メッセージログを有効にする" name="Enable Message Log"/>
 			<menu_item_call label="メッセージログを使用不可にする" name="Disable Message Log"/>
 			<menu_item_check label="速度補間オブジェクト" name="Velocity Interpolate Objects"/>

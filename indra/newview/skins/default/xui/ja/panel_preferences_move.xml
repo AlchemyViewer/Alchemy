@@ -16,7 +16,7 @@
 	<text name="mouse_lbl">
 		マウス：
 	</text>
-	<check_box label="Show me in Mouselook" name="first_person_avatar_visible"/>
+	<check_box label="マウスルックで自身を表示" name="first_person_avatar_visible"/>
 	<text name=" Mouse Sensitivity">
 		マウスルック時のマウスの感度：
 	</text>

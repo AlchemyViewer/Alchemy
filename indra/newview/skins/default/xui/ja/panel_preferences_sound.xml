@@ -23,19 +23,13 @@
 	<text name="Listen media from">
 		メディアとサウンドの聞き取り位置：
 	</text>
-	<radio_group name="media_ear_location">
-		<radio_item label="カメラの位置" name="camera_position"/>
-		<radio_item label="アバターの位置" name="avatar_position"/>
-	</radio_group>
-	<check_box name="sound_on_collisions" tool_tip="ここをチェックすると、オブジェクトやアバターにぶつかったときに衝突音がなります。" label="衝突音を再生する"/>
-	<check_box name="media_auto_play_hud" tool_tip="ここのチェックを外すと、自分のＨＵＤに取り付けられたメディアが自動再生されなくなります。" label="自分のＨＵＤのメディアを自動再生"/>
 	<text name="media_autoplay_label">
 		メディアの自動再生
 	</text>
 	<combo_box name="media_auto_play_combo">
-		<item label="再生しない" name="autoplay_disabled" value="0"/>
-		<item label="常に再生" name="autoplay_enabled" value="1"/>
-		<item label="その都度確認" name="autoplay_ask" value="2"/>
+		<item label="再生しない" name="autoplay_disabled"/>
+		<item label="常に再生" name="autoplay_enabled"/>
+		<item label="その都度確認" name="autoplay_ask"/>
 	</combo_box>
 	<text name="media_firstinteract_label">
 		メディアの開始インタラクト：
@@ -65,10 +59,10 @@
 	<text name="Listen from">
 		ボイスの聞き取り位置：
 	</text>
-	<radio_group name="ear_location">
-		<radio_item label="カメラの位置" name="0"/>
-		<radio_item label="アバターの位置" name="1"/>
-	</radio_group>
+	<combo_box name="ear_location_combo">
+		<item label="カメラの位置" name="camera_position"/>
+		<item label="アバターの位置" name="avatar_position"/>
+	</combo_box>
 	<check_box tool_tip="ここをチェックするとボイスのエコーを除去します。" label="エコー除去" name="enable_echo_cancellation"/>
 	<check_box label="ツールバーのボタンでボイスの切り替え" name="push_to_talk_toggle_check" tool_tip="トグルモードでは、トリガーキーを押すことでマイクのオン／オフを切り替えます。そうでない場合は、トリガーキーを押している間だけマイクがオンになります。"/>
 	<check_box tool_tip="ここをチェックすると、自動ゲインコントロールを有効化します。" label="自動音量調整" name="voice_automatic_gain_control"/>

@@ -3,33 +3,6 @@
 	<text name="Graphic Presets">
 		グラフィックのプリセット
 	</text>
-	<text name="QualitySpeed">
-		品質と速度
-	</text>
-	<text name="ShadersPrefText">
-		低
-	</text>
-	<text name="ShadersPrefText2">
-		中
-	</text>
-	<text name="ShadersPrefText3">
-		高
-	</text>
-	<text name="ShadersPrefText4">
-		最高
-	</text>
-	<text value="描画距離：" name="draw_distance_label"/>
-	<text value="オブジェクトのＬｏＤ：" name="lod_label"/>
-	<text value="パーティクル数：" name="max_particles_label"/>
-	<text value="アバター数：" name="max_avatars_label"/>
-	<text value="複雑度：" name="complexity_label"/>
-	<!--Max Local Lights-->
-	<text value="ローカル光源：" name="lights_label"/>
-	<!--Global Light Scale-->
-	<text value="光の強度：" name="light_intensity_label"/>
-	<text value="解像度スケール：" name="res_scale_label"/>
-	<slider_bar name="res_scale_slider_bar" tool_tip="（デフォルト：1.0）［危険］内部描画解像度スケールです。"/>
-	<spinner name="res_scale_spinner" tool_tip="（デフォルト：1.0）［危険］内部描画解像度スケールです。"/>
 	<button name="open_prefs_btn" label="グラフィック初期設定" tool_tip="グラフィック設定を呼び出します。"/>
 	<button name="open_autofps_btn" label="自動ＦＰＳ設定を開く" tool_tip="自動調整設定を開きます。"/>
 </panel>

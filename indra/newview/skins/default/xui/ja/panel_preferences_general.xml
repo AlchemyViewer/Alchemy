@@ -45,7 +45,6 @@
 	<check_box label="自分のグループタイトルを隠す" name="RenderHideGroupTitle" tool_tip="自分自身と他の全員に対する自分のグループタイトルを表示／非表示します。"/>
 	<check_box label="フレンドをハイライト表示" name="show_friends" tool_tip="フレンドの名前をハイライト表示します。"/>
 	<check_box label="表示名を表示" name="display_names_check" tool_tip="これを選択すると、チャット、ＩＭなどで表示名が表示されます。"/>
-	<check_box label="距離を表示" name="show_distance" tool_tip="自分から他の住人までの距離を名前タグに表示します。"/>
 	<text name="inworld_typing_rg_label">
 		特定キーを押したときの動作：
 	</text>
@@ -66,4 +65,7 @@
 	<text name="text_box3">
 		「取り込み中」のときの応答：
 	</text>
+	<text_editor name="do_not_disturb_response">
+		ログイン後に変更できます。
+	</text_editor>
 </panel>

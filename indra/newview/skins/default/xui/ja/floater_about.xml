@@ -17,15 +17,6 @@
 						<text name="alchemy_intro">
 							Alchemy は、Alchemy Development Groupによって提供されています：
 						</text>
-						<text_editor name="alchemy_names">
-							Rye Cogtail
-Luminous Luminos
-Unexpectedly Dismantled
-Cinder Roxley
-Inusaito Kanya
-Zanibar Darkstone
-Doug Falta
-						</text_editor>
 						<text name="alchemy_thanks_intro">スペシャルサンクス：</text>
 						<text_editor name="alchemy_supporter_names">
 							実行時に置き換えられるダミー名

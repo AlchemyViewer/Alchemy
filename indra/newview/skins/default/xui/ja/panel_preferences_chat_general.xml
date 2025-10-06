@@ -1,45 +1,17 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="テキストチャット" name="preferences_chat_general">
 	<panel name="general_chat_settings">
-		<check_box label="近くのチャット入力でチャットバーを使用する" name="use_chat_bar"/>
 		<check_box label="ローカルチャットでジェスチャーを自動補完する" name="auto_complete_gestures"/>
 		<check_box label="チャット時にタイピングアニメーションを再生する" name="play_typing_animation"/>
 		<check_box label="コールやＩＭができるのをフレンドとグループに限定する" name="voice_call_friends_only_check"/>
-		<check_box label="オフライン時にＩＭが送られてきたときにメールを送る（[EMAIL]）" name="send_im_to_email"/>
 		<text name="email_settings">[https://accounts.secondlife.com/change_email?lang=ja-JP オフライン時のＩＭのメール送信先の設定]</text>
-		<text name="font_name">
-			フォント名：
-		</text>
-		<combo_box name="chat_font_name">
-			<item label="IBM Plex" name="IBMPlex"/>
-			<item label="Noto Sans" name="NotoSans"/>
-			<item label="Open Dyslexic" name="OpenDyslexic"/>
-			<item label="Sans Serif" name="SansSerif"/>
-			<item label="Source Sans" name="SourceSans"/>
-			<item label="Ubuntu" name="Ubuntu"/>
-			<item label="Cascadia Code" name="CascadiaCode"/>
-			<item label="Fira Code" name="FiraCode"/>
-			<item label="IBM Plex Mono" name="IBMPlexMono"/>
-			<item label="Jetbrains Mono" name="JetbrainsMono"/>
-			<item label="Monaspace Argon" name="MonaspaceArgon"/>
-			<item label="Monaspace Krypton" name="MonaspaceKrypton"/>
-			<item label="Monaspace Neon" name="MonaspaceNeon"/>
-			<item label="Monaspace Xenon" name="MonaspaceXenon"/>
-			<item label="Monospace" name="Monospace"/>
-			<item label="Noto Sans Mono" name="NotoSansMono"/>
-			<item label="Open Dyslexic Mono" name="OpenDyslexicMono"/>
-			<item label="源ノ角ゴシック" name="SourceCodePro"/>
-			<item label="Ubuntu Mono" name="UbuntuMono"/>
-		</combo_box>
 		<text name="font_size" width="70" left="296">
 			サイズ：
 		</text>
 		<combo_box name="chat_font_size">
-			<item label="等幅" name="Monospace"/>
 			<item label="小" name="Small"/>
 			<item label="中" name="Medium"/>
 			<item label="大" name="Large"/>
-			<item label="特大" name="Huge"/>
 		</combo_box>
 		<check_box label="吹き出しチャット" name="bubble_text_chat"/>
 	</panel>

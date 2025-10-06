@@ -310,13 +310,6 @@
 			<text name="allow_label">
 				他の住人への許可設定：
 			</text>
-			<text name="allow_label1">
-				地形の編集：
-			</text>
-			<check_box label="全員" name="edit land check" tool_tip="ここにチェックを入れると、誰でもあなたの土地をテラフォーミングすることができるようになります。自分の土地はいつでも編集できるため、ここはオフのままにしておくことを推奨します。"/>
-			<text name="caution_text">
-				（使用には注意してください！）
-			</text>
 			<text name="allow_label0">
 				飛行：
 			</text>

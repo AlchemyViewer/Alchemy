@@ -4,7 +4,7 @@
 		<file>
 			DejaVuSans.ttf
 		</file>
-		<file>
+		<file load_collection="true">
 			NotoSansCJK-Regular.ttc
 		</file>
 		<file functor="is_emoji">
@@ -106,22 +106,22 @@
 			<file>
 				YuGothic-Bold.otf
 			</file>
-            <file>
+			<file>
 				ヒラギノ角ゴシック W5.ttc
-            </file>
-            <file>
+			</file>
+			<file>
 				ヒラギノ角ゴ Pro W5.otf
-            </file>
-            <file>
+			</file>
+			<file>
 				ヒラギノ角ゴ ProN W5.otf
-            </file>
+			</file>
 		</os>
 	</font>
 	<font name="SansSerif" comment="Name of san-serif font (Truetype file name)">
 		<file>
 			DejaVuSans.ttf
 		</file>
-		<file>
+		<file load_collection="true">
 			NotoSansCJK-Regular.ttc
 		</file>
 		<os name="Windows">

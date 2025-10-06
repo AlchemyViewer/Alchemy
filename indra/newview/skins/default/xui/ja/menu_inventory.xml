@@ -141,8 +141,4 @@
 	</menu>
 	<menu_item_call label="マーケットプレイスの出品リストにコピー" name="Marketplace Copy"/>
 	<menu_item_call label="マーケットプレイスの出品リストに移動" name="Marketplace Move"/>
-	<menu label="エクストラ" name="Extras Menu">
-		<menu_item_call label="ＨＥＸ編集" name="Edit Hex"/>
-		<menu_item_call label="－オプションなし－" name="--no options--"/>
-	</menu>
 </menu>

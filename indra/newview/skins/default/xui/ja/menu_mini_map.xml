@@ -7,7 +7,6 @@
 	<menu_item_check label="北を上に" name="North at top"/>
 	<menu_item_check label="カメラの向きを上に" name="Camera at top"/>
 	<menu_item_check label="マップの自動センター" name="Auto-center map"/>
-	<menu_item_check label="マップタイルを使用" name="Use Map Tile"/>
 	<menu_item_check label="オブジェクトを描画" name="Render Objects"/>
 	<menu_item_check label="ガイドラインを表示" name="Show Guide Line"/>
 	<menu_item_check label="チャット範囲を表示" name="Show Chat Rings"/>

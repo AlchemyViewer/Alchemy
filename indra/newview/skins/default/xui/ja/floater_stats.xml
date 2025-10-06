@@ -29,7 +29,6 @@
 					<stat_bar name="framet_events" label="フレームタイムのイベント"/>
 					<stat_bar label="秒あたりのKTris" name="ktrissec"/>
 					<stat_bar name="totalobjs" label="全オブジェクト"/>
-					<stat_bar name="objs" label="オブジェクトの総計"/>
 					<stat_bar label="キャッシュされたオブジェクト" name="cachedobjs"/>
 					<stat_bar label="新規オブジェクト" name="newobjs"/>
 					<stat_bar label="オブジェクトキャッシュヒット率" name="object_cache_hits"/>

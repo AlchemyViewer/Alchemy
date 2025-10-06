@@ -53,6 +53,10 @@
 	<text name="calc_txt">
 		アニメーションを再同期
 	</text>
+	<!--Set Channel-->
+	<text name="calc_txt">
+		近くのチャットのチャンネルをセット
+	</text>
 	<!--rezplat-->
 	<text name="AlchemyChatCommandRezPlat_txt">
 		プラットフォームにRez（使用法：cmd size）

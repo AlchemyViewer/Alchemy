@@ -45,12 +45,6 @@
 	<floater.string name="status_remaining_capacity">
 		残りの許容数は[LAND_CAPACITY]です。
 	</floater.string>
-	<floater.string name="link_number">
-		リンク数：
-	</floater.string>
-	<floater.string name="selected_faces">
-		面：
-	</floater.string>
 	<button name="button focus" tool_tip="注視"/>
 	<button name="button move" tool_tip="移動"/>
 	<button name="button edit" tool_tip="編集"/>
@@ -74,11 +68,8 @@
 		<radio_item label="回転（Ctrl）" name="radio rotate"/>
 		<radio_item label="引き延ばす (Ctrl＋Shift)" name="radio stretch"/>
 		<radio_item label="面を選択" name="radio select face"/>
-		<radio_item label="整列" name="radio align"/>
 	</radio_group>
 	<check_box label="リンク部分を編集" name="checkbox edit linked parts"/>
-	<button name="prev_part_btn" tool_tip="前のリンク部分か面を選択します。"/>
-	<button name="next_part_btn" tool_tip="次のリンク部分か面を選択します。"/>
 	<button label="リンク" name="link_btn"/>
 	<button label="リンク解除" name="unlink_btn"/>
 	<combo_box name="combobox grid mode" tool_tip="オブジェクトを配置するグリッドルーラーを選択します。">
@@ -89,9 +80,6 @@
 	<check_box label="両側を引き伸ばす" name="checkbox uniform"/>
 	<check_box label="テクスチャを引き延ばす" name="checkbox stretch textures"/>
 	<check_box label="グリッドにスナップ" name="checkbox snap to grid"/>
-	<check_box label="軸をルートとして編集" name="checkbox actual root"/>
-	<check_box label="選択のアウトラインを表示" name="checkbox selection"/>
-	<check_box label="反射プローブを選択する" name="checkbox select probes"/>
 	<button name="Options..." tool_tip="グリッドオプションを表示します。"/>
 	<button name="ToolCube" tool_tip="立方体（キューブ）"/>
 	<button name="ToolPrism" tool_tip="三角柱（プリズム）"/>
@@ -131,17 +119,11 @@
 		強度：
 	</text>
 	<button label="適用" label_selected="適用" name="button apply to selection" tool_tip="選択した土地を修正します。"/>
-	<text name="link_num_obj_count" tool_tip="このリンク数は正確でない可能性があります。">
-		[DESC] [NUM]
-	</text>
 	<text name="selection_empty">
 		選択されていません。
 	</text>
 	<text name="selection_faces">
 		選択された面：[FACES_STRING]
-	</text>
-	<text name="remaining_capacity">
-		[CAPACITY_STRING] [secondlife:///app/openfloater/object_weights 詳細情報]
 	</text>
 	<tab_container name="Object Info Tabs">
 		<panel label="一般" name="General">
@@ -186,9 +168,6 @@
 			</panel.string>
 			<panel.string name="Sale Mixed">
 				販売価格
-			</panel.string>
-			<panel.string name="multiple selection">
-				複数の選択
 			</panel.string>
 			<text name="Name:">
 				名前：
@@ -253,7 +232,6 @@
 				</text>
 				<check_box label="移動" name="checkbox allow everyone move" tool_tip="オブジェクトは誰でも動かすことができます。"/>
 				<check_box label="コピー" name="checkbox allow everyone copy" tool_tip="オブジェクトのコピーは誰でも受け取ることができます。オブジェクトとそのオブジェクトの中身はすべて、コピーまたは譲渡できるように設定する必要があります。"/>
-				<check_box label="エクスポート" name="checkbox allow export"/>
 				<text name="Next owner can:">
 					次の所有者：
 				</text>
@@ -292,15 +270,6 @@
 		</panel>
 		<!-- Object tab -->
 		<panel label="オブジェクト" name="Object">
-			<panel.string name="paste_position">
-				位置のペースト：[VALUE]
-			</panel.string>
-			<panel.string name="paste_size">
-				サイズのペースト：[VALUE]
-			</panel.string>
-			<panel.string name="paste_rotation">
-				回転のペースト：[VALUE]
-			</panel.string>
 			<check_box label="ロック" name="checkbox locked" tool_tip="オブジェクトの移動や削除を抑止します。意図しない編集を避けるために、ビルド中によく使用されます。"/>
 			<check_box label="物理的" name="Physical Checkbox Ctrl" tool_tip="オブジェクトを押したり、重力の影響を受けるようにします。"/>
 			<check_box label="一時的" name="Temporary Checkbox Ctrl" tool_tip="作成から１分後にオブジェクトを削除します。"/>
@@ -311,9 +280,6 @@
 			<spinner label="Ｘ" name="Pos X"/>
 			<spinner label="Ｙ" name="Pos Y"/>
 			<spinner label="Ｚ" name="Pos Z"/>
-			<button name="copy_position_btn" tool_tip="位置をコピーします。"/>
-			<button name="paste_position_btn" tool_tip="位置をペーストします。"/>
-			<button name="pipette_position_btn" tool_tip="ピペットツールで位置をペーストします。"/>
 			<menu_button name="clipboard_pos_btn" tool_tip="位置のペースト時のオプションを選択します。"/>
 			<text name="label size" tool_tip="サイズ（メートル）">
 				サイズ（メートル）
@@ -321,9 +287,6 @@
 			<spinner label="Ｘ" name="Scale X"/>
 			<spinner label="Ｙ" name="Scale Y"/>
 			<spinner label="Ｚ" name="Scale Z"/>
-			<button name="copy_size_btn" tool_tip="サイズをコピーします。"/>
-			<button name="paste_size_btn" tool_tip="サイズをペーストします。"/>
-			<button name="pipette_size_btn" tool_tip="ピペットツールでサイズをペーストします。"/>
 			<menu_button name="clipboard_size_btn" tool_tip="サイズのペースト時のオプションを選択します。"/>
 			<text name="label rotation" tool_tip="回転（角度）">
 				回転角°
@@ -331,9 +294,6 @@
 			<spinner label="Ｘ" name="Rot X"/>
 			<spinner label="Ｙ" name="Rot Y"/>
 			<spinner label="Ｚ" name="Rot Z"/>
-			<button name="copy_rotation_btn" tool_tip="回転をコピーします。"/>
-			<button name="paste_rotation_btn" tool_tip="回転をペーストします。"/>
-			<button name="pipette_rotation_btn" tool_tip="ピペットツールで回転をペーストします。"/>
 			<menu_button name="clipboard_rot_btn" tool_tip="回転のペースト時のオプションを選択します。"/>
 			<!--
 			<text name="label basetype">プリムの種類</text>
@@ -347,27 +307,8 @@
 				<combo_box.item label="円筒（チューブ）" name="Tube"/>
 				<combo_box.item label="輪（リング）" name="Ring"/>
 				<combo_box.item label="スカルプト" name="Sculpted"/>
-				<combo_item name="PathLineProfileHalfCircle" value="PathLineProfileHalfCircle" label="線→半円"/>
-				<combo_item name="PathCircleProfileHalfCircle" value="PathCircleProfileHalfCircle" label="円→半円"/>
-				<combo_item name="PathCircle2ProfileSquare" value="PathCircle2ProfileSquare" label="円２→正方形"/>
-				<combo_item name="PathCircle2ProfileTriangle" value="PathCircle2ProfileTriangle" label="円２→三角形"/>
-				<combo_item name="PathCircle2ProfileCircle" value="PathCircle2ProfileCircle" label="円２→円"/>
-				<combo_item name="PathCircle2ProfileHalfCircle" value="PathCircle2ProfileHalfCircle" label="円２→半円"/>
-				<combo_item name="PathTestProfileSquare" value="PathTestProfileSquare" label="テスト→正方形"/>
-				<combo_item name="PathTestProfileTriangle" value="PathTestProfileTriangle" label="テスト→三角形"/>
-				<combo_item name="PathTestProfileCircle" value="PathTestProfileCircle" label="テスト→円"/>
-				<combo_item name="PathTestProfileHalfCircle" value="PathTestProfileHalfCircle" label="テスト→半円"/>
-				<!-- Working33 by Gregory Maurer -->
-				<combo_item name="Path33Profile0" value="Path33Profile0" label="３３→円"/>
-				<combo_item name="Path33Profile1" value="Path33Profile1" label="３３→正方形"/>
-				<combo_item name="Path33Profile2" value="Path33Profile2" label="３３→三角形"/>
-				<combo_item name="Path33Profile5" value="Path33Profile5" label="３３→半円"/>
-				<!-- End Working33 by Gregory Maurer -->
 			</combo_box>
 			<menu_button name="clipboard_obj_params_btn" tool_tip="オブジェクトのパラメータのペースト時のオプションを選択します。"/>
-			<button name="copy_primparams_btn" tool_tip="プリムのパラメータをコピーします。"/>
-			<button name="paste_primparams_btn" tool_tip="プリムのパラメータをペーストします。"/>
-			<button name="pipette_primparams_btn" tool_tip="ピペットツールでプリムのパラメータをペーストします。"/>
 			<text name="text cut">
 				パスカット（始点と終点）
 			</text>
@@ -451,9 +392,6 @@
 			<panel.string name="Convex Hull">
 				凸包
 			</panel.string>
-			<button name="copy_features_btn" tool_tip="特徴のパラメータをコピーします。"/>
-			<button name="paste_features_btn" tool_tip="特徴のパラメータをペーストします。"/>
-			<button name="pipette_features_btn" tool_tip="ピペットツールで特徴のパラメータをペーストします。"/>
 			<menu_button name="clipboard_features_params_btn" tool_tip="特徴のペースト時のオプションを選択します。"/>
 			<text name="select_single">
 				編集したいプリムを１つだけ選択してください。
@@ -475,9 +413,6 @@
 			<check_box label="射影元" name="Light Checkbox Ctrl" tool_tip="オブジェクトが投影元になります。"/>
 			<color_swatch name="colorswatch" tool_tip="クリックしてカラーピッカーを開きます"/>
 			<texture_picker label="画像" name="light texture control" tool_tip="クリックで射影テクスチャを選択します。（遅延描画有効時のみ）"/>
-			<button name="copy_light_btn" tool_tip="光源と反射プローブのパラメータをコピーします。"/>
-			<button name="paste_light_btn" tool_tip="光源と反射プローブのパラメータをペーストします。"/>
-			<button name="pipette_light_btn" tool_tip="ピペットツールで光源と反射プローブのパラメータをペーストします。"/>
 			<menu_button name="clipboard_light_params_btn" tool_tip="光源のパラメータのペースト時のオプションを選択します。"/>
 			<spinner label="強度" name="Light Intensity"/>
 			<spinner label="ＦｏＶ" name="Light FOV"/>

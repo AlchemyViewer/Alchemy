@@ -13,9 +13,6 @@
 		ペースト時のオプション
 	</panel.string>
 	<menu_button name="clipboard_color_params_btn" tool_tip="ペースト時のオプションを選択します。"/>
-	<button name="copy_color_btn" tool_tip="色のパラメータをコピーします。"/>
-	<button name="paste_color_btn" tool_tip="色のパラメータをペーストします。"/>
-	<button name="pipette_color_btn" tool_tip="ピペットツールで色のパラメータをペーストします。"/>
 	<text name="color label">
 		色
 	</text>
@@ -50,9 +47,6 @@
 		<radio_item label="放射（エミッシブ）" name="Emissive"/>
 	</radio_group>
 	<menu_button name="clipboard_texture_params_btn" tool_tip="ペースト時のオプションを選択します。"/>
-	<button name="copy_texture_btn" tool_tip="テクスチャパラメータをコピーします。"/>
-	<button name="paste_texture_btn" tool_tip="テクスチャパラメータをペーストします。"/>
-	<button name="pipette_texture_btn" tool_tip="ピペットツールでテクスチャパラメータをペーストします。"/>
 	<texture_picker label="ＰＢＲマテリアル" name="pbr_control" tool_tip="クリックでＰＢＲマテリアルを選択します。"/>
 	<button name="pbr_from_inventory" label="インベントリから選択"/>
 	<text name="material_permissions_loading_label">
@@ -171,8 +165,4 @@
 	<!-- END PBR Material texture transform parameters -->
 	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同期させます。"/>
 	<button label="揃える" name="button align textures" label_selected="現在のテクスチャレイヤーを揃える" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
-	<button label="全て検索" name="btn_select_same_diff" tool_tip="この面と同じ拡散（ディフューズ）マップを貼り付けた、すべての面を選択します。"/>
-	<button label="全て検索" name="btn_select_same_norm" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。"/>
-	<button label="全て検索" name="btn_select_same_spec" tool_tip="この面と同じ鏡面反射（スペキュラ）マップを貼り付けた、すべての面を選択します。"/>
-	<button label="全て検索" name="btn_select_same_pbr" tool_tip="この面と同じＰＢＲマテリアルを貼り付けた、すべての面を選択します。"/>
 </panel>

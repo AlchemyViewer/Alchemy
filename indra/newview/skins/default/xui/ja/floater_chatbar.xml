@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater name="chatbar" title="">
-	<menu_button name="chatbar_gear_menu" tool_tip="チャットバーのオプションを表示します。"/>
-</floater>

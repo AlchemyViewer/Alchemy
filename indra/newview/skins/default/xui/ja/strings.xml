@@ -8,7 +8,7 @@ that are returned from one component and may appear in many places
 <strings>
 	<!-- Default Args - these arguments will be replaced in all strings -->
 	<string name="SECOND_LIFE">
-		[CURRENT_GRID]
+		Second Life
 	</string>
 	<string name="APP_NAME">
 		Alchemy
@@ -17,88 +17,31 @@ that are returned from one component and may appear in many places
 		ALCHEMY
 	</string>
 	<string name="SECOND_LIFE_GRID">
-		[CURRENT_GRID]グリッド
+		Second Lifeグリッド
 	</string>
 	<string name="SUPPORT_SITE">
 		サポートポータル
 	</string>
-	<!-- Default Args set in LLViewerNetwork -->
-	<string name="CURRENT_GRID"/>
-	<string name="GRID_ADMIN"/>
 	<!-- starting up -->
-	<string name="StartupDetectingHardware">
-		ハードウェアを検出しています…
-	</string>
 	<string name="StartupLoading">
 		[APP_NAME]をインストールしています…
-	</string>
-	<string name="StartupChangingCacheLocation">
-		キャッシュを移行しています…
 	</string>
 	<string name="StartupClearingCache">
 		キャッシュを消去しています…
 	</string>
-	<string name="StartupClearingTextureCache">
-		テクスチャキャッシュを消去しています…
-	</string>
-	<string name="StartupClearingDiskCache">
-		アセットキャッシュを消去しています…
-	</string>
-	<string name="StartupClearingObjectCache">
-		オブジェクトキャッシュを消去しています…
-	</string>
-	<string name="StartupClearingShaderCache">
-		シェーダーキャッシュを消去しています…
-	</string>
-	<string name="StartupInitializingDiskCache">
-		ディスクキャッシュを初期化しています…
-	</string>
 	<string name="StartupInitializingTextureCache">
 		テクスチャキャッシュを初期化しています…
-	</string>
-	<string name="StartupInitializingTextureCache0">
-		テクスチャキャッシュのフラッフィングしています…
-	</string>
-	<string name="StartupInitializingTextureCache1">
-		網目状のスプライン…
-	</string>
-	<string name="StartupInitializingTextureCache2">
-		テクスチャのベーキングに使用するオーブンの予熱をしています…
-	</string>
-	<string name="StartupInitializingTextureCache3">
-		スヌートを叩いてテクスチャの質感を出しています…
-	</string>
-	<string name="StartupInitializingTextureCache4">
-		魔法のカバを読み込んでいます…
-	</string>
-	<string name="StartupInitializingTextureCache5">
-		Nvidiaにスケープゴートを捧げています…
-	</string>
-	<string name="StartupInitializingTextureCache6">
-		プロジェクト・サンサール（笑）を準備しています…
-	</string>
-	<string name="StartupInitializingTextureCache7">
-		あなたを待たせる新しい方法を発見しています…
-	</string>
-	<string name="StartupInitializingTextureCache8">
-		オ（ン）で並べ替えを試みています…
-	</string>
-	<string name="StartupInitializingTextureCache9">
-		気の利いた起動メッセージを生成しています…
 	</string>
 	<string name="StartupRequireDriverUpdate">
 		グラフィックを初期化できませんでした。グラフィックドライバを更新してください。
 	</string>
 	<!-- about dialog/support string-->
 	<string name="AboutHeader">
-		[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2].[VIEWER_VERSION_3]（[ADDRESS_SIZE]bit）
-[[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]
+		[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2].[VIEWER_VERSION_3]（[ADDRESS_SIZE]bit）（[ARCHITECTURE]）
+[[VIEWER_RELEASE_NOTES_URL]　[ReleaseNotes]]
 	</string>
 	<string name="AboutCompiler">
-		コンパイラのバージョン：[COMPILER] [COMPILER_VERSION]
-	</string>
-	<string name="AboutVCSRev">
-		Gitリビジョン：[GIT_REV]
+		コンパイラのバージョン：[COMPILER]　[COMPILER_VERSION]
 	</string>
 	<string name="BuildConfig">
 		ビルド構成：[BUILD_CONFIG]
@@ -135,18 +78,15 @@ SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 	<string name="AboutOGL">
 		OpenGLバージョン：[OPENGL_VERSION]</string>
 	<string name="AboutSettings">
-		ウィンドウサイズ:[WINDOW_WIDTH]x[WINDOW_HEIGHT]
+		ウィンドウサイズ：[WINDOW_WIDTH]✕[WINDOW_HEIGHT]
 フォントサイズ調整：[FONT_SIZE_ADJUSTMENT]pt
-ＵＩフォント：[FONT_MAIN_OVERRIDE]
-等幅フォント：[FONT_MONO_OVERRIDE]
-チャットフォント：[FONT_CHAT_OVERRIDE]
-スクリプトフォント：[FONT_SCRIPT_OVERRIDE]
 ＵＩスケーリング：[UI_SCALE]
 描画距離：[DRAW_DISTANCE]ｍ
 帯域幅：[NET_BANDWITH]kbit／秒
 ＬＯＤ係数：[LOD_FACTOR]
 描画の質：[RENDER_QUALITY]
 テクスチャメモリ：[TEXTURE_MEMORY]㎆
+ディスクキャッシュ：[DISK_CACHE_INFO]
 	</string>
 	<string name="AboutOSXHiDPI">
 		高ＤＰＩ表示モード：[HIDPI]
@@ -156,7 +96,7 @@ SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 libcurlのバージョン：[LIBCURL_VERSION]
 J2Cデコーダーのバージョン：[J2C_VERSION]
 オーディオドライバのバージョン：[AUDIO_DRIVER_VERSION]
-[CEF_VERSION]
+[LIBCEF_VERSION]
 LibVLCのバージョン：[LIBVLC_VERSION]
 ボイスサーバーのバージョン：[VOICE_VERSION]
 	</string>
@@ -284,6 +224,9 @@ LibVLCのバージョン：[LIBVLC_VERSION]
 	<string name="Quit">
 		終了
 	</string>
+	<string name="create_account_url">
+		https://join.secondlife.com/?lang=ja-JP&amp;sourceid=[sourceid]
+	</string>
 	<string name="AgniGridLabel">
 		Second Lifeメイングリッド（Agni）
 	</string>
@@ -294,7 +237,7 @@ LibVLCのバージョン：[LIBVLC_VERSION]
 		https://www.alchemyviewer.org/downloads
 	</string>
 	<string name="LoginFailedViewerNotPermitted">
-		お使いの古いビューアでは、[CURRENT_GRID]にアクセスできません。以下のページから新しいビューアをダウンロードしてください：https://www.alchemyviewer.org/downloads
+		お使いの古いビューアでは、Second Lifeにアクセスできません。以下のページから新しいビューアをダウンロードしてください：https://www.alchemyviewer.org/downloads
 
 詳細については、ＦＡＱを参照してください：
 https://secondlife.com/viewer-access-faq
@@ -320,37 +263,40 @@ https://secondlife.com/viewer-access-faq
 ・２段階認証（使用している場合）
 また、Caps Lockが入っていないこともご確認ください。
 	</string>
-	<string name="LoginFailedPasswordChanged"> セキュリティ上の理由により、あなたのパスワードは変更されました。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP）へ移動し、
+	<string name="LoginFailedPasswordChanged">
+		セキュリティ上の理由により、あなたのパスワードは変更されました。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP ）へ移動し、
 秘密の質問に答えて、パスワードをリセットしてください。
 ご迷惑をおかけして申し訳ございません。
 	</string>
-	<string name="LoginFailedPasswordReset"> 弊社はシステムを若干変更しました。お手数ですが、パスワードのリセットをお願いします。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP ）に移動し、
+	<string name="LoginFailedPasswordReset">
+		弊社はシステムを若干変更しました。お手数ですが、パスワードのリセットをお願いします。アカウントページ（https://secondlife.com/my/account/request.php?lang=ja-JP ）に移動し、
 秘密の質問に答えて、パスワードをリセットしてください。
 ご迷惑をおかけして申し訳ございません。
 	</string>
 	<string name="LoginFailedEmployeesOnly">
-		[CURRENT_GRID]はメンテナンスのため一時的に閉鎖されています。
-ログインは現在[GRID_ADMIN]の従業員のみに制限されています。
+		Second Lifeはメンテナンスのため一時的に閉鎖されています。
+ログインは現在従業員のみに制限されています。
+www.secondlife.com/statusにて更新をご確認ください。
 	</string>
 	<string name="LoginFailedPremiumOnly">
-		[CURRENT_GRID]へのログインは、インワールドの人々が可能な限り最高の体験をできるようにするため、一時的に制限されています。
+		Second Lifeへのログインは、インワールドの人々が可能な限り最高の体験をできるようにするため、一時的に制限されています。
 	</string>
 	<string name="LoginFailedComputerProhibited">
-		このコンピュータから[CURRENT_GRID]にアクセスできません。
+		このコンピュータからSecond Lifeにアクセスできません。
 エラーと思われる場合は、サポートまでご連絡ください。
 	</string>
 	<string name="LoginFailedAcountSuspended">
 		あなたのアカウントは、下記時間までアクセスできません：
 [TIME]
-エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
+エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedAccountDisabled">
 		現在リクエストを完了することができません。
-[CURRENT_GRID]のサポートにお問い合わせください。
+Second Lifeのサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedTransformError">
 		ログイン時にデータの不一致が見つかりました。
-[CURRENT_GRID]のサポートまでお問い合わせください。
+Second Lifeのサポートまでお問い合わせください。
 	</string>
 	<!--'Pacific time' placeholder for [TIME] in case time from server can't be decoded-->
 	<string name="PacificTime">
@@ -360,7 +306,7 @@ https://secondlife.com/viewer-access-faq
 		現在アカウントのメンテナンスが行われています。
 あなたのアカウントは、
 太平洋時間の[TIME]までご利用いただけません。
-エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
+エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedPendingLogoutFault">
 		ログアウトのリスクエスト時に、シミュレーターから「fault」が返されました。
@@ -379,19 +325,19 @@ https://secondlife.com/viewer-access-faq
 		あなたのアカウントにアクセスできるのは、
 太平洋時間の[START]～[END]の間に限られます。
 有効な時間帯に再度お試しください。
-エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
+エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedIncorrectParameters">
 		パラメーターが正しくありません。
-エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
+エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedFirstNameNotAlphanumeric">
 		ファーストネームのパラメーターは英数字です。
-エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
+エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
 	</string>
 	<string name="LoginFailedLastNameNotAlphanumeric">
 		ラストネームのパラメーターは英数字です。
-エラーと思われる場合は、[CURRENT_GRID]のサポートにお問い合わせください。
+エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
 	</string>
 	<string name="LogoutFailedRegionGoingOffline">
 		リージョンは、現在オフラインです。
@@ -426,7 +372,7 @@ https://secondlife.com/viewer-access-faq
 しばらくしてから再度お試しください。
 	</string>
 	<string name="LoginFailedAuthenticationMFARequired">
-		ログインするには二段階認証アプリから新しいトークンを入力する必要があります。
+		ログインするには多段階認証アプリから新しいトークンを入力する必要があります。
 それでもこのエラーが発生する場合は、support@secondlife.comにお問い合わせください。
 	</string>
 	<!-- Disconnection -->
@@ -1374,14 +1320,8 @@ https://secondlife.com/viewer-access-faq
 	<string name="dictionary_files">
 		辞書
 	</string>
-	<string name="gltf_files">
-		GLTFファイル
-	</string>
 	<string name="zip_files">
 		Zipファイル
-	</string>
-	<string name="recompile_script_verb">
-		再コンパイル
 	</string>
 	<!-- Text validator error messages -->
 	<string name="Validator_InvalidNumericString">
@@ -1748,7 +1688,7 @@ Returns the rotation velocity in radians per second
 	</string>
 	<string name="LSLTipText_llGetTimeOfDay" translate="false">
 		float llGetTimeOfDay()
-Returns the time in seconds since [CURRENT_GRID] server midnight or since region up-time, whichever is smaller
+Returns the time in seconds since Second Life server midnight or since region up-time, whichever is smaller
 	</string>
 	<string name="LSLTipText_llGetWallclock" translate="false">
 		float llGetWallclock()
@@ -3524,9 +3464,6 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="No Filters" value="なし"/>
 	<string name="Since Logoff" value="–ログオフ以来"/>
 	<!-- inventory folder -->
-	<string name="InvFolder Basic Root">
-		基本ルート
-	</string>
 	<string name="InvFolder My Inventory">
 		インベントリ
 	</string>
@@ -3632,20 +3569,8 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="InvFolder Materials">
 		マテリアル
 	</string>
-	<string name="InvFolder Animation Overrides">
-		アニメーションオーバーライド
-	</string>
 	<string name="InvFolder Settings">
 		自然環境の設定
-	</string>
-	<string name="InvFolder Local Inventory">
-		ローカルのインベントリ
-	</string>
-	<string name="InvFolder #RLV">
-		#RLV
-	</string>
-	<string name="InvFolder #Firestorm">
-		#Firestorm
 	</string>
 	<!-- are used for Friends and Friends/All folders in Inventory "Calling cards" folder. See EXT-694-->
 	<string name="InvFolder Friends">
@@ -4045,24 +3970,6 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="CompileQueueStart">
 		再コンパイル
 	</string>
-	<string name="CompileQueuePreprocessing">
-		スクリプト「[SCRIPT]」のプリプロセッシング
-	</string>
-	<string name="CompileQueuePreprocessingComplete">
-		スクリプト「[SCRIPT]」のプリプロセッシングが完了しました。
-	</string>
-	<string name="CompileQueueCompiling">
-		「[SCRIPT]」のコンパイルをしています…
-	</string>
-	<string name="CompileSuccess">
-		「[SCRIPT]」のコンパイルに成功しました。
-	</string>
-	<string name="CompileFailure">
-		「[SCRIPT]」のコンパイルに失敗しました：
-	</string>
-	<string name="CompilePermissions">
-		スキップしています：[ITEM_NAME]（権限）
-	</string>
 	<string name="ResetQueueTitle">
 		進行をリセット
 	</string>
@@ -4442,12 +4349,6 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<!-- panel preferences chat-->
 	<string name="RejectTeleportOffersResponseDefault">
 		あなたがメッセージを送った住民は、[APP_NAME]ビューアの「すべてのテレポートのオファーとリクエストを拒否するモード」を有効にしました。これは、テレポートのオファーやリクエストに邪魔されないように要求したことを意味します。ＩＭは手動で送信することもできます。
-	</string>
-	<string name="AlchemyAutoresponseDefault">
-		あなたがメッセージを送った住人は「自動応答モード」を有効にしており、邪魔されないよう要求しています。あなたの送ったメッセージは、後で閲覧できるように住人のＩＭパネルに表示されます。
-	</string>
-	<string name="AlchemyAutoresponseNotFriendDefault">
-		あなたがメッセージを送った住人は「非フレンドの自動応答モード」を有効にしており、邪魔されないよう要求しています。あなたの送ったメッセージは、後で閲覧できるように住人のＩＭパネルに表示されます。
 	</string>
 	<!-- Mute -->
 	<string name="MuteByName">
@@ -6847,9 +6748,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="RlvRoot">
 		#RLV
 	</string>
-	<string name="Local Inventory">
-		ローカルインベントリ
-	</string>
 	<!-- gestures -->
 	<string name="Male - Excuse me">
 		男性－すみません
@@ -7557,9 +7455,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Command_AboutLand_Label">
 		土地情報
 	</string>
-	<string name="Command_AnimationOverride_Label">
-		ＡＯ
-	</string>
 	<string name="Command_Appearance_Label">
 		アウトフィット
 	</string>
@@ -7599,9 +7494,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Command_Inventory_Label">
 		インベントリ
 	</string>
-	<string name="Command_Lightbox_Settings_Label">
-		ライトボックス
-	</string>
 	<string name="Command_Map_Label">
 		マップ
 	</string>
@@ -7635,17 +7527,11 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Command_Places_Label">
 		場所
 	</string>
-	<string name="Command_Poser_Label">
-		ポーザー
-	</string>
 	<string name="Command_Preferences_Label">
 		初期設定
 	</string>
 	<string name="Command_Profile_Label">
 		プロフィール
-	</string>
-	<string name="Command_Quick_Settings_Label">
-		クイック設定
 	</string>
 	<string name="Command_RegionTracker_Label">
 		リージョントラッカー
@@ -7687,9 +7573,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Command_AboutLand_Tooltip">
 		訪問先に関する情報を表示します。
 	</string>
-	<string name="Command_AnimationOverride_Tooltip">
-		アニメーションオーバーライド設定を表示します。
-	</string>
 	<string name="Command_Appearance_Tooltip">
 		アバターの容姿を変更します。
 	</string>
@@ -7729,9 +7612,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Command_Inventory_Tooltip">
 		インベントリの内容を表示したり使用したりします。
 	</string>
-	<string name="Command_Lightbox_Settings_Tooltip">
-		フォトジェニックな画を撮影する上で便利なオプションを表示します。
-	</string>
 	<string name="Command_Map_Tooltip">
 		ワールドマップを表示します。
 	</string>
@@ -7765,17 +7645,11 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Command_Places_Tooltip">
 		保存済みの場所を表示します。
 	</string>
-	<string name="Command_Poser_Tooltip">
-		あなたのアバターとアニメーションするオブジェクトのポーズを取ることができます。
-	</string>
 	<string name="Command_Preferences_Tooltip">
 		初期設定を表示します。
 	</string>
 	<string name="Command_Profile_Tooltip">
 		自分のプロフィールの表示や編集を行います。
-	</string>
-	<string name="Command_Quick_Settings_Tooltip">
-		簡易初期設定を表示します。
 	</string>
 	<string name="Command_RegionTracker_Tooltip">
 		様々なリージョンの状況を追跡します。
@@ -8057,122 +7931,13 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 このエラーが継続的に起こる場合は、Secondlife.com のサポートセクションから問題を報告してください。
 [https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%8A%E3%83%AC%E3%83%83%E3%82%B8%E3%83%99%E3%83%BC%E3%82%B9/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%A8%E3%83%A9%E3%83%BC-r1283/ ナレッジベース]
 	</string>
-	<string name="outfit_photo_load_codec_error">
-		無効な画像ファイル形式です。他の画像を選択してください。
-	</string>
 	<!-- Alchemy Strings -->
 	<string name="NotifyIncomingMessage">[NAME]さんからのメッセージが届いています…</string>
-	<string name="NearbyChatTitleChannel">近くのチャット（チャンネル[CHANNEL]）</string>
 	<string name="AvatarTyping">入力中</string>
 	<string name="UnknownAvatar">不明なアバター</string>
 	<string name="NotAvailableOnPlatform">このプラットフォームでは使用できません。</string>
 	<string name="NowPlaying">再生中：</string>
 	<string name="SimulatorFeaturesTitle">シミュレーターの機能</string>
-	<!-- <LSL Preprocessor -->
-	<string name="preproc_toggle_warning">
-		プリプロセッサの切り替えは、このエディタを閉じて再度開くまで完全には有効になりません。
-	</string>
-	<string name="fs_preprocessor_starting">
-		[APP_NAME]プリプロセッサを開始しています…
-	</string>
-	<string name="fs_preprocessor_not_supported">
-		警告：このビルドではプリプロセッサをサポートしていません。（[WHERE]）
-	</string>
-	<string name="fs_preprocessor_disabled_by_script_marker">
-		[APP_NAME]プリプロセッサは、[LINENUMBER]行目の命令で無効化されています。
-	</string>
-	<string name="fs_preprocessor_settings_list_prefix">
-		設定：
-	</string>
-	<string name="fs_preprocessor_cpp_exception">
-		[ERR_NAME]（[LINENUMBER]）：[ERR_DESC]
-	</string>
-	<string name="fs_preprocessor_lexing_exception">
-		[SEVERITY]：[ERR_NAME]（[LINENUMBER]）：[ERR_DESC]
-	</string>
-	<string name="fs_preprocessor_exception">
-		[ERR_NAME]（[LINENUMBER]）：以下の例外が発生しました：[ERR_DESC]
-	</string>
-	<string name="fs_preprocessor_error">
-		[ERR_NAME]（[LINENUMBER]）：予期しない例外がキャッチされました。
-	</string>
-	<string name="fs_preprocessor_lsl2_directive_override">
-		ＬＳＬ２としてコンパイルするディレクティブの優先設定が検出されました。
-	</string>
-	<string name="fs_preprocessor_mono_directive_override">
-		Ｍｏｎｏとしてコンパイルするディレクティブの優先設定が検出されました。
-	</string>
-	<!-- LSL Optimizer -->
-	<string name="fs_preprocessor_optimizer_start">
-		参照されていないユーザー定義関数とグローバル変数を最適化します。
-	</string>
-	<string name="fs_preprocessor_optimizer_regex_err">
-		有効な正規表現ではありません：「[WHAT]」；ＬＳＬ最適化はスキップされました。
-	</string>
-	<string name="fs_preprocessor_optimizer_exception">
-		例外をキャッチしました：「[WHAT]」；ＬＳＬ最適化はスキップされました。
-	</string>
-	<string name="fs_preprocessor_optimizer_unexpected_exception">
-		ＬＳＬ最適化時に予期しない例外が発生しました。適用されていません。
-	</string>
-	<!-- LSL Compressor -->
-	<string name="fs_preprocessor_compress_start">
-		不要なスペースを削除してスクリプトテキストを圧縮します。
-	</string>
-	<string name="fs_preprocessor_compress_regex_err">
-		有効な正規表現ではありません：「[WHAT]」；ＬＳＬ圧縮はスキップされました。
-	</string>
-	<string name="fs_preprocessor_compress_exception">
-		例外をキャッチしました：「[WHAT]」；ＬＳＬ圧縮はスキップされました。
-	</string>
-	<string name="fs_preprocessor_compress_unexpected_exception">
-		ＬＳＬ圧縮時に予期しない例外が発生しました。適用されていません。
-	</string>
-	<!-- LSL Lazy lists -->
-	<string name="fs_preprocessor_lazylist_start">
-		遅延リスト変換を適用します。
-	</string>
-	<string name="fs_preprocessor_lazylist_regex_err">
-		有効な正規表現ではありません：「[WHAT]」；ＬＳＬ遅延リスト変換はスキップされました。
-	</string>
-	<string name="fs_preprocessor_lazylist_exception">
-		例外をキャッチしました：「[WHAT]」；ＬＳＬ遅延リスト変換されました。
-	</string>
-	<string name="fs_preprocessor_lazylist_unexpected_exception">
-		ＬＳＬ遅延リスト変換時に予期しない例外が発生しました。適用されていません。
-	</string>
-	<!-- LSL switch statement -->
-	<string name="fs_preprocessor_switchstatement_start">
-		Switch文変換を適用します。
-	</string>
-	<string name="fs_preprocessor_switchstatement_regex_err">
-		有効な正規表現ではありません：「[WHAT]」；Swicth文変換はスキップされました。
-	</string>
-	<string name="fs_preprocessor_switchstatement_exception">
-		例外をキャッチしました：'[WHAT]'; Swicth文変換はスキップされました。
-	</string>
-	<string name="fs_preprocessor_switchstatement_unexpected_exception">
-		Switch文変換時に予期しない例外が発生しました。適用されていません。
-	</string>
-	<!-- LSL Cache -->
-	<string name="fs_preprocessor_cache_miss">
-		キャッシュされたインクルードファイル：「[FILENAME]」
-	</string>
-	<string name="fs_preprocessor_cache_invalidated">
-		インクルードされたファイル「[FILENAME]」に変更がありました。再キャッシュしています。
-	</string>
-	<string name="fs_preprocessor_cache_completed">
-		コンパイルされた「[FILENAME]」をキャッシュしています。
-	</string>
-	<string name="fs_preprocessor_cache_unsafe">
-		エラー：「[FILENAME]」という名前のスクリプトをファイルシステムにコピーするのは安全ではありません。このインクルードは失敗します。
-	</string>
-	<string name="fs_preprocessor_caching_err">
-		エラー：インクルードされた「[FILENAME]」というファイルをキャッシュできませんでした。
-	</string>
-	<string name="fs_preprocessor_truncated">
-		警告：スクリプトのテキストサイズが大きすぎるため、プリプロセッサの出力が切り詰められました。このスクリプトはおそらく機能しません。
-	</string>
 	<!--Minimap-->
 	<string name="MinimapToolTipMsg">
 		[AGENT][PARCEL_NAME_MSG][PARCEL_SALE_PRICE_MSG][PARCEL_SALE_AREA_MSG][PARCEL_OWNER_MSG][REGION_NAME_MSG][TOOL_TIP_HINT_MSG]

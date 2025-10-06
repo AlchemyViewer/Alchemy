@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater title="二段階認証トークンが必要です" name="mfa_challenge">
+<floater title="多段階認証トークンが必要です" name="mfa_challenge">
 	<text name="token_prompt_text">
 		トークンのプロンプト
 	</text>

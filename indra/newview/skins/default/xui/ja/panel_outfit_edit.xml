@@ -50,16 +50,10 @@ It is calculated as border_size + 2*UIResizeBarOverlap
 	</layout_stack>
 	<!-- BUTTON BAR -->
 	<panel name="no_add_wearables_button_bar">
-		<text name="avatar_complexity_label">
-			複雑度：[WEIGHT]
-		</text>
 		<button name="shop_btn_1" tool_tip="ＳＬマーケットプレイスをご覧ください。また、いま着用しているアイテムを選択してここをクリックすると、それに似たアイテムが表示されます。"/>
 	</panel>
 	<!-- BUTTON BAR - WEARABLES ADDING MODE -->
 	<panel name="add_wearables_button_bar">
-		<text name="avatar_complexity_adding_label">
-			複雑度：[WEIGHT]
-		</text>
 		<button name="shop_btn_2" tool_tip="ＳＬマーケットプレイスをご覧ください。また、いま着用しているアイテムを選択してここをクリックすると、それに似たアイテムが表示されます。"/>
 	</panel>
 	<!-- SAVE AND REVERT BUTTONS -->

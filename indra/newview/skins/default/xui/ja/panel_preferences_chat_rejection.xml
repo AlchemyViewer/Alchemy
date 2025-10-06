@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel name="autoresponse_settings">
+<panel name="autoresponse_rejection_settings">
 	<text name="autorespond_reject_friends_response_label">
 		「フレンドシップのリクエストをすべて拒否する」モード時の他のアバターに対する自動返答：
 	</text>
