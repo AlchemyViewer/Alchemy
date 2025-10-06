@@ -105,6 +105,7 @@ LLNetMap::LLNetMap (const Params & p)
     mPopupWorldPos(0.f, 0.f, 0.f),
     mMouseDown(0, 0),
     mPanning(false),
+    mCentering(false),
     mObjectImageCenterGlobal( gAgentCamera.getCameraPositionGlobal() ),
     mObjectRawImagep(),
     mObjectImagep(),

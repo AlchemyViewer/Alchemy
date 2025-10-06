@@ -175,39 +175,39 @@
          tool_tip="Camera spin around clockwise"
          value="Clockwise" />
     </rows>
-	<rows
+    <rows
      name="roll_left"
      value="roll_left">
-		<columns
+        <columns
          column="lst_action"
          font="SansSerif"
          halign="left"
          name="lst_action"
          tool_tip="Camera roll left"
          value="Roll Left" />
-	</rows>
-	<rows
+    </rows>
+    <rows
      name="roll_right"
      value="roll_right">
-		<columns
+        <columns
          column="lst_action"
          font="SansSerif"
          halign="left"
          name="lst_action"
          tool_tip="Camera roll right"
          value="Roll Right" />
-	</rows>
-	<rows
+    </rows>
+    <rows
      name="roll_reset"
      value="roll_reset">
-		<columns
+        <columns
          column="lst_action"
          font="SansSerif"
          halign="left"
          name="lst_action"
          tool_tip="Reset camera roll"
          value="Roll Reset" />
-	</rows>
+    </rows>
     <rows
      name="move_forward_sitting"
      value="move_forward_sitting">
