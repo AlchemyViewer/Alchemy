@@ -38,7 +38,7 @@ that are returned from one component and may appear in many places
 	<!-- about dialog/support string-->
 	<string name="AboutHeader">
 		[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2].[VIEWER_VERSION_3]（[ADDRESS_SIZE]bit）（[ARCHITECTURE]）
-[[VIEWER_RELEASE_NOTES_URL]　[ReleaseNotes]]
+[[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]
 	</string>
 	<string name="AboutCompiler">
 		コンパイラのバージョン：[COMPILER]　[COMPILER_VERSION]
