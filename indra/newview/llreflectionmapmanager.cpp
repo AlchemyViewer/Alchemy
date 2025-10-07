@@ -1442,6 +1442,7 @@ void LLReflectionMapManager::initReflectionMaps()
             mTexture->getWidth() != mProbeResolution ||
             mReflectionProbeCount + 2 != mTexture->getCount())
         {
+#if 0 // LLCubeMapArray copy critically flawed
             if (mTexture)
             {
                 mTexture = new LLCubeMapArray(*mTexture, mProbeResolution, mReflectionProbeCount + 2);
@@ -1449,6 +1450,7 @@ void LLReflectionMapManager::initReflectionMaps()
                 mIrradianceMaps = new LLCubeMapArray(*mIrradianceMaps, LL_IRRADIANCE_MAP_RESOLUTION, mReflectionProbeCount);
             }
             else
+#endif
             {
                 mTexture = new LLCubeMapArray();
 
