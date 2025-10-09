@@ -49,13 +49,13 @@
 		<radio_item label="Google翻訳" name="google"/>
 		<radio_item label="DeepL翻訳" name="deepl"/>
 	</radio_group>
-	<text name="google_links_text">
+	<text name="azure_links_text">
 		[https://learn.microsoft.com/ja-jp/azure/cognitive-services/translator/create-translator-resource セットアップ]
 	</text>
 	<text name="azure_api_endoint_label">
 		エンドポイント：
 	</text>
-	<combo_box name="azure_api_endpoint_combo" value="https://api.cognitive.microsofttranslator.com">
+	<combo_box name="azure_api_endpoint_combo">
 		<combo_box.item label="https://api.cognitive.microsofttranslator.com" name="global"/>
 		<combo_box.item label="https://api-apc.cognitive.microsofttranslator.com" name="api-apc"/>
 		<combo_box.item label="https://api-eur.cognitive.microsofttranslator.com" name="api-eur"/>

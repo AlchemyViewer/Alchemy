@@ -4902,12 +4902,12 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="RiggedMeshAttachedToHUD">
-		ＨＵＤポイント「[POINT]」にアタッチされたオブジェクト「[NAME]」にはリグメッシュが含まれています。
+		ＨＵＤポイント「[POINT]」に装着されたオブジェクト「[NAME]」にはリグメッシュが含まれています。
 
 リグメッシュオブジェクトは、アバターに取り付けるように設計されています。あなたにはこのオブジェクトが表示されますが、他の人には表示されません。
 
-他の人にこのオブジェクトを見てもらいたい場合は、オブジェクトを削除して、アバターのアタッチメントポイントに再度アタッチします。
-		<usetemplate ignoretext="リグメッシュがＨＵＤポイントにアタッチされている場合の警告" name="okignore" yestext="ＯＫ"/>
+他の人にこのオブジェクトを見てもらいたい場合は、オブジェクトを削除して、アバターの装着ポイントに再度装着します。
+		<usetemplate ignoretext="リグメッシュがＨＵＤポイントに装着されている場合の警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="EnableAutoFPSWarning">
 		自動ＦＰＳを有効にしようとしています。保存されていないグラフィック設定はすべて失われます。

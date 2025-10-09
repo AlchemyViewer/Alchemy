@@ -13,7 +13,7 @@
 					<combo_box label="ユーザ名" tool_tip="登録時に自分で選んだユーザー名（例：bobsmith12、Steller Sunshineなど）" name="username_combo"/>
 					<line_editor name="password_edit" label="パスワード"/>
 					<button label="ログイン" name="connect_btn"/>
-					<text name="sign_up_text" valign="center">
+					<text name="sign_up_text">
 						サインアップ
 					</text>
 					<check_box label="ユーザ名を記憶" name="remember_name" tool_tip="すでに記憶されているユーザーは、「私」＞「初期設定」＞「詳細設定」＞「記憶されたユーザー名」から削除できます。"/>

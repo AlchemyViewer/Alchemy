@@ -21,10 +21,14 @@
 	<slider label="ボイスチャット" name="Voice Volume"/>
 	<check_box label="有効" name="enable_voice_check"/>
 	<text name="Listen media from">
-		メディアとサウンドの聞き取り位置：
+		聞き取り位置：
 	</text>
+	<combo_box name="ear_location_combo">
+		<item label="カメラの位置" name="camera_position"/>
+		<item label="アバターの位置" name="avatar_position"/>
+	</combo_box>
 	<text name="media_autoplay_label">
-		メディアの自動再生
+		メディアの自動再生：
 	</text>
 	<combo_box name="media_auto_play_combo">
 		<item label="再生しない" name="autoplay_disabled"/>
@@ -47,7 +51,7 @@
 	<check_box name="media_show_on_others_btn" tool_tip="ここのチェックを外すと、近くにいる他のアバターに取り付けられたメディアを非表示にします。" label="近くのアバターのメディアを自動再生"/>
 	<check_box name="media_huds_autoplay" tool_tip="チェックを外すと、ＨＵＤは標準のメディア自動再生設定に従います。" label="ＨＵＤに装着されたメディアを自動再生する"/>
 	<text name="noise_suppression_label">
-		ノイズ抑制
+		マイクのノイズ抑制：
 	</text>
 	<combo_box name="noise_suppression_combo">
 		<item label="オフ" name="noise_suppression_none"/>
@@ -63,11 +67,11 @@
 		<item label="カメラの位置" name="camera_position"/>
 		<item label="アバターの位置" name="avatar_position"/>
 	</combo_box>
+	<check_box label="喋ったときにアバターの口を動かす" name="enable_lip_sync"/>
 	<check_box tool_tip="ここをチェックするとボイスのエコーを除去します。" label="エコー除去" name="enable_echo_cancellation"/>
 	<check_box label="ツールバーのボタンでボイスの切り替え" name="push_to_talk_toggle_check" tool_tip="トグルモードでは、トリガーキーを押すことでマイクのオン／オフを切り替えます。そうでない場合は、トリガーキーを押している間だけマイクがオンになります。"/>
 	<check_box tool_tip="ここをチェックすると、自動ゲインコントロールを有効化します。" label="自動音量調整" name="voice_automatic_gain_control"/>
 	<check_box name="gesture_audio_play_btn" tool_tip="ジェスチャーからのサウンドを聞くにはこれを選択します。" label="ジェスチャーのサウンドを再生する"/>
 	<check_box tool_tip="アバターの上に音声ドットインジケーターを表示するにはチェックを入れます。" label="アバターの上にボイスのドットを表示する" name="voice_dot_visualizer"/>
-	<check_box label="喋ったときにアバターの口を動かす" name="enable_lip_sync"/>
 	<button label="入出力機器の設定" name="device_settings_btn"/>
 </panel>

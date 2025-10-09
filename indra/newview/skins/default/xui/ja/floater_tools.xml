@@ -73,9 +73,9 @@
 	<button label="リンク" name="link_btn"/>
 	<button label="リンク解除" name="unlink_btn"/>
 	<combo_box name="combobox grid mode" tool_tip="オブジェクトを配置するグリッドルーラーを選択します。">
-		<combo_box.item label="ワールドグリッド" name="World" value="World"/>
-		<combo_box.item label="ローカルグリッド" name="Local" value="Local"/>
-		<combo_box.item label="リファレンスグリッド" name="Reference" value="Reference"/>
+		<combo_box.item label="ワールドグリッド" name="World"/>
+		<combo_box.item label="ローカルグリッド" name="Local"/>
+		<combo_box.item label="リファレンスグリッド" name="Reference"/>
 	</combo_box>
 	<check_box label="両側を引き伸ばす" name="checkbox uniform"/>
 	<check_box label="テクスチャを引き延ばす" name="checkbox stretch textures"/>
@@ -422,8 +422,8 @@
 			<spinner label="周辺環境光" name="Light Ambiance"/>
 			<check_box label="反射プローブ" name="Reflection Probe" tool_tip="ＰＢＲが有効な場合に、この範囲内のオブジェクトが光の反射をどのように受け取るかを調整します。"/>
 			<combo_box name="Probe Volume Type" tool_tip="プローブの影響量を選択してください。">
-				<combo_box.item label="球状（スフィア）" name="Sphere" value="Sphere"/>
-				<combo_box.item label="箱状（ボックス）" name="Box" value="Box"/>
+				<combo_box.item label="球状（スフィア）" name="Sphere"/>
+				<combo_box.item label="箱状（ボックス）" name="Box"/>
 			</combo_box>
 			<check_box label="動的" name="Probe Dynamic" tool_tip="有効にすると、アバターはこのプローブ範囲内の反射に影響されて表示されます。"/>
 			<text name="Probe Update Label">
