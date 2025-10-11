@@ -2134,6 +2134,10 @@ if( TARGET ll::nvapi )
    target_link_libraries(${VIEWER_BINARY_NAME} ll::nvapi )
 endif()
 
+if ( TARGET llconvexdecomposition )
+    target_link_libraries(${VIEWER_BINARY_NAME} llconvexdecomposition )
+endif ()
+
 set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
     "Path to artwork files.")
 

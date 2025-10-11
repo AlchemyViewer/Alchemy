@@ -256,6 +256,7 @@
 //     mDecompositionRequests   mMutex        rw.repo.mMutex, ro.repo.none [5]
 //     mPhysicsShapeRequests    mMutex        rw.repo.mMutex, ro.repo.none [5]
 //     mDecompositionQ          mMutex        rw.repo.mLoadedMutex, rw.main.mLoadedMutex [5] (was:  [0])
+//     mPhysicsQ                mMutex        rw.repo.mLoadedMutex, rw.main.mLoadedMutex [5] (was:  [0])
 //     mHeaderReqQ              mMutex        ro.repo.none [5], rw.repo.mMutex, rw.any.mMutex
 //     mLODReqQ                 mMutex        ro.repo.none [5], rw.repo.mMutex, rw.any.mMutex
 //     mUnavailableQ            mMutex        rw.repo.none [0], ro.main.none [5], rw.main.mLoadedMutex
@@ -973,6 +974,12 @@ LLMeshRepoThread::~LLMeshRepoThread()
     {
         delete mDecompositionQ.front();
         mDecompositionQ.pop_front();
+    }
+
+    while (!mPhysicsQ.empty())
+    {
+        delete mPhysicsQ.front();
+        mPhysicsQ.pop_front();
     }
 
     delete mHttpRequest;
@@ -2558,7 +2565,7 @@ EMeshProcessingResult LLMeshRepoThread::physicsShapeReceived(const LLUUID& mesh_
 
     {
         LLMutexLock lock(mLoadedMutex);
-        mDecompositionQ.push_back(d);
+        mPhysicsQ.push_back(d);
     }
     return MESH_OK;
 }
@@ -3434,13 +3441,14 @@ void LLMeshRepoThread::notifyLoadedMeshes()
         }
     }
 
-    if (!mSkinInfoQ.empty() || !mSkinUnavailableQ.empty() || ! mDecompositionQ.empty())
+    if (!mSkinInfoQ.empty() || !mSkinUnavailableQ.empty() || !mDecompositionQ.empty() || !mPhysicsQ.empty())
     {
         if (mLoadedMutex->trylock())
         {
             std::deque<LLPointer<LLMeshSkinInfo>> skin_info_q;
             std::deque<UUIDBasedRequest> skin_info_unavail_q;
             std::list<LLModel::Decomposition*> decomp_q;
+            std::list<LLModel::Decomposition*> physics_q;
 
             if (! mSkinInfoQ.empty())
             {
@@ -3455,6 +3463,11 @@ void LLMeshRepoThread::notifyLoadedMeshes()
             if (! mDecompositionQ.empty())
             {
                 decomp_q.swap(mDecompositionQ);
+            }
+
+            if (!mPhysicsQ.empty())
+            {
+                physics_q.swap(mPhysicsQ);
             }
 
             mLoadedMutex->unlock();
@@ -3473,8 +3486,14 @@ void LLMeshRepoThread::notifyLoadedMeshes()
 
             while (! decomp_q.empty())
             {
-                gMeshRepo.notifyDecompositionReceived(decomp_q.front());
+                gMeshRepo.notifyDecompositionReceived(decomp_q.front(), false);
                 decomp_q.pop_front();
+            }
+
+            while (!physics_q.empty())
+            {
+                gMeshRepo.notifyDecompositionReceived(physics_q.front(), true);
+                physics_q.pop_front();
             }
         }
     }
@@ -4717,13 +4736,13 @@ void LLMeshRepository::notifySkinInfoUnavailable(const LLUUID& mesh_id)
     }
 }
 
-void LLMeshRepository::notifyDecompositionReceived(LLModel::Decomposition* decomp)
+void LLMeshRepository::notifyDecompositionReceived(LLModel::Decomposition* decomp, bool physics_mesh)
 {
-    decomposition_map::iterator iter = mDecompositionMap.find(decomp->mMeshID);
+    LLUUID decomp_id = decomp->mMeshID; // Copy to avoid invalidation in below deletion
+    decomposition_map::iterator iter = mDecompositionMap.find(decomp_id);
     if (iter == mDecompositionMap.end())
     { //just insert decomp into map
-        mDecompositionMap[decomp->mMeshID] = decomp;
-        mLoadingDecompositions.erase(decomp->mMeshID);
+        mDecompositionMap[decomp_id] = decomp;
         sCacheBytesDecomps += decomp->sizeBytes();
     }
     else
@@ -4731,9 +4750,16 @@ void LLMeshRepository::notifyDecompositionReceived(LLModel::Decomposition* decom
         sCacheBytesDecomps -= iter->second->sizeBytes();
         iter->second->merge(decomp);
         sCacheBytesDecomps += iter->second->sizeBytes();
-
-        mLoadingDecompositions.erase(decomp->mMeshID);
         delete decomp;
+    }
+
+    if (physics_mesh)
+    {
+        mLoadingPhysicsShapes.erase(decomp_id);
+    }
+    else
+    {
+        mLoadingDecompositions.erase(decomp_id);
     }
 }
 
@@ -4881,7 +4907,6 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
             boost::unordered_set<LLUUID>::iterator iter = mLoadingPhysicsShapes.find(mesh_id);
             if (iter == mLoadingPhysicsShapes.end())
             { //no request pending for this skin info
-                // *FIXME:  Nothing ever deletes entries, can't be right
                 mLoadingPhysicsShapes.insert(mesh_id);
                 mPendingPhysicsShapeRequests.push(mesh_id);
             }

@@ -70,6 +70,12 @@ target_link_libraries(llprimitive
         ll::glm
         )
 
+if (TARGET llconvexdecomposition)
+    target_link_libraries(llprimitive
+            llconvexdecomposition
+            )
+endif ()
+
 if (USE_PRECOMPILED_HEADERS)
     target_precompile_headers(llprimitive REUSE_FROM llprecompiled)
 endif ()
