@@ -38,7 +38,7 @@ class LLViewerObject;
 #define LL_MAX_REFLECTION_PROBE_COUNT 256
 
 // reflection probe resolution
-#define LL_IRRADIANCE_MAP_RESOLUTION 16
+#define LL_IRRADIANCE_MAP_RESOLUTION 64
 
 // reflection probe mininum scale
 #define LL_REFLECTION_PROBE_MINIMUM_SCALE 1.f;
