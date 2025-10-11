@@ -248,15 +248,15 @@ void LLConvexDecompositionVHACD::bindDecomposition(int decomp)
 
 LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, float val)
 {
-    if (name == std::string("Num Hulls"))
+    if (name == std::string_view("Num Hulls"))
     {
         mVHACDParameters.m_maxConvexHulls = llclamp(ll_round(val), 1, MAX_HULLS);
     }
-    else if (name == std::string("Num Vertices"))
+    else if (name == std::string_view("Num Vertices"))
     {
         mVHACDParameters.m_maxNumVerticesPerCH = llclamp(ll_round(val), 3, MAX_VERTICES_PER_HULL);
     }
-    else if (name == std::string("Error Tolerance"))
+    else if (name == std::string_view("Error Tolerance"))
     {
         mVHACDParameters.m_minimumVolumePercentErrorAllowed = val;
     }
