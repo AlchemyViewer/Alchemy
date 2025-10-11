@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_new_feature_notification" title="新機能">
+	<floater.string name="title_txt_inventory">
+		インベントリの新機能
+	</floater.string>
+	<floater.string name="description_txt_inventory">
+		アイテムやフォルダをお気に入りとしてマークできるようになりました。お気に入りに登録したアイテムはインベントリの「お気に入り」タブに表示され、デフォルトではメインのインベントリ画面でスターで強調表示されます。
+	</floater.string>
+	<text name="title_txt">
+		新機能
+	</text>
+	<text name="description_txt">
+		機能の詳細
+	</text>
+	<button name="close_btn" label="了解！"/>
+</floater>

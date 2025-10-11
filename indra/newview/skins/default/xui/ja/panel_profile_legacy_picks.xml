@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel label="Picks" name="panel_profile_picks">
+	<text name="picks_panel_text">
+		ピック無し
+	</text>
+	<accordion name="accordion">
+		<accordion_tab name="tab_picks" title="ピック"/>
+		<accordion_tab name="tab_classifieds" title="クラシファイド"/>
+	</accordion>
+	<panel name="buttons_cucks">
+		<layout_stack name="buttons_cucks_ls">
+			<layout_panel name="add_btn_lp">
+				<menu_button name="add_btn" tool_tip="エントリを追加します。"/>
+			</layout_panel>
+			<layout_panel name="info_btn_lp">
+				<button label="情報" name="info_btn" tool_tip="ピックの情報を表示します。"/>
+			</layout_panel>
+			<layout_panel name="teleport_btn_lp">
+				<button label="テレポート" name="teleport_btn" tool_tip="対応するエリアにテレポートします。"/>
+			</layout_panel>
+			<layout_panel name="show_on_map_btn_lp">
+				<button label="マップ" name="show_on_map_btn" tool_tip="ワールドマップ上に対応するエリアを表示します。"/>
+			</layout_panel>
+		</layout_stack>
+	</panel>
+</panel>

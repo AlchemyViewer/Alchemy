@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel name="autoresponse_settings">
+	<text name="autorespond_response_label">
+		「自動応答」モード時の他のアバターに対する自動応答：
+	</text>
+	<text_editor name="AlchemyAutoresponse">
+		ログイン後に変更できます。
+	</text_editor>
+
+	<text name="autorespond_nf_response_label">
+		「非フレンドへの自動応答」モード時の非フレンドのアバターに対する自動応答：
+	</text>
+	<text_editor name="AlchemyAutoresponseNotFriend">
+		ログイン後に変更できます。
+	</text_editor>
+	<check_box label="他の人からの新着インスタントメッセージに自動返信" name="AlchemyAutoresponseEnable"/>
+	<check_box label="フレンド以外からの新しいインスタントメッセージに自動返信" name="AlchemyAutoresponseNotFriendEnable"/>
+
+</panel>

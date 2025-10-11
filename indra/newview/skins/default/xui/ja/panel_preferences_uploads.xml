@@ -3,20 +3,28 @@
 	<text name="title">
 		アップロード先のフォルダ
 	</text>
-	<text name="title_models">
+	<button name="reset_textures" tool_tip="画像のアップロード先のフォルダをリセットします。"/>
+	<text name="title_textures">
 		画像
 	</text>
+	<button name="reset_sounds" tool_tip="サウンドのアップロード先のフォルダをリセットします。"/>
 	<text name="title_sounds">
 		サウンド
 	</text>
+	<button name="reset_animations" tool_tip="アニメーションのアップロード先のフォルダをリセットします。"/>
 	<text name="title_animation">
 		アニメーション
 	</text>
+	<button name="reset_models" tool_tip="モデルのアップロード先のフォルダをリセットします。"/>
 	<text name="title_model">
 		モデル
 	</text>
+	<button name="reset_pbr" tool_tip="ＰＢＲマテリアルのアップロード先のフォルダをリセットします。"/>
+	<text name="title_pbr">
+		ＰＢＲマテリアル
+	</text>
 	<text name="upload_help">
-		宛先フォルダを変更するには、インベントリでそのフォルダを右クリックして、
-「デフォルトとして使用」を選択します。
+		アップロード先のフォルダを変更したい場合は、インベントリで対象のフォルダを右クリックして、
+「デフォルトとして使用」を選択してください。
 	</text>
 </panel>

@@ -2,20 +2,33 @@
 <floater name="Statistics" title="統計">
 	<scroll_container name="statistics_scroll">
 		<container_view name="statistics_view">
-			<stat_view label="基本" name="basic">
+			<stat_view label="基本情報" name="basic">
 				<stat_bar label="ＦＰＳ" name="fps" unit_label="／秒"/>
 				<stat_bar name="frame_mean" label="フレーム（平均）" unit_label="㎳"/>
 				<stat_bar name="frame_median" label="フレーム（中央値）" unit_label="㎳"/>
 				<stat_bar name="framet_jitter" label="ジッタ"/>
+				<stat_bar name="normalized_cumulative_frametime" label="正規化されたセッションのジッタ"/>
+				<stat_bar name="normalized_period_jitter" label="正規化された周期ジッタ"/>
+				<stat_bar name="normalized_frametime_variation" label="正規化されたフレームタイム変動"/>
+				<stat_bar name="frame_events_per_minute" label="フレームイベント／分"/>
+				<stat_bar name="frame_events_last_minute" label="フレームイベントの最終分"/>
 				<stat_bar label="受信したＵＤＰデータ" name="bandwidth"/>
 				<stat_bar label="パケットロス" name="packet_loss"/>
 				<stat_bar label="シムのPing" name="ping"/>
 			</stat_view>
-			<stat_view label="拡張" name="advanced">
+			<stat_view label="高度な情報" name="advanced">
 				<stat_view label="描画" name="render">
 					<stat_bar label="フレームあたりのKTris" name="ktrisframe" unit_label="ktris／フレーム"/>
+					<stat_bar name="framet_cumulative" label="累積ジッタ"/>
+					<stat_bar name="framet_jitter_99th" label="ジッタ９９の分布"/>
+					<stat_bar name="framet_jitter_95th" label="ジッタ９５の分布"/>
+					<stat_bar name="framet_jitter_stddev" label="ジッタの標準偏差"/>
+					<stat_bar name="framet_99th" label="フレームタイム９９の分布"/>
+					<stat_bar name="framet_95th" label="フレームタイム９５の分布"/>
+					<stat_bar name="framet_stddev" label="フレームタイムの標準偏差"/>
+					<stat_bar name="framet_events" label="フレームタイムのイベント"/>
 					<stat_bar label="秒あたりのKTris" name="ktrissec"/>
-					<stat_bar label="オブジェクト合計" name="totalobjs"/>
+					<stat_bar name="totalobjs" label="全オブジェクト"/>
 					<stat_bar label="キャッシュされたオブジェクト" name="cachedobjs"/>
 					<stat_bar label="新規オブジェクト" name="newobjs"/>
 					<stat_bar label="オブジェクトキャッシュヒット率" name="object_cache_hits"/>
@@ -32,23 +45,9 @@
 					<stat_bar label="フォーマット済メモリ" name="formattedmemstat"/>
 					<stat_bar label="ＲＡＷメモリ" name="rawmemstat"/>
 					<stat_bar label="統合メモリ" name="glboundmemstat"/>
-				</stat_view>
-				<stat_view label="メモリ使用量" name="memory">
-					<stat_bar label="ＬＬトレース" name="LLTrace"/>
-					<stat_bar label="ＵＩ" name="LLView"/>
-					<stat_bar label="フォント" name="LLFontFreetype"/>
-					<stat_bar label="インベントリ" name="LLInventoryObject"/>
-					<stat_bar label="ビューアオブジェクト" name="LLViewerObject"/>
-					<stat_bar label="八分木グループデータ" name="LLViewerOctreeGroup"/>
-					<stat_bar label="八分木データ" name="LLViewerOctreeEntry"/>
-					<stat_bar label="ビューアのオブジェクトキャッシュ" name="LLVOCacheEntry"/>
-					<stat_bar label="描画可能オブジェクト" name="LLDrawable"/>
-					<stat_bar label="顔データ" name="LLFace"/>
-					<stat_bar label="描画情報" name="LLDrawInfo"/>
-					<stat_bar label="テクスチャデータ" name="LLTexture"/>
-					<stat_bar label="画像データ" name="LLImage"/>
-					<stat_bar label="ＧＬ画像データ" name="LLImageGL"/>
-					<stat_bar label="頂点バッファ" name="LLVertexBuffer"/>
+					<stat_view name="material" label="マテリアル">
+						<stat_bar name="nummaterials" label="個"/>
+					</stat_view>
 				</stat_view>
 				<stat_view label="ネットワーク" name="network">
 					<stat_bar label="パケットイン" name="packetsinstat"/>
@@ -67,7 +66,7 @@
 				<stat_bar label="物理作用のＦＰＳ" name="simphysicsfps"/>
 				<stat_view label="物理作用の詳細" name="physicsdetail">
 					<stat_bar label="ピン留めオブジェクト" name="physicspinnedtasks"/>
-					<stat_bar label="低ＬＯＤオブジェクト" name="physicslodtasks"/>
+					<stat_bar label="低ＬｏＤオブジェクト" name="physicslodtasks"/>
 					<stat_bar label="メモリ配分" name="physicsmemoryallocated"/>
 				</stat_view>
 				<stat_bar label="エージェントの更新／秒" name="simagentups"/>

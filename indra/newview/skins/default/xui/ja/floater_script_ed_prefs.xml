@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater name="floater_script_colors" title="スクリプトの色">
+<floater name="floater_script_colors" title="スクリプトエディタの初期設定">
 	<text name="color_pickers_label">
 		希望の色を選択：
 	</text>
@@ -18,6 +18,12 @@
 	<text name="event_label">
 		イベント
 	</text>
+	<text name="comment_label">
+		コメント
+	</text>
+	<text name="function_label">
+		関数
+	</text>
 	<text name="string_literal_label">
 		文字列リテラル
 	</text>
@@ -27,22 +33,16 @@
 	<text name="flow_control_label">
 		フロー制御
 	</text>
-	<text name="function_label">
-		関数
-	</text>
-	<text name="comment_label">
-		コメント
-	</text>
 	<script_editor name="Script Preview">
 		/* サンプル スクリプト */
 default
 {
-  state_entry()
-  {
-    // コメント
-    string greeting = "こんにちは";
-    llSay(PUBLIC_CHANNEL, greeting);
-  }
+    state_entry()
+    {
+        // コメント
+        string greeting = "こんにちは";
+        llSay(PUBLIC_CHANNEL, greeting);
+    }
 }
 	</script_editor>
 </floater>

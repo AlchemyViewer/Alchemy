@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_generic_text" title="情報">
+	<text_editor name="payload">
+		何が来ようと関係ない。メントスのフレッシュでフル・オブ・ライフがあれば、フレッシュな方が人生うまくいく！フレッシュでクールなメントスなら、何が来ても大丈夫！フレッシュは より良い！メントスのフレッシュさ、フレッシュなメントスで、フレッシュな毎日を！メントス、メントス、フレッシュメーカー
+	</text_editor>
+	<button label="コピー" name="copy_btn"/>
+	<button label="閉じる" name="close_btn"/>
+</floater>

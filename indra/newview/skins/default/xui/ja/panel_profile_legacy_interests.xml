@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<panel label="関心" name="avatar_interests_tab">
+	<text name="i_want_label">
+		やりたいこと：
+	</text>
+	<check_box label="ビルド" name="wanna_build"/>
+	<check_box label="探索" name="wanna_explore"/>
+	<check_box label="出会い" name="wanna_yiff"/>
+	<check_box label="雇われる" name="wanna_work"/>
+	<check_box label="グループ" name="wanna_group"/>
+	<check_box label="買う" name="wanna_buy"/>
+	<check_box label="売る" name="wanna_sell"/>
+	<check_box label="雇用" name="wanna_hire"/>
+	<text name="skills_label">
+		スキル：
+	</text>
+	<check_box label="テクスチャ" name="can_texture"/>
+	<check_box label="建築" name="can_architect"/>
+	<check_box label="モデリング" name="can_model"/>
+	<check_box label="イベント計画" name="can_event"/>
+	<check_box label="スクリプト" name="can_script"/>
+	<check_box label="カスタムキャラクター" name="can_characters"/>
+	<text name="language_label">
+		言語：
+	</text>
+</panel>
