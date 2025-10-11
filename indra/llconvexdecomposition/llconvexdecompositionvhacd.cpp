@@ -192,7 +192,7 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
         }
         case LLCDParam::LLCD_BOOLEAN:
         {
-            setParam(name, (param.mDefault.mBool != 0));
+            setParam(name, !!param.mDefault.mBool);
             break;
         }
         case LLCDParam::LLCD_INVALID:
