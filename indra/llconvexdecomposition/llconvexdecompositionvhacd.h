@@ -151,7 +151,7 @@ private:
             {
                 from(hullIn);
             }
-        };
+        }
 
         LLVHACDMesh(const LLCDMeshData* meshIn, bool vertex_based)
         {
@@ -159,7 +159,7 @@ private:
             {
                 from(meshIn, vertex_based);
             }
-        };
+        }
 
         void clear()
         {

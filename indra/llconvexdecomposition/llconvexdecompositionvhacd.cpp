@@ -192,7 +192,7 @@ LLConvexDecompositionVHACD::LLConvexDecompositionVHACD()
         }
         case LLCDParam::LLCD_BOOLEAN:
         {
-            setParam(name, (param.mDefault.mBool != 0));
+            setParam(name, !!param.mDefault.mBool);
             break;
         }
         case LLCDParam::LLCD_INVALID:
@@ -214,9 +214,8 @@ LLConvexDecompositionVHACD::~LLConvexDecompositionVHACD()
 
 void LLConvexDecompositionVHACD::genDecomposition(int& decomp)
 {
-    int new_decomp_id = static_cast<int>(mDecompData.size()) + 1;
-    mDecompData[new_decomp_id] = LLDecompData();
-    decomp = new_decomp_id;
+    decomp = static_cast<int>(mDecompData.size()) + 1;
+    mDecompData[decomp] = LLDecompData();
 }
 
 void LLConvexDecompositionVHACD::deleteDecomposition(int decomp)
@@ -248,15 +247,15 @@ void LLConvexDecompositionVHACD::bindDecomposition(int decomp)
 
 LLCDResult LLConvexDecompositionVHACD::setParam(const char* name, float val)
 {
-    if (name == std::string("Num Hulls"))
+    if (name == std::string_view("Num Hulls"))
     {
         mVHACDParameters.m_maxConvexHulls = llclamp(ll_round(val), 1, MAX_HULLS);
     }
-    else if (name == std::string("Num Vertices"))
+    else if (name == std::string_view("Num Vertices"))
     {
         mVHACDParameters.m_maxNumVerticesPerCH = llclamp(ll_round(val), 3, MAX_VERTICES_PER_HULL);
     }
-    else if (name == std::string("Error Tolerance"))
+    else if (name == std::string_view("Error Tolerance"))
     {
         mVHACDParameters.m_minimumVolumePercentErrorAllowed = val;
     }
