@@ -214,9 +214,8 @@ LLConvexDecompositionVHACD::~LLConvexDecompositionVHACD()
 
 void LLConvexDecompositionVHACD::genDecomposition(int& decomp)
 {
-    int new_decomp_id = static_cast<int>(mDecompData.size()) + 1;
-    mDecompData[new_decomp_id] = LLDecompData();
-    decomp = new_decomp_id;
+    decomp = static_cast<int>(mDecompData.size()) + 1;
+    mDecompData[decomp] = LLDecompData();
 }
 
 void LLConvexDecompositionVHACD::deleteDecomposition(int decomp)
