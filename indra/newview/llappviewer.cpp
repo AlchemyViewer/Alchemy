@@ -1188,10 +1188,11 @@ bool LLAppViewer::init()
         }
     }
     else
+#endif //LL_RELEASE_FOR_DOWNLOAD
     {
+        mUpdaterNotFound = true;
         LL_WARNS("InitInfo") << "Skipping updater check." << LL_ENDL;
     }
-#endif //LL_RELEASE_FOR_DOWNLOAD
 
     {
         // Iterate over --leap command-line options. But this is a bit tricky: if
