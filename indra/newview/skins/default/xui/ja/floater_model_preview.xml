@@ -317,6 +317,28 @@
 					<button label="分析" name="Decompose"/>
 					<button label="キャンセル" name="decompose_cancel"/>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="method_label">
+						ステップ２：殻への変換（オプション）
+					</text>
+					<text name="analysis_method_label">
+						フィルモード：
+					</text>
+					<text name="quality_label">
+						解像度：
+					</text>
+					<text name="quality_label">
+						殻あたりのメッシュ：
+					</text>
+					<text name="smooth_method_label">
+						殻あたりの頂点：
+					</text>
+					<text name="tolerance_label">
+						誤差許容度：
+					</text>
+					<button label="解析" name="Analyze"/>
+					<button label="キャンセル" name="analyze_cancel"/>
+				</panel>
 				<!-- ==== STEP 3: Simplify ==== -->
 				<panel name="physics simplification">
 					<text name="second_step_label">
@@ -426,7 +448,7 @@
 			</text>
 			<!-- =========== Cost breakdown ======== -->
 			<panel name="price_breakdown_panel" width="150">
-				<text>
+				<text name="price_breakdown_title">
 					費用の内訳
 				</text>
 				<text name="price_breakdown_labels" width="100">
@@ -457,8 +479,8 @@
 [STR_LOW]
 [STR_LOWEST]</text>-->
 			<panel name="physics_costs_panel">
-				<text>
-					物理効果コスト
+				<text name="physics_breakdown_title">
+					物理効果の費用
 				</text>
 				<text name="physics_breakdown_labels">
 					基準の殻：
@@ -508,7 +530,7 @@
 		<check_box label="ジョイント位置のオーバーライド" name="show_joint_overrides"/>
 		<check_box label="ジョイント数" name="show_joint_positions"/>
 		<text name="physics_explode_label">
-			展開プレビュー：
+			プレビュー：
 		</text>
 	</panel>
 </floater>

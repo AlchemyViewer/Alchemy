@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <panel label="セカンドライフ" name="avatar_secondlife_tab">
-	<layout_stack>
+	<layout_stack name="avatar_secondlife_stack">
 		<layout_panel name="avatar_info_top">
 			<profile_image  name="sl_profile_pic" tool_tip="クリックして画像を選択してください。">
 				<!-- It would be cool if this worked someday!
