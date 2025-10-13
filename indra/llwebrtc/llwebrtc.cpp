@@ -749,7 +749,7 @@ LLWebRTCPeerConnectionInterface *LLWebRTCImpl::newPeerConnection()
     bool empty = mPeerConnections.empty();
     webrtc::scoped_refptr<LLWebRTCPeerConnectionImpl> peerConnection = webrtc::scoped_refptr<LLWebRTCPeerConnectionImpl>(new webrtc::RefCountedObject<LLWebRTCPeerConnectionImpl>());
     peerConnection->init(this);
-    if (mPeerConnections.empty())
+    if (empty)
     {
         intSetMute(mMute);
     }
