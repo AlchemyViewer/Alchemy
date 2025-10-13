@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="グラフィック" name="Display panel">
-	<text>
+	<text name="preset_label">
 		使用中のプリセット：
 	</text>
 	<text name="preset_text">

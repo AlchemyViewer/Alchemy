@@ -15,7 +15,8 @@
     width="304"
     layout="topleft"
     orientation="vertical"
-    show_drag_handle="false">
+    show_drag_handle="false"
+    name="avatar_secondlife_stack">
     <layout_panel
      name="avatar_info_top"
      follows="top|left|right"
