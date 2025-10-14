@@ -448,7 +448,7 @@ Second Lifeのサポートまでお問い合わせください。
 		（グループ）
 	</string>
 	<string name="TooltipForSaleL$">
-		売り出し中：L$[AMOUNT]
+		販売中：L$ [AMOUNT]
 	</string>
 	<string name="TooltipFlagGroupBuild">
 		グループ作成
@@ -5835,7 +5835,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		アウトフィット
 	</string>
 	<string name="Command_Avatar_Label">
-		アバター一式
+		アバターウェルカムパック
 	</string>
 	<string name="Command_Build_Label">
 		ビルド
@@ -5883,7 +5883,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		ミニマップ
 	</string>
 	<string name="Command_Move_Label">
-		歩行／走行／飛行
+		歩く／走る／飛ぶ
 	</string>
 	<string name="Command_Panic_Label">
 		パニック！
@@ -5953,7 +5953,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		アバターの容姿を変更します。
 	</string>
 	<string name="Command_Avatar_Tooltip">
-		アバター一式を選択します。
+		アバターウェルカムパックを開きます。
 	</string>
 	<string name="Command_Build_Tooltip">
 		オブジェクトのビルドや地形の変形をします。
