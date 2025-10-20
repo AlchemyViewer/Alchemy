@@ -334,7 +334,7 @@
 						殻あたりの頂点：
 					</text>
 					<text name="tolerance_label">
-						誤差許容度：
+						許容誤差：
 					</text>
 					<button label="解析" name="Analyze"/>
 					<button label="キャンセル" name="analyze_cancel"/>
@@ -342,7 +342,7 @@
 				<!-- ==== STEP 3: Simplify ==== -->
 				<panel name="physics simplification">
 					<text name="second_step_label">
-						手順３：簡素化
+						ステップ３：簡素化
 					</text>
 					<text name="simp_method_header">
 						方法：
