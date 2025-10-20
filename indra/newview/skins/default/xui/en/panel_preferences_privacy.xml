@@ -236,7 +236,8 @@
             increment="0.5"
             label="Max Distance"
             width="275"
-            layout="topleft"/>
+            layout="topleft"
+            name="Max Distance"/>
     <button
      follows="left|top"
      height="23"

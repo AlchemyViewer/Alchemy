@@ -22,19 +22,19 @@
 			</text>
 			<combo_box name="lookatshownames_combobox">
 				<combo_box.item label="表示しない" name="None"/>
-				<combo_box.item label="フル表示" name="Complete_Name"/>
+				<combo_box.item label="完全な名前" name="Complete_Name"/>
 				<combo_box.item label="表示名" name="Display_Name"/>
-				<combo_box.item label="古い形式" name="Legacy_Name"/>
+				<combo_box.item label="レガシー名" name="Legacy_Name"/>
 				<combo_box.item label="ユーザ名" name="User_Name"/>
 			</combo_box>
 			<check_box label="視線ビーコンからその所有者までを線で表示する" name="lineslookat" tool_tip="カメラのフォーカスポイントとアバターを結ぶ線が表示されます。アバターの位置を確認するのに役立ちます。"/>
 			<text name="mylookat">
 				自分の視線：
 			</text>
-			<check_box label="視線ターゲットを表示しない" name="LookAtHideOwn" tool_tip="自分のカメラのクロスヘアーを表示しないようにします。"/>
-			<check_box label="視線ーゲットを他の人に送信しない" name="privatelookat" tool_tip="カメラのフォーカスポイントを他の人に表示しないようにします。"/>
+			<check_box label="視線のターゲットを表示しない" name="LookAtHideOwn" tool_tip="自分のカメラのクロスヘアーを表示しないようにします。"/>
+			<check_box label="視線のターゲットを他の人に送信しない" name="privatelookat" tool_tip="カメラのフォーカスポイントを他の人に表示しないようにします。"/>
 			<check_box label="視線の距離を制限する" name="privatelookat" tool_tip="目や頭の動きなどの装飾的な特徴を許可しますが、設定された距離を超えると特定のものを指さなくなります。"/>
-			<slider label="最大距離"/>
+			<slider label="最大距離" name="Max Distance"/>
 			<button label="ブロックリスト" name="block_list"/>
 			<text name="block_list_label">
 				（ブロックした人物やオブジェクト）
