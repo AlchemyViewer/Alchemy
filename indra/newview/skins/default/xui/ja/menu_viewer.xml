@@ -54,10 +54,10 @@
 		<menu_item_call label="選択した装着物を削除" name="Remove Selected Attachments"/>
 		<menu_item_call label="アバターウェルカムパック…" name="Avatar Welcome Pack"/>
 		<menu_item_call label="座る／立つ" name="Sit stand"/>
-		<menu_item_call label="飛行／歩く" name="Fly land" shortcut="HOME"/>
+		<menu_item_call label="飛ぶ／歩く" name="Fly land" shortcut="HOME"/>
 		<menu_item_call label="アニメーション停止" name="Stop Animating My Avatar"/>
-		<menu_item_check label="歩く／走行／飛行…" name="WalkRunFly"/>
-		<menu_item_check label="常時走行" name="Always Run"/>
+		<menu_item_check label="歩く／走る／飛ぶ…" name="WalkRunFly"/>
+		<menu_item_check label="常に走る" name="Always Run"/>
 		<menu_item_check label="ジェスチャー…" name="Gestures"/>
 		<menu_item_call label="スケルトンをリセット" name="Reset Skeleton"/>
 		<menu_item_call label="スケルトンとアニメーションをリセット" name="Reset Skeleton And Animations"/>
