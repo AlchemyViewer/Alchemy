@@ -139,18 +139,18 @@
 	</combo_box>
 	<spinner label="水平スケール" name="TexScaleU"/>
 	<spinner label="垂直スケール" name="TexScaleV"/>
-	<spinner label="メートル毎に繰り返す" name="rptctrl"/>
-	<spinner label="回転度" name="TexRot"/>
+	<spinner label="メートル毎の繰り返し" name="rptctrl"/>
+	<spinner label="回転角度" name="TexRot"/>
 	<spinner label="水平オフセット" name="TexOffsetU"/>
 	<spinner label="垂直オフセット" name="TexOffsetV"/>
 	<spinner label="水平スケール" name="bumpyScaleU"/>
 	<spinner label="垂直スケール" name="bumpyScaleV"/>
-	<spinner label="回転度" name="bumpyRot"/>
+	<spinner label="回転角度" name="bumpyRot"/>
 	<spinner label="水平オフセット" name="bumpyOffsetU"/>
 	<spinner label="垂直オフセット" name="bumpyOffsetV"/>
 	<spinner label="水平スケール" name="shinyScaleU"/>
 	<spinner label="垂直スケール" name="shinyScaleV"/>
-	<spinner label="回転度" name="shinyRot"/>
+	<spinner label="回転角度" name="shinyRot"/>
 	<spinner label="水平オフセット" name="shinyOffsetU"/>
 	<spinner label="垂直オフセット" name="shinyOffsetV"/>
 	<check_box label="平面を揃える" name="checkbox planar align" tool_tip="テクスチャを最後に選択された面を基準に揃えます。平面テクスチャのマッピングが必要です。"/>
@@ -161,7 +161,7 @@
 	<spinner label="回転度" name="gltfTextureRotation"/>
 	<spinner label="水平オフセット" name="gltfTextureOffsetU"/>
 	<spinner label="垂直オフセット" name="gltfTextureOffsetV"/>
-	<spinner label="メートル毎に繰り返す" name="gltfRptctrl"/>
+	<spinner label="メートル毎の繰り返し" name="gltfRptctrl"/>
 	<!-- END PBR Material texture transform parameters -->
 	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同期させます。"/>
 	<button label="揃える" name="button align textures" label_selected="現在のテクスチャレイヤーを揃える" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>

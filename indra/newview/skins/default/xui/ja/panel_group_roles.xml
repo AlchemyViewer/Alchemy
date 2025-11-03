@@ -50,22 +50,12 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 			<panel.string name="donation_area">
 				[AREA]㎡
 			</panel.string>
-			<panel.string name="power_folder_icon">
-				Inv_FolderClosed
-			</panel.string>
-			<panel.string name="power_all_have_icon">
-				Checkbox_On
-			</panel.string>
-			<panel.string name="power_partial_icon">
-				Checkbox_Off
-			</panel.string>
-			<filter_editor label="メンバーをフィルタ" name="filter_input"/>
-			<name_list name="member_list">
-				<name_list.columns label="メンバー" name="name"/>
-				<name_list.columns label="寄付" name="donated"/>
-				<name_list.columns label="ステータス" name="online"/>
-				<name_list.columns label="タイトル" name="title"/>
-			</name_list>
+			<filter_editor label="役割でフィルタ" name="filter_input"/>
+			<scroll_list name="role_list">
+				<scroll_list.columns label="役割" name="name"/>
+				<scroll_list.columns label="タイトル" name="title"/>
+				<scroll_list.columns label="＃" name="members"/>
+			</scroll_list>
 			<button label="新しい役割" name="role_create"/>
 			<button label="役割をコピー" name="role_copy"/>
 			<button label="役割を削除" name="role_delete"/>
@@ -74,15 +64,6 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 			<panel.string name="help_text">
 				能力は、ロール内のメンバーはこのグループ内で特定のことを行うことができます。
 多種多様な能力が指定可能です。
-			</panel.string>
-			<panel.string name="power_folder_icon">
-				Inv_FolderClosed
-			</panel.string>
-			<panel.string name="power_all_have_icon">
-				Checkbox_On
-			</panel.string>
-			<panel.string name="power_partial_icon">
-				Checkbox_Off
 			</panel.string>
 			<filter_editor label="能力でフィルタ" name="filter_input"/>
 			<scroll_list name="action_list" tool_tip="能力を選択して詳細を表示します。"/>

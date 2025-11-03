@@ -6,16 +6,6 @@ For example, the strings used in avatar chat bubbles, and strings
 that are returned from one component and may appear in many places
 -->
 <strings>
-	<!-- Default Args - these arguments will be replaced in all strings -->
-	<string name="SECOND_LIFE">
-		Second Life
-	</string>
-	<string name="APP_NAME">
-		Alchemy
-	</string>
-	<string name="CAPITALIZED_APP_NAME">
-		ALCHEMY
-	</string>
 	<string name="SECOND_LIFE_GRID">
 		Second Lifeグリッド
 	</string>
@@ -34,11 +24,6 @@ that are returned from one component and may appear in many places
 	</string>
 	<string name="StartupRequireDriverUpdate">
 		グラフィックを初期化できませんでした。グラフィックドライバを更新してください。
-	</string>
-	<!-- about dialog/support string-->
-	<string name="AboutHeader">
-		[CHANNEL]　[VIEWER_VERSION_0].[VIEWER_VERSION_1].[VIEWER_VERSION_2].[VIEWER_VERSION_3]（[ADDRESS_SIZE]bit）（[ARCHITECTURE]）
-[[VIEWER_RELEASE_NOTES_URL] [ReleaseNotes]]
 	</string>
 	<string name="AboutCompiler">
 		コンパイラのバージョン：[COMPILER]　[COMPILER_VERSION]
@@ -62,21 +47,12 @@ SLURL：&lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 [SERVER_VERSION]
 [SERVER_RELEASE_NOTES_URL]
 	</string>
-	<!-- *NOTE: Do not translate text like GPU, Graphics Card, etc -
-	Most PC users who know what these mean will be used to the English versions,
-	and this info sometimes gets sent to support. -->
-	<string name="AboutSystem">
-		ＣＰＵ：[CPU]
-メモリ：[MEMORY_MB]㎆
-ＯＳのバージョン：[OS_VERSION]
-グラフィックカード製造元：[GRAPHICS_CARD_VENDOR]
-グラフィックカード:[GRAPHICS_CARD]
-	</string>
 	<string name="AboutDriver">
 		Windowsグラフィックドライババージョン：[GRAPHICS_DRIVER_VERSION]
 	</string>
 	<string name="AboutOGL">
-		OpenGLバージョン：[OPENGL_VERSION]</string>
+		OpenGLバージョン：[OPENGL_VERSION]
+	</string>
 	<string name="AboutSettings">
 		ウィンドウサイズ：[WINDOW_WIDTH]✕[WINDOW_HEIGHT]
 フォントサイズ調整：[FONT_SIZE_ADJUSTMENT]pt
@@ -233,11 +209,9 @@ LibVLCのバージョン：[LIBVLC_VERSION]
 	<string name="AditiGridLabel">
 		Second Lifeベータテストグリッド（Aditi）
 	</string>
-	<string name="ViewerDownloadURL">
-		https://www.alchemyviewer.org/downloads
-	</string>
 	<string name="LoginFailedViewerNotPermitted">
-		お使いの古いビューアでは、Second Lifeにアクセスできません。以下のページから新しいビューアをダウンロードしてください：https://www.alchemyviewer.org/downloads
+		お使いの古いビューアでは、Second Lifeにアクセスできません。以下のページから新しいビューアをダウンロードしてください：
+https://www.alchemyviewer.org/downloads
 
 詳細については、ＦＡＱを参照してください：
 https://secondlife.com/viewer-access-faq
@@ -325,19 +299,19 @@ Second Lifeのサポートまでお問い合わせください。
 		あなたのアカウントにアクセスできるのは、
 太平洋時間の[START]～[END]の間に限られます。
 有効な時間帯に再度お試しください。
-エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
+エラーと思われる場合は、support@secondlife.comにお問い合わせください。
 	</string>
 	<string name="LoginFailedIncorrectParameters">
 		パラメーターが正しくありません。
-エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
+エラーと思われる場合は、support@secondlife.comにお問い合わせください。
 	</string>
 	<string name="LoginFailedFirstNameNotAlphanumeric">
 		ファーストネームのパラメーターは英数字です。
-エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
+エラーと思われる場合は、support@secondlife.comにお問い合わせください。
 	</string>
 	<string name="LoginFailedLastNameNotAlphanumeric">
 		ラストネームのパラメーターは英数字です。
-エラーと思われる場合は、Second Lifeのサポートにお問い合わせください。
+エラーと思われる場合は、support@secondlife.comにお問い合わせください。
 	</string>
 	<string name="LogoutFailedRegionGoingOffline">
 		リージョンは、現在オフラインです。
@@ -448,7 +422,7 @@ Second Lifeのサポートまでお問い合わせください。
 		（グループ）
 	</string>
 	<string name="TooltipForSaleL$">
-		売り出し中：L$[AMOUNT]
+		販売中：L$ [AMOUNT]
 	</string>
 	<string name="TooltipFlagGroupBuild">
 		グループ作成
@@ -524,7 +498,7 @@ Second Lifeのサポートまでお問い合わせください。
 		表示されている出品リストを移動できません。
 	</string>
 	<string name="TooltipOutboxCannotMoveRoot">
-		ルートフォルダを出品リストに表示するマーケットプレイスを移動できません。
+		マーケットプレイスの出品リストのルートフォルダは移動できません。
 	</string>
 	<string name="TooltipOutboxMixedStock">
 		在庫フォルダ内のアイテムは、すべて同じ種類と権限でなければなりません。
@@ -533,7 +507,7 @@ Second Lifeのサポートまでお問い合わせください。
 		１つ以上のアイテムが 「アウトフィット」内で使用できません。
 	</string>
 	<string name="TooltipCantMoveOutfitIntoOutfit">
-		アウトフィットを別のアウトフィットへ移動することはできません。
+		アウトフィットを別のアウトフィットに移動することはできません。
 	</string>
 	<string name="TooltipOutfitNotInInventory">
 		「アウトフィット」に入れることができるのは、自分のインベントリにあるアイテムや衣装のみです。
@@ -621,7 +595,7 @@ Second Lifeのサポートまでお問い合わせください。
 		ＩＭ
 	</string>
 	<string name="SLappAgentPay">
-		支払い
+		支払う
 	</string>
 	<string name="SLappAgentOfferTeleport">
 		次の場所へのテレポートのオファーを送ります：
@@ -687,10 +661,6 @@ Second Lifeのサポートまでお問い合わせください。
 	</string>
 	<string name="ReleaseNotes">
 		リリースノート
-	</string>
-	<!-- Always mark translate="false" for strings that are nothing but URLs, as they don't need translation. -->
-	<string name="RELEASE_NOTES_BASE_URL" translate="false">
-		https://github.com/AlchemyViewer/Alchemy/releases/tag/
 	</string>
 	<!-- Indicates something is being loaded. Maybe should be merged with RetrievingData -->
 	<string name="LoadingData">
@@ -1223,16 +1193,6 @@ Second Lifeのサポートまでお問い合わせください。
 	<string name="UnknownScriptPermission">
 		（不明）！
 	</string>
-	<!-- Sim Access labels -->
-	<string name="SIM_ACCESS_PG">
-		General
-	</string>
-	<string name="SIM_ACCESS_MATURE">
-		Moderate
-	</string>
-	<string name="SIM_ACCESS_ADULT">
-		Adult
-	</string>
 	<string name="SIM_ACCESS_DOWN">
 		オフライン
 	</string>
@@ -1562,6 +1522,7 @@ Second Lifeのサポートまでお問い合わせください。
 	<string name="OverflowInfoChannelString">
 		あなたにはさらに%d件の通知があります
 	</string>
+	<!-- body parts -->
 	<string name="BodyPartsRightArm">
 		右腕
 	</string>
@@ -1601,11 +1562,11 @@ Second Lifeのサポートまでお問い合わせください。
 	<string name="InventoryNoMatchingItems">
 		お探しのものは見つかりましたか？[secondlife:///app/search/all/[SEARCH_TERM] 検索]をお試しください。
 	</string>
-	<string name="InventoryNoMatchingRecentItems">
-		お探しのものは見つかりましたか？[secondlife:///app/inventory/filters フィルタを表示]をお試しください。
-	</string>
 	<string name="InventoryNoMatchingFavorites">
 		お気に入りとしてマークしたアイテムはありません。
+	</string>
+	<string name="InventoryNoMatchingRecentItems">
+		お探しのものは見つかりましたか？[secondlife:///app/inventory/filters フィルタを表示]をお試しください。
 	</string>
 	<string name="PlacesNoMatchingItems">
 		お探しのものは見つかりましたか？[secondlife:///app/search/places/[SEARCH_TERM] 検索]をお試しください。
@@ -1632,10 +1593,12 @@ Second Lifeのサポートまでお問い合わせください。
 		マーケットプレイスで購入した商品はここに表示されます。その後、アイテムをインベントリにドラッグすれば、それらのアイテムを使用できます。
 	</string>
 	<string name="MarketplaceURL">https://marketplace.[MARKETPLACE_DOMAIN_NAME]/?lang=ja-JP</string>
-	<string name="MarketplaceURL_CreateStore">https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%8A%E3%83%AC%E3%83%83%E3%82%B8%E3%83%99%E3%83%BC%E3%82%B9/%E3%83%9E%E3%83%BC%E3%82%B1%E3%83%83%E3%83%88%E3%83%97%E3%83%AC%E3%82%A4%E3%82%B9%E3%81%A7%E8%B2%A9%E5%A3%B2%E3%81%99%E3%82%8B-r769/</string>
-	<string name="MarketplaceURL_Dashboard"> https://marketplace.[MARKETPLACE_DOMAIN_NAME]/merchants/store/dashboard?lang=ja-JP</string>
-	<string name="MarketplaceURL_Imports"> https://marketplace.[MARKETPLACE_DOMAIN_NAME]/merchants/store/imports?lang=ja-JP</string>
-	<string name="MarketplaceURL_LearnMore"> https://marketplace.[MARKETPLACE_DOMAIN_NAME]/learn_more?lang=ja-JP</string>
+	<string name="MarketplaceURL_CreateStore">
+		https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%8A%E3%83%AC%E3%83%83%E3%82%B8%E3%83%99%E3%83%BC%E3%82%B9/%E3%83%9E%E3%83%BC%E3%82%B1%E3%83%83%E3%83%88%E3%83%97%E3%83%AC%E3%82%A4%E3%82%B9%E3%81%A7%E8%B2%A9%E5%A3%B2%E3%81%99%E3%82%8B-r769/
+	</string>
+	<string name="MarketplaceURL_Dashboard">https://marketplace.[MARKETPLACE_DOMAIN_NAME]/merchants/store/dashboard?lang=ja-JP</string>
+	<string name="MarketplaceURL_Imports">https://marketplace.[MARKETPLACE_DOMAIN_NAME]/merchants/store/imports?lang=ja-JP</string>
+	<string name="MarketplaceURL_LearnMore">https://marketplace.[MARKETPLACE_DOMAIN_NAME]/learn_more?lang=ja-JP</string>
 	<string name="InventoryPlayAnimationTooltip">
 		「再生」オプションでウィンドウを開きます。
 	</string>
@@ -1673,12 +1636,12 @@ Second Lifeのサポートまでお問い合わせください。
 		マーケットプレイスの出品リストを開くときにエラーが発生しました。引き続きこのメッセージを受信するには、Second Lifeのサポート（http://support.secondlife.com）にお問い合わせください
 	</string>
 	<string name="InventoryMarketplaceConnectionError">
-マーケットプレイス出品時の接続に失敗しました。
+		マーケットプレイス出品時の接続に失敗しました。
 このメッセージが続けて表示される場合は、
 https://support.secondlife.com よりSecond Lifeのサポートまでお問い合わせください。
 	</string>
 	<string name="InventoryMarketplaceConnectionErrorReason">
-マーケットプレイス出品時の接続に失敗しました：[REASON]
+		マーケットプレイス出品時の接続に失敗しました：[REASON]
 このメッセージが続けて表示される場合は、
 https://support.secondlife.com よりSecond Lifeのサポートまでお問い合わせください。
 	</string>
@@ -1775,7 +1738,8 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="MarketplaceUpdating">
 		アップデート中…
 	</string>
-	<string name="UploadFeeInfo"> 料金はサブスクリプションのレベルにより異なります。レベルが高いほど、料金が下がります。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細]
+	<string name="UploadFeeInfo">
+		料金はサブスクリプションのレベルにより異なります。レベルが高いほど、料金が下がります。[https://accounts.secondlife.com/change_membership/?lang=ja-JP 詳細]
 	</string>
 	<string name="Open landmarks">
 		ランドマークを開く
@@ -1785,11 +1749,11 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	</string>
 	<!-- use value="" because they have preceding spaces -->
 	<string name="active" value="（アクティブ）"/>
-	<string name="no_transfer" value=" （再販・譲渡不可）"/>
-	<string name="no_modify" value=" （編集不可）"/>
-	<string name="no_copy" value=" （コピー不可）"/>
-	<string name="worn" value=" （着用中）"/>
-	<string name="link" value=" 　リンク"/>
+	<string name="no_transfer" value="（再販・譲渡不可）"/>
+	<string name="no_modify" value="（編集不可）"/>
+	<string name="no_copy" value="（コピー不可）"/>
+	<string name="worn" value="（着用中）"/>
+	<string name="link" value="　リンク"/>
 	<string name="broken_link" value=" 　壊れたリンク"/>
 	<string name="no_transfer_lbl" value="　再販・譲渡不可"/>
 	<string name="no_modify_lbl" value="　編集不可"/>
@@ -1800,7 +1764,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="NoContents">
 		コンテンツなし
 	</string>
-	<string name="WornOnAttachmentPoint" value=" （[ATTACHMENT_POINT]に装着中）"/>
+	<string name="WornOnAttachmentPoint" value="（[ATTACHMENT_POINT]に装着中）"/>
 	<string name="AttachmentErrorMessage" value="（[ATTACHMENT_ERROR]）"/>
 	<string name="ActiveGesture" value="[GESLABEL]（アクティブ）"/>
 	<!-- Inventory permissions -->
@@ -1829,7 +1793,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="Clothing" value="衣装、"/>
 	<string name="Gestures" value="ジェスチャー、"/>
 	<string name="Landmarks" value="ランドマーク、"/>
-	<string name="Materials" value=" マテリアル、"/>
+	<string name="Materials" value="マテリアル、"/>
 	<string name="Notecards" value="ノートカード、"/>
 	<string name="Objects" value="オブジェクト、"/>
 	<string name="Scripts" value="スクリプト、"/>
@@ -1838,7 +1802,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="Settings" value="自然環境の設定、"/>
 	<string name="Snapshots" value="スナップショット、"/>
 	<string name="No Filters" value="なし"/>
-	<string name="Since Logoff" value="–ログオフ以来"/>
+	<string name="Since Logoff" value="－ログオフ以来"/>
 	<!-- inventory folder -->
 	<string name="InvFolder My Inventory">
 		インベントリ
@@ -1900,12 +1864,12 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="InvFolder Gestures">
 		ジェスチャー
 	</string>
-	<!-- historically default name of the Favorites folder can start from either "f" or "F" letter.
-	Also, it can be written as "Favorite" or "Favorites".
-	We should localize all variants of them with the same value -->
 	<string name="InvFolder Favorite">
 		お気に入り
 	</string>
+	<!-- historically default name of the Favorites folder can start from either "f" or "F" letter.
+      Also, it can be written as "Favorite" or "Favorites".
+  We should localize all variants of them with the same value -->
 	<string name="InvFolder favorite">
 		お気に入り
 	</string>
@@ -2035,7 +1999,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		口
 	</string>
 	<string name="Chin">
-		あご
+		顎
 	</string>
 	<string name="Left Ear">
 		左耳
@@ -2211,6 +2175,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="hud_render_textures_warning">
 		[HUD_DETAILS]は、使用されているテクスチャが多すぎます。
 	</string>
+
 	<!-- AgeYearsA = singular,
 	AgeYearsB = plural,
 	AgeYearsC = plural for non-English languages like Russian
@@ -2244,13 +2209,13 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		[COUNT]週間
 	</string>
 	<string name="AgeDaysA">
-		[COUNT]日間
+		[COUNT]日
 	</string>
 	<string name="AgeDaysB">
-		[COUNT]日間
+		[COUNT]日
 	</string>
 	<string name="AgeDaysC">
-		[COUNT]日間
+		[COUNT]日
 	</string>
 	<!-- Group member counts -->
 	<string name="GroupMembersA">
@@ -2559,7 +2524,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		口
 	</string>
 	<string name="ATTACH_CHIN">
-		あご
+		顎
 	</string>
 	<string name="ATTACH_LEAR">
 		左耳
@@ -2699,7 +2664,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		[COUNT]件見つかりました
 	</string>
 	<string name="PanelDirTimeStr">
-		[ampm,datetime,utc]　[hour12,datetime,utc]：[min,datetime,utc]
+		[ampm,datetime,slt]　[hour12,datetime,slt]：[min,datetime,slt]
 	</string>
 	<!-- panel dir events -->
 	<string name="PanelDirEventsDateText">
@@ -2853,7 +2818,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		購入：
 	</string>
 	<string name="GroupMoneyPaidYou">
-		あなたに支払い：
+		あなたへの支払い：
 	</string>
 	<string name="GroupMoneyPaidInto">
 		支払情報
@@ -2891,7 +2856,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	</string>
 	<string name="UnknownFileExtension">
 		不明な拡張子：%s
-		使用可能な拡張子：.wav，.tga，.bmp，.jpg，.jpeg，.bvh
+使用可能な拡張子：.wav，.tga，.bmp，.jpg，.jpeg，.bvh
 	</string>
 	<string name="MuteObject2">
 		オブジェクトのブロック
@@ -3023,7 +2988,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		Linden所在地
 	</string>
 	<string name="Adult">
-		成人向け
+		Adult向け
 	</string>
 	<string name="Arts&amp;Culture">
 		芸術と文化
@@ -3105,14 +3070,9 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		メディアの再生／一時停止
 	</string>
 	<!-- Drivers support/update pages -->
-	<string name="IntelDriverPage">
-		https://www.intel.co.jp/content/www/jp/ja/support/detect.html
-	</string>
-	<string name="NvidiaDriverPage"> https://www.nvidia.com/Download/index.aspx?lang=ja-jp
-	</string>
-	<string name="AMDDriverPage">
-		https://www.amd.com/ja/support
-	</string>
+	<string name="IntelDriverPage">https://www.intel.co.jp/content/www/jp/ja/support/detect.html</string>
+	<string name="NvidiaDriverPage">https://www.nvidia.com/Download/index.aspx?lang=ja-jp</string>
+	<string name="AMDDriverPage">https://www.amd.com/ja/support</string>
 	<!-- OSMessageBox messages -->
 	<string name="MBCmdLineError">
 		コマンドラインにエラーが見つかりました。
@@ -4822,8 +4782,8 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		[NAME]からのインベントリのオファーです。
 	</string>
 	<string name="bot_warning">
-		ボット「[NAME]」とチャット中です。個人情報は共有しないでください。
-詳しくは https://second.life/scripted-agents をご覧ください。
+		[NAME]とチャットしています。個人情報は共有しないでください。
+詳細は https://second.life/scripted-agents をご覧ください。
 	</string>
 	<string name="share_alert">
 		インベントリからここにアイテムをドラッグします。
@@ -4918,22 +4878,9 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Home position set.">
 		ホーム配置を設定しました。
 	</string>
-	<string name="voice_morphing_url">
-		https://secondlife.com/destination/voice-island
-	</string>
-	<string name="premium_voice_morphing_url">
-		https://secondlife.com/destination/voice-morphing-premium
-	</string>
-	<string name="no_voice_morphing_faq_url">
-		https://lindenlab.freshdesk.com/support/solutions/articles/31000173560-webrtc-update-for-voice-chat-faq/
-	</string>
-	<string name="lindenhomes_get_home_url"> https://secondlife.com/land/lindenhomes/member.php?lang=ja-JP
-	</string>
-	<string name="lindenhomes_my_home_url">
-		https://secondlife.com/ja-JP/land/lindenhomes
-	</string>
-	<string name="membership_url"> https://accounts.secondlife.com/change_membership/?lang=ja-JP
-	</string>
+	<string name="lindenhomes_get_home_url">https://secondlife.com/land/lindenhomes/member.php?lang=ja-JP</string>
+	<string name="lindenhomes_my_home_url">https://secondlife.com/ja-JP/land/lindenhomes</string>
+	<string name="membership_url">https://accounts.secondlife.com/change_membership/?lang=ja-JP</string>
 	<!-- Financial operations strings -->
 	<string name="paid_you_ldollars">
 		[NAME]は、[REASON]費用のL$ [AMOUNT]を支払いました。
@@ -5212,6 +5159,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Female - Wow">
 		女性－わぁ
 	</string>
+	<!-- settings -->
 	<string name="New Daycycle">
 		新しいデイサイクル
 	</string>
@@ -5302,9 +5250,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="dance8">
 		ダンス８
 	</string>
-	<string name="DefaultMimeType">
-		none/none
-	</string>
 	<string name="texture_load_area_error">
 		[PIXELS]ピクセルよりも大きな画像は、読み込むことができません。
 	</string>
@@ -5329,7 +5274,9 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<!-- language specific white-space characters, delimiters, spacers, item separation symbols -->
 	<string name="sentences_separator" value="　"/>
 	<string name="words_separator" value="、"/>
-	<string name="server_is_down"> 大変申し訳ございませんが、予期しない問題が発生しました。サービスに関する既知の問題については、https://status.secondlifegrid.net/?lang=ja-JP をご覧ください。
+	<string name="server_is_down">
+		大変申し訳ございませんが、予期しない問題が発生しました。
+サービスに関する既知の問題については、https://status.secondlifegrid.net/ をご覧ください。
 問題が引き続き発生する場合は、お使いのネットワークやファイアウォールの設定を調べてください。
 	</string>
 	<string name="dateTimeWeekdaysNames">
@@ -5345,9 +5292,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	</string>
 	<string name="dateTimeMonthShortNames">
 		㋀:㋁:㋂:㋃:㋄:㋅:㋆:㋇:㋈:㋉:㋊:㋋
-	</string>
-	<string name="dateTimeDayFormat">
-		[MDAY]
 	</string>
 	<string name="dateTimeAM">
 		午前
@@ -5454,39 +5398,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		翻訳の応答にエラーが発生しました。
 	</string>
 	<!-- Key names begin -->
-	<string name="Esc">
-		Esc
-	</string>
-	<string name="Space">
-		Space
-	</string>
-	<string name="Enter">
-		Enter
-	</string>
-	<string name="Tab">
-		Tab
-	</string>
-	<string name="Ins">
-		Ins
-	</string>
-	<string name="Del">
-		Del
-	</string>
-	<string name="Backsp">
-		BackSp
-	</string>
-	<string name="Shift">
-		Shift
-	</string>
-	<string name="Ctrl">
-		Ctrl
-	</string>
-	<string name="Alt">
-		Alt
-	</string>
-	<string name="CapsLock">
-		CapsLock
-	</string>
 	<string name="Left">
 		←
 	</string>
@@ -5499,54 +5410,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Down">
 		↓
 	</string>
-	<string name="Home">
-		Home
-	</string>
-	<string name="End">
-		End
-	</string>
-	<string name="PgUp">
-		PgUp
-	</string>
-	<string name="PgDn">
-		PgDn
-	</string>
-	<string name="F1">
-		F1
-	</string>
-	<string name="F2">
-		F2
-	</string>
-	<string name="F3">
-		F3
-	</string>
-	<string name="F4">
-		F4
-	</string>
-	<string name="F5">
-		F5
-	</string>
-	<string name="F6">
-		F6
-	</string>
-	<string name="F7">
-		F7
-	</string>
-	<string name="F8">
-		F8
-	</string>
-	<string name="F9">
-		F9
-	</string>
-	<string name="F10">
-		F10
-	</string>
-	<string name="F11">
-		F11
-	</string>
-	<string name="F12">
-		F12
-	</string>
 	<string name="Add">
 		追加
 	</string>
@@ -5558,221 +5421,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	</string>
 	<string name="Divide">
 		除算
-	</string>
-	<string name="PAD_DIVIDE">
-		PAD_DIVIDE
-	</string>
-	<string name="PAD_LEFT">
-		PAD_LEFT
-	</string>
-	<string name="PAD_RIGHT">
-		PAD_RIGHT
-	</string>
-	<string name="PAD_DOWN">
-		PAD_DOWN
-	</string>
-	<string name="PAD_UP">
-		PAD_UP
-	</string>
-	<string name="PAD_HOME">
-		PAD_HOME
-	</string>
-	<string name="PAD_END">
-		PAD_END
-	</string>
-	<string name="PAD_PGUP">
-		PAD_PGUP
-	</string>
-	<string name="PAD_PGDN">
-		PAD_PGDN
-	</string>
-	<string name="PAD_CENTER">
-		PAD_CENTER
-	</string>
-	<string name="PAD_INS">
-		PAD_INS
-	</string>
-	<string name="PAD_DEL">
-		PAD_DEL
-	</string>
-	<string name="PAD_Enter">
-		PAD_Enter
-	</string>
-	<string name="PAD_BUTTON0">
-		PAD_BUTTON0
-	</string>
-	<string name="PAD_BUTTON1">
-		PAD_BUTTON1
-	</string>
-	<string name="PAD_BUTTON2">
-		PAD_BUTTON2
-	</string>
-	<string name="PAD_BUTTON3">
-		PAD_BUTTON3
-	</string>
-	<string name="PAD_BUTTON4">
-		PAD_BUTTON4
-	</string>
-	<string name="PAD_BUTTON5">
-		PAD_BUTTON5
-	</string>
-	<string name="PAD_BUTTON6">
-		PAD_BUTTON6
-	</string>
-	<string name="PAD_BUTTON7">
-		PAD_BUTTON7
-	</string>
-	<string name="PAD_BUTTON8">
-		PAD_BUTTON8
-	</string>
-	<string name="PAD_BUTTON9">
-		PAD_BUTTON9
-	</string>
-	<string name="PAD_BUTTON10">
-		PAD_BUTTON10
-	</string>
-	<string name="PAD_BUTTON11">
-		PAD_BUTTON11
-	</string>
-	<string name="PAD_BUTTON12">
-		PAD_BUTTON12
-	</string>
-	<string name="PAD_BUTTON13">
-		PAD_BUTTON13
-	</string>
-	<string name="PAD_BUTTON14">
-		PAD_BUTTON14
-	</string>
-	<string name="PAD_BUTTON15">
-		PAD_BUTTON15
-	</string>
-	<string name="-">
-		-
-	</string>
-	<string name="="> =
-	</string>
-	<string name="`">
-		`
-	</string>
-	<string name=";">
-		;
-	</string>
-	<string name="[">
-		[
-	</string>
-	<string name="]">
-		]
-	</string>
-	<string name="\">
-		\
-	</string>
-	<string name="0">
-		0
-	</string>
-	<string name="1">
-		1
-	</string>
-	<string name="2">
-		2
-	</string>
-	<string name="3">
-		3
-	</string>
-	<string name="4">
-		4
-	</string>
-	<string name="5">
-		5
-	</string>
-	<string name="6">
-		6
-	</string>
-	<string name="7">
-		7
-	</string>
-	<string name="8">
-		8
-	</string>
-	<string name="9">
-		9
-	</string>
-	<string name="A">
-		A
-	</string>
-	<string name="B">
-		B
-	</string>
-	<string name="C">
-		C
-	</string>
-	<string name="D">
-		D
-	</string>
-	<string name="E">
-		E
-	</string>
-	<string name="F">
-		F
-	</string>
-	<string name="G">
-		G
-	</string>
-	<string name="H">
-		H
-	</string>
-	<string name="I">
-		I
-	</string>
-	<string name="J">
-		J
-	</string>
-	<string name="K">
-		K
-	</string>
-	<string name="L">
-		L
-	</string>
-	<string name="M">
-		M
-	</string>
-	<string name="N">
-		N
-	</string>
-	<string name="O">
-		O
-	</string>
-	<string name="P">
-		P
-	</string>
-	<string name="Q">
-		Q
-	</string>
-	<string name="R">
-		R
-	</string>
-	<string name="S">
-		S
-	</string>
-	<string name="T">
-		T
-	</string>
-	<string name="U">
-		U
-	</string>
-	<string name="V">
-		V
-	</string>
-	<string name="W">
-		W
-	</string>
-	<string name="X">
-		X
-	</string>
-	<string name="Y">
-		Y
-	</string>
-	<string name="Z">
-		Z
 	</string>
 	<!-- Key names end -->
 	<!-- Mouse button names (short) begin -->
@@ -5797,7 +5445,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<!-- Mouse button names end -->
 	<!-- llviewerwindow -->
 	<string name="BeaconParticle">
-		パーティクル源ビーコン（青）を表示しています。
+		パーティクル源のビーコン（青）を表示しています。
 	</string>
 	<string name="BeaconPhysical">
 		物理的オブジェクトのビーコン（緑）を表示しています。
@@ -5835,7 +5483,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		アウトフィット
 	</string>
 	<string name="Command_Avatar_Label">
-		アバター一式
+		アバターウェルカムパック
 	</string>
 	<string name="Command_Build_Label">
 		ビルド
@@ -5883,7 +5531,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		ミニマップ
 	</string>
 	<string name="Command_Move_Label">
-		歩行／走行／飛行
+		歩く／走る／飛ぶ
 	</string>
 	<string name="Command_Panic_Label">
 		パニック！
@@ -5953,7 +5601,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		アバターの容姿を変更します。
 	</string>
 	<string name="Command_Avatar_Tooltip">
-		アバター一式を選択します。
+		アバターウェルカムパックを開きます。
 	</string>
 	<string name="Command_Build_Tooltip">
 		オブジェクトのビルドや地形の変形をします。
@@ -6097,10 +5745,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="Normal">
 		通常
 	</string>
-	<!-- Pathfinding -->
-	<string name="Pathfinding_Wiki_URL">
-		https://wiki.secondlife.com/wiki/Pathfinding_Tools_in_the_Second_Life_Viewer
-	</string>
 	<string name="Pathfinding_Object_Attr_None">
 		なし
 	</string>
@@ -6189,7 +5833,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		（全[MAXEXPERIENCES]件中[EXPERIENCES]件）
 	</string>
 	<string name="ExperiencePermission1">
-		コントロールを引き継ぐ
+		操作を引き継ぐ
 	</string>
 	<string name="ExperiencePermission3">
 		アバターでアニメーションをトリガー
@@ -6198,10 +5842,10 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		アバターに装着
 	</string>
 	<string name="ExperiencePermission9">
-		カメラ追従
+		カメラの追従
 	</string>
 	<string name="ExperiencePermission10">
-		カメラのコントロール
+		カメラの制御
 	</string>
 	<string name="ExperiencePermission11">
 		あなたをテレポート
@@ -6219,7 +5863,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		が、不明な操作を実行しました：[Permission]
 	</string>
 	<string name="ExperiencePermissionShort1">
-		コントロールする
+		操作する
 	</string>
 	<string name="ExperiencePermissionShort3">
 		アニメーションをトリガー
@@ -6228,10 +5872,10 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		取り付ける
 	</string>
 	<string name="ExperiencePermissionShort9">
-		カメラを追跡
+		カメラ追跡
 	</string>
 	<string name="ExperiencePermissionShort10">
-		カメラを制御
+		カメラ制御
 	</string>
 	<string name="ExperiencePermissionShort11">
 		テレポート
@@ -6250,6 +5894,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="material_selection_title">マテリアルの選択</string>
 	<string name="material_selection_text">マテリアル選択：</string>
 	<string name="material_batch_import_text">─全てを一括アップロード─</string>
+
 	<!-- Conversation log messages -->
 	<string name="logging_calls_disabled_log_empty">
 		会話はログに記録されていません。ログの記録を開始するには、「初期設定」＞「チャット」で「保存：ログのみ」または「保存：ログと会話のテキスト」を選択します。
@@ -6264,6 +5909,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		読み込んでいます…
 	</string>
 	<!-- Statistics -->
+	<!-- Presets graphic/camera -->
 	<string name="na">
 		該当なし
 	</string>

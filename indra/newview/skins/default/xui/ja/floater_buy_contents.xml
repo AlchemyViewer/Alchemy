@@ -5,7 +5,7 @@
 	</text>
 	<scroll_list name="item_list"/>
 	<text name="buy_text">
-		[NAME]から、L$ [AMOUNT]で購入しますか？
+		[NAME] からL$ [AMOUNT]で購入しますか？
 	</text>
 	<button label="キャンセル" label_selected="キャンセル" name="cancel_btn"/>
 	<button label="購入" label_selected="購入" name="buy_btn"/>
