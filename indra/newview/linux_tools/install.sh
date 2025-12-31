@@ -3,8 +3,12 @@
 # Install the Second Life Viewer. This script can install the viewer both
 # system-wide and for an individual user.
 
-_STYLE_NORMAL="$(tput sgr0)"
-_COLOR_RED="$(tput setaf 9)"
+exec 3>&2 2> /dev/null
+if command -v tput > /dev/null ; then
+    _STYLE_NORMAL="$(tput sgr0)"
+    _COLOR_RED="$(tput setaf 9)"
+fi
+exec 2>&3 3>&-
 
 SCRIPTSRC=`readlink -f "$0" || echo "$0"`
 RUN_PATH=`dirname "${SCRIPTSRC}" || echo .`
