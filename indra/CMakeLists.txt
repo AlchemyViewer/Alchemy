@@ -249,6 +249,7 @@ include(Tut)
 include(VHACD)
 include(Vorbis)
 include(WebRTC)
+include(websocketpp)
 include(xxHash)
 include(ZLIBNG)
 

@@ -257,13 +257,13 @@ struct Server_impl
             {
                 // Process events for up to 100ms, then check the stop flag
                 std::chrono::milliseconds timeout(100);
-                std::size_t handlers_run = mServer.get_io_service().run_for(timeout);
+                std::size_t handlers_run = mServer.get_io_context().run_for(timeout);
 
                 // If no handlers were run and the server isn't stopped,
                 // reset the io_service for the next iteration
                 if (handlers_run == 0 && !mServer.stopped() && !mOwner->mShouldStop)
                 {
-                    mServer.get_io_service().restart();
+                    mServer.get_io_context().restart();
                 }
             }
 

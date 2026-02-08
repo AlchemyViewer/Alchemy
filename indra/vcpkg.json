@@ -115,6 +115,7 @@
       "platform": "windows | osx"
     },
     "webrtc-bin",
+    "websocketpp",
     "xxhash",
     "zlib"
   ],
