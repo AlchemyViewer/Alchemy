@@ -359,6 +359,9 @@ if(DARWIN)
     endif()
   endif()
 
+  # Enable xcode compiler caching
+  set(CMAKE_XCODE_ATTRIBUTE_COMPILATION_CACHE_ENABLE_CACHING YES)
+
   # Use dwarf symbols for most libraries and executables for compilation speed
   # per-target overrides applied where needed
   set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS YES)
@@ -418,6 +421,16 @@ if(DARWIN)
   add_link_options($<$<CONFIG:RelWithDebInfo,Release>:LINKER:-dead_strip> LINKER:-dead_strip_dylibs)
 
   add_link_options("LINKER:-headerpad_max_install_names" "LINKER:-search_paths_first")
+
+  # Special handling for LTO  on non-xcode generators to generate valid debug symbols
+  if (USE_LTO AND NOT XCODE)
+    add_link_options(
+      "LINKER:-cache_path_lto,${CMAKE_BINARY_DIR}/LTOCache"
+      "LINKER:-object_path_lto,$<TARGET_PROPERTY:BINARY_DIR>/CMakeFiles/$<TARGET_PROPERTY:NAME>.dir/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>/,>$<TARGET_PROPERTY:NAME>_lto.o"
+    )
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/LTOCache")
+  endif ()
+
 endif(DARWIN)
 
 if(LINUX OR DARWIN)

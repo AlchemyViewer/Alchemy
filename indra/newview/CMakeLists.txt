@@ -1805,7 +1805,6 @@ if (WINDOWS)
   set_target_properties(${VIEWER_BINARY_NAME}
       PROPERTIES
       PDB_NAME ${VIEWER_BINARY_NAME}
-      PDB_OUTPUT_DIRECTORY ${SYMBOLS_STAGING_DIR}
       RUNTIME_OUTPUT_NAME "SecondLifeViewer"
       RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
       ENABLE_EXPORTS OFF
@@ -2050,6 +2049,12 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING))
   if (USE_BUGSPLAT)
     # BugSplat symbol-file generation
     if (WINDOWS)
+      # Redirect symbols to staging directory for upload to BugSplat.
+      set_target_properties(${VIEWER_BINARY_NAME}
+          PROPERTIES
+          PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}"
+          )
+
       set(VIEWER_APP_SYMBOLS_ARCHIVE "${SYMBOLS_STAGING_DIR}.sym.tar.xz")
 
       # Just pack up a tarball containing only the .pdb files for the
