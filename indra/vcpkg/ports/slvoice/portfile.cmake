@@ -66,7 +66,7 @@ elseif(VCPKG_TARGET_IS_OSX)
 elseif(VCPKG_TARGET_IS_LINUX)
     vcpkg_download_distfile(
         SLVOICE_ARCHIVE
-        URLS http://automated-builds-secondlife-com.s3.amazonaws.com/ct2/613/1289/slvoice-3.2.0002.10426.500605-linux64-500605.tar.bz2
+        URLS https://automated-builds-secondlife-com.s3.amazonaws.com/ct2/613/1289/slvoice-3.2.0002.10426.500605-linux64-500605.tar.bz2
         FILENAME slvoice-linux.tar.zst
         SHA512 2941da523a5495fc56e841d2ef855d8eefaf74795e809adf09cc91924599ba38974963d937d9d529c153619c92e30a12aa24d7e4baa7d0a4cee859ba4a59996e
     )
