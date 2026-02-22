@@ -7,27 +7,27 @@ if(VCPKG_TARGET_IS_WINDOWS)
 
     vcpkg_download_distfile(
         WEBRTC_ARCHIVE
-        URLS https://github.com/secondlife/3p-webrtc-build/releases/download/m137.7151.04.21/webrtc-m137.7151.04.21.18609120431-windows64-18609120431.tar.zst
+        URLS https://github.com/secondlife/3p-webrtc-build/releases/download/m137.7151.04.23/webrtc-m137.7151.04.23.22004231636-windows64-22004231636.tar.zst
         FILENAME webrtc-windows64.tar.zst
-        SHA512 810c6bfaec734c48d799c603aed5843ba8600fb6221d08437f73c382af5d86b46e75ea3957ae7b242032756008c202ea73cfc2a0c0070227bd77b33bc48a56d4
+        SHA512 0b57ef8c863dd1e1c8c90bd9d63d93b57b4c690a8b30bc8417ad2cfac395d1ee6a6e7324470b5a220c96c2086446447119419300a66389a30285a2a73be5ff47
     )
 elseif(VCPKG_TARGET_IS_OSX)
     set(WEBRTC_LIBNAME "libwebrtc.a")
 
     vcpkg_download_distfile(
         WEBRTC_ARCHIVE
-        URLS https://github.com/secondlife/3p-webrtc-build/releases/download/m137.7151.04.21/webrtc-m137.7151.04.21.18609120431-darwin64-18609120431.tar.zst
+        URLS https://github.com/secondlife/3p-webrtc-build/releases/download/m137.7151.04.23/webrtc-m137.7151.04.23.22004231636-darwin64-22004231636.tar.zst
         FILENAME webrtc-osx.tar.zst
-        SHA512 0c037b32ed5fedff0e2afe480f08983afe7d72dbfd2fa01e6749678e14ae94bff1ef402a0246feb5977eaa43467748fc729c1ab9c410465a03679b9dcac5f38a
+        SHA512 84f7c91b8d92ea3037bbf4370a8142d97260916c2ca62dad7641317f6a3da66154e12926a213f3ab3c5d96c5fc468643fc8aa13bca348efd0a0c8f080a52545d
     )
 elseif(VCPKG_TARGET_IS_LINUX)
     set(WEBRTC_LIBNAME "libwebrtc.a")
 
     vcpkg_download_distfile(
         WEBRTC_ARCHIVE
-        URLS https://github.com/secondlife/3p-webrtc-build/releases/download/m137.7151.04.21/webrtc-m137.7151.04.21.18609120431-linux64-18609120431.tar.zst
+        URLS https://github.com/secondlife/3p-webrtc-build/releases/download/m137.7151.04.23/webrtc-m137.7151.04.23.22004231636-linux64-22004231636.tar.zst
         FILENAME webrtc-linux64.tar.zst
-        SHA512 44f52c8c0fc3efe64428c90da3f4ac322ba3c107a5ab42851b59b27e324d984cbeed7aefa8e1ff83b3cf5e3092ca86214ed4bacc0c13ea2836f6e53ce6f38ecd
+        SHA512 7f3a84ba9f6da66efe5ca1a475601df49bc0a80d8e9257765ff4a9720f07ccc6649d0421e5041ceaa322ea5d6059bbafcbc505b4cf7d13af22251fb76d799098
     )
 endif()
 
