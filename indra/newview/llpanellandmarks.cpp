@@ -515,28 +515,28 @@ void LLLandmarksPanel::onAddAction(const LLSD& userdata) const
         if (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
         {
 // [/RLVa:KB]
-        LLViewerInventoryItem* landmark = LLLandmarkActions::findLandmarkForAgentPos();
-        if(landmark)
-        {
-            LLNotificationsUtil::add("LandmarkAlreadyExists");
-        }
-        else
-        {
-            LLSD args;
-            args["type"] = "create_landmark";
-            if ("add_landmark" == command_name
-                && view_model->getInventoryType() == LLInventoryType::IT_CATEGORY)
+            LLViewerInventoryItem* landmark = LLLandmarkActions::findLandmarkForAgentPos();
+            if(landmark)
             {
-                args["dest_folder"] = view_model->getUUID();
+                LLNotificationsUtil::add("LandmarkAlreadyExists");
             }
-            if ("add_landmark_root" == command_name
-                && mCurrentSelectedList == mLandmarksInventoryPanel)
+            else
             {
-                args["dest_folder"] = mLandmarksInventoryPanel->getRootFolderID();
+                LLSD args;
+                args["type"] = "create_landmark";
+                if ("add_landmark" == command_name
+                    && view_model->getInventoryType() == LLInventoryType::IT_CATEGORY)
+                {
+                    args["dest_folder"] = view_model->getUUID();
+                }
+                if ("add_landmark_root" == command_name
+                    && mCurrentSelectedList == mLandmarksInventoryPanel)
+                {
+                    args["dest_folder"] = mLandmarksInventoryPanel->getRootFolderID();
+                }
+                // else will end up in favorites
+                LLFloaterReg::showInstance("add_landmark", args);
             }
-            // else will end up in favorites
-            LLFloaterReg::showInstance("add_landmark", args);
-        }
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
         }
 // [/RLVa:KB]
@@ -776,10 +776,10 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
     else if ("add_landmark" == command_name)
     {
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
-    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
-    {
-        return false;
-    }
+        if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+        {
+            return false;
+        }
 // [/RLVa:KB]
 
         if (!is_single_selection)
@@ -803,10 +803,10 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
     else if ("add_landmark_root" == command_name)
     {
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
-    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
-    {
-        return false;
-    }
+        if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+        {
+            return false;
+        }
 // [/RLVa:KB]
 
         LLViewerInventoryItem* landmark = LLLandmarkActions::findLandmarkForAgentPos();

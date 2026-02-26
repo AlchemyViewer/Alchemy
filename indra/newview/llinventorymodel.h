@@ -292,7 +292,7 @@ public:
 //  void collectDescendentsIf(const LLUUID& id,
 //                            cat_array_t& categories,
 //                            item_array_t& items,
-//  	     				  bool include_trash);
+//                            bool include_trash);
 
     bool hasMatchingDescendents(const LLUUID& id,
         bool include_trash,
