@@ -1,6 +1,9 @@
 {
   "builtin-baseline": "66c0373dc7fca549e5803087b9487edfe3aca0a1",
   "dependencies": [
+    "alchemy-branding",
+    "alchemy-dictionaries",
+    "alchemy-fonts",
     "apr",
     "apr-util",
     "boost-asio",
@@ -96,9 +99,7 @@
       "platform": "windows | osx"
     },
     "secondlife-certificates",
-    "secondlife-dictionaries",
     "secondlife-emoji-shortcodes",
-    "secondlife-fonts",
     "slvoice",
     {
       "name": "sse2neon",

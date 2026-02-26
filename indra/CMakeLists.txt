@@ -8,11 +8,11 @@ cmake_minimum_required(VERSION 3.27...4.2 FATAL_ERROR)
 
 include(CMakeDependentOption)
 
-set(ROOT_PROJECT_NAME "SecondLife" CACHE STRING
-    "The root project/makefile/solution name. Defaults to SecondLife.")
+set(ROOT_PROJECT_NAME "Alchemy" CACHE STRING
+    "The root project/makefile/solution name. Defaults to Alchemy.")
 
 # Set our base channel
-set(VIEWER_CHANNEL "Second Life Test" CACHE STRING "Viewer Channel Name")
+set(VIEWER_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
 
 # Default deploy grid
 set(GRID agni CACHE STRING "Target Grid")

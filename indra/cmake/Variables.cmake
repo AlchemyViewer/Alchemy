@@ -56,3 +56,6 @@ get_property(LL_GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CON
 if(DEFINED LL_TESTS)
   set(BUILD_TESTING ${LL_TESTS} CACHE BOOL "Build and run unit and integration tests: disable for build timing runs to reduce variation" FORCE)
 endif()
+
+# Internal flags
+string(REPLACE " " "" VIEWER_CHANNEL_ONEWORD ${VIEWER_CHANNEL})

@@ -2515,10 +2515,10 @@ Para sua segurança, os SLurls serão bloqueados por alguns instantes.</notifica
 O botão será exibido quando houver espaço suficente.</notification>
 	<notification name="ShareNotification">Selecione os residentes com quem compartilhar.</notification>
 	<notification name="MeshUploadErrorDetails">[LABEL] falhou ao realizar upload: [MESSAGE] 
-[DETAILS]Acesse SecondLife.log para detalhes</notification>
+[DETAILS]Acesse Alchemy.log para detalhes</notification>
 	<notification name="MeshUploadError">[LABEL] falhou ao realizar upload: [MESSAGE] 
 
-Acesse SecondLife.log para detalhes</notification>
+Acesse Alchemy.log para detalhes</notification>
 	<notification name="MeshUploadPermError">Erro ao solicitar permissões de upload de mesh.</notification>
 	<notification name="RegionCapabilityRequestError">Não foi possível obter o recurso '[CAPABILITY]' da região.</notification>
 	<notification name="ShareItemsConfirmation">

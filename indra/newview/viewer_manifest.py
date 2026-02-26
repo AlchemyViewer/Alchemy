@@ -90,7 +90,7 @@ class ViewerManifest(LLManifest):
                 self.path("filters")
 
                 # ... and the included spell checking dictionaries
-                dicts_dir = os.path.join(self.args['vcpkg_dir'], 'share', 'secondlife-dictionaries')
+                dicts_dir = os.path.join(self.args['vcpkg_dir'], 'share', 'alchemy-dictionaries')
                 with self.prefix(src=dicts_dir):
                     self.path("dictionaries")
 
@@ -268,7 +268,7 @@ class ViewerManifest(LLManifest):
         return CHANNEL_VENDOR_BASE + ' ' + app_suffix
 
     def exec_name(self):
-        return "SecondLifeViewer"
+        return self.app_name_oneword()
 
     def app_name_oneword(self):
         return ''.join(self.app_name().split())
@@ -481,7 +481,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
                                     # except for this stuff
                                     *(('!' + os.path.join(appbase, pattern))
                                         for pattern in (
-                                                'secondlife-bin.*',
+                                                'alchemy-bin.*',
                                                 '*_Setup.exe',
                                                 '**/*.bat',
                                                 '**/*.pdb',

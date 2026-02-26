@@ -2525,10 +2525,10 @@ Elles vont être bloquées pendant quelques secondes pour votre sécurité.</not
 Le bouton sera affiché quand il y aura suffisamment de place.</notification>
 	<notification name="ShareNotification">Sélectionnez les résidents avec lesquels partager l'élément.</notification>
 	<notification name="MeshUploadErrorDetails">[LABEL] n'a pas pu être téléchargé : [MESSAGE] 
-[DETAILS]Voir SecondLife.log pour plus de détails</notification>
+[DETAILS]Voir Alchemy.log pour plus de détails</notification>
 	<notification name="MeshUploadError">Échec de chargement de [LABEL] : [MESSAGE] 
 
-Voir SecondLife.log pour plus de détails.</notification>
+Voir Alchemy.log pour plus de détails.</notification>
 	<notification name="MeshUploadPermError">Erreur lors de la demande des autorisations de chargement de maillage.</notification>
 	<notification name="RegionCapabilityRequestError">Impossible d'obtenir la capacité de région : [CAPABILITY].</notification>
 	<notification name="ShareItemsConfirmation">

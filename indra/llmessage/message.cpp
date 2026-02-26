@@ -514,7 +514,7 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count )
         U8* buffer = mTrueReceiveBuffer;
 
         mTrueReceiveSize = mPacketRing.receivePacket(mSocket, (char *)mTrueReceiveBuffer);
-        // If you want to dump all received packets into SecondLife.log, uncomment this
+        // If you want to dump all received packets into Alchemy.log, uncomment this
         //dumpPacketToLog();
 
         receive_size = mTrueReceiveSize;

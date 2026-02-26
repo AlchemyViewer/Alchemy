@@ -378,14 +378,14 @@ WorkQueue gMainloopWork("mainloop", 1024*1024);
 // Internal globals... that should be removed.
 static std::string gArgs;
 const int MAX_MARKER_LENGTH = 1024;
-const std::string MARKER_FILE_NAME("SecondLife.exec_marker");
-const std::string START_MARKER_FILE_NAME("SecondLife.start_marker");
-const std::string ERROR_MARKER_FILE_NAME("SecondLife.error_marker");
-const std::string LOGOUT_MARKER_FILE_NAME("SecondLife.logout_marker");
+const std::string MARKER_FILE_NAME("Alchemy.exec_marker");
+const std::string START_MARKER_FILE_NAME("Alchemy.start_marker");
+const std::string ERROR_MARKER_FILE_NAME("Alchemy.error_marker");
+const std::string LOGOUT_MARKER_FILE_NAME("Alchemy.logout_marker");
 static std::string gLaunchFileOnQuit;
 
 // Used on Win32 for other apps to identify our window (eg, win_setup)
-const char* const VIEWER_WINDOW_CLASSNAME = "Second Life";
+const char* const VIEWER_WINDOW_CLASSNAME = "Alchemy";
 
 //----------------------------------------------------------------------------
 
@@ -393,6 +393,7 @@ const char* const VIEWER_WINDOW_CLASSNAME = "Second Life";
 static std::set<std::string> default_trans_args;
 void init_default_trans_args()
 {
+    default_trans_args.insert("ALCHEMY"); // World
     default_trans_args.insert("SECOND_LIFE"); // World
     default_trans_args.insert("APP_NAME");
     default_trans_args.insert("CAPITALIZED_APP_NAME");
@@ -690,7 +691,7 @@ LLAppViewer::LLAppViewer()
 
     // Need to do this initialization before we do anything else, since anything
     // that touches files should really go through the lldir API
-    gDirUtilp->initAppDirs("SecondLife");
+    gDirUtilp->initAppDirs("AlchemyNext");
     //
     // IMPORTANT! Do NOT put anything that will write
     // into the log files during normal startup until AFTER
@@ -2375,12 +2376,12 @@ void LLAppViewer::initLoggingAndGetLastDuration()
     {
         // Remove the last ".old" log file.
         std::string old_log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,
-            "SecondLife.old");
+            "Alchemy.old");
         LLFile::remove(old_log_file);
 
         // Get name of the log file
         std::string log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,
-            "SecondLife.log");
+            "Alchemy.log");
         /*
         * Before touching any log files, compute the duration of the last run
         * by comparing the ctime of the previous start marker file with the ctime
@@ -2427,7 +2428,7 @@ void LLAppViewer::initLoggingAndGetLastDuration()
         // Rename current log file to ".old"
         LLFile::rename(log_file, old_log_file);
 
-        // Set the log file to SecondLife.log
+        // Set the log file to Alchemy.log
         LLError::logToFile(log_file);
         LL_INFOS() << "Started logging to " << log_file << LL_ENDL;
         if (!duration_log_msg.empty())
@@ -3707,14 +3708,14 @@ void LLAppViewer::writeSystemInfo()
 
 #if LL_DARWIN
     // crash processing in CrashMetadataSingleton reads SLLog
-    gDebugInfo["SLLog"] = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,"SecondLife.crash");
+    gDebugInfo["SLLog"] = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,"Alchemy.crash");
 #elif LL_WINDOWS && !LL_BUGSPLAT
-    gDebugInfo["SLLog"] = gDirUtilp->getExpandedFilename(LL_PATH_DUMP,"SecondLife.log");
+    gDebugInfo["SLLog"] = gDirUtilp->getExpandedFilename(LL_PATH_DUMP,"Alchemy.log");
 #else
     // Far from ideal, especially when multiple instances get involved.
     // Note that attachmentsForBugSplat expects .old extendion.
     // Todo: improve.
-    gDebugInfo["SLLog"] = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,"SecondLife.old");  //LLError::logFileName();
+    gDebugInfo["SLLog"] = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,"Alchemy.old");  //LLError::logFileName();
 #endif
 
     gDebugInfo["ClientInfo"]["Name"] = LLVersionInfo::instance().getChannel();
@@ -3976,7 +3977,7 @@ bool LLAppViewer::getMarkerData(const std::string& marker_name, std::string& dat
 void LLAppViewer::processMarkerFiles()
 {
     //We've got 4 things to test for here
-    // - Other Process Running (SecondLife.exec_marker present, locked)
+    // - Other Process Running (Alchemy.exec_marker present, locked)
     // - Freeze (SecondLife.exec_marker present, not locked)
     // - LLError Crash (SecondLife.llerror_marker present)
     // - Other Crash (SecondLife.error_marker present)
@@ -4129,9 +4130,9 @@ void LLAppViewer::processMarkerFiles()
         // may take a while to trigger crash report so it has a special file.
         // Remove .crash file if exists
         std::string old_log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,
-            "SecondLife.old");
+            "Alchemy.old");
         std::string crash_log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,
-            "SecondLife.crash");
+            "Alchemy.crash");
         LLFile::remove(crash_log_file);
         // Rename ".old" log file to ".crash"
         LLFile::rename(old_log_file, crash_log_file);
@@ -4321,18 +4322,18 @@ void LLAppViewer::abortQuit()
 void LLAppViewer::migrateCacheDirectory()
 {
 #if LL_WINDOWS || LL_DARWIN
-    // NOTE: (Nyx) as of 1.21, cache for mac is moving to /library/caches/SecondLife from
-    // /library/application support/SecondLife/cache This should clear/delete the old dir.
+    // NOTE: (Nyx) as of 1.21, cache for mac is moving to /library/caches/Alchemy from
+    // /library/application support/Alchemy/cache This should clear/delete the old dir.
 
     // As of 1.23 the Windows cache moved from
-    //   C:\Documents and Settings\James\Application Support\SecondLife\cache
+    //   C:\Documents and Settings\James\Application Support\Alchemy\cache
     // to
-    //   C:\Documents and Settings\James\Local Settings\Application Support\SecondLife
+    //   C:\Documents and Settings\James\Local Settings\Application Support\Alchemy
     //
     // The Windows Vista equivalent is from
-    //   C:\Users\James\AppData\Roaming\SecondLife\cache
+    //   C:\Users\James\AppData\Roaming\Alchemy\cache
     // to
-    //   C:\Users\James\AppData\Local\SecondLife
+    //   C:\Users\James\AppData\Local\Alchemy
     //
     // Note the absence of \cache on the second path.  James.
 

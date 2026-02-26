@@ -3232,11 +3232,11 @@ Przycisk zostanie wyświetlony w przypadku dostatecznej ilości przestrzeni.
 	</notification>
 	<notification name="MeshUploadErrorDetails">
 		Nie można przesłać [LABEL]: [MESSAGE]
-[DETAILS] Zobacz SecondLife.log, aby dowiedzieć się więcej.
+[DETAILS] Zobacz Alchemy.log, aby dowiedzieć się więcej.
 	</notification>
 	<notification name="MeshUploadError">
 		Nie można przesłać [LABEL]: [MESSAGE]
-Zobacz SecondLife.log, aby dowiedzieć się więcej.
+Zobacz Alchemy.log, aby dowiedzieć się więcej.
 	</notification>
 	<notification name="MeshUploadPermError">
 		Wystąpił błąd podczas pobierania uprawnień przesyłania meszy.

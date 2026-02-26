@@ -7,8 +7,9 @@
 
 	<!-- Default Args - these arguments will be replaced in all strings -->
 	<string name="SECOND_LIFE">Second Life</string>
-	<string name="APP_NAME">Second Life</string>
-	<string name="CAPITALIZED_APP_NAME">SECOND LIFE</string>
+	<string name="ALCHEMY">Alchemy</string>
+	<string name="APP_NAME">Alchemy</string>
+	<string name="CAPITALIZED_APP_NAME">ALCHEMY</string>
 	<string name="SECOND_LIFE_GRID">Second Life Grid</string>
 	<string name="SUPPORT_SITE">Second Life Support Portal</string>
 
@@ -123,15 +124,12 @@ Voice Server Version: [VOICE_VERSION]
 	<string name="AgniGridLabel">Second Life Main Grid (Agni)</string>
 	<string name="AditiGridLabel">Second Life Beta Test Grid (Aditi)</string>
 	
-	<string name="ViewerDownloadURL">http://secondlife.com/download</string>
+	<string name="ViewerDownloadURL">https://www.alchemyviewer.org/downloads</string>
 	<string name="LoginFailedViewerNotPermitted">
 The viewer you are using can no longer access Second Life. Please visit the following page to download a new viewer:
-http://secondlife.com/download
-
-For more information, see our FAQ below:
-http://secondlife.com/viewer-access-faq</string>
+https://www.alchemyviewer.org/downloads</string>
 	<string name="LoginFailed">"Login process did not complete due to system issues. Try again in a few minutes.
-If you feel this is an error, contact Support at https://support.secondlife.com"</string>
+If you feel this is an error, please contact Support.</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">Optional viewer update available: [VERSION]</string>
 	<string name="LoginFailedRequiredUpdate">Required viewer update: [VERSION]</string>
 	<string name="LoginFailedAlreadyLoggedIn">This agent is already logged in.
@@ -340,7 +338,7 @@ are allowed.
 
 	<string name="ReleaseNotes">Release Notes</string>
 	<!-- Always mark translate="false" for strings that are nothing but URLs, as they don't need translation. -->
-	<string name="RELEASE_NOTES_BASE_URL" translate="false">https://releasenotes.secondlife.com/viewer/</string>
+	<string name="RELEASE_NOTES_BASE_URL" translate="false">https://github.com/AlchemyViewer/Alchemy/releases/tag/</string>
 
 	<!-- Indicates something is being loaded. Maybe should be merged with RetrievingData -->
 	<string name="LoadingData">Loading...</string>
@@ -3023,7 +3021,7 @@ Do you wish to continue?
 	<string name="MBWarning">Warning</string>
 	<string name="MBNoAutoUpdate">
 		Automatic updating is not yet implemented for Linux.
-Please download the latest version from www.secondlife.com.
+Please download the latest version from https://www.alchemyviewer.org
 	</string>
 	<string name="MBRegClassFailed">RegisterClass failed</string>
 	<string name="MBError">Error</string>
@@ -3053,7 +3051,7 @@ If your computer's RAM is low, quit any heavy applications before runing Second 
     <string name="MBMissingFile">
         [APP_NAME] couldn't access or find some of the files it needs and will be closed.
 
-Please reinstall viewer from  https://secondlife.com/support/downloads/ and contact https://support.secondlife.com if issue persists after reinstall.
+Please reinstall viewer from https://alchemyviewer.org/downloads and contact the Alchemy Viewer team if issue persists after reinstall.
     </string>
 
     <!-- Avatar Shape Information -->
@@ -3667,7 +3665,7 @@ Please reinstall viewer from  https://secondlife.com/support/downloads/ and cont
 	  Failed to download update
 	</string>
 	<string name="UpdaterFailUpdateDescriptive">
-	  An error occurred while updating [APP_NAME]. Please download the latest version from www.secondlife.com.
+	  An error occurred while updating [APP_NAME]. Please download the latest version from https://www.alchemyviewer.org
 	</string>
 	<string name="UpdaterFailInstallTitle">
 	  Failed to install update

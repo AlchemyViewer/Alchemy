@@ -5,7 +5,7 @@ include(BuildVersion)
 include(CMakeCopyIfDifferent)
 include(TemplateCheck)
 
-set(VIEWER_BINARY_NAME "secondlife-bin" CACHE STRING
+set(VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
     "The name of the viewer executable to create.")
 
 # Generate version vars header
@@ -21,7 +21,7 @@ configure_file("${INDRA_SOURCE_DIR}/externals/js/OrbitControls.js" "${CMAKE_CURR
 
 message(STATUS "Copying fonts")
 file(GLOB FONT_FILE_GLOB_LIST
-  "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/secondlife-fonts/fonts/*"
+  "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/alchemy-fonts/fonts/*"
 )
 file(COPY ${FONT_FILE_GLOB_LIST} DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/fonts")
 
@@ -1489,8 +1489,8 @@ if (DARWIN)
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
     secondlife.icns
-    Info-SecondLife.plist
-    SecondLife.xib
+    Info-Alchemy.plist
+    Alchemy.xib
     # CMake doesn't seem to support Xcode language variants well just yet
     English.lproj/InfoPlist.strings
     English.lproj/language.txt
@@ -1524,31 +1524,48 @@ if (WINDOWS)
     set(ICON_PATH "test")
     set(VIEWER_MACOSX_PHASE "d")
     string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
-    if(channel_lower MATCHES "^second life release")
+    if(channel_lower MATCHES "^alchemy release")
         set(ICON_PATH "release")
         set(VIEWER_MACOSX_PHASE "f")
-    elseif(channel_lower MATCHES "^second life beta")
+    elseif(channel_lower MATCHES "^alchemy beta")
         set(ICON_PATH "beta")
         set(VIEWER_MACOSX_PHASE "b")
-    elseif(channel_lower MATCHES "^second life project")
+    elseif(channel_lower MATCHES "^alchemy project")
         set(ICON_PATH "project")
         set(VIEWER_MACOSX_PHASE "a")
     endif()
     message(STATUS "Copying icons for ${ICON_PATH}")
+
+   set(BRANDING_SOURCE_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/alchemy-branding")
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/icons/${ICON_PATH}/secondlife.ico"
+        "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.ico"
         "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico"
       )
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/icons/${ICON_PATH}/secondlife_256.BMP"
+        "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
         "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP"
       )
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/icons/${ICON_PATH}/secondlife_256.BMP"
+        "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
         "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
+      )
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${BRANDING_SOURCE_DIR}/installer/icons/install_icon.ico"
+        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico"
+      )
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${BRANDING_SOURCE_DIR}/installer/icons/uninstall_icon.ico"
+        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/uninstall_icon.ico"
+      )
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
+        "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_wizard_small.png"
       )
 
     # Add resource files to the project.
@@ -1827,37 +1844,43 @@ set(PACKAGE ON CACHE BOOL
 set(VIEWER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,/$<CONFIG>,>)
 
 if (WINDOWS)
+    string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
+    if(channel_lower MATCHES "^alchemy release")
+        set(OUTPUT_BINARY_NAME "AlchemyViewer")
+    else()
+        set(OUTPUT_BINARY_NAME "${VIEWER_CHANNEL_ONEWORD}")
+    endif()
+
   set_target_properties(${VIEWER_BINARY_NAME}
       PROPERTIES
-      PDB_NAME ${VIEWER_BINARY_NAME}
-      RUNTIME_OUTPUT_NAME "SecondLifeViewer"
+      OUTPUT_NAME "${OUTPUT_BINARY_NAME}"
       RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
       ENABLE_EXPORTS OFF
       VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" # Sets VS debugger working directory
       )
   target_compile_options(${VIEWER_BINARY_NAME} PRIVATE /bigobj)
   if(HAVOK)
-      target_link_options(${VIEWER_BINARY_NAME} PRIVATE "/MAP\"secondlife-bin.MAP\"") # generate symbol map for havok_tpv scripts
+      target_link_options(${VIEWER_BINARY_NAME} PRIVATE "/MAP\"alchemy-bin.MAP\"") # generate symbol map for havok_tpv scripts
   endif()
 
-  set(product SecondLife-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
+  set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
   set(MANIFEST_DEST_DIR ${VIEWER_STAGING_DIR})
   set(MANIFEST_PACKAGE_OUT_FILE "${VIEWER_BINARY_DIR}/touched.bat")
 elseif(DARWIN)
   # These all get set with PROPERTIES. It's not that the property names are
   # magically known to CMake -- it's that these names are referenced in the
-  # Info-SecondLife.plist file in the configure_file() directive below.
+  # Info-Alchemy.plist file in the configure_file() directive below.
   set(product "${VIEWER_CHANNEL}")
   set(MACOSX_EXECUTABLE_NAME "${VIEWER_CHANNEL}")
   set(MACOSX_BUNDLE_INFO_STRING "${VIEWER_CHANNEL}")
-  set(MACOSX_BUNDLE_ICON_FILE "secondlife.icns")
-  set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.secondlife.indra.viewer")
+  set(MACOSX_BUNDLE_ICON_FILE "alchemy.icns")
+  set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer")
   set(MACOSX_BUNDLE_LONG_VERSION_STRING "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
-  set(MACOSX_BUNDLE_BUNDLE_NAME "SecondLife")
+  set(MACOSX_BUNDLE_BUNDLE_NAME "Alchemy")
   set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
   set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}")
   set(MACOSX_BUNDLE_COPYRIGHT "Copyright © Linden Research, Inc. 2020")
-  set(MACOSX_BUNDLE_NSMAIN_NIB_FILE "SecondLife.nib")
+  set(MACOSX_BUNDLE_NSMAIN_NIB_FILE "Alchemy.nib")
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
 
   # https://blog.kitware.com/upcoming-in-cmake-2-8-12-osx-rpath-support/
@@ -1880,7 +1903,7 @@ elseif(DARWIN)
     set_target_properties(
         ${VIEWER_BINARY_NAME}
         PROPERTIES
-        RESOURCE "SecondLife.xib"
+        RESOURCE "Alchemy.xib"
         )
   else()
     if(USE_BUGSPLAT)
@@ -1893,7 +1916,7 @@ elseif(DARWIN)
 
     find_program(IBTOOL_PROGRAM ibtool REQUIRED)
     add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E env MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET} ${IBTOOL_PROGRAM} --compile $<TARGET_BUNDLE_DIR:${VIEWER_BINARY_NAME}>/Contents/Resources/SecondLife.nib ${CMAKE_CURRENT_SOURCE_DIR}/SecondLife.xib
+          COMMAND ${CMAKE_COMMAND} -E env MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET} ${IBTOOL_PROGRAM} --compile $<TARGET_BUNDLE_DIR:${VIEWER_BINARY_NAME}>/Contents/Resources/Alchemy.nib ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib
           COMMENT "Compiling SecondLife.nib")
   endif()
 
@@ -1954,7 +1977,14 @@ elseif(LINUX)
           COMMENT "Generating ${DEBUG_FILE_NAME}")
   endif()
 
-  set(product SecondLife-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
+  string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
+  if(channel_lower MATCHES "^alchemy release")
+    set(OUTPUT_PRODUCT_NAME "AlchemyViewer")
+  else()
+    set(OUTPUT_PRODUCT_NAME "${VIEWER_CHANNEL_ONEWORD}")
+  endif()
+
+  set(product ${OUTPUT_PRODUCT_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
   set(MANIFEST_DEST_DIR ${VIEWER_STAGING_DIR})
   set(MANIFEST_PACKAGE_OUT_FILE ${product}.tar.xz)
 endif()

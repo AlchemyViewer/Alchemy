@@ -9,12 +9,12 @@
              Log types and their masks are:
 
              1  - RecordToSyslog (not used by viewer)
-             2  - RecordToFile (SecondLife.log)
+             2  - RecordToFile (Alchemy.log)
              4  - RecordToStderr (this will appear in the console window, if there is one)
              8  - RecordToFixedBuffer (viewer debug console)
              16 - RecordToWinDebug (on windows, output to VS IDE window)
 
-             For example, value of 10 = 2|8 would enable logging only to SecondLife.log and the viewer debug console.
+             For example, value of 10 = 2|8 would enable logging only to Alchemy.log and the viewer debug console.
              Note: RecordToFile is always enabled in release builds.
         -->
 		<key>enabled-log-types-mask</key>   <integer>255</integer>

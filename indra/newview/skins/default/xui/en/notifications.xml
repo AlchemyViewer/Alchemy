@@ -193,7 +193,7 @@ No tutorial is currently available.
    icon="alertmodal.tga"
    name="BadInstallation"
    type="alertmodal">
- An error occurred while updating [APP_NAME].  Please [http://get.secondlife.com download the latest version] of the Viewer.
+ An error occurred while updating [APP_NAME].  Please [https://www.alchemyviewer.org download the latest version] of the Viewer.
     <tag>fail</tag>
     <usetemplate
      name="okbutton"
@@ -3878,7 +3878,7 @@ We&apos;re having trouble connecting. There may be a problem with your Internet 
 You can either check your Internet connection and try again in a few minutes, click Help to view the [SUPPORT_SITE], or click Teleport to attempt to teleport home.
     <url option="1" name="url">
 
-			http://secondlife.com/support/
+			https://github.com/AlchemyViewer/Alchemy/issues
     </url>
     <form name="form">
       <button
@@ -3906,7 +3906,7 @@ We&apos;re having trouble connecting. There may be a problem with your Internet 
 
 You can either check your Internet connection and try again in a few minutes or click Help to view the [SUPPORT_SITE].
     <url option="1" name="url">
-			http://secondlife.com/support/
+			https://github.com/AlchemyViewer/Alchemy/issues
     </url>
     <form name="form">
       <button
@@ -4400,7 +4400,7 @@ Finished download of raw terrain file to:
    name="RequiredUpdate"
    type="alertmodal">
 Version [VERSION] is required for login.
-Please download from https://secondlife.com/support/downloads/
+Please download the latest version from https://www.alchemyviewer.org/downloads
     <tag>confirm</tag>
     <usetemplate
      name="okbutton"
@@ -9287,7 +9287,7 @@ Select residents to share with.
     icon="alert.tga"
     type="alert">
       [LABEL] failed to upload: [MESSAGE]
-[DETAILS]See SecondLife.log for details
+[DETAILS]See Alchemy.log for details
   </notification>
 
   <notification
@@ -9296,7 +9296,7 @@ Select residents to share with.
     type="alert">
       [LABEL] failed to upload: [MESSAGE]
 
-See SecondLife.log for details
+See Alchemy.log for details
   </notification>
    
   <notification

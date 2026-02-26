@@ -2540,10 +2540,10 @@ Diese werden für ein paar Sekunden sicherheitshalber gesperrt.</notification>
 Die Schaltfläche wird angezeigt, wenn genügend Platz vorhanden ist.</notification>
 	<notification name="ShareNotification">Wählen Sie Einwohner aus, für die Sie das Objekt freigeben möchten.</notification>
 	<notification name="MeshUploadErrorDetails">[LABEL] konnte nicht hochgeladen werden: [MESSAGE]
-[DETAILS]Siehe SecondLife.log für weitere Details</notification>
+[DETAILS]Siehe Alchemy.log für weitere Details</notification>
 	<notification name="MeshUploadError">[LABEL] konnte nicht hochgeladen werden: [MESSAGE] 
 			
-Siehe SecondLife.log für weitere Details</notification>
+Siehe Alchemy.log für weitere Details</notification>
 	<notification name="MeshUploadPermError">Fehler beim Anfordern der Berechtigungen zum Hochladen des Netzes</notification>
 	<notification name="RegionCapabilityRequestError">Regionsfähigkeit „[CAPABILITY]“ konnte nicht abgerufen werden.</notification>
 	<notification name="ShareItemsConfirmation">

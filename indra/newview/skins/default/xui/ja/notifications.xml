@@ -4832,12 +4832,12 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	<notification name="MeshUploadErrorDetails">
 		[LABEL]をアップロードできませんでした：[MESSAGE]
 [DETAILS]
-詳しくは、SecondLife.logをご覧ください。
+詳しくは、Alchemy.logをご覧ください。
 	</notification>
 	<notification name="MeshUploadError">
 		[LABEL]をアップロードできませんでした：[MESSAGE]
 
-詳しくは、SecondLife.logをご覧ください
+詳しくは、Alchemy.logをご覧ください
 	</notification>
 	<notification name="MeshUploadPermError">
 		メッシュのアップロード許可をリクエスト中にエラーが発生しました。
