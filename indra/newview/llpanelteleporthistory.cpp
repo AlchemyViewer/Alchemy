@@ -47,6 +47,10 @@
 #include "lllandmarkactions.h"
 #include "llclipboard.h"
 #include "lltrans.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvhandler.h"
+// [/RLVa:KB]
 
 // Maximum number of items that can be added to a list in one pass.
 // Used to limit time spent for items list update per frame.
@@ -1146,6 +1150,17 @@ bool LLTeleportHistoryPanel::isActionEnabled(const LLSD& userdata) const
             return false;
         }
         LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+// [RLVa:KB]
+        if ("teleport" == command_name)
+        {
+            return itemp && RlvActions::canTeleportToLocation();
+        }
+        else if ("show_on_map" == command_name)
+        {
+            return itemp && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
+        }
+// [/RLVa:KB]
+
         return itemp != NULL;
     }
 

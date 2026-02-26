@@ -123,6 +123,13 @@ LLFloaterIMNearbyChat::LLFloaterIMNearbyChat(const LLSD& llsd)
     mMinFloaterHeight = EXPANDED_MIN_HEIGHT;
 }
 
+// [RLVa:KB]
+LLFloaterIMNearbyChat::~LLFloaterIMNearbyChat()
+{
+    mRlvBehaviorCallbackConnection.disconnect();
+}
+// [/RLVa:KB]
+
 //static
 LLFloaterIMNearbyChat* LLFloaterIMNearbyChat::buildFloater(const LLSD& key)
 {
@@ -143,6 +150,12 @@ bool LLFloaterIMNearbyChat::postBuild()
     mInputEditor->setFocusReceivedCallback(boost::bind(&LLFloaterIMNearbyChat::onChatBoxFocusReceived, this));
     std::string nearbyChatTitle(LLTrans::getString("NearbyChatTitle"));
     mInputEditor->setLabel(nearbyChatTitle);
+
+// [RLVa:KB]
+    mInputEditor->setShowChatMentionPicker(!RlvActions::isRlvEnabled() || RlvActions::canShowName(RlvActions::SNC_DEFAULT));
+    mRlvBehaviorCallbackConnection =
+    gRlvHandler.setBehaviourToggleCallback(boost::bind(&LLFloaterIMNearbyChat::updateRlvRestrictions, this, _1));
+// [/RLVa:KB]
 
     // Title must be defined BEFORE call to addConversationListItem() because
     // it is used to show the item's name in the conversations list
@@ -879,6 +892,26 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
         return mesg;
     }
 }
+
+// [RLVa:KB]
+void LLFloaterIMNearbyChat::updateRlvRestrictions(ERlvBehaviour behavior)
+{
+    if (behavior != RLV_BHVR_SHOWNAMES)
+    {
+        return;
+    }
+
+    setChatMentionPickerEnabled(!RlvActions::isRlvEnabled() || RlvActions::canShowName(RlvActions::SNC_DEFAULT));
+}
+
+void LLFloaterIMNearbyChat::setChatMentionPickerEnabled(bool enabled)
+{
+    if (mInputEditor)
+    {
+        mInputEditor->setShowChatMentionPicker(enabled);
+    }
+}
+// [/RLVa:KB]
 
 //void send_chat_from_viewer(const std::string& utf8_out_text, EChatType type, S32 channel)
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b) | Modified: RLVa-0.2.2a

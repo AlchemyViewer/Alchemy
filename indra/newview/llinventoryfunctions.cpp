@@ -95,6 +95,7 @@
 #include "llwearablelist.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvactions.h"
+#include "rlvhandler.h"
 #include "rlvlocks.h"
 // [/RLVa:KB]
 
@@ -997,6 +998,13 @@ void show_item_profile(const LLUUID& item_uuid)
 
 void show_item_original(const LLUUID& item_uuid)
 {
+// [RLVa:KB]
+    if (rlv_handler_t::isEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWINV))
+    {
+        return;
+    }
+// [/RLVa:KB]
+
     static LLUICachedControl<bool> find_original_new_floater("FindOriginalOpenWindow", false);
 
     //show in a new single-folder window

@@ -46,7 +46,7 @@ class LLFloaterIMNearbyChat
 public:
     // constructor for inline chat-bars (e.g. hosted in chat history window)
     LLFloaterIMNearbyChat(const LLSD& key = LLSD(LLUUID()));
-    ~LLFloaterIMNearbyChat() {}
+    ~LLFloaterIMNearbyChat();
 
     static LLFloaterIMNearbyChat* buildFloater(const LLSD& key);
 
@@ -102,6 +102,11 @@ protected:
 
     void displaySpeakingIndicator();
 
+// [RLVa:KB]
+    void setChatMentionPickerEnabled(bool enabled);
+    void updateRlvRestrictions(ERlvBehaviour behavior);
+// [/RLVa:KB]
+
     // Which non-zero channel did we last chat on?
     static S32 sLastSpecialChatChannel;
 
@@ -109,6 +114,10 @@ protected:
     LLLocalSpeakerMgr*      mSpeakerMgr;
 
     S32 mExpandedHeight;
+
+// [RLVa:KB]
+    boost::signals2::connection mRlvBehaviorCallbackConnection{};
+// [/RLVa:KB]
 
 private:
     /*virtual*/ void refresh();

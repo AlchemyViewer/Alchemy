@@ -213,7 +213,10 @@ public:
     void            hideEmojiHelper();
     void            setShowEmojiHelper(bool show);
     bool            getShowEmojiHelper() const { return mShowEmojiHelper; }
-
+// [RLVa:KB]
+    void            setShowChatMentionPicker(bool show) { mShowChatMentionPicker = show; }
+    bool            getShowChatMentionPicker() const { return mShowChatMentionPicker; }
+// [/RLVa:KB]
     void            setPassDelete(bool b) { mPassDelete = b; }
 
     LLWString       getConvertedText() const;

@@ -5678,7 +5678,10 @@ void mean_name_callback(const LLUUID &id, const LLAvatarName& av_name)
         LLMeanCollisionData *mcd = *iter;
         if (mcd->mPerp == id)
         {
-            mcd->mFullName = av_name.getUserName();
+//          mcd->mFullName = av_name.getUserName();
+// [RLVa:KB]
+            mcd->mFullName = gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES) ? RlvStrings::getAnonym(av_name) : av_name.getUserName();
+// [/RLVa:KB]
         }
     }
 }

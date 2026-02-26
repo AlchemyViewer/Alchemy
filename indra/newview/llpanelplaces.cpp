@@ -74,6 +74,10 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvhandler.h"
+// [/RLVa:KB]
 
 // Constants
 static const F32 PLACE_INFO_UPDATE_INTERVAL = 3.0;
@@ -1305,10 +1309,20 @@ void LLPanelPlaces::updateVerbs()
             mTeleportBtn->setEnabled(have_3d_pos &&
                                      !LLViewerParcelMgr::getInstance()->inAgentParcel(mPosGlobal));
         }
-        else if (mPlaceInfoType == LANDMARK_INFO_TYPE || mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+// [RLVa:KB]
+        else if (mPlaceInfoType == LANDMARK_INFO_TYPE)
         {
-            mTeleportBtn->setEnabled(have_3d_pos);
+            mTeleportBtn->setEnabled(have_3d_pos && !gRlvHandler.hasBehaviour(RLV_BHVR_TPLM));
         }
+        else if (mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+        {
+            mTeleportBtn->setEnabled(have_3d_pos && RlvActions::canTeleportToLocation());
+        }
+// [/RLVa:KB]
+//      else if (mPlaceInfoType == LANDMARK_INFO_TYPE || mPlaceInfoType == REMOTE_PLACE_INFO_TYPE)
+//      {
+//          mTeleportBtn->setEnabled(have_3d_pos);
+//      }
     }
     else
     {

@@ -27,7 +27,10 @@
 #include "llregionhandle.h"
 #include "llscriptruntimeperms.h"
 #include "llsdserialize.h"
+#include "lluri.h"
 #include "lltrans.h"
+#include "llurlentry.h"
+#include "llurlregistry.h"
 #include "llversioninfo.h"
 #include "llviewerparcelmgr.h"
 #include "llviewermenu.h"
@@ -43,8 +46,8 @@
 #include "rlvlocks.h"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/regex.hpp>
 #include <boost/regex.hpp>
-
 
 // ============================================================================
 // Forward declarations
@@ -493,6 +496,12 @@ void RlvStrings::setCustomString(const std::string& strStringName, const std::st
 
 bool RlvUtil::m_fForceTp = false;
 
+std::string escape_for_regex(const std::string& str)
+{
+    using namespace boost;
+    return regex_replace(str, regex("[.^$|()\\[\\]{}*+?\\\\]"), "\\\\&", match_default|format_sed);
+}
+
 // Checked: 2009-07-04 (RLVa-1.0.0a) | Modified: RLVa-1.0.0a
 void RlvUtil::filterLocation(std::string& strUTF8Text)
 {
@@ -500,12 +509,12 @@ void RlvUtil::filterLocation(std::string& strUTF8Text)
     LLWorld::region_list_t regions = LLWorld::getInstance()->getRegionList();
     const std::string& strHiddenRegion = RlvStrings::getString(RlvStringKeys::Hidden::Region);
     for (LLWorld::region_list_t::const_iterator itRegion = regions.begin(); itRegion != regions.end(); ++itRegion)
-        boost::ireplace_all(strUTF8Text, (*itRegion)->getName(), strHiddenRegion);
+        boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex((*itRegion)->getName()) + "\\b", boost::regex::icase), strHiddenRegion);
 
     // Filter any mention of the parcel name
     LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstance();
     if (pParcelMgr)
-        boost::ireplace_all(strUTF8Text, pParcelMgr->getAgentParcelName(), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
+        boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex(pParcelMgr->getAgentParcelName()) + "\\b", boost::regex::icase), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
 }
 
 // Checked: 2010-12-08 (RLVa-1.2.2c) | Modified: RLVa-1.2.2c
@@ -519,7 +528,7 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
         // NOTE: if we're agressively culling nearby names then ignore exceptions
         if ( (LLAvatarNameCache::get(idAgents[idxAgent], &avName)) && ((fClearMatches) || (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idAgents[idxAgent]))) )
         {
-            const std::string& strDisplayName = avName.getDisplayName();
+            const std::string& strDisplayName = escape_for_regex(avName.getDisplayName());
             bool fFilterDisplay = (strDisplayName.length() > 2);
             const std::string& strLegacyName = avName.getLegacyName();
             fFilterLegacy &= (strLegacyName.length() > 2);
@@ -529,26 +538,95 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
             if (boost::icontains(strLegacyName, strDisplayName))
             {
                 if (fFilterLegacy)
-                    boost::ireplace_all(strUTF8Text, strLegacyName, strAnonym);
+                    boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strLegacyName + "\\b", boost::regex::icase), strAnonym);
                 if (fFilterDisplay)
-                    boost::ireplace_all(strUTF8Text, strDisplayName, strAnonym);
+                    boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strDisplayName + "\\b", boost::regex::icase), strAnonym);
             }
             else
             {
                 if (fFilterDisplay)
-                    boost::ireplace_all(strUTF8Text, strDisplayName, strAnonym);
+                    boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strDisplayName + "\\b", boost::regex::icase), strAnonym);
                 if (fFilterLegacy)
-                    boost::ireplace_all(strUTF8Text, strLegacyName, strAnonym);
+                    boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strLegacyName + "\\b", boost::regex::icase), strAnonym);
             }
         }
     }
+
+    filterMentions(strUTF8Text);
+}
+
+// Checked: 2026-02-09 (RLVa-2.6.2) | Added: RLVa-2.6.2
+void RlvUtil::filterMentions(std::string& strUTF8Text)
+{
+    if (!RlvActions::isRlvEnabled())
+        return;
+    if (RlvActions::canShowName(RlvActions::SNC_DEFAULT))
+        return;
+
+    static const boost::regex mention_regex(APP_HEADER_REGEX
+                                            "/agent/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+                                            "/mention(?=/|\\?|$)",
+                                            boost::regex::perl);
+    boost::sregex_iterator it(strUTF8Text.begin(), strUTF8Text.end(), mention_regex);
+    boost::sregex_iterator end;
+
+    if (it == end)
+        return;
+
+    std::string result;
+    result.reserve(strUTF8Text.size());
+    size_t last_pos = 0;
+
+    for (; it != end; ++it)
+    {
+        const boost::smatch& match = *it;
+        const size_t start = match.position();
+        const size_t length = match.length();
+
+        result.append(strUTF8Text, last_pos, start - last_pos);
+
+        const std::string match_url = match.str();
+        std::string agent_id_str;
+        {
+            LLURI uri(match_url);
+            LLSD path_array = uri.pathArray();
+            if (path_array.size() == 4)
+            {
+                agent_id_str = path_array.get(2).asString();
+            }
+        }
+        const LLUUID agent_id(agent_id_str);
+        const bool can_show =
+            agent_id.notNull() &&
+            (RlvActions::canShowName(RlvActions::SNC_DEFAULT, agent_id));
+
+        if (can_show)
+        {
+            // Preserve the original mention URI for exceptions so URL-aware floaters keep it clickable.
+            result.append(strUTF8Text, start, length);
+        }
+        else
+        {
+            // Remove the URI and replace with anonymized name if names are hidden
+            LLAvatarName av_name;
+            const std::string anonym = (agent_id.notNull() && LLAvatarNameCache::get(agent_id, &av_name))
+                                           ? RlvStrings::getAnonym(av_name)
+                                           : RlvStrings::getAnonym(agent_id_str.empty() ? LLUUID::null.asString() : agent_id_str);
+            result += "@" + anonym;
+        }
+
+        last_pos = start + length;
+    }
+
+    result.append(strUTF8Text, last_pos, std::string::npos);
+    strUTF8Text.swap(result);
 }
 
 // Checked: 2012-08-19 (RLVa-1.4.7)
 void RlvUtil::filterScriptQuestions(S32& nQuestions, LLSD& sdPayload)
 {
     // Check SCRIPT_PERMISSION_ATTACH
-    if ((!gRlvAttachmentLocks.canAttach()) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_ATTACH].permbit & nQuestions))
+    if ( (!gRlvAttachmentLocks.canAttach()) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_ATTACH].permbit & nQuestions) )
     {
         // Notify the user that we blocked it since they're not allowed to wear any new attachments
         sdPayload["rlv_blocked"] = RlvStringKeys::Blocked::PermissionAttach;
@@ -556,7 +634,7 @@ void RlvUtil::filterScriptQuestions(S32& nQuestions, LLSD& sdPayload)
     }
 
     // Check SCRIPT_PERMISSION_TELEPORT
-    if ((gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TELEPORT].permbit & nQuestions))
+    if ( (gRlvHandler.hasBehaviour(RLV_BHVR_TPLOC)) && (SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TELEPORT].permbit & nQuestions) )
     {
         // Notify the user that we blocked it since they're not allowed to teleport
         sdPayload["rlv_blocked"] = RlvStringKeys::Blocked::PermissionTeleport;
@@ -783,16 +861,19 @@ bool rlvMenuEnableIfNot(const LLSD& sdParam)
 // Checked: 2011-05-28 (RLVa-1.4.6) | Modified: RLVa-1.4.0
 bool rlvCanDeleteOrReturn(const LLViewerObject* pObj)
 {
-    // Block if: @rez=n restricted and owned by us or a group *or* @unsit=n restricted and being sat on by us
+    // Block right here if this specific object is edit blocked
+    if (!RlvActions::canEdit(pObj)) return false;
+
+    // Block if: @rez=n or @edit=n restricted and owned/editable by us or a group *or* @unsit=n restricted and being sat on by us
     return
-        ( (!gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || ((!pObj->permYouOwner()) && (!pObj->permGroupOwner())) ) &&
+        ( (!gRlvHandler.hasBehaviour(RLV_BHVR_EDIT) && !gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || ((!pObj->permYouOwner()) && (!pObj->permModify()) && (!pObj->permGroupOwner())) ) &&
         ( (!gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (!isAgentAvatarValid()) || (!pObj->getRootEdit()->isChild(gAgentAvatarp)) );
 }
 
 // Checked: 2011-05-28 (RLVa-1.4.6) | Modified: RLVa-1.4.0
 bool rlvCanDeleteOrReturn()
 {
-    if ( (gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || (gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) )
+    if ( (gRlvHandler.hasBehaviour(RLV_BHVR_EDIT)) || (gRlvHandler.hasBehaviour(RLV_BHVR_REZ)) || (gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (gRlvHandler.hasException(RLV_BHVR_EDITOBJ)) )
     {
         struct RlvCanDeleteOrReturn : public LLSelectedObjectFunctor
         {

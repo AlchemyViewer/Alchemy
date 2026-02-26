@@ -3934,14 +3934,7 @@ bool LLVOAvatar::isVisuallyMuted()
     // * check against the render cost and attachment limits
     if (!isSelf())
     {
-// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
-        if (isRlvSilhouette())
-        {
-            muted = true;
-        }
-        else if (mVisuallyMuteSetting == AV_ALWAYS_RENDER)
-// [/RLVa:KB]
-//      if (mVisuallyMuteSetting == AV_ALWAYS_RENDER)
+        if (mVisuallyMuteSetting == AV_ALWAYS_RENDER)
         {
             muted = false;
         }
@@ -8712,7 +8705,14 @@ bool LLVOAvatar::isTooComplex() const
     static LLCachedControl<S32> complexity_render_mode(gSavedSettings, "RenderAvatarComplexityMode");
     bool render_friend =  (isBuddy() && complexity_render_mode > AV_RENDER_LIMIT_BY_COMPLEXITY);
 
-    if (isSelf() || render_friend || mVisuallyMuteSetting == AV_ALWAYS_RENDER)
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+    if (isRlvSilhouette())
+    {
+        too_complex = true;
+    }
+    else if (isSelf() || render_friend || mVisuallyMuteSetting == AV_ALWAYS_RENDER)
+// [/RLVa:KB]
+//  if (isSelf() || render_friend || mVisuallyMuteSetting == AV_ALWAYS_RENDER)
     {
         too_complex = false;
     }

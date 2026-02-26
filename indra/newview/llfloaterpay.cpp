@@ -52,6 +52,9 @@
 #include "llselectmgr.h"
 #include "lltransactiontypes.h"
 #include "lluictrlfactory.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+// [/RLVa:KB]
 
 ///----------------------------------------------------------------------------
 /// Local function declarations, constants, enums, and typedefs
@@ -410,6 +413,9 @@ void LLFloaterPay::payDirectly(money_callback callback,
     floater->getChildView("amount")->setVisible(true);
     floater->getChildView("pay btn")->setVisible(true);
     floater->getChildView("amount text")->setVisible(true);
+// [RLVa:KB]
+    floater->getChildView("payment_message")->setEnabled(RlvActions::canSendIM(target_id));
+// [/RLVa:KB]
 
     for(S32 i=0;i<MAX_PAY_BUTTONS;++i)
     {

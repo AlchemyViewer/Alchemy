@@ -57,6 +57,7 @@
 #include "llviewermenu.h"
 #include "llviewerregion.h"
 // [RLVa:KB]
+#include "rlvactions.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
 
@@ -734,7 +735,10 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
             if (asset_uuid.isNull()) return false;
 
             // Disable "Show on Map" if landmark loading is in progress.
-            return !gLandmarkList.isAssetInLoadedCallbackMap(asset_uuid);
+// [RLVa:KB]
+            return !gLandmarkList.isAssetInLoadedCallbackMap(asset_uuid) && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWWORLDMAP);
+// [/RLVa:KB]
+//          return !gLandmarkList.isAssetInLoadedCallbackMap(asset_uuid);
         }
         else if ("rename" == command_name)
         {
@@ -743,6 +747,12 @@ bool LLLandmarksPanel::isActionEnabled(const LLSD& userdata) const
 
             return canItemBeModified(command_name, selected_item);
         }
+// [RLVa:KB]
+        else if ("teleport" == command_name)
+        {
+            return !gRlvHandler.hasBehaviour(RLV_BHVR_TPLM);
+        }
+// [/RLVa:KB]
 
         return true;
     }
