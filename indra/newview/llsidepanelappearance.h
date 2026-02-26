@@ -69,6 +69,14 @@ public:
 
     bool isCOFPanelVisible();
 
+// [RLVa:KB] - Checked: 2010-09-16 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
+    bool isOutfitEditPanelVisible() const;
+    bool isWearableEditPanelVisible() const;
+
+    LLPanelOutfitEdit*   getOutfitEditPanel() { return mOutfitEdit; }
+    LLPanelEditWearable* getWearableEditPanel() { return mEditWearable; }
+// [/RLVa:KB]
+
 private:
     void onFilterEdit(const std::string& search_string);
     void onVisibilityChanged ( const LLSD& new_visibility );

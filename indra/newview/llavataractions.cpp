@@ -77,6 +77,10 @@
 #include "llavatarname.h"
 #include "llagentui.h"
 #include "lluiusage.h"
+// [RLVa:KB] - Checked: 2011-04-11 (RLVa-1.3.0)
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 // Flags for kick message
 const U32 KICK_FLAGS_DEFAULT    = 0x0;
@@ -219,6 +223,15 @@ void LLAvatarActions::startIM(const LLUUID& id)
     if (id.isNull() || gAgent.getID() == id)
         return;
 
+// [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
+    if (!RlvActions::canStartIM(id))
+    {
+        make_ui_sound("UISndInvalidOp");
+        RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartIm, LLSD().with("RECIPIENT", LLSLURL("agent", id, "completename").getSLURLString()));
+        return;
+    }
+// [/RLVa:KB]
+
     LLAvatarNameCache::get(id, boost::bind(&on_avatar_name_cache_start_im, _1, _2));
 }
 
@@ -251,6 +264,16 @@ void LLAvatarActions::startCall(const LLUUID& id)
     {
         return;
     }
+
+// [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
+    if (!RlvActions::canStartIM(id))
+    {
+        make_ui_sound("UISndInvalidOp");
+        RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartIm, LLSD().with("RECIPIENT", LLSLURL("agent", id, "completename").getSLURLString()));
+        return;
+    }
+// [/RLVa:KB]
+
     LLAvatarNameCache::get(id, boost::bind(&on_avatar_name_cache_start_call, _1, _2));
 }
 
@@ -267,7 +290,17 @@ void LLAvatarActions::startAdhocCall(const uuid_vec_t& ids, const LLUUID& floate
     id_array.reserve(ids.size());
     for (uuid_vec_t::const_iterator it = ids.begin(); it != ids.end(); ++it)
     {
-        id_array.push_back(*it);
+// [RLVa:KB] - Checked: 2011-04-11 (RLVa-1.3.0)
+        const LLUUID& idAgent = *it;
+        if (!RlvActions::canStartIM(idAgent))
+        {
+            make_ui_sound("UISndInvalidOp");
+            RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartConference);
+            return;
+        }
+        id_array.push_back(idAgent);
+// [/RLVa:KB]
+//      id_array.push_back(*it);
     }
 
     // create the new ad hoc voice session
@@ -313,7 +346,17 @@ void LLAvatarActions::startConference(const uuid_vec_t& ids, const LLUUID& float
     id_array.reserve(ids.size());
     for (uuid_vec_t::const_iterator it = ids.begin(); it != ids.end(); ++it)
     {
-        id_array.push_back(*it);
+// [RLVa:KB] - Checked: 2011-04-11 (RLVa-1.3.0)
+        const LLUUID& idAgent = *it;
+        if (!RlvActions::canStartIM(idAgent))
+        {
+            make_ui_sound("UISndInvalidOp");
+            RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartConference);
+            return;
+        }
+        id_array.push_back(idAgent);
+// [/RLVa:KB]
+//      id_array.push_back(*it);
     }
     const std::string title = LLTrans::getString("conference-title");
     LLUUID  session_id = gIMMgr->addSession(title, IM_SESSION_CONFERENCE_START, ids[0], id_array, LLSD(), floater_id);
@@ -516,6 +559,17 @@ void LLAvatarActions::teleport_request_callback(const LLSD& notification, const 
     {
         LLMessageSystem* msg = gMessageSystem;
 
+// [RLVa:KB] - Checked: RLVa-2.0.0
+        const LLUUID idRecipient = notification["substitutions"]["uuid"];
+        std::string strMessage = response["message"];
+
+        // Filter the request message if the recipients is IM-blocked
+        if ( (RlvActions::isRlvEnabled()) && ((!RlvActions::canStartIM(idRecipient)) || (!RlvActions::canSendIM(idRecipient))) )
+        {
+            strMessage = RlvStrings::getString(RlvStringKeys::Hidden::Generic);
+        }
+// [/RLVa:KB]
+
         msg->newMessageFast(_PREHASH_ImprovedInstantMessage);
         msg->nextBlockFast(_PREHASH_AgentData);
         msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
@@ -533,7 +587,10 @@ void LLAvatarActions::teleport_request_callback(const LLSD& notification, const 
         LLAgentUI::buildFullname(name);
 
         msg->addStringFast(_PREHASH_FromAgentName, name);
-        msg->addStringFast(_PREHASH_Message, response["message"]);
+// [RLVa:KB] - Checked: RLVa-2.0.0
+        msg->addStringFast(_PREHASH_Message, strMessage);
+// [/RLVa:KB]
+//      msg->addStringFast(_PREHASH_Message, response["message"]);
         msg->addU32Fast(_PREHASH_ParentEstateID, 0);
         msg->addUUIDFast(_PREHASH_RegionID, LLUUID::null);
         msg->addVector3Fast(_PREHASH_Position, gAgent.getPositionAgent());
@@ -552,14 +609,17 @@ void LLAvatarActions::teleportRequest(const LLUUID& id)
 {
     LLSD notification;
     notification["uuid"] = id;
-    LLAvatarName av_name;
-    if (!LLAvatarNameCache::get(id, &av_name))
-    {
-        // unlikely ... they just picked this name from somewhere...
-        LLAvatarNameCache::get(id, boost::bind(&LLAvatarActions::teleportRequest, id));
-        return; // reinvoke this when the name resolves
-    }
-    notification["NAME"] = av_name.getCompleteName();
+// [RLVa:KB] - Checked: RLVa-1.5.0
+    notification["NAME"] = LLSLURL("agent", id, (RlvActions::canShowName(RlvActions::SNC_TELEPORTREQUEST, id)) ? "completename" : "rlvanonym").getSLURLString();
+// [/RLVa:KB]
+//  LLAvatarName av_name;
+//  if (!LLAvatarNameCache::get(id, &av_name))
+//  {
+//      // unlikely ... they just picked this name from somewhere...
+//      LLAvatarNameCache::get(id, boost::bind(&LLAvatarActions::teleportRequest, id));
+//      return; // reinvoke this when the name resolves
+//  }
+//  notification["NAME"] = av_name.getCompleteName();
 
     LLSD payload;
 
@@ -666,6 +726,14 @@ void LLAvatarActions::csr(const LLUUID& id, std::string name)
 //static
 void LLAvatarActions::share(const LLUUID& id)
 {
+// [RLVa:KB] - @share
+    if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canGiveInventory(id)) )
+    {
+        RlvUtil::notifyBlocked(RlvStringKeys::Blocked::Share, LLSD().with("RECIPIENT", id));
+        return;
+    }
+// [/RLVa:KB]
+
     LLSD key;
     LLFloaterSidePanelContainer::showPanel("inventory", key);
     LLFloaterReg::showInstance("im_container");
@@ -901,9 +969,33 @@ namespace action_give_inventory
      * @param avatar_uuids - avatar names request to be sent.
      */
 
-    static void give_inventory_ids(const uuid_vec_t& avatar_uuids, const std::vector<LLAvatarName> avatar_names, const uuid_set_t inventory_selected_uuids)
+//  static void give_inventory_ids(const uuid_vec_t& avatar_uuids, const std::vector<LLAvatarName> avatar_names, const uuid_set_t inventory_selected_uuids)
+// [RLVa:KB] - @share
+    static void give_inventory_ids(uuid_vec_t avatar_uuids, std::vector<LLAvatarName> avatar_names, const uuid_set_t inventory_selected_uuids)
+// [/RLVa:KB]
     {
         llassert(avatar_names.size() == avatar_uuids.size());
+
+// [RLVa:KB] - @share
+        if ( (RlvActions::isRlvEnabled()) && (RlvActions::hasBehaviour(RLV_BHVR_SHARE)) )
+        {
+            for (ptrdiff_t idxAvatar = avatar_uuids.size() - 1; idxAvatar >= 0; idxAvatar--)
+            {
+                if (!RlvActions::canGiveInventory(avatar_uuids[idxAvatar]))
+                {
+                    RlvUtil::notifyBlocked(RlvStringKeys::Blocked::Share, LLSD().with("RECIPIENT", LLSLURL("agent", avatar_uuids[idxAvatar], "completename").getSLURLString()));
+
+                    avatar_uuids.erase(avatar_uuids.begin() + idxAvatar);
+                    avatar_names.erase(avatar_names.begin() + idxAvatar);
+                }
+            }
+        }
+
+        if (avatar_uuids.empty())
+        {
+            return;
+        }
+// [/RLVa:KB]
 
         if (inventory_selected_uuids.empty())
         {
@@ -1045,6 +1137,14 @@ std::set<LLUUID> LLAvatarActions::getInventorySelectedUUIDs(LLInventoryPanel* ac
 //static
 void LLAvatarActions::shareWithAvatars(LLView * panel)
 {
+// [RLVa:KB] - @share
+    if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canGiveInventory()) )
+    {
+        RlvUtil::notifyBlocked(RlvStringKeys::Blocked::ShareGeneric);
+        return;
+    }
+// [/RLVa:KB]
+
     using namespace action_give_inventory;
 
     LLFloater* root_floater = gFloaterView->getParentFloater(panel);

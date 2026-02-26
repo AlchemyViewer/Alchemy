@@ -89,6 +89,10 @@
 #include "llavatarappearancedefines.h"
 #include "llgltfmateriallist.h"
 #include "gltfscenemanager.h"
+// [RLVa:KB] - Checked: RLVa-2.0.0
+#include "rlvactions.h"
+#include "rlvlocks.h"
+// [/RLVa:KB]
 
 const F32 FORCE_SIMPLE_RENDER_AREA = 512.f;
 const F32 FORCE_CULL_AREA = 8.f;
@@ -4447,6 +4451,20 @@ U32 LLVOVolume::getHighLODTriangleCount()
     return ret;
 }
 
+// [FS:Beq] - Patch: Appearance-RebuildAttachments | Checked: Catznip-5.3
+void LLVOVolume::forceLOD(S32 lod)
+{
+// [SL:KB] - Patch: Appearance-RebuildAttachments | Checked: Catznip-5.3
+    if (mDrawable.isNull())
+        return;
+// [/SL:KB]
+
+    mLOD = lod;
+    gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
+    mLODChanged = true;
+}
+// [/FS]
+
 //static
 void LLVOVolume::preUpdateGeom()
 {
@@ -5311,9 +5329,16 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
         LL_WARNS_ONCE("RenderMaterials") << "Oh no! No binormals for this alpha blended face!" << LL_ENDL;
     }
 
-    bool selected = facep->getViewerObject()->isSelected();
-
-    if (selected && LLSelectMgr::getInstance()->mHideSelectedObjects)
+//  bool selected = facep->getViewerObject()->isSelected();
+//
+//  if (selected && LLSelectMgr::getInstance()->mHideSelectedObjects)
+// [RLVa:KB] - Checked: 2010-11-29 (RLVa-1.3.0c) | Modified: RLVa-1.3.0c
+    const LLViewerObject* pObj = facep->getViewerObject();
+    if ( (pObj->isSelected() && LLSelectMgr::getInstance()->mHideSelectedObjects) &&
+         ( (!RlvActions::isRlvEnabled()) ||
+           ( ((!pObj->isHUDAttachment()) || (!gRlvAttachmentLocks.isLockedAttachment(pObj->getRootEdit()))) &&
+             (RlvActions::canEdit(pObj)) ) ) )
+// [/RVLa:KB]
     {
         return;
     }

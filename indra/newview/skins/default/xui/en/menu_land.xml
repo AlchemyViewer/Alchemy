@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <context_menu
  layout="topleft"
  name="Land Pie">
@@ -7,6 +7,9 @@
      name="Place Information...">
         <menu_item_call.on_click
          function="Floater.Show"
+         parameter="about_land" />
+        <menu_item_call.on_enable
+         function="Floater.CanShow"
          parameter="about_land" />
     </menu_item_call>
  <!--   <menu_item_call

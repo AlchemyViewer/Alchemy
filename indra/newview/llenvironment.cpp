@@ -62,6 +62,10 @@
 #include "llviewergenericmessage.h"
 #include "llexperiencelog.h"
 
+// [RLVa:KB] - Checked: RLVa-2.4 (@setenv)
+#include "rlvactions.h"
+// [/RLVa:KB]
+
 //=========================================================================
 namespace
 {
@@ -1069,6 +1073,13 @@ bool LLEnvironment::getIsMoonUp() const
 //-------------------------------------------------------------------------
 void LLEnvironment::setSelectedEnvironment(LLEnvironment::EnvSelection_t env, LLSettingsBase::Seconds transition, bool forced)
 {
+// [RLVa:KB] - Checked: RLVa-2.4 (@setenv)
+    if ( (!RlvActions::canChangeEnvironment()) && (LLEnvironment::ENV_EDIT != env) )
+    {
+        return;
+    }
+// [/RLVa:KB]
+
     mSelectedEnvironment = env;
     updateEnvironment(transition, forced);
     LL_DEBUGS("ENVIRONMENT") << "Setting environment " << env_selection_to_string(env) << " with transition: " << transition << LL_ENDL;

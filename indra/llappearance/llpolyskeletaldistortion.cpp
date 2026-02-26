@@ -27,7 +27,7 @@
 //-----------------------------------------------------------------------------
 // Header Files
 //-----------------------------------------------------------------------------
-#include "llpreprocessor.h"
+#include "linden_common.h"
 #include "llerror.h"
 #include "llavatarappearance.h"
 #include "llavatarjoint.h"

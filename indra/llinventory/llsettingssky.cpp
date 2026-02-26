@@ -44,7 +44,7 @@ namespace
     const LLUUID IMG_HALO("12149143-f599-91a7-77ac-b52a3c0f59cd");
 }
 
-namespace {
+//namespace {
     LLQuaternion convert_azimuth_and_altitude_to_quat(F32 azimuth, F32 altitude)
     {
         F32 sinTheta = sin(azimuth);
@@ -68,7 +68,7 @@ namespace {
 
         return quat;
     }
-}
+//}
 
 //=========================================================================
 const std::string LLSettingsSky::SETTING_AMBIENT("ambient");

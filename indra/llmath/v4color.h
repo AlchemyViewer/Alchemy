@@ -165,6 +165,9 @@ public:
     static LLColor4 grey2;
     static LLColor4 grey3;
     static LLColor4 grey4;
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+    static LLColor4 silhouette;
+// [/RLVa:KB]
 
     static LLColor4 red1;
     static LLColor4 red2;

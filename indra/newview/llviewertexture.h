@@ -518,6 +518,9 @@ public:
     static LLPointer<LLViewerFetchedTexture> sFlatNormalImagep; // Flat normal map denoting no bumpiness on a surface
     static LLPointer<LLViewerFetchedTexture> sDefaultIrradiancePBRp; // PBR: irradiance
     static LLPointer<LLViewerFetchedTexture> sDefaultParticleImagep; // Default particle texture
+// [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
+    static LLPointer<LLViewerFetchedTexture> sDefaultDiffuseImagep;
+// [/SL:KB]
 
     // not sure why, but something is iffy about the loading of this particular texture, use the accessor instead of accessing directly
     static LLPointer<LLViewerFetchedTexture> sSmokeImagep; // Old "Default" translucent texture

@@ -45,6 +45,10 @@
 
 #include "llslurl.h"
 
+// [RLVa:KB] - Checked: 2010-04-21 (RLVa-1.2.0f)
+#include "rlvhandler.h"
+// [/RLVa:KB]
+
 static constexpr S32 msg_left_offset = 10;
 static constexpr S32 msg_right_offset = 10;
 static constexpr S32 msg_height_pad = 5;
@@ -205,6 +209,10 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
     mFromID = notification["from_id"].asUUID();     // agent id or object id
     mFromName = fromName;
 
+// [RLVa:KB] - Checked: 2010-04-22 (RLVa-1.2.0f) | Added: RLVa-1.2.0f
+    mShowIconTooltip = notification.has("show_icon_tooltip") ? notification["show_icon_tooltip"].asBoolean() : true;
+// [/RLVa:KB]
+
     int sType = notification["source"].asInteger();
     mSourceType = (EChatSourceType)sType;
 
@@ -246,8 +254,15 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
             style_params_name.font.name = LLFontGL::nameFromFont(messageFont);
             style_params_name.font.size = LLFontGL::sizeFromFont(messageFont);
 
-            style_params_name.link_href = notification["sender_slurl"].asString();
-            style_params_name.is_link = true;
+//          style_params_name.link_href = notification["sender_slurl"].asString();
+//          style_params_name.is_link = true;
+// [RLVa:KB] - Checked: 2011-12-13 (RLVa-1.4.6) | Added: RLVa-1.4.6
+            if (notification.has("sender_slurl"))
+            {
+                style_params_name.link_href = notification["sender_slurl"].asString();
+                style_params_name.is_link = true;
+            }
+// [/RLVa:KB]
 
             mMsgText->appendText(str_sender, false, style_params_name);
 
@@ -410,7 +425,10 @@ void LLFloaterIMNearbyChatToastPanel::draw()
         LLAvatarIconCtrl* icon = getChild<LLAvatarIconCtrl>("avatar_icon", false);
         if(icon)
         {
-            icon->setDrawTooltip(mSourceType == CHAT_SOURCE_AGENT);
+//          icon->setDrawTooltip(mSourceType == CHAT_SOURCE_AGENT);
+// [RLVa:KB] - Checked: 2010-04-200 (RLVa-1.2.0f) | Added: RLVa-1.2.0f
+            icon->setDrawTooltip( (mShowIconTooltip) && (mSourceType == CHAT_SOURCE_AGENT) );
+// [/RLVa:KB]
             if(mSourceType == CHAT_SOURCE_OBJECT)
                 icon->setValue(LLSD("OBJECT_Icon"));
             else if(mSourceType == CHAT_SOURCE_SYSTEM)

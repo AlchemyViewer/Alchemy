@@ -317,7 +317,10 @@ bool LLGLTexture::getIsAlphaMask() const
     return mGLTexturep->getIsAlphaMask() ;
 }
 
-bool LLGLTexture::getMask(const LLVector2 &tc)
+//bool LLGLTexture::getMask(const LLVector2 &tc)
+// [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
+bool LLGLTexture::getMask(const LLVector2 &tc) const
+// [/RLVa:KB]
 {
     llassert(mGLTexturep.notNull()) ;
 

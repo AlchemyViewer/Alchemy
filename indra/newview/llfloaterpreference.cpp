@@ -107,6 +107,9 @@
 #include "llteleporthistorystorage.h"
 #include "llproxy.h"
 #include "llweb.h"
+// [RLVa:KB] - Checked: 2010-03-18 (RLVa-1.2.0a)
+#include "rlvactions.h"
+// [/RLVa:KB]
 
 #include "lllogininstance.h"        // to check if logged in yet
 #include "llsdserialize.h"
@@ -1276,6 +1279,13 @@ void LLFloaterPreference::buildPopupLists()
 
 void LLFloaterPreference::refreshEnabledState()
 {
+// [RLVa:KB] - Checked: 2013-05-11 (RLVa-1.4.9)
+    if (RlvActions::isRlvEnabled())
+    {
+        getChild<LLUICtrl>("do_not_disturb_response")->setEnabled(!RlvActions::hasBehaviour(RLV_BHVR_SENDIM));
+    }
+// [/RLVa:KB]
+
     // Cannot have floater active until caps have been received
     getChild<LLButton>("default_creation_permissions")->setEnabled(LLStartUp::getStartupState() >= STATE_STARTED);
 

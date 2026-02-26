@@ -47,6 +47,13 @@
 #include "llrecentpeople.h"
 #include "llviewerobjectlist.h"
 #include "llvoavatarself.h"
+// [RLVa:KB] - Checked: RLVa-1.2.2
+#include "llavatarnamecache.h"
+#include "llslurl.h"
+#include "rlvactions.h"
+#include "rlvcommon.h"
+#include "rlvui.h"
+// [/RLVa:KB]
 
 // MAX ITEMS is based on (sizeof(uuid)+2) * count must be < MTUBYTES
 // or 18 * count < 1200 => count < 1200/18 => 66. I've cut it down a
@@ -194,7 +201,10 @@ bool LLGiveInventory::doGiveInventoryItem(const LLUUID& to_agent,
     if (item->getPermissions().allowCopyBy(gAgentID))
     {
         // just give it away.
-        LLGiveInventory::commitGiveInventoryItem(to_agent, item, im_session_id);
+// [RLVa:KB] - @share
+        res = LLGiveInventory::commitGiveInventoryItem(to_agent, item, im_session_id);
+// [/RLVa:KB]
+//      LLGiveInventory::commitGiveInventoryItem(to_agent, item, im_session_id);
     }
     else
     {
@@ -311,6 +321,19 @@ void LLGiveInventory::logInventoryOffer(const LLUUID& to_agent, const LLUUID &im
     {
         gIMMgr->addSystemMessage(im_session_id, message_name, args);
     }
+// [RLVa:KB] - Checked: RLVa-1.2.0
+    else if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) && (RlvUtil::isNearbyAgent(to_agent)) && (!RlvUIEnabler::hasOpenProfile(to_agent)) )
+    {
+        // Log to chat history if the user didn't drop on an IM session or a profile to avoid revealing the name of the recipient
+        std::string strMsgName = "inventory_item_offered-im"; LLSD args; LLAvatarName avName;
+        if (LLAvatarNameCache::get(to_agent, &avName))
+        {
+            args["NAME"] = RlvStrings::getAnonym(avName);
+            strMsgName = "inventory_item_offered_rlv";
+        }
+        gIMMgr->addSystemMessage(LLUUID::null, strMsgName, args);
+    }
+// [/RLVa:KB]
     // If this item was given by drag-and-drop on avatar while IM panel was open, log this action in the IM panel chat.
     else if (LLIMModel::getInstance()->findIMSession(session_id))
     {
@@ -342,6 +365,14 @@ bool LLGiveInventory::handleCopyProtectedItem(const LLSD& notification, const LL
     switch(option)
     {
     case 0:  // "Yes"
+// [RLVa:KB] - @share
+        if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canGiveInventory(notification["payload"]["agent_id"].asUUID())) )
+        {
+            RlvUtil::notifyBlocked(RlvStringKeys::Blocked::Share, LLSD().with("RECIPIENT", LLSLURL("agent", notification["payload"]["agent_id"], "completename").getSLURLString()));
+            return false;
+        }
+// [/RLVa:KB]
+
         for (LLSD::array_iterator it = itmes.beginArray(); it != itmes.endArray(); it++)
         {
             item = gInventory.getItem((*it).asUUID());
@@ -375,11 +406,24 @@ bool LLGiveInventory::handleCopyProtectedItem(const LLSD& notification, const LL
 }
 
 // static
-void LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
+//void LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
+//                                              const LLInventoryItem* item,
+//                                              const LLUUID& im_session_id)
+// [RLVa:KB] - @share
+bool LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
                                                 const LLInventoryItem* item,
                                                 const LLUUID& im_session_id)
+// [/RLVa:KB]
 {
-    if (!item) return;
+//  if (!item) return;
+// [RLVa:KB] - @share
+    if (!item) return false;
+    if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canGiveInventory(to_agent)) )
+    {
+        return false;
+    }
+// [/RLVa:KB]
+
     std::string name;
     std::string item_name = item->getName();
     LLAgentUI::buildFullname(name);
@@ -425,7 +469,16 @@ void LLGiveInventory::commitGiveInventoryItem(const LLUUID& to_agent,
     logInventoryOffer(to_agent, im_session_id, item_name);
 
     // add buddy to recent people list
+//  LLRecentPeople::instance().add(to_agent);
+// [RLVa:KB] - Checked: RLVa-2.0.0
+    // Block the recent activity update if this was an in-world drop on an avatar (as opposed to a drop on an IM session or on a profile)
+    if ( (!RlvActions::isRlvEnabled()) ||
+         (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
+    {
     LLRecentPeople::instance().add(to_agent);
+}
+    return true;
+// [/RLVa:KB]
 }
 
 // static
@@ -440,6 +493,14 @@ bool LLGiveInventory::handleCopyProtectedCategory(const LLSD& notification, cons
         cat = gInventory.getCategory(notification["payload"]["folder_id"].asUUID());
         if (cat)
         {
+// [RLVa:KB] - @share
+            if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canGiveInventory(notification["payload"]["agent_id"].asUUID())) )
+            {
+                RlvUtil::notifyBlocked(RlvStringKeys::Blocked::Share, LLSD().with("RECIPIENT", LLSLURL("agent", notification["payload"]["agent_id"], "completename").getSLURLString()));
+                return false;
+            }
+// [/RLVa:KB]
+
             give_successful = LLGiveInventory::commitGiveInventoryCategory(notification["payload"]["agent_id"].asUUID(),
                 cat);
             LLViewerInventoryCategory::cat_array_t cats;
@@ -487,11 +548,26 @@ bool LLGiveInventory::commitGiveInventoryCategory(const LLUUID& to_agent,
     {
         return false;
     }
+// [RLVa:KB] - @share
+    if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canGiveInventory(to_agent)) )
+    {
+        return false;
+    }
+// [/RLVa:KB]
+
     LL_INFOS() << "LLGiveInventory::commitGiveInventoryCategory() - "
         << cat->getUUID() << LL_ENDL;
 
     // add buddy to recent people list
+//  LLRecentPeople::instance().add(to_agent);
+// [RLVa:KB] - Checked: RLVa-2.0.0
+    // Block the recent activity update if this was an in-world drop on an avatar (as opposed to a drop on an IM session or on a profile)
+    if ( (!RlvActions::isRlvEnabled()) ||
+         (RlvActions::canShowName(RlvActions::SNC_DEFAULT, to_agent)) || (im_session_id.notNull()) || (!RlvUtil::isNearbyAgent(to_agent)) || (RlvUIEnabler::hasOpenProfile(to_agent)) )
+    {
     LLRecentPeople::instance().add(to_agent);
+    }
+// [/RLVa:KB]
 
     // Test out how many items are being given.
     LLViewerInventoryCategory::cat_array_t cats;

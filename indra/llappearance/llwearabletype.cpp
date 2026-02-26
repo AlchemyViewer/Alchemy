@@ -49,7 +49,10 @@ LLWearableType::LLWearableDictionary::LLWearableDictionary(LLTranslationBridge::
     addEntry(LLWearableType::WT_TATTOO,       new WearableEntry(trans, "tattoo",      "New Tattoo",     LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_TATTOO, false, true));
     addEntry(LLWearableType::WT_UNIVERSAL,    new WearableEntry(trans, "universal",   "New Universal",     LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_UNIVERSAL, false, true));
 
-    addEntry(LLWearableType::WT_PHYSICS,      new WearableEntry(trans, "physics",     "New Physics",        LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_PHYSICS, true, true));
+// [SL:KB] - Patch: Appearance-Misc | Checked: 2011-05-29 (Catznip-2.6)
+    addEntry(LLWearableType::WT_PHYSICS,      new WearableEntry(trans, "physics",     "New Physics",        LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_PHYSICS, true, false));
+// [/SL:KB]
+//  addEntry(LLWearableType::WT_PHYSICS,      new WearableEntry(trans, "physics",     "New Physics",        LLAssetType::AT_CLOTHING,   LLInventoryType::ICONNAME_CLOTHING_PHYSICS, true, true));
 
     addEntry(LLWearableType::WT_INVALID,      new WearableEntry(trans, "invalid",     "Invalid Wearable",   LLAssetType::AT_NONE,       LLInventoryType::ICONNAME_UNKNOWN, false, false));
     addEntry(LLWearableType::WT_NONE,         new WearableEntry(trans, "none",        "Invalid Wearable",   LLAssetType::AT_NONE,       LLInventoryType::ICONNAME_NONE, false, false));

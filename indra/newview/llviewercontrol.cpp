@@ -78,6 +78,11 @@
 #include "llslurl.h"
 #include "llstartup.h"
 #include "llperfstats.h"
+// [RLVa:KB] - Checked: 2015-12-27 (RLVa-1.5.0)
+#include "llvisualeffect.h"
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 #if LL_DARWIN
 #include "llwindowmacosx.h"
@@ -178,6 +183,15 @@ static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
 
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
+// [RLVa:KB] - @setenv and @setsphere
+    if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canChangeEnvironment() || (LLVfxManager::instance().hasEffect(EVisualEffect::RlvSphere))) &&
+         (LLFeatureManager::getInstance()->isFeatureAvailable("WindLightUseAtmosShaders"))&& (!gSavedSettings.getBOOL("WindLightUseAtmosShaders")) )
+    {
+        gSavedSettings.setBOOL("WindLightUseAtmosShaders", TRUE);
+        return true;
+    }
+// [/RLVa:KB]
+
     // changing shader level may invalidate existing cached bump maps, as the shader type determines the format of the bump map it expects - clear and repopulate the bump cache
     gBumpImageList.destroyGL();
     gBumpImageList.restoreGL();
@@ -874,6 +888,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleHeroProbeResolutionChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleSetShaderChanged);
+// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
+    setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);
+// [/SL:KB]
     setting_setup_signal_listener(gSavedSettings, "RenderPerformanceTest", handleRenderPerfTestChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAvatarCloth", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "ChatFontSize", handleChatFontSizeChanged);
@@ -1002,6 +1019,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "TerrainPaintBitDepth", handleSetShaderChanged);
 
     setting_setup_signal_listener(gSavedPerAccountSettings, "AvatarHoverOffsetZ", handleAvatarHoverOffsetChanged);
+// [RLVa:KB] - Checked: 2015-12-27 (RLVa-1.5.0)
+    gSavedSettings.getControl(RlvSettingNames::Main)->getSignal()->connect(boost::bind(&RlvSettings::onChangedSettingMain, _2));
+// [/RLVa:KB]
 }
 
 #if TEST_CACHED_CONTROL

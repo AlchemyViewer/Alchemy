@@ -45,6 +45,9 @@
 #include "llviewermenu.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+#include "rlvhandler.h"
+// [/RLVa:KB]
 
 class LLPanelTopInfoBar::LLParcelChangeObserver : public LLParcelObserver
 {
@@ -453,6 +456,10 @@ void LLPanelTopInfoBar::onContextMenuItemClicked(const LLSD::String& item)
 {
     if (item == "landmark")
     {
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+        if (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+        {
+// [/RLVa:KB]
         LLViewerInventoryItem* landmark = LLLandmarkActions::findLandmarkForAgentPos();
 
         if(landmark == NULL)
@@ -463,18 +470,33 @@ void LLPanelTopInfoBar::onContextMenuItemClicked(const LLSD::String& item)
         {
             LLFloaterSidePanelContainer::showPanel("places", LLSD().with("type", "landmark").with("id",landmark->getUUID()));
         }
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+        }
+// [/RLVa:KB]
     }
     else if (item == "copy")
     {
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+        if (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+        {
+// [/RLVa:KB]
         LLSLURL slurl;
         LLAgentUI::buildSLURL(slurl, false);
         LLUIString location_str(slurl.getSLURLString());
 
         LLClipboard::instance().copyToClipboard(location_str,0,location_str.length());
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+        }
+// [/RLVa:KB]
     }
 }
 
 void LLPanelTopInfoBar::onInfoButtonClicked()
 {
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
+        return;
+// [/RLVa:KB]
+
     LLFloaterSidePanelContainer::showPanel("places", LLSD().with("type", "agent"));
 }

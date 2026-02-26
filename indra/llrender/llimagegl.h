@@ -185,7 +185,10 @@ public:
     void setUseMipMaps(bool usemips) { mUseMipMaps = usemips; }
     void setHasMipMaps(bool hasmips) { mHasMipMaps = hasmips; }
     void updatePickMask(S32 width, S32 height, const U8* data_in);
-    bool getMask(const LLVector2 &tc);
+// [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
+    bool getMask(const LLVector2 &tc) const;
+// [/RLVa:KB]
+//  bool getMask(const LLVector2 &tc);
 
     void checkTexSize(bool forced = false) const ;
 

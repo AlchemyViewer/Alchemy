@@ -7041,6 +7041,14 @@ The string [STRING_NAME] is missing from strings.xml
   
   <notification
    icon="notifytip.tga"
+   name="ChatSystemMessageTip"
+   log_to_chat="true"
+   type="notifytip">
+[MESSAGE]
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
    name="IMSystemMessageTip"
    log_to_im="true"   
    log_to_chat="false"   
@@ -8062,6 +8070,7 @@ Your object named &lt;nolink&gt;[OBJECTFROMNAME]&lt;/nolink&gt; has given you th
   <notification
    icon="notify.tga"
    name="UserGiveItem"
+   label="Inventory offer from [NAME_LABEL]"
    log_to_im ="true"
    type="offer"
    sound="UISndNewIncomingIMSession">
@@ -8119,6 +8128,7 @@ Your object named &lt;nolink&gt;[OBJECTFROMNAME]&lt;/nolink&gt; has given you th
   <notification
    icon="notify.tga"
    name="TeleportOffered"
+   label="Teleport offer from [NAME_LABEL]"
    log_to_im="true"
    log_to_chat="false"
    fade_toast="false"
@@ -8238,6 +8248,7 @@ Offer a teleport?
   <notification
    icon="notify.tga"
    name="OfferFriendship"
+   label="Friendship offer from [NAME_LABEL]"
    log_to_im="true"
    type="offer">
     <tag>friendship</tag>
@@ -8271,6 +8282,7 @@ Offer a teleport?
   <notification
    icon="notify.tga"
    name="OfferFriendshipNoMessage"
+   label="Friendship offer from [NAME_LABEL]"
    persist="true"
    type="notify">
     <tag>friendship</tag>
@@ -12139,6 +12151,40 @@ An internal error prevented us from properly updating your viewer.  The L$ balan
 Cannot create large prims that intersect other residents.  Please re-try when other residents have moved.
   </notification>
   
+  <notification
+   icon="alertmodal.tga"
+   name="RLVaChangeStrings"
+   type="alertmodal">
+Changes won't take effect until after you restart [APP_NAME].
+  </notification>
+
+  <notification
+   icon="notify.tga"
+   name="RLVaListRequested"
+   label="Restriction request from [NAME_LABEL]"
+   log_to_im="true"
+   log_to_chat="false"
+   type="offer">
+[NAME_SLURL] has requested to be sent a list of your currently active RLV restrictions.
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       default="true"
+       name="Allow"
+       text="Allow"/>
+      <button
+       index="1"
+       name="Always Allow"
+       text="Always Allow"/>
+      <button
+       index="2"
+       name="Deny"
+       text="Deny"/>
+      <ignore text="Confirm before sending anyone a list of my current RLV restrictions."/>
+    </form>
+  </notification>
+
   <notification
    icon="alertmodal.tga"
    name="PreferenceChatClearLog"

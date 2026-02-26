@@ -211,6 +211,7 @@ Learn about [https://community.secondlife.com/knowledgebase/joining-and-particip
              layout="topleft"
              min_dim="100"
              mouse_opaque="false"
+             name="Net Map Panel"
              user_resize="true"
              visibility_control="NearbyListShowMap"
              width="313">

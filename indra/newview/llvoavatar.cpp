@@ -100,6 +100,11 @@
 #include "llanimstatelabels.h"
 #include "lltrans.h"
 #include "llappearancemgr.h"
+// [RLVa:KB] - Checked: RLVa-2.0.1
+#include "rlvactions.h"
+#include "rlvhandler.h"
+#include "rlvmodifiers.h"
+// [/RLVa:KB]
 
 #include "llgesturemgr.h" //needed to trigger the voice gesticulations
 #include "llvoiceclient.h"
@@ -3373,10 +3378,23 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
     static LLCachedControl<F32> FADE_DURATION(gSavedSettings, "RenderNameFadeDuration"); // seconds
     static LLCachedControl<bool> use_chat_bubbles(gSavedSettings, "UseChatBubbles");
 
+// [RLVa:KB] - Checked: RLVa-2.0.1
+    bool fRlvShowAvTag = true, fRlvShowAvName = true;
+    if (RlvActions::isRlvEnabled())
+    {
+        fRlvShowAvTag = RlvActions::canShowNameTag(this);
+        fRlvShowAvName = (fRlvShowAvTag) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, getID()));
+    }
+// [/RLVa:KB]
     bool visible_chat = use_chat_bubbles && (mChats.size() || mTyping);
     bool render_name =  visible_chat ||
-        (((sRenderName == RENDER_NAME_ALWAYS) ||
+// [RLVa:KB] - Checked: RLVa-2.0.1
+        ((fRlvShowAvTag) &&
+         ((sRenderName == RENDER_NAME_ALWAYS) ||
           (sRenderName == RENDER_NAME_FADE && time_visible < NAME_SHOW_TIME)));
+// [/RLVa:KB]
+//      (((sRenderName == RENDER_NAME_ALWAYS) ||
+//        (sRenderName == RENDER_NAME_FADE && time_visible < NAME_SHOW_TIME)));
     // If it's your own avatar, don't draw in mouselook, and don't
     // draw if we're specifically hiding our own name.
     if (isSelf())
@@ -3407,7 +3425,18 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
         new_name = true;
     }
 
-    if (sRenderGroupTitles != mRenderGroupTitles)
+// [RLVa:KB] - Checked: RLVa-0.2.0
+    if (!fRlvShowAvName)
+    {
+        if (mRenderGroupTitles)
+        {
+            mRenderGroupTitles = false;
+            new_name = true;
+        }
+    }
+    else if (sRenderGroupTitles != mRenderGroupTitles)
+// [/RLVa]
+//  if (sRenderGroupTitles != mRenderGroupTitles)
     {
         mRenderGroupTitles = sRenderGroupTitles;
         new_name = true;
@@ -3475,6 +3504,9 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
     // Avatars must have a first and last name
     if (!firstname || !lastname) return;
 
+// [RLVa:KB] - Checked: RLVa-2.0.1
+    bool fRlvShowAvName = RlvActions::canShowName(RlvActions::SNC_DEFAULT, getID());
+// [/RLVa:KB]
     bool is_away = mSignaledAnimations.find(ANIM_AGENT_AWAY)  != mSignaledAnimations.end();
     bool is_do_not_disturb = mSignaledAnimations.find(ANIM_AGENT_DO_NOT_DISTURB) != mSignaledAnimations.end();
     bool is_appearance = mSignaledAnimations.find(ANIM_AGENT_CUSTOMIZE) != mSignaledAnimations.end();
@@ -3487,7 +3519,10 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
     {
         is_muted = isInMuteList();
     }
-    bool is_friend = isBuddy();
+//  bool is_friend = isBuddy();
+// [RLVa:KB] - Checked: RLVa-1.2.2
+    bool is_friend = (fRlvShowAvName) && (isBuddy());
+// [/RLVa:KB]
     bool is_cloud = getHasMissingParts();
 
     if (is_appearance != mNameAppearance)
@@ -3552,7 +3587,10 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
                 LLFontGL::getFontSansSerifSmall());
         }
 
-        if (sRenderGroupTitles
+//      if (sRenderGroupTitles
+// [RLVa:KB] - Checked: RLVa-1.2.2
+        if (sRenderGroupTitles && fRlvShowAvName
+// [/RLVa:KB]
             && title && title->getString() && title->getString()[0] != '\0')
         {
             std::string title_str = title->getString();
@@ -3575,6 +3613,10 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
                 clearNameTag();
             }
 
+// [RLVa:KB] - Checked: RLVa-1.2.2
+            if ( (fRlvShowAvName) || (isSelf()) )
+            {
+// [/RLVa:KB]
             // Might be blank if name not available yet, that's OK
             if (show_display_names)
             {
@@ -3588,12 +3630,25 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
                 LLColor4 username_color = name_tag_color * 0.83f;
                 addNameTagLine(av_name.getUserName(), username_color, LLFontGL::NORMAL,
                     LLFontGL::getFontSansSerifSmall(), true);
+                }
+// [RLVa:KB] - Checked: RLVa-1.2.2
             }
+            else
+            {
+                addNameTagLine(RlvStrings::getAnonym(av_name), name_tag_color, LLFontGL::NORMAL, LLFontGL::getFontSansSerif());
+            }
+// [/RLVa:KB]
         }
         else
         {
             const LLFontGL* font = LLFontGL::getFontSansSerif();
             std::string full_name = LLCacheName::buildFullName( firstname->getString(), lastname->getString() );
+// [RLVa:KB] - Checked: RLVa-1.2.2
+            if ( (!fRlvShowAvName) && (!isSelf()) )
+            {
+                full_name = RlvStrings::getAnonym(full_name);
+            }
+// [/RLVa:KB]
             addNameTagLine(full_name, name_tag_color, LLFontGL::NORMAL, font, true);
         }
 
@@ -3879,7 +3934,14 @@ bool LLVOAvatar::isVisuallyMuted()
     // * check against the render cost and attachment limits
     if (!isSelf())
     {
-        if (mVisuallyMuteSetting == AV_ALWAYS_RENDER)
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+        if (isRlvSilhouette())
+        {
+            muted = true;
+        }
+        else if (mVisuallyMuteSetting == AV_ALWAYS_RENDER)
+// [/RLVa:KB]
+//      if (mVisuallyMuteSetting == AV_ALWAYS_RENDER)
         {
             muted = false;
         }
@@ -3927,6 +3989,30 @@ bool LLVOAvatar::isInMuteList() const
     }
     return muted;
 }
+
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+bool LLVOAvatar::isRlvSilhouette() const
+{
+    if (!RlvActions::hasBehaviour(RLV_BHVR_SETCAM_AVDIST))
+        return false;
+
+    static RlvCachedBehaviourModifier<float> s_nSetCamAvDist(RLV_MODIFIER_SETCAM_AVDIST);
+
+    const F64 now = LLFrameTimer::getTotalSeconds();
+    if (now >= mCachedRlvSilhouetteUpdateTime)
+    {
+        const F64 SECONDS_BETWEEN_SILHOUETTE_UPDATES = .5f;
+        bool fIsRlvSilhouette = dist_vec_squared(gAgent.getPositionGlobal(), getPositionGlobal()) > s_nSetCamAvDist() * s_nSetCamAvDist();
+        if (fIsRlvSilhouette != mCachedIsRlvSilhouette)
+        {
+            mCachedIsRlvSilhouette = fIsRlvSilhouette;
+            mNeedsImpostorUpdate = true;
+        }
+        mCachedRlvSilhouetteUpdateTime = now + SECONDS_BETWEEN_SILHOUETTE_UPDATES;
+    }
+    return mCachedIsRlvSilhouette;
+}
+// [/RLVa:KB]
 
 void LLVOAvatar::updateAppearanceMessageDebugText()
 {
@@ -7910,6 +7996,13 @@ void LLVOAvatar::sitDown(bool bSitting)
     {
         // Update Movement Controls according to own Sitting mode
         LLFloaterMove::setSittingMode(bSitting);
+
+// [RLVa:KB] - Checked: 2010-08-29 (RLVa-1.2.1c) | Modified: RLVa-1.2.1c
+        if (rlv_handler_t::isEnabled())
+        {
+            gRlvHandler.onSitOrStand(bSitting);
+        }
+// [/RLVa:KB]
     }
 }
 
@@ -8151,6 +8244,27 @@ LLViewerObject *    LLVOAvatar::findAttachmentByID( const LLUUID & target_id ) c
 
     return NULL;
 }
+
+// [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
+void LLVOAvatar::rebuildAttachments()
+{
+    for (const auto& kvpAttachPt : mAttachmentPoints)
+    {
+        for (LLViewerObject* pAttachObj : kvpAttachPt.second->mAttachedObjects)
+        {
+            if (LLVOVolume* pAttachVol = (pAttachObj->isMesh()) ? dynamic_cast<LLVOVolume*>(pAttachObj) : nullptr)
+            {
+                pAttachVol->forceLOD(3);
+                for (LLViewerObject* pChildObj : pAttachObj->getChildren())
+                {
+                    if (LLVOVolume* pChildVol = (pChildObj->isMesh()) ? dynamic_cast<LLVOVolume*>(pChildObj) : nullptr)
+                        pAttachVol->forceLOD(3);
+                }
+            }
+        }
+    }
+}
+// [/SL:KB]
 
 // virtual
 void LLVOAvatar::invalidateComposite( LLTexLayerSet* layerset)
@@ -8579,8 +8693,11 @@ bool LLVOAvatar::processFullyLoadedChange(bool loading)
 
 bool LLVOAvatar::isFullyLoaded() const
 {
+// [SL:KB] - Patch: Appearance-SyncAttach | Checked: Catznip-2.2
     static LLCachedControl<bool> render_unloaded_avatar(gSavedSettings, "RenderUnloadedAvatar", false);
-    return (render_unloaded_avatar || mFullyLoaded);
+    return (render_unloaded_avatar && !isSelf()) ||(mFullyLoaded);
+// [/SL:KB]
+//  return (render_unloaded_avatar || mFullyLoaded);
 }
 
 bool LLVOAvatar::hasFirstFullAttachmentData() const
@@ -11615,7 +11732,15 @@ void LLVOAvatar::calcMutedAVColor()
     std::string change_msg;
     LLUUID av_id(getID());
 
-    if (getVisualMuteSettings() == AV_DO_NOT_RENDER)
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+    if (isRlvSilhouette())
+    {
+        new_color = LLColor4::silhouette;
+        change_msg = " not rendered: color is silhouette";
+    }
+    else if (getVisualMuteSettings() == AV_DO_NOT_RENDER)
+// [/RLVa:KB]
+//    if (getVisualMuteSettings() == AV_DO_NOT_RENDER)
     {
         // explicitly not-rendered avatars are light grey
         new_color = LLColor4::grey4;

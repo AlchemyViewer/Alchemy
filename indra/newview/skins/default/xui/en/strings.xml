@@ -32,6 +32,11 @@ SLURL: &lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 [SERVER_VERSION]
 [SERVER_RELEASE_NOTES_URL]
 	</string>
+	<string name="AboutPositionRLVShowLoc">
+You are in [REGION]
+[SERVER_VERSION]
+[SERVER_RELEASE_NOTES_URL]
+	</string>
 	<!-- *NOTE: Do not translate text like GPU, Graphics Card, etc -
        Most PC users who know what these mean will be used to the English versions,
        and this info sometimes gets sent to support. -->
@@ -59,6 +64,7 @@ Disk cache: [DISK_CACHE_INFO]
 HiDPI display mode: [HIDPI]
 	</string>
 	<string name="AboutLibs">
+RestrainedLove API: [RLV_VERSION]
 J2C Decoder Version: [J2C_VERSION]
 Audio Driver Version: [AUDIO_DRIVER_VERSION]
 [LIBCEF_VERSION]
@@ -3722,6 +3728,9 @@ Please reinstall viewer from  https://secondlife.com/support/downloads/ and cont
   <string name="inventory_folder_offered-im">
     Inventory folder '[ITEM_NAME]' offered
   </string>
+  <string name="inventory_item_offered_rlv">
+    Inventory item offered to [NAME]
+  </string>
   <string name="bot_warning">
   You are chatting with a bot, [NAME]. Do not share any personal information.
 Learn more at https://second.life/scripted-agents.
@@ -4287,6 +4296,13 @@ name="Command_360_Capture_Tooltip">Capture a 360 equirectangular image</string>
   <!-- Spell check settings floater -->
   <string name="UserDictionary">[User]</string>
   
+  <!-- RLVa -->
+  <string name="RLVaPendingRestart">(pending restart)</string>
+  <string name="RLVaToggleMessageLogin">RLVa has been [STATE] (no restart required)</string>
+  <string name="RLVaToggleMessageRestart">RLVa will be [STATE] after you restart</string>
+  <string name="RLVaToggleEnabled">enabled</string>
+  <string name="RLVaToggleDisabled">disabled</string>
+   
   <!-- Experience Tools strings -->
   <string name="experience_tools_experience">Experience</string>
   <string name="ExperienceNameNull">(no experience)</string>

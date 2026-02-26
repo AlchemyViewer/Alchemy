@@ -47,6 +47,10 @@
 #include "llwearableitemslist.h"
 #include "llsdserialize.h"
 #include "llclipboard.h"
+// [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
+#include "rlvcommon.h"
+#include "rlvhandler.h"
+// [/RLVa:KB]
 
 // Context menu and Gear menu helper.
 static void edit_outfit()
@@ -128,6 +132,9 @@ protected:
         bool attachments_selected   = false;
         bool can_favorite = false;
         bool can_unfavorite = false;
+// [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
+        S32 rlv_locked_count = 0;
+// [/RLVa:KB]
 
         // See what types of wearables are selected.
         for (uuid_vec_t::const_iterator it = mUUIDs.begin(); it != mUUIDs.end(); ++it)
@@ -158,11 +165,20 @@ protected:
             }
             can_favorite |= !linked_item->getIsFavorite();
             can_unfavorite |= linked_item->getIsFavorite();
+// [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
+            if ( (rlv_handler_t::isEnabled()) && (!rlvPredCanRemoveItem(*it)) )
+            {
+                rlv_locked_count++;
+            }
+// [/RLVa:KB]
         }
 
         // Enable/disable some menu items depending on the selection.
         bool show_touch = !bp_selected && !clothes_selected && attachments_selected;
         bool show_edit = bp_selected || clothes_selected || attachments_selected;
+// [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
+        bool rlv_blocked = (mUUIDs.size() == rlv_locked_count);
+// [/RLVa:KB]
         bool allow_detach = !bp_selected && !clothes_selected && attachments_selected;
         bool allow_take_off = !bp_selected && clothes_selected && !attachments_selected;
 
@@ -172,7 +188,11 @@ protected:
         menu->setItemEnabled("edit_item",          1 == mUUIDs.size() && get_is_item_editable(mUUIDs.front()));
         menu->setItemVisible("take_off",    allow_take_off);
         menu->setItemVisible("detach",      allow_detach);
-        menu->setItemVisible("edit_outfit_separator", show_touch | show_edit | allow_take_off || allow_detach);
+        menu->setItemVisible("edit_outfit_separator", show_touch || show_edit || allow_take_off || allow_detach);
+// [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
+        menu->setItemEnabled("take_off",    !rlv_blocked);
+        menu->setItemEnabled("detach",      !rlv_blocked);
+// [/RLVa:KB]
         menu->setItemVisible("show_original", mUUIDs.size() == 1);
         menu->setItemVisible("favorites_add", can_favorite);
         menu->setItemVisible("favorites_remove", can_unfavorite);

@@ -59,6 +59,11 @@ public:
     // when voice is available
     void onChange(EStatusType status, const LLSD& channelInfo, bool proximal) override;
 
+// [RLVa:KB] - Checked: RLVa-1.2.0
+    LLAvatarList* getNearbyList() { return mNearbyList; }
+    void          updateNearbyList();
+// [/RLVa:KB]
+
     // internals
     class Updater;
 
@@ -80,7 +85,7 @@ private:
     // methods indirectly called by the updaters
     void                    updateFriendListHelpText();
     void                    updateFriendList();
-    void                    updateNearbyList();
+//  void                    updateNearbyList();
     void                    updateRecentList();
 
     bool                    isItemsFreeOfFriends(const uuid_vec_t& uuids);

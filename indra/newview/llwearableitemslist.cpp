@@ -39,6 +39,10 @@
 #include "llviewerattachmenu.h"
 #include "llviewermenu.h"
 #include "llvoavatarself.h"
+// [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
+#include "rlvactions.h"
+#include "rlvlocks.h"
+// [/RLVa:KB]
 
 bool LLFindOutfitItems::operator()(LLInventoryCategory* cat,
                                    LLInventoryItem* item)
@@ -971,6 +975,13 @@ void LLWearableItemsList::ContextMenu::updateItemsVisibility(LLContextMenu* menu
     bool can_favorite = false;
     bool can_unfavorite = false;
 
+// [RLVa:KB] - Checked: 2010-09-04 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
+    // We'll enable a menu option if at least one item in the selection is wearable/removable
+    bool rlvCanWearReplace = !RlvActions::isRlvEnabled();
+    bool rlvCanWearAdd = !RlvActions::isRlvEnabled();
+    bool rlvCanRemove = !RlvActions::isRlvEnabled();
+// [/RLVa:KB]
+
     for (uuid_vec_t::const_iterator it = ids.begin(); it != ids.end(); ++it)
     {
         LLUUID id = *it;
@@ -1025,6 +1036,29 @@ void LLWearableItemsList::ContextMenu::updateItemsVisibility(LLContextMenu* menu
         {
             can_be_worn = get_can_item_be_worn(linked_id);
         }
+
+// [RLVa:KB] - Checked: 2010-09-04 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
+        if (RlvActions::isRlvEnabled())
+        {
+            ERlvWearMask eWearMask = RLV_WEAR_LOCKED;
+            switch (item->getType())
+            {
+                case LLAssetType::AT_BODYPART:
+                case LLAssetType::AT_CLOTHING:
+                    eWearMask = gRlvWearableLocks.canWear(item);
+                    rlvCanRemove |= (is_worn) ? gRlvWearableLocks.canRemove(item) : false;
+                    break;
+                case LLAssetType::AT_OBJECT:
+                    eWearMask = gRlvAttachmentLocks.canAttach(item);
+                    rlvCanRemove |= (is_worn) ? gRlvAttachmentLocks.canDetach(item) : false;
+                    break;
+                default:
+                    break;
+            }
+            rlvCanWearReplace |= ((eWearMask & RLV_WEAR_REPLACE) == RLV_WEAR_REPLACE);
+            rlvCanWearAdd |= ((eWearMask & RLV_WEAR_ADD) == RLV_WEAR_ADD);
+        }
+// [/RLVa:KB]
     } // for
 
     bool standalone = mParent ? mParent->isStandalone() : false;
@@ -1032,10 +1066,15 @@ void LLWearableItemsList::ContextMenu::updateItemsVisibility(LLContextMenu* menu
 
     // *TODO: eliminate multiple traversals over the menu items
     setMenuItemVisible(menu, "wear_wear",           n_already_worn == 0 && n_worn == 0 && can_be_worn);
-    setMenuItemEnabled(menu, "wear_wear",           n_already_worn == 0 && n_worn == 0);
+//  setMenuItemEnabled(menu, "wear_wear",           n_already_worn == 0 && n_worn == 0);
     setMenuItemVisible(menu, "wear_add",            wear_add_visible);
-    setMenuItemEnabled(menu, "wear_add",            LLAppearanceMgr::instance().canAddWearables(ids));
+//  setMenuItemEnabled(menu, "wear_add",            LLAppearanceMgr::instance().canAddWearables(ids));
     setMenuItemVisible(menu, "wear_replace",        n_worn == 0 && n_already_worn != 0 && can_be_worn);
+// [RLVa:KB] - Checked: 2010-09-04 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
+    setMenuItemEnabled(menu, "wear_wear",           n_already_worn == 0 && n_worn == 0 && rlvCanWearReplace);
+    setMenuItemEnabled(menu, "wear_add",            LLAppearanceMgr::instance().canAddWearables(ids) && rlvCanWearAdd);
+    setMenuItemEnabled(menu, "wear_replace",        rlvCanWearReplace);
+// [/RLVa:KB]
     //visible only when one item selected and this item is worn
     setMenuItemVisible(menu, "touch",               !standalone && mask == MASK_ATTACHMENT && n_worn == n_items);
     setMenuItemEnabled(menu, "touch",               n_touchable && n_worn == 1 && n_items == 1);
@@ -1050,7 +1089,12 @@ void LLWearableItemsList::ContextMenu::updateItemsVisibility(LLContextMenu* menu
     setMenuItemVisible(menu, "take_off",            mask == MASK_CLOTHING && n_worn == n_items);
     setMenuItemVisible(menu, "detach",              mask == MASK_ATTACHMENT && n_worn == n_items);
     setMenuItemVisible(menu, "take_off_or_detach",  mask == (MASK_ATTACHMENT|MASK_CLOTHING));
-    setMenuItemEnabled(menu, "take_off_or_detach",  n_worn == n_items);
+//  setMenuItemEnabled(menu, "take_off_or_detach",  n_worn == n_items);
+// [RLVa:KB] - Checked: 2010-09-04 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
+    setMenuItemEnabled(menu, "take_off",            rlvCanRemove);
+    setMenuItemEnabled(menu, "detach",              rlvCanRemove);
+    setMenuItemEnabled(menu, "take_off_or_detach",  (n_worn == n_items) && (rlvCanRemove));
+// [/RLVa:KB]
     setMenuItemVisible(menu, "object_profile",      !standalone);
     setMenuItemEnabled(menu, "object_profile",      n_items == 1);
     setMenuItemVisible(menu, "--no options--",      false);

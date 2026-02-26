@@ -42,6 +42,12 @@
 #include "llstartup.h"
 #include "llstatusbar.h"    // can_afford_transaction()
 #include "groupchatlistener.h"
+// [RLVa:KB] - Checked: 2011-03-28 (RLVa-1.3.0)
+#include "llslurl.h"
+#include "rlvactions.h"
+#include "rlvcommon.h"
+#include "rlvhandler.h"
+// [/RLVa:KB]
 
 //
 // Globals
@@ -248,6 +254,15 @@ void LLGroupActions::startCall(const LLUUID& group_id)
         return;
     }
 
+// [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
+    if (!RlvActions::canStartIM(group_id))
+    {
+        make_ui_sound("UISndInvalidOp");
+        RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartIm, LLSD().with("RECIPIENT", LLSLURL("group", group_id, "about").getSLURLString()));
+        return;
+    }
+// [/RLVa:KB]
+
     LLUUID session_id = gIMMgr->addSession(gdata.mName, IM_SESSION_GROUP_START, group_id, LLSD());
     if (session_id == LLUUID::null)
     {
@@ -321,7 +336,10 @@ bool LLGroupActions::onJoinGroup(const LLSD& notification, const LLSD& response)
 // static
 void LLGroupActions::leave(const LLUUID& group_id)
 {
-    if (group_id.isNull())
+//  if (group_id.isNull())
+// [RLVa:KB] - Checked: RLVa-1.3.0
+    if ( (group_id.isNull()) || ((gAgent.getGroupID() == group_id) && (!RlvActions::canChangeActiveGroup())) )
+// [/RLVa:KB]
     {
         return;
     }
@@ -382,6 +400,13 @@ void LLGroupActions::processLeaveGroupDataResponse(const LLUUID group_id)
 // static
 void LLGroupActions::activate(const LLUUID& group_id)
 {
+// [RLVa:KB] - Checked: RLVa-1.3.0
+    if ( (!RlvActions::canChangeActiveGroup()) && (gRlvHandler.getAgentGroup() != group_id) )
+    {
+        return;
+    }
+// [/RLVa:KB]
+
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_ActivateGroup);
     msg->nextBlockFast(_PREHASH_AgentData);
@@ -486,6 +511,15 @@ void LLGroupActions::closeGroup(const LLUUID& group_id)
 LLUUID LLGroupActions::startIM(const LLUUID& group_id)
 {
     if (group_id.isNull()) return LLUUID::null;
+
+// [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
+    if (!RlvActions::canStartIM(group_id))
+    {
+        make_ui_sound("UISndInvalidOp");
+        RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartIm, LLSD().with("RECIPIENT", LLSLURL("group", group_id, "about").getSLURLString()));
+        return LLUUID::null;
+    }
+// [/RLVa:KB]
 
     LLGroupData group_data;
     if (gAgent.getGroupData(group_id, group_data))

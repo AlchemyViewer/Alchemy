@@ -91,6 +91,11 @@
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
+// [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
+#include "llvisualeffect.h"
+#include "rlvactions.h"
+#include "rlvlocks.h"
+// [/RLVa:KB]
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -598,6 +603,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         LLAppViewer::instance()->pingMainloopTimeout("Display:Teleport");
         // Note: false = not minimized, do update the TP screen. HB
         update_tp_display(false);
+// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
+        LLViewerParcelMgr::getInstance()->onTeleportDone();
+// [/SL:KB]
     }
     else if(LLAppViewer::instance()->logoutRequestSent())
     {
@@ -1273,7 +1281,11 @@ void render_hud_attachments()
     glm::mat4 current_mod = get_current_modelview();
 
     // clamp target zoom level to reasonable values
-    gAgentCamera.mHUDTargetZoom = llclamp(gAgentCamera.mHUDTargetZoom, 0.1f, 1.f);
+//  gAgentCamera.mHUDTargetZoom = llclamp(gAgentCamera.mHUDTargetZoom, 0.1f, 1.f);
+// [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Modified: RLVa-1.0.0c
+    gAgentCamera.mHUDTargetZoom = llclamp(gAgentCamera.mHUDTargetZoom, (!gRlvAttachmentLocks.hasLockedHUD()) ? 0.1f : 0.85f, 1.f);
+// [/RLVa:KB]
+
     // smoothly interpolate current zoom level
     gAgentCamera.mHUDCurZoom = lerp(gAgentCamera.mHUDCurZoom, gAgentCamera.getAgentHUDTargetZoom(), LLSmoothInterpolation::getInterpolant(0.03f));
 
@@ -1498,6 +1510,12 @@ void render_ui(F32 zoom_factor, int subfield)
         LL_PROFILE_ZONE_NAMED_CATEGORY_UI("HUD");
         render_hud_elements();
         LLGLState::checkStates();
+// [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
+        if (RlvActions::hasBehaviour(RLV_BHVR_SETOVERLAY))
+        {
+            LLVfxManager::instance().runEffect(EVisualEffect::RlvOverlay);
+        }
+// [/RLVa:KB]
         render_hud_attachments();
 
         LLGLState::checkStates();

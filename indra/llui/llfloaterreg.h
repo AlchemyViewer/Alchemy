@@ -34,6 +34,10 @@
 #include <functional>
 #include <list>
 #include <unordered_set>
+// [RLVa:KB] - Checked: 2011-05-25 (RLVa-1.4.0a)
+#include <boost/signals2.hpp>
+#include "llboost.h"
+// [/RLVa:KB]
 
 //*******************************************************
 //
@@ -77,6 +81,15 @@ private:
     using always_showable_t = std::unordered_set<std::string, ll::string_hash, std::equal_to<>>;
     static always_showable_t sAlwaysShowableList;
 
+// [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
+    // Used to determine whether a floater can be shown
+public:
+    typedef boost::signals2::signal<bool(const std::string&, const LLSD&), boost_boolean_combiner> validate_signal_t;
+    static boost::signals2::connection setValidateCallback(const validate_signal_t::slot_type& cb) { return mValidateSignal.connect(cb); }
+private:
+    static validate_signal_t mValidateSignal;
+// [/RLVa:KB]
+
 public:
     // Registration
 
@@ -106,6 +119,10 @@ public:
     static const_instance_list_t& getFloaterList(std::string_view name);
 
     // Visibility Management
+// [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
+    // return false if floater can not be shown (=doesn't pass the validation filter)
+    static bool canShowInstance(const std::string& name, const LLSD& key = LLSD());
+// [/RLVa:KB]
     // return NULL if instance not found or can't create instance (no builder)
     static LLFloater* showInstance(std::string_view name, const LLSD& key = LLSD(), bool focus = false);
     // Close a floater (may destroy or set invisible)

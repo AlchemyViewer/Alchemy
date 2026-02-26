@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <toggleable_menu
  height="101"
  layout="topleft"
@@ -95,6 +95,7 @@
      layout="topleft"
      name="Pay">
        <on_click function="AvatarIcon.Action" parameter="pay" />
+       <on_enable function="AvatarIcon.Enable" parameter="can_pay" />
     </menu_item_call>
     <menu_item_call
      label="Report Abuse"

@@ -71,8 +71,11 @@ void LLDrawPoolTree::renderDeferred(S32 pass)
         return;
     }
 
-
-    gGL.getTexUnit(sDiffTex)->bindFast(mTexturep);
+// [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
+    LLViewerTexture* pTexture = (LLPipeline::sRenderTextures) ? mTexturep.get() : LLViewerFetchedTexture::sDefaultDiffuseImagep.get();
+    gGL.getTexUnit(sDiffTex)->bindFast(pTexture);
+// [/SL:KB]
+//  gGL.getTexUnit(sDiffTex)->bindFast(mTexturep);
     mTexturep->addTextureStats(1024.f * 1024.f); // <=== keep Linden tree textures at full res
 
     for (std::vector<LLFace*>::iterator iter = mDrawFace.begin();

@@ -56,6 +56,10 @@
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
 #include "lltrans.h"
+// [RLVa:KB] - Checked: 2010-04-19 (RLVa-1.2.0f)
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 #include "llglheaders.h"
 
@@ -515,7 +519,10 @@ void LLWorldMapView::draw()
         }
 
         // Draw the region name in the lower left corner
-        if (mMapScale >= DRAW_TEXT_THRESHOLD)
+// [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
+        if ( (mMapScale >= DRAW_TEXT_THRESHOLD) && (RlvActions::canShowLocation()) )
+// [/RLVa:KB]
+//      if (mMapScale >= DRAW_TEXT_THRESHOLD)
         {
             static LLCachedControl<bool> print_coords(gSavedSettings, "MapShowGridCoords");
             static LLFontGL* font = LLFontGL::getFontSansSerifSmallBold();
@@ -1063,7 +1070,10 @@ void LLWorldMapView::drawTracking(const LLVector3d& pos_global, const LLColor4& 
         drawImage(pos_global, sTrackCircleImage, color);
     }
 
-    if (label != "")
+//  if (label != "")
+// [RLVa:KB] - Checked: 2009-07-04 (RLVa-1.4.5) | Added: RLVa-1.0.0
+    if ( (label != "") && (RlvActions::canShowLocation()) )
+// [/RLVa:KB]
     {
         // clamp text position to on-screen
         const S32 TEXT_PADDING = DEFAULT_TRACKING_ARROW_SIZE + 2;
@@ -1131,7 +1141,12 @@ bool LLWorldMapView::handleToolTip( S32 x, S32 y, MASK mask )
     {
         LLViewerRegion *region = gAgent.getRegion();
 
-        std::string message = llformat("%s (%s)", info->getName().c_str(), info->getAccessString().c_str());
+// [RLVa:KB] - Checked: 2010-04-19 (RLVa-1.4.5) | Modified: RLVa-1.4.5
+        std::string message = llformat("%s (%s)",
+            (RlvActions::canShowLocation()) ? info->getName().c_str() : RlvStrings::getString(RlvStringKeys::Hidden::Region).c_str(),
+            info->getAccessString().c_str());
+// [/RLVa:KB]
+//      std::string message = llformat("%s (%s)", info->getName().c_str(), info->getAccessString().c_str());
 
         if (!info->isDown())
         {

@@ -684,6 +684,12 @@ public:
     static S32              sVisibleLightCount;
     static bool             sRenderingHUDs;
     static F32              sDistortionWaterClipPlaneMargin;
+// [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
+    static bool             sRenderTextures;
+// [/SL:KB]
+// [RLVa:KB] - @setsphere
+    static bool             sUseDepthTexture;
+// [/RLVa:KB]
 
     static LLTrace::EventStatHandle<S64> sStatBatchSize;
 
@@ -1010,6 +1016,9 @@ public:
     static F32 RenderDeferredSunWash;
     static U32 RenderFSAAType;
     static U32 RenderResolutionDivisor;
+// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
+    static F32 RenderResolutionMultiplier;
+// [/SL:KB]
     static bool RenderUIBuffer;
     static S32 RenderShadowDetail;
     static S32 RenderShadowSplits;

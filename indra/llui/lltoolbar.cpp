@@ -1228,6 +1228,9 @@ void LLToolBarButton::setEnabled(bool enabled)
         mImageOverlayColor = mImageOverlayDisabledColor;
         mImageOverlaySelectedColor = mImageOverlayDisabledColor;
     }
+// [RLVa:KB] - Checked: 2011-12-17 (RLVa-1.4.5a) | Added: RLVa-1.4.5a
+    LLButton::setEnabled(enabled);
+// [/RLVa:KB]
 }
 
 const std::string LLToolBarButton::getToolTip() const

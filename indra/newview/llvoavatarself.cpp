@@ -61,6 +61,15 @@
 #include "llsdserialize.h"
 #include "llcorehttputil.h"
 #include "lluiusage.h"
+// [RLVa:KB] - Checked: RLVa-2.0.2
+#include "rlvhandler.h"
+#include "rlvhelper.h"
+#include "rlvlocks.h"
+// [/RLVa:KB]
+// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
+#include "llviewerparcelmgr.h"
+extern bool gTeleportDisplay;
+// [/SL:KB]
 
 #include <boost/lexical_cast.hpp>
 
@@ -151,6 +160,9 @@ LLVOAvatarSelf::LLVOAvatarSelf(const LLUUID& id,
                                const LLPCode pcode,
                                LLViewerRegion* regionp) :
     LLVOAvatar(id, pcode, regionp),
+// [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
+    mAttachmentSignal(NULL),
+// [/RLVa:KB]
     mScreenp(NULL),
     mLastRegionHandle(0),
     mRegionCrossingCount(0),
@@ -211,6 +223,10 @@ void LLVOAvatarSelf::initInstance()
         mDebugBakedTextureTimes[i][0] = -1.0f;
         mDebugBakedTextureTimes[i][1] = -1.0f;
     }
+
+// [RLVa:KB] - Checked: 2010-12-12 (RLVa-1.2.2c) | Added: RLVa-1.2.2c
+    RlvAttachPtLookup::initLookupTable();
+// [/RLVa:KB]
 
     status &= buildMenus();
     if (!status)
@@ -441,6 +457,7 @@ bool LLVOAvatarSelf::buildMenus()
                     item_params.name =(item_params.label );
                     item_params.on_click.function_name = "Object.AttachToAvatar";
                     item_params.on_click.parameter = iter->first;
+                    // [RLVa:KB] - No changes, but we do need the parameter to always be idxAttachPt for object_selected_and_point_valid()
                     item_params.on_enable.function_name = "Object.EnableWear";
                     item_params.on_enable.parameter = iter->first;
                     LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(item_params);
@@ -516,6 +533,7 @@ bool LLVOAvatarSelf::buildMenus()
             item_params.name =(item_params.label );
             item_params.on_click.function_name = "Object.AttachToAvatar";
             item_params.on_click.parameter = iter->first;
+            // [RLVa:KB] - No changes, but we do need the parameter to always be idxAttachPt for object_selected_and_point_valid()
             item_params.on_enable.function_name = "Object.EnableWear";
             item_params.on_enable.parameter = iter->first;
             LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(item_params);
@@ -561,6 +579,7 @@ bool LLVOAvatarSelf::buildMenus()
             item_params.name =(item_params.label );
             item_params.on_click.function_name = "Object.AttachToAvatar";
             item_params.on_click.parameter = iter->first;
+            // [RLVa:KB] - No changes, but we do need the parameter to always be idxAttachPt for object_selected_and_point_valid()
             item_params.on_enable.function_name = "Object.EnableWear";
             item_params.on_enable.parameter = iter->first;
             //* TODO: Skinning:
@@ -627,6 +646,7 @@ bool LLVOAvatarSelf::buildMenus()
                 item_params.label = LLTrans::getString(attachment->getName());
                 item_params.on_click.function_name = "Object.AttachToAvatar";
                 item_params.on_click.parameter = attach_index;
+                // [RLVa:KB] - No changes, but we do need the parameter to always be idxAttachPt for object_selected_and_point_valid()
                 item_params.on_enable.function_name = "Object.EnableWear";
                 item_params.on_enable.parameter = attach_index;
 
@@ -656,6 +676,10 @@ void LLVOAvatarSelf::cleanup()
 LLVOAvatarSelf::~LLVOAvatarSelf()
 {
     cleanup();
+
+// [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
+    delete mAttachmentSignal;
+// [/RLVa:KB]
 }
 
 /**
@@ -1063,12 +1087,25 @@ void LLVOAvatarSelf::updateAttachmentVisibility(U32 camera_mode)
         }
         else
         {
+// [RLVa:KB] - Checked: RLVa-2.0.2
+            bool fRlvCanShowAttachment = true;
+            if (rlv_handler_t::isEnabled())
+            {
+                fRlvCanShowAttachment =
+                    (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELF)) &&
+                    ( (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELFHEAD)) || (RLV_ATTACHGROUP_HEAD != rlvAttachGroupFromIndex(attachment->getGroup())) );
+            }
+// [/RLVa:KB]
+
             switch (camera_mode)
             {
                 case CAMERA_MODE_MOUSELOOK:
                     if ((LLVOAvatar::sVisibleInFirstPerson && attachment->getVisibleInFirstPerson()) || gPipeline.mHeroProbeManager.isMirrorPass())
                     {
-                        attachment->setAttachmentVisibility(true);
+// [RLVa:KB] - Checked: RLVa-2.0.2
+                        attachment->setAttachmentVisibility(fRlvCanShowAttachment);
+// [/RLVa:KB]
+//                      attachment->setAttachmentVisibility(true);
                     }
                     else
                     {
@@ -1076,7 +1113,10 @@ void LLVOAvatarSelf::updateAttachmentVisibility(U32 camera_mode)
                     }
                     break;
                 default:
-                    attachment->setAttachmentVisibility(true);
+// [RLVa:KB] - Checked: RLVa-2.0.2
+                    attachment->setAttachmentVisibility(fRlvCanShowAttachment);
+// [/RLVa:KB]
+//                  attachment->setAttachmentVisibility(true);
                     break;
             }
         }
@@ -1157,6 +1197,28 @@ LLViewerObject* LLVOAvatarSelf::getWornAttachment(const LLUUID& inv_item_id)
     return NULL;
 }
 
+// [RLVa:KB] - Checked: 2012-07-28 (RLVa-1.4.7)
+boost::signals2::connection LLVOAvatarSelf::setAttachmentCallback(const attachment_signal_t::slot_type& cb)
+{
+    if (!mAttachmentSignal)
+        mAttachmentSignal = new attachment_signal_t();
+    return mAttachmentSignal->connect(cb);
+}
+// [/RLVa:KB]
+// [RLVa:KB] - Checked: 2010-03-14 (RLVa-1.2.0a) | Modified: RLVa-1.2.0a
+LLViewerJointAttachment* LLVOAvatarSelf::getWornAttachmentPoint(const LLUUID& idItem) const
+{
+    const LLUUID& idItemBase = gInventory.getLinkedItemID(idItem);
+    for (attachment_map_t::const_iterator itAttachPt = mAttachmentPoints.begin(); itAttachPt != mAttachmentPoints.end(); ++itAttachPt)
+    {
+        LLViewerJointAttachment* pAttachPt = itAttachPt->second;
+        if (pAttachPt->getAttachedObject(idItemBase))
+            return pAttachPt;
+    }
+    return NULL;
+}
+// [/RLVa:KB]
+
 bool LLVOAvatarSelf::getAttachedPointName(const LLUUID& inv_item_id, std::string& name) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
@@ -1206,6 +1268,22 @@ const LLViewerJointAttachment *LLVOAvatarSelf::attachObject(LLViewerObject *view
         const LLUUID& attachment_id = viewer_object->getAttachmentItemID();
         LLAppearanceMgr::instance().registerAttachment(attachment_id);
         updateLODRiggedAttachments();
+
+// [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Modified: RLVa-1.2.1a
+        // NOTE: RLVa event handlers should be invoked *after* LLVOAvatar::attachObject() calls LLViewerJointAttachment::addObject()
+        if (mAttachmentSignal)
+        {
+            (*mAttachmentSignal)(viewer_object, attachment, ACTION_ATTACH);
+        }
+        if (rlv_handler_t::isEnabled())
+        {
+            RlvAttachmentLockWatchdog::instance().onAttach(viewer_object, attachment);
+            gRlvHandler.onAttach(viewer_object, attachment);
+
+            if ( (attachment->getIsHUDAttachment()) && (!gRlvAttachmentLocks.hasLockedHUD()) )
+                gRlvAttachmentLocks.updateLockedHUD();
+        }
+// [/RLVa:KB]
     }
 
     return attachment;
@@ -1215,6 +1293,27 @@ const LLViewerJointAttachment *LLVOAvatarSelf::attachObject(LLViewerObject *view
 bool LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
 {
     const LLUUID attachment_id = viewer_object->getAttachmentItemID();
+
+// [RLVa:KB] - Checked: 2010-03-05 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
+    // NOTE: RLVa event handlers should be invoked *before* LLVOAvatar::detachObject() calls LLViewerJointAttachment::removeObject()
+    if (rlv_handler_t::isEnabled())
+    {
+        for (attachment_map_t::const_iterator itAttachPt = mAttachmentPoints.begin(); itAttachPt != mAttachmentPoints.end(); ++itAttachPt)
+        {
+            const LLViewerJointAttachment* pAttachPt = itAttachPt->second;
+            if (pAttachPt->isObjectAttached(viewer_object))
+            {
+                RlvAttachmentLockWatchdog::instance().onDetach(viewer_object, pAttachPt);
+                gRlvHandler.onDetach(viewer_object, pAttachPt);
+            }
+            if (mAttachmentSignal)
+            {
+                (*mAttachmentSignal)(viewer_object, pAttachPt, ACTION_DETACH);
+            }
+        }
+    }
+// [/RLVa:KB]
+
     if ( LLVOAvatar::detachObject(viewer_object) )
     {
         // the simulator should automatically handle permission revocation
@@ -1247,6 +1346,11 @@ bool LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
             LLAppearanceMgr::instance().unregisterAttachment(attachment_id);
         }
 
+// [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Added: RLVa-1.2.1a
+        if ( (rlv_handler_t::isEnabled()) && (viewer_object->isHUDAttachment()) && (gRlvAttachmentLocks.hasLockedHUD()) )
+            gRlvAttachmentLocks.updateLockedHUD();
+// [/RLVa:KB]
+
         return true;
     }
     return false;
@@ -1277,7 +1381,10 @@ bool LLVOAvatarSelf::hasAttachmentsInTrash()
 bool LLVOAvatarSelf::detachAttachmentIntoInventory(const LLUUID &item_id)
 {
     LLInventoryItem* item = gInventory.getItem(item_id);
-    if (item)
+//  if (item)
+// [RLVa:KB] - Checked: 2010-09-04 (RLVa-1.2.1c) | Added: RLVa-1.2.1c
+    if ( (item) && ((!rlv_handler_t::isEnabled()) || (gRlvAttachmentLocks.canDetach(item))) )
+// [/RLVa:KB]
     {
         gMessageSystem->newMessageFast(_PREHASH_DetachAttachmentIntoInv);
         gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
@@ -2909,3 +3016,57 @@ void LLVOAvatarSelf::dumpWearableInfo(LLAPRFile& outfile)
     }
     apr_file_printf( file, "\n</wearable_info>\n" );
 }
+
+//// [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
+//void LLVOAvatarSelf::addPendingDetach(const LLUUID& idObject)
+//{
+//  if (mPendingObjectDetach.end() == std::find(mPendingObjectDetach.begin(), mPendingObjectDetach.end(), idObject))
+//      mPendingObjectDetach.push_back(idObject);
+//
+//  if ((!mPendingObjectDetach.empty()) && (!mTeleportDoneConn.connected()))
+//      mTeleportDoneConn = LLViewerParcelMgr::instance().setTeleportDoneCallback(boost::bind(&LLVOAvatarSelf::onTeleportDone, this));
+//}
+//
+//bool LLVOAvatarSelf::isPendingDetach(const LLUUID& idObject) const
+//{
+//  return mPendingObjectDetach.end() != std::find(mPendingObjectDetach.begin(), mPendingObjectDetach.end(), idObject);
+//}
+//
+//void LLVOAvatarSelf::removePendingDetach(const LLUUID& idObject)
+//{
+//  auto itPendingDetach = std::find(mPendingObjectDetach.begin(), mPendingObjectDetach.end(), idObject);
+//  if (mPendingObjectDetach.end() != itPendingDetach)
+//      mPendingObjectDetach.erase(itPendingDetach);
+//
+//  if (mPendingObjectDetach.empty())
+//      mTeleportDoneConn.disconnect();
+//}
+//
+//void LLVOAvatarSelf::onTeleportDone()
+//{
+//  mTeleportDoneConn.disconnect();
+//  doAfterInterval(boost::bind(&LLVOAvatarSelf::checkPendingDetach, this), 30.f);
+//}
+//
+//void LLVOAvatarSelf::checkPendingDetach()
+//{
+//  if (gTeleportDisplay)
+//      return;
+//
+//  for (const LLUUID& idObj : mPendingObjectDetach)
+//  {
+//      LLViewerObject* pObject = gObjectList.findObject(idObj);
+//      if (pObject)
+//      {
+//          gObjectList.killObject(pObject);
+//          if (gShowObjectUpdates)
+//          {
+//              LLColor4 color(0.f, 1.f, 0.f, 1.f);
+//              gPipeline.addDebugBlip(pObject->getPositionAgent(), color);
+//          }
+//          LLSelectMgr::getInstance()->removeObjectFromSelections(idObj);
+//      }
+//  }
+//  mPendingObjectDetach.clear();
+//}
+//// [/SL:KB]

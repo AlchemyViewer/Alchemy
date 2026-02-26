@@ -494,7 +494,9 @@ public:
     U32         renderImpostor(LLColor4U color = LLColor4U(255,255,255,255), S32 diffuse_channel = 0);
     bool        isVisuallyMuted();
     bool        isInMuteList() const;
-
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+    bool        isRlvSilhouette() const;
+// [/RLVa:KB]
     // states for RenderAvatarComplexityMode
     enum ERenderComplexityMode
     {
@@ -591,6 +593,10 @@ private:
     mutable F64         mCachedMuteListUpdateTime;
     mutable bool        mCachedInBuddyList = false;
     mutable F64         mCachedBuddyListUpdateTime = 0.0;
+// [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
+    mutable bool        mCachedIsRlvSilhouette = false;
+    mutable F64         mCachedRlvSilhouetteUpdateTime = 0.f;
+// [/RLVa:KB]
 
     VisualMuteSettings      mVisuallyMuteSetting;           // Always or never visually mute this AV
 
@@ -652,7 +658,10 @@ public:
     static void resetImpostors();
     static void updateImpostors();
     LLRenderTarget mImpostor;
-    bool        mNeedsImpostorUpdate;
+// [RLVa:KB] - Checked: RLVa-2.4 (@setcam_avdist)
+    mutable bool mNeedsImpostorUpdate;
+// [/RLVa:KB]
+//  bool        mNeedsImpostorUpdate;
     S32         mLastImpostorUpdateReason;
     F32SecondsImplicit mLastImpostorUpdateFrameTime;
     const LLVector3*  getLastAnimExtents() const { return mLastAnimExtents; }
@@ -937,6 +946,9 @@ public:
     /*virtual*/ bool    isWearingWearableType(LLWearableType::EType type ) const;
     LLViewerObject *    findAttachmentByID( const LLUUID & target_id ) const;
     LLViewerJointAttachment* getTargetAttachmentPoint(LLViewerObject* viewer_object);
+// [SL:KB] - Patch: Appearance-RefreshAttachments | Checked: Catznip-5.3
+    void                rebuildAttachments();
+// [/SL:KB]
 
 protected:
     void                lazyAttach();

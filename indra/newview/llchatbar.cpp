@@ -59,6 +59,10 @@
 #include "llui.h"
 #include "lluictrlfactory.h"
 #include "lluiusage.h"
+// [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b)
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 //
 // Globals
@@ -78,7 +82,10 @@ private:
 };
 
 
-extern void send_chat_from_viewer(const std::string& utf8_out_text, EChatType type, S32 channel);
+//extern void send_chat_from_viewer(const std::string& utf8_out_text, EChatType type, S32 channel);
+// [RLVa:KB] - Checked: 2010-02-27 (RLVa-0.2.2)
+extern void send_chat_from_viewer(std::string utf8_out_text, EChatType type, S32 channel);
+// [/RLVa:KB]
 
 //
 // Functions
@@ -583,6 +590,16 @@ void LLChatBar::sendChatFromViewer(const LLWString &wtext, EChatType type, bool 
     {
         utf8_text = utf8str_truncate(utf8_text, MAX_STRING - 1);
     }
+
+// [RLVa:KB] - Checked: 2010-03-27 (RLVa-1.2.0b) | Modified: RLVa-1.2.0b
+    // RELEASE-RLVa: [SL-2.0.0] This entire class appears to be dead/non-functional?
+    if ( (0 == channel) && (RlvActions::isRlvEnabled()) )
+    {
+        // Adjust the (public) chat "volume" on chat and gestures (also takes care of playing the proper animation)
+        type = RlvActions::checkChatVolume(type);
+        animate &= !RlvActions::hasBehaviour( (!RlvUtil::isEmote(utf8_text)) ? RLV_BHVR_REDIRCHAT : RLV_BHVR_REDIREMOTE );
+    }
+// [/RLVa:KB]
 
     // Don't animate for chats people can't hear (chat to scripts)
     if (animate && (channel == 0))

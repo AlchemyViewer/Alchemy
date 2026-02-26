@@ -59,7 +59,12 @@ enum ECameraPreset
     CAMERA_PRESET_GROUP_VIEW,
 
     /** Current view when a preset is saved */
-    CAMERA_PRESET_CUSTOM
+    CAMERA_PRESET_CUSTOM,
+
+// [RLVa:KB] - @setcam_eyeoffset and @setcam_focusoffset
+    /* Used by RLVa */
+    CAMERA_RLV_SETCAM_VIEW,
+// [/RLVa:KB]
 };
 
 //------------------------------------------------------------------------
@@ -115,6 +120,10 @@ public:
     ECameraPreset getCameraPreset() const { return mCameraPreset; }
     /** Determines default camera offset depending on the current camera preset */
     LLVector3 getCameraOffsetInitial();
+// [RLVa:KB] - @setcam_eyeoffsetscale
+    /** Determines default camera offset scale depending on the current camera preset */
+    F32 getCameraOffsetScale() const;
+// [/RLVa:KB]
     /** Determines default focus offset depending on the current camera preset */
     LLVector3d getFocusOffsetInitial();
 
@@ -317,6 +326,18 @@ public:
     F32             mHUDTargetZoom; // Target zoom level for HUD objects (used when editing)
     F32             mHUDCurZoom;    // Current animated zoom level for HUD objects
 
+// [RLVa:KB] - Checked: RLVa-2.0.0
+    //--------------------------------------------------------------------
+    // RLVa
+    //--------------------------------------------------------------------
+protected:
+    bool allowFocusOffsetChange(const LLVector3d& offsetFocus);
+    bool clampCameraPosition(LLVector3d& posCamGlobal, const LLVector3d posCamRefGlobal, float nDistMin, float nDistMax);
+
+    bool m_fRlvMaxDist;             // True if the camera is at max distance
+    bool m_fRlvMinDist;             // True if the camera is at min distance
+    LLVector3d m_posRlvRefGlobal;       // Current reference point for distance calculations
+// [/RLVa:KB]
 
 /********************************************************************************
  **                                                                            **

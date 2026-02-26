@@ -46,6 +46,10 @@ LLFloaterReg::always_showable_t LLFloaterReg::sAlwaysShowableList;
 
 static LLFloaterRegListener sFloaterRegListener;
 
+// [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
+LLFloaterReg::validate_signal_t LLFloaterReg::mValidateSignal;
+// [/RLVa:KB]
+
 //*******************************************************
 
 //static
@@ -261,12 +265,23 @@ LLFloaterReg::const_instance_list_t& LLFloaterReg::getFloaterList(std::string_vi
 
 // Visibility Management
 
+// [RLVa:KB] - Checked: 2012-02-07 (RLVa-1.4.5) | Added: RLVa-1.4.5
+//static
+bool LLFloaterReg::canShowInstance(const std::string& name, const LLSD& key)
+{
+    return mValidateSignal(name, key);
+}
+// [/RLVa:KB]
+
 //static
 LLFloater* LLFloaterReg::showInstance(std::string_view name, const LLSD& key, bool focus)
 {
-    if( sBlockShowFloaters
-            // see EXT-7090
-            && sAlwaysShowableList.find(name) == sAlwaysShowableList.end())
+//  if( sBlockShowFloaters
+//          // see EXT-7090
+//          && sAlwaysShowableList.find(name) == sAlwaysShowableList.end())
+// [RLVa:KB] - Checked: 2010-02-28 (RLVa-1.4.0a) | Modified: RLVa-1.2.0a
+    if ( (sBlockShowFloaters && sAlwaysShowableList.find(name) == sAlwaysShowableList.end()) || (!mValidateSignal(std::string(name), key)) )
+// [/RLVa:KB]
         return 0;//
     LLFloater* instance = getInstance(name, key);
     if (instance)

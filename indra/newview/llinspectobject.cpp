@@ -39,6 +39,11 @@
 #include "llviewermediafocus.h"
 #include "llviewerobjectlist.h" // to select the requested object
 #include "llvoavatarself.h"
+// [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0c)
+#include "rlvactions.h"
+#include "rlvcommon.h"
+#include "lltoolpie.h"
+// [/RLVa:KB]
 
 // Linden libraries
 #include "llbutton.h"           // setLabel(), not virtual!
@@ -357,6 +362,10 @@ void LLInspectObject::updateButtons(LLSelectNode* nodep)
         || (parent && parent->flagHandleTouch()))
     {
         getChild<LLUICtrl>("touch_btn")->setVisible(true);
+// [RLVa:KB] - Checked: RLVa-1.2.1
+        if (RlvActions::isRlvEnabled())
+            getChild<LLUICtrl>("touch_btn")->setEnabled(RlvActions::canTouch(object));
+// [/RLVa:KB]
         updateTouchLabel(nodep);
     }
     else if ( enable_object_open() )
@@ -386,6 +395,15 @@ void LLInspectObject::updateSitLabel(LLSelectNode* nodep)
     {
         sit_btn->setLabel( getString("Sit") );
     }
+
+// [RLVa:KB] - Checked: 2010-03-06 (RLVa-1.2.0c) | Added: RLVa-1.2.0a
+    // RELEASE-RLVa: [SL-2.0.0] Make sure we're examining the same object that handle_sit_or_stand() will request a sit for
+    if (RlvActions::isRlvEnabled())
+    {
+        const LLPickInfo& pick = LLToolPie::getInstance()->getPick();
+        sit_btn->setEnabled( (pick.mObjectID.notNull()) && (RlvActions::canSit(pick.getObject(), pick.mObjectOffset)) );
+    }
+// [/RLVa:KB]
 }
 
 void LLInspectObject::updateTouchLabel(LLSelectNode* nodep)
@@ -481,8 +499,13 @@ void LLInspectObject::updateCreator(LLSelectNode* nodep)
         // a clickable link
         // Objects cannot be created by a group, so use agent URL format
         LLUUID creator_id = nodep->mPermissions->getCreator();
-        std::string creator_url =
-            LLSLURL("agent", creator_id, "about").getSLURLString();
+//      std::string creator_url =
+//          LLSLURL("agent", creator_id, "about").getSLURLString();
+// [RLVa:KB] - Checked: RLVa-1.2.2
+        // Only anonymize the creator if they're also the owner or if they're a nearby avie
+        bool fRlvHideCreator = (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, creator_id)) && ((nodep->mPermissions->getOwner() == creator_id) || (RlvUtil::isNearbyAgent(creator_id)));
+        const std::string creator_url = LLSLURL("agent", creator_id, (!fRlvHideCreator) ? "about" : "rlvanonym").getSLURLString();
+// [/RLVa:KB]
         args["[CREATOR]"] = creator_url;
 
         // created by one user but owned by another
@@ -497,7 +520,11 @@ void LLInspectObject::updateCreator(LLSelectNode* nodep)
         else
         {
             owner_id = nodep->mPermissions->getOwner();
-            owner_url = LLSLURL("agent", owner_id, "about").getSLURLString();
+//          owner_url = LLSLURL("agent", owner_id, "about").getSLURLString();
+// [RLVa:KB] - Checked: RLVa-1.2.2
+            bool fRlvHideOwner = (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, owner_id));
+            owner_url = LLSLURL("agent", owner_id, (!fRlvHideOwner) ? "about" : "rlvanonym").getSLURLString();
+// [/RLVa:KB]
         }
         args["[OWNER]"] = owner_url;
 

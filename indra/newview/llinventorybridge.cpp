@@ -85,6 +85,12 @@
 
 #include "llenvironment.h"
 
+// [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1)
+#include "rlvactions.h"
+#include "rlvhandler.h"
+#include "rlvlocks.h"
+// [/RLVa:KB]
+
 void copy_slurl_to_clipboard_callback_inv(const std::string& slurl);
 
 const F32 SOUND_GAIN = 1.0f;
@@ -1011,6 +1017,20 @@ void LLInvFVBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
 
         addOpenRightClickMenuOption(items);
         items.push_back(std::string("Properties"));
+
+// [RLVa:KB] - Checked: 2010-03-01 (RLVa-1.2.0b) | Modified: RLVa-1.1.0a
+        if (rlv_handler_t::isEnabled())
+        {
+            const LLInventoryObject* pItem = getInventoryObject();
+            if ( (pItem) &&
+                 ( ((LLAssetType::AT_NOTECARD == pItem->getType()) && (gRlvHandler.hasBehaviour(RLV_BHVR_VIEWNOTE))) ||
+                   ((LLAssetType::AT_LSL_TEXT == pItem->getType()) && (gRlvHandler.hasBehaviour(RLV_BHVR_VIEWSCRIPT))) ||
+                   ((LLAssetType::AT_TEXTURE == pItem->getType()) && (!RlvActions::canPreviewTextures()))))
+            {
+                disabled_items.push_back(std::string("Open"));
+            }
+        }
+// [/RLVa:KB]
 
         getClipboardEntries(true, items, disabled_items, flags);
     }
@@ -2154,6 +2174,13 @@ bool LLItemBridge::isItemRenameable() const
             return false;
         }
 
+// [RLVa:KB] - Checked: 2011-03-29 (RLVa-1.3.0g) | Modified: RLVa-1.3.0g
+        if ( (rlv_handler_t::isEnabled()) && (!RlvFolderLocks::instance().canRenameItem(mUUID)) )
+        {
+            return false;
+        }
+// [/RLVa:KB]
+
         return item->getPermissions().allowModifyBy(gAgent.getID());
     }
 
@@ -2944,6 +2971,14 @@ bool LLFolderBridge::dragCategoryIntoFolder(LLInventoryCategory* inv_cat,
                 }
             }
         }
+
+// [RLVa:KB] - Checked: 2011-03-29 (RLVa-1.3.0g) | Added: RLVa-1.3.0g
+        if ( (is_movable) && (rlv_handler_t::isEnabled()) && (RlvFolderLocks::instance().hasLockedFolder(RLV_LOCK_ANY)) )
+        {
+            is_movable = RlvFolderLocks::instance().canMoveFolder(cat_id, mUUID);
+        }
+// [/RLVa:KB]
+
         //
         //--------------------------------------------------------------------------------
 
@@ -4150,6 +4185,15 @@ void LLFolderBridge::perform_pasteFromClipboard()
                     LLNotificationsUtil::add("StockPasteFailed", subs);
                     return;
                 }
+
+// [RLVa:KB] - Checked: RLVa-2.1.0
+                if ( ((item) && (!RlvActions::canPasteInventory(item, dest_folder))) || ((cat) && (!RlvActions::canPasteInventory(cat, dest_folder))) )
+                {
+                    RlvActions::notifyBlocked(RlvStringKeys::Blocked::InvFolder);
+                    return;
+                }
+// [/RLVa:KB]
+
             }
         }
 
@@ -4800,6 +4844,9 @@ void LLFolderBridge::buildContextMenuFolderOptions(U32 flags,   menuentry_vec_t&
     const bool is_system_folder = LLFolderType::lookupIsProtectedType(type);
     // BAP change once we're no longer treating regular categories as ensembles.
     const bool is_agent_inventory = isAgentInventory();
+// [SL:KB] - Patch: Appearance-Misc | Checked: 2010-11-24 (Catznip-2.4)
+    const bool is_outfit = (type == LLFolderType::FT_OUTFIT);
+// [/SL:KB]
 
     // Only enable calling-card related options for non-system folders.
     if (!is_system_folder && is_agent_inventory && (mRoot != NULL))
@@ -4863,10 +4910,21 @@ void LLFolderBridge::buildContextMenuFolderOptions(U32 flags,   menuentry_vec_t&
             }
 
             items.push_back(std::string("Replace Outfit"));
-            if (!LLAppearanceMgr::instance().getCanReplaceCOF(mUUID))
+//          if (!LLAppearanceMgr::instance().getCanReplaceCOF(mUUID))
+// [SL:KB] - Patch: Appearance-Misc | Checked: 2010-11-24 (Catznip-2.4)
+            if ( ((is_outfit) && (!LLAppearanceMgr::instance().getCanReplaceCOF(mUUID))) ||
+                ((!is_outfit) && (gAgentWearables.isCOFChangeInProgress())) )
+// [/SL:KB]
             {
                 disabled_items.push_back(std::string("Replace Outfit"));
             }
+// [RLVa:KB] - Checked: RLVa-2.0.3
+        // Block "Replace Current Outfit" if the user can't wear the new folder
+            if ( (RlvActions::isRlvEnabled()) && (RlvFolderLocks::instance().isLockedFolder(mUUID, RLV_LOCK_ADD)) )
+            {
+                disabled_items.push_back(std::string("Replace Outfit"));
+            }
+// [/RLVa:KB]
         }
         if (is_agent_inventory)
         {
@@ -5760,6 +5818,24 @@ bool LLFolderBridge::dragItemIntoFolder(LLInventoryItem* inv_item,
         {
             is_movable = false;
         }
+
+// [RLVa:KB] - Checked: 2011-03-29 (RLVa-1.3.0g) | Modified: RLVa-1.3.0g
+        if ( (rlv_handler_t::isEnabled()) && (is_movable) )
+        {
+            if (move_is_into_current_outfit)
+            {
+                // RELEASE-RLVa: [RLVa-1.3.0] Keep sync'ed with code below => LLAppearanceMgr::wearItemOnAvatar() with "replace == true"
+                const LLViewerInventoryItem* pItem = dynamic_cast<const LLViewerInventoryItem*>(inv_item);
+                is_movable = rlvPredCanWearItem(pItem, RLV_WEAR_REPLACE);
+            }
+            if (is_movable)
+            {
+                is_movable = (!RlvFolderLocks::instance().hasLockedFolder(RLV_LOCK_ANY)) ||
+                    (RlvFolderLocks::instance().canMoveItem(inv_item->getUUID(), mUUID));
+            }
+        }
+// [/RLVa:KB]
+
         if (move_is_into_trash)
         {
             is_movable &= inv_item->getIsLinkType() || !get_is_item_worn(inv_item->getUUID());
@@ -6214,6 +6290,13 @@ bool LLTextureBridge::canSaveTexture(void)
         return false;
     }
 
+// [RLVa:KB] - Checked: RLVa-2.2 (@viewtexture)
+    if (!RlvActions::canPreviewTextures())
+    {
+        return false;
+    }
+// [/RLVa:KB]
+
     const LLViewerInventoryItem *item = model->getItem(mUUID);
     if (item)
     {
@@ -6622,6 +6705,16 @@ void LLCallingCardBridge::performAction(LLInventoryModel* model, std::string act
             {
                 callingcard_name = av_name.getCompleteName();
             }
+
+// [RLVa:KB] - Checked: 2013-05-08 (RLVa-1.4.9)
+            if (!RlvActions::canStartIM(item->getCreatorUUID()))
+            {
+                make_ui_sound("UISndInvalidOp");
+                RlvUtil::notifyBlocked(RlvStringKeys::Blocked::StartIm, LLSD().with("RECIPIENT", LLSLURL("agent", item->getCreatorUUID(), "completename").getSLURLString()));
+                return;
+            }
+// [/RLVa:KB]
+
             LLUUID session_id = gIMMgr->addSession(callingcard_name, IM_NOTHING_SPECIAL, item->getCreatorUUID());
             if (session_id != LLUUID::null)
             {
@@ -6763,6 +6856,19 @@ bool LLCallingCardBridge::dragOrDrop(MASK mask, bool drop,
     bool rv = false;
     if(item)
     {
+// [RLVa:KB] - @share
+        if ( (RlvActions::isRlvEnabled()) && (!RlvActions::canGiveInventory(item->getCreatorUUID())) )
+        {
+            if (drop)
+            {
+                RlvUtil::notifyBlocked(RlvStringKeys::Blocked::Share, LLSD().with("RECIPIENT", LLSLURL("agent", item->getCreatorUUID(), "completename").getSLURLString()));
+            }
+            // We should return false but our caller uses the return value as both 'will accept' *and* 'was handled' so
+            // returning false will result in the dropped item being moved when it is blocked.
+            return true;
+        }
+// [/RLVa:KB]
+
         // check the type
         switch(cargo_type)
         {
@@ -7197,7 +7303,11 @@ void LLObjectBridge::performAction(LLInventoryModel* model, std::string action)
         else if(item && item->isFinished())
         {
             // must be in library. copy it to our inventory and put it on.
+//          LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, (LLViewerJointAttachment*)0));
+// [SL:KB] - Patch: Appearance-DnDWear | Checked: 2013-02-04 (Catznip-3.4)
+            // "Wear" from inventory replaces, so library items should too
             LLPointer<LLInventoryCallback> cb = new LLBoostFuncInventoryCallback(boost::bind(rez_attachment_cb, _1, (LLViewerJointAttachment*)0, true));
+// [/SL;KB]
             copy_inventory_item(
                 gAgent.getID(),
                 item->getPermissions().getOwner(),
@@ -7262,6 +7372,21 @@ std::string LLObjectBridge::getLabelSuffix() const
 
 void rez_attachment(LLViewerInventoryItem* item, LLViewerJointAttachment* attachment, bool replace)
 {
+// [RLVa:KB] - Checked: 2010-08-25 (RLVa-1.2.1)
+    // If no attachment point was specified, try looking it up from the item name
+    static LLCachedControl<bool> fRlvDeprecateAttachPt(gSavedSettings, "RLVaDebugDeprecateExplicitPoint", false);
+    if ( (rlv_handler_t::isEnabled()) && (!fRlvDeprecateAttachPt) &&
+         (!attachment) && (gRlvAttachmentLocks.hasLockedAttachmentPoint(RLV_LOCK_ANY)) )
+    {
+        attachment = RlvAttachPtLookup::getAttachPoint(item);
+    }
+
+    if ( (RlvActions::isRlvEnabled()) && (!rlvPredCanWearItem(item, (replace) ? RLV_WEAR_REPLACE : RLV_WEAR_ADD)) )
+    {
+        return;
+    }
+// [/RLVa:KB]
+
     const LLUUID& item_id = item->getLinkedUUID();
 
     // Check for duplicate request.
@@ -7294,10 +7419,24 @@ void rez_attachment(LLViewerInventoryItem* item, LLViewerJointAttachment* attach
     if (replace &&
         (attachment && attachment->getNumObjects() > 0))
     {
+// [RLVa:KB] - Checked: 2010-08-25 (RLVa-1.2.1)
+        // Block if we can't "replace wear" what's currently there
+        if ( (rlv_handler_t::isEnabled()) && ((gRlvAttachmentLocks.canAttach(attachment) & RLV_WEAR_REPLACE) == 0) )
+        {
+            return;
+        }
+// [/RLVa:KB]
         LLNotificationsUtil::add("ReplaceAttachment", LLSD(), payload, confirm_attachment_rez);
     }
     else
     {
+// [RLVa:KB] - Checked: 2010-08-07 (RLVa-1.2.0)
+        // Block wearing anything on a non-attachable attachment point
+        if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.isLockedAttachmentPoint(attach_pt, RLV_LOCK_ADD)) )
+        {
+            return;
+        }
+// [/RLVa:KB]
         LLNotifications::instance().forceResponse(LLNotification::Params("ReplaceAttachment").payload(payload), 0/*YES*/);
     }
 }
@@ -7384,6 +7523,10 @@ void LLObjectBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
                 }
 
                 items.push_back(std::string("Detach From Yourself"));
+// [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0a) | Modified: RLVa-1.2.0a
+                if ( (rlv_handler_t::isEnabled()) && (!gRlvAttachmentLocks.canDetach(item)) )
+                    disabled_items.push_back(std::string("Detach From Yourself"));
+// [/RLVa:KB]
             }
             else if (!isItemInTrash() && !isLinkedObjectInTrash() && !isLinkedObjectMissing() && !isCOFFolder())
             {
@@ -7402,6 +7545,17 @@ void LLObjectBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
                     disabled_items.push_back(std::string("Attach To"));
                     disabled_items.push_back(std::string("Attach To HUD"));
                 }
+// [RLVa:KB] - Checked: 2010-09-03 (RLVa-1.2.1a) | Modified: RLVa-1.2.1a
+                else if (rlv_handler_t::isEnabled())
+                {
+                    ERlvWearMask eWearMask = gRlvAttachmentLocks.canAttach(item);
+                    if ((eWearMask & RLV_WEAR_REPLACE) == 0)
+                        disabled_items.push_back(std::string("Wearable And Object Wear"));
+                    if ((eWearMask & RLV_WEAR_ADD) == 0)
+                        disabled_items.push_back(std::string("Wearable Add"));
+                }
+// [/RLVa:KB]
+
                 LLMenuGL* attach_menu = menu.findChildMenuByName("Attach To", true);
                 LLMenuGL* attach_hud_menu = menu.findChildMenuByName("Attach To HUD", true);
                 if (attach_menu
@@ -7645,18 +7799,36 @@ void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
                     {
                         disabled_items.push_back(std::string("Wearable And Object Wear"));
                         disabled_items.push_back(std::string("Wearable Add"));
+// [RLVa:KB] - Checked: 2010-04-04 (RLVa-1.2.0c) | Added: RLVa-1.2.0c
+                        if ( (rlv_handler_t::isEnabled()) && (!gRlvWearableLocks.canRemove(item)) )
+                            disabled_items.push_back(std::string("Take Off"));
+// [/RLVa:KB]
                     }
                     else
                     {
                         items.push_back(std::string("Wearable And Object Wear"));
                         disabled_items.push_back(std::string("Take Off"));
                         disabled_items.push_back(std::string("Wearable Edit"));
+
+// [RLVa:KB] - Checked: 2010-06-09 (RLVa-1.2.0g) | Modified: RLVa-1.2.0g
+                        if (rlv_handler_t::isEnabled())
+                        {
+                            ERlvWearMask eWearMask = gRlvWearableLocks.canWear(item);
+                            if ((eWearMask & RLV_WEAR_REPLACE) == 0)
+                                disabled_items.push_back(std::string("Wearable And Object Wear"));
+                            if ((eWearMask & RLV_WEAR_ADD) == 0)
+                                disabled_items.push_back(std::string("Wearable Add"));
+                        }
+// [/RLVa:KB]
                     }
 
                     if (LLWearableType::getInstance()->getAllowMultiwear(mWearableType))
                     {
                         items.push_back(std::string("Wearable Add"));
-                        if (!gAgentWearables.canAddWearable(mWearableType))
+//                      if (!gAgentWearables.canAddWearable(mWearableType))
+// [SL:KB] - Patch: Appearance-WearableDuplicateAssets | Checked: 2011-07-24 (Catznip-2.6.0e) | Added: Catznip-2.6.0e
+                        if ( (!gAgentWearables.canAddWearable(mWearableType)) || (gAgentWearables.getWearableFromAssetID(item->getAssetUUID())) )
+// [/SL:KB]
                         {
                             disabled_items.push_back(std::string("Wearable Add"));
                         }
@@ -7717,56 +7889,56 @@ void LLWearableBridge::wearAddOnAvatar()
 }
 
 // static
-void LLWearableBridge::onWearOnAvatarArrived( LLViewerWearable* wearable, void* userdata )
-{
-    LLUUID* item_id = (LLUUID*) userdata;
-    if(wearable)
-    {
-        LLViewerInventoryItem* item = NULL;
-        item = (LLViewerInventoryItem*)gInventory.getItem(*item_id);
-        if(item)
-        {
-            if(item->getAssetUUID() == wearable->getAssetID())
-            {
-                gAgentWearables.setWearableItem(item, wearable);
-                gInventory.notifyObservers();
-                //self->getFolderItem()->refreshFromRoot();
-            }
-            else
-            {
-                LL_INFOS() << "By the time wearable asset arrived, its inv item already pointed to a different asset." << LL_ENDL;
-            }
-        }
-    }
-    delete item_id;
-}
+//void LLWearableBridge::onWearOnAvatarArrived( LLViewerWearable* wearable, void* userdata )
+//{
+//  LLUUID* item_id = (LLUUID*) userdata;
+//  if(wearable)
+//  {
+//      LLViewerInventoryItem* item = NULL;
+//      item = (LLViewerInventoryItem*)gInventory.getItem(*item_id);
+//      if(item)
+//      {
+//          if(item->getAssetUUID() == wearable->getAssetID())
+//          {
+//              gAgentWearables.setWearableItem(item, wearable);
+//              gInventory.notifyObservers();
+//              //self->getFolderItem()->refreshFromRoot();
+//          }
+//          else
+//          {
+//              LL_INFOS() << "By the time wearable asset arrived, its inv item already pointed to a different asset." << LL_ENDL;
+//          }
+//      }
+//  }
+//  delete item_id;
+//}
 
 // static
 // BAP remove the "add" code path once everything is fully COF-ified.
-void LLWearableBridge::onWearAddOnAvatarArrived( LLViewerWearable* wearable, void* userdata )
-{
-    LLUUID* item_id = (LLUUID*) userdata;
-    if(wearable)
-    {
-        LLViewerInventoryItem* item = NULL;
-        item = (LLViewerInventoryItem*)gInventory.getItem(*item_id);
-        if(item)
-        {
-            if(item->getAssetUUID() == wearable->getAssetID())
-            {
-                bool do_append = true;
-                gAgentWearables.setWearableItem(item, wearable, do_append);
-                gInventory.notifyObservers();
-                //self->getFolderItem()->refreshFromRoot();
-            }
-            else
-            {
-                LL_INFOS() << "By the time wearable asset arrived, its inv item already pointed to a different asset." << LL_ENDL;
-            }
-        }
-    }
-    delete item_id;
-}
+//void LLWearableBridge::onWearAddOnAvatarArrived( LLViewerWearable* wearable, void* userdata )
+//{
+//  LLUUID* item_id = (LLUUID*) userdata;
+//  if(wearable)
+//  {
+//      LLViewerInventoryItem* item = NULL;
+//      item = (LLViewerInventoryItem*)gInventory.getItem(*item_id);
+//      if(item)
+//      {
+//          if(item->getAssetUUID() == wearable->getAssetID())
+//          {
+//              bool do_append = true;
+//              gAgentWearables.setWearableItem(item, wearable, do_append);
+//              gInventory.notifyObservers();
+//              //self->getFolderItem()->refreshFromRoot();
+//          }
+//          else
+//          {
+//              LL_INFOS() << "By the time wearable asset arrived, its inv item already pointed to a different asset." << LL_ENDL;
+//          }
+//      }
+//  }
+//  delete item_id;
+//}
 
 // static
 bool LLWearableBridge::canEditOnAvatar(void* user_data)

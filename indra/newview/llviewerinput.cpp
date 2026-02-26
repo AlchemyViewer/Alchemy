@@ -118,14 +118,18 @@ bool agent_push_down( EKeystate s )
 
 static void agent_check_temporary_run(LLAgent::EDoubleTapRunMode mode)
 {
-    if (gAgent.mDoubleTapRunMode == mode &&
-        gAgent.getRunning() &&
-        !gAgent.getAlwaysRun())
-    {
-        // Turn off temporary running.
-        gAgent.clearRunning();
-        gAgent.sendWalkRun(gAgent.getRunning());
-    }
+// [RLVa:KB] - Checked: 2011-05-11 (RLVa-1.3.0i) | Added: RLVa-1.3.0i
+    if ( (gAgent.mDoubleTapRunMode == mode) && (gAgent.getTempRun()) )
+        gAgent.clearTempRun();
+// [/RLVa:KB]
+//  if (gAgent.mDoubleTapRunMode == mode &&
+//      gAgent.getRunning() &&
+//      !gAgent.getAlwaysRun())
+//  {
+//      // Turn off temporary running.
+//      gAgent.clearRunning();
+//      gAgent.sendWalkRun(gAgent.getRunning());
+//  }
 }
 
 static void agent_handle_doubletap_run(EKeystate s, LLAgent::EDoubleTapRunMode mode)
@@ -145,8 +149,11 @@ static void agent_handle_doubletap_run(EKeystate s, LLAgent::EDoubleTapRunMode m
         {
             // Same walk-key was pushed again quickly; this is a
             // double-tap so engage temporary running.
-            gAgent.setRunning();
-            gAgent.sendWalkRun(gAgent.getRunning());
+//          gAgent.setRunning();
+//          gAgent.sendWalkRun(gAgent.getRunning());
+// [RLVa:KB] - Checked: 2011-05-11 (RLVa-1.3.0i) | Added: RLVa-1.3.0i
+            gAgent.setTempRun();
+// [/RLVa:KB]
         }
 
         // Pressing any walk-key resets the double-tap timer
@@ -676,16 +683,22 @@ bool run_forward(EKeystate s)
         }
         if (!gAgent.getRunning())
         {
-            gAgent.setRunning();
-            gAgent.sendWalkRun(true);
+// [RLVa:KB] - @temprun
+            gAgent.setTempRun();
+// [/RLVa:KB]
+//            gAgent.setRunning();
+//            gAgent.sendWalkRun(true);
         }
     }
     else if(KEYSTATE_UP == s)
     {
         if (gAgent.mDoubleTapRunMode == LLAgent::DOUBLETAP_FORWARD)
             gAgent.mDoubleTapRunMode = LLAgent::DOUBLETAP_NONE;
-        gAgent.clearRunning();
-        gAgent.sendWalkRun(false);
+// [RLVa:KB] - @temprun
+        gAgent.clearTempRun();
+// [/RLVa:KB]
+//        gAgent.clearRunning();
+//        gAgent.sendWalkRun(false);
     }
     agent_push_forward(s);
     return true;
@@ -701,16 +714,22 @@ bool run_backward(EKeystate s)
         }
         if (!gAgent.getRunning())
         {
-            gAgent.setRunning();
-            gAgent.sendWalkRun(true);
+// [RLVa:KB] - @temprun
+            gAgent.setTempRun();
+// [/RLVa:KB]
+//            gAgent.setRunning();
+//            gAgent.sendWalkRun(true);
         }
     }
     else if (KEYSTATE_UP == s)
     {
         if (gAgent.mDoubleTapRunMode == LLAgent::DOUBLETAP_BACKWARD)
             gAgent.mDoubleTapRunMode = LLAgent::DOUBLETAP_NONE;
-        gAgent.clearRunning();
-        gAgent.sendWalkRun(false);
+// [RLVa:KB] - @temprun
+        gAgent.clearTempRun();
+// [/RLVa:KB]
+//        gAgent.clearRunning();
+//        gAgent.sendWalkRun(false);
     }
     agent_push_backward(s);
     return true;
@@ -726,16 +745,22 @@ bool run_left(EKeystate s)
         }
         if (!gAgent.getRunning())
         {
-            gAgent.setRunning();
-            gAgent.sendWalkRun(true);
+// [RLVa:KB] - @temprun
+            gAgent.setTempRun();
+// [/RLVa:KB]
+//            gAgent.setRunning();
+//            gAgent.sendWalkRun(true);
         }
     }
     else if (KEYSTATE_UP == s)
     {
         if (gAgent.mDoubleTapRunMode == LLAgent::DOUBLETAP_SLIDELEFT)
             gAgent.mDoubleTapRunMode = LLAgent::DOUBLETAP_NONE;
-        gAgent.clearRunning();
-        gAgent.sendWalkRun(false);
+// [RLVa:KB] - @temprun
+        gAgent.clearTempRun();
+// [/RLVa:KB]
+//        gAgent.clearRunning();
+//        gAgent.sendWalkRun(false);
     }
     agent_slide_left(s);
     return true;
@@ -751,16 +776,22 @@ bool run_right(EKeystate s)
         }
         if (!gAgent.getRunning())
         {
-            gAgent.setRunning();
-            gAgent.sendWalkRun(true);
+// [RLVa:KB] - @temprun
+            gAgent.setTempRun();
+// [/RLVa:KB]
+//            gAgent.setRunning();
+//            gAgent.sendWalkRun(true);
         }
     }
     else if (KEYSTATE_UP == s)
     {
         if (gAgent.mDoubleTapRunMode == LLAgent::DOUBLETAP_SLIDERIGHT)
             gAgent.mDoubleTapRunMode = LLAgent::DOUBLETAP_NONE;
-        gAgent.clearRunning();
-        gAgent.sendWalkRun(false);
+// [RLVa:KB] - @temprun
+        gAgent.clearTempRun();
+// [/RLVa:KB]
+//        gAgent.clearRunning();
+//        gAgent.sendWalkRun(false);
     }
     agent_slide_right(s);
     return true;
@@ -772,15 +803,21 @@ bool toggle_run(EKeystate s)
     bool run = gAgent.getAlwaysRun();
     if (run)
     {
+// [RLVa:KB] - @alwaysrun
         gAgent.clearAlwaysRun();
-        gAgent.clearRunning();
+// [/RLVa:KB]
+//        gAgent.clearAlwaysRun();
+//        gAgent.clearRunning();
     }
     else
     {
+// [RLVa:KB] - @alwaysrun
         gAgent.setAlwaysRun();
-        gAgent.setRunning();
+// [/RLVa:KB]
+//        gAgent.setAlwaysRun();
+//        gAgent.setRunning();
     }
-    gAgent.sendWalkRun(!run);
+//    gAgent.sendWalkRun(!run);
     return true;
 }
 

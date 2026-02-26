@@ -40,6 +40,9 @@
 #include "llviewertexturelist.h"
 #include "llvoavatar.h"
 #include "pipeline.h"
+// [RLVa:KB] - Checked: 2010-03-18 (RLVa-1.2.0a)
+#include "rlvactions.h"
+// [/RLVa:KB]
 
 
 LLFloaterPreferenceGraphicsAdvanced::LLFloaterPreferenceGraphicsAdvanced(const LLSD& key)

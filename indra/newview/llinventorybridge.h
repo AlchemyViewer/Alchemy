@@ -595,10 +595,10 @@ public:
 
     static void     onWearOnAvatar( void* userdata );   // Access to wearOnAvatar() from menu
     static bool     canWearOnAvatar( void* userdata );
-    static void     onWearOnAvatarArrived( LLViewerWearable* wearable, void* userdata );
+//  static void     onWearOnAvatarArrived( LLViewerWearable* wearable, void* userdata );
     void            wearOnAvatar();
 
-    static void     onWearAddOnAvatarArrived( LLViewerWearable* wearable, void* userdata );
+//  static void     onWearAddOnAvatarArrived( LLViewerWearable* wearable, void* userdata );
     void            wearAddOnAvatar();
 
     static bool     canEditOnAvatar( void* userdata );  // Access to editOnAvatar() from menu

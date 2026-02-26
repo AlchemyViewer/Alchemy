@@ -66,6 +66,10 @@
 #include "llviewerwindow.h"
 #include "llworld.h"
 #include "llworldmapview.h"     // shared draw code
+// [RLVa:KB] - Checked: RLVa-2.0.1
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 static LLDefaultChildRegistry::Register<LLNetMap> r1("net_map");
 
@@ -406,7 +410,10 @@ void LLNetMap::draw()
 
             pos_map = globalPosToView(positions[i]);
 
-            bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL);
+// [RLVa:KB] - Checked: RLVa-1.2.0
+            bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, uuid));
+// [/RLVa:KB]
+//          bool show_as_friend = (LLAvatarTracker::instance().getBuddyInfo(uuid) != NULL);
 
             LLColor4 color = show_as_friend ? map_avatar_friend_color : map_avatar_color;
 
@@ -712,7 +719,11 @@ bool LLNetMap::handleToolTip(S32 x, S32 y, MASK mask)
 
     // If the cursor is near an avatar on the minimap, a mini-inspector will be
     // shown for the avatar, instead of the normal map tooltip.
-    if (handleToolTipAgent(mClosestAgentToCursor))
+//    if (handleToolTipAgent(mClosestAgentToCursor))
+// [RLVa:KB] - Checked: RLVa-1.2.2
+    bool fRlvCanShowName = (mClosestAgentToCursor.notNull()) && (RlvActions::canShowName(RlvActions::SNC_DEFAULT, mClosestAgentToCursor));
+    if ( (fRlvCanShowName) && (handleToolTipAgent(mClosestAgentToCursor)) )
+// [/RLVa:KB]
     {
         return true;
     }
@@ -742,7 +753,10 @@ bool LLNetMap::handleToolTip(S32 x, S32 y, MASK mask)
     LLViewerRegion *region    = LLWorld::getInstance()->getRegionFromPosGlobal(posGlobal);
     if (region)
     {
-        std::string region_name = region->getName();
+//        std::string region_name = region->getName();
+// [RLVa:KB] - Checked: RLVa-1.2.2
+        std::string region_name = (RlvActions::canShowLocation()) ? region->getName() : RlvStrings::getString(RlvStringKeys::Hidden::Region);
+// [/RLVa:KB]
         if (!region_name.empty())
         {
             region_name_msg = mRegionNameMsg;
@@ -820,6 +834,10 @@ bool LLNetMap::handleToolTip(S32 x, S32 y, MASK mask)
     args["[PARCEL_OWNER_MSG]"]      = parcel_owner_msg.empty() ? "" : parcel_owner_msg + '\n';
     args["[REGION_NAME_MSG]"]       = region_name_msg.empty() ? "" : region_name_msg + '\n';
     args["[TOOL_TIP_HINT_MSG]"]     = tool_tip_hint_msg.empty() ? "" : tool_tip_hint_msg + '\n';
+// [RLVa:KB] - Checked: RLVa-1.2.2
+    LLAvatarName avName;
+    args["[AGENT]"] = ( (!fRlvCanShowName) && (mClosestAgentToCursor.notNull()) && (LLAvatarNameCache::get(mClosestAgentToCursor, &avName)) ) ? RlvStrings::getAnonym(avName) + "\n" : "";
+// [/RLVa:KB]
 
     std::string msg                 = mToolTipMsg;
     LLStringUtil::format(msg, args);

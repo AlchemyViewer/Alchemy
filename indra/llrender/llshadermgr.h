@@ -260,6 +260,14 @@ public:
         WATER_SUN_ANGLE2,                   //  "sunAngle2"
 
         WL_CAMPOSLOCAL,                     //  "camPosLocal"
+// [RLVa:KB] - @setsphere
+        RLV_EFFECT_MODE,
+        RLV_EFFECT_PARAM1,
+        RLV_EFFECT_PARAM2,
+        RLV_EFFECT_PARAM3,
+        RLV_EFFECT_PARAM4,
+        RLV_EFFECT_PARAM5,
+// [/RLVa:KB]
 
         AVATAR_WIND,                        //  "gWindDir"
         AVATAR_SINWAVE,                     //  "gSinWaveParams"
