@@ -109,10 +109,6 @@
     "tinygltf",
     "v-hacd",
     {
-      "name": "viewer-manager",
-      "platform": "windows | osx"
-    },
-    {
       "name": "vlc-bin",
       "platform": "windows | osx"
     },

@@ -490,10 +490,6 @@ class Windows_x86_64_Manifest(ViewerManifest):
                                                 '**/*.exp',
                                                 '**/*.tar.xz')))
 
-            with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'viewer-manager')):
-                # include the compiled launcher scripts so that it gets included in the file_list
-                self.path('SLVersionChecker.exe')
-
             with self.prefix(dst="vmp_icons"):
                 with self.prefix(src=self.icon_path()):
                     self.path("secondlife.ico")
@@ -722,10 +718,6 @@ class DarwinManifest(ViewerManifest):
                 with self.prefix(src=self.icon_path(), dst="") :
                     self.path("secondlife.icns")
 
-                # Copy in the updater script and helper modules
-                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'viewer-manager'), dst="updater"):
-                    self.path("SLVersionChecker")
-
                 with self.prefix(src="", dst=os.path.join("updater", "icons")):
                     self.path2basename(self.icon_path(), "secondlife.ico")
                     with self.prefix(src="vmp_icons", dst=""):
@@ -904,9 +896,6 @@ class LinuxManifest(ViewerManifest):
         with self.prefix(dst="bin"):
             with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'llplugin', 'slplugin', self.args['configuration'])):
                 self.path("SLPlugin")
-            #this copies over the python wrapper script, associated utilities and required libraries, see SL-321, SL-322 and SL-323
-            #with self.prefix(src="../viewer_components/manager", dst=""):
-            #    self.path("*.py")
 
         # recurses, packaged again
         self.path("res-sdl")
