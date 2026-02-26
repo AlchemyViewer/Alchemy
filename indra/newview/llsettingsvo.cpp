@@ -822,7 +822,8 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 
     F32 probe_ambiance = getReflectionProbeAmbiance();
 
-    if (irradiance_pass)
+    static LLCachedControl<bool> desaturate_irradiance(gSavedSettings, "RenderDesaturateIrradiance", true);
+    if (irradiance_pass && desaturate_irradiance)
     { // during an irradiance map update, disable ambient lighting (direct lighting only) and desaturate sky color (avoid tinting the world blue)
         shader->uniform3fv(LLShaderMgr::AMBIENT, LLVector3::zero.mV);
     }
