@@ -114,7 +114,6 @@ static std::thread::id sMainThreadId;
 
 
 LPWSTR gIconResource = IDI_APPLICATION;
-LPWSTR gIconSmallResource = IDI_APPLICATION;
 LPDIRECTINPUT8 gDirectInput8;
 
 LLW32MsgCallback gAsyncMsgCallback = NULL;
@@ -583,7 +582,6 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 
     mFSAASamples = fsaa_samples;
     mIconResource = gIconResource;
-    mIconSmallResource = gIconSmallResource;
     mOverrideAspectRatio = 0.f;
     mNativeAspectRatio = 0.f;
     mInputProcessingPaused = false;
@@ -917,7 +915,6 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
     // based on the system's (or user's) default settings.
     allowLanguageTextInput(NULL, false);
     updateWindowTheme();
-    setCustomIcon();
 }
 
 
@@ -5166,21 +5163,4 @@ void LLWindowWin32::updateWindowTheme()
     DwmSetWindowAttribute(mWindowHandle, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, sizeof(dark_mode));
 
     LL_INFOS("Window") << "Viewer window theme is set to " << (use_dark_mode ? "dark" : "light") << " mode" << LL_ENDL;
-}
-
-void LLWindowWin32::setCustomIcon()
-{
-        if (mWindowHandle)
-        {
-            HICON hDefaultIcon = LoadIcon(mhInstance, mIconResource);
-            HICON hSmallIcon   = LoadIcon(mhInstance, mIconSmallResource);
-            mWindowThread->post([=, this]()
-                {
-                    SendMessage(mWindowHandle, WM_SETICON, ICON_BIG, (LPARAM)hDefaultIcon);
-                    SendMessage(mWindowHandle, WM_SETICON, ICON_SMALL, (LPARAM)hSmallIcon);
-
-                    SetClassLongPtr(mWindowHandle, GCLP_HICON, (LONG_PTR)hDefaultIcon);
-                    SetClassLongPtr(mWindowHandle, GCLP_HICONSM, (LONG_PTR)hSmallIcon);
-                });
-        }
 }
