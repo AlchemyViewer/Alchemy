@@ -2377,7 +2377,7 @@ void LLAppearanceMgr::updateCOF(LLInventoryModel::item_array_t& body_items_new,
 // [SL:KB] - Patch: Appearance-WearableDuplicateAssets | Checked: 2011-07-24 (Catznip-2.6.0e) | Added: Catznip-2.6.0e
     removeDuplicateWearableItemsByAssetID(wear_items);
 // [/SL:KB]
-    filterWearableItems(wear_items, 0, LLAgentWearables::MAX_CLOTHING_LAYERS);
+    filterWearableItems(wear_items, 0, LLAgentWearables::MAX_CLOTHING_LAYERS + LLAgentWearables::MAX_BODY_PARTS);
 
     //
     // - Attachments: include COF contents only if appending.
