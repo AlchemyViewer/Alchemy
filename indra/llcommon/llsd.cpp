@@ -1095,6 +1095,17 @@ void LLSD::assign(const char* v)
     else assign(std::string());
 }
 
+// std::string_view helpers
+LLSD::LLSD(std::string_view v) : impl(0)
+{
+    ALLOC_LLSD_OBJECT;
+    assign(v);
+}
+void LLSD::assign(std::string_view v)
+{
+    safe(impl).assign(impl, std::string(v));
+}
+
 
 LLSD LLSD::emptyMap()
 {

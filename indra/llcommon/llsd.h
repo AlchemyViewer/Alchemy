@@ -306,13 +306,17 @@ public:
     //@}
 
     /** @name Character Pointer Helpers
-        These are helper routines to make working with char* as easy as
+        These are helper routines to make working with string_view and char* as easy as
         working with strings.
      */
     //@{
         LLSD(const char*);
         void assign(const char*);
         LLSD& operator=(const char* v) { assign(v); return *this; }
+
+        LLSD(std::string_view);
+        void assign(std::string_view);
+        LLSD& operator=(std::string_view v) { assign(v); return *this; }
     //@}
 
     /** @name Map Values */

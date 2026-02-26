@@ -17,9 +17,9 @@
 
 #pragma once
 
-#ifdef CATZNIP_STRINGVIEW
-#include "llstringview.h"
-#endif // CATZNIP_STRINGVIE
+#include <string_view>
+
+using namespace std::literals;
 
 // ============================================================================
 // Defines
@@ -395,57 +395,30 @@ enum ERlvAttachGroupType
 
 namespace RlvSettingNames
 {
-#ifdef CATZNIP_STRINGVIEW
-    /*inline*/ constexpr boost::string_view Main = make_string_view("RestrainedLove");
-    /*inline*/ constexpr boost::string_view Debug = make_string_view("RestrainedLoveDebug");
-    /*inline*/ constexpr boost::string_view CanOoc = make_string_view("RestrainedLoveCanOOC");
-    /*inline*/ constexpr boost::string_view ForbidGiveToRlv = make_string_view("RestrainedLoveForbidGiveToRLV");
-    /*inline*/ constexpr boost::string_view NoSetEnv = make_string_view("RestrainedLoveNoSetEnv");
-    /*inline*/ constexpr boost::string_view ShowEllipsis = make_string_view("RestrainedLoveShowEllipsis");
-    /*inline*/ constexpr boost::string_view WearAddPrefix = make_string_view("RestrainedLoveStackWhenFolderBeginsWith");
-    /*inline*/ constexpr boost::string_view WearReplacePrefix = make_string_view("RestrainedLoveReplaceWhenFolderBeginsWith");
+    /*inline*/ constexpr std::string_view Main = "RestrainedLove"sv;
+    /*inline*/ constexpr std::string_view Debug = "RestrainedLoveDebug"sv;
+    /*inline*/ constexpr std::string_view CanOoc = "RestrainedLoveCanOOC"sv;
+    /*inline*/ constexpr std::string_view ForbidGiveToRlv = "RestrainedLoveForbidGiveToRLV"sv;
+    /*inline*/ constexpr std::string_view NoSetEnv = "RestrainedLoveNoSetEnv"sv;
+    /*inline*/ constexpr std::string_view ShowEllipsis = "RestrainedLoveShowEllipsis"sv;
+    /*inline*/ constexpr std::string_view WearAddPrefix = "RestrainedLoveStackWhenFolderBeginsWith"sv;
+    /*inline*/ constexpr std::string_view WearReplacePrefix = "RestrainedLoveReplaceWhenFolderBeginsWith"sv;
 
-    /*inline*/ constexpr boost::string_view DebugHideUnsetDup = make_string_view("RLVaDebugHideUnsetDuplicate");
-    /*inline*/ constexpr boost::string_view EnableIMQuery = make_string_view("RLVaEnableIMQuery");
-    /*inline*/ constexpr boost::string_view EnableLegacyNaming = make_string_view("RLVaEnableLegacyNaming");
-    /*inline*/ constexpr boost::string_view EnableSharedWear = make_string_view("RLVaEnableSharedWear");
-    /*inline*/ constexpr boost::string_view EnableTempAttach = make_string_view("RLVaEnableTemporaryAttachments");
-    /*inline*/ constexpr boost::string_view HideLockedLayer = make_string_view("RLVaHideLockedLayers");
-    /*inline*/ constexpr boost::string_view HideLockedAttach = make_string_view("RLVaHideLockedAttachments");
-    /*inline*/ constexpr boost::string_view HideLockedInventory = make_string_view("RLVaHideLockedInventory");
-    /*inline*/ constexpr boost::string_view LoginLastLocation = make_string_view("RLVaLoginLastLocation");
-    /*inline*/ constexpr boost::string_view SharedInvAutoRename = make_string_view("RLVaSharedInvAutoRename");
-    /*inline*/ constexpr boost::string_view ShowAssertionFail = make_string_view("RLVaShowAssertionFailures");
-    /*inline*/ constexpr boost::string_view ShowRedirectChatTyping = make_string_view("RLVaShowRedirectChatTyping");
-    /*inline*/ constexpr boost::string_view SplitRedirectChat = make_string_view("RLVaSplitRedirectChat");
-    /*inline*/ constexpr boost::string_view TopLevelMenu = make_string_view("RLVaTopLevelMenu");
-    /*inline*/ constexpr boost::string_view WearReplaceUnlocked = make_string_view("RLVaWearReplaceUnlocked");
-#else
-    constexpr const char Main[] = "RestrainedLove";
-    constexpr const char Debug[] = "RestrainedLoveDebug";
-    constexpr const char CanOoc[] = "RestrainedLoveCanOOC";
-    constexpr const char ForbidGiveToRlv[] = "RestrainedLoveForbidGiveToRLV";
-    constexpr const char NoSetEnv[] = "RestrainedLoveNoSetEnv";
-    constexpr const char ShowEllipsis[] = "RestrainedLoveShowEllipsis";
-    constexpr const char WearAddPrefix[] = "RestrainedLoveStackWhenFolderBeginsWith";
-    constexpr const char WearReplacePrefix[] = "RestrainedLoveReplaceWhenFolderBeginsWith";
-
-    constexpr const char DebugHideUnsetDup[] = "RLVaDebugHideUnsetDuplicate";
-    constexpr const char EnableIMQuery[] = "RLVaEnableIMQuery";
-    constexpr const char EnableLegacyNaming[] = "RLVaEnableLegacyNaming";
-    constexpr const char EnableSharedWear[] = "RLVaEnableSharedWear";
-    constexpr const char EnableTempAttach[] = "RLVaEnableTemporaryAttachments";
-    constexpr const char HideLockedLayer[] = "RLVaHideLockedLayers";
-    constexpr const char HideLockedAttach[] = "RLVaHideLockedAttachments";
-    constexpr const char HideLockedInventory[] = "RLVaHideLockedInventory";
-    constexpr const char LoginLastLocation[] = "RLVaLoginLastLocation";
-    constexpr const char SharedInvAutoRename[] = "RLVaSharedInvAutoRename";
-    constexpr const char ShowAssertionFail[] = "RLVaShowAssertionFailures";
-    constexpr const char ShowRedirectChatTyping[] = "RLVaShowRedirectChatTyping";
-    constexpr const char SplitRedirectChat[] = "RLVaSplitRedirectChat";
-    constexpr const char TopLevelMenu[] = "RLVaTopLevelMenu";
-    constexpr const char WearReplaceUnlocked[] = "RLVaWearReplaceUnlocked";
-#endif // CATZNIP_STRINGVIEW
+    /*inline*/ constexpr std::string_view DebugHideUnsetDup = "RLVaDebugHideUnsetDuplicate"sv;
+    /*inline*/ constexpr std::string_view EnableIMQuery = "RLVaEnableIMQuery"sv;
+    /*inline*/ constexpr std::string_view EnableLegacyNaming = "RLVaEnableLegacyNaming"sv;
+    /*inline*/ constexpr std::string_view EnableSharedWear = "RLVaEnableSharedWear"sv;
+    /*inline*/ constexpr std::string_view EnableTempAttach = "RLVaEnableTemporaryAttachments"sv;
+    /*inline*/ constexpr std::string_view HideLockedLayer = "RLVaHideLockedLayers"sv;
+    /*inline*/ constexpr std::string_view HideLockedAttach = "RLVaHideLockedAttachments"sv;
+    /*inline*/ constexpr std::string_view HideLockedInventory = "RLVaHideLockedInventory"sv;
+    /*inline*/ constexpr std::string_view LoginLastLocation = "RLVaLoginLastLocation"sv;
+    /*inline*/ constexpr std::string_view SharedInvAutoRename = "RLVaSharedInvAutoRename"sv;
+    /*inline*/ constexpr std::string_view ShowAssertionFail = "RLVaShowAssertionFailures"sv;
+    /*inline*/ constexpr std::string_view ShowRedirectChatTyping = "RLVaShowRedirectChatTyping"sv;
+    /*inline*/ constexpr std::string_view SplitRedirectChat = "RLVaSplitRedirectChat"sv;
+    /*inline*/ constexpr std::string_view TopLevelMenu = "RLVaTopLevelMenu"sv;
+    /*inline*/ constexpr std::string_view WearReplaceUnlocked = "RLVaWearReplaceUnlocked"sv;
 }
 
 // ============================================================================
@@ -456,73 +429,39 @@ namespace RlvStringKeys
 {
     namespace Blocked
     {
-#ifdef CATZNIP_STRINGVIEW
-        /*inline*/ constexpr boost::string_view AutoPilot = make_string_view("blocked_autopilot");
-        /*inline*/ constexpr boost::string_view Generic = make_string_view("blocked_generic");
-        /*inline*/ constexpr boost::string_view GroupChange = make_string_view("blocked_groupchange");
-        /*inline*/ constexpr boost::string_view InvFolder = make_string_view("blocked_invfolder");
-        /*inline*/ constexpr boost::string_view PermissionAttach = make_string_view("blocked_permattach");
-        /*inline*/ constexpr boost::string_view PermissionTeleport = make_string_view("blocked_permteleport");
-        /*inline*/ constexpr boost::string_view RecvIm = make_string_view("blocked_recvim");
-        /*inline*/ constexpr boost::string_view RecvImRemote = make_string_view("blocked_recvim_remote");
-        /*inline*/ constexpr boost::string_view SendIm = make_string_view("blocked_sendim");
-        /*inline*/ constexpr boost::string_view Share = make_string_view("blocked_share");
-        /*inline*/ constexpr boost::string_view ShareGeneric = make_string_view("blocked_share_generic");
-        /*inline*/ constexpr boost::string_view StartConference = make_string_view("blocked_startconf");
-        /*inline*/ constexpr boost::string_view StartIm = make_string_view("blocked_startim");
-        /*inline*/ constexpr boost::string_view Teleport = make_string_view("blocked_teleport");
-        /*inline*/ constexpr boost::string_view TeleportOffer = make_string_view("blocked_teleport_offer");
-        /*inline*/ constexpr boost::string_view TpLureRemote = make_string_view("blocked_tplure_remote");
-        /*inline*/ constexpr boost::string_view TpRequestRemote = make_string_view("blocked_tprequest_remote");
-        /*inline*/ constexpr boost::string_view ViewXxx = make_string_view("blocked_viewxxx");
-        /*inline*/ constexpr boost::string_view Wireframe = make_string_view("blocked_wireframe");
-#else
-        static constexpr const char AutoPilot[] = "blocked_autopilot";
-        static constexpr const char Generic[] = "blocked_generic";
-        static constexpr const char GroupChange[] = "blocked_groupchange";
-        static constexpr const char InvFolder[] = "blocked_invfolder";
-        static constexpr const char PermissionAttach[] = "blocked_permattach";
-        static constexpr const char PermissionTeleport[] = "blocked_permteleport";
-        static constexpr const char RecvIm[] = "blocked_recvim";
-        static constexpr const char RecvImRemote[] = "blocked_recvim_remote";
-        static constexpr const char SendIm[] = "blocked_sendim";
-        static constexpr const char Share[] = "blocked_share";
-        static constexpr const char ShareGeneric[] = "blocked_share_generic";
-        static constexpr const char StartConference[] = "blocked_startconf";
-        static constexpr const char StartIm[] = "blocked_startim";
-        static constexpr const char Teleport[] = "blocked_teleport";
-        static constexpr const char TeleportOffer[] = "blocked_teleport_offer";
-        static constexpr const char TpLureRemote[] = "blocked_tplure_remote";
-        static constexpr const char TpRequestRemote[] = "blocked_tprequest_remote";
-        static constexpr const char ViewXxx[] = "blocked_viewxxx";
-        static constexpr const char Wireframe[] = "blocked_wireframe";
-#endif // CATZNIP_STRINGVIEW
+        /*inline*/ constexpr std::string_view AutoPilot = "blocked_autopilot"sv;
+        /*inline*/ constexpr std::string_view Generic = "blocked_generic"sv;
+        /*inline*/ constexpr std::string_view GroupChange = "blocked_groupchange"sv;
+        /*inline*/ constexpr std::string_view InvFolder = "blocked_invfolder"sv;
+        /*inline*/ constexpr std::string_view PermissionAttach = "blocked_permattach"sv;
+        /*inline*/ constexpr std::string_view PermissionTeleport = "blocked_permteleport"sv;
+        /*inline*/ constexpr std::string_view RecvIm = "blocked_recvim"sv;
+        /*inline*/ constexpr std::string_view RecvImRemote = "blocked_recvim_remote"sv;
+        /*inline*/ constexpr std::string_view SendIm = "blocked_sendim"sv;
+        /*inline*/ constexpr std::string_view Share = "blocked_share"sv;
+        /*inline*/ constexpr std::string_view ShareGeneric = "blocked_share_generic"sv;
+        /*inline*/ constexpr std::string_view StartConference = "blocked_startconf"sv;
+        /*inline*/ constexpr std::string_view StartIm = "blocked_startim"sv;
+        /*inline*/ constexpr std::string_view Teleport = "blocked_teleport"sv;
+        /*inline*/ constexpr std::string_view TeleportOffer = "blocked_teleport_offer"sv;
+        /*inline*/ constexpr std::string_view TpLureRemote = "blocked_tplure_remote"sv;
+        /*inline*/ constexpr std::string_view TpRequestRemote = "blocked_tprequest_remote"sv;
+        /*inline*/ constexpr std::string_view ViewXxx = "blocked_viewxxx"sv;
+        /*inline*/ constexpr std::string_view Wireframe = "blocked_wireframe"sv;
     }
 
     namespace Hidden
     {
-#ifdef CATZNIP_STRINGVIEW
-        /*inline*/ constexpr boost::string_view Generic = make_string_view("hidden_generic");
-        /*inline*/ constexpr boost::string_view Parcel = make_string_view("hidden_parcel");
-        /*inline*/ constexpr boost::string_view Region = make_string_view("hidden_region");
-#else
-        constexpr const char Generic[] = "hidden_generic";
-        constexpr const char Parcel[] = "hidden_parcel";
-        constexpr const char Region[] = "hidden_region";
-#endif // CATZNIP_STRINGVIEW
+        /*inline*/ constexpr std::string_view Generic = "hidden_generic"sv;
+        /*inline*/ constexpr std::string_view Parcel = "hidden_parcel"sv;
+        /*inline*/ constexpr std::string_view Region = "hidden_region"sv;
     }
 
     namespace StopIm
     {
-#ifdef CATZNIP_STRINGVIEW
-        /*inline*/ constexpr boost::string_view NoSession = make_string_view("stopim_nosession");
-        /*inline*/ constexpr boost::string_view EndSessionRemote = make_string_view("stopim_endsession_remote");
-        /*inline*/ constexpr boost::string_view EndSessionLocal = make_string_view("stopim_endsession_local");
-#else
-        constexpr const char NoSession[] = "stopim_nosession";
-        constexpr const char EndSessionRemote[] = "stopim_endsession_remote";
-        constexpr const char EndSessionLocal[] = "stopim_endsession_local";
-#endif // CATZNIP_STRINGVIEW
+        /*inline*/ constexpr std::string_view NoSession = "stopim_nosession"sv;
+        /*inline*/ constexpr std::string_view EndSessionRemote = "stopim_endsession_remote"sv;
+        /*inline*/ constexpr std::string_view EndSessionLocal = "stopim_endsession_local"sv;
     }
 }
 
