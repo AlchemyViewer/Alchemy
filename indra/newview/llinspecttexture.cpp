@@ -196,8 +196,10 @@ LLTextureToolTip::LLTextureToolTip(const LLToolTip::Params& p)
     mMaxWidth = llmax(mMaxWidth, mPreviewSize);
 
     // Currently has to share params with LLToolTip, override values
+#if 0
     setBackgroundColor(LLColor4::black);
     setTransparentColor(LLColor4::black);
+#endif
     setBorderVisible(true);
 }
 
@@ -231,6 +233,7 @@ void LLTextureToolTip::initFromParams(const LLToolTip::Params& p)
 
     // Currently has to share params with LLToolTip, override values manually
     // Todo: provide from own params instead, may be like object inspector does it
+#if 0
     LLViewBorder::Params border_params;
     border_params.border_thickness(LLPANEL_BORDER_WIDTH);
     border_params.highlight_light_color(LLColor4::white);
@@ -239,14 +242,21 @@ void LLTextureToolTip::initFromParams(const LLToolTip::Params& p)
     border_params.shadow_dark_color(LLColor4::white);
     addBorder(border_params);
     setBorderVisible(true);
+#endif
 
+#if 0
     setBackgroundColor(LLColor4::black);
+#endif
     setBackgroundVisible(true);
     setBackgroundOpaque(true);
+#if 0
     setBackgroundImage(nullptr);
+#endif
     setTransparentImage(nullptr);
 
+#if 0
     mTextBox->setColor(LLColor4::white);
+#endif
 
     snapToChildren();
 }
