@@ -2990,7 +2990,7 @@ bool LLAppViewer::initConfiguration()
     // crash as this dialog is always frontmost.
     std::string splash_msg;
     LLStringUtil::format_map_t args;
-    args["[APP_NAME]"] = LLTrans::getString("SECOND_LIFE");
+    args["[APP_NAME]"] = getSecondLifeTitle();
     splash_msg = LLTrans::getString("StartupLoading", args);
     LLSplashScreen::show();
     LLSplashScreen::update(splash_msg);
@@ -3007,7 +3007,14 @@ bool LLAppViewer::initConfiguration()
     //
     // Set the name of the window
     //
-    gWindowTitle = LLTrans::getString("APP_NAME");
+    if (LLVersionInfo::instance().getViewerMaturity() != LLVersionInfo::RELEASE_VIEWER)
+    {
+        gWindowTitle = LLVersionInfo::instance().getChannelAndVersion();
+    }
+    else
+    {
+        gWindowTitle = LLTrans::getString("APP_NAME");
+    }
 #if LL_DEBUG
     gWindowTitle += std::string(" [DEBUG]");
 #elif LL_RELEASE_WITH_DEBUG_INFO
@@ -6041,6 +6048,12 @@ void LLAppViewer::handleLoginComplete()
     if(LLAppViewer::instance()->mMainloopTimeout)
     {
         gDebugInfo["MainloopTimeoutState"] = LLAppViewer::instance()->mMainloopTimeout->getState();
+    }
+
+    if (gAgentAvatarp)
+    {
+        gWindowTitle.append(" - ").append(gAgentAvatarp->getFullname());
+        gViewerWindow->getWindow()->setTitle(gWindowTitle);
     }
 
     mOnLoginCompleted();
