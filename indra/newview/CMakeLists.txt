@@ -70,6 +70,7 @@ if (HAVOK)
 endif ()
 
 set(viewer_SOURCE_FILES
+    alunzip.cpp
     gltfscenemanager.cpp
     gltf/asset.cpp
     gltf/accessor.cpp
@@ -759,6 +760,7 @@ set(viewer_SOURCE_FILES
 
 set(viewer_HEADER_FILES
     ViewerInstall.cmake
+    alunzip.h
     gltfscenemanager.h
     groupchatlistener.h
     gltf/asset.h
@@ -1800,6 +1802,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         ll::nvapi
         ll::tinygltf
         ll::tinyexr
+        ll::minizip
         )
 
 if (NOT DISABLE_WEBRTC)

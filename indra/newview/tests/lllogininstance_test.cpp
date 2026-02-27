@@ -209,7 +209,7 @@ LLControlVariable* LLControlGroup::declareBOOL(const std::string& name, bool ini
 LLControlVariable* LLControlGroup::declareString(const std::string& name, const std::string &initial_val, const std::string& comment, LLControlVariable::ePersist persist) { return NULL; }
 
 #include "lluicolortable.h"
-void LLUIColorTable::saveUserSettings(void)const {}
+void LLUIColorTable::saveUserSettings(bool scrub)const {}
 
 //-----------------------------------------------------------------------------
 #include "../llversioninfo.h"

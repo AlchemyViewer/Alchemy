@@ -149,24 +149,25 @@ class ViewerManifest(LLManifest):
 
             # skins
             with self.prefix(src_dst="skins"):
-                    # include the entire textures directory recursively
-                    with self.prefix(src_dst="*/textures"):
-                            self.path("*/*.jpg")
-                            self.path("*/*.png")
-                            self.path("*.tga")
-                            self.path("*.j2c")
-                            self.path("*.png")
-                            self.path("textures.xml")
-                    self.path("*/xui/*/*.xml")
-                    self.path("*/xui/*/widgets/*.xml")
-                    self.path("*/*.xml")
+                # include the entire textures directory recursively
+                with self.prefix(src_dst="*/textures"):
+                        self.path("*/*.jpg")
+                        self.path("*/*.png")
+                        self.path("*.tga")
+                        self.path("*.j2c")
+                        self.path("*.png")
+                        self.path("textures.xml")
+                self.path("*/xui/*/*.xml")
+                self.path("*/xui/*/widgets/*.xml")
+                self.path("*/*.xml")
+                self.path("*/*.json")
 
-                    # Update: 2017-11-01 CP Now we store app code in the html folder
-                    #         Initially the HTML/JS code to render equirectangular
-                    #         images for the 360 capture feature but more to follow.
-                    with self.prefix(src="*/html", dst="*/html"):
-                        self.path("*/*/*/*.js")
-                        self.path("*/*/*.html")
+                # Update: 2017-11-01 CP Now we store app code in the html folder
+                #         Initially the HTML/JS code to render equirectangular
+                #         images for the 360 capture feature but more to follow.
+                with self.prefix(src="*/html", dst="*/html"):
+                    self.path("*/*/*/*.js")
+                    self.path("*/*/*.html")
 
             #build_data.json.  Standard with exception handling is fine.  If we can't open a new file for writing, we have worse problems
             #platform is computed above with other arg parsing

@@ -33,5 +33,13 @@ if (NOT COLLADA14_LIBRARY_DEBUG STREQUAL "COLLADA14_LIBRARY_DEBUG-NOTFOUND")
 endif()
 
 find_package(minizip CONFIG REQUIRED)
+
+add_library(ll::minizip INTERFACE IMPORTED)
+target_link_libraries(ll::minizip INTERFACE MINIZIP::minizip ll::zlib-ng)
+
 find_package(LibXml2 REQUIRED)
-target_link_libraries(ll::colladadom INTERFACE LibXml2::LibXml2 MINIZIP::minizip ZLIB::ZLIB)
+
+add_library(ll::libxml2 INTERFACE IMPORTED)
+target_link_libraries(ll::libxml2 INTERFACE LibXml2::LibXml2)
+
+target_link_libraries(ll::colladadom INTERFACE ll::libxml2 ll::minizip)

@@ -170,6 +170,11 @@
          layout="topleft"
          help_topic="preferences_controls_tab"
          name="controls" />
+        <panel
+         filename="panel_preferences_skins.xml"
+         label="Themes"
+         layout="topleft"
+         name="skins" />
     </tab_container>
 
 </floater>

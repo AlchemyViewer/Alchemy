@@ -273,7 +273,7 @@ bool LLUIColorTable::loadFromSettings()
     return result;
 }
 
-void LLUIColorTable::saveUserSettings() const
+void LLUIColorTable::saveUserSettings(const bool scrub /* = false */) const
 {
     Params params;
 
@@ -284,11 +284,14 @@ void LLUIColorTable::saveUserSettings() const
         if(itd != mLoadedColors.end() && itd->second == color_pair.second)
             continue;
 
-        ColorEntryParams color_entry;
-        color_entry.name = color_pair.first;
-        color_entry.color.value = color_pair.second;
+        if (!scrub || color_pair.first.find("ColorPaletteEntry") != std::string::npos)
+        {
+            ColorEntryParams color_entry;
+            color_entry.name = color_pair.first;
+            color_entry.color.value = color_pair.second;
 
-        params.color_entries.add(color_entry);
+            params.color_entries.add(color_entry);
+        }
     }
 
     LLXMLNodePtr output_node = new LLXMLNode("colors", false);

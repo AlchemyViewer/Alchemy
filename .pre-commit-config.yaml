@@ -2,7 +2,6 @@ repos:
   - repo: https://github.com/secondlife/git-hooks.git
     rev: v1.0.2
     hooks:
-      - id: opensource-license
       - id: llsd
       - id: no-trigraphs
       - id: copyright

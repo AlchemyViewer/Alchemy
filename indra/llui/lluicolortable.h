@@ -91,7 +91,7 @@ public:
     bool loadFromSettings();
 
     // saves colors specified by the user to the users skin directory
-    void saveUserSettings() const;
+    void saveUserSettings(const bool scrub = false) const;
 
     const auto& getLoadedColors() { return mLoadedColors; }
     const auto& getUserColors() { return mUserSetColors; }

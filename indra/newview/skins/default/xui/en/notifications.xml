@@ -1664,6 +1664,13 @@ This debug setting change will take effect after you restart [APP_NAME].
    name="ChangeSkin"
    type="alertmodal">
 The new skin will appear after you restart [APP_NAME].
+Would you like to reset modified colors back to their defaults?
+   <tag>confirm</tag>
+   <usetemplate
+    canceltext="Cancel"
+    name="yesnocancelbuttons"
+    notext="No"
+    yestext="Yes"/>
   </notification>
 
   <notification
@@ -12781,5 +12788,61 @@ are wearing now.
           ignoretext="Image Upload Resized"
           name="okignore"
           yestext="OK"/>
+  </notification>
+ <!-- ALCHEMY BELOW THIS LINE -->
+ 
+  <notification
+   icon="alertmodal.tga"
+   name="ConfirmRemoveSkin"
+   type="alertmodal">
+    <tag>confirm</tag>
+    Are you sure you want to remove [SKIN]? This will erase it permenantly from your hard disk.
+    <usetemplate
+     ignoretext="Confirm removing skins"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="RemoveSkinSuccess"
+   type="alertmodal">
+    <tag>fail</tag>
+    Removed [SKIN] successfully.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="RemoveSkinFailure"
+   type="alertmodal">
+    <tag>fail</tag>
+    Failed to remove [SKIN].
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddSkinNoManifest"
+   type="alertmodal">
+    <tag>fail</tag>
+    [PACKAGE] doesn't contain a manifest or is unreadable.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddSkinCantParseManifest"
+   type="alertmodal">
+    <tag>fail</tag>
+    [PACKAGE] has an invalid manifest.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddSkinUnpackFailed"
+   type="alertmodal">
+    <tag>fail</tag>
+    Failed to unpack the skin package. See the log for more details.
+  </notification>
+  <notification
+   icon="alertmodal.tga"
+   name="AddSkinSuccess"
+   type="alertmodal">
+    <tag>fail</tag>
+    [PACKAGE] was added successfully.
   </notification>
 </notifications>

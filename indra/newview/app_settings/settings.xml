@@ -2,6 +2,10 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:noNamespaceSchemaLocation="llsd.xsd">
 <map>
+    <key>Include</key>
+    <array>
+      <string>settings_alchemy.xml</string>
+    </array>
     <key>RestrainedLove</key>
     <map>
       <key>Comment</key>
