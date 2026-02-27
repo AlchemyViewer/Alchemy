@@ -1677,6 +1677,7 @@ set(viewer_APPSETTINGS_FILES
     app_settings/keywords_lsl_default.xml
     app_settings/logcontrol.xml
     app_settings/settings.xml
+    app_settings/settings_alchemy.xml
     app_settings/settings_crash_behavior.xml
     app_settings/settings_files.xml
     app_settings/settings_per_account.xml

@@ -403,7 +403,7 @@
       <key>Type</key>
       <string>S32</string>
       <key>Value</key>
-      <real>300</real>
+      <integer>300</integer>
     </map>
     <key>AckCollectTime</key>
     <map>
@@ -606,7 +606,7 @@
     <key>AudioLevelMedia</key>
     <map>
       <key>Comment</key>
-      <string>Audio level of Quicktime movies</string>
+      <string>Audio level of parcel Media</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -2383,7 +2383,7 @@
     <key>Type</key>
     <string>Boolean</string>
     <key>Value</key>
-    <integer>1</integer>
+    <integer>0</integer>
   </map>
   <key>DebugAvatarCompositeBaked</key>
   <map>
@@ -2944,7 +2944,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>0</integer>
+      <integer>1</integer>
     </map>
     <key>DoubleClickShowWorldMap</key>
     <map>
@@ -3914,7 +3914,7 @@
     <key>ImagePipelineUseHTTP</key>
     <map>
       <key>Comment</key>
-      <string>If TRUE use HTTP GET to fetch textures from the server</string>
+      <string>[OBSOLETE]</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
@@ -5363,7 +5363,7 @@
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>48.0</real>
+      <real>65.0</real>
     </map>
     <key>MaxHeapSize</key>
     <map>
@@ -5695,7 +5695,7 @@
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>256.0</real>
+      <real>48.0</real>
     </map>
     <key>MiniMapRotate</key>
     <map>
@@ -5907,7 +5907,7 @@
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <integer>130</integer>
+      <real>4096.0</real>
     </map>
     <key>NewObjectCreationThrottle</key>
     <map>
@@ -6583,7 +6583,7 @@
       <key>Type</key>
       <string>S32</string>
       <key>Value</key>
-      <integer>1</integer>
+      <integer>0</integer>
     </map>
     <key>ParticipantListShowIcons</key>
     <map>
@@ -7292,7 +7292,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>1</integer>
+      <integer>0</integer>
     </map>
     <key>QAMode</key>
     <map>
@@ -8570,7 +8570,7 @@
     <key>Comment</key>
     <string>EXPERIMENTAL: Prime the depth buffer with simple prim geometry before rendering with textures.</string>
     <key>Persist</key>
-    <integer>1</integer>
+    <integer>0</integer>
     <key>Type</key>
     <string>Boolean</string>
     <key>Value</key>
@@ -8955,7 +8955,7 @@
       <key>Comment</key>
       <string>Dynamically adjust level of detail.</string>
       <key>Persist</key>
-      <integer>1</integer>
+      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -9352,7 +9352,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>0</integer>
+      <integer>1</integer>
     </map>
     <key>NameTagShowUsernames</key>
     <map>
@@ -9662,7 +9662,7 @@
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
-    <integer>64</integer>
+    <real>64</real>
   </map>
   <key>RenderReflectionProbeAmbiance</key>
   <map>
@@ -10908,7 +10908,7 @@
       <key>Comment</key>
       <string>Select reflection probes</string>
       <key>Persist</key>
-      <integer>0</integer>
+      <integer>1</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -11110,7 +11110,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>0</integer>
+      <integer>1</integer>
     </map>
     <key>NavBarShowParcelProperties</key>
     <map>
@@ -11407,7 +11407,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <boolean>1</boolean>
+      <integer>1</integer>
     </map>
     <key>NearbyListShowIcons</key>
     <map>
@@ -11451,7 +11451,7 @@
       <key>Type</key>
       <string>U32</string>
       <key>Value</key>
-      <integer>4</integer>
+      <integer>3</integer>
     </map>
     <key>RecentPeopleSortOrder</key>
     <map>
@@ -12189,7 +12189,7 @@
       <key>Comment</key>
       <string>If TRUE, do not fetch and decode any textures</string>
       <key>Persist</key>
-      <integer>1</integer>
+      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -12200,7 +12200,7 @@
       <key>Comment</key>
       <string>If TRUE, do not load textures for in-world content</string>
       <key>Persist</key>
-      <integer>1</integer>
+      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -12288,7 +12288,7 @@
       <key>Comment</key>
       <string>If TRUE, always load textures at full resolution (discard = 0)</string>
       <key>Persist</key>
-      <integer>1</integer>
+      <integer>0</integer>
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
@@ -14290,7 +14290,7 @@
       <key>Type</key>
       <string>S32</string>
       <key>Value</key>
-      <integer>1</integer>
+      <integer>0</integer>
     </map>
     <key>WaterGLFogDensityScale</key>
     <map>
@@ -14761,6 +14761,15 @@
         <key>Value</key>
             <real>1</real>
         </map>
+    <key>PoolSizeExpCache</key>
+        <map>
+        <key>Comment</key>
+            <string>Coroutine Pool size for Experience Cache</string>
+        <key>Type</key>
+            <string>U32</string>
+        <key>Value</key>
+            <real>1</real>
+        </map>
     <key>PoolSizeAssetStorage</key>
         <map>
         <key>Comment</key>
@@ -14846,6 +14855,7 @@
 	      <string>postcard</string>
 	      <string>mini_map</string>
 	      <string>beacons</string>
+	      <string>stats</string>
       </array>
     </map>
     <key>LandmarksSortedByDate</key>
@@ -15099,7 +15109,7 @@
       <key>Type</key>
       <string>Boolean</string>
       <key>Value</key>
-      <integer>1</integer>
+      <integer>0</integer>
     </map>
     <key>ShowOfferedInventory</key>
     <map>
@@ -16664,7 +16674,7 @@
     <key>Type</key>
     <string>U32</string>
     <key>Value</key>
-    <integer>95</integer>
+    <integer>100</integer>
   </map>
   <key>360CaptureDebugSaveImage</key>
   <map>
