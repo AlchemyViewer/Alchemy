@@ -308,7 +308,10 @@ void LLControlVariable::resetToDefault(bool fire_signal)
         mValues.pop_back();
     }
 
-    if(fire_signal)
+    // don't fire if the value didn't actually change
+    LLSD previous_value = getComparableValue(getValue());
+    bool value_changed = !llsd_compare(originalValue, previous_value);
+    if(fire_signal && value_changed)
     {
         firePropertyChanged(originalValue);
     }
@@ -997,6 +1000,12 @@ U32 LLControlGroup::saveToFile(const std::string& filename, bool nondefault_only
 U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_values, bool save_values, bool error_when_no_comment)
 {
     LL_PROFILE_ZONE_SCOPED;
+
+    if (!mIncludedFiles.insert(filename).second && set_default_values)
+    {
+        return 0; //Already included this file.
+    }
+
     LLSD settings;
     llifstream infile;
     infile.open(filename.c_str());
@@ -1021,6 +1030,26 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
         LLControlVariable::ePersist persist = LLControlVariable::PERSIST_NONDFT;
         std::string const & name = itr->first;
         LLSD const & control_map = itr->second;
+
+        if(name == "Include")
+        {
+            if(control_map.isArray())
+            {
+#if LL_WINDOWS
+                size_t pos = filename.find_last_of('\\');
+#else
+                size_t pos = filename.find_last_of('/');
+#endif
+                if(pos != std::string::npos)
+                {
+                    const std::string dir = filename.substr(0,++pos);
+                    for(LLSD::array_const_iterator array_itr = control_map.beginArray(), array_end = control_map.endArray();
+                        array_itr != array_end; ++array_itr)
+                        validitems+=loadFromFile(dir+(*array_itr).asString(),set_default_values);
+                }
+            }
+            continue;
+        }
 
         if(control_map.has("Persist"))
         {

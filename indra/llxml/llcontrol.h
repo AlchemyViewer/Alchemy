@@ -174,6 +174,8 @@ protected:
     ctrl_name_table_t mNameTable;
     static const std::string mTypeString[TYPE_COUNT];
 
+    std::set<std::string> mIncludedFiles;
+
 public:
     static eControlType typeStringToEnum(const std::string& typestr);
     static std::string typeEnumToString(eControlType typeenum);
@@ -186,7 +188,7 @@ public:
 
     struct ApplyFunctor
     {
-        virtual ~ApplyFunctor() {};
+        virtual ~ApplyFunctor() = default;
         virtual void apply(const std::string& name, LLControlVariable* control) = 0;
     };
     void applyToAll(ApplyFunctor* func);
@@ -250,7 +252,7 @@ public:
     void    setS32(std::string_view name, S32 val);
     void    setF32(std::string_view name, F32 val);
     void    setU32(std::string_view name, U32 val);
-    void    setString(std::string_view  name, const std::string& val);
+    void    setString(std::string_view name, const std::string& val);
     void    setVector3(std::string_view name, const LLVector3 &val);
     void    setVector3d(std::string_view name, const LLVector3d &val);
     void    setQuaternion(std::string_view name, const LLQuaternion &val);
@@ -297,7 +299,7 @@ public:
 //! without have to manually create and bind a listener to a local
 //! object.
 template <class T>
-class LLControlCache : public LLRefCount, public LLInstanceTracker<LLControlCache<T>, std::string>
+class LLControlCache final : public LLRefCount, public LLInstanceTracker<LLControlCache<T>, std::string>
 {
 public:
     // This constructor will declare a control if it doesn't exist in the contol group
@@ -330,9 +332,7 @@ public:
         bindToControl(group, name);
     }
 
-    ~LLControlCache()
-    {
-    }
+    ~LLControlCache() = default;
 
     const T& getValue() const { return mCachedValue; }
 
@@ -406,7 +406,7 @@ public:
 
     operator const T&() const { return mCachedControlPtr->getValue(); }
     operator std::function<const T&()> () const { return std::function<const T&()>(*this); }
-    const T& operator()() { return mCachedControlPtr->getValue(); }
+    const T& operator()() const { return mCachedControlPtr->getValue(); }
 
 private:
     LLPointer<LLControlCache<T> > mCachedControlPtr;
