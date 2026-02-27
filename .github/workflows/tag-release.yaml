@@ -30,7 +30,7 @@ jobs:
       - name: Setup Env Vars
         run: |
           CHANNEL="${{ inputs.channel }}"
-          echo VIEWER_CHANNEL="Second_Life_${CHANNEL:-Develop}" >> ${GITHUB_ENV}
+          echo VIEWER_CHANNEL="Alchemy_${CHANNEL:-Develop}" >> ${GITHUB_ENV}
           NIGHTLY_DATE=$(date --rfc-3339=date)
           echo NIGHTLY_DATE=${NIGHTLY_DATE} >> ${GITHUB_ENV}
           echo TAG_ID="$(echo ${{ github.sha }} | cut -c1-8)-${{ inputs.project || '${NIGHTLY_DATE}' }}" >> ${GITHUB_ENV}

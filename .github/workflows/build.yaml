@@ -24,7 +24,7 @@ on:
   pull_request:
   push:
     branches: ["main", "release/*", "project/*"]
-    tags: ["Second_Life*"]
+    tags: ["Alchemy*"]
 
 jobs:
   # The whole point of the setup job is that we want to set variables once
@@ -40,12 +40,12 @@ jobs:
       viewer_channel: ${{ steps.setvar.outputs.viewer_channel }}
       is_private_build: ${{ steps.setvar.outputs.is_private_build }}
     env:
-      # Build with a tag like "Second_Life#abcdef0" to generate a release page
+      # Build with a tag like "Alchemy#abcdef0" to generate a release page
       # (used for builds we are planning to deploy).
       # When you want to use a string variable as a workflow YAML boolean, it's
       # important to ensure it's the empty string when false. If you omit || '',
       # its value when false is "false", which is interpreted as true.
-      RELEASE_RUN: ${{ (github.event.inputs.release_run || github.ref_type == 'tag' && startsWith(github.ref_name, 'Second_Life')) && 'Y' || '' }}
+      RELEASE_RUN: ${{ (github.event.inputs.release_run || github.ref_type == 'tag' && startsWith(github.ref_name, 'Alchemy')) && 'Y' || '' }}
       FROM_FORK: ${{ github.event.pull_request.head.repo.fork }}
     steps:
       - name: Checkout code
@@ -69,7 +69,7 @@ jobs:
         shell: bash
         env:
           BUILD_VCS_BRANCH: ${{ steps.which-branch.outputs.branch }}
-          VIEWER_CHANNEL_BASE: "Second Life"
+          VIEWER_CHANNEL_BASE: "Alchemy"
         run: |
           echo "release_run=$RELEASE_RUN" >> "$GITHUB_OUTPUT"
 
@@ -135,7 +135,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        runner: ${{ fromJson((github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/Second_Life')) && '["windows-large","macos-26-xlarge","linux-large"]' || '["windows-2025", "macos-26", "ubuntu-22.04"]') }}
+        runner: ["windows-2025", "macos-26", "ubuntu-22.04"]
         configuration: [release, relwithdebinfo, optdebug]
         arch: [x64, arm64]
         build_variant: [Viewer, Tests]
