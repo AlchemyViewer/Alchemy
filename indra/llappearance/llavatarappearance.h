@@ -126,11 +126,14 @@ public:
  **                    SKELETON
  **/
 
+public:
+    typedef std::map<std::string, std::string, std::less<>> joint_alias_map_t;
+
 protected:
     virtual LLAvatarJoint*  createAvatarJoint() = 0;
     virtual LLAvatarJoint*  createAvatarJoint(S32 joint_num) = 0;
     virtual LLAvatarJointMesh*  createAvatarJointMesh() = 0;
-    void makeJointAliases(LLAvatarBoneInfo *bone_info);
+    static void makeJointAliases(LLAvatarBoneInfo* bone_info, joint_alias_map_t& joint_alias_map);
 
 
 public:
@@ -153,8 +156,8 @@ public:
 public:
     typedef std::vector<LLAvatarJoint*> avatar_joint_list_t;
     const avatar_joint_list_t& getSkeleton() { return mSkeleton; }
-    typedef std::map<std::string, std::string, std::less<>> joint_alias_map_t;
     const joint_alias_map_t& getJointAliases();
+    static joint_alias_map_t buildJointAliases();
     typedef std::map<std::string, std::string> joint_parent_map_t; // matrix plus parent
     typedef std::map<std::string, glm::mat4> joint_rest_map_t;
     void getJointMatricesAndHierarhy(std::vector<LLJointData> &data) const;

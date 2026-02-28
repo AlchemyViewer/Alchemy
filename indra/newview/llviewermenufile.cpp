@@ -504,30 +504,34 @@ void upload_single_file(
                 LLNotificationsUtil::add(error_msg, args);
                 return;
             }
-            else
-            {
-                LLFloaterReg::showInstance("upload_sound", args);
-            }
         }
-        if (type == LLFilePicker::FFLOAD_IMAGE)
+
+        std::string floater_name;
+
+        switch (type)
         {
-            LLFloaterReg::showInstance("upload_image", args);
-        }
-        if (type == LLFilePicker::FFLOAD_ANIM)
+        case LLFilePicker::FFLOAD_ANIM:
         {
             std::string filename_lc(filename);
             LLStringUtil::toLower(filename_lc);
-            if (filename_lc.rfind(".anim") != std::string::npos)
-            {
-                LLFloaterReg::showInstance("upload_anim_anim", args);
-            }
-            else
-            {
-                LLFloaterReg::showInstance("upload_anim_bvh", args);
-            }
+            floater_name = (filename_lc.rfind(".anim") != std::string::npos) ? "upload_anim_anim" : "upload_anim_bvh";
+        }
+        break;
+        case LLFilePicker::FFLOAD_IMAGE:
+            floater_name = "upload_image";
+            break;
+        case LLFilePicker::FFLOAD_WAV:
+            floater_name = "upload_sound";
+            break;
+        default:
+            break;
+        }
+
+        if (!floater_name.empty())
+        {
+            LLFloaterReg::showInstance(floater_name, args);
         }
     }
-    return;
 }
 
 void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLUUID& dest)
@@ -712,22 +716,15 @@ bool get_bulk_upload_expected_cost(
     bool allow_2k,
     S32& total_cost,
     S32& file_count,
-    S32& bvh_count,
     S32& textures_2k_count)
 {
     total_cost = 0;
     file_count = 0;
-    bvh_count = 0;
     textures_2k_count = 0;
     for (std::vector<std::string>::const_iterator in_iter = filenames.begin(); in_iter != filenames.end(); ++in_iter)
     {
         std::string filename = (*in_iter);
         std::string ext = gDirUtilp->getExtension(filename);
-
-        if (ext == "bvh")
-        {
-            bvh_count++;
-        }
 
         LLAssetType::EType asset_type;
         U32 codec;
@@ -829,40 +826,35 @@ void upload_bulk(const std::vector<std::string>& filtered_filenames, bool allow_
 {
     S32 expected_upload_cost;
     S32 expected_upload_count;
-    S32 bvh_count;
     S32 textures_2k_count;
-    if (get_bulk_upload_expected_cost(filtered_filenames, allow_2k, expected_upload_cost, expected_upload_count, bvh_count, textures_2k_count))
+    if (get_bulk_upload_expected_cost(filtered_filenames, allow_2k, expected_upload_cost, expected_upload_count, textures_2k_count))
     {
-        LLSD key;
-        key["upload_cost"] = expected_upload_cost;
-        key["upload_count"] = expected_upload_count;
-        key["has_2k_textures"] = (textures_2k_count > 0);
-        key["dest"] = dest;
-
-        LLSD array;
-        for (const std::string& str : filtered_filenames)
+        static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
+        if (sPowerfulWizard && expected_upload_cost == 0)
         {
-            array.append(str);
+            do_bulk_upload(filtered_filenames, allow_2k, dest);
         }
-        key["files"] = array;
+        else
+        {
+            LLSD key;
+            key["upload_cost"] = expected_upload_cost;
+            key["upload_count"] = expected_upload_count;
+            key["has_2k_textures"] = (textures_2k_count > 0);
+            key["dest"] = dest;
 
-        LLFloaterReg::showInstance("bulk_upload", key);
+            LLSD array;
+            for (const std::string& str : filtered_filenames)
+            {
+                array.append(str);
+            }
+            key["files"] = array;
 
+            LLFloaterReg::showInstance("bulk_upload", key);
+        }
         if (filtered_filenames.size() > expected_upload_count)
         {
-            if (bvh_count == filtered_filenames.size() - expected_upload_count)
-            {
-                LLNotificationsUtil::add("DoNotSupportBulkAnimationUpload");
-            }
-            else
-            {
-                LLNotificationsUtil::add("BulkUploadIncompatibleFiles");
-            }
+            LLNotificationsUtil::add("BulkUploadIncompatibleFiles");
         }
-    }
-    else if (bvh_count == filtered_filenames.size())
-    {
-        LLNotificationsUtil::add("DoNotSupportBulkAnimationUpload");
     }
     else
     {

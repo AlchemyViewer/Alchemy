@@ -79,9 +79,8 @@ bool LLFloaterBulkUpload::postBuild()
     if (!mAllow2kTextures && mHas2kTextures)
     {
         // provided cost is for 2K textures, recalculate cost
-        S32 bvh_count;
         S32 textures_2k_count;
-        get_bulk_upload_expected_cost(mFiles, mAllow2kTextures, mUploadCost, mUploadCount, bvh_count, textures_2k_count);
+        get_bulk_upload_expected_cost(mFiles, mAllow2kTextures, mUploadCost, mUploadCount, textures_2k_count);
 
         update();
     }
@@ -116,9 +115,8 @@ void LLFloaterBulkUpload::onUpload2KCheckBox()
     mAllow2kTextures = !mCheckboxUpload2K->getValue().asBoolean();
     gSavedSettings.setBOOL("BulkUpload2KTextures", mAllow2kTextures);
 
-    S32 bvh_count;
     S32 textures_2k_count;
-    get_bulk_upload_expected_cost(mFiles, mAllow2kTextures, mUploadCost, mUploadCount, bvh_count, textures_2k_count);
+    get_bulk_upload_expected_cost(mFiles, mAllow2kTextures, mUploadCost, mUploadCount, textures_2k_count);
     // keep old value of mHas2kTextures to show checkbox
 
     update();

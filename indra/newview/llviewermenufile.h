@@ -69,7 +69,6 @@ bool get_bulk_upload_expected_cost(
     bool allow_2k,
     S32& total_cost,
     S32& file_count,
-    S32& bvh_count,
     S32& textures_2k_count);
 
 void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLUUID &dest_folder);

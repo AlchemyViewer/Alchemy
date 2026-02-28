@@ -49,10 +49,13 @@
 #include "llkeyframemotion.h"
 #include "lldatapacker.h"
 #include "llvoavatarself.h"
+#include "lldatapacker.h"
+#include "llbvhloader.h"
+#include "llbvhconsts.h"
 
 void dialog_refresh_all();
 
-static const U32 LL_ASSET_UPLOAD_TIMEOUT_SEC = 60;
+static constexpr U32 LL_ASSET_UPLOAD_TIMEOUT_SEC = 60;
 
 LLResourceUploadInfo::LLResourceUploadInfo(LLTransactionID transactId,
         LLAssetType::EType assetType, std::string name, std::string description,
@@ -320,11 +323,11 @@ std::string LLResourceUploadInfo::getDisplayName() const
 bool LLResourceUploadInfo::findAssetTypeOfExtension(const std::string& exten, LLAssetType::EType& asset_type)
 {
     U32 codec;
-    return findAssetTypeAndCodecOfExtension(exten, asset_type, codec, false);
+    return findAssetTypeAndCodecOfExtension(exten, asset_type, codec);
 }
 
 // static
-bool LLResourceUploadInfo::findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec, bool bulk_upload)
+bool LLResourceUploadInfo::findAssetTypeAndCodecOfExtension(const std::string& exten, LLAssetType::EType& asset_type, U32& codec)
 {
     bool succ = false;
     std::string exten_lc(exten);
@@ -345,7 +348,7 @@ bool LLResourceUploadInfo::findAssetTypeAndCodecOfExtension(const std::string& e
         asset_type = LLAssetType::AT_ANIMATION;
         succ = true;
     }
-    else if (!bulk_upload && (exten_lc == "bvh"))
+    else if (exten_lc == "bvh")
     {
         asset_type = LLAssetType::AT_ANIMATION;
         succ = true;
@@ -461,9 +464,57 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
     }
     else if (exten == "bvh")
     {
-        errorMessage = llformat("We do not currently support bulk upload of animation files\n");
-        errorLabel = "DoNotSupportBulkAnimationUpload";
-        error = true;
+        assetType = LLAssetType::AT_ANIMATION;
+        S64 file_size;
+        LLFile infile(getFileName(), LLFile::in | LLFile::binary, ec);
+        if (ec || !infile)
+        {
+            errorMessage = llformat("Couldn't open animation file for reading: %s\n", getFileName().c_str());
+            errorLabel = "ProblemWithFile";
+            error = true;
+        }
+        else
+        {
+            file_size = infile.size(ec);
+            if (!ec && file_size > 0)
+            {
+                auto joint_aliases = LLAvatarAppearance::buildJointAliases();
+
+                char* file_buffer = new char[file_size + 1];
+                ELoadStatus  load_status = E_ST_OK;
+                S32 line_number = 0;
+                LLBVHLoader* loaderp = new LLBVHLoader(file_buffer, load_status, line_number, joint_aliases);
+
+                if (load_status == E_ST_NO_XLT_FILE)
+                {
+                    LL_WARNS() << "NOTE: No translation table found." << LL_ENDL;
+                }
+                else
+                {
+                    LL_WARNS() << "ERROR: [line: " << line_number << "] " << BVHSTATUS[load_status] << LL_ENDL;
+                }
+                // create data buffer for keyframe initialization
+                S32 buffer_size = loaderp->getOutputSize();
+                U8* buffer = new U8[buffer_size];
+                LLDataPackerBinaryBuffer dp(buffer, buffer_size);
+
+                // pass animation data through memory buffer
+                loaderp->serialize(dp);
+                LLAPRFile apr_file(filename, LL_APR_WB);
+                apr_file.write(buffer, buffer_size);
+                apr_file.close();
+                delete[] file_buffer;
+                delete[] buffer;
+                delete loaderp;
+            }
+            else
+            {
+                errorMessage = llformat("Couldn't open animation file for reading: %s\n", getFileName().c_str());
+                errorLabel = "ProblemWithFile";
+                error = true;
+            }
+        }
+        infile.close();
     }
     else if (exten == "anim")
     {
@@ -475,55 +526,56 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
         LLFile infile(getFileName(), LLFile::in | LLFile::binary, ec);
         if (ec || !infile)
         {
-            LL_WARNS() << "Couldn't open file for reading: " << getFileName() << LL_ENDL;
-            errorMessage = llformat("Failed to open animation file %s\n", getFileName().c_str());
+            errorMessage = llformat("Couldn't open file for reading: %s", getFileName().c_str());
         }
         else
         {
             S64 size = infile.size(ec);
             if (ec || size <= 0)
             {
-                LLError::LLUserWarningMsg::showMissingFiles();
-                LL_ERRS() << "Invalid file" << LL_ENDL;
+                errorMessage = llformat("Invalid file: %s", getFileName().c_str());
             }
             else if (size > INT_MAX)
             {
-                LL_ERRS() << "File " << getFileName() << " is too big, size: " << size << LL_ENDL;
-            }
-            U8* buffer = new(std::nothrow) U8[size];
-            if (!buffer)
-            {
-                LLError::LLUserWarningMsg::showOutOfMemory();
-                LL_ERRS() << "Bad memory allocation for buffer, size: " << size << LL_ENDL;
-            }
-            S64 size_read = infile.read(buffer, size, ec);
-            if (ec || size_read != size)
-            {
-                errorMessage = llformat("Failed to read animation file %s: wanted %d bytes, got %d\n", getFileName().c_str(), size, size_read);
+                errorMessage = llformat("File %s is too big, size: %d", getFileName().c_str(), size);
             }
             else
             {
-                LLDataPackerBinaryBuffer dp(buffer, (S32)size);
-                LLKeyframeMotion *motionp = new LLKeyframeMotion(getAssetId());
-                motionp->setCharacter(gAgentAvatarp);
-                if (motionp->deserialize(dp, getAssetId(), false))
+                U8* buffer = new (std::nothrow) U8[size];
+                if (!buffer)
                 {
-                    // write to temp file
-                    bool succ = motionp->dumpToFile(filename);
-                    if (succ)
-                    {
-                        assetType = LLAssetType::AT_ANIMATION;
-                        errorLabel = "";
-                        error = false;
-                    }
-                    else
-                    {
-                        errorMessage = "Failed saving temporary animation file";
-                    }
+                    errorMessage = llformat("Bad memory allocation for buffer, size: %d", size);
+                }
+                S64 size_read = infile.read(buffer, size, ec);
+                if (ec || size_read != size)
+                {
+                    errorMessage =
+                        llformat("Failed to read animation file %s: wanted %d bytes, got %d\n", getFileName().c_str(), size, size_read);
                 }
                 else
                 {
-                    errorMessage = "Failed reading animation file";
+                    LLDataPackerBinaryBuffer dp(buffer, (S32)size);
+                    LLKeyframeMotion*        motionp = new LLKeyframeMotion(getAssetId());
+                    motionp->setCharacter(gAgentAvatarp);
+                    if (motionp->deserialize(dp, getAssetId(), false))
+                    {
+                        // write to temp file
+                        bool succ = motionp->dumpToFile(filename);
+                        if (succ)
+                        {
+                            assetType  = LLAssetType::AT_ANIMATION;
+                            errorLabel = "";
+                            error      = false;
+                        }
+                        else
+                        {
+                            errorMessage = "Failed saving temporary animation file";
+                        }
+                    }
+                    else
+                    {
+                        errorMessage = "Failed reading animation file";
+                    }
                 }
             }
         }
@@ -533,7 +585,7 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
         // Unknown extension
         errorMessage = llformat(LLTrans::getString("UnknownFileExtension").c_str(), exten.c_str());
         errorLabel = "ErrorMessage";
-        error = true;;
+        error = true;
     }
 
     if (error)
