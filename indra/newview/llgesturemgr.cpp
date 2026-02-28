@@ -61,7 +61,7 @@
 // [/RLVa:KB]
 
 // Longest time, in seconds, to wait for all animations to stop playing
-const F32 MAX_WAIT_ANIM_SECS = 30.f;
+const F32 MAX_WAIT_ANIM_SECS = 60.f;
 // Longest time, in seconds, to wait for a key release.
 // This should be relatively long, but not too long. 10 minutes is enough
 const F32 MAX_WAIT_KEY_SECS = 60.f * 10.f;

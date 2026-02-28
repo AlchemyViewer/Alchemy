@@ -505,9 +505,17 @@ void LLPreviewGesture::addKeys()
     LLComboBox* combo = mKeyCombo;
 
     combo->add( NONE_LABEL );
-    for (KEY key = KEY_F2; key <= KEY_F12; key++)
+    for (KEY key = ' '; key < KEY_NONE; key++)
     {
-        combo->add( LLKeyboard::stringFromKey(key), ADD_BOTTOM );
+        char buffer[] = { (char)key, '\0' };
+        std::string str_org(buffer);
+        std::string str_translated = LLKeyboard::stringFromKey(key);
+
+        if (str_org == str_translated)
+        {
+            if (key >= ' ' && key <= '~') combo->add(str_translated, ADD_BOTTOM);
+        }
+        else combo->add(str_translated, ADD_BOTTOM);
     }
     combo->setCurrentByIndex(0);
 }
@@ -1096,6 +1104,8 @@ void LLPreviewGesture::saveIfNeeded()
         if (!region)
         {
             LL_WARNS() << "Not connected to a region, cannot save gesture." << LL_ENDL;
+            delete gesture;
+            gesture = NULL;
             return;
         }
         std::string agent_url = region->getCapability("UpdateGestureAgentInventory");
