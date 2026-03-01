@@ -154,7 +154,7 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
         fail_if_not_legacy = true;
     }
 
-    if (!strncasecmp(LEGACY_NON_HEADER, hdr_buf, strlen(LEGACY_NON_HEADER))) /* Flawfinder: ignore */
+    if (!strnicmp(LEGACY_NON_HEADER, hdr_buf, strlen(LEGACY_NON_HEADER))) /* Flawfinder: ignore */
     {   // Create a LLSD XML parser, and parse the first chunk read above.
         LLSDXMLParser x;
         x.parsePart(hdr_buf, inbuf);    // Parse the first part that was already read
