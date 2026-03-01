@@ -70,6 +70,7 @@ if (HAVOK)
 endif ()
 
 set(viewer_SOURCE_FILES
+    alfloaterprogressview.cpp
     alunzip.cpp
     gltfscenemanager.cpp
     gltf/asset.cpp
@@ -760,6 +761,7 @@ set(viewer_SOURCE_FILES
 
 set(viewer_HEADER_FILES
     ViewerInstall.cmake
+    alfloaterprogressview.h
     alunzip.h
     gltfscenemanager.h
     groupchatlistener.h

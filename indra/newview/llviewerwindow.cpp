@@ -83,6 +83,7 @@
 #include "raytrace.h"
 
 // newview includes
+#include "alfloaterprogressview.h"
 #include "llaccordionctrl.h"
 #include "llbox.h"
 #include "llchicletbar.h"
@@ -5817,6 +5818,11 @@ void LLViewerWindow::setProgressPercent(const F32 percent)
 
 void LLViewerWindow::setProgressCancelButtonVisible( bool b, const std::string& label )
 {
+    ALFloaterProgressView* pProgFloater = LLFloaterReg::findTypedInstance<ALFloaterProgressView>("progress_view");
+    if(pProgFloater)
+    {
+        pProgFloater->setProgressCancelButtonVisible(b, label);
+    }
     if (mProgressView)
     {
         mProgressView->setCancelButtonVisible( b, label );

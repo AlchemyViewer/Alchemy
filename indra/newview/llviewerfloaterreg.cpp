@@ -31,6 +31,7 @@
 #include "llfloaterreg.h"
 #include "llviewerfloaterreg.h"
 
+#include "alfloaterprogressview.h"
 #include "llcommandhandler.h"
 #include "llcompilequeue.h"
 #include "llfasttimerview.h"
@@ -534,6 +535,9 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("whitelist_entry", "floater_whitelist_entry.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterWhiteListEntry>);
     LLFloaterReg::add("window_size", "floater_window_size.xml", &LLFloaterReg::build<LLFloaterWindowSize>);
     LLFloaterReg::add("world_map", "floater_world_map.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterWorldMap>);
+
+    // Alchemy Floaters
+    LLFloaterReg::add("progress_view", "floater_al_progress_view.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProgressView>);
 
     // *NOTE: Please keep these alphabetized for easier merges
 
