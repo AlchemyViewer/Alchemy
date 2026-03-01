@@ -1895,10 +1895,10 @@ elseif(DARWIN)
     PROPERTIES
     OUTPUT_NAME "${product}"
     RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
-    # From Contents/MacOS/SecondLife, look in Contents/Frameworks
+    # From Contents/MacOS/Alchemy, look in Contents/Frameworks
     BUILD_WITH_INSTALL_RPATH 1
     INSTALL_RPATH "@executable_path/../Frameworks"
-    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-SecondLife.plist"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-Alchemy.plist"
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
     )
 
@@ -1915,13 +1915,13 @@ elseif(DARWIN)
       find_program(DSYMUTIL_PROGRAM dsymutil REQUIRED)
       add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
             COMMAND ${DSYMUTIL_PROGRAM} -o ${VIEWER_DEBUG_BUNDLE} $<TARGET_FILE:${VIEWER_BINARY_NAME}>
-            COMMENT "Generating SecondLife.dSYM")
+            COMMENT "Generating Alchemy.dSYM")
     endif()
 
     find_program(IBTOOL_PROGRAM ibtool REQUIRED)
     add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
           COMMAND ${CMAKE_COMMAND} -E env MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET} ${IBTOOL_PROGRAM} --compile $<TARGET_BUNDLE_DIR:${VIEWER_BINARY_NAME}>/Contents/Resources/Alchemy.nib ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib
-          COMMENT "Compiling SecondLife.nib")
+          COMMENT "Compiling Alchemy.nib")
   endif()
 
   if(HAVOK)

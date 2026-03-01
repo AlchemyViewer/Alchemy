@@ -593,21 +593,6 @@ void LLImageGL::cleanup()
 
 //----------------------------------------------------------------------------
 
-//this function is used to check the size of a texture image.
-//so dim should be a positive number
-static bool check_power_of_two(S32 dim)
-{
-    if(dim < 0)
-    {
-        return false ;
-    }
-    if(!dim)//0 is a power-of-two number
-    {
-        return true ;
-    }
-    return !(dim & (dim - 1)) ;
-}
-
 //static
 bool LLImageGL::checkSize(S32 width, S32 height)
 {
