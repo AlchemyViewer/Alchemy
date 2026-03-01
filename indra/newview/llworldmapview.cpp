@@ -524,6 +524,7 @@ void LLWorldMapView::draw()
 // [/RLVa:KB]
 //      if (mMapScale >= DRAW_TEXT_THRESHOLD)
         {
+            static LLCachedControl<bool> show_agent_count(gSavedSettings, "AlchemyMapShowAgentCount", true);
             static LLCachedControl<bool> print_coords(gSavedSettings, "MapShowGridCoords");
             static LLFontGL* font = LLFontGL::getFontSansSerifSmallBold();
 
@@ -539,10 +540,28 @@ void LLWorldMapView::draw()
                         use_ellipses);
                 };
 
-            std::string grid_name = info->getName();
+            std::string grid_name;
             if (info->isDown())
             {
-                grid_name += " (" + sStringsMap["offline"] + ")";
+                grid_name = llformat("%s (%s)", info->getName().c_str(), sStringsMap["offline"].c_str());
+            }
+            else if (show_agent_count)
+            {
+                S32 agent_count = info->getAgentCount();
+                LLViewerRegion *region = gAgent.getRegion();
+                if (region && (region->getHandle() == handle))
+                {
+                    ++agent_count; // Bump by 1 if we're here
+                }
+                if (agent_count > 0)
+                {
+                    grid_name = llformat("%s (%d) (%s)", info->getName().c_str(), agent_count, info->getShortAccessString().c_str());
+                }
+            }
+
+            if (grid_name.empty())
+            {
+                grid_name = llformat("%s (%s)", info->getName().c_str(), info->getShortAccessString().c_str());
             }
 
             if (print_coords)
