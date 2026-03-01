@@ -26,10 +26,6 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "llapr.h"
-#include "apr_portable.h"
-#include "apr_pools.h"
-#include "apr_dso.h"
 #include "llhttpconstants.h"
 #include "llmeshrepository.h"
 
@@ -3064,7 +3060,7 @@ void LLMeshUploadThread::generateHulls()
         // on isDiscarded() prevents that.
         while (! mPhysicsComplete && ! isDiscarded())
         {
-            apr_sleep(100);
+            ms_sleep(100);
         }
     }
 }
@@ -4189,7 +4185,7 @@ void LLMeshRepository::init()
 
     while (!mDecompThread->mInited)
     { //wait for physics decomp thread to init
-        apr_sleep(100);
+        ms_sleep(100);
     }
 
     metrics_teleport_started_signal = LLViewerMessage::getInstance()->setTeleportStartedCallback(teleport_started);
@@ -4216,7 +4212,7 @@ void LLMeshRepository::shutdown()
 
     while (!mThread->isStopped())
     {
-        apr_sleep(10);
+        ms_sleep(10);
     }
     delete mThread;
     mThread = NULL;
@@ -4226,7 +4222,7 @@ void LLMeshRepository::shutdown()
         LL_INFOS(LOG_MESH) << "Waiting for pending mesh upload " << (i + 1) << "/" << mUploads.size() << LL_ENDL;
         while (!mUploads[i]->isStopped())
         {
-            apr_sleep(10);
+            ms_sleep(10);
         }
         delete mUploads[i];
     }
@@ -5533,7 +5529,7 @@ void LLPhysicsDecomp::shutdown()
 
         while (!isStopped())
         {
-            apr_sleep(10);
+            ms_sleep(10);
         }
     }
 }
