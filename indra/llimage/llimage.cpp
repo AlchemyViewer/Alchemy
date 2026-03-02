@@ -2516,16 +2516,17 @@ bool LLImageFormatted::load(const std::string &filename, int load_size)
 {
     resetLastError();
 
-    S32 file_size = 0;
-    LLAPRFile infile ;
-    infile.open(filename, LL_APR_RB, NULL, &file_size);
-    apr_file_t* apr_file = infile.getFileHandle();
-    if (!apr_file)
+    std::error_code ec;
+    LLFile infile ;
+    infile.open(filename, LLFile::in|LLFile::binary, ec);
+    if (!infile || ec)
     {
         setLastError("Unable to open file for reading", filename);
         return false;
     }
-    if (file_size == 0)
+
+    S32 file_size = narrow(infile.size(ec));
+    if (file_size == 0 || ec)
     {
         setLastError("File is empty",filename);
         return false;
@@ -2543,9 +2544,8 @@ bool LLImageFormatted::load(const std::string &filename, int load_size)
     U8 *data = allocateData(load_size);
     if (data)
     {
-        apr_size_t bytes_read = load_size;
-        apr_status_t s = apr_file_read(apr_file, data, &bytes_read); // modifies bytes_read
-        if (s != APR_SUCCESS || (S32) bytes_read != load_size)
+        S64 bytes_read = infile.read(data, load_size, ec);
+        if (bytes_read != load_size || ec)
         {
             deleteData();
             setLastError("Unable to read file",filename);
@@ -2569,9 +2569,10 @@ bool LLImageFormatted::save(const std::string &filename)
 {
     resetLastError();
 
-    LLAPRFile outfile ;
-    outfile.open(filename, LL_APR_WB);
-    if (!outfile.getFileHandle())
+    std::error_code ec;
+    LLFile outfile ;
+    outfile.open(filename, LLFile::out|LLFile::binary|LLFile::trunc, ec);
+    if (!outfile || ec)
     {
         setLastError("Unable to open file for writing", filename);
         return false;
@@ -2579,7 +2580,7 @@ bool LLImageFormatted::save(const std::string &filename)
 
     LLImageDataSharedLock lock(this);
 
-    S32 result = outfile.write(getData(), getDataSize());
+    S64 result = outfile.write(getData(), getDataSize(), ec);
     outfile.close() ;
     return (result != 0);
 }

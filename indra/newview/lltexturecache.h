@@ -165,7 +165,7 @@ private:
     void purgeAllTextures(bool purge_directories);
     void purgeTexturesLazy(F32 time_limit_sec);
     void purgeTextures(bool validate);
-    LLAPRFile* openHeaderEntriesFile(bool readonly, S32 offset);
+    LLFile* openHeaderEntriesFile(bool readonly, S32 offset);
     void closeHeaderEntriesFile();
     void readEntriesHeader();
     void setEntriesHeader();
@@ -196,13 +196,7 @@ private:
     LLMutex mHeaderMutex;
     LLMutex mListMutex;
     LLMutex mFastCacheMutex;
-    LLAPRFile* mHeaderAPRFile;
-    LLVolatileAPRPool* mFastCachePoolp;
-
-    // mLocalAPRFilePoolp is not thread safe and is meant only for workers
-    // howhever mHeaderEntriesFileName is accessed not from workers' threads
-    // so it needs own pool (not thread safe by itself, relies onto header's mutex)
-    LLVolatileAPRPool*   mHeaderAPRFilePoolp;
+    LLFile* mHeaderAPRFile;
 
     typedef std::map<handle_t, LLTextureCacheWorker*> handle_map_t;
     handle_map_t mReaders;
@@ -217,17 +211,16 @@ private:
     bool mReadOnly;
 
     // HEADERS (Include first mip)
-    std::string mHeaderEntriesFileName;
     std::filesystem::path mHeaderEntriesFilePath;
     std::filesystem::path mHeaderDataFilePath;
-    std::string mFastCacheFileName;
+    std::filesystem::path mFastCacheFilePath;
     EntriesInfo mHeaderEntriesInfo;
     std::set<S32> mFreeList; // deleted entries
     std::set<LLUUID> mLRU;
     typedef std::map<LLUUID, S32> id_map_t;
     id_map_t mHeaderIDMap;
 
-    LLAPRFile*   mFastCachep;
+    LLFile*      mFastCachep;
     LLFrameTimer mFastCacheTimer;
     U8*          mFastCachePadBuffer;
 

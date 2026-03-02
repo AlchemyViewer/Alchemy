@@ -27,8 +27,6 @@
 #ifndef LL_LLIMAGEDIMENSIONSINFO_H
 #define LL_LLIMAGEDIMENSIONSINFO_H
 
-#include "llapr.h"
-
 //-----------------------------------------------------------------------------
 // LLImageDimensionsInfo
 // helper class to get image dimensions WITHOUT loading image to memore
@@ -95,7 +93,8 @@ protected:
     S32 read_s32()
     {
         char p[4];
-        mInfile.read(&p[0],4);
+        std::error_code ec;
+        mInfile.read(&p[0], 4, ec);
         S32 temp =  (((S32)p[3])       & 0x000000FF) |
                     (((S32)p[2] << 8 ) & 0x0000FF00) |
                     (((S32)p[1] << 16) & 0x00FF0000) |
@@ -106,7 +105,8 @@ protected:
     S32 read_reverse_s32()
     {
         char p[4];
-        mInfile.read(&p[0],4);
+        std::error_code ec;
+        mInfile.read(&p[0], 4, ec);
         S32 temp =  (((S32)p[0])       & 0x000000FF) |
                     (((S32)p[1] << 8 ) & 0x0000FF00) |
                     (((S32)p[2] << 16) & 0x00FF0000) |
@@ -118,7 +118,8 @@ protected:
     U8 read_byte()
     {
         U8 bt;
-        mInfile.read(&bt,1);
+        std::error_code ec;
+        mInfile.read(&bt, 1, ec);
         return bt;
     }
 
@@ -131,7 +132,7 @@ protected:
     bool checkFileLength(S32 min_len);
 
 protected:
-    LLAPRFile mInfile ;
+    LLFile mInfile ;
     std::string mSrcFilename;
 
     std::string mLastError;

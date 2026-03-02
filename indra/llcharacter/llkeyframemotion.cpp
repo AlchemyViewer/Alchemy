@@ -2238,11 +2238,12 @@ bool LLKeyframeMotion::dumpToFile(const std::string& name)
         LLDataPackerBinaryBuffer dp(buffer, file_size);
         if (serialize(dp))
         {
-            LLAPRFile outfile;
-            outfile.open(outfilename, LL_APR_WPB);
-            if (outfile.getFileHandle())
+            std::error_code ec;
+            LLFile outfile;
+            outfile.open(outfilename, LLFile::in|LLFile::out|LLFile::trunc|LLFile::binary, ec);
+            if (outfile && !ec)
             {
-                S32 wrote_bytes = outfile.write(buffer, file_size);
+                S32 wrote_bytes = narrow(outfile.write(buffer, file_size, ec));
                 succ = (wrote_bytes == file_size);
             }
         }

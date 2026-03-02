@@ -36,7 +36,7 @@
 #include "llkeyframemotion.h"
 #include "llquantize.h"
 #include "llstl.h"
-#include "llapr.h"
+#include "llfile.h"
 #include "llsdserialize.h"
 
 
@@ -204,10 +204,8 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
     //--------------------------------------------------------------------
     std::string path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,fileName);
 
-    LLAPRFile infile ;
-    infile.open(path, LL_APR_R);
-    apr_file_t *fp = infile.getFileHandle();
-    if (!fp)
+    llifstream infile(path, std::ios::in);
+    if (!infile)
         return E_ST_NO_XLT_FILE;
 
     LL_INFOS("BVH") << "NOTE: Loading translation table: " << fileName << LL_ENDL;
@@ -219,7 +217,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
     //--------------------------------------------------------------------
     // load header
     //--------------------------------------------------------------------
-    if ( ! getLine(fp) )
+    if (!getLine(infile))
         return E_ST_EOF;
     if ( strncmp(mLine, "Translations 1.0", 16) )
         return E_ST_NO_XLT_HEADER;
@@ -228,7 +226,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
     // load data one line at a time
     //--------------------------------------------------------------------
     bool loadingGlobals = false;
-    while ( getLine(fp) )
+    while (getLine(infile))
     {
         //----------------------------------------------------------------
         // check the 1st token on the line to determine if it's empty or a comment
@@ -1262,13 +1260,13 @@ void LLBVHLoader::reset()
 //------------------------------------------------------------------------
 // LLBVHLoader::getLine()
 //------------------------------------------------------------------------
-bool LLBVHLoader::getLine(apr_file_t* fp)
+bool LLBVHLoader::getLine(llifstream& fp)
 {
-    if (apr_file_eof(fp) == APR_EOF)
+    if (fp.eof())
     {
         return false;
     }
-    if ( apr_file_gets(mLine, BVH_PARSER_LINE_SIZE, fp) == APR_SUCCESS)
+    if (fp.getline(mLine, BVH_PARSER_LINE_SIZE))
     {
         mLineNumber++;
         return true;

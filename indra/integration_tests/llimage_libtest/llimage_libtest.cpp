@@ -31,6 +31,7 @@
 #include "llimage_libtest.h"
 
 // Linden library includes
+#include "llapr.h"
 #include "llimage.h"
 #include "llimagefilter.h"
 #include "llimagejpeg.h"

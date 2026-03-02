@@ -339,7 +339,7 @@ uintmax_t LLDiskCache::dirFileSize(const std::string& dir)
 }
 
 LLPurgeDiskCacheThread::LLPurgeDiskCacheThread() :
-    LLThread("PurgeDiskCacheThread", nullptr)
+    LLThread("PurgeDiskCacheThread")
 {
 }
 

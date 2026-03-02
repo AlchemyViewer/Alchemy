@@ -31,7 +31,6 @@
 #include "lldatapacker.h"
 #include "lldir.h"
 #include "llvieweroctree.h"
-#include "llapr.h"
 #include "llgltfmaterial.h"
 
 #include <unordered_map>
@@ -102,7 +101,7 @@ protected:
     ~LLVOCacheEntry();
 public:
     LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &dp);
-    LLVOCacheEntry(LLAPRFile* apr_file);
+    LLVOCacheEntry(LLFile* apr_file);
     LLVOCacheEntry();
 
     void updateEntry(U32 crc, LLDataPackerBinaryBuffer &dp);
@@ -317,9 +316,8 @@ private:
     HeaderMetaInfo       mMetaInfo;
     U32                  mCacheSize;
     U32                  mNumEntries;
-    std::string          mHeaderFileName ;
-    std::string          mObjectCacheDirName;
-    LLVolatileAPRPool*   mLocalAPRFilePoolp ;
+    std::filesystem::path          mHeaderFilePath;
+    std::filesystem::path          mObjectCacheDirPath;
     header_entry_queue_t mHeaderEntryQueue;
     handle_entry_map_t   mHandleEntryMap;
 };

@@ -2185,7 +2185,7 @@ if (BUILD_TESTING)
     lldateutil.cpp
 #    llmediadataclient.cpp
     lllogininstance.cpp
-    llremoteparcelrequest.cpp
+#    llremoteparcelrequest.cpp
     llviewerhelputil.cpp
     llversioninfo.cpp
 #    llvocache.cpp

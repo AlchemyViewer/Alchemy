@@ -34,7 +34,6 @@
 #include "lldir.h"
 #include "llnotificationsutil.h"
 #include "llfilesystem.h"
-#include "llapr.h"
 #include "llstring.h"
 
 #include "llagent.h"
@@ -195,45 +194,46 @@ bool LLFloaterBvhPreview::postBuild()
         // loading a bvh file
 
         // now load bvh file
-        S32 file_size;
+        S64 file_size;
 
-        LLAPRFile infile ;
-        infile.open(mFilenameAndPath, LL_APR_RB, NULL, &file_size);
+        std::error_code ec;
+        LLFile infile ;
+        infile.open(mFilenameAndPath, LLFile::in|LLFile::binary, ec);
 
-        if (!infile.getFileHandle())
+        if (!infile || ec)
         {
             LL_WARNS() << "Can't open BVH file:" << mFilename << LL_ENDL;
         }
         else
         {
-            char*   file_buffer;
-
-            file_buffer = new char[file_size + 1];
-
-            if (file_size == infile.read(file_buffer, file_size))
+            file_size = infile.size(ec);
+            if (file_size > 0 )
             {
-                file_buffer[file_size] = '\0';
-                LL_INFOS() << "Loading BVH file " << mFilename << LL_ENDL;
-                ELoadStatus load_status = E_ST_OK;
-                S32 line_number = 0;
-
-                auto joint_alias_map = getJointAliases();
-
-                loaderp = new LLBVHLoader(file_buffer, load_status, line_number, joint_alias_map);
-                std::string status = getString(BVHSTATUS[load_status]);
-
-                if(load_status == E_ST_NO_XLT_FILE)
+                std::unique_ptr<char[]> file_buffer = std::make_unique<char[]>(file_size + 1);
+                if (file_size == infile.read(file_buffer.get(), file_size, ec) && !ec)
                 {
-                    LL_WARNS() << "NOTE: No translation table found." << LL_ENDL;
-                }
-                else
-                {
-                    LL_WARNS() << "ERROR: [line: " << line_number << "] " << status << LL_ENDL;
+                    file_buffer[file_size] = '\0';
+                    LL_INFOS() << "Loading BVH file " << mFilename << LL_ENDL;
+                    ELoadStatus load_status = E_ST_OK;
+                    S32 line_number = 0;
+
+                    auto joint_alias_map = getJointAliases();
+
+                    loaderp = new LLBVHLoader(file_buffer.get(), load_status, line_number, joint_alias_map);
+                    std::string status = getString(BVHSTATUS[load_status]);
+
+                    if (load_status == E_ST_NO_XLT_FILE)
+                    {
+                        LL_WARNS() << "NOTE: No translation table found." << LL_ENDL;
+                    }
+                    else
+                    {
+                        LL_WARNS() << "ERROR: [line: " << line_number << "] " << status << LL_ENDL;
+                    }
                 }
             }
 
-            infile.close() ;
-            delete[] file_buffer;
+            infile.close();
         }
     }
 

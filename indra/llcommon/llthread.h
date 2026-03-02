@@ -27,7 +27,6 @@
 #ifndef LL_LLTHREAD_H
 #define LL_LLTHREAD_H
 
-#include "llapr.h"
 #include "llrefcount.h"
 #include <thread>
 
@@ -53,7 +52,7 @@ public:
     } EThreadStatus;
     typedef std::thread::id id_t;
 
-    LLThread(const std::string& name, apr_pool_t *poolp = NULL);
+    LLThread(const std::string& name);
     virtual ~LLThread(); // Warning!  You almost NEVER want to destroy a thread unless it's in the STOPPED state.
     virtual void shutdown(); // stops the thread
 
@@ -83,8 +82,6 @@ public:
     // this kicks off the apr thread
     void start(void);
 
-    LLVolatileAPRPool* getLocalAPRFilePool() { return mLocalAPRFilePoolp ; }
-
     id_t getID() const { return mID; }
 
 private:
@@ -108,11 +105,6 @@ protected:
     EThreadStatus       mStatus;
     id_t                mID;
     LLTrace::ThreadRecorder* mRecorder;
-
-    //a local apr_pool for APRFile operations in this thread. If it exists, LLAPRFile::sAPRFilePoolp should not be used.
-    //Note: this pool is used by APRFile ONLY, do NOT use it for any other purposes.
-    //      otherwise it will cause severe memory leaking!!! --bao
-    LLVolatileAPRPool  *mLocalAPRFilePoolp ;
 
     void setQuitting();
 

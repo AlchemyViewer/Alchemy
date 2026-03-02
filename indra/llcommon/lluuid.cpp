@@ -904,7 +904,7 @@ U32 LLUUID::getRandomSeed()
     // Incorporate the pid into the seed to prevent
     // processes that start on the same host at the same
     // time from generating the same seed.
-    pid_t pid = LLApp::getPid();
+    int pid = LLApp::getPid();
 
     seed[6] = (unsigned char)(pid >> 8);
     seed[7] = (unsigned char)(pid);

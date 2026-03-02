@@ -24,9 +24,6 @@
  */
 
 #include "linden_common.h"
-#include "llapr.h"
-
-#include "apr_portable.h"
 
 #include "llapp.h"
 #include "llthread.h"
@@ -265,7 +262,7 @@ void LLThread::sehHandle()
 }
 #endif
 
-LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
+LLThread::LLThread(const std::string& name) :
     mPaused(false),
     mName(name),
     mThreadp(NULL),
@@ -274,7 +271,6 @@ LLThread::LLThread(const std::string& name, apr_pool_t *poolp) :
 {
     mRunCondition = new LLCondition();
     mDataLock = new LLMutex();
-    mLocalAPRFilePoolp = NULL ;
 }
 
 
@@ -285,12 +281,6 @@ LLThread::~LLThread()
     if (isCrashed())
     {
         LL_WARNS("THREAD") << "Destroying crashed thread named '" << mName << "'" << LL_ENDL;
-    }
-
-    if(mLocalAPRFilePoolp)
-    {
-        delete mLocalAPRFilePoolp ;
-        mLocalAPRFilePoolp = NULL ;
     }
 }
 

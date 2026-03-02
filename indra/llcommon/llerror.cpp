@@ -47,7 +47,6 @@
 #include "string.h"
 
 #include "llapp.h"
-#include "llapr.h"
 #include "llfile.h"
 #include "lllivefile.h"
 #include "llsd.h"

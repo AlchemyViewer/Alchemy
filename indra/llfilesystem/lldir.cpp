@@ -110,7 +110,7 @@ std::vector<std::string> LLDir::getFilesInDir(const std::string &dirname)
     return v;
 }
 
-S32 LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask)
+S32 LLDir::deleteFilesInDir(const std::filesystem::path& dirname, const std::string& mask)
 {
     S32 count = 0;
     std::string filename;
@@ -127,7 +127,7 @@ S32 LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask)
     LLDirIterator iter(dirname, mask);
     while (iter.next(filename))
     {
-        fullpath = add(dirname, filename);
+        std::filesystem::path fullpath = dirname / fsyspath(filename);
 
         if(LLFile::isdir(fullpath))
         {
@@ -168,7 +168,7 @@ S32 LLDir::deleteFilesInDir(const std::string &dirname, const std::string &mask)
     return count;
 }
 
-U32 LLDir::deleteDirAndContents(const std::string& dir_name)
+U32 LLDir::deleteDirAndContents(const std::filesystem::path& dir_path)
 {
     //Removes the directory and its contents.  Returns number of files deleted.
 
@@ -176,7 +176,6 @@ U32 LLDir::deleteDirAndContents(const std::string& dir_name)
 
     try
     {
-       fsyspath dir_path(dir_name);
        if (std::filesystem::is_directory(dir_path))
        {
           if (!std::filesystem::is_empty(dir_path))
@@ -191,7 +190,7 @@ U32 LLDir::deleteDirAndContents(const std::string& dir_name)
     }
     catch (std::filesystem::filesystem_error &er)
     {
-        LL_WARNS() << "Failed to delete " << dir_name << " with error " << er.code().message() << LL_ENDL;
+        LL_WARNS() << "Failed to delete " << dir_path << " with error " << er.code().message() << LL_ENDL;
     }
     return num_deleted;
 }

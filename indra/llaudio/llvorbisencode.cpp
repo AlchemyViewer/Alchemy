@@ -32,7 +32,7 @@
 #include "llerror.h"
 #include "llrand.h"
 #include "llmath.h"
-#include "llapr.h"
+#include "llfile.h"
 
 S32 check_for_invalid_wav_formats(const std::string& in_fname, std::string& error_msg)
 {
@@ -45,22 +45,23 @@ S32 check_for_invalid_wav_formats(const std::string& in_fname, std::string& erro
     U32 bytes_per_sec = 0;
     bool uncompressed_pcm = false;
 
-    unsigned char wav_header[44];       /*Flawfinder: ignore*/
+    char wav_header[44];       /*Flawfinder: ignore*/
 
     error_msg.clear();
 
     //********************************
-    LLAPRFile infile ;
-    infile.open(in_fname,LL_APR_RB);
+    llifstream infile(in_fname, std::ios::in | std::ios::binary);
     //********************************
-    if (!infile.getFileHandle())
+    if (!infile)
     {
         error_msg = "CannotUploadSoundFile";
         return(LLVORBISENC_SOURCE_OPEN_ERR);
     }
 
     infile.read(wav_header, 44);
-    physical_file_size = infile.seek(APR_END,0);
+    infile.seekg(0, std::ios::end);
+    physical_file_size = narrow(infile.tellg());
+    infile.seekg(0, std::ios::beg);
 
     if (strncmp((char *)&(wav_header[0]),"RIFF",4))
     {
@@ -80,7 +81,7 @@ S32 check_for_invalid_wav_formats(const std::string& in_fname, std::string& erro
 
     while ((file_pos + 8)< physical_file_size)
     {
-        infile.seek(APR_SET,file_pos);
+        infile.seekg(file_pos, std::ios::beg);
         infile.read(wav_header, 44);
 
         chunk_length = ((U32) wav_header[7] << 24)
@@ -201,18 +202,17 @@ S32 encode_vorbis_file(const std::string& in_fname, const std::string& out_fname
 
     S32 data_left = 0;
 
-    LLAPRFile infile ;
-    infile.open(in_fname,LL_APR_RB);
-    if (!infile.getFileHandle())
+    llifstream infile(in_fname, std::ios::in | std::ios::binary);
+    if (!infile)
     {
         LL_WARNS() << "Couldn't open temporary ogg file for writing: " << in_fname
             << LL_ENDL;
         return(LLVORBISENC_SOURCE_OPEN_ERR);
     }
 
-    LLAPRFile outfile ;
-    outfile.open(out_fname,LL_APR_WPB);
-    if (!outfile.getFileHandle())
+    llofstream outfile;
+    outfile.open(out_fname, std::ios::in | std::ios::out | std::ios::trunc | std::ios::binary);
+    if (!outfile)
     {
         LL_WARNS() << "Couldn't open upload sound file for reading: " << in_fname
             << LL_ENDL;
@@ -223,10 +223,10 @@ S32 encode_vorbis_file(const std::string& in_fname, const std::string& out_fname
      U32 chunk_length = 0;
      U32 file_pos = 12;  // start at the first chunk (usually fmt but not always)
 
-     while (infile.eof() != APR_EOF)
+     while (infile.good() && !infile.eof())
      {
-         infile.seek(APR_SET,file_pos);
-         infile.read(wav_header, 44);
+         infile.seekg(file_pos, std::ios::beg);
+         infile.read((char*)wav_header, 44);
 
          chunk_length = ((U32) wav_header[7] << 24)
              + ((U32) wav_header[6] << 16)
@@ -246,7 +246,7 @@ S32 encode_vorbis_file(const std::string& in_fname, const std::string& out_fname
          }
          else if (!(strncmp((char *)&(wav_header[0]),"data",4)))
          {
-             infile.seek(APR_SET,file_pos+8);
+             infile.seekg(file_pos+8, std::ios::beg);
              // leave the file pointer at the beginning of the data chunk data
              data_left = chunk_length;
              break;
@@ -319,8 +319,8 @@ S32 encode_vorbis_file(const std::string& in_fname, const std::string& out_fname
          while(!eos){
              int result=ogg_stream_flush(&os,&og);
              if(result==0)break;
-             outfile.write(og.header, og.header_len);
-             outfile.write(og.body, og.body_len);
+             outfile.write((char*)og.header, og.header_len);
+             outfile.write((char*)og.body, og.body_len);
          }
 
      }
@@ -330,7 +330,8 @@ S32 encode_vorbis_file(const std::string& in_fname, const std::string& out_fname
      {
          long bytes_per_sample = bits_per_sample/8;
 
-         long bytes=(long)infile.read(readbuffer,llclamp((S32)(READ_BUFFER*num_channels*bytes_per_sample),0,data_left)); /* stereo hardwired here */
+         infile.read((char*)readbuffer,llclamp((S32)(READ_BUFFER*num_channels*bytes_per_sample),0,data_left)); /* stereo hardwired here */
+         long bytes = (long)infile.gcount();
 
          if (bytes==0)
          {
@@ -438,8 +439,8 @@ S32 encode_vorbis_file(const std::string& in_fname, const std::string& out_fname
                  if(result==0)
                     break;
 
-                 outfile.write(og.header, og.header_len);
-                 outfile.write(og.body, og.body_len);
+                 outfile.write((char*)og.header, og.header_len);
+                 outfile.write((char*)og.body, og.body_len);
 
                  /* this could be set above, but for illustrative purposes, I do
                     it here (to show that vorbis does know where the stream ends) */

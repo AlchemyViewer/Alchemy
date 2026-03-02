@@ -162,7 +162,6 @@
 #   include <sys/file.h> // For processMarkerFiles
 #endif
 
-#include "llapr.h"
 #include <boost/lexical_cast.hpp>
 
 #include "llviewerinput.h"
@@ -2417,9 +2416,10 @@ void LLAppViewer::initLoggingAndGetLastDuration()
         std::string duration_log_msg(duration_log_stream.str());
 
         // Create a new start marker file for comparison with log file time for the next run
-        LLAPRFile start_marker_file;
-        start_marker_file.open(start_marker_file_name, LL_APR_WB);
-        if (start_marker_file.getFileHandle())
+        std::error_code ec;
+        LLFile start_marker_file;
+        start_marker_file.open(start_marker_file_name, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+        if (start_marker_file)
         {
             recordMarkerVersion(start_marker_file);
             start_marker_file.close();
@@ -3851,7 +3851,7 @@ void getFileList()
 #endif
 
 // static
-void LLAppViewer::recordMarkerVersion(LLAPRFile& marker_file)
+void LLAppViewer::recordMarkerVersion(LLFile& marker_file)
 {
     std::string marker_version(LLVersionInfo::instance().getChannelAndVersion());
     if ( marker_version.length() > MAX_MARKER_LENGTH )
@@ -3863,7 +3863,8 @@ void LLAppViewer::recordMarkerVersion(LLAPRFile& marker_file)
     }
 
     // record the viewer version in the marker file
-    marker_file.write(marker_version.data(), static_cast<S32>(marker_version.length()));
+    std::error_code ec;
+    marker_file.write(marker_version.data(), static_cast<S32>(marker_version.length()), ec);
 }
 
 bool LLAppViewer::markerIsSameVersion(const std::string& marker_name) const
@@ -3872,13 +3873,14 @@ bool LLAppViewer::markerIsSameVersion(const std::string& marker_name) const
 
     std::string my_version(LLVersionInfo::instance().getChannelAndVersion());
     char marker_data[MAX_MARKER_LENGTH];
-    S32  marker_version_length;
+    S64  marker_version_length;
 
-    LLAPRFile marker_file;
-    marker_file.open(marker_name, LL_APR_RB);
-    if (marker_file.getFileHandle())
+    std::error_code ec;
+    LLFile marker_file;
+    marker_file.open(marker_name, LLFile::in|LLFile::binary, ec);
+    if (marker_file)
     {
-        marker_version_length = marker_file.read(marker_data, sizeof(marker_data));
+        marker_version_length = marker_file.read(marker_data, sizeof(marker_data), ec);
         std::string marker_string(marker_data, marker_version_length);
         size_t pos = marker_string.find('\n');
         if (pos != std::string::npos)
@@ -3911,8 +3913,9 @@ void LLAppViewer::recordSessionToMarker()
             << LL_ENDL;
     }
 
-    mMarkerFile.seek(APR_SET, (S32)marker_version.length());
-    mMarkerFile.write(uuid_str.data(), (S32)uuid_str.length());
+    std::error_code ec;
+    mMarkerFile.seek((S32)marker_version.length(), LLFile::beg, ec);
+    mMarkerFile.write(uuid_str.data(), (S32)uuid_str.length(), ec);
 }
 
 LLUUID LLAppViewer::getMarkerSessionId(const std::string& marker_name) const
@@ -3948,13 +3951,14 @@ bool LLAppViewer::getMarkerData(const std::string& marker_name, std::string& dat
 
     std::string my_version(LLVersionInfo::instance().getChannelAndVersion());
     char marker_data[MAX_MARKER_LENGTH];
-    S32  marker_version_length;
+    S64  marker_version_length;
 
-    LLAPRFile marker_file;
-    marker_file.open(marker_name, LL_APR_RB);
-    if (marker_file.getFileHandle())
+    std::error_code ec;
+    LLFile marker_file;
+    marker_file.open(marker_name, LLFile::in|LLFile::binary, ec);
+    if (marker_file)
     {
-        marker_version_length = marker_file.read(marker_data, sizeof(marker_data));
+        marker_version_length = marker_file.read(marker_data, sizeof(marker_data), ec);
         marker_file.close();
         std::string marker_string(marker_data, marker_version_length);
         size_t pos = marker_string.find('\n');
@@ -4006,9 +4010,9 @@ void LLAppViewer::processMarkerFiles()
 
         // now test to see if this file is locked by a running process (try to open for write)
         marker_log_stream << "Checking exec marker file for lock...";
-        mMarkerFile.open(mMarkerFileName, LL_APR_WB);
-        apr_file_t* fMarker = mMarkerFile.getFileHandle() ;
-        if (!fMarker)
+        std::error_code ec;
+        mMarkerFile.open(mMarkerFileName, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+        if (!mMarkerFile)
         {
             marker_log_stream << "Exec marker file open failed - assume it is locked.";
             mSecondInstance = true; // lock means that instance is running.
@@ -4016,7 +4020,8 @@ void LLAppViewer::processMarkerFiles()
         else
         {
             // We were able to open it, now try to lock it ourselves...
-            if (apr_file_lock(fMarker, APR_FLOCK_NONBLOCK | APR_FLOCK_EXCLUSIVE) != APR_SUCCESS)
+            std::error_code ec;
+            if (0 != mMarkerFile.lock(LLFile::exclusive, ec) || ec)
             {
                 marker_log_stream << "Locking exec marker failed.";
                 mSecondInstance = true; // lost a race? be conservative
@@ -4059,13 +4064,14 @@ void LLAppViewer::processMarkerFiles()
     {
         initLoggingAndGetLastDuration();
         // Create the marker file for this execution & lock it; it will be deleted on a clean exit
-        apr_status_t s;
-        s = mMarkerFile.open(mMarkerFileName, LL_APR_WB, true);
+        std::error_code ec;
+        int ret = mMarkerFile.open(mMarkerFileName, LLFile::out|LLFile::trunc|LLFile::binary, ec);
 
-        if (s == APR_SUCCESS && mMarkerFile.getFileHandle())
+        if (ret == 0 && mMarkerFile)
         {
             LL_DEBUGS("MarkerFile") << "Exec marker file '"<< mMarkerFileName << "' created." << LL_ENDL;
-            if (APR_SUCCESS == apr_file_lock(mMarkerFile.getFileHandle(), APR_FLOCK_NONBLOCK | APR_FLOCK_EXCLUSIVE))
+            std::error_code ec;
+            if (0 == mMarkerFile.lock(LLFile::exclusive, ec))
             {
                 recordMarkerVersion(mMarkerFile);
                 LL_DEBUGS("MarkerFile") << "Exec marker file locked." << LL_ENDL;
@@ -4151,7 +4157,7 @@ void LLAppViewer::removeMarkerFiles()
 {
     if (!mSecondInstance)
     {
-        if (mMarkerFile.getFileHandle())
+        if (mMarkerFile)
         {
             mMarkerFile.close() ;
             LLFile::remove( mMarkerFileName );
@@ -4162,7 +4168,7 @@ void LLAppViewer::removeMarkerFiles()
             LL_WARNS("MarkerFile") << "marker '"<<mMarkerFileName<<"' not open"<< LL_ENDL;
         }
 
-        if (mLogoutMarkerFile.getFileHandle())
+        if (mLogoutMarkerFile)
         {
             mLogoutMarkerFile.close();
             LLFile::remove( mLogoutMarkerFileName );
@@ -5419,10 +5425,11 @@ void LLAppViewer::sendLogoutRequest()
             mLogoutMarkerFileName = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, LOGOUT_MARKER_FILE_NAME);
             try
             {
-                if (!mLogoutMarkerFile.getFileHandle())
+                if (!mLogoutMarkerFile)
                 {
-                    mLogoutMarkerFile.open(mLogoutMarkerFileName, LL_APR_WB);
-                    if (mLogoutMarkerFile.getFileHandle())
+                    std::error_code ec;
+                    mLogoutMarkerFile.open(mLogoutMarkerFileName, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+                    if (mLogoutMarkerFile)
                     {
                         LL_INFOS("MarkerFile") << "Created logout marker file '" << mLogoutMarkerFileName << "' " << LL_ENDL;
                         recordMarkerVersion(mLogoutMarkerFile);
@@ -5537,13 +5544,14 @@ void LLAppViewer::createErrorMarker(eLastExecEvent error_code) const
     {
         std::string error_marker = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, ERROR_MARKER_FILE_NAME);
 
-        LLAPRFile file;
-        file.open(error_marker, LL_APR_WB);
-        if (file.getFileHandle())
+        LLFile file;
+        std::error_code ec;
+        file.open(error_marker, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+        if (file)
         {
             recordMarkerVersion(file);
             std::string data = "\n" + std::to_string((S32)error_code);
-            file.write(data.data(), static_cast<S32>(data.length()));
+            file.write(data.data(), static_cast<S32>(data.length()), ec);
             file.close();
         }
     }

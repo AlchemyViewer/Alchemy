@@ -500,8 +500,10 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
 
                 // pass animation data through memory buffer
                 loaderp->serialize(dp);
-                LLAPRFile apr_file(filename, LL_APR_WB);
-                apr_file.write(buffer, buffer_size);
+
+                std::error_code ec;
+                LLFile apr_file(filename, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+                apr_file.write(buffer, buffer_size, ec);
                 apr_file.close();
                 delete[] file_buffer;
                 delete[] buffer;

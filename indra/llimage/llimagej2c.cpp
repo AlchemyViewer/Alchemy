@@ -24,7 +24,6 @@
  */
 #include "linden_common.h"
 
-#include "llapr.h"
 #include "lldir.h"
 #include "llimagej2c.h"
 #include "lltimer.h"
@@ -365,44 +364,46 @@ bool LLImageJ2C::loadAndValidate(const std::string &filename)
 
     resetLastError();
 
-    S32 file_size = 0;
-    LLAPRFile infile ;
-    infile.open(filename, LL_APR_RB, NULL, &file_size);
-    apr_file_t* apr_file = infile.getFileHandle() ;
-    if (!apr_file)
+    std::error_code ec;
+    LLFile infile;
+    infile.open(filename, LLFile::in | LLFile::binary, ec);
+    if (!infile || ec)
     {
         setLastError("Unable to open file for reading", filename);
         res = false;
     }
-    else if (file_size == 0)
-    {
-        setLastError("File is empty",filename);
-        res = false;
-    }
     else
     {
-        U8 *data = (U8*)ll_aligned_malloc_16(file_size);
-        if (!data)
+        S64 file_size = infile.size(ec);
+        if (file_size == 0 || ec)
         {
-            infile.close();
-            setLastError("Out of memory", filename);
+            setLastError("File is empty", filename);
             res = false;
         }
         else
         {
-            apr_size_t bytes_read = file_size;
-            apr_status_t s = apr_file_read(apr_file, data, &bytes_read); // modifies bytes_read
-            infile.close();
-
-            if (s != APR_SUCCESS || (S32)bytes_read != file_size)
+            U8* data = (U8*)ll_aligned_malloc_16(file_size);
+            if (!data)
             {
-                ll_aligned_free_16(data);
-                setLastError("Unable to read entire file");
+                infile.close();
+                setLastError("Out of memory", filename);
                 res = false;
             }
             else
             {
-                res = validate(data, file_size);
+                S64 bytes_read = infile.read((char*)data, file_size, ec);
+                infile.close();
+
+                if (ec || bytes_read != file_size)
+                {
+                    ll_aligned_free_16(data);
+                    setLastError("Unable to read entire file");
+                    res = false;
+                }
+                else
+                {
+                    res = validate(data, narrow(file_size));
+                }
             }
         }
     }

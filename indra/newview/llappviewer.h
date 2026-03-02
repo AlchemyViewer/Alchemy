@@ -44,7 +44,7 @@
 #define LL_LLAPPVIEWER_H
 
 #include "llapp.h"
-#include "llapr.h"
+#include "llfile.h"
 #include "llcontrol.h"
 #include "llsys.h"          // for LLOSInfo
 #include "lltimer.h"
@@ -307,7 +307,7 @@ private:
     void writeSystemInfo(); // Write system info to "debug_info.log"
 
     void processMarkerFiles();
-    static void recordMarkerVersion(LLAPRFile& marker_file);
+    static void recordMarkerVersion(LLFile& marker_file);
     bool markerIsSameVersion(const std::string& marker_name) const;
     LLUUID getMarkerSessionId(const std::string& marker_name) const;
     S32 getMarkerErrorCode(const std::string& marker_name) const;
@@ -330,10 +330,10 @@ private:
     bool mUpdaterNotFound; // True when attempt to start updater failed
 
     std::string mMarkerFileName;
-    LLAPRFile mMarkerFile; // A file created to indicate the app is running.
+    LLFile mMarkerFile; // A file created to indicate the app is running.
 
     std::string mLogoutMarkerFileName;
-    LLAPRFile mLogoutMarkerFile; // A file created to indicate the app is running.
+    LLFile mLogoutMarkerFile; // A file created to indicate the app is running.
 
     bool mReportedCrash;
 

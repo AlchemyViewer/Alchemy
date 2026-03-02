@@ -43,6 +43,7 @@
 #include "lltrace.h"
 #include "lltracethreadrecorder.h"
 
+#include "llapr.h"
 #include "apr_pools.h"
 #include "apr_getopt.h"
 
