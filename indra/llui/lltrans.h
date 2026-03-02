@@ -30,6 +30,8 @@
 #include <map>
 #include <set>
 
+#include <boost/unordered_map.hpp>
+
 #include "llstring.h"
 #include "llxmlnode.h"
 
@@ -125,7 +127,7 @@ public:
     }
 
 private:
-    typedef std::unordered_map<std::string, LLTransTemplate, ll::string_hash, std::equal_to<>> template_map_t;
+    typedef boost::unordered_map<std::string, LLTransTemplate, ll::string_hash, std::equal_to<>> template_map_t;
     static template_map_t sStringTemplates;
     static template_map_t sDefaultStringTemplates;
     static LLStringUtil::format_map_t sDefaultArgs;

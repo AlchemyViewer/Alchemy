@@ -33,7 +33,7 @@
 #include "lluuid.h"
 #include <boost/signals2.hpp>
 #include <set>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 class LLSD;
 class LLUUID;
@@ -179,18 +179,18 @@ private:
 
     // Agent IDs that have been requested, but with no reply.
     // Maps agent ID to frame time request was made.
-    using pending_queue_t = std::unordered_map<LLUUID, F64>;
+    using pending_queue_t = boost::unordered_map<LLUUID, F64>;
     pending_queue_t mPendingQueue;
 
     // Callbacks to fire when we received a name.
     // May have multiple callbacks for a single ID, which are
     // represented as multiple slots bound to the signal.
     // Avoid copying signals via pointers.
-    using signal_map_t = std::unordered_map<LLUUID, callback_signal_t*>;
+    using signal_map_t = boost::unordered_map<LLUUID, callback_signal_t*>;
     signal_map_t mSignalMap;
 
     // The cache at last, i.e. avatar names we know about.
-    using cache_t = std::unordered_map<LLUUID, LLAvatarName>;
+    using cache_t = boost::unordered_map<LLUUID, LLAvatarName>;
     cache_t mCache;
 
     // Time when unrefreshed cached names were checked last.

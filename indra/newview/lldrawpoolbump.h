@@ -32,7 +32,7 @@
 #include "lltextureentry.h"
 #include "lluuid.h"
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 class LLImageRaw;
 class LLSpatialGroup;
@@ -149,7 +149,7 @@ private:
     static void onSourceUpdated( LLViewerTexture *src_vi, EBumpEffect bump );
 
 private:
-    typedef std::unordered_map<LLUUID, LLPointer<LLViewerTexture> > bump_image_map_t;
+    typedef boost::unordered_map<LLUUID, LLPointer<LLViewerTexture>> bump_image_map_t;
     bump_image_map_t mBrightnessEntries;
     bump_image_map_t mDarknessEntries;
     static LLRenderTarget sRenderTarget;

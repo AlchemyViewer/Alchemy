@@ -26,6 +26,7 @@
 #ifndef LLPOINTER_H
 #define LLPOINTER_H
 
+#include <boost/container_hash/hash.hpp>
 #include <functional>
 #include <string_view>
 #include <utility>                  // std::swap()
@@ -304,4 +305,12 @@ namespace std
         }
     };
 }
+
+// For use with boost::container_hash
+template<class Type>
+inline size_t hash_value(LLPointer<Type> const& s) noexcept
+{
+    return boost::hash<Type*>()(s.get());
+}
+
 #endif

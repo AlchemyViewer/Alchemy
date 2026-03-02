@@ -27,7 +27,7 @@
 #ifndef LL_LLUICOLORTABLE_H_
 #define LL_LLUICOLORTABLE_H_
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 #include "llinitparam.h"
 #include "llsingleton.h"
@@ -42,7 +42,7 @@ class LLUIColorTable : public LLSingleton<LLUIColorTable>
     LOG_CLASS(LLUIColorTable);
 
     // consider using sorted vector, can be much faster
-    typedef std::unordered_map<std::string, LLUIColor, ll::string_hash, std::equal_to<>>  string_color_map_t;
+    typedef boost::unordered_map<std::string, LLUIColor, ll::string_hash, std::equal_to<>>  string_color_map_t;
 
 public:
     struct ColorParams : LLInitParam::ChoiceBlock<ColorParams>

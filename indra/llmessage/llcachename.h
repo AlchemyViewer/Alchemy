@@ -29,6 +29,7 @@
 
 #include <boost/bind.hpp>
 #include <boost/signals2.hpp>
+#include <boost/unordered_map.hpp>
 
 class LLMessageSystem;
 class LLHost;
@@ -136,7 +137,7 @@ public:
     void localizeCacheName(std::string key, std::string value);
 
 private:
-    using cache_map_t = std::unordered_map<std::string, std::string>;
+    using cache_map_t = boost::unordered_map<std::string, std::string>;
     cache_map_t mCacheName;
 
     class Impl;

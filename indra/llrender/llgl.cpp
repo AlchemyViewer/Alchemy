@@ -2429,7 +2429,7 @@ void clear_glerror()
 //
 
 // Static members
-std::unordered_map<LLGLenum, LLGLboolean> LLGLState::sStateMap;
+boost::unordered_map<LLGLenum, LLGLboolean> LLGLState::sStateMap;
 
 GLboolean LLGLDepthTest::sDepthEnabled = GL_FALSE; // OpenGL default
 GLenum LLGLDepthTest::sDepthFunc = GL_LESS; // OpenGL default
@@ -2471,7 +2471,7 @@ void LLGLState::resetTextureStates()
 void LLGLState::dumpStates()
 {
     LL_INFOS("RenderState") << "GL States:" << LL_ENDL;
-    for (std::unordered_map<LLGLenum, LLGLboolean>::iterator iter = sStateMap.begin();
+    for (boost::unordered_map<LLGLenum, LLGLboolean>::iterator iter = sStateMap.begin();
          iter != sStateMap.end(); ++iter)
     {
         LL_INFOS("RenderState") << llformat(" 0x%04x : %s",(S32)iter->first,iter->second?"true":"false") << LL_ENDL;
@@ -2503,7 +2503,7 @@ void LLGLState::checkStates(GLboolean writeAlpha)
     //llassert_always(colorMask[2]);
     // llassert_always(colorMask[3] == writeAlpha);
 
-    for (std::unordered_map<LLGLenum, LLGLboolean>::iterator iter = sStateMap.begin();
+    for (boost::unordered_map<LLGLenum, LLGLboolean>::iterator iter = sStateMap.begin();
          iter != sStateMap.end(); ++iter)
     {
         LLGLenum state = iter->first;

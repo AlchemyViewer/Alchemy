@@ -30,6 +30,8 @@
 #include <map>
 #include <set>
 
+#include <boost/unordered_map.hpp>
+
 // common includes
 #include "llstring.h"
 #include "lltrace.h"
@@ -207,7 +209,7 @@ protected:
 
     uuid_set_t   mDeadObjects;
 
-    std::unordered_map<LLUUID, LLPointer<LLViewerObject> > mUUIDObjectMap;
+    boost::unordered_map<LLUUID, LLPointer<LLViewerObject>> mUUIDObjectMap;
 
     //set of objects that need to update their cost
     uuid_set_t   mStaleObjectCost;
@@ -224,7 +226,7 @@ protected:
     static U32 sSimulatorMachineIndex;
     std::map<U64, U32> mIPAndPortToIndex;
 
-    std::unordered_map<U64, LLUUID> mIndexAndLocalIDToUUID;
+    boost::unordered_map<U64, LLUUID> mIndexAndLocalIDToUUID;
 
     friend class LLViewerObject;
 

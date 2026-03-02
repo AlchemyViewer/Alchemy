@@ -199,7 +199,19 @@ namespace std
 // For use with boost::container_hash
 inline size_t hash_value(const LLUUID& id) noexcept
 {
-    return std::hash<LLUUID>{}(id);
+    size_t h = 0;
+    // Golden ratio hash with avalanche mixing
+    // Process 8 bytes at a time by manually constructing 64-bit values
+    // Shift by 31: mixes upper half into lower half for better bit distribution
+    // Shift by 47: ensures highest bits influence final hash output
+    for (int i = 0; i < UUID_BYTES; i += 8)
+    {
+        size_t chunk = (size_t)id.mData[i] | ((size_t)id.mData[i + 1] << 8) | ((size_t)id.mData[i + 2] << 16) |
+                       ((size_t)id.mData[i + 3] << 24) | ((size_t)id.mData[i + 4] << 32) | ((size_t)id.mData[i + 5] << 40) |
+                       ((size_t)id.mData[i + 6] << 48) | ((size_t)id.mData[i + 7] << 56);
+        h ^= (chunk * 0x9e3779b97f4a7c15ULL) ^ (h >> 31) ^ (h >> 47);
+    }
+    return h;
 }
 
 #endif // LL_LLUUID_H

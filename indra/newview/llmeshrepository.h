@@ -27,8 +27,8 @@
 #ifndef LL_MESH_REPOSITORY_H
 #define LL_MESH_REPOSITORY_H
 
-#include <unordered_map>
-#include <unordered_set>
+#include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 #include "llassettype.h"
 #include "llmodel.h"
 #include "lluuid.h"
@@ -312,7 +312,7 @@ public:
             request->setScoreDirty();
         }
     }
-    std::unordered_set<LLVOVolume*> mVolumes;
+    boost::unordered_set<LLVOVolume*> mVolumes;
 private:
     std::weak_ptr<PendingRequestBase> mRequest;
 };
@@ -442,7 +442,7 @@ public:
     LLCondition* mSignal;
 
     //map of known mesh headers
-    typedef std::unordered_map<LLUUID, LLMeshHeader> mesh_header_map; // pair is header_size and data
+    typedef boost::unordered_map<LLUUID, LLMeshHeader> mesh_header_map; // pair is header_size and data
     mesh_header_map mMeshHeader;
 
     class HeaderRequest : public RequestStats
@@ -537,12 +537,12 @@ public:
     std::deque<LoadedMesh> mLoadedQ;
 
     //map of pending header requests and currently desired LODs
-    typedef std::unordered_map<LLUUID, std::array<S32, LLModel::NUM_LODS> > pending_lod_map;
+    typedef boost::unordered_map<LLUUID, std::array<S32, LLModel::NUM_LODS> > pending_lod_map;
     pending_lod_map mPendingLOD;
 
     // map of mesh ID to skin info (mirrors LLMeshRepository::mSkinMap)
     /// NOTE: LLMeshRepository::mSkinMap is accessed very frequently, so maintain a copy here to avoid mutex overhead
-    typedef std::unordered_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
+    typedef boost::unordered_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
     skin_map mSkinMap;
 
     // workqueue for processing generic requests
@@ -559,7 +559,7 @@ public:
     LLCore::HttpRequest::policy_t       mHttpPolicyClass;
     LLCore::HttpRequest::policy_t       mHttpLargePolicyClass;
 
-    typedef std::unordered_set<LLCore::HttpHandler::ptr_t> http_request_set;
+    typedef boost::unordered_set<LLCore::HttpHandler::ptr_t> http_request_set;
     http_request_set                    mHttpRequestSet;            // Outstanding HTTP requests
 
     std::string mGetMeshCapability;
@@ -757,9 +757,9 @@ protected:
         S32& mesh_num,
         S32& texture_num,
         S32& instance_num,
-        std::unordered_set<LLViewerTexture* > &textures,
-        std::unordered_map<LLViewerTexture*, S32> texture_index,
-        std::unordered_map<LLModel*, S32>& mesh_index,
+        boost::unordered_set<LLViewerTexture* > &textures,
+        boost::unordered_map<LLViewerTexture*, S32> texture_index,
+        boost::unordered_map<LLModel*, S32>& mesh_index,
         std::vector<std::string>& texture_list_dest,
         bool include_textures
         );
@@ -910,10 +910,10 @@ public:
     static void metricsProgress(unsigned int count);
     static void metricsUpdate();
 
-    typedef std::unordered_map<LLUUID, MeshLoadData> mesh_load_map;
+    typedef boost::unordered_map<LLUUID, MeshLoadData> mesh_load_map;
     mesh_load_map mLoadingMeshes[4];
 
-    typedef std::unordered_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
+    typedef boost::unordered_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
     skin_map mSkinMap;
 
     typedef std::map<LLUUID, LLModel::Decomposition*> decomposition_map;
@@ -925,17 +925,17 @@ public:
     pending_requests_vec mPendingRequests;
 
     //list of mesh ids awaiting skin info
-    typedef std::unordered_map<LLUUID, MeshLoadData > skin_load_map;
+    typedef boost::unordered_map<LLUUID, MeshLoadData > skin_load_map;
     skin_load_map mLoadingSkins;
 
     //list of mesh ids awaiting decompositions
-    std::unordered_set<LLUUID> mLoadingDecompositions;
+    boost::unordered_set<LLUUID> mLoadingDecompositions;
 
     //list of mesh ids that need to send decomposition fetch requests
     std::queue<LLUUID> mPendingDecompositionRequests;
 
     //list of mesh ids awaiting physics shapes
-    std::unordered_set<LLUUID> mLoadingPhysicsShapes;
+    boost::unordered_set<LLUUID> mLoadingPhysicsShapes;
 
     //list of mesh ids that need to send physics shape fetch requests
     std::queue<LLUUID> mPendingPhysicsShapeRequests;

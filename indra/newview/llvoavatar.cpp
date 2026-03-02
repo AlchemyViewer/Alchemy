@@ -11433,7 +11433,7 @@ void LLVOAvatar::calculateUpdateRenderComplexity()
         max_attachment_complexity = llmax(max_attachment_complexity, DEFAULT_MAX_ATTACHMENT_COMPLEXITY);
 
         // Diagnostic list of all textures on our avatar
-        static std::unordered_set<const LLViewerTexture*> all_textures;
+        static boost::unordered_set<const LLViewerTexture*> all_textures;
 
         U32 cost = VISUAL_COMPLEXITY_UNKNOWN;
         LLVOVolume::texture_cost_t textures;

@@ -15,7 +15,7 @@
 #include <typeindex>
 #include <typeinfo>
 #include <utility>                  // std::pair
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 /**
  * LLHeteroMap addresses an odd requirement. Usually when you want to put
@@ -74,7 +74,7 @@ private:
 
     // What we actually store is a map from std::type_index (permitting lookup
     // by object type) to a void* pointer to the object PLUS its deleter.
-    typedef std::unordered_map<std::type_index, std::pair<void*, void (*)(void*)>>
+    typedef boost::unordered_map<std::type_index, std::pair<void*, void (*)(void*)>>
     TypeMap;
     TypeMap mMap;
 };

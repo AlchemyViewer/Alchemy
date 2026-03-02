@@ -39,7 +39,7 @@
 #include "llrender.h"
 #include "threadpool.h"
 #include "workqueue.h"
-#include <unordered_set>
+#include <boost/unordered_set.hpp>
 
 #define LL_IMAGEGL_THREAD_CHECK 0 //set to 1 to enable thread debugging for ImageGL
 
@@ -280,7 +280,7 @@ protected:
 
     // STATICS
 public:
-    static std::unordered_set<LLImageGL*> sImageList;
+    static boost::unordered_set<LLImageGL*> sImageList;
     static S32 sCount;
     static U32 sFrameCount;
     static F32 sLastFrameTime;

@@ -34,6 +34,7 @@
 #include "httpheaders.h"
 #include "httpoptions.h"
 #include <boost/container_hash/hash.hpp>
+#include <boost/unordered_map.hpp>
 
 class LLViewerRegion;
 
@@ -68,6 +69,14 @@ namespace std
         }
     };
 } // namespace std
+
+inline std::size_t hash_value(TEMaterialPair const& id)
+{
+    std::size_t seed = 0;
+    boost::hash_combine(seed, id.te);
+    boost::hash_combine(seed, id.materialID);
+    return seed;
+}
 
 class LLMaterialMgr : public LLSingleton<LLMaterialMgr>
 {
@@ -123,7 +132,7 @@ private:
     typedef std::map<LLMaterialID, std::unique_ptr<get_callback_t>> get_callback_map_t;
 
 
-    typedef std::unordered_map<TEMaterialPair, std::unique_ptr<get_callback_te_t>> get_callback_te_map_t;
+    typedef boost::unordered_map<TEMaterialPair, std::unique_ptr<get_callback_te_t>> get_callback_te_map_t;
     typedef std::set<LLUUID> getall_queue_t;
     typedef std::map<LLUUID, F64> getall_pending_map_t;
     typedef std::map<LLUUID, std::unique_ptr<getall_callback_t>> getall_callback_map_t;

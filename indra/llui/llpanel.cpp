@@ -441,7 +441,7 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
         it != p.strings.end();
         ++it)
     {
-        mUIStrings[it->name] = it->value;
+        mUIStrings[it->name()] = it->value;
     }
 
     setLabel(p.label());

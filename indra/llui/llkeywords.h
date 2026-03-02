@@ -36,6 +36,7 @@
 #include <map>
 #include <list>
 #include <deque>
+#include <boost/unordered_map.hpp>
 #include "llpointer.h"
 
 class LLTextSegment;
@@ -194,7 +195,7 @@ protected:
     token_list_t mLineTokenList;
     token_list_t mDelimiterTokenList;
 
-    typedef std::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> element_attributes_t;
+    typedef boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> element_attributes_t;
     typedef element_attributes_t::const_iterator attribute_iterator_t;
     element_attributes_t mAttributes;
     std::string getAttribute(std::string_view key);

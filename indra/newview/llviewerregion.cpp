@@ -104,7 +104,7 @@ S32  LLViewerRegion::sLastCameraUpdated = 0;
 S32  LLViewerRegion::sNewObjectCreationThrottle = -1;
 LLViewerRegion::vocache_entry_map_t LLViewerRegion::sRegionCacheCleanup;
 
-typedef std::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> CapabilityMap;
+typedef boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> CapabilityMap;
 
 static void log_capabilities(const CapabilityMap &capmap);
 

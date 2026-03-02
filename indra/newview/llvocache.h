@@ -33,7 +33,7 @@
 #include "llvieweroctree.h"
 #include "llgltfmaterial.h"
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 //---------------------------------------------------------------------------
 // Cache entries
@@ -49,8 +49,8 @@ public:
 
     LLUUID mObjectId;
     U32    mLocalId = 0;
-    std::unordered_map<S32, LLSD> mSides; //override LLSD per side
-    std::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side
+    boost::unordered_map<S32, LLSD> mSides; //override LLSD per side
+    boost::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side
     U64 mRegionHandle = 0;
 };
 
@@ -162,7 +162,7 @@ public:
     typedef std::set<LLVOCacheEntry*>                      vocache_entry_set_t;
     typedef std::set<LLVOCacheEntry*, CompareVOCacheEntry> vocache_entry_priority_list_t;
 
-    typedef std::unordered_map<U32, LLGLTFOverrideCacheEntry>  vocache_gltf_overrides_map_t;
+    typedef boost::unordered_map<U32, LLGLTFOverrideCacheEntry>  vocache_gltf_overrides_map_t;
 
     S32                         mLastCameraUpdated;
 protected:

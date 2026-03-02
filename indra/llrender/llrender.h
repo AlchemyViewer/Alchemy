@@ -44,6 +44,8 @@
 #include "llmatrix4a.h"
 #include "glm/mat4x4.hpp"
 
+#include <boost/unordered_map.hpp>
+
 #include <array>
 #include <chrono>
 #include <list>
@@ -546,7 +548,7 @@ private:
         std::chrono::steady_clock::time_point touched;
     };
 
-    std::unordered_map<U64, LLVBCache> mVBCache;
+    boost::unordered_map<U64, LLVBCache> mVBCache;
     std::list<LLVertexBufferData>* mBufferDataList = nullptr;
 };
 

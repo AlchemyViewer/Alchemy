@@ -57,6 +57,7 @@
 #include "llprofiler.h"
 
 #include <boost/stacktrace.hpp>
+#include <boost/unordered_map.hpp>
 
 namespace {
 #if LL_WINDOWS
@@ -516,7 +517,7 @@ namespace
     }
 
 
-    typedef std::unordered_map<std::string, LLError::ELevel> LevelMap;
+    typedef boost::unordered_map<std::string, LLError::ELevel> LevelMap;
     typedef std::vector<LLError::RecorderPtr> Recorders;
     typedef std::vector<LLError::CallSite*> CallSiteVector;
 
@@ -537,7 +538,7 @@ namespace
         LevelMap                            mClassLevelMap;
         LevelMap                            mFileLevelMap;
         LevelMap                            mTagLevelMap;
-        std::unordered_map<std::string, unsigned int> mUniqueLogMessages;
+        boost::unordered_map<std::string, unsigned int> mUniqueLogMessages;
 
         LLError::FatalFunction              mCrashFunction;
         LLError::TimeFunction               mTimeFunction;

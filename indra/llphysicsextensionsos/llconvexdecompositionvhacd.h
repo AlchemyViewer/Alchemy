@@ -33,6 +33,8 @@
 #include "llmath.h"
 #include "llmutex.h"
 
+#include <boost/unordered_map.hpp>
+
 #include <vector>
 
 #include "VHACD.h"
@@ -336,7 +338,7 @@ private:
     int mBoundDecompID = INVALID_DECOMP_ID;
     int mNextDecompID = 0; // Only for use inside genDecomposition.
 
-    std::unordered_map<int, data_ptr_t> mDecompData;
+    boost::unordered_map<int, data_ptr_t> mDecompData;
 
     VHACDLogger    mVHACDLogger;
 

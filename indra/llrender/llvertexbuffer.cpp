@@ -38,6 +38,8 @@
 #include "llmemory.h"
 #include <glm/gtc/type_ptr.hpp>
 
+#include <boost/unordered_map.hpp>
+
 //Next Highest Power Of Two
 //helper function, returns first number > v that is a power of 2, or v if v is already a power of 2
 U32 nhpo2(U32 v)
@@ -400,7 +402,7 @@ public:
         clear();
     }
 
-    typedef std::unordered_map<U32, std::list<Entry>> Pool;
+    typedef boost::unordered_map<U32, std::list<Entry>> Pool;
 
     Pool mVBOPool;
     Pool mIBOPool;
@@ -531,7 +533,7 @@ public:
 
         LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
 
-        std::unordered_map<U32, std::list<Entry>>* pools[] = { &mVBOPool, &mIBOPool };
+        boost::unordered_map<U32, std::list<Entry>>* pools[] = { &mVBOPool, &mIBOPool };
 
         using namespace std::chrono_literals;
 

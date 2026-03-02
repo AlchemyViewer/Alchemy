@@ -29,7 +29,7 @@
 #define LL_LLVIEWEROBJECT_H
 
 #include <map>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 #include "llassetstorage.h"
 //#include "llhudicon.h"
@@ -807,7 +807,8 @@ private:
     std::unique_ptr<LLReflectionProbeParams> mReflectionProbeParams;
 
     static std::map<std::string, U32> sObjectDataMap;
-    static std::unordered_map<LLUUID, std::vector<LLViewerObject*>> sPendingUpdatesByOwner;
+    static boost::unordered_map<LLUUID, std::vector<LLViewerObject*>> sPendingUpdatesByOwner;
+
 public:
     // Sent to sim in UPDATE_FLAGS, received in ObjectPhysicsProperties
     U8              mPhysicsShapeType;

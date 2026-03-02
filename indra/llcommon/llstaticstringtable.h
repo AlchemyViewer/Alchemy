@@ -31,7 +31,7 @@
 #include "lldefs.h"
 #include "llstl.h"
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 class LLStaticHashedString
 {
@@ -75,7 +75,7 @@ struct LLStaticStringHasher
 
 template< typename MappedObject >
 class LL_COMMON_API LLStaticStringTable
-    : public std::unordered_map< LLStaticHashedString, MappedObject, LLStaticStringHasher >
+    : public boost::unordered_map< LLStaticHashedString, MappedObject, LLStaticStringHasher >
 {
 };
 

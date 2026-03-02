@@ -34,11 +34,11 @@
 #include "lltrans.h"
 #include "llui.h"
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 
 // Baked-in return values for getString()
-std::unordered_map< std::string, std::string, ll::string_hash, std::equal_to<>> gString;
+boost::unordered_map< std::string, std::string, ll::string_hash, std::equal_to<>> gString;
 
 // Baked-in return values for getCountString()
 // map of pairs of input xml_desc and integer count

@@ -146,7 +146,7 @@ public:
     const LLMatrix4&    getRelativeXform() const                { return mRelativeXform; }
     const LLMatrix3&    getRelativeXformInvTrans() const        { return mRelativeXformInvTrans; }
     /*virtual*/ const LLMatrix4 getRenderMatrix() const override;
-                typedef std::unordered_set<const LLViewerTexture*> texture_cost_t;
+                typedef boost::unordered_set<const LLViewerTexture*> texture_cost_t;
                 static S32 getTextureCost(const LLViewerTexture* img);
                 U32     getRenderCost(texture_cost_t &textures) const;
     /*virtual*/ F32     getEstTrianglesMax() const override;

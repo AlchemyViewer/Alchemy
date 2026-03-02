@@ -33,7 +33,7 @@
 #include "llimagegl.h"
 #include "llfontbitmapcache.h"
 
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 
 // Hack.  FT_Face is just a typedef for a pointer to a struct,
 // but there's no simple forward declarations file for FreeType,
@@ -185,7 +185,7 @@ private:
     fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)
 
     // *NOTE: the same glyph can be present with multiple representations (but the pointer is always unique)
-    typedef std::unordered_multimap<llwchar, LLFontGlyphInfo*> char_glyph_info_map_t;
+    typedef boost::unordered_multimap<llwchar, LLFontGlyphInfo*> char_glyph_info_map_t;
     mutable char_glyph_info_map_t mCharGlyphInfoMap; // Information about glyph location in bitmap
 
     mutable LLFontBitmapCache* mFontBitmapCachep;

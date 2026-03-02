@@ -36,7 +36,7 @@
 #include "llstl.h"
 
 #include <functional>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 #include <vector>
 
 #include <boost/signals2.hpp>
@@ -170,7 +170,7 @@ class LLControlGroup : public LLInstanceTracker<LLControlGroup, std::string>
     LOG_CLASS(LLControlGroup);
 
 protected:
-    using ctrl_name_table_t = std::unordered_map<std::string, LLControlVariablePtr, ll::string_hash, std::equal_to<>>;
+    using ctrl_name_table_t = boost::unordered_map<std::string, LLControlVariablePtr, ll::string_hash, std::equal_to<>>;
     ctrl_name_table_t mNameTable;
     static const std::string mTypeString[TYPE_COUNT];
 

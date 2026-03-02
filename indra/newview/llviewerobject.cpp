@@ -135,7 +135,7 @@ F64Seconds  LLViewerObject::sPhaseOutUpdateInterpolationTime(2.0);  // For motio
 F64Seconds  LLViewerObject::sMaxRegionCrossingInterpolationTime(1.0);// For motion interpolation: don't interpolate over this time on region crossing
 
 std::map<std::string, U32> LLViewerObject::sObjectDataMap;
-std::unordered_map<LLUUID, std::vector<LLViewerObject*>> LLViewerObject::sPendingUpdatesByOwner;
+boost::unordered_map<LLUUID, std::vector<LLViewerObject*>> LLViewerObject::sPendingUpdatesByOwner;
 
 // The maximum size of an object extra parameters binary (packed) block
 #define MAX_OBJECT_PARAMS_SIZE 1024
@@ -7771,7 +7771,7 @@ bool LLViewerObject::isReachable()
         return true;
     }
 
-    std::unordered_set<LLViewerRegion*> visited;
+    boost::unordered_set<LLViewerRegion*> visited;
     std::queue<LLViewerRegion*> pending;
     visited.insert(agent_region);
     pending.push(agent_region);

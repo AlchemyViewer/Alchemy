@@ -32,7 +32,7 @@
 #include <type_traits>
 #include <vector>
 #include <list>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 #include <boost/function.hpp>
 
 #include "llerror.h"
@@ -266,7 +266,7 @@ namespace LLInitParam
     private:
         struct Inaccessable{};
     public:
-        typedef std::unordered_map<std::string, T> value_name_map_t;
+        typedef boost::unordered_map<std::string, T> value_name_map_t;
         typedef Inaccessable name_t;
         typedef TypeValues<T> type_value_t;
         typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;
@@ -320,7 +320,7 @@ namespace LLInitParam
     {
         typedef TypeValuesHelper<T, DERIVED_TYPE, IS_SPECIALIZED> self_t;
     public:
-        typedef typename std::unordered_map<std::string, T> value_name_map_t;
+        typedef typename boost::unordered_map<std::string, T> value_name_map_t;
         typedef std::string name_t;
         typedef self_t type_value_t;
         typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;
@@ -496,9 +496,9 @@ namespace LLInitParam
         typedef bool (*parser_write_func_t)(Parser& parser, const void*, name_stack_t&);
         typedef std::function<void (name_stack_t&, S32, S32, const possible_values_t*)>   parser_inspect_func_t;
 
-        typedef std::unordered_map<std::type_index, parser_read_func_t>           parser_read_func_map_t;
-        typedef std::unordered_map<std::type_index, parser_write_func_t>          parser_write_func_map_t;
-        typedef std::unordered_map<std::type_index, parser_inspect_func_t>        parser_inspect_func_map_t;
+        typedef boost::unordered_map<std::type_index, parser_read_func_t>           parser_read_func_map_t;
+        typedef boost::unordered_map<std::type_index, parser_write_func_t>          parser_write_func_map_t;
+        typedef boost::unordered_map<std::type_index, parser_inspect_func_t>        parser_inspect_func_map_t;
 
     public:
 
@@ -664,7 +664,7 @@ namespace LLInitParam
         void aggregateBlockData(BlockDescriptor& src_block_data);
         void addParam(ParamDescriptorPtr param, const char* name);
 
-        typedef std::unordered_map<std::string, ParamDescriptorPtr, ll::string_hash, std::equal_to<>> param_map_t;
+        typedef boost::unordered_map<std::string, ParamDescriptorPtr, ll::string_hash, std::equal_to<>> param_map_t;
         typedef std::vector<ParamDescriptorPtr>                                                 param_list_t;
         typedef std::list<ParamDescriptorPtr>                                                   all_params_list_t;
         typedef std::vector<std::pair<param_handle_t, ParamDescriptor::validation_func_t> >     param_validation_list_t;

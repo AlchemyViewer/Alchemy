@@ -1628,7 +1628,7 @@ bool LLNotifications::loadTemplates()
 
     for (const LLNotificationTemplate::GlobalString& string : params.strings)
     {
-        mGlobalStrings[string.name] = string.value;
+        mGlobalStrings[string.name()] = string.value;
     }
 
     std::map<std::string, LLNotificationForm::Params> form_templates;
@@ -1665,7 +1665,7 @@ bool LLNotifications::loadTemplates()
                 replaceFormText(notification.form_ref.form, "$ignoretext", notification.form_ref.form_template.ignore_text);
             }
         }
-        mTemplates[notification.name] = std::make_shared<LLNotificationTemplate>(notification);
+        mTemplates[notification.name()] = std::make_shared<LLNotificationTemplate>(notification);
     }
 
     LL_INFOS("Notifications") << "...done" << LL_ENDL;

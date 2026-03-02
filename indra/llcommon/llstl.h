@@ -41,6 +41,9 @@
 // <ND> For strcmp
 #include <string.h>
 #endif
+
+#include <boost/container_hash/hash.hpp>
+
 // Use to compare the first element only of a pair
 // e.g. typedef std::set<std::pair<int, Data*>, compare_pair<int, Data*> > some_pair_set_t;
 template <typename T1, typename T2>
@@ -702,10 +705,11 @@ namespace ll
 {
     struct string_hash
     {
+        using hash_type = boost::hash<std::string_view>;
         using is_transparent = void;
-        [[nodiscard]] size_t operator()(char const* rhs) const { return std::hash<std::string_view>{}(rhs); }
-        [[nodiscard]] size_t operator()(std::string_view rhs) const { return std::hash<std::string_view>{}(rhs); }
-        [[nodiscard]] size_t operator()(const std::string& rhs) const { return std::hash<std::string>{}(rhs); }
+        [[nodiscard]] size_t operator()(const char* txt) const { return hash_type{}(txt); }
+        [[nodiscard]] size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
+        [[nodiscard]] size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
     };
 } // namespace ll
 

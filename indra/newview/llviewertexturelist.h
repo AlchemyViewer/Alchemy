@@ -33,7 +33,7 @@
 #include "llviewertexture.h"
 #include "llui.h"
 #include <list>
-#include <unordered_set>
+#include <boost/unordered_set.hpp>
 #include "lluiimage.h"
 
 const U32 LL_IMAGE_REZ_LOSSLESS_CUTOFF = 128;
@@ -208,7 +208,7 @@ private:
     { return getImage(image_id, f_type, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE, 0, 0, host); }
 
 public:
-    typedef std::unordered_set<LLPointer<LLViewerFetchedTexture> > image_list_t;
+    typedef boost::unordered_set<LLPointer<LLViewerFetchedTexture>> image_list_t;
     typedef std::queue<LLPointer<LLViewerFetchedTexture> > image_queue_t;
 
     // images that have been loaded but are waiting to be uploaded to GL
@@ -234,7 +234,7 @@ private:
     image_list_t mImageList;
 
     // simply holds on to LLViewerFetchedTexture references to stop them from being purged too soon
-    std::unordered_set<LLPointer<LLViewerFetchedTexture> > mImagePreloads;
+    boost::unordered_set<LLPointer<LLViewerFetchedTexture>> mImagePreloads;
 
     bool mInitialized ;
     LLFrameTimer mForceDecodeTimer;

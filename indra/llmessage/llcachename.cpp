@@ -38,6 +38,7 @@
 #include "message.h"
 
 #include <boost/regex.hpp>
+#include <boost/unordered_map.hpp>
 
 // llsd serialization constants
 static const std::string AGENTS("agents");
@@ -181,9 +182,9 @@ void ReplySender::flush()
 
 using AskQueue     = std::set<LLUUID>;
 using ReplyQueue   = std::list<PendingReply*>;
-using PendingQueue = std::unordered_map<LLUUID, U32>;
-using Cache        = std::unordered_map<LLUUID, LLCacheNameEntry*>;
-using ReverseCache = std::unordered_map<std::string, LLUUID>;
+using PendingQueue = boost::unordered_map<LLUUID, U32>;
+using Cache        = boost::unordered_map<LLUUID, LLCacheNameEntry*>;
+using ReverseCache = boost::unordered_map<std::string, LLUUID>;
 
 class LLCacheName::Impl
 {

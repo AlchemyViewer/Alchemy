@@ -41,7 +41,7 @@
 #include "llrender.h"
 #include "llwindow.h"
 #include "llframetimer.h"
-#include <unordered_set>
+#include <boost/unordered_map.hpp>
 
 extern LL_COMMON_API bool on_main_thread();
 
@@ -63,7 +63,7 @@ U32 LLImageGL::sFrameCount = 0;
 
 // texture memory accounting (for macOS)
 static LLMutex sTexMemMutex;
-static std::unordered_map<U32, U64> sTextureAllocs;
+static boost::unordered_map<U32, U64> sTextureAllocs;
 static U64 sTextureBytes = 0;
 
 // track a texture alloc on the currently bound texture.
@@ -141,7 +141,7 @@ S32 LLImageGL::sCount                   = 0;
 F32 LLImageGL::sLastFrameTime           = 0.f;
 LLImageGL* LLImageGL::sDefaultGLTexture = NULL ;
 bool LLImageGL::sCompressTextures = false;
-std::unordered_set<LLImageGL*> LLImageGL::sImageList;
+boost::unordered_set<LLImageGL*> LLImageGL::sImageList;
 
 
 bool LLImageGLThread::sEnabledTextures = false;

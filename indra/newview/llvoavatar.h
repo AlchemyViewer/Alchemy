@@ -34,6 +34,7 @@
 #include <vector>
 
 #include <boost/signals2/trackable.hpp>
+#include <boost/unordered_map.hpp>
 
 #include "llavatarappearance.h"
 #include "llchat.h"
@@ -852,7 +853,7 @@ public:
     const MatrixPaletteCache& updateSkinInfoMatrixPalette(const LLMeshSkinInfo* skinInfo);
 
     // Map of LLMeshSkinInfo::mHash to MatrixPaletteCache
-    typedef std::unordered_map<U64, MatrixPaletteCache> matrix_palette_cache_t;
+    typedef boost::unordered_map<U64, MatrixPaletteCache> matrix_palette_cache_t;
     matrix_palette_cache_t mMatrixPaletteCache;
 
 protected:
