@@ -1284,7 +1284,7 @@ namespace tut
         // Single cert in the chain.
         X509_STORE_CTX *test_store = X509_STORE_CTX_new();
         X509_STORE_CTX_set_cert(test_store, mX509ChildCert);
-        X509_STORE_CTX_set0_untrusted(test_store, NULL);
+        X509_STORE_CTX_set0_untrusted(test_store, sk_X509_new_null());
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
         ensure_equals("two elements in store [1]", test_chain->size(), 1);
