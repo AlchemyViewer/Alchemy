@@ -30,7 +30,7 @@
 #include <iostream>
 #include <deque>
 
-#include "apr_base64.h"
+#include <simdutf.h>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <boost/regex.hpp>
@@ -194,14 +194,10 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
             // *FIX: memory inefficient.
             // *TODO: convert to use LLBase64
             ostr << pre << "<binary encoding=\"base64\">";
-            int b64_buffer_length = apr_base64_encode_len(narrow<size_t>(buffer.size()));
-            char* b64_buffer = new char[b64_buffer_length];
-            b64_buffer_length = apr_base64_encode_binary(
-                b64_buffer,
-                &buffer[0],
-                narrow<size_t>(buffer.size()));
-            ostr.write(b64_buffer, b64_buffer_length - 1);
-            delete[] b64_buffer;
+            std::string output;
+            output.resize(simdutf::base64_length_from_binary(buffer.size()));
+            simdutf::binary_to_base64((const char*)buffer.data(), buffer.size(), output.data());
+            ostr.write(output.data(), output.size());
             ostr << "</binary>" << post;
         }
         break;
@@ -796,12 +792,18 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
             // so performance impact shold be negligible. + poppy 2009-09-04
             static const boost::regex r("\\s");
             std::string stripped = boost::regex_replace(mCurrentContent, r, "");
-            S32 len = apr_base64_decode_len(stripped.c_str());
-            std::vector<U8> data;
-            data.resize(len);
-            len = apr_base64_decode_binary(&data[0], stripped.c_str());
-            data.resize(len);
-            value = std::move(data);
+            if(stripped.size() > 0)
+            {
+                // allocate enough memory for the maximal binary length
+                std::vector<U8> data(simdutf::maximal_binary_length_from_base64(stripped.data(), stripped.size()));
+                // convert to binary and check for errors
+                simdutf::result r = simdutf::base64_to_binary(stripped.data(), stripped.size(), (char*)data.data());
+                if(r.error == simdutf::error_code::SUCCESS)
+                {
+                    data.resize(r.count); // in case of success, r.count contains the output length
+                    value = std::move(data);
+                }
+            }
             break;
         }
 

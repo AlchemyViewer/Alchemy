@@ -72,9 +72,6 @@
 
 #include "llwebrtc.h"
 
-// for base64 decoding
-#include "apr_base64.h"
-
 #include "boost/json.hpp"
 
 const std::string WEBRTC_VOICE_SERVER_TYPE = "webrtc";

@@ -28,11 +28,43 @@
 #ifndef LLBASE64_H
 #define LLBASE64_H
 
+#include "llpreprocessor.h"
+
+#include <simdutf.h>
+
+#include <string>
+
 class LL_COMMON_API LLBase64
 {
 public:
-    static std::string encode(const U8* input, size_t input_size);
-    static std::string decodeAsString(const std::string& input);
+    inline static std::string encode(const U8* input, size_t input_size)
+    {
+        std::string output;
+        if (input && input_size > 0)
+        {
+            output.resize(simdutf::base64_length_from_binary(input_size));
+            simdutf::binary_to_base64((const char*)input, input_size, output.data());
+        }
+        return output;
+    }
+
+    inline static std::string decodeAsString(const std::string& input)
+    {
+        // allocate enough memory for the maximal binary length
+        std::string buffer;
+        buffer.resize(simdutf::maximal_binary_length_from_base64(input.data(), input.size()));
+        // convert to binary and check for errors
+        simdutf::result r = simdutf::base64_to_binary(input.data(), input.size(), (char*)buffer.data());
+        if (r.error != simdutf::error_code::SUCCESS)
+        {
+            return {};
+        }
+        else
+        {
+            buffer.resize(r.count); // in case of success, r.count contains the output length
+            return buffer;
+        }
+    }
 };
 
 #endif

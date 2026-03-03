@@ -278,6 +278,7 @@ target_link_libraries(
         ll::tracy
         ll::sse2neon
         ll::xxhash
+        ll::simdutf
         Threads::Threads
     )
 

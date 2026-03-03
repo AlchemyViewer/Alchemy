@@ -5,7 +5,6 @@
     "alchemy-dictionaries",
     "alchemy-fonts",
     "apr",
-    "apr-util",
     "boost-asio",
     "boost-circular-buffer",
     "boost-fiber",
@@ -100,6 +99,7 @@
     },
     "secondlife-certificates",
     "secondlife-emoji-shortcodes",
+    "simdutf",
     "slvoice",
     {
       "name": "sse2neon",

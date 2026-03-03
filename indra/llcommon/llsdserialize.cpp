@@ -32,7 +32,7 @@
 #include "llstreamtools.h" // for fullread
 
 #include <iostream>
-#include <apr_base64.h>
+#include <simdutf.h>
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
@@ -882,15 +882,18 @@ bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
         get(istr, *(coded_stream.rdbuf()), '\"');
         c = get(istr);
         std::string encoded(std::move(coded_stream).str());
-        S32 len = apr_base64_decode_len(encoded.c_str());
-        std::vector<U8> value;
-        if(len)
+        if(encoded.size() > 0)
         {
-            value.resize(len);
-            len = apr_base64_decode_binary(&value[0], encoded.c_str());
-            value.resize(len);
+            // allocate enough memory for the maximal binary length
+            std::vector<U8> value(simdutf::maximal_binary_length_from_base64(encoded.data(), encoded.size()));
+            // convert to binary and check for errors
+            simdutf::result r = simdutf::base64_to_binary(encoded.data(), encoded.size(), (char*)value.data());
+            if(r.error == simdutf::error_code::SUCCESS)
+            {
+                value.resize(r.count); // in case of success, r.count contains the output length
+                data = std::move(value);
+            }
         }
-        data = std::move(value);
     }
     else if(0 == strncmp("b16", buf, 3))
     {

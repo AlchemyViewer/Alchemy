@@ -68,7 +68,7 @@
 #include "stringize.h"
 
 // for base64 decoding
-#include "apr_base64.h"
+#include <simdutf.h>
 
 #define USE_SESSION_GROUPS 0
 #define VX_NULL_POSITION -2147483648.0 /*The Silence*/
@@ -5243,16 +5243,18 @@ bool LLVivoxVoiceClient::IDFromName(const std::string inName, LLUUID &uuid)
         // The name appears to have the right form.
 
         // Reverse the transforms done by nameFromID
-        std::string temp = name;
+        std::string temp = name.substr(1); // Skip ahead one character to match how apr was used
         LLStringUtil::replaceChar(temp, '-', '+');
         LLStringUtil::replaceChar(temp, '_', '/');
 
-        U8 rawuuid[UUID_BYTES + 1];
-        int len = apr_base64_decode_binary(rawuuid, temp.c_str() + 1);
-        if(len == UUID_BYTES)
+        // allocate enough memory for the maximal binary length
+        std::vector<uint8_t> buffer(simdutf::maximal_binary_length_from_base64(temp.data(), temp.size()));
+        // convert to binary and check for errors
+        simdutf::result r = simdutf::base64_to_binary(temp.data(), temp.size(), (char*)buffer.data());
+        if(r.error == simdutf::error_code::SUCCESS && r.count == UUID_BYTES)
         {
             // The decode succeeded.  Stuff the bits into the result's UUID
-            memcpy(uuid.mData, rawuuid, UUID_BYTES);
+            memcpy(uuid.mData, buffer.data(), UUID_BYTES);
             result = true;
         }
     }
