@@ -120,8 +120,8 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
             if (RlvActions::canStartIM(from_id))
             {
 // [/RLVa:KB]
-            LLHandlerUtil::spawnIMSession(name, from_id);
-            LLHandlerUtil::addNotifPanelToIM(notification);
+                LLHandlerUtil::spawnIMSession(name, from_id);
+                LLHandlerUtil::addNotifPanelToIM(notification);
 // [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
             }
             else

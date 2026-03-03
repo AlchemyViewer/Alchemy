@@ -394,10 +394,10 @@ std::string LLSLURL::getSLURLString() const
             S32 x = ll_round((F32)mPosition[VX]);
             S32 y = ll_round((F32)mPosition[VY]);
             S32 z = ll_round((F32)mPosition[VZ]);
-//              return LLGridManager::getInstance()->getSLURLBase(mGrid) +
-//              LLURI::escape(mRegion) + llformat("/%d/%d/%d",x,y,z);
+//          return LLGridManager::getInstance()->getSLURLBase(mGrid) +
+//          LLURI::escape(mRegion) + llformat("/%d/%d/%d",x,y,z);
 // [RLVa:KB] - Checked: 2010-04-05 (RLVa-1.2.0d) | Added: RLVa-1.2.0d
-                return LLGridManager::getInstance()->getSLURLBase(mGrid) +
+            return LLGridManager::getInstance()->getSLURLBase(mGrid) +
                     ( ((!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC)) || (!RlvUtil::isNearbyRegion(mRegion)))
                         ? (LLURI::escape(mRegion) + llformat("/%d/%d/%d",x,y,z)) : RlvStrings::getString(RlvStringKeys::Hidden::Region) );
 // [/RLVa:KB]

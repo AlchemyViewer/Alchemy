@@ -473,7 +473,7 @@ void LLFloaterMove::sUpdateMovementStatus()
     {
         pFloater->mModeControlButtonMap[MM_RUN]->setEnabled(!RlvActions::hasBehaviour(RLV_BHVR_ALWAYSRUN));
         pFloater->mModeControlButtonMap[MM_FLY]->setEnabled(gAgent.canFly());
-}
+    }
 }
 // [/RLVa:KB]
 
@@ -714,10 +714,10 @@ void LLPanelStandStopFlying::onStandButtonClick()
 // [RLVa:KB] - Checked: 2010-03-07 (RLVa-1.2.0c) | Added: RLVa-1.2.0a
     if ( (!RlvActions::isRlvEnabled()) || (RlvActions::canStand()) )
     {
-    LLFirstUse::sit(false);
+        LLFirstUse::sit(false);
 
-    LLSelectMgr::getInstance()->deselectAllForStandingUp();
-    gAgent.setControlFlags(AGENT_CONTROL_STAND_UP);
+        LLSelectMgr::getInstance()->deselectAllForStandingUp();
+        gAgent.setControlFlags(AGENT_CONTROL_STAND_UP);
     }
 // [/RLVa:KB]
 //  LLSelectMgr::getInstance()->deselectAllForStandingUp();

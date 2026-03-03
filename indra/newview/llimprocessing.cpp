@@ -1036,7 +1036,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 (RlvActions::canShowName(RlvActions::SNC_DEFAULT, from_id)) || (!RlvUtil::isNearbyAgent(from_id)) || (RlvUIEnabler::hasOpenProfile(from_id)) || (RlvUIEnabler::hasOpenIM(from_id));
             args["NAME"] = LLSLURL("agent", from_id, (fRlvCanShowName) ? "completename" : "rlvanonym").getSLURLString();
             if (RlvActions::canShowName(RlvActions::SNC_DEFAULT, from_id))
-            args["ORIGINAL_NAME"] = original_name;
+                args["ORIGINAL_NAME"] = original_name;
             else
                 args["ORIGINAL_NAME"] = RlvStrings::getAnonym(original_name);
 // [/RLVa:KB]
@@ -1459,8 +1459,8 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     }
                     else
                     {
-                    LLPostponedNotification::add<LLPostponedOfferNotification>(params, from_id, false);
-                }
+                        LLPostponedNotification::add<LLPostponedOfferNotification>(params, from_id, false);
+                    }
 // [/RLVa:KB]
 //                    LLPostponedNotification::add<LLPostponedOfferNotification>(params, from_id, false);
                 }

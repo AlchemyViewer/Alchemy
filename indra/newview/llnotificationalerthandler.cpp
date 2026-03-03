@@ -100,8 +100,8 @@ bool LLAlertHandler::processNotification(const LLNotificationPtr& notification, 
         if (RlvActions::canStartIM(from_id))
         {
 // [/RLVa:KB]
-        // firstly create session...
-        LLHandlerUtil::spawnIMSession(name, from_id);
+            // firstly create session...
+            LLHandlerUtil::spawnIMSession(name, from_id);
 // [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
         }
 // [/RLVa:KB]

@@ -264,8 +264,8 @@ void LLHUDText::setString(const std::string &text_utf8)
     }
     else
     {
-    addLine(text_utf8, mColor);
-}
+        addLine(text_utf8, mColor);
+    }
 // [/RLVa:KB]
 }
 

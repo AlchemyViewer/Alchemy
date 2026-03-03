@@ -460,16 +460,16 @@ void LLPanelTopInfoBar::onContextMenuItemClicked(const LLSD::String& item)
         if (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
         {
 // [/RLVa:KB]
-        LLViewerInventoryItem* landmark = LLLandmarkActions::findLandmarkForAgentPos();
+            LLViewerInventoryItem* landmark = LLLandmarkActions::findLandmarkForAgentPos();
 
-        if(landmark == NULL)
-        {
-            LLFloaterReg::showInstance("add_landmark");
-        }
-        else
-        {
-            LLFloaterSidePanelContainer::showPanel("places", LLSD().with("type", "landmark").with("id",landmark->getUUID()));
-        }
+            if(landmark == NULL)
+            {
+                LLFloaterReg::showInstance("add_landmark");
+            }
+            else
+            {
+                LLFloaterSidePanelContainer::showPanel("places", LLSD().with("type", "landmark").with("id",landmark->getUUID()));
+            }
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
         }
 // [/RLVa:KB]
@@ -480,11 +480,11 @@ void LLPanelTopInfoBar::onContextMenuItemClicked(const LLSD::String& item)
         if (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
         {
 // [/RLVa:KB]
-        LLSLURL slurl;
-        LLAgentUI::buildSLURL(slurl, false);
-        LLUIString location_str(slurl.getSLURLString());
+            LLSLURL slurl;
+            LLAgentUI::buildSLURL(slurl, false);
+            LLUIString location_str(slurl.getSLURLString());
 
-        LLClipboard::instance().copyToClipboard(location_str,0,location_str.length());
+            LLClipboard::instance().copyToClipboard(location_str,0,location_str.length());
 // [RLVa:KB] - Checked: 2012-02-08 (RLVa-1.4.5) | Added: RLVa-1.4.5
         }
 // [/RLVa:KB]

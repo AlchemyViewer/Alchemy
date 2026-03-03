@@ -1137,7 +1137,7 @@ LLToast* LLScreenChannel::getToastByNotificationID(LLUUID id)
         // If we can't find it among the stored toasts then widen it to "all visible toasts"
         it = find(mToastList.begin(), mToastList.end(), id);
         if (it == mToastList.end())
-        return NULL;
+            return nullptr;
     }
 // [/SL:KB]
 
