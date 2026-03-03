@@ -881,7 +881,7 @@ bool LLAgent::canFly()
         return false;
     }
 // [/RLVa:KB]
-    if (isGodlike()) return true;
+    if (isGodlike() || canManageEstate()) return true;
 
     LLViewerRegion* regionp = getRegion();
     if (regionp && regionp->getBlockFly()) return false;

@@ -3372,7 +3372,7 @@ void process_agent_movement_complete(LLMessageSystem* msg, void**)
 
     send_agent_update(true, true);
 
-    if (gAgent.getRegion()->getBlockFly())
+    if (gAgent.getFlying() && gAgent.getRegion()->getBlockFly())
     {
         gAgent.setFlying(gAgent.canFly());
     }
