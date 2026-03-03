@@ -50,9 +50,6 @@ public:
 
     static void processViewerEffect(LLMessageSystem *mesgsys, void **user_data);
 
-    static LLColor4 sParentColor;
-    static LLColor4 sChildColor;
-
 protected:
     std::vector<LLPointer<LLHUDEffect> > mHUDEffects;
 };

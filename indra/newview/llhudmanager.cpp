@@ -38,16 +38,8 @@
 #include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
 
-// These are loaded from saved settings.
-LLColor4 LLHUDManager::sParentColor;
-LLColor4 LLHUDManager::sChildColor;
-
 LLHUDManager::LLHUDManager()
 {
-
-    LLHUDManager::sParentColor = LLUIColorTable::instance().getColor("FocusColor");
-    // rdw commented out since it's not used.  Also removed from colors_base.xml
-    //LLHUDManager::sChildColor =LLUIColorTable::instance().getColor("FocusSecondaryColor");
 }
 
 LLHUDManager::~LLHUDManager()

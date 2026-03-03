@@ -91,27 +91,6 @@
      top_pad="10"
      width="350" />
     <check_box
-     control_name="EnableLookAtTarget"
-     height="16"
-     label="Enable LookAt"
-     tool_tip="Enable tracking cursor position with avatar head's rotation"
-     layout="topleft"
-     left="30"
-     name="enable_lookat_target"
-     top_pad="10"
-     width="350" />
-    <check_box
-     enabled_control="EnableLookAtTarget"
-     control_name="LimitLookAtTarget"
-     height="16"
-     label="Limit LookAt Distance"
-     tool_tip="Limit the look at target's distance by restricting it around the avatar's head"
-     layout="topleft"
-     left="50"
-     name="limit_lookat_distance"
-     top_pad="10"
-     width="350" />
-    <check_box
      control_name="EnableSelectionHints"
      height="16"
      label="Enable Selection Hints"
@@ -121,6 +100,143 @@
      name="enable_selection_hints"
      top_pad="10"
      width="350" />
+        <text
+         type="string"
+         length="1"
+         follows="left|top"
+         height="20"
+         layout="topleft"
+         left="20"
+         top_pad="0"
+         name="mylookat"
+         valign="center"
+         width="200">
+            Look At:
+        </text>
+        <check_box
+         follows="left|top"
+         height="16"
+         label="Show others Look At targets"
+         left="30"
+         name="showlookat"
+         width="250"
+         control_name="AlchemyLookAtShow"
+         tool_tip="Enable crosshairs marking where people are looking."/>
+        <text
+         type="string"
+         length="1"
+         follows="left|top"
+         height="15"
+         layout="topleft"
+         left="290"
+         name="lookatnames"
+		     tool_tip="Select whether to show avatar names on the LookAt crosshairs"
+         left_delta="250"
+         width="70">
+            Name Style:
+        </text>
+        <combo_box
+         control_name="AlchemyLookAtNames"
+         follows="left|top"
+         height="23"
+         layout="topleft"
+         top_delta="-4"
+         left_pad="0"
+         max_chars="135"
+         name="lookatshownames_combobox"
+         width="150">
+            <combo_box.item
+             enabled="true"
+             label="None"
+             name="None"
+             value="0" />
+            <combo_box.item
+             enabled="true"
+             label="Complete name"
+             name="Complete_Name"
+             value="1" />
+            <combo_box.item
+             enabled="true"
+             label="Display name"
+             name="Display_Name"
+             value="2" />
+            <combo_box.item
+             enabled="true"
+             label="Legacy name"
+             name="Legacy_Name"
+             value="3" />
+            <combo_box.item
+             enabled="true"
+             label="Username"
+             name="User_Name"
+             value="4" />
+        </combo_box>
+
+        <check_box
+         control_name="AlchemyLookAtLines"
+         height="16"
+         label="Show a line from the Look At beacon to its owner"
+         layout="topleft"
+         left="30"
+         name="lineslookat"
+         tool_tip="See a line connecting the camera focus point to the avatar. Useful to find where they are."
+         top_pad="0"
+         width="350" />
+
+        <text
+         type="string"
+         length="1"
+         follows="left|top"
+         height="14"
+         layout="topleft"
+         left="20"
+         name="mylookat"
+         width="200">
+            My LookAt:
+        </text>
+	    	<check_box
+         control_name="AlchemyLookAtHideSelf"
+         height="16"
+         initial_value="true"
+         label="Don't show me my Look At target"
+         layout="topleft"
+         left="30"
+         name="LookAtHideOwn"
+         tool_tip="Don't show me my own camera crosshairs"
+         width="350" />
+        <check_box
+         control_name="EnableLookAtTarget"
+         height="16"
+         label="Don't send my Look At target to others"
+         layout="topleft"
+         left="30"
+         name="privatelookat"
+         tool_tip="Disable your camera focus point from showing to others"
+         width="350" />
+        <check_box
+         control_name="LimitLookAtTarget"
+         disabled_control="EnableLookAtTarget"
+         height="16"
+         label="Limit Look At Distance"
+         layout="topleft"
+         left="30"
+         name="privatelookat"
+         tool_tip="Allows cosmetic features like eye and head movement but will point at nothing specific if beyond the set distance."
+         width="200" />
+         <slider
+            height="16"
+            left_pad="10"
+            top_delta="0"
+            min_val="0.5"
+            max_val="128"
+            follows="top|left"
+            control_name="LimitLookAtTargetDistance"
+            disabled_control="EnableLookAtTarget"
+            initial_value="1.0"
+            increment="0.5"
+            label="Max Distance"
+            width="275"
+            layout="topleft"/>
     <button
      follows="left|top"
      height="23"

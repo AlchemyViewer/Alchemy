@@ -2947,7 +2947,14 @@ void LLAgentCamera::setFocusOnAvatar(bool focus_on_avatar, bool animate, bool re
 
 bool LLAgentCamera::setLookAt(ELookAtType target_type, LLViewerObject *object, LLVector3 position)
 {
-    if(object && object->isAttachment())
+    static LLCachedControl<bool> isPrivate(gSavedSettings, "EnableLookAtTarget", false);
+    if (isPrivate)
+    {
+        target_type = LOOKAT_TARGET_NONE;
+        object = gAgentAvatarp;
+        position.clearVec();
+    }
+    else if(object && object->isAttachment())
     {
         LLViewerObject* parent = object;
         while(parent)
@@ -3063,6 +3070,14 @@ bool LLAgentCamera::setPointAt(EPointAtType target_type, LLViewerObject *object,
     if (object && (object->isAttachment() || object->isAvatar()))
     {
         return false;
+    }
+
+    static LLCachedControl<bool> disablePointAt(gSavedSettings, "EnableSelectionHints", false);
+    if (disablePointAt)
+    {
+        target_type = POINTAT_TARGET_CLEAR;
+        object = nullptr;
+        position.clear();
     }
     if (!mPointAt || mPointAt->isDead())
     {
