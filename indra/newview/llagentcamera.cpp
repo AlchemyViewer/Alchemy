@@ -1569,6 +1569,7 @@ void LLAgentCamera::updateCamera()
         LLVector3 chest_scale = chest_joint->getScale();
 
         // shorten avatar skeleton to avoid foot interpenetration
+#if 0 // This screws up mouselook attachments
         if (!gAgentAvatarp->mInAir)
         {
             LLVector3 chest_offset = LLVector3(0.f, 0.f, chest_joint->getPosition().mV[VZ]) * torso_joint->getWorldRotation();
@@ -1582,9 +1583,37 @@ void LLAgentCamera::updateCamera()
             chest_joint->setScale(LLVector3(1.f, 1.f, scale_factor));
             diff.mV[VZ] = 0.f;
         }
+#endif
+        static LLCachedControl<bool> useRealisticMouselook(gSavedSettings, "AlchemyRealisticMouselook", false);
+        if (useRealisticMouselook)
+        {
+            auto frame_agent = gAgent.getFrameAgent();
+            LLQuaternion agent_rot(frame_agent.getQuaternion());
+            auto avatarp_parent = (LLViewerObject*)gAgentAvatarp->getParent();
+            if(avatarp_parent)
+            {
+                auto avatarp_root = (LLViewerObject*)gAgentAvatarp->getRoot();
+                if(avatarp_root)
+                {
+                    auto decoupled = avatarp_root->flagCameraDecoupled();
+                    if(decoupled)
+                    {
+                        agent_rot *= avatarp_parent->getRenderRotation();
+                    }
 
-        // SL-315
-        gAgentAvatarp->mPelvisp->setPosition(gAgentAvatarp->mPelvisp->getPosition() + diff);
+                }
+            }
+
+            LLViewerCamera::getInstance()->updateCameraLocation(head_pos,
+                                                               mCameraUpVector,
+                                                               gAgentAvatarp->mHeadp->getWorldPosition() +
+                                                                   LLVector3(1.0, 0.0, 0.0) * agent_rot);
+        }
+        else
+        {
+            // SL-315
+            gAgentAvatarp->mPelvisp->setPosition(gAgentAvatarp->mPelvisp->getPosition() + diff);
+        }
 
         gAgentAvatarp->mRoot->updateWorldMatrixChildren();
 
