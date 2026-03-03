@@ -331,7 +331,8 @@ void LLAgentCamera::resetView(bool reset_camera, bool change_camera)
         //Camera Tool is needed for Free Camera Control Mode
         if (!LLFloaterCamera::inFreeCameraMode())
         {
-            LLFloaterReg::hideInstance("build");
+            if (LLFloaterReg::instanceVisible("build"))
+                LLFloaterReg::hideInstance("build");
 
             // Switch back to basic toolset
             LLToolMgr::getInstance()->setCurrentToolset(gBasicToolset);
@@ -1712,7 +1713,6 @@ LLVector3d LLAgentCamera::calcFocusPositionTargetGlobal()
 LLVector3d LLAgentCamera::calcThirdPersonFocusOffset()
 {
     // ...offset from avatar
-    LLVector3d focus_offset;
     LLQuaternion agent_rot = gAgent.getFrameAgent().getQuaternion();
     if (isAgentAvatarValid() && gAgentAvatarp->getParent())
     {
@@ -2245,6 +2245,22 @@ void LLAgentCamera::handleScrollWheel(S32 clicks)
         }
         else if (mFocusOnAvatar && (mCameraMode == CAMERA_MODE_THIRD_PERSON))
         {
+            MASK mask = gKeyboard->currentMask(TRUE);
+            if (mask & MASK_SHIFT)
+            {
+                LLVector3d offset = gSavedSettings.getVector3d("FocusOffsetRearView");
+                offset.mdV[VZ] += 0.1f * (F32)clicks;
+                gSavedSettings.setVector3d("FocusOffsetRearView", offset);
+                return;
+            }
+            else if (mask & MASK_CONTROL)
+            {
+                LLVector3 offset = gSavedSettings.getVector3("CameraOffsetRearView");
+                offset.mV[VZ] += 0.1f * (F32)clicks;
+                gSavedSettings.setVector3("CameraOffsetRearView", offset);
+                return;
+            }
+
             F32 camera_offset_initial_mag = getCameraOffsetInitial().magVec();
 
 //          F32 current_zoom_fraction = mTargetCameraDistance / (camera_offset_initial_mag * gSavedSettings.getF32("CameraOffsetScale"));
@@ -2345,7 +2361,6 @@ void LLAgentCamera::changeCameraToMouselook(bool animate)
 
         updateLastCamera();
         mCameraMode = CAMERA_MODE_MOUSELOOK;
-        const U32 old_flags = gAgent.getControlFlags();
         gAgent.setControlFlags(AGENT_CONTROL_MOUSELOOK);
 
         if (animate)
